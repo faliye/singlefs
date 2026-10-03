@@ -5,7 +5,7 @@ base=/tmp/claude-1000/gate54-tiering
 repo="$base/selftest-repo"
 export PATH="$base/fake-bin:$PATH"
 unset SINGLEFS_LAYER0_THREADS SINGLEFS_STAGED_TREE GATE_BASE
-stage=".claude/gate.d/54-layer0-replay.sh"
+stage=".claude/gate.d/checker-tier-layer0-replay.sh"
 marker="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-full-green"
 run_step() { # <标题> <命令…>
   local title="$1"; shift

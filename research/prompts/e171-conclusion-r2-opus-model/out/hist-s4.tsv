@@ -1,0 +1,6 @@
+base_s1_s4	inodes	step=start	recover=1,3 o2_red=-
+base_s1_s4	inodes	step=mount	ok instance=2 new_root=2,5 floor=0 chosen=1,3 effective=1,3	recover=2,5 o2_red=-
+base_s1_s4	inodes	step=new_inodes_1	ok containers=1:233,234:1	recover=2,6 o2_red=-
+row23_s1_m23core_s4	inodes	step=start	recover=1,3 o2_red=-
+row23_s1_m23core_s4	inodes	step=mount	ok instance=2 new_root=2,5 floor=0 chosen=1,3 effective=1,3	recover=2,5 o2_red=-
+row23_s1_m23core_s4	inodes	step=new_inodes_1	ok containers=0:233,0:1	recover=2,6 o2_red=I-1.1:树_65537（种类_2）的根：key_宽_/_key_区间与条目不符（Err(KeysNotStrictlyAscending)）|I-9.4:沿叶序容器号不严格递增：容器_0_之后是容器_0|I-9.12:第_1_条的分隔_key_0_不大于上一条的_0

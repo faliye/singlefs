@@ -6,9 +6,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"; R=/home/user/singlefs
 SCRATCH=${SCRATCH:?草稿目录}; export SCRATCH; C="$SCRATCH/copy"
 p() { LINES_SHOWN=${LINES_SHOWN:-2} bash "$HERE/probe.sh" "$@"; }
 echo "## G1 主 agent 的层 0 全量命令（main-agent.md:59）"
-p heavy-test-guard.sh - $R 'SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree' true
-p heavy-test-guard.sh - $R 'bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree' true
-p heavy-test-guard.sh crash-verifier $R 'SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/54-layer0-replay.sh'
+p heavy-test-guard.sh - $R 'SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/tmp.X/tree' true
+p heavy-test-guard.sh - $R 'bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/tmp.X/tree' true
+p heavy-test-guard.sh crash-verifier $R 'SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh'
 p heavy-test-guard.sh gate-triage $R 'SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged'
 echo "## G2 子 agent 经内存包装（agent-common.md:46）"
 p heavy-test-guard.sh implementation-writer $C 'bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-core --test core_contract'

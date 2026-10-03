@@ -1,0 +1,1678 @@
+diff --git a/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs b/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+index 1015f3d..b759bbe 100644
+--- a/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
++++ b/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+@@ -22010,6 +22010,7 @@ mod fourth_run_segment_two {
+                 effective_root: Some(key),
+                 journal: singlefs_core::recovery::JournalScanReport::default(),
+                 mapping_fallbacks: 0,
++                devices_without_a_mountable_system_configuration_slot: Vec::new(),
+             }
+         }
+ 
+diff --git a/crates/singlefs-core/src/allocation_record_tree.rs b/crates/singlefs-core/src/allocation_record_tree.rs
+index 6f88942..a4f7289 100644
+--- a/crates/singlefs-core/src/allocation_record_tree.rs
++++ b/crates/singlefs-core/src/allocation_record_tree.rs
+@@ -771,7 +771,11 @@ impl AllocationRecordTreeReading<'_> {
+             }
+             previous_child = Some(child);
+             let mut reader = ByteReader::at(entry, key_bytes_width());
+-            let child_pointer = NodePointer::read_from(&mut reader);
++            let child_pointer = NodePointer::read_judging_the_extent_offset_from(&mut reader)
++                .map_err(|_extent_offset| RecoveryFailure::UnitMalformed {
++                    what:
++                        ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++                })?;
+             self.read_node_and_its_subtree(
+                 child,
+                 &child_pointer,
+@@ -830,8 +834,13 @@ pub fn read_allocation_record_tree(
+     Ok(AllocationRecordTreeReadFromDisk { nodes, records })
+ }
+ 
++/// 分配记录树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句
++/// （C581（extent 偏移非 0 没有判据）：判该指针所在的结构损坏）。
++pub const ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
++    "分配记录树内部条目的子指针头部 extent 偏移不是 0";
++
+ /// 从根指针往下，读得出多少就认多少：交回走得到的每个节点的指针（根在内；读不出、解不开、位置对不上的节点它自己的指针照样交回，
+-/// 只是不再往它下面走）。影子账认一条被抛弃根引用着哪些单元时用它（`mount`）：这棵树的节点都是这条根引用的单元，
++/// 只是不再往它下面走；子指针头部 extent 偏移非 0 的那一条条目同「解不开」，它指的孩子不认）。影子账认一条被抛弃根引用着哪些单元时用它（`mount`）：这棵树的节点都是这条根引用的单元，
+ /// 少认一个，被抛弃根的那一个就不隔离、回退之后可能被发出去——同实例表那条链「认得出的都算上」。
+ #[must_use]
+ pub fn node_pointers_as_far_as_readable(
+@@ -865,9 +874,11 @@ pub fn node_pointers_as_far_as_readable(
+             if let Some(child) =
+                 geometry.child_named_by_entry_key(node, &entry[..key_bytes_width()])
+             {
+-                let child_pointer =
+-                    NodePointer::read_from(&mut ByteReader::at(entry, key_bytes_width()));
+-                pending.push((child, child_pointer));
++                if let Ok(child_pointer) = NodePointer::read_judging_the_extent_offset_from(
++                    &mut ByteReader::at(entry, key_bytes_width()),
++                ) {
++                    pending.push((child, child_pointer));
++                }
+             }
+         }
+     }
+diff --git a/crates/singlefs-core/src/code_two_tree.rs b/crates/singlefs-core/src/code_two_tree.rs
+index 3514c14..e646877 100644
+--- a/crates/singlefs-core/src/code_two_tree.rs
++++ b/crates/singlefs-core/src/code_two_tree.rs
+@@ -133,11 +133,11 @@ pub fn build_internal_entry(separator_key: &[u8], child: NodePointer) -> Vec<u8>
+ pub enum InternalEntryRefusal {
+     /// 条目宽（节点头里的盘上字段）窄于 key 宽 + 86：调用方报「条目窄于字段表」。
+     NarrowerThanTheKeyAndTheChildPointer,
+-    /// 子指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条）。
++    /// 子指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条；extent 偏移是 C581）。
+     ChildPointerHeadOutsideTheFirstVersion(PointerHeadFieldOutsideTheFirstVersion),
+ }
+ 
+-/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，子指针头部里加密与压缩那几段也是盘上的字节，
++/// 解一条内部节点条目：条目宽是节点头里的**盘上字段**，子指针头部里加密、压缩与 extent 偏移那几段也是盘上的字节，
+ /// 这里是盘上字节进字段表的边界。
+ ///
+ /// # Errors
+@@ -151,8 +151,10 @@ pub fn parse_internal_entry(
+         return Err(InternalEntryRefusal::NarrowerThanTheKeyAndTheChildPointer);
+     }
+     let mut reader = ByteReader::at(entry, key_width_in_bytes);
+-    let child = NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+-        .map_err(InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion)?;
++    let child = NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++        &mut reader,
++    )
++    .map_err(InternalEntryRefusal::ChildPointerHeadOutsideTheFirstVersion)?;
+     Ok((entry[..key_width_in_bytes].to_vec(), child))
+ }
+ 
+@@ -789,10 +791,10 @@ fn violated(detail: &'static str) -> RecoveryFailure {
+     }
+ }
+ 
+-/// 多层码 2 树（记账树、中央映射树）内部条目里的子指针头部，加密与压缩那几段不是第一版的取值时报
++/// 多层码 2 树（记账树、中央映射树）内部条目里的子指针头部，加密、压缩与 extent 偏移那几段不是第一版的取值时报
+ /// [`RecoveryFailure::UnitMalformed`]，`what` 取这一句（`pointer::PointerHeadFieldOutsideTheFirstVersion`，代码审阅第 29 条）。
+ pub const MULTI_LEVEL_CODE_TWO_TREE_CHILD_POINTER_HEAD_OUTSIDE_THE_FIRST_VERSION: &str =
+-    "多层码 2 树内部条目的子指针头部里加密或压缩那几段不是第一版的取值";
++    "多层码 2 树内部条目的子指针头部里加密、压缩或 extent 偏移那几段不是第一版的取值";
+ 
+ /// 核一个节点的头：只有 `EveryHeaderAgainstItsReference` 才走到这里。根（`is_root`）的报错逐字沿用 `recovery` 核树根的那几句，
+ /// 读路径上几种坏法报的成员因此不随树长没长多层而变。
+diff --git a/crates/singlefs-core/src/extent_tree.rs b/crates/singlefs-core/src/extent_tree.rs
+index 3592b8b..213e70b 100644
+--- a/crates/singlefs-core/src/extent_tree.rs
++++ b/crates/singlefs-core/src/extent_tree.rs
+@@ -28,8 +28,8 @@ use singlefs_format::{
+ 
+ use crate::address::{CheckpointTxg, InstanceGeneration, SlotNumber, TreeIdentifier};
+ use crate::bytes::{ByteReader, ByteWriter};
+-use crate::pointer::{BirthSequence, DataPointer, NodePointer};
+-use crate::records::{build_extent_record, parse_extent_record};
++use crate::pointer::{BirthSequence, DataPointer, NodePointer, PointerHeadExtentOffsetNotZero};
++use crate::records::{build_extent_record, parse_extent_record, PointerCarryingEntryRefusal};
+ use crate::recovery::RecoveryFailure;
+ use crate::root_record::RootRecord;
+ use crate::unit::{
+@@ -261,8 +261,21 @@ pub enum ExtentUpperLeafEntryMalformed {
+     UnrecognizedTag(u8),
+     /// key 的 locality 段或 offset 段不是 0，或载荷里该是零的字节不是零。
+     NonZeroBytesWhereTheFieldTableSaysZero,
++    /// 标签 1 / 2 的载荷里那条指针（下段根指针、内联的数据指针）头部 extent 偏移非 0：判这条条目损坏
++    /// （D19（块指针的结构与宽度预算） 已定项 3、C581（extent 偏移非 0 没有判据））。
++    PointerExtentOffsetNotZero(PointerHeadExtentOffsetNotZero),
+ }
+ 
++/// extent 上段叶条目里那条指针（下段根指针或内联的数据指针）头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
++pub const EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
++    "extent 上段叶条目里那条指针的头部 extent 偏移不是 0";
++/// extent 树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
++pub const EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
++    "extent 树内部条目的子指针头部 extent 偏移不是 0";
++/// extent 叶记录里的数据指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句。
++pub const EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
++    "extent 叶记录里数据指针的头部 extent 偏移不是 0";
++
+ impl ExtentUpperLeafEntry {
+     #[must_use]
+     pub fn to_bytes(&self) -> Vec<u8> {
+@@ -291,7 +304,7 @@ impl ExtentUpperLeafEntry {
+     /// 上段叶条目的读者：这里是盘上字节进字段表的边界。
+     ///
+     /// # Errors
+-    /// 窄于 113、标签不认识、该是零的字节不是零。
++    /// 窄于 113、标签不认识、该是零的字节不是零、载荷里那条指针头部 extent 偏移非 0。
+     pub fn parse(bytes: &[u8]) -> Result<Self, ExtentUpperLeafEntryMalformed> {
+         if bytes.len() < usize::try_from(EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES).expect("113") {
+             return Err(ExtentUpperLeafEntryMalformed::NarrowerThanItsFieldTable);
+@@ -319,12 +332,16 @@ impl ExtentUpperLeafEntry {
+                         ExtentUpperLeafEntryMalformed::NonZeroBytesWhereTheFieldTableSaysZero,
+                     );
+                 }
+-                ExtentUpperLeafTarget::LowerSegmentRoot(NodePointer::read_from(
+-                    &mut ByteReader::at(payload, 0),
+-                ))
++                ExtentUpperLeafTarget::LowerSegmentRoot(
++                    NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(
++                        payload, 0,
++                    ))
++                    .map_err(ExtentUpperLeafEntryMalformed::PointerExtentOffsetNotZero)?,
++                )
+             }
+             EXTENT_UPPER_LEAF_ENTRY_TAG_INLINE_DATA_UNIT => ExtentUpperLeafTarget::InlineDataUnit(
+-                DataPointer::read_from(&mut ByteReader::at(payload, 0)),
++                DataPointer::read_judging_the_extent_offset_from(&mut ByteReader::at(payload, 0))
++                    .map_err(ExtentUpperLeafEntryMalformed::PointerExtentOffsetNotZero)?,
+             ),
+             unrecognized => {
+                 return Err(ExtentUpperLeafEntryMalformed::UnrecognizedTag(unrecognized))
+@@ -679,16 +696,20 @@ impl ExtentTreeReading<'_> {
+                 field_table_bytes: internal_width,
+             });
+         }
+-        Ok(header
++        header
+             .entries
+             .iter()
+             .map(|entry| {
+-                (
+-                    entry[..key_width()].to_vec(),
+-                    NodePointer::read_from(&mut ByteReader::at(entry, key_width())),
+-                )
++                NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(
++                    entry,
++                    key_width(),
++                ))
++                .map(|child| (entry[..key_width()].to_vec(), child))
++                .map_err(|_extent_offset| RecoveryFailure::UnitMalformed {
++                    what: EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++                })
+             })
+-            .collect())
++            .collect()
+     }
+ }
+ 
+@@ -768,13 +789,22 @@ fn read_lower_node_and_its_subtree(
+         let payload = payload_capacity_in_bytes();
+         let mut previous_unit: Option<u64> = None;
+         for entry in &header.entries {
+-            let (key, data_pointer) = parse_extent_record(entry).ok_or(
+-                RecoveryFailure::EntryNarrowerThanItsFieldTable {
+-                    what: "extent 叶记录",
+-                    entry_bytes: entry.len(),
+-                    field_table_bytes: usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112"),
+-                },
+-            )?;
++            let (key, data_pointer) =
++                parse_extent_record(entry).map_err(|refusal| match refusal {
++                    PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++                        RecoveryFailure::EntryNarrowerThanItsFieldTable {
++                            what: "extent 叶记录",
++                            entry_bytes: entry.len(),
++                            field_table_bytes: usize::try_from(EXTENT_LEAF_RECORD_BYTES)
++                                .expect("112"),
++                        }
++                    }
++                    PointerCarryingEntryRefusal::PointerExtentOffsetNotZero(_extent_offset) => {
++                        RecoveryFailure::UnitMalformed {
++                            what: EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO,
++                        }
++                    }
++                })?;
+             let (locality, record_inode, offset) = extent_key_fields(&key);
+             if locality != 0 || record_inode != inode || !offset.is_multiple_of(payload) {
+                 return Err(violated(
+@@ -882,6 +912,11 @@ fn upper_leaf_entries(
+                         detail: "extent 上段叶条目里字段表写零的字节不是零",
+                     }
+                 }
++                ExtentUpperLeafEntryMalformed::PointerExtentOffsetNotZero(_extent_offset) => {
++                    RecoveryFailure::UnitMalformed {
++                        what: EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
++                    }
++                }
+             })?;
+         if !(first_inode..=last_inode).contains(&entry.inode)
+             || entries
+diff --git a/crates/singlefs-core/src/instance_table.rs b/crates/singlefs-core/src/instance_table.rs
+index 45cd05d..70fe762 100644
+--- a/crates/singlefs-core/src/instance_table.rs
++++ b/crates/singlefs-core/src/instance_table.rs
+@@ -189,7 +189,8 @@ impl InstanceTableChainRecord {
+     }
+ 
+     /// 解一条链指针记录。宽不是 88、`kind` 不是 1、「有无下一片」不是 0 或 1、无下一片而位置指针不全零（条款：清零占位）、
+-    /// 有下一片而位置指针全零（指不到任何地方），都是 `None`。
++    /// 有下一片而位置指针全零（指不到任何地方）、有下一片而位置指针头部 extent 偏移非 0（C581（extent 偏移非 0 没有判据）：
++    /// 判该指针所在的结构——这一片——损坏），都是 `None`。
+     #[must_use]
+     pub fn parse(bytes: &[u8]) -> Option<Self> {
+         if bytes.len() != usize::try_from(INSTANCE_ROW_BYTES).expect("88")
+@@ -202,12 +203,17 @@ impl InstanceTableChainRecord {
+             .all(|byte| *byte == 0);
+         match bytes[1] {
+             CHAIN_RECORD_NO_NEXT_PAGE => pointer_is_zero.then_some(Self::LastPage),
+-            CHAIN_RECORD_HAS_NEXT_PAGE => (!pointer_is_zero).then(|| {
+-                Self::NextPage(NodePointer::read_from(&mut ByteReader::at(
++            CHAIN_RECORD_HAS_NEXT_PAGE => {
++                if pointer_is_zero {
++                    return None;
++                }
++                NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(
+                     bytes,
+                     CHAIN_RECORD_POINTER_OFFSET,
+-                )))
+-            }),
++                ))
++                .ok()
++                .map(Self::NextPage)
++            }
+             _value_the_field_table_does_not_register => None,
+         }
+     }
+diff --git a/crates/singlefs-core/src/journal.rs b/crates/singlefs-core/src/journal.rs
+index b7d6408..56e5352 100644
+--- a/crates/singlefs-core/src/journal.rs
++++ b/crates/singlefs-core/src/journal.rs
+@@ -265,7 +265,7 @@ impl JournalRecord {
+     }
+ 
+     /// 读者：magic、类型、整条校验和、fsid、载荷校验和四关，外加四条当损坏的（D23（journal 的角色与格式） 已定项 4 / 已定项 7；最后一条是代码审阅第 29 条）：
+-    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1，另有新根段两条指针头部里加密与压缩那几段不是第一版的取值
++    /// 记录标志位 0 之外有位为 1、本次发布内序号为 0、提交标记不是 0 也不是 1，另有新根段两条指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值
+     /// （代码审阅第 29 条）。当损坏就是与校验和不过同一个结局——这条记录不算在，前缀在它之前断
+     /// （已定项 22 断号即止）。不查反向链，也不查一次发布之内跳不跳号：那两样要看别的记录，是前缀取法的事。
+     #[must_use]
+@@ -307,14 +307,18 @@ impl JournalRecord {
+         }
+         let back_chain = reader.get_u32();
+         let payload_checksum = reader.get_u32();
+-        // 新根段那两条指针头部里加密与压缩那几段不是第一版的取值（代码审阅第 29 条，`pointer::PointerHeadFieldOutsideTheFirstVersion`）：
++        // 新根段那两条指针头部里加密、压缩与 extent 偏移那几段不是第一版的取值（代码审阅第 29 条，`pointer::PointerHeadFieldOutsideTheFirstVersion`）：
+         // 与上面几格同一个结局，这条记录不算在、前缀在它之前断。
+         let new_tree_table =
+-            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+-                .ok()?;
++            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++                &mut reader,
++            )
++            .ok()?;
+         let new_mapping_root =
+-            NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut reader)
+-                .ok()?;
++            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++                &mut reader,
++            )
++            .ok()?;
+         let new_tree_identifier_watermark = reader.get_u64();
+         let new_rollback_floor = CheckpointTxg(reader.get_u64());
+         let filesystem_identifier = reader.get_u64();
+diff --git a/crates/singlefs-core/src/pointer.rs b/crates/singlefs-core/src/pointer.rs
+index 22940b3..d13cc3a 100644
+--- a/crates/singlefs-core/src/pointer.rs
++++ b/crates/singlefs-core/src/pointer.rs
+@@ -133,7 +133,7 @@ pub struct PointerHeadExtentOffsetNotZero {
+ }
+ 
+ /// 指针头部按字段表读出来的样子，加密与压缩那几段与 extent 偏移还没判：[`PointerHead::read_from`]、
+-/// [`PointerHead::read_judging_the_encryption_and_compression_fields_from`] 与 [`PointerHead::read_judging_the_extent_offset_from`]
++/// [`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`] 与 [`PointerHead::read_judging_the_extent_offset_from`]
+ /// 共用这一份读法，字段表的偏移只写一处。
+ struct PointerHeadAsRead {
+     is_every_mac_and_nonce_byte_zero: bool,
+@@ -194,8 +194,9 @@ impl PointerHeadAsRead {
+             .map_err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero)
+     }
+ 
+-    /// 只判 extent 偏移（C581）：根记录里那四条指针走这一判（[`NodePointer::read_judging_the_extent_offset_from`]），
+-    /// 加密与压缩那几段在它们上面还没换成判（实审 A3a 的报告列着）。
++    /// 只判 extent 偏移（C581）：多层码 2 树内部条目与 journal 新根段之外读指针头部的每一个 core 读者走这一判
++    /// （根记录、树表条目、inode 内部条目、extent 树的上段叶条目、内部条目与叶记录、分配记录树内部条目、实例表链指针；
++    /// 判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 5 行），加密与压缩那几段在它们上面还没换成判（实审 A3a 的报告列着）。
+     fn judged_extent_offset(self) -> Result<PointerHead, PointerHeadExtentOffsetNotZero> {
+         if self.extent_offset != 0 {
+             return Err(PointerHeadExtentOffsetNotZero {
+@@ -222,8 +223,9 @@ impl PointerHead {
+             usize::try_from(POINTER_HEAD_BYTES).expect("50")
+         );
+     }
+-    /// 读头部，加密与压缩那几段与 extent 偏移都不判（还没换成判的那几个读者用：`records`、`instance_table`、`extent_tree`、
+-    /// `allocation_record_tree` 里的指针，实审 A3a 的报告列了它们；`root_record` 走 [`Self::read_judging_the_extent_offset_from`]）。
++    /// 读头部，加密与压缩那几段与 extent 偏移都不判。core 读盘上指针的读者一律不用它（走
++    /// [`Self::read_judging_the_extent_offset_from`] 或 [`Self::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）；
++    /// 留给测试与造坏盘的装置读自己刚写出、要改的那几个字节。
+     pub fn read_from(reader: &mut ByteReader<'_>) -> Self {
+         PointerHeadAsRead::read_from(reader).head
+     }
+@@ -232,7 +234,7 @@ impl PointerHead {
+     ///
+     /// # Errors
+     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
+-    pub fn read_judging_the_encryption_and_compression_fields_from(
++    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
+         reader: &mut ByteReader<'_>,
+     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
+         PointerHeadAsRead::read_from(reader).judged()
+@@ -312,14 +314,17 @@ impl NodePointer {
+         Self::read_after_the_head(head, reader)
+     }
+ 
+-    /// 同 [`Self::read_from`]，头部里加密与压缩那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_and_compression_fields_from`]）。
++    /// 同 [`Self::read_from`]，头部里加密、压缩与 extent 偏移那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）。
+     ///
+     /// # Errors
+     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
+-    pub fn read_judging_the_encryption_and_compression_fields_from(
++    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
+         reader: &mut ByteReader<'_>,
+     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
+-        let head = PointerHead::read_judging_the_encryption_and_compression_fields_from(reader)?;
++        let head =
++            PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++                reader,
++            )?;
+         Ok(Self::read_after_the_head(head, reader))
+     }
+ 
+@@ -379,14 +384,28 @@ impl DataPointer {
+         Self::read_after_the_head(head, reader)
+     }
+ 
+-    /// 同 [`Self::read_from`]，头部里加密与压缩那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_and_compression_fields_from`]）。
++    /// 同 [`Self::read_from`]，头部里加密、压缩与 extent 偏移那几段按第一版的取值判（[`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）。
+     ///
+     /// # Errors
+     /// 那几段有一段不是第一版的取值 ⇒ [`PointerHeadFieldOutsideTheFirstVersion`]。
+-    pub fn read_judging_the_encryption_and_compression_fields_from(
++    pub fn read_judging_the_encryption_compression_and_extent_offset_fields_from(
+         reader: &mut ByteReader<'_>,
+     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
+-        let head = PointerHead::read_judging_the_encryption_and_compression_fields_from(reader)?;
++        let head =
++            PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++                reader,
++            )?;
++        Ok(Self::read_after_the_head(head, reader))
++    }
++
++    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
++    ///
++    /// # Errors
++    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
++    pub fn read_judging_the_extent_offset_from(
++        reader: &mut ByteReader<'_>,
++    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
++        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
+         Ok(Self::read_after_the_head(head, reader))
+     }
+ 
+diff --git a/crates/singlefs-core/src/records.rs b/crates/singlefs-core/src/records.rs
+index c427117..11cec64 100644
+--- a/crates/singlefs-core/src/records.rs
++++ b/crates/singlefs-core/src/records.rs
+@@ -8,7 +8,10 @@ use singlefs_format::{
+ 
+ use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, TreeIdentifier};
+ use crate::bytes::{ByteReader, ByteWriter};
+-use crate::pointer::{BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead};
++use crate::pointer::{
++    BirthSequence, DataPointer, LocationEntry, NodePointer, PointerHead,
++    PointerHeadExtentOffsetNotZero,
++};
+ use crate::unit::{PackedIdentity, WriteOrder, UNIT_CLASS_DATA};
+ 
+ /// 统计量标签 = D5（快照 / 空间记账机制） 已定项 4 的行号（已定项 10 的登记表）。
+@@ -325,7 +328,8 @@ impl TreeTableEntry {
+             ..TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES
+                 + usize::try_from(NODE_POINTER_BYTES).expect("86")]
+     }
+-    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零都判不可用。
++    /// 读者：条目长度、flags 未知位（D8（核心索引结构） 已定项 8 ㊁：一律拒收）、预留 76 非零、根指针头部 extent 偏移非 0
++    /// （C581（extent 偏移非 0 没有判据）：判该指针所在的结构——这条条目——损坏）都判不可用。
+     #[must_use]
+     pub fn parse(bytes: &[u8]) -> Option<Self> {
+         if bytes.len() != usize::try_from(TREE_TABLE_ENTRY_BYTES).expect("200")
+@@ -342,7 +346,7 @@ impl TreeTableEntry {
+         if reader.get_u16() != 0 {
+             return None;
+         }
+-        let root = NodePointer::read_from(&mut reader);
++        let root = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+         let _previous_snapshot_txg = reader.get_u64();
+         let birth_txg = CheckpointTxg(reader.get_u64());
+         let head_identifier = reader.get_u64();
+@@ -356,12 +360,34 @@ impl TreeTableEntry {
+     }
+ }
+ 
++/// 一条带指针的条目（inode 内部条目 120、extent 叶记录 112）解不开是哪一种。封闭集合，`match` 不写通配臂。
++/// 两种都是盘上读来的字节、不是我们的不变量：调用方把这条条目当损坏处置，不拿里面的指针去解引用。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum PointerCarryingEntryRefusal {
++    /// 条目宽（索引节点头里的盘上字段）窄于字段表：调用方报「条目窄于字段表」。
++    NarrowerThanItsFieldTable,
++    /// 条目里那条指针的头部 extent 偏移非 0：判该指针所在的结构（这条条目）损坏，同 MAC / nonce
++    /// （D19（块指针的结构与宽度预算） 已定项 3、C581（extent 偏移非 0 没有判据））。
++    PointerExtentOffsetNotZero(PointerHeadExtentOffsetNotZero),
++}
++
+ /// inode 内部条目 120 的读者。条目宽是索引节点头里的一个盘上字段（`parse_index_node` 只判了它 ≥ key 宽 8），
+-/// 窄于字段表时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
++/// 窄于字段表、或子指针头部 extent 偏移非 0 时返回 `None`：这里是盘上字节进字段表的边界，往里就按 120 信它。
++/// 要分清是哪一种的调用方用 [`parse_inode_internal_entry_or_refusal`]；只要知道解不解得开的（只读挂载打开池，两种都报同一个成员）用这一个。
+ #[must_use]
+ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity, NodePointer)> {
++    parse_inode_internal_entry_or_refusal(bytes).ok()
++}
++
++/// 同 [`parse_inode_internal_entry`]，解不开时交回是哪一种。
++///
++/// # Errors
++/// 窄于 120 ⇒ `NarrowerThanItsFieldTable`；子指针头部 extent 偏移非 0 ⇒ `PointerExtentOffsetNotZero`。
++pub fn parse_inode_internal_entry_or_refusal(
++    bytes: &[u8],
++) -> Result<(u64, PackedIdentity, NodePointer), PointerCarryingEntryRefusal> {
+     if bytes.len() < usize::try_from(INODE_INTERNAL_ENTRY).expect("120") {
+-        return None;
++        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
+     }
+     let mut reader = ByteReader::at(bytes, 0);
+     let separator_key = reader.get_u64();
+@@ -371,20 +397,26 @@ pub fn parse_inode_internal_entry(bytes: &[u8]) -> Option<(u64, PackedIdentity,
+         container: reader.get_u64(),
+         container_birth: CheckpointTxg(reader.get_u64()),
+     };
+-    let child = NodePointer::read_from(&mut reader);
+-    Some((separator_key, child_identity, child))
++    let child = NodePointer::read_judging_the_extent_offset_from(&mut reader)
++        .map_err(PointerCarryingEntryRefusal::PointerExtentOffsetNotZero)?;
++    Ok((separator_key, child_identity, child))
+ }
+ 
+-/// extent 叶记录 112 的读者：key 24 + 指针 88。条目宽窄于 112 时返回 `None`（同 [`parse_inode_internal_entry`]：
+-/// `parse_index_node` 只判了条目宽 ≥ key 宽 24，切到偏移 112 之前要在这里判一次）。
+-#[must_use]
+-pub fn parse_extent_record(bytes: &[u8]) -> Option<([u8; 24], DataPointer)> {
++/// extent 叶记录 112 的读者：key 24 + 指针 88（同 [`parse_inode_internal_entry_or_refusal`]：`parse_index_node` 只判了条目宽 ≥ key 宽 24，
++/// 切到偏移 112 之前要在这里判一次；数据指针头部的 extent 偏移也在这里判）。
++///
++/// # Errors
++/// 窄于 112 ⇒ `NarrowerThanItsFieldTable`；数据指针头部 extent 偏移非 0 ⇒ `PointerExtentOffsetNotZero`。
++pub fn parse_extent_record(
++    bytes: &[u8],
++) -> Result<([u8; 24], DataPointer), PointerCarryingEntryRefusal> {
+     if bytes.len() < usize::try_from(EXTENT_LEAF_RECORD_BYTES).expect("112") {
+-        return None;
++        return Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable);
+     }
+     let key: [u8; 24] = bytes[..24].try_into().expect("24");
+-    let pointer = DataPointer::read_from(&mut ByteReader::at(bytes, 24));
+-    Some((key, pointer))
++    let pointer = DataPointer::read_judging_the_extent_offset_from(&mut ByteReader::at(bytes, 24))
++        .map_err(PointerCarryingEntryRefusal::PointerExtentOffsetNotZero)?;
++    Ok((key, pointer))
+ }
+ 
+ /// 映射条目 55 的读者：key 27 + 位置条目 14 × 2。条目宽窄于 55 时返回 `None`
+@@ -660,12 +692,16 @@ mod tests {
+         let entry_narrowed_to_the_key_width = |key_width: usize| vec![0u8; key_width];
+         assert_eq!(
+             parse_extent_record(&entry_narrowed_to_the_key_width(24)),
+-            None,
++            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
+             "extent 叶记录该有 112 字节，条目宽缩到 key 宽 24 时不解"
+         );
+-        assert_eq!(parse_extent_record(&[0u8; 111]), None, "差一个字节也不解");
++        assert_eq!(
++            parse_extent_record(&[0u8; 111]),
++            Err(PointerCarryingEntryRefusal::NarrowerThanItsFieldTable),
++            "差一个字节也不解"
++        );
+         assert!(
+-            parse_extent_record(&[0u8; 112]).is_some(),
++            parse_extent_record(&[0u8; 112]).is_ok(),
+             "刚好 112 要解得开"
+         );
+         assert_eq!(
+diff --git a/crates/singlefs-core/src/recovery.rs b/crates/singlefs-core/src/recovery.rs
+index f73b40c..77e5644 100644
+--- a/crates/singlefs-core/src/recovery.rs
++++ b/crates/singlefs-core/src/recovery.rs
+@@ -56,11 +56,12 @@ use crate::journal::{
+ use crate::make_filesystem::TREE_TABLE_KEY_WIDTH;
+ use crate::pointer::{location_entries_ascend_by_device, DataPointer, LocationEntry, NodePointer};
+ use crate::records::{
+-    mapping_key_for_data, mapping_key_for_node, parse_inode_internal_entry, parse_mapping_entry,
+-    AccountingEntry, InodeRecord, TreeTableEntry, STATISTIC_INODE_WATERMARK, TREE_KIND_ACCOUNTING,
+-    TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST, TREE_KIND_DELETED_INODES, TREE_KIND_EXTENT,
+-    TREE_KIND_INODE, TREE_KIND_LINEAGE, TREE_KIND_LIVELIST, TREE_KIND_LOGGED_OPERATIONS,
+-    TREE_KIND_SPARSE_SIDE_TABLE, TREE_KIND_TOMBSTONE,
++    mapping_key_for_data, mapping_key_for_node, parse_inode_internal_entry_or_refusal,
++    parse_mapping_entry, AccountingEntry, InodeRecord, PointerCarryingEntryRefusal, TreeTableEntry,
++    STATISTIC_INODE_WATERMARK, TREE_KIND_ACCOUNTING, TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST,
++    TREE_KIND_DELETED_INODES, TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LINEAGE,
++    TREE_KIND_LIVELIST, TREE_KIND_LOGGED_OPERATIONS, TREE_KIND_SPARSE_SIDE_TABLE,
++    TREE_KIND_TOMBSTONE,
+ };
+ use crate::root_record::{RootRecord, UnmountMarker};
+ use crate::root_ring::{region_start, slot_offset, RootRingSlot, RootRingSlotsPerRegionOutOfRange};
+@@ -327,6 +328,10 @@ pub struct RecoveryReport {
+     pub journal: JournalScanReport,
+     /// 位置提示读不到、转去查映射的次数。
+     pub mapping_fallbacks: usize,
++    /// 择系统配置时两个槽都不可择而被跳过的盘（[`SystemConfigurationChoice::devices_without_a_mountable_system_configuration_slot`]，
++    /// C463（一块盘的系统配置两份全废之后静默成功）「只读与恢复路径报出来」）；冗余完好时为空。系统配置择不出来（`outcome` 是
++    /// 择系统配置那一步的 `Failed`）时也是空的：那时没有「跳过它、照常择别的盘」这回事。
++    pub devices_without_a_mountable_system_configuration_slot: Vec<DeviceIdentity>,
+ }
+ 
+ /// 要不要看 journal：正常恢复看；层 0 里与「不看」逐状态比，问 journal 在这条流里承不承重；
+@@ -2253,7 +2258,7 @@ pub const TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE: &str = "树表里同一种
+ /// 树表的条目读不下去是哪一种（[`tree_table_entries_each_kind_at_most_once`] 交回）。封闭集合，`match` 不写通配臂。
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub(crate) enum TreeTableEntriesRefusal {
+-    /// 一条条目解不开（条目长度、flags 未知位、预留 76 非零，`TreeTableEntry::parse`）。
++    /// 一条条目解不开（条目长度、flags 未知位、预留 76 非零、根指针头部 extent 偏移非 0，`TreeTableEntry::parse`）。
+     EntryMalformed,
+     /// 同一种树有两条。
+     OneKindOfTreeAppearsTwice,
+@@ -3740,18 +3745,32 @@ struct InodeInternalEntry {
+     child: NodePointer,
+ }
+ 
+-/// 解一条 inode 树内部条目（条目宽是盘上的值，窄于 120 报 `EntryNarrowerThanItsFieldTable`），判类型段是 2（I-9.2（条目身份与子头相符）
++/// inode 树内部条目里的子指针头部 extent 偏移非 0 时报 [`RecoveryFailure::UnitMalformed`]，`what` 取这一句
++/// （C581（extent 偏移非 0 没有判据）：判该指针所在的结构损坏）。
++pub const INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO: &str =
++    "inode 树内部条目的子指针头部 extent 偏移不是 0";
++
++/// 解一条 inode 树内部条目（条目宽是盘上的值，窄于 120 报 `EntryNarrowerThanItsFieldTable`；子指针头部 extent 偏移非 0 报
++/// `UnitMalformed`，`what` 取 [`INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO`]），判类型段是 2（I-9.2（条目身份与子头相符）
+ /// 的第一句；第一版 inode 树根下面只有叶容器）。
+ fn inode_internal_entry_parsed_and_judged(
+     entry: &[u8],
+ ) -> Result<(u64, PackedIdentity, NodePointer), RecoveryFailure> {
+-    let (separator_key, identity, child) = parse_inode_internal_entry(entry).ok_or(
+-        RecoveryFailure::EntryNarrowerThanItsFieldTable {
+-            what: "inode 树内部条目",
+-            entry_bytes: entry.len(),
+-            field_table_bytes: usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
+-        },
+-    )?;
++    let (separator_key, identity, child) =
++        parse_inode_internal_entry_or_refusal(entry).map_err(|refusal| match refusal {
++            PointerCarryingEntryRefusal::NarrowerThanItsFieldTable => {
++                RecoveryFailure::EntryNarrowerThanItsFieldTable {
++                    what: "inode 树内部条目",
++                    entry_bytes: entry.len(),
++                    field_table_bytes: usize::try_from(INODE_INTERNAL_ENTRY).expect("120"),
++                }
++            }
++            PointerCarryingEntryRefusal::PointerExtentOffsetNotZero(_extent_offset) => {
++                RecoveryFailure::UnitMalformed {
++                    what: INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++                }
++            }
++        })?;
+     if identity.record_type != PACKED_TYPE_INODE {
+         return Err(RecoveryFailure::InvariantViolated {
+             invariant: "I-9.2",
+@@ -4299,8 +4318,11 @@ pub fn rebuild_version(
+ #[must_use]
+ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport {
+     let mut mapping_fallbacks = 0;
+-    let system_configuration = match choose_system_configuration(reader) {
+-        Ok(system_configuration) => system_configuration,
++    let SystemConfigurationChoice {
++        system_configuration,
++        devices_without_a_mountable_system_configuration_slot,
++    } = match choose_system_configuration_naming_devices_without_a_mountable_slot(reader) {
++        Ok(choice) => choice,
+         Err(failure) => {
+             return RecoveryReport {
+                 outcome: RecoveryOutcome::Failed {
+@@ -4310,6 +4332,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
+                 effective_root: None,
+                 journal: JournalScanReport::default(),
+                 mapping_fallbacks,
++                devices_without_a_mountable_system_configuration_slot: Vec::new(),
+             }
+         }
+     };
+@@ -4322,6 +4345,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
+             effective_root: None,
+             journal: JournalScanReport::default(),
+             mapping_fallbacks,
++            devices_without_a_mountable_system_configuration_slot,
+         };
+     };
+     let root_key = (root.instance, root.checkpoint_txg);
+@@ -4350,6 +4374,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
+                 effective_root: None,
+                 journal: JournalScanReport::default(),
+                 mapping_fallbacks,
++                devices_without_a_mountable_system_configuration_slot,
+             }
+         }
+     };
+@@ -4375,6 +4400,7 @@ pub fn recover(reader: &dyn PoolReader, policy: JournalPolicy) -> RecoveryReport
+         effective_root: Some((effective_root.instance, effective_root.checkpoint_txg)),
+         journal,
+         mapping_fallbacks,
++        devices_without_a_mountable_system_configuration_slot,
+     }
+ }
+ 
+diff --git a/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs b/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
+index 2377fe2..c0542e9 100644
+--- a/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
++++ b/crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
+@@ -1011,9 +1011,9 @@ fn a_node_pointer_head_carrying_encryption_or_compression_is_refused_field_by_fi
+     let pointer = sample_node_pointer();
+     let clean = node_pointer_bytes(&pointer);
+     assert_eq!(
+-        NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
+-            &clean, 0
+-        )),
++        NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++            &mut ByteReader::at(&clean, 0)
++        ),
+         Ok(pointer),
+         "第一版的取值照常读出"
+     );
+@@ -1054,7 +1054,7 @@ fn a_node_pointer_head_carrying_encryption_or_compression_is_refused_field_by_fi
+         let mut damaged = clean.clone();
+         damaged[offset] = value;
+         assert_eq!(
+-            NodePointer::read_judging_the_encryption_and_compression_fields_from(
++            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                 &mut ByteReader::at(&damaged, 0)
+             ),
+             Err(expected),
+@@ -1079,16 +1079,16 @@ fn a_data_pointer_head_carrying_an_encryption_algorithm_is_refused() {
+     data_pointer.write_to(&mut writer);
+     let mut bytes = writer.into_bytes();
+     assert_eq!(
+-        DataPointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
+-            &bytes, 0
+-        )),
++        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++            &mut ByteReader::at(&bytes, 0)
++        ),
+         Ok(data_pointer)
+     );
+     bytes[28] = 1;
+     assert_eq!(
+-        DataPointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
+-            &bytes, 0
+-        )),
++        DataPointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++            &mut ByteReader::at(&bytes, 0)
++        ),
+         Err(
+             PointerHeadFieldOutsideTheFirstVersion::AlgorithmTypeNotUnencrypted {
+                 algorithm_type: 1
+diff --git a/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
+index 71b8065..0170ab6 100644
+--- a/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
++++ b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
+@@ -234,14 +234,14 @@ fn node_pointer_bytes_with_extent_offset(extent_offset: u16) -> (NodePointer, Ve
+ 
+ /// 场景：一条节点指针头部 extent 偏移写成 7，MAC、nonce、算法类型、压缩那几段都是第一版的取值。
+ /// 预期：判头部的两个读法都报 extent 偏移非 0、带着读到的 7——多层码 2 树内部条目与 journal 新根段指针用的
+-/// `read_judging_the_encryption_and_compression_fields_from`，根记录用的 `read_judging_the_extent_offset_from`；
++/// `read_judging_the_encryption_compression_and_extent_offset_fields_from`，根记录用的 `read_judging_the_extent_offset_from`；
+ /// extent 偏移是 0 的同一条指针两个读法都照常读出。改之前两个读法都跳过这 2 字节、照常读出。
+ #[test]
+ fn a_node_pointer_head_with_a_non_zero_extent_offset_is_refused_by_both_judging_readers() {
+     let (pointer, clean) = node_pointer_bytes_with_extent_offset(0);
+     assert_eq!(
+         (
+-            NodePointer::read_judging_the_encryption_and_compression_fields_from(
++            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                 &mut ByteReader::at(&clean, 0)
+             ),
+             NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(&clean, 0)),
+@@ -252,9 +252,9 @@ fn a_node_pointer_head_with_a_non_zero_extent_offset_is_refused_by_both_judging_
+     let (_, damaged) = node_pointer_bytes_with_extent_offset(7);
+     let not_zero = PointerHeadExtentOffsetNotZero { extent_offset: 7 };
+     assert_eq!(
+-        NodePointer::read_judging_the_encryption_and_compression_fields_from(&mut ByteReader::at(
+-            &damaged, 0
+-        )),
++        NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
++            &mut ByteReader::at(&damaged, 0)
++        ),
+         Err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(
+             not_zero
+         )),
+diff --git a/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader.rs b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader.rs
+new file mode 100644
+index 0000000..7691235
+--- /dev/null
++++ b/crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader.rs
+@@ -0,0 +1,854 @@
++//! 指针头部 extent 偏移那 2 字节第一版恒 0，**读指针头部的每一个 core 读者**遇到非 0 都判该指针所在的结构损坏，同 MAC / nonce
++//! （D19（块指针的结构与宽度预算） 已定项 3；判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 5 行、
++//! C581（extent 偏移非 0 没有判据））。根记录、多层码 2 树内部条目与 journal 新根段那三类读者另有用例
++//! （`pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs`、`corrupt_on_disk_content_is_refused_instead_of_panicking.rs`）；
++//! 这里一类读者一条用例：树表条目的根指针、inode 树内部条目的子指针、extent 上段叶条目里内联的数据指针与下段根指针、
++//! extent 叶记录的数据指针、extent 树内部条目的子指针、分配记录树内部条目的子指针（连同影子账认单元的那个读者）、实例表链指针
++//! （连同影子账认链上各片的那个读者）。
++//!
++//! 坏镜像只改一处：在发布路径写出的一版上找到那条指针所在的单元，把那条指针头部偏移 32 的 extent 偏移由 0 改成 1、重封这个单元，
++//! 新的整单元校验和沿引用链补上去（父单元里的位置条目、中央映射条目、根槽，`propagate_the_new_unit_checksum`），
++//! 再把每条根抄进它那几条 journal 记录的新根段；读者走到被改的那条指针才判得到。每条用例先在改之前的同一版上核：读者照常读出。
++//! 改之前这些读者跳过这 2 字节、照常读出（正推腿 `research/prompts/m3-batch4-code-r1-sonnet-output.md` 4.3 节那份镜像：
++//! extent 树根里那条数据指针 extent 偏移改 1，只读挂载与读第一个字节都成功）。
++
++mod common;
++
++use common::{
++    build_pool, copy_each_root_into_the_new_root_segment_of_its_journal_records,
++    memory_pool_of_sparse_devices, parameters,
++    sequential_write_in_process_as_instance_one_and_advance_the_pool, IMAGE_BYTES,
++};
++use singlefs_core::address::{
++    DeviceIdentity, DeviceOffsetInBytes, FileOffsetInBytes, InodeNumber, SlotNumber,
++};
++use singlefs_core::allocation_record_tree::{
++    node_pointers_as_far_as_readable, AllocationRecordTreeGeometry,
++    ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::bytes::{ByteReader, ByteWriter};
++use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
++use singlefs_core::extent_tree::{
++    ExtentUpperLeafEntry, ExtentUpperLeafTarget,
++    EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
++};
++use singlefs_core::instance_table::{
++    InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
++};
++use singlefs_core::mount::{mount_writable, MountError};
++use singlefs_core::mounted_read::{
++    mount_read_only, MountReadOnlyFailure, OpenFileFailure, OpenPoolForReadFailure,
++};
++use singlefs_core::pointer::{DataPointer, NodePointer};
++use singlefs_core::records::{
++    parse_extent_record, parse_inode_internal_entry, TreeTableEntry, TREE_KIND_ALLOCATION,
++    TREE_KIND_EXTENT, TREE_KIND_INODE,
++};
++use singlefs_core::recovery::{
++    choose_root, choose_system_configuration, every_root_ring_slot, instance_table_chain_of_root,
++    instance_table_page_pointers_as_far_as_readable, recover, JournalPolicy, RecoveryFailure,
++    RecoveryOutcome, INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++};
++use singlefs_core::root_record::{RootRecord, ROOT_CHECKSUM_OFFSET};
++use singlefs_core::root_ring::slot_offset;
++use singlefs_core::transaction::{acquire_instance, PoolWriter, FIRST_INODE_NUMBER};
++use singlefs_core::unit::{
++    data_unit_payload_capacity, parse_data_unit, parse_index_node, parse_packed_unit,
++    seal_header_checksum, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
++};
++use singlefs_format::{
++    DATA_POINTER_BYTES, DATA_UNIT_BYTES, NODE_BYTES, NODE_POINTER_BYTES, SLOT_BYTES,
++    UNIT_AREA_START_SLOT,
++};
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++use singlefs_harness::scenario::run_new_pool_file_creation;
++use singlefs_harness::{RecordingBlockDevice, SharedStream};
++
++/// 指针头部里 extent 偏移那 2 字节的偏移：MAC 16、nonce 12、算法类型 1、压缩算法码 1、压后长度 2 之后（D19（块指针的结构与宽度预算） 已定项 7 的字段表）。
++const EXTENT_OFFSET_IN_THE_POINTER_HEAD: usize = 32;
++/// 单元头第 6 个字节是单元类（共同前缀：magic 4、格式版本 2 之后）。
++const UNIT_CLASS_OFFSET_IN_THE_UNIT_HEADER: usize = 6;
++/// 根槽宽 = physical_block_size（`common::parameters` 取 512）。
++const ROOT_SLOT_BYTES: usize = 512;
++/// 一片实例表里数据行的上限：370 条记录减去链指针那一条（D18（块里携带什么信息） 已定项 11）。
++const INSTANCE_ROWS_PER_PAGE: u32 = 369;
++
++fn node_bytes() -> usize {
++    usize::try_from(NODE_BYTES).expect("16384")
++}
++
++fn data_unit_bytes() -> usize {
++    usize::try_from(DATA_UNIT_BYTES).expect("32768")
++}
++
++/// 盘 0 上从 `slot` 起 `length_in_bytes` 字节（第一版两盘同槽同内容，读一份就够）。
++fn unit_bytes_at(image: &MemoryPool, slot: SlotNumber, length_in_bytes: usize) -> Vec<u8> {
++    image
++        .devices
++        .get(&DeviceIdentity(0))
++        .expect("池里有盘 0")
++        .read(slot.to_device_offset(), length_in_bytes)
++}
++
++/// 一个单元按单元类的整单元宽；单元类不认识（槽里不是单元的开头）时是 None。
++fn unit_bytes_of_class(unit_class: u8) -> Option<usize> {
++    match unit_class {
++        UNIT_CLASS_DATA | UNIT_CLASS_PACKED => Some(data_unit_bytes()),
++        UNIT_CLASS_INDEX_NODE => Some(node_bytes()),
++        _not_a_unit_class => None,
++    }
++}
++
++/// 改过的单元重封：载荷 CRC 与头校验和（码 1 罩 [105, 32768)、住 101，头 [0, 105)；码 3 罩 [107, 32768)、住 89，头 [0, 107)；
++/// 码 2 罩 [86 + 2k, 16384)、住 76 + 2k，头 [0, 86 + 2k)，k 是 key 宽、住偏移 51）。
++fn reseal_unit(unit: &mut [u8]) {
++    let (header_end, payload_checksum_offset) = match unit[UNIT_CLASS_OFFSET_IN_THE_UNIT_HEADER] {
++        UNIT_CLASS_DATA => (105, 101),
++        UNIT_CLASS_PACKED => (107, 89),
++        UNIT_CLASS_INDEX_NODE => {
++            let key_width = usize::from(unit[51]);
++            (86 + 2 * key_width, 76 + 2 * key_width)
++        }
++        unknown_class => panic!("只重封三类单元，读到类 {unknown_class}"),
++    };
++    let payload_checksum = crc32_castagnoli(&unit[header_end..]);
++    unit[payload_checksum_offset..payload_checksum_offset + 4]
++        .copy_from_slice(&payload_checksum.to_le_bytes());
++    seal_header_checksum(unit, header_end);
++}
++
++/// 单元区里盘 0 上写过的每个单元（起始槽、整单元宽）：按槽号升序逐槽看单元头，按单元类取宽、解得开才算一个单元，32 KiB 的单元跳过它的第二个槽。
++fn units_in_the_unit_area(image: &MemoryPool) -> Vec<(SlotNumber, usize)> {
++    let slot_bytes = SLOT_BYTES;
++    let unit_area_start = DeviceOffsetInBytes(UNIT_AREA_START_SLOT * slot_bytes);
++    let device = image.devices.get(&DeviceIdentity(0)).expect("池里有盘 0");
++    let written_slots: std::collections::BTreeSet<u64> = device
++        .written_sectors_in(unit_area_start, IMAGE_BYTES - unit_area_start.0)
++        .into_iter()
++        .map(|sector| sector * 512 / slot_bytes)
++        .collect();
++    let mut units = Vec::new();
++    let mut first_slot_not_yet_covered = UNIT_AREA_START_SLOT;
++    // 迭代上界是写过的槽数；跨轮携带的是上一个单元之后的第一个槽（32 KiB 单元的第二个槽不当单元的开头看）。
++    for slot in written_slots {
++        if slot < first_slot_not_yet_covered {
++            continue;
++        }
++        let header = unit_bytes_at(image, SlotNumber(slot), 512);
++        let Some(length_in_bytes) =
++            unit_bytes_of_class(header[UNIT_CLASS_OFFSET_IN_THE_UNIT_HEADER])
++        else {
++            continue;
++        };
++        let bytes = unit_bytes_at(image, SlotNumber(slot), length_in_bytes);
++        let is_a_unit = match header[UNIT_CLASS_OFFSET_IN_THE_UNIT_HEADER] {
++            UNIT_CLASS_DATA => parse_data_unit(&bytes).is_ok(),
++            UNIT_CLASS_PACKED => parse_packed_unit(&bytes).is_ok(),
++            _index_node => parse_index_node(&bytes).is_ok(),
++        };
++        if is_a_unit {
++            units.push((SlotNumber(slot), length_in_bytes));
++            first_slot_not_yet_covered =
++                slot + u64::try_from(length_in_bytes).expect("单元宽") / slot_bytes;
++        }
++    }
++    units
++}
++
++/// 位置条目 14 字节的盘上样子：设备身份 4、槽号 6、整单元校验和 4。
++fn location_entry_bytes(device: DeviceIdentity, slot: SlotNumber, unit_checksum: u32) -> Vec<u8> {
++    [
++        device.0.to_le_bytes().to_vec(),
++        slot.0.to_le_bytes()[..6].to_vec(),
++        unit_checksum.to_le_bytes().to_vec(),
++    ]
++    .concat()
++}
++
++/// 把 `container` 里每一处 `from` 换成 `to`（等长），交回换了几处。
++fn replace_every_occurrence(container: &mut [u8], from: &[u8], to: &[u8]) -> usize {
++    assert_eq!(from.len(), to.len(), "等长替换");
++    let mut replaced = 0;
++    let mut position = 0;
++    // 迭代上界是容器的字节数；跨轮携带的是下一个要比的位置（换过的那一段整段跳过）。
++    while position + from.len() <= container.len() {
++        if container[position..position + from.len()] == *from {
++            container[position..position + from.len()].copy_from_slice(to);
++            replaced += 1;
++            position += from.len();
++        } else {
++            position += 1;
++        }
++    }
++    replaced
++}
++
++/// 根环里每个根槽（盘、偏移）。
++fn root_slots(image: &MemoryPool) -> Vec<(DeviceIdentity, DeviceOffsetInBytes)> {
++    let system_configuration = choose_system_configuration(image).expect("系统配置择得到");
++    every_root_ring_slot(&system_configuration.immutable.sizes)
++        .into_iter()
++        .map(|ring_slot| {
++            (
++                system_configuration.immutable.region_devices
++                    [usize::try_from(ring_slot.region).expect("区域号")],
++                slot_offset(
++                    ring_slot,
++                    system_configuration
++                        .immutable
++                        .sizes
++                        .fixed_structure_slot_spacing,
++                ),
++            )
++        })
++        .collect()
++}
++
++/// `slot` 那个单元（两盘同槽）的整单元校验和由 `old` 换成了 `new`：引用它的每一条位置条目（单元区里的父单元、中央映射条目、根槽）
++/// 换成新的，被换的单元重封、它自己的新校验和再往上补，直到根槽；最后把每条根抄进它那几条 journal 记录的新根段。
++fn propagate_the_new_unit_checksum(image: &mut MemoryPool, slot: SlotNumber, old: u32, new: u32) {
++    let units = units_in_the_unit_area(image);
++    let mut pending = vec![(slot, old, new)];
++    // 迭代上界：每换一处，被换的单元的新校验和入队一次；引用链从叶到根是有限的、不成环（单元只被更晚写出的单元引用）。
++    while let Some((changed_slot, old_checksum, new_checksum)) = pending.pop() {
++        if old_checksum == new_checksum {
++            continue;
++        }
++        for (container_slot, length_in_bytes) in &units {
++            if *container_slot == changed_slot {
++                continue;
++            }
++            let before = unit_bytes_at(image, *container_slot, *length_in_bytes);
++            let mut after = before.clone();
++            let mut replaced = 0;
++            for device in [DeviceIdentity(0), DeviceIdentity(1)] {
++                replaced += replace_every_occurrence(
++                    &mut after,
++                    &location_entry_bytes(device, changed_slot, old_checksum),
++                    &location_entry_bytes(device, changed_slot, new_checksum),
++                );
++            }
++            if replaced > 0 {
++                reseal_unit(&mut after);
++                for device in image.devices.values_mut() {
++                    device.write(container_slot.to_device_offset(), &after);
++                }
++                pending.push((
++                    *container_slot,
++                    crc32_castagnoli(&before),
++                    crc32_castagnoli(&after),
++                ));
++            }
++        }
++        for (device, offset) in root_slots(image) {
++            let sparse = image.devices.get_mut(&device).expect("根槽所在的盘在池里");
++            let mut root_slot = sparse.read(offset, ROOT_SLOT_BYTES);
++            let mut replaced = 0;
++            for location_device in [DeviceIdentity(0), DeviceIdentity(1)] {
++                replaced += replace_every_occurrence(
++                    &mut root_slot,
++                    &location_entry_bytes(location_device, changed_slot, old_checksum),
++                    &location_entry_bytes(location_device, changed_slot, new_checksum),
++                );
++            }
++            if replaced > 0 {
++                let digest = wide_checksum_with_field_zeroed(
++                    &root_slot,
++                    ROOT_SLOT_BYTES,
++                    ROOT_CHECKSUM_OFFSET,
++                );
++                root_slot[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
++                sparse.write(offset, &root_slot);
++            }
++        }
++    }
++    copy_each_root_into_the_new_root_segment_of_its_journal_records(image);
++}
++
++/// `container` 那个单元里恰好一处是 `pointer_bytes`（一条指针的盘上原样）：把它头部的 extent 偏移由 0 改成 1、重封、写回两盘，
++/// 新的整单元校验和沿引用链补上去。
++fn set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++    image: &mut MemoryPool,
++    container: SlotNumber,
++    container_bytes: usize,
++    pointer_bytes: &[u8],
++) {
++    let before = unit_bytes_at(image, container, container_bytes);
++    let occurrences: Vec<usize> = (0..=before.len() - pointer_bytes.len())
++        .filter(|start| before[*start..*start + pointer_bytes.len()] == *pointer_bytes)
++        .collect();
++    assert_eq!(
++        occurrences.len(),
++        1,
++        "槽 {container:?} 那个单元里这条指针恰好出现一次"
++    );
++    let extent_offset_at = occurrences[0] + EXTENT_OFFSET_IN_THE_POINTER_HEAD;
++    assert_eq!(
++        before[extent_offset_at..extent_offset_at + 2],
++        [0, 0],
++        "第一版写者写的 extent 偏移是 0"
++    );
++    let mut after = before.clone();
++    after[extent_offset_at..extent_offset_at + 2].copy_from_slice(&1u16.to_le_bytes());
++    reseal_unit(&mut after);
++    for device in image.devices.values_mut() {
++        device.write(container.to_device_offset(), &after);
++    }
++    propagate_the_new_unit_checksum(
++        image,
++        container,
++        crc32_castagnoli(&before),
++        crc32_castagnoli(&after),
++    );
++}
++
++fn node_pointer_bytes(pointer: &NodePointer) -> Vec<u8> {
++    let mut writer = ByteWriter::new(usize::try_from(NODE_POINTER_BYTES).expect("86"));
++    pointer.write_to(&mut writer);
++    writer.into_bytes()
++}
++
++fn data_pointer_bytes(pointer: &DataPointer) -> Vec<u8> {
++    let mut writer = ByteWriter::new(usize::try_from(DATA_POINTER_BYTES).expect("88"));
++    pointer.write_to(&mut writer);
++    writer.into_bytes()
++}
++
++fn the_slot_of(pointer: &NodePointer) -> SlotNumber {
++    assert_eq!(
++        pointer.locations[0].slot, pointer.locations[1].slot,
++        "第一版两盘同槽"
++    );
++    pointer.locations[0].slot
++}
++
++/// 择根择到的那条根（只读恢复与挂载择的是它）。
++fn newest_root(image: &MemoryPool) -> RootRecord {
++    let system_configuration = choose_system_configuration(image).expect("系统配置择得到");
++    choose_root(image, &system_configuration).expect("择得到根")
++}
++
++/// 最新那条根的树表里种类为 `kind` 的那条条目（树表单元按根记录里的树表指针读）。
++fn tree_table_entry_of_kind(image: &MemoryPool, kind: u16) -> TreeTableEntry {
++    let root = newest_root(image);
++    let tree_table = parse_index_node(&unit_bytes_at(
++        image,
++        the_slot_of(&root.tree_table),
++        node_bytes(),
++    ))
++    .expect("树表单元解得开");
++    tree_table
++        .entries
++        .iter()
++        .filter_map(|entry| TreeTableEntry::parse(entry))
++        .find(|entry| entry.kind == kind)
++        .expect("树表里有这种树")
++}
++
++/// 一个码 2 节点第 0 条条目。
++fn first_entry_of_the_node_at(image: &MemoryPool, pointer: &NodePointer) -> Vec<u8> {
++    parse_index_node(&unit_bytes_at(image, the_slot_of(pointer), node_bytes()))
++        .expect("节点解得开")
++        .entries
++        .first()
++        .expect("节点里至少一条条目")
++        .clone()
++}
++
++/// extent 树根（第一版只有一片上段叶：根兼叶）第 0 条上段叶条目。
++fn first_upper_leaf_entry(image: &MemoryPool) -> ExtentUpperLeafEntry {
++    let extent_root = tree_table_entry_of_kind(image, TREE_KIND_EXTENT).root;
++    ExtentUpperLeafEntry::parse(&first_entry_of_the_node_at(image, &extent_root))
++        .expect("上段叶条目解得开")
++}
++
++/// 只读挂载照常挂上，打开第一个文件被拒：交回打开那一步的错。
++fn open_the_first_file_refused(image: &MemoryPool) -> OpenFileFailure {
++    let mounted = match mount_read_only(image) {
++        Ok(mounted) => mounted,
++        Err(failure) => panic!("只读挂载那一步不读 extent 树，要挂得上：{failure:?}"),
++    };
++    match mounted
++        .mounted
++        .open_file(image, InodeNumber(FIRST_INODE_NUMBER))
++    {
++        Ok(_file) => panic!("extent 树里那条指针头部 extent 偏移非 0，打开文件却成功了"),
++        Err(failure) => failure,
++    }
++}
++
++/// 只读挂载、打开第一个文件、读第一个字节都成功：交回读到的字节数。
++fn first_byte_of_the_first_file_read(image: &MemoryPool) -> usize {
++    let mounted = match mount_read_only(image) {
++        Ok(mounted) => mounted,
++        Err(failure) => panic!("改之前只读挂载要挂得上：{failure:?}"),
++    };
++    let file = mounted
++        .mounted
++        .open_file(image, InodeNumber(FIRST_INODE_NUMBER))
++        .expect("改之前打开第一个文件");
++    file.read_at(image, FileOffsetInBytes(0), 1)
++        .expect("改之前读第一个字节")
++        .bytes
++        .len()
++}
++
++/// 冷启动恢复报的那个失败成员（恢复沿择到的根走读，走到被改的那条指针）。
++fn recovery_failure(image: &MemoryPool) -> RecoveryFailure {
++    match recover(image, JournalPolicy::Consult).outcome {
++        RecoveryOutcome::Failed { failure, .. } => failure,
++        RecoveryOutcome::FileRead { .. } | RecoveryOutcome::NoFile { .. } => {
++            panic!("被改的那条指针在冷启动走读的路上，恢复却成功了")
++        }
++    }
++}
++
++type WritableDevices = Vec<(DeviceIdentity, SparseBlockDevice)>;
++
++fn writable_devices_of(image: &MemoryPool) -> WritableDevices {
++    image
++        .devices
++        .iter()
++        .map(|(identity, sparse)| {
++            let mut device = SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512));
++            device.image = sparse.clone();
++            (*identity, device)
++        })
++        .collect()
++}
++
++/// 可写挂载被拒、盘上逐字节不变：交回拒的那个错。
++fn writable_mount_refused_before_any_write(image: &MemoryPool) -> MountError {
++    let mut devices = writable_devices_of(image);
++    let refusal = match mount_writable(&parameters(), &mut devices) {
++        Ok(mounted) => panic!("坏镜像被可写挂载收下了：实例 {:?}", mounted.output.instance),
++        Err(refusal) => refusal,
++    };
++    for (identity, device) in &devices {
++        assert!(
++            device.image == image.devices[identity],
++            "可写挂载在任何写之前拒：盘 {identity:?} 逐字节不变（{refusal:?}）"
++        );
++    }
++    refusal
++}
++
++/// 新池新建文件之后再顺序写一版 `data_units` 个数据单元的文件（最后一个装一半）。
++fn image_after_a_sequential_write_of(tag: &str, data_units: usize) -> MemoryPool {
++    let mut pool = build_pool(tag);
++    let payload_capacity = data_unit_payload_capacity();
++    let content: Vec<u8> = (0..(data_units - 1) * payload_capacity + payload_capacity / 2)
++        .map(|index| u8::try_from((index * 31 + 7) % 251).expect("小于 256"))
++        .collect();
++    sequential_write_in_process_as_instance_one_and_advance_the_pool(&mut pool, &content);
++    pool.memory_pool()
++}
++
++/// 场景：新池新建文件那一版，树表里 inode 树那条条目的根指针头部 extent 偏移改成 1（树表单元重封、根记录补校验和）。
++/// 预期：冷启动恢复与可写挂载都报「树表条目」解不开（`UnitMalformed`），可写挂载在任何写之前拒；只读挂载报树表条目解不开。
++/// 改之前 `TreeTableEntry::parse` 跳过这 2 字节，三个入口都照常走下去。
++#[test]
++fn a_tree_table_entry_whose_root_pointer_carries_a_non_zero_extent_offset_is_refused() {
++    let mut image = build_pool("extent-offset-tree-table-entry").memory_pool();
++    assert!(
++        matches!(
++            recover(&image, JournalPolicy::Consult).outcome,
++            RecoveryOutcome::FileRead { .. }
++        ),
++        "改之前冷启动读得出文件"
++    );
++    let tree_table = newest_root(&image).tree_table;
++    let inode_root = tree_table_entry_of_kind(&image, TREE_KIND_INODE).root;
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&tree_table),
++        node_bytes(),
++        &node_pointer_bytes(&inode_root),
++    );
++    let tree_table_entry_malformed = RecoveryFailure::UnitMalformed {
++        what: "树表条目"
++    };
++    assert_eq!(
++        recovery_failure(&image),
++        tree_table_entry_malformed,
++        "冷启动恢复：树表条目解不开"
++    );
++    assert!(
++        matches!(
++            mount_read_only(&image),
++            Err(MountReadOnlyFailure::Open(
++                OpenPoolForReadFailure::TreeTableEntryMalformed
++            ))
++        ),
++        "只读挂载：打开挂载态时树表条目解不开"
++    );
++    let refusal = writable_mount_refused_before_any_write(&image);
++    assert!(
++        matches!(&refusal, MountError::Recovery(failure) if *failure == tree_table_entry_malformed),
++        "可写挂载：树表条目解不开，实际 {refusal:?}"
++    );
++}
++
++/// 场景：新池新建文件那一版，inode 树根第 0 条内部条目的子指针头部 extent 偏移改成 1（inode 树根重封，树表、中央映射、根记录补校验和）。
++/// 预期：冷启动恢复报 `UnitMalformed`（[`INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO`]），只读挂载报 inode 树内部条目解不开。
++/// 改之前两个读者都跳过这 2 字节、照常读出文件。
++#[test]
++fn an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_extent_offset_is_refused() {
++    let mut image = build_pool("extent-offset-inode-internal-entry").memory_pool();
++    assert_eq!(
++        first_byte_of_the_first_file_read(&image),
++        1,
++        "改之前读得出第一个字节"
++    );
++    let inode_root = tree_table_entry_of_kind(&image, TREE_KIND_INODE).root;
++    let (_separator_key, _identity, child) =
++        parse_inode_internal_entry(&first_entry_of_the_node_at(&image, &inode_root))
++            .expect("改之前 inode 内部条目解得开");
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&inode_root),
++        node_bytes(),
++        &node_pointer_bytes(&child),
++    );
++    assert_eq!(
++        recovery_failure(&image),
++        RecoveryFailure::UnitMalformed {
++            what: INODE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++        },
++        "冷启动恢复：inode 内部条目的子指针 extent 偏移非 0"
++    );
++    assert!(
++        matches!(
++            mount_read_only(&image),
++            Err(MountReadOnlyFailure::Open(
++                OpenPoolForReadFailure::RecordMalformed {
++                    what: "inode 树内部条目"
++                }
++            ))
++        ),
++        "只读挂载：inode 树内部条目解不开"
++    );
++}
++
++/// 场景：正推腿那一份镜像——新池新建文件那一版（3000 字节，一个内联的数据单元），extent 树根里那条上段叶条目内联的数据指针
++/// 头部 extent 偏移改成 1（extent 树根重封，树表、中央映射、根记录补校验和）。
++/// 预期：只读挂载照常挂上，打开文件报 extent 树走读失败（`UnitMalformed`，[`EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO`]）；
++/// 冷启动恢复报同一个成员。改之前只读挂载与读第一个字节都成功（正推腿 4.3 节）。
++#[test]
++fn an_extent_upper_leaf_entry_whose_inline_data_pointer_carries_a_non_zero_extent_offset_is_refused(
++) {
++    let mut image = build_pool("extent-offset-inline-data-pointer").memory_pool();
++    assert_eq!(
++        first_byte_of_the_first_file_read(&image),
++        1,
++        "改之前读得出第一个字节"
++    );
++    let ExtentUpperLeafTarget::InlineDataUnit(data_pointer) = first_upper_leaf_entry(&image).target
++    else {
++        panic!("3000 字节的文件是一个内联的数据单元（标签 2）");
++    };
++    let extent_root = tree_table_entry_of_kind(&image, TREE_KIND_EXTENT).root;
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&extent_root),
++        node_bytes(),
++        &data_pointer_bytes(&data_pointer),
++    );
++    let upper_leaf_entry_refused = RecoveryFailure::UnitMalformed {
++        what: EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    };
++    assert_eq!(
++        open_the_first_file_refused(&image),
++        OpenFileFailure::ExtentTreeWalk(upper_leaf_entry_refused.clone()),
++        "打开文件：上段叶条目内联的数据指针 extent 偏移非 0"
++    );
++    assert_eq!(
++        recovery_failure(&image),
++        upper_leaf_entry_refused,
++        "冷启动恢复：同一个成员"
++    );
++}
++
++/// 场景：新池新建文件之后顺序写成两个数据单元的文件，上段叶条目（标签 1）里下段根指针头部 extent 偏移改成 1。
++/// 预期：打开文件与冷启动恢复都报 `UnitMalformed`（[`EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO`]）。改之前照常读出。
++#[test]
++fn an_extent_upper_leaf_entry_whose_lower_segment_root_pointer_carries_a_non_zero_extent_offset_is_refused(
++) {
++    let mut image = image_after_a_sequential_write_of("extent-offset-lower-segment-root", 2);
++    assert_eq!(
++        first_byte_of_the_first_file_read(&image),
++        1,
++        "改之前读得出第一个字节"
++    );
++    let ExtentUpperLeafTarget::LowerSegmentRoot(lower_root) = first_upper_leaf_entry(&image).target
++    else {
++        panic!("两个数据单元的文件在上段叶里是一条标签 1 的条目");
++    };
++    let extent_root = tree_table_entry_of_kind(&image, TREE_KIND_EXTENT).root;
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&extent_root),
++        node_bytes(),
++        &node_pointer_bytes(&lower_root),
++    );
++    let upper_leaf_entry_refused = RecoveryFailure::UnitMalformed {
++        what: EXTENT_UPPER_LEAF_ENTRY_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    };
++    assert_eq!(
++        open_the_first_file_refused(&image),
++        OpenFileFailure::ExtentTreeWalk(upper_leaf_entry_refused.clone()),
++        "打开文件：下段根指针 extent 偏移非 0"
++    );
++    assert_eq!(
++        recovery_failure(&image),
++        upper_leaf_entry_refused,
++        "冷启动恢复：同一个成员"
++    );
++}
++
++/// 场景：两个数据单元的文件，下段只有一片叶（根兼叶），它第 0 条叶记录的数据指针头部 extent 偏移改成 1。
++/// 预期：打开文件与冷启动恢复都报 `UnitMalformed`（[`EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO`]），
++/// 不再报成「条目窄于字段表」。改之前照常读出。
++#[test]
++fn an_extent_leaf_record_whose_data_pointer_carries_a_non_zero_extent_offset_is_refused() {
++    let mut image = image_after_a_sequential_write_of("extent-offset-leaf-record", 2);
++    assert_eq!(
++        first_byte_of_the_first_file_read(&image),
++        1,
++        "改之前读得出第一个字节"
++    );
++    let ExtentUpperLeafTarget::LowerSegmentRoot(lower_root) = first_upper_leaf_entry(&image).target
++    else {
++        panic!("两个数据单元的文件在上段叶里是一条标签 1 的条目");
++    };
++    let (_key, data_pointer) =
++        parse_extent_record(&first_entry_of_the_node_at(&image, &lower_root))
++            .expect("改之前叶记录解得开");
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&lower_root),
++        node_bytes(),
++        &data_pointer_bytes(&data_pointer),
++    );
++    let leaf_record_refused = RecoveryFailure::UnitMalformed {
++        what: EXTENT_LEAF_RECORD_DATA_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    };
++    assert_eq!(
++        open_the_first_file_refused(&image),
++        OpenFileFailure::ExtentTreeWalk(leaf_record_refused.clone()),
++        "打开文件：叶记录的数据指针 extent 偏移非 0"
++    );
++    assert_eq!(
++        recovery_failure(&image),
++        leaf_record_refused,
++        "冷启动恢复：同一个成员"
++    );
++}
++
++/// 下段两层的文件有几个数据单元：比一片下段叶装得下的 144 个多一个（D8（核心索引结构） 已定项 14「实现取值」）。
++const DATA_UNITS_OF_A_FILE_WITH_A_TWO_LEVEL_LOWER_SEGMENT: usize = 145;
++
++/// 场景：145 个数据单元的文件，下段两片叶上面长出第 1 层的根；下段根第 0 条内部条目的子指针头部 extent 偏移改成 1。
++/// 预期：打开文件与冷启动恢复都报 `UnitMalformed`（[`EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO`]）。改之前照常读出。
++#[test]
++fn an_extent_internal_entry_whose_child_pointer_carries_a_non_zero_extent_offset_is_refused() {
++    let mut image = image_after_a_sequential_write_of(
++        "extent-offset-extent-internal-entry",
++        DATA_UNITS_OF_A_FILE_WITH_A_TWO_LEVEL_LOWER_SEGMENT,
++    );
++    assert_eq!(
++        first_byte_of_the_first_file_read(&image),
++        1,
++        "改之前读得出第一个字节"
++    );
++    let ExtentUpperLeafTarget::LowerSegmentRoot(lower_root) = first_upper_leaf_entry(&image).target
++    else {
++        panic!("145 个数据单元的文件在上段叶里是一条标签 1 的条目");
++    };
++    let lower_root_bytes = unit_bytes_at(&image, the_slot_of(&lower_root), node_bytes());
++    assert_eq!(
++        parse_index_node(&lower_root_bytes)
++            .expect("下段根解得开")
++            .level,
++        1,
++        "145 个单元：下段根在第 1 层"
++    );
++    let first_child = NodePointer::read_from(&mut ByteReader::at(
++        &first_entry_of_the_node_at(&image, &lower_root),
++        24,
++    ));
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&lower_root),
++        node_bytes(),
++        &node_pointer_bytes(&first_child),
++    );
++    let internal_entry_refused = RecoveryFailure::UnitMalformed {
++        what: EXTENT_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO,
++    };
++    assert_eq!(
++        open_the_first_file_refused(&image),
++        OpenFileFailure::ExtentTreeWalk(internal_entry_refused.clone()),
++        "打开文件：下段内部条目的子指针 extent 偏移非 0"
++    );
++    assert_eq!(
++        recovery_failure(&image),
++        internal_entry_refused,
++        "冷启动恢复：同一个成员"
++    );
++}
++
++/// 一棵分配记录树从根往下认得出的节点指针（影子账认被抛弃根引用的单元时用的那个读者），节点按指针里第一条位置条目从盘 0 读。
++fn allocation_record_tree_nodes_as_far_as_readable(
++    image: &MemoryPool,
++    root_pointer: &NodePointer,
++) -> Vec<NodePointer> {
++    node_pointers_as_far_as_readable(
++        root_pointer,
++        &AllocationRecordTreeGeometry::of_reader(image),
++        &mut |pointer: &NodePointer| {
++            Some(unit_bytes_at(
++                image,
++                pointer.locations[0].slot,
++                node_bytes(),
++            ))
++        },
++    )
++}
++
++/// 场景：新池新建文件那一版，分配记录树根（层级由池几何定，第一版两块 4 GiB 盘上在第 1 层以上）第 0 条内部条目的子指针头部
++/// extent 偏移改成 1。
++/// 预期：可写挂载在任何写之前拒，报 `UnitMalformed`（[`ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO`]）；
++/// 影子账认单元的那个读者把这条条目当解不开，不认它指的孩子（认得出的节点比改之前少）。改之前可写挂载照常挂上。
++#[test]
++fn an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_extent_offset_is_refused(
++) {
++    let mut image = build_pool("extent-offset-allocation-internal-entry").memory_pool();
++    let allocation_root = tree_table_entry_of_kind(&image, TREE_KIND_ALLOCATION).root;
++    let nodes_before = allocation_record_tree_nodes_as_far_as_readable(&image, &allocation_root);
++    let root_entry = first_entry_of_the_node_at(&image, &allocation_root);
++    assert!(
++        parse_index_node(&unit_bytes_at(
++            &image,
++            the_slot_of(&allocation_root),
++            node_bytes()
++        ))
++        .expect("分配记录树根解得开")
++        .level
++            >= 1,
++        "分配记录树根是内部节点"
++    );
++    let first_child = NodePointer::read_from(&mut ByteReader::at(&root_entry, 10));
++    assert!(
++        nodes_before.contains(&first_child),
++        "改之前影子账那个读者认得出第 0 条条目指的孩子"
++    );
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&allocation_root),
++        node_bytes(),
++        &node_pointer_bytes(&first_child),
++    );
++    let refusal = writable_mount_refused_before_any_write(&image);
++    assert!(
++        matches!(
++            &refusal,
++            MountError::Recovery(RecoveryFailure::UnitMalformed { what })
++                if *what == ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_CHILD_POINTER_EXTENT_OFFSET_NOT_ZERO
++        ),
++        "可写挂载：分配记录树内部条目的子指针 extent 偏移非 0，实际 {refusal:?}"
++    );
++    let allocation_root_after = tree_table_entry_of_kind(&image, TREE_KIND_ALLOCATION).root;
++    let nodes_after =
++        allocation_record_tree_nodes_as_far_as_readable(&image, &allocation_root_after);
++    assert!(
++        nodes_after.len() < nodes_before.len()
++            && !nodes_after
++                .iter()
++                .any(|pointer| pointer.locations[0].slot == first_child.locations[0].slot),
++        "影子账那个读者不认那条条目指的孩子：改之前 {} 个节点，改之后 {} 个",
++        nodes_before.len(),
++        nodes_after.len()
++    );
++}
++
++type RecordedSparseDevices = Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)>;
++
++/// 两块 4 GiB 内存盘上新池新建文件，再连着 369 次「取号之后崩溃」、可写挂载一次：给 [1, 371) 写 370 行——一片装不下，
++/// 实例表链两片（`instance_table_second_page_write.rs` 同一个造法）。
++fn image_whose_instance_table_has_two_pages() -> MemoryPool {
++    let stream = SharedStream::new();
++    let mut devices: RecordedSparseDevices = [DeviceIdentity(0), DeviceIdentity(1)]
++        .into_iter()
++        .map(|identity| {
++            (
++                identity,
++                RecordingBlockDevice::with_shared_stream(
++                    identity,
++                    SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
++                    stream.clone(),
++                ),
++            )
++        })
++        .collect();
++    run_new_pool_file_creation(&parameters(), &mut devices, &stream, |_, _| {})
++        .expect("新池新建文件");
++    {
++        let publish_parameters = parameters();
++        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        for _ in 0..INSTANCE_ROWS_PER_PAGE {
++            acquire_instance(&mut writer).expect("取号");
++        }
++    }
++    mount_writable(&parameters(), &mut devices).expect("370 行写成两片，可写挂载要成立");
++    memory_pool_of_sparse_devices(&devices)
++}
++
++/// 场景：实例表链两片的那一版，第 0 片末尾那条链指针记录里下一片指针的头部 extent 偏移改成 1（第 0 片重封，引用它的根记录补校验和）。
++/// 预期：沿链读整张实例表报这一片解不开（`UnitMalformed`）；影子账认链上各片的那个读者只认得出第 0 片；
++/// 可写挂载在任何写之前拒（`InstanceTableMalformed`）。改之前链上两片都认得出、整张表读得出。
++#[test]
++fn an_instance_table_chain_pointer_carrying_a_non_zero_extent_offset_is_refused() {
++    let mut image = image_whose_instance_table_has_two_pages();
++    let root = newest_root(&image);
++    assert_eq!(
++        instance_table_page_pointers_as_far_as_readable(&image, &root).len(),
++        2,
++        "改之前链上两片都认得出"
++    );
++    let first_page = unit_bytes_at(&image, the_slot_of(&root.instance_table), data_unit_bytes());
++    let InstanceTableChainRecord::NextPage(second_page) =
++        InstanceTablePage::parse(&first_page, InstanceTablePageIndex::FIRST)
++            .expect("改之前第 0 片解得开")
++            .chain
++    else {
++        panic!("第 0 片的链指针记录是「有下一片」");
++    };
++    set_the_extent_offset_of_the_pointer_inside_the_unit_to_one(
++        &mut image,
++        the_slot_of(&root.instance_table),
++        data_unit_bytes(),
++        &node_pointer_bytes(&second_page),
++    );
++    let root_after = newest_root(&image);
++    assert!(
++        matches!(
++            instance_table_chain_of_root(&image, &root_after),
++            Err(RecoveryFailure::UnitMalformed { .. })
++        ),
++        "沿链读：第 0 片的链指针记录解不开"
++    );
++    assert_eq!(
++        instance_table_page_pointers_as_far_as_readable(&image, &root_after),
++        vec![root_after.instance_table],
++        "影子账那个读者只认得出第 0 片"
++    );
++    let refusal = writable_mount_refused_before_any_write(&image);
++    assert!(
++        matches!(&refusal, MountError::InstanceTableMalformed),
++        "可写挂载：所选根的实例表沿链有一片解不开，实际 {refusal:?}"
++    );
++}
+diff --git a/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs b/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
+index 07c7f3b..ca65d9c 100644
+--- a/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
++++ b/crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
+@@ -2,9 +2,10 @@
+ //! - C462（空池恢复报的错名不副实）：交进来的池里一块盘都没有，恢复这一层报 `RecoveryFailure::NoDeviceInThePool`，
+ //!   不再报「各盘系统配置对不上」（`SystemConfigurationsDisagree`）；
+ //! - C463（一块盘的系统配置两份全废之后静默成功）：一块盘两个系统配置槽都废了、别的盘那一份照常择到时，只读挂载
+-//!   （`MountedReadOnly::devices_without_a_mountable_system_configuration_slot`）与恢复这一层
+-//!   （`choose_system_configuration_naming_devices_without_a_mountable_slot`）点名那块盘；冗余完好时两处都是空表。
+-//!   在用的 `choose_system_configuration` 返回类型不变、择到的还是同一份。
++//!   （`MountedReadOnly::devices_without_a_mountable_system_configuration_slot`）、恢复这一层
++//!   （`choose_system_configuration_naming_devices_without_a_mountable_slot`）与整条恢复的报告
++//!   （`RecoveryReport::devices_without_a_mountable_system_configuration_slot`，判决 `research/prompts/m3-batch4-code-r1-main-verification.md`
++//!   第二节第 7 行）点名那块盘；冗余完好时三处都是空表。在用的 `choose_system_configuration` 返回类型不变、择到的还是同一份。
+ //!
+ //! 盘：两块 4 GiB 内存稀疏盘上 mkfs、取号、暖机、第一个文件（txg 3）之后的池（只读挂载要沿根打开文件版本）。
+ 
+@@ -124,7 +125,8 @@ fn a_pool_without_any_device_is_refused_as_having_no_device() {
+     );
+ }
+ 
+-/// 场景：第一个文件之后的池，两块盘四个系统配置槽都完好。预期：只读挂载与恢复这一层都报空表（冗余完好），择到的与在用的入口同一份。
++/// 场景：第一个文件之后的池，两块盘四个系统配置槽都完好。预期：只读挂载、恢复这一层与整条恢复的报告都报空表（冗余完好），
++/// 择到的与在用的入口同一份。
+ #[test]
+ fn a_pool_whose_every_device_keeps_a_mountable_system_configuration_names_no_device() {
+     let devices = pool_after_the_first_file();
+@@ -146,11 +148,21 @@ fn a_pool_whose_every_device_keeps_a_mountable_system_configuration_names_no_dev
+         Vec::<DeviceIdentity>::new(),
+         "只读挂载：冗余完好，一块盘都不点名"
+     );
++    let report = recover(&devices, JournalPolicy::Consult);
++    assert!(
++        matches!(report.outcome, RecoveryOutcome::FileRead { .. }),
++        "整条恢复读得出文件"
++    );
++    assert_eq!(
++        report.devices_without_a_mountable_system_configuration_slot,
++        Vec::<DeviceIdentity>::new(),
++        "整条恢复的报告：冗余完好，一块盘都不点名"
++    );
+ }
+ 
+ /// 场景：第一个文件之后的池，盘 1 两个系统配置槽都自证不过，盘 0 两槽完好。
+-/// 预期：只读挂载照常挂上（择盘 0 那一份），并点名盘 1；恢复这一层同样点名盘 1，择到的与 `choose_system_configuration` 同一份。
+-/// 改之前两处都只报成功，盘 1 的系统配置冗余已经没了却没人知道（C463）。
++/// 预期：只读挂载照常挂上（择盘 0 那一份），并点名盘 1；恢复这一层同样点名盘 1，择到的与 `choose_system_configuration` 同一份；
++/// 整条恢复照常读出文件，报告里那一格点名盘 1。改之前几处都只报成功，盘 1 的系统配置冗余已经没了却没人知道（C463）。
+ #[test]
+ fn a_device_whose_two_system_configuration_slots_are_both_lost_is_named_by_the_read_only_mount_and_recovery(
+ ) {
+@@ -179,4 +191,14 @@ fn a_device_whose_two_system_configuration_slots_are_both_lost_is_named_by_the_r
+         vec![DeviceIdentity(1)],
+         "只读挂载点名盘 1"
+     );
++    let report = recover(&devices, JournalPolicy::Consult);
++    assert!(
++        matches!(report.outcome, RecoveryOutcome::FileRead { .. }),
++        "一块盘两槽全废，整条恢复照常读出文件"
++    );
++    assert_eq!(
++        report.devices_without_a_mountable_system_configuration_slot,
++        vec![DeviceIdentity(1)],
++        "整条恢复的报告点名盘 1"
++    );
+ }

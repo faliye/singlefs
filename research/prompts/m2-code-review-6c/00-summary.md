@@ -1,4 +1,4 @@
-# crates/ 代码审阅汇总（singlefs-6c 会话，2026-09-26，只读，未改任何仓内文件）
+# crates/ 代码审阅汇总（别的会话，2026-09-26，只读，未改任何仓内文件）
 
 口径
 - 范围：singlefs-format、singlefs-core 全部、singlefs-checker 全部；singlefs-harness 只审 lib.rs / segments.rs / crash.rs / model.rs / model_comparison.rs，其余 harness 源文件与 tests/ 没审。
@@ -8,4 +8,4 @@
 - 欠账表：按关键词 grep 过 .claude/kb/checks-owed.md，只有第 15 条对上 C475；其余没搜到对应条目（关键词搜，不保证穷尽）。
 - 分组详细报告：同目录 A-report.md … G-report.md（A format 与编解码；B 分配器/准入/块设备；C 事务层；D 挂载与读路径；E 恢复与树；F checker；G 验证装置）。
 
-逐条正文见发给 singlefs-99 的消息，与本文件相同。
+逐条正文见发给别的会话的消息，与本文件相同。

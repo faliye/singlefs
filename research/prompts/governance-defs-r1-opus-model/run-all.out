@@ -1,13 +1,13 @@
 # probes
 ## G1 主 agent 的层 0 全量命令（main-agent.md:59）
 exit=0 agent=- hook=heavy-test-guard.sh
-  cmd: SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree
+  cmd: SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/tmp.X/tree
 exit=2 agent=- hook=heavy-test-guard.sh
-  cmd: bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/54-layer0-replay.sh --full /tmp/tmp.X/tree
-  | ✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+  cmd: bash research/scripts/run-with-memory-cap.sh 16G bash /tmp/tmp.X/tree/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/tmp.X/tree
+  | ✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
   | → 规矩：重型测试（层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置）只在提交代码时跑一次、或用户要求时跑；子 agent 一律不跑，只跑自己动到的测试二进制（`cargo test -p <crate> --test <自己的目标>`、`--lib`）与 fmt / clippy / build；主 agent 在提交流程里跑要带 `SINGLEFS_HEAVY_TESTS=commit`，用户要求时带 `SINGLEFS_HEAVY_TESTS=user-request`。
 exit=0 agent=crash-verifier hook=heavy-test-guard.sh
-  cmd: SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/54-layer0-replay.sh
+  cmd: SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh
 exit=0 agent=gate-triage hook=heavy-test-guard.sh
   cmd: SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/scripts/gate.sh --staged
 ## G2 子 agent 经内存包装（agent-common.md:46）

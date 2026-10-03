@@ -4,10 +4,10 @@
 
 ## 结果
 
-真文件 `.claude/gate.d/54-layer0-replay.sh`：397 行，sha256 `232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7`。
-- 改前是第二轮那一份 `c3f9360f…`：动手前现核过；备份在 `r3/54-layer0-replay.sh.r2`，本轮 diff 在 `r3/r3.diff`（+9 / −5）。
+真文件 `.claude/gate.d/checker-tier-layer0-replay.sh`：397 行，sha256 `232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7`。
+- 改前是第二轮那一份 `c3f9360f…`：动手前现核过；备份在 `r3/checker-tier-layer0-replay.sh.r2`，本轮 diff 在 `r3/r3.diff`（+9 / −5）。
 - 5 处都用 `replace-once.py` 改，每处都是「命中 1 次，已替换并回读确认」；旧/新文本对在 `r3/edits/`。
-- 先改草稿副本 `r3/54-layer0-replay.sh`、跑完全部场景，再套到真文件上；套完 `cmp` 报「真文件与 r3 自证用的草稿副本逐字节相同」。
+- 先改草稿副本 `r3/checker-tier-layer0-replay.sh`、跑完全部场景，再套到真文件上；套完 `cmp` 报「真文件与 r3 自证用的草稿副本逐字节相同」。
 
 | 编号 | 改了什么 |
 |---|---|
@@ -20,10 +20,10 @@
 第 2 条（旧格只增不减）照你说的不改，「common-dir 里现有 N 格」那一句保留。
 
 README 与规则，都用 `replace-once.py`，一处一改，每处命中 1 次。改前副本和 diff 在 `r3/README.md.before`、`r3/README.diff`、`r3/implementation-workflow.md.before`、`r3/implementation-workflow.diff`。
-- `README.md` 第 108 行（别的会话已经把原来的第 107 行拆成快档第 107 行与 --full 第 108 行）：改成 `bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记`。
+- `README.md` 第 108 行（别的会话已经把原来的第 107 行拆成快档第 107 行与 --full 第 108 行）：改成 `bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记`。
 - 第 107 行（快档）现在的说法是对的，没动。
 - **另改了第 104 行**：它说整轮 `gate.sh`「含层 0 全量」，现在是假的。改成「含层 0 快档与全绿标记核对、QEMU 真设备，要十几分钟；层 0 全量不在里面」。「十几分钟」没核。
-- `.claude/rules/implementation-workflow.md` 第 65 行改成：「崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1……判红」。只写怎么做，没写经过。
+- `.claude/rules/implementation-workflow.md` 第 65 行改成：「崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1……判红」。只写怎么做，没写经过。
 
 ## 在 r3 下重跑
 
@@ -178,14 +178,14 @@ doc-lint 退出码 0
       ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lock 底下
     [gate --staged 里 54 号的退出码 77]
   ── 起门禁：gate-staged
-      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（8850cf9cd811）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（8850cf9cd811）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/checker-tier-layer0-replay.sh
     [gate --staged 里 54 号的退出码 77]
 ════ S2 [other-session-crates｜r3] 暂存的路径：NOTES.md ｜[标记 1 个：singlefs-layer0-full-green.c07850adb431…（记 c07850adb431…；exhaustive=true,exhaustive=true）]
   ── 起门禁：gate-triage
       ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lock 底下
     [gate --staged 里 54 号的退出码 77]
   ── 起门禁：gate-staged
-      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（bc5ae54134b2）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（bc5ae54134b2）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/checker-tier-layer0-replay.sh
     [gate --staged 里 54 号的退出码 77]
 ```
 
@@ -344,8 +344,8 @@ doc-lint 退出码 0
 ## 附录：`r3/model/outputs/s4-marker-provenance.out` 原样
 
 ```
-════ S4 [r1] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
-  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+════ S4 [r1] 工作区 vs 暂存区： M .claude/gate.d/checker-tier-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/checker-tier-layer0-replay.sh --full
       ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
       ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -356,8 +356,8 @@ doc-lint 退出码 0
       ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
           LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
     [gate --staged 里 54 号的退出码 0]
-════ S4 [r3-main] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
-  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+════ S4 [r3-main] 工作区 vs 暂存区： M .claude/gate.d/checker-tier-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/checker-tier-layer0-replay.sh --full
       ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
       ✓ 第一个事务那条流逐条不变量（评估过的状态数/判违例的状态数）：record_root_without_record=0 record_claimed_state_missing_unit=0 I-1.1=262165/0 I-2.1=4/0
       ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
@@ -368,8 +368,8 @@ doc-lint 退出码 0
              LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
              LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
     [gate --staged 里 54 号的退出码 1]
-════ S4 [r3-f5] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
-  ── 收尾（f5）：bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>；worktree 里那一份 54 号带 B 的半成品吗：0 行
+════ S4 [r3-f5] 工作区 vs 暂存区： M .claude/gate.d/checker-tier-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾（f5）：bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>；worktree 里那一份 54 号带 B 的半成品吗：0 行
       ✗ 层 0 不是全量：LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
     [标记不在]
   ── gate.sh --staged
@@ -381,7 +381,7 @@ doc-lint 退出码 0
 
 ```
 ════ 准备：--full 写这批输入那一格（哈希 A）
-$ bash .claude/gate.d/54-layer0-replay.sh --full
+$ bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -392,7 +392,7 @@ $ bash .claude/gate.d/54-layer0-replay.sh --full
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 自证一：这批输入那一格在、相等 ⇒ 快档判绿
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -404,7 +404,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 改一个字节：/tmp/claude-1000/gate54-tiering/r3/lib.rs.before-byte-change crates/singlefs-harness/src/lib.rs differ: byte 13, line 1
 
 ════ 自证二：改一个输入文件的一个字节 ⇒ 这批输入（哈希 B）没有自己那一格 ⇒ 判红，列出最近一格与这一次不同的文件
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 a1be3d5c2e6f5859…，3 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r3/selftest-repo/.git/singlefs-layer0-full-green.a1be3d5c2e6f58592d6ea725fa7aa9b981622e40f54c58e77a729d196847c97d）
        common-dir 里最近写的一格是 singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4（跑完于 2026-09-24），与这一次的输入比：
        不同的文件共 1 个（最多列 20 个）：
@@ -412,12 +412,12 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 [退出码 1]
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 准备：哈希 B 上 --full 全绿 ⇒ 两格并存，A 那一格不删
-$ bash .claude/gate.d/54-layer0-replay.sh --full
+$ bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -428,7 +428,7 @@ $ bash .claude/gate.d/54-layer0-replay.sh --full
 [标记 2 个：singlefs-layer0-full-green.2c406d1eaecd… singlefs-layer0-full-green.a1be3d5c2e6f…]
 
 ════ 自证四：哈希 B 上 --full 喂缺 CHECKER 行的合成日志 ⇒ 判红、B 那一格删掉不写，A 那一格还在
-$ env FAKE_CARGO_DROP_CHECKER=1 bash .claude/gate.d/54-layer0-replay.sh --full
+$ env FAKE_CARGO_DROP_CHECKER=1 bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✗ 用例跑过了，LAYER0 计数行的下一行却不是以 CHECKER 开头的逐条不变量行：成功句里「逐条不变量」那一句会是空话
@@ -438,7 +438,7 @@ $ env FAKE_CARGO_DROP_CHECKER=1 bash .claude/gate.d/54-layer0-replay.sh --full
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 自证四（另一支）：哈希 B 上 cargo 判红 ⇒ 判红、B 那一格不写，A 那一格还在
-$ env FAKE_CARGO_FAIL=1 bash .claude/gate.d/54-layer0-replay.sh --full
+$ env FAKE_CARGO_FAIL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 a1be3d5c2e6f5859…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
 running 6 tests (fake cargo, test=first_transaction_step_seven_layer0, include_ignored=1)
 test full_enumeration ... FAILED
@@ -450,7 +450,7 @@ test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 改回那个字节（回到哈希 A）⇒ 快档判绿（A 那一格没被 B 上的几趟 --full 删掉）
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -460,19 +460,19 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ 自证三（兼 f3 旧名字）：删掉这批输入那一格，只留一份内容与这批输入相同、但不带哈希的旧名字标记 ⇒ 判红，点名旧名字不再认
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 2c406d1eaecd2706…，3 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r3/selftest-repo/.git/singlefs-layer0-full-green.2c406d1eaecd27061928685e1828c386709d3806ed2a4aa16ad72183d8a8c3d4）
        common-dir 里一格全绿标记都没有。
        不带哈希的旧名字标记（/tmp/claude-1000/gate54-tiering/r3/selftest-repo/.git/singlefs-layer0-full-green）是按输入哈希分格之前写的，不再认：它罩不到任何一批，可以删掉。
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 [退出码 1]
 [标记 1 个：singlefs-layer0-full-green]
 
 ════ 准备：--full 重写 A 那一格
-$ bash .claude/gate.d/54-layer0-replay.sh --full
+$ bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -485,33 +485,33 @@ $ bash .claude/gate.d/54-layer0-replay.sh --full
 改那一格的 LAYER0B 行：LAYER0B states=2104413 closed_form=2104413 exhau … exhaustive=false
 
 ════ f4a：这批输入那一格里 LAYER0B 行是 exhaustive=false ⇒ 判红
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✗ 这批输入那一格全绿标记里，LAYER0 与 LAYER0B 两行不都是 exhaustive=true（是的只有 1 行）：写它的那一趟 --full 没把「不是全量」判红
          LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
          LAYER0B states=2104413 closed_form=2104413 exhaustive=false violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
                 那一趟判「层 0 不是全量」就是这一批让枚举退化了，去 crash.rs 的 enumerate_layer0 看。
 [退出码 1]
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ f4a：这批输入那一格里 LAYER0 行是 exhaustive=false ⇒ 判红
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✗ 这批输入那一格全绿标记里，LAYER0 与 LAYER0B 两行不都是 exhaustive=true（是的只有 1 行）：写它的那一趟 --full 没把「不是全量」判红
          LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
          LAYER0B states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
                 那一趟判「层 0 不是全量」就是这一批让枚举退化了，去 crash.rs 的 enumerate_layer0 看。
 [退出码 1]
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ f4a 换回原样 ⇒ 判绿
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -521,7 +521,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 [标记 1 个：singlefs-layer0-full-green.2c406d1eaecd…]
 
 ════ --full 跑到第二条流时改了一个输入 ⇒ 判红、出路给 HEAD + 暂存区 worktree 的建法、不写这一格
-$ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/gate54-tiering/r3/selftest-repo/crates/singlefs-harness/src/lib.rs bash .claude/gate.d/54-layer0-replay.sh --full
+$ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/gate54-tiering/r3/selftest-repo/crates/singlefs-harness/src/lib.rs bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -533,7 +533,7 @@ $ env FAKE_CARGO_TOUCH_DURING_SECOND=/tmp/claude-1000/gate54-tiering/r3/selftest
      → 怎么办：别在有人改这些路径的树里跑。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 [退出码 1]
 [标记不在]
 
@@ -548,12 +548,12 @@ A  crates/singlefs-harness/src/new_module.rs
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 
 ──── 从出路句里抠出来的命令（原样照跑）：
 layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 
 Preparing worktree (detached HEAD 8f70feb)
 HEAD is now at 8f70feb base
@@ -567,7 +567,7 @@ HEAD is now at 8f70feb base
 [标记 1 个：singlefs-layer0-full-green.5e3b302b7908…]
 
 ════ 仿 gate.sh --staged：临时 worktree 里跑快档 ⇒ 判绿（工作区里别的会话的 other_session_wip.rs 与 Cargo.toml 改动都不在）
-$ env SINGLEFS_GATE_FULL=1 bash /tmp/claude-1000/gate54-tiering/r3/selftest-staged-worktree/.claude/gate.d/54-layer0-replay.sh /tmp/claude-1000/gate54-tiering/r3/selftest-staged-worktree
+$ env SINGLEFS_GATE_FULL=1 bash /tmp/claude-1000/gate54-tiering/r3/selftest-staged-worktree/.claude/gate.d/checker-tier-layer0-replay.sh /tmp/claude-1000/gate54-tiering/r3/selftest-staged-worktree
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（5e3b302b7908e0d2…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -577,7 +577,7 @@ $ env SINGLEFS_GATE_FULL=1 bash /tmp/claude-1000/gate54-tiering/r3/selftest-stag
 [标记 1 个：singlefs-layer0-full-green.5e3b302b7908…]
 
 ════ 对照：主工作区（带别的会话没暂存的改动）跑快档 ⇒ 判红
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 fff20e92dedbcecb…，5 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/gate54-tiering/r3/selftest-repo/.git/singlefs-layer0-full-green.fff20e92dedbcecbc16c11abbbb7ff1513eb8d32550c1633035a348653bf0ad5）
        common-dir 里最近写的一格是 singlefs-layer0-full-green.5e3b302b7908e0d228d14029c3148766c03d9e2aefc0f764f61317a149a0f0b9（跑完于 2026-09-24），与这一次的输入比：
        不同的文件共 2 个（最多列 20 个）：
@@ -586,7 +586,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 [退出码 1]
 [标记 1 个：singlefs-layer0-full-green.5e3b302b7908…]
 
@@ -595,7 +595,7 @@ $ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
 
 ════ r3 新加：同一批输入先绿、第二趟 --full 被 TERM / INT 打断或被 SIGKILL 杀掉，那一格去留
 ════ 准备：--full 全绿，写这批输入那一格
-$ bash .claude/gate.d/54-layer0-replay.sh --full
+$ bash .claude/gate.d/checker-tier-layer0-replay.sh --full
   · --full 开跑（2026-09-24）：不删任何一格，这一趟判红才删这批输入那一格；这一道的输入哈希 2c406d1eaecd2706…（3 个文件，登记路径 crates/ Cargo.toml Cargo.lock）
     LAYER0_PROGRESS slice=1/2 states=[0,131083) segments=0..=9 finished_slices=1/2 finished_states=131083/262165 elapsed_seconds=1.0
   ✓ 层 0 崩溃点重放全量跑完（第一个事务那条流、每个状态两遍恢复 + checker + 记录核对器；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -615,7 +615,7 @@ $ bash .claude/gate.d/54-layer0-replay.sh --full
 selftest-driver.sh: line 80: 95474 Killed                  FAKE_CARGO_SLEEP_FULL=5 bash "$stage" --full > "$base/interrupted-$signal_name.log" 2>&1
    发 SIGKILL 之后退出码 137：[标记 2 个：singlefs-layer0-full-green.2c406d1eaecd… singlefs-layer0-full-green.5e3b302b7908…]
 ════ SIGKILL 之后留下的那一格照样认 ⇒ 快档判绿
-$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh
+$ env SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（2c406d1eaecd2706…，3 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
       LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=true
@@ -694,9 +694,9 @@ rules-lint（照 gate.sh「规则纪律（项目本地）」的调法）退出�
 +bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 快档与全绿标记核对、QEMU 真设备，要十几分钟；层 0 全量不在里面）
  
  cargo test --workspace                    # 平时的单测；层 0 全量标 ignored，这里只跑缩小版
- bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放快档，并核这批输入有没有全量的全绿标记
--bash .claude/gate.d/54-layer0-replay.sh --full  # 层 0 全量（release），判绿写全绿标记；主 agent 在任务收尾时跑
-+bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记
+ bash .claude/gate.d/checker-tier-layer0-replay.sh   # 单跑层 0 崩溃点重放快档，并核这批输入有没有全量的全绿标记
+-bash .claude/gate.d/checker-tier-layer0-replay.sh --full  # 层 0 全量（release），判绿写全绿标记；主 agent 在任务收尾时跑
++bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记
  bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务
  bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
  bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）
@@ -711,15 +711,15 @@ rules-lint（照 gate.sh「规则纪律（项目本地）」的调法）退出�
  - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
  - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
  
--**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档、再核这批输入有没有层 0 全量的全绿标记；全量由 `bash .claude/gate.d/54-layer0-replay.sh --full` 跑，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
-+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档、再核这批输入有没有层 0 全量的全绿标记；全量由 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full` 跑，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
++**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 ```
 
 ## 附录：`r3/r3.diff` 原样
 
 ```
---- /tmp/claude-1000/gate54-tiering/r3/54-layer0-replay.sh.r2	2026-09-24
-+++ .claude/gate.d/54-layer0-replay.sh	2026-09-24
+--- /tmp/claude-1000/gate54-tiering/r3/checker-tier-layer0-replay.sh.r2	2026-09-24
++++ .claude/gate.d/checker-tier-layer0-replay.sh	2026-09-24
 @@ -8,7 +8,8 @@
  #     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
  #     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿标记按输入哈希分格：
@@ -728,7 +728,7 @@ rules-lint（照 gate.sh「规则纪律（项目本地）」的调法）退出�
 +#     开跑一格都不删：同一批输入的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。这一趟没写成标记就退出（判红、跑的过程中输入变了、
 +#     被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
  #     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
- #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+ #   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
  #     快档：两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
 @@ -34,7 +35,7 @@
  # --full 里没显式把 SINGLEFS_LAYER0_THREADS 设成 1、而本机多于 1 核却只起了 1 个工作线程：判红（多半是线程数没传进去）。

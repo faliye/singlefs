@@ -12,7 +12,7 @@ e6166346f5b54fb0e4f28e40557955be8058b35850f95957d6fe78321ef7e8c7  .claude/gate.d
 1466b83aea0a47ec93618f708c774e6e6ece58134d2c9cf617d807539fa4f078  .claude/gate.d/34-doc-experiment-pages-and-products.sh
 2980cc437aa4c27e167bbfe3dfe0fccfc8a42d07d02273b2533c0685e820799b  .claude/gate.d/43-checks-owed-and-closeout.sh
 71b003a3c46b4372ecd7909363a810f75fd6808d2446909938f413dad580f1c9  .claude/gate.d/47-code-tooling-selftests-and-registries.sh
-13d13f4f8448b1f33425f1d7cc08d911055284eab9e2192bbf17ea346c82f4e7  .claude/gate.d/54-layer0-replay.sh
+13d13f4f8448b1f33425f1d7cc08d911055284eab9e2192bbf17ea346c82f4e7  .claude/gate.d/checker-tier-layer0-replay.sh
 f6ae6bd8332c3ba2562c018d23f095a90d63e20d5740e466beadfcfd9a68d736  .claude/gate.d/55-qemu-device-streams.sh
 8e7fe5c05ab52d189cdd22c19997ad0438d56c5c18ddf2f7bdfd7058892ea659  .claude/gate.d/57-lkmm.sh
 5465020292ccc1a8c670d1db7f80f2e59e5d33c6d5e8f1eac8d7ef90263fdf4c  .claude/gate.d/59-crates-mutation-replay.sh

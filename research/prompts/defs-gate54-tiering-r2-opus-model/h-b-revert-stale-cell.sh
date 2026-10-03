@@ -41,7 +41,7 @@ run_case() { # <arm> <drift> <action>
     ( cd "$r" && FAKE_CARGO_HOLD="$hold" bash "$RUNS/outpath.sh" > "$r.c-full.log" 2>&1 ) &
     pid=$!
     for _ in $(seq 1 600); do [[ -e "$hold.started" ]] && break; sleep 0.1; done
-    stage_pid="$(descendant_matching "$pid" '54-layer0-replay.sh --full')"
+    stage_pid="$(descendant_matching "$pid" 'checker-tier-layer0-replay.sh --full')"
     case "$action" in
       during) echo "  ── --full 还在跑（54 号 pid $stage_pid），起门禁"; gate_staged_54 "$r"; : > "$hold.release"; wait "$pid" ;;
       kill9)  kill -KILL "$stage_pid"; : > "$hold.release"; wait "$pid"; echo "  ── 54 号 pid $stage_pid 被 SIGKILL 之后起门禁"; gate_staged_54 "$r" ;;

@@ -221,7 +221,7 @@ cargo 把没跟踪的 `src/bin/*.rs`、`tests/*.rs` 都认成目标；59 号拷�
 
 ### B4：三行放进同一次调用，这次调用的退出码恒为 0（`--full` 红、内存包装 250 / 251 都一样）
 
-被判的句子：`.claude/main-agent.md:59`「三行放进同一次 Bash 调用」与「全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红」；打印处 `.claude/gate.d/54-layer0-replay.sh:230`（「把下面三行命令放进同一次 Bash 调用」）与 `:233`，第三行以 `; git worktree remove --force "$layer0_full_base/tree"` 收尾。
+被判的句子：`.claude/main-agent.md:59`「三行放进同一次 Bash 调用」与「全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红」；打印处 `.claude/gate.d/checker-tier-layer0-replay.sh:230`（「把下面三行命令放进同一次 Bash 调用」）与 `:233`，第三行以 `; git worktree remove --force "$layer0_full_base/tree"` 收尾。
 
 历史（`g1-exit-status.sh`：三行从今天的 54 号现取，只把 54 号脚本与内存包装两个名字换成桩，在临时仓里放进同一次 `bash -c` 跑；换名是为了模型不碰层 0 与内存包装本身）：
 

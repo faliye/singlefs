@@ -1,0 +1,6 @@
+7a13b5b288be983cbbc477ebe63d0b70ac11c313b811c1e9ec2949c634c49ef0  .claude/kb/decisions/01-数据可移动性-反向索引.md
+571dfc06209500e453fa93bffc1ca3ad7e17ed642b4a58e0984a43d0741eb8f6  .claude/kb/decisions/02-RAID条带策略.md
+11e245ccf0037021dc2865948987756ae7421e83bec672afa317d72cdc6ad397  .claude/kb/decisions/03-空间分配.md
+8a96967f2d2dc7aae13622dae5955bffb74646fcaf3841cd72868cb6bf929269  .claude/kb/decisions/04-校验和位置.md
+e6fa0dc472fd1acb308a9f5d0fe0ab35f2ab5e2af80154f1a78ce456be7ad159  .claude/kb/decisions/05-快照-空间记账机制.md
+203f86d71dfc2d4cdfb534ed30517f8549ed865c9ddc01aa87fc298245479b0b  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md

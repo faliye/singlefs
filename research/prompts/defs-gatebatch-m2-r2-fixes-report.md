@@ -1,10 +1,10 @@
-# 门禁批第二轮改法（G1）交回：P1–P7、P9、P10、D2、标记字段，加 singlefs-39 的 54 号替换
+# 门禁批第二轮改法（G1）交回：P1–P7、P9、P10、D2、标记字段，加别的会话的 54 号替换
 
 写于 2026-09-26（交回时刻见文末）。规格 `/tmp/claude-1000/gate-batch-m2-r2-fixes/spec.md`，判决 `research/prompts/defs-gatebatch-m2-r2-main-verification.md` 第二、三节。
 
 ## 结论
 
-- 判决第二节 P1–P7、P9、P10、D2、标记字段全部落进仓里五份文件；singlefs-39 的 54 号替换先套上（命中 1 次、新 inode，与 `54-after.sh` 逐字节相同）。P8 没做（照规格）。G3 写进 `admission.py` 文件头「管不到的」一段。
+- 判决第二节 P1–P7、P9、P10、D2、标记字段全部落进仓里五份文件；别的会话的 54 号替换先套上（命中 1 次、新 inode，与 `54-after.sh` 逐字节相同）。P8 没做（照规格）。G3 写进 `admission.py` 文件头「管不到的」一段。
 - 改前在攻方两个探针上各格原样判错，改后同一探针在仓的临时拷贝上复跑，剩下的是否只有 L12、R5、M3、G3 见「rerun.sh 复跑」一节。
 - 三份自证在仓里全过：`admission.py` 207 格（原 167 格）、`lib_heavy_tests.py` 132 种（原 109 种）、`heavy-test-guard.sh` 658 种（原 628 种）；新加的每一格都有弄坏开关，开关打开时对应那几格转红（原样行见「弄坏开关证红」一节）。
 - 47 号退 1、doc-lint 退 1，红的都不在这一批的文件里（check-segment-registry.py 的 E142 段序列、kb 里的编号引用），见「门禁与 lint」一节；62、63、gate-lint、shell-lint 全绿。
@@ -14,13 +14,13 @@
 
 | 文件 | 改了什么 | 对应改法 |
 |---|---|---|
-| `.claude/gate.d/54-layer0-replay.sh` | 套 singlefs-39 那一处（`stage-run-or-skip.sh`）；清单改给 `--judging-digest`，不再给 54 号与整份准入模块；起用例改照 `admission.py crash-case-command` 交的 NUL 分隔词跑（`read_crash_case_command`、`run_crash_case <日志> <命令…>`），线程数、续跑变量、进度目录都由它交；判日志与写标记的核数、线程数、explicit/default 取它交的前三个；删掉自己算线程数的那一段；文件头相应改写 | 替换、D2、标记字段 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh` | 套别的会话那一处（`stage-run-or-skip.sh`）；清单改给 `--judging-digest`，不再给 54 号与整份准入模块；起用例改照 `admission.py crash-case-command` 交的 NUL 分隔词跑（`read_crash_case_command`、`run_crash_case <日志> <命令…>`），线程数、续跑变量、进度目录都由它交；判日志与写标记的核数、线程数、explicit/default 取它交的前三个；删掉自己算线程数的那一段；文件头相应改写 | 替换、D2、标记字段 |
 | `research/scripts/admission.py` | P4/P4b（`attributes_before_each_definition`、`definitions_marked_ignored`、`IGNORE_ATTRIBUTE_FORM` 许 `# [`）；P6（`COMPILE_TIME_COMPUTED_INCLUDE`：include 族参数不以字符串字面量开头就按宽处理，宏名带 `::core::` / `std::` 也认）；P7（`files_crash_cases_do_not_read` 在有这种 include 时一份都不减）；P9（`program_contents` 把首词之后指到现存文件的参数按内容接上）；D2（`crash_case_judging_digest_text` 等、`--judging-digest`、`crash-case-command` 子命令、`crash_case_launch`、`crash_case_worker_threads`）；标记字段（`started_worker_threads=` 由判日志写，`configured_worker_threads=` 由 `crash-case-record` 按 `--machine-cores/--threads/--threads-origin` 写，旧的 `--threads-text` 与 `worker_threads=` 去掉）；自证加格与 9 个弄坏开关；文件头 | P4、P4b、P6、P7、P9、D2、标记字段、G3 声明 |
 | `.claude/hooks/lib_heavy_tests.py` | P1（`launcher_option`：短选项合写逐字母查表）；P2（`LAUNCHER_ENVIRONMENT_OPTIONS`：`systemd-run -E` / `--setenv` 的 NAME=VALUE 写在交回命令最前面，交回的首词是赋值时不当包装剥）；P3（`libtest_lists_only` 跳过带值选项的值，cargo 与直接执行两处都换）；P5（`crash_case_function_runs_without_ignored` 判不出按没标）；P10（`configuration_value_names_runner` 按 TOML 读 `--config`）；样本工作区多登记四条（cfg 二选一、子模块同名、宏生成、`# [ignore]`）；自证加格；`LIB_HEAVY_TESTS_BREAK` 五个开关；文件头 | P1、P2、P3、P5、P10 |
 | `.claude/hooks/heavy-test-guard.sh` | 自证加 10 格（走 JSON 判定）；文件头里 `--list`、runner、「没标 #[ignore]」、接受的误拒三处字面跟着改；判定逻辑没动（它已经把剥出来的命令重新切词，NAME=VALUE 前缀照认） | P1–P5、P10 的闸那一侧 |
 | `.claude/rules/implementation-workflow.md` | 重型测试清单「崩溃枚举用例」一条与 `--list` / 剥包装那一段的字面跟着闸改 | 字面 |
 
-逐文件改动行数（`diff 备份 现文件` 数出来的 `>` / `<`）：54 号 +72 −50、admission.py +516 −95、lib_heavy_tests.py +174 −24、heavy-test-guard.sh +33 −5、implementation-workflow.md +2 −2。diff 在 `/tmp/claude-1000/gate-batch-m2-r2-fixes/my-changes.diff`（1630 行，由 `backup/` 与现文件生成；54 号那一份含 singlefs-39 的替换，因为备份是替换之前的）。
+逐文件改动行数（`diff 备份 现文件` 数出来的 `>` / `<`）：54 号 +72 −50、admission.py +516 −95、lib_heavy_tests.py +174 −24、heavy-test-guard.sh +33 −5、implementation-workflow.md +2 −2。diff 在 `/tmp/claude-1000/gate-batch-m2-r2-fixes/my-changes.diff`（1630 行，由 `backup/` 与现文件生成；54 号那一份含别的会话的替换，因为备份是替换之前的）。
 
 改法怎么写的、与判决字面有出入的两处：
 - P6 写成「include 族宏的参数不以字符串字面量开头」一条正则，而不是逐个列 `concat!` / `env!` / `option_env!`：include 的参数只能是字面量或宏，这样写把判决点名的三个宏连同别的宏（用户自己的 `macro_rules!`）一起罩住，方向只会少减、多重跑。真仓 `crates/` 里 include 只有一处 `include_str!("model.rs")`（字面量，`grep -rnE 'include(_str|_bytes)?\s*!' crates --include=*.rs` 现跑），四条真用例的清单改前改后都是 61 个文件、减去 92 个（改前模块与改后模块各跑一遍 `crash-case-manifest`）。
@@ -28,7 +28,7 @@
 
 ## D2 与标记字段：改前判错 → 改后判对
 
-在草稿目录的临时小仓（包 pkg、用例 own_case、登记 count-line=C561_SIGMA_FULL，与 c561 同形）上，改前拿备份的 admission.py 与套完 singlefs-39 替换、还没做 D2 的 54 号（`/tmp/claude-1000/gate-fix-54-handoff/54-after.sh`），照那时 54 号给的参数（两个 `--extra-file`）算指纹；改后拿这一批的两份、给 `--judging-digest`。脚本 `/tmp/claude-1000/gate-batch-m2-r2-fixes/demo_d2_marker.py`，原样输出（`demo-d2-marker.log`）：
+在草稿目录的临时小仓（包 pkg、用例 own_case、登记 count-line=C561_SIGMA_FULL，与 c561 同形）上，改前拿备份的 admission.py 与套完别的会话替换、还没做 D2 的 54 号（`/tmp/claude-1000/gate-fix-54-handoff/54-after.sh`），照那时 54 号给的参数（两个 `--extra-file`）算指纹；改后拿这一批的两份、给 `--judging-digest`。脚本 `/tmp/claude-1000/gate-batch-m2-r2-fixes/demo_d2_marker.py`，原样输出（`demo-d2-marker.log`）：
 
 ```
 # D2：每条崩溃枚举用例的指纹里，准入模块与 54 号怎么进
@@ -223,7 +223,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 ## 与实分一交来的四份 diff 相邻的地方（`/tmp/claude-1000/impl-shard-1/deliver/`，这一次没套）
 
 重打时按新代码手工对，下面几处上下文已经变了，原 hunk 不会直接套上：
-- `54-layer0-replay.sh`：文件头「断点续跑」那三行（它在后面加双机分片四行）我改写了；`run_crash_case` 整个改写成 `run_crash_case <日志> <命令…>`，前面多了 `read_crash_case_command`（它要在 `run_crash_case` 后面加 `run_crash_case_in_two_shards`）；循环里「开跑」那一句与 `if ! run_crash_case …` 那一段我改了（它把这一段换成分片 / 单机两支）。它在「--full 开跑」那一句之后加的分片判定那几行，上下文我没动。
+- `checker-tier-layer0-replay.sh`：文件头「断点续跑」那三行（它在后面加双机分片四行）我改写了；`run_crash_case` 整个改写成 `run_crash_case <日志> <命令…>`，前面多了 `read_crash_case_command`（它要在 `run_crash_case` 后面加 `run_crash_case_in_two_shards`）；循环里「开跑」那一句与 `if ! run_crash_case …` 那一段我改了（它把这一段换成分片 / 单机两支）。它在「--full 开跑」那一句之后加的分片判定那几行，上下文我没动。
 - `admission.py`：文件头第三列说明（test= 那两行我改成四行，它改「认四种 → 五种」与 threads= 那一行）、子命令表（crash-case-manifest / crash-case-record 两条我改了，它在 crash-case-marker-path 之后加 crash-case-shardable）、弄坏开关那一段（同一行我续了 8 个开关，它续 threads-ignore-shards）、「崩溃枚举用例」一节开头的注释（我改了 ① 与 ② ③）、自证成功那一句（同一行两边都续）、`FAKE_CARGO_FOR_STAGE` 的 printf 行（我加了第 9 列线程数）、分派表 COMMANDS 与 main 的用法句（两边都加一项）。`parse_crash_case`、`judge_worker_threads` 两边都没冲突：它改的那几处我没动，但我的判法摘要自证有一格改 `parse_crash_case` 里 `if prefix not in count_lines]` 那一串，它要保证那一串在函数里仍恰好一处。
 - `lib_heavy_tests.py`：它加的 KNOWN_SCRIPT_LOCATIONS 一项、classify 里 layer0-shard-run.sh 那一支、自证里三格与一个按名字判的格，所在的上下文我没改，按行号偏移应能套上（没试）。
 - `stage-inputs.tsv`：我没改。
@@ -256,7 +256,7 @@ ADMISSION_BREAK=ignore-attribute-without-space → 退 1
 ## 草稿目录与清理
 
 - 删了（交回之前，`du -sh` 记的大小）：`/tmp/claude-1000/gate-batch-m2-r2-fixes/dev`（172M，开发用的仓拷贝）、`before-repo`（172M，改前探针用的仓拷贝）、`rerun-repo`（360M，rerun.sh 用的仓拷贝，含 .git）、`rerun-scratch`（205M，含 `semantics/crate/target` 编译目录）、`probe-scratch-before`（3.9M，探针小仓）；`mut54`（开发副本的一份拷贝）判完当场删了。
-- 留着：`backup/`（五份改前原件，`cp -p`）、`my-changes.diff`、各份日志（`before-k1-*.log`、`rerun-out/`、`final-*.log`、`lib-break-*.log`、`guard-*break-*.log`、`lint-*.log`、`demo-d2-marker.log`、`mut54-selftest.log`）、`demo_d2_marker.py`、`54-before-d2.sh`（套完 singlefs-39 替换、D2 之前的 54 号，演示用）。
+- 留着：`backup/`（五份改前原件，`cp -p`）、`my-changes.diff`、各份日志（`before-k1-*.log`、`rerun-out/`、`final-*.log`、`lib-break-*.log`、`guard-*break-*.log`、`lint-*.log`、`demo-d2-marker.log`、`mut54-selftest.log`）、`demo_d2_marker.py`、`54-before-d2.sh`（套完别的会话替换、D2 之前的 54 号，演示用）。
 - 攻方的草稿目录 `/tmp/claude-1000/defs-gatebatch-m2-r2-opus/` 不是我建的，没动（我的探针与复跑都把 SCRATCH_ROOT 指到了自己的草稿目录）。
 
 交回时刻：2026-09-27。

@@ -144,7 +144,7 @@
 
 ### agent-common.md 内存包装退出码（对应甲组 A7，`report-A.md:15`）与 main-agent.md 退出码措辞（对应甲组 A9，`report-A.md:17`，丙组第 1 条，`report-C.md:9`）
 
-已在前文分段核实，均是直接后果：`agent-common.md`（`grep -n '253 是超过限时'` 命中一处）逐字对应甲组 A7 建议；`main-agent.md:59` 与 `54-layer0-replay.sh:230`（`grep -n '退出码是经内存包装的那条'`，两处都命中）把措辞改成「退出码是经内存包装的那条 `--full` 命令的，250–254 是包装自己的结局」，比甲组 A9 建议的「退出码是内存包装的：0–249 就是 `--full` 的，250–254 照 `.claude/agent-common.md` 那张表读」少了「照哪张表读」这个指向，但没有引入新的错误说法；配合丙组第 1 条对 `54-layer0-replay.sh:232-234` 脚本本身的修复（`layer0_tree_ready` 守卫，apply 失败时不再无条件跑 `--full` 而是直接把 `layer0_full_rc` 设成 1），改后措辞与脚本今天的真实行为一致（已现查脚本源码确认守卫逻辑存在）。
+已在前文分段核实，均是直接后果：`agent-common.md`（`grep -n '253 是超过限时'` 命中一处）逐字对应甲组 A7 建议；`main-agent.md:59` 与 `checker-tier-layer0-replay.sh:230`（`grep -n '退出码是经内存包装的那条'`，两处都命中）把措辞改成「退出码是经内存包装的那条 `--full` 命令的，250–254 是包装自己的结局」，比甲组 A9 建议的「退出码是内存包装的：0–249 就是 `--full` 的，250–254 照 `.claude/agent-common.md` 那张表读」少了「照哪张表读」这个指向，但没有引入新的错误说法；配合丙组第 1 条对 `checker-tier-layer0-replay.sh:232-234` 脚本本身的修复（`layer0_tree_ready` 守卫，apply 失败时不再无条件跑 `--full` 而是直接把 `layer0_full_rc` 设成 1），改后措辞与脚本今天的真实行为一致（已现查脚本源码确认守卫逻辑存在）。
 
 什么现象会推翻它：`.claude/agent-common.md` 那张退出码表被进一步改写而 `run-with-memory-cap.sh` 文件头的表没有跟着改（两处出现分歧）——现查 `agent-common.md:46`（`grep -n` 现取）末尾写「退出码表以 `research/scripts/run-with-memory-cap.sh` 文件头为准」，把权威定义指向脚本本身而不是自己重复一份表，不存在两处分歧的可能，判定站得住。
 

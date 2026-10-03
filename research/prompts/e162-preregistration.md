@@ -1132,7 +1132,7 @@ print('drop picks first3', [g.next() % 1000 for _ in range(3)])
 | `.claude/kb/decisions/08-核心索引结构.md` | grep 命中 203 |
 | `.claude/kb/decisions-history/2026-08.md` | grep 命中 534 |
 | `.claude/kb/decisions-history/2026-09.md` | grep 命中 1208、6456、6488、8588、8618、8710 |
-| `.claude/gate.d/54-layer0-replay.sh` | grep 命中 25、26、28、33、267、466、470、473、516、517、534、562 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh` | grep 命中 25、26、28、33、267、466、470、473、516、517、534、562 |
 | `crates/singlefs-harness/src/crash.rs` | grep 命中 1519、1980、2386、2692、2730、2735、2737、2742、2744、2796、2924、2967、3160、4358；1519-1535；1980-1990；2380-2392；2730-2746；2790-2800；2921-2926 |
 | `crates/singlefs-harness/src/layer0_progress.rs` | 1-17；grep 命中 8、21、30、63、67、112、123、130、185、193、264、272、304、442、463、478、479、566、651、1145、1148、1156、1160、1195、1408、1411、1419、1771、1799、1816；476-481；1136-1162；1188-1198；1400-1422 |
 | `research/scripts/layer0-shard-run.sh` | 14-16；grep 命中 42、134、137、139、141、155、165；150-158 |

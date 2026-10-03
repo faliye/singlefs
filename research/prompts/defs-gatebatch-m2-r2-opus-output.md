@@ -57,7 +57,7 @@ SUMMARY K1 排除规则与 runner 指纹: cells=12 attack_cells_broken=2 control
 
 ### Y1 `--extra-file`：两处是同一份，没打中
 
-- 快档与 `--full` 都调同一个 `write_crash_case_manifest`，`--extra-file` 只写在一处：`.claude/gate.d/54-layer0-replay.sh:173` `      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" \`、`:174` `      --extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module" --toolchain --build-environment)"; then`。`crash-case-record` 不重算指纹，记的是开跑那一次的（跑完那一次与它相等才走到这一步）；`crash-case-marker-check` 拿的是快档刚算的。
+- 快档与 `--full` 都调同一个 `write_crash_case_manifest`，`--extra-file` 只写在一处：`.claude/gate.d/checker-tier-layer0-replay.sh:173` `      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" \`、`:174` `      --extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module" --toolchain --build-environment)"; then`。`crash-case-record` 不重算指纹，记的是开跑那一次的（跑完那一次与它相等才走到这一步）；`crash-case-marker-check` 拿的是快档刚算的。
 - 两处读的 54 号与准入模块都是「这一份 54 号所在的那棵树」里的：`gate.sh --staged` 在临时 worktree 里按 `$ROOT/.claude/gate.d` 起阶段（`.claude/singlefs-ai-sop/scripts/gate.sh:505` 取 `GATE_D`），`--full` 照定义用 worktree 里那一份，两边都是暂存内容。名字那一格取 `basename "$0"`，门禁用 `bash <阶段>` 起（不 `source`），`$0` 两边相同。
 - 仓里自证原样（`outputs/selftest-admission.log:151`、`:165`、`:166`）：`  ✓ 54 号快档：两条流跑不标 ignored 的用例，三条用例的标记都作数，判绿`；只改 54 号、只改准入模块各加一行注释，快档照样核标记、三条都判红。
 - 试过没打中的：主工作区不带 `--staged` 跑快档（工作区里准入模块有没暂存的改动）⇒ 指纹与 worktree 里 `--full` 写的不同，只会假红；这一形第一轮 J3-c 已记，不重复。
@@ -215,7 +215,7 @@ M1、M2 的前提在真 cargo 上成立：`outputs/semantics.log:44-46` `ENV_LEN
 
 - 门禁对它只要「恰好一行 `test result: ok. 1 passed; …`」加「恰好一行 `C561_SIGMA_FULL `」。计数行里的 `states=`、`record_claimed_state_missing_unit=` 一个都不读（S2、S3 判绿），靠的全是用例自己的断言（`crates/singlefs-harness/tests/record_checker_judges_absence_by_the_persisted_set.rs:588` `    assert_eq!(state_count, 262_144, "σ 有 18 个写");`、`:590` `        reported_missing, 0,`）。
 - **单线程跑完也判绿**（S4）：它按 `SINGLEFS_LAYER0_THREADS` 自己起线程（同文件 `:554` `    let worker_threads = u64::try_from(Layer0Parallelism::from_environment().worker_threads.get())`），不打任何线程行。规则那一段（`.claude/rules/implementation-workflow.md:89`）先写 54 号「这一趟跑了至少两片、没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红」，末句是「别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。」c561 是登记给 54 号的崩溃枚举用例，读者按前一句会以为它也被判了，实际它落在末句里。线程数不进它的判，这一层看不见的是「c561 自己的代码把线程写死成 1」：54 号没把线程数传进去、`Layer0Parallelism::from_environment` 坏了，都会改到 54 号或 `crates/singlefs-harness/src/crash.rs`，另外三条用例的指纹跟着变、跟着重跑、跟着被判线程（推的）；只改 c561 那份测试文件时，只重跑 c561，没人判它的线程。
-- **标记里一格的字面会误导**：判绿之后 `worker_threads=` 那一格记的是 `--threads-text`（`research/scripts/admission.py:1911` `                   ("judged_root", values["--judged-root"]), ("worker_threads", values["--threads-text"])]`），对 c561 那一句只有 `SINGLEFS_LAYER0_THREADS=<值>（没设，取本机核数），本机 <n> 核`（`.claude/gate.d/54-layer0-replay.sh:384` 拼的）：是配置值，不是起了几个线程；读标记的人（崩溃验证员原样抄计数行）会当成「用了 n 个线程」（推的读法）。
+- **标记里一格的字面会误导**：判绿之后 `worker_threads=` 那一格记的是 `--threads-text`（`research/scripts/admission.py:1911` `                   ("judged_root", values["--judged-root"]), ("worker_threads", values["--threads-text"])]`），对 c561 那一句只有 `SINGLEFS_LAYER0_THREADS=<值>（没设，取本机核数），本机 <n> 核`（`.claude/gate.d/checker-tier-layer0-replay.sh:384` 拼的）：是配置值，不是起了几个线程；读标记的人（崩溃验证员原样抄计数行）会当成「用了 n 个线程」（推的读法）。
 
 四句：
 - 分不分辨臂：不涉及臂。
@@ -234,7 +234,7 @@ M1、M2 的前提在真 cargo 上成立：`outputs/semantics.log:44-46` `ENV_LEN
 - 仓里自证原样（`outputs/selftest-admission.log:166`）：`  ✓ 54 号快档（不带 SINGLEFS_GATE_FULL=1）：只改准入模块（加一行注释） ⇒ 照样核标记，判红并点名 crash-case:stream-a、crash-case:stream-b、crash-case:case-c，不退 77`；第 165 行同样一句，改的是 54 号。一行注释就让所有用例重跑。
 - admission.py 里真正决定「日志判不判绿、标记作不作数、登记行怎么读」的，从 13 个入口（`judge_crash_case_log`、`judge_worker_threads`、`crash_case_marker_problems`、`read_crash_case_marker`、`check_crash_case_marker`、`write_crash_case_marker`、`crash_case_marker_path`、`parse_crash_case`、`crash_case_of_key`、`crash_cases_of` 与三个 `command_crash_case_*`）按 ast 顺着模块级名字求闭包：`outputs/k4-cost.log:1` `MEASURE admission.py 全文 3194 行；闭包 37 个定义、365 行（11%）；自证从第 1944 行起到文件尾共 1251 行`。其余 89% 是实验准入、门禁复用、门禁前提、构建环境、排除法、自证。
 - 这一批 Y1–Y8 对 admission.py 的改动：`outputs/k4-cost.log:33` `MEASURE 附录二 admission.py 的 21 个 hunk：落在判法闭包里 0 个，闭包外 21 个`；改法前后判法闭包逐字节相同（第 11 行 `…判法摘要 0f18d61a0a890957…，今天 0f18d61a0a890957…，相同…`）。也就是说这一批 21 处改动没有一处改判法，按 Y1 却每一处都足以让四条全重跑。
-- 54 号 403 行，决定「跑的是什么、怎么判」的只有起用例的那几行（`.claude/gate.d/54-layer0-replay.sh:205` 起的 `run_crash_case`、`:210` `    cargo test --release -p "$1" --test "$2" -- --include-ignored --exact "$3" --nocapture 2>&1 \`、线程数那一段与调 `crash-case-judge` / `crash-case-record` 的参数），其余是快档、出路句与说明。54 号的提交历史：`git log --format='%ad' --date=format:'%m-%d' -- .claude/gate.d/54-layer0-replay.sh` 现跑是 `09-24 09-22 09-20 09-19 09-18 09-16 09-14 09-14`，11 天里 8 次（admission.py 是这一批新建的、没进 git，没有历史可数）。照这个频率外推，54 号平均不到两天改一次，第二条流全量约 2.3–2.8 天（第一轮判决与背景里的数，都是推的），它的标记会一直追不上（推的）。
+- 54 号 403 行，决定「跑的是什么、怎么判」的只有起用例的那几行（`.claude/gate.d/checker-tier-layer0-replay.sh:205` 起的 `run_crash_case`、`:210` `    cargo test --release -p "$1" --test "$2" -- --include-ignored --exact "$3" --nocapture 2>&1 \`、线程数那一段与调 `crash-case-judge` / `crash-case-record` 的参数），其余是快档、出路句与说明。54 号的提交历史：`git log --format='%ad' --date=format:'%m-%d' -- .claude/gate.d/checker-tier-layer0-replay.sh` 现跑是 `09-24 09-22 09-20 09-19 09-18 09-16 09-14 09-14`，11 天里 8 次（admission.py 是这一批新建的、没进 git，没有历史可数）。照这个频率外推，54 号平均不到两天改一次，第二条流全量约 2.3–2.8 天（第一轮判决与背景里的数，都是推的），它的标记会一直追不上（推的）。
 
 ### 代价对不对
 

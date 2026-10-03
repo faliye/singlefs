@@ -30,7 +30,7 @@ a853cbbb6cd2b1f5acce628f711a97902ff1b90ffcea51b3941b145b077f996d  .claude/skills
 78cfbd79315e03fed17f52fd6ee7e5584d468fa9e339dc283069230df4b57749  .claude/hooks/runner-dispatch-guard.sh
 8a52b052e9f0d865a5a6c47a5c71632fd66b5e58372e132bd7ac8be1ef84ee24  .claude/hooks/bash-command-detector.sh
 c8ed3bbe97d44000d9eb01f7793e51ec8e57ef3b3d2ecb6b7275e24c1ddb60f3  .claude/hooks/agent-write-scope.tsv
-cb728520c264c66d2f32768f5e9ee5a1f284b9ccb8a03502bbb8f7008a863653  .claude/gate.d/54-layer0-replay.sh
+cb728520c264c66d2f32768f5e9ee5a1f284b9ccb8a03502bbb8f7008a863653  .claude/gate.d/checker-tier-layer0-replay.sh
 534604085013f912dbb124649dd351d5953ce320fa691741b829cc278bc89750  .claude/gate.d/20-kb-shape.sh
 5c249439304d4b5f6296650e802e999a4bd71992c8f638f5f99ff3b68973e4d2  .claude/gate.d/75-decision-experiment-links.sh
 9bba81a6c9521c98a97fb86e240123127fe0faabbcd1161f4689cec08887c29c  .claude/gate.d/90-term-renames.sh

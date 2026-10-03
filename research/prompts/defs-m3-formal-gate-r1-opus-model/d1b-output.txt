@@ -1,0 +1,9 @@
+崩溃验证员第 1 步，照 crash-verifier.md 的两条命令（在拷贝里）：
+  git diff --quiet -- <登记路径> <阶段脚本> 退 0
+  git ls-files --others --exclude-standard -- crates 'research/results/e165-*-red-examples.tsv' 打出 0 行
+  （对照）同一条换成整个 research/results/ 打出 1 行
+崩溃验证员在工作区判绿、写标记：<common-dir>/singlefs-stage-green.checker-tier-formal-verification.sh.f3e0854da931eb44b0b00d459ef5870c0309291a4636e0fa29ea3cd9148c0411
+gate.sh --staged 的临时 worktree（HEAD + 暂存区，这里暂存区与 HEAD 相同）：
+  stage-marker-check 退 1 ：这批输入（指纹 0d7e96d4f72f260e…）没有全绿标记：<common-dir>/singlefs-stage-green.checker-tier-formal-verification.sh.0d7e96d4f72f260e3c83619995aeb64cc625cc05292b670f138adf39bf8f23f6
+  gate-reuse 退 0 （0 = 要跑）：输入与上次整轮全绿那棵树相同，但这一道上一次判绿时的环境没记下（<common-dir>/singlefs-gate-environment.checker-tier-formal-verification.sh），判不出环境变没变，按要跑处理
+（对照）删掉那份未跟踪产物后，工作区 stage-marker-check 退 1 ：这批输入（指纹 0d7e96d4f72f260e…）没有全绿标记：<common-dir>/singlefs-stage-green.checker-tier-formal-verification.sh.0d7e96d4f72f260e3c83619995aeb64cc625cc05292b670f138adf39bf8f23f6

@@ -1009,7 +1009,7 @@ ANCHOR point=G11_merge_reading path=before_window operations=43 writes=31 barrie
 - 重抄：`nice -n 19 python3 research/scripts/quote-kb.py <草稿目录>/step0/baseline-clauses-step0.md <第十三节命令二的六个取法> '.claude/kb/decisions/16-发布语义.md@#### 已定项 7：发布的持久顺序'`，「✓ 7 段整抄进 …，回读逐字节一致」，189 行，**sha256 `e1bda65b8b3c333efc4cba03cf88dfbce7ca43d7a22ae837e7a49d5ba8cf49ce`**（其中 D16 那一段第 168–189 行 sha256 `1702a15a3dbfa61a498283b2825d50dd65284a73d38dd514a736835119ed411f`）。步 ② 开工前与步 ③(1) 的重抄都比这一个值。
 - 与 那一版（第二节原文按 R19C-3(b) 的 diff 还原、接上 R19C-2 抄的 D16 那一段）逐行比，不同的有三类，逐条判：
   1. D13 已定项 4 的出处行 `:69-83` → `:70-84`：同文件上方多了一行，条款正文一字没变。
-  2. `layout/01` 第八节表格第 6–9 行（写行、后续暖机、抬 F、只做过 mkfs 的池）与表后「第二条流」一段里的用例路径 `crates/singlefs-harness/tests/second_transaction_…` → `crates/singlefs-checker/tests/second_transaction_…`（派发提示说的「被 singlefs-8b 挪进 `crates/singlefs-checker/tests/` 的 11 份测试」），段序列、写数、种类串、闭式一个字没变。**这一类派发提示那句没点名**，照实记在这里、报告里交主 agent。
+  2. `layout/01` 第八节表格第 6–9 行（写行、后续暖机、抬 F、只做过 mkfs 的池）与表后「第二条流」一段里的用例路径 `crates/singlefs-harness/tests/second_transaction_…` → `crates/singlefs-checker/tests/second_transaction_…`（派发提示说的「被别的会话挪进 `crates/singlefs-checker/tests/` 的 11 份测试」），段序列、写数、种类串、闭式一个字没变。**这一类派发提示那句没点名**，照实记在这里、报告里交主 agent。
   3. D16 已定项 7 依据第二条「实现待派（排在实审 A3c 之后），代价另登记小实验量」→「实现已合入（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`，实 C577（系统配置没见证到的最新根，乙罩不到） 报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`），代价仍另登记小实验量」：派发提示点名的那一处。D16 第 15 行索引表那一格不在七个取法里，今天是「…→ 根槽（FUA）→ 系统配置槽 → 屏障；…」。
 - 臂 N18、N19、N19C 的「怎么做」与第六、七节的门槛没有一处引这三类改动的字句 ⇒ 臂与判据不改；比对仍逐字节，基线换成上面这个值（与 R19C-3(b) 同一种收严）。
 

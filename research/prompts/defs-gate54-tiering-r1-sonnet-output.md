@@ -34,7 +34,7 @@
 
 > 「| 改 `crates/`：条款已定、验收标准写得清、改动有界（照已定分项实现、补测试与变异、修原因已知的红） | `implementation-writer`（后台派，主 agent 审 diff）→ 上一行的三方（代码轮）→ `crash-verifier`（层 0、QEMU、herd7、crates 变异表） |」
 
-是在**每一次**「改 `crates/`」的代码轮之后被派发，不是「一个任务收尾时」才派发一次；一个阶段任务里可能有多次「改 `crates/`」（多次 implementation-writer → 代码轮 → crash-verifier），K2 让 crash-verifier 每次都带 `--full`，等于把「全量」重新钉回 Q8 明令要撤掉的「每次都跑」。`--full` 这条路径本身不做复用短路——`.claude/gate.d/54-layer0-replay.sh` 里「能不能复用」「碰没碰 crates/」两问都包在 `if [[ "$layer0_tier" == quick ]]` 分支里，`--full` 一律真跑一遍全量，不是空跑。
+是在**每一次**「改 `crates/`」的代码轮之后被派发，不是「一个任务收尾时」才派发一次；一个阶段任务里可能有多次「改 `crates/`」（多次 implementation-writer → 代码轮 → crash-verifier），K2 让 crash-verifier 每次都带 `--full`，等于把「全量」重新钉回 Q8 明令要撤掉的「每次都跑」。`--full` 这条路径本身不做复用短路——`.claude/gate.d/checker-tier-layer0-replay.sh` 里「能不能复用」「碰没碰 crates/」两问都包在 `if [[ "$layer0_tier" == quick ]]` 分支里，`--full` 一律真跑一遍全量，不是空跑。
 
 两边原文并排：
 
@@ -48,7 +48,7 @@
 
 > 「1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号时，不起 54 号，等它结束。」
 
-这句碰撞检测只挡得住「另一个 `gate.sh`」，而 K3 让主 agent 在阶段同步那一步直接跑 `bash .claude/gate.d/54-layer0-replay.sh --full`（`.claude/main-agent.md:43`），这条命令不经过 `gate.sh`，字面上不是「别的 `gate.sh`」。我在 `.claude/gate.d/54-layer0-replay.sh` 里 `grep -n '正在跑\|已有\|lock\|flock\|ps -'` 零命中——脚本自己也没有互斥锁。**缺哪一句**：`crash-verifier.md:23` 没有覆盖「主 agent 直接跑 54 号脚本本身（不经 `gate.sh`）」这一种碰撞源，这一半推不出「K2 与 K3 不会撞车」，只能推出「碰撞检测这句话的射程窄于 K3 引入的新触发路径」。
+这句碰撞检测只挡得住「另一个 `gate.sh`」，而 K3 让主 agent 在阶段同步那一步直接跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`（`.claude/main-agent.md:43`），这条命令不经过 `gate.sh`，字面上不是「别的 `gate.sh`」。我在 `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `grep -n '正在跑\|已有\|lock\|flock\|ps -'` 零命中——脚本自己也没有互斥锁。**缺哪一句**：`crash-verifier.md:23` 没有覆盖「主 agent 直接跑 54 号脚本本身（不经 `gate.sh`）」这一种碰撞源，这一半推不出「K2 与 K3 不会撞车」，只能推出「碰撞检测这句话的射程窄于 K3 引入的新触发路径」。
 
 什么现象会推翻「冲突」这条判断：如果查到用户定案或规则明确说「crash-verifier 每次跑的 `--full` 允许被短路成复用」，或者查到 crash-verifier 实际只在「一个阶段任务」里最多被派发一次，这条冲突就不成立。什么现象会推翻「碰撞检测缺口」那句：如果查到 `--full` 内部或 `gate.sh` 之外另有一层互斥（比如文件锁），这条缺口就不成立。
 
@@ -56,13 +56,13 @@
 
 **改动**：`.claude/main-agent.md:43`（「什么时候派哪个 agent」表「一个阶段任务结束」一行）：
 
-> 「……→ 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/54-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行」
+> 「……→ 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行」
 
 **核心落点是不是用户定案的直接后果**：是。Q8 原话「每次主 agent 执行完任务后统一执行」，其收口结论额外写明「改之前先写清『任务收尾』是哪一步（阶段同步那一步）」（引文同 K1，`records:147`）。K3 把触发点放在「一个阶段任务结束」这一行，即正文自己框定的「阶段同步」那一步，与用户定案逐字对得上：**落点一致**。
 
 **触发条件与规则冲突**：K3 的触发条件写的是「这一批碰了 `crates/` 就……」（同上，`main-agent.md:43`），但 54 号实际登记的输入集是三项，`.claude/gate.d/stage-inputs.tsv:11`：
 
-> 「54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）」
+> 「checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）」
 
 而 `.claude/rules/implementation-workflow.md:32`「复用上一次全量门禁的判定」一节明令：
 
@@ -74,7 +74,7 @@
 |---|---|
 | 判据是那一道读的全部输入变没变，不是「我改的是不是 `crates/`」 | 触发条件写成「这一批碰了 `crates/` 就……」，只字未提 `Cargo.toml`／`Cargo.lock` |
 
-这处冲突不是假想：一批只改 `Cargo.lock`（比如升级一个依赖版本、不碰任何 `crates/` 下的文件）时，54 号的输入哈希（按 `stage-inputs.tsv:11` 登记的三项算）已经变了、旧的全绿标记对不上新状态，但 K3 这句触发条件不会为它后台跑 `--full`——阶段同步这一步会跳过全量，等到下一次整轮门禁跑快档时才会因为标记的输入哈希不等而判红（`.claude/gate.d/54-layer0-replay.sh:219` 的 `marker_input_hash != layer0_input_hash` 分支）。红本身不算「不该红的红了」，但「该跑全量的没跑」在阶段同步这一步确实成立——这属于正文五「跑前条款」第二款描述的形状（「攻方给出一条可达历史，在上面该跑全量的没跑……」），值得攻方腿（Opus）拿这条具体历史去实测。
+这处冲突不是假想：一批只改 `Cargo.lock`（比如升级一个依赖版本、不碰任何 `crates/` 下的文件）时，54 号的输入哈希（按 `stage-inputs.tsv:11` 登记的三项算）已经变了、旧的全绿标记对不上新状态，但 K3 这句触发条件不会为它后台跑 `--full`——阶段同步这一步会跳过全量，等到下一次整轮门禁跑快档时才会因为标记的输入哈希不等而判红（`.claude/gate.d/checker-tier-layer0-replay.sh:219` 的 `marker_input_hash != layer0_input_hash` 分支）。红本身不算「不该红的红了」，但「该跑全量的没跑」在阶段同步这一步确实成立——这属于正文五「跑前条款」第二款描述的形状（「攻方给出一条可达历史，在上面该跑全量的没跑……」），值得攻方腿（Opus）拿这条具体历史去实测。
 
 结论：**这一格「核心落点」判「一致」，「触发条件」判「冲突」**——落点（阶段同步那一步）与 Q8 逐字对得上；触发条件字面窄于 54 号自己登记的输入集，与 implementation-workflow.md「不按『改了哪个目录』判」这条规则相悖。
 

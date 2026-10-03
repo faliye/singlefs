@@ -107,19 +107,19 @@
       ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
     [gate --staged 里 54 号的退出码 77]
   ── 起门禁：gate-staged
-      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（be9e1aba2894）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（be9e1aba2894）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/checker-tier-layer0-replay.sh
     [gate --staged 里 54 号的退出码 77]
 ════ S2 [other-session-crates｜pre] 暂存的路径：NOTES.md ｜K3 字面触发 --full：no｜[标记不在]
   ── 起门禁：gate-triage
       ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ 底下
     [gate --staged 里 54 号的退出码 77]
   ── 起门禁：gate-staged
-      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（dc7e9986d2d7）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/ .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（dc7e9986d2d7）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/ .claude/gate.d/stage-inputs.tsv .claude/gate.d/checker-tier-layer0-replay.sh
     [gate --staged 里 54 号的退出码 77]
 ════ S2 [other-session-crates｜fix] 暂存的路径：NOTES.md ｜K3 字面触发 --full：no｜[标记：input_hash=c07850adb431b3cb… judged_root=/tmp/claude-1000/defs54-attack/s2/repo-other-session-crates-fix；exhaustive=true]
   ── 起门禁：gate-triage
       ! 本阶段跳过（这次改动没碰它判的东西）：没碰：与基 HEAD 之间共 1 个改动路径，没有一个落在 crates/ Cargo.toml Cargo.lock 底下
     [gate --staged 里 54 号的退出码 77]
   ── 起门禁：gate-staged
-      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（53cf5323cc28）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/54-layer0-replay.sh
+      ! 本阶段跳过（复用上一次整轮全绿的判定）：与上次整轮全绿那棵树（53cf5323cc28）在这几条路径上逐字相同：crates/ Cargo.toml Cargo.lock .claude/gate.d/stage-inputs.tsv .claude/gate.d/checker-tier-layer0-replay.sh
     [gate --staged 里 54 号的退出码 77]

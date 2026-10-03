@@ -31,7 +31,7 @@
 | agent-common.md:46、implementation-workflow.md:48–56、crash-test / gate SKILL | 谁能跑哪几道：crash-verifier 带前缀跑 55、57、59 放行，跑 54 拒；gate-triage 带前缀跑 gate.sh、gate-staged.sh、87 放行；主 agent 不带前缀跑 54 --full 拒；implementation-writer 跑 74 放行；主 agent与 kb-scribe 跑 stage-selftest.sh、number-name-sync.sh 放行 | 合成 PreToolUse JSON 喂 heavy-test-guard.sh，rc 0 / 2 与文字一致 |
 | agent-common.md:55 并行写法 | `{ 甲; echo $? > a.rc; } & { 乙; …; } & wait; cat …` 在 run_in_background 与前台都不拒、不记检出；两个 `&` 后逐个 `wait "$pid"` 记一条检出；一个 `&` 后 `wait "$p1"` 不记 | 合成输入喂 bash-command-detector.sh，检出记录现数行数 |
 | agent-common.md:57「拒绝七种」 | 与 bash-command-detector.sh 文件头 ①–⑦ 对得上（⑦ 射程是仓里或 /tmp/claude-1000/ 下） | 读 :30–135 |
-| main-agent.md:59（暂存行） | 三行命令、`layer0_tree_ready`、退出码取经内存包装那一条 | 54-layer0-replay.sh:227–234 |
+| main-agent.md:59（暂存行） | 三行命令、`layer0_tree_ready`、退出码取经内存包装那一条 | checker-tier-layer0-replay.sh:227–234 |
 | main-agent.md:61（kb-scribe 行） | relabel-item.py 确实改写 `crates/**/*.rs`（与 `.claude/rules/*.md`），33 号数 `crates/mutations.tsv` 锚点 | lib-item-ref-status.py:71–79；33-mutation-tables.sh:11、:76–88；kb-scribe.md:30、:39 已为 rules 放行 |
 | main-agent.md:30 | `watch.sh --processes`、`--ack 进程:<pid>`、`ask-every-minutes=60` 都在 | watch.sh:7、:10；watch.conf:23 |
 | three-way-inference.md:145 新三级标题 | main-agent.md 引的「交岔路时写岔路单」仍命中；`-s2` 命名没有门禁或脚本按别的形态解析 | grep；`grep -rn -- '-s2' .claude/agents .claude/gate.d research/scripts` 只有 replay.sh:464 无关注释 |

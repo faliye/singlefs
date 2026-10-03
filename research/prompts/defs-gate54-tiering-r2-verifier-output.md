@@ -5,12 +5,12 @@
 ## 判别力自证
 
 取 opus 报告 `defs-gate54-tiering-r2-opus-output.md:249` 引用的
-`.claude/gate.d/54-layer0-replay.sh:249`（原文 `full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash"`），
-在草稿目录副本 `/tmp/claude-1000/defs54-r2-verifier/selftest/54-layer0-replay.sh` 里把待核行号 +1 → 250，
+`.claude/gate.d/checker-tier-layer0-replay.sh:249`（原文 `full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash"`），
+在草稿目录副本 `/tmp/claude-1000/defs54-r2-verifier/selftest/checker-tier-layer0-replay.sh` 里把待核行号 +1 → 250，
 取该行内容：
 
 ```
-$ sed -n '250p' 54-layer0-replay.sh
+$ sed -n '250p' checker-tier-layer0-replay.sh
   quick_tier_report=""
 ```
 
@@ -53,16 +53,16 @@ $ sed -n '250p' 54-layer0-replay.sh
 |---|---|---|
 | `.claude/main-agent.md:49`「暂存之后、提交之前跑门禁…」 | **分不清**：快照期在第 44 行（`_defs-gate54-tiering-r2-diff.md` 反推坐实），现查已挪到第 49 行，字面不变（opus 自报，本报告独立复核吻合） | 见上「方法与输入说明」 |
 | `.claude/gate.d/stage-inputs.tsv:11` | ✓ | `sed -n '11p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:20` | ✓ | `sed -n '20p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:249`（判别力自证已用） | ✓ | 同上 |
-| `.claude/gate.d/54-layer0-replay.sh:300` | ✓ | `sed -n '300p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:8` | ✓ | `sed -n '8p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:20` | ✓ | `sed -n '20p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:249`（判别力自证已用） | ✓ | 同上 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:300` | ✓ | `sed -n '300p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:8` | ✓ | `sed -n '8p'` 逐字相同 |
 | `.claude/singlefs-ai-sop/scripts/gate.sh:75`（连同 76 行 `die`） | ✓ | `sed -n '74,77p'` |
-| `.claude/gate.d/54-layer0-replay.sh:11`、`:12` | ✓ | `sed -n '11p;12p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:303`（trap 行） | ✓ | `sed -n '303p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:23` | ✓ | `sed -n '23p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:11`、`:12` | ✓ | `sed -n '11p;12p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:303`（trap 行） | ✓ | `sed -n '303p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:23` | ✓ | `sed -n '23p'` 逐字相同 |
 | 附：`.claude/agents/crash-verifier.md:23`、`:24` | ✓ | `sed -n '23p;24p'` 逐字相同 |
-| 附：`.claude/gate.d/54-layer0-replay.sh:91`、`:147` | ✓ | `sed -n '91p;147p'` 逐字相同 |
+| 附：`.claude/gate.d/checker-tier-layer0-replay.sh:91`、`:147` | ✓ | `sed -n '91p;147p'` 逐字相同 |
 | 附：`research/prompts/_defs-gate54-tiering-r2-body.md:61` | ✓ | `sed -n '61p'` 逐字相同 |
 | `git log -S'只起了 1 个工作线程' … 找到 fc7942f，同一提交把线程判定加进 54 号、把 crates/ 改多线程` | ✓ | 重跑同一条 `git log -S` 命中同一提交；`git show --stat fc7942f` 确认该提交同时含 `crash.rs` 多线程改动与「门禁 54 号：…只起了 1 个工作线程，判红」 |
 | 「真仓一处 git 写都没做；common-dir 里 `singlefs-layer0*` 现查 0 个」 | ✓ | `find "$(git rev-parse --git-common-dir)" -maxdepth 1 -name 'singlefs-layer0*'` 复跑前后均 0 |
@@ -117,11 +117,11 @@ T0–T3 格、H-B 两种漂移 × 5 种用户动作、H-B2、H-C 两种 Z × 4 �
 | `git show 3b60f098:experiment-runner.md \| grep` 零命中 | ✓ | 重跑，仍 0 |
 | `grep -rn "singlefs-harness/src/bin/e" r1-*.md` 零命中 | ✓ | 重跑，仍 0 |
 | `git diff 3b60f098 -- agent-write-scope.tsv`（两行新增） | ✓ | 重跑同一条 diff，逐字节相同 |
-| `git show 3b60f098:54-layer0-replay.sh` 特征（无 worktree/marker/hash，`ROOT="${1:-…}"` 默认调用者根目录，两道跳过判定接 `cargo test --release … --include-ignored`） | ✓ | 重取该 blob，`grep -n` 确认零命中 worktree/marker/input_hash，通读前 50 行确认 ROOT、跳过逻辑与直接跑 cargo |
+| `git show 3b60f098:checker-tier-layer0-replay.sh` 特征（无 worktree/marker/hash，`ROOT="${1:-…}"` 默认调用者根目录，两道跳过判定接 `cargo test --release … --include-ignored`） | ✓ | 重取该 blob，`grep -n` 确认零命中 worktree/marker/input_hash，通读前 50 行确认 ROOT、跳过逻辑与直接跑 cargo |
 | `.claude/agents/gate-triage.md:26` | ✓ | `sed -n '26p'` 逐字相同 |
 | `.claude/agents/gate-triage.md:39` | ✓ | `sed -n '39p'` 逐字相同 |
 | `.claude/agent-common.md:58` | ✓ | `sed -n '58p'` 逐字相同 |
-| `.claude/gate.d/54-layer0-replay.sh:254` | ✓ | `sed -n '254p'` 逐字相同 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:254` | ✓ | `sed -n '254p'` 逐字相同 |
 | `research/scripts/stage-mine.py` 内 `layer0/full-green/input_hash` 零命中 | ✓ | 重跑，仍 0 |
 
 **独立发现（sonnet 报告未自报）**：sonnet 的 `.claude/main-agent.md:44` 与本报告用相同方法核对，
@@ -150,9 +150,9 @@ sonnet 报告本身没有像 opus 那样加一句「文件在我跑的时候被�
 
 | FACT/项 | 核对表所写 | 结果 | 命令/依据 |
 |---|---|---|---|
-| FACT 1 区块引用 `54-layer0-replay.sh:376-388` | 整段 heredoc 块 | ✓（区块边界对，376=`if ! {`，388=`sed 's/^/input_file /' …`） | `sed -n '374,392p'` |
+| FACT 1 区块引用 `checker-tier-layer0-replay.sh:376-388` | 整段 heredoc 块 | ✓（区块边界对，376=`if ! {`，388=`sed 's/^/input_file /' …`） | `sed -n '374,392p'` |
 | FACT 1 正文「第 376 行那条 # 开头的注释行」「第 377 行 input_hash=」 | 376=注释、377=input_hash | **✗ 差 1**：现查注释行实为第 377 行，`input_hash=` 实为第 378 行 | `grep -n '层 0 全量全绿标记\|input_hash=\$layer0_input_hash\|^if ! {'`；`awk '/^  echo "input_hash=/{print NR}'` |
-| FACT 2「`:1013-1014`（`write_layer0_input_manifest` 现算哈希）」 | 1013-1014 | **✗ 误写成背景附录行号**：`_defs-gate54-tiering-r2-appendix.md` 第 1010-1015 行正是这段代码（`sed -n '1010,1020p'` 命中原样），原文件 `54-layer0-replay.sh` 该逻辑实为第 248 行 | 见下方命令 |
+| FACT 2「`:1013-1014`（`write_layer0_input_manifest` 现算哈希）」 | 1013-1014 | **✗ 误写成背景附录行号**：`_defs-gate54-tiering-r2-appendix.md` 第 1010-1015 行正是这段代码（`sed -n '1010,1020p'` 命中原样），原文件 `checker-tier-layer0-replay.sh` 该逻辑实为第 248 行 | 见下方命令 |
 | FACT 2「`:1015`（`full_green_marker_path` 按哈希拼文件名）」 | 1015 | **✗ 同上**，原文件实为第 249 行 | 同上 |
 | FACT 2「`:1019`…真实行号 253」 | 1019（已自行标注真实行号 253） | ✓（自行更正的部分核对无误） | `sed -n '1019p' 附录`、`sed -n '253p' 54号` 两处均为 `if [[ ! -f "$full_green_marker_path" ]]; then` |
 | FACT 2「`:260-261`、`:270-272`、`:279-280`、`:288`、`:290`」 | 5 段代码 | ✓ 全部逐字相同 | `sed -n` 逐行核对（哈希比对/三行计数/两行 exhaustive 计数/finished_utc 读取） |
@@ -171,15 +171,15 @@ sonnet 报告本身没有像 opus 那样加一句「文件在我跑的时候被�
 $ wc -l research/prompts/_defs-gate54-tiering-r2-appendix.md
 1365 research/prompts/_defs-gate54-tiering-r2-appendix.md
 $ sed -n '1010,1020p' research/prompts/_defs-gate54-tiering-r2-appendix.md
-（与 54-layer0-replay.sh 第 246-254 行的快档开头段落逐字相同：
+（与 checker-tier-layer0-replay.sh 第 246-254 行的快档开头段落逐字相同：
 write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest
 full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash" 等）
-$ grep -n 'write_layer0_input_manifest\b' .claude/gate.d/54-layer0-replay.sh
+$ grep -n 'write_layer0_input_manifest\b' .claude/gate.d/checker-tier-layer0-replay.sh
 156:write_layer0_input_manifest() {
 248:  write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest
 298:write_layer0_input_manifest "$manifest_at_start" || fail_without_input_manifest
 366:write_layer0_input_manifest "$manifest_at_finish" || fail_without_input_manifest
-$ grep -n 'full_green_marker_path=' .claude/gate.d/54-layer0-replay.sh
+$ grep -n 'full_green_marker_path=' .claude/gate.d/checker-tier-layer0-replay.sh
 249:  full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash"
 300:full_green_marker_path="$full_green_marker_prefix.$input_hash_at_start"
 ```

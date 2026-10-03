@@ -7,7 +7,7 @@
 出口 1–5 都做到了：
 - 54 号 `--full`：每条用例的全量日志与发现日志放 `<common-dir>/singlefs-layer0-logs/<时刻>-<pid>/`，名字 `log.<用例名>` 与 `log.<用例名>.findings.tsv`，跑完不删。单机跑时在 crash-case-command 交的命令外面套 `env SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>`。跑完先打发现表，再判：没有 summary 的节报「这一趟没跑完」判红；`red_states` 不是 0 判红；定稿行数与 `signatures=` 对不上判红；超过 30 个签名只打前 30 行，再打一行「其余 N 个见 <路径>」。全量日志只给路径。快档不设、不读，还用 `env -u` 清掉调用方的这个变量。
 - 双机驱动：三趟各设一个发现日志，每份都是那一趟的日志名加 `.findings.tsv`。`--merged-log` 时 merge 那一份就是 `<54 给的日志>.findings.tsv`，正是 54 号读的那一份。第二台那一片先写在第二台上，跑完拷回本机、放在那一片的日志旁边，第二台上那一份随后删掉。三份路径都打进输出。
-- 判别力样本 `.claude/gate.d/fixtures/54-layer0-replay.sh/{red,green}`，`stage-selftest.sh` 两格都判对。
+- 判别力样本 `.claude/gate.d/fixtures/checker-tier-layer0-replay.sh/{red,green}`，`stage-selftest.sh` 两格都判对。
 - 全绿标记不带发现表（judged 行文件没动）。
 
 有三处是我定的写法，派发提示里没写：
@@ -24,13 +24,13 @@
 ## 改过的文件
 
 ```
- .claude/gate.d/54-layer0-replay.sh            | 150 ++++++++++++++++++++++++--
+ .claude/gate.d/checker-tier-layer0-replay.sh            | 150 ++++++++++++++++++++++++--
  research/scripts/layer0-shard-run-selftest.sh |  34 ++++++
  research/scripts/layer0-shard-run.sh          |  60 ++++++++---
  3 files changed, 224 insertions(+), 20 deletions(-)
 ```
 
-新建（未跟踪，30 个文件）：`.claude/gate.d/fixtures/54-layer0-replay.sh/`。`git status --short --untracked-files=all` 数出来的行数：30。
+新建（未跟踪，30 个文件）：`.claude/gate.d/fixtures/checker-tier-layer0-replay.sh/`。`git status --short --untracked-files=all` 数出来的行数：30。
 
 54 号文件头的准入声明两行（第 2、3 行）与 `source …preflight.sh` / `preflight …` 两行没动；驱动与自证文件头的声明、source、preflight 行也没动。已存在的三份脚本都是先在草稿目录里改，再写成同目录临时文件、`mv` 换上，换上后 `cmp` 与草稿相同。例外：开工时 54 号文件头两段说明是用 Edit 就地改的，当时 `ps` 查过，没有 54 号或驱动在跑。
 
@@ -103,8 +103,8 @@ GATE_LAYER0_BREAK=no-truncation
 
 改后在仓里跑 `bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh "$PWD/.claude/gate.d"`（退 1，红在 55 号，见下）：
 ```
-  ✓ 54-layer0-replay.sh          red   判得对
-  ✓ 54-layer0-replay.sh          green 判得对
+  ✓ checker-tier-layer0-replay.sh          red   判得对
+  ✓ checker-tier-layer0-replay.sh          green 判得对
   ✗ 55-qemu-first-transaction.sh red   输出里找不到「second-transaction 盘 0：盘上收到的写（23）没有多于第一个事务那段（23）」
   ✗ 55-qemu-first-transaction.sh red   输出里找不到「这一档该在第一个事务之后再发布一次」
   ✗ 55-qemu-first-transaction.sh green 期望退出 3，实测 1

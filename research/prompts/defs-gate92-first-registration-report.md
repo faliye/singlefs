@@ -124,7 +124,7 @@ $ git diff --stat -- .claude/gate.d/92-layout-checker-sync.sh
 - `bash .claude/gate.d/92-layout-checker-sync.sh`（真仓）：见上方，exit=0
 - `bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d`（全量 76 个阶段）：
   `✗ 2 个样本判错（判对 151 个，1 个阶段没有样本）`，exit=1；红的两条都是 `55-qemu-first-transaction.sh`
-  （`git status` 显示这个文件是别的会话未提交的改动，我没碰过），`54-layer0-replay.sh` 报「本次未跑」
+  （`git status` 显示这个文件是别的会话未提交的改动，我没碰过），`checker-tier-layer0-replay.sh` 报「本次未跑」
   （重型测试，按定义不跑）——92 号自己的 5 个样本（`red`、`green`、三个新目录）全部判对。
 - `GATE_LINT_DIR=.claude/gate.d bash .claude/singlefs-ai-sop/scripts/gate-lint.sh`：
   `✓ 门禁自检通过：85 个脚本（.sh 与 .py）、310 条拒绝都带了出路`，exit=0

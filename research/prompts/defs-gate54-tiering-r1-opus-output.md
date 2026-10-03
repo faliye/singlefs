@@ -38,7 +38,7 @@ d6beb174daa5f9f59a7c9b4a5b78f657d325a12db070d0fd1705f45fd60482af  outputs/s2-tri
 装置从主仓拷的被判对象（跑前现算，前两份与开工快照 `sha256sums.txt` 里的逐字相同）：
 
 ```
-86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9  .claude/gate.d/54-layer0-replay.sh
+86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9  .claude/gate.d/checker-tier-layer0-replay.sh
 03314d49bf746b584c170722aaef29a1271120894c3dc952473d46509aab5acb  .claude/gate.d/stage-inputs.tsv
 5c75fa0eef04bb105330a935032c3f34eb5759c29918caf0f1506a4d1bf323db  research/scripts/stage-must-run.sh
 f0c64f9f470c9f478be0ab864d5386e1f40f3e85df92b8a78e5e4a00fcb514f2  research/scripts/change-touches-crates.sh
@@ -65,17 +65,17 @@ f0c64f9f470c9f478be0ab864d5386e1f40f3e85df92b8a78e5e4a00fcb514f2  research/scrip
 | K3 标记出处 | 主工作区的 54 号脚本有别的会话没暂存的半成品；这一批让枚举退化成非全量；收尾在主工作区跑 `--full`（S4） | **打中**：标记里 `LAYER0 … exhaustive=false`，`--staged` 下快档判绿并把这一行原样打出来 | 该红的没红 | **分辨**（pre 判红「层 0 不是全量」） |
 | K3 跑中输入改了又改回 | 收尾 `--full` 在主工作区跑，第二条流编译那一刻别的会话临时改了 `crash.rs`、跑完改回（S5） | **打中两样**：S5a 这一批本身坏、被临时改好 ⇒ 标记照写、`--staged` 判绿；S5b 这一批是好的、被临时改坏 ⇒ `--full` 判红 | S5a 该红的没红；S5b 不该红的红了 | **分辨**（pre：S5a 红、S5b 绿） |
 | K2×K3 标记只有一格 | S3a 同一会话：验证员 `--full` 已绿，收尾又后台跑 `--full`，下一行 gate-triage 在它跑的途中起门禁。S3b 两个会话：A 在出路 worktree 里、B 在主工作区里各跑一次 `--full`（S3） | **打中**：S3a 6 格里 1 格误红（验证员绿过、门禁起在收尾途中）；S3b 8 格里 3 格 A 误红（A 先跑完 B 后跑完，B 绿、B 红各一格；A 夹在 B 里、B 绿） | 不该红的红了 | **分辨**（pre 两处都绿） |
-| K2×K3 等待闸 | 收尾那一趟的进程命令行（S3c） | 命令行 `bash .claude/gate.d/54-layer0-replay.sh --full`，含 `gate.sh` 0 次：崩溃验证员第 23 行、gate-triage 第 24 行的「别的 `gate.sh` 在跑」看不见它 | 事实，是 S3 能发生的条件 | — |
+| K2×K3 等待闸 | 收尾那一趟的进程命令行（S3c） | 命令行 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`，含 `gate.sh` 0 次：崩溃验证员第 23 行、gate-triage 第 24 行的「别的 `gate.sh` 在跑」看不见它 | 事实，是 S3 能发生的条件 | — |
 
 ## 一、K3 的触发条件（S2）
 
 K3 那一句在 `.claude/main-agent.md` 第 43 行，整行原文：
 
 ```
-| 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/54-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行 |
+| 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行 |
 ```
 
-快档先问的两问里，第二问只拿 `crates/` 当前缀（`.claude/gate.d/54-layer0-replay.sh` 第 66 行）：
+快档先问的两问里，第二问只拿 `crates/` 当前缀（`.claude/gate.d/checker-tier-layer0-replay.sh` 第 66 行）：
 
 ```
   scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" crates/)"
@@ -84,7 +84,7 @@ K3 那一句在 `.claude/main-agent.md` 第 43 行，整行原文：
 而这一道登记的输入是三条（`.claude/gate.d/stage-inputs.tsv` 第 11 行）：
 
 ```
-54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
+checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
 ```
 
 **历史**（`s2-trigger-gaps.sh`，每格一个新合成仓）：base 提交 → 在 base 上跑一次 `--full`（标记与 base 相等）→ 把 `refs/sop/staged-green` 指到 base 那棵树 → 做这一批并暂存 → 两种起门禁的法各起一次：gate-triage 定义第 25 行的 `gate.sh --staged`（没有 `SINGLEFS_STAGED_TREE`）与 `gate-staged.sh`（有）。这一批之后没人再跑 `--full`（K3 字面没触发时正是这样）。
@@ -141,7 +141,7 @@ post 臂里「只改测试」「只追加变异表」两格的 1 是因为模型
 
 暂存区此刻为空（`git diff --cached --name-only | wc -l` 得 0）。也就是说此刻任何一批的收尾在主工作区跑 `--full`，标记里都会带着这 75 个不在这一批里的文件。
 
-**历史**（`s1-worktree-vs-staged.sh`）：base 提交 → A 这一批：新建 `crates/singlefs-harness/src/batch_a.rs`、`lib.rs` 加一行 → B 的半成品（扫三种：未跟踪的 `crates/singlefs-core/src/b_wip.rs`；已跟踪、没暂存的 `crates/singlefs-core/src/lib.rs`；两样都有）→ ① 主工作区 `bash .claude/gate.d/54-layer0-replay.sh --full` → 暂存 A 的两个文件 → ③ `gate.sh --staged` → ② 出路：`worktree add --detach HEAD` + `apply --index` 暂存区 diff，跑 `bash <wt>/.claude/gate.d/54-layer0-replay.sh --full <wt>` → ④ `gate.sh --staged`。
+**历史**（`s1-worktree-vs-staged.sh`）：base 提交 → A 这一批：新建 `crates/singlefs-harness/src/batch_a.rs`、`lib.rs` 加一行 → B 的半成品（扫三种：未跟踪的 `crates/singlefs-core/src/b_wip.rs`；已跟踪、没暂存的 `crates/singlefs-core/src/lib.rs`；两样都有）→ ① 主工作区 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full` → 暂存 A 的两个文件 → ③ `gate.sh --staged` → ② 出路：`worktree add --detach HEAD` + `apply --index` 暂存区 diff，跑 `bash <wt>/.claude/gate.d/checker-tier-layer0-replay.sh --full <wt>` → ④ `gate.sh --staged`。
 出路 worktree 什么时候建是人定的那一步，扫两种：暂存之后、暂存之前（第 43 行给的时点）。
 
 | B 的东西 | ③ 主工作区的标记在 `--staged` 下 | 出路在暂存之后建：④ | 出路在暂存之前建：④ |
@@ -204,13 +204,13 @@ if [[ "$layer0_input_hash" != "$input_hash_at_start" ]]; then
 
 ### S4　标记出处：主工作区里的 54 号不是暂存区里那一份
 
-**历史**（`s4-marker-provenance.sh`）：base 提交（54 号是今天分档后的版本）→ A 这一批把 `crash.rs` 改坏成「某一段没展开子集」（假 cargo 见到 `NONEXHAUSTIVE` 就打 `exhaustive=false`，用例本身不红），暂存 → B 会话在主工作区里改 54 号改到一半、没暂存，恰好让第 274 行那一判不生效（模型里把那一行换成 `if false; then`）→ A 收尾照第 43 行在主工作区跑 `bash .claude/gate.d/54-layer0-replay.sh --full`，跑的是工作区那一份脚本 → `gate.sh --staged`（临时 worktree 里是 HEAD 那一份 54 号）。
+**历史**（`s4-marker-provenance.sh`）：base 提交（54 号是今天分档后的版本）→ A 这一批把 `crash.rs` 改坏成「某一段没展开子集」（假 cargo 见到 `NONEXHAUSTIVE` 就打 `exhaustive=false`，用例本身不红），暂存 → B 会话在主工作区里改 54 号改到一半、没暂存，恰好让第 274 行那一判不生效（模型里把那一行换成 `if false; then`）→ A 收尾照第 43 行在主工作区跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`，跑的是工作区那一份脚本 → `gate.sh --staged`（临时 worktree 里是 HEAD 那一份 54 号）。
 
 post 臂原样（`outputs/s4-marker-provenance.out`）：
 
 ```
-════ S4 [post] 工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
-  ── 收尾：主工作区 bash .claude/gate.d/54-layer0-replay.sh --full
+════ S4 [post] 工作区 vs 暂存区： M .claude/gate.d/checker-tier-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾：主工作区 bash .claude/gate.d/checker-tier-layer0-replay.sh --full
     [标记：input_hash=ad967f0e6db52cb2… judged_root=/tmp/claude-1000/defs54-attack/s4/repo-post；exhaustive=false]
   ── gate.sh --staged
       ✓ 全绿标记与这批输入的内容哈希相同（ad967f0e6db52cb2…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
@@ -233,7 +233,7 @@ pre 臂（分档前，门禁在临时 worktree 里用暂存区那份脚本自己
 
 **可达性要打的折扣**：要有别的会话同时改 54 号、改坏的又恰好是 `--full` 里的判定。这一轮就是例子：54 号的分档改动此刻还在工作区里、没提交。
 
-**什么会推翻它**：主 agent 实际跑的不是 `bash .claude/gate.d/54-layer0-replay.sh`（工作区那一份）而是暂存区里那一份；或快档在别处核标记里的计数行。
+**什么会推翻它**：主 agent 实际跑的不是 `bash .claude/gate.d/checker-tier-layer0-replay.sh`（工作区那一份）而是暂存区里那一份；或快档在别处核标记里的计数行。
 
 ### S5　跑的中途别的会话改了又改回（A → B → A）
 
@@ -313,11 +313,11 @@ S5a post 原样（`outputs/s5-transient-edit.out`）：
 两份定义里挡并发的都是「别的 `gate.sh` 在跑」。S3c 量了收尾那一趟的进程命令行（`outputs/s3-marker-slot.out`）：
 
 ```
-    收尾 --full 的进程（pid 2015562）的命令行：bash .claude/gate.d/54-layer0-replay.sh --full
+    收尾 --full 的进程（pid 2015562）的命令行：bash .claude/gate.d/checker-tier-layer0-replay.sh --full
     这条命令行里含 gate.sh 的次数：0
 ```
 
-验证员自己那一趟的命令行照第 24 行也是 `nice -n 19 bash .claude/gate.d/54-layer0-replay.sh --full` 的形状，同样不含 `gate.sh`（推的，按定义字面，没另起进程量）。所以两道等待都看不见这两趟 `--full`，下面的撞车不会被它们拦住。
+验证员自己那一趟的命令行照第 24 行也是 `nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh --full` 的形状，同样不含 `gate.sh`（推的，按定义字面，没另起进程量）。所以两道等待都看不见这两趟 `--full`，下面的撞车不会被它们拦住。
 
 ### S3a　同一个会话，照定义字面走
 

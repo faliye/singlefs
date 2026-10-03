@@ -12,7 +12,7 @@
 
 | 格 | 判 | 依据 |
 |---|---|---|
-| J1-a 只改登记表或 54 号本身 | **打中（量过），这一批新带进来的（改 54 号本身那一形之前就有）**：范围那一问（`54-layer0-replay.sh:114`）只按 `crates/ Cargo.toml Cargo.lock` 判，只改 `stage-inputs.tsv` 或 54 号的提交快档退 77、一格标记都不核；54 号的自证全带 `SINGLEFS_GATE_FULL=1` 跑所以没抓到；先提交带 ignore 的用例、后提交登记行，新用例一次都不会被核 | 攻方 J1、核查员复跑 |
+| J1-a 只改登记表或 54 号本身 | **打中（量过），这一批新带进来的（改 54 号本身那一形之前就有）**：范围那一问（`checker-tier-layer0-replay.sh:114`）只按 `crates/ Cargo.toml Cargo.lock` 判，只改 `stage-inputs.tsv` 或 54 号的提交快档退 77、一格标记都不核；54 号的自证全带 `SINGLEFS_GATE_FULL=1` 跑所以没抓到；先提交带 ignore 的用例、后提交登记行，新用例一次都不会被核 | 攻方 J1、核查员复跑 |
 | J1-b 判法不进指纹 | **打中（量过）**：判日志的代码搬进了 `admission.py`，它不进每条用例的指纹（`admission.py:168`），修前修后指纹都是 `639097891a56ec19…`，旧判法写下的标记照样被复用 | 同上 |
 | J1-c 两趟并发 | 低危、推的：后一趟判红会删掉前一趟刚写的绿标记，只会假红 | 攻方 |
 | J2-a 排除法漏认 | 打中（量过），今天的仓里没有这种写法：`include!(concat!(…))` 编译期拼文件名、别的包的 `build.rs` 按目录读本包 `tests/`，被减掉的文件其实编进了用例 | 攻方 |
@@ -43,7 +43,7 @@
 
 ## 五、按路径点名被判的定义与文件（门禁 72 号）
 
-被判的：`.claude/gate.d/54-layer0-replay.sh`、`research/scripts/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/stage-owners.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/agents/crash-verifier.md`、`.claude/rules/implementation-workflow.md`、`research/scripts/check-segment-registry.py`；一并核过的 `.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
+被判的：`.claude/gate.d/checker-tier-layer0-replay.sh`、`research/scripts/admission.py`、`.claude/gate.d/stage-inputs.tsv`、`.claude/gate.d/stage-owners.tsv`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/agents/crash-verifier.md`、`.claude/rules/implementation-workflow.md`、`research/scripts/check-segment-registry.py`；一并核过的 `.claude/main-agent.md`、`.claude/agents/gate-triage.md`。
 
 ## 回看决策
 

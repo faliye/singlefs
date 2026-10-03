@@ -1,4 +1,4 @@
-# mutate.sh 读 required-features：报告（tooling-writer，会话 singlefs-e1 交接的工具缺口）
+# mutate.sh 读 required-features：报告（tooling-writer，别的会话交接的工具缺口）
 
 ## 结论
 

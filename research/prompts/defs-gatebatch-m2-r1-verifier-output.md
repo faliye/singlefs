@@ -21,7 +21,7 @@ tools: Read, Bash
 
 ```
 $ sha256sum -c research/prompts/defs-gatebatch-m2-r1-snapshot/sha256sums.txt
-.claude/gate.d/54-layer0-replay.sh: OK
+.claude/gate.d/checker-tier-layer0-replay.sh: OK
 research/scripts/admission.py: OK
 .claude/gate.d/stage-inputs.tsv: OK
 .claude/gate.d/stage-owners.tsv: OK
@@ -85,12 +85,12 @@ $ (cd research/prompts/defs-gatebatch-m2-r1-opus-model && sha256sum -c SHA256SUM
 | `grep -c "推翻\|覆盖\|不再维持\|不再作数" research/prompts/m2-layer0-scale-r3-main-verification.md` 声称 0 | **✗（分不清，见「发现二」）** | 现跑：`grep -c` 结果是 **1**，不是 0 |
 | 同一模式在 `records/2026-09-24-…调度.md` 全文 14 处命中 | ✓ | 现跑 `grep -c` = 14，一致 |
 | 同一模式在该文件第 190 行单独核为 0 处 | ✓ | 现跑 `awk 'NR==190'\|grep -c` = 0，一致 |
-| `54-layer0-replay.sh:2` 摘引 | ✓ | 首尾对得上 |
-| `54-layer0-replay.sh:314` 摘引 | ✓ | 首尾对得上 |
-| `54-layer0-replay.sh` 头部注释第 16 行摘引（内层引号用『』，原文用「」） | ✓（引号符号不同，字面内容一致） | `sed -n '16p'` 核对，内容逐字相同 |
-| `54-layer0-replay.sh:50-61`「`--start-over` 只与 `--full` 同用，第 60-61 行显式拒绝单独用」 | ✓ | `awk 'NR>=50&&NR<=61'` 逐行核，60/61 行确为拒绝语句 |
-| `54-layer0-replay.sh:201-202` 摘引 | ✓ | 逐字相同 |
-| `54-layer0-replay.sh:19` 摘引（省了行首「不带它时从调用方的环境里清掉这个变量。」） | ✓（未标省略号但确是该行的后半句，内容不假） | `sed -n '19p'` 核对 |
+| `checker-tier-layer0-replay.sh:2` 摘引 | ✓ | 首尾对得上 |
+| `checker-tier-layer0-replay.sh:314` 摘引 | ✓ | 首尾对得上 |
+| `checker-tier-layer0-replay.sh` 头部注释第 16 行摘引（内层引号用『』，原文用「」） | ✓（引号符号不同，字面内容一致） | `sed -n '16p'` 核对，内容逐字相同 |
+| `checker-tier-layer0-replay.sh:50-61`「`--start-over` 只与 `--full` 同用，第 60-61 行显式拒绝单独用」 | ✓ | `awk 'NR>=50&&NR<=61'` 逐行核，60/61 行确为拒绝语句 |
+| `checker-tier-layer0-replay.sh:201-202` 摘引 | ✓ | 逐字相同 |
+| `checker-tier-layer0-replay.sh:19` 摘引（省了行首「不带它时从调用方的环境里清掉这个变量。」） | ✓（未标省略号但确是该行的后半句，内容不假） | `sed -n '19p'` 核对 |
 
 **发现一（✗）**：`stage-inputs.tsv:32-35` 处的断言「各自 `test=` 恰一条、`count-line=`/`exhaustive=`/`threads=` 齐」与实际文件不符。逐行核（`cat -A` 现查，按 tab 分列）：
 
@@ -134,24 +134,24 @@ $ git status --porcelain -- research/prompts/m2-layer0-scale-r3-main-verificatio
 
 | 引用 | 结果 |
 |---|---|
-| `54-layer0-replay.sh:114` | ✓ |
+| `checker-tier-layer0-replay.sh:114` | ✓ |
 | `stage-inputs.tsv:24`（路径列 `crates/ Cargo.toml Cargo.lock`） | ✓ |
 | `change-touches-crates.sh:105` | ✓ |
-| `54-layer0-replay.sh:117` | ✓ |
+| `checker-tier-layer0-replay.sh:117` | ✓ |
 | `.claude/singlefs-ai-sop/scripts/gate.sh:250` | ✓（快照外，对主树核，一致） |
 | `stage-inputs.tsv:19` | ✓ |
 | `admission.py:921` | ✓ |
 | `admission.py:2633` | ✓ |
-| `54-layer0-replay.sh:69` | ✓ |
+| `checker-tier-layer0-replay.sh:69` | ✓ |
 | `admission.py:1291` | ✓ |
-| `54-layer0-replay.sh:168` | ✓ |
+| `checker-tier-layer0-replay.sh:168` | ✓ |
 | `_defs-gatebatch-m2-r1-diff.md:445` | ✓ |
 | `_defs-gatebatch-m2-r1-diff.md:476` | ✓ |
 | `admission.py:1265` | ✓ |
 | `admission.py:1321` | ✓ |
 | `crates/singlefs-harness/src/layer0_progress.rs:700` | ✓（快照外，对主树核，一致） |
 | `layer0_progress.rs:767` | ✓（同上） |
-| `54-layer0-replay.sh:344` | ✓ |
+| `checker-tier-layer0-replay.sh:344` | ✓ |
 | `admission.py:1154` | ✓ |
 | `admission.py:90` | ✓ |
 | `admission.py:91` | ✓ |
@@ -167,7 +167,7 @@ $ git status --porcelain -- research/prompts/m2-layer0-scale-r3-main-verificatio
 | `crates/singlefs-harness/tests/record_checker_judges_absence_by_the_persisted_set.rs:544` | ✓（快照外，对主树核，一致） |
 | `admission.py:1060` | ✓ |
 | `lib_heavy_tests.py:78` | ✓ |
-| `54-layer0-replay.sh:200` | ✓ |
+| `checker-tier-layer0-replay.sh:200` | ✓ |
 | `crates/singlefs-harness/src/crash.rs:2374` | ✓（快照外，对主树核，一致） |
 | `first_transaction_step_seven_layer0.rs:456` | ✓（同上） |
 | `second_transaction_step_zero_layer0.rs:736` | ✓（同上） |

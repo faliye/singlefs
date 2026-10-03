@@ -1,0 +1,12 @@
+── verus-toolchain-pinned：Verus 安装的 version 与 commit、Cargo.lock 里六个包的版本、本机 cargo 缓存里包源码的出处与内容指纹都与登记相同
+  ✓ 合成：版本一致
+── verus-must-red-worlds：必红世界表每行改坏核之后 Verus 都报错且出现期望片段，原文恰好命中一次
+  ✗ 第 4 行「改坏了也验得过」改坏之后 Verus 照样验过（verified 2、errors 0）：证明没盯住这一处
+     → 怎么办：补证明或收紧 spec，让这一处改坏就验不过
+── 汇总：checker-tier-formal-verification.sh 跑了 2 格（全部登记的格）
+  verus-toolchain-pinned：绿
+  verus-must-red-worlds：红（退出 1）
+  ✗ checker-tier-formal-verification.sh：2 格里 1 格红（verus-must-red-worlds）
+     → verus-must-red-worlds：锚点腐化就照今天的核改那一行的原文；改坏了还验得过就补证明或收紧 spec；表在 .claude/gate.d/verus-pins.tsv 的 must-red-worlds 行点名的路径；✗ 行写「没跑成：内存包装」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，不改表或证明
+     → 改完只重跑红的格：bash .claude/gate.d/checker-tier-formal-verification.sh --check verus-must-red-worlds
+合成阶段退 1

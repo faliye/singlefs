@@ -1,0 +1,4 @@
+name=witness_after_return label=base1 states=60 executor_style=0 witness_below_ack_rotation=0 versions_with_rotation=3 examples=-
+name=witness_after_return label=base2 states=516 executor_style=0 witness_below_ack_rotation=0 versions_with_rotation=19 examples=-
+name=witness_after_return label=r270s1 states=56 executor_style=8 witness_below_ack_rotation=5 versions_with_rotation=3 examples=state=29 batch=1 seg=6 witness=1 needed=2 ack=2;state=31 batch=1 seg=6 witness=1 needed=2 ack=2;state=32 batch=1 seg=6 witness=1 needed=2 ack=2
+name=witness_after_return label=r270s2 states=460 executor_style=79 witness_below_ack_rotation=63 versions_with_rotation=19 examples=state=29 batch=1 seg=6 witness=1 needed=2 ack=2;state=31 batch=1 seg=6 witness=1 needed=2 ack=2;state=32 batch=1 seg=6 witness=1 needed=2 ack=2

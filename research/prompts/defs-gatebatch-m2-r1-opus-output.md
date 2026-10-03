@@ -32,7 +32,7 @@ SUMMARY J4 重型测试闸: cells=28 attack_cells_broken=16 control_cells_broken
 模型目录 `research/prompts/defs-gatebatch-m2-r1-opus-model/` 各文件的 sha256（`SHA256SUMS` 原样）：
 
 ```
-9d7a9b5a54efba4dbb10603f69b9c8443644b99ef315ae4fba96da0b85ca0c6d  ./fix-f1-54-layer0-replay.patch
+9d7a9b5a54efba4dbb10603f69b9c8443644b99ef315ae4fba96da0b85ca0c6d  ./fix-f1-checker-tier-layer0-replay.patch
 51245f19fc4a79e86e414c04336b9be0dc215f6fd3108cf344f24022784fadf9  ./fix-f6-admission.patch
 b4b5957b1015314be36193319bfee0e76c9d2d742922b78ef8eea2ec427b1a7b  ./outputs/j1-fix.log
 746be04fa109acf4f4f50a5129207f06d2cca04770ef3099c0be05f73fda2f4c  ./outputs/j1.log
@@ -78,15 +78,15 @@ ff06b09785e982c77325bd44c14760afd71d652902b92a7aca0c6038b63fe2c7  ./probe_j4_hoo
 3. 整轮门禁跑快档，结果退 77（j1.log:4、6、8）。同样的改动加 `SINGLEFS_GATE_FULL=1` 再跑，快档退 1，点名的正是那一条用例（j1.log:5、7、9）。对照：改 `crates/` 下的 src/lib.rs，快档不退 77、判红（j1.log:3）。
 
 **每一步的出处**：
-- 快档的第二问只按 54 号那一行登记的路径判范围：`.claude/gate.d/54-layer0-replay.sh:114` 原文 `scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}")"`。54 号那一行的路径是 `crates/ Cargo.toml Cargo.lock`（`.claude/gate.d/stage-inputs.tsv:24`）。`change-touches-crates.sh:105` `  for prefix in "${prefixes[@]}"; do` 只拿这几个前缀去比。
-- 答「没碰」就退 77：`.claude/gate.d/54-layer0-replay.sh:117` `    echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"`，下一行 `exit 77`。
+- 快档的第二问只按 54 号那一行登记的路径判范围：`.claude/gate.d/checker-tier-layer0-replay.sh:114` 原文 `scope_reason="$(bash "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/change-touches-crates.sh" "$ROOT" "${layer0_registered_input_paths[@]}")"`。54 号那一行的路径是 `crates/ Cargo.toml Cargo.lock`（`.claude/gate.d/stage-inputs.tsv:24`）。`change-touches-crates.sh:105` `  for prefix in "${prefixes[@]}"; do` 只拿这几个前缀去比。
+- 答「没碰」就退 77：`.claude/gate.d/checker-tier-layer0-replay.sh:117` `    echo "  ! 本阶段跳过（这次改动没碰它判的东西）：$scope_reason"`，下一行 `exit 77`。
 - 77 不拦提交：`.claude/singlefs-ai-sop/scripts/gate.sh:250` `# 退出码 77 = 这一轮无对象可判，记「本次未跑」，既不算通过也不算失败`。
 - 可登记表对这种改动的承诺是：`.claude/gate.d/stage-inputs.tsv:19` `# 不会让这道阶段重跑——而清单本身变了必定重跑，改清单的代价因此是「下一趟全跑一次」，不是零；加一个实验行也一样。`第一问（stage-must-run）确实把登记表与 54 号本身算进去了（`research/scripts/admission.py:921` 那一行 `input_paths += [REGISTRATION_TABLE, f".claude/gate.d/{stage}"]`），但第二问不算，于是第一问答完「要跑」，第二问又把它摘掉了。
 - 自证为什么没抓到：54 号那几格全带着 `SINGLEFS_GATE_FULL=1` 跑（`research/scripts/admission.py:2633`），范围这一问从来没被走到。
 
 **四句**：
 - 分不分辨臂：这一轮判的是一份实现，没有几条候选要选。这一格分辨的是「今天的 54 号」与「改法 F1」：F1 在 A1–A3 上成立（j1-fix.log:4、6、8），今天的代码不成立。
-- 被判的系统当时看不看得到判别它的东西：看得到。做这个决定时，54 号手里已经有登记表（`$layer0_input_table`）、自己的路径（`$layer0_stage_script_path`）和准入模块的路径（`$layer0_admission_module`，`.claude/gate.d/54-layer0-replay.sh:69`）。
+- 被判的系统当时看不看得到判别它的东西：看得到。做这个决定时，54 号手里已经有登记表（`$layer0_input_table`）、自己的路径（`$layer0_stage_script_path`）和准入模块的路径（`$layer0_admission_module`，`.claude/gate.d/checker-tier-layer0-replay.sh:69`）。
 - 满足判据字面的哪一个分句：正文 J1「某条用例的输入变了而它的旧标记照样作数」旁边那一问，加上共用问句里的「放过」。这里的输入（登记行、判它的 54 号）确实进了指纹，指纹也确实变了；问题是快档根本没走到核指纹那一步。归「放过」，不归「假复用」。
 - 跑前条款给的改法在这几格上还中不中：规格里给的改法（清单用排除法写、指纹补第三轮 U4 那几样；`records/2026-09-24-里程碑二收尾调度.md:190`）都不碰范围这一问。它们在这三格上照样中。
 
@@ -99,7 +99,7 @@ ff06b09785e982c77325bd44c14760afd71d652902b92a7aca0c6038b63fe2c7  ./probe_j4_hoo
 2. 提交修好的判法，也就是今天这一份。stream-b 的指纹前后逐字相同（j1.log:12：`旧 639097891a56ec19…，新 639097891a56ec19…`）。
 3. `--full` 复用那一格，一条都不跑（j1.log:13）。快档带 `SINGLEFS_GATE_FULL=1`，退 0（j1.log:14）。修好的判法拿同一份日志判，是红的：「只起了 1 个工作线程」（j1.log:15）。
 
-**出处**：每条用例的指纹只把 54 号当「判它的」：`.claude/gate.d/54-layer0-replay.sh:168` `      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" --toolchain --build-environment)"; then`。改动之前，判法写在 54 号正文里，例如附录二 `research/prompts/_defs-gatebatch-m2-r1-diff.md:445` `-if [[ "$line" != *"exhaustive=true"* ]]; then`、`:476` `-worker_threads_are_acceptable "两次发布那条流" "$worker_threads_b" || exit 1`，54 号进指纹，判法也就跟着进了。现在判法在 `research/scripts/admission.py:1265` `def judge_crash_case_log(…)`，快档复核标记用的是 `:1321` `def crash_case_marker_problems(case, fingerprint, marker):`，后者只复核输入指纹、用例名、test result、计数行、exhaustive 这几样，不复核工作线程，也不复核「读回的片 + 这一趟跑的片 = 总片数」。
+**出处**：每条用例的指纹只把 54 号当「判它的」：`.claude/gate.d/checker-tier-layer0-replay.sh:168` `      --extra-file "<判它的 54 号：$layer0_stage_file_name>" "$layer0_stage_script_path" --toolchain --build-environment)"; then`。改动之前，判法写在 54 号正文里，例如附录二 `research/prompts/_defs-gatebatch-m2-r1-diff.md:445` `-if [[ "$line" != *"exhaustive=true"* ]]; then`、`:476` `-worker_threads_are_acceptable "两次发布那条流" "$worker_threads_b" || exit 1`，54 号进指纹，判法也就跟着进了。现在判法在 `research/scripts/admission.py:1265` `def judge_crash_case_log(…)`，快档复核标记用的是 `:1321` `def crash_case_marker_problems(case, fingerprint, marker):`，后者只复核输入指纹、用例名、test result、计数行、exhaustive 这几样，不复核工作线程，也不复核「读回的片 + 这一趟跑的片 = 总片数」。
 
 **四句**：
 - 分不分辨臂：分辨「今天的 54 号」与「F1」（F1 把 admission.py 当 `--extra-file` 放进指纹）：j1-fix.log:12–14 三格都成立。
@@ -210,7 +210,7 @@ E6（j3.log:6）：两边干净、环境相同，指纹相同。E7（j3.log:7）
 
 | 改法 | 修哪几格 | 量过 / 推的 |
 |---|---|---|
-| **F1**（54 号，补丁 `fix-f1-54-layer0-replay.patch`）：范围那一问的前缀在登记路径之外，再加 `.claude/gate.d/stage-inputs.tsv`、跑的这一份 54 号、准入模块（按 `realpath --relative-to=$ROOT` 取相对路径）；`write_crash_case_manifest` 再加一个 `--extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module"` | A1、A2、A3、A4 | **量过**：副本上 `probe_j1_stage.py` 由 6 格不成立变成 0 格（原样 `SUMMARY J1 54 号: cells=15 attack_cells_broken=0 control_cells_broken=0`，j1-fix.log:16）。副本上的 `admission.py --selftest` 139/140：唯一红的那一格是「54 号 --full 设续跑的环境变量」，那一格的 `expected_fingerprint` 照旧只带 54 号那一个 `--extra-file`，要跟着 F1 改（`outputs/selftest-admission-f1-f6.log`）。另外，stage-inputs.tsv 里 54 号那一行最好也加上 `research/scripts/admission.py`，让 stage-must-run 的复用判定同样看得到它（推的，没量） |
+| **F1**（54 号，补丁 `fix-f1-checker-tier-layer0-replay.patch`）：范围那一问的前缀在登记路径之外，再加 `.claude/gate.d/stage-inputs.tsv`、跑的这一份 54 号、准入模块（按 `realpath --relative-to=$ROOT` 取相对路径）；`write_crash_case_manifest` 再加一个 `--extra-file "<判它的准入模块：admission.py>" "$layer0_admission_module"` | A1、A2、A3、A4 | **量过**：副本上 `probe_j1_stage.py` 由 6 格不成立变成 0 格（原样 `SUMMARY J1 54 号: cells=15 attack_cells_broken=0 control_cells_broken=0`，j1-fix.log:16）。副本上的 `admission.py --selftest` 139/140：唯一红的那一格是「54 号 --full 设续跑的环境变量」，那一格的 `expected_fingerprint` 照旧只带 54 号那一个 `--extra-file`，要跟着 F1 改（`outputs/selftest-admission-f1-f6.log`）。另外，stage-inputs.tsv 里 54 号那一行最好也加上 `research/scripts/admission.py`，让 stage-must-run 的复用判定同样看得到它（推的，没量） |
 | **F6**（admission.py，补丁 `fix-f6-admission.patch`）：`crash_case_test_files` 找到用例函数之后，再核它前面那串属性里有没有 `#[ignore`，没有就报登记错（`crash-cases` 退 2，54 号快档与 `--full` 开头都红） | I2 | **量过**：j4-fix.log:28 成立。副本自证除上面那一格外都过；四条真用例都标了 `#[ignore]`，副本上自查通过（同一份日志里「真仓的登记表自查」那一格是绿的） |
 | F7（闸）：`cargo_use` 除 test / t 之外，把 nextest（`--run-ignored`）、mutants、miri、llvm-cov、hack 也当成跑测试的子命令；`--config` 里有 `alias.` 或 `.runner`、环境里有 `CARGO_TARGET_*_RUNNER` 的，一律当成可能带 `--ignored`；前缀表补 `/usr/bin/time`、`flock`、`rustup run`、`chrt`、`prlimit`、`systemd-run`、`strace`、`perf` | B1–B5、B8–B13 | 推的，没实现 |
 | F8（闸）：命令词是任意可执行文件、参数里有 `--ignored` / `--include-ignored`，且（`--exact` 之后的名字，或任一参数）等于登记的用例函数名时，按崩溃枚举用例算 | B6、B7 的一部分 | 推的，没实现；只点名测试目标、不点名函数的写法照样漏 |
@@ -231,7 +231,7 @@ E6（j3.log:6）：两边干净、环境相同，指纹相同。E7（j3.log:7）
 
 - **libtest 认不认缩写的参数**：草稿里用 `rustc --test` 编一个 5 行的小测试，逐个试 `--include-ignored`、`--include-ig`、`--include`、`--ignore`、`--ign`。只有第一个跑到了 ignored 用例，其余全报 `error: Unrecognized option`（原样，本机 stable 工具链）。这条路走不通。
 - **闸认得出的写法**（j4.log:1–7，全部判对）：`--test=<名>` 的等号写法、`cargo +stable t` 加通配、直接执行 deps 下的二进制、在包目录里不带 `-p`、别的测试目标带 `--ignored`、点名目标但不带 `--ignored`。
-- **续跑目录跨输入串用**：进度目录按这条用例的指纹分（`.claude/gate.d/54-layer0-replay.sh:200`），指纹里有登记行，两条用例不会共用一个目录。进度文件头另核流名与枚举计划（第三轮 U1），读 `layer0_progress.rs` 的 `open` / `restored_slices_of` 没找到串用的路径。这是推的，没造并发以外的场景去量。
+- **续跑目录跨输入串用**：进度目录按这条用例的指纹分（`.claude/gate.d/checker-tier-layer0-replay.sh:200`），指纹里有登记行，两条用例不会共用一个目录。进度文件头另核流名与枚举计划（第三轮 U1），读 `layer0_progress.rs` 的 `open` / `restored_slices_of` 没找到串用的路径。这是推的，没造并发以外的场景去量。
 - **`--start-over` 没传到、或别处漏清 `SINGLEFS_LAYER0_START_OVER`**：`--full` 用 `env -u` 或 `=1` 设它，自证有一格核这个。快档不清它，但只有两份层 0 全量用例读续跑的环境变量（`first_transaction_step_seven_layer0.rs:456`、`second_transaction_step_zero_layer0.rs:736` 各有一处 `Layer0Resume::from_environment`），而这两份在快档里被 ignore。没有漏。
 - **被打断或判红之后留下作数的标记**：标记只在判日志、复算指纹都过了之后写，而且先写临时文件再换名，读的时候跳过 `.partial.`。判红的那一支删的是开跑那一批的格。没造出来。
 - **54 号判红了，靠「整份进度文件读回」在下一趟洗成绿**：harness 在枚举跑完时就删了进度文件（`crates/singlefs-harness/src/crash.rs:2374` `    let progress_file_after_completion = progress_file.map(Layer0ProgressFile::finish);`，`finish` 里删），54 号那边再判线程红时，文件已经不在，下一趟从头跑。只有在最后一片写完、`finish` 之前被杀这一个窄窗口里，才剩一份完整的进度文件，而那一趟本来就没被判红。

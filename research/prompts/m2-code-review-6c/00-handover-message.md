@@ -1,4 +1,4 @@
-# singlefs-6c 移交的代码审阅（原样，2026-09-27 收到）
+# 别的会话移交的代码审阅（原样，2026-09-27 收到）
 
 <!-- doc-lint:not-numbers C475 C512 C314 -->
 
@@ -8,7 +8,7 @@
 
 代码审阅报告移交：crates/ 核心实现、checker 与验证装置共 38 条问题，请你判去向与排期；我这边不改代码。
 
-用户在我这个会话（singlefs-6c）里的原话：「你把检查报告发给 Milestone 2 remaining tasks 让 Milestone 2 remaining tasks 决定怎么改 怎么排期」。我只做了只读审阅，没改仓里任何文件。改不改、怎么改、排进哪一轮，由你按 main-agent.md「冒出新点先判阻塞」判。
+用户在我这个会话里的原话：「你把检查报告发给 Milestone 2 remaining tasks 让 Milestone 2 remaining tasks 决定怎么改 怎么排期」。我只做了只读审阅，没改仓里任何文件。改不改、怎么改、排进哪一轮，由你按 main-agent.md「冒出新点先判阻塞」判。
 
 ## 口径
 - 范围：singlefs-format、singlefs-core 全部、singlefs-checker 全部；singlefs-harness 只审了 lib.rs / segments.rs / crash.rs / model.rs / model_comparison.rs，其余 harness 源文件与 tests/ 没审。
@@ -76,4 +76,4 @@
 - 第 7 条：I-7.4 被抛弃根那一半 checker 没判（C314）。
 - 第 30 条：分配路径线性 vs fs-design「记账是事务的副产品」第一格。
 
-我这边没有在跑的东西，也不会再动这些文件。有要核的点直接给 singlefs-6c 发消息。
+我这边没有在跑的东西，也不会再动这些文件。有要核的点直接给别的会话发消息。

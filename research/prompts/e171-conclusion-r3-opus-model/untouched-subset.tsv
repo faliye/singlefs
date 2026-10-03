@@ -1,0 +1,13 @@
+2	crates/singlefs-core/src/admission.rs	D28_已定项_3_实现：实例表链的片数向下取整（370_行算成一片）
+33	crates/singlefs-core/src/mount.rs	步_4：影子账把被抛弃根账里已释放的落点也隔离
+49	crates/singlefs-core/src/mount.rs	C554_乙：c_见证_取系统配置槽_tail_的最小值（只剩较旧那一槽的见证）
+70	crates/singlefs-core/src/recovery.rs	实二十：层_0_L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）
+110	crates/singlefs-core/src/write_accounting.rs	增补_1：树表单元的写记到中央映射树名下（合计不变，按种类钉的字节表红）
+113	crates/singlefs-replay-prefix/src/lib.rs	P6_后一半：锚点读不出时不看本次发布内序号，链首接在下一次发布的第二条上（三方第一轮_K4-b）
+155	crates/singlefs-core/src/mount.rs	步_5：抬_F_的上限不看第_4_新的非空根
+161	crates/singlefs-core/src/mount.rs	增补_3_第_2_件（理想模型，r1_攻方变异_B3）：抬_F_上限不取第_4_新的非空根（只取每盘最新有效根）
+162	crates/singlefs-core/src/mount.rs	影子账两臂报同一个分支名（运行时看不出走了哪一条，五条硬要求第_4_条）
+174	crates/singlefs-core/src/mount.rs	实二（回退改形态：SysPre_与_B1，D16_已定项_1_/_7、D22_已定项_7_/_9、I-7.9_/_I-7.12、C556_/_C557）：抬_F_做成时先写系统配置那一步的写账丢掉
+213	crates/singlefs-core/src/recovery.rs	实审_A2a_第_25_条：前一条不在盘上也断前缀
+252	crates/singlefs-core/src/transaction.rs	增补_2_收口表第_39_行那一族：发布取完落点之后不记根（不转环、不回收；取号之前的预演与真发走同一段，两边一起不回收）
+274	crates/singlefs-replay-prefix/src/lib.rs	只供测试的开关：关掉点名验证时_verification_passed_照加（两臂在健康镜像上报同一个数，运行时看不出走了哪一条）

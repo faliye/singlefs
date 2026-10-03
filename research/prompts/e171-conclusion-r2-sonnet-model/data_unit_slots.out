@@ -1,0 +1,20 @@
+== baseline-run1
+op=22 slot=50180 bytes=32768
+op=57 slot=50182 bytes=32768
+op=179 slot=50184 bytes=32768
+op=245 slot=50186 bytes=32768
+op=284 slot=50188 bytes=32768
+op=323 slot=50190 bytes=32768
+op=362 slot=50192 bytes=32768
+op=401 slot=50194 bytes=32768
+op=498 slot=50176 bytes=32768
+== rows-s4/row-34/dump
+op=22 slot=50180 bytes=32768
+op=57 slot=50182 bytes=32768
+op=179 slot=50184 bytes=32768
+op=245 slot=50186 bytes=32768
+op=284 slot=50188 bytes=32768
+op=323 slot=50190 bytes=32768
+op=362 slot=50192 bytes=32768
+op=401 slot=50194 bytes=32768
+op=498 slot=50196 bytes=32768

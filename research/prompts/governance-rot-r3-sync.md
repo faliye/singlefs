@@ -1,7 +1,7 @@
 <!-- knowledge-sync -->
 # governance-rot-r3 阶段同步
 
-触发文件：CLAUDE.md、.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/experiment-runner.md、.claude/agents/gate-triage.md、.claude/agents/implementation-writer.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/sweep.md、.claude/agents/three-way-attack.md、.claude/agents/three-way-local-attack.md、.claude/agents/three-way-local-defense.md、.claude/agents/three-way-materials.md、.claude/agents/three-way-verifier.md、.claude/gate.d/54-layer0-replay.sh、.claude/rules/format-evolution.md、.claude/rules/fs-design.md、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、.claude/rules/path-moves.md、.claude/rules/three-way-inference.md、research/scripts/ask-local.sh、research/scripts/ask-local-selftest.sh、research/scripts/stale-candidates.py；另改了 .claude/main-agent.md 与三个 .claude/skills/*/SKILL.md（不在触发登记里，一并记）
+触发文件：CLAUDE.md、.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/experiment-runner.md、.claude/agents/gate-triage.md、.claude/agents/implementation-writer.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/sweep.md、.claude/agents/three-way-attack.md、.claude/agents/three-way-local-attack.md、.claude/agents/three-way-local-defense.md、.claude/agents/three-way-materials.md、.claude/agents/three-way-verifier.md、.claude/gate.d/checker-tier-layer0-replay.sh、.claude/rules/format-evolution.md、.claude/rules/fs-design.md、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、.claude/rules/path-moves.md、.claude/rules/three-way-inference.md、research/scripts/ask-local.sh、research/scripts/ask-local-selftest.sh、research/scripts/stale-candidates.py；另改了 .claude/main-agent.md 与三个 .claude/skills/*/SKILL.md（不在触发登记里，一并记）
 
 这一阶段做成的事：五个只读核对员逐份核 29 份治理文档（报告 A–E，共 97 条），主 agent 逐条现查后处置：纯描述修正直接改；十二项要定的由用户在三个弹窗里定（层 0 全量由主 agent 建 worktree 并跑、定义问题出口内直改出口外弹窗、历史类文件换名照实际做法、57 号文档照实写、ask-local.sh 没验过退 6、本地腿派哪条由主 agent 定并写理由、云端腿再抽由主 agent 再派、本地腿用 run_in_background、实现员在主工作区改、15 与 74 号按轻阶段、草稿目录改成按 uid 取（另起第 4 轮）、pre-commit 本机没装）。
 
@@ -49,7 +49,7 @@
 | .claude/agents/three-way-materials.md:24 | 47 号红时要停下的脚本名单 | 改了：补 quote-rust-items.py；C-15 |
 | .claude/agents/experiment-runner.md:28 | 写变异表 research/mutations/e<号>_<简称>.tsv…；变异三个数 | 改了：入库装置变异行进 crates/mutations.tsv、三个数待 59 号；文件名用英文名；decision-links-pending 空时跳过；报超时与内存撞顶；E152 补简称；C-8、C-9、C-13、C-14 |
 | .claude/agents/experiment-designer.md:28 | --exclude-dir=experiments …（排不掉索引文件）；实验简称 | 改了：补排除文件与排不干净时的处置；登记里定英文名；C-9、C-10 |
-| .claude/gate.d/54-layer0-replay.sh:232 | 出路里 --full 那行不带前缀 | 改了：带前缀并经内存包装，照抄不再被 heavy-test-guard 拒；B-8 |
+| .claude/gate.d/checker-tier-layer0-replay.sh:232 | 出路里 --full 那行不带前缀 | 改了：带前缀并经内存包装，照抄不再被 heavy-test-guard 拒；B-8 |
 | .claude/rules/implementation-workflow.md:48 | 重型测试清单（与钩子不全一致）；pre-commit hook 照旧跑整轮门禁；54、55、57、59 复用 | 改了：清单与钩子「按类」对齐并指过去、15/74 轻阶段、删 pre-commit（用户：本机没装）、57 号照跑、层 0 全量主 agent 跑、腿名、E152 简称；B-3、B-4、D-5、D-6、D-11、D-18、D-19 |
 | .claude/rules/fs-design.md:137 | C8（范围判定）与 C19（腰线渗透）；D5 索引表第 8 行；「不许指向核心层的对象」；见第 1 条；incompat 示例；裸 D 编号；预留空位 | 改了：简称、D5 已定项 4 第 8、9 行、D21 出处、指到四样成本第 1 条、示例加示意说明、补 D 简称、补位图宽度与登记位；D-1、D-2、D-10、D-11、D-15、D-16、D-17 |
 | .claude/rules/format-evolution.md:26 | 要按门禁 20 号写「—— 半定（一项未定）」；门禁管哪一半只点 75 号；27 号从此替你盯着 | 改了：括注写法与两道门禁的实际判法；补 99 号；27 号射程；D-7、D-8、D-9 |

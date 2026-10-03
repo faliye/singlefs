@@ -3,7 +3,7 @@
 # 输入哈希里没有 54 号脚本自己（stage-inputs.tsv 第 11 行只登记 crates/ Cargo.toml Cargo.lock）。
 # 历史：A 这一批让第一条流的枚举退化成非全量（假 cargo 见到 NONEXHAUSTIVE 就打 exhaustive=false，用例本身不红）；
 # 主工作区里 54 号脚本有 B 会话没暂存的半成品（把第一条流的 exhaustive 判定关了）；A 收尾照 main-agent.md 第 43 行在主工作区
-# 跑 `bash .claude/gate.d/54-layer0-replay.sh --full`——跑的是工作区那一份脚本。然后 A 只暂存自己的 crates/ 改动，起 gate.sh --staged。
+# 跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`——跑的是工作区那一份脚本。然后 A 只暂存自己的 crates/ 改动，起 gate.sh --staged。
 # 臂：post（今天的 54 号）｜pre（分档前，门禁自己跑全量）｜f4a（我提的：快档另核标记里两行都有 exhaustive=true）｜
 #     f4b（我提的：标记记写它的 54 号脚本的 sha256，快档与自己比）。f4a / f4b 只在这个模型上量过、被攻过零轮。
 source "$(dirname "$0")/lib.sh"

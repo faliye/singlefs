@@ -1,0 +1,28 @@
+   退 0 期望 0 | D1-01 崩溃验证员：定义第 2 步的写法（前缀 + nice） | agent=crash-verifier | 
+   退 0 期望 0 | D1-02 崩溃验证员：定义第 1b 步的写法（两个上限写在 nice 前面、前缀在最前） | agent=crash-verifier | 
+   退 0 期望 0 | D1-03 崩溃验证员：上限在前、前缀在后 | agent=crash-verifier | 
+   退 0 期望 0 | D1-04 崩溃验证员：后台写法 { …; echo exit=$?; } > log | agent=crash-verifier | 
+   退 0 期望 0 | D1-05 崩溃验证员：外面再包一层内存包装（定义说不再包） | agent=crash-verifier | 
+   退 2 期望 2 | D1-06 崩溃验证员：不带前缀 | agent=crash-verifier | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：crash-verifier 跑「Verus」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+   退 0 期望 0 | D1-07 崩溃验证员：=user-request 前缀 | agent=crash-verifier | 
+   退 0 期望 0 | D1-08 崩溃验证员：单跑一格 --check verus-proof 带前缀 | agent=crash-verifier | 
+   退 0 期望 0 | D1-09 崩溃验证员：--list 不带前缀 | agent=crash-verifier | 
+   退 2 期望 2 | D1-10 门禁分诊：带前缀直接调这一道 | agent=gate-triage | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：gate-triage 不跑「Verus」
+   退 2 期望 2 | D1-11 门禁分诊：带前缀单跑一格 | agent=gate-triage | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：gate-triage 不跑「Verus」
+   退 0 期望 0 | D1-12 门禁分诊：gate-staged.sh 带前缀 | agent=gate-triage | 
+   退 0 期望 0 | D1-13 门禁分诊：gate.sh 不带参数带前缀 | agent=gate-triage | 
+   退 0 期望 0 | D1-14 主 agent：带前缀整道 | agent=主 agent | 
+   退 2 期望 2 | D1-15 主 agent：不带前缀 | agent=主 agent | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：主 agent 跑「Verus」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+   退 2 期望 2 | D1-16 实现员：带前缀 | agent=implementation-writer | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：implementation-writer 不跑「Verus」
+   退 2 期望 2 | D1-17 实现员：单跑一格 --check verus-proof | agent=implementation-writer | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：implementation-writer 不跑「Verus」
+   退 0 期望 0 | D1-18 实现员：直接起 verus 验自己的证明 | agent=implementation-writer | 
+   退 0 期望 — | D1-19 实现员：python3 起判法脚本验证明（门禁那一道的判法） | agent=implementation-writer | 
+   退 0 期望 — | D1-20 实现员：python3 起判法脚本跑必红世界（94 处 Verus） | agent=implementation-writer | 
+   退 0 期望 — | D1-21 实现员：python3 起红例重放（编装置、跑装置） | agent=implementation-writer | 
+   退 0 期望 — | D1-22 门禁分诊员：python3 起红例重放 | agent=gate-triage | 
+   退 2 期望 — | D1-24 实现员：--tool-versions（只打 Verus 版本） | agent=implementation-writer | ✗ 重型测试被拒：门禁 checker-tier-formal-verification.sh（Verus）：implementation-writer 不跑「Verus」
+   退 0 期望 0 | D1-25 崩溃验证员：第 1 步的标记核对命令 | agent=crash-verifier | 
+   退 0 期望 — | D1-23 崩溃验证员：带前缀起一个读不到的脚本（只看闸怎么判） | agent=crash-verifier | ! heavy-test-guard.sh：bash / sh 起的脚本 /tmp/claude-1000/no-such-dir/s.sh 不存在，里面的命令没判；这条命令照常执行，记了一条检出
+共 25 格，期望对不上的 0 格
+命中 .claude/main-agent.md diff 文件第 229 行 '下面那'
+扫了 30 条射程内的加行，命中 1 条

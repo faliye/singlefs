@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers X1 X2 X3 X4 X5 X6 Y1 Y2 Y4 Y5 Z1Q-A Z1Q-B Z3-A P1 Q4 Q7 -->
 
-正文 `research/prompts/_m2-closeout-code-r3-body.md`，材料 `_m2-closeout-code-r3-{checklist,appendix,diff,background}.md`。快照 `refs/sop/m2-closeout-code-r3-snapshot`（提交 `0cc2a238a57d297f511f9e08cedbbc36c6d56d67`），基准 `refs/sop/m2-closeout-code-r3-base`（`9a9cfb6c`），清单在 `research/prompts/m2-closeout-code-r3-snapshot/`。这份判决由主 agent（会话 singlefs-1e，接手 singlefs-99）写：原定的核查员被停（调度记录 `records/2026-09-24-里程碑二收尾调度.md` 第 320 行，用户「判决和核查是主agent 下的」），核查照 `.claude/rules/three-way-inference.md`「核查与判决由主 agent 做」五步由主 agent 自己做。
+正文 `research/prompts/_m2-closeout-code-r3-body.md`，材料 `_m2-closeout-code-r3-{checklist,appendix,diff,background}.md`。快照 `refs/sop/m2-closeout-code-r3-snapshot`（提交 `0cc2a238a57d297f511f9e08cedbbc36c6d56d67`），基准 `refs/sop/m2-closeout-code-r3-base`（`9a9cfb6c`），清单在 `research/prompts/m2-closeout-code-r3-snapshot/`。这份判决由主 agent（接手别的会话）写：原定的核查员被停（调度记录 `records/2026-09-24-里程碑二收尾调度.md` 第 320 行，用户「判决和核查是主agent 下的」），核查照 `.claude/rules/three-way-inference.md`「核查与判决由主 agent 做」五步由主 agent 自己做。
 
 **三条腿与每一份样本**：
 - 云端攻方（Opus，X1、X5 ①②③、X6）：`research/prompts/m2-closeout-code-r3-opus-output.md`，模型目录 `research/prompts/m2-closeout-code-r3-opus-model/`。第 3 批按用户要求停下（报告第 80–81 行），停下时那一条流没跑完、不计数。

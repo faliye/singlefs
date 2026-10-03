@@ -5,7 +5,7 @@ MAIN_REPO=<仓根>
 MODEL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 export PATH="$MODEL_DIR/fake-bin:$PATH"
 unset SINGLEFS_LAYER0_THREADS SINGLEFS_STAGED_TREE GATE_BASE SINGLEFS_GATE_FULL FAKE_CARGO_SLEEP_FULL FAKE_CARGO_HOOK_BEFORE_SECOND FAKE_CARGO_HOOK_AFTER_SECOND
-STAGE=.claude/gate.d/54-layer0-replay.sh
+STAGE=.claude/gate.d/checker-tier-layer0-replay.sh
 gitq() { git -c user.email=attack@example.com -c user.name=attack "$@"; }
 
 # build_repo <目录> <post|pre>：post＝工作区今天的 54 号与 stage-inputs.tsv（开工快照里的那一版），pre＝HEAD 的（分档之前）。

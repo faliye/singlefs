@@ -74,7 +74,7 @@ into it: 92-layout-checker-sync.sh, 94-checker-implementation-disjoint.sh. The p
 this group should end up with a total cell count of 2.
 
 Group 10. Target name: kept separate, one merged file per old file, not actually combined.
-Old gate script file names merged into it: 54-layer0-replay.sh, 55-qemu-device-streams.sh,
+Old gate script file names merged into it: checker-tier-layer0-replay.sh, 55-qemu-device-streams.sh,
 57-lkmm.sh, 59-crates-mutation-replay.sh, 87-replay.sh, 77-test-environment.sh. The plan
 states this group should end up with a total cell count of 6.
 
@@ -703,7 +703,7 @@ subdirectory of it, must be registered by path in the first cell of some row ins
 project's own local facts table; every kb path cited anywhere in that table must actually
 exist.
 
-Row 4. Old gate script: 54-layer0-replay.sh. Cell name: the whole gate. What it judges: In
+Row 4. Old gate script: checker-tier-layer0-replay.sh. Cell name: the whole gate. What it judges: In
 its fast tier, every non ignored test inside the checker tier package is run in release
 mode; then, row by row, it checks a fixed crash case marker table for an all green marker,
 reporting not run this time for any row that does not count; before running, it checks

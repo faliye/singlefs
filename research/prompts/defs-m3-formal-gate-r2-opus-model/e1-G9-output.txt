@@ -1,0 +1,81 @@
+2	2	implementation-writer	C1 原样
+2	2	主 agent	C1 原样
+2	2	implementation-writer	C2 cd 进去再 -m
+2	2	主 agent	C2 cd 进去再 -m
+2	2	implementation-writer	C3 -m 带包路径
+2	2	主 agent	C3 -m 带包路径
+2	2	implementation-writer	C4 直接执行（带执行位）
+2	2	主 agent	C4 直接执行（带执行位）
+2	2	implementation-writer	C5 bash -c 包一层
+2	2	主 agent	C5 bash -c 包一层
+2	2	implementation-writer	C6 timeout 前缀
+2	2	主 agent	C6 timeout 前缀
+2	2	implementation-writer	C7 子 shell 里 cd
+2	2	主 agent	C7 子 shell 里 cd
+2	2	implementation-writer	C8 capped.sh 包一层起红例重放
+2	2	主 agent	C8 capped.sh 包一层起红例重放
+2	2	implementation-writer	C9 /usr/bin/time -v
+2	2	主 agent	C9 /usr/bin/time -v
+2	2	implementation-writer	C10 heredoc 喂 bash
+2	2	主 agent	C10 heredoc 喂 bash
+2	2	implementation-writer	C11 内存包装 auto
+2	2	主 agent	C11 内存包装 auto
+2	2	implementation-writer	C12 python3 -I（不带值的选项）
+2	2	主 agent	C12 python3 -I（不带值的选项）
+0	2	implementation-writer	B1 env -C 换目录  <- 与期望不同
+0	2	主 agent	B1 env -C 换目录  <- 与期望不同
+0	2	implementation-writer	B2 env --chdir= 换目录  <- 与期望不同
+0	2	主 agent	B2 env --chdir= 换目录  <- 与期望不同
+2	2	implementation-writer	B3 env PYTHONPATH= 再 -m
+2	2	主 agent	B3 env PYTHONPATH= 再 -m
+2	2	implementation-writer	B4 PYTHONPATH= 前缀再 -m
+2	2	主 agent	B4 PYTHONPATH= 前缀再 -m
+2	2	implementation-writer	B5 export PYTHONPATH 再 -m 起红例重放
+2	2	主 agent	B5 export PYTHONPATH 再 -m 起红例重放
+2	2	implementation-writer	B6 python3 -c runpy.run_path
+2	2	主 agent	B6 python3 -c runpy.run_path
+0	2	implementation-writer	B7 仓外同名符号链接  <- 与期望不同
+0	2	主 agent	B7 仓外同名符号链接  <- 与期望不同
+0	2	implementation-writer	B8 仓内改名符号链接  <- 与期望不同
+0	2	主 agent	B8 仓内改名符号链接  <- 与期望不同
+2	2	implementation-writer	B9 子命令放变量
+2	2	主 agent	B9 子命令放变量
+2	2	implementation-writer	B10 子命令用命令替换
+2	2	主 agent	B10 子命令用命令替换
+2	2	implementation-writer	B11 shell 函数转参数
+2	2	主 agent	B11 shell 函数转参数
+2	2	implementation-writer	B12 红例重放的模式放变量
+2	2	主 agent	B12 红例重放的模式放变量
+0	2	implementation-writer	B13 脚本目录放变量  <- 与期望不同
+0	2	主 agent	B13 脚本目录放变量  <- 与期望不同
+0	2	implementation-writer	B14 xargs 喂子命令（文件头列过的老口子）  <- 与期望不同
+0	2	主 agent	B14 xargs 喂子命令（文件头列过的老口子）  <- 与期望不同
+2	2	implementation-writer	B15 strace -f
+2	2	主 agent	B15 strace -f
+2	2	implementation-writer	B16 flock
+2	2	主 agent	B16 flock
+2	2	implementation-writer	B17 systemd-run --scope
+2	2	主 agent	B17 systemd-run --scope
+0	2	implementation-writer	B18 script -qc  <- 与期望不同
+0	2	主 agent	B18 script -qc  <- 与期望不同
+2	2	implementation-writer	B19 chrt
+2	2	主 agent	B19 chrt
+0	2	implementation-writer	B20 env -C 起红例重放  <- 与期望不同
+0	2	主 agent	B20 env -C 起红例重放  <- 与期望不同
+2	2	implementation-writer	B21 for 循环逐格跑三格
+2	2	主 agent	B21 for 循环逐格跑三格
+2	2	implementation-writer	B22 for 循环先核钉全再重放
+2	2	主 agent	B22 for 循环先核钉全再重放
+0	0	implementation-writer	R1 tool-versions
+0	0	主 agent	R1 tool-versions
+0	0	implementation-writer	R2 toolchain
+0	0	主 agent	R2 toolchain
+0	0	implementation-writer	R3 红例 --check
+0	0	主 agent	R3 红例 --check
+0	0	implementation-writer	R4 阶段 --tool-versions
+0	0	主 agent	R4 阶段 --tool-versions
+0	-	implementation-writer	R5 54 号带 --tool-versions
+0	-	主 agent	R5 54 号带 --tool-versions
+0	-	implementation-writer	R6 crates 变异整表带 --tool-versions
+0	-	主 agent	R6 crates 变异整表带 --tool-versions
+对不上期望的：16 条（期望写 - 的是待观测的，不计）

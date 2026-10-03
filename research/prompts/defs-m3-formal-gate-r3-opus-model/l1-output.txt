@@ -1,0 +1,49 @@
+0	2	implementation-writer	P1 --force 占 --target 的值位，后面写 --check  <- 与期望不同
+0	2	主 agent	P1 --force 占 --target 的值位，后面写 --check  <- 与期望不同
+0	2	implementation-writer	P2 同上带 --root  <- 与期望不同
+0	2	主 agent	P2 同上带 --root  <- 与期望不同
+2	2	implementation-writer	P3 对照：--force 写在末尾
+2	2	主 agent	P3 对照：--force 写在末尾
+0	0	implementation-writer	P4 对照：--check 带 --force
+0	0	主 agent	P4 对照：--check 带 --force
+2	-	implementation-writer	P5 verus-proof-check 首参前写 --force（闸更严，期望拒）
+2	-	主 agent	P5 verus-proof-check 首参前写 --force（闸更严，期望拒）
+0	2	implementation-writer	C1 -c 里改 sys.argv 成 proof，代码后写 tool-versions  <- 与期望不同
+0	2	主 agent	C1 -c 里改 sys.argv 成 proof，代码后写 tool-versions  <- 与期望不同
+0	2	implementation-writer	C2 -c 里改 sys.argv 成 --replay，代码后不写词  <- 与期望不同
+0	2	主 agent	C2 -c 里改 sys.argv 成 --replay，代码后不写词  <- 与期望不同
+0	2	implementation-writer	C3 -c 里改 sys.argv 成 --replay，代码后写 --check  <- 与期望不同
+0	2	主 agent	C3 -c 里改 sys.argv 成 --replay，代码后写 --check  <- 与期望不同
+0	2	implementation-writer	C4 -c 里 __import__ 按模块名导入再调 main  <- 与期望不同
+0	2	主 agent	C4 -c 里 __import__ 按模块名导入再调 main  <- 与期望不同
+0	2	implementation-writer	C5 -c 里 importlib.import_module 起红例重放  <- 与期望不同
+0	2	主 agent	C5 -c 里 importlib.import_module 起红例重放  <- 与期望不同
+0	2	implementation-writer	C6 -c 里路径拼出来  <- 与期望不同
+0	2	主 agent	C6 -c 里路径拼出来  <- 与期望不同
+0	2	implementation-writer	C7 heredoc 喂 python3 -  <- 与期望不同
+0	2	主 agent	C7 heredoc 喂 python3 -  <- 与期望不同
+0	2	implementation-writer	C8 -c 里调函数 check_proof（spec_from_file_location 点了文件名），代码后写 toolchain  <- 与期望不同
+0	2	主 agent	C8 -c 里调函数 check_proof（spec_from_file_location 点了文件名），代码后写 toolchain  <- 与期望不同
+2	2	implementation-writer	C9 对照：-c exec 文件、代码后写 proof
+2	2	主 agent	C9 对照：-c exec 文件、代码后写 proof
+2	2	implementation-writer	C10 对照：python3 -m runpy 加 PYTHONPATH
+2	2	主 agent	C10 对照：python3 -m runpy 加 PYTHONPATH
+0	2	implementation-writer	M1 广谱变异：-c 里改 sys.argv，代码后写 --summary  <- 与期望不同
+0	2	主 agent	M1 广谱变异：-c 里改 sys.argv，代码后写 --summary  <- 与期望不同
+0	2	implementation-writer	M2 广谱变异：-c 里 __import__ 按模块名  <- 与期望不同
+0	2	主 agent	M2 广谱变异：-c 里 __import__ 按模块名  <- 与期望不同
+0	0	implementation-writer	F1 python3 -m py_compile 两份判法脚本（共用约束点名的语法检查）
+0	0	主 agent	F1 python3 -m py_compile 两份判法脚本（共用约束点名的语法检查）
+2	-	implementation-writer	F2 python3 -c 只读文件做语法检查（文件头写的接受的误拒）
+2	-	主 agent	F2 python3 -c 只读文件做语法检查（文件头写的接受的误拒）
+0	0	implementation-writer	F3 -W 选项加 tool-versions
+0	0	主 agent	F3 -W 选项加 tool-versions
+0	0	implementation-writer	F4 同目录名字相近的研究脚本
+0	0	主 agent	F4 同目录名字相近的研究脚本
+0	-	implementation-writer	F5 -c 代码里只在字符串里写了 e165 的名字、代码后不写词（照 e165 判成追加）
+0	-	主 agent	F5 -c 代码里只在字符串里写了 e165 的名字、代码后不写词（照 e165 判成追加）
+0	0	implementation-writer	F6 grep 读判法脚本
+0	0	主 agent	F6 grep 读判法脚本
+0	0	implementation-writer	F7 仓副本里的判法脚本 tool-versions
+0	0	主 agent	F7 仓副本里的判法脚本 tool-versions
+对不上期望的：24 条（期望写 - 的是待观测的，不计）

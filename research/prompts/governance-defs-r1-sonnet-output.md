@@ -9,21 +9,21 @@
 ### main-agent.md:59（暂存之后、提交之前跑门禁 一行）
 
 改后：主 agent 自建 HEAD + 暂存区 worktree，跑
-`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`；
+`SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`；
 `crash-verifier` 只跑 54 号快档与 55、57、59；`gate-triage` 分诊时「54 号跑快档并核全绿标记，55、59 照 stage-inputs.tsv 复用上一次全绿判定，57 号没有复用、每次现跑」。
 
 对应：`governance-rot-r3-sync.md` 命中处置表「.claude/main-agent.md:59」行 → A-11、B-6、B-7（用户定）。用户定案见 `governance-rot-r3-sync.md` 第 6 行「这一阶段做成的事」：「层 0 全量由主 agent 建 worktree 并跑」是用户在三个弹窗里定的十二项之一。
 
 核实：
-- 命令里的 `bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>` 逐字等于 54 号自己出路打印的那一行——`.claude/gate.d/54-layer0-replay.sh:232`：
-  `echo '                SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'`。
-  这处改动对应 r3-sync 表另一行「.claude/gate.d/54-layer0-replay.sh:232 | 出路里 --full 那行不带前缀 | 改了：带前缀并经内存包装，照抄不再被 heavy-test-guard 拒；B-8」——54 号文件不在被判 15 份内，但 main-agent.md:59 是照抄它的出路，16G 这个数不是 main-agent.md 自己发明的，是从 54 号（背景文件）的已定输出抄来的，可判为直接后果、没有多做。
+- 命令里的 `bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>` 逐字等于 54 号自己出路打印的那一行——`.claude/gate.d/checker-tier-layer0-replay.sh:232`：
+  `echo '                SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'`。
+  这处改动对应 r3-sync 表另一行「.claude/gate.d/checker-tier-layer0-replay.sh:232 | 出路里 --full 那行不带前缀 | 改了：带前缀并经内存包装，照抄不再被 heavy-test-guard 拒；B-8」——54 号文件不在被判 15 份内，但 main-agent.md:59 是照抄它的出路，16G 这个数不是 main-agent.md 自己发明的，是从 54 号（背景文件）的已定输出抄来的，可判为直接后果、没有多做。
 - B-7 原句（`governance-rot-r2-audit-B.md` 第 7 行）指出「crash-verifier 定义既没说谁建 worktree、也没给 `<它的根>` 参数」。改后 `crash-verifier.md` 的「输入」一节（`.claude/agents/crash-verifier.md:16-19`，`grep -n '## 输入' -A4` 现查）不再出现 worktree 路径，第 2 步（:25）写「层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里自己跑，不归你」——B-7 提的两个选项（① 主 agent 建 worktree 交给 crash-verifier 的路径参数，② 或在 crash-verifier 里给例外）都没选，选的是第三种「crash-verifier 完全不碰 --full」，与用户定案「层 0 全量由主 agent 建 worktree 并跑」一致，不是 B-7 原文列出的两条候选之一但落在用户定案范围内，不算越出。
 - gate-triage.md:26（`grep -n` 现查该行）「54 号跑快档并核全绿标记，55、59 照 stage-inputs.tsv 复用上一次全绿判定，57 号没有复用、每次现跑」逐字对应 B-6 建议改法「写成「54 跑快档并核全绿标记，55、59 照 stage-inputs.tsv 复用，57 每次现跑」；三处同改」——`main-agent.md:59`、`gate-triage.md:26`、`crash-verifier.md`（隐含在只跑快档这一句里）三处现在说法一致，`.claude/rules/implementation-workflow.md`「场合 / 跑不跑」表（附录二抄录，行 219）也是同一句，四处一致，B-6 指出的三处不一致已消。
 
 丢判据检查：diff 删除的原句「派 `crash-verifier` 跑它那几道，命令带 `SINGLEFS_HEAVY_TESTS=commit`：这一批改了门禁 54 号在…登记的输入，就在 HEAD + 暂存区的 worktree 里跑那棵树里的…」——删掉的是「谁跑」这半句判据（原来含糊地写成 crash-verifier 的调度分支的一部分），新句把「谁跑」明确成主 agent 自己，判据没有丢，是从含糊状态被坐实。旧句「54、55、57、59 在 gate.sh 里照各自的复用判定走，它不直接调」这条判据也没丢，改写成逐条列出的形式（55、59 复用，57 现跑），信息量更大，不是删减。
 
-推翻条件：若日后发现 `crash-verifier.md` 或 `.claude/hooks/heavy-test-guard.sh` 里还留着一条允许 crash-verifier 自己跑 `--full` 的分支（与「不归你」矛盾），或 `54-layer0-replay.sh:232` 的出路命令后续改了但 main-agent.md:59 没跟着改，此条判定翻。
+推翻条件：若日后发现 `crash-verifier.md` 或 `.claude/hooks/heavy-test-guard.sh` 里还留着一条允许 crash-verifier 自己跑 `--full` 的分支（与「不归你」矛盾），或 `checker-tier-layer0-replay.sh:232` 的出路命令后续改了但 main-agent.md:59 没跟着改，此条判定翻。
 
 ### main-agent.md:14（禁止在 subagent 中跑重型测试 例外）
 

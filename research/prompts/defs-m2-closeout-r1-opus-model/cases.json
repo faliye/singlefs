@@ -215,7 +215,7 @@
  {
   "id": "H20",
   "hook": "heavy",
-  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash /tmp/claude-1000/wt/.claude/gate.d/54-layer0-replay.sh --full /tmp/claude-1000/wt",
+  "command": "SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash /tmp/claude-1000/wt/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/claude-1000/wt",
   "agent": "crash-verifier"
  },
  {

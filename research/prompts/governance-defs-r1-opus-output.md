@@ -60,23 +60,23 @@ nice -n 19 bash run-all.sh <草稿目录>      # 草稿目录下没有 copy/ 时
 改后的定义让 crash-verifier 在提交流程里跑 54 号快档：
 
 - `.claude/agents/crash-verifier.md:25:2. 只在提交时（或主 agent 转达用户要求时）跑你那几道，不跑 `gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个；54、55、57、59 号命令带输入给的那个前缀：`SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>`，其余登记给你的轻阶段不带；54 号只跑快档（不带 `--full`，快档加核全绿标记）；层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里自己跑，不归你；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。`
-- `.claude/main-agent.md:59:| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，主 agent 自己建 HEAD + 暂存区的 worktree（建法照 54 号出路），在后台跑那棵树里的 `SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯 → 派 `crash-verifier` 跑 54 号快档与 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `gate.sh --staged` 并分诊（`gate.sh` 里 54 号跑快档并核全绿标记，55、59 照 `stage-inputs.tsv` 复用上一次全绿判定，57 号没有复用、每次现跑）；用户要求时两处都换成 `=user-request` |`
+- `.claude/main-agent.md:59:| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，主 agent 自己建 HEAD + 暂存区的 worktree（建法照 54 号出路），在后台跑那棵树里的 `SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯 → 派 `crash-verifier` 跑 54 号快档与 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `gate.sh --staged` 并分诊（`gate.sh` 里 54 号跑快档并核全绿标记，55、59 照 `stage-inputs.tsv` 复用上一次全绿判定，57 号没有复用、每次现跑）；用户要求时两处都换成 `=user-request` |`
 - 规则同样这么写：`.claude/rules/implementation-workflow.md:55:| 崩溃验证员、门禁分诊员 | 各跑各的那一部分，只在提交时或用户要求时（命令带 `SINGLEFS_HEAVY_TESTS=commit` 或 `=user-request`）：层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里跑；崩溃验证员跑 54 号快档与 55、57、59 号；门禁分诊员跑 `gate.sh --staged` 并分诊，其中 54 号跑快档并核全绿标记，55、59 靠「输入没变就复用上一次全绿判定」不重跑，57 号没有复用、照跑 |`
-- 阶段归属：`.claude/gate.d/stage-owners.tsv:37:54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放`
+- 阶段归属：`.claude/gate.d/stage-owners.tsv:37:checker-tier-layer0-replay.sh	crash-verifier	层 0 崩溃点重放`
 
-54 号快档怎么找标记（`.claude/gate.d/54-layer0-replay.sh`）：
+54 号快档怎么找标记（`.claude/gate.d/checker-tier-layer0-replay.sh`）：
 
-- 不带根参数时根取脚本所在的树：`.claude/gate.d/54-layer0-replay.sh:61:ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"`；crash-verifier 的命令是 `bash .claude/gate.d/<文件>`，根就是主工作区。
-- 键按磁盘上的内容算，含未跟踪文件：`.claude/gate.d/54-layer0-replay.sh:182:  git -C "$ROOT" ls-files -z --cached --others --exclude-standard -- "${layer0_registered_input_paths[@]}" > "$manifest_file.listing" || return 1`，还有 `:190:  stage_script_hash="$(sha256sum < "$layer0_stage_script_path" | cut -d' ' -f1)" || return 1` 与 `:191:  toolchain_versions="$(cd "$ROOT" && cargo -V && rustc -V)" || return 1`。
-- 快档用这个键找格：`.claude/gate.d/54-layer0-replay.sh:279:  write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest`、`:284:  if [[ ! -f "$full_green_marker_path" ]]; then`（找不到就判红，出路是再去 worktree 跑一次全量）。
-- 54 号自己的文件头说了主工作区罩不到暂存内容：`.claude/gate.d/54-layer0-replay.sh:29:# 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动、工作区那一份 54 号），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。`
-- 登记路径：`.claude/gate.d/stage-inputs.tsv:11:54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）`
+- 不带根参数时根取脚本所在的树：`.claude/gate.d/checker-tier-layer0-replay.sh:61:ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"`；crash-verifier 的命令是 `bash .claude/gate.d/<文件>`，根就是主工作区。
+- 键按磁盘上的内容算，含未跟踪文件：`.claude/gate.d/checker-tier-layer0-replay.sh:182:  git -C "$ROOT" ls-files -z --cached --others --exclude-standard -- "${layer0_registered_input_paths[@]}" > "$manifest_file.listing" || return 1`，还有 `:190:  stage_script_hash="$(sha256sum < "$layer0_stage_script_path" | cut -d' ' -f1)" || return 1` 与 `:191:  toolchain_versions="$(cd "$ROOT" && cargo -V && rustc -V)" || return 1`。
+- 快档用这个键找格：`.claude/gate.d/checker-tier-layer0-replay.sh:279:  write_layer0_input_manifest "$quick_manifest" || fail_without_input_manifest`、`:284:  if [[ ! -f "$full_green_marker_path" ]]; then`（找不到就判红，出路是再去 worktree 跑一次全量）。
+- 54 号自己的文件头说了主工作区罩不到暂存内容：`.claude/gate.d/checker-tier-layer0-replay.sh:29:# 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动、工作区那一份 54 号），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。`
+- 登记路径：`.claude/gate.d/stage-inputs.tsv:11:checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）`
 
 **历史**（每一步指到许可它的那一句）：
 1. 主 agent 照 main-agent.md:59 用 stage-mine.py 暂存这一轮的 crates/ 改动。
 2. 主 agent 照同一行建 HEAD + 暂存区的 worktree、在里面跑 `--full`，判绿，写下键为 H_staged 的那一格。
 3. 主工作区里 54 号登记路径下有一处与暂存区不同（下表 C1–C4、C6、C7；agent-common.md 写明「本机常有别的会话在同一个仓里干活」）。
-4. 主 agent 照同一行派 crash-verifier；crash-verifier 照 crash-verifier.md:25 在主工作区跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`：算出的键是 H_disk ≠ H_staged，第 284 行判红。
+4. 主 agent 照同一行派 crash-verifier；crash-verifier 照 crash-verifier.md:25 在主工作区跑 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh`：算出的键是 H_disk ≠ H_staged，第 284 行判红。
 5. gate-triage 照 main-agent.md:59 跑 `gate.sh --staged`，54 号在临时 worktree 里算出 H_staged，判绿。
 
 同一批暂存内容，一处红、一处绿。照红句的出路再跑一次全量也没用：全量在 worktree 里跑，写的还是 H_staged；只要第 3 步那处不同还在，crash-verifier 的快档就一直红。
@@ -105,7 +105,7 @@ C7 主工作区的 54 号有未暂存改动 full=9bfbc9fc24ccc662 files=4 | cv=4
 | 改法 | C1–C4、C6、C7 | 代价与副作用 | 量过 / 推的 |
 |---|---|---|---|
 | F1 crash-verifier 不跑 54 号（快档与核标记由 `gate.sh --staged` 管） | 不中（没有主工作区那一次） | 要同时改 crash-verifier.md:25、main-agent.md:59、stage-owners.tsv:37，规则 implementation-workflow.md:55 也要改 | 推的 |
-| F2 crash-verifier 在 HEAD + 暂存区 worktree 里跑快档（`bash <树>/.claude/gate.d/54-layer0-replay.sh <树>`） | 不中：键等于模型的 staged 列，8 行全等 | crash-verifier 不许自己做 git 写（agent-common「不做」第一条，含 worktree），树要由主 agent 给；而 54 号出路那三行在全量跑完后就 `git worktree remove`。快档与 `gate.sh --staged` 重复跑一遍 | 键相等量过；流程推的 |
+| F2 crash-verifier 在 HEAD + 暂存区 worktree 里跑快档（`bash <树>/.claude/gate.d/checker-tier-layer0-replay.sh <树>`） | 不中：键等于模型的 staged 列，8 行全等 | crash-verifier 不许自己做 git 写（agent-common「不做」第一条，含 worktree），树要由主 agent 给；而 54 号出路那三行在全量跑完后就 `git worktree remove`。快档与 `gate.sh --staged` 重复跑一遍 | 键相等量过；流程推的 |
 | F3 照旧在主工作区跑，另加一条分诊「主工作区在登记路径下与暂存区不同 ⇒ 不是这一批」 | 照样红，只是不算这一批的账 | 红还在，每次提交都要多看一次 | 推的 |
 
 **什么现象会推翻 A1**：crash-verifier 实际在 HEAD + 暂存区的树里跑 54 号（比如派发提示给它树根、它照带根参数跑），或 54 号快档改成按暂存区内容（`git ls-files -s` 的对象）算键而不按磁盘。
@@ -320,10 +320,10 @@ research/scripts/watch.sh
 ## 构造不出的格：依据
 
 **G1**（`run-all.out`「## G1」）：
-- 主 agent 的命令带 `SINGLEFS_HEAVY_TESTS=commit` 退 0，不带退 2（`✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带`）。54 号出路那三行（`print_staged_worktree_full_commands` 打出来的原样，存在草稿 `g1-worktree-cmd.txt`）以主 agent、`run_in_background` 喂两个钩子都退 0。那三行里 54 号的路径是 `"$layer0_full_base/tree/…"`，钩子看不见变量拼出的路径，放行与前缀无关；主 agent 照 main-agent.md:59 带前缀，不受影响。
+- 主 agent 的命令带 `SINGLEFS_HEAVY_TESTS=commit` 退 0，不带退 2（`✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带`）。54 号出路那三行（`print_staged_worktree_full_commands` 打出来的原样，存在草稿 `g1-worktree-cmd.txt`）以主 agent、`run_in_background` 喂两个钩子都退 0。那三行里 54 号的路径是 `"$layer0_full_base/tree/…"`，钩子看不见变量拼出的路径，放行与前缀无关；主 agent 照 main-agent.md:59 带前缀，不受影响。
 - gate-triage 不再单跑登记给它的阶段：`gate.sh` 按文件名跑全部本地阶段（`.claude/singlefs-ai-sop/scripts/gate.sh:419:    < <(find "$GATE_D" -maxdepth 1 -name '*.sh' -type f | sort)`），`--staged` 在临时树里跑同一份循环，登记给它的阶段都在里面。ref 名：`.claude/singlefs-ai-sop/scripts/gate.sh:535:  git -C "$ROOT" update-ref refs/sop/gate-ok "$START_HEAD" 2>/dev/null || true`，与 gate-triage 写范围一句一致。
 - 看门狗：`research/scripts/watch.sh:7:#   bash research/scripts/watch.sh --processes                           只盯这个 Claude 实例底下已经在跑的长进程（主 agent 自己起的长命令）；`
-- crash-verifier 等全量：它第 1 步「有 `54-layer0-replay.sh --full` 在跑时，不起 54 号」，主 agent 的全量在后台，`ps` 看得到那条命令行，接得上（推的，没起真进程）。
+- crash-verifier 等全量：它第 1 步「有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号」，主 agent 的全量在后台，`ps` 看得到那条命令行，接得上（推的，没起真进程）。
 
 **G6**：
 - kb-scribe 预检（改后第 1 步写法）真跑三条路径：`.claude/kb/decisions.md` 退 0，`crates/singlefs-core/src/lib.rs` 与 `research/prompts/x.md` 退 2；`/tmp/claude-1000/agent-hook-detections.jsonl` 前后都是 598 字节，草稿里的 `precheck.jsonl` 2 行。

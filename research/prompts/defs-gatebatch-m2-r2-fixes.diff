@@ -1,7 +1,7 @@
---- a/.claude/gate.d/54-layer0-replay.sh
-+++ b/.claude/gate.d/54-layer0-replay.sh
+--- a/.claude/gate.d/checker-tier-layer0-replay.sh
++++ b/.claude/gate.d/checker-tier-layer0-replay.sh
 @@ -9,16 +9,19 @@
- #   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
+ #   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full [--start-over] <worktree>
  #     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
  #     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
 -#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加判它的 54 号、准入模块 admission.py、
@@ -22,7 +22,7 @@
  #     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
 +#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
 +#     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
- #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+ #   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
  #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
  #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
 @@ -35,7 +38,10 @@
@@ -1045,7 +1045,7 @@
 @@ -2948,9 +3329,10 @@
  
  def run_layer0_stage_cells(selftest, module):
-     """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 54-layer0-replay.sh），
+     """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 checker-tier-layer0-replay.sh），
 -    假 cargo、rustc、nproc 在 PATH 最前面。核：逐条跑、续跑的三个环境变量、判绿写标记、快档核标记、第二趟全复用、只重跑输入变了的那一条、
 -    --start-over、只剩 1 片要跑不误红、1 个线程跑了 64 片判红、0 passed 判红、cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、
 -    快档不带 SINGLEFS_GATE_FULL=1 时只改登记表、只改 54 号、只改准入模块照样核标记（不退 77）。"""
@@ -1054,7 +1054,7 @@
 +    cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、快档不带 SINGLEFS_GATE_FULL=1 时只改登记表判红、只改 54 号与只改准入模块判法之外的部分
 +    照样核标记而判绿（54 号不进指纹）、改准入模块的判法判红（都不退 77）。"""
      repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
-     real_stage = os.path.join(repository_root, ".claude/gate.d/54-layer0-replay.sh")
+     real_stage = os.path.join(repository_root, ".claude/gate.d/checker-tier-layer0-replay.sh")
      work = tempfile.mkdtemp(prefix="admission-selftest-stage54-")
 @@ -2967,7 +3349,7 @@
          write_text(os.path.join(work, REGISTRATION_TABLE), "".join(row + "\n" for row in rows))
@@ -1063,13 +1063,13 @@
 -        for helper in ("stage-must-run.sh", "change-touches-crates.sh"):
 +        for helper in ("stage-must-run.sh", "change-touches-crates.sh", "stage-run-or-skip.sh"):
              shutil.copy(os.path.join(SELFTEST_HERE, helper), os.path.join(work, "research/scripts", helper))
-         stage_copy = os.path.join(work, ".claude/stage-under-test/54-layer0-replay.sh")
+         stage_copy = os.path.join(work, ".claude/stage-under-test/checker-tier-layer0-replay.sh")
          os.makedirs(os.path.dirname(stage_copy))
 @@ -3012,9 +3394,7 @@
          def expected_fingerprint(key):
              _exit_code, output, _messages = run_in_environment(
                  [sys.executable, os.path.join(work, "research/scripts/admission.py"), "crash-case-manifest", work, key,
--                 os.path.join(control, "expected-manifest"), "--extra-file", "<判它的 54 号：54-layer0-replay.sh>", stage_copy,
+-                 os.path.join(control, "expected-manifest"), "--extra-file", "<判它的 54 号：checker-tier-layer0-replay.sh>", stage_copy,
 -                 "--extra-file", "<判它的准入模块：admission.py>", os.path.join(work, "research/scripts/admission.py"),
 -                 "--toolchain", "--build-environment"], environment)
 +                 os.path.join(control, "expected-manifest"), "--judging-digest", "--toolchain", "--build-environment"], environment)
@@ -1414,7 +1414,7 @@
 +    write("crates/singlefs-harness/tests/spaced_ignore_crash_enumeration.rs", "#[test]\n# [ignore]\nfn the_spaced_case() {}\n")
      write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
      write("crates/singlefs-checker/tests/checker_crash_enumeration.rs", marked_case)
-     write(CRASH_CASE_REGISTRY, "# 样本登记表\n54-layer0-replay.sh\tcrates/\t# 样本\n"
+     write(CRASH_CASE_REGISTRY, "# 样本登记表\nchecker-tier-layer0-replay.sh\tcrates/\t# 样本\n"
                                 "crash-case:sample\tcrates/ Cargo.toml\ttest=singlefs-harness:sample_crash_enumeration:the_full_case\t# 样本\n"
                                 "crash-case:checker\tcrates/ Cargo.toml\ttest=singlefs-checker:checker_crash_enumeration:the_full_case\t# 样本\n"
 -                               "crash-case:unmarked\tcrates/ Cargo.toml\ttest=singlefs-harness:unmarked_crash_enumeration:the_unmarked_case\t# 样本\n")

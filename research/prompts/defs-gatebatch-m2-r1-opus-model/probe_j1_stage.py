@@ -41,7 +41,7 @@ try:
     w("crates/singlefs-harness/src/lib.rs", "pub fn one() -> u32 { 1 }\n")
     for _key, target, function, _conditions in CASES + [("", "case_d", "case_d_full", "")]:
         w(f"crates/singlefs-harness/tests/{target}.rs", f"#[test]\n#[ignore]\nfn {function}() {{}}\n")
-    base_rows = ["54-layer0-replay.sh\tcrates/ Cargo.toml\tcommand=cargo command=rustc\t# 样本"] + [row_of(*case) for case in CASES]
+    base_rows = ["checker-tier-layer0-replay.sh\tcrates/ Cargo.toml\tcommand=cargo command=rustc\t# 样本"] + [row_of(*case) for case in CASES]
     table = os.path.join(work, module.REGISTRATION_TABLE)
     w(module.REGISTRATION_TABLE, "".join(row + "\n" for row in base_rows))
     os.makedirs(os.path.join(work, "research/scripts"))
@@ -49,7 +49,7 @@ try:
     shutil.copy(ADMISSION, admission_copy)
     for helper in ("stage-must-run.sh", "change-touches-crates.sh"):
         shutil.copy(os.path.join(SCRIPTS, helper), os.path.join(work, "research/scripts", helper))
-    stage_copy = os.path.join(work, ".claude/stage-under-test/54-layer0-replay.sh")
+    stage_copy = os.path.join(work, ".claude/stage-under-test/checker-tier-layer0-replay.sh")
     os.makedirs(os.path.dirname(stage_copy))
     shutil.copy(STAGE, stage_copy)
     w(".gitignore", ".control/\n.tools/\n")
@@ -94,7 +94,7 @@ try:
     def fingerprint(key):
         _exit_code, output, _messages = module.run_in_environment(
             [sys.executable, admission_copy, "crash-case-manifest", work, key, os.path.join(control, "m"),
-             "--extra-file", "<判它的 54 号：54-layer0-replay.sh>", stage_copy, *judge_module_arguments, "--toolchain", "--build-environment"], environment)
+             "--extra-file", "<判它的 54 号：checker-tier-layer0-replay.sh>", stage_copy, *judge_module_arguments, "--toolchain", "--build-environment"], environment)
         return output.split()[0] if output.split() else f"算不出：{output.strip()}"
 
     def last_line(output):

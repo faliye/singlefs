@@ -33,14 +33,14 @@
 | `.claude/main-agent.md:43`「一个阶段任务结束：……→ 下一行」整行 | ✓ 逐字相同 |
 | `.claude/agents/crash-verifier.md:23`「1. 每个阶段开跑前……等它结束。」整行 | ✓ 逐字相同 |
 | `.claude/agents/crash-verifier.md:24`「2. 按共用约束……不带只跑快档）；……」（省略号后半句未引） | ✓ 引的前半句逐字相同，用省略号截断是合理的整句节选，不是断章 |
-| `.claude/gate.d/stage-inputs.tsv:11`「54-layer0-replay.sh\tcrates/ Cargo.toml Cargo.lock\t# 跑 crates 的崩溃点重放……」 | ✓ 逐字相同（含制表符分隔） |
+| `.claude/gate.d/stage-inputs.tsv:11`「checker-tier-layer0-replay.sh\tcrates/ Cargo.toml Cargo.lock\t# 跑 crates 的崩溃点重放……」 | ✓ 逐字相同（含制表符分隔） |
 | `.claude/rules/implementation-workflow.md:32`「改动之后要不要重跑某一道，判据是……不是「我改的是不是 `crates/`」。」 | ✓ 该行前一句逐字相同；该行后半句（「一道读的输入常常不止源码……」）未引，但引的是一句完整独立的话，不构成摘句断裂 |
 | `.claude/hooks/write-guard.sh:93`「target = absolute if pattern.startswith("/") else relative」 | ✓ 逐字相同 |
 | `.claude/hooks/write-guard.sh:94`「glob_to_regex(pattern).match(target)」（子串） | ✓ 是该行子串，该行原文 `if target is not None and glob_to_regex(pattern).match(target):`，未歪曲原意 |
 | `.claude/gate.d/63-agent-write-scope.sh:7`「这个 agent 在表里有没有至少一条模式」（转述） | ✓ 该行原文「③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；」，转述准确、未加未减限定词 |
 | 报告脚注：「背景材料「二、实现今天的样子」第 23 行提到的文件名 `.claude/hooks/agent-write-scope.sh` 在仓里已不存在（2026-09-17 与 `refuse-overwrite-untracked.sh` 合并改名为 `.claude/hooks/write-guard.sh`，该文件头 13 行自述此事）」 | ✓ 三重核实：① `.claude/hooks/` 目录下确实只有 `agent-write-scope.tsv`，没有 `agent-write-scope.sh`；② `write-guard.sh:13`「两道原本是两个 hook（refuse-overwrite-untracked.sh、agent-write-scope.sh），2026-09-17 用户定合并。」逐字对得上「该文件头 13 行自述此事」；③ 背景材料 `_defs-gate54-tiering-r1-background.md:23` 与正文 `_defs-gate54-tiering-r1-body.md:23` 两份文件在这一行逐字相同（背景材料把正文原样嵌在开头），所以这句引用无论算「背景材料第 23 行」还是「正文第二节」都同样成立，不是把正文行号误标成背景材料行号那一类问题 |
-| 报告正文里的 grep 断言：「在 `.claude/gate.d/54-layer0-replay.sh` 里 `grep -n '正在跑\|已有\|lock\|flock\|ps -'` 零命中」 | ✓ 复核跑同一条命令，同样零命中 |
-| `.claude/gate.d/54-layer0-replay.sh:219`「if [[ "$marker_input_hash" != "$layer0_input_hash" ]]; then」 | ✓ 逐字相同 |
+| 报告正文里的 grep 断言：「在 `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `grep -n '正在跑\|已有\|lock\|flock\|ps -'` 零命中」 | ✓ 复核跑同一条命令，同样零命中 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:219`「if [[ "$marker_input_hash" != "$layer0_input_hash" ]]; then」 | ✓ 逐字相同 |
 
 **计数（正推）**：核了 13 处，✓ 13 处，✗ 0 处，核不动 0 处。
 
@@ -56,7 +56,7 @@ s1-worktree-vs-staged / s2-trigger-gaps / s3-marker-slot / s4-marker-provenance 
 
 六份掩码后逐字节相同（S3 仅剩 pid 一处差异，属已知会变字段）。掩码前的差异逐处核对，全部落在「时间戳／临时目录名／git 提交哈希前缀／pid」四类里，没有一处判定行、退出码、内容哈希、计数行发生变化 ⇒ 复跑绿，且绿的不是摆设（判定与退出码本身完整重现）。
 
-模型脚本与产物哈希：报告开头列出的 15 个 sha256（`lib.sh`、`run-all.sh`、6 个场景脚本、`fake-bin/cargo`、6 份原始 `outputs/*.out`）逐一用 `sha256sum` 现算，与报告原文逐字相同。报告里另列的「装置从主仓拷的被判对象」4 个哈希中，`54-layer0-replay.sh`、`stage-inputs.tsv` 两个与本轮快照 `sha256sums.txt` 逐字相同（已在「输入核对」一节核过）；`stage-must-run.sh`、`change-touches-crates.sh` 不在快照清单内，报告如实注明前者是工作区未提交版本、后者与 HEAD 相同，属如实披露，不算隐瞒。
+模型脚本与产物哈希：报告开头列出的 15 个 sha256（`lib.sh`、`run-all.sh`、6 个场景脚本、`fake-bin/cargo`、6 份原始 `outputs/*.out`）逐一用 `sha256sum` 现算，与报告原文逐字相同。报告里另列的「装置从主仓拷的被判对象」4 个哈希中，`checker-tier-layer0-replay.sh`、`stage-inputs.tsv` 两个与本轮快照 `sha256sums.txt` 逐字相同（已在「输入核对」一节核过）；`stage-must-run.sh`、`change-touches-crates.sh` 不在快照清单内，报告如实注明前者是工作区未提交版本、后者与 HEAD 相同，属如实披露，不算隐瞒。
 
 ### 表与「量过」原样输出的核对
 
@@ -74,7 +74,7 @@ s1-worktree-vs-staged / s2-trigger-gaps / s3-marker-slot / s4-marker-provenance 
 
 ### 引规则/代码的行号核对（对主树，快照未覆盖的按当前工作区现读）
 
-`.claude/main-agent.md:40`、`:43`；`.claude/agents/crash-verifier.md:23`、`:24`；`.claude/gate.d/stage-inputs.tsv:11`；`.claude/gate.d/54-layer0-replay.sh:8`、`:19`、`:66`、`:213`、`:218`、`:219`、`:225`、`:230`、`:246`、`:310`、`:311`；`.claude/agents/gate-triage.md:24`、`:25`、`:26`；`.claude/agent-common.md:41`；`.claude/agents/implementation-writer.md:27`；`.claude/gate.d/59-crates-mutation-replay.sh:6`；`research/scripts/stage-mine.py:165`-`166`；`research/scripts/change-touches-crates.sh:58`起的 `judge()` 与 `:100`-`110`附近的前缀匹配循环——**全部 25 处逐字核对，与报告原文引用逐字相同**，无一处行号或引文有误。
+`.claude/main-agent.md:40`、`:43`；`.claude/agents/crash-verifier.md:23`、`:24`；`.claude/gate.d/stage-inputs.tsv:11`；`.claude/gate.d/checker-tier-layer0-replay.sh:8`、`:19`、`:66`、`:213`、`:218`、`:219`、`:225`、`:230`、`:246`、`:310`、`:311`；`.claude/agents/gate-triage.md:24`、`:25`、`:26`；`.claude/agent-common.md:41`；`.claude/agents/implementation-writer.md:27`；`.claude/gate.d/59-crates-mutation-replay.sh:6`；`research/scripts/stage-mine.py:165`-`166`；`research/scripts/change-touches-crates.sh:58`起的 `judge()` 与 `:100`-`110`附近的前缀匹配循环——**全部 25 处逐字核对，与报告原文引用逐字相同**，无一处行号或引文有误。
 
 **计数（攻方）**：表格/原样块核了 8（各格判定一览）+15（S2）+1（S1「两样都有」原样块）+7（S3a）+8（S3b）+1（S3c）+4（S4）+6（S5）+15（S6 三组：S3a×f3 6 格、S3b×f3 8 格、S4×f5 1 格）=65 处；文件行号引用核了 25 处；哈希核了 15+4=19 处。合计 65+25+19=109 处；✓ 109 处，✗ 0 处，核不动 0 处。
 
@@ -109,7 +109,7 @@ s1-worktree-vs-staged / s2-trigger-gaps / s3-marker-slot / s4-marker-provenance 
 | FACT 8 | `.claude/agents/crash-verifier.md:24` | ✓ 逐字相同 |
 | FACT 9 | `.claude/agent-common.md:48`-`50` | ✓ 逐字相同（含核对表明确标注「有意略去」的两段操作细节） |
 | FACT 10 | `.claude/main-agent.md:43` | ✓ 逐字相同（核对表明确标注「it does not itself rerun the full layer 0 replay」是从「只核这个标记」显式化出来的否定句，不是新事实——判读合理） |
-| FACT 11 | `.claude/gate.d/54-layer0-replay.sh:8`-`9`、`:34`、`:243`、`:308`-`337` | ✓ 各段逐字核对相符（含 `rm -f -- "${full_green_marker_path:?}"` 在 `:243`、`marker_being_written` 先写临时文件再 `mv` 在 `:308`-`337` 范围内） |
+| FACT 11 | `.claude/gate.d/checker-tier-layer0-replay.sh:8`-`9`、`:34`、`:243`、`:308`-`337` | ✓ 各段逐字核对相符（含 `rm -f -- "${full_green_marker_path:?}"` 在 `:243`、`marker_being_written` 先写临时文件再 `mv` 在 `:308`-`337` 范围内） |
 
 **核对表本身的两张附表**（「首稿缺的/改动的」「英文比原文多出来的限定词」）逐条核：FACT 3 补回的两条放行分支（无 agent_type / 无项目定义两种放行）、FACT 4 补回的「文件不在也算腐化」分支、FACT 11 补回的「不问复用、不问改动范围」一句，均现查确认原文确有这些限定词、核对表补得对；FACT 6 两段历史加的操作细节（补丁按顺序应用、批量改名连带改多行）如实标注为「加了原文没有的括注」并给出理由，未伪装成原文——符合「多出来的也要列」的要求。
 

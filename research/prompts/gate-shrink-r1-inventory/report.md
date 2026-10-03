@@ -35,7 +35,7 @@ $ ls .claude/gate.d/*.sh | wc -l
 34-doc-experiment-pages-and-products.sh	10
 43-checks-owed-and-closeout.sh	5
 47-code-tooling-selftests-and-registries.sh	8
-54-layer0-replay.sh	1
+checker-tier-layer0-replay.sh	1
 55-qemu-device-streams.sh	1
 57-lkmm.sh	1
 59-crates-mutation-replay.sh	1

@@ -23,7 +23,7 @@
 246+ 23- .claude/hooks/lib_heavy_tests.py
 36+ 1- .claude/hooks/heavy-test-guard.sh
 622+ 106- research/scripts/admission.py
-9+ 7- .claude/gate.d/54-layer0-replay.sh
+9+ 7- .claude/gate.d/checker-tier-layer0-replay.sh
 1+ 1- .claude/gate.d/stage-inputs.tsv
 26+ 13- research/scripts/layer0-shard-run.sh
 5+ 1- research/scripts/layer0-shard-configuration-check.sh
@@ -38,7 +38,7 @@
 
 ```
  .claude/agents/crash-verifier.md                   |   7 +-
- .claude/gate.d/54-layer0-replay.sh                 | 166 ++++-
+ .claude/gate.d/checker-tier-layer0-replay.sh                 | 166 ++++-
  .claude/gate.d/stage-inputs.tsv                    |   4 +-
  .claude/hooks/heavy-test-guard.sh                  |  37 +-
  .claude/hooks/lib_heavy_tests.py                   | 269 +++++++-
@@ -56,7 +56,7 @@
 换进 cmp 相同 .claude/hooks/lib_heavy_tests.py
 换进 cmp 相同 .claude/hooks/heavy-test-guard.sh
 换进 cmp 相同 research/scripts/admission.py
-换进 cmp 相同 .claude/gate.d/54-layer0-replay.sh
+换进 cmp 相同 .claude/gate.d/checker-tier-layer0-replay.sh
 换进 cmp 相同 .claude/gate.d/stage-inputs.tsv
 换进 cmp 相同 research/scripts/layer0-shard-run.sh
 换进 cmp 相同 research/scripts/layer0-shard-configuration-check.sh
@@ -237,11 +237,11 @@ CONTROL	BROKEN	I3 只有 include! 进来的一份（测试目标里没有字面�
   ✗ 门禁自检失败：45 处（共 667 个脚本、1093 条拒绝）
 ```
 
-更正上面 gate-lint / shell-lint 那一条：用 `grep -a` 重数，gate-lint 0 行，shell-lint 7 行。这 7 行全是 `grep: …/.claude/gate.d/fixtures/54-layer0-replay.sh: Is a directory`（6 行）与一行 `awk: warning: … is a directory: skipped`，是 lint 把样本目录当成脚本读时出的噪声，不是违规条目，也没点名这一轮改的文件。
+更正上面 gate-lint / shell-lint 那一条：用 `grep -a` 重数，gate-lint 0 行，shell-lint 7 行。这 7 行全是 `grep: …/.claude/gate.d/fixtures/checker-tier-layer0-replay.sh: Is a directory`（6 行）与一行 `awk: warning: … is a directory: skipped`，是 lint 把样本目录当成脚本读时出的噪声，不是违规条目，也没点名这一轮改的文件。
 
 ## 54 号样本
 
-- 没改 `.claude/gate.d/fixtures/54-layer0-replay.sh/`。FD3 在 54 号只动了两处：`crash-case-judge` / `crash-case-record` 两次调用里去掉 `--machine-cores/--threads/--threads-origin`；文件头「54 号不进指纹」那一段与 `case_threads` 那句注释跟着改了（改前改后的 diff 是 9+ 7-）。判法（读发现日志、判红的那几段）一字没动。
+- 没改 `.claude/gate.d/fixtures/checker-tier-layer0-replay.sh/`。FD3 在 54 号只动了两处：`crash-case-judge` / `crash-case-record` 两次调用里去掉 `--machine-cores/--threads/--threads-origin`；文件头「54 号不进指纹」那一段与 `case_threads` 那句注释跟着改了（改前改后的 diff 是 9+ 7-）。判法（读发现日志、判红的那几段）一字没动。
 - 两个样本（red：two_signatures、unfinished、many_signatures；green：clean_stream、no_enumeration）的登记行都没写 `threads=`，不走线程判定，所以 FD3 前后判的结果一样。上一任在只放 54 号的临时 gate.d 上跑过：改前与改后都是 2 格判对（`stage54-base.log`、`stage54-after.log`）。换进仓之后再跑一遍，还是 2 格判对（上面 stage54 那一格）。
 - 「54 号改了转法也翻不了线程判定」这件事，样本造不出来：要翻，就得改 54 号本身。所以这一格放在 `admission.py --selftest`：「crash-case-judge 自己现取线程数」那几格，由开关 judge-takes-forwarded-threads 证红。
 - 规格要求的那一句（「54 号不进指纹：它里面还定着结论的只剩流程的次序」）改成了现在的写法：点名 54 号里还定着结论的是流程次序与两处第二道判红，它们的第一道在判法摘要里。判法摘要是 FD2 改过的那一份。

@@ -1,0 +1,51 @@
+### d2-output
+H1 不换（A）：三条路里复用 3/3
+H1 换版本（B：version、commit、verus 都变）：三条路里复用 3/3
+H1 只换 z3（C：version.json、verus 不变）：三条路里复用 3/3
+H1 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 3/3
+H2 不换（A）：三条路里复用 3/3
+H2 换版本（B：version、commit、verus 都变）：三条路里复用 3/3
+H2 只换 z3（C：version.json、verus 不变）：三条路里复用 3/3
+H2 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 3/3
+H3 不换（A）：三条路里复用 1/3
+H3 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H3 只换 z3（C：version.json、verus 不变）：三条路里复用 1/3
+H3 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 1/3
+H4 不换（A）：三条路里复用 0/3
+H4 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H4 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H4 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3
+### d2-F1-output
+H1 不换（A）：三条路里复用 3/3
+H1 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H1 只换 z3（C：version.json、verus 不变）：三条路里复用 3/3
+H1 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 3/3
+H2 不换（A）：三条路里复用 3/3
+H2 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H2 只换 z3（C：version.json、verus 不变）：三条路里复用 3/3
+H2 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 3/3
+H3 不换（A）：三条路里复用 1/3
+H3 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H3 只换 z3（C：version.json、verus 不变）：三条路里复用 1/3
+H3 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 1/3
+H4 不换（A）：三条路里复用 0/3
+H4 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H4 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H4 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3
+### d2-F1F2-output
+H1 不换（A）：三条路里复用 3/3
+H1 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H1 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H1 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3
+H2 不换（A）：三条路里复用 3/3
+H2 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H2 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H2 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3
+H3 不换（A）：三条路里复用 1/3
+H3 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H3 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H3 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3
+H4 不换（A）：三条路里复用 0/3
+H4 换版本（B：version、commit、verus 都变）：三条路里复用 0/3
+H4 只换 z3（C：version.json、verus 不变）：三条路里复用 0/3
+H4 A 加 VERUS_Z3_PATH 指别的 z3：三条路里复用 0/3

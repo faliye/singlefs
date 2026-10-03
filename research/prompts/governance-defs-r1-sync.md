@@ -37,7 +37,7 @@
 | .claude/agents/three-way-attack.md:37 | （第 3 轮改动） | 改了：第 3 轮，这一轮三方未打中，照留 |
 | .claude/agents/three-way-local-defense.md:11 | （第 3 轮改动） | 改了：第 3 轮，这一轮三方未打中，照留 |
 | .claude/agents/three-way-materials.md:24 | （第 3 轮改动） | 改了：第 3 轮，这一轮三方未打中，照留 |
-| .claude/gate.d/stage-owners.tsv:37 | 54-layer0-replay.sh 归 crash-verifier | 改了：A1，62 号绿 |
+| .claude/gate.d/stage-owners.tsv:37 | checker-tier-layer0-replay.sh 归 crash-verifier | 改了：A1，62 号绿 |
 | .claude/hooks/heavy-test-guard.sh:519 | 拒绝出路：crash-verifier 只跑 54、55、57、59 | 改了：A1；判法不动（放行比职责宽，交用户），--selftest 562 种通过 |
 | .claude/hooks/bash-command-detector.sh:2366 | 拒绝出路：a & b & wait | 改了：A10；--selftest 430 种通过；逐个 wait "$pid" 被记成没等齐属判法，交用户 |
 | .claude/rules/implementation-workflow.md:55 | 崩溃验证员跑 54 号快档与 55、57、59 号 | 改了：A1 |

@@ -335,7 +335,7 @@ E900 @driver_e900 期望比 e900-second-mode.out，实际跑出：second-mode ou
 ### G5 其余几处：构造不出
 
 - 共用约束的 `cargo bench`：裸 `cargo bench` 被 `heavy-test-guard.sh` 以 `rc=2` 拒（「不经内存包装跑编译出来的代码被拒：cargo bench」），经包装的放行，与「不经它的由 `heavy-test-guard.sh` 拒」一致。
-- main-agent.md「退出码是经内存包装的那条 `--full` 命令的，250–254 是包装自己的结局」：`.claude/gate.d/54-layer0-replay.sh:233` 打印的第三行在 worktree 没建好时退 1、建好时退 `--full` 那条的码，最后 `( exit "$layer0_full_rc" )`，与这句一致。包装用法错的 2 这里不会出现（命令写死在 54 号里）。
+- main-agent.md「退出码是经内存包装的那条 `--full` 命令的，250–254 是包装自己的结局」：`.claude/gate.d/checker-tier-layer0-replay.sh:233` 打印的第三行在 worktree 没建好时退 1、建好时退 `--full` 那条的码，最后 `( exit "$layer0_full_rc" )`，与这句一致。包装用法错的 2 这里不会出现（命令写死在 54 号里）。
 - 书记员两处（标题状态 N、21 / 30 号先红）没攻，见「这条腿自己的限度」。
 
 ## 没打中的形状

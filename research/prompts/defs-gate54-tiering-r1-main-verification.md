@@ -4,7 +4,7 @@
 
 正文 `research/prompts/_defs-gate54-tiering-r1-body.md`，背景材料 `_defs-gate54-tiering-r1-background.md`，diff `_defs-gate54-tiering-r1-diff.md`，开工快照 `defs-gate54-tiering-r1-snapshot/sha256sums.txt`。判决只引产物与文件原文，腿的结论句当线索。
 
-被判的定义与脚本（门禁 72 号按路径点名）：`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/main-agent.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`。
+被判的定义与脚本（门禁 72 号按路径点名）：`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/main-agent.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`。
 
 ## 一、这一轮交了什么
 
@@ -63,9 +63,9 @@
 
 ## 四、要落的改动（主 agent 定，不交用户）
 
-1. `.claude/gate.d/54-layer0-replay.sh`：「碰没碰输入」的前缀换成 `stage-inputs.tsv` 登记的三条（f2）；标记按输入哈希分格、`--full` 开跑只删自己那一格（f3）；快档另核标记里两条流都是 `exhaustive=true`（f4a）；出路句改成「暂存之后，在 HEAD + 暂存区的 worktree 里跑 `--full <它的根>`」（f5）。每一处先在副本里证明会红。
+1. `.claude/gate.d/checker-tier-layer0-replay.sh`：「碰没碰输入」的前缀换成 `stage-inputs.tsv` 登记的三条（f2）；标记按输入哈希分格、`--full` 开跑只删自己那一格（f3）；快档另核标记里两条流都是 `exhaustive=true`（f4a）；出路句改成「暂存之后，在 HEAD + 暂存区的 worktree 里跑 `--full <它的根>`」（f5）。每一处先在副本里证明会红。
 2. `.claude/main-agent.md`：收尾全量从「一个阶段任务结束」那一行挪到「暂存之后、提交之前跑门禁」那一行：主 agent 用 `stage-mine.py` 暂存之后，先在 HEAD + 暂存区的 worktree 里跑 54 号 `--full`，再派 `gate-triage`；触发条件写成「这一批改了 54 号在 `stage-inputs.tsv` 登记的输入」。
-3. `.claude/agents/crash-verifier.md`：54 号默认不带 `--full`，派发提示点名要全量时才带；判「别的 54 号在跑」时不只看 `gate.sh`，也看 `54-layer0-replay.sh --full`。
+3. `.claude/agents/crash-verifier.md`：54 号默认不带 `--full`，派发提示点名要全量时才带；判「别的 54 号在跑」时不只看 `gate.sh`，也看 `checker-tier-layer0-replay.sh --full`。
 4. K1 照留。
 
 这几处改法都是攻方在自己的模型上提、量过的，**被攻过零轮**。改完要再攻一轮（第二轮），攻的是改后的形态：f5 的 worktree 在建完之后别人又往暂存区放东西（攻方报告第五节自己点名的老问题）、f3 的分格与旧标记的清理。

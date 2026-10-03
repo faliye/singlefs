@@ -40,7 +40,7 @@ diff <(sed 's#/tmp/[^ ]*#<TMP>#g' <草稿目录>/rerun/run-all.out.rerun) \
 | A1：`.claude/main-agent.md:59` 全文 | ✓ 逐字相符（与 sonnet 腿引的同一行一致） | `sed -n '59p' .claude/main-agent.md` |
 | A1：`.claude/rules/implementation-workflow.md:55` 全文 | ✓ 逐字相符 | `sed -n '55p' .claude/rules/implementation-workflow.md` |
 | A1：`.claude/gate.d/stage-owners.tsv:37` | ✓ 逐字相符 | `sed -n '37p' .claude/gate.d/stage-owners.tsv` |
-| A1：`.claude/gate.d/54-layer0-replay.sh:61,182,190,191,279,284,29` | ✓ 全部逐字相符 | `sed -n '61p;182p;190p;191p;279p;284p;29p' .claude/gate.d/54-layer0-replay.sh` |
+| A1：`.claude/gate.d/checker-tier-layer0-replay.sh:61,182,190,191,279,284,29` | ✓ 全部逐字相符 | `sed -n '61p;182p;190p;191p;279p;284p;29p' .claude/gate.d/checker-tier-layer0-replay.sh` |
 | A1：`.claude/gate.d/stage-inputs.tsv:11` | ✓ 逐字相符 | `sed -n '11p' .claude/gate.d/stage-inputs.tsv` |
 | A1：模型复跑（`g1-hash-divergence.sh`） | ✓ 复跑输出与报告贴的 8 行（C0–C7）逐字相同 | 见上「复跑」一节 |
 | A2：`.claude/gate.d/stage-inputs.tsv:11`（同上）、54 号 190/191 行（同上） | ✓ | 同上 |
@@ -93,7 +93,7 @@ comm -23 /tmp/x-cited <(cut -d'  ' -f2- ../../../../../home/user/singlefs/resear
 | 引用 | 核的结果 | 命令 |
 |---|---|---|
 | `.claude/main-agent.md:59` 全文 | ✓ 逐字相符 | `sed -n '59p' .claude/main-agent.md` |
-| `.claude/gate.d/54-layer0-replay.sh:232` | ✓ 逐字相符 | `sed -n '232p' .claude/gate.d/54-layer0-replay.sh` |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:232` | ✓ 逐字相符 | `sed -n '232p' .claude/gate.d/checker-tier-layer0-replay.sh` |
 | `.claude/agents/crash-verifier.md:16-19,25` | ✓ 逐字相符 | `sed -n '16,19p;25p' .claude/agents/crash-verifier.md` |
 | `.claude/agents/gate-triage.md:26` | ✓ 逐字相符 | `sed -n '26p' .claude/agents/gate-triage.md` |
 | `.claude/rules/implementation-workflow.md`「场合/跑不跑」表「附录二抄录，行 219」 | **✗ 行号与出处都错**：附录二（`_governance-defs-r1-diff.md`）第 219 行是「-- 三个数（原样贴 `mutate.sh` 的汇总行）…」，与「场合/跑不跑」表毫不相关；这段表格内容实际逐字落在**背景材料** `_governance-defs-r1-background.md` 第 219 行，而 `implementation-workflow.md` 自己的对应行是第 55 行（已在攻方腿核对表里核过、逐字相符） | `sed -n '219p' research/prompts/_governance-defs-r1-diff.md`；`sed -n '219p' research/prompts/_governance-defs-r1-background.md`；`sed -n '55p' .claude/rules/implementation-workflow.md` |

@@ -1,0 +1,9 @@
+l3-stage-all-not-run.txt：格里 ✗ 2 条（没跑成形 2 条）；整道 ✗ 3 条（没跑成形 2 条）
+  crash-verifier 读法 a（只看格段）：没跑成；读法 b（加汇总里点名这一格的 ✗）：红
+  gate-triage（整道）：红；整道里不是没跑成形的 ✗：['✗ checker-tier-formal-verification.sh：2 格里 1 格红（verus-must-red-worlds）']
+l3-stage-mixed.txt：格里 ✗ 4 条（没跑成形 2 条）；整道 ✗ 5 条（没跑成形 2 条）
+  crash-verifier 读法 a（只看格段）：红；读法 b（加汇总里点名这一格的 ✗）：红
+  gate-triage（整道）：红；整道里不是没跑成形的 ✗：['✗ 第 4 行「改坏了也验得过」改坏之后 Verus 照样验过（verified 2、errors 0）：证明没盯住这一处', '✗ 这一格 1 条真红、2 条没跑成：按红记，不是没跑成（没跑成的那几处重跑不替真红作保）', '✗ checker-tier-formal-verification.sh：2 格里 1 格红（verus-must-red-worlds）']
+l3-stage-all-red.txt：格里 ✗ 1 条（没跑成形 0 条）；整道 ✗ 2 条（没跑成形 0 条）
+  crash-verifier 读法 a（只看格段）：红；读法 b（加汇总里点名这一格的 ✗）：红
+  gate-triage（整道）：红；整道里不是没跑成形的 ✗：['✗ 第 4 行「改坏了也验得过」改坏之后 Verus 照样验过（verified 2、errors 0）：证明没盯住这一处', '✗ checker-tier-formal-verification.sh：2 格里 1 格红（verus-must-red-worlds）']

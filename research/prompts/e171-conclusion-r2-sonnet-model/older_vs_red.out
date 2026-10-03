@@ -1,0 +1,8 @@
+row=27 stream=fixed older=51 of_which_crash_judge_red=0 o2_red=0 neither=51
+row=27 stream=new_p older=6 of_which_crash_judge_red=0 o2_red=0 neither=6
+row=277 stream=fixed older=51 of_which_crash_judge_red=0 o2_red=0 neither=51
+row=277 stream=new_p older=6 of_which_crash_judge_red=0 o2_red=0 neither=6
+row=245 stream=fixed older=24 of_which_crash_judge_red=0 o2_red=24 neither=0
+row=245 stream=new_p older=0 of_which_crash_judge_red=0 o2_red=0 neither=0
+row=281 stream=fixed older=0 of_which_crash_judge_red=0 o2_red=0 neither=0
+row=281 stream=new_p older=48 of_which_crash_judge_red=48 o2_red=0 neither=0

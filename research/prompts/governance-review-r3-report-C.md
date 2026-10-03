@@ -18,7 +18,7 @@
 
 | 核的 | 怎么核的 | 结果 |
 |---|---|---|
-| 第二轮丙 1 处置：54 号出路三行（`layer0_tree_ready`、第三行） | 从 54-layer0-replay.sh 抽出 `print_staged_worktree_full_commands` 实打；临时桩仓（桩 54 `exit $STUBRC`、桩内存包装 `exec`）整段跑 | `--full` 退 0 / 1 / 250 时整次调用退 0 / 1 / 250，worktree 清干净；三行当主 agent 的 run_in_background 命令喂 heavy-test-guard、bash-command-detector 都 rc=0；去掉 `SINGLEFS_HEAVY_TESTS=commit` 后 heavy-test-guard 拒——`then` 之后的前缀认得出 |
+| 第二轮丙 1 处置：54 号出路三行（`layer0_tree_ready`、第三行） | 从 checker-tier-layer0-replay.sh 抽出 `print_staged_worktree_full_commands` 实打；临时桩仓（桩 54 `exit $STUBRC`、桩内存包装 `exec`）整段跑 | `--full` 退 0 / 1 / 250 时整次调用退 0 / 1 / 250，worktree 清干净；三行当主 agent 的 run_in_background 命令喂 heavy-test-guard、bash-command-detector 都 rc=0；去掉 `SINGLEFS_HEAVY_TESTS=commit` 后 heavy-test-guard 拒——`then` 之后的前缀认得出 |
 | 第二轮丙 2 处置：10-kb-rot.sh 的 GATE_DIRECTORY 与退出码 3 | 在 `.claude/gate.d/` 里直接 `bash 10-kb-rot.sh`；读 :168–183 | 退 0；rc 0 / 3 / 其它非 1 / 1 四支各有 ✓ 或 bad+howto（rc 1 撞号见第 2 条） |
 | 第二轮丙 3、4、6、7 处置：lib 的跳过计数、「/」「-」、说明文字、样本 | 真仓跑 lib；`草稿/runmut.sh` 逐支改坏 | 真仓 rc=0，末行「扫 29 份治理文档：门禁号 137 处、路径 330 处、小节 94 处；没判 10 处；跳过 70 处（被 .gitignore 挡着 69、不像仓内路径 1）」；删「/」分隔、删 `\-`、删「不像仓内路径」计数、删 cd 基准、删小节判定各自被 green 或 red 抓到；样本里的「10 / 12 号」「2026-09-26 号」「origin/master」「text/plain」判得对（跳过计数与两支例外见第 3、4 条） |
 | 75 号 `\s*` | 读 :226 与 20-kb-shape.sh 取数正则、format-evolution.md:26 | 「（3 项未定）」「（两项未定）」都合；stage-selftest 里 75 号红绿判得对 |

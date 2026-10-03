@@ -1,0 +1,3 @@
+l3-stage-all-not-run.txt：K4 读法下 gate-triage（整道，去掉汇总行）：没跑成（按码归环境 / 并发）
+l3-stage-mixed.txt：K4 读法下 gate-triage（整道，去掉汇总行）：红
+l3-stage-all-red.txt：K4 读法下 gate-triage（整道，去掉汇总行）：红

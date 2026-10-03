@@ -1,7 +1,7 @@
 <!-- knowledge-sync -->
 # gate-reuse 阶段同步
 
-触发文件：.claude/gate.d/54-layer0-replay.sh、.claude/gate.d/55-qemu-first-transaction.sh、.claude/gate.d/59-crates-mutation-replay.sh、.claude/gate.d/74-model-differential.sh、.claude/gate.d/87-replay.sh、.claude/gate.d/stage-inputs.tsv、.claude/rules/implementation-workflow.md、research/scripts/change-touches-crates.sh、research/scripts/gate-staged.sh、research/scripts/stage-must-run.sh、research/scripts/stage-must-run-selftest.sh
+触发文件：.claude/gate.d/checker-tier-layer0-replay.sh、.claude/gate.d/55-qemu-first-transaction.sh、.claude/gate.d/59-crates-mutation-replay.sh、.claude/gate.d/74-model-differential.sh、.claude/gate.d/87-replay.sh、.claude/gate.d/stage-inputs.tsv、.claude/rules/implementation-workflow.md、research/scripts/change-touches-crates.sh、research/scripts/gate-staged.sh、research/scripts/stage-must-run.sh、research/scripts/stage-must-run-selftest.sh
 
 这一阶段做成的事：门禁阶段能复用上一次整轮全绿的判定（新立 `research/scripts/stage-must-run.sh`，判据是「这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，git 说变没变」）、每道阶段读哪几条路径登记进 `.claude/gate.d/stage-inputs.tsv`、新立外壳 `research/scripts/gate-staged.sh` 负责整轮全绿时前移那条 ref、门禁 59 号第一次有了范围判定、54 / 55 / 74 / 87 四道多了一道更准的前置而 `change-touches-crates.sh` 降为第二道闸、新立欠账 C477（暂存的是整份文件，别的会话的改动跟着进来）。
 

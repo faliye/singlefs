@@ -421,7 +421,7 @@ ENUM_STATES_TOTAL 721617
 - 绑到代码：`a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs` 的第二条比的是只做过 mkfs 的池第一次可写挂载（全是零单元发布）的录制流；
   带文件的发布那一路由 `publish_order_matches_litmus.rs` 钉：步数 35、根槽之后恰是「系统配置、系统配置、屏障、屏障」（快照该文件第 51–79 行）。两份在快照上本腿都跑了，见「快照自带用例单跑」。
 - 过期的一处：新 litmus 注释写块层那一半在 `crates/singlefs-harness/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs`，
-  快照里这份文件在 `crates/singlefs-checker-tier/tests/` 下（别的会话 singlefs-8b 的包重组挪的，写 litmus 的一方沿用了旧路径）。57 号只核 `singlefs-models:` 行，不核注释里的路径，这一处没人会红。
+  快照里这份文件在 `crates/singlefs-checker-tier/tests/` 下（别的会话的包重组挪的，写 litmus 的一方沿用了旧路径）。57 号只核 `singlefs-models:` 行，不核注释里的路径，这一处没人会红。
 
 结论：兑现了条款（D16 已定项 7 的最后三步与「屏障完成才返回」）。只是注释路径过期，归属写在上一条。推翻条件：herd7 在提交时判 Never 那一份为 Sometimes，或 `-nofence` 那一份为 Never。
 

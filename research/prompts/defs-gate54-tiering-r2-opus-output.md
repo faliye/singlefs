@@ -90,14 +90,14 @@ bash research/prompts/defs-gate54-tiering-r2-opus-model/run-all.sh /tmp/claude-1
 
 ```
 .claude/main-agent.md:49
-| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage` |
+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage` |
 .claude/gate.d/stage-inputs.tsv:11
-54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
-.claude/gate.d/54-layer0-replay.sh:20
+checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
+.claude/gate.d/checker-tier-layer0-replay.sh:20
 # 输入：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的路径（唯一登记位，复用判定读的也是它）。文件集是 git 眼里这些路径下
-.claude/gate.d/54-layer0-replay.sh:249
+.claude/gate.d/checker-tier-layer0-replay.sh:249
   full_green_marker_path="$full_green_marker_prefix.$layer0_input_hash"
-.claude/gate.d/54-layer0-replay.sh:300
+.claude/gate.d/checker-tier-layer0-replay.sh:300
 full_green_marker_path="$full_green_marker_prefix.$input_hash_at_start"
 ```
 
@@ -108,7 +108,7 @@ post 臂 T1 原样（`outputs/h-a-late-stage-54.out`）：
   ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-a-post-T1-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.b42259802ccae17c3287fa23d8be8486
       [格] b42259802cca worker_threads=1 judged_root=…/tmp.poU65Fs6mr/tree
-  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✓ 层 0 快档跑完（release，只跑不标 ignored 的用例，全量那条留给 --full）：第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored
   ✓ 这批输入那一格全绿标记与这批输入的内容哈希相同（b42259802ccae17c…，4 个文件，登记路径 crates/ Cargo.toml Cargo.lock），两条流都是 exhaustive=true：层 0 全量跑完于 2026-09-24，标记里的计数行原样
     [gate --staged 里 54 号退出码 0]
@@ -121,7 +121,7 @@ post 臂 T1 原样（`outputs/h-a-late-stage-54.out`）：
 
 ```
 ════ H-A [pre] Y 在 T1 暂存 54；X 的 crash.rs 记号=SINGLE_THREADED
-  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✗ 第一个事务那条流：本机 32 核、SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），全量枚举却只起了 1 个工作线程
     [gate --staged 里 54 号退出码 1]
 ```
@@ -152,7 +152,7 @@ post 臂 T1 原样（`outputs/h-a-late-stage-54.out`）：
 ```
   echo '                在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
   echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }'
-  echo '                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
+  echo '                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
 ```
 
 **V1-a 暂存区为空。** 最常见的来路是崩溃验证员：`.claude/main-agent.md` 第 45 行把它排在代码轮之后、暂存之前，定义第 2 步 54 号默认快档、在主工作区跑。
@@ -193,7 +193,7 @@ error: crates/singlefs-harness/src/lib.rs: patch does not apply
 补丁是对旧 HEAD 算的，套到新 HEAD 上两种提交法都失败；第 2 行的 `&& { …; }` 只挡住 `apply`，第 3 行照跑，全量跑在没套上补丁的新 HEAD 上、写下那一格。之后的门禁：别的会话提交了整个暂存区时 77（对），只提交它自己的路径时红「没有这一格」（对）。没有误判，是一趟白跑；与第 8 行「worktree 的建法与 `gate.sh --staged` 相同」字面不符：共享 `gate.sh` 第 75、76 行套不上就 `die`。
 
 ```
-.claude/gate.d/54-layer0-replay.sh:8
+.claude/gate.d/checker-tier-layer0-replay.sh:8
 #     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
 .claude/singlefs-ai-sop/scripts/gate.sh:75
   if [[ -s "$staged_base/staged.patch" ]] && ! git -C "$staged_tree" apply --index "$staged_base/staged.patch"; then
@@ -206,9 +206,9 @@ error: crates/singlefs-harness/src/lib.rs: patch does not apply
 54 号头部把「开跑不删」立在一条前提上（第 11、12 行）：
 
 ```
-.claude/gate.d/54-layer0-replay.sh:11
+.claude/gate.d/checker-tier-layer0-replay.sh:11
 #     开跑一格都不删：同一批输入的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。这一趟没写成标记就退出（判红、跑的过程中输入变了、
-.claude/gate.d/54-layer0-replay.sh:12
+.claude/gate.d/checker-tier-layer0-replay.sh:12
 #     被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
 ```
 
@@ -321,7 +321,7 @@ pre 臂两种都红（`[gate --staged 里 54 号退出码 1]`、`[退出码 1]`�
 **历史**：
 1. HEAD 的 54 号是 new。X 改 `crash.rs`（多线程，入库 54 号的全量该绿），暂存；主工作区的 `crates/` 与暂存区相同（X 刚把自己的改动全暂存了）。
 2. X 照第 49 行在 worktree 里跑 `--full`，判绿，写格 `74f88a29…`。
-3. Z 在主工作区里跑 `bash .claude/gate.d/54-layer0-replay.sh --full`（不带根，第 53 行取主工作区），输入哈希与 X 那一格相同。两种 Z：
+3. Z 在主工作区里跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`（不带根，第 53 行取主工作区），输入哈希与 X 那一格相同。两种 Z：
    - wip：Z 是正在改 54 号的会话，主工作区里的 54 号是它没暂存的半成品（模型里多了一判「`LAYER0` 行要 `journal_differing=0`」，合成日志里是 3），拿半成品试跑。
    - edit：Z 用入库的 54 号，例如崩溃验证员被派发提示点名跑全量（定义第 24 行「派发提示点名要层 0 全量时才带」，第 2 步在主工作区起）；跑的途中主工作区的 `crates/` 被人接着改（没暂存）。
 4. Z 判红（wip：半成品那一判；edit：第 367、368 行「跑的过程中输入变了」），EXIT trap（第 303 行）删掉第 300 行那个键——就是 X 那一格。
@@ -329,9 +329,9 @@ pre 臂两种都红（`[gate --staged 里 54 号退出码 1]`、`[退出码 1]`�
 6. **放开扫的**：两趟的先后，Zfirst / Zlast / overlapZlast / overlapXlast。
 
 ```
-.claude/gate.d/54-layer0-replay.sh:303
+.claude/gate.d/checker-tier-layer0-replay.sh:303
 trap 'if [[ "$full_marker_written" != 1 ]]; then rm -f -- "${full_green_marker_path:?}"; fi; rm -rf -- "${layer0_scratch_directory:?}"' EXIT
-.claude/gate.d/54-layer0-replay.sh:23
+.claude/gate.d/checker-tier-layer0-replay.sh:23
 # 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动、工作区那一份 54 号），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。
 ```
 
@@ -445,13 +445,13 @@ edit、overlapZlast 里 Z 的红句原样：`  ✗ 全量跑的过程中这一�
 
 ```
 .claude/agents/crash-verifier.md:23
-1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `54-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
+1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
 .claude/agents/crash-verifier.md:24
 2. 按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个：`nice -n 19 bash .claude/gate.d/<文件>`，54 号默认不带 `--full`（快档加核全绿标记），派发提示点名要层 0 全量时才带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
-.claude/gate.d/54-layer0-replay.sh:91
+.claude/gate.d/checker-tier-layer0-replay.sh:91
     echo "     → 要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；前缀是 stage-inputs.tsv 登记给本阶段的 ${layer0_input_paths_text}，判据见 research/scripts/change-touches-crates.sh。"
-.claude/gate.d/54-layer0-replay.sh:147
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
+.claude/gate.d/checker-tier-layer0-replay.sh:147
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/checker-tier-layer0-replay.sh。"
 research/prompts/_defs-gate54-tiering-r2-body.md:61
 | 一格判「站不住」⇒ 改 54 号或定义；按「第三轮之后停」，第三轮只攻前两轮都站住的形态 | 攻方给出一条可达历史：该跑全量的没跑、不该红的红了、该红的没红，或 agent 照定义做会覆盖别人的东西 |
 ```

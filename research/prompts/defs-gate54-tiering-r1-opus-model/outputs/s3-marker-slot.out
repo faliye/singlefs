@@ -79,5 +79,5 @@
       ✓ 层 0 崩溃点重放全量跑完（两次发布那条流，多版本 oracle；32 个工作线程，SINGLEFS_LAYER0_THREADS=32（没设，取本机核数），本机 32 核）：states=2104413 closed_form=2104413 exhaustive=true violations=0 root_persisted_states=9 no_file=1 file_read=2 failed=0 journal_differing=0 verification_ran=1 verification_failed=0 record_root_without_record=0 record_claimed_state_missing_unit=0 checker_violations=0 I-1.1=2104413/0/0 first_violation=none
     [gate --staged 里 54 号的退出码 0]
 ════ S3c 两份定义里「别的 gate.sh 在跑」那道等待（crash-verifier.md 第 23 行、gate-triage.md 第 24 行）看得见收尾那一趟吗
-    收尾 --full 的进程（pid 2015562）的命令行：bash .claude/gate.d/54-layer0-replay.sh --full
+    收尾 --full 的进程（pid 2015562）的命令行：bash .claude/gate.d/checker-tier-layer0-replay.sh --full
     这条命令行里含 gate.sh 的次数：0

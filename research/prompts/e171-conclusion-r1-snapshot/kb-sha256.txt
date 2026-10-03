@@ -1,0 +1,9 @@
+c4ffc17f513ce0039352cf7369ec42d5f57257899765e407c05877397b0798a9  .claude/kb/experiments/171-三oracle合谋测试.md
+4e8c6208f9a37e71b6a5055c5a9f8b58c527095d2f7d3569a990f765107ee532  .claude/kb/milestone/01-first-txn.md
+cd2dd5ab966b35cf63d752def6ebaf49cc200528528b903098ab482b3fe7452b  .claude/kb/milestone/02-second-txn.md
+96af4bf5ede499ff1ee86b64a34b6927a4f60bb22877aed4893e8ae823e120d0  .claude/kb/decisions/13-验证路线.md
+9bc62ca548fe7461495781457b7328fb524eb853e688a07f679f7e90a9069900  .claude/kb/checks-owed.md
+268e78ce3d2e820b420244191d64c70ab5706005959a8ceb3cdce154be590425  .claude/kb/experiments/07-离线索引harness.md
+8906cccea92f669e24960adf4c27a07fe328a1b0bd56212bb87e8b45a2f018b4  .claude/kb/decisions/08-核心索引结构.md
+298a2c08fe8650e7fd7514533078bbaad3cc190a8702435e15da7c6f9d322966  .claude/kb/decisions/16-发布语义.md
+1649833fd8aeb7b0217341f6f21c55b4df6801bd68d0ffb2aaabc159c467c9c2  .claude/kb/decisions/23-journal的角色与格式.md

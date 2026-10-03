@@ -4,10 +4,10 @@
 
 ## 〇、判别力自证
 
-取辩方报告第 11 行的引用（`54-layer0-replay.sh:118`，原文
+取辩方报告第 11 行的引用（`checker-tier-layer0-replay.sh:118`，原文
 `layer0_judge_paths=(.claude/gate.d/stage-inputs.tsv "$(realpath ... layer0_stage_script_path)" "$(realpath ... layer0_admission_module)")`），
-在草稿目录 `/tmp/claude-1000/defs-gatebatch-m2-r2-verifier/selftest/54-layer0-replay.sh` 副本上把行号人为改成 119（原文第 119 行是
-`scope_reason="$(bash ...)"`，与被核引文不同）。核法：`awk 'NR==119' 54-layer0-replay.sh | grep -qF 'layer0_judge_paths='`。
+在草稿目录 `/tmp/claude-1000/defs-gatebatch-m2-r2-verifier/selftest/checker-tier-layer0-replay.sh` 副本上把行号人为改成 119（原文第 119 行是
+`scope_reason="$(bash ...)"`，与被核引文不同）。核法：`awk 'NR==119' checker-tier-layer0-replay.sh | grep -qF 'layer0_judge_paths='`。
 
 ```
 ✗（引文与该行号实际内容不符——判别力自证通过：核对方法确实能分辨行号错配）
@@ -20,7 +20,7 @@
 - 三条腿报告：`defs-gatebatch-m2-r2-defense-output.md`（66 行）、`defs-gatebatch-m2-r2-opus-output.md`（308 行）、
   `defs-gatebatch-m2-r2-local-attack-output-s1.md`（15 行）、`-s2.md`（15 行），提示 `defs-gatebatch-m2-r2-local-attack.md`（61 行）、
   核对表 `-translation-audit.md`（31 行）、运行记录 `-runlog.md`（11 行）。
-- 快照：`research/prompts/defs-gatebatch-m2-r2-snapshot/sha256sums.txt`，11 个文件（`54-layer0-replay.sh`、`admission.py`、
+- 快照：`research/prompts/defs-gatebatch-m2-r2-snapshot/sha256sums.txt`，11 个文件（`checker-tier-layer0-replay.sh`、`admission.py`、
   `stage-inputs.tsv`、`stage-owners.tsv`、`lib_heavy_tests.py`、`heavy-test-guard.sh`、`crash-verifier.md`、
   `implementation-workflow.md`、`main-agent.md`、`gate-triage.md`、`check-segment-registry.py`）。现跑 `sha256sum -c` 11 个全 OK
   （与主 agent 交回时一致），故这 11 个文件的引用直接对主树核，等价于对快照核。
@@ -35,13 +35,13 @@
 
 | 引用 | 核的结果 | 命令 |
 |---|---|---|
-| `54-layer0-replay.sh:118`（Y1，`layer0_judge_paths=(...)`） | ✓ | `awk 'NR==118' .claude/gate.d/54-layer0-replay.sh` |
+| `checker-tier-layer0-replay.sh:118`（Y1，`layer0_judge_paths=(...)`） | ✓ | `awk 'NR==118' .claude/gate.d/checker-tier-layer0-replay.sh` |
 | `admission.py:168`（第 12 行「现仓与备份…都是」docstring） | **✗ 现仓部分错** | 现仓第 168 行实为 `BUILD_ENVIRONMENT_VARIABLE_FORMS = (...)`，与所引 docstring 无关；docstring 现查在 **admission.py:198**（`grep -n '进指纹的只有键与路径' research/scripts/admission.py` → `198:        """进指纹的只有键与路径…`）。经 `_defs-gatebatch-m2-r2-diff.md` 的 hunk 偏移重算（`@@ -146,6 +169,13 @@` 之后、下一个 hunk 在 `@@ -425,7 +455,9 @@` 之前，这一段旧行到新行恒定 +30），倒推备份（r1 时刻）里这句 docstring 确在旧行 168（198−30=168），故「备份」那半准确，「现仓」那半错配 |
 | `admission.py:1265`（`judge_crash_case_log` 定义，「备份同」） | **✗ 现仓错** | 现仓第 1265 行是空行（`attributes_before_function` 函数体内），`judge_crash_case_log` 现查定义在 **admission.py:1495**（`grep -n '^def judge_crash_case_log' research/scripts/admission.py`） |
-| `admission.py:1321`（转述 r1 核查员 ✓ 判定，未逐字引文） | ✓（转述准确） | 对照 `defs-gatebatch-m2-r1-verifier-output.md:147,150,151`：分别是 `54-layer0-replay.sh:168 ✓`、`admission.py:1265 ✓`、`admission.py:1321 ✓`，与辩方转述一致 |
-| `54-layer0-replay.sh` 头部「两趟 --full 同时跑同一条用例…」（未给行号） | ✓ | `grep -n '两趟 --full 同时跑同一条用例' .claude/gate.d/54-layer0-replay.sh` 命中第 17 行，逐字节相同 |
+| `admission.py:1321`（转述 r1 核查员 ✓ 判定，未逐字引文） | ✓（转述准确） | 对照 `defs-gatebatch-m2-r1-verifier-output.md:147,150,151`：分别是 `checker-tier-layer0-replay.sh:168 ✓`、`admission.py:1265 ✓`、`admission.py:1321 ✓`，与辩方转述一致 |
+| `checker-tier-layer0-replay.sh` 头部「两趟 --full 同时跑同一条用例…」（未给行号） | ✓ | `grep -n '两趟 --full 同时跑同一条用例' .claude/gate.d/checker-tier-layer0-replay.sh` 命中第 17 行，逐字节相同 |
 | `admission.py:1613`（`write_crash_case_marker` 定义） | ✓ | `awk 'NR==1613' research/scripts/admission.py` |
-| `54-layer0-replay.sh:187`（`delete_crash_case_marker`） | ✓ | `awk 'NR==187' .claude/gate.d/54-layer0-replay.sh` |
+| `checker-tier-layer0-replay.sh:187`（`delete_crash_case_marker`） | ✓ | `awk 'NR==187' .claude/gate.d/checker-tier-layer0-replay.sh` |
 | `admission.py:100`（「减得少的（改了照样让用例重跑）…」） | ✓ | `awk 'NR==100' research/scripts/admission.py`，逐字节相同 |
 | `lib_heavy_tests.py:40`（「接受的误拒…」） | ✓ | `awk 'NR==40' .claude/hooks/lib_heavy_tests.py` |
 | `heavy-test-guard.sh:83`（同一句） | ✓ | `awk 'NR==83' .claude/hooks/heavy-test-guard.sh` |
@@ -63,7 +63,7 @@
    这句话讲的是**实验准入条件**（experiment admission）的指纹口径，字面上不是「判日志的代码…它不进每条用例的指纹」
    （崩溃枚举用例的日志判法）这件事。
 3. 该句真正的支持性引文在别处且都能现核命中：`judge_crash_case_log` 定义处（现仓 admission.py:1495，r1 时刻按同一偏移换算约
-   1265）、`--extra-file` 只把 54 号自己算进指纹处（`54-layer0-replay.sh:168`，r1 与现仓这一行本身没变）。
+   1265）、`--extra-file` 只把 54 号自己算进指纹处（`checker-tier-layer0-replay.sh:168`，r1 与现仓这一行本身没变）。
 
 结论：**这是主 agent 写判决时的一处行内引文错配**（辩方原话），不是攻方或 r1 核查员的错——三方材料里都没有这个具体行号。
 但辩方自己复核这一处时，报告里把「现仓」与「备份」的行号混成同一个数（都写 168），这本身在现仓一侧也是错的
@@ -73,8 +73,8 @@
 
 | 引用 | 核的结果 | 命令 |
 |---|---|---|
-| `54-layer0-replay.sh:173`（`--extra-file "<判它的 54 号：…>"`） | ✓ | `sed -n '173p'` |
-| `54-layer0-replay.sh:174`（`--extra-file "<判它的准入模块…>"`） | ✓ | `sed -n '174p'` |
+| `checker-tier-layer0-replay.sh:173`（`--extra-file "<判它的 54 号：…>"`） | ✓ | `sed -n '173p'` |
+| `checker-tier-layer0-replay.sh:174`（`--extra-file "<判它的准入模块…>"`） | ✓ | `sed -n '174p'` |
 | `admission.py:1270`（`found = re.search(...)`） | ✓ | `awk 'NR==1270'` |
 | `admission.py:153`（`IGNORE_ATTRIBUTE_FORM = re.compile(...)`） | ✓ | `awk 'NR==153'` |
 | `lib_heavy_tests.py:181`（说明句「标了、找不到那个目标…」） | ✓ | `awk 'NR>=178&&NR<=186{print NR": "$0}'` |
@@ -82,7 +82,7 @@
 | `.claude/rules/implementation-workflow.md:89`（「门禁管哪一半」整段） | ✓ | `awk 'NR==89'`，逐字节相同 |
 | `admission.py:1476`（`if resumed_slices + freshly_run_slices != slices:`） | ✓ | `awk 'NR==1476'` |
 | `admission.py:1911`（`("worker_threads", values["--threads-text"])`） | ✓ | `awk 'NR==1911'` |
-| `54-layer0-replay.sh:384`（`threads_text=...`） | ✓ | `awk 'NR==384'` |
+| `checker-tier-layer0-replay.sh:384`（`threads_text=...`） | ✓ | `awk 'NR==384'` |
 | `admission.py:97/98/99`（文件头「认不出的」「按宽处理」两段） | ✓（3/3） | `sed -n '97,99p'` |
 | `admission.py:481/501/539`（runner/wrapper 按内容进指纹三处） | ✓（3/3） | 逐行 `awk 'NR==<N>'` |
 | `admission.py:158`（`COMPILE_TIME_CONCATENATED_INCLUDE`） | ✓ | `awk 'NR==158'` |

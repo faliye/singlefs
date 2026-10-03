@@ -1,4 +1,4 @@
-232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7  .claude/gate.d/54-layer0-replay.sh
+232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7  .claude/gate.d/checker-tier-layer0-replay.sh
 03314d49bf746b584c170722aaef29a1271120894c3dc952473d46509aab5acb  .claude/gate.d/stage-inputs.tsv
 14a43f860469aa17823e9330f6625316eb963e6b2a627382cf88501b7474d265  .claude/main-agent.md
 3cfbf2e57a969c189e5dc754f26fdd76d4c030ac417596954415763590cd719f  .claude/agents/crash-verifier.md

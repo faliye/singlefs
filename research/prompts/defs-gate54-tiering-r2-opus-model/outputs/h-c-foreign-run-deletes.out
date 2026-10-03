@@ -1,5 +1,5 @@
 ════ H-C [post] Z=wip 先后=Zfirst
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-c-post-wip-Zfirst/.git/singlefs-layer0-full-green.74f88a29d4fc1e39c65611dd687a300f06693668396
   ── Z 那一趟（主工作区）：
@@ -13,7 +13,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
 
 ════ H-C [post] Z=wip 先后=Zlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-c-post-wip-Zlast/.git/singlefs-layer0-full-green.74f88a29d4fc1e39c65611dd687a300f06693668396f
   ── Z 那一趟（主工作区）：
@@ -26,7 +26,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
 
 ════ H-C [post] Z=wip 先后=overlapZlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-c-post-wip-overlapZlast/.git/singlefs-layer0-full-green.74f88a29d4fc1e39c65611dd687a300f06693
   ── Z 那一趟（主工作区）：
@@ -39,7 +39,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
 
 ════ H-C [post] Z=wip 先后=overlapXlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/main/h-c-post-wip-overlapXlast/.git/singlefs-layer0-full-green.74f88a29d4fc1e39c65611dd687a300f06693
   ── Z 那一趟（主工作区）：
@@ -53,7 +53,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
 
 ════ H-C [pre] Z=wip 先后=Zlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── Z 那一趟（主工作区）：
   ✗ （别的会话改到一半的 54 号）LAYER0 行 journal_differing 不是 0
       [格] 一格都没有

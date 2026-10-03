@@ -1,7 +1,7 @@
 <!-- knowledge-sync -->
 # governance-review-r1 阶段同步
 
-触发文件：.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/experiment-runner.md、.claude/agents/gate-triage.md、.claude/agents/implementation-writer.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/20-kb-shape.sh、.claude/gate.d/54-layer0-replay.sh、.claude/gate.d/75-decision-experiment-links.sh、.claude/gate.d/90-term-renames.sh、.claude/gate.d/lib-governance-refs.py、.claude/hooks/heavy-test-guard.sh、.claude/hooks/runner-dispatch-guard.sh、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、research/scripts/archive-past-rounds.py、research/scripts/ask-local-selftest.sh、research/scripts/ask-local.sh；另改了 .claude/main-agent.md、.claude/skills/gate/SKILL.md、.claude/skills/crash-test/SKILL.md 与门禁 10 号的两份样本（不在触发登记里，一并记）
+触发文件：.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/experiment-runner.md、.claude/agents/gate-triage.md、.claude/agents/implementation-writer.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/20-kb-shape.sh、.claude/gate.d/checker-tier-layer0-replay.sh、.claude/gate.d/75-decision-experiment-links.sh、.claude/gate.d/90-term-renames.sh、.claude/gate.d/lib-governance-refs.py、.claude/hooks/heavy-test-guard.sh、.claude/hooks/runner-dispatch-guard.sh、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、research/scripts/archive-past-rounds.py、research/scripts/ask-local-selftest.sh、research/scripts/ask-local.sh；另改了 .claude/main-agent.md、.claude/skills/gate/SKILL.md、.claude/skills/crash-test/SKILL.md 与门禁 10 号的两份样本（不在触发登记里，一并记）
 
 这一阶段做成的事：对分支 claude/exciting-bohr-4olowk 相对 73ba4a4 的全部改动做第一轮严查（甲组规则与入口 11 条、乙组 agent 定义 11 条、丙组门禁钩子脚本 14 条，报告原样入库，见「原始证据」），每条现查之后改掉；改法都只被这一轮之后的第二轮严查攻过。
 
@@ -51,7 +51,7 @@
 | .claude/agents/kb-scribe.md:20 | 标题行状态与 decisions.md 状态列改成什么 | 改了：乙 8 |
 | .claude/agents/experiment-designer.md:28 | （英文名写在输入一节） | 改了：乙 9：挪进第 2 步 |
 | .claude/agents/experiment-designer.md:38 | `## 一、问题` 写什么 | 补了：第一行「英文名：…」 |
-| .claude/gate.d/54-layer0-replay.sh:230 | 在项目根、暂存之后：layer0_full_base=… | 改了：甲 2：说明另起一行，三行是纯命令 |
+| .claude/gate.d/checker-tier-layer0-replay.sh:230 | 在项目根、暂存之后：layer0_full_base=… | 改了：甲 2：说明另起一行，三行是纯命令 |
 | .claude/gate.d/lib-governance-refs.py:34 | 「第」「月」后隔空白、`origin/master` 类误报；没判的不列 | 改了：丙 5–9：见文件头 |
 | .claude/gate.d/lib-governance-refs.py:73 | 第一段不在仓里就不判 | 改了：丙 10 / 11：带扩展名的照判，样本红得出来 |
 | .claude/gate.d/fixtures/10-kb-rot.sh/red/.claude/agents/sample.md:7 | （样本） | 补了：cd 之后的悬空路径、research/ 下悬空脚本 |

@@ -1,7 +1,7 @@
 <!-- knowledge-sync -->
 # governance-defs-r2 阶段同步
 
-触发文件：.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/gate-triage.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/54-layer0-replay.sh、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md；另改了 .claude/main-agent.md（不在触发登记里，一并记）
+触发文件：.claude/agents/crash-verifier.md、.claude/agents/experiment-designer.md、.claude/agents/gate-triage.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/checker-tier-layer0-replay.sh、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md；另改了 .claude/main-agent.md（不在触发登记里，一并记）
 
 这一阶段做成的事：严查第一轮之后的十份定义改动走完一轮三方（判决 research/prompts/governance-defs-r2-main-verification.md），攻方打中的 B1–B7 与正推 G3 逐条现查后写回，写回处被攻过零轮。
 
@@ -18,8 +18,8 @@
 
 | 载体 | 原句 | 处置 |
 |---|---|---|
-| .claude/gate.d/54-layer0-replay.sh:233 | --full …; git worktree remove --force … | 改了：B4：保留 --full 的退出码、清理临时目录 |
-| .claude/gate.d/54-layer0-replay.sh:230 | 把下面三行命令放进同一次 Bash 调用（…） | 补了：这次调用的退出码就是 --full 的 |
+| .claude/gate.d/checker-tier-layer0-replay.sh:233 | --full …; git worktree remove --force … | 改了：B4：保留 --full 的退出码、清理临时目录 |
+| .claude/gate.d/checker-tier-layer0-replay.sh:230 | 把下面三行命令放进同一次 Bash 调用（…） | 补了：这次调用的退出码就是 --full 的 |
 | .claude/main-agent.md:59 | 全量判绿、全绿标记写好之后才往下；54、55、59、74 号 | 改了：B4 看这次调用退 0；B5 补 87 |
 | .claude/rules/implementation-workflow.md:55 | 54、55、59、74 号只在这一趟里能复用 | 改了：B5 |
 | .claude/rules/implementation-workflow.md:26 | 记一份 sha256sum 快照，交核查员当输入 | 补了：B7 连同派腿时刻 |

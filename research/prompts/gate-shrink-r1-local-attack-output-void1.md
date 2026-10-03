@@ -145,7 +145,7 @@ T12-Q2: no such reason this would be refuted if the background section stated th
 T13-Q1: code-tooling this would be refuted if the old gate script file name 47-code-tooling-selftests-and-registries.sh is not included in the code-tooling group's old-file list in the background section
 T13-Q1: code-tooling this would be refuted if the old gate script file name 47-code-tooling-selftests-and-registries.sh is not included in the code-tooling group's old-file list in the background section
 T13-Q1: code-tooling this would be refuted if the old gate script file name 47-code-tooling-selftests-and-registries.sh is not included in the code-tooling group's old-file list in the background section
-T13-Q1: kept separate this would be refuted if the old gate script file name 54-layer0-replay.sh is not included in the kept separate group's old-file list in the background section
+T13-Q1: kept separate this would be refuted if the old gate script file name checker-tier-layer0-replay.sh is not included in the kept separate group's old-file list in the background section
 T13-Q1: kept separate this would be refuted if the old gate script file name 55-qemu-device-streams.sh is not included in the kept separate group's old-file list in the background section
 T13-Q1: kept separate this would be refuted if the old gate script file name 57-lkmm.sh is not included in the kept separate group's old-file list in the background section
 T13-Q2: no such reason this would be refuted if the background section stated the merge plan would alter any cell's judging criteria

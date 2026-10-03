@@ -1,0 +1,35 @@
+$ git status --porcelain research/results | grep -v "^A  "
+$ git ls-files --others --exclude-standard -- research/results | wc -l
+0
+$ ls -d /tmp/singlefs-e165-pinned-target
+ls: cannot access '/tmp/singlefs-e165-pinned-target': No such file or directory
+$ nproc; grep MemTotal /proc/meminfo
+32
+MemTotal:       63033404 kB
+$ bash research/scripts/run-with-memory-cap.sh --status
+  … 整机内存 60.1 GiB（/proc/meminfo 的 MemTotal），此刻 MemAvailable 41.9 GiB
+  … slice singlefs-heavy.slice 的总上限 40.1 GiB（整机内存 − 余量 20G；RUN_WITH_MEMORY_CAP_RESERVE 改余量）
+  … slice 里回收不掉的用量 8.7 GiB；账上在跑 5 条：
+      singlefs-memory-cap-1022554-363224326：要 5.1 GiB，此刻占 82 MiB，包装进程 1022554，2026-10-01T08:01:12Z 起跑，键「cargo test --release --bin e166-parallel-commit-shared-state-partition」
+      singlefs-memory-cap-339353-288849482：要 12.0 GiB，此刻占 335 MiB，包装进程 339353，2026-10-01T06:40:11Z 起跑，键「bash /home/fy5090/code/singlefs/research/scripts/capped.sh 16 cargo test --offline --no-fail-fast -p singlefs-format -p 」
+      singlefs-memory-cap-644547-100672418：要 3.0 GiB，此刻占 1.6 GiB，包装进程 644547，2026-10-01T07:36:55Z 起跑，键「bash /home/fy5090/code/singlefs/research/scripts/capped.sh 12 bash /tmp/claude-1000/m3-code-r2-opus/model/chain3.sh」
+      singlefs-memory-cap-870380-312748882：要 14.0 GiB，此刻占 2.0 GiB，包装进程 870380，2026-10-01T07:58:43Z 起跑，键「broad-mutation one-build」
+      singlefs-memory-cap-999831-2926912910：要 2.6 GiB，此刻占 4.3 GiB，包装进程 999831，2026-10-01T08:01:05Z 起跑，键「cargo test --release --bin e166-parallel-commit-shared-state-partition」
+  … slice 外面回收不掉的合计约 9.5 GiB（MemTotal − MemAvailable − slice 里的用量），其中本地模型服务的 anon + shmem 2.2 GiB、user.slice 的 anon 11.1 GiB
+  ✓ 余量比 slice 外面此刻的用量多 10.5 GiB
+$ grep -n verus-proof-check research/scripts/memory-peaks.tsv
+3039:328204288	2026-10-01T07:39:00Z	2G	verus-proof-check must-red-worlds	4
+3040:211812352	2026-10-01T07:06:56Z	1G	verus-proof-check proof	4
+3041:217055232	2026-10-01T05:46:35Z	4G	verus-proof-check vacuity	4
+$ grep -nF "bash .claude/gate.d/checker-tier-layer0-replay.sh ." research/scripts/memory-peaks.tsv
+301:25769803776	2026-09-27T13:06:52Z	24G	bash .claude/gate.d/checker-tier-layer0-replay.sh .	未设（整机 32 核）
+$ grep -a -c VERUS_Z3_PATH <verus 安装>/verus <verus 安装>/rust_verify
+/home/fy5090/.local/share/singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux/verus:1
+/home/fy5090/.local/share/singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux/rust_verify:3
+$ ls <verus 安装> | grep -E "^(verus|rust_verify|z3|vstd.vir|libvstd.rlib|version.json)$"
+libvstd.rlib
+rust_verify
+version.json
+verus
+vstd.vir
+z3

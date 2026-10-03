@@ -10,11 +10,11 @@ heavy-test-guard.sh	rc=0
 == g1-triage-54-direct agent=gate-triage run_in_background=0
 pattern-process-guard.sh	rc=0	
 bash-command-detector.sh	rc=0	
-heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
 == g1-triage-54-direct agent=gate-triage run_in_background=1
 pattern-process-guard.sh	rc=0	
 bash-command-detector.sh	rc=0	
-heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
+heavy-test-guard.sh	rc=2	✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：gate-triage 不跑「层 0」
 == g1-triage-87 agent=gate-triage run_in_background=0
 pattern-process-guard.sh	rc=0	
 bash-command-detector.sh	rc=0	

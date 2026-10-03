@@ -5,9 +5,9 @@
 # 在一个临时仓里按 main-agent.md 的写法放进同一次 bash 调用，看三种结局下这次调用的退出码。
 set -uo pipefail
 root="$1"; draft="$2"
-printed="$(bash -c "$(sed -n '/^print_staged_worktree_full_commands() {/,/^}/p' "$root/.claude/gate.d/54-layer0-replay.sh"); print_staged_worktree_full_commands")"
+printed="$(bash -c "$(sed -n '/^print_staged_worktree_full_commands() {/,/^}/p' "$root/.claude/gate.d/checker-tier-layer0-replay.sh"); print_staged_worktree_full_commands")"
 three_lines="$(printf '%s\n' "$printed" | sed -n '2,4p' | sed 's/^ *//' \
-  | sed 's#\.claude/gate\.d/54-layer0-replay\.sh#.claude/gate.d/stub-full.sh#; s#research/scripts/run-with-memory-cap\.sh#research/scripts/stub-memory-cap.sh#')"
+  | sed 's#\.claude/gate\.d/checker-tier-layer0-replay\.sh#.claude/gate.d/stub-full.sh#; s#research/scripts/run-with-memory-cap\.sh#research/scripts/stub-memory-cap.sh#')"
 for outcome in green red memory-cap-250 scope-unavailable-251; do
   repo="$(mktemp -d "$draft/g1-repo-XXXXXX")"
   git -C "$repo" init -q; git -C "$repo" config user.email m@x; git -C "$repo" config user.name m

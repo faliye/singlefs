@@ -92,7 +92,7 @@ exit=1
 
 ### R2 「给一个数」不带单位：包装认成字节数，退 251，出路指错方向
 
-**情形**：主 agent 照 `.claude/main-agent.md:48` 的字面「给一个数」，写「15 号上限 16」；或崩溃验证员照 `.claude/agents/crash-verifier.md:20` 的「每道一个数」拿到「54 号 16（推的）」。子 agent 设 `GATE_RESEARCH_BUILD_MEMORY_MAX=16`，或照崩溃验证员第 1b 步写 `run-with-memory-cap.sh 16 bash .claude/gate.d/54-layer0-replay.sh`。
+**情形**：主 agent 照 `.claude/main-agent.md:48` 的字面「给一个数」，写「15 号上限 16」；或崩溃验证员照 `.claude/agents/crash-verifier.md:20` 的「每道一个数」拿到「54 号 16（推的）」。子 agent 设 `GATE_RESEARCH_BUILD_MEMORY_MAX=16`，或照崩溃验证员第 1b 步写 `run-with-memory-cap.sh 16 bash .claude/gate.d/checker-tier-layer0-replay.sh`。
 
 - `.claude/main-agent.md:48`（整行）：`派崩溃验证员时给 54、55、57 号各自的内存上限，每道一个数，照 \`.claude/agents/crash-verifier.md\`「输入」一节给：54、57 号写明是量过的还是推的，55 号的不小于同时起的虚机数乘每台的内存。门禁 15、74 号在阶段里面经内存包装，要换它们的上限就在派发提示里给一个数，没给用 \`research/scripts/replay.sh\` 的 \`REPLAY_MEMORY_CAP\` 默认值。`
 - `research/scripts/run-with-memory-cap.sh:16`：`# 上限照 systemd 的 MemoryMax 写法：正整数加 K / M / G / T（1024 进制），例 16G、512M。默认值由调用方定，写在调用方的脚本头。`

@@ -5,7 +5,7 @@
 产出四份：
 - research/prompts/_m2-closeout-code-r2-checklist.md（482 行，14 个 kb 文件小节清单：invariants.md、checks-owed.md、decisions/02、03、08、09、13、15、16、18、19、22、23、28；36 行标抄、375 行标不抄）
 - research/prompts/_m2-closeout-code-r2-appendix.md（1233 行，40 段）
-- research/prompts/_m2-closeout-code-r2-diff.md（40610 行：一、git diff --stat 全表 71 文件；二、src+测试 69 文件完整 diff；三、mutations.tsv 只放 numstat 与新增 311 行变异名列；四、bin/e161_* 只列路径注明是 singlefs-e1 会话的文件）
+- research/prompts/_m2-closeout-code-r2-diff.md（40610 行：一、git diff --stat 全表 71 文件；二、src+测试 69 文件完整 diff；三、mutations.tsv 只放 numstat 与新增 311 行变异名列；四、bin/e161_* 只列路径注明是别的会话的文件）
 - research/prompts/_m2-closeout-code-r2-background.md（1821 行 = 正文106+清单482+附录1233，按定义顺序拼、排他新建）
 
 快照目录 research/prompts/m2-closeout-code-r2-snapshot/：kb-sha256.txt（16 行，主 agent 已给，未动）、crates-src-sha256.txt（主 agent 已给，未动）、dispatch-time.txt（已在，未动）；新写 crates-sha256.txt（71 行，diff 里 71 个 crates/ 文件在 r2 快照上的 sha256sum，路径从仓根起，排他新建）。开工前核对 16 份 sha256 与 kb-sha256.txt 逐行一致。

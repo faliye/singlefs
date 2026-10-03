@@ -28,7 +28,7 @@
 | 代码类 | `code-research-build.sh` | 15 | 1 | 否（改名） |
 | harness 类 | `harness-tests.sh` | 14、74 | 2 | 是（2→1） |
 | checker 类 | `checker-independence-and-sync.sh` | 92、94 | 2 | 是（2→1） |
-| checker-tier 类 | `54-layer0-replay.sh`（不改名） | 54 | 1 | 否 |
+| checker-tier 类 | `checker-tier-layer0-replay.sh`（不改名） | 54 | 1 | 否 |
 | checker-tier 类 | `checker-tier-qemu-device-streams.sh` | 55 | 1 | 否（改名） |
 | checker-tier 类 | `checker-tier-lkmm.sh` | 57 | 1 | 否（改名） |
 | checker-tier 类 | `checker-tier-mutation-replay.sh` | 59 | 1 | 否（改名） |
@@ -96,7 +96,7 @@
 
 逐份核对未发现硬矛盾：`three-way-materials.md` 步骤 0 的「开工先跑 `--check implementation-premise`」发生在工作**开始之前**（前提检查），不是「交回前跑门禁」，与 Q9 不冲突；`kb-scribe.md` 第 4 步明写「第 2、3 步里的 `--check shape` 与 `--write` 是写回流程的一步，照跑」，把这两次调用显式排除在「门禁阶段交回前不跑」之外，是一句自洽的例外声明，不是矛盾。**唯一的语义漂移（不算硬矛盾）**：`agent-common.md`「门禁」一节把 `stage-owners.tsv` 第二列的角色从「哪个门禁阶段该由谁在干完自己的活之后先跑」改写成「提交前整轮门禁判这一道红时先派给谁修」，但同一节里紧邻的上一句已明写「`crash-verifier` 在提交时跑登记给它的那几道，照它的定义」——这个例外写在前面，所以 `crash-verifier.md` 仍把该表当「我该主动跑哪几道」的清单来读，两句连起来读不矛盾；只是分开摘录容易读成矛盾，建议在门禁一节里把 crash-verifier 的例外紧跟着第二句一起重复一次（写作代价小，可读性收益大，不是这一轮必须做的事）。
 
-**这一条本身可推翻的现象**：若 `crash-verifier.md` 从 `stage-owners.tsv` 取到的文件名与 `.claude/gate.d/` 今天的实际文件名对不上（即该表把 54/55/57/59/74/77/94 的行也改成了旧编号或旧文件名），则「还说得通」这一判定要改判——现查 `stage-owners.tsv` 里这几行的第一列（`54-layer0-replay.sh`、`55-qemu-device-streams.sh`、`57-lkmm.sh`、`59-crates-mutation-replay.sh`、`74-model-differential.sh`、`77-test-environment.sh`、`94-checker-implementation-disjoint.sh`）与 `ls .claude/gate.d/*.sh` 逐字比对，七行全部与仓里现存文件名相同（该表其余大多数行——`10-kb-rot.sh`、`11-batch-scope.sh`、`16-freeze-layer-membership.sh` 等——指向的是round 1 合并之前的旧文件名，在仓里已不存在，但这些行不归 `crash-verifier` 使用，归 `kb-scribe`、`experiment-runner` 等其他 agent；这批陈旧登记已经被 `47-code-tooling-selftests-and-registries.sh` 的 stage-owners 格判红，见该格今天的判定「表还按旧文件名，归『登记收尾』一件」，是已知欠账，不是这一轮新introduced 的问题）。
+**这一条本身可推翻的现象**：若 `crash-verifier.md` 从 `stage-owners.tsv` 取到的文件名与 `.claude/gate.d/` 今天的实际文件名对不上（即该表把 54/55/57/59/74/77/94 的行也改成了旧编号或旧文件名），则「还说得通」这一判定要改判——现查 `stage-owners.tsv` 里这几行的第一列（`checker-tier-layer0-replay.sh`、`55-qemu-device-streams.sh`、`57-lkmm.sh`、`59-crates-mutation-replay.sh`、`74-model-differential.sh`、`77-test-environment.sh`、`94-checker-implementation-disjoint.sh`）与 `ls .claude/gate.d/*.sh` 逐字比对，七行全部与仓里现存文件名相同（该表其余大多数行——`10-kb-rot.sh`、`11-batch-scope.sh`、`16-freeze-layer-membership.sh` 等——指向的是round 1 合并之前的旧文件名，在仓里已不存在，但这些行不归 `crash-verifier` 使用，归 `kb-scribe`、`experiment-runner` 等其他 agent；这批陈旧登记已经被 `47-code-tooling-selftests-and-registries.sh` 的 stage-owners 格判红，见该格今天的判定「表还按旧文件名，归『登记收尾』一件」，是已知欠账，不是这一轮新introduced 的问题）。
 
 ## 三、Q6：「只在提交时跑」这条规矩的代价——该在写入那一刻拦的清单
 

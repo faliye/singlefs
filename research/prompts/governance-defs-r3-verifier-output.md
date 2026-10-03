@@ -45,7 +45,7 @@
 | `.claude/hooks/kb-scribe-followups.tsv` 相关行（21/30/49 号触发条件） | 转述 | 核不动（表格具体行号 Sonnet 未点名精确行号，只引用 grep 结果） | — |
 | `.claude/agent-common.md:46`「253 是超过限时」等整段 | 与甲组 A7 对应 | ✓ 与现文一致，且末尾「退出码表以 run-with-memory-cap.sh 文件头为准」也与现文一致 | `sed -n '46p' .claude/agent-common.md` |
 | `.claude/main-agent.md:59` | 「退出码是经内存包装的那条 --full 命令的，250–254 是包装自己的结局」 | ✓ 与现文一致 | `sed -n '59p' .claude/main-agent.md` |
-| `.claude/gate.d/54-layer0-replay.sh:230` | 同句 | ✓ 与现文一致 | `grep -n '退出码是经内存包装的那条' .claude/gate.d/54-layer0-replay.sh` |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:230` | 同句 | ✓ 与现文一致 | `grep -n '退出码是经内存包装的那条' .claude/gate.d/checker-tier-layer0-replay.sh` |
 | `.gitignore:6` `/.claude/singlefs-ai-sop/`；`git ls-files .claude/singlefs-ai-sop/scripts/lib.sh` 零输出 | 判定依据 | ✓ 现查确认：`git check-ignore -v` 命中 `.gitignore:6`，`git ls-files` 零输出 | `git check-ignore -v .claude/singlefs-ai-sop/scripts/lib.sh`；`git ls-files .claude/singlefs-ai-sop/scripts/lib.sh` |
 
 Sonnet 报告没有出现产物引用（没有交模型或复跑命令），本表覆盖它全部可核的文字引用。

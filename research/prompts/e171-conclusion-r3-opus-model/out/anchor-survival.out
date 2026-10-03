@@ -1,0 +1,2 @@
+name=anchor_survival root=/tmp/claude-1000/e171-s4/frozen-tree rows=281 applicable=281 not_applicable=0 by_category=none counted_not_applicable=none all_quiet_not_applicable=none
+name=anchor_survival root=/tmp/claude-1000/e171-conclusion-r3/tree rows=281 applicable=279 not_applicable=2 by_category=untouched:2 counted_not_applicable=none all_quiet_not_applicable=none

@@ -1,0 +1,10 @@
+name=e165_pin_overlap row=70 category=untouched pin_table_lines=100,101,102,103,104,105,106,107,108,109,110,111,112 row_name=实二十：层_0_L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）
+name=e165_pin_overlap row=71 category=untouched pin_table_lines=119,120 row_name=实审_A2a_第_25_条：链值不等的记录照样进重放前缀
+name=e165_pin_overlap row=112 category=counted pin_table_lines=26 row_name=步_3：前缀跨实例边界（把别的实例的记录也接上）
+name=e165_pin_overlap row=113 category=untouched pin_table_lines=177,178,179,180,181,182,183,184,185,186,187,188 row_name=P6_后一半：锚点读不出时不看本次发布内序号，链首接在下一次发布的第二条上（三方第一轮_K4-b）
+name=e165_pin_overlap row=114 category=untouched pin_table_lines=113,114,115,189,190,191,192,193,194,195,196,197,198,199,200 row_name=实二二三_b（C539，D23_已定项_4_读者规则）：锚点读得出时下一次发布的首条序号不是_1_照接
+name=e165_pin_overlap row=213 category=untouched pin_table_lines=121,122,123,124,125,126,127,128,129,130,131,132 row_name=实审_A2a_第_25_条：前一条不在盘上也断前缀
+name=e165_pin_overlap row=274 category=untouched pin_table_lines=50 row_name=只供测试的开关：关掉点名验证时_verification_passed_照加（两臂在健康镜像上报同一个数，运行时看不出走了哪一条）
+name=e165_pin_overlap row=275 category=untouched pin_table_lines=82,83,84 row_name=实二十：一个事务的提交标记没出现、下一条换了事务号也照接
+name=e165_pin_overlap row=276 category=untouched pin_table_lines=116,117,118 row_name=实二二三_b（C540，D23_已定项_4_读者规则）：带末条标志的那一条之后同一_(实例,_txg)_还有记录照字面按标志认边界
+name=e165_pin_overlap_summary rows=9 counted=1 untouched=8

@@ -85,8 +85,8 @@
       ✓ 全绿标记与这批输入的内容哈希相同（0a906e4b33b85a9b…，8 个文件，登记路径 crates/ Cargo.toml Cargo.lock）：层 0 全量跑完于 2026-09-24，标记里的计数行原样：
     [gate --staged 里 54 号的退出码 0]
 ════ S4 × f5
-  工作区 vs 暂存区： M .claude/gate.d/54-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
-  ── 收尾（f5）：bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>
+  工作区 vs 暂存区： M .claude/gate.d/checker-tier-layer0-replay.sh M  crates/singlefs-harness/src/crash.rs ；B 的改动命中 1 行
+  ── 收尾（f5）：bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>
       ✗ 层 0 不是全量：LAYER0 states=262165 closed_form=262165 violations=0 root_persisted_states=4 no_file=262158 file_read=7 failed=0 verification_ran=6 verification_failed=0 journal_differing=3 exhaustive=false
     [标记不在]
   ── gate.sh --staged

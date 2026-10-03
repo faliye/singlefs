@@ -33,10 +33,10 @@ bash research/prompts/governance-defs-r2-opus-model/run-all.sh /tmp/claude-0/-ho
 | G1#1 `main-agent.md:59`、`implementation-workflow.md:52` 三处同步换成 `gate-staged.sh` | ✓ | 现取三行原文均含该命令 |
 | G1#2 `stage-must-run.sh:51-52` | ✓ | `sed -n '51,52p'` 逐字对得上 |
 | G1#3 `gate-staged.sh:27-28,43` | ✓ | `sed -n` 三处逐字对得上 |
-| G1#4 `54-layer0-replay.sh:230-233` | ✓ | 逐行对得上；`bash -n` 现核语法通过 |
+| G1#4 `checker-tier-layer0-replay.sh:230-233` | ✓ | 逐行对得上；`bash -n` 现核语法通过 |
 | G1#5 `main-agent.md:59` | ✓ | 与 G1#1 同一行，已核 |
 | G1#6 `heavy-test-guard.sh:40` | ✓ | 逐字对得上；`:520` 只作旁证位置未逐字引，未发现不一致 |
-| G1#7 `stage-owners.tsv:37`、`agent-common.md:63` | ✓ | 逐字对得上；复跑 `nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（不带前缀）确实仍被拒（`rc=2`，「gate-triage 不跑「层 0」」，与 Sonnet 附带观测一致） |
+| G1#7 `stage-owners.tsv:37`、`agent-common.md:63` | ✓ | 逐字对得上；复跑 `nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh`（不带前缀）确实仍被拒（`rc=2`，「gate-triage 不跑「层 0」」，与 Sonnet 附带观测一致） |
 | G1「grep 两遍/重复跑」零命中 | ✓ | 现跑同一条 grep，零命中，4 处「两遍」均与本条无关 |
 | G2#1 `crash-verifier.md:24` | ✓ | 逐字对得上（与 Opus 引用同一行，两腿一致） |
 | G2#1 `stage-inputs.tsv` 第 12 行（55号）、57 号无登记行 | ✓ | `sed -n '12p'`、`grep -c '^57'` = 0 |
@@ -86,7 +86,7 @@ bash research/prompts/governance-defs-r2-opus-model/run-all.sh /tmp/claude-0/-ho
 | `agent-common.md:54` | ✓ | 逐字对得上 |
 | `main-agent.md:59` 引用（同 Sonnet） | ✓ | 已核 |
 | B4 桩测试 green/red/250/251（今天写法与改法两组输出） | ✓ | 复跑输出与报告表逐字一致（含临时路径归一化后） |
-| `54-layer0-replay.sh:230,233` | ✓ | 与 Sonnet 引用同段，已核 |
+| `checker-tier-layer0-replay.sh:230,233` | ✓ | 与 Sonnet 引用同段，已核 |
 | B5 `stage-owners.tsv:19`（59 号「要几个钟头」） | ✓ | 逐字对得上 |
 | `87-replay.sh:26`、`stage-inputs.tsv:15`（87 号一行） | ✓ | 逐字对得上 |
 | N1 派发闸 `gate-triage--*` 三个 `rc=2` 输出（含末尾截断的乱码字节） | ✓ | 复跑输出逐字节一致，包括截断处的同一乱码字节 |

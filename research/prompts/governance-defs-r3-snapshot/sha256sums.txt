@@ -29,7 +29,7 @@ f2b3b804e87992835463090f56c61e2a6d0dca51c4e402ccffd886a600d567f1  .claude/skills
 764db018012547409b7a4dc85de41a744777199f81ed67de1e934948d9e85e2a  .claude/hooks/heavy-test-guard.sh
 c7c363db32f94b4c0832aa3b8f0cc28b753db2f2fc4bdf0eed0d5c9540286d70  .claude/hooks/runner-dispatch-guard.sh
 36c2bf4d9de9e0f09ff42810eae064a323a9365e7e2f56b2f9e4ec9a5da583b6  .claude/hooks/kb-scribe-followups.tsv
-e9ce0c97496a93cc917b5ae9106e6f3fa8fe0179a2c28af10204824899ff432e  .claude/gate.d/54-layer0-replay.sh
+e9ce0c97496a93cc917b5ae9106e6f3fa8fe0179a2c28af10204824899ff432e  .claude/gate.d/checker-tier-layer0-replay.sh
 e09784f9ed0f1a623fd60a41c778a49567ff1be88e684439d53fbfe20989c6d9  .claude/gate.d/59-crates-mutation-replay.sh
 d4f65a4c1eaa1a61bb6f059a2eae3eb6d30fa2807445d8cbd1db42631745e865  .claude/gate.d/57-lkmm.sh
 14c622fa69f41a587c89785bec9b02d5243e7fd927e2c91a3412cf5c086f81fa  .claude/gate.d/stage-inputs.tsv

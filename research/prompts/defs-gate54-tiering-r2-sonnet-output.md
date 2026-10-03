@@ -85,7 +85,7 @@ r1 正文 `research/prompts/defs-gate54-tiering-r1-main-verification.md:52-58` �
 
 ### S1–S5 是否打中「分档之前的 54 号」
 
-分档之前（基线提交 3b60f098，2026-09-22）的 54 号，现查（`git show 3b60f098e97dc4c4f3ed9c6355422b607db1c34c:.claude/gate.d/54-layer0-replay.sh`）：只有两道跳过判定（`stage-must-run.sh` 树对比复用、`change-touches-crates.sh` 范围判定），跳过就退 77；不跳过就直接在**调用它的那个进程自己的根目录**下跑 `cargo test --release ... --include-ignored`（无条件全量，没有「快档」，没有标记文件，没有 worktree 转移，没有输入哈希）。
+分档之前（基线提交 3b60f098，2026-09-22）的 54 号，现查（`git show 3b60f098e97dc4c4f3ed9c6355422b607db1c34c:.claude/gate.d/checker-tier-layer0-replay.sh`）：只有两道跳过判定（`stage-must-run.sh` 树对比复用、`change-touches-crates.sh` 范围判定），跳过就退 77；不跳过就直接在**调用它的那个进程自己的根目录**下跑 `cargo test --release ... --include-ignored`（无条件全量，没有「快档」，没有标记文件，没有 worktree 转移，没有输入哈希）。
 
 - **S1**（全量在别处跑、标记在这里核，两地对不上）：分档前「全量在哪跑」与「谁来判定」是同一次调用、同一个地方，没有跨地点的核对可言。**不打中**分档前的 54 号。
 - **S3**（标记只有一格，两处各跑一次互删）：分档前没有标记文件这个产物。**不打中**。
@@ -96,7 +96,7 @@ r1 正文 `research/prompts/defs-gate54-tiering-r1-main-verification.md:52-58` �
 
 **问题**：K2 让崩溃验证员默认只跑快档；崩溃验证员定义第 1 条只处理「另一个 `--full` 正在跑」这一种并发，不负责确保全量**曾经跑过**。真正会跑 `--full` 的地方只有一处：`.claude/main-agent.md:44`（现查命中，全文）：
 
-> 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage`
+> 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage`
 
 这一行的触发条件（「这一批改了…登记的输入」）是**主 agent 自己用自然语言判断**的一句提示，不是代码强制。若主 agent 漏判或跳过这一步、直接派 `gate-triage`，是否有后续机制兜底？
 
@@ -104,7 +104,7 @@ r1 正文 `research/prompts/defs-gate54-tiering-r1-main-verification.md:52-58` �
 
 > 3. 每个红阶段：抄门禁给的「✗」行与紧跟的「→」下一步原样；看它点名的文件与行在不在暂存区 diff 的块里（`git diff --cached -U0 -- <文件>`）。在块里 ⇒「这一轮」；文件在但行不在块里、或文件不在暂存区 ⇒「不是这一轮」；……
 
-54 号快档没有标记时的红行，`.claude/gate.d/54-layer0-replay.sh:254`（现查命中）：
+54 号快档没有标记时的红行，`.claude/gate.d/checker-tier-layer0-replay.sh:254`（现查命中）：
 
 > echo "  ✗ 快档绿了（${quick_tier_report}），但这批输入（哈希 ${layer0_input_hash:0:16}…，${layer0_input_file_count} 个文件）没有层 0 全量的全绿标记（$full_green_marker_path）"
 

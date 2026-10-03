@@ -130,7 +130,7 @@ $ grep -n "分片\|shard\|双机\|第二台" .claude/agents/crash-verifier.md
    $ grep -n "memory\|ulimit\|cap\b\|prlimit" research/scripts/layer0-shard-run.sh research/scripts/layer0-shard-configuration-check.sh
    （零命中）
    ```
-   共用约束「不做」一节的内存包装规则（`bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/54-layer0-replay.sh --full`）
+   共用约束「不做」一节的内存包装规则（`bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/checker-tier-layer0-replay.sh --full`）
    包住的是**本机**这一次调用产生的子进程树；第二台是 ssh 起的一个全新进程，不在本机这棵进程树里，
    `run-with-memory-cap.sh` 的上限**够不着它**。crash-verifier.md 给的「54 号内存上限」这个输入因此只
    管到本机那一片（加 merge），第二台那一片的内存没有任何上限、也没人要求主 agent 给一个「第二台内存

@@ -13,7 +13,7 @@
 - 冲突块在 `records/2026-09-27-同步远端冲突块.md` 第 564–680 行（heavy-test-guard.sh 三块，本地留下的一侧是「crash-verifier：层 0、崩溃枚举用例、55 号…」）。另外第 131–180 行是 crash-verifier.md 三块，本地一侧同样是「54 号默认带 --full」。
 - 现行各处都说层 0 全量归崩溃验证员：
   - `.claude/agents/crash-verifier.md` 第 3、27–31 行
-  - `.claude/gate.d/stage-owners.tsv` 第 37 行（`54-layer0-replay.sh	crash-verifier	…`）
+  - `.claude/gate.d/stage-owners.tsv` 第 37 行（`checker-tier-layer0-replay.sh	crash-verifier	…`）
   - `.claude/main-agent.md` 第 57、61 行
   - `.claude/rules/implementation-workflow.md` 第 64、67 行（第 67 行：「崩溃验证员在 HEAD + 暂存区的 worktree 里跑 54 号 `--full`（连同登记的崩溃枚举用例），另跑 55、57、59 号」）
 - 提醒：开工时读到的这张表第 55 行还是远端那句「层 0 全量由主 agent 在 HEAD + 暂存区的 worktree 里跑；崩溃验证员跑 55、57、59 号」。之后另一个会话在 `faf255e2` 里改成了现在的样子。
@@ -26,7 +26,7 @@
 ```
             ("崩溃验证员带前缀不经内存包装跑层 0 测试目标", crash, commit + "cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 2),
             ("崩溃验证员带前缀经内存包装跑 54 号全量", crash,
-             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
+             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 0),
 ```
 
 - 第二、三行：期望改成 0，去掉「：层 0 不归它」。
@@ -58,9 +58,9 @@
 - 原因：shell-lint 的 S5 是按行判的（`.claude/singlefs-ai-sop/scripts/shell-lint.sh` 第 89–90、166–172 行）。只要一行里有 `rm -r…`，同一行里任何 `$变量/` 都算没守卫。第 270 行的 `rm -rf "${layer0_full_base:?}"` 本身已经带守卫，红的是同一行里另外三处 `"$layer0_full_base/tree…"`（`bash` 的脚本路径、`--full` 的参数、`git worktree remove`）。
 - 改法：这三处都写成 `"${layer0_full_base:?}/tree…"`。
 - 判红（改之前，`SHELL_LINT_DIR=.claude/gate.d bash …/shell-lint.sh .`）：
-  `  ✗ .claude/gate.d/54-layer0-replay.sh:270  rm -rf 作用在变量路径上（$layer0_full_base/），变量为空时会从根目录往下删`
+  `  ✗ .claude/gate.d/checker-tier-layer0-replay.sh:270  rm -rf 作用在变量路径上（$layer0_full_base/），变量为空时会从根目录往下删`
 - 对照样本在 `/tmp/claude-1000/gate-sync-fix/lint54/`，同一份脚本只有这三处不同：
-  - 把守卫还原掉：`  ✗ 54-layer0-replay.sh:270  rm -rf 作用在变量路径上（$layer0_full_base/）…`，`✗ shell 纪律检查失败：1 处（共检查 1 个脚本）`
+  - 把守卫还原掉：`  ✗ checker-tier-layer0-replay.sh:270  rm -rf 作用在变量路径上（$layer0_full_base/）…`，`✗ shell 纪律检查失败：1 处（共检查 1 个脚本）`
   - 带守卫的现版：`  ✓ shell 纪律检查通过（共 1 个脚本）`
 - 转绿（`SHELL_LINT_DIR=.claude/gate.d bash .claude/singlefs-ai-sop/scripts/shell-lint.sh`，exit=0）：`  ✓ shell 纪律检查通过（共 76 个脚本）`
 - 出路里打印的三行命令：`bash -n` 退 0。空变量时 `git worktree remove --force "${layer0_full_base:?}/tree"` 会报 `layer0_full_base: parameter null or not set` 并中止。
@@ -69,11 +69,11 @@
 ## 改过的文件
 
 - `.claude/hooks/heavy-test-guard.sh`：第 863–865 行
-- `.claude/gate.d/54-layer0-replay.sh`：第 270 行
+- `.claude/gate.d/checker-tier-layer0-replay.sh`：第 270 行
 
-`git diff --stat -- .claude/hooks/heavy-test-guard.sh .claude/hooks/lib_heavy_tests.py .claude/gate.d/54-layer0-replay.sh` 的输出现在为空：两处改动都已经在 ecdf8465 里。确认过的点：
+`git diff --stat -- .claude/hooks/heavy-test-guard.sh .claude/hooks/lib_heavy_tests.py .claude/gate.d/checker-tier-layer0-replay.sh` 的输出现在为空：两处改动都已经在 ecdf8465 里。确认过的点：
 - `git show ecdf8465 -- .claude/hooks/heavy-test-guard.sh` 里有上面那三行 `+`。
-- `.claude/gate.d/54-layer0-replay.sh` 里 `grep -cF '${layer0_full_base:?}/tree'` 数到 1 行。
+- `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `grep -cF '${layer0_full_base:?}/tree'` 数到 1 行。
 
 没有新写 `# gate-similar:` / `# hook-events:` 行（没建新门禁或新钩子）。
 

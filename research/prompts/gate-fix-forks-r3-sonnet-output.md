@@ -200,7 +200,7 @@ PY
 ('.claude/gate.d/20-kb-shape.sh', 19, 247)
 ('.claude/gate.d/40-results-cited.sh', 14, 90)
 ('.claude/gate.d/50-rules-manifest.sh', 15, 16)
-('.claude/gate.d/54-layer0-replay.sh', 20, 28)
+('.claude/gate.d/checker-tier-layer0-replay.sh', 20, 28)
 ('.claude/gate.d/55-qemu-first-transaction.sh', 27, 98)
 ('.claude/gate.d/56-crates-adversarial-review.sh', 18, 20)
 ('.claude/gate.d/59-crates-mutation-replay.sh', 32, 37)

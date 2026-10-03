@@ -9,7 +9,7 @@
 
 ## 判法
 
-F1 的事实是「门禁按编号称呼 → 收成 15 道按五类命名去编号（`54-layer0-replay` 除外）」。329 行分四类：
+F1 的事实是「门禁按编号称呼 → 收成 15 道按五类命名去编号（`checker-tier-layer0-replay` 除外）」。329 行分四类：
 
 1. **checks-owed.md / milestone/02-second-txn.md / experiments/158-择根与修复四岔路.md（E158）/ layout/01-first-txn.md /
    invariants.md / decisions/05、20、21**（这一批还没改成全名，规格已备好在

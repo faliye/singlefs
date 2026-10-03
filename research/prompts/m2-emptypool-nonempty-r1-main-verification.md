@@ -41,7 +41,7 @@
 
 1. F1–F5 见第一节。实现员报告 `research/prompts/m2-emptypool-nonempty-r1-implementer-report.md`「续做二」一节（每条用例怎么证明会红）。
 2. 欠账（今天不改代码）：checker 看不到「最后确认的根不是最新的」（Z3-A 那份镜像零违例）；「非空」的两处补的细节标预想；Z1 那一格写进 D16 已定项 1「生效」重议那段。
-3. 另一个会话（singlefs-8e）拿 fe1acd72 / 0d4db4d0 / ad1ea35c 当计数实验基线：F1–F5 没碰「非空」判法与 `rollback_floor_ceiling`（`recovery.rs` 未改），`mount.rs` 与 `transaction.rs` 的哈希变了，改动落在取号、空池挂载的形状判定与 `publish_first_file` 的核对，已通知。
+3. 另一个会话拿 fe1acd72 / 0d4db4d0 / ad1ea35c 当计数实验基线：F1–F5 没碰「非空」判法与 `rollback_floor_ceiling`（`recovery.rs` 未改），`mount.rs` 与 `transaction.rs` 的哈希变了，改动落在取号、空池挂载的形状判定与 `publish_first_file` 的核对，已通知。
 
 ## 五、交用户的决策点（都标预想）
 

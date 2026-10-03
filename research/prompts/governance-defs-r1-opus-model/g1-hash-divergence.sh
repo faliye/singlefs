@@ -1,20 +1,20 @@
 #!/usr/bin/env bash
-# G1 模型：54 号全绿标记的键（输入内容哈希）在三棵树上各算一次，函数原样取自工作区 .claude/gate.d/54-layer0-replay.sh 的 write_layer0_input_manifest。
+# G1 模型：54 号全绿标记的键（输入内容哈希）在三棵树上各算一次，函数原样取自工作区 .claude/gate.d/checker-tier-layer0-replay.sh 的 write_layer0_input_manifest。
 #   full   ＝主 agent 照 main-agent.md 在 HEAD + 暂存区 worktree 里跑 --full 时写的那一格的键
-#   cv     ＝crash-verifier 照改后 crash-verifier.md 第 2 步在主工作区跑 `bash .claude/gate.d/54-layer0-replay.sh`（快档）时找的键
+#   cv     ＝crash-verifier 照改后 crash-verifier.md 第 2 步在主工作区跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh`（快档）时找的键
 #   staged ＝gate-triage 的 `gate.sh --staged` 在另一个 HEAD + 暂存区 worktree 里跑快档时找的键
 # 固定的前缀：一个临时仓（只在草稿目录里），这一轮暂存了一处 crates/ 改动；放开扫的是「暂存之后、crash-verifier 开跑之前，主工作区里 54 号登记路径下还有什么」。
 # 用法：bash g1-hash-divergence.sh <草稿目录>；不跑 cargo test，只跑 cargo -V / rustc -V。
 set -uo pipefail
 REPO=/home/user/singlefs
 SCRATCH=${1:?草稿目录}
-STAGE="$REPO/.claude/gate.d/54-layer0-replay.sh"
+STAGE="$REPO/.claude/gate.d/checker-tier-layer0-replay.sh"
 FUNCTION_TEXT="$(sed -n '/^write_layer0_input_manifest() {/,/^}/p' "$STAGE")"
 [[ -n "$FUNCTION_TEXT" ]] || { echo "取不到 write_layer0_input_manifest"; exit 1; }
 eval "$FUNCTION_TEXT"
 layer0_registered_input_paths=(crates/ Cargo.toml Cargo.lock)   # stage-inputs.tsv 里 54 号那一行
 key_of() { # <根>
-  ROOT="$1"; layer0_stage_script_path="$1/.claude/gate.d/54-layer0-replay.sh"; layer0_stage_file_name=54-layer0-replay.sh
+  ROOT="$1"; layer0_stage_script_path="$1/.claude/gate.d/checker-tier-layer0-replay.sh"; layer0_stage_file_name=checker-tier-layer0-replay.sh
   local manifest; manifest="$(mktemp -p "$SCRATCH")"
   write_layer0_input_manifest "$manifest" || { echo "算不出"; return; }
   echo "${layer0_input_hash:0:16} files=${layer0_input_file_count}"
@@ -24,7 +24,7 @@ make_repo() { # <目录>：HEAD 里有 crates/a.rs、crates/b.rs、Cargo.toml、
   git -C "$d" init -q; git -C "$d" config user.email m@example; git -C "$d" config user.name model
   printf 'fn a() {}\n' > "$d/crates/singlefs-core/src/a.rs"; printf 'fn b() {}\n' > "$d/crates/singlefs-core/src/b.rs"
   printf '[workspace]\n' > "$d/Cargo.toml"; printf '# lock\n' > "$d/Cargo.lock"; printf 'target/\n' > "$d/.gitignore"
-  cp "$STAGE" "$d/.claude/gate.d/54-layer0-replay.sh"
+  cp "$STAGE" "$d/.claude/gate.d/checker-tier-layer0-replay.sh"
   git -C "$d" add -A; git -C "$d" commit -qm base
   printf 'fn a() { /* this round */ }\n' > "$d/crates/singlefs-core/src/a.rs"; git -C "$d" add crates/singlefs-core/src/a.rs   # 这一轮暂存的改动
 }
@@ -51,4 +51,4 @@ run_case "C3 自己一处改动漏暂存（Cargo.lock）" 'printf "# lock v2\n" 
 run_case "C4 删了已跟踪文件、删除未暂存" 'rm crates/singlefs-core/src/b.rs'
 run_case "C5 被忽略的文件（crates/target/）" 'mkdir -p crates/target && printf x > crates/target/junk'
 run_case "C6 暂存之后又改了已暂存的文件" 'printf "fn a() { /* edited after staging */ }\n" > crates/singlefs-core/src/a.rs'
-run_case "C7 主工作区的 54 号有未暂存改动" 'printf "# local edit\n" >> .claude/gate.d/54-layer0-replay.sh'
+run_case "C7 主工作区的 54 号有未暂存改动" 'printf "# local edit\n" >> .claude/gate.d/checker-tier-layer0-replay.sh'

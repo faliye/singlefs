@@ -52,7 +52,7 @@
 
 被判的 src 28 份：`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/lib.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-core/src/admission.rs`、`crates/singlefs-core/src/allocator.rs`、`crates/singlefs-core/src/code_two_tree.rs`、`crates/singlefs-core/src/inode_tree.rs`、`crates/singlefs-core/src/journal.rs`、`crates/singlefs-core/src/make_filesystem.rs`、`crates/singlefs-core/src/mount.rs`、`crates/singlefs-core/src/mounted_session.rs`、`crates/singlefs-core/src/pointer.rs`、`crates/singlefs-core/src/recovery.rs`、`crates/singlefs-core/src/system_configuration.rs`、`crates/singlefs-core/src/transaction.rs`、`crates/singlefs-core/src/unit.rs`、`crates/singlefs-format/src/lib.rs`、`crates/singlefs-harness/src/bad_disk_input.rs`、`crates/singlefs-harness/src/crash.rs`、`crates/singlefs-harness/src/crash_injection.rs`、`crates/singlefs-harness/src/fault_injection.rs`、`crates/singlefs-harness/src/history.rs`、`crates/singlefs-harness/src/layer0_progress.rs`、`crates/singlefs-harness/src/model.rs`、`crates/singlefs-harness/src/model_comparison.rs`、`crates/singlefs-harness/src/bin/first_transaction_on_device.rs`、`crates/singlefs-harness/src/bin/e156_allocation_basis_counts.rs`、`crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（后两份是实验装置，对不对由各自实验页的变异表与单测判）。
 
-按路径点名、不判、归别的会话：`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`（singlefs-e1 的 E161 装置）。
+按路径点名、不判、归别的会话：`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`（别的会话的 E161 装置）。
 
 ## 回看决策
 

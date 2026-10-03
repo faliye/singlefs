@@ -4,7 +4,7 @@
 # 记下 --full 那一条的退出码，删 worktree、删临时目录之后用它退出。
 set -uo pipefail
 root="$1"; draft="$2"
-printed="$(bash -c "$(sed -n '/^print_staged_worktree_full_commands() {/,/^}/p' "$root/.claude/gate.d/54-layer0-replay.sh"); print_staged_worktree_full_commands")"
+printed="$(bash -c "$(sed -n '/^print_staged_worktree_full_commands() {/,/^}/p' "$root/.claude/gate.d/checker-tier-layer0-replay.sh"); print_staged_worktree_full_commands")"
 first_two="$(printf '%s\n' "$printed" | sed -n '2,3p' | sed 's/^ *//')"
 third='SINGLEFS_HEAVY_TESTS=commit bash research/scripts/stub-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/stub-full.sh" --full "$layer0_full_base/tree"; layer0_full_rc=$?; git worktree remove --force "$layer0_full_base/tree"; rm -rf "$layer0_full_base"; exit "$layer0_full_rc"'
 for outcome in green red memory-cap-250 scope-unavailable-251; do

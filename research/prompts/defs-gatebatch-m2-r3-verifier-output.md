@@ -23,7 +23,7 @@
 
 ```
 $ sha256sum -c research/prompts/defs-gatebatch-m2-r3-snapshot/sha256sums.txt
-.claude/gate.d/54-layer0-replay.sh: OK
+.claude/gate.d/checker-tier-layer0-replay.sh: OK
 research/scripts/admission.py: OK
 .claude/gate.d/stage-inputs.tsv: OK
 .claude/gate.d/stage-owners.tsv: OK
@@ -82,9 +82,9 @@ opus 报告的引文几乎全用这种写法，57 处里 55 处由它判过；so
 | P5（第 151、153、155 行，`lib_heavy_tests.py:217/219`、`heavy-test-guard.sh:1152/1153`、`defs-gatebatch-m2-r2-main-verification.md:33`、`heavy-test-guard.sh:88`、`implementation-workflow.md:58`） | ✓（cite-check.py 判过，7 处全对上） |
 | P4/P4b（第 173 行，`admission.py:1232/1235/26`） | ✓（cite-check.py 判过） |
 | P6/P7、P9（第 205、206、211、212 行，`admission.py:228/128/581/553/46`、`implementation-workflow.md:32`、`defs-gatebatch-m2-r2-fixes-report.md:243`） | ✓（cite-check.py 判过） |
-| D2 判法摘要（第 234、236、238 行，`admission.py:132/1877/1879/1908/1913/133/2184/1621`、`54-layer0-replay.sh:40/245`、`defs-gatebatch-m2-r2-main-verification.md:37`） | ✓（cite-check.py 判过，11 处全对上） |
+| D2 判法摘要（第 234、236、238 行，`admission.py:132/1877/1879/1908/1913/133/2184/1621`、`checker-tier-layer0-replay.sh:40/245`、`defs-gatebatch-m2-r2-main-verification.md:37`） | ✓（cite-check.py 判过，11 处全对上） |
 | 标记字段（第 256 行，`admission.py:1718/1863/1831`、`crash_injection.rs:71`、`implementation-workflow.md:89`） | ✓（cite-check.py 判过，5 处全对上） |
-| Y1、K3 floor-raise、J1-c（第 264、266、268 行，`defs-gatebatch-m2-r2-main-verification.md:14/21`、`layer0-shard-run.sh:173/180`、`54-layer0-replay.sh:197/20`、`admission.py:1610/1615`、`crash-verifier.md:27`） | ✓（cite-check.py 判过，9 处全对上） |
+| Y1、K3 floor-raise、J1-c（第 264、266、268 行，`defs-gatebatch-m2-r2-main-verification.md:14/21`、`layer0-shard-run.sh:173/180`、`checker-tier-layer0-replay.sh:197/20`、`admission.py:1610/1615`、`crash-verifier.md:27`） | ✓（cite-check.py 判过，9 处全对上） |
 | P3、P4b、P6 的字面判定表（第 296、301–320 行「一次性 python，按路径导入……没存进模型目录」） | 没落盘（报告自己说没存进模型目录，属报告承认的限度，不算证据缺口） |
 | 引产物：模型目录 `defs-gatebatch-m2-r3-opus-model/SHA256SUMS`（第 29–56 行原样抄） | ✓（`sha256sum -c SHA256SUMS` 24 个文件全 OK，逐字节与报告贴的表相同） |
 | 复跑命令 `bash …/rerun.sh [<输出目录>] [<草稿目录>]`（第 5–27 行） | ✓（在仓根用真实 `research/prompts/defs-gatebatch-m2-r3-opus-model/rerun.sh`、输出与草稿目录都指到 `/tmp/claude-1000/defs-gatebatch-m2-r3-verifier/opus-rerun/`，未改脚本本身；见下方「opus 复跑」一节） |

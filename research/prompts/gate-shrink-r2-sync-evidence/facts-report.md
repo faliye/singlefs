@@ -42,7 +42,7 @@ grep -E '^\| H[0-9]+ \|' /tmp/claude-1000/gate-sync-facts/changes.md | awk -F'|'
 
 | 编号 | 旧事实 → 新事实（摘要） | 检索词 | 出处 |
 |---|---|---|---|
-| F1 | 门禁 23 道、散布「门禁 NN 号」称呼 → 收成 15 道按五类命名去编号（`54-layer0-replay` 除外），README/kb/skills 改称全名；`checks-owed`/决策05·20·21·23/`invariants`/`milestone/02`/E158 几份 kb 还没改，规格留 `/tmp` | `门禁 ?[0-9]{2} ?号` | 记录第二轮 4/4a 行、旧编号对照表；gate-t1、gate-t3-scribe、gate-t3c-scribe 报告 |
+| F1 | 门禁 23 道、散布「门禁 NN 号」称呼 → 收成 15 道按五类命名去编号（`checker-tier-layer0-replay` 除外），README/kb/skills 改称全名；`checks-owed`/决策05·20·21·23/`invariants`/`milestone/02`/E158 几份 kb 还没改，规格留 `/tmp` | `门禁 ?[0-9]{2} ?号` | 记录第二轮 4/4a 行、旧编号对照表；gate-t1、gate-t3-scribe、gate-t3c-scribe 报告 |
 | F2（新立） | 门禁阶段各自实现参数解析，没有统一的 `--list`/`--check`/`.gate-cells`/按格汇总结构 → 共用库 `.claude/gate.d/lib/stage-cells.sh` 提供这套结构，`gate-structure-check.py` 静态判 | `gate-structure-check\.py\|stage-cells\.sh` | 记录第二轮 4b/4c 行；gate-structure-lib 报告 |
 | F3 | `agent-common.md`「门禁」教各 agent 按 `stage-owners.tsv`（三列）自己跑登记给自己的阶段；`check-staged.sh` 存在；`gate-reuse-check` 在 Stop/SubagentStop 注册 → 门禁阶段统一归 `gate-triage`，其余 agent 交回前不跑；`check-staged.sh` 已删；`heavy-test-guard.sh` 新增「提交时才跑的检查」执行前拒绝；两处注册已删；`stage-owners.tsv` 改按格四列 | `check-staged\.sh\|gate-reuse-check\|stage-owners\.tsv` | 记录第二轮 4d 行 |
 | F4（新立） | `checker-tier-crates-mutation-replay`（原 59 号）跨机分片不看本地开关 → 只在本地配置 `ENABLE_ACROSS_MACHINES=1` 时才跨机 | `ENABLE_ACROSS_MACHINES` | 记录第二轮 4 行「修的硬伤」 |

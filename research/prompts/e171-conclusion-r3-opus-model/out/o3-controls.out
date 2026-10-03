@@ -1,0 +1,4 @@
+name=o3_controls variant=v0 p1_f_new_pool_strict=not_in base_images_strict_not_in=0 freeze_check_differences=0
+name=o3_controls variant=v1 p1_f_new_pool_strict=not_in base_images_strict_not_in=0 freeze_check_differences=2
+name=o3_controls variant=v2 p1_f_new_pool_strict=not_in base_images_strict_not_in=0 freeze_check_differences=2
+name=o3_controls variant=v3 p1_f_new_pool_strict=not_in base_images_strict_not_in=0 freeze_check_differences=2

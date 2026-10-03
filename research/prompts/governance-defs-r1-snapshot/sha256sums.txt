@@ -25,7 +25,7 @@ c8ed3bbe97d44000d9eb01f7793e51ec8e57ef3b3d2ecb6b7275e24c1ddb60f3  .claude/hooks/
 97383b5e5fb460626d21df3f4e23f276d2d7c39f9c29dc648e2e6cbe8861e72a  research/scripts/mutate.sh
 c8db93d7b6e914aac79942e31097829d15d10e054d078a816122e8b8ccd1830a  research/scripts/run-with-memory-cap.sh
 fc2dbc699d5f6a785443687d59f776f5e909a5925d5d51e83f947ff1e93b31fa  research/scripts/oov-check.py
-69c7d03fa9804be1ab3548aa1fb595ce904f0c00c938f02f672349929c708370  .claude/gate.d/54-layer0-replay.sh
+69c7d03fa9804be1ab3548aa1fb595ce904f0c00c938f02f672349929c708370  .claude/gate.d/checker-tier-layer0-replay.sh
 e09784f9ed0f1a623fd60a41c778a49567ff1be88e684439d53fbfe20989c6d9  .claude/gate.d/59-crates-mutation-replay.sh
 14c622fa69f41a587c89785bec9b02d5243e7fd927e2c91a3412cf5c086f81fa  .claude/gate.d/stage-inputs.tsv
 7036dc7321aeb8aa83f61dd1888fee707eacb77e776e9d3065e4352cd812392a  .claude/gate.d/stage-owners.tsv

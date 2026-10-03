@@ -3,7 +3,7 @@
   ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g124/h-a-post-T1-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.8cf4b9f801105dd4eb7286e36a8b
       [格] 8cf4b9f80110 worker_threads=1 judged_root=…/tmp.pSE5WumlKQ/tree
-  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 34962a038895fdca…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
     [gate --staged 里 54 号退出码 1]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
@@ -14,7 +14,7 @@
   ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g124/h-a-post-T2-SINGLE_THREADED-54/.git/singlefs-layer0-full-green.8cf4b9f801105dd4eb7286e36a8b
       [格] 8cf4b9f80110 worker_threads=1 judged_root=…/tmp.Wp3ud3x8ii/tree
-  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 34962a038895fdca…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
     [gate --staged 里 54 号退出码 1]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
@@ -31,7 +31,7 @@
     [gate --staged 里 54 号退出码 0]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
-  ── Y 起门禁；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── Y 起门禁；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 34962a038895fdca…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
     [gate --staged 里 54 号退出码 1]
   ── 真值（Y 门禁那一刻）
@@ -43,7 +43,7 @@
   ── X 的 --full（出路句三行原样，worktree 建于 Y 暂存之前）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g124/h-a-post-T1-multi-54/.git/singlefs-layer0-full-green.744bcda6f6a34fd3eacb29efa29363fb7d9a8e
       [格] 744bcda6f6a3 worker_threads=32 judged_root=…/tmp.V3FFdXxfc3/tree
-  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/54-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
+  ── X 起门禁（gate.sh --staged 的建法，只跑 54 号）；暂存区：.claude/gate.d/checker-tier-layer0-replay.sh crates/singlefs-harness/src/crash.rs 
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored），但这批输入（哈希 0c9adca5cf9d90e4…，4 个文件）没有层 0 全量的全绿标记（/tmp/claude-1000/defs54-r2-attack/runs/f
     [gate --staged 里 54 号退出码 1]
   ── 真值（X 门禁那一刻的 HEAD + 暂存区）
@@ -183,7 +183,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 1]
 
 ════ H-C [post] Z=wip 先后=Zlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g124/h-c-post-wip-Zlast/.git/singlefs-layer0-full-green.251fad687a9ed69db588930a328393434b8bfffd
   ── Z 那一趟（主工作区）：
@@ -197,7 +197,7 @@
     [真值：这份 HEAD + 暂存区用它自己的 54 号跑 --full，退出码 0]
 
 ════ H-C [post] Z=wip 先后=overlapZlast
-  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/54-layer0-replay.sh 
+  ── 主工作区相对暂存区（Z 开跑前）：.claude/gate.d/checker-tier-layer0-replay.sh 
   ── X 那一趟（worktree，入库的 54 号）：
   ✓ 全绿标记写进 /tmp/claude-1000/defs54-r2-attack/runs/fix-g124/h-c-post-wip-overlapZlast/.git/singlefs-layer0-full-green.251fad687a9ed69db588930a328393434
   ── Z 那一趟（主工作区）：

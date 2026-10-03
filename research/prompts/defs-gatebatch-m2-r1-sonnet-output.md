@@ -14,8 +14,8 @@
 - `implementation-workflow.md:89`（门禁管哪一半，改后）：「崩溃点重放由门禁 54 号判：整轮门禁跑快档，再逐条崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:` 行）按它这批输入的指纹核那一格全绿标记（两条流的层 0 全量都要 `exhaustive=true`）；全量……逐条按输入复用、只重跑输入变了的；……」
 - `.claude/gate.d/stage-inputs.tsv:13-16`（新增注释段，逐字）：「崩溃枚举用例（键是 crash-case:<名>）：门禁 54 号逐条按复用判定跑、逐条记全绿标记（在 git common-dir，按用例与它的输入指纹分格），输入没变复用、变了才重跑。路径用排除法写：只写整个 crates/ 与 Cargo 清单、锁，不按用例手列它读哪些文件——admission.py 算输入时自动减去别的测试目标独占的测试文件……」
 - `stage-inputs.tsv:32-35`：四条 `crash-case:` 行（`layer0-first-stream`、`layer0-second-stream`、`floor-raise-pushed-by-the-session`、`c561-sigma-full`），各自 `test=` 恰一条、`count-line=` / `exhaustive=` / `threads=` 齐。
-- `.claude/gate.d/stage-owners.tsv:37`（改后）：「54-layer0-replay.sh	crash-verifier	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用、只重跑输入变了的）：提交时在 HEAD + 暂存区的 worktree 里跑 --full」
-- `.claude/main-agent.md:61`（本批未改，原样）：「……就在 HEAD + 暂存区的 worktree 里跑那棵树里的 `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（整条经内存包装，照 `crash-verifier` 定义第 1b 步；层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记），55、57、59 同样带前缀……」
+- `.claude/gate.d/stage-owners.tsv:37`（改后）：「checker-tier-layer0-replay.sh	crash-verifier	层 0 崩溃点重放与 stage-inputs.tsv 里登记的崩溃枚举用例（crash-case: 行，逐条按输入复用、只重跑输入变了的）：提交时在 HEAD + 暂存区的 worktree 里跑 --full」
+- `.claude/main-agent.md:61`（本批未改，原样）：「……就在 HEAD + 暂存区的 worktree 里跑那棵树里的 `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`（整条经内存包装，照 `crash-verifier` 定义第 1b 步；层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记），55、57、59 同样带前缀……」
 - `.claude/agents/gate-triage.md:29`（本批未改，原样节选）：「……红句说的是「这一批输入」本身的（54 号的「没有这批输入的全绿标记」「那一格的哈希不同」这类）不按它点名的标记路径判：这一轮的改动……碰了 `.claude/gate.d/stage-inputs.tsv` 里那一道那一行登记的路径 ⇒「这一轮」……」
 
 **这六份／六处彼此的字面判定**：`crash-verifier.md` 的 description、输入项、做什么第 2/4 步、写范围、没做什么六处一致地改成了「逐条 crash-case、逐条标记、逐条复用」；`implementation-workflow.md` 的重型测试判据与「门禁管哪一半」两处同样改成逐条；`stage-inputs.tsv`/`stage-owners.tsv` 的新增内容与这五处对得上。`main-agent.md:61` 与 `gate-triage.md:29` 未改，但两处原文用的是「判绿按输入哈希写全绿标记」「那一格的哈希」这类不点明「一格」是全批还是逐用例的措辞，与改后的逐条方案不冲突，只是没有显式跟着更新（详见 1.3）。**这六份被判文字之间没有互相矛盾**，也没有任何一处仍写着「整批一格标记」的字样（`grep -rn "整批.*一格\|按整批输入哈希"` 六份文件全部 0 命中，命令与结果见下）。
@@ -58,7 +58,7 @@ $ grep -rn "整批.*一格\|按整批输入哈希" .claude/agents/crash-verifier
 
 ### 1.5 「照改后的字面，崩溃验证员在提交时做不做得对」
 
-按 `.claude/main-agent.md:61` 与 `crash-verifier.md:17-29` 的字面走一遍提交时的调用链：主 agent 暂存 → 派 `crash-verifier`（带 `SINGLEFS_HEAVY_TESTS=commit`）→ 崩溃验证员在 HEAD + 暂存区 worktree 里跑 `54-layer0-replay.sh --full`（默认带，`crash-verifier.md:29`）→ 54 号逐条核 `stage-inputs.tsv` 的四条 `crash-case:` 用例的指纹与标记 → 没变的复用、变了的在 release 下重跑并写新标记 → 崩溃验证员抄「✓/✗」与计数行、末句判绿/复用/判红数（`crash-verifier.md:31`）→ 建的 worktree 用完删（`crash-verifier.md:37`）。**这条链每一步都在六份被判文字里有对应的字面指令，链条本身不断**——即字面上照做能跑通、能得到「逐条判定」的结果，不会漏掉一步或指向不存在的命令。
+按 `.claude/main-agent.md:61` 与 `crash-verifier.md:17-29` 的字面走一遍提交时的调用链：主 agent 暂存 → 派 `crash-verifier`（带 `SINGLEFS_HEAVY_TESTS=commit`）→ 崩溃验证员在 HEAD + 暂存区 worktree 里跑 `checker-tier-layer0-replay.sh --full`（默认带，`crash-verifier.md:29`）→ 54 号逐条核 `stage-inputs.tsv` 的四条 `crash-case:` 用例的指纹与标记 → 没变的复用、变了的在 release 下重跑并写新标记 → 崩溃验证员抄「✓/✗」与计数行、末句判绿/复用/判红数（`crash-verifier.md:31`）→ 建的 worktree 用完删（`crash-verifier.md:37`）。**这条链每一步都在六份被判文字里有对应的字面指令，链条本身不断**——即字面上照做能跑通、能得到「逐条判定」的结果，不会漏掉一步或指向不存在的命令。
 
 **但「做得对」还要看两处它自己控制不了的前提**：① `admission.py` 的排除法算出的每条用例输入是否真的只包含改了才该重跑的文件（J2 的射程，我不判）；② 54 号 `--full` 内部的续跑、`--start-over`、进度目录键法是否真的不会假复用或串用（J1 的语义射程，Opus 的攻方腿判，我只核了字面，见下 2.2）。字面层面我没找到「跟着做会走不通」的一步。
 
@@ -66,15 +66,15 @@ $ grep -rn "整批.*一格\|按整批输入哈希" .claude/agents/crash-verifier
 
 ### 2.1 J1 问句字面对照
 
-`54-layer0-replay.sh` 头部注释（现查行号）：
-- 逐条跑、逐条标记：`54-layer0-replay.sh:2`「……逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等……那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格」——字面是逐条，不是整批合一。
+`checker-tier-layer0-replay.sh` 头部注释（现查行号）：
+- 逐条跑、逐条标记：`checker-tier-layer0-replay.sh:2`「……逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等……那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格」——字面是逐条，不是整批合一。
 - 续跑目录跨输入串用：脚本内 `layer0_progress_root/<输入指纹>/`（现查行 314：`续跑的进度文件在 ${layer0_progress_root}/<输入指纹>/`）——目录名带指纹，字面上不同输入落在不同目录，不是同一个目录被跨输入复用。
 - 跑了一部分被打断留下作数的标记：头部注释第 16 行「一条判红删它这批输入那一格（先绿后红，前一趟那一格不再作数），接着跑下一条；『跑的过程中输入变了』那一支判红不删」——字面是「标记只在判绿时写」（`crash-verifier.md:31`「判绿写那一格」同一句式），被打断（进程被杀、没跑到判定那一步）不会走到「写标记」这一句，字面上不会留下作数的假标记；但**进度文件（续跑用，不是全绿标记）在被打断时会不会残留、残留的是否安全，是运行语义，我没有跑变异或构造真实中断去核，这属于 J1 攻方腿的射程**。
-- `--start-over`：`54-layer0-replay.sh:50-61` 逐行看，`--start-over` 只与 `--full` 同用（第 60-61 行显式拒绝单独用），字面与 `crash-verifier.md:22`「要丢掉续跑的进度文件从头跑的，写明『--start-over』」对得上；`SINGLEFS_LAYER0_START_OVER` 只在 `--start-over` 设时导出为 1、否则从环境里 `unset`（第 201-202 行 `start_over_setting=(-u SINGLEFS_LAYER0_START_OVER)`），字面上没有漏清的迹象。
+- `--start-over`：`checker-tier-layer0-replay.sh:50-61` 逐行看，`--start-over` 只与 `--full` 同用（第 60-61 行显式拒绝单独用），字面与 `crash-verifier.md:22`「要丢掉续跑的进度文件从头跑的，写明『--start-over』」对得上；`SINGLEFS_LAYER0_START_OVER` 只在 `--start-over` 设时导出为 1、否则从环境里 `unset`（第 201-202 行 `start_over_setting=(-u SINGLEFS_LAYER0_START_OVER)`），字面上没有漏清的迹象。
 
 ### 2.2 我没做、留给 Opus 的部分
 
-以上只是「字面自洽」核对：注释怎么写、变量怎么传、条件分支的字面顺序。**J1 真正要判的是「有没有一条造得出来的路径让这些字面失效」**（假复用、被打断后仍作数、进度目录串用、`--start-over` 没传到），这需要构造真实的改动、真实跑一次或至少在临时拷贝上模拟中断/续跑，那是攻方腿的射程，我没有跑任何变异或中断实验去验证 `layer0_progress.rs` 内部的续跑判法（`54-layer0-replay.sh:19`「续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs」），我也没有读那份 Rust 源码。
+以上只是「字面自洽」核对：注释怎么写、变量怎么传、条件分支的字面顺序。**J1 真正要判的是「有没有一条造得出来的路径让这些字面失效」**（假复用、被打断后仍作数、进度目录串用、`--start-over` 没传到），这需要构造真实的改动、真实跑一次或至少在临时拷贝上模拟中断/续跑，那是攻方腿的射程，我没有跑任何变异或中断实验去验证 `layer0_progress.rs` 内部的续跑判法（`checker-tier-layer0-replay.sh:19`「续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs」），我也没有读那份 Rust 源码。
 
 ## 三、判定一览
 
@@ -85,12 +85,12 @@ $ grep -rn "整批.*一格\|按整批输入哈希" .claude/agents/crash-verifier
 | J5·main-agent.md:61 / gate-triage.md:29 与新方案 | 不矛盾但未更新 | 两处「一格」「哈希」措辞在两种粒度读法下都通，没有代码依赖它们的字面粒度分辨对错 |
 | J5·「改了只跑改了的部分」字面兑现没有 | 兑现了（在「用例／流」粒度上） | 四条 `crash-case:` 用例各自复用判定，粒度与用户原话对得上；粒度算得准不准是 J2 的射程 |
 | J5·崩溃验证员在提交时做不做得对（字面） | 字面链条走得通 | 六份文字给的每一步指令互相衔接，没有断链或指向不存在的命令；正确性还依赖 J1/J2 的语义层，未在此判 |
-| J1（字面兼核）·逐条跑/逐条标记/续跑/`--start-over` 的字面 | 字面自洽，语义未攻 | `54-layer0-replay.sh` 头部注释与代码分支的字面与 `crash-verifier.md` 的指令对得上；假复用等语义漏洞需要构造实验，留给 Opus |
+| J1（字面兼核）·逐条跑/逐条标记/续跑/`--start-over` 的字面 | 字面自洽，语义未攻 | `checker-tier-layer0-replay.sh` 头部注释与代码分支的字面与 `crash-verifier.md` 的指令对得上；假复用等语义漏洞需要构造实验，留给 Opus |
 
 ## 四、没做什么
 
 - 没有判 J1 的语义（假复用、被打断后的进度文件残留、续跑目录跨输入串用的真实攻击构造）：只核了字面自洽，深挖代码语义、造反例是本轮 Opus 攻方腿的射程，我没有跑变异、没有构造中断实验、没有读 `crates/singlefs-harness/src/layer0_progress.rs` 源码。
 - 没有判 J2、J3、J4：不归我这条腿。
 - 没有判 r3 判决「维持挂起、不采纳」被用户决定推翻是否合法、该不该推翻——那是主 agent 的判决权（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「判决由主 agent 做，不由投票做」），我只报告字面上两处互相矛盾、没有互相指认这一事实。
-- 没有跑任何重型测试、没有跑 `admission.py`、`54-layer0-replay.sh` 的自证或任何编译；本轮只做文字与字面比对，全部靠 `grep -nF` / `awk`/ Read 核对，未使用探针目录（`research/prompts/defs-gatebatch-m2-r1-sonnet-model/` 留空，本格不需要可执行探针；已建目录但没有内容，无需 `SHA256SUMS` / `rerun.sh`）。
+- 没有跑任何重型测试、没有跑 `admission.py`、`checker-tier-layer0-replay.sh` 的自证或任何编译；本轮只做文字与字面比对，全部靠 `grep -nF` / `awk`/ Read 核对，未使用探针目录（`research/prompts/defs-gatebatch-m2-r1-sonnet-model/` 留空，本格不需要可执行探针；已建目录但没有内容，无需 `SHA256SUMS` / `rerun.sh`）。
 - 没有核附录二里 `check-segment-registry.py` 那两处修补（52 号），它不在 J5/J1 的射程内。

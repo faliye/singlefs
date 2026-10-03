@@ -4,7 +4,7 @@
 
 正文 `research/prompts/_defs-gate54-tiering-r2-body.md`，背景材料 `_defs-gate54-tiering-r2-background.md`，diff `_defs-gate54-tiering-r2-diff.md`，开工快照 `defs-gate54-tiering-r2-snapshot/sha256sums.txt`。判决只引产物与文件原文，腿的结论句当线索。
 
-被判的定义与脚本（门禁 72 号按路径点名）：`.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`.claude/main-agent.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/experiment-runner.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/rules/implementation-workflow.md`、`README.md`；这一轮判决新定要改的 `.claude/agents/gate-triage.md`（第四节第 6 条）。
+被判的定义与脚本（门禁 72 号按路径点名）：`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`.claude/main-agent.md`、`.claude/agents/crash-verifier.md`、`.claude/agents/experiment-runner.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/rules/implementation-workflow.md`、`README.md`；这一轮判决新定要改的 `.claude/agents/gate-triage.md`（第四节第 6 条）。
 
 ## 一、这一轮交了什么
 
@@ -78,7 +78,7 @@
 
 ## 四、要落的改动（主 agent 定，不交用户）
 
-1. `.claude/gate.d/54-layer0-replay.sh` 的 `write_layer0_input_manifest`：清单末尾加两行——判它的 54 号自己的 sha256（g1；脚本路径在 `cd "$ROOT"` 之前取成绝对路径），`cargo -V` 与 `rustc -V` 原样的 sha256（g2）。文件头「输入」一段跟着改。
+1. `.claude/gate.d/checker-tier-layer0-replay.sh` 的 `write_layer0_input_manifest`：清单末尾加两行——判它的 54 号自己的 sha256（g1；脚本路径在 `cd "$ROOT"` 之前取成绝对路径），`cargo -V` 与 `rustc -V` 原样的 sha256（g2）。文件头「输入」一段跟着改。
 2. 同一份的 `--full`：「跑的过程中输入变了」那一支判红时不删开跑那一格，trap 只在这一趟没写标记、也不是因为输入变了而退出时删（g4）；文件头第 11、12 行的说法跟着改。
 3. 同一份的快档：`LAYER0`、`CHECKER`、`LAYER0B` 三种行各恰好一行，`LAYER0` 与 `LAYER0B` 各自带 `exhaustive=true`（h1）。
 4. 同一份的快档：复用与改动范围两问之前，登记的每一条路径至少列得出一个文件，列不出判红（h2）。

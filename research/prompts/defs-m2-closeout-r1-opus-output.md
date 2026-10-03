@@ -119,7 +119,7 @@ B14	detector	three-way-attack	rib	exit=0
 ### O4 3b 叫攻方用「层 0 那一套」，共用约束把「层 0」列为子 agent 一律不跑
 
 - `.claude/agent-common.md:46` 开头：「重型测试（层 0、QEMU、herd7、crates 变异整表……）只在提交代码时跑一次、或用户要求时跑；子 agent 一律不跑」；第 47 行：「自己写的验证链里不许出现重型测试的任何一步，名字含 `layer0` 的测试二进制也不许。」
-- `.claude/rules/implementation-workflow.md:48` 的清单写的是「层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）」。
+- `.claude/rules/implementation-workflow.md:48` 的清单写的是「层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）」。
 - 3b 第 32 行：「用同一份文件里层 0 那一套（录制写流、按崩溃点截断重放）」。
 
 派发情形：攻方腿在草稿副本里写一个测试目标，调 `crash.rs` 的 `enumerate_layer0*` 把自己的历史逐状态枚举。照共用约束第 46 行的字面，它在跑「层 0」，属于「子 agent 一律不跑」；照 3b 它必须这样跑；照 workflow 的清单，只有 54 号与名字含 layer0 的目标才算。闸按名字判（原样）：
@@ -231,7 +231,7 @@ H38	heavy	crash-verifier	fg	exit=0
 
 - 上限的来源：`.claude/agent-common.md:48`「上限取派发提示给的（定义另写了来源的照定义），都没给就取 `research/scripts/replay.sh` 文件头 `REPLAY_MEMORY_CAP` 的默认值」；`research/scripts/replay.sh:24`：`REPLAY_MEMORY_CAP="${REPLAY_MEMORY_CAP:-8G}"`。
 - 崩溃验证员「输入」一节（`.claude/agents/crash-verifier.md:18-20`）只有改动范围、提交还是用户要求、报告路径与草稿目录，没有上限；第 1b 步（第 25 行）也没另写来源。主 agent「派发提示怎么写」一节只要求线程上限（`.claude/main-agent.md:46`）。
-- 包装文件头给的正是这一条命令的例子，上限 16G：`research/scripts/run-with-memory-cap.sh:9`：`#   SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`。
+- 包装文件头给的正是这一条命令的例子，上限 16G：`research/scripts/run-with-memory-cap.sh:9`：`#   SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>`。
 - 峰值表 `research/scripts/memory-peaks.tsv`（`grep -c .` 781 行，含文件头注释）里，键含 `gate.d/54`、`gate.d/55`、`gate.d/57` 的 0 行；峰值超过 8 GiB 的 18 行、9 种命令（`cargo build --offline --all-targets`、`checker_known_bad_images` 等测试二进制）。口径含页缓存，不能据此说它们在 8G 里一定撞顶。
 - 55 号同时起 6 台客机：`.claude/gate.d/55-qemu-first-transaction.sh:39` `MODES=(direct skip-first-transaction-barrier page-cache second-transaction second-instance raise-rollback-floor)`，第 207 行起每档一个 `( … vm-bench.sh … ) &`；`research/scripts/vm-bench.sh:14` `VM_MEM="${VM_MEM:-2048}"`。6 × 2048 MiB = 12 GiB 客机内存配置，全在一个 8G 的 scope 里。
 
@@ -414,7 +414,7 @@ H34	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：门禁 57 号
 
 ### 乙要改 54 号吗：不是必然的
 
-54 号没有静态分支（它的「快档」是核全绿标记，不是不跑层 0），这一题问的是 55、57（有标记分支）与 59（样本是小 crate 上的真变异）。声明式只要 55、57 各加一行；54 的全绿标记键里有 54 号自己的 sha256（`.claude/gate.d/54-layer0-replay.sh:25` 起「清单末尾再加两行：跑的这一份 54 号的 sha256……」），不碰它就不作废。只有「运行期自守、而且四道一起改」那一种才必须动 54。55 号的登记输入本来就含整个 `research/scripts/`（`.claude/gate.d/stage-inputs.tsv:21`），它随手就会被判「要重跑」，改它一行的代价是下一次提交多跑一次 QEMU。
+54 号没有静态分支（它的「快档」是核全绿标记，不是不跑层 0），这一题问的是 55、57（有标记分支）与 59（样本是小 crate 上的真变异）。声明式只要 55、57 各加一行；54 的全绿标记键里有 54 号自己的 sha256（`.claude/gate.d/checker-tier-layer0-replay.sh:25` 起「清单末尾再加两行：跑的这一份 54 号的 sha256……」），不碰它就不作废。只有「运行期自守、而且四道一起改」那一种才必须动 54。55 号的登记输入本来就含整个 `research/scripts/`（`.claude/gate.d/stage-inputs.tsv:21`），它随手就会被判「要重跑」，改它一行的代价是下一次提交多跑一次 QEMU。
 
 ### 第三条路（零轮、推的，都没实现）
 
@@ -498,6 +498,6 @@ H34	heavy	implementation-writer	fg	exit=2	✗ 重型测试被拒：门禁 57 号
 .claude/main-agent.md:20: 3. **重型测试**（哪几样以 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」那一节开头的清单为准）提交之外任务确实要跑，先弹窗问用户，同意了才跑。
 .claude/main-agent.md:22: 5. **弹窗问用户之前，问句里每一句事实写出处**（产物的整行、命令与输出、文件:行号）；推出来、没量过的，句子里写明「推的，没量过」。
 .claude/main-agent.md:30: 盯住，不能一直干等，也不强制结束：子 agent 与脚本可以跑很久，结不结束、怎么处置由主 agent 看了定；hook 不停任务和脚本：检出类的只记录；拒绝一种危险写法的在执行前拒绝，不碰已经在跑的东西，拒哪几种列在共用约束 `.claude/agent-common.md`「不做」一节「执行前拒绝的写法」那一条（主 agent 同样被拒）。每次派发（包括续做）之后，立刻用 Bash 的 `run_in_background` 起看门狗 `bash research/scripts/watch.sh <这次派出的 agent id，逗号分隔>`（只填 agent 号：会话目录它自己找，阈值在 `research/scripts/watch.conf` 里配，不在命令行上手敲；调用里不再加 `&`、`nohup`、`disown`）：它每 4 分钟复检一次子 agent 的会话记录与本实例底下的长进程、每 15 秒读一次 hook 的检出记录，发现没超时的等待循环、一次工具调用超过 8 分钟、同一命令反复且输出不变、按模式找进程、10 分钟无动静、结束本轮而手里没有在跑的后台任务、进程写的文件 20 分钟不涨、本实例底下有没带 `SINGLEFS_HEAVY_TESTS` 前缀的重型测试进程（确认接着盯写 `--ack 进程:<pid>`）、子 agent 从派发起的运行时间跨过一个整小时（每个整点报一次，那个整点之后主 agent 给它发过消息就不报；一格多长在 `watch.conf` 的 `ask-every-minutes`），或 hook 检出本会话的问题命令，就退出并叫醒主 agent；子 agent 全部交回或被停也退出，没有告警时每 60 分钟定时回报一次。
-.claude/rules/implementation-workflow.md:48: **重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+.claude/rules/implementation-workflow.md:48: **重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
 .claude/rules/implementation-workflow.md:55: | 崩溃验证员、门禁分诊员 | 各跑各的那一部分，只在提交时或用户要求时（命令带 `SINGLEFS_HEAVY_TESTS=commit` 或 `=user-request`）：崩溃验证员跑 54、55、57、59 号那几道；门禁分诊员跑门禁其余阶段并分诊，54、55、57、59 靠「输入没变就复用上一次全绿判定」不重跑。谁都不把整轮全量从头跑一遍 |
 ```

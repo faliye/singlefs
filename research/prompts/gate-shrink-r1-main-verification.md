@@ -1,4 +1,4 @@
-# gate-shrink-r1 判决（2026-09-28，主 agent singlefs-8f）
+# gate-shrink-r1 判决（2026-09-28，主 agent）
 
 正文 `research/prompts/_gate-shrink-r1-body.md`；背景材料 `_gate-shrink-r1-background.md`；附录二 `_gate-shrink-r1-diff.md`；盘点 `gate-shrink-r1-inventory/`。
 
@@ -30,7 +30,7 @@
 | 3-B8 | **打中，不删** experiment-refs、decision-refs | 云端攻方 B8，M7 V8 |
 | 3-B9 | batch-scope 判据对、缺成批登记的写法；knowledge-sync 判据对、红是流程欠账（这一轮自己也要写阶段同步记录）；archive-past-rounds 在多会话下判据不合用（攻方推的） | 云端攻方 B9；M8 算过 batch-scope 在暂存树上照样红（188 个触发文件 151 个没登记） |
 | 4 次序与改名 | 77 号见 B6；47 号两处认「两位数开头」的 glob（`[0-9][0-9]-*.sh`）去编号时要改，否则部分改名时 fixture-claims 静默跳过；**按全名指门禁从此没人判**（governance-refs 只认「两位数加号」与反引号路径，M5 量过）——打中，采 | 云端攻方第三节 4、5 |
-| 5 定义改动 | 这一轮改的那几块（Q8、Q9、Q15 与改门禁号）没有互相矛盾的句子；**两处不是这一轮的**：`.claude/rules/three-way-inference.md` 与 `.claude/main-agent.md` 里撤掉「核查员按轮派」的文字、`.claude/rules/verification.md` 的耗时用例量法改写（连带 `research/scripts/harness-test-timing.py` 删除），不在这一轮判；**一处是这一轮的、要改**：`.claude/rules/implementation-workflow.md`「双机分片」那一条接的 59 号双机写法，与用户同日两条定案不符（59 号整套重设计归 singlefs-29；双机与 GPU 都要从本地配置读 `ENABLE_ACROSS_MACHINES` / `ENABLE_GPU` 才开） | 正推第 5 问；`crash-verifier.md` 把 `stage-owners.tsv` 当「提交时跑哪几道」读，与第二列新意思「判红时派给谁修」要连着读才说得通——采正推的意见：`crash-verifier.md` 自己写明跑哪几道，不再靠这张表 |
+| 5 定义改动 | 这一轮改的那几块（Q8、Q9、Q15 与改门禁号）没有互相矛盾的句子；**两处不是这一轮的**：`.claude/rules/three-way-inference.md` 与 `.claude/main-agent.md` 里撤掉「核查员按轮派」的文字、`.claude/rules/verification.md` 的耗时用例量法改写（连带 `research/scripts/harness-test-timing.py` 删除），不在这一轮判；**一处是这一轮的、要改**：`.claude/rules/implementation-workflow.md`「双机分片」那一条接的 59 号双机写法，与用户同日两条定案不符（59 号整套重设计归别的会话；双机与 GPU 都要从本地配置读 `ENABLE_ACROSS_MACHINES` / `ENABLE_GPU` 才开） | 正推第 5 问；`crash-verifier.md` 把 `stage-owners.tsv` 当「提交时跑哪几道」读，与第二列新意思「判红时派给谁修」要连着读才说得通——采正推的意见：`crash-verifier.md` 自己写明跑哪几道，不再靠这张表 |
 | 6 只在提交时跑的代价 | **打中一处硬伤**：34 号 evidence-in-repo 在 `gate-staged.sh` 的链接 worktree 里整格退 77，提交路径上它从来不判 | 主 agent 现查 `.claude/gate.d/34-doc-experiment-pages-and-products.sh:509`、`:526`–`:527`：链接 worktree 退 77，理由是时间戳是检出时写的；它的判据二（kb 与新写的提示拿 `/tmp` 当依据）不看时间戳，照样该判。写入时拦的 W1–W4 与用户「扫仓的门禁只在提交时跑」有交集，交用户 |
 
 ## 采纳的改法（第 4 步实施）
@@ -54,7 +54,7 @@
 | checker 类 | `checker-independence-and-sync` | 92、94 |
 | checker-tier 类 | `checker-tier-research-build-and-replay` | 15、87（两格：单测、复跑，只编一次） |
 | checker-tier 类 | `checker-tier-qemu-device-streams`、`checker-tier-lkmm`、`checker-tier-crates-mutation-replay` | 55、57、59 |
-| checker-tier 类 | 54 | 名字随 KV 那一批由 singlefs-29 改；这一轮只补最小的 `--list` / `--check` |
+| checker-tier 类 | 54 | 名字随 KV 那一批由别的会话改；这一轮只补最小的 `--list` / `--check` |
 
    合计 14 道（文档类 5、代码类 2、harness 类 2、checker 类 1、checker-tier 类 4 加 54）。
 3. **精华**：B2（只删钩子自证的重复调用）、B3（删与 doc-lint F 重叠的一半）、B5（攻方认法）、B7（正则左边界、runner 分批并行）照采；B1、B8 不删。
@@ -69,7 +69,7 @@
 |---|---|
 | `.claude/agent-common.md` | 认：「门禁」一节改成交回前不跑门禁阶段、归属表第二列改成判红时派给谁修；改门禁号那几处认 |
 | `.claude/main-agent.md` | 认这一轮那几块（第 10 条、改门禁号）；撤核查员的文字不是这一轮的，不判 |
-| `.claude/agents/kb-scribe.md` | 认这一轮那几块（交回前不跑阶段、撤写入后钩子、改门禁号）；变更史写法那几块归 singlefs-0a 的 changelog-format-r1，不判 |
+| `.claude/agents/kb-scribe.md` | 认这一轮那几块（交回前不跑阶段、撤写入后钩子、改门禁号）；变更史写法那几块归别的会话的 changelog-format-r1，不判 |
 | `.claude/agents/experiment-runner.md` | 认 |
 | `.claude/agents/tooling-writer.md` | 认（第 7 步只跑自己动过的阶段的样本） |
 | `.claude/agents/three-way-materials.md` | 认（第 0 步改成跑合并后那一格） |
@@ -77,15 +77,15 @@
 | `.claude/agents/crash-verifier.md` | 认改门禁号；要补一处：自己写明提交时跑哪几道（第 5 问） |
 | `.claude/agents/implementation-writer.md` | 认改门禁号；交回前跑登记给它的阶段那一句照 Q9 删（己件报告列的遗留） |
 | `.claude/agents/investigator.md` | 认改门禁号 |
-| `.claude/agents/kb-spec-drafter.md` | 认改门禁号；变更史写法那几块归 singlefs-0a，不判 |
+| `.claude/agents/kb-spec-drafter.md` | 认改门禁号；变更史写法那几块归别的会话，不判 |
 | `.claude/rules/implementation-workflow.md` | 认改门禁号；「双机分片」那一条接的 59 号写法要照用户两条定案改（第 5 问） |
 | `.claude/rules/implementation-first.md` | 认 |
 | `.claude/rules/three-way-inference.md` | 认改门禁号那几处；撤核查员的文字不是这一轮的，不判 |
-| `.claude/rules/format-evolution.md` | 认改门禁号那几处；变更史写法那几块归 singlefs-0a，不判 |
+| `.claude/rules/format-evolution.md` | 认改门禁号那几处；变更史写法那几块归别的会话，不判 |
 | `.claude/rules/mutation-sampling.md` | 认 |
 | `.claude/rules/verification.md` | 认 12、13、14、54 号那几处；耗时用例量法的改写不是这一轮的，不判；加一节「门禁的结构」（第 4 步） |
 | `.claude/rules/path-moves.md` | 认 |
-| `CLAUDE.md` | 认这一轮那几块（第 22 行门禁归提交时、改门禁号）；`@.claude/rules/changelog-format.md` 那一行归 singlefs-0a，不判 |
+| `CLAUDE.md` | 认这一轮那几块（第 22 行门禁归提交时、改门禁号）；`@.claude/rules/changelog-format.md` 那一行归别的会话，不判 |
 
 ## 交用户（被攻过零轮的，照实标）
 

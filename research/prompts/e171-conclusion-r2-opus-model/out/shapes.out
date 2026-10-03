@@ -1,0 +1,2 @@
+name=o3_ack_shape shape=warmup tail_writes=7 torn_in_tail=2 states=288 o3_strict_not_in=27 o3_provisional_not_in=27 spec_gap=0 anomalies=1
+name=o3_ack_shape shape=content tail_writes=7 torn_in_tail=2 states=288 o3_strict_not_in=27 o3_provisional_not_in=27 spec_gap=0 anomalies=1

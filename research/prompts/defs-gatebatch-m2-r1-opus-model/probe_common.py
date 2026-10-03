@@ -6,7 +6,7 @@ import sys
 
 REPOSITORY = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 DEFAULT_ADMISSION = os.path.join(REPOSITORY, "research/scripts/admission.py")
-DEFAULT_STAGE = os.path.join(REPOSITORY, ".claude/gate.d/54-layer0-replay.sh")
+DEFAULT_STAGE = os.path.join(REPOSITORY, ".claude/gate.d/checker-tier-layer0-replay.sh")
 DEFAULT_SCRIPTS = os.path.join(REPOSITORY, "research/scripts")
 DEFAULT_HOOK = os.path.join(REPOSITORY, ".claude/hooks/heavy-test-guard.sh")
 

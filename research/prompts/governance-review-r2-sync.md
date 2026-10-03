@@ -1,7 +1,7 @@
 <!-- knowledge-sync -->
 # governance-review-r2 阶段同步
 
-触发文件：.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-runner.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/10-kb-rot.sh、.claude/gate.d/20-kb-shape.sh、.claude/gate.d/54-layer0-replay.sh、.claude/gate.d/75-decision-experiment-links.sh、.claude/gate.d/90-term-renames.sh、.claude/gate.d/lib-governance-refs.py、.claude/hooks/heavy-test-guard.sh、.claude/hooks/runner-dispatch-guard.sh、.claude/rules/format-evolution.md、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、.claude/rules/three-way-inference.md、research/scripts/ask-local-selftest.sh、research/scripts/ask-local.sh；另改了 .claude/main-agent.md、.claude/skills/crash-test/SKILL.md、.claude/skills/gate/SKILL.md 与门禁 10 号的绿样本（不在触发登记里，一并记）；改动范围以 1c58cfa 为基准（第二轮严查开跑时的 HEAD）
+触发文件：.claude/agent-common.md、.claude/agents/crash-verifier.md、.claude/agents/experiment-runner.md、.claude/agents/kb-scribe.md、.claude/agents/mutation-triage.md、.claude/agents/three-way-verifier.md、.claude/gate.d/10-kb-rot.sh、.claude/gate.d/20-kb-shape.sh、.claude/gate.d/checker-tier-layer0-replay.sh、.claude/gate.d/75-decision-experiment-links.sh、.claude/gate.d/90-term-renames.sh、.claude/gate.d/lib-governance-refs.py、.claude/hooks/heavy-test-guard.sh、.claude/hooks/runner-dispatch-guard.sh、.claude/rules/format-evolution.md、.claude/rules/implementation-workflow.md、.claude/rules/mutation-sampling.md、.claude/rules/three-way-inference.md、research/scripts/ask-local-selftest.sh、research/scripts/ask-local.sh；另改了 .claude/main-agent.md、.claude/skills/crash-test/SKILL.md、.claude/skills/gate/SKILL.md 与门禁 10 号的绿样本（不在触发登记里，一并记）；改动范围以 1c58cfa 为基准（第二轮严查开跑时的 HEAD）
 
 这一阶段做成的事：对分支相对 73ba4a4 的全部改动做第二轮严查（甲组 9 条、乙组 9 条、丙组 16 条，报告原样入库，见「原始证据」），逐条现查：甲组 A1 不成立（只改文档的提交 54 号经 change-touches-crates.sh 退 77，不会红），甲组 A3 与乙组第 1 条同一处，其余全部改掉；改法只被这一轮之后的确认轮攻过。
 
@@ -18,7 +18,7 @@
 
 | 载体 | 原句 | 处置 |
 |---|---|---|
-| .claude/gate.d/54-layer0-replay.sh:232 | worktree add / apply 失败时第三行照跑 --full | 改了：丙 1：`layer0_tree_ready` 为 1 才跑，否则退 1；甲 A9：说明改成「经内存包装的那条命令的」 |
+| .claude/gate.d/checker-tier-layer0-replay.sh:232 | worktree add / apply 失败时第三行照跑 --full | 改了：丙 1：`layer0_tree_ready` 为 1 才跑，否则退 1；甲 A9：说明改成「经内存包装的那条命令的」 |
 | .claude/main-agent.md:59 | 退出码就是 `--full` 的 | 改了：甲 A9 |
 | .claude/gate.d/10-kb-rot.sh:29 | cd 之后按相对 $0 找共用库 | 改了：丙 2 |
 | .claude/gate.d/10-kb-rot.sh:177 | 退 2 当「一份治理文档都没扫到」 | 改了：丙 2：3 是没有对象，其余非 0 是没跑成 |

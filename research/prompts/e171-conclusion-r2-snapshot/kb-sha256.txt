@@ -1,0 +1,7 @@
+c4ffc17f513ce0039352cf7369ec42d5f57257899765e407c05877397b0798a9  .claude/kb/experiments/171-三oracle合谋测试.md
+96af4bf5ede499ff1ee86b64a34b6927a4f60bb22877aed4893e8ae823e120d0  .claude/kb/decisions/13-验证路线.md
+9bc62ca548fe7461495781457b7328fb524eb853e688a07f679f7e90a9069900  .claude/kb/checks-owed.md
+298a2c08fe8650e7fd7514533078bbaad3cc190a8702435e15da7c6f9d322966  .claude/kb/decisions/16-发布语义.md
+3eb1b773bc5fb71458f168670af2da521cebbda4f09f5ca52c7441f3d501ac5d  .claude/kb/decisions/03-空间分配.md
+1649833fd8aeb7b0217341f6f21c55b4df6801bd68d0ffb2aaabc159c467c9c2  .claude/kb/decisions/23-journal的角色与格式.md
+e5efaab76ea74e3a49f2ee0304d7921f37563f2adc14ef2706c2f77dcbcdbcfc  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md

@@ -118,7 +118,7 @@
 - 旧：- 54、55、57 号各自的内存上限（第
   新：ice-streams、checker-tier-lkmm 各自的内存上限（第 1
 - 旧：上限（例 16G）：54、57 号的写明是量过的（峰值
-  新：限（例 16G）：`54-layer0-replay` 与 checker-t
+  新：限（例 16G）：`checker-tier-layer0-replay` 与 checker-t
 - 旧：的线程数相同）还是推的；55 号的不小于同时起的虚机
   新：的线程数相同）还是推的；checker-tier-qemu-device-streams 的不小于同时起的虚机数
 - 旧：aude/gate.d/55-qemu-device
@@ -164,7 +164,7 @@
 - 旧：` 拒）。按共用约束 `.claude/agent-
   新：ier-lkmm 与 `54-layer0-repla
 - 旧：。按共用约束 `.claude/agent-comm
-  新：kmm 与 `54-layer0-replay`
+  新：kmm 与 `checker-tier-layer0-replay`
 - 旧：束 `.claude/agent-common.md`「门禁」一节从阶段归属
   新：layer0-replay` 并行起（各自后台、各
 - 旧：t-common.md`「门禁」一节从阶段归属表取登记给你的阶段：55、57 号与 54 号并行起（
@@ -921,7 +921,7 @@
 - 旧：个 Claude 会话在 `/home/fy5090/code/singlefs` 并行工作，
   新：个 Claude 会话在本仓的同一个工作区里并行工作，
 - 旧：| 只暂存自己的块 | `research
-  新：| 54-layer0-replay（层 0 全量） | 用例标 `#[ig
+  新：| checker-tier-layer0-replay（层 0 全量） | 用例标 `#[ig
 - 旧：| 只暂存自己的块 | `research/scripts/stage-mine.py --match 我的标记 --foreign
   新：y（层 0 全量） | 用例标 `#[ignore]
 - 旧：--match 我的标记 --foreign 别人的标记 文件…`，先 `--dry-run`
@@ -1030,7 +1030,7 @@
 - 旧：验证员时给 54、55、57 号各自的内存上限，每道
   新：ice-streams、checker-tier-lkmm 各自的内存上限，每道一
 - 旧：d`「输入」一节给：54、57 号写明是量过的还是推的
-  新：`「输入」一节给：`54-layer0-replay` 与 checker-t
+  新：`「输入」一节给：`checker-tier-layer0-replay` 与 checker-t
 - 旧：号写明是量过的还是推的，55 号的不小于同时起的虚机
   新：写明是量过的还是推的，checker-tier-qemu-device-streams 的不小于同时起的虚机数
 - 旧：机数乘每台的内存。门禁 15、74 号在阶段里面经内存包装
