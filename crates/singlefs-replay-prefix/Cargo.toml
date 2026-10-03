@@ -1,0 +1,19 @@
+[package]
+name = "singlefs-replay-prefix"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "取 journal 前缀并施加的纯函数核：singlefs-core 的恢复路径调它，Verus 验的就是这一份；只依赖 vstd，让 Verus 只编这一个文件（用户 2026-10-01 定拆）"
+
+# vstd 与 Verus 工具钉同一个发布：crates.io 的 vstd / verus_builtin_macros 0.0.0-2026-09-20-0158 出自提交 3204118，
+# 与 Verus 发布 0.2026.09.20.aef82ed 之间这几个包的源码目录只有 Cargo.toml 不同（主 agent 2026-10-01 现查）。写精确版本，不许 cargo 自己升。
+[dependencies]
+vstd = "=0.0.0-2026-09-20-0158"
+
+# `cargo verus` 编的时候带 verus_keep_ghost / verus_keep_ghost_body 两个 cfg，平时的 rustc 不认得它们会报 unexpected_cfgs。
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(verus_keep_ghost)", "cfg(verus_keep_ghost_body)"] }
+
+# `cargo verus verify` 只验带这一项的包；不带时它只验依赖里的 vstd、跳过这个包。
+[package.metadata.verus]
+verify = true
