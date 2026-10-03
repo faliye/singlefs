@@ -9,7 +9,7 @@
 | 正文 | `research/prompts/_m3-prune-gpu-r1-body.md` | 派腿时 sha256 0f6fe4c5…（`research/prompts/m3-prune-gpu-r1-snapshot/round-files-sha256.txt`） |
 | 岔路单 | `research/prompts/m3-prune-gpu-r1-forks.md` | 同上 93f36f65… |
 | 背景材料 | `research/prompts/_m3-prune-gpu-r1-background.md`（2733 行） | 同上 15ecf71a… |
-| 开工快照 | `research/prompts/m3-prune-gpu-r1-snapshot/kb-sha256.txt`（7 份 kb） | 写判决前 `sha256sum -c`：6 份 OK，`.claude/kb/checks-owed.md` 被 singlefs-1e 改了 1 处；倒推回去 sha256 与快照逐字相同，六份腿报告与样本里 `C131` 命中 0 次，不碍任何一格（`research/prompts/m3-prune-gpu-r1-snapshot/after-snapshot-changes.md`） |
+| 开工快照 | `research/prompts/m3-prune-gpu-r1-snapshot/kb-sha256.txt`（7 份 kb） | 写判决前 `sha256sum -c`：6 份 OK，`.claude/kb/checks-owed.md` 被别的会话改了 1 处；倒推回去 sha256 与快照逐字相同，六份腿报告与样本里 `C131` 命中 0 次，不碍任何一格（`research/prompts/m3-prune-gpu-r1-snapshot/after-snapshot-changes.md`） |
 | 云端正推（Sonnet） | `research/prompts/m3-prune-gpu-r1-sonnet-output.md`（sha256 df660139…）；模型 `research/prompts/m3-prune-gpu-r1-sonnet-model/` | 主 agent 跑 `cite-check.py`：「核了 37 处引文，对上 37 处，没判 0 处」 |
 | 云端攻方（Opus） | `research/prompts/m3-prune-gpu-r1-opus-output.md`（sha256 875bdf28…）；模型 `research/prompts/m3-prune-gpu-r1-opus-model/` | `cite-check.py`：「核了 30 处引文，对上 30 处，没判 0 处」；模型目录 `sha256sum -c SHA256SUMS` 全 OK；主 agent 把模型目录拷进草稿目录、照 `rerun.sh` 在副本上重编重跑十个世界（经 `run-with-memory-cap.sh 8G`、`capped.sh 4`）：十个都「与存档逐行相同（去掉带 seconds= 的行）」；`rerun.sh` 的比法把带 `seconds=` 的整行扔掉，p6、collide 的结论行正好带它，主 agent 剥掉耗时字段再比，两行也逐行相同 |
 | 本地攻方 | 提示 `research/prompts/m3-prune-gpu-r1-local-attack.md`、核对表 `research/prompts/m3-prune-gpu-r1-local-attack-translation-audit.md` | 四份样本逐份读，见「本地攻方的样本」一节 |

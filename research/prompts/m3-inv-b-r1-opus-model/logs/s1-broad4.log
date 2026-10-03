@@ -1,0 +1,34 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-inv-b-r1 攻方腿在自己副本上跑原型，与别的派出腿各跑各的
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/inv_b_proto_histories.rs (target/debug/deps/inv_b_proto_histories-2bd5ef6075207ec8)
+
+running 1 test
+PROTO_RUN weights=broad first_seed=1000000 seeds=4 operations=30 images=124 endings={"completed": 4} seconds=37.4
+PROTO name=B1-data-pointer-birth-tree evaluated=1083 violations=0 images_red=0 first=-
+PROTO name=B1-instance-table-pointer-birth-tree evaluated=1559 violations=0 images_red=0 first=-
+PROTO name=B1-instance-table-pointer-identity evaluated=1559 violations=0 images_red=0 first=-
+PROTO name=B1-tree-root-pointer-birth-tree-vs-tree-id evaluated=4332 violations=0 images_red=0 first=-
+PROTO name=B1-tree-table-pointer-birth-tree-vs-tree-id evaluated=1559 violations=0 images_red=0 first=-
+PROTO name=B2-all evaluated=3030 violations=0 images_red=0 first=-
+PROTO name=B2-last evaluated=3030 violations=0 images_red=0 first=-
+PROTO name=B2-max evaluated=3030 violations=0 images_red=0 first=-
+PROTO name=B3-lower evaluated=25302 violations=0 images_red=0 first=-
+PROTO name=B3-named evaluated=52848 violations=0 images_red=0 first=-
+PROTO name=B3-named-skipped evaluated=8 violations=0 images_red=0 first=-
+PROTO name=B3-upper evaluated=26162 violations=0 images_red=0 first=-
+PROTO name=B4-accounting-generation evaluated=16245 violations=0 images_red=0 first=-
+PROTO name=B4-change-count-lower evaluated=1083 violations=0 images_red=0 first=-
+PROTO name=B4-change-count-upper evaluated=1083 violations=0 images_red=0 first=-
+PROTO name=B4-previous-snapshot-txg evaluated=7581 violations=0 images_red=0 first=-
+PROTO name=B5a evaluated=2110 violations=0 images_red=0 first=-
+PROTO name=B5a-all-roots evaluated=2131 violations=0 images_red=0 first=-
+PROTO name=B5b evaluated=2110 violations=0 images_red=0 first=-
+PROTO name=B6-jtxg-new-instance evaluated=424 violations=0 images_red=0 first=-
+PROTO name=B6-jtxg-nondecreasing evaluated=2834 violations=0 images_red=0 first=-
+PROTO name=B6-root evaluated=1637 violations=0 images_red=0 first=-
+PROTO name=B6-sc-pair evaluated=248 violations=0 images_red=0 first=-
+PROTO name=B6-sc-parity evaluated=484 violations=0 images_red=0 first=-
+test proto_predicates_over_random_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.36s
+

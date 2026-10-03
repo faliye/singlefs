@@ -1,0 +1,4 @@
+7a10fc6db0b5b5a3f7d5d7bb3b351b66facab6c2a6c409f98155643ad466a4f1  .claude/kb/checks-owed.md
+1649833fd8aeb7b0217341f6f21c55b4df6801bd68d0ffb2aaabc159c467c9c2  .claude/kb/decisions/23-journal的角色与格式.md
+284e05959cc8ae37c43a915ba7a83e19f47638e0e362d12f3e0e61a219cce04a  .claude/kb/decisions/16-发布语义.md
+158a740762a98646c1fb5202acc3203e790abd23c117c26b5f7d686031c0459b  .claude/kb/invariants.md

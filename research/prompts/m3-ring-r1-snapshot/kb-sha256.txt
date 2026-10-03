@@ -1,0 +1,7 @@
+054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
+9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md
+f2738f6bd4c0db88de024447ed83be057dff8b72c92d76ef787c13097202cde5  .claude/kb/checks-owed.md
+dd45d2f9383d394034adbb0476ff93d9a955242905fc8ebfb3ac326fad43739d  .claude/kb/decisions/22-单元原子性怎么合成.md
+9026c34b2bb40bab874bdb0dd193537c074263ef064ef63d143534092d4fc058  .claude/kb/experiments/156-alloc-basis四条岔路的代价数.md
+520e7d909aaa28dbd2c116a90dd1a36729bb7bb76304d8006595e8be592aa290  .claude/kb/decisions/17-实现分层与第三方管道.md
+576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md

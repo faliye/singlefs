@@ -1,0 +1,104 @@
+run-with-memory-cap: 上限 1G 超过实测峰值 63M 的 2 倍，照理由放行：峰值表只有一次样本、加了调试输出
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：主agent同时派出的正推腿与攻方腿各跑各的
+
+running 1 test
+FAULT_INJECTION_START seeds=[7463871032432355222,7463871032432355223) slices=1 worker_threads=1 configured_worker_threads=6 worker_threads_source=environment_variable
+C600DEBUG NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } } })
+C600DEBUG NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } } })
+C600DEBUG NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } }, reread: SelectedVersionAgainstTheWitness { selected_version: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, witness: NewerPublishWitness { witnessed_journal_counter: 0, comparison: SomeSystemConfigurationSlotUnreadOrUnverified } } })
+FAULT_INJECTION_PROGRESS slice=1/1 seeds=[7463871032432355222,7463871032432355223) finished_slices=1/1 finished_histories=1/1 elapsed_seconds=16.9
+FAULT_INJECTION_FINISHED seeds=[7463871032432355222,7463871032432355223) slices=1 worker_threads=1 elapsed_seconds=16.9
+── 故障注入大档 ──
+故障注入：种子 [7463871032432355222, 7463871032432355223)（种子基是这个测试周期写死的那一个）、每段 30 步、每段注入 6 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker；两块 4 GiB 的盘
+历史 1 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 6 次
+  注入 barrier_fails：1 次
+  注入 barrier_is_swallowed：1 次
+  注入 read_returns_corrupted_bytes：2 次
+  注入 write_is_swallowed：2 次
+  收尾「历史停在别的东西上」：2 次
+  收尾「被容错、历史跑完」：3 次
+  收尾「返回了错误」：1 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+说谎的设备丢掉一份内容之后盘面不一致：2 次（设备丢的，不算新发现）
+    CheckerViolations { invariants: ["I-2.1", "I-4.8", "I-7.4"] }：2 次
+  TheStartingPoint 上注入 1 次
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 2 次
+  PublishWithoutUnits 上注入 0 次
+  CloseAndMountWritable 上注入 1 次
+  RollBackWhileMounted 上注入 1 次
+  RaiseRollbackFloor 上注入 0 次
+  ColdStartRecover 上注入 0 次
+  CrashRecoveryAbandoningTheNewestRoot 上注入 0 次
+    注入点 CloseAndMountWritable/read：1 次
+    注入点 PublishFirstFile/barrier：1 次
+    注入点 PublishOverwrite/barrier：1 次
+    注入点 PublishOverwrite/unit_write：1 次
+    注入点 RollBackWhileMounted/read：1 次
+    注入点 TheStartingPoint/system_configuration_slot：1 次
+  没命中的注入点 48 个：TheStartingPoint/unit_write、TheStartingPoint/journal_record、TheStartingPoint/root_record_fua、TheStartingPoint/read、TheStartingPoint/barrier、PublishFirstFile/unit_write、PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishOverwrite/journal_record、PublishOverwrite/root_record_fua、PublishOverwrite/system_configuration_slot、PublishOverwrite/read、PublishWithoutUnits/unit_write、PublishWithoutUnits/journal_record、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、PublishWithoutUnits/barrier、CloseAndMountWritable/unit_write、CloseAndMountWritable/journal_record、CloseAndMountWritable/root_record_fua、CloseAndMountWritable/system_configuration_slot、CloseAndMountWritable/barrier、RollBackWhileMounted/unit_write、RollBackWhileMounted/journal_record、RollBackWhileMounted/root_record_fua、RollBackWhileMounted/system_configuration_slot、RollBackWhileMounted/barrier、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/read、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/read、ColdStartRecover/barrier、CrashRecoveryAbandoningTheNewestRoot/unit_write、CrashRecoveryAbandoningTheNewestRoot/journal_record、CrashRecoveryAbandoningTheNewestRoot/root_record_fua、CrashRecoveryAbandoningTheNewestRoot/system_configuration_slot、CrashRecoveryAbandoningTheNewestRoot/read、CrashRecoveryAbandoningTheNewestRoot/barrier
+  返回的错误成员 PublishError::BlockDevice(BlockDeviceError::InputOutput)：1 次
+取号之后挂载报错、新号不回卷（C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）：用户 2026-09-23 认下的已知行为，D23（journal 的角色与格式） 已定项 16）：0 次
+  新号一条根都没有（烧掉）：0 次
+  新号已有写行那次的根：0 次
+重开 6 次：读回文件 5、没有文件 1、走读失败 0
+  走到模型认下的某一版 5 次、走到失败那一步正在写的那一版 1 次（收口表第 40 行那一格，只记不判）、模型都不允许的 0 次、本来就没一版立得住而走读失败 0 次（只记不判）
+注入之后的镜像上跑池级 checker 6 次：判绿 261 条次、不适用 30 条次
+以「已知红」收尾 {}、新发现 1
+种子 7463871032432355222 write_is_swallowed：整池第 19 次write，落在起点段（mkfs、取号、暖机、第一个文件）：ModelDisagreement { aspect: "模型说该成、实现拒了" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（模型说该成、实现拒了）：模型 MountWritable 该成（写出 [(1, 1), (2, 1)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)
+用时 16.9 秒
+
+thread 'fault_injection_large_tier_from_the_environment' (4122517) panicked at crates/singlefs-harness/tests/fault_injection_fast_tier.rs:274:5:
+注入之后「已知红」清单外的失败；重放：SINGLEFS_FAULT_INJECTION_FIRST_SEED=7463871032432355222 SINGLEFS_FAULT_INJECTION_SEEDS=1 SINGLEFS_FAULT_INJECTION_OPERATIONS=30 SINGLEFS_FAULT_INJECTION_FAULTS=6 跑大档那条 #[ignore] 用例
+故障注入：种子 [7463871032432355222, 7463871032432355223)（种子基是这个测试周期写死的那一个）、每段 30 步、每段注入 6 次、比重 各类操作都抽（快档、大档）、每一步之后跑池级 checker；两块 4 GiB 的盘
+历史 1 段：测量跑就提前停的 0 段、摆不出注入点的 0 段；注入 6 次
+  注入 barrier_fails：1 次
+  注入 barrier_is_swallowed：1 次
+  注入 read_returns_corrupted_bytes：2 次
+  注入 write_is_swallowed：2 次
+  收尾「历史停在别的东西上」：2 次
+  收尾「被容错、历史跑完」：3 次
+  收尾「返回了错误」：1 次
+注入之后 core panic 的次数：0（被测的性质：返回错误而不是 panic）
+说谎的设备丢掉一份内容之后盘面不一致：2 次（设备丢的，不算新发现）
+    CheckerViolations { invariants: ["I-2.1", "I-4.8", "I-7.4"] }：2 次
+  TheStartingPoint 上注入 1 次
+  PublishFirstFile 上注入 1 次
+  PublishOverwrite 上注入 2 次
+  PublishWithoutUnits 上注入 0 次
+  CloseAndMountWritable 上注入 1 次
+  RollBackWhileMounted 上注入 1 次
+  RaiseRollbackFloor 上注入 0 次
+  ColdStartRecover 上注入 0 次
+  CrashRecoveryAbandoningTheNewestRoot 上注入 0 次
+    注入点 CloseAndMountWritable/read：1 次
+    注入点 PublishFirstFile/barrier：1 次
+    注入点 PublishOverwrite/barrier：1 次
+    注入点 PublishOverwrite/unit_write：1 次
+    注入点 RollBackWhileMounted/read：1 次
+    注入点 TheStartingPoint/system_configuration_slot：1 次
+  没命中的注入点 48 个：TheStartingPoint/unit_write、TheStartingPoint/journal_record、TheStartingPoint/root_record_fua、TheStartingPoint/read、TheStartingPoint/barrier、PublishFirstFile/unit_write、PublishFirstFile/journal_record、PublishFirstFile/root_record_fua、PublishFirstFile/system_configuration_slot、PublishFirstFile/read、PublishOverwrite/journal_record、PublishOverwrite/root_record_fua、PublishOverwrite/system_configuration_slot、PublishOverwrite/read、PublishWithoutUnits/unit_write、PublishWithoutUnits/journal_record、PublishWithoutUnits/root_record_fua、PublishWithoutUnits/system_configuration_slot、PublishWithoutUnits/read、PublishWithoutUnits/barrier、CloseAndMountWritable/unit_write、CloseAndMountWritable/journal_record、CloseAndMountWritable/root_record_fua、CloseAndMountWritable/system_configuration_slot、CloseAndMountWritable/barrier、RollBackWhileMounted/unit_write、RollBackWhileMounted/journal_record、RollBackWhileMounted/root_record_fua、RollBackWhileMounted/system_configuration_slot、RollBackWhileMounted/barrier、RaiseRollbackFloor/unit_write、RaiseRollbackFloor/journal_record、RaiseRollbackFloor/root_record_fua、RaiseRollbackFloor/system_configuration_slot、RaiseRollbackFloor/read、RaiseRollbackFloor/barrier、ColdStartRecover/unit_write、ColdStartRecover/journal_record、ColdStartRecover/root_record_fua、ColdStartRecover/system_configuration_slot、ColdStartRecover/read、ColdStartRecover/barrier、CrashRecoveryAbandoningTheNewestRoot/unit_write、CrashRecoveryAbandoningTheNewestRoot/journal_record、CrashRecoveryAbandoningTheNewestRoot/root_record_fua、CrashRecoveryAbandoningTheNewestRoot/system_configuration_slot、CrashRecoveryAbandoningTheNewestRoot/read、CrashRecoveryAbandoningTheNewestRoot/barrier
+  返回的错误成员 PublishError::BlockDevice(BlockDeviceError::InputOutput)：1 次
+取号之后挂载报错、新号不回卷（C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）：用户 2026-09-23 认下的已知行为，D23（journal 的角色与格式） 已定项 16）：0 次
+  新号一条根都没有（烧掉）：0 次
+  新号已有写行那次的根：0 次
+重开 6 次：读回文件 5、没有文件 1、走读失败 0
+  走到模型认下的某一版 5 次、走到失败那一步正在写的那一版 1 次（收口表第 40 行那一格，只记不判）、模型都不允许的 0 次、本来就没一版立得住而走读失败 0 次（只记不判）
+注入之后的镜像上跑池级 checker 6 次：判绿 261 条次、不适用 30 条次
+以「已知红」收尾 {}、新发现 1
+种子 7463871032432355222 write_is_swallowed：整池第 19 次write，落在起点段（mkfs、取号、暖机、第一个文件）：ModelDisagreement { aspect: "模型说该成、实现拒了" }
+  重开：CommittedByTheModel（走到实例 0 第 0 代根、没有文件）
+  模型对不上（模型说该成、实现拒了）：模型 MountWritable 该成（写出 [(1, 1), (2, 1)]；允许拒的只有容量墙区间与 []）；实现 拒了：MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test fault_injection_large_tier_from_the_environment ... FAILED
+
+failures:
+
+failures:
+    fault_injection_large_tier_from_the_environment
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 16.92s
+

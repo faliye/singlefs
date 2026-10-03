@@ -1,0 +1,2 @@
+name=row1417 cases=2 failed=1
+  FAILED an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor::the_implementations_effective_floor_counts_the_floor_an_abandoned_root_carries rc=101

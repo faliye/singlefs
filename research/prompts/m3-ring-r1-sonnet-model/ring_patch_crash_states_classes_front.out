@@ -1,0 +1,55 @@
+S=4 h=5 pos(h)=9  列: (chosen, effective, floor_next, red, interior_hole) -> 状态数
+-- none
+   (4, 5, 0, False, False) -> 4
+   (4, 6, 0, False, False) -> 2
+   (6, 6, 0, False, True) -> 4
+   (6, 7, 0, False, True) -> 2
+   (7, 7, 0, False, True) -> 4
+   (7, 8, 0, False, True) -> 2
+   (8, 8, 0, False, True) -> 1
+-- P1
+   (4, 5, 0, False, False) -> 2
+   (5, 5, 0, False, False) -> 4
+   (5, 6, 0, False, False) -> 2
+   (6, 6, 0, False, False) -> 4
+   (6, 7, 0, False, False) -> 2
+   (7, 7, 0, False, False) -> 4
+   (7, 8, 0, False, False) -> 2
+   (8, 8, 0, False, False) -> 1
+-- P2-late
+   (4, 5, 0, False, False) -> 4
+   (4, 6, 0, False, False) -> 2
+   (5, 6, 0, False, False) -> 1
+   (6, 6, 0, False, False) -> 4
+   (6, 6, 0, False, True) -> 1
+   (6, 7, 0, False, False) -> 2
+   (7, 7, 0, False, False) -> 4
+   (7, 8, 0, False, False) -> 2
+   (8, 8, 0, False, False) -> 1
+-- P2-eager
+   (4, 5, 0, False, False) -> 4
+   (4, 6, 0, False, False) -> 2
+   (5, 6, 0, False, False) -> 1
+   (6, 6, 0, False, False) -> 4
+   (6, 6, 0, False, True) -> 1
+   (6, 7, 0, False, False) -> 2
+   (7, 7, 0, False, False) -> 4
+   (7, 8, 0, False, False) -> 2
+   (8, 8, 0, False, False) -> 1
+-- P3
+   (4, 5, 0, False, False) -> 4
+   (4, 6, 0, False, False) -> 2
+   (6, 6, 0, False, True) -> 4
+   (6, 7, 0, False, True) -> 2
+   (7, 7, 0, False, True) -> 4
+   (7, 8, 0, False, True) -> 2
+   (8, 8, 0, False, False) -> 1
+   (8, 8, 0, False, True) -> 2
+-- P1-wipe
+   (4, 5, 0, False, False) -> 6
+   (4, 6, 0, False, False) -> 2
+   (6, 6, 0, False, True) -> 4
+   (6, 7, 0, False, True) -> 2
+   (7, 7, 0, False, True) -> 4
+   (7, 8, 0, False, True) -> 2
+   (8, 8, 0, False, True) -> 1

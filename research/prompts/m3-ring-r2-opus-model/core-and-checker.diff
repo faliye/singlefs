@@ -1,0 +1,202 @@
+--- m3-batch4-freeze/tree/crates/singlefs-core/src/mount.rs	2026-10-01 13:01:25.657058584 +0000
++++ m3-ring-r2-opus/repo/crates/singlefs-core/src/mount.rs	2026-10-01 17:43:27.761513828 +0000
+@@ -1209,6 +1209,28 @@
+     oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.max(oldest))
+ }
+ 
++/// m3-ring-r2 攻方副本：一圈窗口的锚怎么取（`SINGLEFS_WINDOW_ANCHOR`：off 不开窗口；ring 挂载时锚在环里读得出的最新根；
++/// first_txg 挂载时锚在 first_txg − 1，即根环表 latest_recorded_txg 的初值）。进程内恒锚在这个进程记到的最新根。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum WindowAnchor { Off, Ring, FirstTxgMinusOne }
++#[must_use]
++pub fn window_anchor() -> WindowAnchor {
++    match std::env::var("SINGLEFS_WINDOW_ANCHOR").as_deref() {
++        Ok("ring") => WindowAnchor::Ring,
++        Ok("first_txg") => WindowAnchor::FirstTxgMinusOne,
++        _ => WindowAnchor::Off,
++    }
++}
++/// 窗口下沿：txg > 它才在窗口里（锚 − 3S；锚 < 3S 时 None = 全在窗口里）。
++#[must_use]
++pub fn window_lower(anchor: CheckpointTxg, ring_len: u64) -> Option<CheckpointTxg> {
++    anchor.0.checked_sub(ring_len).map(CheckpointTxg)
++}
++#[must_use]
++pub fn in_window(txg: CheckpointTxg, lower: Option<CheckpointTxg>) -> bool {
++    lower.is_none_or(|lower| txg > lower)
++}
++
+ /// 一条根按一张实例表判是不是被抛弃的（`recovery::root_is_abandoned_by_the_instance_table`，一处定义）。
+ fn abandoned_by_table(root: &RootRecord, table: &InstanceTableRecords) -> bool {
+     root_is_abandoned_by_the_instance_table(root, table)
+@@ -1287,6 +1309,7 @@
+     floor: CheckpointTxg,
+     current_records: &[AllocationRecord],
+     before_the_one_reread: &mut BeforeTheOneReread<'_>,
++    window: Option<CheckpointTxg>,
+ ) -> Result<ShadowLedgerComputed, MountError> {
+     let mut referenced_by_candidates: BTreeSet<(u32, u64)> = current_records
+         .iter()
+@@ -1295,7 +1318,7 @@
+         .collect();
+     for root in roots
+         .iter()
+-        .filter(|root| !is_abandoned(root) && root.checkpoint_txg >= floor)
++        .filter(|root| !is_abandoned(root) && root.checkpoint_txg >= floor && in_window(root.checkpoint_txg, window))
+     {
+         if let Some(placements) = placements_referenced_by_root(devices, unit_area_start, root) {
+             referenced_by_candidates.extend(
+@@ -1587,11 +1610,25 @@
+         .map(|(_, root)| *root)
+         .collect();
+     let is_abandoned = |root: &RootRecord| abandoned_by_table(root, &newest_table);
++    let ring_len = 3 * system_configuration.immutable.sizes.root_ring_slots_per_region.count();
++    let mount_window = match window_anchor() {
++        WindowAnchor::Off => None,
++        WindowAnchor::Ring => roots
++            .iter()
++            .filter(|root| !is_abandoned(root))
++            .map(|root| root.checkpoint_txg)
++            .max()
++            .and_then(|newest| window_lower(newest, ring_len)),
++        WindowAnchor::FirstTxgMinusOne => window_lower(CheckpointTxg(first_txg.0 - 1), ring_len),
++    };
+     let oldest_valid_root = roots
+         .iter()
+-        .filter(|root| !is_abandoned(root))
++        .filter(|root| !is_abandoned(root) && in_window(root.checkpoint_txg, mount_window))
+         .map(|root| root.checkpoint_txg)
+         .min();
++    if std::env::var("SINGLEFS_WINDOW_TRACE").is_ok_and(|v| v == "1") {
++        eprintln!("WINDOW_TRACE mount anchor={:?} first_txg={} window_lower={:?} oldest_valid_in_window={:?} effective_floor={}", window_anchor(), first_txg.0, mount_window, oldest_valid_root, effective_floor.0);
++    }
+     allocator.reclaim_released_up_to(
+         reclaim_floor(effective_floor, oldest_valid_root),
+         ReclaimedReuse::Immediately,
+@@ -1606,6 +1643,7 @@
+             effective_floor,
+             &current_records,
+             before_the_one_reread,
++            mount_window,
+         )?,
+         ShadowLedger::Off => ShadowLedgerComputed {
+             abandoned_roots_unreadable: 0,
+@@ -2506,9 +2544,13 @@
+     .map_err(|still_unreadable| {
+         MountError::NewerStateStillUnreadableAfterOneReread(Box::new(still_unreadable.into()))
+     })?;
++    let raise_window = match window_anchor() {
++        WindowAnchor::Off => None,
++        _ => window_lower(current.root.checkpoint_txg, 3 * system_configuration.immutable.sizes.root_ring_slots_per_region.count()),
++    };
+     let oldest_valid_root = roots
+         .iter()
+-        .filter(|root| !abandoned_by_table(root, &table))
++        .filter(|root| !abandoned_by_table(root, &table) && in_window(root.checkpoint_txg, raise_window))
+         .map(|root| root.checkpoint_txg)
+         .min();
+     // 候选集按新 F 缩小，只被被抛弃根引用的槽会变多（一个槽此前靠一条低于新 F 的根豁免），回收之前先按新 F 重算影子账，
+@@ -2523,6 +2565,7 @@
+             new_floor,
+             &current.allocation_records,
+             &mut BeforeTheOneReread::RereadImmediately,
++            raise_window,
+         ) {
+             Ok(computed) => computed.abandoned_roots_unreadable,
+             Err(error) => {
+@@ -5282,6 +5325,14 @@
+         &ring_slots_known_to_hold_a_root_by(allocator),
+         target,
+     )?;
++    if window_anchor() != WindowAnchor::Off
++        && !in_window(
++            target.checkpoint_txg,
++            window_lower(current.root.checkpoint_txg, 3 * system_configuration.immutable.sizes.root_ring_slots_per_region.count()),
++        )
++    {
++        return Err(RollbackError::TargetNotACandidate { target, exclusion: RollbackCandidateExclusion::BelowEffectiveFloor });
++    }
+     let unit_area_start = unit_area_start_of_the_chosen_system_configuration(&system_configuration);
+     // R_old 那一版整个从盘上重建（它的账、它的三棵用户可见树、记账树、中央映射树都读回来）：有一个节点读不出就拒。
+     // 顶着的记录只给重建填字段，这里只用那一版的用户可见一半与它的账。
+--- m3-batch4-freeze/tree/crates/singlefs-core/src/allocator.rs	2026-09-27 15:26:43.933599675 +0000
++++ m3-ring-r2-opus/repo/crates/singlefs-core/src/allocator.rs	2026-10-01 17:43:27.761739118 +0000
+@@ -996,12 +996,17 @@
+ 
+     /// 环里最旧有效根的 txg；一条有效根都没有时 `None`。
+     fn oldest_valid_root(&self) -> Option<CheckpointTxg> {
++        let window = match crate::mount::window_anchor() {
++            crate::mount::WindowAnchor::Off => None,
++            _ => crate::mount::window_lower(self.latest_recorded_txg, 3 * self.slots_per_region.count()),
++        };
+         self.occupants
+             .values()
+             .filter_map(|occupant| match occupant {
+                 RootRingOccupant::ValidRoot { checkpoint_txg, .. } => Some(*checkpoint_txg),
+                 RootRingOccupant::AbandonedRoot { .. } => None,
+             })
++            .filter(|txg| crate::mount::in_window(*txg, window))
+             .min()
+     }
+ 
+--- m3-batch4-freeze/tree/crates/singlefs-checker/src/walk.rs	2026-10-01 16:19:21.021673186 +0000
++++ m3-ring-r2-opus/repo/crates/singlefs-checker/src/walk.rs	2026-10-01 17:43:27.764021282 +0000
+@@ -5596,9 +5596,16 @@
+             .iter()
+             .any(|row| row.instance == instance && checkpoint_txg > row.published_checkpoint_txg)
+     };
++    let window_newest = roots.iter().map(|(_, _, root)| root.checkpoint_txg).max().unwrap_or(0);
++    let ring_len = u64::try_from(roots.len()).unwrap_or(0).max(1);
++    let _ = ring_len;
+     let Some(oldest_valid_root_txg) = roots
+         .iter()
+         .filter(|(_, _, root)| !is_abandoned(root.instance, root.checkpoint_txg))
++        .filter(|(_, _, root)| {
++            std::env::var("SINGLEFS_CHECKER_WINDOW_RING_LEN").ok().and_then(|v| v.parse::<u64>().ok())
++                .is_none_or(|len| root.checkpoint_txg + len > window_newest)
++        })
+         .map(|(_, _, root)| root.checkpoint_txg)
+         .min()
+     else {
+@@ -5974,7 +5981,10 @@
+             // 被抛弃：按最新根指着的实例表判（D23（journal 的角色与格式） 已定项 14 候选集）。
+             let abandoned = abandoned_by_the_newest_roots_table(root);
+             let below_floor = root.checkpoint_txg < effective_rollback_floor;
+-            let walked = *index == newest_index || (!abandoned && !below_floor);
++            // m3-ring-r2 攻方副本：一圈窗口（SINGLEFS_CHECKER_WINDOW=1），锚在环里读得出的最新根。
++            let outside_window = std::env::var("SINGLEFS_CHECKER_WINDOW").is_ok_and(|v| v == "1")
++                && root.checkpoint_txg + geometry.regions * geometry.slots_per_region <= newest_txg;
++            let walked = *index == newest_index || (!abandoned && !below_floor && !outside_window);
+             if !walked {
+                 if abandoned {
+                     root_slots_dropped_as_abandoned += 1;
+--- m3-batch4-freeze/tree/Cargo.toml	2026-10-01 08:17:23.622350295 +0000
++++ m3-ring-r2-opus/repo/Cargo.toml	2026-10-01 17:44:12.729348620 +0000
+@@ -9,6 +9,7 @@
+     "crates/singlefs-harness",
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
++    "crates/ring-window-proto",
+ ]
+ exclude = ["research"]
+ 
+--- m3-batch4-freeze/tree/Cargo.lock	2026-10-01 13:01:25.650897991 +0000
++++ m3-ring-r2-opus/repo/Cargo.lock	2026-10-01 17:46:13.993647995 +0000
+@@ -737,6 +737,17 @@
+ checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
+ 
+ [[package]]
++name = "ring-window-proto"
++version = "0.1.0"
++dependencies = [
++ "singlefs-checker",
++ "singlefs-checker-tier",
++ "singlefs-core",
++ "singlefs-format",
++ "singlefs-harness",
++]
++
++[[package]]
+ name = "rocksdb"
+ version = "0.25.0"
+ source = "registry+https://github.com/rust-lang/crates.io-index"

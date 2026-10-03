@@ -1,0 +1,6 @@
+WINDOW_TRACE mount anchor=FirstTxgMinusOne first_txg=1 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(0)) effective_floor=0
+WINDOW_TRACE mount anchor=FirstTxgMinusOne first_txg=16 window_lower=Some(CheckpointTxg(3)) oldest_valid_in_window=Some(CheckpointTxg(4)) effective_floor=0
+WINDOW_TRACE mount anchor=FirstTxgMinusOne first_txg=17 window_lower=Some(CheckpointTxg(4)) oldest_valid_in_window=Some(CheckpointTxg(5)) effective_floor=0
+WINDOW_TRACE mount anchor=Ring first_txg=1 window_lower=None oldest_valid_in_window=Some(CheckpointTxg(0)) effective_floor=0
+WINDOW_TRACE mount anchor=Ring first_txg=16 window_lower=Some(CheckpointTxg(3)) oldest_valid_in_window=Some(CheckpointTxg(4)) effective_floor=0
+WINDOW_TRACE mount anchor=Ring first_txg=17 window_lower=Some(CheckpointTxg(3)) oldest_valid_in_window=Some(CheckpointTxg(4)) effective_floor=0

@@ -1,0 +1,164 @@
+===== crates/singlefs-core/src/mount.rs WitnessedCounterComparison old 10 new 10 difflines 0
+
+===== crates/singlefs-core/src/mount.rs witnesses_a_publish_newer_than_the_selected_version old 18 new 18 difflines 0
+
+===== crates/singlefs-core/src/mount.rs newer_publish_witness old 74 new 75 difflines 20
+--- 0928
++++ today
+@@ -31,9 +31,10 @@
+         .unwrap_or(0);
+-    let some_system_configuration_slot_unread = verified_slots_of_each_device.iter().any(
+-        |verified_slots_of_this_device| {
+-            u64::try_from(verified_slots_of_this_device.len())
+-                .expect("每块盘的系统配置槽数装得进 u64")
+-                < SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+-        },
+-    );
++    let some_system_configuration_slot_unread =
++        verified_slots_of_each_device
++            .iter()
++            .any(|verified_slots_of_this_device| {
++                u64::try_from(verified_slots_of_this_device.len())
++                    .expect("每块盘的系统配置槽数装得进 u64")
++                    < SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
++            });
+     let comparison = if some_system_configuration_slot_unread {
+===== crates/singlefs-core/src/mount.rs StillUnreadableAfterOneReread old 19 new 19 difflines 0
+
+===== crates/singlefs-core/src/mount.rs isolate_slots_referenced_only_by_abandoned_roots old 90 new 88 difflines 67
+--- 0928
++++ today
+@@ -31,27 +31,26 @@
+     for root in roots.iter().filter(|root| is_abandoned(root)) {
+-        let placements = match placements_referenced_by_root(devices, unit_area_start, root) {
+-            Some(placements) => placements,
+-            None => {
+-                unreadable += 1;
+-                match placements_referenced_by_root_computed_from_the_mapping(
+-                    devices,
+-                    unit_area_start,
+-                    root,
+-                ) {
+-                    Some(computed) => computed,
+-                    None => {
+-                        before_the_one_reread.before_rereading();
+-                        match placements_referenced_by_root(devices, unit_area_start, root).or_else(
+-                            || {
+-                                placements_referenced_by_root_computed_from_the_mapping(
+-                                    devices,
+-                                    unit_area_start,
+-                                    root,
+-                                )
+-                            },
+-                        ) {
+-                            Some(placements) => placements,
+-                            None => {
+-                                return Err(MountError::NewerStateStillUnreadableAfterOneReread(
+-                                    Box::new(
++        let placements =
++            match placements_referenced_by_root(devices, unit_area_start, root) {
++                Some(placements) => placements,
++                None => {
++                    unreadable += 1;
++                    match placements_referenced_by_root_computed_from_the_mapping(
++                        devices,
++                        unit_area_start,
++                        root,
++                    ) {
++                        Some(computed) => computed,
++                        None => {
++                            before_the_one_reread.before_rereading();
++                            match placements_referenced_by_root(devices, unit_area_start, root)
++                                .or_else(|| {
++                                    placements_referenced_by_root_computed_from_the_mapping(
++                                        devices,
++                                        unit_area_start,
++                                        root,
++                                    )
++                                }) {
++                                Some(placements) => placements,
++                                None => return Err(
++                                    MountError::NewerStateStillUnreadableAfterOneReread(Box::new(
+                                         StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot {
+@@ -62,4 +61,4 @@
+                                         },
+-                                    ),
+-                                ))
++                                    )),
++                                ),
+                             }
+@@ -68,4 +67,3 @@
+                 }
+-            }
+-        };
++            };
+         for (device, slot, span_slots) in placements.iter().copied() {
+===== crates/singlefs-core/src/mount.rs placements_referenced_by_root_computed_from_the_mapping old 46 new 55 difflines 23
+--- 0928
++++ today
+@@ -22,3 +22,6 @@
+     }
+-    located.push((root.tree_table.locations, TransactionUnit::TreeTable.span_slots()));
++    located.push((
++        root.tree_table.locations,
++        TransactionUnit::TreeTable.span_slots(),
++    ));
+     for pointer in &mapping_tree.version.pointers {
+@@ -39,4 +42,10 @@
+         for (identity, _) in devices {
+-            placement_lies_in_the_unit_area_of_its_device(devices, unit_area_start, *identity, slot, span)
+-                .ok()?;
++            placement_lies_in_the_unit_area_of_its_device(
++                devices,
++                unit_area_start,
++                *identity,
++                slot,
++                span,
++            )
++            .ok()?;
+             placements.push((*identity, slot, span));
+===== crates/singlefs-core/src/mount.rs rebuilt_allocator old 116 new 117 difflines 8
+--- 0928
++++ today
+@@ -16,3 +16,4 @@
+     let mut allocator = match previous {
+-        PreviousVersion::WithFile { output, .. } => {
++        PreviousVersion::WithFile { output, .. }
++        | PreviousVersion::WithTreesAndNoFile { output, .. } => {
+             PoolAllocator::rebuild_from_records(device_maps, output.allocation_records.clone())
+===== crates/singlefs-core/src/mount.rs raise_the_floor_through old 217 new 217 difflines 0
+
+===== crates/singlefs-core/src/transaction.rs self_verified_system_configurations_of_every_device old 27 new 27 difflines 0
+
+===== crates/singlefs-core/src/transaction.rs InstanceAcquisitionFailed old 5 new 7 difflines 9
+--- 0928
++++ today
+@@ -2,3 +2,5 @@
+ pub enum InstanceAcquisitionFailed {
+-    DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness { device: DeviceIdentity },
++    DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness {
++        device: DeviceIdentity,
++    },
+     Acquisition(AcquisitionFailed),
+===== crates/singlefs-core/src/transaction.rs ExpectedInstanceAcquisitionFailed old 12 new 12 difflines 0
+
+===== crates/singlefs-core/src/recovery.rs effective_rollback_floor_of_the_roots_read old 60 new 60 difflines 0
+
+===== crates/singlefs-checker/src/walk.rs deferred_slots_referenced_only_below_the_floor_per_device old 65 new 65 difflines 0
+
+
+######## whitespace/trailing-comma-insensitive comparison
+WitnessedCounterComparison SAME 289 289
+witnesses_a_publish_newer_than_the_selected_version SAME 649 649
+newer_publish_witness SAME 2168 2168
+StillUnreadableAfterOneReread SAME 599 599
+isolate_slots_referenced_only_by_abandoned_roots DIFF 2177 2175
+placements_referenced_by_root_computed_from_the_mapping SAME 1710 1710
+rebuilt_allocator DIFF 3079 3126
+raise_the_floor_through SAME 5719 5719
+self_verified_system_configurations_of_every_device SAME 731 731
+InstanceAcquisitionFailed SAME 178 178
+ExpectedInstanceAcquisitionFailed SAME 361 361
+effective_rollback_floor_of_the_roots_read SAME 1636 1636
+check_pool_image DIFF 16470 19606
+deferred_slots_referenced_only_below_the_floor_per_device SAME 1818 1818

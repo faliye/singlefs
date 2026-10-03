@@ -1,0 +1,5 @@
+054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
+9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md
+f2738f6bd4c0db88de024447ed83be057dff8b72c92d76ef787c13097202cde5  .claude/kb/checks-owed.md
+181bb2ddfbf2fc79b48e20de354289da4aa7a6789a3686681d2672a13f87a81c  .claude/kb/decisions/18-块里携带什么信息.md
+dd45d2f9383d394034adbb0476ff93d9a955242905fc8ebfb3ac326fad43739d  .claude/kb/decisions/22-单元原子性怎么合成.md

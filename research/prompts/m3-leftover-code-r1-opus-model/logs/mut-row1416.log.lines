@@ -1,0 +1,2 @@
+name=row1416 cases=2 failed=1
+  FAILED raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic::raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_every_invariant_green rc=101

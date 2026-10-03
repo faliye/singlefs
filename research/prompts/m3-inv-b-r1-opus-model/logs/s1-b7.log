@@ -1,0 +1,36 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：m3-inv-b-r1 攻方腿在自己副本上跑原型，与别的派出腿各跑各的
+run-with-memory-cap: 排队（已等 0 秒，至多 1800 秒）：slice 已占 34.5 GiB，这一条要 10.0 GiB（峰值表里没有这条，按它的上限 10G 算），总上限 40.1 GiB；账上在跑 3 条
+run-with-memory-cap: 排队（已等 60 秒，至多 1800 秒）：slice 已占 38.5 GiB，这一条要 10.0 GiB（峰值表里没有这条，按它的上限 10G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 99 秒，起跑（singlefs-memory-cap-2505122-337814097）
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.01s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-cc0fa816c51ce4ab)
+
+running 3 tests
+test each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite ... ok
+test proto_b7_combined_bad_image_after_the_overwrite ... PROTO_B7 image=clean guard=Today i39=Holds violated=[]
+PROTO_B7 image=clean guard=Narrowed i39=Holds violated=[]
+PROTO_B7 image=clean guard=Unguarded i39=Holds violated=[]
+PROTO_B7 image=release-4-to-3-only guard=Today i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-3.9"]
+PROTO_B7 image=release-4-to-3-only guard=Narrowed i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-3.9"]
+PROTO_B7 image=release-4-to-3-only guard=Unguarded i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-3.9"]
+PROTO_B7 image=A-leaf-50245-unreadable-only guard=Today i39=NotApplicable("有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全") violated=["I-2.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=A-leaf-50245-unreadable-only guard=Narrowed i39=Holds violated=["I-2.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=A-leaf-50245-unreadable-only guard=Unguarded i39=Holds violated=["I-2.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined guard=Today i39=NotApplicable("有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全") violated=["I-2.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined guard=Narrowed i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-2.1", "I-3.9", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined guard=Unguarded i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-2.1", "I-3.9", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined-both-A-leaves guard=Today i39=NotApplicable("有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全") violated=["I-2.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined-both-A-leaves guard=Narrowed i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-2.1", "I-3.9", "I-4.8", "I-7.4"]
+PROTO_B7 image=combined-both-A-leaves guard=Unguarded i39=Violated("盘 1 槽 50180 的分配记录释放代 3 不在 (3, 4] 里：还引用它的最新一条有效根是 txg 3，最早不再引用它的是 txg 4") violated=["I-2.1", "I-3.9", "I-4.8", "I-7.4"]
+ok
+test proto_b7_control_a_later_incomplete_root_hides_the_placement ... PROTO_B7 control last_raise_txg=CheckpointTxg(16) its_tree_table_slot=50438 overwrite_txg=CheckpointTxg(17)
+PROTO_B7 image=control-clean guard=Today i39=Holds violated=[]
+PROTO_B7 image=control-clean guard=Narrowed i39=Holds violated=[]
+PROTO_B7 image=control-clean guard=Unguarded i39=Holds violated=[]
+PROTO_B7 image=control-later-root-tree-table-unreadable guard=Today i39=NotApplicable("有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全") violated=["I-2.1", "I-3.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=control-later-root-tree-table-unreadable guard=Narrowed i39=Holds violated=["I-2.1", "I-3.1", "I-4.8", "I-7.4"]
+PROTO_B7 image=control-later-root-tree-table-unreadable guard=Unguarded i39=Violated("盘 1 槽 50409 的分配记录释放代 17 不在 (15, 16] 里：还引用它的最新一条有效根是 txg 15，最早不再引用它的是 txg 16") violated=["I-2.1", "I-3.1", "I-3.9", "I-4.8", "I-7.4"]
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 43 filtered out; finished in 11.21s
+

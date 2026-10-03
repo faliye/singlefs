@@ -1,0 +1,159 @@
+STATIC s=4 history=k1 hole=13 suffix=0 rollback=none anchor=Ring first_txg=14 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={1} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=13 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=14 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={1} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=13 suffix=0 rollback=none anchor=Ring first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={1, 2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=13 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={1, 2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=13 suffix=0 rollback=none anchor=Ring first_txg=14 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={1} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=13 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=14 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={1} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=14 suffix=0 rollback=none anchor=Ring first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=14 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=14 suffix=0 rollback=none anchor=Ring first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2, 3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=14 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2, 3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=14 suffix=0 rollback=none anchor=Ring first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=14 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=15 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={2} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=15 suffix=0 rollback=none anchor=Ring first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=15 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=15 suffix=0 rollback=none anchor=Ring first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={3, 4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=15 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={3, 4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=15 suffix=0 rollback=none anchor=Ring first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=15 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=16 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={3} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=16 suffix=0 rollback=none anchor=Ring first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=16 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=16 suffix=0 rollback=none anchor=Ring first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={4, 5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=16 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={4, 5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=16 suffix=0 rollback=none anchor=Ring first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=16 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=17 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={4} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=17 suffix=0 rollback=none anchor=Ring first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=17 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=17 suffix=0 rollback=none anchor=Ring first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5, 6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=17 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5, 6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=17 suffix=0 rollback=none anchor=Ring first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=17 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=18 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={5} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=18 suffix=0 rollback=none anchor=Ring first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=18 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=18 suffix=0 rollback=none anchor=Ring first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={6, 7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=18 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={6, 7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=18 suffix=0 rollback=none anchor=Ring first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=18 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=19 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={6} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=19 suffix=0 rollback=none anchor=Ring first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=19 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=19 suffix=0 rollback=none anchor=Ring first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={7, 8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=19 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={7, 8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=19 suffix=0 rollback=none anchor=Ring first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=19 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=20 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={7} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=20 suffix=0 rollback=none anchor=Ring first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=20 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=20 suffix=0 rollback=none anchor=Ring first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8, 9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=20 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8, 9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=20 suffix=0 rollback=none anchor=Ring first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=20 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=21 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=21 suffix=0 rollback=none anchor=Ring first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=21 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=21 suffix=0 rollback=none anchor=Ring first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={9, 10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=21 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={9, 10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=21 suffix=0 rollback=none anchor=Ring first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=21 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=22 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=22 suffix=0 rollback=none anchor=Ring first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=22 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=22 suffix=0 rollback=none anchor=Ring first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={10, 11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=22 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={10, 11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=22 suffix=0 rollback=none anchor=Ring first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=22 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=23 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={10} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=23 suffix=0 rollback=none anchor=Ring first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=23 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=23 suffix=0 rollback=none anchor=Ring first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11, 12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=23 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11, 12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=23 suffix=0 rollback=none anchor=Ring first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=23 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=24 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={11} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=24 suffix=0 rollback=none anchor=Ring first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=24 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=24 suffix=0 rollback=none anchor=Ring first_txg=26 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={12, 13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=24 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=26 writes=67 segments=13 unit_writes=50 valid_roots_outside_window_seen={12, 13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=24 suffix=0 rollback=none anchor=Ring first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=24 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=25 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={12} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=25 suffix=0 rollback=none anchor=Ring first_txg=26 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=25 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=26 writes=67 segments=13 unit_writes=50 valid_roots_outside_window_seen={13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=25 suffix=0 rollback=none anchor=Ring first_txg=27 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={13, 14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=25 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=27 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={13, 14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=25 suffix=0 rollback=none anchor=Ring first_txg=26 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=25 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=26 writes=67 segments=13 unit_writes=50 valid_roots_outside_window_seen={13} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=26 suffix=0 rollback=none anchor=Ring first_txg=27 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=26 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=27 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=26 suffix=0 rollback=none anchor=Ring first_txg=28 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14, 15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=26 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=28 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14, 15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=26 suffix=0 rollback=none anchor=Ring first_txg=27 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=26 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=27 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={14} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=27 suffix=0 rollback=none anchor=Ring first_txg=28 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=27 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=28 writes=46 segments=9 unit_writes=34 valid_roots_outside_window_seen={15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=27 suffix=0 rollback=none anchor=Ring first_txg=29 writes=67 segments=13 unit_writes=50 valid_roots_outside_window_seen={15, 16} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1x2 hole=27 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=29 writes=67 segments=13 unit_writes=50 valid_roots_outside_window_seen={15, 16} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=27 suffix=0 rollback=none anchor=Ring first_txg=28 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=fillable hole=27 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=28 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={15} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=28 suffix=0 rollback=none anchor=Ring first_txg=29 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={16} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=4 history=k1 hole=28 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=29 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={16} hit_writes=0 hits={} first_hit=None  rc=0 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+rc=252 
+STATIC s=8 history=fillable hole=32 suffix=0 rollback=none anchor=Ring first_txg=33 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=8 history=fillable hole=32 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=33 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={8} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=8 history=k1 hole=33 suffix=0 rollback=none anchor=Ring first_txg=34 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=8 history=k1 hole=33 suffix=0 rollback=none anchor=FirstTxgMinusOne first_txg=34 writes=50 segments=9 unit_writes=38 valid_roots_outside_window_seen={9} hit_writes=0 hits={} first_hit=None  rc=0 
+STATIC s=8 history=k1x2 hole=33 suffix=0 rollback=none anchor=Ring first_txg=35 writes=71 segments=13 unit_writes=54 valid_roots_outside_window_seen={9, 10} hit_writes=0 hits={} first_hit=None  rc=0 

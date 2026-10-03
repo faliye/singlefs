@@ -1,0 +1,6 @@
+mode=0 rc=0 seconds=48
+mode=1 rc=0 seconds=34
+mode=2 rc=0 seconds=40
+mode=3 rc=0 seconds=36
+mode=4 rc=0 seconds=35
+wrapper rc=0

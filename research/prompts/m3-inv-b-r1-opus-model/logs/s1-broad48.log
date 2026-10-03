@@ -1,0 +1,36 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：m3-inv-b-r1 攻方腿在自己副本上跑原型，与别的派出腿各跑各的
+    Blocking waiting for file lock on package cache
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/inv_b_proto_histories.rs (target/debug/deps/inv_b_proto_histories-2bd5ef6075207ec8)
+
+running 1 test
+test proto_predicates_over_random_histories has been running for over 60 seconds
+PROTO_RUN weights=broad first_seed=2000000 seeds=48 operations=30 images=1488 endings={"completed": 48} seconds=597.1
+PROTO name=B1-data-pointer-birth-tree evaluated=14635 violations=0 images_red=0 first=-
+PROTO name=B1-instance-table-pointer-birth-tree evaluated=18742 violations=0 images_red=0 first=-
+PROTO name=B1-instance-table-pointer-identity evaluated=18742 violations=0 images_red=0 first=-
+PROTO name=B1-tree-root-pointer-birth-tree-vs-tree-id evaluated=58540 violations=0 images_red=0 first=-
+PROTO name=B1-tree-table-pointer-birth-tree-vs-tree-id evaluated=18742 violations=0 images_red=0 first=-
+PROTO name=B2-all evaluated=39304 violations=0 images_red=0 first=-
+PROTO name=B2-last evaluated=39304 violations=0 images_red=0 first=-
+PROTO name=B2-max evaluated=39304 violations=0 images_red=0 first=-
+PROTO name=B3-lower evaluated=310068 violations=184 images_red=23 first=seed=2000015 step=15 start=AfterFirstFile ops=[RaiseRollbackFloor>RaiseRollbackFloor>CloseAndMountWritable>PublishOverwrite>RollBackWhileMounted>PublishOverwrite>RaiseRollbackFloor>PublishOverwrite>RollBackWhileMounted>RollBackWhileMounted>ColdStartRecover>CloseAndMountWritable>PublishOverwrite>PublishOverwrite>RaiseRollbackFloor] :: 盘 0 槽 50180 类 1 诞生代号 3 ≤ R_prev (实例 2, txg 8)，R_first (实例 2, txg 9)
+PROTO name=B3-named evaluated=719220 violations=0 images_red=0 first=-
+PROTO name=B3-named-skipped evaluated=6496 violations=0 images_red=0 first=-
+PROTO name=B3-upper evaluated=325066 violations=0 images_red=0 first=-
+PROTO name=B4-accounting-generation evaluated=219525 violations=0 images_red=0 first=-
+PROTO name=B4-change-count-lower evaluated=14635 violations=0 images_red=0 first=-
+PROTO name=B4-change-count-upper evaluated=14635 violations=0 images_red=0 first=-
+PROTO name=B4-previous-snapshot-txg evaluated=102445 violations=0 images_red=0 first=-
+PROTO name=B5a evaluated=22097 violations=0 images_red=0 first=-
+PROTO name=B5a-all-roots evaluated=23300 violations=0 images_red=0 first=-
+PROTO name=B5b evaluated=22097 violations=0 images_red=0 first=-
+PROTO name=B6-jtxg-new-instance evaluated=4766 violations=0 images_red=0 first=-
+PROTO name=B6-jtxg-nondecreasing evaluated=38306 violations=0 images_red=0 first=-
+PROTO name=B6-root evaluated=20974 violations=0 images_red=0 first=-
+PROTO name=B6-sc-pair evaluated=2976 violations=0 images_red=0 first=-
+PROTO name=B6-sc-parity evaluated=5848 violations=0 images_red=0 first=-
+test proto_predicates_over_random_histories ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 597.08s
+

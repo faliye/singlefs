@@ -1,0 +1,5 @@
+PROTO name=prefix s=4 anchor=Off hole=16 stale_root_txg=4 stale_root_instance=1 stale_placements=32 newest=15 oldest_valid=4 floor=4 window_floor=4 valid_outside_window=[]
+PROTO name=stream instance=3 row_txg=17 warm_ups=2 cut=row writes=29 segments=5 closed_form_states=4194314 layer0_states_with_torn=4194324 roots=[(26, 17)] unit_writes_into_stale_root_slots=[] segment_sizes=[2, 22, 2, 1, 2]
+PROTO name=segments list=system_configuration_slot+system_configuration_slot | unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write+unit_write | journal_record+journal_record | root17 | system_configuration_slot+system_configuration_slot
+PROTO name=count_only_or_over_budget states=4194324
+rc=0

@@ -1,0 +1,49 @@
+s rho pos k | m0: peakΔreal peakΔevery max_h_que n | m1: peakΔreal peakΔevery max_h_que n | m2: peakΔreal peakΔevery max_h_que n | m3: peakΔreal peakΔevery max_h_que n | m4: peakΔreal peakΔevery max_h_que n
+4 1 front 1 | 8 8 1 15 | 0 0 0 15 | 0 0 0 15 | 0 0 0 15 | 0 0 0 15
+4 1 back 1 | 174 174 12 25 | 0 0 0 25 | 0 0 0 25 | 0 0 0 25 | 0 0 0 25
+4 1 - 0 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46
+4 1 front 2 | 18 18 2 17 | 0 0 0 17 | 0 0 0 17 | 0 0 0 17 | 0 0 0 17
+4 1 back 2 | 168 168 12 28 | 0 0 0 28 | 0 0 0 28 | 0 0 0 28 | 0 0 0 28
+4 1/4 - 0 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46 | 0 0 0 46
+4 1/4 front 1 | 8 8 1 15 | 0 0 0 15 | 0 0 0 15 | 0 0 0 15 | 0 0 0 15
+4 1/4 front 2 | 18 18 2 17 | 0 0 0 17 | 0 0 0 17 | 0 0 0 17 | 0 0 0 17
+4 1/4 back 1 | 114 114 12 25 | 0 0 0 25 | 0 0 0 25 | 0 0 0 25 | 0 0 0 25
+4 1/4 back 2 | 118 118 12 28 | 0 0 0 28 | 0 0 0 28 | 0 0 0 28 | 0 0 0 28
+8 1 - 0 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70
+8 1 front 1 | 8 8 1 27 | 0 0 0 27 | 0 0 0 27 | 0 0 0 27 | 0 0 0 27
+8 1 front 2 | 18 18 2 29 | 0 0 0 29 | 0 0 0 29 | 0 0 0 29 | 0 0 0 29
+8 1 front 4 | 34 34 4 35 | 0 0 0 35 | 0 0 0 35 | 0 0 0 35 | 0 0 0 35
+8 1 back 1 | 366 366 24 49 | 0 0 0 49 | 0 0 0 49 | 0 0 0 49 | 0 0 0 49
+8 1 back 2 | 360 360 24 52 | 0 0 0 52 | 0 0 0 52 | 0 0 0 52 | 0 0 0 52
+8 1 back 4 | 344 344 24 58 | 0 0 0 58 | 0 0 0 58 | 0 0 0 58 | 0 0 0 58
+8 1/4 - 0 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70 | 0 0 0 70
+8 1/4 front 1 | 8 8 1 27 | 0 0 0 27 | 0 0 0 27 | 0 0 0 27 | 0 0 0 27
+8 1/4 front 2 | 18 18 2 29 | 0 0 0 29 | 0 0 0 29 | 0 0 0 29 | 0 0 0 29
+8 1/4 front 4 | 34 34 4 35 | 0 0 0 35 | 0 0 0 35 | 0 0 0 35 | 0 0 0 35
+8 1/4 back 1 | 234 234 24 49 | 0 0 0 49 | 0 0 0 49 | 0 0 0 49 | 0 0 0 49
+8 1/4 back 2 | 238 238 24 52 | 0 0 0 52 | 0 0 0 52 | 0 0 0 52 | 0 0 0 52
+8 1/4 back 4 | 232 232 24 58 | 0 0 0 58 | 0 0 0 58 | 0 0 0 58 | 0 0 0 58
+16 1 - 0 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118
+16 1 front 1 | 8 8 1 51 | 0 0 0 51 | 0 0 0 51 | 0 0 0 51 | 0 0 0 51
+16 1 front 2 | 18 18 2 53 | 0 0 0 53 | 0 0 0 53 | 0 0 0 53 | 0 0 0 53
+16 1 front 4 | 34 34 4 59 | 0 0 0 59 | 0 0 0 59 | 0 0 0 59 | 0 0 0 59
+16 1 back 1 | 716 716 48 97 | 0 0 0 97 | 0 0 0 97 | 0 0 0 97 | 0 0 0 97
+16 1 back 2 | 710 710 48 100 | 0 0 0 100 | 0 0 0 100 | 0 0 0 100 | 0 0 0 100
+16 1 back 4 | 694 694 48 106 | 0 0 0 106 | 0 0 0 106 | 0 0 0 106 | 0 0 0 106
+16 1/4 - 0 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118 | 0 0 0 118
+16 1/4 front 1 | 8 8 1 51 | 0 0 0 51 | 0 0 0 51 | 0 0 0 51 | 0 0 0 51
+16 1/4 front 2 | 18 18 2 53 | 0 0 0 53 | 0 0 0 53 | 0 0 0 53 | 0 0 0 53
+16 1/4 front 4 | 34 34 4 59 | 0 0 0 59 | 0 0 0 59 | 0 0 0 59 | 0 0 0 59
+16 1/4 back 1 | 474 474 48 97 | 0 0 0 97 | 0 0 0 97 | 0 0 0 97 | 0 0 0 97
+16 1/4 back 2 | 478 478 48 100 | 0 0 0 100 | 0 0 0 100 | 0 0 0 100 | 0 0 0 100
+16 1/4 back 4 | 472 472 48 106 | 0 0 0 106 | 0 0 0 106 | 0 0 0 106 | 0 0 0 106
+TOTAL mode0.out position=front cells=16 peak_delta_real=34 peak_delta_every=34 max_h_que=4 observations=572
+TOTAL mode0.out position=back cells=16 peak_delta_real=716 peak_delta_every=716 max_h_que=48 observations=1030
+TOTAL mode1.out position=front cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=572
+TOTAL mode1.out position=back cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=1030
+TOTAL mode2.out position=front cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=572
+TOTAL mode2.out position=back cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=1030
+TOTAL mode3.out position=front cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=572
+TOTAL mode3.out position=back cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=1030
+TOTAL mode4.out position=front cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=572
+TOTAL mode4.out position=back cells=16 peak_delta_real=0 peak_delta_every=0 max_h_que=0 observations=1030

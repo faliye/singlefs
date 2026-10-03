@@ -1,0 +1,14 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主agent同时派出的正推腿与攻方腿各跑各的
+Tally {
+    total: 59539320,
+    agree: 59539320,
+    impl_only_nospan: 0,
+    impl_only_span: 0,
+    oracle_only: 0,
+    wrong_n: 0,
+    first_unsound: None,
+    first_incomplete: None,
+}
+length0 declared: folded=[Write { offset: DeviceOffsetInBytes(8), length: 0, content_hash: 1 }]
+zero-length write at head: [Write { offset: DeviceOffsetInBytes(0), length: 4, content_hash: 29 }]
+zero-length ahead write: [Write { offset: DeviceOffsetInBytes(0), length: 4, content_hash: 29 }]

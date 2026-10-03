@@ -1,0 +1,2 @@
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：主agent同时派出的正推腿与攻方腿各跑各的
+run-with-memory-cap: 撞了内存上限 1G（scope singlefs-memory-cap-4147391-772313128 的 Result=oom-kill，命令退出码 137）

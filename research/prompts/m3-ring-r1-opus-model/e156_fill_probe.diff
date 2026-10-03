@@ -1,0 +1,27 @@
+--- a/crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
++++ b/crates/ring-hole-proto/src/bin/e156_fill_probe.rs
+@@ -4372,6 +4372,15 @@
+     reason = "第一段、第二段与全部判定行按登记第五节 5.5 的次序连着跑，拆开反而难与登记逐行对"
+ )]
+ fn main() {
++    // m3-ring-r1 攻方副本：补洞挂点由环境变量 HOLE_FILL_POINT 选（0 不补、1 P1、2 P2 根前、3 P2 根后、4 P3）。
++    let point = match std::env::var("HOLE_FILL_POINT").as_deref() {
++        Ok("1") => singlefs_core::mount::HoleFillPoint::P1AfterAcquisition,
++        Ok("2") => singlefs_core::mount::HoleFillPoint::P2BeforeRowRoot,
++        Ok("3") => singlefs_core::mount::HoleFillPoint::P2AfterRowRoot,
++        Ok("4") => singlefs_core::mount::HoleFillPoint::P3AfterWarmUp,
++        _ => singlefs_core::mount::HoleFillPoint::NotFilled,
++    };
++    singlefs_core::mount::set_hole_fill_point(point);
+     let mut emitter = Emitter { emitted: 0 };
+     emit_static_anchors(&mut emitter);
+ 
+@@ -4637,7 +4646,7 @@
+         !synthetic_flip2,
+         if stage_one_stop_reasons.is_empty() { "none".to_string() } else { stage_one_stop_reasons.join(",") },
+     ));
+-    if !stage_one_stop_reasons.is_empty() {
++    if !stage_one_stop_reasons.is_empty() && std::env::var("E156_FILL_PROBE_IGNORE_STOPS").is_err() {
+         emitter.emit("name=stage_two_not_run reason=stage_one_stop");
+         emitter.finish();
+         return;

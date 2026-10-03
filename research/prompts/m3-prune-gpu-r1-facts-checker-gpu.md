@@ -260,7 +260,7 @@ G5 的内容量（`name=g5_contents`，5 行）与显存阳性对照（`name=pos
 
 | 行 | 键 | 根 `Cargo.lock` | `research/Cargo.lock` |
 |---|---|---|---|
-| 28 | 54-layer0-replay.sh | 有 | — |
+| 28 | checker-tier-layer0-replay.sh | 有 | — |
 | 29 | 55-qemu-device-streams.sh | 有 | — |
 | 31 | 59-crates-mutation-replay.sh | 有 | — |
 | 32 | 74-model-differential.sh | 有 | — |

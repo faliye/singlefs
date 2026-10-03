@@ -1,0 +1,7 @@
+054b9ebee80f05837a000ed704eb552dd4d2527281f03ee52b77bb1576523097  .claude/kb/milestone/03-third-txn.md
+9c516a472cca21797fc4313718807bf225a7834f4e3228415a6f2650cae888b7  .claude/kb/invariants.md
+f2738f6bd4c0db88de024447ed83be057dff8b72c92d76ef787c13097202cde5  .claude/kb/checks-owed.md
+576c061884220aa76560cd5cf4b409576fe074fab11d7bf49204897e27bff491  .claude/kb/decisions/13-验证路线.md
+042e559ad774fbc6b11e184846b090171f13ce690e8074742f7a2c9d9a2be6e4  .claude/kb/decisions/23-journal的角色与格式.md
+65f68e809c41362bd4b8d418eb2835045f19f0d2129508ea6424e167eddb064d  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+13e84988bece09c0712e6a49dd62bb4a3e9cc39ce9f98be1db97a9ec23d9e719  .claude/kb/decisions/28-挂载期承诺量.md

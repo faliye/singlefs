@@ -142,8 +142,8 @@ P7 只做第 3、4（只 Consult）、7 步（`record_checker_judges_absence_by_
 | 每条用例各自 `prepare`：各自 `build_pool` 重跑整条写路径、各自切段、各自调枚举器 | P1 `crash_enumeration_new_pool_file_creation_stream.rs:458`–`:489`；P2 `crash_enumeration_fixed_script_stream.rs:218`–`:493`；P3 `crash_enumeration_multi_record_publish_stream.rs:147`–`:185` |
 | 枚举器每一趟从状态 0 数到状态总数，没有「从某个序号起」「跳过某段」的入参；能跳过的只有 `NotExpanded`（整段不展开，只以全持久进入后面） | `crash.rs:1393`–`:1404` `Layer0SegmentExpansion`；`crash.rs:2644`–`:2647` 切片从 `plan.state_count` 起 |
 | 断点续跑与分片账本按「输入指纹 + 流名 + 计划哈希」分格，计划哈希含整张写表、段、版本表、有没有观察者；不同流的格互不相认，没有跨流复用 | `layer0_progress.rs:4`–`:6` 文件头；`crash.rs:2286`–`:2290` `layer0_plan_hash` 文档 |
-| 全绿标记按用例分格（`singlefs-crash-case-green.<用例名>.<输入指纹>`） | `.claude/gate.d/54-layer0-replay.sh:19` |
-| 唯一「相同就不另枚举」的先例：只做过 mkfs 的池那条流，用例逐项核「基线、写表连同内容、段序列」与第一条流相同，54 号文件头写「由 cargo test 里的快用例钉住，不另枚举」 | `crash_enumeration_writable_mount_of_a_formatted_pool.rs:210`–`:237`；`.claude/gate.d/54-layer0-replay.sh:4` |
+| 全绿标记按用例分格（`singlefs-crash-case-green.<用例名>.<输入指纹>`） | `.claude/gate.d/checker-tier-layer0-replay.sh:19` |
+| 唯一「相同就不另枚举」的先例：只做过 mkfs 的池那条流，用例逐项核「基线、写表连同内容、段序列」与第一条流相同，54 号文件头写「由 cargo test 里的快用例钉住，不另枚举」 | `crash_enumeration_writable_mount_of_a_formatted_pool.rs:210`–`:237`；`.claude/gate.d/checker-tier-layer0-replay.sh:4` |
 | 另一种已在用的写法「起点镜像不枚举，只录被判那一次发布」：树分裂、位置寻址、记录跨条三类流把之前那一大截施加成基线（`memory_pool_before_the_current_version`，`crates/singlefs-harness/tests/common_tree_split/mod.rs:401`–`:406`），只枚举最后那一次发布的段；它们的起点前缀（mkfs、取号、暖机、A、铺垫的发布，节点容量用只供测试的开关压小）没有哪条流枚举过 | `crash_enumeration_tree_split_streams.rs:3`–`:5`、`:298`；`crash_enumeration_position_addressed_trees.rs:3`–`:4`、`:148`；`crash_enumeration_record_spill_over_stream.rs` 文件头 |
 
 ## 三　每条流「走到哪些代码模块」有没有机械登记（问题 3）
@@ -222,7 +222,7 @@ P7 只做第 3、4（只 Consult）、7 步（`record_checker_judges_absence_by_
 | 被杀时最多丢每个线程手上那一片；读回时核过的片不再跑，末尾半行丢掉、那一片重跑 | `crash.rs:2027`–`:2028` 注释；`layer0_progress.rs:8`–`:9` |
 | 进度文件按「输入指纹 + 流名 + 枚举计划哈希」分格，三样都进文件名 | `layer0_progress.rs:4`–`:6` |
 | 计划哈希拼的是：基线每个扇区、枚举写表（含撕裂镜像与重放）、段与每段展开方式、被判的根、版本表、状态数、片方案、有没有观察者（分片时另拼 `shard <i>/<n>`） | `crash.rs:2286`–`:2290` |
-| 进度目录由 54 号设：`<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/54-layer0-replay.sh:23` |
+| 进度目录由 54 号设：`<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/checker-tier-layer0-replay.sh:23` |
 
 ### 4.4 双机分片（`research/scripts/layer0-shard-run.sh`）的单位
 
