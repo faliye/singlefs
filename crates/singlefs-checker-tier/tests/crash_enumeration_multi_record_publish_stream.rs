@@ -19,7 +19,7 @@
 //!
 //! 快的那条只展开写数小于 10 的段（A、B、C 三个单元段 24 写、28 写与 30 写不展开，只以整段持久进入后面的状态）；
 //! 全量标 ignored（层 0 的枚举域 1358954634 个状态，B、C 两个单元段占 1342177278；每次写只取两态时的闭式 1358954604、
-//! 两段同样占 1342177278；C577 之前轮换并进单元段，12230590578 与 5435818083），登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
+//! 两段同样占 1342177278；C577 之前轮换并进单元段，12230590578 与 5435818083），登记成崩溃枚举用例，门禁 checker-tier-layer0-replay --full 在 release 下跑，带断点续跑、可双机分片（与第一、第二条流同一个入口）。
 //! 系统配置槽写是原地覆写，取三态（`crash::TearableInPlaceOverwrites`），其余写取两态。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -358,12 +358,12 @@ fn every_crash_state_between_the_records_of_a_multi_record_publish_keeps_the_ver
 
 /// 全量：19 段、闭式见下。A、B、C 三个单元段各 2^24 − 1、2^28 − 1 与 2^30 − 1 个状态（C577 之前各带上一次发布的两次系统配置槽轮换、
 /// 取三态，各 3² · 2^n − 1，共 16 段、12230590578），
-/// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），54 号认下面打印的
+/// 每个状态两遍恢复 + checker。登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），checker-tier-layer0-replay 认下面打印的
 /// `LAYER0_PARALLEL_LINE_ONE` 行里 `exhaustive=true`。带断点续跑：进度目录、输入指纹与强制从头跑的开关从环境变量取，
 /// 没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，`research/scripts/layer0-shard-run.sh`）：
 /// 跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 54 号 --full 在 release 下跑，带断点续跑、可双机分片"]
+#[ignore = "全量 1358954634 个状态（十三亿多）、每个两遍恢复 + checker；门禁 checker-tier-layer0-replay --full 在 release 下跑，带断点续跑、可双机分片"]
 fn full_enumeration_of_the_multi_record_publish_stream_is_exhaustive_and_clean() {
     let prepared = prepare("parallel-line-one-layer0-full");
     let closed_form_with_two_states_per_write = closed_form_state_count(&prepared.segments);

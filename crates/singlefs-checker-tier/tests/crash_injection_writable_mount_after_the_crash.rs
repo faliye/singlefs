@@ -1,16 +1,17 @@
 //! checker 档模块：crash_injection
-//! 代码审阅第 2 条（用户 2026-09-27 定案「崩溃注入层补可写挂载」）：崩溃注入在每个崩溃状态上，只读恢复与判定照旧之后，
+//! 代码审阅第 2 条（崩溃注入层补可写挂载）：崩溃注入在每个崩溃状态上，只读恢复与判定照旧之后，
 //! 在同一份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）、再发一次布、跑池级 checker；挂载途中再崩一次（二次崩溃），
-//! 取号、写行、暖机三段各摆一个，每个二次崩溃状态上只读恢复、问模型、池级 checker、记录核对器。
+//! 取号、写行、暖机、续做各段各摆一个，每个二次崩溃状态上只读恢复、问模型、池级 checker、记录核对器。
 //! 实现在 `singlefs_checker_tier::crash_injection`；随机崩溃注入的快档与大档（`crash_injection_campaign.rs`）
-//! 走的是同一个入口，这里用两段短历史钉「每一截都跑到了、三段都摆到了、一条新发现都没有」。
+//! 走的是同一个入口，这里用两段短历史与一段 unlink 的历史钉「每一截都跑到了、四段都摆到了、一条新发现都没有」。
 
 use singlefs_checker_tier::crash_injection::{
     inject_crashes_into_history, CrashInjectionTally, CrashPointDraw, WritableMountPhase,
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_harness::history::{
-    generate_history, HistoryDeviceWidth, HistoryExecution, HistorySeed, PerStepChecker,
+    generate_history, GeneratedHistory, HistoryDeviceWidth, HistoryExecution, HistoryOperation,
+    HistorySeed, HistoryStartingPoint, PerStepChecker,
 };
 
 /// 历史本身不跑每一步的 checker（活盘面由随机历史那一路罩着），两块 4 GiB 的盘：单元区墙在这里够不着，挂载与之后那一次发布都该成。
@@ -20,8 +21,10 @@ const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
     space_admission: SpaceAdmission::JudgedByTheFormula,
 };
 
-/// 两段短历史、每段摆两个崩溃状态：每个崩溃状态之后都起了可写挂载、发了一次布、跑了 checker，
-/// 挂载途中的二次崩溃取号、写行、暖机三段都摆到了，二次崩溃状态上恢复、问模型、checker、记录核对器各跑了一次；
+/// 两段短历史、每段摆两个崩溃状态，再加第一个文件之后经挂着的会话 unlink 它的一段（意图那次 + 最后一批，短段整段枚举：
+/// 崩溃状态有落在意图那一版上的，那一版上的可写挂载续做，U4，`research/prompts/m3-unlink-code-r1-main-verification.md` 第三节）：
+/// 每个崩溃状态之后都起了可写挂载、发了一次布（删完那一版上建 inode）、跑了 checker，
+/// 挂载途中的二次崩溃取号、写行、暖机、续做四段都摆到了，二次崩溃状态上恢复、问模型、checker、记录核对器各跑了一次；
 /// 两截上一条新发现都没有，挂载与那次发布一次都没被拒。
 #[test]
 fn every_crash_state_is_followed_by_a_writable_mount_one_publish_the_checker_and_second_crashes_in_each_phase(
@@ -40,11 +43,26 @@ fn every_crash_state_is_followed_by_a_writable_mount_one_publish_the_checker_and
         tally.absorb(&injection.tally);
         new_findings.extend(injection.new_findings);
     }
+    let unlinking_the_first_file = inject_crashes_into_history(
+        &GeneratedHistory {
+            seed: HistorySeed(3),
+            starting_point: HistoryStartingPoint::AfterFirstFile,
+            operations: vec![HistoryOperation::Unlink],
+        },
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        CrashPointDraw::EveryProperSubsetOfShortSegments {
+            segment_writes: 2,
+            sampled_in_longer_segments: 2,
+        },
+        None,
+    );
+    tally.absorb(&unlinking_the_first_file.tally);
+    new_findings.extend(unlinking_the_first_file.new_findings);
     let rendered = tally.render();
     println!("{rendered}");
     assert!(
         tally.crash_points >= 2,
-        "两段历史里摆出了崩溃状态：{rendered}"
+        "三段历史里摆出了崩溃状态：{rendered}"
     );
     assert_eq!(
         tally.writable_mounts_after_the_crash, tally.crash_points,

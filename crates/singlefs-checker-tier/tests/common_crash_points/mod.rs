@@ -1,5 +1,5 @@
 //! 崩溃放量共用的流程步骤。几个测试文件调这里的同一个函数，就得到同一个身份、同一串路径段：前缀节点在库里只核一次，
-//! 别的流直接复用（用户 2026-09-28 定：前缀共享是剪枝的基础，没有它每次放量都从头核）。
+//! 别的流直接复用（前缀共享是剪枝的基础，没有它每次放量都从头核）。
 //! 崩溃点的文件是这一份（`file!()`），不是调它的测试文件：改调用方的测试文件不动这里的节点。判法摘要与设点的文件无关，
 //! 只随两个判器的闭包变（`crash_identity::JUDGE_ENTRY_FILES`）。
 #![allow(
@@ -151,8 +151,17 @@ pub fn unmount_step(
     })
 }
 
+/// 经 `run_from_environment` 跑的用例的环境守卫（K5）：与 `crash_amplification` 里改环境的单测同一份，住在库里，这里转出去给各个测试文件用。
+#[allow(
+    unused_imports,
+    reason = "共用的步骤模块：只有改环境、经 run_from_environment 跑的测试文件用这两个守卫，别的测试二进制里转出去没人用"
+)]
+pub use singlefs_checker_tier::crash_amplification::{
+    CrashAmplificationEnvironment, EnvironmentRestoredOnDrop,
+};
+
 /// 一条已经录好的流（起点镜像、写表、段、被判的根槽写、版本表、崩溃点）按环境跑一趟崩溃放量：展开上限从
-/// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
+/// `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 取（没设用 `default_expand_up_to`，写坏了 panic），库目录从 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 取
 /// （没设建在临时目录、跑完删），判法摘要取两个判器的闭包；健康的流一个红状态都不该有。只排派活计划的那一趟（`placement_only`）不判，原样交回。
 /// 打一行 `CRASH_AMPLIFICATION flow=<名> …`，交回这一趟的结果。
 #[allow(
@@ -169,23 +178,45 @@ pub fn amplify_prepared_flow(
     crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
     default_expand_up_to: usize,
 ) -> singlefs_checker_tier::crash_amplification::EnvironmentRun {
-    use singlefs_checker_tier::crash::Layer0SegmentExpansion;
+    amplify_prepared_flow_and_hand_back_its_line(
+        flow_name,
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        crash_points,
+        default_expand_up_to,
+    )
+    .0
+}
+
+/// 同 [`amplify_prepared_flow`]，另交回打出去的那一行 `CRASH_AMPLIFICATION flow=<名> …`（只排派活计划的那一趟不打，是 `None`）。
+/// 行末接 `reuse_and_scale_fields_of_the_line` 的几个字段（复用数、全域与否、展开上限、ignore 的跳过数），被叫停的那一行也接。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一条流的七样各自独立，收成一个结构体只是把七个字段挪个地方"
+)]
+pub fn amplify_prepared_flow_and_hand_back_its_line(
+    flow_name: &str,
+    base: &singlefs_harness::memory_pool::MemoryPool,
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[singlefs_harness::memory_pool::PublishedVersion],
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    default_expand_up_to: usize,
+) -> (
+    singlefs_checker_tier::crash_amplification::EnvironmentRun,
+    Option<String>,
+) {
     use singlefs_checker_tier::crash_amplification::{
-        run_from_environment, CrashFlow, PipelineJudgingCode,
+        reuse_and_scale_fields_of_the_line, run_from_environment, CrashFlow,
+        ExpandUpToWritesPerSegment, PipelineJudgingCode,
     };
     use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
-    let limit: usize = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
-        .ok()
-        .and_then(|text| text.parse().ok())
-        .unwrap_or(default_expand_up_to);
-    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
-    let expansion = move |_segment_index: usize, segment: &[usize]| {
-        if segment.len() <= limit {
-            Layer0SegmentExpansion::EveryProperSubset
-        } else {
-            Layer0SegmentExpansion::NotExpanded
-        }
-    };
+    let limit = ExpandUpToWritesPerSegment::from_environment_or(default_expand_up_to);
+    let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
     let flow = CrashFlow {
         base,
         writes,
@@ -196,14 +227,18 @@ pub fn amplify_prepared_flow(
         crash_points,
     };
     let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../Cargo.lock")
         .canonicalize()
-        .expect("仓根");
+        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+        .parent()
+        .expect("Cargo.lock 所在的目录就是仓根")
+        .to_path_buf();
     let judging = PipelineJudgingCode::of_the_judges(
         &root,
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
     )
     .expect("判法摘要");
+    // 调用方没给库就建一份临时的：两个变量设上，跑完（或 panic）还原成调用方原来的样子
     let temporary_library = match std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY") {
         Some(_) => None,
         None => {
@@ -211,38 +246,49 @@ pub fn amplify_prepared_flow(
                 "singlefs-crash-amplification-{flow_name}-{}",
                 std::process::id()
             ));
-            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY", &directory);
-            std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
-            Some(directory)
+            let mut restored = EnvironmentRestoredOnDrop::saved_then_cleared(&[
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
+            ]);
+            restored.set(
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+                directory.as_os_str(),
+            );
+            restored.set(
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
+                std::ffi::OsStr::new("1"),
+            );
+            Some((directory, restored))
         }
     };
     let started = std::time::Instant::now();
-    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
+    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
     let seconds = started.elapsed().as_secs_f64();
-    if let Some(directory) = &temporary_library {
-        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY");
-        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY");
+    if let Some((directory, restored)) = temporary_library {
+        drop(restored);
         let _ = std::fs::remove_dir_all(directory);
     }
     if run.placement_only {
-        return run;
+        return (run, None);
     }
+    let reuse_and_scale = reuse_and_scale_fields_of_the_line(&run);
     if run.stopped_early {
         // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
-        println!(
-            "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
+        let line = format!(
+            "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true{reuse_and_scale}",
             run.mode.name(),
             run.checking.states_checked,
             run.checking.blocks_checked,
             run.unjudged_blocks,
             run.checking.red_states
         );
+        println!("{line}");
         assert_eq!(
             run.checking.red_states, 0,
             "健康的流 {flow_name} 一个红状态都不该有：{:?}",
             run.checking.red_texts
         );
-        return run;
+        return (run, Some(line));
     }
     let judge_line = judge_fields_of_the_summary_line(&run);
     let judge_version: String = run
@@ -252,8 +298,8 @@ pub fn amplify_prepared_flow(
         .take(8)
         .map(|byte| format!("{byte:02x}"))
         .collect();
-    println!(
-        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} expand_up_to={limit} exhaustive={exhaustive} seconds={seconds:.1}{judge_line}",
+    let line = format!(
+        "CRASH_AMPLIFICATION flow={flow_name} mode={} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} violations_in_the_library={} judge_version={judge_version} seconds={seconds:.1}{reuse_and_scale}{judge_line}",
         run.mode.name(),
         run.checking.states_checked,
         run.checking.blocks_checked,
@@ -261,6 +307,7 @@ pub fn amplify_prepared_flow(
         run.checking.red_states,
         run.violations.len()
     );
+    println!("{line}");
     assert_eq!(
         run.checking.red_states, 0,
         "健康的流 {flow_name} 一个红状态都不该有：{:?}",
@@ -282,7 +329,7 @@ pub fn amplify_prepared_flow(
             comparison.disagreement_samples
         );
     }
-    run
+    (run, Some(line))
 }
 
 /// 汇总行里说第 ① 段在哪判的那几个字段：GPU 判的带用了几张卡、判了多少、多快、写库花了多久；CPU 判的只有 `judge=cpu`。

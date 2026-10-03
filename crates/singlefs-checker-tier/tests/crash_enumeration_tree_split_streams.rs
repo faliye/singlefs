@@ -1,6 +1,6 @@
 //! checker 档模块：crash
-//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 28 行的层 0：记账树与中央映射树分裂的每一种写序进崩溃点（用户 2026-09-24 嘱咐「做分裂的时候切记
-//! 需要加崩溃点」；三方 `m2-treesplit-r1` T4 的写法）。**起点镜像不枚举，只录分裂那一次发布**：分裂之前那一大截（mkfs、取号、暖机、
+//! 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 28 行的层 0：记账树与中央映射树分裂的每一种写序进崩溃点（三方
+//! `m2-treesplit-r1` T4 的写法）。**起点镜像不枚举，只录分裂那一次发布**：分裂之前那一大截（mkfs、取号、暖机、
 //! 第一个文件版本、铺垫的空发布）全部施加成起点镜像，录制流从那一次发布的第一个单元写切起——段长只随那一次发布写几个单元涨，
 //! 不随树里有多少条涨。每条流枚举那一次发布的全部崩溃状态（D13（验证路线） 已定项 4 的段模型：单元写段、记录段、根槽 FUA、
 //! 系统配置槽轮换），每个状态跑两遍恢复（看 / 不看 journal）+ 多版本 oracle + 池级 checker（多层码 2 树逐节点核 I-1.1）+ 记录核对器。
@@ -118,7 +118,7 @@ impl TreeSplitStream {
 
     // 第一个文件版本的中央映射树有 10 条（十二个单元里除去树表与映射树自己的节点，D19（块指针的结构与宽度预算） 已定项 8），
     // 按 key（类标签 → 出生树 → 出生 txg → 尾段）排：数据单元（码 1）| extent 根、inode 根、分配记录树五个节点（D8（核心索引结构）
-    // 已定项 14：两盘各叶 61、两盘各第 1 层、根）、记账树（码 2，出生树 11、12、13、14）| inode 叶容器（码 3）。
+    // 已定项 14：两盘各叶 61、两盘各第 1 层、根）、记账树（码 2，出生树 65536、65537、65538、65539）| inode 叶容器（码 3）。
     // 空发布换掉的是分配记录树五个节点与记账树的 6 条（先按 key 升序删、再按 key 升序插，D8（核心索引结构） 已定项 11），
     // 新 key 的出生 txg 更大，落在 inode 根与 inode 叶容器之间；其余 4 条（数据单元、extent 根、inode 根、inode 叶容器）不动。
     // 每个单元两盘各一次写：被录那一次的单元写段是 2 × `units_written` 写。
@@ -213,7 +213,7 @@ impl TreeSplitStream {
         }
     }
 
-    /// 全量用例里这条流那一行计数行的前缀：门禁 54 号按前缀认计数行（每个前缀恰好一行、只许大写字母、数字、`_`），
+    /// 全量用例里这条流那一行计数行的前缀：门禁 checker-tier-layer0-replay 按前缀认计数行（每个前缀恰好一行、只许大写字母、数字、`_`），
     /// 七条流各一个，登记在 `.claude/gate.d/stage-inputs.tsv` 那一条崩溃枚举用例的 `count-line=` 里。
     fn full_enumeration_count_line_prefix(self) -> &'static str {
         match self {
@@ -410,10 +410,10 @@ fn every_tree_split_stream_recovers_cleanly_in_every_state_after_its_unit_writes
 /// 全量：每条流那一次发布的全部崩溃状态，单元写段 2^(2 × 单元数) − 1 个，轮换那一段 3² − 1 个（系统配置槽写取三态）。
 /// 单元写段：9 个单元 262143（摘空）、10 个 1048575（中央映射根分裂、根降高、记账根分裂）、11 个 4194303（两条叶分裂）、
 /// 13 个 67108863（两层连着分裂）；七条流各加记录段 3、根槽 1、轮换 8、全部持久 1，合计 78905428 个状态。
-/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），门禁 54 号 --full 在 release 下跑：每条流跑完打一行计数行
+/// 登记成崩溃枚举用例（`.claude/gate.d/stage-inputs.tsv`），门禁 checker-tier-layer0-replay --full 在 release 下跑：每条流跑完打一行计数行
 /// （前缀 `full_enumeration_count_line_prefix`，带 `exhaustive=`）。枚举不留进度文件、不认双机分片开关。
 #[test]
-#[ignore = "七条流合计 78905428 个状态、每个两遍恢复 + checker；登记成崩溃枚举用例，门禁 54 号 --full 在 release 下跑"]
+#[ignore = "七条流合计 78905428 个状态、每个两遍恢复 + checker；登记成崩溃枚举用例，门禁 checker-tier-layer0-replay --full 在 release 下跑"]
 fn full_enumeration_of_every_tree_split_stream_is_exhaustive_and_clean() {
     for stream in TreeSplitStream::ALL {
         let tally = enumerate(stream, &|_segment_index, _segment| true);

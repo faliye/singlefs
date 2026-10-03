@@ -1,19 +1,19 @@
 //! checker 档模块：crash
 //! 层 0 流 L8（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 36 行、调度表「实二十」；三方 `m2-treesplit-r1` T4 列的八条流里的最后一条）：
-//! 一次发布多条记录、共享点名跨记录。D23（journal 的角色与格式） 已定项 17（用户 2026-09-24 定）：最后一个事务要点名的项多于
-//! 一条记录装得下的 67 项时末条再跨记录，只有真正的最后一条带「本次发布末条」标志；已定项 7：同一事务的记录共享事务号、
+//! 一次发布多条记录、共享点名跨记录。D23（journal 的角色与格式） 已定项 17：最后一个事务要点名的项多于
+//! 一条记录装得下的 64 项时末条再跨记录，只有真正的最后一条带「本次发布末条」标志；已定项 7：同一事务的记录共享事务号、
 //! 提交标记只在它的最后一条；已定项 14 第六条：恢复按记录标志位 0 认发布边界，末条没到的发布整体不施加。
 //!
 //! 写法照 T4「起点镜像不枚举 + 只录那一次发布」：mkfs → 取号 → 暖机 × 2 → A（新池新建文件）整段做完的镜像当起点、不枚举；
-//! 只把建 N 个 inode 的那一次发布（叶容器 + 叶容器之外的角色 = 68 个单元，一个事务，点名 68 项 ⇒ 两条记录：
-//! 67 项不带提交标记与末条标志、1 项两样都带）录进被枚举的流。叶容器之外的角色有几个不写死，由实现现给
-//! （[`leaf_containers_naming_one_more_entry_than_a_record_holds`]）：今天是 11 个（inode 根、分配记录树两盘各叶 61 与叶 62、
-//! 两盘各第 1 层、根，记账树、中央映射树、树表），叶容器 57 片。它的段序列是 `136+4+1+2`：单元段 68 个单元 × 2 盘，
-//! 记录段两条 × 2 盘，根槽 FUA，系统配置槽轮换 × 2 盘。
+//! 只把建 N 个 inode 的那一次发布（叶容器 + 叶容器之外的角色 = 65 个单元，一个事务，点名 65 项 ⇒ 两条记录：
+//! 64 项不带提交标记与末条标志、1 项两样都带）录进被枚举的流。叶容器之外的角色有几个不写死，由实现现给
+//! （[`leaf_containers_naming_one_more_entry_than_a_record_holds`]；叶容器跨过分配记录树叶 61 的末槽时是 11 个——inode 根、分配记录树两盘各叶 61
+//! 与叶 62、两盘各第 1 层、根，记账树、中央映射树、树表；叶容器片数 = 65 − 角色数，记录头改成 487 字节之后没在这条流上跑过）。它的段序列是
+//! `130+4+1+2`：单元段 65 个单元 × 2 盘，记录段两条 × 2 盘，根槽 FUA，系统配置槽轮换 × 2 盘。
 //!
 //! **枚举了哪些崩溃状态**：记录段、根槽两段逐个子集全展开（15 + 1），系统配置槽那一段的两次轮换是原地覆写、各取三态
 //! （3² − 1 = 8，`crash::TearableInPlaceOverwrites`），加全部持久那一个，共 25 个；
-//! 单元段 136 写的 2^136 − 1 个子集枚举不了，它只以整段持久进入后面的状态。单元段里的状态上这次发布的记录一份都没落
+//! 单元段 130 写的 2^130 − 1 个子集枚举不了，它只以整段持久进入后面的状态。单元段里的状态上这次发布的记录一份都没落
 //! （记录段在一道屏障之后），恢复见到的与起点镜像相同的那一版加上几份没人点名的单元——那一格已有的流都罩着。
 //! **比已有的流多罩了什么**：已有的多记录发布（并行线一的层 0 流）一条记录一个事务、每条都带提交标记；这里一个事务跨两条记录，
 //! 第一条不带提交标记，共享的提交内生块分在两条里点名——记录段 15 个状态里：两条都至少落了一份的 8 个（加上根槽那一段的 1 个）
@@ -89,7 +89,7 @@ fn roles_other_than_leaf_containers_named_by_a_trial_publish(
 }
 
 /// 叶容器取几片，这次发布点名的单元才恰好是 [`NAMED_ENTRIES_OF_THE_SPILLING_PUBLISH`] 项。叶容器之外的角色数随叶容器数变
-/// （叶容器落点越过分配记录树叶 61 的末槽时，两块盘各多改一片叶 62：今天 1 片叶容器时 9 个角色、57 片时 11 个），
+/// （叶容器落点越过分配记录树叶 61 的末槽时，两块盘各多改一片叶 62：1 片叶容器时 9 个角色、跨过末槽之后 11 个），
 /// 所以按「叶容器数 = 项数 − 这么多叶容器时的角色数」迭代到不动点，每一轮的角色数都由试发现数。
 ///
 /// 迭代上界 8 轮：角色数随叶容器数不减，从最多的叶容器数（只留 1 个角色）起往下收；今天第 2 轮就不动。
@@ -146,7 +146,7 @@ fn prepare(tag: &str) -> Prepared {
     // 起点镜像：A 整段做完（系统配置槽轮换在内），不枚举。
     let base = pool.memory_pool();
     let operations_before = pool.retained_operations().len();
-    // 叶容器数由实现现给的角色数定（试发在 `base` 的拷贝上，不进录制流）：点名 68 项，比一条记录装得下的 67 多一项。
+    // 叶容器数由实现现给的角色数定（试发在 `base` 的拷贝上，不进录制流）：点名的项数比一条记录装得下的多一项。
     let leaf_containers =
         leaf_containers_naming_one_more_entry_than_a_record_holds(&base, &pool.allocator, &before);
     let new_inode_count = new_inode_count_filling(leaf_containers);
@@ -162,18 +162,13 @@ fn prepare(tag: &str) -> Prepared {
             FIXED_WRITE_TIME_SECONDS + 120,
             InstanceGeneration(1),
         )
-        .expect("点名 68 项：末条再跨记录")
+        .expect("点名的项数比一条记录装得下的多一项：末条再跨记录")
     };
     assert_eq!(
-        spilling.rewritten.len(),
-        68,
-        "{leaf_containers} 片叶容器 + 叶容器之外的角色（由试发现数），恰好比一条记录装得下的 67 多一项：{:?}",
-        spilling.rewritten
-    );
-    assert_eq!(
-        u64::try_from(spilling.rewritten.len()).expect("68"),
+        u64::try_from(spilling.rewritten.len()).expect("一次发布的单元数装得进 u64"),
         NAMED_ENTRIES_OF_THE_SPILLING_PUBLISH,
-        "68 就是一条记录装得下的项数加一（`JOURNAL_NAMED_ENTRIES_PER_RECORD` + 1）"
+        "{leaf_containers} 片叶容器 + 叶容器之外的角色（由试发现数），恰好是一条记录装得下的项数加一（`JOURNAL_NAMED_ENTRIES_PER_RECORD` + 1）：{:?}",
+        spilling.rewritten
     );
     assert_eq!(
         (
@@ -184,15 +179,26 @@ fn prepare(tag: &str) -> Prepared {
                 .len(),
             spilling.record.named.len()
         ),
-        (1, 67, 1),
-        "两条记录：装满 67 项的一条 + 跨出去的 1 项"
+        (
+            1,
+            usize::try_from(JOURNAL_NAMED_ENTRIES_PER_RECORD)
+                .expect("一条记录的点名项数装得进 usize"),
+            1
+        ),
+        "两条记录：装满一条记录的项数的一条 + 跨出去的 1 项"
     );
     let operations = pool.retained_operations();
     let (writes, segments) = writes_and_segments(&operations[operations_before..], &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![136, 4, 1, 2],
-        "只录这一次发布：68 个单元 × 2 盘、两条记录 × 2 盘、根槽 FUA、系统配置槽 × 2 盘"
+        vec![
+            2 * usize::try_from(NAMED_ENTRIES_OF_THE_SPILLING_PUBLISH)
+                .expect("点名项数装得进 usize"),
+            4,
+            1,
+            2
+        ],
+        "只录这一次发布：点名的每个单元 × 2 盘、两条记录 × 2 盘、根槽 FUA、系统配置槽 × 2 盘"
     );
     let root_indexes: Vec<usize> = writes
         .iter()
@@ -343,7 +349,7 @@ fn assert_clean(tally: &Layer0Tally) {
 
 /// L8 能枚举的全部状态：记录段（4 写）、根槽（1 写）逐个子集全展开，系统配置槽（2 写，原地覆写各取三态）全展开，
 /// 加全部持久那一个，共 25 个；
-/// 单元段 136 写不展开（2^136 − 1 个子集，只以整段持久进入后面的状态）。每个状态按两条记录落没落核发布边界。
+/// 单元段 130 写不展开（2^130 − 1 个子集，只以整段持久进入后面的状态）。每个状态按两条记录落没落核发布边界。
 #[test]
 fn every_crash_state_of_a_publish_whose_one_transaction_spills_over_two_records_applies_it_whole_or_not_at_all(
 ) {

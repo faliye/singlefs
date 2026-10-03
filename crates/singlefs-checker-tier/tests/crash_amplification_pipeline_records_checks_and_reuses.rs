@@ -1,11 +1,16 @@
-//! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification、verdict_store
+//! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification、verdict_store、gpu_unit_checks
 //! 崩溃放量流水线在新池新建文件那条流（取号与暖机、发布两个崩溃点）上的端到端用例：录入 → 核对 → 第二趟复用 → 两方分工与对账 →
-//! 两个库并成一个 → ignore 的点不出状态 → 版本表写错要红。要 `verdict-store` 特性（RocksDB），不带特性时这份文件是空的。
+//! 两个库并成一个 → ignore 的点不出状态 → 版本表写错要红；经公共模块按环境真跑两趟，驱动行带复用数、全域与否、展开上限；
+//! 被叫停、导入别的库、只排派活计划的那一趟照实报复用数（L1）。经环境跑的用例自己清、自己还原环境（K5，公共模块的环境守卫）。
+//! 要 `verdict-store` 特性（RocksDB），不带特性时这份文件是空的。
 #![cfg(feature = "verdict-store")]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
+mod common_crash_points;
 
+use std::collections::BTreeMap;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
 use common::{build_pool, file_content, geometry};
@@ -16,10 +21,13 @@ use singlefs_checker_tier::crash::{
 use singlefs_checker_tier::crash_amplification::{
     check_blocks_where_until, check_recorded_blocks, compare_judge_and_verifier, plan_crash_points,
     read_violations, record_crash_points, unjudged_blocks, unjudged_blocks_of_the_flow,
-    verify_blocks_from_facts, CrashFlow, CrashPlan, CrashPointSpan, FactsVerifierOn,
-    PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
+    verify_blocks_from_facts, CrashFlow, CrashPlan, CrashPointSpan, EnvironmentRun,
+    ExpandUpToWritesPerSegment, FactsVerifierOn, PipelineJudgingCode, UnitChecksumsOn,
+    WeightedShares, ENVIRONMENT_VARIABLES_READ_BY_A_RUN,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
+#[cfg(feature = "gpu")]
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
 use singlefs_harness::memory_pool::{
@@ -34,9 +42,12 @@ const LARGEST_EXPANDED_SEGMENT_WRITES: usize = 6;
 
 fn repository_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../Cargo.lock")
         .canonicalize()
-        .expect("仓根在 crate 往上两层")
+        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+        .parent()
+        .expect("Cargo.lock 所在的目录就是仓根")
+        .to_path_buf()
 }
 
 fn expansion(_segment_index: usize, segment: &[usize]) -> Layer0SegmentExpansion {
@@ -725,4 +736,303 @@ fn a_wrong_version_table_is_judge_red_only_for_the_facts_verifier() {
         "判器红而核对绿的正是那些状态"
     );
     assert_eq!(comparison.disagreements, 0);
+}
+
+/// 一行 `CRASH_AMPLIFICATION` 的 `key=value` 字段。
+fn fields_of_the_line(line: &str) -> BTreeMap<String, String> {
+    line.split_whitespace()
+        .skip(1)
+        .filter_map(|field| field.split_once('='))
+        .map(|(key, value)| (key.to_string(), value.to_string()))
+        .collect()
+}
+
+/// 一条录好的流经公共模块按环境跑一趟（展开上限默认 6），交回这一趟的结果与它打的那一行。环境由调用方的守卫定。
+fn amplify(recorded: &RecordedFlow, flow_name: &str) -> (EnvironmentRun, Option<String>) {
+    common_crash_points::amplify_prepared_flow_and_hand_back_its_line(
+        flow_name,
+        &recorded.base,
+        &recorded.writes,
+        &recorded.segments,
+        recorded.judged_root_index,
+        &recorded.versions,
+        recorded.crash_points.clone(),
+        LARGEST_EXPANDED_SEGMENT_WRITES,
+    )
+}
+
+/// 按环境跑的用例的临时目录：一份空的多机配置（单机 CPU）与一份库，环境守卫只设这三个、别的全清。
+struct EnvironmentRunDirectory {
+    temporary: TemporaryStore,
+    configuration: PathBuf,
+    library: PathBuf,
+}
+
+impl EnvironmentRunDirectory {
+    fn new(tag: &str) -> Self {
+        let temporary = TemporaryStore::new(tag);
+        std::fs::create_dir_all(&temporary.directory).expect("建得了临时目录");
+        let configuration = temporary.directory.join("multi-host.env");
+        std::fs::write(&configuration, "").expect("写得了空配置");
+        let library = temporary.directory.join("library");
+        Self {
+            temporary,
+            configuration,
+            library,
+        }
+    }
+
+    fn environment(&self) -> common_crash_points::CrashAmplificationEnvironment {
+        common_crash_points::CrashAmplificationEnvironment::cleared_then_set(&[
+            ("SINGLEFS_MULTI_HOST_CONFIG", self.configuration.as_os_str()),
+            (
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+                self.library.as_os_str(),
+            ),
+            (
+                "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
+                OsStr::new("1"),
+            ),
+        ])
+    }
+}
+
+/// 驱动行的复用数、全域与否、展开上限（入口 `research/scripts/crash-amplification.sh` 按这几个字段汇总）：在新池新建文件那条流上
+/// 经公共模块真跑两趟（同一份库），两趟打出来的行里三个字段都在；第一趟库是空的、复用 0；第二趟 `states_reused` 等于库里这条流
+/// 在这一判法版本下已判的态数（第一趟全判完了，就是整条流的态数），也等于录入时数到的已判态数。
+/// 环境由守卫清掉再设（多机配置换成一份空的、单机 CPU，库落在测试自己的临时目录），跑完或 panic 都还原。要 `verdict-store` 特性：快档靠 C604 才编进来。
+#[test]
+fn a_driver_line_reports_reuse_exhaustiveness_and_depth_and_its_reuse_equals_the_states_judged_in_the_library(
+) {
+    let recorded =
+        record_new_pool_file_creation("crash-amplification-line-fields", false, file_content());
+    let directory = EnvironmentRunDirectory::new("line-fields");
+    let environment = directory.environment();
+    let (first_run, first_line) = amplify(&recorded, "line-fields");
+    let (second_run, second_line) = amplify(&recorded, "line-fields");
+    drop(environment);
+    let first_line = first_line.expect("判了的那一趟打一行");
+    let second_line = second_line.expect("判了的那一趟打一行");
+    for line in [&first_line, &second_line] {
+        let fields = fields_of_the_line(line);
+        for key in ["states_reused", "exhaustive", "expand_up_to"] {
+            assert!(fields.contains_key(key), "行里没有 {key}=：{line}");
+        }
+        assert_eq!(
+            fields.get("expand_up_to").map(String::as_str),
+            Some(second_run.expand_up_to.0.to_string().as_str()),
+            "{line}"
+        );
+        assert_eq!(
+            fields.get("exhaustive").map(String::as_str),
+            Some(second_run.exhaustive.to_string().as_str()),
+            "{line}"
+        );
+    }
+    assert_eq!(
+        fields_of_the_line(&first_line)
+            .get("states_reused")
+            .map(String::as_str),
+        Some("0"),
+        "第一趟库是空的，一态都没复用：{first_line}"
+    );
+    assert!(first_run.checking.states_checked > 0, "第一趟判了状态");
+
+    let limit: ExpandUpToWritesPerSegment = second_run.expand_up_to;
+    let expansion_of_the_run =
+        move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
+    let flow = CrashFlow {
+        base: &recorded.base,
+        writes: &recorded.writes,
+        segments: &recorded.segments,
+        judged_root_index: recorded.judged_root_index,
+        versions: &recorded.versions,
+        expansion: &expansion_of_the_run,
+        crash_points: recorded.crash_points.clone(),
+    };
+    let plan = plan_crash_points(&flow);
+    let state_count = plan.points.last().expect("有点").ordinals.end;
+    let (store, _) = VerdictStore::open_existing(&directory.library).expect("开得了这两趟的库");
+    let unjudged_states: u64 =
+        unjudged_blocks_of_the_flow(&store, &plan, &second_run.judge_version)
+            .expect("对得了账")
+            .iter()
+            .map(|(_, states)| *states)
+            .sum();
+    let judged_in_the_library = state_count - unjudged_states;
+    assert_eq!(judged_in_the_library, state_count, "第一趟把这条流全判完了");
+    assert_eq!(
+        fields_of_the_line(&second_line)
+            .get("states_reused")
+            .map(String::as_str),
+        Some(judged_in_the_library.to_string().as_str()),
+        "第二趟行里的复用数等于库里这条流已判的态数：{second_line}"
+    );
+    assert_eq!(
+        second_run.states_reused, second_run.recording.states_already_judged,
+        "一台跑、没导入：复用数就是录入时数到的已判态数"
+    );
+    assert_eq!(second_run.checking.states_checked, 0, "第二趟一态都不再判");
+    drop(store);
+    drop(directory);
+}
+
+/// L1：被叫停的那一趟照实报它录入时库里已判的态数，不写 0。同一份库上第一趟把整条流判完；第二趟开跑前叫停文件已经放着，
+/// 它全部复用、一态不判、被叫停收尾，行上的 `states_reused` 等于整条流的态数。
+#[test]
+fn a_run_stopped_with_every_block_already_judged_reports_them_as_reused() {
+    let recorded =
+        record_new_pool_file_creation("crash-amplification-stopped-reuse", false, file_content());
+    let directory = EnvironmentRunDirectory::new("stopped-reuse");
+    let mut environment = directory.environment();
+    let (first_run, _) = amplify(&recorded, "stopped-reuse");
+    let stop_file = directory.temporary.directory.join("stop");
+    std::fs::write(&stop_file, "").expect("放得了叫停文件");
+    environment.set(
+        "SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE",
+        stop_file.as_os_str(),
+    );
+    let (stopped_run, stopped_line) = amplify(&recorded, "stopped-reuse");
+    drop(environment);
+    let state_count = first_run.recording.states_recorded;
+    assert!(state_count > 0, "第一趟录了状态");
+    assert!(!first_run.stopped_early, "第一趟没叫停");
+    assert!(stopped_run.stopped_early, "第二趟开跑前叫停文件已经在");
+    assert_eq!(
+        stopped_run.checking.states_checked, 0,
+        "库里全判过，叫停的那一趟一态都没判"
+    );
+    assert_eq!(
+        stopped_run.states_reused, state_count,
+        "叫停的那一趟录入时库里整条流都判过"
+    );
+    let stopped_line = stopped_line.expect("叫停的那一趟也打一行");
+    assert_eq!(
+        fields_of_the_line(&stopped_line)
+            .get("states_reused")
+            .map(String::as_str),
+        Some(state_count.to_string().as_str()),
+        "{stopped_line}"
+    );
+    drop(directory);
+}
+
+/// L1：导入别的库的那一趟照实报导入之前库里已判的态数，不写 0。同一份库上第一趟把整条流判完；第二趟导入一份空库，
+/// 导入之前这份库里整条流都判过，行上的 `states_reused` 等于整条流的态数，导进来的块是 0。
+#[test]
+fn a_run_importing_another_library_reports_the_states_judged_before_the_import_as_reused() {
+    let recorded =
+        record_new_pool_file_creation("crash-amplification-import-reuse", false, file_content());
+    let directory = EnvironmentRunDirectory::new("import-reuse");
+    let mut environment = directory.environment();
+    let (first_run, _) = amplify(&recorded, "import-reuse");
+    let other_library = directory.temporary.directory.join("other-library");
+    drop(VerdictStore::create_empty(&other_library).expect("建得了要导入的那一份空库"));
+    environment.set(
+        "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
+        other_library.as_os_str(),
+    );
+    let (importing_run, importing_line) = amplify(&recorded, "import-reuse");
+    drop(environment);
+    let state_count = first_run.recording.states_recorded;
+    assert!(state_count > 0, "第一趟录了状态");
+    assert_eq!(importing_run.imported_blocks, 0, "导入的是一份空库");
+    assert_eq!(
+        importing_run.states_reused, state_count,
+        "导入之前库里整条流都判过"
+    );
+    let importing_line = importing_line.expect("判了的那一趟打一行");
+    assert_eq!(
+        fields_of_the_line(&importing_line)
+            .get("states_reused")
+            .map(String::as_str),
+        Some(state_count.to_string().as_str()),
+        "{importing_line}"
+    );
+    drop(directory);
+}
+
+/// L1：只排派活计划的那一趟照实报录入时库里已判的态数，不写 0。同一份库上第一趟（单机 CPU）把整条流判完；第二趟配置开 GPU、
+/// 登记 `crash_judge_gpu`、只排计划：一块都不判，复用数等于整条流的态数。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」
+/// （`gpu_unit_checks::gpu_test_start`），有适配器而一张卡都起不来判红。要 `verdict-store,gpu` 两个特性。
+#[cfg(feature = "gpu")]
+#[test]
+fn a_placement_only_run_reports_the_states_judged_at_recording_as_reused() {
+    let Some(card) = first_usable_card_or_report_not_run(
+        "a_placement_only_run_reports_the_states_judged_at_recording_as_reused",
+    ) else {
+        return;
+    };
+    drop(card);
+    let recorded =
+        record_new_pool_file_creation("crash-amplification-placement-reuse", false, file_content());
+    let directory = EnvironmentRunDirectory::new("placement-reuse");
+    let mut environment = directory.environment();
+    let (first_run, _) = amplify(&recorded, "placement-reuse");
+    let gpu_configuration = directory
+        .temporary
+        .directory
+        .join("multi-host-with-gpu.env");
+    std::fs::write(&gpu_configuration, "ENABLE_GPU=1\n").expect("写得了开 GPU 的配置");
+    environment.set("SINGLEFS_MULTI_HOST_CONFIG", gpu_configuration.as_os_str());
+    environment.set("GPU_COMPUTATION_CLASSES", OsStr::new("crash_judge_gpu"));
+    environment.set(
+        "SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY",
+        OsStr::new("1"),
+    );
+    let (placement_run, placement_line) = amplify(&recorded, "placement-reuse");
+    drop(environment);
+    let state_count = first_run.recording.states_recorded;
+    assert!(state_count > 0, "第一趟录了状态");
+    assert!(placement_run.placement_only, "第二趟只排了派活计划");
+    assert!(placement_line.is_none(), "只排计划的那一趟不打汇总行");
+    assert_eq!(
+        placement_run.states_reused, state_count,
+        "只排计划的那一趟录入时库里整条流都判过"
+    );
+    drop(directory);
+}
+
+/// K5：环境守卫里清掉、还原的那一半（`EnvironmentRestoredOnDrop`）：一趟读的变量在守卫里全是没设的，用例设的那一个照它的；
+/// 守卫丢掉之后，调用方原来设了的写回原值、原来没设的仍然没设。调用方的值由外层守卫设（外层守卫拿着改环境的锁，别的用例这时不改环境）。
+#[test]
+fn the_environment_guard_clears_what_a_run_reads_and_restores_the_values_left_by_the_caller() {
+    let mut caller = common_crash_points::CrashAmplificationEnvironment::cleared_then_set(&[(
+        "SINGLEFS_CRASH_AMPLIFICATION_SHARE",
+        OsStr::new("1/2"),
+    )]);
+    caller.set(
+        "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
+        OsStr::new("/caller/library"),
+    );
+    {
+        let mut inner = common_crash_points::EnvironmentRestoredOnDrop::saved_then_cleared(
+            ENVIRONMENT_VARIABLES_READ_BY_A_RUN,
+        );
+        for name in ENVIRONMENT_VARIABLES_READ_BY_A_RUN {
+            assert_eq!(std::env::var_os(name), None, "守卫里 {name} 是清掉的");
+        }
+        inner.set("SINGLEFS_CRASH_AMPLIFICATION_VERIFY", OsStr::new("cpu"));
+        assert_eq!(
+            std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").as_deref(),
+            Ok("cpu"),
+            "用例设的那一个照它的"
+        );
+    }
+    assert_eq!(
+        std::env::var("SINGLEFS_CRASH_AMPLIFICATION_SHARE").as_deref(),
+        Ok("1/2"),
+        "调用方设了的写回原值"
+    );
+    assert_eq!(
+        std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT").as_deref(),
+        Ok("/caller/library"),
+        "调用方设了的写回原值"
+    );
+    assert_eq!(
+        std::env::var_os("SINGLEFS_CRASH_AMPLIFICATION_VERIFY"),
+        None,
+        "调用方没设的仍然没设"
+    );
+    drop(caller);
 }

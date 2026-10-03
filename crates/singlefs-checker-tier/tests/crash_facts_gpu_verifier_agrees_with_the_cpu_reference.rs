@@ -1,7 +1,8 @@
 //! checker 档模块：crash、gpu_unit_checks、crash_facts、crash_verify_gpu
 //! 崩溃放量三段流的第 ②、③ 段在新池新建文件那条流上：① 抽事实；② GPU 内核与 CPU 参照按同一张事实表判每个状态，逐状态相等、健康流全 0；
 //! ③ 改坏一次单元写的一个字节之后，两份仍逐状态相等，那次写持久的每个状态都红，而且每个红状态在 CPU 判器上也红（核对红 ⇒ 判器红）。
-//! 要本机一张空闲显存够的 NVIDIA 独显（`usable_gpu_cards` 列不出就 panic，不悄悄跳过）；要 `verdict-store,gpu` 特性。
+//! 要本机一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，
+//! 有卡而用不上（一张都没起来，或 PCI 上有卡而 Vulkan 枚举不出）判红（`gpu_unit_checks::gpu_test_start`）；要 `verdict-store,gpu` 特性。
 #![cfg(all(feature = "verdict-store", feature = "gpu"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -17,7 +18,7 @@ use singlefs_checker_tier::crash_facts::{
     extract_flow_facts, verdict_bits, verify_states_from_facts, FlowFacts, BASE_IMAGE_SOURCE,
 };
 use singlefs_checker_tier::crash_verify_gpu::{gpu_verifier_digest, GpuFactsVerifier};
-use singlefs_checker_tier::gpu_unit_checks::{usable_gpu_cards, GpuCard};
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_harness::memory_pool::{
     writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, RetainedWrite,
@@ -33,13 +34,6 @@ fn expansion(_segment_index: usize, segment: &[usize]) -> Layer0SegmentExpansion
     } else {
         Layer0SegmentExpansion::NotExpanded
     }
-}
-
-fn one_usable_card() -> GpuCard {
-    usable_gpu_cards()
-        .into_iter()
-        .next()
-        .expect("本机要有一张空闲显存够的 NVIDIA 独显；没有就是这条测试的环境没搭好，不悄悄跳过")
 }
 
 struct Recorded {
@@ -112,7 +106,11 @@ fn facts_of(recorded: &Recorded) -> FlowFacts {
 #[test]
 fn gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_both_and_on_the_judge(
 ) {
-    let card = one_usable_card();
+    let Some(card) = first_usable_card_or_report_not_run(
+        "gpu_and_cpu_verifiers_agree_on_every_state_and_a_flipped_unit_byte_is_red_on_both_and_on_the_judge",
+    ) else {
+        return;
+    };
     let healthy = record_new_pool_file_creation("crash-facts-gpu-healthy");
     let facts = facts_of(&healthy);
     assert!(

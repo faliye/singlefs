@@ -826,7 +826,7 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 /// `LAYER0_PARALLEL_START` + 46 行 `LAYER0_PROGRESS` + `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 51 行。
 /// C577（系统配置没见证到的最新根，乙罩不到）那道发布返回之前的屏障加上之后甲二那一段 54 → 46 个状态（`crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs` 文件头），
 /// 行数与进度文件行数照这个数静态改（合入后验证二，改法 B 报告第四节第 5 条推的，没跑）；池级 checker 多一条 I-7.14 之后
-/// 打印的计数行与进度文件内容也跟着变。**两个 SHA-256 与进度文件名里的计划哈希留原值，待第五步 54 号跑出来重录**
+/// 打印的计数行与进度文件内容也跟着变。**两个 SHA-256 与进度文件名里的计划哈希留原值，待第五步 checker-tier-layer0-replay 跑出来重录**
 /// （checker 档，子 agent 不跑）。
 ///
 /// 钉值的来历：头一版取自加分片之前的代码（`crash.rs` 与 `layer0_progress.rs` 加分片之前那一版：38 行、SHA-256 `6deeb48f…`，
@@ -840,7 +840,7 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 const GOLDEN_PRINTED_LINE_COUNT: usize = 58;
 const GOLDEN_PRINTED_LINES_SHA256: &str =
     "15867e366db44d88e7de85fafe40ab6940310fc9cfe1a75787846c39b1024212";
-/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（47 行：文件头 + 46 行片行；两个值都待第五步 54 号重录，见上）。
+/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（47 行：文件头 + 46 行片行；两个值都待第五步 checker-tier-layer0-replay 重录，见上）。
 const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-5026593803c5654d562ab1858215ddd4a5be477116564e882947660016a1eb5e.txt";
 const GOLDEN_PROGRESS_FILE_SHA256: &str =
     "6a153e1e268f829997ed67198ce0d125a450d0b12c4cdfbf5e6c1024ad8d5cd8";

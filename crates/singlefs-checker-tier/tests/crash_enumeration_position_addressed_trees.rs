@@ -1,5 +1,5 @@
 //! checker 档模块：crash
-//! 分配记录树与 extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1–K4）的层 0：
+//! 分配记录树与 extent 树按 key 空间定形状（D8（核心索引结构） 已定项 14 的 K1–K4）的层 0：
 //! 两棵按位置寻址的树每一种新写序进崩溃点。**起点镜像不枚举，只录被判的那一次发布（或那一次挂载）**，同
 //! `crash_enumeration_tree_split_streams.rs` 的切法：之前那一大截全部施加成起点镜像，录制流从那一次的第一个写切起。
 //! 每个状态跑两遍恢复（看 / 不看 journal）+ 多版本 oracle + 池级 checker（两棵树逐节点按位置核 I-1.1、每个节点有分配记录 I-3.10）
@@ -21,7 +21,7 @@
 //! 缩回。多跑的一步：前四条只有恢复本身；第五条多一次取号与写行、暖机（可写挂载），恢复落在树表 0 条那几代上（只许报没有文件）。
 //! 与已有流的基线镜像、写表、段序列都不相同，各自全量枚举（第三条的单元写段与记录段太大、全量枚举不出来，见那条用例的注）。
 //!
-//! 按派活的约束这一份只要求编译通过，一条都没跑；快档与全量交 crash-verifier 跑。
+//! 按派活的约束这一份只要求编译通过，一条都没跑；快档提交时由主 agent 经门禁 checker-tier-layer0-replay 跑，全量由主 agent 在用户要求时经它的 `--full` 跑。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -478,7 +478,7 @@ fn every_position_addressed_tree_stream_recovers_cleanly_in_every_state_of_its_s
 /// 全量：单元写段的全部子集也展开（分配记录树那一条单元写段约 2 × 14 写，状态数上亿级；两条 extent 流约 2 × 10 写）。
 /// 第三条（145 个数据单元）不在里面：单元写段约 300 写、记录段 290 写，全量枚举不出来——那一格要按段内取样，条款与装置都没有，交回里写明。
 #[test]
-#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；交 crash-verifier 在 release 下跑"]
+#[ignore = "单元写段全展开，状态数上亿、每个两遍恢复 + checker；用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 在 release 下跑，提交时的快档只核它的全绿标记"]
 fn full_enumeration_of_every_enumerable_position_addressed_tree_stream_is_exhaustive_and_clean() {
     for stream in PositionAddressedStream::ENUMERABLE_IN_FULL {
         let tally = enumerate(stream, &|_segment_index, _segment| true);

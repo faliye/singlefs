@@ -163,7 +163,9 @@ impl CoverageReport {
 
 // ============================== 录入的属性：写表与父输出 ==============================
 
-fn content_digest_text(contents: &WrittenContents) -> String {
+/// 一次写的内容在写表哈希里的写法：普通写取字节的 SHA-256，整段清零只写长度。崩溃放量算判器另读的输入时
+/// （`crash_amplification` 的计划哈希）也照这一份写，两处一个写法。
+pub(crate) fn content_digest_text(contents: &WrittenContents) -> String {
     match contents {
         WrittenContents::Bytes(bytes) => hexadecimal_text(&sha256_digest(bytes)),
         WrittenContents::Zeros { length } => format!("zeros:{length}"),
@@ -410,11 +412,48 @@ pub struct JudgingCodeError {
 pub struct JudgingCode {
     pub files: Vec<String>,
     pub raw_files: BTreeSet<String>,
-    /// 每份被收的文件是被谁、因为什么收进来的（入口文件记「entry」）：给人查「为什么这份也算进来」。
+    /// 每份被收的文件是被谁、因为什么收进来的（入口文件记「entry」）：给人查「为什么这份也算进来」。只记第一个，全部的在
+    /// [`Self::introducers_of_each_file`]。
     pub reason_of_each_file: BTreeMap<String, String>,
+    /// 每份被收、或被停在门外的文件的全部引入者（不只第一个）：按份判「谁把它带进来」用（[`random_history_scaffolding_introducers_judged`]）。
+    pub introducers_of_each_file: BTreeMap<String, BTreeSet<FileIntroducer>>,
     /// 被引到、按停止表停在门外的文件（不收、不往下收）：给人查停止表里哪几条真的拦到了。
     pub stopped_at: BTreeSet<String>,
     pub digest: [u8; DIGEST_BYTES],
+}
+
+/// 一份文件进了判法闭包（或被停在门外）是谁带的：它就是入口、哪份文件经路径或 `use` 引到它、哪份文件按原文读它、
+/// 它的 `impl` 头点名了闭包里声明的哪个名字。
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FileIntroducer {
+    Entry,
+    ReferencedBy { file: String },
+    ReadAsRawTextBy { file: String },
+    ImplHeaderNaming { declared_name: String },
+}
+
+impl FileIntroducer {
+    /// 经文件带进来的（引到、按原文读）交回那份文件；入口与 `impl` 头没有引入它的文件，交回 None。
+    #[must_use]
+    pub fn introducing_file(&self) -> Option<&str> {
+        match self {
+            Self::ReferencedBy { file } | Self::ReadAsRawTextBy { file } => Some(file),
+            Self::Entry | Self::ImplHeaderNaming { .. } => None,
+        }
+    }
+}
+
+/// 记下 `file` 的一个引入者。同一份文件的每一个引入者都记：只记第一个，入口文件自己先引了随机历史脚手架时，
+/// 后面经库模块引它的那一份就看不见了（test-script-align-code-r3 判决之后的 impl-b0-guard 报告第 3 条）。
+fn note_introducer(
+    introducers_of_each_file: &mut BTreeMap<String, BTreeSet<FileIntroducer>>,
+    file: &str,
+    introducer: FileIntroducer,
+) {
+    introducers_of_each_file
+        .entry(file.to_string())
+        .or_default()
+        .insert(introducer);
 }
 
 /// 工作区里每个 crate 的名字（下划线形）→ 目录（仓内路径）。
@@ -830,6 +869,133 @@ pub const FILES_THE_JUDGES_MUST_NOT_REACH: &[(&str, &str)] = &[
     ),
 ];
 
+// ============================== 登记的崩溃枚举用例：随机历史脚手架经谁进判法闭包 ==============================
+
+/// 随机历史脚手架（生成器、执行器、取样与复现入口，连同它带进来的理想模型、对拍、场景、故障注入）。登记的崩溃枚举用例的判法闭包里
+/// 有了它，改随机历史就让那一格整格重判（E164 W5）。
+pub const RANDOM_HISTORY_SCAFFOLDING_FILE: &str = "crates/singlefs-harness/src/history.rs";
+
+/// 一条登记的崩溃枚举用例许经一份库模块引随机历史脚手架（用户 2026-10-02 定「按登记用例白名单」）：只给拿随机历史当输入的用例登记，
+/// 理由写明它的判定为什么本来就随随机历史变。
+pub struct RandomHistoryThroughALibraryModuleAllowed {
+    /// `.claude/gate.d/stage-inputs.tsv` 里 `crash-case:` 行 `test=` 列的测试目标。
+    pub test_target: &'static str,
+    /// 引随机历史脚手架的那份库模块（仓内路径，`crates/<包>/src/` 下）。
+    pub library_module: &'static str,
+    pub reason: &'static str,
+}
+
+/// 登记表：哪条用例许经哪份库模块引随机历史脚手架。没登记的库模块把它带进登记的崩溃枚举用例，判法闭包那一核就拦
+/// （[`random_history_scaffolding_introducers_judged`]）；登记了而那条用例的闭包里没有这一引的是死条目，同一核也拦。
+pub const RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED: &[RandomHistoryThroughALibraryModuleAllowed] = &[
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_injection_campaign",
+        library_module: "crates/singlefs-checker-tier/src/crash_injection.rs",
+        reason: "崩溃注入拿随机历史当输入：战役按种子生成随机历史、执行时注入崩溃、照理想模型判恢复落到的版本，判定本来就随随机历史的生成器与执行器变",
+    },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_injection_campaign",
+        library_module: "crates/singlefs-harness/src/model_comparison.rs",
+        reason: "崩溃注入拿随机历史当输入：战役经 crash_injection.rs 用它把崩溃之后读回的结果对到理想模型；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收），判定随对拍的写法变",
+    },
+];
+
+/// 随机历史脚手架的一个引入者判下来是什么。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RandomHistoryIntroducerVerdict {
+    /// 它就是测试目标的入口。
+    EntryOfTheTestTarget,
+    /// 测试目标自己的文件（`tests/` 下，连同经 `#[path]` 共用的搭建模块）直接引：放行。
+    TestTargetFile,
+    /// 库模块引，这条用例登记过它：放行，理由在登记表里。
+    RegisteredLibraryModule { reason: &'static str },
+    /// 库模块引，这条用例没登记它：拦。
+    UnregisteredLibraryModule,
+    /// `impl` 头点名了闭包里声明的名字把它带进来：拦，登记不了。
+    BroughtInByAnImplHeader,
+}
+
+impl RandomHistoryIntroducerVerdict {
+    #[must_use]
+    pub fn is_let_through(&self) -> bool {
+        match self {
+            Self::EntryOfTheTestTarget
+            | Self::TestTargetFile
+            | Self::RegisteredLibraryModule { .. } => true,
+            Self::UnregisteredLibraryModule | Self::BroughtInByAnImplHeader => false,
+        }
+    }
+}
+
+/// 随机历史脚手架的一个引入者与它的判定。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct JudgedRandomHistoryIntroducer {
+    pub introducer: FileIntroducer,
+    pub verdict: RandomHistoryIntroducerVerdict,
+}
+
+/// 仓内路径是不是某个包的库模块（`crates/<包>/src/` 下）；不是的是测试目标自己的文件（`crates/<包>/tests/` 下）。
+fn is_a_library_module(file: &str) -> bool {
+    let mut parts = file.split('/');
+    parts.next() == Some("crates") && parts.next().is_some() && parts.next() == Some("src")
+}
+
+/// 逐份判一条登记的崩溃枚举用例里随机历史脚手架的引入者（用户 2026-10-02 定「逐份判」）。闭包从
+/// `crates/singlefs-checker-tier/tests/<test_target>.rs` 出发按模块引用收、到 [`RANDOM_HISTORY_SCAFFOLDING_FILE`] 停：
+/// 停在门外那一份的每一个引入者，都是不经随机历史脚手架自己就进了闭包、又引它的文件。只因随机历史脚手架才进闭包的模块
+/// （它自己带进来的故障注入、对拍）回引它，不算把它带进来。交回每个引入者与判定（按引入者排序）；闭包够不着随机历史脚手架时是空的。
+///
+/// # Errors
+/// 同 [`judging_code_by_module_references_stopping_at`]。
+pub fn random_history_scaffolding_introducers_judged(
+    repository_root: &Path,
+    test_target: &str,
+    toolchain: &Layer0ToolchainIdentity,
+    allowed: &[RandomHistoryThroughALibraryModuleAllowed],
+) -> Result<Vec<JudgedRandomHistoryIntroducer>, JudgingCodeError> {
+    let entry = format!("crates/singlefs-checker-tier/tests/{test_target}.rs");
+    let closure_stopped_at_the_scaffolding = judging_code_by_module_references_stopping_at(
+        repository_root,
+        &[entry.as_str()],
+        &[RANDOM_HISTORY_SCAFFOLDING_FILE],
+        toolchain,
+    )?;
+    let Some(introducers) = closure_stopped_at_the_scaffolding
+        .introducers_of_each_file
+        .get(RANDOM_HISTORY_SCAFFOLDING_FILE)
+    else {
+        return Ok(Vec::new());
+    };
+    let verdict_on_an_introducing_file = |file: &str| {
+        if !is_a_library_module(file) {
+            return RandomHistoryIntroducerVerdict::TestTargetFile;
+        }
+        match allowed
+            .iter()
+            .find(|row| row.test_target == test_target && row.library_module == file)
+        {
+            Some(row) => {
+                RandomHistoryIntroducerVerdict::RegisteredLibraryModule { reason: row.reason }
+            }
+            None => RandomHistoryIntroducerVerdict::UnregisteredLibraryModule,
+        }
+    };
+    Ok(introducers
+        .iter()
+        .map(|introducer| JudgedRandomHistoryIntroducer {
+            introducer: introducer.clone(),
+            verdict: match introducer {
+                FileIntroducer::Entry => RandomHistoryIntroducerVerdict::EntryOfTheTestTarget,
+                FileIntroducer::ReferencedBy { file }
+                | FileIntroducer::ReadAsRawTextBy { file } => verdict_on_an_introducing_file(file),
+                FileIntroducer::ImplHeaderNaming { .. } => {
+                    RandomHistoryIntroducerVerdict::BroughtInByAnImplHeader
+                }
+            },
+        })
+        .collect())
+}
+
 /// 判器的判法代码：从 [`JUDGE_ENTRY_FILES`] 出发、到 [`JUDGE_CLOSURE_STOP_FILES`] 停的模块引用闭包。
 ///
 /// # Errors
@@ -882,9 +1048,11 @@ pub fn judging_code_by_module_references_stopping_at(
     let mut raw_files: BTreeSet<String> = BTreeSet::new();
     let mut tokens_of: BTreeMap<String, Vec<String>> = BTreeMap::new();
     let mut reason_of_each_file: BTreeMap<String, String> = BTreeMap::new();
+    let mut introducers_of_each_file: BTreeMap<String, BTreeSet<FileIntroducer>> = BTreeMap::new();
     let mut pending: Vec<String> = entry_files.iter().map(|file| (*file).to_string()).collect();
     for file in &pending {
         reason_of_each_file.insert(file.clone(), "entry".to_string());
+        note_introducer(&mut introducers_of_each_file, file, FileIntroducer::Entry);
     }
     loop {
         while let Some(file) = pending.pop() {
@@ -899,10 +1067,20 @@ pub fn judging_code_by_module_references_stopping_at(
                     reason_of_each_file
                         .entry(raw_file.clone())
                         .or_insert_with(|| format!("include_str in {file}"));
+                    note_introducer(
+                        &mut introducers_of_each_file,
+                        &raw_file,
+                        FileIntroducer::ReadAsRawTextBy { file: file.clone() },
+                    );
                     pending.push(raw_file);
                 }
             }
             for referenced_file in referenced {
+                note_introducer(
+                    &mut introducers_of_each_file,
+                    &referenced_file,
+                    FileIntroducer::ReferencedBy { file: file.clone() },
+                );
                 if stopped(&referenced_file) {
                     stopped_at.insert(referenced_file);
                     continue;
@@ -931,22 +1109,41 @@ pub fn judging_code_by_module_references_stopping_at(
         for directory in crates_touched {
             for file in rust_files_under(repository_root, &format!("{directory}/src")) {
                 // src/bin/ 下是各自成 crate 的装置二进制，不是库的模块，节点不经它们判。
-                if included.contains(&file) || file.starts_with(&format!("{directory}/src/bin/")) {
+                if file.starts_with(&format!("{directory}/src/bin/")) {
                     continue;
                 }
-                let tokens = lexical_tokens(&read_repository_file(repository_root, &file)?);
-                let header_names = names_in_impl_headers(&tokens);
+                // 已收的文件不再收，但它的 impl 头照样算引入者（全部引入者都记）：词法单元已经在手，不重读。
+                let header_names = match tokens_of.get(&file) {
+                    Some(tokens) => names_in_impl_headers(tokens),
+                    None => names_in_impl_headers(&lexical_tokens(&read_repository_file(
+                        repository_root,
+                        &file,
+                    )?)),
+                };
                 let shared: Vec<&String> = header_names.intersection(&declared).collect();
-                if let Some(name) = shared.first() {
-                    if stopped(&file) {
-                        stopped_at.insert(file);
-                        continue;
-                    }
-                    reason_of_each_file
-                        .entry(file.clone())
-                        .or_insert_with(|| format!("impl names {name}"));
-                    pending.push(file);
+                let Some(first_name) = shared.first() else {
+                    continue;
+                };
+                for name in &shared {
+                    note_introducer(
+                        &mut introducers_of_each_file,
+                        &file,
+                        FileIntroducer::ImplHeaderNaming {
+                            declared_name: (*name).clone(),
+                        },
+                    );
                 }
+                if included.contains(&file) {
+                    continue;
+                }
+                if stopped(&file) {
+                    stopped_at.insert(file);
+                    continue;
+                }
+                reason_of_each_file
+                    .entry(file.clone())
+                    .or_insert_with(|| format!("impl names {first_name}"));
+                pending.push(file);
             }
         }
         if pending.is_empty() {
@@ -995,6 +1192,7 @@ pub fn judging_code_by_module_references_stopping_at(
         files: included.into_iter().collect(),
         raw_files,
         reason_of_each_file,
+        introducers_of_each_file,
         stopped_at,
         digest: sha256_digest(text.as_bytes()),
     })
@@ -1031,9 +1229,12 @@ mod tests {
 
     fn repository_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../..")
+            .join("../../Cargo.lock")
             .canonicalize()
-            .expect("仓根在 crate 往上两层")
+            .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+            .parent()
+            .expect("Cargo.lock 所在的目录就是仓根")
+            .to_path_buf()
     }
 
     #[test]
@@ -1128,7 +1329,7 @@ mod tests {
         }
     }
 
-    /// 判器的判法闭包：两个判器、它们调的恢复与池级 checker、格式常量、内存池里的状态拼装、五份内核原文都在；流水线（录入、存储、
+    /// 判器的判法闭包：两个判器、它们调的恢复（连同恢复调的取前缀核 `singlefs-replay-prefix`）与池级 checker、格式常量、内存池里的状态拼装、五份内核原文都在；流水线（录入、存储、
     /// 身份、对账）、进度模块、设点的测试文件、实现的写路径、装置二进制都不在。停止表里每一条都指到现存文件、都真的拦到了（没拦到的是死条目）。
     #[test]
     fn the_judging_closure_of_the_judges_holds_recovery_the_checker_and_the_kernels_and_stops_before_the_pipeline(
@@ -1161,6 +1362,7 @@ mod tests {
             "crates/singlefs-checker/src/walk.rs",
             "crates/singlefs-checker/src/image.rs",
             "crates/singlefs-core/src/recovery.rs",
+            "crates/singlefs-replay-prefix/src/lib.rs",
             "crates/singlefs-format/src/lib.rs",
             "crates/singlefs-harness/src/memory_pool.rs",
         ] {
@@ -1220,7 +1422,7 @@ mod tests {
     }
 
     /// 判定只随判器变：在仓副本里给流水线、存储、身份、进度模块、设点的测试文件、实现的写路径各加一条真语句，判法摘要不动；
-    /// 给 CPU 判器、GPU 判器、它的输入表、恢复、池级 checker 走树各加一条，摘要变；一份内核原文改一个字节，摘要变。
+    /// 给 CPU 判器、GPU 判器、它的输入表、恢复、取前缀核、池级 checker 走树各加一条，摘要变；一份内核原文改一个字节，摘要变。
     #[test]
     fn the_judging_digest_ignores_the_pipeline_and_the_progress_module_but_follows_every_judge() {
         let root = repository_root();
@@ -1271,6 +1473,7 @@ mod tests {
             "crates/singlefs-checker-tier/src/crash_judge_gpu.rs",
             "crates/singlefs-checker-tier/src/crash_judge_tables.rs",
             "crates/singlefs-core/src/recovery.rs",
+            "crates/singlefs-replay-prefix/src/lib.rs",
             "crates/singlefs-checker/src/walk.rs",
         ] {
             assert_ne!(
@@ -1311,25 +1514,100 @@ mod tests {
         assert_eq!(original.digest, copied.digest, "摘要相同：身份不含绝对路径");
     }
 
-    /// 每条登记的崩溃枚举用例的判法代码：含恢复与 checker 走树（判它们的正是这两样），不含装置二进制、不含随机历史脚手架
-    /// （按 crate 闭包取会把整个 harness 收进来，E164 W5 量到崩溃枚举节点 20 个提交全部重跑；按模块引用取就不会）。
+    /// 崩溃枚举用例登记表在仓里的位置（相对仓根）。
+    const CRASH_CASE_REGISTRY: &str = ".claude/gate.d/stage-inputs.tsv";
+
+    /// 从仓根取崩溃枚举用例登记了哪些测试目标：登记表在就逐行取 `crash-case:` 行 `test=` 列的测试目标；
+    /// 不在（只导出 `crates/` 的树，广谱变异的导出树就是这样）交回 [`CrashCaseRegistration::RegistryAbsent`]，不猜。
+    #[derive(Debug, PartialEq, Eq)]
+    enum CrashCaseRegistration {
+        Registered { targets: Vec<String> },
+        RegistryAbsent { looked_at: PathBuf },
+    }
+
+    /// # Panics
+    /// 登记表在却读不出、或某一行 `crash-case:` 没有 `test=` 列或 `test=` 列里没有测试目标。
+    fn crash_case_registration_under(root: &Path) -> CrashCaseRegistration {
+        let registry = root.join(CRASH_CASE_REGISTRY);
+        if !registry.is_file() {
+            return CrashCaseRegistration::RegistryAbsent {
+                looked_at: registry,
+            };
+        }
+        let registrations = std::fs::read_to_string(&registry).expect("登记表在就读得出");
+        let targets = registrations
+            .lines()
+            .filter(|line| line.starts_with("crash-case:"))
+            .map(|line| {
+                let test_column = line
+                    .split('\t')
+                    .find_map(|column| column.strip_prefix("test="))
+                    .expect("test= 列");
+                test_column.split(':').nth(1).expect("测试目标").to_string()
+            })
+            .collect();
+        CrashCaseRegistration::Registered { targets }
+    }
+
+    /// 仓里登记表在，取到的是登记的那几条。
+    #[test]
+    fn crash_case_registration_reads_the_crash_cases_registered_in_the_repository() {
+        match crash_case_registration_under(&repository_root()) {
+            CrashCaseRegistration::Registered { targets } => assert!(
+                targets
+                    .iter()
+                    .any(|target| target == "crash_enumeration_fixed_script_stream"),
+                "仓里的登记表登记了固定脚本那条流（取到的：{targets:?}）"
+            ),
+            CrashCaseRegistration::RegistryAbsent { looked_at } => {
+                panic!("仓里登记表 {} 在，却认成不在", looked_at.display())
+            }
+        }
+    }
+
+    /// 只有 `crates/` 的树（广谱变异的导出树）里登记表不在，认成「不在」，不认成「登记了 0 条」。
+    #[test]
+    fn crash_case_registration_reports_the_registry_absent_in_a_tree_of_only_crates() {
+        let exported =
+            std::env::temp_dir().join(format!("singlefs-exported-crates-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&exported);
+        std::fs::create_dir_all(exported.join("crates")).expect("建得出导出树");
+        let registration = crash_case_registration_under(&exported);
+        std::fs::remove_dir_all(&exported).expect("删得掉导出树");
+        assert_eq!(
+            registration,
+            CrashCaseRegistration::RegistryAbsent {
+                looked_at: exported.join(CRASH_CASE_REGISTRY)
+            },
+            "只有 crates/ 的树里登记表不在"
+        );
+    }
+
+    /// 每条登记的崩溃枚举用例的判法代码：含恢复与 checker 走树（判它们的正是这两样），不含装置二进制；随机历史脚手架只许由测试目标自己的
+    /// 文件直接引，或经登记表（[`RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED`]）给这条用例登记过的库模块引，逐个引入者判
+    /// （按 crate 闭包取会把整个 harness 收进来，E164 W5 量到崩溃枚举节点 20 个提交全部重跑；按模块引用取就不会）。登记表里每一行
+    /// 都要在它那条用例里真的引到（没引到的是死条目）。
+    /// 登记表不在（只导出 `crates/` 的树）时这一核没有对象：打一行 `CRASH_CASE_REGISTRY_ABSENT` 写明跳过、不判；
+    /// 按 `tests/` 下的文件名认不出登记的那几条（登记的有不以 `crash_enumeration_` 起头的，以它起头的也有没登记的）。
     #[test]
     fn every_registered_crash_case_depends_on_recovery_and_the_checker_walk_but_not_on_apparatus_binaries(
     ) {
         let root = repository_root();
         let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
-        let registrations =
-            std::fs::read_to_string(root.join(".claude/gate.d/stage-inputs.tsv")).expect("登记表");
+        let targets = match crash_case_registration_under(&root) {
+            CrashCaseRegistration::Registered { targets } => targets,
+            CrashCaseRegistration::RegistryAbsent { looked_at } => {
+                println!(
+                    "CRASH_CASE_REGISTRY_ABSENT registry={} 登记表不在（只导出 crates/ 的树），跳过「登记的崩溃枚举用例的判法代码」这一核",
+                    looked_at.display()
+                );
+                return;
+            }
+        };
         let mut cases = 0usize;
-        for line in registrations
-            .lines()
-            .filter(|line| line.starts_with("crash-case:"))
-        {
-            let test_column = line
-                .split('\t')
-                .find_map(|column| column.strip_prefix("test="))
-                .expect("test= 列");
-            let target = test_column.split(':').nth(1).expect("测试目标");
+        let mut blocked_introducers: Vec<(String, JudgedRandomHistoryIntroducer)> = Vec::new();
+        let mut registrations_used: BTreeSet<(String, String)> = BTreeSet::new();
+        for target in &targets {
             let entry = format!("crates/singlefs-checker-tier/tests/{target}.rs");
             let code = judging_code_by_module_references(&root, &[entry.as_str()], &toolchain)
                 .expect("算得出");
@@ -1365,17 +1643,177 @@ mod tests {
                     .any(|file| file.starts_with("crates/singlefs-checker-tier/src/bin/")),
                 "{target}：装置二进制不是节点判定走的代码"
             );
-            if let Some(reason) = code
-                .reason_of_each_file
-                .get("crates/singlefs-harness/src/history.rs")
-            {
-                assert!(
-                    reason.starts_with("referenced by crates/singlefs-checker-tier/tests/"),
-                    "{target}：随机历史脚手架只许由测试文件自己直接引进来，不许经 impl 头带进来（{reason}）"
+            let judged_introducers = random_history_scaffolding_introducers_judged(
+                &root,
+                target,
+                &toolchain,
+                RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED,
+            )
+            .expect("算得出");
+            for judged in judged_introducers {
+                println!(
+                    "RANDOM_HISTORY_INTRODUCER entry={target} introducer={:?} verdict={:?}",
+                    judged.introducer, judged.verdict
                 );
+                if let (
+                    Some(file),
+                    RandomHistoryIntroducerVerdict::RegisteredLibraryModule { .. },
+                ) = (judged.introducer.introducing_file(), &judged.verdict)
+                {
+                    registrations_used.insert((target.clone(), file.to_string()));
+                }
+                if !judged.verdict.is_let_through() {
+                    blocked_introducers.push((target.clone(), judged));
+                }
             }
             cases += 1;
         }
         assert!(cases >= 8, "登记表里至少 8 条崩溃枚举用例，实际 {cases}");
+        assert!(
+            blocked_introducers.is_empty(),
+            "随机历史脚手架经没登记的库模块或 impl 头进了登记的崩溃枚举用例的判法代码（用例，引入者，判定）：{blocked_introducers:?}。\
+             拿随机历史当输入的用例在 RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED 登记那份库模块并写明理由；别的用例改成不经库模块引它"
+        );
+        for row in RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED {
+            assert!(
+                registrations_used
+                    .contains(&(row.test_target.to_string(), row.library_module.to_string())),
+                "登记表里 {} 经 {} 引随机历史脚手架那一行，在这条用例的判法闭包里没引到（或它不是登记的崩溃枚举用例）：死条目，删掉它（{}）",
+                row.test_target,
+                row.library_module,
+                row.reason
+            );
+        }
+    }
+
+    /// 只有两个包的小仓：入口测试文件先直接引随机历史脚手架，再引一份库模块，那份库模块也引它——闭包里第二份文件经库模块引。
+    /// 交回小仓的根；用完由调用方删。
+    fn repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
+        tag: &str,
+    ) -> PathBuf {
+        let root = std::env::temp_dir().join(format!(
+            "singlefs-random-history-introducers-{tag}-{}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        for (file, contents) in [
+            ("Cargo.lock", ""),
+            (
+                "crates/singlefs-harness/Cargo.toml",
+                "[package]\nname = \"singlefs-harness\"\n",
+            ),
+            ("crates/singlefs-harness/src/lib.rs", "pub mod history;\n"),
+            (
+                RANDOM_HISTORY_SCAFFOLDING_FILE,
+                "pub const RANDOM_HISTORY_PROBE: u8 = 1;\n",
+            ),
+            (
+                "crates/singlefs-checker-tier/Cargo.toml",
+                "[package]\nname = \"singlefs-checker-tier\"\n",
+            ),
+            (
+                "crates/singlefs-checker-tier/src/lib.rs",
+                "pub mod campaign_probe;\n",
+            ),
+            (
+                "crates/singlefs-checker-tier/src/campaign_probe.rs",
+                "use singlefs_harness::history::RANDOM_HISTORY_PROBE;\npub fn probe() -> u8 { RANDOM_HISTORY_PROBE }\n",
+            ),
+            (
+                "crates/singlefs-checker-tier/tests/probe_case.rs",
+                "use singlefs_harness::history::RANDOM_HISTORY_PROBE;\nuse singlefs_checker_tier::campaign_probe::probe;\n\
+                 #[test]\nfn probe_case() { assert_eq!(probe(), RANDOM_HISTORY_PROBE); }\n",
+            ),
+        ] {
+            let path = root.join(file);
+            std::fs::create_dir_all(path.parent().expect("文件有上层")).expect("建得了目录");
+            std::fs::write(&path, contents).expect("写得了小仓的文件");
+        }
+        root
+    }
+
+    const LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY: &str =
+        "crates/singlefs-checker-tier/src/campaign_probe.rs";
+    const ENTRY_OF_THE_SMALL_REPOSITORY: &str = "crates/singlefs-checker-tier/tests/probe_case.rs";
+
+    /// 闭包里第二份文件经库模块引随机历史脚手架，那份库模块只给别的用例登记过：拦；入口自己直接引的那一处照旧放行。
+    /// 入口先引到它，只记第一个引入者就看不见库模块那一引（这条变红）。
+    #[test]
+    fn a_library_module_second_in_the_closure_referencing_the_random_history_unregistered_for_the_case_is_blocked(
+    ) {
+        let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
+            "unregistered",
+        );
+        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let registered_for_another_case = [RandomHistoryThroughALibraryModuleAllowed {
+            test_target: "another_case",
+            library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,
+            reason: "只给别的用例登记",
+        }];
+        let judged = random_history_scaffolding_introducers_judged(
+            &root,
+            "probe_case",
+            &toolchain,
+            &registered_for_another_case,
+        );
+        std::fs::remove_dir_all(&root).expect("删得掉小仓");
+        assert_eq!(
+            judged.expect("小仓算得出"),
+            vec![
+                JudgedRandomHistoryIntroducer {
+                    introducer: FileIntroducer::ReferencedBy {
+                        file: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY.to_string()
+                    },
+                    verdict: RandomHistoryIntroducerVerdict::UnregisteredLibraryModule,
+                },
+                JudgedRandomHistoryIntroducer {
+                    introducer: FileIntroducer::ReferencedBy {
+                        file: ENTRY_OF_THE_SMALL_REPOSITORY.to_string()
+                    },
+                    verdict: RandomHistoryIntroducerVerdict::TestTargetFile,
+                },
+            ],
+            "两个引入者都要判到：库模块那一引没给这条用例登记，拦；入口自己直接引，放行"
+        );
+    }
+
+    /// 同一个小仓，那份库模块给这条用例登记了：放，判定带着登记的理由。
+    #[test]
+    fn a_library_module_second_in_the_closure_referencing_the_random_history_registered_for_the_case_is_let_through(
+    ) {
+        let root = repository_where_the_second_file_in_the_closure_references_the_random_history_through_a_library_module(
+            "registered",
+        );
+        let toolchain = Layer0ToolchainIdentity::of_the_cargo_running_this_test();
+        let registered_for_this_case = [RandomHistoryThroughALibraryModuleAllowed {
+            test_target: "probe_case",
+            library_module: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY,
+            reason: "这条用例拿随机历史当输入",
+        }];
+        let judged = random_history_scaffolding_introducers_judged(
+            &root,
+            "probe_case",
+            &toolchain,
+            &registered_for_this_case,
+        );
+        std::fs::remove_dir_all(&root).expect("删得掉小仓");
+        let judged = judged.expect("小仓算得出");
+        assert!(
+            judged
+                .iter()
+                .all(|introducer| introducer.verdict.is_let_through()),
+            "登记过的库模块与入口自己都放行：{judged:?}"
+        );
+        assert!(
+            judged.contains(&JudgedRandomHistoryIntroducer {
+                introducer: FileIntroducer::ReferencedBy {
+                    file: LIBRARY_MODULE_OF_THE_SMALL_REPOSITORY.to_string()
+                },
+                verdict: RandomHistoryIntroducerVerdict::RegisteredLibraryModule {
+                    reason: "这条用例拿随机历史当输入"
+                },
+            }),
+            "库模块那一引判成登记过、带着登记的理由：{judged:?}"
+        );
     }
 }

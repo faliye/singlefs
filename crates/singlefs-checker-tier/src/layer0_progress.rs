@@ -1,7 +1,7 @@
 //! 层 0 全量的断点续跑：进度文件怎么起名、怎么写、怎么读回（层 0 规模三轮判决的 R1–R5 与 U1–U3，
 //! `research/prompts/m2-layer0-scale-r1-main-verification.md` 第三节、`-r2-` 第三节、`-r3-` 第三节；用户 2026-09-26 定「跑前实现」）。
 //!
-//! - 一个进度文件对应「输入指纹 + 流名 + 枚举计划哈希」（R1、U1）：输入指纹由调用方给（门禁 54 号那一份清单），流名由用例给，
+//! - 一个进度文件对应「输入指纹 + 流名 + 枚举计划哈希」（R1、U1）：输入指纹由调用方给（门禁 checker-tier-layer0-replay 那一份清单），流名由用例给，
 //!   计划哈希由枚举器按基线、写表、段、每段怎么展开、被判的根、版本表、切法、有没有观察者现算（`crash` 模块）；三样都进文件名，
 //!   文件头再写一遍，换了任何一样都是另一个文件，互不作废。
 //! - 文件头写片方案（状态数、片数、片长，R2）；读回时逐片核区间，对不上整份作废。
@@ -43,7 +43,7 @@ use singlefs_harness::memory_pool::RecordCheck;
 /// 进度文件放在哪个目录。没设就不留进度文件（平时的 `cargo test`）。
 pub const LAYER0_PROGRESS_DIRECTORY_ENVIRONMENT_VARIABLE: &str =
     "SINGLEFS_LAYER0_PROGRESS_DIRECTORY";
-/// 这一趟的输入指纹（门禁 54 号算的那一份，与它的全绿标记同一份清单）。设了进度目录就必须设。
+/// 这一趟的输入指纹（门禁 checker-tier-layer0-replay 算的那一份，与它的全绿标记同一份清单）。设了进度目录就必须设。
 pub const LAYER0_INPUT_FINGERPRINT_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_INPUT_FINGERPRINT";
 /// 设成 `1`：不管有没有进度文件都从头跑（先删掉这一格的进度文件）。没设或设成 `0` 就续跑。
 pub const LAYER0_START_OVER_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_START_OVER";
@@ -1256,7 +1256,7 @@ pub fn shard_ledger_path(
 }
 
 /// 一片跑的时候起了几个工作线程、配的几个、从哪来、那台机器几核、从进度文件读回几片、这一趟跑了几片、跑了多久：进账本，
-/// merge 时按片报进 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED`（门禁 54 号按片判工作线程）。
+/// merge 时按片报进 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED`（门禁 checker-tier-layer0-replay 按片判工作线程）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Layer0ShardWorkerThreads {
     pub spawned_worker_threads: usize,

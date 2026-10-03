@@ -104,15 +104,85 @@ const INVARIANT_I_9_15: u32 = 47u;
 
 const INVARIANT_I_9_16: u32 = 48u;
 
-var<private> violated_lo: u32;
+// 第 49 条起是里程碑三二·1 那一批（`singlefs_checker::image::IMPLEMENTED_INVARIANTS` 只往末尾追加）
+const INVARIANT_I_1_12: u32 = 49u;
 
-var<private> violated_hi: u32;
+const INVARIANT_I_8_10: u32 = 50u;
+
+const INVARIANT_I_8_11: u32 = 51u;
+
+const INVARIANT_I_4_9: u32 = 52u;
+
+const INVARIANT_I_9_25: u32 = 53u;
+
+const INVARIANT_I_3_13: u32 = 54u;
+
+const INVARIANT_I_9_26: u32 = 55u;
+
+const INVARIANT_I_3_12: u32 = 56u;
+
+const INVARIANT_I_7_16: u32 = 57u;
+
+const INVARIANT_I_7_17: u32 = 58u;
+
+const INVARIANT_I_8_12: u32 = 59u;
+
+const INVARIANT_I_7_15: u32 = 60u;
+
+const INVARIANT_I_4_1: u32 = 61u;
+
+const INVARIANT_I_8_1: u32 = 62u;
+
+const INVARIANT_I_7_5: u32 = 63u;
+
+const INVARIANT_I_8_5: u32 = 64u;
+
+// 第 67、68 条：C673 ⑤ ⑥ 那两条（只往末尾追加；下标 65 的 I-3.5 内核还没判，这里没有它的常量）
+const INVARIANT_I_9_27: u32 = 66u;
+
+const INVARIANT_I_5_5: u32 = 67u;
+
+// I-9.27 读的另外四个种类码（walk.rs 的 TREE_KIND_*；1..8 在 crash_judge_common.wgsl）
+const TREE_KIND_DELETED_INODES: u32 = 9u;
+
+const TREE_KIND_TOMBSTONE: u32 = 10u;
+
+const TREE_KIND_LINEAGE: u32 = 11u;
+
+const TREE_KIND_LOGGED_OPERATIONS: u32 = 12u;
+
+// 树表条目里头 ID 8 字节的偏移（walk.rs 的 TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET）
+const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: u32 = 116u;
+
+// mkfs 种下的树 ID 水位（singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS），I-5.5 认法 ① 拿 extent 树条目的树 ID 比它
+const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u32 = 65536u;
+
+// 从 mkfs 水位第一次建树那一版，每块盘上落点最小的数据单元比单元区起始槽号多几槽（walk.rs 的 FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START）
+const FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START: u32 = 4u;
+
+// 违例位：位 i 在第 i / 32 字的第 i % 32 位（位 i ↔ IMPLEMENTED_INVARIANTS[i]），存进结论的第 POOL_CHECKER_VIOLATED_FIRST_WORD 字起。
+var<private> violated: array<u32, POOL_CHECKER_VIOLATED_WORDS>;
 
 fn violate(invariant: u32) {
-    if (invariant < 32u) {
-        violated_lo = violated_lo | (1u << invariant);
-    } else {
-        violated_hi = violated_hi | (1u << (invariant - 32u));
+    let word_index = invariant / 32u;
+    violated[word_index] = violated[word_index] | (1u << (invariant % 32u));
+}
+
+fn clear_violated() {
+    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
+        violated[word_index] = 0u;
+    }
+}
+
+fn load_violated(out: u32) {
+    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
+        violated[word_index] = verdicts[out + POOL_CHECKER_VIOLATED_FIRST_WORD + word_index];
+    }
+}
+
+fn store_violated(out: u32) {
+    for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
+        verdicts[out + POOL_CHECKER_VIOLATED_FIRST_WORD + word_index] = violated[word_index];
     }
 }
 
@@ -139,8 +209,13 @@ fn checker_root_of(index: u32) -> CheckerRoot {
     return r;
 }
 
+// 根表第二个字：低 8 位是区域号，第 8 位起是区域内的槽号（checker_collect_roots 写，I-7.17 读槽号）
 fn checker_root_region(index: u32) -> u32 {
-    return sw(R_ROOTS + index * 2u + 1u);
+    return sw(R_ROOTS + index * 2u + 1u) & 0xFFu;
+}
+
+fn checker_root_slot_in_its_region(index: u32) -> u32 {
+    return sw(R_ROOTS + index * 2u + 1u) >> 8u;
 }
 
 struct CheckerRecord {
@@ -158,11 +233,16 @@ struct CheckerRecord {
 };
 
 fn checker_record_at(index: u32) -> CheckerRecord {
-    let version = sw(R_RECORDS + index * RECORD_WORDS);
+    return checker_record_of_row(R_RECORDS + index * RECORD_WORDS);
+}
+
+// 草稿区里一行记录（版本、计数器 lo、计数器 hi、实例，之后各表自己的字）解成 CheckerRecord：逐盘的记录表与重放读的那一份环共用
+fn checker_record_of_row(row: u32) -> CheckerRecord {
+    let version = sw(row);
     var r: CheckerRecord;
     r.base = B[T_VERSION_BYTES] + tab(T_VERSIONS, version * VERSION_WORDS + 1u);
-    r.counter = vec2<u32>(sw(R_RECORDS + index * RECORD_WORDS + 1u), sw(R_RECORDS + index * RECORD_WORDS + 2u));
-    r.instance = sw(R_RECORDS + index * RECORD_WORDS + 3u);
+    r.counter = vec2<u32>(sw(row + 1u), sw(row + 2u));
+    r.instance = sw(row + 3u);
     r.txg = rd64(r.base, 26u);
     r.transaction = rd64(r.base, 78u);
     r.commit_byte = rd8(r.base, 86u);
@@ -607,6 +687,21 @@ const H_BELOW_FLOOR_SLOT_COUNT: u32 = 28u;
 const H_MAX_BELOW_FLOOR_SLOTS: u32 = 4096u;
 const H_BELOW_FLOOR_SLOTS: u32 = 235024u;   // 盘、槽 lo/hi
 const H_END: u32 = 247312u;
+
+// ───────────────────────── 交接段之后：走读内核自己用、扫描内核不读的两张表 ─────────────────────────
+// 主走读（上下文 0）每个走过的单元一行：有没有记下诞生代号、诞生代号 lo/hi（walk.rs 的 birth_txg_of_walked_units，与 C_VISITED0 同下标）。
+// 别的版本再引用它时按这张表判 I-4.9（非最新候选根引用的单元不晚于它）。
+const C_VISITED_BIRTH_WORDS: u32 = 3u;
+
+const C_VISITED_BIRTHS0: u32 = 247312u;
+
+// I-4.1 重放读的那一份环（walk.rs 的 records_the_replay_reads）：版本、计数器 lo/hi、实例，按 (实例, 计数器) 升序
+const C_REPLAY_RECORD_WORDS: u32 = 4u;
+
+const C_REPLAY_RECORDS: u32 = 253456u;
+
+// 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
+const SCRATCH_END: u32 = 255504u;
 
 fn handoff_region_device(region: u32) -> u32 {
     if (region == 0u) {

@@ -2,9 +2,9 @@
 //! 里程碑「覆盖写、释放、回退与复用」步 0 在发布 B 上的那一半：把「取号 → 暖机 → A → B」整条录制流按 D13（验证路线） 已定项 4 枚举全部崩溃状态，
 //! 与新池新建文件同一种切法（上一次发布的系统配置槽写与下一次发布的单元写落在同一段，登记表八末尾那条 ⚠️），
 //! 每个状态跑恢复 + 多版本 oracle（实际走的根是哪一代就得读出那一代的内容）、池级 checker、记录核对器。
-//! 平时 `cargo test` 跑甲二快档（每段原地写各取它的几态、任意组合 × 单元写全不落或全落，`crash::Layer0SegmentExpansion`，用户 2026-09-26 定；
-//! 系统配置槽写是原地覆写、多一态「新旧都读不出」，代码审阅第 4 条，用户 2026-09-27 定）；
-//! 全量那条标 ignored，54 号门禁在 release 下跑它（带断点续跑）。再加四组靶向的阳性对照。
+//! 平时 `cargo test` 跑甲二快档（每段原地写各取它的几态、任意组合 × 单元写全不落或全落，`crash::Layer0SegmentExpansion`；
+//! 系统配置槽写是原地覆写、多一态「新旧都读不出」，代码审阅第 4 条）；
+//! 全量那条标 ignored，门禁 checker-tier-layer0-replay 在 release 下跑它（带断点续跑）。再加四组靶向的阳性对照。
 //! 另有两条只展开小段的流：基镜像里预置一条残留记录（步 0 预想的细节第三条的正例），与到 E 之后再复用两次、改坏 tail（步 6 必红「陈旧 tail + 已复用的块」）。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -656,7 +656,7 @@ fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_se
 }
 
 /// 平时跑的那一份（甲二快档）：每段原地写取任意子集 × 单元写全不落或全落（`crash::Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll`）。
-/// 单元写只落一部分才显出来的那一类它看不见，那一类归全量（下面标 ignored 的那条，54 号门禁提交时跑）。
+/// 单元写只落一部分才显出来的那一类它看不见，那一类归全量（下面标 ignored 的那条，门禁 checker-tier-layer0-replay 提交时跑）。
 #[test]
 fn every_crash_state_of_the_quick_tier_recovers_to_the_version_its_root_claims() {
     let prepared = prepare(
@@ -789,11 +789,11 @@ fn one_state_slices_on_eight_threads_merge_into_the_same_tally_and_observation_o
 }
 
 /// 全量：固定脚本到 E 再正常卸载，闭式 [`FULL_STATES_THROUGH_THE_UNMOUNT`] 个状态（段序列由 `prepare` 钉住）。
-/// 54 号门禁在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。带断点续跑（`singlefs_checker_tier::layer0_progress`）：
+/// 门禁 checker-tier-layer0-replay 在 release 下跑它，认下面打印的 `LAYER0B` 行里 `exhaustive=true`。带断点续跑（`singlefs_checker_tier::layer0_progress`）：
 /// 进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件。双机分片（`SINGLEFS_LAYER0_SHARD`，
 /// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 54 号在 release 下跑，带断点续跑"]
+#[ignore = "全量五十多亿个状态、每个两遍恢复 + checker；门禁 checker-tier-layer0-replay 在 release 下跑，带断点续跑"]
 fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
     let prepared = prepare(
         "layer0-e-full",
@@ -804,7 +804,7 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
         FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT,
         "每次写只取两态时的闭式：1 + Σ(2^|段| − 1)"
     );
-    // 计数行的 closed_form 报枚举域的闭式（系统配置槽写三态），54 号认 exhaustive=true 就是枚举到的恰好这么多。
+    // 计数行的 closed_form 报枚举域的闭式（系统配置槽写三态），checker-tier-layer0-replay 认 exhaustive=true 就是枚举到的恰好这么多。
     let closed_form = layer0_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
@@ -831,7 +831,7 @@ fn full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean() {
     };
     let checker_violations: u64 = tally.checker_violated_states.values().sum();
     // 每条不变量报成 `I-x.y=评估过/判违例/不适用` 夹在 checker_violations 与 first_violation 之间（步 6 验收第 3 条：阴性结果与「代码没跑到」分开）；
-    // 54 号门禁只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
+    // 门禁 checker-tier-layer0-replay 只认行首 `LAYER0B ` 与 `exhaustive=true`，整行原样报出来。按发布分的状态数（步 6 验收第 1 条）夹在
     // checker 那一段与 first_violation 之间，随整行一起进门禁的成功句。
     println!(
         "LAYER0B states={} closed_form={closed_form} exhaustive={} violations={} root_persisted_states={} no_file={} file_read={} failed={} journal_differing={} verification_ran={} verification_failed={} record_root_without_record={} record_claimed_state_missing_unit={} checker_violations={checker_violations} {} states_by_publish=[{}] first_violation={}",

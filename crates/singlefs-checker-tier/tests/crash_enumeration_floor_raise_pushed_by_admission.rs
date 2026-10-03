@@ -7,13 +7,16 @@
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
-#[path = "../../singlefs-harness/tests/common_admission/mod.rs"]
-mod common_admission;
+// 池经 `common_admission_pool` 搭、不经 `common_admission`：后者引随机历史脚手架（history.rs）与故障注入，引了就进这条登记用例的判法闭包。
+#[path = "../../singlefs-harness/tests/common_admission_pool/mod.rs"]
+mod common_admission_pool;
 #[cfg(feature = "verdict-store")]
 mod common_crash_points;
 
-use common_admission::{
-    checker_violations_on, content_of, plain_devices_on, PoolUnderTest, OVERWRITE_BYTES,
+use common_admission_pool::{
+    checker_violations_on, content_of, device_bytes_of_the_384_slot_small_devices,
+    fixed_geometry_of_the_384_slot_small_devices, parameters_of_the_384_slot_small_devices,
+    plain_devices_on, PoolUnderTest, OVERWRITE_BYTES,
 };
 use singlefs_checker_tier::crash::{
     enumerate_layer0_in_state_slices, full_expansion,
@@ -26,7 +29,6 @@ use singlefs_core::mount::{
     FloorRaisePushedWithinTheAdmissionBudget,
 };
 use singlefs_core::transaction::{FirstFile, PoolVersion, PoolWriter, PublishError};
-use singlefs_harness::history::HistoryDeviceWidth;
 use singlefs_harness::memory_pool::{
     writes_and_segments, MemoryPool, PublishedVersion, RetainedWrite, SparseBlockDevice,
 };
@@ -48,8 +50,9 @@ struct RecordedFloorRaise {
 fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     let stream = SharedStream::retaining_contents();
     let stream_for_the_devices = stream.clone();
-    let mut pool = PoolUnderTest::start_after_the_first_file(
-        HistoryDeviceWidth::UnitAreaOf384Slots,
+    let mut pool = PoolUnderTest::start_after_the_first_file_on_devices_of(
+        parameters_of_the_384_slot_small_devices(),
+        device_bytes_of_the_384_slot_small_devices(),
         move |identity, device| {
             RecordingBlockDevice::with_shared_stream(
                 identity,
@@ -125,7 +128,7 @@ fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
     pool.session = Some(session);
     pool.note_floor_raises(std::slice::from_ref(&raised));
     let recorded = stream.retained_operations()[operations_before_the_raise..].to_vec();
-    let geometry = HistoryDeviceWidth::UnitAreaOf384Slots.fixed_geometry();
+    let geometry = fixed_geometry_of_the_384_slot_small_devices();
     let (writes, segments) = writes_and_segments(&recorded, &geometry);
     let root_writes: Vec<usize> = writes
         .iter()
@@ -164,7 +167,7 @@ fn record_the_floor_raise_pushed_by_the_session() -> RecordedFloorRaise {
 /// 挂载全做成。状态数照层 0 的口径另算（系统配置槽写是原地覆写、取三态，[`layer0_state_count_with_torn_in_place_overwrites`]），
 /// 落在 10⁶ 以内才枚举；挂载那一遍的镜像照观察者交来的枚举用写表叠（录制流里的写在前，撕裂镜像与重放接在后面），不只叠录制流那几次写。
 #[test]
-#[ignore = "崩溃枚举：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
+#[ignore = "崩溃枚举：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
 fn crash_states_inside_the_floor_raise_pushed_by_the_session_recover_and_remount_with_the_checker_green(
 ) {
     const STATES_AT_MOST: u64 = 1_000_000;

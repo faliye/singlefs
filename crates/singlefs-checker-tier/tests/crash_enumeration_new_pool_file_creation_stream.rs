@@ -489,12 +489,12 @@ fn prepare(tag: &str) -> Prepared {
     }
 }
 
-/// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 54 号在 release 下跑它；平时 `cargo test` 跳过。
+/// 全量：[`FULL_STATES`] 个状态。跑得慢（每个状态两遍恢复 + checker + 记录核对器），门禁 checker-tier-layer0-replay 在 release 下跑它；平时 `cargo test` 跳过。
 /// 带断点续跑（`singlefs_checker_tier::layer0_progress`）：进度目录、输入指纹与强制从头跑的开关都从环境变量取，没设进度目录就不留进度文件；
 /// I-3.10 那一类的逐状态计数记在观察者计数里，续跑时随进度文件接上。双机分片（`SINGLEFS_LAYER0_SHARD`，
 /// `research/scripts/layer0-shard-run.sh`）：跑一片时只写账本、不打计数行、不判；merge 那一趟拿并齐的计数照下面逐项判、逐字打同样的行。
 #[test]
-#[ignore = "全量六千七百多万个状态，门禁 54 号（.claude/gate.d/54-layer0-replay.sh）在 release 下跑，带断点续跑"]
+#[ignore = "全量六千七百多万个状态，门禁 checker-tier-layer0-replay （.claude/gate.d/checker-tier-layer0-replay.sh）在 release 下跑，带断点续跑"]
 fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violations() {
     let prepared = prepare("layer0-full");
     assert_eq!(
@@ -502,7 +502,7 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
         FULL_STATES_WITH_TWO_STATES_PER_WRITE,
         "每次写只取两态时的闭式（E142 产物的 closed_form）"
     );
-    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态），54 号认 exhaustive=true 就是枚举到的恰好这么多。
+    // 计数行的 closed_form 报枚举域的闭式（原地覆写三态），checker-tier-layer0-replay 认 exhaustive=true 就是枚举到的恰好这么多。
     let closed_form = layer0_state_count_with_torn_in_place_overwrites(
         &prepared.base,
         &prepared.writes,
@@ -538,9 +538,9 @@ fn layer0_enumerates_every_crash_state_of_the_settled_stream_with_zero_violation
         tally.first_ignored_violation
     );
     // 读出文件、根槽已持久、journal 承重、验证跑过的那几格都在 A 那一段之后（记录段、根槽段、轮换段、全部持久），与甲二快档相同；
-    // A 那一段的单元写只落一部分的状态上 A 的记录与根都没落，恢复落在暖机 txg 2 的根上、没有文件（实六推的，54 号全量核）。
+    // A 那一段的单元写只落一部分的状态上 A 的记录与根都没落，恢复落在暖机 txg 2 的根上、没有文件（实六推的，checker-tier-layer0-replay 全量核）。
     // 系统配置槽撕裂的状态（第三态）与那次写没持久的同一状态恢复得一样：撕裂的那一槽解不开，择的是同一块盘上另一槽，
-    // 而没持久时那一槽里是更旧的一代、择的也是另一槽（推的，补第三态之后 54 号全量核）；它们不带待施加的记录，journal 承重、验证那几格不变。
+    // 而没持久时那一槽里是更旧的一代、择的也是另一槽（推的，补第三态之后 checker-tier-layer0-replay 全量核）；它们不带待施加的记录，journal 承重、验证那几格不变。
     assert_eq!(
         oracle_counts(&tally),
         OracleCounts {

@@ -737,7 +737,7 @@ fn sector_equality(
 ///
 /// - 系统配置：`[整槽校验和字段对得上, 0, 0, 0]`。
 /// - 根槽：`[整槽校验和字段对得上（罩整个槽宽）, 0, 0, 0]`。
-/// - journal 记录：`[整条校验和字段对得上, 载荷 CRC 对得上（点名项区在 4096 之内）, 反向链值 = CRC-32C(头 311 字节、校验和字段按 0), 0]`。
+/// - journal 记录：`[整条校验和字段对得上, 载荷 CRC 对得上（点名项区在 4096 之内）, 反向链值 = CRC-32C(头 487 字节、校验和字段按 0), 0]`。
 /// - 单元槽：`[前 16 KiB 的 CRC-32C, 前 32 KiB 的 CRC-32C（落点只有 16 KiB 时 0）, 标志位, 0]`；标志位：位 0 头校验和按自述的类过、
 ///   位 1 载荷 CRC 按自述的类过、位 2 落点有 32 KiB、位 3 类身份段之后的 29 字节预留位全 0。类从偏移 6 读，码 2 的 key 宽从偏移 51 读。
 #[must_use]
@@ -760,7 +760,8 @@ pub fn version_checks(kind: JudgeLocationKind, bytes: &[u8]) -> [u32; 4] {
         }
         JudgeLocationKind::JournalRecord => {
             let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
-            let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("311");
+            let header_bytes =
+                usize::try_from(JOURNAL_HEADER_BYTES).expect("记录头 487 字节装得进 usize");
             let header_holds = wide_checksum_field_holds(bytes, record_bytes, 46);
             let named_count = usize::try_from(u32::from_le_bytes(
                 bytes[12..16].try_into().expect("4 字节"),

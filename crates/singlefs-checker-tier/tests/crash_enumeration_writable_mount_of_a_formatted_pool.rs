@@ -1,5 +1,5 @@
 //! checker 档模块：crash
-//! 只做过 mkfs 的池上的可写挂载（里程碑「覆盖写、释放、回退与复用」步 3 的另一格，2026-09-17 用户定）在层 0 的证据：mkfs → 进程退出、重开走可写挂载
+//! 只做过 mkfs 的池上的可写挂载（里程碑「覆盖写、释放、回退与复用」步 3 的另一格）在层 0 的证据：mkfs → 进程退出、重开走可写挂载
 //! （取号 1、零单元的写行发布 txg 1 与暖机 txg 2）→ 同一个进程里发布第一个文件版本（txg 3），把 mkfs 之后的整条录制流按 D13（验证路线） 已定项 4
 //! 取崩溃状态，快的那条（26 写的那一段不展开）跑恢复 + 多版本 oracle、池级 checker、记录核对器。
 //! 这条流的基线、写表（带内容）、段序列与 mkfs 同一个进程里跑新池新建文件那条流逐项相同（用例钉住），全量枚举就是新池新建文件那条流的全量，不另跑。
@@ -208,7 +208,7 @@ fn every_crash_state_outside_the_unit_segment_of_the_formatted_pool_mount_recove
 
 /// 这条流的崩溃状态与新池新建文件那条流逐个相同，所以不另跑全量：只做过 mkfs 的池可写挂载再发第一个文件版本，与 mkfs 同一个进程里
 /// 新池新建文件，两条流的基线镜像（mkfs 之后）、写表（带内容）、段序列逐项相等——层 0 按「基线 + 写表 + 段」枚举，三样相等就是同一批镜像，
-/// 新池新建文件那条流的全量枚举（`crash_enumeration_new_pool_file_creation_stream.rs`，门禁 54 号）已经罩住（m2-emptypool-nonempty-r1 云端攻方腿 Z4）。
+/// 新池新建文件那条流的全量枚举（`crash_enumeration_new_pool_file_creation_stream.rs`，门禁 checker-tier-layer0-replay）已经罩住（m2-emptypool-nonempty-r1 云端攻方腿 Z4）。
 /// 层 0 每个状态只跑恢复与 checker、不重开挂载，挂载路径在崩溃之后怎样不在这条证据里。
 #[test]
 fn formatted_pool_mount_stream_has_the_same_base_writes_and_segments_as_the_new_pool_file_creation_stream(

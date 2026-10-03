@@ -14,7 +14,9 @@ pub const MINIMUM_FREE_MEMORY_MEBIBYTES: u64 = 2048;
 const SLOT_BYTES: usize = 32_768;
 const WORKGROUP_SIZE: usize = 64;
 const RESULT_ENTRY_BYTES: usize = 8;
-const NVIDIA_VENDOR_IDENTIFIER: u32 = 0x10DE;
+/// NVIDIA 的厂商号（Vulkan 适配器与 PCI 设备报的都是它）：崩溃放量只用 NVIDIA 独显，[`usable_gpu_cards`] 按它筛卡，
+/// 测试取卡的判定（[`gpu_test_start`]）按它认 Vulkan 适配器与 PCI 上的显示控制器。
+pub const NVIDIA_VENDOR_IDENTIFIER: u32 = 0x10DE;
 
 const CRC32C_SHADER_SOURCE: &str = r#"
 struct Params { count: u32, reserved0: u32, reserved1: u32, reserved2: u32, };
@@ -486,4 +488,446 @@ pub fn check_unit_checksums_on_gpu(card: &GpuCard, units: &[&[u8]]) -> Vec<UnitC
         });
     }
     verdicts
+}
+
+/// GPU 对拍用例开跑前取卡，只给测试用（`tests/` 下的 GPU 对拍与库内要卡的计时用例都经它）。
+/// 本机没有 NVIDIA 卡时打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>`、用例当场返回成功（门禁按这一行逐条报「本次未跑」，
+/// 上游 `test-script-discipline.md`「分快慢两档」：要特定硬件的那几条在没有那种硬件的机器上报「本次未跑」）；有卡而用不上判红
+/// （同一篇「用上现有的硬件加速」：有那种硬件而用不上要报错，不悄悄退回）。
+/// 「没卡」看两处：Vulkan 枚举里有没有 NVIDIA 独显，PCI 上有没有 NVIDIA 显示控制器——Vulkan 驱动坏了枚举不出来时，PCI 上照样看得见那张卡
+/// （C620：GPU 对拍认「没卡」只看 Vulkan 枚举，驱动坏了被当成本次未跑）。看不见 PCI 总线（[`gpu_test_start::PCI_BUS_DIRECTORY`] 整个不在）
+/// 也算没卡；总线看得见而设备表读不出照旧判红（代码三方 test-script-align-code-r2 判决 J2 G1）。判定是纯函数 [`gpu_test_start::decide_gpu_test_start`]，
+/// 读 Vulkan 与 PCI 在取卡那一层（[`gpu_test_start::usable_cards_or_report_not_run`]）。
+pub mod gpu_test_start {
+    use super::{usable_gpu_cards, GpuCard, NVIDIA_VENDOR_IDENTIFIER};
+
+    /// PCI 设备 class（24 位：基类、子类、编程接口各一字节）的基类是这个值的是显示控制器；同一块卡的 HDA 音频功能基类是 0x04，不算。
+    pub const PCI_DISPLAY_CONTROLLER_BASE_CLASS: u32 = 0x03;
+    /// sysfs 里 PCI 总线的目录：它整个不在就是这台机器看不见 PCI 总线（没有 PCI 的微虚机、沙箱，或没挂 sysfs）。
+    pub const PCI_BUS_DIRECTORY: &str = "/sys/bus/pci";
+    /// [`PCI_BUS_DIRECTORY`] 下列 PCI 设备的子目录：每个设备一个子目录，里面 `vendor` 与 `class` 两个文件各是一行 `0x` 起头的十六进制。
+    pub const PCI_DEVICES_SUBDIRECTORY_NAME: &str = "devices";
+
+    /// Vulkan 适配器的种类（与 Vulkan 报的物理设备类型一一对应）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub enum AdapterDeviceKind {
+        DiscreteGpu,
+        IntegratedGpu,
+        VirtualGpu,
+        SoftwareRenderingOnTheCpu,
+        OtherOrUnknown,
+    }
+
+    /// Vulkan 枚举出来的一个适配器里，判定要看的两样。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct EnumeratedAdapter {
+        pub vendor_identifier: u32,
+        pub device_kind: AdapterDeviceKind,
+    }
+
+    impl EnumeratedAdapter {
+        /// 崩溃放量认的那一种卡：NVIDIA 独显（[`usable_gpu_cards`] 只从这一种里起上下文）。
+        #[must_use]
+        pub fn is_an_nvidia_discrete_gpu(&self) -> bool {
+            self.vendor_identifier == NVIDIA_VENDOR_IDENTIFIER
+                && self.device_kind == AdapterDeviceKind::DiscreteGpu
+        }
+    }
+
+    /// PCI 上一个设备的厂商号与 class（24 位）。
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    pub struct PciDeviceIdentity {
+        pub vendor_identifier: u32,
+        pub class_code: u32,
+    }
+
+    impl PciDeviceIdentity {
+        /// 从 sysfs 里这个设备的 `vendor` 与 `class` 两个文件的原文读出来（各一行 `0x` 起头的十六进制，带不带行尾换行都认）；
+        /// 有一个读不出交 `None`。
+        #[must_use]
+        pub fn from_sysfs_text(vendor_text: &str, class_text: &str) -> Option<Self> {
+            let hexadecimal_value = |text: &str| {
+                let digits = text.trim().strip_prefix("0x")?;
+                u32::from_str_radix(digits, 16).ok()
+            };
+            Some(Self {
+                vendor_identifier: hexadecimal_value(vendor_text)?,
+                class_code: hexadecimal_value(class_text)?,
+            })
+        }
+
+        /// NVIDIA 的显示控制器（显卡本身，不是同一块卡上的音频功能）。
+        #[must_use]
+        pub fn is_an_nvidia_display_controller(&self) -> bool {
+            self.vendor_identifier == NVIDIA_VENDOR_IDENTIFIER
+                && self.class_code >> 16 == PCI_DISPLAY_CONTROLLER_BASE_CLASS
+        }
+    }
+
+    /// 读 PCI 设备表的结果。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum PciNvidiaDisplayControllers {
+        /// 每个设备的厂商号与 class 都读出来了：其中 NVIDIA 显示控制器有几个。
+        Counted {
+            nvidia_display_controller_count: usize,
+        },
+        /// PCI 总线看得见，而设备表列不出、或某个设备的 `vendor`、`class` 读不出、认不出。
+        ListingUnreadable { reason: String },
+        /// 看不见 PCI 总线：[`PCI_BUS_DIRECTORY`] 整个不在。这台机器上没有 PCI 设备可数，判定与「数到 0 个」同。
+        PciBusNotVisible { reason: String },
+    }
+
+    /// 一串 PCI 设备里 NVIDIA 显示控制器的个数。
+    #[must_use]
+    pub fn count_nvidia_display_controllers(devices: &[PciDeviceIdentity]) -> usize {
+        devices
+            .iter()
+            .filter(|device| device.is_an_nvidia_display_controller())
+            .count()
+    }
+
+    /// 一条 GPU 对拍用例开跑前的结局。
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub enum GpuTestStart {
+        /// 至少一张卡起好了上下文：照常跑。
+        RunOnTheUsableCards,
+        /// Vulkan 枚举里没有 NVIDIA 独显，PCI 上也没有 NVIDIA 显示控制器（或看不见 PCI 总线）：这台机器没有这种硬件，报「本次未跑」。
+        NotRunNoGpuAdapter { reason: String },
+        /// Vulkan 枚举出 NVIDIA 独显，却一张卡都没起来（`nvidia-smi` 读不到、空闲显存低于门槛、上下文起不来）：判红。
+        AdapterPresentButNoCardStarted { reason: String },
+        /// PCI 上有 NVIDIA 显示控制器，Vulkan 枚举里却没有一张 NVIDIA 独显（用户态 Vulkan 驱动坏了或不在）：判红。
+        NvidiaCardOnPciButVulkanEnumeratesNone { reason: String },
+        /// Vulkan 枚举里没有 NVIDIA 独显，PCI 总线看得见而设备表读不出：分不清没卡与驱动坏，判红
+        /// （代码三方 test-script-align-code-r2 判决 J2 G1 定了 C620 留下的这一支：看不见总线才算没卡）。
+        PciBusVisibleButListingUnreadable { reason: String },
+    }
+
+    /// `adapters` 是 Vulkan 枚举的结果，`pci` 是读 PCI 设备表的结果，`usable_card_count` 是起好上下文的卡数（[`usable_gpu_cards`] 交回几张）。
+    #[must_use]
+    pub fn decide_gpu_test_start(
+        adapters: &[EnumeratedAdapter],
+        pci: &PciNvidiaDisplayControllers,
+        usable_card_count: usize,
+    ) -> GpuTestStart {
+        if usable_card_count > 0 {
+            return GpuTestStart::RunOnTheUsableCards;
+        }
+        let nvidia_discrete_adapter_count = adapters
+            .iter()
+            .filter(|adapter| adapter.is_an_nvidia_discrete_gpu())
+            .count();
+        if nvidia_discrete_adapter_count > 0 {
+            return GpuTestStart::AdapterPresentButNoCardStarted {
+                reason: format!(
+                    "Vulkan 枚举出 {nvidia_discrete_adapter_count} 张 NVIDIA 独显，一张都没起来（nvidia-smi 读不到这张卡、空闲显存低于门槛、或上下文起不来）：修好驱动或腾出显存再跑"
+                ),
+            };
+        }
+        match pci {
+            PciNvidiaDisplayControllers::Counted {
+                nvidia_display_controller_count,
+            } => {
+                if *nvidia_display_controller_count == 0 {
+                    GpuTestStart::NotRunNoGpuAdapter {
+                        reason: format!(
+                            "Vulkan 枚举出 {} 个适配器，没有一张 NVIDIA 独显，PCI 上也没有 NVIDIA 显示控制器：{adapters:?}",
+                            adapters.len()
+                        ),
+                    }
+                } else {
+                    GpuTestStart::NvidiaCardOnPciButVulkanEnumeratesNone {
+                        reason: format!(
+                            "PCI 上有 {nvidia_display_controller_count} 个 NVIDIA 显示控制器，Vulkan 枚举出的 {} 个适配器里却没有一张 NVIDIA 独显（{adapters:?}）。驱动坏了：修驱动，或改配置关 GPU",
+                            adapters.len()
+                        ),
+                    }
+                }
+            }
+            PciNvidiaDisplayControllers::ListingUnreadable { reason } => {
+                GpuTestStart::PciBusVisibleButListingUnreadable {
+                    reason: format!(
+                        "Vulkan 枚举出的 {} 个适配器里没有一张 NVIDIA 独显，PCI 总线看得见而设备表读不出（{reason}）：分不清是没卡还是驱动坏了，不报本次未跑",
+                        adapters.len()
+                    ),
+                }
+            }
+            PciNvidiaDisplayControllers::PciBusNotVisible { reason } => {
+                GpuTestStart::NotRunNoGpuAdapter {
+                    reason: format!(
+                        "Vulkan 枚举出 {} 个适配器，没有一张 NVIDIA 独显，也看不见 PCI 总线（{reason}）：{adapters:?}",
+                        adapters.len()
+                    ),
+                }
+            }
+        }
+    }
+
+    /// 这条用例报「本次未跑」时打的那一行。
+    #[must_use]
+    pub fn not_run_line(test_name: &str, reason: &str) -> String {
+        format!("NOT_RUN_NO_GPU_ADAPTER test={test_name} reason={reason}")
+    }
+
+    fn adapter_device_kind(device_type: wgpu::DeviceType) -> AdapterDeviceKind {
+        match device_type {
+            wgpu::DeviceType::DiscreteGpu => AdapterDeviceKind::DiscreteGpu,
+            wgpu::DeviceType::IntegratedGpu => AdapterDeviceKind::IntegratedGpu,
+            wgpu::DeviceType::VirtualGpu => AdapterDeviceKind::VirtualGpu,
+            wgpu::DeviceType::Cpu => AdapterDeviceKind::SoftwareRenderingOnTheCpu,
+            wgpu::DeviceType::Other => AdapterDeviceKind::OtherOrUnknown,
+        }
+    }
+
+    /// 本机 Vulkan 枚举出的每个适配器（与 [`usable_gpu_cards`] 同一个后端）。
+    #[must_use]
+    pub fn enumerate_vulkan_adapters() -> Vec<EnumeratedAdapter> {
+        let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::VULKAN,
+            ..wgpu::InstanceDescriptor::new_without_display_handle()
+        });
+        pollster::block_on(instance.enumerate_adapters(wgpu::Backends::VULKAN))
+            .into_iter()
+            .map(|adapter| {
+                let information = adapter.get_info();
+                EnumeratedAdapter {
+                    vendor_identifier: information.vendor,
+                    device_kind: adapter_device_kind(information.device_type),
+                }
+            })
+            .collect()
+    }
+
+    /// 读 `bus_directory`（平常是 [`PCI_BUS_DIRECTORY`]；测试给一棵假的）：它整个不在（`NotFound`）交
+    /// [`PciNvidiaDisplayControllers::PciBusNotVisible`]；在，就照 [`read_pci_nvidia_display_controllers_under`] 读它下面的
+    /// [`PCI_DEVICES_SUBDIRECTORY_NAME`]。总线目录在而设备表列不出、某个设备读不出，与总线目录本身看不了（`NotFound` 之外的错，
+    /// 权限这类）一样交 [`PciNvidiaDisplayControllers::ListingUnreadable`]，不当成看不见总线。
+    #[must_use]
+    pub fn read_pci_nvidia_display_controllers_on_the_bus(
+        bus_directory: &std::path::Path,
+    ) -> PciNvidiaDisplayControllers {
+        match std::fs::metadata(bus_directory) {
+            Ok(_) => read_pci_nvidia_display_controllers_under(
+                &bus_directory.join(PCI_DEVICES_SUBDIRECTORY_NAME),
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                PciNvidiaDisplayControllers::PciBusNotVisible {
+                    reason: format!("{} 不在：{error}", bus_directory.display()),
+                }
+            }
+            Err(error) => PciNvidiaDisplayControllers::ListingUnreadable {
+                reason: format!("{} 看不了：{error}", bus_directory.display()),
+            },
+        }
+    }
+
+    /// 读 `devices_directory`（平常是 [`PCI_BUS_DIRECTORY`] 下的 [`PCI_DEVICES_SUBDIRECTORY_NAME`]；测试给一棵假的）下每个设备的
+    /// `vendor` 与 `class`，数 NVIDIA 显示控制器；目录或任何一个设备的这两个文件读不出、认不出，交 [`PciNvidiaDisplayControllers::ListingUnreadable`]。
+    #[must_use]
+    pub fn read_pci_nvidia_display_controllers_under(
+        devices_directory: &std::path::Path,
+    ) -> PciNvidiaDisplayControllers {
+        let unreadable =
+            |what: String| PciNvidiaDisplayControllers::ListingUnreadable { reason: what };
+        let entries = match std::fs::read_dir(devices_directory) {
+            Ok(entries) => entries,
+            Err(error) => {
+                return unreadable(format!("{} 列不出：{error}", devices_directory.display()))
+            }
+        };
+        let mut devices = Vec::new();
+        for entry in entries {
+            let device_directory = match entry {
+                Ok(entry) => entry.path(),
+                Err(error) => {
+                    return unreadable(format!(
+                        "{} 里一项读不出：{error}",
+                        devices_directory.display()
+                    ))
+                }
+            };
+            let read = |file_name: &str| {
+                std::fs::read_to_string(device_directory.join(file_name)).map_err(|error| {
+                    format!(
+                        "{} 读不出：{error}",
+                        device_directory.join(file_name).display()
+                    )
+                })
+            };
+            let (vendor_text, class_text) = match (read("vendor"), read("class")) {
+                (Ok(vendor_text), Ok(class_text)) => (vendor_text, class_text),
+                (Err(what), Ok(_) | Err(_)) | (Ok(_), Err(what)) => return unreadable(what),
+            };
+            match PciDeviceIdentity::from_sysfs_text(&vendor_text, &class_text) {
+                Some(device) => devices.push(device),
+                None => {
+                    return unreadable(format!(
+                        "{} 的 vendor {:?}、class {:?} 认不出",
+                        device_directory.display(),
+                        vendor_text.trim(),
+                        class_text.trim()
+                    ))
+                }
+            }
+        }
+        PciNvidiaDisplayControllers::Counted {
+            nvidia_display_controller_count: count_nvidia_display_controllers(&devices),
+        }
+    }
+
+    /// 本机起好的每张卡（按空闲显存从大到小，至少一张）；本机没有 NVIDIA 卡时打 [`not_run_line`] 那一行、交回 `None`（调用的用例当场返回）。
+    ///
+    /// # Panics
+    /// 有卡而用不上：Vulkan 枚举出 NVIDIA 独显而一张都没起来，PCI 上有 NVIDIA 显示控制器而 Vulkan 枚举不出，
+    /// 或 Vulkan 里没有、PCI 总线看得见而设备表读不出。
+    #[must_use]
+    pub fn usable_cards_or_report_not_run(test_name: &str) -> Option<Vec<GpuCard>> {
+        let cards = usable_gpu_cards();
+        match decide_gpu_test_start(
+            &enumerate_vulkan_adapters(),
+            &read_pci_nvidia_display_controllers_on_the_bus(std::path::Path::new(
+                PCI_BUS_DIRECTORY,
+            )),
+            cards.len(),
+        ) {
+            GpuTestStart::RunOnTheUsableCards => Some(cards),
+            GpuTestStart::NotRunNoGpuAdapter { reason } => {
+                println!("{}", not_run_line(test_name, &reason));
+                None
+            }
+            GpuTestStart::AdapterPresentButNoCardStarted { reason }
+            | GpuTestStart::NvidiaCardOnPciButVulkanEnumeratesNone { reason }
+            | GpuTestStart::PciBusVisibleButListingUnreadable { reason } => {
+                panic!("{test_name}：{reason}")
+            }
+        }
+    }
+
+    /// 空闲显存最大的那张卡；别的同 [`usable_cards_or_report_not_run`]。
+    ///
+    /// # Panics
+    /// 同 [`usable_cards_or_report_not_run`]。
+    #[must_use]
+    pub fn first_usable_card_or_report_not_run(test_name: &str) -> Option<GpuCard> {
+        usable_cards_or_report_not_run(test_name).map(|cards| {
+            cards.into_iter().next().expect(
+                "判成照跑只在起好的卡数大于 0 时（decide_gpu_test_start 第一句），交回的卡表不会是空的",
+            )
+        })
+    }
+}
+
+/// 代码三方 test-script-align-code-r2 判决 J2 G1：看不见 PCI 总线（总线目录整个不在）算没卡、报本次未跑；
+/// 总线看得见而设备表列不出、某个设备读不出照旧判红。判定是纯函数，读 PCI 用假的 sysfs 树，不要显卡。
+#[cfg(test)]
+mod tests {
+    use super::gpu_test_start::{
+        decide_gpu_test_start, read_pci_nvidia_display_controllers_on_the_bus, GpuTestStart,
+        PciNvidiaDisplayControllers, PCI_DEVICES_SUBDIRECTORY_NAME,
+    };
+
+    /// 假的 sysfs 里 PCI 总线那一截的样子。
+    enum FakePciBus<'devices> {
+        /// `<根>/bus` 在，`<根>/bus/pci` 不在。
+        NotThere,
+        /// `<根>/bus/pci` 在，它下面没有设备子目录。
+        ThereWithoutItsDevicesDirectory,
+        /// `<根>/bus/pci/devices/<地址>` 每个设备一个子目录，`vendor` 与 `class` 照写；`None` 的那个文件不建。
+        ThereWithDevices(&'devices [(&'devices str, Option<&'devices str>, Option<&'devices str>)]),
+    }
+
+    /// 照 `pci_bus` 建一棵假的 sysfs，交回 `(根, 总线目录 <根>/bus/pci)`；用完由调用方删根。
+    fn fake_sysfs(
+        test_name: &str,
+        pci_bus: &FakePciBus<'_>,
+    ) -> (std::path::PathBuf, std::path::PathBuf) {
+        let root = std::env::temp_dir().join(format!(
+            "singlefs-gpu-test-start-sysfs-{}-{test_name}",
+            std::process::id()
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        let bus_directory = root.join("bus").join("pci");
+        std::fs::create_dir_all(root.join("bus")).expect("临时目录建得出");
+        match pci_bus {
+            FakePciBus::NotThere => {}
+            FakePciBus::ThereWithoutItsDevicesDirectory => {
+                std::fs::create_dir_all(&bus_directory).expect("临时目录建得出");
+            }
+            FakePciBus::ThereWithDevices(devices) => {
+                for (address, vendor_text, class_text) in *devices {
+                    let device_directory = bus_directory
+                        .join(PCI_DEVICES_SUBDIRECTORY_NAME)
+                        .join(address);
+                    std::fs::create_dir_all(&device_directory).expect("临时目录建得出");
+                    if let Some(vendor_text) = vendor_text {
+                        std::fs::write(device_directory.join("vendor"), vendor_text)
+                            .expect("写得进临时目录");
+                    }
+                    if let Some(class_text) = class_text {
+                        std::fs::write(device_directory.join("class"), class_text)
+                            .expect("写得进临时目录");
+                    }
+                }
+            }
+        }
+        (root, bus_directory)
+    }
+
+    #[test]
+    fn no_nvidia_adapter_and_an_invisible_pci_bus_is_reported_as_not_run() {
+        let start = decide_gpu_test_start(
+            &[],
+            &PciNvidiaDisplayControllers::PciBusNotVisible {
+                reason: "假的：/sys/bus/pci 不在".to_string(),
+            },
+            0,
+        );
+        assert!(
+            matches!(start, GpuTestStart::NotRunNoGpuAdapter { .. }),
+            "Vulkan 里没有 NVIDIA 独显、又看不见 PCI 总线的机器没有这种硬件，要报「本次未跑」；判成了 {start:?}"
+        );
+    }
+
+    #[test]
+    fn a_pci_bus_directory_that_is_not_there_is_read_as_the_bus_not_being_visible() {
+        let (root, bus_directory) = fake_sysfs("bus-not-there", &FakePciBus::NotThere);
+        let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            matches!(read, PciNvidiaDisplayControllers::PciBusNotVisible { .. }),
+            "总线目录整个不在是看不见 PCI 总线，不是设备表读不出：{read:?}"
+        );
+    }
+
+    #[test]
+    fn a_visible_pci_bus_without_its_devices_directory_is_an_unreadable_listing_not_an_invisible_bus(
+    ) {
+        let (root, bus_directory) = fake_sysfs(
+            "bus-without-devices",
+            &FakePciBus::ThereWithoutItsDevicesDirectory,
+        );
+        let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
+        let _ = std::fs::remove_dir_all(&root);
+        assert!(
+            matches!(read, PciNvidiaDisplayControllers::ListingUnreadable { .. }),
+            "总线目录在、设备子目录列不出是读不出，不许当成看不见总线：{read:?}"
+        );
+    }
+
+    #[test]
+    fn a_visible_pci_bus_with_a_device_whose_vendor_cannot_be_read_and_no_nvidia_adapter_is_red() {
+        let (root, bus_directory) = fake_sysfs(
+            "device-vendor-unreadable",
+            &FakePciBus::ThereWithDevices(&[("0000:00:1f.3", None, Some("0x040300\n"))]),
+        );
+        let read = read_pci_nvidia_display_controllers_on_the_bus(&bus_directory);
+        let _ = std::fs::remove_dir_all(&root);
+        let start = decide_gpu_test_start(&[], &read, 0);
+        assert!(
+            matches!(
+                start,
+                GpuTestStart::PciBusVisibleButListingUnreadable { .. }
+            ),
+            "总线看得见而某个设备的 vendor 读不出，分不清没卡与驱动坏，照旧判红、不报「本次未跑」；读到 {read:?}，判成了 {start:?}"
+        );
+    }
 }

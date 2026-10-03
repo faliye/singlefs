@@ -1,6 +1,6 @@
 // GPU 判器的池级 checker 扫描内核（接在 crash_judge_common.wgsl 与 crash_judge_checker_common.wgsl 之后）：走读内核判完、交接段有效时，
-// 判第三批——扫描方向与记账那九条（I-1.8、I-3.9、I-9.14、I-5.4、I-3.10、I-7.9、I-3.1、I-5.2、I-3.11），违例位并进第 8、9 字，
-// 第 10 字写成 5、判不了时第 11 字写原因。只读不判的读法照 walk.rs 的 *_without_judging 各写一份。
+// 判第三批——扫描方向与记账那九条（I-1.8、I-3.9、I-9.14、I-5.4、I-3.10、I-7.9、I-3.1、I-5.2、I-3.11），再加 I-3.12（每条根各自那张实例表），
+// 违例位并进违例位那几个字，走到第几步那一字写成 5、判不了时下一字写原因。只读不判的读法照 walk.rs 的 *_without_judging 各写一份。
 
 
 var<private> r_complete: bool;
@@ -38,6 +38,37 @@ fn r_note(p: Ptr) {
             sws(word, sw(word) | (1u << (r_candidate & 31u)));
         }
     }
+}
+
+// I-5.5 那一遍（judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark）开着时，r_extent_tree 读到的每条数据指针
+// 按盘表下标记下每块盘上最小的落点槽号（walk.rs 同名函数里的 smallest_data_unit_slot_on_each_device）；不在盘表里的盘不记
+var<private> r_collecting_data_unit_slots: bool;
+
+var<private> r_has_data_unit_on_device: array<u32, 8>;
+
+var<private> r_smallest_data_unit_slot_on_device: array<vec2<u32>, 8>;
+
+fn r_note_data_unit_slot(device: u32, slot: vec2<u32>) {
+    let device_count = hdr(3u);
+    for (var device_index = 0u; device_index < device_count && device_index < MAX_DEVICES; device_index = device_index + 1u) {
+        if (hdr(12u + device_index) != device) {
+            continue;
+        }
+        if (r_has_data_unit_on_device[device_index] == 0u || lt64(slot, r_smallest_data_unit_slot_on_device[device_index])) {
+            r_smallest_data_unit_slot_on_device[device_index] = slot;
+            r_has_data_unit_on_device[device_index] = 1u;
+        }
+    }
+}
+
+// extent 树里的一条数据指针：照 r_note 记；I-5.5 那一遍开着时再记两条位置条目的落点（全零指针不记，同 walk.rs 过滤 all_zero）
+fn r_note_data_pointer(p: Ptr) {
+    r_note(p);
+    if (!r_collecting_data_unit_slots || p.all_zero) {
+        return;
+    }
+    r_note_data_unit_slot(p.device0, p.slot0);
+    r_note_data_unit_slot(p.device1, p.slot1);
 }
 
 // read_index_node_without_judging：第一份校验和对得上的那一份，按 index_node_view 解
@@ -247,7 +278,7 @@ fn r_extent_tree(base: u32, offset: u32) -> bool {
                         sws(child + 8u, entry_inode.y);
                         pending = pending + 1u;
                     } else if (tag == 2u) {
-                        r_note(parse_data_pointer(n.base, o + 25u));
+                        r_note_data_pointer(parse_data_pointer(n.base, o + 25u));
                     } else {
                         return false;
                     }
@@ -257,7 +288,7 @@ fn r_extent_tree(base: u32, offset: u32) -> bool {
                     return false;
                 }
                 for (var e = 0u; e < n.entry_count; e = e + 1u) {
-                    r_note(parse_data_pointer(n.base, entry_offset(n, e) + 24u));
+                    r_note_data_pointer(parse_data_pointer(n.base, entry_offset(n, e) + 24u));
                 }
             }
             continue;
@@ -1722,14 +1753,201 @@ fn judge_merged_version_total_order(fsid_low: vec2<u32>) {
     }
 }
 
+// I-3.12：根环里每条自证过的根，它自己指着的实例表（沿链读，只读不判）每一行 (i, T, W) 满足 T < 这条根的 checkpoint_txg；
+// 链上某一片读不出的根不判（walk.rs 的 judge_instance_table_rows_against_the_roots_referencing_them）
+fn judge_instance_table_rows_against_the_roots_referencing_them() {
+    for (var i = 0u; i < root_count; i = i + 1u) {
+        let root = checker_root_of(i);
+        if (!r_instance_rows(root.base)) {
+            continue;
+        }
+        for (var k = 0u; k < c_r_row_count; k = k + 1u) {
+            let row_txg = vec2<u32>(sw(C_R_ROWS + k * 3u + 1u), sw(C_R_ROWS + k * 3u + 2u));
+            if (!lt64(row_txg, root.txg)) {
+                violate(INVARIANT_I_3_12);
+            }
+        }
+    }
+}
+
 // 第三批的入口
+// I-5.5 那一判用的两个量（walk.rs 的 CLUSTER_SEGMENT_SLOTS 取自 singlefs_format、DATA_UNIT_SLOTS）：聚簇段 64 槽，一个数据单元占 2 槽
+const FIRST_DATA_UNIT_CLUSTER_SEGMENT_SLOTS: u32 = 64u;
+const FIRST_DATA_UNIT_DATA_UNIT_SLOTS: u32 = 2u;
+
+// C_ALLOC_RECORDS 里装着这一版的分配记录时，device 上的槽 slot 算不算被占：被「已释放、或分配代早于这一版的 txg」的记录罩着
+// （walk.rs first_data_unit_slot_the_allocation_records_leave_on_a_device 的 occupied_slots；这一版自己分配的记录当空）
+fn c_slot_is_occupied_before_the_version(device: u32, slot: vec2<u32>, txg: vec2<u32>) -> bool {
+    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+        let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
+        if (sw(a) != device) {
+            continue;
+        }
+        let generation = vec2<u32>(sw(a + 4u), sw(a + 5u));
+        if (sw(a + 6u) == 0u && !lt64(generation, txg)) {
+            continue;
+        }
+        let start = vec2<u32>(sw(a + 1u), sw(a + 2u));
+        if (le64(start, slot) && lt64(slot, add64(start, u64_of(sw(a + 3u))))) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// 起点 candidate 的那一对合不合 I-5.5 的落点：不在开放段 [open_first, open_first + 64) 里（has_open 为假时不排除），两槽都不被占
+fn c_first_data_unit_pair_is_free(device: u32, candidate: vec2<u32>, txg: vec2<u32>, has_open: bool, open_first: vec2<u32>) -> bool {
+    if (has_open && le64(open_first, candidate)
+        && lt64(candidate, add64(open_first, u64_of(FIRST_DATA_UNIT_CLUSTER_SEGMENT_SLOTS)))) {
+        return false;
+    }
+    return !c_slot_is_occupied_before_the_version(device, candidate, txg)
+        && !c_slot_is_occupied_before_the_version(device, add64(candidate, u64_of(1u)), txg);
+}
+
+// I-5.5 的判据（walk.rs first_data_unit_slot_the_allocation_records_leave_on_a_device，近似在那里写明）：从 U 起，device 上起点最小、
+// 起点是 2 的整数倍、两槽都空、不在开放段里的那一对的起点。walk.rs 从 U 起一对一对往后扫；这里不扫，只试几个候选取合格里最小的：
+// 最小的合格起点要么是 U，要么它前面那一对不合格——那一对里有被占的槽（罩住它的那条记录的末端向上取到 2 的整数倍就是它），
+// 或在开放段里（开放段的末端就是它）。比每个被占的槽、比开放段都靠后的那个候选总合格，所以一定找得到，与 walk.rs 交回同一个起点
+fn c_first_data_unit_slot_the_allocation_records_leave_on_a_device(device: u32, txg: vec2<u32>, has_open: bool, open_first: vec2<u32>) -> vec2<u32> {
+    let unit_area_start = handoff_unit_area_start_slot();
+    var expected = unit_area_start;
+    var found = c_first_data_unit_pair_is_free(device, unit_area_start, txg, has_open, open_first);
+    if (has_open) {
+        let past_the_open_segment = add64(open_first, u64_of(FIRST_DATA_UNIT_CLUSTER_SEGMENT_SLOTS));
+        if (le64(unit_area_start, past_the_open_segment) && (!found || lt64(past_the_open_segment, expected))
+            && c_first_data_unit_pair_is_free(device, past_the_open_segment, txg, has_open, open_first)) {
+            expected = past_the_open_segment;
+            found = true;
+        }
+    }
+    for (var i = 0u; i < c_alloc_record_count; i = i + 1u) {
+        let a = C_ALLOC_RECORDS + i * C_ALLOC_RECORD_WORDS;
+        let generation = vec2<u32>(sw(a + 4u), sw(a + 5u));
+        if (sw(a) != device || (sw(a + 6u) == 0u && !lt64(generation, txg))) {
+            continue;
+        }
+        var past_the_record = add64(vec2<u32>(sw(a + 1u), sw(a + 2u)), u64_of(sw(a + 3u)));
+        if ((past_the_record.x % FIRST_DATA_UNIT_DATA_UNIT_SLOTS) != 0u) {
+            past_the_record = add64(past_the_record, u64_of(FIRST_DATA_UNIT_DATA_UNIT_SLOTS - past_the_record.x % FIRST_DATA_UNIT_DATA_UNIT_SLOTS));
+        }
+        if (le64(unit_area_start, past_the_record) && (!found || lt64(past_the_record, expected))
+            && c_first_data_unit_pair_is_free(device, past_the_record, txg, has_open, open_first)) {
+            expected = past_the_record;
+            found = true;
+        }
+    }
+    return expected;
+}
+
+// I-5.5（walk.rs judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark）的一版：树表指针在 (base, offset)、它的 txg。
+// 认法 ① 树表非空、种类 1 条目恰好一条且树 ID 是 mkfs 水位 65536；② 每条诞生 txg（条目偏移 108）都等于这一版的 txg。认出来、extent 树读得全、
+// 种类 3 条目恰好一条且那棵分配记录树读得全时，盘表里每块有它数据单元的盘上最小落点要等于这一版的分配记录在那块盘上算出的落点
+// （c_first_data_unit_slot_the_allocation_records_leave_on_a_device；U 取交接段里所选系统配置的单元区起始槽号，开放段取这一版树表单元
+// 在那块盘上那一份所在的段）。CPU 记成射程里判不了的那几格（树表读不出、条目宽不到 200、种类 1 不止一条、extent 树读不全、
+// 某块盘上没有数据单元、种类 3 不是恰好一条、分配记录树读不全）在这里一格都不置位
+fn judge_first_data_unit_of_a_version(base: u32, tree_table_pointer_offset: u32, txg: vec2<u32>) {
+    let tree_table_pointer = parse_node_pointer(base, tree_table_pointer_offset);
+    if (tree_table_pointer.all_zero) {
+        return;
+    }
+    let tt = r_read_index_node(tree_table_pointer);
+    if (!tt.ok || tt.entry_count == 0u || tt.entry_width < 200u) {
+        return;
+    }
+    var extent_entry_count = 0u;
+    var extent_entry = 0u;
+    var allocation_entry_count = 0u;
+    var allocation_entry = 0u;
+    var every_birth_is_this_version = true;
+    for (var entry_index = 0u; entry_index < tt.entry_count; entry_index = entry_index + 1u) {
+        let entry = entry_offset(tt, entry_index);
+        if (rd16(tt.base, entry + 10u) == TREE_KIND_EXTENT) {
+            extent_entry_count = extent_entry_count + 1u;
+            extent_entry = entry;
+        }
+        if (rd16(tt.base, entry + 10u) == TREE_KIND_ALLOCATION) {
+            allocation_entry_count = allocation_entry_count + 1u;
+            allocation_entry = entry;
+        }
+        if (!eq64(rd64(tt.base, entry + 108u), txg)) {
+            every_birth_is_this_version = false;
+        }
+    }
+    if (extent_entry_count != 1u || !every_birth_is_this_version
+        || !eq64(rd64(tt.base, extent_entry), u64_of(TREE_IDENTIFIER_WATERMARK_AT_MKFS))) {
+        return;
+    }
+    if (parse_node_pointer(tt.base, extent_entry + 14u).all_zero) {
+        return;
+    }
+    for (var device_index = 0u; device_index < MAX_DEVICES; device_index = device_index + 1u) {
+        r_has_data_unit_on_device[device_index] = 0u;
+    }
+    r_noting = false;
+    r_collecting_data_unit_slots = true;
+    let read_the_whole_extent_tree = r_extent_tree(tt.base, extent_entry + 14u);
+    r_collecting_data_unit_slots = false;
+    if (!read_the_whole_extent_tree) {
+        return;
+    }
+    let device_count = hdr(3u);
+    var has_any_data_unit = false;
+    for (var device_index = 0u; device_index < device_count && device_index < MAX_DEVICES; device_index = device_index + 1u) {
+        if (r_has_data_unit_on_device[device_index] == 1u) {
+            has_any_data_unit = true;
+        }
+    }
+    if (!has_any_data_unit || allocation_entry_count != 1u) {
+        return;
+    }
+    c_alloc_record_count = 0u;
+    if (!r_allocation_tree(tt.base, allocation_entry + 14u)) {
+        return;
+    }
+    for (var device_index = 0u; device_index < device_count && device_index < MAX_DEVICES; device_index = device_index + 1u) {
+        if (r_has_data_unit_on_device[device_index] == 0u) {
+            continue;
+        }
+        let device = hdr(12u + device_index);
+        // 开放段：这一版树表单元在这块盘上那一份所在的 64 槽段（walk.rs open_cluster_segment_named_by_the_tree_table_on_a_device，先看第一条位置条目）
+        var has_open = false;
+        var open_first = vec2<u32>(0u, 0u);
+        if (tree_table_pointer.device0 == device) {
+            has_open = true;
+            open_first = vec2<u32>(tree_table_pointer.slot0.x & ~(FIRST_DATA_UNIT_CLUSTER_SEGMENT_SLOTS - 1u), tree_table_pointer.slot0.y);
+        } else if (tree_table_pointer.device1 == device) {
+            has_open = true;
+            open_first = vec2<u32>(tree_table_pointer.slot1.x & ~(FIRST_DATA_UNIT_CLUSTER_SEGMENT_SLOTS - 1u), tree_table_pointer.slot1.y);
+        }
+        let expected_slot = c_first_data_unit_slot_the_allocation_records_leave_on_a_device(device, txg, has_open, open_first);
+        if (!eq64(r_smallest_data_unit_slot_on_device[device_index], expected_slot)) {
+            violate(INVARIANT_I_5_5);
+        }
+    }
+}
+
+// I-5.5：回退候选集里每条根（树表指针在根记录偏移 36）与由记录施加出来的那几版（记录新根段打头的树表指针）
+fn judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark() {
+    for (var candidate = 0u; candidate < c_candidate_count; candidate = candidate + 1u) {
+        let root = checker_root_of(sw(C_CANDIDATES + candidate));
+        judge_first_data_unit_of_a_version(root.base, 36u, root.txg);
+    }
+    for (var version = 0u; version < c_version_count; version = version + 1u) {
+        let record = checker_record_at(sw(R_DATA + version));
+        judge_first_data_unit_of_a_version(record.base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET, record.txg);
+    }
+}
+
 fn scan_stage(fsid_low: vec2<u32>) {
     judge_merged_version_total_order(fsid_low);
     judge_release_generation_and_tree_table_birth();
     judge_allocation_records_disjoint();
     judge_allocation_generations_against_unit_births();
+    judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark();
     judge_rollback_floor_raises_against_their_ceilings();
     judge_accounting(fsid_low);
+    judge_instance_table_rows_against_the_roots_referencing_them();
 }
 
 // ───────────────────────── 入口 ─────────────────────────
@@ -1741,22 +1959,20 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
     begin_state(local);
-    let out = local * 12u;
+    let out = local * VERDICT_WORDS;
     if (sw(H_BASE + H_VALID) == 0u) {
         return;
     }
-    violated_lo = verdicts[out + 8u];
-    violated_hi = verdicts[out + 9u];
+    load_violated(out);
     handoff_load();
     let fsid_low = vec2<u32>(sw(H_BASE + H_FSID0), sw(H_BASE + H_FSID1));
     scan_stage(fsid_low);
-    verdicts[out + 8u] = violated_lo;
-    verdicts[out + 9u] = violated_hi;
+    store_violated(out);
     if (undecidable != 0u) {
-        if (verdicts[out + 11u] == 0u) {
-            verdicts[out + 11u] = undecidable;
+        if (verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] == 0u) {
+            verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] = undecidable;
         }
     } else {
-        verdicts[out + 10u] = 5u;
+        verdicts[out + POOL_CHECKER_REACHED_WORD] = 5u;
     }
 }

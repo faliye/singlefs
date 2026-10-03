@@ -3,7 +3,7 @@
 //! 六个入口在调时用 `CrashPointRecorder` 记下（共用的步骤在 `common_crash_points` 里，几条流共一个身份），换成崩溃点时每个屏障段一个点、
 //! 名字 `<入口>.<写的种类>.<步>`（`publish_overwrite` 出现两次，同名、树上位置不同）；
 //! 展开不超过 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（默认 6）次写的段，块之间多线程核对；红必须是 0，状态数与闭式逐个相等，
-//! 第二趟全部复用。展开到 18 时约 39 万个状态（一个 18 写段、两个 16 写段）——用户 2026-09-28 定先跑二十万级。要 `verdict-store` 特性。
+//! 第二趟全部复用。展开到 18 时约 39 万个状态（一个 18 写段、两个 16 写段）。要 `verdict-store` 特性。
 #![cfg(feature = "verdict-store")]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -15,10 +15,10 @@ use std::time::Instant;
 
 use common::{build_pool, file_content, geometry};
 use common_crash_points::{mount_writable_step, overwrite_step, record_pool_build, roll_back_step};
-use singlefs_checker_tier::crash::{layer0_plan_state_count, Layer0SegmentExpansion};
+use singlefs_checker_tier::crash::layer0_plan_state_count;
 use singlefs_checker_tier::crash_amplification::{
-    checking_threads, plan_crash_points, run_from_environment, CrashFlow, CrashPointRecorder,
-    PipelineJudgingCode,
+    checking_threads, plan_crash_points, reuse_and_scale_fields_of_the_line, run_from_environment,
+    CrashFlow, CrashPointRecorder, ExpandUpToWritesPerSegment, PipelineJudgingCode,
 };
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
@@ -40,13 +40,6 @@ fn third_content() -> Vec<u8> {
     (0..THIRD_FILE_BYTES)
         .map(|index| u8::try_from((index * 7 + 11) % 253).expect("小于 256"))
         .collect()
-}
-
-fn expand_up_to() -> usize {
-    std::env::var("SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO")
-        .ok()
-        .and_then(|text| text.parse().ok())
-        .unwrap_or(DEFAULT_EXPAND_UP_TO)
 }
 
 struct TemporaryStore {
@@ -218,16 +211,9 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("根槽写");
-    let limit = expand_up_to();
-    // 每一段都不超过上限就是全域：每个屏障段的每个真子集都枚举到了
-    let exhaustive = segments.iter().all(|segment| segment.len() <= limit);
-    let expansion = move |_segment_index: usize, segment: &[usize]| {
-        if segment.len() <= limit {
-            Layer0SegmentExpansion::EveryProperSubset
-        } else {
-            Layer0SegmentExpansion::NotExpanded
-        }
-    };
+    // 展开上限写坏了 panic，不退回默认；每一段都不超过上限就是全域（run.exhaustive）：每个屏障段的每个真子集都枚举到了
+    let limit = ExpandUpToWritesPerSegment::from_environment_or(DEFAULT_EXPAND_UP_TO);
+    let expansion = move |_segment_index: usize, segment: &[usize]| limit.expansion_of(segment);
     let flow = CrashFlow {
         base: &base,
         writes: &writes,
@@ -238,9 +224,12 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         crash_points,
     };
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../Cargo.lock")
         .canonicalize()
-        .expect("仓根");
+        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+        .parent()
+        .expect("Cargo.lock 所在的目录就是仓根")
+        .to_path_buf();
     let judging = PipelineJudgingCode::of_the_judges(
         &root,
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),
@@ -285,7 +274,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         }
     };
     let checking_started = Instant::now();
-    let run = run_from_environment(&flow, &judging, &root).expect("按环境跑得完");
+    let run = run_from_environment(&flow, &judging, &root, limit).expect("按环境跑得完");
     let checking_seconds = checking_started.elapsed().as_secs_f64();
     if run.placement_only {
         // 只排派活计划的那一趟一块都没判：不断言、不打汇总行
@@ -295,14 +284,15 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
     if run.stopped_early {
         // 被叫停的那一趟：判过的块在库里、第 ②③ 段没做；只报判了多少，不断言对账
         println!(
-            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true",
+            "CRASH_AMPLIFICATION mode={} share={}/{} states={state_count} states_checked_here={} blocks_checked_here={} unjudged_blocks={} red={} stopped_early=true{}",
             run.mode.name(),
             run.share.index,
             run.share.count,
             run.checking.states_checked,
             run.checking.blocks_checked,
             run.unjudged_blocks,
-            run.checking.red_states
+            run.checking.red_states,
+            reuse_and_scale_fields_of_the_line(&run)
         );
         assert_eq!(
             run.checking.red_states, 0,
@@ -337,7 +327,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             run.checking.states_checked, run.recording.states_recorded,
             "这一趟录下来要判的状态都核了"
         );
-        let second_run = run_from_environment(&flow, &judging, &root).expect("第二趟跑得完");
+        let second_run = run_from_environment(&flow, &judging, &root, limit).expect("第二趟跑得完");
         assert_eq!(
             second_run.recording.blocks_already_judged,
             run.recording.blocks_recorded + run.recording.blocks_already_judged,
@@ -379,7 +369,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         println!("CRASH_AMPLIFICATION_POINT {line}");
     }
     println!(
-        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} expand_up_to={limit} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1} exhaustive={exhaustive}{verifier_line}{gpu_judge_line}",
+        "CRASH_AMPLIFICATION mode={} share={}/{} cards={} states={state_count} states_checked_here={} blocks_checked_here={} imported_blocks={} unjudged_blocks={} red={} threads={} judge_version={} checking_seconds={checking_seconds:.1} states_per_second={:.0} total_seconds={:.1}{}{verifier_line}{gpu_judge_line}",
         run.mode.name(),
         run.share.index,
         run.share.count,
@@ -397,6 +387,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             .map(|byte| format!("{byte:02x}"))
             .collect::<String>(),
         f64::from(u32::try_from(run.checking.states_checked).expect("装得进 u32")) / checking_seconds.max(0.001),
-        started.elapsed().as_secs_f64()
+        started.elapsed().as_secs_f64(),
+        reuse_and_scale_fields_of_the_line(&run)
     );
 }

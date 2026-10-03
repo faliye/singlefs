@@ -6,6 +6,8 @@
 //!    前面几段相同就是同一段枝干，一棵子树就是一段连续的键。哈希串（复用键）只由流程定：这一步写下的字节与它起步的镜像；
 //!    按 COW 的性质，一个点的输入不变，它的崩溃状态就不变。判法不进键：判定块按（块键，判法版本）存，判法改了旧行留作历史、
 //!    只在同一判法版本下复用（用户 2026-09-29 定：结果只绑流程，崩溃点变了或树变了才重测，代码、commit、树都不进编号）。
+//!    判器判一个点的状态时另读的流程输入（这个点之前的写表、到这个点为止够得着的版本表、被判的根槽写落在哪、没做完的那次发布的根槽写）
+//!    不进复用键与身份（树不动），进这个点的计划哈希、块键（`JudgeInputsOfTheFlow`）：只差这些的两条流不互相复用判定。
 //! 2. **先录后核**：录入把每个点的状态按块（点内序号区间）登进库的录入表；核对按批从库里取还没有判定的块，
 //!    在 CPU 上（或 CPU + GPU：单元两道校验和上 GPU，与 CPU 对拍）判完、原子地写回判定块与违例；门禁一次读完。
 //! 3. **对账**：一轮收尾，录入表里有、判定块表里没有的块就是没核完的（卡掉线、进程被杀），重新分给还在的一方补跑；
@@ -19,20 +21,33 @@ use std::path::{Path, PathBuf};
 #[cfg(feature = "gpu")]
 use std::time::Instant;
 
-use singlefs_harness::memory_pool::{MemoryPool, PublishedVersion, RetainedWrite, WrittenContents};
+use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_core::recovery::{recover, JournalPolicy};
+use singlefs_core::root_record::ROOT_MAGIC;
+use singlefs_harness::hexadecimal::hexadecimal_text;
+use singlefs_harness::memory_pool::{
+    root_identity_of_write, root_identity_written_by, CrashImage, MemoryPool, PublishedVersion,
+    RetainedWrite, WrittenContents,
+};
+use singlefs_harness::numeric_environment_variable::{
+    number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
+};
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash::{
-    judge_layer0_state_range, layer0_state_ranges_by_segment, Layer0SegmentExpansion,
-    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
-    LAYER0_RED_PASS_POOL_CHECKER, LAYER0_RED_PASS_RECORD_CHECKER,
-    RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+    judge_layer0_state_range, layer0_state_ranges_by_segment,
+    receive_until_the_senders_are_gone_with_wall_clock_lines, Layer0SegmentExpansion,
+    ReceivedOrWallClockLineDue, WallClockProgressLines, LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
+    LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, LAYER0_RED_PASS_POOL_CHECKER,
+    LAYER0_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
+    RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
 use crate::crash_facts::{extract_flow_facts, verify_states_from_facts, FlowFacts};
 use crate::crash_identity::{
-    judging_code_of_the_judges, step_write_table_with_barriers, CoverageReport, CoverageState,
-    JudgingCode, JudgingCodeError, NodeLabel, ReuseKey, SectorImage, StepAttributes,
+    content_digest_text, judging_code_of_the_judges, step_write_table_with_barriers,
+    CoverageReport, CoverageState, JudgingCode, JudgingCodeError, NodeLabel, ReuseKey, SectorImage,
+    StepAttributes,
 };
 use crate::verdict_store::{
     BlockStartStateIndex, EncodedVerdictVector, EnumerationPlanHash, InputFingerprint,
@@ -42,6 +57,61 @@ use crate::verdict_store::{
 
 /// 一块最多几个状态：一块是一个 GPU 批、一次原子写、对账与分工的一个单位（里程碑二「增补 4」第十一项「一块取 2¹⁶ 个状态」）。
 pub const STATES_PER_BLOCK: u64 = 1 << 16;
+
+/// 展开上限的环境变量：一段的写数不超过它就展开全部真子集，超过就不展开。全量脚本给全量的深度，没设由用例给默认。
+pub const EXPAND_UP_TO_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO";
+
+/// 展开上限：一段的写数不超过它，这一段展开全部真子集（[`Layer0SegmentExpansion::EveryProperSubset`]）；超过就不展开。
+/// 每一段都不超过它，这一趟就是全域（`exhaustive=true`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ExpandUpToWritesPerSegment(pub usize);
+
+impl ExpandUpToWritesPerSegment {
+    /// 从 [`EXPAND_UP_TO_ENVIRONMENT_VARIABLE`] 取；没设用 `default_when_unset`。
+    ///
+    /// # Panics
+    /// 设了而认不出（不是非负整数、空串、不是 UTF-8）：写明变量名与值，不悄悄退回默认（规模变量写错照样跑完、照样退 0，
+    /// 跑的就不是要的那个规模）。
+    #[must_use]
+    pub fn from_environment_or(default_when_unset: usize) -> Self {
+        Self::from_value_of_the_variable(
+            process_environment_variable(EXPAND_UP_TO_ENVIRONMENT_VARIABLE).as_deref(),
+            default_when_unset,
+        )
+    }
+
+    /// 变量的值（`None` 是没设）换成展开上限：解析经数值环境变量共用的那一份
+    /// （[`number_from_the_variable_value_panicking_when_unreadable`]），这里只给没设时的那一档。
+    ///
+    /// # Panics
+    /// 设了而不是非负整数：消息带变量名与原值。
+    #[must_use]
+    pub fn from_value_of_the_variable(value: Option<&str>, default_when_unset: usize) -> Self {
+        Self(
+            number_from_the_variable_value_panicking_when_unreadable::<usize>(
+                EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+                value,
+            )
+            .unwrap_or(default_when_unset),
+        )
+    }
+
+    /// 一段按这个上限怎么展开。
+    #[must_use]
+    pub fn expansion_of(self, segment: &[usize]) -> Layer0SegmentExpansion {
+        if segment.len() <= self.0 {
+            Layer0SegmentExpansion::EveryProperSubset
+        } else {
+            Layer0SegmentExpansion::NotExpanded
+        }
+    }
+
+    /// 每一段都展开到了（全域）。
+    #[must_use]
+    pub fn covers_every_segment(self, segments: &[Vec<usize>]) -> bool {
+        segments.iter().all(|segment| segment.len() <= self.0)
+    }
+}
 
 /// 一条流程里的一个崩溃点：名称（绑在设它的函数上）与它在写表里发出的写（下标区间）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -78,6 +148,8 @@ pub struct PlannedCrashPoint {
     pub path_number: String,
     /// 身份 `<仓内路径>::<崩溃点名称>::<复用键>`：块键里的节点名只有它，路径不进块键（改名不使判定失效），路径 → 身份记在库的路径索引表里。
     pub identity: String,
+    /// 判器判这个点的状态时另读的流程输入的摘要（`JudgeInputsOfTheFlow::digest_for_a_point`）；进 `plan_hash`。
+    pub judge_inputs: [u8; DIGEST_BYTES],
     pub plan_hash: [u8; DIGEST_BYTES],
 }
 
@@ -143,12 +215,15 @@ fn owner_of_each_segment(flow: &CrashFlow<'_>) -> Vec<usize> {
 
 /// 给一条流程的每个崩溃点定计划：含它最后一次写的段归它（[`owner_of_each_segment`]）；写表按它管的那几段取、父输出是它第一次管到的写
 /// 之前的镜像；状态序号按点的次序首尾相接地划分整条流，最后那个全持久状态归最后一个点；ignore 的点的段不展开。
-/// 计划不看判法：判法是判定行的属性（[`PipelineJudgingCode::version`]），改了它树与块键都不动。
+/// 计划不看判法：判法是判定行的属性（[`PipelineJudgingCode::version`]），改了它树与块键都不动。判器另读的流程输入（`JudgeInputsOfTheFlow`）
+/// 进每个点的计划哈希，不进复用键与身份。
 ///
 /// # Panics
 /// 崩溃点的写区间不是首尾相接地罩住整张写表；某个点的名称或文件路径不合身份的规矩（同一个名字在一条流程里可以出现几次：
 /// 同一个函数调几次就是几个点，树上的位置分得开）；
-/// 各段的状态序号接不上（枚举计划与切段不一致，是这里的 bug）。
+/// 各段的状态序号接不上（枚举计划与切段不一致，是这里的 bug）；
+/// 对基镜像本身照 journal 恢复，落到的根不是基镜像里最新的那条根（B0 的前提，
+/// `assert_journal_recovery_of_the_base_image_lands_on_its_newest_root`）。
 #[must_use]
 pub fn plan_crash_points(flow: &CrashFlow<'_>) -> CrashPlan {
     let mut expected_start = 0usize;
@@ -186,6 +261,7 @@ pub fn plan_crash_points(flow: &CrashFlow<'_>) -> CrashPlan {
         .enumerate()
         .map(|(segment_index, segment)| expansion(segment_index, segment).name())
         .collect();
+    let judge_inputs_of_the_flow = JudgeInputsOfTheFlow::of(flow);
     let mut parent_image = SectorImage::of_base(flow.base);
     let mut applied_writes = 0usize;
     let mut path_segments: Vec<String> = Vec::new();
@@ -252,6 +328,13 @@ pub fn plan_crash_points(flow: &CrashFlow<'_>) -> CrashPlan {
         }
         let ordinals = start_ordinal..next_ordinal;
         plan_text.push_str(&format!("states={}\n", ordinals.end - ordinals.start));
+        // 判器另读的输入进计划哈希、不进复用键：树（身份、路径）照旧只由流程的这一步与它起步的镜像定，判定块按判器真读到的输入分
+        let judge_inputs =
+            judge_inputs_of_the_flow.digest_for_a_point(flow, first_write, last_write);
+        plan_text.push_str(&format!(
+            "judge_inputs={}\n",
+            hexadecimal_text(&judge_inputs)
+        ));
         planned.push(PlannedCrashPoint {
             name: point.name.clone(),
             ignored: point.ignored,
@@ -260,6 +343,7 @@ pub fn plan_crash_points(flow: &CrashFlow<'_>) -> CrashPlan {
             reuse_key,
             identity,
             path_number,
+            judge_inputs,
             plan_hash: sha256_digest(plan_text.as_bytes()),
         });
     }
@@ -270,6 +354,288 @@ pub fn plan_crash_points(flow: &CrashFlow<'_>) -> CrashPlan {
     CrashPlan {
         points: planned,
         owner_of_segment,
+    }
+}
+
+// ============================== 判器另读的流程输入：进计划哈希 ==============================
+
+/// 写表里的一次写在判器输入里的写法：盘、种类、FUA、偏移、长度、内容摘要（与 `step_write_table_with_barriers` 同一套字段），
+/// 后面接它在整条流里的段号（不接的写 `-`）。
+fn judge_input_line_of_a_write(
+    write: &RetainedWrite,
+    segment_in_the_flow: Option<usize>,
+) -> String {
+    let segment_text =
+        segment_in_the_flow.map_or_else(|| "-".to_string(), |segment| segment.to_string());
+    format!(
+        "W {} {} {} {} {} {} {segment_text}\n",
+        write.device.0,
+        write.kind.name(),
+        u8::from(write.is_force_unit_access),
+        write.offset.0,
+        write.length_in_bytes(),
+        content_digest_text(&write.contents),
+    )
+}
+
+/// 一个点最后一次写之后的写表，判器判这个点的状态时读到多少（由整条流的根槽写定）。
+enum WritesAfterThePoint {
+    /// 根槽写的 txg 沿写表严格递增：之后的写只有「没做完的那次发布」的根槽写读得到（判据见 `JudgeInputsOfTheFlow`）。
+    ReadOnlyThroughTheUnfinishedPublish,
+    /// 根槽写的 txg 不是严格递增：之后的写都可能读到。第 k 项是写表第 k 次写往后逐行链起来的摘要（`k` 从 0 到写数）。
+    MayAllBeRead {
+        suffix_digests: Vec<[u8; DIGEST_BYTES]>,
+    },
+}
+
+/// 判器（CPU 的 `crash::judge_crash_image` 与 GPU 判器，读的是同一份 [`CrashFlow`]）判一个点的状态时，复用键（这一步带屏障的写表、
+/// 起步镜像的扇区终值）之外还读到的流程输入。R1（`research/prompts/test-script-align-code-r1-main-verification.md`「二、判定与去向」）：
+/// 判器读到的每一样都进那一块的键，只差这些的两条流不互相复用；前缀共享在判器读到的真相同时保留。逐样：
+///
+/// - 这个点之前的写表（不只是扇区终值）：记录核对器按写表分发布、按写的种类找根槽写与系统配置槽写
+///   （`crash::check_records_against`、`crash::reuse_is_not_proven_illegal_by_the_reclaim_predicate`），种类、次序变了而扇区终值相同时判定会变。
+///   按（写、整条流里的段号）逐行链起来取摘要。
+/// - 版本表：oracle 只按恢复落到的根（实例，txg）找那一版、找比它旧的版本（`crash::classified_oracle_violation_for_versions`）。
+///   落到的根要么是基镜像里本来就有的根（基镜像里带根 magic 的扇区；基镜像自己的 journal 不越过其中最新那条，排计划时断言：
+///   `assert_journal_recovery_of_the_base_image_lands_on_its_newest_root`），要么是写表里到这个点为止写过的根槽写，要么是 journal 重放出来的
+///   那一版——没做完的那次发布，它的根槽写在这个点之后、是下一条。够得着的版本是（txg，实例）不超过这几样根里最大那一条的行：
+///   这个点之前一条根槽写都没有、又没有没做完的发布时（每条流的第一个点只有系统配置槽写），上界是基镜像里的根，版本表里够不着的行
+///   不进，几条只差版本表的流在这里照样共享（test-script-align-code-r2 判决 J1）。没做完的那次发布在写表里没有根槽写，或基镜像里一条根都没有、
+///   这个点之前也没有根槽写，上界取不出，整张表都进。
+/// - 没做完的那次发布的根槽写（这个点最后一次写之前、最后一条根槽写之后还有单元写或记录写时，写表里下一条根槽写）：记录核对器按它分发布、
+///   取 txg（`crash::checkpoint_txg_of_the_publish_that_made_the_write`），恢复落到它那一版时读它带的实例表
+///   （`crash::instance_table_of_the_effective_root` 在整张写表里找写出这个根身份的根槽写）。
+/// - 再往后的写：记录核对器对每次发布都看，但只在恢复落到的根 txg 不小于那次发布的 txg 时才核它的单元，只在它的根槽写的字节恰好在盘上时
+///   才核「根在而记录不在」。根槽写的 txg 沿写表严格递增时这两样对这个点的状态都不成立：落到的根至多是没做完的那一版（前提是对基镜像本身
+///   照 journal 恢复落到的就是它里面最新的那条根，不另越过一版：排计划时断言，`assert_journal_recovery_of_the_base_image_lands_on_its_newest_root`，
+///   不成立的流排计划时就拒），更晚的根槽写 txg 都更大、字节不在盘上。
+///   不严格递增时推不出，之后的写整段进摘要（[`WritesAfterThePoint::MayAllBeRead`]）。
+/// - 被判的根槽写（`judged_root_index`）：判器拿它记「根槽已持久」，不进逐项判定；照样进键：它在这个点之前（每个状态都持久）、
+///   在点里（第几次写）、还是在之后（都不持久）。
+/// - 起点镜像有哪几块盘、每块多大（扇区终值里看不出）。
+struct JudgeInputsOfTheFlow {
+    base_devices_text: String,
+    /// 第 k 项：写表前 k 次写逐行链起来的摘要（`k` 从 0 到写数）。
+    prefix_digests: Vec<[u8; DIGEST_BYTES]>,
+    /// 每条根槽写：写表下标与它写下的根身份，（txg，实例）按择新的次序比。
+    root_writes: Vec<(usize, (CheckpointTxg, InstanceGeneration))>,
+    /// 基镜像里（txg，实例）最大的那条根；一条都没有是 `None`。
+    newest_root_in_the_base_image: Option<(CheckpointTxg, InstanceGeneration)>,
+    writes_after_the_point: WritesAfterThePoint,
+}
+
+/// 基镜像里（txg，实例）最大的那条根：写过的扇区里以根 magic 起头的（根槽写是一个物理块，层 0 的池按 512 字节的扇区建），
+/// 身份照根槽写的读法取（[`root_identity_written_by`]，不验自证校验和：判器输入只要知道恢复最多落到哪一代）。一条都没有是 `None`。
+fn newest_root_in_the_base_image(base: &MemoryPool) -> Option<(CheckpointTxg, InstanceGeneration)> {
+    base.devices
+        .values()
+        .flat_map(|device| device.written_sectors().values())
+        .filter(|bytes| {
+            bytes.len() >= ROOT_RECORD_IDENTITY_END && bytes[..ROOT_MAGIC.len()] == ROOT_MAGIC
+        })
+        .map(|bytes| {
+            let (instance, checkpoint_txg) = root_identity_written_by(bytes);
+            (checkpoint_txg, instance)
+        })
+        .max()
+}
+
+/// 根记录里身份那几个字节到哪为止：实例代号在偏移 24（4 字节）、checkpoint_txg 在偏移 28（8 字节）（[`root_identity_written_by`]）。
+const ROOT_RECORD_IDENTITY_END: usize = 36;
+
+/// B0 的前提（用户 2026-10-02 定「窄一」）：对基镜像本身照 journal 恢复，落到的就是基镜像里最新的那条根。
+/// 恢复走判器那一条（`crash::judge_crash_image` 里的 `recover(…, JournalPolicy::Consult)`），读的是一次写都没落的崩溃镜像，也就是基镜像本身。
+/// 基镜像是崩溃状态（journal 记录落了、根槽写没落）时，恢复落到基镜像里没有根的那一版；B0 按基镜像里的根截够得着的版本，
+/// 就把这一版截掉了，判定不同的两条流会共用块键（test-script-align-code-r3 攻方 L1）。
+///
+/// # Panics
+/// 落到的根与 `newest_root_of_the_base` 不同（连同一边有根、一边没有）。
+fn assert_journal_recovery_of_the_base_image_lands_on_its_newest_root(
+    base: &MemoryPool,
+    newest_root_of_the_base: Option<(CheckpointTxg, InstanceGeneration)>,
+) {
+    let base_with_no_write_persisted = CrashImage {
+        base,
+        writes: &[],
+        persisted: Vec::new(),
+    };
+    let landed_root = recover(&base_with_no_write_persisted, JournalPolicy::Consult)
+        .effective_root
+        .map(|(instance, checkpoint_txg)| (checkpoint_txg, instance));
+    assert_eq!(
+        landed_root, newest_root_of_the_base,
+        "基镜像照 journal 恢复会越过它里面最新的根，B0 的前提不成立（要求恢复落到的正是基镜像里最新的那条根）：\
+         恢复落到（txg，实例）{landed_root:?}，基镜像里最新的根是 {newest_root_of_the_base:?}。\
+         B0 按基镜像里的根截够得着的版本，恢复落到别的根时会截掉判器读得到的那一版，判定不同的两条流共用块键。\
+         出路：基镜像先可写挂载一次（恢复把 journal 落成根、再发布）之后再取，或让流从 mkfs 起步；\
+         要收这种基镜像，先定 B0 的上界怎么并上恢复落到的根（交设计，不在这里放宽）"
+    );
+}
+
+impl JudgeInputsOfTheFlow {
+    fn of(flow: &CrashFlow<'_>) -> Self {
+        let mut segment_of_write: Vec<Option<usize>> = vec![None; flow.writes.len()];
+        for (segment_index, segment) in flow.segments.iter().enumerate() {
+            for write_index in segment {
+                segment_of_write[*write_index] = Some(segment_index);
+            }
+        }
+        let lines: Vec<String> = flow
+            .writes
+            .iter()
+            .zip(&segment_of_write)
+            .map(|(write, segment)| judge_input_line_of_a_write(write, *segment))
+            .collect();
+        let chained = |previous: &[u8; DIGEST_BYTES], line: &str| {
+            let mut message = previous.to_vec();
+            message.extend_from_slice(line.as_bytes());
+            sha256_digest(&message)
+        };
+        let mut prefix_digests = Vec::with_capacity(lines.len() + 1);
+        prefix_digests.push(sha256_digest(b"writes before the point\n"));
+        for line in &lines {
+            let previous = *prefix_digests.last().expect("起头那一项先放进去了");
+            prefix_digests.push(chained(&previous, line));
+        }
+        let root_writes: Vec<(usize, (CheckpointTxg, InstanceGeneration))> = flow
+            .writes
+            .iter()
+            .enumerate()
+            .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
+            .map(|(index, write)| {
+                let (instance, checkpoint_txg) = root_identity_of_write(write);
+                (index, (checkpoint_txg, instance))
+            })
+            .collect();
+        let txgs_of_the_root_writes_strictly_increase = root_writes
+            .windows(2)
+            .all(|pair| pair[0].1 .0 < pair[1].1 .0);
+        let writes_after_the_point = if txgs_of_the_root_writes_strictly_increase {
+            WritesAfterThePoint::ReadOnlyThroughTheUnfinishedPublish
+        } else {
+            let mut suffix_digests =
+                vec![sha256_digest(b"writes after the point\n"); lines.len() + 1];
+            for index in (0..lines.len()).rev() {
+                suffix_digests[index] = chained(&suffix_digests[index + 1], &lines[index]);
+            }
+            WritesAfterThePoint::MayAllBeRead { suffix_digests }
+        };
+        let devices: Vec<String> = flow
+            .base
+            .devices
+            .keys()
+            .map(|device| device.0.to_string())
+            .collect();
+        let newest_root_of_the_base = newest_root_in_the_base_image(flow.base);
+        assert_journal_recovery_of_the_base_image_lands_on_its_newest_root(
+            flow.base,
+            newest_root_of_the_base,
+        );
+        Self {
+            base_devices_text: format!(
+                "base_devices={} device_size_in_bytes={}\n",
+                devices.join(","),
+                flow.base.device_size_in_bytes
+            ),
+            prefix_digests,
+            root_writes,
+            newest_root_in_the_base_image: newest_root_of_the_base,
+            writes_after_the_point,
+        }
+    }
+
+    /// 管写表 `first_write..last_write` 的那个点：它的状态里判器另读的输入（逐样见 [`JudgeInputsOfTheFlow`]）逐行写下、取 SHA-256。
+    fn digest_for_a_point(
+        &self,
+        flow: &CrashFlow<'_>,
+        first_write: usize,
+        last_write: usize,
+    ) -> [u8; DIGEST_BYTES] {
+        let mut text = self.base_devices_text.clone();
+        text.push_str(&format!(
+            "writes_before_the_point={}\n",
+            hexadecimal_text(&self.prefix_digests[first_write])
+        ));
+        let writes_since_the_last_root = self
+            .root_writes
+            .iter()
+            .rev()
+            .find(|(index, _)| *index < last_write)
+            .map_or(0, |(index, _)| index + 1)..last_write;
+        let a_publish_is_unfinished = flow.writes[writes_since_the_last_root]
+            .iter()
+            .any(|write| matches!(write.kind, StepKind::UnitWrite | StepKind::JournalRecord));
+        let unfinished_publish_root = if a_publish_is_unfinished {
+            self.root_writes
+                .iter()
+                .find(|(index, _)| *index >= last_write)
+        } else {
+            None
+        };
+        match unfinished_publish_root {
+            Some((index, _)) => text.push_str(&format!(
+                "unfinished_publish_root={}",
+                judge_input_line_of_a_write(&flow.writes[*index], None)
+            )),
+            None => text.push_str(if a_publish_is_unfinished {
+                "unfinished_publish_root=absent_from_the_write_table\n"
+            } else {
+                "unfinished_publish_root=none\n"
+            }),
+        }
+        let highest_reachable_root: Option<(CheckpointTxg, InstanceGeneration)> =
+            if a_publish_is_unfinished && unfinished_publish_root.is_none() {
+                None
+            } else {
+                self.root_writes
+                    .iter()
+                    .filter(|(index, _)| *index < last_write)
+                    .chain(unfinished_publish_root)
+                    .map(|(_, identity)| *identity)
+                    .chain(self.newest_root_in_the_base_image)
+                    .max()
+            };
+        match highest_reachable_root {
+            Some((checkpoint_txg, instance)) => text.push_str(&format!(
+                "versions_up_to_txg={} instance={}\n",
+                checkpoint_txg.0, instance.0
+            )),
+            None => text.push_str("versions_up_to=every_version\n"),
+        }
+        for version in flow.versions.iter().filter(|version| {
+            highest_reachable_root
+                .is_none_or(|highest| (version.checkpoint_txg, version.instance) <= highest)
+        }) {
+            text.push_str(&format!(
+                "version instance={} txg={} content={}\n",
+                version.instance.0,
+                version.checkpoint_txg.0,
+                hexadecimal_text(&sha256_digest(&version.content))
+            ));
+        }
+        let judged_root_slot_write = if flow.judged_root_index < first_write {
+            "persisted_in_every_state".to_string()
+        } else if flow.judged_root_index < last_write {
+            format!(
+                "inside_the_point_at_write_{}",
+                flow.judged_root_index - first_write
+            )
+        } else {
+            "never_persisted".to_string()
+        };
+        text.push_str(&format!(
+            "judged_root_slot_write={judged_root_slot_write}\n"
+        ));
+        match &self.writes_after_the_point {
+            WritesAfterThePoint::ReadOnlyThroughTheUnfinishedPublish => {
+                text.push_str("writes_after_the_point=read_only_through_the_unfinished_publish\n")
+            }
+            WritesAfterThePoint::MayAllBeRead { suffix_digests } => text.push_str(&format!(
+                "writes_after_the_point={}\n",
+                hexadecimal_text(&suffix_digests[last_write])
+            )),
+        }
+        sha256_digest(text.as_bytes())
     }
 }
 
@@ -595,6 +961,154 @@ pub fn cards_by_priority_from_configuration_or_environment(
     }
 }
 
+/// 显卡配置里登记哪几类计算走 GPU 的键（上游 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用上现有的硬件加速」；
+/// 模板是仓根的 `gpu-cards.env.example`）。环境变量同名，设了就照它。
+pub const GPU_COMPUTATION_CLASSES_KEY: &str = "GPU_COMPUTATION_CLASSES";
+
+/// 能登记走 GPU 的计算类，名字就是各自的模块名。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum GpuComputationClass {
+    /// `gpu_unit_checks`：第 ① 段由 CPU 判时，每个状态被写过的单元两道校验和另交一张卡算、与 CPU 逐个对拍（`UnitChecksumsOn::Gpu`）。
+    /// 第 ① 段整个在卡上判（登记了 `crash_judge_gpu`）时校验和在判器的内核里算，这一类没有自己的路径。
+    GpuUnitChecks,
+    /// `crash_verify_gpu`：第 ② 段读事实表的核对在卡上（`FactsVerifierOn::Gpu`）。
+    CrashVerifyGpu,
+    /// `crash_judge_gpu`：第 ① 段整个在卡上判（`judge_my_blocks_on_gpu_cards`）。
+    CrashJudgeGpu,
+}
+
+impl GpuComputationClass {
+    pub const EVERY_CLASS: [Self; 3] = [
+        Self::GpuUnitChecks,
+        Self::CrashVerifyGpu,
+        Self::CrashJudgeGpu,
+    ];
+
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::GpuUnitChecks => "gpu_unit_checks",
+            Self::CrashVerifyGpu => "crash_verify_gpu",
+            Self::CrashJudgeGpu => "crash_judge_gpu",
+        }
+    }
+}
+
+/// 读 `GPU_COMPUTATION_CLASSES` 的值：空白隔开的类名（[`GpuComputationClass::name`]），重复的算一个。
+///
+/// # Errors
+/// 有认不得的词：写明是哪个、认得的有哪几个。
+pub fn parse_gpu_computation_classes(text: &str) -> Result<BTreeSet<GpuComputationClass>, String> {
+    let mut classes = BTreeSet::new();
+    for word in text.split_whitespace() {
+        let class = GpuComputationClass::EVERY_CLASS
+            .into_iter()
+            .find(|class| class.name() == word)
+            .ok_or_else(|| {
+                format!(
+                    "{GPU_COMPUTATION_CLASSES_KEY} 里的「{word}」认不得：认得的类名是 {}",
+                    GpuComputationClass::EVERY_CLASS
+                        .map(GpuComputationClass::name)
+                        .join("、")
+                )
+            })?;
+        classes.insert(class);
+    }
+    Ok(classes)
+}
+
+/// 登记了哪几类走 GPU：`environment_value`（环境变量 `GPU_COMPUTATION_CLASSES`，驱动脚本随命令送，第二台也靠它）给了就照它，
+/// 没给读显卡配置文件里的同名键；都没有是 `None`。
+///
+/// # Errors
+/// 写了而有认不得的类名（[`parse_gpu_computation_classes`]）。
+pub fn gpu_computation_classes_from(
+    environment_value: Option<&str>,
+    configuration_file: Option<&Path>,
+) -> Result<Option<BTreeSet<GpuComputationClass>>, String> {
+    let text = match environment_value {
+        Some(text) => Some(text.to_string()),
+        None => configuration_file
+            .and_then(|path| configuration_value(path, GPU_COMPUTATION_CLASSES_KEY)),
+    };
+    text.map(|text| parse_gpu_computation_classes(&text))
+        .transpose()
+}
+
+/// 一类计算在哪算。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ComputedOn {
+    Cpu,
+    Gpu,
+}
+
+/// 这一趟每一类计算在哪算（[`computation_routes`] 定，`run_from_environment` 照它选路）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct ComputationRoutes {
+    /// 第 ① 段的判器。
+    pub crash_judge: ComputedOn,
+    /// 第 ② 段读事实表的核对。
+    pub facts_verifier: ComputedOn,
+    /// 第 ① 段由 CPU 判时，单元两道校验和另交一张卡对拍；第 ① 段在卡上判时不看它。
+    pub unit_checksums: ComputedOn,
+}
+
+impl ComputationRoutes {
+    /// 有哪一类要卡。
+    #[must_use]
+    pub fn need_a_card(&self) -> bool {
+        [self.crash_judge, self.facts_verifier, self.unit_checksums].contains(&ComputedOn::Gpu)
+    }
+}
+
+/// 照配置定每一类计算在哪算：没开 GPU（`ENABLE_GPU=0`）时登记不读，三类都在 CPU；开了 GPU，登记了的类只走 GPU、没登记的只走 CPU。
+///
+/// # Errors
+/// 开了 GPU 而一类都没登记（没写这个键、或写的是空的：不默认全开，也不悄悄全走 CPU）；开了 GPU 而这份二进制没编进 `gpu` 特性
+/// （登记了的类上不了卡，不悄悄退回 CPU）。
+pub fn computation_routes(
+    gpu_is_switched_on: bool,
+    registered: Option<&BTreeSet<GpuComputationClass>>,
+    gpu_feature_is_compiled_in: bool,
+) -> Result<ComputationRoutes, String> {
+    if !gpu_is_switched_on {
+        return Ok(ComputationRoutes {
+            crash_judge: ComputedOn::Cpu,
+            facts_verifier: ComputedOn::Cpu,
+            unit_checksums: ComputedOn::Cpu,
+        });
+    }
+    let Some(registered) = registered.filter(|registered| !registered.is_empty()) else {
+        return Err(format!(
+            "配置写了 ENABLE_GPU=1，却没登记哪几类计算走 GPU：在显卡配置（SINGLEFS_GPU_CARDS_CONFIG 指的那一份，模板 gpu-cards.env.example）\
+             或环境变量里写 {GPU_COMPUTATION_CLASSES_KEY}=<{}…>；不走 GPU 就把 ENABLE_GPU 改成 0",
+            GpuComputationClass::EVERY_CLASS.map(GpuComputationClass::name).join(" ")
+        ));
+    };
+    if !gpu_feature_is_compiled_in {
+        return Err(format!(
+            "配置写了 ENABLE_GPU=1、登记了 {} 走 GPU，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）",
+            registered
+                .iter()
+                .map(|class| class.name())
+                .collect::<Vec<_>>()
+                .join("、")
+        ));
+    }
+    let route_of = |class: GpuComputationClass| {
+        if registered.contains(&class) {
+            ComputedOn::Gpu
+        } else {
+            ComputedOn::Cpu
+        }
+    };
+    Ok(ComputationRoutes {
+        crash_judge: route_of(GpuComputationClass::CrashJudgeGpu),
+        facts_verifier: route_of(GpuComputationClass::CrashVerifyGpu),
+        unit_checksums: route_of(GpuComputationClass::GpuUnitChecks),
+    })
+}
+
 /// 按优先级把 `pending_states` 个状态装到卡上：逐张装到这张卡一次派活带得了的状态数为止，装不下的才给下一张。
 /// 交回每张卡装了多少，0 就是这一趟不用这张卡；每张卡都装满还有剩的，剩下的排队等前面的判完（不算在任何一张卡上）。
 #[must_use]
@@ -703,16 +1217,33 @@ pub struct CheckingTally {
 
 pub const RED_TEXTS_KEPT: usize = 64;
 
-/// 核对线程数：环境变量 `SINGLEFS_CRASH_AMPLIFICATION_THREADS`，没设取本机可用并行度（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）。
+/// 核对线程数的环境变量。
+pub const CHECKING_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_AMPLIFICATION_THREADS";
+
+/// 核对线程数：环境变量 [`CHECKING_THREADS_ENVIRONMENT_VARIABLE`]，没设取本机可用并行度（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）。
+///
+/// # Panics
+/// 同 [`checking_threads_from_the_variable_value`]；值不是 UTF-8 也 panic。
 #[must_use]
 pub fn checking_threads() -> usize {
-    std::env::var("SINGLEFS_CRASH_AMPLIFICATION_THREADS")
-        .ok()
-        .and_then(|text| text.parse::<usize>().ok())
-        .filter(|count| *count >= 1)
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-        })
+    checking_threads_from_the_variable_value(
+        process_environment_variable(CHECKING_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
+    )
+}
+
+/// 核对线程数变量的值（`None` 是没设）换成线程数：没设取本机可用并行度（取不到是 1）；解析经数值环境变量共用的那一份，
+/// 线程数取 `NonZeroUsize`，与仓里别的线程数变量同一口径（C606：写错、写 0 都停下，不悄悄退回本机并行度）。
+///
+/// # Panics
+/// 设了而不是正整数（含 0、空串）：消息带变量名与原值。
+#[must_use]
+pub fn checking_threads_from_the_variable_value(value: Option<&str>) -> usize {
+    number_from_the_variable_value_panicking_when_unreadable::<std::num::NonZeroUsize>(
+        CHECKING_THREADS_ENVIRONMENT_VARIABLE,
+        value,
+    )
+    .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))
+    .get()
 }
 
 /// 一块判完的结果（还没写库）：每个状态判红的各项、红状态的正文、GPU 与 CPU 对不上的状态数。
@@ -867,6 +1398,10 @@ pub fn check_blocks_where_until(
     // 判完按段序拼回一块、当场写库：中途被停，写进库的块下一次不再判。
     let threads = checking_threads();
     let mut tally = CheckingTally::default();
+    // 每一段判完打一行 `CRASH_AMPLIFICATION_BLOCK`；一段判得比进度间隔久时，等着收的这条线程隔一个间隔另打一行按挂钟的
+    let started = std::time::Instant::now();
+    let clock = || started.elapsed();
+    let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
     for (pending_index, (point_index, local)) in pending.iter().enumerate() {
         if stop_is_requested() {
             break;
@@ -882,21 +1417,41 @@ pub fn check_blocks_where_until(
             pieces.push(start..end);
             start = end;
         }
-        let judged: Vec<JudgedBlock> = std::thread::scope(|scope| {
-            let handles: Vec<_> = pieces
-                .iter()
-                .map(|range| {
-                    let range = range.clone();
-                    scope.spawn(move || {
-                        judge_one_block(flow, plan, *point_index, range, unit_checksums)
-                    })
-                })
-                .collect();
-            handles
-                .into_iter()
-                .map(|handle| handle.join().expect("核对线程没有 panic"))
-                .collect()
+        let piece_count = pieces.len();
+        let mut judged: Vec<JudgedBlock> = std::thread::scope(|scope| {
+            let (judged_sender, judged_receiver) = std::sync::mpsc::channel::<JudgedBlock>();
+            for range in &pieces {
+                let range = range.clone();
+                let judged_sender = judged_sender.clone();
+                scope.spawn(move || {
+                    let piece = judge_one_block(flow, plan, *point_index, range, unit_checksums);
+                    // 发不出去说明收的这条线程已经走了（它 panic 了），这一段的结果没人要
+                    let _ = judged_sender.send(piece);
+                });
+            }
+            // 只留核对线程手里的发送端：它们都退出之后（判完或 panic），下面的接收才结束；有线程 panic 时 scope 收尾把它往外传
+            drop(judged_sender);
+            receive_the_pieces_of_one_block(
+                &judged_receiver,
+                &mut wall_clock_lines,
+                &clock,
+                &BlockInProgress {
+                    point_name: &point.name,
+                    block_start: local.start,
+                    piece_count,
+                    blocks_finished: tally.blocks_checked,
+                    pending_blocks: pending.len(),
+                    states_finished: tally.states_checked,
+                },
+                &mut |line| eprintln!("{line}"),
+            )
         });
+        assert_eq!(
+            judged.len(),
+            piece_count,
+            "块 {pending_index} 的每一段都判完交回了（核对线程 panic 时上面的 scope 已经往外传）"
+        );
+        judged.sort_by_key(|piece| piece.local.start);
         let mut items_of_each_state: Vec<Vec<String>> =
             Vec::with_capacity(usize::try_from(local.end - local.start).expect("一块装得进 usize"));
         let mut next_expected = local.start;
@@ -934,6 +1489,66 @@ pub fn check_blocks_where_until(
         tally.states_checked += local.end - local.start;
     }
     Ok(tally)
+}
+
+/// 一块正在判的时候按挂钟那一行要报的：哪个点、块从点内第几个状态起、切成几段，这一趟已经判完几块（共几块）与几个状态。
+struct BlockInProgress<'point> {
+    point_name: &'point str,
+    block_start: u64,
+    piece_count: usize,
+    blocks_finished: u64,
+    pending_blocks: usize,
+    states_finished: u64,
+}
+
+/// 收齐一块各段的判定：收到一段就记下；上一行之后 `clock` 走过整个进度间隔还没有新的一段，就交 `write_progress_line` 一行
+/// `CRASH_AMPLIFICATION_BLOCK by=wall_clock …`（C611：一块判得比进度间隔久时照样隔一个间隔报一行）。核对线程都退出（发送端全丢掉）才交回，
+/// 交回的是收到的各段（次序是到达的次序）。
+fn receive_the_pieces_of_one_block(
+    receiver: &std::sync::mpsc::Receiver<JudgedBlock>,
+    wall_clock_lines: &mut WallClockProgressLines,
+    clock: &dyn Fn() -> std::time::Duration,
+    block: &BlockInProgress<'_>,
+    write_progress_line: &mut dyn FnMut(String),
+) -> Vec<JudgedBlock> {
+    let mut arrived: Vec<JudgedBlock> = Vec::with_capacity(block.piece_count);
+    receive_until_the_senders_are_gone_with_wall_clock_lines(
+        receiver,
+        wall_clock_lines,
+        clock,
+        &mut |event| {
+            match event {
+            ReceivedOrWallClockLineDue::Received(piece) => arrived.push(piece),
+            ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => write_progress_line(format!(
+                "CRASH_AMPLIFICATION_BLOCK by=wall_clock point={} block_start={} pieces_finished={}/{} blocks_finished={}/{} states_finished={} elapsed_seconds={:.1}",
+                block.point_name,
+                block.block_start,
+                arrived.len(),
+                block.piece_count,
+                block.blocks_finished,
+                block.pending_blocks,
+                block.states_finished,
+                elapsed.as_secs_f64()
+            )),
+        }
+        },
+    );
+    arrived
+}
+
+/// GPU 判器判这一趟时等着收的那条线程隔一个进度间隔打的那一行：写进库几块（共几块）、几块判完了在等前面的块、几张卡收工了、开跑多久。
+#[must_use]
+pub fn gpu_judge_wall_clock_line(
+    blocks_stored: usize,
+    pending_blocks: usize,
+    blocks_waiting_for_an_earlier_block: usize,
+    cards_finished: usize,
+    elapsed: std::time::Duration,
+) -> String {
+    format!(
+        "CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu blocks_stored={blocks_stored}/{pending_blocks} blocks_waiting_for_an_earlier_block={blocks_waiting_for_an_earlier_block} cards_finished={cards_finished} elapsed_seconds={:.1}",
+        elapsed.as_secs_f64()
+    )
 }
 
 /// 一个崩溃镜像里被写表写过的每个单元（数据单元、节点、打包单元）两道校验和在 GPU 上算、与 CPU 对拍，
@@ -1073,7 +1688,7 @@ pub fn gpu_verdict_items(
         .iter()
         .enumerate()
     {
-        if violated & (1u64 << index) != 0 {
+        if violated & (1u128 << index) != 0 {
             items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"));
         }
     }
@@ -1232,6 +1847,73 @@ enum CardMessage {
     Finished(GpuCardOutcome),
     /// 这张卡判不了领到的块里的某个状态（表越过了内核的容量）：整趟停下、报错，不退回 CPU 判器。
     Refused(String),
+}
+
+/// 写库那条线程收完卡上的线程发来的话之后手里的：按块序写进库几块、收工的卡各自的账（按收到的次序）、写库的错、卡拒判的理由。
+#[cfg(feature = "gpu")]
+struct CardsMessagesReceived {
+    blocks_stored: usize,
+    finished_cards: Vec<GpuCardOutcome>,
+    storing_error: Option<String>,
+    refusal: Option<String>,
+}
+
+/// 写库那条线程收卡上的线程发来的话，到发送端全丢掉为止：判完的块按块序交 `store_block` 写库（后面的块先到就等前面那一块，
+/// 到了一起写；写库失败之后到的块不再写），收工的卡记下它的账，拒判的留第一条理由；上一次收到之后 `clock` 走过整个进度间隔还没有新的话，
+/// 就交 `write_progress_line` 一行 `CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu …`（C611：卡上判一块、编内核比进度间隔久时
+/// 照样隔一个间隔报一行，[`gpu_judge_wall_clock_line`]）。`pending_blocks` 是这一趟要判的块数，只进那一行。
+#[cfg(feature = "gpu")]
+fn receive_the_cards_messages_and_store_the_blocks_in_order(
+    receiver: &std::sync::mpsc::Receiver<CardMessage>,
+    wall_clock_lines: &mut WallClockProgressLines,
+    clock: &dyn Fn() -> std::time::Duration,
+    pending_blocks: usize,
+    store_block: &mut dyn FnMut(GpuJudgedBlock) -> Result<(), String>,
+    write_progress_line: &mut dyn FnMut(String),
+) -> CardsMessagesReceived {
+    let mut received = CardsMessagesReceived {
+        blocks_stored: 0,
+        finished_cards: Vec::new(),
+        storing_error: None,
+        refusal: None,
+    };
+    // 写库：按块序。后面的块先判完就在这里等，前面那一块到了一起写
+    let mut waiting: BTreeMap<usize, GpuJudgedBlock> = BTreeMap::new();
+    receive_until_the_senders_are_gone_with_wall_clock_lines(
+        receiver,
+        wall_clock_lines,
+        clock,
+        &mut |event| match event {
+            ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => {
+                write_progress_line(gpu_judge_wall_clock_line(
+                    received.blocks_stored,
+                    pending_blocks,
+                    waiting.len(),
+                    received.finished_cards.len(),
+                    elapsed,
+                ));
+            }
+            ReceivedOrWallClockLineDue::Received(CardMessage::Finished(card_outcome)) => {
+                received.finished_cards.push(card_outcome);
+            }
+            ReceivedOrWallClockLineDue::Received(CardMessage::Refused(reason)) => {
+                received.refusal.get_or_insert(reason);
+            }
+            ReceivedOrWallClockLineDue::Received(CardMessage::Block(arrived_block)) => {
+                waiting.insert(arrived_block.pending_index, arrived_block);
+                while let Some(block) = waiting.remove(&received.blocks_stored) {
+                    if received.storing_error.is_some() {
+                        continue;
+                    }
+                    match store_block(block) {
+                        Ok(()) => received.blocks_stored += 1,
+                        Err(error) => received.storing_error = Some(error),
+                    }
+                }
+            }
+        },
+    );
+    received
 }
 
 /// 几张卡一起干的那份活：要判的块排成一队，备好的卡从队头领。
@@ -1500,72 +2182,66 @@ pub fn judge_my_blocks_on_gpu_cards(
         stop_is_requested,
     };
     let started = Instant::now();
-    let mut storing_error: Option<String> = None;
-    let mut refusal: Option<String> = None;
-    std::thread::scope(|scope| {
+    let received = std::thread::scope(|scope| {
         let (sender, receiver) = std::sync::mpsc::channel::<CardMessage>();
         let work = &work;
         scope.spawn(move || {
             judge_on_one_card_and_start_the_next(scope, work, first_position, sender);
         });
-        // 写库：按块序。后面的块先判完就在这里等，前面那一块到了一起写
-        let mut waiting: BTreeMap<usize, GpuJudgedBlock> = BTreeMap::new();
-        let mut next_to_store = 0usize;
-        for message in receiver {
-            match message {
-                CardMessage::Finished(card_outcome) => outcome.cards.push(card_outcome),
-                CardMessage::Refused(reason) => {
-                    refusal.get_or_insert(reason);
-                }
-                CardMessage::Block(arrived_block) => {
-                    waiting.insert(arrived_block.pending_index, arrived_block);
-                    while let Some(block) = waiting.remove(&next_to_store) {
-                        if storing_error.is_some() {
-                            continue;
-                        }
-                        let storing_started = Instant::now();
-                        let (point_index, local) = &pending[block.pending_index];
-                        match store_judged_block(
-                            store,
-                            &plan.points[*point_index],
-                            local,
-                            version,
-                            &block.items_of_each_state,
-                            &mut tally,
-                        ) {
-                            Ok(()) => {
-                                outcome.blocks_judged += 1;
-                                outcome.states_judged += local.end - local.start;
-                                next_to_store += 1;
-                            }
-                            Err(error) => {
-                                storing_error = Some(format!("写判定块失败：{error:?}"));
-                                work.stop.store(true, std::sync::atomic::Ordering::SeqCst);
-                            }
-                        }
-                        outcome.seconds_storing += storing_started.elapsed().as_secs_f64();
+        // 卡上判一块、编内核都可能比进度间隔久：等着收的这条线程隔一个间隔打一行按挂钟的
+        let clock = || started.elapsed();
+        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
+        let received = receive_the_cards_messages_and_store_the_blocks_in_order(
+            &receiver,
+            &mut wall_clock_lines,
+            &clock,
+            pending.len(),
+            &mut |block| {
+                let storing_started = Instant::now();
+                let (point_index, local) = &pending[block.pending_index];
+                let stored = store_judged_block(
+                    store,
+                    &plan.points[*point_index],
+                    local,
+                    version,
+                    &block.items_of_each_state,
+                    &mut tally,
+                );
+                outcome.seconds_storing += storing_started.elapsed().as_secs_f64();
+                match stored {
+                    Ok(()) => {
+                        outcome.blocks_judged += 1;
+                        outcome.states_judged += local.end - local.start;
+                        Ok(())
+                    }
+                    Err(error) => {
+                        work.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+                        Err(format!("写判定块失败：{error:?}"))
                     }
                 }
-            }
-        }
-        if storing_error.is_none() && refusal.is_none() {
+            },
+            &mut |line| eprintln!("{line}"),
+        );
+        if received.storing_error.is_none() && received.refusal.is_none() {
             // 领走的块（序号连着、从 0 起）每一块都写进了库；没被叫停时领走的就是全部
             let taken = work
                 .next_pending
                 .load(std::sync::atomic::Ordering::SeqCst)
                 .min(pending.len());
-            assert_eq!(next_to_store, taken, "领走的块每一块都写进了库");
+            assert_eq!(received.blocks_stored, taken, "领走的块每一块都写进了库");
             assert!(
-                next_to_store == pending.len() || stop_is_requested(),
+                received.blocks_stored == pending.len() || stop_is_requested(),
                 "没人叫停，却有 {} 块没判",
-                pending.len() - next_to_store
+                pending.len() - received.blocks_stored
             );
         }
+        received
     });
-    if let Some(error) = storing_error {
+    outcome.cards = received.finished_cards;
+    if let Some(error) = received.storing_error {
         return Err(error);
     }
-    if let Some(reason) = refusal {
+    if let Some(reason) = received.refusal {
         return Err(reason);
     }
     outcome.cards.sort_by_key(|card| {
@@ -1577,17 +2253,27 @@ pub fn judge_my_blocks_on_gpu_cards(
     outcome.compile_seconds = outcome.cards.iter().map(|card| card.build_seconds).sum();
     outcome.judge_seconds = (started.elapsed().as_secs_f64() - outcome.compile_seconds).max(0.0);
     outcome.red_states = tally.red_states;
-    eprintln!(
-        "CRASH_AMPLIFICATION_GPU_TOTAL cards_used={} blocks={} states={} compile_seconds={:.1} judge_seconds={:.1} states_per_second={:.0} seconds_storing={:.1}",
+    Ok((tally, outcome))
+}
+
+/// GPU 判完这一趟打的那一行：判了多少、多快，连这一趟的展开上限与全域与否（[`run_from_environment`] 打，展开上限只有它知道）。
+#[must_use]
+pub fn gpu_total_line(
+    outcome: &GpuJudgeOutcome,
+    expand_up_to: ExpandUpToWritesPerSegment,
+    exhaustive: bool,
+) -> String {
+    format!(
+        "CRASH_AMPLIFICATION_GPU_TOTAL cards_used={} blocks={} states={} compile_seconds={:.1} judge_seconds={:.1} states_per_second={:.0} seconds_storing={:.1} expand_up_to={} exhaustive={exhaustive}",
         outcome.cards_used,
         outcome.blocks_judged,
         outcome.states_judged,
         outcome.compile_seconds,
         outcome.judge_seconds,
         outcome.states_per_second(),
-        outcome.seconds_storing
-    );
-    Ok((tally, outcome))
+        outcome.seconds_storing,
+        expand_up_to.0
+    )
 }
 
 // ============================== 三段流的第 ②、③ 段：读事实核对，与判器逐状态比 ==============================
@@ -1851,6 +2537,54 @@ pub struct StoredRedState {
     pub items: Vec<String>,
 }
 
+/// 这条流每个状态在库里、这一判法版本下的判定（判红的各项；绿的是空的），按整条流的状态序号排；这一判法版本下没判过的块，
+/// 它的状态是 `None`。复用与剪枝的对照拿它与不经库现判的结果逐态比。
+///
+/// # Errors
+/// 库读失败。
+///
+/// # Panics
+/// 判定块里的编号没在这个库里登记过，或块里的状态数与计划不符（库坏了）。
+pub fn read_verdict_items_of_every_state(
+    store: &VerdictStore,
+    plan: &CrashPlan,
+    version: &JudgeVersion,
+) -> Result<Vec<Option<Vec<String>>>, VerdictStoreError> {
+    let mut items_of_each_state = Vec::new();
+    for point in &plan.points {
+        for local in point.blocks() {
+            let state_count = usize::try_from(local.end - local.start).expect("一块装得进 usize");
+            match store.read_verdict_block(&point.block_key(&local), version)? {
+                None => items_of_each_state.extend(std::iter::repeat_n(None, state_count)),
+                Some(block) => {
+                    let numbers = block.verdict_vector_number_of_each_state();
+                    assert_eq!(
+                        numbers.len(),
+                        state_count,
+                        "点 {} 块 {} 存着的状态数与计划不符",
+                        point.path_number,
+                        local.start
+                    );
+                    for number in numbers {
+                        let vector = store
+                            .verdict_vector_of_number(*number)
+                            .expect("判定块里的编号在这个库里登记过");
+                        items_of_each_state.push(Some(if vector.0.is_empty() {
+                            Vec::new()
+                        } else {
+                            String::from_utf8_lossy(&vector.0)
+                                .split('\n')
+                                .map(str::to_string)
+                                .collect()
+                        }));
+                    }
+                }
+            }
+        }
+    }
+    Ok(items_of_each_state)
+}
+
 /// 门禁一次读：这些点每一块在这一判法版本下的违例，按点、按序号交回。
 ///
 /// # Errors
@@ -1994,9 +2728,11 @@ mod tests {
         assert_eq!(place_states_on_cards_by_priority(10, &[0, 100]), [0, 10]);
     }
 
-    /// 配置的值去掉一层引号；键没写是 `None`；显卡优先级从配置文件读，文件不在才读环境。
+    /// 配置的值去掉一层引号；键没写是 `None`；环境变量 `GPU_CARDS_BY_PRIORITY` 没设时显卡优先级从配置文件读。
+    /// 环境走 K5 那一个守卫：那个变量设了就盖过配置文件，用例清掉它、跑完（或 panic）还原，不读调用方留下的值。
     #[test]
     fn the_card_priority_is_read_from_the_configuration_file_with_one_layer_of_quotes_removed() {
+        let _environment = CrashAmplificationEnvironment::cleared_then_set(&[]);
         let directory = std::env::temp_dir().join(format!(
             "singlefs-crash-amplification-card-priority-{}",
             std::process::id()
@@ -2037,9 +2773,10 @@ mod tests {
     }
 
     /// 库落在开机会清空的目录下就拒；写明一次性才放行；家目录这类持久目录放行；目录还没建也按它的上层判。
+    /// 环境走 K5 那一个守卫：清掉一趟读的变量、跑完（或 panic）还原，不读调用方留下的「一次性」开关。
     #[test]
     fn a_library_under_a_directory_a_reboot_erases_is_refused_unless_declared_temporary() {
-        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY");
+        let mut environment = CrashAmplificationEnvironment::cleared_then_set(&[]);
         let refused = refuse_a_library_that_a_reboot_would_erase(Path::new(
             "/tmp/singlefs-crash-amplification-not-yet-created/library",
         ));
@@ -2062,13 +2799,15 @@ mod tests {
             Ok(()),
             "家目录下的库放行"
         );
-        std::env::set_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY", "1");
+        environment.set(
+            "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
+            std::ffi::OsStr::new("1"),
+        );
         assert_eq!(
             refuse_a_library_that_a_reboot_would_erase(Path::new("/tmp/x")),
             Ok(()),
             "写明一次性的放行"
         );
-        std::env::remove_var("SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY");
     }
 
     #[test]
@@ -2125,8 +2864,13 @@ mod tests {
         );
     }
 
+    /// 配置文件在就只看文件，不在才读同名的两个环境变量。环境走 K5 那一个守卫：两个开关由用例设、跑完（或 panic）还原。
     #[test]
     fn environment_switches_are_read_only_when_the_configuration_file_is_absent() {
+        let _environment = CrashAmplificationEnvironment::cleared_then_set(&[
+            ("ENABLE_ACROSS_MACHINES", std::ffi::OsStr::new("1")),
+            ("ENABLE_GPU", std::ffi::OsStr::new("\"1\"")),
+        ]);
         let directory = std::env::temp_dir().join(format!(
             "singlefs-run-mode-environment-{}",
             std::process::id()
@@ -2134,8 +2878,6 @@ mod tests {
         std::fs::create_dir_all(&directory).expect("建得了临时目录");
         let file = directory.join("multi-host.env");
         std::fs::write(&file, "ENABLE_ACROSS_MACHINES=0\nENABLE_GPU=0\n").expect("写得了");
-        std::env::set_var("ENABLE_ACROSS_MACHINES", "1");
-        std::env::set_var("ENABLE_GPU", "\"1\"");
         assert_eq!(
             CrashAmplificationRunMode::from_configuration_file_or_environment(&file),
             CrashAmplificationRunMode::SingleHostCpu,
@@ -2147,8 +2889,6 @@ mod tests {
             CrashAmplificationRunMode::TwoHostsCpuWithGpus,
             "文件不在读同名环境变量"
         );
-        std::env::remove_var("ENABLE_ACROSS_MACHINES");
-        std::env::remove_var("ENABLE_GPU");
     }
 
     #[test]
@@ -2197,6 +2937,58 @@ mod tests {
         );
     }
 
+    /// 展开上限的变量写坏了（不是非负整数）：panic，消息带变量名与原值，不悄悄退回默认。
+    #[test]
+    #[should_panic(expected = "SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO=\"2B\" 认不出")]
+    fn an_unreadable_expand_up_to_value_panics_naming_the_variable_and_the_value() {
+        let _ = ExpandUpToWritesPerSegment::from_value_of_the_variable(Some("2B"), 6);
+    }
+
+    /// 核对线程数写成 0：panic，消息带变量名与原值，不悄悄退回本机并行度（与仓里别的线程数变量同一口径）。
+    #[test]
+    #[should_panic(expected = "SINGLEFS_CRASH_AMPLIFICATION_THREADS=\"0\" 认不出")]
+    fn zero_checking_threads_panics_naming_the_variable_and_the_value() {
+        let _ = checking_threads_from_the_variable_value(Some("0"));
+    }
+
+    /// 核对线程数写坏（不是数）：panic，消息带变量名与原值，不悄悄退回本机并行度。
+    #[test]
+    #[should_panic(expected = "SINGLEFS_CRASH_AMPLIFICATION_THREADS=\"eight\" 认不出")]
+    fn an_unreadable_checking_threads_value_panics_naming_the_variable_and_the_value() {
+        let _ = checking_threads_from_the_variable_value(Some("eight"));
+    }
+
+    /// 核对线程数设了照它（两头的空白不算），没设取本机可用并行度。
+    #[test]
+    fn checking_threads_are_the_value_written_or_the_available_parallelism_when_unset() {
+        assert_eq!(checking_threads_from_the_variable_value(Some(" 3\n")), 3);
+        assert_eq!(
+            checking_threads_from_the_variable_value(None),
+            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
+        );
+    }
+
+    /// 没设取默认；设了照它（两头的空白不算）；按它判一段展不展开、整条流是不是全域。
+    #[test]
+    fn the_expand_up_to_value_is_the_default_when_unset_and_decides_each_segment() {
+        assert_eq!(
+            ExpandUpToWritesPerSegment::from_value_of_the_variable(None, 6),
+            ExpandUpToWritesPerSegment(6)
+        );
+        let limit = ExpandUpToWritesPerSegment::from_value_of_the_variable(Some(" 28\n"), 6);
+        assert_eq!(limit, ExpandUpToWritesPerSegment(28));
+        assert_eq!(
+            limit.expansion_of(&[0; 28]),
+            Layer0SegmentExpansion::EveryProperSubset
+        );
+        assert_eq!(
+            limit.expansion_of(&[0; 29]),
+            Layer0SegmentExpansion::NotExpanded
+        );
+        assert!(limit.covers_every_segment(&[vec![0; 2], vec![0; 28]]));
+        assert!(!limit.covers_every_segment(&[vec![0; 2], vec![0; 29]]));
+    }
+
     #[test]
     fn blocks_of_a_point_cover_its_states_without_gap() {
         let point = PlannedCrashPoint {
@@ -2211,6 +3003,7 @@ mod tests {
             .reuse_key(),
             path_number: "a".to_string(),
             identity: "f::p::0".to_string(),
+            judge_inputs: [0; 32],
             plan_hash: [0; 32],
         };
         let blocks = point.blocks();
@@ -2221,6 +3014,397 @@ mod tests {
                 STATES_PER_BLOCK..2 * STATES_PER_BLOCK,
                 2 * STATES_PER_BLOCK..2 * STATES_PER_BLOCK + 5
             ]
+        );
+    }
+
+    /// C611：一块判得比进度间隔久（假时钟每读一次走过一个间隔多一秒，那一段等到时钟读过两次才交来），等着收的那条线程打一行按挂钟的进度，
+    /// 行里是这一块的点名、块起点、已收到几段（共几段）、这一趟判完几块与几个状态、开跑多久；那一段照样收进来。
+    #[test]
+    fn a_block_judged_for_longer_than_the_progress_interval_reports_a_wall_clock_line_naming_its_point(
+    ) {
+        use crate::crash::PROGRESS_LINE_INTERVAL_IN_SECONDS;
+        use std::sync::atomic::{AtomicU64, Ordering};
+        let one_interval_and_a_second =
+            std::time::Duration::from_secs(PROGRESS_LINE_INTERVAL_IN_SECONDS + 1);
+        let (piece_sender, piece_receiver) = std::sync::mpsc::channel::<JudgedBlock>();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel::<()>();
+        let clock_reads = AtomicU64::new(0);
+        // 第 0 次读是开跑那一刻；第 2 次读（已经过了一个间隔、按挂钟那一行到期）时才放那一段进来
+        let clock = || {
+            let reads = clock_reads.fetch_add(1, Ordering::SeqCst);
+            if reads == 2 {
+                // 放行的那一头只收一次，收过之后发不出去也无妨
+                let _ = release_sender.send(());
+            }
+            one_interval_and_a_second * u32::try_from(reads).expect("一条用例里读不了几十亿次")
+        };
+        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
+        let mut printed: Vec<String> = Vec::new();
+        let arrived = std::thread::scope(|scope| {
+            scope.spawn(move || {
+                release_receiver.recv().expect("时钟读到第 2 次就放行");
+                piece_sender
+                    .send(JudgedBlock {
+                        local: 7..9,
+                        items_of_each_state: vec![Vec::new(), Vec::new()],
+                        red_texts: Vec::new(),
+                        gpu_cpu_disagreements: 0,
+                    })
+                    .expect("收的那一头还在等");
+            });
+            receive_the_pieces_of_one_block(
+                &piece_receiver,
+                &mut wall_clock_lines,
+                &clock,
+                &BlockInProgress {
+                    point_name: "publish_first_file.journal_record.1",
+                    block_start: 7,
+                    piece_count: 1,
+                    blocks_finished: 3,
+                    pending_blocks: 5,
+                    states_finished: 40,
+                },
+                &mut |line| printed.push(line),
+            )
+        });
+        assert_eq!(arrived.len(), 1, "那一段照样收进来");
+        assert_eq!(
+            printed.first().map(String::as_str),
+            Some(
+                "CRASH_AMPLIFICATION_BLOCK by=wall_clock point=publish_first_file.journal_record.1 block_start=7 pieces_finished=0/1 blocks_finished=3/5 states_finished=40 elapsed_seconds=602.0"
+            ),
+            "过了一个间隔还没收到那一段，按挂钟打一行：{printed:?}"
+        );
+    }
+
+    /// C611：GPU 判器那一处按挂钟的行：写进库几块（共几块）、几块在等前面的块、几张卡收工、开跑多久。
+    #[test]
+    fn the_gpu_judge_wall_clock_line_names_the_blocks_stored_and_waiting_and_the_cards_finished() {
+        assert_eq!(
+            gpu_judge_wall_clock_line(3, 10, 2, 1, std::time::Duration::from_secs(301)),
+            "CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu blocks_stored=3/10 blocks_waiting_for_an_earlier_block=2 cards_finished=1 elapsed_seconds=301.0"
+        );
+    }
+
+    /// C611 GPU 判器那一处：写库那条线程收卡上的话，过了一个进度间隔还没有新的话（块 1 先到、在等块 0；假时钟每读一次走过一个间隔多一秒，
+    /// 那张卡收工的话等到时钟读过四次才发），打一行按挂钟的：写进库几块（共几块）、几块在等前面的块、几张卡收工、开跑多久；
+    /// 之后收工的那张卡照样记下，没写成的块一块都不写。不要卡：卡上的线程换成一条发同样几句话的线程。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_gpu_judge_reports_a_wall_clock_line_while_it_waits_for_the_cards() {
+        use crate::crash::PROGRESS_LINE_INTERVAL_IN_SECONDS;
+        use std::cell::Cell;
+        let one_interval_and_a_second =
+            std::time::Duration::from_secs(PROGRESS_LINE_INTERVAL_IN_SECONDS + 1);
+        let (card_sender, card_receiver) = std::sync::mpsc::channel::<CardMessage>();
+        let (release_sender, release_receiver) = std::sync::mpsc::channel::<()>();
+        card_sender
+            .send(CardMessage::Block(GpuJudgedBlock {
+                pending_index: 1,
+                items_of_each_state: vec![Vec::new()],
+            }))
+            .expect("收的那一头还在");
+        let clock_reads = Cell::new(0u32);
+        // 第 0 次读是开跑那一刻、第 1 次读收到块 1、第 2 次读记下收到的时刻；第 4 次读（块 1 之后过了一个间隔、按挂钟那一行到期）时
+        // 才放收工的那句话进来
+        let clock = || {
+            let reads = clock_reads.get();
+            clock_reads.set(reads + 1);
+            if reads == 4 {
+                // 放行的那一头只收一次，收过之后发不出去也无妨
+                let _ = release_sender.send(());
+            }
+            one_interval_and_a_second * reads
+        };
+        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
+        let mut printed: Vec<String> = Vec::new();
+        let mut blocks_handed_to_the_store = 0usize;
+        let received = std::thread::scope(|scope| {
+            scope.spawn(move || {
+                release_receiver.recv().expect("时钟读到第 4 次就放行");
+                let finished_card = GpuCardOutcome {
+                    name: "stand-in card".to_string(),
+                    index: 3,
+                    memory_budget_mebibytes: 0,
+                    states_per_dispatch: 0,
+                    scratch_mebibytes: 0,
+                    blocks_judged: 0,
+                    states_judged: 0,
+                    build_seconds: 0.0,
+                    judge_seconds: 0.0,
+                    dispatches: 0,
+                    seconds_preparing: 0.0,
+                    seconds_waiting_for_the_card: 0.0,
+                    seconds_reading_back: 0.0,
+                    seconds_decoding: 0.0,
+                    states_in_the_widest_dispatch: 0,
+                    seconds_of_the_longest_dispatch: 0.0,
+                };
+                card_sender
+                    .send(CardMessage::Finished(finished_card))
+                    .expect("收的那一头还在等");
+            });
+            receive_the_cards_messages_and_store_the_blocks_in_order(
+                &card_receiver,
+                &mut wall_clock_lines,
+                &clock,
+                3,
+                &mut |_block| {
+                    blocks_handed_to_the_store += 1;
+                    Ok(())
+                },
+                &mut |line| printed.push(line),
+            )
+        });
+        assert_eq!(
+            printed.first().map(String::as_str),
+            Some(
+                "CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu blocks_stored=0/3 blocks_waiting_for_an_earlier_block=1 cards_finished=0 elapsed_seconds=1204.0"
+            ),
+            "过了一个间隔还没收到新的话，按挂钟打一行：{printed:?}"
+        );
+        assert_eq!(
+            received
+                .finished_cards
+                .iter()
+                .map(|card| card.index)
+                .collect::<Vec<u32>>(),
+            vec![3],
+            "收工的那张卡照样记下"
+        );
+        assert_eq!(
+            (received.blocks_stored, blocks_handed_to_the_store),
+            (0, 0),
+            "块 1 在等块 0，一块都不写"
+        );
+        assert_eq!(received.storing_error, None);
+        assert_eq!(received.refusal, None);
+    }
+
+    /// K5：这份文件里每一处按名字读环境变量（`env::var("…")`、`env::var_os("…")`，测试模块之外），名字都在
+    /// [`ENVIRONMENT_VARIABLES_READ_BY_A_RUN`] 里：用例的环境守卫照这张表清、还原，漏一个就会读到调用方留下的值。
+    #[test]
+    fn every_environment_variable_this_file_reads_by_name_is_in_the_list_a_run_reads() {
+        let source = std::fs::read_to_string(
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("src/crash_amplification.rs"),
+        )
+        .expect("读得了这份源文件");
+        let tests_start = source
+            .find("#[cfg(test)]\nmod tests {")
+            .expect("这份文件有测试模块");
+        let tests_end = tests_start
+            + source[tests_start..]
+                .find("\n}\n")
+                .expect("测试模块在顶格的右括号处收尾");
+        let outside_the_tests = format!("{}{}", &source[..tests_start], &source[tests_end..]);
+        let mut names_read = Vec::new();
+        for opening in ["env::var(\"", "env::var_os(\""] {
+            for (position, _) in outside_the_tests.match_indices(opening) {
+                let rest = &outside_the_tests[position + opening.len()..];
+                let name = &rest[..rest.find('"').expect("变量名的串收得了尾")];
+                names_read.push(name.to_string());
+            }
+        }
+        assert!(
+            names_read.len() >= 10,
+            "按名字读的环境变量少得不对，扫法坏了：{names_read:?}"
+        );
+        for name in &names_read {
+            assert!(
+                ENVIRONMENT_VARIABLES_READ_BY_A_RUN.contains(&name.as_str()),
+                "{name} 在这份文件里按名字读，却不在 ENVIRONMENT_VARIABLES_READ_BY_A_RUN 里"
+            );
+        }
+    }
+
+    fn registered(classes: &[GpuComputationClass]) -> BTreeSet<GpuComputationClass> {
+        classes.iter().copied().collect()
+    }
+
+    fn routes_with_the_gpu_switched_on(classes: &[GpuComputationClass]) -> ComputationRoutes {
+        computation_routes(true, Some(&registered(classes)), true)
+            .expect("开了 GPU、登记了至少一类、编进了 gpu 特性")
+    }
+
+    /// H9：登记了 `crash_judge_gpu`，第 ① 段在卡上判。
+    #[test]
+    fn the_crash_judge_runs_on_the_gpu_when_crash_judge_gpu_is_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[GpuComputationClass::CrashJudgeGpu]).crash_judge,
+            ComputedOn::Gpu
+        );
+    }
+
+    /// H9：没登记 `crash_judge_gpu`（登记了别的），第 ① 段在 CPU 上判。
+    #[test]
+    fn the_crash_judge_runs_on_the_cpu_when_crash_judge_gpu_is_not_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[
+                GpuComputationClass::CrashVerifyGpu,
+                GpuComputationClass::GpuUnitChecks
+            ])
+            .crash_judge,
+            ComputedOn::Cpu
+        );
+    }
+
+    /// H9：登记了 `crash_verify_gpu`，第 ② 段在卡上核。
+    #[test]
+    fn the_facts_verifier_runs_on_the_gpu_when_crash_verify_gpu_is_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[GpuComputationClass::CrashVerifyGpu]).facts_verifier,
+            ComputedOn::Gpu
+        );
+    }
+
+    /// H9：没登记 `crash_verify_gpu`（登记了别的），第 ② 段在 CPU 上核。
+    #[test]
+    fn the_facts_verifier_runs_on_the_cpu_when_crash_verify_gpu_is_not_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[
+                GpuComputationClass::CrashJudgeGpu,
+                GpuComputationClass::GpuUnitChecks
+            ])
+            .facts_verifier,
+            ComputedOn::Cpu
+        );
+    }
+
+    /// H9：登记了 `gpu_unit_checks`，第 ① 段由 CPU 判时单元校验和交卡对拍。
+    #[test]
+    fn the_unit_checksums_run_on_the_gpu_when_gpu_unit_checks_is_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[GpuComputationClass::GpuUnitChecks]).unit_checksums,
+            ComputedOn::Gpu
+        );
+    }
+
+    /// H9：没登记 `gpu_unit_checks`（登记了别的），单元校验和只在 CPU 上。
+    #[test]
+    fn the_unit_checksums_run_on_the_cpu_when_gpu_unit_checks_is_not_registered() {
+        assert_eq!(
+            routes_with_the_gpu_switched_on(&[
+                GpuComputationClass::CrashJudgeGpu,
+                GpuComputationClass::CrashVerifyGpu
+            ])
+            .unit_checksums,
+            ComputedOn::Cpu
+        );
+    }
+
+    /// H9：没开 GPU 时登记不读，三类都在 CPU 上，一张卡都不要。
+    #[test]
+    fn every_class_runs_on_the_cpu_when_the_gpu_is_switched_off_even_if_registered() {
+        let routes = computation_routes(
+            false,
+            Some(&registered(&GpuComputationClass::EVERY_CLASS)),
+            true,
+        )
+        .expect("没开 GPU 不报错");
+        assert_eq!(
+            routes,
+            ComputationRoutes {
+                crash_judge: ComputedOn::Cpu,
+                facts_verifier: ComputedOn::Cpu,
+                unit_checksums: ComputedOn::Cpu,
+            }
+        );
+        assert!(!routes.need_a_card());
+    }
+
+    /// H9：开了 GPU 而一类都没登记（键没写、或写的是空的）：报错，不默认全开、也不悄悄全走 CPU。
+    #[test]
+    fn the_gpu_switched_on_with_no_class_registered_is_refused() {
+        for registration in [None, Some(BTreeSet::new())] {
+            let refused = computation_routes(true, registration.as_ref(), true);
+            assert!(
+                refused
+                    .as_ref()
+                    .is_err_and(|reason| reason.contains(GPU_COMPUTATION_CLASSES_KEY)),
+                "登记 {registration:?}：{refused:?}"
+            );
+        }
+    }
+
+    /// H9：开了 GPU、登记了一类，而这份二进制没编进 `gpu` 特性：报错并点名登记的类，不悄悄退回 CPU。
+    #[test]
+    fn a_registered_class_without_the_gpu_feature_compiled_in_is_refused() {
+        let refused = computation_routes(
+            true,
+            Some(&registered(&[GpuComputationClass::CrashVerifyGpu])),
+            false,
+        );
+        assert!(
+            refused.as_ref().is_err_and(
+                |reason| reason.contains("gpu 特性") && reason.contains("crash_verify_gpu")
+            ),
+            "{refused:?}"
+        );
+    }
+
+    /// H9：类名照模块名读，空白隔开、重复的算一个。
+    #[test]
+    fn the_three_class_names_read_back_as_the_three_classes() {
+        assert_eq!(
+            parse_gpu_computation_classes(
+                "gpu_unit_checks  crash_verify_gpu\tcrash_judge_gpu crash_judge_gpu"
+            ),
+            Ok(registered(&GpuComputationClass::EVERY_CLASS))
+        );
+    }
+
+    /// H9：认不得的类名报错，点名是哪一个。
+    #[test]
+    fn an_unknown_class_name_is_refused_naming_it() {
+        let refused = parse_gpu_computation_classes("crash_judge_gpu crash_judge_cpu");
+        assert!(
+            refused
+                .as_ref()
+                .is_err_and(|reason| reason.contains("「crash_judge_cpu」")),
+            "{refused:?}"
+        );
+    }
+
+    /// H9：环境变量给了就照它，不读显卡配置里的同名键。
+    #[test]
+    fn the_classes_from_the_environment_come_before_the_configuration_file() {
+        let directory = std::env::temp_dir().join(format!(
+            "singlefs-gpu-computation-classes-environment-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).expect("建得了临时目录");
+        let file = directory.join("gpu-cards.env");
+        std::fs::write(&file, "GPU_COMPUTATION_CLASSES='crash_judge_gpu'\n").expect("写得了");
+        let classes = gpu_computation_classes_from(Some("crash_verify_gpu"), Some(&file));
+        std::fs::remove_dir_all(&directory).expect("删得掉");
+        assert_eq!(
+            classes,
+            Ok(Some(registered(&[GpuComputationClass::CrashVerifyGpu])))
+        );
+    }
+
+    /// H9：环境变量没给就读显卡配置里的同名键（去一层引号）。
+    #[test]
+    fn the_classes_are_read_from_the_configuration_file_when_the_environment_gives_none() {
+        let directory = std::env::temp_dir().join(format!(
+            "singlefs-gpu-computation-classes-file-{}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&directory).expect("建得了临时目录");
+        let file = directory.join("gpu-cards.env");
+        std::fs::write(
+            &file,
+            "GPU_CARDS_BY_PRIORITY='local:0:15G'\nGPU_COMPUTATION_CLASSES='crash_judge_gpu gpu_unit_checks'\n",
+        )
+        .expect("写得了");
+        let classes = gpu_computation_classes_from(None, Some(&file));
+        std::fs::remove_dir_all(&directory).expect("删得掉");
+        assert_eq!(
+            classes,
+            Ok(Some(registered(&[
+                GpuComputationClass::CrashJudgeGpu,
+                GpuComputationClass::GpuUnitChecks
+            ])))
         );
     }
 }
@@ -2454,6 +3638,82 @@ pub struct EnvironmentRun {
     pub stopped_early: bool,
     /// 这一趟判定行上的判法版本。
     pub judge_version: JudgeVersion,
+    /// 这一趟每一类计算在哪算（[`computation_routes`]）。
+    pub computation_routes: ComputationRoutes,
+    /// 这一趟的展开上限（调用方给的，与流自己的展开方式逐段核过）。
+    pub expand_up_to: ExpandUpToWritesPerSegment,
+    /// 每一段都不超过展开上限（全域）；测试代码里 ignore 的点另报，不算在这里。
+    pub exhaustive: bool,
+    /// 这一行报的复用态数，取法见 [`reuse_and_scale_fields_of_the_line`]。
+    pub states_reused: u64,
+    /// 测试代码里预设 ignore 的点（按登记整批不判的一类，不算剪枝）与因此没展开的态数。
+    pub ignored_points: usize,
+    pub states_skipped_by_ignore: u64,
+}
+
+/// 每一行 `CRASH_AMPLIFICATION ` 末尾都接的几个字段（汇总行、被叫停的行、`flow=` 行、两台跑的分份行与导入行，打法都在
+/// `crates/singlefs-checker-tier/tests/` 里调 [`run_from_environment`] 的用例）：
+///
+/// ` states_reused=<n> exhaustive=<true|false> expand_up_to=<n> ignored_points=<n> states_skipped_by_ignore=<n>`
+///
+/// - `states_reused`：这一趟分给本机的块（`SINGLEFS_CRASH_AMPLIFICATION_SHARE=<i>/<n>` 那一份；没设是整份）里，录入时库中已有这一判法版本
+///   的判定、这一趟因此没判的态数；导入之前数，导入进来的块不算。每一趟照实报自己的（R1 判决 L1：叫停、导入、只排计划都不写 0）：
+///   被叫停的那一趟（[`stop_is_requested_by_the_environment`]）报它录入时库里已判的；导入那一趟（设了 `SINGLEFS_CRASH_AMPLIFICATION_IMPORT`）
+///   报导入之前库里已判的（两台跑时就是 `share=0/2` 那一行刚判过或复用过的那一份）；只排派活计划的那一趟同样报（它的
+///   `CRASH_AMPLIFICATION_PLACEMENT` 行也带）。所以同一份库上几趟的行加起来会重复计：叫停之后接着跑的那一趟、导入那一趟数到的，
+///   有一部分是同一项里前一行判过或报过的。
+/// - `exhaustive`：每一段的写数都不超过展开上限（全域）。全量的完成标记只认 `true`。
+/// - `expand_up_to`：这一趟的展开上限（[`ExpandUpToWritesPerSegment`]）。
+/// - `ignored_points`、`states_skipped_by_ignore`：测试代码里预设 ignore 的点数，与它们的段因此没展开的态数（不 ignore 时照流自己的展开方式
+///   该有的态数减去这一趟的）。ignore 是按登记整批不判的一类，不算剪枝，也不进复用的对照；入口的成功句照这两个数报跳过了多少。
+#[must_use]
+pub fn reuse_and_scale_fields_of_the_line(run: &EnvironmentRun) -> String {
+    format!(
+        " states_reused={} exhaustive={} expand_up_to={} ignored_points={} states_skipped_by_ignore={}",
+        run.states_reused,
+        run.exhaustive,
+        run.expand_up_to.0,
+        run.ignored_points,
+        run.states_skipped_by_ignore
+    )
+}
+
+/// 不 ignore 时照流自己的展开方式该有的态数，减去这一份计划的态数（ignore 的点的段不展开）。一个点都没 ignore 是 0。
+fn states_skipped_by_ignore(flow: &CrashFlow<'_>, plan: &CrashPlan) -> u64 {
+    if !plan.points.iter().any(|point| point.ignored) {
+        return 0;
+    }
+    let without_ignore =
+        layer0_state_ranges_by_segment(flow.base, flow.writes, flow.segments, flow.expansion).1;
+    let planned = plan.points.last().map_or(0, |point| point.ordinals.end);
+    without_ignore
+        .checked_sub(planned)
+        .expect("ignore 只会让段少展开，态数不会比不 ignore 时多")
+}
+
+/// 这一份（`is_mine` 选的块）里录入时库中已有这一判法版本判定的态数。
+fn states_already_judged_in_this_share(
+    store: &VerdictStore,
+    plan: &CrashPlan,
+    version: &JudgeVersion,
+    is_mine: &dyn Fn(u64) -> bool,
+) -> Result<u64, VerdictStoreError> {
+    let mut states = 0u64;
+    let mut block_sequence = 0u64;
+    for point in &plan.points {
+        for local in point.blocks() {
+            let this_block = block_sequence;
+            block_sequence += 1;
+            if is_mine(this_block)
+                && store
+                    .read_verdict_block(&point.block_key(&local), version)?
+                    .is_some()
+            {
+                states += local.end - local.start;
+            }
+        }
+    }
+    Ok(states)
 }
 
 /// 只核给定序号的那些块（块序号 = 全部点的块按次序编号）；[`check_recorded_blocks`] 是它按权重分工的形态。
@@ -2492,6 +3752,114 @@ pub fn path_relative_to_repository_root(repository_root: &Path, text: &str) -> P
     }
 }
 
+/// [`run_from_environment`] 一趟（连同它调的、这份文件里的函数）读的全部环境变量。调它的用例照这张表清掉、跑完还原
+/// （`tests/common_crash_points/mod.rs` 的环境守卫），不读调用方与别的用例留下的值；这份文件里每一处按名字读环境变量都要在表里
+/// （`crash_amplification::tests` 里有一条用例逐个核）。
+pub const ENVIRONMENT_VARIABLES_READ_BY_A_RUN: &[&str] = &[
+    "SINGLEFS_MULTI_HOST_CONFIG",
+    "ENABLE_ACROSS_MACHINES",
+    "ENABLE_GPU",
+    "SINGLEFS_GPU_CARDS_CONFIG",
+    "GPU_CARDS_BY_PRIORITY",
+    GPU_COMPUTATION_CLASSES_KEY,
+    "SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE",
+    "SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY",
+    "SINGLEFS_CRASH_AMPLIFICATION_SHARE",
+    "SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS",
+    "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY",
+    "SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY",
+    "SINGLEFS_CRASH_AMPLIFICATION_IMPORT",
+    "SINGLEFS_CRASH_AMPLIFICATION_STOP_FILE",
+    "SINGLEFS_CRASH_AMPLIFICATION_VERIFY",
+    CHECKING_THREADS_ENVIRONMENT_VARIABLE,
+    EXPAND_UP_TO_ENVIRONMENT_VARIABLE,
+];
+
+/// 同一个测试二进制里改进程环境、读 [`ENVIRONMENT_VARIABLES_READ_BY_A_RUN`] 里变量的用例一条接一条跑：几条一起改同一批变量会互相读到对方的值。
+/// 这份库的单测与 `tests/` 下各个测试二进制各有一把（一个进程一份）。
+static ONE_TEST_CHANGES_THE_ENVIRONMENT_AT_A_TIME: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+/// 一批环境变量：建的时候记下原值，丢掉（用例收尾、panic）时逐个还原——原来没设的删掉，设了的写回原值。
+pub struct EnvironmentRestoredOnDrop {
+    saved: Vec<(&'static str, Option<std::ffi::OsString>)>,
+}
+
+impl EnvironmentRestoredOnDrop {
+    /// 记下 `names` 每个变量的原值，再全部删掉。
+    #[must_use]
+    pub fn saved_then_cleared(names: &[&'static str]) -> Self {
+        let saved = names
+            .iter()
+            .map(|name| (*name, std::env::var_os(name)))
+            .collect();
+        for name in names {
+            std::env::remove_var(name);
+        }
+        Self { saved }
+    }
+
+    /// 设一个变量。
+    ///
+    /// # Panics
+    /// 变量不在建它时记下的那一批里（丢掉时还原不了它）。
+    pub fn set(&mut self, name: &str, value: &std::ffi::OsStr) {
+        assert!(
+            self.saved.iter().any(|(saved_name, _)| *saved_name == name),
+            "{name} 不在记下原值的那一批里，丢掉时还原不了它"
+        );
+        std::env::set_var(name, value);
+    }
+}
+
+impl Drop for EnvironmentRestoredOnDrop {
+    fn drop(&mut self) {
+        for (name, value) in &self.saved {
+            match value {
+                Some(value) => std::env::set_var(name, value),
+                None => std::env::remove_var(name),
+            }
+        }
+    }
+}
+
+/// 读这份文件里环境变量的用例的环境（K5：用例自己清、自己还原，不读别的用例与调用方留下的值）：拿住这个测试二进制里改环境的锁，
+/// 把一趟读的全部变量（[`ENVIRONMENT_VARIABLES_READ_BY_A_RUN`]）记下原值、清掉，再设用例给的那几个；丢掉时（用例收尾、panic）逐个还原、放锁。
+/// 经 [`run_from_environment`] 跑的用例（`tests/common_crash_points/mod.rs` 转出去用）与这份文件里改环境的单测走的都是它。
+pub struct CrashAmplificationEnvironment {
+    // 先还原、后放锁：字段按声明的次序丢
+    variables: EnvironmentRestoredOnDrop,
+    _one_test_at_a_time: std::sync::MutexGuard<'static, ()>,
+}
+
+impl CrashAmplificationEnvironment {
+    /// # Panics
+    /// `settings` 里有不在 [`ENVIRONMENT_VARIABLES_READ_BY_A_RUN`] 里的变量。
+    #[must_use]
+    pub fn cleared_then_set(settings: &[(&str, &std::ffi::OsStr)]) -> Self {
+        // 上一条拿着锁的用例 panic 了：它的环境已经在丢守卫时还原，锁照样能用
+        let one_test_at_a_time = ONE_TEST_CHANGES_THE_ENVIRONMENT_AT_A_TIME
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut variables =
+            EnvironmentRestoredOnDrop::saved_then_cleared(ENVIRONMENT_VARIABLES_READ_BY_A_RUN);
+        for (name, value) in settings {
+            variables.set(name, value);
+        }
+        Self {
+            variables,
+            _one_test_at_a_time: one_test_at_a_time,
+        }
+    }
+
+    /// 用例跑到一半再设一个（例如第二趟之前放叫停文件）。
+    ///
+    /// # Panics
+    /// 同 [`EnvironmentRestoredOnDrop::set`]。
+    pub fn set(&mut self, name: &str, value: &std::ffi::OsStr) {
+        self.variables.set(name, value);
+    }
+}
+
 /// 从环境跑一趟：配置定跑法，`SINGLEFS_CRASH_AMPLIFICATION_SHARE` 定这台机器领哪一份，`SINGLEFS_CRASH_AMPLIFICATION_LIBRARY` 是库目录
 /// （没设建在临时目录、跑完删；设了就要落在开机不清空的地方——`/tmp`、`/var/tmp`、`/dev/shm`、`/run` 之下一律拒绝，
 /// 只有测试自己知道库是一次性的时才写 `SINGLEFS_CRASH_AMPLIFICATION_LIBRARY_IS_TEMPORARY=1` 放行），
@@ -2499,13 +3867,17 @@ pub fn path_relative_to_repository_root(repository_root: &Path, text: &str) -> P
 /// 这一判法版本下判过的块全部复用，只补没判的；
 /// 跑法带 GPU 时卡按配置的优先级用（`SINGLEFS_GPU_CARDS_CONFIG` 指的显卡配置里的 `GPU_CARDS_BY_PRIORITY`，[`parse_cards_by_priority`]；
 /// 这个进程在哪台机器看 `SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE`）：任务先装第一张卡，装到它的显存额度为止，装不下的才给下一张；没配就按本机能用的卡的
-/// 空闲显存从大到小用（`gpu` 特性没编进来而配置写了 `ENABLE_GPU=1` 就报错，不悄悄退回 CPU）。
+/// 空闲显存从大到小用（`gpu` 特性没编进来而配置写了 `ENABLE_GPU=1` 就报错，不悄悄退回 CPU）。哪几类计算走 GPU 照
+/// `GPU_COMPUTATION_CLASSES`（环境变量优先，退到显卡配置里的同名键；[`computation_routes`]）：登记了的只走 GPU、没登记的只走 CPU。
 /// `SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1` 只排派活计划：打一行 `CRASH_AMPLIFICATION_PLACEMENT …`（要判多少、每张卡装多少、
 /// 这台机器的卡试判几次派活量到的速度），一块都不判。
 /// 主机之间等分（`SINGLEFS_CRASH_AMPLIFICATION_HOST_WEIGHTS=<w0>,<w1>,…` 可以改成按权重）。
+/// `expand_up_to` 是这一趟的展开上限，进交回的结果与 `CRASH_AMPLIFICATION_GPU_TOTAL` 行；流自己的展开方式要与它逐段相同。
 ///
 /// # Errors
-/// 环境变量写法错、库打不开、判定存储读写失败、配置要 GPU 而这份二进制没有。
+/// 环境变量写法错、库打不开、判定存储读写失败、配置要 GPU 而这份二进制没有；流的展开方式与 `expand_up_to` 在某一段上不同
+/// （报的展开上限就不是这一趟枚举的那个，在任何录入之前拒）；开了 GPU 而 `GPU_COMPUTATION_CLASSES` 没登记、登记了认不得的类名
+/// （在开库之前拒，[`computation_routes`]）；登记了的类这一趟上不了卡；只排派活计划而没登记 `crash_judge_gpu`。
 #[allow(
     clippy::too_many_lines,
     reason = "读环境、开库、导入、录入、按卡分工核对、对账、打行，是一趟的全部步骤，拆开要把十几个量来回传"
@@ -2514,7 +3886,25 @@ pub fn run_from_environment(
     flow: &CrashFlow<'_>,
     judging: &PipelineJudgingCode,
     repository_root: &Path,
+    expand_up_to: ExpandUpToWritesPerSegment,
 ) -> Result<EnvironmentRun, String> {
+    if let Some((segment_index, segment)) =
+        flow.segments
+            .iter()
+            .enumerate()
+            .find(|(segment_index, segment)| {
+                (flow.expansion)(*segment_index, segment) != expand_up_to.expansion_of(segment)
+            })
+    {
+        return Err(format!(
+            "流的展开方式与报的展开上限 {} 在第 {segment_index} 段（{} 次写）上不同：流给 {}，上限该给 {}",
+            expand_up_to.0,
+            segment.len(),
+            (flow.expansion)(segment_index, segment).name(),
+            expand_up_to.expansion_of(segment).name()
+        ));
+    }
+    let exhaustive = expand_up_to.covers_every_segment(flow.segments);
     let configuration_file: Option<PathBuf> = match std::env::var("SINGLEFS_MULTI_HOST_CONFIG") {
         Ok(text) => {
             let configuration = path_relative_to_repository_root(repository_root, &text);
@@ -2554,6 +3944,20 @@ pub fn run_from_environment(
     };
     let cards_by_priority =
         cards_by_priority_from_configuration_or_environment(gpu_cards_configuration.as_deref())?;
+    // 哪几类计算走 GPU：没开 GPU 不读登记；开了照登记，登记了的只走 GPU、没登记的只走 CPU，在开库之前定
+    let registered_gpu_classes = if mode.uses_gpu() {
+        gpu_computation_classes_from(
+            std::env::var(GPU_COMPUTATION_CLASSES_KEY).ok().as_deref(),
+            gpu_cards_configuration.as_deref(),
+        )?
+    } else {
+        None
+    };
+    let routes = computation_routes(
+        mode.uses_gpu(),
+        registered_gpu_classes.as_ref(),
+        cfg!(feature = "gpu"),
+    )?;
     let host = CardHost::of_this_process()?;
     let placement_only = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY")
         .is_ok_and(|value| value == "1");
@@ -2619,8 +4023,27 @@ pub fn run_from_environment(
     let mut report = CoverageReport::default();
     let recording = record_crash_points(&mut store, &plan, &version, &mut report)
         .map_err(|error| format!("录入失败：{error:?}"))?;
+    let host_shares = WeightedShares::new(host_weights);
+    let total_blocks: u64 = plan
+        .points
+        .iter()
+        .map(|point| u64::try_from(point.blocks().len()).expect("块数装得进 u64"))
+        .sum();
+    let my_blocks: Vec<u64> = (0..total_blocks)
+        .filter(|block| host_shares.owner_of_block(*block) == share.index)
+        .collect();
+    let selected: std::collections::HashSet<u64> = my_blocks.iter().copied().collect();
+    // 复用数在导入之前数：导入进来的块是别的机器这一趟判的，不算复用。叫停、导入、只排计划的那一趟都照这个数报（L1）
+    let import_list = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT").ok();
+    let states_reused_at_recording =
+        states_already_judged_in_this_share(&store, &plan, &version, &|block| {
+            selected.contains(&block)
+        })
+        .map_err(|error| format!("数复用失败：{error:?}"))?;
+    let ignored_points = plan.points.iter().filter(|point| point.ignored).count();
+    let states_skipped_by_ignore = states_skipped_by_ignore(flow, &plan);
     let mut imported_blocks = 0u64;
-    if let Ok(list) = std::env::var("SINGLEFS_CRASH_AMPLIFICATION_IMPORT") {
+    if let Some(list) = &import_list {
         for directory in list.split(':').filter(|directory| !directory.is_empty()) {
             let (other, _) = VerdictStore::open_existing(&path_relative_to_repository_root(
                 repository_root,
@@ -2632,25 +4055,18 @@ pub fn run_from_environment(
                 .map_err(|error| format!("导入 {directory} 失败：{error:?}"))?;
         }
     }
-    let host_shares = WeightedShares::new(host_weights);
-    let total_blocks: u64 = plan
-        .points
-        .iter()
-        .map(|point| u64::try_from(point.blocks().len()).expect("块数装得进 u64"))
-        .sum();
-    let my_blocks: Vec<u64> = (0..total_blocks)
-        .filter(|block| host_shares.owner_of_block(*block) == share.index)
-        .collect();
-    let selected: std::collections::HashSet<u64> = my_blocks.iter().copied().collect();
     let seconds_planning_and_recording = planning_started.elapsed().as_secs_f64();
-    let cards = if mode.uses_gpu() {
+    let cards = if routes.need_a_card() {
         Some(gpu_cards_in_use(cards_by_priority.as_deref(), host)?)
     } else {
         None
     };
     if placement_only {
-        let Some(cards) = &cards else {
-            return Err("只排派活计划要配置开着 GPU（ENABLE_GPU=1）".to_string());
+        let (ComputedOn::Gpu, Some(cards)) = (routes.crash_judge, &cards) else {
+            return Err(format!(
+                "只排派活计划排的是 GPU 判器的活：要配置开着 GPU（ENABLE_GPU=1）、{GPU_COMPUTATION_CLASSES_KEY} 里登记 {}",
+                GpuComputationClass::CrashJudgeGpu.name()
+            ));
         };
         print_the_placement(
             &store,
@@ -2661,6 +4077,7 @@ pub fn run_from_environment(
             cards,
             cards_by_priority.as_deref(),
             host,
+            states_reused_at_recording,
         )?;
         let unjudged = unjudged_blocks_of_the_flow(&store, &plan, &version)
             .map_err(|error| format!("对账失败：{error:?}"))?
@@ -2686,12 +4103,20 @@ pub fn run_from_environment(
             placement_only: true,
             stopped_early: false,
             judge_version: version,
+            computation_routes: routes,
+            expand_up_to,
+            exhaustive,
+            // 只排派活计划的那一趟一块都不判、不打 CRASH_AMPLIFICATION 行；复用数照实报（PLACEMENT 行也带）
+            states_reused: states_reused_at_recording,
+            ignored_points,
+            states_skipped_by_ignore,
         });
     }
-    // 第 ① 段：配置开了 GPU 就由 GPU 判器判这台机器领的块（判不了就报错，不退回 CPU）；没开 GPU 由 CPU 判器判
+    // 第 ① 段：登记了 crash_judge_gpu 就由 GPU 判器判这台机器领的块（判不了就报错，不退回 CPU）；没登记由 CPU 判器判，
+    // 那时登记了 gpu_unit_checks 就把单元两道校验和另交一张卡对拍
     let judging_started = std::time::Instant::now();
-    let (checking, gpu_judge) = match &cards {
-        Some(cards) => {
+    let (checking, gpu_judge) = match (routes.crash_judge, &cards) {
+        (ComputedOn::Gpu, Some(cards)) => {
             let (checking, outcome) = judge_my_blocks_on_gpu(
                 &mut store,
                 flow,
@@ -2701,15 +4126,22 @@ pub fn run_from_environment(
                 cards,
                 &stop_is_requested_by_the_environment,
             )?;
+            eprintln!("{}", gpu_total_line(&outcome, expand_up_to, exhaustive));
             (checking, Some(outcome))
         }
-        None => (
+        (ComputedOn::Gpu, None) => {
+            return Err(format!(
+                "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回 CPU 判器",
+                GpuComputationClass::CrashJudgeGpu.name()
+            ));
+        }
+        (ComputedOn::Cpu, _) => (
             check_selected_blocks(
                 &mut store,
                 flow,
                 &plan,
                 &selected,
-                &UnitChecksumsOn::CpuOnly,
+                &unit_checksums_on(routes.unit_checksums, cards.as_ref())?,
                 &version,
                 &stop_is_requested_by_the_environment,
             )
@@ -2747,33 +4179,66 @@ pub fn run_from_environment(
             placement_only: false,
             stopped_early: true,
             judge_version: version,
+            computation_routes: routes,
+            expand_up_to,
+            exhaustive,
+            // 被叫停的那一趟照实报它录入时库里已判的（L1）；接着跑的那一趟另报它自己的（reuse_and_scale_fields_of_the_line）
+            states_reused: states_reused_at_recording,
+            ignored_points,
+            states_skipped_by_ignore,
         });
     }
     let seconds_judging = judging_started.elapsed().as_secs_f64();
-    // 第 ② 段：配置开了 GPU 就在优先级最高的那张卡上核（第 ① 段的草稿区已经放掉）；没开 GPU 而 SINGLEFS_CRASH_AMPLIFICATION_VERIFY=cpu 就用 CPU 参照核
+    // 第 ② 段：配置开了 GPU 就核，登记了 crash_verify_gpu 在优先级最高的那张卡上核（第 ① 段的草稿区已经放掉）、没登记用 CPU 参照核；
+    // 没开 GPU 而 SINGLEFS_CRASH_AMPLIFICATION_VERIFY=cpu 也用 CPU 参照核
     let verifying_started = std::time::Instant::now();
-    let (verification, cards_used) = if let Some(cards) = &cards {
-        verify_my_blocks_on_the_first_card(&mut store, flow, &plan, &my_blocks, cards)?
-    } else if std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").is_ok_and(|value| value == "cpu")
+    let facts_verifier_route = if mode.uses_gpu()
+        || std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").is_ok_and(|value| value == "cpu")
     {
-        let on = FactsVerifierOn::Cpu;
-        let tally = verify_blocks_from_facts(
-            &mut store,
-            flow,
-            &plan,
-            &|block| selected.contains(&block),
-            &on,
-        )?;
-        (
-            Some(VerificationOutcome {
-                verifier: on.name(),
-                tally,
-            }),
-            0,
-        )
+        Some(routes.facts_verifier)
     } else {
-        (None, 0)
+        None
     };
+    let (verification, verifying_cards_used) = match (facts_verifier_route, &cards) {
+        (Some(ComputedOn::Gpu), Some(cards)) => {
+            verify_my_blocks_on_the_first_card(&mut store, flow, &plan, &my_blocks, cards)?
+        }
+        (Some(ComputedOn::Gpu), None) => {
+            return Err(format!(
+                "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回 CPU 参照核",
+                GpuComputationClass::CrashVerifyGpu.name()
+            ));
+        }
+        (None, _) => (None, 0),
+        (Some(ComputedOn::Cpu), _) => {
+            let on = FactsVerifierOn::Cpu;
+            let tally = verify_blocks_from_facts(
+                &mut store,
+                flow,
+                &plan,
+                &|block| selected.contains(&block),
+                &on,
+            )?;
+            (
+                Some(VerificationOutcome {
+                    verifier: on.name(),
+                    tally,
+                }),
+                0,
+            )
+        }
+    };
+    // 用了几张卡：第 ① 段在卡上判的按它用的，第 ② 段在卡上核、单元校验和在卡上对拍的各一张
+    let cards_used = [
+        gpu_judge.as_ref().map_or(0, |outcome| outcome.cards_used),
+        verifying_cards_used,
+        usize::from(
+            routes.crash_judge == ComputedOn::Cpu && routes.unit_checksums == ComputedOn::Gpu,
+        ),
+    ]
+    .into_iter()
+    .max()
+    .expect("三样里取最大");
     let seconds_verifying = verifying_started.elapsed().as_secs_f64();
     // 第 ③ 段：核过就比
     let comparing_started = std::time::Instant::now();
@@ -2828,6 +4293,12 @@ pub fn run_from_environment(
         placement_only: false,
         stopped_early: false,
         judge_version: version,
+        computation_routes: routes,
+        expand_up_to,
+        exhaustive,
+        states_reused: states_reused_at_recording,
+        ignored_points,
+        states_skipped_by_ignore,
     })
 }
 
@@ -2914,6 +4385,47 @@ fn gpu_cards_in_use(
         );
     }
     Ok(cards.into_iter().map(std::sync::Arc::new).collect())
+}
+
+/// 第 ① 段由 CPU 判时，单元两道校验和在哪对拍：登记了 `gpu_unit_checks` 交优先级最高的那张卡，没登记只在 CPU 上。
+///
+/// # Errors
+/// 登记了却没有起好的卡（不退回只在 CPU 上算）。
+#[cfg(feature = "gpu")]
+fn unit_checksums_on(
+    route: ComputedOn,
+    cards: Option<&CardsInUse>,
+) -> Result<UnitChecksumsOn, String> {
+    match route {
+        ComputedOn::Cpu => Ok(UnitChecksumsOn::CpuOnly),
+        ComputedOn::Gpu => cards
+            .and_then(|cards| cards.first())
+            .map(|card| UnitChecksumsOn::Gpu(card.clone()))
+            .ok_or_else(|| {
+                format!(
+                    "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回只在 CPU 上算",
+                    GpuComputationClass::GpuUnitChecks.name()
+                )
+            }),
+    }
+}
+
+/// 没编进 `gpu` 特性：登记了 `gpu_unit_checks` 走不到这里（[`computation_routes`] 先报错），走到了照样报错。
+///
+/// # Errors
+/// 登记了 `gpu_unit_checks`。
+#[cfg(not(feature = "gpu"))]
+fn unit_checksums_on(
+    route: ComputedOn,
+    _cards: Option<&CardsInUse>,
+) -> Result<UnitChecksumsOn, String> {
+    match route {
+        ComputedOn::Cpu => Ok(UnitChecksumsOn::CpuOnly),
+        ComputedOn::Gpu => Err(format!(
+            "登记了 {} 走 GPU，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）",
+            GpuComputationClass::GpuUnitChecks.name()
+        )),
+    }
 }
 
 /// 配置要 GPU 而这份二进制没编进 `gpu` 特性：报错，不悄悄退回 CPU。
@@ -3008,11 +4520,12 @@ fn verify_my_blocks_on_the_first_card(
 }
 
 /// 只排派活计划：这一趟要判多少、配置的每张卡按额度带得了多少、按优先级各装多少；这台机器装了状态的卡各试判几次派活量速度。
-/// 打一行 `CRASH_AMPLIFICATION_PLACEMENT`。别的机器上的卡带得了多少按它的额度算（绑定上限按本机第一张卡估）。
+/// 打一行 `CRASH_AMPLIFICATION_PLACEMENT`（带这一趟录入时库里已判、因此不排的态数 `states_reused`）。别的机器上的卡带得了多少按它的额度算
+/// （绑定上限按本机第一张卡估）。
 #[cfg(feature = "gpu")]
 #[allow(
     clippy::too_many_arguments,
-    reason = "库、流、计划、分工、判法版本、卡、配置、机器，各是各的东西，凑成结构体只为让签名变短"
+    reason = "库、流、计划、分工、判法版本、卡、配置、机器、复用数，各是各的东西，凑成结构体只为让签名变短"
 )]
 fn print_the_placement(
     store: &VerdictStore,
@@ -3023,6 +4536,7 @@ fn print_the_placement(
     cards: &CardsInUse,
     configured: Option<&[CardByPriority]>,
     host: CardHost,
+    states_reused: u64,
 ) -> Result<(), String> {
     use crate::crash_judge_dispatch::{states_in_flight_within, GpuCrashJudge, PackedJudgeTables};
     use crate::crash_judge_tables::{build_judge_tables, JudgeFlow};
@@ -3147,7 +4661,7 @@ fn print_the_placement(
             .sum()
     };
     println!(
-        "CRASH_AMPLIFICATION_PLACEMENT host={} judge=gpu pending_blocks={} pending_states={pending_states} tables_mebibytes={} cards={} states_placed_on_local={} states_placed_on_peer={} states_per_second_on_this_host={states_per_second_on_this_host:.0} estimated_seconds_on_this_host={:.0}",
+        "CRASH_AMPLIFICATION_PLACEMENT host={} judge=gpu pending_blocks={} pending_states={pending_states} states_reused={states_reused} tables_mebibytes={} cards={} states_placed_on_local={} states_placed_on_peer={} states_per_second_on_this_host={states_per_second_on_this_host:.0} estimated_seconds_on_this_host={:.0}",
         host.name(),
         pending.len(),
         tables.mebibytes(),
@@ -3178,6 +4692,7 @@ fn print_the_placement(
     _cards: &CardsInUse,
     _configured: Option<&[CardByPriority]>,
     _host: CardHost,
+    _states_reused: u64,
 ) -> Result<(), String> {
     Err("配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）".to_string())
 }

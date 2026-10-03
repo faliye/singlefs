@@ -1,7 +1,8 @@
 //! checker 档模块：crash、layer0_progress、crash_identity、crash_amplification、verdict_store、gpu_unit_checks
 //! 崩溃放量的 GPU 核对（`gpu_unit_checks`）在本机的卡上：新池新建文件那条流写出的每个单元，两道校验和 GPU 与 CPU 逐个相同、全部成立；
 //! 翻载荷里一个字节报载荷 CRC 不对、翻头里一个字节报头校验和不对；整条流水线开着 GPU 核一遍 0 红、0 对不上。
-//! 要 `gpu` 与 `verdict-store` 两个特性（配置 `ENABLE_GPU=1` 的跑法才开）；开了 `gpu` 却一张能用的卡都没有就红，不悄悄跳过。
+//! 要 `gpu` 与 `verdict-store` 两个特性（配置 `ENABLE_GPU=1` 的跑法才开）；开了 `gpu` 而本机一张 NVIDIA 独显适配器都没有时打一行
+//! `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，有卡而用不上（一张都没起来，或 PCI 上有卡而 Vulkan 枚举不出）判红（`gpu_unit_checks::gpu_test_start`）。
 #![cfg(all(feature = "gpu", feature = "verdict-store"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -18,8 +19,9 @@ use singlefs_checker_tier::crash_amplification::{
     PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
 use singlefs_checker_tier::gpu_unit_checks::{
-    check_unit_checksums_on_gpu, usable_gpu_cards, GpuCard, UnitChecksumVerdict,
+    check_unit_checksums_on_gpu, GpuCard, UnitChecksumVerdict,
 };
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_checker_tier::verdict_store::VerdictStore;
@@ -31,15 +33,14 @@ use singlefs_harness::segments::StepKind;
 
 const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_unit_checks_agree_with_the_cpu_and_catch_a_flipped_byte.rs";
 
-fn one_usable_card() -> GpuCard {
-    let mut cards = usable_gpu_cards();
-    assert!(!cards.is_empty(), "gpu 特性开着，本机却没有一张空闲显存够的 NVIDIA 独显（nvidia-smi 的 memory.free 不低于 2048 MiB）");
-    let card = cards.remove(0);
+/// 取空闲显存最大的那张卡；本机没有 NVIDIA 卡时打「本次未跑」那一行、交回 `None`，用例当场返回。
+fn one_usable_card_or_report_not_run(test_name: &str) -> Option<GpuCard> {
+    let card = first_usable_card_or_report_not_run(test_name)?;
     println!(
         "GPU_CARD name={:?} pci={} free_mebibytes={}",
         card.name, card.pci_bus_identifier, card.free_memory_mebibytes
     );
-    card
+    Some(card)
 }
 
 struct Recorded {
@@ -104,7 +105,11 @@ fn every_unit(recorded: &Recorded) -> Vec<Vec<u8>> {
 
 #[test]
 fn gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_unit_hold() {
-    let card = one_usable_card();
+    let Some(card) = one_usable_card_or_report_not_run(
+        "gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_unit_hold",
+    ) else {
+        return;
+    };
     let recorded = record("gpu-unit-checks-healthy");
     let units = every_unit(&recorded);
     assert!(
@@ -133,7 +138,11 @@ fn gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_
 
 #[test]
 fn a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu() {
-    let card = one_usable_card();
+    let Some(card) = one_usable_card_or_report_not_run(
+        "a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu",
+    ) else {
+        return;
+    };
     let recorded = record("gpu-unit-checks-flipped");
     let mut units = every_unit(&recorded);
     let last = units.len() - 1;
@@ -159,7 +168,12 @@ fn a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu()
 
 #[test]
 fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_healthy_flow() {
-    let card = Arc::new(one_usable_card());
+    let Some(card) = one_usable_card_or_report_not_run(
+        "the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_healthy_flow",
+    ) else {
+        return;
+    };
+    let card = Arc::new(card);
     let recorded = record("gpu-pipeline");
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= 6 {
@@ -191,9 +205,12 @@ fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_h
         ],
     };
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../..")
+        .join("../../Cargo.lock")
         .canonicalize()
-        .expect("仓根");
+        .expect("工作区的 Cargo.lock 在 crate 往上两层（变异复跑的源码副本里也有它）")
+        .parent()
+        .expect("Cargo.lock 所在的目录就是仓根")
+        .to_path_buf();
     let judging = PipelineJudgingCode::of_the_judges(
         &root,
         &Layer0ToolchainIdentity::of_the_cargo_running_this_test(),

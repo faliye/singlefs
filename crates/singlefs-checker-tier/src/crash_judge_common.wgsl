@@ -1,7 +1,7 @@
 // GPU 判器：每个调用判一个崩溃状态，读 crash_judge_tables 摊出来的表（一张打包的 u32 表 + 目录），
 // 按持久掩码给每个落点查版本，在版本字节上按 singlefs-core 的恢复路径解结构、择系统配置、择根、扫 journal 并重放、
 // 走到第一个文件，两种 journal 政策各走一遍；再按 oracle 判七类违例、按记录核对器判两条判据。
-// 结论：每个状态 8 个 u32（布局见 crash_judge_gpu.rs 的 VERDICT_WORDS 那一段）。判不了的状态置最高位并写原因码，交 CPU 判。
+// 结论：每个状态 VERDICT_WORDS 个 u32（布局见 crash_judge_gpu.rs 文件头；字号常量由 verdict_layout_wgsl_constants 生成、接在源码最前面）。判不了的状态置最高位并写原因码，交 CPU 判。
 
 struct Dispatch {
     block_start_lo: u32,
@@ -88,8 +88,13 @@ const NODE_BYTES: u32 = 16384u;
 const DATA_UNIT_BYTES: u32 = 32768u;
 const ROOT_RECORD_BYTES: u32 = 457u;
 const JOURNAL_RECORD_BYTES: u32 = 4096u;
-const JOURNAL_HEADER_BYTES: u32 = 311u;
+const JOURNAL_HEADER_BYTES: u32 = 487u;
 const JOURNAL_NAMED_ENTRY_BYTES: u32 = 56u;
+// 记录头里新根段的起点与宽（D23（journal 的角色与格式） 已定项 4 / 已定项 15：树表指针 86、映射根指针 86、树 ID 水位 8、F 8、
+// 实例表指针 86、分配记录树根指针 86、卸载记号 4），fsid 8 紧跟新根段（偏移 463），头到 487 为止
+const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: u32 = 99u;
+const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u32 = 364u;
+const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: u32 = 463u;
 const JOURNAL_RING_START_BYTES: u32 = 16777216u;   // 1024 × 16384
 const SYSTEM_CONFIGURATION_SLOT_BYTES: u32 = 4096u;
 const ROOT_RING_REGION_STRIDE: u32 = 3145728u;     // P × chunk = 3 × 1 MiB
@@ -651,6 +656,17 @@ fn parse_system_configuration(s: Slice) -> SysConfig {
     if ((slot_after_the_ring.x & 63u) != 0u) {
         return empty_system_configuration(3u, 10u);
     }
+    // I-8.1 的三条等式，放在最后、按这个次序（recovery::journal_ring_geometry_fields_recompute_from_the_ring_length）：
+    // F（357）= 格式常量 3、在飞上限（345）= ⌊环长 ÷ 4096 ÷ 3⌋（上面算好的 in_flight，装得进 4 字节）、最坏占用（349）= 在飞上限 × 4096
+    if (rd32(base, 357u) != 3u) {
+        return empty_system_configuration(3u, 11u);
+    }
+    if (rd32(base, 345u) != in_flight.x) {
+        return empty_system_configuration(3u, 12u);
+    }
+    if (!eq64(rd64(base, 349u), shl64(in_flight, 12u))) {
+        return empty_system_configuration(3u, 13u);
+    }
     var c = empty_system_configuration(0u, 0u);
     c.fsid = vec4<u32>(rd32(base, 102u), rd32(base, 106u), rd32(base, 110u), rd32(base, 114u));
     c.this_device = rd32(base, 139u);
@@ -965,7 +981,7 @@ fn parse_record(s: Slice, fsid_low: vec2<u32>) -> Rec {
     if (!tree_table.head_ok || !mapping_root.head_ok) {
         return invalid_record();
     }
-    if (!eq64(rd64(base, 287u), fsid_low)) {
+    if (!eq64(rd64(base, JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET), fsid_low)) {
         return invalid_record();
     }
     if (s.c1 != 1u) {
@@ -1081,11 +1097,11 @@ fn records_parse_equal(base_a: u32, base_b: u32) -> bool {
     if (!bytes_equal(base_a, 78u, base_b, 78u, 21u)) {
         return false;
     }
-    if (!bytes_equal(base_a, 99u, base_b, 99u, 196u)) {
+    if (!bytes_equal(base_a, JOURNAL_NEW_ROOT_SEGMENT_OFFSET, base_b, JOURNAL_NEW_ROOT_SEGMENT_OFFSET, JOURNAL_NEW_ROOT_SEGMENT_BYTES + 8u)) {
         return false;
     }
     let named = rd32(base_a, 12u);
-    return bytes_equal(base_a, 311u, base_b, 311u, named * JOURNAL_NAMED_ENTRY_BYTES);
+    return bytes_equal(base_a, JOURNAL_HEADER_BYTES, base_b, JOURNAL_HEADER_BYTES, named * JOURNAL_NAMED_ENTRY_BYTES);
 }
 // 反向链判定：0 成立、1 断、2 前一条不在盘上
 fn judge_back_chain(r: Rec, ring_bytes: vec2<u32>) -> u32 {
@@ -1103,7 +1119,7 @@ fn judge_back_chain(r: Rec, ring_bytes: vec2<u32>) -> u32 {
     let slot_in_ring = divmod64(sub64(previous_counter, u64_of(1u)), ring_slots).remainder;
     let offset = add64(u64_of(JOURNAL_RING_START_BYTES), shl64(slot_in_ring, 12u));
     let device_count = hdr(3u);
-    let fsid_low = rd64(previous_base, 287u);
+    let fsid_low = rd64(previous_base, JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET);
     for (var d = 0u; d < device_count; d = d + 1u) {
         let s = read_at(hdr(12u + d), offset, JOURNAL_RECORD_BYTES);
         if (s.version == NONE) {

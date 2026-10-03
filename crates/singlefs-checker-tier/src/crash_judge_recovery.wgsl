@@ -387,7 +387,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     if (undecidable != 0u) {
         bits = bits | (1u << BIT_UNDECIDABLE);
     }
-    let out = local * 12u;
+    let out = local * VERDICT_WORDS;
     verdicts[out] = bits;
     // 判得了时第 1 字本来恒 0：借它带出看 journal 那一遍重放停在哪一道（诊断，`replay_stop_reason`；高 16 位给 record_count）
     if (undecidable != 0u) {

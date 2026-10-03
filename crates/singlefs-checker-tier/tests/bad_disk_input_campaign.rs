@@ -6,7 +6,7 @@
 //! 判据（里程碑「设想实现」第 5 件逐字）：恢复、挂载与 checker 三者都不许 panic；恢复读回的内容要么是模型允许的某一版，
 //! 要么报错，**不许读回一版从没提交过的内容**。
 //!
-//! 「零 panic」那一半 2026-09-22 第三批改法落地之后**在这一档上成立**：`bad_disk_input::KNOWN_PANIC_SITES`
+//! 「零 panic」那一半**在这一档上成立**：`bad_disk_input::KNOWN_PANIC_SITES`
 //! 空了（`records/2026-09-22-panic面普查-走得到的那些.md` 那三族里这批坏法打得到的十处，改法都是
 //! 「盘上读来的值在边界上验一次、返回错误成员」），这一档三个读者一次都没 panic。清单空着仍然是判据：
 //! 任何一处 panic 都落进「清单外的新发现」那一格、当场判红。清单只许缩，往里加一行要主 agent 点头。
@@ -18,13 +18,14 @@
 use std::io::Write as _;
 
 use singlefs_checker_tier::bad_disk_input::{
-    damage_image, damage_image_the_way_the_header_judgement_refuses, feed_a_damaged_image,
+    bad_disk_campaign_from_environment, damage_image,
+    damage_image_the_way_the_header_judgement_refuses, feed_a_damaged_image,
     known_panic_site_among, known_panic_site_of,
     newest_root_has_the_trees_the_targeted_damages_need,
     release_check_of_the_instance_table_placement_released_on_the_second_device_only,
     run_bad_disk_campaign, BadDiskCampaign, BadDiskFinding, BadDiskInputWorkerThreads,
-    BadDiskObservation, BadDiskReport, DamageKind, DamageRefusedAtTheHeaderJudgement, DamagedImage,
-    KnownPanicSite, ReadBackVerdict, ReaderOutcome,
+    BadDiskObservation, BadDiskReport, BadDiskTally, DamageKind, DamageRefusedAtTheHeaderJudgement,
+    DamagedImage, KnownPanicSite, ReadBackVerdict, ReaderOutcome,
     BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE, EVERY_BASE_IMAGE_TIER, EVERY_DAMAGE_KIND,
     KNOWN_PANIC_SITES,
 };
@@ -35,11 +36,12 @@ use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::transaction::TransactionUnit;
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    execute_history_with, generate_history_with_weights, CapturedPanic, GeneratedHistory,
-    GenerationWeights, HistoryDeviceWidth, HistoryExecution, HistoryOperation, HistorySeed,
-    HistoryStartingPoint, PerStepChecker, SeededRandomSource,
+    environment_assignments_in_line, execute_history_with, generate_history_with_weights,
+    CapturedPanic, GeneratedHistory, GenerationWeights, HistoryDeviceWidth, HistoryExecution,
+    HistoryOperation, HistorySeed, HistoryStartingPoint, PerStepChecker, SeededRandomSource,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
+use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::SharedStream;
 
 /// 快档的规模：段数与每段步数。规模与种子基都写死（种子基是这个测试周期的常量）。
@@ -71,18 +73,10 @@ fn print_uncaptured(text: &str) {
     let _ = standard_output.flush();
 }
 
-fn number_from_environment(name: &str, default: u64) -> u64 {
-    std::env::var(name).map_or(default, |text| {
-        text.parse()
-            .unwrap_or_else(|error| panic!("{name}={text} 不是一个非负整数：{error}"))
-    })
-}
-
+/// 判红时打的重放行由报告自己拼（`BadDiskReport::replay_line`：种子区间、步数、比重、checker、盘宽、空间准入），
+/// 大档那条入口照同一张变量表读回（`bad_disk_campaign_from_environment`）。
 fn how_to_replay(report: &BadDiskReport) -> String {
-    format!(
-        "重放：SINGLEFS_BAD_DISK_FIRST_SEED={} SINGLEFS_BAD_DISK_SEEDS={} SINGLEFS_BAD_DISK_OPERATIONS={} 跑大档那条 #[ignore] 用例",
-        report.first_seed, report.seed_count, report.operations_per_history
-    )
+    format!("重放：{}", report.replay_line())
 }
 
 fn fast_tier_campaign(worker_threads: BadDiskInputWorkerThreads) -> BadDiskCampaign {
@@ -1030,30 +1024,44 @@ const SITES_DELETED_BY_THE_THIRD_BATCH: [KnownPanicSite; 3] = [
     },
 ];
 
-/// 大档：规模从环境变量取，后台跑。
+/// 大档那条入口读环境：变量与判红时打的重放行同一张表（`bad_disk_campaign_from_environment`），没设的取大档的默认
+/// （种子基起 500 段、每段 16 步、各类操作都抽、不跑每一步的 checker、两块 4 GiB 的盘、判空间准入），
+/// 线程数从 `SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS` 取。入口与「重放行喂回入口」那两条自证都经这一个函数。
+/// 种子数写 0 由入口自己拒（`bad_disk_campaign_from_environment` 按计数读它），这里不另读一遍。
+///
+/// # Panics
+/// 某个变量的取值认不得（种子数写 0 也算）：消息带变量名与原值。
+fn large_tier_campaign_from(lookup: &dyn Fn(&str) -> Option<String>) -> BadDiskCampaign {
+    bad_disk_campaign_from_environment(
+        lookup,
+        &BadDiskCampaign {
+            first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+            seed_count: 500,
+            operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
+            weights: GenerationWeights::BROAD,
+            execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            worker_threads: BadDiskInputWorkerThreads::from_the_environment_variable_named(
+                BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+            ),
+        },
+    )
+    .unwrap_or_else(|error| panic!("{}", error.render()))
+}
+
+/// 大档入口里种子数写 0：停下，消息带变量名与原值，不照收（一段都不跑的一批照「零 panic、不读回没提交过的版本」判成绿）。
 #[test]
-#[ignore = "大档按环境变量跑，不进每次的 cargo test"]
-fn the_large_tier_of_bad_disk_inputs() {
-    let first_seed = number_from_environment(
-        "SINGLEFS_BAD_DISK_FIRST_SEED",
-        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
-    );
-    let seed_count = number_from_environment("SINGLEFS_BAD_DISK_SEEDS", 500);
-    let operations_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_BAD_DISK_OPERATIONS",
-        u64::try_from(FAST_TIER_OPERATIONS_PER_HISTORY).expect("步数"),
-    ))
-    .expect("步数装得进 usize");
-    let report = run_bad_disk_campaign(&BadDiskCampaign {
-        first_seed,
-        seed_count,
-        operations_per_history,
-        weights: GenerationWeights::BROAD,
-        execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        worker_threads: BadDiskInputWorkerThreads::from_the_environment_variable_named(
-            BAD_DISK_INPUT_WORKER_THREADS_ENVIRONMENT_VARIABLE,
-        ),
+#[should_panic(expected = "SINGLEFS_BAD_DISK_SEEDS=0：只认 正整数")]
+fn a_bad_disk_seed_count_of_zero_panics_naming_the_variable_and_the_value() {
+    let _campaign = large_tier_campaign_from(&|variable: &str| {
+        (variable == "SINGLEFS_BAD_DISK_SEEDS").then(|| "0".to_string())
     });
+}
+
+/// 大档：规模与取样参数照判红时打的重放行从环境变量取，后台跑。
+#[test]
+#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_BAD_DISK_FIRST_SEED 起 SINGLEFS_BAD_DISK_SEEDS 段、每段 SINGLEFS_BAD_DISK_OPERATIONS 步，比重 SINGLEFS_BAD_DISK_WEIGHTS，checker SINGLEFS_BAD_DISK_CHECKER，盘宽 SINGLEFS_BAD_DISK_DEVICES，空间准入 SINGLEFS_BAD_DISK_SPACE_ADMISSION，线程数 SINGLEFS_BAD_DISK_INPUT_WORKER_THREADS；没设的取大档默认（种子基、500 段、16 步、broad、skip、4gib、judged）；不进每次的 cargo test"]
+fn the_large_tier_of_bad_disk_inputs() {
+    let report = run_bad_disk_campaign(&large_tier_campaign_from(&process_environment_variable));
     print_uncaptured(&report.render());
     assert_eq!(
         report.tally.read_back_versions_never_committed,
@@ -1067,6 +1075,96 @@ fn the_large_tier_of_bad_disk_inputs() {
         "撞到 KNOWN_PANIC_SITES 之外的 panic：{}",
         how_to_replay(&report)
     );
+}
+
+/// 判红时对一批坏盘输入会打的那一行重放命令（`how_to_replay`；造一份报告，不必真红）原样喂回大档那条入口
+/// （`large_tier_campaign_from`，入口用的同一个函数）：种子区间、每段步数、比重、跑法与原来那一批逐项相同，第一段生成的历史逐步相同。
+/// 不跑坏镜像：同一组参数下造出来的坏镜像由种子定，这里只核参数一项不漏地回来了
+/// （代码三方 test-script-align-code-r1 判决 C607：原先的重放行只带种子区间与步数，比重与跑法照抄回不来）。
+fn the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(
+    campaign: &BadDiskCampaign,
+) {
+    let report = BadDiskReport {
+        first_seed: campaign.first_seed,
+        seed_count: campaign.seed_count,
+        operations_per_history: campaign.operations_per_history,
+        weights: campaign.weights,
+        execution: campaign.execution,
+        tally: BadDiskTally::default(),
+        findings: Vec::new(),
+        in_order_digest: 0,
+    };
+    let replay = how_to_replay(&report);
+    let assignments = environment_assignments_in_line(&replay);
+    let replayed = large_tier_campaign_from(&|variable: &str| assignments.get(variable).cloned());
+    assert_eq!(
+        (
+            replayed.first_seed,
+            replayed.seed_count,
+            replayed.operations_per_history,
+            replayed.weights,
+            replayed.execution,
+        ),
+        (
+            campaign.first_seed,
+            campaign.seed_count,
+            campaign.operations_per_history,
+            campaign.weights,
+            campaign.execution,
+        ),
+        "照重放行跑大档，跑的不是原来那一批（种子、种子数、步数、比重、跑法）：{replay}"
+    );
+    assert_eq!(
+        generate_history_with_weights(
+            HistorySeed(replayed.first_seed),
+            replayed.operations_per_history,
+            &replayed.weights
+        ),
+        generate_history_with_weights(
+            HistorySeed(campaign.first_seed),
+            campaign.operations_per_history,
+            &campaign.weights
+        ),
+        "第一段生成的历史逐步相同"
+    );
+}
+
+#[test]
+fn replay_line_of_the_fast_tier_runs_the_same_campaign_on_the_large_tier_entry() {
+    the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(
+        &fast_tier_campaign(BadDiskInputWorkerThreads::GivenByCaller(1)),
+    );
+}
+
+/// 每一项都与大档的默认不同的一批：重放行漏写哪一项，大档入口就退回它的默认，读回的不是这一批。
+/// 前提断言先核「每一项都不同」，不然漏写那一项读回的恰好还是它。
+#[test]
+fn replay_line_of_a_batch_unlike_the_large_tier_defaults_runs_the_same_campaign_on_the_large_tier_entry(
+) {
+    let campaign = BadDiskCampaign {
+        first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + 7,
+        seed_count: 3,
+        operations_per_history: 11,
+        weights: GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
+        execution: HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::SkippedByTheTestOnlySwitch,
+        },
+        worker_threads: BadDiskInputWorkerThreads::GivenByCaller(1),
+    };
+    let defaults = large_tier_campaign_from(&|_variable: &str| None);
+    assert!(
+        campaign.first_seed != defaults.first_seed
+            && campaign.seed_count != defaults.seed_count
+            && campaign.operations_per_history != defaults.operations_per_history
+            && campaign.weights != defaults.weights
+            && campaign.execution.per_step_checker != defaults.execution.per_step_checker
+            && campaign.execution.device_width != defaults.execution.device_width
+            && campaign.execution.space_admission != defaults.execution.space_admission,
+        "前提：这一批的每一项都与大档的默认不同：{campaign:?} 对 {defaults:?}"
+    );
+    the_replay_line_printed_for_a_batch_runs_the_same_campaign_on_the_large_tier_entry(&campaign);
 }
 
 /// 一段写死的历史跑完之后手里那份合法镜像，连同理想模型提交过的每一版内容。

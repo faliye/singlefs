@@ -36,6 +36,9 @@ use singlefs_harness::memory_pool::{
     CrashImage, MemoryPool, PublishWrites, PublishedVersion, RecordCheck, RecordStreamContinuity,
     RetainedWrite, WrittenContents, SECTOR_BYTES,
 };
+use singlefs_harness::numeric_environment_variable::{
+    number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
+};
 use singlefs_harness::segments::StepKind;
 
 /// 记录核对器（D13（验证路线） 已定项 7，故意不给它编号；入参 (崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)）：崩溃前镜像是 `image.base`、
@@ -1545,7 +1548,7 @@ pub fn enumerate_layer0_selecting(
     enumerate_layer0_selecting_versions(base, writes, segments, root_index, &versions, expand)
 }
 
-/// 层 0 枚举的工作线程数从这个环境变量取（十进制正整数）；没设就取 [`std::thread::available_parallelism`]。门禁 54 号显式传进来。
+/// 层 0 枚举的工作线程数从这个环境变量取（十进制正整数）；没设就取 [`std::thread::available_parallelism`]。门禁 checker-tier-layer0-replay 显式传进来。
 pub const LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_LAYER0_THREADS";
 
 /// 默认切法的片数下限：线程数为 1 时全量用例也按片报进度。
@@ -1555,7 +1558,7 @@ const LAYER0_SLICES_PER_WORKER_THREAD: u64 = 16;
 /// 默认切法里每片的状态数下限：平时 `cargo test` 里几十个状态的枚举只切成几片，进度行不刷屏。
 const LAYER0_MINIMUM_STATES_PER_SLICE: u64 = 16;
 
-/// 工作线程数是从哪来的：与实际起的线程数一起打进 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED` 两行（门禁 54 号拿实际起的线程数判「没显式设成 1、机器多于 1 核却只用了 1 个线程」）。
+/// 工作线程数是从哪来的：与实际起的线程数一起打进 `LAYER0_PARALLEL_START` / `LAYER0_PARALLEL_FINISHED` 两行（门禁 checker-tier-layer0-replay 拿实际起的线程数判「没显式设成 1、机器多于 1 核却只用了 1 个线程」）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Layer0WorkerThreadsSource {
     /// 环境变量 [`LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE`] 显式给的。
@@ -1600,44 +1603,39 @@ impl Layer0Parallelism {
     /// 线程数取环境变量 [`LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE`]，没设就取 `available_parallelism`；片长按线程数定。
     ///
     /// # Panics
-    /// 环境变量设了却不是正整数：配错了就停，不悄悄退回单线程。
+    /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）：配错了就停，不悄悄退回单线程。
     #[must_use]
     pub fn from_environment() -> Self {
         Self::from_environment_value(
-            std::env::var(LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE),
+            process_environment_variable(LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE).as_deref(),
             std::thread::available_parallelism,
         )
     }
 
-    /// [`Self::from_environment`] 的判定本身：环境变量读到什么、`available_parallelism` 报什么都由调用方给（用例不改进程的环境变量）。
+    /// [`Self::from_environment`] 的判定本身：环境变量的值（`None` 是没设）、`available_parallelism` 报什么都由调用方给（用例不改进程的环境变量）。
+    /// 解析经数值环境变量共用的那一份，线程数取 `NonZeroUsize`：写错、写 0 的口径与仓里别的线程数变量相同。
     ///
     /// # Panics
-    /// 环境变量设了却不是正整数（含 0、空串、非 UTF-8）。
+    /// 环境变量设了却不是正整数（含 0、空串）：消息带变量名与原值。
     #[must_use]
     fn from_environment_value(
-        environment_value: Result<String, std::env::VarError>,
+        environment_value: Option<&str>,
         available_parallelism: impl FnOnce() -> std::io::Result<NonZeroUsize>,
     ) -> Self {
-        let (worker_threads, worker_threads_source) = match environment_value {
-            Ok(text) => (
-                text.parse::<NonZeroUsize>().unwrap_or_else(|error| {
-                    panic!(
-                        "{LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE} 要是正整数，读到 {text:?}：{error}"
-                    )
-                }),
-                Layer0WorkerThreadsSource::EnvironmentVariable,
-            ),
-            Err(std::env::VarError::NotPresent) => match available_parallelism() {
-                Ok(available) => (available, Layer0WorkerThreadsSource::AvailableParallelism),
-                Err(_unavailable) => (
-                    NonZeroUsize::MIN,
-                    Layer0WorkerThreadsSource::AvailableParallelismUnknown,
-                ),
-            },
-            Err(std::env::VarError::NotUnicode(raw)) => panic!(
-                "{LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE} 要是正整数，读到的不是 UTF-8：{raw:?}"
-            ),
-        };
+        let (worker_threads, worker_threads_source) =
+            match number_from_the_variable_value_panicking_when_unreadable::<NonZeroUsize>(
+                LAYER0_WORKER_THREADS_ENVIRONMENT_VARIABLE,
+                environment_value,
+            ) {
+                Some(given) => (given, Layer0WorkerThreadsSource::EnvironmentVariable),
+                None => match available_parallelism() {
+                    Ok(available) => (available, Layer0WorkerThreadsSource::AvailableParallelism),
+                    Err(_unavailable) => (
+                        NonZeroUsize::MIN,
+                        Layer0WorkerThreadsSource::AvailableParallelismUnknown,
+                    ),
+                },
+            };
         Self {
             worker_threads,
             worker_threads_source,
@@ -2741,6 +2739,155 @@ impl Layer0FindingsReporter {
     }
 }
 
+/// 长跑的枚举与核对按挂钟至少隔这么久打一行进度（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」的进度间隔 5 分钟）：
+/// 一片、一块跑得比它久时，等着收的那条线程照样隔这么久打一行，不至于几个小时零输出。
+pub const PROGRESS_LINE_INTERVAL_IN_SECONDS: u64 = 300;
+
+/// 上一次收到消息、或上一次到期打按挂钟那一行是在什么时候（从这一趟开跑算起），离下一行按挂钟的到期还要等多久。
+/// 时刻由调用方的时钟给，用例换成假的时钟。收到消息记的是收到的时刻，不是调用方真打出它那一行的时刻：调用方收到一条就打一行时两者只差
+/// 打那一行的工夫；收到不打的（崩溃放量 CPU 块那一支，行在核对线程发消息之前打）差一个排队的时间，下一行按挂钟的最多晚这么一截。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct WallClockProgressLines {
+    interval: std::time::Duration,
+    last_message_or_wall_clock_line_at: std::time::Duration,
+}
+
+impl WallClockProgressLines {
+    #[must_use]
+    pub fn new(interval: std::time::Duration, started_at: std::time::Duration) -> Self {
+        Self {
+            interval,
+            last_message_or_wall_clock_line_at: started_at,
+        }
+    }
+
+    /// 间隔取 [`PROGRESS_LINE_INTERVAL_IN_SECONDS`]。
+    #[must_use]
+    pub fn every_progress_line_interval(started_at: std::time::Duration) -> Self {
+        Self::new(
+            std::time::Duration::from_secs(PROGRESS_LINE_INTERVAL_IN_SECONDS),
+            started_at,
+        )
+    }
+
+    /// 离下一行到期还剩多久；已经到期是 0。
+    #[must_use]
+    pub fn wait_before_the_next_line_is_due(
+        &self,
+        now: std::time::Duration,
+    ) -> std::time::Duration {
+        self.interval
+            .saturating_sub(now.saturating_sub(self.last_message_or_wall_clock_line_at))
+    }
+
+    /// 上一次收到消息或打按挂钟那一行之后，时钟走过了整个间隔。
+    #[must_use]
+    pub fn wall_clock_line_is_due(&self, now: std::time::Duration) -> bool {
+        now.saturating_sub(self.last_message_or_wall_clock_line_at) >= self.interval
+    }
+
+    /// 记下 `now`：刚收到一条消息，或刚到期打了一行按挂钟的；下一行按挂钟的从这一刻起再等一个间隔。
+    pub fn restart_the_interval_at_a_received_message_or_a_wall_clock_line(
+        &mut self,
+        now: std::time::Duration,
+    ) {
+        self.last_message_or_wall_clock_line_at = now;
+    }
+}
+
+/// [`receive_until_the_senders_are_gone_with_wall_clock_lines`] 交给调用方的一件事：收到一条消息（调用方照旧按片、按块打它那一行），
+/// 或者上一行之后过了整个间隔还没有新消息（调用方打一行按挂钟的进度）。
+pub enum ReceivedOrWallClockLineDue<Message> {
+    Received(Message),
+    WallClockLineDue { elapsed: std::time::Duration },
+}
+
+/// 一直收到发送端全部丢掉为止：每收到一条交给 `handle`（调用方照它的约定按片、按块打一行或不打），记下收到的时刻；等的时候最多等到下一行到期，
+/// 到期还没收到就交一件 [`ReceivedOrWallClockLineDue::WallClockLineDue`]，让调用方打一行按挂钟的进度。`clock` 交回从这一趟开跑算起的时刻。
+/// `handle` panic 时原样往外传（接收端随调用方的栈一起丢掉，发送的线程下一次发不出去就退）。
+pub fn receive_until_the_senders_are_gone_with_wall_clock_lines<Message>(
+    receiver: &mpsc::Receiver<Message>,
+    progress: &mut WallClockProgressLines,
+    clock: &dyn Fn() -> std::time::Duration,
+    handle: &mut dyn FnMut(ReceivedOrWallClockLineDue<Message>),
+) {
+    loop {
+        let wait = progress.wait_before_the_next_line_is_due(clock());
+        match receiver.recv_timeout(wait) {
+            Ok(message) => {
+                handle(ReceivedOrWallClockLineDue::Received(message));
+                progress.restart_the_interval_at_a_received_message_or_a_wall_clock_line(clock());
+            }
+            Err(mpsc::RecvTimeoutError::Timeout) => {
+                let now = clock();
+                if progress.wall_clock_line_is_due(now) {
+                    handle(ReceivedOrWallClockLineDue::WallClockLineDue { elapsed: now });
+                    progress.restart_the_interval_at_a_received_message_or_a_wall_clock_line(now);
+                }
+            }
+            Err(mpsc::RecvTimeoutError::Disconnected) => break,
+        }
+    }
+}
+
+/// 层 0 枚举收片那一段按挂钟那一行要报的：这一趟要跑几片、负责几个状态、续跑从进度文件接上了几片。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Layer0SlicesOfThisRun {
+    pub slices_to_run: usize,
+    pub states_of_this_run: u64,
+    pub restored_slices: usize,
+}
+
+/// 收到这一片为止（含这一片）这一趟跑完了几片、几个状态。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Layer0FinishedSoFar {
+    pub slices: usize,
+    pub states: u64,
+}
+
+/// 层 0 枚举的调用线程收齐这一趟跑的各片：收到一片先把它的状态数（`states_of_the_slice`）记进跑完的计数，再交 `on_finished_slice`
+/// （它按片打 `LAYER0_PROGRESS` 那一行、按片号次序并片）；上一次收到之后 `clock` 走过整个进度间隔还没有新的一片，就交
+/// `write_progress_line` 一行 `LAYER0_PROGRESS by=wall_clock …`（C611：一片跑得比进度间隔久时照样隔一个间隔报一行）。
+/// 工作线程都退出（发送端全丢掉）才交回，交回这一趟跑完的计数。
+pub fn receive_the_layer0_slices_with_wall_clock_lines<FinishedSliceMessage>(
+    receiver: &mpsc::Receiver<FinishedSliceMessage>,
+    wall_clock_lines: &mut WallClockProgressLines,
+    clock: &dyn Fn() -> std::time::Duration,
+    slices_of_this_run: &Layer0SlicesOfThisRun,
+    states_of_the_slice: &dyn Fn(&FinishedSliceMessage) -> u64,
+    on_finished_slice: &mut dyn FnMut(FinishedSliceMessage, Layer0FinishedSoFar),
+    write_progress_line: &mut dyn FnMut(String),
+) -> Layer0FinishedSoFar {
+    let mut finished_so_far = Layer0FinishedSoFar {
+        slices: 0,
+        states: 0,
+    };
+    receive_until_the_senders_are_gone_with_wall_clock_lines(
+        receiver,
+        wall_clock_lines,
+        clock,
+        &mut |event| {
+            match event {
+            ReceivedOrWallClockLineDue::Received(finished) => {
+                finished_so_far.states += states_of_the_slice(&finished);
+                finished_so_far.slices += 1;
+                on_finished_slice(finished, finished_so_far);
+            }
+            ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => write_progress_line(format!(
+                "LAYER0_PROGRESS by=wall_clock finished_slices={}/{} finished_states={}/{} resumed_slices={} elapsed_seconds={:.1}",
+                finished_so_far.slices,
+                slices_of_this_run.slices_to_run,
+                finished_so_far.states,
+                slices_of_this_run.states_of_this_run,
+                slices_of_this_run.restored_slices,
+                elapsed.as_secs_f64()
+            )),
+        }
+        },
+    );
+    finished_so_far
+}
+
 /// 调用线程上等着按片号次序并进来的一片：这一趟跑完的，或从进度文件读回来的。
 enum SliceWaitingToBeMerged {
     FreshlyRun(FinishedSlice),
@@ -3161,28 +3308,45 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
                 }
             };
         take_and_merge_the_slices_now_in_order(None);
-        let mut finished_states = 0u64;
-        for (finished_slice_count, finished) in finished_slice_receiver.iter().enumerate() {
-            let slice = &slices[finished.slice_index];
-            finished_states += slice.end - slice.start;
-            println!(
-                "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={}/{} finished_states={finished_states}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
-                finished.slice_index + 1,
-                slices.len(),
-                slice.start,
-                slice.end,
-                plan.segment_label(plan.segment_of_state(slice.start)),
-                plan.segment_label(plan.segment_of_state(slice.end - 1)),
-                finished_slice_count + 1,
-                slices_to_run.len(),
+        // 一片跑得比进度间隔久时（大段、慢机器），按片打的行之间照样隔一个间隔打一行 `LAYER0_PROGRESS by=wall_clock`
+        let clock = || started.elapsed();
+        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
+        receive_the_layer0_slices_with_wall_clock_lines(
+            &finished_slice_receiver,
+            &mut wall_clock_lines,
+            &clock,
+            &Layer0SlicesOfThisRun {
+                slices_to_run: slices_to_run.len(),
                 states_of_this_run,
-                started.elapsed().as_secs_f64()
-            );
-            take_and_merge_the_slices_now_in_order(Some((
-                finished.slice_index,
-                SliceWaitingToBeMerged::FreshlyRun(finished),
-            )));
-        }
+                restored_slices: restored_slice_count,
+            },
+            &|finished: &FinishedSlice| {
+                let slice = &slices[finished.slice_index];
+                slice.end - slice.start
+            },
+            &mut |finished, finished_so_far| {
+                let slice = &slices[finished.slice_index];
+                println!(
+                    "LAYER0_PROGRESS slice={}/{} states=[{},{}) segments={}..={} finished_slices={}/{} finished_states={}/{} resumed_slices={restored_slice_count} elapsed_seconds={:.1}",
+                    finished.slice_index + 1,
+                    slices.len(),
+                    slice.start,
+                    slice.end,
+                    plan.segment_label(plan.segment_of_state(slice.start)),
+                    plan.segment_label(plan.segment_of_state(slice.end - 1)),
+                    finished_so_far.slices,
+                    slices_to_run.len(),
+                    finished_so_far.states,
+                    states_of_this_run,
+                    started.elapsed().as_secs_f64()
+                );
+                take_and_merge_the_slices_now_in_order(Some((
+                    finished.slice_index,
+                    SliceWaitingToBeMerged::FreshlyRun(finished),
+                )));
+            },
+            &mut |line| println!("{line}"),
+        );
         MergedSlicesOfThisRun {
             tally: merged,
             merged_slice_count: next_position_in_slices_of_this_run,
@@ -4032,7 +4196,7 @@ mod tests {
     #[test]
     fn worker_threads_come_from_the_environment_variable_before_available_parallelism() {
         let thirty_two = || Ok(NonZeroUsize::new(32).expect("非 0"));
-        let from_variable = Layer0Parallelism::from_environment_value(Ok("4".to_string()), || {
+        let from_variable = Layer0Parallelism::from_environment_value(Some("4"), || {
             panic!("环境变量设了就不该再问 available_parallelism")
         });
         assert_eq!(
@@ -4042,8 +4206,7 @@ mod tests {
             ),
             (4, Layer0WorkerThreadsSource::EnvironmentVariable)
         );
-        let explicit_single =
-            Layer0Parallelism::from_environment_value(Ok("1".to_string()), thirty_two);
+        let explicit_single = Layer0Parallelism::from_environment_value(Some("1"), thirty_two);
         assert_eq!(
             (
                 explicit_single.worker_threads.get(),
@@ -4052,18 +4215,14 @@ mod tests {
             (1, Layer0WorkerThreadsSource::EnvironmentVariable),
             "显式设成 1 就是 1"
         );
-        let unset = Layer0Parallelism::from_environment_value(
-            Err(std::env::VarError::NotPresent),
-            thirty_two,
-        );
+        let unset = Layer0Parallelism::from_environment_value(None, thirty_two);
         assert_eq!(
             (unset.worker_threads.get(), unset.worker_threads_source),
             (32, Layer0WorkerThreadsSource::AvailableParallelism)
         );
-        let unknown =
-            Layer0Parallelism::from_environment_value(Err(std::env::VarError::NotPresent), || {
-                Err(std::io::Error::other("平台报不出核数"))
-            });
+        let unknown = Layer0Parallelism::from_environment_value(None, || {
+            Err(std::io::Error::other("平台报不出核数"))
+        });
         assert_eq!(
             (unknown.worker_threads.get(), unknown.worker_threads_source),
             (1, Layer0WorkerThreadsSource::AvailableParallelismUnknown)
@@ -4071,11 +4230,14 @@ mod tests {
         assert_eq!(unset.slice_length, Layer0SliceLength::ScaledToWorkerThreads);
     }
 
-    /// 环境变量设成 0：停下，不悄悄退回单线程。不写成 `#[should_panic]`：那样 libtest 的输出行带「- should panic」，门禁 59 号认不出这条测试红没红。
+    /// 环境变量设成 0：停下，不悄悄退回单线程；消息是数值环境变量共用解析的那一句（带变量名与原值），不是这里另写的一句。
+    /// 写成 `catch_unwind` 再核 panic 消息，与写成 `#[should_panic(expected = …)]` 等价：
+    /// 判 `crates/mutations.tsv` 的门禁 checker-tier-crates-mutation-replay 认得两种结果行（`research/scripts/crates-mutation-rows.py` 的
+    /// `results_by_test` 在点名之后容得下 ` - should panic` 那一段）。
     #[test]
     fn zero_worker_threads_in_the_environment_variable_stops_instead_of_falling_back() {
         let outcome = std::panic::catch_unwind(|| {
-            Layer0Parallelism::from_environment_value(Ok("0".to_string()), || {
+            Layer0Parallelism::from_environment_value(Some("0"), || {
                 Ok(NonZeroUsize::new(32).expect("非 0"))
             })
         });
@@ -4085,7 +4247,7 @@ mod tests {
             .cloned()
             .unwrap_or_default();
         assert!(
-            panic_message.contains("SINGLEFS_LAYER0_THREADS 要是正整数"),
+            panic_message.contains("SINGLEFS_LAYER0_THREADS=\"0\" 认不出"),
             "停下时说清是哪个环境变量配错了：{panic_message}"
         );
     }
@@ -4543,5 +4705,157 @@ mod oracle_instance_tests {
             ),
             None
         );
+    }
+}
+
+#[cfg(test)]
+mod wall_clock_progress_line_tests {
+    use super::{
+        receive_until_the_senders_are_gone_with_wall_clock_lines, ReceivedOrWallClockLineDue,
+        WallClockProgressLines,
+    };
+    use std::cell::{Cell, RefCell};
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    const INTERVAL: Duration = Duration::from_secs(300);
+    /// 假时钟每读一次走这么久：比间隔长，每一次等都已经到期，不真等。
+    const CLOCK_STEP_LONGER_THAN_THE_INTERVAL: Duration = Duration::from_secs(301);
+    /// 假时钟读到这么多次就丢掉发送端，接收循环随之收尾（间隔判断坏了也收得了尾，用例红而不是卡住）。
+    const CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED: u32 = 12;
+
+    /// 一条消息都没来、假时钟每读一次走过一个间隔以上：每一次等完都要交一行按挂钟的进度，相邻两行之间假时钟走过的不超过两次读数。
+    #[test]
+    fn a_wall_clock_line_is_due_whenever_a_whole_interval_passes_without_a_message() {
+        let (sender, receiver) = mpsc::channel::<u64>();
+        let sender_still_open = RefCell::new(Some(sender));
+        let clock_reads = Cell::new(0u32);
+        let clock = || {
+            let reads = clock_reads.get() + 1;
+            clock_reads.set(reads);
+            if reads >= CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED {
+                sender_still_open.borrow_mut().take();
+            }
+            CLOCK_STEP_LONGER_THAN_THE_INTERVAL * reads
+        };
+        let mut progress = WallClockProgressLines::new(INTERVAL, Duration::ZERO);
+        let mut lines_at: Vec<Duration> = Vec::new();
+        receive_until_the_senders_are_gone_with_wall_clock_lines(
+            &receiver,
+            &mut progress,
+            &clock,
+            &mut |event| match event {
+                ReceivedOrWallClockLineDue::Received(message) => {
+                    panic!("没有发过消息，却收到了 {message}")
+                }
+                ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => lines_at.push(elapsed),
+            },
+        );
+        assert!(
+            lines_at.len() >= 5,
+            "假时钟走过 {} 次间隔以上，按挂钟的进度只交了 {} 行：{lines_at:?}",
+            CLOCK_READS_BEFORE_THE_SENDER_IS_DROPPED,
+            lines_at.len()
+        );
+        let mut previous = Duration::ZERO;
+        for line_at in &lines_at {
+            assert!(
+                line_at.saturating_sub(previous) <= CLOCK_STEP_LONGER_THAN_THE_INTERVAL * 2,
+                "两行之间假时钟走了 {:?}，过了间隔却没有一行：{lines_at:?}",
+                line_at.saturating_sub(previous)
+            );
+            previous = *line_at;
+        }
+    }
+
+    /// 消息接连到、时钟不走：每条消息交给调用方（它按片、按块打行），不多交一行按挂钟的进度。
+    #[test]
+    fn no_wall_clock_line_is_due_while_messages_arrive_within_the_interval() {
+        let (sender, receiver) = mpsc::channel::<u64>();
+        for message in 0..3 {
+            sender.send(message).expect("接收端还在");
+        }
+        drop(sender);
+        let clock = || Duration::from_secs(5);
+        let mut progress = WallClockProgressLines::new(INTERVAL, Duration::ZERO);
+        let mut received = Vec::new();
+        let mut wall_clock_lines = 0usize;
+        receive_until_the_senders_are_gone_with_wall_clock_lines(
+            &receiver,
+            &mut progress,
+            &clock,
+            &mut |event| match event {
+                ReceivedOrWallClockLineDue::Received(message) => received.push(message),
+                ReceivedOrWallClockLineDue::WallClockLineDue { .. } => wall_clock_lines += 1,
+            },
+        );
+        assert_eq!(received, vec![0, 1, 2], "每条消息按次序交给调用方");
+        assert_eq!(wall_clock_lines, 0, "间隔没过，不该有按挂钟的行");
+    }
+
+    /// C611 层 0 那一处：一片跑得比进度间隔久（假时钟每读一次走过一个间隔多一秒，那一片等到时钟读过两次才交来），收片的调用线程打一行
+    /// `LAYER0_PROGRESS by=wall_clock`，行里是这一趟跑完几片（共几片）、几个状态（共几个）、续跑接上几片、开跑多久；那一片照样交给按片打行的那一头，
+    /// 跑完的计数里算上它。
+    #[test]
+    fn a_layer0_slice_running_longer_than_the_progress_interval_reports_a_wall_clock_line() {
+        use super::{
+            receive_the_layer0_slices_with_wall_clock_lines, Layer0FinishedSoFar,
+            Layer0SlicesOfThisRun,
+        };
+        let (slice_sender, slice_receiver) = mpsc::channel::<u64>();
+        let (release_sender, release_receiver) = mpsc::channel::<()>();
+        let clock_reads = Cell::new(0u32);
+        // 第 0 次读是开跑那一刻；第 2 次读（已经过了一个间隔、按挂钟那一行到期）时才放那一片进来
+        let clock = || {
+            let reads = clock_reads.get();
+            clock_reads.set(reads + 1);
+            if reads == 2 {
+                // 放行的那一头只收一次，收过之后发不出去也无妨
+                let _ = release_sender.send(());
+            }
+            (INTERVAL + Duration::from_secs(1)) * reads
+        };
+        let mut wall_clock_lines = WallClockProgressLines::new(INTERVAL, clock());
+        let mut printed: Vec<String> = Vec::new();
+        let mut slices_handed_over: Vec<(u64, Layer0FinishedSoFar)> = Vec::new();
+        let finished = std::thread::scope(|scope| {
+            scope.spawn(move || {
+                release_receiver.recv().expect("时钟读到第 2 次就放行");
+                // 这一片有 7 个状态
+                slice_sender.send(7).expect("收片的那一头还在等");
+            });
+            receive_the_layer0_slices_with_wall_clock_lines(
+                &slice_receiver,
+                &mut wall_clock_lines,
+                &clock,
+                &Layer0SlicesOfThisRun {
+                    slices_to_run: 3,
+                    states_of_this_run: 40,
+                    restored_slices: 2,
+                },
+                &|states_of_the_slice: &u64| *states_of_the_slice,
+                &mut |states_of_the_slice, finished_so_far| {
+                    slices_handed_over.push((states_of_the_slice, finished_so_far));
+                },
+                &mut |line| printed.push(line),
+            )
+        });
+        assert_eq!(
+            printed.first().map(String::as_str),
+            Some(
+                "LAYER0_PROGRESS by=wall_clock finished_slices=0/3 finished_states=0/40 resumed_slices=2 elapsed_seconds=602.0"
+            ),
+            "过了一个间隔还没收到那一片，按挂钟打一行：{printed:?}"
+        );
+        let after_the_slice = Layer0FinishedSoFar {
+            slices: 1,
+            states: 7,
+        };
+        assert_eq!(
+            slices_handed_over,
+            vec![(7, after_the_slice)],
+            "那一片照样交给按片打行的那一头，计数里算上它"
+        );
+        assert_eq!(finished, after_the_slice, "交回这一趟跑完的计数");
     }
 }

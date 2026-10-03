@@ -49,8 +49,10 @@ use singlefs_format::{
 
 use crate::crash_injection::{seed_slices, CrashInjectionWorkerThreads};
 use singlefs_harness::history::{
-    execute_history_with, generate_history_with_weights, with_panic_capture, CapturedPanic,
-    GenerationWeights, HistoryDeviceWidth, HistoryExecution, HistorySeed, SeededRandomSource,
+    count_from_reproduction_environment, execute_history_with, generate_history_with_weights,
+    number_from_reproduction_environment, render_environment_assignments, with_panic_capture,
+    CapturedPanic, GenerationWeights, HistoryDeviceWidth, HistoryExecution, HistorySampling,
+    HistorySeed, ReproductionEnvironmentError, ReproductionVariablePrefix, SeededRandomSource,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice, SECTOR_BYTES};
 use singlefs_harness::model::ObservedReadBack;
@@ -821,6 +823,113 @@ impl BadDiskReport {
         }
         text
     }
+
+    /// 这一批的取样参数（每段步数、比重、跑法）。
+    #[must_use]
+    pub fn history_sampling(&self) -> HistorySampling {
+        HistorySampling {
+            operations_per_history: self.operations_per_history,
+            weights: self.weights,
+            execution: self.execution,
+        }
+    }
+
+    /// 重放这一整批的那一行命令（[`bad_disk_input_replay_line`]）。
+    #[must_use]
+    pub fn replay_line(&self) -> String {
+        bad_disk_input_replay_line(self.first_seed, self.seed_count, &self.history_sampling())
+    }
+}
+
+/// 坏盘输入那个二进制的环境变量前缀；取样参数（每段步数、比重、checker、盘宽、空间准入）的后缀与随机历史共用
+/// （`singlefs_harness::history::HistorySamplingVariable`，格式只有那一份定义；代码三方 test-script-align-code-r1 判决 C607）。
+pub const BAD_DISK_INPUT_VARIABLE_PREFIX: ReproductionVariablePrefix =
+    ReproductionVariablePrefix("SINGLEFS_BAD_DISK_");
+
+singlefs_harness::enum_listing_every_member! {
+/// 重放行与大档入口里坏盘输入自己的两个变量（接在 [`BAD_DISK_INPUT_VARIABLE_PREFIX`] 后面；取样参数接在它们后面）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BadDiskInputVariable {
+    /// 种子区间的起点。
+    FirstSeed,
+    /// 种子数。
+    Seeds,
+}
+}
+
+impl BadDiskInputVariable {
+    #[must_use]
+    pub fn variable_name(self) -> String {
+        BAD_DISK_INPUT_VARIABLE_PREFIX.variable_named(match self {
+            BadDiskInputVariable::FirstSeed => "FIRST_SEED",
+            BadDiskInputVariable::Seeds => "SEEDS",
+        })
+    }
+}
+
+/// 坏盘输入判红时打的重放命令：种子区间与取样参数（每段步数、比重、checker、盘宽、空间准入），
+/// 交大档那条入口（`bad_disk_input_campaign` 的 `the_large_tier_of_bad_disk_inputs`）照抄就是原来那一批。
+/// 线程数不在里面：线程数不改结论（`the_report_is_the_same_with_one_worker_thread_and_four`）。
+#[must_use]
+pub fn bad_disk_input_replay_line(
+    first_seed: u64,
+    seed_count: u64,
+    sampling: &HistorySampling,
+) -> String {
+    let mut assignments: Vec<(String, String)> = BadDiskInputVariable::ALL
+        .into_iter()
+        .map(|variable| {
+            let value = match variable {
+                BadDiskInputVariable::FirstSeed => first_seed.to_string(),
+                BadDiskInputVariable::Seeds => seed_count.to_string(),
+            };
+            (variable.variable_name(), value)
+        })
+        .collect();
+    assignments.extend(sampling.environment_assignments(BAD_DISK_INPUT_VARIABLE_PREFIX));
+    format!(
+        "{} cargo test --release -p singlefs-checker-tier --test bad_disk_input_campaign -- --include-ignored --exact the_large_tier_of_bad_disk_inputs",
+        render_environment_assignments(&assignments)
+    )
+}
+
+/// 大档那条入口读环境：读的变量与 [`bad_disk_input_replay_line`] 写出的逐个相同，没设的取 `defaults` 的；
+/// 线程数不在重放行里，照 `defaults` 的。种子数是「跑几段」的计数，经 `history` 的计数读法读（写 0 与写错一样认不得：
+/// 0 段的一批照「零 panic、不读回没提交过的版本」判成绿，上游 `show-me-test.md`「扫到 0 项也不是通过」）。
+///
+/// # Errors
+/// 某个变量的取值认不得（种子数写 0 也算）。
+pub fn bad_disk_campaign_from_environment(
+    lookup: &dyn Fn(&str) -> Option<String>,
+    defaults: &BadDiskCampaign,
+) -> Result<BadDiskCampaign, ReproductionEnvironmentError> {
+    let first_seed = number_from_reproduction_environment(
+        lookup,
+        &BadDiskInputVariable::FirstSeed.variable_name(),
+        defaults.first_seed,
+    )?;
+    let seed_count = count_from_reproduction_environment(
+        lookup,
+        &BadDiskInputVariable::Seeds.variable_name(),
+        defaults.seed_count,
+    )?;
+    let sampling = HistorySampling::from_environment(
+        BAD_DISK_INPUT_VARIABLE_PREFIX,
+        lookup,
+        &HistorySampling {
+            operations_per_history: defaults.operations_per_history,
+            weights: defaults.weights,
+            execution: defaults.execution,
+        },
+    )?;
+    Ok(BadDiskCampaign {
+        first_seed,
+        seed_count,
+        operations_per_history: sampling.operations_per_history,
+        weights: sampling.weights,
+        execution: sampling.execution,
+        worker_threads: defaults.worker_threads,
+    })
 }
 
 /// 一条 panic 是不是 [`KNOWN_PANIC_SITES`] 里的那一条（按文件与消息片段认，不按行号认）。

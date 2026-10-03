@@ -11,10 +11,9 @@
 use std::ops::Range;
 
 use crate::crash_judge_gpu::{
-    checker_scan_kernel_source, checker_walk_kernel_source, dispatch_words, pack_tables,
-    recovery_kernel_source, verdict_was_written_by_both_kernels, DISPATCH_BINDING, SCRATCH_BINDING,
-    SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING, VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN,
-    WORKGROUP_SIZE,
+    dispatch_words, pack_tables, verdict_was_written_by_both_kernels, JudgeKernelSources,
+    DISPATCH_BINDING, SCRATCH_BINDING, SCRATCH_WORDS, TABLES_BINDING, VERDICTS_BINDING,
+    VERDICT_WORDS, VERDICT_WORD_NOT_WRITTEN, WORKGROUP_SIZE,
 };
 use crate::crash_judge_tables::JudgeTables;
 use crate::gpu_unit_checks::GpuCard;
@@ -421,6 +420,27 @@ impl<'card> GpuCrashJudge<'card> {
         tables: &PackedJudgeTables,
         requested_states_per_dispatch: usize,
     ) -> Self {
+        Self::on_card_compiling_these_kernel_sources(
+            card,
+            tables,
+            requested_states_per_dispatch,
+            &JudgeKernelSources::of_the_judge(),
+        )
+    }
+
+    /// 同 [`Self::on_card_with_packed_tables`]，编的是调用方给的三份内核源码。判器的结论按判法摘要
+    /// （`crate::crash_judge_gpu::gpu_judge_digest`，罩 [`JudgeKernelSources::of_the_judge`] 那三份）入库，
+    /// 编别的源码判出的结论与那个摘要对不上：只给对拍用例在内核里种假违例位用，判定入库的路径不调它。
+    ///
+    /// # Panics
+    /// 同 [`Self::new`]。
+    #[must_use]
+    pub fn on_card_compiling_these_kernel_sources(
+        card: &'card GpuCard,
+        tables: &PackedJudgeTables,
+        requested_states_per_dispatch: usize,
+        kernel_sources: &JudgeKernelSources,
+    ) -> Self {
         let packed = &tables.words;
         let device = card.device();
         let table_bytes = u64::try_from(packed.len() * 4).expect("装得进 u64");
@@ -461,34 +481,34 @@ impl<'card> GpuCrashJudge<'card> {
             std::env::var("SINGLEFS_GPU_KERNELS_ONE_AT_A_TIME").is_ok_and(|value| value == "1");
         let (recovery_pipeline, checker_walk_pipeline, checker_scan_pipeline) = if one_at_a_time {
             (
-                compute_pipeline(card, "crash-judge-recovery", &recovery_kernel_source()),
+                compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery),
                 compute_pipeline(
                     card,
                     "crash-judge-checker-walk",
-                    &checker_walk_kernel_source(),
+                    &kernel_sources.checker_walk,
                 ),
                 compute_pipeline(
                     card,
                     "crash-judge-checker-scan",
-                    &checker_scan_kernel_source(),
+                    &kernel_sources.checker_scan,
                 ),
             )
         } else {
             std::thread::scope(|scope| {
                 let recovery = scope.spawn(|| {
-                    compute_pipeline(card, "crash-judge-recovery", &recovery_kernel_source())
+                    compute_pipeline(card, "crash-judge-recovery", &kernel_sources.recovery)
                 });
                 let scan = scope.spawn(|| {
                     compute_pipeline(
                         card,
                         "crash-judge-checker-scan",
-                        &checker_scan_kernel_source(),
+                        &kernel_sources.checker_scan,
                     )
                 });
                 let walk = compute_pipeline(
                     card,
                     "crash-judge-checker-walk",
-                    &checker_walk_kernel_source(),
+                    &kernel_sources.checker_walk,
                 );
                 (
                     recovery.join().expect("恢复内核的编译线程不 panic"),
@@ -969,12 +989,17 @@ mod tests {
     /// 内核原文多大。查「这台机器编判器内核要多少内存、卡在哪一个上」用；中途被内存上限杀掉，已经打出来的行还在。
     /// 要量冷编，把驱动的盘上缓存指到一个空目录（环境变量 `__GL_SHADER_DISK_CACHE_PATH`）。
     #[test]
-    #[ignore = "要本机一张能用的 NVIDIA 卡；冷编每个内核几分钟"]
+    #[ignore = "要本机一张能用的 NVIDIA 卡（没有 NVIDIA 卡报「本次未跑」，有卡而用不上判红）；冷编每个内核几分钟"]
     fn each_kernel_compile_time_and_peak_memory_one_at_a_time() {
         use crate::crash_judge_gpu::{checker_scan_kernel_source, checker_walk_kernel_source};
         use std::io::Write;
-        let cards = crate::gpu_unit_checks::usable_gpu_cards();
-        let card = cards.first().expect("本机有一张能用的卡");
+        let Some(card) =
+            crate::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run(
+                "each_kernel_compile_time_and_peak_memory_one_at_a_time",
+            )
+        else {
+            return;
+        };
         println!(
             "GPU_KERNEL_COMPILE_CARD card={:?} index={} free_mebibytes={} peak_resident_mebibytes_before={}",
             card.name,
@@ -993,7 +1018,7 @@ mod tests {
             );
             std::io::stdout().flush().expect("刷得出去");
             let started = std::time::Instant::now();
-            let _pipeline = super::compute_pipeline(card, kernel, &source);
+            let _pipeline = super::compute_pipeline(&card, kernel, &source);
             println!(
                 "GPU_KERNEL_COMPILE kernel={kernel} seconds={:.1} peak_resident_mebibytes={}",
                 started.elapsed().as_secs_f64(),
@@ -1095,13 +1120,18 @@ mod tests {
     /// 量一次恢复内核在本机第一张能用的卡上的编译时间（要显卡；打一行 `GPU_KERNEL_COMPILE kernel=recovery seconds=…`）：
     /// 连跑两次、比第二次快不快，就知道驱动的盘上着色器缓存管不管 Vulkan 管线。
     #[test]
-    #[ignore = "要本机一张能用的 NVIDIA 卡，编一次几十秒"]
+    #[ignore = "要本机一张能用的 NVIDIA 卡（没有 NVIDIA 卡报「本次未跑」，有卡而用不上判红），编一次几十秒"]
     fn recovery_kernel_compile_time_on_the_first_usable_card() {
-        let cards = crate::gpu_unit_checks::usable_gpu_cards();
-        let card = cards.first().expect("本机有一张能用的卡");
+        let Some(card) =
+            crate::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run(
+                "recovery_kernel_compile_time_on_the_first_usable_card",
+            )
+        else {
+            return;
+        };
         let started = std::time::Instant::now();
         let _pipeline =
-            super::compute_pipeline(card, "crash-judge-recovery", &recovery_kernel_source());
+            super::compute_pipeline(&card, "crash-judge-recovery", &recovery_kernel_source());
         println!(
             "GPU_KERNEL_COMPILE kernel=recovery seconds={:.1}",
             started.elapsed().as_secs_f64()

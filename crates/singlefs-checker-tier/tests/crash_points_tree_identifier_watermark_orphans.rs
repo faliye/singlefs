@@ -1,7 +1,7 @@
 //! checker 档模块：无（自己逐个造崩溃状态，只用 harness 档的内存池与池级 checker）
 //! I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向的改法 D（`research/prompts/m2-wave3-code-r1-main-verification.md`
 //! 第三节 Y1、第四节第 1 条，被攻过零轮）：第一个文件版本那次发布崩在录制流的每一个前缀上 → 可写挂载 → 挂载之后六种动作，
-//! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 11 发八棵树）。
+//! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 65536 发十二棵树）。
 //! 原先的流 ②（回退到暖机根 (1, 2) 之后在回退那个会话里再发第一个文件版本）随管理员回退改成挂着时的向前发布删掉：
 //! 向前回退的候选要带文件，退不到树表 0 条的暖机根（D23（journal 的角色与格式） 已定项 14）。
 //!
@@ -103,8 +103,8 @@ fn first_file_publish_after_mkfs() -> (
                 first_file.root.checkpoint_txg,
                 first_file.root.tree_identifier_watermark
             ),
-            (CheckpointTxg(3), 19),
-            "流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 11 发 11..18、新水位 19"
+            (CheckpointTxg(3), 65548),
+            "流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 65536 发 65536..65547、新水位 65548"
         );
         (start, stream.operation_count())
     };
@@ -192,7 +192,7 @@ fn perform_after_the_mount(
         }
         (
             ActionAfterTheMount::ZeroUnitPublishes { .. } | ActionAfterTheMount::FirstFileVersion,
-            PoolVersion::WithFile(_),
+            PoolVersion::WithFile(_) | PoolVersion::WithTreesAndNoFile(_),
         ) => ActionOutcome::NotApplicableToAVersionWithAFile,
     }
 }
@@ -307,7 +307,7 @@ fn assert_the_sweep_stays_green_and_reached_the_orphans(tally: &SweepTally, stre
 }
 
 /// 流 ①：崩在第一个文件版本那次发布的每一个前缀上、可写挂载、再做那六种动作，池级 checker 一条违例都没有；
-/// 改法 D 之前的读法在其中有格子判红（孤儿 11..15、水位 11）。
+/// 改法 D 之前的读法在其中有格子判红（孤儿 65536..65540、水位 65536）。
 #[test]
 fn every_crash_inside_the_first_file_version_after_mkfs_then_a_writable_mount_leaves_the_orphans_out_of_the_tree_identifier_watermark(
 ) {

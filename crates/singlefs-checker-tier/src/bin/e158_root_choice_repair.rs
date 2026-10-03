@@ -4906,13 +4906,17 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
     };
     let row_publish_writes = match &mounted.output.row_publish {
         PoolVersion::WithoutFile(version) => version.writes.clone(),
-        PoolVersion::WithFile(version) => version.writes.clone(),
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+            version.writes.clone()
+        }
     };
     emit_writes_by_kind("second_mount_row_publish", &row_publish_writes);
     for (index, warm_up_publish) in mounted.output.warm_up_publishes.iter().enumerate() {
         let writes = match warm_up_publish {
             PoolVersion::WithoutFile(version) => version.writes.clone(),
-            PoolVersion::WithFile(version) => version.writes.clone(),
+            PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+                version.writes.clone()
+            }
         };
         emit_writes_by_kind(&format!("second_mount_warm_up_publish_{index}"), &writes);
     }
@@ -4966,13 +4970,17 @@ fn run_fixed_publication_byte_script(geometry: &Geometry) {
     };
     let rollback_row_publish_writes = match &rollback_mounted.output.row_publish {
         PoolVersion::WithoutFile(version) => version.writes.clone(),
-        PoolVersion::WithFile(version) => version.writes.clone(),
+        PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+            version.writes.clone()
+        }
     };
     emit_writes_by_kind("rollback_row_publish", &rollback_row_publish_writes);
     for (index, warm_up_publish) in rollback_mounted.output.warm_up_publishes.iter().enumerate() {
         let writes = match warm_up_publish {
             PoolVersion::WithoutFile(version) => version.writes.clone(),
-            PoolVersion::WithFile(version) => version.writes.clone(),
+            PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+                version.writes.clone()
+            }
         };
         emit_writes_by_kind(&format!("rollback_warm_up_publish_{index}"), &writes);
     }
@@ -8587,14 +8595,16 @@ fn third_run_change_content(
             write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * content_number,
         };
         match &session.current {
-            PoolVersion::WithFile(previous) => publish_overwrite(
-                &mut writer,
-                &mut session.allocator,
-                previous,
-                file,
-                session.instance,
-            )
-            .map_err(|error| format!("覆盖写: {error:?}"))?,
+            PoolVersion::WithFile(previous) | PoolVersion::WithTreesAndNoFile(previous) => {
+                publish_overwrite(
+                    &mut writer,
+                    &mut session.allocator,
+                    previous,
+                    file,
+                    session.instance,
+                )
+                .map_err(|error| format!("覆盖写: {error:?}"))?
+            }
             PoolVersion::WithoutFile(version) => publish_first_file(
                 &mut writer,
                 &mut session.allocator,
@@ -14290,14 +14300,16 @@ fn fourth_run_change_content_recorded(
             write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 * content_number,
         };
         match &session.current {
-            PoolVersion::WithFile(previous) => publish_overwrite(
-                &mut writer,
-                &mut session.allocator,
-                previous,
-                file,
-                session.instance,
-            )
-            .map_err(|error| format!("覆盖写: {error:?}")),
+            PoolVersion::WithFile(previous) | PoolVersion::WithTreesAndNoFile(previous) => {
+                publish_overwrite(
+                    &mut writer,
+                    &mut session.allocator,
+                    previous,
+                    file,
+                    session.instance,
+                )
+                .map_err(|error| format!("覆盖写: {error:?}"))
+            }
             PoolVersion::WithoutFile(version) => publish_first_file(
                 &mut writer,
                 &mut session.allocator,
@@ -17899,7 +17911,9 @@ mod fourth_run_segment_two {
                 | HistoryOperation::PublishWithoutUnits
                 | HistoryOperation::CloseAndMountWritable
                 | HistoryOperation::RollBackWhileMounted(_)
-                | HistoryOperation::ColdStartRecover => format!("{operation:?}"),
+                | HistoryOperation::ColdStartRecover
+                | HistoryOperation::Unlink
+                | HistoryOperation::CreateInode => format!("{operation:?}"),
             });
         }
         let source_lines: Vec<&str> = body
@@ -18229,7 +18243,9 @@ mod fourth_run_segment_two {
     ) -> Option<Vec<HiddenRange>> {
         let earlier_records = match current {
             PoolVersion::WithoutFile(version) => &version.earlier_records_of_this_publish,
-            PoolVersion::WithFile(version) => &version.earlier_records_of_this_publish,
+            PoolVersion::WithFile(version) | PoolVersion::WithTreesAndNoFile(version) => {
+                &version.earlier_records_of_this_publish
+            }
         };
         let named_units: Vec<LocationEntry> = earlier_records
             .iter()
@@ -18979,6 +18995,12 @@ mod fourth_run_segment_two {
                 HistoryOperation::CrashRecoveryAbandoningTheNewestRoot => {
                     self.apply_crash_recovery_abandoning_the_newest_root(order)
                 }
+                // 这个装置的执行器不发 unlink（三·2 第 8 条把它加进随机历史的生成；这里的格子都是删除之前的那几种）：照前提不满足记。
+                HistoryOperation::Unlink => not_applicable("UnlinkIsNotDrivenByThisExperiment"),
+                // 建 inode 只接在 unlink 删完之后（三·2 后续把它加进随机历史的生成），这个装置不发 unlink，同样照前提不满足记。
+                HistoryOperation::CreateInode => {
+                    not_applicable("CreateInodeIsNotDrivenByThisExperiment")
+                }
             }
         }
 
@@ -19078,12 +19100,14 @@ mod fourth_run_segment_two {
             });
             let floor_raises: &[singlefs_core::mount::RaisedFloor] = match &change {
                 Ok(published) => &published.floor_raises,
+                Err(UserChangeRefused::NoFileVersionToChange { floor_raises, .. }) => floor_raises,
                 Err(
                     UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount { .. }
-                    | UserChangeRefused::NoFileVersionToChange
                     | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
                     | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
-                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
+                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                        ..
+                    },
                 ) => &[],
                 Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
                 Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused_change)) => {
@@ -22008,6 +22032,7 @@ mod fourth_run_segment_two {
                 effective_root: Some(key),
                 journal: singlefs_core::recovery::JournalScanReport::default(),
                 mapping_fallbacks: 0,
+                devices_without_a_mountable_system_configuration_slot: Vec::new(),
             }
         }
 

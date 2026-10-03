@@ -574,7 +574,9 @@ fn device_call_counts<Inner: BlockDevice>(
 fn writes_of(version: &PoolVersion) -> &WritesByStructureKind {
     match version {
         PoolVersion::WithoutFile(version_without_file) => &version_without_file.writes,
-        PoolVersion::WithFile(file_version) => &file_version.writes,
+        PoolVersion::WithFile(file_version) | PoolVersion::WithTreesAndNoFile(file_version) => {
+            &file_version.writes
+        }
     }
 }
 
@@ -831,8 +833,9 @@ where
                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
                     ..
                 }
-                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
-                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+                // 有盘落后于现行那一版、又缺它的单元或它的根（根写在这块盘上而那个根环槽里不是它）：挂着之后的入口在任何写之前拒，
+                // 这个二进制不换盘，走不到。
+                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
                 // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
@@ -1248,8 +1251,9 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
                 | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration {
                     ..
                 }
-                // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
-                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
+                // 有盘落后于现行那一版、又缺它的单元或它的根（根写在这块盘上而那个根环槽里不是它）：挂着之后的入口在任何写之前拒，
+                // 这个二进制不换盘，走不到。
+                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
@@ -2779,7 +2783,7 @@ mod tests {
         // C577 之后发布 D 以一道池屏障收尾，抬 F 那一串开的新写入口开头又一道，两道之间没有写：录制器
         // （`SharedStream::push` 的末尾一串屏障去重）把后一道并掉，设备照收两次 FLUSH，所以每块盘设备一层比录制流投出的多 1。
         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
-        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
+        // 盘 0 的 12 / 13 是合入后验证一那一次跑出来的；盘 1 同一个机制推的，没跑（singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
         let flushes_the_recorder_merged_into_the_barrier_that_closed_publish_d: u64 = 1;
         for (index, identity) in [DeviceIdentity(0), DeviceIdentity(1)]
             .into_iter()
@@ -3070,7 +3074,7 @@ mod tests {
         // 两道之间没有写，录制器（`SharedStream::push` 的末尾一串屏障去重）把后一道并进上一段，设备在这一段照收一次 FLUSH。
         // 录制器并掉相邻屏障、设备收两次，归第五步 55 号六档重录时定（合入后验证一报告第八节；主 agent 定不改装置、不改判据，照今天的数改钉）。
         // 发布 B 那一段是 0（合入后验证一那一次两块盘都过了）；重开那一段盘 0 的 16 / 17 是那一次跑出来的，盘 1 同一个机制推的，没跑
-        // （singlefs-checker-tier 是 checker 档，归提交时的 crash-verifier）。
+        // （singlefs-checker-tier 是 checker 档，提交时由主 agent 经门禁 checker-tier-layer0-replay 快档跑）。
         let windows = [
             (
                 "file_overwrite",

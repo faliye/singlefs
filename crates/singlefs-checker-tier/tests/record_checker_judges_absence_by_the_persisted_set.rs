@@ -16,7 +16,7 @@
 //! - C513（复用豁免不判那次复用合不合法） 那三个状态（复用窗口置 0、txg 5 的数据单元落回 txg 4 的那一对槽）：解释那一槽的后写落了、
 //!   但过不了回收谓词，照判缺席。
 //!
-//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，提交时由崩溃验证员跑）。
+//! σ 那一段全部 2^16 个状态（C577 之前 2^18）的记录核对器判定另有一条标了 ignore 的全量（崩溃枚举，用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 跑，提交时的快档只核它的全绿标记）。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
 mod common;
@@ -44,6 +44,50 @@ use singlefs_harness::{RecordedEntrySpan, RecordedPublishEntry};
 
 /// 16K 节点槽的宽：l 是两槽宽的数据单元，u、u2、x、y 各一槽。
 const NODE_SLOT_BYTES: u64 = 16 * 1024;
+
+#[cfg(feature = "gpu")]
+const CPU_THREADS_ENVIRONMENT_VARIABLE: &str = "SINGLEFS_CRASH_JUDGE_CPU_THREADS";
+
+/// σ 对拍里 CPU 判器线程数变量的值（`None` 是没设）：没设取本机可用并行度；设了而不是正整数（0 也算）就 panic、消息带变量名与原值，
+/// 不悄悄换成本机并行度（与 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO` 同一判法，经
+/// `singlefs_harness::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable`）。
+///
+/// # Panics
+/// 设了而不是正整数。
+#[cfg(feature = "gpu")]
+fn cpu_threads_from_the_value_of_the_variable(value: Option<&str>) -> std::num::NonZeroUsize {
+    singlefs_harness::numeric_environment_variable::number_from_the_variable_value_panicking_when_unreadable(
+        CPU_THREADS_ENVIRONMENT_VARIABLE,
+        value,
+    )
+    .unwrap_or_else(|| std::thread::available_parallelism().unwrap_or(std::num::NonZeroUsize::MIN))
+}
+
+/// 这条流的入口文件不引随机历史脚手架（`singlefs_harness` 的 `history` 模块）：登记的崩溃枚举用例按模块引用收判法代码，
+/// 入口文件一引它，`history.rs` 连同它带进来的模型、对拍、场景、故障注入就都进了这一格的判法摘要，改随机历史就让这一格整格重判。
+/// 进程环境变量的读法经 `numeric_environment_variable` 直接引（`history` 不转出它）。
+/// 读源文件判、不调 `crash_identity` 的闭包函数：引 `crash_identity` 本身就会把它收进这一格的判法代码。
+#[test]
+fn this_flow_does_not_reference_the_random_history_scaffolding() {
+    let source_path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/record_checker_judges_absence_by_the_persisted_set.rs"
+    );
+    let source = std::fs::read_to_string(source_path)
+        .unwrap_or_else(|error| panic!("读不了这条流自己的源文件 {source_path}：{error}"));
+    let random_history_module = ["singlefs_harness", "history"].join("::");
+    assert!(
+        !source.contains(&random_history_module),
+        "这条流的入口文件引了 {random_history_module}：随机历史脚手架会进这一格的判法摘要"
+    );
+}
+
+#[cfg(feature = "gpu")]
+#[test]
+#[should_panic(expected = "SINGLEFS_CRASH_JUDGE_CPU_THREADS=\"sixteen\" 认不出")]
+fn an_unreadable_crash_judge_cpu_threads_value_panics_naming_the_variable_and_the_value() {
+    let _threads = cpu_threads_from_the_value_of_the_variable(Some("sixteen"));
+}
 
 fn second_content() -> Vec<u8> {
     (0..4100usize)
@@ -709,7 +753,7 @@ fn enumerate_every_subset_of_one_segment(
 }
 
 /// 计数行：`<前缀> states=… closed_form_states=… exhaustive=… record_claimed_state_missing_unit=…`。
-/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 54 号的 `exhaustive=` 判它，`research/scripts/admission.py`）。
+/// `exhaustive=true` 只在评过的状态数等于闭式算的数时打（门禁 checker-tier-layer0-replay 的 `exhaustive=` 判它，`research/scripts/admission.py`）。
 fn count_line(prefix: &str, enumerated: &SubsetsOfOneSegmentEnumerated) -> String {
     format!(
         "{prefix} states={} closed_form_states={} exhaustive={} record_claimed_state_missing_unit={}",
@@ -720,7 +764,7 @@ fn count_line(prefix: &str, enumerated: &SubsetsOfOneSegmentEnumerated) -> Strin
     )
 }
 
-/// 与 `crash::enumerate_layer0_in_state_slices` 打的那一行同形的线程行（门禁 54 号的 `threads=` 按 `states=` 找它，
+/// 与 `crash::enumerate_layer0_in_state_slices` 打的那一行同形的线程行（门禁 checker-tier-layer0-replay 的 `threads=` 按 `states=` 找它，
 /// 读 `worker_threads=`、`slices=`、`resumed_slices=`、`freshly_run_slices=`，`admission.py` 的 `judge_worker_threads`）。
 /// 不留进度文件：读回的片恒 0，这一趟跑的片就是全部片。
 fn parallel_finished_line(enumerated: &SubsetsOfOneSegmentEnumerated) -> String {
@@ -761,9 +805,9 @@ fn persisted_before_sigma(recorded: &RecordedHistory, sigma: usize) -> Vec<bool>
 /// 在冻结副本上量过按整份判的那一版在这里红 32768 个（那时 σ 18 个写；`research/prompts/m2-layer0-scale-r2-opus-output.md` 第一节，
 /// 核查员复跑逐字一致）。每个状态一遍看 journal 的恢复加记录核对器，
 /// 按掩码区间切片多线程跑（线程数与层 0 同一个来源）；打计数行 `C561_SIGMA_FULL`（状态数等于闭式时带 `exhaustive=true`）
-/// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 54 号按这两行判穷尽没有、线程用没用上。
+/// 与一行 `LAYER0_PARALLEL_FINISHED` 同形的线程行，门禁 checker-tier-layer0-replay 按这两行判穷尽没有、线程用没用上。
 #[test]
-#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：提交时由崩溃验证员按输入哈希跑（release），平时不跑"]
+#[ignore = "崩溃枚举（65536 个状态、每个一遍恢复）：用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按输入哈希跑（release），提交时的快档只核它的全绿标记，平时不跑"]
 fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present() {
     let recorded = record_history("c561-sigma-full", &HISTORY_UOOUOMSU);
     let chain = misaligned_reuse_chain(&recorded);
@@ -792,7 +836,7 @@ fn every_crash_state_of_sigma_leaves_every_unit_of_the_claimed_publishes_present
 
 /// σ 全量那两行的打法，拿同一条历史上 σ 前面一段只有几个写的小段核（全量本身标了 ignore，平时不跑）：
 /// 评过的状态数等于闭式 2^|段| 时计数行带 `exhaustive=true`；线程行与层 0 那一行同形、`states=` 与计数行相同，
-/// 读回的片 + 这一趟跑的片 = 总片数、起了至少一个工作线程、不多于配的线程数与片数——门禁 54 号按这几样判。
+/// 读回的片 + 这一趟跑的片 = 总片数、起了至少一个工作线程、不多于配的线程数与片数——门禁 checker-tier-layer0-replay 按这几样判。
 /// 两个工作线程与一个工作线程并出来的计数相同。
 #[test]
 fn the_sigma_enumeration_prints_exhaustive_true_and_a_thread_line_of_the_layer0_shape() {
@@ -1011,7 +1055,8 @@ fn sigma_publish_writes(recorded: &RecordedHistory) -> std::ops::Range<usize> {
 
 /// GPU 判器在 σ 那次发布上与 CPU 判器逐状态相同：这条历史把系统配置 0 号槽写了 34 次，判器表里一个落点的组合掩码要用到高 32 位
 /// （它是今天唯一一条一个落点超过 32 次写的流）。只展开 σ 那次发布的段，其余段不展开；每个状态 GPU 的红项与 CPU 判器的
-/// `red_items` 逐项同名、同序，GPU 一个状态都不许判不了。要一张空闲显存够的 NVIDIA 独显。
+/// `red_items` 逐项同名、同序，GPU 一个状态都不许判不了。要一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行
+/// `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，有卡而用不上判红（`gpu_unit_checks::gpu_test_start`）。
 #[cfg(feature = "gpu")]
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times(
@@ -1022,7 +1067,7 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
     };
     use singlefs_checker_tier::crash_judge_dispatch::GpuCrashJudge;
     use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-    use singlefs_checker_tier::gpu_unit_checks::usable_gpu_cards;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
     let recorded = record_history("gpu-judge-sigma", &HISTORY_UOOUOMSU);
     let sigma_publish = sigma_publish_writes(&recorded);
     let expansion = |_segment_index: usize, segment: &[usize]| {
@@ -1078,21 +1123,22 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
         versions_told_apart_only_by_the_high_bits > 0,
         "这条对拍要有两个版本低 32 位相同、只差高位，不然只比低 32 位的内核也判得对"
     );
-    let card = usable_gpu_cards()
-        .into_iter()
-        .next()
-        .expect("本机要有一张空闲显存够的 NVIDIA 独显；没有就是这条测试的环境没搭好，不悄悄跳过");
+    let Some(card) = first_usable_card_or_report_not_run(
+        "the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times",
+    ) else {
+        return;
+    };
     let judge = GpuCrashJudge::new(&card, &tables);
     let gpu = judge.judge_states(0..tables.state_count);
     // CPU 判器按区间切片并行判（每个状态十几到几十毫秒，单线程判 6.5 万态要一个多小时）：线程数从
     // SINGLEFS_CRASH_JUDGE_CPU_THREADS 取，没设取本机可用并行度；每线程 8 片，按片序拼回，与单线程逐状态相同
-    let threads = std::env::var("SINGLEFS_CRASH_JUDGE_CPU_THREADS")
-        .ok()
-        .and_then(|text| text.parse::<usize>().ok())
-        .filter(|count| *count >= 1)
-        .unwrap_or_else(|| {
-            std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get)
-        });
+    let threads = cpu_threads_from_the_value_of_the_variable(
+        singlefs_harness::numeric_environment_variable::process_environment_variable(
+            CPU_THREADS_ENVIRONMENT_VARIABLE,
+        )
+        .as_deref(),
+    )
+    .get();
     let slice_count = u64::try_from(threads * 8).expect("装得进 u64");
     let slice_length = tables.state_count.div_ceil(slice_count).max(1);
     let slices: Vec<std::ops::Range<u64>> = (0..slice_count)

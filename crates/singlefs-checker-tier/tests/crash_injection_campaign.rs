@@ -3,9 +3,9 @@
 //! `singlefs_harness::model`），切段、摆崩溃状态、重建与判定在 `singlefs_checker_tier::crash_injection`；
 //! 这里是快档（普通 `cargo test`）、多线程对拍、写死的那几段历史（段内真子集全枚举）与大档（`#[ignore]`，规模从环境变量取）。
 //!
-//! 枚举域与层 0 同一个（屏障与 FUA 写切段、段内任意真子集）；差别在怎么取：层 0 在两条写死的流上全枚举（门禁 54 号），
+//! 枚举域与层 0 同一个（屏障与 FUA 写切段、段内任意真子集）；差别在怎么取：层 0 在两条写死的流上全枚举（门禁 checker-tier-layer0-replay），
 //! 这里在随机历史上抽样。种子基是这个测试周期写死的那一个（`SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE`，随机历史那个二进制用的是同一个），
-//! 打在报告第一行与失败信息里（用户 2026-09-20 定案第 7 条，同日定的范围：随机说的是一个测试周期与下一个之间，不是每次跑重抽）。
+//! 打在报告第一行与失败信息里（随机说的是一个测试周期与下一个之间，不是每次跑重抽）。
 
 use std::collections::BTreeMap;
 use std::io::Write as _;
@@ -13,9 +13,11 @@ use std::io::Write as _;
 use singlefs_checker::walk::InstanceTableOfRootRecord;
 use singlefs_checker_tier::crash::check_records;
 use singlefs_checker_tier::crash_injection::{
-    inject_crashes_into_history, run_crash_injection_campaign, CrashInjectionCampaign,
-    CrashInjectionReport, CrashInjectionWorkerThreads, CrashPoint, CrashPointDraw,
-    FailureImageRetention,
+    crash_injection_campaign_from_environment, inject_crashes_into_history,
+    run_crash_injection_campaign, CrashInjectionAssertions, CrashInjectionCampaign,
+    CrashInjectionReport, CrashInjectionTally, CrashInjectionWorkerThreads, CrashPoint,
+    CrashPointDraw, CrashPointFinding, CrashStateStage, FailureImageRetention,
+    HistoryCrashInjection,
 };
 use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
 use singlefs_core::admission::SpaceAdmission;
@@ -23,21 +25,23 @@ use singlefs_core::recovery::{recover, JournalPolicy, PoolReader};
 use singlefs_format::DATA_UNIT_BYTES;
 use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
 use singlefs_harness::history::{
-    execute_history_with, generate_history, generate_history_with_weights, ContentChoice,
-    ContentLength, FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDeviceWidth,
+    environment_assignments_in_line, execute_history_with, generate_history,
+    generate_history_with_weights, ContentChoice, ContentLength, FailureObservation,
+    FailureSignature, FloorTargetChoice, GeneratedHistory, GenerationWeights, HistoryDeviceWidth,
     HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind, HistorySeed,
-    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice, StepOutcome,
+    HistoryStartingPoint, PerStepChecker, RollbackTargetChoice, StepOutcome, StepPosition,
 };
 use singlefs_harness::memory_pool::{
     root_identity_written_by, writes_and_segments, CrashImage, MemoryPool, RecordCheck,
     RetainedWrite,
 };
+use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
 
 /// 快档的规模：段数、每段步数与每段摆几个崩溃状态。规模与种子基都写死（种子基是这个测试周期的常量）。
 /// 每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后（代码审阅第 2 条），这一档 debug 下单跑一百来秒，标了 ignore，
-/// 由提交时的崩溃验证员经门禁 54 号（`crash-case:crash-injection-fast-tier`）在 release 下跑；普通 `cargo test` 由小快档守。
+/// 用户要求时由主 agent 经门禁 checker-tier-layer0-replay `--full`（`crash-case:crash-injection-fast-tier`）在 release 下跑，提交时的快档只核它的全绿标记；普通 `cargo test` 由小快档守。
 const FAST_TIER_SEEDS: u64 = 24;
 const FAST_TIER_OPERATIONS_PER_HISTORY: usize = 24;
 const FAST_TIER_DRAW: CrashPointDraw = CrashPointDraw::Sampled {
@@ -64,19 +68,11 @@ fn print_uncaptured(text: &str) {
     let _ = standard_output.flush();
 }
 
-fn number_from_environment(name: &str, default: u64) -> u64 {
-    std::env::var(name).map_or(default, |text| {
-        text.parse()
-            .unwrap_or_else(|error| panic!("{name}={text} 不是一个非负整数：{error}"))
-    })
-}
-
 /// 判红时先把种子基说清楚：同一个构建加同一个种子基重放得出来，报告里不带它就没法复现。
+/// 重放行由报告自己拼（`CrashInjectionReport::replay_line`：种子区间、崩溃状态怎么摆、照哪一组断言判、步数、比重、checker、盘宽、空间准入），
+/// 大档那条入口照同一张变量表读回（`crash_injection_campaign_from_environment`），照同一组断言判（[`judge_crash_injection_report`]）。
 fn how_to_replay(report: &CrashInjectionReport) -> String {
-    format!(
-        "重放：SINGLEFS_CRASH_INJECTION_FIRST_SEED={} SINGLEFS_CRASH_INJECTION_SEEDS={} SINGLEFS_CRASH_INJECTION_OPERATIONS={} 跑大档那条 #[ignore] 用例",
-        report.first_seed, report.seed_count, report.operations_per_history
-    )
+    format!("重放：{}", report.replay_line())
 }
 
 /// 种子基是一个测试周期的常量：开一个周期抽一次，抽完在这个周期之内写死。周期从「开一个新里程碑」与
@@ -109,6 +105,7 @@ fn the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle() {
         execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
         worker_threads: CrashInjectionWorkerThreads::GivenByCaller(1),
         image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+        assertions: CrashInjectionAssertions::NewFindingsOnly,
     });
     assert_eq!(
         report.first_seed, SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
@@ -131,31 +128,18 @@ fn the_test_cycle_seed_base_is_the_number_drawn_for_this_cycle() {
 /// 计数照打，并核各条路径真的跑到了：四种落点都扣下过、段内摆出过洞、起点那一段摆到过、截在发布中间过、
 /// 截回到最后一版之前过、恢复三种结局见过两种（失败一次都不许有）、journal 记录真的施加过、模型真的比过内容。
 #[test]
-#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；交提交时的崩溃验证员经门禁 54 号按 crash-case:crash-injection-fast-tier 在 release 下跑，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
+#[ignore = "快档：每个崩溃状态上起可写挂载、发一次布、摆三个二次崩溃之后 debug 下单跑一百来秒；用户要求时由主 agent 经门禁 checker-tier-layer0-replay --full 按 crash-case:crash-injection-fast-tier 在 release 下跑、提交时的快档只核它的全绿标记，普通 cargo test 由 crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed 守"]
 fn crash_injection_fast_tier_recovers_only_into_versions_the_model_committed() {
     let started = std::time::Instant::now();
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
-        first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
-        seed_count: FAST_TIER_SEEDS,
-        operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
-        draw: FAST_TIER_DRAW,
-        weights: GenerationWeights::BROAD,
-        execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
-        // 门禁这一档跑完把镜像目录删掉：临时目录里不留东西（门禁 77 号判跑完机器干不干净）。
-        image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
-    });
+    let report = run_crash_injection_campaign(&fast_tier_campaign(
+        CrashInjectionWorkerThreads::from_the_environment(),
+    ));
     let rendered = report.render();
     print_uncaptured(&format!(
         "── 崩溃注入快档 ──\n{rendered}用时 {:.1} 秒\n",
         started.elapsed().as_secs_f64()
     ));
-    assert!(
-        report.new_findings.is_empty(),
-        "崩溃状态上「已知红」清单外的失败；{}\n{rendered}",
-        how_to_replay(&report)
-    );
-    assert_every_crash_injection_path_was_exercised(&report);
+    judge_crash_injection_report(&report);
 }
 
 /// 小快档：快档的头 [`SMALL_FAST_TIER_SEEDS`] 段（每段步数、每段几个崩溃状态、比重与快档相同），普通 `cargo test` 里守着崩溃注入这一路。
@@ -165,27 +149,97 @@ fn crash_injection_fast_tier_recovers_only_into_versions_the_model_committed() {
 #[test]
 fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committed() {
     let started = std::time::Instant::now();
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
+    let report = run_crash_injection_campaign(&small_fast_tier_campaign(
+        CrashInjectionWorkerThreads::from_the_environment(),
+    ));
+    let rendered = report.render();
+    print_uncaptured(&format!(
+        "── 崩溃注入小快档 ──\n{rendered}用时 {:.1} 秒\n",
+        started.elapsed().as_secs_f64()
+    ));
+    judge_crash_injection_report(&report);
+}
+
+/// 小快档那一批：快档的头 [`SMALL_FAST_TIER_SEEDS`] 段，按小快档那一组断言判。
+fn small_fast_tier_campaign(worker_threads: CrashInjectionWorkerThreads) -> CrashInjectionCampaign {
+    CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: SMALL_FAST_TIER_SEEDS,
         operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
         draw: FAST_TIER_DRAW,
         weights: GenerationWeights::BROAD,
         execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
+        worker_threads,
         image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
-    });
-    let rendered = report.render();
-    print_uncaptured(&format!(
-        "── 崩溃注入小快档 ──\n{rendered}用时 {:.1} 秒\n",
-        started.elapsed().as_secs_f64()
-    ));
-    let replay = how_to_replay(&report);
+        assertions: CrashInjectionAssertions::SmallFastTier,
+    }
+}
+
+/// 照这一批的那一组断言判（[`CrashInjectionAssertions`]）：出红的那条用例与照它的重放行跑的大档入口都经这一个函数，
+/// 所以照抄重放行跑，红在同一条断言上（代码三方 test-script-align-code-r1 判决 S2）。
+fn judge_crash_injection_report(report: &CrashInjectionReport) {
     assert!(
         report.new_findings.is_empty(),
-        "崩溃状态上「已知红」清单外的失败；{replay}\n{rendered}"
+        "崩溃状态上「已知红」清单外的失败；{}\n{}",
+        how_to_replay(report),
+        report.render()
     );
+    match report.assertions {
+        CrashInjectionAssertions::NewFindingsOnly => {
+            assert_at_least_one_crash_state_was_judged(report);
+        }
+        CrashInjectionAssertions::SmallFastTier => {
+            assert_the_small_fast_tier_ran_each_stage_on_every_crash_state(report);
+        }
+        CrashInjectionAssertions::FastTier => {
+            assert_every_crash_injection_path_was_exercised(report);
+        }
+        CrashInjectionAssertions::RollbackSampling => {
+            assert_the_rollback_sampling_placed_crash_states_and_recovered_from_each(report);
+        }
+    }
+}
+
+/// 只判清单外失败的那一组也要判过至少一个崩溃状态：一个都没判过的一批没有清单外失败，只是因为什么都没判
+/// （上游 `show-me-test.md`「扫到 0 项也不是通过」）。别的三组各自要的计数都不少于段数，已经含着这一条。
+fn assert_at_least_one_crash_state_was_judged(report: &CrashInjectionReport) {
+    assert!(
+        report.tally.crash_points > 0,
+        "这一批一个崩溃状态都没判过，扫到 0 项不算通过；{}",
+        how_to_replay(report)
+    );
+}
+
+/// 一段都不跑的一批照只判清单外失败的那一组判：判红，不因为没有清单外失败就判成绿。
+#[test]
+#[should_panic(expected = "这一批一个崩溃状态都没判过")]
+fn a_batch_that_judged_no_crash_state_is_red_under_the_new_findings_only_assertions() {
+    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
+        first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+        seed_count: 0,
+        operations_per_history: 8,
+        draw: CrashPointDraw::Sampled {
+            crash_points_per_history: 2,
+        },
+        weights: GenerationWeights::BROAD,
+        execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        worker_threads: CrashInjectionWorkerThreads::GivenByCaller(1),
+        image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+        assertions: CrashInjectionAssertions::NewFindingsOnly,
+    });
+    judge_crash_injection_report(&report);
+}
+
+/// 小快档那一组的结构计数：三截每一截在每个崩溃状态上都真的跑了，二次崩溃摆出来过、每个都判过，恢复没失败过。
+fn assert_the_small_fast_tier_ran_each_stage_on_every_crash_state(report: &CrashInjectionReport) {
+    let replay = how_to_replay(report);
     let tally = &report.tally;
+    // 每段历史都摆出过崩溃状态（总数够放得过「几段一个都没有、别的段多摆」，判决 `m2-supp3-item3-code-r2-main-verification.md`
+    // 第四节第 4 题，用户定「全补」；为什么每段都摆得出见快档那一组）。
+    assert_eq!(
+        tally.histories_without_any_crash_point, 0,
+        "有历史段一个崩溃状态都没摆出来；{replay}"
+    );
     assert!(
         tally.crash_points >= SMALL_FAST_TIER_SEEDS,
         "平均每段连一个崩溃状态都没摆出来：{}；{replay}",
@@ -230,9 +284,34 @@ fn crash_injection_small_fast_tier_recovers_only_into_versions_the_model_committ
     assert_eq!(tally.recoveries_failed, 0, "崩溃之后恢复失败过；{replay}");
 }
 
+/// 快档那一批：这个测试周期的种子基起 [`FAST_TIER_SEEDS`] 段、每段 [`FAST_TIER_OPERATIONS_PER_HISTORY`] 步、[`FAST_TIER_DRAW`]、
+/// 各类操作都抽。门禁这一档跑完把镜像目录删掉：临时目录里不留东西（门禁 77 号判跑完机器干不干净）。
+fn fast_tier_campaign(worker_threads: CrashInjectionWorkerThreads) -> CrashInjectionCampaign {
+    CrashInjectionCampaign {
+        first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+        seed_count: FAST_TIER_SEEDS,
+        operations_per_history: FAST_TIER_OPERATIONS_PER_HISTORY,
+        draw: FAST_TIER_DRAW,
+        weights: GenerationWeights::BROAD,
+        execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        worker_threads,
+        image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+        assertions: CrashInjectionAssertions::FastTier,
+    }
+}
+
+/// 快档那一组：各条路径都跑到了（四种落点都扣下过、段内摆出过洞、起点那一段摆到过、截在发布中间过……）。
 fn assert_every_crash_injection_path_was_exercised(report: &CrashInjectionReport) {
     let tally = &report.tally;
     let replay = how_to_replay(report);
+    // 总数够不说明每段都摆到了：`crash_points >= FAST_TIER_SEEDS` 放得过「几段一个都没有、别的段多摆」（判决
+    // `m2-supp3-item3-code-r2-main-verification.md` 第四节第 4 题，用户定「全补」）。从第一个文件起的历史，起点那一段（取号、暖机、
+    // 第一个文件）就有写、都是候选段；从 mkfs 起的历史要等第一次做成的可写挂载，关着会话时只抽可写挂载与冷启动两种，
+    // 一次可写挂载都没做成就收尾的（新发现或已知红收尾在那之前）这一条照判红。推的，没在快档上跑过。
+    assert_eq!(
+        tally.histories_without_any_crash_point, 0,
+        "有历史段一个崩溃状态都没摆出来；{replay}"
+    );
     assert!(
         tally.crash_points >= FAST_TIER_SEEDS,
         "平均每段连一个崩溃状态都没摆出来：{}；{replay}",
@@ -347,6 +426,7 @@ fn one_thread_and_four_threads_render_the_same_report() {
             execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
             worker_threads: CrashInjectionWorkerThreads::GivenByCaller(worker_threads),
             image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
+            assertions: CrashInjectionAssertions::NewFindingsOnly,
         })
         .render()
     };
@@ -517,6 +597,95 @@ fn crash_states_of_the_history_that_raised_the_floor_into_a_rollback_gap_are_cle
             injection.tally.crash_points_by_operation_kind
         );
     }
+}
+
+/// 各类操作的写上摆到几个崩溃状态（判决 `m2-supp3-item3-code-r2-main-verification.md` 第四节第 4 题，用户定「全补」：七类操作各钉一条；
+/// 这之后又加了崩溃恢复抛弃根，共八类）。覆盖写与可写挂载由快档钉、回退与抬 F 由上一条写死历史钉，剩下四类钉在这一段写死的历史上：
+/// mkfs → 可写挂载 → 零单元发布（树表 0 条的一版上才调得成）→ 冷启动 → 可写挂载 → 第一个文件 → 崩溃恢复抛弃根（C554 乙拒）→ 可写挂载。
+/// 写数不超过 2 的段整段枚举（2^n − 1 个真子集），更长的段各抽 1 个，所以每一类摆到几个是定数，不靠抽样运气：
+/// 零单元发布的段是 2、1、2 ⇒ 3 + 1 + 3 = 7；第一个文件的段是 24、2、1、2 ⇒ 1 + 3 + 1 + 3 = 8；
+/// 冷启动只读盘、一个写都不发，崩溃恢复抛弃根在取号之前被拒、也不发写 ⇒ 两类都是 0（崩溃状态按第一个被扣下的写落在哪一步归类，
+/// 不发写的那一步归不到）。段序列是 2026-10-03 在 harness 侧按同一段历史、同一个执行（`execute_history_with` 加
+/// `writes_and_segments_with_stream_indexes`）现量的，这一条在 checker 档里没在交回之前跑过。
+/// 比已有的两段写死历史多罩的：树表 0 条的一版上的零单元发布、冷启动之后与崩溃恢复被拒之后的可写挂载那几段的崩溃状态。
+#[test]
+fn crash_states_land_in_zero_unit_publishes_and_first_files_but_never_in_cold_starts_or_refused_crash_recoveries(
+) {
+    let history = GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterMakeFilesystem,
+        operations: vec![
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishWithoutUnits,
+            HistoryOperation::ColdStartRecover,
+            HistoryOperation::CloseAndMountWritable,
+            HistoryOperation::PublishFirstFile(ContentChoice {
+                length: ContentLength::InsideOneDataUnit { selector: 3 },
+                fill_seed: 1,
+            }),
+            HistoryOperation::CrashRecoveryAbandoningTheNewestRoot,
+            HistoryOperation::CloseAndMountWritable,
+        ],
+    };
+    let crash_recovery_outcomes = outcomes_of_the_crash_recovery_steps(&history);
+    assert_eq!(
+        crash_recovery_outcomes,
+        vec![StepOutcome::Refused {
+            member: CRASH_RECOVERY_REFUSED_BY_THE_WITNESS.to_string()
+        }],
+        "崩溃恢复抛弃根那一步被 C554 乙拒：它归到 0 个崩溃状态说的是「被拒的那一步不发写」"
+    );
+    let injection = inject_crashes_into_history(
+        &history,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        CrashPointDraw::EveryProperSubsetOfShortSegments {
+            segment_writes: 2,
+            sampled_in_longer_segments: 1,
+        },
+        None,
+    );
+    print_uncaptured(&format!(
+        "── 崩溃注入：零单元发布、第一个文件、冷启动与崩溃恢复抛弃根各摆几个崩溃状态 ──\n{}",
+        injection.tally.render()
+    ));
+    let crash_points_in = |kind: HistoryOperationKind| {
+        injection
+            .tally
+            .crash_points_by_operation_kind
+            .get(&kind)
+            .copied()
+            .unwrap_or(0)
+    };
+    assert_eq!(
+        crash_points_in(HistoryOperationKind::ColdStartRecover),
+        0,
+        "冷启动一个写都不发，崩溃状态归不到它：{:?}",
+        injection.tally.crash_points_by_operation_kind
+    );
+    assert_eq!(
+        crash_points_in(HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot),
+        0,
+        "崩溃恢复抛弃根在取号之前被拒、一个写都不发，崩溃状态归不到它：{:?}",
+        injection.tally.crash_points_by_operation_kind
+    );
+    assert_eq!(
+        crash_points_in(HistoryOperationKind::PublishWithoutUnits),
+        7,
+        "零单元发布的段 2、1、2：3 + 1 + 3：{:?}",
+        injection.tally.crash_points_by_operation_kind
+    );
+    assert_eq!(
+        crash_points_in(HistoryOperationKind::PublishFirstFile),
+        8,
+        "第一个文件的段 24、2、1、2：1 + 3 + 1 + 3：{:?}",
+        injection.tally.crash_points_by_operation_kind
+    );
+    // 计数先钉、判定后钉：计数只看段序列与归步，少一道屏障那类变异先红在上面的计数上（`crates/mutations.tsv`）。
+    assert!(
+        injection.new_findings.is_empty(),
+        "一条清单外的失败都不许有：{:#?}",
+        injection.new_findings
+    );
 }
 
 /// 一段历史上写出的每次发布：它写出的单元写（写表下标）与它的根身份 (实例代号, checkpoint_txg)。
@@ -921,7 +1090,38 @@ fn on_the_whole_stream_a_kept_publish_missing_a_unit_under_a_version_rebuilt_fro
 /// 各类操作各摆到几个照打进报告，给人看。
 #[test]
 fn crash_states_land_inside_rollbacks_and_floor_raises() {
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
+    let report = run_crash_injection_campaign(&rollback_sampling_campaign(
+        CrashInjectionWorkerThreads::from_the_environment(),
+    ));
+    let rendered = report.render();
+    print_uncaptured(&format!(
+        "── 崩溃注入：偏向抬 F 之后回退的取样点 ──\n{rendered}"
+    ));
+    judge_crash_injection_report(&report);
+}
+
+/// 回退取样那一组：摆出过崩溃状态、恢复没失败过（不钉抽样摆出来的形态，见用到它的那条用例的文档注释）。
+fn assert_the_rollback_sampling_placed_crash_states_and_recovered_from_each(
+    report: &CrashInjectionReport,
+) {
+    assert!(
+        report.tally.crash_points >= 1,
+        "一个崩溃状态都没摆出来；{}",
+        how_to_replay(report)
+    );
+    assert_eq!(
+        report.tally.recoveries_failed,
+        0,
+        "崩溃之后恢复失败过；{}",
+        how_to_replay(report)
+    );
+}
+
+/// 偏向抬 F 之后回退的那一批：种子基起 12 段、每段 20 步、每段 6 个崩溃状态。
+fn rollback_sampling_campaign(
+    worker_threads: CrashInjectionWorkerThreads,
+) -> CrashInjectionCampaign {
+    CrashInjectionCampaign {
         first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
         seed_count: 12,
         operations_per_history: 20,
@@ -930,103 +1130,50 @@ fn crash_states_land_inside_rollbacks_and_floor_raises() {
         },
         weights: GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
         execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
-        worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
+        worker_threads,
         image_retention: FailureImageRetention::DeleteTheImageFilesWhenTheRunFinishes,
-    });
-    let rendered = report.render();
-    print_uncaptured(&format!(
-        "── 崩溃注入：偏向抬 F 之后回退的取样点 ──\n{rendered}"
-    ));
-    assert!(
-        report.new_findings.is_empty(),
-        "崩溃状态上「已知红」清单外的失败；{}\n{rendered}",
-        how_to_replay(&report)
-    );
-    assert!(
-        report.tally.crash_points >= 1,
-        "一个崩溃状态都没摆出来；{}",
-        how_to_replay(&report)
-    );
-    assert_eq!(
-        report.tally.recoveries_failed,
-        0,
-        "崩溃之后恢复失败过；{}",
-        how_to_replay(&report)
-    );
+        assertions: CrashInjectionAssertions::RollbackSampling,
+    }
+}
+
+/// 大档那条入口读环境：变量与判红时打的重放行同一张表（`crash_injection_campaign_from_environment`），没设的取大档的默认
+/// （种子基起 500 段、每段 40 步、每段 8 个崩溃状态、各类操作都抽、不跑每一步的 checker、两块 4 GiB 的盘、判空间准入、只判清单外的失败），
+/// 线程数从 `SINGLEFS_CRASH_INJECTION_THREADS` 取，判红的崩溃镜像留着。入口与「重放行喂回入口」那两条自证都经这一个函数。
+fn large_tier_campaign_from(lookup: &dyn Fn(&str) -> Option<String>) -> CrashInjectionCampaign {
+    crash_injection_campaign_from_environment(
+        lookup,
+        &CrashInjectionCampaign {
+            first_seed: SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+            seed_count: 500,
+            operations_per_history: 40,
+            draw: CrashPointDraw::Sampled {
+                crash_points_per_history: 8,
+            },
+            weights: GenerationWeights::BROAD,
+            execution: UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
+            image_retention: FailureImageRetention::KeepTheImageFiles,
+            assertions: CrashInjectionAssertions::NewFindingsOnly,
+        },
+    )
 }
 
 /// 大档／探索档：种子数、每段步数、每段几个崩溃状态、比重与盘宽从环境变量取；种子基没给就用这个测试周期写死的那一个。
 /// 探索档要跑别的一批历史时，把种子基显式给出来（给了什么就跑什么，报告第一行照打）。
 /// 判红的崩溃镜像留在临时目录里、路径打进报告（探索档要能回头看现场）。release 下后台跑。
+// crash-case-check:not-a-crash-case 照重放行复现一批崩溃注入的入口，规模全由环境变量给、没有固定的全量域；它调的两个辅助函数只对计数断言、不造崩溃状态
 #[test]
-#[ignore = "大档：SINGLEFS_CRASH_INJECTION_SEEDS 段、每段 SINGLEFS_CRASH_INJECTION_OPERATIONS 步、每段 SINGLEFS_CRASH_INJECTION_POINTS 个崩溃状态，种子基 SINGLEFS_CRASH_INJECTION_FIRST_SEED（没给就用这个测试周期写死的那一个），线程数 SINGLEFS_CRASH_INJECTION_THREADS，比重 SINGLEFS_CRASH_INJECTION_WEIGHTS，盘宽 SINGLEFS_CRASH_INJECTION_DEVICES"]
+#[ignore = "大档：照判红时打的重放行设环境变量；SINGLEFS_CRASH_INJECTION_FIRST_SEED 起 SINGLEFS_CRASH_INJECTION_SEEDS 段、每段 SINGLEFS_CRASH_INJECTION_OPERATIONS 步、每段 SINGLEFS_CRASH_INJECTION_POINTS 个崩溃状态（SINGLEFS_CRASH_INJECTION_SHORT_SEGMENT_WRITES 给数时是写数不超过它的段整段枚举、长段各抽这么多个，none 是只抽样），比重 SINGLEFS_CRASH_INJECTION_WEIGHTS，checker SINGLEFS_CRASH_INJECTION_CHECKER，盘宽 SINGLEFS_CRASH_INJECTION_DEVICES，空间准入 SINGLEFS_CRASH_INJECTION_SPACE_ADMISSION，照哪一组断言判 SINGLEFS_CRASH_INJECTION_ASSERTIONS（new-findings、small-fast-tier、fast-tier、rollback-sampling），线程数 SINGLEFS_CRASH_INJECTION_THREADS；没设的取大档默认（种子基、500 段、40 步、8 个、只判清单外的失败）"]
 fn crash_injection_large_tier_from_the_environment() {
-    let first_seed = std::env::var("SINGLEFS_CRASH_INJECTION_FIRST_SEED").map_or_else(
-        |_not_given| SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
-        |text| {
-            text.parse()
-                .unwrap_or_else(|error| panic!("种子基 {text} 不是一个非负整数：{error}"))
-        },
-    );
-    let seed_count = number_from_environment("SINGLEFS_CRASH_INJECTION_SEEDS", 500);
-    let operations_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_CRASH_INJECTION_OPERATIONS",
-        40,
-    ))
-    .expect("步数装得进 usize");
-    let crash_points_per_history = usize::try_from(number_from_environment(
-        "SINGLEFS_CRASH_INJECTION_POINTS",
-        8,
-    ))
-    .expect("崩溃状态数装得进 usize");
-    let weights = match std::env::var("SINGLEFS_CRASH_INJECTION_WEIGHTS").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("broad") => GenerationWeights::BROAD,
-        Ok("reuse") => GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
-        Ok("rollback") => GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
-        Ok("wall") => GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
-        Ok("unit-area-wall") => GenerationWeights::TOWARD_THE_UNIT_AREA_WALL,
-        Ok(other) => panic!(
-            "SINGLEFS_CRASH_INJECTION_WEIGHTS={other}：只认 broad、reuse、rollback、wall 与 unit-area-wall"
-        ),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_CRASH_INJECTION_WEIGHTS 不是 UTF-8：{raw:?}")
-        }
-    };
-    let device_width = match std::env::var("SINGLEFS_CRASH_INJECTION_DEVICES").as_deref() {
-        Err(std::env::VarError::NotPresent) | Ok("4gib") => HistoryDeviceWidth::FourGibibytes,
-        Ok("small") => HistoryDeviceWidth::UnitAreaOf384Slots,
-        Ok(other) => panic!("SINGLEFS_CRASH_INJECTION_DEVICES={other}：只认 4gib 与 small"),
-        Err(std::env::VarError::NotUnicode(raw)) => {
-            panic!("SINGLEFS_CRASH_INJECTION_DEVICES 不是 UTF-8：{raw:?}")
-        }
-    };
     let started = std::time::Instant::now();
-    let report = run_crash_injection_campaign(&CrashInjectionCampaign {
-        first_seed,
-        seed_count,
-        operations_per_history,
-        draw: CrashPointDraw::Sampled {
-            crash_points_per_history,
-        },
-        weights,
-        execution: HistoryExecution {
-            per_step_checker: PerStepChecker::Skipped,
-            device_width,
-            space_admission: SpaceAdmission::JudgedByTheFormula,
-        },
-        worker_threads: CrashInjectionWorkerThreads::from_the_environment(),
-        image_retention: FailureImageRetention::KeepTheImageFiles,
-    });
+    let report =
+        run_crash_injection_campaign(&large_tier_campaign_from(&process_environment_variable));
     let rendered = report.render();
     print_uncaptured(&format!(
         "── 崩溃注入大档 ──\n{rendered}用时 {:.1} 秒\n",
         started.elapsed().as_secs_f64()
     ));
-    assert!(
-        report.new_findings.is_empty(),
-        "崩溃状态上「已知红」清单外的失败；{}\n{rendered}",
-        how_to_replay(&report)
-    );
+    judge_crash_injection_report(&report);
 }
 
 /// 生成器那一路没被这一件碰过：同一个种子生成的历史与随机历史那一段逐项相同（摆崩溃状态的随机源与它岔开）。
@@ -1079,5 +1226,478 @@ fn drawing_crash_points_does_not_change_the_generated_history() {
         with_five.crash_points.len() <= 5 && !with_five.crash_points.is_empty(),
         "摆出来的崩溃状态要落在 1..=5：{}",
         with_five.crash_points.len()
+    );
+}
+
+/// 判红时对一批崩溃注入会打的两行重放命令（`CrashInjectionReport::render` 里新发现之后的「复现这一段：」与末尾的「重放这一整批：」；
+/// 造一个假发现，不必真红），原样喂回大档那条入口（`large_tier_campaign_from`，入口用的同一个函数）：
+/// 种子区间是那一段（种子数 1）或那一整批，崩溃状态怎么摆、每段步数、比重、跑法与原来那一批逐项相同，那一段生成的历史逐步相同；
+/// 「重放这一整批」照原来那一批的那一组断言判，「复现这一段」只判清单外的失败（一段的新发现与整批的结构计数无关）。
+/// 不跑崩溃状态：同一组参数下摆出来的崩溃状态由种子定（`crash_points_are_reproducible`），这里只核参数一项不漏地回来了。
+fn the_replay_lines_printed_for_a_finding_run_the_same_campaign_on_the_large_tier_entry(
+    campaign: &CrashInjectionCampaign,
+) {
+    let finding_seed = HistorySeed(campaign.first_seed + 5);
+    let report = CrashInjectionReport {
+        first_seed: campaign.first_seed,
+        seed_count: campaign.seed_count,
+        operations_per_history: campaign.operations_per_history,
+        draw: campaign.draw,
+        weights: campaign.weights,
+        execution: campaign.execution,
+        tally: CrashInjectionTally::default(),
+        known_red_hits: Vec::new(),
+        new_findings: vec![CrashPointFinding {
+            signature: FailureSignature::HarnessJudgement {
+                judgement: "自证用的假发现",
+            },
+            seed: finding_seed,
+            crash_point: CrashPoint {
+                segment_index: 3,
+                persisted_within_the_segment: vec![true, false],
+                step: StepPosition::Operation(2),
+                operation_kind: None,
+            },
+            stage: CrashStateStage::CrashImage,
+            observation: FailureObservation {
+                position: StepPosition::Operation(2),
+                operation_kind: None,
+                violations: Vec::new(),
+                panic: None,
+                newest_ring_root_txg: None,
+                root_ring_slot_count: None,
+                harness_judgement: None,
+                model_disagreement: None,
+                raised_floor_lands_only_on_abandoned_roots: None,
+                record_check: RecordCheck::default(),
+            },
+            read_back: "自证不读回".to_string(),
+            image_files: None,
+        }],
+        image_directory: None,
+        image_retention: campaign.image_retention,
+        assertions: campaign.assertions,
+    };
+    let rendered = report.render();
+    let replay_lines: Vec<&str> = rendered
+        .lines()
+        .filter(|line| line.contains("SINGLEFS_CRASH_INJECTION_FIRST_SEED="))
+        .collect();
+    assert_eq!(
+        replay_lines.len(),
+        2,
+        "判红的报告里有两行重放命令（那一段、那一整批）：\n{rendered}"
+    );
+    let replayed_parameters = |line: &str| {
+        let assignments = environment_assignments_in_line(line);
+        let replayed =
+            large_tier_campaign_from(&|variable: &str| assignments.get(variable).cloned());
+        (
+            replayed.first_seed,
+            replayed.seed_count,
+            replayed.operations_per_history,
+            replayed.draw,
+            replayed.weights,
+            replayed.execution,
+            replayed.assertions,
+        )
+    };
+    let original_batch = (
+        campaign.first_seed,
+        campaign.seed_count,
+        campaign.operations_per_history,
+        campaign.draw,
+        campaign.weights,
+        campaign.execution,
+        campaign.assertions,
+    );
+    let original_finding = (
+        finding_seed.0,
+        1,
+        campaign.operations_per_history,
+        campaign.draw,
+        campaign.weights,
+        campaign.execution,
+        CrashInjectionAssertions::NewFindingsOnly,
+    );
+    let replayed_finding = replayed_parameters(replay_lines[0]);
+    assert_eq!(
+        replayed_finding, original_finding,
+        "照「复现这一段」那一行跑大档，跑的不是原来那一段（种子、种子数、步数、摆法、比重、跑法、照哪一组断言判）：{}",
+        replay_lines[0]
+    );
+    assert_eq!(
+        replayed_parameters(replay_lines[1]),
+        original_batch,
+        "照「重放这一整批」那一行跑大档，跑的不是原来那一批、或不照原来那一组断言判：{}",
+        replay_lines[1]
+    );
+    assert_eq!(
+        generate_history_with_weights(
+            HistorySeed(replayed_finding.0),
+            replayed_finding.2,
+            &replayed_finding.4
+        ),
+        generate_history_with_weights(
+            finding_seed,
+            campaign.operations_per_history,
+            &campaign.weights
+        ),
+        "那一段生成的历史逐步相同"
+    );
+}
+
+#[test]
+fn replay_lines_of_the_small_fast_tier_run_the_same_campaign_on_the_large_tier_entry() {
+    the_replay_lines_printed_for_a_finding_run_the_same_campaign_on_the_large_tier_entry(
+        &small_fast_tier_campaign(CrashInjectionWorkerThreads::GivenByCaller(1)),
+    );
+}
+
+/// 照小快档的重放行跑的大档入口按小快档那一组断言判：一批二次崩溃一个都没摆出来的报告（造的计数，不跑崩溃状态；
+/// 攻方的改坏就是这一形：`draw_second_crash_points` 一个都不摆），判红在小快档那一条「挂载途中一个二次崩溃都没摆出来」上，
+/// 不是只判新发现而判绿（代码三方 test-script-align-code-r1 判决 S2）。
+#[test]
+#[should_panic(expected = "挂载途中一个二次崩溃都没摆出来")]
+fn a_small_fast_tier_replay_without_second_crashes_is_judged_red_by_the_small_fast_tier_assertions()
+{
+    let campaign = small_fast_tier_campaign(CrashInjectionWorkerThreads::GivenByCaller(1));
+    let every_crash_state = SMALL_FAST_TIER_SEEDS;
+    let tally = CrashInjectionTally {
+        crash_points: every_crash_state,
+        model_judgements: every_crash_state,
+        checker_runs: every_crash_state,
+        record_checks: every_crash_state,
+        writable_mounts_after_the_crash: every_crash_state,
+        checker_runs_after_the_writable_mount: every_crash_state,
+        record_checks_after_the_writable_mount: every_crash_state,
+        second_crash_points: 0,
+        // 计数袋没有不变量，其余计数从零起（与 `crash_injection.rs` 里汇总一段历史的计数同一种写法）。
+        ..CrashInjectionTally::default()
+    };
+    let replay_line = CrashInjectionReport {
+        first_seed: campaign.first_seed,
+        seed_count: campaign.seed_count,
+        operations_per_history: campaign.operations_per_history,
+        draw: campaign.draw,
+        weights: campaign.weights,
+        execution: campaign.execution,
+        tally: CrashInjectionTally::default(),
+        known_red_hits: Vec::new(),
+        new_findings: Vec::new(),
+        image_directory: None,
+        image_retention: campaign.image_retention,
+        assertions: campaign.assertions,
+    }
+    .replay_line();
+    let assignments = environment_assignments_in_line(&replay_line);
+    let replayed = large_tier_campaign_from(&|variable: &str| assignments.get(variable).cloned());
+    judge_crash_injection_report(&CrashInjectionReport {
+        first_seed: replayed.first_seed,
+        seed_count: replayed.seed_count,
+        operations_per_history: replayed.operations_per_history,
+        draw: replayed.draw,
+        weights: replayed.weights,
+        execution: replayed.execution,
+        tally,
+        known_red_hits: Vec::new(),
+        new_findings: Vec::new(),
+        image_directory: None,
+        image_retention: replayed.image_retention,
+        assertions: replayed.assertions,
+    });
+}
+
+#[test]
+fn replay_lines_of_the_fast_tier_run_the_same_campaign_on_the_large_tier_entry() {
+    the_replay_lines_printed_for_a_finding_run_the_same_campaign_on_the_large_tier_entry(
+        &fast_tier_campaign(CrashInjectionWorkerThreads::GivenByCaller(1)),
+    );
+}
+
+#[test]
+fn replay_lines_of_the_rollback_sampling_run_the_same_campaign_on_the_large_tier_entry() {
+    the_replay_lines_printed_for_a_finding_run_the_same_campaign_on_the_large_tier_entry(
+        &rollback_sampling_campaign(CrashInjectionWorkerThreads::GivenByCaller(1)),
+    );
+}
+
+/// 记录核对器两条判据的靶向用例（代码三方 m2-supp3-item3-code-r2 判决第四节第 1 题，用户 2026-09-28 选「靶向用例 + 变异行」；
+/// 攻方报告第四节改法甲、丙）用的那段历史：起点发完第一个文件 (1, 3)，再覆盖写两次 (1, 4)、(1, 5)。
+/// 两块 4 GiB 的盘上这段历史的录制流切成 24 段（2026-10-03 在 harness 侧现量的）：第 12 段起是 (1, 3) 的单元写
+/// （段内第 0、1 个是它的数据单元在两块盘上的两份），第 21 段是 (1, 5) 的两份 journal 记录，第 22 段是 (1, 5) 的根槽写；
+/// 从第 12 段的第一个写数到 (1, 4) 的根槽写共 56 个写。两条用例都先核这几处，段形变了先在那里红，不悄悄判别的状态。
+fn history_of_a_first_file_and_two_overwrites() -> GeneratedHistory {
+    GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: vec![overwrite_choosing(5), overwrite_choosing(7)],
+    }
+}
+
+/// 一次覆盖写：内容落在一个数据单元里，长度与字节都随 `selector` 变（每一次都换下上一版的数据单元）。
+fn overwrite_choosing(selector: u64) -> HistoryOperation {
+    HistoryOperation::PublishOverwrite(ContentChoice {
+        length: ContentLength::InsideOneDataUnit { selector },
+        fill_seed: selector,
+    })
+}
+
+/// 这段历史在崩溃注入那一种执行下的写表与切段（与 `inject_crashes_into_history` 自己切的同一份：同一条执行、同一份几何）。
+fn writes_and_segments_of(history: &GeneratedHistory) -> (Vec<RetainedWrite>, Vec<Vec<usize>>) {
+    let execution = UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+    let stream = SharedStream::retaining_contents();
+    let run = execute_history_with(history, execution, &stream, &mut |_| {});
+    assert_eq!(run.ending, HistoryEnding::Completed, "这段历史跑完");
+    writes_and_segments(
+        &stream.retained_operations(),
+        &execution.device_width.fixed_geometry(),
+    )
+}
+
+/// 崩溃镜像那一截（只读恢复、模型、池级 checker、记录核对器）判红记下的那一条新发现；没有时 panic，带上全部新发现。
+fn finding_on_the_crash_image(injection: &HistoryCrashInjection) -> &CrashPointFinding {
+    injection
+        .new_findings
+        .iter()
+        .find(|finding| finding.stage == CrashStateStage::CrashImage)
+        .unwrap_or_else(|| panic!("崩溃镜像那一截没有判红：{:#?}", injection.new_findings))
+}
+
+/// 记录核对器第一条判据（根在而那次发布的记录一条都不在）接进崩溃注入之后真的判得出东西（K3-④）：
+/// 第 21 段起数 3 个写（(1, 5) 的两份 journal 记录与它的根槽写），两份记录扣下、根槽写持久——越过了记录与根之间那道屏障，
+/// 屏障守住时摆不出来。恢复落到 (1, 5)、读回它的内容，模型认、池级 checker 不红（2026-10-03 在 harness 侧照同一个持久集合现量的），
+/// 这个崩溃状态只有记录核对器判得出。把崩溃镜像那一截通过条件里的 `record_check == RecordCheck::default()` 丢掉、
+/// 计数照记（攻方变异 A，`crates/mutations.tsv`），这一截就没有新发现，这一条红。
+#[test]
+fn a_crash_state_with_the_root_but_neither_of_its_records_is_a_finding_of_the_record_checker_alone()
+{
+    let history = history_of_a_first_file_and_two_overwrites();
+    let (writes, segments) = writes_and_segments_of(&history);
+    let first_write = segments[21][0];
+    assert_eq!(
+        writes[first_write..first_write + 3]
+            .iter()
+            .map(|write| write.kind)
+            .collect::<Vec<_>>(),
+        vec![
+            StepKind::JournalRecord,
+            StepKind::JournalRecord,
+            StepKind::RootRecordFua
+        ],
+        "第 21 段起的 3 个写是一次发布的两份 journal 记录与它的根槽写"
+    );
+    assert_eq!(
+        root_identity_of_a_root_slot_write(&writes[first_write + 2]),
+        Some((InstanceGeneration(1), CheckpointTxg(5))),
+        "那个根槽写是第二次覆盖写 (1, 5) 的"
+    );
+
+    let injection = inject_crashes_into_history(
+        &history,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        CrashPointDraw::ExactlyOneCrashState {
+            segment_index: 21,
+            writes_from_the_segment_on: 3,
+            withheld_among_them: &[0, 1],
+        },
+        None,
+    );
+    print_uncaptured(&format!(
+        "── 崩溃注入：记录核对器第一条判据的靶向崩溃状态 ──\n{}",
+        injection.tally.render()
+    ));
+    assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
+    assert_eq!(
+        injection.tally.record_root_without_record, 1,
+        "记录核对器在这个崩溃状态上判出「根在而它那次发布的记录一条都不在」"
+    );
+    let finding = finding_on_the_crash_image(&injection);
+    assert_eq!(
+        finding.signature,
+        FailureSignature::RecordCheck {
+            aspects: vec!["root_without_record"]
+        },
+        "崩溃镜像那一截的新发现记在记录核对器头上：{finding:#?}"
+    );
+    assert!(
+        finding.observation.violations.is_empty()
+            && finding.observation.model_disagreement.is_none(),
+        "池级 checker、RefFS 与模型都不红，这一条新发现只来自记录核对器：{finding:#?}"
+    );
+}
+
+/// 记录核对器第二条判据（恢复自称的那一版不早于某次发布、而那次发布写出的某个单元两份都不在）接进崩溃注入之后真的判得出东西（K3-⑨）：
+/// 第 12 段起数 56 个写（(1, 3) 的单元写起、到 (1, 4) 的根槽写为止），扣下 (1, 3) 的数据单元两份、别的都持久——
+/// 越过了 (1, 3) 自己单元与记录之间、记录与根之间两道屏障。恢复落到 (1, 4)（它的根槽写持久了），读回它的内容，模型认。
+/// (1, 3) 的数据单元已被 (1, 4) 换下、还没被复用，盘上那两处一直是空的，记录核对器判「恢复自称新态而单元缺席」。
+/// 照常点名验证的恢复下，只扣单元不越过根的状态落回上一版，这一条判据判不到（K3-⑨ 调查），所以这里让根也持久。
+/// 池级 checker 也红（根环里还留着 (1, 3) 的根，从它出发的遍历读不到那个数据单元），签名照「记录核对器先于 checker」取记录核对器；
+/// 只有记录核对器红的那一个状态是下一条用例。
+/// 把崩溃镜像那一截交给记录核对器的「恢复落到的那一版」换成 None（`crates/mutations.tsv`），第二条判据的前置不成立，这一条红。
+#[test]
+fn a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_finding_of_the_record_checker(
+) {
+    let history = history_of_a_first_file_and_two_overwrites();
+    let (writes, segments) = writes_and_segments_of(&history);
+    let first_write = segments[12][0];
+    let withheld_copies = &writes[first_write..first_write + 2];
+    assert!(
+        withheld_copies
+            .iter()
+            .all(|write| write.kind == StepKind::UnitWrite
+                && write.length_in_bytes() == DATA_UNIT_BYTES
+                && write.offset == withheld_copies[0].offset)
+            && withheld_copies[0].device != withheld_copies[1].device,
+        "第 12 段的头两个写是同一个数据单元在两块盘上的两份：{withheld_copies:?}"
+    );
+    assert_eq!(
+        writes[first_write + 2..first_write + 56]
+            .iter()
+            .filter_map(root_identity_of_a_root_slot_write)
+            .collect::<Vec<_>>(),
+        vec![
+            (InstanceGeneration(1), CheckpointTxg(3)),
+            (InstanceGeneration(1), CheckpointTxg(4))
+        ],
+        "从第 12 段起数的 56 个写里有 (1, 3) 与 (1, 4) 的根槽写，最后一个是 (1, 4) 的"
+    );
+    assert_eq!(
+        root_identity_of_a_root_slot_write(&writes[first_write + 55]),
+        Some((InstanceGeneration(1), CheckpointTxg(4))),
+        "从第 12 段起数的第 56 个写是 (1, 4) 的根槽写"
+    );
+
+    let injection = inject_crashes_into_history(
+        &history,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        CrashPointDraw::ExactlyOneCrashState {
+            segment_index: 12,
+            writes_from_the_segment_on: 56,
+            withheld_among_them: &[0, 1],
+        },
+        None,
+    );
+    print_uncaptured(&format!(
+        "── 崩溃注入：记录核对器第二条判据的靶向崩溃状态 ──\n{}",
+        injection.tally.render()
+    ));
+    assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
+    assert_eq!(
+        injection.tally.record_claimed_state_missing_unit, 1,
+        "记录核对器在这个崩溃状态上判出「恢复自称新态而单元缺席」"
+    );
+    let finding = finding_on_the_crash_image(&injection);
+    assert_eq!(
+        finding.signature,
+        FailureSignature::RecordCheck {
+            aspects: vec!["claimed_state_missing_unit"]
+        },
+        "崩溃镜像那一截的新发现记在记录核对器第二条判据头上：{finding:#?}"
+    );
+    assert!(
+        finding.observation.model_disagreement.is_none(),
+        "恢复落到 (1, 4) 并读回它的内容，模型认：{finding:#?}"
+    );
+}
+
+/// 第一个文件之后接着覆盖写的次数：根环三个区域各 8 槽，第 24 次覆盖写 (1, 27) 的根槽写盖掉 (1, 3) 的那一槽。
+const OVERWRITES_THAT_TURN_THE_ROOT_RING_PAST_THE_FIRST_FILE: u64 = 24;
+
+/// 第一个文件 (1, 3) 之后覆盖写 24 次：根环转过一圈，(1, 3) 的根槽已被 (1, 27) 盖掉。
+fn history_of_a_first_file_and_overwrites_that_turn_the_root_ring() -> GeneratedHistory {
+    GeneratedHistory {
+        seed: HistorySeed(0),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations: (0..OVERWRITES_THAT_TURN_THE_ROOT_RING_PAST_THE_FIRST_FILE)
+            .map(|overwrite_index| overwrite_choosing(5 + 2 * overwrite_index))
+            .collect(),
+    }
+}
+
+/// 记录核对器第二条判据只有它自己判得出的那一个状态（第二批报告 `research/prompts/m2-rest-batch2/report.md`「停下交主 agent 的设计问题」
+/// 第 2 条说找不到：缺单元的发布只要它的根还在环里，从那条根出发的 checker 遍历就会红）。根环转过一圈之后 (1, 3) 的根不在环里了：
+/// 第 12 段起到流尾的每一个写都持久，只扣下第 12 段段内第 4、5 个写——(1, 3) 那一片 inode 树叶容器在两块盘上的两份（它已被 (1, 4)
+/// 换下，之后没有一个写落在那两处）。恢复落到 (1, 27)、读回它的内容，模型认，池级 checker 不红（2026-10-03 在 harness 侧照同一个持久集合现量：
+/// 覆盖写 16 次时 (1, 3) 的根还在环里，checker 红 I-2.1、I-4.8、I-7.4；24 次时不红）；记录核对器判 (1, 3) 那个单元两份都缺席。
+/// RefFS 的崩溃时刻取持久窗口最后一个写所在那一段（流尾那一次覆盖写），读回最后一版的内容合它。
+/// 把崩溃镜像那一截通过条件里的 `record_check == RecordCheck::default()` 丢掉（攻方变异 A，`crates/mutations.tsv`），这一截就没有新发现，这一条红。
+#[test]
+fn a_crash_state_missing_a_unit_of_a_publish_whose_root_left_the_ring_is_a_finding_of_the_record_checker_alone(
+) {
+    let history = history_of_a_first_file_and_overwrites_that_turn_the_root_ring();
+    let (writes, segments) = writes_and_segments_of(&history);
+    let first_write = segments[12][0];
+    let withheld_copies = [&writes[first_write + 4], &writes[first_write + 5]];
+    assert!(
+        withheld_copies
+            .iter()
+            .all(|write| write.kind == StepKind::UnitWrite
+                && write.offset == withheld_copies[0].offset)
+            && withheld_copies[0].device != withheld_copies[1].device,
+        "第 12 段段内第 4、5 个写是同一个单元在两块盘上的两份：{withheld_copies:?}"
+    );
+    let first_file_root = writes
+        .iter()
+        .position(|write| {
+            root_identity_of_a_root_slot_write(write)
+                == Some((InstanceGeneration(1), CheckpointTxg(3)))
+        })
+        .expect("流里有第一个文件 (1, 3) 的根槽写");
+    assert!(
+        first_write + 5 < first_file_root,
+        "扣下的两份是 (1, 3) 那次发布的单元写（在它的根槽写之前）"
+    );
+    assert!(
+        writes[first_file_root + 1..].iter().any(|write| {
+            write.kind == StepKind::RootRecordFua
+                && write.device == writes[first_file_root].device
+                && write.offset == writes[first_file_root].offset
+        }),
+        "(1, 3) 的根槽之后被别的根盖掉了：根环转过一圈"
+    );
+    assert!(
+        writes[first_write + 6..].iter().all(|later| withheld_copies
+            .iter()
+            .all(|withheld| later.device != withheld.device || later.offset != withheld.offset)),
+        "扣下的那两处之后没有一个写落上去：缺席没有更晚的写来解释"
+    );
+    let writes_from_the_segment_to_the_end = writes.len() - first_write;
+    assert_eq!(
+        writes_from_the_segment_to_the_end, 793,
+        "从第 12 段的第一个写数到流尾共 793 个写"
+    );
+
+    let injection = inject_crashes_into_history(
+        &history,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        CrashPointDraw::ExactlyOneCrashState {
+            segment_index: 12,
+            writes_from_the_segment_on: 793,
+            withheld_among_them: &[4, 5],
+        },
+        None,
+    );
+    print_uncaptured(&format!(
+        "── 崩溃注入：只有记录核对器判得出的第二条判据靶向崩溃状态 ──\n{}",
+        injection.tally.render()
+    ));
+    assert_eq!(injection.crash_points.len(), 1, "只摆写死的那一个崩溃状态");
+    assert_eq!(
+        injection.tally.record_claimed_state_missing_unit, 1,
+        "记录核对器在这个崩溃状态上判出「恢复自称新态而单元缺席」"
+    );
+    let finding = finding_on_the_crash_image(&injection);
+    assert_eq!(
+        finding.signature,
+        FailureSignature::RecordCheck {
+            aspects: vec!["claimed_state_missing_unit"]
+        },
+        "崩溃镜像那一截的新发现记在记录核对器第二条判据头上：{finding:#?}"
+    );
+    assert!(
+        finding.observation.violations.is_empty()
+            && finding.observation.model_disagreement.is_none(),
+        "池级 checker、RefFS 与模型都不红，这一条新发现只来自记录核对器：{finding:#?}"
     );
 }

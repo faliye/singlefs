@@ -33,7 +33,7 @@ pub const SHA256_DIGEST_BYTES: usize = 32;
 /// 违例表的键里块内序号占几个字节。
 const STATE_OFFSET_IN_BLOCK_BYTES: usize = std::mem::size_of::<u64>();
 
-/// 这一份判定是拿哪一份输入算出来的：门禁 54 号给每条崩溃枚举用例算的输入指纹（`research/scripts/admission.py`，SHA-256）。
+/// 这一份判定是拿哪一份输入算出来的：门禁 checker-tier-layer0-replay 给每条崩溃枚举用例算的输入指纹（`research/scripts/admission.py`，SHA-256）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct InputFingerprint(pub [u8; SHA256_DIGEST_BYTES]);
 
