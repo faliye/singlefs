@@ -1,0 +1,36 @@
+FUZZ seed=340 s=4 lives=3 states=14 reds=[] aborted="" log=start4 |m2@5C4/13 |m3@6O |m4@9FOOR10OEOOOR16C44/45
+FUZZ seed=341 s=4 lives=5 states=57 reds=[] aborted="" log=start13 |m2@14OR15OEOOOOR23R15OOOOOEOC13/81 |m3@17OOOOOOR14C32/41 |m4@25C5/9 |m5@26OOR25EOOEOFFU |m6@41OFOOOOOEOR49OOOOR46OOEU
+FUZZ seed=342 s=4 lives=2 states=2 reds=[] aborted="" log=start18 |m2@19C7/9 |m3@21C1/9
+FUZZ seed=343 s=4 lives=2 states=3 reds=[] aborted="" log=start18 |m2@19C3/9 |m3@20R16U
+FUZZ seed=344 s=4 lives=2 states=27 reds=[] aborted="" log=start13 |m2@14R15R12OFR19OOEFC10/63 |m3@16OR8R9OR18EOOOOR26FEER25OU
+FUZZ seed=345 s=4 lives=2 states=8 reds=[] aborted="" log=start8 |m2@9O |m3@12FOOOOC29/38
+FUZZ seed=346 s=4 lives=4 states=29 reds=[] aborted="" log=start15 |m2@16C0/9 |m3@16EOOOR15OOR23EFOOOEOER29U |m4@38OFOFOFFOC5/29 |m5@39C7/9
+FUZZ seed=347 s=4 lives=2 states=20 reds=[] aborted="" log=start14 |m2@15OOR12OOOEOOR18OER18EFOFOU |m3@39C0/9
+FUZZ seed=348 s=4 lives=5 states=54 reds=["I-7.9:5"] aborted="" log=start8 |m2@9Er2OOEEOOOOR14R15OF |m3@26R21R18OR29EOER31OOOFOER39R39OC70/86 |m4@43OOC4/17 |m5@44R43OER38R49R49R51OOFC47/62 |m6@56FOOOER64U
+FIRST seed=348 I-7.9 life4/step1/txg62: 实例 6 txg 59 那条根把回退下界 F 从 36 抬到 50，高于它之前的根算出的抬 F 上限 43：每块盘上最新的有效根 {0: 57, 1: 58}，非空有效根 [43, 51, 54, 56]，空不空判不了的有效根 []，最旧有效根 txg 43
+FUZZ seed=349 s=4 lives=5 states=44 reds=[] aborted="" log=start8 |m2@9C7/9 |m3@11OU |m4@17OFOR19R19O |m5@25OOOOOOR26OOOOOOR32R34OO |m6@44OR40EOR39R49FR53OEFOOOOC20/91
+FUZZ seed=350 s=4 lives=5 states=55 reds=["I-7.9:2"] aborted="" log=start7 |m2@8OOOOFOFR17OOOR21OFEO |m3@31C5/9 |m4@32OR33R29EER35OR36U |m5@45EOOOOFOOOC6/50 |m6@47OOR43R44FOOOFER54OFOR60OEC84/91
+FIRST seed=350 I-7.9 life4/step5/txg54: 实例 4 txg 43 那条带卸载记号的根把回退下界 F 从 22 抬到 42，高于根环里 txg 比它小的最新那条根的 txg 34
+FUZZ seed=351 s=4 lives=4 states=29 reds=[] aborted="" log=start14 |m2@15C3/9 |m3@16C9/9 |m4@18OOR17OR21EOR18EOR28OOOOEFOC81/86 |m5@38OOOEOFR42U
+FUZZ seed=352 s=4 lives=4 states=26 reds=["I-7.9:2"] aborted="" log=start12 |m2@13OFOOU |m3@23R22OC5/21 |m4@24OR20OFFOR27EOOR25R33R30OC22/57 |m5@30OOC4/17
+FIRST seed=352 I-7.9 life3/step0/txg32: 实例 2 txg 21 那条带卸载记号的根把回退下界 F 从 10 抬到 19，高于根环里 txg 比它小的最新那条根的 txg 17
+FUZZ seed=353 s=4 lives=5 states=26 reds=[] aborted="" log=start10 |m2@11OC12/17 |m3@14R11R7OOR16OOOOOOOF |m4@32FER29OOOR37 |m5@41C4/13 |m6@42C5/9
+FUZZ seed=354 s=4 lives=4 states=40 reds=[] aborted="" log=start6 |m2@7OOOEOOFR14OOOR15OR16U |m3@26OOEOFER25U |m4@38R37ER37OFOOR44OOOR39C9/57 |m5@40FOOU
+FUZZ seed=355 s=4 lives=2 states=21 reds=[] aborted="" log=start10 |m2@11EOOER7OOOOOFOOFOU |m3@33OR33FE
+FUZZ seed=356 s=4 lives=2 states=12 reds=[] aborted="" log=start15 |m2@16C9/9 |m3@18R9EOR19R22OEOFR23U
+FUZZ seed=357 s=4 lives=3 states=28 reds=["I-7.9:1"] aborted="" log=start15 |m2@16C2/9 |m3@17EOR18OFOR17EEOOOR23U |m4@36OOOOR33OFOR43R44FOU
+FIRST seed=357 I-7.9 life1/step5/txg26: 实例 3 txg 24 那条根把回退下界 F 从 0 抬到 14，高于它之前的根算出的抬 F 上限 4：每块盘上最新的有效根 {0: 23, 1: 22}，非空有效根 [4, 15, 21, 22, 23]，空不空判不了的有效根 []，最旧有效根 txg 4
+FUZZ seed=358 s=4 lives=5 states=71 reds=[] aborted="" log=start10 |m2@11OR10OR10OOR16R12R15OFU |m3@29OEEFC16/25 |m4@33EOOOOOFOEOOR41OFR46R50EOC11/99 |m5@36FOOOOR33OEOOOR43EOOR43OU |m6@59OR59ER57OOOOR65OR69OR65ER71OC40/77
+FUZZ seed=359 s=4 lives=2 states=14 reds=[] aborted="" log=start17 |m2@18OOEOR15OR14R25OR17U |m3@32EFC7/17
+FUZZ seed=360 s=4 lives=4 states=42 reds=[] aborted="" log=start14 |m2@15FFOOOR11R20OER16OC37/58 |m3@24C8/9 |m4@26OR19R24OR26OFOOFR40OOOR34FOU |m5@53OOOEOR50OOR56EC2/53
+FUZZ seed=361 s=4 lives=2 states=17 reds=[] aborted="" log=start18 |m2@19R17R15R21OOOOOOFOOER28EC0/74 |m3@19C0/9
+FUZZ seed=362 s=4 lives=2 states=6 reds=[] aborted="" log=start18 |m2@19C8/9 |m3@21R18OOOU
+FUZZ seed=363 s=4 lives=3 states=26 reds=[] aborted="" log=start9 |m2@10EU |m3@15R13ER14OC1/25 |m4@15FOOOFOOR20OOR15EOOR26OR29R21U
+FUZZ seed=364 s=4 lives=3 states=35 reds=[] aborted="" log=start4 |m2@5r0r2EOOOR7FOOER9OOOC5/70 |m3@6EOOOOr2R11FOOR13R12OC0/66 |m3@6OEFOC11/21
+FUZZ seed=365 s=4 lives=3 states=36 reds=[] aborted="" log=start7 |m2@8R7ER9EOOFR11OEOEEOOOU |m3@32OOOR28R35R36R36R33OR40EC57/57 |m4@46OR45ER39FR51C8/38
+FUZZ seed=366 s=4 lives=2 states=9 reds=[] aborted="" log=start1 |m2@4FER3OOU |m3@12OR12U
+FUZZ seed=367 s=4 lives=2 states=30 reds=[] aborted="" log=start13 |m2@14OEFFOOFOEFOR28OOC17/84 |m3@18OEOOFOEOR23R28OOOOC36/70
+FUZZ seed=368 s=4 lives=2 states=20 reds=[] aborted="" log=start8 |m2@9OOOFR15OOE |m3@21OOOFER22R25R25FEC52/63
+FUZZ seed=369 s=4 lives=4 states=42 reds=["I-7.9:1"] aborted="" log=start12 |m2@13R8OOR6OEO |m3@22OEOER24OFOOEFOER33OU |m4@44OR42OOOOR49R51OR46OR48OC31/65 |m5@52R45R43OC20/21
+FIRST seed=369 I-7.9 life3/step0/txg54: 实例 3 txg 43 那条带卸载记号的根把回退下界 F 从 28 抬到 41，高于根环里 txg 比它小的最新那条根的 txg 39
+rc=0

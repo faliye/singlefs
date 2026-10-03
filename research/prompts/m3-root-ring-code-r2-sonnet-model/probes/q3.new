@@ -1,0 +1,2 @@
+    allocator.record_root_written_by_this_process(txg);
+    // 这一次发布的提交内生块（实例表链的各片、分配记录树的节点）都归树 0

@@ -1,0 +1,4 @@
+        RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+            RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+        }
+    }

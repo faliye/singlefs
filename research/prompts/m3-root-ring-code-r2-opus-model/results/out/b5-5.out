@@ -1,0 +1,46 @@
+FUZZ seed=5100 s=4 lives=5 states=22 i35_holds_na_red_holestates_holeholds=[22, 0, 0, 0, 0] reds=[] aborted="" log=start3 |m2@4C0/9 |m3@4 |m4@6FR5C9/13 |m5@8FOFOR11R4R4R10OOOOEC29/57 |m6@15R8FU
+FUZZ seed=5101 s=4 lives=2 states=18 i35_holds_na_red_holestates_holeholds=[18, 0, 0, 0, 0] reds=[] aborted="" log=start16 |m2@17R14OR10R15OR16C24/37 |m3@23R20OFOR26OR26R23ER31U
+FUZZ seed=5102 s=4 lives=4 states=36 i35_holds_na_red_holestates_holeholds=[36, 0, 0, 0, 0] reds=[] aborted="" log=start7 |m2@8R3OR3U |m3@17R18R16EOFER18OR25R25OFO |m4@33R28OR31R26ER37OOOR41R37R38R45OR42OC48/73 |m5@45C4/9
+FUZZ seed=5103 s=4 lives=5 states=41 i35_holds_na_red_holestates_holeholds=[41, 0, 0, 0, 0] reds=[] aborted="" log=start10 |m2@11C1/13 |m3@11EOR11FOR10R11OOR20FOR21OOOR27FC65/112 |m4@27 |m5@29OOR22OR24R35OOR33OR30R35OU |m6@47R45R44OR50R50
+REFUSED seed=5104 life=0 target=(1,1) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=5104 life=0 target=(0,0) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+FUZZ seed=5104 s=4 lives=4 states=30 i35_holds_na_red_holestates_holeholds=[30, 0, 0, 5, 5] reds=[] aborted="" log=start1 |m2@4r1r0R4OOR7FEC23/29 |m3@10C3/9 |m4@11R7R7OR10R14U |m5@21R18EOR19FR20EOR18EEOOU
+REFUSED seed=5105 life=0 target=(0,0) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+REFUSED seed=5105 life=0 target=(1,2) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=5105 life=0 target=(1,1) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=5105 life=0 target=(0,0) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+REFUSED seed=5105 life=0 target=(1,1) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=5105 s=4 lives=5 states=39 i35_holds_na_red_holestates_holeholds=[39, 0, 0, 7, 7] reds=[] aborted="" log=start1 |m2@4r0Fr2Fr1r0r1OEEOOC2/29 |m3@5R3OR3R9R5ER9U |m4@17C8/13 |m5@19OOFOEOR16R17R26FR24OR30OEC14/74 |m6@23C4/13
+REFUSED seed=5106 life=0 target=(1,2) current=6 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=5106 life=0 target=(1,1) current=8 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=5106 life=0 target=(1,2) current=8 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=5106 life=0 target=(1,1) current=11 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=5106 life=1 target=(1,1) current=8 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=5106 s=4 lives=4 states=34 i35_holds_na_red_holestates_holeholds=[34, 0, 0, 0, 0] reds=[] aborted="" log=start3 |m2@4Or2EFR3r1Fr2R6R6Or1EOC4/41 |m3@5Or1ER5R6OEOU |m4@17U |m5@23FOOR26OOOFC7/50
+FUZZ seed=5107 s=4 lives=5 states=49 i35_holds_na_red_holestates_holeholds=[49, 0, 0, 0, 0] reds=[] aborted="" log=start15 |m2@16R16OR17OR19R14R21OOO |m3@28R26R28R20 |m4@33OR29R29OOOOR40U |m5@45OR45R46R44OR48R51R52FFFOOOOOOR66C44/100 |m6@56FEOR58OC23/42
+FUZZ seed=5108 s=4 lives=3 states=41 i35_holds_na_red_holestates_holeholds=[41, 0, 0, 0, 0] reds=[] aborted="" log=start11 |m2@12R7FEFEOR13R19R19R16OFOR22EOU |m3@33R32OR35FR33R33FR35R31ER40R37OR42 |m4@47FOER50R46R54OEC24/54
+FUZZ seed=5109 s=4 lives=4 states=21 i35_holds_na_red_holestates_holeholds=[21, 0, 0, 6, 6] reds=["I-7.9:5"] aborted="" log=start12 |m2@13C6/9 |m3@15FEER10OR15R18R22R21OOFU |m4@35OR35R38OC16/29 |m5@39OC1/13
+FIRST seed=5109 I-7.9 life1/step2/txg21: 实例 3 txg 17 那条根把回退下界 F 从 0 抬到 9，高于它之前的根算出的抬 F 上限 2：每块盘上最新的有效根 {0: 15, 1: 16}，非空有效根 [10, 11, 12]，空不空判不了的有效根 []，最旧有效根 txg 2
+FUZZ seed=5110 s=4 lives=2 states=18 i35_holds_na_red_holestates_holeholds=[18, 0, 0, 5, 5] reds=[] aborted="" log=start16 |m2@17FR21EOFOR26OEOOOC48/79 |m3@29OOR23OC22/29
+FUZZ seed=5111 s=4 lives=5 states=17 i35_holds_na_red_holestates_holeholds=[17, 0, 0, 0, 0] reds=[] aborted="" log=start7 |m2@8R5R4ER3R11EU |m3@20C4/13 |m4@21C5/9 |m5@22C4/9 |m6@23R18OOOOOC6/37
+OUTSIDE_TARGET seed=5112 life=3 target=(3,31) current=47
+REFUSED seed=5112 life=3 target=(3,31) current=47 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(3), checkpoint_txg: CheckpointTxg(31) }, exclusion: OutsideTheOneRevolutionWindow }
+FUZZ seed=5112 s=4 lives=4 states=31 i35_holds_na_red_holestates_holeholds=[31, 0, 0, 5, 5] reds=[] aborted="" log=start16 |m2@17C11/13 |m3@20OOFFR18OOR23R26U |m4@35R33FFR33OR35FFER34FR43EOC34/62 |m5@44R37r31OR38C22/25
+REFUSED seed=5113 life=0 target=(1,2) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=5113 life=0 target=(1,2) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+FUZZ seed=5113 s=4 lives=4 states=55 i35_holds_na_red_holestates_holeholds=[55, 0, 0, 0, 0] reds=[] aborted="" log=start1 |m2@4r2EOr2R4OFC9/25 |m3@6R4R3FOR6OFEOOR11OEFOEFOC66/92 |m4@22ER23OR18OOFFR28R31ER27OR29C33/66 |m5@30R26OOEOFOOR32OR38OC52/62
+REFUSED seed=5114 life=1 target=(1,1) current=9 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=5114 life=1 target=(1,1) current=9 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=5114 s=4 lives=5 states=30 i35_holds_na_red_holestates_holeholds=[30, 0, 0, 8, 8] reds=[] aborted="" log=start2 |m2@4C3/9 |m3@5ER7r1r1OOOFR13R13R5U |m4@20R19OEEEEU |m5@32OR30OOR34 |m6@40OOR38U
+FUZZ seed=5115 s=4 lives=4 states=33 i35_holds_na_red_holestates_holeholds=[33, 0, 0, 0, 0] reds=[] aborted="" log=start11 |m2@12R12 |m3@15C8/9 |m4@17OR16R14EOR13R22R18OR24OR24R25OC63/69 |m5@33EER30R32EOR30OFR41R39OOR39U
+FUZZ seed=5116 s=4 lives=2 states=9 i35_holds_na_red_holestates_holeholds=[9, 0, 0, 0, 0] reds=[] aborted="" log=start2 |m2@4 |m3@6R5R6ER7OR10R11C13/37
+FUZZ seed=5117 s=4 lives=2 states=9 i35_holds_na_red_holestates_holeholds=[9, 0, 0, 0, 0] reds=[] aborted="" log=start7 |m2@8OR9ER11EOOC0/41 |m3@8C4/13
+FUZZ seed=5118 s=4 lives=3 states=30 i35_holds_na_red_holestates_holeholds=[30, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13OR14R5OFFR19ER17R17R20R19OC23/62 |m3@19R17OOR21R13FR27OOR25R27R26OO |m4@37C5/9
+FUZZ seed=5119 s=4 lives=2 states=16 i35_holds_na_red_holestates_holeholds=[16, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13R12R9R7R16OR11OR12OEOOC18/57 |m3@17OOU
+FUZZ seed=5120 s=4 lives=5 states=23 i35_holds_na_red_holestates_holeholds=[23, 0, 0, 0, 0] reds=[] aborted="" log=start17 |m2@18C6/9 |m3@19OOOR20ER18R18R16R24OOOOR29OOU |m4@39OR40C10/17 |m5@41C2/13 |m6@42C2/9
+FUZZ seed=5121 s=4 lives=4 states=35 i35_holds_na_red_holestates_holeholds=[35, 0, 0, 0, 0] reds=[] aborted="" log=start11 |m2@12OR9OR14OR8ER18O |m3@23EEOR19R23R29OOC24/45 |m4@29C4/13 |m5@30R28R29FR25R33R35R33R37R30R39R33FOR39C54/79
+REFUSED seed=5122 life=0 target=(1,1) current=12 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=5122 s=4 lives=2 states=19 i35_holds_na_red_holestates_holeholds=[19, 0, 0, 0, 0] reds=[] aborted="" log=start9 |m2@10R5r1FOR13ER16R13OOR14R13R16C34/62 |m3@18R14R10R10O
+FUZZ seed=5123 s=4 lives=5 states=43 i35_holds_na_red_holestates_holeholds=[43, 0, 0, 0, 0] reds=[] aborted="" log=start15 |m2@16OFR13R15R18R13R22R14OOR22OR24FR32 |m3@36R36FR29C8/17 |m4@38R38R33OR35C11/29 |m5@41R38OOFOR47OR50FFER45OFR54U |m6@65EC1/17
+FUZZ seed=5124 s=4 lives=4 states=24 i35_holds_na_red_holestates_holeholds=[24, 0, 0, 2, 2] reds=[] aborted="" log=start11 |m2@12C5/9 |m3@13R3R4FOR10R11OR21OOEOOF |m4@32OR27OR35C22/29 |m5@38R39R38U
+rc=0

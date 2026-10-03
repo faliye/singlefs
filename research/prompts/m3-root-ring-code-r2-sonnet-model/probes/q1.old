@@ -1,0 +1,7 @@
+            record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(
+                &*pool.devices,
+                pool.parameters,
+                allocator,
+                published.root.checkpoint_txg,
+            );
+            Ok(PoolVersion::WithoutFile(published))

@@ -1,0 +1,5 @@
+ARM control template=(dev 0, slot 50178, class 2, tree 0) fake_at_content_offset=16250 header_end=102 root=(1,3) watermark=65548
+CHECKER red=[]
+READ_ONLY_MOUNT ok=true
+REMOUNT ok instance=2 red_after=[]
+rc=0

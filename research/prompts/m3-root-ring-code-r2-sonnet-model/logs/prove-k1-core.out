@@ -1,0 +1,4 @@
+E2 单测：挂载时读不出的槽成了窗口里最小的那个也不重读	抓到	the_slot_unreadable_at_mount_rereading_as_a_root_outside_the_window_leaves_the_window 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/001.log）
+E2 单测：窗口里还有更旧的有效根也重读挂载时读不出的槽	抓到	the_slot_unreadable_at_mount_is_not_reread_while_an_older_valid_root_is_in_the_window 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/002.log）
+E2 单测：重读仍读不出时不按它能住的最大 txg 算（取窗口里读得出的最旧有效根）	抓到	the_slot_unreadable_at_mount_still_unreadable_on_the_reread_counts_by_its_highest_txg 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/003.log）
+✓ 点名 3 条：跑了 3 条，跳过 0 条，跑的都抓到了

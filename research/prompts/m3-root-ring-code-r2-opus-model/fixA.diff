@@ -1,0 +1,21 @@
+--- /tmp/claude-1000/m3-root-ring-code-r2-opus/tree/crates/singlefs-core/src/mount.rs	2026-10-03 15:51:26.153350673 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 16:41:36.871991727 +0000
+@@ -1292,13 +1292,11 @@
+                 checkpoint_txg: root.checkpoint_txg,
+             }
+         }
+-        RootRingSlotReading::SelfVerified(_)
+-        | RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {
+-            RereadOfARootRingSlotUnreadableAtMount::NoValidRoot
+-        }
+-        RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => {
+-            RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+-        }
++        RootRingSlotReading::SelfVerified(_) => RereadOfARootRingSlotUnreadableAtMount::NoValidRoot,
++        // 攻方改法 A（零轮）：读得出而自证不过与仍读不出同一个处置，按记的最大 txg 算。
++        RootRingSlotReading::Bad(
++            BadRootRingSlotReading::NotSelfVerified | BadRootRingSlotReading::Unreadable,
++        ) => RereadOfARootRingSlotUnreadableAtMount::StillUnreadable,
+     }
+ }
+ 

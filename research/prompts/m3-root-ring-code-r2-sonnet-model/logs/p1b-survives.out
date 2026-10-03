@@ -1,0 +1,19 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 1160M 的 2 倍，照理由放行：复核变异行在冻结副本上编译要余量
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.97s
+     Running tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs (target/debug/deps/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window-8ea9accc97fe5292)
+
+running 2 tests
+test admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window ... ok
+test admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.63s
+
+     Running tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs (target/debug/deps/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window-035136d7909d5b63)
+
+running 1 test
+test a_root_ring_slot_unreadable_only_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window_and_the_allocated_statistic_holds ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 31.58s
+

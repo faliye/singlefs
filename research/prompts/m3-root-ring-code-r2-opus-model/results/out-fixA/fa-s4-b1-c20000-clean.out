@@ -1,0 +1,13 @@
+SETUP S=4 P=20 h=19 slot=(1,2) device=1 h_referenced_slots=28
+MOUNTED instance=2 current=22 hits=20 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro red=[]
+PUBLISHED txg=23 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=24 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=25 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=26 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=27 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=28 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=29 x_reads=2 x_in_table=RootRingSlot { region: 1, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(19) }, Ro
+PUBLISHED txg=30 x_reads=3 x_in_table=RootRingSlot { region: 1, slot: 2 }: ValidRootReadWhenTheSlotUnreadableAtMountWasReread { checkpoint_txg: CheckpointTxg(
+ANCHOR txg=30 hits=37 x_in_table=RootRingSlot { region: 1, slot: 2 }: ValidRootReadWhenTheSlotUnreadableAtMountWasReread { checkpoint_txg: CheckpointTxg( red=[]
+NEXT txg=31 unit_writes_over_h_refs=[] h_on_disk_at_crash=Some(19) crash_before_root_red=[]
+rc=0

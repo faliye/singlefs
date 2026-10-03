@@ -1,0 +1,4 @@
+test probe_marker_bits_core_set_vs_checker_prefix ... PROBE2 marker=1,tt-corrupt: core scan keys=[(1, 1), (1, 2), (1, 3)] prefix_applied=1 ; checker=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
+PROBE2 marker=2,tt-corrupt: core scan keys=[(1, 1), (1, 2)] prefix_applied=0 ; checker=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
+PROBE2 marker=0x80000000,tt-corrupt: core scan keys=[(1, 1), (1, 2)] prefix_applied=0 ; checker=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.08s

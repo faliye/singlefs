@@ -1,0 +1,11 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出的正推腿与攻方腿各跑各的
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/writable_mount_of_a_formatted_pool.rs (target/debug/deps/writable_mount_of_a_formatted_pool-d604020127c6ce48)
+
+running 1 test
+test a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold ... I35DBG versions=5 groups=5 pairs=4 pairs_skipped_incomplete=0 units_judged=6
+I35DBG versions=6 groups=6 pairs=5 pairs_skipped_incomplete=0 units_judged=18
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 5.10s
+

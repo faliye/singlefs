@@ -1,0 +1,1 @@
+        if !self.is_every_mac_and_nonce_byte_zero {

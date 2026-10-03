@@ -1,0 +1,5 @@
+python crc32c over the fed stream, 7-2 之后 (冻结副本): 4048568891  pinned 4048568891 equal: True  fed_bytes= 614128
+python crc32c over the fed stream, 三份补丁反向应用之后: 1733593715  改之前的钉值 1733593715 equal: True  fed_bytes= 614128
+old sectors 1172 new sectors 1172 differing sectors 10
+differing (device, sector, byte offset): [(0, 32768, '0x1000000'), (0, 32776, '0x1001000'), (0, 32784, '0x1002000'), (0, 32785, '0x1002200'), (0, 32786, '0x1002400'), (1, 32768, '0x1000000'), (1, 32776, '0x1001000'), (1, 32784, '0x1002000'), (1, 32785, '0x1002200'), (1, 32786, '0x1002400')]
+journal ring start = 1024 slots * 16384 = 0x1000000

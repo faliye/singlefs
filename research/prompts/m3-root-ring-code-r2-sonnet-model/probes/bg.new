@@ -1,0 +1,3 @@
+            if !previous_references_are_complete {
+                continue;
+            }

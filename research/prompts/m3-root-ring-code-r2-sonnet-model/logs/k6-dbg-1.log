@@ -1,0 +1,16 @@
+run-with-memory-cap: 这个会话已有 10 条日常的在跑，照理由并行：同一会话派出的正推腿与攻方腿各跑各的
+run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 37.2 GiB，这一条要 6.0 GiB（峰值表里没有这条，按它的上限 6G 算），总上限 40.1 GiB；账上在跑 12 条
+run-with-memory-cap: 排了 41 秒，起跑（singlefs-memory-cap-3543214-1989121425）
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.78s
+     Running tests/writable_mount_of_a_formatted_pool.rs (target/debug/deps/writable_mount_of_a_formatted_pool-d604020127c6ce48)
+
+running 1 test
+test writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold ... I35DBG versions=3 groups=1 pairs=0 pairs_skipped_incomplete=0 units_judged=0
+I35DBG versions=3 groups=3 pairs=2 pairs_skipped_incomplete=0 units_judged=0
+I35DBG versions=4 groups=4 pairs=3 pairs_skipped_incomplete=0 units_judged=12
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 2.79s
+

@@ -1,0 +1,42 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 624M 的 2 倍，照理由放行：复核变异行在冻结副本上编译要余量
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.49s
+     Running tests/pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader.rs (target/debug/deps/pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader-c92ed04b1c51eff3)
+
+running 7 tests
+test a_tree_table_entry_whose_root_pointer_carries_a_non_zero_mac_is_refused ... FAILED
+test an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_nonce_is_refused ... FAILED
+test an_extent_upper_leaf_entry_whose_inline_data_pointer_names_an_encryption_algorithm_is_refused ... ok
+test an_extent_leaf_record_whose_data_pointer_names_an_unregistered_compression_algorithm_is_refused ... ok
+test an_extent_internal_entry_whose_child_pointer_carries_a_compressed_length_without_compression_is_refused ... ok
+test an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_mac_is_refused_by_the_walk ... FAILED
+test an_instance_table_chain_pointer_naming_an_encryption_algorithm_is_refused_by_the_walk ... ok
+
+failures:
+
+---- a_tree_table_entry_whose_root_pointer_carries_a_non_zero_mac_is_refused stdout ----
+
+thread 'a_tree_table_entry_whose_root_pointer_carries_a_non_zero_mac_is_refused' (3755118) panicked at crates/singlefs-harness/tests/common_pointer_head_corruption/mod.rs:422:13:
+被改的那条指针在冷启动走读的路上，恢复却成功了
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_nonce_is_refused stdout ----
+
+thread 'an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_nonce_is_refused' (3755123) panicked at crates/singlefs-harness/tests/common_pointer_head_corruption/mod.rs:422:13:
+被改的那条指针在冷启动走读的路上，恢复却成功了
+
+---- an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_mac_is_refused_by_the_walk stdout ----
+
+thread 'an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_mac_is_refused_by_the_walk' (3755119) panicked at crates/singlefs-harness/tests/common_pointer_head_corruption/mod.rs:445:24:
+坏镜像被可写挂载收下了：实例 InstanceGeneration(2)
+
+
+failures:
+    a_tree_table_entry_whose_root_pointer_carries_a_non_zero_mac_is_refused
+    an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_mac_is_refused_by_the_walk
+    an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_nonce_is_refused
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.20s
+
+error: test failed, to rerun pass `-p singlefs-harness --test pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader`

@@ -1,0 +1,45 @@
+REFUSED seed=1225 life=0 target=(1,1) current=8 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=1225 s=4 lives=4 states=26 i35_holds_na_red_holestates_holeholds=[26, 0, 0, 7, 7] reds=[] aborted="" log=start6 |m2@7r1C2/9 |m3@7C6/9 |m4@9R3R9FR12R7R7OFR13R20R14R22R16OU |m5@29R29OR29FOOFU
+FUZZ seed=1226 s=4 lives=5 states=50 i35_holds_na_red_holestates_holeholds=[50, 0, 0, 0, 0] reds=[] aborted="" log=start13 |m2@14OOR7OU |m3@23OR21R24OOOOEER29R31FU |m4@41FR38OER40FU |m5@50R50ER52R52OR52OR54R49R58ER57R63EEOE |m6@70R67OOOFFU
+REFUSED seed=1227 life=0 target=(1,2) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+FUZZ seed=1227 s=4 lives=5 states=32 i35_holds_na_red_holestates_holeholds=[32, 0, 0, 3, 3] reds=["I-7.9:3"] aborted="" log=start1 |m2@4EOr2R5R6OOOR5R6R11 |m3@16OEOR11ER17OOOC38/45 |m4@26EFOU |m5@35OOR35EC8/29 |m6@37C6/9
+FIRST seed=1227 I-7.9 life2/step2/txg32: 实例 4 txg 30 那条根把回退下界 F 从 0 抬到 20，高于它之前的根算出的抬 F 上限 13：每块盘上最新的有效根 {0: 29, 1: 28}，非空有效根 [13, 21, 24, 26]，空不空判不了的有效根 []，最旧有效根 txg 13
+FUZZ seed=1228 s=4 lives=3 states=31 i35_holds_na_red_holestates_holeholds=[31, 0, 0, 0, 0] reds=[] aborted="" log=start9 |m2@10OOR5ER5OOFOER19FR17R23FR22C75/88 |m3@28R21C9/13 |m4@30R29R28R29R30OOR28OR31R31FC58/58
+FUZZ seed=1229 s=4 lives=4 states=31 i35_holds_na_red_holestates_holeholds=[31, 0, 0, 12, 12] reds=["I-7.9:10"] aborted="" log=start10 |m2@11OC11/17 |m3@14FR8OR14R16R20OOR19FR28OR25OR28C29/87 |m4@21OOR22C19/21 |m5@26OEOFR29OEOC53/54
+FIRST seed=1229 I-7.9 life1/step0/txg19: 实例 3 txg 17 那条根把回退下界 F 从 0 抬到 7，高于它之前的根算出的抬 F 上限 1：每块盘上最新的有效根 {0: 15, 1: 16}，非空有效根 [8, 9, 10]，空不空判不了的有效根 []，最旧有效根 txg 1
+FUZZ seed=1230 s=4 lives=4 states=26 i35_holds_na_red_holestates_holeholds=[26, 0, 0, 0, 0] reds=[] aborted="" log=start11 |m2@12R7OFR11OR18R17OEFR20R19R24R27EOOU |m3@35C8/13 |m4@37 |m5@39OR34OR40E
+FUZZ seed=1231 s=4 lives=2 states=2 i35_holds_na_red_holestates_holeholds=[2, 0, 0, 0, 0] reds=[] aborted="" log=start3 |m2@4C3/9 |m3@5C1/13
+FUZZ seed=1232 s=4 lives=4 states=20 i35_holds_na_red_holestates_holeholds=[20, 0, 0, 1, 1] reds=[] aborted="" log=start9 |m2@10R4R10OER12OU |m3@20C7/13 |m4@22EFR19OEER25R20R26R26C15/45 |m5@26C10/13
+REFUSED seed=1233 life=0 target=(1,1) current=10 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=1233 s=4 lives=2 states=20 i35_holds_na_red_holestates_holeholds=[20, 0, 0, 0, 0] reds=[] aborted="" log=start7 |m2@8r1R7OR10R3EFOU |m3@21OEER20R25EOR21R28OC33/49
+FUZZ seed=1234 s=4 lives=4 states=20 i35_holds_na_red_holestates_holeholds=[20, 0, 0, 7, 7] reds=[] aborted="" log=start11 |m2@12OOR10FOOR11OR19FR24C10/67 |m3@15C0/9 |m4@15R12R6R15R12O |m5@22C9/9
+FUZZ seed=1235 s=4 lives=4 states=35 i35_holds_na_red_holestates_holeholds=[35, 0, 0, 0, 0] reds=[] aborted="" log=start16 |m2@17EFR15R15EOR18R26F |m3@32R30R25EOER34R29OR32OOR37EOC53/69 |m4@45FOOFC17/39 |m5@49OR45OFC4/30
+REFUSED seed=1236 life=0 target=(1,1) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+FUZZ seed=1236 s=4 lives=5 states=47 i35_holds_na_red_holestates_holeholds=[47, 0, 0, 13, 13] reds=["I-7.9:2"] aborted="" log=start5 |m2@6r1OEOEOR8FR6R6OR18R17OOU |m3@26R26OOOR30R29R27OR34R26OC27/57 |m4@33OOOR35C6/25 |m5@35ER37OR37R31R39R42C28/41 |m6@42R33EER36OU
+FIRST seed=1236 I-7.9 life2/step0/txg35: 实例 2 txg 24 那条带卸载记号的根把回退下界 F 从 5 抬到 23，高于根环里 txg 比它小的最新那条根的 txg 20
+FUZZ seed=1237 s=4 lives=4 states=36 i35_holds_na_red_holestates_holeholds=[36, 0, 0, 0, 0] reds=[] aborted="" log=start8 |m2@9OR6OFR9OEOFR18EOR21R23OOOU |m3@33FR32OOOR33R34EEOOOR34R45EC8/65 |m4@35C8/13 |m5@37C6/9
+FUZZ seed=1238 s=4 lives=5 states=47 i35_holds_na_red_holestates_holeholds=[47, 0, 0, 0, 0] reds=[] aborted="" log=start18 |m2@19C3/9 |m3@20OEOR14R17F |m4@30OOOER26R33R29R27 |m5@40OR38R38OFFOFR48R45R47R46U |m6@57R56FR58ER55R57OER57OR61FEFFFU
+REFUSED seed=1239 life=0 target=(1,2) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=1239 life=0 target=(1,2) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+FUZZ seed=1239 s=4 lives=5 states=17 i35_holds_na_red_holestates_holeholds=[17, 0, 0, 0, 0] reds=[] aborted="" log=start2 |m2@4r2R3Or2U |m3@11EOR13OR10EC13/37 |m4@14OU |m5@20C12/13 |m6@23R24C2/17
+REFUSED seed=1240 life=0 target=(0,0) current=5 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+REFUSED seed=1240 life=0 target=(1,1) current=6 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=1240 life=0 target=(0,0) current=6 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+REFUSED seed=1240 life=1 target=(1,2) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+REFUSED seed=1240 life=1 target=(1,1) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(1) }, exclusion: VersionWithoutFile }
+REFUSED seed=1240 life=1 target=(1,2) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(1), checkpoint_txg: CheckpointTxg(2) }, exclusion: VersionWithoutFile }
+FUZZ seed=1240 s=4 lives=2 states=25 i35_holds_na_red_holestates_holeholds=[25, 0, 0, 10, 10] reds=[] aborted="" log=start2 |m2@4r0R4r1r0FR3OEOC2/29 |m3@5r2r1r2ER7R6R5R8ER6FEFOU
+FUZZ seed=1241 s=4 lives=2 states=29 i35_holds_na_red_holestates_holeholds=[29, 0, 0, 0, 0] reds=[] aborted="" log=start10 |m2@11R9FFOOOOOOOOOR15OR22OEU |m3@33OR30OR30R37R34FR38R34R38
+REFUSED seed=1242 life=0 target=(0,0) current=7 reason=TargetNotACandidate { target: RollbackTarget { instance: InstanceGeneration(0), checkpoint_txg: CheckpointTxg(0) }, exclusion: VersionWithoutFile }
+FUZZ seed=1242 s=4 lives=5 states=33 i35_holds_na_red_holestates_holeholds=[33, 0, 0, 0, 0] reds=[] aborted="" log=start5 |m2@6r0OR6EOFR5OU |m3@18U |m4@23R24R24R24OR25R24U |m5@35OFFU |m6@41OR39R44OOR45R47FR48OR50C11/62
+FUZZ seed=1243 s=4 lives=4 states=42 i35_holds_na_red_holestates_holeholds=[42, 0, 0, 5, 5] reds=["I-7.9:3"] aborted="" log=start17 |m2@18C3/9 |m3@19R10FR18EOOR23C27/42 |m4@26OR21FOR23FFOOOOR41R44R40R37OOOU |m5@54FR51R53R55R53FR55EOOOOF
+FIRST seed=1243 I-7.9 life2/step0/txg29: 实例 3 txg 22 那条根把回退下界 F 从 0 抬到 15，高于它之前的根算出的抬 F 上限 13：每块盘上最新的有效根 {0: 21, 1: 19}，非空有效根 [13, 18, 21]，空不空判不了的有效根 []，最旧有效根 txg 13
+FUZZ seed=1244 s=4 lives=3 states=22 i35_holds_na_red_holestates_holeholds=[22, 0, 0, 0, 0] reds=[] aborted="" log=start18 |m2@19C4/9 |m3@20R21OR21OFEOFOR31R30EOR31OO |m4@41R36R36O
+FUZZ seed=1245 s=4 lives=5 states=39 i35_holds_na_red_holestates_holeholds=[39, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13OR13FU |m3@23OOOFR26OR27R25FFC43/50 |m4@33R30ER34OOR35R39R36R32R37OER41 |m5@48R47ER44R47C4/25 |m6@49R41R46ER48U
+FUZZ seed=1246 s=4 lives=5 states=37 i35_holds_na_red_holestates_holeholds=[37, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13R9C4/13 |m3@14R6OR12R8OR19OEFR20R25OER26C59/74 |m4@28ER23U |m5@35OR32R36R39 |m6@42R41OR39R38R41R47R42OR47OOC41/53
+FUZZ seed=1247 s=4 lives=5 states=43 i35_holds_na_red_holestates_holeholds=[43, 0, 0, 12, 12] reds=["I-7.9:5"] aborted="" log=start5 |m2@6OFOFOR6R8EOOFC46/72 |m3@17C11/13 |m4@20FOR22R17R17FOFOOEOOR29R39FOR42C11/109 |m5@23EEOR27OC13/33 |m6@26EFOOU
+FIRST seed=1247 I-7.9 life2/step0/txg25: 实例 4 txg 23 那条根把回退下界 F 从 4 抬到 11，高于它之前的根算出的抬 F 上限 7：每块盘上最新的有效根 {0: 21, 1: 22}，非空有效根 [7, 14, 15, 16]，空不空判不了的有效根 []，最旧有效根 txg 7
+FUZZ seed=1248 s=4 lives=4 states=32 i35_holds_na_red_holestates_holeholds=[32, 0, 0, 7, 7] reds=["I-7.9:2"] aborted="" log=start15 |m2@16R10OOOR15OOOOR21R21R24U |m3@32C10/13 |m4@35OR29R30OOR38OFOR46R45R41R48R50R43R50U |m5@57C5/9
+FIRST seed=1248 I-7.9 life2/step3/txg41: 实例 2 txg 30 那条带卸载记号的根把回退下界 F 从 0 抬到 29，高于根环里 txg 比它小的最新那条根的 txg 22
+FUZZ seed=1249 s=4 lives=3 states=26 i35_holds_na_red_holestates_holeholds=[26, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13R9R4OOR8R10R11R10R15R19OOU |m3@29OC16/17 |m4@33OR28OOEOOR40OR34C3/49
+rc=0

@@ -1,0 +1,4 @@
+244b83faf6eafeb911b2312b569d62725404f34fb65ee5d999e431da75bd942c  .claude/kb/invariants.md
+a3fa10d9d0d4649761578aab89814b72e3a6d9b9dbeee8b2e2b4565a0fc6c8f6  .claude/kb/decisions/16-发布语义.md
+59b00a816ec1d50806f5902398205d9f18008dc1a5ea33a8988451ac5a61b17f  .claude/kb/decisions/19-块指针的结构与宽度预算.md
+2f035423ea148c9e926c1ba0d9bf8e2e27b2b65b444b1a06b881854b71109b96  .claude/kb/decisions/09-加密.md

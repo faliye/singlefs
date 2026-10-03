@@ -1,0 +1,23 @@
+FUZZ seed=2140 s=6 lives=2 states=13 i35_holds_na_red_holestates_holeholds=[13, 0, 0, 0, 0] reds=[] aborted="" log=start15 |m2@16C8/9 |m3@18R14FFOOFOR23FOOC6/68
+FUZZ seed=2141 s=6 lives=2 states=36 i35_holds_na_red_holestates_holeholds=[36, 0, 0, 6, 6] reds=["I-7.9:2"] aborted="" log=start24 |m2@25EOEOR15OOR32OR26OFR35R35FR38EFR42C64/86 |m3@41OOEFR39OFOOOR44R47OOR44U
+FIRST seed=2141 I-7.9 life1/step6/txg53: 实例 2 txg 38 那条根把回退下界 F 从 0 抬到 34，高于它之前的根算出的抬 F 上限 22：每块盘上最新的有效根 {0: 36, 1: 37}，非空有效根 [22, 36, 37]，空不空判不了的有效根 []，最旧有效根 txg 22
+FUZZ seed=2142 s=6 lives=2 states=3 i35_holds_na_red_holestates_holeholds=[3, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13U |m3@17EC14/17
+FUZZ seed=2143 s=6 lives=2 states=20 i35_holds_na_red_holestates_holeholds=[20, 0, 0, 0, 0] reds=[] aborted="" log=start8 |m2@9r1FC10/22 |m3@11OOOOOR5OEFR20OOEOR23OU
+FUZZ seed=2144 s=6 lives=4 states=56 i35_holds_na_red_holestates_holeholds=[56, 0, 0, 0, 0] reds=[] aborted="" log=start3 |m2@4OOR4r0Or2OOOFOER11FER14R20ER16OOC16/95 |m3@8OC15/17 |m4@12OOOR12FR17R15R14ER18OR24OOER24R17OC77/86 |m5@31FER34R27ER33OR26OOOOC57/62
+FUZZ seed=2145 s=6 lives=4 states=73 i35_holds_na_red_holestates_holeholds=[73, 0, 0, 0, 0] reds=[] aborted="" log=start12 |m2@13R8R12EOOFOOOOR25R24OOOR23C20/82 |m3@18EOFOFR17FR15FR23OR30R33EOC80/84 |m4@37OOOR29R33EOOOOR39OOR50EOEFFOR54C78/98 |m5@56R54EFR54OR58OOOOOOOR56R69R69FU
+FUZZ seed=2146 s=6 lives=5 states=71 i35_holds_na_red_holestates_holeholds=[71, 0, 0, 6, 6] reds=["I-7.9:2"] aborted="" log=start17 |m2@18OR7OR16R15OOOOEOOR30FFOOOR29OOOR30OC74/106 |m3@36OOR38OFFOEOER46ER43R44FOOOFOR57U |m4@63R60OR60R66FOER62R64R66R61FR70C39/53 |m5@73R69OOR69R74R63U |m6@83OOC21/21
+FIRST seed=2146 I-7.9 life3/step3/txg78: 实例 3 txg 61 那条带卸载记号的根把回退下界 F 从 40 抬到 60，高于根环里 txg 比它小的最新那条根的 txg 54
+FUZZ seed=2147 s=6 lives=5 states=24 i35_holds_na_red_holestates_holeholds=[24, 0, 0, 0, 0] reds=[] aborted="" log=start22 |m2@23C5/13 |m3@24C5/9 |m4@25ER20EOOOR21R30ER29R19R23R30OOOR41R32R40U |m5@48C8/9 |m6@50C12/13
+FUZZ seed=2148 s=6 lives=2 states=45 i35_holds_na_red_holestates_holeholds=[45, 0, 0, 0, 0] reds=[] aborted="" log=start2 |m2@4EOOR6r0OOR5OFOOOOOOOR18OFU |m3@32OOOEEOFOOOOOER41OOR37OR48FOR54R53C113/123
+FUZZ seed=2149 s=6 lives=3 states=28 i35_holds_na_red_holestates_holeholds=[28, 0, 0, 0, 0] reds=[] aborted="" log=start23 |m2@24R9EOFFEOOOOR24OEEOC50/74 |m3@36 |m4@38OR34OOOOOOEOC38/53
+FUZZ seed=2150 s=6 lives=3 states=62 i35_holds_na_red_holestates_holeholds=[62, 0, 0, 7, 7] reds=[] aborted="" log=start16 |m2@17OR4OOOOOOFOEFOEFER36OEC26/108 |m3@24OER11R15OOOFEOR35R31OOR32OOOOOER42R36C70/106 |m4@41OOOOR31R37OR39OOFFFR54R55R51OU
+FUZZ seed=2151 s=6 lives=4 states=68 i35_holds_na_red_holestates_holeholds=[68, 0, 0, 0, 0] reds=[] aborted="" log=start8 |m2@9FOOOOEOOEOR14R9R17R14R10OOOR14OC62/98 |m3@24OOOOR22R23OFR29OR31OOOOC4/74 |m4@25OOR19OOOOOR17OR19OOFOOR40C56/82 |m5@39OOFEFR40OOER46R39E
+FUZZ seed=2152 s=6 lives=5 states=44 i35_holds_na_red_holestates_holeholds=[44, 0, 0, 0, 0] reds=[] aborted="" log=start1 |m2@4Or1FOR6OFR10EEOEOOR6C35/66 |m3@12C0/9 |m4@12C1/9 |m5@12C4/9 |m6@13OR14FOR10R9OOR13OOOOOEFOFOOOR34OEC95/128
+FUZZ seed=2153 s=6 lives=4 states=65 i35_holds_na_red_holestates_holeholds=[65, 0, 0, 0, 0] reds=[] aborted="" log=start18 |m2@19FOOR22OFOR24FEOOOR25R31OOFOR40 |m3@46R39R37R47OR37OFOOR51R53O |m4@61OEEOR61C0/29 |m5@61EOEOOFOR68OOR61R68OOOOR71OOOR69OR76OU
+FUZZ seed=2154 s=6 lives=3 states=23 i35_holds_na_red_holestates_holeholds=[23, 0, 0, 0, 0] reds=[] aborted="" log=start10 |m2@11OOOOr1FFOOOOR14OOR14R18R22C21/78 |m3@16Er1OU |m4@23
+FUZZ seed=2155 s=6 lives=3 states=13 i35_holds_na_red_holestates_holeholds=[13, 0, 0, 10, 10] reds=[] aborted="" log=start4 |m2@5OOC15/21 |m3@9EOC11/17 |m4@12OOOOER3C0/33
+FUZZ seed=2156 s=6 lives=5 states=91 i35_holds_na_red_holestates_holeholds=[91, 0, 0, 0, 0] reds=[] aborted="" log=start8 |m2@9OOr2r0OOR9R11r2OOOOR15OOR16OEFR24 |m3@30OFOFOC34/39 |m4@38R28R37OFOOOOOOOOOOER46R45OR49FR59OC17/119 |m5@42OOOR32FOR44OFOFOR56OR56ER51OOFU |m6@71FOER74FOOOOR69R76EOR73OEFOC63/82
+FUZZ seed=2157 s=6 lives=5 states=71 i35_holds_na_red_holestates_holeholds=[71, 0, 0, 0, 0] reds=[] aborted="" log=start20 |m2@21FEFR22R26FOR19OOER21OOOOOEOOER39C16/98 |m3@25OOOOFR27OR27FOU |m4@41R40FFFEOOOFFOEOFOOR51R47FR54OR60R54 |m5@64OOOR67OOOOOEOU |m6@80C6/13
+FUZZ seed=2158 s=6 lives=4 states=37 i35_holds_na_red_holestates_holeholds=[37, 0, 0, 14, 14] reds=[] aborted="" log=start13 |m2@14FFR13C16/30 |m3@18R13EFR13ER10OFOOEOR22R21OFOR33R31OR38OR35R38U |m4@48R47OR49OOC6/29 |m5@50R51C0/17
+FUZZ seed=2159 s=6 lives=2 states=18 i35_holds_na_red_holestates_holeholds=[18, 0, 0, 14, 14] reds=[] aborted="" log=start7 |m2@8C2/13 |m3@9ER10R6R6r1Or2Er1OOR5R14R13FEU
+rc=0

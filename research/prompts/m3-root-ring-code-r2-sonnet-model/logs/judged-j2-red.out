@@ -1,0 +1,30 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 962M 的 2 倍，照理由放行：复核变异行在冻结副本上编译要余量
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.17s
+     Running tests/pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader.rs (target/debug/deps/pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader-c92ed04b1c51eff3)
+
+running 7 tests
+test an_inode_internal_entry_whose_child_pointer_carries_a_non_zero_nonce_is_refused ... ok
+test an_extent_upper_leaf_entry_whose_inline_data_pointer_names_an_encryption_algorithm_is_refused ... ok
+test an_extent_leaf_record_whose_data_pointer_names_an_unregistered_compression_algorithm_is_refused ... FAILED
+test an_extent_internal_entry_whose_child_pointer_carries_a_compressed_length_without_compression_is_refused ... ok
+test a_tree_table_entry_whose_root_pointer_carries_a_non_zero_mac_is_refused ... ok
+test an_allocation_record_tree_internal_entry_whose_child_pointer_carries_a_non_zero_mac_is_refused_by_the_walk ... ok
+test an_instance_table_chain_pointer_naming_an_encryption_algorithm_is_refused_by_the_walk ... ok
+
+failures:
+
+---- an_extent_leaf_record_whose_data_pointer_names_an_unregistered_compression_algorithm_is_refused stdout ----
+
+thread 'an_extent_leaf_record_whose_data_pointer_names_an_unregistered_compression_algorithm_is_refused' (3753538) panicked at crates/singlefs-harness/tests/common_pointer_head_corruption/mod.rs:396:22:
+extent 树里那条指针头部不是第一版的取值，打开文件却成功了
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_extent_leaf_record_whose_data_pointer_names_an_unregistered_compression_algorithm_is_refused
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.93s
+
+error: test failed, to rerun pass `-p singlefs-harness --test pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader`

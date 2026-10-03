@@ -1,0 +1,2 @@
+                let in_a_tree_inherited_whole = false;
+                let _ = &trees_inherited_whole;

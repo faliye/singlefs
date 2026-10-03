@@ -1,0 +1,11 @@
+.claude/kb/decisions-history.md:13833: JOURNAL_HEADER_BYTES kb=307 code=487 MISMATCH
+.claude/kb/decisions/23-journal的角色与格式.md:160: JOURNAL_HEADER_BYTES kb=487 code=487 OK
+.claude/kb/decisions/23-journal的角色与格式.md:161: JOURNAL_HEADER_TEN_FIELD_BYTES kb=78 code=78 OK
+.claude/kb/decisions/23-journal的角色与格式.md:319: JOURNAL_NAMED_ENTRIES_PER_RECORD kb=64 code=64 OK
+.claude/kb/decisions/23-journal的角色与格式.md:450: JOURNAL_NEW_ROOT_SEGMENT_BYTES kb=364 code=364 OK
+.claude/kb/decisions/23-journal的角色与格式.md:481: JOURNAL_NAMED_ENTRY_BYTES kb=56 code=56 OK
+.claude/kb/experiments-history.md:1468: JOURNAL_HEADER_BYTES kb=307 code=487 MISMATCH
+.claude/kb/experiments-history.md:1479: JOURNAL_HEADER_BYTES kb=277 code=487 MISMATCH
+.claude/kb/experiments/43-扩展点字节上限.md:293: JOURNAL_HEADER_BYTES kb=307 code=487 MISMATCH
+.claude/kb/experiments/43-扩展点字节上限.md:308: JOURNAL_HEADER_BYTES kb=277 code=487 MISMATCH
+.claude/kb/layout/01-first-txn.md:132: JOURNAL_RING_DEFAULT_BYTES kb=805306368 code=805306368 OK

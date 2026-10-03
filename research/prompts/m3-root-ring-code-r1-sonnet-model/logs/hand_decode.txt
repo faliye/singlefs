@@ -1,0 +1,32 @@
+named entries per 4096 record: 64
+record 1: type=1 len=4096 named=0 instance=1 counter=1 txg=1 flags=1 tx=0 commit=1 ordinal=1 back=0 marker=0x0
+   segment tree_table      == root txg1[36:122] : True
+   segment watermark       == root txg1[122:130] : True
+   segment floor           == root txg1[130:138] : True
+   segment instance_table  == root txg1[170:256] : True
+   segment mapping         == root txg1[256:342] : True
+   segment alloc           == root txg1[342:428] : True
+   marker 0x0 == root flags 0x0 : True
+   root fsid[4:20][:8] vs record fsid: True  (record fsid = low 8 bytes of root fsid? 5f5346532d453134 / 5f5346532d453134)
+record 2: type=1 len=4096 named=0 instance=1 counter=2 txg=2 flags=1 tx=0 commit=1 ordinal=1 back=750278362 marker=0x0
+   segment tree_table      == root txg2[36:122] : True
+   segment watermark       == root txg2[122:130] : True
+   segment floor           == root txg2[130:138] : True
+   segment instance_table  == root txg2[170:256] : True
+   segment mapping         == root txg2[256:342] : True
+   segment alloc           == root txg2[342:428] : True
+   marker 0x0 == root flags 0x0 : True
+   root fsid[4:20][:8] vs record fsid: True  (record fsid = low 8 bytes of root fsid? 5f5346532d453134 / 5f5346532d453134)
+record 3: type=1 len=4096 named=12 instance=1 counter=3 txg=3 flags=1 tx=1 commit=1 ordinal=1 back=2660362816 marker=0x0
+   segment tree_table      == root txg3[36:122] : True
+   segment watermark       == root txg3[122:130] : True
+   segment floor           == root txg3[130:138] : True
+   segment instance_table  == root txg3[170:256] : True
+   segment mapping         == root txg3[256:342] : True
+   segment alloc           == root txg3[342:428] : True
+   marker 0x0 == root flags 0x0 : True
+   root fsid[4:20][:8] vs record fsid: True  (record fsid = low 8 bytes of root fsid? 5f5346532d453134 / 5f5346532d453134)
+record 2 back_chain on disk 750278362 ; CRC32C(record 1 487-byte header, csum zero) = 750278362 ; equal=True
+record 3 back_chain on disk 2660362816 ; CRC32C(record 2 487-byte header, csum zero) = 2660362816 ; equal=True
+pin E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION = 2660362816 ; record 3 back chain = 2660362816
+control: CRC32C of first 311 bytes of record 2 (csum zero) = 295996559 (不是 2213468031 也不应是：字节已变)

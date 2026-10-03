@@ -1,0 +1,3 @@
+    if previous_txg.checked_add(1) == Some(version_txg) || true {
+        return HoleInTheCandidateSet::NoHole;
+    }

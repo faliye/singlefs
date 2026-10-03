@@ -1,0 +1,25 @@
+FUZZ seed=2000 s=6 lives=2 states=39 i35_holds_na_red_holestates_holeholds=[39, 0, 0, 0, 0] reds=[] aborted="" log=start13 |m2@14R15R13OR17OOR14OR18R8FER25OER29OR29OEOOOU |m3@44EFOR47OEOOOR44OOOR50C19/65
+FUZZ seed=2001 s=6 lives=2 states=12 i35_holds_na_red_holestates_holeholds=[12, 0, 0, 0, 0] reds=[] aborted="" log=start10 |m2@11R5R13OOEEOOR19C15/49 |m3@15OU
+FUZZ seed=2002 s=6 lives=5 states=45 i35_holds_na_red_holestates_holeholds=[45, 0, 0, 0, 0] reds=[] aborted="" log=start5 |m2@6OOER7r2FOR4OC1/46 |m3@6C5/9 |m4@7R7FFER8OOEr0OEEOFOU |m5@24OOOOOOEOOFR33OOOOFC7/87 |m6@26C9/13
+FUZZ seed=2003 s=6 lives=4 states=50 i35_holds_na_red_holestates_holeholds=[50, 0, 0, 0, 0] reds=[] aborted="" log=start13 |m2@14R15EFR16R19OR11FOFFOOEFFFC62/89 |m3@29OR16OR27R24OOR22R32OOR33OOFFR42OFC64/99 |m4@45OOOOEOOR36OR41U |m5@59C8/13
+FUZZ seed=2004 s=6 lives=2 states=7 i35_holds_na_red_holestates_holeholds=[7, 0, 0, 4, 4] reds=[] aborted="" log=start10 |m2@11R11C6/17 |m3@13OOOOU
+FUZZ seed=2005 s=6 lives=5 states=47 i35_holds_na_red_holestates_holeholds=[47, 0, 0, 11, 11] reds=[] aborted="" log=start10 |m2@11r1OFFR10R11R13OOFOOOOOR23FC37/88 |m3@20EOOOOEER23EOOEOU |m4@38OOOC6/25 |m5@40R35R36FOR35R41R42R43OC22/41 |m6@46C9/9
+FUZZ seed=2006 s=6 lives=3 states=31 i35_holds_na_red_holestates_holeholds=[31, 0, 0, 0, 0] reds=[] aborted="" log=start18 |m2@19C9/9 |m3@21OR18OFOOR21EFOOOOEOOR29OR35FOO |m4@49R49OOOOR51
+FUZZ seed=2007 s=6 lives=2 states=28 i35_holds_na_red_holestates_holeholds=[28, 0, 0, 0, 0] reds=[] aborted="" log=start5 |m2@6OFOR5FOOOEOOEOOR8OOR13OEOOC13/107 |m3@9OEEOU
+FUZZ seed=2008 s=6 lives=5 states=90 i35_holds_na_red_holestates_holeholds=[90, 0, 0, 23, 23] reds=["I-7.9:8"] aborted="" log=start15 |m2@16OR14OOER17OOFOOOR26OEOOOFOC42/107 |m3@26ER23EOOR26R29FEOOOR35OOO |m4@46R32R36OOFOR51R50OOFOFR58FR64OEOFC14/109 |m5@50R51FR50R45R48R44ER45EOOC29/62 |m6@57FR48R57FR52FR55OOOOOEOOEFEC0/74
+FIRST seed=2008 I-7.9 life3/step8/txg62: 实例 5 txg 54 那条根把回退下界 F 从 30 抬到 44，高于它之前的根算出的抬 F 上限 31：每块盘上最新的有效根 {0: 53, 1: 52}，非空有效根 [31, 45, 48, 50]，空不空判不了的有效根 []，最旧有效根 txg 31
+FUZZ seed=2009 s=6 lives=5 states=61 i35_holds_na_red_holestates_holeholds=[61, 0, 0, 6, 6] reds=[] aborted="" log=start19 |m2@20C3/13 |m3@21OOEOEOFEOR24 |m4@35OOOOR27R32R33 |m5@45OR43OOOR42R50R46EOOFOOOER54R57EU |m6@69OEOEOOOFR78R73OOOOOEOOOOU
+FUZZ seed=2010 s=6 lives=4 states=28 i35_holds_na_red_holestates_holeholds=[28, 0, 0, 14, 14] reds=["I-7.9:8"] aborted="" log=start7 |m2@8OFEOOOEER15ER12OC48/66 |m3@20C7/13 |m4@22OEOOOOR23ER29C9/45 |m5@24R16EFU
+FIRST seed=2010 I-7.9 life2/step0/txg24: 实例 2 txg 12 那条根把回退下界 F 从 0 抬到 5，高于它之前的根算出的抬 F 上限 1：每块盘上最新的有效根 {0: 11, 1: 10}，非空有效根 [11]，空不空判不了的有效根 [1, 7]，最旧有效根 txg 1
+FUZZ seed=2011 s=6 lives=3 states=21 i35_holds_na_red_holestates_holeholds=[21, 0, 0, 0, 0] reds=[] aborted="" log=start2 |m2@4OOOC12/21 |m3@7FOOR7FU |m4@17FR13R17OOER19OOOU
+FUZZ seed=2012 s=6 lives=4 states=44 i35_holds_na_red_holestates_holeholds=[44, 0, 0, 6, 6] reds=["I-7.9:3"] aborted="" log=start16 |m2@17FOOER21OR17OOOC55/62 |m3@31FR29OOFOFOOR41OR39OOOR41OR48C28/100 |m4@38OFOR39O |m5@47OEEOEFR55C7/46
+FIRST seed=2012 I-7.9 life1/step0/txg34: 实例 2 txg 20 那条根把回退下界 F 从 0 抬到 13，高于它之前的根算出的抬 F 上限 12：每块盘上最新的有效根 {0: 18, 1: 19}，非空有效根 [12, 17]，空不空判不了的有效根 []，最旧有效根 txg 12
+FUZZ seed=2013 s=6 lives=3 states=30 i35_holds_na_red_holestates_holeholds=[30, 0, 0, 0, 0] reds=[] aborted="" log=start2 |m2@4OOC2/17 |m3@4OR5Or0OU |m4@12OOFR14FOFR11R14OOOOFOER24ER23R26C35/82
+FUZZ seed=2014 s=6 lives=5 states=71 i35_holds_na_red_holestates_holeholds=[71, 0, 0, 0, 0] reds=[] aborted="" log=start9 |m2@10R7FR10OOFEOFOEFER16OOFOOR34O |m3@39OEOOOFFOOFER50R53FR47R44R48R45FC24/96 |m4@45C3/9 |m5@46R41OR35OOOFOOFEOOEOOC29/83 |m6@53OOOOOOOFFR59
+FUZZ seed=2015 s=6 lives=2 states=20 i35_holds_na_red_holestates_holeholds=[20, 0, 0, 0, 0] reds=[] aborted="" log=start11 |m2@12 |m3@14FR18OOER18OOOEER28OOOOR27R30C26/94
+FUZZ seed=2016 s=6 lives=5 states=72 i35_holds_na_red_holestates_holeholds=[72, 0, 0, 0, 0] reds=[] aborted="" log=start17 |m2@18EOOOOOOOR13OR17OO |m3@33R23OR25FOR40OF |m4@47OR41R45R36R51OFR53FC13/54 |m5@50OFFFR49OOOOR50OR50OOEO |m6@68OEOOOOOFFR74OR78OOOEOOR75OOC43/98
+FUZZ seed=2017 s=6 lives=5 states=18 i35_holds_na_red_holestates_holeholds=[18, 0, 0, 0, 0] reds=[] aborted="" log=start5 |m2@6C0/9 |m3@6r2OOC15/17 |m4@10C3/9 |m5@11R8OEOOR9FOOOC24/62 |m6@17C0/13
+FUZZ seed=2018 s=6 lives=2 states=37 i35_holds_na_red_holestates_holeholds=[37, 0, 0, 9, 9] reds=["I-7.9:11"] aborted="" log=start13 |m2@14OOOOOR10OOOOR17OR18FR30OOEEOOOOC99/110 |m3@39EFOOOEOR33OFOOC55/67
+FIRST seed=2018 I-7.9 life1/step2/txg44: 实例 2 txg 30 那条根把回退下界 F 从 0 抬到 26，高于它之前的根算出的抬 F 上限 20：每块盘上最新的有效根 {0: 29, 1: 28}，非空有效根 [20, 27, 28, 29]，空不空判不了的有效根 []，最旧有效根 txg 20
+FUZZ seed=2019 s=6 lives=3 states=28 i35_holds_na_red_holestates_holeholds=[28, 0, 0, 0, 0] reds=[] aborted="" log=start1 |m2@4FEOOR6Or0OFR9OF |m3@18C5/9 |m4@19FOR20OOR17EOER19OOFC19/66
+rc=0

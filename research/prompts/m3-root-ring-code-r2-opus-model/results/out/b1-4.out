@@ -1,0 +1,35 @@
+FUZZ seed=190 s=4 lives=5 states=37 reds=["I-7.9:8"] aborted="" log=start11 |m2@12C1/9 |m3@12OR7OR14FOU |m4@23C10/13 |m5@26EEFER24OOOOFC30/54 |m6@34OOFFR34OOR41OOOOEFR50R54C38/100
+FIRST seed=190 I-7.9 life3/step4/txg32: 实例 3 txg 21 那条带卸载记号的根把回退下界 F 从 0 抬到 20，高于根环里 txg 比它小的最新那条根的 txg 13
+FUZZ seed=191 s=4 lives=3 states=7 reds=[] aborted="" log=start15 |m2@16C4/9 |m3@17C1/13 |m4@17ER18OFC15/38
+FUZZ seed=192 s=4 lives=5 states=48 reds=[] aborted="" log=start5 |m2@6OOOEOR3R12OOOFOFEEOU |m3@29OOR28FER29R28OOEO |m4@42EOC12/17 |m5@45FC9/22 |m6@47OOR48R42EEFOOOEOOC46/74
+FUZZ seed=193 s=4 lives=3 states=10 reds=[] aborted="" log=start14 |m2@15OC11/13 |m3@18FFEOOO |m4@27C4/9
+FUZZ seed=194 s=4 lives=5 states=37 reds=[] aborted="" log=start17 |m2@18OOOEEOFR26OR25OR27OOOC73/78 |m3@36R32FOOU |m4@45OOC17/17 |m5@49FEER45FR47R44FOR49OC39/54 |m6@58C5/9
+FUZZ seed=195 s=4 lives=3 states=27 reds=[] aborted="" log=start17 |m2@18OC9/13 |m3@20OEOR20FOOOOOOC29/62 |m4@27FOEOOOOOOR35R33OU
+FUZZ seed=196 s=4 lives=5 states=63 reds=[] aborted="" log=start3 |m2@4FFOFOFR4R4FEOOOC14/41 |m3@8OOR9OF |m4@17R11FR21OO |m5@26OOOR25R24OR33R25EOOOFER38OOU |m6@50OOEOOR55R53R52OOR55FOR63OOOOC78/90
+FUZZ seed=197 s=4 lives=2 states=25 reds=[] aborted="" log=start4 |m2@5OR7OOr0OOOR10OE |m3@18FOOEOR25OR18R25OEOU
+FUZZ seed=198 s=4 lives=5 states=45 reds=[] aborted="" log=start12 |m2@13R8R13FFOOOFOR17OC31/67 |m3@20FFOOFR31ER24C18/68 |m4@24 |m5@26OOOFR31R31R33FOEOFR41O |m6@49EFFOR50R56R52U
+FUZZ seed=199 s=4 lives=2 states=14 reds=[] aborted="" log=start13 |m2@14C0/13 |m3@14OOOER17R14OOOOOOU
+FUZZ seed=200 s=4 lives=5 states=32 reds=[] aborted="" log=start1 |m2@4r1U |m3@8R8OR10FOOR13OOOOOOOC62/65 |m4@24OOOFR25OR25R24EOEEU |m5@42C9/9 |m6@44C12/13
+FUZZ seed=201 s=4 lives=2 states=7 reds=[] aborted="" log=start18 |m2@19FR17OC25/26 |m3@25R18R23U
+FUZZ seed=202 s=4 lives=2 states=20 reds=[] aborted="" log=start1 |m2@4EEOOEr1r2C22/29 |m3@10EOR10R12FFR16R12OOR21C57/63
+FUZZ seed=203 s=4 lives=5 states=15 reds=[] aborted="" log=start13 |m2@14OR7EOEC5/33 |m3@15R6U |m4@20OR21R23R23C13/29 |m5@23C8/13 |m6@25C8/9
+FUZZ seed=204 s=4 lives=3 states=42 reds=[] aborted="" log=start2 |m2@4Fr2OOER7OOR6FR8OOFOOR15C32/79 |m3@12OOOOR7OOOU |m4@24OOOFOOFOR31R27FR29R37EC1/71
+FUZZ seed=205 s=4 lives=3 states=26 reds=["I-7.9:3"] aborted="" log=start14 |m2@15OOFFOOOR14OOR19C29/54 |m3@22OEOFEOC10/38 |m4@25R18OOR19EO
+FIRST seed=205 I-7.9 life2/step0/txg27: 实例 2 txg 19 那条根把回退下界 F 从 0 抬到 13，高于它之前的根算出的抬 F 上限 12：每块盘上最新的有效根 {0: 18, 1: 16}，非空有效根 [12, 16, 17, 18]，空不空判不了的有效根 []，最旧有效根 txg 12
+FUZZ seed=206 s=4 lives=5 states=63 reds=[] aborted="" log=start5 |m2@6OOOOR3EOER10R9OOC29/57 |m3@13R4OEOOR10OOR12OR22OOOOC42/69 |m4@24OOEEEOOOOOOOOR36E |m5@41R37R42OFR46C2/42 |m6@42OR36OR38OOER44OOO
+FUZZ seed=207 s=4 lives=4 states=29 reds=[] aborted="" log=start10 |m2@11R6FOOOOEOOOOOFU |m3@32OOOFOR37R31 |m4@41R37R40R35OR44C23/33 |m5@47C13/13
+FUZZ seed=208 s=4 lives=2 states=13 reds=[] aborted="" log=start5 |m2@6C9/9 |m3@8FFFOOR3OOOFOU
+FUZZ seed=209 s=4 lives=4 states=66 reds=[] aborted="" log=start3 |m2@4OOOR4R8OFOOR13R9OOOOU |m3@24OOOOEER30R23ER28OEEOOOC2/73 |m4@24OOOER22FOOR33OR35OOOOR39 |m5@43OOEEEOOOER46OFFOR56U
+FUZZ seed=210 s=4 lives=4 states=34 reds=["I-7.9:2"] aborted="" log=start9 |m2@10OOOEEOR6OOOU |m3@24C2/9 |m4@25OOR23OOOOOR23OOEOOR39O |m5@43OR39R35R44U
+FIRST seed=210 I-7.9 life2/step6/txg33: 实例 2 txg 22 那条带卸载记号的根把回退下界 F 从 0 抬到 21，高于根环里 txg 比它小的最新那条根的 txg 12
+FUZZ seed=211 s=4 lives=3 states=18 reds=[] aborted="" log=start14 |m2@15U |m3@20EEOOC20/29 |m4@25OOR27FR20EOEFFOC12/59
+FUZZ seed=212 s=4 lives=3 states=24 reds=["I-7.9:2"] aborted="" log=start10 |m2@11OOOOOC30/33 |m3@19OFFR17R20OOEOEOOOOOOC36/74 |m4@28C0/9
+FIRST seed=212 I-7.9 life1/step7/txg28: 实例 3 txg 22 那条根把回退下界 F 从 0 抬到 16，高于它之前的根算出的抬 F 上限 6：每块盘上最新的有效根 {0: 21, 1: 19}，非空有效根 [6, 17, 19, 21]，空不空判不了的有效根 []，最旧有效根 txg 6
+FUZZ seed=213 s=4 lives=4 states=19 reds=[] aborted="" log=start7 |m2@8C12/13 |m3@11OR13R11U |m4@20R18R20R21R17ER25OOFEC37/58 |m5@29R27R26U
+FUZZ seed=214 s=4 lives=4 states=22 reds=[] aborted="" log=start7 |m2@8C1/13 |m3@8 |m4@11R11R10OR15OR8OER19R13FOFR21C20/79 |m5@16R12OFOC4/34
+FUZZ seed=215 s=4 lives=5 states=23 reds=[] aborted="" log=start7 |m2@8 |m3@11OEOOOOOFU |m4@26OOR26EU |m5@35OR35OOOC10/33 |m6@37EU
+FUZZ seed=216 s=4 lives=4 states=30 reds=[] aborted="" log=start11 |m2@12R3U |m3@17OOOR17OR20OR22O |m4@29OR28R26OOR30FOOOOO |m5@46OOFFC30/30
+FUZZ seed=217 s=4 lives=3 states=31 reds=[] aborted="" log=start10 |m2@11OEFOR13OOEFEFOOR26OFR30OU |m3@38R35OR37 |m4@44OOOOOOOC30/41
+FUZZ seed=218 s=4 lives=5 states=21 reds=[] aborted="" log=start8 |m2@9C5/9 |m3@10r2OEOOOOFU |m4@23C0/13 |m5@23OEOEOOR21FC21/50 |m6@28C1/9
+FUZZ seed=219 s=4 lives=3 states=37 reds=[] aborted="" log=start9 |m2@10OOOR6OR14R16OER18FOOU |m3@29OOOOFR34OOOOOOEFFOOC66/87 |m4@45R42R44R40EU
+rc=0

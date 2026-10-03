@@ -1,0 +1,14 @@
+rf-4-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 4 persist
+rf-4-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 4 none
+rf-5-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 5 persist
+rf-5-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 5 none
+rf-6-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 6 persist
+rf-6-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 6 none
+rf-7-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 7 persist
+rf-7-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 7 none
+rf-13-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 13 persist
+rf-13-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 13 none
+rf-14-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 14 persist
+rf-14-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 14 none
+rf-15-persist PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 15 persist
+rf-15-none PROTO_JOURNAL_BYTES=1048576,PROTO_IMAGE_BYTES=134217728 raise_floor_hidden_slot 4 15 none

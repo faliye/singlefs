@@ -1,0 +1,3 @@
+        let previous_references_are_complete = previous_versions
+            .iter()
+            .all(|previous_version| previous_version.references_are_complete);

@@ -1,0 +1,13 @@
+[package]
+name = "e2-attack-proto"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m3-root-ring-code-r2 攻方腿原型（只在攻方副本里有）"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }

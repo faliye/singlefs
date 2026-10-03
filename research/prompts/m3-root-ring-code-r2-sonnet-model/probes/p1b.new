@@ -1,0 +1,3 @@
+            RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                checkpoint_txg: CheckpointTxg(root.checkpoint_txg.0 + 1000),
+            }

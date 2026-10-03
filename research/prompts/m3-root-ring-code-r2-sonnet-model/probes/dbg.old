@@ -1,0 +1,3 @@
+    if units_judged == 0 {
+        judgements.not_applicable(
+            REFERENCE_INTERVALS_ARE_EXACT,

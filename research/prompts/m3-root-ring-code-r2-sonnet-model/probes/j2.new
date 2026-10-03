@@ -1,0 +1,1 @@
+        if false && self.compression_algorithm_code != 0 {

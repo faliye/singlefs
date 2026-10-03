@@ -1,0 +1,26 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-root-ring-code-r2-sonnet/work/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.25s
+     Running tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs (target/debug/deps/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window-8ea9accc97fe5292)
+
+running 2 tests
+test admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window ... ok
+test admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold ... FAILED
+
+failures:
+
+---- admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold stdout ----
+
+thread 'admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold' (3680037) panicked at crates/singlefs-harness/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs:221:5:
+assertion `left == right` failed: 抬完之后：门槛不越过 X 那一槽
+  left: ["I-3.1：盘 0：记账的已分配 Some(1146880)，遍历全部有效根得到 1245184（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 31、环里自证过的根槽 12 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 6、低于 F 的根槽 0 个、一圈窗口之外的根槽 1 个"]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+
+error: test failed, to rerun pass `-p singlefs-harness --test raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window`
