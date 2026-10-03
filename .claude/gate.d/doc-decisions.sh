@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 决策文档与变更史（十六格：kb 形状；分项引用状态；状态别说两遍；说未定其实已定；已定分项自称未定；引用写已定紧跟说没定；未定项被别处定了；定了新东西没回看同文件未定项；冻结层归属登记表；决策分项清单与正文同步；未定项判过改不改新池新建文件的字节；动了用户定案的条款记了未还的账；决策索引结论列的宽度；同一结构的写频率只有一个量级；决策正文改了要留变更史条目；变更史的形状）
+# gate-stage: 决策文档与变更史（十六格：决策与分项的状态、索引与登记表对正文、未定项回看、写频率、变更史条目与形状）
 # gate-category: 文档类
 # gate-similar: history-ordinal.sh 它也读变更史的条目标题、也只判这一轮新增的，但判的是「（其 N）」撞号，住在上游副本里由上游门禁管，项目本地改不了它
 # gate-similar: doc-registries.sh 它从欠账表、收口表与总审核出发判表本身的形状与账的去向，判字段与布局登记表（字节表「指向」列点名的分项存不存在、字段投影与加和、认购表求和不超预留），它的 decision-refs 那一格判 kb 全文引用的 D 号有定义、不看分项号与状态；这里的 user-verdict-owed 那一格方向相反，从决策正文里的「待用户复核」出发去欠账表找一笔未还的账，item-ref-status 那一格判引用写的已定 / 未定与正文分项表相符，判的对象都是决策正文、索引页、冻结层归属登记表与变更史
 # gate-similar: code-source-discipline.sh 它的 clause-enums 格也读 .claude/gate.d/ 下一张登记表、去决策分项里找逐字的串，但比对的另一边是代码里的枚举；这里格「同一结构的写频率只有一个量级」两边都在决策正文里（句子写的频率与登记的量级），不碰代码
 #
-# 决策文档与变更史：kb 里同一件事不许有两种写法，决策与分项的状态在哪一处说都要说得一样，
-# 决策索引页与它的投影、决策相关的登记表都要与决策正文对得上；决策正文改了要在变更史里留条目，变更史自己的形状也要对。
-# 原是两道阶段（「kb 形状与决策文档」十四格、「变更史的条目与形状」两格，下面分别叫决策文档组、变更史组），2026-09-28 按门禁收缩判决
-# research/prompts/gate-shrink-r1-main-verification.md「采纳的改法」第 2 条合成这一道；每一格的判据、出路、成功行报的数与射程照原样留在那一格的函数上方与函数里。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十六格按下面的次序全跑，格名写错退 2）：
+# kb 里同一件事只许一种写法：决策与分项的状态在哪一处说都一样，索引页与决策相关的登记表与正文对得上；决策正文改了要在变更史留条目，变更史的形状要对。
+# 格名表（--list 打它；各格的中文名写在格函数上方的「格「…」」那一行）：
 # gate-cell: kb-shape kb 形状：分项只许一种叫法、kb 文件不链回自己、规则路径带 .claude/、决策标题与分项两节、索引页分项计数与正文相符
 # gate-cell: item-ref-status 每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符
 # gate-cell: status-redundancy 状态别说两遍：小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行挂在对的节
@@ -30,110 +27,113 @@
 # gate-cell: shape 变更史的形状：日期块住在自己的节、同节同一天只一块、块下是 - 变更项而不是 #### 子条目、不留快查与现状行
 # gate-cell: history-loss 两份变更史与基准相比，基准里每个日期块的数、编号、产物名、引名在改后都找得到（提交前整理不许丢）
 #
-#   格名（--check 用）         格（原中文名）                   判什么
-#   kb-shape                   kb 形状                          1 未定项 / 已定项只许一种叫法；3 kb 文件不许链回自己；4 上游规则路径带 .claude/；
-#                                                               5 决策标题连号带状态、分项两节不串味不重号、标题未定条数与列表相符；7 索引页状态列的分项计数与正文相符
-#   item-ref-status            分项引用状态                     每一处「D<n>（简称） 已定项 k / 未定项 k」写的状态与正文分项表相符（归属规则在 lib-item-ref-status.py）
-#   status-redundancy          状态别说两遍                     小节标题不带「—— 已定」、条目不同时写破折号与「状态：」、分项索引行的「状态：」与所在节一致
-#   cross-decision-status      说未定其实已定                   紧贴「D<n>（简称）」写「未定」，而那条决策的状态行不是待定
-#   settled-item-self-open     已定分项自称未定                 已定项区段里说它自己、或同一条决策里另一条已定分项还没定
-#   settled-ref-says-open      引用写已定紧跟说没定             引用写着「已定项 k」、归属到的那一条也已定，紧跟着却说它没定
-#   stale-open-items           未定项被别处定了                 未定项点名的决策，状态行在这条未定项最近一次复核之后又变过（看 git 历史）
-#   settled-same-file          定了新东西没回看同文件未定项     这次改动在一份决策里新增了「已定」小节，同文件还开着的未定项与索引页的待议节一个字没动（看 diff）
-#   freeze-layer-membership    冻结层归属登记表                 每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项（依据的状态借 lib-item-ref-status.py）
-#   decision-items-sync        决策分项清单与正文同步           decisions.md 的分项清单生成块与索引表「状态」列，与生成器 .claude/scripts/gen-decision-items.py 的输出逐字相同
-#   blocking-verdict           未定项判过改不改新池新建文件的字节   每条未定项都写了「改新池新建文件的字节」与「动不动格式」两把尺的判定（未定项清单取自同一个生成器）
-#   user-verdict-owed          动了用户定案的条款记了未还的账   决策正文里标着「待用户复核」的，checks-owed.md 里要有一笔未还的账点名那条决策
-#   decision-summary-width     决策索引结论列的宽度             决策索引表每一行的「结论」列不超过 decisions.md 那一句写的字数上限
-#   write-frequency            同一结构的写频率只有一个量级     决策正文里一处频率断言落在登记的结构上（叫法在句内、同一表格行或所属标题），与 .claude/gate.d/write-frequency.tsv 登记的说反话
-#                                                               （不同级、否定了登记罩住的时机、「只在 / 仅」限定到别的量）
-#   entry-added                决策正文改了要留条目             决策正文改了，decisions-history.md 里要有新增条目
-#   shape                      变更史的形状                     两份变更史里的日期块住在自己的 `## D<n>（` / `## E<n>（` 节；同一节里同一天只一块；块下是顶格 `- ` 变更项，不许 `#### ` 子条目、「> 快查·」行与「**现状**：」行；新开的块不许空
-#   history-loss               变更史整理不许丢                 两份变更史各拿基准里的那一版与现在的比（research/scripts/history-consolidate.py loss-check）：基准里每个日期块的数、编号、产物名、别的日期、引名，在改后同一块、它指到的家节同日块或引的 git 版本里都找得到
+# 用法：
+#   bash .claude/gate.d/doc-decisions.sh [项目根]                                       十六格都跑；项目根不给取本脚本往上两级
+#   bash .claude/gate.d/doc-decisions.sh --list                                         逐行打格名与判什么，不跑格
+#   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]              只跑点名的格，按格名表的次序
+#   bash .claude/gate.d/doc-decisions.sh --write [--check decision-items-sync] [项目根]  重写 decisions.md 的分项清单生成块与索引表「状态」列，写完回读判一遍
+# 退出码：0 绿；1 有格红（红格逐格接它登记的出路）；77 跑到的格全本次未跑（逐格报进 $GATE_NOT_RUN_FILE）；
+#   2 参数错：认不出的选项、两个项目根、进不去项目根、格名写错、--write 配了 decision-items-sync 之外的格。
+# --list、--check、样本根的 .gate-cells、每格一个子 shell 与逐格汇总都在共用库 lib/stage-cells.sh（写法在它的文件头）。
 #
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析自己的 --write 与项目根。格按上表的次序一格跑完再跑下一格（决策文档组十四格原是并行跑的，并进来之后照共用库逐格跑）。
-#   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路；跑到的格全退 77 ⇒ 整道退 77，不记通过；
-#   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行「本次未跑」。
-#
-# --write 重写一块投影：decision-items-sync（重新生成 decisions.md 的分项清单、改写索引表「状态」列）。给了项目根写那个仓，不给写本脚本所在的仓。
-# --write 可以与 --check decision-items-sync 一起用；与别的格一起用退 2。写完回读判一遍，汇总照同一套退出码。
-#
-# 判别力：fixtures/doc-decisions.sh/ 下每份样本根放 .gate-cells，只跑它点名的格：
-#   <格名>-red                    决策文档组的十四份红样本，各对一格（kb-shape-red、item-ref-status-red……write-frequency-red），必须判红，
-#                                 expect 除那一格自己的 want 外还要汇总里「<格名>：红（退出 1）」那一行
-#   decision-documents-green      决策文档组十四格的绿样本并在一棵树里（setup.sh 改编号、建 lib.rs、造 git 历史与工作区改动），
-#                                 十三格都判绿、整道退 0，写频率那一格没有登记表退 77
-#   write-frequency-green         格「同一结构的写频率只有一个量级」的绿样本（一份决策、登记表与排除表，不是 git 仓），那一格判绿、整道退 0
-#   decision-documents-some-cells-not-run  不是 git 仓、没有分项引用、没有 D15、没有一处「待用户复核」、没有写频率登记表：
-#                                 决策文档组十四格里七格退 77，整道退 0 而那七格逐格报「本次未跑」
-#   decision-history-red          决策首行状态翻了、已提交没推出去、变更史没新增条目；新建的一份 kb 页里有日期与序号粘在一起的标题；
-#                                 （entry-added、shape 两格都红）
-#   shape-cells-marker-red        现场与 decision-history-red 同样两格都红，.gate-cells 只点名 shape：只跑 shape 那一格，汇总只列一格
-#   decision-history-green        决策正文改了 7 行，D1 节里新增一个日期块带一条顶格 `- ` 变更项（两格都绿）
-#   shape-red                     这一轮新增的 a 两处、b 四处、c 两组；基准里另有 a、b、c 各一处存量，只计数
-#   shape-green                   新增的日期块都住对了节、同节日期不重复、块下是顶格 `- ` 变更项、围栏里的旧形态不算；基准里 a、b、c 各一处存量，只计数不判红
-#   shape-red 只点名自己那一格；shape-green 照原样两格（entry-added、shape）一起跑。
-# 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让各份 *-red 整道退 0；=marker-ignored 让 shape-cells-marker-red
-# 十六格都跑、「跑了 1 格」那条 want 找不到；=check-ignored 让 --check 不起作用）。
-# 格的弄坏开关 DOC_DECISIONS_BREAK=<项>（样本自检时设进环境），每一项都让某几份样本判错：
-#   <格名>                                   那一格不跑、按判过了记：那一格的红样本出不来它的红行，绿样本出不来它的成功行
-#   write-frequency-levels-merged            格「同一结构的写频率只有一个量级」把不同级一律判成同级，write-frequency-red 出不来「每次挂载」那一行
-#   write-frequency-negation-asserts         那一格把否定形态也算断言，write-frequency-green 里「不是每个事务推进一次」判红
-#   write-frequency-subject-in-sentence-only 那一格只认句内的叫法，write-frequency-red 出不来 C245 立账那一行（主语只在标题里）的红行
-#   write-frequency-negation-adjacent-only   那一格只认紧挨频率词的否定词，write-frequency-red 出不来「不会在每次发布时写」「每次发布不写」「不再每次发布推进」三行、
-#                                            write-frequency-green 里「不会在每次挂载时推进」「每个事务都不写」当成肯定断言判红
-#   write-frequency-restriction-as-plain     那一格把「只在 / 仅」限定形态当普通断言，write-frequency-red 出不来「只在 fsync 时写」那一行
-#   stock-judged                             shape 把存量也当新增判：shape-green 判红
-#   fused-ignored                            shape 不判 a：shape-red、decision-history-red 里 a 那几条 want 找不到
-#   no-home-ignored                          shape 不判 b：shape-red 里 b 那几条 want 找不到
-#   duplicate-date-ignored                   shape 不判 c：shape-red 里 c 那几条 want 找不到
-#   wrapper-ignored                          shape 不判 d：shape-red 里 `#### `、快查行、现状行那几条 want 找不到
-#   empty-ignored                            shape 不判 e：shape-red 里空日期块那一条 want 找不到
-#
-# ── entry-added：决策正文改了，变更史里要有新增条目 ──
-# 改了决策正文却没在 `.claude/kb/decisions-history.md` 留条目 ⇒ 判红。
-#
-# 为什么判红而不是提醒：`.claude/rules/format-evolution.md`「硬约束」已定决策变更**必须记进**决策变更史，含推翻依据；
-# 而 kb-discipline 又要求正文只写现状 ⇒ **被推翻的那句话会被直接改掉**，
-# 不留条目就等于它从未存在过，三个月后没人知道它为什么不算数了。
-#
-# ⚠️ 判据是「有没有新增条目」，不判「条目写得对不对」——后者只有人能判。
-# 条目数按新增的顶格 `- ` 变更项数（一条改动一个）；一个都没加的，按新增的 `### 日期` 标题数。
-#
-# 改动范围：基准取共用库 research/scripts/changed-paths.sh 的 gate 取法（与 doc-process-records.sh、这一道 settled-same-file 格「定了新东西没回看同文件未定项」同一份）：
-# 这一轮已经提交、还没推出去的决策改动也算，不只看 HEAD 之后的——先提交决策改动再跑门禁，基准是 HEAD 就什么都看不见。
-# 小改动：决策正文增删合计不超过 4 行、而且一行状态都没碰（首行「## D<n> 简称 —— 状态」、「状态：」标记、
-# 已定项 / 未定项的标题），不要求变更史，这一格退 77 记「本次未判」，不记通过；碰了状态行的照常判。
-#
-# ⚠️ **这一格自己恒绿过一段时间**（2026-08-29 复跑复核轮查出）：两个路径被塞进一个变量再加引号，
-# `git diff -- "$KB"` 于是拿一个「两条路径粘成的字符串」当单个 pathspec，**匹配不到任何文件**。
-# 加上历史外置到 decisions-history.md 之后仍在决策正文里找 `### 2026-`，判据也早已错位。
-# ⇒ 路径改成数组，历史条目改到正确的文件里数。
-#
-# ── shape：变更史的形状 ──
-# 变更史的形态是「条目 → 日期 → 变更清单」：每条决策 / 实验一个 `## D<n>（` / `## E<n>（` 节，节里按 `### YYYY-MM-DD` 分块，
-# 块下每条改动一个顶格的 `- ` 变更项（正文缩进在项下）；没有 `#### ` 子条目、「（其N）」、「> 快查·」两行与节顶「**现状**：」行。
-# 判五样：
-#   a) `.claude/kb/` 下任何一份 .md 里，`### 20YY-MM-DD` 后面直接跟「（其…）」：日期与序号粘在同一个标题里的旧形态。
-#   b) decisions-history.md 里每个 `### 日期` 的上一级标题是 `## D<n>（`，experiments-history.md 里是 `## E<n>（`：
-#      落在节外（文件头下面、`## 不挂在某一条决策上的` 这类别的节里）是条目忘了放进决策 / 实验自己的节。
-#      文件自己文末的「## 历史版本」里的日期块不算节外；但块里标题或 `- ` 项点名了 `D<n>（` / `E<n>（` 的，是那条决策 / 实验的条目写错了地方，照样判红。
-#   c) 同一个 `## D<n>（` / `## E<n>（` 节里，同一个日期的 `### ` 标题出现两次以上（按标题开头的日期比）。
-#   d) 两份变更史里出现 `#### ` 子条目、「> 快查·」行或「**现状**：」行：旧形态的包装。变更写成 `- ` 项，结论写进项里，现状只在索引表里。
-#   e) 两份变更史里某个 `## D<n>（` / `## E<n>（` 节下的 `### 日期` 块一条 `- ` 变更项都没有：空块。
-# 只判这一轮新增的：基准与 entry-added 同一个（gate_diff_base gate）。a、d 看那一行是不是新增的；
-#   b 看日期块的 `### ` 行或块里某一行是不是新增的；c 看重复的几行里有没有一行是新增的；e 看那个 `### ` 行是不是新增的。
-#   基准里就有的（规则改形态之前写下、等搬迁的存量）只计数写进输出，不判红——与上游 history-ordinal.sh 对存量撞号同一个口径。
-#   新增行按行号取（`git diff -U0` 的 hunk 头，未跟踪的文件整份算新增）：
-#   共用库 changed-paths.sh 的 gate_added_lines 只给行文、不给行号，所以这里另解析一次。
-#   不在 git 仓里没有基准：整棵树都按新增判，输出里写明。围栏代码块里的行不算。
-# ⚠️ 判不了：变更项写得对不对、一条改动该点名的决策或实验点没点全、日期块排没排成倒序——这几样靠人。
-#
-#   bash .claude/gate.d/doc-decisions.sh [项目根]                                     十六格都跑
-#   bash .claude/gate.d/doc-decisions.sh --list                                       逐行打格名与判什么，不跑格
-#   bash .claude/gate.d/doc-decisions.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
-#   bash .claude/gate.d/doc-decisions.sh --write [--check <格名>[,<格名>…]] [项目根]   重写一块投影（分项清单与索引表状态列），再回读判一遍
+# 样本 fixtures/doc-decisions.sh/，每份样本根的 .gate-cells 点名只跑哪几格：
+#   <格名>-red（前十四格各一份，kb-shape-red … write-frequency-red）  那一格判红、汇总有「<格名>：红（退出 1）」；各份犯了什么写在那一格函数上方
+#   decision-documents-green                前十四格的绿样本并在一棵树里（setup.sh 造 git 历史与工作区改动）：十三格绿，write-frequency 没有登记表退 77，整道退 0
+#   write-frequency-green                   write-frequency 的绿样本（不是 git 仓），那一格绿；判绿靠的几句写在那一格函数上方
+#   decision-documents-some-cells-not-run   不是 git 仓，没有分项引用、D15、「待用户复核」与写频率登记表：七格退 77 逐格报本次未跑，整道退 0
+#   decision-history-red                    决策首行状态翻了、已提交没推出去、变更史没新增条目，新 kb 页里日期与序号粘在一起：entry-added、shape 都红
+#   shape-cells-marker-red                  现场同 decision-history-red，.gate-cells 只点名 shape：汇总只列一格
+#   decision-history-green                  决策正文改了 7 行，D1 节新增一个带一条顶格 `- ` 项的日期块：entry-added、shape 都绿
+#   shape-red                               shape 的 a 到 e 五样都有新增的，基准里另有存量只计数：shape 红
+#   shape-green                             新增的日期块都住对节、同节日期不重复、围栏里的旧形态不算，存量只计数：shape 绿、entry-added 本次未跑
+#   history-loss-red / history-loss-green   基准里一块带一个数：整理时弄丢了判红；整理成一条结论、数都在判绿
+# 弄坏开关（样本自检时设进环境）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-decisions.sh/ 下的目录名，
+# 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   STAGE_CELLS_BREAK=red-swallowed  归共用库：红格按绿记、整道退 0
+#       blocking-verdict-red、cross-decision-status-red、decision-history-red、decision-items-sync-red、decision-summary-width-red、
+#       freeze-layer-membership-red、history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、
+#       settled-same-file-red、shape-cells-marker-red、shape-red、stale-open-items-red、status-redundancy-red、user-verdict-owed-red、
+#       write-frequency-red（期望退出 1，实测 0）
+#   STAGE_CELLS_BREAK=marker-ignored  归共用库：不认样本根的 .gate-cells，每份样本把登记的格都跑
+#       blocking-verdict-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
+#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-red、shape-red、
+#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       decision-documents-green、decision-history-green、history-loss-green、shape-green（期望退出 0，实测 1）；
+#       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
+#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#   STAGE_CELLS_BREAK=check-ignored  归共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
+#       blocking-verdict-red、cross-decision-status-red、decision-items-sync-red、decision-summary-width-red、freeze-layer-membership-red、
+#       history-loss-red、item-ref-status-red、kb-shape-red、settled-item-self-open-red、settled-ref-says-open-red、settled-same-file-red、shape-red、
+#       stale-open-items-red、status-redundancy-red、user-verdict-owed-red、write-frequency-red（输出里找不到「doc-decisions.sh：1 格里 1 格红…」）；
+#       decision-documents-green、decision-history-green、history-loss-green、shape-green（期望退出 0，实测 1）；
+#       decision-documents-some-cells-not-run（输出里找不到「doc-decisions.sh：14 格里 7 格绿…」）；decision-history-red（输出里找不到「doc-decisions.sh：2 格里 2 格红…」）；
+#       shape-cells-marker-red（输出里找不到「样本只跑 .gate-cells 点名的格：shape」）；write-frequency-green（输出里找不到「doc-decisions.sh：1 格里 1 格绿…」）
+#   DOC_DECISIONS_BREAK=kb-shape  kb-shape 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「决策标题与未定项列表相符，且两节没有互相串味…」）；kb-shape-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=item-ref-status  item-ref-status 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「分项引用与正文状态一致…」）；decision-documents-some-cells-not-run（输出里找不到「  item-ref-status：本次未跑」）；
+#       item-ref-status-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=status-redundancy  status-redundancy 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「状态只说一遍，且分项都在对的节里…」）；status-redundancy-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=cross-decision-status  cross-decision-status 格不跑、按判过了记
+#       cross-decision-status-red（期望退出 1，实测 0）；decision-documents-green（输出里找不到「没有把已定的决策说成未定…」）
+#   DOC_DECISIONS_BREAK=settled-item-self-open  settled-item-self-open 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「已定项的正文没有把已经定了的东西说成未定…」）；settled-item-self-open-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=settled-ref-says-open  settled-ref-says-open 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「扫了 29 个文件、43 处已定项引用，没有一处紧跟着说它没…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-ref-says-open：本次未跑」）；
+#       settled-ref-says-open-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=stale-open-items  stale-open-items 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「没有未定项被别处的更新甩在后面…」）；decision-documents-some-cells-not-run（输出里找不到「  stale-open-items：本次未跑」）；
+#       stale-open-items-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=settled-same-file  settled-same-file 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「同文件的未定项与索引页的待议节都被回头看过…」）；decision-documents-some-cells-not-run（输出里找不到「  settled-same-file：本次未跑」）；
+#       settled-same-file-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=freeze-layer-membership  freeze-layer-membership 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「冻结层归属登记表判过了…」）；decision-documents-some-cells-not-run（输出里找不到「  freeze-layer-membership：本次未跑」）；
+#       freeze-layer-membership-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=decision-items-sync  decision-items-sync 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「决策索引表状态列与正文同步（21 条决策）」）；decision-items-sync-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=blocking-verdict  blocking-verdict 格不跑、按判过了记
+#       blocking-verdict-red（期望退出 1，实测 0）；decision-documents-green（输出里找不到「13 条未定项两把尺都判过」）
+#   DOC_DECISIONS_BREAK=user-verdict-owed  user-verdict-owed 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「待用户复核的条款都有未还的账盯着」）；decision-documents-some-cells-not-run（输出里找不到「  user-verdict-owed：本次未跑」）；
+#       user-verdict-owed-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=decision-summary-width  decision-summary-width 格不跑、按判过了记
+#       decision-documents-green（输出里找不到「决策索引结论列都不超 200 字（共 21 行）」）；decision-summary-width-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=write-frequency  write-frequency 格不跑、按判过了记
+#       decision-documents-green、decision-documents-some-cells-not-run（输出里找不到「  write-frequency：本次未跑」）；write-frequency-green（输出里找不到「同一结构的写频率只有一个量级…」）；
+#       write-frequency-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=entry-added  entry-added 格不跑、按判过了记
+#       decision-history-green（输出里找不到「决策正文改了 7 行，变更史新增 1 条条目」）；decision-history-red（输出里找不到「决策正文改了 2 行（碰了 2 行状态行，不按小改动放行），…」）；
+#       shape-green（输出里找不到「doc-decisions.sh：2 格里 1 格绿…」）
+#   DOC_DECISIONS_BREAK=shape  shape 格不跑、按判过了记
+#       decision-history-green（输出里找不到「查了 3 份 kb 文件、1 个 `### 日期` 标题…」）；decision-history-red（输出里找不到「.claude/kb/invariants.md:5  ##…」）；
+#       shape-cells-marker-red、shape-red（期望退出 1，实测 0）；shape-green（输出里找不到「变更史的形状对：查了 7 份 kb 文件、11 个 `###…」）
+#   DOC_DECISIONS_BREAK=history-loss  history-loss 格不跑、按判过了记
+#       history-loss-green（输出里找不到「变更史整理没丢：查了 1 份，基准里每个日期块的数、编号、产…」）；history-loss-red（期望退出 1，实测 0）
+#   DOC_DECISIONS_BREAK=write-frequency-levels-merged  write-frequency 不同级一律判同级
+#       write-frequency-green（期望退出 0，实测 1）；write-frequency-red（输出里找不到「01-写频率样本甲.md:11「系统配置槽」写成「每次挂载」…」）
+#   DOC_DECISIONS_BREAK=write-frequency-negation-asserts  write-frequency 否定形态也算断言
+#       write-frequency-green（期望退出 0，实测 1）；write-frequency-red（输出里找不到「01-写频率样本甲.md:11「tail」否定了「每次发布」…」）
+#   DOC_DECISIONS_BREAK=write-frequency-subject-in-sentence-only  write-frequency 叫法只从句内认
+#       write-frequency-green（输出里找不到「同一结构的写频率只有一个量级…」）；write-frequency-red（输出里找不到「01-写频率样本甲.md:23「tail」（叫法在所属标题）…」）
+#   DOC_DECISIONS_BREAK=write-frequency-negation-adjacent-only  write-frequency 否定词只认紧挨频率词的
+#       write-frequency-green（期望退出 0，实测 1）；write-frequency-red（输出里找不到「01-写频率样本甲.md:12「系统配置槽」否定了「每次发布…」）
+#   DOC_DECISIONS_BREAK=write-frequency-restriction-as-plain  write-frequency「只在 / 仅」当普通断言
+#       write-frequency-green（输出里找不到「同一结构的写频率只有一个量级…」）；write-frequency-red（输出里找不到「01-写频率样本甲.md:15「系统配置槽」用「只在 / 仅…」）
+#   DOC_DECISIONS_BREAK=stock-judged  shape 把存量也当新增判
+#       shape-green（期望退出 0，实测 1）；shape-red（输出里找不到「2 处新写的标题把日期与「（其N）」粘在同一个 `### `…」）
+#   DOC_DECISIONS_BREAK=fused-ignored  shape 不判 a（日期与序号粘在一起）
+#       decision-history-red（输出里找不到「.claude/kb/invariants.md:5  ##…」）；shape-cells-marker-red（期望退出 1，实测 0）；
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「2 处新写的标题把日期与「（其N）」粘在同一个 `### `…」）
+#   DOC_DECISIONS_BREAK=no-home-ignored  shape 不判 b（日期块没住进自己的节）
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「4 个新写的日期块没住进自己的节」）
+#   DOC_DECISIONS_BREAK=duplicate-date-ignored  shape 不判 c（同节同一个日期开几块）
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「2 组同一节里同一个日期开了几个 `### ` 块」）
+#   DOC_DECISIONS_BREAK=wrapper-ignored  shape 不判 d（旧形态包装）
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「3 行新写进变更史的旧形态包装…」）
+#   DOC_DECISIONS_BREAK=empty-ignored  shape 不判 e（日期块下没有变更项）
+#       shape-green（输出里找不到「存量（基准里就有，等搬迁，只计数不判红）：日期与序号粘在一起…」）；shape-red（输出里找不到「1 个新开的 `### 日期` 块下一条 `- ` 变更项都…」）
 set -uo pipefail
 # 路径要在 cd 之前算：$0 是相对路径时，cd 进项目根之后就指不到了
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
@@ -144,12 +144,11 @@ REPO_ROOT="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_RELATIVE_PATH=".claude/gate.d/$(basename "${BASH_SOURCE[0]}")"
 LIB_ITEM_REF_STATUS="$GATE_DIRECTORY/lib-item-ref-status.py"
 LIB_CHANGED_PATHS="$REPO_ROOT/research/scripts/changed-paths.sh"
-# 生成器按本脚本自己所在的仓取，不按项目根：样本在只放着样本 kb 的临时目录里跑，那里没有 .claude/scripts/
+# 生成器按本脚本所在的仓取、不按项目根：样本根里没有 .claude/scripts/（坑见格 blocking-verdict）
 GENERATOR="$REPO_ROOT/.claude/scripts/gen-decision-items.py"
 DECISION_ITEMS_WRITE=0
 BREAK_SWITCH="${DOC_DECISIONS_BREAK:-}"
-# gate.sh 与阶段之间的握手变量只留给共用库在汇总时写，不导出给各格起的子进程
-# （`.claude/singlefs-ai-sop/rules/command-safety.md`「进程边界上的三种静默失效」）
+# 握手变量 GATE_NOT_RUN_FILE 只留给共用库汇总时写，不导出给各格的子进程（command-safety.md「进程边界上的三种静默失效」）
 export -n GATE_NOT_RUN_FILE 2>/dev/null || true
 source "$STAGE_DIR/lib/stage-cells.sh"
 bad() { printf '  ✗ %s\n' "$*"; }
@@ -212,10 +211,9 @@ done
 ROOT="${root_argument:-$REPO_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 
-# ════════════════ 决策文档组的十四格（kb 形状与决策文档） ════════════════
+# ════════════════ 前十四格：决策正文、索引页与登记表 ════════════════
 
-# ── 决策索引表的「状态」列 vs 各决策正文（格「kb 形状」第 5 段取它的 declared_open_count，第 7 段整份跑它的 main）──
-# 只有格「kb 形状」用它，所以住在这里、不另立库文件；第 5 段把它读成模块，第 7 段 python3 -c 直接跑。
+# 决策索引表「状态」列对各决策正文：只有格「kb 形状」用（第 5 段读成模块取 declared_open_count，第 7 段 python3 -c 跑 main），所以不另立库文件。
 IFS= read -r -d '' INDEX_VS_BODY_SOURCE <<'PY' || true
 """决策索引表的「状态」列 vs 各决策正文（格「kb 形状」第 7 段用）。
 
@@ -235,8 +233,7 @@ IFS= read -r -d '' INDEX_VS_BODY_SOURCE <<'PY' || true
 """
 import re, sys
 
-# 标题里声明的未定条数：阿拉伯数字，或 1–99 的中文数字（「十一」「二十三」「两」）。
-# 格「kb 形状」第 5 段读同一份（不各抄一份）：中文数字只认一个字时，「十一项未定」会被读成「一项未定」。
+# 标题里声明的未定条数：阿拉伯数字或 1–99 的中文数字；第 5 段读同一份。只认一个字的中文数字会把「十一项未定」读成「一项未定」。
 TITLE_OPEN_COUNT = re.compile(r'([0-9]+|[一二两三四五六七八九十]+)\s*[项条]未定')
 CHINESE_DIGITS = {"一": 1, "二": 2, "两": 2, "三": 3, "四": 4, "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
 
@@ -288,9 +285,8 @@ def count_items(body):
         seg = m.group(1) if m else ""
         cut = re.search(r'^#{4}\s', seg, flags=re.M)
         top = seg[:cut.start()] if cut else seg
-        # 表格行要有**闭合的第二根竖线**，与 `.claude/scripts/gen-decision-items.py` 的 harvest、
-        # `.claude/gate.d/lib-item-ref-status.py` 的分项表逐字同口径：口径不一时，一行畸形表格
-        # 会一边数得到、一边数不到，而两边都不报错。
+        # 表格行要有闭合的第二根竖线，与 gen-decision-items.py 的 harvest、lib-item-ref-status.py 同口径：
+        # 口径不一时一行畸形表格一边数得到、一边数不到，两边都不报错。
         got.append(len(re.findall(r'^\|\s*(\d+)\s*\|[^|]*\|', top, flags=re.M))
                    or len(re.findall(r'^\d+\.\s', top, flags=re.M)))
     return got[0], got[1]
@@ -304,8 +300,7 @@ def main():
     for p in bodies:
         body = open(p, encoding="utf-8").read()
         t = body.split("\n", 1)[0]
-        # 破折号前的空格是可选的（D14 的标题就没有）。老版本只认带空格的写法，
-        # 于是那一条决策**整条被跳过**，而输出里看不出少核了一条 —— 现在读不出来就判红。
+        # 破折号前的空格可选（D14 的标题就没有）；读不出首行判红，跳过会让少核一条在输出里看不出来。
         m = re.match(r'## (D\d+) .+?\s*——\s*(.+)$', t)
         if not m:
             print(f"  ✗ {p} 首行读不出 `## D<n> 简称 —— 状态`：{t[:40]}")
@@ -323,7 +318,6 @@ def main():
             continue
         seen += 1
         isx = row.group(1).strip()
-        # 正文里实际有几条分项 —— 本段自己数的那一份
         n_settled, n_open = count_items(body.split("\n## 历史版本")[0])
 
         mc, mn = CELL.match(isx), NOITEM.match(isx)
@@ -350,7 +344,7 @@ def main():
             print("       改完正文跑 bash .claude/gate.d/doc-decisions.sh --write")
             fail = 1
             continue
-        # 正文标题若自己声明了未定条数，也要与实数相符（写在标题里的那句同样会被检索到）；没声明就是 0
+        # 标题声明的未定条数也要与实数相符（标题同样会被检索到）；没声明按 0
         declared = declared_open_count(bs)
         if declared is not None and declared[0] is None:
             print(f"  ✗ {num} 正文标题写「{declared[1]}」，里面的数认不出来")
@@ -375,8 +369,7 @@ if __name__ == "__main__":
     main()
 PY
 
-# ── 格「未定项被别处定了」的复核判据：一条未定项对它点名的决策 Dn，最近一次「复核」是什么时候 ──
-# 只有那一格用它，所以住在这里、不另立库文件；那一格逐条 python3 -c 跑它。
+# 格「未定项被别处定了」的复核判据：只有那一格用（逐条 python3 -c 跑），所以不另立库文件。
 IFS= read -r -d '' OPEN_ITEM_REVIEW_SOURCE <<'PY' || true
 """格「未定项被别处定了」的复核判据：一条未定项对它点名的决策 Dn，最近一次「复核」是什么时候。
 
@@ -440,12 +433,11 @@ def head_start_index(head_lines, work_first_line):
 
 def history_of_block(path, first_line_number, last_line_number):
     """条目块的历史（HEAD 里第 first..last 行，从 1 数）：[(提交时间, 改前, 改后)]，新的在前。"""
-    # --no-color 写死：使用者配了 color.ui / color.diff = always 时，每行前面多一段转义码，
-    # 「@@」「+」「-」一个都认不出，复核过的条目被读成没复核（绿样本 setup.sh 配的就是这种）。
+    # --no-color 写死：配了 color.ui = always 时行首多转义码，「@@」「+」「-」都认不出（绿样本 setup.sh 就这样配）。
     result = subprocess.run(['git', 'log', '--no-color', '-L', f'{first_line_number},{last_line_number}:{path}', '--format=%x00%ct'],
                             capture_output=True, text=True)
     if result.returncode != 0:
-        # 失败时 stdout 可能是空的，也可能是半截（-L 边走边打）：两种都不能当成历史用
+        # 失败时 stdout 可能是半截（-L 边走边打），不能当历史用
         reason = (result.stderr.strip().splitlines() or ['（git 没说原因）'])[-1]
         raise BlockHistoryUnavailable(f'git log -L {first_line_number},{last_line_number}:{path} 退出码 {result.returncode}：{reason}')
     log = result.stdout
@@ -497,7 +489,7 @@ def main():
         print(f'  取不到条目块的历史，这一条没比：{error}', file=sys.stderr)
         sys.exit(3)
     if not history:
-        # 退 0 却一个提交都没交出来：条目块在 HEAD 里，就一定有引入它的那次提交；什么都没有是判不了，不是「复核过了」
+        # 条目块在 HEAD 里就一定有引入它的提交：退 0 却一个都没交出来是判不了，不是「复核过了」
         print(f'  git log -L 对 {path} 第 {head_start + 1}–{head_end + 1} 行一个提交都没交出来，这一条没比', file=sys.stderr)
         sys.exit(3)
     for decision, changed_at in dependencies:
@@ -514,16 +506,8 @@ if __name__ == '__main__':
 PY
 
 # ════ 格「kb 形状」════
-# 查「同一件事在 kb 里有两种写法」。指代（位置指代、自指称呼、时间指代）由上游 doc-lint.sh 判，这里不重复。
-#
-# 为什么这几条要判红而不是写成提醒：
-#   kb 按「被单条取出」设计（.claude/singlefs-ai-sop/rules/kb-discipline.md）。
-#   同一概念两个名字（未答项 / 未定项）会让按其中一个名字的检索漏掉另一半；
-#   标题里写死的条数与列表对不上，检索到标题的人拿到的就是错的。
-#
-# 判别力：fixtures/doc-decisions.sh/kb-shape-red 每一段都至少犯一次，必须判红；decision-documents-green 必须判绿。
-# 第 7 段「一条决策的索引行都没核到」与「状态列的分项计数与正文不符」互斥（后者要先核到一行），
-# 红样本里放的是后者。
+# 同一件事在 kb 里只许一种写法（.claude/singlefs-ai-sop/rules/kb-discipline.md）；位置、自指、时间指代归上游 doc-lint.sh。
+# 样本：kb-shape-red 每一段至少犯一次；第 7 段的两种红互斥，放的是「状态列的分项计数与正文不符」。
 grid_kb_shape() (
   KB=.claude/kb
   fail=0
@@ -531,8 +515,7 @@ grid_kb_shape() (
   ok()  { printf '  ✓ %s\n' "$*"; }
   howto() { printf '     → %s\n' "$*"; }
 
-  # 扫的文件装进数组，不靠 $(find …) 的分词：文件名里有空格时会被切成两个不存在的路径，
-  # 而 grep 打不开它们的报错原先丢进 /dev/null——那一份里写了什么都判不到。
+  # 文件装进数组，不靠 $(find …) 的分词：带空格的文件名会被切成两个不存在的路径
   kb_md_files=()
   while IFS= read -r -d '' found_file; do kb_md_files+=("$found_file"); done \
     < <(find "$KB" -name '*.md' -print0 2>/dev/null)
@@ -543,9 +526,8 @@ grid_kb_shape() (
   kb_and_rule_md_files=(${kb_md_files[@]+"${kb_md_files[@]}"} ${rule_md_files[@]+"${rule_md_files[@]}"})
   grep_error_file="$(mktemp)"
   trap 'rm -f "${grep_error_file:?}"' EXIT
-  # 用法：grep_files <这一段叫什么> <grep 参数…> -- <文件…>；命中写进 $grep_hits。
-  # 退 0：都读到了。退 1：一份要扫的文件都没有（判红）。退 2：有文件读不了（判红；读到的那些照样交命中）——
-  # 出错的那几份里写了什么都没判，不能读成「没命中」，所以调用方只在退 0 时报绿。
+  # 用法：grep_files <段名> <grep 参数…> -- <文件…>；命中写进 $grep_hits。
+  # 退 0 都读到了；退 1 没有要扫的文件；退 2 有文件读不了（读到的照样交命中）。非 0 都已判红，调用方只在退 0 时报绿。
   grep_files() {
     local stage_label="$1" grep_exit_code=0; shift
     local -a grep_options=()
@@ -583,10 +565,8 @@ grid_kb_shape() (
 
   echo
   echo "── 3. 文件内自指链接 ──"
-  # 扫 kb 下每一份 .md：链接目标（去掉 #锚点）按这份文件自己的目录解析之后就是它自己，判红。
-  # 历史类文件（`*-history.md`、`decisions-history/` 下的月份文件）整份跳过：它们逐字记着当时的原文，
-  # 里面抄录的链接多半是当时的原文，这一道分不出哪一句换了会成假话，所以整份不判；这是这一道的射程，
-  # 不是豁免：`.claude/rules/path-moves.md`「改一个全仓术语：正文之外还有五处会红」里「历史类文件同样换名」那一段要逐句判，历史类文件里的自链靠人看。
+  # 历史类文件（*-history.md、decisions-history/ 下）整份不判：里面是当时的原文，分不出哪一句换了会成假话；
+  # 它们里的自链靠人看（.claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」）。
   self_link_report=$(python3 - "$KB" <<'PY'
 import os, re, sys, glob
 kb = sys.argv[1]
@@ -634,12 +614,9 @@ PY
 
   echo
   echo "── 5. 决策标题：编号连续、带状态；分项两节严格分开、未定条数与列表相符 ──"
-  # ⚠️ 2026-08-29：此前这一段只读 decisions.md，而决策正文早已拆到 decisions/ 下，
-  # decisions.md 里一个 `## D<n>` 标题都没有 ⇒ **整段恒绿**，标题声明的未定项条数从没被核过。
-  # 现在逐个读 decisions/*.md。
   INDEX_VS_BODY_SOURCE="$INDEX_VS_BODY_SOURCE" python3 - $KB/decisions/*.md <<'PY'
 import os, re, sys, types
-# 标题里未定条数的读法与第 7 段同一份（INDEX_VS_BODY_SOURCE 的 declared_open_count），不各抄一份
+# 标题里未定条数的读法与第 7 段同一份（INDEX_VS_BODY_SOURCE 的 declared_open_count）
 lib_index_vs_body = types.ModuleType("lib_index_vs_body")
 exec(compile(os.environ["INDEX_VS_BODY_SOURCE"], "INDEX_VS_BODY_SOURCE", "exec"), lib_index_vs_body.__dict__)
 body = ""
@@ -656,7 +633,7 @@ def bad(m, how=""):
         print(f"     → {how}")
     fail = 1
 
-# 编号连续（每个文件一个标题，按文件名顺序读进来，所以直接比对）
+# 编号连续：每个文件一个标题、按文件名次序读入，所以直接比
 nums = [int(m.group(1)) for m in re.finditer(r'^## D(\d+) ', body, flags=re.M)]
 if not nums:
     bad("一个 `## D<n>` 标题都没读到——这一段又变成恒绿了，先修检查再谈别的",
@@ -665,7 +642,6 @@ elif nums != list(range(1, len(nums) + 1)):
     bad(f"决策编号不连续或不从 D1 起：{nums}",
          "决策编号必须从 D1 起连号；废弃一条也要留占位并在变更史里写明。")
 
-# 切成每条决策
 starts = [m.start() for m in re.finditer(r'^## D\d+ ', body, flags=re.M)]
 starts.append(len(body))
 decision_count = len(starts) - 1
@@ -675,9 +651,7 @@ for a, b in zip(starts, starts[1:]):
     if not re.search(r'——\s*(已定|半定|待定)', title):
         bad(f"标题缺状态（已定/半定/待定）：{title[:50]}",
             "首行写成 `## D<n> 简称 —— 已定/半定/待定（…）`，索引行要与它一致。")
-    # 分项分住两节：「### 已定项」全是已定的，「### 未定项」全是未定的。
-    # 只看每节的**索引**（第一个 `####` 之前那一段）——之后是各分项各自的论证，
-    # 那里面另有编号列表，混进来会把论证的第 1/2/3 条当成分项。
+    # 只看每节第一个 `####` 之前的索引：之后是各分项的论证，里面另有编号列表
     def index_of(head):
         sec = re.search(r'^### %s$(.*?)(?=^#{1,3} |\Z)' % head, blk, flags=re.M | re.S)
         if not sec:
@@ -685,21 +659,9 @@ for a, b in zip(starts, starts[1:]):
         t = sec.group(1)
         cut = re.search(r'^#{4}\s', t, flags=re.M)
         return t[:cut.start()] if cut else t
-    # ① + ② 严格区分：每条分项索引行必须**自带状态词**，且那个状态词要与它所在的小节一致。
-    #    kb 按「被单条取出」设计（kb-discipline 第 1 条）：检索端出来的是那一行，
-    #    不是它上面的小节标题 ⇒ 状态只挂在位置上，单条取出时状态就没了。
-    #
-    #    ⚠️ **判状态之前必须先剥掉自引用短语**（「正文见 D2（RAID 条带策略）「已定项 2」」）。
-    #    第一版没剥，于是本仓通行的那句自引用**本身就含「已定项」三个字**，
-    #    足以让一条状态词被整段删空的行照样通过——2026-08-30 的对抗验证用故障注入当场击穿。
-    #    ⚠️ **也不许只认加粗写法**：第一版的正则是 `\*\*未定` 与 `——\s*已定`，
-    #    把状态词写成不加粗的「未定」就逃过去了，同一轮验证一并击穿。
-    #    ⚠️ **也不许靠「取行内第一个状态词」来猜**：一条合法的分项常常先提到**别处**的状态
-    #    （D12 未定项 3 逐字是「判据已定（2026-08-27），但答案的前置未定」，
-    #    D13 未定项 2 先提到「D8（核心索引结构） 已定的 write buffer」）——猜法当场两条假阳性。
-    #    现在要求每行带一个**规范标记**「状态：已定」/「状态：未定」，判据因此不是猜的。
-    #    ⚠️ **判不了的那一半**：行首状态词写对、而后半句自相矛盾（「未定：…这一条已定为…」），
-    #    本检查看不见。落点 [checks-owed.md](../kb/checks-owed.md) C51（分项引用只验状态不验身份）。
+    # ①② 每条分项索引行要带规范标记「状态：已定 / 未定」且与所在节一致：单条取出时出来的是这一行，不是小节标题。
+    #    不靠「取行内第一个状态词」猜：合法分项常先提别处的状态。加粗与不加粗都认。
+    #    判不了：标记写对而后半句自相矛盾，欠账 C51（分项引用只验状态不验身份）。
     for head in ("已定项", "未定项"):
         seg = index_of(head)
         if not seg:
@@ -719,13 +681,7 @@ for a, b in zip(starts, starts[1:]):
                 bad(f"{title.split()[1]} {head}里有一条分项的状态标记写着「{marks[0]}」："
                     f"{row[:56]}",
                     "要么把它挪到对应的小节去（编号不变），要么改正状态标记；两节的编号是同一套。")
-    # ③ 已定项那一侧的正文不许自陈「还没定」。
-    #    实测（2026-08-30 五轮验证）：D23 已定项 8 的正文末尾留着一句
-    #    「只走了本地腿，两条云端腿欠着——所以它落成未定项，不是定案」，
-    #    而同一分项的标题、以及下游三条分项都以它已定为前提。**状态一致性检查看不见这一类**：
-    #    它比的是引用处与索引表，比不了同一分项正文内部自相矛盾。
-    #    措辞是窄的、只认「说本项自己没定」那几句，避免误伤「别处仍未定」这种合法陈述
-    #    （本仓当前 0 假阳性：同样的词在未定项小节里 0 命中）。
+    # ③ 已定项一侧的正文不许自陈本项没定；措辞只认「说本项自己没定」那几句，不误伤「别处仍未定」。
     SELF_UNDECIDED = r'不是定案|落成未定项|退回未定|本项未定|本项仍未定|本项还没定|该项未定|仍未定案|尚未定案'
     regions = []
     m0 = re.search(r'^### 已定项\s*$(.*?)(?=^### |\Z)', blk, flags=re.M | re.S)
@@ -741,9 +697,7 @@ for a, b in zip(starts, starts[1:]):
             bad(f"{title.split()[1]} 已定项一侧的正文自陈还没定："
                 f"…{reg[a:hit.end() + 10]}…",
                 "正文只写现状：定了就删掉这句陈旧的证据等级；真没定就把这条分项挪回未定项小节。")
-    # ④ 两节合起来，编号必须**唯一且从 1 连到 n**。
-    #    一条决策的分项只有一套编号，分住两节；重号会让「D8 已定项 2」同时指两件事，
-    #    断号会让读的人以为中间那条被删了。两者都不改任何状态词 ⇒ 前两条检查看不见。
+    # ④ 两节共用一套编号，合起来要唯一且从 1 连到 n：重号让一个号指两件事，断号像有分项被删
     nums = []
     for head in ("已定项", "未定项"):
         seg = index_of(head)
@@ -760,7 +714,6 @@ for a, b in zip(starts, starts[1:]):
             bad(f"{title.split()[1]} 分项编号不是从 1 连到 {len(nums)}：{sorted(nums)}",
                 "断号说明有分项被删了却没交代。要么补回那一条，要么在变更史里写明它去哪了。")
     # ⑤ 标题声明的未定条数与「### 未定项」小节的分项数相符
-    #    中文数字按 1–99 读（「十一项未定」是 11，不是 1），读法在 INDEX_VS_BODY_SOURCE
     declared = lib_index_vs_body.declared_open_count(title)
     if declared is None:
         continue
@@ -794,11 +747,7 @@ PY
 
   echo
   echo "── 7. 决策索引表的状态列（分项计数）vs 正文实际分项数 ──"
-  # ⚠️ 2026-08-30 实测踩过：给 D21 加了两个未定项、改了正文标题（两项→四项），
-  # 而 decisions.md 的索引行还写「两项未定」。第 5 段只比「正文标题 vs 正文列表」，
-  # 索引页在它的视野之外 ⇒ 这类不一致此前无人拦。
-  # ⚠️ 本段**自己数正文**，不经过 gen-decision-items.py：写回索引页的是那个生成器，
-  # 格「决策分项清单与正文同步」拿它的输出与索引页逐字比对 ⇒ 生成器数错时两边一起错，只有本段会红。
+  # 本段自己数正文、不经生成器（理由在 INDEX_VS_BODY_SOURCE 的文档串）
   if python3 -c "$INDEX_VS_BODY_SOURCE" "$KB/decisions.md" $KB/decisions/*.md; then :; else fail=1; fi
 
   echo
@@ -807,45 +756,25 @@ PY
 )
 
 # ════ 格「分项引用状态」════
-# 每一处「D<n>（简称） 已定项 k / 未定项 k」的前缀都在**断言那条分项的状态**。
-# 写错了没有任何东西会发现：检索会把「已定项 5」当成已经定了的东西端出去，
-# 而它可能还开着——这正是 kb-discipline 第 4 条「矛盾比空白更糟」说的那种坏法
-# （检索不会把两条都端出来，它会挑一条，而且不告诉你它挑了）。
-#
-# 权威是各决策正文的「### 已定项」与「### 未定项」两张索引表；
-# 引用处一律是投影。扫 kb / records / research / crates 全域，含 .rs 注释。
-# 判据、出路与成功行都在 lib-item-ref-status.py 的 main（同一份库另有调用方：格「冻结层归属登记表」与 research/scripts/relabel-item.py）。
-# 判别力：fixtures/doc-decisions.sh/item-ref-status-red 必须判红。
+# 每一处「D<n>（简称） 已定项 k / 未定项 k」都在断言那条分项的状态，权威是正文两节的索引表；扫 kb / records / research / crates 全域，含 .rs 注释。
+# 判据、出路与成功行在 lib-item-ref-status.py 的 main（格「冻结层归属登记表」与 research/scripts/relabel-item.py 也用这份库）。
+# 样本：item-ref-status-red 判红。
 grid_item_ref_status() (
   python3 "$LIB_ITEM_REF_STATUS"
 )
 
 # ════ 格「状态别说两遍」════
-# 分项已经按状态分住「### 已定项」与「### 未定项」两节 ⇒ **节本身就是状态**。
-# 再在标题或条目里写一遍「—— 已定」，同一个词就说了两遍；
-# 而重复的标注会各自漂移——检索取到其中一处时不知道另一处写的是什么
-# （`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条：矛盾比空白更糟）。
-#
-# 判三样：
-#   1. 小节标题不许写成「已定项 N —— 已定…」（节名已经说过了；编号后面带括注的也算）
-#   2. 同一个条目不许既有「—— 已定 / 未定」又有「状态：已定 / 未定」，两处的值相不相同都判
-#   一份都没扫到、或一条分项索引行都没核到，退 77（不记通过）。
-#   3. 条目的「状态：」必须与它所在的节一致（已定项节里不许有状态：未定）
-#   2、3 只看每节的索引（第一个 `####` 之前），与格「kb 形状」第 5 段同一条边界；
-#   `####` 之下的论证里另有编号列表，不是分项。
-#
-# 判别力：fixtures/doc-decisions.sh/status-redundancy-red 三样各犯一次，必须判红；
-# decision-documents-green 里另放一份论证带「3. …状态：未定」的决策，必须判绿。
-#
-# ⚠️ 只认**显式的**「状态：X」与破折号形态，不认句中随口提到的「已定」——
-#    一条未定项里出现「D18 已定项 3 已定」是正常引用，不是它自己的状态。
+# 分项按状态分住两节，节本身就是状态；再写一遍会各自漂移（.claude/singlefs-ai-sop/rules/kb-discipline.md 第 4 条）。判三样：
+#   1. 小节标题不写成「已定项 N —— 已定…」（编号后带括注的也算）
+#   2. 同一条目不同时写「—— 已定 / 未定」与「状态：已定 / 未定」，两处值同不同都判
+#   3. 条目的「状态：」与所在节一致
+#   2、3 只看每节第一个 `####` 之前的索引，与格「kb 形状」第 5 段同一条边界；只认显式的「状态：X」与破折号形态，句中的「D18 已定项 3 已定」是引用。
+#   一份都没扫到或一条索引行都没核到退 77。决策正文之外也扫实验正文与 records/，防同样的写法在那里复发。
+# 样本：status-redundancy-red 三样各犯一次判红；decision-documents-green 里论证带「3. …状态：未定」的决策判绿。
 grid_status_redundancy() (
   DEC=.claude/kb/decisions
   [[ -d "$DEC" ]] || { echo "  ! 找不到 $DEC，这一格跳过"; exit 77; }
 
-  # 扫的范围：决策正文 + 实验正文 + records/。
-  # 后两处今天是干净的（2026-08-31 现查：三类毛病各 0 处），扫它们是**防复发**——
-  # 一条只在出事之后才加的检查，等于承认那一次出事没人拦得住。
   python3 - "$DEC" .claude/kb/experiments records <<'PY'
 import re, sys, glob, os
 bad = []
@@ -861,14 +790,11 @@ for f in files:
 
     # 1. 标题里重复
     for i, line in enumerate(body.split('\n'), 1):
-        # 编号后面许跟一段括注（「已定项 3（2026-09-01）—— 已定」），不许的话带日期的标题整个漏过去
+        # 编号后面许跟一段括注（「已定项 3（2026-09-01）—— 已定」），否则带日期的标题整个漏过去
         if re.match(r'^#{3,4} (已定项|未定项) \d+ *(?:[（(][^）)]*[）)])? *—— *\*{0,2}(已定|未定)', line):
             bad.append((name, i, '标题重复', line.strip()[:60]))
 
-    # 2 / 3. 条目层
-    # 只看每节的**索引**：节到下一个一至三级标题为止，再在第一个 `####` 处收口——
-    # `####` 之下是各分项自己的论证，里面另有编号列表（「3. …状态：未定」这类），那些不是分项。
-    # 边界与格「kb 形状」第 5 段的 index_of、INDEX_VS_BODY_SOURCE 的 count_items 同一条。
+    # 2 / 3. 条目层：节到下一个一至三级标题，再在第一个 `####` 处收口（与 index_of、count_items 同一条边界）
     for sec_name, want in (('已定项', '已定'), ('未定项', '未定')):
         m = re.search(r'^### %s\s*$(.*?)(?=^#{1,3} |\Z)' % sec_name, body, re.M | re.S)
         if not m:
@@ -884,7 +810,6 @@ for f in files:
             ln = base + off
             dash = re.search(r'——\s*\*{0,2}(已定|未定)', line)
             stat = re.search(r'状态：\s*\*{0,2}(已定|未定)', line)
-            # 破折号与「状态：」同时出现就算说了两遍，两处写的值相不相同都一样：值不同时是两处已经漂开了
             if dash and stat:
                 bad.append((name, ln, '条目说两遍', line.strip()[:60]))
             if stat and stat.group(1) != want:
@@ -902,8 +827,6 @@ if bad:
     print('     → 状态与所在节不一致的，把条目搬到对的那一节，别就地改状态词。')
     sys.exit(1)
 
-# 扫到 0 份、或一条分项索引行都没核到：条目层的 2、3 没有对象，退 77，不记通过
-# （.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
 if not files or rows_checked == 0:
     print(f'  ! 本次无对象可判：扫了 {len(files)} 份、核到 {rows_checked} 条分项索引行（决策正文、实验正文、records/ 下的 .md 里没有分项索引）')
     sys.exit(77)
@@ -912,35 +835,12 @@ PY
 )
 
 # ════ 格「说未定其实已定」════
-# **判据**：kb 正文里凡是紧贴着「D<n>（简称）」写下「未定」的句子，
-# 拿它与那条决策**状态行**上的实际状态比对；实际不是「待定」（含「待定（…）」带括注的写法）就判红。
-# 历史节只认整行的「## 历史版本」：「### 历史版本对照」这类标题不是文末历史节，它后面的正文照判。
-#
-# ⚠️ **它与格「未定项被别处定了」不是一条。**
-# 那一格只扫**未定项小节**，且靠「谁比谁新」这个时间判据；
-# 这一格扫**全部正文**，靠「说的状态与写着的状态对不对得上」这个文本判据。
-# 实测三处它抓得到而那一格抓不到：一处写在**已定项的论证里**（D22 轴② 的前置①
-# 说「D25，取值未定」，而 D25 已定），一处写在**不变量清单的开篇**
-# （说「D4/D6/D8/D9/D10 未定」，而其中四条都定了），一处写在**实验正文的局限里**。
-# 三处都不在未定项小节，那一格一个字都看不见。
-#
-# ⚠️ **为什么必须机检**：`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条
-# 「矛盾比空白更糟」——检索不会把两条都端出来，它挑一条而且不告诉你挑了哪条。
-# 一句陈旧的「X 还没定」会让读的人以为那一格还开着，从而**不去读那条定案**。
-#
-# ⚠️ **判据是收紧过的，收紧的理由是实测**：第一版允许「D<n> …… 未定」之间隔任意
-# 40 字，在真实语料上报 32 处而只有 4 处是真的——分项索引表的「状态：未定」、
-# 自动生成的分项清单、「从未定过」、以及**被引号括起来当历史陈述引用的**
-# 「且 D6 未定」全被误伤。假红压倒真红的检查等于没有检查
-# （`.claude/singlefs-ai-sop/rules/show-me-test.md`），所以只认**紧贴**的写法，
-# 并跳过「」引文。代价是漏掉隔着名词短语的那种（例：「D2 的条带宽度可变粒度仍然未定」），
-# 那一类留给人看——**宁可漏，不可假红**。
-#
-# 判别力：fixtures/doc-decisions.sh/cross-decision-status-red 里「D180 未定」而 D180 标着已定，必须红；
-# decision-documents-green 里同样紧贴着写「未定」而被引的那条标着待定（含「待定（两项未定）」），必须绿。
+# kb 正文里紧贴「D<n>（简称）」写的「未定」，与那条决策状态行比：状态不是「待定」（含「待定（…）」）判红。
+# 与格「未定项被别处定了」不是一条：那一格只扫未定项小节、按时间比；这一格扫全部正文、按文本比，写在已定项论证、不变量清单、实验正文里的它才抓得到。
+# 只认紧贴的写法并跳过「」引文：放宽到隔 40 字时假红远多于真红。代价是隔着名词短语的（「D2 的条带宽度可变粒度仍然未定」）漏掉，靠人看。
+# 样本：cross-decision-status-red 里「D180 未定」而 D180 已定判红；decision-documents-green 里被引的那条标着待定（含「待定（两项未定）」）判绿。
 grid_cross_decision_status() (
   KB="$PWD/.claude/kb"
-  # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
   [[ -d "$KB/decisions" ]] || { echo "  ! 没有 $KB/decisions，这一格无对象可判"; exit 77; }
 
   python3 - "$KB" <<'PY'
@@ -948,12 +848,7 @@ import re, sys, pathlib
 
 kb = pathlib.Path(sys.argv[1])
 
-# 1) 每条决策的实际状态：取正文标题行 `## D<n> 简称 —— 状态`
-# ⚠️ **破折号前的空格是可选的**：实测 D14 写作「…持久临时）—— 半定」，
-# 第一版的 `\s+——` 把整条 D14 静默漏掉了，而它恰恰是矛盾最密的一条。
-# ⚠️ **解析不了的标题一律判红，不许当成跳过**
-# （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）——
-# 一条没被扫到的决策与一条干净的决策，在门禁输出里长得一模一样。
+# 1) 每条决策的状态取正文标题行 `## D<n> 简称 —— 状态`：破折号前的空格可选（D14 没有）；解析不了的标题判红，不当成跳过
 status, name, unparsed = {}, {}, []
 title_re = re.compile(r'^##\s+(D\d+)\s*(.+?)\s*——\s*(.+?)\s*$')
 for f in sorted((kb / "decisions").glob("*.md")):
@@ -971,8 +866,7 @@ if unparsed:
 if not status:
     print("  ! 没有决策正文，这一格无对象可判"); sys.exit(77)
 
-# 2) 紧贴写法：D<n>（简称） 之后只允许空白 / 逗号 / 括号 / 「取值」「状态」
-#    再接可选的「仍/仍然/尚/都/均」，然后就是「未定」，且不许是「未定项」。
+# 2) 紧贴：D<n>（简称） 之后只许空白、逗号、括号、「取值」「状态」与「仍 / 仍然 / 尚 / 都 / 均」，然后是「未定」（不是「未定项」）
 ref_re = re.compile(r'D\d+(?:（[^）]*）)?')
 tight_re = re.compile(r'^[\s，,、（(]*(?:取值|状态)?[\s：:]*(?:仍然|仍|尚|都|均)?未定(?!项)')
 
@@ -980,14 +874,14 @@ bad, in_hist = [], False
 scanned_files, history_files, history_section_lines, quoted_references = 0, [], 0, 0
 for f in sorted(kb.rglob("*.md")):
     rel = f.relative_to(kb.parent.parent)
-    # 决策变更史整份都是历史：decisions-history.md 里每条条目的「改前 / 改后」写的是当时的状态，组织形态见 .claude/rules/changelog-format.md
+    # 决策变更史整份是历史，写的是当时的状态
     if f.name == "decisions-history.md" or f.parent.name == "decisions-history":
         history_files.append(str(rel))
         continue
     scanned_files += 1
     in_hist = False
     for i, line in enumerate(f.read_text(encoding="utf-8").splitlines(), 1):
-        # 只认整行的「## 历史版本」（kb 文件文末那一节）：前缀匹配会让「### 历史版本对照」把后半份文件整段跳过
+        # 只认整行的「## 历史版本」：前缀匹配会让「### 历史版本对照」把后半份文件整段跳过
         if re.match(r'^##\s*历史版本\s*$', line):
             in_hist = True          # 文末历史节按定义写的是旧状态，不判
         if in_hist:
@@ -1027,32 +921,15 @@ PY
 )
 
 # ════ 格「已定分项自称未定」════
-# **判据**：在一条决策的「已定项」小节（含各 `#### 已定项 N` 论证）里，
-# 凡出现「X 仍未定 / X 还没定 / X 尚未定」这样的断言，就查 X 是谁：
-#   a. X 是**自指**（取值 / 本项 / 该项 / 本分项；「`T_time` 的取值」这类打头是「的」的，去掉「的」再比）⇒ 这条分项标着已定却说自己没定，判红；
-#   b. X 落在**同一个决策里另一条已定分项的标题**上 ⇒ 说一个已经定了的东西没定，判红。
-#   同一行有几处断言就逐处看，直到判出一处为止。没有一份决策有已定项区段 ⇒ 无对象可判，退 77。
-#
-# ⚠️ **这一类只发生在同一个文件内部，而门禁此前对它整个是盲的。**
-# 格「kb 形状」比的是索引行与标题行的状态，格「分项引用状态」比的是引用处
-# 写的状态与索引表，两个都只看**状态标记**，不看正文说了什么。
-# 实测三处：D16 已定项 5 定了 `T_time` = 5 s，同一项正文里留着
-# 「取值仍未定」；D23 已定项 10 说「hash 算法仍未定」而已定项 11 定了 CRC32C；
-# D23 已定项 8 自己的标题写着「宽度 32 位」而它的论证里留着「宽度仍未定」。
-# 三处都是**定案之后没清理推导过程**留下的，而检索会把陈旧的那一条单独端出来
-# （`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 8 条）。
-#
-# ⚠️ **不判「本笔仍然未定」这一类。** 一条已定分项里就某个**子问题**显式记
-# 「这一笔还没定」是 kb-discipline 第 3 条要求的「显式记录不知道」，不是矛盾；
-# 真要收拾它，该做的是把那个子问题升成独立分项，而不是把这句话删掉。
-# 判据因此只认自指与兄弟分项两种，**宁可漏，不可假红**。
-#
-# 判别力：fixtures/doc-decisions.sh/settled-item-self-open-red 里已定项 1 的正文写「取值仍未定」（a 支），必须红；
-# 另一份决策在已定项 2 的正文里说「校验算法选哪个仍未定」，而已定项 1 的标题就是它（b 支），也必须红，两支各有一条 want；
-# decision-documents-green 里同一句的无害版本（「本分项取区间上端 5」）留在已定项论证里，必须绿。
+# 一条决策的已定项区段（「### 已定项」索引与各「#### 已定项 N」论证）里出现「X 仍未定 / 还没定 / 尚未定」，看 X：
+#   a. 自指（取值 / 本项 / 该项 / 本分项 / 本条；打头的「的」去掉再比）：标着已定却说自己没定，判红；
+#   b. 同一决策已定项区段里另一条带编号、写着「已定」的行里有 X（兄弟分项已经定了它）：判红。
+#   同一行逐处看，判出一处为止。没有一份决策有已定项区段退 77。
+# 格「kb 形状」「分项引用状态」只比状态标记，看不见正文；这一格抓定案之后没清理的推导过程。
+# 不判「本笔仍然未定」这类子问题：那是 kb-discipline 第 3 条要的显式记录不知道，所以只认自指与兄弟分项，宁可漏不可假红。
+# 样本：settled-item-self-open-red 里 a 支「取值仍未定」、b 支「校验算法选哪个仍未定」各一条判红；decision-documents-green 里无害的「本分项取区间上端 5」判绿。
 grid_settled_item_self_open() (
   DEC="$PWD/.claude/kb/decisions"
-  # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
 
   python3 - "$DEC" <<'PY'
@@ -1101,7 +978,7 @@ for f in decision_files:
             x = pm.group(1).strip('*` ')
             if len(x) < 2:
                 continue
-            # 「`T_time` 的取值仍未定」：短语停在反引号与空格上，取到的是「的取值」；去掉打头的「的」再比自指词
+            # 「`T_time` 的取值仍未定」取到的是「的取值」：去掉打头的「的」再比自指词
             x_core = x[1:] if x.startswith('的') else x
             why = None
             if x_core in SELF:
@@ -1126,7 +1003,6 @@ if bad:
     print("     → 怎么办：这是定案之后没清理的推导过程。把这句改写成定案后的现状；")
     print("               若那个子问题真的还开着，把它升成一条独立的未定项，别留在已定项正文里。")
     sys.exit(1)
-# 每份决策都没有已定项区段：一行都没判，退 77，不记通过
 if files_with_settled_region == 0:
     print(f"  ! 本次无对象可判：{len(decision_files)} 份决策正文里没有一份有已定项区段（### 已定项 / #### 已定项 N）")
     sys.exit(77)
@@ -1136,16 +1012,10 @@ PY
 )
 
 # ════ 格「引用写已定紧跟说没定」════
-# 一条分项从未定翻成已定之后，全仓的引用要从「未定项 k」改写成「已定项 k」（格「分项引用状态」逼的）；
-# 改完标签，**句子本身**常常还在说它没定：「D19 已定项 6 未定」「那个 key 是 D19 已定项 6、今天没定」。
-# 格「分项引用状态」只比标签，格「说未定其实已定」只认紧贴「D<n>（简称）」的「未定」，格「已定分项自称未定」只扫已定项小节里的自指——三个都看不见这一型。
-# 实测（2026-09-11，D19 已定项 6 定案）：改完标签之后这样的句子留了六处（三份实验源码的注释、D06、两份实验正文），
-# 是逐句手找出来的。
-#
-# 判据：归属按格「分项引用状态」的规则（同一份库 `lib-item-ref-status.py`，不另抄）；归属到的那一条是已定、引用处也写着「已定项」，
-# 而它后面紧跟着「未定 / 没定 / 定不下 / 待定 / 空着」（中间只许有一段括注、标点与「今天 / 仍 / 还」这类词）⇒ 判红。
-# 两份变更史与 records/ 不扫：它们写的是当时的状态，按「今天的编号」改写之后本来就会读成这样。成功行报没扫的份数并逐个列名（现算）。
-# 判别力：fixtures/doc-decisions.sh/settled-ref-says-open-red 必须判红；decision-documents-green 里 records/ 下同一种句子不扫、必须绿。
+# 引用写着「已定项 k」、归属到的那条也已定，后面紧跟「未定 / 没定 / 定不下 / 待定 / 空着」（中间只许一段括注、标点与「今天 / 仍 / 还」这类词）：判红。
+# 抓的是改完标签、句子还在说没定的那一型：格「分项引用状态」只比标签，「说未定其实已定」只认紧贴的「未定」，「已定分项自称未定」只扫已定项小节里的自指。
+# 归属用 lib-item-ref-status.py（与格「分项引用状态」同一份）。两份变更史与 records/ 写的是当时的状态，不扫，成功行逐个列出。
+# 样本：settled-ref-says-open-red 判红；decision-documents-green 里 records/ 下同一种句子不扫，判绿。
 grid_settled_ref_says_open() (
   python3 - "$LIB_ITEM_REF_STATUS" <<'PY'
 import importlib.util, sys
@@ -1177,8 +1047,6 @@ if bad:
     print("     → 那条分项已经定了：把句子改成它定下来之后的说法（定成了什么、这一处按它重算了没有），别只改标签。")
 if bad or unreadable:
     sys.exit(1)
-# 一处归属到已定分项的「已定项」引用都没扫到，这一轮什么都没判过：退 77，不报绿
-# （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
 if seen == 0:
     print(f"  ! 扫了 {len(files)} 个文件，没有一处归属到已定分项的「已定项」引用，这一格无对象可判")
     sys.exit(77)
@@ -1188,28 +1056,13 @@ PY
 )
 
 # ════ 格「未定项被别处定了」════
-# 还 checks-owed.md C31（未定项被别处定了却没回收）。
-#
-# **判据**：一个还开着的未定项，如果它的正文点名了另一个决策，
-# 而那个决策的**状态行**在它最后一次被改动之后又变过 —— 就要求复核。
-# 「它的正文」是整个条目块：首行加它下面的续行，到下一条分项（编号列表项或「| k |」表格行）或下一个标题之前、至多 20 行，
-# 与复核判据（OPEN_ITEM_REVIEW_SOURCE）的条目块同一个口径——列表式条目常把「依赖 Dn」写在续行里，只看首行就漏了。
-#
-# ⚠️ **纯文本的依赖图抓不到这一类**：实测 D22 的三个陈旧未定项里，
-# 两个根本没有「前置是某某」这种标记（一个是「本事务内释放的块不得重用」
-# 与 D16 新规则 2 撞了，一个是「D2 的口径要扩」而 D2 早就扩完了）。
-# 能抓住它们的只有「谁比谁新」这个时间判据。
-# ⚠️ **本检查对 2026-08-29 决策文档拆分之前的历史无效**：
-# 拆分把一份 4830 行的 decisions.md 变成 25 个文件，逐行历史在那里断了，
-# 两侧的时间戳都塌到拆分那一次提交。**它管的是今后**。
-# 判别力在一次性合成仓里双向证过：D2 后定而 D22 的项没动 ⇒ rc=1；
-# 把那条项改写成「已定」之后 ⇒ rc=0。
-# git 取不到时间（对象缺了、仓坏了）判红，不当「这条决策从没定过」：那样点名它的未定项一条都不比，照样报绿。
-# 样本：fixtures/doc-decisions.sh/stale-open-items-red 另造一个缺了旧版本对象的仓：一份决策的 git log -G 读不到，
-# 一份未定项的条目块 git log -L 读不到，两处都要报出来。
+# 还开着的未定项的条目块点名了别的决策 Dn，而 Dn 最近一次新增「—— 已定」小节标题晚于这条未定项对 Dn 的最近一次复核：判红，要求复核。
+# 按时间比、不按文本依赖图：陈旧的未定项多半没写「前置是某某」这种标记。
+# git 取不到时间或条目块历史判红，不当「从没定过 / 复核过了」。没有一条未定项点名定过东西的别的决策退 77。
+# 判不了：2026-08-29 决策文档拆分之前的历史（逐行历史在拆分处断了），欠账 C36（未定项检查的第三个盲区）。
+# 样本：stale-open-items-red 另造缺旧版本对象的仓：一份决策的 git log -G、一份条目块的 git log -L 读不到，两处都要报。
 grid_stale_open_items() (
   DEC=.claude/kb/decisions
-  # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，这一格跳过"; exit 77; }
 
@@ -1219,23 +1072,15 @@ grid_stale_open_items() (
   for f in "$DEC"/*.md; do
     n=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}') || continue
     [[ -n "$n" ]] || continue
-    # ⚠️ **不能拿标题行当「这个决策定了新东西」的信号**——标题行几乎不变，
-    # 实测在已知有三处陈旧未定项的历史点上一条都不报。
-    # 改用「这个文件里新增过『已定』标记」的那次提交时间。
-    # ⚠️ **必须匹配「小节标题」，不能匹配正文里的「已定」二字。**
-    # 用 -S'—— 已定' 时，正文里一句「D21 已定索引是派生态」也会命中，
-    # 于是任何一次给决策补实验结论都会把引用它的未定项全报一遍（实测三处假阳性）。
-    # -G 加行首锚定只认 `## …—— 已定` / `### …—— 已定` 这种标题行。
-    # git 自己的退出码先判，再取第一行：写成「git log … | head -1」时管道只交 head 的退出码，git 失败被读成「从没定过」
+    # 「定了新东西」取这个文件最近一次新增「—— 已定」小节标题的提交：决策首行几乎不变；-G 加行首锚定只认标题行，正文里的「已定」二字会造成假阳性。
+    # git 的退出码先判再取第一行：「git log … | head -1」只交 head 的退出码，git 失败会被读成「从没定过」
     if ! t_out="$(git log -1 --format=%ct -G'^#{2,4} .*—— 已定' -- "$f")"; then
       st_time[$n]=-1
       time_unavailable+=("$n（$(basename "$f")）")
       continue
     fi
     t="$(head -n 1 <<<"$t_out")"
-    # ⚠️ **没有兜底。** 第一版取不到时退化成「文件最后修改时间」，
-    # 于是任何一次给决策补内容都会把引用它的未定项全报一遍。
-    # 从没加过「—— 已定」小节标题 = 它没定过任何东西 = 不该触发任何复核。
+    # 从没加过「—— 已定」标题记 0、不触发复核；不退化成文件修改时间（那样每次补内容都把引用它的未定项全报一遍）
     [[ -n "$t" ]] || t=0
     st_time[$n]=$t
   done
@@ -1250,32 +1095,17 @@ grid_stale_open_items() (
   judged_items=0   # 其中点名了「定过东西的别的决策」、真拿去比过复核时间的条数
   for f in "$DEC"/*.md; do
     self=$(grep -m1 -oE '^## (D[0-9]+)' "$f" | awk '{print $2}')
-    # 未定项行：编号开头且标着未定
     while IFS=: read -r ln text; do
       [[ -n "$ln" ]] || continue
       open_items=$((open_items + 1))
-      # ⚠️ **要看整个条目块的最新改动，不是首行。**
-      # 复核通常写在条目下面，首行的 blame 时间不动——只看首行会让
-      # 复核过的条目永远红着，检查退化成噪声（实测踩过）。
-      # ⚠️ **行号必须先映射回 HEAD 的版本，不能直接拿工作区的行号喂 `git log -L`。**
-      # `-L` 的行范围是按**历史里的文件**解释的：工作区一旦有未提交改动，
-      # 上方插几行就让整段偏移，`-L` 去历史里看的是另一段内容（实测：工作区 140 行、
-      # HEAD 131 行，140 在 HEAD 里是空行）⇒ 取不到时间戳 ⇒ **把复核过的条目报成陈旧**。
-      # 这是假红，而假红压倒真红的检查等于没有检查
-      # （`.claude/singlefs-ai-sop/rules/show-me-test.md`）。
-      # 判别力：改前在「工作区有未提交改动且条目上方插过行」时必红，改后转绿。
-      # ⚠️ **「条目块动过」不等于「复核过」**（2026-09-12 改）：此前拿条目块最后一次改动的时间当复核时间，
-      # 于是**任何**一次改动都能把红消掉——2026-09-11 往 D19 未定项 6 那一格补性能数（与 D16 无关），
-      # 它对 D16 状态变动的那一红就这样没了，D16 那两句还成不成立是事后手核的，门禁没逼。
-      # ⇒ 复核时间按「被点名的那条决策」逐条算：条目块历史里最近一次让它的点名次数变多的那次提交
-      #   （条目诞生那次也算）；工作区里条目块比 HEAD 多点了它一次，算刚复核过。
-      #   复核写一句「（YYYY-MM-DD 复核 Dn：……）」就满足；改别的地方不算。判据住在 OPEN_ITEM_REVIEW_SOURCE。
+      # 复核时间按被点名的决策逐条算，判据在 OPEN_ITEM_REVIEW_SOURCE：条目块的任意改动不算复核（否则什么改动都能消红），
+      # 工作区行号先映射回 HEAD 再喂 git log -L（-L 按历史里的文件解释行号，上方插过行会错位成假红）。
+      # 复核写一句点名 Dn 的「（YYYY-MM-DD 复核 Dn：……）」就满足。
       deps=()
-      # 点名按整个条目块认（首行加续行，到下一条分项或下一个标题之前、至多 20 行），与 OPEN_ITEM_REVIEW_SOURCE 的 block_end 同一个口径
+      # 点名按整个条目块认（首行加续行，到下一条分项或标题之前、至多 20 行），与 OPEN_ITEM_REVIEW_SOURCE 的 block_end 同口径：续行里的点名也算
       block_text="$(awk -v s="$ln" 'NR == s { print; next }
           NR > s && NR <= s + 20 { if (/^[[:space:]]*[0-9]+\. / || /^##+ / || /^\|[[:space:]]*[0-9]+[[:space:]]*\|/) exit; print }' "$f")"
-      # ⚠️ D 编号前面要是非字母数字：「RAID5」里的「D5」不是在点名 D5（实测：D2 未定项 15 因此被报成依赖 D5，
-      # 改判据之前那一红被任何一次改动顺手消掉，改判据之后永远复核不掉）。
+      # D 编号前面要是非字母数字：「RAID5」里的「D5」不是在点名 D5
       for d in $(grep -oE '(^|[^A-Za-z0-9])D[0-9]+' <<<"$block_text" | grep -oE 'D[0-9]+' | sort -u); do
         [[ "$d" == "$self" ]] && continue
         dt=${st_time[$d]:-0}
@@ -1300,25 +1130,15 @@ grid_stale_open_items() (
         echo "     ⇒ 复核这一项是不是已经被 $d 定掉了；复核完在这一条里写一句点名 $d 的复核记录。原文：${text:0:60}"
         flagged=1
       done <<<"$review_out"
-    # ⚠️ **列表式未定项的行内不含「未定」二字**——那两个字在小节标题上。
-    # 第一版按行内关键字过滤，把 D22 那三条陈旧项全滤掉了，于是检查恒绿。
-    # 改成：取「### 未定项」小节内的条目行，再排掉已经标了「已定」的。
+    # 未定项按所在小节取，不按行内关键字滤：列表式条目行内没有「未定」，未定项也常提到别处的「已定」
     done < <(awk -F: '
-        # ⚠️ 只认**光秃秃的**「### 未定项」标题。
-        # 「### 未定项 3 —— 已定」也以它开头，第一版把已定案小节里的表格行
-        # 全当成未定项抓了进来，报出两处假阳性。
-        # ⚠️ **在第一个 `####` 处也收口**：小节里索引表之后是各分项各自的论证，
-        # 那里面另有编号列表，不收口会把论证的第 1/2/3 条当成分项。
+        # 只认光秃秃的「### 未定项」（「### 未定项 3 —— 已定」也以它开头）；在第一个 #### 处收口，之后是论证里的编号列表
         /^### 未定项[[:space:]]*$/  { inside=1; next }
         /^### /              { inside=0 }
         /^#### /             { inside=0 }
         /^## /               { inside=0 }
         inside && /^[[:space:]]*[0-9]+\. |^\| [0-9]+ \|/ { print NR":"$0 }
       ' "$f")
-    # ⚠️ **不再按行内关键字滤掉「已定」**：已定的分项现在住在「### 已定项」小节里，
-    # 这一节按定义全是未定的。老版本那道 `grep -v 已定` 有个静默盲区——
-    # 一条**未定**分项只要正文里提到别处的「已定」（例：D18 的「与 D16 已定的
-    # checkpoint 序号怎么共存」）就会被滤掉，从此不被这一格看一眼。
   done
 
   if ((flagged)); then
@@ -1326,8 +1146,6 @@ grid_stale_open_items() (
     echo "               仍然开着的就把点名改成不构成依赖的写法。"
     exit 1
   fi
-  # 没有一条未定项点名定过东西的别的决策，这一轮一次复核时间都没比：退 77，不报绿
-  # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「扫到 0 项也不是通过」）。
   if ((judged_items == 0)); then
     echo "  ! 查了 $open_items 条未定项，没有一条点名定过东西的别的决策，这一格无对象可判"
     exit 77
@@ -1336,47 +1154,24 @@ grid_stale_open_items() (
 )
 
 # ════ 格「定了新东西没回看同文件未定项」════
-# 还 checks-owed.md C36（未定项检查的三个盲区）的前两条。
-#
-# **它与格「未定项被别处定了」是两把不同的尺子，不是加强版**：
-#   「未定项被别处定了」：**跨文件 + 看历史**——未定项点名了别的决策，而那个决策后来定过东西。
-#   这一格：**同文件 + 看本次 diff**——本次 diff 在某个决策里新增了一个「已定」小节，
-#       而同一个文件里还开着的未定项**这次一个都没碰**。
-#
-# ⚠️ **为什么必须看 diff 而不是看历史**：按历史判会在每个「有已定小节又有未定项」的
-# 决策上恒红，而 D13（验证路线） 已定项 9（.claude/kb/decisions/13-验证路线.md）写过
-# 「一个不可复现的夜间失败价值接近 0，甚至为负，它训练人忽略红灯」——一个恒红的检查比没有检查更坏。
-# 看 diff 则只在**真正发生了定案的那一次提交**上说话，其余时候安静。
-#
-# **它抓的两个实测形态**（2026-08-29 审计轮，一轮之内各撞一次）：
-#   ① D25 同一个文件里既写「已定：取粗粒度 8 叶 1 脊柱」，
-#      又在「还要回答的」里留着「目标负载的两个数取什么值。这一步只能由人定」。
-#   ② decisions.md 索引页末尾「待议：记账与反向索引的隔离纪律」自 2026-08-25 悬着，
-#      而 D6 定案取「付 O(N) 次反向索引查找」已经实质选中了它要禁的那件事。
-#      格「未定项被别处定了」看不见它，因为那一格只扫 decisions/ 下的正文文件，**不扫索引页**。
-# ⚠️ **`git diff --name-only` 对非 ASCII 文件名默认做 C 转义**（`"\347\233\256…"`），
-# 而本仓**每一个决策文件名都是中文** ⇒ 拿转义后的串再去 `git diff -- "$f"` 匹配不到任何文件
-# ⇒ **检查恒绿**。必须带 `-c core.quotepath=false`。
-# 这个 bug 在合成仓的双向验里当场暴露，是「新增的检查必须先证明它会红」抓到的第二个。
-# 「碰没碰」按条目块判：表格行一行就是一条分项，列表式条目从首行到下一条分项或下一个标题之前（与 OPEN_ITEM_REVIEW_SOURCE 同一个口径）；
-# 索引页的「待议」按那一节判（从 `## 待议` 到下一个 `## ` 之前），整份 decisions.md 别处动过不算碰了它。
-# 这份文件跟踪没有，按 `git ls-files --error-unmatch` 的退出码判：1 是未跟踪（整份算碰过），别的非 0 是 git 自己出错，判红。
-# 新增了已定小节的那几份里一条未定项都没有、索引页也没有待议节时，什么都没查，退 77。
-# 样本：fixtures/doc-decisions.sh/settled-same-file-red 另放一份两行表格的决策（只改了第 2 行，第 1 行要报）与一节没动的待议（同一次只改了索引表那一行）。
+# 这一轮在一份决策里新增了「已定」小节标题，而同文件还开着的未定项（「### 未定项」与「### 还要回答的」两节）一条都没碰、
+# 索引页 decisions.md 还悬着的「## 待议」节一个字没动：判红，要一次回头看。
+# 与格「未定项被别处定了」是两把尺：那一格跨文件看历史，这一格同文件看这一轮的 diff。按历史判会在每个有已定小节又有未定项的决策上恒红。
+# 「碰没碰」按条目块判（表格行一行一条，列表项到下一条分项或标题之前，与 OPEN_ITEM_REVIEW_SOURCE 同口径）；待议按那一节判（`## 待议` 到下一个 `## `），索引页别处动过不算。
+# 新增了已定小节的几份里一条未定项都没有、索引页也没有待议节时退 77。
+# 样本：settled-same-file-red 另放一份两行表格的决策（只改了第 2 行，第 1 行要报）与一节没动的待议（同一次只改了索引表那一行）。
 grid_settled_same_file() (
   DEC=.claude/kb/decisions
   IDX=.claude/kb/decisions.md
-  # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
   git rev-parse --git-dir >/dev/null 2>&1 || { echo "  ! 不在 git 仓库里，这一格跳过"; exit 77; }
 
-  # 改动范围取共用脚本 research/scripts/changed-paths.sh（门禁 code-tooling 的 change-range-single-source 格判阶段里不另算一份）：
-  # 基准是 gate_diff_base gate，名单带未跟踪文件——新写的决策文件在 git add 之前也算这次改动。
+  # 改动范围取共用脚本 changed-paths.sh，不另算一份（code-tooling 的 change-range-single-source 格判）；名单带未跟踪文件
   # shellcheck source=../../research/scripts/changed-paths.sh
   source "$LIB_CHANGED_PATHS" || { echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"; echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"; exit 1; }
   BASE="$(gate_diff_base gate)"
 
-  # 本次改动碰过的决策文件。名单先落到变量、判过退出码再读：git 失败时名单是空的，会被读成「本次没有新增已定小节」。
+  # 名单先落到变量、判过退出码再读：git 失败时名单是空的，会被读成「本次没有新增已定小节」
   all_changed="$(gate_changed_paths "$BASE" untracked)" || {
     echo "  ✗ 取不到这次改动碰了哪些路径（基准 $BASE），这次改了哪些决策文件没取到"
     echo "     → 按上面 git 的报错修好仓库状态（基准 $BASE 要存在；仓里还没有提交就先提交一次）再跑；git 失败时这一格什么都没比，不是通过。"
@@ -1384,18 +1179,11 @@ grid_settled_same_file() (
   }
   changed_names="$(grep "^\.claude/kb/decisions/" <<<"$all_changed" || true)"
 
-  # 本次 diff 里**新增**了「已定」小节标题的决策文件
   settled_files=()
   while IFS= read -r f; do
     [[ -n "$f" ]] || continue
-    # 只认新增行（+），且必须是小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `### 已定（…）`
-    # ⚠️ **这个正则第一版写坏过，而且是「写坏了但恒绿」那种坏法**：
-    # 写成 '^\+#{2,4} .*(—— 已定|^\+### 已定)' 时，第二个分支里的 ^ 在组内永远匹配不上，
-    # 于是 `### 已定（…）` 这种最常见的定案小节标题一个都抓不到，检查恒绿。
-    # 合成仓双向验的时候当场红——**这就是「新增的检查必须先证明它会红」拦下来的那一次**。
-    # 同 doc-registries.sh 那条：pipefail + `grep -q` 提前退出 ⇒ 前段 SIGPIPE ⇒ 命中被读成没命中。
-    # `git diff` 的输出可以很大，这里比那条更容易撞上。
-    # 新增行按共用脚本取（未跟踪的文件整份算新增）；取不到就判红，不当「没有新增」
+    # 只认新增行里的小节标题：`## D1 简称 —— 已定` / `### 未定项 3 —— 已定` / `### 已定（…）`；未跟踪的文件整份算新增
+    # 不接 `| grep -q`：pipefail 下前段吃 SIGPIPE，命中会被读成没命中
     added_out="$(gate_added_lines "$BASE" "$f")" || {
       echo "  ✗ 取不到 $f 这次新增了哪些行（基准 $BASE）"
       echo "     → 按上面 git 的报错修好仓库状态再跑；取不到新增行时这一格什么都没比，不是通过。"
@@ -1408,14 +1196,12 @@ grid_settled_same_file() (
   done <<<"$changed_names"
 
   if ((${#settled_files[@]} == 0)); then
-    # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
     echo "  ! 本次 diff 没有新增「已定」小节，这一格无对象可判"
     exit 77
   fi
 
-  # 这次改动碰过的行号（新文件侧），一行一个。未跟踪的新文件整份都是这次写的，每一行都算碰过。
-  # 跟踪没有按 ls-files --error-unmatch 的退出码判：0 跟踪、1 未跟踪，别的码是 git 自己出错——返回 2，调用方判红，
-  # 不当「未跟踪」（那样整份每行都算碰过，这一份一条都不报）。
+  # touched_lines_of <文件>：这一轮碰过的行号（新文件侧）一行一个，未跟踪的整份都算碰过。
+  # ls-files --error-unmatch 退 0 跟踪、1 未跟踪，别的码返回 2 由调用方判红：当成未跟踪会整份算碰过、一条都不报。
   touched_lines_of() {
     local file="$1" tracked_rc=0
     git -c core.quotepath=false ls-files --error-unmatch -- "$file" >/dev/null 2>&1 || tracked_rc=$?
@@ -1435,7 +1221,6 @@ grid_settled_same_file() (
 
   # ── ① 同文件里还开着、而本次一个都没碰的未定项 ──────────────────
   for f in "${settled_files[@]}"; do
-    # 本次 diff 在这个文件里碰过的行号（新文件侧）；未跟踪的新文件整份都算碰过
     touched="$(touched_lines_of "$f")" || {
       echo "  ✗ 判不了 $f 有没有被 git 跟踪（上面是 git 的退出码），这一份的未定项这一轮没比"
       echo "     → 怎么办：按 git 的报错修好仓库状态（索引坏了就 git status 看、必要时重建索引）再跑；判不了不是「未跟踪、整份都碰过」。"
@@ -1444,10 +1229,8 @@ grid_settled_same_file() (
     while IFS=: read -r ln text; do
       [[ -n "$ln" ]] || continue
       open_checked=$((open_checked + 1))
-      # 条目块：表格行一行就是一条，列表项到下一条分项（编号列表项或「| k |」表格行）或任一级标题之前（与 OPEN_ITEM_REVIEW_SOURCE 同一个口径）
       end=$(awk -v s="$ln" 'NR>s && (/^[[:space:]]*[0-9]+\. /||/^\|[[:space:]]*[0-9]+[[:space:]]*\|/||/^##+ /){print NR-1; exit}' "$f")
       [[ -n "$end" ]] || end=$((ln+20))
-      # 这个条目块里有没有任何一行在本次 diff 里被碰过
       hit=0
       for t in $touched; do (( t>=ln && t<=end )) && { hit=1; break; }; done
       (( hit )) && continue
@@ -1462,13 +1245,10 @@ grid_settled_same_file() (
         /^## /                       { inside=0 }
         inside && /^[[:space:]]*[0-9]+\. |^\| [0-9]+ \|/ { print NR":"$0 }
       ' "$f")
-    # ⚠️ 滤器已撤：已定的分项住「### 已定项」小节，这一节按定义全是未定的。
-    # 老版本按行内关键字滤，会把「正文里提到别处已定」的未定分项一起滤掉。
   done
 
   # ── ② 索引页里还悬着、而本次一个都没碰的「待议」节 ──────────────
   if [[ -f "$IDX" ]]; then
-    # 按这一节判「动没动」：索引页别处（索引表的一行）改了不算回头看过这一节待议
     idx_touched_lines=""
     if grep -qxF "$IDX" <<<"$all_changed"; then
       idx_touched_lines="$(touched_lines_of "$IDX")" || {
@@ -1506,36 +1286,16 @@ grid_settled_same_file() (
 )
 
 # ════ 格「冻结层归属登记表」════
-# 冻结层归属登记表：每层每个结构都有行、写「退出」的必是派生态、依据指得到已定分项。
-#
-# 还 checks-owed.md C45（四层图里每个结构的态别没有登记）可机检的那一半。
-# 三条判据的权威原文在那一行的「怎么拦」列，清单从哪来写在
-# `.claude/kb/freeze-layer-membership.md`「门禁判哪三条」，这一格照它判：
-#   ① 表里要有行的对象，三份清单都现读、不在脚本里抄第二份：
-#      - 层与独立冻结组件：D15 已定项 7 正文里 `第 N 层：` 的代码块与 `- ①/②/③ **…**` 的列表；
-#        一棵树在其中两层各占一个结构——写着「key 编码」的那一层与写着「索引节点内部布局」的那一层，
-#        两层的号从代码块里认，不写死；
-#      - 树：`crates/singlefs-format/src/lib.rs` 的 `TREE_IDENTIFIER_*` 常量（`WATERMARK` 两个是水位、不是树）；
-#      - 单元类：D18 已定项 11 登记表里首列是单个整数、类名不是「无效」「保留」的那几行。
-#      每一层、每个组件至少一行；每棵树在 key 编码那层与节点内部布局那层各至少一行（结构列写着「树 ID <n>」）；
-#      每个单元类码至少一行（结构列写着「码 <n>」）。漏一个判红。三份清单任一份读成 0 项也判红——扫到 0 项不是通过。
-#   ② 「退不退出冻结」写「退出」的行，态别必须是「派生态」，别的都判红。
-#   ③ 依据列点名的 `D<n>（简称） 已定项 k` 要在 `.claude/kb/decisions/` 里有那条决策、有第 k 条分项、
-#      且索引表里是已定；归属与状态用格「分项引用状态」那份 `lib-item-ref-status.py`，不另抄一份。
-#      依据列写「判不动」开头的行不判 ③。
-#   表按 `<!-- freeze-layer-membership:table -->` 那一行定位（整行匹配，不用 in），表头五列逐字；
-#   层列只认 D15 已定项 7 读出的那几个值加「没有条款」，态别列只认 权威态 / 派生态 / 判不动，
-#   退出列只认 退出 / 不退出 / 判不动——写了别的字判红，不然一个错别字会让 ② 静默放行。
-#   退不退出冻结写「判不动」的行 ② 判不到，成功那句逐个列出；态别写「判不动」而退不退出冻结已定的行另列一句，
-#   两份清单都从表里现算，不无声跳过。
-#
-# 这一格管不了的：某一行的态别判得对不对（例：把记账树码 2 节点那行改成「派生态 + 退出」，三条都不红——
-# ② 只判「退出 ⇒ 派生态」，这一行两格自洽，错在态别本身）、判不动的理由站不站得住、有没有一个仓里存在而
-# 三份清单都没单列的结构（树表单元、实例表单元、容器索引三行不是任何一份清单里的独立一项，删掉哪一行这一格都不红）。
-#
-# 判别力：fixtures/doc-decisions.sh/freeze-layer-membership-red 的表漏了一棵树的 key 编码行、漏了组件 ② 与码 16 那两行、
-# 一行写「权威态 + 退出」、依据指到不存在的分项（一处接在「已定项 5 / 98」后面）、指到未定项、指到不存在的决策
-# （简称里套了一层括号）各有一处，必须判红；decision-documents-green 里 D13–D18 与 `.claude/kb/freeze-layer-membership.md` 是真表原样的一份（编号与分项号改成连号），必须判绿。
+# .claude/kb/freeze-layer-membership.md 那张表（按整行的 <!-- freeze-layer-membership:table --> 定位，表头五列逐字），清单从哪来见那份文件「门禁判哪三条」：
+#   ① 每层、每个独立冻结组件至少一行；每棵树在 key 编码层与索引节点内部布局层各至少一行（结构列写「树 ID <n>」）；每个单元类码至少一行（结构列写「码 <n>」）。
+#      三份清单都现读、不抄：D15 已定项 7 的「第 N 层：」与「- ① **…**」（两层的号按「key 编码」「索引节点内部布局」认）、
+#      crates/singlefs-format/src/lib.rs 的 TREE_IDENTIFIER_*（WATERMARK 两个是水位）、D18 已定项 11 登记表里首列是整数、类名不是「无效」「保留」的行。任一份读成 0 项判红。
+#   ② 写「退出」的行态别必须是派生态。
+#   ③ 依据列点名的「D<n>（简称） 已定项 k」要存在且已定（归属借 lib-item-ref-status.py）；依据以「判不动」开头的不判。
+#   层、态别、退出三列只认封闭的几个值，写别的判红（一个错别字会让 ② 静默放行）。② 判不到的「判不动」行、态别判不动而退出已定的行，成功行逐个列出。
+# 判不了：某一行的态别对不对（改成自洽的「派生态 + 退出」三条都不红）、判不动的理由、三份清单都没单列的结构（树表单元、实例表单元、容器索引）。
+# 样本：freeze-layer-membership-red 漏一棵树的 key 编码行、漏组件 ② 与码 16 两行、一行「权威态 + 退出」、依据指到不存在的分项（一处接在「已定项 5 / 98」后面）、
+#   未定项、不存在的决策（简称里套括号），判红；decision-documents-green 里是真表原样的一份（编号与分项号改成连号），判绿。
 grid_freeze_layer_membership() (
   LIB="$LIB_ITEM_REF_STATUS"
   REGISTRY=.claude/kb/freeze-layer-membership.md
@@ -1638,8 +1398,7 @@ body = section(units_path, "#### 已定项 11") if units_path else None
 if body is None:
     bad("清单", f"{units_path or '.claude/kb/decisions/18-*.md'} 里没有「#### 已定项 11」这一节，读不出单元类登记表")
 else:
-    # 表在第一个非 | 行就结束，空行也算结束：下一张表只隔一个空行时，不这样切会把它并进来
-    # （样本实测：偏移表的「| 42 | 单元类型标签 |」被当成了单元类码 42）。
+    # 表在第一个非 | 行（含空行）处结束：下一张表只隔一个空行时，不这样切会被并进来
     table, seen_table = [], False
     for line in body:
         if line.startswith("|"):
@@ -1734,8 +1493,7 @@ item_map, _names = item_ref_status.load_map()
 basis_checked = 0
 for line_number, (structure, _layer, _state, _exits, basis) in rows:
     short = strip_trailing_parenthetical(structure)
-    # 简称里可以再套一层全角括号（D14（双轨（大小文件 / 持久临时）） 那种），[^）]* 会在里层的 ） 处断开、整处引用漏抓；
-    # 一处引用可以接着写几个项号（「已定项 3 / 4」「已定项 3 / 已定项 4」），只取第一个会让后面的无声漏判。
+    # 简称里可以再套一层全角括号（D14（双轨（大小文件 / 持久临时））），一处引用可以接几个项号（「已定项 3 / 4」）：都要认全，否则无声漏判
     references = []
     for hit in re.finditer(r"(D\d+)（(?:[^（）]|（[^（）]*）)*）\s*(已定项|未定项)\s*(\d+)((?:\s*[/、]\s*(?:(?:已定项|未定项)\s*)?\d+)*)", basis):
         decision, written, first, tail = hit.groups()
@@ -1839,26 +1597,11 @@ PY
 )
 
 # ════ 格「决策分项清单与正文同步」════
-# `decisions.md` 的分项清单生成块与索引表「状态」列，都要与生成器从各决策正文算出来的逐字相同。
-#
-# `decisions.md` 里的「分项清单」和索引表的「状态」列，都是各决策正文的**投影**，
-# 不是第二处权威记录。手抄一份就会漂，而漂了没有任何东西会发现——
-# 这一格拿生成器 `.claude/scripts/gen-decision-items.py` 的输出与索引页逐字比对，两处都比。
-#
-# 「状态」列写的是**分项计数**（`已定 6 项 / 未定 0 项`）：一条决策有几个分项、
-# 其中几个还没定，看一眼就有数。三态词（已定 / 半定 / 待定）的权威记录是各正文首行
-# `## D<n> 简称 —— 状态`，索引列不再抄它一遍；没有分项的决策那一格写「无分项 · 整条已定」。
-#
-# 为什么判红而不是提醒：`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条
-# 「矛盾比空白更糟」——检索不会把两条都端出来，它会挑一条，而且不告诉你它挑了。
-#
-# ⚠️ **计数对不对，另有一条不经过生成器的检查**：格「kb 形状」第 7 段
-# （本文件的 INDEX_VS_BODY_SOURCE）直接去数正文两节里的分项，不调生成器——两格同住一个文件，判法仍是两段各自的代码。
-# 只有这一格的话，生成器自己数错时索引页会跟着一起错，而两边仍然逐字相同。
-#
-# 带 --write 时写这一块：重新生成分项清单、改写索引表的「状态」列，写回 `decisions.md`（给了项目根写那个仓，不给写本脚本所在的仓）：
-#   bash .claude/gate.d/doc-decisions.sh --write [项目根]
-# 判别力：fixtures/doc-decisions.sh/decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，必须判红。
+# decisions.md 的分项清单生成块与索引表「状态」列是各决策正文的投影，与生成器 .claude/scripts/gen-decision-items.py 的输出逐字比。
+# 状态列写分项计数（`已定 6 项 / 未定 0 项`，没有分项写「无分项 · 整条已定」）；三态词的权威在正文首行。
+# 计数本身由格「kb 形状」第 7 段（INDEX_VS_BODY_SOURCE）不经生成器另数：只靠这一格时，生成器数错索引页会跟着错而仍逐字相同。
+# --write 时把两块写回被判的仓的 decisions.md（用法在文件头）。
+# 样本：decision-items-sync-red 状态列写错、索引漏登、索引多一行、生成块漂了各一处，判红。
 grid_decision_items_sync() (
   GEN="$GENERATOR"
   WRITE="$DECISION_ITEMS_WRITE"
@@ -1873,7 +1616,7 @@ grid_decision_items_sync() (
   cells_f="$(mktemp)"
   # 各分支手写的 rm 管不到半路被打断的那一次：退出时一律删
   trap 'rm -f "${gen_err:?}" "${cells_f:?}"' EXIT
-  # 生成器自己会说清哪一节取不到编号项、下一步怎么办 —— 吞掉 stderr 等于把那条 howto 扔了
+  # 生成器的 stderr 里有它自己的出路，不吞
   want="$(python3 "$GEN" 2>"$gen_err")" || {
     echo "  ✗ 生成器跑不起来"
     sed 's/^/   /' "$gen_err"
@@ -1902,9 +1645,7 @@ open(idx, 'w', encoding='utf-8').write(body[:a] + "\n" + new + "\n" + body[b:])
 PY
   fi
 
-  # ── 索引表「状态」列 ────────────────────────────────────────────
-  # 表格的形状是 `| D<n>（简称） | 状态 | 结论（简报） | 正文 |`，本段只碰第 2 列。
-  # 整行重写会把别的会话刚写进结论列的东西悄悄抹掉（并发会话共写一个仓）。
+  # ── 索引表「状态」列：只改第 2 列，整行重写会抹掉别的会话刚写进结论列的东西 ──
   python3 - "$IDX" "$([[ $WRITE == 1 ]] && echo write || echo check)" "$cells_f" <<'PY'
 import re, sys
 
@@ -1929,7 +1670,7 @@ for num, cell in want.items():
     else:
         bad.append(f"{num} 状态列写着「{m.group(2).strip()}」，正文投影是「{cell}」")
 
-# 反过来也要查：索引表里多出一行（决策正文已经删了/改名了），上面的循环够不着它。
+# 反过来查索引表多出的行（正文删了或改名了），上面的循环够不着
 for row in re.findall(r'^\|\s*(D\d+)（', text, re.M):
     if row not in want:
         bad.append(f"{row} 在决策索引表里有行，而 decisions/ 下没有它的正文")
@@ -1959,7 +1700,7 @@ PY
   if [[ "$want" == "$got" ]]; then
     n=$(printf '%s\n' "$want" | grep -c '^  - ' || true)
     decision_lines=$(printf '%s\n' "$want" | grep -c '^- ' || true)
-    # 生成器一条决策都没产出、生成块也是空的：两个空串相等，什么都没比过，不记通过
+    # 生成器一条决策都没产出、生成块也空：两个空串相等不算比过
     if [[ "$decision_lines" -eq 0 && "$fail" -eq 0 ]]; then
       echo "  ! 本次无对象可判：生成器一条决策都没产出（decisions/ 下没有读得出的决策正文），生成块也是空的"
       exit 77
@@ -1974,72 +1715,23 @@ PY
 )
 
 # ════ 格「未定项判过改不改新池新建文件的字节」════
-# 每个未定项有没有判过改不改新池新建文件的字节（另一把尺：动不动格式）。
-#
-# 还 checks-owed.md C50（阻塞标记没人维护）的**覆盖性**那一半。
-#
-# **它拦的不是「判错」，是「没判过」。** 一条未定项挡不挡第一行代码，此前只记在正文
-# 某一句 ⚠️ 里，措辞还各不相同（「不阻塞第一行代码」「不阻塞第一行事务层代码」
-# 「可延后」），于是**没判过与判过是否**在 kb 里长得一模一样——2026-09-01 现查：
-# 23 条未定项里只有 3 条写过明确判定，另外 20 条从来没按那把尺量过，而没有任何东西发现。
-#
-# **它与格「未定项被别处定了」「定了新东西没回看同文件未定项」是三把不同的尺子，不是加强版**：
-#   「未定项被别处定了」：跨文件 + 看历史——未定项点名了别的决策，而那个决策后来定过东西。
-#   「定了新东西没回看同文件未定项」：同文件 + 看本次 diff——本次新增了「已定」小节，而同文件的未定项一个都没碰。
-#   这一格：**不看历史也不看 diff**——每条未定项当下有没有一条判定，缺就红。
-# 那两格管的是「判定会不会过期」，这一格管的是「判定存不存在」。
-# 少了这一格，一条**从未判过**的未定项在那两格眼里是干净的：它没点名别人，本次也没人定案。
-#
-# **判定的规范形态**（写在该分项的登记行或它那一条列表条目里）：
-#
-#   改新池新建文件的字节：否（2026-09-01，依据：…）
-#
-# 三个合法取值：**是** / **否** / **无对象**（前置已被推翻，这一项没有对象了）。
-#
-# **那把尺的可执行形式**（不是新发明，是 decisions-history.md 的 D5（快照 / 空间记账机制） 节 2026-08-29 那一条逐字用过的那个）：
-# 那一轮的依据写作「攻方逐条给出**新池新建文件写不出的是哪些字节**」⇒ 尺子问的不是
-# 「两个答案会不会给出不同的字节」，而是——
-#
-#   **不定它，新池新建文件写出的字节能不能由已经定了的条款唯一确定？**
-#   （**mkfs 写出的字节算在内**——事务必须落在一个格式化好的盘上，改 mkfs 的布局同样要返工。
-#    这一格是 2026-09-01 那轮的本地腿当成尺子的洞攻出来的，主 agent 当轮裁定算在内，
-#    它当场改掉一条判定：D12 未定项 3 的一个候选只在 mkfs 写。）
-#     能   ⇒ 否
-#     不能 ⇒ 是
-#
-# 这一步不能省，省了两条结构一样的分项会判出相反的结果：
-# D18 未定项 7（块头要不要第六个字段）与 D5 未定项 1（维度元组有哪几维）都带着
-# 「先按最小的写、以后再加」，但 D18 已定项 3 是一条**正式已定**的五字段集合，
-# 新池新建文件的块头由它唯一确定 ⇒ 否；而 D5 没有任何已定项钉住维度元组的内容，
-# 「先按最小维度」是口头方向不是登记的已定项 ⇒ 第一条记账记录的 key 宽度写不出来 ⇒ 是。
-#
-# ⚠️ **这个名字是刻意不叫「阻塞」的**，而仓里此前三处判定都写作「不阻塞第一行代码」——
-# 那个词被同时用作两个意思：①「不改新池新建文件写出的字节」（D21 未定项 1：共享单元数为 0
-# ⇒ 两个答案逐字节相同）；②「改，但已定案接受先写后改」（D5 未定项 1、D18 未定项 7）。
-# **两者在盘上的后果完全不同**：① 不返工，② 要重写记账树 / 重排块头。
-# 一个词罩住两件事，正是 decisions-history.md 的 D5（快照 / 空间记账机制） 节 2026-08-29 那一条记下的那次
-# 「判据用得不一致」的病因。⇒ **标记只回答那把尺**（改不改字节），
-# **挡不挡开工是处置，写在依据里**。
-# 日期不许省——判定会因为别处定案而过期，没有日期就没法判它是哪一轮的产物
-# （`.claude/singlefs-ai-sop/rules/kb-discipline.md`「每条带出处与状态」）。
-#
-# ⚠️ **只认这一种写法，不认同义的散文。** 散文形态是这条检查诞生的原因：
-# 三条已判过的分项用了三种措辞，机器分不开「判过否」与「随口提了一句阻塞」。
-#
-# ⚠️ **「哪些是未定项」不自己解析**：调 `.claude/scripts/gen-decision-items.py`，
-# 与格「决策分项清单与正文同步」同一个权威解析器。这一格自己定位登记行，所以另加一道**条数比对**——
-# 两侧对不上就说明定位漏了或多了，判红而不是安静地少查几条。「多了」＝「### 未定项」索引里定位到、
-# 而生成器不认它是未定项的行（例：表格行缺了收尾的竖线，生成器不收）。对不上与缺判定各报各的，都红。
-#
-# 判别力：fixtures/doc-decisions.sh/blocking-verdict-red 两把尺各缺、外加一行表格缺收尾竖线（多定位出），必须判红。
+# 每条未定项（清单取自生成器 gen-decision-items.py，与格「决策分项清单与正文同步」同一个解析）的登记行或列表条目里要有两把尺的判定，缺就红：
+#   改新池新建文件的字节：是 / 否 / 无对象（YYYY-MM-DD，依据：…）
+#   动不动格式：动 / 不动 / 界不定（YYYY-MM-DD，依据：…）
+# 只认这一种写法，散文措辞分不开「判过否」与「随口提了一句阻塞」；日期不许省，判定会因别处定案而过期。
+# 第一把尺问：不定它，新池新建文件写出的字节（mkfs 写的也算）能不能由已定条款唯一确定？能为否，不能为是。
+# 刻意不叫「阻塞」：那个词同时罩着「不改字节」与「改、但接受先写后改」，挡不挡开工是处置，写在依据里。
+# 与格「未定项被别处定了」「定了新东西没回看同文件未定项」的分工：那两格管判定会不会过期，这一格管判定在不在。
+# 登记行由这一格自己定位，所以另比条数：定位到的与生成器认的未定项对不上（漏了，或多了：例如表格行缺收尾竖线生成器不收）判红。
+# 只判判定在不在，判得对不对（依赖对）还欠着：C50（阻塞标记没人维护）。
+# 样本：blocking-verdict-red 两把尺各缺、外加一行表格缺收尾竖线（多定位出），判红。
 grid_blocking_verdict() (
   DEC=.claude/kb/decisions
-  # 生成器按**本脚本自身的位置**取，不按 cwd——判别力样本会把 cwd 换成一个只放着样本决策文件的临时目录，
-  # 那里没有 `.claude/scripts/`。按 cwd 取会「找不到生成器 ⇒ 跳过」，红样本安静地绿掉。生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
+  # 生成器按本脚本所在的仓取（GENERATOR），不按 cwd：样本把 cwd 换成只放着样本 kb 的临时目录，按 cwd 取会找不到生成器而跳过，红样本悄悄变绿。
+  # 生成器自己 glob 的是 cwd 下的 kb，正合样本所需。
   GEN="$GENERATOR"
-  # 无对象可判退 77，门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）
   [[ -d "$DEC" ]] || { echo "  ! 没有 $DEC，这一格无对象可判"; exit 77; }
-  # 生成器随仓走，不在就是被删了或挪了——退 1 不退 77，与格「决策分项清单与正文同步」依赖同一个生成器时的退法一致（三方判决 gate-fix-forks-r1 的 T7）
+  # 生成器随仓走，不在是被删了或挪了：退 1 不退 77，与格「决策分项清单与正文同步」一致
   [[ -f "$GEN" ]] || { echo "  ✗ 找不到生成器 $GEN"; echo "     → 生成器随门禁住在同一个仓的 .claude/scripts/ 下：它丢了这一格什么都判不了，从 git 里找回它"; exit 1; }
 
   python3 - "$DEC" "$GEN" <<'PY'
@@ -2065,10 +1757,7 @@ for line in r.stdout.splitlines():
     if m and cur and '未定' in m.group(2):
         want.add((cur, m.group(1)))
 
-# 两把尺，同一批登记行上各判各的。**不许互相代替，也不许拿一把的结论去填另一格**：
-# 一条未定项可以在「改新池新建文件的字节」上判「否」而在「动不动格式」上判「动」——
-# D2（RAID 条带策略） 未定项 21 就是：第一版两盘恒 w=2 不写第二种字节，
-# 而它的答案会改 `w_max` 那个字节将来的取值。
+# 两把尺在同一批登记行上各判各的，不拿一把的结论填另一把：一条未定项可以前一把判「否」而后一把判「动」
 RULERS = [
     ("改新池新建文件的字节",
      re.compile(r'改新池新建文件的字节：\*{0,2}(是|否|无对象)\*{0,2}[（(](\d{4}-\d{2}-\d{2})'),
@@ -2090,10 +1779,10 @@ for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
     if not m:
         continue
     sec = m.group(1)
-    # 索引表 / 编号列表都只取第一个 `####` 之前那一段，与生成器同一口径
+    # 只取第一个 `####` 之前那一段，与生成器同口径
     cut = re.search(r'^#{4}\s', sec, re.M)
     top = sec[:cut.start()] if cut else sec
-    # 每条分项的「块」= 它的登记行起，到下一条登记行为止（表格形态就是一行）
+    # 每条分项的块从它的登记行到下一条登记行为止（表格形态就是一行）
     starts = [(mo.start(), mo.group(1))
               for mo in re.finditer(r'^(?:\|\s*(\d+)\s*\||(?=\d))(\d+)?\.?\s', top, re.M)]
     marks = [(mo.start(), mo.group(1) or mo.group(2))
@@ -2111,7 +1800,7 @@ for f in sorted(glob.glob(os.path.join(dec, '*.md'))):
                 bad.setdefault(name, []).append((os.path.basename(f), dnum, num, first[:70]))
 
 missed = want - seen
-# seen 只收 want 里的，seen - want 恒为空；多出来的要拿「定位到的」去比
+# seen 只收 want 里的，多出来的要拿定位到的去比
 extra = located - want
 if missed or extra:
     print("  ✗ 登记行定位与生成器对不上，这一格这一轮查的不是全部未定项")
@@ -2153,22 +1842,10 @@ PY
 )
 
 # ════ 格「动了用户定案的条款记了未还的账」════
-# 决策正文里标着「待用户复核」的，欠账表里要有一笔未还的账点名那条决策。
-#
-# 判据（`.claude/singlefs-ai-sop/skills/decide/SKILL.md` 硬要求第 6 条）：
-# 决策正文里凡标着「待用户复核」的条款，`checks-owed.md` 里必须有一笔**未还**的账点名它。
-#
-# ⚠️ **这条是实测出来的**：2026-09-05 C113 定案顺手改了 D16 已定项 5 的丢失窗口口径，
-# 而那一句是 2026-08-31 由用户拍板的。正文里写了「待用户复核」，然后就没有任何东西
-# 保证它会被看到——唯一提到它的那笔账（C113）当天就标了「已还」。
-# 拍板的人不知道自己的定案变了，而门禁全绿。
-#
-# 账点名决策按整个号认（D1 不算点名了 D16）。粒度是决策：一份决策正文里标了几处，都只要一笔未还的账点名这条决策。
-# 判「未还」看账那一行有没有带日期的还清标记（`已还（2026-…`、`已还一半（…`）：
-# 已还的账不会再被回看，等于没有账。要留着盯，就单立一笔。
-# 不按「已还」两字判——那两个字出现在描述里就会把整笔账误判成还清（写这条时实测）。
-#
-# 判别力：fixtures/doc-decisions.sh/user-verdict-owed-red 里 D316 只有一笔已还的账、D31 只有一笔点名 D319 的未还账（按整号认不算点名 D31），必须判红。
+# 决策正文里标着「待用户复核 / 等用户复核」的，checks-owed.md 里要有一笔未还的账在同一行点名那条决策（.claude/singlefs-ai-sop/skills/decide/SKILL.md 硬要求第 6 条）。
+# 粒度是决策：一份正文标了几处，有一笔未还的账点名这条决策就算有。
+# 「未还」看那一行有没有带日期的还清标记（`已还（20…`、`已还一半（…`），不按「已还」两字判：描述里出现这两个字会被误判成还清。已还的账不再被回看，要盯就单立一笔。
+# 样本：user-verdict-owed-red 里 D316 只有一笔已还的账、D31 只有一笔点名 D319 的未还账，判红。
 grid_user_verdict_owed() (
   KB="$PWD/.claude/kb"
   OWED="$KB/checks-owed.md"
@@ -2185,10 +1862,7 @@ grid_user_verdict_owed() (
     # 决策号取自文件名：`16-发布语义.md` → D16
     d="D$(basename "$f" | sed 's/^0*//; s/-.*//')"
     checked=$((checked+1))
-    # 未还的账：同一行里点名了这条决策、带着复核标记，且没标「已还」
-    # 末段不许是 `grep -q`：pipefail 下它一命中就退出，前段吃 SIGPIPE ⇒ 命中被读成没命中
-    # （shell-lint 的 S7 判这一条：.claude/singlefs-ai-sop/scripts/shell-lint.sh）。先落到变量再判。
-    # 决策号按整个号认：D1 不许靠子串命中 D10–D19 的账
+    # 先落到变量再判，末段不接 `grep -q`：pipefail 下命中会被读成没命中（shell-lint S7）。决策号按整个号认：D1 不命中 D10–D19 的账
     hits=$(grep "$MARK" "$OWED" | grep -E "${d}([^0-9]|\$)" || true)
     if [[ -n "$hits" ]] && grep -qv "已还[^ |]*（20" <<<"$hits"; then continue; fi
     echo "  ✗ $d 的正文标着待用户复核，checks-owed.md 里却没有一笔**未还**的账点名它"
@@ -2207,8 +1881,6 @@ grid_user_verdict_owed() (
     echo "               这一条已经复核完了就把「待用户复核」改成结论。"
     exit 1
   fi
-  # 一处「待用户复核」都没有，这一轮什么都没判：退 77，门禁记「本次未跑」，不记通过
-  # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
   if [[ $checked -eq 0 ]]; then
     echo "  ! 决策正文里没有一处标着待用户复核，这一格无对象可判"
     exit 77
@@ -2217,18 +1889,8 @@ grid_user_verdict_owed() (
 )
 
 # ════ 格「决策索引结论列的宽度」════
-# 决策索引表每一行的「结论」列不超过 decisions.md 那一句写的字数上限。
-#
-# `decisions.md` 的索引表是检索这批决策的入口，「结论」列只写那条决策**定了什么**。
-# 表头上写着一个字数上限，而这个上限此前没有任何东西在执行——实测（2026-09-07）
-# 七行超标、最长 96 字，当时写的限是 50。一条只写在文档里、没人执行的规约，
-# 下一个人会照着最长的那行写，索引就退化成第二份正文，导航价值归零。
-#
-# 上限**从 decisions.md 那一行读**，不写死在这里：同一个事实只许一处权威记录
-# （`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条）。改限只改文档那一行，
-# 这一格跟着走；两边各写各的，就会一处改对、一处停在旧值。
-#
-# 判别力：fixtures/doc-decisions.sh/decision-summary-width-red 两行超限（一行结论里带转义竖线），必须判红。
+# 决策索引表每一行的「结论」列不超过 decisions.md 里「「结论」列一律 N 字以内」那一句的上限；上限从那一句读、不写死（只许一处权威）。
+# 样本：decision-summary-width-red 两行超限（一行结论里带转义竖线），判红。
 grid_decision_summary_width() (
   IDX=.claude/kb/decisions.md
   [[ -f "$IDX" ]] || { echo "  ! 找不到 $IDX，这一格跳过"; exit 77; }
@@ -2251,7 +1913,7 @@ rows, bad = [], []
 for line in text.splitlines():
     if not re.match(r"^\|\s*D\d+（", line):
         continue
-    # 按没转义的竖线切格：结论里写的 `\|` 是格子里的字，不是格界（与格「冻结层归属登记表」同一种切法）
+    # 按没转义的竖线切格：结论里的 `\|` 是格子里的字（与格「冻结层归属登记表」同一种切法）
     cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
     if len(cells) < 4:
         continue
@@ -2282,42 +1944,21 @@ PY
 )
 
 # ════ 格「同一结构的写频率只有一个量级」════
-# C245（系统配置槽的写频率，两条条款说反话）的门禁形态：同一个结构的写频率在两处写成不同的量级，判红。
-# 登记表 .claude/gate.d/write-frequency.tsv 给出封闭的频率词表（每个词归一个量级，可另记一个量）与每个结构的叫法、登记频率、权威分项；
-# 排除表 .claude/gate.d/write-frequency-exclude.tsv 逐句登记确实该留的判红句子。两张表的写法在各自的文件头。
-#
-# 扫什么：.claude/kb/decisions/*.md 在「## 历史版本」之前的正文，代码围栏里的行不扫；去掉 ** 与反引号，
-#   每行按没转义的竖线切成格，每格按「。；！？」切成句。
-# 断言怎么认：句子里出现频率词表里的一个词，后面同一个小句里（不越过「，。；：、」、括号与引号）12 字以内跟着写动词
-#   （写、更新、轮换、推进、回写、重写、改写、覆写、落盘、涨；「写放大」不算），或者紧跟「一次」。
-#   只出现频率词、后面不跟写动词的（「每次发布四个序点」「每次挂载现取」）不是写频率断言，不判。
-# 归到哪个结构：句子里出现的每个登记叫法都算（一句点了两个结构，两个都判）；句子里一个都没有的，
-#   认同一表格行别的格里的叫法；还没有的，认所属最近一个标题（任意级）里的叫法。主语只在标题里的表格行（「tail 住超级块槽」下面那张表）就这样认到。
-# 三种形态，各按一把尺判（量级与量见登记表文件头：量是同一量级里的一部分时机，每次 fsync 都有一次发布、发布不都是 fsync，fsync 那几个词量记 fsync）：
-#   否定：频率词前面有「不是 / 并非 / 而非 / 没有 / 无需 / 无须 / 不必 / 不用 / 不 / 没 / 非」，中间只隔三个以内的虚字
-#     （都、是、在、随、按、会、再、需、要、必、用、应、该、能、可、就、也、于）与空白（「不会在每次发布时写」「不再每次发布推进」）；
-#     或者频率词与写动词之间有「不 / 没 / 无需 / 无须」（「每次发布不写」；「不仅、不止、不只、不但、不同、不变、不论、不管」不算否定）。
-#     否定的是别的量级（「不是每个事务推进一次」），是在划界，不算断言、只计数；否定的时机被登记的罩住（同量级，且登记的是整个量级或正是这个量），与登记说反话，判红。
-#   限定：频率词前面紧挨「只 / 仅 / 只有」（可带「在 / 于」，「只在 fsync 时写」「仅 fsync 路径写」）。写的量与登记的量不同就判红——
-#     同级不够：「只在 fsync 时写」与登记的「每次发布」同级而不同量，判红。前面是「不只 / 不仅 / 不是只」的（「不是只在 fsync 时写」）不划界，按否定形态计数、不判。
-#   普通：其余的断言按量级比，不同级判红（登记的是量级里的一部分时机的，还要同量）。
-# 判红：上面三种形态说反话；登记表写坏（行认不出、理由不足 4 个字、频率词重复、叫法登记给两个结构、
-#   登记频率不在词表里）；权威分项不是「D<n>（简称） 已定项 k」、决策不在、简称与正文首行不符、那一条不是已定项（归属借 lib-item-ref-status.py）；
-#   排除表一行指的文件不在、那一段不足 8 个字、或一句判红的断言都没排到；登记了结构而全部正文里一处落在它们身上的断言都没扫到。
-# 看不见的：频率词表外的说法（「每 10 个 fsync」「只在准入之后」，要认就把那一段登记成词）、叫法表外的称呼；
-#   跨句的指代（「它每次挂载写一次」）：这一句自己没有叫法时只认同一表格行与所属标题，前一句的主语不带过来；
-#   否定词与频率词之间隔了虚字表外的字（「不影响每次发布写」本来就不是否定，「不一定每次发布都写」是否定而认不到）、双重否定；
-#   叫法取自同一表格行或标题时，那一格或那一节说的是不是这个结构；句子说的是不是这个结构的稳态写频率。后两样靠排除表与人。
-#   成功行末尾逐个列出一处断言都没扫到的结构，它们这一轮没判。
-# 登记表不在：这一格无对象可判，退 77（样本树里多数没有它）。
-#
-# 判别力：fixtures/doc-decisions.sh/write-frequency-red 里系统配置槽写成「每次挂载写一次」、tail 写成「不是每次发布都推进」、
-# 「系统配置槽不会在每次发布时写」「系统配置槽每次发布不写」「tail 不再每次发布推进」三句隔字与动词前的否定、「系统配置槽只在 fsync 时写」、
-# C245 立账时 D23 那一行原句（主语只在标题「tail 住超级块槽」里，「不是每 fsync 一次」），
-# 一个结构的权威分项是未定项、一个简称写错、排除表一行指不存在的文件、一行没排到判红句子，必须判红；
-# write-frequency-green 里「每个 checkpoint 一次」「每次 fsync 写一次」与登记的「每次发布」同级、「只在 checkpoint 持久之后写一次」与登记同量、
-# 「不是每个事务推进一次」「不是每次挂载才写」「不会在每次挂载时推进」「每个事务都不写」否定的是别的量级、「不仅每次发布推进」「不是只在 fsync 时写」不划界、
-# 表格行的主语在别的格、一句的主语只在标题里、一句「每次挂载回写」登记在排除表里，必须判绿。
+# 决策正文里落在登记结构上的写频率断言，不许与 .claude/gate.d/write-frequency.tsv 登记的量级说反话；.claude/gate.d/write-frequency-exclude.tsv 逐句登记该留的判红句。两张表的写法与量级、量的口径在各自的文件头。
+# 扫 .claude/kb/decisions/*.md「## 历史版本」之前、围栏之外的行：去掉 ** 与反引号，按没转义的竖线切格、按「。；！？」切句。
+# 断言：频率词后面同一小句里 12 字以内跟写动词（「写放大」不算），或紧跟「一次」；只有频率词、不跟写动词的不判。
+# 归属：句里的每个登记叫法都算；句里没有就认同一表格行别的格，还没有就认所属最近一个标题。
+# 三种形态：
+#   否定（频率词前隔至多三个虚字的否定词，或频率词与写动词之间的「不 / 没 / 无需 / 无须」）：否定别的量级是划界、只计数；否定的时机被登记的罩住，判红。
+#   限定（前面紧挨「只 / 仅 / 只有」，可带「在 / 于」）：写的量与登记的量不同就判红，同级不同量也红；「不只 / 不仅 / 不是只」不划界，按否定计数。
+#   普通：不同级判红；登记的只是量级里一部分时机的，还要同量。
+# 另判红：登记表写坏；权威分项不是已定的「D<n>（简称） 已定项 k」、决策不在或简称与首行不符（归属借 lib-item-ref-status.py）；
+#   排除表一行指不存在的文件、那一段不足 8 字或一句判红句都没排到；登记了结构而一处落在它们身上的断言都没扫到。
+# 看不见：词表外的频率说法与叫法、跨句指代、否定词与频率词之间隔着虚字表外的字、双重否定、叫法取自表格行或标题时说的是不是这个结构、
+#   是不是稳态写频率。成功行逐个列出一处断言都没扫到的结构。登记表不在退 77。
+# 样本：write-frequency-red 里不同级、否定同级、隔字与动词前否定三句、「只在 fsync 时写」、主语只在标题里的一句、权威是未定项、简称写错、
+#   排除表一行指不存在的文件、一行没排到判红句，判红；write-frequency-green 里同级不同词、限定与登记同量、否定别的量级、不划界的「不仅 / 不是只」、
+#   主语在别的格或只在标题、排除表登记的一句，判绿。
 grid_write_frequency() (
   REGISTRY=.claude/gate.d/write-frequency.tsv
   EXCLUDE=.claude/gate.d/write-frequency-exclude.tsv
@@ -2342,7 +1983,7 @@ def bad(kind, detail):
 
 
 def phrase_pattern(phrase):
-    # 登记里的空格是「中英文之间可有可无的空白」：「每次 fsync」认「每次fsync」「每次 fsync」
+    # 登记里的空格是中英文之间可有可无的空白：「每次 fsync」也认「每次fsync」
     return r"\s*".join(re.escape(piece) for piece in phrase.split(" ") if piece)
 
 
@@ -2585,7 +2226,7 @@ if missed:
 PY
 )
 
-# ════════════════ 变更史组的两格（变更史的条目与形状） ════════════════
+# ════════════════ 后三格：变更史 ════════════════
 
 # 在仓里时取 gate 基准写进 diff_base；不在仓里 diff_base 留空。source 失败、取不到基准就判红退出。
 load_diff_base() {
@@ -2598,19 +2239,22 @@ load_diff_base() {
   diff_base="$(gate_diff_base gate)" || { echo "  ✗ 共用库算不出 diff 基准"; echo "     → 怎么办：照上面 gate_diff_base 的报错修（多半是 GATE_BASE 写错了），再跑。"; exit 1; }
 }
 
-# ── entry-added ──
+# ── entry-added：决策正文改了，变更史里要有新增条目 ──
+# 改了 decisions.md 或 decisions/ 却没在 decisions-history.md 新增条目，判红（.claude/rules/format-evolution.md「硬约束」：已定决策变更必须记进变更史）。
+# 只数有没有新增：顶格 `- ` 变更项，一个都没有按 `### 日期` 标题数；条目写得对不对靠人。
+# 基准取 changed-paths.sh 的 gate_diff_base gate：已提交没推出去的决策改动也算。
+# 小改动（增删合计不超过 4 行、一行状态都没碰：首行「## D<n> 简称 —— 状态」、「状态：」、已定项 / 未定项标题）不要求变更史，退 77。
+# 两条路径放数组：拼成一个字符串再加引号会变成单个 pathspec，什么都匹配不到。
 cell_entry_added() {
   local KB HIST diff_base diff_rc numstat changed decision_diff status_lines_touched added hist_diff
   KB=(.claude/kb/decisions.md .claude/kb/decisions)
   HIST=.claude/kb/decisions-history.md
 
-  # 不在 git 仓里没有「改了什么」可比：退 77（本次无对象可判）。老写法把 git 的报错丢进 /dev/null，
-  # 每一道 git 都失败、行数读成 0，于是「只改了 0 行，按小改动放行」报绿。
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "  ! 不在 git 仓库里，这一格无对象可判"
     exit 77
   fi
-  # 在仓里时每一道 git 都要成功：失败了这一格什么都没比，判红，不许读成「没改」。
+  # 在仓里时每一道 git 都要成功：失败了判红，不许读成「没改」
   git_failed() {
     bad "git $1 跑不起来（退出码 $2），决策正文改了多少、变更史加了几条都没数出来"
     howto "按上面 git 的报错修好仓库状态再跑（常见是还没有任何提交、HEAD 不存在：先提交一次）；"
@@ -2626,13 +2270,11 @@ cell_entry_added() {
     *) git_failed "diff --quiet $diff_base" "$diff_rc" ;;
   esac
 
-  # 决策正文改了多少行（增 + 删，各文件相加）
   numstat="$(git diff "$diff_base" --numstat -- "${KB[@]}")" || git_failed "diff --numstat" "$?"
   changed=$(awk '{n+=$1+$2} END{print n+0}' <<<"$numstat")
-  # 改动碰没碰状态行：碰了就不算小改动（把「—— 半定」改成「—— 已定」只有两行，而它正是最该留痕的那种）
+  # 碰了状态行就不算小改动：「—— 半定」改成「—— 已定」只有两行，却最该留痕
   decision_diff="$(git diff "$diff_base" -U0 -- "${KB[@]}")" || git_failed "diff -U0" "$?"
   status_lines_touched=$(grep -cE '^[+-](## D[0-9]+ .*——|#{3,4} *(已定项|未定项)|.*状态：)' <<<"$decision_diff" || true)
-  # 本次 diff 往变更史里加了几条：一条改动一个顶格的 `- ` 变更项；一个都没加的按 `### 日期` 数
   hist_diff="$(git diff "$diff_base" -- "$HIST")" || git_failed "diff（变更史）" "$?"
   added=$(grep -c '^+- ' <<<"$hist_diff" || true)
   if ((added == 0)); then added=$(grep -c '^+### 20[0-9][0-9]-' <<<"$hist_diff" || true); fi
@@ -2660,12 +2302,8 @@ cell_entry_added() {
 }
 
 # ── history-loss：变更史整理不许丢 ──
-# 提交前主 agent 把当天的变更项整理成结论（.claude/rules/changelog-format.md）；整理只许删同日日期、包装、原文围栏与批量复制，
-# 数、编号、产物名、别的日期、引名一个都不许丢。这一格拿基准里的那一版与现在的比：两份变更史各跑一次
-# research/scripts/history-consolidate.py loss-check（判法在那份脚本文件头），任一份退 3 判红；两份都与基准无差异退 77。
-# 弄坏开关 DOC_DECISIONS_BREAK=history-loss：这一格不跑、按判过了记，history-loss-red 出不来它的红行。
-# 判别力：fixtures/doc-decisions.sh/history-loss-red 基准里一块带一个数，工作区整理时把那个数弄丢了，必须判红；
-#         history-loss-green 同一块整理成一条结论、数都在，判绿。
+# 整理变更项（.claude/rules/changelog-format.md）不许丢数、编号、产物名、别的日期、引名。两份变更史各拿基准里那一版与现在的比：
+# research/scripts/history-consolidate.py loss-check（判法与出路在它的文件头），任一份退非 0 判红；都与基准无差异或基准里没有退 77。
 cell_history_loss() {
   local diff_base checked=0 failed=0 hist base_copy rc
   if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
@@ -2700,7 +2338,16 @@ cell_history_loss() {
   ok "变更史整理没丢：查了 $checked 份，基准里每个日期块的数、编号、产物名、引名在改后都找得到"
 }
 
-# ── shape ──
+# ── shape：变更史的形状 ──
+# 形态是「条目 → 日期 → 变更清单」：每条决策 / 实验一个 `## D<n>（` / `## E<n>（` 节，节里按 `### YYYY-MM-DD` 分块，块下每条改动一个顶格 `- ` 项（.claude/rules/changelog-format.md）。判五样：
+#   a) .claude/kb/ 下任何 .md 里 `### 20YY-MM-DD` 后面直接跟「（其…）」
+#   b) 两份变更史里日期块的上一级标题不是 `## D<n>（` / `## E<n>（`；文末「## 历史版本」里的块不算节外，但块里标题或 `- ` 项点名了 `D<n>（` / `E<n>（` 的照样判红
+#   c) 同一节里同一个日期的 `### ` 出现两次以上
+#   d) 两份变更史里的 `#### ` 子条目、「> 快查·」行、「**现状**：」行
+#   e) 节里的 `### 日期` 块一条 `- ` 项都没有
+# 只判这一轮新增的（基准同 entry-added）：a、d 看那一行，b 看块里任一行，c 看重复的几行里任一行，e 看 `### ` 行；基准里就有的只计数不判红。
+# 新增行按 `git diff -U0` 的 hunk 头取行号（changed-paths.sh 的 gate_added_lines 只给行文），未跟踪的整份算新增；不在 git 仓里整棵树按新增判。围栏里的行不算。
+# 判不了：变更项写得对不对、该点名的决策或实验点没点全、日期块是不是倒序。
 cell_shape() {
   local diff_base
   load_diff_base
@@ -2919,7 +2566,6 @@ if failed:
     print(f'     → 改完只重跑这一格：{CHECK_COMMAND}')
     sys.exit(1)
 if date_headings == 0:
-    # 退 77：门禁记「本次未跑」，不记通过（`.claude/singlefs-ai-sop/rules/show-me-test.md`「扫到 0 项也不是通过」）
     print(f'  ! {KB} 下 {len(files)} 份 .md 里一个 `### 日期` 标题都没有，这一格无对象可判')
     sys.exit(77)
 print(f'  ✓ 变更史的形状对：查了 {len(files)} 份 kb 文件、{date_headings} 个 `### 日期` 标题'
@@ -2929,7 +2575,7 @@ PY
 }
 
 # ════ 登记的格函数：弄坏开关点名这一格就不跑、按判过了记，否则调这一格的判法 ════
-# 决策文档组十四格原是在后台起的（stdin 是 /dev/null），这里照样把 stdin 接到 /dev/null。
+# 前十四格的 stdin 接 /dev/null，与它们原先在后台跑时读到的一样。
 break_skips() {
   if [[ "$BREAK_SWITCH" == "$1" ]]; then
     echo "  ✓ 弄坏开关 DOC_DECISIONS_BREAK=$1：这一格没判"
@@ -2954,7 +2600,7 @@ judge_entry_added()             { break_skips entry-added;             cell_entr
 judge_shape()                   { break_skips shape;                   cell_shape; }
 judge_history_loss()            { break_skips history-loss;            cell_history_loss; }
 
-# ════ --write：按格表次序重写两块投影，每块在自己的子 shell 里写完回读判一遍 ════
+# ════ --write：在子 shell 里重写 decision-items-sync 的两块投影，写完回读判一遍 ════
 if ((write_mode)); then
   write_cells=(decision-items-sync)
   if ((STAGE_CELLS_CHECK_GIVEN)); then

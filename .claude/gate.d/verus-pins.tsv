@@ -1,0 +1,35 @@
+# Verus 的登记表：门禁 checker-tier-formal-verification 的四格 Verus 判法（research/scripts/verus-proof-check.py）从这里取钉住的版本、被验的 crate、核与必红世界表。
+# 一行一条，制表符分隔，第一段是种类：
+#   release	<Verus 发布 tag>	<它出自的提交（40 位）>	<发布包 zip 的 sha256：本机那一份放在安装目录旁、名叫 verus.zip，在就核，不在只报一句>	<安装目录，相对 ${XDG_DATA_HOME:-~/.local/share}；SINGLEFS_VERUS_ROOT 盖过它>
+#   package	<crates.io 包名>	<版本>	<包里 .cargo_vcs_info.json 的 git.sha1>	<它的 path_in_vcs>	<包源码的内容指纹：去掉顶层 Cargo.toml、Cargo.toml.orig、.cargo_vcs_info.json、.cargo-ok，算法见 verus-proof-check.py 文件头>
+#   crate	<被验的 crate 目录>	<Verus 验整个 crate 时 verified 的登记数：加减了证明就照判定行改这个数，改动说明写加减了哪几个>
+#   kernel	<核的路径（在 crate 里）>
+#   must-red-worlds	<必红世界表的路径（五段制表符分隔：变异名、文件、原文、替换文、proof_errors=<证明错条数>）>
+#   rlimit	<Verus 命令行上的 --rlimit，proof、vacuity、must-red-worlds 三格同一个数；至多一行，没有这一行取 verus-proof-check.py 的 DEFAULT_RLIMIT>
+#
+# 同源的依据（主 agent 2026-10-01 用 GitHub compare 现查；工具实现员 2026-10-01 在 /tmp/claude-1000/m3-verus-gate-3-3/provenance/ 复核一遍）：
+#   crates.io 的 vstd 与 verus_builtin_macros 0.0.0-2026-09-20-0158 出自 3204118，verus_builtin 0.0.0-2026-09-16-0054 出自 1b9b1d7，
+#   verus_state_machines_macros、verus_syn、verus_prettyplease 0.0.0-2026-09-06-0133 出自 53ec5c4（各包的 .cargo_vcs_info.json）；Verus 发布 0.2026.09.20.aef82ed 出自 aef82ed。
+#   compare 3204118...aef82ed、1b9b1d7...aef82ed、53ec5c4...aef82ed 在这六个包各自的 path_in_vcs 目录里只列出 Cargo.toml 改过；
+#   复核另拿 aef82ed 的源码树逐文件比：六个包里除去上面四样之外的文件，除 cargo 打包时生成的 Cargo.lock 之外都与 aef82ed 同一路径逐字节相同，
+#   包里的 README.md 是 Cargo.toml 的 readme = "../../README.md" 带进来的、与 aef82ed 的仓根 README.md 相同，六个包的 Cargo.toml.orig 与 aef82ed 的 Cargo.toml 相同。
+#   所以编译用 crates.io 这六个包擦 verus!、验证用这份 Verus 自带的宏与 vstd，两边是同一份源码；对齐走「Verus 退到 0.2026.09.20」，不改依赖。
+#   换版本：先照上面复核一遍同源（换了的包逐个），再改这几行；只改一边就是 verus-toolchain-pinned 那一格红。
+release	0.2026.09.20.aef82ed	aef82eda71838deef4a8cd0260fda6c9504be9b9	7b870fa12bc589015c2fab60a8b3d9f07c7b1adb3444eb0fadffcbf7f0447b33	singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux
+package	vstd	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/vstd	068cac977afcf0f5d5b736f8fa3ceb79114a1f3634c59ba6671331a99dd022ac
+package	verus_builtin_macros	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/builtin_macros	66e70cb448dc0fd414f570871f07397f0de0235af67df5eee448a485c5d3e8d1
+package	verus_builtin	0.0.0-2026-09-16-0054	1b9b1d7c09d6a2c17f150c3e48ad27d9b7300615	source/builtin	46f932ee8945f7083ba15bbb9780be57b269c7fcf99622fbe0a1b682c7db059f
+package	verus_state_machines_macros	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	source/state_machines_macros	44b527d1f3f2b169c9fe186681824fd347a06f0a1d9afe29b1c8108b61985961
+package	verus_syn	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/syn	a5bc7d13c41c1635dedb635c82e6c26d852ebee78b928d78f0eef1e94affa008
+package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/prettyplease	0052db78e25abd4a063ac154bfb8e616aa017725154a3dba5d6e9816551f8f97
+# 核是单独的 crate singlefs-replay-prefix（只依赖 vstd），核就是它的 src/lib.rs。56 是第 10 批加择根核、扫环核与合判推论合入那一版的判定行
+# （主 agent 合入后在 /tmp/claude-1000/m3-verus-rows-10-3/rows.out 现跑：Verus 0.2026.09.20 --no-cheating --rlimit 10，56 verified, 0 errors）；加减了证明照合入那一版的判定行改这个数。
+crate	crates/singlefs-replay-prefix	56
+kernel	crates/singlefs-replay-prefix/src/lib.rs
+must-red-worlds	crates/singlefs-replay-prefix/verus-mutations.tsv
+# rlimit 取 10，就是 Verus 0.2026.09.20 不给 --rlimit 时的默认值：今天的核与必红世界表都是在默认值上验的（实现员 4-1 的报告 /tmp/claude-1000/m3-verus-core-4-1/report.md
+# 第 62 行起的命令不带 --rlimit；同一份第 105 行：主循环 --rlimit 5 验得过、3 验不过），10 是验得过的最小值 5 的两倍，写死之后不随 Verus 改默认值漂。
+# 必红世界表第五段一律写 proof_errors=M：M 是一行改坏之后的证明错条数，就是 error 起头的报错除去含 Resource limit (rlimit) exceeded 的
+# 与以 aborting due to 起头的之后剩下的条数（不数 rlimit 用尽：Verus 把它也计进 errors，同一行换个 rlimit 那个数就变），格里比条数等于 M；
+# 第五段不是这个形态的行判红。证明错一条都没有、只剩 rlimit 用尽的那一行不作数、判红。要调高这个数，先在新数上把核与必红世界表整张重验一遍再改。
+rlimit	10

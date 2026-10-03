@@ -28,8 +28,7 @@ decisions-history.md、experiments-history.md、CHANGELOG.md 三种变更史；r
      「<门禁名> 的 <格名> 格」（「那一格」「这一格」同）与反引号里「gate.d/<门禁名>.sh … --check <格名>[,<格名>…]」里的格名，
      要在那道门禁文件头的格名表里（`# gate-cell:` 行，经 research/scripts/gate-structure-check.py 的 header_cells 读）。
      「<名> 的 <x> 格」里 <名> 不是门禁目录里的门禁的不判（分不清是不是在说门禁）。
-  ⑤ 用旧编号称呼门禁：「NN 号」（排除与 ① 相同）、「门禁 NN」、「gate.d/NN-…」（含 gate.d/fixtures/NN-…），NN 是下面 OLD_GATES 里的旧号，54 除外
-     （54 号的全名就是 54-layer0-replay）。出路给那个旧号今天在哪道门禁、哪几格。
+  ⑤ 用旧编号称呼门禁：「NN 号」（排除与 ① 相同）、「门禁 NN」、「gate.d/NN-…」（含 gate.d/fixtures/NN-…），NN 是下面 OLD_GATES 里的旧号。出路给那个旧号今天在哪道门禁、哪几格。
      「NN 号」「门禁 NN」两种写法先把带目录的文件路径与「日期-」起头的记录文件名遮掉再找（`records/2026-09-28-门禁59号提速与双机分片.md`
      这种文件名里的号不是在称呼门禁；① 同样遮）；「gate.d/NN-」那一种就是路径，不遮。
      OLD_GATES 照调度记录 records/2026-09-28-门禁59号提速与双机分片.md「旧编号与现在的门禁」那张表，外加表里漏了的 96 号
@@ -89,7 +88,6 @@ REPO_PATH = re.compile(r"^[A-Za-z0-9_.\-/]+$")
 FILE_WITH_SECTIONS = re.compile(r"`?([^\s`「」]+\.(?:md|py|sh))`?\s*(?:的)?\s*((?:「[^」]+」(?:、|与|和)?)+)")
 DECORATION = re.compile(r"[\s`*「」]")
 BASE_DIRECTORIES = ("", ".claude", ".claude/kb")
-KEPT_NUMBER = 54
 
 # 旧号 → (今天的门禁, 那一道里的哪几格；空元组表示整道或拆得说不清，只给门禁名)
 OLD_GATES = {
@@ -128,6 +126,7 @@ OLD_GATES = {
     51: ("doc-registries", ("admission-terms",)),
     52: ("doc-registries", ("segment-registry",)),
     53: ("doc-registries", ("format-const-placeholders",)),
+    54: ("checker-tier-layer0-replay", ()),
     55: ("checker-tier-qemu-device-streams", ("device-streams",)),
     56: ("doc-process-records", ("crates-adversarial-review",)),
     57: ("checker-tier-lkmm", ("litmus-verdicts",)),
@@ -177,7 +176,7 @@ OLD_GATES = {
 SPLIT_OLD_GATES = {
     14: "拆开了：「一条用例一个场景」是门禁 harness-model-differential-and-scenarios 的 one-scenario 格，"
         "「测试文件不按里程碑起名」是门禁 code-source-discipline 的 test-file-names 格，"
-        "「崩溃枚举用例住 checker 档且登记」「测试文件声明模块」归门禁 54-layer0-replay",
+        "「崩溃枚举用例住 checker 档且登记」「测试文件声明模块」归门禁 checker-tier-layer0-replay",
 }
 
 
@@ -336,7 +335,7 @@ def judge_governance(carriers, gates_on_disk, problems, unjudged, counts, skippe
             lines = handle.read().split("\n")
         for number, line in enumerate(lines, 1):
             for _start, gate in gate_numbers_in(line):
-                if gate != KEPT_NUMBER and (gate in OLD_GATES or gate in SPLIT_OLD_GATES):
+                if gate in OLD_GATES or gate in SPLIT_OLD_GATES:
                     continue   # 旧号归 ⑤
                 counts["gate"] += 1
                 if gate not in gates_on_disk:
@@ -394,7 +393,7 @@ def judge_current_text(carriers, gates, upstream, problems, counts):
                 spans += [(match.start(1), int(match.group(1))) for match in GATE_WORD_NUMBER.finditer(without_paths(line))]
                 spans += [(match.start(1), int(match.group(1))) for match in OLD_GATE_PATH.finditer(line)]
                 for start, gate in sorted(spans):
-                    if start in reported or gate == KEPT_NUMBER or (gate not in OLD_GATES and gate not in SPLIT_OLD_GATES):
+                    if start in reported or (gate not in OLD_GATES and gate not in SPLIT_OLD_GATES):
                         continue
                     reported.add(start)
                     counts["old"] += 1
@@ -403,7 +402,7 @@ def judge_current_text(carriers, gates, upstream, problems, counts):
                 continue
             for match in GATE_BY_NAME.finditer(line):
                 name = match.group(1)
-                if re.match(r"[0-9]{2}-", name) and name != f"{KEPT_NUMBER}-layer0-replay" and int(name[:2]) in OLD_GATES.keys() | SPLIT_OLD_GATES.keys():
+                if re.match(r"[0-9]{2}-", name) and int(name[:2]) in OLD_GATES.keys() | SPLIT_OLD_GATES.keys():
                     continue   # 带旧号的文件名，⑤ 不判裸名，这里也不重复报
                 counts["name"] += 1
                 if name not in known_names:

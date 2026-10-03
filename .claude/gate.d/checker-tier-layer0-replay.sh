@@ -1,122 +1,137 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
-# gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（整轮门禁与提交时跑快档：checker 档包（crates/singlefs-checker-tier，D13 已定项 15）不标 ignored 的用例，再逐条核 stage-inputs.tsv 里 crash-case: 那几条用例各自那一格全绿标记与它这批输入的指纹相等，不作数的报「本次未跑」、不判红；全量由用户要求或夜间在 HEAD + 暂存区的 worktree 里跑 --full，逐条用例照复用判定跑：那一格全绿标记在就复用，不在才在 release 下跑它、判绿写那一格；两条流的层 0 全量带断点续跑，新池新建文件与 E142 产物逐字比对、里程碑「覆盖写、释放、回退与复用」固定脚本到 E 与用例的闭式比对由用例自己断言；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与新池新建文件逐项相同，由 cargo test 里的快用例钉住，不另枚举）
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
+# gate-stage: 层 0 崩溃点重放与登记的崩溃枚举用例（快档跑 checker 档包不标 ignored 的用例、核每条用例的全绿标记；--full 逐条照复用判定跑全量）
 # gate-category: checker-tier 类
 # gate-similar: code-source-discipline.sh 与 harness-model-differential-and-scenarios.sh 也调 research/scripts/crash-case-check.py，但调的是 file-names、one-scenario 两样，分归代码类与 harness 类；这里开跑前只调 placement、modules 两样，判的是崩溃枚举用例与 checker 档测试文件，红了就不起 cargo
 # gate-covers: 崩溃点重放
 # gate-cell: layer0-replay 快档跑 checker 档包不标 ignored 的用例、逐条核崩溃枚举用例的全绿标记；--full 逐条照复用判定跑
+# gate-cell: feature-gated-tests 快档带上 checker 档 tests/ 里 cfg 点到的特性另跑一趟：挂特性的测试文件逐个跑到的用例不为 0，GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑
 #
-# 格结构只补了最小的一截（.claude/rules/verification.md「门禁的结构」；这一道的重设计归会话「里程碑3 放量 GPU加速」）：只有一格，
-#   --list                 打格名表那一行（格名、制表符、判什么），不起 cargo、不起 python
-#   --check layer0-replay  与不给一样；格名写错或缺格名退 2、列出可用的格名
-#   --list-items           按崩溃枚举用例点名：逐行打被判那棵树的 .claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几条与它们的 test=，不起 cargo、不起 python
-#   --item <用例名>        只看点名的崩溃枚举用例（crash-case: 可写可不写，给几次取并集，没登记退 2）：快档照跑 checker 档包、只核这几条的标记；--full 只跑这几条
-# 不改用共用库 lib/stage-cells.sh：它的汇总把 0、77 之外的退出码并成 1，而样本档判绿退 3；research/scripts/admission.py --selftest 的「54 号」那几格
-# 把这一份拷进临时仓的 .claude/stage-under-test/（没有 lib/）跑流程，source 不到共用库。解析参数的判法与共用库同一套（写错退 2、列出格名）。
+# 用法（参数顺序不限）：
+#   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]                                     快档，两格都跑；gate.sh 只传项目根
+#   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full [--start-over] <worktree>   全量，只有 layer0-replay 一格
+#   --list                     打格名表（格名、制表符、判什么），不起 cargo、不起 python
+#   --check <格名>[,<格名>…]   只跑点名的格
+#   --list-items               逐行打被判那棵树 stage-inputs.tsv 里键是 crash-case: 的行与它们的 test=，不起 cargo、不起 python
+#   --item <用例名>            只看点名的崩溃枚举用例（crash-case: 可写可不写，给几次取并集）：快档照跑 checker 档包、只核这几条的标记；--full 只跑这几条
+#   --start-over               只跟 --full：设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑）；不带时从调用方的环境里清掉它
+# 退出码：
+#   0   绿；快档有标记不作数、带特性那一格有本次未跑时也退 0，逐条报「本次未跑」
+#   1   红；快档有一格红就退 1
+#   2   用法错：参数认不出，格名或用例名写错或缺，--start-over 没跟 --full，--full 只点了 feature-gated-tests，项目根进不去，
+#       样本档标记目录里的假 cargo 或假 rustc 不在或不可执行，PATH 上的 cargo 没解到标记目录里那一份
+#   3   样本档流程判绿：样本档没跑过真的层 0，不与真跑的绿混在一起
+#   77  本次未跑：快档可复用上一次整轮全绿的判定、改动没碰登记的路径，或没有 checker 档包
+#   78  准入与运行条件没满足（preflight）
+# 不用共用库 lib/stage-cells.sh：它的汇总把 0、77 之外的退出码并成 1（样本档要退 3）；admission.py --selftest 拷这一份去跑的临时仓里也没有 lib/。
+# 解析参数的判法与共用库同一套（写错退 2、列出格名）。
 #
-# 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问；
-# 用户 2026-09-26 定逐条用例复用，原话「下次肯定要接入提交时崩溃验证员， 并且以后跑也不能全量这么跑，改了只跑改了的部分。」，
-# records/2026-09-24-里程碑二收尾调度.md 第三节「崩溃枚举的跑法」那一行；
-# 用户 2026-09-27 定验证代码分两档、提交时默认只跑快档，原话「checker可以自己跑，但是默认只有在提交时候才跑」，records/2026-09-27-验证两档拆分.md）：
+# 覆盖：两条流的层 0 全量由登记的崩溃枚举用例跑，新池新建文件与 E142 产物逐字比对、「覆盖写、释放、回退与复用」固定脚本到 E 与闭式比对，都由用例自己断言；
+#   只做过 mkfs 的池可写挂载再发第一个文件版本那条流与新池新建文件逐项相同，由 cargo test 里的快用例钉住，不另枚举。
+#   用例平时标 ignored，--full 在 release 下带 --include-ignored --exact 逐条跑；用例的判别力在用例自己（计数断言与同文件的靶向阳性对照）。
 #
-#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
-#     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
-#     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
-#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加准入模块 admission.py 里崩溃枚举用例的判法摘要、
-#     工具链、构建环境与这条用例的登记行；这一份 54 号不进指纹）；那一格全绿标记在、作数就复用，不跑；不在才照 admission.py crash-case-command
-#     交出的命令与环境跑（`cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture`，续跑的变量与线程数也由它定，
-#     那一段在判法摘要里），按登记行第三列判日志（crash-case-judge），开跑与跑完各算一次指纹，相同才写那一格（crash-case-record）。
-#     全绿标记在 git common-dir：`singlefs-crash-case-green.<用例名>.<输入指纹>`，不进工作树，各 worktree 读写同一组；别的格不动。
-#     一条判红删它这批输入那一格（先绿后红，前一趟那一格不再作数），接着跑下一条；「跑的过程中输入变了」那一支判红不删：它说不出开跑那一批的好坏。
-#     两趟 --full 同时跑同一条用例、同一个指纹时这里不加锁：后跑完的那一趟判红会删掉先跑完的那一趟刚写的绿标记，只会假红、不会假绿
-#     （崩溃验证员的定义里「另有 --full 在跑时不起」挡着这一种）。
-#     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
-#     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
-#     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-checker-tier/src/layer0_progress.rs。
-#     双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）：本地配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，
-#     模板是仓根 multi-host.env.example）在、research/scripts/layer0-shard-configuration-check.sh 判得过（键齐、第二台 ssh 连得上、它上面有 cargo）
-#     才开；开着时登记了 shard=across-machines 的用例（admission.py crash-case-shardable）交给 research/scripts/layer0-shard-run.sh --merged-log
-#     （本机 0/2、第二台 1/2、本机 merge/2；驱动脚本与配置判法按内容进这几条用例的指纹），它交回的 merge 那一趟日志照单机的判法判、写同一格标记；
-#     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
-#     发现日志（用户 2026-09-27 定「崩溃放量日志要全量与发现双份，不然读不过来」，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；
-#     行格式以 crates/singlefs-checker-tier/src/crash.rs 的发现日志为准）：每趟 --full 的全量日志与发现日志放 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，
-#     不随 worktree 删、跑完不删；一条用例的全量日志是 log.<用例名>，发现日志是它同名加 .findings.tsv。单机跑时在 crash-case-command 交的命令外面
-#     设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；双机分片时驱动脚本照同一个命名（<它交回的 merge 日志>.findings.tsv）给 merge 那一趟，两片各自的
-#     发现日志在那一片的日志旁边（驱动脚本的输出里打出三份路径）。跑完逐节读发现日志（一节一趟枚举；这一趟的目录是新建的，里面的节都是这一趟的）：
-#     有 layer0_findings_summary 的节打一行 signatures / red_states / states 与发现表（每签名一行：号、pass、violated、segment、publish、states、
-#     sample_states；超过 30 个签名只打前 30 行加一行「其余 N 个见 <路径>」）；没有 summary 的节报「这一趟没跑完」判红；red_states 不是 0 判红
-#     （用例自己也会红，这是第二道）；定稿行数与 signatures= 对不上判红。发现日志不在或是空的：全量日志里有 LAYER0_FINDINGS 行（枚举跑完了却没写）判红，
-#     一行都没有（这条用例不走读这个变量的枚举入口）打一行说明、不判红。全量日志不转进阶段输出，只给路径（LAYER0_PROGRESS 照旧边跑边转，
-#     cargo 退非 0 时照旧打它的尾部）；全绿标记不带发现表。快档不设、不读发现日志，还从起 cargo 的环境里清掉调用方的这个变量。
-#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。本机核数、线程数不经它转：crash-case-judge 与 crash-case-record 自己现取
-#     （与 crash-case-command 同一个算法、同一份环境），crash-case-command 交的前三个词这里只拿来打开跑那一行。它里面还定着结论的只剩流程的次序
-#     （开跑与跑完各算一次指纹、先判日志再写标记、判红删那一格）与两处第二道判红（cargo 退非 0、发现日志那几条）——这两处的第一道
-#     （test result 恰好 1 passed、登记的计数行）在准入模块的判法摘要里；由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记
-#     （范围那一问不摘掉它）。
-#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
-#     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
-#     checker 档包在 release 下只跑不标 ignored 的用例（cargo test --release -p singlefs-checker-tier --lib --tests：库与集成测试，崩溃枚举用例都住那个包的 tests/；装置二进制 src/bin/ 的内联单测不在快档里，归它们的变异表（checker-tier-crates-mutation-replay）与实验复跑），一条都没通过判红；
-#     再逐条崩溃枚举用例算它这批输入的指纹、核那一格
-#     （admission.py crash-case-marker-check：在、记的指纹与用例相同、test result 是 1 passed、登记的计数行各恰好一行、要 exhaustive=true 的带着），
-#     全部作数成功句逐条原样带出那一格的计数行与时刻；有不作数的逐条列原因（没有那一格时比最近写的一格与这一次的清单）、每条往 GATE_NOT_RUN_FILE 报一行「本次未跑」，
-#     不判红、退 0（全量默认不在提交时跑，D13 已定项 15；报过本次未跑的这一轮不算覆盖崩溃点重放），出路是跑 --full。
-#     按整批输入分格的旧标记（singlefs-layer0-full-green.*）不再认。
+# --full：在 HEAD + 暂存区的 worktree 里跑（主工作区读得到别的会话没暂存的改动）；建法与 gate.sh --staged 相同，命令在快档的出路句里。
+#   逐条崩溃枚举用例，照登记表的次序。指纹由 admission.py crash-case-manifest 按内容算；这一份 checker-tier-layer0-replay 不进指纹，改它不废旧标记。
+#   全绿标记在 git common-dir 的 singlefs-crash-case-green.<用例名>.<输入指纹>，各 worktree 读写同一组：在且作数就复用；
+#   不在才照 crash-case-command 交的命令跑，开跑与跑完各算一次指纹、相同才写。判红删这批输入那一格；「跑的过程中输入变了」判红不删：它说不出开跑那一批的好坏。
+#   两趟 --full 同时跑同一条用例、同一个指纹时不加锁：后跑完的判红会删掉先跑完的绿标记，只会假红、不会假绿（.claude/skills/crash-test/commit-stages.md 里「另有 --full 在跑时不起」挡着）。
+#   续跑的进度在 <common-dir>/singlefs-layer0-progress/<输入指纹>/，不随 worktree 删；变量由 crash-case-command 设，判法在 crates/singlefs-checker-tier/src/layer0_progress.rs。
+#   线程数 SINGLEFS_LAYER0_THREADS 没设取本机核数（admission.py 的 crash_case_worker_threads）；只起 1 个线程怎么判红、标记里线程怎么记，判法在 admission.py crash-case-judge。
+#   双机分片默认关：本地配置 ${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}（模板 multi-host.env.example）经 research/scripts/layer0-shard-configuration-check.sh
+#   判得过才开；开着时登记了 shard=across-machines 的用例交 research/scripts/layer0-shard-run.sh --merged-log，merge 那一趟的日志照单机判、写同一格标记。
+#   日志：每趟一个新目录 <common-dir>/singlefs-layer0-logs/<开跑时刻>-<pid>/，跑完不删；log.<用例名> 是全量日志，同名加 .findings.tsv 是发现日志
+#   （行格式以 crates/singlefs-checker-tier/src/crash.rs 为准）。发现日志判红：某节没有 summary、red_states 不是 0、定稿行数与 signatures= 对不上，
+#   或发现日志空而全量日志里有 LAYER0_FINDINGS 行。发现表超过 30 个签名只打前 30 行。全绿标记不带发现表。
+#   这一份里定着结论的只有流程次序（开跑与跑完各算一次指纹、先判日志再写标记、判红删那一格）与两处第二道判红（cargo 退非 0、发现日志）；
+#   第一道（test result 恰好 1 passed、登记的计数行）在准入模块的判法摘要里。所以改它时快档照样核标记（范围那一问不摘掉它）。
 #
-# 输入：整道阶段的复用判定与改动范围按 stage-inputs.tsv 里本阶段那一行（唯一登记位）；每条崩溃枚举用例的输入按它自己那一行，
-# 由 admission.py 按内容算（主工作区跑的与 `--staged` 临时 worktree 里的同一份内容算出同一个数）。
-# 主工作区里跑的 --full 读的是工作区（连同别的会话没暂存的改动），罩不到这一批暂存内容；所以 --full 在 HEAD + 暂存区的 worktree 里跑。
+# 快档 feature-gated-tests 格（C604（快档不开特性，崩溃放量与 GPU 对拍编进来零条））：特性从 checker 档 tests/ 顶层每个 .rs 的 cfg 现读，不另抄名单；
+#   挂特性的文件跑到 0 条、每处 NOT_RUN_NO_GPU_ADAPTER（GPU 对拍没卡时打这一行后返回成功）都报「本次未跑」、不判红；一个挂特性的文件都没有，记无对象可判。
+#   清掉调用方的 SINGLEFS_CRASH_AMPLIFICATION_* 与 SINGLEFS_LAYER0_FINDINGS_FILE：快档不写真的判定库、不按全量的规模跑。
 #
-# 全量（里程碑「新池新建文件」步 7）：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，每个状态跑恢复与 oracle、池级 checker、记录核对器，
-# 计数由用例钉死。全量要跑很久，平时 `cargo test` 里那几条标 ignored；--full 在 release 下带 --include-ignored --exact 逐条跑。
-# 用例的判别力在用例自己：对着产物与闭式的计数断言，oracle 的判别力由同文件的靶向阳性对照证明。
-#
-# 多线程（增补 2 收口表第 41 行；2026-09-18 用户定：测试与崩溃检测优先多线程）：crash.rs 按状态序号区间切片、多线程跑，
-# 线程数由 SINGLEFS_LAYER0_THREADS 传进去——调用方没设就取本机核数（nproc），取法在 admission.py 的 crash_case_worker_threads。
-# 每跑完一片，用例打一行 `LAYER0_PROGRESS`，这里边跑边转到本阶段的输出里。
-# 全绿标记里线程分两格记：configured_worker_threads= 是配的（SINGLEFS_LAYER0_THREADS 与它怎么来的、本机几核），started_worker_threads= 是
-# 登记了 threads= 的用例从 LAYER0_PARALLEL_FINISHED 读到的起了几个；没登记 threads= 的记「读不到」。
-# 登记了 threads=<前缀> 的用例：按那一行计数的状态数找 `LAYER0_PARALLEL_FINISHED`，这一趟真跑了至少两片、却只起了 1 个工作线程、本机多于 1 核、
-# SINGLEFS_LAYER0_THREADS 没显式设成 1，判红（多半是线程数没传进去）；全部片从进度文件读回（起 0 个线程）、只剩 1 片要跑（最多起 1 个）都不判红。
-#
-# 判别力：日志与标记怎么判、输入指纹怎么算，由 research/scripts/admission.py --selftest 的「崩溃枚举用例」那几格拿合成日志与临时仓核；
-# 这一份脚本的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）
-# 由同一份自证的「54 号」那几格核：把这一份拷进临时仓（不放在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑。
-# 发现日志那一段的判别力样本 fixtures/54-layer0-replay.sh/{red,green}（共享门禁的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑，setup.sh 在临时目录里 git init）：
-# 样本根上放一个 .layer0-sample-tools/ 目录，本阶段就进样本档——把它放到 PATH 最前面（里面是假 cargo 与假 rustc：照 cases/<测试目标>.log 打日志，
-# 设了 SINGLEFS_LAYER0_FINDINGS_FILE 时把 cases/<测试目标>.findings.tsv 追加进去），不管带没带 --full 都走 --full 那一路；判绿退 3（不退 0，
-# 样本档不算真跑过），判红照常退 1。green：一条用例的发现日志一节、0 个签名，一条用例不走发现日志；red：两个签名 red_states=3、没有 summary、32 个签名三条用例。
-# 弄坏开关（只给证红用）GATE_LAYER0_BREAK=<项>：no-findings-file 不设 SINGLEFS_LAYER0_FINDINGS_FILE、ignore-unfinished 没有 summary 的节当跑完了、
-# ignore-red-states 不看 red_states、no-truncation 签名全打不截；各自打开时 red 或 green 样本判错。
-# 开跑前的静态判据（placement、modules 两样）：样本 fixtures/54-layer0-replay.sh/static-check-red 放一条标了 #[ignore]、调 enumerate_layer0 却没登记 crash-case: 的
-# checker 档用例与一份第一行没声明模块的 checker 档测试文件，判红、不起 cargo；red、green 两份的测试文件第一行都声明了「无」，静态判据判绿、往下走。
-# 弄坏开关 GATE_LAYER0_BREAK=static-check-skipped 跳过这一段，static-check-red 报不出那两处，样本判错；
-# 判法那一份的开关 CRASH_CASE_CHECK_BREAK=rows-ignored 让没登记那一条报不出来，样本同样判错。
+# 自证：这一份的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）由
+#   research/scripts/admission.py --selftest 的「checker-tier-layer0-replay」那几格核：把这一份拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑；
+#   日志与标记怎么判、输入指纹怎么算，由同一份自证的「崩溃枚举用例」那几格拿合成日志与临时仓核。
+# 样本档：样本根上有 .layer0-sample-tools/ 就进样本档，把它放到 PATH 最前面（里面的假 cargo、假 rustc 照 cases/<测试目标>.log 打日志，
+#   设了 SINGLEFS_LAYER0_FINDINGS_FILE 时把 cases/<测试目标>.findings.tsv 追加进去），不管带没带 --full 都走 --full 那一路；判绿退 3，判红照常退 1。
+#   里面另放一个 quick-tier 文件就留在快档（复用与范围两问不问）：假 cargo 不带 --features 打 cases/default-pass.log，
+#   带了打 cases/feature-pass.<--features 的值>.log、退出码照同名 .exit（没有那一份日志退 101）。
+#   样本由 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑，setup.sh 在临时目录里 git init；进库的假工具 git 模式是 100755。
+# 样本（fixtures/checker-tier-layer0-replay.sh/）：
+#   green                        一条用例的发现日志一节、0 个签名，一条用例不走发现日志
+#   red                          两个签名 red_states=3、没有 summary、32 个签名三条用例
+#   static-check-red             一条标了 #[ignore]、调 enumerate_layer0 却没登记 crash-case: 的 checker 档用例，一份第一行没声明模块的 checker 档测试文件：
+#                                开跑前的静态判据判红、不起 cargo（red、green 的测试文件第一行都声明了「无」，静态判据判绿、往下走）
+#   quick-features-green         三个挂特性的文件都跑到了用例
+#   quick-features-gpu-not-run   两处 NOT_RUN_NO_GPU_ADAPTER（一处跟在 test 行后面、一处在库那一段）
+#   quick-features-zero          一个文件只有 ignored、一个文件 cargo 输出里没有它那一段
+#   quick-features-red           带特性那一趟退 101
+#   sample-cargo-not-executable  标记目录里只有假 cargo 与假 rustc，setup.sh 把假 cargo 的执行位去掉、给假 rustc 补上：退 2
+#   四份 quick-features-* 的 tests/ 里挂特性的写法各有一处：整份 #![cfg(feature)]、折成几行的 #![cfg(all(…))]、逐条 #[cfg(feature)]，
+#   与一个只在 // 注释里出现的特性名（读进来就找不到那组特性的日志）。
+# 弄坏开关（只给证红用）。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/checker-tier-layer0-replay.sh/ 下的目录名，
+# 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   GATE_LAYER0_BREAK=no-findings-file  不设 SINGLEFS_LAYER0_FINDINGS_FILE
+#       green（期望退出 3，实测 1）；red（输出里找不到「第 1 节…」）
+#   GATE_LAYER0_BREAK=ignore-unfinished  没有 summary 的节当跑完了
+#       red（输出里找不到「第 1 节…」）
+#   GATE_LAYER0_BREAK=ignore-red-states  不看 red_states
+#       red（输出里找不到「问题：第 1 节 red_states=3：有状态判红」）
+#   GATE_LAYER0_BREAK=no-truncation  签名全打不截
+#       red（输出里找不到「其余 2 个见」）
+#   GATE_LAYER0_BREAK=static-check-skipped  跳过开跑前的静态判据
+#       static-check-red（输出里找不到「── 开跑前的静态判据」）
+#   GATE_LAYER0_BREAK=no-feature-pass  不起带特性那一趟
+#       quick-features-gpu-not-run（输出里找不到「本次未跑（这不是通过）：GPU 对拍没跑…」）；quick-features-green（输出里找不到「✓ feature-gated-tests：3 个挂特性的测…」）；
+#       quick-features-red（期望退出 1，实测 3）；quick-features-zero（输出里找不到「! feature-gated-tests 不算全绿：3 个…」）
+#   GATE_LAYER0_BREAK=features-not-from-source  特性不从源码读、写死 verdict-store,gpu（假 cargo 没有这组特性的日志、退 101）
+#       quick-features-gpu-not-run、quick-features-green、quick-features-zero（期望退出 3，实测 1）；quick-features-red（输出里找不到「找不到 GPU 适配器…」）
+#   GATE_LAYER0_BREAK=ignore-feature-pass-exit  带特性那一趟退非 0 当成跑过
+#       quick-features-red（期望退出 1，实测 3）
+#   GATE_LAYER0_BREAK=ignore-zero-feature-files  不判挂特性的文件跑到 0 条
+#       quick-features-zero（输出里找不到「本次未跑（这不是通过）：checker 档 crates/s…」）
+#   GATE_LAYER0_BREAK=ignore-gpu-not-run  不读 NOT_RUN_NO_GPU_ADAPTER
+#       quick-features-gpu-not-run（输出里找不到「本次未跑（这不是通过）：GPU 对拍没跑…」）
+#   GATE_LAYER0_BREAK=sample-tools-unchecked  不核标记目录里的假工具
+#       sample-cargo-not-executable（期望退出 2，实测 1）
+#   CRASH_CASE_CHECK_BREAK=rows-ignored  判法那一份（research/scripts/crash-case-check.py）不报没登记的那一条
+#       static-check-red（输出里找不到「forgot_to_register_full：标了 #[i…」）
 set -uo pipefail
-# 参数：`--full`、`--start-over`、`--list`、`--check <格名>`、`--list-items`、`--item <用例名>` 与项目根，顺序不限；gate.sh 只传项目根，于是整轮门禁走快档。
 layer0_tier="quick"
 layer0_start_over=0
 root_argument=""
 layer0_list_cells=0
 layer0_list_items=0
 layer0_named_cases=()
-# 格名表（与文件头 `# gate-cell:` 那一行逐字相同；.claude/rules/verification.md「门禁的结构」）
+# 格名表：与文件头两行 `# gate-cell:` 逐字相同
 LAYER0_CELL_NAME="layer0-replay"
 LAYER0_CELL_TITLE="快档跑 checker 档包不标 ignored 的用例、逐条核崩溃枚举用例的全绿标记；--full 逐条照复用判定跑"
+LAYER0_FEATURE_CELL_NAME="feature-gated-tests"
+LAYER0_FEATURE_CELL_TITLE="快档带上 checker 档 tests/ 里 cfg 点到的特性另跑一趟：挂特性的测试文件逐个跑到的用例不为 0，GPU 对拍没卡打的 NOT_RUN_NO_GPU_ADAPTER 逐条记本次未跑"
+# --check 点名的格（空着就是两格都跑）
+layer0_selected_cells=()
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
-layer0_check_cells() { # <逗号隔开的格名>：只认 layer0-replay；写错、空着退 2 并列出可用的格名
+layer0_check_cells() { # <逗号隔开的格名>：认 layer0-replay、feature-gated-tests，记进 layer0_selected_cells；写错、空着退 2 并列出可用的格名
   local requested_cell requested_cells=()
   IFS=, read -r -a requested_cells <<< "$1"
   ((${#requested_cells[@]})) || requested_cells=("")
   for requested_cell in "${requested_cells[@]}"; do
-    if [[ "$requested_cell" != "$LAYER0_CELL_NAME" ]]; then
-      echo "  ✗ 54-layer0-replay.sh：--check 里有没登记的格名：「$requested_cell」"
-      echo "     → 怎么办：这一道只有一格，格名照下面写（也可以 bash .claude/gate.d/54-layer0-replay.sh --list 看）；按崩溃枚举用例点名用 --item <用例名>："
-      printf '       %s  %s\n' "$LAYER0_CELL_NAME" "$LAYER0_CELL_TITLE"
+    if [[ "$requested_cell" != "$LAYER0_CELL_NAME" && "$requested_cell" != "$LAYER0_FEATURE_CELL_NAME" ]]; then
+      echo "  ✗ checker-tier-layer0-replay.sh：--check 里有没登记的格名：「$requested_cell」"
+      echo "     → 怎么办：格名照下面写（也可以 bash .claude/gate.d/checker-tier-layer0-replay.sh --list 看）；按崩溃枚举用例点名用 --item <用例名>："
+      printf '       %s  %s\n' "$LAYER0_CELL_NAME" "$LAYER0_CELL_TITLE" "$LAYER0_FEATURE_CELL_NAME" "$LAYER0_FEATURE_CELL_TITLE"
       exit 2
     fi
+    layer0_selected_cells+=("$requested_cell")
   done
+}
+layer0_runs_cell() { # <格名>：这一趟跑不跑这一格（没给 --check 两格都跑）
+  local selected_cell
+  ((${#layer0_selected_cells[@]})) || return 0
+  for selected_cell in "${layer0_selected_cells[@]}"; do [[ "$selected_cell" == "$1" ]] && return 0; done
+  return 1
 }
 while (($#)); do
   stage_argument="$1"
@@ -137,18 +152,17 @@ while (($#)); do
     --item=*) layer0_named_value="${stage_argument#--item=}"; layer0_named_cases+=("crash-case:${layer0_named_value#crash-case:}") ;;
     -*)
       echo "  ✗ 认不出的参数：$stage_argument"
-      echo "     → 怎么办：只认 --full、--start-over、--list、--check $LAYER0_CELL_NAME、--list-items、--item <用例名> 与项目根，顺序不限：bash .claude/gate.d/54-layer0-replay.sh [--full [--start-over]] [--item <用例名>] [项目根]"
+      echo "     → 怎么办：只认 --full、--start-over、--list、--check $LAYER0_CELL_NAME、--list-items、--item <用例名> 与项目根，顺序不限：bash .claude/gate.d/checker-tier-layer0-replay.sh [--full [--start-over]] [--item <用例名>] [项目根]"
       exit 2 ;;
     *) root_argument="$stage_argument" ;;
   esac
   shift
 done
 if ((layer0_list_cells)); then
-  printf '%s\t%s\n' "$LAYER0_CELL_NAME" "$LAYER0_CELL_TITLE"
+  printf '%s\t%s\n' "$LAYER0_CELL_NAME" "$LAYER0_CELL_TITLE" "$LAYER0_FEATURE_CELL_NAME" "$LAYER0_FEATURE_CELL_TITLE"
   exit 0
 fi
 if ((layer0_list_items)); then
-  # 可点名的崩溃枚举用例：被判那棵树的登记表里键是 crash-case: 的行，照登记表的次序；不起 cargo、不起 python
   layer0_list_table="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}/.claude/gate.d/stage-inputs.tsv"
   if [[ ! -f "$layer0_list_table" ]]; then
     echo "  ✗ 读不到 $layer0_list_table：列不出可点名的崩溃枚举用例"
@@ -160,38 +174,69 @@ if ((layer0_list_items)); then
 fi
 if [[ "$layer0_start_over" == 1 && "$layer0_tier" != full ]]; then
   echo "  ✗ --start-over 只跟 --full 一起用：快档不跑全量，没有进度文件可丢"
-  echo "     → 怎么办：要丢掉进度文件、从头跑全量，写成 bash .claude/gate.d/54-layer0-replay.sh --full --start-over <根>。"
+  echo "     → 怎么办：要丢掉进度文件、从头跑全量，写成 bash .claude/gate.d/checker-tier-layer0-replay.sh --full --start-over <根>。"
+  exit 2
+fi
+if [[ "$layer0_tier" == full ]] && ! layer0_runs_cell "$LAYER0_CELL_NAME"; then
+  echo "  ✗ --full 只有 $LAYER0_CELL_NAME 一格：$LAYER0_FEATURE_CELL_NAME 只在快档跑"
+  echo "     → 怎么办：带特性那一格不带 --full 跑：bash .claude/gate.d/checker-tier-layer0-replay.sh --check $LAYER0_FEATURE_CELL_NAME [项目根]；全量写成 --full（或 --full --check $LAYER0_CELL_NAME）。"
   exit 2
 fi
 ROOT="${root_argument:-$(cd "$(dirname "$0")/../.." && pwd)}"
-# 跑的这一份 54 号进每条用例的输入清单；相对的 $0 在 cd 之后会指错，所以在 cd 之前取成绝对路径
+# 相对的 $0 在 cd 之后会指错，在 cd 之前取成绝对路径
 layer0_stage_script_path="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
-# 门禁与实验共用的准入模块：读登记表、算输入清单、判前提、判日志与读写全绿标记都经它（research/scripts/admission.py，文件头写全了各子命令）
+# 准入模块：读登记表、算指纹、判前提、判日志、读写全绿标记都经它（子命令见它的文件头）
 layer0_stage_repository="$(cd "$(dirname "$0")/../.." && pwd)"
 layer0_admission_module="$layer0_stage_repository/research/scripts/admission.py"
 cd "$ROOT" 2>/dev/null || exit 2
-# 样本档：样本根上有 .layer0-sample-tools/ 时，假 cargo 与假 rustc 放到 PATH 最前面、走 --full 那一路，判绿退 3（写法见文件头「判别力」那一段）
+# 样本档（写法见文件头「样本档」）
 layer0_sample_mode=0
 if [[ -d "$PWD/.layer0-sample-tools" ]]; then
   layer0_sample_mode=1
-  layer0_tier="full"
   PATH="$PWD/.layer0-sample-tools:$PATH"
   export PATH
-  echo "  ! 样本档：$PWD/.layer0-sample-tools 在，起用例的是那里面的假 cargo，走 --full 那一路；这一趟不算真跑过层 0"
+  if [[ -f "$PWD/.layer0-sample-tools/quick-tier" ]]; then
+    echo "  ! 样本档（快档）：$PWD/.layer0-sample-tools 在、里面有 quick-tier，起 cargo 的是那里面的假 cargo，留在快档、复用与范围两问不问；这一趟不算真跑过 checker 档"
+  else
+    layer0_tier="full"
+    echo "  ! 样本档：$PWD/.layer0-sample-tools 在，起用例的是那里面的假 cargo，走 --full 那一路；这一趟不算真跑过层 0"
+  fi
 fi
-# 弄坏开关（只给证红用，文件头「判别力」那一段）
+# 弄坏开关（只给证红用，清单在文件头）
 layer0_break="${GATE_LAYER0_BREAK:-}"
+# 样本档先核假工具：不可执行时 PATH 解到真 cargo，就在样本目录里起了真编译、判的也不再是样本；有一样不对退 2
+if [[ "$layer0_sample_mode" == 1 && "$layer0_break" != sample-tools-unchecked ]]; then
+  layer0_sample_tools_directory="$PWD/.layer0-sample-tools"
+  layer0_sample_tool_problems=()
+  for layer0_sample_tool in cargo rustc; do
+    layer0_sample_tool_path="$layer0_sample_tools_directory/$layer0_sample_tool"
+    if [[ ! -e "$layer0_sample_tool_path" ]]; then
+      layer0_sample_tool_problems+=("假 $layer0_sample_tool 不在：$layer0_sample_tool_path")
+    elif [[ ! -f "$layer0_sample_tool_path" || ! -x "$layer0_sample_tool_path" ]]; then
+      layer0_sample_tool_mode="$(stat -c '%A' "$layer0_sample_tool_path")"
+      layer0_sample_tool_problems+=("假 $layer0_sample_tool 不可执行（$layer0_sample_tool_mode）：$layer0_sample_tool_path")
+    fi
+  done
+  if layer0_resolved_cargo="$(type -P cargo)"; then :; else layer0_resolved_cargo=""; fi
+  if [[ "$layer0_resolved_cargo" != "$layer0_sample_tools_directory/cargo" ]]; then
+    layer0_sample_tool_problems+=("PATH 最前面放了标记目录，cargo 却解到 ${layer0_resolved_cargo:-（哪里都解不到）}")
+  fi
+  if (( ${#layer0_sample_tool_problems[@]} > 0 )); then
+    echo "  ✗ 样本档：$layer0_sample_tools_directory 里的假工具有 ${#layer0_sample_tool_problems[@]} 处不对，不往下走（往下走 cargo 就是真的那一个，在样本目录里起真编译）："
+    printf '      · %s\n' "${layer0_sample_tool_problems[@]}"
+    echo "     → 怎么办：给标记目录里的假 cargo、假 rustc 补上执行位（chmod 755；进库的样本 git 模式写 100755：git update-index --chmod=+x <文件>），"
+    echo "                缺的照 .claude/gate.d/fixtures/checker-tier-layer0-replay.sh/green/.layer0-sample-tools 补上，再跑；不是有意跑样本档的，把 $layer0_sample_tools_directory 挪走再跑。"
+    exit 2
+  fi
+fi
 
-# 开跑前的静态判据（原是测试粒度那一道的两样；判法只在 research/scripts/crash-case-check.py，静态、几秒跑完）：
-# placement 崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记成 crash-case:（没登记的 --full 不跑，谁都不跑）；
-# modules checker 档每个测试文件第一行声明它测哪几个模块。快档、--full、样本档都先判这一次，在复用判定之前：红了判红、不起 cargo。
-# 没有 crates/ 时不判（后面没有 checker 档包那一句退 77）；两样都无对象可判（crash-case-check 退 77）照往下走；
-# 判法脚本不在（admission.py --selftest 把这一份拷进不带 research/scripts/ 的临时仓跑）往 $GATE_NOT_RUN_FILE 报一行没跑、往下走，不判绿也不判红。
+# 开跑前的静态判据（placement、modules；判法在 research/scripts/crash-case-check.py）：快档、--full、样本档都在复用判定之前判，红了不起 cargo。
+# 判法脚本不在（admission.py --selftest 拷这一份去的临时仓没有它）报一行本次未跑、往下走，不判绿也不判红。
 layer0_static_judge="$layer0_stage_repository/research/scripts/crash-case-check.py"
 if [[ -d crates && "$layer0_break" != static-check-skipped && ! -f "$layer0_static_judge" ]]; then
-  echo "  ! 开跑前的静态判据没跑：判法脚本 $layer0_static_judge 不在（这一份 54 号被拷到了不带 research/scripts/ 的树里），往 GATE_NOT_RUN_FILE 报一行"
+  echo "  ! 开跑前的静态判据没跑：判法脚本 $layer0_static_judge 不在（这一份 checker-tier-layer0-replay 被拷到了不带 research/scripts/ 的树里），往 GATE_NOT_RUN_FILE 报一行"
   if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
-    printf '%s\n' "54-layer0-replay.sh 开跑前的静态判据（placement、modules）没跑：$layer0_static_judge 不在" >> "$GATE_NOT_RUN_FILE"
+    printf '%s\n' "checker-tier-layer0-replay.sh 开跑前的静态判据（placement、modules）没跑：$layer0_static_judge 不在" >> "$GATE_NOT_RUN_FILE"
   fi
 elif [[ -d crates && "$layer0_break" != static-check-skipped ]]; then
   echo "── 开跑前的静态判据：崩溃枚举用例住哪、登记没有，checker 档测试文件声明模块"
@@ -204,8 +249,6 @@ elif [[ -d crates && "$layer0_break" != static-check-skipped ]]; then
   fi
 fi
 
-# 这一道读的路径：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的那几条（唯一登记位），经准入模块的 paths 读。
-# 快档的复用判定与改动范围按它算；每条崩溃枚举用例的输入另按它自己那一行算。
 layer0_stage_file_name="$(basename "$0")"
 layer0_input_table="$ROOT/.claude/gate.d/stage-inputs.tsv"
 layer0_registered_input_paths=()
@@ -220,17 +263,11 @@ if (( ${#layer0_registered_input_paths[@]} == 0 )); then
 fi
 layer0_input_paths_text="${layer0_registered_input_paths[*]}"
 
-# 快档先问两件事，任一答「可跳过」就退 77（本次未跑），不退 0——`exit 0` 的跳过在汇总里与「判过了」
-# 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。--full 是收尾时点名要跑的，这两问都不问（逐条用例的复用另判）。
-# 一问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
-# 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
-# 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
-# 二问这次改动碰没碰登记给本阶段的那几条路径，再加登记表本身、跑的这一份 54 号与准入模块：登记行与准入模块的判法摘要进每条崩溃枚举用例的指纹，
-# 54 号定着流程的次序，只改它们的改动（新登记一条用例、改一条的第三列、改判法、改流程）同样要核标记，不能在这一问被摘掉；
-# 核下来标记照样作数（只改了准入模块判法之外的部分、只改了 54 号）就判绿。
-# 这是 C8（范围判定）的粗粒度前身：它只摘得掉「零行输入的改动」，摘不出别的，C8 照旧欠着。
-# 两问之前先核登记的每一条路径 git 至少列得出一个文件：写错的路径两问都拿它答「没碰」，这一道就一直退 77、一次都不跑。
-if [[ "$layer0_tier" == quick ]]; then
+# 快档先问能不能复用上一次整轮全绿的判定、这次改动碰没碰登记的路径，任一可跳过退 77 不退 0（show-me-test.md「门禁不许假装通过」）；--full 不问。
+# 两问之前先核登记的每条路径 git 列得出文件：写错的路径两问都答「没碰」，这一道就一直退 77、一次都不跑。
+# 范围那一问另加登记表、这一份 checker-tier-layer0-replay 与准入模块：登记行与判法摘要进指纹、checker-tier-layer0-replay 定流程次序，只改它们也要核标记。C8（门禁范围判不出来）还欠着。
+# 快档样本档不问：样本是刚 git init 的临时仓，判的是后面的流程。
+if [[ "$layer0_tier" == quick && "$layer0_sample_mode" == 0 ]]; then
   layer0_unlisted_input_paths=()
   for registered_input_path in "${layer0_registered_input_paths[@]}"; do
     registered_input_listing="$(git -c core.quotepath=false -C "$ROOT" ls-files -co --exclude-standard -- "$registered_input_path" 2>/dev/null)"
@@ -251,10 +288,8 @@ if [[ "$layer0_tier" == quick ]]; then
     -- "$ROOT" "${layer0_registered_input_paths[@]}" "${layer0_judge_paths[@]}"
 fi
 [[ -f Cargo.toml && -d crates/singlefs-checker-tier ]] || { echo "  ! 没有 crates/singlefs-checker-tier（checker 档包），本阶段跳过"; exit 77; }
-# 前提（cargo、rustc）登记在 stage-inputs.tsv 本阶段那一行第三列，经准入模块判，没齐判红（不退 77）
 python3 "$layer0_admission_module" gate-preconditions "$layer0_stage_repository" "$layer0_stage_file_name" || exit 1
 
-# 全绿标记与续跑的进度文件放 git 的 common-dir：不进工作树，主工作树与 `gate.sh --staged` 的临时 worktree 读写的是同一份。
 if ! git_common_directory="$(git -C "$ROOT" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$git_common_directory" ]]; then
   echo "  ✗ $ROOT 不是 git 工作树（取不到 git common-dir）：崩溃枚举用例的全绿标记与续跑的进度文件没处放、也没处读"
   echo "     → 怎么办：在这个项目的 git 仓里跑，或把仓库根作为参数传进来；标记在 \$(git rev-parse --git-common-dir)/singlefs-crash-case-green.<用例名>.<输入指纹>。"
@@ -264,7 +299,7 @@ layer0_progress_root="$git_common_directory/singlefs-layer0-progress"
 layer0_scratch_directory="$(mktemp -d)"
 trap 'rm -rf -- "${layer0_scratch_directory:?}"' EXIT
 
-# 登记的崩溃枚举用例，一条一行「键、包、测试目标、用例函数」（制表符分隔），照登记表的次序；登记有错判红。
+# crash-cases 一条一行：键、包、测试目标、用例函数（制表符分隔），照登记表的次序；登记有错退非 0
 if ! crash_case_listing="$(python3 "$layer0_admission_module" crash-cases "$ROOT")"; then
   printf '%s\n' "$crash_case_listing" | sed 's/^/       /'
   echo "  ✗ .claude/gate.d/stage-inputs.tsv 里 crash-case: 那几行登记有错（上面逐条列出）：判不出要跑、要核哪几条崩溃枚举用例"
@@ -279,7 +314,6 @@ if (( ${#crash_case_rows[@]} == 0 )); then
   echo "     → 怎么办：两条流的层 0 全量至少各登记一行，写法见 research/scripts/admission.py 文件头「崩溃枚举用例行」。"
   exit 1
 fi
-# --item 点名的崩溃枚举用例：快档只核、--full 只跑这几条（照登记表的次序）；点名的不在登记表里退 2
 if (( ${#layer0_named_cases[@]} > 0 )); then
   layer0_kept_rows=()
   layer0_unknown_cases=()
@@ -290,7 +324,7 @@ if (( ${#layer0_named_cases[@]} > 0 )); then
   done
   if (( ${#layer0_unknown_cases[@]} > 0 )); then
     echo "  ✗ --item 点名的崩溃枚举用例没登记：${layer0_unknown_cases[*]}"
-    echo "     → 怎么办：用例名照 bash .claude/gate.d/54-layer0-replay.sh --list-items 列的写（登记表里有 ${#crash_case_rows[@]} 条）。"
+    echo "     → 怎么办：用例名照 bash .claude/gate.d/checker-tier-layer0-replay.sh --list-items 列的写（登记表里有 ${#crash_case_rows[@]} 条）。"
     exit 2
   fi
   for crash_case_row in "${crash_case_rows[@]}"; do
@@ -319,7 +353,7 @@ write_crash_case_manifest() {
   return 0
 }
 
-# delete_crash_case_marker <键> <指纹>：这条用例这批输入那一格全绿标记删掉（判红时；前一趟那一格不再作数）。
+# delete_crash_case_marker <键> <指纹>：删这条用例这批输入那一格全绿标记
 delete_crash_case_marker() {
   local marker_path
   marker_path="$(python3 "$layer0_admission_module" crash-case-marker-path "$ROOT" "$1" "$2")" || return 0
@@ -327,8 +361,8 @@ delete_crash_case_marker() {
   return 0
 }
 
-# run_checker_package_tests <日志>：快档跑 checker 档包不标 ignored 的全部用例（崩溃枚举用例住那个包的 tests/，D13 已定项 15）；cargo 的整段输出进日志。
-# 快档不写发现日志：调用方环境里的 SINGLEFS_LAYER0_FINDINGS_FILE 清掉，不漏给快用例。
+# run_checker_package_tests <日志>：只跑不标 ignored 的用例（src/bin/ 的内联单测归变异表与实验复跑），cargo 的整段输出进日志；
+# 快档不写发现日志，清掉调用方的 SINGLEFS_LAYER0_FINDINGS_FILE。
 run_checker_package_tests() {
   env -u SINGLEFS_LAYER0_FINDINGS_FILE cargo test --release -p singlefs-checker-tier --lib --tests -- --nocapture 2>&1 \
     | tee "$1" \
@@ -364,8 +398,7 @@ read_crash_case_command() {
   return 0
 }
 
-# run_crash_case <日志> <发现日志> <命令的词…>：--full 照准入模块交的命令跑一条崩溃枚举用例，环境里设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；
-# 整段输出进日志，`LAYER0_PROGRESS` 行边跑边转到本阶段的输出（跑全量时这里一直在涨）。
+# run_crash_case <日志> <发现日志> <命令的词…>：环境里设 SINGLEFS_LAYER0_FINDINGS_FILE=<发现日志>；整段输出进日志，LAYER0_PROGRESS 行边跑边转出来。
 run_crash_case() {
   local log_file="$1"
   local -a findings_setting=(SINGLEFS_LAYER0_FINDINGS_FILE="$2")
@@ -482,13 +515,12 @@ report_manifest_differences() {
   sed -n '1,20p' <<< "$difference_lines" | sed 's/^/         /'
 }
 
-# print_staged_worktree_full_commands：出路里建「HEAD + 暂存区」worktree、在里面用那棵树里的 54 号跑 --full 的命令。
-# 建法与共享 gate.sh --staged 相同：worktree add --detach HEAD，再 apply --index 暂存区的 diff（diff 为空就不套）。
+# print_staged_worktree_full_commands：出路里建「HEAD + 暂存区」worktree 并在里面跑 --full 的命令；建法与共享 gate.sh --staged 相同。
 print_staged_worktree_full_commands() {
   echo '                在项目根、暂存之后，把下面三行命令放进同一次 Bash 调用（三行共用 layer0_full_base 这个变量，分开跑它就是空的；这次调用的退出码是经内存包装的那条 --full 命令的，250–254 是包装自己的结局）：'
   echo '                layer0_tree_ready=; layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
   echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; } && layer0_tree_ready=1'
-  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/54-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
+  echo '                if [ "$layer0_tree_ready" = 1 ]; then SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "${layer0_full_base:?}/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "${layer0_full_base:?}/tree"; layer0_full_rc=$?; else echo "worktree 没建好或暂存区的 diff 套不上，--full 没跑"; layer0_full_rc=1; fi; git worktree remove --force "${layer0_full_base:?}/tree" 2>/dev/null; rm -rf "${layer0_full_base:?}"; ( exit "$layer0_full_rc" )'
 }
 
 # run_checker_quick_tier：快档跑 checker 档包不标 ignored 的用例。判红打出路、返回 1；判绿把每个测试二进制那一行 test result 的 passed / ignored 加总进 quick_tier_report。
@@ -518,10 +550,14 @@ run_checker_quick_tier() {
   return 0
 }
 
-# ── 快档：checker 档包不标 ignored 的用例，再逐条核崩溃枚举用例这批输入那一格全绿标记 ─────────
-if [[ "$layer0_tier" == quick ]]; then
-  quick_tier_report=""
-  run_checker_quick_tier || exit 1
+# layer0_report_not_run <哪一部分没跑：为什么、怎么补>：照共享 lib.sh 的 report_not_run（这一份不 source lib.sh）。
+layer0_report_not_run() {
+  echo "  ! 本次未跑（这不是通过）：$1"
+  if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then printf '%s\n' "$1" >> "$GATE_NOT_RUN_FILE"; fi
+}
+
+# check_crash_case_markers：layer0-replay 格快档的后一半，逐条核全绿标记；不作数的报本次未跑、不判红。结论放进 layer0_cell_state。
+check_crash_case_markers() {
   present_report="$layer0_scratch_directory/present-report"
   missing_report="$layer0_scratch_directory/missing-report"
   : > "$present_report"
@@ -557,26 +593,224 @@ if [[ "$layer0_tier" == quick ]]; then
     if [[ "$legacy_marker_total" -gt 0 ]]; then
       echo "       common-dir 里还有 ${legacy_marker_total} 格按整批输入分格的旧标记（singlefs-layer0-full-green*）：分成逐条用例之后不再认，可以删掉。"
     fi
-    echo "     → 要跑全量（用户要求或夜间）：暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>"
+    echo "     → 要跑全量（用户要求时）：暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 checker-tier-layer0-replay 跑 --full <它的根>"
     echo "                （与 gate.sh --staged 同一建法；它只跑没有作数标记的那几条，别的复用）："
     print_staged_worktree_full_commands
     if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
       for missing_case in "${missing_cases[@]}"; do
-        echo "崩溃枚举用例 ${missing_case} 这批输入没有作数的全绿标记，全量没跑（要跑：54 号 --full）" >> "$GATE_NOT_RUN_FILE"
+        echo "崩溃枚举用例 ${missing_case} 这批输入没有作数的全绿标记，全量没跑（要跑：checker-tier-layer0-replay --full）" >> "$GATE_NOT_RUN_FILE"
       done
     fi
   fi
   echo "  ✓ 登记 ${#crash_case_rows[@]} 条崩溃枚举用例，$(( ${#crash_case_rows[@]} - ${#missing_cases[@]} )) 条的全绿标记与各自这批输入的指纹相同（登记路径 ${layer0_input_paths_text}，逐条减去用例读不到的文件），标记里的计数行原样："
   cat "$present_report"
+  layer0_cell_state="绿"
+  if (( ${#missing_cases[@]} > 0 )); then layer0_cell_state="有 ${#missing_cases[@]} 条崩溃枚举用例全量本次未跑"; fi
+}
+
+# list_feature_gated_test_files <tests 目录>：目录顶层每个 .rs（一个文件一个测试二进制）里 #[cfg(…)] / #![cfg(…)] 点到的特性，
+# 一个文件一行「文件名<TAB>whole-file|items<TAB>特性,特性」（有 #![cfg(…)] 点到特性的记 whole-file），照文件名排序；挂特性的一个都没有时不打。
+# 括号按层数配对（rustfmt 把长的 cfg 折成几行也认）；// 起头的行（注释与文档注释）不读。
+list_feature_gated_test_files() {
+  python3 - "$1" <<'PYTHON'
+import pathlib
+import re
+import sys
+
+attribute_start = re.compile(r"#(!?)\[\s*cfg\s*\(")
+feature_name = re.compile(r"\bfeature\s*=\s*\"([^\"]+)\"")
+for path in sorted(pathlib.Path(sys.argv[1]).glob("*.rs")):
+    text = "\n".join(line for line in path.read_text(encoding="utf-8").splitlines() if not line.lstrip().startswith("//"))
+    features, whole_file = set(), False
+    for match in attribute_start.finditer(text):
+        depth, position = 1, match.end()
+        while position < len(text) and depth > 0:
+            depth += {"(": 1, ")": -1}.get(text[position], 0)
+            position += 1
+        named = feature_name.findall(text[match.end():position])
+        features.update(named)
+        if named and match.group(1) == "!":
+            whole_file = True
+    if features:
+        print(f"{path.name}\t{'whole-file' if whole_file else 'items'}\t{','.join(sorted(features))}")
+PYTHON
+}
+
+# count_tests_run_by_file <日志…>：cargo test 输出里逐个集成测试文件跑到的用例数，几份日志相加；一行「文件名<TAB>条数」。
+# 一个测试二进制从 cargo 的「Running …tests/<名>.rs (…)」那一行起、到下一行 Running 为止，条数是它 test result 行的 passed 加 failed（ignored 不算跑到）；
+# 库（Running unittests …）与别的二进制不打。
+count_tests_run_by_file() {
+  awk '
+    FNR == 1 { current = "" }
+    /^[[:space:]]*Running / {
+      current = ""
+      if (match($0, /tests\/[^\/ ]+\.rs \(/)) { current = substr($0, RSTART + 6, RLENGTH - 8); seen[current] = 1 }
+      next
+    }
+    current != "" && /^test result: / {
+      if (match($0, /[0-9]+ passed/)) ran[current] += substr($0, RSTART, RLENGTH) + 0
+      if (match($0, /[0-9]+ failed/)) ran[current] += substr($0, RSTART, RLENGTH) + 0
+    }
+    END { for (name in seen) printf "%s\t%d\n", name, ran[name] + 0 }
+  ' "$@"
+}
+
+# gpu_adapter_not_run_lines <日志>：日志里每一处 NOT_RUN_NO_GPU_ADAPTER（GPU 对拍找不到 GPU 适配器时打的那一行：test=<用例名> reason=<一句>），
+# 一处一行「<它所在的 tests/<名>.rs，或「库与别的二进制」><TAB>NOT_RUN_NO_GPU_ADAPTER …」；--nocapture 下它可能跟在「test <名> ... 」后面，按子串找。
+gpu_adapter_not_run_lines() {
+  awk '
+    /^[[:space:]]*Running / {
+      current = "库与别的二进制"
+      if (match($0, /tests\/[^\/ ]+\.rs \(/)) current = "tests/" substr($0, RSTART + 6, RLENGTH - 8)
+      next
+    }
+    {
+      rest = $0
+      while ((at = index(rest, "NOT_RUN_NO_GPU_ADAPTER ")) > 0) {
+        rest = substr(rest, at)
+        following = index(substr(rest, 2), "NOT_RUN_NO_GPU_ADAPTER ")
+        piece = (following > 0) ? substr(rest, 1, following) : rest
+        sub(/[[:space:]]+$/, "", piece)
+        print ((current == "") ? "库与别的二进制" : current) "\t" piece
+        rest = (following > 0) ? substr(rest, following + 1) : ""
+      }
+    }
+  ' "$1"
+}
+
+# run_feature_gated_tests_cell <layer0-replay 格那一趟的日志，没跑传空串>：判红打出路、返回 1；不红返回 0，结论放进 feature_cell_state。
+run_feature_gated_tests_cell() {
+  local tests_directory="crates/singlefs-checker-tier/tests" listing feature_list feature_log feature_exit=0 bindgen_arguments=""
+  local amplification_library="$layer0_stage_repository/research/scripts/crash-amplification-lib.sh"
+  local counts_file="$layer0_scratch_directory/feature-gated-counts"
+  local row file_name file_scope file_features scope_text count ran_total=0 environment_name gpu_where gpu_line not_run_total
+  local -a gated_rows=() features=() target_arguments=() bindgen_setting=() cleared_environment=(-u SINGLEFS_LAYER0_FINDINGS_FILE) zero_files=() gpu_not_run=()
+  if ! listing="$(list_feature_gated_test_files "$tests_directory")"; then
+    echo "  ✗ $LAYER0_FEATURE_CELL_NAME：读不出 $tests_directory 下哪几个测试文件挂特性 cfg（上面是 python 的报错）"
+    echo "     → 怎么办：看报错里点名的文件（多半不是 UTF-8 或读不了），修好之后只重跑这一格：bash .claude/gate.d/checker-tier-layer0-replay.sh --check $LAYER0_FEATURE_CELL_NAME"
+    return 1
+  fi
+  if [[ -z "$listing" ]]; then
+    feature_cell_state="无对象可判"
+    echo "  · $LAYER0_FEATURE_CELL_NAME：$tests_directory 下 0 个测试文件挂特性 cfg，无对象可判，带特性那一趟不起（往 GATE_NOT_RUN_FILE 记一行）"
+    if [[ -n "${GATE_NOT_RUN_FILE:-}" ]]; then
+      printf '%s\n' "checker-tier-layer0-replay.sh 的 $LAYER0_FEATURE_CELL_NAME 格无对象可判：$tests_directory 下没有挂特性 cfg 的测试文件" >> "$GATE_NOT_RUN_FILE"
+    fi
+    return 0
+  fi
+  mapfile -t gated_rows <<< "$listing"
+  mapfile -t features < <(cut -f3 <<< "$listing" | tr ',' '\n' | LC_ALL=C sort -u)
+  feature_list="$(IFS=,; printf '%s' "${features[*]}")"
+  if [[ "$layer0_break" == features-not-from-source ]]; then feature_list="verdict-store,gpu"; fi
+  for row in "${gated_rows[@]}"; do target_arguments+=(--test "${row%%.rs$'\t'*}"); done
+# librocksdb-sys 的 bindgen 要的头文件目录：与崩溃放量取同一个值，编译产物才共用。在子 shell 里 source 那份库、只读这一个变量。
+  if [[ -f "$amplification_library" ]]; then
+    bindgen_arguments="$(source "$amplification_library" >/dev/null 2>&1; printf '%s' "${CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS:-}")"
+  fi
+  if [[ -n "$bindgen_arguments" ]]; then
+    bindgen_setting=("BINDGEN_EXTRA_CLANG_ARGS=$bindgen_arguments")
+  else
+    echo "  · $LAYER0_FEATURE_CELL_NAME：从 $amplification_library 读不到 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS，BINDGEN_EXTRA_CLANG_ARGS 照调用方环境（${BINDGEN_EXTRA_CLANG_ARGS:-没设}）；librocksdb-sys 编不过时这一格判红"
+  fi
+  while IFS= read -r environment_name; do
+    if [[ "$environment_name" == SINGLEFS_CRASH_AMPLIFICATION_* ]]; then cleared_environment+=(-u "$environment_name"); fi
+  done < <(compgen -e)
+  feature_log="$layer0_scratch_directory/quick-singlefs-checker-tier-features.log"
+  echo "── $LAYER0_FEATURE_CELL_NAME：带特性那一趟（特性从 $tests_directory 下 ${#gated_rows[@]} 个挂特性的测试文件现读）：cargo test --release -p singlefs-checker-tier --features $feature_list --lib ${target_arguments[*]} -- --nocapture"
+  if [[ "$layer0_break" == no-feature-pass ]]; then
+    : > "$feature_log"
+  else
+    env "${cleared_environment[@]}" ${bindgen_setting[@]+"${bindgen_setting[@]}"} \
+      cargo test --release -p singlefs-checker-tier --features "$feature_list" --lib "${target_arguments[@]}" -- --nocapture 2>&1 \
+      | tee "$feature_log" \
+      | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
+      | sed -u 's/^/    /'
+    feature_exit="${PIPESTATUS[0]}"
+  fi
+  if [[ "$feature_exit" != 0 && "$layer0_break" != ignore-feature-pass-exit ]]; then
+    tail -40 "$feature_log"
+    echo "  ✗ $LAYER0_FEATURE_CELL_NAME：带特性那一趟 cargo test 退 $feature_exit（上面是它的尾部）"
+    echo "     → 怎么办：单跑看细节：BINDGEN_EXTRA_CLANG_ARGS=\"$bindgen_arguments\" cargo test --release -p singlefs-checker-tier --features $feature_list --lib ${target_arguments[*]} -- --nocapture；"
+    echo "                编不过多半是 librocksdb-sys 现编 C++ 缺 libclang、C++ 编译器或这个变量；用例红照断言消息改；没卡的机器上 GPU 对拍该打一行 NOT_RUN_NO_GPU_ADAPTER 之后返回成功，panic 就是那条用例没接这个约定。"
+    return 1
+  fi
+  count_tests_run_by_file "$feature_log" ${1:+"$1"} > "$counts_file"
+  for row in "${gated_rows[@]}"; do
+    IFS=$'\t' read -r file_name file_scope file_features <<< "$row"
+    count="$(awk -F'\t' -v name="$file_name" '$1 == name { print $2 }' "$counts_file")"
+    count="${count:-0}"
+    ran_total=$((ran_total + count))
+    if [[ "$count" == 0 && "$layer0_break" != ignore-zero-feature-files ]]; then
+      zero_files+=("tests/$file_name")
+      scope_text="逐条挂"; if [[ "$file_scope" == whole-file ]]; then scope_text="整份挂"; fi
+      layer0_report_not_run "checker 档 $tests_directory/$file_name ${scope_text}特性 $file_features，快档跑到它的用例 0 条（cargo 输出里没有它那一段，或只有 ignored）：给它补一条不标 ignored 的快用例，或查 cfg 里的特性名与 Cargo.toml 的 [features] 对不对得上"
+    fi
+  done
+  if [[ "$layer0_break" != ignore-gpu-not-run ]]; then
+    while IFS=$'\t' read -r gpu_where gpu_line; do
+      [[ -n "$gpu_line" ]] || continue
+      gpu_not_run+=("$gpu_line")
+      layer0_report_not_run "GPU 对拍没跑（${gpu_where}；这台机器找不到 GPU 适配器）：${gpu_line}；在有卡的机器上跑这一格补上"
+    done < <(gpu_adapter_not_run_lines "$feature_log")
+  fi
+  not_run_total=$(( ${#zero_files[@]} + ${#gpu_not_run[@]} ))
+  if (( not_run_total > 0 )); then
+    feature_cell_state="有 ${not_run_total} 处本次未跑"
+    echo "  ! $LAYER0_FEATURE_CELL_NAME 不算全绿：${#gated_rows[@]} 个挂特性的测试文件（特性 $feature_list）跑到 ${ran_total} 条，本次未跑 ${not_run_total} 处：编进来 0 条的文件 ${#zero_files[@]} 个（${zero_files[*]:-无}），没卡没跑的 GPU 对拍 ${#gpu_not_run[@]} 条"
+    echo "     → 编进来 0 条的给它补不标 ignored 的快用例；GPU 对拍在有卡的机器上补跑：bash .claude/gate.d/checker-tier-layer0-replay.sh --check $LAYER0_FEATURE_CELL_NAME"
+  else
+    feature_cell_state="绿"
+    echo "  ✓ $LAYER0_FEATURE_CELL_NAME：${#gated_rows[@]} 个挂特性的测试文件（特性 $feature_list）每个都编进来、跑到了用例，共 ${ran_total} 条"
+  fi
+  return 0
+}
+
+# ── 快档：layer0-replay 格与 feature-gated-tests 格 ─────────
+if [[ "$layer0_tier" == quick ]]; then
+  quick_red_cells=()
+  quick_cell_states=()
+  quick_tier_log=""
+  if layer0_runs_cell "$LAYER0_CELL_NAME"; then
+    quick_tier_report=""
+    if run_checker_quick_tier; then
+      quick_tier_log="$layer0_scratch_directory/quick-singlefs-checker-tier.log"
+      check_crash_case_markers
+      quick_cell_states+=("$LAYER0_CELL_NAME：$layer0_cell_state")
+    else
+      quick_red_cells+=("$LAYER0_CELL_NAME")
+      quick_cell_states+=("$LAYER0_CELL_NAME：红")
+    fi
+  fi
+  if layer0_runs_cell "$LAYER0_FEATURE_CELL_NAME"; then
+    if run_feature_gated_tests_cell "$quick_tier_log"; then
+      quick_cell_states+=("$LAYER0_FEATURE_CELL_NAME：$feature_cell_state")
+    else
+      quick_red_cells+=("$LAYER0_FEATURE_CELL_NAME")
+      quick_cell_states+=("$LAYER0_FEATURE_CELL_NAME：红")
+    fi
+  fi
+  quick_cell_summary=""
+  for quick_cell_state in "${quick_cell_states[@]}"; do quick_cell_summary+="${quick_cell_summary:+；}${quick_cell_state}"; done
+  echo "  · 逐格：${quick_cell_summary}"
+  if (( ${#quick_red_cells[@]} > 0 )); then
+    echo "  ✗ 快档有 ${#quick_red_cells[@]} 格判红：${quick_red_cells[*]}（各自的出路在上面）"
+    echo "     → 怎么办：照上面那几格各自的「→ 怎么办」改完，只重跑红的格：bash .claude/gate.d/checker-tier-layer0-replay.sh --check $(IFS=,; printf '%s' "${quick_red_cells[*]}") [项目根]"
+    exit 1
+  fi
+  if [[ "$layer0_sample_mode" == 1 ]]; then
+    echo "  ! 样本档（.layer0-sample-tools/quick-tier，假 cargo）：快档流程判绿，退 3 不退 0——这一趟没跑过真的 checker 档"
+    echo "     → 真跑要在不带 .layer0-sample-tools 的树里跑快档。"
+    exit 3
+  fi
   exit 0
 fi
 
-# ── --full：逐条崩溃枚举用例照复用判定跑；那一格在就复用，不在才跑，判绿写那一格 ─────────
+# ── --full：逐条崩溃枚举用例照复用判定跑 ─────────
 full_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 start_over_note="不带 --start-over：有进度文件就接着跑"
 if [[ "$layer0_start_over" == 1 ]]; then start_over_note="带 --start-over：进度文件整份丢掉、从头跑"; fi
 echo "  · --full 开跑（${full_started_utc}）：${#crash_case_rows[@]} 条崩溃枚举用例逐条照复用判定跑（这批输入那一格全绿标记在就复用）；续跑的进度文件在 ${layer0_progress_root}/<输入指纹>/，${start_over_note}"
-# 这一趟的全量日志与发现日志：common-dir 下新建一个目录（不随 worktree 删，跑完不删；每趟一个新目录，不拿上一趟的输出顶上）
+# 每趟一个新目录，不拿上一趟的输出顶上
 layer0_log_directory="$git_common_directory/singlefs-layer0-logs/$(date -u +%Y%m%dT%H%M%SZ)-$$"
 if ! mkdir -p -- "$layer0_log_directory"; then
   echo "  ✗ 建不了这一趟的日志目录 $layer0_log_directory：全量日志与发现日志没处放"
@@ -584,7 +818,6 @@ if ! mkdir -p -- "$layer0_log_directory"; then
   exit 1
 fi
 echo "  · 这一趟的全量日志与发现日志放 ${layer0_log_directory}/（log.<用例名> 与 log.<用例名>.findings.tsv，跑完不删）"
-# 双机分片开不开：本地配置在、判得过才开（判法在 layer0-shard-configuration-check.sh，与驱动脚本的运行条件同一份）
 layer0_shard_driver="$ROOT/research/scripts/layer0-shard-run.sh"
 if layer0_shard_configuration_note="$(bash "$ROOT/research/scripts/layer0-shard-configuration-check.sh" "$ROOT" 2>&1)"; then
   layer0_sharded=1
@@ -646,7 +879,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     run_crash_case "$case_log" "$case_findings_file" "${case_command[@]}"
   fi
   case_run_exit=$?
-  # 发现表跑完就打（判红的那一趟最要看它）；判定留到下面，cargo 退非 0、日志判不绿先报
+# 发现表跑完就打（判红的那一趟最要看它），判定留到下面
   if report_crash_case_findings "$case_findings_file" "$case_log"; then case_findings_exit=0; else case_findings_exit=$?; fi
   if [[ "$case_run_exit" != 0 ]]; then
     [[ -f "$case_log" ]] && tail -40 "$case_log"
@@ -670,7 +903,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
     echo "  ✗ $case_key 的用例跑过了，日志却判不绿（上面逐条列出）"
     echo "     → 怎么办：计数行不是恰好一行、过滤之后没跑到恰好一条用例，对一对 stage-inputs.tsv 里 $case_key 那一行第三列与用例打印的行；"
     echo "                不是全量去 crates/singlefs-checker-tier/src/crash.rs 的 enumerate_layer0 看；只起了 1 个线程看 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS，"
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh --full <根>。"
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/checker-tier-layer0-replay.sh --full <根>。"
     red_cases+=("$case_key")
     continue
   fi
@@ -693,7 +926,7 @@ for crash_case_row in "${crash_case_rows[@]}"; do
   if [[ "$case_fingerprint" != "$fingerprint_at_start" ]]; then
     echo "  ✗ $case_key 跑的过程中它的输入变了（开跑 ${fingerprint_at_start:0:16}…，跑完 ${case_fingerprint:0:16}…）：读到的不一定是同一版，不写全绿标记；开跑那一批已有的那一格不删"
     report_manifest_differences "$manifest_at_start" "$manifest_at_finish" "开跑时" "跑完时"
-    echo "     → 怎么办：别在有人改这些路径的树里跑。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）："
+    echo "     → 怎么办：别在有人改这些路径的树里跑。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 checker-tier-layer0-replay 跑 --full <它的根>（与 gate.sh --staged 同一建法）："
     print_staged_worktree_full_commands
     red_cases+=("$case_key")
     continue

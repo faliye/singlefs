@@ -2,16 +2,14 @@
 # admission: always 直接执行时跑这份库此刻的自证：库与用它的阶段随时在改，上一次的结论不替这一次作保
 # run-condition: none 自证只在临时目录里造一道合成阶段来跑，除了 bash 与 coreutils 没有环境要求
 # gate-stage: 门禁格共用库的自证
-# gate-similar: code-tooling.sh 它自己写了一份 --check 解析与逐格汇总，并注明抽共用库归并组的收尾一件；这一份就是那个共用库，code-tooling 的判据不并进来，下一批改成 source 它
+# gate-similar: code-tooling.sh 它 source 这一份，自己判的是工具层；这一份只是格结构的共用库，code-tooling 的判据不并进来
 # gate-similar: doc-registries.sh 与 code-tooling 同形的逐格汇总外壳（按退出码分三堆、报本次未跑的格）；这一份把外壳抽出来，doc-registries 的格判的是欠账表，不并进来
 # gate-similar: code-source-discipline.sh 同样各写一份 --check 解析与汇总外壳，格判的是格式常量与 kb 对账，不并进来；同样各写一份汇总外壳与弄坏开关，格判的是实验源码纪律，不并进来
 # gate-similar: doc-experiments.sh 同样各写一份汇总外壳，格判的是实验页与产物，不并进来
-# gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段（样板），只留格的判法
+# gate-similar: doc-decisions.sh 它是第一道改用这份库的阶段，只留格的判法
 #
-# research/scripts/stage-run-or-skip.sh 也是被阶段 source 的库，但判的是一整道要不要跑，不管格。
-#
-# 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格在自己的子 shell 里跑、逐格汇总，
-# 阶段 source 这一份，不各写一份。规则：.claude/rules/verification.md「门禁的结构」。
+# 门禁阶段共用的格结构：登记格、解析 --list / --check、样本只跑点名的格、每格一个子 shell、逐格汇总。
+# 规则：.claude/rules/verification.md「门禁的结构」。research/scripts/stage-run-or-skip.sh 判的是整道要不要跑，不管格。
 #
 # 阶段里的写法（preflight 那一行之后）：
 #   source "$(dirname "${BASH_SOURCE[0]}")/lib/stage-cells.sh"
@@ -32,27 +30,21 @@
 #
 # 样本只跑点名的格：没给 --check、被判的根里有 .gate-cells（一行一个格名；空行与 # 开头的行不算）、
 #   被判的根（pwd -P）不是这道阶段所在的仓（阶段文件往上两级，pwd -P）、也没设 GATE_STAGED_FROM 时，
-#   只跑文件里点名的格。真仓与 gate.sh --staged 的临时 worktree 里这个文件一律不认
-#   （与 code-tooling 的 research-script-selftests 格认 .selftest-coverage-only 同一种判法）。
-#   文件里点了没登记的格、或一格都没点：退 2。
+#   只跑文件里点名的格；与 --check 走同一段选格（stage_cells_pick）。文件里点了没登记的格、或一格都没点：退 2。
 #
-# stage_cells_run：每格在自己的子 shell 里跑，退出码写进临时目录，全部跑完按登记次序回读（数一遍，份数对不上判红）。
+# stage_cells_run：每格的退出码写进临时目录，全部跑完按登记次序回读（份数对不上判红）。
 #   汇总逐格一行「<格名>：绿 / 红（退出 N）/ 本次未跑」。
 #   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路，末了给只重跑红格的 --check 命令；
 #   跑到的格全退 77 ⇒ 整道退 77，不记通过；否则退 0。
-#   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写；.claude/singlefs-ai-sop/rules/show-me-test.md「门禁不许假装通过」）。
+#   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写）。
 #
-# 直接执行只跑自证（住在 .claude/gate.d/lib/ 下，gate.sh 只取门禁目录顶层的 *.sh，不把它当阶段跑；提交时由工具层自检的 runner 表跑一次 --selftest）：
+# 直接执行只跑自证（gate.sh 只取门禁目录顶层的 *.sh，不把它当阶段跑；code-tooling 的 runner 表跑它的 --selftest）：
 #   bash .claude/gate.d/lib/stage-cells.sh [项目根] [--force] [--selftest]
-#   跑自证：项目根下有 .claude/gate.d/lib/stage-cells.sh 就判那一份，没有（或没给根）就判这一份自己。
-#   自证造一道三格（alpha、beta、gamma）的合成阶段，逐条判：--list 的输出与没跑格、--check 只跑点名的（一格与两格）、
-#   格名写错与缺格名退 2、其余参数原样交给阶段、.gate-cells 在样本根生效而在阶段所在的仓与 --staged 下不生效、
-#   .gate-cells 点了没登记的格退 2、汇总三种结局（有红退 1、全 77 退 77、绿与 77 混着退 0）与本次未跑的上报、
-#   退出码 2 的格算红、一格红之后别的格照跑照判、红格接它自己的出路。
-#   判的是这一份自己时，再逐个打开弄坏开关重跑一遍自证，每个开关都要让至少一条判错。
+#   项目根下有 .claude/gate.d/lib/stage-cells.sh 就判那一份，没有（或没给根）就判这一份自己；判这一份自己时再逐个打开弄坏开关重跑。
 # 弄坏开关 STAGE_CELLS_BREAK=<项>，每一项让某几条自证判错：
 #   list-empty          --list 什么都不打                          list 判错
-#   check-ignored       --check 不起作用，照跑全部                  check-one、check-two、pass-through 判错
+#   check-ignored       点名选格不起作用（--check 与 .gate-cells 共用的 stage_cells_pick），照跑全部
+#                                                                  check-one、check-two、pass-through、marker-sample 判错
 #   unknown-accepted    写错的格名悄悄丢掉、不退 2                  check-unknown、marker-unknown 判错
 #   marker-everywhere   .gate-cells 在阶段所在的仓与 --staged 下也认  marker-own-repository、marker-staged 判错
 #   marker-ignored      .gate-cells 一律不认                        marker-sample、marker-unknown 判错
@@ -83,7 +75,6 @@ stage_cells_available() {
   done
 }
 
-# stage_cell <格名> <函数> <判什么的一句> <判红时的出路>
 stage_cell() {
   if (($# != 4)) || [[ -z "$3" || -z "$4" ]]; then
     printf '  ✗ %s：stage_cell 要四个参数（格名、函数、判什么的一句、判红时的出路），收到 %s 个：%s\n' "$STAGE_CELLS_STAGE_NAME" "$#" "$*"
@@ -106,7 +97,8 @@ stage_cell() {
   STAGE_CELLS_HOWTO[$1]="$4"
 }
 
-# stage_cells_pick <来源说明> <格名…>：把点名的格按登记次序放进 STAGE_CELLS_SELECTED；有没登记的就退 2
+# stage_cells_pick <来源说明> <格名…>：把点名的格按登记次序放进 STAGE_CELLS_SELECTED；有没登记的就退 2。
+# --check 与样本根的 .gate-cells 都经这一段选格，不各写一份。
 stage_cells_pick() {
   local source_description="$1" name requested unknown=()
   shift
@@ -135,6 +127,7 @@ stage_cells_pick() {
   for name in "${STAGE_CELLS_NAMES[@]}"; do
     if [[ -n "${wanted[$name]+set}" ]]; then STAGE_CELLS_SELECTED+=("$name"); fi
   done
+  if [[ "${STAGE_CELLS_BREAK:-}" == check-ignored ]]; then STAGE_CELLS_SELECTED=("${STAGE_CELLS_NAMES[@]}"); fi
 }
 
 stage_cells_parse() {
@@ -177,14 +170,12 @@ stage_cells_parse() {
   if ((STAGE_CELLS_CHECK_GIVEN)); then
     stage_cells_pick "--check " ${requested[@]+"${requested[@]}"}
     STAGE_CELLS_SELECTION_SOURCE="--check 点名"
-    if [[ "${STAGE_CELLS_BREAK:-}" == check-ignored ]]; then STAGE_CELLS_SELECTED=("${STAGE_CELLS_NAMES[@]}"); fi
   else
     STAGE_CELLS_SELECTED=("${STAGE_CELLS_NAMES[@]}")
   fi
 }
 
-# 样本标记：被判的根是样本（不是这道阶段所在的仓、不在 --staged 里）时，只跑 .gate-cells 点名的格。
-# 读的是当前目录（stage_cells_run 之前阶段已经 cd 到项目根），参数只用来写进输出。
+# 读的是当前目录的 .gate-cells（阶段已经 cd 到项目根），参数只用来写进输出。
 stage_cells_apply_sample_marker() {
   local root="$1" root_physical line honored=0
   local marked=()
@@ -209,7 +200,6 @@ stage_cells_apply_sample_marker() {
   printf '  · 样本只跑 .gate-cells 点名的格：%s（%s 是样本，不是这道阶段所在的仓）\n' "${STAGE_CELLS_SELECTED[*]}" "$root"
 }
 
-# stage_cells_run <项目根>：调用前阶段已经 cd 到项目根。跑完按汇总 exit，不返回。
 stage_cells_run() {
   local root="${1:-.}" scratch name function_name cell_exit index=0 collected=0
   local green=() red=() not_run=()
@@ -293,8 +283,7 @@ stage_cells_run() {
 }
 
 # ── 自证 ──
-# stage_cells_selftest <要判的库> [nested]：在临时目录里造一道三格的合成阶段 source 那一份库，逐条判；
-# 判的是这一份自己、又不是 nested 时，再逐个打开弄坏开关重跑，每个开关都要让至少一条判错。
+# stage_cells_selftest <要判的库> [nested]：造一道三格（alpha、beta、gamma）的合成阶段 source 那一份库，逐条判
 stage_cells_selftest() {
   local library_under_test="$1" nested="${2:-}" scratch stage_file sample_root own_root
   local cases=0 wrong=0 label
@@ -421,7 +410,7 @@ stage_cells_selftest() {
 
 if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
   set -uo pipefail
-  source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
+  source "$(dirname "${BASH_SOURCE[0]}")/../../scripts/preflight.sh"
   preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
   root_argument=""; nested_run=""
   for argument in "$@"; do

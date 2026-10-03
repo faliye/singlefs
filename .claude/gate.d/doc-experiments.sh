@@ -3,20 +3,14 @@
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 实验页与产物（十格：索引行与正文标题、产物写回、产物与依据落在仓里、决策与实验双向登记、判决行的 false 被点名、复跑命令、实验号有正文、整行抄的产物行、上一轮记录已归档、多路径互证的登记）
 # gate-category: 文档类
-# 不声明 gate-covers：.claude/gate-not-implemented.tsv 里的两项（崩溃点重放、模型对拍）判的是被测代码的行为，这一道只判实验页、实验索引与产物的文本，一项都不覆盖。
+# 不声明 gate-covers：未实现清单（.claude/gate-not-implemented.tsv）里的两项判被测代码的行为，这一道只判文本。
 # gate-similar: checker-tier-research-build-and-replay.sh 它的 experiment-replay 格按 research/scripts/replay.sh 登记表逐条复跑装置、逐字节比产物，要编译、归重型；这一道只读登记表、实验页与产物的文本，判产物有没有被点名、判决行的 false 有没有被解释、整行抄的产物行找不找得到，不跑装置
 # gate-similar: doc-registries.sh 它的 experiment-refs 格判全 kb 里的实验号引用有定义，对象是引用；audit-contradictions 格核欠账表与里程碑收口表的引文在 kb 里找得到，方向是记录到 kb；segment-registry 格拿段序列登记表与 E142 的产物逐字比，对象是一份登记表。这一道判实验页、实验索引与产物本身，实验与决策之间的双向登记归这里的 decision-links 格，quoted-result-lines 格方向是 kb 与 research 正文到产物，multipath-registry 格还着 C48 可机检的那一半而不判欠账表本身
 # gate-similar: doc-process-records.sh 也用 gate 取法的改动范围、也读 research/prompts/，但它判三方与同步留下的记录写没写、点没点名；这一道判产物与依据落没落进仓、新判决回看没回看决策、上一轮记录归没归档
 # gate-similar: code-source-discipline.sh 它判每个实验二进制都有变异表、变异条目锚得住、钉绝对值的断言与读数纪律，对象是实验源码与变异表的内容；这一道的 evidence-in-repo 格只看这一轮改过的装置与变异表有没有一份不比它旧的产物
 # gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，改动范围在这一道里只取一次、六格共用
 #
-# 十格原是十道阶段（实验索引同步、产物写回、产物落在仓里、决策与实验双向登记、
-# 判决行 false 字段被点名、复跑命令、孤儿实验号、整行抄的产物行、归档上一轮、
-# 多路径登记），2026-09-28 按 .claude/singlefs-ai-sop/rules/sop-first.md「加门禁或钩子之前，先找已有的」第 2 条并成这一道：
-# 十道都判 .claude/kb/experiments/ 的实验页、实验索引 .claude/kb/experiments.md、research/results/ 的产物与 research/scripts/replay.sh 的登记表。
-# 每一格的判据、出路、成功行里报的数、射程与「管不到的」照原样留着；原文里互相点名的号改成了格名。
-#
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就十格按下面的次序全跑，格名写错退 2）：
+# 格名表（不给 --check 就按这个次序全跑）：
 # gate-cell: index-sync 实验索引行与正文标题说的是不是同一件事
 # gate-cell: results-cited 实验产物有没有写回
 # gate-cell: evidence-in-repo 跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
@@ -27,34 +21,23 @@
 # gate-cell: quoted-result-lines kb 与 research 正文里整行抄的产物行，产物里逐字找得到
 # gate-cell: archive-past-rounds 上一轮及更早的实验记录已经归档进版本库，工作区里不留
 # gate-cell: multipath-registry 多条路径互证的实验，路径与共用项要登记且指得到
-# （quoted-result-lines 只认去掉首尾空白后以 `E7RESULT ` 开头的行。）
 #
-# 改动范围：results-cited、evidence-in-repo、decision-links、quoted-result-lines、archive-past-rounds、multipath-registry 六格要「这次改动」，
-# 只经共用库 research/scripts/changed-paths.sh 取一次、各格共用（选中的格里有这六格之一才取；不在 git 仓里不取）：
-#   基准 gate_diff_base gate；改动的路径 gate_changed_paths <基准> untracked（evidence-in-repo、decision-links 用）；
-#   新增的路径 gate_changed_paths <基准> untracked A（evidence-in-repo 用）；
-#   新增的行 gate_added_lines <基准> .claude/kb ':(glob)research/**/*.md' 一次取全：results-cited 只看 .claude/kb/experiments.md 与
-#   .claude/kb/experiments/ 下的、evidence-in-repo 只看 .claude/kb/experiments/ 下的、quoted-result-lines 全看；
-#   archive-past-rounds 把同一个基准经环境变量 GATE_BASE 交给 research/scripts/archive-past-rounds.py（它取基准也是 gate_diff_base gate）。
-#   取新增的行失败时三格一起按取不到办：results-cited 与 quoted-result-lines 退回全量判，evidence-in-repo 判红。
-#   各格在自己的子 shell 里跑，所以改动范围在父进程里取、落进文件，各格只读；按 --check 选中的格取（样本根的 .gate-cells 在这之后才生效，那时按全部格取）。
+# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经 lib/stage-cells.sh；每格自己打判定行（成功行报查了多少项，红行带出路）。
 #
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析项目根、在父进程里取改动范围。每一格照原样打出自己的判定行（成功行报它查了多少项，红行带出路）。
+# 样本 fixtures/doc-experiments.sh/：每格一对 <格名>-red / <格名>-green，另有 verdict-false-named-zero（登记表一行都读不到）、
+# decision-links-formatting-green、evidence-in-repo-worktree-red / -green（链接 worktree）；每份样本根的 .gate-cells 只点名它判的那一格。
+# 各样本放了什么写在那一格的注释里。
+# 弄坏开关：
+#   STAGE_CELLS_BREAK=red-swallowed（共用库）                       每份红样本整道退 0，样本判错
+#   STAGE_CELLS_BREAK=marker-ignored（共用库）                      每份样本十格全跑，汇总那条「跑了 1 格」的 want 找不到
+#   GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1                           verdict-false-named 把每个 false 字段都当成已点名：verdict-false-named-red 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-skips-whole-cell   evidence-in-repo 在链接 worktree 里整格退 77、判据二也不判：evidence-in-repo-worktree-red 判错
+#   EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-trusts-timestamps  链接 worktree 里照信检出时写的修改时刻：evidence-in-repo-worktree-green 判错
 #
-# 判别力：fixtures/doc-experiments.sh/ 下每一格一对样本 <格名>-red 与 <格名>-green，verdict-false-named 另有一份 verdict-false-named-zero（登记表一行都读不到），
-# evidence-in-repo 另有一对链接 worktree 里的 evidence-in-repo-worktree-red 与 evidence-in-repo-worktree-green。每一格的样本放了什么，写在那一格的注释里。
-# 每份样本根放 .gate-cells 只点名它判的那一格，别的格不跑；setup.sh 里为别的格补的东西（空的 decisions/ 目录、待回填清单、点名产物与复跑命令的一句、
-# 「原始输出未留存」的一句）是十格一起跑时留下的，留着不碍事。
-# 汇总与 --check 的弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让红样本整道退 0；STAGE_CELLS_BREAK=marker-ignored 让每份样本十格全跑，
-# 汇总那条「跑了 1 格」的 want 找不到。
-# 格的判法的弄坏开关：verdict-false-named 格的 GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1（把每个 false 字段都当成已点名）；
-# evidence-in-repo 格的 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-skips-whole-cell（链接 worktree 里整格退 77，判据二也不判：evidence-in-repo-worktree-red 退 77、样本判错）
-# 与 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-trusts-timestamps（链接 worktree 里照信修改时刻：evidence-in-repo-worktree-green 判红、样本判错）。
-#
-#   bash .claude/gate.d/doc-experiments.sh [项目根]                              十格都跑
+#   bash .claude/gate.d/doc-experiments.sh [项目根]                              十格按格名表的次序全跑
 #   bash .claude/gate.d/doc-experiments.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-experiments.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格
+#   格名写错、给了两个项目根、认不出的选项、进不去项目根都退 2。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -112,7 +95,10 @@ ROOT="${root_argument:-$SCRIPT_REPOSITORY_ROOT}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
-# ── 改动范围：只经共用库取一次，六格共用（在父进程里取、落进文件，各格的子 shell 只读）
+# ── 改动范围：经共用库 research/scripts/changed-paths.sh 只取一次（基准 gate_diff_base gate），六格共用。
+# 各格在自己的子 shell 里跑，所以在父进程里取、落进文件，各格只读。按 --check 选中的格判要不要取；样本根的 .gate-cells 在这之后才生效，那时按全部格取。
+# 取新增行失败时：results-cited 与 quoted-result-lines 退回全量判，evidence-in-repo 判红。
+# 没有上游、也没设 GATE_BASE 时基准是 HEAD，窗口只含工作区与暂存区：已提交没推的那几次不在里面。
 changed_paths_library_loaded=0
 in_git_work_tree=0
 head_born=0
@@ -147,30 +133,13 @@ if ((change_range_needed)); then
 fi
 
 # ── 格 index-sync：实验索引行与正文标题说的是不是同一件事
-#
-# `experiments.md` 的索引表是检索这批实验的入口，而编号的登记位在各正文的
-# `## E<n> 简称 —— 状态` 那一行。**两处各写各的，就会一处改对、一处停在旧值**——
-# 单独检索到索引那一行的人拿到的是作废结论，而它看起来完全正常。
-#
-# ⚠️ **这条是实测出来的**（2026-09-06 一轮实验↔决策一致性核查）：
-# E69（反向索引取权威态的增量维护代价）的正文标题从 2026-08-31 起就是「结论整体作废」，
-# 而索引行状态列写着「已跑（08-31，8 单测）」、结论列**原样登记着**被判作废的那两句
-# （「无共享时恰好 0」是计数器从没自增过的仪表伪影，「按盘容量计费」被判为那个实现的性质）。
-# E45（事务跨多条记录的环占用）与 E61（反向链 hash 算法的均匀性）的索引行都带了作废标记，
-# 只有那一行没带 —— 一处漏改，五天没人看得出来。
-#
+# 索引行与正文标题 `## E<n> 简称 —— 状态` 各写各的，就会一处改对、一处停在旧值，只检索到索引那一行的人拿到的是作废结论。
 # 查四样：
 #   1. 正文标题带「结论作废 / 结论整体作废」的，索引行里必须也出现「作废」
 #   2. 正文标题的状态词是「未跑」「部分已跑」或「已跑（够判）」的，索引状态列必须跟着说
-#   3. 索引结论列里的数，正文里要找得到（千位分隔的空格先归一；按整个数找，「10」不许靠「100」里的子串算找到，
-#      带小数的许正文多几位小数）
-#   4. 两边一一对应：正文有而索引无 = 入了正文没进索引，索引有而正文无 = 指到空处
-#
-# ⚠️ **它抓不到的那一半要说清楚**：一个旧值只要还以历史叙述的形态留在正文里
-# （E17（write buffer 合并上限）的「从 31.6M 抬到 31.8M」就是这样），
-# 第 3 项照样判它「找得到」。**同一轮核查里 E17 与 E79（根记录的容量）两行的旧值都是人比出来的，
-# 这一格拦不住它们** —— 拦得住的是第 1 项那一类：正文已经宣告作废而索引只字未提。
-#
+#   3. 索引结论列里的数，正文里要找得到
+#   4. 两边一一对应：正文有而索引无、索引有而正文无都红
+# 管不到：旧值以历史叙述的形态留在正文里时（「从 31.6M 抬到 31.8M」），第 3 项照样判它找得到。
 # 样本：index-sync-red 里一行正文宣告作废而索引没提、一行索引结论列的数正文里找不到、一行正文「已跑（够判）」而索引没跟、
 # 一行按子串会被「100」冒充找到的「10」；index-sync-green 里补零链接、结论整体作废两边都写了、够判两边都写了。
 cell_index_sync() {
@@ -215,12 +184,9 @@ for n, st, concl, raw in rows:
         bad.append(f"E{n} 索引有行，{exp_dir}/ 下没有正文文件")
         continue
     fname, title, text = bodies[n]
-    # 一：正文宣告结论作废，索引一个字不提
-    # 只看状态列与结论列：简称里碰巧带「作废」二字（例如一个叫「…作废…」的实验）
-    # 不能算索引说了这件事。
+    # 第 1 项只看状态列与结论列：简称里碰巧带「作废」二字不算索引说了这件事
     if re.search(r"结论(整体)?作废|结论已作废", title) and "作废" not in (st + concl):
         bad.append(f"E{n} 正文标题写着结论作废，索引行里没有「作废」二字（{fname}）")
-    # 二：状态词
     seg = status_seg(title)
     if seg.strip().startswith("未跑") and "未跑" not in st:
         bad.append(f"E{n} 正文状态是「未跑」，索引状态列写「{st}」")
@@ -228,7 +194,6 @@ for n, st, concl, raw in rows:
         bad.append(f"E{n} 正文状态是「部分已跑」，索引状态列写「{st}」")
     if "够判" in seg and "够判" not in st:
         bad.append(f"E{n} 正文状态是「已跑（够判）」，索引状态列写「{st}」")
-    # 三：索引结论列里的数，正文里找得到吗
     c = unspace(concl)
     for mm in re.finditer(r"\d[\d.]*", c):
         v = mm.group(0).rstrip(".")
@@ -259,25 +224,18 @@ PY
 }
 
 # ── 格 results-cited：实验产物有没有写回
-#
-# 判据：`research/results/` 里的实验产物，必须在 `kb/experiments.md` 里被点名。
-# 点不到名 = 跑过但结论没写回，或者写回了却无法复核（读的人拿不到那份原始数据）。
-# 产物 = `research/results/` 下（含子目录）的每一个普通文件，不只 `*.out`（`.log`、`.txt` 一样是原始输出）；
-# 顶层的按文件名、子目录里的按相对 `research/results/` 的路径点名。不算产物的几类照名字跳过，成功行逐个列名。
-# 三道各报各的对象数；三道都一个对象都没有时这一格退 77（不记通过）。
-#
-# ⚠️ **这条是实测出来的，不是想出来的**：2026-08-29 有一次把 E20 从 2 档扩到 6 档、
-# 跑了三轮、原始输出 22 KB 落了盘，而 experiments.md 里那一节还是两点对比，
-# 决策侧一次都没引——报告只存在于对话里。
-#
+# 三道，判完再一起退出；三道各报各的对象数，都没有对象时退 77：
+#   ① research/results/ 下（含子目录）每个普通文件（不只 *.out）要在实验索引或正文里被点名，顶层按文件名、子目录按相对路径；
+#      不算产物的几类照名字跳过、成功行列名。
+#   ② 标着已跑的实验要点名产物，或写明「原始输出未留存」。
+#   ③ 这次改动新增或改写的点名，树里或版本库历史里要找得到。
 # 样本：results-cited-red 里一份没被点名的产物、一份名字像逐轮中间件而登记了却没点名的产物、一个标着已跑却没点产物的实验、
 # 一页未跟踪的新实验页点名了树里与历史里都没有的产物；results-cited-green 里点名齐、一份没登记的逐轮中间件列进没判的清单。
 cell_results_cited() {
-  # ⚠️ 2026-08-29 起实验正文拆到 `kb/experiments/` 下，索引只剩导航表。
-  # 两侧都要扫：产物可能被任一实验正文点名。
+  # 索引与各实验正文都要扫：产物可能被任一实验正文点名。
   EXP_DIR=.claude/kb/experiments
   EXP_ALL="$(mktemp)"; UNCITED="$(mktemp)"; NAMED="$(mktemp)"
-  # 中间文件全用 mktemp 并交给 trap：固定路径加 $$ 不会撞，但判红那一支 exit 之前只删了一份，另一份每红一次就在 /tmp 留一份
+  # 中间文件全交给 trap 删：判红那一支直接 exit，逐个手删会漏。
   trap 'rm -f "$EXP_ALL" "$UNCITED" "$NAMED"' EXIT
   cat .claude/kb/experiments.md "$EXP_DIR"/*.md > "$EXP_ALL" 2>/dev/null
   EXP="$EXP_ALL"
@@ -288,9 +246,9 @@ cell_results_cited() {
   # 三道都判完再退出，一次把问题说全；判的工具自己没跑成（awk 出错）才当场退出。
   failed=0
   missing=()
-  # research/scripts/replay.sh 登记的入库产物（取行的形状与 verdict-false-named 格、门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一份：编号|二进制|参数|产物|exact 或 timing，产物取文件名）：
-  # 名字像逐轮中间件（*.r<一位数>.out）的，登记了照样要被点名。
-  # replay.sh 不在或读不了：登记的逐轮产物认不出来，全被当成中间件跳过——有这种名字的产物时判红，不许静默放过。
+  # replay.sh 登记的入库产物（行形状 编号|二进制|参数|产物|exact 或 timing，与 verdict-false-named、quoted-result-lines 格和
+  # checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一份）：名字像逐轮中间件（*.r<一位数>.out）的，登记了照样要被点名；
+  # 读不了 replay.sh 时这种名字的产物全会被当成中间件跳过，所以有这种产物就判红。
   REPLAY_TABLE=research/scripts/replay.sh
   replay_table_readable=1
   REGISTERED=""
@@ -339,9 +297,7 @@ cell_results_cited() {
     printf '       %s\n' "${not_products[@]}"
   fi
 
-  # ── 反方向：已跑的实验必须要么点名产物，要么显式说明产物没留 ──
-  # 只查一个方向会漏掉「实验写了结论、但产物从没存在过」——那种情况下
-  # 读的人既翻不到档案也不知道翻不到，比明说「没留」更糟。
+  # ── 第二道：已跑的实验要么点名产物，要么写明产物没留 ──
   awk '
     /^## E[0-9]+ /{
       if (cur != "" && done && !cited && !excused) print cur
@@ -351,9 +307,7 @@ cell_results_cited() {
     }
     # 目录名后面要跟着一个文件名才算点名：只写「产物放在 research/results/ 下」的那一节什么都没点
     /research\/results\/[A-Za-z0-9_.-]/{ cited=1 }
-    # 归档之后引用只剩文件名（「每一次提交删上一次的实验记录」，产物去版本库历史里查），
-    # 所以裸文件名也算点了名——但它点的那份下面还要逐个去树里与 git 历史里找得到，
-    # 不然「点名」就退化成「写个像文件名的串」。
+    # 归档之后引用只剩文件名，所以裸文件名也算点名；它点的那份由第三道去树里与 git 历史里找。
     # 前面要有词边界：少了它，`-stage1.out` 里的 "stag|e1.out" 会被咬成一个产物名
     match($0, /(^|[^a-zA-Z0-9_-])e[0-9]+[a-zA-Z0-9._-]*\.out/) {
       tok=substr($0, RSTART, RLENGTH); sub(/^[^a-zA-Z0-9_-]/, "", tok)
@@ -380,14 +334,9 @@ cell_results_cited() {
   ran_count="$(sed -n 's/^RAN_COUNT\t//p' "$NAMED")"
 
   # ── 第三道：点名的产物，树里没有就必须在版本库历史里找得到 ──
-  # 射程与 quoted-result-lines 格同一条（用户 2026-09-21 定）：只判**这次改动新增或改写的**点名行。
-  # 早先写下的点名是历史，仅作参考；而别的会话正在跑、产物还没提交的实验，它的页也不该由这一次提交来判。
-  # 改动范围取这一道开头只经共用脚本 research/scripts/changed-paths.sh 取一次的那一份（基准 gate_diff_base gate，新增行 gate_added_lines，
-  # 这一格只看 .claude/kb/experiments.md 与 .claude/kb/experiments/ 下的：未跟踪的实验页整份算新增——新写的页在 git add 之前，里面点名的产物也要判）。
-  # 不在 git 仓里、或取不到改动范围，就判全部（保守）。
-  # ⚠️ 没有上游、也没设 GATE_BASE 时，共用脚本的基准是 HEAD，窗口只含工作区与暂存区（与 quoted-result-lines 格同一格，交用户定：gate-fix-forks-r1-forks.md 的 T11）。
-  # 少了这一道，上一道就退化成「正文里写个像文件名的串」：归档之后引用只剩文件名，
-  # 而一个从没存在过的文件名与一份归档进历史的产物，在正文里长得一模一样。
+  # 只判这次改动新增或改写的点名行（射程与 quoted-result-lines 格同一条）：早先的点名是历史；别的会话还没提交产物的实验页也不由这一次判。
+  # 只看 .claude/kb/experiments.md 与 .claude/kb/experiments/ 下的新增行，未跟踪的实验页整份算新增；不在 git 仓里或取不到新增行就判全部。
+  # 少了这一道，第二道就退化成「正文里写个像文件名的串」：从没存在过的文件名与归档进历史的产物在正文里长得一样。
   if ((! changed_paths_library_loaded)); then
     echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
     echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
@@ -408,8 +357,7 @@ cell_results_cited() {
   declare -A skipped_names_by_owner=()
   while read -r _ name owner; do   # 字段是 NAMED、文件名、实验号，都不含空格，默认分隔够用
     [[ -n "$name" ]] || continue
-    # 不用管道接 grep -q：pipefail 下管道的退出码会被后一段盖掉（command-safety.md）。
-    # 这里拿 case 在 shell 里逐字比：$touched 是换行分隔的一串名字，两端各补一个换行再比整段。
+    # 不用管道接 grep -q（pipefail 下退出码会被后一段盖掉）：$touched 是换行分隔的名字，两端各补一个换行再用 case 比整段。
     if [[ -n "$BASE" ]]; then
       case "$(printf "\n%s\n" "$touched")" in
         *"$(printf "\n%s\n" "$name")"*) : ;;
@@ -441,7 +389,6 @@ cell_results_cited() {
     echo "  ✓ $scope_note点名的 $checked 份产物在树里或版本库历史里都找得到"
   fi
   if ((skipped)); then
-    # 没判的现算：不在这次改动新增或改写的行里的点名（早先写下的，历史参考；射程与 quoted-result-lines 格同一条），按实验逐个列
     echo "     第三道没判的 $skipped 份：不在这次改动新增或改写的行里的点名，按实验列："
     while IFS= read -r skipped_owner; do
       echo "       $skipped_owner：${skipped_names_by_owner[$skipped_owner]# }"
@@ -461,68 +408,34 @@ cell_results_cited() {
 
 # ── 格 evidence-in-repo：跑出来的产物与引来的依据都要落在仓里，不许只留在 /tmp
 #
-# 实测（2026-09-18 核出）：E142（新池新建文件的干跑） 第十一次跑改了装置与变异表、跑了一个半小时，
-# 产物只在 /tmp/claude-1000/e142-r11-runner/e142-r11-draft.out，research/results/ 里最新的还是 09-17 那份，
-# research/scripts/replay.sh 的登记行也还指着它；另一处是一份还清依据写成 /tmp/claude-1000/<轮>/report.md。
-# /tmp 下的草稿目录会话一重启就没了，那一轮的活等于白干，而此前没有任何东西报警。用户 2026-09-18 定：这类事拿门禁约束。
+# 判据一「实验跑了没留存」：改动范围里还在盘上的 research/e7-index-bench/src/bin/e<号>_*.rs 或 research/mutations/e<号>_*.tsv，
+#   research/results/ 下（含子目录）要有一份这个实验号的产物（文件名 e<号> 后面跟非数字或到头），且 mtime 不早于源码。
+#   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按产物头的输入指纹判（admission.py 的 stored_product_status）：
+#   对得上就绿、对不上就红，mtime 不作数；一份带指纹的产物都没有才按 mtime 判。mtime 会被 git checkout / stash pop 刷新，指纹不会。
+#   只改了 // 注释的装置源码不判、成功行列名：按 path-moves.md 改注释里的路径碰不到产物。
+#   按要求才跑的实验（research/on-request-experiments.tsv 登记的）不要求新产物：装置比产物新时，实验页这一轮新加的行里要写
+#   「没有正式跑」或「未正式跑」；页里早先那句说的是上一次改装置，不算。
+# 判据二「证据指向仓外」：.claude/kb/ 下全部 .md 与 research/prompts/ 下这一轮新写（新增或未跟踪）的 .md 里，
+#   依据词（citation_form）后面接 /tmp/ 路径就红。
+#   两半射程不同：kb 正文只写现状，旧文件照样该改；research/prompts/ 是原样保存的证据（evidence-discipline.md），只判还没冻的新写那一批。
 #
-# 改动范围：这一道开头只经共用库 research/scripts/changed-paths.sh 取一次的那一份（GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，
-# 都没有就与 HEAD 比；工作区、暂存区与未跟踪文件都算；与 doc-process-records.sh 用改动范围的几格、doc-registries.sh 的 invariant-anchors 那一格同一份代码；
-# 它的 git 调用带 core.quotepath=false，中文路径不转义）。
+# 链接 worktree 里（git-dir 落在 .git/worktrees/ 下；gate-staged.sh 与 --staged 的临时 worktree 就是）mtime 是检出时写的：
+# 判据一里只能比 mtime 的那几份（产物在、指纹没判出对不上）不判，逐份列成本次未跑并报进 $GATE_NOT_RUN_FILE；别的照判，
+# 所以提交路径上判据二照样判得到。全是要比 mtime 的、判据二又没有 .md 时退 77。
 #
-# 判据一「实验跑了没留存」：改动范围里每个还在盘上的
-#   research/e7-index-bench/src/bin/e<号>_*.rs 或 research/mutations/e<号>_*.tsv，
-#   research/results/ 下（含子目录）要有一份这个实验号的产物——文件名形如 e<号> 后面跟非数字或到头（e142-…、e142_…、e12.1.out）——
-#   而且它的 mtime 不早于那份源码。一个这样的产物都没有、或最新的那份比源码旧 ⇒ 红。
-#   登记了准入的实验（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）先按输入指纹判（research/scripts/admission.py 的 stored_product_status，
-#   与装置入口、replay.sh 同一份算法）：research/results/ 里有一份产物头上记着 E<号> 的指纹、与今天的输入算出来的相同 ⇒ 绿，mtime 再旧也算；
-#   带指纹的产物都对不上 ⇒ 红；一份带指纹的都没有 ⇒ 照上面按 mtime 判。mtime 会被 git checkout / stash pop 刷新，指纹不会。
-#   红行里的改动日子按东京的日期报，不报钟点。
-#   只改了 // 注释的装置源码（与基准比，增删的每一行都是 // 注释或空行）不判、在成功行里逐个列名：
-#   path-moves.md 要求全仓改路径，注释里的路径改了碰不到产物（2026-09-18 实测六份装置因此误判）。
-#   按要求才跑的实验（research/on-request-experiments.tsv 登记的实验号，例：E152 按里程碑、用户说跑才跑）不要求新产物：
-#   装置改了、产物旧时改查它的实验页（.claude/kb/experiments/<号>-*.md）这一轮新加的行（与基准比，按 gate_added_lines 取；未跟踪的整份算新加）
-#   里写没写「没有正式跑」或「未正式跑」，写了就在成功行列名，没写 ⇒ 红。页里早先那句说的是上一次改装置，不给这一次作证。
-#   用户 2026-09-19 定：E152 本质上是用户要跑才跑的里程碑性能对比，每次改装置都跑没有意义。
-# 判据二「证据指向仓外」：下面这些文件里，把 /tmp 路径当依据引用 ⇒ 红。认的形态是
-#   「依据 / 证据 / 出处 / 产物 / 报告 / 原件 / 结论 / 存档 / 留档 / 留存 / 记录 / 落点 / 见 / 详见 / 参见」
-#   之后隔至多两个空白、至多一个连接记号（是 / 在 / 为 / ： / : / = / →）、至多两个空白，再（可带一个 ` 或 「）接上 /tmp/ 路径。
-#   判的文件是：.claude/kb/ 下全部 .md；research/prompts/ 下这一轮**新写**的 .md（新增或未跟踪）。
+# 管不到：产物对不对得上源码（归 checker-tier-research-build-and-replay.sh 的逐字节复跑，它不看变异表的重跑日志）；
+#   replay.sh 的登记行指没指到最新那份；句子是说做法还是引依据只按形状认（「草稿放 /tmp/…」不算，「报告原件在 /tmp/…，已转存」照样红）；
+#   已提交的 prompts 文件后来加进的 /tmp 依据。
 #
-# 为什么两半的射程不一样：kb 正文只写现状（kb-discipline.md 第 8 条），旧文件照样该改；
-# 而 research/prompts/ 登记在 .claude/doc-lint-exclude 里，是「原样保存的证据不许事后改」
-# （evidence-discipline.md），一道要求回去改旧提示的检查只会逼出证据链断掉或整个被绕过（sop-first.md）。
-# 新写的那一批还没冻，此刻正是能改的时候，所以只判它们。
-#
-# 不判的，成功行现算着列：这次改动没碰实验装置与变异表时判据一没有对象；
-# research/prompts/ 下这一轮没新写的 .md（数目现算）；判据二只扫 .md，模型目录里的 .py 不扫。
-# 在链接 worktree 里（git rev-parse --git-dir 落在 .git/worktrees/ 下；research/scripts/gate-staged.sh 与 --staged 的临时 worktree 就是这种）
-# 全部文件是检出那一刻写的，mtime 分不出装置与产物谁新：判据一里只能比修改时刻的那几份（产物在、没按指纹判出对不上）不判，
-# 在这一格的输出里逐份列成「本次未跑」，并往 $GATE_NOT_RUN_FILE 报一行（这个变量不在时不写）；
-# 判据一里不看时间戳的（按指纹判的、一份产物都没有的、只改了注释的）与判据二照判——提交路径上的整轮门禁就跑在链接 worktree 里，
-# 判据二因此在提交时判得到。判据一全是要比修改时刻的、判据二又一份 .md 都没有时，这一格无对象可判（77）。
-# 比修改时刻的那几份，不带 --staged 在工作区里跑这一格才判得了。
-#
-# ⚠️ 管不到的：产物对不对得上源码（那是 checker-tier-research-build-and-replay.sh 的逐字节复跑，这一格只看有没有、新不新，
-# 而变异表的重跑日志 checker-tier-research-build-and-replay.sh 一行都不看）；replay.sh 的登记行指没指到最新那份（只写在出路里，不判）；
-# 句子是说做法还是引依据（这一格按上面那个形状认，说「草稿放 /tmp/…」不算引依据；反过来，
-# 一句「报告原件在 /tmp/…，这里已原样转存」照样判红，改法是把 /tmp 那一截删掉）；
-# 已经提交的 prompts 文件后来加进去的 /tmp 依据（只判整份新写的文件，不判改动的行）；
-# git checkout / stash pop 会把源码的 mtime 刷新，那时判据一会要求重跑一次。
-# 判别力：fixtures/doc-experiments.sh/evidence-in-repo-red 放一个产物比源码旧的装置、一个一份产物都没有的变异表、
-# 一份 kb 里写「依据：/tmp/…」、一份这一轮新写的 prompts 里写「报告 `/tmp/…`」，必须判红；
-# evidence-in-repo-green 放一个产物比源码新的装置、一个不在改动范围里的旧装置、kb 里三种说做法的 /tmp 写法、
-# 一份改过但不是新写的 prompts 里的「依据：/tmp/…」，必须判绿并报对数。
-# 指纹那一半：red 放一个登记了准入、产物比源码新而产物头的指纹对不上的装置（E910，按 mtime 会判绿）；
-# green 放一个登记了准入、产物比源码旧而产物头的指纹与今天的输入相同的装置（E909，按 mtime 会判红），指纹由 setup.sh 用 sha256sum 另算。
-# 链接 worktree 那一半（setup.sh 在样本根里建主仓 .origin-repository/，把它的一个链接 worktree 搬到样本根）：
-# evidence-in-repo-worktree-red 放一份 kb 里写「依据：/tmp/…」、一份这一轮新写的 prompts 里写「报告 `/tmp/…`」、一个产物比源码旧的装置（E920），
-# 必须判红、点名两处 /tmp 依据、把 E920 列成本次未跑；evidence-in-repo-worktree-green 放一个产物比源码旧的装置（E921）与只说做法的 /tmp 写法，
-# 必须判绿、把 E921 列成本次未跑。弄坏开关 EXPERIMENT_PAGES_AND_PRODUCTS_BREAK=worktree-skips-whole-cell（整格退 77）让 -red 退 77，
-# =worktree-trusts-timestamps（照信检出时写的修改时刻）让 -green 判红。
+# 样本：evidence-in-repo-red 放一个产物比源码旧的装置、一个一份产物都没有的变异表、kb 里一处「依据：/tmp/…」、
+# 一份新写的 prompts 里「报告 `/tmp/…`」、一个登记了准入而产物头指纹对不上的装置（E910，按 mtime 会判绿），必须判红；
+# evidence-in-repo-green 放产物比源码新的装置、不在改动范围里的旧装置、kb 里三种说做法的 /tmp 写法、改过但不是新写的 prompts 里的「依据：/tmp/…」、
+# 登记了准入而产物比源码旧、指纹与今天的输入相同的装置（E909，按 mtime 会判红；指纹由 setup.sh 另算），必须判绿并报对数。
+# 链接 worktree 的一对（setup.sh 在样本根里建主仓 .origin-repository/，把它的一个链接 worktree 搬到样本根）：
+# evidence-in-repo-worktree-red 放 kb 与新写的 prompts 里各一处 /tmp 依据、一个产物比源码旧的装置（E920），必须判红、点名两处、把 E920 列成本次未跑；
+# evidence-in-repo-worktree-green 放一个产物比源码旧的装置（E921）与只说做法的 /tmp 写法，必须判绿、把 E921 列成本次未跑。
 cell_evidence_in_repo() {
   ((in_git_work_tree)) || { echo "  ! $ROOT 不是 git 仓，这一格跳过"; exit 77; }
-  # 链接 worktree 里时间戳是检出那一刻写的：只有判据一里要比修改时刻的那几份不判，别的照判（见这一格的注释）
   local timestamps_from_checkout=0
   if [[ "$(git rev-parse --git-dir 2>/dev/null)" == */worktrees/* ]]; then
     timestamps_from_checkout=1
@@ -546,7 +459,7 @@ cell_evidence_in_repo() {
     echo "     → 怎么办：按上面 git 的报错修好仓库状态（基准要存在、索引没坏）再跑；取不到改动范围时这一格什么都没比，不是通过。"
     exit 1
   fi
-  # 实验页这一轮新加的行：按要求才跑的实验只认这一轮写进实验页的「没有正式跑」，页里早先那句说的是上一次改装置
+  # 按要求才跑的实验要读实验页这一轮新加的行
   if ((! added_lines_ok)); then
     echo "  ✗ 取不到实验页这一轮新加了哪些行（基准 $base）"
     echo "     → 怎么办：按上面 git 的报错修好仓库状态再跑；取不到时按要求才跑的实验判不了，不是通过。"
@@ -560,9 +473,9 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 base = sys.argv[1]
-# 链接 worktree 里（1）修改时刻是检出时写的：判据一里要比修改时刻的那几份不判，列成本次未跑
+# argv[6] 为 1：在链接 worktree 里，修改时刻是检出时写的
 timestamps_from_checkout = sys.argv[6] == "1"
-# 准入模块（门禁与实验共用，research/scripts/admission.py）：登记了准入的实验按产物头的输入指纹判，不按修改时刻判。
+# 输入指纹的算法只有 research/scripts/admission.py 一份（门禁与实验共用），不在这里另算。
 sys.path.insert(0, sys.argv[4])
 try:
     import admission
@@ -668,8 +581,6 @@ for path, number, kind in changed_sources:
         continue
     source_modified_at = os.path.getmtime(path)
     newest = newest_product_by_number.get(number)
-    # 先按指纹判：登记了准入（.claude/gate.d/stage-inputs.tsv 有 E<号> 那一行）、research/results/ 里有带这个键指纹的产物时，
-    # 指纹相同就是产物按今天的输入跑的（修改时刻再旧也算），不同就是跟不上；没登记或没有一份带指纹的，照旧按修改时刻判。
     try:
         fingerprint_status, fingerprint_detail = admission.stored_product_status(".", f"E{number}")
     except (admission.InputManifestError, admission.RegistrationError) as error:
@@ -818,7 +729,7 @@ PY
 #      分项「**依据**」段引的每个实验，那个实验页里要有这一行、关系是支撑或推翻。待回填清单里的决策不判这一条。
 #   ④ 时效（全量）：实验最近一次变动的日期——页内历史节带日期的 ### 标题、experiments-history.md 里标题
 #      （标题没点名实验时看条目正文）点名它的条目——晚于表里某一行的回看日期，判红。
-#   ⑤ 按这次改动（这一道开头取的那一份：GATE_BASE / @{upstream} 的 merge-base / HEAD 起，工作区、暂存区、未跟踪文件都算）：
+#   ⑤ 按这次改动（这一道开头取的那一份）：
 #      实验页正文（历史版本与影响的决策两节之外）改了、或 research/results/e<号>… 的产物变了，
 #      这次改动要在那张表里改过至少一行；新加的三方判决 research/prompts/*-main-verification.md
 #      要有「## 回看决策」一节（同样的表，或一行「不涉及决策：理由」）；这次改动里新写成「改了」的行，
@@ -831,14 +742,10 @@ PY
 #   ⑤ 取某一页的新增行时 git diff 失败，判红，不当成那一页没改。
 #   ⑦ 瘦身形态（待回填清单之外的决策）：首行 `## D<号> 简称 —— 状态` 后面不带括注；分项标题不带日期；
 #      每个已定项有「**定案**：」「**射程**：」「**依据**：」「**欠**：」四块；索引表的定案格不带日期、不超过 100 字。
-#   ⑧ 有实验才有决策（用户 2026-09-19）：已定项的依据段至少引一个实验，或写「无实验：理由」（理由至少八个字）；
+#   ⑧ 有实验才有决策：已定项的依据段至少引一个实验，或写「无实验：理由」（理由至少八个字）；
 #      成功行报出写「无实验」的已定项有几个。
-#   ⑨ 实验必须对应决策（用户 2026-09-19）：待回填清单之外的实验页，表里至少一行关系是支撑 / 推翻 / 备料；
+#   ⑨ 实验必须对应决策：待回填清单之外的实验页，表里至少一行关系是支撑 / 推翻 / 备料；
 #      标题里写着「结论……作废」或「结论……退役」的实验不判（它们留着是为了记下那条路不通）。
-#
-# 为什么：2026-09-19 用户指出决策知识腐烂、分项膨胀、决策与实验关联不够，要求「做实验或者有结论后要回去看决策
-# 是不是受到了影响」。当天现量：154 个实验页里 296 对「实验引了决策、决策没引回来」，决策里没有一处统一的依据栏；
-# 一个实验重跑、结论变了之后，没有任何东西逼人回去看它撑着的那几条决策。
 #
 # 管不到的：回看写的理由对不对、关系判得对不对（支撑写成不影响也过得了③以外的判据），靠人与抽查；
 # 实验正文只用编号不用「D<号>（」形态提到的决策，①看不见。
@@ -858,7 +765,6 @@ cell_decision_links() {
   changed_list=/dev/null
   if ((in_git_work_tree && head_born)); then
     in_git=1
-    # 改动范围与 doc-process-records.sh 用改动范围的几格、evidence-in-repo 格、doc-registries.sh 的 invariant-anchors 那一格同一份取法：research/scripts/changed-paths.sh 的 gate 取法，未跟踪也算
     if ((! changed_paths_library_loaded)); then
       echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
       echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
@@ -885,7 +791,7 @@ RELATIONS = ('支撑', '推翻', '备料', '不影响')
 BASIS_RELATIONS = ('支撑', '推翻')
 E_REF = re.compile(r'(?<![A-Za-z0-9])E(\d+)（')
 D_REF = re.compile(r'(?<![A-Za-z0-9])D(\d+)（')
-# 「决策正文引了它」按 doc-lint 认引用的写法认：粗体、反引号、编号与括号之间有空格、半角括号都算（第三轮三方 T1-b）
+# 「决策正文引了它」按 doc-lint 认引用的写法认：粗体、反引号、编号与括号之间有空格、半角括号都算
 MENTION_REF = re.compile(r'(?<![A-Za-z0-9._-])[*`]*E(\d+)[*`]*\s*[（(]')
 TABLE_HEAD = re.compile(r'^\|\s*决策分项\s*\|\s*关系\s*\|\s*回看\s*\|\s*$')
 REVIEW = re.compile(r'^(20\d\d-\d\d-\d\d)\s*(改了|不受影响：\s*\S.{3,})')
@@ -1071,12 +977,8 @@ for decision, info in sorted(decisions.items()):
             else:
                 bad('没有实验', f'{where}：D{decision} 已定项 {item_number} 的依据一个实验都没引——有实验才有决策；实在没有可量的，写「无实验：理由」')
     for kind, item_number, cell in info['index_cells']:
-        # 「**状态：已定。**」是 doc-decisions.sh 要的规范标记（检索端出来的是这一行），不算在一句话的字数里；
-        # doc-decisions.sh 的 blocking-verdict 格要写在未定项登记行里的两句规范标记（「改新池新建文件的字节：…」与「动不动格式：…」）同理不算——
-        # blocking-verdict 格明写它要在登记行里（写在表下那一段里它定位不到），而它必须带日期，与这一条的「不带日期、
-        # 不超过 100 字」直接相撞：2026-09-20 给 D2 未定项 21 与 D26 未定项 8 / 9 / 10 补上字节判决之后四行一起红。
-        # 两句都剥：blocking-verdict 格是两把尺，一句量「这一版写不写出不同字节」、一句量「将来动不动格式」，
-        # 缺哪一句它都判红，而两句都必须带日期 ⇒ 两句都不算进这一条的「不带日期、不超过 100 字」。
+        # 定案格里两类规范标记不算字数、不判日期：「**状态：…**」是 doc-decisions.sh 要的检索标记；
+        # 「改新池新建文件的字节：…」「动不动格式：…」是 doc-decisions.sh 的 blocking-verdict 格要写在登记行里、必须带日期的两句。
         without_marks = cell
         for mark in ('改新池新建文件的字节', '动不动格式'):
             without_marks = re.sub(mark + r'：[^（(]*[（(][^）)]*[）)]', '', without_marks)
@@ -1120,7 +1022,7 @@ for path in sorted(glob.glob(os.path.join(kb, 'experiments', '*.md'))):
         bad('认不出标题', f'{rel}：没有一行写成「## E<号> 简称 —— 状态」（编号后面要跟空格），这一页一条都没判')
         continue
     number = int(re.match(r'^## E(\d+) ', head_line).group(1))
-    # 只认「结论……作废 / 退役」：标题里别处出现这两个词（「上界 A 作废」「容器退役记录」）的实验结论照样成立，照判（第三轮三方 T1-f）
+    # 只认「结论……作废 / 退役」：标题里别处出现这两个词（「上界 A 作废」「容器退役记录」）的实验结论照样成立，照判
     voided = re.search(r'结论[^，。：]{0,3}(作废|退役)', head_line) is not None
     hist = history_start(lines)
     section = section_range(lines[:hist], r'^### 影响的决策\s*$', 3)
@@ -1388,41 +1290,15 @@ PY
 
 # ── 格 verdict-false-named：实验产物判决行里的 false 字段有没有被实验页点名
 #
-# 判据：`research/scripts/replay.sh` 登记表里每一行登记的入库产物（路径在 research/results/ 下），
-# 逐行找 `E7RESULT name=verdict ` 开头的行（现查过全仓产物：14 份产物里出现的 `name=verdict` 一律
-# 是这个字面形式，没有 `name=verdict_candidate` / `_base` / `_unit` 这几种源码里存在、但从未落进已入库
-# 产物的变体——这几种不在这一格射程里，出现了这一格也看不见，算已知空白）。
-# 判决行里任何 `字段=false`，都要在它对应实验号的实验页里被点名，否则判红。
+# 判据：research/scripts/replay.sh 登记的入库产物（在 research/results/ 下的）里，以 `E7RESULT name=verdict ` 开头的判决行，
+# 每个 `字段=false` 都要在对应实验号的实验页（.claude/kb/experiments/<号>-*.md）里被点名，否则判红。不开豁免。
+# 射程只认这个字面形式：源码里有 name=verdict_candidate / _base / _unit 这几种变体，没落进入库产物，出现了这一格看不见。
 #
-# 实验号 → 实验页：`.claude/kb/experiments/<去掉前导 E 的号>-*.md`（登记表第 1 列去掉前导 `E`，
-# 与 kb-discipline.md「编号只能做索引」的登记位是同一份文件名约定）。
+# 点名：同一物理行里字段名紧跟它自己的 =false（中间可夹反引号与空白；同一行别的字段的 false 不算），且这一行在最新那条历史条目
+# （「## 历史版本」之后第一个 ### 那一节）或正文（「## 历史版本」之前）里。只认字段名出现在正文不够：正文可能是旧一轮留下的。
+# 正文里那一行自己标着「第 N 次跑」、而标的次数里没有最新历史条目标题里的那一次，是上一次跑留下的，不算点名。
+# 登记的产物一份都不在 research/results/ 下、或一个 false 字段都没有，退 77。
 #
-# 「点名」怎么认（现查过 kb/experiments/*.md 里已有的写法定的）：同一行里字段名**紧跟着**它的值 `false`
-# （`字段=false`，字段名与等号、等号与 false 之间可以夹反引号与空白；同一行里别的字段的 false 不算），
-# （kb 里一行常常是一整段散文，含标点分隔的若干分句，这里按物理行界定，不切分句），
-# 且这一行落在下面两处之一：
-#   ① 实验页「## 历史版本」下**最新那一条**历史条目（即 `## 历史版本` 之后第一个 `### ` 到下一个
-#      `### `/`## ` 之间的文本）；
-#   ② 正文（`## 历史版本` 之前的全部文本）。
-# 只认字段名出现在正文的某处不够——正文可能是旧一轮留下的、没跟这一次的 false 一起刷新
-# （已知会红的一格 E142 就是这样：正文「判决」一节原样抄着 `control_violations_ok=true` 的旧行，
-# 字段名确实在正文里，但那是旧值的旧记录，不是这一次 false 的说明；只有字段名与 `false` 同一行
-# 出现才算真的把这次的 false 讲清楚了）。
-# 正文里那一行自己标着「第 N 次跑」、而标的次数里没有最新历史条目标题里的那一次，它是上一次跑留下的，不算点名。
-# 实验页文件名补零（08-、09-）与不补零两种都认。登记的产物一份都不在 research/results/ 下、或一个 false 字段都没有，
-# 本次无对象可判，这一格退 77。
-#
-# 出路：在实验页那一次跑的历史条目里写明这个字段为什么是 false——是判据如实判出的结论，
-# 还是装置或期望值的问题；后者照问题单重跑。
-#
-# 背景：`records/2026-09-16-subagent拆分提案.md` 第四十节第 33 行。
-# 不开豁免：登记产物里的 false 一个都不豁免；今天有几个、点了名的几个，由成功行与汇总行现报，这里不写死。
-# 与别的格、别的阶段的分工：results-cited 格判产物文件本身有没有被点名，不看产物内部判决字段的值；
-# quoted-result-lines 格判 kb 正文整行抄的 E7RESULT 行是不是逐字见于产物（反方向：产物是不是配得上 kb 已经抄的话），不看某个字段是不是 false；
-# checker-tier-research-build-and-replay.sh 的 experiment-replay 格判产物今天复不复现得出来（逐字节比对），不读产物内容里的判决字段。
-#
-# 弄坏开关：GATE_VERDICT_FALSE_SKIP_NAMED_CHECK=1 时跳过点名检查（把每个 false 字段都当成已点名），
-# 只用来证明这道检查真的在起作用——不是提交时能用的旁路。
 # 样本：verdict-false-named-red 里三个没点名的 false（一个在正文里只写字段名、一个点名的那一行标着上一次跑、一个根本没提）；
 # verdict-false-named-green 里一个在最新历史条目点名、一个实验页文件名补了零；verdict-false-named-zero 的登记表一行都读不到。
 cell_verdict_false_named() {
@@ -1446,8 +1322,6 @@ with open(replay_path, encoding='utf-8') as handle:
         if m:
             rows.append((m.group(1), m.group(4)))
 
-# 表格格式变了、一行都读不到，判红，不许当成「0 项，通过」——与门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一条判据
-# （show-me-test.md「扫到 0 项也不是通过」）。
 if not rows:
     print(f"  ✗ 从 {replay_path} 一行都没读到——登记表的格式变了？")
     print("     → 怎么办：这一格靠 '编号|二进制|参数|产物|exact/timing' 这个形状取行（与门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格")
@@ -1586,18 +1460,9 @@ PY
 
 # ── 格 repro-command：跑过的实验有没有留下复跑命令
 #
-# 判据：一个实验正文若点名了 `research/results/` 里的产物，就必须同时写出**怎么把它跑出来**——
-# 一条 `cargo run --release --bin X`，或者点名复跑入口 `research/scripts/replay.sh` / `research/scripts/vm-bench.sh`。
-# 提到别的 `research/scripts/*.sh`（`mutate.sh` 这类）不算写了复跑命令：它们跑不出那份产物。
-#
-# ⚠️ **这条是实测出来的**：2026-08-29 的复跑轮里，E9（key 编码对遍历局部性的影响）的入库产物是
-# **25 次运行拼起来的**（5 种子 × 5 改名档），而那个循环一个字都没写进 kb。
-# 复跑的人只能从产物的 config 行反推参数——反推对了才发现它本来就复跑得出来。
-# 「产物在」和「产物跑得出来」是两件事，results-cited 格只查了前一件。
-#
-# 例外：正文写明「原始输出未留存」的（要真设备 / 虚机的那类），这一格不管，成功行逐个列名。
-# 读不了的页判红（grep 出错与「没点产物」不是一回事）；一页都没点产物，本次无对象可判，这一格退 77。
-# 实验页目录里一页 .md 都没有也是无对象可判、退 77（原来那一道把没展开的通配 `*.md` 当成一页读不了的页判红，2026-09-28 并进来时改掉）。
+# 判据：实验页点名了 research/results/ 里的产物，就要写出怎么把它跑出来：一条 `cargo run --release --bin X`，
+# 或者点名复跑入口 research/scripts/replay.sh / research/scripts/vm-bench.sh；提到 mutate.sh 这类别的脚本不算，它们跑不出那份产物。
+# 写明「原始输出未留存」的页不判、成功行列名。读不了的页判红（grep 出错与「没点产物」不是一回事）；一页 .md 都没有、或没有一页点产物，退 77。
 # 样本：repro-command-red 里一页点了产物却只提到变异脚本；repro-command-green 里一页写了 cargo run、一页写明原始输出未留存。
 cell_repro_command() {
   EXP_DIR=.claude/kb/experiments
@@ -1646,15 +1511,9 @@ cell_repro_command() {
 
 # ── 格 experiment-orphans：research 里的实验号在 kb 里有没有正文
 #
-# 判据：`research/` 下（逐层往下扫，`target/` 编译目录不扫）凡是以 `eNN` 命名的东西（提示、产物、源码、变异表、数据），
-# 以及住在 `crates/singlefs-checker-tier/src/bin/` 下的实验装置（`eNN_*.rs`），
-# `kb/experiments/` 里就必须有对应编号的正文文件。没有 = 干了活但没入库，
-# 而**跑过的东西没入库比没跑更危险**——它会以「我们量过」的形式活在对话里，谁也复核不了。
-#
-# ⚠️ **这条是实测出来的**：2026-08-29 复跑轮现查，`research/prompts/e34-rootring-geometry-local.md`
-# 与 `research/results/e34-rootring-local.out` 都在，而 kb 里没有 E34。
-# results-cited 格抓不到它，因为那一格把文件名含 `local` 的一律当本地腿问答排除掉了
-# ——**排除规则正好盖住了这一个**。
+# 判据：research/ 下（逐层往下扫，target/ 不扫）以 eNN 命名的东西（提示、产物、源码、变异表、数据），以及
+# crates/singlefs-checker-tier/src/bin/ 下的实验装置（eNN_*.rs），kb/experiments/ 里都要有对应编号的正文：跑过的东西没入库，
+# 会以「我们量过」的形式活在对话里，谁也复核不了。results-cited 格按名字排除的（*local* 这类）也在这里判到。
 # 样本：experiment-orphans-red 里 research/data/ 与 crates/singlefs-checker-tier/src/bin/ 下各一个 kb 里没有正文的实验号；
 # experiment-orphans-green 里的实验号都有正文。
 cell_experiment_orphans() {
@@ -1699,38 +1558,27 @@ cell_experiment_orphans() {
   echo "    扫了 ${SCOPE_DIRS[*]}（target/ 不扫）；不在的目录 ${#absent[@]} 个：${absent[*]:-（没有）}"
 }
 
-# ── 格 quoted-result-lines：kb 与 research 正文里整行抄的产物行（只认去掉首尾空白后以 `E7RESULT ` 开头的行），产物里逐字找得到
+# ── 格 quoted-result-lines：kb 与 research 正文里整行抄的产物行，产物里逐字找得到
 #
 # 判据：kb 正文（「## 历史版本」之前；*-history.md 与 decisions-history/ 不算）里去掉首尾空白后
 # 以 `E7RESULT ` 开头的行，必须在 research/results/*.out 的某一行里逐字出现。
 # 找不到 = 抄的时候改了数，或者产物重跑之后正文没跟。
 #
-# ⚠️ **这条是实测出来的，不是想出来的**（2026-09-16）：规则早就写着「引产物就整行抄」「重跑之后要回对正文」
-# （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`），检查一直没有——checker-tier-research-build-and-replay.sh 的 experiment-replay 格只比产物与二进制、不看正文，
-# results-cited 格只看产物有没有被点名。树表条目 148 → 200 那一轮撞见 E146 的判决块混着两版产物（config 行 145、
-# 下面几行 148），E142 的正文有三行停在旧产物上；这道检查接上的当天又扫出 E139 两行、E144 一行，
-# 正文里的数在它自己点名的留存产物里找不到。
-#
-# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
+# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）：
 #   1. 只认整行。句中反引号里的片段、按字段转述成一句话的数，一概不判。
 #   2. 不按实验号配对：正文允许引别的实验的产物（E152 引 E142 的 write_list）。代价是两个实验恰好吐出同一行时，
 #      引错了实验认不出来。**这次改动新增或改写的行只对照 `research/scripts/replay.sh` 登记着的产物**
 #      （树里还留着的旧一轮产物不算：登记的已经是新一轮，正文却新抄了旧一轮的行，就是「重跑之后正文没跟」）；
 #      登记的产物已归档出了树的，去版本库历史里取它最后那一版。退回全量判时照旧对照全部产物加全部归档。
 #   3. 历史节里的旧行不判：旧产物被删掉之后，历史节里留着当时抄的那一行是对的。
-#   4. **只判这次改动新增或改写的行**（用户 2026-09-21 定）：正文里早先抄下的行是历史，仅作参考——
-#      那一轮跑过、当时对得上，之后产物按「每次提交删上一次的实验记录」删掉了，再判就是判一个不存在的对照。
-#      要推翻早先的结论，按 `.claude/rules/three-way-inference.md` 重新跑三腿，那时产物是新的、这一格照样判得到。
-#      不在 git 仓里、或取不到新增行（git 失败）时**退回全量判**（保守：宁可多判，不可漏判）。
-#      ⚠️ 没有上游、也没设 GATE_BASE 时，共用脚本的基准是 HEAD，窗口只含工作区与暂存区：已提交没推的那几次不在里面。
-#      这一格与「共用脚本认不认门禁导出的 GATE_DIFF_BASE」同根，交用户定（research/prompts/gate-fix-forks-r1-forks.md 的 T11）。
+#   4. 只判这次改动新增或改写的行：正文里早先抄下的行是历史，那时的产物按归档规则删掉了，再判就是判一个不存在的对照；
+#      要推翻早先的结论按 `.claude/rules/three-way-inference.md` 重跑。不在 git 仓里、或取不到新增行时退回全量判（宁可多判，不可漏判）。
 # 样本：quoted-result-lines-red 里一页未跟踪的新实验页整行抄了两行在登记着的产物里找不到的产物行（一行只在没登记的旧一轮产物里有）；
 # quoted-result-lines-green 里正文抄的那一行在产物里逐字找得到、历史节里的旧行不判。
 cell_quoted_result_lines() {
   [[ -d .claude/kb ]] || { echo "  ! 找不到 .claude/kb，这一格无对象可判"; exit 77; }
 
-  # 改动范围取这一道开头只经共用脚本 research/scripts/changed-paths.sh 取一次的那一份（门禁 code-tooling.sh 的 change-range-single-source 格判阶段里不另算一份）：基准 gate_diff_base gate，
-  # 新增行 gate_added_lines——未跟踪的文件整份算新增，新写的 kb 页在 git add 之前抄的产物行也要判。
+  # 改动范围用这一道开头取的那一份（新增行里未跟踪的文件整份算新增）。
   if ((! changed_paths_library_loaded)); then
     echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
     echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"
@@ -1746,10 +1594,8 @@ cell_quoted_result_lines() {
   python3 - <<'PY'
 import glob, os, subprocess, sys
 
-# 射程不止 kb：research/ 下也有正文整行抄产物（research/perf-by-milestone.md 就是），
-# 而它原先一份门禁都罩不到——2026-09-21 术语改名把那里一行引文改成了假话，没有任何检查会说。
-# 冻结证据目录（research/prompts/ 的提示与腿的产出、research/results/ 的产物本身）不判：
-# 前者按 evidence-discipline 不许事后改，后者就是被比对的那一方。
+# 射程含 research/ 下的正文（research/perf-by-milestone.md 也整行抄产物）；冻结证据目录不判：
+# research/prompts/ 按 evidence-discipline 不许事后改，research/results/ 是被比对的一方。
 import re
 kb = sorted(f for f in glob.glob('.claude/kb/**/*.md', recursive=True)
                  + glob.glob('research/**/*.md', recursive=True)
@@ -1764,8 +1610,7 @@ for path in kb:
         stripped = line.strip()
         if stripped.startswith('E7RESULT '):
             quoted.append((path, number, stripped))
-# 只判这次改动新增或改写的行：共用脚本交来的新增行（路径<TAB>行文）里挑 E7RESULT 行，
-# 不在 git 仓里或取不到新增行（SCOPE_BASE 为空）就退回全量判（保守，宁可多判不可漏判）。
+# 只判这次改动新增或改写的行；SCOPE_BASE 为空（不在 git 仓里或取不到新增行）就退回全量判。
 scope = '全量'
 all_quoted = list(quoted)
 if os.environ.get('SCOPE_BASE', '').strip():
@@ -1783,7 +1628,7 @@ if not quoted:
     print('  ! %s kb 正文里没有整行抄的 E7RESULT 行，这一格无对象可判' % scope)
     sys.exit(77)
 
-# 登记的产物：research/scripts/replay.sh 登记表里每一行的第 4 列（与 verdict-false-named 格、门禁 checker-tier-research-build-and-replay.sh 的 experiment-replay 格同一个形状）
+# 登记的产物：replay.sh 登记表每一行的第 4 列（与 verdict-false-named 格、experiment-replay 格同一个形状）
 REPLAY = 'research/scripts/replay.sh'
 ROW_RE = re.compile(r'^(E[0-9]+)\|([^|]*)\|([^|]*)\|([^|]*)\|(exact|timing)$')
 registered = None
@@ -1813,11 +1658,8 @@ for product in products:
             if is_registered:
                 registered_lines.add(text)
 
-# 树里找不到就去版本库历史里找：产物按「每次提交删上一次的实验记录」归档进 git，
-# 树里没有不等于对照物没有。少了这一段，归档之后每一行历史引文都会被报成「找不到」，
-# 而它们当时逐字是对的——那样这道检查会由「抓抄错的数」退化成「抓归档过的产物」。
-# 反过来它也更硬：引文与**归档那一刻的产物字节**不符，照样红（2026-09-21 术语改名
-# 把 research/perf-by-milestone.md 里一行引文改成了假话，就是这一格抓出来的）。
+# 树里找不到就去版本库历史里找：产物按归档规则删进了 git，历史引文当时逐字是对的；少了这一段，这道检查会退化成「抓归档过的产物」。
+# 引文与归档那一刻的产物字节不符照样红。
 archived_count = 0
 def archived_product_lines(only_names=None):
     """归档进版本库的产物的行；only_names 给了就只取这些文件名的（登记着、却已出了树的那几份）。"""
@@ -1894,20 +1736,8 @@ PY
 
 # ── 格 archive-past-rounds：上一轮及更早的实验记录已经归档进版本库，工作区里不留
 #
-# 规则见 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」之下那三段：
-# 冻结只在本轮内有效；这一轮提交之后，下一次提交把上一次留下的那批删掉；本次的照旧留着、本次的验证照旧做得了；
-# 要查删掉的那些去版本库历史里找，对早先的结论有疑问就重新验证，不翻旧证据。
-#
-# ⚠️ **这条是实测出来的**（2026-09-21）：留着的旧记录不只占地方，它让当前工程的命名、路径、口径出现二义性——
-# 那天一次全仓术语改名量出 22741 处旧名，其中 19639 处（86%）躺在上一轮及更早的提示与产物里，
-# 改它们对今天的工程没有任何用处，不改又让「全仓一致」这件事永远做不完。
-#
-# 保留三类：三方判决 `*-main-verification.md`（kb 的依据指着它）、`abandoned-rounds.tsv`（门禁 doc-process-records.sh 的 abandoned-rounds 格的输入）、
-# 还被代码当输入的产物（门禁阶段、脚本或装置源码的非注释行点名它，见 archive-past-rounds.py 的 still_an_input）。
-# 「这一轮」的起点与门禁 doc-process-records.sh 的 knowledge-sync 格同一个基准：research/scripts/changed-paths.sh 的 `gate_diff_base gate`
-# （GATE_BASE，否则 @{upstream} 的 merge-base，都没有就 HEAD）；就是这一道开头取的那一个，经 GATE_BASE 交给脚本，
-# 脚本判红时出路里打出来的基准因此是这一个具体的提交，不再是占位句。
-# 不在 git 仓里这一格退 77（分不出哪些是上一轮提交进来的；原来那一道在那里让脚本带着调用栈退出、判红，2026-09-28 并进来时改掉）。
+# 规则：.claude/singlefs-ai-sop/rules/evidence-discipline.md「原样保存的证据不许事后改」之下那三段；判法与保留哪几类在 research/scripts/archive-past-rounds.py。
+# 基准是这一道开头取的 gate_diff_base gate（与 doc-process-records.sh 的 knowledge-sync 格同一个），经 GATE_BASE 交给脚本，出路里打出的基准就是这个提交。
 # 判别力：fixtures/doc-experiments.sh/archive-past-rounds-red 是一个留着上一轮产物的小仓，必须判红；
 # archive-past-rounds-green 只有本轮的，必须判绿。
 cell_archive_past_rounds() {
@@ -1929,32 +1759,21 @@ cell_archive_past_rounds() {
 
 # ── 格 multipath-registry：多条路径互证的实验，路径与共用项要登记且指得到
 #
-# 还 checks-owed.md C48（多条校验路径共用同一个前提）可机检的那一半。
-#
-# 判据与形态在 `.claude/rules/format-evolution.md`「实验页的「路径与结论登记」」，这一格判三条：
+# 判据与形态在 `.claude/rules/format-evolution.md`「实验页的「路径与结论登记」」，这一格判四条：
 #   ① 登记表的形状：`### 路径与结论登记` 之下恰好一张表，表头逐字
-#      `| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |`，每行五格；
-#   ② 源码落点指得到：写成 `路径:行号` 的，那个文件要在仓里现存；只活在正文里的写
-#      「无实现：理由」，理由不许空；
-#   ③ 共用项那一格不许空，也不许只写「无」（去掉括号、标点与「共用项」这类字眼之后只剩「无」「没有」「N/A」「none」
-#      这一类的都算只写了「无」）——多条路径逐格相等不构成证据，当它们共用
-#      同一个错误前提时，而那一列正是唯一能让人看出「共用了什么」的地方；
-#   表头下面要有分隔行；数据行按「不是分隔行」认，不按位置跳过前两行（少了分隔行时第一条数据行照判）。
-#   没有一页写了登记节、滞后表也一行都没有，本次无对象可判，这一格退 77。基准里还没有滞后表（只缩不涨没法比）
-#   与 git 取不到基准那一版分开：后者判红。
+#      `| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |`，每行五格；表头下面要有分隔行，
+#      数据行按「不是分隔行」认，不按位置跳过前两行（少了分隔行时第一条数据行照判）；
+#   ② 源码落点指得到：写成 `路径:行号` 的，那个文件要在仓里现存；只活在正文里的写「无实现：理由」，理由不许空；
+#   ③ 共用项那一格不许空，也不许只写「无」（去掉括号、标点与「共用项」这类字眼之后只剩「无」「没有」「N/A」「none」这一类的都算）；
 #   ④ 还没写登记节的实验页登记在 `.claude/gate.d/multipath-registry-lag.tsv`，这张表每一行：
 #      两列（页面路径、普查判定的依据）用制表符分隔、都不许空；路径形如
 #      `.claude/kb/experiments/<编号>-….md` 且文件在仓里现存；那一页确实还没有登记节——补上了就判过期，删行；
 #      **只缩不涨**：与基准提交比，基准里这张表没有的实验编号不许出现。按编号比、不按整条路径比：
-#      页面改名、登记行抄错了题目改正，都不算新加了一份。
+#      页面改名、登记行抄错了题目改正，都不算新加了一份。基准里还没有滞后表时不比；git 取不到基准那一版判红。
+#   没有一页写了登记节、滞后表也一行都没有，退 77。
 #
-# ⚠️ **射程只到已经写了这一节的实验页**。建表时 10 份实验页在做多条路径互证（普查
-# `research/prompts/c48-c49-multipath-survey.md`，已归档，去 git 历史里找：
-# `git show 13bccea:research/prompts/c48-c49-multipath-survey.md`），只有 1 份写了登记节；
-# 其余登记在滞后表里，那张表**只缩不涨**：一份补齐了就删一行，新写的实验页不许往里加。
-# 要判「该写而没写」那一半得先认出「这个实验在做多条路径互证」，
-# 而按关键词扫正文认不出来——普查里 15 份命中有 5 份，grep 命中的那一行说的是别的意思，
-# 真结构在页面别处。那一半的欠账在 C48（多条校验路径共用同一个前提）。
+# 射程只到已经写了这一节的实验页。「该写而没写」要先认出实验在做多条路径互证，按关键词扫正文认不出来，
+# 那一半欠在 C48（多条校验路径共用同一个前提）。
 #
 # 判别力：fixtures/doc-experiments.sh/{multipath-registry-red,multipath-registry-green}/ 各一份实验页，
 # red 那份四行里一行共用项写「无」、一行写「N/A」、一行源码落点指不到文件，另一份页的表缺分隔行、第一条数据行共用项写「无」，
@@ -1967,7 +1786,6 @@ cell_multipath_registry() {
   [[ -d "$EXPERIMENTS" ]] || { echo "  ! 没有 $EXPERIMENTS，这一格无对象可判"; exit 77; }
   base=""
   if ((in_git_work_tree)); then
-    # 基准取法与 doc-process-records.sh 用改动范围的几格、evidence-in-repo 格、decision-links 格、doc-registries.sh 的 invariant-anchors 那一格同一份：research/scripts/changed-paths.sh 的 gate 取法
     if ((! changed_paths_library_loaded)); then
       echo "  ✗ 读不到共用脚本 $LIB_CHANGED_PATHS"
       echo "     → 怎么办：它随仓走（research/scripts/changed-paths.sh），被删了就从 git 找回来。"

@@ -3,10 +3,12 @@
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
 # gate-stage: 三方论证与阶段同步有没有留下该留的记录：批次范围、判决点名、正文前提、轮次收尾、同步记录
 # gate-category: 文档类
-# 不声明 gate-covers：.claude/gate-not-implemented.tsv 里的两项（崩溃点重放、模型对拍）判的是被测代码的行为，这一道只判三方论证与阶段同步留下的记录，一项都不覆盖。
+# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让七格之外多一种对象（research/results/ 的产物）
+# gate-similar: doc-experiments.sh 它的 archive-past-rounds 格按与 knowledge-sync 格同一个基准删上一轮的实验记录，保留判决与 abandoned-rounds.tsv 供这里读；它判工作区里还留没留旧记录，不判记录写没写、写得全不全
+# gate-similar: doc-experiments.sh 它的 verdict-false-named 格名字里也有 verdict，但判的是实验产物判决行里的 false 字段有没有被实验页点名，对象是 research/results/ 与实验页，不是三方判决
+# gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，不判别的阶段
+# 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判记录。
 #
-# 七格，都读 research/prompts/ 与改动范围；每格是一条独立的判据，各有各的出路与计数（原是七道，每道一格，合成这一道）。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就七格都跑，格名写错退 2）：
 # gate-cell: batch-scope 这一批要碰的触发文件有没有登记进范围
 # gate-cell: verdict-names-local-samples 新写的三方判决有没有按路径点名那一轮本地腿的每一份样本（含作废副本）
 # gate-cell: crates-adversarial-review crates 里的实现改动有没有走过三方正反对抗推理
@@ -14,169 +16,97 @@
 # gate-cell: abandoned-rounds 发过腿的三方轮次，要么有判决，要么登记撂下
 # gate-cell: knowledge-sync 改了规则、agent、hook、门禁、脚本或实现之后，有没有写阶段同步记录
 # gate-cell: agent-def-adversarial-review 改过的 agent 定义与共用约束有没有走过三方审核
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析项目根、在父进程里预取改动范围。每格自己的成功行照旧报它查了多少项。
+# 格结构经 lib/stage-cells.sh；每格的成功行报它查了多少项。
 #
 #   bash .claude/gate.d/doc-process-records.sh [项目根]                              七格都跑
 #   bash .claude/gate.d/doc-process-records.sh --list                                逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-process-records.sh --check <格名>[,<格名>…] [项目根]     只跑点名的格（例：材料员开工只跑 implementation-premise）
 #
-# 改动范围只经共用库 research/scripts/changed-paths.sh 取，每一种取法这一趟只取一次、各格共用（门禁 code-tooling.sh 的 change-range-single-source 格判阶段里没有第二份取法）：
-#   GATE_BASE 起的改动路径（gate 取法：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；工作区、暂存区与未跟踪都算）
-#     ——verdict-names-local-samples 只用其中新增的、crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
-#   HEAD 起的改动路径（head 取法）——batch-scope；
-#   同步记录这一轮新增的行（gate_added_lines，GATE_BASE 起）——knowledge-sync。
-# 各格在自己的子 shell 里跑，子 shell 里取的传不回父进程，所以在父进程里按 --check 选中的格预取（样本根的 .gate-cells 在预取之后才生效，
-# 那时按全部格预取，多取的几种不用）；取不到时每个要用它的格各自判红、各报各的出路。
+# 改动范围只经 research/scripts/changed-paths.sh 取（基准怎么定见它的 gate_diff_base），每种取法这一趟只取一次、各格共用：
+#   gate 取法（含工作区、暂存区与未跟踪）：verdict-names-local-samples 只用其中新增的，crates-adversarial-review、knowledge-sync、agent-def-adversarial-review 用全部；
+#   head 取法（基准 HEAD）：batch-scope；
+#   gate_added_lines（同步记录这一轮新增的行）：knowledge-sync。
 # 被判的根不是 git 仓时，用改动范围的五格退 77；implementation-premise 与 abandoned-rounds 只看树，照判。
+# 「新写的判决」各格同一个认法：相对基准新增（git diff --diff-filter=A）、暂存区新增、未跟踪；被改过的旧判决（路径改写、补一句）不算。
 #
-# ── batch-scope ────────────────────────────────────────────────────────────────
-# 为什么：knowledge-sync 格的阶段同步按**触发文件**算范围——每多碰一个触发文件，事实表就多一行、候选表多几十到
-# 几百行、逐行判与主 agent 的逐行全看跟着涨。而「顺手把踩过的那个脚本修一下」的 diff 只有几行，这个放大器
-# 在判「它挡不挡着本轮的课题」的时候看不见。2026-09-22 实测：C468（判错的原始证据不落盘） 本身只要 3 行候选，
-# 同一批里顺手修的两个脚本贡献了 249 行候选，逐行判下来 249 行全是「不相干」，多花的挂钟以小时计。
-# 写一句「先判阻塞」拦不住手，拦得住的是暂存之后当场红的一道闸（C472（暂存区里多出来的触发文件没人拦））。
-#
-# 改动范围：**还没进 HEAD 的**——工作区、暂存区与未跟踪文件，基准是 HEAD，不是 GATE_BASE。
-# 与 knowledge-sync 格的基准不同是有意的，两者回答的不是同一个问题：
-#   knowledge-sync 问「这一轮要回扫哪些」，一轮可以跨几个提交，范围取 GATE_BASE；
-#   这一格问「这一次提交要带哪些」，那就只能是还没进 HEAD 的那几个。
-# 取 GATE_BASE 会把**上一个提交**的触发文件也算进来（gate-ok 不存在时基准退回 HEAD~1），
-# 而那些属于上一批、不在这一批的登记里，每次提交之后必然误红——与判据 ⑤ 躲开的是同一格（C450）。
-#
+# ── batch-scope ──
+# 为什么：knowledge-sync 格的阶段同步按触发文件算范围，每多碰一个触发文件候选表就多几十到几百行；
+# 这一格在暂存之后当场红，逼着先判多碰的那个文件挡不挡着本轮课题。
+# 基准是 HEAD（工作区、暂存区与未跟踪），不是 GATE_BASE：这一格问「这一次提交要带哪些」，只能是还没进 HEAD 的；
+# knowledge-sync 问「这一轮要回扫哪些」，一轮可以跨几个提交，所以取 GATE_BASE。这一格取 GATE_BASE 会把上一个提交的触发文件
+# 也算进来（gate-ok 不存在时基准退回 HEAD~1），每次提交之后必然误红。
 # 判据：
-#   ① 触发文件：改动范围里命中 .claude/gate.d/knowledge-sync-triggers.tsv 里任一条正则的路径。
-#      那份表是触发文件的唯一登记位，knowledge-sync 格读同一份（表的路径在这个文件里只写一处，两格都从那一处取）；
-#      表读不到或一条正则都没有 ⇒ 红。
-#   ② 每个触发文件都要在 .claude/batch-scope 里有一行；少一个 ⇒ 红，出路给两条。
-#   ③ .claude/batch-scope 里的每个路径都要是这一批的触发文件；多出来的 ⇒ 红
-#      （上一批留下的登记会让下一批白放行，判据同 .claude/naming-lint-exclude 的「排除只缩不涨」）。
+#   ① 触发文件：改动范围里命中 TRIGGER_TABLE 里任一条正则的路径；表读不到或一条正则都没有 ⇒ 红。
+#   ② 每个触发文件都要在 .claude/batch-scope 里有一行；少一个 ⇒ 红。
+#   ③ .claude/batch-scope 里的每个路径都要是这一批的触发文件；多出来的 ⇒ 红（上一批留下的登记会让下一批白放行）。
 #   ④ 登记行要写理由：路径之后 # 起，# 后面非空；空理由 ⇒ 红。
 #   ⑤ 登记的路径要从仓库根起写（不以 / ./ ../ 开头、不含 /../）；写歪了 ⇒ 红。
-#   改动范围一个文件都没有 ⇒ 这一格无对象可判（77，不记通过）。
+#   改动范围一个文件都没有：退 77。
+# .claude/batch-scope 一行一条 <从仓库根起的路径><制表符或空格>#<为什么这一批要碰它>；空行与整行以 # 开头的行是注释。一批提交完把它清空（只留注释）。
+# 管不到的：理由写得对不对、这一批该不该碰这个文件、登记是不是开工时写的。
+# 几个会话共写一个仓时，不带 --staged 跑会把别的会话没提交的改动也算进来；判这一批的范围跑 bash .claude/scripts/gate.sh --staged。
 #
-# .claude/batch-scope 的格式：一行一条 <从仓库根起的路径><制表符或空格>#<为什么这一批要碰它>；
-# 空行与整行以 # 开头的行是注释。一批提交完把它清空（只留注释）。
+# ── verdict-names-local-samples ──
+# 规则：.claude/rules/three-way-inference.md「判决由主 agent 做，不由投票做」。判据：
+#   ① 对象是这一次改动新写的 research/prompts/<轮>-main-verification.md（只认 research/prompts/ 顶层）。
+#   ② 轮名取判决文件名去掉 -main-verification.md。那一轮本地腿的样本：research/prompts/ 顶层里文件名以 <轮>-local- 起头、
+#      含 -output-s 或 -output-void、以 .md 结尾的普通文件（含 <轮>-local-attack-part1-output-s1.md 这类拆题的）。
+#   ③ 每一份样本的文件名都要在那份判决里逐字出现（带不带目录都算）；漏的逐个列出，判红。
+#   0 字节的样本（ask-local.sh 退 5、退 6 时留下的空 s<n>）不判，成功行逐个报跳过的；没有本地腿样本的判决不判，照样计数、逐个报出。
+#   没有新写的判决：退 77。
+# 管不到的：点名了读没读、标得对不对、「不稳定」格里的线索有没有逐条写去向；文件名出现在「没读」那一句里也算点名
+# （crates-adversarial-review、agent-def-adversarial-review 同一个盲区）；轮名互为前缀的（x-r1 与 x-r1-local-y-r1）会把后者的样本算给前者。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-process-records.sh/ 下的目录名，括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   VERDICT_LOCAL_SAMPLES_BREAK=skip-void  不认作废副本
+#       verdict-names-local-samples-green（输出里找不到「✓ 新写的判决 2 份：1 份逐份点名了那一轮本地腿的 3…」）；verdict-names-local-samples-red（期望退出 1，实测 0）
+#   VERDICT_LOCAL_SAMPLES_BREAK=require-empty  连 0 字节的样本也要点名
+#       verdict-names-local-samples-green（期望退出 0，实测 1）
 #
-# 管不到的：理由写得对不对、这一批该不该碰这个文件、登记是不是开工时写的（也可能是判红之后补的）。
-# 这几样是语义判断，靠人与 review。
-# ⚠️ 几个会话共写一个仓时，不带 --staged 跑它会把**别的会话未提交的改动**也算进这一批，报出一堆不是你的触发文件。
-# 判这一批的范围要跑 `bash .claude/scripts/gate.sh --staged`：它在临时 worktree 上只拿 HEAD + 暂存区，
-# 那时报出来的就是这一次提交真要带的那几个（`session-wrapup.md` 第 4 条）。
-# 判别力：fixtures/doc-process-records.sh/batch-scope-red 放一个没登记的触发文件、一个登记了却不在这一批里的路径、
-# 一行没写理由的登记、一个不是从仓库根起的路径，四种必须同时判红；
-# batch-scope-green 放三个触发文件（工作区改、暂存新增、未跟踪）都登记了、理由都写了、另有四个不是触发文件的路径不用登记，
-# 必须判绿并报对数。
+# ── crates-adversarial-review ──
+# 规则：.claude/rules/implementation-workflow.md 的第二步（三方正反对抗推理，.claude/rules/three-way-inference.md）。
+# 这次改动里每个 crates/*/src/*.rs 文件，都要在这一次改动新写的某份 research/prompts/*-main-verification.md 里按路径点名。
+# 没有 crates 改动：退 77。管不到的：点名了判得对不对。
 #
-# ── verdict-names-local-samples ─────────────────────────────────────────────
-# 规则在 `.claude/rules/three-way-inference.md`「判决由主 agent 做，不由投票做」一节「本地腿交回的每一份样本都读，判决里逐份按路径列出」那一条：
-# 干净样本、通读判带损坏的样本、损坏闸留下的作废副本（`-output-void<n>.md`）都要在判决里按路径列出，不许只写「作废」「不稳定不采」。
-# 判据（形式）：
-#   ① 对象是这一次改动新写的判决 `research/prompts/<轮>-main-verification.md`（只认 research/prompts/ 顶层）。新写的只认三种：
-#      相对基准新增（`git diff --diff-filter=A`）、暂存区新增、未跟踪；被改过的旧判决不算、不追溯。
-#   ② 轮名取判决文件名去掉 `-main-verification.md`。那一轮本地腿的样本：research/prompts/ 顶层里文件名以 `<轮>-local-` 起头、
-#      含 `-output-s` 或 `-output-void`、以 `.md` 结尾的普通文件（含 `<轮>-local-attack-part1-output-s1.md` 这类拆题的）。
-#   ③ 每一份样本的文件名都要在那份判决里逐字出现（按文件名字面找，带不带目录都算）；漏的逐个列出，判红。
-#   0 字节的样本（ask-local.sh 退 5、退 6 时重定向建出的空 s<n>）不判，成功句逐个报跳过的；那一轮没有本地腿样本的判决不判，照样计数、逐个报出。
-#   没有新写的判决 ⇒ 这一格无对象可判（77，不记通过）。
+# ── implementation-premise ──
+# 规则：.claude/rules/implementation-first.md 第 3 条。判据只看形式：
+#   ① 标题日期在 PREMISE_CUTOFF 及以后的正文（research/prompts/_*-body.md）里必须出现 crates/。
+#      日期取首行里的第一个 YYYY-MM-DD；标题里没有日期的照要查的算。成功行报查了几份，逐个列出因为日期早而没查的。
+#   标题日期在 SIDE_AND_SNAPSHOT_CUTOFF 及以后的正文另判两条：
+#   ② 正文里有一行「本地腿：攻 …」或「本地腿：辩 …」，冒号后面在攻 / 辩之外还写了理由；
+#   ③ 有背景材料（_<轮>-background.md）的轮要有开工快照目录 <轮>-snapshot/，小节清单（_<轮>-checklist.md）里每个「### 小节清单：`<文件>`」
+#      点名的 .claude/kb/ 文件在快照目录里某一份 sha256 清单里有一行。
+#   正文全都早于 PREMISE_CUTOFF：退 77。
+# 两个截止日之前的证据不回改（evidence-discipline「原样保存的证据不许事后改」）。管不到的：读没读对、改法是不是真按实现写的。
 #
-# ⚠️ 管不到的：点名了读没读、标得对不对（干净还是参考）、「不稳定」格里的线索有没有逐条写去向——靠人看；
-# 文件名出现在「没读」那一句里也算点名（与 crates-adversarial-review、agent-def-adversarial-review 两格同一个盲区）。
-# 轮名互为前缀的（`x-r1` 与 `x-r1-local-y-r1`）会把后者的样本算给前者。
-#
-# 判别力：fixtures/doc-process-records.sh/verdict-names-local-samples-red（两份新写的判决各漏一份作废副本：一份未跟踪、一份暂存新增）与
-# verdict-names-local-samples-missing-clean-sample（漏一份干净样本）必须判红并逐个列出漏的；verdict-names-local-samples-green（点名齐、0 字节 s2 没点名、
-# 别一轮与子目录里的样本、没有本地腿样本的判决、只补了一句的旧判决）必须判绿并报对数。
-# 弄坏开关 VERDICT_LOCAL_SAMPLES_BREAK：=skip-void 不认作废副本（-red 转绿），=require-empty 连 0 字节的也要点名（-green 转红）；
-# 带着任一项跑 `bash .claude/singlefs-ai-sop/scripts/stage-selftest.sh .claude/gate.d`，那一例判错、自证判红。
-#
-# ── crates-adversarial-review ───────────────────────────────────────────────
-# 本工程的实现流程是三步：写代码 → 多 agent 正反对抗推理（.claude/rules/three-way-inference.md）→ checker / 层 0 / 变异证明会红
-# （.claude/rules/implementation-workflow.md）。第二步没有任何东西盯着：代码写完、单测绿、门禁绿，就直接提交了。
-# 这一格判的是形式：这次改动里每个 crates/*/src/*.rs 文件，都要在这一次改动新写的某份三方判决文件
-# （research/prompts/*-main-verification.md）里被按路径点名。点名了判得对不对，要人看。
-# 新写的只认三种：相对基准新增（`git diff --diff-filter=A`）、暂存区新增、未跟踪；被改过的旧判决（路径改写、补一句）不算点名。
-# 共用库的 git 调用带 core.quotepath=false——不带的话中文文件名的判决被转成带引号的八进制串，
-# 对不上 research/prompts/*-main-verification.md，点名了也算没点。
-# 没有 crates 改动 ⇒ 这一格无对象可判（77，show-me-test.md：本次未跑，不记通过）。
-# 判别力：fixtures/doc-process-records.sh/crates-adversarial-review-red（一个没人点名、一个只被改过的旧判决点名、一个被中文文件名的新判决点名）
-# 必须判红并只列前两个；crates-adversarial-review-green 必须判绿并报对数。
-#
-# ── implementation-premise ──────────────────────────────────────────────────
-# 管的是 `.claude/rules/implementation-first.md` 第 3 条：实现已经在 `crates/` 里（里程碑一 2026-09-14 出口），
-# 三方论证的背景材料必须有一行前提写明读过的 `crates/` 路径与看到的事实；没有相关实现时写 grep 命令与零命中。
-# 判据只看形式：标题日期在 PREMISE_CUTOFF 及以后的正文（`research/prompts/_*-body.md`）里必须出现 `crates/`。
-# 日期取首行（标题）里的第一个 YYYY-MM-DD；标题里没有日期的，证不出它早于 PREMISE_CUTOFF，照要查的算。
-# 成功行报查了几份，并逐个列出因为标题日期早于 PREMISE_CUTOFF 而没查的（现算）。
-# PREMISE_CUTOFF 取规范落地的次日：2026-09-16 当天那几轮有的写在用户指示之前，那批证据不回改（evidence-discipline「原样保存的证据不许事后改」）。
-#
-# 另两条，只管标题日期在 SIDE_AND_SNAPSHOT_CUTOFF 及以后的正文（那天起材料员与主 agent 的定义才要求它们，更早的证据不回改）：
-#   ② 正文里有一行「本地腿：攻 …」或「本地腿：辩 …」，冒号后面在攻 / 辩之外还写了理由（这一轮本地腿派哪一侧、为什么）；
-#   ③ 这一轮有背景材料（`_<轮>-background.md`）的，要有开工快照目录 `<轮>-snapshot/`，小节清单（`_<轮>-checklist.md`）里每个「### 小节清单：`<文件>`」
-#      点名的 `.claude/kb/` 文件在快照目录里某一份 sha256 清单里有一行。
-# 标题日期早于 PREMISE_CUTOFF 的正文全部不判 ⇒ 这一格无对象可判（77）。
-# ⚠️ 它管不到读没读对、改法是不是真按实现写的——那一半靠攻方腿与人。
-# 判别力：fixtures/doc-process-records.sh/implementation-premise-red（没有 crates/ 的正文、标题没日期的正文、没写本地腿一侧、缺开工快照）
-# 必须判红并逐个点名；implementation-premise-green 必须判绿并报查了几份、没查哪一份。
-#
-# ── abandoned-rounds ────────────────────────────────────────────────────────
-# 实测（2026-09-17 核出）：c245-r3 与 c355-c363-r3 两轮 2026-09-16 发了云端腿提示、本地腿交了样本，
-# 云端腿没交、没有判决，之后没人收尾，也没有任何东西报警（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 33 行）。
-#
+# ── abandoned-rounds ──
 # 判据（只看 research/prompts/ 顶层文件，不进子目录）：
-#   ① 认轮次。文件名是下面五种之一，就算这一轮发过腿；轮名必须以 -r<N> 结尾：
-#        _<轮>-body.md          主 agent 写的三方正文（CLAUDE.md 派发表）
-#        <轮>-opus.md           云端攻方腿的提示
-#        <轮>-sonnet.md         云端正推 / 辩方腿的提示
-#        <轮>-local-attack.md   本地攻方腿的提示（.claude/agents/three-way-local-attack.md）
-#        <轮>-local-defense.md  本地辩方腿的提示（.claude/agents/three-way-local-defense.md）
-#   ② 认判决。两种任一：
-#        research/prompts/<轮>-main-verification.md；
-#        .claude/kb/ 下某个 .md 的同一小节（一个标题到下一个标题之间）既点名这一轮的材料
-#        （出现 research/prompts/<轮>- 或 research/prompts/_<轮>-），又有「**判决」——
-#        2026-09-11 有判决文件之前，判决直接写进决策正文或变更史，d16-item1-r2、d26-item4-r1、d26-item5-r4 三轮是这样。
-#   ③ 认撂下。research/prompts/abandoned-rounds.tsv 一行一轮，四列用制表符分隔：轮名、日期、为什么撂下、去向。
+#   ① 认轮次：文件名是 _<轮>-body.md、<轮>-opus.md、<轮>-sonnet.md、<轮>-local-attack.md、<轮>-local-defense.md 之一，
+#      就算这一轮发过腿；轮名必须以 -r<N> 结尾。
+#   ② 认判决，两种任一：research/prompts/<轮>-main-verification.md；或 .claude/kb/ 下某个 .md 的同一小节（一个标题到下一个标题之间）
+#      既点名这一轮的材料（research/prompts/<轮>- 或 research/prompts/_<轮>-），又有「**判决」（判决文件出现之前的几轮这样写）。
+#   ③ 认撂下：research/prompts/abandoned-rounds.tsv 一行一轮，四列用制表符分隔：轮名、日期、为什么撂下、去向。
 #   发过腿、没有判决、也没登记 ⇒ 红。登记表写坏（不是四列、有空列、日期不是 YYYY-MM-DD、同一轮登记两行）、
-#   登记了一个目录里认不出的轮、登记了已经有判决的轮 ⇒ 也红。没有 research/prompts/、或认不出一个发过腿的轮 ⇒ 这一格无对象可判（77）。
+#   登记了认不出的轮、登记了已经有判决的轮 ⇒ 也红。没有 research/prompts/、或认不出一个发过腿的轮：退 77。
+# 不判的，成功行逐个列出前缀：腿提示是旧形态的轮（<题>-local.md、<题>-forward-sonnet.md / -reverse-opus.md）与轮名不以 -r<N> 结尾的；
+#   它们都早于判决文件，判决写进 kb、形态不一，按 ② 认会把任意一句提到材料的话读成判决。
+# 归档进版本库的腿文件由 git log 取：不在 git 仓里只看树；git log 失败判红，不退回只看树（那样归档的轮次整批消失）。
+# 管不到的：判决写得对不对、登记的理由真不真；② 的第二种只认同一小节里既点名又有 **判决，写着「**判决**：没判」也算判过；
+#   新轮既不写正文、腿提示又用了五种之外的名字，落进不判的那一列而不红。
 #
-# 不判的，成功行逐个列出前缀（现算）：腿提示是旧形态的轮——<题>-local.md、<题>-forward-sonnet.md / -reverse-opus.md
-# 这类，或轮名不以 -r<N> 结尾（arm3、d16-items134）。2026-09-17 现查这些文件的首次提交全部在 2026-09-11 或更早，
-# 那时还没有判决文件（第一份 2026-09-11 提交），判决直接写进 kb、形态不一，按 ② 认会把「判决」读成任意一句提到材料的话；
-# 此后仍用 -local.md 写本地腿提示的轮（到 2026-09-16 为止）都另有 _<轮>-body.md 或 <轮>-opus.md / -sonnet.md，已被 ① 认出；agent 定义要求写成 -local-attack / -local-defense。
-#
-# ⚠️ 管不到的：判决写得对不对、登记的理由真不真（靠人）；② 的第二种只认「同一小节里既点名又有 **判决」，
-# 一段写着「**判决**：没判」的小节也算判过；新轮若既不写正文、腿提示又用了上面五种之外的名字，它落进不判的那一列而不红。
-# 归档进版本库的腿文件由 git log 取：不在 git 仓里跑（样本目录）时只看树；在 git 仓里而 git log 失败（对象缺了、仓坏了）判红，
-# 不退回只看树——那样归档的轮次整批消失，既没判决也没登记的归档轮不再红。
-# 判别力：fixtures/doc-process-records.sh/abandoned-rounds-red 放一轮发了腿没判决没登记、一轮只在 kb 里被提到而没有判决、
-# 写坏与说反话的登记（认不出的轮、有判决的轮、日期写坏、少一列、同一轮两行），另由 setup.sh 建一个缺了旧树对象的 git 仓（git log 读不到），必须判红；
-# abandoned-rounds-green 放判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，必须判绿并报对数。
-#
-# ── knowledge-sync ──────────────────────────────────────────────────────────
-# 为什么：2026-09-17 一批改动做完后没人回头同步知识——records/2026-09-16-subagent拆分提案.md 与 .claude/agent-common.md
-# 里两句「还没用过」在用过之后都留着，另一个会话在那句正下方追加新一批也没改它。用户定：阶段任务结束时有一个同步知识的任务点，
-# 派 sweep 做阶段同步，主 agent 判完每处命中写一份同步记录。这一格判的是那份记录的形式。
-#
-# 判据：
-#   ① 触发文件：改动范围里命中 `.claude/gate.d/knowledge-sync-triggers.tsv` 里任一条正则的路径。
-#      那份表是触发文件的**唯一登记位**，batch-scope 格读同一份；
-#      两格各存一份清单就会判得不一样，一格说要回扫、另一格说不用登记。表读不到或一条正则都没有 ⇒ 红。
-#      一个触发文件都没有 ⇒ 这一格无对象可判（77，不记通过）。
+# ── knowledge-sync ──
+# 判阶段同步记录的形式（阶段任务结束时主 agent 判完每处命中写的那份）。判据：
+#   ① 触发文件：改动范围里命中 TRIGGER_TABLE 里任一条正则的路径；表读不到或一条正则都没有 ⇒ 红；一个触发文件都没有：退 77。
 #   ② 同步记录：改动范围里的 research/prompts/<阶段>-sync.md（prompts 顶层），且文件里有一行只写 <!-- knowledge-sync -->。
 #      每个触发文件都要在某份同步记录里按路径逐字出现（等同 grep -F）；漏的逐个列出 ⇒ 红。
 #   ③ 每份同步记录有「## 搜索」小节且不空 ⇒ 否则红。
 #   ④ 每份同步记录有「## 命中处置」小节，小节里恰好一张表，表头 | 载体 | 原句 | 处置 |。逐行：
 #      载体格是「路径:行号」，路径从仓库根起（可包一层反引号），在仓里存在或在改动范围里；
 #      处置格以「改了」「补了」「不改：」之一开头，「不改：」后面要写理由；
-#      处置是「改了」「补了」的，载体路径要在改动范围里（记录说改了而文件没动）。任一不合 ⇒ 红。表可以 0 行。
-#      这一条判这一轮新写的处置行：新写的记录里每一行，加上基准里就有的旧记录这一轮新加的行（按 gate_added_lines 取的新增行逐字认）；
-#      旧记录里早先写下的行点名的是更早一轮改的载体，不判。
-#   ⑤ 这一次提交要带上的每份同步记录（**还没进 HEAD** 的那几份，基准与 ①–④ 的 GATE_BASE 不同，理由写在 uncommitted_records 那一段）有「## 原始证据」小节，小节里恰好一张表，表头 | 材料 | 路径 | 行数 |，**至少一行**。
-#      逐行：材料格非空；路径格是仓库根起的路径、在仓里现存；行数格是十进制整数，与那份文件的 `wc -l` 逐字相等。任一不合 ⇒ 红。
-#      拦的是 C468（判错的原始证据不落盘）：阶段同步判错一行之后，事实表、候选表与逐行判定报告都留在 /tmp，
-#      想复盘「当时看得出来吗」一个字节都拿不到，只能由当时判错的人事后重建。⑤ 只对还没进 HEAD 的记录判——
-#      已经提交的记录是冻结证据、改不得，它点名的材料也早晚归档进版本库（archive-past-rounds.py 会删掉工作区里的那一份），
-#      再判就是判一个不存在的对照。
+#      处置是「改了」「补了」的，载体路径要在改动范围里。任一不合 ⇒ 红。表可以 0 行。
+#      只判这一轮写的处置行：新写的记录整份，加上旧记录这一轮新加的行（gate_added_lines 取的新增行逐字认）。
+#   ⑤ 还没进 HEAD 的同步记录有「## 原始证据」小节，小节里恰好一张表，表头 | 材料 | 路径 | 行数 |，至少一行。
+#      逐行：材料格非空；路径格是仓库根起的路径、在仓里现存；行数格是十进制整数，与那份文件的 wc -l 逐字相等。任一不合 ⇒ 红。
+#      已经提交的记录是冻结证据、改不得，它点名的材料也归档了，不判。
 #
 # 同步记录的格式（research/prompts/<阶段>-sync.md）：
 #   <!-- knowledge-sync -->
@@ -202,40 +132,44 @@
 #   | 逐行判定报告（第一段 f1-f11） | research/prompts/<阶段>-judge-f1-f11.md | 420 |
 #   三个小节标题逐字写，后面不加字；原句里的 | 写成 \|；代码围栏里的 # 行不算标题。
 #
-# 管不到的：记录写得对不对（原句是不是那一行、「不改」的理由站不站得住）、回扫搜没搜全、
-# 只用过而没改动的东西（用过之后该改的句子，只要没碰触发范围就不触发）——这些靠阶段收尾的任务点与人。
-# 「改了」「补了」只核载体文件在改动范围里，不核那一行真的动了；行号不核是否越界；路径里带制表符、换行或引号的，git 仍会转义，认不出。
-# ⑤ 只核「点名的那几份在不在、行数对不对得上」：材料的内容对不对、候选表召回全没全、判定报告里那几行判得对不对，一个字都判不了。
-# 判别力：fixtures/doc-process-records.sh/knowledge-sync-red 放一个没被点名的触发文件、一个只在不带标记的文件里点名的触发文件、
-# 说改了而载体没动、开头不合法、不改没理由、载体没行号、载体不存在、缺「## 搜索」、表头写错，必须判红；
-# 另放四种「## 原始证据」的坏形态：整节缺掉、表头写错、表一行都没有、点名的候选表不在仓里、行数与 wc -l 对不上；
-# knowledge-sync-green 放三个触发文件分在两份记录里点名、三种处置各一行、中文文件名的载体、原句里的 \|、表后围栏里的竖线行、一份 0 行的表，
-# 两份记录各带一张对得上的「## 原始证据」表（含一个反引号包着的路径、一份不以换行结尾的材料），必须判绿并报对数。
+# 管不到的：记录写得对不对（原句是不是那一行、「不改」的理由站不站得住）、回扫搜没搜全、只用过而没改动的东西；
+# 「改了」「补了」只核载体文件在改动范围里，不核那一行真的动了；行号不核是否越界；路径里带制表符、换行或引号的认不出；
+# ⑤ 只核点名的材料在不在、行数对不对得上，内容一个字都判不了。
 #
-# ── agent-def-adversarial-review ────────────────────────────────────────────
-# 规则在 `.claude/rules/implementation-workflow.md`「改 agent 定义与共用约束，走同一条三步」：改 `.claude/agents/`、
-# `.claude/agent-common.md`、`.claude/main-agent.md` 与改 `crates/` 同规矩，写完要走一轮三方（`.claude/rules/three-way-inference.md`），
-# 判决落 `research/prompts/<轮>-main-verification.md` 并按路径点名改过的每一份。形态照 crates-adversarial-review 格。
-# 这一格判的是形式：改动范围里每个被管文件，都要在这一次改动新写的某份判决文件里被按路径点名。点名了判得对不对，要人看；
-# 新写的只认三种：相对基准新增（`git diff --diff-filter=A`）、暂存区新增、未跟踪；被改过的旧判决（路径改写、补一句）不算点名。
-# 与 crates-adversarial-review 格同一个盲区——路径出现在「没攻它」那句里也算点名（`records/2026-09-16-subagent拆分提案.md` 第十一节第二行）。
-# 删掉的定义也算改动。没有被管文件的改动 ⇒ 这一格无对象可判（77，不记通过）。
-# 用户逐次豁免的那几份：`.claude/agent-def-review-exempt` 一行三段（路径、豁免时那一版的 sha256、为什么），删掉一份定义时第二段写 deleted；
-# 按内容哈希认，那份定义再改一个字就不再豁免。
-# 判别力：fixtures/doc-process-records.sh/agent-def-adversarial-review-red（共用约束没人点名、主 agent 入口只被旧判决点名、删掉的定义没有去向）
-# 必须判红并逐个列出；agent-def-adversarial-review-green（四份被新判决点名、一份删除按 deleted 豁免、顺带改的 README 不算）必须判绿并报对数。
+# ── agent-def-adversarial-review ──
+# 规则：.claude/rules/implementation-workflow.md「改 agent 定义与共用约束，走同一条三步」。改动范围里每个被管文件
+# （.claude/agents/、.claude/agent-common.md、.claude/main-agent.md；删掉的也算）都要在这一次改动新写的某份判决里按路径点名，
+# 形态照 crates-adversarial-review 格。没有被管文件的改动：退 77。豁免表的格式在 check_agent_def_adversarial_review 里。
+# 管不到的：点名了判得对不对；路径出现在「没攻它」那句里也算点名。
 #
-# ── 样本 ────────────────────────────────────────────────────────────────────
-# fixtures/doc-process-records.sh/ 下每一格一对样本（verdict-names-local-samples 另有一份 -missing-clean-sample），
-# 每份样本根放 .gate-cells 只点名它判的那一格，别的格不跑（共用库的样本标记：被判的根不是这道门禁所在的仓时才认）。
-# setup.sh 里为别的格补的东西（触发文件清单、同步记录、撂下登记、豁免行、正文里的 crates/）是七格一起跑时留下的，留着不碍事。
-# 汇总与 --check 的弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让红样本整道退 0；STAGE_CELLS_BREAK=marker-ignored 让每份样本七格全跑，
-# 汇总那条「跑了 1 格」的 want 找不到。格的判法的弄坏开关写在各格那一段（VERDICT_LOCAL_SAMPLES_BREAK）。
-#
-# gate-similar: doc-experiments.sh 它的 evidence-in-repo 格也用 gate 取法的改动范围、也读 research/prompts/，但判产物与依据落没落进仓（/tmp 路径、产物新不新），不判三方与同步留下的记录；并进来会让七格之外多一种对象（research/results/ 的产物）
-# gate-similar: doc-experiments.sh 它的 archive-past-rounds 格按与 knowledge-sync 格同一个基准删上一轮的实验记录，保留判决与 abandoned-rounds.tsv 供这里读；它判工作区里还留没留旧记录，不判记录写没写、写得全不全
-# gate-similar: doc-experiments.sh 它的 verdict-false-named 格名字里也有 verdict，但判的是实验产物判决行里的 false 字段有没有被实验页点名，对象是 research/results/ 与实验页，不是三方判决
-# gate-similar: code-tooling.sh 它的 change-range-single-source 格判各阶段取改动范围只经 changed-paths.sh 一份取法；这里是那份取法的使用者之一，不判别的阶段
+# ── 样本 ──
+# fixtures/doc-process-records.sh/ 下每格一对，各放 .gate-cells 只点名它那一格；setup.sh 里给别的格补的东西不碍事。
+#   batch-scope-red                 没登记的触发文件、不在这一批的登记、没写理由的登记、不从仓库根起的路径，四种同时判红
+#   batch-scope-green               三个触发文件（工作区改、暂存新增、未跟踪）都登记了，另四个非触发文件不用登记，判绿报对数
+#   verdict-names-local-samples-red   两份新写的判决（一份未跟踪、一份暂存新增）各漏一份作废副本，判红逐个列出
+#   verdict-names-local-samples-missing-clean-sample  漏一份干净样本，判红
+#   verdict-names-local-samples-green 点名齐；0 字节 s2、别一轮与子目录里的样本、没有本地腿样本的判决、只补了一句的旧判决都不算漏，判绿报对数
+#   crates-adversarial-review-red   一个没人点名、一个只被改过的旧判决点名、一个被中文文件名的新判决点名，判红只列前两个
+#   crates-adversarial-review-green 判绿报对数
+#   implementation-premise-red      没有 crates/ 的正文、标题没日期的正文、没写本地腿一侧、缺开工快照，逐个点名判红
+#   implementation-premise-green    判绿，报查了几份、没查哪一份
+#   abandoned-rounds-red            发了腿没判决没登记的轮、只在 kb 里被提到的轮、写坏与说反话的登记，另有 setup.sh 建的缺旧树对象的 git 仓，判红
+#   abandoned-rounds-green          判决文件、kb 小节判决、登记撂下各一轮与三个旧形态前缀，判绿报对数
+#   knowledge-sync-red              没点名的触发文件、只在不带标记的文件里点名的、说改了而载体没动、处置开头不合法、不改没理由、载体没行号、
+#                                   载体不存在、缺「## 搜索」、表头写错，外加「## 原始证据」整节缺、表头错、零行、材料不在、行数不对，判红
+#   knowledge-sync-green            两份记录点名三个触发文件、三种处置各一行、中文载体、原句里的 \|、围栏里的竖线行、0 行的表、
+#                                   对得上的原始证据表（含反引号包着的路径、不以换行结尾的材料），判绿报对数
+#   agent-def-adversarial-review-red   共用约束没人点名、主 agent 入口只被旧判决点名、删掉的定义没有去向，判红逐个列出
+#   agent-def-adversarial-review-green 四份被新判决点名、一份删除按 deleted 豁免、顺带改的 README 不算，判绿报对数
+# 共用库的弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   STAGE_CELLS_BREAK=red-swallowed  红格按绿记、整道退 0
+#       abandoned-rounds-red、agent-def-adversarial-review-red、batch-scope-red、crates-adversarial-review-red、implementation-premise-red、
+#       knowledge-sync-red、verdict-names-local-samples-missing-clean-sample、verdict-names-local-samples-red（期望退出 1，实测 0）
+#   STAGE_CELLS_BREAK=marker-ignored  不认样本根的 .gate-cells，每份样本七格全跑
+#       abandoned-rounds-green、abandoned-rounds-red、agent-def-adversarial-review-green、agent-def-adversarial-review-red、batch-scope-green、
+#       batch-scope-red、crates-adversarial-review-green、crates-adversarial-review-red、implementation-premise-green、implementation-premise-red、
+#       knowledge-sync-green、knowledge-sync-red、verdict-names-local-samples-green、verdict-names-local-samples-missing-clean-sample、
+#       verdict-names-local-samples-red（输出里找不到「样本只跑 .gate-cells 点名的格：…」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -673,9 +607,7 @@ dispatch_forms = (
 legacy_body_form = re.compile(r"^_(?P<prefix>.+)-body\.md$")
 legacy_leg_form = re.compile(r"^(?P<prefix>[^_].*?)(?:(?:-(?:forward|reverse|attack|defense|admission|ledger))?-(?:opus|sonnet)|-local|-local-attack|-local-defense)\.md$")
 
-# 树上现有的，加上按「每一次提交删上一次的实验记录」归档进版本库的那些。
-# 少了后一半，一轮的腿文件一被归档，撂下登记表里那一行就报「认不出它发过腿」——
-# 而登记表本身是归档规则明令保留的（这一格的输入），两边对不上不是登记错了，是这道检查只看了树。
+# 树上现有的，加上归档进版本库的那些：只看树的话，一轮的腿文件一被归档，撂下登记表里那一行就报「认不出它发过腿」。
 archived_names = set()
 archive_log_error = None                     # 在 git 仓里而 git log 失败：归档的轮次读不到，收尾判红
 inside_repository = subprocess.run(["git", "rev-parse", "--is-inside-work-tree"],
@@ -778,9 +710,7 @@ if os.path.isfile(registry_path):
             registered_reasons[fields[0].strip()] = fields[2]
 
 duplicated_registrations = [f"{name}（第 {', '.join(map(str, numbers))} 行）" for name, numbers in sorted(registered_line_numbers.items()) if len(numbers) > 1]
-# 「腿一条没派」也是合法的撂下理由（正文写完之后现查发现题没了、题面并进别处），
-# 这种轮次本来就没有腿文件。它的正文一被归档，这条判据就永远认不出它——而登记表自己那一行
-# 写着为什么撂下，比文件名更权威。⇒ 理由里明写没派腿的，不要求认出腿文件。
+# 理由里明写没派腿的，不要求认出腿文件：这种轮本来就没有腿文件，正文一被归档就永远认不出，登记表那一行比文件名更权威。
 no_leg_form = re.compile(r"腿一条没派|没有派腿|一条腿都没派")
 registered_unknown_rounds = [name for name in sorted(registered_line_numbers)
                              if name not in dispatch_files_by_round
@@ -868,9 +798,7 @@ with open(sys.argv[3], encoding="utf-8", errors="replace") as handle:
             added_path, added_text = added.split("\t", 1)
             added_lines_by_record.setdefault(added_path, set()).add(added_text)
 
-# 触发文件的清单读 .claude/gate.d/knowledge-sync-triggers.tsv（路径由外层传进来，与 batch-scope 格同一处），不在这里再存一份：
-# batch-scope 格拿同一份清单算它那个范围，两格判得不一样谁都说不清该信哪个
-# （`show-me-test.md`「两套装置算同一个量，就要有一条检查逼它们落到同一个数」）。
+# 触发文件的清单只读外层传进来的 TRIGGER_TABLE（与 batch-scope 格同一份），不在这里再存一份：两格算的范围要一致。
 TRIGGER_TABLE = sys.argv[4]
 STAGE_NAME = sys.argv[5]
 if not os.path.isfile(TRIGGER_TABLE):
@@ -906,24 +834,15 @@ for path in changed_files:
         text = handle.read()
     if any(line.strip() == marker_line for line in text.split("\n")):
         records.append((path, text))
-        # 这一轮**新写**的那几份：处置行的「改了 / 补了」只对它们判。
-        # ⚠️ 跨轮留存的旧记录点名的载体是更早一轮改的，相对今天的基准当然不在范围里，
-        # 而那些行说的都是真话——改写它们才是假的（C450 实测 2026-09-21）。
-        # 判据用同一个基准：相对基准是新增（A）的才算这一轮写的；只是被改过（M，例如
-        # 按 C450 追加一句「为什么这一轮还留着」）的不算。
-        # 判据是「基准那一版里有没有这个文件」，不是 `git diff --name-status`：
-        # 后者看不见**未跟踪**的新文件，而这一轮刚写出来还没 add 的记录正是那一种
-        # （门禁自己的红样本就这么造的，用 diff 判会把它当成旧记录放行）。
+        # 这一轮新写的记录：基准那一版里没有这个文件。只是被改过的旧记录不算，它早先的行点名的是更早一轮改的载体。
+        # 不用 git diff --name-status：它看不见未跟踪的新文件，而这一轮刚写出来还没 add 的记录正是那一种。
         exists_at_base = subprocess.run(
             ["git", "cat-file", "-e", f"{base}:{path}"],
             capture_output=True, text=True).returncode == 0
         if not exists_at_base:
             fresh_records.add(path)
-        # ⑤ 用的是另一个基准：HEAD，不是 GATE_BASE。两个基准回答的不是同一个问题——
-        # 「改了 / 补了」问的是「这一轮的改动范围里有没有这个载体」，范围由 GATE_BASE 定，两边必须同一个基准（C450）；
-        # ⑤ 问的是「这一次提交要带上的记录，它的原始材料带了没有」，那就只能是还没进 HEAD 的那几份。
-        # 拿 GATE_BASE 判 ⑤ 会连**上一个提交里已经写好的记录**一起判（gate-ok 不存在时基准退回 HEAD~1，
-        # 上一个提交新增的记录相对它就是「新写的」），而那份记录是冻结证据、改不得，它的材料也归档了。
+        # ⑤ 的基准是 HEAD，不是 GATE_BASE：它问这一次提交要带上的记录带没带原始材料；
+        # 拿 GATE_BASE 会连上一个提交里写好、已经冻结的记录一起判（gate-ok 不存在时基准退回 HEAD~1）。
         exists_at_head = subprocess.run(
             ["git", "cat-file", "-e", f"HEAD:{path}"],
             capture_output=True, text=True).returncode == 0
@@ -1018,7 +937,7 @@ for record_path, text in records:
         search_problems.append(f"{record_path}：没有「## 搜索」小节")
     elif not any(line.strip() for _number, line, _fenced in sections["## 搜索"]):
         search_problems.append(f"{record_path}：「## 搜索」小节是空的")
-    # ⑤ 原始证据只对还没进 HEAD 的记录判：已提交的记录改不得，它点名的材料也归档了（C468）。
+    # ⑤ 原始证据只对还没进 HEAD 的记录判：已提交的记录改不得，它点名的材料也归档了。
     if record_path in uncommitted_records:
         evidence_record_count += 1
         if "## 原始证据" not in sections:
@@ -1204,9 +1123,8 @@ check_agent_def_adversarial_review() {
     return 1
   }
   verdicts="$(grep -E '^research/prompts/.*-main-verification\.md$' <<<"$added_since_gate" || true)"
-  # 用户逐次豁免的那几份：`.claude/agent-def-review-exempt` 一行三段（路径、豁免时那一版的 sha256、为什么）；豁免的是删掉一份定义时第二段写 deleted。
-  # ⚠️ 按**内容哈希**认，不按文件名认：那份定义再改一个字，哈希就对不上、这一格照常红。
-  # 只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。
+  # 豁免表 .claude/agent-def-review-exempt 一行三段（路径、豁免时那一版的 sha256、为什么）；删掉一份定义时第二段写 deleted。
+  # 按内容哈希认：那份定义再改一个字，哈希就对不上、这一格照常红。只有用户明说「这次不走三方」时才加一行，理由里写明是哪一次、他说了什么。
   local exempt_table=".claude/agent-def-review-exempt"
   while IFS= read -r definition; do
     [[ -z "$definition" ]] && continue

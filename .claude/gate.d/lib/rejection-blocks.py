@@ -13,10 +13,16 @@ checker-independence-and-sync 的 layout-checker-sync。两格原来各写一份
 出路列表里以「怎么办」开头的一条打成「     → 怎么办……」，其余各条是它的续行，前面垫 continuation_indent
 （两格原来的续行缩进不同：layout-checker-sync 5 个空格，reading-discipline 7 个空格，照原样各传各的）。
 
-弄坏开关 REJECTION_BLOCKS_BREAK=<项>，让用它的两格的红样本判错（样本的 want 找不到）：
-  summaries-only   只打「✗ 摘要」，不打明细：reading-discipline-red 里「e2_sample.rs:5    seed | 1」、
-                   layout-checker-sync-red 里「format/布局.md:5  标记按文法读不出来」这类明细 want 找不到
-  silent           一块都不打：两份红样本的摘要 want 也找不到
+弄坏开关 REJECTION_BLOCKS_BREAK=<项>。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（<阶段>/<fixtures 下的样本目录名>，
+括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+  REJECTION_BLOCKS_BREAK=summaries-only  只打「✗ 摘要」，不打明细
+      checker-independence-and-sync.sh/layout-checker-sync-first-registration-changed-value、
+      checker-independence-and-sync.sh/layout-checker-sync-red（输出里找不到「改值 SAMPLE_UNIT_BYTES：16384 → 3…」）；
+      code-source-discipline.sh/reading-discipline-red（输出里找不到「crates/singlefs-checker-tier/s…」）
+  REJECTION_BLOCKS_BREAK=silent  一块都不打
+      checker-independence-and-sync.sh/layout-checker-sync-first-registration-changed-value、
+      checker-independence-and-sync.sh/layout-checker-sync-red（输出里找不到「格式常量在这次改动里变了」）；
+      code-source-discipline.sh/reading-discipline-red（输出里找不到「C59（种子折叠成同一个状态）：2 处违规没有登记在豁免表里」）
 """
 import os
 

@@ -1,23 +1,18 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录；外部引用那一格调的 research/scripts/verify-citations.sh 要本机固定下来的外部文献树，缺了在那一格判红，不交给 gate.sh 预判
-# gate-stage: 登记表与引用（二十一格：字段表指向分项；字段投影；字段表加和与结构总宽登记；新池新建文件三份挂钩；准入不等式各项有人维护；段序列登记表与 E142 产物；格式常量占位；覆盖写释放回退复用三处挂钩；树表预留认购；欠账表两张登记表的行形状；收口表收全开着的账；已还清行点名的测试还在；总审核矛盾都有去向；收口表第 27 行那几笔的前置；实验号引用有定义；决策号引用有定义；不变量声明条数与表对得上、欠账表数得出条数；治理文档里的门禁号、路径与「小节」指得到；不变量条数在 invariants.md 之外也要对；外部引用还核得动；新写的不变量点名它判的字段住在哪条已定分项）
+# gate-stage: 登记表与引用（二十一格：字段与布局登记表之间的账；欠账表与收口表的形状与去向；实验号、决策号、门禁名、路径、小节与外部引用指得到；不变量条数与字段落点）
 # gate-category: 文档类
 # gate-similar: link-targets.py 它只解析 ](相对路径) 链接与「第 N 节」，不看反引号里的路径、「门禁 N 号」与「小节」名；这三类与 experiment-refs、decision-refs 两格同是「引用了不存在的东西」，并在这里
-# gate-similar: doc-decisions.sh 它判决策文档本身：索引表结论列的字数上限、「分项引用状态」（引用写的已定 / 未定与正文相符，前提是那条分项存在）、每条未定项写没写「改新池新建文件的字节」那句判定、动了用户定案的条款有没有在欠账表里记一笔（方向是决策改动到欠账表）；这一道 field-refs 那一格判字节表「指向」的分项存不存在（指向 D22 已定项 99 的字段在它眼里没有对象可比），first-txn-hooks 那一格拿判了「是」的那几条去核字节表与里程碑引没引，tree-table-reserve 那一格对认购表求和、比预留，欠账表各格从欠账表、收口表与总审核出发判表本身的形状与账的去向，decision-refs 那一格只判 D 号有定义、不看分项号与状态
-# gate-similar: checker-independence-and-sync.sh 它的 layout-checker-sync 那一格判 layouts.tsv 登记的布局常量变了 checker 跟没跟、按 lib-owed.py 判滞后登记点名的欠账还开着，对象是布局清单与 checker 源码；这一道只对 kb 各表之间、kb 与 E142 产物和钉住的用例之间的账，判欠账表与收口表本身
-# gate-similar: code-source-discipline.sh 它的 reading-discipline 那一格按 lib-owed.py 判读数纪律登记表点名的欠账号还开着，对象是实验二进制源码；mutation-tables 那一格数变异表每条原文在源码里恰好命中一次，锚点腐化就红，服务于变异复跑；format-constants、clause-enums、feature-bits 几格拿 kb 里 format-const 标记的登记值去核 crates/singlefs-format 里同名 const 的字面量与 stale= 旧串、条文列与 Rust 枚举逐个成员对上、feature bit 与代码对应，方向是 kb 到代码；这一道判欠账表与收口表本身，closeout-row27-preconditions 那一格数的是登记的今天命中次数（可以是 0 或 2），全对上那一格记本次未跑，对不上说明那笔欠账的前置进来了、要回去重核；这一道的 field-table-sums 那一格与它共用 lib-format-const.py 读标记，判的是 kb 里字段表的加和、表前说明句与结构总宽有没有登记，format-const-placeholders 那一格是代码注释到 kb 的单向编号核对，closeout-row27-preconditions 那一格读源码只数几段写死的原文命中几次，都不拿 kb 的值去比代码
-# gate-similar: doc-experiments.sh 它的 multipath-registry 那一格判实验页「路径与结论登记」表的形状、源码落点与共用项，quoted-result-lines 那一格判 kb 正文里整行抄的 E7RESULT 产物行在 research/results/ 里逐字找得到（方向是 kb 到产物）；这一道 audit-contradictions 那一格判总审核处置列里「」引的原文在点名的 kb 文件今天的正文里找得到，方向是记录到 kb，另外要判欠账号还开着
+# gate-similar: doc-decisions.sh 它判决策文档本身（索引结论字数、分项引用状态、未定项写没写改不改新池新建文件的字节、用户定案改动记没记欠账）；这一道判字段表指向的分项存不存在、判「是」的分项在字节表与里程碑里挂没挂钩、认购表求和、欠账表与收口表的形状与去向，decision-refs 只判 D 号有定义
+# gate-similar: checker-independence-and-sync.sh 它的 layout-checker-sync 格判 layouts.tsv 登记的布局常量变了 checker 跟没跟，对象是布局清单与 checker 源码；这一道只对 kb 各表之间、kb 与 E142 产物和钉住的用例之间的账
+# gate-similar: code-source-discipline.sh 它的 reading-discipline、mutation-tables、format-constants、clause-enums、feature-bits 几格方向是 kb 到代码，拿登记值核 crates 源码；这一道的 field-table-sums 与它共用 lib-format-const.py 读标记但只判 kb 里的加和与登记，format-const-placeholders 只核代码注释里的编号指得到 kb，closeout-row27-preconditions 只数几段写死的原文命中几次，都不拿 kb 的值比代码
+# gate-similar: doc-experiments.sh 它的 multipath-registry 格判实验页登记表的形状，quoted-result-lines 格判 kb 整行抄的产物行在 research/results/ 里找得到（kb 到产物）；这一道 audit-contradictions 格判总审核处置列引的原文在 kb 今天的正文里找得到（记录到 kb），另判欠账号还开着
 #
-# 登记表与引用：字段与布局登记表之间、kb 与 E142 产物和钉住的用例之间的账；欠账表 checks-owed.md 与里程碑收口表本身的形状与账的去向；
-# 「一处改了、引用它的地方没跟着改」（实验号、决策号、治理文档里的门禁号与路径与小节、外部引用），外加不变量清单自己的条数与字段落点。
-# 原是三道阶段（「字段与布局登记」九格、「欠账与收口」五格、「引用与不变量」七格，下面分别叫字段与布局组、欠账与收口组、引用与不变量组），
-# 2026-09-28 按门禁收缩判决 research/prompts/gate-shrink-r1-main-verification.md「采纳的改法」第 2 条合成这一道；
-# 每一格的判据、出路、成功行里报的数与射程照原样留在那一格的注释与函数里，下面两处照判决改了：
-#   欠账与收口组的 row27-preconditions 改名 closeout-row27-preconditions（盯的是里程碑收口表第 27 行那几笔欠账的前置），判法不动（判决 3-B1：不删）；
-#   table-shape 那一格删掉「同一个编号在两张表里各登记一次」那一半，它归上游 doc-lint 的 F 判（判决 3-B3）。
-#   experiment-refs、decision-refs 两格留着（判决 3-B8）。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就二十一格按下面的次序全跑，格名写错退 2）：
+# 三组格：字段与布局组九格（kb 字段表、字节布局表、段序列登记表与里程碑各步对账）、欠账与收口组五格（checks-owed.md 与里程碑收口表）、
+# 引用与不变量组七格（引用指得到、不变量条数与字段落点；governance-refs 的判据在 lib-governance-refs.py 文件头）。
+# 实验改成已跑后引用它的决策有没有回看、已跑的实验有没有对应的决策，不在这里判，归 doc-experiments.sh 的 decision-links 格。
+# 格名表（--list 打它；--check <格名>[,<格名>…] 只跑点名的格，不给就按下面的次序全跑）：
 # gate-cell: field-refs 新池新建文件的字段表，每个「指向」都指到一条真实存在的分项
 # gate-cell: field-projection 决策里定的字段有没有漏投影进新池新建文件的表
 # gate-cell: field-table-sums 字段表加出来的数（表后合计、表前说明句、format-const 标记）与字节布局表里结构总宽的登记
@@ -40,51 +35,91 @@
 # gate-cell: citations kb 里承重的外部逐行引用还核得动（调 research/scripts/verify-citations.sh）
 # gate-cell: invariant-anchors 这次改动新写或改写的不变量行，点名它判的字段住在哪条已定分项
 #
-# 字段与布局组九格都判 kb 里的字段表、字节布局表、段序列登记表与里程碑各步之间的对账。
-# first-txn-hooks 与 second-txn-hooks 判法不同形，各成一格：前一格从决策里判「是」的未定项出发，判字节表的空白表、
-# 每节标题下的步号、里程碑每步点名的节标题（逐字，只许省末尾括注）；后一格从 layout/02 登记表出发，判行与步互相点名
-# （形态前缀只许对得上一行）、钉住的用例在仓里、「八、」段序列登记表标到的步与点名它的步两边相等。
-# 欠账与收口组五格都判 .claude/kb/checks-owed.md 与里程碑收口表，其中两格共用 lib-owed.py。
-# 引用与不变量组七格都是机械可判的；governance-refs 的判据与够不着的写法在 lib-governance-refs.py 文件头。
-# declared-counts 与 invariant-count-elsewhere 逐字核过，判的不是同一件事：前者只判 invariants.md 自己
-# <!-- invariant-count --> 下一行那句，后者只判 invariants.md 与变更史之外的 kb 文件；在用条数两格用同一份数法（count_invariant_rows）。
-# 实验与决策之间的两件事不在这里判，都归 doc-experiments.sh 的 decision-links 格（三方判决 gate-fix-forks-r1、r2 的 T1）：
-#   「实验改成已跑、引用它的决策有没有同批回看」归 ⑤——表里改过一行不够，正文引了它的每条决策都要回看；
-#   「已跑的实验有没有对应的决策」归 ⑨——表里至少一行支撑、推翻或备料，标题写了作废或退役的不判。
-# 每格的成功行都报查了多少项；本该有对象却一个都没扫到的，判红（.claude/singlefs-ai-sop/rules/show-me-test.md「扫到 0 项也不是通过」）。
+# 参数解析、样本根的 .gate-cells、逐格汇总与退出码经共用库 lib/stage-cells.sh（写法在它的文件头）。退出码：
+#   0  跑到的格没有红
+#   1  有格红（退出码既不是 0 也不是 77），红格逐格接它登记的出路；建不了临时目录也退 1
+#   2  认不出的选项、两个项目根、格名写错、进不去项目根
+#   77 跑到的格全退 77，不记通过；退 77 的格逐格往 $GATE_NOT_RUN_FILE 报本次未跑
 #
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析项目根。格按上表的次序一格跑完再跑下一格（字段与布局组九格原是并行跑的、引用与不变量组的 citations 原是先在后台起的，
-# 并进来之后照共用库逐格跑，citations 轮到它时才起 verify-citations.sh、等它跑完）。
-#   有一格红（退出码既不是 0 也不是 77）⇒ 整道退 1，红格逐格接它登记的出路；跑到的格全退 77 ⇒ 整道退 77，不记通过；
-#   退 77 的格逐格往 $GATE_NOT_RUN_FILE 报一行「本次未跑」（closeout-row27-preconditions 那一格前置没进来时就退 77）。
+# 样本（fixtures/doc-registries.sh/，每份样本根的 .gate-cells 点名只跑哪几格；每一格的样本放了什么写在那一格的注释里）：
+#   <格名>-red                  字段与布局组九格各一份，判红；expect 另要汇总里「<格名>：红（退出 1）」那一行
+#   field-registry-green        字段与布局组九格的绿样本并在一棵树里，九格各报成功行、整道退 0
+#   checks-owed-red             同一份欠账表喂欠账与收口五格，五格都红、各报自己点名的行，整道退 1
+#   checks-owed-green           四格判绿、closeout-row27-preconditions 退 77，整道退 0 并报那一格本次未跑
+#   references-red              引用与不变量七格各放一处该红的对象，逐格点名判红
+#   references-unreadable-red   悬空符号链接的 kb 文件，experiment-refs、decision-refs 要报出 grep 退 2
+#   references-green            七格判绿；setup.sh 建成 git 仓（新加一行带分项引用又 git add，只许算 1 行），verify-citations.sh 是退 0 打一行 ✓ 的替身
+#   governance-refs-red         只跑 governance-refs：kb 与仓根 README.md 里用旧编号称呼门禁、不存在的门禁与格名，逐条点名判红
+#   governance-refs-green       只跑 governance-refs：按全名指的门禁与格都在，历史节、变更史与记录文件名里的旧编号不判，报扫了几份、全名与格名几处
 #
-# 判别力：fixtures/doc-registries.sh/ 下每份样本根放 .gate-cells，只跑它点名的格：
-#   <格名>-red                  字段与布局组的九份红样本各对一格（field-refs-red……tree-table-reserve-red），必须判红，
-#                               expect 除那一格自己的 want 外还要汇总里「<格名>：红（退出 1）」那一行
-#   field-registry-green        字段与布局组九格的绿样本并在一棵树里，九格都判绿、整道退 0，每一格的成功行各有一条 want
-#   checks-owed-red             欠账与收口五格的红样本放在一棵树里，同一份欠账表同时喂五格，五格都要判红、各报出自己点名的行，整道退 1
-#   checks-owed-green           五格的绿样本，四格判绿、closeout-row27-preconditions 那一格退 77，整道退 0 并报那一格本次未跑
-#   references-red              引用与不变量七格各放一处该红的对象（悬空的实验号与决策号、invariants.md 丢了登记标记、欠账表一行都数不出、
-#                               治理文档里悬空的门禁号、路径与小节、别处写错的「N 条在用」、没有 verify-citations.sh、未跟踪的清单里一行没点名分项），逐格点名判红
-#   references-unreadable-red   读不了的 kb 文件（悬空的符号链接），experiment-refs、decision-refs 两格要报出 grep 退 2
-#   references-green            七格都判绿（setup.sh 把它建成 git 仓：清单已跟踪、新加一行带分项引用又 git add，只许算 1 行；
-#                               research/scripts/verify-citations.sh 是替身，退 0、打一行 ✓，判的是 citations 这一格自己那两件事：脚本在被判的仓里就去跑它、按它的退出码判）
-#   governance-refs-red         只跑 governance-refs：kb 现状文字里用旧编号称呼门禁（「门禁 11 号」「门禁 91」「gate.d/47-…」三种写法、「54、55 号」里的 55），
-#                               「门禁 doc-kb」不是门禁、「doc-registries 的 no-such-cell 格」与「--check no-such-cell」格名不在，
-#                               仓根 README.md 里的「门禁 59 号」与「checker-tier-lkmm 的 no-such-cell 格」，逐条点名判红
-#   governance-refs-green       只跑 governance-refs：按全名指的门禁与格都在、「门禁 doc-lint」是上游共享门禁、「54 号」照旧；
-#                               「## 历史版本」一节、decisions-history.md 与 experiments-history.md 里的旧编号不判，
-#                               记录文件名里带的号不判，仓根 README.md 里按全名指的门禁与格（含门禁 54-layer0-replay 与它的脚本路径）都在，
-#                               判绿并报扫了几份、全名与格名几处
-# 每一格的样本放了什么，写在那一格的注释里。
-# governance-refs 另有 lib-governance-refs.py 的弄坏开关 GOVERNANCE_REFS_BREAK=old-numbers-ignored / names-ignored / fences-scanned（governance-refs-red 里对应的 want 找不到）、
-# =history-scanned（governance-refs-green 判红）、=readme-skipped（仓根 README.md 不进射程：governance-refs-red 里 README.md 那两行 want 找不到，
-# governance-refs-green 的份数与处数对不上）。
-# 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让各份 *-red 整道退 0；=check-ignored 让 --check 不起作用）。
-# 格的弄坏开关 DOC_REGISTRIES_BREAK=<格名>（样本自检时设进环境）让那一格不跑、按判过了记：那一格的红样本出不来它的红行、
-# 绿样本出不来它的成功行，样本判错。research/scripts/changed-paths.sh 的 LIB_CHANGED_PATHS_BREAK=untracked 让 invariant-anchors
-# 看不见未跟踪的清单，references-red 里那一格报不出来，样本判错。
+# 弄坏开关。逐项写开关名、弄坏哪一处，下一行起写打开后判错的样本（fixtures/doc-registries.sh/ 下的目录名，
+# 括号里是 stage-selftest.sh 报那份样本判错的第一行的句首）：
+#   DOC_REGISTRIES_BREAK=field-refs  field-refs 格不跑、按判过了记
+#       field-refs-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「新池新建文件的字段表指向都成立（查了 7 处引用）」）
+#   DOC_REGISTRIES_BREAK=field-projection  field-projection 格不跑、按判过了记
+#       field-projection-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「被投影的分项，字段表都投影全了…」）
+#   DOC_REGISTRIES_BREAK=field-table-sums  field-table-sums 格不跑、按判过了记
+#       field-registry-green（输出里找不到「扫了 10 份决策、4 份字节布局表；表后合计 3 张，表前…」）；field-table-sums-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=first-txn-hooks  first-txn-hooks 格不跑、按判过了记
+#       field-registry-green（输出里找不到「互相挂钩…」）；first-txn-hooks-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=admission-terms  admission-terms 格不跑、按判过了记
+#       admission-terms-red（期望退出 1，实测 0）；field-registry-green（输出里找不到「准入不等式 3 项逐项有归属」）
+#   DOC_REGISTRIES_BREAK=segment-registry  segment-registry 格不跑、按判过了记
+#       field-registry-green（输出里找不到「比对了 2 处登记…」）；segment-registry-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=format-const-placeholders  format-const-placeholders 格不跑、按判过了记
+#       field-registry-green（输出里找不到「2 个占位」）；format-const-placeholders-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=second-txn-hooks  second-txn-hooks 格不跑、按判过了记
+#       field-registry-green（输出里找不到「登记表 1 行、行到步 1 处、「写出的字节」点名 3 处、…」）；second-txn-hooks-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=tree-table-reserve  tree-table-reserve 格不跑、按判过了记
+#       field-registry-green（输出里找不到「3 条认购」）；tree-table-reserve-red（期望退出 1，实测 0）
+#   DOC_REGISTRIES_BREAK=table-shape  table-shape 格不跑、按判过了记
+#       checks-owed-green（输出里找不到「检查了 16 行」）；checks-owed-red（输出里找不到「C4：6 格」）
+#   DOC_REGISTRIES_BREAK=closeout-collects-open  closeout-collects-open 格不跑、按判过了记
+#       checks-owed-green（输出里找不到「判了 2 份；02-sample.md：全文点名 3 个 C…」）；checks-owed-red（输出里找不到「02-sample.md 点名了这些还开着的欠账号，收口表里…」）
+#   DOC_REGISTRIES_BREAK=paid-cited-tests  paid-cited-tests 格不跑、按判过了记
+#       checks-owed-green（输出里找不到「查了 1 个标识符」）；checks-owed-red（输出里找不到「C902 引的 `the_sample_test_that_…」）
+#   DOC_REGISTRIES_BREAK=audit-contradictions  audit-contradictions 格不跑、按判过了记
+#       checks-owed-green（输出里找不到「每一行都有去向」）；checks-owed-red（输出里找不到「有行没有去向」）
+#   DOC_REGISTRIES_BREAK=closeout-row27-preconditions  closeout-row27-preconditions 格不跑、按判过了记
+#       checks-owed-green（输出里找不到「5 条逐字探针、覆盖 4 笔」）；checks-owed-red（输出里找不到「收口表第 27 行那几笔欠账的前置动了」）
+#   DOC_REGISTRIES_BREAK=experiment-refs  experiment-refs 格不跑、按判过了记
+#       references-green（输出里找不到「实验号引用全部有定义：2 个不同的实验号…」）；references-red（输出里找不到「E999 被引用但 experiments/ 下没有它」）；
+#       references-unreadable-red（输出里找不到「抽 E 号引用时有文件读不了（grep 退 2）」）
+#   DOC_REGISTRIES_BREAK=decision-refs  decision-refs 格不跑、按判过了记
+#       references-green（输出里找不到「决策号引用全部有定义：2 个不同的决策号…」）；references-red（输出里找不到「D998 被引用但 decisions/ 下没有它」）；
+#       references-unreadable-red（输出里找不到「抽 D 号引用时有文件读不了（grep 退 2）」）
+#   DOC_REGISTRIES_BREAK=declared-counts  declared-counts 格不跑、按判过了记
+#       references-green（输出里找不到「欠检查 1 条、已还清 1 条」）；references-red（输出里找不到「invariants.md 里没有 <!-- invaria…」）
+#   DOC_REGISTRIES_BREAK=governance-refs  governance-refs 格不跑、按判过了记
+#       governance-refs-green、references-green（输出里找不到「治理文档与 kb 里的门禁号、门禁全名与格名、路径与「小节」…」）；governance-refs-red（期望退出 1，实测 0）；
+#       references-red（输出里找不到「治理文档与 kb 里有指不到的指向（上面逐条列出）」）
+#   DOC_REGISTRIES_BREAK=invariant-count-elsewhere  invariant-count-elsewhere 格不跑、按判过了记
+#       references-green（输出里找不到「不变量条数跨文件一致：实际在用 1 条，扫了 6 份 kb…」）；references-red（输出里找不到「写「99 条在用」，而 invariants.md 实际在用…」）
+#   DOC_REGISTRIES_BREAK=citations  citations 格不跑、按判过了记
+#       references-green（输出里找不到「样本替身：3 条命中，0 条未命中」）；references-red（输出里找不到「找不到 research/scripts/verify-ci…」）
+#   DOC_REGISTRIES_BREAK=invariant-anchors  invariant-anchors 格不跑、按判过了记
+#       references-green（输出里找不到「这次改动新写或改写的 1 行不变量都点名了已定分项」）；references-red（输出里找不到「这次改动新写或改写的 1 行不变量，没有点名它判的字段住在哪…」）
+#   GOVERNANCE_REFS_BREAK=old-numbers-ignored  lib-governance-refs.py 的 ⑤ 整条不判（用旧编号称呼门禁）
+#       governance-refs-red（输出里找不到「.claude/kb/tooling.md:3: 用旧编号称…」）
+#   GOVERNANCE_REFS_BREAK=names-ignored  lib-governance-refs.py 的 ④ 整条不判（不是门禁目录里的门禁、格名表里没有）
+#       governance-refs-green（输出里找不到「扫 3 份现状文字…」）；governance-refs-red（输出里找不到「.claude/agents/sample.md:7: 「门…」）
+#   GOVERNANCE_REFS_BREAK=fences-scanned  lib-governance-refs.py 把代码围栏里的行也当现状文字扫
+#       governance-refs-green（期望退出 0，实测 1）
+#   GOVERNANCE_REFS_BREAK=history-scanned  lib-governance-refs.py 把「## 历史版本」一节与变更史也扫
+#       governance-refs-green（期望退出 0，实测 1）；governance-refs-red（输出里找不到「扫 3 份现状文字…」）
+#   GOVERNANCE_REFS_BREAK=readme-skipped  lib-governance-refs.py 不把仓根 README.md 算进现状文字
+#       governance-refs-green（输出里找不到「扫 3 份现状文字…」）；governance-refs-red（输出里找不到「README.md:3: 用旧编号称呼门禁」）
+#   STAGE_CELLS_BREAK=red-swallowed  共用库：红格按绿记、整道退 0
+#       admission-terms-red、checks-owed-red、field-projection-red、field-refs-red、field-table-sums-red、first-txn-hooks-red、
+#       format-const-placeholders-red、governance-refs-red、references-red、references-unreadable-red、second-txn-hooks-red、segment-registry-red、
+#       tree-table-reserve-red（期望退出 1，实测 0）
+#   STAGE_CELLS_BREAK=check-ignored  共用库：点名选格不起作用（--check 与样本根的 .gate-cells 共用一段），照跑全部登记的格
+#       admission-terms-red、field-projection-red、field-refs-red、field-table-sums-red、first-txn-hooks-red、format-const-placeholders-red、
+#       second-txn-hooks-red、segment-registry-red、tree-table-reserve-red（输出里找不到「doc-registries.sh：1 格里 1 格红…」）；checks-owed-green、field-registry-green、
+#       governance-refs-green、references-green（期望退出 0，实测 1）；checks-owed-red（输出里找不到「doc-registries.sh：5 格里 5 格红…」）；
+#       references-red（输出里找不到「doc-registries.sh：7 格里 7 格红…」）；references-unreadable-red（输出里找不到「doc-registries.sh：2 格里 2 格红…」）
+#   LIB_CHANGED_PATHS_BREAK=untracked  research/scripts/changed-paths.sh 丢掉未跟踪文件：invariant-anchors 看不见未跟踪的清单
+#       references-red（输出里找不到「这次改动新写或改写的 1 行不变量，没有点名它判的字段住在哪…」）
 #
 #   bash .claude/gate.d/doc-registries.sh [项目根]                                   二十一格都跑
 #   bash .claude/gate.d/doc-registries.sh --list                                     逐行打格名与判什么，不跑格
@@ -103,8 +138,7 @@ OWED_LIBRARY="$STAGE_DIRECTORY/lib-owed.py"
 FORMAT_CONST_LIBRARY="$STAGE_DIRECTORY/lib-format-const.py"
 SEGMENT_REGISTRY_SCRIPT="$REPOSITORY/research/scripts/check-segment-registry.py"
 BREAK_SWITCH="${DOC_REGISTRIES_BREAK:-}"
-# gate.sh 与阶段之间的握手变量只留给共用库在汇总时写，不导出给各格起的子进程
-# （`.claude/singlefs-ai-sop/rules/command-safety.md`「进程边界上的三种静默失效」）
+# 握手变量只留给共用库在汇总时写，不导出给各格起的子进程（command-safety.md「进程边界上的三种静默失效」）
 export -n GATE_NOT_RUN_FILE 2>/dev/null || true
 source "$STAGE_DIRECTORY/lib/stage-cells.sh"
 
@@ -172,7 +206,6 @@ ROOT="${root_argument:-$REPOSITORY}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
-# ── 引用与不变量组七格共用的现场：kb 目录、放 grep 报错与 verify-citations.sh 输出的临时目录、判红记号与打印
 KB=.claude/kb
 work_directory="$(mktemp -d)" || { echo "  ✗ 建不了临时目录"; echo "     → 怎么办：看 \${TMPDIR:-/tmp} 能不能写、满没满；这一道什么都没判。"; exit 1; }
 trap 'rm -rf "${work_directory:?}"' EXIT
@@ -186,23 +219,11 @@ howto() { printf '     → 怎么办： %s\n' "$1"; shift; for l in "$@"; do pri
 # ════════════════ 字段与布局组的九格（字段与布局登记） ════════════════
 
 # ── 格 field-refs：新池新建文件的字段表，每个「指向」都指到一条真实存在的分项
-#
-# 判据：`kb/layout/01-first-txn.md` 每一行的「指向」列，凡是写了
-# 「D<n>（简称） 已定项 <k>」或「…… 未定项 <k>」的（简称可以不写，也可以套一层括号），那条分项必须在
-# `kb/decisions/` 那条决策「### 已定项」/「### 未定项」的索引里（第一个 `####` 之前）真实存在；指不到就判红。
-#
-# 那张表是 C66（格式级空白没有分项号）欠的东西，它的价值在于「每个字段都指得到一条分项」这个性质持续成立：
-# 分项会改号、会从未定项挪进已定项、会被合并，某一行指向的分项不存在了，读表的人看到的仍然是一个格式正确的编号。
-#
-# ⚠️ 它和「分项引用的状态与正文相符」（`doc-decisions.sh` 的格「分项引用状态」）不是一条：
-# 那一格判「说已定的是不是真已定」，前提是那条分项存在；这一格判分项存不存在。
-# 一个指向 `D22 已定项 99` 的字段，在 doc-decisions 的格「分项引用状态」眼里没有对象可比，会安静地通过。
-#
-# ⚠️ 写了「无分项」的行是合法的，那正是这张表要暴露的格式级空白，不判红。
-# 表或 decisions/ 不在、表里一处引用都没有：这一格无对象可判，退 77。
-#
-# 样本：field-refs-red 里一行指向 D322 已定项 7（索引里没有）、一行指向简称套了括号的 D323 已定项 3、
-# 一行指向 D322 已定项 5（只在论证的编号列表里出现，不是分项）；field-registry-green 里表格式与列表式两种索引、未定项与「无分项」都放行。
+# 判据：kb/layout/01-first-txn.md 每行「指向」列里的「D<n>（简称） 已定项 / 未定项 <k>」（简称可省，也可套一层括号），
+# 要在那条决策「### 已定项」/「### 未定项」的索引（第一个 #### 之前）里有那一行。
+# 「无分项」合法（这张表就是要把格式级空白摆出来）；表或 decisions/ 不在、一处引用都没有，退 77。
+# 样本：field-refs-red 指向索引里没有的 D322 已定项 7、简称套了括号的 D323 已定项 3、只在论证编号列表里出现的 D322 已定项 5；
+# field-registry-green 表格式与列表式两种索引、未定项与「无分项」都放行。
 cell_field_refs() {
   local KB=.claude/kb
   local TABLE="$KB/layout/01-first-txn.md"
@@ -211,12 +232,10 @@ cell_field_refs() {
 
   local bad=0 checked=0 lineno dnum kind item file section
 
-  # 抽出表里每一处「D<n>（…） 已定项 <k>」/「未定项 <k>」引用，连同行号
   while IFS=$'\t' read -r lineno dnum kind item; do
     [[ -z "${dnum:-}" ]] && continue
     checked=$((checked + 1))
 
-    # 找到那条决策的正文文件：文件名以两位编号打头
     file="$(ls "$KB/decisions/" 2>/dev/null | grep -E "^0*${dnum}-" | head -1)"
     if [[ -z "$file" ]]; then
       echo "  ✗ $TABLE:$lineno 指向 D$dnum，而 decisions/ 里没有这条决策"   # gate-lint:detail
@@ -224,10 +243,7 @@ cell_field_refs() {
       continue
     fi
 
-    # 那条分项要在对应小节的索引表里有一行，形如 `| <k> | …`
-    # 已定项与未定项各有一张表，取「### 已定项」/「### 未定项」之后到下一个任意级标题之前：
-    # 只看索引，`#### 已定项 N` 之下的论证里另有编号列表、「## 历史版本」里另有表格，那些不是分项
-    # （与 doc-decisions 的格「kb 形状」第 5 段、格「状态别说两遍」同一条边界）
+    # 只看「### 已定项」/「### 未定项」之后到下一个任意级标题之前的索引：`#### 已定项 N` 之下的论证与「## 历史版本」里另有编号列表和表格，那些不是分项
     section="$(awk -v want="$kind" '
       /^### 已定项[[:space:]]*$/ { cur="已定项"; next }
       /^### 未定项[[:space:]]*$/ { cur="未定项"; next }
@@ -235,8 +251,7 @@ cell_field_refs() {
       cur == want { print }
     ' "$KB/decisions/$file")"
 
-    # 分项行有两种写法：表格行 `| k | …`（D18 / D22 一类），
-    # 或编号列表 `k. **…**`（D16 / D19 / D23 一类）。两种都认。
+    # 分项行认表格行 `| k | …` 与编号列表 `k. **…**` 两种写法
     if ! grep -qE "^(\| *${item} *\||${item}\. )" <<<"$section"; then
       echo "  ✗ $TABLE:$lineno 指向 D$dnum（$file）的「$kind $item」，而那张表里没有这一条"   # gate-lint:detail
       bad=$((bad + 1))
@@ -276,25 +291,15 @@ cell_field_refs() {
 }
 
 # ── 格 field-projection：决策里定的字段有没有漏投影进新池新建文件的表
-#
-# field-refs 那一格查的是正向：[layout/01-first-txn.md] 表里每个字段都指得到一条真实分项。
-# 这一格查反向：一条分项的字段表里新加了一行，而投影表没跟着加。
-#
-# ⚠️ 这条是实测出来的（2026-09-07）：D8（核心索引结构）已定项 8 ② 于 2026-09-06 把
-# 树 ID 水位 8 字节加进根记录（D22 已定项 7 的字段表当天就加了这一行，合计 186 → 194），
-# 而 [layout/01-first-txn.md] 第七节「发布（根记录与根槽）」那张表一个字没动，正向检查全程判绿。
-#
-# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
-#   1. 只认表头恰好是 `| 字段 | 宽 |` 或 `| 字段 | 宽度 |` 的表。散在段落里的字段定义抓不到。
-#   2. 只检查已经被投影过的分项——[layout/01-first-txn.md] 里出现过 `D<n>（简称） 已定项 <k>` 的那些。
-#      不是每条分项都属于新池新建文件（口径见 [layout/01-first-txn.md] 开头：不含快照、加密、目录树），
-#      对没被投影的分项要求投影会假红。代价是：一条从头到尾就没进过投影表的分项，这一格一个字也不说。
-#   3. 字段名按子串比对，只判「在不在」，不判宽度值对不对（宽度归 code-source-discipline 与 C94）。
-#      比对范围是投影表里引用了这条分项的那几节（按 `## ` 标题切）里的表格行：字段名只在别的节、或只在正文段落里出现，不算投影了。
-#   一张被投影的字段表都没核到：无对象可判，退 77（不记通过）。
-#
-# 样本：field-projection-red 里 D362 已定项 7 的字段表有三行，投影表只收了 magic，「块头版本」只在别的节的正文里提了一句；
-# field-registry-green 里被投影的两行都在引用了那条分项的那一节的表里。
+# field-refs 判正向（投影表每个字段指得到分项），这一格判反向：分项的字段表新加了一行，投影表没跟着加。
+# 射程：
+#   1. 只认表头恰好是 `| 字段 | 宽 |` 或 `| 字段 | 宽度 |` 的表，散在段落里的字段定义抓不到。
+#   2. 只查 layout/01-first-txn.md 里引过（`D<n>（简称） 已定项 <k>`）的分项：新池新建文件不含快照、加密、目录树，
+#      对没投影的分项要求投影会假红；代价是从没进过投影表的分项，这一格一个字也不说。
+#   3. 字段名按子串比，只判在不在，不判宽度（宽度归 code-source-discipline 与 C94（登记的格式常量与后来的定案对不上））。
+#   一张被投影的字段表都没核到，退 77。
+# 样本：field-projection-red 里 D362 已定项 7 的字段表三行，投影表只收了 magic，「块头版本」只在别的节的正文里提了一句；
+# field-registry-green 里被投影的两行都在引了那条分项的那一节的表里。
 cell_field_projection() {
   local FTL=.claude/kb/layout/01-first-txn.md
   [[ -f "$FTL" && -d .claude/kb/decisions ]] || { echo "  ! 找不到 $FTL 或 decisions/，这一格无对象可判"; exit 77; }
@@ -305,12 +310,10 @@ import re, sys, glob, os
 ftl_path = sys.argv[1]
 ftl = open(ftl_path, encoding="utf-8").read().split("\n## 历史版本")[0]
 
-# 投影表引用过哪些分项：D<n>（任意简称） 已定项 <k>
 REFERENCE = r"D(\d+)（[^）]*）\s*已定项\s*(\d+)"
 refs = {(int(a), int(b)) for a, b in re.findall(REFERENCE, ftl)}
 
-# 按 `## ` 切节：每节记下它引用了哪些分项、它的表格行。字段名要落在引用了那条分项的节的表格行里，
-# 在整份文件里按子串找会让别的节的正文顶替（「树 ID 水位」在别处提过一句，那一节的表里却没有这一行）
+# 字段名要落在引了那条分项的节（按 `## ` 切）的表格行里：整份文件按子串找，会让别的节的正文顶替（「树 ID 水位」在别处提过一句，那一节的表里却没有）
 sections = []
 for chunk in re.split(r"(?m)^(?=## )", ftl):
     chunk_refs = {(int(a), int(b)) for a, b in re.findall(REFERENCE, chunk)}
@@ -367,51 +370,24 @@ PY
 }
 
 # ── 格 field-table-sums：字段表加出来的数（表后合计、表前说明句、format-const 标记）与字节布局表里结构总宽的登记
-#
-# C94（登记的格式常量与后来的定案对不上）逐字要的两条：
-# 「每个 `format-const` 标记的值，与同一份正文里点名同一个量的全部已定增量之和相等，不等即判红」；
-# 「[layout/01-first-txn.md] 表里每个已定宽度都有登记标记，缺即判红」。
-# 这一格落的是它们能机械判的那几样：字段表紧跟着的「合计 N 字节」、表前说明句里的总宽与增量、
-# 一个分项里唯一的那个标记，以及字节布局表里写成认得出的形态的结构总宽（射程第 7、8 条）。
-#
-# ⚠️ 这条是实测出来的（2026-09-07）：D22（单元原子性怎么合成）已定项 7 的根记录字段表
-# 2026-09-06 加了「树 ID 水位 8」，正文的合计跟着改成 194，而同文件索引表那一行还写着「合计 186」。
-#
-# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
-#   1. 只认表头里「字段」一列紧跟着「宽」或「宽度」一列的表（前面可以有「段」这类列：
-#      字节布局表的系统配置字段表就是 `| 段 | 字段 | 宽 |`），表后合计要在表后 3 行内、写成「合计 N 字节」或「合计 **N** 字节」。
-#   2. 宽度格按整数或只含 ×、+、− 的整数算式读（「8 × 3」「12 + 16 + 1」）；表里只要有一行读不出来
-#      （「未定」「随实现定」「—」），整张表跳过并计入跳过数：加不出确定的和时判红只会是假红。
+# 落的是 C94（登记的格式常量与后来的定案对不上）里能机械判的那几样。射程：
+#   1. 只认表头里「字段」列紧跟「宽」或「宽度」列的表（前面可以有「段」这类列）；表后合计在表后 3 行内，写成「合计 N 字节」或「合计 **N** 字节」。
+#   2. 宽度格按整数或只含 ×、+、− 的整数算式读；有一行读不出（「未定」「随实现定」「—」），整张表跳过并计入跳过数：加不出确定的和时判红只会是假红。
 #   3. 只判总宽与各行之和、标记与分项之和、布局里的总宽有没有登记；各行宽度本身对不对不判。
-#   4. 一条「已定项 N」里恰好一个 `format-const` 标记时，标记值要等于该分项下
-#      全部字段表之和（`DATA_UNIT_HEADER_BYTES = 105` 对着 D18 已定项 7 那两张表 42 + 63）。一个分项里
-#      有多个标记时无从对应，跳过并报出——跳过的那些这一格一个字也没验。只有一个标记、而这一节的字段表
-#      有宽度不是数的行或根本加不出和的，同样进跳过清单点名，不静默放过。
-#   5. 扫两处的正文（「## 历史版本」之前）：`.claude/kb/decisions/*.md` 与 `.claude/kb/layout/*.md`。
-#   6. 标记按 `lib-format-const.py` 读（code-source-discipline、checker-independence-and-sync 用的是同一份）：以 `<!-- format-const` 开头而按文法读不出来的、
-#      同一份文件里同一个名字登记了不止一次的，判红——前者会让「一个分项里恰好一个标记」数错，
-#      后者两个值里哪个算数这一格说不清。
-#   7. 表前说明句：表头之前最多 3 行非空行里、以 `**` 起头的标题行（D18（块里携带什么信息） 已定项 7 那两张表的
-#      「**类身份段——数据单元（+63 字节 ⇒ 共 105 字节初值）**：」）。认两种写法：
-#      增量式「+M 字节 ⇒ 共 N 字节」判 M = 这张表之和、N = 这一小节（上一个标题起）到这张表为止全部字段表之和；
-#      绝对式「合计 / 共 N 字节」「N 字节初值」「（N 字节，」「定长 N」判 N = 这张表之和。增量式认上了就不再按绝对式判。
-#      不是 `**` 起头的普通段落不认：「记录定长 140」说的多半不是紧跟着的那张表。
-#   8. 字节布局表（`.claude/kb/layout/*.md`）里的结构总宽要有登记。「结构总宽」只认三种写法：
-#      ① 非表格行的「合计 N 字节」；② 以 ⇒ 起头的行里、紧挨着一个求和等式的加粗整数（「**88** = 头部 50 + …」
-#      「24 + 88 = **112**」；等式那一侧去掉括注后要有 +，只有 × 的「6 × 55 = **330**」是条数乘宽、不算）；
-#      ③ 带「状态」列的表里、状态以「已定」开头的行、宽度格里加粗的整数。
-#      登记 = 同一行（①还可以是它那张表的说明句）里有值等于 N 的 `<!-- format-const: 名字 = N -->`，
-#      或有「`format-const: 名字`」引用、而那个名字在 kb 正文里登记的值等于 N。缺即判红。
-#      ⚠️ 认不出的写法（不加粗的总宽、「107 + 29」这种算式格、各字段自己的宽度）这一格一个字也不说；
-#      成功那句报出认出了几处，认出 0 处不是「都登记了」。表后合计、表前说明句、标记、结构总宽四样一处都没认出：
-#      无对象可判，退 77（不记通过）。表前表后都没写认得出的总宽的表，成功行下面逐个列表头行。
-#
-# 样本：field-table-sums-red 放一张合计写错的决策字段表、一个与表和对不上的标记、
-# 一张合计写错的布局字段表、一条多写了键的标记与一个同一份文件里登记两次的名字；C94 要的「登记 78 而正文写着
-# 两笔增量共 13 字节」（367-样例）；三句写错的表前说明句（369-样例：绝对式、增量、累计各一句）；
-# 以及布局里没登记的三种结构总宽、引用了值不对的名字与没登记的名字、`| 段 | 字段 | 宽 |` 带乘式的表合计写错（02-样例），
-# 必须判红。field-registry-green 放同一个增量样本而登记值改成 91（368-样例）、三种写法各一处登记好的总宽、
-# 未定行里的加粗宽度与只有 × 的等式（不算），必须判绿。
+#   4. 一条「已定项 N」里恰好一个 format-const 标记时，标记值要等于该分项下全部字段表之和；有多个标记时无从对应，跳过并报出。
+#   5. 扫 .claude/kb/decisions/*.md 与 .claude/kb/layout/*.md 的正文（「## 历史版本」之前）。
+#   6. 标记按 lib-format-const.py 读；以 `<!-- format-const` 开头而读不出的、同一份文件里同一个名字登记了不止一次的，判红。
+#   7. 表前说明句只认表头前最多 3 行非空行里以 `**` 起头的标题行。增量式「+M 字节 ⇒ 共 N 字节」判 M = 这张表之和、
+#      N = 这一小节（上一个标题起）到这张表为止全部字段表之和；绝对式「合计 / 共 N 字节」「N 字节初值」「（N 字节，」「定长 N」判 N = 这张表之和。
+#   8. 字节布局表（.claude/kb/layout/*.md）的结构总宽只认三种写法：① 非表格行的「合计 N 字节」；② 以 ⇒ 起头的行里紧挨求和等式的加粗整数
+#      （等式那一侧去掉括注后要有 +，只有 × 的「6 × 55 = **330**」是条数乘宽、不算）；③ 带「状态」列的表里状态以「已定」开头的行、宽度格里加粗的整数。
+#      登记 = 同一行（① 还可以是它那张表的说明句）里有值等于 N 的 `<!-- format-const: 名字 = N -->`，或有「`format-const: 名字`」引用、
+#      而那个名字在 kb 正文里登记的值等于 N；缺即判红。认不出的写法这一格一个字也不说，成功那句报认出了几处。
+#   四样一处都没认出，退 77；表前表后都没写认得出的总宽的表，成功行下面逐个列表头行。
+# 样本：field-table-sums-red 放合计写错的决策表与布局表、与表和对不上的标记、多写了键的标记、同一份文件登记两次的名字、
+# 登记 78 而正文两笔增量共 13 字节（367-样例）、三句写错的表前说明句（369-样例）、布局里没登记的三种结构总宽、引用值不对与没登记的名字、
+# `| 段 | 字段 | 宽 |` 带乘式的表合计写错（02-样例），判红；field-registry-green 放同一个增量样本而登记值改成 91（368-样例）、
+# 三种写法各一处登记好的总宽、未定行里的加粗宽度与只有 × 的等式（不算），判绿。
 cell_field_table_sums() {
   [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 decisions/，这一格无对象可判"; exit 77; }
 
@@ -425,7 +401,7 @@ library_spec.loader.exec_module(format_const)
 SUM = re.compile(r"合计\s*\**\s*(\d+)\s*\**\s*字节")
 HEAD = re.compile(r"^#{2,6}\s")
 ITEM = re.compile(r"^#{3,6}\s*已定项\s*(\d+)")
-# 表前说明句的写法（射程第 7 条）。增量式先认，认上了就不再按绝对式判同一句。
+# 表前说明句（射程第 7 条）：增量式先认，认上了就不再按绝对式判同一句
 CAPTION_INCREMENT = re.compile(r"\+\s*(\d+)\s*字节\s*⇒\s*共\s*\**\s*(\d+)\s*\**\s*字节")
 CAPTION_ABSOLUTE_FORMS = (
     re.compile(r"(?:合计|共)\s*\**\s*(\d+)\s*\**\s*字节"),
@@ -647,8 +623,6 @@ for kb_path in decision_paths + layout_paths:
             section_ok = False
         else:
             section_sum += table_sum
-        # 表前说明句只认加粗起头的标题行（「**类身份段——数据单元（+63 字节 ⇒ 共 105 字节）**：」）：
-        # 普通段落里的「记录定长 140」说的多半不是紧跟着的这张表
         caption_text = format_const.strip_marks(" ".join(lines[index] for index in caption
                                                          if lines[index].lstrip().startswith("**")))
         caption_judged = False
@@ -757,30 +731,16 @@ PY
 }
 
 # ── 格 first-txn-hooks：新池新建文件的三份文件互相挂钩（字节表 / 里程碑 / 决策索引）
-#
-# 三份文件说的是同一件事的三面：
-#   decisions/*.md 里每条未定项判过「改新池新建文件的字节：是 / 否」（`doc-decisions.sh` 的 blocking-verdict 格管「判过没有」）；
-#   layout/01-first-txn.md 把新池新建文件的每个字节列成表，判「是」的未定项在它的「还剩几处空白」表里各占一行；
-#   milestone/01-first-txn.md 把写这些字节的活拆成步，每步写「写出的字节」在字节表哪几节、「会碰到的决策点」有哪些。
-#
-# 它拦的是三面对不上（2026-09-10 实测三处）：字节表的空白表里躺着一条已定案的分项（D8 已定项 7）、
-# 判「是」的 D2 未定项 15 与 D19 未定项 8 在字节表与里程碑里一处都没有、
-# 里程碑说「六个根槽」而字节表按已定项 8 只有三份。三处当时门禁全绿——没有任何阶段同时看两份文件。
-#
-# 判据（每条都报绝对数，扫到 0 也报出来）：
+# 三份说的是同一件事：decisions/*.md 的每条未定项判过「改新池新建文件的字节：是 / 否」；layout/01-first-txn.md 列出每个字节，
+# 判「是」的未定项在它的「还剩几处空白」表里各占一行；milestone/01-first-txn.md 把写这些字节的活拆成步，每步写「写出的字节」在哪几节、「会碰到的决策点」。
+# 判据（每条都报绝对数，扫到 0 也报）：
 #   1. 判「是」且仍未定的每一条 `D<n> 未定项 <k>`，字节表与里程碑各至少引一次。
 #   2. 字节表「还剩几处空白」表里引到的未定项，必须都在第 1 条那个集合里（定了就要从表里拿走）。
 #   3. 字节表每一节（历史版本与空白表除外）标题下紧跟一行 `**里程碑**：… 步 N`，N 是里程碑里存在的 `## 步 N`。
 #   4. 里程碑每个 `## 步 N` 有一行 `**写出的字节**：`，要么写「无」，要么点名字节表里存在的节标题（「…」引起来的那段）：
-#      引起来的那段要与某一节的标题逐字相同，只许省掉标题末尾那一段全角括注（「七、发布」认「七、发布（根记录与根槽）」）；
-#      只是标题的一截（「根」「发布」）不算点名。被字节表某节标成归属的步，不许写「无」。
-#
-# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
-#   只认「改新池新建文件的字节：**是**（日期…」这一种写法（doc-decisions 的 blocking-verdict 格定的规范形态，括号是判据的一部分）；
-#   判定写在未定项小节之外的散文抓不到，转述别的分项判过「是」的引号句不算。
-#   判「是」的未定项、字节表的节、里程碑的步三样一个都没有时，什么都没比，退 77（本次无对象可判），不报绿。
-#   引用形态只认 `D<n>（简称） 未定项 <k>`，与 field-refs 那一格同一形态。不判引用处说的内容对不对。
-#
+#      要与某一节的标题逐字相同，只许省掉标题末尾那一段全角括注；只是标题的一截不算点名。被字节表某节标成归属的步，不许写「无」。
+# 射程：只认「改新池新建文件的字节：**是**（日期…」这一种写法（括号是判据的一部分），写在未定项小节之外的散文抓不到；
+#   引用形态只认 `D<n>（简称） 未定项 <k>`，不判引用处说的内容对不对。判「是」的未定项、字节表的节、里程碑的步三样一个都没有，退 77。
 # 样本：first-txn-hooks-red 里判「是」的 D401 未定项 1 里程碑没引、空白表引着判「否」的未定项 2、一节没标步号、
 # 被标成归属的步 1 写「无」、步 2 只点了标题的一截；field-registry-green 里三面都对得上。
 cell_first_txn_hooks() {
@@ -796,7 +756,7 @@ ftl_path, ms_path, dec_dir = sys.argv[1:4]
 ftl = open(ftl_path, encoding="utf-8").read().split("\n## 历史版本")[0]
 ms = open(ms_path, encoding="utf-8").read().split("\n## 历史版本")[0]
 REF = re.compile(r"D(\d+)（[^）]*）\s*未定项\s*(\d+)")
-# 只认带日期括号的规范形态；「……判过「改新池新建文件的字节：是」」这种转述引用不算（D26 未定项 5 实测误判）
+# 只认带日期括号的规范形态；「……判过「改新池新建文件的字节：是」」这种转述引用不算
 YES = re.compile(r"改新池新建文件的字节：\**是\**（")
 
 # 1. 判「是」且仍未定的分项集合
@@ -897,30 +857,18 @@ PY
 }
 
 # ── 格 admission-terms：准入不等式的每一项都有人维护（统计量，或写明的例外）
-#
-# 判据（2026-09-13 用户定案，登记在 D5（快照 / 空间记账机制） 已定项 4）：
-# 「式子里出现的每一项都必须是被维护的统计量，如果无法做到就写上例外是谁」。
-#
-# 做法：
+# 判据在 D5（快照 / 空间记账机制） 已定项 4：式子里出现的每一项都是被维护的统计量，做不到就写明例外是谁。
 #   1. 式子的权威正文前面有一行 `<!-- gate:admission-formula -->`，全仓只许一处；取它下面第一个代码块里 `可用 =` 那一行，
 #      按 `−` 拆成项（去掉 `Σ设备(` 与括号）。
 #   2. 对照表前面有一行 `<!-- gate:admission-terms -->`，全仓只许一处；取它下面第一张表的两列。
-#   3. 两边的项必须逐一相等——式子加了一项而对照表没加、或对照表多出一项，都判红。
+#   3. 两边的项逐一相等：式子多一项或对照表多一项，都判红。
 #   4. 对照表每一行的右列要么是「第 N 项（名字）」，N 在同一文件那张 `| # | 统计量 |` 表里、名字逐字相等、且不是已撤回的编号；
 #      要么以 `**例外**：` 开头并写出理由（不少于 8 个字）。
 #   5. `decisions/` 下凡是写着 `可用 = Σ设备` 的地方（索引行、挪走后留的指针），去掉空白与反引号之后必须与权威那一行逐字相等：
 #      副本在反引号里的，取到收尾那个反引号；在表格行里、没有反引号的，取到那一格的竖线；都不是的取到行尾（末尾的句号、分号不算）。
-#      多出一项、少一项都判红，不是只比开头。
-#   两个锚不是各恰好一处（含一处都没有）判红，不退 77：锚没了就是式子与对照表脱了钩。decisions/ 不在时无对象可判，退 77。
-#
-# ⚠️ 这条是实测出来的：2026-09-13 立 D28（挂载期承诺量） 时往式子里加了第五项「挂载期承诺量」，
-# 而 D5（快照 / 空间记账机制） 已定项 4 的完备性口径逐字是「式子里出现的每一项都必须是被维护的统计量」——
-# 新项只住内存、不是统计量，那句话当场为假；同一轮回头看，式子里的「容量」也从来不是统计量，没有任何东西发现过。
-#
-# 射程（`.claude/singlefs-ai-sop/rules/show-me-test.md`「没实现的要明说」）：
-#   只判「每一项都有归属、归属指得到」，不判归属对不对（某一项该不该是统计量、例外的理由成不成立，靠人）；
-#   不判统计量表里多出来的项（那一半是「没出现在任何判定里的就不要」，判定不止准入一处，机器列不全）。
-#
+#   两个锚不是各恰好一处（含一处都没有）判红、不退 77：锚没了就是式子与对照表脱了钩。decisions/ 不在，退 77。
+# 射程：只判每一项有归属、归属指得到，不判归属对不对（该不该是统计量、例外的理由成不成立，靠人）；
+#   不判统计量表里多出来的项（判定不止准入一处，机器列不全）。
 # 样本：admission-terms-red 的式子多了「挂载期承诺量」而对照表没有、副本在权威那一行后面多写一项；field-registry-green 三项各有归属、副本逐字一致。
 cell_admission_terms() {
   [[ -d .claude/kb/decisions ]] || { echo "  ! 找不到 .claude/kb/decisions/，这一格无对象可判"; exit 77; }
@@ -1072,31 +1020,14 @@ PY
 }
 
 # ── 格 segment-registry：段序列登记表与 E142 产物逐字比对
-#
-# 判据（C316（提交步骤的登记位有四处且互不相同） 欠账的第①半）：
-#   .claude/kb/layout/01-first-txn.md 「八、根槽写路径的段序列登记表」里每一行的段序列数字串
-#   （`4+1+1+1+2` 这种）都是人从 E142（新池新建文件的干跑） 产物里抄过来的——抄错一位，
-#   或者产物重跑之后表没跟着改，此前没有任何东西会报警。
-#
-# 做法：转发给 research/scripts/check-segment-registry.py，逻辑不写第二份
-#   （表怎么解析、path 怎么从「出处」栏原样抠出来、第四条产物路径怎么按排除法认领，
-#   都写在那个脚本自己的文档字符串与注释里）。它的退出码 1（对不上）与 2（结构认不出、文件不在）这一格都记红。
-#
-# 该脚本自己的 --selftest（改坏拷贝里的一个段序列数字，确认判红；未改动的拷贝确认判绿）
-# 由 code-tooling 阶段（三方论证 research 脚本的自证）复跑，这里不重复跑一遍。
-#
-# ⚠️ 脚本按这一道阶段自己的位置取仓里的那一份（$SEGMENT_REGISTRY_SCRIPT），不按 cwd 取；`--root` 指被判的仓。
-#   判别力样本会把 cwd 换成样本目录，按 cwd 取就成了样本里那份拷贝：仓里的脚本退化了（例如 main() 不再传退出码），
-#   样本照样判对，这一格与 code-tooling 的 --selftest 一起放过（三方判决 research/prompts/gate-fix-forks-r1-main-verification.md 的 T6）。
-#   同一个坑见 `doc-decisions.sh` 里 blocking-verdict 那一格的注释。脚本随仓走，不在就是被删了或挪了——退 1 不退 77，与 checker-tier-lkmm、code-tooling、harness-test-environment、这一道的 citations 那一格同一条
-#   （三方判决 gate-fix-forks-r1 的 T7）。
-#
-# 样本：segment-registry-red 只放脚本读的三样合成输入——layout 表的「八、」一节（十行表、一句 path 声明、
-#   一句整条流）、replay.sh 里 E142 那一行、产物里几行 name=segments。十行各埋一种错（段序列、种类、操作数、状态数、
-#   产物里没有这条 path、没写段序列、产物这一行没有 kinds、钉住的用例文件不在、用例里没有那个函数、出处既无 path 也无用例），
-#   另把整条流的状态数写错、第二条流的写数与数组与用例里的状态数各错一处，脚本每条逐行比对的分支都有一处会红，逐条点名；
-#   field-registry-green 一致，判绿（三方判决 gate-fix-forks-r3 的 T6）。「声明的 path 集合剩不下恰好一条」走退 2 那一支，放不进这份红样本，没有样本格。
-#   钉活代码的那几句与真产物的解析由脚本自己的 --selftest（code-tooling 跑）拿真文件测，样本不再测一遍。
+# 落的是 C316（提交步骤的登记位有四处且互不相同） 的第①半：layout/01-first-txn.md「八、」登记表的段序列是人从 E142 产物里抄的。
+# 转发给 research/scripts/check-segment-registry.py，判法不写第二份（在它的文档字符串里）；它退 1（对不上）与 2（结构认不出、文件不在）都记红。
+# 它的 --selftest 由 code-tooling 跑，这里不重复跑。
+# 脚本按本阶段自己的位置取（$SEGMENT_REGISTRY_SCRIPT），不按 cwd 取，`--root` 指被判的仓：样本会把 cwd 换成样本目录，
+#   按 cwd 取到的是样本里的拷贝，仓里的脚本退化了样本照样判对。脚本不在退 1 不退 77：它随仓走，不在就是被删了或挪了。
+# 样本：segment-registry-red 只放脚本读的三样合成输入（layout 表的「八、」一节、replay.sh 里 E142 那一行、产物里几行 name=segments），
+#   十行各埋一种错，另把整条流的状态数、第二条流的写数与数组与用例里的状态数各错一处，脚本每条逐行比对的分支都有一处会红，逐条点名；
+#   field-registry-green 一致，判绿。「声明的 path 集合剩不下恰好一条」走退 2 那一支，放不进红样本；真产物的解析由脚本自己的 --selftest 测。
 cell_segment_registry() {
   if [[ ! -f "$SEGMENT_REGISTRY_SCRIPT" ]]; then
     echo "  ✗ 找不到 $SEGMENT_REGISTRY_SCRIPT"
@@ -1107,17 +1038,12 @@ cell_segment_registry() {
 }
 
 # ── 格 format-const-placeholders：格式常量文件里的占位，每个都指得到一条真实存在的分项或欠账
-#
-# 里程碑「新池新建文件」步 0 要求：一个格式常量文件，新池新建文件要写的每个宽度都在里面，
-# 占位的常量带占位标记与分项号；门禁数出常量文件里还有几个占位，每个占位都指得到分项号，指不到判红。
-# 占位的写法（crates/singlefs-format/src/*.rs）：常量前一行
+# 占位的写法（crates/singlefs-format/src/*.rs，常量前一行；`/// placeholder:`、`//! placeholder:` 一样认）：
 #   // placeholder: D22（单元原子性怎么合成） 已定项 2 —— 为什么还是预想
 #   // placeholder: C323（镜像大小全仓没有条款） —— 为什么还是预想
-# 文档注释写法（`/// placeholder:`、`//! placeholder:`）一样认作占位，一样要指得到。
 # 判据：编号带简称；D<n> 的分项号在 .claude/kb/decisions/<n>-*.md 的「### 已定项 / ### 未定项」两张表里能找到那一行，
-# C<n> 在 .claude/kb/checks-owed.md 里有登记行；简称与登记位一致由 doc-lint 管，这里只核编号与分项号。
-# 成功那句报出检查了多少个占位；没有常量目录、或一个占位都没有时退 77（本次无对象可判），不报绿。
-#
+# C<n> 在 .claude/kb/checks-owed.md 里有登记行；简称与登记位一致归 doc-lint，这里只核编号与分项号。
+# 没有常量目录、或一个占位都没有，退 77。
 # 样本：format-const-placeholders-red 里一个占位指已定项 99、一个把只在已定项表里的第 2 行写成未定项、一个没写编号、
 # 一个文档注释写法的指到不存在的 D99；field-registry-green 里一个 D 占位、一个 C 占位都指得到。
 cell_format_const_placeholders() {
@@ -1171,12 +1097,10 @@ PY
 }
 
 # ── 格 second-txn-hooks：覆盖写、释放、回退与复用的三处互相挂钩
-#
 # 里程碑「覆盖写、释放、回退与复用」的字节登记在三处：`layout/02-second-txn.md` 那张表登记第一次出现的盘上形态，
 # 每行指里程碑的一步与钉住它的用例；里程碑每步的「**写出的字节**：」点名 layout/01 的节与 layout/02 的行；
 # `layout/01-first-txn.md`「八、根槽写路径的段序列登记表」的行标「里程碑「覆盖写、释放、回退与复用」步 N」。
-# first-txn-hooks 那一格只管新池新建文件那三份（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 31 行）。
-#
+# 新池新建文件那三份归 first-txn-hooks。
 # 判据（每条都报绝对数）：
 #   0. layout/02 表每一行都要六格（形态 / 第一次出现在哪次发布 / 写成什么 / 决策分项 / 里程碑那一步 / 钉住它的用例），少一格判红，不静默丢掉。
 #   1. layout/02 表每一行「里程碑那一步」点名的步 N 在里程碑里存在，且步 N 的「写出的字节」行用「」点名了这一行的形态
@@ -1185,10 +1109,7 @@ PY
 #      （同样只许对得上一行）；点名 layout/02 某一行的步 N，那一行的「里程碑那一步」里要有步 N。
 #   3. layout/02 表「钉住它的用例」里反引号的 `*.rs` 在 `crates/*/tests/` 下存在，反引号的函数名在同一格点名的文件里有 `fn 名字`。
 #   4. 步 N 的「写出的字节」点名了 layout/01 的「八、」那一节，当且仅当「八、」那张表有一行写「里程碑「覆盖写、释放、回退与复用」步 N」。
-#
-# 射程：只认「」引起来的点名与反引号里的用例名；点名的内容与字节对不对，这里不判（字节由用例与层 0 钉）。
-# 三份文件缺一份：这一格无对象可判，退 77。
-#
+# 射程：只认「」引起来的点名与反引号里的用例名；点名的内容与字节对不对，这里不判（字节由用例与层 0 钉）。三份文件缺一份，退 77。
 # 样本：second-txn-hooks-red 里一行指的步没点名它、一步点名了不存在的节、用例文件不在、用例函数改了名、
 # 「八、」表标着的步没点名那一节、点名「八、」的步表里没有、一行只有四格、点名写成两行的共同前缀；field-registry-green 三处互相点名。
 cell_second_txn_hooks() {
@@ -1324,12 +1245,7 @@ PY
 }
 
 # ── 格 tree-table-reserve：树表条目预留字节的认购合计（认购不许超过预留，每条要指得到一个编号）
-#
-# C338（树表条目预留没有余量）欠的那一半：认购表立成正文之后，要有一道算和的检查。
-# 2026-09-22 立表时当场抓到一处：正文列的是 8 + 8 + 8 + 16 + 8 = 48，而它自己写「共 56」——
-# 那个 8 是 C143（inode 号水位在回退后会退回去重发）2026-09-16 定案「水位照旧住记账」之前的旧账，
-# 定案之后没人回来改合计。靠人算迟早再漂，所以这个数由这一格来算。
-#
+# 补的是 C338（树表条目预留没有余量）要的算和检查：合计靠人算会漂。
 # 表的形态（.claude/kb/decisions/08-核心索引结构.md 已定项 11）：
 #   <!-- gate:tree-table-reserve total=76 -->
 #   | 认购者 | 住哪条条目 | 宽度 | 出处 |
@@ -1337,11 +1253,8 @@ PY
 #   | … | 头条目 | 8 | C271（…） |
 # 判据三条：① 宽度列全是正整数；② 合计不超过标记里的 total；③ 每行「出处」要带一个编号
 #（C<n> 在 .claude/kb/checks-owed.md 有登记行，D<n> 在 .claude/kb/decisions/<n>-*.md 存在）。
-# 带标记的表不是恰好一张（含一张都没有）判红；认购行不足四格（少了宽度或出处）判红，不静默丢掉；
-# 标记下面一条认购都没有，本次无对象可判，退 77。
+# 带标记的表不是恰好一张（含一张都没有）判红；认购行不足四格（少了宽度或出处）判红，不静默丢掉；标记下面一条认购都没有，退 77。
 # 内嵌 python 的退出码要取，而且必须报出 CHECKED 那一行：它崩了（例如读不到 checks-owed.md）时不许走绿。
-# 成功那句报出检查了几条认购、合计多少、余多少。
-#
 # 样本：tree-table-reserve-red 里认购合计 88 超过预留 76、一行只有三格；field-registry-green 三条认购合计 32、余 44。
 cell_tree_table_reserve() {
   local report python_rc
@@ -1437,32 +1350,13 @@ PY
 # ════════════════ 欠账与收口组的五格（欠账表与里程碑收口表） ════════════════
 
 # ── 格 table-shape：欠账表两张登记表的行形状（已还清那张不许混进六列的欠账行，欠着那张不许留写着已还的行）
-#
-# 判据：`.claude/kb/checks-owed.md` 有两张登记表——欠着的那张六列
-# （编号 / 简称 / 要拦什么 / 怎么拦 / 前置 / 出处），「### 已还清」那张四列
-# （编号 / 简称 / 怎么还的 / 还清日期）。一行的格数与它所在那张表的表头对不上就判红；
-# 欠着的那张里，一行有哪一格（第 3 列起）开头写着
-# 「已还」而后面不是「一半 / 这一半 / 大半」、或开头写着「销账」「作废」（三个词前面带 ⚠️ 与日期都算），也判红——还清了就挪走，
-# 只还了一部分就把开头写成还欠什么（「已还一半」「决策已定、检查仍欠」「前置已还」）。
+# 判据：`.claude/kb/checks-owed.md` 有两张登记表——欠着的那张六列（编号 / 简称 / 要拦什么 / 怎么拦 / 前置 / 出处），
+# 「### 已还清」那张四列（编号 / 简称 / 怎么还的 / 还清日期）。一行的格数与它所在那张表的表头对不上，判红；
+# 欠着的那张里，一行有哪一格（第 3 列起）开头写着「已还」而后面不是「一半 / 这一半 / 大半」、或开头写着「销账」「作废」
+# （前面带 ⚠️ 与日期都算），也判红：还清了就挪走，只还了一部分就把开头写成还欠什么（「已还一半」「决策已定、检查仍欠」「前置已还」）。
+# 编号行前面没有表头（被空行从上一张表断开）判红。
 # 只看紧挨着 `doc-lint:registry` 标记的表，历史版本里别的表不管；带编号行而没判的表，成功行逐张列出（现算）。
-# 「同一个编号在两张表里各登记一次」不在这一格判：两张表都挨着 `doc-lint:registry` 标记，每一行都是 kb 的登记位，
-# 上游 doc-lint 的 F（一个编号只许有一处登记位）逐个编号判它；编号后面接全角空格的那一行 doc-lint 登记不上，
-# 由它的 G 报成裸引用（门禁收缩判决 research/prompts/gate-shrink-r1-main-verification.md 3-B3，攻方 M7 V3）。
-#
-# ⚠️ 实测（2026-09-11）：C248–C273 这 26 行全是六列的欠账行，却一行接一行追加在
-# 「已还清」那张四列表的末尾——几个会话往文件末尾追加时都没看它落在哪张表下面。
-# 于是一条没还的欠账（C266、C272）按小节检索时挂在「已还清」标题下，
-# 渲染时多出来的两格被截掉，而此前没有任何一道检查看这件事。
-#
-# ⚠️ 实测（2026-09-19）：反过来的形态。C273（小节清单不认一级标题） 2026-09-11 就还清了
-# （自检接进门禁 code-tooling），行首写着「已还（2026-09-11……）」却一直留在欠着的那张表里，
-# 门禁 doc-registries 照样把它算进「欠检查 N 条」；同一张表里另有九行开头写「已还（…）」，
-# 核下来只还了决策、前置或一半，写法与已还清表同一个词，按行检索分不开。
-# 2026-09-19 又查出三行（C137 / C150 / C151）第一格写「⚠️ 2026-09-07 作废……此编号不再使用」却留在欠着的那张表里：
-# 同一族的 C135 / C138 当天就按同一理由挪进了已还清，这三行被算进「欠检查」的数里一个多月。
-# 同一天还查出欠着的那张表中间夹着 6 个空行：Markdown 在空行处结束表格，第 87 行起约 270 行
-# 渲染不成表，这一格也只把第一段当登记表判，后面几段一行都没判过。所以编号行前面没有表头也判红。
-#
+# 「同一个编号在两张表里各登记一次」不在这一格判：两张表都是 kb 的登记位，归上游 doc-lint 的 F（一个编号只许有一处登记位）逐个编号判。
 # 样本：checks-owed-red 的欠账表里欠着那张有一行写「已还（日期）」、一行「日期 作废」、一行「日期 销账」，一行被空行断开、前面没有表头，
 # 已还清那张混进一行六格的；checks-owed-green 里欠着那张的「已还一半」「已还这一半」「前置已还」、已还清那张里写「销账」的都放行。
 cell_table_shape() {
@@ -1508,7 +1402,6 @@ if len(reg) < 2:
     print(f'  ✗ 只找到 {len(reg)} 张带编号行的登记表，欠着的与已还清的两张应当都在')
     print('  → 怎么办：表头或它上面的 doc-lint:registry 标记被改坏了；按文件开头的约定把两张表恢复出来。')
     sys.exit(1)
-# 欠着的那张里，一格开头写「已还」（后面不是一半 / 这一半 / 大半）或「销账」，就是在说这一行已经不欠了。
 paid_claim = re.compile(r'(?:20\d\d-\d\d-\d\d\s*)?(已还(?!一半|这一半|大半)|销账|作废)')
 bad, claims, checked = [], [], 0
 for t in reg:
@@ -1543,31 +1436,22 @@ PY
 }
 
 # ── 格 closeout-collects-open：里程碑收口表收全了文件里点名、还开着的欠账号，行号只许是顺序号
-#
-# 实测（2026-09-17 核出）：.claude/kb/milestone/02-second-txn.md「增补 2」的收口表立表时 13 行，
-# 同一文件别处点名、.claude/kb/checks-owed.md 里还开着的 C 编号（C374、C329、C330、C331、C287 等）表里一个字没提，
-# 当天派四个只读核查才补进第 5–34 行；此前没有任何检查报警（那张表第 34 行）。
-#
 # 判据：
 #   ① 收口表用一行标记指明：`<!-- milestone:closeout-table -->`，紧挨着写在表上方（中间只许空行），一份里程碑文件至多一处。
-#   ② 还开着的欠账号：checks-owed.md 里「### 已还清」标题之前、表格首列是 C<编号> 的行
-#      （按 `lib-owed.py` 读，checker-independence-and-sync、code-source-discipline 用的是同一份，不另抄）。
+#   ② 还开着的欠账号：checks-owed.md 里「### 已还清」标题之前、表格首列是 C<编号> 的行（按 `lib-owed.py` 读）。
 #   ③ 带标记的文件，全文（含历史版本节）出现的每个 C<编号>，若还开着，要么在收口表的某一行里出现，
 #      要么在表后（表结束到下一个标题之前）有一行显式豁免，形态：`- 不收口 C<编号>（简称）：为什么不收`。
-#   任一个开着的编号两处都没有 ⇒ 红。豁免行写坏（没有编号、冒号后面是空的）、同一个编号既豁免又进了表、
-#   标记后面不是表、一份文件两处标记 ⇒ 也红。
-#   ④ 收口表每一行的首列（表头 `#` 与分隔行除外）要么是纯十进制数字，要么是圆圈号 `①`–`⑳`
-#      （那一档是这张表早先给「被打回的项」留的）；带撇号（U+2032、U+2033、ASCII 单引号）或紧跟字母的 ⇒ 红，指名那一行。
-#      用户 2026-09-23 定：行号全改成顺序号，以后禁止后缀。当天现查，加撇号的那几行与它们的基号毫不相干，
-#      撇号的实际含义是「这个号被占了」，读的人却当成从属关系，「跟第 N 行一起判」就指到一件不相干的事上；字母后缀同病。
+#   任一个开着的编号两处都没有，红。豁免行写坏（没有编号、冒号后面是空的）、同一个编号既豁免又进了表、
+#   标记后面不是表、一份文件两处标记，也红。
+#   ④ 收口表每一行的首列（表头 `#` 与分隔行除外）要么是纯十进制数字，要么是圆圈号 `①`–`⑳`；
+#      带撇号（U+2032、U+2033、ASCII 单引号）或紧跟字母的，红，指名那一行（为什么不许后缀见 path-moves.md「变体起新名字，不用角标」）。
 #      全仓的 U+2032、U+2033 另由 doc-text 判；这一条多管的是 ASCII 单引号、字母与其余一切非顺序号的写法，只在收口表首列。
-#
-# 不判的：没有标记的里程碑文件，成功行逐个列出（现算）；一份带标记的文件都没有 ⇒ 这一格退 77，不记通过。
-# ⚠️ 管不到的：表里那一行写的去向对不对、豁免的理由站不站得住（靠人）；编号只按字面 C<数字> 认，
-# 写成「C 374」或只写简称的引用它看不见；已还清的编号、checks-owed.md 里没有的编号一律不管。
+# 没有标记的里程碑文件不判，成功行逐个列出（现算）；一份带标记的文件都没有，退 77。
+# 管不到的：表里那一行写的去向对不对、豁免的理由站不站得住（靠人）；编号只按字面 C<数字> 认，
+# 写成「C 374」或只写简称的引用看不见；已还清的编号、checks-owed.md 里没有的编号一律不管。
 # 样本：checks-owed-red 放一个漏收的开着编号、一个既豁免又进表的编号、一行空理由的豁免、
-# 一份标记后面没有表的文件、一行字母后缀与一行 ASCII 单引号后缀的行号，必须判红；checks-owed-green 放表里一个、豁免一个、已还清一个、
-# 一份不带标记的文件，收口表里一个圆圈号、一个一位数与一个两位数的行号，必须判绿并报对数
+# 一份标记后面没有表的文件、一行字母后缀与一行 ASCII 单引号后缀的行号，判红；checks-owed-green 放表里一个、豁免一个、已还清一个、
+# 一份不带标记的文件，收口表里一个圆圈号、一个一位数与一个两位数的行号，判绿并报对数
 # （checks-owed-green 里 closeout-row27-preconditions 那一格的 02-second-txn.md 也带标记，这一格一并判它）。
 cell_closeout_collects_open() {
   python3 - "$OWED_LIBRARY" <<'PY'
@@ -1710,29 +1594,15 @@ PY
 }
 
 # ── 格 paid-cited-tests：已还清的欠账行里点名的测试名，仓里还在不在
-#
-# 判据：`.claude/kb/checks-owed.md` 的「### 已还清」那张表里，反引号括起来的 snake_case 标识符
-# （形如 `a_b_c`，至少三段）必须在仓里的 `.rs` / `.py` / `.sh` 的代码里按整词找得到；找不到就红。
-# 按整词（`a_b_c_v2` 不算 `a_b_c` 还在）、只认注释之外（`.rs` 的 `//` 之后、`.py` / `.sh` 的 `#` 之后不算：
-# 旧名只剩在一句注释里，那个测试其实已经没了）。已还清表一行都没有、或行里一个这样的标识符都没有，这一格本次无对象可判，退 77。
-# 一条已还清的行说「某某单测钉着这件事」，那个单测正是这条定案**唯一的记录位**——它被改名或删掉时，
-# 今天没有任何东西会说话。
-#
-# 射程只到「已还清」那张表。**欠着的那张表不查**：那张表写的正是「知道要拦什么但还拦不了」，
-# 里面点名一个还不存在的测试名是它应有的样子，拿这条判据去扫它一定是错的。
-#
-# 为什么只认「至少三段」的 snake_case：2026-09-20 在真语料上量过假阳性——已还清表 44 行、
-# 命中 6 个标识符、仓里找不到的 1 个，而那 1 个正是要拦的那种（C313 行引的那条单测名，
-# E142 第六次跑之后状态数变了、单测跟着改了名，这条已还清的行没跟上）。
-# 放宽到两段会把 `log_append`、`write_cache` 这类词组也扫进来。
-#
-# ⚠️ 注释里不写被拦的那个标识符的整串字面量，搜索也排掉 `.claude/gate.d/`：第一版在注释里写了，
-# 于是 grep 扫到这个阶段自己、把该红的那一条判成「还在」（与 `pgrep -f` 匹配到自己的命令行同形）。
-# 门禁脚本里出现一个测试名，本来也不构成「这个测试存在」的证据——测试住在 crates/ 与 research/。
-#
-# 不扫 `research/prompts/`：当时原样发给模型的材料是冻结证据，里面引的旧名字本来就不该跟着改
-# （`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「原样保存的证据不许事后改」）。
-#
+# 判据：`.claude/kb/checks-owed.md` 的「### 已还清」那张表里，反引号括起来的 snake_case 标识符（至少三段）
+# 必须在仓里的 `.rs` / `.py` / `.sh` 的代码里按整词找得到；找不到就红。按整词（加了后缀的不算还在）、只认注释之外
+# （`.rs` 的 `//` 之后、`.py` / `.sh` 的 `#` 之后不算：旧名只剩在一句注释里，那个测试其实已经没了）。
+# 已还清表一行都没有、或行里一个这样的标识符都没有，退 77。
+# 已还清的行里点名的单测常是那条定案唯一的记录位，它被改名或删掉时没有别的东西会说话。
+# 欠着的那张表不查：那里点名一个还不存在的测试名是它应有的样子。
+# 至少三段：放宽到两段会把 `log_append`、`write_cache` 这类词组也扫进来。
+# 注释里不写被拦的那个标识符的整串字面量，搜索也排掉 `.claude/gate.d/`：否则 grep 扫到这个阶段自己，把该红的那一条判成「还在」。
+# 不扫 `research/prompts/`：原样发给模型的材料是冻结证据，里面的旧名字不跟着改（evidence-discipline.md「原样保存的证据不许事后改」）。
 # 样本：checks-owed-red 的已还清表里一行引的单测改了名、一行引的旧名只剩在注释里、一行引的名字只剩加了后缀的，三个都要点名；
 # 欠着那张里一行引一个不存在的名字，不许点名。checks-owed-green 里已还清表引的单测在、另有不带标识符的行进「没查的」。
 cell_paid_cited_tests() {
@@ -1766,10 +1636,8 @@ for line in lines[settled_heading + 1:]:
     stripped = line.strip()
     if stripped.startswith("## ") or (stripped.startswith("### ") and not stripped.startswith("### 已还清")):
         break
-    # 只认首格是 `C<数字>` 的登记行。表头（真表写 `| # | 简称 | …`）与分隔行不是登记行：
-    # 数进去会让成功句里报的行数比真实行数多，而那个数没有任何东西钉着
-    # （`.claude/singlefs-ai-sop/rules/show-me-test.md`「成功那句里报的数也要有东西钉住」）。
-    # 一行掉了编号算表的形状坏了，那是 table-shape 那一格判的事，这一格不重复判。
+    # 只认首格是 `C<数字>` 的登记行：表头与分隔行数进去，成功句报的行数会比真实行数多，而那个数没有东西钉着。
+    # 一行掉了编号算表的形状坏了，归 table-shape 判。
     if stripped.startswith("|") and stripped.count("|") >= 4 and row_number.match(stripped):
         rows.append(stripped)
 
@@ -1836,42 +1704,21 @@ PY
 }
 
 # ── 格 audit-contradictions：最近一次总审核登记的文档级矛盾，每一行都要有去向
-#
-# `records/` 里的总审核记录第五节登记文档级矛盾。这些矛盾**在 kb 里一个落点都没有**，
-# 只活在那份记录里：没有任何检查会在它们腐化时变红，而其中几条按记录自陈会误导实现者
+# `records/` 里的总审核记录第五节登记的文档级矛盾在 kb 里没有落点，腐化了没有别的检查会红
 # （C358（总审核第五节的文档级矛盾没有回扫闸））。
-#
-# 这一格判：第五节表里每一行的处置列，要么以「已改」开头，要么点名一个 checks-owed.md
-# **开着那张表**里的欠账号。只点名已还清的号不算去向——那笔账还了，这一行的矛盾却还在。
-# 与 closeout-collects-open 那一格的分工：那一格的对象是里程碑文件点名的开着欠账号；这一格的对象是总审核记录第五节的矛盾行。
-#
-# 「已改」还要指得到今天的正文（C358（总审核第五节的文档级矛盾没有回扫闸） 的原话）：处置列要用「」引至少一句原文，每一句归一之后
-# （去掉 ** 与反引号、空白压成一个）都要在这一行点名的 kb 文件的今天正文里找得到——点名指这一行四列里
-# 出现的 D / E 编号（→ decisions/、experiments/ 下同号的那份）、C 号（→ checks-owed.md）、I- 号
-# （→ invariants.md）与直接写出的 .md 文件名；四列里一份 kb 文件都没点名的，才在 kb 全部正文里找。
-# 正文 = 「## 历史版本」之前，不含 decisions-history/ 与 *-history.md。
-# 引号后面紧跟「0 命中」「不在」「没有了」的是在说那句话已经删掉，不算指向正文的引文；
-# 这类「已经不在」的说法这一格**不核**（「0 命中」在哪个范围里 0 命中，处置列写不清，按整份文件判会误红）。
-# 只判引文找不找得到，不判引文说的是不是那一行的矛盾——后者要人看。
-# 引文里去掉编号（D / E / C / I- 号连同简称括注）与 .md 文件名之后，至少要剩两个字：只引一个编号（「D8」）
-# 或一个字，在点名的那份文件里总找得到，指不出今天正文里的任何一句话。
-#
-# 第五节的标题认「## 五」后面跟标点、空白或行尾的写法（「## 五、」「## 五.」「## 五 文档级矛盾」都认）；
-# 最近一次总审核里认不出第五节标题判红，认出了而表里一行矛盾都没有，这一格本次无对象可判，退 77。
-# 欠账表开着与已还清的切法用共用读法 lib-owed.py（「已还清」整行标题为界，认不出标题判红），不在这里按子串切。
-#
-# 挂账表 .claude/audit-rows-pending 2026-09-23 已清空并关闭：立闸那天挂着的 26 行逐行现查过，
-# 全部给了去向。表里再出现任何一行非注释内容就判红——新的矛盾行一律当场给去向，不许挂账。
-#
-# 样本：checks-owed-red 放一行「未改」且不给欠账号、一行只点名已还清的号、
-# 一行挂进已关闭的挂账表、一行「已改」却不引原文、两行「已改」引的原文在点名的文件里找不到而只在别的文件里有
-# （一行按 D 编号点名、一行按文件名点名）、一行引的原文哪里都没有、一行只引了一个编号「D9」，第五节标题写成
-# 「## 五 文档级矛盾」（不带顿号），必须判红；checks-owed-green 放按 D 编号与按文件名点名、
+# 判据：第五节表里每一行的处置列，要么以「已改」开头，要么点名一个 checks-owed.md 开着那张表里的欠账号
+# （只点名已还清的号不算去向：那笔账还了，这一行的矛盾却还在）。
+#   「已改」要用「」引至少一句原文，在这一行点名的 kb 文件今天的正文里找得到（归一与点名的规则在下面 QUOTE 旁的注释）。
+#   引文去掉编号（D / E / C / I- 号连同简称括注）与 .md 文件名之后至少剩两个字：只引一个编号或一个字，在点名的文件里总找得到。
+#   只判引文找不找得到，不判引文说的是不是那一行的矛盾（靠人）。
+# 第五节标题认「## 五」后面跟标点、空白或行尾的写法；最近一次总审核里认不出第五节标题，判红；表里一行矛盾都没有，退 77。
+# 挂账表 .claude/audit-rows-pending 已关闭：再出现任何一行非注释内容判红，新的矛盾行一律当场给去向。
+# 内嵌 python 的退出码要取，而且必须报出 COUNT 那一行，缺一样判红：不取退出码时，python 崩了成功句照印、只是数变空白。
+# 样本：checks-owed-red 放一行「未改」且不给欠账号、一行只点名已还清的号、一行挂进已关闭的挂账表、一行「已改」却不引原文、
+# 两行「已改」引的原文在点名的文件里找不到而只在别的文件里有（一行按 D 编号点名、一行按文件名点名）、一行引的原文哪里都没有、
+# 一行只引了一个编号「D9」，第五节标题写成「## 五 文档级矛盾」（不带顿号），判红；checks-owed-green 放按 D 编号与按文件名点名、
 # 原文都在点名的文件里各一行，一行没点名文件而原文在 kb 别处，一行带「「旧说法」0 命中」而 kb 里没有「旧说法」，
-# 欠账表开着的那张里有一行正文提到「### 已还清」这几个字（按子串切会把它后面开着的账算成还清），必须判绿。
-#
-# 内嵌 python 崩了不许走绿：它的退出码要取，而且必须报出 COUNT 那一行，缺一样判红
-# （2026-09-23 门禁审计那一轮查出：不取退出码时，python 崩了成功句照印、只是数变空白）。
+# 欠账表开着的那张里有一行正文提到「### 已还清」这几个字（按子串切会把它后面开着的账算成还清），判绿。
 cell_audit_contradictions() {
   local PENDING=".claude/audit-rows-pending"
   local latest report
@@ -1922,7 +1769,6 @@ for number, line in enumerate(lines, 1):
     if in_section and line.startswith("| "):
         rows.append((number, line))
 
-# 表头与分隔行不是矛盾行。
 rows = [(number, line) for number, line in rows
         if not line.startswith("|---") and not re.match(r"^\|\s*#\s*\|", line)]
 if section_heading is None:
@@ -2069,25 +1915,14 @@ PY
 }
 
 # ── 格 closeout-row27-preconditions：收口表第 27 行那几笔欠账的前置有没有进来（进来了就得补会红的用例）
-#
-# 里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 27 行点名了一批「今天不可达的欠账」：走不到那一格，
-# 就写不出会红的用例。这一格不判那几笔本身，判的是它们各自的**前置**动没动：
-# 每一笔登记一条逐字探针（文件、原文、今天的命中次数）。
-#   全部对上 ⇒ 前置一个都没进来，今天无对象可判 ⇒ 这一格退 77（汇总往 $GATE_NOT_RUN_FILE 报「本次未跑」，不记通过、不算覆盖）。
-#   任一条对不上 ⇒ 那一笔的前置进来了，或者它压着的那段代码改了形态 ⇒ 红，回去重核那一笔。
-# 探针盯的是「这一笔的描述今天还成不成立」，所以重构那几处也会红：那时候要做的同样是回去重核，
-# 不是把探针的期望值改成新数（改成新数等于把这一笔的描述悄悄换掉）。
-# 与 closeout-collects-open 那一格的分工：那一格读收口表本身，判开着的欠账号收全了、行号只许顺序号；
-# 这一格不判收口表，读 crates 源码，按写死的探针判第 27 行那几笔的前置动没动。
-#
-# 成功那句报出查了几条探针、覆盖几笔，以及**没做成探针的是哪几笔**（逐个列名；rules/show-me-test.md：
-# 扫到 0 项不是通过，报了「查了多少」还要说「没查的是哪些」）。没做成探针的那张 UNPROBED 表是**手写的**：
-# 收口表第 27 行只写「alloc-basis 第三轮转来的四条」、没有逐条列（四条的出处在 alloc-basis 第三轮判决第五节第 4 条），
-# 现算不出来。能现算的那一半每轮现算：读收口表第 27 行第二格，按「、」「；」切成几笔，逐笔对探针与 UNPROBED 的笔名，
-# 两边都没有的逐个列名；「alloc-basis 第三轮转来的 N 条」这一笔，拿 N 与这里名字以「alloc-basis 第三轮」起头的笔数比。
-# 这一段只报不判：对不上的是这张表手写得不全，要人回去补，不是前置进来了。
-#
-# 样本：checks-owed-red 的 instance_table.rs 里多了一处 `rows.retain(`（C333 那一笔的前置进来了），必须判红并点名那一笔；
+# .claude/kb/milestone/02-second-txn.md 收口表第 27 行点名了一批「今天不可达的欠账」：走不到那一格，就写不出会红的用例。
+# 这一格判的是它们各自的前置动没动：每一笔登记一条逐字探针（文件、原文、今天的命中次数）。
+#   全部对上：前置一个都没进来，退 77。任一条对不上：那一笔的前置进来了，或者它压着的那段代码改了形态，红，回去重核那一笔。
+#   重构那几处也会红：要做的同样是重核，不是把探针的期望值改成新数（那等于把这一笔的描述悄悄换掉）。
+# UNPROBED 表是手写的：第 27 行只写「alloc-basis 第三轮转来的四条」、没有逐条列，现算不出来。
+# 能现算的那一半每轮现算、只报不判：第 27 行第二格按「、」「；」切成几笔，探针与 UNPROBED 两边都没有的逐个列名；
+#   「alloc-basis 第三轮转来的 N 条」拿 N 与这里名字以「alloc-basis 第三轮」起头的笔数比。对不上是这张表手写得不全，要人回去补。
+# 样本：checks-owed-red 的 instance_table.rs 里多了一处 `rows.retain(`（C333 那一笔的前置进来了），判红并点名那一笔；
 # checks-owed-green 的探针逐条对上今天的值，这一格退 77，并报第 27 行现算的笔数与 alloc-basis 那一笔的条数对照。
 cell_closeout_row27_preconditions() {
   local PROBES UNPROBED report row27_report probe_count item_count unprobed_count name why line
@@ -2161,7 +1996,6 @@ PY
   fi
 
   unprobed_count="$(grep -c . <<<"$UNPROBED")"
-  # 现算的那一半：收口表第 27 行点名的几笔里，探针与 UNPROBED 两边都没有的，逐个列名（只报不判）
   row27_report="$(PROBES="$PROBES" UNPROBED="$UNPROBED" python3 - 2>&1 <<'PY'
 import os, re
 path = ".claude/kb/milestone/02-second-txn.md"
@@ -2216,10 +2050,8 @@ PY
 
 # ════════════════ 引用与不变量组的七格（引用与不变量） ════════════════
 
-# ── 1–2 格共用：扫的文件与编号引用的抽法 ─────────────────────────────────
-# ⚠️ **必须递归扫**：2026-08-29 决策与实验都拆进了子目录，
-# 而引用大半住在那里。用 $KB/*.md 单层通配会静默漏掉它们——
-# 实测拆分之后这段检查有一段时间对决策文件里的引用完全失明。
+# ── experiment-refs、decision-refs 共用：扫的文件与编号引用的抽法 ─────────────────
+# 必须递归扫：决策与实验拆在子目录里，引用大半住在那里，$KB/*.md 单层通配会静默漏掉。
 # 扫的文件：kb 下全部 .md（递归）加项目规则。数组装、不靠 $(find …) 的分词，文件名里有空格也不散。
 scanned_files_collected=0
 collect_scanned_files() {
@@ -2259,7 +2091,7 @@ cell_experiment_refs() {
   collect_scanned_files
   local missing=0 e
   local experiment_refs=()
-  # ⚠️ 不能用 \bE[0-9]+\b —— 它会把 URL 里的 E19253-01 当成实验号（实测踩过）。
+  # 不能用 \bE[0-9]+\b：它会把 URL 里的 E19253-01 当成实验号
   extract_numbered_references E experiment_refs
   for e in "${experiment_refs[@]}"; do
     grep -rqE "^## $e " "$KB/experiments" 2>/dev/null || { bad "$e 被引用但 experiments/ 下没有它"
@@ -2299,7 +2131,7 @@ cell_decision_refs() {
   return "$cell_failed"
 }
 
-# ── 3、5 格共用：不变量表的在用条数 ─────────────────────────────────────
+# ── declared-counts、invariant-count-elsewhere 共用：不变量表的在用条数 ─────────────
 # 表行形如 `| I-1.1 | 简称 | 陈述 | … |`；表里第 2 列是简称（singlefs-ai-sop/rules/kb-discipline.md 第 5 条），陈述在第 3 列。
 # 设 inv_actual（总行）、inv_retired（退役）、inv_live（在用）。
 count_invariant_rows() {
@@ -2315,9 +2147,8 @@ cell_declared_counts() {
     howto "确认门禁是在仓库根上跑的；文件真搬了家的话，按 .claude/rules/path-moves.md 把这里的路径一起改。"
   else
     count_invariant_rows
-    # 当前条数的权威登记位是 <!-- invariant-count --> 下一行那句（2026-09-18 立）：历史版本里也有「现共 N 条在用」，
-    # 那是当时的数、不跟着改，按文件序取第一处会取到历史里的那一句（实测：2026-09-18 取到 2026-09-14 那条的 66）。
-    # 标记丢了、或下一行读不出那句，都判红：退回去取文件里第一处「N 条在用」，取到的正是那句历史。
+    # 当前条数的权威登记位是 <!-- invariant-count --> 下一行那句：历史版本里也有「现共 N 条在用」，那是当时的数、不跟着改，
+    # 按文件序取第一处会取到历史里的那一句。标记丢了、或下一行读不出那句，都判红，不退回去取第一处。
     local marker_line_number claim_line inv_claim
     marker_line_number=$(grep -n -m1 -F '<!-- invariant-count -->' "$KB/invariants.md" | cut -d: -f1)
     if [[ "$inv_actual" -eq 0 ]]; then
@@ -2344,15 +2175,13 @@ cell_declared_counts() {
     fi
   fi
   # 三段各数各的：欠着的那张表、「### 已还清」那张表、「## 历史版本」里的条目。
-  # ⚠️ **分界线是「### 已还清」，不是「## 历史版本」**：已还清那张表住在历史版本**之前**，
-  # 按历史版本切会把还清的全算进欠账里——2026-09-16 现查它报「欠 326、已还清 0」，
-  # 真数是 297 / 29。一条报错数的检查与没有这条检查，在门禁输出里长得一模一样。
+  # 分界线是「### 已还清」，不是「## 历史版本」：已还清那张表住在历史版本之前，按历史版本切会把还清的全算进欠账里。
   # 数不出来（文件不在、awk 出错、两张表一行都没数到）判红：两个空白或两个 0 印在成功行里，看着就像数过了。
   if [[ ! -f "$KB/checks-owed.md" ]]; then
     bad "找不到 $KB/checks-owed.md，欠账条数取不到"
     howto "确认门禁是在仓库根上跑的；文件真搬了家的话，按 .claude/rules/path-moves.md 把这里的路径一起改。"
   else
-    # 开着与已还清的切法用共用读法 lib-owed.py（doc-registries、checker-independence-and-sync、code-source-discipline 同一份），不在这里再抄一份 awk
+    # 开着与已还清的切法用共用读法 lib-owed.py，不在这里再抄一份 awk
     local chk_counts="" chk_actual chk_done chk_heading
     if chk_counts=$(python3 - "$GATE_DIRECTORY/lib-owed.py" "$KB/checks-owed.md" <<'PY_OWED'
 import importlib.util, sys
@@ -2401,18 +2230,12 @@ cell_governance_refs() {
   return "$cell_failed"
 }
 
-# 同一个量被别的文件抄过去之后，declared-counts 那一格只看 invariants.md 自己，就没有任何东西在对了。
-# ⚠️ **这条是实测出来的**（2026-09-07）：`decisions/13-验证路线.md` 的「冲突 1」
-# 写着「26 条不变量若既是 checker 源码又是形式验证的 spec，就成了单点」，
-# 而 `invariants.md` 当时已是 63 条在用 —— 那个 26 是某轮的旧数，从写下起就没人回来改过。
-# 坑在**跨文件的口径层**，不在某一段代码里（`.claude/singlefs-ai-sop/rules/show-me-test.md`「先问这个坑在哪一层」）。
+# ── 格 invariant-count-elsewhere：同一个量被别的文件抄过去之后，declared-counts 只看 invariants.md 自己，就没有东西在对了。
 # 查的是：`invariants.md` 之外的 kb 文件，正文里写「N 条在用」或「N 条不变量在用」的地方，N 必须等于实际在用条数。
-# 一处这样的声明都没有：这一格本次无对象可判（77，不记通过）。
-# ⚠️ **抓不到的那一半**：
-#   1. 不带「在用」二字的写法（「66 条不变量」）抓不到 —— 那种句子多半在复述某一轮普查
-#      当时的口径，是历史事实，照现值判会误判。要它被管住，就把话写成「N 条在用」。
+# 一处这样的声明都没有，退 77。抓不到的：
+#   1. 不带「在用」二字的写法（「66 条不变量」）：多半在复述某一轮普查当时的口径，照现值判会误判。要它被管住，就把话写成「N 条在用」。
 #   2. `## 历史版本` 之后的内容整段跳过（旧数留在那里是 `kb-discipline.md` 第 8 条要求的）。
-#   3. `*-history.md` 与 `decisions-history/` 下整份跳过 —— 那些文件通篇是历史。
+#   3. `*-history.md` 与 `decisions-history/` 下整份跳过：那些文件通篇是历史。
 cell_invariant_count_elsewhere() {
   cell_failed=0
   [[ -f "$KB/invariants.md" ]] || { echo "  ! 找不到 $KB/invariants.md，这一格本次无对象可判"; return 77; }
@@ -2461,17 +2284,11 @@ PY
   return "$elsewhere_rc"
 }
 
-# 还 checks-owed.md C38（外部文献不可复核）的源码那一半。
-# **它要拦的是证据蒸发，不是 kb 写错。** 2026-08-29 的 find 发现一批标着
-# 「本机 PDF 逐字核实」的文献已经不在本机了，而引用它们的结论仍标着「已核实」——
-# 那批蒸发得**无声无息**。源码这一侧会以同样的方式蒸发：路径变了、版本升了、树被删了。
-# ⚠️ **源码树不在也判红，不许当跳过**——「跳过」正是让上一批文献无声蒸发的那个行为。
-# 红了不等于 kb 写错，处置见 verify-citations.sh 自己打印的下一步。
+# ── 格 citations：还 checks-owed.md C38（外部文献不可复核）的源码那一半。
+# 要拦的是证据蒸发（路径变了、版本升了、树被删了），不是 kb 写错；红了怎么处置见 verify-citations.sh 自己打印的下一步。
+# 源码树不在也判红，不当跳过：跳过正是让上一批文献无声蒸发的那个行为。
 # 真 verify-citations.sh 的判别力不在这里测：它读两个本机绝对路径下的源码树（FS_REFS、KERNEL_TREE 的默认值），装不进密封的样本目录；
-# 它自己的 --selftest 合成两棵假树测，由 code-tooling 跑。它的判别力双向证过（2026-08-29）：
-#   FS_REFS=/nonexistent ⇒ 固定点三棵树（refs-linux、refs-zfs、refs-docs）上的断言成批未命中、rc=1
-#   （条数随断言表增减，这里不写死：现跑一次看末行「N 条未命中」）；
-#   把 spa.h 的 SPA_BLKPTRSHIFT 从 7 改成 9 ⇒ 该条未命中、rc=1。
+# 它自己的 --selftest 合成两棵假树测，由 code-tooling 跑。
 CITATIONS_SCRIPT=research/scripts/verify-citations.sh
 citations_pid=""
 start_citations() {
@@ -2498,22 +2315,14 @@ cell_citations() {
   return "$cell_failed"
 }
 
-# 判据：这次改动在 `.claude/kb/invariants.md` 里新增或改写的每一行不变量（`| I-x.y | …`），
-# 正文里必须至少点名一条 `D<n>（简称） 已定项 k`——那是这条不变量要判的字段的落点。
-# 点不出来判红。已停用的行（正文写着「此编号不再使用」）不判。
-# 为什么：I-1.2（块头写序已发布） 与 I-1.4（块头 fsid 一致） 写下来的时候，它们点名的 generation 与 fsid
-# 在当时的字段表里根本不存在——两条已定不变量在第一版直接落空，而没有任何东西说话
-# （C69（已定不变量没有字段可判））。一条判不了的不变量比没有这条更糟：checker 会老老实实跑它、
-# 老老实实报绿（`show-me-test.md`「不变量本身就是错的，checker 会老老实实检查一条错规矩，而且全绿」）。
-# ⚠️ 射程只到**这次改动的行**，与门禁 doc-experiments 的 results-cited、quoted-result-lines 两格同一条：存量里点不出分项的行今天有几十条，
-# 一次全判会把每一次提交都挡住，而 `sop-first.md` 要的是抬地板、不是筑墙。存量那笔账仍然欠着
-# （C69（已定不变量没有字段可判）），所以成功那句**每轮都把存量的条数现算着报出来**，不让它沉默。
-# ⚠️ 判不了的：点名的那条分项里到底有没有这个字段、宽度对不对——那要人看。这一格只判「点没点名」。
-# 改动范围：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；
-# 工作区、暂存区与未跟踪文件都算（基准用共用库 research/scripts/changed-paths.sh 的 gate 取法，与 doc-process-records、doc-experiments 的 evidence-in-repo 格同一份代码）。
-# 这次改动里 invariants.md 是新增的（相对基准新增、暂存新增或未跟踪），整份的每一行都算新写；
-# 否则取「基准到工作区」与「HEAD 到暂存区」两份 diff 的 + 行，同一行两份都有只算一次；两份 diff 任一份 git 失败判红，
-# 不当成「一行没改」。这次改动没有新写或改写任何不变量行，这一格本次无对象可判（77，存量条数照样报出来）。
+# ── 格 invariant-anchors：这次改动在 `.claude/kb/invariants.md` 里新增或改写的每一行不变量（`| I-x.y | …`），
+# 正文里必须至少点名一条 `D<n>（简称） 已定项 k`，那是这条不变量要判的字段的落点；点不出来判红。正文写着「此编号不再使用」的不判。
+# 判不了的不变量比没有这条更糟：checker 会照跑、照报绿（C69（已定不变量没有字段可判））。
+# 射程只到这次改动的行：存量里点不出分项的行一次全判会挡住每一次提交；存量那笔账仍欠着（C69（已定不变量没有字段可判）），
+# 所以成功那句每轮都把存量的条数现算着报出来。不判点名的那条分项里到底有没有这个字段、宽度对不对。
+# 改动范围：GATE_BASE 给了就与它比，否则与 @{upstream} 的 merge-base 比，都没有就与 HEAD 比；工作区、暂存区与未跟踪文件都算
+# （基准用共用库 research/scripts/changed-paths.sh 的 gate 取法）。两份 diff 任一份 git 失败判红，不当成「一行没改」。
+# 这次改动没有新写或改写任何不变量行，退 77（存量条数照样报出来）。
 cell_invariant_anchors() {
   cell_failed=0
   git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "  ! $PWD 不是 git 仓，这一格本次无对象可判"; return 77; }
@@ -2602,7 +2411,7 @@ PY
 }
 
 # ════ 登记的格函数：弄坏开关点名这一格就不跑、按判过了记，否则调这一格的判法 ════
-# 字段与布局组九格原是在后台起的（stdin 是 /dev/null），这里照样把 stdin 接到 /dev/null。
+# 字段与布局组九格的 stdin 接到 /dev/null，与它们并进来之前在后台起时一致。
 break_skips() {
   if [[ "$BREAK_SWITCH" == "$1" ]]; then
     echo "  ✓ 弄坏开关 DOC_REGISTRIES_BREAK=$1：这一格没判"

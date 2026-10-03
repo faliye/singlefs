@@ -30,11 +30,17 @@ FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。�
   （前面是「第」的是序号，不算）。
 - 时段词（PERIOD_WORDS）：挨在日期或时区词后面的（中间可隔空格、全角或半角左括号、全角逗号），与后面跟「N 点 / N 时」或时:分的。
   不挨日期、时区、数字的光秃时段词不判。
-「东京时间」不认（仓里有用户原话引文用它，改不得）。
+- 英文十二小时制：一到两位的时（可带「:分」）后面跟 am / pm（大小写都认、字母后可带点、与数字之间可隔一个空格），
+  前后不挨 ASCII 字母数字与下划线（「AMD」「amps」「ppm」这类词不算）；前面是英文月日（外部限额通知的原样）的照判。
+会话号（session-names）：ListAgents 列的会话名，本仓与上游三语仓的目录名后面跟「-」与 2 到 6 位小写十六进制；
+后面紧跟 . - } / 或 ASCII 字母数字的（mktemp 模板、临时目录名、更长的标识符）不算。改过标题的会话（「会话「<标题>」」）认不出：
+同一个写法在仓里也用来引一句话、说一种读法，机器分不开，靠写的人。
+
+
 上下文规则放过长得像钟点、其实不是的冒号对（不挨日期时区的钟点那一行）：
 - 紧挨在前面的是 = [ { , > " ' + - . 之一或「, 」：产物行的「名字=值」、切片、字典与逗号列表、「0->1:10」、引号里的代码字面、
   时区偏移、小数；前面是反引号而小时只有一位的，是反引号里的键（`3:10`）；
-- 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、门禁文件名（「20:54-layer0-replay.sh」这类）；
+- 紧跟在后面的是 %、「.数字」或「-字母」：百分比、「分:秒.百分之一秒」（time -v 的格式）、带编号的阶段文件名（「20:09-sample-stage.sh」这类）；
 - 同一行里有取值出了钟点范围的冒号对（时大于 23、分大于 59、一边三位或分只有一位）或「文件:行号」（「.md:42」这类）的，
   这一行的冒号对按「门禁号:行号」「决策号:行号」这类编号读。
 ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（产物行的字段值，「taken_jst=<日期>T<钟点>」这类）。
@@ -43,13 +49,13 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
 
 弄坏开关（环境变量，逗号分隔，可以写几个键；每次现读，同一个进程里切换也认）：
 - LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>：那几条判据行（写形态键的，那一形态的全部判据行）不判。
-  打开时 doc-text.sh 那一形态的红样本（prime-marks-red、clock-times-red）、write-guard.sh --selftest 里点名那一行的格必须判红，证判据真在管那一行。
+  打开时 doc-text.sh 那一形态的红样本（prime-marks-red、clock-times-red、session-names-red）、write-guard.sh --selftest 里点名那一行的格必须判红，证判据真在管那一行。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>：那几条判据行的上下文规则不生效，命中一律算违例。
   打开时 doc-text.sh 的 clock-times-green 样本里的冒号对、write-guard.sh --selftest 里靠上下文放行的格必须判红，证放行靠的是上下文规则。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键>：那几种形态的放行标记不认。
-  打开时 doc-text.sh 的 clock-times-green 样本与 write-guard.sh --selftest 里带放行标记的格必须判红。
+  打开时 doc-text.sh 的 clock-times-green、session-names-green 样本与 write-guard.sh --selftest 里带放行标记的格必须判红。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键>：那几种形态的 excluded_prefixes 不生效。
-  打开时 doc-text.sh 那一形态的绿样本（prime-marks-green、clock-times-green）里落在排除前缀下的放行格必须判红，证排除前缀只放过登记的那几处。
+  打开时 doc-text.sh 那一形态的绿样本（prime-marks-green、clock-times-green、session-names-green）里落在排除前缀下的放行格必须判红，证排除前缀只放过登记的那几处。
 """
 import os
 import re
@@ -75,6 +81,9 @@ MINUTE_VALUE = r'[0-5]\d'
 BARE_CLOCK = rf'(?<![{ASCII_WORD}:]){HOUR_VALUE}:{MINUTE_VALUE}(?::{MINUTE_VALUE}(?:\.\d+)?)?(?![{ASCII_WORD}:])'
 ISO_TIMESTAMP = rf'(?:{DATE}|(?<![{ASCII_WORD}\-]))T(?:[01]\d|2[0-3]):{MINUTE_VALUE}'
 ZONE_WORD = rf'(?<![{ASCII_WORD}]){ZONE}(?![{ASCII_WORD}])'
+TWELVE_HOUR = rf'(?<![{ASCII_WORD}:.])\d{{1,2}}(?::{MINUTE_VALUE})? ?[AaPp]\.?[Mm]\.?(?![{ASCII_WORD}])'
+# 会话号：本仓与上游三语仓的目录名，后面跟 - 与 2 到 6 位小写十六进制；后面紧跟 . - } / 的是 mktemp 模板、路径里的临时目录名，不算
+SESSION_NAME = rf'(?<![{ASCII_WORD}\-])singlefs(?:-ai-sop(?:-zh|-en|-ja)?)?-[0-9a-f]{{2,6}}(?![{ASCII_WORD}.\-}}/])'
 
 # 上下文规则用的：紧挨在冒号对前面、说明它是代码或产物字段的字符
 CODE_CHARACTERS_BEFORE = ('=', '[', '{', ',', '>', '"', "'", '+', '-', '.')
@@ -143,6 +152,7 @@ FORMS = (
             ('date-zone-period', '日期或时区后面跟时段词', re.compile(rf'(?:{DATE}(?:\s*{ZONE})?|{ZONE})[\s（(，]*{NEXT_DAY}{PERIOD}'), None),
             ('period-hour', '时段词后面跟钟点', re.compile(rf'{PERIOD}\s*(?:{HOUR}|{CLOCK})'), None),
             ('hour-suffix', '「N 点前后」这类钟点', re.compile(r'(?<![第\d])(?<!第 )\d{1,2}\s*(?:点(?:前后|左右|许|半|钟)|时许)'), None),
+            ('twelve-hour', '十二小时制钟点', re.compile(TWELVE_HOUR), None),
             ('bare-clock', '不挨日期时区的钟点', re.compile(BARE_CLOCK), bare_clock_is_not_clock),
             ('iso-timestamp', 'ISO 时间戳', re.compile(ISO_TIMESTAMP), field_value),
             ('zone-word', '时区词', re.compile(ZONE_WORD), None),
@@ -187,6 +197,29 @@ FORMS = (
             '.sh、.py、.rs 里代码真要用这些字面（TZ 环境变量、解析外部文本的正则、造时间戳的自检输入），在那一行写'
             '「# clock-times:allow <理由>」（Rust 写「//」），理由不许省；',
             '钟点确实是被测输入的整份文件，登记进 .claude/gate.d/lib-forbidden-notations.py 里钟点那一形态的 excluded_prefixes 并写明理由。',
+        ),
+    },
+    {
+        'key': 'session-names',
+        'name': '会话号',
+        'patterns': (
+            ('session-names', '会话号', re.compile(SESSION_NAME), None),
+        ),
+        'excluded_prefixes': (
+            ('.claude/gate.d/fixtures/', '门禁样本：会话号是被测输入，由 setup.sh 拆开拼出'),
+            (UPSTREAM_COPY, '上游副本，只能在上游改'),
+        ),
+        'allow_suffixes': ('.sh', '.py', '.rs'),
+        'clean': '没有会话号',
+        'excluded_label': '会话号的排除前缀下 {count} 份（门禁样本或上游副本）',
+        'finding': '行写了会话号',
+        'detail_shows_pattern': False,
+        'snippet_to_match_end': True,
+        'remedy': (
+            '会话号（ListAgents 列的「目录名-十六进制」）不写进仓：标签式的「（会话 <号>，<日期>）」只留日期，'
+            '当主语用的写成「别的会话」「SOP 会话」「发版会话」这类不带号的说法，事情与日期照留；',
+            '改过标题的会话（「会话「<标题>」」）门禁认不出，照同样的写法改；',
+            '.sh、.py、.rs 里代码真要用这些字面（解析 ListAgents 输出的正则、造会话号的自检输入），在那一行写「# session-names:allow <理由>」，理由不许省。',
         ),
     },
 )

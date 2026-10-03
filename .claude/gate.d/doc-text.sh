@@ -1,73 +1,61 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 只读仓里的文本与 git 记录，除了跑门禁本身就要的 bash、git、python3 之外没有环境要求
-# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标 U+2032、U+2033、U+2034、U+02B9、U+02BA，K9 的变体起一个新名字，不写成 K9 加一撇；描述里的钟点、时区词与时间戳，时间只写到日期），也不许再出现登记过改名的术语的旧名（登记表 .claude/kb/term-renames.md，排除表 .claude/term-rename-exempt）
+# gate-stage: 文本写法：全仓不许出现登记过的禁用写法（撇号类角标、描述里的钟点与时区词、会话号）与登记过改名的术语旧名；改动碰到的记录与 kb 页日期只写在标题上
 # gate-category: 文档类
-# 不声明 gate-covers：.claude/gate-not-implemented.tsv 里的两项（崩溃点重放、模型对拍）判的是被测代码的行为，这一道只判全仓文本的写法，一项都不覆盖。
+# 不声明 gate-covers：.claude/gate-not-implemented.tsv 的两项判被测代码的行为，这一道只判文本写法。
 # gate-similar: code-tooling.sh 它的 fixture-claims 格也扫全仓文件，但判的是文件名与样本目录里编出来的日期、阶段头部声称的样本在不在，不是文本里的写法
 # gate-similar: code-source-discipline.sh 它的 vague-names 与 test-file-names 两格也判写法，但对象是 .rs 里声明的函数名、类型名与测试文件名，读的是空泛词表与按里程碑起名的正则，不扫全部文本
 #
-# 四格：前三格扫全仓文本（原是禁用写法、术语改名两道，合成这一道），第四格只判这次改动碰到的记录与 kb 页。
-# 格名表（--list 打它，--check <格名>[,<格名>…] 只跑点名的格，不给就四格都跑，格名写错退 2）：
 # gate-cell: prime-marks 撇号类角标
 # gate-cell: clock-times 描述里的钟点、时区词与时间戳
+# gate-cell: session-names 会话号（ListAgents 列的会话名）
 # gate-cell: term-renames 登记过改名的术语不再出现旧名
 # gate-cell: date-once 这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析项目根。
+# 格结构经 lib/stage-cells.sh。
 #
-# ── prime-marks、clock-times ──
-# 判据：`git ls-files --cached --others --exclude-standard` 列出的每一份文本文件（不在 git 仓里时走目录树），
-# 每一行拿同目录 lib-forbidden-notations.py 的 FORMS 里这一格的形态去判：形态的判据行命中任一条就是那一形态的一处违例，
-# 报一段「文件:行」（钟点那一形态另点名命中的判据行）。形态登记正则、排除前缀、成功行怎么报、判红的出路，
-# 加一种禁用写法就是往 FORMS 里加一项、再在这里的格名表里加一格。格名就是形态的键，两格各扫一趟。
+# ── prime-marks、clock-times、session-names ──
+# 格名就是同目录 lib-forbidden-notations.py 里 FORMS 的形态键。git ls-files --cached --others --exclude-standard 列出的每份文本文件
+# （不在 git 仓里时走目录树）逐行交那一形态判，违例报「文件:行」。判据行、上下文放行规则、放行标记、排除前缀、成功行与出路都在那份库里；
+# 加一种禁用写法就是往 FORMS 加一项、再在格名表里加一格。.claude/hooks/write-guard.sh 写入时读同一份库。
 # 射程是全仓，冻结证据（research/prompts/、records/、变更史、research/results/）也在内。
-# 角标连门禁样本也扫，只排除上游副本；钟点另排除把钟点当被测输入的门禁样本、hook 自检与 c510 那一轮；逐项见 FORMS 的 excluded_prefixes。
-# 管不到的：ASCII 单引号当角标（`S1'`、`丙'`）——它与代码里的引号、带引号的词分不开，机器判不了，靠写的人与 review。
-# 钟点那一形态连 ISO 时间戳、diff 头与 stat 的机器时间、不挨日期时区的时:分、光秃的时区词都判；长得像钟点的冒号对
-# （产物字段、切片、编号对）靠库里的上下文规则放过，.sh、.py、.rs 里带「clock-times:allow <理由>」的那一行放过，逐条写在那份库的文档串里。
-# 没扫的：二进制文件（前 8 KiB 里有 NUL 的）与列出了却不是普通文件的（工作区里删掉还没暂存的），逐个列名；
-# 这一形态排除前缀下的份数在成功行下面报。一份文本文件都没扫到：这一格本次无对象可判。
-# .claude/hooks/write-guard.sh 在写入那一刻拒绝时读同一份库（角标读 PRIME_MARKS，钟点读钟点那一形态），不各抄一份。
+# 没扫的：二进制文件（前 8 KiB 里有 NUL）与列出了却不是普通文件的，逐个列名。一份文本文件都没扫到：退 77。
+# 管不到的：ASCII 单引号当角标（与代码里的引号分不开）；改过标题的会话。
 #
 # ── term-renames ──
-# 判据：research/scripts/sweep-term.py --check <项目根>：按 .claude/kb/term-renames.md 的登记表查全仓（排除表 .claude/term-rename-exempt 登记的不扫，
-# 已归档产物的名字不换也不报，逐项列在它的成功行里）；排除表指向不存在的路径也判红。改一个全仓术语怎么做见
-# .claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」。没有登记表时这一格本次无对象可判。
-# 管不到的：登记表里没登记的改名；一个概念换了名字却没往登记表加一行，这一格照旧绿，靠改名的人登记。
+# 判法在 research/scripts/sweep-term.py --check：按 .claude/kb/term-renames.md 查全仓，排除表 .claude/term-rename-exempt，
+# 排除表指向不存在的路径也判红。没有登记表：退 77。规则：.claude/rules/path-moves.md「改一个全仓术语：正文之外还有五处会红」。
+# 管不到的：登记表里没登记的改名。
 #
 # ── date-once ──
-# 判据：research/scripts/changed-paths.sh 的 gate 取法取基准，这次改动碰到的（含未跟踪的）records/*.md 与 .claude/kb/ 下的 .md
-# （两份变更史归 doc-decisions 的 shape 格，INDEX.md 不判）逐份交 research/scripts/doc-consolidate.py migrate 干跑：
-# 它会删掉与所属日期（文件名里的日期、最近一个带日期的标题）相同的行内日期、并掉同一天的第二个同级小节；
-# 干跑改了什么就是违例，报那一份删了几个日期、并了几个小节。路径、产物名、「」里的引名、紧跟「：」的小节名、
-# 实验页回看列与未定项两句字节判决里的日期不算（判法逐条在那份脚本文件头）。规则：.claude/rules/changelog-format.md、kb-discipline 第 1 条。
-# 不在 git 仓里没有基准：整棵树都判。一份都没碰到：这一格本次无对象可判。
-# 管不到的：别的日期该不该写（事件的锚照写）、日期挪进标题之后小节切得对不对——这两样靠人。
-# 弄坏开关 GATE_TEXT_NOTATIONS_BREAK=date-once-unjudged：这一格不干跑、记无对象可判，date-once-red 退 77、样本判错。
+# 这次改动碰到的（含未跟踪的）records/*.md 与 .claude/kb/ 下的 .md（两份变更史与 INDEX.md 不判）逐份交
+# research/scripts/doc-consolidate.py migrate 干跑，干跑改了什么就是违例；哪些日期不算，判法在那份脚本文件头。
+# 基准取 research/scripts/changed-paths.sh 的 gate 取法；不在 git 仓里整棵树都判；一份都没碰到：退 77。
+# 规则：.claude/rules/changelog-format.md、kb-discipline 第 1 条。管不到的：别的日期该不该写、日期挪进标题之后小节切得对不对。
 #
-# 样本：fixtures/doc-text.sh/ 下八份，每份样本根放 .gate-cells 只点名它判的那一格：
-#   date-once-red       setup.sh 建 git 仓，基准里一份记录与一份实验页干净；这一轮往记录正文加一行带文件名日期的话、
-#                       往实验页加第二个同日 `### ` 小节，逐份点名判红
-#   date-once-green     同一基准；这一轮加的行只带别的日期、加的小节是另一天，判绿
-#   prime-marks-red     setup.sh 现写一份带「K9」加一撇的 md、一份带「G5」加两撇的 rs，逐处点名「文件:行」判红（现场与 clock-times-red 是同一份 setup.sh）
+# 弄坏开关（打开后样本判错）：
+#   GATE_TEXT_NOTATIONS_BREAK=date-once-unjudged      date-once 不干跑、记无对象可判：date-once-red 退 77
+#   GATE_TEXT_NOTATIONS_BREAK=term-renames-unjudged   term-renames 不调 sweep-term、记无对象可判：term-renames-red 退 77
+#   LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>   关掉判据行：红样本里点名那一行的报不出来
+#   LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键>、
+#   LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键>  关掉上下文规则、不认放行标记、排除前缀失效：那一格的绿样本判红
+#   （键写在 lib-forbidden-notations.py）
+#   STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0；=marker-ignored 让每份样本几格都跑，「跑了 1 格」的 want 找不到
+#
+# 样本：fixtures/doc-text.sh/ 下十份，每份样本根放 .gate-cells 只点名它判的那一格：
+#   date-once-red       setup.sh 建 git 仓；这一轮往记录正文加一行带文件名日期的话、往实验页加第二个同日 `### ` 小节，逐份点名判红
+#   date-once-green     同一基准；加的行只带别的日期、加的小节是另一天，判绿
+#   prime-marks-red     一份带「K9」加一撇的 md、一份带「G5」加两撇的 rs，逐处点名「文件:行」判红
 #   prime-marks-green   只有正常写法（变体起了新名字、ASCII 单引号），外加上游副本里带角标的 md（排除前缀下），判绿
-#   clock-times-red     setup.sh 现写一份带「日期 时区词 时:分x」的 md、一份带「时:分 时区词」的 rs，
-#                       与「N 点 / N 时」、时段词那四个判据行各一份 md（每行一种写法），不挨日期时区的钟点、光秃时区词、ISO 与 diff 头 stat 的机器时间各一份 md，
-#                       写在 md 里与没写理由的放行标记各一行，逐处点名「文件:行」与判据行判红
-#   clock-times-green   只有日期与近似但该放行的写法（序号的「第 N 点」、个数后的「点」、光秃时段词、标识符里的时区词、
-#                       一行一类长得像钟点的冒号对），.sh、.py、.rs 里带放行标记的各一行，外加落在钟点排除前缀下的门禁样本、hook 自检与 c510 提示，判绿
-#                       （现场与 prime-marks-green 是同一份 setup.sh）
-#   term-renames-red    setup.sh 现写一份改名登记表与一份还用着旧名的 rs（旧名由几段拼出来，样本目录里不出现旧名的字面），判红
+#   clock-times-red     每条判据行各有一份带那种写法的 md 或 rs，外加写在 md 里与没写理由的放行标记，逐处点名「文件:行」与判据行判红
+#   clock-times-green   只有日期与近似但该放行的写法，.sh、.py、.rs 里带放行标记的各一行，外加钟点排除前缀下的门禁样本、hook 自检与 c510 提示，判绿
+#   session-names-red   标签式、当主语用的、上游三语仓的、长十六进制的会话号各一行，外加 rs 里没写理由的放行标记，逐处点名判红
+#   session-names-green 近似但该放行的写法（crate 名、mktemp 模板与临时目录名、上游仓目录名、带字母后缀的标识符）与 .sh 里带放行标记的一行，
+#                       外加会话号排除前缀下的门禁样本，判绿
+#   term-renames-red    一份改名登记表与一份还用着旧名的 rs（旧名由几段拼出来，样本目录里不出现旧名的字面），判红
 #   term-renames-green  同一张登记表，rs 里只有新名，判绿
-# 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让三份红样本整道退 0；
-# STAGE_CELLS_BREAK=marker-ignored 让每份样本三格都跑，汇总那条「跑了 1 格」的 want 找不到）。
-# 格的判法的弄坏开关：LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键> 关掉判据行，红样本里点名那一行的就报不出来，样本判错（键写在 lib-forbidden-notations.py）；
-# LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键> 关掉上下文规则、LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键> 不认放行标记，
-# LIB_FORBIDDEN_NOTATIONS_BREAK_EXCLUSIONS=<形态键> 让那一形态的排除前缀失效，那一格的绿样本判红，样本判错；
-# GATE_TEXT_NOTATIONS_BREAK=term-renames-unjudged 让 term-renames 那一格不调 sweep-term、记无对象可判，term-renames-red 退 77、样本判错。
 #
-#   bash .claude/gate.d/doc-text.sh [项目根]                                     四格都跑
+#   bash .claude/gate.d/doc-text.sh [项目根]                                     五格都跑
 #   bash .claude/gate.d/doc-text.sh --list                                       逐行打格名与判什么，不跑格
 #   bash .claude/gate.d/doc-text.sh --check <格名>[,<格名>…] [项目根]            只跑点名的格
 set -uo pipefail
@@ -86,6 +74,8 @@ stage_cell prime-marks cell_prime_marks "撇号类角标" \
   "给变体起一个新名字（那一族里下一个没用过的号，或一个短的描述性名字），撞号先查，全仓一次改完：.claude/rules/path-moves.md「变体起新名字，不用角标」"
 stage_cell clock-times cell_clock_times "描述里的钟点、时区词与时间戳" \
   "时间只写到日期，钟点、时区词、时间戳连同「前后」一起删；代码真要用这些字面的那一行写「# clock-times:allow <理由>」，整份是被测输入的登记进 lib-forbidden-notations.py 的 excluded_prefixes"
+stage_cell session-names cell_session_names "会话号（ListAgents 列的会话名）" \
+  "会话号不写进仓：标签式的「（会话 <号>，<日期>）」只留日期，当主语用的写成「别的会话」这类不带号的说法；代码真要用的那一行写「# session-names:allow <理由>」"
 stage_cell term-renames cell_term_renames "登记过改名的术语不再出现旧名" \
   "python3 research/scripts/sweep-term.py --apply 一次换完（跑不出来的产物一个字节都不许动，连同引它的正文留旧名）；确实该留旧名的登记进 .claude/term-rename-exempt 并写明为什么"
 stage_cell date-once cell_date_once "这次改动碰到的记录与 kb 页里，日期只在标题上：正文行不重复所属标题或文件名里的日期，同一天不开第二个同级小节" \
@@ -187,17 +177,18 @@ for path in irregular_files:
 PY
 }
 
-# ── prime-marks ──
 cell_prime_marks() {
   scan_form prime-marks
 }
 
-# ── clock-times ──
 cell_clock_times() {
   scan_form clock-times
 }
 
-# ── term-renames ──
+cell_session_names() {
+  scan_form session-names
+}
+
 cell_term_renames() {
   if [[ "$text_notations_break" == term-renames-unjudged ]]; then
     echo "  ! 弄坏开关 term-renames-unjudged：这一格不调 sweep-term，记本次无对象可判"
@@ -221,7 +212,6 @@ cell_term_renames() {
   exit 1
 }
 
-# ── date-once ──
 cell_date_once() {
   local base changed path count=0 red=0 scratch summary dates merges
   if [[ "$text_notations_break" == date-once-unjudged ]]; then

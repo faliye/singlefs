@@ -3,7 +3,7 @@
 # run-condition: none 只读仓里的文本与 git 记录、跑研究脚本与共用库自己的自证、起各道门禁的 --list；research-gate-lint 格调的上游 gate-lint.sh、shell-lint.sh 要 gawk，缺了由它们自己拒绝（退 78），那一格按红记，不交给 gate.sh 预判
 # gate-stage: 工具层自检（十一格：研究脚本的自证都过、有阶段在跑；项目规则清单；阶段归属表按格登记；钩子注册与写范围表与定义头；改动范围只许一份取法；研究脚本与钩子的拒绝出路与 shell 纪律；阶段声称的样本与编造的日期；kb 登记表；门禁结构；环境检查排在跑测试的阶段之后）
 # gate-category: 代码类
-# 不声明 gate-covers：.claude/gate-not-implemented.tsv 里的两项（崩溃点重放、模型对拍）判的是被测代码的行为，这一道只判工具层自己，一项都不覆盖。
+# 不写 gate-covers：.claude/gate-not-implemented.tsv 里的两项判的是被测代码的行为，这一道只判工具层自己。
 # gate-similar: checker-tier-research-build-and-replay.sh 它编 research/ 的装置、跑它们的单测，也先赋变量再 "$变量" --selftest 跑几份脚本的自证；这一道的 research-script-selftests 格跑的是 runner 表里研究脚本的自证、research-script-selftest-coverage 格核每份实现了 --selftest 的都有阶段在跑，不编译
 # gate-similar: harness-model-differential-and-scenarios.sh 它在真仓上判 harness 用例一条一个场景，crash-case-check.py 的判别力由这一道 research-script-selftests 格跑它的 --selftest；判的对象一个是用例源码，一个是脚本的自证
 # gate-similar: doc-text.sh 也扫全仓文件，但判的是文本里登记过的禁用写法与旧术语；这一道 fixture-claims 格判文件名与样本目录里编出来的日期、阶段头部声称的样本在不在
@@ -29,42 +29,35 @@
 # gate-cell: gate-structure 每道门禁有格名表，--list 与表一致且不起重活，--check 写错格名退 2
 # gate-cell: stage-order 环境检查那一道排在门禁目录里全部跑测试的阶段之后
 #
-# 前九格原是八道阶段（研究脚本自证、项目规则清单、阶段归属、写范围、改动范围取法、研究脚本门禁纪律、样本声称、kb 登记），2026-09-28 按
-# .claude/singlefs-ai-sop/rules/sop-first.md「加门禁或钩子之前，先找已有的」第 2 条并成一道：都判工具层自己
-# （研究脚本、钩子、门禁阶段、登记表、agent 定义头），其中四格共用同一份目录与清单表的双向比对（写成下面的 MANIFEST_LIBRARY）。
-# 同日按判决 research/prompts/gate-shrink-r1-main-verification.md「采纳的改法」改成共用库的结构：研究脚本自证那一格拆成跑 runner 表与核覆盖两格
-# （原来样本靠 .selftest-coverage-only 标记只判覆盖那一半，拆开以后样本用 .gate-cells 点名覆盖那一格），另加 gate-structure、stage-order 两格。
-# 这一轮改了判法的只有这几处：agent-write-scope 不再跑钩子的 --selftest（3-B2）；research-script-selftest-coverage 认「有 --selftest」只认
-# .sh / .py 代码里的（3-B5）；research-script-selftests 分批并行（3-B7）；两处认阶段的 glob 从「两位数开头」改成门禁目录顶层全部 *.sh（第 4 问）；
-# stage-owners 改认按格登记的表（采纳的改法第 1 条）。别的格的判据、出路、成功行里报的数、射程与「管不到的」照原样留着。
+# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经共用库 lib/stage-cells.sh（写法在它的文件头），这里只登记格、解析项目根。
 #
-# 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码都经共用库 lib/stage-cells.sh（写法与判据在它的文件头），
-# 这里只登记格、解析自己的项目根。
-#
-# 判别力：fixtures/code-tooling.sh/ 下每一格至少一红一绿，每份样本根放 .gate-cells 点名它判的那一格（只跑那一格，别的格不掺进来）：
+# 判别力：fixtures/code-tooling.sh/ 下每一格至少一红一绿，每份样本根放 .gate-cells 只点名它判的那一格：
 #   research-script-selftests          runner-red、runner-green
 #   research-script-selftest-coverage  red、green、coverage-claims-red、coverage-claims-green
 #   rules-manifest                     rules-manifest-red、rules-manifest-green
 #   stage-owners                       stage-owners-red、stage-owners-green
-#   agent-write-scope                  agent-write-scope-red、agent-write-scope-green
+#   agent-write-scope                  agent-write-scope-red、agent-write-scope-multiedit-red、agent-write-scope-green
 #   change-range-single-source         change-range-single-source-red、change-range-single-source-green
 #   research-gate-lint                 research-gate-lint-red、research-gate-lint-green
 #   fixture-claims                     fixture-claims-red、fixture-claims-unnumbered-red、fixture-claims-cells-red、fixture-claims-green
 #   kb-registry                        kb-registry-red、kb-registry-green
 #   gate-structure                     gate-structure-red、gate-structure-green
 #   stage-order                        stage-order-red、stage-order-green
-# 每一格的样本放了什么，写在那一格的注释里。原来八格的样本搬进来时每份八格全跑，绿样本为此补了同一副架子
-# （research/scripts/vm-bench.sh、stage-owners.tsv、定义、settings.json、写范围表这些）；现在有 .gate-cells，那副架子留着不碍事，want 不变。
-# 汇总与 --check 的弄坏开关归共用库（STAGE_CELLS_BREAK=red-swallowed 让每份红样本整道退 0）。
-# 格的判法各有弄坏开关 CODE_TOOLING_BREAK=<项>，每一项都让某一格的样本判错：
+# 每格的样本放了什么写在那一格的注释里。各份绿样本里 vm-bench.sh、stage-owners.tsv、定义、settings.json 这副架子是并道时为八格全跑补的，留着不碍事。
+# 汇总与 --check 的弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让这一道每份 exit=1 的样本（red 与各格的 *-red）都判错；别的开关见 lib/stage-cells.sh 文件头。
+# 格的判法各有弄坏开关 CODE_TOOLING_BREAK=<项>，逐项写开关名、弄坏哪一处、打开后哪几份样本判错（样本自检报那一份退出码不对或 want 找不到）：
 #   runner-exit-swallowed    research-script-selftests 回读时把每条的退出码都当 0：runner-red 判绿
 #   claims-any-file          research-script-selftest-coverage 退回「全文出现 --selftest 就算声称有」：coverage-claims-green 判红
-#   numbered-stages-only     research-script-selftest-coverage 与 fixture-claims 只认两位数开头的阶段：coverage-claims-green 判红、fixture-claims-unnumbered-red 退 77
+#   numbered-stages-only     research-script-selftest-coverage 与 fixture-claims 只认两位数开头的阶段：coverage-claims-green 判红、fixture-claims-unnumbered-red 退 77，
+#                            fixture-claims-green（cells-covered.sh 不扫，「有样本的阶段 3 格」那条 want 找不到）、fixture-claims-cells-red（cells-uncovered.sh 不扫，扫到 0 个阶段，「有格缺红或缺绿」那条 want 找不到）
 #   bare-red-green-only      fixture-claims 退回只认裸 red / green 样本目录、不按格数红绿：fixture-claims-green 判红（cells-covered.sh 成了空壳）、fixture-claims-cells-red 里那条「有格缺红或缺绿」的 want 找不到
 #   owner-rows-ignored       stage-owners 不判「--list 出的每一格都有一行」：stage-owners-red 里那几条 want 找不到
 #   structure-exit-ignored   gate-structure 不看 gate-structure-check.py 的退出码：gate-structure-red 判绿
 #   stage-order-ignored      stage-order 不比次序：stage-order-red 判绿
-# agent-write-scope 格另有它原来的开关 AGENT_WRITE_SCOPE_BREAK=any-model（关掉定义 model 取值那一条），名字没改。
+# agent-write-scope 格的弄坏开关 AGENT_WRITE_SCOPE_BREAK=any-model：关掉定义 model 取值那一条，agent-write-scope-red 照样退 1，
+#   「model 不是 opus、sonnet、haiku、inherit 之一」与「delta：model: local-model」两条 want 找不到；
+#   AGENT_WRITE_SCOPE_BREAK=multiedit-ignored：写范围闸的注册只要求覆盖 Write 与 Edit、不看 MultiEdit，agent-write-scope-multiedit-red 照样退 1，
+#   「写范围闸没挂全工具」与「没覆盖：MultiEdit」两条 want 找不到。
 #
 #   bash .claude/gate.d/code-tooling.sh [项目根]                                十一格都跑
 #   bash .claude/gate.d/code-tooling.sh --list                                  逐行打格名与判什么，不跑格
@@ -125,21 +118,13 @@ ROOT="${root_argument:-$STAGE_REPOSITORY}"
 cd "$ROOT" 2>/dev/null || { echo "  ✗ 进不去项目根 $ROOT"; echo "     → 怎么办：第一个参数给项目根（仓的顶层目录），不给就取这个脚本往上两级；路径写错或没有权限进去时这一道什么都没判。"; exit 2; }
 ROOT="$(pwd)"
 
-# 被判的根是样本（不是这一道所在的仓、也不在 gate.sh --staged 的临时树里）：与共用库认 .gate-cells 同一种判法。
-# research-script-selftests 格只在样本里认样本根的 .selftest-runners（换掉 runner 表），真仓与 --staged 下放了它也不认。
+# 被判的根是样本：不是这一道所在的仓，也不在 gate.sh --staged 的临时树里（与共用库认 .gate-cells 同一种判法）。
 judged_root_is_sample() {
   [[ "$(pwd -P)" != "$STAGE_CELLS_STAGE_REPOSITORY" && -z "${GATE_STAGED_FROM:-}" ]]
 }
 
-# 目录 ↔ 清单表的双向比对（rules-manifest、stage-owners、agent-write-scope、kb-registry 四格共用；原是门禁目录里一份单独的 lib-manifest.py，只有这四格调它）。
-# 四格判的是同一种形状：盘上有一批东西（规则文件、门禁阶段、agent 定义、kb 文件），
-# 一张清单表登记它们（CLAUDE.md 的 @ 引用、stage-owners.tsv、agent-write-scope.tsv、「项目本地事实」表）。
-# 两个方向都要判：盘上有、清单没登记的，读的人不知道它是什么；清单登记了、盘上没有的，
-# 清单指向空处，让人以为那一格有人管着。只判一个方向的比对，另一个方向永远不红。
-# 各格自己决定「盘上有什么」「清单登记了什么」「怎么算登记上了」，这里只管比对与读表：
-#   two_way(on_disk, registered, is_registered=None, exists=None) -> (unregistered, dangling)
-#   table_rows(path) -> [(行号, 去掉换行的整行, 按制表符切开的各格)]
-# 各格的 python 段把它当第一个参数收进来，装成一个模块：
+# 目录与清单表的双向比对，rules-manifest、stage-owners、agent-write-scope、kb-registry 四格共用；两个方向都判，只判一个方向的另一个方向永远不红。
+# 各格的 python 段把它当第一个参数收进来，装成模块：
 #   manifest = types.ModuleType("lib_manifest"); exec(compile(sys.argv[1], "manifest-library", "exec"), manifest.__dict__)
 MANIFEST_LIBRARY="$(cat <<'PY_MANIFEST'
 def two_way(on_disk, registered, is_registered=None, exists=None):
@@ -176,10 +161,8 @@ def table_rows(path):
 PY_MANIFEST
 )"
 
-# 去掉注释与出路文字之后剩下的代码（research-script-selftest-coverage、stage-order 两格共用）：认「脚本实现了 --selftest」
-# 「阶段在跑某份脚本的自证」「阶段在跑测试」都只认代码，注释行不算，出路文字里提到的也不算。
-# 各格的 python 段把它当一个参数收进来，照 MANIFEST_LIBRARY 那样装成模块：
-#   code_text = types.ModuleType("lib_code_without_text"); exec(compile(sys.argv[i], "code-without-text-library", "exec"), code_text.__dict__)
+# 去掉注释行与出路文字之后剩下的代码，research-script-selftest-coverage、stage-order 两格共用：认「实现了 --selftest」「在跑某份自证」「在跑测试」都只认代码。
+# 装法照 MANIFEST_LIBRARY：code_text = types.ModuleType("lib_code_without_text"); exec(compile(sys.argv[i], "code-without-text-library", "exec"), code_text.__dict__)
 CODE_WITHOUT_TEXT_LIBRARY="$(cat <<'PY_CODE_WITHOUT_TEXT'
 import re
 
@@ -196,31 +179,16 @@ PY_CODE_WITHOUT_TEXT
 
 # ── 格 research-script-selftests：runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
 #
-# 判据：SELFTEST_RUNNERS 里的每一条自证都要退 0。表里有哪几份、哪几份不在表里要登记为什么，归下一格 research-script-selftest-coverage。
-# 为什么：这几份自证此前都写着，却没有任何门禁阶段在跑（2026-09-12 现查 gate.d 与 .claude/scripts 零处调用）——自证只在写它的那天被跑过一次，
-# 之后脚本改坏了也没人知道。2026-09-12 实测的两个坑都住在这里：
-# ask-local.sh 判红时正文照样打到 stdout（一份作废输出顶着 -output-s1.md 落盘），
-# 以及取法用不加引号的 $SPECS 传过 shell 被拆词（checklist-specs.py 就是为它写的）。
+# 判据：SELFTEST_RUNNERS 里每一条自证都退 0；表全不全归 research-script-selftest-coverage 格。lib/stage-cells.sh 不是阶段，它的自证只在这张表里跑。
 #
-# check-segment-registry.py 不是三方论证脚本，但同一个道理成立：doc-registries.sh 的 segment-registry 那一格（段序列登记表与 E142 产物逐字比对）的
-# 判别力样本只放三样合成输入，钉活代码的那几句与真产物的解析靠它自己的 --selftest 拿真文件测；
-# 那份 --selftest 同样要有人在门禁里替它复跑，不然只在写它的那天跑过一次。
-# 共用库 lib/stage-cells.sh 住在门禁目录的 lib/ 下，gate.sh 不把它当阶段跑，它的自证只在这张表里跑这一次。
+# 分批并行：SELFTEST_RUNNERS_STARTED_ALONE 里最慢的那几条先各自单独起、跑到完；其余按表次序每批 N 条并行，一批收齐再起下一批，
+#   N = SINGLEFS_THREAD_CAP（research/scripts/capped.sh 设的；不设或不是正整数取 nproc）减去单独起的条数，至少 1。
+#   每条的输出与退出码各写自己的文件，跑完按表次序回读、数份数（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）。
+#   几份自证抢同一份状态（同一个临时路径、同一个端口）的，只在并行下红：那一条挪进 SELFTEST_RUNNERS_STARTED_ALONE 单独起，或让它的自证各用各的临时目录。
 #
-# 分批并行（判决 research/prompts/gate-shrink-r1-main-verification.md 3-B7；攻方量过，research/prompts/gate-shrink-r1-opus-output.md 第七节：
-#   45 条顺序跑合计约 400 秒，layer0-shard-run.sh 与 agent-watch.py 两条占 68%；按耗时分批、每批 8 条并行 137–178 秒，只两次观测，不算稳定）：
-#   SELFTEST_RUNNERS_STARTED_ALONE 里那几条先各自单独起、一直跑到完；其余按表次序每批 N 条并行、一批全收回再起下一批，
-#   N = 线程上限（SINGLEFS_THREAD_CAP，research/scripts/capped.sh 设的那个；不设或不是正整数就取 nproc）减去单独起的条数，至少 1。
-#   每条的输出写自己的文件、退出码写自己的文件；收束时逐个 wait 那一批的进程号，全部跑完按表次序逐条回读，
-#   数一遍退出码文件，份数与派出去的条数对不上整格红（.claude/singlefs-ai-sop/rules/command-safety.md「并行不许把失败吃掉」）。
-#   没过的那几条按表次序逐条列出原样输出。单独起的那几条都要在 runner 表里：表里改了名忘了改它，就判红，不悄悄少跑。
-#   几份自证互相抢同一份状态（同一个临时路径、同一个端口）的，并行下才会红：那一条挪进 SELFTEST_RUNNERS_STARTED_ALONE 单独起，或修它的自证各用各的临时目录。
-#
-# 样本：被判的根是样本时（judged_root_is_sample，与共用库认 .gate-cells 同一种判法），样本根的 .selftest-runners
-#   （一行一条命令，空行与 # 开头的行不算）换掉 runner 表：表里那几十份自证要真仓里的脚本，装不进样本；真仓与 --staged 下放了它也不认。
-#   fixtures/code-tooling.sh/runner-red 的表里四条、第二条必红（退 1 并打一句原因），必须判红、点名那一条并列出它的输出，
-#   另外三条照样跑完、报 4 条里 1 条没过；runner-green 三条都退 0，判绿并报跑了 3 条。
-#   样本里没有单独起的那一路（样本的表不认 SELFTEST_RUNNERS_STARTED_ALONE），那一路只在真仓里走。
+# 样本：被判的根是样本时（judged_root_is_sample），样本根的 .selftest-runners（一行一条命令，空行与 # 开头的行不算）换掉 runner 表，
+#   单独起的那一路不走；真仓与 --staged 下放了它也不认。runner-red 四条里第二条必红，必须判红、点名它并列出输出，另三条照样跑完、
+#   报 4 条里 1 条没过；runner-green 三条都退 0，判绿并报跑了 3 条。
 SELFTEST_RUNNERS=(
   "bash research/scripts/ask-local-selftest.sh" "python3 research/scripts/checklist-specs.py --selftest"
   "python3 research/scripts/quote-kb.py --selftest" "python3 research/scripts/kb-sections.py --selftest"
@@ -242,6 +210,7 @@ SELFTEST_RUNNERS=(
   "bash research/scripts/capped.sh --selftest" "bash research/scripts/stage-run-or-skip.sh --selftest"
   "bash research/scripts/layer0-shard-run.sh --selftest" "bash research/scripts/mutation-shard-run.sh --selftest"
   "bash research/scripts/multi-host-run.sh --selftest" "bash research/scripts/run-with-memory-cap.sh --selftest"
+  "bash research/scripts/detached-run.sh --selftest"
   "bash research/scripts/mutate.sh --selftest" "python3 research/scripts/cite-check.py --selftest"
   "python3 research/scripts/kb-spec-check.py --selftest" "python3 research/scripts/crash-case-check.py --selftest"
   "bash research/scripts/prove-red.sh --selftest" "python3 research/scripts/apply-writer-patch.py --selftest"
@@ -251,6 +220,13 @@ SELFTEST_RUNNERS=(
   "python3 research/scripts/migrate-changelog-format.py --selftest"
   "bash research/scripts/crash-amplification.sh --selftest"
   "bash research/scripts/crash-amplification-item.sh --selftest"
+  "bash research/scripts/crash-amplification-two-hosts.sh --selftest"
+  "python3 research/scripts/broad-mutation.py --selftest" "python3 research/scripts/mutation-prune.py --selftest"
+  "python3 research/scripts/verus-proof-check.py --selftest" "python3 research/scripts/e165-pin-red-examples.py --selftest"
+  "bash research/scripts/e165-replay-mutation-kill-bounds.sh --selftest"
+  "python3 research/scripts/e165-compare-kill-bounds.py --selftest"
+  "python3 research/scripts/hook-swap.py --selftest"
+  "bash research/scripts/qemu-blklogwrites-check.sh --selftest" "bash research/scripts/build-patched-qemu.sh --selftest"
 )
 SELFTEST_RUNNERS_STARTED_ALONE=("bash research/scripts/layer0-shard-run.sh --selftest" "python3 research/scripts/agent-watch.py --selftest")
 
@@ -351,32 +327,18 @@ echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} �
 
 # ── 格 research-script-selftest-coverage：research/scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑
 #
-# 判据：research/scripts/ 里代码实现了 `--selftest` 的脚本，要么有阶段在调用它（上一格的 runner 表，
-# 或 checker-tier-research-build-and-replay.sh 那种先赋给变量再调的写法），要么登记进 NOT_RUN_HERE 并写明为什么；
-# NOT_RUN_HERE 里的每一行都要还指着一份实现了 --selftest、又没人跑的脚本，不然是过期的豁免。份数不在注释里写死，成功行现算。
-# 为什么：同上一格——没人跑的自证只在写它的那天跑过一次。
+# 判据：research/scripts/ 里实现了 --selftest 的脚本，要么有阶段在调它（脚本名后直接跟 --selftest，或先赋给变量再 "$变量" --selftest），
+#   要么登记进 NOT_RUN_HERE 写明为什么；NOT_RUN_HERE 里那份脚本已经有阶段在跑、或不再实现 --selftest 的，是过期豁免，也红。
+# 「实现了」只认 .sh / .py 经 code_of 去掉注释与出路文字之后的代码，不列具体写法（==、case、match 都认）；「有阶段在调」同样只认 code_of 之后的代码。
+# 阶段取门禁目录顶层全部 *.sh，与 gate.sh 起的是同一批。
 #
-# 「实现了 --selftest」（判决 3-B5，攻方 research/prompts/gate-shrink-r1-opus-output.md 第六节 M2 的 R3）：只认 .sh / .py，
-# 去掉 # 注释行与出路文字之后，代码里还有 `--selftest` 才算。去掉的是同一套（下面的 code_of），与认「有阶段在跑它」一样。
-# 原来全文出现 `--selftest` 就算，多认了只在注释里提别人的脚本与数据文件（2026-09-28 现算：54 份认 51 份，去掉的三份是
-# layer0-shard-configuration-check.sh、layer0-shard-run-selftest.sh 两份只在注释里提、memory-peaks.tsv 一份数据文件）；
-# 不列写法（== "--selftest"、case 分支、match 语句这些都认），新写一种实现自证的写法照样被认进来。
-# 「有阶段在跑它」只认代码：注释行不算，出路文字也不算——echo / printf / howto / bad / die / say / print( 后面带引号的那几段
-# 先去掉再认，一句「单跑 python3 research/scripts/foo.py --selftest 看它报什么」不是在跑它。
-# 阶段是门禁目录顶层全部 *.sh（与 gate.sh 起的是同一批；原来只认两位数开头的，去编号之后每份都会被报成没人跑，只改一部分时又悄悄漏掉改了名的那几道）。
-#
-# 样本：fixtures/code-tooling.sh/red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；
-# green 放一份真被阶段调用的与一份登记在 NOT_RUN_HERE 的，判绿并报对数。
-# coverage-claims-green 放一份只在注释与出路文字里提 --selftest 的 .py、一份提到它的 .tsv（两份都不算实现了），
-# 与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，判绿并报 2 份中 1 份（另一份是 NOT_RUN_HERE 那一份）；
-# coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
+# 样本：red 放一份只在某个阶段的 echo 出路里被提到的 --selftest 脚本，必须报它没人跑；green 放一份真被阶段调用的与一份登记在 NOT_RUN_HERE 的，判绿并报对数。
+#   coverage-claims-green 放一份只在注释与出路里提 --selftest 的 .py、一份提到它的 .tsv（都不算实现了）与一份由不带编号的阶段 tooling-runs.sh 在跑的 .sh，
+#   判绿并报 2 份中 1 份（另一份是 NOT_RUN_HERE 那一份）；coverage-claims-red 放一份用 match 语句实现 --selftest、没人跑的 .py，必须报它没人跑。
 NOT_RUN_HERE=(
   "research/scripts/vm-bench.sh	自证要连起三次虚机，挂钟太重，不进每轮门禁"
-  "research/scripts/crash-amplification-two-hosts.sh	自证要编 checker 档、两个进程各领一份真跑一条流水线用例再导入，挂钟以分计，归用户要求时跑"
 )
 cell_research_script_selftest_coverage() {
-# 被扫集合现算，不手抄份数（show-me-test.md「跳过清单要与被扫集合出自同一份数据、现算」）。
-# 认两种调用写法：脚本名后面直接跟 --selftest，或先赋给变量再 "$变量" --selftest（checker-tier-research-build-and-replay.sh 那样）；注释行不算调用。
 coverage="$(python3 - "$CODE_WITHOUT_TEXT_LIBRARY" "${CODE_TOOLING_BREAK:-}" "${NOT_RUN_HERE[@]}" <<'PY_COVERAGE'
 import glob, os, re, sys, types
 code_text = types.ModuleType("lib_code_without_text")
@@ -434,16 +396,9 @@ grep '^EXEMPT' <<<"$coverage" | cut -f2,3 | sed 's/\t/：/; s/^/      /'
 
 # ── 格 rules-manifest：项目规则清单一致
 #
-# 还 checks-owed.md C4（项目规则清单不一致）。
-# 判据：`.claude/rules/` 下的文件集合，必须与 CLAUDE.md 里 `@.claude/rules/` 的引用集合逐项相等。
-# 任一侧多出一项即判红——多出的那一份规则**不会被读进上下文**，等于没写。
-# 代码围栏（``` 或 ~~~ 起止）与行内代码（反引号括起的一段）里的 @ 不算引用：Claude Code 不在代码里展开 @ 导入，
-# 只在那里提到一次的规则文件照样读不进上下文。
-#
-# ⚠️ 上游 manifest.sh 只覆盖 SOP 包自己的 CLAUDE.md + rules/，
-# 项目本地那一份此前没有任何检查在看（C4 的原文）。
-# 双向比对用这一道文件头的 MANIFEST_LIBRARY，与 stage-owners、agent-write-scope、kb-registry 三格同一份代码。没有 .claude/rules 或没有 CLAUDE.md ⇒ 无对象可判，退 77（不记通过）。
-# 样本：fixtures/code-tooling.sh/rules-manifest-red 放一份没被引用的规则、一份只在代码围栏里与一份只在行内代码里被 @ 的规则，必须逐个报出；rules-manifest-green 两侧逐项相等，判绿。
+# 判据：.claude/rules/ 下的文件集合与 CLAUDE.md 里 @.claude/rules/ 的引用集合逐项相等；没被引用的规则读不进上下文。
+#   代码围栏（``` 或 ~~~ 起止）与行内代码里的 @ 不算引用：Claude Code 不在代码里展开 @ 导入。
+# 样本：rules-manifest-red 放一份没被引用的规则、一份只在代码围栏里与一份只在行内代码里被 @ 的规则，必须逐个报出；rules-manifest-green 两侧逐项相等，判绿。
 cell_rules_manifest() {
 python3 - "$MANIFEST_LIBRARY" <<'PY'
 import fnmatch, os, re, sys, types
@@ -497,27 +452,16 @@ PY
 
 # ── 格 stage-owners：阶段归属表与各道门禁的格逐格一致、派给的 agent 有定义，每道阶段认第一个参数当项目根
 #
-# 判据：`.claude/gate.d/stage-owners.tsv` 一行一个门禁与格名：门禁文件名、格名、判红时派给谁修（agent 名，逗号分隔）、为什么
-# （.claude/rules/verification.md「门禁的结构」）。提交前的整轮门禁跑全部门禁，哪一格红就按这张表派给谁修。任一条不成立判红：
-#   ① 门禁目录顶层每道门禁（`*.sh` 普通文件，共享 gate.sh 当本地阶段跑的就是这一批）`--list` 出的每一格，在表里恰好一行；
-#      `--list` 的起法与 research/scripts/gate-structure-check.py 同一份（导入它的 header_cells、make_shims、start_stage：
-#      项目根、--list、--force，清掉门禁的握手变量，cargo、qemu 这类重活换成替身，限时）；文件头没有格名表的门禁不起它
-#      （起它就是全跑），与 --list 没退 0、起了重活、一格都没打的一起报「列不出格」，这几道的格登没登记判不了；
-#   ② 表里每一行的门禁文件都在、那一格在那道门禁的 --list 里；
-#   ③ 第三列每个 agent 名都有 `.claude/agents/<名字>.md`；
-#   ④ 每一行四列齐全、没有空列；
-#   ⑤ 每个阶段都认第一个参数当项目根：`ROOT="${1…`（或先解析选项再 `ROOT="${root_argument…`）、或直接 `cd "${1…`。
-#      只看当前目录的阶段，被人从别的目录带着根目录参数调用时安静地判错地方，而 stage-selftest 既 cd 又传参，看不出来。
-# 不再要求每道门禁登记给某个 agent 在干完活之后先跑：扫仓的门禁只在提交前由整轮门禁跑，这张表只回答红了派给谁。
-#
-# 为什么：归谁的清单原来在 CLAUDE.md 与 kb-scribe 定义里各手抄一份，没有任何东西盯着它们与目录同步——
-# CLAUDE.md 那份 52 行清单里实验复跑那一道的说明已经与脚本头部对不上（records/2026-09-17-CLAUDE.md去冗余.md）。
-# 按道登记时，一道里一格红把别的格的派修一起带走（判决 research/prompts/gate-shrink-r1-main-verification.md 第 2 问），所以按格登记。
-# 表只写一份；新加一格忘了登记、删了一格或一道没改表、删了一个定义没改表，这一格当场红。
-# ① ② 的双向比对与读表用这一道文件头的 MANIFEST_LIBRARY，与 rules-manifest、agent-write-scope、kb-registry 三格同一份代码。
-# 样本：fixtures/code-tooling.sh/stage-owners-red 的表里有三列的行、同一格登记两行、没有定义的 agent、指向门禁里没有的格与指向不在的门禁的行，
-# 目录里有一格没登记、一道没有格名表、一道 --list 退 1、一道不认第一个参数，必须逐个报出；
-# stage-owners-green 两道门禁三格逐格登记，判绿并报门禁数、格数与 agent 数。
+# 判据（.claude/rules/verification.md「门禁的结构」）：.claude/gate.d/stage-owners.tsv 一行一格，四列：门禁文件名、格名、判红时派给谁修、为什么。任一条不成立判红：
+#   ① 门禁目录顶层每道 *.sh 的 --list 出的每一格在表里恰好一行。--list 经 gate-structure-check.py 的 header_cells、make_shims、start_stage 起
+#      （替身拦重活、限时）；没有格名表的不起它（起它就是全跑），与 --list 没退 0、起了重活、一格都没打的一起报「列不出格」；
+#   ② 表里每一行的门禁文件在、那一格在它的 --list 里；③ 第三列每个 agent 名都有 .claude/agents/<名字>.md；④ 每行四列、没有空列；
+#   ⑤ 每道阶段认第一个参数当项目根（ROOT_ARGUMENT_PATTERN）：只看当前目录的阶段从别的目录带着根参数调用时安静地判错地方，
+#      stage-selftest 既 cd 又传参，看不出来。
+# 按格登记、不按道：按道时一格红会把同道别的格的派修一起带走。
+# 样本：stage-owners-red 的表里有三列的行、同一格登记两行、没有定义的 agent、指向门禁里没有的格与指向不在的门禁的行，
+#   目录里有一格没登记、一道没有格名表、一道 --list 退 1、一道不认第一个参数，必须逐个报出；
+#   stage-owners-green 两道门禁三格逐格登记，判绿并报门禁数、格数与 agent 数。
 cell_stage_owners() {
 python3 - "$MANIFEST_LIBRARY" "$STAGE_REPOSITORY/research/scripts/gate-structure-check.py" "${CODE_TOOLING_BREAK:-}" <<'PY'
 import glob, importlib.util, os, re, shutil, sys, tempfile, types
@@ -611,7 +555,7 @@ if unregistered:
     print("  ✗ 这些格在表里没有登记——判红时不知道派给谁修：")  # gate-lint:summary
     for stage, cell in unregistered:
         print(f"     {stage} 的 {cell}")  # gate-lint:detail
-    print(f"     → 怎么办：在 {table_path} 给每一格加一行：门禁文件名、格名、判红时派给谁修、为什么；没有合适的 agent 就写 gate-triage。格名照 bash .claude/gate.d/<门禁> --list 抄。")
+    print(f"     → 怎么办：在 {table_path} 给每一格加一行：门禁文件名、格名、判红时派给谁修、为什么；没有合适的 agent 就写 investigator。格名照 bash .claude/gate.d/<门禁> --list 抄。")
 if duplicated:
     failed = True
     print("  ✗ 这些格在表里登记了不止一行：")  # gate-lint:summary
@@ -646,48 +590,23 @@ PY
 
 # ── 格 agent-write-scope：钩子注册在要的 matcher 上、写范围表与定义双向一致、每个定义带 omitClaudeMd 与「开工先读：」、共用切词与重型测试判定模块不另写一份
 #
-# 判据，任一条不成立判红：
-#   ① `.claude/settings.json` 的 PreToolUse 里有一条 matcher 同时覆盖 Write 与 Edit、命令指向 `write-guard.sh` 的 hook（写范围与整份覆盖未跟踪文件两道合在里面）；
-#   ② （空号：原来在这里跑 write-guard.sh 的 --selftest，见下面「钩子的自证」）；
-#   ③ `.claude/agents/` 里 tools 含 Write 或 Edit 的每个定义，在 `.claude/hooks/agent-write-scope.tsv` 里至少有一条路径模式；
-#   ④ 表里每个 agent 名都有定义，每行至少两列；
-#   ⑤ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `bash-command-detector.sh` 的 hook（没超时的等待循环、run_in_background 里又自己放后台记进检出记录、放行：在跑的命令结不结束由主 agent 判断；起看门狗的错误写法——不用 run_in_background、带 `&` / nohup / setsid / disown、输出丢进 /dev/null——执行前拒绝）；
-#   ⑥ PreToolUse 里有一条 matcher 覆盖 Agent、命令指向 `runner-dispatch-guard.sh` 的 hook（派执行员没点名岔路、续做没写还差的行会被拒；派 crash-verifier、gate-triage 之外的类型没写「重型测试：不跑」一行、缺定义要的输入、写范围之外的路径、实现员撞文件、opus 满上限会被拒；派 kb-scribe、implementation-writer 时要改的文件落在还没判完的三方轮开工快照里会被拒）；
-#   ⑦ PreToolUse 里有一条 matcher 覆盖 SendMessage、命令指向 `continuation-guard.sh` 的 hook（给最近一次任务通知是 failed 或 killed 的、或已经交回过的子 agent 续做会被拒，上下文多大不拦）；
-#   ⑧ `.claude/agents/` 里每个定义的 frontmatter 有 `omitClaudeMd: true`，正文有一行以「开工先读：」开头（不继承 CLAUDE.md 之后，要读的规则全靠这一行点名）；
-#   ⑨ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向上游 SOP 的 `claude-hooks/pattern-process-guard.sh` 的 hook，且那个文件在
-#     （按模式找进程在执行前拒绝；它的判别力由上游 selftest 的样本管，门禁「门禁自检」阶段跑它，这里只查注册着、文件在）；
-#   ⑩ SessionStart 里有一条 matcher 覆盖 compact、一条 matcher 同时覆盖 startup 与 resume（可以是同一条），命令都指向 `session-start.sh`
-#     （压缩上下文之后补回分支、未提交数、最近的记录与看门狗命令；会话启动或恢复时报近几小时内核因为内存不够杀过的进程，读不到内核日志报「没查成」）。
-#   ⑫ PreToolUse 里有一条 matcher 覆盖 Bash、命令指向 `heavy-test-guard.sh` 的 hook（重型测试——层 0、QEMU、herd7、crates 变异整表、全量测试、整轮门禁、全部实验复跑、E152 装置——子 agent 越出自己那一份就拒，主 agent 与 crash-verifier、gate-triage 不带 `SINGLEFS_HEAVY_TESTS=commit` 或 `=user-request` 也拒）。
-#   ⑬ 两份共用模块顶层定义的每个函数名，只许在它自己那一份里定义：`.claude/hooks/` 下别的文件里再 `def <名字>(` 一份就判红——
-#     切词模块 `.claude/hooks/lib_shell_words.py`（判 Bash 命令的 hook 手抄一份切词，一份改了另一份不跟，同一条命令一个 hook 认得出、另一个认不出），
-#     重型测试判定模块 `.claude/hooks/lib_heavy_tests.py`（heavy-test-guard.sh 与看门狗 research/scripts/agent-watch.py 共用 classify、classify_process、
-#     judged_by_name 这些判定，手抄一份就是执行前的闸与进程这一层判得不一样）；名字从模块现读，读不到或一个函数都没有也判红。
-#     不算的名字登记在 NOT_SHARED_JUDGMENT（每个 hook 都有自己的 selftest 入口，导入样板 load_sibling_module），登记了而模块里没有这个函数也判红。
-#   ⑮ `.claude/agents/*.md` 的 frontmatter 里 `model:` 只许 opus、sonnet、haiku、inherit（行尾可带 YAML 注释）；AGENT_WRITE_SCOPE_BREAK=any-model 关掉这一条，判别力样本必须转红为绿。
-#   ⑯ PreToolUse 里有一条 matcher 覆盖 SubagentHandback、命令指向 `handback-guard.sh` 的 hook（项目子 agent 交回正文超长、三方腿与核查员引文对不上、
-#     书记员与执行员绿行没报数都拒）。
-#   ⑭ PreToolUse 里有一条 matcher 覆盖 AskUserQuestion、命令指向 `ask-user-claim-guard.sh` 的 hook（弹窗问句与选项说明里
-#     带断言词——不可能、造不出、从来不、一定、恒为这类——的句子，同一句里既没有出处也没写「推的，没量过」就拒）。
-# 「命令指向某个 hook」按 shell 切词认：命令的第一个词（或 bash / sh / python3 / env 后面那个词）就是那个脚本，路径按结尾认；
-#   只在注释、echo 的参数或别的词里提到它（`true # write-guard.sh`）不算注册。
-# 「tools 含 Write 或 Edit」：frontmatter 没写 tools 的定义继承全部工具，算；`tools: [A, B]` 与 YAML 列表（下面几行 `- A`）照样认。
-# ③ ④ 的双向比对与读表用这一道文件头的 MANIFEST_LIBRARY，与 rules-manifest、stage-owners、kb-registry 三格同一份代码。
+# 判据，任一条不成立判红（「注册」指 settings.json 里有一条 matcher 覆盖那个工具或事件、命令指向那个钩子）：
+#   ① PreToolUse 里命令指向 write-guard.sh 的注册，matcher 合起来覆盖 Write、Edit 与 MultiEdit（WRITE_GUARD_TOOLS）；
+#   ③ tools 含 Write 或 Edit 的每个定义，在 .claude/hooks/agent-write-scope.tsv 里至少一条路径模式；④ 表里每个 agent 名都有定义，每行至少两列；
+#   ⑤ Bash 注册 bash-command-detector.sh；⑥ Agent 注册 runner-dispatch-guard.sh；⑦ SendMessage 注册 continuation-guard.sh；
+#   ⑧ 每个定义的 frontmatter 有 omitClaudeMd: true，正文有一行以「开工先读：」开头；
+#   ⑨ Bash 注册上游 claude-hooks/pattern-process-guard.sh，且那个文件在（它的判别力归上游 selftest）；
+#   ⑩ SessionStart 有一条 matcher 覆盖 compact、一条同时覆盖 startup 与 resume（可以是同一条），命令都指向 session-start.sh；
+#   ⑫ Bash 注册 heavy-test-guard.sh；⑭ AskUserQuestion 注册 ask-user-claim-guard.sh；⑯ SubagentHandback 注册 handback-guard.sh；
+#   ⑬ 共用模块 lib_shell_words.py、lib_heavy_tests.py 顶层定义的每个函数名，.claude/hooks/ 下别的文件里不许再 def 一份；名字从模块现读，
+#      读不到或一个函数都没有也红；不算的名字登记在 NOT_SHARED_JUDGMENT，登记了而模块里没有的也红；
+#   ⑮ frontmatter 的 model 只许 ALLOWED_MODELS 里的取值。
+# 钩子的自证不在这里跑，归上游 hooks-registered.sh；它只核有一条注册指向钩子、不核挂在要的 matcher 上，所以 matcher 留在这一格判。
 #
-# 钩子的自证（判决 research/prompts/gate-shrink-r1-main-verification.md 3-B2）：这一格原来逐个跑上面八个项目钩子的 --selftest，
-# 与上游 hooks-registered.sh 重复——它对 settings.json 里注册的、文件里带 --selftest 字样的每个钩子都跑自证，射程还更宽，提交时由 gate.sh 跑。
-# 所以这一格不再跑钩子的自证，只留上游判不到的：点名的钩子挂在要的 matcher 上（hooks-registered 只核有一条注册指向它，
-# 与文件头 hook-events 写了工具名的那几个 matcher；攻方量过：write-guard 收成只挂 Write、heavy-test-guard 挪到 Edit 上、
-# session-start 收成只挂 startup，它照样绿，research/prompts/gate-shrink-r1-opus-output.md「B2」）、写范围表与定义双向一致、定义头、共用模块不另写一份。
-#
-# 判别力：fixtures/code-tooling.sh/agent-write-scope-red 的 .claude/hooks/ 里放一份手抄 shell_tokens 的 hook 与一份手抄 classify_process 的 hook，必须各报出文件与行号；
-# agent-write-scope-green 的 .claude/hooks/ 里放两份从共用模块导入、只写自己判定的 hook（连同被判仓自己那两份模块），必须判绿，成功行数进去的别的文件数要对。
+# 样本：agent-write-scope-red 的 .claude/hooks/ 里放一份手抄 shell_tokens 的 hook 与一份手抄 classify_process 的 hook，必须各报出文件与行号；
+#   agent-write-scope-multiedit-red 的 settings.json 只把 write-guard.sh 注册在 "Write|Edit" 上，必须报没覆盖 MultiEdit；
+#   agent-write-scope-green 的 .claude/hooks/ 里放两份从共用模块导入、只写自己判定的 hook（连同被判仓自己那两份模块），必须判绿，成功行数进去的别的文件数要对。
 # 共用模块的函数名取自这一道脚本旁边 ../hooks/ 下那两份（取自 $0 的目录，不取项目根）：样本仓里放坏的模块碰不到它。
-#
-# 为什么：执行类 agent 越界写，靠定义里一句「只写写范围」拦不住；hook 被删、注册挂错了 matcher、新加一个能写文件的定义忘了登记，
-# 这道闸都会静默消失或静默放行——只有门禁会在它消失时说话。
-# 2026-09-17 写 hook 时实测撞过一次静默放行：程序从标准输入读，hook 的 JSON 读不到，判定一律放行，而直接调判定函数的自证全绿。
 cell_agent_write_scope() {
 HOOKS_DIRECTORY="$(cd "$STAGE_DIRECTORY/../hooks" && pwd)"
 table_output="$(python3 - "$MANIFEST_LIBRARY" "$HOOKS_DIRECTORY/lib_shell_words.py" "$HOOKS_DIRECTORY/lib_heavy_tests.py" <<'PY'
@@ -726,16 +645,23 @@ except Exception as error:
     failed = True
     print(f"  ✗ 读不了 {settings_path}：{error}")
     print("     → 怎么办：修好这份 JSON，再在 hooks.PreToolUse 里注册写范围闸。")
+WRITE_GUARD_TOOLS = ("Write", "Edit") if os.environ.get("AGENT_WRITE_SCOPE_BREAK") == "multiedit-ignored" else ("Write", "Edit", "MultiEdit")
 if entries is not None:
     registered = [entry for entry in entries
-                  if matcher_covers(entry.get("matcher", ""), "Write") and matcher_covers(entry.get("matcher", ""), "Edit")
-                  and any(command_invokes(hook.get("command"), "write-guard.sh") for hook in entry.get("hooks") or [])]
+                  if any(command_invokes(hook.get("command"), "write-guard.sh") for hook in entry.get("hooks") or [])]
+    uncovered_tools = [tool for tool in WRITE_GUARD_TOOLS
+                       if not any(matcher_covers(entry.get("matcher", ""), tool) for entry in registered)]
     if not registered:
         failed = True
-        print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有 matcher 同时覆盖 Write 与 Edit、命令指向 write-guard.sh 的一条")
+        print(f"  ✗ {settings_path} 没注册写范围闸：PreToolUse 里没有命令指向 write-guard.sh 的一条")
         for command in mention_only_commands(entries, "write-guard.sh"):
             print(f"     这一条只是提到 write-guard.sh、没有跑它，不算注册：{command}")  # gate-lint:detail
-        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/write-guard.sh"。')
+        print('     → 怎么办：在 hooks.PreToolUse 里加一条 matcher "Write|Edit|MultiEdit"、command "bash \\"$CLAUDE_PROJECT_DIR\\"/.claude/hooks/write-guard.sh"。')
+    elif uncovered_tools:
+        failed = True
+        print(f"  ✗ {settings_path} 写范围闸没挂全工具：命令指向 write-guard.sh 的注册，matcher 合起来没覆盖：{'、'.join(uncovered_tools)}"
+              "——这几个工具写文件时写范围、角标、钟点、行尾空白那几道判定一道都不跑")
+        print('     → 怎么办：把 write-guard.sh 那一条的 matcher 写成 "Write|Edit|MultiEdit"。')
     guard_registered = [entry for entry in entries
                         if matcher_covers(entry.get("matcher", ""), "Bash")
                         and any(command_invokes(hook.get("command"), "bash-command-detector.sh") for hook in entry.get("hooks") or [])]
@@ -973,34 +899,18 @@ echo "  ✓ 写范围闸、Bash 检出 hook、重型测试闸、续派闸、续�
 
 # ── 格 change-range-single-source：改动范围只许一份取法：阶段不自己算 diff 基准，列路径的 git 调用都带 core.quotepath=false
 #
-# 判据（射程是 `.claude/gate.d/` 顶层的 *.sh 与 *.py；这一道文件里只除掉这一格自己，从这一格的标题行到下一格的标题行之间按空行判，
-# 别的格照样在射程里——它们原来是别的阶段文件，并进来之前一直被这一条扫着）。三条，任一条不成立判红：
-#   ① 算 diff 基准只许在 research/scripts/changed-paths.sh 里：代码行里出现 merge-base（`--is-ancestor` 核祖先除外）、
-#      @{upstream} 或 @{u}、gate-ok、读 GATE_BASE 或 GATE_DIFF_BASE（`$GATE_BASE`、`${GATE_BASE`、environ）的，
-#      以及跑 git 的那一行上写死 HEAD~N、HEAD^（HEAD^{tree} 这类剥类型的不算）、用三点号（A...B 就是取 merge-base）的，判红。`unset GATE_BASE` 这类不读它的不算。
-#      阶段要改动范围就 source 那份共用脚本、调 gate_diff_base。
-#   ② 列路径的 git 调用（--name-only、--name-status、ls-files）要带 -c core.quotepath=false（键不分大小写，值必须是 false）：
-#      同一行写了它；或者这一行用的变量 / 列表在同一个文件里带着它定义（例 `GIT = ["git", "-c", "core.quotepath=false"]`）；
-#      或者这一行调的是同一个文件里带着它的包装函数（python 写成「名字(」，bash 写在命令位置上；名字恰好是 git 时，
-#      裸的 git 命令与 ['git', …] 列表不算调了它——例 doc-experiments.sh 的 decision-links 格的 `def git(*args)`）；或者 git 自己带 -z（-z 下不转义路径）。
-#      参数列表换了行、这一行以引号开头的，往上看三行找调用前缀。
-#      中文路径不带这个选项会被转成带引号的八进制串，与仓里的路径逐字对不上，而 git 不报错。
-#   ③ 调共用取法（gate_changed_paths、gate_added_lines）要判退出码：同一行带 `||`，或放在 if / while 里。
-#      git 失败时共用脚本退非 0、什么都不交，不判就会把「没取到」读成「这次什么都没改」。
-#   「代码行」：去掉前导空白后不以 #、echo、printf、print(、bad、howto、die、引号开头的行，或者以这些开头、但这一行里
-#   跑了 `$(git …)`、带引号括起的列路径参数、或带引号括起的取基准参数（"merge-base"、"@{upstream}"、"HEAD~1"、"HEAD^"）的——
-#   出路文字与注释里提到这些词不算；参数列表换了行、续行以引号开头的，① 与 ② 一样判。
+# 判据（射程 .claude/gate.d/ 顶层的 *.sh 与 *.py；这一道文件里只除掉这一格自己：从这一格的标题行到下一格的标题行按空行判），任一条不成立判红：
+#   ① 算 diff 基准只许在 research/scripts/changed-paths.sh 里：代码行出现 merge-base（--is-ancestor 核祖先除外）、@{upstream} 或 @{u}、gate-ok、
+#      读 GATE_BASE 或 GATE_DIFF_BASE，或者跑 git 的那一行写死 HEAD~N、HEAD^（HEAD^{tree} 不算）、用三点号（A...B 就是取 merge-base）的，红。
+#   ② 列路径的 git 调用（--name-only、--name-status、ls-files）要带 -c core.quotepath=false：同一行带，或经同一个文件里带着它的变量 / 列表、
+#      包装函数调，或 git 带 -z；参数列表换了行、这一行以引号开头的，往上看三行找调用前缀。不带时中文路径被转成带引号的八进制串，git 不报错。
+#   ③ 调共用取法（gate_changed_paths、gate_added_lines）要判退出码：同一行带 ||，或放在 if / while 里。
+#   「代码行」的认法在 is_text：出路文字与注释里提到这些词不算。
+# 为什么：取法收成共用脚本之前有六份以上拷贝，已经分叉过（一半漏了 quotepath），收完之后要有东西拦下一份拷贝。
 #
-# 为什么：改动范围的取法收成共用脚本之前有六份以上拷贝，已经分叉过（一半漏了 quotepath；doc-decisions.sh 的格「定了新东西没回看同文件未定项」的基准在默认分支上
-# 就是 HEAD，定案分两次提交、第一次没推，它就退 77 不判）。收完之后没有东西拦下一份拷贝。
-# 三方判决：research/prompts/gate-fix-forks-r1-main-verification.md 的 T5；判据按第二轮攻方打中的写法收严（gate-fix-forks-r2）。
-#
-# 没扫的：research/scripts/、.claude/scripts/、.claude/hooks/ 下的脚本不是门禁阶段，成功行把其中碰到这两条的逐个列名，清单现算。
-# 样本：fixtures/code-tooling.sh/change-range-single-source-red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、HEAD^、
-# 换了行的参数列表续行里的 "merge-base"、
-# 不带或带 =true 的 quotepath、包装函数名叫 git 而这一行没调它、test 的 -z、printf "$(git …)"、换行的参数列表、
-# 不判退出码的共用取法），逐条点名判红；change-range-single-source-green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、HEAD^{tree}、判了退出码的调用，判绿。
-# 并进来时 change-range-single-source-green 的四个 .sh 各补一行 ROOT 注释、补了 stage-owners.tsv（stage-owners 格要）；注释行不在这一格的射程里，want 不变。
+# 样本：change-range-single-source-red 把三条判据该抓的写法各放几种（自己取 merge-base、@{u}...、HEAD~1、HEAD^、换了行的参数列表续行里的 "merge-base"、
+#   不带或带 =true 的 quotepath、包装函数名叫 git 而这一行没调它、test 的 -z、printf "$(git …)"、换行的参数列表、不判退出码的共用取法），逐条点名判红；
+#   change-range-single-source-green 放五种合法写法与 unset GATE_BASE、merge-base --is-ancestor、HEAD^{tree}、判了退出码的调用，判绿。
 cell_change_range_single_source() {
 [[ -d .claude/gate.d ]] || { echo "  ! 没有 .claude/gate.d，这一格无对象可判"; exit 77; }
 python3 - "$STAGE_NAME" <<'PY'
@@ -1150,23 +1060,16 @@ PY
 
 # ── 格 research-gate-lint：research/scripts/、.claude/hooks/ 与 .claude/scripts/ 里每一条拒绝都带出路、守 shell 纪律；前两个目录的执行位不丢；连同 .claude/gate.d/，终止进程只许点名一个
 #
-# 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint（.claude/singlefs-ai-sop/scripts/gate.sh 里 run_stage "门禁自检" 那一行与它前面给 LINT_EXTRA 赋值的那一行），
-# 研究脚本与 hook 不在射程里。2026-09-18 单跑整仓 gate-lint 红 90 处，84 处在这两个目录，没有任何一笔账记着（C382（研究脚本与 hook 的拒绝不在门禁自检的射程里））。
-# research/prompts/ 下的脚本是冻结证据，不扫（同 .claude/doc-lint-exclude 那一行的理由）。
-# shell-lint 同一批目录一起跑（上游 show-me-test.md「射程只到 .claude/gate.d/」：只接 gate-lint 等于只补了一半，
-# 2026-09-19 单跑 shell-lint 报 14 处，全是它认不出一行写完的函数造成的假红，上游已修、同步副本之后才生效）。两个 lint 都跑完再判，不在第一个红就停。
-# .claude/scripts/ 此前同样不在这两个 lint 的射程里（共享门禁只把它交给「脚本执行位」），而 lkmm.sh 一份就有二十多处拒绝，
-# 所以一并交给 gate-lint 与 shell-lint；执行位仍归共享那一道，这里不重复扫。
-# 判别力：fixtures/code-tooling.sh/research-gate-lint-red 放一个只带一句话的 die 和一个靠子 shell 赋值往外带值的函数，两样都必须报出来；
-# 它的 .claude/scripts/ 里再放一个不带出路的拒绝和一处 pkill -f，只有这个目录进了射程才报得出来。
-# research-gate-lint-green 带上第二个参数、不靠子 shell 带值，必须判绿；它的 .claude/scripts/ 里放一个干净的包装，成功行的脚本数要把它数进去。
-# 进程安全（终止只许点名一个自己起的进程号或任务号）：判定只有一份，在 .claude/hooks/bash-command-detector.sh（拒绝 ⑥），这里经它的 --scan-scripts 扫脚本，
-# 射程比上面两个 lint 多一个 .claude/gate.d/（它的样本目录不扫）。用户 2026-09-25 定的规矩与写法见那个 hook 的文件头 ⑥。
-# 判别力：red 的 research/scripts/stop-processes.sh（自己任务的进程组、循环里 kill、systemctl 带通配）、research/scripts/stop.py（循环 os.kill、os.killpg）
-# 与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标；只有 .claude/gate.d/ 进了射程才报得出来）逐处按行号报；
-# green 的 research/scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
-# 并进来时 research-gate-lint-green 补了绿样本的架子（research/scripts/vm-bench.sh、.claude/hooks/agent-write-scope.tsv、.claude/gate.d/10-sample.sh），
-# want 跟着改了数：gate-lint 数到 4 个脚本、进程安全查 5 个、扫了 3 个目录（原样本是 3、3、2）。
+# 共享门禁的「门禁自检」只把 SOP 自己的脚本与 .claude/gate.d/ 交给 gate-lint 与 shell-lint，这三个目录不在它的射程里，这里补上
+#   （.claude/singlefs-ai-sop/rules/show-me-test.md「射程只到 .claude/gate.d/」）；两个 lint 都跑完再判，不在第一个红就停。
+#   .claude/scripts/ 的执行位仍归共享那一道，这里不重复扫。research/prompts/ 下的脚本是冻结证据，不扫（同 .claude/doc-lint-exclude 那一行的理由）。
+# 进程安全（终止只许点名一个自己起的进程号或任务号）：判定只有一份，在 .claude/hooks/bash-command-detector.sh（拒绝 ⑥），
+#   这里经它的 --scan-scripts 扫，射程比两个 lint 多一个 .claude/gate.d/（它的样本目录不扫）。
+# 样本：research-gate-lint-red 放一个只带一句话的 die 和一个靠子 shell 赋值往外带值的函数；它的 .claude/scripts/ 里再放一个不带出路的拒绝和一处 pkill -f
+#   （这个目录进了射程才报得出来）；进程安全那一路有 research/scripts/stop-processes.sh（自己任务的进程组、循环里 kill、systemctl 带通配）、
+#   research/scripts/stop.py（循环 os.kill、os.killpg）与 .claude/gate.d/50-stop-group.sh（按 cgroup.procs 批量发、没核 scope 也没标），都必须逐处报出。
+#   research-gate-lint-green 的 die 带第二个参数、不靠子 shell 带值，.claude/scripts/ 里放一个干净的包装（成功行的脚本数要把它数进去），
+#   research/scripts/stop-own.sh 只停点名的一个、按 cgroup 批量发的那一段核过 singlefs-memory-cap-*.scope 又标了 own-scope，必须判绿。
 cell_research_gate_lint() {
 LINT="$(cd "$STAGE_DIRECTORY/../.." && pwd)/.claude/singlefs-ai-sop/scripts/gate-lint.sh"
 SHELL_LINT="$(dirname "$LINT")/shell-lint.sh"
@@ -1246,65 +1149,26 @@ exit "$failed"
 
 # ── 格 fixture-claims：阶段头部声称的判别力样本必须真的存在；全仓文件名与样本目录里的日期不许是编的
 #
-# 判据：四条，任一条不成立判红。
-#   ① 一个阶段的头部注释里写了 `fixtures/<它自己的文件名>`，那个样本目录就必须存在；
-#   ② `.claude/gate.d/fixtures/` 下的每个目录都要对应一个存在的阶段文件——孤儿样本目录没有任何东西会跑它，
-#      而目录摆在那里看着就像验过了；
-#   ③ 样本目录下每个子目录都是一份样本（与上游 stage-selftest.sh 同一个认法：带 expect 的都跑），每个子目录都要有 `expect`，
-#      至少一份；再按那道门禁文件头的格名表（`# gate-cell:` 行，经 research/scripts/gate-structure-check.py 的 header_cells 读；
-#      没有格名表的整道算一格）逐格数，每一格至少一份红（exit=1）一份绿（exit=0），缺的逐格列名。一份样本算给哪几格：
-#      `.gate-cells` 点名的格，没有的算给整道全部格；红样本点名一格的算给那一格，点名几格的只算给 want 里写了
-#      「<格名>：红」（共用库汇总那一行）的格；退 0 的样本不算给 want 里写了「<格名>：本次未跑」的格。
-#      绿的一侧按设计只能退 77（或别的非 0、非 1 码）的格，那份样本的 expect 里写一行 `not-green-by-design=<格名> <为什么>`
-#      （理由至少 8 个字）才算绿。空目录与只认裸 red / green 的样本目录既骗过第 ① 条，又会被判别力自检整个跳过；
-#   ④ 日期不许是编的——全仓**文件名**里的日期，以及 `fixtures/` 下 `.md` **正文**里的日期，
-#      都要落在可能的区间里。判据不自己写，source 上游 lib.sh 的 `date_out_of_range`
-#      （早于本仓第一个提交宽限 7 天、或晚于最晚时区的今天，都不可能是真发生过的事）。
+# 判据，任一条不成立判红：
+#   ① 阶段的头部注释里写了 fixtures/<它自己的文件名>，那个样本目录就要在；
+#   ② .claude/gate.d/fixtures/ 下每个目录都对应一个在的阶段文件：孤儿样本目录没有东西会跑它，摆在那里看着却像验过了；
+#   ③ 样本目录下每个子目录都是一份样本（与上游 stage-selftest.sh 同一个认法），都要有 expect，至少一份；按那道门禁的格名表
+#      （gate-structure-check.py 的 header_cells；没有格名表的整道算一格）逐格数，每格至少一份红（exit=1）一份绿（exit=0）。
+#      一份样本算给哪几格见 cell_gaps 的文档字符串；绿的一侧按设计只能退 77 的格，那份样本的 expect 里写一行
+#      not-green-by-design=<格名> <为什么>（理由至少 8 个字）才算绿；
+#   ④ 全仓文件名里的日期，与 fixtures/ 下正文里的日期，都要落在可能的区间里：判据 source 上游 lib.sh 的 date_out_of_range，
+#      下界取本仓第一个提交（取不到退回上游的 SOP_START_DATE）。正文只扫 fixtures 的理由写在第 ④ 条那段代码旁。
+# 射程：判的是声称与目录对不对得上，判不了样本本身有没有判别力（归 stage-selftest.sh）；没有声称也没有样本的阶段由它的「未自检」名单管。
+# 不是 git 仓时第 ④ 条整条没判，前三条都过也退 77。第 ④ 条正文唯一的排除是这一格自己的样本（fixture-claims-*），这一道别的格的样本照旧扫。
 #
-# 第 ④ 条与前三条是同一个病理：**摆在那里看着是真的，其实是造的**。
-# 前三条管「声称验过了而其实没验」，第 ④ 条管「日期看着是真的而其实是编的」。
-# 实测（2026-09-23）：门禁样本里 8 个文件名与 32 处正文写着 2026-01-01 / 2026-01-02，
-# 比本仓第一个提交（2026-08-26）早大半年，而当天带一个 records/2026-01-01-临时实测.md
-# 跑 64 道阶段加 doc-lint，0 道点名它。上游 doc-lint 的 M 段只认正文里的
-# `### 日期` 与「实测（日期）」两种形态，够不着文件名，也够不着
-# `已定（日期）`、`—— 已跑（日期）` 这类装成本仓事实的写法。
-#
-# ⚠️ 第 ④ 条的正文那一维**只扫 fixtures**，不扫真 kb 正文：`date_out_of_range` 的下界假设是
-# 「本仓的事不可能早于本仓第一个提交」，这只对说本仓自己事的日期成立。实测扫全仓正文得 52 处越界，
-# 其中 20 处在 prior-art.md（别家项目的真实日期）、decisions-history（RFC 演进史 2015–2017）与
-# checks-owed.md（C510（编造的日期没人拦） 引 2026-01-01 当例子）里，全部合法——射程放到真 kb 正文就是误判。
-# 文件名那一维没有这个反例（带日期的路径说的都是本仓自己的事；有几条由成功行现报），所以扫全仓。
-#
-# 为什么：上游的判别力自检（`.claude/singlefs-ai-sop/scripts/stage-selftest.sh`）把没有样本的阶段
-# 列成「未自检」，这很好——但它只看目录在不在，不看**阶段自己怎么说**。一个阶段的头部逐字写着
-# 「判别力：fixtures/<自己>/red 是一个……必须判红；green ……必须判绿」，而那个目录压根不存在时，
-# 读脚本的人以为验过了，自检的名单里那一行又只是一句轻描淡写的「未自检」，两边对不上没有人会发现。
-#
-# ⚠️ **这条是实测出来的**（2026-09-21）：当时的实验归档那一道（后来并进 `doc-experiments.sh` 的 archive-past-rounds 格）的头部就是这么写的，
-# 而它的样本目录（后来并进 `fixtures/doc-experiments.sh/archive-past-rounds-*`）不存在——它立项那天起就没验过判别力。
-#
-# ⚠️ 射程：判的是「声称与目录对不对得上」，判不了样本本身有没有判别力——那一层归
-# `stage-selftest.sh`（红样本真判红、绿样本真判绿）。**没有声称、也没有样本**的阶段这一道不判，
-# 它们由自检的「未自检」名单管着。
-#
-# 判别力：fixtures/code-tooling.sh/fixture-claims-red 摆一个假的 gate.d，前三条各犯一次，必须判红；fixture-claims-green 都干净。
-# fixture-claims-unnumbered-red 的 gate.d 里一道不带编号的阶段 tooling-claims.sh 声称有样本而目录不在、另一道带编号的干净阶段，必须点名前者判红
-# （阶段只认两位数开头时它一声不吭：判决 research/prompts/gate-shrink-r1-main-verification.md 第 4 问）。
-# 第 ③ 条按格数：fixture-claims-cells-red 的 cells-uncovered.sh 三格，样本按 <格>-red / <格>-green 起名，alpha 缺绿、beta 只在点名两格而
-# want 只写了 gamma 红的样本里（不算给 beta，缺红）、gamma 的绿样本退 77 而 not-green-by-design 的理由太短（缺绿），必须逐格列名判红；
-# fixture-claims-green 的 cells-covered.sh 两格没有裸 red / green，alpha 一红一绿、beta 的红来自点名两格而 want 写了「beta：红」的样本、
-# 绿样本退 77 并写了够长的 not-green-by-design，必须判绿（只认裸 red / green 时它是空壳）。
-# 第 ④ 条的坏日期由 fixture-claims-red/setup.sh 在临时仓里现造，不摆进仓里——摆进来它会被这一条自己扫到
-# （C441（全仓清扫工具会吃掉自己的判别力样本））。setup.sh 里要 git init 再提交一个真实日期的提交，
-# 否则 project_start_date 取不到值、下界那一支根本走不到，红样本就只证了上界。
-#
-# 不是 git 仓时第 ④ 条列不出要扫的文件、整条没判：前三条都过也不报绿，这一格退 77（本次未跑）。
-# 第 ④ 条正文那一维唯一的排除是这一格自己的样本（fixtures/<这一道>/fixture-claims-* 那几份，setup.sh 里现造的日期就是判别力），
-# 这一道别的格的样本照旧在射程里（并进来之前它们住在各自的样本目录下，一直被这一条扫着）。
-# 第 ④ 条的下界取本仓第一个提交；取不到时退回上游的 SOP_START_DATE，成功行写明下界取自哪一个。
-# 读不了的样本正文（grep 出错）不计进「查了几份」，逐个列进没扫的清单；二进制样本按文本读，里面的日期照判。
-# 并进来时 fixture-claims-green 的 50-good.sh 补一行 ROOT 注释、补了 stage-owners.tsv（stage-owners 格要），另补 CLAUDE.md 那张表的一行
-# （setup.sh 建了 .claude/kb/decisions-history/，kb-registry 格要它有登记）；want 不变。
+# 样本：fixture-claims-red 摆一个假的 gate.d，前三条各犯一次，必须判红；fixture-claims-green 都干净。
+#   fixture-claims-unnumbered-red 的 gate.d 里一道不带编号的 tooling-claims.sh 声称有样本而目录不在、另一道带编号的干净，必须点名前者判红。
+#   fixture-claims-cells-red 的 cells-uncovered.sh 三格，样本按 <格>-red / <格>-green 起名：alpha 缺绿；beta 只在点名两格而 want 只写了 gamma 红的样本里
+#   （不算给 beta，缺红）；gamma 的绿样本退 77 而 not-green-by-design 的理由太短（缺绿），必须逐格列名判红。
+#   fixture-claims-green 的 cells-covered.sh 两格没有裸 red / green：alpha 一红一绿，beta 的红来自点名两格而 want 写了「beta：红」的样本，
+#   绿样本退 77 并写了够长的 not-green-by-design，必须判绿。
+#   第 ④ 条的坏日期由 fixture-claims-red/setup.sh 在临时仓里现造，不摆进仓里（摆进来会被这一条自己扫到）；setup.sh 要 git init 再提交一个
+#   真实日期的提交，否则 project_start_date 取不到值，下界那一支走不到。
 cell_fixture_claims() {
 LIB="$(cd "$STAGE_DIRECTORY/../.." && pwd)/.claude/singlefs-ai-sop/scripts/lib.sh"
 python_rc=0
@@ -1389,7 +1253,7 @@ def cell_gaps(cells, samples):
 
 judged_cells = 0
 uncovered = []
-# 阶段是门禁目录顶层全部 *.sh，与 gate.sh 起的是同一批（原来只认两位数开头的，去编号时改了名的那几道会被悄悄漏掉）
+# 阶段是门禁目录顶层全部 *.sh，与 gate.sh 起的是同一批
 stage_pattern = "[0-9][0-9]-*.sh" if broken == "numbered-stages-only" else "*.sh"
 stages = sorted(path for path in glob.glob(os.path.join(STAGE_DIR, stage_pattern)) if os.path.isfile(path))
 if not stages:
@@ -1484,9 +1348,7 @@ print(f"  ✓ 阶段头部声称的判别力样本都在（{len(stages)} 个阶�
 PY
 
 # ── 第 ④ 条：日期不许是编的 ────────────────────────────
-# 判据 source 上游 lib.sh，不另写一份：两套装置算同一个量，就要落到同一个数。
-# lib.sh 自带 set -euo pipefail，所以整段关在子 shell 里，判定经文件带出来
-# （command-safety.md：子 shell 里的赋值传不回父进程）。
+# lib.sh 自带 set -euo pipefail，所以整段关在子 shell 里，判定经文件带出来（command-safety.md「子 shell 里的赋值传不回父进程」）。
 date_report="$(mktemp)"
 trap 'rm -f "$date_report"' EXIT
 date_rc=0
@@ -1500,32 +1362,21 @@ date_skipped=0
   else
     start_date="$SOP_START_DATE"; start_source="取不到本仓第一个提交，退回上游的 SOP_START_DATE"
   fi
-  # 阳性对照：判据先对一个确知越界的日期跑一次，报不出越界就说明它已经失效。
-  # 少了这一句，上游把 date_out_of_range 改名或删掉之后，这一条会**静默报绿**——
-  # 调用落在 `if` 条件位置，command not found 的 127 被读成「没越界」，COUNT 照样打印。
-  # 2026-09-23 实测：把 lib.sh 里的函数改个名，这一条报「✓ 日期都可能是真的」，数看着完全正常。
+  # 阳性对照：上游把 date_out_of_range 改名或删掉时，if 条件里 command not found 的 127 会被读成「没越界」而静默报绿；先拿确知越界的日期试一次。
   if ! date_out_of_range "1970-01-01" "$start_date" >/dev/null 2>&1; then
     printf 'BROKEN\t判据对 1970-01-01 都报不出越界：date_out_of_range 被改名、删掉，或边界口径变了\n'
     exit 0
   fi
   date_re='[0-9]{4}-[0-9]{2}-[0-9]{2}'
-  # 唯一的排除：这一条自己的红样本，里面的越界日期是它的判别力本身（C441（全仓清扫工具会吃掉自己的判别力样本）
-  # 说的就是清扫工具会吃掉自己的样本）。**不静默挖空**——跳过几份现算着报进成功句，
-  # 读的人看得见排除了什么（show-me-test.md：排除的每一份都要登记，跳过清单要与被扫集合出自同一份数据）。
+  # 唯一的排除：这一格自己的样本，里面的越界日期就是判别力；跳过几份现算着报进成功句。
   own_fixture=".claude/gate.d/fixtures/${STAGE_NAME}/fixture-claims-"
   scanned=0; dated=0; bodies=0; body_dates=0; skipped_own=0; unreadable_bodies=()
   # 路径走 NUL：git 默认把非 ASCII 路径整条引起来并转义成八进制，报出来的那一行既搜不到也对不上 want
   while IFS= read -r -d '' path; do
-    # --cached 列的是**索引**不是磁盘：git mv 过又被别的会话 `git reset` 掉暂存时，
-    # 索引里还留着旧名，而那个文件早已不在工作区。不滤掉就会判红一批根本不存在的文件
-    # （2026-09-23 真仓实测：6 个 git mv 改过名的样本产物被判红，磁盘上一个都没有）。
+    # --cached 列的是索引：git mv 过又被 reset 掉暂存时索引里还留着旧名、文件已不在，不滤掉会判红不存在的文件。
     [[ -e "$path" ]] || continue
     scanned=$((scanned + 1))
-    # 名字就是 <年-月>.md 的文件不含「日」，date_re（年-月-日）那把尺抓不到。这一支判的是全仓任何位置的这种名字，
-    # 不专为哪一个目录留：kb 的按月变更史撤了之后照样留着，新建一份按月命名的文件、月份是编的，照样要红。
-    # 判法不能拿 2026-08 当 2026-08-01 比——那会误判合法的 2026-08.md
-    # （它的第一天早于下界，而这个月本身是合法的）。整月与允许区间没有交集才算越界，
-    # 而「没有交集」等价于两个端点都越界，所以不必分辨越的是哪一端，措辞变了也不受影响。
+    # 名字是 <年-月>.md 的文件 date_re 抓不到，单独判：整月与允许区间没有交集（两个端点都越界）才算越界；拿月初比会误判合法的当月。
     if [[ "$path" =~ (^|/)([0-9]{4}-(0[1-9]|1[0-2]))\.md$ ]]; then
       month="${BASH_REMATCH[2]}"
       month_end="$(date -d "$month-01 + 1 month - 1 day" +%F)"
@@ -1561,8 +1412,7 @@ date_skipped=0
       if why="$(date_out_of_range "$found" "$start_date")"; then
         printf 'BADBODY\t%s:%s\t%s\t%s\n' "$body" "$line_number" "$found" "$why"
       fi
-      # 整行去重，不拿行号当唯一键：`sort -u -t: -k1,1n` 按行号去重，
-      # 一行上的第二个日期会被丢掉（实测：`实测（2026-09-20）…已定（2026-01-01）` 判绿）
+      # 整行去重，不按行号去重：按行号会丢掉同一行上的第二个日期。
     done < <(sort -u <<<"$hits")
   done < <(git ls-files -z --cached --others --exclude-standard '.claude/gate.d/fixtures/' | sort -z -u)
   printf 'COUNT\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$scanned" "$dated" "$bodies" "$body_dates" "$start_date" "$skipped_own" "$own_fixture" "$start_source" "${unreadable_bodies[*]:-（没有）}"
@@ -1605,8 +1455,7 @@ elif ! grep -q '^COUNT' "$date_report"; then
   echo "     → 怎么办：上面是子 shell 的原样输出；多半是 lib.sh 取不到或 git 列不出文件，按它说的修。"
 else
   IFS=$'\t' read -r _ scanned dated bodies body_dates start_date skipped_own own_fixture start_source unreadable_list < <(grep '^COUNT' "$date_report")
-  # 计数缺一个就判红：成功句是给人看的唯一结论，它报着空数照样绿，比没有这一条更糟
-  # （2026-09-23 变异实测：砍掉「没有 COUNT 就判红」那一支，屏幕上出现「%s 个文件里  条带日期」四个数全空）。
+  # 计数缺一个就判红：报着空数的成功句照样绿，比没有这一条更糟。
   if ! [[ "$scanned" =~ ^[0-9]+$ && "$dated" =~ ^[0-9]+$ && "$bodies" =~ ^[0-9]+$ && "$body_dates" =~ ^[0-9]+$ && "$skipped_own" =~ ^[0-9]+$ ]]; then
     date_rc=1
     echo "  ✗ 日期这一条的计数行残缺，报不出检查了多少项："
@@ -1633,29 +1482,14 @@ exit 0
 
 # ── 格 kb-registry：kb 目录里的每一份都要在 CLAUDE.md 的「项目本地事实」表里有一行
 #
-# 判据：三条，任一条不成立判红。
-#   ① `.claude/kb/` 根目录下每一份 `.md`，都要在 `CLAUDE.md` 的「## 项目本地事实」表里被按路径点名；
-#   ② `.claude/kb/` 下每一个子目录也要被点名（形态是带斜杠的路径，例如 `.claude/kb/decisions/`）；
-#   ③ 反过来，那张表里点到的每一个 `.claude/kb/…` 路径都要真的存在。
-#
-# 为什么：那张表是 kb 各文件职责的唯一登记位——一份文件是什么、归谁读、与别处什么关系，只写在那里一行。
-# 新建一份 kb 文件而不登记，它对别的会话与派出去的 agent 就是个来历不明的东西；删掉一份而不撤行，
-# 表就指向空处。stage-owners 格早就在盯 `stage-owners.tsv` 与 `.claude/gate.d/` 逐项一致，kb 这一侧一直没有对应的闸。
-#
-# ⚠️ **这条是实测出来的**（2026-09-21）：建 `.claude/kb/feature-bits.md` 时漏了登记，一查那张表还同时漏着
-# `INDEX.md`、`term-renames.md`、`tooling.md` 三份——四份文件没有任何东西说得出它们是什么。
-#
-# 「登记」只认那张表里一行的**第一格**写的路径（逐字相等）：表外散文里提到的反引号路径不算，
-# 一行 `.claude/kb/` 也不替它下面的每一份登记。「指得到东西」那一条对那一节里点到的每个 `.claude/kb/…` 路径判，
-# 带 `<…>` 占位的形态也是一个路径，指不到东西照样判红。
-#
-# ⚠️ 射程：判的是「登记了没有」，判不了那一行写得对不对——后者要人看。
-# `decisions/`、`experiments/` 这类由别的阶段管形状的子目录同样要有一行，表里写它与谁同进退。
-#
-# 双向比对用这一道文件头的 MANIFEST_LIBRARY，与 rules-manifest、stage-owners、agent-write-scope 三格同一份代码。
-#
-# 判别力：fixtures/code-tooling.sh/kb-registry-red 放一份没登记的 kb 文件与一行指向空处的登记，必须判红；
-# 它的表里另有一行只写 `.claude/kb/`、散文里另提一份文件，这两处都不许替那两份没登记的文件登记；kb-registry-green 两边对齐。
+# 判据，任一条不成立判红：
+#   ① .claude/kb/ 根目录下每一份 .md，都要在 CLAUDE.md「## 项目本地事实」表里被按路径点名；
+#   ② .claude/kb/ 下每一个子目录也要被点名（带斜杠的路径，例如 .claude/kb/decisions/）；
+#   ③ 那一节里点到的每一个 .claude/kb/… 路径都要真的存在，带 <…> 占位的也算一个路径。
+# 「登记」只认表里一行的第一格写的路径、逐字相等：表外散文里提到的不算，一行 .claude/kb/ 也不替它下面的每一份登记。
+# 判不了那一行写得对不对，要人看。
+# 样本：kb-registry-red 放一份没登记的 kb 文件与一行指向空处的登记，必须判红；它的表里另有一行只写 .claude/kb/、散文里另提一份文件，
+#   这两处都不许替那两份没登记的文件登记；kb-registry-green 两边对齐。
 cell_kb_registry() {
 python3 - "$MANIFEST_LIBRARY" <<'PY'
 import glob, os, re, sys, types
@@ -1743,16 +1577,11 @@ PY
 
 # ── 格 gate-structure：每道门禁有格名表，--list 与表一致且不起重活，--check 写错格名退 2
 #
-# 判据与起法都在 research/scripts/gate-structure-check.py，这一格只调它、按它的退出码记：门禁目录顶层每道 *.sh
-# （共用库住在 lib/ 下，不在顶层，不判）文件头有格名表；`bash <阶段> <根> --list --force` 退 0、输出与格名表逐格相同、没起 cargo、QEMU、herd7 这类重活；
-# `--check <不存在的格>` 退 2。规则：.claude/rules/verification.md「门禁的结构」。
-# 为什么：用户 2026-09-28 定「门禁中的每一条都可以单独出来跑 不要编程一个测试函数 要可以全跑 也可以分项跑」；
-# 没有这一格，新加一道门禁照老样子写成一个大函数、不认 --list，没有东西会红（records/2026-09-28-门禁59号提速与双机分片.md「第二轮」4b 行）。
-# 脚本取这一道所在的仓里那一份（取自 $0 的目录，不取项目根），判的是被判的根：样本仓里放坏的脚本碰不到它。
-# 退出码照它：0 绿；77（门禁目录里一道都没有）本次未跑；别的（1 结构不对、2 参数错、78 它自己的准入与运行条件没满足）都按红记。
-# 判不了：见那份脚本文件头「判不了的」（按绝对路径起的重活、格判得对不对、「判什么」写得准不准）。
-# 样本：fixtures/code-tooling.sh/gate-structure-red 的 gate.d 里一道没有格名表、一道 --check 写错格名照跑退 0、一道 --list 打的与格名表不一致，
-# 必须逐道点名判红；gate-structure-green 两道都照规矩（格名表、--list 与表一致、--check 写错退 2），判绿并报查了 2 道。
+# 判据与起法都在 research/scripts/gate-structure-check.py（规则：.claude/rules/verification.md「门禁的结构」），这一格只调它、按它的退出码记：
+#   0 绿；77（门禁目录里一道都没有）本次未跑；别的（1 结构不对、2 参数错、78 它自己的准入与运行条件没满足）都按红记。
+# 脚本取这一道所在的仓里那一份（取自 $0 的目录，不取项目根），判的是被判的根：样本仓里放坏的脚本碰不到它。判不了的见它文件头「判不了的」。
+# 样本：gate-structure-red 的 gate.d 里一道没有格名表、一道 --check 写错格名照跑退 0、一道 --list 打的与格名表不一致，必须逐道点名判红；
+#   gate-structure-green 两道都照规矩（格名表、--list 与表一致、--check 写错退 2），判绿并报查了 2 道。
 cell_gate_structure() {
 structure_check="$STAGE_REPOSITORY/research/scripts/gate-structure-check.py"
 [[ -f "$structure_check" ]] || { echo "  ✗ 找不到 $structure_check"; echo "     → 怎么办：它随仓走（research/scripts/gate-structure-check.py），被删了就从 git 找回来；别在这一格另写一份判法。"; exit 1; }
@@ -1771,20 +1600,14 @@ esac
 
 # ── 格 stage-order：环境检查那一道排在门禁目录里全部跑测试的阶段之后
 #
-# 判据：共享 gate.sh 按文件名排序逐道起本地阶段（.claude/singlefs-ai-sop/scripts/gate.sh 里 find "$GATE_D" -maxdepth 1 -name '*.sh' … | sort 那一行）；
-# 环境检查那一道（ENVIRONMENT_STAGE）要排在门禁目录里每一道跑测试的阶段后面。排序用同一条 find … | sort 现算，不另写一份比较。
-# 「跑测试的阶段」：去掉 # 注释行与出路文字之后（CODE_WITHOUT_TEXT_LIBRARY，与 research-script-selftest-coverage 格同一套），
-# 代码里起了 cargo test / build / run / nextest / bench，起了 replay.sh、mutate.sh、mutation-shard-run.sh、layer0-shard-run.sh、
-# multi-host-run.sh、vm-bench.sh、lkmm.sh 之一，或点名 qemu-system、herd7（TEST_RUNNING）。
-# 为什么（判决 research/prompts/gate-shrink-r1-main-verification.md 3-B6 与「采纳的改法」第 2 条；攻方 research/prompts/gate-shrink-r1-opus-output.md 第三节 1）：
-# 环境检查里与时刻无关的那几类（残留 loop / dm 设备、挂载、带 singlefs 的 qemu 进程、宿主盘只读与剩余空间、ext4 错误计数、内核日志）
-# 判的是它开跑那一刻的机器，排在它后面的阶段编的、建的、留下的，这一趟看不见；去编号以后次序只由名字定，改一个名就能悄悄挪到它前面。
-# 环境检查那一道不在门禁目录里判红（改了名就同步改 ENVIRONMENT_STAGE；删了就连这一格一起删）；门禁目录里一道跑测试的阶段都没有退 77。
-# 判不了：用别的写法起测试的阶段（命令拼在变量里、经这里没列的脚本间接起）认不出，要把那个脚本名加进 TEST_RUNNING；
-# 环境检查自己判得对不对；排序用的是跑这一格时的 locale（整轮门禁下就是 gate.sh 的，两边一样）。
-# 样本：fixtures/code-tooling.sh/stage-order-red 的 gate.d 里 harness-tests.sh 起 cargo test、排在 harness-test-environment.sh 后面，必须点名它判红；
-# 同一份里排在后面、只在注释与 echo 里提到 cargo test 的 zz-docs.sh 不算，不许点名。stage-order-green 把跑测试的那一道改名成 harness-model-scenarios.sh，
-# 排到环境检查前面，判绿并报 2 道跑测试的阶段。
+# 判据：环境检查那一道（ENVIRONMENT_STAGE）要排在门禁目录里每一道跑测试的阶段后面；次序用共享 gate.sh 起本地阶段的同一条 find … | sort 现算。
+#   「跑测试」：经 code_of 去掉注释与出路文字之后，代码里匹配 TEST_RUNNING（cargo test / build / run / nextest / bench、几份起测试的脚本、qemu-system、herd7）。
+# 为什么：环境检查判的是它开跑那一刻的机器（残留 loop / dm 设备、挂载、qemu 进程、宿主盘），排在它后面的阶段编的、建的、留下的，这一趟看不见；
+#   次序只由文件名定，改一个名就能悄悄挪到它前面。
+# 判不了：用别的写法起测试的阶段（命令拼在变量里、经没列的脚本间接起），要把那个脚本名加进 TEST_RUNNING；排序跟跑这一格时的 locale。
+# 样本：stage-order-red 的 gate.d 里 harness-tests.sh 起 cargo test、排在 harness-test-environment.sh 后面，必须点名它判红；同一份里排在后面、
+#   只在注释与 echo 里提到 cargo test 的 zz-docs.sh 不算，不许点名。stage-order-green 把跑测试的那一道改名成 harness-model-scenarios.sh，
+#   排到环境检查前面，判绿并报 2 道跑测试的阶段。
 ENVIRONMENT_STAGE="harness-test-environment.sh"
 cell_stage_order() {
 [[ -d .claude/gate.d ]] || { echo "  ! 没有 .claude/gate.d，这一格无对象可判"; exit 77; }

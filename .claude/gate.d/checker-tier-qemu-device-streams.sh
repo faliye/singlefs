@@ -1,53 +1,36 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
-# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判（用户 2026-09-26 定：项目更严）
+# run-condition: none 要的工具与设备登记在 stage-inputs.tsv 本阶段那一行第三列，由 research/scripts/admission.py gate-preconditions 在阶段里判，没齐判红，不交给 gate.sh 预判
 # gate-stage: QEMU 真设备上的新池新建文件、发布 B、第二个实例、发布 D 与抬 F（两块 virtio 盘、设备侧独立录制、漏一道屏障与走页缓存两个对照必须判红）
 # gate-category: checker-tier 类
-# gate-similar: 54-layer0-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同（用户 2026-09-28 定「55因需QEMU/KVM独立保留」）
+# gate-similar: checker-tier-layer0-replay.sh 它也验 crates 写路的崩溃一致性、也是 checker-tier 类，但在宿主上枚举崩溃状态、判录制流截断重放；这里起 QEMU 虚机在两块 virtio 盘上跑真负载、判设备侧独立录制与程序录制逐项相同，要 QEMU、/dev/kvm 与内核镜像，前提、登记的输入与失败方式都不同
 # gate-similar: checker-tier-research-build-and-replay.sh 它的复跑那一格也读 E142 的产物，但比的是纯模型实验的整份输出；这里只从 E142 产物取段序列与反向链当虚机跑的对照，判的是真设备上收到的写
 #
-# 一格（--list 打格名表，--check device-streams 只跑它，格名写错退 2）：
 # gate-cell: device-streams QEMU 真设备上各档负载跑完，设备侧独立录制与程序录制逐项相同、两个对照红在该红的地方
-# 参数解析、每格一个子 shell、汇总与退出码经共用库 lib/stage-cells.sh（写法与判据在它的文件头）。
-# 逐项可点名（.claude/rules/verification.md「门禁的结构」：重型的按模式点名）：
-#   --list-items         逐行打六个模式与各自判什么，不编译、不起虚机
-#   --item <模式>        只跑点名的模式（给几次取并集，写错退 2、列出可点的模式）：不问整道的复用判定与改动范围（那两问是整道的），
-#                        判法照旧；成功行照旧列出跑了哪几档，不写全绿标记（只跑了一部分，不是整道结论）
+# 参数解析、每格一个子 shell、汇总与退出码经 lib/stage-cells.sh。
 #
-# 不声明 gate-covers：共享清单 2026-09-16 起没有「QEMU 真实负载」这一项（QEMU 移交给本工程），而「最终判据」要的是真实负载 + 崩溃注入 + checker 全绿，
-# 这一道今天只有真实负载与设备侧录制、没有崩溃注入，不冒充覆盖它。
+# 「程序以为发了什么」与「盘上实际收到了什么」由两条不共享代码的路比：程序那一条是被测程序自己的录制器（宿主上同参数重跑，同字节）；
+# 盘那一条是 QEMU 的 blklogwrites 过滤节点在来宾之外按 dm-log-writes 格式记下的每个写（带数据）与每个 FLUSH。
+# 不声明 gate-covers：「最终判据」要真实负载 + 崩溃注入 + checker 全绿，这一道没有崩溃注入（欠在 C6（块层语义假设写错））。
 #
-# C6（块层语义假设写错）要的：「程序以为发了什么」与「盘上实际收到了什么」由两条不共享代码的路比。
-#   程序那一条 = 被测程序自己的录制器（宿主上同参数重跑，同字节）；
-#   盘那一条   = QEMU 的 blklogwrites 过滤节点在来宾之外按 dm-log-writes 格式记下的每个写（带数据）与每个 FLUSH。
-# 六次虚机跑（并行）：
-#   direct                          O_DIRECT 真写路：设备侧日志逐项等于程序的录制流（末尾至多一个关机 FLUSH），
-#                                   来宾块层的 FLUSH 数 = 屏障 + FUA 写数，冷重开读回文件，段序列与 E142 产物逐字相同，宿主从盘镜像再读回一次
-#   skip-new-pool-file-creation-barrier  盘 0 漏掉「单元 → journal 记录」那道屏障：设备侧比对必须判红，且红在盘 0
-#   page-cache                      读写走页缓存（阳性对照）：回写合并 / 重排写，设备侧比对必须判红
-#   file-overwrite              新池新建文件之后同一个进程里覆盖写一次（发布 B，里程碑「覆盖写、释放、回退与复用」步 1）：冷重开择 (1, 4) 读回第二版
-#   second-instance                 发布 B 之后同一对盘冷重开、可写挂载（取号 → 写行 txg 5 → 暖机 txg 6、7）再发布 C（步 3）：冷重开择 (2, 8) 读回第三版
-#   raise-rollback-floor            second-instance 那条路走完，同一次挂载里再发布 D（txg 9，第四版），把 F 抬到上限 3、推两次空发布 txg 10、11
-#                                   （增补 2 收口表第 58 行）：冷重开择 (2, 11) 读回第四版
+# 用法：bash .claude/gate.d/checker-tier-qemu-device-streams.sh [选项] [项目根]；不带选项时六个模式并行各起一台虚机。
+#   --list                  逐行打格名与判什么
+#   --check device-streams  只跑这一格；格名写错退 2
+#   --list-items            逐行打六个模式与各自判什么，不编译、不起虚机
+#   --item <模式>           只跑点名的模式（给几次取并集；写错退 2、列出可点的模式）：不问整道的复用判定与改动范围，不写全绿标记
+#   认不出的选项退 2。
+# 读的环境变量：VM_LOG_MB（每块盘的设备侧日志 MiB，默认 4096）；GATE55_KEEP_WORK=1（判绿也留现场，重录样本时拷四件套用）；
+#   SINGLEFS_GATE_FULL=1 由 stage-must-run.sh 与 change-touches-crates.sh 读（不复用、不按改动范围跳过）。
 #
-# 设备侧比对每一档都逐项比到这一档最后那次发布：`new_pool_file_creation_device_log_check` 的第一个参数是模式，宿主照模式重跑
-# 发布 B / 可写挂载与发布 C / 发布 D 与抬 F（`name=host_rerun` 行列出重跑了哪几段）。所以后三档照 direct 判：退出码 0、两块盘都没有分歧。
+# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
+# 样本根放 .qemu-prerecorded，按 <模式>/out.txt、vm-exit、check.txt、check-exit 摆某一轮真跑的原样输出，本阶段不起虚机、不编译，
+# 用同一段判定代码判（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）。预录档全过这一格退 77：退 0 与真起过虚机的一档在汇总里分不出。
 #
-# 设备侧日志的容量：本阶段给 vm-bench.sh 传 VM_LOG_MB，默认取一块数据盘的大小（4096 MiB），不用 vm-bench.sh 自己的 256 MiB。
-# mkfs 按 4 MiB 一块写零 768 MiB，blklogwrites 连数据一起记，每块盘的日志实用约 770 MiB；256 MiB 时 direct、file-overwrite、
-# second-instance 三档在 mkfs 里报 `run_failed step=mkfs cause=BlockDevice(InputOutput(…I/O error))`。
-# 判红时留下的现场里有 log<d>.img，`du -m` 看实际用了多少；数据盘或写路再变大，先看它。
+# 弄坏开关（只给样本证红用）：GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行，
+#   direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0）判绿退 77、expect 里那几条 want 找不到。
 #
-# 判别力样本 fixtures/checker-tier-qemu-device-streams.sh/{red,green}（共享门禁的 .claude/singlefs-ai-sop/scripts/stage-selftest.sh 跑；各放 .gate-cells 点名 device-streams）拿预录输出喂：样本目录里放一个 `.qemu-prerecorded` 标记文件，再按 `<模式>/out.txt`、`vm-exit`、
-# `check.txt`、`check-exit` 摆好某一轮真跑留下来的原样输出，本阶段就不起虚机、不编译，只拿同一段判定代码判它们
-# （`.claude/rules/fs-design.md` 五条硬要求第 2 条：只供测试的开关）。预录档判全过这一格退 77（本次未跑），不退 0——
-# 退 0 会和真起过虚机的那一档在汇总里长得一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」）。
-# 改用共用库之前退 3；改用共用库之后，格退 0、77 之外的码一律算红，所以改成 77，整道跟着退 77。
-#
-# 准入（门禁与实验共用 research/scripts/admission.py，登记表 .claude/gate.d/stage-inputs.tsv 里本阶段那一行）：
-#   这一道读的路径只登记在那一行：复用判定（stage-must-run.sh）与改动范围（change-touches-crates.sh 的前缀）都从它取，
-#   前缀另加本阶段脚本自己（判定代码改了要重跑）；那一行不在就判红。
-#   QEMU、/dev/kvm、内核镜像三个前置写在那一行第三列，开跑前经 admission.py gate-preconditions 判，没齐判红（不退 77）。
+# 准入：读的路径与三个前提（QEMU、/dev/kvm、内核镜像）都登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，复用判定与改动范围都从它取，
+# 那一行不在判红；判法在 research/scripts/admission.py。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -131,9 +114,10 @@ cold_root_of() {
 required_lines_of() {
   case "$1" in
     file-overwrite|second-instance|raise-rollback-floor)
+      # file_overwrite 单元写 24：kb layout/01-first-txn.md 第八节第二条流「A、B、C 各 24」（来宾单测不钉 B 的段序列）
       cat <<'PATTERNS'
 name=file_overwrite root_txg=4 transaction=2 released=
-name=file_overwrite .*segments=16+2+1+2 closed_form=
+name=file_overwrite .*segments=24+2+1+2 closed_form=
 name=publish_writes publish=file_overwrite txg=4 write_calls=
 name=publish_writes_against_device window=file_overwrite publishes=1 .*matches=true
 PATTERNS
@@ -142,6 +126,7 @@ PATTERNS
   esac
   case "$1" in
     second-instance|raise-rollback-floor)
+      # third_transaction 单元写 28：来宾单测 new_pool_file_creation_on_device.rs 的 second_instance_mode_mounts_writes_the_row_warms_up_publishes_the_third_version_and_every_window_matches 钉的值
       cat <<'PATTERNS'
 name=writable_mount instance=2 chosen_root=1:4 rows_written=1 row_publish_root=2:5 warm_up_txgs=6,7 nanoseconds=
 name=publish_writes publish=instance_row txg=5 write_calls=
@@ -149,7 +134,7 @@ name=publish_writes publish=warm_up txg=6 write_calls=
 name=publish_writes publish=warm_up txg=7 write_calls=
 name=publish_writes_against_device window=writable_mount publishes=3 .*matches=true
 name=third_transaction root_txg=8 transaction=1 released=
-name=third_transaction .*segments=16+2+1+2 closed_form=
+name=third_transaction .*segments=28+2+1+2 closed_form=
 name=publish_writes publish=third_transaction txg=8 write_calls=
 name=publish_writes_against_device window=third_transaction publishes=1 .*matches=true
 PATTERNS
@@ -158,14 +143,16 @@ PATTERNS
   esac
   case "$1" in
     raise-rollback-floor)
+      # fourth_transaction 单元写 28：来宾单测 new_pool_file_creation_on_device.rs 的 raise_rollback_floor_mode_publishes_the_fourth_version_raises_the_floor_to_its_ceiling_above_zero_and_every_window_matches_the_device_layer_count 钉的值
+      # raise_rollback_floor：kb layout/01-first-txn.md 第八节第二条流「抬 F 与卸载开头先写的系统配置与上一次的轮换各自成段（2、2）」「抬 F 与卸载推的空发布各 16」，D 的轮换算在 D 自己的窗口里
       cat <<'PATTERNS'
 name=fourth_transaction root_txg=9 transaction=2 released=
-name=fourth_transaction .*segments=16+2+1+2 closed_form=
+name=fourth_transaction .*segments=28+2+1+2 closed_form=
 name=publish_writes publish=fourth_transaction txg=9 write_calls=
 name=publish_writes_against_device window=fourth_transaction publishes=1 .*matches=true
 name=raise_rollback_floor floor_before=0 requested_floor=3 ceiling=3 publishes=2 root_txgs=10,11 
 name=recover_cold_rollback_floor chosen_root=2:11 rollback_floor_on_disk=3$
-name=raise_rollback_floor .*segments=8+2+1+10+2+1+2 closed_form=
+name=raise_rollback_floor .*segments=2+16+2+1+2+16+2+1+2 closed_form=
 name=publish_writes publish=raise_rollback_floor txg=10 write_calls=
 name=publish_writes publish=raise_rollback_floor txg=11 write_calls=
 name=publish_writes_against_device window=raise_rollback_floor publishes=2 .*matches=true
@@ -200,7 +187,7 @@ host_rerun_windows_of() {
   esac
 }
 
-# ── device-streams：整段判法照改用共用库之前那一版，只包进一个格函数（它在自己的子 shell 里跑，fail 与 exit 只结束这一格）──
+# ── 格 device-streams（在自己的子 shell 里跑，fail 与 exit 只结束这一格）──
 cell_device_streams() {
 prerecorded=0
 [[ -f "$ROOT/.qemu-prerecorded" ]] && prerecorded=1
@@ -209,12 +196,8 @@ if ((prerecorded == 0)); then
  if ((${#named_modes[@]})); then
   echo "  · 只跑点名的 ${#MODES[@]} 档（${MODES[*]}）：不问整道的复用判定与改动范围，跑完不写全绿标记"
  else
-  # 这次改动没碰这道阶段判的东西就退 77（本次未跑），不退 0——`exit 0` 的跳过在汇总里与「判过了」
-  # 一模一样（`.claude/singlefs-ai-sop/rules/show-me-test.md`）。这是 C8（范围判定）的粗粒度前身：
-  # 它只摘得掉「零行代码的改动」，摘不出别的，C8 照旧欠着。本阶段自己的脚本也算输入：判定代码改了要重跑。
-  # 先问能不能复用上一次整轮全绿的判定：这一道读的那几条路径（`.claude/gate.d/stage-inputs.tsv`）
-  # 在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间变没变。为什么用树、为什么只一条 ref、
-  # 为什么不看工作区，写在 research/scripts/stage-must-run.sh 的文件头。
+  # 先问能不能复用上一次整轮全绿的判定，再问这次改动碰没碰它判的东西（前缀含本阶段脚本自己）；两样都退 77（本次未跑），不退 0。
+  # 判法在 research/scripts/stage-must-run.sh 与 change-touches-crates.sh 的文件头。范围判定只摘得掉零行代码的改动，细的那一半欠在 C8（门禁范围判不出来）。
   source "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
   stage_run_or_skip "$(cd "$(dirname "$0")/../.." && pwd)/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
     "要强制跑：SINGLEFS_GATE_FULL=1 再跑一次；这一道读哪几条路径见 .claude/gate.d/stage-inputs.tsv。" -- "$ROOT" "$(basename "$0")"
@@ -246,8 +229,7 @@ fi
 
 PRODUCT="research/results/$(awk -F'|' '$1=="E142"{print $4}' research/scripts/replay.sh)"
 [[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 E142 行解析不出产物文件（得到 $PRODUCT）" "看 research/scripts/replay.sh 里 E142 那一行的第 4 列。"
-# 反向链从产物里现取，不写死：写死的那个数在格式常量一改就过期，而这道闸红起来像是写路错了。
-# 实测 2026-09-16 树表条目 148 → 200：产物已经是新链值，闸里还写着旧的，红在一个与写路无关的地方。
+# 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
 EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
 [[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
 
@@ -268,14 +250,12 @@ if ((prerecorded)); then
   MODES=("${present[@]}")
 else
   work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-gate55.XXXXXX")"
-  # 设备侧日志（blklogwrites）连数据一起记下来宾发到每块盘的每个写，要装得下 mkfs 写零的那 768 MiB 与之后的写：
-  # 默认取一块数据盘的大小（4096 MiB）。vm-bench.sh 自己的默认 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。
-  # 镜像是 truncate 建的稀疏文件，只占真写进去的那些。要换就设 VM_LOG_MB。
+  # 设备侧日志（blklogwrites）连数据记下每块盘收到的每个写，要装得下 mkfs 写零的 768 MiB 与之后的写：默认取一块数据盘的大小（4096 MiB）；
+  # vm-bench.sh 自己的 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。镜像是稀疏文件，只占真写进去的那些。
+  # 数据盘或写路再变大，先看判红现场里 log<d>.img 的 du -m。
   QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
   [[ "$QEMU_DEVICE_LOG_MEGABYTES" =~ ^[1-9][0-9]*$ ]] || fail "VM_LOG_MB 写成了「$QEMU_DEVICE_LOG_MEGABYTES」，vm-bench.sh 要的是正整数（MiB）" "写成正整数，例 VM_LOG_MB=4096；不设就用一块数据盘的大小 4096。"
-  # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，退出时一删，人照着出路去看就扑空。
-  # 判红（退出码不是 0）把现场留下、把路径印出来，删不删由看的人定；盘镜像是 vm-bench.sh 用 truncate 建的稀疏文件，留下只占真写进去的那些。
-  # 要把判绿的现场也留下（重录判别力样本 fixtures/checker-tier-qemu-device-streams.sh 时拷四件套用），设 GATE55_KEEP_WORK=1：不删、打印路径。
+  # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，留着现场、印出路径，删不删由看的人定。
   trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE55_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE55_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
   missing=()
   BIN="target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"
@@ -347,6 +327,17 @@ for mode in "${MODES[@]}"; do
 done
 
 verdict() { cat "$work/$1/check-exit"; }
+# 宿主检查退出 0 的档，两块盘各要有一行 divergence_window=none divergence=none 的 name=device_log：退出码与结果行两处都判，
+# 只看退出码的话宿主检查漏比一块盘、或那块盘的行没打出来，都照样判绿
+require_each_device_without_divergence() {
+  local mode="$1" device
+  for device in 0 1; do
+    grep -q "name=device_log device=$device .* divergence_window=none divergence=none" "$work/$mode/check.txt" \
+      || { sed 's/^/        /' "$work/$mode/check.txt"
+           fail "$mode 盘 $device：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行" "退出码与结果行对不上，先查 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs 的 main 与 compare_one_device。"; }
+    checks=$((checks + 1))
+  done
+}
 judged_device_logs=0
 matched_device_log_modes=(); control_modes=()
 for mode in "${MODES[@]}"; do
@@ -357,6 +348,7 @@ for mode in "${MODES[@]}"; do
       grep -q 'name=host_recover outcome=file_read root=1:3 content_matches=true' "$work/direct/check.txt" \
         || fail "direct：宿主从虚机写出的盘镜像上读不回文件" "看 $work/direct/check.txt 的 name=host_recover 行。"
       checks=$((checks + 2))
+      [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == direct-divergence-unread ]] || require_each_device_without_divergence direct
       matched_device_log_modes+=("$mode")
       ;;
     skip-new-pool-file-creation-barrier)
@@ -380,12 +372,7 @@ for mode in "${MODES[@]}"; do
       [[ "$(verdict "$mode")" == 0 ]] || { sed 's/^/        /' "$work/$mode/check.txt"
         fail "$mode：设备侧日志与程序的录制流对不上" "上面 divergence_window= 指着第一处不一致落在哪一段、divergence= 指着下标与两侧各是什么，先判是写路的错还是比对口径的错；退出码 2 是用法错或宿主重跑失败，看 check.txt 末尾那句。"; }
       checks=$((checks + 1))
-      for device in 0 1; do
-        grep -q "name=device_log device=$device .* divergence_window=none divergence=none" "$work/$mode/check.txt" \
-          || { sed 's/^/        /' "$work/$mode/check.txt"
-               fail "$mode 盘 $device：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行" "退出码与结果行对不上，先查 crates/singlefs-checker-tier/src/bin/new_pool_file_creation_device_log_check.rs 的 main 与 compare_one_device。"; }
-        checks=$((checks + 1))
-      done
+      require_each_device_without_divergence "$mode"
       host_rerun_windows="$(host_rerun_windows_of "$mode")"
       [[ -n "$host_rerun_windows" ]] || fail "模式 $mode 没有登记宿主检查该重跑的段" "在 host_rerun_windows_of 里给它补一行；不补，宿主少重跑一段也看不出来。"
       grep -q "name=host_rerun mode=$mode windows=$host_rerun_windows operations_by_window=" "$work/$mode/check.txt" \
@@ -408,8 +395,7 @@ if ((prerecorded)); then
 fi
 echo "  ✓ QEMU 真设备：${#MODES[@]} 次虚机跑（${MODES[*]}）、$checks 项检查全过；${matched_device_log_modes[*]} 设备侧逐项对得上（宿主照模式重跑到这一档最后那次发布），${#control_modes[@]} 个对照（${control_modes[*]}）都红在该红的地方"
 echo "     ! 这一道没罩到：$uncovered"
-# 判绿之后写这一道这批输入的全绿标记（git common-dir）：整轮门禁与下一趟按它复用，不再跑第二遍（用户 2026-09-27 定：照 54 号写标记、只跑变了的）。
-# 写不成只报不红：缺标记时下一趟判「要跑」，方向是多跑。只跑了点名的几档（--item）不写：标记说的是整道。
+# 全绿标记（git common-dir）供整轮门禁与下一趟复用；写不成只报不红（方向是多跑）。只跑了点名的几档（--item）不写：标记说的是整道。
 if ((${#named_modes[@]})); then
   echo "     ! 只跑了点名的 ${#MODES[@]} 档，不是整道结论：没写全绿标记"
 elif ! python3 "$ADMISSION_MODULE" stage-marker-write "$ROOT" "$(basename "$0")" >/dev/null; then

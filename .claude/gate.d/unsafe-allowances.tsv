@@ -1,0 +1,25 @@
+# crates/ 下每个 crate 放开 unsafe 的地方，一个 crate 一行。
+# 门禁 code-source-discipline（.claude/gate.d/code-source-discipline.sh）的 unsafe-allowances 那一格读这张表。
+#
+# 六段，制表符分隔（# 开头的行与空行不算）：
+#   1 crate 目录名（crates/ 下一级）
+#   2 crate 根（src/lib.rs）允许写的级别：forbid，或 forbid,deny（写了 deny 才可以有放开）
+#   3 唯一放开 unsafe 的文件；没有放开写 -
+#   4 唯一放开 unsafe 的函数名；没有放开写 -
+#   5 理由：为什么非放开不可、不放开的替代为什么不行；放开了的行必填、不少于 20 个字，没有放开写 -
+#   6 出处：谁哪天定的；放开了的行必填，写仓里真有的文件路径，或「用户 YYYY-MM-DD 弹窗定」加那份记录的路径，
+#     路径指向不存在的文件门禁判红；没有放开写 -
+#
+# 判法：根写 forbid 时这个 crate 里 allow(unsafe_code) 与 unsafe 关键字都是 0 处；
+# 根写 deny 时 allow(unsafe_code) 恰好 1 处、紧挨着第 4 段那个函数、在第 3 段那个文件里，
+# 函数里 unsafe 关键字恰好 1 处、上方连着的 // 注释里有一行 // SAFETY:，且那段注释写出依赖的前提（提到文件描述符、偏移、长度）。
+# crates/ 下出现这张表里没有的 crate 判红；这张表里的 crate 目录不在仓里，这一格跳过那一行。
+#
+# 增一处放开：改这张表的行并走三方（.claude/rules/three-way-inference.md），不改门禁的判法。
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	punch_hole_keeping_the_file_length	文件后端写零改成打洞，调 fallocate(2) 的 FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE（libc 0.2.189 已在锁文件里），只在这一个函数放开；不放开的路是有的：带安全封装的 rustix 在本机 cargo 缓存里（能否离线解析没核），纯标准库的「记写过的区间」零 unsafe、调查员量的效果与打洞相同——用户 2026-09-30 三选一选了打洞，2026-10-01 在知道这两条零 unsafe 的路之后弹窗仍选「照旧：core 里一处 unsafe」；同日定「立，恰好一处」「只在「不支持」（EOPNOTSUPP / ENOSYS）时退回逐块写零，别的错照报」	用户 2026-10-01 弹窗定 records/2026-09-30-里程碑三开工第一轮.md
+singlefs-format	forbid	-	-	-	-
+singlefs-checker	forbid	-	-	-	-
+singlefs-checker-tier	forbid	-	-	-	-
+singlefs-harness	forbid	-	-	-	-
+singlefs-replay-prefix	forbid	-	-	-	-
+singlefs-reference-filesystem	forbid	-	-	-	-
