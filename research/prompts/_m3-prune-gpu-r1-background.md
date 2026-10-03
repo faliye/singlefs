@@ -1339,8 +1339,8 @@ P7 只做第 3、4（只 Consult）、7 步（`record_checker_judges_absence_by_
 | 每条用例各自 `prepare`：各自 `build_pool` 重跑整条写路径、各自切段、各自调枚举器 | P1 `crash_enumeration_new_pool_file_creation_stream.rs:458`–`:489`；P2 `crash_enumeration_fixed_script_stream.rs:218`–`:493`；P3 `crash_enumeration_multi_record_publish_stream.rs:147`–`:185` |
 | 枚举器每一趟从状态 0 数到状态总数，没有「从某个序号起」「跳过某段」的入参；能跳过的只有 `NotExpanded`（整段不展开，只以全持久进入后面） | `crash.rs:1393`–`:1404` `Layer0SegmentExpansion`；`crash.rs:2644`–`:2647` 切片从 `plan.state_count` 起 |
 | 断点续跑与分片账本按「输入指纹 + 流名 + 计划哈希」分格，计划哈希含整张写表、段、版本表、有没有观察者；不同流的格互不相认，没有跨流复用 | `layer0_progress.rs:4`–`:6` 文件头；`crash.rs:2286`–`:2290` `layer0_plan_hash` 文档 |
-| 全绿标记按用例分格（`singlefs-crash-case-green.<用例名>.<输入指纹>`） | `.claude/gate.d/54-layer0-replay.sh:19` |
-| 唯一「相同就不另枚举」的先例：只做过 mkfs 的池那条流，用例逐项核「基线、写表连同内容、段序列」与第一条流相同，54 号文件头写「由 cargo test 里的快用例钉住，不另枚举」 | `crash_enumeration_writable_mount_of_a_formatted_pool.rs:210`–`:237`；`.claude/gate.d/54-layer0-replay.sh:4` |
+| 全绿标记按用例分格（`singlefs-crash-case-green.<用例名>.<输入指纹>`） | `.claude/gate.d/checker-tier-layer0-replay.sh:19` |
+| 唯一「相同就不另枚举」的先例：只做过 mkfs 的池那条流，用例逐项核「基线、写表连同内容、段序列」与第一条流相同，54 号文件头写「由 cargo test 里的快用例钉住，不另枚举」 | `crash_enumeration_writable_mount_of_a_formatted_pool.rs:210`–`:237`；`.claude/gate.d/checker-tier-layer0-replay.sh:4` |
 | 另一种已在用的写法「起点镜像不枚举，只录被判那一次发布」：树分裂、位置寻址、记录跨条三类流把之前那一大截施加成基线（`memory_pool_before_the_current_version`，`crates/singlefs-harness/tests/common_tree_split/mod.rs:401`–`:406`），只枚举最后那一次发布的段；它们的起点前缀（mkfs、取号、暖机、A、铺垫的发布，节点容量用只供测试的开关压小）没有哪条流枚举过 | `crash_enumeration_tree_split_streams.rs:3`–`:5`、`:298`；`crash_enumeration_position_addressed_trees.rs:3`–`:4`、`:148`；`crash_enumeration_record_spill_over_stream.rs` 文件头 |
 
 ## 三　每条流「走到哪些代码模块」有没有机械登记（问题 3）
@@ -1419,7 +1419,7 @@ P7 只做第 3、4（只 Consult）、7 步（`record_checker_judges_absence_by_
 | 被杀时最多丢每个线程手上那一片；读回时核过的片不再跑，末尾半行丢掉、那一片重跑 | `crash.rs:2027`–`:2028` 注释；`layer0_progress.rs:8`–`:9` |
 | 进度文件按「输入指纹 + 流名 + 枚举计划哈希」分格，三样都进文件名 | `layer0_progress.rs:4`–`:6` |
 | 计划哈希拼的是：基线每个扇区、枚举写表（含撕裂镜像与重放）、段与每段展开方式、被判的根、版本表、状态数、片方案、有没有观察者（分片时另拼 `shard <i>/<n>`） | `crash.rs:2286`–`:2290` |
-| 进度目录由 54 号设：`<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/54-layer0-replay.sh:23` |
+| 进度目录由 54 号设：`<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/checker-tier-layer0-replay.sh:23` |
 
 ### 4.4 双机分片（`research/scripts/layer0-shard-run.sh`）的单位
 
@@ -1765,7 +1765,7 @@ G5 的内容量（`name=g5_contents`，5 行）与显存阳性对照（`name=pos
 
 | 行 | 键 | 根 `Cargo.lock` | `research/Cargo.lock` |
 |---|---|---|---|
-| 28 | 54-layer0-replay.sh | 有 | — |
+| 28 | checker-tier-layer0-replay.sh | 有 | — |
 | 29 | 55-qemu-device-streams.sh | 有 | — |
 | 31 | 59-crates-mutation-replay.sh | 有 | — |
 | 32 | 74-model-differential.sh | 有 | — |
@@ -1970,7 +1970,7 @@ E161 今天只有可行性档：页 `.claude/kb/experiments/161-崩溃放量的�
 | 怎么写 | 打开时把核过的片重写成新文件：建 `.rewriting` → `write_all` → `sync_all` → `rename` → 目录 `sync_all`；之后每跑完一片追加一行、`sync_data` | :1139–:1159、:1186–:1197 |
 | 读回 | 每行自带 CRC-32C；末尾没换行的半行丢掉；整行坏、字段缺多、解不开，整份作废；同一片出现两次计数相同去重、不同整份作废 | 模块文档 :1–:17 |
 | 跑完 | 默认删掉（`Layer0ProgressFileAfterCompletion::Deleted`：「进度文件只在『没跑完』时存在」） | :102–:109、:1204–:1215 |
-| 54 号放哪 | `<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/54-layer0-replay.sh` 文件头「断点续跑」那几行 |
+| 54 号放哪 | `<git common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>` | `.claude/gate.d/checker-tier-layer0-replay.sh` 文件头「断点续跑」那几行 |
 
 具体的数（按片长公式现算，算术）：并行线一那条流 12 230 590 578 个状态（`.claude/gate.d/stage-inputs.tsv:40` 注释）→ 每片 186 625 个状态；`crash.rs:2028` 注释「第二条流全量五十多亿个状态时每片约八万五千个（32 线程每秒约两万多个时一片一分钟上下，推的）」。
 
@@ -1995,7 +1995,7 @@ E161 今天只有可行性档：页 `.claude/kb/experiments/161-崩溃放量的�
 
 | 项 | 事实 | 出处 |
 |---|---|---|
-| 单位 | **一条崩溃枚举用例 × 这条用例这批输入的指纹**；一条用例整条流一个标记，不按片、不按段 | `.claude/gate.d/54-layer0-replay.sh` 文件头 `--full` 那一段；`research/scripts/admission.py:1757–:1762` |
+| 单位 | **一条崩溃枚举用例 × 这条用例这批输入的指纹**；一条用例整条流一个标记，不按片、不按段 | `.claude/gate.d/checker-tier-layer0-replay.sh` 文件头 `--full` 那一段；`research/scripts/admission.py:1757–:1762` |
 | 指纹怎么算 | `admission.py crash-case-manifest`：登记路径（`crates/ Cargo.toml Cargo.lock`）下的文件减去这条用例读不到的（别的测试目标独占的测试文件、`crates/mutations.tsv`、没有代码读 `CARGO_BIN_EXE_` 时的 `src/bin/`），加准入模块里崩溃枚举用例的判法摘要、工具链、构建环境、这条用例的登记行；登记了 `shard=across-machines` 的再按内容加驱动与配置判法两份（`SHARD_DRIVER_FILES`，:220） | `admission.py` 文件头 :82–:85；`.claude/gate.d/stage-inputs.tsv:14–:20` 注释 |
 | 标记写在哪 | git common-dir 里 `singlefs-crash-case-green.<用例名>.<输入指纹>`，不进工作树，各 worktree 共用 | `admission.py:225`、:1757–:1762 |
 | 标记里有什么、何时作数 | `input_hash` 等于这一次指纹、`case` 对、`test_result` 是「1 passed; 0 failed」、登记的每个计数行恰好一行、要 `exhaustive=true` 的带着；没有发现表 | `admission.py:1931–:1947` `crash_case_marker_problems`；54 号文件头「全绿标记不带发现表」 |
@@ -2018,7 +2018,7 @@ E161 今天只有可行性档：页 `.claude/kb/experiments/161-崩溃放量的�
 
 `records/2026-09-24-里程碑二收尾调度.md:311`（分片可用性真测一次；KV 接入放提交之后）：
 
-> | 分片可用性真测一次、红在第二台算不出指纹；用户定 KV 接入放提交之后、两台清场扩大、提交时测试次序（2026-09-28） | 用户：「没有越权 分片你要测试一下 测试可用性 然后告诉我大约预计的时间」。驱动自检 13 格绿（假 cargo、第二台是本机目录）；主 agent 用第三轮快照那棵树带 `SINGLEFS_HEAVY_TESTS=user-request` 真跑 `crash-case:layer0-first-stream`：两台工具链相同、各 32 核，树拷过去之后第二台算不出输入指纹（规范副本被 `.gitignore` 第 6 行忽略、不随树走；本机与自检都能回退到主仓，所以自检没抓到），失败在清场之前，本机本地模型服务一直 active；派 tooling-writer 修（`records/2026-09-16-subagent拆分提案.md` 第 54 行）。全量时间先报推的：三条大流合计 30.4 亿状态，按 2026-09-25 量的 13,880 个/秒（32 线程、第二条流，C577 与 49 条不变量之前）单机约 61 小时、双机约 30 小时，修好后真跑量两台速率再换成量的数。用户接着定：①「32核 至少可以跑31核」——本机那一片 `SINGLEFS_LAYER0_THREADS=31`；② KV 与 GPU 弹窗答「先跑第五步，KV 接入放提交之后（推荐）」——全量跑期间并行做 E163 GPU 重跑与 E162 的 S3 跨机、S4 断电、几何敏感性，选型定了之后 KV 接入作为里程碑二提交后的剩余任务、接完再跑一趟全量；③「两台都停 包括tts」「配置写在本地 不要公开」「要明确指定cot服务 防止错误清理systemctl 导致系统问题」——主 agent 改私有配置（仓根 `multi-host.env` 与它指向的三份私有清场脚本，单元逐个写死、两张白名单、带通配字符就拒，只停开跑前 active 的、复原只起开跑前 active 的；清场单元里原来经别的仓的脚本间接停的那几个也改成直接写死），仓里不写单元名与主机；不是服务单元的 java / node 开发服务器开跑时按进程号逐个停、起法记私有文件交用户；④「提交时候 先跑 harness 然后跑 checker 最后跑checker-tier」——第五步派崩溃验证员照这个次序。另：singlefs-8b 提交 `e5253e8a` 之后主 agent 把第一段打进主工作区（`crates/mutations.tsv` 1400 行、33 号绿，`crates/` `litmus/` 与第三轮快照逐字相同，差的只是第一段的变异表行）；singlefs-8b 转来 55 号判别力样本缺 raise-rollback-floor 档（stage-selftest 判错 2 个），用户定下次提交崩溃验证员跑 55 号带 `VM_KEEP=1` 补样本，并进第五步派发提示。第十步素材 ㊳：用户「你遇到的这些问题 稍后都要按照脚本的方式处理 修bug」——看门狗把驱动自检里一趟趟起的小分片认成没带前缀的重型测试（按 pid 确认压不住）；交回后留在后台的门禁进程没人停；派发闸要「重型测试：不跑」单独一行；内存准入排队时主 agent 看不出要等多久 | 驱动修好 → 真跑第一条流量速率 → 报用户；第五步照 ④ 的次序 |
+> | 分片可用性真测一次、红在第二台算不出指纹；用户定 KV 接入放提交之后、两台清场扩大、提交时测试次序（2026-09-28） | 用户：「没有越权 分片你要测试一下 测试可用性 然后告诉我大约预计的时间」。驱动自检 13 格绿（假 cargo、第二台是本机目录）；主 agent 用第三轮快照那棵树带 `SINGLEFS_HEAVY_TESTS=user-request` 真跑 `crash-case:layer0-first-stream`：两台工具链相同、各 32 核，树拷过去之后第二台算不出输入指纹（规范副本被 `.gitignore` 第 6 行忽略、不随树走；本机与自检都能回退到主仓，所以自检没抓到），失败在清场之前，本机本地模型服务一直 active；派 tooling-writer 修（`records/2026-09-16-subagent拆分提案.md` 第 54 行）。全量时间先报推的：三条大流合计 30.4 亿状态，按 2026-09-25 量的 13,880 个/秒（32 线程、第二条流，C577 与 49 条不变量之前）单机约 61 小时、双机约 30 小时，修好后真跑量两台速率再换成量的数。用户接着定：①「32核 至少可以跑31核」——本机那一片 `SINGLEFS_LAYER0_THREADS=31`；② KV 与 GPU 弹窗答「先跑第五步，KV 接入放提交之后（推荐）」——全量跑期间并行做 E163 GPU 重跑与 E162 的 S3 跨机、S4 断电、几何敏感性，选型定了之后 KV 接入作为里程碑二提交后的剩余任务、接完再跑一趟全量；③「两台都停 包括tts」「配置写在本地 不要公开」「要明确指定cot服务 防止错误清理systemctl 导致系统问题」——主 agent 改私有配置（仓根 `multi-host.env` 与它指向的三份私有清场脚本，单元逐个写死、两张白名单、带通配字符就拒，只停开跑前 active 的、复原只起开跑前 active 的；清场单元里原来经别的仓的脚本间接停的那几个也改成直接写死），仓里不写单元名与主机；不是服务单元的 java / node 开发服务器开跑时按进程号逐个停、起法记私有文件交用户；④「提交时候 先跑 harness 然后跑 checker 最后跑checker-tier」——第五步派崩溃验证员照这个次序。另：别的会话提交 `e5253e8a` 之后主 agent 把第一段打进主工作区（`crates/mutations.tsv` 1400 行、33 号绿，`crates/` `litmus/` 与第三轮快照逐字相同，差的只是第一段的变异表行）；别的会话转来 55 号判别力样本缺 raise-rollback-floor 档（stage-selftest 判错 2 个），用户定下次提交崩溃验证员跑 55 号带 `VM_KEEP=1` 补样本，并进第五步派发提示。第十步素材 ㊳：用户「你遇到的这些问题 稍后都要按照脚本的方式处理 修bug」——看门狗把驱动自检里一趟趟起的小分片认成没带前缀的重型测试（按 pid 确认压不住）；交回后留在后台的门禁进程没人停；派发闸要「重型测试：不跑」单独一行；内存准入排队时主 agent 看不出要等多久 | 驱动修好 → 真跑第一条流量速率 → 报用户；第五步照 ④ 的次序 |
 
 里程碑三第十一项的原话，`.claude/kb/milestone/03-third-txn.md:93` 整行：
 
@@ -2062,7 +2062,7 @@ E161 今天只有可行性档：页 `.claude/kb/experiments/161-崩溃放量的�
 
 | 行 | 键 |
 |---|---|
-| :28 | `54-layer0-replay.sh` |
+| :28 | `checker-tier-layer0-replay.sh` |
 | :29 | `55-qemu-device-streams.sh` |
 | :31 | `59-crates-mutation-replay.sh` |
 | :32 | `74-model-differential.sh` |

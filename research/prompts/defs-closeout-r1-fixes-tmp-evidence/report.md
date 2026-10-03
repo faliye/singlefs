@@ -124,7 +124,7 @@ K18	heavy	主 agent	fg	exit=0
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K21	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_layer0（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K22	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+K22	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K23	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 57 号（57-lkmm.sh）（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 59 号（59-crates-mutation-replay.sh）（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K25	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 55 号（55-qemu-first-transaction.sh）（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
@@ -276,7 +276,7 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
  
  ## 做什么
  
- 1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `54-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
+ 1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
 -1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条，上限与退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash research/scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，照第 2 步直接跑，外面不再包一层。
 +1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条；上限取输入给的那一道的，退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash research/scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，照第 2 步直接跑，外面不再包一层。
  2. 只在提交时（或主 agent 转达用户要求时）跑你那几道，不跑 `gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个；54、55、57、59 号命令带输入给的那个前缀：`SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>`，其余登记给你的轻阶段不带；54 号默认不带 `--full`（快档加核全绿标记），派发提示点名要层 0 全量时才带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
@@ -390,10 +390,10 @@ F1-old-3c	detector	three-way-attack	rib	exit=0
  
  ## 重型测试只在提交时跑
  
--**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+-**重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
 +**重型测试**，与 `.claude/hooks/heavy-test-guard.sh` 拒的逐类相同（判定在 `.claude/hooks/lib_heavy_tests.py` 的 `classify`）：
 +
-+- 层 0 全量：`.claude/gate.d/54-layer0-replay.sh`；会跑到名字含 `layer0` 的测试二进制的 `cargo test`——`--test` 的名字含 `layer0` 或通配命中它，或者不挑目标（不带 `--test` / `--lib` / `--bin` 这类、或带 `--tests` / `--all-targets`）而包里有这种测试目标（例 `cargo test -p singlefs-harness`）；直接执行名字含 `layer0` 的测试二进制（`<target 目录>/<profile>/deps/<名字>-<16 位十六进制哈希>`）。
++- 层 0 全量：`.claude/gate.d/checker-tier-layer0-replay.sh`；会跑到名字含 `layer0` 的测试二进制的 `cargo test`——`--test` 的名字含 `layer0` 或通配命中它，或者不挑目标（不带 `--test` / `--lib` / `--bin` 这类、或带 `--tests` / `--all-targets`）而包里有这种测试目标（例 `cargo test -p singlefs-harness`）；直接执行名字含 `layer0` 的测试二进制（`<target 目录>/<profile>/deps/<名字>-<16 位十六进制哈希>`）。
 +- QEMU：55 号、`qemu-system-*`、`research/scripts/vm-bench.sh`（`--selftest` 也算）。
 +- herd7：57 号、`.claude/scripts/lkmm.sh`、`herd7`；这两样带什么参数都算，只取版本号的也算。
 +- `crates` 变异整表：59 号、参数里有 `crates/mutations.tsv` 的 `research/scripts/mutate.sh`。

@@ -13,7 +13,7 @@
 | K1 | 实验执行员的写范围加 `crates/mutations.tsv`：入库装置的变异行只追加进末尾，不改别人的行 | `.claude/agents/experiment-runner.md`「写范围」一节；`.claude/hooks/agent-write-scope.tsv` 新加一行 |
 | K2 | 崩溃验证员跑 54 号时带 `--full`（不带只跑快档） | `.claude/agents/crash-verifier.md`「做什么」第 2 条 |
 | K3 | 主 agent 在阶段同步那一步、这一批碰了 `crates/` 时后台跑 54 号 `--full`；整轮门禁的 54 号只核全绿标记 | `.claude/main-agent.md`「什么时候派哪个 agent」那张表「一个阶段任务结束」一行 |
-| 背景 | 54 号分档：默认跑两条流的快档，再核 `<git common-dir>/singlefs-layer0-full-green` 里记的输入哈希与这批输入相等；`--full` 跑全量、判绿写标记；输入清单收窄成 `crates/ Cargo.toml Cargo.lock` | `.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv` |
+| 背景 | 54 号分档：默认跑两条流的快档，再核 `<git common-dir>/singlefs-layer0-full-green` 里记的输入哈希与这批输入相等；`--full` 跑全量、判绿写标记；输入清单收窄成 `crates/ Cargo.toml Cargo.lock` | `.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv` |
 
 ## 二、实现今天的样子（主 agent 的观测，2026-09-23 现查）
 

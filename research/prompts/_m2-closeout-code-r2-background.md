@@ -43,7 +43,7 @@
   - core：`admission.rs`、`allocator.rs`、`code_two_tree.rs`、`inode_tree.rs`、`journal.rs`、`make_filesystem.rs`、`mount.rs`、`mounted_session.rs`、`pointer.rs`、`recovery.rs`、`system_configuration.rs`、`transaction.rs`、`unit.rs`；
   - format：`lib.rs`；
   - harness：`bad_disk_input.rs`、`crash.rs`、`crash_injection.rs`、`fault_injection.rs`、`history.rs`、`layer0_progress.rs`、`model.rs`、`model_comparison.rs`、`bin/first_transaction_on_device.rs`；
-  - 实验装置 bin：`bin/e156_allocation_basis_counts.rs`、`bin/e158_root_choice_repair.rs`（对不对由各自实验页的变异表与单测判，判决里只按路径点名）；`bin/e161_crash_state_dedup_and_time_split.rs` 是别的会话（singlefs-e1）的 E161 装置，不在这一轮里，判决里按路径点名、写明归属。
+  - 实验装置 bin：`bin/e156_allocation_basis_counts.rs`、`bin/e158_root_choice_repair.rs`（对不对由各自实验页的变异表与单测判，判决里只按路径点名）；`bin/e161_crash_state_dedup_and_time_split.rs` 是别的会话的 E161 装置，不在这一轮里，判决里按路径点名、写明归属。
 - **在飞、不在快照里、归第三轮的**（用户 2026-09-27 定第二轮与它们并行开）：测试钉值的统一修正（C577 与 A3b 带来的非层 0 钉值，C577 报告「第 1 条盘点」一节的算法；A3b 善后二：随机历史两条撞墙步数、小盘几份、故障注入第 595 行、E158 装置自拼的分配器 Q8）；A3b 第三节 Q7 剩下两处「读不出就放过」（`transaction.rs:368` 写系统配置前算生效 F 调原 `effective_rollback_floor`、`mount.rs` 管理员回退的候选判 `rollback_candidate`）与 Q4 新错误成员归到与乙同一级；善后一报告第五节 P1（抬 F 时挂载那一刻就读不出的根槽照 D16 第 37 行当没有根，只对挂载时读得出、这一次读不出的槽重读一次仍读不出才拒，A3b 今天对每个读不出的槽都拒）；层 0 文件、`.claude/gate.d/stage-inputs.tsv` 注释里的数与 litmus 的静态改。腿打中这几格时写「已知」并点名去向。
 - **已知、不算打中**（腿打中这几格时写「已知」并点名去向）：
   - C572（回退目标引用隔离单元不进逐盘验）：第一轮 Z1Q-A 立的账。

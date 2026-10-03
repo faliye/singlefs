@@ -2,13 +2,13 @@
 
 | 文件 | 行数 | 说明 |
 |---|---|---|
-| `.claude/gate.d/54-layer0-replay.sh` | 397 | 全文，正文点名（附录二另附 diff 与全文） |
+| `.claude/gate.d/checker-tier-layer0-replay.sh` | 397 | 全文，正文点名（附录二另附 diff 与全文） |
 | `.claude/gate.d/stage-inputs.tsv` | 15 | 全文，正文点名（含第 11 行注释） |
 | `research/scripts/stage-must-run.sh` | 87 | 全文，正文点名 |
 | `.claude/hooks/agent-write-scope.tsv` | 23 | 全文，正文点名 |
 | `research/prompts/defs-gate54-tiering-implementer/selftest-driver.sh` | 56 | 全文，正文二「自证都在合成仓 + 假 cargo 上（驱动脚本 …selftest-driver.sh 与三份报告的附录）」直接点名 |
 
-试跑 `kb-sections.py` 于 `.claude/gate.d/54-layer0-replay.sh` 得到的是每一行 `#` 注释各自单独一节（把 shell 注释行误判成一级标题），是退化产物，故不采用、按上表整份带入。
+试跑 `kb-sections.py` 于 `.claude/gate.d/checker-tier-layer0-replay.sh` 得到的是每一行 `#` 注释各自单独一节（把 shell 注释行误判成一级标题），是退化产物，故不采用、按上表整份带入。
 
 ### 小节清单：`.claude/main-agent.md`（kb-sections.py 全量生成，未经任何过滤）
 

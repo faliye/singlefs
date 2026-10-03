@@ -137,7 +137,7 @@
 | ## 代码轮派腿之前记一份开工快照 | 抄 | 第三节 G4「要答」整行引用（implementation-workflow.md「代码轮派腿之前记一份开工快照」） |
 | ## 复用上一次全量门禁的判定：按「那一道读的输入变没变」判，不按「改了哪个目录」判 | 抄 | 随：G1「判据指到 `research/scripts/stage-must-run.sh`」与「复用上一次整轮全绿判定只在那一趟里有」逐句对应这一节的 ⇒ 表与「没登记在那张表里的阶段（57 号 herd7 就是）没有复用判定」；这是 G1「implementation-workflow.md 表」最贴近的一张表；标题带冒号，`@标题` 会切错，另用 `--extra .claude/rules/implementation-workflow.md:30-45` 取同一段 |
 | ## 重型测试只在提交时跑 | 抄 | 「场合 / 跑不跑」表里「崩溃验证员、门禁分诊员」一行逐句对应 G1「整轮门禁改由门禁分诊员跑」与第三节「要答」问的「它里面起的 `gate.sh --staged` 与各阶段……在钩子眼里算谁的」；这也是 G1「implementation-workflow.md 表」可能指的另一张表 |
-| ## 测试与崩溃检测优先多线程 | 抄 | 末段「门禁管哪一半」写的 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>` 与「HEAD + 暂存区的 worktree」逐句对应 G1「层 0 全量的三行命令放进同一次 Bash 调用、判绿之后才往下」 |
+| ## 测试与崩溃检测优先多线程 | 抄 | 末段「门禁管哪一半」写的 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>` 与「HEAD + 暂存区的 worktree」逐句对应 G1「层 0 全量的三行命令放进同一次 Bash 调用、判绿之后才往下」 |
 
 ### 小节清单：`.claude/rules/mutation-sampling.md`
 

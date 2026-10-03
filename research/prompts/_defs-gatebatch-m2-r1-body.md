@@ -8,7 +8,7 @@
 
 | 格 | 被攻的 | 问题 |
 |---|---|---|
-| J1 | **54 号 `--full` 逐条跑、逐条标记、续跑**（`.claude/gate.d/54-layer0-replay.sh`） | 有没有一条路径：某条用例的输入变了而它的旧标记照样作数（假复用）；跑了一部分、被打断或判红之后留下一个作数的标记；续跑的进度目录跨输入串用；`--start-over` 没传到、或别处漏清 `SINGLEFS_LAYER0_START_OVER` |
+| J1 | **54 号 `--full` 逐条跑、逐条标记、续跑**（`.claude/gate.d/checker-tier-layer0-replay.sh`） | 有没有一条路径：某条用例的输入变了而它的旧标记照样作数（假复用）；跑了一部分、被打断或判红之后留下一个作数的标记；续跑的进度目录跨输入串用；`--start-over` 没传到、或别处漏清 `SINGLEFS_LAYER0_START_OVER` |
 | J2 | **按排除法算每条用例的输入**（`research/scripts/admission.py` 的崩溃枚举那一节：「别的所有测试目标」自动减掉，在别处 `.rs` 或 `Cargo.toml` 里以整词出现的不减，有 `build.rs` / `[[test]]` / autotests 的包整份不减） | 造一处改动：它改变了某条登记用例的行为，而被算成「与它无关」减掉了（宏、`include!`、`#[path]`、按目录读 `tests/`、拼接出来的名字、共用模块改名）；另看会不会减得太少，让无关改动把 2.8 天的第二条流拖去重跑 |
 | J3 | **构建环境进指纹**（`build_environment_lines`；`CARGO_BUILD_JOBS` 故意不进；行名只写类别不写绝对路径） | 还有什么改了会改测试二进制的行为而不进指纹；`CARGO_BUILD_JOBS` 不进会不会让一个真有差别的构建被当成同一个；主工作区与 HEAD + 暂存区的 worktree 算出的指纹是不是一定相同 |
 | J4 | **重型测试闸认崩溃枚举用例**（`.claude/hooks/lib_heavy_tests.py` 的 `classify`、`.claude/hooks/heavy-test-guard.sh`） | 子 agent 有没有一种写法绕得过去（脚本里运行时读参数、别名、`cargo nextest`、直接起测试二进制加 `--ignored` 的别的拼法）；有没有把只跑同一目标里快用例的合法命令误拒 |

@@ -34,7 +34,7 @@
 - 第一、二轮的事实表：`research/prompts/m3-prune-gpu-r1-facts-{landscape,checker-gpu,kv,k4,case-design}.md`、`research/prompts/m3-prune-gpu-r2-facts-scale-up-inventory.md`；F1、F2 报告 `research/prompts/m3-prune-gpu-r1-f1-i78-report.md`、`research/prompts/m3-prune-gpu-r1-f2-order-report.md`。
 - 第二轮攻方的模型 `research/prompts/m3-prune-gpu-r2-opus-model/`（`r2.rs` 挂在 E161 装置副本上，十六个世界；主 agent 在新副本上复跑逐行相同）——它实现了第二轮被攻的最强版本（P7 键、F1 候选槽改法、记录按自己的 txg 归属、符号键、逐项原始判定、按内容换编号导入），第三轮在它上面攻。
 - KV 第一段已在主工作区（未提交）：`crates/singlefs-checker-tier/src/verdict_store.rs`（可选特性 `verdict-store`；块键 = 输入指纹 32 字节 + 流或节点名 + 计划哈希 + 块起点；判定向量编号 1 字节）。库里没有布局版本、没有「已录入 / 已核对」标记、没有调用方。
-- 门禁 54、59 号正由 singlefs-8f 补最小的 `--list` / `--check`（按崩溃枚举用例、按变异行点名），判法与复用不动；`.claude/rules/verification.md`「门禁的结构」按用户定案写进（它在写）。
+- 门禁 54、59 号正由别的会话补最小的 `--list` / `--check`（按崩溃枚举用例、按变异行点名），判法与复用不动；`.claude/rules/verification.md`「门禁的结构」按用户定案写进（它在写）。
 - 多机配置开关 `ENABLE_ACROSS_MACHINES`、`ENABLE_GPU`（`research/scripts/layer0-shard-configuration-check.sh`）；E163 装置 `research/e7-index-bench/src/bin/e163_gpu_multicard_crc32c.rs` 是今天唯一的 GPU 代码（按连续单元区间一卡一片）。
 - `crates/` 里今天没有节点树、没有剪枝、没有 GPU 代码。
 

@@ -286,9 +286,9 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 **出处 `records/2026-09-27-验证两档拆分.md:1-4`（整段抄，未转述）**
 
 ```markdown
-# 验证代码分两档：harness 日常测试 / checker 提交时验证（singlefs-8b，用户定案）
+# 验证代码分两档：harness 日常测试 / checker 提交时验证（用户定案）
 
-来源：用户 2026-09-27 在会话 singlefs-8b 里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
+来源：用户 2026-09-27 在别的会话里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
 
 ```
 

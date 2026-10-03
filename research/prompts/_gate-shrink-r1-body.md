@@ -13,7 +13,7 @@
 - 盘点报的四处同一件事跑两遍：33 号 mutation-tables 与 59 号用同一份 `row_problems`；47 号 agent-write-scope 与共享 `hooks-registered` 各跑一遍同一批钩子自证；43 号 table-shape 与 doc-lint F 都判「同一编号不许两处登记」；54 号快档与 74 号的用例已在共享「构建与单测」的 `cargo test --all`（debug）里跑过一遍。
 - 盘点报的次序依赖：`gate.sh` 按文件名排序跑本地阶段（`gate.sh` 第 636 行一带），77 号文件头写「这一阶段排在最后」而 87、92、94 号在它后面；去掉编号改成 `<类>-<内容>.sh` 之后次序按类名字母序（checker、checker-tier、code、doc、harness）。
 - 47 号 research-script-selftests 报 4 份「声称有 `--selftest` 却没阶段在跑」：认法是文件里出现 `--selftest` 这串字就算（47 号第 241 行一带）；4 份里只有 `rerun-failed-tests.py` 真有自己的 `--selftest`；原 47 号（HEAD 版）对同一份工作区报同样 4 份。
-- 54、59 号与双机分片、按输入复用与全绿标记，用户已定由 singlefs-29 的里程碑三第二轮按「先录入（KV）、后核对」重设计；这一轮对它们只改名、改开关，不加功能。
+- 54、59 号与双机分片、按输入复用与全绿标记，用户已定由别的会话的里程碑三第二轮按「先录入（KV）、后核对」重设计；这一轮对它们只改名、改开关，不加功能。
 
 ## 二、方案（要腿攻的）
 
@@ -50,7 +50,7 @@
 
 ### C 第一轮改过的定义与共用约束
 
-第一轮为「扫仓的门禁只在提交时跑」（Q9）、「看门狗放行样本自检」（Q15）、doc-lint 挪到提交时（Q8）与各组合并改了下面这些文件的文字；按合并后 11 号 agent-def-adversarial-review 那一格的要求走这一轮三方：`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/agents/kb-scribe.md`、`experiment-runner.md`、`tooling-writer.md`、`three-way-materials.md`、`prior-art.md`、`crash-verifier.md`、`implementation-writer.md`、`investigator.md`、`kb-spec-drafter.md`，规则 `.claude/rules/implementation-workflow.md`、`implementation-first.md`、`three-way-inference.md`、`format-evolution.md`、`mutation-sampling.md`、`verification.md`、`path-moves.md`，以及 `CLAUDE.md`。材料员照 `git diff HEAD --` 这些路径出 diff。不审：`three-way-verifier.md` 的删除与 `three-way-local-attack.md`（会话开始前已在暂存区）、`.claude/rules/changelog-format.md`（singlefs-0a 那一轮，它另开了 changelog-format-r1）。
+第一轮为「扫仓的门禁只在提交时跑」（Q9）、「看门狗放行样本自检」（Q15）、doc-lint 挪到提交时（Q8）与各组合并改了下面这些文件的文字；按合并后 11 号 agent-def-adversarial-review 那一格的要求走这一轮三方：`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/agents/kb-scribe.md`、`experiment-runner.md`、`tooling-writer.md`、`three-way-materials.md`、`prior-art.md`、`crash-verifier.md`、`implementation-writer.md`、`investigator.md`、`kb-spec-drafter.md`，规则 `.claude/rules/implementation-workflow.md`、`implementation-first.md`、`three-way-inference.md`、`format-evolution.md`、`mutation-sampling.md`、`verification.md`、`path-moves.md`，以及 `CLAUDE.md`。材料员照 `git diff HEAD --` 这些路径出 diff。不审：`three-way-verifier.md` 的删除与 `three-way-local-attack.md`（会话开始前已在暂存区）、`.claude/rules/changelog-format.md`（别的会话那一轮，它另开了 changelog-format-r1）。
 
 ## 三、要腿答的
 

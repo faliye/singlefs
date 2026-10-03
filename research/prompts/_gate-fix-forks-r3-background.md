@@ -285,7 +285,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 
@@ -726,7 +726,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 
 材料：正文 `research/prompts/_gate-fix-forks-r1-body.md`，清单 `_gate-fix-forks-r1-checklist.md`、附录 `_gate-fix-forks-r1-appendix.md`，拼成 `_gate-fix-forks-r1-background.md`。这是第一轮：打中的先挂起，下面「暂定」的形态进第二轮再攻。
 
-**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被 singlefs-ca 会话定点插进 1 行（第 29 行 `"bash research/scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
+**开工快照漂移**（`gate-fix-forks-r1-snapshot/sha256sums.txt`，2026-09-23 记，20 份）：变了 1 份。`.claude/gate.d/47-research-script-selftests.sh` 在腿跑着的时候被别的会话定点插进 1 行（第 29 行 `"bash research/scripts/watch.sh --selftest" \`）。倒推出快照时的原样存为 `gate-fix-forks-r1-snapshot/47-research-script-selftests.sh.at-snapshot`，sha256 与快照一致；经过写在同目录 `changed-during-legs.md`。攻方引的 `47:42` 落在副本第 42 行、主树第 43 行。
 
 **本地攻方提示的一条事实写错了**：fact 8-3 说截断点落在六字符算法名中间、剪成头两个字符。主 agent 拿生成器现跑（`.claude/scripts/gen-decision-items.py` 的 `clip`）：截在中间（`校验和算法取 SHA`，n=10）原样留着；剪成 `SH` 的是截断点**正好停在整词之后**（`校验和算法取 SHA256`，n=13 → `校验和算法取 SH`；`条带冗余按 RAID5`，n=11 → `条带冗余按 RAI`），剥尾正则 `[A-Z]-?\d+` 从词中间咬走 `A256` / `D5`。两份样本 T8 第 8、9 题建在这条错的事实上，作废；第 10 题不依赖它，照判。
 
@@ -956,7 +956,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 
 辩方：丙a 对 kb 的 not-numbers 标记里登记过的领域词（`SHA256`、`RAID5` 这类）整词丢掉，而「乙的词表 + 丙a 已落地的正则」能保住它们——判决说「乙堵不住」是对着旧正则现跑的，换成新正则就不成立。本地攻方两份样本一致：截断点落在词中间（`SH`、`RAI`）时剩半截，新旧正则都不管；s2 把 11 格里 10 格判成「不该丢的整词被丢」，其中 D22、E142、I-9.5 是真编号、剥掉是对的，s2 判错了这 3 格，另 7 格（SHA256、RAID5、AES-256、SHA-256、M1、L1、T10，都在标记里）与辩方一致。
 
-**暂定（主 agent 按辩方与本地腿合成，零轮）**：丙a 之上加两条——截断尾巴上的整词登记在 not-numbers 标记里就不剥；截断点落在一个 ASCII 词中间时把半截整个去掉（也管住 `D22` 截成 `D2` 这种指错对象的引用）。十九格手写用例全对；真仓生成块与 singlefs-5a 重新生成的索引页逐字相同（21 号绿）。第三轮攻。
+**暂定（主 agent 按辩方与本地腿合成，零轮）**：丙a 之上加两条——截断尾巴上的整词登记在 not-numbers 标记里就不剥；截断点落在一个 ASCII 词中间时把半截整个去掉（也管住 `D22` 截成 `D2` 这种指错对象的引用）。十九格手写用例全对；真仓生成块与别的会话重新生成的索引页逐字相同（21 号绿）。第三轮攻。
 
 ### T9、T10
 

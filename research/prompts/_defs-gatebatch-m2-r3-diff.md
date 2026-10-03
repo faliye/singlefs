@@ -11,10 +11,10 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 ## 一、G1 diff（`research/prompts/defs-gatebatch-m2-r2-fixes.diff`，1630 行，原样）
 
 ```diff
---- a/.claude/gate.d/54-layer0-replay.sh
-+++ b/.claude/gate.d/54-layer0-replay.sh
+--- a/.claude/gate.d/checker-tier-layer0-replay.sh
++++ b/.claude/gate.d/checker-tier-layer0-replay.sh
 @@ -9,16 +9,19 @@
- #   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full [--start-over] <worktree>
+ #   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full [--start-over] <worktree>
  #     主 agent 暂存之后（提交时由崩溃验证员），在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
  #     逐条崩溃枚举用例（.claude/gate.d/stage-inputs.tsv 里键是 crash-case: 的那几行，照登记表的次序）：先算这条用例这批输入的指纹
 -#     （research/scripts/admission.py crash-case-manifest：登记路径下的文件减去用例读不到的文件，加判它的 54 号、准入模块 admission.py、
@@ -35,7 +35,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  #     不带它时从调用方的环境里清掉这个变量。续跑的判法（片方案、校验和、观察者计数、判红删进度文件）在 crates/singlefs-harness/src/layer0_progress.rs。
 +#     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
 +#     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
- #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+ #   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
  #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
  #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再逐条崩溃枚举用例算它这批输入的指纹、核那一格
 @@ -35,7 +38,10 @@
@@ -1058,7 +1058,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 @@ -2948,9 +3329,10 @@
  
  def run_layer0_stage_cells(selftest, module):
-     """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 54-layer0-replay.sh），
+     """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 checker-tier-layer0-replay.sh），
 -    假 cargo、rustc、nproc 在 PATH 最前面。核：逐条跑、续跑的三个环境变量、判绿写标记、快档核标记、第二趟全复用、只重跑输入变了的那一条、
 -    --start-over、只剩 1 片要跑不误红、1 个线程跑了 64 片判红、0 passed 判红、cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、
 -    快档不带 SINGLEFS_GATE_FULL=1 时只改登记表、只改 54 号、只改准入模块照样核标记（不退 77）。"""
@@ -1067,7 +1067,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +    cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、快档不带 SINGLEFS_GATE_FULL=1 时只改登记表判红、只改 54 号与只改准入模块判法之外的部分
 +    照样核标记而判绿（54 号不进指纹）、改准入模块的判法判红（都不退 77）。"""
      repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
-     real_stage = os.path.join(repository_root, ".claude/gate.d/54-layer0-replay.sh")
+     real_stage = os.path.join(repository_root, ".claude/gate.d/checker-tier-layer0-replay.sh")
      work = tempfile.mkdtemp(prefix="admission-selftest-stage54-")
 @@ -2967,7 +3349,7 @@
          write_text(os.path.join(work, REGISTRATION_TABLE), "".join(row + "\n" for row in rows))
@@ -1076,13 +1076,13 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 -        for helper in ("stage-must-run.sh", "change-touches-crates.sh"):
 +        for helper in ("stage-must-run.sh", "change-touches-crates.sh", "stage-run-or-skip.sh"):
              shutil.copy(os.path.join(SELFTEST_HERE, helper), os.path.join(work, "research/scripts", helper))
-         stage_copy = os.path.join(work, ".claude/stage-under-test/54-layer0-replay.sh")
+         stage_copy = os.path.join(work, ".claude/stage-under-test/checker-tier-layer0-replay.sh")
          os.makedirs(os.path.dirname(stage_copy))
 @@ -3012,9 +3394,7 @@
          def expected_fingerprint(key):
              _exit_code, output, _messages = run_in_environment(
                  [sys.executable, os.path.join(work, "research/scripts/admission.py"), "crash-case-manifest", work, key,
--                 os.path.join(control, "expected-manifest"), "--extra-file", "<判它的 54 号：54-layer0-replay.sh>", stage_copy,
+-                 os.path.join(control, "expected-manifest"), "--extra-file", "<判它的 54 号：checker-tier-layer0-replay.sh>", stage_copy,
 -                 "--extra-file", "<判它的准入模块：admission.py>", os.path.join(work, "research/scripts/admission.py"),
 -                 "--toolchain", "--build-environment"], environment)
 +                 os.path.join(control, "expected-manifest"), "--judging-digest", "--toolchain", "--build-environment"], environment)
@@ -1427,7 +1427,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +    write("crates/singlefs-harness/tests/spaced_ignore_crash_enumeration.rs", "#[test]\n# [ignore]\nfn the_spaced_case() {}\n")
      write("crates/singlefs-checker/Cargo.toml", '[package]\nname = "singlefs-checker"\nversion = "0.0.0"\n')
      write("crates/singlefs-checker/tests/checker_crash_enumeration.rs", marked_case)
-     write(CRASH_CASE_REGISTRY, "# 样本登记表\n54-layer0-replay.sh\tcrates/\t# 样本\n"
+     write(CRASH_CASE_REGISTRY, "# 样本登记表\nchecker-tier-layer0-replay.sh\tcrates/\t# 样本\n"
                                 "crash-case:sample\tcrates/ Cargo.toml\ttest=singlefs-harness:sample_crash_enumeration:the_full_case\t# 样本\n"
                                 "crash-case:checker\tcrates/ Cargo.toml\ttest=singlefs-checker:checker_crash_enumeration:the_full_case\t# 样本\n"
 -                               "crash-case:unmarked\tcrates/ Cargo.toml\ttest=singlefs-harness:unmarked_crash_enumeration:the_unmarked_case\t# 样本\n")
@@ -2306,8 +2306,8 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  #
  # 宁宽勿窄：多写一条路径只会多跑几趟，少写一条会让一次真的改动被跳过。拿不准就写上。
  # 只写从仓库根起的路径；目录写成带斜杠的前缀（git diff 与 git ls-files 的路径限定都按前缀匹配）。
--54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock research/scripts/admission.py	command=cargo command=rustc	# 跑 crates 的崩溃点重放；research/scripts/admission.py 是它判日志、算每条崩溃枚举用例的输入指纹、读写全绿标记的准入模块（它也进每条用例的指纹），改了它这一道不许复用上一次的判定；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）。这一行管整道阶段的复用判定与改动范围；它逐条跑的崩溃枚举用例各自的输入登记在本表 crash-case: 开头的那几行。前提：cargo 与 rustc（两档都要 cargo -V && rustc -V 算输入指纹，快档与 --full 都起 cargo test）
-+54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock research/scripts/admission.py research/scripts/layer0-shard-run.sh research/scripts/layer0-shard-configuration-check.sh	command=cargo command=rustc	# 跑 crates 的崩溃点重放；research/scripts/admission.py 是它判日志、算每条崩溃枚举用例的输入指纹、读写全绿标记、交起用例命令的准入模块（进每条用例指纹的是它里面崩溃枚举用例的判法摘要，不是整份），改了它这一道不许复用上一次的判定；layer0-shard-run.sh 与 layer0-shard-configuration-check.sh 是 --full 在分片配置可用时跑登记了 shard=across-machines 的用例的驱动脚本与配置判法（按内容进那几条用例的指纹），改了它们快档同样要核标记；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）。这一行管整道阶段的复用判定与改动范围；它逐条跑的崩溃枚举用例各自的输入登记在本表 crash-case: 开头的那几行。前提：cargo 与 rustc（两档都要 cargo -V && rustc -V 算输入指纹，快档与 --full 都起 cargo test）
+-checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock research/scripts/admission.py	command=cargo command=rustc	# 跑 crates 的崩溃点重放；research/scripts/admission.py 是它判日志、算每条崩溃枚举用例的输入指纹、读写全绿标记的准入模块（它也进每条用例的指纹），改了它这一道不许复用上一次的判定；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）。这一行管整道阶段的复用判定与改动范围；它逐条跑的崩溃枚举用例各自的输入登记在本表 crash-case: 开头的那几行。前提：cargo 与 rustc（两档都要 cargo -V && rustc -V 算输入指纹，快档与 --full 都起 cargo test）
++checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock research/scripts/admission.py research/scripts/layer0-shard-run.sh research/scripts/layer0-shard-configuration-check.sh	command=cargo command=rustc	# 跑 crates 的崩溃点重放；research/scripts/admission.py 是它判日志、算每条崩溃枚举用例的输入指纹、读写全绿标记、交起用例命令的准入模块（进每条用例指纹的是它里面崩溃枚举用例的判法摘要，不是整份），改了它这一道不许复用上一次的判定；layer0-shard-run.sh 与 layer0-shard-configuration-check.sh 是 --full 在分片配置可用时跑登记了 shard=across-machines 的用例的驱动脚本与配置判法（按内容进那几条用例的指纹），改了它们快档同样要核标记；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）。这一行管整道阶段的复用判定与改动范围；它逐条跑的崩溃枚举用例各自的输入登记在本表 crash-case: 开头的那几行。前提：cargo 与 rustc（两档都要 cargo -V && rustc -V 算输入指纹，快档与 --full 都起 cargo test）
  55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock research/scripts/ research/results/	command=qemu-system-x86_64 readwrite=/dev/kvm probe=research/scripts/vm-kernel.sh:--check	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 research/scripts/；这几条路径同时是改动范围（change-touches-crates.sh）的前缀。前提是 .claude/kb/vm-harness.md「三个前置」：缺 QEMU 装 qemu-system-x86；/dev/kvm 不可读写查 kvm 组成员身份，不许用 setfacl 补；找不到可读的内核镜像就跑 bash research/scripts/vm-kernel.sh，按它打印的路径设 SINGLEFS_KERNEL
  57-lkmm.sh	litmus/ .claude/scripts/lkmm.sh .claude/scripts/fetch-deps.sh .claude/singlefs-ai-sop/scripts/lib.sh crates/	probe=.claude/scripts/lkmm.sh:--herd7-version environment=.claude/scripts/lkmm.sh:--herd7-version	# 判 litmus/ 下每条 Never 的对照组、代码绑定与 herd7 判定。lkmm.sh 是判法，它 source 的 lib.sh、找不到内核树时调的 fetch-deps.sh 一并登记；crates/ 整个取：litmus 的 singlefs-models 锚点今天指 crates/singlefs-core/src/transaction.rs 与 recovery.rs，读 litmus 文件名的测试在 crates/singlefs-harness/tests/publish_order_matches_litmus.rs，而 lkmm.sh 按文件名在全部 crates/**/*.rs 里找测试、新加一条 litmus 的锚点可以指到 crates/ 任何一处，只登记这三份会让下一条新锚点的改动被跳过（宁宽勿窄）。herd7 的版本不在 git 树里，经第三列 environment= 进复用判定（lkmm.sh --herd7-version 打的那一行，57 号判绿之后记进 git common-dir）；前提是找得到 herd7（probe= 同一个入口，PATH 里没有就试 opam 的环境；缺了 opam install herdtools7）。内核树的 tools/memory-model 不进判定，靠 stage-must-run.sh 的 24 小时复用上限兜
  59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock research/scripts/run-with-memory-cap.sh	command=cargo	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试；每条经 run-with-memory-cap.sh 带内存上限跑，它判不判得出撞顶也是这一道的判据。前提：cargo（装 Rust 工具链，bash .claude/scripts/env.sh 会报缺什么）
@@ -2411,7 +2411,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 @@ -820,6 +826,10 @@
              ("经 nice 包一层", ["/usr/bin/nice", "-n", "19", "cargo", "test", "--workspace"], work, "full-cargo"),
              ("bash -c 里", ["bash", "-c", "cd crates/singlefs-harness && cargo test"], work, "layer0-cargo"),
-             ("bash 起 54 号", ["bash", ".claude/gate.d/54-layer0-replay.sh", "--full", "/tmp/wt"], work, "layer0-stage"),
+             ("bash 起 54 号", ["bash", ".claude/gate.d/checker-tier-layer0-replay.sh", "--full", "/tmp/wt"], work, "layer0-stage"),
 +            ("bash 起双机分片的驱动脚本", ["bash", "research/scripts/layer0-shard-run.sh", "crash-case:sample", "/tmp/wt"], work, "crash-case-cargo"),
 +            ("双机分片的驱动脚本 --merged-log", ["bash", "research/scripts/layer0-shard-run.sh", "--merged-log", "crash-case:sample", "/tmp/wt", "0" * 64, "/tmp/log"],
 +             work, "crash-case-cargo"),
@@ -2461,8 +2461,8 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  
  只认命令位置；`bash -c`、`capped.sh`、`run-with-memory-cap.sh`、`nice`、`timeout`、`env` 这类包装里面的同样算，`/usr/bin/time`、`flock`、`rustup run`、`chrt`、`prlimit`、`systemd-run`、`strace`、`perf stat|record|trace` 包在外面的剥掉照算（短选项合写的 `strace -fo <文件>`、`flock -xw 10` 同样剥）。重型测试清单各类里的 `cargo test` 同样指 `cargo nextest run`、`cargo miri test`、`cargo llvm-cov`、`cargo hack test`、`cargo mutants` 与别名；libtest 参数里 `--list` 当选项出现（只列用例、一条都不跑）的哪一类都不算，跟在 `--skip`、`--logfile` 这类带值的选项后面的 `--list` 是那个选项的值，照算。命令位置上执行的脚本（`bash x.sh`、`./x.sh`、`source x`）闸读进去，逐行照同一个 `classify` 判，里面有一样就整条算（例：`.claude/scripts/fetch-deps.sh --check` 第 81 行调 `herd7 -version`，整条算 herd7）；门禁阶段与 `lib_heavy_tests.py` 的 `KNOWN_SCRIPT_LOCATIONS` 登记的仓内脚本按名字判、不读正文。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
  
---- a/.claude/gate.d/54-layer0-replay.sh
-+++ b/.claude/gate.d/54-layer0-replay.sh
+--- a/.claude/gate.d/checker-tier-layer0-replay.sh
++++ b/.claude/gate.d/checker-tier-layer0-replay.sh
 @@ -22,6 +22,11 @@
  #     断点续跑（crash-case-command 设）：跑用例时设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=<common-dir>/singlefs-layer0-progress/<这条用例的输入指纹>
  #     （不随 worktree 删掉）、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<这条用例的输入指纹>；--start-over 设 SINGLEFS_LAYER0_START_OVER=1（丢掉进度文件、从头跑），
@@ -2474,7 +2474,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +#     别的用例、配置不在或判不过时，照 crash-case-command 单机跑。开没开、为什么，开跑时打一行。
  #     这一份 54 号不进指纹：改它（出路句、快档、次序）不废旧标记。它里面还定着结论的只剩流程的次序（开跑与跑完各算一次指纹、先判日志再写标记、
  #     判红删那一格），由 admission.py --selftest 的「54 号」那几格核；改它时快档照样核标记（范围那一问不摘掉它）。
- #   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+ #   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 @@ -55,7 +60,7 @@
  layer0_tier="quick"
  layer0_start_over=0
@@ -2638,7 +2638,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 +[[ -n "$registration_row" && -n "$case_package" && -n "$case_target" && -n "$case_function" ]] \
 +  || fail "stage-inputs.tsv 里找不到这一行或它的 test=<包>:<测试目标>:<用例函数>" "照 research/scripts/admission.py 文件头「崩溃枚举用例行」登记"
 +python3 "$admission_module" crash-case-shardable "$tree_root" "$case_key" >/dev/null \
-+  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/54-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
++  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/checker-tier-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
 +
 +if ! git_common_directory="$(git -C "$tree_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$git_common_directory" ]]; then
 +  fail "$tree_root 不是 git 工作树（取不到 git common-dir）" "在 HEAD + 暂存区的 worktree 里跑，建法见门禁 54 号 --full 的出路句"
@@ -3148,10 +3148,10 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
 
 ## 三、`git diff --stat ecdf8465 -- <9 paths>`（原样输出；标出哪几处不归这一轮）
 
-主 agent 给的 9 条路径：`.claude/gate.d/54-layer0-replay.sh .claude/gate.d/stage-inputs.tsv research/scripts/admission.py .claude/hooks/lib_heavy_tests.py .claude/hooks/heavy-test-guard.sh .claude/rules/implementation-workflow.md research/scripts/layer0-shard-run.sh research/scripts/layer0-shard-run-selftest.sh research/scripts/layer0-shard-configuration-check.sh`。
+主 agent 给的 9 条路径：`.claude/gate.d/checker-tier-layer0-replay.sh .claude/gate.d/stage-inputs.tsv research/scripts/admission.py .claude/hooks/lib_heavy_tests.py .claude/hooks/heavy-test-guard.sh .claude/rules/implementation-workflow.md research/scripts/layer0-shard-run.sh research/scripts/layer0-shard-run-selftest.sh research/scripts/layer0-shard-configuration-check.sh`。
 
 ```
- .claude/gate.d/54-layer0-replay.sh            | 150 ++++++++++++++++++++++++--
+ .claude/gate.d/checker-tier-layer0-replay.sh            | 150 ++++++++++++++++++++++++--
  .claude/gate.d/stage-inputs.tsv               |   2 +-
  .claude/rules/implementation-workflow.md      |   4 +-
  research/scripts/layer0-shard-run-selftest.sh |  34 ++++++
@@ -3159,7 +3159,7 @@ d2a94fafe7b200bf19ed455c389f28db80e2e04cb53c5bc737d1bc92422f5864  research/promp
  5 files changed, 227 insertions(+), 23 deletions(-)
 ```
 
-正文第一节「不归这一轮的」点名：`.claude/gate.d/54-layer0-replay.sh`（这份统计里的 +150 行）与 `research/scripts/layer0-shard-run.sh`（+60 行）里读层 0 发现日志的那几段，以及 `research/scripts/layer0-shard-run-selftest.sh`（+34 行，自证第 ⑦ 格，随发现日志那件一起加），是 2026-09-27 工具员加的（报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方，不归这一轮。这一趟统计里剩下的 `.claude/gate.d/stage-inputs.tsv`（+2 行）与 `.claude/rules/implementation-workflow.md`（+4 行）：`stage-inputs.tsv` 的改动是正文第二节写明的「第 34 行 E142 那一行加了一个输入 `research/prompts/e142-r19-prereg.md`，与崩溃枚举无关」；`implementation-workflow.md` 的改动是正文第二节写明的「已提交的 2 行（别的会话的措辞改动）」——现跑 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md`，两行改动都是遣词，不涉判据字面（材料员现查，见下）。`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`research/scripts/layer0-shard-configuration-check.sh` 四份在这份统计里没有出现，即与 `ecdf8465` 逐字节相同，与正文第二节「逐字节相同」的声明一致。
+正文第一节「不归这一轮的」点名：`.claude/gate.d/checker-tier-layer0-replay.sh`（这份统计里的 +150 行）与 `research/scripts/layer0-shard-run.sh`（+60 行）里读层 0 发现日志的那几段，以及 `research/scripts/layer0-shard-run-selftest.sh`（+34 行，自证第 ⑦ 格，随发现日志那件一起加），是 2026-09-27 工具员加的（报告 `research/prompts/defs-gate54-findings-report.md`；工作区里还没提交），与写发现日志的 `crates/singlefs-harness/src/crash.rs` 一起归代码第二轮三方，不归这一轮。这一趟统计里剩下的 `.claude/gate.d/stage-inputs.tsv`（+2 行）与 `.claude/rules/implementation-workflow.md`（+4 行）：`stage-inputs.tsv` 的改动是正文第二节写明的「第 34 行 E142 那一行加了一个输入 `research/prompts/e142-r19-prereg.md`，与崩溃枚举无关」；`implementation-workflow.md` 的改动是正文第二节写明的「已提交的 2 行（别的会话的措辞改动）」——现跑 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md`，两行改动都是遣词，不涉判据字面（材料员现查，见下）。`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`research/scripts/layer0-shard-configuration-check.sh` 四份在这份统计里没有出现，即与 `ecdf8465` 逐字节相同，与正文第二节「逐字节相同」的声明一致。
 
 `git diff ecdf8465 -- .claude/rules/implementation-workflow.md` 原样：
 
@@ -3273,7 +3273,7 @@ IFS=: read -r case_package case_target case_function <<< "${test_token#test=}"
 [[ -n "$registration_row" && -n "$case_package" && -n "$case_target" && -n "$case_function" ]] \
   || fail "stage-inputs.tsv 里找不到这一行或它的 test=<包>:<测试目标>:<用例函数>" "照 research/scripts/admission.py 文件头「崩溃枚举用例行」登记"
 python3 "$admission_module" crash-case-shardable "$tree_root" "$case_key" >/dev/null \
-  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/54-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
+  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/checker-tier-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
 
 if ! git_common_directory="$(git -C "$tree_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$git_common_directory" ]]; then
   fail "$tree_root 不是 git 工作树（取不到 git common-dir）" "在 HEAD + 暂存区的 worktree 里跑，建法见门禁 54 号 --full 的出路句"

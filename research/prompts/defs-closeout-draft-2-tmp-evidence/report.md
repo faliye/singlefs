@@ -91,8 +91,8 @@ heavy-test-guard	implementation-writer	nice -n 19 cargo build --offline --all-ta
 heavy-test-guard	implementation-writer	nice -n 19 cargo clippy --all-targets	exit=0	
 heavy-test-guard	experiment-runner	nice -n 19 cargo run --release --bin e142-first-txn-dry-run	exit=2	✗ 不经内存包装跑编译出来的代码被拒：cargo run（experiment-runner 不经 run-with-memory-cap.sh）
 heavy-test-guard	experiment-runner	nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G cargo run --release --bin e142-first-txn-dry-run	exit=0	
-heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/54-layer0-replay.sh	exit=0	
-heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/54-layer0-replay.sh	exit=0	
+heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh	exit=0	
+heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/checker-tier-layer0-replay.sh	exit=0	
 heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/55-qemu-first-transaction.sh	exit=0	
 heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/57-lkmm.sh	exit=0	
 heavy-test-guard	crash-verifier	SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/59-crates-mutation-replay.sh	exit=0	
@@ -165,7 +165,7 @@ heavy-test-guard	implementation-writer	"bash research/scripts/run-with-memory-ca
 --- a/.claude/agents/crash-verifier.md
 +++ b/.claude/agents/crash-verifier.md
 @@ -24,2 +24,3 @@
- 1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `54-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
+ 1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
 +1b. 54、55、57 号整条经内存包装跑（共用约束「不做」一节「跑编译出来的代码经内存包装」那一条，上限与退出码 250–254 照那一条办）：第 2 步里起这三道的每条命令，在 `bash <阶段文件>` 前面加 `bash research/scripts/run-with-memory-cap.sh <上限>`，写成 `SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/<文件>`；59 号在里面逐条套了，照第 2 步直接跑，外面不再包一层。
  2. 只在提交时（或主 agent 转达用户要求时）跑你那几道，不跑 `gate.sh` 整轮与全量 `cargo test`（`.claude/hooks/heavy-test-guard.sh` 拒）。按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个；54、55、57、59 号命令带输入给的那个前缀：`SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>`，其余登记给你的轻阶段不带；54 号默认不带 `--full`（快档加核全绿标记），派发提示点名要层 0 全量时才带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
 --- a/.claude/agents/gate-triage.md
@@ -249,7 +249,7 @@ rules-lint exit=0
 1. `.claude/main-agent.md:14`「禁止」一节「禁止在subagent中跑重型测试（层 0 全量、QEMU、herd7、`crates` 变异整表、全量测试、整轮门禁）等」与第 3 条改前是同一张六类清单（缺 87 号、E152 装置，靠「等」收尾）；派发只点了第 20 行，没动。
 2. `.claude/agent-common.md:49`「要停自己起的一条链」那一条写 `scripts/proc.py stop <pid>`：`ls scripts/proc.py` 报 No such file，实际在 `.claude/singlefs-ai-sop/scripts/proc.py`（新条 ⑥ 与攻方 3c 写的是全路径）。
 3. `.claude/agents/implementation-writer.md:29` 第 4 步末尾「交回前对主工作区现状 `git apply --check` 一次，打不上就在副本里按现状重做再交」与第 13 行「在主工作区改」、第 3 步「`crates/mutations.tsv` 在的话，每条再加一行变异」是两种交法（打补丁 / 直接改）；`mutations-append.tsv` 正是打补丁那种交法的草稿表（`research/prompts/m2-*-implementer-report.md` 里十几份都写 `/tmp/claude-1000/<草稿目录>/mutations-append.tsv` 由主 agent 追加进 `crates/mutations.tsv`）。我只照任务把名字改成 `crates/mutations.tsv`；定义到底要哪一种交法，`git apply --check` 那半句要不要跟着改，没动。
-4. `.claude/main-agent.md:59`「暂存之后、提交之前跑门禁」一行写的层 0 全量命令 `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/54-layer0-replay.sh --full <它的根>` 没有包装；崩溃验证员第 1b 步现在要求 54、55、57 号经包装，两处命令形态不一样（照定义跑的是带包装那一种）。
+4. `.claude/main-agent.md:59`「暂存之后、提交之前跑门禁」一行写的层 0 全量命令 `SINGLEFS_HEAVY_TESTS=commit bash .claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>` 没有包装；崩溃验证员第 1b 步现在要求 54、55、57 号经包装，两处命令形态不一样（照定义跑的是带包装那一种）。
 5. `heavy-test-guard.sh:81` 文件头说 `run-with-memory-cap.sh 4G bash <<EOF` 会被误拒，现查放行（第二节）。
 6. 84 号文件头写着「已知会红的一格（不开豁免）」：E142 第十六次跑 `r16-combined.out` 第 683 行 `control_violations_ok=false` 实验页没点名。登记给执行员之后，任何一个执行员照第 6 步跑归属表都会看到这一格红，不是它那一轮的；共用约束「门禁」一节「红了先看它点名的文件与行在不在这一轮的改动里；不在的不修，照写」罩着。
 7. 记录只改了第 30 行那一格：拒绝清单统一（第 2 项）、攻方 3c（第 5 项）、84 号登记（第 33 行 ② 那一半）、`mutations-append.tsv`（第一批报告第六节 #17）这几件记录第四十节里没有对应的「现状」格被改，要不要记、记在哪一行，主 agent 定。

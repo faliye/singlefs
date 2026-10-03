@@ -2,7 +2,7 @@
 
 ## 一、diff（六份文件相对 HEAD `3b60f098e97dc4c4f3ed9c6355422b607db1c34c` 的工作区改动）
 
-命令：`git diff HEAD -- .claude/agents/experiment-runner.md .claude/agents/crash-verifier.md .claude/main-agent.md .claude/hooks/agent-write-scope.tsv .claude/gate.d/54-layer0-replay.sh .claude/gate.d/stage-inputs.tsv`
+命令：`git diff HEAD -- .claude/agents/experiment-runner.md .claude/agents/crash-verifier.md .claude/main-agent.md .claude/hooks/agent-write-scope.tsv .claude/gate.d/checker-tier-layer0-replay.sh .claude/gate.d/stage-inputs.tsv`
 
 ```diff
 diff --git a/.claude/agents/crash-verifier.md b/.claude/agents/crash-verifier.md
@@ -40,10 +40,10 @@ index 0bad931..8aa8a2d 100644
  
  ## 产出
  
-diff --git a/.claude/gate.d/54-layer0-replay.sh b/.claude/gate.d/54-layer0-replay.sh
+diff --git a/.claude/gate.d/checker-tier-layer0-replay.sh b/.claude/gate.d/checker-tier-layer0-replay.sh
 index 0834ef1..e94ae73 100755
---- a/.claude/gate.d/54-layer0-replay.sh
-+++ b/.claude/gate.d/54-layer0-replay.sh
+--- a/.claude/gate.d/checker-tier-layer0-replay.sh
++++ b/.claude/gate.d/checker-tier-layer0-replay.sh
 @@ -1,10 +1,26 @@
  #!/usr/bin/env bash
 -# gate-stage: 层 0 崩溃点重放（两条流的全部崩溃状态在 release 下逐个跑恢复：第一个事务与 E142 产物逐字比对，里程碑「第二个事务」固定脚本到 E 与用例的闭式比对；只做过 mkfs 的池可写挂载再发第一个文件版本那条流与第一个事务逐项相同，由 cargo test 里的快用例钉住，不另枚举）
@@ -53,12 +53,12 @@ index 0834ef1..e94ae73 100755
 -# 里程碑「第一个事务」步 7：拿步 5 的录制流按 D13（验证路线） 已定项 4 枚举崩溃状态，每个状态跑三件事：步 6 的恢复与 oracle、
 +# 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问）：
 +#
-+#   bash .claude/gate.d/54-layer0-replay.sh --full [项目根]    主 agent 一个任务收尾时跑一次
++#   bash .claude/gate.d/checker-tier-layer0-replay.sh --full [项目根]    主 agent 一个任务收尾时跑一次
 +#     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。开跑先删旧的全绿标记，判红、被打断都不留标记；
 +#     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿才写标记
 +#     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green`：不进工作树；放 common-dir，`gate.sh --staged` 的临时 worktree 读到的是同一份。
 +#     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
-+#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
++#   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 +#     快档：两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再读标记：输入哈希与标记里的相等才判绿，
 +#     成功句报快档计数、原样带出标记里的全量计数行与时刻；不相等（列出哪几个文件不同）或没有标记判红。快档本身红照旧红。
 +#
@@ -93,7 +93,7 @@ index 0834ef1..e94ae73 100755
 +    --full) layer0_tier="full" ;;
 +    -*)
 +      echo "  ✗ 认不出的参数：$stage_argument"
-+      echo "     → 怎么办：只认 --full 与项目根，顺序不限：bash .claude/gate.d/54-layer0-replay.sh [--full] [项目根]"
++      echo "     → 怎么办：只认 --full 与项目根，顺序不限：bash .claude/gate.d/checker-tier-layer0-replay.sh [--full] [项目根]"
 +      exit 2 ;;
 +    *) root_argument="$stage_argument" ;;
 +  esac
@@ -256,7 +256,7 @@ index 0834ef1..e94ae73 100755
 +  run_quick_tier_of_stream second_transaction_step_zero_layer0 "两次发布那条流" || exit 1
 +  if [[ ! -f "$full_green_marker_path" ]]; then
 +    echo "  ✗ 快档绿了（${quick_tier_report}），但没有层 0 全量的全绿标记（$full_green_marker_path）"
-+    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/54-layer0-replay.sh --full\`"
++    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/checker-tier-layer0-replay.sh --full\`"
 +    exit 1
 +  fi
 +  marker_input_hash="$(sed -n 's/^input_hash=//p' "$full_green_marker_path" | head -1)"
@@ -265,7 +265,7 @@ index 0834ef1..e94ae73 100755
 +    marker_manifest="$layer0_scratch_directory/marker-manifest"
 +    sed -n 's/^input_file //p' "$full_green_marker_path" > "$marker_manifest"
 +    report_manifest_differences "$marker_manifest" "$quick_manifest" "标记" "这一次"
-+    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/54-layer0-replay.sh --full\`"
++    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/checker-tier-layer0-replay.sh --full\`"
 +    echo "                不同的文件里有别的会话没提交的东西时，工作区跑的全量罩不到这一批：在只含这一批的 worktree 里跑 --full <它的根>。"
 +    exit 1
 +  fi
@@ -273,7 +273,7 @@ index 0834ef1..e94ae73 100755
 +  marker_count_line_total="$(grep -c . <<< "$marker_count_lines")"
 +  if [[ "$marker_count_line_total" != 3 ]]; then
 +    echo "  ✗ 全绿标记的输入哈希对得上，计数行却不是 LAYER0 / CHECKER / LAYER0B 恰好三行（数到 ${marker_count_line_total} 行）：标记不是 --full 写的，或被改过"
-+    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/54-layer0-replay.sh --full\`"
++    echo "     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 \`bash .claude/gate.d/checker-tier-layer0-replay.sh --full\`"
 +    exit 1
 +  fi
 +  marker_finished_utc="$(sed -n 's/^finished_utc=//p' "$full_green_marker_path" | head -1)"
@@ -324,7 +324,7 @@ index 0834ef1..e94ae73 100755
 +full_finished_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 +marker_being_written="$full_green_marker_path.partial.$$"
 +if ! {
-+  echo "# 层 0 全量全绿标记：.claude/gate.d/54-layer0-replay.sh --full 判绿之后写，整轮门禁的快档读。不进工作树，别手改。"
++  echo "# 层 0 全量全绿标记：.claude/gate.d/checker-tier-layer0-replay.sh --full 判绿之后写，整轮门禁的快档读。不进工作树，别手改。"
 +  echo "input_hash=$layer0_input_hash"
 +  echo "input_file_count=$layer0_input_file_count"
 +  echo "input_paths=$layer0_input_paths_text"
@@ -351,8 +351,8 @@ index feeefac..d77c15f 100644
  #
  # 宁宽勿窄：多写一条路径只会多跑几趟，少写一条会让一次真的改动被跳过。拿不准就写上。
  # 只写从仓库根起的路径；目录写成带斜杠的前缀（git diff 的路径限定就按前缀匹配）。
--54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/	# 跑 crates 的崩溃点重放，与字节布局表、入库产物逐字比对
-+54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
+-checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/	# 跑 crates 的崩溃点重放，与字节布局表、入库产物逐字比对
++checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
  55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock research/scripts/ research/results/	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 research/scripts/
  59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试
  74-model-differential.sh	crates/ Cargo.toml Cargo.lock	# 拿 crates 里的实现与只住内存的理想模型对拍
@@ -400,7 +400,7 @@ index af40d1a..b7680f7 100644
  | 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 上一行的三方（代码轮）→ `crash-verifier` |
  | 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧 `implementation-writer`（输入给分诊报告），`research/` 那侧 `experiment-designer` 写重跑登记 → `experiment-runner` |
 -| 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 下一行 |
-+| 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/54-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行 |
++| 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 这一批碰了 `crates/` 就后台跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`（层 0 全量只在这一步跑，判绿写全绿标记，整轮门禁的 54 号只核这个标记）→ 下一行 |
  | 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → `gate-triage` |
  | 撤回一个数、改格式常量、新立一条判据 | `sweep` |
  | 定案之后写回 kb | `kb-scribe`（主 agent 给逐条规格）；规格动了某条分项的「**依据**」段时，同一份规格要带上那个实验页 `### 影响的决策` 表里对应那几行（门禁 75 号那条双向检查两侧要同时到位，而判一个实验撑不撑一条分项是主 agent 的活）；它翻了分项状态、33 号红（变异表锚点腐化）→ `experiment-runner` 只修锚点 |

@@ -10,7 +10,7 @@
 | 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 上一行的三方（代码轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：层 0 全量主 agent 跑，`crash-verifier` 跑 QEMU、herd7、crates 变异表 |
 | 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧 `implementation-writer`（输入给分诊报告），`research/` 那侧 `experiment-designer` 写重跑登记 → `experiment-runner` |
 | 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 下一行 |
-| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/54-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行命令，三行放进同一次 Bash 调用（它们共用一个 shell 变量；建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯；全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊：54、55、59、74 号只在这一趟里能复用上一次整轮全绿的判定，判据在 `research/scripts/stage-must-run.sh` 文件头；要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑；用户要求时各处都换成 `=user-request` |
+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行命令，三行放进同一次 Bash 调用（它们共用一个 shell 变量；建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯；全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊：54、55、59、74 号只在这一趟里能复用上一次整轮全绿的判定，判据在 `research/scripts/stage-must-run.sh` 文件头；要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑；用户要求时各处都换成 `=user-request` |
 | 改了一个数或格式常量、撤回一条结论、新立一条判据 | `sweep`（四种活与各自要给的输入见它的定义） |
 | 定案之后写回 kb | `kb-scribe`（主 agent 给逐条规格）；规格动了某条分项的「**依据**」段时，同一份规格要带上那个实验页 `### 影响的决策` 表里对应那几行（门禁 75 号那条双向检查两侧要同时到位，而判一个实验撑不撑一条分项是主 agent 的活）；它翻了分项状态、33 号红（变异表锚点腐化）→ 红在 `research/mutations/` 的表：`experiment-runner` 只修锚点；红在 `crates/mutations.tsv`（`relabel-item.py` 改写了 `crates/` 下的源码）：派 `implementation-writer` 修锚点，走代码轮 |
 | 要建计数实验，或重跑已有实验 | 主 agent 写岔路单（`.claude/rules/three-way-inference.md`「交岔路时写岔路单」；不是为岔路建的实验写同格式的问题单）→ `experiment-designer` 写跑前登记或重跑登记 → 主 agent 删掉登记里待删的问法（有的话）→ `experiment-runner` → 每段交回主 agent 对着岔路单判够不够：一行开着的都不剩就停、交岔路表；续派时派发提示点名还差的那几行（续派闸 `.claude/hooks/runner-dispatch-guard.sh` 查这一句） |
@@ -262,7 +262,7 @@
 ```markdown
 ## 重型测试只在提交时跑
 
-**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与会跑到名字含 `layer0` 的测试二进制的 `cargo test`）、QEMU（55 号、`qemu-system-*`、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`、`herd7`）、`crates` 变异整表（59 号、参数里有 `crates/mutations.tsv` 的 `mutate.sh`）、全量 `cargo test`（`--all`、`--workspace`、在仓根或 `research/` 这两个工作区根上不挑目标裸跑、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152（按里程碑对比六家文件系统的文件性能） 装置（`e152-file-system-benchmark`、`e152-run.sh`）。逐条的判法以 `.claude/hooks/heavy-test-guard.sh` 文件头「重型测试，按类」为准。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑；15、74 号虽然在里面跑 `cargo test`，按轻阶段对待。
+**重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与会跑到名字含 `layer0` 的测试二进制的 `cargo test`）、QEMU（55 号、`qemu-system-*`、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`、`herd7`）、`crates` 变异整表（59 号、参数里有 `crates/mutations.tsv` 的 `mutate.sh`）、全量 `cargo test`（`--all`、`--workspace`、在仓根或 `research/` 这两个工作区根上不挑目标裸跑、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152（按里程碑对比六家文件系统的文件性能） 装置（`e152-file-system-benchmark`、`e152-run.sh`）。逐条的判法以 `.claude/hooks/heavy-test-guard.sh` 文件头「重型测试，按类」为准。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑；15、74 号虽然在里面跑 `cargo test`，按轻阶段对待。
 
 | 场合 | 跑不跑 |
 |---|---|
@@ -296,7 +296,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量由主 agent 在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量由主 agent 在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 

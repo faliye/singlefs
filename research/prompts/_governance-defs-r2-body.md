@@ -12,7 +12,7 @@
 
 | 格 | 改了什么 | 在哪 |
 |---|---|---|
-| G1 | 整轮门禁改由门禁分诊员跑 `research/scripts/gate-staged.sh`；复用上一次整轮全绿判定只在那一趟里有（判据指到 `research/scripts/stage-must-run.sh`）；层 0 全量的三行命令放进同一次 Bash 调用、判绿之后才往下；54 号出路打印把说明与命令分开 | main-agent.md「暂存之后、提交之前跑门禁」一行与「探索性改 crates」一行；gate-triage.md 第 2 步与写范围；implementation-workflow.md 表；heavy-test-guard.sh 文件头与 POLICY；gate/SKILL.md；54-layer0-replay.sh 的 `print_staged_worktree_full_commands` |
+| G1 | 整轮门禁改由门禁分诊员跑 `research/scripts/gate-staged.sh`；复用上一次整轮全绿判定只在那一趟里有（判据指到 `research/scripts/stage-must-run.sh`）；层 0 全量的三行命令放进同一次 Bash 调用、判绿之后才往下；54 号出路打印把说明与命令分开 | main-agent.md「暂存之后、提交之前跑门禁」一行与「探索性改 crates」一行；gate-triage.md 第 2 步与写范围；implementation-workflow.md 表；heavy-test-guard.sh 文件头与 POLICY；gate/SKILL.md；checker-tier-layer0-replay.sh 的 `print_staged_worktree_full_commands` |
 | G2 | 崩溃验证员不再放行层 0（钩子与派发闸）；它跑 55、57、59 前用 `git diff --quiet` 核工作区与暂存区在这几道的输入上相同，不同就停下报；实现员两处「层 0 归崩溃验证员」改掉；crash-test skill「子 agent 不跑」补例外 | crash-verifier.md 第 1 步；implementation-writer.md 第 4 步与「没做什么」；crash-test/SKILL.md；heavy-test-guard.sh 与 runner-dispatch-guard.sh 的放行集合 |
 | G3 | 变异计数：`💥` 不判整轮失败，`⚠️` `⏱` `🧱` 判；`mutate.sh` 与 59 号两行「计数：」分开说 | mutation-triage.md 第 5 步；mutation-sampling.md「改了一个格式常量之后」一节 |
 | G4 | 核查员三处「分不清」统一标签、补输入「腿开工时刻」、「文件不在快照清单里」限定为给了快照的轮、末尾计数加两栏 | three-way-verifier.md |

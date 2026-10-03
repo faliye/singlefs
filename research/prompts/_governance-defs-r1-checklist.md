@@ -9,7 +9,7 @@
 | ## 代码轮派腿之前记一份开工快照 | 抄 | G4「要答」整行引用（implementation-workflow.md「代码轮派腿之前记一份开工快照」），且 G4 格描述「sha256sum -c」「倒推副本」都出自这一节 |
 | ## 复用上一次全量门禁的判定：按「那一道读的输入变没变」判，不按「改了哪个目录」判 | 抄 | G1「57 号写明没有复用」一句对应这一节里「没登记在那张表里的阶段（57 号 herd7 就是）没有复用判定」 |
 | ## 重型测试只在提交时跑 | 抄 | G1、G2 两格描述（层 0 全量归主 agent、崩溃验证员只跑 54 快档与 55/57/59、15/74 号按轻阶段）都逐句对应这一节的表与正文 |
-| ## 测试与崩溃检测优先多线程 | 抄 | G1「要答」点名的命令（`bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`、主 agent 在 HEAD + 暂存区的 worktree 里跑）出自这一节末段「门禁管哪一半」 |
+| ## 测试与崩溃检测优先多线程 | 抄 | G1「要答」点名的命令（`bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>`、主 agent 在 HEAD + 暂存区的 worktree 里跑）出自这一节末段「门禁管哪一半」 |
 
 ### 小节清单：`.claude/rules/three-way-inference.md`（kb-sections.py 全量生成，未经任何过滤）
 

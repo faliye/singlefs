@@ -19,7 +19,7 @@ K18	heavy	主 agent	fg	exit=0
 K19	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：check.sh（里面是全量 cargo test）（全量测试）：主 agent 跑「全量测试」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K20	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 87 号（87-replay.sh）（全部实验复跑）：主 agent 跑「全部实验复跑」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K21	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：cargo test --test second_transaction_step_zero_layer0（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
-K22	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 54 号（54-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
+K22	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 54 号（checker-tier-layer0-replay.sh）（层 0）：主 agent 跑「层 0」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K23	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 57 号（57-lkmm.sh）（herd7）：主 agent 跑「herd7」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K24	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 59 号（59-crates-mutation-replay.sh）（crates 变异整表）：主 agent 跑「crates 变异整表」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带
 K25	heavy	主 agent	fg	exit=2	✗ 重型测试被拒：门禁 55 号（55-qemu-first-transaction.sh）（QEMU）：主 agent 跑「QEMU」要带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request，这一条没带

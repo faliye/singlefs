@@ -1,0 +1,5253 @@
+# E171（三oracle合谋测试） 的结论撑不撑 D13（验证路线） 已定项 6：第一轮正文（2026-10-03）
+
+<!-- doc-lint:not-numbers O1 O2 O3 Q1 Q2 Q3 Q4 G1 G2 G3 G4 G5 F3 F4 F5 P8 -->
+
+## 一、题面
+
+E171（三oracle合谋测试） 照跑前登记 `research/prompts/e171-preregistration.md`（修订 1–5）与问题单 `research/prompts/three-oracle-collusion-questions.md` 跑完了干净整表（117 行，s4）与 F4 扩表（164 行），编不过的 6 行补位那一趟（产物与读数见第三节末）。D13（验证路线） 已定项 6 要求「独立性要被验证，不许自称」：「若三者全部放行，说明存在共同盲区，回头补 oracle」。这一轮判的是推论，不是读数：
+
+1. 执行员三分出来的「真盲区候选」各自是不是真盲区——坏实现写出的状态在哪一句已定条款下非法、条款读得对不对、这一处算不算三条 oracle 的**共同**盲区（D13（验证路线） 已定项 6 表最后一列「验不到什么」是不是已经承认了它）；
+2. 判为「对这一批等价」「取样点不敏感」的几行站不站得住；
+3. O3（独立规约执行器） 在全部计入分母的行上 0 红、它的允许集合 A(c) 由实现自己写出的根构成——这削不削 D13（验证路线） 已定项 6 写给 O3 的「独立性来自哪里」；
+4. 第 155、161 行照登记读法 4 是「未触达」，O1-对拍却红（成功调用的交回值不同）——触达定义的缺口影不影响 Q1、Q3 的判；
+5. 由 1–4，D13（验证路线） 已定项 6 与 C407（三 oracle 合谋测试没有代码） 该怎么改：依据能不能引 E171（三oracle合谋测试）、关系写支撑还是推翻、「回头补 oracle」补在哪一条、C407 还清还是改写。
+
+## 二、实现今天的样子（主 agent 的观测，2026-10-03）
+
+- O1（内存模型对拍（HashMap 理想文件系统））：`crates/singlefs-harness/src/model.rs` 第 594 行 `ObservedRoot`（根的 key、journal 计数器、根带的 F、文件内容、实例表、分配记录）；`write_time` 在 `model.rs`、`model_comparison.rs` 零命中（`grep -n write_time crates/singlefs-harness/src/model.rs crates/singlefs-harness/src/model_comparison.rs` 无输出）。E171 装置里 O1 分两列：O1-对拍（逐调用比交回值）与 O1-崩溃判官（实现恢复落到的那一版合不合法）。
+- O2（独立解析器 + checker）：`crates/singlefs-checker`，只依赖 `singlefs-format`；系统配置槽的 `journal_tail` 在 `crates/singlefs-checker/src/lib.rs` 第 286 行读出（执行员报告说读了没有判它的不变量，主 agent 没逐条核 `invariants.md`）。
+- O3（独立规约执行器）：`research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/`（冻结种子 85441ae491419411）；`version_table.py` 文件头：版本表 = 基镜像上的现行那一版加「录制流里每一次根槽写按流序各一版」，A(c) 由这张表算。
+- 坏实现：E171 装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 逐行把 `crates/mutations.tsv` 里 `crates/singlefs-core/src/` 与 `crates/singlefs-replay-prefix/src/lib.rs` 的变异打进实现（挑法登记 5.2：按文件分组、步长 8 取 117 行，F4 步长 4 多取 164 行），在新池新建文件与固定脚本到 E 再卸载两条流上录写流，层 0 切段取样两批，O1、O2、O3 各判。
+- 方案按 `crates/` 今天的实现来谈。
+
+## 三、读数（主 agent 现查产物，整行抄）
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out`：
+
+```
+E7RESULT name=q1_denominator rows_run=281 counted_D=37 untouched=232 only_in_the_ignored_pass=0 compile_failed=6 anchor_not_unique=0 not_found=0 self_crash=6 timeout=0 device_stop=0 wrapper_ended=0 enough_to_judge_none_side=true
+E7RESULT name=q1_o1_and_o2_both_quiet counted_rows=37 rows=12 row_numbers=15,23,27,34,42,92,112,242,269,270,271,277 o3=run
+E7RESULT name=q1_gamma counted_rows=37 all_quiet_rows=13 row_numbers=15,23,27,34,42,92,112,233,242,269,270,271,277 batch_2_all_quiet_rows=15 rows_that_differ_from_batch_1=102,265 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_o3_coverage counted_rows=37 rows_with_no_strict_judgement=0 strict_reading_unreachable=false
+E7RESULT name=q3_beta caught_rows=25 only_O1=32,45,108,115,172,233,237,249,250,281 only_O2=8,65,86,87,90,99,102,135,234,238,245,258,265 rows_whose_red_columns_differ_between_batch_1_and_2=102,233,265
+E7RESULT name=untouched_but_red rows=2 row_numbers=155,161
+```
+
+逐行三分（执行员做的，主 agent 只核了引的条款行在不在）在实验页 `.claude/kb/experiments/171-三oracle合谋测试.md` 的「三条全放行的 7 行」「F4 新出的全放行行」「F4 新出的只靠一条的 12 行」「没触达却红的两行（第 155、161 行）」几节，执行员报告 `/tmp/claude-1000/e171-segment7/report.md` 第二、三节与 `/tmp/claude-1000/e171-segment8/report.md` 第二至四节。真盲区候选与它们依的条款：
+
+| 行 | 坏实现 | 执行员依的条款句 | 状态在哪 |
+|---|---|---|---|
+| 23 | inode 叶容器号 1 → 0 | D8（核心索引结构） 已定项 6「一个码 3 叶（类型 2、容器号 1……）」与射程「每个容器号都是某条记录首次插入时的 inode 号」 | 择到新版的态 |
+| 42 | 正常卸载把 F 抬到现行那一版带的 F，不抬到它的 txg | D16（发布语义） 已定项 1 字段表「正常卸载」「推一串空发布把 F 抬到现行那一版的 txg」 | 卸载写的系统配置与空发布的根 |
+| 92 | 覆盖写照抄上一版的写入时间 | 「写入时间是发布参数」只在 `.claude/kb/milestone/01-first-txn.md` 与 `.claude/kb/milestone/02-second-txn.md` 第 103 行；决策正文只有 D8（核心索引结构） 已定项 6 字段表的位置 | 覆盖写的 inode 记录 |
+| 242 | 系统配置槽轮换挪到根槽 FUA 之前 | D16（发布语义） 已定项 7「根槽（FUA）→ 系统配置槽 → 屏障」「系统配置槽在根槽持久之后再更新」 | 系统配置先落、它那一段根没落的态（层 0 切段模型上数） |
+| 269 | 取号见证值取成槽世代号 | D23（journal的角色与格式） 已定项 14「mkfs 之后第一次取号读到 0、写 0」 | 取号写的系统配置槽 |
+| 270 | 系统配置轮换之后不过屏障就返回 | D16（发布语义） 已定项 7「fsync 等系统配置轮换持久之后才返回」与射程「屏障口径」 | 后一次调用的写先于前一次的系统配置落盘的态 |
+| 271 | `deleted_inodes` 树表条目头 ID 写 0 | D8（核心索引结构） 已定项 8「`deleted_inodes` 与墓碑树写 inode 树的树 ID（65537）」 | 择到新版的态 |
+| 233（只在读法丙） | 由记录重建的根不照抄所选根的 fsid | D13（验证路线） 已定项 1 M2 与「其余字段等于所选根」 | 施加了记录的态；甲乙里 O1-崩溃判官红，批 2 没有这种态 |
+
+判为对这一批等价：15、27、34、112、277；取样点不敏感（两批红列不同）：102、233、265。
+
+补位那一趟（6 行）跑完：`research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-comparator.out`「E7RESULT name=substitution_summary rows_that_did_not_compile=6 substituted_rows=6 still_not_compiled=0 row_numbers=33,59,127,163,206,243」，六行换上的都是 `category=untouched`；补位之后「q1_denominator rows_run=281 counted_D=37 untouched=238 … compile_failed=0 …」，全放行、只靠一条、没触达却红三张名单与补位之前逐字相同。
+
+## 四、格
+
+### G1　真盲区候选逐行（23、42、92、242、269、270、271；丙里 233）
+每一行：条款句读得对不对（整节读，不只读结论句）；执行员数的「不合法的态」是不是真的不合法（242、270 是在层 0 切段模型上数的，FUA 写只放行它自己那块盘）；这一处是不是**三条的共同**盲区——D13（验证路线） 已定项 6 表「验不到什么」一列是不是已经写明某条 oracle 验不到它（写明了的，算不算「共同盲区」）；要补，补在哪一条 oracle、补什么（O1 的 `ObservedRoot` 加字段、O2 加一条不变量、O3 投影加字段）。92 那一句只在里程碑页：里程碑页的验收句算不算「条款」。
+
+### G2　等价与取样点不敏感
+15、27、34、112、277 的「每个态连同实现的恢复都在条款允许的集合里」站不站得住；执行员推的「会分开的历史」是不是真会分开；102、233、265 记「不稳定」对不对。
+
+### G3　O3 的 A(c) 取自实现写出的根
+O3 在 37 行上 0 红、每行都有严格判定（`q1_o3_coverage rows_with_no_strict_judgement=0`）。A(c) 由「录制流里每一次根槽写」构成，这是不是让 O3 对「实现写了一个错的根」整类无感；D13（验证路线） 已定项 6 写 O3「只照 decisions 与 invariants 的文字重新推导」，这一读法下它推导的是什么、不推导的是什么；这一点是 O3 的设计边界（该写进「验不到什么」）还是缺陷（该改）。
+
+### G4　触达定义与测量方法
+155、161 照读法 4 未触达而 O1-对拍红：若算触达，D = 39、Q3 只靠 O1 多两行，Q1 不变（执行员推的）——这一判对不对。坏实现表取自 `crates/mutations.tsv`（每一行本来就被某条测试抓过）：这对 Q1「有共同盲区」的判与对 Q3 的判各偏向哪一边；两条流、两批层 0 取样的域外推到哪里为止。
+
+### G5　D13（验证路线） 已定项 6 与 C407（三 oracle 合谋测试没有代码） 怎么改
+由 G1–G4：已定项 6 的依据能不能引 E171（三oracle合谋测试）、实验页「影响的决策」那一行写支撑、推翻还是仍是备料；「回头补 oracle」这一句今天落成什么（逐条补哪几处，还是登记欠账）；O3 的「验不到什么」要不要加句；C407 还清（它的改法要求做成门禁阶段：已知坏实现至少一条红、关一条仍有别的腿红）还是改写成什么。
+
+## 五、分工
+
+| 腿 | 格 | 立场 |
+|---|---|---|
+| 云端正推（Sonnet） | G1–G5 | 从条款原文与产物推：每个候选是不是真盲区、O3 的边界在哪、D13 已定项 6 与 C407 该怎么写；给出每一格的推导与它依的原文行 |
+| 云端攻方（Opus） | G1–G5，重点 G1、G3 | 攻执行员的三分与主 agent 读数：哪个「真盲区」其实合法或其实有一条 oracle 判得到、哪个「等价」其实有非法态、O3 的 A(c) 是不是让「共同盲区」的数被低估或高估；可以在 `crates/` 与 E171 导出的拷贝上造反例（例：只让 O3 红的坏实现、让 O2 判出 242 的那一句不变量），不重跑整表 |
+
+## 六、跑前写死的判据
+
+- 两腿对一个候选同判且主 agent 现查坐实 ⇒ 按那一判写；不一致 ⇒ 先核能分辨它们的那个事实，再判；核不动的写明、该候选挂起、进第二轮。
+- 一个候选判为真盲区，必须写出：非法依的条款原文行（kb 文件自己的行号）、三条各自为什么放行（指到代码行）、补在哪。
+- 腿提的新改法（新不变量、新投影字段、改登记）算零轮。
+
+交付：腿的报告写 `research/prompts/e171-conclusion-r1-<腿名>-output.md`，分段落盘（每次写进文件不超过 150 行，第一段排他新建，回复只写短句）；模型与脚本放 `research/prompts/e171-conclusion-r1-<腿名>-model/`；草稿放 `/tmp/claude-1000/<腿名>/`。引 kb 条款写 kb 文件自己的行号（去 kb 文件里现查，不从背景材料里数）。方案按 `crates/` 今天的实现来谈。
+
+### 小节清单：`.claude/kb/experiments/171-三oracle合谋测试.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## E171 三oracle合谋测试 —— 部分已跑（s4 整表 117 行与 F4 扩表 164 行已跑，编不过的 6 行补位待跑） | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （E171 标题之下、第一个下级标题之前的正文：第 2-15 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 装置、研究一侧与变异表 | 抄 | 默认全抄（脚本生成） |
+| ### s4 整表的结果（整行抄自产物） | 抄 | 默认全抄（脚本生成） |
+| ### 三条全放行的 7 行 | 抄 | 默认全抄（脚本生成） |
+| ### Q3 只靠一条的 11 行 | 抄 | 默认全抄（脚本生成） |
+| ### s3 整表作废 | 抄 | 默认全抄（脚本生成） |
+| ### F4 扩表 | 抄 | 默认全抄（脚本生成） |
+| ### F4 扩表的结果（整行抄自产物） | 抄 | 默认全抄（脚本生成） |
+| ### F4 新出的全放行行 | 抄 | 默认全抄（脚本生成） |
+| ### F4 新出的只靠一条的 12 行 | 抄 | 默认全抄（脚本生成） |
+| ### 没触达却红的两行（第 155、161 行） | 抄 | 默认全抄（脚本生成） |
+| ### 编不过的 6 行补位（待跑） | 抄 | 默认全抄（脚本生成） |
+| ### 第一段的基线与对照（整行抄自 s1 产物） | 抄 | 默认全抄（脚本生成） |
+| ### 对照与自检 | 抄 | 默认全抄（脚本生成） |
+| ### 单测与变异 | 抄 | 默认全抄（脚本生成） |
+| ### 路径与结论登记 | 抄 | 默认全抄（脚本生成） |
+| ### 复跑 | 抄 | 默认全抄（脚本生成） |
+| ### 它答不了的 | 抄 | 默认全抄（脚本生成） |
+| ### 影响的决策 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+| ### 2026-10-03：建页；O3 接上；s3 整表作废；s4 整表；F4 扩表跑完；编不过的行补位待跑 | 不抄 | 历史节的子节 |
+
+### 小节清单：`.claude/kb/milestone/01-first-txn.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # 里程碑「新池新建文件」：每一步设想实现什么、预想的细节、验收标准 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （里程碑「新池新建文件」：每一步设想实现什么、预想的细节、验收标准 标题之下、第一个下级标题之前的正文：第 2-16 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ## 步 0　脚手架 | 抄 | 默认全抄（脚本生成） |
+| ## 步 1　mkfs | 抄 | 默认全抄（脚本生成） |
+| ## 步 2　分配一个数据单元，写一个小文件的数据 | 抄 | 默认全抄（脚本生成） |
+| ## 步 3　inode 树与其余几棵树 | 抄 | 默认全抄（脚本生成） |
+| ## 步 4　中央映射 | 抄 | 默认全抄（脚本生成） |
+| ## 步 5　一次发布 | 抄 | 默认全抄（脚本生成） |
+| ## 步 6　读回来：冷启动恢复 | 抄 | 默认全抄（脚本生成） |
+| ## 步 7　层 0 崩溃点重放 | 抄 | 默认全抄（脚本生成） |
+
+### 小节清单：`.claude/kb/milestone/02-second-txn.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # 里程碑「覆盖写、释放、回退与复用」：每一步设想实现什么、预想的细节、验收标准 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （里程碑「覆盖写、释放、回退与复用」：每一步设想实现什么、预想的细节、验收标准 标题之下、第一个下级标题之前的正文：第 2-47 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ## 开工前　树表条目 148 → 200（2026-09-16 用户定案，改新池新建文件的字节） | 抄 | 默认全抄（脚本生成） |
+| ## 步 0　装置：层 0 脚本从一次发布扩成一条固定脚本 | 抄 | 默认全抄（脚本生成） |
+| ## 步 1　覆盖写：同一个文件、同一个池、第二次发布（发布 B） | 抄 | 默认全抄（脚本生成） |
+| ## 步 2　释放：分配记录改写、记账变更、映射条目删除（发布 B 的另一半） | 抄 | 默认全抄（脚本生成） |
+| ## 步 3　第二个可写实例：关闭、重开、取号、写行、暖机，再发布 C | 抄 | 默认全抄（脚本生成） |
+| ## 步 4　管理员回退到 A 的根，再发布 D | 抄 | 默认全抄（脚本生成） |
+| ## 步 5　抬回退下界 F，延迟之后重用第一个数据单元的落点（发布 E） | 抄 | 默认全抄（脚本生成） |
+| ## 步 6　层 0 全量崩溃点重放，checker 扩到覆盖写、释放、回退与复用判得出的那批不变量 | 抄 | 默认全抄（脚本生成） |
+| ## 步 7　出口：性能表加一节，覆盖写、释放、回退与复用的字节登记成表 | 抄 | 默认全抄（脚本生成） |
+| ## 增补 1　每次持久化写多少：按现在的数据重新验证压着它的条款 | 抄 | 默认全抄（脚本生成） |
+| ## 增补 2　收口：打回的四处与各步现状里还开着的项 | 抄 | 默认全抄（脚本生成） |
+| ## 增补 3　捶打 `crates/`：随机历史、崩溃与故障注入、坏盘输入、与理想模型对拍 | 抄 | 默认全抄（脚本生成） |
+| ## 增补 4　崩溃验证重做（从里程碑三挪来） | 抄 | 默认全抄（脚本生成） |
+| ### 一　崩溃重放的验证重新设计：公共的、模块的、单独分支的 | 抄 | 随父节带到 |
+| ### 二　checker 的算法优化（不是 core 的） | 抄 | 随父节带到 |
+| ### 三　`Vec<bool>` 在验证一侧重新实现 | 抄 | 随父节带到 |
+| ### 四　崩溃放量的 checker 挪到 GPU：过程落文件，一次算出结果 | 抄 | 随父节带到 |
+| ### 五　屏障的判红与计数 | 抄 | 随父节带到 |
+| ### 十一　崩溃放量的过程与结果怎么存、怎么快速读写 | 抄 | 随父节带到 |
+| ## 与主线并行的四条线（2026-09-16 用户指示：按 E152（按里程碑对比六家文件系统的文件性能） 缺的能力补、先不优化） | 抄 | 默认全抄（脚本生成） |
+| ### 并行线一　一个文件跨多个单元（大文件顺序写、顺序读） | 抄 | 随父节带到 |
+| ### 并行线二　挂载态的读：打开一个文件、按偏移反复读（4K 随机读） | 抄 | 随父节带到 |
+| ### 并行线三　多个文件：多个 inode（元数据按「个」量，没有目录） | 抄 | 随父节带到 |
+| ### 并行线四　真设备补齐：mkfs 整环写 0、真设备二进制报分段时间 | 抄 | 随父节带到 |
+
+### 小节清单：`.claude/kb/decisions/13-验证路线.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## D13 验证路线 —— 已定 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （D13 标题之下、第一个下级标题之前的正文：第 2-4 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 已定项 | 不抄 | 分项索引表，用 --extra 按行区间取 |
+| #### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 2：先串行提交 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 3：RefFS 做到极致，自己处理持久化与崩溃语义 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 4：崩溃点重放只枚举整写子集 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 5：只共享一份从 kb 生成的常量 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 6：三个互相独立的 oracle | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 8：自研的两样：Merkle 根链差分与代际增量 scrub | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 9：崩溃点重放要分三层，否则挂钟必炸 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 10：真正必须精确覆盖的 N 不是「布局套数」，是「提交协议结构的等价类数」 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 11：ignore 的节点什么时候开：否决按欠账轮转的账本，留下三条 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 12：冲突 1：`checker 即规范` 与 `校验的两条路径不许共享工具` | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 13：冲突 2：crash refinement 的 spec 与模型对拍的 model | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 14：与其他决策的连锁 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 15：验证代码分两档——harness 档随时跑，checker 档默认只在提交时跑 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+
+### 小节清单：`.claude/kb/checks-owed.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| # 欠的检查清单 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （欠的检查清单 标题之下、第一个下级标题之前的正文：第 2-541 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 已还清 | 抄 | 默认全抄（脚本生成） |
+
+### 小节清单：`.claude/kb/experiments/07-离线索引harness.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## E7 离线索引 harness —— 首轮已跑（2026-08-27） | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （E7 标题之下、第一个下级标题之前的正文：第 2-43 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 首轮结果（2026-08-27，N=5 轮、五个不同种子、带块层独立读数） | 抄 | 默认全抄（脚本生成） |
+| #### 三条硬要求逐条判定 | 抄 | 随父节带到 |
+| #### 两条解析对照（第三条独立路径） | 抄 | 随父节带到 |
+| ### 缓存/树比扫描（2026-08-27，4 档 × 5 种子 = 20 轮，全部有效） | 抄 | 默认全抄（脚本生成） |
+| #### 两条结论 | 抄 | 随父节带到 |
+| ### 节点大小扫描（2026-08-27，3 档 × 5 种子 = 15 轮，**固定约 1 MB 缓存预算**） | 抄 | 默认全抄（脚本生成） |
+| #### 结论：固定内存预算下，大节点在三个轴上全都更差 | 抄 | 随父节带到 |
+| ### 寻道主导档（2026-08-27，QEMU 限流 4000 IOPS，**2 档 × 5 种子 = 10 轮**，两端对比） | 抄 | 默认全抄（脚本生成） |
+| ### 2026-08-29 复跑：数字复现了，但**校验路径没有复现** | 抄 | 默认全抄（脚本生成） |
+| ### 同日在虚机里复跑：那条校验路径也复现了 | 抄 | 默认全抄（脚本生成） |
+| ### 寻道主导档证明不了什么 | 抄 | 默认全抄（脚本生成） |
+| ### 这组数字不能证明什么 | 抄 | 默认全抄（脚本生成） |
+| ### ⚠️ 那条解析式对照此前只活在散文里（2026-08-29 对抗验证补上） | 抄 | 默认全抄（脚本生成） |
+| ### 三条从 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 学来的硬要求（不满足就别开跑） | 抄 | 默认全抄（脚本生成） |
+| ### 另加一个自变量：缓冲里放幂等完整值还是增量 | 抄 | 默认全抄（脚本生成） |
+| ### 影响的决策 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+
+### 小节清单：`.claude/kb/decisions/08-核心索引结构.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## D8 核心索引结构 —— 已定 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （D8 标题之下、第一个下级标题之前的正文：第 2-4 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 已定项 | 不抄 | 分项索引表，用 --extra 按行区间取 |
+| #### 已定项 1：记账取幂等完整值，接受 key 数量上升 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 2：节点大小 16 KiB，钉成常量 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 3：key 布局 —— 改名与索引分开处理 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 4：节点大小 —— 上限由恢复时间定，靠实验取值 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 5：whiteout 删除 —— 接受，但批量删除必须走 intent log | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 7：write buffer 条目的 `seq` —— 4 字节，住 value | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 8：树表条目的字段表 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 9：树的种类码的登记表 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 10：第一版记账直落叶，`seq` 的取值规则 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 11：码 2 的载荷布局与 key 比较序 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 12：write buffer 前端与节点消息缓冲区的衔接 —— 一棵树只准一级 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 13：索引树更新做状态折叠 —— 同一次发布里同一个 key 的中间状态不落叶 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 14：一套 btree 实现 + 多个独立 keyspace + 两个前端，派生树可以异构 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 15：write buffer 条目的三条硬要求 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+
+### 小节清单：`.claude/kb/decisions/16-发布语义.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## D16 发布语义 —— 已定 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （D16 标题之下、第一个下级标题之前的正文：第 2-4 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 已定项 | 不抄 | 分项索引表，用 --extra 按行区间取 |
+| #### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 2：checkpoint 的触发判据取时间与脏数据量，两者取先到 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 3：journal 记录格式是四层之外的第三个独立冻结组件 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 4：一次发布整体施加或整体不施加，第二份 replay 停在句法层 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 5：`T_time` 与 `T_dirty` 取多少，丢失窗口的口径 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 6：发布计数器，四个等号写成一条 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 7：发布的持久顺序 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 8：暖机取戊，新实例的根先覆盖两块盘 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 9：一次空发布也写单元 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 10：发布粒度取攒批，不是每个事务发一次 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 11：没有任何操作可以绕过 journal 直接发根 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 12：中间状态的合法性语义改写成「根 + journal 任意前缀」 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 13：这份 journal replay 归记录核对器，不归 O2（独立解析器 + checker） | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 14：快照发布点与 checkpoint 边界对齐，钉在全部数据变更之后 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 15：checkpoint C 中产生的释放，C 发布之前不进可分配集合 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 16：checkpoint 与消息缓冲买同一样东西，E7（离线索引 harness） 的对照组钉死 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 17：fsync 报错之后，调用方能假设什么 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+
+### 小节清单：`.claude/kb/decisions/23-journal的角色与格式.md`（kb-sections.py 全量生成，未经任何过滤）
+
+| 小节 | 抄 / 不抄 | 理由 |
+|---|---|---|
+| ## D23 journal 的角色与格式 —— 已定 | 抄 | 顶上标题，与开篇正文合成行区间 |
+| （D23 标题之下、第一个下级标题之前的正文：第 2-13 行） | 抄 | 开篇正文，与顶上标题合成行区间 |
+| ### 已定项 | 不抄 | 分项索引表，用 --extra 按行区间取 |
+| #### 已定项 1：journal 的角色本身 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 2：journal 是定长环还是链式 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 3：tail 住系统配置槽，改 jbd2 两处 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 4：记录头约束在单个原子单元内，头 311 字节 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 5：O2（独立解析器 + checker） 是一元谓词，逐字节比对归记录核对器 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 6：目标负载优先级移出 journal 这条线 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 7：一个事务可以跨多条记录，记录头带事务边界字段 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 8：记录头带一条 32 位反向链 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 9：jsn = 实例代号 32 位 + 计数器 48 位 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 10：`previous_hash` 覆盖前一条记录的整个记录头 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 11：反向链的 hash 取完整 32 位 CRC32C | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 12：记录尺寸取 4 KiB | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 13：载荷完整性，`header_csum` 罩整条记录 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 16：mkfs 写实例代号 0，第一次可写挂载取 1 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 17：点名项 56 字节的字段表 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 18：在飞记录数上限的取值与语义，tail 字段的编码 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 19：空发布记录的事务号与提交标记、`previous_hash`、环长 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 20：记录承载指针层的目标态，分配先于 journal | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 21：世代号：记录粒度的全局单调号，不是 D5（快照 / 空间记账机制） 的 txg | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 22：前缀判定：严格连续、断号即止 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 23：三个死锁各自怎么破 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 24：死锁 2 与假性 ENOSPC 是两种故障，要分治 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 25：D16（发布语义）「不绕过 journal」取读法甲 | 抄 | 默认全抄（脚本生成） |
+| #### 已定项 26：记录头的两条解析纪律 | 抄 | 默认全抄（脚本生成） |
+| ## 历史版本 | 不抄 | 历史节，正文只引现状 |
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:1-15`（整段抄，未转述）**
+
+```markdown
+## E171 三oracle合谋测试 —— 部分已跑（s4 整表 117 行与 F4 扩表 164 行已跑，编不过的 6 行补位待跑）
+
+<!-- doc-lint:not-numbers O1 O2 O3 Q1 Q2 Q3 Q4 Y1 Y3 P1 P2 P3 P4 P5 P8 P9 N1 N2 N3 N4 N5 S1 S2 S3 S4 S5 S6 S7 S8 Z1 Z2 Z3 Z4 F1 F2 F3 F4 F5 F6 F7 X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X52 X53 X54 X55 X56 X57 X58 X59 X60 X61 X62 X63 X64 X65 X66 X67 X68 X69 X70 X71 X72 X73 A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 V1 V2 W1 K4 -->
+
+跑前登记 `research/prompts/e171-preregistration.md`（含第十二节修订 1–5；Q4 的另一种读法由主 agent 在装置写之前删去，只留整表 ≤ 60 秒那一种）；问题单 `research/prompts/three-oracle-collusion-questions.md` 的 Q1（一张坏实现表在同一批历史与崩溃状态上，有没有一行三条 oracle 全放行）、Q2（手造坏镜像喂 O2、O3，有没有一张两条全放行）、Q3（拿已知被抓的坏实现逐条关掉一条 oracle，剩下的还红不红）、Q4（这道测试一次跑多久、怎么进门禁）。被测条款 D13（验证路线） 已定项 6：三个 oracle 的独立性要靠合谋测试验证，不许自称。
+
+**现状**：坏实现表 117 行用修过的逐行驱动在同一棵冻住的树上跑完一遍（s4，两条线道、每条 2 线程），连同 Q3-核三趟与比对器；s3 那一次整表因驱动把上一行的变异带进下一行而整表作废、留档（「s3 整表作废」一节）。O3 用 E170（O3规约执行器第一版） 第 1 次重跑冻结的执行器，开头与收尾两次冻结核对都是 0 处不同。s4 的分母 D = 19 < 30，登记 F4 触发，扩表 164 行（序号 118–281）在同一份冻住的树上跑完，比对器把两半并成 281 行：分母 D = 37 ≥ 30。两趟里编不过的 6 行（第 33、59、127、163、206、243 行）当时的驱动没按登记 5.2 补位；驱动已改成编不过之后补位，补位那一趟写成脚本交主 agent 跑，还没有读数（「编不过的 6 行补位（待跑）」一节）。分母口径在补位之前是 37。
+
+| 行 | 判定 | 依据（产物） | 照字面之外要一起读的 |
+|---|---|---|---|
+| Q1 | 有：甲、乙各 12 行三条全放行（s4 的 7 行加扩表的第 242、269、270、271、277 行），丙 13 行（另加第 233 行）；分母 D = 37（补位之前） | `e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out` 的 `name=q1_alpha`、`name=q1_beta`、`name=q1_gamma`（`verdict=yes_a_row_is_quiet_on_every_oracle`）、`name=q1_denominator`（`counted_D=37 … enough_to_judge_none_side=true`） | 照登记第六节 Q1-甲「≥ 1 判『有』」，与分母无关；D ≥ 30 只说「没有」那一边的门槛够了，这一批里「有」已成立。s4 那 7 行的读数在 F4 产物里没变（第 1–117 行的结果行逐字节相同），三分不重做；扩表新出的 5 行与第 233 行（丙）、批 2 的第 265 行逐行三分在「F4 新出的全放行行」一节：真盲区候选 4 行（第 242、269、270、271 行），对这一批等价 1 行（第 277 行），第 233 行在丙里是真盲区候选（甲乙里 O1-崩溃判官抓到），第 265 行批 2 是取样点不敏感。O3 在 37 行上一行都没红（`name=q1_column_red_rows … O3甲=0 O3乙=0`）。编不过的 6 行补位之后分母会变，「有」不会翻 |
+| Q2 | 有（照登记字面）：甲、乙各 4 张两条全放行，全是 P8 | 同一份产物的 `name=q2_all_quiet`（`table_rows=107 all_quiet_rows=4 verdict=yes_a_bad_image_passes_both`）、`name=f3_p_rows_judged_in_by_o3`、`name=q2_negative_bases` | 4 张都是 E170（O3规约执行器第一版） 设计员推的「不在」而 O3 判「在」的 P8 行，F3 触发；主 agent 照 F3 判成期望推错、这四张不是坏镜像（判决记在 D13（验证路线） 已定项 6 的射程）。Q2 的数与第二段 `…-s2-comparator.out` 同出一批输入，s4 比对器重算一遍；F4 产物里 Q2、F3 与对照的结果行与 s4 那一份逐字节相同。几何两点（`q2_geometry_unstable_kinds=2`）：翻面的是流一 P2、P5 两种补丁的 O2 一列（底态 F 红、Mk 不红），O3 两个底态都判「不在」，所以这两种补丁的「两条全放行」两点都不成立、不翻；全放行的 P8 两个底态都是 `same_on_both_points` |
+| Q3 | 有一行只靠一条：甲、乙各 23 行（只靠 O1 的 32、45、108、115、172、233、237、249、250、281；只靠 O2 的 8、65、86、87、90、99、102、135、234、238、245、258、265） | F4 产物的 `name=q3_alpha`、`name=q3_beta`；Q3-核 9 行 `name=q3_core_row` 全是 `differences_outside_the_closed_column=0`（Q3-核取第一刀的行，扩表没有第一刀） | Q3-核 9 趟 0 处不同，读法 9 成立、F5 不触发。第 102、233、265 行批 1 与批 2 红的列不同，都是取样点不敏感（批 2 没取到红的那几段或那一类态），记「不稳定」。s4 那 11 行另外两条为什么看不到在「Q3 只靠一条的 11 行」一节，扩表新出的 12 行在「F4 新出的只靠一条的 12 行」一节 |
+| Q4 | 只能进全量：117 行整表两条线道 5 569.6 秒，扩表 164 行另一趟 7 607.9 秒，门槛 60 秒 | `e171-three-oracle-collusion-2026-10-03-s4-f4-rows-timing.out` 的两行 `name=table source=table-driver.out`（`rows=117 table_wall_ns=5569579167726`、`rows=164 table_wall_ns=7607936234181`） | 281 行分两趟跑，两趟挂钟相加约 13 177.5 秒（两个数相加，不是一趟量的）；各行之和 11 114.4 + 15 191.9 秒是单线道的估计（没单独跑单线道）。Q3-核每趟三行约 114–130 秒 |
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:16-31`（整段抄，未转述）**
+
+```markdown
+### 装置、研究一侧与变异表
+
+| 件 | 位置 | 说明 |
+|---|---|---|
+| 入库装置 | `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` | 模式 `baseline`、`row`、`known-bad-images`，开关 `--positive-control`、`--disable-oracle`；只读、只驱动、只观测，不改 core、checker、harness、format、replay-prefix；内联单测 31 条（`grep -c '#\[test\]'`） |
+| 研究一侧 | `research/e7-index-bench/src/bin/e171_three_oracle_collusion/`（Python，目录里没有 `main.rs`，cargo 不认它当 bin） | 挑法脚本（登记 5.2，sha256 `4032a0e0…`，原样抄）、117 行的表 `bad-implementations-117.tsv`（登记 5.9 照名字抄出）、F4 扩表 `bad-implementations-expansion-164.tsv` 与造它的 `expansion_table.py`、`row_driver.py`、`comparator.py` 与它的几个模块、冻结执行器的接线 `frozen_o3.py`、判坏镜像的 `o3_bad_image_judge.py`、四个单测文件、变异驱动 |
+| 变异 | 研究一侧 `research/mutations/e171_three_oracle_collusion.tsv` 67 行；装置一侧 `crates/mutations.tsv` 末尾 15 行（名字以「E171 装置」起头，`grep -c '^E171 装置' crates/mutations.tsv`） | 研究一侧经本目录的 `mutation_driver.py` 跑（登记修订 1 第 1 行）；装置一侧是 checker 档，三个数归提交时的门禁 checker-tier-crates-mutation-replay |
+| 复跑 | `research/scripts/replay.sh` 里 E171 十行登记（`grep -c '^E171.@driver' research/scripts/replay.sh`） | 见「复跑」一节 |
+| 产物 | `research/results/` 下 `e171-three-oracle-collusion-2026-10-03-` 起头的 44 份（`ls research/results \| grep -c '^e171-three-oracle-collusion-2026-10-03-'`） | 逐份在「复跑」一节的产物表里 |
+
+- 流的驱动：两条流（新池新建文件、固定脚本到 E 再正常卸载）照抄 E170（O3规约执行器第一版） 导出装置的两条流驱动、取样三批与中性格式的写出（不 `#[path]` 引它），改三处：驱动里的 API 调用不 `.expect`，结局（成功、错误成员、panic）记进 `calls.tsv` 的 `ok` / `err` 列与 `call-outcomes.tsv`；跟着每次调用推理想模型，记 O1-对拍（模型的答案与实现的结局比，`judge_and_advance`）；每个取样态算 O1-崩溃判官（`crash_recovery_disagreement`）与 O2（`check_pool_image`），写 `oracle-verdicts.tsv`。`baseline` 回比本地常量与 crates 的现算值（S1，42 条 `name=s1` 行都是 `holds=true`；`grep -c 'name=s1 ' …-baseline-run1.out` 与 `grep -c 'name=s1 .*holds=false'` 现数）；`row` 不回比，只取批 1 与批 2。
+- S8 的三处调用在装置里的行号（`grep -n` 现取）：`newest_persisted_root` 第 1883 行、`observed_read_back_after_a_crash` 第 1885 行、`crash_recovery_disagreement` 第 1907 行，都在 `crash_judge_of_the_state`（第 1875 行）与它转调的 `crash_judge_verdict` 里；O1-对拍的 `judge_and_advance` 在第 544 行。
+- 已知坏镜像族：`crates/singlefs-harness/tests/checker_known_bad_images.rs`（sha256 `e8543908…`）的导入、常量、辅助函数与 `known_bad_images` 照抄进装置里的一个模块（第 7–1294 行，加上 `known_bad_images` 用到而散在第 1295 行之后的 12 个常量与辅助函数）；`known-bad-images` 模式核条数 41、条目名与原文件逐条相同、干净镜像摘要等于 `build_pool` 的（S4）。
+- 逐行驱动：一次跑先拍一张仓快照（`Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`，237 个文件，总摘要写在驱动的标准输出第一行），每条线道从快照同步出自己的树与编译目录，改一处、`cargo build --release`、装置 `row` 经 `run-with-memory-cap.sh`（限时 1800 秒）、还原；表里的行照名字取、核锚点，不行按补位规则换同组下一行（至多三次）。s4 与 F4 两趟时驱动只在编之前的失败上补位；第八段起编不过之后也补位（换上的行编不过再换，编之前的失败与编不过合起来至多三次），组里不含 E171 装置自己的变异行，`row-result.tsv` 记 `substituted_from` 与每一个试过而没用上的 `failed_attempt_<序>`；开关 `--keep-compile-failures-as-they-are` 只给 `replay.sh` 复跑 s4、F4 两份产物用。
+
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:32-79`（整段抄，未转述）**
+
+````markdown
+### s4 整表的结果（整行抄自产物）
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s4-comparator.out`（2119 行，末行 `E7RESULT name=done emitted=2119`）。冻结核对、阳性对照四条 oracle 各两趟（基线与空变异）、Q1 的分母与三种读法、7 行全放行（甲）、Q3 两种读法、Q3-核 9 趟与判决行：
+
+```
+E7RESULT name=config segment=s4 o3=frozen_executor baseline_run=baseline-run1 rows_root=rows-s4 controls=8 disabled_runs=2 q3_core_comparisons=3
+E7RESULT name=freeze_check phase=start reference=e170-r1-o3-spec-executor-2026-10-03-s1-executor.out files=15 seed=85441ae491419411 differences=0 detail=none
+E7RESULT name=positive_control oracle=O1-对拍 run=baseline red_units=1 red=true
+E7RESULT name=positive_control oracle=O1-对拍 run=empty_mutation red_units=1 red=true
+E7RESULT name=positive_control oracle=O1-崩溃判官 run=baseline red_units=2 red=true
+E7RESULT name=positive_control oracle=O1-崩溃判官 run=empty_mutation red_units=2 red=true
+E7RESULT name=positive_control oracle=O2 run=baseline red_units=1 red=true
+E7RESULT name=positive_control oracle=O2 run=empty_mutation red_units=1 red=true
+E7RESULT name=positive_control oracle=O3 run=baseline red_units=1 red=true
+E7RESULT name=positive_control oracle=O3 run=empty_mutation red_units=1 red=true
+E7RESULT name=q1_denominator rows_run=117 counted_D=19 untouched=93 only_in_the_ignored_pass=0 compile_failed=2 anchor_not_unique=0 not_found=0 self_crash=3 timeout=0 device_stop=0 wrapper_ended=0 enough_to_judge_none_side=false
+E7RESULT name=f6_table_failures rows_not_counted_for_the_table=5 rows_run=117 more_than_half=false
+E7RESULT name=q1_column_red_rows counted_rows=19 O1=5 O1-对拍=5 O1-崩溃判官=1 O2=8 O3甲=0 O3乙=0
+E7RESULT name=untouched_but_red rows=0 row_numbers=none
+E7RESULT name=q1_alpha counted_rows=19 all_quiet_rows=7 row_numbers=15,23,27,34,42,92,112 batch_2_all_quiet_rows=8 rows_that_differ_from_batch_1=102 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_quiet_row reading=q1_alpha row=15 row_name=实审_A2c_第_15_条：用户数据落点不从这张图的单元区起点起扫 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=22/22 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=23 row_name=并行线三_C116：分裂出来的右半容器号不是触发分裂那条新记录的_inode_号 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=26/26 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=27 row_name=实二十：记录头读者把末条标志位_0_读反（带标志的读成不是末条） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/same layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=34 row_name=步_5：抬_F_生效之后不放开扣住的槽 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/498 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=42 row_name=实二（回退改形态：SysPre_与_B1，D16_已定项_1_/_7、D22_已定项_7_/_9、I-7.9_/_I-7.12、C556_/_C557）：卸载把_F_抬到现行那一版带的_F（原地不动）而不是它的_txg o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/537 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=92 row_name=步_1_验收第_4_条：inode_记录的写入时间留成_A_的（覆盖写照抄上一版的写入时间） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/61 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=112 row_name=步_3：前缀跨实例边界（把别的实例的记录也接上） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/same layer0_or_record_checker_red=false
+E7RESULT name=q1_beta counted_rows=19 all_quiet_rows=7 row_numbers=15,23,27,34,42,92,112 batch_2_all_quiet_rows=8 rows_that_differ_from_batch_1=102 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_gamma counted_rows=19 all_quiet_rows=7 row_numbers=15,23,27,34,42,92,112 batch_2_all_quiet_rows=8 rows_that_differ_from_batch_1=102 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_o3_coverage counted_rows=19 rows_with_no_strict_judgement=0 strict_reading_unreachable=false
+E7RESULT name=q1_delta rows_quiet_on_the_three_oracles_but_red_on_the_record_checker_or_the_layer0_oracle=none
+E7RESULT name=q3_alpha caught_rows=12 only_O1=32,45,108,115 only_O2=8,65,86,87,90,99,102 rows_whose_red_columns_differ_between_batch_1_and_2=102
+E7RESULT name=q3_beta caught_rows=12 only_O1=32,45,108,115 only_O2=8,65,86,87,90,99,102 rows_whose_red_columns_differ_between_batch_1_and_2=102
+E7RESULT name=q3_core_row closing=O1 row=108 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=O1 row=32 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=O1 row=8 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=O2 row=108 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=O2 row=32 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=O2 row=8 differences_outside_the_closed_column=0 o3_state_lines_differ=false where=none
+E7RESULT name=q3_core_row closing=no_executor row=108 differences_outside_the_closed_column=0 o3_state_lines_differ=not_applicable_no_executor_in_the_closed_run where=none
+E7RESULT name=q3_core_row closing=no_executor row=32 differences_outside_the_closed_column=0 o3_state_lines_differ=not_applicable_no_executor_in_the_closed_run where=none
+E7RESULT name=q3_core_row closing=no_executor row=8 differences_outside_the_closed_column=0 o3_state_lines_differ=not_applicable_no_executor_in_the_closed_run where=none
+E7RESULT name=freeze_check phase=end reference=e170-r1-o3-spec-executor-2026-10-03-s1-executor.out files=15 seed=85441ae491419411 differences=0 detail=none
+E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0 s2_files_differing=0 s5_numbers_that_differ=0 positive_controls_run=8 positive_controls_not_red=0 disabled_runs_with_differences_outside_the_closed_column=0 q3_core_runs=9 q3_core_runs_with_differences=0 rows_untouched_but_red=0 negative_bases_with_o2_red=0 negative_bases_with_o3_red=0 known_bad_rows_with_o2_quiet=0 o3_freeze_differences=0 o3_digest_mismatch_states=0 o3_dump_problem_lines=0 o3_image_digest_mismatches=0 rows_with_o3_freeze_lines_not_the_reference=0 rows_with_the_o3_executor_failed=0 a2_p_rows_not_expected_not_in=0 f3_p_rows_judged_in_by_o3=4 q2_geometry_unstable_kinds=2 q1_alpha_all_quiet_rows=7 q1_beta_all_quiet_rows=7 q1_gamma_all_quiet_rows=7 q1_o3_strict_reading_unreachable=0 q2_all_quiet_alpha=4 q2_all_quiet_beta=4 q3_alpha_rows_held_by_a_single_oracle=11 q3_beta_rows_held_by_a_single_oracle=11 rows_with_an_errored_call_the_comparison_did_not_judge=0 rows_with_o1_not_applicable_from_another_source=0 rows_compiled_without_the_rebuild_check=0
+```
+
+分族、分类的计数（一条命令从产物里数，原样输出）：`grep -o 'name=row row=[0-9]* .* category=[a-z_]*' research/results/e171-three-oracle-collusion-2026-10-03-s4-comparator.out | sed -E 's/.*category=//' | sort | uniq -c` 输出 `2 compile_failed`、`19 counted`、`3 self_crash`、`93 untouched`（四行）。不进分母的 5 行：第 6、7、85 行实现自崩，第 33、59 行编不过。登记 5.2 写「一行编不过……换同一文件组内下标 j + 1」，s3、s4 那一版逐行驱动只在编之前的失败（找不到、名字不唯一、锚点不唯一）上补位，第 33、59 行没有补位；驱动在第八段改成编不过之后也补位，这两行连同扩表编不过的 4 行的补位那一趟待跑（「编不过的 6 行补位（待跑）」一节）。
+
+````
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:80-95`（整段抄，未转述）**
+
+```markdown
+### 三条全放行的 7 行
+
+读数取 s4 的导出目录（`research/target/e171-dumps/rows-s4/row-<序号>/dump/`，与 `baseline-run1` 逐条 op、逐态比；草稿脚本 `quiet_rows_s4_fua.py`、`returned_check.py` 只读导出目录，不入库）。三分照 `.claude/rules/mutation-sampling.md` 的口径落到这一批上：**对这一批等价**＝两条流、批 1 批 2 的每个态连同实现在态上的恢复都在条款允许的集合里（写依据；会分开的历史写在旁边，没跑）；**取样点不敏感**＝两条流里有条款不许的态，取样规则没取到；**真盲区**＝取到的态里有条款不许的，三条都放行。「镜像不同」数的是 `states.tsv` 里镜像摘要与基线那一态不同的态；「择到新版」数的是其中实现看 journal 那一遍恢复择到的根 txg 不小于「第一处不同之后写出的第一条根」的态。三条各自看什么：O1-对拍比每次调用之后实现交回的 `ObservedRoot`（`crates/singlefs-harness/src/model.rs` 第 589 行：根的 key、journal 计数器、根带的 F、文件内容、实例表、每块盘的分配记录），O1-崩溃判官比实现恢复择到的根与读回内容；O2 判单个镜像的结构；O3 的允许集合 A(c) 由这一行自己写出的根槽写构成（`research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/version_table.py` 第 3 行），一版只投影根的六样（`root_ring.py` 第 22 行：实例代号、checkpoint_txg、树表单元指针、中央映射树根指针、树 ID 水位、F），判的是它自己从镜像恢复出的那一版在不在 A(c) 里（`executor_core.py` 第 127 行）。
+
+| 行（变异） | 和基线不同在哪 | 落在哪种状态里 | O1 / O2 / O3 看不看得到 | 三分 |
+|---|---|---|---|---|
+| 15（用户数据落点不从这张图的单元区起点起扫） | 两条流第 22 条 op 起：用户数据单元两块盘各 32 KiB 落点 822149120 → 823132160，内容逐字节相同；指向它的 16 KiB 节点里指针与校验和随之变；流二第 4 次调用起返回点后移 4 条 op（`mount_writable` 92–179 → 92–183），共 555 条 op 不同；调用结局同；看 journal 那一遍恢复逐态同 | 镜像不同：流一批 1 20 态、批 2 7 态，流二批 1 364 态、批 2 119 态；择到新版：流一批 1 12 态，流二批 1 356 态、批 2 112 态 | O1：`ObservedRoot` 不带落点，读回同，看不到；O2：落点在单元区里、记账自洽，判绿；O3：投影不带落点，「在」 | **对这一批等价**：用户数据放在单元区里哪个空闲槽，条款没定（`grep -rn '起扫\|单元区起点' .claude/kb/decisions .claude/kb/invariants.md .claude/kb/layout` 只命中单元区起点的字段，不定扫的次序）。会分开的历史（推的）：单元区刚好够用的池，跳过开头一段之后发布在模型说该成的地方报空间不够，O1-对拍会红 |
+| 23（分裂出来的右半容器号不是触发分裂那条新记录的 inode 号） | 两条流第 26 条 op 起：第一个文件那次发布写的 inode 叶（码 3，两块盘各 32 KiB）偏移 53 一字节 0x01 → 0x00（容器号 1 → 0），头校验和随之变；同一次发布第 28 条 op（16 KiB 节点）偏移 52、60、131、149 等处 0x01 → 0x00；之后重写 inode 树的每次发布都带着（流二 155 条 op 不同）；调用结局同；恢复逐态同 | 镜像不同：流一批 1 20 态、批 2 7 态，流二批 1 364 态、批 2 119 态；择到第一个文件那一版（txg 3）及之后：流一批 1 12 态，流二批 1 356 态、批 2 112 态 | O1：不读盘，`ObservedRoot` 里没有容器号，读回同；O2：I-9.4（容器号不超最小 key）只要「inode 号 ≥ 容器号、沿叶序严格递增」，一片叶时 1 ≥ 0 成立，判绿；O3：投影不进 inode 树，「在」 | **真盲区候选**：D8（核心索引结构） 已定项 6 定案写「**新池新建文件写**：一个码 2 根节点（头带 key 区间 [1, 1]；一条条目：key 1、类型 2、出生树、容器号 1、出生代 3、指针）；一个码 3 叶（类型 2、容器号 1、出生代 3、记录数 1、记录宽 140）」（`.claude/kb/decisions/08-核心索引结构.md` 第 203 行），射程写「每个容器号都是某条记录首次插入时的 inode 号」（第 205 行）；容器号 0 不是任何一条记录的 inode 号。择到新版的那些态不在条款写得出的镜像里，三条都放行。会让 O2 红的取样点（推的，没跑）：一片叶装满之后的分裂，右半容器号 0 小于左半，I-9.4 的「沿叶序严格递增」判红 |
+| 27（记录头读者把末条标志位 0 读反） | 写流与调用结局全同；只在看 journal 那一遍恢复上不同：流一批 1 6 态、流二批 1 51 态（批 2 0 态）里，基线施加 1 条记录、择到新的一版，变异把带末条标志的记录读成「后面还有」、施加 0 条、停在前一版；读回内容不同的 3 / 30 态（例：流一第 41 态基线 `1,3 file_read e8ca4bf8…`，变异 `1,2 no_file`） | 发布写到一半的态：被丢掉的那一版的调用没返回、它的根槽没落（`returned_check.py` 57 态全是 `call_returned=False its_root_slot_landed=False`） | O1-崩溃判官：前一版是模型提交过的、不比盘上已持久的最新根槽旧、读回与那一版相同，判绿是对的；O1-对拍：调用不经恢复；O2、O3：镜像与基线逐字节相同，各自不看实现的恢复 | **对这一批等价**：调用没返回，新旧两版都在允许集合里。会分开的取样点（推的，没跑）：一次已经返回、提交点只在 journal 记录里（根槽还没写）的发布之后的态，变异会丢掉一次已返回的发布；两条流的发布都在返回之前写根槽，这样的态不存在。那时 O1-崩溃判官的「不许比盘上已持久的最新根槽旧」也挡不住（根槽没写），会不会三条都放行没量过 |
+| 34（抬 F 生效之后不放开扣住的槽） | 流一无不同；流二第 498 条 op 起（抬 F 之后那次 `publish`）：用户数据单元落点 822083584 → 822411264，内容相同；指向它的节点与分配记录随之变（51 条 op 不同）；调用结局同；恢复逐态同 | 镜像不同：流二批 1 68 态、批 2 21 态；择到 txg 17 及之后的根：批 1 60 态、批 2 14 态 | 同第 15 行：O1 不比落点，O2 判绿（记账自洽），O3「在」 | **对这一批等价**：抬 F 之后那次发布换了一个空闲槽、没复用回收的槽，每个态的分配记录与记账自洽，落点不是条款定的值。会分开的历史（推的）：抬 F 之后空间只够复用扣住那几槽的池，发布报空间不够而模型说该成，O1-对拍会红；这一行在 `crates/mutations.tsv` 点名的测试 `raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it` 直接断言复用 |
+| 42（卸载把 F 抬到现行那一版带的 F 而不是它的 txg） | 流一无不同；流二第 537 条 op 起（卸载那次调用的第一条写：两块盘的系统配置槽，偏移 481 一字节 0x11 → 0x0b，即 F 17 → 11，连同校验和），之后卸载推的空发布写的根与节点里同样是 11（24 条 op 不同）；卸载照常 `ok`；恢复逐态同 | 镜像不同：流二批 1 48 态、批 2 14 态，全持久态在内；择到卸载写出的根（txg ≥ 18）：批 1 32 态、批 2 7 态 | O1：卸载没有模型的答（登记读法 6），这次调用不对拍、写落在卸载里的态崩溃判官记不适用，看不到（若有卸载的答，`ObservedRoot` 带根的 F，会比出 11 对 17，推的）；O2：系统配置的 F 与根带的 F 都是 11，I-7.12（系统配置 F 不低于同盘根上的 F）成立，单个镜像不知道该是 17；O3：投影带 F，但 A(c) 就是这一行自己写的 F = 11 的根，「在」 | **真盲区候选**：D16（发布语义） 已定项 1 定案的字段表「正常卸载」一行写「推一串空发布把 F 抬到现行那一版的 txg」（`.claude/kb/decisions/16-发布语义.md` 第 42 行），射程「正常卸载的代价」那一条写「卸载之后 F = 现行那一版的 txg，回退候选集只剩现行那一版」（第 57 行）。变异下卸载返回之后的全持久态 F = 11，回退候选集里留着 txg 11–16 的根，不在条款允许的镜像里，三条都放行。O1 那一半是登记读法 6 写明的已知缺口（模型没有卸载的答） |
+| 92（inode 记录的写入时间留成 A 的） | 流一无不同；流二第 61 条 op 起（第二次 `publish`，覆盖写那次的 inode 叶，两块盘各 32 KiB）：叶内偏移 200、208、216 三个字节 0x3c → 0x00（第 0 条记录起点 136，+64 / +72 / +80 是 atime、mtime、ctime 秒：基线 60，变异留 A 的 0），头里偏移 10–13（头校验和）与 89–92 另有不同；之后重写这片叶的发布都带着（139 条 op 不同）；调用结局同；恢复逐态同 | 镜像不同：流二批 1 344 态、批 2 112 态；择到覆盖写那一版（txg 4）及之后：批 1 336 态、批 2 105 态 | O1：`ObservedFile` 只有内容，`model.rs` 与 `model_comparison.rs` 里 `write_time` 零命中，D13（验证路线） 已定项 6 表 O1 行判「内容、大小、目录结构」，看不到；O2：单个镜像不知道这次发布的写入时间参数，判绿；O3：投影不进 inode 树，「在」 | **真盲区候选（条款依据要主 agent 认）**：D8（核心索引结构） 已定项 6 的字段表只定了偏移 64「atime / mtime / ctime 秒」的位置；「写入时间是发布参数」写在 `.claude/kb/milestone/01-first-txn.md` 第 103 行与 `02-second-txn.md` 第 103 行，决策正文里没找到。认那一句算条款，择到新版的态（写入时间 0、这次发布的参数是 60）不在允许集合里、三条都放行；不认，就是条款没定，归对这一批等价 |
+| 112（前缀跨实例边界） | 写流与调用结局全同；看 journal 那一遍恢复在两条流各 3 态（批 1 第 9–11 态，段 1：暖机的第一条写——新实例 1 的 journal 记录——落了、它的根槽没落）不同：基线择 `0,0`、施加 0 条，变异把实例 1 的记录接到实例 0 的根上、施加 1 条、得到 `1,1`；读回都没有文件 | 暖机写到一半的态（`returned_check.py` 6 态全是 `call_returned=False`） | O1-崩溃判官：`1,1` 是模型提交过的一版、不比已持久的最新根槽旧、读回同，判绿是对的；O2、O3：镜像与基线逐字节相同 | **对这一批等价**：暖机没返回，`0,0` 与 `1,1` 都在允许集合里。会分开的取样点（推的，没跑）：环里留着别的实例、不在所选根那条时间线上的记录（崩溃恢复抛弃了根之后的新实例），接进来之后恢复落到模型没提交过的一版，O1-崩溃判官会红；两条流里没有这种态 |
+
+第 102 行（抬 F 先写系统配置那一步不带新 F）是批 2 多出来的那一行全放行（`name=q1_alpha … rows_that_differ_from_batch_1=102`）：流二第 440 条 op（抬 F 先写的系统配置槽，偏移 481 一字节 0x0b → 0x00）与第 537 条 op（卸载先写的系统配置槽，0x11 → 0x0b）不同，4 条 op；O2 在批 1 判红 12 态，都是 I-7.12（系统配置 F 不低于同盘根上的 F），在第 60、73 段各 6 态（`name=trajectory row=102 stream=fixed_script_through_e_then_unmount oracle=O2 total_red_states=12 peak=6 positive_segments=2 of_segments=79 …`）。批 2 在流二只取 17 段（7、11、16、20、24、28、32、36、40、44、48、52、57、61、65、70、74），第 60、73 段一个态都没取（`awk -F'\t' '$3==60\|\|$3==73' states.tsv` 只出批 1 的 8 + 8 态）：**取样点不敏感**，会分开的取样点就是第 60、73 段的任一态。这一格两批翻面，记「不稳定」；Q1、Q3 的结论字在批 2 上不翻（批 2 全放行 8 行仍 ≥ 1；只靠一条的 10 行仍 ≥ 1）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:96-115`（整段抄，未转述）**
+
+```markdown
+### Q3 只靠一条的 11 行
+
+只写够不到的对象与没判的字段，不判结论。读数取 s4 的导出目录（草稿脚本 `caught_rows_s4.py`，不入库）与产物的 `name=trajectory` 行；段为正的数是「红态的段数 / 这条流的段数」。
+
+| 行（变异） | 那一条红在哪 | 另外两条为什么看不到 |
+|---|---|---|
+| 32（可写挂载不写实例表的行，实例表照抄） | O1-对拍：流二第 4 次调用 `mount_writable` 判 `disagrees:这一版的实例表`（模型要有上一个实例那一行，实现交回空表），模型停在这次调用，之后流二 324 态（批 1）崩溃判官记不适用 | O2：这一行 0 态红（批 1 流二 397 态都绿），实现了的不变量里没有一条拿根的实例代号去对实例表的行（由读数推的，没逐条查 invariants.md）；O3：投影里没有实例表，A(c) 是这一行自己写的根，「在」 |
+| 45（挂载那一刻就读不出的槽也重读、仍坏就拒） | O1-对拍：流二第 12 次调用 `raise_floor` 交回 `err:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`，模型说该成 | O2、O3：被拒之前的写流与基线逐条相同（流二停在第 440 条 op，0 条 op 不同），取到的镜像都是基线那一批的前缀；被拒的调用不留镜像，单镜像的判官没有对象可判 |
+| 108（码 2 读者补齐字节从最后一个载荷字节算起） | O1-对拍：两条流第 2 次调用 `publish` 判 `disagrees:这一版的文件内容`（胶水解不开实现交回的单元：「补齐字节非零」）；流二第 4 次调用 `mount_writable` 交回 `err:Recovery` | 错在实现的读者一侧，写出的字节与基线相同（流一 0 条 op 不同，流二停在第 92 条 op 之前也 0 条不同）；O2 用自己的解析器读裸字节、不调 core 的读者，O3 用 Python 自己的读者，两边看到的镜像与基线逐字节相同。层 0 那份手写版本表的 oracle 与记录核对器红（`layer0_or_record_checker_red=true`，不是三条之一） |
+| 115（取前缀核锚点筛选不看 txg） | O1-崩溃判官：批 1 流一 32 态、流二 52 态「走读失败：没择到根」（实现恢复报 `RootPublishCarriesMoreThanOneLastRecordFlag…`），段为正 8/12、12/16；O1-对拍：流二第 4 次调用 `mount_writable` 交回 `err:Recovery`，模型说该成 | 写出的字节与基线相同（流一 0 条 op 不同）；O2 判镜像结构、O3 用它自己的前缀规则从镜像恢复，都不看实现的恢复，看到的镜像与基线逐字节相同。层 0 那份 oracle 与记录核对器红 |
+| 8（空闲不随分配减） | O2：I-5.2（空闲统计对得上）批 1 流一 9 态、流二 353 态，段为正 2/12、69/79；批 2 流二 112 态 | O1：`ObservedRoot` 里没有记账行，调用都成、内容都对；O3：投影不进记账树，「在」 |
+| 65（blocks 向下取整） | O2：I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）批 1 流一 9 态、流二 353 态 | O1：`model.rs` 与 `model_comparison.rs` 里 `blocks` 零命中，读回内容同；O3：投影不进 inode 树 |
+| 86（写系统配置槽时 F 那 8 字节写成 0） | O2：I-7.12（系统配置 F 不低于同盘根上的 F）批 1 流二 97 态，段为正 19/79；批 2 28 态 | O1：比的是根带的 F（`ObservedRoot` 的 `rollback_floor`），不比系统配置槽里的 F；O3：投影的 F 取自根，系统配置槽只拿来择几何，A(c) 是这一行自己写的根，「在」 |
+| 87（core 那份在飞上限把 F 多算 1） | O2：I-8.1（环几何够大）批 1 流一 51 态、流二 385 态，I-7.13（系统配置池级字段在读者收的范围里）流一 2 态、流二 12 态；段为正 12/12、79/79 | O1：不比系统配置槽的字段；O3：同第 86 行，投影里没有在飞上限 |
+| 90（新池新建文件的改动计数写回 1） | O2：I-9.26（inode 改动计数落在出生代与容器诞生代号之间）批 1 流一 9 态、流二 240 态 | O1：不比 inode 记录的改动计数；O3：投影不进 inode 树 |
+| 99（defer 行写 0） | O2：I-3.11（已分配减 defer 等于最新根走读）批 1 流一 9 态、流二 353 态 | O1：不比记账行；O3：投影不进记账树 |
+| 102（抬 F 先写系统配置那一步不带新 F） | O2：I-7.12（系统配置 F 不低于同盘根上的 F）批 1 流二 12 态，第 60、73 段各 6 态；批 2 不红（取样点不敏感，见「三条全放行的 7 行」一节末） | O1：`raise_floor` 的答比的是写出的根（根带的 F 对），不比系统配置槽；O3：同第 86 行 |
+
+O3 在 s4 计入分母的 19 行上一行都没红（`name=q1_column_red_rows … O3甲=0 O3乙=0`），而它在每行两条流的 450 个批 1 态上都给出了严格判定（`o3_judged_states_strict=450`，`name=q1_o3_coverage … rows_with_no_strict_judgement=0`）。由执行器的写法读出来的一条（读码，没另跑）：A(c) 只由这一行自己写出的根槽写构成，投影只有根的六样，所以 O3 只在「实现自己的恢复规则与条款不同、或一次发布在崩溃之后半施加」这一类上红；实现把某个字段一致地写错，O3 照样判「在」。O3 在坏镜像那一族（Q2）上红得多：P 行 26 张红 22、盲测 40 张全红、已知坏镜像 41 张严格红 28（`name=q2_family` 四行）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:116-119`（整段抄，未转述）**
+
+```markdown
+### s3 整表作废
+
+s3 那一次整表（输出根 `research/target/e171-dumps/rows-s3/`）两条线道各自跨行复用编译目录；还原改过的文件用 `copy2`、同步用 `rsync -a`，都把修改时间带回快照那一刻，cargo 按修改时间判新旧，线道 1 跑过第 112 行（replay-prefix 的变异）之后、跑第 114 行之前的 45 行，编出来的装置都带着第 112 行的变异。登记修订 5 照实记了这 45 行、cargo 1.98.0 上的机理实测与驱动的改法；s3 整表、s3 的 Q3-核各趟与 s3 比对器产物不再当 Q1、Q3、Q4 的读数。留档不删：`research/results/` 下的 `e171-three-oracle-collusion-2026-10-03-s3-comparator.out`、`…-s3-rows-timing.out`、`…-s3-clean-check-comparator.out`（第五段对第 2、27、42、65 行的干净复核），与 `research/target/e171-dumps/rows-s3*`、`rows-s5-clean-check`。s3 读到的「Q1 全放行 40 行、分母 52」里 38 行是被带着跑的；s4 在修过的驱动上重跑全部 117 行，判决行 `rows_compiled_without_the_rebuild_check=0`。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:120-128`（整段抄，未转述）**
+
+```markdown
+### F4 扩表
+
+登记第十节 F4：「触达行太少，Q1 的『没有』不够判：进第三段扩表（5.2），扩完仍不够记『不够判』，不记『没有』」，触发观测「Q1-分母 D < 30」；s4 的 D = 19。扩表照登记 5.2「扩表」：步长 4 的挑法比步长 8 多出来的 164 行（与步长 8 重叠的 56 行不重跑），按挑法脚本的输出顺序接在 117 后面编号 118–281、刀号 3。
+
+- 行文件 `research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv`（sha256 `f1bd082e…`），由同一目录的 `expansion_table.py` 起挑法脚本两次（步长 8、步长 4）造出；表取 `crates/mutations.tsv` 去掉 E171 装置自己的变异行（与 A6、A7 同一个去法）。在 s4 冻住的树的那一份与今天仓里的那一份上造出来逐字节相同；按文件：admission 5、allocation_record_tree 2、allocator 12、block_device 2、code_two_tree 3、extent_tree 2、inode_tree 1、instance_table 2、journal 2、make_filesystem 6、mount 44、mounted_read 3、mounted_session 2、records 2、recovery 28、root_record 1、system_configuration 3、transaction 34、unit 2、replay-prefix 8。登记 5.9 只钉了 117 行的行文 sha256，扩表各行的行文摘要取造表那一刻的表。
+- 逐行驱动加 `--other-selected-rows`：补位时跳过 117 行与扩表两张表里的每一个名字（登记 5.2「扩表与补位都不重挑已跑过的行」）。
+- 比对器 `--rows-root` 可以给两份（117 行那份与扩表那份，同一个行号在两份里都有就拒），`--expansion-rows` 给扩表时多两行结果：`name=f4_expansion`（扩表与挑法脚本在 `--mutations-table` 那张表上现算的逐行相同、164 行、序号连续、刀号 3、与 117 行不重名）与 `name=q1_denominator_by_table`（分母按表分开再报）；Q1 的分母与三种读法、Q3 都按并起来的 281 行算。拿 s4 的输入重跑改过的比对器（只给 rows-s4），E7RESULT 行与 `…-s4-comparator.out` 逐字节相同（`cmp` 无输出）。
+- 扩表那一趟在 s4 那一份冻住的树上跑（快照摘要 `d1586465…`，与 s4 五趟驱动的相同），两半才能并成同一批；树不重新冻。主 agent 照第七段交回的脚本跑完七步（空变异一行对 `baseline-run1` 未触达、扩表与挑法脚本在冻住的树的表上现算的逐字节相同、这一次两趟驱动与 s4 的快照摘要只有一种），扩表那一趟两条线道 7 607.9 秒。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:129-161`（整段抄，未转述）**
+
+````markdown
+### F4 扩表的结果（整行抄自产物）
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out`（4698 行，末行 `E7RESULT name=done emitted=4698`；耗时行在 `…-s4-f4-rows-timing.out`，291 行）。并表、分母、三种读法、Q3、判决行，与扩表新出的全放行行（甲 5 行、丙多出的第 233 行）：
+
+```
+E7RESULT name=config segment=s4-f4 o3=frozen_executor baseline_run=baseline-run1 rows_root=rows-s4+rows-s4-f4 controls=8 disabled_runs=2 q3_core_comparisons=3
+E7RESULT name=freeze_check phase=start reference=e170-r1-o3-spec-executor-2026-10-03-s1-executor.out files=15 seed=85441ae491419411 differences=0 detail=none
+E7RESULT name=f4_expansion rows=164 expected=164 first_number=118 last_number=281 numbers_are_consecutive=true slice_3_rows=164 names_shared_with_the_117_rows=0 found_once_in_today_table=164 equal_to_the_selection_script_on_today_table=true
+E7RESULT name=q1_denominator rows_run=281 counted_D=37 untouched=232 only_in_the_ignored_pass=0 compile_failed=6 anchor_not_unique=0 not_found=0 self_crash=6 timeout=0 device_stop=0 wrapper_ended=0 enough_to_judge_none_side=true
+E7RESULT name=f6_table_failures rows_not_counted_for_the_table=12 rows_run=281 more_than_half=false
+E7RESULT name=q1_column_red_rows counted_rows=37 O1=12 O1-对拍=11 O1-崩溃判官=4 O2=15 O3甲=0 O3乙=0
+E7RESULT name=untouched_but_red rows=2 row_numbers=155,161
+E7RESULT name=q1_alpha counted_rows=37 all_quiet_rows=12 row_numbers=15,23,27,34,42,92,112,242,269,270,271,277 batch_2_all_quiet_rows=15 rows_that_differ_from_batch_1=102,233,265 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_beta counted_rows=37 all_quiet_rows=12 row_numbers=15,23,27,34,42,92,112,242,269,270,271,277 batch_2_all_quiet_rows=15 rows_that_differ_from_batch_1=102,233,265 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_gamma counted_rows=37 all_quiet_rows=13 row_numbers=15,23,27,34,42,92,112,233,242,269,270,271,277 batch_2_all_quiet_rows=15 rows_that_differ_from_batch_1=102,265 verdict=yes_a_row_is_quiet_on_every_oracle
+E7RESULT name=q1_o3_coverage counted_rows=37 rows_with_no_strict_judgement=0 strict_reading_unreachable=false
+E7RESULT name=q1_delta rows_quiet_on_the_three_oracles_but_red_on_the_record_checker_or_the_layer0_oracle=none
+E7RESULT name=q3_alpha caught_rows=25 only_O1=32,45,108,115,172,233,237,249,250,281 only_O2=8,65,86,87,90,99,102,135,234,238,245,258,265 rows_whose_red_columns_differ_between_batch_1_and_2=102,233,265
+E7RESULT name=q3_beta caught_rows=25 only_O1=32,45,108,115,172,233,237,249,250,281 only_O2=8,65,86,87,90,99,102,135,234,238,245,258,265 rows_whose_red_columns_differ_between_batch_1_and_2=102,233,265
+E7RESULT name=q1_denominator_by_table table=step_8_table rows_run=117 counted_D=19 counted_row_numbers=8,11,15,23,27,32,34,42,45,65,86,87,90,92,99,102,108,112,115
+E7RESULT name=q1_denominator_by_table table=step_4_expansion rows_run=164 counted_D=18 counted_row_numbers=135,172,233,234,237,238,242,244,245,249,250,258,265,269,270,271,277,281
+E7RESULT name=freeze_check phase=end reference=e170-r1-o3-spec-executor-2026-10-03-s1-executor.out files=15 seed=85441ae491419411 differences=0 detail=none
+E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0 s2_files_differing=0 s5_numbers_that_differ=0 positive_controls_run=8 positive_controls_not_red=0 disabled_runs_with_differences_outside_the_closed_column=0 q3_core_runs=9 q3_core_runs_with_differences=0 rows_untouched_but_red=2 negative_bases_with_o2_red=0 negative_bases_with_o3_red=0 known_bad_rows_with_o2_quiet=0 o3_freeze_differences=0 o3_digest_mismatch_states=0 o3_dump_problem_lines=0 o3_image_digest_mismatches=0 rows_with_o3_freeze_lines_not_the_reference=0 rows_with_the_o3_executor_failed=0 a2_p_rows_not_expected_not_in=0 f3_p_rows_judged_in_by_o3=4 q2_geometry_unstable_kinds=2 q1_alpha_all_quiet_rows=12 q1_beta_all_quiet_rows=12 q1_gamma_all_quiet_rows=13 q1_o3_strict_reading_unreachable=0 q2_all_quiet_alpha=4 q2_all_quiet_beta=4 q3_alpha_rows_held_by_a_single_oracle=23 q3_beta_rows_held_by_a_single_oracle=23 rows_with_an_errored_call_the_comparison_did_not_judge=0 rows_with_o1_not_applicable_from_another_source=0 rows_compiled_without_the_rebuild_check=0
+E7RESULT name=q1_quiet_row reading=q1_alpha row=242 row_name=增补_3_第_4_件（增补_2_收口表第_40_行_/_C381_的前提）：发布的持久顺序把系统配置槽轮换挪到根槽_FUA_写之前，最后一步失败时根就不会已经落盘 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=516 o3_judged_states_provisional=516 first_operation_that_differs_from_the_baseline=8/8 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=269 row_name=C554_乙-配置续：见证值取成槽世代号（mkfs_之后第一次取号写的_tail_不再是_0，新池新建文件的字节变了） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=0/0 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=270 row_name=C577：发布在系统配置轮换之后不过屏障就返回（树表_0_条的一版上返回之后见证值可以落后） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=390 o3_judged_states_provisional=390 first_operation_that_differs_from_the_baseline=20/20 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=271 row_name=D8_已定项_8_头_ID：deleted_inodes_的树表条目头_ID_退回写_0（不写它服务的_inode_树的树_ID） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=44/44 layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_alpha row=277 row_name=取前缀核单测：施加一次发布之后新根段不换（停在所选根的） o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/same layer0_or_record_checker_red=false
+E7RESULT name=q1_quiet_row reading=q1_gamma row=233 row_name=由记录重建的根不照抄所选根的文件系统标识（代码轮_m3-formal-code-r1_K3，R3-1「其余字段等于所选根」）：改写全零 o1_comparison_red_calls=0 o1_crash_judge_red_states=45 o2_red_states=0 o3_judged_states_strict=450 o3_judged_states_provisional=450 first_operation_that_differs_from_the_baseline=same/same layer0_or_record_checker_red=true
+```
+
+分类的计数（一条命令从产物里数，原样输出）：`grep -o 'name=row row=[0-9]* .* category=[a-z_]*' research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out | sed -E 's/.*category=//' | sort | uniq -c` 输出 `6 compile_failed`、`37 counted`、`6 self_crash`、`232 untouched`（四行）。不进分母的 12 行：第 6、7、85、125、235、272 行实现自崩，第 33、59、127、163、206、243 行编不过（补位待跑）。第 1–117 行的结果行（`name=row`、`row_touch`、`row_matrix`、`trajectory`、`row_o3`、`row_s5`）在 F4 产物与 s4 产物里逐字节相同（1819 行，`cmp` 无输出），7 行全放行的 `name=q1_quiet_row` 三种读法逐行相同：s4 那 7 行的三分不重做。Q2、F3 与对照的结果行两份也逐字节相同。拿第八段改过的比对器重跑 F4 与 s4 的输入，E7RESULT 行与两份产物各自逐字节相同。
+
+````
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:162-176`（整段抄，未转述）**
+
+```markdown
+### F4 新出的全放行行
+
+读数取 F4 的导出目录（`research/target/e171-dumps/rows-s4-f4/row-<序号>/dump/`，与 `baseline-run1` 逐条 op、逐态比）；草稿脚本 `quiet_rows_f4.py`（第七段 `quiet_rows_s4_fua.py` 改输出根）、`extra_checks_f4.py`、`order_by_segment_f4.py`（都只读导出目录，不入库）。三分的口径与「三条全放行的 7 行」一节相同。顺序类的两行（第 242、270 行）写流的条数或次序变了，逐态与基线比没有意义，改用一条判法在这一行自己的态上数「条款不许的态」，同一判法在基线上数一遍都是 0（判法分得出）：切段用比对器自己的 `baseline_checks.segments_of_the_write_stream`（FUA 写放行它那块盘、屏障放行它那块盘）。
+
+| 行（变异） | 和基线不同在哪 | 条款不许的态（批 1 / 批 2） | O1 / O2 / O3 看不看得到 | 三分 |
+|---|---|---|---|---|
+| 242（发布的持久顺序把系统配置槽轮换挪到根槽 FUA 写之前） | 两条流第 8 条 op 起：每次取号、暖机、发布末尾的「根槽 FUA → 两块盘的系统配置槽 → 屏障」换成「两块盘的系统配置槽 → 根槽 FUA → 屏障」，写的内容逐条相同、次序变了（流一 9 条、流二 57 条 op 按下标比不同）；基线里根槽 FUA 自成一段，变异把它与系统配置写切进同一段（流一 8 段里 3 段、流二 59 段里 19 段，基线 0 段）；调用结局同 | 同一段里系统配置写已落、根槽 FUA 没落全：流一 21 / 3 态，流二 133 / 19 态；基线 0 | O1-崩溃判官：根槽没落，恢复择到前一版，前一版是模型提交过的、不比已持久的最新根槽旧，判绿；O1-对拍：调用结局同；O2：这一行 0 态红（单个镜像里系统配置槽比根早一次发布，没逐条查 invariants.md 有没有管这一样的）；O3：A(c) 由这一行自己写的根构成，恢复落到的版本在里面，「在」 | **真盲区候选**：D16（发布语义） 已定项 7 定案「一次发布的持久顺序恒为 COW 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障」「系统配置槽在根槽持久之后再更新」（`.claude/kb/decisions/16-发布语义.md` 第 181 行）；系统配置先于它见证的根落盘的态，照条款的写序造不出来，三条都放行 |
+| 269（见证值取成槽世代号） | 流一第 0、1 条 op（mkfs 之后第一次取号写的两块盘系统配置槽）偏移 469 一字节 0x00 → 0x01，连同校验和（155–158）；流二另有第 92、93 条 op（可写挂载取号那一写）0x04 → 0x06。偏移 469 是 journal tail（`crates/singlefs-checker/src/lib.rs` 第 200 行 `SYSTEM_CONFIGURATION_TAIL_OFFSET`）；调用结局同；看 journal 那一遍恢复逐态同 | 镜像与基线不同的态：流一 31 / 0，流二 78 / 14（全持久态相同：之后的发布把那一槽写成正确的 tail） | O1：`ObservedRoot` 不带系统配置，恢复不先信 tail（D23（journal 的角色与格式） 已定项 3），读回同；O2：读了 tail（`crates/singlefs-checker/src/lib.rs` 第 285 行），没有一条不变量判它的值；O3：执行器只在锚点断言里读 tail（`research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/executor_main.py` 第 180 行，`anchor_assertions` 里），只核全持久态，判定不用它 | **真盲区候选**：D23（journal 的角色与格式） 已定项 14 写「取号那一写……改写取号那一刻按同一取法读到的见证值 c_见证」（全部自证过的槽 journal_tail 取最大）、「mkfs 写 tail 0，mkfs 之后第一次取号读到 0、写 0：新池新建文件的字节不变」（`.claude/kb/decisions/23-journal的角色与格式.md` 第 392 行）；tail 写成 1 的系统配置槽不在条款写得出的镜像里，三条都放行 |
+| 270（发布在系统配置轮换之后不过屏障就返回） | 每次发布末尾那道屏障没了：流一 57 → 53 条 op、流二 595 → 565 条，之后的返回点整体前移；写的内容同；系统配置轮换与下一次调用的第一批写切进同一段 | 一次调用的系统配置写没落全、之后的调用的写已落：流一 7 / 6 态，流二 70 / 59 态；基线 0 | O1-崩溃判官：那次发布的根槽 FUA 已落，恢复择到它，判绿；O1-对拍：调用结局同；O2：系统配置落后根一次发布在单个镜像里合法（I-7.12 只比 F）；O3：「在」 | **真盲区候选**：D16（发布语义） 已定项 7 定案「根槽（FUA）→ 系统配置槽 → 屏障；fsync 等系统配置轮换持久之后才返回」（第 181 行），射程「屏障口径」写明系统配置轮换之后那一道屏障是「发布返回前加屏障」（第 186 行）；返回之后系统配置还没落、后面的写先落的态照条款造不出来，三条都放行 |
+| 271（deleted_inodes 的树表条目头 ID 写 0） | 两条流第 44、45 条 op（树表单元，两块盘各 16 KiB）偏移 1647、1649 两字节 0x01 → 0x00（头 ID 65537 → 0），连同单元校验和；指向它的节点（第 48、49 条 op）与根槽（第 52 条 op）的指针与校验和随之变；流二之后重写树表的发布都带着（85 条 op 不同）；调用结局同；恢复逐态同 | 择到新版（根 txg 不小于第一处不同之后写出的第一条根）：流一 12 / 0 态，流二 356 / 112 态 | O1：不读树表；O2：树表条目只解树 ID、种类、诞生 txg（`crates/singlefs-checker/src/walk.rs` 第 2953、2955 行），头 ID 不判；O3：投影只带树表单元指针，A(c) 是这一行自己写的根，「在」 | **真盲区候选**：D8（核心索引结构） 已定项 8 定案「头 ID 8 字节的取值：……`deleted_inodes` 与墓碑树写 inode 树的树 ID（65537）」（`.claude/kb/decisions/08-核心索引结构.md` 第 250 行）；择到新版的态里头 ID 是 0，三条都放行 |
+| 277（取前缀施加一次发布之后新根段不换） | 写流与调用结局全同；看 journal 那一遍恢复在流一批 1 6 态、流二批 1 51 态（批 2 0 态）不同：基线施加 1 条记录、落到新的一版，变异同样施加 1 条、却停在所选根那一版（例：流一第 41 态基线 `1,3 file_read e8ca4bf8…`，变异 `1,2 no_file`） | 0：57 态里被丢掉的那一版的调用都没返回、它的根槽都没落（`extra_checks_f4.py`：全是 `call_returned=False its_root_slot_landed=False`） | O1-崩溃判官：前一版是模型提交过的、不比已持久的最新根槽旧、读回与那一版相同，判绿是对的；O2、O3：镜像与基线逐字节相同 | **对这一批等价**：调用没返回，新旧两版都在「根 + journal 任意前缀」（D16（发布语义） 已定项 12）里。会分开的历史（推的，没跑）：一次已返回的发布之后根槽读不出、恢复要靠 journal 重放追上那一版（D16（发布语义） 已定项 7 射程「同一实例里退一代，靠 journal 重放追得上」），变异会停在前一版；两条流里没有读坏根槽的态 |
+
+- **第 233 行（由记录重建的根不照抄所选根的文件系统标识，改写全零），只在丙里全放行**：写流与调用结局全同；看 journal 那一遍恢复在施加了记录的态上走读失败（`InvariantViolated { invariant: "I-1.4", detail: "树根 fsid 不符" }`），流一批 1 3 态、流二批 1 48 态（其中 6 态写落在卸载里、崩溃判官记不适用）。甲、乙里 O1-崩溃判官判红（流一 3 态、流二 42 态，段为正 2/12、28/79），只靠 O1；丙只取 O1-对拍，调用不经恢复，三条全放行。在丙里是**真盲区候选**：实现在合法的崩溃镜像上恢复不出任何一版，D13（验证路线） 已定项 1 的 M2 写重放结果的根「其余字段等于所选根」（`.claude/kb/decisions/13-验证路线.md` 第 32 行）；O2 判恢复之前的镜像（与基线逐字节相同），O3 跑的是它自己的恢复。层 0 那份 oracle 与记录核对器在这一行上红（`layer0_or_record_checker_red=true`，不是三条之一）。批 2 不红：两条流批 2 一个「基线施加了记录」的态都没有（`extra_checks_f4.py` 输出 `b2_base_records_applied_gt0: 0`），**取样点不敏感**，会分开的取样点是任一个施加了记录的态；这一格两批翻面，记「不稳定」。
+- **第 265 行（抬 F 那一串不先写系统配置），批 2 多出来的全放行**：只有流二第 440 条 op 起不同（抬 F 先写系统配置那一步整步没了，149 条 op 按下标比不同）；O2 在批 1 判红 12 态，都是 I-7.12（系统配置 F 不低于同盘根上的 F），在第 59、71 段各 6 态（`name=trajectory row=265 stream=fixed_script_through_e_then_unmount oracle=O2 total_red_states=12 peak=6 positive_segments=2 of_segments=77 …`）。批 2 在流二取的段是 7、11、16、20、24、28、32、36、40、44、48、52、56、60、64、68、72，没有第 59、71 段（`extra_checks_f4.py` 输出 `batch2_states_in_segments_59_71=0`）：**取样点不敏感**，同第 102 行；记「不稳定」。条款是 D16（发布语义） 已定项 7 定案「抬 F 那一串……先把新 F 写进每块盘的系统配置、过一道屏障」。Q1、Q3 的结论字在批 2 上不翻（批 2 全放行 15 行，只靠一条的行仍 ≥ 1）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:177-197`（整段抄，未转述）**
+
+```markdown
+### F4 新出的只靠一条的 12 行
+
+只写够不到的对象与没判的字段，不判结论。读数取 F4 的导出目录（草稿脚本 `caught_rows_f4.py`，第七段 `caught_rows_s4.py` 改输出根，不入库）与产物的 `name=trajectory`、`name=row_matrix` 行；段为正的数是「红态的段数 / 这条流的段数」。
+
+| 行（变异） | 那一条红在哪 | 另外两条为什么看不到 |
+|---|---|---|
+| 172（交进来的盘数等于 w 的下限也拒） | O1-对拍：流二第 4 次调用 `mount_writable` 交回 `err:WritableDeviceCountBelowTheStripeWidthLowerBound`，模型说该成；流二停在第 92 条 op | 被拒之前的写流与基线逐条相同（0 条 op 不同），取到的镜像都是基线那一批的前缀；被拒的调用不留镜像，O2、O3 没有对象可判（同第 45 行） |
+| 233（由记录重建的根不照抄所选根的 fsid） | O1-崩溃判官：批 1 流一 3 态、流二 42 态走读失败（I-1.4 树根 fsid 不符），段为正 2/12、28/79；批 2 0 态 | 错在实现的恢复，写流与基线逐字节相同；O2 判恢复之前的镜像，O3 跑它自己的恢复。批 1 与批 2 红的列不同：批 2 没有施加了记录的态，取样点不敏感（「F4 新出的全放行行」一节） |
+| 237（解系统配置槽时根环起点读错了位置） | O1-崩溃判官：批 1 流一 53 态、流二 73 态（段为正 12/12、16/16），批 2 7、14 态，「没择到根」（`SystemConfigurationValueRefused … RootRingBaseNotTheFirstVersionSlot`）；O1-对拍：流二第 4 次调用 `mount_writable` 交回 `err:Recovery` | 错在实现的读者一侧，写出的字节与基线相同（0 条 op 不同）；O2、O3 各用自己的解析器读系统配置，看到的镜像与基线逐字节相同 |
+| 249（一个数据单元的发布也切成两条记录） | O1-对拍：两条流第 2 次调用 `publish` 判 `disagrees:jsn`（模型说那一版的 jsn 3，实现 4），模型停下 | 两条记录合起来仍是一次完整的发布：O2 在这一行 0 态红（没逐条查 invariants.md 有没有限一次发布几条记录的）；O3 自己重放记录，落到的版本在 A(c) 里，投影不带 jsn |
+| 250（数据单元的净荷字节倒序写） | O1-对拍：两条流第 2 次调用 `publish` 判 `disagrees:这一版的文件内容`（读回 3000 字节、内容倒序） | 单元的校验和按写下去的字节算，结构自洽：D13（验证路线） 已定项 6 表 O2 行「验不到」一栏写的「一个块被覆盖成另一份合法内容」；O3 的投影不带文件内容，不拿写入的内容去比 |
+| 281（择根取第一个自证过的槽就不再换） | O1-崩溃判官：批 1 流一 41 态、流二 61 态（段为正 9/12、13/16），批 2 7、14 态，「走到实例 0 第 0 代根」（比盘上已持久的最新根槽旧）；O1-对拍：流二第 4 次调用 `mount_writable` 交回 `err:NewerStateStillUnreadableAfterOneReread` | 错在实现的择根，写流与基线逐字节相同（0 条 op 不同）；O2 判镜像结构，O3 用自己的择根规则恢复，看到的镜像与基线相同 |
+| 135（复活 defer 里那一条时 defer 槽数不减） | O2：I-3.11（已分配减 defer 等于最新根走读）批 1 流二 225 态，段为正 44/79；批 2 70 态 | O1：`ObservedRoot`（`crates/singlefs-harness/src/model.rs` 第 594 行）没有记账行；O3：投影不进记账树 |
+| 234（根记录写者不照卸载记号写 flags） | O2：I-7.9（回退下界 F 不高于抬 F 的上限，按卸载记号分两支）批 1 流二 29 态，第 73 段起段为正 6/79；批 2 7 态 | O1：写落在卸载那次调用里，模型没有卸载的答（登记读法 6），对拍不比、崩溃判官记不适用，`ObservedRoot` 也不带根的 flags；O3：投影不带卸载记号（`root_ring.py` 第 22 行起的说明：「卸载记号与根记录其余字段不进投影」） |
+| 238（改动计数留 1） | O2：I-9.26（inode 改动计数落在出生代与容器诞生代号之间）批 1 流二 333 态，段为正 65/79；批 2 105 态 | O1：不比 inode 记录的改动计数；O3：投影不进 inode 树 |
+| 245（覆盖写的反向链取上一版记录自己的反向链） | O2：I-8.6（反向链不等的记录不进重放）批 1 流二 336 态，段为正 67/79；批 2 105 态 | O1：`ObservedRoot` 只带 journal 计数器，不带反向链；O3：它的前缀规则核反向链（`research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/replay_prefix.py` 第 188 行，不等就停），这一行严格、暂代都判「在」；停下之后落到的那一版仍在 A(c) 里是推的（根槽已落、不靠重放），没逐态查它停在哪 |
+| 258（不释放旧落点） | O2：I-3.1、I-3.11 批 1 流二 333 态，段为正 65/79；批 2 105 态 | O1：`ObservedUnitAllocationRecords` 只带这一版每个角色的单元的分配记录（`model.rs` 第 638 行），旧落点释没释放不在里面；O3：投影不进分配记录树与记账树 |
+| 265（抬 F 那一串不先写系统配置） | O2：I-7.12 批 1 流二 12 态（第 59、71 段各 6 态）；批 2 0 态 | O1：比的是根带的 F，不比系统配置槽；O3：投影的 F 取自根，A(c) 是这一行自己写的根。批 1 与批 2 红的列不同：批 2 没取第 59、71 段，取样点不敏感（「F4 新出的全放行行」一节） |
+
+O3 在 F4 计入分母的 37 行上一行都没红（`name=q1_column_red_rows … O3甲=0 O3乙=0`），每行两条流的批 1 态都给了严格判定（`name=q1_o3_coverage … rows_with_no_strict_judgement=0`）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:198-205`（整段抄，未转述）**
+
+```markdown
+### 没触达却红的两行（第 155、161 行）
+
+`name=untouched_but_red rows=2 row_numbers=155,161`：两行的变异是同一处（`crates/singlefs-core/src/mount.rs` 里抬 F 上限 `newest_on_every_device.min(fourth_newest)` 改成 `.max(…)`，两行原文只差行首空白），触达三样都不同（`name=row_touch row=155 write_stream_differs=false call_outcomes_differ=false recovery_report_differs=false … touched=false`），O1-对拍在流二第 12 次调用 `raise_floor` 判 `disagrees:抬 F 的上限`（`call-outcomes.tsv`：模型「上限 Some(11)（D16（发布语义） 已定项 1）」，实现「实现报上限 13」），批 1、批 2 都红；O2、O3 不红。
+
+- 不是装置、比对器或取样的缺陷：比对器的触达照登记第一节读法 4 字面算（「任一次调用的结局（成功 / 哪一种错误）」，`collusion_matrix.py` 的 `outcome_words` 只比调用名与结局列），这一次调用两边都是 `ok`；O1-对拍比的是成功的调用交回的值（这里是抬 F 的上限），写流不变是因为这一次请求的 F 不超过 11，上限放宽没起作用。O1-对拍按调用算，与取样点无关，两批都红。
+- 缺口在登记读法 4 的触达定义：它把「成功的调用交回的值」排在三样之外，却写「三样都相同的行……在这一批上与正常实现逐字节同行为，哪条 oracle 都不该红」；这两行交回值不同，那句前提不成立。装置的 `call-outcomes.tsv` 只在对拍判出不同时记两边的值，成功的调用交回什么没有单独记，别的未触达行有没有同类差异看不出来（对拍比得到的调用上没有，不然会进这一格）。改不改触达定义归主 agent（产物跑过之后不改登记）。
+- 对其余读数的影响：两行不进分母，也不进任何 Q1、Q3 名单。照「触达」把它们算进去，D = 39，两行都只有 O1 红，Q3 只靠 O1 的行多两行（第 155、161 行），Q1 三种读法的全放行行不变。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:206-212`（整段抄，未转述）**
+
+```markdown
+### 编不过的 6 行补位（待跑）
+
+登记第一节读法 5「替换之后编不过（`.claude/rules/mutation-sampling.md` 第八类，按 5.2 的补位规则换行）」；s4 与 F4 那一版驱动只在编之前的失败上补位，第 33、59、127、163、206、243 行编不过之后照原样记编不过、没有补位。第八段把驱动改成编不过之后也补位（换同一文件组里下标 j + 1、两张表里都没有、这一次跑里别的补位也没用过的那一行，换上的行编之前照样核锚点，编不过再换，编之前的失败与编不过合起来一行至多三次；组里不含 E171 装置自己的变异行），加 `--rerun-compile-failed-from`（只跑几个输出根里结局是编不过的行）；比对器加 `--substitution-rows-root`（补位那一趟的行换掉原来编不过的同号行，别的情形拒），多出 `name=substitution` 与 `name=substitution_summary` 两种结果行。
+
+- 补位那一趟写成脚本交主 agent（第八段执行员报告「要主 agent 跑的命令」），在 s4 那一份冻住的树上跑，比对器把 117 + 164 + 补位并成一份新产物 `…-s4-f4-substitutes-comparator.out`，还没有读数。在冻住的树的表上推的第一个补位（假定原行照旧编不过、换上的第一行编得过，不编）：第 33 行 → mount.rs 组内下标 9、第 59 行 → mounted_read.rs 下标 8、第 127 行 → allocator.rs 下标 16、第 163 行 → mount.rs 下标 37、第 206 行 → recovery.rs 下标 4、第 243 行 → transaction.rs 下标 25。
+- 拿改过的比对器（不给补位根）重跑 s4 与 F4 的输入，E7RESULT 行与两份产物各自逐字节相同；拿一个手造的补位根（一行换成第 34 行的导出、一行仍编不过）空跑过一遍，分母与名单照换过的行算、两种新结果行照写（草稿，不入库）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:213-315`（整段抄，未转述）**
+
+````markdown
+### 第一段的基线与对照（整行抄自 s1 产物）
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run1.out`（基线第一趟；两趟的 E7RESULT 行逐字节相同，`diff` 无输出）：
+
+```
+E7RESULT name=stream stream=new_pool_file_creation ending=completed exported=true not_exported_why=- operations=57 writes=41 segments=11 tearable_writes=8 calls=3 full_states=16777260 quick_tier_states=46 sampled_states=82 model_stopped_at_call=none
+E7RESULT name=batch stream=new_pool_file_creation batch=1 states=53 segments_touched=12 states_with_a_torn_write=20 o1_crash_judge_red=0 o1_crash_judge_green=53 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7RESULT name=batch stream=new_pool_file_creation batch=2 states=7 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=7 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=completed exported=true not_exported_why=- operations=595 writes=477 segments=78 tearable_writes=46 calls=15 full_states=1662648564 quick_tier_states=278 sampled_states=890 model_stopped_at_call=14
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=1 states=397 segments_touched=79 states_with_a_torn_write=115 o1_crash_judge_red=0 o1_crash_judge_green=349 o1_crash_judge_not_applicable=48 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=119 segments_touched=17 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=105 o1_crash_judge_not_applicable=14 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0
+```
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out`，基线与对照（Z1 两趟 26 个文件逐字节相同、S2 与 E170（O3规约执行器第一版） 导出装置 18 项逐字节相同、S5 两个数比对器自己现算、A3 基线 0 红）：
+
+```
+E7RESULT name=a4 table_rows=117 expected=117 per_file_matches_the_registration=true found_once_in_today_table=117 line_unchanged_since_the_registration=117
+E7RESULT name=a5 first_slice_rows=24 expected=24 distinct_files=24
+E7RESULT name=a6 step_8_rows=117 step_4_rows=220 expected_step_4=220 overlap=56 expected_overlap=56 step_4_only=164 expected_step_4_only=164 step_8_names_equal_the_registered_table=true
+E7RESULT name=a7 implementation_rows=844 expected=844 files=24 expected_files=24
+E7RESULT name=a3_baseline_reds o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0
+E7RESULT name=s5_batch_1_states stream=new_pool_file_creation recomputed=53 device=53 equal_counts=true equal_ordinals=true
+E7RESULT name=s5_o1_applicable stream=new_pool_file_creation batch=1 recomputed=53 device=53 equal=true
+E7RESULT name=s5_o1_applicable stream=new_pool_file_creation batch=2 recomputed=7 device=7 equal=true
+E7RESULT name=s5_o1_applicable stream=new_pool_file_creation batch=3 recomputed=22 device=22 equal=true
+E7RESULT name=s5_batch_1_states stream=fixed_script_through_e_then_unmount recomputed=397 device=397 equal_counts=true equal_ordinals=true
+E7RESULT name=s5_o1_applicable stream=fixed_script_through_e_then_unmount batch=1 recomputed=349 device=349 equal=true
+E7RESULT name=s5_o1_applicable stream=fixed_script_through_e_then_unmount batch=2 recomputed=105 device=105 equal=true
+E7RESULT name=s5_o1_applicable stream=fixed_script_through_e_then_unmount batch=3 recomputed=330 device=330 equal=true
+E7RESULT name=z1_summary files_compared=26 files_differing=0
+E7RESULT name=s2_summary files_compared=18 files_differing=0
+```
+
+阳性对照（登记 5.6，每条 oracle 在基线与空变异各一趟）与关一条的开关自检：
+
+```
+E7RESULT name=positive_control oracle=O1-对拍 run=baseline red_units=1 red=true
+E7RESULT name=positive_control oracle=O1-对拍 run=empty_mutation red_units=1 red=true
+E7RESULT name=positive_control oracle=O1-崩溃判官 run=baseline red_units=2 red=true
+E7RESULT name=positive_control oracle=O1-崩溃判官 run=empty_mutation red_units=2 red=true
+E7RESULT name=positive_control oracle=O2 run=baseline red_units=1 red=true
+E7RESULT name=positive_control oracle=O2 run=empty_mutation red_units=1 red=true
+E7RESULT name=q3_core closed=O1 run=disable-O1 differences_outside_the_closed_column=0 where=none
+E7RESULT name=q3_core closed=O2 run=disable-O2 differences_outside_the_closed_column=0 where=none
+```
+
+三行试跑的分类、触达三样与 Q1 的分母：
+
+```
+E7RESULT name=row row=0 row_name=空变异（C318_实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒_0（影子账隔离的单元又不进不等式）） category=untouched substituted_from=- line_matches_the_registration=true
+E7RESULT name=row_touch row=0 write_stream_differs=false call_outcomes_differ=false recovery_report_differs=false ignored_pass_differs=false touched=false
+E7RESULT name=row row=1 row_name=C318_实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒_0（影子账隔离的单元又不进不等式） category=untouched substituted_from=- line_matches_the_registration=true
+E7RESULT name=row_touch row=1 write_stream_differs=false call_outcomes_differ=false recovery_report_differs=false ignored_pass_differs=false touched=false
+E7RESULT name=row row=6 row_name=K1：分配记录树按槽号找叶时叶宽算成两倍（记录进了不罩它的叶，按位置寻址的核判出） category=self_crash substituted_from=- line_matches_the_registration=true
+E7RESULT name=row_touch row=6 write_stream_differs=true call_outcomes_differ=true recovery_report_differs=false ignored_pass_differs=false touched=true
+E7RESULT name=q1_denominator rows_run=3 counted_D=0 untouched=2 only_in_the_ignored_pass=0 compile_failed=0 anchor_not_unique=0 not_found=0 self_crash=1 timeout=0 device_stop=0 wrapper_ended=0 enough_to_judge_none_side=false
+E7RESULT name=f6_table_failures rows_not_counted_for_the_table=1 rows_run=3 more_than_half=false
+E7RESULT name=q1_o1_and_o2_both_quiet counted_rows=0 rows=0 row_numbers=none o3=not_run
+E7RESULT name=q1_o1_and_o2_both_quiet_batch_2 rows=0 rows_that_differ_from_batch_1=none
+E7RESULT name=q1_column_red_rows counted_rows=0 O1=0 O1-对拍=0 O1-崩溃判官=0 O2=0
+E7RESULT name=untouched_but_red rows=0 row_numbers=none
+```
+
+Q2 的 O2 一列（O3 两列、盲测族没跑）：
+
+```
+E7RESULT name=q2_family family=P rows=26 o2_red=10 o2_quiet=16 o2_quiet_rows=new:2,new:3,new:5,new:7,new:8,new:9,new:10,new:11,new:12,fix:2,fix:3,fix:5,fix:8,fix:9,fix:11,fix:12
+E7RESULT name=q2_family family=N rows=10 o2_red=2 o2_quiet=8 o2_quiet_rows=new:14,new:15,new:16,new:17,fix:14,fix:15,fix:16,fix:17
+E7RESULT name=q2_family family=K rows=41 o2_red=41 o2_quiet=0 o2_quiet_rows=none
+E7RESULT name=q2_blind_family rows=0 expected_when_run=40 status=not_run why=seed_needs_the_frozen_executor_s7
+E7RESULT name=q2_negative_bases bases=8 expected=8 o2_red_bases=0 red_base_list=none
+E7RESULT name=a9_a10_a8 p_rows=26 p_rows_expected=26 n_rows=10 n_rows_expected=10 known_bad_rows=41 known_bad_rows_expected=41 blind_rows=0 q2_table_rows_when_the_blind_family_exists=107
+E7RESULT name=q2_all_quiet status=not_run why=o3_frozen_version_not_available_s7 o2_quiet_rows_total=16
+```
+
+判决行（比对器自己的那一行；O3 一律 `not_run`）：
+
+```
+E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0 s2_files_differing=0 s5_numbers_that_differ=0 positive_controls_run=6 positive_controls_not_red=0 disabled_runs_with_differences_outside_the_closed_column=0 rows_untouched_but_red=0 negative_bases_with_o2_red=0 known_bad_rows_with_o2_quiet=0 o3_columns=not_run q1_alpha=not_run q1_beta=not_run q2_all_quiet=not_run q3_alpha=not_run
+```
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out`（第一刀第 6 行：分配记录树按槽号找叶时叶宽算成两倍，实现在第一次 `publish` 里 panic，装置记「实现自崩」、这条流不导出）：
+
+```
+E7RESULT name=stream stream=new_pool_file_creation ending=implementation_crashed:call_2_publish:分配记录（盘DeviceIdentity(0)槽SlotNumber(50176)跨2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 exported=false not_exported_why=implementation_crashed_in_a_call:call_2_publish:分配记录（盘_DeviceIdentity(0)_槽_SlotNumber(50176)_跨_2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 operations=22 writes=12 segments=7 tearable_writes=0 calls=3 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=2
+E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=22 status=panic o1_comparison=not_modelled
+E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=implementation_crashed:call_2_publish:分配记录（盘DeviceIdentity(0)槽SlotNumber(50176)跨2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 exported=false not_exported_why=implementation_crashed_in_a_call:call_2_publish:分配记录（盘_DeviceIdentity(0)_槽_SlotNumber(50176)_跨_2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 operations=22 writes=12 segments=7 tearable_writes=0 calls=3 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=2
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=2 label=publish first_operation=22 return_point=22 status=panic o1_comparison=not_modelled
+```
+
+`research/results/e171-three-oracle-collusion-2026-10-03-s1-known-bad-images.out`（41 条已知坏镜像在流一全持久态上：补丁叠回与直接改坏判红的不变量集合相等、目标不变量都红、条目名与原文件逐条相同）：
+
+```
+E7RESULT name=s4 check=known_bad_clean_image_digest_equals_build_pool local="9b4ee0cf7baf2bf175a5727d189d253c8f161695650cdc9023e354d8a4d39034" crates="9b4ee0cf7baf2bf175a5727d189d253c8f161695650cdc9023e354d8a4d39034" holds=true
+E7RESULT name=s4 check=known_bad_clean_image_digest_equals_the_full_state_of_the_dump local=Some("9b4ee0cf7baf2bf175a5727d189d253c8f161695650cdc9023e354d8a4d39034") crates=Some("9b4ee0cf7baf2bf175a5727d189d253c8f161695650cdc9023e354d8a4d39034") holds=true
+E7RESULT name=s4 check=known_bad_test_file_sha256_is_the_copied_one local="e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820" crates="e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820" holds=true
+E7RESULT name=s4 check=known_bad_entry_count_here local=41 crates=41 holds=true
+E7RESULT name=s4 check=known_bad_entry_count_in_the_original_file local=41 crates=41 holds=true
+E7RESULT name=s4 check=known_bad_entry_names_equal_the_original_file_in_order local=["I-7.4","I-4.8","I-1.1","I-1.3","I-1.4","I-1.4","I-1.6","I-1.7","I-1.10","I-2.1","I-2.3","I-2.4","I-2.5","I-3.1","I-5.1","I-5.2","I-7.1","I-7.2","I-7.6","I-7.13","I-7.14","I-7.7","I-7.7","I-7.7","I-7.8","I-9.1","I-9.2","I-9.4","I-9.7","I-9.10","I-9.15","I-9.16","I-3.8","I-8.6","I-1.8","I-1.2","I-1.11","I-4.2","I-9.6","I-9.12","I-9.13"] crates=["I-7.4","I-4.8","I-1.1","I-1.3","I-1.4","I-1.4","I-1.6","I-1.7","I-1.10","I-2.1","I-2.3","I-2.4","I-2.5","I-3.1","I-5.1","I-5.2","I-7.1","I-7.2","I-7.6","I-7.13","I-7.14","I-7.7","I-7.7","I-7.7","I-7.8","I-9.1","I-9.2","I-9.4","I-9.7","I-9.10","I-9.15","I-9.16","I-3.8","I-8.6","I-1.8","I-1.2","I-1.11","I-4.2","I-9.6","I-9.12","I-9.13"] holds=true
+E7RESULT name=verdict known_bad_entries_failing_s4=0 e170_bad_rows_failing_s3_or_s4=0
+```
+
+````
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:316-322`（整段抄，未转述）**
+
+```markdown
+### 对照与自检
+
+- 阴性（登记 5.6）：基线两趟、三批的每一态与每一次调用上，O1-对拍、O1-崩溃判官、O2 判红都是 0 处（A3，`name=a3_baseline_reds`）；空变异（拿表里第一行、把替换文换成原文本身，走完整条逐行驱动）判未触达、四列不红（`name=row row=0`、`name=row_touch row=0`、`name=row_matrix row=0`）；8 张不打补丁的底态（两条流的 F、Mk、Mk⁺、Mk⁻）O2 不红（`name=q2_negative_bases`）。O3（第二段起）：冻结的执行器在基线两条流批 1、批 2 的 576 态上判红 0 处，s4 产物原行 `E7RESULT name=a3_o3_baseline states=576 strict_in=576 strict_not_in=0 strict_spec_gap=0 strict_error=0 provisional_in=576 provisional_not_in=0 digest_mismatch_states=0 dump_problem_lines=0 base_unrecoverable_streams=none complete=true freeze_lines_equal_the_reference=true`；8 张底态 O3 甲乙都不红（`name=q2_negative_bases … o3_strict_red_bases=0 o3_provisional_red_bases=0`）。s4 整表开跑前，同一棵冻住的树上的空变异一行对 `baseline-run1` 未触达（主 agent 跑的整表脚本第 3 步：`write_stream_differs=false call_outcomes_differ=false recovery_report_differs=false touched=false`）。
+- 阳性（装置一侧三条，登记 5.6）：O1-对拍在流二第一次 `publish` 的观测里把那一版文件内容的末字节翻一位，对拍判出一处；O1-崩溃判官在每条流批 1 第一个「实现读回了文件」的态把读回内容末字节翻一位，每条流各一处、合计 2 处（登记字面是「第一个」，装置按每条流各翻一次，对照要的「红」没变）；O2 在流一全持久态上叠已知坏镜像族第一条，1 处。基线一趟与空变异一趟各跑一遍，红都一路带到 `oracle-verdicts.tsv` 与 `call-outcomes.tsv`（比对器的 `name=positive_control` 六行）。O3 的阳性对照（第二段起）：流一全持久态叠 P1 补丁交冻结的执行器，基线与空变异两趟各判红 1 处（s4 产物 `name=positive_control oracle=O3` 两行）。翻过的那次对拍让模型停在那次调用，此后的调用不比、写落在它之后的态 O1-崩溃判官记「不适用」，所以 O1-对拍那一趟的 `o1_crash_judge_red_states` 是 0。
+- 停机条款：S1 本地常量与 crates 回比 42 条全过；S2 两条流的八个文件与 `impl-verdicts.tsv`（去掉耗时列）逐字节等于 E170（O3规约执行器第一版） 导出装置在同一棵树上 `dump` 写出的；S3 O2 直接调 `check_pool_image` 与 `judge_crash_image` 内那一遍判红的不变量集合在基线每个取样态上相同（`o2_matches_judgement_false=0`），在 76 行坏状态上与 E170（O3规约执行器第一版） `bad-impl-verdicts.tsv` 池级 checker 那一列逐行相同；S4 已知坏镜像族 41 条、条目名与原文件逐条相同、干净镜像摘要等于 `build_pool` 的、补丁叠回与直接改坏判红集合相等、目标不变量都红；S5 比对器自己现算的两个数（批 1 的态数与序号集合、O1-崩溃判官适用的态数）与装置的计数相等；S6 没触发：E170（O3规约执行器第一版） 导出装置在今天的树上 `dump` 退 0、36 条 `holds=true`、0 条 `holds=false`；S7 在第一段触发（O3 列不跑），第二段起 O3 用登记修订 2 抄下冻结行的那一版，s4 比对器开头与收尾两次冻结核对都是 0 处不同；S8 的三处调用在「装置、研究一侧与变异表」一节给了行号。逐行那一趟的 S5（登记修订 3、4）在 s4 117 行上 0 行不过：判决行 `rows_with_an_errored_call_the_comparison_did_not_judge=0 rows_with_o1_not_applicable_from_another_source=0`，`name=q1_denominator … device_stop=0`。
+- 被测的是跑那一刻的树：s4 的空变异、117 行与 Q3-核三趟从同一份冻住的树拍快照（五趟驱动的 `snapshot_digest` 只有一种，`d15864653cd83cedddc4902b6598d5db9cf590a62e6cbb8a54bed6661e4700cb`）；开跑前树核对拿它与第六段读码时的清单逐文件比，只差一个别的 bin（`e168_delete_ring_window_borrow.rs`，不挡）。第一段的基线、对照与试跑用的是 `crates/` 在跑那一刻的状态；E170（O3规约执行器第一版） 导出装置一侧用的是 `git show :crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 取出的暂存版本（sha256 `8c526293…`，登记第三节钉的那一份）在草稿目录里编出来的，它的 `dump` 与 `bad-states` 输出与工作区里 E170（O3规约执行器第一版） 第 1 次重跑改过的版本逐字节相同（`cmp` 无输出），所以复跑驱动直接用工作区里的版本。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:323-328`（整段抄，未转述）**
+
+```markdown
+### 单测与变异
+
+- Python 一侧单测 110 条（研究一侧目录里 `grep -c '    def test_' test_*.py` 四个文件 32 + 29 + 24 + 25），`python3 -m unittest test_collusion_matrix test_collusion_pipeline test_o3_columns test_o3_comparison` 连跑 5 轮每轮 `Ran 110 tests` / `OK`（手造数据、确定性，5 轮只说明没有隐藏状态）：矩阵（触达三样、O3 两列的读法、全放行谓词、关一条、门槛、轨迹）、切段与取样公式现算、导出目录读回、坏实现表（锚点、补位、空变异）、挑法脚本的行数、冻结核对、坏镜像的 O3 判法、逐行驱动的编译记录与重编核对（真 `rsync -a` 与 `copy2`、假 cargo）、F4 扩表（挑法脚本两次的差集与编号、比对器的逐行核对、两个输出根的合并与重号拒绝、分母按表分开、补位跳过两张表的名字）、编不过之后的补位（手造组 r0–r5、表里有 r0 与 r2、装置行插在中间：编不过依次换到 r1、r3、r4，第四次补不上记编不过；换上的行锚点不过与编不过合算三次；空变异不补位；组里没有装置行；驱动在同一个行目录里重编换上的行、`compile-failed-1.log` 与 `failed_attempt_1` 同号、复跑开关不补位；比对器只拿补位行换掉编不过的同号行、别的情形拒、补位行的结果行写换上的名字）。每个会被变异弄坏的谓词都配了钉绝对值的断言（例：扩表在手造表上必须是 `(118, a4)`、`(119, a12)`、`(120, b2)` 三行；补位的整行 `name=substitution row=3 … substituted_by=c_换 failed_attempts=1 …` 写死）。
+- Python 一侧变异 67 条，表 `research/mutations/e171_three_oracle_collusion.tsv`，跑法 `mutation_driver.py`（登记第九节写「经 `research/scripts/mutate.sh` 跑」，那条脚本只起 cargo test，起不了 Python 的单测，登记修订 1 第 1 行记了这一处）：`e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7.out` 第 137 行 `E7RESULT name=verdict mutations=67 caught=67 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`，抓到 / 无效 / 没红 = 67 / 0 / 0（结局符号逐个数：✅ 67、⏭ 0、❌ 0、⏱ 0、💥 0、⚠️ 0、🧱 0）。X60–X74 是编不过补位那一批（编不过不补位、不计次数、组里算进装置行、换上的行锚点不过时结局不记编不过、补位那一趟领了不是编不过的行、不记试过的名字、编不过之后不换行直接跑装置、比对器不核原行是编不过、不核补位自的名字、结果行写原名、合计把补不上的算换上、行分析不套补位、日志与试过的名字不同号、复跑开关不起作用、补位那一趟同一行在两个根里不拒）。同名的 `…-r6.out` 是同一批的前 13 条加进来时的全表跑（65 条，65 / 0 / 0），之后补了 X73、X74，留档。按「没红的三类」想过而没加的一条：编不过之后的补位从表里原名往下找、不从编不过的那一行往下找——补位跳过表里与已用过的名字，原名与编不过那一行之间的每个名字都在这两样里，两种找法在所有输入上同值，是等价变异，没加进表，等价性写成一条留档测试（`test_walking_from_the_name_in_the_table_or_from_the_last_failed_name_gives_the_same_substitute`，手造组上逐个起点核）；加了这条测试之后变异表重跑一遍，输出与 `-r7.out` 逐字节相同。X52–X59 是 F4 扩表那一批（扩表不去掉重叠行、从 117 编号、把装置自己的变异行算进挑法、两个输出根同号不拒、补位不跳过别的表、扩表核对只比行数、分母按表对调、只读第一个输出根），每条都由 `F4ExpansionTests` 里对应的那条单测抓到。同名的 `…-r4.out` 是同一张表的一次中途被停的跑（外面套的 `timeout 230` 在第 8 条变异时停了它，61 行、没有判决行），不算数、留档。更早的 `…-s1-comparator-mutations.out`、`…-s2-comparator-mutations.out`、`…-s3-comparator-mutations.out` 与 `…-s3-comparator-mutations-2026-10-03.out`、`-r2.out`、`-r3.out` 是表在 9、26、37、40、44、44 条时的全表跑，各自全抓。
+- 装置内联单测 31 条（`grep -c '#\[test\]' crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`）：编过（`research/scripts/compile-then-swap.py` 的 `cargo build` 与 `cargo test --no-run`），没跑（checker 档，归提交）。装置一侧变异 15 行追加在 `crates/mutations.tsv` 末尾（名字以「E171 装置」起头），三个数待提交时门禁 checker-tier-crates-mutation-replay。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:329-341`（整段抄，未转述）**
+
+```markdown
+### 路径与结论登记
+
+| # | 路径 | 怎么算 | 源码落点 | 读了哪些共用项 |
+|---|---|---|---|---|
+| 1 | 批 1 的态数（装置） | 取样三批的公式作用在层 0 枚举表给的每段序号区间上，再加撕裂扫描；枚举点，不是全量 | `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:1346` `sample_ordinals` | `layer0_enumeration_tables` 的段区间与哪几次写取三态（来自 `crates/singlefs-checker-tier/src/crash.rs`） |
+| 2 | 批 1 的态数（比对器现算） | 从 `ops.tsv` 按切段规则切段、`torn.tsv` 的写序号当三态写，每段状态数 = 各写取几态的乘积减 1，再按同一套取样公式现算序号集合 | `research/e7-index-bench/src/bin/e171_three_oracle_collusion/baseline_checks.py:175` `recompute_first_batch` | 取样公式（E170（O3规约执行器第一版） 登记 5.4 的文字）；`torn.tsv` 与 `ops.tsv`（装置从 crates 的枚举表与写表写出）：两条路径共用「哪几次写取三态」 |
+| 3 | O1-崩溃判官适用的态数（装置） | 一态里持久或撕裂的写属于的最后一次调用不早于模型停下的那次调用，这一态不适用 | `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:1920` `crash_judge_is_applicable` | 调用表的返回点与写表的流序下标 |
+| 4 | O1-崩溃判官适用的态数（比对器现算） | 从 `calls.tsv`、`ops.tsv`、`states.tsv` 的落地向量数写落在 `unmount` 那次调用里的态 | `research/e7-index-bench/src/bin/e171_three_oracle_collusion/baseline_checks.py:184` `recompute_crash_judge_applicable` | `calls.tsv` 的返回点（装置写出）；模型只停在 `unmount` 这一条读法（登记第一节读法 6） |
+| 5 | O2 在坏状态行上的判定（装置） | 从中性格式按落地向量重建 `MemoryPool`、叠 E170（O3规约执行器第一版） 写的补丁、调 `check_pool_image` | `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs:4646` `e170_bad_rows_on_both_streams` | 池级 checker 本身、E170（O3规约执行器第一版） 写的 `bad-patches.bin` 与落地向量 |
+| 6 | O2 在坏状态行上的判定（E170（O3规约执行器第一版） 导出装置） | `CrashImage` 上把补丁接在写表末尾当持久的系统配置槽写，调 `judge_crash_image` 取池级 checker 一项 | `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs:2994` `observe_bad_row` | 池级 checker 本身；同一批补丁字节与落地向量 |
+
+路径 1 与 2、3 与 4 在产物里逐格比（`name=s5_batch_1_states`、`name=s5_o1_applicable` 八行 `equal=true`），路径 5 与 6 逐行比（`name=e170_bad_row` 76 行 `o2_equals_e170=true`）；这几处比对写在产物里，没有 `assert` 把两条路径直接连起来，还欠这一条。共用项里最要紧的是池级 checker 本身（路径 5、6 同一份 `check_pool_image`）：它错了两条一起错，所以这一格不能当 O2 判得对的证据；路径 1、2 共用「哪几次写取三态」，它错了两份态数一起错。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:342-457`（整段抄，未转述）**
+
+````markdown
+### 复跑
+
+装置与 E170（O3规约执行器第一版） 导出装置都是 checker 档的入库装置，经内存包装起；研究一侧是 Python。`research/scripts/replay.sh` 里 E171 的十行登记，各带自己的临时目录，产物只留 E7RESULT 行、exact 比：
+
+| 驱动函数 | 产物 | 跑什么 |
+|---|---|---|
+| `driver_e171_s1_baseline` | `…-s1-baseline-run1.out` | 装置 `baseline` 一趟 |
+| `driver_e171_s1_known_bad_images` | `…-s1-known-bad-images.out` | 基线、E170 导出装置 `bad-states`（占位种子）、装置 `known-bad-images` |
+| `driver_e171_s2_bad_states_export`、`driver_e171_s2_known_bad_images`、`driver_e171_s2_images_o3`、`driver_e171_s2_o3_control_baseline` | `…-s2-bad-states-export.out`、`…-s2-known-bad-images.out`、`…-s2-images-o3.out`、`…-s2-o3-control-baseline.out` | 坏镜像三族在冻结种子下的造法、O2 与冻结执行器的判定、O3 阳性对照 |
+| `driver_e171_s2_comparator` | `…-s2-comparator.out` | 第二段比对器那一串（九行试跑）；比对器在第三至六段改过判决行与 config 行，这份今天复跑对不上，没改指 |
+| `driver_e171_s3_comparator_mutations` | `…-s3-comparator-mutations-2026-10-03-r7.out` | 研究一侧 67 条变异，`mutation_driver.py`，约一分钟 |
+| `driver_e171_s4_comparator` | `…-s4-comparator.out` | 第二段那一串前置、修过的逐行驱动跑全部 117 行（两条线道、每条 2 线程，一份冻住的树）、Q3-核三趟、比对器；推的约两小时，没真跑过这个驱动函数（重型，归提交时的全部实验复跑）。117 行的读数读今天的 `crates/`，实现、O2、O1、装置或那 117 行的行文变了产物就变。整表那一步带 `--keep-compile-failures-as-they-are`：这份产物是编不过不补位的那一版驱动跑的 |
+| `driver_e171_s4_f4_comparator` | `…-s4-f4-comparator.out` | 先整条跑 `driver_e171_s4_comparator`，再在它那一份冻住的树与工作根上跑扩表 164 行（同样带 `--keep-compile-failures-as-they-are`），比对器并两半、带扩表、段名 s4-f4；推的约四小时，没真跑过（`bash -n` 过；比对器那一半用同一组参数在已有导出上重跑过、与产物逐字节相同） |
+
+拿 s4 的输入（已有的导出目录与驱动输出）重跑今天的比对器，E7RESULT 行与 `…-s4-comparator.out` 逐字节相同（`cmp` 无输出）：比对器这一半复得出；装置与驱动那一半要整表重跑才核得到。第一段几样的单条命令：
+
+```
+bash research/scripts/run-with-memory-cap.sh 8G cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion -- baseline --output-directory <新目录>
+bash research/scripts/run-with-memory-cap.sh 8G cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states --dump-directory <基线导出目录的一份拷贝> --seed-hex 0000000000000000
+bash research/scripts/run-with-memory-cap.sh 8G cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion -- known-bad-images --dump-directory <上一步那份拷贝> --output-directory <新目录> --e170-bad-rows
+cd research/e7-index-bench/src/bin/e171_three_oracle_collusion && python3 mutation_driver.py --table ../../../../mutations/e171_three_oracle_collusion.tsv --scratch <草稿目录> --output <新文件>
+```
+
+第一段比对器那份（`…-s1-comparator.out`，第一段的 `driver_e171_s1_comparator` 已由 s2 那一份取代、不再登记）要先跑齐基线两趟、E170（O3规约执行器第一版） 导出装置的 `dump`、关一条两趟、阳性对照六趟（基线三趟，空变异三趟经 `row_driver.py --empty-mutation --positive-control <名>`）、逐行驱动三行（`row_driver.py --empty-mutation --rows 1,6`），再 `python3 comparator.py …`，大约十几趟装置（每趟约一分钟），驱动函数把这一串写死；比对器的 config 行只写目录的名字，所以复跑目录的名字要与驱动里的相同。比对器的 A4–A7 读今天的 `crates/mutations.tsv`：表里别处加了核心实现的行或改了那 117 行，这几行会变，不是装置坏了。占位种子 `0000000000000000` 造出的盲测行 E171（三oracle合谋测试） 不用；E170（O3规约执行器第一版） 在第 1 次重跑里加了第二套坏状态表（`bad-states-second-run`），`bad-states` 仍是第一套，两个版本的导出装置在第一套上的输出逐字节相同（「对照与自检」一节最后一条）。
+
+复跑驱动的自检：基线、已知坏镜像、变异驱动三个驱动函数照 `replay.sh` 的口径在草稿目录里跑过一遍，输出与入库产物逐字节相同（`cmp` 无输出）；比对器那一个驱动函数没有整条真跑（十几趟装置，前台跑不完），它的胶水（各步命令行、目录的名字、传给比对器的参数）用「装置、E170（O3规约执行器第一版） 导出装置与逐行驱动换成从已有导出目录拷」的桩跑过，比对器照真的跑，输出与入库产物逐字节相同；各步命令本身在做产物时逐条真跑过。整条真跑由提交时的复跑做。
+
+产物（都在 `research/results/` 下，名字前缀 `e171-three-oracle-collusion-2026-10-03-s1-` 之后接）：
+
+| 文件名（前缀之后） | 内容 |
+|---|---|
+| `baseline-run1.out`、`baseline-run2.out` | 基线两趟的 E7RESULT 行（两份逐字节相同） |
+| `baseline-timing.out` | 两趟的 E7TIMING 行（每批每段耗时、每条流驱动、判、写各花多久） |
+| `known-bad-images.out` | 装置 `known-bad-images` 模式：41 条已知坏镜像与 E170（O3规约执行器第一版） 的 76 行坏状态上的 O2 |
+| `comparator.out` | 比对器：登记锚点、基线与对照、关一条、三行试跑、Q1 分母、Q2 的 O2 一列 |
+| `rows-timing.out` | 逐行驱动与比对器的 E7TIMING 行（Q4 单行数） |
+| `comparator-mutations.out` | Python 一侧 9 条变异 |
+| `e170-pinned-dump.out` | E170 暂存版本导出装置的 `dump`（S2 的对照） |
+| `e170-bad-states-placeholder-seed.out` | 同一版本的 `bad-states`（P、N 行的出处，盲测行不用） |
+| `positive-control-o1-comparison.out`、`positive-control-o1-crash-judge.out`、`positive-control-o2.out` | 三条阳性对照在基线那一趟的装置输出 |
+| `disable-o1.out`、`disable-o2.out` | 关一条的开关自检（基线上各一趟）的装置输出 |
+| `row-0-device.out`、`row-1-device.out`、`row-6-device.out` | 三行试跑的装置输出（row-0 是空变异） |
+
+全名（`ls research/results | grep '^e171-three-oracle-collusion-2026-10-03-s1-'`，17 份）：
+
+```
+research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run1.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run2.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-timing.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator-mutations.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-disable-o1.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-disable-o2.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-e170-bad-states-placeholder-seed.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-e170-pinned-dump.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-known-bad-images.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-comparison.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-crash-judge.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o2.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-row-0-device.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-row-1-device.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out
+research/results/e171-three-oracle-collusion-2026-10-03-s1-rows-timing.out
+```
+
+第二段起的产物（`ls research/results | grep -E '^e171-three-oracle-collusion-2026-10-03-s[234]-'`，27 份，名字前缀 `e171-three-oracle-collusion-2026-10-03-` 之后接）：
+
+| 文件名（前缀之后） | 内容 | 现在算不算数 |
+|---|---|---|
+| `s2-bad-states-export.out`、`s2-known-bad-images.out`、`s2-images-o3.out`、`s2-o3-control-baseline.out`、`s2-o3-baseline.out` | 坏镜像三族的造法与 O2、O3 判定、O3 阳性对照、冻结执行器在基线上（A3 的 O3 一份） | 算：s4 比对器读的就是这几份 |
+| `s2-comparator.out`、`s2-rows-timing.out` | 第二段比对器（Q2 全表、九行试跑）与它的耗时 | Q2 的数同 s4；九行试跑由 s4 整表取代 |
+| `s2-comparator-mutations.out` | 变异表 26 条时的全表跑 | 历史 |
+| `s3-baseline-after-the-fix.out`、`s3-row-0-device.out` | 修订 3 修过取号、暖机记红之后的装置基线与空变异一行（与修之前逐字节相同） | 算：修订 3 的实核 |
+| `s3-k4c-attack-row-device.out`、`s3-k4c-check-driver.out` | 修订 3：取号恒拒那一行经逐行驱动跑一行（O1 红） | 算：修订 3 的实核 |
+| `s3-comparator.out`、`s3-rows-timing.out` | s3 整表 117 行的比对器与耗时 | 作废留档（「s3 整表作废」一节） |
+| `s3-clean-check-comparator.out` | 第五段在干净工作根上复核第 2、27、42、65 行 | 作废的佐证，留档 |
+| `s3-comparator-mutations.out`、`s3-comparator-mutations-2026-10-03.out`、`-r2.out`、`-r3.out` | 变异表 37、40、44、44 条时的全表跑 | 历史 |
+| `s3-comparator-mutations-2026-10-03-r4.out` | 52 条那一次中途被停（61 行、没有判决行） | 不算数，留档 |
+| `s3-comparator-mutations-2026-10-03-r5.out` | 变异表 52 条的全表跑，52 / 0 / 0 | 历史 |
+| `s3-comparator-mutations-2026-10-03-r6.out` | 变异表 65 条的全表跑（X60–X72 加进来之后），65 / 0 / 0 | 历史 |
+| `s3-comparator-mutations-2026-10-03-r7.out` | 变异表 67 条的全表跑，67 / 0 / 0 | 算：复跑登记指它 |
+| `s4-comparator.out`、`s4-rows-timing.out` | s4 整表 117 行、Q3-核三趟、比对器与耗时 | 算：117 行那一半的读数（F4 产物里第 1–117 行的结果行与它逐字节相同） |
+| `s4-f4-comparator.out`、`s4-f4-rows-timing.out` | F4 扩表 164 行与 s4 的 117 行并表的比对器与耗时 | 算：这一版 Q1、Q3、Q4 的读数（补位之前） |
+
+全名：
+
+```
+research/results/e171-three-oracle-collusion-2026-10-03-s2-bad-states-export.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-comparator-mutations.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-images-o3.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-known-bad-images.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-o3-baseline.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-o3-control-baseline.out
+research/results/e171-three-oracle-collusion-2026-10-03-s2-rows-timing.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-baseline-after-the-fix.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-clean-check-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r2.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r3.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r4.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r5.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r6.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-k4c-attack-row-device.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-k4c-check-driver.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-row-0-device.out
+research/results/e171-three-oracle-collusion-2026-10-03-s3-rows-timing.out
+research/results/e171-three-oracle-collusion-2026-10-03-s4-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out
+research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-rows-timing.out
+research/results/e171-three-oracle-collusion-2026-10-03-s4-rows-timing.out
+```
+
+````
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:458-473`（整段抄，未转述）**
+
+```markdown
+### 它答不了的
+
+- Q1 的「有」是照字面判的（≥ 1 行），12 行（丙 13 行）里哪几行算真坏、算不算 oracle 的共同盲区，没判：三分里的「真盲区候选」s4 3 行、F4 4 行（丙另有第 233 行），状态不合法所依的条款句写在「三条全放行的 7 行」「F4 新出的全放行行」两节，第 92 行那一句在里程碑页、不在决策正文。分母 D = 37 是补位之前的口径：编不过的 6 行补位那一趟没跑，补位之后 D 会变，Q1 的「有」不会翻（全放行行只会增减补位那几行，已有的 12 行判定不变）。
+- 281 行里 232 行未触达：这两条流的历史只走到实现的一小部分（取号、暖机、发布、可写挂载、管理员回退、抬 F、正常卸载各一两次，没有分裂、没有删除、没有空间紧的池），未触达只说那一处改动在这两条流上没走到，不说它被哪条 oracle 罩着。全放行行里对这一批等价的 5 行（s4 4 行、F4 第 277 行），会分开它们的历史都写的是「推的、没跑」。
+- 触达的定义（登记读法 4）不比成功的调用交回的值：第 155、161 行抬 F 的上限交回 13（模型 11）、写流与结局都同，记未触达，而 O1-对拍判红（「没触达却红的两行」一节）；别的未触达行有没有同类差异，装置没记成功调用的交回值，看不出来。
+- 编不过的 6 行的补位那一趟待跑（「编不过的 6 行补位（待跑）」一节）；s4、F4 两份产物是补位之前的驱动跑的。
+- 顺序类的条款（第 242、270 行）是在层 0 的切段模型上数的：「条款不许的态」靠切段规则（FUA 写只放行它自己那块盘、屏障放行它那块盘）分得出，真机上一次 FUA 写与随后的写怎么排，不在这一批里。
+- O3 在 37 行上一行都没红：它的 A(c) 由实现自己写出的根构成，抓的是「恢复落到的那一版不在 [ack, begun] 里」这一类，实现一致地写错的字段（容器号、写入时间、F 的取值、记账行）它照样判「在」。这是读执行器代码读出来的，没有另造一行只让 O3 红的坏实现去核；坏镜像那一族里 O3 红得多（Q2）。
+- 三行试跑（第一段）不是表的抽样，s4 整表取代了它们当 Q1 的读数；第 1 行未触达只说那一处改动在这两条流的历史上没走到。
+- 基线上 O1-崩溃判官有一部分态不适用：流二最后一次调用 `unmount` 模型没有答，写落在这次调用里的态不判；基线批 1 流二 397 态里 48 个、批 2 的 119 态里 14 个不适用（`o1_crash_judge_not_applicable`），这些态上 O1 一列是空的。流一没有不适用的态。
+- 阳性对照 O1-崩溃判官每条流各翻一次（合计 2 处），登记字面是「批 1 里第一个」；O2 的对照只在流一的全持久态上叠第一条已知坏镜像，没有别的取样点。对照证明管子把红带到矩阵，不证明每条 oracle 对每种改坏都分得出。
+- Q2 的 O2 一列取自两条路径（路径 5、6）；P 行的补丁字节与落地向量是 E170（O3规约执行器第一版） 导出装置写的，期望是 E170（O3规约执行器第一版） 设计员推的（登记 A2、F3）。Q2 全放行的 4 张全是 P8，那一判归 F3。41 条已知坏镜像是 O2 自己的回归语料，O2 41 条全红是构造的结果，不是 O2 独立性的证据。
+- 逐行驱动与装置读跑那一刻的 `crates/`：s4 五趟驱动是同一份冻住的树，但 `crates/` 里别处在变，整表跑出来的数只说那一份树。
+- 坏镜像上实现的恢复读回什么（登记第一节读法 11，附带）、旧种子盲测族的回归都没跑。Q1-丁（三条全放行而记录核对器或层 0 手写版本表的 oracle 红的行）跑了：F4 的 12 行全放行（甲、乙）里一行都没有（`name=q1_delta … =none`）；比对器只按甲乙算这一格，丙多出的第 233 行上层 0 那份 oracle 与记录核对器红（`name=q1_quiet_row reading=q1_gamma row=233 … layer0_or_record_checker_red=true`）；层 0 那份 oracle 与记录核对器另在只靠 O1 的第 108、115 行上红。
+- 装置内联单测没跑（checker 档），装置一侧变异 15 行的三个数没有；Python 一侧的变异只证明比对器与驱动的谓词会红，不证明它们读的装置输出是对的（装置输出由两趟基线、S2、S5 与对照另行钉）。
+
+```
+
+**出处 `.claude/kb/experiments/171-三oracle合谋测试.md:474-489`（整段抄，未转述）**
+
+```markdown
+### 影响的决策
+
+| 决策分项 | 关系 | 回看 |
+|---|---|---|
+| D13（验证路线） 已定项 6 | 备料 | 2026-10-03 不受影响：这一项的依据段不按编号引 E171（三oracle合谋测试）（`grep -n 'E171（' .claude/kb/decisions/13-验证路线.md` 只命中射程与欠两段）；F4 并表给出 Q1「有」12 行（丙 13 行）、Q3「有一行只靠一条」23 行、分母 D = 37（补位之前），这些数说明三条 oracle 在两条流上有共同放过的坏实现，是撑住「独立性要靠合谋测试验证」还是落到定案里「若三者全部放行，说明存在共同盲区，回头补 oracle」那一支、哪几行算真盲区，都是推论，没走三方 |
+| D13（验证路线） 已定项 1 | 不影响 | 2026-10-03 不受影响：只拿 M2 重放结果的根「其余字段等于所选根」当第 233 行（丙）实现恢复结果合不合法的判据；实验不量这一项 |
+| D13（验证路线） 已定项 7 | 备料 | 2026-10-03 不受影响：记录核对器与层 0 手写版本表的 oracle 不是三条之一，比对器给它们留了附带列（Q1-丁）；F4 的 12 行全放行（甲乙）里它们一行都没红，在丙多出的第 233 行与只靠 O1 的第 108、115 行上红；已定项 7 的定案句没被动 |
+| D13（验证路线） 已定项 15 | 备料 | 2026-10-03 不受影响：117 行整表两条线道 5 569.6 秒、扩表 164 行另一趟 7 607.9 秒，Q4 照登记判「只能进全量」；已定项 15 取的「debug 下单条跑到 60 秒及以上算重」那一档与「checker 档默认只在提交时跑」的定案句没被动，合谋测试进哪一档由主 agent 照 Q4 定 |
+| D8（核心索引结构） 已定项 6 | 不影响 | 2026-10-03 不受影响：只拿它定案里「新池新建文件写」那一句的容器号 1 与射程里「每个容器号都是某条记录首次插入时的 inode 号」当第 23 行状态合不合法的判据，字段表的写入时间那一格当第 92 行的判据；实验不量这一项 |
+| D16（发布语义） 已定项 1 | 不影响 | 2026-10-03 不受影响：只拿它字段表「正常卸载」一行与射程「卸载之后 F = 现行那一版的 txg」当第 42 行状态合不合法的判据；实验不量这一项 |
+| D16（发布语义） 已定项 7 | 不影响 | 2026-10-03 不受影响：只拿定案的持久顺序（根槽 FUA → 系统配置槽 → 屏障、系统配置轮换持久之后才返回、抬 F 那一串先写系统配置）当第 242、270、265 行状态合不合法的判据，射程「同一实例里退一代，靠 journal 重放追得上」当第 277 行会分开的历史；实验不量这一项 |
+| D16（发布语义） 已定项 12 | 不影响 | 2026-10-03 不受影响：只拿「根 + journal 任意前缀」当第 277 行新旧两版都合法的依据；实验不量这一项 |
+| D8（核心索引结构） 已定项 8 | 不影响 | 2026-10-03 不受影响：只拿定案「头 ID 8 字节的取值」里 `deleted_inodes` 写 inode 树的树 ID 那一句当第 271 行的判据；实验不量这一项 |
+| D23（journal 的角色与格式） 已定项 3 | 不影响 | 2026-10-03 不受影响：只拿「恢复不许先信 tail」说明第 269 行 tail 写错而恢复逐态相同；实验不量这一项 |
+| D23（journal 的角色与格式） 已定项 14 | 不影响 | 2026-10-03 不受影响：只拿取号那一写写见证值 c_见证、mkfs 之后第一次取号写 0 那一句当第 269 行的判据；实验不量这一项 |
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:1-16`（整段抄，未转述）**
+
+```markdown
+# 里程碑「新池新建文件」：每一步设想实现什么、预想的细节、验收标准
+
+**口径**：规划文件，2026-09-10 建档，按当日的判断写。**它不要求正确**：预想的细节会随决策与实装逐步修正，
+每一步开工前回来改一遍，改完在文末「历史版本」记一行。步骤沿用户 2026-09-10 提的六项，
+前面加一步脚手架、后面加一步崩溃点重放。目标是项目 `CLAUDE.md` 写的第一个可运行目标「正确提交一个事务」。
+
+**读法**：每步三段。「设想实现」是这一步做完盘上和内存里多了什么；「预想的细节」里凡标**预想**的，
+是仓里没定、写代码时先这么取的东西，定了就改；「验收标准」是这一步做完要能演示给人看的，
+每条都要先证明会红。末尾一行「会碰到的决策点」只列编号，不展开。
+
+**里程碑到步 7 为止**，出口是步 7 的验收。目录、快照、加密、压缩、zoned、并行提交、第三方管道都不在里面。
+
+**与字节表和决策索引挂钩**：每一步有一行「写出的字节」指到 [layout/01-first-txn.md](../layout/01-first-txn.md) 的哪几节，宽度、取值、落点以那张表为准，
+不在这里另抄；[decisions.md](../decisions.md) 里判过「改新池新建文件的字节：是」的未定项，每一条都要出现在某一步的「会碰到的决策点」里。
+两条都由门禁阶段「新池新建文件的三份文件互相挂钩」判红。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:17-40`（整段抄，未转述）**
+
+```markdown
+## 步 0　脚手架
+
+**现状（2026-09-14 开工）**：根 `Cargo.toml` workspace（排除 `research/`）+ 四个 crate：`crates/singlefs-format`（格式常量，带 `format-const:` 注与 `// placeholder:` 占位）、`crates/singlefs-core`（地址 newtype、块设备 trait 与文件后端）、`crates/singlefs-harness`（录制器与流的条数闸）、`crates/singlefs-checker`（骨架：判定宽度的「探到 / 声明」两态）。门禁多一道阶段「格式常量文件里的占位」（`.claude/gate.d/doc-registries.sh` 的 format-const-placeholders 格，样本在 fixtures），code-source-discipline 的 format-constants 格的常量同步扩到 `crates/`。验收三条：录制器条数闸的自证（`stream_count_gate_rejects_a_stream_that_lost_one_write`）、两种地址类型混用编译不过（`address` 模块的 `compile_fail` 文档测试）、占位计数的门禁——都在。镜像默认 4 GiB（`TEST_IMAGE_DEFAULT_BYTES`，C323（镜像大小全仓没有条款） 的占位），用户 2026-09-14 说虚拟盘可扩到 200–500 GB。
+
+**设想实现**：一个 `crates/` workspace，三个 crate：核心（事务层）、checker、harness。
+一个块设备抽象，接 N 个镜像文件；一个录制器包装在它外面，把每个写请求与屏障记成一条流。
+一个格式常量文件，新池新建文件要写的每个宽度都在里面，占位的常量带占位标记与分项号。
+
+**预想的细节**：
+- 设备抽象只暴露读、写、屏障、FUA 写、探测 `physical_block_size` 五个动作，不暴露介质是什么。
+- 镜像文件默认两个，放 `${TMPDIR:-/tmp}`，大小预想 **4 GiB**（2026-09-14 起：D23（journal 的角色与格式） 已定项 19 ③ 定「环 ≤ 设备容量 ÷ 4」，1 GiB 装不下默认的 768 MiB 环）。**预想**：`physical_block_size` 按参数给，默认 512（与 [layout/01-first-txn.md](../layout/01-first-txn.md) 零那一节同口径；4096 作为第二档在步 7 另跑）。
+- 录制器每条记：设备号、偏移、长度、内容哈希、是不是屏障、是不是 FUA。流落到文件，给步 7 用。
+- 地址全部 newtype：设备号、设备内 16 KiB 槽号、代号 `txg`、`jsn`、树 ID、inode 号。
+- 常量文件里每个常量一行注释：值来自哪条分项，是不是占位。
+
+**验收标准**：
+- 录制器自证：喂一个少发一条写的假设备，比对条数判红。
+- 两种地址类型混用的代码编译不过（一个 compile-fail 测试）。
+- 门禁多一道阶段：数出常量文件里还有几个占位，每个占位都指得到分项号，指不到判红。
+
+**写出的字节**：无（这一步不写新的盘上字节）。
+
+**会碰到的决策点**：无格式决策；工程约定见 [verification-build.md](../verification-build.md)「待定案」第 5 问。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:41-73`（整段抄，未转述）**
+
+```markdown
+## 步 1　mkfs
+
+**现状（2026-09-14 开工，验收五条全过）**：`crates/singlefs-core` 的 `make_filesystem` 吃两块设备，按字节表零的 m1–m4 写出实例表单元第 0 片（槽 50176）、树表单元第 0 版（槽 50178）、三个区域各自槽 0 的第 0 代根记录（FUA）、每盘两个世代号 1 的系统配置槽；几何越界（环 > 容量 / 4、根环或单元区越过盘尾、区域归属指到不存在的盘）在写任何字节之前拒绝。编码在 `bytes` / `checksum` / `pointer` / `unit` / `system_configuration` / `root_record` / `root_ring` 六个模块，每个偏移用 `assert_position` 钉在字段表上；checker（`crates/singlefs-checker`）另写按位 CRC-32C 与三种槽 / 单元的解析，只与实现共享常量模块。验收（`crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs`）：同参数两次 mkfs 逐字节相同；三个区域的槽 0 解出同一份第 0 代根、改坏一槽一字节只判那一槽；每盘两槽校验和过且世代号 1、改坏一槽择另一槽；根记录两条指针指到的单元头自检过且位置条目里的整单元校验和对得上；录制流段序列 `4+1+1+1+4`、种类串与八那一节 mkfs 那一行逐字相同、13 次操作。镜像准备（journal 环与根环区域全 0）靠新建的稀疏镜像，真设备上要显式写 0 的那一半还没做。
+
+**设想实现**：`mkfs` 吃两个镜像文件，写出一个能被挂载、但一个文件都没有的池：每盘一份系统配置、
+三个根环区域、一条两盘镜像的 journal 环、实例表单元第一片、一个空的树表单元，
+然后把第 0 代根记录种进全部三个区域。
+
+**预想的细节**：
+- 槽宽 = 探测到的 `physical_block_size`，系统配置槽与根环槽都是（D20（承重面：单元的原子性与自包含）、D22（单元原子性怎么合成） 已定项 2）。
+- 系统配置每盘两个槽轮换。**预想**的字段：magic、格式版本、三张 feature bitmap、fsid、本盘设备号、设备数、
+  节点与单元与落点粒度三个尺寸、根环参数（区域数 3、素数步长、每区槽数、区域起点）、journal 几何（起点、长度、记录尺寸）、
+  tail 字段、槽世代号、整单元校验和。字段表按 D22（单元原子性怎么合成） 已定项 9 与已定项 15 定案（[layout/01-first-txn.md](../layout/01-first-txn.md) 一那一节 45 行、**481 字节**：去掉间接目录单元指针 59，加单元区起始槽号 8 与 io_min / 槽距各 4，主密钥槽 80 内联，devs 留、整理三水位恒 0；2026-09-14 用户定案再加写入者身份 20 + 校验和算法标识 1 + mkfs 时的 physical_block_size 4 + 扩展点声明值 N 4），mkfs 全部写出；槽数恒 2、槽距 max(4096, io_min)、世代号从 1 起每写 +1、槽 = 世代号 mod 2、择槽取校验和过且世代号最大（D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）。
+- 根环三个区域落在 `1 MiB + r × P × chunk`。**预想**：P = 3、`chunk` = 1 MiB、每区 8 槽、槽距 4096；区域 0 / 1 / 2 归盘 0 / 1 / 0——
+  两盘上三个区域必有一盘背两个（E87（固定结构的放置） 逐字），归属由 mkfs 逐区域写进系统配置（D2（RAID 条带策略） 已定项 7）。
+- journal 环两盘镜像，记录 4 KiB（D23（journal 的角色与格式） 已定项 12）；环长是 mkfs 参数、默认 768 MiB、约束环 ≤ 设备容量 ÷ 4（2026-09-14 用户定案），默认环下 196608 个记录槽、在飞记录数上限 196608 ÷ 3 = 65536（语义 = 重放前缀最多 65536 条、坏校验和断链即止，D23（journal 的角色与格式） 已定项 18 / 已定项 19），mkfs 把整环写 0；挂载时有效 T_dirty = min(字段, 环长 ÷ F) = 256 MiB。
+- 实例表单元：码 3 打包记录类型 4，只有一条「无下一片」记录。树表单元：码 2 索引节点，0 条条目。
+- 第 0 代根记录 **457 字节**（D22（单元原子性怎么合成） 已定项 7；D16（发布语义） 已定项 1 加回退下界 F、D19（块指针的结构与宽度预算） 已定项 11 加中央映射树根指针之后，2026-09-14 用户定案三条指针各 86 并在末尾加算法类型 1 + nonce 12 + MAC 16，2026-09-23 用户定案加分配记录树根指针 86）：实例代号 0（mkfs，D23（journal 的角色与格式） 已定项 16）、`checkpoint_txg` 0、树表单元指针、
+  实例表单元指针、树 ID 水位 65536、中央映射树根指针全 0、分配记录树根指针全 0、自证校验和（CRC32C 4 + 28 零，罩整槽，D18（块里携带什么信息） 已定项 17）。写进三个区域各自的槽 0，一共三份、不镜像，最后一道屏障加 FUA。
+- 固定结构的落点写死在设备头部固定偏移，两盘各一份；实例表单元与树表单元第 0 版落单元区起点（槽 50176–50177、50178，D3（空间分配） 已定项 10 ④：单元区从系统配置「单元区起始槽号」起，固定结构不写分配记录）。
+
+**验收标准**：
+- 同参数跑两次 mkfs，两个镜像逐字节相同——fsid 与时间戳因此都是 mkfs 参数，不是随机量（E142（新池新建文件的干跑） 2026-09-13：字节表一写「fsid = mkfs 随机」，与这一句矛盾，按这一句办）。
+- checker 骨架从三个区域的槽 0 各自解析出同一份第 0 代根记录；改坏其中一个槽的一个字节，那个槽判无效、其余两个仍一致。
+- 每盘两个系统配置槽校验和都过、世代号相同（mkfs 两槽同写世代号 1）；改坏一个槽，挂载选另一个。第一次可写挂载取号先把实例代号 1 写进每一份系统配置（槽 0、世代号 2），之后才动单元（D23（journal 的角色与格式） 已定项 16）。
+- 根记录里两条指针指到的单元，头自检都过。
+- 录制器流的段序列与 [layout/01-first-txn.md](../layout/01-first-txn.md) 八 mkfs 那一行逐字相同：`4+1+1+1+4`，末尾是四条系统配置槽写（两盘各两槽，都是世代号 1）加一道屏障，三道根 FUA 各自独占一段。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「零、盘面地图与新池新建文件的写清单」「一、mkfs 已经种下的」，第 0 代根记录与树表单元第 0 版在「七、发布」。
+
+**会碰到的决策点**：D22（单元原子性怎么合成） 已定项 9；D2（RAID 条带策略） 已定项 15（槽距与槽宽，C212（固定结构的写小于 io_min））； D22（单元原子性怎么合成） 已定项 13（盘上定长字段的字节序与枚举编码约定，2026-09-13 新立：E142（新池新建文件的干跑） 按小端写）。
+C217（P 大于设备数这条约束的理由没了而约束还在）；系统配置槽轮换字段的宽度（世代号 8 + 校验和 32，D22（单元原子性怎么合成） 已定项 21 定形态、D18（块里携带什么信息） 已定项 17 定算法）。2026-09-13 总审核新立并同日定案：D22（单元原子性怎么合成） 已定项 14（devs < R 时 I-7.6（根环区域落在互不相同的盘上） 判什么）、D22（单元原子性怎么合成） 已定项 15（系统配置字段表的四格连带）、D22（单元原子性怎么合成） 已定项 16（系统配置槽轮换与根环落点规则）、D22（单元原子性怎么合成） 已定项 17（登记位清单）；D23（journal 的角色与格式） 已定项 16（mkfs 与第一次可写挂载的实例代号）；D2（RAID 条带策略） 已定项 18（w_max 与 g）、D2（RAID 条带策略） 已定项 19（槽距与 io_min）；D18（块里携带什么信息） 已定项 17（32 字节校验和的算法与自证结构的覆盖范围）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:74-100`（整段抄，未转述）**
+
+```markdown
+## 步 2　分配一个数据单元，写一个小文件的数据
+
+**现状（2026-09-14 开工，验收三条全过）**：`crates/singlefs-core` 的 `allocator` 模块——每盘一张单元区空闲图（已分配位、每段已用槽数、空闲 run 数三样增量维护，运行时不扫盘）、用户数据落点政策（起点最小、偶数槽、两槽都空、不在开放段）、提交内生块从开放段 bump（容器按 32768 对齐档）、政策函数复算比对计数（新池新建文件恒 0）、分配记录 20 字节编码；`unit::build_data_unit` 按字节表二写码 1（头 105 + 预留 29，载荷从 134 起，载荷 CRC 罩 [105, 32768)）；`pointer::DataPointer` 88 字节。验收（`crates/singlefs-harness/tests/data_unit_allocation_and_write.rs`）：3000 字节文件写到 t1@50180 两盘各一份，读回头自检过、载荷 CRC 对、前 3000 字节等于文件内容、之后全 0；改坏载荷 / 补齐区 / 头任一字节各判红、flags 非 0 拒收；内存里恰好两条分配记录、槽号等于录制流里两次写的偏移 ÷ 16384；记账增量：已分配 5 槽、空闲 run 2 段。
+
+**设想实现**：内存里一个分配器，从两盘各拿一个 32 KiB 数据单元的落点；把文件内容装成一个自描述的数据单元，
+写到两盘各一份；在内存里记下分配记录与记账增量。这一步还没有任何树落盘。
+
+**预想的细节**：
+- 落点粒度 16 KiB 槽，一个数据单元占两个连续槽（D3（空间分配） 已定项 7、D4（校验和位置） 已定项 5）。落点政策已定：用户数据不进聚簇段，取已选设备内槽号最小、过准入合取、不在 `R` 保护期内的空槽（D3（空间分配） 已定项 8）；第一版不做分配器提示（D14（双轨（大小文件 / 持久临时）） 已定项 2）；提交内生块（步 3 的树节点、步 5 的树表单元）从聚簇段分配（D3（空间分配） 已定项 5）。落点：两盘各自的槽 50180–50181——单元区从 50176 起、mkfs 占 50176–50178、开放段是最低的 64 槽对齐全空段 [50240, 50304)，不在开放段里的最低 32768 对齐空槽对是 50180（D3（空间分配） 已定项 10）；E142（新池新建文件的干跑） 第六次跑对过之前仍标预想。
+- 分配时同时算一遍政策函数（最低空槽、排除 bump 的开放段与 `R`）并与实际落点比对，不一致就计数、非 0 判红（C146（无空段时的回落政策全仓无定义） 第 ② 条；新池新建文件恒 0，口径在 [verification-build.md](../verification-build.md) 事务层第一版「运行时计数与准入自证」表）。
+- 单元头按 `DATA_UNIT_HEADER_BYTES`（D18（块里携带什么信息） 已定项 7）：magic、格式版本、单元类型标签 1、flag 0、
+  extent 声明长度 = 文件字节数、头校验和、五元组、诞生代号、fsid、写序、载荷 CRC、nonce 与 MAC 预留位。
+  五元组里树 ID 取 65536（引用它的 extent 树，D8（核心索引结构） 已定项 11 从 65536 起编号）、对象 ID 取分配到的 inode 号、锚点偏移 0；诞生代号 = 发布它的 checkpoint_txg，暖机后是 3（D16（发布语义） 已定项 6）；含 29 字节预留位的头 134，载荷从 134 起（D18（块里携带什么信息） 已定项 16，2026-09-14 预留 28 → 29）。
+- 载荷 = 文件字节，之后补 0 到单元末尾，补齐参与校验和（I-2.3（补齐字节为零且参与校验和））。
+- 整个单元落一列，两盘各一份，位置条目两条（D2（RAID 条带策略） 已定项 10、已定项 6 的 `w ≥ 2`）。
+- 分配记录两条（每盘一条）：key = 设备 4 + 槽号 6，value = 跨度 2（最高位是已释放标志）+ 分配代 8（D3（空间分配） 已定项 7 / 已定项 11）。
+- 第一版不加密，位置条目里那 4 字节校验和取 CRC32C 罩整个单元（D4（校验和位置） 已定项 8），MAC 16 字节留位全 0。
+
+**验收标准**：
+- 从两盘各读回那个单元：头自检过、载荷 CRC 对、前 N 字节等于文件内容、之后全 0。
+- 改坏载荷任一字节，CRC 判红；改坏头任一字节，头校验和判红。
+- 内存里这一步新增恰好两条分配记录（mkfs 的两个单元另有分配代 0 的四条，字节表五那 20 条里的头四条），槽号与录制器流里的写偏移对得上。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「二、数据这一侧」；分配记录与记账增量在「五、空间记账与分配」。
+
+**会碰到的决策点**：整单元校验和在无加密下用哪个字段、多宽（D4（校验和位置） 已定项 8）；落点这一格 D3（空间分配） 已定项 8 与 D14（双轨（大小文件 / 持久临时）） 已定项 2 都已定（2026-09-13），这一步碰的是它们的运行时计数，以及 2026-09-13 总审核立、同日定案的 D3（空间分配） 已定项 10（聚簇段的定义、「不在开放段」那条合取、32 KiB 单元的取法、固定结构区怎么挡住分配器）、D3（空间分配） 已定项 11（分配记录跨度段归 key 还是 value）、D5（快照 / 空间记账机制） 已定项 7（已分配字节含不含固定结构）、D18（块里携带什么信息） 已定项 16（28 字节预留位的开关，码 1 载荷从哪起）；C323（镜像大小全仓没有条款）（空闲字节与全空段数是它的函数）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:101-131`（整段抄，未转述）**
+
+```markdown
+## 步 3　inode 树与其余几棵树
+
+**现状（2026-09-14 开工，验收四条全过）**：`crates/singlefs-core` 的 `records` 模块装树里的记录——inode 记录 140（写入时间是发布参数，不取系统时钟）、inode 内部条目 120、extent 叶记录 112、记账条目 34、树表条目 200（树 ID 打头、头 ID、预留 76 非零拒收），分配记录 20 在 `allocator` 模块；节点由 `unit::build_index_node` 装（头 86 + 2 × key 宽 + 29，key 宽住偏移 51）。新池新建文件里五棵有根的树各一个根兼叶，inode 树是码 2 根 + 码 3 叶；出生序号按 (树, txg, 实例) 从 0 发、树内先叶后根（`transaction::BirthSequenceAllocator`）；分配记录 20 条（mkfs 的 m1 / m2 分配代 0，其余 3）、记账 15 行全部取自分配器在分配那一刻增量维护的数。checker 加 `index_node_view`（声明长度 = 条目数 × 条目宽、条目宽 ≥ key 宽）、`check_index_node_keys`（按树的 key 形态逐字段比、严格递增、区间贴紧首末条目）与 `packed_unit_view`。验收（`crates/singlefs-harness/tests/new_pool_file_creation_publish.rs`）：六个码 2 节点头自检过、key 序与区间过、每条父指针里的整单元校验和等于子单元算出来的；从根记录 → 树表 → inode 树根 → 内部条目 → 叶容器读出的 inode 记录逐字段等于写入；从 extent 树按 (0, 1, 0) 读出指针 88、解引用到 t1、前 3000 字节等于文件内容；变异：叶容器头记录宽改 139 头校验和判红、子节点改坏一字节父指针校验和对不上、条目逆序 checker 判红、声明长度与条目宽对不上解析拒绝。
+
+**设想实现**：一个按 keyspace 参数化的 btree，节点 16 KiB。用它建五棵有根的树（另两棵 livelist 共享树 6 与稀疏旁表树 7 只在树表注册、根指针为零，D6（快照实现模型） 已定项 2 / D5（快照 / 空间记账机制） 已定项 6）：extent 树（树 ID 65536）、inode 树（65537）、分配记录树（65538）、记账树（65539）、
+以及步 4 的映射树（65540）；livelist 65541、稀疏旁表 65542、deadlist 65543，树 ID 水位发布后 **65548**（D8（核心索引结构） 已定项 11、D5（快照 / 空间记账机制） 已定项 11）。映射树的根住根记录、不进树表，树表第 1 版 **7 条**（D19（块指针的结构与宽度预算） 已定项 11）。新池新建文件里每棵树都只有一个根加至多一个叶。inode 树按已定的形态：码 2 根、码 3 叶、一条定长 140 记录。
+
+**预想的细节**：
+- 码 2 节点头自描述（D18（块里携带什么信息） 已定项 7 / 已定项 18、D8（核心索引结构） 已定项 11）：共同前缀、树 ID、
+  key 宽 1（偏移 51，排在 key 区间之前）、层级、key 区间、诞生代号、fsid、写序 4、出生序号 4、载荷 CRC 4、预留 2、条目数 2、条目宽 2，再加 **29** 字节预留位（nonce 12 + MAC 16 + 算法类型 1）。头 = 86 + 2 × key 宽 + 29：inode 树根 **131**、extent 树 **163**（key 区间全树无条件带，D18（块里携带什么信息） 已定项 2）、分配记录树 **135**、记账树 **159**、映射树 **169**、树表单元 **131**。
+- inode 树根：层级 1，key 区间 [ino, ino]，一条 **120** 字节条目 = 分隔 key 8 + 身份引用 26 + 子指针 **86**（D8（核心索引结构） 已定项 6）。
+- inode 树叶：32 KiB 码 3 容器，类身份段 107 字节、含 **29** 字节预留位的头 **136**（D18（块里携带什么信息） 已定项 11 / 已定项 16）；扩展点带、紧贴尾部、第一版 0 字节（D21（权威态与派生态的分界） 已定项 8）：标签 3、出生树、打包记录类型 2、容器号 1、
+  容器出生代、记录数 1、记录宽 140、诞生代号、fsid、载荷校验和、写序、出生序号。一条 inode 记录按 D8（核心索引结构） 已定项 6 的偏移表填。
+  **预想**：第一个文件的 inode 号取 1，`locality_id` 0，mode 常规文件，size = 文件字节数。
+- extent 树：一个根兼叶节点（高度 1 的树根就是叶，D11（索引节点要不要留消息缓冲区） 已定项 7），一条 **112** 字节记录 = key 24（`locality_id`, inode, offset）+ 指向数据单元的指针 **88**（D19（块指针的结构与宽度预算） 已定项 7 / 8）。
+- 分配记录树：一个根兼叶节点，装 20 条记录（mkfs 的两个单元、步 2 的数据单元、这一步与步 4 / 步 5 写出的 7 个提交内生块，每个两盘各一条；自己那条的落点在写出前已定，D3（空间分配） 已定项 5）。落点按 D3（空间分配） 已定项 10 ⑤ 的 bump 次序（2026-09-14 用户定案：按树 ID 升序、树内先叶后根、中央映射树倒数第二、树表单元最末）：t2 50240、t3 50242–50243、t4 50244、t5 50245、t6 50246、t7 50247、t8 50248；槽 50241 被 t3 的 32768 对齐跳过，空着。
+- 记账树：一个根兼叶节点，装 **15 行**（已分配字节 × 2 盘、空闲字节 × 2、不可回收字节 × 2、待删占用 × 1、defer 待释放 × 2、已承诺预留 × 1、碎片度 runs × 2（2026-09-14 起带设备维、口径是「单元区空闲槽的连续段数」）、全空聚簇段数 × 2、inode 号水位 × 1；key 22 + value 8 + seq 4，seq 住 value 且一律 1，D8（核心索引结构） 已定项 7 / 已定项 10、D5（快照 / 空间记账机制） 已定项 8）。统计量标签 = D5（快照 / 空间记账机制） 已定项 4 的行号，不带设备维的设备段 0xFFFF_FFFF（D5（快照 / 空间记账机制） 已定项 10）；已分配 = 落点之和（含 mkfs 的两个单元）、容量 = 单元区（D5（快照 / 空间记账机制） 已定项 7）。
+- 父指针里的校验和与子单元一致（Merkle，D4（校验和位置） 已定项 1）。
+
+**验收标准**：
+- 每棵树：根节点头自检过，key 区间与条目一致，父指针校验和等于子单元算出来的。
+- 从 inode 树按 inode 号查到那条记录，逐字段回读等于写入。
+- 从 extent 树按 (inode, 0) 查到指针，指针解引用到步 2 那个单元。
+- 变异：把叶容器头里记录宽改成 139，头合法性判红；把子节点改坏一字节，父指针校验和判红。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「四、文件元数据（inode）」「四·二、extent 树」「五、空间记账与分配」，指针在「三、指向数据单元的指针」。
+
+**会碰到的决策点**：D18（块里携带什么信息） 已定项 7 索引节点类的基础字节数；C108（扩展点归属对打包记录单元无判定）；
+C71（不认识的统计量标签静默忽略）（登记表已立、检查仍欠）；C117（不带设备维的统计量的设备段没有取值）（保留值已定、检查仍欠）；D26（后台整理与放置回收） 已定项 4（2026-09-13 定不进格式，节点布局就是今天的）；
+D5（快照 / 空间记账机制） 已定项 6（稀疏旁表自成一棵树 day-1 进树表：树表第 1 版第 6 条、根指针零，新池新建文件没有释放、条目不写）；D5（快照 / 空间记账机制） 已定项 11（deadlist 同样 day-1 进树表：第 7 条、树的种类码 8、树 ID 65543、根指针零，2026-09-14 用户定案；条目形态是 D5（快照 / 空间记账机制） 已定项 12，新池新建文件一条都不写）。2026-09-13 总审核新立并同日定案：D8（核心索引结构） 已定项 10（write buffer 前端与 seq 取值）、D8（核心索引结构） 已定项 11（码 2 节点载荷布局、种类到条目宽的表、key 比较序）；D11（索引节点要不要留消息缓冲区） 已定项 7（另四棵树的 ε、高度为 1 的树、第一版全树 ε = 0）；D18（块里携带什么信息） 已定项 18（码 2 的声明长度与补齐区、码 1 / 码 2 偏移表）；D19（块指针的结构与宽度预算） 已定项 9（出生序号的分配规则）、D19（块指针的结构与宽度预算） 已定项 11（指针偏移表、位置条目顺序）；D21（权威态与派生态的分界） 已定项 8（码 3 带不带扩展点）；D5（快照 / 空间记账机制） 已定项 8（写哪几行记账）、D5（快照 / 空间记账机制） 已定项 9（可写头的标识与 previous_snapshot_txg）、D5（快照 / 空间记账机制） 已定项 10（统计量标签登记表与设备段保留值）；D2（RAID 条带策略） 已定项 20（条带表与容器索引 day-1 注不注册）；C324（码 3 打包容器要不要 32768 对齐没写）、C325（码 2 的 key 宽字段定位它要先知道 k）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:132-156`（整段抄，未转述）**
+
+```markdown
+## 步 4　中央映射
+
+**现状（2026-09-14 开工，验收三条全过、一条要覆盖写、释放、回退与复用）**：映射 key 一律 27（`records::mapping_key_for_data` / `mapping_key_for_node`，码 2 / 码 3 末尾补零 2）、条目 55、按 (类标签, 出生树, 出生 txg, 实例代号, 尾段) 逐字段排序（`mapping_key_sort_key`）；新池新建文件 6 条（码 1 一条 + 码 2 / 码 3 五条），映射树自己的节点与树表单元不进；根住根记录的映射根指针字段。验收：按 t1 的逻辑身份查映射得到的位置等于 extent 树指针里的位置提示、key 三段与数据单元头的树 ID / 诞生代号 / 写序同值；映射里没有树 65540 与树 0 的条目；journal 点名项凑出来的 8 把 key 罩住映射里的 6 把，多出的两把正是映射树自己与树表单元。「把单元搬到别的落点」与「删掉映射条目走释放判定」两条要覆盖写、释放、回退与复用与释放路径，新池新建文件里做不到，没做。
+
+**设想实现**：映射树，每写出一个数据单元就插一条「逻辑身份 → 位置」条目。解引用先按父指针里的位置提示读，
+校验和不对再查映射；释放判定一律走映射（D19（块指针的结构与宽度预算） 已定项 5）。新池新建文件里没有释放，
+这一步只把入口建起来。
+
+**预想的细节**：
+- key 形态是 D19（块指针的结构与宽度预算） 已定项 6 / 已定项 10（按类复用写序键、按类变长不补齐）：码 1 的 key = 类标签 1 + 出生树 8 + 出生 txg 8 + 写序 10 = 27 字节，码 2 / 码 3 的 key = 类标签 1 + 出生树 8 + 出生 txg 8 + 实例代号 4 + 出生序号 4 = 25 字节；
+  value = 位置条目 14 × 2，按设备身份升序；**条目一律 55**（码 2 / 码 3 的 25 字节 key 末尾补零到 27，D19（块指针的结构与宽度预算） 已定项 10，2026-09-14 用户定案）。指针带出生树、出生 txg 与写序才凑得出 key：指向码 1 的指针 **88**、指向码 2 / 码 3 的指针 **86**（D19（块指针的结构与宽度预算） 已定项 7、已定项 8，2026-09-12 用户定案，宽度 2026-09-14 随压缩算法码 1 + 压后长度 2 各加 3）。
+- 映射装码 1、码 2、码 3，day-1 就写、固定点只写一次（D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12）；映射树自己的节点、树表单元、实例表单元不进（自举豁免）。新池新建文件 6 条条目、一个 16 KiB 根兼叶节点。
+- 映射树的根住根记录的第 11 个字段（**86** 字节），不进树表（D19（块指针的结构与宽度预算） 已定项 11；C196（中央映射树的根住哪全仓无条款） 的条款已写、检查仍欠）。
+
+**验收标准**：
+- 按步 2 那个单元的逻辑身份查映射，得到的位置等于 extent 树指针里的位置提示；映射 key 的三段（出生树、出生 txg、写序）与数据单元头同值。
+- 把单元搬到别的落点、映射条目跟着改、父指针里的位置提示不改，解引用经映射仍读到正确内容（E142（新池新建文件的干跑） 2026-09-13：「把提示改坏」在字节层做不到——提示住父节点，父节点被树表指针里的整单元 CRC 罩着，改坏提示先红父节点；能验的只有「提示过期」这一形，它要覆盖写、释放、回退与复用）。
+- 映射树自己的节点不在映射里。
+- 变异：删掉映射条目，释放判定路径报「不在映射」而不是按提示释放。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「三·二、中央映射条目」。
+
+**会碰到的决策点**：D19（块指针的结构与宽度预算） 已定项 7、D19（块指针的结构与宽度预算） 已定项 8（D19（块指针的结构与宽度预算） 已定项 6 带的四条收严要守）；C196（中央映射树的根住哪全仓无条款）（条款已写、检查仍欠）；
+映射条目不走 write buffer（D8（核心索引结构） 已定项 10：第一版全部直落叶）。2026-09-13 总审核新立并同日定案：D19（块指针的结构与宽度预算） 已定项 10（映射 key 27 / 25 补齐）、D19（块指针的结构与宽度预算） 已定项 11（映射树的根住哪）、D19（块指针的结构与宽度预算） 已定项 12（码 2 / 码 3 映射条目 day-1 写不写、固定点只写一次）；C321（码 2 头的条目宽是单值而映射树条目按类两宽）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:157-188`（整段抄，未转述）**
+
+```markdown
+## 步 5　一次发布
+
+**现状（2026-09-14 开工，验收六条全过）**：`crates/singlefs-core` 的 `transaction` 模块——封闭的 `CommitStep` 枚举五个臂（写单元 / 写 journal 记录 / 根槽 FUA / 系统配置槽轮换 / 屏障），`PoolWriter::perform` 穷举 `match`，取号（`acquire_instance`）、暖机（`warm_up`）、新池新建文件（`publish_first_file`）三条路径都只从它走；`journal` 模块装记录 4096（头 307、`header_csum` 罩整条、载荷 CRC 罩点名项、反向链 = 本实例前一条 307 字节头的 CRC-32C、本实例第一条 0）。取号写世代 2 槽 0、暖机 txg 1 / 2 写世代 3 / 4、事务 txg 3 写世代 5 槽 1 且 tail = jsn 3；根槽落区域 `txg mod 3` 的槽 `(txg div 3) mod 8`。验收（`crates/singlefs-harness/tests/new_pool_file_creation_publish.rs`）：录制流五条路径的操作数、段序列、闭式、种类串与八那一节及 E142（新池新建文件的干跑） 第八次跑产物逐字相同（取号 `2`、暖机 `2+1+2+2+1+2`、事务 `16+2+1+2`、mkfs 之后整条 `2+2+1+2+2+1+18+2+1+2`、闭式 262165）；根槽读回 txg 3 / 实例 1 / 水位 19 / F 0、映射根指向 t7，暖机两个根分住两块盘，jsn 1 / 2 的空记录事务号 0、不点名、新根段照 mkfs 根；jsn 3 点名 8 项、反向链与产物 `back_chain=628216162` 逐字相同——两套装置（实验与实现）对同一个量落到同一个数；两个运行时计数（取号序不一致、落点偏离政策函数）都是 0，8 把 key 倒过来的单测计数 7；变异：摘掉记录与根槽之间那道屏障段序列判红、反向链不把 `header_csum` 按 0 参与产物比对判红、`CommitStep` 少写一个臂编译不过。取号 = 逐盘一次系统配置槽写（世代号按那块盘自证过的槽里最大的 + 1）+ 一道屏障，新号 = max(每块盘两槽里全部自证过的槽, 根环) + 1；首次挂载路径上那道屏障就是暖机开场那道（写入口不再发第二次），录制流与 262165 个状态不变；取号写或那道屏障报错时回卷成旧代号、不交出新号（C322（取号那一步的屏障怎么放没有条款） 2026-09-14 定案并实现，`crates/singlefs-harness/tests/instance_acquisition.rs` 四条）。
+
+**设想实现**：事务状态机加一个封闭的 `CommitStep` 枚举，穷尽 `match` 没有通配臂。一次发布把步 2 到步 4 写出的全部单元、
+一份新的树表单元、一条 journal 记录、一条根记录按已定的持久顺序落盘：单元与节点 → 屏障 → journal 记录 → 屏障 → 根槽 FUA
+（D16（发布语义） 已定项 7）。mkfs 之后第一次可写挂载先推两次空发布（暖机，D16（发布语义） 已定项 8：本实例的根覆盖两块盘才让 fsync 返回），`checkpoint_txg` 走 0 → 1 → 2，新池新建文件是 3（D16（发布语义） 已定项 6）。
+
+**预想的细节**：
+- 提交步骤种类五种（写单元、写 journal 记录、根槽 FUA 写、系统配置槽原地覆写、屏障），登记位只有 [layout/01-first-txn.md](../layout/01-first-txn.md) 八那一张段序列表（D17（实现分层与第三方管道） 已定项 2）；状态机每前进一步都经过录制器。E142（新池新建文件的干跑） 第五次跑的 `StepKind` 就是这五种（`unit_write` / `journal_record` / `root_record_fua` / `system_configuration_slot` / `barrier`），产物 `name=segments` 行按段报种类多重集，门禁 doc-registries 的 segment-registry 格拿登记表逐字比对——实装的枚举照它写。
+- 提交路径记「同一请求内取号序与 key 序不一致的次数」（D16（发布语义） 已定项 5 的切分纪律，C319（请求内单元按 key 升序发出没有条款也没有检查））：新池新建文件的 8 个数据单元来自一次请求、按 key 升序取号 ⇒ 恒 0，非 0 判红。
+- 树表单元 COW 出新版本，装**七条**树表条目（extent、inode、分配记录、记账四条有根，livelist、稀疏旁表、deadlist 三条根指针为零；映射树的根住根记录），每条 **200** 字节（树 ID 8 打头 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 头 ID 8 + 预留 76，D8（核心索引结构） 已定项 8，2026-09-14 用户定案重排并加头 ID、2026-09-16 用户定案加宽；树的种类码按 D8（核心索引结构） 已定项 9 的登记表、树 ID 65536..65543）。
+- journal 记录 4 KiB。头 = 78 加七笔已定增量（事务号 8 + 提交标记 1、本次发布内序号 4、反向链 4、载荷校验和 4、新根段 **188** = 树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8、fsid 8、MAC 16）= **311**（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 15，fsid 与 MAC 是 2026-09-14 用户定案）；`header_csum` 覆盖整条记录 `[0, 4096)` 含补齐（D23（journal 的角色与格式） 已定项 13，2026-09-14 用户定案），
+  字段：magic、类型、算法类型、填充、记录长度、点名项数、`jsn`、checkpoint_txg、nonce、头校验和、事务号、提交标记、反向链、载荷校验和、新根段；
+  点名项每条 56 字节（位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1，D23（journal 的角色与格式） 已定项 17），每个新写单元一条。记录 n 落环内 `(计数器 − 1) mod 槽数 × 4096`（D23（journal 的角色与格式） 已定项 18）。两盘各写一份。
+- 根记录写到区域 `txg mod 3` 的槽 `(txg div 3) mod 8`（D22（单元原子性怎么合成） 已定项 16），FUA，一道写。第一版每次发布都是 checkpoint，发布后再写系统配置的下一个轮换槽（tail = jsn 计数器）。
+- 第一版串行提交（D13（验证路线） 已定项 2）；defer 窗口由 D16（发布语义） 已定项 1 的回退下界 F 管，新池新建文件里 F 恒 0，这一步用不到。
+
+**验收标准**：
+- 录制器流的顺序恰是：若干单元写 → 屏障 → 记录写 × 2 → 屏障 → 一条 FUA 根槽写 → 系统配置槽写 × 2；每次发布 FUA 只有一道；切出的段序列与 [layout/01-first-txn.md](../layout/01-first-txn.md) 八逐字相同。
+- 根槽读回自证校验和过，`checkpoint_txg` = 3，`jsn` = 3，映射根指针指向步 4 的节点；暖机的两个根分住两块盘（区域 1、区域 2），jsn 1、2 的空记录不点名任何单元、事务号 0、新根段照 mkfs 根（D23（journal 的角色与格式） 已定项 19、D16（发布语义） 已定项 9）。
+- 记录的点名项数等于这次新写的单元数（8，一项含两盘的位置条目；一条 4096 记录最多装 ⌊(4096 − 311) / 56⌋ = 67 项）；t9 的反向链 = w4 记录头 **311** 字节的 CRC32C（`header_csum` 按零参与）、w1 的反向链 = 0（**本实例第一条**——链按实例算，2026-09-14 用户定案）（D23（journal 的角色与格式） 已定项 19 ②）。
+- 两个运行时计数（取号序不一致、落点偏离政策函数）都是 0；把 8 个单元的取号序故意倒过来的变异让第一个计数变成 7（7 对相邻 key 全反），把落点改成「最低空槽但不排除开放段」的变异让第二个计数非 0。
+- 变异：摘掉第二道屏障，步 7 的 harness 用例判红（E77（发布的持久顺序） 那两条）；`CommitStep` 少写一个臂，编译不过。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「六、journal」「七、发布」；整个事务的写清单（取号 2 条 + 暖机 10 条 + 事务 21 条写请求）在「零、盘面地图与新池新建文件的写清单」，段序列在「八、根槽写路径的段序列登记表」。
+
+**会碰到的决策点**：D16（发布语义） 已定项 8（暖机取戊，2026-09-13 起生效：前置 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 的条款那一半满足即生效，新池新建文件之前补两次空发布，字节表已按补）；C94（登记的格式常量与后来的定案对不上）（记录头登记值取哪个数）；
+C199（实例代号递增与 jsn 断号即止互相矛盾）；D16（发布语义） 已定项 3（journal 记录格式是四层之外的独立冻结组件；冻它之前 C199（实例代号递增与 jsn 断号即止互相矛盾） 要先还）；
+D6（快照实现模型） 已定项 2（livelist 共享树 day-1 进树表：树表第 1 版第 6 条、根指针零，新池新建文件不写条目）；
+D16（发布语义） 已定项 1（根记录带回退下界 F 8 字节，新池新建文件里 F 恒 0）。2026-09-13 总审核新立并同日定案：D23（journal 的角色与格式） 已定项 17（点名项字段表）、D23（journal 的角色与格式） 已定项 18（在飞记录数上限、tail 编码、记录槽位公式）、D23（journal 的角色与格式） 已定项 19（空发布记录的事务号、previous_hash 里 header_csum 的处理、环长）；D16（发布语义） 已定项 9（空发布写不写单元）；C322（取号那一步的屏障怎么放没有条款）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:189-214`（整段抄，未转述）**
+
+```markdown
+## 步 6　读回来：冷启动恢复
+
+**现状（2026-09-14 开工，验收五条全过）**：`crates/singlefs-core` 的 `recovery` 模块只通过 `PoolReader` 读盘（文件后端的池与层 0 的崩溃镜像各一个实现），不沿进程内的指针热读。择系统配置：每盘两槽取校验和过且世代号大的，各盘 fsid 与设备数要对得上；择根：三个区域全部槽里自证过的取 `(checkpoint_txg, 实例代号)` 最大；journal 全环扫描不信 tail、两份镜像任一份自证过即在、fsid 不符不算数；前缀按「严格大于所选根、jsn 连续、提交标记、在飞上限、点名单元逐项校验和过」取，施加一条记录 = 把所选根的四个字段换成新根段里的。走读 = 根记录 → 实例表 / 树表 → inode 树根 → 内部条目 → 叶容器 → inode 记录 → extent 树 → 指针（位置提示读不到再查映射）→ 数据单元 → 前 size 字节，沿途判的不变量列在 [invariants.md](../invariants.md)「状态」一节；单元解析在 `unit::parse_index_node` / `parse_packed_unit` / `parse_data_unit`，与 checker 那份各写各的（D13（验证路线） 已定项 5）。验收（`crates/singlefs-harness/tests/recovery_reads_the_created_file_after_reopen.rs`）：丢掉进程内的设备句柄、按路径重开两个镜像走完整挂载路径，读回内容逐字节相同、择到实例 1 / txg 3，与产物 `name=recover_full` 逐字相同；八条探针与产物 `name=probe` 八行逐字相同——改坏最新根槽一字节择回 1:2、再由 jsn 3 的新根段重建、文件在；改坏 jsn 3 一份或两份文件照读；数据单元一份坏走另一份，两份都坏经映射仍读不到、报失败不返回坏数据；树表两份坏报读不到；系统配置槽 1 两盘都坏择回槽 0（tail 2）结果不变。另加：改坏 jsn 2 两份前缀截断、恢复仍完成，再改坏最新根槽时 jsn 3 仍施加；「关掉点名单元验证并改坏单元」那条必红用例做成 `JournalPolicy::ConsultWithoutNamedVerification`（只供测试强制进入）——验的停在 1:2，不验的走进读不到的数据单元。变异：位置条目读到就信、不比校验和 → 探针用例判红；择根取最小 → 冷启动用例判红。
+
+**设想实现**：进程退出后重开两个镜像，走完整的挂载路径读出那个文件：择系统配置、择根、扫 journal、
+取前缀、重放、沿树走到数据单元、验校验和、返回内容。不许沿进程内的指针热读。
+
+**预想的细节**：
+- 择系统配置：每盘两槽，校验和过且世代号大的那个（D22（单元原子性怎么合成） 已定项 16）；各盘的 fsid、设备数、io_min 与槽距要互相对得上（D2（RAID 条带策略） 已定项 19）。
+- 择根：读三个区域全部槽，逐个验自证校验和，取 `checkpoint_txg` 最大的，平局按实例代号高者赢（D22（单元原子性怎么合成） 已定项 7）。
+- journal：全环扫描、不先信 tail（D23（journal 的角色与格式） 已定项 3）；前缀按五条口径取，缺一不可（D23（journal 的角色与格式） 已定项 14）。
+  重放施加记录头里的新根段：树表指针、映射根指针、树 ID 水位、F 从记录重建根（D23（journal 的角色与格式） 已定项 15），点名单元只验存在且校验和对，不改镜像。
+- 读路径：根记录 → 树表单元 → inode 树 → inode 记录 → extent 树 → 指针 → 映射校验 → 数据单元 → 校验和 → 前 size 字节。
+
+**验收标准**：
+- 读回内容与写入逐字节相同。
+- 改坏最新那个根槽一个字节：择回暖机的第 2 代根，再从 jsn 3 那条记录的新根段重建第 3 代根，文件在、内容逐字节相同（D23（journal 的角色与格式） 已定项 15 取「由记录重建根」；E142（新池新建文件的干跑） 第五次跑探针 `newest_root_slot_one_byte` 逐字 `outcome=no_file root=1:2` 是定案前的形，第六次跑要翻成有文件）；不崩溃、不返回坏数据。
+  ⚠️ 这一条是 D16（发布语义） 已定项 7 那条代价的写照（2026-09-13 C199（实例代号递增与 jsn 断号即止互相矛盾） 两轮三方论证：前缀规则不改）：那次写的 fsync 已经返回，重放按严格前缀停在实例边界就丢了它。D16（发布语义） 已定项 8 取暖机之后，第一次挂载先把本实例的根写到两块盘上再确认，暖机买到的是这次挂载的实例不会整个退到上一个实例；退一代还能读到文件靠的是 D23（journal 的角色与格式） 已定项 15 的新根段，不靠暖机根——暖机根指向 mkfs 的 0 条树表。
+- 改坏 journal 记录一个字节：前缀在它之前截断，恢复仍完成。
+- 改坏数据单元一个字节：报校验和错误，不返回数据。
+- 改坏 tail 槽让它指向陈旧位置：恢复结果与 tail 正确时相同。
+
+**写出的字节**：无（这一步只读；D16（发布语义） 已定项 8 暖机的两次空发布与取号的系统配置写归步 5，落「零、盘面地图与新池新建文件的写清单」「六、journal」「七、发布（根记录与根槽）」）。
+
+**会碰到的决策点**：C199（实例代号递增与 jsn 断号即止互相矛盾）；C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 的回退行口径在新池新建文件上是空的，要有一条测试证明它被跑到。2026-09-13 总审核新立并同日定案：D23（journal 的角色与格式） 已定项 15（崩在记录后根槽前恢复施加什么：由记录重建根）。
+
+```
+
+**出处 `.claude/kb/milestone/01-first-txn.md:215-237`（整段抄，未转述）**
+
+```markdown
+## 步 7　层 0 崩溃点重放
+
+**现状（2026-09-14 开工，验收两条全过、一条只跑了能跑的那几格）**：`crates/singlefs-harness` 的 `crash` 模块——录制流开内容保留（`SharedStream::retaining_contents`）；基线 = mkfs 那 13 步施加到稀疏扇区图上的内存镜像，崩溃镜像 = 基线 + 这一状态里持久了的写（`CrashImage` 实现 `PoolReader`，没持久的位置读出旧字节，两盘各算）；切段与段序列登记表同一条规则，段内任意真子集 + 全部持久，每个状态各跑一遍看 journal 与不看的恢复，oracle 三条（读回内容要对、根槽已持久不许恢复到旧态、走读不许失败）。全量 262165 个状态 = 闭式，本机 release 下 22.7 s（每个状态两遍恢复），计数与产物 `name=layer0` / `name=journal_effect` 逐字相同（violations 0、根槽已持久 4、文件在 7、验证跑过 9、journal 改变结局 3）；全量那条用例标 ignored，门禁 checker-tier-layer0-replay（`.claude/gate.d/checker-tier-layer0-replay.sh`）在 release 下跑它并要求 exhaustive=true；平时 `cargo test` 跑不展开 18 个写那一段的 22 个状态，形状与全量相同（同一个枚举函数、只换段选择器）。阳性对照是靶向的、不是 E142（新池新建文件的干跑） 那条单盘无屏障臂：根槽已持久而某个单元两份都没持久，8 个单元逐个都判红；根槽已持久而 jsn 3 两份没持久不算违例（根记录自带全部字段）。必红用例表里能在新池新建文件上跑的：「摘掉根槽前的屏障」由记录核对器判红、「关掉点名单元验证并改坏单元」在步 6 用例与记录核对器各一条、「陈旧 tail」在探针；「先信 tail」那条没做。变异：枚举漏掉全部持久那个状态 → 平时那条用例判红。真设备与内存序两档（2026-09-14）：`crates/singlefs-core` 加 `O_DIRECT` 后端（`DirectInputOutputBlockDevice`，物理块大小与 io_min 从 sysfs 探），`new_pool_file_creation_on_device` 在虚机里两块真 virtio 盘上跑整条写路、冷重开读回文件，段序列与反向链与产物逐字相同；设备侧（QEMU blklogwrites）日志与程序录制流逐项对得上，漏一道屏障与走页缓存两个对照都判红，门禁 checker-tier-qemu-device-streams 三次虚机跑合计十几秒。herd7 两对 litmus（`litmus/new-pool-file-creation-*.litmus`）判「根槽已持久 ⇒ 单元已持久」「journal 记录已持久 ⇒ 单元已持久」都是 Never、去屏障的对照是 Sometimes；`publish_order_matches_litmus.rs` 把 litmus 的写者次序钉在录制流上。三个判决器（2026-09-14）：每个崩溃状态跑恢复 + oracle、池级 checker（23 条不变量，`crates/singlefs-checker` 的 `walk::check_pool_image`）、记录核对器（`crash::check_records`：根在案而记录缺席、恢复自称新态而单元缺席）；全量 262165 个状态上 checker 每条都评估过（记账树与 inode 树那 8 条只在根槽已持久的 4 个状态上走得到），违例 0（I-7.7（系统配置实例代号不低于根环） 按 2026-09-14 定案的 ① ② 判；旧定义下取号只落一块盘的 2 个状态判红，C322（取号那一步的屏障怎么放没有条款） 同日还清），记录核对器两条都是 0；门禁 checker-tier-layer0-replay 在 release 下约 3 分钟。checker 的 26 份坏镜像（每条不变量至少一份）每份都让它那一条判红；这一步的里程碑出口「全部崩溃状态零红」2026-09-14 满足（C322（取号那一步的屏障怎么放没有条款） 还清之后层 0 全量 checker 违例 0）。
+
+**设想实现**：harness 拿步 5 的录制流，按 D13（验证路线） 已定项 4 枚举崩溃状态：屏障切段、段内任意整写子集、
+撕裂态并进「没持久」、没持久的位置放旧字节、镜像双写按设备各算。对每个状态生成镜像，跑步 6 的恢复、
+checker 已实现的不变量、记录核对器，三样都要绿。
+
+**预想的细节**：
+- 新池新建文件的写数按 [layout/01-first-txn.md](../layout/01-first-txn.md) 的写清单是取号 2 条 + 暖机 10 条 + 事务 21 条（单元 8 × 2 盘 + 记录 × 2 + 根槽 1 + 系统配置 2）；E142（新池新建文件的干跑） 第六次跑层 0 是 262165 个状态（暖机第二次的系统配置写与事务的单元写同段；取号那 2 个系统配置写与暖机第一次的屏障合成开头一段，产物 `e142-first-txn-dry-run-2026-09-13-settled6.out` 逐字 `states=262165 closed_form=262165 violations=0`）；单元段内任意子集是指数量，
+  层 0 全量枚举能不能跑完要先量；跑不完就按 D13（验证路线） 已定项 9「崩溃点重放要分三层」进层 1，但里程碑出口要求层 0 全量。
+- checker 第一版两个方向：从根槽下去、全盘扫描；每条已实现的不变量报成立 / 不成立 / 不适用。
+- 记录核对器吃 (崩溃前镜像, 记录流, 崩溃后镜像)，判「根在案而记录缺席」那类状态。
+
+**验收标准**：
+- 全部崩溃状态零红，并报出枚举了多少个状态、是不是全量。
+- [verification-build.md](../verification-build.md) 必红用例表里能在新池新建文件上跑的那几条先红后绿（摘屏障、关掉点名单元验证并改坏单元、先信 tail、陈旧 tail）；表里的九条不全在这一步：释放 / 重用 / 残留三条要等发布 B 与 C，回退那两格（C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元））要等回退进里程碑，关掉 `R` 保护那一条（C146（无空段时的回落政策全仓无定义） ① / C243（停机谓词那个量从来没有过轨迹））要等整理进里程碑。
+- 阴性结果要能和「代码没跑到」分开：每条不变量至少一个崩溃状态上真被评估过。
+
+**写出的字节**：无（这一步只生成崩溃镜像并读，不定义新的盘上字节）。
+
+**会碰到的决策点**：D13（验证路线） 已定项 4 的枚举规模；checker 与实现允许共享什么（D13（验证路线） 已定项 5）在代码里怎么落。 D8（核心索引结构） 已定项 9（树的种类码的登记表：树表 6 条条目的 2 字节码按登记表写，映射树的种类 5 不进树表）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:1-47`（整段抄，未转述）**
+
+```markdown
+# 里程碑「覆盖写、释放、回退与复用」：每一步设想实现什么、预想的细节、验收标准
+
+<!-- doc-lint:not-numbers LAYER0 -->
+
+**状态：2026-09-29 判定结束**（用户 2026-10-01 定）。主线步 0 到步 7 与四条并行线已落地（各节现状段），增补 4 的崩溃放量接进了代码；崩溃放量七个分项全域 2 615 501 475 态 0 红（2026-09-30 那一趟，`briefs/2026-09-28.md`「全量（2026-09-30）」一节）。没做完的转进里程碑「删除与多次 COW」（[03-third-txn.md](03-third-txn.md)）项五：已知红钉值（五·7）、`crates/*/src/` 里欠账旧简称（五·8）、E150（回退复用被抛弃的根引用的单元） 的简称（五·9）、代码审阅 D 级（五·10）、欠账增量再核（五·11）；这一版的简报是 `briefs/2026-09-28.md`；收口表里原已挪后的各行照各自的去向列走。
+
+**口径**：规划文件，2026-09-16 建档，按当日的判断写。**它不要求正确**：预想的细节会随决策与实装逐步修正，
+每一步开工前回来改一遍，改完在文末「历史版本」记一行。前一个里程碑是 [01-first-txn.md](01-first-txn.md)，
+出口（步 7 层 0 全量零违例）2026-09-14 满足；它留下的、仓里各处已经写明「要覆盖写、释放、回退与复用」的东西，就是这个里程碑的题面：
+
+| 谁在等覆盖写、释放、回退与复用 | 逐字出处 |
+|---|---|
+| 层 0 的固定负载 | [verification-build.md](../verification-build.md)「崩溃点重放第一版」：mkfs、发布 A（写文件）、发布 B（覆盖写）、在 B 的每个崩溃点恢复、再发布 C（短）、在 C 的每个崩溃点恢复；2026-09-13 随 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 定案再加「回退到 A、D」 |
+| 必红用例表里跑不了的那几条 | 释放 / 重用 / 残留三条要等发布 B 与 C；回退那两格要等回退进里程碑 |
+| checker 里写「未实现」的不变量 | [invariants.md](../invariants.md)「状态」：它们要覆盖写、释放、回退与复用（释放、重用、残留）、journal 一侧的那一类检查 |
+| 新池新建文件步 4 没做的两条验收 | 把单元搬到别的落点让位置提示过期；删掉映射条目走释放判定 |
+| 性能对比表 | [perf-by-milestone.md](../../../research/perf-by-milestone.md)「以后的里程碑怎么往下接」第一行：同一个池里再发布一次，小文件持久化才能按次数量 |
+| 项目 `CLAUDE.md` 一句话版本 | 层 0 的负载还只有新池新建文件，覆盖写、释放、多次挂载、回退都没进来 |
+
+**这个里程碑要让四件新池新建文件里一次都没发生的事发生，并且每一件都被层 0 崩溃点重放罩住**：
+释放一个单元、延迟之后重用它的落点、第二个可写实例（关闭再挂载）、管理员回退。
+目标是「同一个池里再正确提交一个事务」，不是「多一个功能」（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）。
+
+**读法**：每步三段，与 [01-first-txn.md](01-first-txn.md) 相同。「设想实现」是这一步做完盘上和内存里多了什么；
+「预想的细节」里凡标**预想**的，是仓里没定、写代码时先这么取的东西，定了就改；「验收标准」是这一步做完要能演示给人看的，
+每条都要先证明会红。末尾一行「会碰到的决策点」只列编号，不展开。
+
+**主线到步 7 为止，另有三项增补**（增补 1、增补 2 2026-09-17 重开计划时加，增补 3 2026-09-18 用户加），出口是步 6 的验收、步 7 的性能表、增补 1 到增补 3 的验收；主线之外还有四条与它并行的线（「与主线并行的四条线」那一节，2026-09-16 用户指示按 E152（按里程碑对比六家文件系统的文件性能） 缺的能力补、先不优化），它们各自的验收也在出口里。**不在里面**：目录与 POSIX 面、FUSE（2026-09-16 用户定案不进、留给下一个里程碑；E152（按里程碑对比六家文件系统的文件性能） 的元数据那一维因此只能按 inode 计、写明不可比）、
+冷挂载整环扫描的优化（差距最大的一维，但它是优化）、快照与克隆、加密、压缩、后台整理（D26（后台整理与放置回收），必红用例表里「关掉 `R` 保护」那一条因此仍跑不了）、
+小数据打包容器（D27（小数据打包容器））、zoned、并行提交、第三方管道、真设备上 mkfs 整环写 0。
+
+**固定脚本（预想）**：mkfs、A（新池新建文件，沿用）、B（覆盖写，释放第一个数据单元）、关闭再挂载（第二个可写实例：取号、写行、暖机）、
+C（再覆盖一次）、管理员回退到 A 的根并发布 D（回退行与第一个新根同一次发布，之后暖机）、若干次覆盖写把非空有效根攒够、一次抬 F 的空发布、
+E（复用第一个数据单元的落点）。**抬 F 排在回退之后**：F 抬过 A 的 txg 之后，A 就不在回退候选集里了（D16（发布语义） 已定项 1 的候选集是「按实例表判仍然有效 ∧ txg ≥ F_生效」），
+先回退再抬 F 两件事才都做得到。脚本每次发布的段序列先按预想登记，跑出来对不上就改登记，与新池新建文件同一条纪律。并行四条线的大负载不进这条脚本，每条线各挑一个一次发布的小负载进层 0（各线的验收里写明）。
+
+**与字节表和决策索引挂钩**：覆盖写、释放、回退与复用写出的字节大半沿用 [layout/01-first-txn.md](../layout/01-first-txn.md) 已经登记的形态，每一步的「写出的字节」行指到那张表的节；
+新池新建文件里没写过的盘上形态只有五种：已释放的分配记录（跨度段最高位 + 释放代，D3（空间分配） 已定项 11）、实例表的 `kind` 0 行与回退行（D18（块里携带什么信息） 已定项 11：88 字节，flags bit0 = 回退行）、
+F 不为 0 的根记录（D22（单元原子性怎么合成） 已定项 7）、事务号大于 A 的 journal 记录、抬 F 的空发布。它们的登记位放哪张表，等用户定（见步 7）。
+门禁 doc-registries 的 first-txn-hooks 格只管新池新建文件那三份文件；覆盖写、释放、回退与复用的挂钩检查在步 0 立。
+
+**代码三方的轮次与收尾时打回重议的四处（2026-09-17）**：`crates/` 的每一处改动都走 `.claude/rules/implementation-workflow.md` 的三步。
+已走完的轮次与判决：步 1 / 步 2（发布 B）两轮 `research/prompts/m2-code-r1-main-verification.md`、`m2-code-r2-main-verification.md`；步 0 / 步 3 一轮 `m2-step3-code-r1-main-verification.md`；步 4 / 步 5 三轮 `m2-step45-code-r1/r2/r3-main-verification.md`（第三轮之后停）；步 6 checker 一轮 `m2-step6-checker-r1-main-verification.md`；空池可写挂载与「非空」判法一轮 `m2-emptypool-nonempty-r1-main-verification.md`。每一轮改法被攻过几轮写在各自判决的末节；被攻过零轮的只剩「在写之前拒绝」一类，用例与变异钉着。
+打回决策、等重议的四处（都是设计问题，代码按保守读法写、标预想；重议要走三方并给每条路的代价数）：① D23（journal 的角色与格式） 已定项 14 前缀第五条与回退行的落点（连同 C340（回退之后记录链从哪条之后接没有定义））；② D16（发布语义） 已定项 1「生效」一行——F 事后回落（连同 checker 判 I-7.4（近 K 代块未被复用） / I-4.8（近 K 代根校验和自洽） 用哪个 F、被抛弃根带的 F 算不算、抬 F 分配不到固定点、F 回落之后抬 F 被挡、一次挂载内转过一整圈根环时 checker 误红），与另一个会话的 alloc-basis 三轮判决和 E153（账本形态与环上有洞的代价） / E154（两道闸串-重判与回收时点的代价） 的数一起判；③ 被抛弃根的账读不出时的修复路径（用户否决跳过，修复没有条款也没有实现）；④ 没有文件的一版上怎么写实例表行（空池可写挂载今天只兑现一次，回退到树表 0 条的根被拒）。
+
+**重开计划（2026-09-17 用户指示，转述）**：里程碑二的问题还没解决，先不管里程碑三，重开计划、往里程碑二里加内容。另一件是写放大：发布 B 的 7 个元数据单元两盘合计 262 144 字节，是六家里最重的 Btrfs raid1 整次写（201 195 字节）的 1.30 倍（[perf-by-milestone.md](../../../research/perf-by-milestone.md)「差距从哪来（发布 B 写的字节，算术）」）；用户担心树长高、文件变多之后「可能会呈指数级恶化」，而那一节逐字写着「树长高、文件变多之后每次写多少，这一轮量不到」。于是加两项增补，不接主线的步号（用户当日定）：增补 1 按现在的数据重新验证压着每次持久化写量的那几条已定条款，改不改设计带代价数走三方、交用户定；增补 2 把打回的四处与各步现状里还开着的项逐项收口，清单在增补 2 的现状里。**顺序（预想，交用户）**：增补 2 表里打回的 ①、② 两行、树分裂那一行，以及并行线一、三，都等增补 1 定下来再开——增补 1 若改了 D23（journal 的角色与格式） 已定项 1（每次 fsync 写脏叶加全部祖先），它们要按新的发布形态重问，并行线一、三每次发布写多少也跟着变；增补 2 其余各行与并行线二、四不压在每次发布写什么上，不等增补 1。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:48-65`（整段抄，未转述）**
+
+```markdown
+## 开工前　树表条目 148 → 200（2026-09-16 用户定案，改新池新建文件的字节）
+
+**现状**：已落地。用户当日收尾弹窗随 C338（树表条目预留没有余量） 定案：树表条目从 148 字节加宽到 200（固定 124 + 预留 76），知情接受每单元 ⌊(16384 − 131) / 200⌋ = 81 棵、二层封顶 81² = 6561 棵（此前 109 / 11881）；定案原文在 `research/prompts/d5-item12-r3-main-verification.md` 第五节。当日一次做完：`TREE_TABLE_ENTRY_BYTES` 在四份装置里同步到 200，`crates/singlefs-core` 的写读两侧预留宽改 76，字节表与 D8（核心索引结构） / D22（单元原子性怎么合成） / D5（快照 / 空间记账机制） 的数跟着改，E142（新池新建文件的干跑） 第八次跑、E145（码 2 自描述头与映射树 key 宽的代价） 与 E146（livelist 条目按映射 key 定身份之后的宽度与代价） 各换产物（变更史（其九）与实验变更史（其一））。
+
+**设想实现**：一次改完、中间不提交。代码：`crates/singlefs-format` 的 `TREE_TABLE_ENTRY_BYTES` 与它的断言；`crates/singlefs-core` 里树表条目的写与读（预留段的跳过宽度、「预留非零判不可用」那一段）和 `expect` 消息里的数；harness 三条测试（t8 声明长度改成 7 × 200 = 1400、坏镜像里按条目宽算的偏移、改坏预留最后一个字节的那一处）；E142（新池新建文件的干跑）、E145（码 2 自描述头与映射树 key 宽的代价）、E146（livelist 条目按映射 key 定身份之后的宽度与代价） 三份装置里的同名常量（code-source-discipline 的 format-constants 格比对的那几份）与 E142（新池新建文件的干跑） 变异表里引 148 / 24 的原文列。产物：E142（新池新建文件的干跑） 重跑并登记新一次跑（结果文件、`replay.sh` 那一行、实验正文与索引、变更史）。kb：[layout/01-first-txn.md](../layout/01-first-txn.md)「七、发布（根记录与根槽）」树表条目那一行（字段表、格式常量标记、t8 声明长度）；D8（核心索引结构） 已定项 8（连同索引表里「每层 112 棵」那个陈旧的数）；D5（快照 / 空间记账机制） 已定项 11 的字节句；D22（单元原子性怎么合成） 已定项 2 的容量段；C338（树表条目预留没有余量） 改句；变更史给 D8（核心索引结构） 已定项 8 记一条（改前 148 / 24 / 109 / 11881，改后 200 / 76 / 81 / 6561）。
+
+**验收标准**：
+- `check.sh` 绿；`mutate.sh` 跑 E142（新池新建文件的干跑） 的变异表，动条目宽与预留宽的两条变异仍被抓。
+- E142（新池新建文件的干跑） 新一次跑的断言按 200 / 81 / 1400 过；段序列登记表（doc-registries 的 segment-registry 格）不动——写数不随条目宽变。
+- code-source-discipline 的 format-constants 格（四份装置与 kb 登记值同为 200）、doc-registries 的 field-projection 格、doc-registries 的 field-table-sums 格（124 + 76 = 200）、checker-tier-layer0-replay（层 0 全量状态数仍 262165，计数与新产物逐字比）、checker-tier-qemu-device-streams 绿，最后全量 `gate.sh`。
+- 判别力：把其中一份装置的常量留在 148 ⇒ code-source-discipline 的 format-constants 格红。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「七、发布（根记录与根槽）」——树表条目 200、t8 声明长度 1400；新池新建文件的字节从此按这个宽度写。
+
+**会碰到的决策点**：C338（树表条目预留没有余量）（认购表本身与三个 8 字节宽度仍要定）；D8（核心索引结构） 已定项 8；D22（单元原子性怎么合成） 已定项 2。
+
+** 复核（主 agent，提交 d2aeb7d 之后按新基准重审）**：常量 200 在 `crates/singlefs-format`、E142（新池新建文件的干跑） / E145（码 2 自描述头与映射树 key 宽的代价） / E146（livelist 条目按映射 key 定身份之后的宽度与代价） 三份装置里都是 200，code-source-discipline 的 format-constants 格 19 个常量同步；E142（新池新建文件的干跑） 第八次跑产物 `e142-first-txn-dry-run-2026-09-16-tree-table-200.out` 逐字 `name=width structure=tree_table_entry expected=200 actual=200`、`name=layer0 … states=262165`、五条段序列与第七次跑相同；harness 用例的 t8 声明长度 1400；字节表七的树表单元行写「条目数 7、条目宽 200、声明长度 1400」，D22（单元原子性怎么合成） 正文写「装 81 棵/层」。主线八步与并行四线里没有一个数压在树表条目宽上（树表 7 条仍是一个 16 KiB 节点，c_max 按单元数计不随宽度变）。宽度改了之后要跟上的在别处：D6（快照实现模型） 已定项 3 的树表第二层门槛按条目宽 200 重跑之后是 39 头（每头一棵树 27 头），E131（livelist 的两条载体，数值与代价） / E132（livelist 载体·按真实树数与内部扇出重算） 的重跑结果已提交，D6（快照实现模型） 正文 2026-09-18 知识腐烂回扫时改过来（旧数 66 头 / 44 头是按 121 宽算的）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:66-91`（整段抄，未转述）**
+
+```markdown
+## 步 0　装置：层 0 脚本从一次发布扩成一条固定脚本
+
+**现状（2026-09-17 步 5 落地之后）**：固定脚本做到发布 E（到 C 的那一段照旧，之后：重开回退到 (1, 3)、D、暖机一次、四次覆盖写、抬 F 两次空发布、E）：54 段、279 次写、闭式 2104413 个状态（八个 18 写段各 262143、七个 10 写段各 1023、两个 4 写段各 15），快的那条只展开写数小于 10 的段、108 个状态零违例；到 C（26 段、789555）与到 D（33 段、791624）各由一条只跑 `prepare` 的用例钉住段序列。到 C 那一段的实况（2026-09-16 写，数照旧）：固定脚本做到发布 C：`crates/singlefs-harness` 的 `crash` 模块按整条录制流切段枚举、每个崩溃状态按「最新持久根 (txg, 实例) 对应哪个版本」判 oracle（`enumerate_layer0_versions`），「取号 → 暖机 × 2 → A → B → 进程退出、重开取号 → 写行 → 暖机 × 2 → C」的 118 次写切成 26 段、789555 个状态在门禁 checker-tier-layer0-replay 第二条流上全量零违例（`tests/crash_enumeration_fixed_script_stream.rs`：全量用例 `full_enumeration_of_the_fixed_script_stream_is_exhaustive_and_clean` 标 ignored、交 checker-tier-layer0-replay 在 release 下跑；快的那条只展开写数小于 10 的段、57 个状态；五个对照仍在到 B 为止的脚本上各红在自己那格）。八个根槽写里后四个是实例 2 的（txg 5–8），实例那一维走到了：oracle 认 (2, 5)、(2, 6)、(2, 7) 三个根都是第二次的内容（写行与暖机不换文件版本）、(2, 8) 是第三次的；不看 journal 那一遍恢复也过同一个 oracle（另计 `ignored_violations`）。段序列登记在 [layout/01-first-txn.md](../layout/01-first-txn.md) 八的「第二条流」那句与两行「装置钉住」的表格行，门禁 doc-registries 的 segment-registry 格拿那句与用例里钉的数组、闭式、写数比。还没做的（2026-09-17 核，固定脚本已到 E）：预置基镜像、只供测试的开关里的三个（把「一条记录装几个事务」压小——并行线一要它（复用窗口置 0 与按 (区域, 槽) 让根槽读返回失败两个 2026-09-22 已落地，见增补 2 收口表第 24 行）；把「一条记录装几个事务」压小——并行线一要它）、干跑实验号、覆盖写、释放、回退与复用的挂钩检查，都进了增补 2 的收口表。
+
+**设想实现**：harness 能跑「固定脚本（预想）」那一段列的脚本（mkfs、A、B、切换、C、回退与 D、攒根、抬 F、E），并在脚本里任一次发布的每个崩溃点上恢复、跑 checker 与记录核对器；
+崩溃状态的基线不再是「mkfs 那 13 步」，而是「脚本到这次发布之前的全部写都持久」的镜像；基镜像能预置（往环里种一条残留记录）；
+每条只供测试的开关都有一个可观测的「走了哪条」；段序列登记表给切换、写行、回退、抬 F 各写成字节行（今天那四行是预想）。
+
+**预想的细节**：
+- 录制流已经能留内容（`crates/singlefs-harness` 的 `SharedStream::retaining_contents`）、切段与闭式已经有（`segments` 模块），要改的是 `crash` 模块：今天基线写死成 mkfs 那 13 步施加到稀疏扇区图上、只枚举一条流；改成按整条录制流切段枚举（与新池新建文件同一种切法：上一次发布的系统配置槽写与下一次发布的单元写落在同一段，[layout/01-first-txn.md](../layout/01-first-txn.md) 八末尾那条 ⚠️），只在脚本要求「恢复之后续写」的地方重建基线（C42（残留记录冒充合法前缀） 要的「崩溃 → 恢复 → 少量续写 → 再崩」）。不许把「这次发布之前的全部写都持久」当基线：那样把接缝上 18 写的段退成 16 写，每个接缝丢约 19.6 万个状态、整条脚本丢约七成，而丢的正是「上一代根没定版、下一代已开始写单元」那一格（2026-09-16 三方第一轮攻方腿打中的第六条，`research/prompts/m2-r1-main-verification.md`）。
+- 崩溃状态数按段相加、不按发布相乘，但段内是 2 的写数次方：一次发布写几个单元决定这一段枚不枚举得完——新池新建文件那一档（8 个单元、两盘 16 次写）能，16 个单元就是 4.3 × 10⁹ 个状态、不能。一次覆盖写的段序列预想与新池新建文件同型 `16+2+1+2`；第一次可写挂载之后的每次空发布都写 c_max 个单元（D16（发布语义） 已定项 9），段序列是 `2c_max+2 | 2 | 1 | 2`、不是第一次暖机那种 `2+1+2`，而 c_max 在这条脚本上是多少全仓没有值（E148（提交固定点按两棵记录树重算） 给的是池规模 9 块与新池新建文件规模 4 块），干跑要把它报出来。整条脚本按整条流切段算出来约 225 万个状态（c_max 取 5；取 9 约 747 万），按新池新建文件每状态的成本折约 3 到 11 分钟——主线全量可行、不必进层 1（三方第一轮攻方腿打中的第五条 的三个臂）；并行线的小负载各自要满足「一次发布的单元数不超过 10」。全量跑多少 2026-09-16 用户定案：主线全量，并行线各一个一次发布的小负载。
+- 预置基镜像（E32（上一条时间线的残留）、C42（残留记录冒充合法前缀））：harness 往环里种一条 jsn 连续、校验和过、点名单元也在的记录。正例（步 3）：它属于所选根的实例、没有回退行 ⇒ 恢复必须施加它；反例（步 4 之后）：回退行在场、它属于被抛弃的那段 ⇒ 恢复不许施加它——「被抛弃」要有回退行才有定义，所以反例的前置是步 4（三方第一轮攻方腿打中的第二条）。
+- 只供测试的开关（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支必须能被测试强制进入）：强制抬 F（正常触发是准入不够）、复用窗口置 0（C22（刚释放的块立即重分配） 那条必红）、关掉影子账（C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那两格）、关掉点名单元验证（已有）、按 (区域, 槽) 让根槽读返回失败（必红第八条的 ② 格与 C332（回退实例两个根都读不出时回退被撤销）、C335（根槽持续读不出时实例表只增不减） 要它；它不是层 0 的崩溃状态，是层 0 之外的一次故障注入）、把「一条记录装几个事务」压小（并行线一要用它在小单元数上造出多记录边界）。每个开关一条测试证明它改变了走的分支。
+- 开一个干跑实验号（`research/scripts/claim-experiment.sh`），形态照 E142（新池新建文件的干跑）：先把整条脚本的写清单与段序列算成字节，再让实装对它。
+- 覆盖写、释放、回退与复用的挂钩检查（预想）：脚本每次发布的段序列行、里程碑每步的「写出的字节」行、字节登记位三处互相指得到；照门禁 doc-registries 的 first-txn-hooks 格的形态写，样本放 fixtures。
+
+**验收标准**：
+- 整条脚本跑完，录制流按段序列登记表切出的段序列与登记表逐字相同，每次发布一行。
+- 预置的残留记录：属于被抛弃实例的那条恢复不施加，改成本实例的那条恢复施加；两条各有一个崩溃状态真跑到。
+- 每个只供测试的开关各有一条测试：开关关着走 X、开着走 Y，运行时报出的分支名不同。
+- 干跑实验的产物里 `name=segments` 行与登记表逐字相同（照门禁 doc-registries 的 segment-registry 格的比法）。
+
+**写出的字节**：无（这一步只扩装置，不定义新的盘上字节）。
+
+**会碰到的决策点**：D13（验证路线） 已定项 4（枚举规模）；D17（实现分层与第三方管道） 已定项 2（段序列登记表是提交步骤唯一的登记位）；C323（镜像大小全仓没有条款）；C42（残留记录冒充合法前缀）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:92-118`（整段抄，未转述）**
+
+```markdown
+## 步 1　覆盖写：同一个文件、同一个池、第二次发布（发布 B）
+
+**现状（2026-09-16 开工；验收第 2 条「搬落点、经映射读对」与第 4 条三条变异没做，归增补 2 收口表第 36、45 行，其余两条过了）**：`crates/singlefs-core` 的 `transaction` 模块把新池新建文件那条单体函数抽成 `publish_file_version`（新池新建文件照旧调用，字节一个不变：既有 E142（新池新建文件的干跑） 逐字比对的用例全绿），新入口 `publish_overwrite` 接在同一个实例的上一次发布之后：txg / jsn / 事务号各加一、对象出生代与容器身份（容器号 1、容器出生代 3）不改、改动计数 = 这次发布的 txg、树表条目诞生 txg 不改、实例表指针照旧。验收（`crates/singlefs-harness/tests/overwrite_in_one_instance.rs`）：段序列 `16+2+1+2`、种类串与新池新建文件同型；根槽落区域 1 槽 1（盘 1）、txg 4、jsn 4、事务号 2、反向链 = A 那条记录头的 CRC32C、系统配置世代 6 tail 4；落点 t12 50182、提交内生块 50249–50256 接着 A 的 bump；冷启动读回第二次的内容（4100 字节，与第一次不同长）、择根 (1, 4)、四条记录零施加、看不看 journal 同一答案；探针：新单元两份都坏 ⇒ 经映射仍读不到、不返回坏数据，被换下的旧单元两份都坏 ⇒ 不受影响，B 的记录两份坏 ⇒ 根已持久不碍事，B 的根槽坏一字节 ⇒ 择回 A 的根、由 jsn 4 那条记录重建第 4 代根、内容仍是第二次的，不看 journal 就退回第一次的内容。会红：四处变异（不释放旧落点、defer 行写 0、事务号不加一、改动计数留 1）各红在对应的断言上，改回全绿。
+
+**设想实现**：不重开进程，在新池新建文件之后把同一个文件的内容整个换掉并发布一次：新数据单元 COW 到新落点，extent 叶记录的指针换成它，
+inode 记录更新，六个提交内生块（extent 树根、inode 树根与叶容器、分配记录树根、记账树根、映射树根）与树表单元各 COW 出新版本，一条记录，一条根。
+旧数据单元留在盘上没人指，释放在步 2 写。
+
+**预想的细节**：
+- 新数据单元的落点按 D3（空间分配） 已定项 8 的政策函数：已选设备内槽号最小、过准入合取、不在开放段与 `R` 内、32768 对齐的空槽对。**预想**：第一个单元占 50180–50181，新单元落 50182–50183，两盘相同；提交内生块从开放段 [50240, 50304) 接着新池新建文件的 bump 往后（D3（空间分配） 已定项 10 ⑤ 的次序），具体槽号等干跑。
+- 一个 extent 一个单元（D4（校验和位置） 已定项 7：占盘长度恒 32768、不跨多单元）⇒ 覆盖写就是整单元重写；extent 叶记录的 key (0, 1, 0) 不变，88 字节指针换成新单元的。
+- inode 记录（D8（核心索引结构） 已定项 6）：inode 号不变（单调不复用）、size 按新内容、写入时间是发布参数；容器 COW 出新版本。
+- 出生序号按 (树, txg, 实例) 从 0 重新发（D19（块指针的结构与宽度预算） 已定项 9）；txg 4（D16（发布语义） 已定项 6：每次发布 checkpoint_txg 加一）。
+- journal 记录：事务号比 A 的大 1、反向链 = A 那条记录头 311 字节的 CRC32C（本实例内逻辑前一条，D23（journal 的角色与格式） 已定项 19 ②）、点名项 = 这次新写的单元数（**预想** 8：数据单元 1 + 提交内生块 6 + 树表单元 1）。
+- 根记录：txg 4、实例代号 1、树 ID 水位 65548 不变、F 0、映射根指向 B 的映射树根；根槽落区域 `4 mod 3 = 1` 的槽 `(4 div 3) mod 8 = 1`（D22（单元原子性怎么合成） 已定项 16）。
+- 段序列 **预想** 与新池新建文件同型 `24+2+1+2`，且上一次发布的系统配置槽写与这次的单元写落在同一段（登记表末尾那条 ⚠️）。
+
+**验收标准**：
+- 冷启动读回：内容与第二次写入逐字节相同；第一次的内容从任何根出发都读不到（A 的根还在环里、但从 B 的根走读只到新单元）。
+- 新池新建文件步 4 欠的那条：把新单元搬到别的落点、映射条目跟着改、父指针里的位置提示不改，解引用经映射仍读到正确内容。
+- 录制流的段序列与登记表 B 那一行逐字相同；根槽读回 txg 4、jsn 4。
+- 变异：extent 叶记录的指针忘了换（仍指第一个单元）⇒ 判红，读者报的是「声明长度与 inode size 不符」而不是「读回旧内容」（B 的 4100 字节与 A 不同长，先撞上长度检查），验收这句「读回等于旧内容」字面不成立、红照样红；inode 记录的写入时间留成 A 的 ⇒ 判红；反向链算成 A 之前那条 ⇒ 记录核对器判红，I-8.6（反向链算法） 的 checker 今天已经接上。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「二、数据这一侧」「三、指向数据单元的指针（住在父节点里）」「三·二、中央映射条目」「四、文件元数据（inode）」「四·二、extent 树」「六、journal」「七、发布（根记录与根槽）」——形态全部沿用，值不同。
+
+**会碰到的决策点**：D4（校验和位置） 已定项 7 / 已定项 5；D8（核心索引结构） 已定项 6（改动计数 = 最后一次改动所在发布的 checkpoint_txg，这次写 4；⚠️ 新池新建文件写的是 1——D8（核心索引结构） 已定项 6「新池新建文件写」那句的「改动计数 1」是新池新建文件还在 txg 1 时的数，字段表的定义下该是 3，代码与 E142（新池新建文件的干跑） 都按 1，改它要重跑 E142（新池新建文件的干跑），2026-09-16 核出；2026-09-18 已改成 3 并重跑，E142（新池新建文件的干跑） 第十一次跑）；段序列登记表八还没有 B 那一行（登记表由 doc-registries 的 segment-registry 格与 E142（新池新建文件的干跑） 产物逐字比，E142（新池新建文件的干跑） 不建模 B，要等步 0 的干跑实验）；D19（块指针的结构与宽度预算） 已定项 9；D16（发布语义） 已定项 6；D23（journal 的角色与格式） 已定项 19。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:119-142`（整段抄，未转述）**
+
+```markdown
+## 步 2　释放：分配记录改写、记账变更、映射条目删除（发布 B 的另一半）
+
+**现状（2026-09-16 开工，随步 1 一起落地）**：`allocator` 模块加 `release`：每盘那条分配记录改写成已释放（跨度段最高位）+ 释放代，条目不删，槽仍占着、不再发出（`lowest_user_data_slot` 跳过它，下一个偶数空槽对是 50182）；`DeviceFreeMap` 多一个 `deferred_slots`。记账 15 行：已分配 = 占着的槽（mkfs 3 + A 10 + B 10 = 23 槽 × 16384）——已释放的仍算在内，因为根环里 A 的根还引用它们、checker 的 I-3.1（已分配统计对得上） 读法甲按全部有效根的引用取并集；defer 待释放 = 10 槽 × 16384；空闲 = 独立维护的空闲槽数（`DeviceFreeMap` 分配时减，不由「单元区 − 已分配」现算；此前正是那样现算，D5（快照 / 空间记账机制） 已定项 4 的 ⚠️ 明令禁止而代码注释自称守了——三方代码第一轮攻方腿打中「I-5.2（空闲统计对得上） 恒真式」；改成独立计数之后把那次减法摘掉，checker 的 I-5.2（空闲统计对得上） 会红）；runs 4、全空段 3310、水位 2。映射：B 的六条新 key，A 的六条一条不留；释放判定路径 `placements_to_release_via_mapping` 按 A 的六把映射 key 在 A 的映射节点里查落点、映射树与树表从根记录里的指针取，查不到报 `ReleaseNotInMapping`；查到的槽再对分配记录核——没条目报 `ReleaseTargetNotAllocated`、已释放报 `ReleaseTargetAlreadyReleased`、记录的跨度与单元种类不符报 `ReleaseSpanMismatch`，跨度取记录里的（映射给槽、记录给跨度）；四种错都在动分配器之前报、一个落点都不释放（D19（块指针的结构与宽度预算） 已定项 5 第 1 条；第一轮攻方腿打中「释放不经映射、验收那两条没测过」，第二轮攻方腿打中「查到 key 就交给 `release`，落点指错在断言上 panic」「跨度按种类现推、两条路在跨度维上是恒等式」）。发布的准入（内容装得进一个数据单元：32634 字节；分配记录树装得下）过了之后，释放、分配、装单元、落盘任何一步失败都把整个分配器换回进来时的样子（每次发布约 450 KiB 的拷贝，第一版认；第二轮攻方腿打中 `NoSpaceFor` 在释放之后、分配到一半返回、留下半新的池）。分配记录树第一版只有一个节点、装 812 条：每次覆盖写每盘加 8 条、释放只改写不删，第 50 次覆盖写要 820 条 ⇒ 在动分配器之前报 `AllocationRecordsExceedOneNode`（此前走到 `build_index_node` 的断言 panic，攻方腿打中）；节点分裂是步 3 之后的事。可再分配谓词（D16（发布语义） 已定项 1 的「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）今天没有实现：defer 队列只增不减、位图不清，已释放落点在步 5 之前一个都不回来，D3（空间分配） 已定项 9 第 2 条的界在这批代码上没有上限（C283（准入失败时不先推发布就报 ENOSPC） 与 I-5.3（报出的空闲都兑现得了） 未实现那一格）；用例 `released_placements_are_not_handed_out_again_before_reclaim_exists` 把这个形态钉住（三次发布之后 defer 20 槽、释放过的落点一个不再发、C 的数据单元落 50184），把 `mark_released` 改成清位图它红，步 5 接上回收那天它也必须红。恢复的走读放开两条新池新建文件专用判定（分配记录数恒 10 × 盘数、不许带已释放标志）：分配记录改成逐盘核同盘槽号不重复、同一批（槽, 跨度, 代, 已释放）、每盘不少于 10 个落点（三方代码第一轮正推腿打中「只核总数放过两盘条数不等的镜像」，第二轮攻方腿打中「集合比放过同盘同槽两条记录」；`recovery.rs` 的 `allocation_records_are_one_per_device` 六条单测、变异回旧判法会红），已释放记录的代按释放代判「不晚于根」。池级 checker 23 条在 B 之后的镜像上零红、I-3.1（已分配统计对得上） / I-5.1（物理范围不重叠） / I-5.2（空闲统计对得上） / I-7.2（最新根可完整遍历） 真被评估过。三方两轮每一处改法各留一条「改回去它就红」的变异在 `crates/mutations.tsv`（十三条），门禁 checker-tier-crates-mutation-replay 逐条改坏、跑点名的测试、要求它红（第二轮攻方腿打中「把空闲改法整个撤回全仓零判红」——对值的断言分不出独立维护与现算，能分出的只有那条变异，撤回之后它的锚点命中 0 次、checker-tier-crates-mutation-replay 红）。
+
+**设想实现**：同一次发布 B 里把第一个数据单元释放：它两盘的两条分配记录改写成已释放（条目不删）、记账树的 15 行按「每行每发布重写」出新值、
+映射树里它的条目删掉；准入读数按「窗口内释放不发信用」不动。没有快照，释放直接走，不进 deadlist。
+
+**预想的细节**：
+- 分配记录（D3（空间分配） 已定项 7 / 已定项 11）：释放时条目不删、不点删，改写 value：跨度段最高位置 1、后 8 字节从分配代换成释放代 4；两盘各一条。「释放」的口径按 D3（空间分配） 已定项 7 逐字：分配器把落点放进 defer 队列那一刻，也就是没有任何根（含快照）引用它。
+- 记账（D5（快照 / 空间记账机制） 已定项 4 的登记表）：按 checker 的读法办（checker 即规范）——已分配 = 根环里全部有效根引用的槽的并集（I-3.1（已分配统计对得上） 2026-09-14 用户定甲），所以 B 释放的十个槽仍算已分配（A 的根还引用它们），已分配每盘 +10 槽而不是 −2；defer 待释放 = 那十个槽；空闲独立维护、分配时减（D5（快照 / 空间记账机制） 已定项 4 的 ⚠️），I-5.2（空闲统计对得上） 拿它与已分配相加对容量；runs 与全空段按物理量；不可回收、待删占用、已承诺预留仍 0；水位 2。⚠️ 这与 D28（挂载期承诺量） 已定项 1 的式子「容量 − 已分配 − defer 待释放」在字面上会把 defer 扣两次——式子写在 checker 读法甲之前，已分配当时读成「仍分配的」。哪一边改，列成决策点（2026-09-16 核出，此前这里的预想「已分配减、空闲不变」两个都错）。
+- 映射（D19（块指针的结构与宽度预算） 已定项 5 / 已定项 12）：释放判定一律走映射 ⇒ 释放就是把它的条目从映射树删掉，映射树根 COW；解引用旧指针时位置提示读到的单元头自检仍过、但映射里查不到，这一格的判定要写清（**预想**：不在映射 = 已释放）。
+- deadlist / 稀疏旁表：第一版没有快照，直接释放，一条都不写（I-3.6（deadlist 紧界） 判别力那一格「该走直接释放却进了 deadlist」正是要抓的反面）。
+- 准入：可用按 D28（挂载期承诺量） 已定项 1 的式子现算，defer 待释放那一项从 0 变成两盘各一个单元。
+
+**验收标准**：
+- 冷启动之后 checker：I-3.1（已分配统计对得上） 按未释放落点之和判绿；I-5.2（空闲统计对得上） 判绿；defer 待释放行读回等于两盘各 32768。
+- 第一个单元的两条分配记录读回：已释放标志置位、释放代 4；释放判定路径对它报「不在映射」。
+- 新池新建文件步 4 欠的另一条：删掉映射条目，释放判定路径报「不在映射」而不是按提示释放。
+- 变异（C80（记账更新必须原子地随根发布））：把记账重写从发布路径摘掉 ⇒ 每个发布点后 I-3.1（已分配统计对得上） 红；忘了改写分配记录 ⇒ 验收断言（16 条已释放）红，I-3.1（已分配统计对得上） 不红：读法甲下已分配含已释放、两边仍相等（2026-09-16 核出，此前这里写「同一条红」）。这两条与步 1 的四条变异都在 `crates/mutations.tsv`，checker-tier-crates-mutation-replay 复跑。「释放代写成 3」这条变异只有一条验收断言会红（读 B 的内存态输出与常量比），没有会红的不变量：三方第一轮三条腿都核过 [invariants.md](../invariants.md) 没有「释放代不小于分配代」这条；「树表诞生 txg 跟着这次 txg 走」同型且更隐蔽（容器头与条目身份引用一起变，逐字相等那条判定恒真）。两条记在 C374（释放代与树表诞生 txg 只有验收断言盯着），立不变量还是不写这两条变异，步 3 开工前定（三方代码第一轮攻方腿）。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「五、空间记账与分配」「三·二、中央映射条目」——分配记录多了已释放形态，映射少一条。第一次出现的取值登记在 [layout/02-second-txn.md](../layout/02-second-txn.md)「已释放的分配记录」「记账的 defer 待释放行第一次不为 0」两行。
+
+**会碰到的决策点**：D3（空间分配） 已定项 7 / 已定项 11；D5（快照 / 空间记账机制） 已定项 4 / 已定项 8；D19（块指针的结构与宽度预算） 已定项 5 / 已定项 12；D28（挂载期承诺量） 已定项 1 / 已定项 2（可用式子里的「已分配」按 checker 读法甲含 defer 之后，「− defer 待释放」那一项扣两次，要么式子改成不减 defer、要么记账第 1 项改回「仍分配的」并改 checker——交用户）；D5（快照 / 空间记账机制） 已定项 12（deadlist 条目的形态，2026-09-16 用户定案 + 三轮三方；它本来也不挡步 2：D3（空间分配） 已定项 7 逐字「被快照引用的落点按 D5（快照 / 空间记账机制） 的 deadlist 纪律进 deadlist 不进 defer」，没有快照的释放直接进 defer、一条 deadlist 条目都不写，第一次真写 deadlist 条目的是快照之后那一步。2026-09-16 三方第一轮正推腿打中，此前这里写「发布 B 就是第一次删除、挡在步 2 前面」）；C80（记账更新必须原子地随根发布）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:143-167`（整段抄，未转述）**
+
+```markdown
+## 步 3　第二个可写实例：关闭、重开、取号、写行、暖机，再发布 C
+
+**现状（2026-09-16 落地）**：`crates/singlefs-core/src/mount.rs` 的 `mount_writable`：先走一遍恢复（`recover`，前缀规则只收所选根自己那个实例的记录、链首接在所选根自己那条记录之后），从盘上重建上一版（`recovery::rebuild_version`：实例表、树表、五棵树的根节点、数据单元、inode 叶；树表 0 条时返回没有文件的那一版——2026-09-17 用户定案允许只做过 mkfs 的池可写挂载：取号 1、不写行、零单元写行与暖机各一次（txg 1、2）、之后在同一个进程里发第一个文件版本（txg 3），用例 `crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs`，`crash_enumeration_writable_mount_of_a_formatted_pool.rs` 钉住这条流的基线镜像、写表与段序列与新池新建文件那条流逐项相同（三方第一轮 `research/prompts/m2-emptypool-nonempty-r1-main-verification.md` 云端攻方腿量出全量枚举等于把第一条流再跑一遍，不接进门禁 checker-tier-layer0-replay）；⚠️ 设计缺口（同一轮攻方腿，零故障可达）：只做过 mkfs 的池可写挂载一次、不写文件、进程正常退出之后，下一次可写挂载要给实例 1 写行而这一版没有分配记录树与记账树，每一次都被拒——用户选的「允许可写挂载」今天只兑现第一次，树表 0 条的一版上怎么写实例表行要开决策；树表 0 条而要写实例表行（新池新建文件暖机之后、文件版本之前崩溃再重开）在取号之前返回 `InstanceRowsOnVersionWithoutFileUnsupported`，回退到树表 0 条的根在任何写之前返回 `RollbackToVersionWithoutFileUnsupported`——两格要重写实例表而这一版没有分配记录树与记账树，落点与换下的 mkfs 实例表谁护着没有条款，是设计判断、没做；所选根有文件而环里一条记录都没有返回 `FileVersionWithoutAnyJournalRecord`；空池挂载只放行与新池新建文件同形的那一格——第一次发布 txg 1、jsn 1，零单元写行与暖机落在不同的盘上——其余在取号之前返回 `FormattedPoolMountNotShapedLikeTheNewPoolFileCreation`，`publish_first_file` 写之前核上一版记录是 txg 2、jsn 2、不是就返回 `FirstFileVersionNotRightAfterTheSecondWarmUp`（三方第一轮云端攻方腿打中：两个系统配置槽坏加一次崩溃之后写死 txg 3 的文件版本返回成功却读不回）；取号只算一次号、写之前重算对不上返回 `InstanceGenerationChangedBeforeAcquisition`（同一条腿打中：瞬时读错让判定与取号算出不同号）；mkfs 两块盘时区域归属不是 [盘 0, 盘 1, 盘 0] 就在写之前返回 `RegionDevicesNotTheFirstVersionLayout`（D2（RAID 条带策略） 写死 0 / 1 / 0）。这七个拒绝都没有条款，是「拒绝优先于猜」的预想，判决 `research/prompts/m2-emptypool-nonempty-r1-main-verification.md`），分配器从分配记录重建（`PoolAllocator::rebuild_from_records`：已分配标位图、已释放进 defer 队列、开放段不续、第一次分配从空闲位图重找），取实例代号 max(系统配置, 根环) + 1 = 2 写进两份系统配置再发一道屏障（`acquire_instance`），写行那次发布（`publish_version` + `InstanceTablePlan::Rewrite`：给 [max(所选根的实例, 1), 新实例) 里每个实例各写一行 (实例, T = 这次恢复生效的根的 txg, W = 这次施加的最大事务号)、链指针记录仍在末尾；重写实例表 + 分配记录 + 记账 + 映射 + 树表五个单元，txg = max(根环, 记录) + 1 = 5、jsn 全局接着数 = 5、事务号 0、反向链 0），之后连推空发布直到本实例的根落在每块区域盘上（上限 3 次；实例 2 从 txg 5 起要 2 次：txg 6 落盘 0、txg 7 落盘 1，每次重写四个固定点单元、释放上一版的四个），再发布 C（(2, 8)，事务号 1，释放 B 的八个落点，数据单元落 50184）。验收四条今天的样子（`crates/singlefs-harness/tests/writable_mount_takes_a_second_instance.rs`）：录制流里写行之后有两次空发布、两个根分住两块盘，行 (1, 4, 0)，冷启动读 (2, 8) 的第三次内容、记录 8 条全有效，checker 24 条全绿、I-3.8（实例表行唯一且低于挂载根） 真判过（`remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version`）；把实例 2 在一块盘上的根槽都改坏仍从另一块盘恢复到实例 2（`damaging_every_instance_two_root_on_one_device_still_leaves_a_root_on_the_other_device`）；预置一条实例 1 的记录（jsn 5、事务号 3、点名单元在）重开时施加、行写 (1, 5, 3)（`stray_record_of_the_previous_instance_is_applied_on_remount_and_its_transaction_lands_in_the_row`）；I-3.8（实例表行唯一且低于挂载根） 的坏镜像（写者往实例表多写一行实例 2）只红那一条（`checker_rejects_an_instance_table_row_whose_instance_is_not_below_the_mount_root`；`checker_known_bad_images.rs` 另有一份改字节的）；链首那条：所选根自己那条记录读得出、紧接的 jsn 5 读不出时 jsn 6 不许接上（`one_missing_record_right_after_the_chosen_root_stops_the_prefix_even_when_later_records_are_intact`）。变异六条在 `crates/mutations.tsv`（不写行、暖机只推一次、前缀跨实例边界、链首不接在所选根之后、I-3.8（实例表行唯一且低于挂载根） 判定恒真、重建分配器不把已释放的放进 defer 队列），门禁 checker-tier-crates-mutation-replay 逐条改坏都红；「取号之后没有屏障」没做成变异——取号那道屏障的位置由层 0 用例钉的段序列守着（取号的 2 个写与 B 的 2 个系统配置槽写合成 4 写一段，屏障之后才是写行的 10 个单元写；少了它两段合成 14 写一段、钉住的数组就红）。预想里没定、这一步实做时定下的（都标预想、等用户）：实例表在 bump 序列末尾当第九个角色；写行与暖机的空发布都重写四个固定点单元（这条脚本上 c_max = 4，写行那次是 5）；后续挂载的暖机次数按「本实例的根覆盖全部区域盘」现算、不是常量 2；重开后开放段不续；第一版没有干净关闭标记、一律走恢复；所选根自己那条记录读不出时链首从水位之上同实例最小的一条接。步 0 那条流到 C 的 789555 个状态零违例是这一步在层 0 的证据。
+
+**设想实现**：进程退出后重开两个镜像走可写挂载：取实例代号 2 并写进每份系统配置，给实例 1 在实例表里写一行 (1, 所选根的 txg, W)，
+推两次空发布把本实例的根落到两块盘上，之后 fsync 才许返回；然后发布 C 再覆盖一次同一个文件（释放 B 写的那个单元），给回退留下一条只被被抛弃根引用的单元。
+恢复路径从此要认两个实例：实例 1 的记录只施加到它那一行的 W 为止。
+
+**预想的细节**：
+- 取号：max(系统配置, 根环) + 1 = 2，一次系统配置槽写（世代号 +1），之后一道屏障（D23（journal 的角色与格式） 已定项 16，C322（取号那一步的屏障怎么放没有条款） 定案）。
+- 写行：实例表 `kind` 0 行 88 字节 = kind 1 + 实例代号 4 + 所选根的 checkpoint_txg 8 + W 8 + flags 1 + 预留 66（D18（块里携带什么信息） 已定项 11）；给 [max(所选根的实例, 1), 新实例) 里每个实例各写一行，第一版只有实例 1 一行：B 的根持久了、这次恢复一条都不用施加时写 (1, 4, 0)；B 的记录持久了而根没有时恢复由记录重建根、那条记录算这次施加的 ⇒ 写 (1, 4, B 的事务号)（事务号按实例计数从 1 起，A 是 1、B 是 2，D23（journal 的角色与格式） 已定项 7）。写行那次发布是新实例的第一次发布，元数据走切换预留（D28（挂载期承诺量） 已定项 3），**它之前不推抬 F 的空发布**（D18（块里携带什么信息） 已定项 11 的写行规则与 D16（发布语义） 已定项 1 的准入行逐字，C329（写行那次发布之前推抬 F 的空发布没有检查） 三轮三方定案；欠的是会红的检查）。**预想**：第一版没有干净关闭标记，重开一律走恢复。
+- 暖机（D16（发布语义） 已定项 8 戊）：本实例的根覆盖两块盘之前不让 fsync 返回、不向管理员确认回退，连推空发布至多 3 次；次数由 txg mod 3 的区域归属定（写行那次发布自己的根也算一块盘）：按落点公式现算，实例 2 从 txg 5 起要 2 次（txg 6 落盘 0 白费、txg 7 落盘 1），主 agent 校验路与两条云端腿算得相同。`WARM_UP_EMPTY_PUBLISHES = 2` 那个格式常量 D16（发布语义） 已定项 8 只给第一次可写挂载定了，后续挂载与回退之后的次数没有条款，列在决策点里。与第一次可写挂载不同，记账树已经存在 ⇒ 空发布也重写记账行、连带记账树节点、分配记录、映射条目与树表单元（D16（发布语义） 已定项 9），单元数按 D28（挂载期承诺量） 已定项 4 现算的 c_max。
+- 段序列按登记表「第一次之后的可写挂载（写行）」那一行的预想：[取号系统配置槽 × 2] 屏障 [实例表单元（写行）+ 固定点单元] 屏障 [记录] 屏障 [根 FUA] [系统配置槽]，之后接暖机。
+- 发布 C：与 B 同型（步 1 / 步 2），实例代号 2、事务号从本实例第一条数起、反向链本实例第一条恒 0（D23（journal 的角色与格式） 已定项 19 ②）。
+
+**验收标准**：
+- 重开之后、fsync 返回之前，录制流里已有两次空发布，两个根分住两块盘。
+- 冷启动择根取 (checkpoint_txg, 实例代号) 最大 ⇒ 实例 2 的根；实例表读出实例 1 那一行 (1, 4, W)；I-3.8（实例表行唯一且低于挂载根） 判绿。
+- 预置一条实例 1 的记录（jsn 接在 B 那条之后、校验和过、点名的单元也预置成校验过的）：重开那一刻所选根是 B 的根、同一个实例、没有回退行 ⇒ 恢复**必须**施加它，行写 (1, 5, 该记录的事务号)。「不施加」那一半要有回退行才有定义，挪到步 4。（2026-09-16 三方第一轮：此前这里写「恢复不施加它（前缀第五条）」，而前缀第五条逐字是「有回退行时」，攻方腿打中的第二条 与正推腿判据四那格 各自打中。）
+- 变异：不写行 ⇒ 下一次挂载算不出实例 1 的 W，I-3.8（实例表行唯一且低于挂载根） 判红；暖机只推一次 ⇒ 把带根的那块盘的根槽改坏，恢复退回实例 1，判红（这是 D16（发布语义） 已定项 8 买的东西）；取号之后没有屏障 ⇒ 层 0 里出现「系统配置已是 2、单元却先持久」的状态，I-7.7（系统配置实例代号不低于根环） 那一族判红（2026-09-23 已落：`crash_enumeration_acquisition_barrier.rs` 的 `no_unit_of_the_new_instance_persists_before_the_acquired_instance_in_any_crash_state_of_the_remount` 红在这条断言上，变异「取号的系统配置槽写与写行那次发布的单元写并成一段」；待代码三方与崩溃验证）。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「一、mkfs 已经种下的（新池新建文件之前就在盘上）」（实例表单元多一行）「六、journal」「七、发布（根记录与根槽）」「八、根槽写路径的段序列登记表（C316（提交步骤的登记位有四处且互不相同） 的登记位，2026-09-13 立）」（写行那一行从预想写成字节）；第一次出现的取值登记在 [layout/02-second-txn.md](../layout/02-second-txn.md)「实例表 `kind` 0 行」那一行。
+
+**会碰到的决策点**：D23（journal 的角色与格式） 已定项 14 / 已定项 16；D18（块里携带什么信息） 已定项 11；D16（发布语义） 已定项 8 / 已定项 9；D28（挂载期承诺量） 已定项 3 / 已定项 4；C329（写行那次发布之前推抬 F 的空发布没有检查）（这条脚本上写行那次准入充裕、造不出对象，会红的检查要另造负载）；C330（中间实例那一行的 T_pub 取所选根的 txg）；C334（切换的所选根没有会红的检查）；C287（切换收养开放 checkpoint 的事务后再崩）；C335（根槽持续读不出时实例表只增不减）；C126（切换预留的最坏量没有口径）；重开之后上一版从盘上重建：释放判定路径今天读的是同进程的内存态（`TransactionOutput`）、一个 reader 都不带，从盘上重建 `previous` 时映射条目里的位置项带单元校验和，释放之前要按它核盘上那个单元（第二轮攻方腿 Y1 射程）；其它树装不下也要报错不 panic：记账树 477 条（80 块盘）、树表 81 棵（第 82 棵树）、`FirstFile.content` 已判，分裂随树的种类一起做（第二轮攻方腿 Y3）；后续可写挂载与回退之后的暖机次数（D16（发布语义） 已定项 8 只定了第一次可写挂载，2026-09-16 三方第一轮正推腿）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:168-195`（整段抄，未转述）**
+
+```markdown
+## 步 4　管理员回退到 A 的根，再发布 D
+
+**现状**：`crates/singlefs-core/src/mount.rs` 的 `roll_back_by_a_forward_publish` 在挂着的时候发一次普通发布，照 D23（journal 的角色与格式） 已定项 14 管理员回退那一段：分配器上冻结着一次没重发的发布就先拒；候选按现行那一版的实例表判，依次判不在环里、txg 低于 F_生效、被崩溃恢复抛弃、树表 0 条（`rollback_candidate`，各报 `RollbackCandidateExclusion` 的一个成员）；从盘上重建 R_old 那一版、读一遍现行那一版的账，有节点读不出就拒；复活集按现行那一版的账算，R_old 的用户可见单元在账里没有记录、或仍分配而分配代不同就拒（`resurrection_against_the_current_account`），复活集里每个单元逐盘读回核校验和；释放集是现行那一版引用、R_old 不引用的用户可见单元，D19（块指针的结构与宽度预算） 已定项 5 的释放前核照走；inode 号与树 ID 水位取 max(内存里现行那一版的, 环里读得出的根的)；新根的用户可见一半取 R_old 的、固定点一半照现行那一版（`version_to_publish_the_rollback_after`），分配器先复活、再释放，然后 `publish_version`（不带文件、事务号 0、不推进实例内计数，实例表与 F 照带现行那一版的）。发布在落盘之前被拒，分配器换回回退之前那一份；落盘途中失败，冻结在分配器上，原样重发之后回退照样生效。两版树号不同在任何写之前拒（`TargetTreeIdentifiersDifferFromTheCurrentVersionWhoseHandlingIsUndecided`：条款没写，推的走不到）。挂载时回退（`mount_rollback` 那几个函数）、回退见证、实例表回退行、恢复按回退行截断前缀都已删掉。影子账（`mount::isolate_slots_referenced_only_by_abandoned_roots`）与按实例表判抛弃留着，理由是崩溃恢复抛弃的时间线，用例改由崩溃恢复造被抛弃的根（`crates/singlefs-harness/tests/common/mod.rs` 的 `abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`）。验收用例在 `crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs`（13 条），变异是 `crates/mutations.tsv` 以「实三」开头的 13 行与跟着改了锚点、换了用例的旧行。层 0 固定脚本里的回退（`crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs` 的 `Script::RollbackToFirstVersion`）只改到编得过：D 是 (2, 9)、不暖机，脚本钉的段序列、写数与闭式已按段模型手算钉住（第 420–431 行钉段序列，第 627–656 行钉 36 段、闭式 51773503、快档 77）；实六 2026-09-26 在新形态代码上跑过一次探针，核对出 191 写、9 根、29 段、快档 104（`research/prompts/m2-impl6-implementer-report.md` 第 45 行），当时在代码审阅第 19 条与 C577（系统配置没见证到的最新根，乙罩不到）之前；带 layer0 名字的目标仍没跑过（`research/prompts/m2-impl-merge-verify-1-implementer-report.md` 第 73、222 行），层 0 没跑（步 6）。
+
+**设想实现**：步 3 那一次可写挂载发布 C 之后，挂着的时候由管理员从回退候选集选 A 的根当 R_old，文件系统发一次普通发布 D（D16（发布语义） 已定项 7 的持久顺序）：D 的 inode 树、extent 树根指针取 A 那一版的，树表单元、分配记录树、中央映射树与记账统计量（D5（快照 / 空间记账机制） 已定项 4）按这次发布照调整之后的分配器现算、不从 A 那棵账载入，实例表照 C 那一版的；checkpoint_txg 照常加一（D 的 txg = 9，实例代号仍是 2），不取实例代号、不写实例表行、不施加也不删除任何记录。D 的根持久之后才向管理员确认，与 fsync 同一个返回条件。
+
+**预想的细节**：
+- 候选集 = 根环里按 C 那一版的实例表判仍然有效 ∧ txg ≥ F_生效（此时 F = 0 ⇒ 整个根环）；A 的根 txg 3、实例 1，在里面。
+- 释放：C 那一版账里仍分配、而 D 不引用的落点，释放代 = 9。
+- 复活：A 引用的用户可见单元（数据单元与 inode 树、extent 树的单元）里 C 的账记成已释放的，改回已分配，分配代写回 A 那一版账里的；A 的第一个数据单元在 B 那次被释放，这里复活。
+- 水位：inode 号水位与树 ID 水位 = max(C 那一版内存里的, 环里读得出的根的)，不跟着 A 退回去。
+- 在任何写之前拒：A 引用的用户可见单元在 C 的账里没有记录，或仍分配而分配代与 A 那一版账里的不同；A 那一版或 C 那一版的账有一个节点读不出；A 引用的某个单元在某块盘上那一份读不出或校验和对不上。
+- B、C 的根不被抛弃：D 之后它们仍在回退候选集里，还可以再回退过去；这一步不产生被抛弃的根，影子账在这一步没有输入。
+- 不暖机：D 是现行实例里的一次发布，不开新实例（D16（发布语义） 已定项 8 的暖机管的是新实例的第一个根）。
+
+**验收标准**（D23（journal 的角色与格式） 已定项 14 管理员回退那一段的表格五格各一条，加崩溃点与再回退）：
+- 回退之后冷启动读回的内容与第一次写入逐字节相同；实例表与 C 那一版逐字节相同、系统配置的实例代号仍是 2；checker 全绿。
+- 候选集：退到根环里没有的根、txg 低于 F_生效 的根、被崩溃恢复抛弃的时间线上的根，都在任何写之前拒，盘上逐字节不变。
+- 释放与复活：D 之后 I-3.9（释放代落在停止引用它的那一格区间里）、I-3.11（已分配减 defer 等于最新根走读） 判绿；判别力：只释放不复活，这两条红、下一次覆盖写被发布路径拒（第一轮判决第二节 F1 里 H3 那一格）。
+- 水位：回退那一刻 C 的根读不出时，D 之后新建对象的 inode 号不与此前发过的相同；判别力：水位只取环里读得出的根，I-9.6（水位大于两处最大号） 红（第三轮判决第二节 K1）。
+- 拒：四种拒各一条用例（账里没有记录、分配代不同、账的节点读不出、某块盘上一份单元读不出或校验和不对），拒之后盘上逐字节不变。
+- 崩在 D 的每个崩溃点：根槽没持久 ⇒ 恢复到 C 的根、文件是第三次的内容；根槽已持久 ⇒ 恢复到 D、文件是第一次的内容；两边 checker 都绿。
+- D 之后再回退到 C 的根，读回第三次的内容（向前发布不抛弃 B、C）。
+
+**写出的字节**：D 是一次普通发布（[layout/01-first-txn.md](../layout/01-first-txn.md)「六、journal」「七、发布（根记录与根槽）」），段序列的形状登记在「八、根槽写路径的段序列登记表」标步 4 的那一行（实例切换 / 管理员回退）：不取号、不写实例表单元、不写数据单元、不暖机，只重写固定点单元（树表单元、分配记录树、记账树与中央映射树的节点），实例表照 C 的（同一条指针、同一份字节），D 的 journal 记录 jsn 接 C 那一条、事务号 0。第一次出现的取值登记在 [layout/02-second-txn.md](../layout/02-second-txn.md)「实例表 `kind` 0 行」（回退不写行）与「复用后改写的分配记录；回退那次复活的分配记录」（A 的四个用户可见单元的记录两块盘各改回已分配、分配代写回 3）两行；C 引用、D 不引用的用户可见单元记成已释放、释放代 9，与步 2 登记的已释放分配记录同形。钉住这些字节的用例是 `crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的 `rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content`；每段写几个没有用例钉（步 6）。
+
+**会碰到的决策点**：D23（journal 的角色与格式） 已定项 14（管理员回退那一段与表格五格）；D16（发布语义） 已定项 1（回退候选集、F_生效）、已定项 7（持久顺序与确认时点）；D5（快照 / 空间记账机制） 已定项 4（记账统计量现算）；C493（回退候选集条文与实现说反话）（`RollbackCandidateExclusion` 搬进挂着时回退）；C511（回退到无文件那一版之后诞生代怎么接）（挂着时回退到树表 0 条那一版照样会发生）；C143（inode 号水位在崩溃恢复落到旧根后退回去重发）（管理员回退不再重发，崩溃恢复那一形仍开着）；C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）（影子账的用例换成由崩溃恢复造被抛弃的根）；层 0 oracle 与固定脚本里的回退换成向前发布（步 6）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:196-222`（整段抄，未转述）**
+
+```markdown
+## 步 5　抬回退下界 F，延迟之后重用第一个数据单元的落点（发布 E）
+
+**现状（2026-09-17 落地）**：可再分配谓词接上：`PoolAllocator::reclaim_released_up_to(floor)` 把释放代 ≤ floor 的已释放落点回到空闲（位图清、占着与 defer 各减、空闲加；D16（发布语义） 已定项 1，第一版环里最旧有效根恒 0、floor 就是 F_生效）；回收过的落点被再分配时那条记录改写（代 = 这次 txg、已释放位清），槽号每盘仍唯一。`crates/singlefs-core/src/mount.rs`：`rollback_floor_ceiling` = min(每块盘上最新的有效根, 第 4 新的非空有效根)（有效 = 自证 ∧ 按最新根实例表有效 ∧ txg ≥ 今天的 F；非空 = 树表里 inode 树与 extent 树的根指针与前一条有效根的不同，2026-09-17 用户定案，`recovery::user_visible_tree_root_pointers`；数第 4 个时按 (inode 树根指针, extent 树根指针) 去重，状态与更新的已计入根相同的不计入（`mount::newest_first_distinct_states`，D16（发布语义） 已定项 1「「非空」从盘上怎么认」末段）；一条有效根的树表读不出时抬 F 返回 `RollbackFloorCeilingNeedsUnreadableValidRootTreeTable`、不回收不发布，用户对读不出的态度是走修复、不许猜）；`raise_rollback_floor(new_floor)` 是只供测试的强制入口（正常触发是准入不够）：超过上限报 `RollbackFloorAboveCeiling`，先回收、再逐盘把新 F 写进系统配置并过一道屏障（`transaction::write_the_raised_floor_into_every_system_configuration`；这一步任一块盘写失败就一条根都不发，报 `MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot`）、再连推带新 F 的空发布直到每块盘上都有一条（生效），返回 `RaisedFloor { ceiling, publishes, reclaimed }`；重开时 `recovery::effective_rollback_floor`（max(各块盘上最新的有效根所带 F 的最大值, 系统配置里读得出的 F 的最大值)，D16（发布语义） 已定项 1「生效」）既给分配器回收、也写进新实例的根——一条根带的 F 与它的记账行说同一件事，checker 的 I-3.1（已分配统计对得上） 并集按 F_生效 收候选集、最新根带的 F 低于 F_生效 时这一格报不适用（F 之下的根不走，I-2.1（校验和与内容匹配） 也不在它们上判）。第一个文件版本重写树表时把 mkfs 那片第 0 版树表单元释放（不释放它，抬 F 之后那一槽永远占着、I-3.1（已分配统计对得上） 红；新池新建文件的字节表五随之改，E142（新池新建文件的干跑） 第十次跑）。验收（`crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs`，接在步 4 的向前回退 D (2, 9) 之后）：回退之后五次覆盖写（txg 10–14，实例 2），这时每块盘 defer 里 143 槽（向前回退不重建分配器，F = 0、环里最旧有效根 txg 0，一条都回收不了）、上限 11（从新到旧的不同状态 14、13、12、11，D 与 A 是同一个状态只数一次）、抬到 11 两次空发布（15 落盘 0、16 落盘 1）、回收 86 个落点（释放代 ≤ 11）、defer 降到 64、E（txg 17）的数据单元落回最低的可再分配偶数槽对 50176（mkfs 实例表那 2 槽：实例 2 写行那次换下、释放代 5，回收了；引用它的 A、B 在 F 之下、不在候选集，影子账不隔离；A 的数据单元 50180 也回收了、排在后面——此前预想 50180）、那条记录改写成代 17、E 之后 defer 80、冷启动读回 E、根记录 F = 11、checker 全绿（`raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it`）；抬到 12 被拒（`raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused`）；不抬 F 直接回收（复用窗口置 0）⇒ 回收 86 个落点、E 落回 50176（mkfs 实例表那 2 槽）、A（txg 3）还在候选集里（F = 0）、它的根指着的那片实例表被盖 ⇒ I-2.1（校验和与内容匹配） 与 I-4.8（近 K 代根校验和自洽） 红（`reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red`，C22（刚释放的块立即重分配） 的必红）；只有一块盘上的根带新 F（盘 1 上带 F 11 的那条根改坏）⇒ 两块盘系统配置里的 F 还是 11，重开后 F_生效 仍是 11、回收与根槽都好时一样多，每块盘 defer 剩 92 槽（`floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_one_device_lost_its_root_carrying_it`），txg 9 的 D 在 F 之下、挂着时回退到它在任何写之前拒成 `BelowEffectiveFloor`（`floor_carried_by_only_one_device_root_and_the_system_configuration_keeps_the_roots_below_it_out_of_the_rollback_candidates`）。回收门槛 = max(F_生效, 环里最旧有效根)（`mount::reclaim_floor`；第 0 代根被盖之前恒 F_生效，三方第一轮本地攻方腿与 alloc-basis 那一轮都指出此前省了后一项）；重建分配器时认得出还没被换下的第 0 版树表单元（本地辩方腿两份样本都指出 mkfs 与第一个文件版本不在同一个进程里那一格）。层 0：固定脚本到 E 54 段、2104413 个状态（快的那条 108 个），全量交门禁 checker-tier-layer0-replay。变异在 `crates/mutations.tsv` 以「步 5」开头的行（其中两条钉代码三方第二轮的改法：抬 F 之后不按新候选集重算影子账、影子账的豁免不看候选根的 txg 是否 ≥ F；三条钉 alloc-basis 第二轮云端攻方腿打中之后的改法：抬 F 回收的槽不扣住、生效之后不放开、没做过可写挂载的进程抬 F 时 panic）。抬 F 回收的槽扣住到生效（`ReclaimedReuse::HeldUntilFloorTakesEffect`，`DeviceFreeMap` 的扣住位让 `is_free` 与开段都绕开它，带新 F 的根落满每块盘之后 `release_reclaim_holds` 放开；alloc-basis 第二轮云端攻方腿打中：抬 F 自己的空发布在开放段满了之后开到刚回收空的那一段，崩在两条带新 F 的根之间时 F 之下的根仍是候选、它们的单元已被盖；用例 `slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect`：A、B、重开、六次覆盖写、抬 F 到 8，扣住之前 txg 14 的记账树落在回收的 50240 上）；记账仍在第一条带新 F 的根之前动，按写那条根那一刻的 F 还是它持久之后的 F_生效 算的口径归 alloc-basis 那一轮（预想）。没做过可写挂载的进程抬 F 报 `RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion`（`raising_the_floor_in_a_process_that_never_mounted_writable_is_refused_instead_of_panicking`）。⚠️ 已知问题：一次挂载里连续发布超过根环容量（R × S = 24 次）时，checker 在合法状态上判 I-3.1（已分配统计对得上） 红——回收只在重建与抬 F 两处做、挂载内转环不回收，账里那些已释放的槽仍算已分配，而 checker 取并集的有效根随根环转过去变少（另一个会话 E153（账本形态与环上有洞的代价） 在 `crates/` 副本上第一次让实现跑过一整圈根环量到，`e153-s1-crates-alignment-2026-09-17.out`，入库装置上没重做；固定脚本走不到，门禁没见过）；改法要等 D16（发布语义） 已定项 1「生效」一行的重议。同一次挂载里转环不回收（回收只在重建与抬 F 两处；固定脚本走不到 txg 24，alloc-basis 第二轮云端攻方腿 1.1 / 1.2 节，口径归那一轮）。代码三方第三轮（`research/prompts/m2-step45-code-r3-main-verification.md`）之后：抬 F 重算影子账时读不出账的被抛弃根也计数（`RaisedFloor::abandoned_roots_unreadable`，用例 `raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable`）；提交内生块的 bump 游标绕开开段之后才置的隔离位与扣住位（`DeviceFreeMap::is_blocked_for_commit_generated`，单测 `commit_generated_bump_skips_a_slot_isolated_after_the_segment_was_opened`；三种影子账读法共用的前提，今天可达的历史里不改变任何一次分配）。2026-09-22 重核这批欠账，两笔今天已可达、各做成一条用例（`crates/singlefs-harness/tests/unreadable_abandoned_root_slot.rs`，三条变异钉在 `crates/mutations.tsv`）：被抛弃根的根槽自己读不出时既不隔离也不计数（点名 B 那次发布的根槽注入读失败，隔离槽数 34 → 30，掉出的正是 B 新分配的 50253–50256，而 `abandoned_roots_unreadable` 两条臂都是 0——读不出的根进不了 `isolate_slots_referenced_only_by_abandoned_roots` 的输入，那个 `unreadable += 1` 数的是「根读得出、账读不出」）；隔离位只置不清（`target_for_publish(28) == target_for_publish(4)`，B 的根槽被轮转覆写之后隔离槽数 34 一个没清）。仍不可达的那几笔由 `.claude/gate.d/doc-registries.sh` 的 closeout-row27-preconditions 格按各自的前置立逐字探针盯着：前置一个都没进来时退 77（本次未跑），任一条对不上就红、回去重核那一笔。欠账（仍不可达、没有会红的用例）：豁免集与隔离集按记录起点做 key 而 `isolate` 按跨度铺位，同槽换跨度的复用跨过抛弃边界时第二槽没人罩（**未证明可达，也未证明不可达**：只有跨度收窄能漏，而步 5 脚本上走到的是放宽，收窄要先耗尽这块盘的聚簇段、2026-09-22 那一轮没构造出来）；`release_reclaim_holds` 在空发布循环之后无条件放开，靠区域循环长度 = 根环区域数 = 3 担保落满每块盘；alloc-basis 第三轮判决（`research/prompts/alloc-basis-r3-main-verification.md` 第五节 4，攻方腿副本上量或推的，入库装置上没重做）转来四条（④ 2026-09-22 已做成用例，余三条仍不可达）——① 以后加上挂载内回收时，G5 要在每次回收门槛抬高（抬 F 或环里最旧有效根变大）之前按此刻候选集重算，否则回退时被候选根豁免的槽在环转过之后被回收而被抛弃根还在环里（今天挂载内不回收，走不到）；② 暖机与抬 F 两个循环都按发布次数 < 3 截断，接上「根槽写失败推进一格重发」之后连续失败会让循环退出而本实例的根没覆盖每块盘、扣住在生效之前放开（今天写失败直接报错，走不到）；③ 扣住配今天的 checker（最新根自己的 F）放过「扣住位被撤掉」那份坏镜像；④ 隔离位只置不清，被抛弃根被轮转覆写之后到下一次挂载前仍隔离着，与 D28（挂载期承诺量） 已定项 1 第九项「轮转覆写时清零」不一致（多隔离，方向保守；2026-09-22 已做成用例钉住今天的行为，并立 C503（隔离位清零的时机条文与实现说反话）——改代码还是改条款交用户）。交用户的决策点：抬 F 的空发布分配不到固定点（开放段满、唯一全空段正是扣住的那一段——准入不够正是抬 F 的触发条件）时报错返回、扣住位留在这个进程里、之后的发布都分配不到固定点、重开可写挂载恢复成一致的满盘——三个改法（失败路径放开扣住 / 整个分配器退回抬 F 之前 / 回收推迟到生效之后）各修一半，压在 alloc-basis 第二轮 Z2 的耦合与保留池没实现上；这一条 2026-09-17 并进 D16（发布语义） 已定项 1「生效」一行的重议。第九项的公式 2026-09-17 用户定案改成独占集（被抛弃根引用的槽 − 回退候选集里的根引用的槽，下界 0，D28（挂载期承诺量） 已定项 1 已改写）。没做的：抬 F 的正常触发（准入）。「非空持久有效根」2026-09-17 用户定案按树表认（inode 树、extent 树的根指针与前一条有效根不同，D16（发布语义） 已定项 1 表格后那段 ⚠️），代码在改；F 回落（一块盘上唯一的载体根坏掉之后 F_生效 回落、新实例的根写低）2026-09-17 用户打回重议，见 D16（发布语义） 已定项 1 表格后那段 ⚠️。
+
+**设想实现**：回退之后再覆盖写一次（释放第一个数据单元，释放代 = 这次的 txg），接着推几次非空发布把「第 4 新的非空持久有效根」攒到那个 txg 之上，
+再用只供测试的开关触发一次抬 F 的空发布，把根记录的 F 写成那个释放代；然后发布 E 写入时分配器把 50180 发出去——正好是第一个数据单元的落点。
+释放代大于 F 的那些单元不许发出去，分得清。
+
+**预想的细节**：
+- 可再分配 ⟺ 已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)（D16（发布语义） 已定项 1）。根环 24 槽、mkfs 的种子 txg 0 ⇒ 环里最旧有效根在前 24 次发布里恒为 0，第一版的重用只能靠抬 F。
+- 抬 F 的上限 = min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根)；一次处置的目标 = min(这次释放的释放代, 第 4 新的非空根)。「4」数的是可退到的不同状态——只数改过用户可见状态的根，推空与抬 F 产生的空发布根不算（D16（发布语义） 已定项 1 逐字）⇒ 攒根的那几次必须是覆盖写，空发布不算数。**预想**：释放那次发布之后再覆盖写 3 次（每次释放前一个单元），上限刚好够到第一次的释放代。
+- 抬 F 的正常触发是准入不够；测试用开关强制触发（步 0）。生效 = 每块幸存盘上都有带新 F 的持久根 ⇒ 抬 F 的空发布之后还要让两块盘各有一个带新 F 的根，**预想**再推一次。
+- 分配器：政策函数「已选设备内槽号最小」会先把 50180 发出去；后释放的那几个单元释放代大于 F，仍在 defer 队列里。
+- 记账：defer 待释放减掉发出去的那一块、已分配加回来；空闲字节到这时才动。
+
+**验收标准**：
+- E 之后冷启动：新内容读回正确，它的数据单元落在 50180–50181，映射条目的位置就是它；后释放的那几个单元仍在 defer 队列里、落点没被发出去。
+- 根记录读回 F = 释放代；checker：回退候选集只剩 txg ≥ F 的根，I-7.4（近 K 代块未被复用） 对候选集里每个根判绿；I-4.8（近 K 代根校验和自洽） 从候选集里任一根出发遍历判绿。
+- 抬 F 那次空发布的段序列与登记表「抬 F 的空发布」那一行逐字相同。
+- 必红（C22（刚释放的块立即重分配））：复用窗口置 0 让 E 在 F 还是 0 时就复用 ⇒ I-4.8（近 K 代根校验和自洽） 从 A 的根出发遍历，第一个数据单元的校验和与父指针对不上，红。
+- 变异：F 抬过上限（候选集少于 4 个可退到的状态）⇒ 要红的是一条新检查，checker 从盘上算「第 4 新的非空持久有效根」得先认得出哪些根改过用户可见状态，「非空」的认法 2026-09-17 已写进 D16（发布语义） 已定项 1 表格后段（三方第一轮正推腿判据八那格；攻方腿没打中的第一条 按三种「非空」读法在这条脚本上同答 11，换一条脚本可能不同），列成决策点；F 只在一块盘的根上 ⇒ 恢复后生效值仍是旧的，E 发不出 50180，验收断言红。
+- 判别力自证（影子账的读法）：把影子账的查账集合从「被抛弃的根」放宽到「环里全部可读根」⇒ E 必须发不出 50180；不加这一条，「落在 50180」对两种读法之一恒真（攻方腿打中的第十二条）。这一条做成了变异 `crates/mutations.tsv`「步 4：影子账不豁免候选根引用的槽（保守读法）」：放宽之后红的是步 4 那条「回退到第一个根、冷启动读回第一版内容」的用例，不是 E 那一句「落在 50180」；E 那一句上的会红形态仍欠。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「七、发布（根记录与根槽）」（F 第一次不为 0）「五、空间记账与分配」（已释放记录被重用之后再改写一次）「八、根槽写路径的段序列登记表（C316（提交步骤的登记位有四处且互不相同） 的登记位，2026-09-13 立）」（抬 F 的空发布那一行从预想写成字节）；第一次出现的取值登记在 [layout/02-second-txn.md](../layout/02-second-txn.md)「根记录的回退下界 F 第一次不为 0」与「复用后改写的分配记录；回退那次复活的分配记录」两行；回收把 defer 待释放行降回去，那一格的取值在「记账的 defer 待释放行第一次不为 0」那一行（它第一次不为 0 在步 2）。
+
+**会碰到的决策点**：D16（发布语义） 已定项 1；D3（空间分配） 已定项 7 / 已定项 8；D28（挂载期承诺量） 已定项 1；C22（刚释放的块立即重分配）；C282（环里最旧根没有定义）；C215（回退深度的承诺与 K 的下限不能同时成立）；C222（I-7.4 的下限 2 与第一版两盘几何要的 3 打架）；C283（准入失败时不先推发布就报 ENOSPC）；checker 怎么从盘上认「非空持久有效根」（2026-09-17 已定，D16（发布语义） 已定项 1 表格后段）；影子账查谁的账（同步 4）；A 的根被根环轮转覆写之后 checker I-3.1（已分配统计对得上） 读法甲的并集不再含 A 独占的那 10 槽、而分配器的「占着」不缩 ⇒ 回收要在覆写之前把已释放落点放回空闲，或者「已分配」按仍被有效根引用维护（三方代码第一轮本地腿第二次抽样提出、主 agent 核实机理，`research/prompts/m2-code-r1-main-verification.md`）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:223-247`（整段抄，未转述）**
+
+```markdown
+## 步 6　层 0 全量崩溃点重放，checker 扩到覆盖写、释放、回退与复用判得出的那批不变量
+
+**现状（崩溃放量）**：固定脚本到 D 那条流在崩溃放量流水线上全域 51 773 558 个状态（36 段全部展开，`exhaustive=true`）双机 0 红，同库同代码重跑两台都不再核；到 E 再正常卸载那条（78 段）全域 1 662 648 564 个状态 0 红、逐状态比过全部 0 不一致（判器一个落点的组合掩码放到 64 位之后按新判法版本 `c63329dc60dabfaa` 重判，同一趟七个分项合计 2 615 501 475 态 0 红，到 D 那条也在其中）；到 D 的数与命令在 `records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「到 D 全域收口」那一行，到 E 与七项合计在同一节「全量 i」那一行。层 0 门禁 checker-tier-layer0-replay 的全量照旧。
+
+**现状（2026-09-17 部分落地）**：层 0 的负载是两条流（新池新建文件；固定脚本到 E，54 段、2104413 个状态），门禁 checker-tier-layer0-replay 在 release 下跑全量，第一条流 262165 个状态零违例、2026-09-17 在最终的树上（`crates/singlefs-core/src/mount.rs` a358a7b2、`transaction.rs` bc8737ac、`recovery.rs` ad1ea35c）门禁 checker-tier-layer0-replay 两条流全量都零违例：新池新建文件 262165 个状态，固定脚本到 E 2104413 个状态（exhaustive=true，每个状态两遍恢复 + 26 条不变量的 checker + 记录核对器）；同一棵树上 checker-tier-crates-mutation-replay 71 条变异各红、checker-tier-lkmm（herd7）与 checker-tier-qemu-device-streams（QEMU）通过（checker-tier-qemu-device-streams 的三种模式都只跑新池新建文件，发布 B 与切换没在 QEMU 上跑过，验收第 4 条后半没满足，2026-09-17 核 `.claude/gate.d/checker-tier-qemu-device-streams.sh` 的 `MODES`）；必红八条里五条各有先红后绿的用例或变异（摘根槽前的屏障、关掉点名验证并改坏单元、复用窗口置 0、记账重写摘掉、影子账关掉——含层 0 之外那一格的故障注入）；残留记录与陈旧 tail + 已复用的块 2026-09-17 补进层 0（残留记录只做正例）；**「先信 tail」2026-09-22 做出来了 ⇒ 必红八条到齐**：`recovery_reads_the_created_file_after_reopen.rs` 的 `a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply` 造一份「tail 陈旧、而它之上还有必须被施加的记录」的镜像，`crates/mutations.tsv` 第 285 行把扫描范围从全环改成「tail 为它作过证的那些记录」，当场红在正题上——`所选根是第 2 代，施加 jsn 3 之后走到第 3 代的树上读出那个文件`，`left: NoFile{...}` 对 `right: FileRead{...}`，正是 C29（恢复先信 tail 会丢数据） 说的「先信 tail 会丢掉窗口内全部记录」第一次在真实恢复路径上被钉住（此前只有 E24（恢复算法：先信 tail 会不会丢记录） 的可执行模型，与一个证明今天不信 tail 的正例探针）（**这是八条里今天唯一还缺的一条**：复用窗口置 0 与影子账关掉的 ② 格 2026-09-22 随增补 2 收口表第 24 行的两个开关做出来了——复用那一条现在走正常发布路径造出来、不再是直接调回收，② 格「让回退实例的根全读不出」由 `RootRingSlotTarget` 让设备读真返回错误造出来，与「改坏根槽字节」那条路分开）（2026-09-17 层 0 装置实现员核，此前这句写七条已有、含残留记录与先信 tail），「陈旧 tail + 已复用的块」那一条 2026-09-17 补上了（同一段前面那句），只造得出跨实例的一格；checker 新接了 I-3.8（实例表行唯一且低于挂载根）、I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）（后两条按候选集里每条根各判一格：走读它引用的单元时校验和对不上或头用不了就红，坏镜像是 mkfs 树表单元——只有第 0 代根还引用——改内容重封 / 抹成零；`crates/singlefs-checker/src/walk.rs`、`image.rs` 清单 26 条），I-3.1（已分配统计对得上） 与 I-2.1（校验和与内容匹配） 改按回退候选集判；预想清单里其余各条（I-3.4（可用空间扣待删占用） 起）还没有 checker；记录核对器认实例表行与回退行的那两样没做（前缀第五条是死条款，见步 4 现状）。checker 这一轮代码三方（`research/prompts/m2-step6-checker-r1-main-verification.md`）：云端攻方打中 checker 的候选集下界取最新根自己带的 F 而条款要 F_生效——一块盘的载体根坏掉、F_生效 回落之后被合法复用的单元让更早的根成为假回退候选，I-7.4（近 K 代块未被复用） 与 I-4.8（近 K 代根校验和自洽） 全绿（交用户，与 alloc-basis 第二轮判决 Z2 一起）；欠账：I-7.4（近 K 代块未被复用） 只靠校验和对不上或头用不了判复用与抹头、池级报告不报每条根几格、树表已访问时不走那条根的中央映射树、被抛弃根引用的单元不在 checker 候选集里（影子账只住内存）、I-7.2（最新根可完整遍历） 的不适用分支是死码（多层树下面的单元不读）；层 0 按每次发布报状态数（步 6 验收「每次发布各多少」）2026-09-23 已报：两条流的 LAYER0 / LAYER0B 计数行多一个 `states_by_publish=[…]` 字段，第二条流全量那一串只拿闭式核过，等门禁 checker-tier-layer0-replay `--full` 真枚举一遍。
+
+**设想实现**：整条固定脚本的每次发布都进层 0：每个崩溃状态跑恢复、池级 checker、记录核对器，三样都绿；必红用例表里除「关掉 `R` 保护」之外的八条全部先红后绿；
+checker 把 [invariants.md](../invariants.md) 里今天写「未实现、要覆盖写、释放、回退与复用」的那批接上，每条至少在一个崩溃状态上真被评估过。
+
+**预想的细节**：
+- 必红八条与它们挂在哪次发布上：摘根槽前的屏障（任一发布，已有）；关掉点名验证并改坏单元（已有）；残留记录（步 0 预置 + 步 3）；复用窗口置 0（步 5）；记账重写摘掉（步 2）；陈旧 tail + 已复用的块（步 5 之后再改坏 tail）；先信 tail（已有）；影子账关掉（步 4）——它的 ② 格「让回退实例的根全读不出」不是层 0 的崩溃状态（前缀里的根按定义已持久），是层 0 之外的一次故障注入，靠步 0 的第五个开关，步 6 把它单列成「层 0 之外」，不许以「跑不到」静默通过（攻方腿打中的第八条）。
+- checker 新接的不变量（**预想**）：I-7.4（近 K 代块未被复用）、I-4.8（近 K 代根校验和自洽）、I-3.4（可用空间扣待删占用）、I-3.8（实例表行唯一且低于挂载根）、I-1.8（归并后版本全序）、I-4.2（无被引用未提交块）、I-4.3（提交原子）、I-8.3（重放前缀严格连续）、I-8.4（重放幂等）、I-8.6（反向链算法）、I-7.3（环健康性）（种子被覆盖完之前射程有限，那条 ⚠️ 逐字写着要 R × S 次发布）、I-1.2（块头写序已发布）（已发布谓词本身，步 3 / 步 4 的输入）、I-5.3（报出的空闲都兑现得了）（步 5 的目标）、I-8.1（环几何够大）、I-8.2（记录头不跨原子单元）、I-8.5（tail 槽有效集非空）（后五条是三方第一轮正推腿判据七那格 补的）。每条配一份改坏了正好触发它的镜像，形态照 `checker_known_bad_images.rs`。
+- 记录核对器要多认两样：实例表行（前缀在 W 截断）、回退行（回退之后被抛弃实例的记录一条都不施加）。
+- 全量状态数与挂钟先量（步 0 干跑）：跑不完就按用户在步 0 定的那一格办。
+
+**验收标准**：
+- 脚本里每次发布的全部崩溃状态零红，报出枚举了多少个状态、是不是全量、每次发布各多少（2026-09-23 已报：两条流的 LAYER0 / LAYER0B 计数行多一个 `states_by_publish=[…]` 字段；第二条流全量那一串只拿闭式核过，等门禁 checker-tier-layer0-replay `--full` 真枚举一遍）。
+- 必红八条各自先红后绿，每条写明改坏了哪一行、哪条断言红。
+- 阴性结果与「代码没跑到」分开：新接的每条不变量至少一个崩溃状态上真被评估过，报出评估次数。
+- 门禁 checker-tier-layer0-replay 扩到整条脚本（计数与干跑产物逐字比对）；checker-tier-qemu-device-streams（QEMU 真设备）至少把 B 与切换跑一遍。
+
+**写出的字节**：无（这一步只生成崩溃镜像并读）。
+
+**会碰到的决策点**：D13（验证路线） 已定项 4 / 已定项 5；D16（发布语义） 已定项 4（记录核对器那第二份 replay 实现）；C6（块层语义假设写错）；C16（管道声明失败模型例外）；C26（屏障数从没量过）；C77（重放起点未定义）；C29（恢复先信 tail 会丢数据）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:248-269`（整段抄，未转述）**
+
+```markdown
+## 步 7　出口：性能表加一节，覆盖写、释放、回退与复用的字节登记成表
+
+**现状（2026-09-17 跑完）**：E152（按里程碑对比六家文件系统的文件性能） 2026-09-17 步 7 那次正式跑只重跑 singlefs 一臂（配置只选 singlefs，命令在实验页的复跑命令里；真设备二进制的 `file-overwrite` 模式：新池新建文件之后同一个进程里再覆盖写一次、冷重开读回第二版；跑前登记第十二节写死判据），5 轮一次过、判据全中：发布 B 两盘合计 21 次写调用（来宾块层记 26 次写请求：每道屏障与每次 FUA 各多记一次）、344 576 字节、4 次屏障、1 次 FUA，段序列 16+2+1+2，与新池新建文件一字节不差；汇总行里覆盖写、释放、回退与复用的挂钟 5 轮中位 5.08 ms（离散 186%）是外层按输出行到达时刻切的、混进了打印积压，二进制自己计的发布 B 5 轮中位 6.14 ms；冷恢复 7 893 ms、两盘读 1 610 981 376 字节（整环扫描没动）。产物 `e152-file-system-benchmark-second-transaction-2026-09-17.out`；表与结论在 `research/perf-by-milestone.md` 第三·二节，实验页 `.claude/kb/experiments/152-按里程碑对比六家文件系统的文件性能.md` 加一节整行抄录。覆盖写、释放、回退与复用的字节登记表是 [layout/02-second-txn.md](../layout/02-second-txn.md)。管理员回退、抬 F、复用没进 E152（按里程碑对比六家文件系统的文件性能）（六家没有对应的负载）。收尾时（`crates/` 又改了四处之后）用户要求再跑一轮：2026-09-17 收尾那次正式跑 5 轮一次过，写数与段序列与第三次逐字相同，汇总行里覆盖写、释放、回退与复用挂钟中位 5.53 ms（离散 259%，同样混进打印积压），二进制自己计的发布 B 中位 6.63 ms（离散 11.8%），冷恢复中位 7 738 ms；与两盘镜像六家的对比结论（写字节、块层写请求、挂钟三项七家垫底，是 Btrfs raid1 的 1.71 / 1.86 / 3.0 倍）在实验页「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节；产物 `e152-file-system-benchmark-second-transaction-final-2026-09-17.out`，并列表在 `research/perf-by-milestone.md` 第三·二节「收尾时再跑一次」。
+
+**设想实现**：给 singlefs 重跑 E152（按里程碑对比六家文件系统的文件性能）（`research/scripts/e152-run.sh`，配置只选 singlefs 那一臂，命令照 [perf-by-milestone.md](../../../research/perf-by-milestone.md)「以后的里程碑怎么往下接」那一句），
+在 [perf-by-milestone.md](../../../research/perf-by-milestone.md) 加一节。八维里预想能跑七维：小文件持久化按次数量、拿到稳态的每次代价（主线）；大文件顺序写与顺序读（并行线一）；4K 随机读（并行线二）；4K 随机写（并行线一加主线步 1 的覆盖写：改一页就重写它所在的整个 32 KiB 单元）；格式化的挂钟与写量、小文件持久化的延迟从上界变实数（并行线四）；元数据只能按「建 N 个 inode 并持久 / 秒」量、与六家的 fio 作业不同口径（并行线三），表里写明不可比。数只求量得出、不求追上六家：先不优化。
+把这个里程碑写出的、新池新建文件没有的五种盘上形态登记成表，登记位按用户定的放（另开 `layout/02-second-txn.md`，或在 [layout/01-first-txn.md](../layout/01-first-txn.md) 加节）。
+
+**预想的细节**：
+- E152（按里程碑对比六家文件系统的文件性能） 的 singlefs 臂量「所有树第一次落盘的那一个事务」与第二次写（发布 B）的写数与字节数，与六家「刚格式化之后的第二次写」对（第三、四次跑，见步 7 现状）。
+- 稳态每次代价 = B 的段序列 `24+2+1+2` 对应的写请求数与字节数（**预想** 21 次写、8 个单元 × 2 盘 + 记录 × 2 + 根 + 系统配置 × 2）。
+- 并行线跑出的三维（顺序读写、随机读）与六家比会差很多——冷挂载整环扫描、无读缓存、每页读整单元都还在；这一节只登记差多少，不据此改设计。
+
+**验收标准**：
+- 改了 `crates/` 就重新 mkfs、新镜像、新虚机，门禁与崩溃点重放全量重跑，不复用上一轮的环境与产物（用户 2026-09-20 定）；跑完机器上不许留测试残留、宿主盘不许有异常，由门禁 harness-test-environment（跑完测试之后机器还干不干净）判。
+- perf-by-milestone 多一节，数从产物生成（`research/scripts/e152-tables.py`），跑前登记另写。
+- 五种新形态每一种都指得到一条决策分项，与字节登记位、里程碑各步的「写出的字节」行互相指得到（步 0 立的那道挂钩检查判）。
+
+**写出的字节**：无（这一步登记，不写新字节）。
+
+**会碰到的决策点**：D17（实现分层与第三方管道） 已定项 2；C94（登记的格式常量与后来的定案对不上）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:270-327`（整段抄，未转述）**
+
+```markdown
+## 增补 1　每次持久化写多少：按现在的数据重新验证压着它的条款
+
+**两轮三方已判完，结论：三条岔路收成「甲（不改）」，决策正文一个字不动。** 判决在
+`research/prompts/m2-s1-r2-main-verification.md`（第一轮在 `m2-s1-r1-main-verification.md`），
+岔路单 `m2-s1-forks.md`。接手的人只读判决就够，三条腿的报告与材料已按归档规矩删掉，要看去 git 历史里找。
+
+三格交用户定，每格带着它的限度：
+
+| 交什么 | 内容 | 限度 |
+|---|---|---|
+| 第一轮那处打中被翻掉 | journal 记录头里 188 字节的新根段今天已经在（`crates/singlefs-format/src/lib.rs` 的 `JOURNAL_NEW_ROOT_SEGMENT_BYTES`），施加就是把所选根的四个字段换成记录里的（`recovery.rs` 的 `replay_journal` 现查）。第一轮判 wal_full「施加单位那一格自己改不掉」是错的 | 只对「每次 fsync 另写一个树表单元」那一形成立；乙-M 那一格两轮两中，原样成立 |
+| 「周期可配置」在 WAL 类形态下买不到 | 攻方判「不能同真」：`T_time` 取它自己的默认值 5 s 就越过环 ÷ F，而 `T_dirty` 夹取在 WAL 类下永不触发（数据在 fsync 那一刻已落盘、不是脏页）。要么收严 `T_time` 让环几何说了算，要么先补一条约束「一个 checkpoint 间隔的 journal 占用」的条款——今天全仓没有这条，D23（journal 的角色与格式） 已定项 23 与 I-8.1（环几何够大） 的主语是「任一操作 / 任一事务」 | λ = 2785 fsync/秒 是 E44（序号位宽的本机实测与代价） 的本机实测、不是 D25（目标负载优先级） 的负载参数；λ 小一个量级，越界点从 2.94 s 挪到 29.4 s，默认 5 s 就过了 |
+| 甲的组提交没有想象中便宜 | 它摊薄写字节（E155（每次持久化的写量：三种 fsync 形态与反事实上界）：k ≤ 16 内没有一组让甲追平 WAL 臂），但不摊薄 fsync 的等待时间——两个量量纲不同 | 本地腿两份样本对到达过程取了相反的假设（分散 vs 同时），记不稳定；分歧点是 D25（目标负载优先级） 没写并发 fsync 怎么到达 |
+
+WAL 三臂出局的那一格：K10 让一次普通崩溃永久泄漏一个间隔的中间版（N=16 时 60 / 45 个槽）——
+中间版的 fsync 记录活在重放前缀里被施加成已分配，而 K10 那条已释放的分配记录死在没发布的 checkpoint 里，
+撞 D3（空间分配） 已定项 9 正文那句「崩溃丢掉的是没发布的那个 checkpoint，它里面的释放一条都不留痕」。甲不中这一格。
+
+**还欠的三笔**（都没做成检查）：一个 checkpoint 间隔的 journal 占用全仓无条款；D25（目标负载优先级） 没写并发 fsync 的到达过程与 λ；
+E16（journal 的角色：WAL vs 意图日志） 的「批 ≈ 流数处见顶」按今天的宽度没算到底。
+
+
+**现状（2026-09-17 立；同日开工）**：第 1 件已交回：发布路径按 12 种结构报每次发布的写调用与写字节（`crates/singlefs-core/src/write_accounting.rs`），真设备二进制每段窗口与设备一层计数比对，发布 B 两盘合计 21 次写调用 / 344 576 字节按种类拆开与算术逐项相同；代码三方第一轮打中失败路径那一格（收口表第 58 行）；第 3 件交回，报告入库 `m2-s1-prior-art-report.md`（三家的 fsync 都只写日志或意图日志，主树只在周期提交时落盘，本机能查源码的三家里没有一家每次 fsync 写脏叶加全部祖先加根；读源码，没实测，未在本项目验证）；第 2 件：岔路单 `m2-s1-forks.md`（五行），跑前登记 `e155-preregistration.md`，实验 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 第一、二段已跑（岔路单第 1 行够判）：甲与乙每次 fsync 的写字节比随池里对象数从 2.00×（对象数 ≤ 100）涨到 10.65×（10⁸），不收敛；D23（journal 的角色与格式） 已定项 1「重开轴二的可判据」表里 G23.1（祖先链占比达标） 那一行的写字节替身份额从 47.70% 涨到 90.16%（10⁸ 那一格 99.63%）；三臂在已跑的每一格上都是「乙 ≤ wal_full ≤ 甲」。产物 `e155-fsync-write-volume-2026-09-17-stage2.out`，单测 29 条、变异 11 条全抓。第三、四段已跑，四行全部够判（产物 `e155-fsync-write-volume-2026-09-17-stage4.out`，1334 行，单测 42 条、变异 15 条全抓；这一段里对象数与写字节的数由主 agent 从产物里现取，执行员两次交回报的数不一致，以产物为准）：**不是指数级**——主几何（位置策略 Lbalanced、顺序落点）下对象数从 1 涨到 10⁸，每次持久化的写字节从 344 576 涨到 1 831 348（5.31 倍），三种界的读法 ρ_a = 2.81、ρ_b = 2.22、ρ_c = 1.11；⚠️ 换成最坏位置策略（Lfar + 随机落点）同一格是 7 043 097 980 字节、ρ_a = 11270，几乎随规模线性变差，那是一个非物理的最坏假设，方向上三种界一致。四样固定点在 10⁸ 那一格（Lbalanced）记账 7.19%（不过 10% 门槛）、分配记录 32.8%，而小池上四样都过门槛 ⇒「哪一样值得重开」随池规模换答案。按够判停机，没跑的量逐条标「够判后未跑」写在实验页。⚠️ 调研顺带核出一处口径：`research/perf-by-milestone.md` 里六家的「每次持久化写字节」量的是「新建文件 + 写 3000 字节 + fsync 文件 + fsync 目录」100 次的平均，singlefs 的 344 576 字节是「覆盖写 4100 字节」一次（[perf-by-milestone.md](../../../research/perf-by-milestone.md) 与 E152（按里程碑对比六家文件系统的文件性能） 实验页都写了六家没跑覆盖写），两者不是同一个负载，「1.30 倍」只能当量级参考。E152（按里程碑对比六家文件系统的文件性能） 2026-09-17 两次正式跑量出发布 B（覆盖写 4100 字节）两盘合计写 344 576 字节、块层 26 次写请求。按单元种类拆开是字节表上的算术，不是块层分解（[perf-by-milestone.md](../../../research/perf-by-milestone.md)「差距从哪来（发布 B 写的字节，算术）」）：数据单元 1 个 65 536 字节（19.0%）；元数据单元 7 个 262 144 字节（76.1%：inode 树叶容器 32 KiB，extent 树、inode 树根、分配记录树、记账树、中央映射树、树表单元各 16 KiB）；journal 记录 2 个、根槽 1 个、系统配置槽 2 个共 16 896 字节（4.9%）。同一台测试台上两盘镜像的六家，每次持久化写字节最多的是 Btrfs raid1 201 195，Bcachefs 双副本 14 592，OpenZFS mirror 8 192（同一文件「二·二、两盘镜像」的小文件持久化表）。那一节逐字写着「要缩哪一块、怎么缩，是设计推论，这份文件不下，要走三方论证」，三家写时复制文件系统「写的是日志、意图日志还是树，这一轮没量」。
+
+每次 fsync 写这么多，今天是哪几条已定条款直接定下的（主 agent 读条款得出的对应，推论，没走三方论证）：
+
+| 写的是什么 | 压着它的条款 |
+|---|---|
+| 被碰到的每棵树写脏叶加全部祖先，每次 fsync 都写 | D23（journal 的角色与格式） 已定项 1 逐字「取甲：每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录。祖先不延后。」，同一句括注「fsync = 一次全量发布，2026-09-16 用户定案」；D16（发布语义） 已定项 11逐字「fsync 的效果是「提前触发一次发布」，不是另开一条日志格式、另一套恢复逻辑」 |
+| 记账树每次发布都重写 | D5（快照 / 空间记账机制） 已定项 2 的 K 代点删要求「每行每发布重写」；D16（发布语义） 已定项 9 引它：空发布也重写记账行，连带记账树节点、分配记录、映射条目与树表单元 |
+| 中央映射树每次发布都 COW | D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12：映射装码 1、码 2、码 3，day-1 就写，每个新写的单元加一条（映射树自己的节点、树表单元、实例表单元不进） |
+| 分配记录树每次发布都 COW | D3（空间分配） 已定项 7 / 已定项 11：每个新落点每盘一条记录，释放时改写不删 |
+| 改一条记录也整单元重写 | 码 2 节点 16 KiB、码 3 容器 32 KiB（宽度在 [layout/01-first-txn.md](../layout/01-first-txn.md)）；第一版全部直落叶、全树 ε = 0（D8（核心索引结构） 已定项 10、D11（索引节点要不要留消息缓冲区） 已定项 7） |
+| 4100 字节的内容占 32 KiB | D4（校验和位置） 已定项 5 / 已定项 7：单元恒 32768 含头、一个 extent 一个单元；小数据打包容器 D27（小数据打包容器） 不在这个里程碑 |
+
+**随什么涨（预想，没量）**：被碰到的每棵树写一条脏叶到根的路径，写量随树高线性涨，树高随对象数按扇出取对数涨；一次发布里脏叶不止一片时按脏叶数涨，上限是这次发布碰到的叶数（T_dirty 管量）；记账、映射、分配记录、树表四样每次发布都在路径上，与负载写了什么无关。三样合起来怎么涨、是不是用户担心的「指数级」，由计数模型答，这里不下结论。
+
+**设想实现**：四件，按次序做。
+1. 实现自己报每次发布写了什么：`crates/singlefs-core` 的发布路径按单元种类（数据单元、各棵树、树表、实例表、journal 记录、根槽、系统配置槽）计写字节与写调用，真设备二进制打出来，E152（按里程碑对比六家文件系统的文件性能） 按它出表，合计与块层读数逐个对上。今天那张分解是字节表上的算术。
+2. 计数模型量增长：`experiment-designer` 写跑前登记，写死轴（各树树高 1 到 4、一次发布的脏文件数、顺序与随机覆盖写）与判据。模型按 `crates/` 今天的写法建（`.claude/rules/implementation-first.md`）；树高大于 1 的格子实现里没有分裂，只能由模型给。第一格（树高 1、一个文件、覆盖写）要与第 1 件报的 344 576 字节逐字节对上：两套装置算同一个量。钉绝对值，带变异表。
+3. `prior-art` 查 Btrfs、Bcachefs、OpenZFS 一次 fsync 各写了什么（日志、意图日志还是树），树什么时候落盘；只要带出处的事实，未在本项目验证。
+4. 候选改法：「压着它的条款」那张表每一行各列候选，「不改」也算一条，每条带第 2 件的代价数，走三方（`.claude/rules/three-way-inference.md`「岔路交用户定之前，每条路要有代价数」），交用户定；定了要改的，写回决策、改 `crates/`、重跑 E152（按里程碑对比六家文件系统的文件性能） 与层 0。
+
+**预想的细节**：
+- 目标（2026-09-17 用户定）：按现在的数据重新验证，不先定写量要压到多少。与六家比性能不是为了提早优化，只是一次校准：看 singlefs 每次持久化落在哪一档、哪一块差得最多，六家的数不当判据写死。量的是写路径的代价（每次持久化的写字节、写请求、屏障、挂钟），不是盘上占用。
+- 重开 D23（journal 的角色与格式） 已定项 1 要回答它自己列的依据，逐字「轴一那四条依据（环截断不了 / 多一条挂载期重放路径 / journal 进验证链 / 屏障一个没省）」，还有 D16（发布语义） 已定项 11与 `.claude/rules/fs-design.md`「一个事务层，所有结构共用」。那条已定项定于 2026-08-28，E152（按里程碑对比六家文件系统的文件性能） 每次持久化写多少字节是 2026-09-15 起才有的数，算新证据。
+- 改设计会碰到已经落地的东西：段序列登记表、层 0 两条流的状态数（一次发布写几个单元变了，段内状态数按 2 的写数次方变）、两份字节表、E142（新池新建文件的干跑） 干跑。
+
+**验收标准**：
+- 真设备二进制报出发布 B 按单元种类的写字节，合计 344 576、写调用 21，与 E152（按里程碑对比六家文件系统的文件性能） 的块层读数逐个对上；变异：漏计一种单元，合计对不上判红。
+- 计数模型的跑前登记、产物、变异表入库；树高 1 那一格与第 1 件逐字节相同，漏算任一棵树的变异判红；报出树高 2、3、4 与多个脏文件下每次持久化的写字节，每个数带口径。
+- prior-art 报告入库，每条事实带出处。
+- 候选改法的三方判决与用户定案写回决策与变更史；定案要改设计的，`crates/` 改完之后 E152（按里程碑对比六家文件系统的文件性能） 小文件持久化重跑，层 0 两条流全量零违例，段序列登记表跟着改。
+
+**写出的字节**：无（这一步量与定；定案之后要改字节的，写进 [layout/02-second-txn.md](../layout/02-second-txn.md) 与对应的步）。
+
+**会碰到的决策点**：D23（journal 的角色与格式） 已定项 1；D16（发布语义） 已定项 11、已定项 5、已定项 9；D5（快照 / 空间记账机制） 已定项 2；D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12；D3（空间分配） 已定项 7 / 已定项 11；D8（核心索引结构） 已定项 10；D11（索引节点要不要留消息缓冲区） 已定项 7；D4（校验和位置） 已定项 5 / 已定项 7；D25（目标负载优先级）；D27（小数据打包容器）；`.claude/rules/fs-design.md`「一个事务层，所有结构共用」「不为省空间牺牲自包含」。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:328-422`（整段抄，未转述）**
+
+```markdown
+## 增补 2　收口：打回的四处与各步现状里还开着的项
+
+**现状（2026-09-17 立；同日重核；2026-09-19 再重核）**：步 0 到步 7 的代码已经落地，层 0 两条流全量零违例（步 6 现状）；收口表里已关的是第 10、11、15、33、34、37、39、42 行；第 12 行 C374（释放代与树表诞生 txg 只有验收断言盯着） 那两条做完了，回扫又立了 C395（代字段只有验收断言盯着），其余还开着。2026-09-19 五份只读重核（`m2-closeout-recheck-a.md` 到 `-e.md`）逐行现查过，逐行去向与这一批的次序在 `records/2026-09-19-里程碑二遗留收拢.md`，表里过时的格子与漏写的欠账号照重核改了。出口按增补 2 的验收判，不按各步现状写了「落地」判。立表时只有 13 行；同日派四个只读核查（步 0–2、步 3–4、步 5–7 与并行线、里程碑正文之外的判决与欠账表）逐项现查 `crates/`、欠账表与判决，补进第 5–34 行，报告入库 `m2-closeout-inventory-a.md` 到 `-d.md`；其中「准入式子没实现」「C369（提交内生块段耗尽时没有回落）」「层 0 oracle 对实例表零引用」三条主 agent 现查过。
+
+<!-- milestone:closeout-table -->
+
+| # | 项 | 性质 | 等不等增补 1 | 去向（2026-09-17） | 记在哪 |
+|---|---|---|---|---|---|
+| ① | 前缀第五条在任何可达历史上取不到真、回退行要不要另有落点、回退之后记录链从哪条之后接（C340（回退之后记录链从哪条之后接没有定义））；连带 C124（回退行与重放下界没有会红的检查） 仍欠的那一半，与层 0 oracle 不读实例表（步 4 决策点写了「开工前给 oracle 实例表当输入」，`crates/singlefs-checker-tier/src/crash.rs` 对实例表零引用）；C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 的回退行口径要一条可达历史证明它被跑到（里程碑一步 6 决策点带过来的，今天只有函数级用例，`crates/mutations.tsv` 第 36 行钉着）；步 4 决策点末句写的两个择新序并存（根环择新 txg 为主、journal 水线实例为主），全仓只那一句 | 打回重议 | 等 | **增补 1 判完了（甲：发布形态不改），这一行不再等。** 「择根、回退与修复」那一轮三方 2026-09-22 判的是 ③、7、16 三行（`research/prompts/m2-rootchoice-repair-r1-main-verification.md`），没带这一行的三格，但**这三格不另开一轮**（主 agent 2026-09-23 判）：「回退行要不要另有一处不依赖新实例根的落点」就是那一轮 K3 里 C332（回退实例两个根都读不出时回退被撤销） 的候选 2（另给一个盘上见证），前缀第五条能不能活过来随它定；C340（回退之后记录链从哪条之后接没有定义） 的 P2 被打中的那段历史正是 C332（回退实例两个根都读不出时回退被撤销） 那一格（比 R_old 新的根全读不出），P1 被打中的是崩在回退生效之前，C332（回退实例两个根都读不出时回退被撤销） 取哪条决定 P2 那一格还中不中；第 9 行 P7 回退行的 W（C514（回退行的 W 等整段重议）） 也跟着它。这四样并进岔路单 `research/prompts/m2-rootchoice-repair-r1-forks.md` 第 3 行，E158（择根与修复四岔路） 量完那一行（候选 2 那一半已够判，候选 3 那一半归第二段）一起交用户。**用户 2026-09-24 定**：候选 2 表形态见证，放系统配置槽里、写行之后第一次轮换写、条数上限取根环槽数减 1（D23（journal 的角色与格式） 已定项 14「回退见证」那一段，判决 `research/prompts/m2-witness-r1-main-verification.md`）；实现与会红检查等实现员。**2026-09-25 实二二三已实现回退见证**（系统配置槽偏移 481 起、753 字节；择根跳过被抛弃的根；checker 加 I-7.10（已停用·回退见证表删了）、I-7.11（已停用·见证择根删了））；层 0 三条新流提交时跑。2026-09-25 实二五已实现被罩住的条目删掉、每次可写挂载按回退行补写见证。**2026-09-26 回退改成挂着时的一次向前发布**（三轮三方 `research/prompts/m2-rollback-forward-r3-main-verification.md`，用户 2026-09-25、2026-09-26 定）：前缀第五条、回退行、回退见证一起删，I-7.10（已停用·回退见证表删了）、I-7.11（已停用·见证择根删了） 退役，这一行三格的对象都不在了；代码随回退改形态的实现员删。 | 步 4 现状与决策点；D23（journal 的角色与格式） 已定项 14 |
+| ② | F 的「生效」事后回落（checker 候选集下界用哪个 F、被抛弃根带的 F 算不算、抬 F 的空发布分配不到固定点、F 回落之后抬 F 被挡、一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1（已分配统计对得上） 红）；连带：A 的根被轮转覆写之后 I-3.1（已分配统计对得上） 读法甲与分配器的「占着」分道（步 5 决策点）；D28（挂载期承诺量） 已定项 1 的可用式子按读法甲扣两次 defer（步 2 决策点）；alloc-basis 岔路表第 1、2、3 行待你定、第 7 行 2026-09-25 在可达基底上自证成立、G27 照旧采纳（I-3.11（已分配减 defer 等于最新根走读））、第 4 行要不要修 E154（两道闸串-重判与回收时点的代价） 装置两处 bug 与「回退不查目标在不在环里」之后重跑、第 8 行没立题，而第 8 行与 C370（需求、可用与 df 没有共同单位）、C371（活元数据没有定义） 是同一个没定义的前提；C356（第九项按统计量之差算，净释放时为负且没有钳位） 在第九项改成独占集之后还成不成立没人答；C380（环上有洞时释放代判不出唯一值） 的前置写明与这一行一起判（2026-09-18 C374（释放代与树表诞生 txg 只有验收断言盯着） 的 checker 实现时立）；E153（账本形态与环上有洞的代价）、E154（两道闸串-重判与回收时点的代价） 与 `crates/` 的对拍不在复跑里；2026-09-18 代码三方第二轮攻方顺带看到「可写挂载 → 覆盖写 2 次」循环第 6 次挂载起 I-3.1（已分配统计对得上） 在合法状态上红，疑似本行那一族，攻方与主 agent 都没核（判决第二节末段）；同日增补 3 第 1 件的历史生成器坐实：跨几次挂载转过一整圈同样红，快档 96 段里 50 段、大档 3000 段里 1929 段以它收尾（生成器已知红第 0 条，`m2-supp3-item1-implementer-report.md`第三节、第八节），这一行不修，随机历史走不到根环转过之后的状态；生成器的已知红第 0 条按今天的宽度接走的失败里混着别的机理：代码三方第一轮攻方腿在回收门槛差一的变异下看到它接走不是转圈造成的多算，实现员在今天的代码上数出种子 61、81 以它收尾，而多算的 13 个槽里 2 个只被还在根环里的被抛弃根引用（`m2-supp3-item1-implementer-report.md`第十三节，只数了槽、没核机理）。第 0 条没按多算的量收窄：要分「已释放、还在延迟」与「已回收」得读写入进程内存里的分配器，盘上没有，用实现自己的记账给实现的失败开脱不取；这一行修好之后第 0 条整条删掉，它接走的别的机理那时自己露出来 | 打回重议；2026-09-18 用户定案：alloc-basis 岔路表第 1–8 行全部等增补 1 定案之后一起判（记账口径与每次发布写什么耦合），这一轮不动决策正文 | 等 | **增补 1 判完了（甲：发布形态不改），alloc-basis 岔路表第 1–8 行的等待条件解除**（用户 2026-09-18 定的是「全部等增补 1 定案之后一起判」）。⇒ 这一行现在可判：岔路逐条给代价数、交用户定；F 的「生效」事后回落那一族与第 43 行的抬 F 进空档一起判。**2026-09-23 现状**（岔路单 `research/prompts/alloc-basis-forks.md` 四行）：岔路 7（defer 的检查）用户已定采纳 G27、立成 I-3.11（已分配减 defer 等于最新根走读），实现待做；岔路 2（删不删「− defer 待释放」）够判，但它的候选写在岔路 1 选甲-T1 之下，等岔路 1 一起交；岔路 1、3 还开着，由 E156（alloc-basis 四条岔路的代价数） 重跑登记 `research/prompts/e156-r2-prereg.md` 的第二段（岔路 3）与第三段（岔路 1）量。**2026-09-26**：「F 的生效事后回落」那一格定成 SysPre（F 另记进系统配置，D16（发布语义） 已定项 1），checker 候选集下界读哪个 F 由 C556（checker 与层 0 不读系统配置里的 F） 接；被抛弃根带的 F 算进 F_生效（用户 2026-09-28 定，`research/prompts/abandoned-floor-r1-main-verification.md` M2，D16（发布语义） 已定项 1）；一次挂载转过一整圈根环那一格随 C518（一次挂载之内环转过一圈之后不回收） 已还清（`crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs`，mkfs 同一个进程那条会话也装根环表），随机历史的已知红清单里那一形已删（`crates/singlefs-harness/src/history.rs` 的 `KNOWN_RED_FORMS` 只剩第 43 行那一条） | 步 2、5、6 现状；D16（发布语义） 已定项 1；`alloc-basis-r3-forks.md`；`records/2026-09-17-已分配口径三方与两个实验.md` 第四之二节 |
+| ③ | 被抛弃根的账读不出时走修复：用户否决跳过，修复没有条款，`crates/` 里没有 scrub 或自愈 | 打回重议 | 不等 | 2026-09-22 三方判完（`research/prompts/m2-rootchoice-repair-r1-main-verification.md` K1）：仍是条款空白，「账」有两个指称——树表（权威态）与分配记录树（派生态），写条款时分开判；三种形态的代价由 `research/prompts/e158-preregistration.md` 量，岔路单 `research/prompts/m2-rootchoice-repair-r1-forks.md` 第 1 行，量完交用户定。欠账 C393（被抛弃根的账读不出时修复没有条款）。**2026-09-28 用户定 (b)-从映射现算**（两轮三方 `research/prompts/unreadable-at-mount-r1-main-verification.md`、`unreadable-at-mount-r2-main-verification.md` L3；被攻过零轮，第三轮留到以后）：账读不出时从中央映射现算被抛弃根引用的落点、内存隔离、计数往上报，现算也不成重读一次再拒可写（D23（journal 的角色与格式） 已定项 14）；已实现，用例 `an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs`，C393（被抛弃根的账读不出时修复没有条款） 挪进已还清 | 步 4 现状 |
+| ④ | 树表 0 条的一版上怎么写实例表行：只做过 mkfs 的池可写挂载只兑现第一次，回退到树表 0 条的根被拒 | 打回重议 | 不等 | **2026-09-23 两格都有了去向。** 写行那一格已落地：写行那次发布在树表 0 条的一版上写实例表与一片分配记录节点两个单元，分配记录树根指针住根记录（D16（发布语义） 已定项 9；根记录 371 → 457 字节，D22（单元原子性怎么合成） 已定项 7），C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 由此还清。回退那一格：环里没有带文件的根时回退照常做（`rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_instance_table`），环里还留着带文件版本的根时，那道拒绝 2026-09-23 已拿掉、实现已落（水位取根环与记录新根段的 max，`publish_first_file` 改看树表条数，待代码三方与崩溃验证）；这一格的依据与验收写在 C511（回退到无文件那一版之后诞生代怎么接） 那一行。拿掉这道拒绝（C511（回退到无文件那一版之后诞生代怎么接） 第 3 步）之前照 D8（核心索引结构） 已定项 8 ② 修实现：回退到无文件那一版时树 ID 水位取根环里全部根记录的 max 带过去，号永不重发；`publish_first_file` 里「水位 = 11 ⇒ 树还没建」那一判改看树表条数；拿掉之后 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 不许红。I-7.8（根记录树 ID 水位不低于全池最大树 ID） 与 D8（核心索引结构） 已定项 8 ② 都不改——用户 2026-09-23 先选了「I-7.8（根记录树 ID 水位不低于全池最大树 ID） 也按时间线收窄」，看到 D8（核心索引结构） 已定项 8 ② 之后改选照条款修实现。账在 C511（回退到无文件那一版之后诞生代怎么接） | 步 3 现状 |
+| 5 | 准入与保留池：D28（挂载期承诺量） 已定项 1 的「可用」式子在 `crates/` 里没有实现，步 4 验收「准入读数少了正好被隔离的那几块」、C318（影子账隔离的单元没进准入不等式） 的判别力自证、I-5.3（报出的空闲都兑现得了）、C283（准入失败时不先推发布就报 ENOSPC）、抬 F 的正常触发都压在它上面；C355（checkpoint 保留池池级扣而固定点每块要落两列）、C363（现算保留池时树高从哪读没有条款）、C375（待删占用与已承诺预留按份还是按和记没有条款） 的第三轮三方 2026-09-16 发了腿没收尾，2026-09-23 重出材料再派、判完 | 没实现；三方撂下 | 等（保留池按每次发布写多少算；式子本身等 ②） | **增补 1 判完了，不再等它。** 第三轮 2026-09-23 重出材料再派、判完（`research/prompts/c355-c363-r3-main-verification.md`），用户同日定：C375（待删占用与已承诺预留按份还是按和记没有条款） 两项按全部副本之和记字节（第三轮写回）、C355（checkpoint 保留池池级扣而固定点每块要落两列） 取丁（逐设备合取，推翻 2026-09-13 的「作池级一项」），式子改写在 D28（挂载期承诺量） 已定项 1 / 已定项 4；C363（现算保留池时树高从哪读没有条款） 取 (b) 带着第三轮打中的四格另开一题，那一题 2026-09-25 已判（`research/prompts/c363b-r1-main-verification.md`：(b) 不采用，固定点分配失败在任何写之前拒绝），C363（现算保留池时树高从哪读没有条款） 已挪进 `.claude/kb/checks-owed.md` 已还清表。`crates/` 里准入式子照丁 写，C375（待删占用与已承诺预留按份还是按和记没有条款） 与 C355（checkpoint 保留池池级扣而固定点每块要落两列） 的检查那一半等它；保留池按每次发布写多少算仍在第 ② 行的岔路里。第三轮另立三笔今天就走得到的实现缺口：C516（抬 F 那一串发布被拒时前面几次已落盘）、C517（固定点分配被拒之后同一进程里写不出去）、C518（一次挂载之内环转过一圈之后不回收）**2026-09-25 实十六接续已打进主工作区**：C515（政策不一致计数恒 0，口径没改） 的计数删光、已还清。**2026-09-25 C363（现算保留池时树高从哪读没有条款） 候选 (b) 判完**：空间准入接进发布与挂载路径、抬 F 被拒时退回分配器，这个里程碑由实二五做。**2026-09-25 实二五已接线**：空间准入接进发布与挂载路径，抬 F 第一次被拒时分配器换回原样。 | 步 4、5 现状；`.claude/kb/checks-owed.md` |
+| 6 | 链首锚与链尾边界：C245（系统配置槽的写频率，两条条款说反话） 第三轮 2026-09-16 发了腿没收尾，第二轮交用户的题面「链首锚与链尾边界各放哪」没交；C365（恢复路径的链首不锚在所选根覆盖的最后一条） 只修了锚点记录读不出那一格；C376（发布边界在链尾没有输入）；C377（回退复用水位之上记录点名的单元）；C331（择根倒挂压过已确认的写） 的追加（回退与切换时「前缀末」没绑参数、ringmax 回绕） | 三方撂下；交用户 | 等（记录粒度） | 链首锚与链尾边界：链首锚由 P6 定（同 txg 里 jsn 最大那条，读不出时靠本次发布内序号）；链尾边界（第五条『发布边界怎么认』）改按记录标志位 0 是否为 1 判定（2026-09-24 改，非『点名了共享内生块的那条』），末条没到的发布整体不施加；链首与链尾两处的实现均已随实二十／实二二三完成，C245（系统配置槽的写频率，两条条款说反话） 剩下的门禁那道『同一个结构写频率不许两处不同量级』2026-09-28 接进门禁 doc-decisions 的 write-frequency 格；C245（系统配置槽的写频率，两条条款说反话） 第三轮同日判完、已还清（见第 33 行） | `research/prompts/c245-r2-main-verification.md`；`.claude/kb/checks-owed.md` |
+| 7 | C331（择根倒挂压过已确认的写） 修法（计数器从全环最大 + 1 起 / 系统配置带 txg / 记录扫描水位）；C332（回退实例两个根都读不出时回退被撤销） 择根要不要读实例表；C335（根槽持续读不出时实例表只增不减） 不再是吸收态的条款 | 条款空白 | 不等（C331（择根倒挂压过已确认的写） 的修法动记录号的那一支等） | 2026-09-22 三方判完（`research/prompts/m2-rootchoice-repair-r1-main-verification.md` K2–K4）：C331（择根倒挂压过已确认的写） 甲、乙挡不住，丁 挡得住，丙攻不动；C332（回退实例两个根都读不出时回退被撤销） 候选 1 结构性无效、候选 2 与 C331（择根倒挂压过已确认的写） 乙抢同一块系统配置槽空间、候选 3 是价值判断；C335（根槽持续读不出时实例表只增不减） 本地腿两次抽样不一致、不下结论。各条的代价由 `research/prompts/e158-preregistration.md` 量，岔路单 `research/prompts/m2-rootchoice-repair-r1-forks.md` 第 2、3 行，量完交用户定。**2026-09-28**：C331（择根倒挂压过已确认的写） 用户定取甲（见证读缺一槽就判不出、取号缺一槽就拒，被攻过两轮，`research/prompts/unreadable-at-mount-r2-main-verification.md` L2；代价是撕裂轮换之后只剩只读挂载，记 C596（撕裂的系统配置轮换之后只剩只读挂载））；已实现，用例 `a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify.rs`，C331（择根倒挂压过已确认的写） 仍欠多次挂载崩溃点重放里的注入；C335（根槽持续读不出时实例表只增不减） 调查员实测题面不成立、用户定关账，行只增不删另立 C597（实例表行只增不删，删行的条件没有条款）；C332（回退实例两个根都读不出时回退被撤销） 早已作废 | 步 4 决策点 |
+| 8 | 空池挂载那七个拒绝没有条款 | 预想，交用户 | 不等 | 逐格判决（`research/prompts/m2-refusals-presumed-r1-main-verification.md` 第三节）：R1 误拒，该写条款：C492（树表 0 条的一版上写实例表行是误拒）；R2 条文与实现说反话：C493（回退候选集条文与实现说反话），2026-09-23 实现拿掉那条排除、已与条文对上，只欠一条判别力变异；R3 登记成第一版不支持，另记 C496（环里一条记录都读不出的那道拒绝的前提不承重）；R4 实现缺口，加 C494（新池新建文件 txg 常量的射程没有条款）——用户 2026-09-23 定「只管 mkfs 那条流」：任何池的第一个文件版本 txg 取现行根 + 1，写进 D22（单元原子性怎么合成） 已定项 16 第 5 句，实现已按它接线；R5 该写条款：C495（第一个文件版本核上一版记录没有条款）——用户 2026-09-24 定照今天写成条款（D23（journal 的角色与格式） 已定项 14「第一个文件版本接在哪条记录之后」），欠一条故障注入用例；R6 推得出维持；R7 推得出维持（D2（RAID 条带策略） 已定项 7 的字面后果）；R8 登记成第一版不支持 | 步 3 现状 |
+| 9 | 实做时定下、标预想的：实例表排在全部提交内生块之前、写行与暖机重写四个固定点单元、后续挂载与回退之后的暖机次数现算（D16（发布语义） 已定项 8 只定了第一次可写挂载）、重开后开放段不续、没有干净关闭标记、链首接法、回退行的 W 恒 0 | 预想，交用户 | 不等 | 逐格判决（`research/prompts/m2-refusals-presumed-r1-main-verification.md` 第三节）：P1 条款空白：C497（实例表在 bump 次序里排第几没有条款）；P2 推得出维持；P3 条款空白：C498（后续挂载与崩了再挂的暖机次数没有条款）；P4 推得出维持；P5 条款空白：C499（干净关闭标记有没有没有条款）；P6 条款空白：C500（所选根那条记录读不出时链首接法没有条款）；P7：2026-09-23 用户定案等整段重议时一起定，账记在 C514（回退行的 W 等整段重议）。**用户 2026-09-23 定 P1 / P3 / P5 / P6 四格逐条走三方**，每格一轮，条款由三方判完再交用户定。第一轮 2026-09-23 判完（`research/prompts/m2-presumed-clauses-r1-main-verification.md`）：P1、P5 判不动、缺一句条款，今天的做法不碰任何已定分项，交用户定要不要写成条款；P3 构造不出不够、但白推一次空发布，P6 在一次发布 N ≥ 2 条记录下两个方向都打中、条款跟并行线一一起写——这两格第一轮打中。**用户 2026-09-23 四格都定了**（判决第七节）：P1、P5 照今天写成条款（D3（空间分配） 已定项 10 ⑤、D23（journal 的角色与格式） 已定项 14），P3 照今天写、认白推（D16（发布语义） 已定项 8），P6 锚点取 jsn 最大那条、锚点读不出时靠记录头的本次发布内序号（D23（journal 的角色与格式） 已定项 14 注 1 与已定项 4，随并行线一落地）；四格各欠一条会红的用例，P6 的实现归第 36 行。旁见另立 C519（丢一整块盘时恢复丢掉刚确认的那一版），收口表第 61 行。**2026-09-28 核实：四格欠的会红用例都已写，这一行关**（这一行 P7 的 W 随回退改成向前发布、对象已不在，C514（回退行的 W 等整段重议） 已作废）：C497（实例表在 bump 次序里排第几没有条款）、C498（后续挂载与崩了再挂的暖机次数没有条款）、C499（干净关闭标记有没有没有条款） 的用例在 `crates/singlefs-harness/tests/presumed_clause_checks.rs`，C500（所选根那条记录读不出时链首接法没有条款） 的在 `multi_unit_file_write_and_read.rs` 与 `journal_last_record_flag_of_a_multi_record_publish.rs`，四笔都在 `.claude/kb/checks-owed.md` 已还清表里，各自点名变异行 | 步 3、步 4 现状 |
+| 10 | C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 另一半：崩溃丢弃的孤儿单元里的 inode 号能不能重发，D8（核心索引结构） 已定项 6「单调不复用」要不要收窄 | 已答：D8（核心索引结构） 已定项 6 2026-09-06 用户定案收窄成「已发布的 inode 号单调不复用」，依据逐字是普通崩溃会重发未发布的号（decisions-history.md 的 D8（核心索引结构） 节 2026-09-06 那一条「D8（核心索引结构） 已定项 6 的射程收窄成……」）；2026-09-17 立表时照 C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 前置列的「另一半交用户」抄进来，漏看了那次定案（`m2-closeout-recheck-a.md` 第 10 行） | 不等 | 关；收窄之后剩下的复核要扫描重建，不收口（表后那一栏） | 步 4 决策点 |
+| 11 | 改动计数：新池新建文件写 1，D8（核心索引结构） 已定项 6 字段表按定义该是 3；2026-09-16 核出，没立欠账 | 2026-09-18 用户定案：改代码写 3、重跑 E142（新池新建文件的干跑）（字段表是定义，实现跟定义走）；同日代码已改（`publish_first_file` 写 `NEW_POOL_FILE_CREATION_TXG`，`records.rs` 与两处用例跟着改，变异「换回 1」红在「逐字段回读等于写入」） | 不等 | 2026-09-18 E142（新池新建文件的干跑） 第十一次跑已重跑：67 段差异全部归因，另有 journal_record、mapping_root 两个结构跟着变，量 5 与 `crates/` 实装 21/21 全等（`e142-new-pool-file-creation-dry-run-2026-09-18-change-count-three.out` 第 181–183、233 行）；[layout/01-first-txn.md](../layout/01-first-txn.md) 改动计数那一格与 D8（核心索引结构） 正文「新池新建文件写」那一句同日改成 3（代码三方第二轮正推腿打中后者漏列）。层 0 全量同日在改成 3 的代码上重跑，两条流零违例（第一条流 262,165 个状态、第二条流 2,104,413 个状态，`m2-wave2-crash-verifier-report.md`） | 步 1 决策点 |
+| 12 | C374（释放代与树表诞生 txg 只有验收断言盯着）：立不变量还是不写这两条变异，自定的「步 3 开工前定」已过 | 2026-09-18 用户定案：立不变量 + checker 实现（不是只加两条变异） | 不等 | 主 agent 给不变量措辞 → `kb-scribe` 写进 [invariants.md](../invariants.md) → 实现员做 checker 判定与两份坏镜像 → `sweep` 按「新立一条判据」回扫已有条目。前三步 2026-09-18 做完：I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变） 写进 invariants.md，`walk.rs` 的 `judge_release_generation_and_tree_table_birth`，坏镜像用例 `each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite`，`crates/mutations.tsv` 第 114–115 行，C374（释放代与树表诞生 txg 只有验收断言盯着） 已还清；回扫那一步 2026-09-19 做了（`m2-generation-fields-sweep-report.md`）：盘上 20 个代字段，过 8、不过 9、分不清 4，另 I-3.9（释放代落在停止引用它的那一格区间里） 在某条候选根的引用集合走不完时整条报不适用、没有坏镜像罩着；不过的与那一处空当立 C395（代字段只有验收断言盯着），归批 C，先由主 agent 逐条给不变量措辞，第 44 行是其中一项（I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 已实现）。**用户 2026-09-24 定：C395（代字段只有验收断言盯着） 判不收口，挪到后面的里程碑**——措辞草稿已入库 `research/prompts/c395-invariants-draft.md`，开工时直接用；草稿查出的 I-7.9（回退下界 F 不高于抬 F 的上限） 条文近乎恒真那一处归第 26 行，照旧在这个里程碑修 | 步 2 验收 |
+| 13 | 从盘上重建上一版时，释放判定路径不核映射条目里位置项带的单元校验和（第二轮攻方腿 Y1 射程） | 条款空白 | 不等 | **2026-09-23 三方判完：推不出，条款空白。** D19（块指针的结构与宽度预算） 已定项 5「释放一律经映射，不经提示」那三条硬规则里没有一条回答「核到映射条目之后要不要读盘核校验和」；已定项 2 与已定项 4 只定校验和字段的存在与位宽，不回答谁在何时核它。C394（释放判定不核映射条目位置项里的单元校验和） 的登记行本来就写着「条款定了……之后」。⇒ **用户 2026-09-23 定「核」**，并定核出对不上时隔离那个槽、发布照成（逻辑上照样释放、映射条目去掉，物理槽不还回空闲池、记进隔离并计数报出），写进 D19（块指针的结构与宽度预算） 已定项 5 硬规则 1。读盘本身失败归哪个错误成员、从盘上重建上一版的路径与发布路径要不要同一条判据、隔离的槽跨不跨重挂与进不进准入式子，还没有条款，另起一题（那一轮正推腿的失败面清单在 `research/prompts/m2-placement-falsepositive-r1-sonnet-output.md`「核了之后新开什么失败面」），账在 C394（释放判定不核映射条目位置项里的单元校验和）。**2026-09-25 实十六接续已打进主工作区**：N1（读不出先重读一次）、N3（对不上的留在已分配）做了；只一份坏时两块盘一起留、池外位置项拒绝、checker 豁免读法用户已定，实现随实二二。2026-09-25 实二二三已实现两块盘一起留、池外位置拒绝、按单元豁免。2026-09-25 实二五已实现核出对不上先重读一次，故障注入两条转绿。 | 步 3 决策点 |
+| 14 | C126（切换预留的最坏量没有口径） 实现侧对拍与三块盘以上两份副本落哪两块 | 要三方 + 对拍 | 等 | **用户 2026-09-23 定：判不收口，挪到后面的里程碑**——第一版只有两块盘，三块盘以上两份副本落哪两块在这个里程碑没有对象可造。C126（切换预留的最坏量没有口径） 的活照旧：先定「最坏量」的口径，再在对拍工装里造三块盘以上、两份副本落哪两块的历史 | 步 3 决策点 |
+| 15 | 步 1 / 步 2 代码三方第二轮的七处改法被攻过零轮，第三轮时机（「并行线一开工前、或步 3 开工前」）已过 | 要三方 | 不等 | 不再单开一轮：七处改法 2026-09-17 并进 `m2-step3-code-r1` 的 X11（`_m2-step3-code-r1-body.md` 第 10、53 行），只分给本地攻方，两份干净样本零打中（`research/prompts/m2-step3-code-r1-main-verification.md` 第 17 行），云端腿没攻过；此后生成器快档、层 0 全量与门禁 checker-tier-crates-mutation-replay 都罩着这些路径。主 agent 2026-09-19 判关（`records/2026-09-19-里程碑二遗留收拢.md` 第二节） | `research/prompts/m2-code-r2-main-verification.md` |
+| 16 | C334（切换的所选根没有会红的检查）：那条定义只在攻方腿自己的模型上量过 | 要三方 | 不等 | **用户 2026-09-23 定：判不收口，挪到后面的里程碑**——要挂载内实例切换，`crates/` 里没有。用户同日另定实例切换要重新读盘择根（D23（journal 的角色与格式） 已定项 14，第 40 行），C334（切换的所选根没有会红的检查） 要拦的那条定义随之改了，检查形态等切换落地时照新定义重写 | 步 3 决策点 |
+| 17 | C338（树表条目预留没有余量）：认购表与三个 8 字节宽度 | 认购表已立成正文 + 算和的门禁（2026-09-22 还清） | 不等 | **已还**：用户 2026-09-16 定案已把条目加宽到 200 / 预留 76，2026-09-22 把认购表立成 D8（核心索引结构） 已定项 11 里一张机器读得了的表（标记 `gate:tree-table-reserve total=76`），并立门禁 doc-registries 的 tree-table-reserve 格算和——合计不许超过预留、每条出处要指得到一个真实存在的编号；判别力样本 `.claude/gate.d/fixtures/doc-registries.sh/tree-table-reserve-red`，红臂（合计 88 > 76）判红、绿臂报「3 条认购、余 44」。⚠️ **立表当场抓到一处真错**：正文列的是 8 + 8 + 8 + 16 + 8 = 48 而写着「共 56」，多出的 8 是 inode 号水位——C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 2026-09-16 定案「水位照旧住记账」之后认购作废、合计没人回来改 ⇒ 预留 76 的真实余量是 **28** 不是 20 | 开工前一节 |
+| 18 | C357（同一根轴上的两条重开判据没人合过） | 等 D25（目标负载优先级） 的数值权重 | 等 | **用户 2026-09-23 定：这个里程碑里量。** D25（目标负载优先级） 的数值权重怎么量待定，照规矩先写岔路单再立实验；量出来之后按 C357（同一根轴上的两条重开判据没人合过） 那张「重开判据轴表」给两条判据写合成规则 | `.claude/kb/checks-owed.md` |
+| 19 | 并行线三开工前：目录进不进；出生序号作用域（`BirthSequenceAllocator` 每次调用重建，多对象同一 checkpoint 会撞重复映射 key）。并行线四开工前：块设备抽象要不要加「写零」、环清零写登记成哪种步骤 | 交用户；作用域那格代码三方第一轮没打中（`research/prompts/m2-wave1-code-r1-main-verification.md` 第 14 行） | 线三等；作用域那格与线四不等 | 目录那一问 2026-09-16 已答：目录与 POSIX 面不进这个里程碑（文首范围段）；写零与环清零的步骤种类线四开工前交用户；作用域 2026-09-17 实现员交回：发号器每次发布建一个，一个文件对象的单元抽成 `build_file_version_units`，单文件发布字节不变 | 并行线三、四 |
+| 20 | C369（提交内生块段耗尽时没有回落）；C368（分配器落点只看盘 0，盘不等大时断言失败）；C146（无空段时的回落政策全仓无定义） 第 ② 条核后销账 | 条款已定；两处实现过了两轮代码三方（第一轮打中的另起第 59、60 行，第 59 行的改法第二轮再攻，`research/prompts/m2-wave2-code-r1-main-verification.md` 第 14、37 行）；C369（提交内生块段耗尽时没有回落） 2026-09-19 挪进已还清；C368（分配器落点只看盘 0，盘不等大时断言失败） 还欠发布层把拒绝原因统一报成 `NoSpaceFor` 那半句（`allocator.rs` 的 `allocate_*` 用 `.ok()` 丢掉原因），与增补 3 第 2 件代码三方第一轮 M3 第二分句是同一处，交实现员一起改；C146（无空段时的回落政策全仓无定义） 第 ① ③ 条是后台整理，不归这个里程碑，推迟要用户点头 | 不等 | 2026-09-17 实现员交回：回落与 bump 共用「已分配、隔离、扣住」三样挡位；三处落点由每块盘各答一个、一致才分配；新用例 `commit_generated_units_fall_back_when_the_segment_runs_out.rs`、`unequal_devices.rs`，变异 9 条；补回落之后第 ② 行「抬 F 的空发布分配不到固定点」缩成「扣住的槽之外一个空槽都没有」 | `.claude/kb/checks-owed.md` |
+| 53 | 盘不等大时各盘的落点答案可以不同：`Placement` 两盘同槽、只有一个槽号，而 D2（RAID 条带策略） 已定项 10 要每个副本一条位置条目；w ≥ 2 时各盘聚簇段要不要对齐是 D3（空间分配） 已定项 8 ⚠️ 待办 ①；小盘写满之后设备集合怎么选是 D2（RAID 条带策略） 已定项 2 ⚠️ 那一半。今天实现在动状态之前拒绝（三个错误成员），盘不等大、小盘没有全空段而大盘有时走得到，发布层统一报 `NoSpaceFor`（假性 ENOSPC）；运行时计数「用户数据的落点与政策函数不一致的次数」已删除（C515（政策不一致计数恒 0，口径没改） 2026-09-25 已还清）：`PoolAllocator::policy_mismatches` 字段已删（实十六接续），`verification-build.md` 改核「写记录」（4 KiB 定长记录字段、事务边界、反向链 CRC32C、载荷校验和、实例代号位宽） | 条款空白（2026-09-17 分配器实现员交回时报） | 不等 | **2026-09-23 三方判完：推不出，条款空白。** 今天「三个错误成员拒绝」是对空白的第一版默认，不是任何已定分项的直接后果——D2（RAID 条带策略） 已定项 2 明写「不由已定项 2 覆盖」；已定项 8 在第一版几何下没有对象可执行；已定项 10 允许各副本槽号不同、不要求同槽号，`Placement` 的单槽号是实现自己加的一层；D3（空间分配） 已定项 5 与已定项 8 的射程句都自认「全仓没有条款」。**计数口径那一问也答了**：`policy_mismatches` 恒 0 是结构性的，该量的是「实际记录的落点」与「单块盘政策函数独立求值的答案」之差，而两者之间插着一道「不等就拒绝」的闸、永不分离。⚠️ 顺带订正：`.claude/kb/verification-build.md` 今天没有 `fallback_policy_mismatches` 字样，字段名与代码一致就是 `policy_mismatches`。2026-09-23 用户定案第一版维持拒绝并写明是限制，条款已补进 D3（空间分配） 已定项 8；`policy_mismatches` 的口径这一轮没改，仍恒 0，另记一笔账 C515（政策不一致计数恒 0，口径没改）。 | `.claude/kb/decisions/03-空间分配.md` 已定项 8；`.claude/kb/decisions/02-RAID条带策略.md` 已定项 2 / 已定项 10 |
+| 21 | C366（暖机路径把 txg 写进计数器与 tail）：只有第一次可写挂载走这条路，两者按构造相等，今天走不到出错的那格，写法不对 | 函数层已改，代码三方第一轮 U4 没打中（`research/prompts/m2-wave1-code-r1-main-verification.md` 第 13–14 行）；C366（暖机路径把 txg 写进计数器与 tail） 的「怎么拦」（多次挂载的固定脚本里在 txg ≠ 计数器的状态上断言 tail 跟记录号走）没做，挂载的暖机走 `mount.rs` 的 `publish_empty_after`，今天两个量按构造相等（`m2-closeout-recheck-b.md` 第 21 行） | 不等 | 会红形态归批 B（`records/2026-09-19-里程碑二遗留收拢.md`）。2026-09-17 实现员交回：暖机拆成 `warm_up`（环空时从记录号 0 接着数）与 `warm_up_after_journal_counter`，tail 跟记录号走；挂载层今天分不出两个量（重开之后的挂载本来按记录号数，崩在暖机记录落盘、根没落时取号之前就被拒），用例只在函数层给不相等的起点。2026-09-23 harness 那一组查出：那条拒绝已经没了，但重挂时两个量照样相等（随机历史 3600 步处处相等），唯一分得开的是所选根自己那条记录两份都读不出那一格（txg 5、计数器 4）；那一格上 D23（journal 的角色与格式） 已定项 14 注 3 的前缀末没写，用户同日定取环里读得出的最大那一个，会红的用例就写在那一格上。**2026-09-28 核实：已写，这一行关**——`crates/singlefs-harness/tests/warm_up_journal_counter.rs` 两条用例：挂载层 `a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg`（变异 `crates/mutations.tsv` 第 351、352 行）与函数层 `warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two`（第 89、353 行），C366（暖机路径把 txg 写进计数器与 tail） 在 `.claude/kb/checks-owed.md` 已还清表里 | 步 3 |
+| 22 | 多次挂载录制流上会红的检查欠：C287（切换收养开放 checkpoint 的事务后再崩）、C330（中间实例那一行的 T_pub 取所选根的 txg）、C282（环里最旧根没有定义）；C329（写行那次发布之前推抬 F 的空发布没有检查） 要准入不够的负载，跟第 5 行；C22（刚释放的块立即重分配）、C80（记账更新必须原子地随根发布）、C281（回退后第一次发布会复用被抛弃时间线还引用的块）、C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 2026-09-17 逐句核过（`m2-closeout-debts-check.md`）：七条今天一条都销不掉。C77（重放起点未定义） 最近，三个分句都有断言、已进门禁 checker-tier-layer0-replay，差把变异表第 97 行真跑一遍坐实；C22（刚释放的块立即重分配） 的故障注入用例只断言 I-2.1（校验和与内容匹配）、没点名 I-4.8（近 K 代根校验和自洽）；C29（恢复先信 tail 会丢数据） 2026-09-28 核实已还清（用例 `a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply`，`crates/mutations.tsv` 第 249 行靶它）；C42（残留记录冒充合法前缀） 只有正例；C281（回退后第一次发布会复用被抛弃时间线还引用的块） / C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 的「前置」列过时（写着「检查仍欠：崩溃点重放 harness」，而全量枚举与定向自证今天都有） | 会红的检查欠；去向列那三件 2026-09-18 已做（`m2-closeout-recheck-b.md` 第 22 行）：C22（刚释放的块立即重分配） 的断言点名 I-4.8（近 K 代根校验和自洽）、变异第 110 行在门禁 checker-tier-crates-mutation-replay 里红，2026-09-19 挪进已还清；C77（重放起点未定义） 的变异第 97 行两次复跑都红，跨实例那一形有了，同一实例内的那一形与撕裂注入的旗标仍欠；C281（回退后第一次发布会复用被抛弃时间线还引用的块） / C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 的前置列已改。另并进 C353（journal 在恢复路径上的承重没有会红的检查） 的判别力自证（拿掉记录头的新根段、差异态必须回到 0，`crates/mutations.tsv` 没有这条变异）与 C199（实例代号递增与 jsn 断号即止互相矛盾） 的两格崩溃状态（里程碑一步 5、6 决策点带过来的，第 ② 格要第 24 行的根槽读失败开关） | 不等（C329（写行那次发布之前推抬 F 的空发布没有检查） 跟第 5 行） | **用户 2026-09-22 定：判不收口。** 这一批欠账都要一件今天没有的东西——**多次挂载的崩溃点重放装置**：层 0 今天只有两条写死的流（新池新建文件；固定脚本到 E），而 C287（切换收养开放 checkpoint 的事务后再崩）、C330（中间实例那一行的 T_pub 取所选根的 txg）、C282（环里最旧根没有定义）、C353（journal 在恢复路径上的承重没有会红的检查） 各自要的形态都跨挂载。⚠️ 增补 3 第 1 件的随机历史生成器**是跨挂载的，但它不是崩溃点重放**（按种子抽若干次写截断、不枚举），顶不上。把「多次挂载的崩溃点重放装置」记进 C287（切换收养开放 checkpoint 的事务后再崩）、C330（中间实例那一行的 T_pub 取所选根的 txg）、C282（环里最旧根没有定义）、C353（journal 在恢复路径上的承重没有会红的检查） 各自的前置列，等那套装置出来再开。**用户 2026-09-24 定：判不收口，挪到后面的里程碑**——多次挂载的崩溃点重放装置这个里程碑不做，C287（切换收养开放 checkpoint 的事务后再崩）、C330（中间实例那一行的 T_pub 取所选根的 txg）、C282（环里最旧根没有定义）、C353（journal 在恢复路径上的承重没有会红的检查） 留着、前置写着要这套装置；C287（切换收养开放 checkpoint 的事务后再崩） 属于实例切换，实例切换本来就已挪后 | 步 3、4、5、6 |
+| 23 | 步 0 装置：预置基镜像（正例；反例跟 ①）；必红「陈旧 tail + 已复用的块」（C77（重放起点未定义）、C29（恢复先信 tail 会丢数据）、C42（残留记录冒充合法前缀） 那几格）；层 0 报每条不变量的评估次数 | 代码三方第一轮 U7 没算打中（`research/prompts/m2-wave1-code-r1-main-verification.md` 第 14 行）（残留记录正例 31 个状态里 19 个跑到；陈旧 tail 那格只造得出跨实例的一格，同一实例内的 E78（重放的起点） 形态这条脚本造不出；「先信 tail」C29（恢复先信 tail 会丢数据） 那一形态仍没有会红的检查） | 不等 | 2026-09-17 实现员交回：`crash_enumeration_fixed_script_stream.rs` 两条新用例、`crash.rs` 按不变量报「评估过 / 判违例 / 不适用」、变异 6 条 | 步 0、步 6 |
+| 54 | I-3.1（已分配统计对得上） 在合法状态上判红：可写挂载接在「由记录施加出来、根槽从没落盘」的那一版之后，写行发布把那一版的四个固定点单元放进 defer，分配器按占着算已分配、checker 的并集里没有任何根引用它们，残留记录那条流 12 个状态差 65 536 字节（步 3 的函数级用例就是这段历史，只是没跑池级 checker） | 口径冲突，今天走得到；2026-09-19 c381-r1 攻方在 HEAD 版 core 副本上用一个纯断电复现同形（固定前缀到 B、C 的记录落盘根槽没落，断电点 17 或 18，可写重开之后差 4 个槽，`research/prompts/c381-r1-main-verification.md` 第六节，核查员复跑逐字相同），失败之后原样重发也走得到（同一报告第五节） | 跟第 ② 行（I-3.1（已分配统计对得上） 的口径）一起判，但它不等增补 1 就在错 | **2026-09-23 三方判完：那 12 个状态合法，错在判据这一句**——`walked` 只由根环里读得出的根贡献，而「由记录施加出来、根槽从没落盘」那一版进不了 `roots`。四个候选里 c（记账 ≥ 遍历）、f（记账 − 遍历 ≤ defer 行）、e（报不适用）**都交不出「改完仍会红」那一半**，按跑前判据第 2 条判「没验过」；c 与 f 更被一份纯泄漏坏镜像当场打穿（改完连仓里原有那份 I-3.1（已分配统计对得上） 坏镜像也一起哑）。**用户 2026-09-23 定：做候选 b**（checker 的候选集并集补上「由记录施加出来的版本」）——它是唯一交得出第二半的。待实现。。**2026-09-23 实现已落**（checker 那一组）：候选集并进「由记录施加出来、根槽从没落盘的那一版」，那 12 个状态不再红，加一个槽的泄漏照样只红 I-3.1（已分配统计对得上），两份纯泄漏坏镜像照样红；认法四条是实现推出来的、交代码三方攻；由此查出的新根段缺两样另立 C533（记录新根段缺实例表与分配记录树两个根指针），第 62 行 | 步 3；第 ② 行 |
+| 55 | 记录核对器第二条判据（`record_claimed_state_missing_unit`）的复用豁免 2026-09-20 落地，误报已消失。 | 检查自己错 | 不等 | **2026-09-23 收严已做完**：① 两半读数如上，C507（记录核对器的复用豁免比登记的候选宽，把真洞变哑） 已还清；剩下的盲点另立 C513（复用豁免不判那次复用合不合法）。② **那一半要写得更准**：实现员自己拿探针在**六条流**上重数过，同时含根槽写与单元写的段都是 0；它另外还数了「单元写 + journal 记录同段」也全是 0——理由是恢复能用记录重建出更新的根，只堵根槽那一半不够。那句 `(0, 0)` 断言的理由已改成实话（结构上到不了、不是语义上保证），断言本身留着。 | 步 6 |
+| 24 | 只供测试的开关缺三个：复用窗口置 0、按 (区域, 槽) 让根槽读返回失败（C332（回退实例两个根都读不出时回退被撤销）、C335（根槽持续读不出时实例表只增不减）、C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 要它）、把「一条记录装几个事务」压小（并行线一要它）；已有开关的运行时分支名没核 | 没实现 | 前两个不等；第三个等 | **前两个 2026-09-22 已落地**：`ReuseWindow`（`crates/singlefs-core/src/allocator.rs`，两臂各有运行时分支名）与 `RootRingSlotTarget`（`crates/singlefs-harness/src/fault_injection.rs`，两个口子——包在读者外面返回 `None`、包在块设备外面真返回 `BlockDeviceError`，判「这一次读落在哪个点名的槽里」共用同一个 `slot_covering`），**而且是持续的**（再跑一遍拦下的读数接着涨、结论逐项相同，两条用例各钉一次）。用例在 `test_only_switches_force_every_branch.rs` 与 `rollback_by_a_forward_publish.rs`，八条变异逐条在副本里改坏跑红、基线红集为空。⚠️ 与步 4 已有的「改坏根槽字节」是**两条不同的路**：那条走校验和对不上，这条走设备读返回错误，错误成员与代码路径都不同、不能互相顶替。**第三个（把「一条记录装几个事务」压小）仍归并行线一。** 末句「已有开关的运行时分支名没核」已核：五个开关里三个当天补齐（`verification_passed` 只数真验过的、`raise_rollback_floor` 的文档改成实话、`ShadowLedger::branch_name`，账在 C482（只供测试的开关有三个走了哪一条看不出来） —— 已还），两个本来就对得上（`ReuseWindow`、`RootRingSlotTarget`） | 步 0 |
+| 25 | 干跑实验号（覆盖写、释放、回退与复用固定脚本的字节清单，照 E142（新池新建文件的干跑））；段序列登记表八没有发布 B 自己那一行 | 没实现 | 等（发布形态可能变） | **用户 2026-09-23 定：判不收口，挪到后面的里程碑**——是整轮新实验：照 E142（新池新建文件的干跑） 的形态给覆盖写、释放、回退与复用的固定脚本建一份字节清单，连同段序列登记表八补发布 B 自己那一行 | 步 0、步 1 |
+| 26 | checker：认「非空持久有效根」与 F 抬过上限要红的检查（定义已定，D16（发布语义） 已定项 1 表格后那段 ⚠️）；预想清单里没接的 I-1.2（块头写序已发布）、I-1.8（归并后版本全序）、I-3.4（可用空间扣待删占用）、I-4.2（无被引用未提交块）、I-4.3（提交原子）、I-5.3（报出的空闲都兑现得了）、I-7.3（环健康性）、I-8.1（环几何够大）、I-8.2（记录头不跨原子单元）、I-8.3（重放前缀严格连续）、I-8.4（重放幂等）、I-8.5（tail 槽有效集非空）、I-8.6（反向链算法）；记录核对器不认实例表行与回退行（跟 ①）；I-7.4（近 K 代块未被复用） 只靠校验和对不上判复用；被抛弃根引用的单元不在 checker 候选集里；I-7.2（最新根可完整遍历） 的不适用分支是死码；checker 的 `walk_root` 在树表单元已访问过时整条根返回、那条根的中央映射树不走（步 6 现状），先判今天可不可达 | 没实现 | 非空根那条与块头写序、版本全序、无被引用未提交块、提交原子、环健康性那五条不等；journal 那六条等（journal 形态可能变）；I-5.3（报出的空闲都兑现得了） 跟第 5 行 | **2026-09-22 现查 `.claude/kb/invariants.md` 的状态列，项列那张清单已经腐烂**：I-1.8（归并后版本全序）、I-7.3（环健康性）、I-8.6（反向链算法） 三条 2026-09-21 都已实现（池级 checker `walk::check_pool_image`，坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`，层 0 每个崩溃状态都判），I-7.2（最新根可完整遍历） 2026-09-14 已实现 ⇒ 别按项列那张清单重做。**真正还欠、而且不等的只剩三条**：I-1.2（块头写序已发布）、I-4.2（无被引用未提交块）、I-4.3（提交原子），**2026-09-22 交回**：I-1.2（块头写序已发布） 与 I-4.2（无被引用未提交块） 接进池级 checker（`walk::check_pool_image` 的 `judge_birth_identity_of_a_referenced_unit`，两份坏镜像各只红自己那一条、由 `the_birth_identity_bad_images_redden_only_their_own_invariant` 钉住，三条变异抓到 3 / 无效 0 / 没红 0，`check.sh` 绿）；**I-4.3（提交原子） 判不了，留在「未实现」、没写恒真的检查**——「部分生效」要拿「这次事务该有的全部效果」当 oracle 才分得出来，而一份镜像上任何状态都自洽，池级 checker 手上没有第二个输入，判它的是层 0 崩溃点重放加 oracle（形态同 C116（叶容器的分裂 / 合并纪律没有会失败的检查））。⚠️ **I-1.2（块头写序已发布） 的射程被收成「遍历方向」那一半**：扫描方向（「任一单元」都按谓词判、i > 挂载根实例就判损坏）对着一份崩溃镜像判不了——判不成已发布本身不是违例，而「i > 挂载根实例」只在恢复刚发布完新根那一刻成立，上一次挂载取了号、写出单元、一个根都没发布就崩是合法的，那一支今天由 I-7.7（系统配置实例代号不低于根环） ① 兜着。两条理由已写进 `.claude/kb/invariants.md` 那一行。journal 那六条（I-8.1（环几何够大）、I-8.2（记录头不跨原子单元）、I-8.3（重放前缀严格连续）、I-8.4（重放幂等）、I-8.5（tail 槽有效集非空））仍等 journal 形态；I-3.4（可用空间扣待删占用）、I-5.3（报出的空闲都兑现得了） 跟第 5 行。**非空根那条**已立成 I-7.9（回退下界 F 不高于抬 F 的上限）（2026-09-24 已实现：checker `judge_rollback_floor_raises_against_their_ceilings`，坏镜像 `raising_the_floor_above_its_ceiling_reddens_only_the_rollback_floor_invariant`，`crates/mutations.tsv` 6 条变异，见 invariants.md） | 步 5、步 6 |
+| 27 | 今天不可达的欠账：豁免集与隔离集按记录起点做 key、扣住位在空发布循环之后无条件放开、被抛弃根的根槽读不出时既不隔离也不计数、alloc-basis 第三轮转来的四条；C333（删行那次发布被重放）：行回收没实现（步 3、步 4 只加行不删行） | 2026-09-22 逐笔重核可达性：两笔今天已可达，各做成一条会红的用例（`unreadable_abandoned_root_slot.rs` 的 `an_abandoned_root_whose_own_root_slot_is_unreadable_is_neither_isolated_nor_counted` 与 `the_isolation_bits_of_an_abandoned_root_survive_the_ring_rotation_that_overwrites_its_root_slot`，三条变异）；一笔未证明可达也未证明不可达，两边都不写死；其中「隔离位只置不清」那一笔连带查出条文与实现说反话，已立 C503（隔离位清零的时机条文与实现说反话） 交用户定改哪一边；余下仍不可达的由门禁 doc-registries 的 closeout-row27-preconditions 格按前置立逐字探针（前置没进来退 77，动了就红） | 不等 | 这一行已有去向，不再等前置。C503（隔离位清零的时机条文与实现说反话） 用户 2026-09-23 定改代码、条文不动：轮转覆写被抛弃根的根槽时清掉那一支的隔离位；2026-09-28 核实已实现、挪进已还清（用例 `the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_that_overwrites_its_root_slot`，`crates/mutations.tsv` 第 429–431、435 行） | 步 5 现状、`.claude/gate.d/doc-registries.sh` 的 closeout-row27-preconditions 格 |
+| 28 | 树装不下只报错、没有分裂：文件只有一个数据单元（32634 字节）、分配记录树一个节点 812 条、记账树 477 条、树表 81 棵；记账树与树表今天连报错的错误成员都没有 | 部分已实现：记账树、中央映射树的分裂（含挂载态整棵读多层映射）2026-09-25 实十九已完成；分配记录树、extent 树的分裂由实二一在做，仍未实现 | 分裂等；两个报错成员不等 | **用户 2026-09-24 推翻 09-23 的挪后，定四棵树的分裂都在这个里程碑做**：分配记录树、记账树、中央映射树（含挂载态读多层映射，D19（块指针的结构与宽度预算） 已定项 5 重定）、extent 树内部节点（条目 110 字节）；分裂的每一种写序都进层 0 崩溃点，分裂规则从块自描述出发设计、不照搬别家的分裂算法（用户原话在 `records/2026-09-24-里程碑二收尾调度.md` 第三节）；分裂规则、另三棵树的内部条目格式与「末条装不下」在三方 `m2-treesplit-r1` 里判；**2026-09-24 分裂规则与内部条目用户已定**（D8（核心索引结构） 已定项 11：同段照常 COW、从中间切、只摘空节点且根剩一个孩子时降高、分隔 key 跟着维护；记账 108、映射 113）；**分配记录树与 extent 树不分裂、按 key 空间定形状**（D8（核心索引结构） 已定项 14 改成派生树可以异构），结构在三方 `m2-keyspace-r1`；多层映射挂载时整棵读进挂载态、写侧补映射树容量准入（D19（块指针的结构与宽度预算） 已定项 5），多层之后「提示过期一次解引用 3 次读」要重量；ckpt_cost 树高从根节点头现读（D28（挂载期承诺量） 已定项 4）；层 0 加 L1–L8（并行线三跨记录层0流）（L7 inode 叶容器末尾分裂用户 2026-09-24 排出这个里程碑，挪到后面的里程碑）；实现待派。**2026-09-24 两棵派生树的结构用户已定**（D8（核心索引结构） 已定项 14：分配记录树按绝对槽号按位置寻址、缺席 = 全空闲；extent 树全局两段按位置、单单元文件内联；挂载时分配记录树整棵读、extent 按需）；释放链让保留池兜不住挪到后面的里程碑（C538（分配记录树释放链让保留池兜不住））；实现待派（实二一，排在实十九之后）。**2026-09-25 实十九已实现**记账树与中央映射树的分裂（七条新层 0 流提交时跑）；分配记录树与 extent 树由实二一在做。**2026-09-25 实二一已实现**分配记录树与 extent 树按位置寻址（K1、K2、K4），四棵树的分裂都做完；五条新层 0 流提交时跑。 | 步 2 现状、步 3 决策点 |
+| 29 | C310（事务切分纪律与记录数口径打架） 会红的检查 | 会红的检查欠 | 等 | **用户 2026-09-23 定：判不收口，挪到后面的里程碑**——要并行线一的多单元写路径才造得出多单元的对象。C310（事务切分纪律与记录数口径打架） 的会红形态照旧：一次发布的记录条数 = 数据单元数，造一条多单元的写请求断言条数相符；判别力自证：把切分改成按点名项上限走必须红 | 并行线一 |
+| 30 | checker-tier-qemu-device-streams（QEMU）没跑发布 B 与切换 | 门禁缺口 | 不等 | 二进制那一半 2026-09-17 已实现；checker-tier-qemu-device-streams 2026-09-21 改完：`MODES` 加 `file-overwrite` 与 `second-instance`（二进制有五个模式，而 checker-tier-qemu-device-streams 只登记了三个），冷重开该择到的根按模式取（`1:3` / `1:4` / `2:8`，写死 `1:3` 对新两档是错的），每档另查它独有的结果行**与不许出现的行**（没有后一半，把 `MODES` 里新模式换成 `direct` 也照样全绿），判的档数与跑的档数对账，范围前缀补上本阶段自己的脚本。实跑 5 档 74 项全过、32.4 秒；设备侧日志（QEMU blklogwrites，与程序录制器不共享代码）里第二档盘 0 收到 33 个写、第三档 66 个，而新池新建文件是 23 个——多收到的那些就是发布 B 与挂载、发布 C。判别力样本已补（`fixtures/checker-tier-qemu-device-streams.sh/{red,green}`，走 checker-tier-lkmm 那条「预录档 + 只供测试的开关」的路，判全过退 3 不退 0），C455（挂钟最贵的七道阶段没有判别力样本） 的八道因此减到七道。**还欠**：`new_pool_file_creation_device_log_check` 在宿主上只重跑新池新建文件，发布 B / 可写挂载 / 发布 C 的设备侧逐项比对还没有——这两档今天只判「新池新建文件那段是设备侧日志的逐项前缀（`program` 侧为 `None`）且盘上确实多收到了写」。要还清得给它加模式参数、在宿主上接着重跑 B、挂载与 C，那是 `crates/` 的活 | 步 6 验收 |
+| 31 | 覆盖写、释放、回退与复用的挂钩检查：段序列行、各步「写出的字节」行、[layout/02-second-txn.md](../layout/02-second-txn.md) 三处互相指得到 | 门禁缺口 | 不等 | 2026-09-19 立门禁 doc-registries 的 second-txn-hooks 格（`.claude/gate.d/doc-registries.sh`，判别力样本在 `.claude/gate.d/fixtures/doc-registries.sh/second-txn-hooks-red`，阶段归属登记给 `kb-scribe`）：登记表每行与它点名的步互相点名、「写出的字节」的点名落得到、钉住它的用例文件与函数在仓里、段序列登记表标到的步与点名「八、」的步相等；立的当天抓到一处（登记表「记账的 defer 待释放行第一次不为 0」指步 5，步 5 没点名它，已补） | 步 0、步 7 |
+| 32 | D6（快照实现模型） 已定项 3 的「66 头 / 44 头」取自按 121 宽算的数，E131（livelist 的两条载体，数值与代价）、E132（livelist 载体·按真实树数与内部扇出重算） 按条目宽 200 重跑的结果已提交；D6（快照实现模型） 正文与实验索引那一行 2026-09-18 已改成 39 头 / 27 头（知识腐烂回扫）；C94（登记的格式常量与后来的定案对不上） 覆盖率；C358（总审核第五节的文档级矛盾没有回扫闸） | 回扫；门禁缺口 | 不等 | D6（快照实现模型） 那一半已关（最后一处旧数在「开工前」一节 2026-09-16 复核那段，2026-09-19 改）；C94（登记的格式常量与后来的定案对不上）、C358（总审核第五节的文档级矛盾没有回扫闸） 要的是门禁阶段。**已接、这一行关**：2026-09-24 C94（登记的格式常量与后来的定案对不上） 接进门禁 doc-registries 的 field-table-sums 格、C358（总审核第五节的文档级矛盾没有回扫闸） 接进门禁 doc-registries 的 audit-contradictions 格；2026-09-28 门禁并号之后两者仍都在 `.claude/gate.d/doc-registries.sh`，两笔都在 `.claude/kb/checks-owed.md` 已还清表里 | 开工前一节；`.claude/kb/checks-owed.md` |
+| 33 | 两轮三方（C245（系统配置槽的写频率，两条条款说反话） 第三轮、C355（checkpoint 保留池池级扣而固定点每块要落两列） / C363（现算保留池时树高从哪读没有条款） 第三轮）发了腿没收尾，没有任何检查报警 | 流程缺口 | — | 门禁 doc-process-records 的 abandoned-rounds 格已立（`.claude/gate.d/doc-process-records.sh`）。C355（checkpoint 保留池池级扣而固定点每块要落两列） / C363（现算保留池时树高从哪读没有条款） 第三轮 2026-09-23 重出材料再派、判完（`research/prompts/c355-c363-r3-main-verification.md`），用户同日定 C355（checkpoint 保留池池级扣而固定点每块要落两列） 取丁、C375（待删占用与已承诺预留按份还是按和记没有条款） 两项按全部副本之和记、C363（现算保留池时树高从哪读没有条款） 取 (b)（后来判完、已还清，见第 ⑤ 行）；`research/prompts/abandoned-rounds.tsv` 里 `c355-c363-r3` 那一行已删。C245（系统配置槽的写频率，两条条款说反话） 第三轮 2026-09-28 判完（`research/prompts/c245-r3-main-verification.md`）：21 : 500 作废，每次发布轮换系统配置槽的依据换成判据 N-配置，用户同日定「已确认的发布 + 根槽一时读不出 + 一份点名单元坏」这类双故障在射程里，D23（journal 的角色与格式） 已定项 3 射程句已改，C245（系统配置槽的写频率，两条条款说反话） 已还清、`research/prompts/abandoned-rounds.tsv` 的 c245-r3 行已删；那一轮新查出 C593（落后且缺一份单元的盘被永久拒可写），用户定先走三方再定，另立 C594（每次轮换之前现算整池 F 的读开销没量）；同批还有 c364-r3，C364（整理意图记录没有字段表） 属后台整理、不在这个里程碑 | 第 5、6 行 |
+| 34 | 收口表漏收还开着的欠账号（2026-09-17 重核之前这张表 13 行，漏了第 5–33 行里的大半），没有任何检查报警 | 流程缺口 | — | 门禁 doc-registries 的 closeout-collects-open 格已立（`.claude/gate.d/doc-registries.sh`，认表头上方的 `milestone:closeout-table` 标记与表后逐行的「不收口」） | 「增补 2」 |
+| 56 | 记账树每次发布只写当前代：`crates/singlefs-core/src/transaction.rs` 每次发布装 15 行（`accounting_entry_count(2)` = 3 + 6 × 2 算出来的），而 D5（快照 / 空间记账机制） 已定项 2 定「只保留最近 K 代」、K = 根环槽总数 + 1；每条根各自 COW 一棵记账树之后「账跟着根回退」是不是已经由树本身给了，条款没重判。按条款保留 K 代，两盘 30 行 × 25 代 × 34 字节装不下一个 16 KiB 节点，会改每次发布写多少 | 条款与实现不一致（2026-09-17 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 设计员读实现时报，主 agent 现查坐实） | 等 | **用户 2026-09-23 定：改条款，每条根只带自己那一代**；主 agent 核过没有读者要多代的账，D5（快照 / 空间记账机制） 已定项 2 已改；实现不动 | 增补 1「压着它的条款」表 |
+| 57 | 取号（两次系统配置槽写 + 屏障）在写行发布之前，发布被拒时不回卷：实例代号已经 1 → 2、录制流多 3 步，池此后每试一次可写挂载再烧一个代号；今天可达（分配记录树满了的池，第 50 次覆盖写被准入挡住之后每次可写挂载都被挡） | 实现缺口（代码三方第一轮打中，主 agent 现查 `mount.rs` 的 `establish_instance` 次序坐实）；2026-09-17 已改（主 agent 现查代码）：与内容无关的两条准入抽成只读的 `transaction::publish_admission`，可写挂载按 `PublishShape::ROW_PUBLISH` 的角色表在取号之前算，算不过返回 `MountError::RowPublishAdmissionRefusedBeforeAcquisition`，一个写都不发；用例钉「812 条正好装满、写行要 822 ⇒ 被拒，两块盘逐字节不变、四个槽的实例代号都还是 1」。⚠️ 只算写行那一次：写行之后的 1–3 次暖机空发布没进这一遍，「写行装得下、暖机装不下」那一格仍是取号写完才报错；映射与树表也没有条数上限（树表那格是第 28 行） | 不等 | 2026-09-18 用户定案：暖机那几次的准入也挪到取号之前，回卷那一格先不定。同日实现（`PublishShape::EMPTY_PUBLISH`、`publish_sequence_admission`、`MountError::WarmUpAdmissionRefusedBeforeAcquisition`、`mount::warm_up_publish_txgs` 让准入与推发布共用一份计划），两条新用例（暖机第 1 次、第 2 次装不下各一条）、三条变异。⚠️ 实现员量出的新问题：这套准入算的是上界（每次按「角色数 × 盘数」加，连乘几次），而真发起来重开之后释放掉的落点是改写不是追加——它量的那个池按上界在暖机第一次就被拒，真跑起来条数没到（796 → 798 → 798，容量 812）⇒ 新准入会拒掉发得起来的池，而「写行装得下、暖机第 N 次装不下」在真实分配下今天造不出来。要不要把可复用的已释放记录抵扣掉（抵扣多少取决于分配器真会挑哪些槽）是设计判断，交用户；改完走第二轮。抵扣那一问 2026-09-18 用户在第 39 行定了（保留上界）；回卷还是认了：**用户 2026-09-23 定「认了，写成已知行为」**，写进 D23（journal 的角色与格式） 已定项 16 的射程；C378（取号之后写行发布被拒，已烧掉的实例代号不回卷） 按「认了」断言的用例已落（2026-09-23）：写行那次写报错、暖机那次写报错两格，断言重开之后系统配置仍是 2、失败账记一次（`FaultInjectionTally::acquired_instances_left_after_a_failed_mount`，单开的一本账，不进已知红清单）、报告里点名；待代码三方与崩溃验证 | C378（取号之后写行发布被拒，已烧掉的实例代号不回卷）；`research/prompts/m2-wave1-code-r1-main-verification.md` 第二节第 1 行 |
+| 58 | 一次发布的账是前后两次快照之差、两次都在成功路径上：中途任一 `?` 返回时已落盘的写不属于任何一次发布的账，与设备一层对不上（探针：按种类 21 次 / 344 576，设备 25 次 / 442 880）；真设备二进制发布报错即整程序退出，`matches=false` 在失败路径上判别力为零 | 实现缺口（代码三方第一轮打中；压着增补 1 验收第一条）；2026-09-17 已改（主 agent 现查代码）：`PoolWriter::writes_of_failed_publishes` 一次失败存一份、不并进成功发布的账，两条落盘路径收进闭包、失败先记账再原样交回错；用例钉「失败那次 11 次 / 245 760、重试 21 次 / 344 576，相加 = 录制器记的 32 次 / 590 336」。⚠️ 失败挂载那一路的账交给谁没有条款：`establish_instance` 的 `PoolWriter` 随 `MountError` 一起丢掉，取不到——同一次挂载里已经成功落盘的写行与第一次暖机的账也一起丢（代码三方第二轮攻方探针：挂载在第二次暖机失败，设备一层 31 次 / 386 048 字节，一份都取不到），`raise_rollback_floor` 同形；真设备二进制在发布报错时整程序退出，也不取。`transaction.rs` 注释「份数就是失败过几次发布」与代码不符（落盘之前就失败的不记），2026-09-18 判决改注释 | 不等 | 二进制那一侧与增补 1 验收那句待补；改完走第二轮。**用户 2026-09-24 定**：真设备二进制在这个里程碑加抬 F 模式，连宿主侧检查与门禁 checker-tier-qemu-device-streams 的预录样本，实现待派。**2026-09-25 实二四与实二四续已实现**真设备二进制的抬 F 模式（发布 D 之后 F 抬到 3、冷重开择 (2, 11)），门禁 checker-tier-qemu-device-streams 已登记这一档；绿样本提交时由崩溃验证员真跑一次换上。2026-09-25 实二五让真设备二进制冷重开之后打印盘上读回的 F，门禁 checker-tier-qemu-device-streams 改判那一行，样本提交前真跑换上。 | `research/prompts/m2-wave1-code-r1-main-verification.md` 第二节第 2 行 |
+| 59 | 回落分支把开放段置空，而用户数据只排除「当前那一个」开放段 ⇒ 回落之后那个装着本次提交内生块的 64 槽段对用户数据开放（探针：数据单元落 50240、同一次发布的提交内生块落 50242–50249）；压的是 D3（空间分配） 已定项 8 第 2 条，代码只实现了第 1 条那半句 | 实现缺口（代码三方第一轮打中）；2026-09-17 已改（主 agent 现查代码）：`PoolAllocator::cluster_segments` 记下这次挂载开过的每个聚簇段，回落只清 bump 目标、登记留着，`lowest_user_data_slot` 排除全部聚簇段（D3（空间分配） 已定项 10 ② 的量词是「任何」）；用例钉落点 50306。⚠️ 这张表只住内存、只在本次挂载内有效，重开之后从分配记录重建时是空的；「一个聚簇段什么时候不再算聚簇段」全仓没有条款，实现取最保守的「本挂载内开过就一直算」，要不要写进 D3（空间分配） 已定项 10 待判 | 不等 | 重开之后那一格今天可达：代码三方第二轮攻方在 88 种「每次挂载之后覆盖写几次」的模式里 18 种量到用户数据落进上一次挂载开过、仍装着环里的根引用的提交内生块的段（例：[24, 0] 模式第 3 次挂载第 11 次覆盖写的数据单元落 50250，与上一次挂载写行与暖机写的实例表、八个固定点节点同段，环里 txg 30、31 的根还引用它们）；不写坏数据（判决第二节第 9 行）。**用户 2026-09-23 定照今天的实现写成条款，代码不动**（有警告，见 `.claude/warnings/2026-09-23.md`），写进 D3（空间分配） 已定项 8 第 2 条：这次挂载开过的聚簇段都对用户数据关着、回落之后那一段也关着（`PoolAllocator::cluster_segments`），重开之后上一次挂载开过、装着提交内生块的段对用户数据开放，混放允许 | `research/prompts/m2-wave1-code-r1-main-verification.md` 第二节第 3 行 |
+| 60 | 记账行「全空聚簇段数」只看已分配位，而分配器能开的段还要隔离与扣住为 0 ⇒ 整段被隔离后记账说 3310 不变、分配器能开的最低段从 50304 跳到 50368；不在 C318（影子账隔离的单元没进准入不等式） 射程内（那笔账的题面是准入不等式） | 口径冲突（代码三方第一轮打中；攻方副本上的数，入库装置上没重做） | 跟第 ② 行 | 已立 C379（记账的全空聚簇段数与分配器能开的段两个口径）；改哪一边与第 ② 行（F 的「生效」与 I-3.1（已分配统计对得上） 口径）一起判。**2026-09-28 用户定取 B**（`research/prompts/abandoned-floor-r1-main-verification.md` M3）：「全空聚簇段数」与「可开聚簇段」分开登记（D3（空间分配） 已定项 10 ①），C379（记账的全空聚簇段数与分配器能开的段两个口径） 挪进已还清；C372（全空聚簇段数两份定义相反） 照旧开着 | `research/prompts/m2-wave1-code-r1-main-verification.md` 第二节第 4 行 |
+| 35 | 写放大 | 新立 | — | 增补 1 第 1、2、3 件交回；第 4 件两轮三方都判完了（`research/prompts/m2-s1-r1-main-verification.md`、`m2-s1-r2-main-verification.md`），结论三条岔路收成甲（不改）、决策正文不动，三格交用户；E155（每次持久化的写量：三种 fsync 形态与反事实上界） 已跑到第四次跑第一段（k 轴扩到 1024，0% 门槛上不翻面，失败条款 F11 触发）。**用户 2026-09-22 定案**：三格交用户的那一批**三格都认下、维持甲（不改）**，其中第 ③ 格（甲的组提交摊薄写字节、不摊薄 fsync 的等待时间）用户另提一条要求——**等待时间那一半没量过，要先量再认**。⇒ 增补 1 本体收；剩「还欠的三笔」（一个 checkpoint 间隔的 journal 占用无条款、D25（目标负载优先级） 没写并发 fsync 的到达过程与 λ、E16（journal 的角色：WAL vs 意图日志） 的「批 ≈ 流数处见顶」没算到底）各自立账，加上组提交的等待时间这一笔 | 增补 1 |
+| 36 | 并行线一到四；线二并进里程碑一步 4 欠的「搬落点让位置提示过期、经映射读对」（步 1 现状曾把它算成过了）与 C196（中央映射树的根住哪全仓无条款） 的回退镜像（实现里映射根住根记录，`crates/singlefs-core/src/root_record.rs` 第 25 行，条款没写）；线三的验收就是 C116（叶容器的分裂 / 合并纪律没有会失败的检查） 的检查 | 并行线二、三、四 2026-09-22 已落地；线一的读写路径随后落地（`crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs` 2026-09-24 入库，各线现状段里有用例与变异） | 不等 | **线二、三、四已落地**（各自现状段里有用例、变异与验收逐条）；线二并进的「搬落点让位置提示过期、经映射读对」由 `mounted_read.rs` 的提示过期回退与那条多跳用例罩住，C196（中央映射树的根住哪全仓无条款） 仍开着。**只剩线一；挡它的两条条款 2026-09-23 都定了**：写路径 2026-09-22 立账时只落了「多于一个单元当场返回错误」那一支（提交 a1f4691b（2026-09-24）起已能发两个数据单元的写，见并行线一现状）（`transaction.rs` 的 `UndecidedClauseBlockingMoreThanOneDataUnit::STILL_UNDECIDED_TODAY`，两条都没定时在任何落盘动作之前拒绝、盘上逐字节不变，由 `sequential_write_split_into_one_unit_transactions.rs` 钉住），顺序读要等它先写得出多单元的对象。两条条款 2026-09-22 立账：C490（extent 叶 key 的 offset 段没定单位）——第二个数据单元起「文件字节偏移」与「单元序号」给出不同的 24 字节 key，不定案就写不出那 24 字节；C491（多条记录时共享内生块在哪条点名没定）——并行线三从「一条记录 67 个点名项装不下」那一边走到同一格。⇒ 这一行的去向：C490（extent 叶 key 的 offset 段没定单位） 2026-09-23 用户已定（文件字节偏移，D8（核心索引结构） 已定项 3）；C491（多条记录时共享内生块在哪条点名没定） 2026-09-23 用户定「只在最后一条点名」（D23（journal 的角色与格式） 已定项 17）。**两条都定了**：`STILL_UNDECIDED_TODAY` 那两个成员可以删、拒绝分支拿掉，线一的读写路径接着做；两条各欠一条会红的用例；末条装不下时再跨记录、末条带标志位（D23（journal 的角色与格式） 已定项 17），实现待派；末条标志放在原『填充 1』那个字节、锚点按末条标志认、序号与末条标志的不变量（用户 2026-09-24 定）。**2026-09-24 实二十已实现**末条标志、末条再跨记录、读法乙与 I-8.9（一次发布的记录序号连续且只有末条带标志）；2026-09-25 实二二三补了读者规则两格（C539（锚点读得出时下一次发布的首条序号不是 1）、C540（末条标志坏在一次发布中间，读者切出两次发布））、失败原样重发、提交标记 2..=255 当损坏。 | 各线现状、C490（extent 叶 key 的 offset 段没定单位）、C491（多条记录时共享内生块在哪条点名没定） |
+| 37 | 复用已回收的分配记录时跨度变了，旧记录留着：同一块盘上两条记录罩住同一个槽，下一次可写挂载在重建分配器时 panic（`crates/singlefs-core/src/allocator.rs` 第 375 行的断言），发生在取号之前，池从此挂不上可写；攻方扫 288 段历史 208 段以它收尾；checker 对记录之间的重叠没有判定（I-5.1（物理范围不重叠） 只管树里的引用） | 实现缺口（代码三方第二轮攻方打中；步 5 的复用） | 不等 | 挡着第二波代码改动的课题，改代码：写一条落点的记录时删掉同盘上与它相交的已回收记录；新立 I-5.4（分配记录罩住的槽互不相交） 并由 checker 实现；2026-09-18 已改（`allocator.rs` 的 `make_room_for_record_on_device`、`walk.rs` 的 `judge_allocation_records_disjoint`，`check.sh` 绿，`crates/mutations.tsv` 第 121–128 行复跑 8 行全红；攻方那组扫描 k = 2–10 改后 60 次挂载都成功，k = 12–20 停在 812 条的容量墙、不再 panic；实现员报告 `m2-wave2-fixes-implementer-report.md`），被攻过零轮（跑前条款不开第三轮）；层 0 全量同日在新代码上重跑零违例，I-5.4（分配记录罩住的槽互不相交） 在第二条流上评估 1,842,252 个状态、第一条流上 4 个，违例都是 0（`m2-wave2-crash-verifier-report.md`）；第 121–128 行同日在整表复跑里各自红在点名的测试上（`m2-anchor-fix-crash-verifier-report.md`，见第 42 行） | 判决第二节第 1 行；步 5 现状 |
+| 38 | 实例表只增不减、实现只有一片（`INSTANCE_TABLE_PAGE_RECORDS` 370 条含链指针），取号之前的准入不算它：第 370 次可写挂载取号之后在 `crates/singlefs-core/src/bytes.rs` 第 18 行越界 panic，每再试一次烧一个实例号 | 实现缺口（代码三方第二轮攻方打中）；D28（挂载期承诺量） 已定项 3 按多片写，实现只有一片；与 C335（根槽持续读不出时实例表只增不减） 同一族，那一笔在删行条件上 | 不等 | 最小改法挡着第二波代码改动的课题：取号之前的准入加实例表行数一项，不够返回挂载错误、一个写都不发；2026-09-18 已改（`mount.rs` 的 `MountError::InstanceTableRowsExceedOnePageSecondPageUnsupported`，拒绝那一次盘上逐字节不变、系统配置实例代号不变），被攻过零轮；第二片或删行不在第二波代码改动里。**用户 2026-09-19 定第二片进这个里程碑**（`records/2026-09-19-里程碑二遗留收拢.md` 五之二第 7 问：第二片或删行在这个里程碑做，格式已定，归批 B 之后的实现）；`crates/` 今天仍只有一片，第 370 次可写挂载仍在取号之前拒绝，实现待做**2026-09-25 实十六接续已打进主工作区**：实例表一片写满 369 行再开下一片、尾片先、每次写行整条链 COW 重写；树表 0 条那一版片数 ≥ 67 时一条记录装不下，照 D23（journal 的角色与格式） 已定项 17 接再跨记录，随实二二。 | 判决第二节第 2、6 行 |
+| 39 | 取号之前与发布路径的准入都按「每个角色每盘新增一条记录」的上界算，不抵扣会被复用的已回收记录：分配记录树 812 条上限最后约 10 条里误拒真发得起来的池（攻方另量 5 处，含「一路写到被拒、再重开」进吸收态：写行按 816 被拒、分配器拷贝上真分配 808）；会话里的覆盖写同样误拒（798 + 16 = 814 被拒、真分配 800） | 精度缺口（代码三方第二轮攻方打中两格）；误拒在保守一侧，不写坏 | 不等 | 2026-09-18 用户定：保留上界，等分配记录树能分裂（增补 1）之后这道墙本身就没了；不改。当时交的另一条路是取号之前与发布路径两处都换成「分配器拷贝上真分配」（攻方改法臂 3：扫过的格上不误拒也不漏，被攻过零轮，每次发布多一次分配器拷贝的代价没量；只换取号之前那一处，第 57 行要挡的烧号会回来；全额抵扣会漏、取号之后 panic）**用户 2026-09-24 定**：取号之前按分配器副本上的预演判落点（D18（块里携带什么信息） 已定项 11）；发布路径那一处的上界照 2026-09-18 定的保留。2026-09-25 实二二三已把写行那次的释放核验与树表 0 条那一版的条数准入挪到取号之前（不烧号）；容量墙那一半见 C544（树表 0 条那一版分配记录条数撞墙）。 | 判决第二节第 5 行；攻方报告 `research/prompts/m2-wave2-code-r1-main-verification.md` 第二节 |
+| 40 | 发布在最后一步（系统配置槽）失败时根已 FUA 落盘，分配器照样退回：同一个写入口换发一次空发布、再断电之后 checker 五条红（I-2.1（校验和与内容匹配）、I-3.1（已分配统计对得上）、I-4.8（近 K 代根校验和自洽）、I-7.2（最新根可完整遍历）、I-7.4（近 K 代块未被复用）），重开报 `Recovery(UnitUnreadable)`；原样重试同内容不中 | 正确性缺陷（代码三方第二轮攻方打中；病根在失败语义：`transaction.rs` 第 1221 行注释引 D16（发布语义） 已定项 7「这次发布没有成立」，而恢复会选中已落盘的根） | 不等 | 不挡第二波代码改动的课题，另立 C381（根已落盘之后发布失败，分配器仍退回）；2026-09-18 用户定：立题走三方再定（牵涉 D16（发布语义） 已定项 7「这次发布没有成立」的定义），但不马上开，等第二波收口之后开。第一轮 2026-09-19 已判（`research/prompts/c381-r1-main-verification.md`）：今天的「一律退回」在攻方原历史与这一轮新造的「根槽 FUA 报错而根已落盘」两处坐实是缺陷（攻方副本与 HEAD 版 core 副本上，入库装置上的重做随改法的用例做）；D23（journal 的角色与格式） 已定项 14 的失败表（先探针写，瞬时走实例切换、持续转只读）已经答了失败之后写入口怎么走，`crates/` 里三样都没有；候选收成「失败即停、重开由恢复定」（今天能实现）与「照失败表」（要挂载内实例切换，交用户第 3 问），第二、三轮都判完了（2026-09-21，判决 `research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）：第二轮判出三条候选栽在同一个共用前提上（探针写盘上没落点），用户定两题、打回两题；第三轮候选甲站住并要加两样、候选乙被推翻。按「第三轮之后停」这条线到此为止。**条款那一半有了**：第三轮交用户的三题里，候选甲加两样（D16（发布语义） 已定项 17）与改法 B 固定落点探针写加失败落点只读复核（D23（journal 的角色与格式） 已定项 14）2026-09-21 已写回、用户 2026-09-23 再确认；「实例切换取的是内存里的根」那一题，用户 2026-09-23 定「改条款：切换要重新读盘」（C458（实例切换取内存里的根，不重新读盘）），写进 D23（journal 的角色与格式） 已定项 14 实例切换那一句与 D18（块里携带什么信息） 已定项 11 切换写的行，由此带出的三件（读盘选出的根比内存里记的新时被重发的在飞 checkpoint 还重不重发、行与 W 按哪个根写、回退那次发布里读盘选出的根与 R_old 怎么对上）另起一题。**实现那一半挪后**：失败表的探针写、只读复核、实例切换、转只读都要挂载内实例切换，`crates/` 里没有，跟第 16 行一起挪到后面的里程碑（用户 2026-09-23 划一刀） | C381（根已落盘之后发布失败，分配器仍退回）；判决第二节第 7 行 |
+| 41 | 崩溃点重放越跑越慢：层 0 第二条流（固定脚本到 E，2,104,413 个状态）2026-09-18 在新代码上单进程跑完，门禁 checker-tier-layer0-replay 两条流合计 3 小时 50 分 49 秒（`checker-tier-layer0-replay.log`），这是以后并行的对照基准；第一条流（262,165 个状态）约 3 分钟（同日单独跑一次整个用例文件 203.84 秒）；进程只用满 32 核里的 1 核；每个状态做两遍恢复加 checker，I-3.9（释放代落在停止引用它的那一格区间里）、I-9.14（树表条目的诞生 txg 跨根不变）、I-5.4（分配记录罩住的槽互不相交） 要对回退候选集里每条根各走一遍，历史越长越贵 | 验证装置的代价（2026-09-18 用户与主 agent 讨论提出） | 不等 | 立一个计数实验先量账：每个状态的时间里恢复与 checker 各占多少、截出来的盘面有几成逐字节重复、按状态区间切成 4 / 8 / 16 / 32 个进程各快几倍、切片之后读数与单进程逐字相同。2026-09-18 用户定方向：以并行为主，门禁分三档——必须测（不看 diff、每次都跑的固定集合：第一条流全量、第二条流快档、checker 坏镜像）；分模块测（由「改了哪个文件 → 跑哪几条流与哪几条不变量」的映射表选，映射表由门禁核，碰到共享代码强制全跑，与 C8（门禁范围判不出来） 是同一件事）；全量测（不堵每次提交，定一个必须跑的节点，结果按提交号挂账）。同日用户又定：碰到共享代码强制全量没有问题；多核并行一定要加、不必先论证；实验不现在立。同日晚些用户定先做这件事：层 0 改成多线程（按状态区间切片、合并确定、输出与单线程逐字相同、每片报进度，门禁 checker-tier-layer0-replay 在多核机器上只用 1 个线程时判红），以后的测试与崩溃检测都优先多线程（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）；实现员在仓的副本里开发，补丁在增补 3 第 1 件那一轮代码三方交回之后打进了主工作区（`m2-layer0-parallel-implementer-report.md`）：`crash.rs` 的 `enumerate_layer0_*` 按状态序号切片（片数按线程数算，32 线程时 512 片）、`std::thread::scope` 并行，线程数由 `SINGLEFS_LAYER0_THREADS` 给、没设取核数；第一条流的计数行与 checker 逐条计数行在同一份代码上与 1 线程逐字相同，第二条流的计数行与旧代码（只差 `read_into` 的读法）上单线程那一趟的日志逐字相同；机器空闲时第一条流 1 线程 202.45 秒、32 线程 7.35 秒，第二条流 32 线程 492.23 秒（单线程两条流合计 3 小时 50 分 49 秒），打了补丁的门禁 checker-tier-layer0-replay 在副本上两条流 8 分 24 秒；每片报 `LAYER0_PROGRESS`；门禁 checker-tier-layer0-replay 在多核机器上只起 1 个线程时判红（红的那一支只拿合成日志核过）。它的代码三方第一轮（与增补 3 第 1 件第二轮同一轮，判决 `research/prompts/m2-supp3-item1-code-r2-main-verification.md`）：实现没打中（攻方与 `00c9d4f` 的单线程代码差分 60 次、1–32 线程，计数、每处「第一处」、观察者的次序全部相同；本地攻方的切片与门禁读法 18 格两份样本一致），单测有一处空当（两片都带「第一处被忽略的 journal 违例」的合并没有格），在补。主工作区上的门禁 checker-tier-layer0-replay 2026-09-19 跑过（`m2-supp3-item1-r2-crash-verifier-report.md`）：32 线程两条流合计 8 分 38 秒（第一条流 7.3 秒、第二条流 490.3 秒），两条流的计数行与单线程那一趟逐字相同，第一条流的 `CHECKER` 行与另跑那一次逐字相同。在新代码上起的那一趟单线程 checker-tier-layer0-replay 跑了 17 分钟，按用户的话停掉。另一个缺口：全量用例跑完才打计数行，跑的过程中外面看不到进度（这一趟的输出文件从某一刻起一个字都没再写），切片之后每一片要报段号与已跑的状态数；checker-tier-layer0-replay 第一条流只留计数那一行、把带逐条不变量计数的 `CHECKER` 行连同 cargo 输出一起删了，第一条流上每条不变量评估了几个状态门禁不报（2026-09-18 靠另跑一次读到，`m2-wave2-crash-verifier-report.md`「checker-tier-layer0-replay 原样输出」）；这两处缺口已补（每片打进度行、checker-tier-layer0-replay 边跑边转；逐条不变量计数行不在计数行正下方就判红）。**用户 2026-09-19 另定层 0 全量挂在哪个节点**，原话「每次主 agent 执行完任务后统一执行」（`records/2026-09-19-里程碑二遗留收拢.md` 五之二第 8 问）：层 0 全量不再每次门禁都跑，改在主 agent 一个任务收尾（阶段同步那一步）时统一跑一次，门禁 checker-tier-layer0-replay 改成快档每次跑、全量在收尾跑。这句当时没写回；**用户 2026-09-27 另定验证代码分两档**（`records/2026-09-27-验证两档拆分.md`，原话「checker可以自己跑，但是默认只有在提交时候才跑」），取代了「任务收尾统一跑」：checker-tier-layer0-replay 快档在整轮门禁与每次提交时跑，`--full` 只在用户要求时跑（`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头，`.claude/rules/verification.md`「checker 档自己分快档与全量」）。**这一行关**；同一格里 2026-09-18 定的三档之一「分模块测」没做，欠在 C8（门禁范围判不出来） | 本行；C8（门禁范围判不出来） |
+| 42 | 门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）2026-09-18 在新代码上红：`crates/mutations.tsv` 第 32、37、41、42、69、107 行的原文在源码里命中 0 次（锚点腐化），checker-tier-crates-mutation-replay 在预扫这一步就整张表退出，128 行一条都没真跑，第 121–128 行也没跑到。第 32、41、69、107 行是第二波修复改掉的（实现员开工前的副本里各命中 1 次）；第 37、42 行（`walk.rs` 候选集那一句）在第二波修复开工前就已命中 0 次（`anchor-origin.out`）。实现员只照 checker-tier-crates-mutation-replay 的判法跑了自己追加的 8 行，没扫整张表 | 实现缺口（崩溃验证员复跑，`m2-wave2-crash-verifier-report.md` 里 crates 变异表那一道的原样输出一节） | 不等 | 挡着第二波代码改动的出口，2026-09-18 已改：6 行只改原文与替换文，变异名、cargo test 参数、点名测试不动（实现员报告 `m2-anchor-fix-implementer-report.md`）；同日整表复跑 checker-tier-crates-mutation-replay，123 条变异各自红在点名的测试上、原文都恰好命中一次。第 107 行删掉的调用今天还包着实例表准入，这条变异一次拿掉三道取号之前的检查，比变异名宽；点名测试红在写行那次发布取号之后才被拒（822 条对 812 条），实例表准入另有第 125–128 行盯着，没收窄。改代码的一方整表数一遍锚点：2026-09-19 做成门禁 code-source-discipline 的 mutation-tables 格的一段（`crates/mutations.tsv` 每行原文恰好命中一次，不跑变异），阶段归属表把 code-source-discipline 的 mutation-tables 格登记给 `implementation-writer`，定义没改（`records/2026-09-16-subagent拆分提案.md` 第三十二节） | 本行；`m2-wave2-fixes-implementer-report.md` 第 116–121 行 |
+| 43 | 回退之后把 F 抬进回退留下的空档（F 落在被抛弃实例那几条根的 txg 上），checker 在合法状态上判 I-3.1（已分配统计对得上） 红：回退目标根的 txg 在 F 之下、出了 checker 取并集的候选集，它独占的槽还在记账的已分配里。最短复现 11 步：可写挂载、覆盖写两次、回退到 (2, 7) 两次（实例 3 的三条根被抛弃）、覆盖写、可写挂载、覆盖写三次、抬 F 到 8，盘 0 记账的已分配 1441792、遍历全部有效根 1343488，差 6 × 16384；同一段只换 F，7、11、12 不红，8、9、10 红，红的正好是被抛弃实例的三个 txg。增补 3 第 1 件的历史生成器第一次跑撞出（快档种子 80；大档 3000 段里 30 段） | 实现与 checker 读法对不上，第 ② 行那一族（checker 候选集的下界用哪个 F、被抛弃的根算不算），增补 3 撞出 | 等 | 登记成生成器的已知红第 1 条（撞到照记、那段历史到此为止），用例 `raising_the_floor_into_the_gap_left_by_a_rollback_ends_in_the_second_known_red_form` 钉着复现；修法与第 ② 行一起判：抬 F 不许落进空档、checker 候选集改读法、还是抬 F 时记账放掉这些槽，要三方。第 1 条的匹配 2026-09-18 收窄成「新 F 那个 txg 上的根全属于被抛弃的实例」，但不比多算的量：代码三方第二轮攻方腿在抬 F 一个都不回收的变异下看到它在空档里接走 11 段、多算 7–37 个槽而不是这一行登记的 6 个——空档里别的机理会被它遮住（`research/prompts/m2-supp3-item1-code-r2-main-verification.md`第一节「收窄之后的第 1 条」那一格的旁注，没改）。**2026-09-28 用户定丁-defer**（`research/prompts/abandoned-floor-r1-main-verification.md` M1：甲、乙、丙、丁另两种读法都被打中，丁-defer 1254 格零红，被攻过一轮）：I-3.1（已分配统计对得上） 的遍历并上 F_生效 之下仍在 defer 的槽（`walk::deferred_slots_referenced_only_below_the_floor_per_device`）；这一形今天由管理员回退造不出，只靠崩溃恢复造（调查员 `research/prompts/closeout-recheck-2026-09-28/row43-investigator-report.md`），用例 `raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs` 钉 F = 5 全绿 | 本行；第 ② 行；`m2-supp3-item1-implementer-report.md`第四节 |
+| 44 | 复用一个已回收的落点、改写那条分配记录时分配代没改（留着上一次的代），checker 判不出：`.claude/kb/invariants.md` 里只有 I-3.9（释放代落在停止引用它的那一格区间里） 管释放代，没有一条管已分配记录的分配代；增补 3 第 1 件的生成器快档与大档也判不出（代码三方第一轮攻方腿的变异「复用改写已回收记录时不改分配代」，主 agent 在副本上亲跑：快档与基线逐字相同） | checker 缺一条判据，增补 3 撞出 | 不等 | **主 agent 2026-09-22 定：立**。新条 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）——记录与单元是同一次发布写出来的，两个数同源，单张镜像判得了（checker 今天已经解得出分配记录的 `generation` / `is_released`，也读得到单元头的诞生代号）。射程写窄了三处：只管未释放的记录、跨多槽时取起点槽、那个槽读不出可用单元头时报不适用。⇒ 剩下的是把它做成套（checker 实现 + 坏镜像 + 变异），归增补 3 第 2 件；生成器按内存里的分配记录判那一半照旧。**2026-09-23 实现已落**（checker 那一组，`walk::judge_allocation_generations_against_unit_births`、只红它的坏镜像、8 条变异；读法照 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 射程 ④），待代码三方与崩溃验证 | 本行；`research/prompts/m2-supp3-item1-code-r1-main-verification.md`第二节第 3 行 |
+| 45 | 各步验收里没做成的几格（2026-09-19 重核 `m2-closeout-recheck-e.md` 第 159–165 行步 1 验收变异那一条、N5–N8）：步 1 验收第 4 条三条变异（extent 指针不换、inode 写入时间留 A、反向链算成 A 之前）没进变异表；步 6 验收的层 0 按每次发布报状态数没做；步 5 验收第 6 条（影子账读法的判别力、E 发不出 50180）按今天的读法与落点怎么判没写清；步 3 验收的「取号之后没有屏障」没做成变异；增补 1 第 1 件真设备跑出的 `publish_writes` 产物没入库 | 没实现 | 不等 | 步 1 验收第 4 条三条变异、步 6 层 0 按每次发布报状态数、步 3「取号之后没有屏障」的变异三样实现已落（2026-09-23），待代码三方与崩溃验证；步 5 那条验收改成指 `crates/mutations.tsv` 第 50 行那条变异（主 agent）；真设备产物在第 30 行做完之后由 `crash-verifier` 跑一次入库 | 步 1、3、5、6；增补 1 |
+| 46 | 并行线三落地时定下的三处口径，各欠一条条款或一条会红的检查：C478（码 2 头的 key 区间是条目键区间还是子树覆盖区间）——根写出的区间取分隔 key 首尾，而 D18（块里携带什么信息） 已定项 2 的理由句说的是「该覆盖哪一段 key」，两个读法在孩子是码 3 容器的内部节点上分叉，而这个值上盘；C479（inode 号复用已发过的号今天造不出来）——并行线三验收逐字要的那条变异，今天号只从水位发、水位只增，造不出这条写路径；C480（inode 记录的 blocks 怎么算全仓没有条款）——D8（核心索引结构） 已定项 6 的字段表只写了名字与宽度，实现按「这个对象分到几个数据单元」填 | 条款空白（三处都是实现自己选的，值上盘） | 不等 | C478（码 2 头的 key 区间是条目键区间还是子树覆盖区间） 用户 2026-09-23 定「子树覆盖区间」（D18（块里携带什么信息） 已定项 2），checker 的 `check_index_node_keys` 与写路径按它改；（E142（新池新建文件的干跑） 第十三次跑已照条款写 blocks = 6，量 5「装置与 `crates/` 逐字节比对」因此从 21 格全等掉到 10 格：`crates/singlefs-core/src/transaction.rs` 还写占位的 64，其余 10 格是它沿指针链传下去的；`crates/` 这一侧改完之后量 5 要回到 21 格全等，这一句是 C480（inode 记录的 blocks 怎么算全仓没有条款） 实现的验收之一）C480（inode 记录的 blocks 怎么算全仓没有条款） 用户 2026-09-23 定「按文件长度向上取整」，副作用照主 agent 的提议落（D8（核心索引结构） 已定项 6：`blocks` = ⌈size ÷ 512⌉，是逻辑长度的块数、不表示分到的空间；checker 加一条 `blocks` == ⌈size ÷ 512⌉；对外的 `st_blocks`（stat 时现算分到的单元、SEEK_HOLE / SEEK_DATA）挪到做 POSIX 面的里程碑），新池新建文件那条记录从 64 变 6、改新池新建文件的字节，写路径与 checker 按它改；C479（inode 号复用已发过的号今天造不出来） 等第 24 行那个只供测试的开关能把水位压到指定值 | 并行线三现状；`.claude/kb/checks-owed.md` |
+| 47 | C481（坏盘输入的基线镜像取不到树表 0 条的盘面）：增补 3 第 5 件的基线只从「最新那条根下面三棵树都在」的那几步里抽，树表 0 条的盘面一档都没打过 | 覆盖缺口 | 不等 | 基线抽样加一档「树表 0 条」的盘面，判据不变；与第 8、④ 行那三个拒绝同一族——拒绝改成接受的那一天这一档才会被真正走到；实现已落（2026-09-23）：基线按档抽、加了「树表 0 条」一档、判据不变，报告那句「基线档 2 / 2 档抽到过镜像」由用例钉住；待代码三方与崩溃验证 | 增补 3 现状；`.claude/kb/checks-owed.md` |
+| 48 | C476（盘上内容可控时走得到的 panic 有 21 处）：增补 3 第 6 件的只读普查查出 21 处盘上内容可控时走得到的 panic，分三族（分配器、条目宽度、结构值不判就喂进断言）；第 5 件当天实测坐实其中 10 处、撞出 136 次 | 实现缺口（盘上读来的值当成了不变量） | 不等 | 逐处改成返回错误。**2026-09-22 已收七处**（`bytes.rs` 那一族四个条目读者、`allocator.rs` 三处、`checker/image.rs` 的区域数下标，以及 checker 两处按用户当天定的 **I-1.10（码 2 条目宽等于字段表宽）** 成套做出来：实现在 `walk::walk_tree_table_entry`、坏镜像在 `checker_known_bad_images.rs`、变异在 `crates/mutations.tsv`）⇒ 坏盘输入快档的 panic 从 136 次降到 20 次、`KNOWN_PANIC_SITES` 从 10 条缩到 3 条。`transaction.rs` 两处与 `mount.rs` 一处当天也收了 ⇒ **坏盘输入快档的 panic 归零、`KNOWN_PANIC_SITES` 空表，增补 3 第 5 件的「零 panic」验收成立**。**普查那 21 处里还剩三族没修**：R2（映射条目短于 55 字节 ⇒ `parse_mapping_entry` 越界）、R7（被抛弃根那棵账里的槽号 ⇒ `isolate` 的跨度断言）、R10（两块盘的分配记录树不对称 ⇒ 释放时另一块盘没有记录）——它们走得到，只是第 5 件的坏法够不着。**2026-09-22 交回：三族都关掉了**——R2 逐处改成返回错误，五个落点（`records.rs` 的 `parse_mapping_entry` 改成返回 `Option`，`recovery.rs` 两处、`mounted_read.rs`、`transaction.rs` 的 `mapping_locations_for_key` 各交回自己的错误成员，`checker/src/walk.rs` 的中央映射那一支改成走读失败）；R10 的 `placements_to_release_via_mapping` 从「只核第一块盘」改成逐盘核一遍，三个错误成员各加设备号；**R7 没改代码——它今天已经走不到**（`allocation_records_under_root` 的最后一步里就有前一批加的几何判，`isolate_abandoned` 的产品调用点只有一处，槽号下界与跨度上界都判过了），这一轮做的是把那道判与这条调用链接上钉成会红的用例，并在副本上坐实了「把跨度判改坏、断言放宽之后，挂载当场 panic 在 `allocator.rs` 那条跨度断言上」。⚠️ **新坏法第一次跑就撞出同族第六处**（不在派发范围内，已一并修）：`checker/src/walk.rs` 切 `entry[27..55]` 越界，前一批的 I-1.10（码 2 条目宽等于字段表宽） 只铺到 `walk_tree_table_entry`，而映射树的根住根记录、不经树表。坏法数 15 → 17，变异 `crates/mutations.tsv` 末尾追加 8 行（另修了一条被这次改动带坏的旧锚点），9 行逐条在副本里改坏跑红、基线红集为空；`check.sh` 四道全绿，坏盘输入快档仍是 0 panic。**同一族新查出第 5 处**：树表条目（200 字节）的条目宽 I-1.10（码 2 条目宽等于字段表宽） 与 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树） 两边都没写，而走读照样按固定偏移切它——今天没坏法打到，但走得到，要不要把 I-1.10（码 2 条目宽等于字段表宽） 的射程扩到它是条款的事，已立 C504（树表条目宽在走读里无守卫，今天没坏法打得到），用户 2026-09-23 定只加走读守卫、不动 I-1.10（码 2 条目宽等于字段表宽），实现待做。**2026-09-23**：C504（树表条目宽在走读里无守卫，今天没坏法打得到） 的守卫、新坏法、用例与变异已在主工作区，checker 那一组复核过（拿掉守卫之后未知 panic 0 → 11），待代码三方与崩溃验证 | 增补 3 现状；`records/2026-09-22-panic面普查-走得到的那些.md` |
+| 49 | C483（挂载态读映射与树节点回退都没有条款）：并行线二落地时定下两样，两样都没有条款——整片读映射（「提示过期的一次解引用发 3 次设备读」这个读数整个骑在它上面），以及树节点只按提示读、不经映射回退 | 条款空白（值不上盘，但读数与失败面骑在上面） | 不等 | **2026-09-23 代码轮判完，两处都是「替没写的条款做了选择」**。① 整片读中央映射：`open_pool_for_read` 读一次映射树根就把整片条目解进挂载态，而**写侧没有映射树的容量准入**（分配记录树与记账树各有一条，映射树一条都没有）；攻方腿在副本上量出映射节点容量 294、一次发布的条目上界 140 ⇒ 今天不翻车靠的是两棵无关的树之间的数字巧合，没有任何东西钉住它；读侧那条「映射树根不是根兼叶就拒绝」**从今天的写侧走不到**（层级写死字面常量 0、没有分裂逻辑）。② 树节点不经映射回退：映射根与树表不回退与 D19（块指针的结构与宽度预算） 已定项 8 的自举豁免三类相符，而 extent 根 / inode 根 / inode 叶容器不回退，条款里找不到许可它的那一句 ⇒ C483（挂载态读映射与树节点回退都没有条款） 第 ② 条。攻方腿实测：同一种损伤，数据单元多跳一次读回正确字节，extent 树根则整池挂不上。条款怎么写交用户。2026-09-23 用户定案树节点也回退，条款已补（D19（块指针的结构与宽度预算） 已定项 8：豁免三类之外的单元位置提示读不出时一律经映射回退），实现已做：`crates/singlefs-core/src/recovery.rs:404` 的 `read_mapped_tree_node_via_hint_then_central_mapping`，挂载态调用点在 `crates/singlefs-core/src/mounted_read.rs:457`、`:640`，用例 `crates/singlefs-harness/tests/tree_nodes_and_the_central_mapping_on_mounted_read.rs:566`、`:820`，变异 `crates/mutations.tsv` 第 371、588 行；C483（挂载态读映射与树节点回退都没有条款） 已挪进 `.claude/kb/checks-owed.md` 已还清表。① 用户 2026-09-24 定整片读写成条款（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」），映射根不是根兼叶就拒绝打开是第一版限制；欠一条两层映射镜像拒绝打开的用例。 | 并行线二现状；`.claude/kb/checks-owed.md` |
+| 50 | 并行线四量出的两个数与两处门禁缺口：C484（mkfs 不清根环，同 fsid 重来旧根还择得中）（用户 2026-09-22 定「连根环一起清」，在改）、C485（segment-registry 格不读活代码，段序列变了照样绿）、C486（整环清零的 55 秒与冷重开的 17 秒都没人管） | 一处实现缺口、一处门禁假绿、两个数认下 | 不等 | C484（mkfs 不清根环，同 fsid 重来旧根还择得中） 在改（改完一次重跑 E142（新池新建文件的干跑），再接 C485（segment-registry 格不读活代码，段序列变了照样绿） 的活代码判据——次序这样排是因为 mkfs 再变一次段序列，先跑就作废）；C486（整环清零的 55 秒与冷重开的 17 秒都没人管） 两条各要一道会红的形态，② 那条要先有「换环长」的路。**2026-09-22 进展**：C484（mkfs 不清根环，同 fsid 重来旧根还择得中） 已改（mkfs 连根环三区域一起清）、C485（segment-registry 格不读活代码，段序列变了照样绿） 已还（登记表 mkfs 那一行的出处改成钉住活代码的那条用例，段序列写成真值 `12+1+1+1+4`、21 次操作、4114 个崩溃状态，步骤种类五种改六种）；顺带证伪了一个前提——**重跑 E142（新池新建文件的干跑） 转不绿门禁 checker-tier-qemu-device-streams**，因为 E142（新池新建文件的干跑） 的装置是 `research/` 下一份独立手写模型、不读 `crates/` 的 mkfs 实现，第十二次跑出来的 `path=mkfs` 段序列一字没变。⇒ 门禁 checker-tier-qemu-device-streams 那条红另立 C487（device-streams 格拿活代码与不跟踪它的模型比），三条路择一（让模型追平 / 改成与钉住活代码的那条用例比 / 只比 mkfs 之后那几段）；**用户 2026-09-23 定「让模型照条款追平」，模型那一半已追平**：`research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 的 mkfs 在第 2193、2195 行调 `record_zero_fill`，门禁 checker-tier-qemu-device-streams 读的产物（`research/scripts/replay.sh` 第 171 行登记的 `e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out`）mkfs 行 `operations=23 segments=12+1+1+1+4`，与 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 333–337 行逐字相同；还欠：`.claude/gate.d/fixtures/checker-tier-qemu-device-streams.sh/` 的 red / green 样本 mkfs 行仍是 `operations=13 segments=4+1+1+1+4`，没有一格证「虚机段序列改一步门禁 checker-tier-qemu-device-streams 由绿转红」，checker-tier-qemu-device-streams 真跑没人跑过 | 并行线四现状；`.claude/kb/checks-owed.md` |
+| 51 | C489（singlefs-core 那 1786 条广谱变异没跑）：增补 3 第 7 件量出 2697 条变异、基线 367 秒 ⇒ 全跑要 5.7–11.5 天，用户 2026-09-22 定「先跑 checker 那 911 条」 | 机器时间的账（不是缺条款、也不是缺实现） | 不等 | checker 那一表在独立 worktree 上跑；core 那一表另立 C489（singlefs-core 那 1786 条广谱变异没跑），三个数与两条要害（`--jobs` 不能按 `nproc` 取、「没红」那一桶最贵）都已写进那一笔。**2026-09-22 交回：整张表没跑。** 只跑了一个 7 条采样子集去摸 `--jobs`，5 条出结果里 **4 条撞满 900 秒超时地板**、只有 1 条真判出结果（抓到 1 / 没红 0 / 无效 0 / 分不出 4）——撞满的原因不是变异难判，是同一时刻这台机器上还有别的线在抢同一批 32 核。撞满超时的条目**既不算抓到、也不算没红、也不算无效**（八类分类的判据都要求测试真的跑完），这一条记进了 `.claude/kb/tooling.md`「超时当判据的跑法，在这台机器上被并发污染」。**另查出两个数都漂了**：主 agent 2026-09-22 用 `cargo mutants --list --package <crate> \| wc -l` 各数一遍，checker **917** 条（不是 911）、core **1789** 条（不是 1786），合计 **2706**；漂的原因是那几个 crate 的源码被改过，而 kb 里把数钉死了 ⇒ 正文改成写数它的命令，登记在 `.claude/kb/tooling.md`「变异条数会随源码漂，不许在 kb 里钉死」。⇒ **这一行今天的去向：跑不跑得完是机器时间与并发的账，不是缺条款也不是缺实现；要跑就得挑这台机器上没有别的重活的时候跑** | 增补 3 现状；`.claude/kb/checks-owed.md` |
+| 52 | 抬 F 时现行版本里没有实例表单元：`mount.rs` 返回 `RaiseNeedsRewrittenInstanceTableUnitInCurrentVersion`（增补 3 第 2 件的模型把它划进「允许拒」，随机历史快档里走到 34 次）。2026-09-22 三方判决 `m2-refusals-presumed-r1-main-verification.md` 的 Q1 格 | 拒得明那一关不过 | 不等 | **登记成实现细节加 C502（抬 F 时现行版本里没有实例表单元），不立条款、改代码**：零故障可达（mkfs 同一个进程里再覆盖写三次照样被拒），同一张表从现行根的指针上读得出、解得开，改法之后抬 F 一次成功；错误成员名说「现行版本里没有」而实际条件是「`TransactionOutput::units` 这个内存数组里没有」。今天不伤用户只因为产品路径还没有调用点 | 步 5 现状；`m2-refusals-presumed-r1-main-verification.md` 第三节 C 格 |
+| 61 | C519（丢一整块盘时恢复丢掉刚确认的那一版）：两块盘的池上，暖机覆盖两块盘之后发一版数据（fsync 已返回），那一版根槽所在的盘整块掉了，恢复在幸存盘上施加第一条记录时点名单元验证失败（`replay_journal` 要点名单元的两条位置条目都验得过），那一版丢了；D16（发布语义） 已定项 8 的暖机买的正是这一格 | 正确性缺陷（副本上量到，入库装置上没复现） | 不等 | 2026-09-23 P1 / P3 / P5 / P6 第一轮三方的云端攻方腿在副本上量到（`research/prompts/m2-presumed-clauses-r1-main-verification.md` 第四节）；先由实现员在入库装置上写复现用例，坐实之后「点名单元两份都验」还是「任一份验过」交用户定。**用户 2026-09-25 定两份都验过才施加**（认下丢一整块盘时丢掉刚确认的那一版，D23（journal 的角色与格式） 已定项 14），C519（丢一整块盘时恢复丢掉刚确认的那一版） 挪进已还清 | C519（丢一整块盘时恢复丢掉刚确认的那一版） |
+| 62 | C533（记录新根段缺实例表与分配记录树两个根指针）：写行那次发布在树表 0 条的一版上另写实例表与一片分配记录节点，根槽没落盘时恢复从记录重建的根拿不到这两样，那一行实例表行与那片节点怎么算条款没写 | 条款空白（checker 那一组实现候选 b 时查出） | 不等 | 已销账：前提不成立，写行那条记录因实例边界不施加，「整次不施加」就是今天的行为；复现用例 `crates/singlefs-harness/tests/row_publish_record_without_its_root.rs` 钉着；用户 2026-09-24 定（`.claude/kb/checks-owed.md` 已还清表 C533（记录新根段缺实例表与分配记录树两个根指针） 那一行） | C533（记录新根段缺实例表与分配记录树两个根指针） |
+
+不收口的（在别处引到、还开着，但不归这个里程碑还）：
+
+- 不收口 C6（块层语义假设写错）：「故意去掉一次 FUA 崩溃测试必须变红」要记录核对器判屏障，不在这个里程碑的范围
+- 不收口 C16（管道声明失败模型例外）：要至少两条管道，第三方管道不在这个里程碑
+- 不收口 C26（屏障数从没量过）：增补 1 第 1 件会报每次发布的屏障数，seq 与 multistream 的对比不在这个里程碑
+- 不收口 C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）：冗余条款不在这个里程碑
+- 不收口 C118（`deleted_inodes` 树的形态无落点）：删除不在这个里程碑
+- 不收口 C418（位置权威三臂的缓存命中维零测量）：要映射树长成多层才量得到缓存命中那一维，而这个里程碑里映射恒一层（并行线二的读路径直接拒绝打开映射根不是根兼叶的池）；多跳率的运行时观测点本身已经有了（`ReadPathObservation::stale_location_hint_hops`，D19（块指针的结构与宽度预算） 已定项 5 硬规则 3）
+- 不收口 C323（镜像大小全仓没有条款）：探测容量与盘上统计量谁核，不在这个里程碑
+- 不收口 C461（checker 判「挂不上的镜像」整片报不适用）：增补 3 第 4 件的代码三方照见的，主要那一半（早退条件从「任一块盘择不出」改成「全部盘都择不出」，与恢复对齐）2026-09-21 当天落地、有用例与变异钉着；另一半是「哪块盘的系统配置全废了」没有编号报得出来——checker 的返回按不变量编号组织，要先定用哪条编号报还是另开一个出口，那是报告形态的题，不归增补 2 收口；这一半已由旁路报告 `system_configuration_redundancy_report` 还清（`checks-owed.md` 已还清表 C461 那一行）
+- 不收口 C152（收窄后未发布号重发的扫描重建复核）：要扫描重建，`crates/` 里没有（`grep -rln '扫描重建\|scan_rebuild\|ScanRebuild' crates/*/src/` 零命中）
+- 不收口 C71（不认识的统计量标签静默忽略）：这个里程碑不加统计量标签、只有一版格式，造不出不认识的标签；D15（格式冻结政策） 判定表缺的那一行是格式冻结前清单的事
+- 不收口 C117（不带设备维的统计量的设备段没有取值）：新池新建文件写的那几行的设备段 2026-09-13 总审核已定（D5（快照 / 空间记账机制） 已定项 10）；还欠的新建树初始行要克隆头，不在这个里程碑
+
+**设想实现**：表里「打回重议」「交用户」的行逐项走三方，每条路带代价数，交用户定，写回决策与代码；「没实现」「没有会红的用例」的行逐项补实现，或做成会红的检查。
+
+**验收标准**：
+- 表里每一行都有去向：定案并实现（写明决策分项与用例名）、做成会红的检查（写明门禁阶段或用例名），或者用户明确推迟到以后的里程碑（写明依据与记在哪笔欠账）。没有去向的行不许删。
+- 门禁全量绿；层 0 两条流全量零违例；必红八条全部先红后绿。
+
+**写出的字节**：随各行定案；改字节的写进 [layout/02-second-txn.md](../layout/02-second-txn.md)。
+
+**会碰到的决策点**：D23（journal 的角色与格式） 已定项 14；D16（发布语义） 已定项 1 / 已定项 8；D28（挂载期承诺量） 已定项 1；C340（回退之后记录链从哪条之后接没有定义）；以及表里「记在哪」那一列指到的各步决策点。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:423-472`（整段抄，未转述）**
+
+```markdown
+## 增补 3　捶打 `crates/`：随机历史、崩溃与故障注入、坏盘输入、与理想模型对拍
+
+**现状（2026-09-18 立；同日开工）**：工具已装（nightly 工具链、cargo-mutants 27.1.0、cargo-fuzz 0.13.2）。第 1 件交回（`m2-supp3-item1-implementer-report.md`，产物在同名目录）：生成器、执行器、已知红清单、收缩与大档在 `crates/singlefs-harness/src/history.rs`，快档（种子 [0, 96)、每段 30 步、`check.sh` 里约 26 秒）在 `crates/singlefs-harness/tests/random_histories.rs`，随机源手写 SplitMix64；把 `crates/mutations.tsv` 第 41、121 行改回去快档都判红（第 129、130 行钉着；第 121 行那一条只有种子 54、69 判得出，余量薄）；第一次跑撞出清单外一类，登记成已知红第 1 条（增补 2 收口表第 43 行）；快档 96 段里 50 段以已知红第 0 条收尾（收口表第 ② 行），那一行不修，随机历史罩不到根环转过之后的状态。第 1 件的代码三方第一轮（判决 `research/prompts/m2-supp3-item1-code-r1-main-verification.md`）：遮蔽打中（两条已知红的匹配条件都比形态宽：不经回退的抬 F 之后记账多算，也被第 1 条接走）、漏判打中（复用改写已回收记录时分配代没改，快档与大档都判不出，主 agent 在副本上亲跑核过；冷启动读回失败被记成合法结局；该成的被拒、该拒的放行四类）、余量打中（第 130 行 3000 个种子里判出 101 个），可达性、读路径等价（`read_into` 与原读法逐字相同，本地攻方两份样本 8 格一致）、写回没打中。处置：两条已知红按机理收窄、生成器加「这次发布改写或新增的分配记录，分配代等于这次的 txg」、checker 判绿的镜像上冷启动报错算失败、装得下的每种内容长度至少成功一次、给第 121 行那一类补专门的取样点；该成的被拒与该拒的放行归第 2 件。第一轮的改法同日落地（`m2-supp3-item1-implementer-report.md`第十三节）：已知红第 1 条收窄（回收门槛差一的变异下被它接走的从 18 段回到 1 段、17 段转成新发现）；这次发布改写或新增的分配记录分配代不等于这次的 txg ⇒ 失败（复用改写时不改分配代的变异下快档 17 个种子判红；写行与暖机那几次发布不在其内，挂载不交回上一版的记录）；冷启动读回失败 ⇒ 失败（冷启动读回补齐字节算错的变异下 45 个种子判红）；装得下的四种内容长度各至少成功一次；第 121 行那一类的专门取样点（偏向复用与抬 F 的比重，种子 [0, 48) × 30 步，6000 个种子里判出 13.3%，每 48 个一窗都至少 2 个）；`check.sh` 63 秒。第 0 条没收窄，理由在收口表第 ② 行。代码三方第二轮（判决 `research/prompts/m2-supp3-item1-code-r2-main-verification.md`，与层 0 并行化的第一轮同一轮）：收窄之后的第 1 条没再接走空档外的失败（21016 段历史、13 条变异）；写行与暖机那几次发布不判分配代打中（挂载时复用不改代、挂载期间分配都写成 txg − 1，两档都判不出），按攻方的改法补（拿挂载输出里生效根下盘上的记录比）；判别力只沿种子区间量过打中，补每段步数与比重两维的重量；第 0 条不收窄、分配代判定用内存这两个决定辩方复核之后站得住。第 1 件不开第三轮：第二轮的两处改法被攻过零轮。两处改法 2026-09-19 落地（`m2-supp3-item1-implementer-report.md` 第十四节）：写行与暖机那几次发布拿挂载之前镜像上生效根下的分配记录逐次比，挂载时复用不改代（形态 a）快档 7 段、专门取样点 12 段判红，挂载期间都写成 txg − 1（形态 b）72 / 47 段，基线零误红，`crates/mutations.tsv` 第 143、144 行钉着——这两行判「在不在挂载里」靠调用栈里有没有 `mount::establish_instance`，要带调试符号的构建，这个函数改名这两行会悄悄失效；判别力在 8 个取样点上重量（每段 20 / 30 / 40 步、两套比重互换、另一段种子），只有第 130 行在「快档比重、每段 20 步」与「专门取样点的种子配快档比重」两点上判不出，补了第 145 行（同一条变异点名快档，种子 54、69 判红）；余量只有 1–2 个种子的三处（第 130 行 20 步配专门比重、第 145 行快档、第 143 行专门种子配快档比重）改规模或比重之前要重量。层 0 并行化单测的空当也补了（`m2-layer0-parallel-implementer-report-r2.md`，第 142 行）。门禁 checker-tier-layer0-replay（并行版）与 checker-tier-crates-mutation-replay 2026-09-19 在主工作区全绿（`m2-supp3-item1-r2-crash-verifier-report.md`：checker-tier-layer0-replay 32 线程 8 分 38 秒，计数行与单线程逐字相同；checker-tier-crates-mutation-replay 140 条变异全部红在点名的测试上，4 分 1 秒）。第 1 件收口。第 2 件（理想模型与对拍）交回（`m2-supp3-item2-implementer-report.md`）；代码三方第一轮（判决 `research/prompts/m2-supp3-item2-code-r1-main-verification.md`）打中三处：分配记录墙的区间只有上端、拒绝理由按文字映射、门禁 harness-model-differential-and-scenarios 的红样本只罩一支；改法 2026-09-19 落地（`m2-supp3-item2-fix-implementer-report.md`：墙拒时拿镜像上数出的条数判，回退与落点的拒绝带判别字段、按字段映射，新加「逼近分配记录墙」取样点，`crates/mutations.tsv` 第 156–164 行），门禁 harness-model-differential-and-scenarios 查四段；代码三方第二轮（判决 `research/prompts/m2-supp3-item2-code-r2-main-verification.md`）打中两处（树表 0 条那一格的候选排除理由、小盘上落点拒绝只换原因也不红），改法五条 2026-09-19 落地（`m2-supp3-item2-r2-fix-implementer-report.md`：候选排除「低于 F」不再报成「树表 0 条、第一版不支持」等五处，`crates/mutations.tsv` 第 165–178 行）；同时新加第五段取样点「随机历史：小盘上逼近单元区墙的取样点」（两块单元区 384 槽的小盘、比重 `TOWARD_THE_UNIT_AREA_WALL`），第四段「逼近分配记录墙」从不跑池级 checker 改成每一步都跑、已知红第 0 条那一形只记不停，门禁 harness-model-differential-and-scenarios 从此查五段。四道重验证过（`research/prompts/m2-supp3-item2-crash-verifier/`）：层 0 崩溃点重放全量两条流零违例、QEMU 真设备 18 项、herd7 三条 Never、`crates/mutations.tsv` 整表 173 条在干净编译目录下全红在点名的测试上。第 3 件（崩溃注入）2026-09-20 落地：`crates/singlefs-checker-tier/src/crash_injection.rs` 拿第 1 件的每段历史开内容保留的录制流，按种子在「起点跑完」到「最后一个跑完的操作」之间抽崩溃点，逐个截断重建镜像、跑恢复、跑池级 checker，再问模型「恢复到的这一版允不允许」；用例 `crates/singlefs-checker-tier/tests/crash_injection_campaign.rs` 五条（快档、一段写死的历史全崩溃点、崩溃点落进回退与抬 F、线程数 1 与 4 逐字相同、抽崩溃点不改变这段历史怎么跑），大档按环境变量后台跑。快档一轮：24 段历史 92 个崩溃点（截在发布中间 77 个），恢复读回文件 61 次、没有文件 31 次、失败 0 次、施加过 journal 记录前缀 14 次，checker 跑 92 次、问模型 92 次，新发现 0。第一次跑抓到 4 条「冷启动读回」对不上，全是截在「记录已写、根槽未写」那个窗口：实现照 D23（journal 的角色与格式） 已定项 14 的前缀口径施加了记录，内容前进而根身份还是旧根，而判读那一步取的是择根——接上 `model_comparison::observed_read_back_after_a_crash`（取施加之后实际走的那条根）之后四条全消，改法在 `crates/mutations.tsv` 留了会红的一条。这一件的代码三方第一轮已判（`research/prompts/m2-supp3-item3-code-r1-main-verification.md`，第四节交用户七题）；那几题 2026-09-20 由用户定案、改法落地，`crates/mutations.tsv` 第 181–192 行按「用户 2026-09-20 定案第 N 条」各留一条会红的变异（N 取到 9）——⚠️ 定案原话在仓里没有落点，只有变异名引着它。代码三方第二轮 2026-09-21 已判（`research/prompts/m2-supp3-item3-code-r2-main-verification.md`），攻的是那几条改法本身（按「攻方自己提的收严算没被攻过」，它们全部零轮）：起点段放开与已知红按机理认人两处站住（前者两处断言钉 `>= 1`、快档实测 3，后者用例逐条钉着「签名一样机理不同照新发现报」），段内真子集摆出来了（快档 40 / 93 个崩溃状态是「后发的写先持久」类，第一轮这一类零概率）；打中四处——记录核对器接了等于没接（删掉判据那半句 12 条测试全绿，第 183 行钉的是计数器不是判据）、三条 oracle 在「单元写与 journal 记录之间少一道屏障」这个真缺陷上一条都没说话（整段全枚举 12347 个崩溃状态仍然 0）、长段上「只扣下一两个写」接近零概率（洞在抽样分布，均匀掩码让扣下数服从 Binomial(n,½)）、第一轮 K1-g 那几条断言原样没修（`crash_points >= 24` 允许整段 0、`histories_without_any_crash_point` 算了不钉、七类操作只覆盖 2 类）。六题交用户定，定案之前不动 `crates/`。**第 4 件（故障注入）2026-09-21 落地**：`crates/singlefs-harness/src/fault_injection.rs` 的 `FaultInjectingBlockDevice` 按种子在任意一次写、读、刷盘上注入六种故障（写失败、写被吞、读失败、读回翻过位的字节、屏障失败、屏障被吞），各用例里手写的四处包装并进来，用例 `crates/singlefs-harness/tests/fault_injection_fast_tier.rs`。代码三方第一轮已判（`research/prompts/m2-supp3-item4-code-r1-main-verification.md`，核查员核 68 处、✓ 60 ✗ 8，八处主 agent 逐处现查坐实）：判定一「注入之后就停」把结果做漂亮了（只让历史继续往下跑，同样 24 段 95 注入点，「模型都不允许的」重开从 0 涨到 14、新发现从 0 涨到 38）、判定二「今天的 checker 判得出东西只是没机会跑到」（再把模型对拍挂起、只留当时的 29 条 checker，仍有 22 条新发现，两条是 checker 自判的 I-3.1（已分配统计对得上） 与 I-7.8（根记录树 ID 水位不低于全池最大树 ID））、判定三 `crates/singlefs-core/src/recovery.rs` 一块盘两个系统配置槽都读不出来时不看别的盘（当天修，见 C461（checker 判「挂不上的镜像」整片报不适用））、判定四六种形态里两种（写被吞、屏障被吞）一次都没被抽到（`draw_injected_fault` 的 `below(4)` 四选一）、判定五那 49 次 panic 是执行器自己的 mkfs `expect`、不是 core 的缺口。用户 2026-09-21 定案三条并落地：两种说谎的设备抽进随机样本（`below(6)`，快档六种形态各自 19/17/14/18/8/19 次、合计 95）；放开起点段（`draw_faults` 的候选区间从 `(1..marks.len())` 改成 `(0..)`，`HistoryPool::start` 四处 `.expect` 改成可失败，起点段设备调用读 48、写 44、刷盘 16 合计 108，44 次写逐次注入全把错交回来、0 panic、四步各至少一次）；「说谎的设备之后盘面不一致」不算新发现，但签名白名单写死两组、名单外照报——一组是 I-2.1（校验和与内容匹配）、I-4.8（近 K 代根校验和自洽） 与 I-7.4（近 K 代块未被复用） 三条一起红（14 次，一份内容没落盘的直接投影），另一组是 I-3.1（已分配统计对得上） 单独红（2 次，记账与遍历对不上）；`crates/mutations.tsv` 钉着从白名单里去掉记账那一组必红。**第 4 件仍欠**：判定一那条改法（让历史在注入的块设备错之后继续往下跑）规格已写、还没落地；代码三方第二轮与 `crash-verifier` 的四道重验证都没做。**第 5 件交回**（`research/prompts/m2-supp3-item5-implementer-report.md`，红证与两趟 campaign 在 `research/prompts/m2-supp3-item5-bad-disk/`）：`crates/singlefs-checker-tier/src/bad_disk_input.rs` 与 `tests/bad_disk_input_campaign.rs`，`crates/mutations.tsv` 末尾追加 6 条。验收那两半**一半成立、一半不成立**：「不许读回一版从没提交过的内容」成立，判别力自证做出来了——把 `crates/singlefs-core/src/recovery.rs` 的 `read_unit_via_locations` 里那道整单元校验和比对改成恒真，两条用例红、报出「恢复读回了一版从没提交过的内容」，首字节 0xA5 正是坏盘写进去的那个字节；「三者都不许 panic」**今天不成立**，快档 12 段历史撞出 136 次 panic、落在 10 处，逐处与 `records/2026-09-22-panic面普查-走得到的那些.md` 对得上，全部是被测代码的缺口，登记在 `bad_disk_input.rs` 的 `KNOWN_PANIC_SITES`（清单外判红、清单只许缩，**清单空掉那天「零 panic」才算满足**）。坏法要打到那 21 处，随机翻位不行——每一层都有校验和罩着，改完字段必须把引用链上五道校验和逐道重算（树根两道 → 树表条目里的整单元校验和 → 树表节点两道 → 根记录里的整单元校验和 → 根槽自证校验和）；判别力那一条故意只重算单元自己的两道，于是「去掉恢复里那一道」正好是唯一的分水岭。cargo-fuzz 那一路没做（里程碑标「两路怎么分是预想」）。**另一处覆盖缺口**：基线镜像只从「最新那条根下面三棵树都在」的那几步里抽，树表 0 条的盘面一档都没打过（C481（坏盘输入的基线镜像取不到树表 0 条的盘面）），而那正是收口表第 8、④ 行那三个拒绝改成接受之后会第一次走到的盘面。**第 6 件（panic 面普查）交回**：只读普查落在 `records/2026-09-22-panic面普查清单.md`（每处一行带判定）、`-走得到的那些.md`（21 处走得到，分三族：分配器、条目宽度、结构值不判就喂进断言）；当时扫的那 42 份源码的哈希在 `research/prompts/m2-supp3-item6-panic-survey-snapshot/sources.sha256`，账在 C476（盘上内容可控时走得到的 panic 有 21 处）；第 5 件当天实测坐实其中 10 处。**验收后半「走得到的逐条修掉或进收口表」还没做完**：第一批 7 处（checker 三处 + `bytes.rs` + `allocator.rs` 三处）在改，`transaction.rs` 两处与 `mount.rs` 一处等别的线让开。**第 7 件（广谱变异）开跑**：`cargo mutants --list` 数出 **2697 条**（`singlefs-core` 1786 + `singlefs-checker` 911）；基线 `cargo test --all`（warm target）366.99 秒、CPU 1878%（约 19/32 核）⇒ 串行约 11.5 天、`--jobs 2` 约 5.7 天，**用户 2026-09-22 定「先跑 checker 那 911 条」**，core 那 1786 条另立 C489（singlefs-core 那 1786 条广谱变异没跑）。配置入库 `.cargo/mutants.toml`（`examine_globs` 两个 crate、`test_workspace = true`、`minimum_test_timeout = 900.0`，逐项注了为什么）；三个桶的自证做过、分得出来（已知会被抓的进 `caught.txt`、已知没人测的进 `missed.txt`、编不过的进 `unviable.txt`）。两条要害：**`--jobs` 不能按 `nproc` 取**（单条变异自己的 `cargo test` 已吃掉约 19/32 核，`--jobs 32` 会堆到约 608 核当量）；**「没红」那一桶最贵**（抓到的在第一个失败的测试二进制之后提前退出、7 秒收尾，没红的吃满整条 workspace），而这一件最关心的正是那一桶。跑在**独立 worktree** 上——干扰源不是别的用户会话，是主 agent 自己并发派的实现线（2026-09-22 实测：相隔 51 秒两次 `cargo check` 报不同的错、第三次才编过）。还没做：第 5 件够不着的三族坏法（R2 映射条目短于 55 字节、R7 被抛弃根那棵账的跨度断言、R10 两盘分配记录树不对称），2026-09-22 已派实现。用户 2026-09-18 指示（逐字）：「里程碑2 还要加一个 增补3  我们需要捶打一下我们现在crates中的代码了」；同日定：七件全做、按次序；随机源手写伪随机；装 cargo-mutants，也装 nightly 与 cargo-fuzz；先把这一批的阶段同步与提交做完再开工。
+
+立题时现查的验证手段（主 agent 的观测，2026-09-18）：
+
+| 手段 | 罩到哪、罩不到哪 |
+|---|---|
+| 层 0 崩溃点重放（门禁 checker-tier-layer0-replay） | 只有两条写死的流：新池新建文件，以及步 0 那条固定脚本到 E |
+| 池级 checker（38 条不变量，条数现查 `.claude/kb/invariants.md` 的状态列） | 在这两条流的每个崩溃状态与各步用例的终态上跑，别的历史上没跑过 |
+| `crates/mutations.tsv`（123 条变异，门禁 checker-tier-crates-mutation-replay） | 只钉三方打中之后的改法，不是全仓的变异 |
+| 故障注入 | 只有各用例文件里手写的设备包装：`crates/singlefs-harness/tests/instance_acquisition.rs` 的 `FaultInjectingDevice`、`write_accounting_per_structure.rs` 的 `WriteFailingDevice`、`writable_mount_of_a_formatted_pool.rs` 的 `TransientSystemConfigurationReadErrorDevice`，另有真设备二进制 `crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs` 里的 `FaultInjectingDevice`；没有按种子在任意一次写、读、刷盘上注入的通用包装 |
+| 随机操作序列 | `crates/` 里没有：`grep -rn "proptest\|quickcheck\|arbitrary\|rand" crates/*/Cargo.toml Cargo.toml` 零命中；各用例里的 `content_of(length, seed)` 只变内容，不变操作序列 |
+| 与理想模型对拍 | 没有：`.claude/singlefs-ai-sop/scripts/gate.sh` 第 296–298 行的未实现清单里「模型对拍」一直挂着，`.claude/gate.d/` 里声明 `# gate-covers:` 的只有 checker-tier-layer0-replay（崩溃点重放）；层 0 的多版本 oracle（`crates/singlefs-checker-tier/src/crash.rs` 的 `oracle_violation_for_versions`）只答「这个崩溃状态恢复到的版本在不在允许集合里」，允许集合按固定脚本写死 |
+| 模糊测试与广谱变异工具 | 立题时本机没有：`cargo fuzz --version`、`cargo mutants --version` 都报 `no such command`，`rustup toolchain list` 只有 stable 1.90，cargo-fuzz 要 nightly；同日按用户定案装上 |
+
+固定脚本走不到的问题，立题时都是三方攻方腿自己写历史扫出来的：增补 2 收口表第 37 行（复用时跨度变了留下重叠记录，攻方扫 288 段历史 208 段以它收尾）、第 38 行（第 370 次可写挂载越界 panic）、第 39 行（812 条上限附近误拒）、第 40 行（系统配置槽写失败之后分配器照样退回）；第 ② 行里「一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1（已分配统计对得上） 红」同样是固定脚本走不到、门禁没见过的（步 5 现状）。攻方腿写的历史生成器住在 `research/prompts/` 下各轮的模型目录里，不在 `crates/`，门禁不跑；2026-09-19 第 1 件收口之后，`crates/singlefs-harness/src/history.rs` 的生成器快档随 `check.sh` 进门禁，第 ② 行那一类在快档 96 段里 50 段以它收尾（已知红第 0 条）。
+
+**设想实现**（七件，按次序，每件单独交回）：
+1. 历史生成器：`crates/singlefs-harness` 里按种子生成一段操作序列（手写伪随机，不加依赖，种子写死就能完全复现，收缩到最短复现也自己写），操作只取 `crates/` 今天的公开入口：`transaction::publish_first_file`、`transaction::publish_overwrite`（内容长度随机，含 0、落在单元边界上的长度与装不下的长度）、关闭再 `mount::mount_writable`（取号、写行、暖机）、`mount::mount_rollback`（候选集里任一根，也试候选集外的根）、`mount::raise_rollback_floor`、`transaction::publish_without_units`、冷启动 `recovery::recover` 读回。每一步之后跑池级 checker。入口返回的拒绝（名字说清哪条条款没定的错误成员、容量墙）算合法结局，panic 算失败。失败的种子收缩到最短复现，写成一条固定种子的用例。
+2. 理想模型与对拍（验收加一条，2026-09-18 第 1 件代码三方第一轮判决：模型接上之后，攻方腿的六条变异都要判红——装得下的内容被拒、合法的回退目标被拒、抬 F 越过上限被接受（两条）、冷启动读回失败、复用改写时分配代不改，变异名与原文在 `mutants.tsv`）：一个只住内存的模型，记每一版提交的内容、每条根属于哪个实例、实例表的行、F，回答「冷启动该读回哪一版」「回退到这条根该不该被拒」「这个错误该不该出现」；第 1 件的每一步拿实现的结局与模型比。模型不与 `crates/singlefs-core` 共用代码，只共享格式常量，与 checker 同一条（D13（验证路线） 已定项 5）。接上之后门禁阶段声明 `# gate-covers: 模型对拍`。
+3. 崩溃注入：第 1 件的每段历史按种子抽若干次写，在那次写之后截断（层 0 的录制与截断，`crates/singlefs-checker-tier/src/crash.rs`），恢复之后跑 checker，并问模型这个状态恢复到的版本允不允许。抽样，不全枚举；全量枚举仍归门禁 checker-tier-layer0-replay 的两条固定流。
+4. 故障注入：一个通用的设备包装，按种子让任意一次写、读、刷盘返回 `BlockDeviceError`，或让一次读返回改坏的字节；实现要返回错误而不是 panic，出错之后重开要恢复到模型允许的版本。各用例里手写的包装并进来。
+5. 坏盘输入：拿第 1 件生成的合法镜像，按种子翻位、清零一个扇区、截掉尾部，喂给恢复、挂载与 checker。三者都不许 panic；恢复读回的内容要么是模型允许的某一版，要么报错，不许读回一版从没提交过的内容。种子驱动的普通用例进门禁；cargo-fuzz（libFuzzer，要 nightly）那一路后台跑，撞出的输入存成固定用例（两路怎么分是预想）。
+6. panic 面普查：列出 `crates/singlefs-core/src/` 与 `crates/singlefs-checker/src/` 非测试代码里每一处 `assert!`、`expect`、`unwrap`、`panic!` 与切片下标，逐处判盘上内容或设备错误走不走得到。走得到的是缺口（第 38 行那种），改成返回错误；走不到的写出为什么走不到（`.claude/agents/implementation-writer.md`「做什么」第 6 步）。
+7. 广谱变异：用 cargo-mutants 一类工具对 `crates/singlefs-core` 与 `crates/singlefs-checker` 全量生成变异，看第 1–5 件接上之后还有哪些变异没有任何测试红，交 `mutation-triage` 按 `.claude/rules/mutation-sampling.md` 分类。
+
+**预想的细节**：
+- 已知问题登记成一张「已知红」清单，每条指到增补 2 收口表的一行（第 ② 行的根环转圈、第 38 行、第 39 行、第 40 行，以及打回重议的 ①）。生成器撞到清单里的形态照记不停，撞到清单外的才算新发现；修好一条就从清单里删一条，删掉之后那条的复现种子要转绿。不登记的话，第一轮跑出来的全是已知的那几个。
+- 模型在打回重议的几处（增补 2 收口表第 ①、② 行）照代码今天的保守读法写，标预想；那几处定案改了，模型跟着改。
+- 规模分两档：快档（历史段数、每段步数、每段抽几个崩溃点按门禁能接受的时间定）进每次都跑的那一档；大档后台跑、结果按提交号挂账。与增补 2 收口表第 41 行的三档和多核并行是同一件事；并行做完之前大档只能单进程跑。
+- 种子基永久固定：随机历史、崩溃注入、坏盘输入、故障注入与 E158（择根与修复四岔路） 装置都从 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE` 起，不再有测试周期、不重抽；要多测历史只往后追加新的种子区间，已有区间的判红、镜像与过程文件跨里程碑复用（用户 2026-09-27 定；为什么：崩溃放量要把每个状态的过程落文件、按 hash 复用判定，种子一换产物整批作废）。
+- 发现的问题照主 agent 判阻塞办：挡着增补 3 的课题就现在修，不挡就进增补 2 收口表，每条带复现种子。改代码照 `.claude/rules/implementation-workflow.md` 三步走。
+- 捶打不改设计：它找实现与已定条款、与模型对不上的地方；要改条款的，记进收口表走三方。
+- 第 1 件的生成器按两条只写在文档注释里的前提调入口（2026-09-18 实现员报，出处写在 `history.rs` 那两处的注释里）：抬 F 的目标不低于今天的 F；`publish_without_units` 只在树表 0 条的一版上调。第 6 件要在前提之外各调一次，入口该返回错误而不是 panic。
+- 与增补 1 的关系：生成器只调公开入口，增补 1 改了每次发布写什么，第 1–5 件不用跟着改，变的只是层 0 与崩溃注入的状态数；不等增补 1（预想）。
+
+**验收标准**（每条先证明会红）：
+- 生成器与模型：快档进门禁、声明 `# gate-covers: 模型对拍`、全绿（「已知红」清单里的除外，逐条报出）；判别力：把 `crates/mutations.tsv` 第 41 行（步 5：复用时追加记录而不改写）与第 121 行（复用时新记录罩住的已回收记录不删）各改回去一次，快档在写死的种子数之内判红并报出种子。
+- 崩溃注入：判别力：施加 `crates/mutations.tsv` 里「步 3：零单元发布在记录与根之间少一道屏障」那一条，抽样在写死的种子数之内判红。
+- 故障注入：每个发布步骤与挂载步骤上各注入过至少一次，报每个注入点的命中次数，没命中的逐个列名；判别力：增补 2 收口表第 40 行那一格修之前判红、修之后转绿。
+- 坏盘输入：写死的种子数上零 panic；判别力：去掉恢复里一道校验和比对，判出「读回了没提交过的内容」。
+- panic 面普查：清单入库，每处一行带判定；走得到的逐条修掉或进收口表。
+- 广谱变异：报抓到、无效、没红三个数，没红的逐条分类。
+- 每件的发现在增补 2 收口表里有一行或已经修掉；「已知红」清单里每一条都指得到收口表的一行。
+
+**写出的字节**：无（捶打不改格式；修缺口要改字节的，写进 [layout/02-second-txn.md](../layout/02-second-txn.md) 与对应的步）。
+
+**会碰到的决策点**：快档与大档的规模与时间（增补 2 收口表第 41 行）；模型在打回重议那几处取哪种读法：D16（发布语义） 已定项 1、D23（journal 的角色与格式） 已定项 14；容量墙的准入：D28（挂载期承诺量） 已定项 1、已定项 3。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:473-516`（整段抄，未转述）**
+
+```markdown
+## 增补 4　崩溃验证重做（从里程碑三挪来）
+
+2026-09-28 用户定：里程碑三甲组（验证装置重做，原第一至五、十一项）整组挪进里程碑二，编号照旧，项内互指的「第 N 项」仍指这一组里的原编号；里程碑三那份只留一行指过来。
+
+### 一　崩溃重放的验证重新设计：公共的、模块的、单独分支的
+
+- **原话**：「重新设计崩溃重放的验证。公共的，模块的 单独分支的。 比如a b c d， abed ，abedf，这些流程，一些部分是可以公用的。但是如果不区分出来，那就容易漏，也容易测不全。」另有同日一句：「量过会漏 说明量的不好，说明我们现在的崩溃重放 还是设计的有问题。」2026-09-27 一句：「我们现在的崩溃放量是分散的 我希望重新组织和设计到一起，然后优化剪枝」。
+- **仓里已有的**：崩溃验证今天分散在几处：层 0 全量（门禁 checker-tier-layer0-replay）、`.claude/gate.d/stage-inputs.tsv` 登记的崩溃枚举用例、崩溃注入（`crates/singlefs-checker-tier/src/crash_injection.rs`）、故障注入、坏盘输入，以及 QEMU 真设备（门禁 checker-tier-qemu-device-streams，只有真实负载、没有崩溃注入；「最终判据」没有门禁阶段覆盖）。层 0 规模第二轮攻方量过，按流列的输入清单漏新加的共用文件（`research/prompts/m2-layer0-scale-r2-main-verification.md` 第二节 M3 那一行）；今天每条流都是从 mkfs 起的一整条写序列，共有的前缀在每条流里各枚举一遍，输入按整条流登记；段模型是「前面的段全持久 + 当前段任意整写子集」（D13（验证路线） 已定项 4）。用户 2026-09-28 四条定案（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定：共享前缀必做」「材料员被门禁 doc-process-records 的 implementation-premise 格挡下；用户定『设计全、枚举不完靠剪枝、粒度合适』」「用户定：ignore 标记慢慢开」「用户定案：不抽样，剪枝加初期 ignore」四行）：按段共享前缀的树必做、该设计的设计全、枚举不完靠精确剪枝、一时跑不了的节点标 ignore 慢慢开、不做抽样；第一轮判决（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节）：多条流前若干次写字节相同要先有一条会红的用例钉住，这一格站住（进 harness 档）；节点以操作为主切分这一格站住（一轮）；物化形态下的候选槽答案与第三态认定、节点身份按录制流种类串认、节点指纹按父结束镜像连锁这三种改法都打中（挂起，第二、三轮再攻，改法见「改法」一节）；节点粒度该用哪把尺仍开着。
+- **用户定的模型（2026-09-28 口述，原话整理在 `records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定：崩溃点网络模型」那一行）**：崩溃点绑在测试代码的分叉上，身份 `<仓内路径>::<崩溃点名称>::<哈希串>`；哈希串只由流程定（它之前的镜像、它自己带屏障的写表），判法版本是判定行的属性、不进身份（用户 2026-09-29 定：结果只绑流程，崩溃点变了或树变了才重测，代码、commit、树都不进编号；判法改了旧行留作历史、这一版从头判）；按 COW，一个点的输入不变则输出不变，输入决定从它往后要不要重验；全部点按流程连成一张网，树上的路径编号记顺序与分叉，有编号就能复用；删点下游重排、加点从它起全部重算；测试代码一改从改动点起下游全重验，代码稳定后根节点先稳；前期用测试代码里预设的 ignore 控制分叉数（剪枝），慢慢补数据；整个模型是一份数据进入网络流经多少点、反复流经多少次。落地：`crates/singlefs-checker-tier/src/crash_identity.rs`（身份、复用键、按模块引用取的判法代码摘要）、`crash_amplification.rs`（崩溃点计划、路径编号、按块录入与核对、按权重分工、对账、门禁读一次）、`gpu_unit_checks.rs`（单元两道校验和上 GPU、与 CPU 对拍）、`verdict_store.rs` 的录入表与导入。
+- **现状（落地）**：四种跑法都在固定脚本到 D 展开 18 的 393 338 态上跑通、0 红；到 D 全域 51 773 558 态（36 段全部展开）双机 0 红，同库同代码重跑两台 `states_checked_here=0`；到 E 再正常卸载那条流（78 段）已接进放量（`crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs`），全域在跑；登记表里除崩溃注入（随机历史抽样，轻测）之外的崩溃枚举流都已接进放量，全部分项由 `research/scripts/crash-amplification.sh` 一起跑。三段流第 ①②③ 段落地（`crash_facts.rs`、`crash_verify_gpu.rs`、`crash_amplification.rs` 的 `verify_blocks_from_facts` / `compare_judge_and_verifier`），GPU 核对今天只覆盖最新持久根的自证、四条指针的落点与那个单元的两道校验和；数与命令在 `records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节。
+- **用户同日续定的四条（原话与论证在同一份记录「分片与 GPU 跑通；用户定路径段、节点粒度、路径拆出块键、GPU 判器归里程碑三」那一行）**：① 路径段写成 `<流程>.<周期>.<步>`（测哪条流程的哪个周期的第几步），不是函数名、不含哈希；② 节点切到周期与步：记录器把一次入口调用按屏障段切成点，名字 `<入口>.<这一段里写的种类，+ 接>.<这个入口里这一种周期的第几段>`（单元写按单元头的类标签再分成 `data_unit` / `index_node` / `packed_records`：单元自描述，不用核心层打标记；用户 2026-09-28 定全域之前先把节点编码定好），路径 = 名字按次序 `/` 接起来，同名不同数据的分叉在路径这一级并成一段、靠身份区分；③ 路径从块键拆出：块键只留身份，路径 → 身份记在库的路径索引表（`verdict_store.rs` 的 PathIndex 表），纯改名不使判定失效，判定在块表、树是索引表；④ 前缀共享：崩溃点自带设它的文件（共用步骤写在公共模块 `crates/singlefs-checker-tier/tests/common_crash_points/mod.rs`），判法代码按点的文件各算一份（`crash_amplification.rs` 的 `JudgingCodes`），几条流的公共前缀在库里只核一次。GPU 上判对错（池级 checker 的 WGSL 版）与 GPU 批量派活不在 [03-third-txn.md](03-third-txn.md) 里（用户 2026-09-28 定从那份文件删掉、由做崩溃放量的那一部分管；施工顺序在 `records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定：GPU 判器全部做完」那一行）。
+- **开工前要先定的**：这几处崩溃验证怎么收进同一套设计，真设备上的崩溃注入（补「最终判据」）也收进来；节点怎么划（按段、按操作、按模块）；「节点走到哪些代码模块」怎么机械地登记（不靠手列清单——手列清单正是量过会漏的那一处）；父节点的结束镜像改了之后下游要重跑。
+
+### 二　checker 的算法优化（不是 core 的）
+
+- **原话**：「checker算法的优化。注意这里不是core的算法优化。checker先优化剪枝。」
+- **仓里已有的**：用户 2026-09-26 另立的原则（`records/2026-09-24-里程碑二收尾调度.md` 第三节「层 0 规模第三轮判完、用户四问」那一行）：checker 的算法优化可以先于 core，core 不优化算法；实六之后跑一次剖析，量每个崩溃状态的时间花在哪（用户许可的重型测试）。
+- **开工前要先定的**：按剖析的数定先优化哪一段；增量枚举（相邻状态只差一次写）、按镜像去重各自的收益——按镜像去重对记录核对器不适用（D13（验证路线） 已定项 7：记录核对器的入参含持久集合）。第一轮判决（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节）：按内容哈希去重这一格站住（附条件：复用键与去重键改用抗碰撞散列，或键相同时逐字节比内容）；键罩全部读位置（位置 + 内容）这一格站住（一轮，但罩不住记录核对器与 oracle，这两样另算）；两种候选剪枝都出局（挂起）：增量枚举「只重算被翻的那次写罩到的读」不够（自适应读，62 对里 10 对漏重算），按论证跳过「根没写就把整段子集当一类」会漏掉 16 个本该判红的状态（改坏的实现写出孤儿节点再盖掉）；按读位置取值分叉、叶子子集数之和证全量的剪枝精确站住，但『能不能把状态数压下去』被打中（挂起）：今天的 checker 结构在单元段上一个状态都省不下，2¹³⁶、约 2³⁰⁰ 那几段今天没有已知的精确剪枝能罩住，改法待第二轮；记录核对器照跑这一格站住，但与『枚举不完靠剪枝』冲突：这几段记录核对器逐状态照跑做不到，它自己的精确剪枝是第二轮的新题。
+
+### 三　`Vec<bool>` 在验证一侧重新实现
+
+- **原话**：「Vec<bool>、state scheduling调度  在checker中的验证要考虑重新实现，按照core中的实现太重。也不利于之后gpu中的验证。」
+- **仓里已有的**：验证一侧的 `Vec<bool>` 在 `crates/singlefs-checker-tier/src/crash.rs`（7 处）与 `crates/singlefs-checker-tier/src/crash_injection.rs`（5 处），`crates/singlefs-checker/src/` 里 0 处（2026-09-26 现查）。
+- **开工前要先定的**：验证一侧自己的表示（位图、按段的整数子集编码这类，推的），与第四项 GPU 的数据结构一起设计。第一轮判决（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节）：状态表示采用位图这一格站住（本地攻方两份干净样本量得每状态 8 字节，段长 16–28）。
+
+### 四　崩溃放量的 checker 挪到 GPU：过程落文件，一次算出结果
+
+- **原话**：「数据比较核校验部分，我认为可以转移到gpu中，这个作为可选项。默认不生效，但是本机是可以用的，不然显卡是空闲的。当然这部分需要重映射数据结构，需要论证一下代价。测试期间两台主机所有GPU都可以放空。」2026-09-27 改为必做：「这是崩溃放量的实现 是checker的部分 和core无关。」「这个肯定是要实现的，因为一旦到了亿级别的数据验证。花费的时间和实现维护的时间已经不成正比了。所以过程落文件，GPU一次计算得出结果，这样比较好。中间只走过程，过程中的结果还可以hash判定不变。」同日：「如果收益显著的话 我不介意挪动到 里程碑2 来验证」——先做极小规模的计数实验（问题单 `research/prompts/m3-gpu-dedup-r1-forks.md`），收益显著就提前到里程碑二。需要时 5 张卡都可以整卡用（用户同日定）。
+- **仓里已有的**：两台主机共 5 张卡，可用合计约 96 GB：本机 RTX 5090 32 GB、RTX 5060 Ti 16 GB；另一台 RTX 5080 16 GB、RTX 5060 Ti 16 GB × 2（2026-09-27 两边 nvidia-smi 现查）；门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格要求 checker 与实现只共享常量模块。第一轮判决（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节）：GPU 做单元级检查（校验和、头自证、key 次序）这一格站住，排在「GPU 做状态到类的映射」之后（按内容去重之后它占剩余每状态耗时的上界，主 agent 复算 0.264、0.0014、0.213、0.0029、0.366）；GPU 做状态到类的映射这一格打中（挂起：读位置表取自代表态时 44 个状态里 6 个分错类，GPU 与 CPU 对拍逐个相同、抓不出来；改法是读位置表按类取不动点，对拍另加「类判定对逐状态照跑」的固定小域）；GPU 代码住新建的第六个 crate 这一格站住（一轮）。
+- **开工前要先定的**：过程文件的格式（内存装置与虚拟机的崩溃落同一种；落「写序列 + 每个状态的子集掩码」而不是整份镜像，推的），与第一项、第四项一起定；过程里哪些中间结果取 hash、hash 不变就复用判定；GPU 上的 checker 与 CPU 上的 checker 怎么对拍（抽样逐格相同，不同就判红），哪一份算规范；测试期间两台主机的卡都放空，跑之前谁负责把本地模型停下、跑完再起来。
+
+### 五　屏障的判红与计数
+
+- **原话**：「这两笔 我希望里程碑3 收口」（用户 2026-09-27，指 C6（块层语义假设写错）、C26（屏障数从没量过））
+- **仓里已有的**：C6（块层语义假设写错）要「故意去掉一次 FUA 崩溃测试必须变红」，要记录核对器判屏障；C26（屏障数从没量过）要比 seq 与 multistream 的屏障数；两笔在里程碑二判不收口（[02-second-txn.md](02-second-txn.md)「增补 2」下「不收口的」那一串）。
+- **开工前要先定的**：记录核对器怎么判屏障，与第一项一起设计。
+
+### 十一　崩溃放量的过程与结果怎么存、怎么快速读写
+
+- **原话**：「既然说到150亿文件的读写，这里就要给里程碑3 增加一个任务任务 快速的读取和写入这150亿文件。我觉得我们需要使用数据库，KV 存储似乎是一个比较合适的方法。」「这种规模文件的读写和持久化放在文件中 不靠谱。需要解决」（用户 2026-09-27）
+- **仓里已有的**：层 0 今天什么都不落盘，每个状态算完只累计进 `Layer0Tally`（`crates/singlefs-checker-tier/src/crash.rs` 的 `evaluate_state_for_versions`），断点续跑只记进度（`crates/singlefs-checker-tier/src/layer0_progress.rs`）；E161（崩溃放量的去重与分段耗时） 跑前登记第四节 4.8、4.9 算过 10¹⁰ 个状态时五卡合计每状态只摊 10.26 字节、显式存每状态掩码装不下；仓里没有任何数据库依赖（2026-09-27 现查各 `Cargo.toml`，sqlite / rocksdb / lmdb / 向量库都 0 命中）。
+- **主 agent 的理解（待用户核，推的，没量过）**：要读写的不是 150 亿个文件，是 150 亿个崩溃状态；一个状态由（节点，段号，段内序号）唯一定出，镜像与持久集合都能从序号现算，真要落盘的只有每个状态的判定与去重用的键。裸文件在这个规模上缺五样：一批写一半的原子性、坏字节的校验、多机多卡写入的事务、数据与「哪个输入算出来的」元数据的绑定、按违例查询。形态：嵌入式事务 KV 存储（纯 Rust 的 redb 或 RocksDB，只进 harness），按块存不按状态存——键 =（节点，段号，序号区间，输入指纹），值 = 区间里每个状态的判定指纹编号（不同的判定向量只有几十种，另存一张表；第一轮判决 Q1「只存类」站住一轮，KV 第一段按「每状态一个判定编号 + 判定向量表 + 违例表」实现，接进层 0 的方式归第二轮正文 `research/prompts/_m3-prune-gpu-r2-body.md` 的 A8）；一块取 2¹⁶ 个状态，150 亿状态约 23 万个键、15–30 GB 值，一块正好是 GPU 的一个批、双机分片的一个单位、门禁 checker-tier-layer0-replay 复用判定的一个单位；违例另存一张小表。向量数据库答的是近似最近邻，这里全是精确匹配，近似命中会把两个状态当成一个，不适用。
+- **开工前要先定的**：选型挪到里程碑二先做（用户 2026-09-27 定；问题单 `research/prompts/m2-crash-store-r1-forks.md`）；里程碑三接着定块多大、块键里带哪些指纹；两台机器各写各的库还是一个库，怎么合并；违例表与判定向量表的形态；与第一项、第四项一起定。第一轮判决（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节）存储格：只存类这一格站住（一轮，块里另存每类状态数）；选库用户 2026-09-28 定 RocksDB（别的会话转，`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「回扫交回；KV 转来这一轮、第一段派出；门禁取消编号」那一行），KV 第一段（依赖与判定存储模块）在实现；块的单位（对齐片、固定 2¹⁶ 个状态还是对齐节点）归第二轮正文 `research/prompts/_m3-prune-gpu-r2-body.md` 的 A8 重判（第一轮 Q3 那一格把片数 65536 读成了片长），块键里的指纹按第一轮改法取整条路径写表的哈希（被攻过零轮）；一个库、第二台经网络送块这一格用户已定「两机公用」（送块吞吐等 E162（崩溃放量判定块存储选型） S3）；只写违例、全量可选这一格站住（一轮）。
+
+```
+
+**出处 `.claude/kb/milestone/02-second-txn.md:517-611`（整段抄，未转述）**
+
+```markdown
+## 与主线并行的四条线（2026-09-16 用户指示：按 E152（按里程碑对比六家文件系统的文件性能） 缺的能力补、先不优化）
+
+主线八步管的是一个事务的生命周期；这四条线只补「那一维能跑」要的能力（[perf-by-milestone.md](../../../research/perf-by-milestone.md)「以后的里程碑怎么往下接」那张表的前四行与最后两行），数只求量得出。
+每条线都是一种新的事务、骑在主线的事务层上（`.claude/rules/fs-design.md`「从事务开始，不从功能开始」）；每条线各挑一个一次发布的小负载进层 0，大负载只进 E152（按里程碑对比六家文件系统的文件性能）。
+写法与主线各步相同：设想实现、预想的细节、验收标准、写出的字节、会碰到的决策点。
+
+### 并行线一　一个文件跨多个单元（大文件顺序写、顺序读）
+
+**现状**：**写路径已做**：`crates/singlefs-core/src/transaction.rs` 的 `publish_sequential_write` 按切分纪律把一次写请求切成若干一单元事务，一个单元与两个单元的分界是净荷容量 32634（32634 一个、32635 两个），由 `crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs` 钉住；原先「多于一个单元在任何落盘动作之前拒绝」那一支已拿掉（`grep -rn STILL_UNDECIDED_TODAY crates/` 零命中）。两条曾挡路的条款 2026-09-23 已定（见增补 2 收口表第 36 行）：C490（extent 叶 key 的 offset 段没定单位） 定文件字节偏移（D8（核心索引结构） 已定项 3），C491（多条记录时共享内生块在哪条点名没定） 定只在最后一条点名（D23（journal 的角色与格式） 已定项 17）。**读路径已做**：`crates/singlefs-core/src/mounted_read.rs:617` 的 `open_file`、`crates/singlefs-core/src/extent_tree.rs:709` 的 `read_lower_segment`，用例 `crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs`，变异 `crates/mutations.tsv` 第 404–418 行。层 0 那条流（`crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs`）在崩溃放量里全域 268 435 552 个状态 0 红（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「全量 i」那一行）。还欠：只供测试的开关「把一条记录装几个事务压小」（见增补 2 收口表第 24 行）已转给里程碑三放量 GPU 加速那一轮的收拢表（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第 40 行），去向收拢时判。
+
+**设想实现**：一个 inode 在 extent 树里有多条叶记录，key (locality_id, inode, offset) 各指一个 32 KiB 数据单元；一次写请求切成若干事务、每个事务一次发布写出 N 个单元、一条或多条 journal 记录；顺序读按 offset 沿 extent 树取指针、逐单元读回。
+
+**预想的细节**：
+- 每单元净荷 = 32768 − 头 134 = 32634 字节（含 29 字节预留位的头是 134，[layout/01-first-txn.md](../layout/01-first-txn.md)「二、数据这一侧」；D4（校验和位置） 已定项 5：净荷不是 2 的幂，文件偏移到单元做除法）；**预想** offset 字段是文件字节偏移（[layout/01-first-txn.md](../layout/01-first-txn.md)「四·二、extent 树」的 key 形态，D8（核心索引结构） 已定项 3），开工前核。
+- extent 叶记录 112 ⇒ 一叶装 ⌊(16384 − 163) / 112⌋ = 144 条；1 GiB 文件约 32 900 个单元 ⇒ 叶 229 片、树高 3（**预想**）；高度大于 1 的 extent 树第一次出现，内部节点条目形态按 D8（核心索引结构） 已定项 11。
+- 记录条数按切分纪律走、不按点名项上限走：D16（发布语义） 已定项 5 末段逐字「切分纪律是一事务一单元」、D23（journal 的角色与格式） 已定项 7「一条记录一个事务号」⇒ N 个数据单元 = N 个事务 = N 条记录，67 那个点名项上限够不着；这笔账（journal 恒占用户数据 12.5%、T_dirty 满窗 65 536 条）在 C310（事务切分纪律与记录数口径打架），改法 2026-09-16 用户定案：一条记录装一个事务连同它的元数据，也就是新池新建文件今天的形态，这条线按 N 个数据单元 N 条记录写；此前这里写「改法要用户定」。新池新建文件一条记录点名 8 个单元（1 个数据单元 + 7 个提交内生块）已经站在「一条记录装一个事务连同它的元数据」那一边，这件事此前没被记成一次选择。（2026-09-16 三方第一轮攻方腿打中的第九条，此前这里写「⌈N / 67⌉ 条记录、提交标记只在最后一条」。）
+- 一次写请求按 T_dirty 切 checkpoint、不是切事务（D16（发布语义） 已定项 5：挂载时有效 T_dirty = min(2 GiB, 环长 ÷ F) = 256 MiB）⇒ 1 GiB 顺序写至少 4 次发布，事务数按切分纪律等于单元数；准入按 D28（挂载期承诺量） 已定项 1 逐事务过。
+- 落点：用户数据按 D3（空间分配） 已定项 8 逐单元取最低空槽对，顺序写自然连续；不做任何放置优化。
+
+**验收标准**：
+- 写 M 个单元（M 跨过 67 与 144 两个门槛）再冷启动顺序读回，逐字节相同；一次发布的记录条数 = 数据单元数 N（C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案的口径）；这次发布共享的提交内生块在哪条记录里点名，开工前定（**预想**：只在最后一条）。
+- 顺序读 M 个单元时 extent 树节点的读取次数 ≤ 树高 + 叶数（可观测：读路径报出节点读取计数），不是每个单元从 inode 重走一遍。
+- 层 0 小负载：一次发布的单元数不许超过 10——70 个单元是 2 的 140 次方个状态（攻方腿打中的第四条）；要造多记录事务的边界，用步 0 那个「一条记录装几个事务」的开关压到 2、4 个数据单元造出两条记录；崩在第二条记录之前 ⇒ 整个事务不施加、文件是旧长度（I-4.3（提交原子））。真 67 项的边界只能进层 1 或 QEMU 档。
+- 变异：把提交标记提前到第一条记录 ⇒ 层 0 上恢复施加了半个事务，I-4.3（提交原子） 红；offset 错写成单元序号 ⇒ 读回错位判红；点名项超过 67 仍塞进一条记录 ⇒ 记录解析拒收。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「四·二、extent 树」（多条记录与高度大于 1 的内部节点）「六、journal」（提交标记为 0 的记录第一次出现）「二、数据这一侧」。
+
+**会碰到的决策点**：C310（事务切分纪律与记录数口径打架）（改法 2026-09-16 用户定案，E143（一事务一单元下的 journal 账） 的重算与 D23（journal 的角色与格式） 已定项 12 的余量口径仍欠）；D8（核心索引结构） 已定项 3 / 已定项 11；D23（journal 的角色与格式） 已定项 7 / 已定项 18；D16（发布语义） 已定项 5；D4（校验和位置） 已定项 5 / 已定项 7；D11（索引节点要不要留消息缓冲区） 已定项 7；D28（挂载期承诺量） 已定项 1。
+
+### 并行线二　挂载态的读：打开一个文件、按偏移反复读（4K 随机读）
+
+**现状（2026-09-22 落地）**：读路径做出来了。`crates/singlefs-core/src/mounted_read.rs`（`open_pool_for_read` / `mount_read_only` / `data_unit_span_covering`）与 `crates/singlefs-harness/src/read_tally.rs`（块层读计数）；用例 `crates/singlefs-harness/tests/mounted_read_by_offset.rs` 10 条，`crates/mutations.tsv` 里 6 条变异（行 248、249 与 258–261）逐条在副本里改坏跑红、基线红集为空。**验收四条**：第 1、2、4 条过；第 3 条只做到一半——「同一个 reader 上冷走读与挂载态读逐字节相同」钉住了，「层 0 每个恢复结果上各跑一遍」归 `crash-verifier`。K 次随机读里**跨单元 7 次 / 64**（净荷 32634 不是 4096 的整数倍，理论约 12.5%），块层数到 71 = 64 + 7，与装置外另跑一台 xorshift64 得同一组数。**实做时答出来的一格**：提示过期的一次解引用发 **3** 次设备读（两条提示各白试一次 + 映射落点第一条就中），不是 4——查中央映射本身**不发设备读**，`open_pool_for_read` 读一次映射树根就把整片条目解进挂载态（派生态，D21（权威态与派生态的分界）），`central_mapping_lookup` 的签名里没有 `reader`。这个读数的前提同时做成了可判的：映射树根不是根兼叶（层级 ≠ 0）就拒绝打开挂载态、不把内部条目当 55 字节映射条目解。**还剩一样没做**：层 0 每个恢复结果上跑一遍（归 `crash-verifier`）。**挂载态整片读中央映射已写成条款**（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）；**树节点经映射的回退也已写成条款并实现**（D19（块指针的结构与宽度预算） 已定项 8：豁免三类之外的单元位置提示读不出时一律经映射回退——`crates/singlefs-core/src/recovery.rs:404` 的 `read_mapped_tree_node_via_hint_then_central_mapping`，用例 `crates/singlefs-harness/tests/tree_nodes_and_the_central_mapping_on_mounted_read.rs`，C483（挂载态读映射与树节点回退都没有条款） 已挪进 `.claude/kb/checks-owed.md` 已还清表，见增补 2 收口表第 49 行）。映射长成多层之后那个 3 会变，那一维是 D19（块指针的结构与宽度预算） 已定项 5 自陈零测量的缓存命中维（C418（位置权威三臂的缓存命中维零测量））。
+
+**设想实现**：池打开之后保持一个挂载态（内存里的根、树表与读过的节点），提供「按 inode 与偏移读 N 字节」的接口；每次读不重走冷恢复；随机读一页 = 定位单元、读整单元、验校验和、拷出那 4096 字节。
+
+**2026-09-17 用户指示（转述；「200 位」按树表条目宽 200 字节读，读法不对由用户改）**：实现树与环的时候记得本工程与传统文件系统不一样——树表条目有 200 字节的元数据（[layout/01-first-txn.md](../layout/01-first-txn.md) 七：树 ID、种类、86 字节根指针连校验和与落点、`previous_snapshot_txg`、诞生 txg、头 ID、预留 76），所以取数据很方便：读路径从根记录到树表条目就拿到每棵树的根指针与校验和，不用再翻别的结构找根、也不用另读一次才能验；按偏移读一页先查树表条目定树，再沿 extent 树取 86 字节指针读整单元、验校验和。并行线一（大文件跨单元）同样照这条做。
+
+**预想的细节**：
+- 挂载态里的一切都是派生态（D21（权威态与派生态的分界）），丢了就从盘上重走；第一版不做读缓存、不做预读——先不优化。
+- 解引用照 D19（块指针的结构与宽度预算） 已定项 5：先按父指针里的位置提示读，校验和不对或读不到再查映射；提示过期的多跳率要有运行时观测点（那条定案的硬规则 3）。
+- 跨单元的页：净荷 32634 不是 4096 的整数倍，约 12.5% 的页跨两个单元、要读两个单元（D4（校验和位置） 已定项 5 的 E140（单元含头逼出的跨单元页与读侧拷贝） 那一段）；读路径要能报出「这次读了几个单元」。
+- E152（按里程碑对比六家文件系统的文件性能） 的 singlefs 臂今天只有 `new_pool_file_creation_on_device` 一个二进制，随机读要另加一个读循环的入口（改 `crates/`，带测试）。
+
+**验收标准**：
+- 打开之后随机读 K 次 4 KiB，每次内容与写入逐字节相同；K 次读期间 journal 环一次都不扫（块层读计数 ≈ 单元读 + 树节点读，没有 196 608 那一档）。
+- 改坏一个数据单元的一个字节 ⇒ 落在它上面的读报校验和错、别的读不受影响。
+- 层 0 小负载：无（这条线不写盘）；但挂载态读要在层 0 的每个恢复结果上也能跑一次——恢复出的镜像打开后读，与冷走读结果相同。
+- 变异：把位置提示故意指到别的槽 ⇒ 经映射仍读对，多跳计数加一；关掉校验和比对 ⇒ 改坏单元的那次读返回坏数据，判红。
+
+**写出的字节**：无（只读）。
+
+**会碰到的决策点**：D19（块指针的结构与宽度预算） 已定项 5；D21（权威态与派生态的分界）；D17（实现分层与第三方管道） 已定项 5；D4（校验和位置） 已定项 5。
+
+### 并行线三　多个文件：多个 inode（元数据按「个」量，没有目录）
+
+**现状（2026-09-22 落地）**：写路径与 checker 那两条都做出来了。`crates/singlefs-core/src/inode_tree.rs` 算「这次发布之后树里是哪几片容器、各装哪些记录、哪几片要重写」（不发写、不动分配器，10 条单测）；`crates/singlefs-harness/tests/many_inodes_write_and_read.rs` 4 条用例建 233 个 inode 一次发布、冷启动逐个读回、字段等于写入，记账里 inode 号水位 = 235；I-9.6（水位大于两处最大号） 与 I-9.12（分隔 key 落在孩子区间之外） 在 checker 里实现、各有坏镜像；左半容器身份不变由期望态带着分裂前的身份钉住；`crates/mutations.tsv` 末尾追加 12 条，12 条全红。C116（叶容器的分裂 / 合并纪律没有会失败的检查） 的分裂那三条已还，合并与空容器两条没有对象。**还没做的三样**：层 0 小负载（一次发布让容器分裂一次，归 crash-verifier）；「inode 号复用已发过的号 ⇒ 判红」那条变异（今天号只从水位发、水位只增，造不出这条写路径，C479（inode 号复用已发过的号今天造不出来））；十万个文件那一档（今天只跑到跨过 233 的一次分裂）。**实做时定下的四处**：建 N 个 inode 算一个事务、一条 journal 记录（D16（发布语义） 已定项 5 的切分上界只管用户数据单元，建 inode 一个都不写）；inode 树根的 key 区间取分隔 key 的首尾、不取子树范围（跟 checker 今天的 `check_index_node_keys` 走，口径的账在 C478（码 2 头的 key 区间是条目键区间还是子树覆盖区间））；inode 记录偏移 48 的 `blocks` 改成结构体字段、文件版本填 64、没写过数据的填 0（口径的账在 C480（inode 记录的 blocks 怎么算全仓没有条款））；没有目录时新建 inode 的 mode / uid / gid / nlink 仍写死 `0o100644` / 0 / 0 / 1。**一次发布只重写被改到的那几片叶容器**今天只有用例钉着，没有条款也没有不变量。
+
+**设想实现**：一个池里建 N 个文件（inode 号从 2 起单调发），inode 树的叶容器装多条 140 字节记录、一容器 233 条、超过就分裂；inode 号水位那一行随之走；没有目录，文件只按 inode 号访问。
+
+**预想的细节**：
+- 叶容器与分裂按 D8（核心索引结构） 已定项 6：一容器 233 条；三条写路径纪律（末尾分裂左半保留全部记录与身份……）今天没有会失败的检查（C116（叶容器的分裂 / 合并纪律没有会失败的检查）），这条线要把它做成会红的量——[invariants.md](../invariants.md) 逐字写它「对着一个镜像判不了，走单测 / 模型对拍与崩溃点重放」，checker 判不了、记录核对器停在句法层，能判的只有恢复加 oracle 那一路（期望态里带分裂前的身份，攻方腿打中的第十条）。
+- 内部节点条目 120、扇出 135 ⇒ 十万个文件约 430 片叶、树高 2（**预想**）；一次发布改了几个容器就重写几片叶。
+- inode 号水位（D5（快照 / 空间记账机制） 已定项 4 第 12 项）：每次发布重写、合并取最大值；建 N 个之后是 N + 2。
+- 与六家的口径：fio 的元数据作业按路径建文件、stat、删；这条线没有名字空间、没有删除，只能报「建 N 个 inode 并持久 / 秒」，性能表里那一格写「不可比」。删除（`deleted_inodes` 树，C118（`deleted_inodes` 树的形态无落点））不在这条线里。
+
+**验收标准**：
+- 建 N 个 inode（N 跨过 233）一次发布后冷启动逐个读回记录，字段等于写入；记账里 inode 号水位 = N + 2；checker I-9.6（水位大于两处最大号） 判绿。
+- 分裂之后 checker：叶容器 key 序与内部节点区间判绿（I-9.12（分隔 key 落在孩子区间之外））；左半容器的身份（容器号、出生代）不变。
+- 层 0 小负载：一次发布让容器分裂一次（第 234 个 inode）进层 0。
+- 变异：分裂时把身份给了右半 ⇒ 判红（C116（叶容器的分裂 / 合并纪律没有会失败的检查） 的检查从此有）；inode 号复用一个已发过的号 ⇒ 判红。
+
+**写出的字节**：[layout/01-first-txn.md](../layout/01-first-txn.md)「四、文件元数据（inode）」（容器多条记录、第二个容器、内部节点多条条目）。
+
+**会碰到的决策点**：D8（核心索引结构） 已定项 6；D5（快照 / 空间记账机制） 已定项 4；C116（叶容器的分裂 / 合并纪律没有会失败的检查）；I-9.6（水位大于两处最大号） 与 I-9.12（分隔 key 落在孩子区间之外） 都写「未实现，前置：树的种类」；C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）；目录进不进这个里程碑（交用户定）；出生序号的作用域：D19（块指针的结构与宽度预算） 已定项 9 逐字「同一棵树内每写出一个码 2 或码 3 单元加 1（两类共用一个计数）；作用域换到下一个 checkpoint 时清零」，而今天 `transaction` 模块的 `BirthSequenceAllocator` 在每次 `publish_file_version` 调用里重建，一次调用 = 一次发布 = 一个文件时两者重合；多个对象在同一个 checkpoint 里各调一次就会在同一个 (树, txg, 实例) 键上从 0 重数、撞出重复的映射 key ⇒ 开工前把它挪到「一次 checkpoint」的作用域里跨调用共享（三方代码第一轮正推腿）。
+
+### 并行线四　真设备补齐：mkfs 整环写 0、真设备二进制报分段时间
+
+**现状（2026-09-22 落地）**：mkfs 把根环三个区域与 journal 环整环清零（`crates/singlefs-core/src/make_filesystem.rs` 的两处 `write_zeroes_at`，每块盘 4 次写零调用），段序列 `12+1+1+1+4`、21 次操作、4114 个崩溃状态，步骤种类从五种变成六种（加了「写零」）；真设备二进制按段报挂钟。量出两个数、用户 2026-09-22 当天各认一笔账：① 每次都跑那一档门禁多 54.9 秒（开 433.18 秒、关 378.28 秒，+14.5%，A/B 实测）；② 冷重开恢复 17.22 秒第一次被量出来（同一趟里 mkfs 713.8 ms、取号 5.39 ms、暖机 9.22 ms、新池新建文件 9.72 ms）。两个数都在 C486（整环清零的 55 秒与冷重开的 17 秒都没人管），而且都是本机值（`.claude/kb/tooling.md`「仓里的性能数都只在本机成立」）。**还没做的**：C485（segment-registry 格不读活代码，段序列变了照样绿）2026-09-22 已还（登记表那一行改成钉住活代码的那条用例）；C487（device-streams 格拿活代码与不跟踪它的模型比）模型那一半 2026-09-23 用户定案追平之后已做到（`research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 的 mkfs 在第 2193、2195 行调 `record_zero_fill`，门禁 checker-tier-qemu-device-streams 读的产物 mkfs 行 `operations=23 segments=12+1+1+1+4`，与 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 333–337 行逐字相同），仍欠判别力自证与真跑：`.claude/gate.d/fixtures/checker-tier-qemu-device-streams.sh/` 的 red / green 样本 mkfs 行仍是 `operations=13 segments=4+1+1+1+4`，没有一格证「虚机段序列改一步门禁 checker-tier-qemu-device-streams 由绿转红」，checker-tier-qemu-device-streams 真跑没人跑过。
+
+**设想实现**：真设备上 mkfs 把 journal 环整环写 0（每盘 768 MiB），格式化那一维的挂钟与写量才与六家可比；真设备二进制把 mkfs、取号、暖机、事务各段的挂钟分开报，小文件持久化的延迟从整段上界变成每段的实数。
+
+**预想的细节**：
+- 整环写 0 走块设备抽象（今天只有读、写、屏障、FUA 写、探测五个动作）：**预想** 用大块顺序写（每次 1 MiB，每盘 768 次），它们进录制流 ⇒ 段序列登记表 mkfs 那一行的写数从 13 变成 13 + 1536，门禁 doc-registries 的 segment-registry 格跟着改；两格决策：块设备抽象要不要加「写零」动作（真设备上可以映射成 WRITE ZEROES，先不加）；段序列登记表的步骤种类只有五种，一次 1 MiB 的环清零写哪一种都不是，而等价类按每段的步骤种类集合判（D17（实现分层与第三方管道） 已定项 2）⇒ 要么登记第六种「写零」、要么论证它归进哪一种，开工前定（攻方腿打中的第十一条）。
+- 层 0 的基线是 mkfs 施加之后的镜像、不枚举 mkfs 的崩溃点，所以写数变多不影响状态数；QEMU 那一档（门禁 checker-tier-qemu-device-streams）的设备侧日志要把这 1536 次写与程序录制流逐项比。
+- 分段时间：二进制在每段末尾打一行带单调时钟的标记，跑批脚本按标记切；五轮分成两群那件事（[perf-by-milestone.md](../../../research/perf-by-milestone.md) 第三节）已查清不来自任何一段：是 E152（按里程碑对比六家文件系统的文件性能） 外层包装程序按输出行到达时刻切挂钟，混进 21.7–25.8 ms 的打印积压（实验页「这几个数说明什么（覆盖写、释放、回退与复用，与两盘镜像的六家比）」一节第 4 条）；E152（按里程碑对比六家文件系统的文件性能） 装置已改成先读完再转打并报包含自检（`e152-preregistration.md` 第十四节），分段时间仍要二进制在每段末尾自己报。
+
+**验收标准**：
+- 真设备 mkfs 之后抽样读 journal 环全 0，设备侧日志的写字节数 = 116 224 + 2 × 768 MiB。
+- E152（按里程碑对比六家文件系统的文件性能） 的格式化维可比，小文件持久化的挂钟按段报出中位与离散。
+- 变异：漏写环的最后 1 MiB ⇒ 抽样读判红；分段标记少打一段 ⇒ 跑批脚本拒收（段数与登记的不等）。
+
+**写出的字节**：无新字段（环写 0 已在 [layout/01-first-txn.md](../layout/01-first-txn.md)「零、盘面地图与新池新建文件的写清单」；「八、根槽写路径的段序列登记表（C316（提交步骤的登记位有四处且互不相同） 的登记位，2026-09-13 立）」mkfs 那一行的写数要改）。
+
+**会碰到的决策点**：D17（实现分层与第三方管道） 已定项 5（块设备抽象的动作清单）；D23（journal 的角色与格式） 已定项 19 ③；C6（块层语义假设写错）；C26（屏障数从没量过）；C323（镜像大小全仓没有条款）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:1-4`（整段抄，未转述）**
+
+```markdown
+## D13 验证路线 —— 已定
+
+D13（验证路线） 管本工程拿什么验正确性：三类现成办法全做——自写参照实现做差分对拍、有界穷举崩溃测试、crash refinement 形式验证（调查见 [prior-art.md](../prior-art.md) 7.4）——并且不照抄，针对本工程特有的四样（COW 每事务发新根、Merkle 自验证、整卷 AEAD 的 nonce 唯一性、没有参照实现）自己设计验证手段。它定 oracle 怎么分、自研哪两样、崩溃点重放怎么分层与抽样、崩溃状态集合怎么定义、checker 与实现共享什么。不管的：每条不变量写什么在 [invariants.md](../invariants.md)；三样验证手段怎么落地、谁挡着谁在 [verification-build.md](../verification-build.md)；提交步骤登记在哪、结构等价类怎么分、今天几个，归 D17（实现分层与第三方管道） 已定项 2。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:25-72`（整段抄，未转述）**
+
+```markdown
+#### 已定项 1：crash refinement 先验「一次发布 + 一次崩溃 + 一次恢复」
+
+**定案**：crash refinement 的第一个验证对象是恢复函数 `Recover` 的关系性质，最小封闭单元是「一次发布 + 一次崩溃 + 一次恢复」。四个里程碑的主语 `Recover` 指 `crates/singlefs-core` 里以 `verify_named_units = true` 调 `replay_journal` 的三处（`recover` 的 `Consult` 策略、可写挂载读阶段、只读挂载），三处的 `records` 都取 `scan_journal` 的输出；`Ignore` 与 `ConsultWithoutNamedVerification` 是测试与对照用的臂，写进可信部分；`crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs` 不是产品调用方。四个里程碑依次是：
+
+| 里程碑 | 义务 | 落点 |
+|---|---|---|
+| **M1 全性** | `Recover` 在 D13（验证路线） 已定项 4 枚举的**每一个**崩溃状态上有定义、终止、输出一个能过 I-7.1（根槽有效集非空） 与 I-8.3（重放前缀严格连续） 的镜像 | 脚手架。**完成判据不是「证出来了」，是「M2 能在它上面写出来」**——层 0 崩溃点重放本就全量枚举（[verification-build.md](../verification-build.md)「层 0 不抽样、全量枚举」），恢复卡住当场暴露，单独证它没有边际价值。取前缀、择根、扫环三截已进 Verus，都在 `crates/singlefs-replay-prefix/src/lib.rs`：取前缀核 `replay_core`（终止与不溢出在核内证到，循环都带 `decreases`；`requires` 两条——记录表按 (实例代号, 计数器) 升序、计数器有后继——由胶水 `replay_journal` 里的断言兜），择根核 `choose_root_slot`（自证过的槽里取 (`checkpoint_txg`, 实例代号) 最大、键相同取槽序最前），扫环核 `first_copy_of_each_record_key`（同一 (实例代号, 计数器) 先到先得），择根与取前缀的合判写成推论 `corollary_recovery_replays_from_the_newest_self_verified_root`；门禁 checker-tier-formal-verification 判证明，登记数 56 verified（`.claude/gate.d/verus-pins.tsv`）。E165（恢复重放有界穷举与变异杀伤界） 当轻量工具，它第 3 次重跑第二段的择根合判族在内存盘上调真 `choose_root`、`scan_journal`、`replay_journal`。择根序的四个改坏变体在合法历史 K 族里只有「取第一个有效者」红，另三种（比较不看实例代号、txg 平局取低、实例代号为主）由 Verus 必红世界（`crates/singlefs-replay-prefix/verus-mutations.tsv` 择根那一节）与对抗根环 KA 罩（第 3 次重跑第三段）。核之外：择系统配置（`choose_system_configuration`）与两截胶水（择根的读槽、自证校验和、fsid、区域到盘的映射、槽的遍历次序；扫环的偏移枚举、提示、解析与 CRC、盘的遍历次序）不在 Verus 里，层 0 与崩溃放量的 CPU 判器在每个崩溃状态上调 `recover` 罩它们（GPU 判器用 WGSL 另写一份 `replay_journal`，验不到 core） |
+| **M2 前缀不切发布** | **任一 `jsn` 连续前缀，其重放结果等于某个整数个已发布的 checkpoint 的结果——不存在被前缀切开的发布；前缀停在一次发布中间时，那次发布整体不施加**（D16（发布语义） 已定项 4「一次发布整体施加或整体不施加」）。分两层。**句法层**（对任意自证过的记录表，无前提）：施加的记录是若干整次发布，在飞上限与提交标记逐条判过，施加的计数器从链首起逐一连续（锚点读得出时从锚点加一起；读不出时首条 `checkpoint_txg` = 所选根 + 1、序号 1）；反向链与点名单元是读盘回调的结果，写成「被施加的每条记录，回调交回了真」。**语义层**（前提：盘上每条记录出自这一版的合法写侧，即 E165（恢复重放有界穷举与变异杀伤界） 的合法历史一族；同一 (实例代号, 计数器) 在全部时间线上只对应一份内容）：「结果」是根的投影加盘，不是整条根——返回的根的 (实例代号, `checkpoint_txg`) 与新根段四个字段等于所选根那条时间线上的第 j 版（j 不早于所选根），其余字段等于所选根，卸载记号除外（由记录重建的根取「不是卸载那一串写下的」）；盘上 (所选根, j] 每一版的记录读得出、点名单元两份都验过、记录条数之和不超在飞上限 | 落点是 I-8.3（重放前缀严格连续）——它的判据补句逐字就是这一条（「前缀不得停在一次发布的中间——一次发布整体施加或整体不施加」），不要在 [invariants.md](../invariants.md) 里另立一条。句法层在 Verus 核 `replay_core` 的 `ensures`（`replay_follows_the_prefix_rules`）里，必红世界登记在 `crates/singlefs-replay-prefix/verus-mutations.tsv`，其中「改判定」行只改可执行判定、不碰 spec；语义层靠 E165（恢复重放有界穷举与变异杀伤界） 的合法历史一族在界内判，Verus 不证。核之外：胶水（摊表、包回调、拼报告与新根）由 E165（恢复重放有界穷举与变异杀伤界） 直接调真 `replay_journal`、harness 用例与 `crates/mutations.tsv` 的变异行罩，拼根里投影之外的字段（卸载记号、实例表指针、分配记录树根）没有变异行、E165（恢复重放有界穷举与变异杀伤界） 的生成器把它们写成定值；两个读盘回调（反向链、点名单元闭包）由 E165（恢复重放有界穷举与变异杀伤界） 里真回调、内存盘的读数、`crates/mutations.tsv` 的变异行与只读挂载几种形状的读盘次数用例罩 |
+| **M3 幂等与单调** | **幂等**：`Recover(Recover(c)) = Recover(c)`，两读都证——记录级（同一条记录施加两次与施加一次，得到的根相同，I-8.4（重放幂等） 的字面）与不动点（把重建出的根当所选根、同一张记录表、同一个读者、同一个开关再重放一次，返回的根不变；前提是所选根之上的记录不超在飞上限，且记录表满足 I-8.12（同实例记录的 txg 不减）：同一实例里 journal 记录的 txg 随计数器不减）；第二次因所选根 `checkpoint_txg` 顶格报 `CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR` 且一条没施加的，算相等。「就是 I-8.4（重放幂等）」不成立：I-8.4（重放幂等） 是记录级一读，不动点是另一条性质。**单调**（M2 的推论，不单独证）：串行提交（已定项 2）、D16（发布语义） 已定项 7 的持久顺序、所选根取根环里最新的有效根之下，同一次运行里 D13（验证路线） 已定项 4 的两个不带故障的崩溃状态 `c ⊆ c'`，`Recover(c)` 落到的版本不晚于 `Recover(c')` 落到的版本，版本按 (`checkpoint_txg`, 实例代号) 比，与 D22（单元原子性怎么合成） 已定项 7 的择新序同一个序；开并行提交或把域放宽到带故障时重开。「施加的事务集包含于」那一读法撤：它对理想恢复也为假 | Verus 核 `replay_core` 的 ensures 证两读：记录级与不动点（不动点的前件含 I-8.12（同实例记录的 txg 不减））；单调写成推论 `corollary_the_landed_version_does_not_go_back`，择根与写侧那两条前提写在它的 requires 里。E165（恢复重放有界穷举与变异杀伤界） 的对抗一族在界内判不动点，违例全在 I-8.12（同实例记录的 txg 不减） 不成立的记录表上（第 3 次重跑第一段）。checker 那一半（I-8.4（重放幂等），取在崩溃注入的二次崩溃上判）未实现。O2（独立解析器 + checker） 判不了幂等：I-4.5（已停用·需两镜像） 退役理由逐字「幂等要比对两个镜像，单镜像判不了」 |
+| **M4 不少施加** | 前提与对象同 M2 的语义层。`Recover` 返回的根恰是 j\*：从所选根起每一版都完整在盘上（记录任一份自证过、点名单元两份都验过）、记录条数之和不超在飞上限的最远一版。不加这一条，M1–M3 全部证出来也排除不了「已确认的完整发布被恢复丢掉」：一条都不施加的恢复过 M1–M3 的全部字面。「不少施加」按「多出违例」读：变体多出违例才算被它挡住 | E165（恢复重放有界穷举与变异杀伤界） 的最远一版判据在界内判；Verus 的必红世界里「第一条水位之上的记录就停、一条都不施加」那一行红；M4 自己不单独证 |
+
+**挂载透明**（独立的第四条性质，不是 M3 的第三读）：在崩溃镜像上只读恢复一次得 R1；在同一份镜像上做一个动作——只挂载（取号、写行、暖机与挂载自己推的抬 F），或挂载加一次发布——之后再只读恢复一次得 R2，逐字段比 R1 与 R2。比的那一版：只挂载比恢复落到的那一版，挂载加一次发布比挂载后那次发布之前的那一版。挂载途中三个相位的二次崩溃镜像 img2 上也判：C(recover(img2)) = C(v1)（v1 是 R1 落到的那一版，C 取 POSIX 内容与存在性），内容与字段两半都判；字段一半里，落回 v1 那一版自己的各字段与 R1 相同，落到这次挂载写的某一版的照逐字段表判，扫描报告不判，抬 F 第一个写起 F 不判、在它之前（含暖机）F 照「挂载没推抬 F」那一格判。逐字段表（R2 对 R1）：
+
+| 字段 | 判法 |
+|---|---|
+| POSIX 内容与存在性 | 必须相同 |
+| 池身份与系统配置的不可变配置（本盘设备号除外） | 必须相同 |
+| 卸载记号 | R2 恒为「不是卸载写的」，R1 的记号不进比较 |
+| F 与 F 生效值 | 挂载没推抬 F：R2 的 F 生效值与 R2 根里的 F 都等于 R1 的 F 生效值；推了：R2 的 F 生效值等于挂载交回的那一串最后抬到的 F |
+| 实例代号 | max(各盘两槽自证系统配置的实例代号, 根环全部可读根的实例代号) + 1，两个量都从崩溃镜像读 |
+| 实例表行 | 照 D18（块里携带什么信息） 已定项 11 恢复写的行 |
+| `checkpoint_txg` | 只判下界：≥ max(根环全部根的 txg, 环里全部自证记录的 `checkpoint_txg`) + 1（D23（journal 的角色与格式） 已定项 14 的下界，允许跳号） |
+| 根槽位置 | 不另判，由 `checkpoint_txg` 定 |
+| 树 ID 水位 | 挂载不发第一个文件时相同 |
+| 树表里 inode 树、extent 树的根指针 | 相同；树表单元自己的落点不比 |
+| 扫描报告 | 施加 0 条、水位之上 0 条 |
+| 分配记录 | 不比整表：POSIX 内容相同，且池级 checker 对 R2 的镜像判绿 |
+
+**射程**：refinement 的边际价值只在层 0 枚举取不到的那几维——载荷字节、记录条数 / 段数 / txg 数（含环回绕）、上一条时间线的残留、槽数与设备数；崩溃点那一维层 0 已全量枚举。「校验和过了」在模型里是一个布尔标志，**不许读成 refinement 验了完整性**——与已定项 14 里 D4（校验和位置） 那一行「不许读成『验了 Merkle』」同形，也与 D13（验证路线） 已定项 4 对 CRC32C 碰撞概率的「知情接受」是同一笔账。D13（验证路线） 已定项 4 是 refinement 左边的 `Crash`（模型层的枚举域），不是右边的 `Spec`，拿它当 spec 会让 refinement 恒真。I-6.5（nonce 水位单调） 的形式化撤下；D18（块里携带什么信息） 已定项 14 定了、且 nonce 分配规则（单调计数器 + 预支水位、水位在使用前持久）被立成一条分项之后，这一格重开——重开时它唯一的真优势是 nonce 对 POSIX 不可见，它的 spec 与 O1（内存模型对拍（HashMap 理想文件系统）） 的 model 结构上不可能同源，不受冲突 2（D13（验证路线） 已定项 13） 影响。
+
+M1–M4 的前提与域：语义层只挂「同一 (实例代号, 计数器) 在全部时间线上只对应一份内容」，由 D23（journal 的角色与格式） 已定项 14「这一版的失败处置」的原样重发担保，根槽写失败推进 `checkpoint_txg` 再发那条路落地时重核；前提域取 E165（恢复重放有界穷举与变异杀伤界） 的合法历史一族（合法写侧写出的历史的任一落盘子集，较新的根槽可以读不出）。M2 的「其余字段等于所选根」里，由记录重建的根的卸载记号是 `NotWrittenByTheUnmountSequence`（D22（单元原子性怎么合成） 已定项 7「其余根写 0」），与所选根的记号可以不同，所以写「卸载记号除外」。M3 的单调推论只在串行提交、不带故障的崩溃状态里成立。M4 连同择根才排除「已确认的」完整发布被恢复丢掉，前提要全：不带故障的崩溃状态（已定项 4 的枚举域）、所选根按 D22（单元原子性怎么合成） 已定项 7 的择根取、链不跨实例边界（D23（journal 的角色与格式） 已定项 14 注 1）、新实例本实例写成的根覆盖两块盘之前不让任何 fsync 返回（D16（发布语义） 已定项 8 的暖机）；带故障的域里不排除——在飞上限会截掉记录完整的发布，一块盘整块掉了时点名单元少一份的那一版不施加（C519（丢一整块盘时恢复丢掉刚确认的那一版））。
+
+挂载透明的射程：只管不带故障、可写挂载做成的崩溃状态。可写挂载被拒的状态不判透明，判拒绝本身合不合法：拒绝合法 ⇔ 拒因在 D23（journal 的角色与格式） 已定项 14 那张单子上，且照那一条的判据在崩溃镜像上自己复算成立，且盘上逐字节不变，且只读读出在允许集合里；拒因不在单子上的照崩溃注入第二截的写法报红。带故障的状态不在射程：取号那一刻有一槽读不出与 N-配置今天报成同一个拒因，接进带读故障的档之前要分开（C664（挂载拒绝合法复算把两种拒因报成一个））。逐字段表里树 ID 水位、两棵树的根指针、`checkpoint_txg`、扫描报告四格是推的（三方判决取辩方的式子，没量），F 那一格「推了」的一半没量；根记录的 `mapping_root`、`allocation_record_tree_root`，墓碑、谱系、deleted_inodes 三根指针，算法、nonce、MAC，系统配置的槽世代号与 journal_tail 不在表里，各归哪一类没定（C655（挂载透明逐字段表有字段没归类））。
+
+**依据**：
+- E42（一事务几条记录）：为了让「被切开 ⇒ 非法」成为恒等式而钉死了载荷，「被切开却碰巧合法」这一类它结构上看不见——M2 把载荷符号化补的正是这一格。
+- 三方：材料 `_d13-item1-background.md`，三条腿的产出 `d13-item1-opus-forward-output.md`、`d13-item1-sonnet-reverse-output.md`、`d13-item1-local-attack-v2-output.md`；三腿一致把原候选排最后，两条云端腿各自收敛到「前缀判定与提交原子性」这道接缝，主 agent 按封闭性把择新与发布原子性收进同一个单元（判决与撤下原候选的三条门槛原文在变更史）。
+- E165（恢复重放有界穷举与变异杀伤界）：在界内对今天的 `replay_journal` 判 M2 的语义层、M4 与 M3 两读，并量变异杀伤界；用户 2026-10-01 定它当轻量工具；C 域合法崩溃状态数按两种切法分写（甲切法是 D16（发布语义） 已定项 7 的屏障位置）；对抗一族里不动点的违例全在 I-8.12（同实例记录的 txg 不减） 不成立的记录表上，谓词成立那一边 0 违例（第 3 次重跑第一段）；择根合判族调真 `choose_root`、`scan_journal`、`replay_journal`，界内、合法、不带故障时已确认的完整发布不丢（第 3 次重跑第二段）；择根序的四个改坏变体在合法历史 K、K9、KW 三族界内只有取第一个有效者红，另三种在对抗根环 KA 上红（第 3 次重跑第三段）。
+- 三方判决（M1–M4 的措辞与落点）：`research/prompts/m3-formal-r1-main-verification.md`、`research/prompts/m3-formal-r2-main-verification.md` 第二节、`research/prompts/m3-formal-r3-main-verification.md` 第二、三节；M3 单调推论的四步推导在 `research/prompts/m3-formal-r2-opus-output.md`「3.2 推的：串行提交下，J1 与 J2 推得出落到的版本单调」一节。
+- 三方判决（M3 不动点前提补 I-8.12（同实例记录的 txg 不减） 与落点现状）：`research/prompts/m3-formal-code-r1-main-verification.md` 第二节不动点前件那一格（打中条款、不打代码）与第三节第 5 条；装置的前提比 Verus 的前件宽、违例全落在该谓词不成立一边的对账在调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 10 批「10-5 交回」那一条。
+- 用户定案（2026-10-01 弹窗，都照推荐）：卸载记号除外、M4 射程句的前提写全、单调的版本序取 (`checkpoint_txg`, 实例代号)、txg 顶格取「报 no_successor 且一条没施加算相等」；写回等 K10 判完一起做，原话在变更史。
+- 挂载透明：无实验：判法在崩溃注入里（`crates/singlefs-harness/src/mount_transparency.rs`，checker 档的崩溃注入调它），不是实验；三轮判决里攻方的数在副本装置上量，代码轮第二轮攻方在入库代码上量的第一次崩溃 147 806 态、二次崩溃 234 773 态 0 红主 agent 没复跑。
+- 三方判决（挂载透明）：`research/prompts/m3-formal-r4-main-verification.md` 第二节「挂载后再恢复：模掉什么」「比的对象与射程」两行与第四节第 2、3 条（独立的第四条、比的那一版、射程）；`research/prompts/m3-formal-r5-main-verification.md` 第二节 U5、U6 两行与第四节第 5、6 条（逐字段表、二次崩溃比 v1、拒绝合法的条件）；`research/prompts/m3-formal-r6-main-verification.md` 第二节 U5、U6 两行（txg 只判下界、拒的判据在崩溃镜像上自己复算）与「逐字段表没碰的字段」一行；`research/prompts/m3-formal-code-r2-main-verification.md` 第二节 K2 各行（实现照判、站住；暖机与挂载推的抬 F 拆段）。
+- 用户定案（挂载透明加二次崩溃，2026-10-02 弹窗，原话在变更史）：`research/prompts/m3-formal-r4-main-verification.md`「用户定案（2026-10-02）」二次崩溃那一行。
+- 择根序变体那一句：调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批 E165（恢复重放有界穷举与变异杀伤界） 第 3 次重跑第三段判 Q2 交回那一条（主 agent 判补这一句）。
+
+**欠**：C37（事务与记录的对应无定义）：M2 的可判定形式；C77（重放起点未定义）：在择新与前缀判定那道接缝上；C649（Verus 判不到的两样回调结果）：M2 语义层的反向链与点名单元只能写成后置条件；C650（择根与重放没有合判）：M4 的射程句要择根与重放合起来才成立；C653（扫环胶水内存随盘数涨）；C654（必红世界期望条数随求解环境漂）；C655（挂载透明逐字段表有字段没归类）：挂载透明逐字段表没碰的字段。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:73-86`（整段抄，未转述）**
+
+```markdown
+#### 已定项 2：先串行提交
+
+**定案**：事务层先承诺串行提交——`.claude/rules/fs-design.md`「判据写不出来时，先只做一条，而且**先做慢而正确的那条**」落到实处，串行是本工程明令的默认值，不是在两条路里挑了一条。越过交点再开并行，而不是现在就承诺并行。对将来并行提交的一条前置约束：记录按事务号顺序追加，事务号 N 的 fsync 在返回前必须等 < N 的事务全部已追加 ∨ 已作废 ∨ 已确定实例切换或转只读（作废是提交管道的内存状态，对并发后继可见）；串行提交下这条规则空转。
+
+**射程**：串行的天花板在一次 checkpoint 约 1.1 万条条目（单线程合并耗时追上一次设备同步的交点，算式在 C58（串行提交撞天花板没人报警））：低于交点设备同步是瓶颈、串行不吃亏，高于交点单线程合并变成天花板，没有安全余量。已定项 2 不决定记录头的字段清单、不改变新池新建文件写出的字节，它决定性能天花板与 crash refinement 的范围。并行提交仍然会动崩溃语义：「前缀」是全序上的概念，并行下一个前缀可能同时含有完整的事务 B 与残缺的事务 A；记录头已带事务边界字段（D23（journal 的角色与格式） 已定项 7：事务号 8 + 提交标记 1）。
+
+**依据**：
+- E17（write buffer 合并上限）：单线程 sort-merge 的上限是交点的一半；按叶分区的无锁并行是越过交点之后的逃生口，但不许默认它够。
+- E44（序号位宽的本机实测与代价）：本机 fsync 率是交点的另一半。
+- E42（一事务几条记录）：串行下一个事务跨多条记录同样会被前缀切开——决定记录头字段清单的是「一个事务恰不恰好产生一条 journal 记录」，不是串行 / 并行。
+- 用户定案，记在变更史；将来并行提交那条前置约束来自 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P1。没走三方论证：这是确认一条已经写明的默认值，真正要走三方的是何时改成并行，那一步没做。
+
+**欠**：C58（串行提交撞天花板没人报警）；C37（事务与记录的对应无定义）：记录与事务对应的不变量与崩溃点重放。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:87-119`（整段抄，未转述）**
+
+```markdown
+#### 已定项 3：RefFS 做到极致，自己处理持久化与崩溃语义
+
+**定案**：不做只管功能的内存模型，做一个自己处理持久化与崩溃语义的参照实现（RefFS），把 RefFS 从「储备候选」升为**要做的东西**。「做到极致」取语义级：RefFS 只在内存里按 POSIX 操作走，自己定义每次 fsync 之后什么算持久、崩溃之后允许看到哪几种 POSIX 状态，没有盘上格式；带自己盘上格式、自己写盘与恢复的那一档（工程量接近再写一个文件系统）不做。RefFS 与实现不许共用崩溃点枚举的那段代码：做到极致之后「三 oracle 合谋测试」（已定项 6）防的那个共同误解，最危险的落点是「RefFS 与实现是否共享同一个崩溃语义的错误理解」。
+
+RefFS 的来处与边界：
+
+| 项 | 定案 |
+|---|---|
+| 来处 | 只照 kb 条文另写：不拷 O1（内存模型对拍（HashMap 理想文件系统）） 的代码，不读录制流，不调切段、状态计划与实现的崩溃点枚举 |
+| 放哪 | 单独一个包 `crates/singlefs-reference-filesystem`：依赖闭包（dev-dependencies 也算）⊆ {它自己, `singlefs-format`}，能只用 std 就只用 std；源码不引 `singlefs_core`、`singlefs_checker`、`singlefs_harness`、`singlefs_checker_tier`（经改名的别名同样算）；`singlefs-core` 与 `singlefs-checker` 的依赖闭包里没有它。三条由门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判 |
+| 输入白名单 | 都由调用方交入，只收五样：每个操作的结局（成、在任何写之前拒、写了之后报错、原样重发）；崩溃落在第几个操作里（hi）与它的归属规则；回退目标 m；每次恢复读出的内容；显式发布点 |
+| 第一版的操作 | 第一个文件、覆盖写、发布调用、fsync、回退 |
+| 调用点 | 崩溃注入与故障注入的调用点上，RefFS 的判定与 O1（内存模型对拍（HashMap 理想文件系统）） 崩溃判官的全部四条判据合取，任一红即红 |
+
+崩溃语义（串行提交、不带故障的崩溃状态）：
+
+1. **fsync**：fsync 返回成功之后，这次 fsync 等到的那次发布带走的全部操作必须在（串行下就是调用开始之前已取号成功的全部操作，按单元计）；按状态下标读，即允许集合的下界 lo 抬到那次发布的末尾。fsync 报错时不抬 lo，报错那次发布带的操作可在可不在；之后的操作接在下一次恢复读出的状态上判。
+2. **丢法：按发布边界的前缀**。崩溃落在第 hi 个操作里时，恢复允许读出的是 {S_j : j = lo，或 j 恰是某次显式发布的末尾；lo ≤ j ≤ hi}，S_j 是上一次恢复之后前 j 个操作施加出来的状态，S_0 是上一次恢复读出的内容。丢掉任意子集的那种丢法在串行提交下出局（与 D16（发布语义） 已定项 12 不相容），开并行提交时重开。
+3. **抬 lo**：返回成功的发布调用、fsync、回退都抬 lo（D16（发布语义） 已定项 7：回退与 fsync 同一个返回条件）；回退算一次已确认发布，它的下标算发布末尾。
+4. **回退**：回退是 RefFS 的一个操作，回退之后的内容等于整段历史里第 m 次已确认发布之后的内容；m 由调用方从实现报的回退根翻出来交入，RefFS 不判目标选得对不对。m 的编号覆盖每一个写根的入口（发布调用、回退、写行与暖机、抬 F、卸载），映到写它时的现行版本，现行版本含每次恢复读出、重新起头的那一份。
+5. **崩溃时刻的归属**：崩溃落在第几个操作里，按「切开当前段的那道屏障由哪一步发出」归属，不按第一个被扣下的写；这条只给 RefFS 用，O1（内存模型对拍（HashMap 理想文件系统）） 的崩溃判官不动。
+6. **恢复之后**：每次恢复之后，RefFS 先判读出的状态在允许集合里，再以它为起点接着走。
+
+**射程**：只定做到什么程度与 RefFS 的形态，不定排期；不许读成「先做 RefFS 再做实现」——RefFS 是验证手段不是里程碑（`.claude/rules/format-evolution.md`「从写开始，不从读开始」）。显式发布点只取历史里的发布调用与 fsync：自动触发的攒批落地之前 RefFS 只接显式发布点，自动触发的发布不在 RefFS 射程，归已定项 1 的 M2 与记录核对器；崩溃恢复抛弃最新根的那一次，RefFS 以读出内容重新起头、不判那一步。带故障的崩溃状态（说谎的设备、丢整块盘 C519（丢一整块盘时恢复丢掉刚确认的那一版））不适用。独立性：RefFS 不读录制流、不调切段与状态计划，但它的 (lo, hi) 与 O1（内存模型对拍（HashMap 理想文件系统）） 崩溃判官盘级下界那一条判据的入参输入同源，记在 C191（同源性计数器只盖了一对） 那一类同源账上。D17（实现分层与第三方管道） 已定项 4 据此把「入口」的可执行定义交给 RefFS 的操作面，fsync 的持久性承诺由 RefFS 的崩溃语义定义；O3（独立规约执行器） 仍是崩溃点集合的独立执行器，职责不变。RefFS 的第一版在 `crates/singlefs-reference-filesystem`，崩溃注入两截与故障注入重开的调用点已接：harness 档经翻译层 `crates/singlefs-harness/src/reference_filesystem_translation.rs` 依赖它，调用点判 RefFS 与 O1（内存模型对拍（HashMap 理想文件系统）） 崩溃判官两票、任一红即红。
+
+**依据**：
+- 无实验：做到什么程度、RefFS 怎么来与收什么是验证投入与边界的取舍；三轮判决里攻方的数都是副本装置上量的，入库装置上还没重做（`research/prompts/m3-formal-r5-main-verification.md` 第五节第 3 条），这里不引。
+- 用户定案，原话在变更史：「做到极致」（原定案）；做到语义级（2026-10-02，岔路单 `research/prompts/m3-formal-7-forks.md` 里 RefFS 做到哪一档那一行，是对原定案换了读法）；按发布边界的前缀、调用点合取、另起、单独一个包（2026-10-02，`research/prompts/m3-formal-r4-main-verification.md`「用户定案」）；合取收严成全四条、回退目标作输入（2026-10-02，`research/prompts/m3-formal-r5-main-verification.md`「用户定案」）；回退抬 lo、崩溃时刻按屏障归属、m 覆盖每一个写根的入口、白名单加原样重发（2026-10-02，`research/prompts/m3-formal-r6-main-verification.md`「用户定案」）。
+- 三方判决：`research/prompts/m3-formal-r4-main-verification.md`（第一轮：fsync、丢法、独立性三格与六条岔路）、`research/prompts/m3-formal-r5-main-verification.md`（第二轮：fsync 合成句、按发布边界补三句、合取收严、另起与单独一个包、任意子集出局限串行）、`research/prompts/m3-formal-r6-main-verification.md`（第三轮最终轮：回退与 lo、射程两句、白名单、fsync 按状态下标读）。
+- D17（实现分层与第三方管道） 已定项 4：O1（内存模型对拍（HashMap 理想文件系统））明写「不管崩溃」，定义不了 fsync 的持久性承诺，而第一个可运行目标恰恰是「正确提交一个事务」——做到极致的 RefFS 补的正是这一半。
+
+**欠**：C447（规约执行器没接进崩溃点重放与 RefFS 比对）；C191（同源性计数器只盖了一对）；C658（崩溃注入第三截放过丢掉的一步复活）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:120-135`（整段抄，未转述）**
+
+```markdown
+#### 已定项 4：崩溃点重放只枚举整写子集
+
+**定案**：崩溃点重放要枚举的崩溃状态集合定义为：录下来的写请求流**按设备**切成段——一次写只被它自己那块盘上之后的屏障（或它那块盘上的 FUA 写）排在之后的写前面；当前段里每块有写的盘都被自己的屏障或 FUA 放行时这一段才关上，有一块盘还没放行，这道屏障（或 FUA）不关段、前后的写同段。一个崩溃状态是「前若干段全部持久，当前段每次写各取它的几态、任意组合，之后各段全部没持久」；枚举的单位是**一次整写**。带 FUA 的写只放行它自己那块盘：它与那块盘上前面没被屏障隔开的写同段，别的盘上的写不因它持久。一次写取两态（持久 / 没持久）；**原地覆写**（不是单元写、长于一个扇区、罩住的范围里原来有东西的写，系统配置槽写与覆盖旧记录的 journal 写属于这一类）多取第三态「新旧都读不出」，全量与快档都枚举；第三态的镜像罩那次写的整个范围，新旧不同的那一截前一半是新字节、后一半是旧字节（按字节撕，不按扇区）；其余写的撕裂态一律并进「这次写没持久」。「没持久」的位置上，镜像里放的是**崩溃前那个位置的旧字节**，不是零，而且这些镜像（第三态的在内）要真的生成出来喂给 checker 与记录核对器，不许只当计数。镜像双写（D2（RAID 条带策略） 已定项 6 的 w ≥ 2、D22（单元原子性怎么合成） 已定项 8 的 journal 镜像）按**设备**各算一次写，harness 的状态数按自己的写流另算闭式。**同一块盘上连着的屏障并成一道**：录制流里一道屏障与这块盘上一道屏障之间没有任何一次写（别的盘的屏障不算写）时，这一道不记（`crates/singlefs-harness/src/lib.rs` 的 `push`），独立模型照同一条规矩记；中间没有写，这一段不产生崩溃状态，合并与否不改变崩溃状态集合，只改变操作数与种类串。
+
+**射程**：它定义的是模型层的枚举域。真实设备的 FLUSH / FUA 是否如宣称生效归 C6（块层语义假设写错），要在 QEMU 里用真设备验。按设备切段多出实际走不到的状态（一块盘没放行时，别的盘上已放行的写也留在段里取任意组合），不漏走得到的。撕裂分两类：原地覆写之外的写（单元写、不长于一个扇区的写、罩住的范围里原来没东西的写）撕裂态与「没持久」的差别只有 CRC32C 的碰撞概率（32 位，D19（块指针的结构与宽度预算） 已定项 2、D23（journal 的角色与格式） 已定项 11），**知情接受**，撕裂粒度不进模型，与 D20（承重面：单元的原子性与自包含）「有父指针的单元不依赖任何宽度」一致；原地覆写撕裂时那一处的旧内容也没了，「没持久」却留着完整的旧内容，两者不是同一个状态，所以单独枚举。层 0 的扇区取 512 字节；两条层 0 流上取第三态的只有系统配置槽写。已知边角：第三态的旧字节取「这次写之前的写全落了」那一版，同段更早、与它重叠的写没落的组合里旧的那一半多带那次写的字节（两条层 0 流上这种组合一次都没有）；根槽写长于一个扇区又罩住旧内容时第一版不支持第三态（harness 断言；层 0 的池都按 512 字节物理块建，走不到）。设备把一次写撕成恰好撞上校验和碰撞的形态不在模型内。D13（验证路线） 已定项 5 与它正交：一个定枚举域、一个定 crate 边界。
+
+**依据**：
+- E77（发布的持久顺序）：段模型在四种屏障摆法下的状态数逐臂等于闭式——这套枚举域数得对。
+- E142（新池新建文件的干跑）：第十七次跑第一段的几何敏感性取样点 G7（阳性对照同一条写流、只把 FUA 当边界）实测 4097 个状态、2046 个违例——没有屏障时单元、journal 记录与根槽合成一段 `[12]`；装置的切法与 `crates/singlefs-harness/src/segments.rs:91`「FUA 写关掉自己所在的那一段（FUA 不替前面的普通写做持久，所以它们同段、任意子集）」一致，「FUA 自成一段」那一读法预言的 2050 / 0 对不上——FUA 那一句的字面照实现的切法写。
+- 三方对抗与判决：[verification-build.md](../verification-build.md)「三方对抗（2026-09-03）」判决第 3 条——每一类单元都有整单元校验（有父指针的靠父指针里的校验和，D4（校验和位置） 已定项 1、D16（发布语义） 已定项 7、D22（单元原子性怎么合成） 已定项 19；自证单元靠整单元校验和加被实际检查的代号，D22（单元原子性怎么合成） 已定项 21；journal 记录靠头校验和与头内的载荷校验和，D23（journal 的角色与格式） 已定项 13），撕裂态与「没持久」在校验和眼里是同一件事。
+- 用户定案（按 E77（发布的持久顺序） 与三方对抗定；FUA 写算段边界那一句是 C313（FUA 写算不算崩溃段的边界） 收口时的用户定案，2026-09-26 用户定照实现改成「关掉它所在的那一段，与前面没被屏障隔开的写同段」），记在变更史。
+- 按设备切段（有一块盘没放行就不关段）、FUA 只放行它那块盘、原地覆写多取「新旧都读不出」：用户定案（代码审阅第 1、3、4 条；2026-09-27 弹窗选「A 合并，按设备记屏障」「照补，全量也跑」与「原地覆写补第三态」），第三态按字节撕是主 agent 同日定的、被攻过零轮，记在变更史；实现与判别力（只吞盘 1 一道屏障，段尾 `26,2,1,2` → `26,5`，层 0 小流里记录核对器报出来）在 `research/prompts/m2-rev-b3a2-implementer-report.md` 第一、三节。
+- 同一块盘上连着的屏障并成一道：用户 2026-09-28 定「并，跟今天的录制器」（E142（新池新建文件的干跑） 第十九次跑撞上登记的停机 S19-crates：独立模型两道都记、录制器并掉第二道，暖机与整条流四格的操作数与种类串不同、崩溃状态数相同，报告 `research/prompts/e142-r19-runner3-report.md` 结论段，登记 `research/prompts/e142-r19-prereg.md` 第 85 行 R40），原话在变更史。
+
+**欠**：C6（块层语义假设写错）：拿虚机的设备侧日志重建崩溃状态、崩溃测试必须变红的那一半。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:136-152`（整段抄，未转述）**
+
+```markdown
+#### 已定项 5：只共享一份从 kb 生成的常量
+
+**定案**：checker 与实现之间只共享一样东西：一份由 kb 的字段表生成的常量模块，生成器从 kb 读、两边都只消费、任何人不许手改（`.claude/singlefs-ai-sop/rules/machine-first.md`：重复要生成，不能手抄）。**其余一律不共享**：地址空间的 newtype 各自声明、格式解析各写一份、校验和各用一份独立实现、遍历与记账代码交集为空（C12（增量语义共用） 由门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格定的判据，形态是 crate 粒度的依赖闭包交集、不是符号级，「格式解析与常量除外」那条例外就是这一项在用）。
+
+- **判定宽度不许从别处拿**：I-7.5（根槽按判定宽度对齐） 与 I-8.2（记录头不跨原子单元） 的判据是挂载时探测的 `physical_block_size`，它不在镜像里。checker 自己探一次，再与系统配置记录的 mkfs 时取值比对（D22（单元原子性怎么合成） 已定项 2「mkfs 按池内最大值划、挂载时逐设备复算比对」的 checker 侧形态）。**探不到时报「声明值，未探测」，不许当成探到的**——文件当设备的镜像属于这一类，崩溃点重放的绝大多数镜像都是文件，所以这条不是边角。异构池里判定宽度是一个集合不是一个数（C17（设备几何当全局参数）），checker 要复算 mkfs 那步取最大值的聚合，不然健康的异构池上会假红。
+- **生成器拒绝发射没有 kb 落点的常量**，也只发射标量值：它一旦开始发射「按字段表算出来的偏移函数」，那就是 D13（验证路线） 明令不许共享的格式解析，而不再是常量；判据是发射物里有没有分支与算术。
+- **CRC32C 各写一份的前提是参数钉死**（多项式、初值、输入输出反转、异或输出）：参数不钉死，两份独立实现会在健康镜像上给出不同结果，那是假红而不是独立性。
+
+**射程**：管 checker 与实现的 crate 边界；管不到 kb 里就写错的值——共享一份生成常量与两边各抄一份都抓不住那一类，它要一条正交的门禁（C94（登记的格式常量与后来的定案对不上））。实现与它的差距：`crates/singlefs-format` 是手写的，不是生成的（值由门禁 code-source-discipline 的 format-constants 格按 kb 里的 `format-const` 标记绑住，只绑标了的那些），生成器没有；`crates/singlefs-checker` 只依赖 `singlefs-format`，CRC-32C 另写了一份按位的；checker 取的是系统配置声明的 `physical_block_size`（`crates/singlefs-checker/src/image.rs` 的 `geometry_of`），「探到 / 声明」两种来源只有类型（`crates/singlefs-checker/src/lib.rs` 的 `DecisionWidth`）、没有接到判定上，I-7.5（根槽按判定宽度对齐） 与 I-8.2（记录头不跨原子单元） 未实现。系统配置里 mkfs 时的 `physical_block_size` 字段在 D22（单元原子性怎么合成） 已定项 9 的几何段（4 字节）。
+
+**依据**：
+- 无实验：共享边界是保验证独立性的政策，没有可量的量；它的判别力靠两边各写一份的检查逐条红给人看。
+- 三方对抗：材料 `_checker-sharing-vehicle-background.md`，腿的产出 `research/prompts/checker-sharing-vehicle-*`，腿况在 [verification-build.md](../verification-build.md)——正推腿从 D13（验证路线）、C12（增量语义共用） 推出「常量在例外内、其余禁止」；替代反推腿与本地腿各自构造出同一条：kb 里写错的值共享与各抄都抓不住。
+- 用户定案，记在变更史。
+
+**欠**：C94（登记的格式常量与后来的定案对不上）；C17（设备几何当全局参数）；C387（常量模块手写，不是从 kb 生成）；C388（checker 的判定宽度不自己探测）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:153-178`（整段抄，未转述）**
+
+```markdown
+#### 已定项 6：三个互相独立的 oracle
+
+**定案**：三个 oracle 各判一样东西，独立性各有来处：
+
+<!-- doc-lint:registry name-col=2 -->
+
+| # | oracle | 判什么 | 独立性来自哪里 | 验不到什么 |
+|---|---|---|---|---|
+| O1 | 内存模型对拍（HashMap 理想文件系统） | POSIX 可见语义：内容、大小、目录结构；无崩溃处的内容期望归它，崩溃之后允许看到的集合归 RefFS（已定项 3） | 不碰盘、不解析磁盘格式 | 磁盘结构是否自洽；崩溃语义；**两份实现对同一条 POSIX 语义的共同误解** |
+| O2 | 独立解析器 + checker | 磁盘字节是否满足 I-1（块自描述）~I-6（加密不变量） | **checker 不得调用被测 crate 的任何反序列化/遍历代码**，必须重新实现一份解析，直接读裸设备 | 只判结构自洽：一个块被覆盖成另一份**合法**内容，Merkle 链照样自洽、记账照样对 |
+| O3 | 独立规约执行器 | 崩溃点截断后的每个磁盘状态是否落在规约允许的集合里 | **用另一种语言写**（不用 Rust），只照 decisions 与 invariants 的文字重新推导；第一版用 Python 单写（E170（O3规约执行器第一版）） | 规约本身可能写错——**必须配阳性对照才有意义** |
+
+**独立性要被验证，不许自称**：设计一个「三 oracle 合谋测试」——拿一个精心构造的坏实现
+（例如 nonce 永远为 0）去过三关，若三者全部放行，说明存在共同盲区，回头补 oracle。
+本工程功能正确性的全部故事就是这三个 oracle。
+
+**射程**：三个 oracle 各自验不到什么写在表的最后一列；O2（独立解析器 + checker） 的定义域归已定项 7，需要第二个输入的核对归记录核对器。**实现今天的样子**：O2（独立解析器 + checker） 在 `crates/singlefs-checker`（只依赖格式常量 crate）；O1（内存模型对拍（HashMap 理想文件系统）） 今天的形态是 `crates/singlefs-harness/src/model.rs` 的理想模型（只住内存、只用 `singlefs_format` 的常量、不建崩溃），门禁 harness-model-differential-and-scenarios 拿随机历史逐步对拍；O3（独立规约执行器） 是只照 kb 文字写的 Python 执行器，现行那一份在 `research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/`（E170（O3规约执行器第一版） 第 1 次重跑照今天的 kb 改过一次后冻结；第一次那一份 `research/e7-index-bench/src/bin/e170_o3_spec_executor/` 留档）：严格跑法判得出（第一次导出的批 1、批 2 上 0 态撞「规约欠一句」），与实现逐态一致（两边全放行，不当它判得对的证据；「择到的根不是自证根里 txg 最大的那条」「③ 收到不少于 2 槽」两条路径批里 0 态，C661（规约执行器批里两条路径没有态）），坏状态表照改正的期望重判有判别力（阳性对照与盲测都判对），还没接进崩溃点重放；RefFS（已定项 3）在 `crates/singlefs-reference-filesystem`，崩溃注入与故障注入的调用点已接；「三 oracle 合谋测试」是 E171（三oracle合谋测试）：O3（独立规约执行器） 一列已接（E170（O3规约执行器第一版） 第 1 次重跑冻结的那一份）；Q2 照登记字面判「有」（4 张全是 P8），按登记 F3 判成 E170（O3规约执行器第一版） 推期望推错、这四张不是坏镜像，真坏镜像里 O2（独立解析器 + checker）、O3（独立规约执行器） 两条全放行的 0 张；Q1、Q3、Q4 等整表，装置在取号或暖机出错时 O1（内存模型对拍（HashMap 理想文件系统）） 一列不判，这处缺陷在修。
+
+**依据**：
+- E170（O3规约执行器第一版）：O3（独立规约执行器） 照「另一种语言、只照 kb 文字重新推导、配阳性对照」写得出第一版，判得动单个崩溃状态、一态够进快档；第 1 次重跑（照今天的 kb 改过一次的执行器）严格跑法判得出、与实现在取样的批态上一致、阳性对照有判别力（第一次跑判不出与判别力不足那两笔留在实验页）。
+- 三个 oracle 的分工与各自独立性的来处是验证体系的结构设计；独立性要靠「三 oracle 合谋测试」观测，那个测试的结论还没出（现状写在射程里），这一条依据今天还不引它。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+- O1（内存模型对拍（HashMap 理想文件系统）） 与 RefFS 的分工句：三方判决 `research/prompts/m3-formal-r5-main-verification.md` 第二节另起与单独一个包那一格（两腿同向）。
+
+**欠**：C445（模型对拍的取样点不随写路径增长）；C446（未实现的不变量没有前置登记，也没有到期）；C447（规约执行器没接进崩溃点重放与 RefFS 比对）；C407（三 oracle 合谋测试没有代码）：E171（三oracle合谋测试） 的装置已写、整表与结论还没出，等结论出来再还或改写。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:179-197`（整段抄，未转述）**
+
+```markdown
+#### 已定项 7：O2（独立解析器 + checker） 判的是**一个**镜像
+
+**定案**：
+
+> **定案：O2（独立解析器 + checker） 的定义域是单个镜像**——一个一元谓词 `P(镜像) → 成立/不成立`，
+> 只判集合成员，永不判 identity。**任何需要第二个输入（另一个镜像、或一段记录流）的检查都不属于它。**
+
+**需要第二个输入的核对归记录核对器**，入参 `(崩溃前镜像, 记录流, 崩溃后镜像, 持久集合)`——持久集合是枚举器给出的这个崩溃状态里哪些写落了盘（层 0 的段内整写子集）；只看盘上字节分不开「写没落、而原地内容恰好相同」与「写落了」，判复用与缺席要拿持久集合判；它与自研第 1 项「Merkle 根链差分」（已定项 8）同属二元检查。⚠️ **故意不给它编号**——O2（独立解析器 + checker） 那场混乱就是编号当称呼造成的，再加一个 O4 只会给下一次漂移多一个落脚点。⚠️ **「崩溃后镜像」是两份，不是一份**：harness 的顺序是先跑实现自己的恢复、再跑记录核对器，而恢复本身会改盘（实例切换写行、重发在飞 checkpoint，D23（journal 的角色与格式） 已定项 14）⇒ 择根与前缀判定看**崩溃态镜像**（「记录流」就是它环里的 journal 记录），比对的对象是**实现恢复后的镜像**。
+
+**射程**：指针层目标态下核对一条记录只需格式解析 + 校验和 + 根环择新；逻辑意图记录不点名任何盘上对象，核对方要自行实现树语义 + 记账 + 分配合法性——D23（journal 的角色与格式） 否掉逻辑意图日志的第二条理由据此改写成第一条的一条封堵，写在 D23（journal 的角色与格式） 已定项 5。记录核对器的代码在 `crates/singlefs-checker-tier/src/crash.rs`，接在层 0 的每个崩溃状态上（门禁 checker-tier-layer0-replay）。记录核对器的判定因此不只是镜像的函数：崩溃后镜像逐字节相同、持久集合不同的两个状态，它可以判得不同，按镜像去重的提速对它不适用（O2（独立解析器 + checker） 与 oracle 照旧只看镜像）。 层 0 不覆盖可写挂载：层 0 在每个崩溃状态上只跑只读恢复（看 journal 与不看各一遍），取号、写行、暖机在层 0 的任何崩溃状态上都不跑。可写挂载由崩溃注入覆盖（`crates/singlefs-checker-tier/src/crash_injection.rs`）：每个抽到的崩溃状态上，只读恢复与判定之后在同一份崩溃后镜像上起一次可写挂载、再发一次布、跑池级 checker；挂载途中再崩一次，取号、写行、暖机三段各摆一个二次崩溃状态，每个上只读恢复、问模型、池级 checker、记录核对器：第三截交给记录核对器的写表从「挂载那一段到当前段为止的前缀」换成整条历史录制流 + 整条挂载流 + 挂载之后那次发布，持久集合逐段对应（历史那一段取第一次崩溃的持久集合，挂载那一段按二次崩溃取子集，之后那次发布全没落）。「比对的对象是实现恢复后的镜像」那一半：记录核对器改收两份镜像，崩溃态镜像判根在而记录在不在（择根与前缀），恢复后的镜像判单元在不在、读落到那一版的实例表；第二截接的恢复后镜像是挂载与那次发布之后的池，恢复自称的那一版取挂载与那次发布写出的最新那条根，挂载一条根都没写出时退回第一次崩溃落到的那一版。
+
+**依据**：
+- 无实验：**依据是类型，不是成本**：「逐字节比对」是二元关系 `R(镜像₁, 镜像₂)`，**没有任何投入能把一元谓词变成二元关系**；I-4.5（已停用·需两镜像） 因同一条门槛退役。
+- 「崩溃后镜像」是两份：随 D16（发布语义） 已定项 4 收窄问法那一轮三方论证（材料 `_d16-items134-background.md`）由用户定案，记在变更史。
+- 持久集合那一样入参：用户定案，原话在变更史；判别子观测不到的实据在 `research/prompts/m2-layer0-scale-r3-main-verification.md` 第二节按扇区豁免那一行。
+- 层 0 不覆盖可写挂载、可写挂载与二次崩溃由崩溃注入覆盖：用户定案（代码审阅第 2 条，2026-09-27 弹窗选「崩溃注入层补可写挂载」），记在变更史；崩溃注入那一侧的实现在 `research/prompts/m2-rev-b3b-implementer-report.md`。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:198-221`（整段抄，未转述）**
+
+```markdown
+#### 已定项 8：自研的两样：Merkle 根链差分与代际增量 scrub
+
+**定案**：现成工具没有、本工程自研的两样：
+
+**1. Merkle 根链差分 —— COW + 每事务发新根独有的杠杆。**
+历史根在被回收前物理存在过，构成一条可回放的链。对相邻两代根递归比较「子树指针 + 校验和/MAC」，
+**指针没变的地方直接跳过不下钻**，复杂度只正比于两代之间实际改动的部分。
+它能检出常规遍历式 checker 检不出的一类错误：**同步篡改后自洽的原地写**——
+某次写绕过 COW、原地改了块内容并同步更新了校验和，单点看它是自洽的（I-2.1（校验和与内容匹配） 全绿），
+而根链差分会发现矛盾：**没走 COW 就不该有新分配，父指针理应没变，校验和却变了**。
+⚠️ **必须配阴性对照**：正常 COW 提交后跑同一检查必须全绿，否则它会把每次正常更新都当成篡改。
+
+**2. 代际增量 scrub。** 靠 I-1.2（块头写序已发布） 与 D5（快照 / 空间记账机制） 的 birth txg
+维护一个「上次 scrub 扫到的 generation 水位」，只遍历 `birth generation > 水位` 的块——
+老子树的校验和链没变就必然还自洽。**它让「每次提交都全量验证本次改动」在挂钟上可行，不必抽样。**
+
+**射程**：被搬过的副本 `birth` 不变、会永远落在水位之下，代际增量 scrub 看不见它们。`crates/` 里没有根链差分（`grep -rn 根链 crates` 零命中），也没有代际增量 scrub（`grep -rn scrub crates` 零命中）。
+
+**依据**：
+- 无实验：两样都靠 COW 每事务发新根与 birth txg 的结构性质成立，今天都还没有实现，没有可量的量。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+
+**欠**：C389（Merkle 根链差分零代码）；C194（代际增量 scrub 看不见被搬过的副本）；代际增量 scrub 零代码没有 C 编号。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:222-255`（整段抄，未转述）**
+
+```markdown
+#### 已定项 9：崩溃点重放要分三层，否则挂钟必炸
+
+**定案**：
+
+| 层 | 范围 | 触发 |
+|---|---|---|
+| 层 0 冒烟 | 固定种子、固定脚本的负载与登记的崩溃枚举用例，不按写请求数限规模（规模见射程），精确全量 | checker 档的全量（已定项 15）：用户要求时跑；提交时默认只跑快档 |
+| 层 1 常规 | 中等规模负载（写请求数上千），精确全量，枚举不完靠精确剪枝，一时跑不了的节点标 ignore，覆盖报告与门禁逐个列「本次未跑」 | 每次提交 |
+| 层 2 全量 | 层 1 负载 + 大规模负载 + 多设备档位交叉，N≥5 轮，精确全量 | 用户要求时 / 发布前 |
+
+**剪枝加 ignore 之后敢说什么**：敢说「开着的节点在全部崩溃状态上通过」；
+**不敢说**「ignore 的节点通过」。
+
+**全量档提交时不默认跑、不限时刻，由用户要求时跑；提交前 = 快速档全绿（必要条件）。**
+**里程碑收尾、动了崩溃点重放或判器的那一批提交之前，由主 agent 弹窗请用户跑一趟全量；跑红或用户不跑，提交照样可以进，记一笔未结的红或「这一阶段收尾没跑全量」，直到修掉或补跑。**
+「全量」指两样：checker-tier-layer0-replay `--full`（门禁 checker-tier-layer0-replay，已定项 15 的全量）与崩溃放量全量（`research/scripts/crash-amplification.sh` 不带参数）。
+「动了崩溃点重放或判器」按暂存改动碰到的路径判：`crates/singlefs-checker/`、`crates/singlefs-checker-tier/src/` 下 `crash*`、`layer0_progress`、`verdict_store`、`crash_identity`、`crash_judge_*`、`crates/singlefs-replay-prefix/`。
+「上一次全量」由主 agent 写进当前里程碑记录一行：日期、两样各自的结论。
+**全量档必须优先保证「失败可复现」而不是「覆盖率最大」**——修一个全量档 bug 的挂钟 ≈ `log2(N) × 一趟全量的挂钟`，一个不可复现的全量档失败价值接近 0，
+甚至为负，它训练人忽略红灯。
+
+**射程**：今天只有层 0（门禁 checker-tier-layer0-replay）；层 0 分两档：平时快档每段原地写取任意子集、COW 写只取全落或全不落（用户 2026-09-26 定，叫「甲二」，在 C561（记录核对器的复用豁免在复用只落一半时假红） 修好之后用），它看不见只在 COW 部分落盘时才显出来的那一类，替不了全量；全量带断点续跑（门禁 checker-tier-layer0-replay `--full`），登记在 `.claude/gate.d/stage-inputs.tsv` 的崩溃枚举用例已经长到并行线一那条流 12230590578 个状态，不再是「写请求数两位数」的冒烟体量，所以提交时默认只跑快档，全量按已定项 15 由用户要求时跑；层 1、层 2 在门禁里没有阶段。每个崩溃状态怎么定义归已定项 4；节点怎么精确剪枝、ignore 节点什么时候开归已定项 10、11。
+
+**依据**：
+- 无实验：分层是门禁挂钟的设计约束，层 1、层 2 的负载与挂钟都还没有，没有可量的量。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+- 平时快档用甲二：用户定案，原话在变更史；层 0 规模三轮判决 `research/prompts/m2-layer0-scale-r3-main-verification.md`。
+- 用户定案：「我们不是抽样 我们是剪枝 加 初期ignore」（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定案：不抽样，剪枝加初期 ignore」那一行）、「枚举可以设置 ignore 标记 然后慢慢开启」（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定：ignore 标记慢慢开」那一行）、「1 该枚举该设计的设计完 设计全」「2 枚举不完 正是剪枝的用处」（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节里材料员被门禁 doc-process-records 的 implementation-premise 格挡下、用户定『设计全、枚举不完靠剪枝、粒度合适』的那一行）；第一轮判决 `research/prompts/m3-prune-gpu-r1-main-verification.md`「回看决策」一节：已定项 9 推翻。
+- 用户定案（2026-10-01）：全量档不限时刻，用户要求时随时跑，删掉「夜间」，原话在变更史。
+- 用户定案（2026-10-01）：全量档全绿的时点是里程碑收尾与动了崩溃点重放或判器的那一批提交之前，由主 agent 弹窗请用户跑，原话在变更史；交用户那一格是三方判决 `research/prompts/test-script-align-r1-main-verification.md` 第二节 T1-3。
+- 三方判决 `research/prompts/test-script-align-r2-main-verification.md` 第二节 U3（「U3 T1-3 写回照字面做不了」那一行）：「全量」的两个所指、「动了崩溃点重放或判器」的路径判法、「上一次全量」的记法，「准入条件」与「异步」合成一句。
+
+**欠**：层 1、层 2 在门禁里没有阶段，没有 C 编号；C635（上一次全量没有机器可读的标记）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:256-285`（整段抄，未转述）**
+
+```markdown
+#### 已定项 10：真正必须精确覆盖的 N 不是「布局套数」，是「提交协议结构的等价类数」
+
+**定案**：层 1 精确覆盖先缩问题，再谈剪枝。崩溃点的定义域是**事务层状态机**，而 `.claude/rules/fs-design.md` 有两句顶层规则：
+「一个事务层，所有结构共用」与「唯一不许多样化的是事务层」。所以布局能改的只有两类：
+
+| 差异 | 改变的是 | 判定 |
+|---|---|---|
+| 节点大小、条带宽度 | 一步写多少字节、某步重复几次 | **参数**，不新增步骤种类 |
+| 旋转 vs SSD | seek 代价、IO 调度 | 落在设备层，**不落在事务层协议里** |
+| **zoned（ZNS）** | **能不能原地覆盖根指针** | **结构性**：只能追加、根位置漂移，且多出 zone finish/reset |
+
+**落地手段是一个封闭枚举 + 穷尽 match**：`crates/singlefs-core/src/transaction.rs` 的 `CommitStep`，步骤种类的登记位是 [layout/01-first-txn.md](../layout/01-first-txn.md) 八的段序列登记表。
+任何布局要引入新的结构性步骤**必须改这个共享定义 ⇒ 编译器强制所有引用处补分支 ⇒
+这个 diff 门禁 grep 得到**，可以自动打标「本次引入了新的结构等价类，需为它新开一轮独立层 2 重放」，
+**不靠人记得申报**（按 diff 算门禁范围欠在 C8（门禁范围判不出来））。再加 newtype 隔离（`RotationalPtr` / `ZonedPtr`），
+把 D12（目标介质） 已定项 2 里「不许共用」那一桶（记账事实的判定路径）变成编译期约束。
+⚠️ **它有第二个职责（D17（实现分层与第三方管道） 加的）：它是第三方管道的接入点。**
+协议归本工程所有，一条管道要引入新的结构性提交步骤必须往本仓发这个 diff。
+
+**射程**：旋转与 SSD 在提交协议层面同构，由 D12（目标介质） 那一轮三方论证承担；zoned 那一行只说明它至少多出一个等价类。等价关系按录制流的段序列同构、今天几个，归 D17（实现分层与第三方管道） 已定项 2。按种类串认节点够不够，第一轮判决打中（挂起，待第二、三轮攻）：`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节。
+⚠️ **它钉住的只是「有哪些步骤」，钉不住「每一步的失败原子性宽度」**——
+持久内存与对象存储改变的是后者，枚举接不住（缺口与补法见 D17（实现分层与第三方管道））。
+`RotationalPtr` / `ZonedPtr` 这层 newtype 隔离 `crates/` 里没有（`grep -rn "RotationalPtr\|ZonedPtr" crates` 零命中）。
+
+**依据**：
+- 无实验：N 是什么由 `.claude/rules/fs-design.md` 那两句顶层规则推出，没有可量的量；等价关系怎么判、今天几个的依据在 D17（实现分层与第三方管道） 已定项 2。
+- 三方论证：层 1 抽样那一轮（「三方论证 + 实测验算」），材料没有留存，经过在变更史。
+
+**欠**：C8（门禁范围判不出来）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:286-320`（整段抄，未转述）**
+
+```markdown
+#### 已定项 11：ignore 的节点什么时候开：否决按欠账轮转的账本，留下三条
+
+**定案**：
+
+**「按欠账轮转的账本」调度：否决。** 格子 = `(布局, 子阶段桶)`、按欠账降序取队首、声称任一格子最多 `K_max = ⌈N×M/C⌉` 次提交必被覆盖的那个调度被否决：它保证不了的恰恰是它要防的那一类——慢的、罕见的分支（实测验算与另外四条否决理由在变更史）。
+
+**留下的三条**：
+
+1. **方向对**：要一个**确定性的、能被门禁判红的覆盖记录**，而不是概率论证——
+   概率保证在长期维护里等于没有保证。
+
+<!-- doc-lint:registry name-col=2 -->
+
+| 符号 | 简称 | 含义 |
+|---|---|---|
+| T1 | 层 1 挂钟预算 | 层 1 本地挂钟预算，是输入不是输出 |
+
+2. **`T1`（层 1 挂钟预算） 是输入，不是输出**（`.claude/rules/fs-design.md`：门禁运行时长本身是设计约束）。
+   正确顺序是「先声明预算 → 用它约束一次提交能开几个 ignore 节点」，不是「量出耗时 → 推出能开多少」。
+   **这一条不需要任何测量，现在就该定。**
+3. **判别力必须与覆盖分开检查**：每个 ignore 节点被打开的那次提交里，额外对一份「已知坏的镜像」跑它自己的 checker，
+   不报错即判红——这是 D13（验证路线）已有的阳性对照纪律的直接复用。见 C13（checker 判定失效）。
+
+门禁里没有「层 1 崩溃点重放」这个阶段，量不出 `T1`（层 1 挂钟预算） / `C` / 每格耗时。
+⚠️ **因此 `C`、`K_max`、`T1`（层 1 挂钟预算） 这三个数一个都不许现在写进 kb。**
+
+**射程**：只管 ignore 的节点什么时候开；层 0 全量枚举不需要 `T1`（层 1 挂钟预算）。第 2 条的「现在就该定」与末句「一个都不许现在写进 kb」说反话，记在 [verification-build.md](../verification-build.md)「待定案」第 6 问，没判。节点登记表带状态字段（开着 / ignore / 等实现），另加三条——每个 ignore 行点名一个会变的对象、那个对象变绿而节点仍 ignore 时判红、覆盖报告列 ignore 的状态数与占比：这三条被攻过零轮（`research/prompts/m3-prune-gpu-r1-main-verification.md`「逐格判决」一节），不写成定案，等第二、三轮再攻。
+
+**依据**：
+- 无实验：否决账本靠的是一次调度规则的模拟验算（200 轮、取后半程稳态最大值、严格前缀贪心，三行数在变更史），没有登记成实验；留下的三条是门禁设计原则，没有可量的量。
+- 三方论证：层 1 抽样那一轮（「三方论证 + 实测验算」），材料没有留存，经过在变更史。
+- 用户定案：「枚举可以设置 ignore 标记 然后慢慢开启」（`records/2026-09-28-里程碑三崩溃放量剪枝与GPU调度.md` 第三节「用户定：ignore 标记慢慢开」那一行）；第一轮判决 `research/prompts/m3-prune-gpu-r1-main-verification.md`「回看决策」一节：已定项 11 推翻，「逐格判决」一节给节点登记表带状态字段的形态与三条待攻的补充条件。
+
+**欠**：C8（门禁范围判不出来）；C13（checker 判定失效）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:321-336`（整段抄，未转述）**
+
+```markdown
+#### 已定项 12：冲突 1：`checker 即规范` 与 `校验的两条路径不许共享工具`
+
+**定案**：**冲突 1：`checker 即规范` 与 `校验的两条路径不许共享工具` 直接打架。**
+在用的不变量（条数的权威登记位在 [invariants.md](../invariants.md) 文件头）若既是 checker 源码又是形式验证的 spec，就成了单点。
+**可行的折中，而且本工程已经付过这笔钱**：checker 做两个方向——**遍历式**（从系统配置走下去）
+与**扫描式**（全盘扫，靠「元数据块必须自描述」的块头重建），两者对同一条不变量独立判断，
+共享的只有格式解析。
+
+**射程**：管 checker 内部两个方向之间共享什么；checker 与实现之间共享什么归已定项 5。池级 checker 今天两个方向都有（`crates/singlefs-checker/src/walk.rs` 文件头）。
+
+**依据**：
+- 无实验：这是「checker 即规范」与校验路径独立之间的取舍，没有可量的量。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+
+**欠**：两个方向「共享的只有格式解析」这一条没有会红的检查（`.claude/gate.d/` 里没有判它的阶段），没有 C 编号。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:337-357`（整段抄，未转述）**
+
+```markdown
+#### 已定项 13：冲突 2：crash refinement 的 spec 与模型对拍的 model
+
+**定案**：**冲突 2：crash refinement 的 spec 与模型对拍的 model 是同一个东西的两种写法。**
+合并成一份 → 省一半工作量，但**直接违反独立性要求**；各写一份 → 名义独立，
+但通常是同一个人同一周写的。缓解（只降低相关性、不消除）：让两份**在表述层面就不同**——
+spec 写成「对镜像的状态谓词」，model 写成「op → 状态转移」，不一致时至少能互相定位。
+**同源性要被观测**：统计「spec 与 model 不一致」的事件数及每次判定哪一方错；
+若累计 ≥ 5 次不一致而判定「spec 错」的次数为 0，说明两者实际同源，应把两条腿合并、预算移给穷举。
+判定分三格：spec 错 / model 错 / 条款欠一句（两边各照条款的一种读法，条款没写谁对）。一次不一致先在前提成立的域里重判，还在的才记；「条款欠一句」的事件先记账，不计入「累计 ≥ 5 次」，也不计入「spec 错」，条款补了那一句之后按补的句子再判一次、归到前两格。
+这里的 model 指 O1（内存模型对拍（HashMap 理想文件系统））。O3（独立规约执行器） 有代码、能对同一（历史、崩溃点）交出判定行之前，O3（独立规约执行器） × RefFS 这一对登记为空格、不计事件；O1（内存模型对拍（HashMap 理想文件系统）） 的崩溃判官不当替身；没立的对报「未立」，不报绿、不计入任何一格。
+
+**射程**：缓解只降低相关性、不消除。已定项 1 撤下的那条原候选不受这条影响，理由在已定项 1 的射程。crash refinement 今天的代码是 `crates/singlefs-replay-prefix/src/lib.rs` 里的 Verus 核与它的 spec（取前缀那一截，已定项 1 的 M1、M2 句法层）；spec 不能对具体状态求值，「spec 与 model 不一致」的事件从哪来没定，计数器没有代码（C191（同源性计数器只盖了一对））。
+
+**依据**：
+- 无实验：同源性要靠将来 spec 与 model 的不一致事件计数观测，spec 与计数器都还没有，没有可量的量。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+- 第三格「条款欠一句」：三方判决 `research/prompts/m3-formal-r1-main-verification.md` 第二节「F2 同源性」一行（攻方打中，推的）、`research/prompts/m3-formal-r2-main-verification.md` 第二节第 9 行、`research/prompts/m3-formal-r3-main-verification.md` 第二节同源性计数器一行，三轮站住；无实验：计数器仍没有事件来源。
+- 「model 指 O1（内存模型对拍（HashMap 理想文件系统））」与没立的对登记为空格：三方判决 `research/prompts/m3-formal-r5-main-verification.md` 第二节同源性计数器那一格（两腿同向的部分）；`research/prompts/m3-formal-r4-main-verification.md`「用户定案」里替身对那一行（不算替身对）。
+
+**欠**：C191（同源性计数器只盖了一对）。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:358-376`（整段抄，未转述）**
+
+```markdown
+#### 已定项 14：与其他决策的连锁
+
+**定案**：
+
+| 决策 | 连锁点 |
+|---|---|
+| D4（校验和位置） | 根链差分把 Merkle 从「要付的代价」翻转成验证杠杆；但形式验证里哈希是 uninterpreted function，**碰撞抗性完全在验证范围之外，不许读成「验了 Merkle」** |
+| D8（核心索引结构） | 日志结构节点、write buffer、key cache 三层都会绑架符号执行（循环上界、滞后窗口、缓存一致性），使「Yggdrasil 一分钟内」的口径在本工程不成立 |
+| D9（加密） | AEAD 在 SMT 里不可解，只能建模成 uninterpreted function，**「nonce 重用泄漏明文」这个后果验不出来**，只剩「nonce 不重复」这条纯组合性质——而后者恰是这条腿最值钱的产出 |
+| D11（索引节点要不要留消息缓冲区） | 已定项 1 取「留」；D8（核心索引结构） 已定项 1 取幂等完整值之后 checker 的 I-3.1（已分配统计对得上） 不必解析消息语义（D11（索引节点要不要留消息缓冲区） 据此判它的代价 1 在本工程不成立），冲突 1 不因此变成「无解」 |
+
+**射程**：连锁的是形式验证与 checker 碰到这几条决策时的边界，不改那几条决策的条款；根链差分与冲突 1 本身归已定项 8、12。
+
+**依据**：
+- 无实验：连锁是从那几条决策的已定条款推出来的边界，没有可量的量。
+- 三方论证：D13（验证路线） 新立那一轮（本地 LLM / Sonnet / Opus 各一条腿，立场不重复），材料没有留存，经过在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:377-389`（整段抄，未转述）**
+
+```markdown
+#### 已定项 15：验证代码分两档——harness 档随时跑，checker 档默认只在提交时跑
+
+**定案**：`crates/` 下的验证代码按「什么时候跑」分两档，各住一个包，与池级 checker 一共三个名字：**harness 档**是 `crates/singlefs-harness`，单元测试与集成测试加上它们用的脚手架库（录制器、内存池、理想模型、随机历史、故障注入设备、场景），改了代码随时跑；包内再分轻重：debug 下单条跑到 60 秒及以上的是重，标 `#[ignore]`，单条用时看平常跑的时候量到的、不另外单独量，要跑随时跑，一律经内存包装；一条用例一个场景，测试文件按测什么起名、不按里程碑起名。**checker 档**是 `crates/singlefs-checker-tier`，崩溃态枚举引擎与记录核对器、断点续跑与双机分片、崩溃注入与坏盘输入两场战役、真设备一侧的设备日志比对、实验与真设备装置二进制，以及它们的全部用例，连同 QEMU（门禁 checker-tier-qemu-device-streams）、herd7（checker-tier-lkmm）、crates 变异整表（checker-tier-crates-mutation-replay）、全部实验复跑（checker-tier-research-build-and-replay 的 experiment-replay 格）：默认只在提交时跑，能单独跑（命令带 `SINGLEFS_HEAVY_TESTS=user-request`）。checker 档里的崩溃点重放（门禁 checker-tier-layer0-replay）分两档，checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-research-build-and-replay 不分：**快档**是 `cargo test --release -p singlefs-checker-tier --lib --tests` 不带 `--ignored`（装置二进制的内联单测不在快档里）（门禁 checker-tier-layer0-replay 在整轮门禁与提交时都跑它），**全量**是登记在 `.claude/gate.d/stage-inputs.tsv` 键为 `crash-case:` 的用例逐条 `--include-ignored --exact`（checker-tier-layer0-replay `--full`），提交时不默认跑，由用户要求时跑，跑法按已定项 9 分层；崩溃放量判器整套上了 GPU，罩全部池级 checker 不变量（`crates/singlefs-checker-tier/src/crash_judge_gpu.rs`）。**池级 checker** 是 `crates/singlefs-checker`，判决器库，被两档调用。依赖只许一个方向：checker 档依赖 harness 档与池级 checker，harness 档不依赖 checker 档（门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格第 ④ 条判，dev-dependencies 也算）；两档都要的一小段代码宁可各留一份。崩溃枚举用例一律写在 `crates/singlefs-checker-tier/tests/` 里（`research/scripts/crash-case-check.py` 判），重型测试闸按包判：跑到 `singlefs-checker-tier` 的测试就是 checker 档。
+
+**射程**：管 `crates/` 下代码与测试住哪个包、什么时候跑、闸按什么认、三个包怎么称呼（`.claude/rules/verification.md`「定义与名字」）；不管每条不变量判什么（[invariants.md](../invariants.md)）、不管枚举域怎么定（已定项 4）、不管池级 checker 与实现共享什么（已定项 5：池级 checker 仍只依赖 `singlefs-format`）。上游 SOP 不再写这个项目的验证手段：崩溃点重放、模型对拍、checker 即规范、文件系统特有的反推缺口四节与 `gate.sh` 未实现清单里的项目键都收进本仓（`.claude/rules/verification.md`、`.claude/gate-not-implemented.tsv`），上游那一批已同步进副本、未发版。拆分那一轮的记录在 `records/2026-09-27-验证两档拆分.md`。
+
+**依据**：
+- 无实验：什么时候跑、住哪个包是流程政策，没有可量的量；两档各自的判别力由各自的用例与变异表证。
+- 用户定案（2026-09-27），原话在变更史；三方 `verification-split-r1`（判决 `research/prompts/verification-split-r1-main-verification.md`）攻的是拆出 `singlefs-checker-tier` 之前的那一版，拆包之后的改动被攻过零轮。
+- 用户定案（2026-10-01）：全量不限时刻，用户要求时随时跑，删掉「夜间」，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/checks-owed.md:1-541`（整段抄，未转述）**
+
+```markdown
+# 欠的检查清单
+
+**checks-owed.md 放「已经知道要拦什么、但现在还拦不了」的检查。**
+
+与 [invariants.md](invariants.md) 的分界：不变量是**对着一个镜像**可判定的性质，
+checker 是它的可执行形式；checks-owed.md 放的是**代码路径的要求**——
+它们对着镜像判不出来，只能由门禁在跑的时候拦。
+
+**写进来的门槛**：说得出「拦什么」「怎么拦会红」「现在缺什么前置」。
+三样缺一样就是还没想清楚，先别写
+（`.claude/singlefs-ai-sop/rules/sop-first.md`：写不出下一步就别加那条检查）。
+
+<!-- doc-lint:registry name-col=2 -->
+
+| # | 简称 | 要拦什么 | 怎么拦（会红的形态） | 前置 | 出处 |
+|---|---|---|---|---|---|
+| C1 | 意图续做做成常规路径 | 把「续做未完成的意图」做成可选的修复通道，而不是每次恢复都跑的常规路径 | 崩溃点重放里，任一含未完成意图的镜像正常挂载后没跑续做即判红；恢复路径里不许存在「跳过续做」的分支 | 事务层、意图日志、崩溃点重放 harness（事务层与崩溃点重放 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay；意图日志还没有代码） | [decisions.md](decisions.md) D8（核心索引结构） 规则 2 |
+| C2 | 无界操作做成单事务 | 无界操作被做成单个事务 | 对 truncate 大文件 / 删大目录量一遍「单个事务的写入量 vs 对象规模」，斜率不为 0 判红 | 事务层、块层写记录（两样 2026-09-14 都有了：`crates/singlefs-core`、`crates/singlefs-harness` 的录制器）。⚠️ **被判的那两个操作今天还不存在**（2026-09-21 现查 `crates/` 零处文件级 truncate、零处目录删除）：两样前置齐了，而这一道要量的「单个事务的写入量 vs 对象规模」没有对象，写出来只会扫到 0 项 | [decisions.md](decisions.md) D8（核心索引结构） 硬要求 |
+| C5 | Z3 超时当通过 | 形式验证的 `Z3 timeout` 被当成通过 | 门禁的 crash refinement 阶段必须有**三种**结果（证明 / 反例 / timeout），timeout 一律判红。现在 `gate.sh` 的 `record` 只有 PASS/FAIL 两态 | crash refinement 阶段存在 | 读 `singlefs-ai-sop/scripts/gate.sh` 确认只有两态；`show-me-test.md`「门禁不许假装通过」 |
+| C6 | 块层语义假设写错 | 块层重排 / FLUSH / FUA 的语义假设本身写错 | 在 QEMU 里用真实 virtio-blk + 写缓存策略跑，**故意去掉一次 FUA**，崩溃测试必须变红；不红说明重排模型没判别力 | QEMU 负载、崩溃点重放 ⚠️ 2026-09-14 虚机档接上（门禁 checker-tier-qemu-device-streams）：真 virtio 盘（写缓存 write back）上，程序发出的写与 FLUSH 在设备侧（QEMU blklogwrites，来宾之外、带数据）逐项原样到达、次序不变，末尾只多一个关机 FLUSH；盘 0 漏掉「单元 → journal 记录」那道屏障时设备侧比对红在盘 0 第 29 项，走页缓存时红在第 0 项。仍欠「崩溃测试必须变红」那一半：层 0 的 oracle 对漏一道屏障不红——herd7 同日判单元与根槽之间隔着哪一道屏障都够，与 E77（发布的持久顺序） b_ur 臂同形——要等记录核对器；真盘（不经 QEMU）的 FLUSH 语义也不在这一档射程里 ⚠️ 2026-09-14 模型层的「崩溃测试变红」有了：摘掉根槽前那道屏障，层 0 里记录核对器判红 1 个状态、oracle 不红；拿虚机的设备侧日志重建崩溃状态再跑记录核对器那一步还没做 | 三类验证路线共享这份假设，共享的东西没有第二条路径能查 |
+| C7 | 过期块无检查 | 「返回正确但过期的块」这一类错误没有任何检查 | 需要一个**会返回该地址历史版本**的设备模型（不是随机损坏），在它上面 D4（校验和位置） 的 Merkle 必须报错 | 设备模型（现成工具没有，必须自造）、checker（池级 checker 2026-09-14 已有：`crates/singlefs-checker`。⚠️ 但 D4（校验和位置） 的 Merkle 2026-09-21 现查零代码，`crates/` 里只有一处测试提到它 ⇒ 这一道要判的那个对象本身还没有） | D4（校验和位置） 正文把「能检测读到正确但过期的块」列为 Merkle 的首要收益，而目前无手段验证它 |
+| C8 | 门禁范围判不出来 | **一次改动的门禁范围判不出来，于是要么全跑（挂钟炸）要么少跑（有布局没被验）** | 门禁按 diff 计算**受影响的布局集合**并打印：diff 只碰某一条布局的专属路径 ⇒ 只跑那一条；碰到共享代码（事务层、`CommitStep`、格式常量、checker 框架）⇒ **强制全跑**。取不到这个集合、或集合为空而 diff 非空，即判红。故障注入自证：造一个只改共享枚举的 diff，门禁必须判为全跑；造一个只改单布局的 diff，必须判为只跑那一条 | 布局清单文件、布局专属路径与共享路径的目录约定、事务层存在（事务层 2026-09-14 已有；布局清单文件 2026-09-21 随 C14（格式变了 checker 没跟） 有了：`.claude/gate.d/layouts.tsv` 一套布局一行，登记位号、格式定义路径与 checker 判定路径，门禁 checker-independence-and-sync 的 layout-checker-sync 格读它——它给的是「布局 → 路径」这一层映射，C8（门禁范围判不出来） 还欠「专属路径与共享路径怎么分」那一层） | **判据从「总时长」改成「范围可判定」（2026-08-28 用户定案）**：单次改动只动一条分支时代价是 O(1)，语料总量大不构成成本——人只是异步等结果，等的时候在做别的事。⚠️ 但「只动了一条」是**需要被证明的断言，不是事实**：btrfs 的 `btrfs_is_zoned` 散到 93 处，正是一次次「我只是加个 zoned 支持」累积出来的，每一次都以为自己只动了一条。⇒ **让 O(1) 成立的东西是这条检查，不是跑得快。** 与 C19（介质判定渗进事务层） 成对：C19（介质判定渗进事务层） 拦渗透，C8（门禁范围判不出来）拦「渗透了但门禁没扩范围」 ⚠️ **2026-09-21 实测这个前身挡不住同一批改动里的二次重跑**：它判不出「这道阶段上次跑绿之后那些输入有没有再变过」：它按一个 diff 基准判「碰没碰前缀」，而一批改动在暂存区里躺着的时候，相对任何固定基准都一直是「碰了」。一轮里第二、三次跑门禁时 `crates/` 相对基准照旧是「碰了」，于是层 0、QEMU、herd7、门禁 checker-tier-crates-mutation-replay 又全跑一遍——同一份代码那一轮验了三遍，两遍纯属白跑（约 80 分钟）。`.claude/rules/implementation-workflow.md`「复用上一次全量门禁的判定」写着该怎么复用，而那是一段要人记得去读的文字：主 agent 当轮读过、还引过那一条，照样全跑了两次。⇒ 这一条要的不是更准的 diff 判定，是**每道阶段记住自己上次跑绿时读到的那批输入的指纹**，下次先比指纹、相同就退 77 并打印上一次的判定行。⚠️ **2026-09-20 落了一个粗粒度前身，这一条照旧欠着**：`research/scripts/change-touches-crates.sh` 按 diff 判「碰没碰这道阶段自己的输入前缀」，没碰就让那道阶段退 77（本次未跑，不记通过也不算覆盖），判不出来一律当成碰了；接进门禁 checker-tier-layer0-replay、checker-tier-qemu-device-streams、harness-model-differential-and-scenarios、checker-tier-research-build-and-replay 四道重阶段（2026-09-22 起降为第二道闸：这四道先问 `stage-must-run.sh` 按 `.claude/gate.d/stage-inputs.tsv` 登记的具体路径比对，判定要跑时才轮到它再判一次「碰没碰前缀」这个更粗的信号），自证由门禁 code-tooling 的 research-script-selftests 格复跑。它只摘得掉「零行代码的改动」（实测当天一次 44 个文件、零行 `crates/` 的提交，四道重阶段照样要跑，18 分钟没跑完），**摘不出 C8（门禁范围判不出来）要的那个按布局算的受影响集合**：碰到 `crates/` 里任何东西都当成碰了共享代码、一律全跑，所以「只跑那一条布局」那一半一个字都没做。⚠️ **2026-09-21 给这个前身补了一刀：基准从 `GATE_BASE` 改成恒取 `HEAD`**。`GATE_BASE` 答的是「上次过闸以来有没有人改过」（共享 gate.sh 为 show-me-test 而设，没有 `refs/sop/gate-ok` 时退到 `HEAD~1`；而 `--staged` 跑绿不会让那个 ref 前移，所以几个会话共写的仓里它永远不存在），拿它当基准，**上一个提交已经验过的同一份 `crates/` 改动会重新落进这一轮**：实测那天暂存区零行 `crates/`，相对 `HEAD~1` 却有 5 个 `crates/` 路径，全是上一个提交改的，四道重阶段白跑 40 分钟。改成 `HEAD` 之后这一类摘掉了，判别力自证是第 6 格（把基准改回 `GATE_BASE`，那一格必须判红）。**同一轮里跑第二、三次仍然重跑**：那批暂存改动相对 HEAD 一直是「碰了」，摘掉它要记每道阶段上次跑绿时的输入指纹——**2026-09-22 落了**：`research/scripts/stage-must-run.sh` 拿 `refs/sop/staged-green`（上次整轮全绿那棵暂存树）与这一次的暂存树做 git diff 当指纹，54、55、59、74、87 五道已接上，同一轮里跑第二、三次只要那几条路径没变就直接退 77。这三条拦路的理由，按今天这个做法一条都不成立：指纹是 git 自己算的树、不另外落盘；git 对象不会腐化；新 clone 没有那条 ref 时退回全跑，是安全的方向。**仍欠的是 C8（门禁范围判不出来） 正题那一半**——按布局算受影响集合，这一条给的是按阶段算输入，粗得多 |
+| C20 | 罕见布局无人跑 | 罕见布局的整条验证链长期没人跑过，静默腐坏 | 里程碑收尾、动了崩溃点重放或判器的那一批提交之前，由主 agent 弹窗请用户跑一趟全量扫（checker-tier-layer0-replay `--full` 与崩溃放量全量 `research/scripts/crash-amplification.sh` 不带参数两样，不挂在每次提交上；「动了崩溃点重放或判器」按 D13（验证路线） 已定项 9 的路径清单判）：每套布局的 checker + 崩溃点重放 + 黄金镜像在上一次里程碑收尾之后至少被完整跑过一次，没跑过的那套，下一次里程碑收尾的提交照样可以进，记一笔未结的红或「这一阶段收尾没跑全量」，直到修掉或补跑（D13（验证路线） 已定项 9）。**必须记录每套布局的「上次完整跑过」时间戳并纳入门禁读数**；今天「上一次全量」由主 agent 写进当前里程碑记录一行（日期、两样各自的结论），机器可读的标记欠在 C635（上一次全量没有机器可读的标记） | 每套布局的 checker、崩溃点重放 harness、布局清单文件（纯 SSD 这一套的 checker 与崩溃点重放 2026-09-14 已有；布局清单文件 2026-09-21 随 C14（格式变了 checker 没跟） 有了：`.claude/gate.d/layouts.tsv`。仍欠「上次完整跑过」的时间戳——清单只说每套布局的 checker 与格式定义住哪，不记谁什么时候跑过） | C8（门禁范围判不出来） 改判据之后打开的缺口：**按 diff 决定范围 ⇒ 没人改的布局就永远不被跑**。而 `.claude/rules/fs-design.md` 已定「罕见分支会腐坏：千分之一才走到的分支，它的 bug 只在生产里出现」。异步等待解除的是人的注意力成本，**没有解除「从来没跑过」**。这条在阶段收尾时由主 agent 弹窗请用户跑，见 D13（验证路线） 已定项 9；「判红」改照 D13（验证路线） 已定项 9：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 两笔矛盾」一行 |
+| C13 | checker 判定失效 | 某套布局的 checker 判定逻辑失效（跑了、全绿，但已经不做事） | 该布局被跑到的**同一轮**里，额外对一份「已知坏的镜像」跑它自己的 checker，**不报错即判红**。已知坏镜像随格式版本一起归档（同 C10（历史单元格式读不了） 的黄金镜像机制） | 层 1 harness、每套布局的 checker ⚠️ 2026-09-14 第一套布局的形态有了：池级 checker 判的条目每条一份坏镜像（`crates/singlefs-harness/tests/checker_known_bad_images.rs`；2026-09-18 起 29 条，里程碑「覆盖写、释放、回退与复用」步 6 与增补 2 加的六条各配一份），每次 `cargo test` 都跑、不报错即判红；层 1 harness 那一半仍欠 | 覆盖记录只证明「被执行」，完全不证明「有判别力」；而判定逻辑失效的 checker **跑得更快**，在按耗时填切片的调度下反而更容易被选中 |
+| C15 | write buffer 混入 Δ | write buffer 里混进了增量 Δ 形态的条目，使 I-3.1（已分配统计对得上） 对那一棵树判别力归零而门禁全绿 | 缓冲条目类型在 Rust 侧强制成幂等形态：条目 value 只有「完整值」和「墓碑」两个构造子，**没有承载 Δ 的构造子**，写不出增量条目（machine-first「用类型让非法状态无法表示」）。另配故障注入自证：临时加一个 Δ 构造子并注入符号取反，I-3.1（已分配统计对得上） 必须变红 | write buffer 实现、记账实现、checker（后两样 2026-09-21 现查已有；write buffer 零代码，`crates/` 里一处都搜不到 ⇒ 这一道的被测对象还不存在） | 依据是实测：[experiments.md](experiments.md) E14（I-3.1 的判别力：幂等完整值 vs 增量 Δ） 量到增量 Δ 形态下四类语义 bug 的 I-3.1（已分配统计对得上） 抓到率 0/4、盲区 4/4，幂等完整值形态 3/3、盲区 0。⚠️ **前置已解（2026-08-29）**：D8（核心索引结构） 已定项 1（用户定案）定「取幂等完整值，接受 key 数量上升」⇒ 「记账怎么表达成幂等完整值」不再是未定项，这条检查可以开工，欠的是实现与故障注入自证。立账时它是C15（write buffer 混入 Δ）的真前置 |
+| C16 | 管道声明失败模型例外 | 一条管道声明了自己的失败模型例外（「我这儿不保证块原子」），核心层没有为它合成，于是那一类撕裂从来没被任何崩溃测试覆盖过 | 契约里**没有**「后端声明能力」这个入口——核心层规定唯一的失败模型，管道无处声明例外。门禁形态：故障注入自证，往被测管道注入一个核心层声明的失败模型**允许**的故障（例如按声明宽度撕裂一个块），崩溃测试必须变红；不红说明合成没做或没生效 | 崩溃点重放 harness、至少两条管道、失败模型这根轴先定下来（[decisions.md](decisions.md) D17（实现分层与第三方管道） 已定项 1）。⚠️ **撕裂注入不能靠 dm-flakey**（2026-08-28 现查 `Documentation/admin-guide/device-mapper/dm-flakey.rst`）：它的全部能力是 `error_reads` / `drop_writes` / `error_writes` / `corrupt_bio_byte <第N字节>` / `random_{read,write}_corrupt`——**丢整个 bio 或改一个字节，没有「前半落盘后半没落」**。撕裂只能在崩溃点重放 harness 里造（截断一条记录下来的写请求） | 依据是现役对照组（2026-08-27 现查 Linux 6.17）：允许后端返回 `-EOPNOTSUPP` 的 `REQ_HARDBARRIER` 在 2.6.37 被砍，换成不许后端拒绝、块层自己合成的 `REQ_PREFLUSH`/`REQ_FUA`，至今 15 年未变。⚠️ 本仓对「失败原子性宽度 / 撕裂 / 重排序」目前零覆盖，C6（块层语义假设写错） 问的是本工程的假设对不对，不是管道的失败模型是什么 ⚠️ **前置之一「失败模型这根轴」2026-09-13 由 D17（实现分层与第三方管道） 已定项 1 定下**（单一模型、核心层合成），前置只剩崩溃点重放 harness 与至少两条管道；崩溃点重放 2026-09-21 现查也有了（层 0 全量枚举，门禁 checker-tier-layer0-replay），所以只剩「至少两条管道」这一样——今天只有核心层自己一条，没有第二条可以往里注故障。 |
+| C17 | 设备几何当全局参数 | 设备级几何量（`zone_size`、擦除块对齐）被当成文件系统级单值参数，异构设备池上算出「看起来合法、但不在该设备写指针位置」的地址，错误到提交路径很晚才暴露 | 挂载时逐设备读回各自声明的几何量，与条带宽度做整除性/一致性校验，**不满足就拒绝挂载**（把「用错了」变成「挂不上」）。故障注入自证：造一个各设备 zone 大小不一致的池，挂载必须失败；不失败说明校验没生效 | 多设备支持、zoned 布局、mkfs 的设备描述符结构（多设备 2026-09-21 现查有了：系统配置带 `device_count`、池是两块盘，`crates/singlefs-core/src/system_configuration.rs`；zoned 布局与逐设备几何量的声明零代码 ⇒ 这一道要比对的那几个几何量今天在盘上没有落点）。⚠️ **不再需要真硬件**：[experiments.md](experiments.md) E15（异构设备几何的模拟是否成立） 已证明 QEMU 能造出来宾确实能分辨的异构几何（含阴性对照），复跑 `research/scripts/vm-geom.sh` | 依据（2026-08-27 现查 Linux 6.17）：`zone_sectors` 挂在 `disk->queue->limits`，是**设备级**量；btrfs 撞到同一堵墙，`fs/btrfs/zoned.c:711` 检出各设备 zone 大小不一致后 `return -EINVAL` 拒绝挂载。⚠️ 失败模式不对称：擦除块对齐设错只是变慢（按 D12（目标介质） 判据不算数），条带宽度 × `zone_size` 不整除才是C17（设备几何当全局参数）要拦的。C17（设备几何当全局参数）的前置是 [decisions.md](decisions.md) D12（目标介质） 已定项 3 |
+| C18 | 解耦字段污染只读维度 | 块里带了一个「更新周期与内容变化解耦」的字段，于是某个本该只读的维护操作（scrub / 统计）静默变成写操作，每跑一遍造一批新块并把旧块灌进 deadlist | 门禁形态：跑一轮全盘 scrub 前后比对**设备写次数与 deadlist 条目数**，两者都必须**逐位不变**；任一增长即判红。自证会红：临时给块头加一个「上次校验时间」并在 scrub 时写回，该检查必须变红 | 事务层、deadlist、scrub、块层写记录 | 依据：[decisions.md](decisions.md) D18（块里携带什么信息） 判据 1。这类字段的危害不是「贵一点」而是方向相反——维护操作反过来制造它本该消灭的碎片与死块。⚠️ 光靠 review 拦不住：一个字段是不是「解耦」要看它的**更新时机**，而那在格式定义里看不出来 |
+| C19 | 介质判定渗进事务层 | 介质判定渗进事务层或 ENOSPC 准入路径，使「事务层不许多样」这条腰线在代码里失效 | 门禁做符号级检查：事务层与准入路径所在的模块，其调用图/符号引用里**不许出现任何介质或布局判定符号**（布局标识、`is_zoned` 一类），出现即判红。故障注入自证：临时在提交路径插一条介质判定，该检查必须变红 | 事务层存在、布局标识的符号命名约定定下来（事务层 2026-09-14 已有） | 现役演示（`.claude/rules/fs-design.md` 已记，2026-08-27 现查 Linux 6.17）：btrfs 的 `btrfs_is_zoned` 散在 20 个文件 **93 处**，其中 **5 处在 `tree-log.c`**（事务日志）、**6 处在 `space-info.c`**（ENOSPC 准入）。⚠️ **[decisions.md](decisions.md) D12（目标介质） 把布局数改成开放的 N 之后，这条风险线性增长**，而 D12（目标介质） 「无脑接入新介质」这个收益**恰恰依赖腰线不被渗透**——腰线一破，接入第 N+1 条的代价从 O(1) 变成 O(N)（要重跑所有已有布局的崩溃点重放） |
+| C21 | 扩展点指向逃出记账 | 开线方扩展点里的指向逃出记账或逃出生命周期：指向的空间没进配额（ENOSPC 准入算出的最坏情况直接失效），或指向了核心层对象（那个对象多一条核心不知道的引用，D5（快照 / 空间记账机制） 的 birth/death 记账当场失效），或宿主单元死了而配额空间没释放（确定的泄漏） | 三条各一个判定，都对着镜像可判：① 扫全盘，每个扩展点声明的配额范围必须在空闲空间统计里被记为已分配，否则判红；② 扩展点里的任何指向若落在核心层对象的地址范围内，判红；③ 宿主单元不再从任何根可达时，其配额范围必须不再被记为已分配，判红。故障注入自证：造一个指向核心对象的扩展点，②必须变红 | 事务层、记账实现、扩展点格式定型、checker | [decisions.md](decisions.md) D21（权威态与派生态的分界） 已定项 17 第 4、5 条。⚠️ 这三条**不能靠 review**：扩展点的内容对本工程不透明，「它指到哪」只能在镜像上判，判不出来就等于开线方拿到了一条绕过记账的通道 ⚠️ **2026-09-13 D21（权威态与派生态的分界） 已定项 3 定了指向是配额内字节偏移 + 1、全零即空** ⇒ 判定 ② 改成「解码值（字段 − 1）落在本单元声明的配额区间内，越界判红；全零视为空、跳过」——旧写法按核心坐标系判，恒不会红。 |
+| C23 | 无密钥 scrub 分不出活槽与陈旧槽 | **D9（加密） 已定项 5 把「一个块的物理地址的权威记录点」留在加密结构里**（位置条目在指针里，D19（块指针的结构与宽度预算） 已定项 4），指针住父节点的载荷、载荷是密文 ⇒ **无密钥的一侧读不到任何引用**。它只能全盘扫单元明文头，而扫到一个头校验和自洽的单元时，判不出它是被最新根引用的活单元、是已释放待重用的陈旧副本、还是正在被覆写的半成品——三者在明文侧（I-6.2（明文头字段白名单） 的白名单）逐字段相同。⇒ D9（加密） 已定项 5 承诺的「检测损坏、报告坏块」两头都会错：把陈旧副本或半写位置报成坏块，或者把活单元的缺损当成陈旧而不报，而没有任何东西分得出这两种 | 造三份镜像，同一个物理位置上分别放被最新根引用的活单元、已释放且在 defer 队列里的陈旧副本、覆写到一半的半成品；无密钥侧跑一遍 scrub，断言三份的判定互不相同、且只有第三份报坏块。判别力自证：把判活死那一步换成「头校验和对得上就算活」，前两份必须判成同一种，检查由绿转红。与 C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效） 的分界：那条问 scrub 要读哪些结构（输入），这条问读到之后拿什么判活死（判据） | D9（加密） 已定项 5 的 scrub 要读哪些结构，今天没有清单（C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效））；加密不进第一个可运行版本（D9（加密） 已定项 10），今天没有对象可跑，先写条款 | 2026-08-29 立账，当时的形态是「无密钥侧回收造别名」，前置是 D9（加密） 已定项 7 的让渡区；已定项 7 于 2026-09-07 随已定项 5 改取「只做 scrub」撤回。2026-09-20 用户定改写成无密钥 scrub 侧的形态：无密钥侧不写，别名那一格随之消失，留下的是判活死的输入不存在。改写前的六列原文逐字照抄在欠账表「## 历史版本」2026-09-20 那一条 |
+| C9 | 冻结后偷改格式 | 冻结后偷偷改了格式却没走演进通道 | 每个已冻结组件记 `spec_hash`；门禁重算比对，不同则要求本次 diff 同时有「`feature-bits.md` 新增行或 `version` 被显式改动」与「`decisions.md` 对应条目被改动」，缺一判红 | 第一次冻结发生（[decisions.md](decisions.md) D15（格式冻结政策）） | D15（格式冻结政策） |
+| C10 | 历史单元格式读不了 | **扫描重建路径**读不了历史单元格式却没人发现 | 黄金镜像回归：用当前的**扫描重建路径**去读全部历史版本的归档镜像，重建索引、跑 checker、比对期望内容摘要，任一不过判红。镜像本体不进仓库，只提交清单，清单**只增不删** | 第一次冻结发生、mkfs、checker、扫描重建路径 | D15（格式冻结政策）。⚠️ **回归对象由 [decisions.md](decisions.md) D21（权威态与派生态的分界） 收窄**：按 D21（权威态与派生态的分界），正常读写路径**不必**读旧镜像（派生态可重建、权威态不变），唯一需要向后兼容的是扫描重建路径 |
+| C27 | 块数口径定格式参数 | **拿块数口径的实验去定扇出或定 D11（索引节点要不要留消息缓冲区），方向可能是反的**。**前置已还（2026-09-03）**：E16（journal 的角色：WAL vs 意图日志）补了字节口径（`e16-journal bytes`，产物入库、replay 登记）——单操作祖先从 512 B 节点的 9 节点 / 4.5 KiB 到 64 KiB 节点的 3 节点 / 192 KiB，**节点数口径省 3 倍、字节口径贵 42.7 倍，排序相反**，前提被 E16（journal 的角色：WAL vs 意图日志）自己的机器坐实 | 任何引用 E16（journal 的角色：WAL vs 意图日志）块数结论去支撑格式参数的 diff，必须同时给出**字节口径**的同一比较；缺则判红。仍欠的是这道判定本身——它要判「diff 里引的是不是块数结论、有没有配字节口径」，语义判断，机器形态还没想清楚，暂靠 review 时对照 E16（journal 的角色：WAL vs 意图日志）正文「字节口径」一节 | 无（量化已备好） | [decisions.md](decisions.md) D25（目标负载优先级） |
+| C26 | 屏障数从没量过 | **屏障数从没被量过，而它可能才是 QD=1 的瓶颈** | 真机 harness 上量 seq 与 multistream 每次 fsync 的 FLUSH/FUA 次数。若两者屏障数相同而块数比是 1.75 : 7.00，则块数模型对延迟无预测力，D25（目标负载优先级）「D11（索引节点要不要留消息缓冲区） 在细粒度下值得」那一格要重做——**D11（索引节点要不要留消息缓冲区） 买回来的是块，不是屏障** | 事务层 + 真机 harness（[decisions.md](decisions.md) D4（校验和位置）/D8（核心索引结构）） ⚠️ 2026-09-14 新池新建文件在虚机档量过一次（门禁 checker-tier-qemu-device-streams）：一次发布在盘 0 上 3 次 FLUSH（2 道屏障 + 根槽 FUA）、盘 1 上 2 次，程序、来宾块层、设备侧日志三处数得一致；seq 与 multistream 两种负载的对比仍没量 | D25（目标负载优先级）。推导值是每次 fsync 2 个持久点，与负载无关；**推导，未实测** |
+| C30 | 链式保留池量化未验 | **模型层已还（2026-08-29）**：E25（环与链各要多大保留池）实测卡死恰在预测那一档归零——环 `reserve = 64`、链 `reserve = 164`。仍欠的是真机与事务层上的复验 | — | 事务层 + 真机 harness | D23（journal 的角色与格式）。它把一条曾被判「过强」的论证换成了可证伪且已证的量 |
+| C32 | 无密钥的一侧写不写得出字节没有闸 | **D9（加密） 已定项 5 定「无密钥的一侧只读只检测」，而「无密钥的一侧」怎么进入、写路径整条关没关，全仓没有一处条款。** 现查：「无密钥挂载」在现行 kb 正文里零命中（只出现在已作废的欠账行与决策变更史里）；`grep -rni "scrub\|无密钥\|keyless" crates/*/src/` 零命中。⇒ 「只读」今天是一句承诺，没有任何东西挡住无密钥的一侧发出一个写请求——挂载流程本身要重放 journal（写）、要推 nonce 水位（写），而它在无密钥时停在哪一步没有定义。现役实现走的是另一条路：fscrypt 与 bcachefs 根本不许未解锁挂载（[prior-art.md](prior-art.md) 第 569 行，未解锁挂载报 `Required key not available`），本工程要不要照办也没有条款 | 块层写请求 trace：无密钥的一侧从进入到退出，落点集合必须是**空集**（不需要任何「空闲」语义，也不必先有让渡区）。判别力自证：让 scrub 把一个「上次扫到哪」的字节写回盘上，检查必须由绿转红；再让挂载流程在无密钥下走进 journal 重放，同样必须红 | 先定「无密钥的一侧」是什么：只读挂载、还是离线工具；定完才知道这道闸装在挂载准入上还是工具入口上。加密不进第一个可运行版本（D9（加密） 已定项 10），今天没有对象可跑，先写条款 | 2026-08-29 立账，当时的形态是「让渡区外的写没有检查拦」，判据是 D9（加密） 已定项 7 命题 5 的三条（落点集合 ⊆ A∪E、A∪E 与活结构不相交、A 的 MAC 验签）；已定项 7 于 2026-09-07 随已定项 5 改取「只做 scrub」撤回。2026-09-20 用户定改写成无密钥 scrub 侧的形态：同一条 trace 判据留下，落点集合从 ⊆ A∪E 收严成空集。改写前的六列原文逐字照抄在欠账表「## 历史版本」2026-09-20 那一条 |
+| C33 | scrub 检出之后做什么没有条款 | **D9（加密） 已定项 5 承诺无密钥的一侧「检测损坏、报告坏块」，而「报告」落在哪、无密钥期怎么留存、解锁之后谁消费，一处都没写过。** 三件都没有定义：① 报告留在内存里就随卸载丢掉，落盘就是写、撞已定项 5 的「只读」（C32（无密钥的一侧写不写得出字节没有闸））；② 解锁之后有没有一个步骤去读它、读完做什么动作（重读、从副本修、只记账），全仓没有；③ 它算不算一个事务、能不能被打断、崩在中途怎么办。与 C393（被抛弃根的账读不出时修复没有条款） 的分界：那条问密钥侧挂载时「修复」是什么动作，这条问无密钥 scrub 的结论怎么留存与交接 | 先在 D9（加密） 里把这三件定下来，再给它一条崩溃点重放的覆盖。检查形态：造一份带已知坏块的镜像，无密钥侧跑完 scrub 后卸载、解锁重挂，断言那几个坏块的编号一个不少地出现在解锁后的处置入口上。判别力自证：把 scrub 的结论丢掉不留存，检查必须由绿转红 | 先答 C32（无密钥的一侧写不写得出字节没有闸）：报告能不能落盘，取决于「无密钥的一侧」是只读挂载还是离线工具。事务层这一项已有（2026-09-14，`crates/singlefs-core`） | 2026-08-29 立账，当时的形态是「解锁后的补做步骤未定义」，补的是锁盘期无密钥侧攒下的搬运与回收；已定项 7 于 2026-09-07 随已定项 5 改取「只做 scrub」撤回之后那一侧不搬不收，补做没有对象。2026-09-20 用户定改写成无密钥 scrub 侧的形态：要补做的换成 scrub 自己的检出结论。改写前的六列原文逐字照抄在欠账表「## 历史版本」2026-09-20 那一条。三条腿里有两条独立指出这是空白 |
+| C35 | 多可写头的 O(N) 没有优化过 | **模型层已还（2026-09-03）**：E89（嵌套区间标号与删除前沿）把三条判据全部测中——候选臂全格子误放漏放恒 0；固定树上 extent ×32 时基线反向查找 8→252 而候选恒 0，前沿上界跟分支数走；Linear 下退化成 D5（快照 / 空间记账机制）的常数形态。「树还是 DAG」由 D6（快照实现模型）已定项 1 解掉（每头一棵树、无合并 ⇒ 树） | 仍欠两笔：① **标号维护**——树增长时 preorder 标号要 order-maintenance / list-labeling 增量维护，成熟解法存在但本工程未验，E89（嵌套区间标号与删除前沿）建完树才编号，没碰这一层；② 事务层 + 真实反向索引上的实装复验，含崩溃点重放（前沿是每 extent 的持久记账，崩溃语义从没被枚举过） | 事务层、反向索引实现、崩溃点重放 harness | D6（快照实现模型）。⚠️ **两笔还清之前实现仍按「付查找」走**——`fs-design.md`「先做慢而正确的那条」；E26（三种记账模型的查找代价与精度）量的付查找代价仍是现行预算 |
+| C36 | 未定项检查的第三个盲区 | 门禁阶段「未定项有没有被别处定了」（`.claude/gate.d/doc-decisions.sh` 的 stale-open-items 格）自陈**对 2026-08-29 文档拆分之前的历史无效**——拆分把一份 4830 行的 `decisions.md` 变成 25 个文件，逐行历史在那里断了，两侧时间戳都塌到拆分那一次提交 | 给一个**一次性人工基线**：列一张「拆分时点上各未定项的前置状态」表（未定项 → 它点名的决策 → 那个决策当时定没定），门禁拿它当 60 阶段的补充输入。判别力自证：往表里塞一条「前置已定而未定项仍开着」，该阶段必须变红 | 无前置，纯欠工 | 2026-08-29 实测：D9（加密） 已定项 4 写着「等 D8（核心索引结构） 的 key 布局」，而那条 key 布局定于 **2026-08-26**——落在断档里，60 阶段永远触发不了。⚠️ **另两个盲区已还**（2026-08-29）：新增门禁阶段 `.claude/gate.d/doc-decisions.sh` 的 settled-same-file 格，管「同文件 + 看本次 diff」那一半，在一次性合成仓里双向证过会红。⚠️ **写它的过程本身抓出两个「写坏了但恒绿」的 bug**：正则里 `^` 写在分组内永远匹配不上；`git diff --name-only` 对中文文件名做 C 转义而本仓每个决策文件名都是中文——**两个都是双向验拦下来的，不是 review 拦下来的** |
+| C37 | 事务与记录的对应无定义 | **方向已定（2026-08-29，D23（journal 的角色与格式）已定项 7 用户定案，2026-08-30 攻击轮复核维持）：可以跨多条，记录头带事务边界字段**——与立账时假设的「一事务恰一条」相反；I-4.3（提交原子） 与 D16（发布语义） 的「根 + journal 任意前缀，replay 后合法」压在这条上，而**「每组要么全在、要么全不在」那一半至今没有崩溃点重放判它**（单张镜像那一半已落成 I-8.8（前缀里的事务不被切开）） | **决策已定、不变量已立、池级 checker 那一半已做、层 0 那一半仍欠**：① 池级 checker 判 I-8.7（实例内事务号不重号） 与 I-8.8（前缀里的事务不被切开），已做（2026-09-23，`walk.rs` 的 `judge_transaction_numbers_per_instance` 与 `judge_commit_markers_per_transaction`，坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`，每份只红自己那一条）；② 仍欠：层 0 崩溃点重放判「施加的记录集合按事务号分组之后，每组要么全在、要么全不在」。 | 崩溃点重放那一半要多记录流分组的读数 | 2026-08-29 三方论证的反推腿指出「84 字节头里可能没有事务标识」，主 agent 用 [experiments.md](experiments.md) E23（journal 几何） 的字段表坐实：11 个字段逐字列出，**一个事务标识都没有**；再全仓 grep 确认该约束无落点 |
+| C39 | 复跑脚本静默踩空 | 复跑实验的脚本把「二进制不存在」（`rc=127`）当成了「输出与归档有差异」，于是**一轮根本没跑起来的复跑被报成一次有差异的复跑** | 复跑脚本必须先判退出码再比对输出，非零一律整轮作废并显式报告；且**二进制名要有唯一来源**（从 `Cargo.toml` 的 `[[bin]] name` 读，不许在脚本里手拼）。判别力自证：删掉一个二进制，脚本必须报「没跑成」而不是「有差异」 | **已还一半（2026-08-29 复跑轮）**：`research/scripts/replay.sh` 把 23 个实验的复跑做成一张表，三条闸各自证过会红——① 跑前删本轮输出；② **逐段**核收尾行 `name=done emitted=N` 与该段实际行数（挖掉中间一行 ⇒ 报「第 3 段…实收 5 条」；删掉末段收尾行 ⇒ 报「最后一段没有收尾行」；整份没有 done ⇒ 报「没有收尾行」）；③ 退出码非 0 一律判「跑不了」，不许掉进 diff。整体判别力也证过：把入库产物里一个 `fanout=100` 改成 101 ⇒ 判「对不上」退出码 1，改回 ⇒ 回绿。⚠️ **仍欠的是「二进制名要有唯一来源」那一半**：`research/scripts/replay.sh` 的登记表里二进制名仍是逐条写死的（例如第 159 行那一条，第二格写着 `e145-self-describing-node-header`），没有从 `Cargo.toml` 的 `[[bin]] name` 读。⚠️ **立账时那句「连字符与下划线两套并存」2026-09-21 现查已经不成立**：`research/e7-index-bench/Cargo.toml` 里 106 个 `[[bin]] name` 全是连字符、含下划线的 0 个（源文件名按 Rust 惯例仍是下划线，两者由 `Cargo.toml` 显式绑住）。手拼的危害也已被闸 ③ 降了一级——名字对不上时退出码非 0，报的是「跑不了」而不是当年那种静默 | 2026-08-29 本轮实测：`research/target/release/` 下的二进制**命名两套并存**——旧的用连字符（`e14-discrimination`）、新的用下划线（`e23_journal_geom`）；一次批量复跑因此把 7 个实验全部报成 `rc=127` 且被 diff 掩盖成「与归档有差异」。这正是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「跑批脚本不许吞掉单轮失败」要拦的形态 |
+| C40 | 变异表没存 | **表已补齐（2026-09-03 对抗测试轮）**：`src/bin/` 77 个 bin 全部有同名变异表；当轮新写 19 张（e12/e14/e17/e18/e19/e20/e23/e24/e25/e26/e27/e28/e30/e61/e68/e69/e6_multicore/e70/e8_split）共 118 条变异全部被抓、0 盲区，抓不住的地方当场补了 10 个新单测（含 e61 的 GF(2) 消元、e19 的 checkpoint 视图、e68 的整个带缓存读模型——之前零断言）；门禁阶段 `.claude/gate.d/code-source-discipline.sh` 的 mutation-tables 格判「每 bin 有同名成形表」，红绿样本双向验过 | 仍欠的一半：**门禁不跑 `research/mutations/` 那一侧的变异**（逐条重编译量级是小时，阶段自陈不冒充跑过）——那一侧「表今天还会不会红」仍靠每轮改实验代码时手跑 `research/scripts/mutate.sh`，复跑记录写进各实验正文。⚠️ **`crates/` 那一侧 2026-09-21 现查已经在门禁里跑了**：门禁 checker-tier-crates-mutation-replay 把仓拷进临时目录、逐条改坏、跑点名的测试，那条测试必须判红，一条锚点腐化或一条没红整道红；门禁 code-source-discipline 的 mutation-tables 格另按子串计数静态判两侧变异表的锚点还唯一命中得上 | 无前置 | 2026-08-29 审计实测立账：结论留下了而产生结论的装置没留下（与 C38（外部文献不可复核）同型）。2026-09-03 当轮同时把此前已有的表复跑了一遍（本轮改动涉及的 7 个 bin：e43 19 条、e57 14 条、e58/e83/e84/e85/e88 共 38 条，全部仍被抓） |
+| C42 | 残留记录冒充合法前缀 | **恢复截断出前缀之后，上一条时间线留在环里的记录会被下一次恢复当作合法前缀重放**——它校验和完好、`jsn` 恰好等于 expected，I-8.3（重放前缀严格连续）、在飞记录数上限、`checkpoint_txg` 三条闸逐条核实都不触发。⚠️ **射程**：已实测的是 `slot = jsn % 槽数` 这一支（E32（上一条时间线的残留），N=5 轮字节一致）；现役 jbd2 把槽位与序号解耦因而免疫，而本仓从没定过槽位怎么映射 | 崩溃点重放里造一次「空洞 → 恢复 → 少量续写 → 再崩」的序列，重放结果里出现属于已丢弃时间线的记录即判红；判别力自证：把残留记录改成与新时间线同源（反向链一致），该检查必须变绿 | 事务层、journal 实现、崩溃点重放 harness（三样 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay；2026-09-17 起层 0 能往基镜像种一条残留记录，只有正例（代码三方 `m2-wave1-code-r1` 攻过，判决第 14 行那一格没算打中）；反例原来押在实例表回退行上，回退行 2026-09-26 随管理员回退改成挂着时的一次向前发布删掉（D23（journal 的角色与格式） 已定项 14，C124（回退行与重放下界没有会红的检查） 同日作废），反例由什么历史造出来还没有重新定；打回经过见里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 ①、23 行） | [decisions.md](decisions.md) D23（journal 的角色与格式） 已定项 8；[experiments.md](experiments.md) E32（上一条时间线的残留） |
+| C43 | 被点名的产物还在不在没人判 | **kb 里点名的实验产物 / 变异表 / 源码路径可能已经不在盘上，而结论留在原地**——门禁只判「产物有没有被点名」，反向那一半没人判 | 扫 kb 里出现的 `research/results/*.out`、`research/mutations/*.tsv` 与 `research/e7-index-bench/src/bin/*.rs` 路径，逐个判存在性，缺一个判红；判别力自证：删掉任一被点名的产物，该检查必须变红。⚠️ **已还一半（2026-09-21 现查）**：门禁 doc-experiments 的 results-cited 格的第三道判「点名的产物，树里没有就必须在版本库历史里找得到」，它的射程逐字是「**这次改动**点名的 N 份产物」——新写或改写的点名行罩住了，**存量的点名行一行都没判过**；被点名的变异表（`research/mutations/*.tsv`）与实验源码路径也不在它的射程里，只判 `research/results/` 下的产物 | 仍欠的是全量那一半：要么让 门禁 doc-experiments 的 results-cited 格第三道另开一支扫全仓存量点名行（代价是每轮都要遍历 kb 全部引用），要么单开一道低频的全量阶段；变异表与源码路径两类要各自加进被扫集合 | 2026-08-30 实测：E32（上一条时间线的残留） 与 E33（两条钉块规则） 的代码、变异表、产物被并发工作流删掉，而 kb 里「已跑、三轮字节一致」的文字留在原地，门禁全绿。与 C38（外部文献不可复核）、C40（变异表没存）同型 |
+| C46 | 门禁阶段自己不会红 | **一个恒绿的门禁阶段与一条真的在跑的检查，在门禁输出里长得一模一样。** 上游的「门禁判别力」阶段只覆盖 `doc-lint.sh`，够不着 `.claude/gate.d/` 这一批项目本地阶段 | **已还一半（2026-08-29 复跑复核轮）**：拿 `.claude/gate.d/fixtures/<阶段名>/{red,green}/` 的样本喂给每个阶段，判退出码 + 失败信息里必须出现的片段；没有样本的阶段**显式列成「未自检」**，不许当成通过。判别力已证：把 `30-decision-history.sh` 换回带 bug 的那一版 ⇒ 判红并逐条指出，换回修好的 ⇒ 回绿。⚠️ **它 2026-09-21 随 SOP 0.0.56 收归上游**，脚本是 `.claude/singlefs-ai-sop/scripts/stage-selftest.sh`，由共享 `gate.sh` 第 258 行把 `.claude/gate.d` 当位置参数传给它；本地那份 `89-stage-selftest.sh` 同日删掉。⚠️ **不带参数跑它退出码 77、一个字不打印**（按自己所在目录往上找，得到 SOP 副本底下那个不存在的 gate.d）——那是「本次无对象可判」，不是自检通过。⚠️ **2026-09-21 补了它够不着的一格**：它只看样本目录在不在，不看**阶段自己怎么说**；`91-archive-past-rounds.sh` 的头部逐字写着「判别力：fixtures/91-archive-past-rounds.sh/red 是一个留着上一轮产物的小仓，必须判红」，而那个目录从它立项那天起就不存在。新立门禁 code-tooling 的 fixture-claims 格判三条：头部声称了样本、目录就必须在；`fixtures/` 下不许有孤儿目录（没有对应阶段，没人会跑它，而它摆在那里像验过了）；样本目录里至少有 red 或 green 之一、每个都要有 `expect`（空壳会被自检整个跳过）。门禁 code-tooling 的 fixture-claims 格立起来当场判红、抓的就是 门禁 doc-experiments 的 archive-past-rounds 格，门禁 doc-experiments 的 archive-past-rounds 格的红绿样本同日补齐（red 是一个把记录提交进版本库又留在工作区的小仓，green 只有未跟踪的本轮记录） | **仍欠 4 个阶段的样本**（名单以上游样本自检每轮列出的「仍未自检」为准，不在这里抄）：`15-research-build`（夹具要装下一个能编译的 cargo 工程）、`87-replay`（要全部已构建的二进制）两个的前置是真实的；`47-research-script-selftests`、`checker-tier-layer0-replay` 两个在各自脚本头部写明了为什么装不进沙箱（要真跑 cargo），判别力各自靠别的东西——47 靠被调脚本自己的 `--selftest`，54 靠它自己必须判红的对照。⚠️ **写明理由不等于验过**：这两个的形态由门禁 code-tooling 的 fixture-claims 格盯着（头部不许留一句与目录对不上的声称），而「它们今天还红不红」仍然没有任何东西在复跑 | 2026-08-29 复跑复核轮实测：`30-decision-history.sh`（决策变更留痕）**恒绿**——`KB=".claude/kb/decisions.md .claude/kb/decisions"` 两条路径塞进一个变量再加引号，`git diff -- "$KB"` 拿「两条路径粘成的字符串」当单个 pathspec，匹配不到任何文件；且历史外置到 `decisions-history.md` 之后它仍在决策正文里找 `### 2026-`，判据也早已错位。**两处都不是笔误级的，而门禁连续多轮报它绿。** |
+| C48 | 多条校验路径共用同一个前提 | **「三条互不共享代码的路径逐格相等」不构成证据，当三条共用同一个错误前提时。** `evidence-discipline.md` 已有的「校验路径本身也要证明它会红」在这里不够用——三条路径**都会红**，只是会一起红在同一个错的地方 | 写实验时把「这三条路径共用哪些常量、哪些规则、哪个规范」显式列出来，并对**每一条共用项**问「它错了三条会不会一起错」。可机检的那一半：同一个源文件里的多条校验路径，若共用同一个常量表或同一个布局函数，判红并要求在正文里写明共用清单。⚠️ 判别力自证：造一个三条路径共用一个错常量的样本，必须红。**已还可机检那一半（2026-09-21，门禁 doc-experiments 的 multipath-registry 格 `.claude/gate.d/doc-experiments.sh` 的 multipath-registry 格）**：先立登记位再立检查——判据里的「一条校验路径」全仓没有机械形态（按函数名认是猜的，实测那三条叫「字节级摆放」「独立闭式算术」「对上 E23（journal 几何) 已发布的表」，一个都不含 `verify`、`check`），所以形态定成实验页的一节 `### 路径与结论登记`，表头 五格：编号、路径、怎么算、源码落点、读了哪些共用项（写法在 `.claude/rules/format-evolution.md`「实验页的「路径与结论登记」」）。门禁 doc-experiments 的 multipath-registry 格判三条：表的形状、源码落点指得到（只活在正文里的写「无实现：理由」）、**共用项那一格不许空也不许只写「无」**。判别力在 `fixtures/99-multipath-registry.sh/` 双向证过。E45（事务跨多条记录的环占用） 当天按新形态补齐当样板，**那张表自己就把这个实验结论作废的原因显出来了**：三条路径的共用项一栏完全相同，其中「整条记录向上取整到原子单元」是仓里没定过的规则、比 I-8.2（记录头不跨原子单元） 严，三条一起读它、一起错，而 10 个格子仍旧逐格相等。**仍欠「该写而没写」那一半**：要判它得先认出一份实验页在不在做多条路径互证，而按关键词扫正文认不出来——普查 `c48-c49-multipath-survey.md` 现查 15 份命中里有 5 份，grep 命中的那一行说的是别的意思、真结构在页面别处。存量 9 份登记在 `.claude/gate.d/multipath-registry-lag.tsv`，只缩不涨 | 无前置，纯欠工 | 2026-08-30 实测：E45（事务跨多条记录的环占用） 声称配了三条互不共享代码的路径（字节级摆放 / 独立闭式算术 / 对上 E23（journal 几何) 已发表的表），10 个格子逐格相等、两个阳性对照都过、7 条变异全被抓，**结论仍然是错的**——三条共用同一条对齐规则，而那条规则比 I-8.2（记录头不跨原子单元） 更严（把整条记录向上取整，而 I-8.2（记录头不跨原子单元） 只约束记录头）⇒ 那个 12 倍是模型自己造的 |
+| C49 | 全称断言只在抽样点验过 | **一条写成全称的结论，其断言只在几个取值点上验过，而分岔点恰好不在抽样里。** 变异测试拦不住它——变异只证明「已写下的断言所覆盖的函数会红」，证不了「断言的量词写对了」 | 对形如「对所有 X，A 与 B 相同 / 不同」的断言，要求实验代码里有一条**扫遍 X 的定义域**的检查（或给出闭式证明），只在枚举点上取值的判红。判别力自证：把扫描范围缩回原来那几个抽样点，该检查必须变红。⚠️ **2026-09-21 立了登记位的入口，判据本身仍没做**：同日为 C48（多条校验路径共用同一个前提） 立的那节 `### 路径与结论登记`（门禁 doc-experiments 的 multipath-registry 格判形状）里，「怎么算」一栏要求结论写成全称的那几行写明 X 的取值是**扫遍定义域**还是**几个枚举点**、写枚举点的要给理由（`.claude/rules/format-evolution.md`「实验页的「路径与结论登记」」）。**这只是把量词摆到明处，没有判它对不对**：门禁不判「写了枚举点的那一行，它的结论是不是全称的」，那仍是语义判断。⚠️ **那个按「字面量数组上循环」扫的判据太宽，不做**：当天现查 `research/` 下 147 个 `.rs` 里「在字面量数组上循环」有 650 处，抽看的三处都不是这一条要判的东西——`for length_in_bytes in [ALIGNMENT_BYTES, ALIGNMENT_BYTES * 4, …]` 是合理取样，`for field_name in ["magic", "format_version", …]` 遍历的是全部字段（本来就是全域）。按这个形态立起来会整片红，而真正要判的那一句「结论是不是写成全称的」住在实验正文里 ⇒ 要判它得把正文的全称词与源码的循环对应起来，跨文件关联的机械形态还没想清楚 | 无前置，纯欠工 | 2026-08-30 实测：E39（反向链挡不挡得住残留记录） 的「2 / 4 / 8 字节三档盘上逐格相同」只取点名项数 ∈ {1,7,8,12,16}，而用它自己的常量（头 84 + 事务字段 9、每项 56）扫遍 0..1200 项，**512 单元下 19 个项数上 2 与 4 字节不同**（最小 items=44，差 512 B）。**10 条变异一条都碰不到那个量词。** 由 D23（journal 的角色与格式） 已定项 8 的反推腿指出，主 agent 独立复算坐实 |
+| C50 | 阻塞标记没人维护 | **「这一条挡不挡第一行代码」只记在正文的一句 ⚠️ 里，没有任何东西在维护它。** 一条决策定案之后，别的未定项可能**因此**变成格式级，而没有一个阶段会回头问这件事 | **已还一半（2026-09-01）**：门禁阶段 `.claude/gate.d/doc-decisions.sh` 的 blocking-verdict 格强制每条未定项在登记行里带一条规范判定（是 / 否 / 无对象 + 日期 + 依据），缺就红，红绿判别力样本在 `fixtures/` 里证过。**仍欠可机检的那一半**：`decisions/` 下每个未定项各判一次「它改不改变新池新建文件写出的字节」——可机检的那一半是**依赖对**：若某未定项被一条已定条款点名为「载体 / 布局 / 位置」的一部分，而它自己没标阻塞，判红。判别力自证：把某条已标阻塞的未定项去掉标记，必须红。⚠️ **2026-09-21 评估下来这个形态会误判，没做**：当天现查，全仓只剩 5 条未定项、被别的决策跨文件点名的 4 处，其中 D17（实现分层与第三方管道） 已定项 1 第 4 条那一处字面点名了 D22（单元原子性怎么合成） 未定项 6、上下文也有「根槽写路径」「字节表」这些词，而它整句的意思是「zoned 开线时按这一条数，**不按** D22（单元原子性怎么合成） 未定项 6 乙问的答案数」——按「点名加词表」的机械判据，这一处会被判成违例。要分出它得先能认「否定式引用」，而那是语义判断。对象只有 4 处引用，做一道会误判的常驻检查不划算 ⇒ 这一条的可机检形态要重新想，或者接受它只能靠人看 | 无前置，纯欠工 | 2026-08-30 实测：D5（快照 / 空间记账机制） 的载体形态定案后，其分项 1、2（当时未定）当场变成格式级（记账 key 的字节布局），D8（核心索引结构） 已定项 2（节点大小）与 D18（块里携带什么信息） 已定项 3 的位置那一格同理——**四条都没被标，靠一次人工复核才发现** |
+| C51 | 分项引用只验状态不验身份 | 门禁阶段「分项引用的状态与正文相符」（`.claude/gate.d/doc-decisions.sh` 的 item-ref-status 格）拿引用处写的「已定项 k / 未定项 k」与正文索引表比**状态**，**不比这个 k 还是不是当初那个问题**。一次重编号漏改一处，新旧两侧若同为已定，它照样判绿——2026-08-30 的 D8（核心索引结构） 主结论重编号（1/2/3 → 3/4/5）正是这种形状，当时靠逐处人工对照 HEAD 版本才确认没漏 | 给每条分项一个**不随编号变的身份**（例如一句钉死的标题短语），引用处带上它，门禁比对短语而不只比编号 | 需要先给分项定一个稳定标识的写法，且要能容忍标题措辞微调 | 2026-08-30 三方验证的本地腿（找反例立场）指出「新旧两侧同为已定 ⇒ 状态断言仍成立」 |
+| C52 | 陈旧当成合法 | **一个 key 的权威值停在内部节点缓冲里，那个节点丢了之后，重建出的树块头对、校验和对、Merkle 链对，而内容是旧的。** [invariants.md](invariants.md) 现有条目无一能检出这一类——它不是「不可达」，是「结构自洽而值过期」 | 造一份「缓冲消息丢失、对应叶子留着旧值」的镜像，checker 必须报红。判据是**故障注入率**而不是抽样通过率：注入 N 次必须抓到 N 次。判别力自证：把检测机制关掉，同一份镜像必须由红转绿 | 需要格式层先给一个可比对的时间线索（代号 / 已应用水位线），且**检测逻辑不许复用消息生成或应用的那段代码**（否则重犯 bcachefs 那个形状：抓得到应用过程出偏差，抓不到语义本身写错）。它本身又前置于 D11（索引节点要不要留消息缓冲区） 取「留」；2026-09-16 D8（核心索引结构） 已定项 12 定前端三棵树 ε 恒 0 之后，记账 / 反向索引 / LRU 上它没有对象（每个 key 盘上只有一条），射程剩 extent / dirent 等留缓冲的树 | D11（索引节点要不要留消息缓冲区） 代价 2（至今是推理、未量化）；D21（权威态与派生态的分界） 已定项 11「『丢了只是慢』有一条前提」把它定位成 D21（权威态与派生态的分界） 那句话的适用条件。2026-08-31 由 E56（消息缓冲的收益 vs ε） 的格式债对抗腿指出落点，主 agent 核对 D21（权威态与派生态的分界） 原文坐实（它已定的「派生态丢了只是慢」与代价 2 直接冲突） |
+| C53 | 缓存声明与常驻集不符 | **代码声明了缓存容量，而实际常驻集远超它**，于是实验量到的是一个更大缓存下的数字。形态：`put` 不走 LRU 的逐出路径，或 `touch` 的返回值被丢弃 ⇒ 被逐出的页塞回常驻集而 LRU 追踪不到，此后永远免费命中并繁殖出新的同类页 | 任何带定容缓存的实验，缓存实现里必须有一条 `常驻集 ≤ 声明容量` 的检查，破了即判红；并把「历史最大常驻集」作为读数报出来，要求它等于 `min(声明容量, 对象总数)`。⚠️ **这是绝对值断言，不是臂间互比**——三条臂互相比看不出来，因为只有嵌套取用缓存的那条臂会中 | 无前置，纯欠工（E56（消息缓冲的收益 vs ε） 与 E7（离线索引 harness） 已各加一道，其余带缓存的实验还没有） | 2026-08-31 实测：E56（消息缓冲的收益 vs ε） 声明 66 个节点的缓存，实际常驻集涨到 **688**（占树 67%），而**偏差形状与被测效应的形状相同**（随 ε 单调增强）⇒ 人为收益与真实收益同向同增。守恒闸抓不到它（不丢消息，只是写少了写晚了）。由代码审查腿按前两个缺陷的签名找出 |
+| C54 | 摊销结构没进稳态就取数 | **一个带缓冲的结构，缓冲总容量可以超过整个负载**，于是量到的是「把消息塞进缓冲的成本」而不是稳态写放大——账还没到期 | 判据要**跑之前就能算**：`总缓冲容量 ÷ 负载` 超过阈值（本工程取 25%）即判该档不可用，容量由几何直接算得。⚠️ **不许用事后的「残留净增」当判据**——2026-08-31 实测那个量主要是相位噪声不是净填充：父节点向全部孩子均匀分发 ⇒ 孩子们同步填满、同步下刷，一次快照抓到的是同一个相位，振幅约等于总缓冲容量（nleaf=8192、ε=0.9 上残留从 41,445 跳到 153,950，差 56% 的负载，而同一配置 ε=0.5 只差 1.2%） | 无前置，纯欠工 | 2026-08-31 实测：E56（消息缓冲的收益 vs ε） 在 nleaf=8192、ε≥0.9 上残留 **100%**——20 万条消息一条都没到过叶子，而总缓冲容量约 50 万条。不加这道闸时那几档给出 25–41 倍，是「没付的账」被算成了「省下的钱」。由反推腿指出，在大树上从局部问题变成全额 |
+| C55 | 排空没排干净就换几何 | **几何再求值事务在还有写在飞的时候就发布了新几何**，于是同一个操作前半段按旧几何算地址、后半段按新几何算——两半各自合法、合起来不合法，而没有任何一侧报错。D2（RAID 条带策略） 已定项 4 b 定了「排空之后再换」⇒ 这条从「要拦一个设计窗口」变成「拦一次实现失误」 | 再求值事务发布新几何的那一刻，在飞写计数必须为 0，不为 0 判红；配一个「每个操作在起点绑住一份几何标识」的运行时读数，落盘时标识与当前几何不等即判红。⚠️ **判别力自证**：把排空那一步去掉，故意在有写在飞时发布新几何，两条检查都必须红；不红说明那一轮根本没有写在飞，整轮作废 | 事务层、几何再求值事务的实现、崩溃点重放 | D2（RAID 条带策略） 已定项 3 与已定项 4 b（2026-08-31 用户定案）。约束来自 `.claude/rules/fs-design.md`「分支变量不许在操作中途改变」。⚠️ 与 C17（设备几何当全局参数） 不是一条：C17（设备几何当全局参数） 拦**挂载那一刻**把设备级量当池级单值，C55（排空没排干净就换几何） 拦**挂载之后**换几何这件事 |
+| C56 | 没登记的格式常量仍会漂 | **门禁阶段「格式常量在 kb 与实验源码之间同步」（`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格）只检查已经登记了 `format-const` 标记的常量。**一个新加的格式常量若没人给它加标记，它照样可以在 kb 与实验源码之间静默分叉，而门禁全绿 ⚠️ 2026-09-14 现查：同一批定案里没有 format-const 登记位的三个常量仍停旧值——E116（打包容器的账·补元数据写与整理策略） 的 `MAP_KEY` 33 / `MAP_ENTRY` 61（kb 现行 27 / 55）、E145（码 2 自描述头与映射树 key 宽的代价） 的 `NODE_POINTER_BYTES` 83（现行 86）、E146（livelist 条目按映射 key 定身份之后的宽度与代价） 的 `NODE_POINTER_BYTES` 83 / `MAPPING_ENTRY_NODE_BYTES` 53 / `MAPPING_KEY_NODE_BYTES` 25（现行 86 / 55 / 27）；三份都要按「三处一起动」重跑并复核结论，还没做 | ⚠️ **`crates/` 那一侧 2026-09-21 起另有一道盯着**：门禁 checker-independence-and-sync 的 layout-checker-sync 格按「常量名 → 值的集合」比这次改动前后的 `crates/singlefs-format/src/lib.rs`，70 个 `pub const` 一个不漏，不管它登没登记 `format-const` 标记——但它判的是「格式变了 checker 跟没跟」，**不是「kb 与源码同不同步」**，C56（没登记的格式常量仍会漂） 要的那一格它不答。`research/` 那一侧一个都没罩到。反向检查：实验源码里凡是被 kb 正文逐字引用过其数值的 `const`，必须有对应标记，缺标记判红。难点是「被 kb 引用过」这件事本身要判得出来 | 需要先给格式常量定一个可机检的识别口径（例如统一命名前缀，或在源码注释里点名它的 kb 出处） | 2026-08-31 实测：`JOURNAL_HEADER_BYTES` 在 D23（journal 的角色与格式） 已定项 9 定案后 kb 改成 86，而源码 `const JOURNAL_HEADER_BYTES = 84`、钉死它的两条单测、产物三处全停在旧值，`10-kb-rot` 与 `87-replay` 双绿——前者只看 kb 内部，后者逐字节比对产物，源码与产物一起停在旧值时它永远绿 |
+| C57 | 零填充顶掉原文 | **RMW 读不回旧单元时用零填充凑出一个新单元**，而 D4（校验和位置） 已定项 4 明令那个写必须失败。零填充重建出来的单元**校验和是自洽的**，与合法单元逐字节不可区分 ⇒ 单镜像判不出来，invariants.md 里放不下（I-2.3（补齐字节为零且参与校验和） 只管补齐字节恒为 0 那一半） | 故障注入：把某个单元的密文改坏（或让它的读返 EIO），随后对该 extent 发一个小于单元的写。**判据是那个写必须失败**；若它成功了，再去看新单元里被顶掉的那一段是不是零。⚠️ 这道闸自己要先证明会红——不注入故障时同一个写必须成功，否则分不清「拦住了」和「本来就写不进去」 | 事务层、故障注入设备模型（`dm-error` 或自造）、崩溃点重放 | D4（校验和位置） 已定项 4（2026-08-31 用户定案）。⚠️ 与 C7（过期块无检查） 不是一条：C7（过期块无检查） 拦「读到正确但过期的块」，C57（零填充顶掉原文） 拦「写的时候拿零把读不回来的原文顶掉」 |
+| C58 | 串行提交撞天花板没人报警 | **单线程 sort-merge 是关键路径**（D8（核心索引结构） 的 write buffer 三条硬要求），而 D13（验证路线） 已定项 2 先承诺串行 ⇒ 一次 checkpoint 的条目数越过「合并耗时 ≥ 一次设备同步」那个交点之后，**吞吐天花板从设备挪到 CPU，而这件事不报错、只是变慢** | **转里程碑四，随 write buffer 落地一起做**（用户 2026-10-02 定，`research/prompts/m3-conc-r1-forks.md` F1 选丙）。做的时候三条都要满足：① 计数对象是那时实现里真有的量，交点在本实现上现标定，不沿用 E17（write buffer 合并上限） 的合并速率（第一版不开 write buffer，D8（核心索引结构） 索引表第 12 行，「本次 checkpoint 的条目数」今天没有对象）；② 判别力自证两面：基线负载不红、条目数翻倍的负载红（只有翻倍一面时，m3-conc-r1 攻方放开负载扫 4 万档漏 2/5 到 4/5 个坏实现）；③ 交点的来源不进盘：不在 mkfs 时实测写进系统配置（与「同参数两次 mkfs 逐字节相同」撞，攻方本机 5 轮量出 3 个交点），也不叫「运行时配置」（与 D22（单元原子性怎么合成） 已定项 26 的「系统运行配置」同名不同义；挂载选项通道今天没有，C422（挂载选项通道不存在）） | write buffer 落地（里程碑四 [04-fourth-txn.md](milestone/04-fourth-txn.md)「六　并行提交（里程碑三项四转来）」）；本实现上的交点标定（E17（write buffer 合并上限） / E44（序号位宽的本机实测与代价） 的数量在 write buffer 原型上，不直接用）| D13（验证路线） 已定项 2（2026-08-31 用户定案）。交点约 **1.1 万条条目/checkpoint**（31.2M 条目/秒 × 359 µs），而 E16（journal 的角色：WAL vs 意图日志） 里 ckpt=1000 那一档的条目数与它同一量级 ⇒ **没有安全余量**。逃生口是 E17（write buffer 合并上限） 实测的按叶分区并行 6.26–6.38×；判决 `research/prompts/m3-conc-r1-main-verification.md` C8 格 |
+| C59 | 种子折叠成同一个状态 | **`let mut st = seed \| 1` 让 seed 2 与 3、4 与 5 折成同一个状态** ⇒ 「N=5 轮」实际是 3 个访问模式 ×(1,2,2) 次重复，**轮间变异系统性偏小**，而那个变异正是「这个数稳不稳」的唯一依据。实测（2026-08-31 复算 5 个种子各 1024 个偏移）：seed2 与 seed3 的偏移序列逐个相同，seed4 与 seed5 相同。⚠️ **「现已知四处」这个数 2026-09-21 现查低估了四倍**：折叠写法今天是 **17 处、14 个文件**，全部登记在 `.claude/gate.d/experiment-seed-fold-lag.tsv`（门禁 code-source-discipline 的 reading-discipline 格读它）。立账时点名的四个文件里只有 `e140_header_alignment.rs` 真的改好了。⚠️ **同一天里这个数错了两次，第二次是主 agent 自己错的**：先按「等号后面紧跟 seed 再跟或运算 1」这一种形态现查，得出「13 处、12 个文件」并据此写下「`e66_small_files.rs` 已经改好、不在名单上」——两句都是假的。漏掉的四处是 `e66_small_files.rs:110` 与 `:128`（元组解构：`seed` 折叠写在一个元组字面量里，前面是左括号不是等号）、`e89_interval_frontier.rs:76` 与 `:77`（**先折叠后混淆**：一处是折叠之后异或一个常数，另一处是折叠之后再乘混淆常数、再置一次位——第二处长得就像正确改法「先乘法混淆再置位」，而那个或运算作用在 `seed` 自己身上、折叠发生在乘法之前，`seed=2` 与 `3` 在那一步已经同值，后面怎么混都救不回来）。⇒ **数一个「有多少处」之前，先问自己的判据是不是比被测对象的写法窄**；这两次都是「核了窄的那一句、说出口的是宽的那一句」（`.claude/singlefs-ai-sop/rules/verify-before-claiming.md`） | **检查已立、存量仍欠（2026-09-21，门禁 code-source-discipline 的 reading-discipline 格）**：注释与字符串之外，名字带 `seed` 的标识符直接跟或运算 1 或与运算取反 1 的，判红；`(种子 或 1) 异或 K` 与 `(种子 或 1) 乘 K 再或 1` 这两种「先折叠后混淆」也判（折叠发生在混淆之前），而正确写法「先乘法混淆再置位」不判。存量 17 处登记在 `.claude/gate.d/experiment-seed-fold-lag.tsv` 放行——**改一处就要重跑那个实验的全部产物并逐个回对正文引的数**，那是另一件大活；豁免表只缩不涨（拿基准提交比每个文件的登记行数，涨了判红），所以新写的实验源码犯这一条当场红。⚠️ **射程罩不到**：先把种子搬进别的名字再折叠（`let base = seed;` 之后再折叠），它判的是表达式形态，不追这个值是不是真被当 PRNG 状态用了。⚠️ **仍欠的是存量那 17 处本身**：那 17 个实验今天的数仍然是「3 个访问模式 ×(1,2,2) 次重复」量出来的，轮间变异系统性偏小。原判据：门禁扫 `research/e7-index-bench/src/bin/*.rs`：凡是把命令行种子直接 `\| 1` 或 `& !1` 之后当 PRNG 状态的，判红；改法是先过一次乘法混淆再置位（奇数乘子是双射，不同种子给不同状态）。⚠️ 这道闸要先证明会红——拿现有三处当红样本，改好之后必须转绿 | 无前置，纯欠工；但**改了就要重跑那三个实验并更新产物**，`87-replay` 会逐字节判红直到重跑 | 2026-08-31 三方论证反推腿指出，主 agent 复算确认。⚠️ 与 C24（实验自己没有单测） 不是一条：C24（实验自己没有单测） 管「有没有单测」，C59（种子折叠成同一个状态） 管「多轮到底有几轮」 |
+| C60 | 恒定读数没有故障注入自证 | **一个恒为某个常数（尤其 0）的读数，与一个「被测对象真的这样」的读数，在产物里长得一模一样。** 实测两次同型：E61（反向链 hash 算法的均匀性） 量一「甲每个窗口满秩」是代数恒真式；E69（反向索引取权威态的增量维护代价） 的 `units_read_on_commit` **零处自增**，而对照臂那一侧有实打实的 `read += 1` ⇒ 两条臂的读数不是同一把尺子量的 | **可机检那一半已立、存量仍欠（2026-09-21，门禁 code-source-discipline 的 reading-discipline 格）**：本文件声明的整型结构体字段，若整个文件里从没出现在写入位置（复合赋值、赋非零值、取可变引用），而且每一处结构体字面量初始化都写着字面量 0，判红。判别力全在「`字段: 非字面量表达式` 算写过、`字段: 0` 不算」这一刀上——把后者也算成写过，这道闸对病灶形态就一个字都不说了；反过来只要有一处非零初始化就不判，配置类字段不会误伤。它扫出立账时那个病灶本身（`e69_backref_cost.rs` 的 `Authoritative.units_read_on_commit`）。存量 14 处登记在 `.claude/gate.d/experiment-constant-reading-lag.tsv` 放行，豁免表只缩不涨。⚠️ **射程罩不到**：局部变量的恒定读数、非整型字段、别的 crate 里声明的结构体、宏展开出来的字段。⚠️ **仍欠的是另一半**（也是这条账的本体）：每个进结论的读数各要有一次注入故障让它变号的自证，那是人的活，机器判不了。原判据：实验代码里凡是被写进结论的读数，必须各有一条**注入故障让它变号**的自证（`0 → 非 0`、`满秩 → 亏秩`），并把那次注入的结果写进正文；可机检的那一半：一个在整个 `main` 与全部单测中**从未出现在赋值左侧**的计数器字段，判红 | 无前置，纯欠工 | 2026-08-31 实测：E69（反向索引取权威态的增量维护代价） 的反推腿把 `commit` 改成每事务扫全盘（正文明写要拦的形态）⇒ **8 个单测一个都没红，产物一个字节没变**；而钉它的那个单测断言 `== 0`，0 是常量，**该测试不可能失败** |
+| C61 | 陈旧状态措辞的漏网写法 | 门禁阶段「说某条决策未定，而它已经定了」（`.claude/gate.d/doc-decisions.sh` 的 cross-decision-status 格）只认**紧贴**的写法（`D<n>（简称） 未定`）。两种它看不见：**隔着名词短语的**（2026-09-01 实测过一处：D19（块指针的结构与宽度预算） 写着「D2（RAID 条带策略） 的条带宽度可变粒度仍然未定」而 D2（RAID 条带策略） 已定项 1 已定，机器没抓到、靠人核出来），以及**被「」引作历史陈述的** | 把判据从「紧贴」放宽到「同一句内且中间不夹别的编号」，并对引文形态单独给一条判据（引文里的陈旧状态要求旁边有一句现状）。⚠️ 放宽之前必须先在真实语料上量假阳性——第一版放宽到 40 字时报 32 处而只有 4 处是真的 | 无前置，纯欠工（阶段已在跑，放宽判据不需要新东西） | 2026-09-01 审核实测：收紧后的判据在真实语料上抓到 4 处真缺陷、零假阳性，但 D19（块指针的结构与宽度预算） 那一处是人工发现的，机器没抓到 |
+| C62 | 分项定案值在 kb 里分叉 | **一条分项的定案值被别处引用时写成了另一个数，而两处都标着「已定」。**实测：D14（双轨（大小文件 / 持久临时）） 已定项 3 的定案是「内联阈值 0，即不内联」，而同一文件的候选表与 D15（格式冻结政策） 的复核句都写着「512 B」——**D15（格式冻结政策） 那句复核是同日稍后写的，照抄了当天早些时候已被推翻的值** | 给分项的定案值一个可机检的登记形式（与 `format-const` 同型，例如 `decision-const: D14.3 = 0`），门禁比对凡是点名该分项且带数值的句子。⚠️ **不许用「数值出现在该分项正文里」当判据**——实测会漏：D14（双轨（大小文件 / 持久临时）） 已定项 3 的代价表里恰好有「512 B 文件占 64 倍」这个无关的 512，按那条判据整个矛盾判绿 | 需要先给分项定案值定一个登记写法，且要能表达「0」「不做」这类非数值定案 | 2026-09-01 审核实测：该矛盾横跨两个文件三处，`22-item-ref-status` 只比状态不比取值，全绿 |
+| C63 | 已定的 AAD 对快照维是瞎的 | **D9（加密） 已定项 6 已定的五项 AAD 不含任何快照维，而 D6（快照实现模型） 已定取多可写头 ⇒ 两个头写同一个逻辑身份时 AAD 完全相同。**E31（AAD 缺快照维） 实测：错配检出 **0 / 2**，两次都**静默读出另一个可写头的数据而 MAC 全绿**。⚠️ 这不是「将来可能出问题」——D6（快照实现模型） 定案之后触发条件已经成立；D9（加密） 2026-08-29 的处置是「定案不改，缺口记入」，而在此之前**缺口没有被记进任何检查清单** | checker 侧：构造两个可写头写同一个 `(树, 对象, 偏移)`，用 A 头的 key 去解 B 头的密文，**MAC 必须失配**；失配不成立即判红。⚠️ **判别力自证**：把 AAD 换成含出生快照的那一版，同一份镜像必须由红转绿——不转绿说明这道闸测的不是快照维。格式侧：AAD 字段表要重开一次（出路只剩「绑出生快照」，D9（加密） 已定项 4 已定 nonce 每 extent 存 ⇒ 折进现算 nonce 那条出路不可用）| 加密实现 + 多可写头 + checker；**格式侧的前置是 D9（加密） 已定项 6 的字段表重开**，那一步没做 | 2026-09-01 审核：D9（加密） 已定项 6 的索引行此前只写「绑逻辑身份五项」，单条检索取出时一个字都看不到这个洞，本轮已把它写进索引行 |
+| C64 | 多条已定项压在同一个未验证假设上 | **两条以上的已定项由同一个模型假设给出余量，而那个假设自陈没被建模过。**实测：D23（journal 的角色与格式） 已定项 8（反向链 32 位）与 已定项 11（取完整 CRC32C）**都由 E51（反向链的碰撞机会有多少次） 的「接缝数」分母给出余量**，而 E51（反向链的碰撞机会有多少次） 逐字自陈「『一次事故一个接缝』是模型假设，没有建模嵌套事故（恢复本身又崩）」⇒ **那个口径一倒，两条格式级定案一起倒**，而两条都写着「余量三个数量级」，读起来像各自独立 | 给承重假设一个可机检的登记形式（例如实验正文里 `<!-- load-bearing-assumption: <名字> -->`，决策引用处写 `依赖假设：<名字>`），门禁统计同一个假设被几条已定项引用，**≥2 条就要求各自写明共享**并配同一条重开条件。⚠️ **不许用「同一个实验号被引用两次」当判据**——同一个实验的不同结论各自独立是正常的，要判的是**同一条假设** | 需要先定假设的登记写法；与 C48（多条校验路径共用同一个前提） 不是一条：C48（多条校验路径共用同一个前提） 管**一个实验内部**三条校验路径共错，C64（多条已定项压在同一个未验证假设上） 管**跨决策**的多条定案共押一条假设 | 2026-09-01 审核：该共享此前一处都没写，两条已定项各自读起来都像独立成立；本轮已在 D23（journal 的角色与格式） 已定项 8 写明 |
+| C65 | 分配器提示落不落盘自相矛盾 | **矛盾 2026-09-09 已收口**：D14（双轨（大小文件 / 持久临时）） 已定项 2 补了「判据要三句全过（不落盘、每次分配都可以重新判、零格式位）」，住盘上字段的候选当场出局；仍欠门禁。原写法：**D14（双轨（大小文件 / 持久临时））「采纳的两层」给分配器提示逐字记的是「不落盘、零格式位」，而同一条决策的已定项 2 问「F2FS 用 superblock 里的后缀表，本工程用什么？」——后者举的形态住系统配置。** 两句一个说零字节、一个在挑落盘形态，矛盾没收口，而按哪一句读会判出相反的「改不改新池新建文件的字节」 | 门禁比对：一条决策的已定条款声明某机制「零格式位」时，同一决策的未定项不许在候选里列出判据**住任何盘上字段**的形态；列了就判红，逼一次收口。⚠️ **howto 2026-09-09 从「住系统配置 / 住指针」放宽成「任何盘上字段」**：那两种是立账时看到的两种形态，而当天三方论证走到很近的那条候选（判据取 D8（核心索引结构） 已定项 3 的 `locality_id`）住的是 **extent key 首段 + inode 记录偏移 16**，两种都不是 ⇒ 旧 howto 会放它过，而它同样让这一层的判据落在盘上。这是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」的形状：立账的人只把尺子挥向了他当时看到的两种形态。⚠️ 收严之后**当场回扫过一次**：D14（双轨（大小文件 / 持久临时）） 已定项 2 的候选臂里那条 `locality_id` 臂被新 howto 拦住，已写进该项正文。判别力自证：把 D14（双轨（大小文件 / 持久临时）） 已定项 6 那句「零格式位」删掉，检查必须转绿；加回来必须转红 | 无前置，纯欠工 | 2026-09-01 三方论证的正推腿抓到，主 agent 现查 `14-双轨大小文件-持久临时.md` 两处原文坐实 ⚠️ 2026-09-13 D14（双轨（大小文件 / 持久临时）） 已定项 2 第三轮三腿一致判第一版不做提示、同日用户定案「否」（D14（双轨（大小文件 / 持久临时）） 已定项 2）：定否之后这笔矛盾在第一版没有对象，重开 D14（双轨（大小文件 / 持久临时）） 那一项时连它一起判 |
+| C66 | 格式级空白没有分项号 | **挡在第一行代码前面的空白，未必在未定项清单里。** 2026-09-01 的正推腿从 mkfs 推到发布根，列出五处新池新建文件必须写、而仓里没有权威落点的字节。**2026-09-03 复核：五处里四处已被后续决策填**——① 分配记录的载体形态**已填**：D3（空间分配） 已定项 3（独立 keyspace 的 btree，key = 落点，value = 分配代）；**仍空的是它的盘上编码与每段宽度**，2026-09-03 立成 D3（空间分配） 已定项 7；② 单元头（当年写 55 字节、D21（权威态与派生态的分界） 自陈提议值）**已填**：D18（块里携带什么信息） 已定项 7 定成 91 字节字段表；③ journal 记录尺寸**已填**：D23（journal 的角色与格式） 已定项 12（4 KiB）；④ journal 载荷完整性**已填**：D23（journal 的角色与格式） 已定项 13（载荷校验和 4 字节）——⚠️ **那两处旧「仍未定」已于 2026-09-03 改写**（D23（journal 的角色与格式） 正文那两段现在各挂一条指向已定项 12 / 13 的注），矛盾已消；⑤ `w ≥ 2` 硬下界**已填**：D2（RAID 条带策略） 已定项 6（`w ≥ 2` 硬下界），单设备互斥归 C82（io_min 不在挂载比对清单）。**新暴露的空白：inode / 文件元数据的盘上格式全仓无决策**（新池新建文件写一个文件必写它，grep `inode.*格式/字段/布局` 零命中）⇒ 落表时它是第一个要判的空白 ⇒ 31 阶段（每个未定项有没有判过改不改新池新建文件的字节）对这些格式级空白无从说话 | 反向检查：从「新池新建文件写出哪些段」这张表出发，每一段的每个字段都要能指到一条已定分项或一条未定分项；指不到就判红。**表已落库（2026-09-03）**：[layout/01-first-txn.md](layout/01-first-txn.md)，七段全列，落表当场暴露两处新空白（inode 的盘上格式、记账 key 各段宽度）。**门禁也做了（2026-09-03）**：`.claude/gate.d/doc-registries.sh` 的 field-refs 格扫表里每一行的「指向」列，指不到 decisions/ 里真实存在的分项就判红（当前查 55 处引用全部成立），red / green 样本都在 `fixtures/` 里、`89-stage-selftest.sh` 判得对。**四处空白也立成分项了（2026-09-03）**：系统配置字段表进 D22（单元原子性怎么合成） 已定项 9、inode 盘上格式进 D8（核心索引结构） 已定项 6、分配记录条目的盘上编码与宽度进 D3（空间分配） 已定项 7、记账 key 各段宽度进 D5（快照 / 空间记账机制） 已定项 5，四条都判了「改新池新建文件的字节：是」⇒ **C66（格式级空白没有分项号） 立账要拦的那个形态已经拦住了**。**仍欠**：那四条未定项本身的定案，以及表里五处「只定形态没定宽度」的收口。⚠️ **2026-09-03 再复核又挖出第五处空白**：位置条目里的设备 ID 与物理偏移宽度全仓无出处，而 D22（单元原子性怎么合成） 已定项 7 的 53 / 121 已经在消费它 ⇒ 当天立成 D19（块指针的结构与宽度预算） 已定项 4。**这说明门禁阶段 32（新池新建文件的每个字段都指到一条真实存在的分项）只判「分项存不存在」，不判「那条分项有没有说这句话」**——一行指向 D19（块指针的结构与宽度预算） 已定项 1 而写着一个 D19（块指针的结构与宽度预算） 从没定过的宽度，它照样放行 | 表、门禁、分项登记都已落地 | 2026-09-01 三方论证的正推腿，主 agent 逐条现查五处原文坐实 |
+| C67 | 那把尺够不着写序与恢复解释 | **「改不改新池新建文件写出的字节」问的是字段与布局，问不到两样东西**：① 写的**顺序**——同一批字节换个落盘次序，崩溃后可恢复性就变了；② 恢复期**怎么解释**已经落盘的字节——解释规则错了，字节一个不差而恢复出错。两类问题都会被这把尺判成「否」 | 崩溃点重放接进来之后，对每一条判「否」的未定项各问一次：它改不改写序、改不改恢复期的解释规则；改则该项要另走一条判据，不许拿字节那把尺放行 | 前置是崩溃点重放 harness（2026-09-14 已有，门禁 checker-tier-layer0-replay） | 2026-09-01 三方论证的本地腿指出（它同时指出 mkfs 那一格，主 agent 当轮裁定 mkfs 算在尺内，见 decisions-history.md） |
+| C68 | 不变量白名单与已定条款打架 | **I-6.2（明文头字段白名单） 逐字把加密开启时的明文头限死为 magic / 格式版本 / flags / nonce 代号 / 长度 / MAC，而 D18（块里携带什么信息） 已定项 3（晚一天定案）要求数据单元的五元组在明文**——六项白名单里一项都不是那五个。I-6.2（明文头字段白名单） 字面只管「元数据块」，但没有任何一处写清它的射程该不该扩到数据单元；对照之下 I-1（块自描述） 类有一条注记记着「要扩到任一单元」，I-6.2（明文头字段白名单） 一条都没有 | **收口备料已齐（2026-09-02）**：E85（单元头的字段表）把需求矩阵与字节账算成可机检的——修补集 71 字节全够（占 32 KiB 单元 0.22%），与 I-6.2（明文头字段白名单）的冲突恰八项逐项点名。**收口决策已落（2026-09-02，用户定案 + 三方论证判决修订）**：D18（块里携带什么信息）已定项 7 字段表按单元类分、I-6.2（明文头字段白名单）改写为两张、I-1（块自描述）四条扩到任一单元并给自证单元开显式豁免行——原提案的去 fsid / 去诞生代号被反推腿的可达破绽翻回（`c68-unit-header 那一轮的腿报告（产物在 git 里）`）。**仍欠**：① nonce 12 字节归属的三处打架 2026-09-13 收口（D18（块里携带什么信息） 已定项 14 让完整 96 位 nonce 住单元明文头、指针里那份保留，三处从那天起同真，D9（加密） 已定项 4 补注）；② 门禁比对工装：invariants.md 里凡是「字段白名单 / 字段集合 ⊆」形态的条目，其清单必须与 decisions/ 里点名同一类对象的已定条款取并集后仍然自洽，一条已定条款要求的字段不在对应白名单里即判红；判别力自证：把 D18（块里携带什么信息） 已定项 3 的五元组之一删掉，检查必须转绿 | 收口决策 | 2026-09-01 三方论证，正推腿与反推腿**各自独立**撞到同一处，主 agent 逐字核 invariants.md:174 与 21-权威态与派生态的分界.md:88 坐实 |
+| C69 | 已定不变量没有字段可判 | **I-1.2（块头写序已发布） 要求「块头记录的 generation ≤ 系统配置当前 generation」，I-1.4（块头 fsid 一致） 要求「块头记录的 fsid == 系统配置 fsid」，而 D18（块里携带什么信息） 已定项 3 那五个字段里既没有块的 birth txg（五元组里的「对象出生代」是 inode generation，不是块代）也没有 fsid** ⇒ 两条已定不变量在第一版落空。⚠️ 判定字段已落点（2026-09-02）：D18（块里携带什么信息）已定项 7 把诞生代号 8 字节与 fsid 8 字节写进单元头，两条不变量在第一版有字段可判了 | **字段已落，检查还清了一半**：2026-09-21 立门禁 doc-registries 的 invariant-anchors 格——这次改动在 [invariants.md](invariants.md) 里新写或改写的每一行不变量，正文必须点名一条「D<编号>（简称） 已定项 k」当字段落点，点不出判红（已停用的行不判；red / green 样本双向证过）。⚠️ **射程只到这次改动的行**，与门禁 doc-experiments 的 results-cited 格、quoted-result-lines 格同一条：存量 69 行在用的里面有 **39 行**今天点不出已定分项，一次全判会把每一次提交都挡住。那 39 行就是这一条仍欠的那一半，门禁 doc-registries 的 invariant-anchors 格每轮把这个数现算着报进成功句，不让它沉默。⚠️ 还判不了的：点名的那条分项里到底有没有这个字段、宽度对不对——那要人看。原判据（反向检查：每条不变量点名的每个字段都要在 `decisions/` 的某条已定条款里找得到落点与宽度，找不到即判红，逼一次「补字段还是降级那一条不变量」的选择）仍是这一条的出口 | 前置是单元头字段集定案 | 2026-09-01 三方论证的正推腿，主 agent 逐字核 I-1.2（块头写序已发布） / I-1.4（块头 fsid 一致） 与 D9（加密） 已定项 6 的字段标注坐实 |
+| C70 | 跨统计量的和没人盯 | **记账的每个统计量各自独立增量维护（幂等完整值），而没有任何一条不变量盯住它们之间的和。** I-3.1（已分配统计对得上） 只比对「已分配统计 vs 全盘遍历」这一条标量总账；两套 `+=` 逻辑可以各自没错而互相对不上，那时 I-3.1（已分配统计对得上） 仍然平 | 新增一条向量等式形态的不变量（形状照 I-3.5（引用区间的精确性） 对 I-3.1（已分配统计对得上） 的补法）：可用 = Σ设备(容量 − 已分配 − 不可回收 − defer 待释放) − 待删占用 − 已承诺预留，逐格判。⚠️ 它的前置是 D3（空间分配） 已定项 4——不等式没落库之前写不出这条等式 | 前置是 D3（空间分配） 已定项 4（准入不等式的权威形式） | 2026-09-01 三方论证的反推腿指出，正推腿独立给出同一个不等式的形态 |
+| C71 | 不认识的统计量标签静默忽略 | **D5（快照 / 空间记账机制） 已定项 3 取 btree key 形态的理由逐字是「加新统计维度不改格式」，而 D12（目标介质） 已定每条线可能各有统计维度 ⇒ 老读者迟早读到不认识的统计量标签。它若静默忽略，自己的 ENOSPC 不等式就少一项而毫无察觉**——那不是 compat，至少是 compat_ro。D15（格式冻结政策） 的判定表把「新增一棵 keyspace」钉成 compat，**没有一行处理「同一棵树里新增一个统计量标签」** ⚠️ 2026-09-13 总审核定案：D5（快照 / 空间记账机制） 已定项 10 立了统计量标签登记表，未登记标签的处置条款已写，会红的检查仍欠 | 门禁比对：D15（格式冻结政策） 的兼容性判定表要覆盖「新增统计量标签」这一行；缺行即判红。运行期的形态是挂载时遇到不认识的统计量标签必须按 compat_ro 拒绝可写挂载，并做成能被测试强制进入的分支 | 无前置，纯欠工 | 2026-09-01 三方论证的正推腿 |
+| C72 | extent 和单元什么关系没人答 | **第一半已解（2026-09-01 D4（校验和位置） 已定项 7）**：extent 占盘恒 = 单元 = 32768，① 的「每逻辑 extent」与 ② 的「覆盖 32 KiB」一致（每 extent = 每单元 = 每 32768），③ D19（块指针的结构与宽度预算） 摊薄表的 4 KiB / 128 KiB 两档不是格式取值、是分析维度（D19（块指针的结构与宽度预算） 已定项 3 注已标「不许再当 extent 大小取值引用」）。**剩第二半：切分存不存在。** 「切分」= 一个物理单元被多个逻辑 extent 指针从不同偏移共享引用（`extent_off` ≠ 0、一份密文/nonce/MAC 罩 k 段）。D4（校验和位置） 已定项 3（RMW 整单元读—改—写）+ 已定项 7（extent 恒 = 单元）之后，第一版无内联（D14（双轨（大小文件 / 持久临时）） 已定项 3 阈值 0）、无尾包（D14（双轨（大小文件 / 持久临时）） 否决）、无压缩实现（指针头部的压缩算法码与压后长度第一版写 0，D19（块指针的结构与宽度预算） 已定项 11；2026-09-19 前这里指的是 D4（校验和位置） 的字段表，那张表已挪进变更史）⇒ **没有任何第一版操作产生 sub-unit 共享，`extent_off` 恒 0**；而 D9（加密） day-1 预留第 2 项、D9（加密） 已定项 4 的警示、D6（快照实现模型） 的跨快照部分覆盖分片、D19（块指针的结构与宽度预算） 的 `extent_off` 7–13 位宽度预算**四处仍按「会切分」写着**。它**不改新池新建文件的字节**（D4（校验和位置） 已定项 7：`extent_off` 定宽留位在不在都占），改的是「MAC 会不会被复制成 k 份」与那四处措辞 | 门禁比对：凡是写「每 X 一份」这种字段频率，X 必须能指到一条已定条款给出它的大小；指不到、或与别处给出的大小不一致即判红。判别力自证：把 D4（校验和位置） 已定项 1 的 `DATA_UNIT_BYTES` 登记删掉，检查必须转绿 | 第一半已解；第二半三方论证（2026-09-03，三腿一致 F11 站住）——切分是**预留特性、v1 关闭、extent_off 恒 0**；必查已闭合：reflink 是 day-1 但整单元共享（extent_off=0 是引用共享不是切分）、sub-unit reflink/dedup 的 pack 形态已被 D14（双轨（大小文件 / 持久临时））/E66（补齐之后小文件怎么落）判出局、D2（RAID 条带策略） restripe 搬「整个对象一组」（已定项 8）、D18（块里携带什么信息）墓碑是 metadata 非 data extent。**两半都已收口（2026-09-03 用户定案）**：D4（校验和位置） 已定项 7 的射程注改写为定案，D6（快照实现模型）/D9（加密）三处/D19（块指针的结构与宽度预算） 四处措辞全部从现在时「会切分」改条件式，并各写明第一版形态；D9（加密） 已定项 4 排除 extent_off 进 AAD 的理由已领头改用「AAD 组成是 day-1 永久契约」（防未来编辑据「恒 0 无害」放回）。**仍欠**：把「`extent_off` 第一版恒 0」做成会红的检查（扫描全部数据指针，非 0 即判红——它同时是「切分被悄悄启用」的哨兵）。三腿原样输出在 research/prompts/c72-extent-split-*.md | 2026-09-01 三方论证的正推腿明写为「分不清」；第一半 2026-09-01 由 D4（校验和位置） 已定项 7 解掉，checks-owed 此前未同步（2026-09-03 补） |
+| C73 | 分配记录的态别没定 | **D3（空间分配） 已定项 1 逐字说分配记录是「某个落点此刻属不属于现行版本」这个谓词的**权威记录点**，而 D3（空间分配） 已定项 3 定它住一棵独立 keyspace 的 btree——按 D21（权威态与派生态的分界），树是**派生态**。⇒ 同一个结构一处说权威、一处的分类说派生，**没有一处收口**。它不是文字疏漏：重建路径能不能拿分配记录当见证者，直接取决于它是不是权威态（派生态的东西自己就要被重建，当不了见证）。**已收口（2026-09-03，用户定案）：分配记录是派生态**，权威记录在 D21（权威态与派生态的分界）已定项 5——「权威记录点」是运行时口径、态别是恢复口径，两句不矛盾 | **决策已定、检查仍欠（2026-09-03）**：定案落 D21（权威态与派生态的分界）已定项 5。**留下的两笔新账**：① D18（块里携带什么信息）已定项 5 的 `map_provenance` 级 2 晋升失去见证者（派生态当不了见证），要另找见证或那一格重开；② 派生态要满足「损坏可检出」那条前提，分配记录的可检出机制还没有 | 无前置，纯欠工。⚠️ 它是 D18（块里携带什么信息） 已定项 5 那条「见证等级」方案的前置——档 A 的见证者正是分配记录 | 2026-09-01 三方论证：正推腿把分配记录当见证者用，反推腿引 I-6.10（已停用·明文映射层不存在了） 的「从权威侧重建」说权威侧不含索引，两条腿撞在同一处 |
+| C74 | 无加密期的跨卷错向写没防线 | **D9（加密） 已定项 8 把 fsid 挪进 KDF，用零字节解决了跨卷错向写——另一个卷的密文搬进本卷，派生密钥不同就解不开。但 KDF 只在加密开启时存在**，而 D9（加密） 已定项 10 已定加密不进第一个可运行版本 ⇒ **第一版那段时间里，D18（块里携带什么信息） 自己引的 XFS 那条原话（错向写可能落到另一个文件系统的正确块号上）一条防线都没有**。⚠️ 不该用往块头加 fsid 来补：格式位是永久的，而这个缺口在加密接上之后就没了，那份 fsid 会变成永久冗余 | 挂载时比对系统配置 fsid 与卷标识，并做成能被测试强制走进「对不上」那条分支的检查（形态照 D12（目标介质） 已定项 4）；scrub 侧另加一条「本卷全部单元的归属都指向本卷」的遍历判定 | 前置是系统配置与挂载路径存在 | 2026-09-01 三方论证：反推腿两轮给出方向相反的判断，主 agent 逐字核 D9（加密） 已定项 8 与已定项 10 后裁定——两轮各自成立，**射程不同** |
+| C75 | 降级挂载这道闸自己不会红 | **D18（块里携带什么信息） 已定项 5 定了 `map_provenance = rebuilt` 且未晋升就只读挂载，而一道恒绿的闸与没有这道闸，在挂载日志里长得一模一样。** 更隐蔽的是它的**遗忘**形态：重建时声明一次、之后再没人看，此后每次挂载都显示正常——即使所有人都善意行事也会这样，只要那个字段没被真正持久化、或被后续正常写路径覆盖掉 | 双向证，**阴性对照不许靠「把字段清掉」**：① 造一个走过重建路径的镜像，任何写路径必须失败；② 阴性对照取一个**从未重建过**的镜像（正常 mkfs + 写），同一个写必须成功。两个镜像的差别必须是「经历过什么」，不是「有人改了一个字节」——**拿清字段当阴性对照，等于把「这道闸能被绕过」当成了「它会红」的证明**。再加两条：**持久性**（重建后走完整的写—卸载—挂载循环，该字段必须仍在，且被后续正常写覆盖不掉）；**晋升留痕**（级 1 → 级 2 的晋升就是「合法地清掉 rebuilt」，它本身是绕过路径的形状 ⇒ 不许原地改一个标志位，要留下依据哪一批双证、何时晋升，且那条记录自己也要能被 checker 复核） | 前置分两半：**格式那一半现在就能定，已补进 D18（块里携带什么信息） 已定项 5**（字段落在哪、第一版防得住什么防不住什么、晋升要留痕）；**跑起来那一半**要等系统配置与挂载路径存在 | 2026-09-01 三方论证的本地腿逐条推出「降级路径要有力必须有什么」，其第 2 问逐字问的就是这个遗忘形态 |
+| C77 | 重放起点未定义 | **陈旧 tail 叠上块重用之后，D23（journal 的角色与格式）已定项 3 的「全环扫描 + 断号即止」与 E77（发布的持久顺序）要求的施加时验证互相打架**：I-7.4（近 K 代块未被复用）只扣几十代而环装几千条记录 ⇒ 窗口内记录的点名块可被合法复用 ⇒ 失配即中止的恢复**在健康镜像上自我中止**（E78（重放的起点）实测），跳过式则把真撕裂与陈旧失配记进同一个计数器、判别力归零。I-8.4（重放幂等）管不到这一类——幂等管「同一条记录重复施加」，不管「旧记录的点名块换了内容」 | **已还一半（2026-09-02）**：恢复算法已定案——D23（journal 的角色与格式）已定项 14 取水位臂，水位 = 根记录的 `(实例代号, checkpoint_txg)`（D16（发布语义）已定项 6 之后零新增字段）。**仍欠**：崩溃点重放造「tail 陈旧 + 窗口内块已复用」的镜像：恢复必须完成且终态与真值逐格相等，中止即红；撕裂注入必须被旗标。**2026-09-18 起跨实例那一形已有**：`crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs` 的 `stale_tail_with_a_reused_named_unit_in_its_window_recovers_every_crash_state_to_the_same_end_state`，`crates/mutations.tsv` 第 97 行在门禁 checker-tier-crates-mutation-replay 里红在它上面（2026-09-18、2026-09-19 两次）；还欠同一实例内的那一形与撕裂注入的旗标（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 22、23 行） | 根记录形态定案（C78（根记录没有字段表））+ 崩溃点重放 harness | E78（重放的起点），2026-09-02 |
+| C78 | 根记录没有字段表 | **新池新建文件就要写根槽，而根记录里有什么字段全仓没有一处定过**（只有 I-7.2（最新根可完整遍历）一句「checkpoint 树根指针出发」）。E79（根记录的容量）算术：512 字节槽带 jsn 水位只装 **6 棵树**，7 棵常识树集恰好 **513 字节爆 1 字节**；每头一棵树（D6（快照实现模型））很快顶穿平铺 ⇒ **间接层（根槽指向树表单元）结构上躲不开**，代价每发布 +7.1% 块。已知必需而无落点的字段：发布代号（择新）、jsn 水位（E78（重放的起点）出路 B）、树表或树表单元指针 | **已还一半（2026-09-02）**：字段表已落地——D22（单元原子性怎么合成）已定项 7 定了「恒走间接层：合计 194 字节，含树表单元指针与实例表单元指针各 59」，含实例代号、checkpoint_txg 与树 ID 水位。**仍欠**：反向检查照 C66（格式级空白没有分项号）的形态——「新池新建文件写出的段」表里根槽段的每个字段都要指到一条已定分项，指不到判红；树表单元自己的头字段等 C68（不变量白名单与已定条款打架）收口 | 反向检查的门禁工装 | E79（根记录的容量），2026-09-02 |
+| C79 | 系统配置与 journal 环的放置没人定 | **系统配置自己**（设备表、树表、journal 几何、tail 槽、根环参数 S、阈值全住在它里）的副本数、放几块盘、更新协议（它是原地覆写结构 ⇒ 按 D22（单元原子性怎么合成） 已定项 21 要「整单元校验和 + 代号 + 槽轮换」，而没有一条写过它）与 **journal 环放在哪块盘、要不要跨盘冗余、掉那块盘还挂不挂得上**，全仓零覆盖（2026-09-02 grep 证实）。2 盘第一版里这两样都是单点 | **2 盘的账已算清（2026-09-02）**：E87（固定结构的放置）——系统配置单份掉盘 0 全池不可挂；每盘一份 + journal 镜像 8 格全可挂、窗口零丢失（镜像 ×2 写恰是 D2（RAID 条带策略）已定项 6 对任何写的 w≥2 下限）；**顺带撞出 mkfs 硬要求：初始根必须种进全部区域**（不种则「第一次发布后掉那盘」全灭）。**定案已落（2026-09-02 用户定案）**：D22（单元原子性怎么合成）已定项 8——系统配置每盘一份（≥2 槽轮换）、journal 环两盘镜像、mkfs 把第 0 代根种进全部区域。**仍欠**：挂载判定做成能强制进入的分支。槽轮换协议的字段表那一半 2026-09-14 已给出——系统配置字段表在 D22（单元原子性怎么合成） 已定项 9（`crates/singlefs-format/src/lib.rs` 的 `SYSTEM_CONFIGURATION_BYTES` = 481），轮换规则在 D22（单元原子性怎么合成） 已定项 16（每盘恒 2 个槽、槽 i 的设备内偏移 = i × 固定结构槽距、世代号从 1 起每写一次 +1、下一次写的槽 = 世代号 mod 2、择槽取校验和过且世代号最大的，逐盘计） | D15（格式冻结政策）第 1 层冻结前必须定 | 2026-09-02 正推，grep 零命中坐实 |
+| C80 | 记账更新必须原子地随根发布 | **发布出去的根若不含同批事务的记账 / 分配记录更新**（还留在内存 write buffer 里没进树），崩溃回到该根后树是新的、账是旧的，I-3.1（已分配统计对得上）必红——而「发布点上 write buffer 强制排空到哪一层」全仓零覆盖（D11（索引节点要不要留消息缓冲区）已定项 5 管的是索引重建入口，不是发布点）。fsync = 一次全量发布（2026-09-16 用户定案：D16（发布语义） 开头那句「fsync 的效果是『提前触发一次发布』」按字面，发布集 = 发布那一刻的全部脏状态，不按文件切；此前这里写的「只写被 fsync 的那个文件的脏叶 + 祖先」与 D23（journal 的角色与格式） 已定项 1 的读法不同，三处说法 C161（缓冲两级并存而衔接没定） 第二轮攻方腿查出——它的模型里全量发布下四条候选 64 格全绿，部分发布要另立「过滤镜像、记账行发布时按发布集现算、发布集的前端条目按事务切一次排空」三条规则才全绿）⇒ **发布集的边界定了；「发布点上 write buffer 排空到哪一层」2026-09-16 随 D8（核心索引结构） 已定项 12 定为发布前排空到叶；剩崩溃点重放里的检查** | 崩溃点重放里每个发布点后跑 I-3.1（已分配统计对得上）必须绿；故障注入自证——把记账排空从发布路径摘掉，同一检查必须红 | 事务层 + 崩溃点重放 harness；发布集边界先落成 D16（发布语义）的分项 | 2026-09-02 正推（D16（发布语义）× D8（核心索引结构）write buffer × D5（快照 / 空间记账机制）记账挂根下的合取） |
+| C81 | 条带部分释放没有规则 | **规则已定（2026-09-02，D2（RAID 条带策略）已定项 11：部分条带钉住、后台惰性重落、修复前成员格不得复用），欠的是会红的检查**（立账时该格零覆盖，故原文写「全仓没有一条」）。E80（条带的部分释放）实测：放任复用 ⇒ 单盘失效平均丢 9.8–13.0 个活单元（最坏盘 24–34 / 288）且**盘坏之前无任何报错**；条带死透才回收（bcachefs 形态）丢 0 但钉住活数据 36.5–45.5%（落点恰是 D5（快照 / 空间记账机制）已定项 4 的「不可回收」统计量）；死一个就搬幸存者丢 0 但写放大 +64–66%。⚠️ **w=2 对照全零 ⇒ 第一版 2 盘的全部测试对它全盲**。连带一格同样无落点：**parity 列的位置与发现机制**——重建要找齐 w−1 个兄弟列，而位置条目只记自己的列 | 规则定案后镜像侧可判：「任一活单元的条带成员（含 parity）要么字节原始、要么整条带死透」，故障注入自证照 E80（条带的部分释放）的手算锚点造（释放一列、复用、坏另一列，丢失计数必须恰 1） | D2（RAID 条带策略）补「条带生命周期」分项；分配器 | E80（条带的部分释放），2026-09-02 |
+| C82 | io_min 不在挂载比对清单 | D2（RAID 条带策略） 已定项 16 逐字「不发出小于 `io_min` 的写」（io_min ≠ physical_block_size，D2（RAID 条带策略）明写两个量不许合成一句），而 **D12（目标介质）已定项 4 的逐设备比对清单没有 io_min**（2026-09-02 grep：`12-目标介质.md` 对 io_min 零命中）⇒ io_min > 32768 的设备上每个单元写都诱发设备内 RMW、掉电可损坏同映射单元的邻居，而挂载不拦 | 挂载比对加一行：`io_min ≤ 32768 且 32768 % io_min == 0`，不满足拒绝可写挂载；按 `.claude/rules/fs-design.md` 硬要求 2 留测试开关强制走进「对不上」分支 | 挂载路径 + 设备描述符表（D12（目标介质）已定项 3）——**两样 2026-09-21 现查都齐了，这一条可以开工**：`io_min` 已经是系统配置的字段（`crates/singlefs-core/src/system_configuration.rs:72`，mkfs 探测后写入；固定结构槽距按 D2（RAID 条带策略） 已定项 19 从它算），checker 也在读它（`crates/singlefs-checker/src/image.rs:102` 的字段偏移表里 io_min 在 425）。欠的是两处落地：`crates/singlefs-core/src/mount.rs` 里零处比对 io_min，D12（目标介质） 已定项 4 的清单正文里也还没有它那一行（那份射程句今天只把 `io_opt` 显式排除在外） | D2（RAID 条带策略）「写的粒度」× D12（目标介质）已定项 4 清单缺格，2026-09-02 |
+| C83 | 提交固定点没人回答 | **给记账树 / 分配记录树写新 COW 节点本身要分配空间、而分配又改这两棵树** ⇒ 提交收敛是固定点迭代（D3（空间分配）已定项 3、D5（快照 / 空间记账机制）已定项 3、D22（单元原子性怎么合成）已定项 3 三条合起来让全部记账结构都是 COW 树）。迭代收敛性与轮数上界没人证过；上界不存在则 I-8.1（环几何够大）要的「任一事务的最坏 journal 占用」算不出。ZFS 用 sync passes 处理同型问题——线索不是证据，未在本工程验证 | **模型层已还（2026-09-02）**：E81（提交的固定点）实测收敛总会发生（脏节点集有限），但上界由「提交自身产生的块聚不聚簇」定——散布分配把一次 12 单元 fsync 放大到 5909 个元数据块（65 轮、journal 点名项 5921 ⇒ I-8.1（环几何够大）在该政策下没有可用上界），只聚簇元数据就断链（2 轮、28 块）。**决策已落（2026-09-02）：D3（空间分配）已定项 5**。**仍欠**：实现后提交路径记「固定点收敛轮数」、超声明上界判红（政策不是格式位，违反只表现为几百倍的性能悬崖，唯一拦法是这条读数）。⚠️ 2026-09-12：固定点上如今还有映射树（D19（块指针的结构与宽度预算） 已定项 8，全部指针进映射）与条带表（D2（RAID 条带策略） 已定项 12 / 14），E81（提交的固定点） 建的是三棵树，它的 28 / 1275 块不能当 ckpt_cost 的上界用；C126（切换预留的最坏量没有口径） 的固定点那一项也押在这个上界上 ⚠️ **2026-09-13 E148（提交固定点按两棵记录树重算） 加第二棵记录树**（映射树，D19（块指针的结构与宽度预算） 已定项 8）：目标负载 12 单元 fsync 聚簇 9 块（E81（提交的固定点） 一棵树 5）、只聚簇提交块 59（28）、散布 13.8 万（5909）；空发布 9 块 / 新池新建文件规模 4 块是 c_max 的候选口径。分裂合并没建模，实现后记轮数那一半仍欠。 | 实现侧等事务层与分配器（两样 2026-09-14 都有了，`crates/singlefs-core`） | 2026-09-02 正推；E81（提交的固定点） 口径那一半 2026-09-13 随 D28（挂载期承诺量） 已定项 4 收口：不设常数上界，实现后记固定点轮数、超过当时现算的量判红。 |
+| C85 | 发布计数器的四个等号没写死 | 四个等式散在四处、没有一处写成一条可引用的条款：**fsync = 提前触发一次发布**（D16（发布语义））、**根槽轮转键 = txg**（D22（单元原子性怎么合成）已定项 2「区域 = txg mod R」）、**一个 txg 一个号**（D5（快照 / 空间记账机制））、**记账的代 = checkpoint 号**（D5（快照 / 空间记账机制）已定项 2）。若 fsync 不推进 checkpoint_txg（按 D5（快照 / 空间记账机制）的 5 秒粒度读），同窗口两次发布**撞同一个根槽**（轮转键相同）——上一代根被覆写，I-7.3（环健康性）当场破；且 E78（重放的起点）的水位出路没法用现有 `checkpoint_txg` 字段实现（同 txg 的记录与根排不了序） | **已还大半（2026-09-02）**：等式已钉成 D16（发布语义）已定项 6（用户定案，先过三方对抗测试），含四条骑手条款（根记录带实例代号 / 记账代段 ≥ 48 位 / E70（checkpoint 两个阈值的可行域）下界推导限定射程 / 记账跨发布合并不再可行）。**仍欠**：checker 侧的可判形式并入 C88（根环的时间线判别未实现）——「同一 txg 不许两条根」在设备失而复得下会误伤，正确判据要带实例代号 | checker（2026-09-14 已有，`crates/singlefs-checker`；四个等号还没写进 `walk::check_pool_image`） | 2026-09-02 正推：三处逐字对不拢；E78（重放的起点）结论 2 压在它上面 |
+| C86 | 两种单元大小与扫描步进对不拢 | **步进取 32768 时，扫描重建会漏掉一半元数据单元**：D4（校验和位置）已定项 1 逐字「**元数据侧 16 KiB**、数据侧 32 KiB」，而节点自己就是一个单元 ⇒ 16 KiB 对齐的节点里，一半的头不落在 32768 步进点上。D18（块里携带什么信息）已定项 9 的步进口径**现在是 16384**（2026-09-02 用户定案改的，此前是 32768），C86（两种单元大小与扫描步进对不拢） 留着的是它欠的红绿对照；「单元起点对齐 32768」那条分配器硬要求对 16 KiB 节点怎么落也没写 | **修法的账已算清（2026-09-02，出处 E86（扫描步进与两种单元大小））**：16384 步进全收（998/998 + 1392/1392），代价是内部探针数 = 数据单元数；32768 步进恰漏全部奇槽节点（496/998）；节点独占 32K 全收但元数据空间恒 ×2。**改字已落（2026-09-02 用户定案）**：D18（块里携带什么信息）已定项 9 步进口径修正为「池内最小单元 16384」，分配器对齐按类各落。**仍欠**：黄金镜像照 E86（扫描步进与两种单元大小）的场景造红绿对照 | D18（块里携带什么信息）已定项 9 复核（决策级，无代码前置） | 两处逐字对不拢，2026-09-02 正推 |
+| C87 | 准入读的合成值无定义 | D28（挂载期承诺量） 已定项 1 的准入不等式（2026-09-13 前住 D3（空间分配） 已定项 4）前六项都是**已发布**统计量，而准入发生在 checkpoint 窗口中间 ⇒ 不叠加在飞增量（本窗口已分配未发布、已承诺预留）就会超卖：两个同窗事务拿同一份已发布值都能过闸，合起来超出容量。「准入读数 = 已发布值 + 在飞 overlay」这层合成全仓没有定义 | **模型层已还（2026-09-02）**：E82（准入的在飞合成）把三种直觉写法各做成可数违例——只读已发布值超卖 80/120、把窗口内释放记成可用则 20 格吃进 defer 该扣的块、忘墓碑预留则盘满后删除全数死锁；正确形态一句话「准入读数 = 已发布 − 在飞已批；窗口内释放不发信用；解开自己含墓碑」。**决策已落（2026-09-02）：D3（空间分配）已定项 6**。**仍欠**：实现侧把 overlay 做成可强制清零的测试开关（清零后并发准入必须超卖、检查必须抓到——双向证） | 实现侧等事务层与准入路径 | 2026-09-02 正推；E82（准入的在飞合成） |
+| C88 | 根环的时间线判别未实现 | **设备失而复得会让根环里并存两条同 checkpoint_txg 的自证合法根**（E53（丢一整块盘之后根环还挂不挂得上）的丢盘回退 + 盘回归：回退后新时间线复用了旧计数），择新平局时可能挂上已丢弃时间线——journal 靠 32 位实例代号分辨时间线（D23（journal 的角色与格式）已定项 9），根环此前什么都没有。格式侧已还：D22（单元原子性怎么合成）已定项 7 给根记录加了实例代号、择新平局按它高者赢 | checker 判「同 `(实例代号, checkpoint_txg)` 的自证合法根 ≥ 2」即红；故障注入自证：造一份双根镜像（同 txg 不同实例代号），择新必须选实例代号高者，且同 (代号, txg) 双根必须判红 | mkfs + 根环实现 + checker（三样 2026-09-14 都有了；时间线判别还没写进 checker） | 2026-09-02 C85（发布计数器的四个等号没写死）三方论证的反推腿发现，主 agent 按 E53（丢一整块盘之后根环还挂不挂得上）的回退机制核实可达 |
+| C89 | 单元头收口的遗留重算 | C68（不变量白名单与已定条款打架）收口把单元头从 55 字节假设改成 91 字节初值，**三笔账没人跟着改**：① E58（校验和粒度的端到端代价）的读模型把 108 字节指针载荷整个加在 G 之外，而其中单元头 55 字节住单元内、本来就在 G 里——**重复计账**（2026-09-02 对抗轮独立发现，e58 源码注释逐字「单元头 55 + 指针头部 31 + 位置条目 22」而成本式全加），每单元额外应为 53 字节（⚠️ **源码早已改成 53，而留存产物一直是 108 那一版跑的**：2026-09-16 现查 `e58-csum-grain-repro-2026-08-31.out` 的 `meta_*` 六行仍写 `ptr_bytes=108`，当日重跑装出 `e58-csum-grain-repro-2026-09-16.out`（`ptr_bytes=53`、`meta_g32768 meta_ratio=0.001617` 与正文的 0.162% 对上），`replay.sh` 里 E58（校验和粒度的端到端代价） 那一行改指新产物，四条区间断言全过）；D4（校验和位置）已定项 1 引用的字节占比与 E43（扩展点字节上限）的挂载阈值（size−55−1 形态）都要按新头宽重推；② 扫描器的**认领规则**（解出一个单元头并认领后按声明长度跳过载荷，载荷内部探针不再参与认领——同卷自备份镜像 fsid 挡不住，全靠它）只写在决策正文里，没有可判红形态；**③ 已还（2026-09-02）**：证伪夹具落成 E88（冒名单元与孤儿单元的判别）——判翻条款**不触发**（47 字节头认领开着也错分 12：冒名 3 进级 2、撕裂 9 未清；定案形态错分 0），骑手维持；顺带钉死认领规则是自身镜像那一格唯一的防线（无认领恰漏 4）| **① 已还（2026-09-02）**：E58（校验和粒度的端到端代价）改式重钉（临界占比 0.0823%→0.0404%，10 条变异再抓，实测臂不动）+ E43（扩展点字节上限）按 91 字节头第三次重跑（4040→4004、131016→130980，挂载判定零翻转，19 条变异再抓）+ D21（权威态与派生态的分界）对照表与 D4（校验和位置）已定项 1 引用同步改；② 认领规则进 checker：造一个嵌套镜像样本，不带认领规则的扫描必须多收、带的必须恰收；③ 夹具跑红则当场改 D18（块里携带什么信息）已定项 7 ④（2026-09-05）C113（扫描重建时多版单元的现行版本判定无输入） 给索引节点类身份段加 10 字节写序，E73（节点 key 区间的扇出代价） / E97（记账与分配记录的条目编码） / E98（inode 记录与 inode 树的几何） / E103（inode 打包路 ① 的更新代价） 按三档 58 / 67 / 76 算的数都要加 10 重算（E105（extent 叶改码 3 的代价） 已按 68 / 77 / 86 算） ⑤（2026-09-06）**数据单元头那一半同样欠，机制是名字对不上**：C113（扫描重建时多版单元的现行版本判定无输入） 定案把码 1 头 91 → 105（`format-const: DATA_UNIT_HEADER_BYTES`），而实验源码里同一个量各叫各的名字（`IN_UNIT_HEADER_BYTES` / `UNIT_HEADER_BYTES` / `DATA_UNIT_HEADER`）⇒ `.claude/gate.d/code-source-discipline.sh` 的 format-constants 格按名字绑，一个都认不出——正是 C56（没登记的格式常量仍会漂） 说的那个形态，本轮实测到。**E43（扩展点字节上限） 已还**（按 105 第四次重跑：结构上界 3990 / 130966、基线 158.0 / 202.0，18 行挂载判定逐字未翻，新钉一条「净荷上界比指针上界紧 2 字节」的次序断言）；**E79（根记录的容量） 已还**（树表单元 267 → 266，68 / 77 / 86 三档同值，新增变异 M6「把头宽打回 55」）；**仍欠 E83（墓碑的粒度） 与 E98（inode 记录与 inode 树的几何） 两处的 91**——按 E102（单元类登记表与打包记录单元） 的头宽区间 583 与 233 / 116 都不翻，但源码与产物停在旧口径，引用前必须复跑 | E58（校验和粒度的端到端代价）修订无前置；认领规则等 checker；夹具在 E59（缓冲消息能不能只从单元重算）模型上扩 | 2026-09-02 C68（不变量白名单与已定条款打架）对抗轮（opus 腿），主 agent 核 e58 源码坐实重复计账 |
+| C90 | 钉住条带下的 ENOSPC 棘轮 | **w ≥ 3 时删除不再能独立清出 ENOSPC**：D2（RAID 条带策略）已定项 11 定部分条带钉住、计入不可回收字节、只由 D26（后台整理与放置回收）腿一重落释放；D28（挂载期承诺量） 已定项 1 的可用量减去不可回收 ⇒ 删一个条带成员把「已分配」换成「不可回收」，可用量净零。整理因盘满停摆时，继续删除只会把不可回收字节单向推高，任何删除都清不出空间——正是 D3（空间分配）原则「释放空间不需要申请空间」要禁的形态。第一版 2 盘恒 w = 2、成员一死整条回收（D2（RAID 条带策略）已定项 11 规则 3）⇒ 现在不触发，w ≥ 3 开线那天触发 | 计数模型：条带 w ≥ 3、填满 → 部分删除 → 填满循环，整理被 ENOSPC 停掉，判「不可回收字节是否单调上升且删除后可用量恒零」；带常驻底额（至少一条新条带的空间）的臂必须回落。判别力自证：把底额清零，棘轮必须重现 | 无前置，纯模型工 | 2026-09-03 D26（后台整理与放置回收）六未定项三方论证反推腿（opus），主 agent 逐字核 D2（RAID 条带策略）已定项 11 与 D3（空间分配）已定项 4 坐实 |
+| C91 | 整理意图与增量触发量的重做漂移 | 两笔同型缺口：① 整理批次的意图若写成「把 v 搬到 s」，崩溃后按 D8（核心索引结构）已定项 5 的中间态**重做**时分配器状态已变，重做不是同一份工作——意图必须写成目标态（「清空区域 R」）才幂等，而这一条没有可判红形态；② E93（老化下的放置与碎片度）证实的 O(1) 增量碎片度 `F` 与全空段计数，在意图重做下若不幂等就会与 checker 的全扫审计漂开，且漂开只在审计时可见 | 崩溃点重放里对一个整理批次在每个截断点重放，判：目标态到达且旧槽零引用；增量 F / 空段数与全扫重算逐点相等。判别力自证：把意图改成增量形态（「再搬 N 个」），重放后目标态必须判红 | 事务层 + 崩溃点重放 harness；模型层可先在 E93（老化下的放置与碎片度）上加崩溃 / 重做臂 | 2026-09-03 D26（后台整理与放置回收）六未定项三方论证（sonnet 正推腿指出意图推广是类比、opus 反推腿指出重做不幂等与计数器漂移） |
+| C97 | 改字段含义而不改宽度，全仓没有一处会红 | **把一个字段从「字节偏移」改成「16 KiB 槽号」，宽度一个字节不变，仓里没有任何检查会动。** 位置条目还是 6 字节、树表单元指针还是 53、根记录还是 121、[layout/01-first-txn.md](layout/01-first-txn.md) 一行不改；`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格只比对已登记标记的常量（全仓 3 个），而含义不是常量。D15（格式冻结政策） 的判定表把「改变已有字段的含义」列为最危险的一类，**而这一类恰好落在门禁的盲区正中**。2026-09-03 E97（记账与分配记录的条目编码） 那轮正是这个形态：一次收窄同时改了 D15（格式冻结政策） 第 2 层与第 3 层两处的语义，零处判红 | 给盘上字段建一份「含义指纹」清单（字段名 + 单位 + 值域口径），门禁比对 kb 与实验源码里的口径串；改了含义而没改指纹即判红。判别力自证：把某个字段的单位从字节改成槽而不改指纹必须红，改指纹必须绿 | 要先有一份字段口径清单（[layout/01-first-txn.md](layout/01-first-txn.md) 是雏形，但它记的是宽度不是单位）| 2026-09-03 E97（记账与分配记录的条目编码） 第三轮反推攻击腿，主 agent 现查 `.claude/gate.d/code-source-discipline.sh` 的 format-constants 格头部注释坐实 |
+| C98 | 单元类型标签的值域没有登记位 | **它是 D9（加密） 已定项 6 的 AAD 域分隔子，而 AAD 字段组成按 D9（加密） 已定项 4 逐字是「day-1 永久契约……改一次就是一次格式断裂」——可它的值域在仓里有四份互不相同的清单**：D9（加密） 已定项 6 写四个值（数据 extent / btree 节点 / 记账单元 / 根记录）、D18（块里携带什么信息） 已定项 7 的字段表分两个内容类加三个自证豁免、D21（权威态与派生态的分界） 已定项 4 的扩展点归属三类、I-6.2（明文头字段白名单） 那两张白名单。**四处没有一处是登记位，而 D18（块里携带什么信息） 已定项 8 已经在用一个不在 D9（加密） 清单里的值（「墓碑」）**，中间隔了两天与一轮三方论证没有任何检查响 | 单元类型标签开一张登记表（一个值一行，含它的类身份段、AAD 变体、I-6.2（明文头字段白名单） 的白名单行、扩展点归属），门禁比对六处引用与登记表逐项相等，不等即判红。判别力自证：把墓碑从登记表里删掉必须红，加回必须绿 | **登记位已还（2026-09-04）**：D18（块里携带什么信息） 已定项 11 的登记表。**仍欠**：门禁比对工装（六处引用与登记表逐项相等；码严格递增、用过不回收，形态照 feature bit 那条；第二级登记表加宽度类别与档次两列并比对）；「compat_ro 读者不许跑扫描重建」的代码路径检查 | 2026-09-04 四条提案第三轮反推攻击腿（opus），主 agent 逐字核 D9（加密） 已定项 6 与 D18（块里携带什么信息） 已定项 8 坐实 |
+| C99 | 打包共享单元里的记录扫描时发现不了 | **D18（块里携带什么信息） 已定项 7 的认领规则逐字「解出一个单元头并认领之后，就按声明长度把整段载荷跳过去，载荷内部的探针不再参与认领」**——而打包共享单元（墓碑已在用，inode 可能跟着用）的载荷里是许多条独立记录 ⇒ **扫描重建时它们一条都不会被独立发现**。要让它们可发现就得给打包类另开一条认领规则，而那条规则的全部价值正在于载荷内部不认领（E88（冒名单元与孤儿单元的判别） 实测：不开认领恰好漏进 4 个） | **形态已改（2026-09-04，D18（块里携带什么信息） 已定项 11）**：记录由类解析器按记录数 × 记录宽枚举，不靠探针；记录级不带字段，整容器由头里的载荷校验和罩。自证样本改为：造「头好、载荷改一字节、诞生代号 ≤ 根 txg、落点有分配记录」的码 3 单元，扫描重建必须整单元拒收；去掉载荷校验和必须让它从拒收变收进。**仍欠**：装载纪律前三条 checker 只验容器头声明，逐记录那一层是对写路径的信任 | 黄金镜像与 checker | 2026-09-04 三轮对抗（正推腿与反推腿各自独立指出） |
+| C100 | inode 容器丢失是永久损失而没有任何冗余条款覆盖它 | E98（inode 记录与 inode 树的几何） 实测：丢一个容器**永久**丢 116（索引叶）/ 233（打包单元）条 inode 记录，**两种形态都不是 0**；而 E29（坏一个节点的爆炸半径） 实测索引节点的永久损失恒 0（靠「索引可从单元重建」），inode 记录不满足那个前提。D22（单元原子性怎么合成） 已定的自证 / 父指针校验和 / 根环冗余没有一条覆盖到 inode 容器 | 崩溃点重放里删掉一个 inode 容器，必须有独立机制检出「这批 inode 丢了」；判别力自证：关掉该机制，同一次删除必须从「检出」变「检不出」 | D8（核心索引结构） 已定项 6 已选定：码 3 叶容器、233 条。记录宽与爆炸半径的取舍（加宽到 160 ⇒ 204 条）归这一条，D8（核心索引结构） 已定项 6 不替它定；填充率没有下界（1e6 顺序创建再删 90% 不合并 = 9.98 倍空间放大），233 是新建树的值 | 2026-09-04 E98（inode 记录与 inode 树的几何） 第三轮补测 + 三轮对抗 |
+| C101 | 格式字段的宽度钉在一个可调值上 | **E99（write buffer 条目与 seq 的去重） 给出的「seq 4 字节」下界，是从 `T_dirty` = 2 GiB 反解出来的 27 位**，而 D16（发布语义） 已定项 5 逐字「`T_dirty` 是可调值，不是格式常量：系统配置里那个字段是格式，字段里放什么数不是」。4 字节对应 `T_dirty` ≤ 120 GiB，**调过去就窗口序号回绕**，而失败模式是静默的（同 key 同 seq ⇒「后者胜」的「后者」无定义）。仓里没有一条判定把这两个数绑在一起 | 把因果反过来：格式字段宽度定死，**可调值的上界成为挂载时判定**（形态照 D21（权威态与派生态的分界） 的挂载期求值：只返回挂得上 / 挂不上）。门禁形态：凡是「宽度由某个可调值反解」的字段，都要有一条配套的挂载判定，没有即判红。判别力自证：把 `T_dirty` 设成超过上界的值，挂载必须拒绝 | 先定 seq 住 key 还是住 value（D8（核心索引结构） 已定项 7）| 2026-09-04 第三轮反推攻击腿，主 agent 核 D16（发布语义） 已定项 5 原文坐实 |
+| C102 | 索引节点头没有预留区，加字段不是 compat | **已还一半（2026-09-07，随 D18（块里携带什么信息） 已定项 12）**：码 2 的类身份段现在有 2 字节预留（从那 6 字节无用途的事务号里腾出，按 D8（核心索引结构） 的三段政策恒 0、非 0 判该记录 EIO）⇒ 门禁那条「要能指到真实存在的预留区」对索引节点头指得到了。⚠️ **只还了一半**：2 字节装得下的字段很少，而本条自陈 flag 位「装不下字段」就不算预留区——同一把尺量下来，2 字节买到的是「有一个预留区」这件事本身，不是「以后加什么都 compat」。剩下那一半是：要不要在冻结前把它加宽。 **D18（块里携带什么信息） 已定项 7 的索引节点头没有预留区、也没有 TLV 尾部**（共同明文前缀五个字段 + 类身份段，全定长定序）⇒ D15（格式冻结政策） 判定表第一行「新增字段在预留区 / TLV 尾部 ⇒ compat 不 bump」**的前提不存在**，中间插字段会让后面所有字段偏移全变，落的是 incompat 那几行。⚠️ D21（权威态与派生态的分界） 的「索引是派生态、不参与格式冻结」这条出路**至少对记账树不成立**——[layout/01-first-txn.md](layout/01-first-txn.md) 把记账树节点头挂在索引节点类，而 D21（权威态与派生态的分界） 把记账列进权威态 | 门禁比对：D15（格式冻结政策） 判定表第一行被引用时，要能指到被改那张字段表里真实存在的预留区或 TLV 尾部；指不到即判红。判别力自证：给索引节点头加一个预留字段必须转绿，删掉必须红。⚠️ D18（块里携带什么信息） 已定项 11 把共同前缀偏移 7 定成 8 个 flag 位（第一版恒 0、非 0 判损坏、赋义要 incompat）——**它不是本条意义上的预留区**（装不下字段），这条门禁不许把它当预留区指到 | 无前置，纯文档比对 | 2026-09-04 第三轮反推攻击腿逐字核 D18（块里携带什么信息） 已定项 7 字段表 ⚠️ 2026-09-13：D26（后台整理与放置回收） 已定项 4 用户定案不进格式 ⇒ 抗老化这一项不要求给那 2 字节预留赋义、也不要求加宽；「要不要在冻结前加宽」剩下的输入只有别的分项。 |
+| C103 | 容器索引无落点 | D18（块里携带什么信息） 已定项 11 要求打包记录单元由一棵容器索引指向：它是打包单元物理指针（与 MAC）的唯一持有者，别的树按身份引用容器；key = (出生树 ID, 打包记录类型, 容器号, 容器出生代) 四段全进，容器号排在出生代之前，使 (树, 类型) 下最大容器号 O(log N) 可查——容器号分配器的下一个号 = 最大号 + 1，派生态、扫描可重建；计数器回退不破身份（出生代不同）。这棵树住哪、key 编码、它自己的更新代价、它独占的 MAC 重建时怎么重算，全仓无落点。第二轮正推腿：容器号分配器与 inode 号分配器是同一类从未处理过的问题。2026-09-05 起本条只覆盖打包记录类型 1（墓碑）：类型 2 的容器索引就是 inode 树的内部节点、容器号 = 触发分裂的新记录 inode 号（D8（核心索引结构） 已定项 6），这半支收口，检查列的「最大容器号一致」同样只对类型 1。2026-10-01 类型 1 那半也收口：墓碑容器由墓碑树的码 2 节点指认（D18（块里携带什么信息） 已定项 24），C103（容器索引无落点） 只剩条带成员表（D2（RAID 条带策略） 已定项 12）那一半，与 C105（打包容器按发布频率重写的写放大）、C106（开放容器数上界） 仍归 D27（小数据打包容器） | 容器索引落成分项之后：黄金镜像里造一个容器索引全丢的样本，扫描重建必须从码 3 单元头恢复出全部条目且各 (树, 类型) 的最大容器号一致；把容器号从头里删掉必须让恢复失败；伪造一条指向错误落点的条目必须被载荷校验和或 MAC 抓住 ⚠️ **两条现查过的事实（2026-09-06，主 agent 逐字核 D18（块里携带什么信息） 已定项 11 的码 3 类身份段表）**：① **容器的四个命名字段在码 3 头里全在**——出生树 ID（偏移 43）、打包记录类型（51）、容器号（53）、容器出生代（61）⇒ **扫描重建读得出容器身份**，不缺字段；② **打包记录类型是独立的 2 字节字段**，不是折在单元类型标签那 1 字节里 ⇒ 任何把「类型」塞进 1 字节标签的收口候选，先要回答那 2 字节的值域怎么办。 ⚠️ **2026-09-06 起它挡着的东西多了三样**：D2（RAID 条带策略） 已定项 12 定了条带成员表走容器索引 ⇒ C127（钉住状态在分配记录里没有落点） 的修法 ②、C128（清扫准入对 parity 格两支都判不出） 的修法、以及 **D9（加密） 已定项 9 那条让渡区 A 的签发判据第 ⑦ 条合取**（「不是钉住的格、也不属于任何含活成员的条带」）**全部要先走一次容器索引点查**。⇒ 它从一笔「日后要还」的账变成**三处的直接前置**。 ⚠️ **2026-09-06 试过一次收口，三腿判定不了案**：候选是「容器索引就是中央映射」（容器按对象进 D19（块指针的结构与宽度预算） 已定项 5 那层映射）。**栽在 value 装不下**——D18（块里携带什么信息） 已定项 11 逐字说容器索引是「打包单元物理指针（**与 MAC**）的唯一持有者」，而 MAC 128 位 + nonce 96 位住在指针头部 31 里，中央映射的 value（位置条目 14）只有密文校验和 4；D9（加密） 已定项 4 逐字「nonce 每 extent 存，不现算」⇒ 加密后解不开。**自举也会重演**，收敛在「中央映射自己的节点」那一层，而那一层零条款。逐条经过与剩下的四条候选路写在 `records/2026-09-06-C103容器索引收口轮.md`。 | 先在 D3（空间分配） 或 D8（核心索引结构） 开一条分项 | 2026-09-04 D18（块里携带什么信息） 已定项 11 三轮三方论证（第一轮立账，第二轮正推腿场景二补三句，第二轮反推腿 9.3 补 MAC 那半） |
+| C104 | 扫描路径上码 1 / 2 的载荷完整性无自包含证据 | 整单元校验和 / MAC 住父指针（D4（校验和位置）），扫描认领时没有父指针，头校验和只罩头（D18（块里携带什么信息） 已定项 7 逐字「头完整性唯一防线」）⇒ 数据单元与索引节点在扫描路径上载荷完整性无任何自包含证据，D18（块里携带什么信息） 已定项 5 级 1 / 级 2 的「校验和自洽」只到头为止；码 3 由类身份段里的载荷校验和补上，码 1 / 2 没有 | **决策已定、检查仍欠（2026-09-07 补齐码 2 那一半；码 1 那一半 2026-09-05 随 C113（扫描重建时多版单元的现行版本判定无输入） 定案）**：码 1 的类身份段加 4 字节载荷 CRC（头 105），副本归并判「载荷逐字节相同」时有据可查。**码 2 那一半 2026-09-07 还清**（用户定案，D18（块里携带什么信息） 已定项 12）：不走「把 CRC 挪进共同前缀一次关全部类」那条候选（那会让已有载荷校验和的码 3 白付 4 字节），改从码 2 自己那 6 字节无用途的事务号里取 4 字节做载荷 CRC，口径照码 1 与码 3（CRC32C，覆盖头末尾到单元末尾，落在头校验和覆盖内），类身份段总宽不变。候选：把 4 字节载荷 CRC 挪进共同前缀，一次关全部类，代价是改 42 与重跑 E43（扩展点字节上限）/ E58（校验和粒度的端到端代价）/ E88（冒名单元与孤儿单元的判别）。判别力自证：造「头好、载荷改一字节、诞生代号 ≤ 根 txg、有分配记录」的数据单元样本，扫描重建级 2 收进即红；补上载荷 CRC 后必须拒收。与 C89（单元头收口的遗留重算） 的认领规则是同一张拼图的两半 | 先决定要不要改共同前缀（D18（块里携带什么信息） 已定项 7） | 2026-09-04 第一轮正推腿与反推腿各自独立打中，主 agent 逐字核 D18（块里携带什么信息） 已定项 7、invariants.md 的 I-6.2（明文头字段白名单） 补注与 E76（载荷校验和的判别力） 第二行坐实 |
+| C105 | 打包容器按发布频率重写的写放大 | 开放容器在它所属代际内每次要发布时被 COW 重写（D16（发布语义） 已定项 7：fsync 等根槽持久），而 E83（墓碑的粒度） 的模型把一个容器当成恰好一次写。第二轮正推腿算：1000 文件、每 10 个 fsync 一次 ⇒ 100 × 32 KiB × 2 ≈ 6.25 MiB，是 E83（墓碑的粒度） 单次批量口径（128 KiB）的约 50 倍，不含容器索引与 journal；稀疏删除时每次带删除的发布至少写一个容器。类型 2（inode 记录）的口径 2026-09-05 起由 E103（inode 打包路 ① 的更新代价） 第三臂给出：每次发布重写被碰到的叶，k = 1 时 131072 字节（1e6，头 58），与路 ① 逐格相同 | E83（墓碑的粒度） 加一条「按发布次数」的臂：物理写字节 = 发布次数 × 32768 × w，与批量臂并列报绝对值；块层 trace 判「单次 fsync 的墓碑容器字节 ≤ 声明值」（与 C634（单次 unlink 的墓碑字节没有 trace 检查） 的单次 unlink 预算互引）；「快照发布之前先关闭并写出开放容器」这条次序要在崩溃点重放里造出违反次序的序列并观测到已删对象复活 | 事务层与崩溃点重放存在（2026-09-14 都有了） | 2026-09-04 第二轮正推腿场景一、反推腿 4.2、第三轮正推腿 1.11 |
+| C106 | 开放容器数上界 | 四条装载纪律相乘：同时开着的容器数（类型 1）= 树数 × 活代际数 × 活头数；类型 2 不受「一容器一个代际」约束，它的容器数 = O(该树 inode 记录数 / 233)，随 B 树分裂 / 合并变，与活代际数无关（D8（核心索引结构） 已定项 6，2026-09-05 拆成两支）；D18（块里携带什么信息） 已定项 10 曾写「代价只是每个活代际一个未满的开放单元」，E84（打包墓碑的钉住量） 的模型没有树这一维 | E84（打包墓碑的钉住量） 加树与头两维重跑，报开放容器数与钉住字节的绝对值；运行时计数器「当前开放容器数」进 checker 的可观测量，超上界时准入必须能拒绝或强制关闭 | 活代际数 / 活头数可枚举（I-3.7（活快照可枚举）、D6（快照实现模型）） | 2026-09-04 第一轮反推腿 7.2 |
+| C107 | 索引节点的 AAD 身份无落点 | D9（加密） 已定项 6 的 day-1 第 ③ 项逐字「btree 节点的逻辑身份要有定义」；D9（加密） 已定项 9 自 2026-08-31 起只管映射层那一半，D18（块里携带什么信息） 已定项 7 那句「随 D9（加密） 已定项 9 那一线走」曾是悬空引用；D18（块里携带什么信息） 已定项 11 登记表码 2 的 AAD 变体只能写「未定，无落点」 | 在 D9（加密） 开一条分项定索引节点的 AAD 字段集，与码 2 类身份段（树 ID + 层级 + key 区间）对齐；E90（树 ID 进 AAD 与跨头共享） 的祖先验收对它同样要跑；定案后 checker 按 I-6.3（MAC 与密文匹配） 从权威树现算期望值 | 先定 D9（加密） 那次「绑出生快照」的字段表重开 | 2026-09-04 第一轮反推腿 9.6 |
+| C108 | 扩展点归属对打包记录单元无判定 | D21（权威态与派生态的分界） 已定项 4 分三类判扩展点归属，D18（块里携带什么信息） 已定项 11 新立的码 3 不在其中；按它自己的两条理由（有带校验和的父指针 ⇒ 带；没有 ⇒ 不带）码 3 该判「带」，但 D18（块里携带什么信息） 已定项 11 不替它判。它直接决定新池新建文件那 32 KiB 叶容器的字节（D8（核心索引结构） 已定项 6 把它列进仍挡着新池新建文件的九样） ⚠️ 2026-09-13 总审核定案：D21（权威态与派生态的分界） 已定项 8 定码 3 带扩展点、紧贴尾部、第一版 N = 0，判定有了，会红的检查仍欠 | D21（权威态与派生态的分界） 已定项 4 增补一行；E43（扩展点字节上限） 按码 3 的 93 字节头重算挂载判定；篡改容器里不可重算的字段必须能被检出 | 无 | 2026-09-04 第一轮反推腿 9.4 |
+| C109 | 哪些树的 key 死亡要写墓碑 | D18（块里携带什么信息） 已定项 8 / 10 的字面只覆盖 extent 区间记录；一次 unlink 还要删 dirent / inode / 反向索引树的 key，E59（缓冲消息能不能只从单元重算） 的负载是 16 棵树、「已删的 key 全数复活」对每棵树都成立；哪些树的 key 死亡要写墓碑、记录取什么字段、算不算进 C105（打包容器按发布频率重写的写放大） 的倍数，全仓未写。inode 树（打包记录类型 2）2026-09-05 已答：记录死亡不写墓碑，死亡由现行叶版本体现，择现行压在 C113（扫描重建时多版单元的现行版本判定无输入）（D8（核心索引结构） 已定项 6）。2026-10-01 收窄：第一版只 inode 对象整对象写墓碑（D18（块里携带什么信息） 已定项 24），别的树的 key 死亡待定 | D18（块里携带什么信息） 补分项：逐树列「死亡要不要墓碑、记录字段」；E59（缓冲消息能不能只从单元重算） 按树分别报复活数；漏一棵即红 | 无（先列全部 keyspace） | 2026-09-04 第二轮正推腿场景一 |
+| C110 | 跨头共享与加密后元数据类的块头一致性读法 | I-1.3（块头树 ID 一致） 逐字「与实际引用它的树一致」，而码 3（与被快照共享的码 1）头里是出生树、读者是另一个头 ⇒ 合法共享按字面判红（E90（树 ID 进 AAD 与跨头共享）：树维分不清合法继承与非法换挂）；I-1.2（块头写序已发布） 在加密开启后对元数据类判不了（诞生代号在密文）。⚠️ **2026-09-12 C297（inode 内部条目里出生树两份没有定处理） 第二轮补**：「条目、子指针与子头处处一致，却不属于这棵树」只有祖先验收抓得到，而下一格的计划解只覆盖 E90（树 ID 进 AAD 与跨头共享） 验收谓词的前一半「出生树在祖先链上」，没有后一半「出生 txg ≤ 对应克隆点」（码 3 的出生 txg 取诞生代号，容器出生代重写时不变，D8（核心索引结构） 已定项 6） | I-1.3（块头树 ID 一致） 改读「出生树在读者头的克隆祖先链上」，与 E90（树 ID 进 AAD 与跨头共享） 的祖先验收同一判据；I-1.2（块头写序已发布） 写明射程（无密钥扫描只对数据单元类判）；跨头样本用错误的头判定必须能检出 | 先定 D9（加密） 那次重开的克隆祖先表落点 | 2026-09-04 第二轮反推腿 10.2 |
+| C111 | 类标签在密文侧无副本 | I-6.2（明文头字段白名单） 补注要求白名单每一项在密文侧有权威副本；单元类型标签住共同前缀（明文），码 3 的类身份段带了副本（D18（块里携带什么信息） 已定项 11），码 1 的五元组副本也在明文，码 2 没有任何副本 ⇒ 三个内容类里两个不满足那条补注 | 码 2 类身份段加 1 字节标签副本（D18（块里携带什么信息） 已定项 7 索引节点类宽度未定，加得进）；checker：解密后类身份段首字节 == 偏移 6，改掉任一边必须红 | 先定索引节点类身份段宽度 | 2026-09-04 第二轮反推腿 5.4 |
+| C112 | settled-same-file 格认不出「已定项 N」子标题 | `.claude/gate.d/doc-decisions.sh` 的 settled-same-file 格只认 `—— 已定` 与 `已定（` 两种新增标题形态，而仓里多数决策的分项定案标题写作 `#### 已定项 N（…）`（多一个「项」字），一律漏判；本轮 D18（块里携带什么信息） 已定项 11 落地就是一次没被它看见的定案——它要求的「回头看同文件未定项」靠人手做了 | 正则扩到同时认 `已定项\s*\d+[（(]`；用本轮 D18（块里携带什么信息） 的 diff 作红样本必须报「已定项 4 未动」（把已定项 4 的复核注去掉），改回旧正则同一 diff 必须转绿 | 无 | 2026-09-04 第三轮正推腿 5.3 现查正则对照 |
+| C113 | 扫描重建时多版单元的现行版本判定无输入 | 扫描重建同时找到同一逻辑身份的多个物理版本（数据 extent 被覆写、打包容器每次发布重写）时要判哪一版是哪个头的现行版本。D18（块里携带什么信息） 已定项 1 否掉了序号这条路，把能力归给 D3（空间分配） 已定项 1 的谓词；那个谓词的两半是分配记录 + deadlist，而分配记录是派生态（D21（权威态与派生态的分界） 已定项 5）、正是被重建的东西。三处对 E59（缓冲消息能不能只从单元重算） 乙臂的归因不一致：D18（块里携带什么信息） 已定项 1 归给谓词、D21（权威态与派生态的分界） 已定项 5 归给「记账」、D3（空间分配） 已定项 1 逐字说记账树答不了单个落点；E59（缓冲消息能不能只从单元重算） 源码里乙臂的「记账」是一个 `live: bool` 神谕，它自陈「给出的是答案的形状，不是答案」；D11（索引节点要不要留消息缓冲区） 已定项 3 的第一个重算源当时写的是记账能逐落点答出活没活（那一句随 C113（扫描重建时多版单元的现行版本判定无输入） 定案改掉了），已定项 4 自陈欠的「两处正文要跟着改」未改，且它的组合「单元 + 记账 + 墓碑单元」E59（缓冲消息能不能只从单元重算） 七条臂一条都没跑过。D8（核心索引结构） 已定项 6 给它添了两条实例（2026-09-05）：① 崩溃后 checkpoint 号会被重发（D5（快照 / 空间记账机制） 逐字「崩溃后该号会被重发」），被抛弃那版与重试那版的 (出生树, 类型, 容器号, 出生代) 四段逐字相同、内容不同、都在盘上，I-1.2（块头写序已发布） 挡不住，是必然可达的实例——根记录靠 D16（发布语义） 骑手条款 1 的实例代号分辨，别的单元类都没有；② 两个头共享 origin 的 inode 叶、各自 COW 之后同身份两版、同一个 key 装着不同对象 | **决策已定、检查仍欠（2026-09-05）**：定案 `_c113-r8-final.md` P1–P8，七轮三方论证（`research/prompts/c113-r1/r2/r3/r4/r5-*-output.md`、`research/results/c113-r*-local.out`）；权威记录分散进 D18（块里携带什么信息） 已定项 1 / 7 / 11、D22（单元原子性怎么合成） 已定项 7、D3（空间分配） 已定项 7、D5（快照 / 空间记账机制） 已定项 3 / 4、D11（索引节点要不要留消息缓冲区） 已定项 3 / 4、D16（发布语义） 已定项 5、D21（权威态与派生态的分界）、D23（journal 的角色与格式） 已定项 7 / 14、D13（验证路线） 已定项 2、D8（核心索引结构） 已定项 6、invariants.md 的 I-1.2（块头写序已发布）（改写）/ I-1.8（归并后版本全序） / I-1.9（清扫水位内无可读垃圾） / I-3.8（实例表行唯一且低于挂载根） / I-7.7（系统配置实例代号不低于根环）（新）/ I-7.4（近 K 代块未被复用）（射程）。三处归因收成一处：判据是单元写序 (实例代号, 事务号) + 实例表的已发布谓词（按单元类分）+ 祖先表，不是记账；E104（扫描重建的现行版本判定） 全规则臂二十二类世界 24 个种子恒 0、十条消融各按闭式非 0、六条写路径纪律各自承重；对立臂（写序只上码 2 / 3、extent 叶改码 3）由 E104（扫描重建的现行版本判定） `wseq_meta_only` 臂与 E105（extent 叶改码 3 的代价） 量过，判决靠 D21（权威态与派生态的分界） 的态别（臂 B 让 extent 叶成权威态）。**留下的新账**：C124（回退行与重放下界没有会红的检查）（2026-09-26 随回退行删掉作废）、C120（分叉盘回归的判定与重同步）、C121（zoned 上实例表链长无上界）、C122（分配记录不点删之后的条目数口径）、C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据） 码 2 那一半、C89（单元头收口的遗留重算） 的节点头 +10 重算；D16（发布语义） 已定项 5 的丢失窗口口径 2026-09-13 已收口（C123（用户定案被改后无人复核））；扫描重建的产物今天永久只读（晋升要级 2 见证者，不存在） | D3（空间分配） / D21（权威态与派生态的分界） 收口那个归因 | 2026-09-04 第三轮反推腿第 3 / 4 / 9 节，主 agent 逐字核 `e59_message_recompute.rs:84-86,288` 与三条决策原文坐实 |
+| C115 | inode 属性的溢出路线无落点 | D8（核心索引结构） 已定项 6 的记录内没有 compat 扩展路径（三段恒 0、任何赋义 incompat），溢出要靠「按属性判档」：无语义依赖的属性走新增 keyspace，有依赖的走 flags 位。可是属性 keyspace 今天没有任何决策承载（xattr 被推迟），「新增 keyspace ⇒ compat」那一行判的是树表可不可扩展、不是看不见一棵属性树安不安全。等到第一个新属性出现时才发现两条路都没铺好 | 立一条分项：属性 keyspace 的形态、它承不承得住有语义依赖的属性、以及「旧读者看不见这棵树」按 D15（格式冻结政策） 判定表哪一行判 | D15（格式冻结政策） 判定表 | 2026-09-05 D8（核心索引结构） 已定项 6 第三轮反推腿详核 4.4 |
+| C116 | 叶容器的分裂 / 合并纪律没有会失败的检查 | D8（核心索引结构） 已定项 6 的三条写路径纪律对着一个镜像判不了：末尾分裂（左半保留全部记录与身份、右半容器号 = 触发分裂的新记录号）、合并保留左半身份、记录数为 0 的类型 2 容器不落盘。三条任一条写错，容器身份就会重复或空叶在重建时没有 key 范围，而 I-9（inode 树结构） 类只能在事后从镜像上抓到症状 | 模型对拍：随机创建 / 删除 / 克隆序列下逐次发布比对容器身份集合与 I-9.4（容器号不超最小 key）；崩溃点重放：在分裂 / 合并那次发布的每个写请求后截断，重放后不许出现记录数为 0 的类型 2 容器。**分裂那三条已还（2026-09-22）**：`crates/singlefs-core/src/inode_tree.rs` 把「这次发布之后树里是哪几片容器、各装哪些记录、哪几片要重写」做成不发一个写的纯函数，三条纪律在它上面是后置条件、10 条单测判得了，另一层是恢复加 oracle（`crates/singlefs-harness/tests/many_inodes_write_and_read.rs`：期望态带着分裂前的容器身份，发布后冷启动重建逐项比）；`crates/mutations.tsv` 末尾三条变异各把一条纪律改坏（右半容器号给错、分裂点不取末尾、COW 重写时身份跟着换出生代），三条都红。**仍欠合并与空容器那两条**：这一版没有删除（C118（`deleted_inodes` 树的形态无落点）），记录只增不减，合并（只许左吸收右 / 左从右借）与「记录数为 0 的类型 2 容器不落盘」都没有对象 | 事务层、崩溃点重放（verification-build.md；两样 2026-09-14 都有了，新池新建文件里没有叶容器的分裂与合并） | 2026-09-05 D8（核心索引结构） 已定项 6 第三轮正推腿结论表、反推腿详核 1.2 / 1.3 |
+| C117 | 不带设备维的统计量的设备段没有取值 | D5（快照 / 空间记账机制） 已定项 5 把记账 key 的设备段定成 4 字节定长，已定项 4 的第 4 / 6 / 7 / 12 项不带设备维，可是只登记过保留树 ID 0，没有登记保留设备值；建一棵新树（克隆头）时它的记账行（第 8 / 9 / 12 项）怎么初始化也没有一条。新池新建文件要写第 4 / 6 / 7 项与 inode 号水位，这 4 个字节今天填不出来 ⚠️ 2026-09-13 总审核定案：D5（快照 / 空间记账机制） 已定项 10 定不带设备维的设备段写 0xFFFF_FFFF，取值有了，会红的检查仍欠 | D5（快照 / 空间记账机制） 补两条：设备段的保留值（并核它不与任何真实设备 ID 撞）、新建树那次发布必须写出哪些初始行 | D5（快照 / 空间记账机制） 已定项 4 / 5 | 2026-09-05 D8（核心索引结构） 已定项 6 第三轮反推腿详核 2.3 / 2.5 |
+| C119 | 冻结组件没有 spec 文件 | D15（格式冻结政策） 2026-09-05 立了四层之外的两个独立冻结组件（类型 2 的记录格式、统计量登记表含合并规则），C9（冻结后偷改格式） 要按组件记 `spec_hash`，而 `format-spec/` 目录与两个组件的 spec 文件今天都不存在，新池新建文件写出类型 2 容器那一刻组件就冻结了，冻结的却是一份不存在的文件。⚠️ 2026-09-11 D16（发布语义） 已定项 3 立了第三个组件（journal 记录格式），它的 spec 文件同样不存在；它的冻结时刻写成了提交那份 toml 的 commit，不走「第一个镜像」 | 先写 `format-spec/inode-record.toml` 与 `format-spec/statistic-registry.toml`，C9（冻结后偷改格式） 的门禁对它们求哈希；改任一字段宽度或合并规则而没抬版本必红 | C9（冻结后偷改格式） | 2026-09-05 D8（核心索引结构） 已定项 6 第四轮反推腿 4.2、正推腿第五节 |
+| C120 | 分叉盘回归的判定与重同步 | 一块盘掉线期间别的盘继续可写（盘数 ≥ 3 时可达），它回来时不是当前时间线的祖先，而根记录没有前驱字段、系统配置只有实例代号，「回归盘不是祖先」今天没有可判定的形式；危险方向被「取最大实例代号」吸收。第一版 2 盘、掉盘只能只读挂载（D2（RAID 条带策略） 已定项 9）、只读不取号 ⇒ 不可达。这句靠挂载路径上两道判兜着：取号之前逐盘核（D18（块里携带什么信息） 已定项 11 那一条子项，`crates/singlefs-core/src/mount.rs` 的 `devices_without_the_selected_version`，用例在 `crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs`），与 D18（块里携带什么信息） 已定项 11「可写挂载的顺序」里「可写设备数够 w 的下限」那一判；后一判今天没有显式实现，只交一块盘时是分配记录树重建报 I-1.1（块头自述逻辑地址） 碰巧拒住，显式实现归实二八 | 候选判据：每盘系统配置记「这块盘见过的最大 (实例代号, txg)」，挂载要求它在当前根环里找得到对应的根，找不到即整盘作废、只读直到重同步完成；重同步的形态今天没有任何决策定过（D2（RAID 条带策略）、D22（单元原子性怎么合成）、D26（后台整理与放置回收） 都没有这一项）。判别力自证：造一块「见过 (3, 40) 而当前根环最大是 (4, 38)」的盘，挂载必拒 | **允许加第三块盘之前，与「可写挂载独占打开过半设备」那条准入同时**（D2（RAID 条带策略） 已定项 3 / 4 的在线加盘是已定操作，加了就可达） | 2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 第四轮反推腿 4.3 / 4.4 |
+| C121 | zoned 上实例表链长无上界 | 实例表每次写行 COW 重写整条链（D18（块里携带什么信息） 已定项 11 类型 4），非 zoned 上链长由行回收压住，zoned 上第一版不回收 ⇒ 每次崩溃恢复多一行、链只长不缩 | 候选：zoned 线开线时给类型 4 定回收纪律，或按代际换片。第一版不跑 zoned，先记不拦 | zoned 线开线 | 2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 第四轮正推腿 |
+| C122 | 分配记录不点删之后的条目数口径 | D3（空间分配） 已定项 7 的条目释放时不删、留到落点被重新分配时覆盖 ⇒ 条目数上界从「已分配落点数」变成「曾分配过、尚未被覆盖的落点数」；E74（分配记录的条目数与整理开销） / E97（记账与分配记录的条目编码） 的条目数模型按旧口径算，今天没有重跑 | 按新口径重跑 E74（分配记录的条目数与整理开销） / E97（记账与分配记录的条目编码），断言条目数 ≤ 容量 / 16 KiB；反向接受条款：新口径越过它们自己的判据 ⇒ 不点删这条改法作废 | — | 2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 第四轮反推腿 5.1–5.4 |
+| C125 | 归档产物里写死了会话路径 | **三份归档产物的正文里带着产生它的那个会话的绝对路径**（`e58-csum-grain-repro-2026-08-31.out` 一处、`e65-write-grain-2026-08-31.out` 与 `e66-small-files-2026-08-31.out` 各五处，形如 `dev=/tmp/claude-1000/<会话 id>/scratchpad/…`）。别的会话复跑时那一行必然不同 ⇒ `research/scripts/replay.sh` 把 E58（校验和粒度的端到端代价） 判成「对不上」而不是「仅计时不同」，2026-09-05 全量复跑逐次如此。**害处不是那一行本身，是它把复跑的红灯变成常态**：一个每次都红、每次都被解释成「哦那个不算」的检查，等于没有检查（`.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁不许假装通过」的反面）。 | 两条一起做：① 实验产物里凡是路径都按「设备角色」输出（`dev=role:test` 之类），不输出真实路径；② `replay.sh` 的比对把带路径的字段与计时字段同等看待，或者干脆让产物不含它。判别力自证：把一份产物里的路径改一个字符，复跑必须仍判「字节一致」；再把一个真的数字改一位，必须判「对不上」 | 三份产物要在有真实块设备的机器上重录（E58（校验和粒度的端到端代价）/ E65（校验和粒度的写侧代价）/ E66（补齐之后小文件怎么落） 都是计时实验，`kb/vm-harness.md` 的三个前置） | 2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 定案收尾时全量复跑逐次判红，主 agent 现查三份产物坐实；**不是这一轮改出来的** |
+| C126 | 切换预留的最坏量没有口径 | **可写挂载的准入合取里有一条「实例切换的预留拿得到」（D2（RAID 条带策略） 已定项 13、D23（journal 的角色与格式） 已定项 14），而它要的那个量——「一次固定点重做的最坏量」——全仓没有任何数。**一条会把文件系统判成只读的准入条件，它的阈值不存在。**第一轮三方论证（2026-09-12，`research/prompts/c126-r1-main-verification.md`）把它拆成三截；2026-09-13 用户定案把①②③全定了，权威正文 D28（挂载期承诺量） 已定项 3 与已定项 2；**模型层已还（2026-09-13）**：判别力自证由 E141（切换预留的挂载准入自证） 在计数模型里做了，五条判据全过；同日第二次跑把 D16（发布语义） 已定项 8 的暖机 N_switch × R × c_max 加进份额（c_max 4 / 9 两档），28 个取样点照过；**仍欠**：实现侧的挂载准入写出来之后照它对拍，三块盘以上两份副本落哪两块盘没定**：① 实例表链重写有式子：一次切换写 副本数 × 32768 × max(1, ⌈(rows0 + k) / 每片行数⌉) 字节，每片行数 = ⌊(32768 − 135) / 行宽⌋ − 1（链指针记录恒为一片的最后一条；行宽 88 ⇒ 369 行，2026-09-13 C304（实例表链指针记录装不下 83 宽的指针） 收口时从 64 改宽），副本数 2 且两份落两块盘 ⇒ 按设备算；按 D23（journal 的角色与格式） 已定项 14 索引句的字面取 N_switch × 最坏的一次（k = N_switch，它是逐次累加的上界；连续切换的前提是上一次的根没发布、重建态从同一个根来，所以实际不累加）；新池新建文件的几何（rows0 = 0）下 3 × 65536 = 196608 字节 = 12 个 16 KiB 块——这一格对每片 509 / 508 / 369 都给 12，验式子要取 rows0 ≥ 1017（2026-09-14 C329（写行那次发布之前推抬 F 的空发布没有检查） 定案预留多一份给写行那次发布之后是 (3 + 1) × 65536 = 262144 字节 = 16 块，E141（切换预留的挂载准入自证） 第三次跑 28 个取样点照过）；zoned 上 rows0 无界（C121（zoned 上实例表链长无上界））是显式例外。② 固定点重做那一项 2026-09-13 用户定案：**不另要空间**（切换是挂载内一次恢复，重建态里失败那次的分配不存在，重做走 checkpoint 的保留池），对应的施加语义写在 D28（挂载期承诺量） 已定项 2（施加登记码 1、所选根之后的码 2 / 3 不登记）；此前的三种读法：切换是挂载内一次恢复，重建态从所选根 + 施加到 W 的记录来；「施加一条记录登不登记它点名的落点」没定义——不登记则重做把号 ≤ W 事务的数据当空闲覆写（反推腿探针 4 个槽，`research/prompts/c126-r1-opus-probe/`）；全登记则记录点名的码 2 祖先也登记成已分配、而已发布谓词判它们未发布要重写 ⇒ 重做另要一份新鲜的固定点空间（探针 8 个槽，那就是「一次固定点重做的最坏量」）；只登记码 1 则重做用回失败那次的空闲空间、保留池 reserve ≥ ckpt_cost 就够（而 ckpt_cost 的上界是 C83（提交固定点没人回答） 欠的）。③ 落点 2026-09-13 用户定案：**另开「挂载期承诺量」一项**并按设备算，D3（空间分配） 已定项 4 的准入不等式随之加一项、权威正文挪进 D28（挂载期承诺量） 已定项 1。`df` 要扣它（E139（按盘回退下界的收严形态） 第四轮探针：没扣的量 > 60 块就出假性 ENOSPC）。已知边角：rows0 单调不减、删行要可写挂载、回收要「无读失败 ∧ 全盘在线」，近满盘 + 坏扇区的池上「预留拿不到 ⇒ 只读」可能成吸收态（推的，每 369 行才多一片；2026-09-14 起根槽持续读不出时不要求近满盘，C335（根槽持续读不出时实例表只增不减））；D16（发布语义） 已定项 5 只写 T_dirty 是触发条件、没写重做期间开放的 checkpoint 会不会堵住写者。 | 模型层 E141（切换预留的挂载准入自证） 已造（28 对池、14 个取样点、阳性对照、池级标量对照、四个错法的敏感性，产物 `e141-switch-reserve-mount-admission-2026-09-13.out`）；实现侧：挂载准入代码写出来之后拿同一组池与取样点对拍，判定逐对相等。原来写的形态：rows0 与占用参数化，两个只差 1 块的池一侧可写一侧只读，阳性对照把预留强制置 0 两侧都可写；取样点要含 rows0 ≥ 1017 与 C304（实例表链指针记录装不下 83 宽的指针） 之后的行宽，另钉一条绝对值（rows0 = 4064 时 108 块） | 实现侧的挂载准入代码（等事务层）；C304（实例表链指针记录装不下 83 宽的指针） 的行宽；C83（提交固定点没人回答） 的 ckpt_cost 上界；N_switch 已定 3；用户 2026-09-23 判不收口，挪到后面的里程碑（里程碑「覆盖写、释放、回退与复用」收口表第 14 行） | 2026-09-05 C113（扫描重建时多版单元的现行版本判定无输入） 第八轮反推腿 4.2 / 4.3；2026-09-12 第一轮三方论证 ⚠️ **2026-09-13 退回半还**：D16（发布语义） 已定项 8 取戊 后一次切换的最坏量多一项「至多 R 次空发布 × 现算 c_max」（E148（提交固定点按两棵记录树重算） 池规模 9 块 ⇒ 27 块），D28（挂载期承诺量） 已定项 3 的式子与 E141（切换预留的挂载准入自证） 的被测式子都还没加这一项。 |
+| C127 | 钉住状态在分配记录里没有落点 | **D2（RAID 条带策略） 已定项 11 规则 1 逐字「w ≥ 3 条带的成员被释放后，该格与整条带（含 parity）在修复完成前不得复用」，而盘上没有任何一位表达「已释放但钉住」。** 分配记录条目的 value 是「分配代或释放代 8 + 跨度段 2」，跨度段最高位已被「已释放」借走（D3（空间分配） 已定项 7），钉住只存在于内存或「去查条带表」这个动作里；而 D3（空间分配） 已定项 7 的分配准入判据里**没有任何一条问条带**。⇒ 崩溃、卸载、或者单纯的根环滚过 K 代之后，被钉住的格满足「有条目 ∧ 已释放 ∧ 释放代够老 ∧ 不在在飞 overlay」⇒ 判可分配、复用，兄弟成员的重建输入没了。这正是 E80（条带的部分释放） 的 `free_now` 臂：单盘失效平均丢 9.8–13.0 个活单元，**盘坏之前无任何报错** | **条款 2026-09-13 已写（用户取修法 ②）**：D3（空间分配） 已定项 7 加第四个合取「∧ 条带表[候选落点] 里没有活成员」，只对 w ≥ 3 的条带起作用，第一版恒真；会红的检查仍欠。原写法：两条二选一，都要写进已定条款：① 跨度段再借一位「钉住」（次高位空着，第一版跨度值恒 1 或 2），并把它写进 D3（空间分配） 已定项 1 的谓词——**但分配记录是派生态（D21（权威态与派生态的分界） 已定项 5），这一位重建不出来，矛盾推回 D2（RAID 条带策略） 已定项 12**；② 分配准入加一条合取「∧ 条带表[候选落点] 里没有活成员」，代价是每次分配多一次点查。 ⚠️ **2026-09-06 起修法 ② 第一次有输入**：D2（RAID 条带策略） 已定项 12 定了条带成员表的载体（住码 3 打包记录、走容器索引、容器恒走镜像）⇒ `条带表[候选落点]` 是一次可执行的点查，不再是「去查一个不存在的东西」。**但那次点查要先走容器索引，而 C103（容器索引无落点） 今天仍然全仓无落点** ⇒ 修法 ② 的前置从「D2（RAID 条带策略） 已定项 12」换成了 **C103（容器索引无落点）**。⚠️ 修法 ① 同日被彻底关死：分配记录是派生态（D21（权威态与派生态的分界） 已定项 5），借一位「钉住」重建不出来。判别力自证：造 E80（条带的部分释放） 手算锚点那个镜像（释放一列、复用、坏另一列），丢失计数必须恰 1；把钉住位关掉必须由绿转红 | D2（RAID 条带策略） 已定项 12 定案（钉住状态住哪由载体定）+ 分配器 | 2026-09-06 D2（RAID 条带策略） 已定项 12 第一轮反推腿三 1，主 agent 逐字核 D3（空间分配） 已定项 7 的 value 段坐实 |
+| C128 | 清扫准入对 parity 格两支都判不出 | **清扫准入的两支都要求读 parity 格的头，而 parity 格没有头。** 共有合取逐字要「头可读」，孤儿那一支逐字要「头里的写序实例 < 当前实例」（D3（空间分配） 已定项 7）。而 parity 格按 D18（块里携带什么信息） 已定项 3 的禁放清单进不了任何自描述头（物理落点不许进块头），按 D18（块里携带什么信息） 已定项 6 / 已定项 9 也放不下自己的头（头必须在第 0 字节、扫描器按 16384 步进）。⇒ ① 扫描重建之后每个 parity 格都是孤儿且判不出，既不能清也不能确认它活着；② 惰性重落把整条条带回收之后，指认它的记录先没了、格还在 ⇒ 永久泄漏，而且泄漏量不进任何统计量（D5（快照 / 空间记账机制） 已定项 4 的「不可回收字节」记的是钉住，这些格已经不钉了）⇒ 撞 `.claude/rules/fs-design.md` 硬要求 4「分支必须可观测」 | ⚠️ **2026-09-06 起 parity 格第一次可被指认**：D2（RAID 条带策略） 已定项 12 定了条带成员表，记录一格一条、**含 parity 格** ⇒ 共有合取里那句「头可读」可以补成「头可读 ∨ 条带表指认它是某条条带的 parity 格」。**改的是 D3（空间分配） 已定项 7（用户定案过的条款），要用户定案**；且同样要先过 C103（容器索引无落点）。 清扫准入两支都要给 parity 格一条判得出的路，且两个方向都要证会红：造一批走完惰性重落的 w ≥ 3 条带，断言池里不存在「既不可读头、又无人指认」的已分配落点（拦泄漏）；再造一批活着的 parity 格并让指认它们的容器判未发布，断言清扫一格都没动（拦静默清掉活 parity）。两条方向缺一条就是只堵了一半 | D2（RAID 条带策略） 已定项 12 定案（谁来指认 parity 格）+ 清扫实现 | 2026-09-06 D2（RAID 条带策略） 已定项 12 第一轮反推腿六 1 / 六 2 / 六 3，主 agent 现查 D18（块里携带什么信息） 已定项 6 与 D3（空间分配） 已定项 7 原文坐实 |
+| C130 | 扫描重建的落点维没有任何度量 | **C113（扫描重建时多版单元的现行版本判定无输入） 定案给的是「哪一版是现行版本」，而「它在哪几个落点」这一步没有条款，也没有实测。** E104（扫描重建的现行版本判定） 里那个看似在比落点的 `wrong` 度量在 `w ≥ 2` 的世界里**恒真**：真值把「正确落点」定义成最小的那个（`e104_current_version.rs:400-410`），重建那一侧遍历按落点升序的 `BTreeMap`、副本归并保留先遇到的（`:1118-1123`），两边共用同一条**只存在于模型里**的「最小落点获胜」规则，而 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3 一个字都没写它 ⇒ 那个 0 说明不了落点维的任何事。而 D2（RAID 条带策略） 已定项 6 的 `w ≥ 2` 是硬下界 ⇒ **第一版就恒在这个世界里**，不是边缘情形 | 给 E104（扫描重建的现行版本判定） 加一个落点维的度量，并造一个「真值落点不是最小的那个」的世界——今天造不出来，因为模型没有搬运操作。判别力自证：把重建那一侧的归并改成「保留最大的那个」，新度量必须由绿转红，而现有的 `wrong` 必须纹丝不动（证明旧度量确实对这一维瞎） | 给 E104（扫描重建的现行版本判定） 的模型加搬运操作；C113（扫描重建时多版单元的现行版本判定无输入） 的输出口径要不要改写成「现行版本 + 它的落点集合」 | 2026-09-06 D9（加密） 已定项 9 第一轮反推腿 H1，主 agent 逐字打开那三处源码核实 |
+| C132 | 自包段里住着随版本变的字段 | **D1（数据可移动性 / 反向索引） 已定项 4 的判据是「随版本变不变」——不变的进自包段，每版可以不同的进扩展点。而 D18（块里携带什么信息） 已定项 7 / 已定项 11 的字段表里，**写序**（实例代号 + 事务号）、**载荷 CRC**、码 3 的**记录数**都是「每版可以不同」的，却住在自包段；D22（单元原子性怎么合成） 已定项 7 的根记录字段表同形。** 两条路二选一：给判据 4 补一条射程（「自包段容得下随版本变的字段，只要它随的是**这一版自己的内容**、不是外部状态」），或者把那些字段挪进扩展点——后者要动 day-1 契约（写序是 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P1、载荷 CRC 是 C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据） 的一半），代价远大于前者。⚠️ **不处置的害处不是格式错，是判据失效**：一条只执行一半的判据，下一个人会照松的那一半用 | 判据补射程之后要能落成检查：checker 扫单元头，凡是自包段里的字段，它的值必须只由「这一版自己的内容」决定——判别力自证：造一个自包段字段随外部状态变的单元（例如把当前根的 txg 抄进去），必须判红 | D1（数据可移动性 / 反向索引） 已定项 4 补射程（或 D18（块里携带什么信息） 改字段表） | 2026-09-06 用 D1（数据可移动性 / 反向索引） 六条回扫 26 条决策，命中第 7 / 14 条；版本链撤回之后这两条**没有消失** |
+| C133 | 搬迁的转发信息没有载体 | ⚠️ **2026-09-08：答案的形状已经知道了，前置仍未解。** D19（块指针的结构与宽度预算） 已定项 5 取混合之后，中央映射给的是「这个版本**现在**在哪」，任何读者都不需要从旧落点追一条转发链 ⇒ 出路是「不存在」那一支。但这一格的检查列逐字要「任一被搬走的落点，要么有一条可达的转发、要么它的**全部引用**都已改完」，而混合权威下**没有「全部引用」这个对象**（D21（权威态与派生态的分界） 已定项 6：不用知道谁引用它）⇒ **检查形态要重写，不是直接销账**。 **「这个落点上原来那个块搬到哪去了」是历史事件，扫描只看得到当前状态、重建不出它**（D21（权威态与派生态的分界） 第四条后果逐字）⇒ 转发不能只住在分配记录里（它是派生态）。两条出路：住权威态（做成单元，与 D18（块里携带什么信息） 已定项 10 的墓碑同装置），或者不存在（回到「改 K 棵快照树」或「钉住旧落点」两条老路）。⚠️ **2026-09-06 这一格变紧了**：当天曾有一个候选（往扩展点里放指向旧落点的链）看着能承接它，当天被三腿一致否掉——它撞 D21（权威态与派生态的分界） 硬约束 5，且正好造出 C21（扩展点指向逃出记账） 拿来自证判别力的那个反例 ⇒ **候选少一个，不是多一个** | 定了载体之后：checker 判「任一被搬走的落点，要么有一条可达的转发、要么它的全部引用都已改完」；判别力自证：搬一个落点、只改一半引用，必须判红 | D26（后台整理与放置回收） 已定项 5 定案 | 2026-09-03 D21（权威态与派生态的分界） 已定项 5 后果 4；2026-09-06 回扫重判确认它是仍然成立的四条之一 |
+| C134 | scrub 水位自己没有落点与保护 | **代际增量 scrub 靠一个水位裁剪遍历集合，而那个水位住哪、谁写它、有没有不要密钥就能验的校验，全仓没有条款。** D13（验证路线） 已定项 8 逐字「维护一个『上次 scrub 扫到的 generation 水位』，只遍历 `birth generation > 水位` 的块」——水位是这道维护动作唯一的真值输入，而现查它在 `.claude/kb/invariants.md`、决策正文与 `crates/` 里都没有落点。⇒ 一个坏扇区把水位改大，水位之下的块此后永不进遍历集合，scrub 照常报绿（**静默漏扫**）；改小只是重扫一遍，两个方向的代价不对称而没有任何东西分得出来。加密开启时更紧：推进水位是写，撞 D9（加密） 已定项 5 的「只读」。与 C194（代际增量 scrub 看不见被搬过的副本） 的分界：那条问被搬过的副本 `birth` 不变而漏扫，这条问水位这个量本身没有家、也没有保护；与 C408（代际增量 scrub 零代码） 的分界：那条问没有实现，这条问没有条款 | 水位要有一个落点，且自带一份不要密钥的校验，每次取用前验。检查形态：造一份「水位的校验与内容不符」的镜像，断言 scrub 拒绝按它裁剪、退回全盘扫；再造一份相符的，断言裁剪照常生效。判别力自证：把那道校验关掉，第一条必须由绿转红 | 先定水位住哪（系统配置、根记录、还是一个自证单元），它与 D9（加密） 已定项 5 的「只读」怎么并存。加密不进第一个可运行版本（D9（加密） 已定项 10）；代际增量 scrub 今天零代码（C408（代际增量 scrub 零代码）） | 2026-09-06 立账，当时的形态是「让渡区自己没有完整性手段」：让渡区 A 是无密钥侧唯一的落点真值而自己没有非密钥校验，一个坏扇区就让搬运工把目的地写到活数据上。前置 D9（加密） 已定项 7 与已定项 9 都已于 2026-09-07 随已定项 5 改取「只做 scrub」撤回。2026-09-20 用户定改写成无密钥 scrub 侧的形态：同一个形状（无密钥侧赖以做判断的真值自己没有非密钥保护），真值从让渡区 A 换成 scrub 水位。改写前的六列原文逐字照抄在欠账表「## 历史版本」2026-09-20 那一条 |
+| C136 | 无密钥能验哪几条不变量没人标过 | **`.claude/kb/invariants.md` 的 73 条里，没有一条标过「无密钥的一侧验不验得了」，而两句承诺都压在这个答案上**：D9（加密） 已定项 5 的「检测损坏、报告坏块」，与 D13（验证路线） 已定项 8 那句「让『每次提交都全量验证本次改动』在挂钟上可行、不必抽样」。现查「无密钥」在 `.claude/kb/invariants.md` 里只出现 3 次，全在正文说明里，没有一处是状态标注。已知至少一条在无密钥侧判不了：I-3.1（已分配统计对得上） 逐字「已分配空间统计 == 实际遍历所有引用得到的和」，而引用住在密文载荷里 ⇒ 无密钥的一侧遍历不出右边那个和。⇒ 无密钥 scrub 到底罩住了哪一块、哪一块完全没人看，今天答不出来。与 C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效） 的分界：那条问 scrub 要读哪些结构（输入），这条问读到之后判得了哪几条不变量（输出） | 给 `.claude/kb/invariants.md` 每一条加一格「无密钥侧」，取值是判得了 / 判不了 / 判一半（写明哪一半）；缺格即判红。判别力自证：往清单里加一条不带这一格的不变量，检查必须由绿转红。加完之后 D9（加密） 已定项 5 的射程里要写明「检测损坏」覆盖的是哪几条 | D9（加密） 已定项 5 的 scrub 要读哪些结构，今天没有清单（C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效））——读得到什么定了才判得出验得了什么。加密不进第一个可运行版本（D9（加密） 已定项 10），今天没有对象可跑，先写条款 | 2026-09-06 立账，当时的形态是「让渡区的占用记已分配却无人引用」：A 整体记为已分配而它的槽不被任何引用指到 ⇒ I-3.1（已分配统计对得上） 恒红。前置 D9（加密） 已定项 7 已于 2026-09-07 随已定项 5 改取「只做 scrub」撤回，让渡区无对象。2026-09-20 用户定改写成无密钥 scrub 侧的形态：同一条不变量、同一个形状（一条不变量在这个模式下给不出判定），成因从「统计里有而引用里没有」换成「无密钥侧遍历不出引用」。改写前的六列原文逐字照抄在欠账表「## 历史版本」2026-09-20 那一条 |
+| C139 | 整理停摆之后释放也发不出去 | **D3（空间分配） 那条立项原则「释放空间这个操作本身不需要申请空间」作为**要求**原样成立；不成立的是「D3（空间分配） 已定项 2 + 已定项 4 已经兑现了它」这句话——而且第一版就不成立，与 `w` 无关。** 链条逐字：E93（老化下的放置与碎片度）「聚簇段政策没有整理喂空段就不自持」「整理预算是唯一把它压下来的力量」⇒ 盘满 ⇒ 整理过不了准入 ⇒ 空段供给关闭 ⇒ 提交内生块散布 ⇒ D3（空间分配） 已定项 5 依据逐字「全散布时一次 12 单元的 fsync 拖出 5909 个元数据块，I-8.1（环几何够大） 的最坏事务占用在该政策下**没有可用上界**」⇒ 删除这个事务本身发不出去。⚠️ D26（后台整理与放置回收） 已定项 3 定案之前有一句说盘满时整理停摆可接受、删除不依赖整理，它只覆盖了钉住那条路径（那句话已随 2026-09-20 的瘦身移出正文，在决策变更史里）。 ⚠️ **靶子在哪要写准（2026-09-06 第三轮攻击腿纠正）**：要重开的是 **D3（空间分配） 已定项 2 的「解开自己需要多少」算法**，不是那条原则本身——重开原则会把立项时点名 btrfs 病根的那条纪律一起拆掉。 ⚠️ **常驻底额进不了准入不等式的任何一项**（它约束的是形状不是标量），只能是**第二个合取式** `(可用 ≥ 需求) ∧ (全空聚簇段数 ≥ N₀)`；而这一搬就把「全空聚簇段数」从 `.claude/rules/fs-design.md` 第三格拖进**第一格**，连带欠在飞 overlay、一条 I-3.1（已分配统计对得上） 形态的不变量、以及设备维三样 | 计数模型：填满 → 删除 → 填满循环，整理被准入挡住，判「删除事务的提交内生块数是否随轮数发散」；带常驻底额的臂必须收敛。⚠️ 底额多大要给算式，而找反例腿给的反例是「没有固定底额够用，因为最坏事务占用无上界」——所以这条检查的第二半是：断言存在一个底额使它收敛，断言不成立就说明要改的是政策不是数值。 ⚠️ **这第二半今天没有任何输入能判**（2026-09-06 第三轮攻击腿）：整理在空段供给上是不是净正，E93（老化下的放置与碎片度） 逐字把提交内生块排除在模型外。 ⚠️ **政策变成会红的检查有现成形态**：照 D3（空间分配） 已定项 5 自己给过的那条——把 I-8.1（环几何够大） 的「最坏占用」从 mkfs 静态值升为发布路径每次复算的读数，一次还 C83（提交固定点没人回答） 与本条两笔。判别力自证：把底额清零，发散必须重现 | 无前置，纯模型工；D26（后台整理与放置回收） 已定项 1 / 3 定案 | 2026-09-06 D26（后台整理与放置回收） 第二轮反推腿命中 7 与第三轮找反例腿第 3 题，主 agent 逐字核 D3（空间分配） 已定项 5 依据段与 E93（老化下的放置与碎片度） 判据 5b 坐实 |
+| C140 | 意图完成不等于空段被腾出 | **整理意图的目标态即使写成单调可达的形态（「R 内不存在分配代 ≤ c0 且未释放的落点」），达成它也不等于 R 变成全空聚簇段。** 找反例腿给的历史：两个聚簇段之间来回搬，每一条意图都正常完成、正常删除，而**全空段供给恒为零**。 ⚠️ **2026-09-06 第三轮攻击腿给了更硬的一版：破坏者是整理自己，前台一次写都不用做。** `grep -rn "回落" .claude/kb/` 现查：**全仓没有一条条款说无空段时分配落到哪**，唯一被建模过的是 E93（老化下的放置与碎片度） 的「最低空槽优先」回落 ⇒ 整理搬走 `R` 的第一个对象之后，`R` 里那个洞就是全池最低的空槽 ⇒ **整理的下一个目的地落回自己正在清空的段**，而它的分配代 > `c0` ⇒ 不违反目标态。⇒ 「意图完成」与「整理有效」被拆成两件不相干的事，而 D3（空间分配） 已定项 5 指望的恰恰是后者。运行时只看意图完成率会一直显示健康 | 检查要盯的是**产出**不是**完成**：断言每 N 条整理意图完成之后全空聚簇段数严格增加，不增即判红（形态同 D26（后台整理与放置回收） 已定项 6 的观测量，但方向是产出侧）。判别力自证：把整理改成「在两个段之间来回搬」，检查必须由绿转红 | D26（后台整理与放置回收） 已定项 1 / 2 定案 | 2026-09-06 D26（后台整理与放置回收） 第三轮找反例腿第 2 题 |
+| C141 | 停机判据的输入不持久 | **D26（后台整理与放置回收） 已定项 6 把「本轮搬迁量」列为运行时计数器、不持久、逐字「丢了不影响观测」，而边际收益停机判据（Δ 碎片度 ÷ Δ 写字节）正要用它。** 崩溃续做之后写字节归零，找反例腿给的历史里同一批整理被恢复打断后多搬 50%（300 字节 vs 不中断的 200）。⇒ 停机行为随崩溃次数漂移，而漂移只在事后对账时可见——与 C91（整理意图与增量触发量的重做漂移） 同型，但 C91（整理意图与增量触发量的重做漂移） 管的是触发量，这条管的是**停机量** | ⚠️ **原来这一格写的修法（把「本轮已写字节」写进意图记录）2026-09-06 撤回**：已写字节是**历史的函数**，从盘上状态导不回来，写进意图就是「声明增量」，直接违反 D8（核心索引结构） 已定项 5 硬要求 1 逐字「意图声明目标状态，绝不声明增量」；那条判别力自证「总搬迁量之差为 0」按重做的定义**恒不成立**。 ⇒ **停机判据的输入只许是两类：当前状态读数、签发时写死的常量。** 换成**产出谓词**：`全空聚簇段数(现在) − segs0 ≥ 1`，无除法、无累加器，`segs0` 是写下意图那一刻的值。⚠️ `segs0` **必须以值写进意图记录**，不能写成「去查 `c0` 那一代的读数」——D5（快照 / 空间记账机制） 已定项 2 只留最近 K 代。检查形态：断言中断 k 次与不中断的一批整理，**终止时的产出谓词取值相同**（不是搬迁量相同）。判别力自证：把 `segs0` 改成每次续做时重取当前值，断言必须由绿转红 | D26（后台整理与放置回收） 已定项 1 定案（停机判据取什么形态）| 2026-09-06 D26（后台整理与放置回收） 第三轮找反例腿第 1 题 |
+| C142 | 第一个 reflink 之后整理会造出静默陈旧读 | **D21（权威态与派生态的分界） 那条「共享之下多引用者住哪」阻塞的是第一个共享引用，而在它定案之前，第一个 reflink 加第一次后台整理就已经会造出静默错误。** 七步：建 reflink ⇒ 同一个单元有两个引用者，而单元头那条五元组按 D1（数据可移动性 / 反向索引） 已定项 5 只指出生所有者 ⇒ 整理（D26（后台整理与放置回收） 腿一）搬走它 ⇒ 按今天已定的位置权威（D19（块指针的结构与宽度预算） 已定项 4：位置条目在指针里）要逐个改引用者的指针 ⇒ 而「谁引用我」今天没有任何结构答得出 ⇒ 第二个引用者的指针没被改到 ⇒ 它指向的旧落点已被回收复用。 ⚠️ **失败模式 2026-09-06 更正**：不是「读出别的数据而不报错」——D19（块指针的结构与宽度预算） 已定项 2 定位置条目里那份密文校验和 32 位，D9（加密） 已定项 1 逐字「**所有读路径都用它，不是只有 scrub 用**」⇒ 复用之后那条指针在**每一条读路径**上都失配，而两个副本一起失配 ⇒ 表现成**一次假的介质损坏、数据读不出来**，不是静默错读。⚠️ **而且更早一步就已经违反了**：D3（空间分配） 已定项 7 的释放口径要「没有任何根引用它」，而那个谓词在多引用者没有载体的今天**算不出来** ⇒ 旧落点根本不该被判成可回收。⚠️ 这条**不改新池新建文件的字节**（第一版无共享），但它在第一个 reflink 那天就成立，不等到「格式冻结」那么远 | 造一个「一个单元两个引用者 + 一次整理搬迁」的镜像，断言搬完之后**所有**引用者的指针都指向新落点；再断言旧落点在所有引用者都改完之前不得进入可分配集合。判别力自证：只改出生所有者那一条指针，第一条必须由绿转红 | D21（权威态与派生态的分界） 那条「多引用者住哪」定案 + D26（后台整理与放置回收） 腿一的搬迁实现 | 2026-09-06 D21（权威态与派生态的分界） 多引用者第二轮辩方复核腿的第五面，七步历史逐字核过 |
+| C143 | inode 号水位在崩溃恢复落到旧根后退回去重发 | **定案（2026-09-16，三轮三方 + 用户定案）：不搬水位，把唯一性收窄到「已发布的 (inode 号, 对象出生代) 不复用」（D8（核心索引结构） 已定项 6），水位照旧住记账。**管理员回退是挂着时的一次向前发布**（D23（journal 的角色与格式） 已定项 14）：那次发布的记账统计量现算、不从 R_old 那棵账载入，inode 号水位取 max(现行那一版内存里的, 环里读得出的根的)，不退回去、不重发（`research/prompts/m2-rollback-forward-r3-main-verification.md` 第二节 K1：水位只取环里读得出的根时，现行那条根在回退那一刻读不出，号 2、3、4 被重发，收严成取 max，被攻过零轮）。水位仍会退回去的只剩崩溃恢复落到较旧的根那一形：水位随所选根那棵账载入，被抛弃时间线里已发过的号会被重发，恢复之后新对象的出生代大于环里读得出的每一条根与记录的 txg（D23（journal 的角色与格式） 已定项 14 注 3）；这一形要几个故障才撞得上，今天的条款没写——2026-09-16 定案时写下的界「只要回退那一刻最新的根读得出，严格暖机与 0 / 1 / 0 归属下要连续 3 个 txg 的根读不出才撞得上」（`c143r3_model.out` 逐槽计那一套里 `arm=C min_fs=3`）量的是挂载时回退从 R_old 重载水位那一形。三轮里出局的：甲 / 乙 + AJ（回退时再读 journal 里该头的水位）——见证随头销毁不再传播，2 个故障盖住；G（根记录与记录头各带全池号水位，各 +8 字节）——抬过水位的最新那次发布的根与两份记录副本读不出（逐槽 3 个故障）就重发一个 fsync 返回过的号。三轮判决在 `research/prompts/c143-r{1,2,3}-main-verification.md`。原洞照录：** 树 ID 水位那个洞对 inode 号水位逐字成立，而 2026-09-06 给树 ID 定的根记录臂同样搬不过去。洞：inode 号水位是 D5（快照 / 空间记账机制） 已定项 4 第 12 项，住记账；D23（journal 的角色与格式） 已定项 14 逐字「全部记账统计量的现行值从 R_old 那棵账重新载入」⇒ 回退之后水位退回旧值 ⇒ 已经发过的 inode 号被重发，撞 D8（核心索引结构） 已定项 6「inode 号单调不复用」。⚠️ **2026-09-06 用新射程回扫过，这条不消失**：同日把 D6（快照实现模型） 判据 9 收窄成「**已发布的**快照标识单调不回收」，而**回退抛弃的是已经发布过的时间线**（那些 checkpoint 的根写成了才谈得上回退到它之前）⇒ 被重发的 inode 号出现在**已发布**的单元里，正落在新射程之内。⚠️ **另一半是开着的问题**：那么 D8（核心索引结构） 已定项 6「inode 号单调不复用」要不要按同一条理由句也收窄成「已发布的」？崩溃丢弃（不是回退）留下的孤儿单元里的 inode 号，按 D6（快照实现模型） 判据 9 的新射程是可以重发的。**这是用户定案要答的，今天没答。**搬不过去的理由：该项**带树维**（逐字「**带**（只为可写头维护）」）⇒ 条数随可写头数长，而根记录与系统配置都是定长槽（E100（系统配置的三段几何） 出路臂的全部价值就是让它「与设备数无关的常数」，走间接层后恒 420 字节） | 多次挂载的崩溃点重放里，管理员回退或挂载之后建的每个对象的 (树 ID, inode 号, 对象出生代) 与此前任何一个写成了根的对象都不同。判别力自证：管理员回退那次发布的水位改成只取环里读得出的根，现行那条根在回退那一刻读不出时必须红（第三轮判决第二节 K1 那一格）；崩溃恢复那一形的判别力自证随它的界一起定——2026-09-16 写下的「严格暖机下回退那次扫描藏住 R_old 之后最新的 2 个根槽必须绿、3 个必须红；把暖机改成用户对象紧跟回退根的宽读法，藏 2 个必须红（注入量随根环归属变，D22（单元原子性怎么合成） 已定项 16）」是按挂载时回退写的 | 多次挂载的录制流（2026-09-17 起有了：层 0 第二条流三次可写挂载含回退；这一格还要回退之后连续几个根读不出的故障注入，另一半（崩溃丢弃的孤儿单元里的 inode 号能不能重发）2026-09-06 用户定案已答：D8（核心索引结构） 已定项 6 收窄成「已发布的 inode 号单调不复用」（decisions-history.md 的 D8（核心索引结构） 节 2026-09-06 那一条「D8（核心索引结构） 已定项 6 的射程收窄成……」），剩下的扫描重建复核在 C152（收窄后未发布号重发的扫描重建复核）；与 C331（择根倒挂压过已确认的写）、C332（回退实例两个根都读不出时回退被撤销） 同一个前置） | 2026-09-06 D8（核心索引结构） 已定项 8 定树 ID 水位时逐字核 E100（系统配置的三段几何） 段四与 D5（快照 / 空间记账机制） 已定项 4 第 12 项的带树维列，坐实方案不可移植 |
+| C144 | 快照谱系的区间标号没有载体 | **D5（快照 / 空间记账机制）`:194` 欠的「全部根的 txg 列表」，2026-09-06 加的诞生 txg 收不了**——D6（快照实现模型）`:66-69` 给了具体反例：「主线 txg=10 建可写快照 X；在 X 里于 txg=30 写一个块（birth=30）；主线 txg=35 建快照 Y。按 D5（快照 / 空间记账机制） 的条件 `30 ≤ 35 < death` → 判「Y 引用它」，**而 Y 根本看不见它**」⇒ 谱系成树之后「每个根一个 txg 标量」判不了归属。D6（快照实现模型）`:73-74` 给了正确形态：「链上的区间标号……树上的推广是**嵌套区间标号**（preorder / postorder）」——那是每个快照两个数，且随谱系变化要回头改写（order-maintenance），与「诞生 txg 写一次不再动」是完全不同的格式性质。⚠️ **同一个被打穿的前提有三个消费者，D8（核心索引结构） 已定项 8 正文自己点过名，而定案只兑现了一个**：**I-3.5（引用区间的精确性）** 的可判定形式逐字要求「按 txg 升序枚举全部快照根与活头得 `Reach(b)`，则 ① `Reach(b)` 在 txg 序上**连续无洞**；② …**双侧夹死，off-by-one 无处可藏**」（`invariants.md:119`）——谱系成树之后 `Reach(b)` 只在**一条谱系路径上**连续，全局 txg 序上有洞 ⇒ ① 恒假。I-3.5（引用区间的精确性） 自己写着「**换快照模型时表达式要重写，内容不变**」，而快照模型 2026-08-30 就换了（D6（快照实现模型） 已定项 1），这次重写欠到今天 ⇒ **不是 I-3.5（引用区间的精确性） 要重开，是它的表达式欠一次重写**。第三个消费者是 D18（块里携带什么信息） 的代际回收（逐字「代际不存字段，= 活快照列表（I-3.7（活快照可枚举））里包含容器出生代的那一段」）：它走的是同一个区间测试，**错的方向是过判 ⇒ 少回收 ⇒ 泄漏，不丢数据**（主 agent 推的，未实测） | 造一棵有分叉的快照谱系（主线 → X 分支 → 主线再建 Y），在 X 分支里写一个块，断言扫描式 checker 判出的归属集合**不含 Y**。判别力自证：把区间标号换成「比 txg 大小」，检查必须由绿转红——那正是 D6（快照实现模型） 那个反例 | 标号的盘上落点（进树表条目还是另立一棵树）要定案，且它要随谱系变化增量维护（order-maintenance），不能靠事后遍历算——撞 `.claude/rules/fs-design.md`「记账是事务的副产品，不是事后的遍历」第一格 | 2026-09-06 D8（核心索引结构） 已定项 8 第二轮反推腿命中 1，主 agent 逐字核 D6（快照实现模型）`:66-69` 与 `:73-74` 坐实 |
+| C145 | deadlist 在盘上没有落点 | **2026-09-16 D5（快照 / 空间记账机制） 已定项 12 定了条目形态（key = 头的树 ID 8 + 纪元 8 + 中央映射 key 27，value 空；条目按纪元分段，交接不搬条目），仍欠的是检查。原洞：** **D5（快照 / 空间记账机制） 逐字「每个可写头各持一份 `previous_snapshot_txg` **与一份 deadlist**」（`:129`）、「建快照时把**活头的 deadlist 整个交接给新快照**，活头换一个空的」（`:8`），而 deadlist 是哪棵树、树 ID 怎么挂到头 / 快照、新池新建文件建不建空的——全仓一处都没定。**2026-09-06 的 ③ 只给了 `previous_snapshot_txg` 一个落点，交接语义要求快照条目也要能指到一份 deadlist | checker：每个纪元恰好落进一份区间（快照的 [prev(X).txg, X.txg) 或头的 [prev(头).txg, ∞)）；未完成意图的区间里没有纪元 ≥ 上界的条目；运行期断言「放块时要删的那条条目必须还在」。判别力自证：把施加时复核拿掉，fuzz 里丙-区间必须判红（`out-fuzz.jsonl` 第 1 行 12 / 400）；把上界改成已发布的号，BFS 必须在 5 步内判红（同目录 `out-bfs-crash.jsonl` 末条） | 形态已定（2026-09-16）；剩事务层 + checker | 2026-09-06 D8（核心索引结构） 已定项 8 第二轮反推腿命中 6，主 agent 逐字核 D5（快照 / 空间记账机制）`:8` 与 `:129` 坐实 |
+| C147 | 树 ID 水位的不变量还没有 | ⚠️ **2026-09-06 当日缩到一件**：这条原本记的是「住系统配置 + 区段预留」带出的六件事；同日重比三条臂后水位改住根记录（D8（核心索引结构） 已定项 8 ②），㈠（挂载中途预留失败没有出路）、㈢（树 ID 要进树表条目固定前缀）——⚠️ **它连「以后再说」都不用留**：唯一可能剩下的消费者是 checker 算「池中出现过的最大树 ID」，而 D18（块里携带什么信息） 已定项 7 逐字「索引节点 = **树 ID** + 层级 + 该树已定携带的 key 区间 + 诞生代号 + fsid」，I-1.3（块头树 ID 一致） 要求它与实际引用它的树一致 ⇒ **扫单元头就拿得到全部树 ID，一条树表条目都不用解**。⇒ 按 `.claude/rules/fs-design.md`「一条格式分支值不值得，看它能不能把『用错了』变成『挂不上』」，它买不到任何失败模式的改善，**不该立**。㈤（盘上那个数是预留段上界而非水位本身）、㈥（消耗速率是 `K × 挂载次数`）**随区段预留与树表见证一起消失**。**剩下的一件**：实例代号有 I-7.7（系统配置实例代号不低于根环）、inode 号水位有 I-9.6（水位大于两处最大号）、nonce 有 I-6.5（nonce 水位单调）、清扫有 I-1.9（清扫水位内无可读垃圾），**树 ID 水位一条不变量都没有** ⇒ 「不重发号」这套安全性论证今天没有可判红的形式。⚠️ **2026-09-06 当日已把不变量写下来：I-7.8（根记录树 ID 水位不低于全池最大树 ID）**，欠的收窄成「它还没实现」（checker 不存在）。 | 原形态：**根环里全部根记录的树 ID 水位取 max，必须 > 该池中出现过的最大树 ID**——「出现过的」由 checker 全盘扫树表与全部单元头的类身份段取最大值算出（**不许与运行时共用同一段代码**，D13（验证路线） 已定项 5）。判别力自证：让某次发布不更新水位，检查必须由绿转红；再造一个「根轮出环」的镜像（2026-10-01 判决采攻方的造法：建一次树之后，经会话入口覆盖写 24 次把发树那条根轮出去，再把环里每条根的水位压到 11，只红 I-7.8（根记录树 ID 水位不低于全池最大树 ID）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 10 行），断言水位仍严格大于全部树 ID——**这一条专门钉住「累计高水位」那个读法**，改成「本 checkpoint 发出的最高号」必须红 | 要 checker 存在（不变量本身 2026-09-06 已写进 invariants.md）；2026-09-14 起 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 已实现，坏镜像（没人引用的槽上放一个树 ID 99 的节点）只罩判别力第 ① 格，「根轮出环」钉住累计高水位那一格还没有坏镜像 | 2026-09-06 D8（核心索引结构） 已定项 8 第三轮辩方腿，主 agent 逐条现查 D18（块里携带什么信息） 已定项 11 的出路句、invariants.md 的水位族（I-1.9（清扫水位内无可读垃圾） / I-6.5（nonce 水位单调） / I-7.7（系统配置实例代号不低于根环） / I-9.6（水位大于两处最大号），无树 ID 水位）坐实 |
+| C148 | 树表条目变宽把间接层门槛压到二层 | **2026-09-16 用户定案把条目加宽到 200、预留 76（C338（树表条目预留没有余量）），每层 81 棵、二层 6561 棵，门槛比立账时更低。立账时的原文：** **四条定案给树表条目加了 34 字节（诞生 txg 8 + `previous_snapshot_txg` 8 + 长度 2 + 预留 16），条目从 67 变 **121** ⇒ 每层从 243 棵降到 16284/121 = **134** 棵，二层封顶 134² ≈ 1.8 万。（121 = 长度 2 + 树的种类 2 + flags 2 + 树 ID 8 + 根指针 59 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 预留 **32**，预留宽度 2026-09-06 用户定案。）而 ① 把快照也放进同一张表 ⇒ 快照多的池必然越过这个门槛 ⇒ 每次发布 COW 的树表单元从 1 个变 2 个，E79（根记录的容量） 量的 +7.1% 变约 +14.2%。这笔每发布代价四条定案一个字没记。**⚠️ **口径已写死**：那 32 字节预留是**给将来未命名的字段留的**，诞生 txg 与 `previous_snapshot_txg` 是已命名字段、不占预留 ⇒ 121 而不是 89（89 那读法给每层 182 棵）。两种读法差 48 棵 | E79（根记录的容量） 加一档：按现行条目宽 200 算每层棵数与二层封顶（2026-09-16 起每层 81 棵、二层 6561），并把「越过一层之后每发布多 COW 几个单元」算成绝对值而不是百分比。判别力自证：把条目宽改回 67，每层必须回到 243 | 无前置，纯算术；口径那一半要 D8（核心索引结构） 已定项 8 定案（预留归谁用） | 2026-09-06 D8（核心索引结构） 已定项 8 第二轮反推腿命中 5、第三轮辩方腿指出它「既没采纳也没否，是消失」 |
+| C149 | 根槽重发之后 birth 口径松一格 | **D23（journal 的角色与格式） 对根槽写失败的处置是「checkpoint_txg 推进一格再发」，而同句「号 ≤ W 的事务**照旧**」，对上 D5（快照 / 空间记账机制） 逐字「`birth(b)` = 块被**发布**的那个 checkpoint 号」⇒ 发生过根槽重发的镜像上，同一个块的 birth 说得出两个号。I-3.5（引用区间的精确性） 那句「**双侧夹死，off-by-one 无处可藏**」在这类镜像上正好松一格。**⚠️ 这是 D5（快照 / 空间记账机制） birth 口径的既有洞，不是 2026-09-06 四条定案造的。⚠️ 同源的另一处空白（2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第二轮反推腿指出）：重发推进一格那一刻，手里已经是 T+1 的开放 checkpoint 换不换号全仓没写；并进重发的那一次、或改成 T+2 都说得通，两个都用 T+1 被 D16（发布语义） 已定项 6「每次发布把 checkpoint_txg 加一」挡住；前两种读法下都有码 1 单元的诞生代号比真正发布它的号小一格，与这里同向 | 造一个「根槽写失败 → checkpoint_txg 推进一格 → 重发」的镜像，断言其中每个块的 birth 只有一个取值，且 I-3.5（引用区间的精确性） 的双侧夹死在它上面仍然是紧的。判别力自证：让重发不推进 txg，检查必须由绿转红 | D5（快照 / 空间记账机制） 的 birth 口径要补一句说清重发那一格取哪个号（细则，不动格式） | 2026-09-06 D8（核心索引结构） 已定项 8 第二轮反推腿在「反推没打中」那一节自陈「值得单独立一笔」，第三轮辩方腿点出它一直没立 |
+| C152 | 收窄后未发布号重发的扫描重建复核 | **2026-09-06 把 D6（快照实现模型） 判据 9 与 D8（核心索引结构） 已定项 6 的射程收窄成「已发布的标识单调不复用」，依据是「孤儿不在任何树里、扫描重建两道闸按写序择新」。而 D8（核心索引结构） 已定项 6 同一段的末尾写着「『未发布的等于没发生』只对常规挂载路径成立，**扫描重建看的是盘**」——两句挨得很近，方向看起来相反。**主 agent 判它们不是同一个命题**（那句管的是水位在一个代段里取最大值而不是后者胜），但这个判断本身没走三方，也没有实测。** | 造一个镜像：checkpoint N 发出 inode 号 M 与树 ID T、写出带它们的单元头、根没写成就崩；重挂后重发 M 与 T 并写出新对象；然后**只走扫描重建**（不读根）重建整个池。断言：重建结果里 M 与 T 各自只对应一个对象，且是新的那个。判别力自证：把单元头里的写序抹掉，重建必须由绿转红（写序是唯一区分孤儿与活版的字段）。2026-09-16 加一格（D8（核心索引结构） 已定项 6 收窄到 (inode 号, 对象出生代)）：造「发号 M、发布、回退到之前的根、再发 M」的镜像，只走扫描重建，断言 M 对应的两个对象按 (号, 出生代) 分开、现行的是新的那个；判别力自证：把五元组里的对象出生代抹掉必须红 | 扫描重建实现 + checker；在那之前可以先做纯内存模型（形态照 E104（扫描重建的现行版本判定）） | 2026-09-06 收窄射程时主 agent 自己现查 D8（核心索引结构） 已定项 6 原文发现的残留疑点，不是攻击腿打的 |
+| C153 | 拒绝给的出路走不通 | **`gate-lint` 只查一条拒绝**有没有**出路，不查那条出路照做之后能不能过。** 两者可以同时成立而检查仍然是坏的：实测 2026-09-06，26-number-name-sync 的拒绝写着「简称照登记位抄」，而 D14（双轨（大小文件 / 持久临时）） 的简称本身含一层全角括号，照登记位抄仍然判红——**在它扫描的目录里没有任何写法能通过**。一道逼人绕过去的检查比不查更糟（`.claude/singlefs-ai-sop/rules/show-me-test.md`）；当时只能退回裸编号绕开，洞是事后才补的 | 每个阶段的红样本，按它自己打印的出路改一遍，必须得到一个绿样本：红样本目录旁放一个 `howto-applied/`，89-stage-selftest 对它断言 exit=0；判别力自证：把出路那句改成一个做不到的要求，检查必须转红 | 要先给每个红样本写出「照出路改完长什么样」，工作量与阶段数同阶；另有一类出路本来就不是一次编辑能表达的（「先定 X 再回来」），这类要显式豁免并说明 | 2026-09-06 本仓实测，修补与会红的样本见 commit 6bff7dd |
+| C154 | 条带成员表没有登记打包记录类型 | **D2（RAID 条带策略） 已定项 12（2026-09-06 用户定案）定了条带成员表住码 3 打包记录，却没给它在打包记录类型那张第二级登记表里登记一个码。** 登记表今天有 0（无效）/ 1（墓碑区间记录）/ 2（inode 记录）/ 3（退役记录）/ 4（实例表）五项，条带成员记录**一项都没有**；而 E106（条带成员表的载体） 的源码头注里已经非正式把它写成「类型 5」⇒ **一个格式常量事实上被实验源码定了，而决策正文没定**。⚠️ 这一格是格式级的：D15（格式冻结政策） 判定表逐字「**新增打包记录类型默认也是 incompat**」⇒ 登记哪个码、要不要占一个 incompat 位，都要在 `w ≥ 3` 开线之前定 | 门禁比对：凡是实验源码里出现的打包记录类型码，都必须能在 D18（块里携带什么信息） 已定项 11 的第二级登记表里点到名；点不到即判红。判别力自证：把登记表里「4 实例表」那一行删掉，检查必须由绿转红 | D2（RAID 条带策略） 已定项 12 的后继分项（给条带成员记录登记一个类型码）| 2026-09-06 C103（容器索引无落点） 收口候选的三方论证正推腿现查，主 agent 逐字核 D18（块里携带什么信息） 已定项 11 的第二级登记表与 E106（条带成员表的载体） 源码头注坐实 |
+| C155 | 跨实验同量无交叉断言 | **两个实验各自算同一个物理量，谁也不去对另一个的数。** 实测 2026-09-06：E106（条带成员表的载体） 与 E111（条带表的 key 与它的几何） 都在算「条带成员表这张表占多少字节」，E106（条带成员表的载体） 报 54 315 515 904 字节 / 3087.5 ppm，E111（条带表的 key 与它的几何） 报 81 473 306 624 / 4631 ppm，**差 1.5 倍**，而两边各自单测全绿、变异全抓、门禁全绿。差的那 1.5 倍是 E111（条带表的 key 与它的几何） 把 90% 填充那笔预算当成数据格数、再往上加 parity（往 16 TiB 盘上摆了 135% 的格），而 E106（条带成员表的载体） 早在同一天修过同一个错并留了会红的断言——**修在 E106（条带成员表的载体） 里的那条断言对 E111（条带表的 key 与它的几何） 一点作用都没有**。⇒ 变异与钉绝对值的断言都只在一个实验内部生效，「两个实验对同一个量必须落到同一个数」这一层今天没有任何东西看着。连带的那笔用户复核 2026-09-13 收口：D2（RAID 条带策略） 已定项 12 是 2026-09-06 用户定案，拍板当时看到的代价数是被抬高 1.5 倍的那个 4631 ppm，按修正后的 3087 ppm 读定案照旧成立 | 每个实验在正文里写一行可解析的声明，说它算的量与哪个已入库的量同尺；门禁按声明取两边的数逐位比，对不上判红。判别力自证：把 E111（条带表的 key 与它的几何） 的 `cells()` 改回第一版，检查必须转红 | 要先给实验产物定一套「这个数是什么量」的机器可读标注——今天产物里只有 `name=` 与字段名，没有量纲与口径 | 2026-09-06 逐字核 E106（条带成员表的载体） / E111（条带表的 key 与它的几何） 两边源码与产物，算术自证（724 775 730 × 32768 大于 16 TiB） |
+| C156 | 记录编码误读没有不变量 | **E112（旧写者遇到不认识的树） 实测：`Ignore` 政策（旧读者忽略未知 flags 位、按已知语义继续解释）下 4000 条记录被按错编码解释，而 `silent_by_spec = 1`——不变量清单里没有任何一条抓「记录被按错编码解释」。**树 ID 是对的 ⇒ I-1.3（块头树 ID 一致） 够不着；记账行在册（值由错误语义算出）⇒ I-9.11（可写克隆头有水位行） 判「有行」也过。⚠️ 这不是 `Ignore` 输在别处，是**它输的那一格根本没人看**——2026-09-06 定「未知 flags 位按不认识这棵树跳过」正是为了不进这一格，但**政策拦得住的只是这一条路径**，别处（记录格式演进、打包记录类型新增）同样可以走进来 | 要一条「记录按声明的编码解出来之后自洽」的不变量：每条记录的声明长度 × 条数 == 载荷长度，且每个字段落在声明的值域里。checker 对每棵树按它自己的种类解一遍，解不通即判红。判别力自证：把一棵树的记录按另一种类的编码解，检查必须由绿转红 | 记录编码的字段表定案（今天只有 D8（核心索引结构） 已定项 6 的 inode 记录定死了 140 字节）+ checker | 2026-09-06 E112（旧写者遇到不认识的树） 跑出来的顺带结果，不在原问题里 |
+| C157 | 树表容量在两处按不同条目宽算 | **D22（单元原子性怎么合成） 已定项 7 正文与 E79（根记录的容量） 报「树表单元装 243 棵/层」，用的条目宽是 67 字节（树 ID 8 + 根指针 59）；而 D8（核心索引结构） 已定项 8 定下的树表条目是 **121** 字节（另有长度 2 + 种类 2 + flags 2 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 预留 32）⇒ 真实容量 **134** 棵/层。两处差 109 棵，而 D22（单元原子性怎么合成） 那个数是「什么时候要嵌第二层」的判据。**⚠️ 方向不变（间接层躲不开），门槛比正文写的低 | **kb 这一半 2026-09-13 已收口**：D22（单元原子性怎么合成） 已定项 7 统一按当时的 145 字节条目算成 112 棵/层（码 2 三档头同值），2026-09-16 条目加宽到 200 之后正文跟着改成 81 棵/层；仍欠：E79（根记录的容量） 加一档：条目宽取 D8（核心索引结构） 已定项 8 的现行字段表算一遍，并把「越过一层之后每次发布多 COW 几个单元」算成绝对值；两处正文引同一个数。判别力自证：把条目宽改回 67，每层必须回到 243 | D8（核心索引结构） 已定项 8 的字段表定案（预留宽 2026-09-16 已定 76，C338（树表条目预留没有余量）；按 200 算的每层 81 棵已写进 D22（单元原子性怎么合成） 已定项 7，E79（根记录的容量） 那一档仍欠） | 2026-09-06 按上游 SOP 新增的「撤回一个数要当场回扫谁在引它」全仓回扫时扫出来的 ⚠️ **2026-09-10 追记：这一格今天并排放着同一个物理量的三个数，互不点名**——D19（块指针的结构与宽度预算） 已定项 7 的代价清单曾写「树表容量 243 → 196」（67 字节口径，C157（树表容量在两处按不同条目宽算） 已记它算错），E128（指针带出生 (树, txg) 之后的点查代价） 一度报 134 → 119（分母 16320），而仓里口径的分母是 16284（D22（单元原子性怎么合成） 逐字「(16384−68−32)/67 = 16284/67 = 243」）给 134 → **118**。⚠️ **两个分母在 121 那一臂上恰好同值（都 134），只在 137 上差 1** —— `.claude/rules/mutation-sampling.md` 说的第三类「取样点不敏感」：基线那一格对上了，就没人会去查另一格。已处置：E128（指针带出生 (树, txg) 之后的点查代价） **不再报每层棵数**，只报条目宽（两个口径对它一致），并留一条单测把「121 同值、137 差 1」钉住；D19（块指针的结构与宽度预算） 已定项 7 的那句「243 → 196」已删。
+| C158 | checker 跳过不认识的树会判假阳性 | **2026-09-06 定「未知 flags 位按不认识这棵树跳过」，而 I-3.1（已分配统计对得上） 逐字要「已分配空间统计 == 实际遍历**所有**引用得到的和」，无限定。混版本池里（新写者建了树、旧 checker 不认识）checker 若沿用同一套跳过语义，遍历和会短一截 ⇒ **判出假阳性红**，不是漏检。** ⚠️ 与 C156（记录编码误读没有不变量） 是两个失败模式：那条是「解错了」，这条是「遍历不全」 | checker 遇到不认识的树必须报「无法完整遍历」并停，不许跳过之后照样比。门禁形态：造一个含一棵 checker 不认识的树的镜像，断言 checker 报的是「不可判定」而不是 I-3.1（已分配统计对得上） 红。判别力自证：把「不可判定」改回「跳过并继续比」，检查必须由绿转红 | checker 存在（2026-09-14 已有，`crates/singlefs-checker`）；D13（验证路线） 要补一条「遇到不认识的结构怎么办」的契约（今天没有） | 2026-09-06 E112（旧写者遇到不认识的树） 对抗轮反推腿，主 agent 逐字核 I-3.1（已分配统计对得上） 原文坐实无限定 |
+| C159 | E112 的臂集缺三条且天平不含挂不上的代价 | **E112（旧写者遇到不认识的树） 的 3×2 臂集漏了本工程自己已定或现役实现正在用的三档**：`RejectEntry`（该条目 EIO——D18（块里携带什么信息） 与 D8（核心索引结构） 对另外两个 flags 字段定的就是这一档，E112（旧写者遇到不认识的树） 的被引用条款表里一条 D18（块里携带什么信息） 都没有）、`ReadOnly`（compat_ro——D15（格式冻结政策） 判定表里明写的那一档，E112（旧写者遇到不认识的树） 把三档表抄进条款表却没建成臂）、「按位分档」。记账轴还缺「豁免那棵树的 K 代点删」（写代价 0，比搬运便宜，代价是改 D5（快照 / 空间记账机制） 已定项 2）。**且天平本身有毛病**：`Refuse` 两格产物里同样 `silent=0`，是被源码里 `if o.mount_ok` 那道筛子请出去的，它「10 代全挂不上」的代价从来没进过那个比较；`compat_with_d15_item2=0` 是**手打字面量**，11 个单测 9 条变异一条都没碰它；`caught_today` 六行全 0 ⇒ 那一列不含信息 | 重跑要补三条 flags 臂与两条记账臂；outcome 向量加「被误释放的仍被引用的块数」与「丢掉的可写代数」，**把挂不上的代价放进同一个天平，不许用 `mount_ok` 筛子请出去**；`compat_with_d15_item2` 由被引条款算出来并配变异；`h_new` 与 `records_per_new_tree` 给出仓内出处或扫一条曲线。判别力自证：补上 `ReadOnly` 臂之后 `absolute_verdict` 那条断言必须由绿转红 | 无前置，纯模型工；结论那一半要 D8（核心索引结构） 已定项 8 ㊁ 重新定案 | 2026-09-06 E112（旧写者遇到不认识的树） 对抗轮「臂集与稻草人」腿，主 agent 逐字核 D18（块里携带什么信息）、D8（核心索引结构）、D15（格式冻结政策） 三处原文坐实 |
+| C160 | 记账臂的真实代价不在天平上 | **E113（不认识的树·补齐臂集） 的字典序第 6 关只比「每代写几行」：`Exempt`（豁免那棵树的 K 代点删）17 行、`Carry`（原样搬到新代）19 行，`Exempt` 因此赢。而 `Exempt` 的真实代价是**要改 D5（快照 / 空间记账机制） 已定项 2**（「只保留最近 K 代」的丢弃规则要开一个例外），那是一条已定条款——**这个代价一个格子都没占**。同型的还有 `RejectEntry` 相对 `Skip`：前者要给树表条目定义「EIO 但位置还在」的语义，也不在天平上 | 给字典序补一位「要改几条已定条款」，排在写行数之前；或者把这一维从实验里摘出去、明写它由人判。判别力自证：把 `Exempt` 的「改一条已定条款」记成 1，赢家必须从 `RejectEntry_Exempt` 变成 `RejectEntry_Carry` | 无前置，纯模型工 | 2026-09-06 E113（不认识的树·补齐臂集） 跑完后主 agent 自查，不是攻击腿打的 |
+| C161 | 缓冲两级并存而衔接没定 | **定案（2026-09-16，三轮三方 + 用户定案，D8（核心索引结构） 已定项 12）：一棵树只准一级——走前端的三棵树 ε 恒 0、写一律进前端、发布前排空到叶；仍欠的是检查。原洞：** **两级今天在记账树上同时存在**：D8（核心索引结构） 给 write buffer 前端，D11（索引节点要不要留消息缓冲区） 已定项 1 / 2 给节点内的消息缓冲区（逐字管的是「索引节点的**磁盘格式**里留不留一块消息缓冲区」，ε = 0.65），而 D8（核心索引结构） 把记账树判在「能重算 ⇒ 留缓冲」那一边。**而「前端 flush 之后条目落进哪一层」——直落叶，还是落进节点缓冲区——全仓一处正文都没有**（`grep 「flush 之后」「落进节点缓冲」「排空到」` 在 D8（核心索引结构） 与 D11（索引节点要不要留消息缓冲区） 正文零命中）。⚠️ **两个承重实验把两者建成互斥的臂**：E7（离线索引 harness） 逐字「没有一个对照组带 write buffer 前端」、E56（消息缓冲的收益 vs ε） 逐字「它不是『无批量』基线」——**没有任何一个实验量过两级并存**。⚠️ **连带**：「消息越靠根越新」这条下推规则全仓零覆盖；D23（journal 的角色与格式） 提到 write buffer **0 次** ⇒ 崩溃后未排空的缓冲条目从哪恢复、按什么序重放，今天没有答案（C80（记账更新必须原子地随根发布） 原样成立）| 运行时断言（只能是运行时的：盘上分不出经前端排空与直写落叶）：一个 checkpoint 里前端树叶上的每一处逻辑改动（key → 值）都对得上一条这个 checkpoint 进过叶的前端条目，窗口中途 flush 的与发布时排空的都算、实例切换重发时保留；重组、索引重建、损坏恢复重建三个例外各配一条「前后每个 key 读出来的值不变」；类型层：前端树的写路径只暴露前端入口。判别力自证：前端树上多一个直落叶的写者必须红（`c161-r3-model-output.txt` 变异 M7，2 步）；按字面写的三种断言在合法历史上会误报（窗口中途 flush、切换重发、叶分裂），写法要按 D8（核心索引结构） 已定项 12「检查」那一段 | 分项已立（D8（核心索引结构） 已定项 12）；剩事务层的写路径与运行时断言 | 2026-09-06 D8（核心索引结构） 已定项 7「seq 住哪」三方论证时，正推腿现查暴露；主 agent 逐条复核 D23（journal 的角色与格式） 零命中与两处正文零命中坐实 |
+| C162 | seq 进 value 之后四个实验的数要重算 | **2026-09-06 定 seq 住 value，记账条目从 30 字节（key 22 + value 8）变 34。**四个实验的数直接建在 30 上：E97（记账与分配记录的条目编码）（条目编码与段清单）、E71（记账 key 的条目数与宽度）（条目数与宽度）、E54（记账的「代」要保留几代）（每代写次数）、E99（write buffer 条目与 seq 的去重）（去重窗口，27 位下界的分母正是 `T_dirty` ÷ 30 字节）。⚠️ **E99（write buffer 条目与 seq 的去重） 那一处最要紧**：窗口条数 = `T_dirty` ÷ 条目字节，分母从 30 变 34 ⇒ 同样 2 GiB 下条数从 71 582 788 降到约 63 161 283，**位宽下界从 27 位变 26 位**——方向是变松，但那个数是 4 字节定案的依据，要重算过才算数 | 四个实验各加一档按 34 字节算，并在正文点明哪些结论随之变；`format-const` 登记记账条目宽，把它绑到源码常量上。判别力自证：把源码常量改回 30，格式常量阶段必须判红 | 无前置，纯算术重跑 | 2026-09-06 D8（核心索引结构） 已定项 7 定案时正推腿点名，主 agent 未做 |
+| C166 | 明文侧取消之后格式预留要不要跟着收 | **2026-09-07 定「无密钥侧只读只检测」，明文映射层与明文反向索引整个取消。而格式里为它们预留的位是按「加密开启时存在这一层」留的**（D9（加密） 已定项 10 逐字「不进第一个可运行版本，**只预留格式字段**」）⇒ 那批预留今天没有消费者。收还是留是格式级判断：收了以后想加回来要动 incompat 位；留着是每单元恒定的浪费 | 先做一张清单：全仓凡是「为明文映射层 / 明文反向索引预留」的字段与位，逐条列出宽度与出处；再逐条判「收 / 留」。门禁形态：清单里每一条都要有判决，缺判决即判红。判别力自证：往清单里加一条不带判决的，检查必须由绿转红 | D9（加密） 已定项 5 改选之后的全仓回扫（C167（明文映射层的引用全仓回扫没做））先做完 | 2026-09-07 定案时主 agent 自己标出来的，不是攻击腿打的 |
+| C167 | 明文映射层的引用全仓回扫没做 | **2026-09-07 撤掉明文映射层与明文反向索引时，只改了核心三处（D3（空间分配） 已定项 16、D9（加密） 已定项 5、D9（加密） 第 7 / 9 项），全仓回扫没做。**「明文映射层」四个字在 9 个文件里出现 45 次：D9（加密） 19、D18（块里携带什么信息） 8、invariants.md 3、D21（权威态与派生态的分界） 3、D8（核心索引结构） 3、checks-owed.md 4、D11（索引节点要不要留消息缓冲区） 2、D26（后台整理与放置回收） 2、D19（块指针的结构与宽度预算） 1；另有 8 条决策提到「无密钥 + 搬」。⚠️ **这正是上游 SOP 2026-09-06 新增的那条要拦的形态**：「撤回一个数或一条结论，同样要当场回扫谁在引它……撤回的人通常确实扫了几处，于是他有理由认为自己扫完了，而漏掉的那处要过几天才发作」。⚠️ **2026-09-09 追记：那次回扫的搜索键太窄，漏掉的对象第一步就被跳过。** D21（权威态与派生态的分界） 已定项 3 ① 的撤回理由逐字是「无密钥的一侧要能搬」，不含「明文映射层」四个字 ⇒ 按四个字扫扫不到它，而它正是 D9（加密） 已定项 5 改案该撤销的下游（留痕见 C95（依据被撤回的已定项无人回看））。⇒ 回扫的键要连**这条改案取消掉的那个能力**一起扫：「无密钥……搬 / 疏散 / 回收」「自动整理是硬承诺」。这正是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「判据的搜索范围写窄一点，对象就会全被第一步跳过」的形状。⚠️ **同日按新键回扫，又扫出三处并当场改掉**：① D9（加密） 分项索引表第 5 行仍写着 2026-08-26 的第三个候选「反向索引 + bucket 代号留明文」，与同文件正文「只做 scrub」直接打架；② D9（加密） 已定项 1 正文「无密钥只做检测**与搬运**」；③ D4（校验和位置） 表格「D9（加密） 已定项 5 的『无密钥能搬块』」。**三处都不含「明文映射层」四个字**，与 D21（权威态与派生态的分界） 那处同因。⇒ 这条欠账仍开着：回扫要按能力名（搬 / 疏散 / 回收）而不是按结构名重做一遍，今天只扫了这一批 | 逐文件过一遍，每处判「随之作废 / 改写 / 本来就与明文侧无关」；改完 `grep -rn 明文映射层` 剩下的每一处都要能说出它为什么还在。门禁形态：把「明文映射层」「明文反向索引」列成禁用词，正文出现即判红（历史节与 `research/prompts/` 除外）。判别力自证：往正文加一句带这两个词的话，检查必须由绿转红 | 无前置，纯回扫工 | 2026-09-07 定案当日主 agent 立，回扫未做 |
+| C173 | 明文头的泄漏面在明文侧取消后没有辩护 | **D18（块里携带什么信息） 已定项 3（数据单元身份留明文）的泄漏面辩护逐字是「同一份信息已经因为 D9（加密） 已定项 5 的明文反向索引躺在明文里 ⇒ 不是第二次泄漏」。2026-09-07 明文映射层与明文反向索引整个取消 ⇒ 那句话不成立，块头里的五元组成了唯一的、首次的泄漏。**今天它泄漏 (树 ID, 对象 ID, 对象出生代, 锚点偏移)，而**锚点偏移直接给出文件大小与文件洞**。⚠️ 本项的主依据（为快速拿到而存在、不为省空间牺牲自包含）不受影响，受影响的只是这一格 | 把加密开启时的泄漏清单写成一张可对照的表（泄漏什么、从哪个字段读出来、哪条已定项许的），门禁比对明文字段表与那张清单，多一项即判红。判别力自证：往明文头加一个新字段而不更新清单，检查必须由绿转红 | **前半段已答（2026-09-07 用户定案：不接受）**，处置转 D18（块里携带什么信息） 已定项 13（加密开启时码 1 的身份段放明文还是密文），第一轮三方论证已跑。**本条剩下的是那张可对照的泄漏表本身**——它现在更要紧了：一轮论证查明泄漏清不到零（`声明长度` 给出小文件精确大小、单元类型标签结构上进不了密文），所以「许了哪些、没许哪些」必须逐项写死才判得动。⚠️ **2026-09-19 又多一格没重算**：D22（单元原子性怎么合成） 已定项 12 与 C241（树表归谁，两条用户定案说反话） 之后树表住根记录的间接层、树表单元是密文，D18（块里携带什么信息） 已定项 13 那张明文泄漏表删掉了系统配置那一行的树表表长；而 D18（块里携带什么信息） 已定项 13 取臂庚 的依据正是一次泄漏面比较，D22（单元原子性怎么合成） 已定项 12 的射程逐字写着「树表表长挪进密文之后，那一条明文泄漏是减了还是增了，没有量过」⇒ 这张表除了要写出来，还要给每次把字段移进或移出明文的改动各记一格「增 / 减 / 不变」，不然支撑已定项 13 的那次比较换了输入也没人知道 | 2026-09-07 明文侧取消的全仓回扫（C167（明文映射层的引用全仓回扫没做））扫出来的第一条，也是最重的一条 |
+| C177 | C34 作废之后被解锁的三处没复核 | **C34（明文映射层的态别三处打架） 2026-09-07 随明文映射层取消而作废，而它曾被三处当成阻塞点名**：D19（块指针的结构与宽度预算）、D21（权威态与派生态的分界） 的「引用者清单」那一半、D26（后台整理与放置回收） 已定项 5 的位置权威三选一（当时的正文把位置权威架构整个交给 C34（明文映射层的态别三处打架）；那句话已随 2026-09-20 的瘦身移出正文）。**阻塞解除了，三处里已复核两处**（2026-09-08：D26（后台整理与放置回收） 已定项 5 的复核留痕写在它自己那一格，结论是位置权威那个三选一**什么都不剩**——2026-09-06 已由 D19（块指针的结构与宽度预算） 已定项 5 取混合，挡路的换成了另一笔格式前置。2026-09-09：D21（权威态与派生态的分界） 的「引用者清单」那一半，留痕随 2026-09-20 的瘦身整节挪进了决策变更史 2026-09-20（其三），结论同为**什么都不剩**——那一格 2026-09-06 已由 D21（权威态与派生态的分界） 已定项 6 定案「不需要任何新结构」，它踩的正是同日 D19（块指针的结构与宽度预算） 已定项 5 那条混合；被撤下的是一句与同日定案打架的「今天定不了」）；2026-09-13：D19（块指针的结构与宽度预算） 那一处，留痕写在 D19（块指针的结构与宽度预算） 已定项 5 的收口句下，结论同为**什么都不剩**——那一条对 C34（明文映射层的态别三处打架） 的收口随它作废落空，D19（块指针的结构与宽度预算） 全文再没有以明文映射层为前提的句子。**三处复核齐了，仍欠的是门禁那一半** | 逐处复核并留痕：写明「C34（明文映射层的态别三处打架） 作废之后这一格还剩什么挡着」，答「什么都不剩」的当场定案。门禁形态：凡是点名一条已作废欠账的未定项，都要有一条复核留痕，缺即判红。判别力自证：把某处的复核留痕删掉，检查必须由绿转红 | 无前置，纯复核工 | 2026-09-07 明文侧取消的全仓回扫（C167（明文映射层的引用全仓回扫没做））扫出来的第二条 |
+| C174 | smallfile 那一行的三列没测 | **D25（目标负载优先级） 2026-09-07 加的 `smallfile 小文件密集` 那一行，叶/fsync、脊柱、每次 fsync 的写放大三列都是「未测」。** D25（目标负载优先级） 负载表这三列的口径来自 E16（journal 的角色：WAL vs 意图日志） 的叶/fsync 模型，而 E114（小数据打包容器的总账） 量的是对象大小与每次发布落多少个小对象，两者不同轴 ⇒ 不能互填。三列空着的后果：任何拿「小文件负载下写放大多少」去论证的推导今天都没有输入 | 照 E16（journal 的角色：WAL vs 意图日志） 的口径给 smallfile 加一档负载重跑，报三列的绝对值；判别力自证：把小对象数设成 1 时它必须退化到与 rand 那一行同量级 | E16（journal 的角色：WAL vs 意图日志） 的装置在（纯模型） | 2026-09-07 D25（目标负载优先级） 加行时同步立账 |
+| C163 | 固定点各轮写序相同使平局破除落空 | I-1.8（归并后版本全序） 给码 3 的全序键是 (诞生代号, 实例代号, 事务号)，并逐字说「事务号留在末位做同一 checkpoint 内的平局破除，固定点会迭代、同一容器在一个 checkpoint 里不保证只写一次」；而 D18（块里携带什么信息） 已定项 7 的取号规则逐字「容器只在 checkpoint 的固定点写出，事务号取那次 checkpoint 里已分配的最大事务号」。固定点迭代按 D3（空间分配） 已定项 5 与 E81（提交的固定点） 是发布阶段内部的收敛（提交自身产生的块又产生分配），不产生新的用户事务 ⇒ 事务号按 D23（journal 的角色与格式） 已定项 7 逐字「按实例计数、从 1 起，同一事务的全部记录共享它，**与 jsn 是两个计数**」，而固定点跑在发布阶段、该 checkpoint 的用户事务已攒完 ⇒ 各轮取到同一个号 ⇒ 同一 checkpoint 内两版容器的写序逐字节相同，**那个平局破除给不出任何判别力**。⚠️ 同一个洞对码 2 逐字成立，而码 2 那 6 字节事务号唯一可能的用途就是这个平局破除 ⚠️ 2026-09-13 总审核定案：D19（块指针的结构与宽度预算） 已定项 12 定固定点里同一节点只写一次、D19（块指针的结构与宽度预算） 已定项 9 定重写换出生序号，平局破除的输入有了，会红的检查仍欠 | 造一个「同一 checkpoint 的固定点两轮各写出一版同身份码 3 容器」的镜像，断言 I-1.8（归并后版本全序） 的全序键分得开它们；按现行取号规则必须红。判别力自证：把取号规则改成固定点轮序，检查必须由红转绿 | 取号规则与平局破除二选一，两条都动 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P1 / P3：要么取号改成固定点轮序，要么承认同 checkpoint 内多版不可分辨、另找判别子。**它挡着 D18（块里携带什么信息） 已定项 12** | 2026-09-07 第二轮三方论证辩方腿指出枢纽，主 agent 逐字现查 I-1.8（归并后版本全序）、D18（块里携带什么信息） 已定项 7 的取号规则、D3（空间分配） 已定项 5 的固定点定义坐实。**2026-09-07 走完一轮三方论证，判矛盾成立，且形状与初记时不同**：事务号那一维**在码 2 与码 3 上都给不出判别力**，依据是 E104（扫描重建的现行版本判定） 源码 `e104_current_version.rs:1128-1131` 的自陈——逐字「码 3 只在 checkpoint 的固定点写出，**写序的事务号是 checkpoint 的属性、给不出全序**，键取 (诞生代号, 实例代号)」「模型按事务写容器（**真实形态是固定点一次**）……**那一维是模型的补丁不是规则的一部分**」。⇒ C113（扫描重建时多版单元的现行版本判定无输入） 定案第九版把码 3 的键从二元改成三元，三条依据逐条断：① 「二元键的前提仓里没有可判红形态」为假——I-1.8（归并后版本全序） 自己就是那个形态；② 引「固定点收敛不了」作证，而那一支走实例切换（D23（journal 的角色与格式）「固定点单元全部按新实例重写」）⇒ 差在实例代号、二元键第 2 位就分得开；③ 「与 E104（扫描重建的现行版本判定） 跑的键同一个」方向反了，见上引源码。⚠️ E104（扫描重建的现行版本判定） **没有**建过「同 checkpoint 内固定点多轮」的世界 ⇒ 它的「全规则臂恒 0」对这一格是空过。**处置候选（没有采用：2026-09-13 总审核定案改从输入端解决，见本行末 D19（块指针的结构与宽度预算） 已定项 9 / 12）**：码 3 的择新键退回二元 (诞生代号, 实例代号)，并把「一个实例在一个 checkpoint 只有一个固定点、每个容器只写出一次」从 E81（提交的固定点） 的隐含建模假设（源码逐字「已脏节点本次发布只 COW 一次」「假设发布末尾一次性 COW」，而 D3（空间分配） 已定项 5 采纳了它的数）升成显式写路径纪律 + 会失败的检查——那正是第九版说「仓里没有可判红形态」的那一条。⚠️ 处置候选的字面「每个容器」罩不到码 2：固定点里反复弄脏的是分配记录树与记账树的码 2 节点，D3（空间分配） 已定项 5 也点名边插边 COW 是合法实现；照 E81（提交的固定点） 源码那句的射程要写成「每个码 2 节点与码 3 容器」，D3（空间分配） 已定项 5 那道数轮数的检查抓不到重复写，会红的检查要按单元计（2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第二轮两条云端腿各自指出）。⚠️ **本轮背景材料自身有两处错**（C83（提交固定点没人回答） 已是「模型层已还」而材料写未还；取号规则在 D18（块里携带什么信息） 已定项 11 不在已定项 7），核心结论不依赖这两处，但记在这里 |
+| C168 | E66 的 pack 臂只覆盖最差的一种实现 | **E66（补齐之后小文件怎么落） 的 `pack` 臂源码逐字 `fn needs_rmw(arm: &str) -> bool { arm != "extent" }`（`research/e7-index-bench/src/bin/e66_small_files.rs:94`）⇒ 每写一个小对象都从盘上读回整个容器，而 `extent` 臂是纯写新单元（源码头部表格逐字「新文件不必 RMW」）。两条臂测的不是同一个操作。** E66（补齐之后小文件怎么落） 自己的局限段已承认缺「一次事务里写同一单元上的多个小文件」那一格，但结论「`pack` 出局、I/O 上纯劣」被 D4（校验和位置） 已定项 2 的三臂对比表与 D14（双轨（大小文件 / 持久临时）） 已定项 3 的旁证当成对整条路的否决在用。E114（小数据打包容器的总账） 算出攒批形态写字节反而省 30 倍（1 KiB / m=30），方向相反 | E66（补齐之后小文件怎么落） 加一条攒批臂（开放容器住内存、写满才落盘）与一条后台整理臂，在同一台设备上重跑并报绝对值；D4（校验和位置） 已定项 2 那张表要标注射程「单次操作口径」 | 无前置（纯欠工，装置已在） | 2026-09-07 小数据打包容器论证轮：主 agent 读源码发现，第三轮替代腿独立复核确认 |
+| C169 | 切不开的拼接落进生词表而不判红 | **`research/scripts/oov-check.py` 的判红条件逐字 `red = len(spliced) > 0`——只有能切成两个已知词的拼接判红；切不开的（`rewritingopy` = rewriting + copy-on-write 粘连、`uniformlyave`）落进生词表，退出码 0。** 检测器把生词一律打印出来（源码注释已写明这是有意的），但 `ask-local.sh` 串跑时只看退出码 ⇒ 这一类损坏能不能被发现，取决于人有没有去看那行生词。2026-09-07 一轮三方论证里连中两次，其中一次的输出已被当作干净证据用过一轮才发现。⚠️ **2026-09-08 收窄了，没销账**：`oov-check.py` 加了规则 D（成词的长前缀 + 一截既不成词也不是后缀的短尾巴），`rewritingopy` 与新中的 `cryptographicord`（cryptographic + [Rec]ord）现在都判红，红样本进了 `--selftest`、由门禁阶段「research 构建与单测」每次复跑；在 395 份既有输出上回扫新增判红 4 份、零误报。**仍逃得掉的是尾巴自己成词的那种**——`uniformlyave` 的 `ave` 在词表里，而放掉这一类正是规则 D 不误伤 `filesystemwide` 这类模型自造合成词的那道闸 ⇒ 两者今天只能二选一。⚠️ **2026-09-09 又中一次，是第三种逃法：尾巴不成词、但够长。** `sub-fieldslementss`（fields + [e]lements + s）里 `lementss` 八个字母、不成词也不是后缀，规则 D 要的是**短**尾巴 ⇒ 切不开，落回生词表判绿，而那一轮输出当时正被当作一条论证腿在用。⚠️ **同一天反方向也中一次**：`rebuildability`（rebuild + ability）被规则 A 判红，是误报——正常派生词，`corruption-check.py` 对同一份判绿，逼得同一条腿连抽四次。⇒ **两个方向要一起改**：放宽规则 A 会放过真拼接，收紧规则 D 会误伤正常派生词；改完要在既有输出上双向回扫（新增判红全为真损坏、新增判绿零真损坏），两个数都有才算修完 | 给 oov-check.py 加一条「生词以某个 ≥5 字母的已知词起头、余下部分不成词」的判红规则，并用它自己的红绿样本自检证明会红、不误伤（`unimplementable` / `decoration` 这类正常生词必须仍判绿）；或退一步：`ask-local.sh` 在生词非空时**拒绝**并要求人显式放行 | 无前置（纯欠工） | 2026-09-07 小数据打包容器论证轮，本地腿 r1b 与 r3 各中一次 |
+| C146 | 无空段时的回落政策全仓无定义 | **「聚簇段里没有位置了，这次分配落到哪」全仓一条条款都没有。** `grep -rn "回落" .claude/kb/` 现查：D26（后台整理与放置回收） 已定项 6 把「回落计数」列成观测量、E93（老化下的放置与碎片度） 建模过「最低空槽优先」这一种，**而没有任何一条决策说它该是哪一种**。⇒ **三条后果**：① 按 E93（老化下的放置与碎片度） 那一种，整理搬走区域 `R` 的第一个对象之后，`R` 里那个洞就是全池最低的空槽 ⇒ **整理的下一个目的地落回自己正在清空的段** ⇒ 意图正常完成而空段供给恒为零（C140（意图完成不等于空段被腾出） 的最硬形态，前台一次写都不用做）；② 回落政策还决定 D3（空间分配） 已定项 5 那条「提交内生块必须从聚簇段分配」在段耗尽时降级成什么，而那一格正是 I-8.1（环几何够大） 最坏占用发散的入口（C139（整理停摆之后释放也发不出去））；③ **它还决定整理自己那批搬迁要写多少分配记录节点**（2026-09-08 补）——目的地侧散着时改写量从 `⌈N/扇出⌉` 变成 `min(N, 叶总数)`，E74（分配记录的条目数与整理开销） 在 16 TiB / N = 4096 那一档上是 13 → 4823 个节点（371 倍），而整理起跑的条件恰恰是池已经碎了 ⇒ 唯一被建模过的那条政策**保证**目的地不连续。⚠️ 这一条**不经过段耗尽**，与 ② 是两条不同的通路。⚠️ 它是**分配器政策不是格式位**，与 D3（空间分配） 已定项 5 同一类——盘上没有字段声明它，违反它的镜像完全合法 ⚠️ 2026-09-13 总审核定案：D3（空间分配） 已定项 10 定聚簇段 64 槽、开放段取最低全空段、bump 只在内存、用户数据不进开放段，② 已还（实现与用例都在），① ③（整理那两条）仍开着，前置是 D26（后台整理与放置回收） 已定项 1 那一侧 | 两条都要：① 断言一批整理跑完之后 `R` 内不存在这批整理自己写出的落点（拦「搬回自己正在清空的段」）；② 断言段耗尽时的回落落点符合写下来的那条政策。判别力自证：把回落改成「最低空槽优先」而 `R` 恰好含最低空槽，第一条必须由绿转红 | 第 ② 条的前置已还：D3（空间分配） 已定项 8（2026-09-13 用户定案）定用户数据不进聚簇段、提交内生块段耗尽回落到该设备内槽号最小且不在 `R` 保护期内的空槽；第 ① 条（整理目的地落回自己正在清空的段）仍等 D26（后台整理与放置回收） 已定项 1 那一侧。两条断言的模型形态同日由 E151（用户数据落点的到达序与容器臂） 第六次跑做出（排除 `R` 时搬回 `R` 与落点偏离政策函数都恒 0，不排除时数万次），实现侧的检查登记在 [verification-build.md](verification-build.md) 事务层第一版「运行时计数与准入自证」表与必红用例表第九条；②的计数 `allocator::PoolAllocator::policy_mismatches` 已删（2026-09-25，C515（政策不一致计数恒 0，口径没改） 已还清，`verification-build.md` 改核「写记录」） | 2026-09-06 D26（后台整理与放置回收） 第三轮反推攻击腿面 2，主 agent 现查全仓 `回落` 命中坐实无一处是条款 |
+| C96 | 指向的分项没说那句话 | **门禁阶段 32（新池新建文件的每个字段都指到一条真实存在的分项）只判「分项存不存在」，不判「那条分项有没有说这句话」。** 实测（2026-09-03）：[layout/01-first-txn.md](layout/01-first-txn.md) 第三节的「设备 ID 1 + 物理偏移 6」指向 D19（块指针的结构与宽度预算） 已定项 1 / 已定项 2 并标着「已定」，而已定项 1 逐字只定了「位置条目带不带设备身份：带」、已定项 2 只定了密文校验和 32 位——**那两个宽度全仓一条决策都没定过**，门禁照样放行。更贵的是它已经被消费：D22（单元原子性怎么合成） 已定项 7 的树表单元指针 53 与根记录 121 都建在这个初值上，两处都标着已定 | 表里每一行要带上「被指分项里支撑它的那句话」（一段可核对的引文或锚点），门禁比对引文在不在被指分项的正文里，不在即判红。判别力自证：把某一行的引文改成被指分项里没有的句子必须红，改回必须绿 | 要给每一行加引文列，且引文要能机器定位（分项正文里的一段原文） | 2026-09-03 E97（记账与分配记录的条目编码） 那轮的两条云端腿各自独立指出，主 agent 逐字核 D19（块指针的结构与宽度预算） 正文与 D22（单元原子性怎么合成） 已定项 7 坐实 |
+| C95 | 依据被撤回的已定项无人回看 | **一条已定项所依据的实验结论被撤回或证伪之后，它照旧挂着「已定」，没人回头判它还站不站得住。** 实测就在仓里：E38（记账结构 COW 还是原地） 的恢复代价列 2026-08-30 撤回，D22（单元原子性怎么合成） 已定项 3 从此只剩 mkfs 预留一条腿；那条腿的原地臂形态 2026-09-03 又被判为稻草人（静态地址映射全量预留，而原地方案真正的形态是首次使用时动态分配、此后地址不变）；而该实验唯一测过的写放大轴指向反面（D25（目标负载优先级） 粗粒度下 COW 贵 25–37.5%）。**三件事各自都记下来了，没有一处把它们合起来问「这条已定项现在还有依据吗」**。⚠️ **第二笔同型，2026-09-09 记，射程要从「实验 → 分项」扩到「决策条款 → 它引的决策条款」**：D21（权威态与派生态的分界） 已定项 3 ① 的依据 2026-09-06 被撤回，撤回的理由是它与「无密钥的一侧要能搬」互斥；而 D9（加密） 已定项 5 于 2026-09-07 改取「只做 scrub」（逐字「加密开启时，无密钥的一侧只读只检测——不搬、不疏散、不回收」）之后，那条理由的另一半没了，D21（权威态与派生态的分界） 正文两天里没人动 ⇒ **失效的是撤回的理由本身**，而引用它的分项照旧写着「这一格现在连依据都没有」。⚠️ **它躲过了 2026-09-07 那次回扫**：C167（明文映射层的引用全仓回扫没做） 逐字按「明文映射层」四个字扫，而这一条的措辞是「无密钥的一侧要能搬」，四个字一个都不含 | 门禁抽「实验 → 引用它的决策分项」引用图：凡实验正文里带撤回标记的结论，其全部引用方分项必须在撤回日期之后有一条新写的依据，没有即判红并列出分项与撤回日期。判别力自证：造一份「实验已撤回、分项仍引用且无新依据」的样本必须红，给分项补一条日期在后的依据必须转绿 | 实验撤回要有机器认得的标记（现在只是正文里的「撤回」二字）；决策分项到实验的引用图（编号引用已在，可抽） | 2026-09-03 三方论证（opus 反例腿逐字核 E38（记账结构 COW 还是原地） 正文，指出恢复代价列已撤回而 mkfs 预留臂是稻草人）；主 agent 现查 E38（记账结构 COW 还是原地） 与 D22（单元原子性怎么合成） 正文确认 |
+| C178 | 系统配置必需字段表靠手抄 | **E115（系统配置字段表的完备性与字节预算） 的 `REQUIRED` 表（31 项）是人从 kb 里抄出来的**（`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs`）。它证明的是「今天抄下来的这 31 项里有 9 项没进候选表」，**证明不了「已定条款要求的就是这 31 项」**——以后任何一条决策再写一句「某某住系统配置 / 系统配置声明」，那张表一个字都不会说，而 E115（系统配置字段表的完备性与字节预算） 照样全绿。这一轮立表本身就是这么发现的：机械普查（`grep -rn "系统配置"）翻出 D2（RAID 条带策略） 已定项 7 那条**用户定案**要求的根环逐区域设备身份，而它躺在 kb 里已经七天没人把它算进字段表 | 做成门禁阶段：扫 `.claude/kb/decisions/*.md` 与 `invariants.md` 里「住系统配置 / 系统配置声明 / 写进系统配置 / 进系统配置」这几种说法，每命中一处就要求 `REQUIRED` 里有对应一行（按出处串匹配），对不上判红。判别力自证：往任一决策正文加一句「XX 住系统配置」，检查必须由绿转红；把 `REQUIRED` 里删一行，也必须由绿转红。⚠️ **同形的一条已经落地（2026-09-07）**，可照抄它的形态：`.claude/gate.d/doc-registries.sh` 的 field-projection 格做的是「决策分项的字段表 → [layout/01-first-txn.md](layout/01-first-txn.md) 投影」的反向检查，**只对已经被投影过的分项要求完整投影**（否则不属于新池新建文件的字段会假红）。系统配置这一格难在哪：「某某住系统配置」是散在段落里的句子，不是 `\| 字段 \| 宽 \|` 表，扫不出结构 | 无前置（纯欠工，装置已在 E115（系统配置字段表的完备性与字节预算））。⚠️ 它是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「这个坑在哪一层」那一节点名的**口径层**形态：检查要立在 kb 与实验装置**之间**，立在装置内部管不住 | 2026-09-07 立 E115（系统配置字段表的完备性与字节预算） 时主 agent 自记 |
+| C179 | 根环逐区域设备身份的字节代价还是 E62 那个旧口径 | **D2（RAID 条带策略） 已定项 7（2026-08-31 用户定案）正文里那个字节代价逐字是「4 字节（4 区域 × 1 字节）」，而它引的两个量今天都不是那个值**：区域数按 D22（单元原子性怎么合成） 已定项 2 是 **R = 3**（不是 4），一个设备 ID 按 D19（块指针的结构与宽度预算） 已定项 4（2026-09-03，成文在后）是 **4 字节**（不是 1）⇒ 今天的口径是 **12 字节**，是正文那个数的 3 倍。它没让任何结论翻向（存身份臂指错盘 0 次、公式臂 2–19 次，差距远大于 8 字节），但那个数已经被 E115（系统配置字段表的完备性与字节预算） 当成两档口径之一算进系统配置预算 | 两件事：① D2（RAID 条带策略） 已定项 7 正文按今天口径重算并标注射程（或显式写「E62（根环归属：存身份 vs 算公式） 跑的是 4 区域 × 1 字节的旧口径」）；② 门禁形态——凡是引用「一个设备 ID 多宽」的地方都必须落到 D19（块指针的结构与宽度预算） 已定项 4 那个数，对不上判红。判别力自证：把某处改成 1 字节，检查必须由绿转红 | 无前置（纯回扫工）。⚠️ 它是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「两套装置对同一个量算出不同的数」那一格的实例：E62（根环归属：存身份 vs 算公式） 自己的单测与变异全绿，跨装置没有任何东西在对 | 2026-09-07 立 E115（系统配置字段表的完备性与字节预算） 时正推腿指出，主 agent 逐字核 D2（RAID 条带策略） 已定项 7、D19（块指针的结构与宽度预算） 已定项 4、D22（单元原子性怎么合成） 已定项 2 坐实 |
+| C180 | 设备身份比对没有第二个独立来源 | **D12（目标介质） 已定项 4 的比对表逐字有一行「设备身份（表里的 dev id ↔ 实际设备）→ 拒绝挂载」，而「比对」要求两个互相独立的来源。** 左边是设备描述符表里的那一行；右边今天没有落点——E100（系统配置的三段几何） 段一七个字段里只有 `this_dev_id` 4 字节（源码注释逐字「D19（块指针的结构与宽度预算） 已定项 4 的设备 ID 同宽」，是池内序号），没有设备内禀身份。E72（设备描述符表的挂载复算） 自陈逐字「**设备身份用 backing 文件名当代理**，不是真的 UUID——真实现要在设备上写一个身份字段并回读……**身份字段本身怎么落盘没验**」，而它假设的条目宽度里有 `dev_uuid 16`。⇒ 若身份只从各盘自己的系统配置取，两边恒等、比对恒真，而 D12（目标介质） 已定项 4 逐字要求「每一条都要能被测试强制走进『对不上』那条分支」 | 定一个设备内禀身份字段的落点与宽度（进不进系统配置段一没定），并让 E72（设备描述符表的挂载复算） 的「强制身份错配」那一格用真身份字段而不是 backing 文件名重跑。判别力自证：把设备侧身份字段改一个字节，必须 refuse；只交换两台盘的接线顺序而身份字段不动，判决要与定案一致（今天连「该 allow 还是该 refuse」都没写过）| 前置：D22（单元原子性怎么合成） 已定项 9 的字段表要先定，身份字段才有地方住 | 2026-09-07 D22（单元原子性怎么合成） 已定项 9 三方论证反推腿指出，主 agent 逐字核 D12（目标介质） 已定项 4、E72（设备描述符表的挂载复算） 的欠账段与 E100（系统配置的三段几何） 源码坐实 |
+| C181 | 池内异构判据漏了条带逐位异或这个轴 | **D12（目标介质） 已定项 3 的判据逐字「一个几何量能不能在池内异构，看用到它的地址算术是否已经携带设备身份。带 ⇒ 可以每设备各不相同」，而单元大小两条都占**——位置条目里就有设备 ID 4 字节（D19（块指针的结构与宽度预算） 已定项 4）⇒ 判据许可它每设备各不相同。可它实际上不能：D2（RAID 条带策略） 已定项 10 依据 2 逐字「一条条带的全部格必须等宽，逐位异或才有定义」，配 D2（RAID 条带策略） 已定项 6 逐字「再夹当时可写的设备数」⇒ 任何一台可写的盘都可能进同一条条带。**判据给出了一个错误的许可。** ⚠️ 判据的四向验证表里那个正例正好说明问题：bcachefs 的 `bucket_size` 之所以能真每设备各异，是因为它不做条带内逐位异或的 parity——本工程做。**这是 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「引用别家实现时必须同时写下一处已知差异」要拦的形态，而那处差异没写。**`grep -rn "等宽" .claude/kb/decisions/12-目标介质.md .claude/kb/checks-owed.md` 零命中 | 给判据补第二个轴：「这个量会不会被条带的逐位异或跨设备耦合」，耦合 ⇒ 必须全池统一，不看地址算术带不带设备身份；补完当场按 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」回扫 D12（目标介质） 已定项 2 三个桶的全部成员。判别力自证：拿补过的判据重判单元大小，必须从「可以各异」翻成「必须全池统一」| 无前置（纯论证工，两条依据都已定案）| 2026-09-07 D22（单元原子性怎么合成） 已定项 9 三方论证反推腿指出，主 agent 逐字核 D12（目标介质） 已定项 3、D2（RAID 条带策略） 已定项 10 依据 2、已定项 6 坐实 |
+| C182 | 两条已定项对根环落盘归属说反话 | **D22（单元原子性怎么合成） 已定项 2 正文逐字「落盘归属 `(r × P) mod devs` 依赖 `devs`」，而 D2（RAID 条带策略） 已定项 7（2026-08-31 用户定案）逐字「归属**不再**按 `(r × P) mod devs` 算，mkfs 时逐区域把设备身份写下来」——同一天定案的两条已定项对同一个机制说相反的话。** 更糟的是 D22（单元原子性怎么合成） 那一处上方有一个小节标题逐字「适用条件：设备集合不变。**这一条必须连同结论一起引**」⇒ 每一次引用都会把已经作废的那个机制一起带走。decisions-history.md 里记了 D2（RAID 条带策略） 已定项 7 的定案，**没有一条记它要回头改 D22（单元原子性怎么合成） 已定项 2 的正文**。⚠️ 它压在 D22（单元原子性怎么合成） 已定项 9 上：`P` 与 `devs` 还是不是运行时输入，取决于那条公式今天还算不算数 | **已还一半（2026-09-09）**：逐字重读两条，判定 D22（单元原子性怎么合成） 已定项 2 那段里哪一半随 D2（RAID 条带策略） 已定项 7 作废、哪一半（加盘换盘后区域可能撞到一起、容错承诺退化）仍然成立，改 D22（单元原子性怎么合成） 已定项 2 正文并记进 decisions-history.md。门禁形态：把 `(r × P) mod devs` 列成禁用式，正文出现即判红（历史节除外）。判别力自证：往正文加一句带这个式子的话，检查必须由绿转红。**实际怎么还的**：作废的是**归属**那一半（D2（RAID 条带策略） 已定项 7 用户定案逐字「归属不再按 `(r × P) mod devs` 算，mkfs 时逐区域把设备身份写下来」）；仍然成立的是**「R = 3 的容错承诺会退化」这个结论**，但机制换了——D2（RAID 条带策略） 已定项 5 逐字「**剩下的退化只有一种**：区域所在的那块盘没了——那是丢失不是撞」。D22（单元原子性怎么合成） 已定项 2 那个小节标题随之从「适用条件：设备集合不变」改成「适用条件：区域所在的那块盘还在」。⚠️ **C182（两条已定项对根环落盘归属说反话） 登记的「两条已定项」少数了一处**：`(r × P) mod devs` 还躺在 **I-7.6（根环区域落在互不相同的盘上）** 的判据句里，是**第三个**站点，C182（两条已定项对根环落盘归属说反话） 立账时没扫到（同日一并改成「R 个区域在 mkfs 时逐区域写下的设备身份两两不同」）。⚠️ **禁用式那道门禁没做**——2026-09-09 只还了回扫那一半，把 `(r × P) mod devs` 列成正文禁用式仍是欠工，而正因为它没做，第三个站点才要靠人扫。⚠️ **回扫翻出一处新缺口，另立**：C217（P 大于设备数这条约束的理由没了而约束还在） | 无前置（纯回扫工）。⚠️ 它是 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条「矛盾比空白更糟」的实例：检索不会把两条都端出来，它会挑一条而且不告诉你它挑了 | 2026-09-07 D22（单元原子性怎么合成） 已定项 9 三方论证反推腿指出，主 agent 逐字核两处坐实 |
+| C183 | 每套布局一个 incompat 位而盘上差不出字节 | **D12（目标介质） 已定项 1 逐字「每套布局必须各占一个 incompat 位」「没有 incompat 位的介质分支买不到任何东西，不许开」，而反过来的那一半今天成立：两套布局之间在盘上差不出任何一个字节。** 逐条查：ε / 缓冲几何 / 索引形态被 D12（目标介质） 已定项 2 逐字排除在本项之外并写明「它们确实**全布局一样**」；ε 具体值按 D11（索引节点要不要留消息缓冲区） 已定项 6 逐字「布局轴**不分支**」；节点大小按 D8（核心索引结构） 已定项 2（2026-08-30 用户定案）逐字「16 KiB，**钉成常量**……**不按设备特性算**」；单元大小由 D2（RAID 条带策略） 已定项 10 依据 2 推成全池统一；落点粒度由 D19（块指针的结构与宽度预算） 已定项 4 的编码定义钉成池级；条带几何在 D2（RAID 条带策略） 已定项 6 / 已定项 8 下没有指称对象（`w` 夹「当时可写的设备数」、组按「最空的 g 块盘」选，两条都不按布局筛，全仓也找不到一条把条带限制在同一套布局内的条款）。「可以各异」桶剩下的第三个成员**每个写的算法类型字段是逐 extent 的，不是逐布局的**（D12（目标介质） 已定项 2 逐字「字段住指针头部……每个逻辑 extent 一份」）。⇒ **「一个卷可以同时装多套布局」这条 2026-08-31 用户定案今天没有任何一条已定项在支撑它** | 二选一并写下依据：① 找出两套布局之间确实要差的那些字节（zoned 的原地覆写能力是最可能的一处，见 D22（单元原子性怎么合成） 未定项 6），把它们逐条登记；② 或者承认第一版的 incompat 位只承诺「不认识就挂不上」这一个失败模式，与盘上差不差字节无关，并把 D12（目标介质） 已定项 2 的「可以各异」桶改写。判别力自证：任选一条登记下来的差异，构造两个只在那一处不同的镜像，不认识那套布局的读者必须拒挂、认识的必须挂上 | 无前置（纯论证工）。⚠️ **它主要不是这一轮造成的**：「要拦什么」一格逐条查过的六条依据里有三条早于本轮就已定案 | 2026-09-07 D22（单元原子性怎么合成） 已定项 9 三方论证反推腿指出（它自陈原题「异构池被架空」打不中，设备维异构是实的、E72（设备描述符表的挂载复算） 在真 loop 池上跑过；空掉的是「多套**布局**」那一半），主 agent 逐字核六条依据坐实 |
+| C184 | 重建路径拿不到完整 nonce | **D9（加密） 已定项 4 逐字「**指针头部**为每个逻辑 extent 存一份 96 位 nonce」，而扫描重建路径上没有指针**，明文头里只有 nonce 代号（I-6.2（明文头字段白名单））。这处「三处不能同真」2026-09-02 就点明并归了 C68（不变量白名单与已定条款打架）——D9（加密） 已定项 4「存一份在指针头部」、invariants.md「nonce 代号必须放明文头、无密钥可读」、已定项 4 自己那句「解密不依赖别处字段 ⇒ 单元自包含」——**而 C68（不变量白名单与已定条款打架） 2026-09-02 的收口只改了字段表与白名单，一个字都没碰它**。⚠️ **它不是 2026-09-07 才出现的，成因也不是臂庚**：I-6.2（明文头字段白名单）「两张白名单、按单元类分」2026-09-02 收口之后，码 2 / 3 的身份就一律在密文里 ⇒ **元数据类的重建那天起就要解密**；invariants.md 逐字「仍挂在 C68（不变量白名单与已定条款打架） 的那一半是 nonce 12 字节的归属三处打架与门禁比对工装」——本行就是那一半的具体形态。D18（块里携带什么信息） 已定项 13 只是把码 1 也拉进同一条船，于是它从「只咬元数据」变成咬所有类，**回退已定项 13 解不掉它** | 门禁比对：凡是被标为「扫描重建路径可用」的字段，其取值来源必须也在该路径可达；nonce 代号 → 完整 nonce 的那一跳指不到落点就判红。判别力自证：把落点改成「住指针」，检查必须由绿转红 | **前置已还（2026-09-07，D18（块里携带什么信息） 已定项 14 取臂甲：nonce 代号就是完整的 96 位 nonce，住单元明文头）** | 2026-09-07 D18（块里携带什么信息） 已定项 13 第一轮反推腿指出，主 agent 逐字核 D9（加密） 已定项 4 与 decisions-history 2026-09-02 那条坐实 |
+| C185 | 载荷 CRC 覆盖密文还是明文没定 | **决策已定、检查仍欠（2026-09-07 用户定案：覆盖盘上字节，即加密开启时算密文；口径的权威记录点在 D18（块里携带什么信息） 已定项 7 的字段表下方）**。定案前：码 1 / 2 / 3 的载荷 CRC 只写了覆盖区间「从头末尾到单元末尾」，没写覆盖的是盘上字节还是加密前的明文载荷**（D18（块里携带什么信息） 已定项 7 / 已定项 11 / 已定项 12 三处都只写区间）。加密关闭时两者同义，开启时是两个不同的值。取错的代价两个方向都实打实：覆盖明文 ⇒ 无密钥一侧读不到明文，D9（加密） 已定项 5 承诺的「检测损坏、报告坏块」落空；而 CRC 值又在明文里 ⇒ 等于给无密钥的攻击者一个 32 位的内容确认预言机 | checker 两侧各算一遍：按密文口径与按明文口径分别算 CRC，与盘上那 4 字节比，只许一侧相等；两侧都相等（例如载荷恰好全零）时该样本作废重取 | 前置已还，不再阻塞 | 2026-09-07 D18（块里携带什么信息） 已定项 13 第一轮，正推腿与反推腿**各自独立**查到全仓空白 |
+| C186 | 跑到一半加的臂不进跑前失败条款的射程 | **E114（小数据打包容器的总账） 的三条反向接受条款逐字全写「A 形态」，而定案用的 `packbg` 是跑到一半才加的第四条臂** ⇒ 产出结论的那条臂不在任何一条可推翻条款的射程里，撞 `.claude/singlefs-ai-sop/rules/test-discipline.md`「实验的失败条款不许让结论不可证伪」。今天没有任何东西看得见这件事：门禁数的是「有没有钉绝对值的断言」「有没有变异表」，数不出「哪条臂被哪条失败条款罩着」 | 门禁阶段：实验源码里每条臂的标识符，都要在「跑前写死的判据与失败条款」那一节被点名至少一次；点不到判红。先证明会红：把 `packbg` 从 E114（小数据打包容器的总账） 正文的失败条款里拿掉，检查必须变红 | 需要先给「臂」一个机器认得出的形态（今天靠正文散文） | 2026-09-07 D27（小数据打包容器） 第二轮反推腿指出，主 agent 逐字核 `research/e7-index-bench/src/bin/e114_pack_ledger.rs` 的跑前条款段坐实 |
+| C187 | 源码里没在 kb 登记的格式常量，格式常量门禁看不见 | **`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格只核对 kb 里用 `format-const` 登记过的常量**，源码里那些没登记的常量它一个字都不会说。实测：`e114_pack_ledger.rs:60` 注释块头逐字「格式常量，全部有出处」，而 `SLOT_FULL = 47` 里的 4 字节槽表条目、`SLOT_MIN = 4`、`LIVE_COUNT_ENTRY = 16` 三个一处出处都没有，最后一个正对 D27（小数据打包容器） 已定项 5（未定）⇒ 它是假设不是常量，而门禁当时全绿。这是 C154（条带成员表没有登记打包记录类型） 那个坑第二次发作，换了个触发点 | 门禁阶段：实验源码里形如 `const X: u64 = <字面量>` 的每一条，注释里要么指到一条 kb 条款，要么显式标「假设」；两样都没有判红。先证明会红：给 `LIVE_COUNT_ENTRY` 的注释去掉标记，检查必须变红 | 要先定「指到一条条款」的机器可判形态 | 2026-09-07 D27（小数据打包容器） 第二轮反推腿，主 agent 逐字核源码坐实 |
+| C190 | 容器里出现原地可变字段没有会红的检查 | **D27（小数据打包容器） 已定项 10（2026-09-07 用户定案）逐字「任何对已写出容器内槽的原地修改都不许存在；哪一项只能靠原地改槽实现，就整条放弃 D27（小数据打包容器）」，而今天没有任何东西拦得住往容器字段表里加一个原地可变字段**——死槽位、liveness 位、引用计数、最后访问时间，加进去之后 doc-lint 不会说话、`27-format-constants.sh` 只核对已登记的常量、checker 还不存在。这一条是 D27（小数据打包容器） 的否决位，而否决位本身没有执行者 ⇒ 它今天只是一句写下来的原则 | 两层。① 门禁阶段：D27（小数据打包容器） 的容器字段表里每个字段都要标「写一次」或「原地可变」，出现后者判红；先证明会红：给槽表条目加一个 `dead: u8` 标注成原地可变，检查必须变红。② checker：黄金镜像里造一个「同一个容器身份的两个版本，槽内容不同而容器出生代与写序相同」的样本，checker 必须判红——原地改过的容器正是这个形状 | ① 要先有 D27（小数据打包容器） 已定项 3 的字段表；② 要 checker 存在 | 2026-09-07 D27（小数据打包容器） 已定项 10 定案时同步立账 |
+| C202 | 打包巡回的空转开销与迟滞 K 都没有数 | **D27（小数据打包容器） 已定项 6（2026-09-08 用户定案）定了两个旋钮的形态而没有数**：① 迟滞 `K` 的形态是「往复一次的代价 ÷ 单次搬迁的收益」，而分子要 churn 概率（一个小对象多久被改一次），全仓一个数都没有——D25（目标负载优先级） 的 smallfile 那一行三列全「未测」（C174（smallfile 那一行的三列没测））；`K` 取小了就是本地腿构造过的往复负载（一个对象改 5 次，打包且无迟滞时多写 2.25 倍），取大了收益兑现无限延后。② 连续巡回在**无活可干时空转读中央映射**的开销一次没量过——E116（打包容器的账·补元数据写与整理策略） 与 E121（按 cap 切档与档数的最优点） 都只算有活干那一轮的字节 | 两条各自的形态：① 建一个装置，扫对象重写间隔的分布，报「`K` 取各值时往复次数与延后的兑现量」，把 `K` 的取值写成那条曲线上的一点；先证明会红：把往复代价记成 0，那条曲线必须塌成「`K` = 0 最优」。② 巡回一轮的读字节 = 中央映射全树条目数 × 条目宽 ÷ 每叶字节，报绝对值，并给一条「限速到 X 时空转占比 < Y」的断言 | ① 要 C174（smallfile 那一行的三列没测） 先还清（要有小文件负载的定义）；② 无前置，随时可做 | 2026-09-08 D27（小数据打包容器） 已定项 6 定案时同步立账 |
+| C191 | 同源性计数器只盖了一对 | **D13（验证路线） 已定项 13「冲突 2」要求的「spec 与 model 不一致」事件计数，今天一对都没立格**：O3（独立规约执行器） × RefFS 那一对（事件来源，用户 2026-10-02 定）在 O3（独立规约执行器） 有代码、能对同一（历史、崩溃点）交出判定行之前登记为空格、不计事件，O1（内存模型对拍（HashMap 理想文件系统）） 的崩溃判官不当替身；没立的对报「未立」，不报绿、不计入任何一格（[verification-build.md](verification-build.md) 落地顺序第 6 步是这一对）。要观测的是三对：O3（独立规约执行器） × RefFS、crash refinement 的 spec × O1（内存模型对拍（HashMap 理想文件系统）） 的 model（D13（验证路线） 已定项 13 里的 model 指 O1（内存模型对拍（HashMap 理想文件系统）））、以及 **D13（验证路线） 已定项 1 采纳 M2 之后新增的那一对**——M2 的 spec 与记录核对器（入参都是 `(崩溃前镜像, 记录流, 崩溃后镜像)`）。少一对就等于那两条腿的独立性从没被观测过。另一笔同源记在这一类账上：RefFS 的 (lo, hi) 与 O1（内存模型对拍（HashMap 理想文件系统）） 崩溃判官盘级下界那一条判据的入参输入同源（D13（验证路线） 已定项 3 射程） | 不一致事件落成一张表，每行记「哪两方、判谁错、日期」；**任一对累计 ≥ 5 次不一致而判「spec 错」的次数为 0 即判红**（D13（验证路线） 已定项 13「冲突 2」逐字的判据），红了的处置是把那两条腿合并、预算移给穷举。判别力自证：喂一张「5 次不一致全判 model 错」的表，必须红 | O3（独立规约执行器） × RefFS 那一对：O3（独立规约执行器） 能对同一（历史、崩溃点）交出判定行、RefFS 接上调用点，两边接上要不要翻译层没判（`research/prompts/m3-formal-r5-main-verification.md` 第二节同源性计数器那一格）；另两对：三样里至少两样存在（O3（独立规约执行器）、记录核对器、crash refinement） | D13（验证路线）「冲突 2」；D13（验证路线） 已定项 1 定案时由正推腿指出，2026-09-07；2026-10-02 `research/prompts/m3-formal-r4-main-verification.md`「用户定案」替身对那一行、`research/prompts/m3-formal-r5-main-verification.md` 第二节同源性计数器那一格 |
+| C192 | 摘句引用没有会红的形式 | **引一条 kb 条款时把它摘短**，两种形状：① 只读结论句、不读它自己的 ⚠️ 射程/口径注（2026-09-07 实测：[verification-build.md](verification-build.md) 把 D23（journal 的角色与格式） 已定项 14 的「前缀判定的完整口径从此是**五条，缺一不可**」复述成「前缀四条口径」，少的第五条正是 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 那条，**少了它一次落在旧根上的恢复会把被回退抛弃的时间线整段重放回来**；同一轮里主 agent 自己把 D13（验证路线） 已定项 4 当成 crash refinement 的规范，而它的射程句逐字是「定义的是**模型层的枚举域**」）；② 条款自陈「引用时连这句一起引」而引用处没连（这类自陈要求 2026-09-07 现查 20 处，口径 `grep -rn "一起引\|一起引用" .claude/kb/ \| grep -v history`） | **候选形态未定，两条已被否**：「同名短语的数量词必须一致」——2026-09-07 现查全仓 1146 种「N 条 + 名词」短语里同名带不同数的 59 种、**几乎全是正常的**（「N 条变异全抓」在不同实验里本来就不同）⇒ 淹在误判里；「按编号找引用处再判语义」——引用处的边界机器判不出。**唯一还站得住的方向**：先把那 20 处自陈引用要求统一成一个机器可读标记（形如 `<!-- quote-with: <关键词> -->`），再检查引用了该编号的段落里有没有那个关键词。判别力自证：把 verification-build.md 那处改回「四条」必须红 | 先把自陈引用要求统一成机器可读标记（今天那 20 处各写各的，措辞至少六种） | `.claude/rules/three-way-inference.md`「引 kb 里的条目要整行抄」；2026-09-07 D13（验证路线） 已定项 1 那一轮实测两处 |
+| C188 | 认领规则的正文与它的实验实现是两条 | **D18（块里携带什么信息） 已定项 11 与 C89（单元头收口的遗留重算） 第 ② 笔逐字「认领时按**声明长度**把整段载荷跳过去，载荷内部的探针不再参与认领」，而支撑它的 E88（冒名单元与孤儿单元的判别） 源码里 `声明长度` / `decl` 出现 0 次**——`e88_impostor_orphan.rs:35` 是 `PROBES_PER_UNIT = UNIT / STEP`，认领之后按**整单元**跳（`:156-160`）。⇒ 决策正文写的规则从来没有和它引以为据的实测对上过。按 `.claude/rules/mutation-sampling.md` 三分，E88（冒名单元与孤儿单元的判别） 对这两条规则是**取样点不敏感**：不是盲区也不是等价，欠一个能分辨它们的取样点 | 夹具补一个取样点：`声明长度 < 16280` 且在补齐区植一个合法头，两条规则必须给出不同的错分数；给不出就说明装置仍分不开它们。判别力自证：把跳过方式换回按声明长度，该取样点必须由绿转红 | 与 C89（单元头收口的遗留重算） 第 ② 笔那个还没落地的夹具同一处落点 | 2026-09-07 D18（块里携带什么信息） 已定项 13 第二轮，正推腿读源码发现，主 agent 逐字核 e88 源码坐实 |
+| C189 | I-2.3 在加密开启时判明文还是盘上字节没定 | **决策已定、检查仍欠（2026-09-07 用户定案：判解密后的明文；口径写进 I-2.3（补齐字节为零且参与校验和） 正文）**。定案前：I-2.3（补齐字节为零且参与校验和） 只写「声明长度之后到单元末尾恒为 0」，没写加密开启时判的是解密后的明文还是盘上字节**。补齐在盘上是 `E(0)`、不是 0 ⇒ 按盘上字节判必然全红。形状与 C185（载荷 CRC 覆盖密文还是明文没定） 定案前完全相同，而那一条 2026-09-07 已由用户定案 ⇒ 这一条是同一族里漏网的那个（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」） | checker 两侧各判一遍：按明文口径与按盘上字节口径分别判补齐区，只许一侧全绿；两侧都绿（例如未加密卷）时该样本不计入判别力 | 前置已还，不再阻塞 | 2026-09-07 D18（块里携带什么信息） 已定项 13 第二轮正推腿查出全仓空白 |
+| C193 | 加密开启时的单元头有多大，全仓没算过 | **D18（块里携带什么信息） 已定项 7 的字段表算出来的 105 字节（共同前缀 42 = 4 + 2 + 2 + 2 + 32，类身份段 63 = 33 + 8 + 8 + 10 + 4）**不含**同一节那句「v1 就预留 nonce 代号与 MAC 的字段位」里的两个位**——它们在表外，宽度一个都没定过。MAC 由 D9（加密） 已定项 2「满 128 位」定成 16 字节，nonce 代号是空白（D18（块里携带什么信息） 已定项 14 在定）。⇒ **加密开启时码 1 / 码 2 / 码 3 的头到底多宽，今天全仓答不出来**，而 E73（节点 key 区间的扇出代价） / E97（记账与分配记录的条目编码） / E98（inode 记录与 inode 树的几何） / E103（inode 打包路 ① 的更新代价） 四个实验都按不含预留位的那个数在算。这是 C89（单元头收口的遗留重算） 第 ④ 笔的射程被漏掉的一半 | 门禁比对：字段表算出的合计与该类头宽常量必须相等，且**预留位要在表里占行**（宽度未定就写「未定」并判红，不许让它从表里消失）。判别力自证：把某一行的宽度改掉而不改合计，检查必须由绿转红 | **数已经算出来了（E117（预留位算进去之后的头宽与几何），码 1 头 133 / 码 3 头 131 / 码 2 三档 96 / 105 / 114）；仍欠的是那道把字段表合计与头宽常量比对的门禁** | 2026-09-07 D18（块里携带什么信息） 已定项 14 第一轮正推腿查出，主 agent 自己核算术坐实 |
+| C201 | ditto 的放置偏移不许取 2 的幂 | **D18（块里携带什么信息） 已定项 4 取「元数据多副本 + 分散放置」时带的骑手条款**：E118（单盘自恢复的三条臂） 实测 ZFS 那句「至少隔 1/8 盘」的偏移在模型里是 32768 = 2¹⁵，**任何 2 的幂周期的故障都整除它** ⇒ 三份副本同余、一起死；k = 8 那格 ditto 的元数据恢复数与无冗余臂逐格相同（都是 4586），换成 k = 9 立刻拉开（5242 对 4659）。⚠️ 真实坏道不是周期性的，所以这不是「ditto 没用」，是**放置偏移的取值有一类坏取法**，而今天没有任何东西挡着它 | 门禁比对：放置偏移与单元大小、落点粒度、盘容量的任意二者不许有公因子 > 1（或至少不许是 2 的幂）；判别力自证：把偏移改成 2 的幂，检查必须由绿转红 | 单盘布局线没开（D18（块里携带什么信息） 已定项 4 同时定的），所以它今天不咬人；开线那天必须先落 | 2026-09-07 E118（单盘自恢复的三条臂） 的散点故障档实测出来 |
+| C210 | 三个「第二套」属于哪一类扩展没人判过 | **D19（块指针的结构与宽度预算） 已定项 3 逐字说 incompat 位与「同一套布局内部的编码」**量纲不同**，日后新开一套布局是「多一套要永远维护的解析器 + checker + 崩溃点重放」。⇒「不预留不贵」这句只在**新增对象 / 新增树 / 新增 feature 位**三类上成立（D27（小数据打包容器） 2026-09-07 走单元类登记表码 4–15 加了一个全新格式能力、没用掉任何专用预留位；D15（格式冻结政策） 已定项 2 的开放树表让新 keyspace 走 compat），在「**已冻结字段的内部编码**」上不成立。而 D14（双轨（大小文件 / 持久临时）） 已定项 6 明令不做的那三个「第二套」（第二套校验语义 / 第二本账 / 第二套恢复语义）各属于哪一类，**仓里今天没有一条条款判过** | 门禁比对：每条「v1 不含此特性」的冻结清单条目都要写明它属于哪一类扩展，写不出即判红。判别力自证：把某条的分类改成另一类而不改它的留白宽度，检查必须由绿转红 | 要在 v1 冻结前答；今天不咬人是因为还没冻 | 2026-09-07 冻结预留那一轮反推腿查出，它同时是那条腿**推翻自己前半段假设**的地方 |
+| C194 | 代际增量 scrub 看不见被搬过的副本 | **D13（验证路线） 已定项 8「2. 代际增量 scrub」逐字「靠 I-1.2（块头写序已发布） 与 D5（快照 / 空间记账机制） 的 birth txg 维护一个「上次 scrub 扫到的 generation 水位」，只遍历 `birth generation > 水位` 的块」，而 D5（快照 / 空间记账机制） 已定搬迁不改 `birth`** ⇒ 一个 txg=5 写下、txg=500 被搬到新落点的单元 `birth` 仍是 5、水位早已过 5 ⇒ **这份物理位置全新的副本此后永不进遍历集合**，可以被反复搬迁而一次都不被 scrub 选中。那段话给的理由句「老子树的校验和链没变就必然还自洽」对**逻辑内容**成立、对**介质**不成立——scrub 要抓的正是「校验和链没变而盘上那几个扇区烂了」 | 造一个「写一个单元 → 跑一遍 scrub → 整理搬走它 → 再跑一遍 scrub」的镜像，断言第二遍的读集合**含**那个新落点。判别力自证：把选择谓词改回纯 `birth > 水位`，检查必须由绿转红 | 整理实现 + scrub 实现，两者今天都没有 ⇒ 只能记账拦不了。**候选出路（要另行定案）**：选择谓词改读 D3（空间分配） 已定项 7 的**分配代**（逐字「value = 分配代或释放代 8 字节，存完整 checkpoint 号」），它在目的地侧每次搬迁都新写一个，恰好是「这个**落点**上这份副本有多新」；⚠️ 「让搬迁换写序」这条路已试过并撤回，见 D26（后台整理与放置回收）「2026-09-08 三轮对抗论证」 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第一轮反推腿 |
+| C195 | 销毁级联时 prev 传递只写在实验的模型修订记录里 | **`grep -rn "prev 要传递\|prev_txg" .claude/kb/` 全仓只命中一处**：`experiments/94-搬共享落点的触碰面.md:95` 的**模型修订记录**，逐字「prev 要传递（不传递会永久钉住，变异 M5b 验证）」。而 D5（快照 / 空间记账机制） 正文那条销毁规则逐字只写到「销毁快照时把它的 deadlist **合并到下一个更新的那一侧**，并按 `birth > prev(S).txg`」，**一个字没提传递** ⇒ 光读 D5（快照 / 空间记账机制） 正文，「级联销毁之后 deadlist 条目永远等不到 `birth > prev(S).txg`」这个无界泄漏构造**驳不倒**（实测：本地腿两轮四次抽样反复造出它） | checker 判「任一 deadlist 条目，其归属快照的 `prev(S).txg` 等于它在销毁级联中**写意图那一刻**继承来的那个值」（2026-09-16 收窄：prev 在写意图的那个事务里传，拆到以后的发布时 D5（快照 / 空间记账机制） 已定项 12 的三条候选都 5 步多放）。判别力自证：把继承那一步去掉（每次销毁各用各的原始 prev），检查必须由绿转红——E94（搬共享落点的触碰面） 的变异 M5b 已经在模型层证过这条会红 | D5（快照 / 空间记账机制） 正文那一句已补（文件开头「`prev` 要跟着传递」那一行）；剩 checker | 2026-09-08 D26（后台整理与放置回收） 已定项 5 三轮论证，本地腿四次抽样都撞在这里 |
+| C196 | 中央映射树的根住哪全仓无条款 | **`grep -rn "中央映射" .claude/kb/` 的全部命中里没有一条说它的根住树表、住根记录还是住系统配置**；只有 E115（系统配置字段表的完备性与字节预算） 把它建模成系统配置的第四个间接指针（`map_sep` 臂）。⚠️ **D19（块指针的结构与宽度预算） 已定项 5 之后这一格从宽度问题变成正确性问题**：映射要按版本身份解引用（D19（块指针的结构与宽度预算） 已定项 6）⇒ 它装着被快照引用的旧版本 ⇒ 回退到根环里更旧的根时映射**必须跟着一起回退**，否则 I-7.4（近 K 代块未被复用） 保住的那些块在映射里已经没有条目、解不出落点。挂在根记录 / 树表下（随根 COW）自动成立；住系统配置槽则不成立 ⚠️ 2026-09-13 总审核定案：D19（块指针的结构与宽度预算） 已定项 11 定映射树的根住根记录（第 11 个字段，83 字节），条款已写，检查仍欠 | 造一个「发布 N 代 → 回退到第 N−2 代 → 解引用一个只被那一代引用的旧版本」的镜像，断言解得出。判别力自证：把映射根改成不随根回退，检查必须由绿转红 | 映射的盘上形态（D19（块指针的结构与宽度预算） 已定项 6 的邻项）；根环回退语义已定（D23（journal 的角色与格式） 已定项 14） | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮跨决策连锁腿 |
+| C197 | 迁移的三笔写是不是一个事务没写下来 | **一次搬迁要写三笔：新单元字节、中央映射条目、分配记录条目（源侧标已释放 + 目的地侧标已分配）。它们是不是同属一次事务，D26（后台整理与放置回收） 已定项 2 与全仓其余条款一个字都没写。** 拆开写的两种后果都到不了任何现有检查：先标源已释放 ⇒ 崩后映射指向一个 defer 期满即可复用的落点 ⇒ 解引用解到**第三方数据**（比 E96（混合架构的一致性） 测到的「读到同 key 的新版本」更坏）；先改映射 ⇒ 旧落点永久标已分配，而 D3（空间分配） 已定项 7 的孤儿准入要求「没有条目」，管不到一个**有条目且标已分配**的落点 ⇒ 泄漏 | checker 判「任一分配记录条目标已释放，其对应的中央映射条目要么已指向别处、要么该版本已在某处 deadlist 或 defer 队列里」。判别力自证：把迁移拆成两个事务并在中间截断，检查必须由绿转红 | 修法零格式位（只约束哪些写打包进同一条 journal 记录），但要等崩溃点重放才验得了；⚠️ 另欠一条依赖声明：迁移对映射的写今天寄生在 D13（验证路线） 已定项 2 的「串行提交」上，而那条自陈是过渡默认值 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮崩溃点与并发交错腿 |
+| C198 | 映射 key 与节点头常量没有 format-const 登记位 | **`grep -rn "format-const" .claude/kb/` 现查：中央映射 key 的宽度在 kb 里没有登记位**，而 `research/e7-index-bench/src/bin/e109_position_authority.rs:62` 有 `const KEY_BYTES: u64 = 33`、`e116_pack_settle.rs:81` 有 `const MAP_KEY: u64 = 33`；两处算同一个映射树节点头的常量（`e109` 的 `MAP_NODE_HEADER_BYTES = 76` 与 `e116` 的 `NODE_HDR = 86`）**取值还不一样**，只是在两轮论证用过的那两个取样点（key 33 / 41）上恰好都给出 267 / 236。⇒ D19（块指针的结构与宽度预算） 已定项 6 定案之后改完 kb，`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格对这几处源码**一个字都不会说**（C187（源码里没在 kb 登记的格式常量，格式常量门禁看不见） 的同一形状，对象换成映射） ⚠️ 2026-09-14：映射 key 27 / 条目 55 / 节点指针 86 这三个数仍没有 format-const 登记位，E116（打包容器的账·补元数据写与整理策略） / E145（码 2 自描述头与映射树 key 宽的代价） / E146（livelist 条目按映射 key 定身份之后的宽度与代价） 三份装置因此停在旧值而门禁 code-source-discipline 的 format-constants 格看不见（见 C56（没登记的格式常量仍会漂） 那一行的现查） | 给映射 key 宽度与映射树节点头各补一个 `format-const` 登记位，让 27-format-constants.sh 覆盖到那三处源码常量。判别力自证：把源码里那个常量改一位，门禁必须由绿转红 | D19（块指针的结构与宽度预算） 已定项 6 定案（登记位要登记一个定下来的值；2026-09-11 已定，这一条前置解开）；两个节点头常量对不对得上要另查 | 2026-09-08 D26（后台整理与放置回收） 已定项 5 第二轮跨决策连锁腿 + 第三轮辩方腿 |
+| C199 | 实例代号递增与 jsn 断号即止互相矛盾 | **D23（journal 的角色与格式） 已定项 9 定「实例代号 32 位 + 计数器 48 位」且代号每次恢复递增，而 E37（日志实例代号） 逐字 `jsn = (代号 << 48) \| 计数器` ⇒ 一次实例切换让 `jsn` 跳 2⁴⁸；而 I-8.3（重放前缀严格连续） 逐字仍是「`jsn == expected`，断号即止」，D23（journal 的角色与格式） 已定项 14 的「前缀判定的完整口径五条」第一条也逐字是「jsn 严格连续（断号即止）」** ⇒ 按今天成文的规则，实例切换之后新实例的记录一条都不施加（E37（日志实例代号） `epoch` 臂实测 `lost_new=1`）。D23（journal 的角色与格式） 正文两处逐字写着「**它还要改一条已定的前缀规则**：恢复必须接受「代号 +1 且计数器接着走」」，而这条改动**没进任何已定项、任何不变量、任何欠账**。**2026-09-13 第一轮三方论证不定案**（`research/prompts/c199-r1-main-verification.md`）：维持严格前缀（甲）被打中——每次可写挂载都取新代号（D18（块里携带什么信息） 已定项 11「只读挂载不取号」），干净重挂之后第一个根所在的槽读不出、再在第二次发布之前崩一次，fsync 已返回的事务就丢，一个故障就够（根槽不镜像）；按实例表跨边界（乙）按字面同样丢，交接记录（丙）与链尾锚的丁 都把一次没持久的回退接上。「被抛弃实例的记录不许施加」这条判据的判别子在恢复时观测不到，第二轮要先改它，再判甲与丁。连带查出仓里没写的两件：计数器按实例从头计还是全池接着走、记录水位 (实例代号, checkpoint_txg) 的比较序。**2026-09-13 第二轮三方论证**（`research/prompts/c199-r2-main-verification.md`）：链尾锚跨实例（丁）一个故障就丢已确认的回退（被抛弃尾巴点名的单元被复用、验不过即停），出局；严格前缀 + 新实例先暖机（戊）单故障没打中；三条臂都被 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那一格打中 ⇒ 按跑前条款不替用户选臂，回到严格前缀、写明代价。**矛盾这一半已收口，2026-09-14 用户复核确认**：D23（journal 的角色与格式） 两句「要改前缀规则」改成「前缀规则不改」，已定项 14 补了链首、比较序（实例代号为主）、计数器（全池接着走）、切换时的 W（窄读）四条注，D16（发布语义） 已定项 7 补了新实例第一个根是单点的代价——D23（journal 的角色与格式） 已定项 9 与 14、D16（发布语义） 已定项 7 都是用户定案；要不要暖机落 D16（发布语义） 已定项 8，建议先还 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 再取暖机 | 崩溃点重放造两格：① 所选根是新实例的根 ⇒ 新实例在水位之后的记录全部施加；② 新实例的根全读不出、退到旧实例的根 ⇒ 新实例的记录一条都不施加、写出的行 W = 0（D16（发布语义） 已定项 7 那条代价）。判别力自证：把链首改成「环里第一条」或把跨实例改成放行，② 必须由绿转红 | I-8.3（重放前缀严格连续） 未实现、崩溃点重放 harness 2026-09-14 已接入（门禁 checker-tier-layer0-replay；2026-09-17 起层 0 第二条流有三次可写挂载含回退，但没有「新实例的根全读不出」那一格的故障注入）；改法本身要 D23（journal 的角色与格式） 定案 | 2026-09-08 三方论证（D22（单元原子性怎么合成） 那条世代号硬要求要不要销账）的反推腿指出，主 agent 逐字核 I-8.3（重放前缀严格连续）、D23（journal 的角色与格式） 已定项 14 的五条口径、E37（日志实例代号） 正文坐实 |
+| C200 | 记录头改宽之后代价侧没重算 | **journal 记录头 2026-08-30 从 86 改成 78（D23（journal 的角色与格式） 已定项 4），而 E49（反向链宽度 32 还是 64） 的代价侧结论压在旧头宽上**：它逐字是「代价在 base = 95 这一档为零」，base = 95 = 当时的头 86 + 事务字段 9。**E49（反向链宽度 32 还是 64） 自己那张表里 base = 78 那一档 2 vs 4 有 31 处分岔，不免费** ⇒ 「反向链两侧都免费」这句话在现行头宽上没有依据。D23（journal 的角色与格式） 正文早已记下要重算，但 E49（反向链宽度 32 还是 64） 正文三处仍把 base = 95 称作「现行值」，**一直没人发现，是 2026-09-07 追 `JOURNAL_HEADER_BYTES` 的登记值时撞出来的**（2026-09-07 已在标题、开头、索引三处标出） | 按 base = 78 与 base = 91 各重跑一次 E49（反向链宽度 32 还是 64） 的代价扫描，把两档结果写回正文并更新结论 3；**判别力自证**：把重跑脚本的 base 改回 95，「两侧都免费」必须复现，改成 78 必须出现 31 处分岔 | 无前置（E49（反向链宽度 32 还是 64） 的扫描装置已在 `research/e7-index-bench/`），但 78 / 91 收成一个数要等 D23（journal 的角色与格式） 那两笔已定增量落地。还账计划写的 base = 78 与 base = 91 是更早的头宽口径，现行头 311（D23（journal 的角色与格式） 已定项 4），还账时先定按哪个 base。 | 2026-09-07 追 C94（登记的格式常量与后来的定案对不上）点名的 `JOURNAL_HEADER_BYTES` 时发现；D23（journal 的角色与格式）「宽度已定」上方那条 ⚠️ 已记同一笔账 |
+| C211 | 节点落盘形态没有正文 | **实现照 bcachefs 形态把索引节点做成盘上追加 bset，而父指针里的校验和只覆盖第一段。** D8（核心索引结构） 的形态表「日志结构节点」那一行逐字是「节点内新 key 追加不插入，内存里定期重排；写顺序、可在只读锁下回写」，整行照抄 bcachefs，而 [prior-art.md](prior-art.md)「5.2 日志结构的 btree 节点」逐字记着它那条性质的理由是「**节点可以在只读锁下写盘**——因为只追加」，指的是**盘上**追加。**本工程盘上追加不成立，而没有一句正文这么写**：D1（数据可移动性 / 反向索引） 已定项 4 逐字「⚠️ **「可改」不是原地改。** 单元不可变（已定项 1 那条判据的另一半）⇒ 动扩展点一个字节就等于写一个新单元」，D4（校验和位置） 已定项 1 的依据逐字「D8（核心索引结构） 已定项 2 的 16 KiB 只管索引节点；节点自己就是一个单元，它的校验和粒度随节点走 ⇒ 元数据侧 16 KiB、数据侧 32 KiB」——两条合起来才推出「节点落盘 = 整单元重写」，**那一步是推理，不是仓里的正文**（2026-09-08 现查：`grep 追加\|整节点\|全量重写\|节点重写\|部分写` 在 decisions/ 下逐条读过，零命中）。⚠️ **连带一处**：「一次写完不回写」被 D18（块里携带什么信息） 的否决清单当既有条款引用（逐字「改成回填就违反「一次写完不回写」」），而全仓只有那一处，**没有登记位** | 块层写记录里，任一单元落点在它被父指针发布之后不许再被写第二次，出现即判红；索引节点落点的写次数断言恰为 1。判别力自证：故意对一个已发布节点追加一段 bset 并同步更新它自己那段的校验和，检查必须由绿转红——单点自洽正是 D13（验证路线） 已定项 8 记过的形态（逐字「某次写绕过 COW、原地改了块内容并同步更新了校验和，单点看它是自洽的（I-2.1（校验和与内容匹配） 全绿）」） | 块层写记录、事务层（2026-09-14 都有了）。**正文那一半 2026-09-14 已写**：D8（核心索引结构） 形态表「日志结构节点」那一行加了射程注（说的是内存里的排布，盘上每次落盘是整单元 COW 重写、按已定项 11 的单一定宽条目数组写，不是盘上追加 bset），「write buffer 前端」那一行注明第一版不实装（已定项 10）。**检查仍欠**：前置 2026-09-14 已有，这条断言还没接进 checker | 2026-09-08 判一个外部说法（「日志结构与 Merkle-COW 是强行缝合」）时暴露：那个说法的最强形态正是「盘上追加 bset 与父存子校验和不能共存」，主 agent 现查确认冲突已被单元不可变提前关死，但关死它的那一步全仓没有正文。与 C161（缓冲两级并存而衔接没定） 同族——都落在 D8（核心索引结构） 抄来的形态与本工程已定条款之间的缝上 |
+| C212 | 固定结构的写小于 io_min | **D2（RAID 条带策略） 已定项 16 逐字是「不发出小于 `io_min` 的写。在 Linux 上这个量是 `io_min`，不是 `physical_block_size`」，而三类固定结构的写宽度都不是按 `io_min` 定的**：根槽宽 = 挂载时探测的 `physical_block_size`（D22（单元原子性怎么合成） 已定项 2），journal 记录 4 KiB（D23（journal 的角色与格式） 已定项 12，用户定案），系统配置槽宽是格式常量 4096（D22（单元原子性怎么合成） 已定项 2，2026-09-14 三方第一轮加用户定案；`crates/singlefs-format/src/lib.rs` 的 `SYSTEM_CONFIGURATION_SLOT_BYTES`）。⇒ 凡 `io_min` 大于那个宽度的设备上，**每一次发布都在发违反硬要求 1 的写**，而硬要求 1 一个未定义的词都没有——这不是判据缺失（那一半是 D2（RAID 条带策略） 已定项 15），是**两条已定条款打架**，形态与 C182（两条已定项对根环落盘归属说反话） 同族。**为什么至今没人发现**：两条硬要求住在 D2（RAID 条带策略）「写的粒度」一节，在「### 已定项」之前，**没有分项号**（2026-09-08 现查 `grep -n "写的粒度\|硬要求" .claude/kb/decisions.md` 零命中）⇒ 所有按分项走的门禁阶段（21 / 22 / 24 / 28 / 29 / 31 / 60）对它们整个是盲的。⚠️ **C82（io_min 不在挂载比对清单） 那道闸盖不住**：它提议的是 `io_min ≤ 32768 且 32768 % io_min == 0`，而 `io_min` = 4096、`physical_block_size` = 512 的普通 NVMe 过得了闸，512 字节的根槽写照样违规 | 两半。**格式侧**：把两条硬要求补成 D2（RAID 条带策略） 的分项（今天就写得出，且不碰已定的 14 条），它们进了分项射程之后，按分项走的那七个门禁阶段（21 / 22 / 24 / 28 / 29 / 31 / 60）才看得见它们。**镜像侧的检查形态取决于这条冲突怎么解，而解法今天没定**——⚠️ **三条候选互不相同，不许预设走哪一条**。⚠️ **2026-09-10 追记：候选 ① 与一条已定条款直接矛盾。** D20（承重面：单元的原子性与自包含） 推论三给「自证单元」类的规则逐字是「**等于运行时探测到的 `physical_block_size`，不许硬编码。**」，而 2026-09-10 用户定案把「系统配置槽」补进了那一行的枚举 ⇒ 该规则现在明文罩着**根槽、journal 记录头、系统配置槽**三个成员，而候选 ① 要把宽度改成 `max(physical_block_size, io_min)`，**违反那个「等于」**。⇒ 走候选 ① 就等于要改 D20（承重面：单元的原子性与自包含） 那条 2026-08-29 已定的类规则，不再是「某一个结构的槽宽怎么取」。⚠️ **「所以解空间只剩 ② 与 ③」是一条推论，还没走三方，不作数**——这里只记下那处矛盾是现查坐实的。三条候选原文：① 抬固定结构的写宽到 `io_min`（根槽宽改成 `max(physical_block_size, io_min)`，代价见 D22（单元原子性怎么合成） 已定项 2 的槽宽张力那一节）；② 收窄硬要求 1 的射程，明写它只管数据 / 单元写，固定结构另有一套（那要给出为什么固定结构不怕设备内 RMW，而 E34（根环槽几何） 的真设备那一轮只证到 RAID5 写洞这一条机制）；③ 挂载时拒绝 `io_min` 大于固定结构写宽的设备（C82（io_min 不在挂载比对清单） 那道闸的推广形态，代价是一批阵列上挂不上）。定了哪一条，检查就写成那一条的可判形式；在那之前**能写的只有格式侧那一半**。判别力自证（对任一解法都成立）：造一台 `io_min` = 64 KiB 的设备，按今天的条款发一次根槽写，检查必须由绿转红 | 块层写记录、事务层（2026-09-14 都有了）。**格式侧那一半不等实现**：补分项号与判「槽宽改不改」都是今天能做的，后者要走三方（E34（根环槽几何） 只给算术不给判决） | 2026-09-08 D22（单元原子性怎么合成） 槽宽张力那一轮三方论证：反推腿指出，主 agent 独立现查同一处，并逐字核 D2（RAID 条带策略）「写的粒度」、D22（单元原子性怎么合成） 已定项 2、D23（journal 的角色与格式） 已定项 12 坐实 ⚠️ **2026-09-10 追记：格式侧那一半已还，实测侧给了候选 ② 一条正面依据但不足以让它成立。** **格式侧**：两条硬要求已补成 D2（RAID 条带策略） 已定项 16（不发出小于 `io_min` 的写）与 已定项 17（不让两个生命周期不同的对象共享同一个物理映射单元），条款本身一个字没改 ⇒ 按分项走的七个门禁阶段现在看得见它们。**实测侧**（E129（小于 io_min 的写在真设备上怎么出事），三段真设备、5 轮逐格一致、9 条变异全抓）：① **候选 ② 欠的「第二条机制」找到了**——`dm-thin` 的块内 COW，与 RAID5 写洞不同族（没有 parity、不跨腿）；② **`io_min > physical_block_size` 不只出现在阵列上**：`dm-thin` 实测 `io_min=65536` / `pbs=512`，块共享时一次 512 字节的写让数据设备写 129 扇区；③ **把那条 RMW 精确撕开时邻居 5/5 轮逐字节完好、写方收到错误** ⇒ 它是**事务性**的，失败形态是可检出的写失败，不是静默的邻居损坏。⇒ **给候选 ② 的是「所有设备内 RMW 都危险」这个全称被削弱**，不是候选 ② 成立：它只覆盖 `dm-thin` 这一条机制；SSD FTL 内部的 RMW 仍然注不进去（E34（根环槽几何） 已记）；而 RAID5 写洞那一条 E34（根环槽几何） 已证**会**损坏邻居，失败形态与它相反。⇒ **三条候选仍未选定，仍不许预设走哪一条**；今天缺的从「一条机制都没有」变成「两条机制的失败形态相反，要按设备类分别论证」。⚠️ **这一格自己写的那条判别力自证今天做得出来了**：逐字「造一台 `io_min` = 64 KiB 的设备，按今天的条款发一次根槽写，检查必须由绿转红」——E129（小于 io_min 的写在真设备上怎么出事） 已经把那台设备造出来了（`dm-thin`，`io_min=65536`），缺的只剩「今天的条款」那一侧，即事务层与检查本身。 ⚠️ **2026-09-19 现查改正两处**：① 「系统配置槽宽跟着根槽走」已过时——D22（单元原子性怎么合成） 已定项 2 于 2026-09-14 把它定成格式常量 4096（`SYSTEM_CONFIGURATION_SLOT_BYTES`），行首那句按现值改；② 槽距这一格 2026-09-13 起有条款了（D2（RAID 条带策略） 已定项 19：槽距 = 4096 向上取整到 mkfs 时探测的 io_min 的整数倍），挂载闸第一版只设 (a) 实际 io_min ≤ 记录的槽距、不设 (b) 实际 io_min ≤ 固定结构的写宽 ⇒ 普通 NVMe（io_min 4096、physical_block_size 512）上每次根槽写与系统配置槽写仍是 512 字节，逐字违反 D2（RAID 条带策略） 已定项 16，知情接受，三条候选仍一条都没选。
+| C214 | 遍历跳的窗口余量没人守 | **任何活树遍历读完父指针、再去读子块，这中间子块不许被释放并重用**——这是 E92（最坏块重用延迟需求） 补列重跑之后清单里**唯一按墙钟计价**的消费者（产物逐字 `name=pricing_census generations=6 wallclock=1 external_event=1 blank=1 total=9`）。它今天被罩住：窗口 = K ÷ 发布率，甲（2785 发布/秒）与 K=2 下是 **718 微秒**，一跳按 100 微秒算余量 7.18 倍。⚠️ **但那条余量没有任何东西在守**：发布率涨、设备变慢、或 K 被调到 1，交叉线就会被越过，而越过之后的失败模式是**遍历读到已被复用的块**——父指针校验和会失配（D4（校验和位置） 检得出来），但「失配 = 真损坏」与「失配 = 我这条路径过期了」**分不开**，于是 scrub 会把复用报成损坏，或者更糟：复用后的内容恰好自洽时静默放过。⚠️ **一跳 100 微秒是取样点不是实测**，本仓没量过单跳耗时 ⇒ 余量倍数不承重，承重的是那条交叉线本身 | 两半。**可判形式**：运行期断言「任一遍历的相邻两跳之间，已过去的发布数 < K」，越界即判红并中止那次遍历（而不是把失配报成损坏）。**镜像侧**：崩溃点重放里造一个「遍历中途发布 K 次并复用被指向的块」的世界，检查必须报「路径过期」而不是「校验和损坏」。判别力自证：把 K 调到 1 且把一跳拖到超过 359 微秒，检查必须由绿转红；恢复原值必须转绿 | 遍历路径、事务层、崩溃点重放 harness（事务层与崩溃点重放 2026-09-14 已有，活树遍历路径还没有）。**今天能做的一半**：量出本机单跳耗时，把交叉线从取样点换成实测 | 2026-09-08 E92（最坏块重用延迟需求） 补列重跑：判据 1 的枚举挂闸触发后补列，遍历跳是补进来的四个消费者之一。⚠️ **它替下了 C213（走旧代根的墙钟消费者没有承担者）**——那一条押在「代际增量 scrub 钉住一代根走到底」这个形状上，而 D13（验证路线） 已定项 8 对 scrub 的逐字定义是「只遍历 `birth generation > 水位` 的块」，形状不存在 |
+| C228 | 字词损坏闸漏掉首字母缩写自粘 | **已还一半（2026-09-09）**：`research/scripts/corruption-check.py` 新增 `ACRO_DUP`（全大写连续串恰好是某个 ≥2 字母串重复两次即判红，不依赖词表），判红式与拼接类同档（二值事实，不设「至少两处」门槛）。**判别力双向验过**：那份漏掉的 `d22-item6r2-local-output.md` 由绿转红（`缩写自粘=1`，样本 `SCSISCSI`），回扫既有 141 份本地腿输出**零新增误判**。仍欠的一半：`oov-check.py` 的取词下限仍是 9 个字母，8 字母以内的其它拼接形态（非全大写的）照样漏。原始病灶：**本地腿的字词损坏闸对「缩写词自己粘自己」判绿，而那正是拼接类损坏。** 2026-09-09 一份本地腿输出里逐字出现 `SCSISCSI ZBC`（= `SCSI` + `SCSI`），`corruption-check.py` 报 `粘连=0`、`oov-check.py` 报 `拼接=0`，**两个检测器一起判绿**，那一轮因此被当成干净证据用了（它同一段里还编了一个不存在的规范条号）。病根可定位：`oov-check.py` 的取词正则逐字是 `[A-Za-z][A-Za-z']{8,}`，**要求至少 9 个字母**，而 `SCSISCSI` 只有 8 个 ⇒ 它连生词都没被算进去，后面四条拼接规则一条都没机会跑 | 给 `corruption-check.py` 加一条不依赖词表的规则：全大写连续串长度 ≥ 4 且恰好等于「某个 ≥2 字母的串重复两次」即判红（`SCSISCSI`、`NVMENVME`），并把它写进该文件已有的 `SELFTEST_RED`；同时把 `oov-check.py` 的长度下限从 9 放宽到 6，用现有 `SELFTEST_GREEN` 回归确认不新增误判。判别力自证：拿 2026-09-09 那份 `d22-item6r2-local-output.md` 喂进去，必须由绿转红 | 无前置（纯工具工） | 2026-09-09 D22（单元原子性怎么合成） 未定项 6 第二轮，主 agent 肉眼在本地腿输出里读到 `SCSISCSI`，回头跑两个检测器都判绿 |
+| C229 | 引文对而编号错，摘句判据拦不住 | **`.claude/rules/three-way-inference.md` 那条判据只比正文、不比编号，所以「引文逐字正确但挂在别的编号名下」这一形态它拦不住。** 2026-09-09 实测：三方论证的背景材料把 D13（验证路线）「O2（独立解析器 + checker） 的定义域是单个镜像」这条**独立定案小节**（2026-09-09 现查时它是 `.claude/kb/decisions/13-验证路线.md` 第 32 行一个不编号的小节，标题逐字 `### 定案：O2（独立解析器 + checker） 判的是**一个**镜像（2026-08-29）`；2026-09-19 D13（验证路线） 瘦身之后那一节已立成 D13（验证路线） 已定项 7）标成了「D13（验证路线） 已定项 4 的射程句」，而 D13（验证路线） 已定项 4 逐字是「**崩溃点重放的崩溃状态集合怎么定义** \| **已定（2026-09-03，用户定案）：屏障切段、段内任意整写子集……**」，两者完全是两件事。⚠️ **自查读不出问题**：被抄的那段正文一个字没错，错的是它头上的门牌 ⇒ 「把引用处那一条与仓里那一条并排放，有没有一个字是引用处没有的」这条判据答「没有」，照样放行。⚠️ 这条与 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 5 条「编号只能做索引，不能做称呼」是同一个洞的两端：那条管「引用时不带简称」，这条管「带了简称却挂错编号」 | 门禁形态：凡写成「D<N>（简称） 已定项 <k>」的引用，都要能在 `decisions/<N>-*.md` 里找到编号为 `k` 的那一节，且引用处紧邻的引文必须出现在该节范围内；找不到或引文落在别的小节即判红。判别力自证：把某处正确引用的分项号 +1，检查必须由绿转红。⚠️ 先量误判率：这类不编号的独立定案小节 2026-09-20 现查在决策正文里已经清零——三批瘦身把它们全立成了编号分项，最后三个例子是 D2（RAID 条带策略） 的「写的粒度」一节与 D6（快照实现模型）、D10（随机写 / 碎片化的真答案） 各自那节带用户定案日期的标题；要量误判率得另找语料，现成的是决策变更史与 `records/` 里照抄的改前原行；门禁要能把「引的是不编号的小节」与「编号写错了」分开，分不开就先只判前一半 | 无前置（纯门禁工） | 2026-09-09 D22（单元原子性怎么合成） 未定项 6 第二轮，正推腿现查 D13（验证路线） 的 `^#### 已定项` 编号后打中，主 agent 逐字核第 32 行与第 219 行坐实 |
+| C230 | 区重置后的态与从没写过的态分不开而不变量全绿 | **一次 `ZoneReset` 把已提交的一整代根销毁之后，盘上留下的态与「这个区从没写过」在三个观测量上逐格相同，而两条根环不变量双双判绿。** 实测反例就在 E125（顺序区写指针之上读到什么） 自己的产物 `e125-zoned-wp-2026-09-09.out` 里：`neg_control`（从没写过）逐字 `wptr=0x000000 zcond=1`，`crit2_after_reset`（写下 8 条根记录再 `BLKRESETZONE`）逐字 `wp_bytes=0 zcond=1 distinct=1 uniform_byte=0xff marker_found_at=-1` ⇒ **字节、写指针、zone condition 三样全同**。⚠️ **2026-09-19 现查：这一格今天到不了，要等 zoned 开线。** 立账时写的「`ZoneReset` 就在 D13（验证路线） 的封闭提交步骤枚举里」已不成立——现查 D13（验证路线） 正文与 `crates/singlefs-core/src/transaction.rs` 的 `CommitStep`（五个成员：写单元、写 journal 记录、根槽 FUA 写、系统配置槽轮换、屏障）里 `ZoneReset` 各命中 0 次，第一版只实现普通 SSD 那一套布局（D12（目标介质） 已定项 5），D13（验证路线） 已定项 10 只把 zone finish/reset 写成 zoned 开线时会多出来的结构性步骤。zoned 线一开，一次落错区的重置、或「重置完而下一条根记录还没落」之间崩溃，就都到得了这个态。⚠️ **它是静默的**：R = 3（D22（单元原子性怎么合成） 已定项 2），抹掉一个区域之后 I-7.1（根槽有效集非空）（S 非空）与 I-7.3（环健康性）（S 中还有更早代号）**双双判绿**，挂载拿到一个更旧的根，已提交的那一代被静默丢掉。⚠️ D20（承重面：单元的原子性与自包含） 七机制表里**没有任何一个机制的「能检测」列覆盖「本该有记录的位置上什么都没有」** | 需要一条「本工程写下的东西不该凭空消失」的判据，而它不能取盘上字节作输入（三样全同）⇒ 只能取**盘外**的东西：系统配置里记下的「本代根应当落在哪几个区域」，挂载时与实际找到的代号集合比对，缺一个即判红。门禁形态：崩溃点重放里造一个「已提交 N 代之后重置掉其中一个区域」的镜像，恢复必须判红而不是静默回退。判别力自证：把该比对删掉，这条检查必须由红转绿 | 崩溃点重放 harness 2026-09-14 已接入（门禁 checker-tier-layer0-replay，只录纯 SSD 线）；且它要求系统配置字段表定案（D22（单元原子性怎么合成） 已定项 9）才有地方记那份「应当落在哪几个区域」 | 2026-09-09 D22（单元原子性怎么合成） 未定项 6 第二轮反推腿打中，主 agent 逐字核 E125（顺序区写指针之上读到什么） 产物两行、`.claude/kb/invariants.md` 第 46/48 行、D22（单元原子性怎么合成） 已定项 2 的 R = 3 坐实 |
+| C231 | 系统配置必需项里混进了根记录的字段 | **E115（系统配置字段表的完备性与字节预算） 的必需项表把「树表单元指针 59 字节」记在系统配置名下，出处写的是 D22（单元原子性怎么合成） 已定项 7——而 D22（单元原子性怎么合成） 已定项 7 定的是**根记录**的字段表，不是系统配置的。**现查坐实：`research/e7-index-bench/src/bin/e115_system_configuration_completeness.rs` 第 97 行逐字 `("树表单元指针", …, Some("tree_table_ptr"))`，其出处串指向 D22（单元原子性怎么合成） 已定项 7（源码里那个出处串写的是裸编号），而 D22（单元原子性怎么合成） 已定项 7 那一节（第 461–503 行）里「系统配置」出现 **0 次**，它自己的 `format-const ROOT_RECORD_BYTES = 194` 已经把这 59 字节算进**根记录**了。⇒ **同一份 59 字节被两个结构各计一次。** 去掉之后 E124（系统配置字段表按 D18 已定项 14 重算） 那四格里的 507 → 448、536 → 477，「512 装不下」那三格塌掉两格 ⚠️ **2026-09-10 追记：修它不是「减 59」那么简单。** D22（单元原子性怎么合成） 已定项 12 定了「系统配置不带自己的树表单元指针」之后，E115（系统配置字段表的完备性与字节预算） 的 `map_sep` 臂（中央映射树根单占一个指针）**同样要撤**，而那要先答 C196（中央映射树的根住哪全仓无条款）。**四格数在 C196（中央映射树的根住哪全仓无条款） 答完之前不许重跑。** ⇒ **凡踩在这四个数上的推论全部要重算**（含 2026-09-09 被打掉的候选 W） ⚠️ **2026-09-13 由 E147（系统配置字段表按新池新建文件字节表重算） 绕过**：按 layout/01-first-txn.md 那张不含树表指针、映射根不单占指针的 413 字节表重算，413 / 512 余 99，六条变体全在一个扇区内 ⇒ D22（单元原子性怎么合成） 已定项 9「四格不可引用」那句到此为止；E115（系统配置字段表的完备性与字节预算） / E124（系统配置字段表按 D18 已定项 14 重算） 产物留档不改。 | 门禁形态：必需项表每一行的出处都要能在被引的那条分项正文里找到该结构的名字（系统配置的行要在正文里出现「系统配置」），找不到即判红。判别力自证：把某一行的出处改成一条不提该结构的分项，检查必须由绿转红。⚠️ C231（系统配置必需项里混进了根记录的字段） 与 C178（系统配置必需字段表靠手抄） 是一对：前者管「串行」，后者管「漏行」 | 无前置（纯工装工），但改完要重跑 E115（系统配置字段表的完备性与字节预算） 与 E124（系统配置字段表按 D18 已定项 14 重算） | 2026-09-09 D22（单元原子性怎么合成） 已定项 9 三方论证，正推腿与反推腿**各自独立**打中同一处，主 agent 逐行核源码与 D22（单元原子性怎么合成） 已定项 7 正文坐实 |
+| C233 | 结论点名的独有收益在自己产物里有反例 | **E122（按目录聚在一起买到什么） 正文 2026-09-07 到 09-09 之间一直写着「真正只有聚集才买得到的是**回收**那一格……`arrival` 与 `random` **一个都腾不出来**」，而同一份留存产物 `e122-dir-locality-2026-09-07.out` 里 `arm=arrival stride=32 total_runs=16 worst_dir_runs=1 empty_segs_at_32=2 empty_segs_at_64=1 empty_segs_at_128=0` 与 `grouped` 同行逐格相同。** 装置里的断言范围一直是对的（`e122_directory_locality.rs` 的 `empty_segments_are_pinned_to_absolute_values` 写死 `stride = 2`，断言消息逐字「arrival **交错之后**一个整段都空不出来（段长 {sg}）」）⇒ **脱掉口径的是正文，不是装置**。E122（按目录聚在一起买到什么） 的复跑与产物逐字节一致、全绿（2026-09-09 现跑 `replay.sh`），门禁对这一类一个字都不说——这正是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「门禁能证明什么」那张表里逐字记着的「正文引的数与它自己的产物对不上」那一格。⚠️ **下游三处已继承，其中一处是被判的决策分项本身**（E122（按目录聚在一起买到什么） 结论句、它的「对 D14（双轨（大小文件 / 持久临时）） 说了什么」第 2 条、D14（双轨（大小文件 / 持久临时）） 已定项 2 正文），2026-09-09 三处一并改正 | 门禁扫每份实验正文里形如「只有 X 才买得到 / X 独有 / 只有 X 能」的句子，取它点名的那个量，去同一份留存产物里逐臂逐参数格比对：**非点名臂在任一参数格上与点名臂相等，而正文那张表没有该参数的口径列 ⇒ 判红**。判别力自证：把 E122（按目录聚在一起买到什么） 的产物 `e122-dir-locality-2026-09-07.out` 里 `stride=32` 那两行删掉，检查必须转绿；加回来必须转红 | 无前置，纯欠工。⚠️ 要先想清楚怎么从正文里认出「点名的那个量」——最省事的形态是要求这类句子显式标出它比的是产物里哪一列 | 2026-09-09 D14（双轨（大小文件 / 持久临时）） 已定项 2 第二轮，反推腿现查产物打中，主 agent 逐行复核坐实 |
+| C234 | 三方材料的小节清单只覆盖被判那一项所在的文件 | **`.claude/rules/three-way-inference.md` 要求「写材料时，先把**被判那一项所在文件**的全部小节列成一张表，逐节标『抄 / 不抄 / 为什么不抄』」，判据逐字「漏掉的那一节在材料里要留下一行『不抄，因为……』，而不是无声消失」。而一轮论证要引的文件常常不止一个。** 实测（2026-09-09，D14（双轨（大小文件 / 持久临时）） 已定项 2 第二轮）：材料给 D14（双轨（大小文件 / 持久临时）） 做了清单、**没给 D27（小数据打包容器） 做**，于是 `27-小数据打包容器.md:252-268` 那一整节（标题逐字「D14（双轨（大小文件 / 持久临时）） 那一关：它给「否」的理由够不到「搬出去」这个形态」，含三条限定，限定 ③ 正是那一轮闸门问题要判的那一问）**无声消失**，而材料引的是同文件里更早、答它之前写下的那笔欠账行。⚠️ **同一轮还暴露清单本身可以写假**：清单给「已定项索引表」标的不抄理由逐字「表里四行的正文各自抄或不抄」为假——现查 D14（双轨（大小文件 / 持久临时）） 只有两个四级小节，已定项 1 与 5 整条只活在那张被标「不抄」的索引表里 ⚠️ **第 ① 条 2026-09-11 做成会红的一项**：`research/scripts/quote-kb.py --checklist 清单 --cited 正文 …`——正文里提到的每个 D / E / C / I 编号所在的 kb 文件都要有一张小节清单，缺一张退出码 5，自检造「正文提到一个欠账编号、清单里没有 checks-owed.md」必须红、补上必须绿。起因是它 2026-09-11 又被打中一次：D19（块指针的结构与宽度预算） 已定项 6 第二轮材料漏了 D23（journal 的角色与格式）、D16（发布语义）、D1（数据可移动性 / 反向索引） 三个文件。⚠️ **射程只到正文里字面出现的编号**：那一轮真正漏掉的 D23（journal 的角色与格式），正文一次都没提到（第 6 格的机制住在它那里，而写材料的人根本没意识到要引它）——这种语义上的漏它抓不住；拿那一轮的真材料去跑，它抓到的是另一个字面漏引（D15（格式冻结政策））。第 ② 条仍欠。 ⚠️ **2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 第三轮又撞一次，正是它自陈够不着的那一型**：判断要用 D3（空间分配） 已定项 1 / 5 与 D22（单元原子性怎么合成） 已定项 2，而材料正文一次都没写这两个编号 ⇒ 两个文件都没有清单，`--cited` 一个字都没说（反推腿指出） | 两条一起做：① 材料里**每个被引的 kb 文件**都要有一张小节清单，缺一张判红——门禁扫材料里出现的 kb 文件路径，逐个比对清单表里有没有该文件的一节；② 清单里每一行标「不抄」的理由若声称「它的正文在别处抄了」，就去核那个小节真的存在，标题数对不上判红。判别力自证：把 D27（小数据打包容器） 那张清单删掉，检查必须转红；补回来转绿 | 无前置，纯欠工 | 2026-09-09 D14（双轨（大小文件 / 持久临时）） 已定项 2 第二轮，反推腿打中材料本身 |
+| C235 | 欠账行写下之后同文件里答它的那一节没人回扫 | **一条「X 没答」的欠账行留在正文里，后来同一个文件里出现了答它的小节，而欠账行一个字没改** ⇒ 下一个检索到它的人（或模型）读到的是那一行。实测（2026-09-09）：`27-小数据打包容器.md:91` 的举证责任表逐字给 D14（双轨（大小文件 / 持久临时）） 已定项 3 那一关记「只答了『容器不是索引节点』，那一关没答」，落款是 decisions-history.md 2026-09-07（其十五）；而同文件 252-268 那一节逐字写着「这条答的是 D14（双轨（大小文件 / 持久临时）） 已定项 3 那一关**逐字问的那件事**」，落款是同日（其二十），**在其十五之后**。两处进仓在同一个 commit ⇒ **先后只能按 kb 自己的历史序号读，git 日志读不出来**。⚠️ 它与 C167（明文映射层的引用全仓回扫没做） 是同一条纪律的两端：那一条是撤的人没扫干净，这一条是答的人没回头改欠账行 | 门禁比对同一个决策文件内部：一条欠账行（表格里含「没答 / 未答 / 没还」且点名了某条外部条款）之后，若同文件出现一个标题或小节点名同一条外部条款且历史序号更晚，判红，逼一次回扫。⚠️ **判据要认历史序号不认 git**（同 commit 进仓）。判别力自证：把 `27-…:252-268` 那一节删掉，检查必须转绿；加回来必须转红 | 无前置，纯欠工。⚠️ 「点名同一条外部条款」怎么机械认，要先定——最省事的形态是要求欠账行写明它在等哪一节 | 2026-09-09 D14（双轨（大小文件 / 持久临时）） 已定项 2 第二轮，反推腿现查两处落款坐实 |
+| C216 | 派生态判定没写明重建不出时是保守还是答错 | **⚠️ 2026-09-09 已还一半：轴定了，检查没做。** 轴那一半的定案是「D21（权威态与派生态的分界） 已定项 10「态别按重算性判」那一段：**重建不出这个值时，读者拿到的是保守答案还是错答案**——保守 ⇒ 仍是派生态；答错 ⇒ 必须逐出该结构或进权威态」（2026-09-09 用户定案 + 三方论证）。**仍欠的是逐条落实**：仓里把某结构判为派生态的条款，正文里都没有逐字段写这一栏，而已经吃过一次亏——C113（扫描重建时多版单元的现行版本判定无输入） 定案 P4（2026-09-05，用户定案）往D21（权威态与派生态的分界） 已定项 5（2026-09-03，用户定案）断言过「整个可重建」的那棵树里加了 `释放代`，字节算不回来，**两天里没有任何人回去判它是保守还是答错**（2026-09-09 三方论证反推腿才打出来；按已定的语义口径它是保守，判过关，但那是事后补判的） | 每一条把某结构判为派生态的条款，正文里要逐字段给出「重建不出这个字段时，读者拿到保守答案还是错答案」；门禁扫派生态判定所在的分项，字段表里有而这一栏没有的即判红并点名字段。判别力自证：把转发信息那一格由「答错、必须逐出」改成「保守」，检查必须由绿转红 | 各派生态结构的字段表已经有了（分配记录条目的段宽表在 D3（空间分配） 已定项 7、inode 树内部节点的宽度拆解在 D8（核心索引结构） 已定项 6）⇒ **无前置，纯欠工** | 2026-09-09 用户对 D21（权威态与派生态的分界） 的复核第 1 点（「能重建」与「重建后能恢复正确语义」分得不彻底）；同日三方论证否掉「按字节判」与「粒度取字段」两个候选，用户定案取语义口径 |
+| C217 | P 大于设备数这条约束的理由没了而约束还在 | **D22（单元原子性怎么合成） 已定项 2 的「区域位置」那一行逐字是「区域 r 落在 `r × P × chunk`，**P 素数且 `P > devs`**」，而「`P` 素数且 `P > devs`」这个约束原本的**唯一理由**是 E48（根环几何的可行点） 那句机制「`gcd(P, devs) = 1` ⇒ 乘 P 是模 `devs` 的双射 ⇒ 区域两两落在不同盘上」。D2（RAID 条带策略） 已定项 7（2026-08-31 用户定案）逐字「归属不再按 `(r × P) mod devs` 算，mkfs 时逐区域把设备身份写下来」之后，**归属不再由那个双射给出 ⇒ 那条理由整个作废，而约束本身还留在正文里**。⚠️ **它有下游**：E115（系统配置字段表的完备性与字节预算） 那 9 项缺项里第 8 项「设备数 `devs`」的出处逐字是「D22（单元原子性怎么合成） 已定项 2「P > devs」；设备表移出槽后槽里没有条目数」——**前半句正是这条失了理由的约束**，而后半句已由 E124（系统配置字段表按 D18 已定项 14 重算） 判据 2 收窄成「取决于设备表单元取哪个码」（C218（设备表单元取哪个码没定）） ⚠️ 2026-09-13 总审核定案：D22（单元原子性怎么合成） 已定项 16 保留 `r × P × chunk` 公式并把它钉成设备内偏移、基址进系统配置，「换成 mkfs 逐区域写起点」留到 zoned 开线前再走三方，约束仍在 | 二选一并写下依据：① 给「`P > devs`」补一条新理由（若有——例如它还在为别的性质服务），或 ② 判它随理由一起作废、把正文里那半句删掉，并当场回扫谁在引它（至少 E115（系统配置字段表的完备性与字节预算） 的 `devs` 那一项）。定了哪一条之后，门禁形态是把「`P > devs`」列成**要么有出处、要么不许出现**的记号。判别力自证：往正文加一句带这个约束而不带出处的话，检查必须由绿转红 | 无前置（纯论证工，两条依据都已定案）。⚠️ **它与 C182（两条已定项对根环落盘归属说反话） 是同一次回扫翻出来的**：C182（两条已定项对根环落盘归属说反话） 管「归属公式作废没同步」，C217（P 大于设备数这条约束的理由没了而约束还在） 管「作废之后遗留的那个约束还有没有理由」 | 2026-09-09 还 C182（两条已定项对根环落盘归属说反话） 时主 agent 逐字核 D22（单元原子性怎么合成） 已定项 2、D2（RAID 条带策略） 已定项 5 / 已定项 7、E48（根环几何的可行点） 机制句、E115（系统配置字段表的完备性与字节预算） 缺项表坐实 |
+| C218 | 设备表单元取哪个码没定 | **E100（系统配置的三段几何） 判据 3 的出路臂逐字是「把设备表移出槽（系统配置只存一个指向设备表单元的指针，形态同 D22（单元原子性怎么合成） 已定项 7 的树表单元指针）」，而「那个单元是哪一类」全仓没写过。**它不是个摆设问题：D18（块里携带什么信息） 已定项 11 码 3 打包记录容器的字段表里偏移 69 那一行逐字 `\| 69 \| 记录数 \| 2 \| ≤ 2039（头 136 含预留位，已定项 16；最窄的记录是类型 5 谱系记录，宽 16，已定项 24） \|`，码 2 索引节点类的类身份段里没有这一项 ⇒ **取码 3 时槽里的 `devs` 那 4 字节可省，取码 2 时省不掉**（E124（系统配置字段表按 D18 已定项 14 重算） 产物逐字 `name=devs_arm wide=0 code3=385 code2=389 saved=4`）。⚠️ **同一个洞还有第二个下游**：设备表若取码 3，它就落进 D18（块里携带什么信息） 已定项 11 的容器索引与打包记录类型登记表，要占一个类型号；若取码 2，它是一棵树还是一个孤立节点又是新问题 ⚠️ 2026-09-13 总审核定案：D22（单元原子性怎么合成） 已定项 15 定第一版不写设备表、`devs` 留，这一格挂到加第二套布局前再答 | 定下来并写进 D22（单元原子性怎么合成） 已定项 9 的字段表，连带把 `devs` 那一行的去留一起定。门禁形态：设备表单元的码进 [layout/01-first-txn.md](layout/01-first-txn.md) 第一节之后，`.claude/gate.d/doc-registries.sh` 的 field-refs 格会要求它指到一条真实存在的分项。判别力自证：把那一行的码改成另一个，槽的字节合计断言必须跟着变（E124（系统配置字段表按 D18 已定项 14 重算） 的变异 M3 / M4 已经证过这一步会红） | 前置：D22（单元原子性怎么合成） 已定项 9 的字段表要先定 | 2026-09-09 立 E124（系统配置字段表按 D18 已定项 14 重算） 时主 agent 读 E115（系统配置字段表的完备性与字节预算） 源码的 `REQUIRED` 第 30 项出处句发现 |
+| C219 | 设备维护的状态与设备探测的几何量没有分界 | **D22（单元原子性怎么合成） 未定项 6 的候选臂 「只做寻址提示」臂 要把「一切设备维护的状态」排除在判定输入之外，而仓里从没写过这条线划在哪，且已定条款正好横跨它。**D22（单元原子性怎么合成） 已定项 2 的槽宽那一行逐字「**等于挂载时探测的 `physical_block_size`**，等号就够」，而 D20（承重面：单元的原子性与自包含） 七机制表里「整单元校验和」那一行的盲区逐字是「**完整的陈旧单元**；按位宽漏检」⇒ **一个设备报出来的量已经决定了完整性判定覆盖哪些字节。**⇒ 「设备**维护**的状态（区写指针、FTL 映射、SMR 隐式重映射）」与「设备**探测**的几何量（`physical_block_size`、`io_min`、容量）」按什么判据分开，全仓零命中，而 「只做寻址提示」臂 的整条论证骑在这条没写下来的判据上 | 写下判据并当场回扫（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」）：至少要判 `physical_block_size`（已在完整性判定的位宽里）、`io_min`（C212（固定结构的写小于 io_min） 那条冲突的一侧）、设备声明的原子宽度（D20（承重面：单元的原子性与自包含） 已判「只做上界参数」）、以及区写指针各落哪一侧。门禁形态：判据写下来之后，凡新引入一个设备侧输入的条款都要标出它落哪一侧，标不出即判红。判别力自证：拿写好的判据重判 `physical_block_size`，结论必须与 D20（承重面：单元的原子性与自包含） 已写的「设备声明只做上界参数」一致，不一致说明判据写错了 | 无前置（纯论证工）。⚠️ **它挡着 D22（单元原子性怎么合成） 未定项 6 的甲问**：「只做寻址提示」臂 在这条判据写下来之前不是一条可判定的条款 | 2026-09-09 D22（单元原子性怎么合成） 未定项 6 三方论证反推腿指出，主 agent 逐字核 D22（单元原子性怎么合成） 已定项 2 槽宽行与 D20（承重面：单元的原子性与自包含） 七机制表坐实 |
+| C221 | 配额单元的类码与认领规则没定 | **D21（权威态与派生态的分界） 已定项 7（2026-09-09 用户定案）把扩展点配额内的空间定成本工程的单元，而这些单元用哪个类码、进不进扫描重建的认领规则，两样都没定。** D18（块里携带什么信息） 已定项 11 的登记表今天只有码 1（数据单元）/ 码 2（索引节点）/ 码 3（打包记录单元），配额单元哪一格都不像；认领那一半是二选一都有代价：进认领规则就要有身份段供认领（而它的「所属对象」是宿主单元的扩展点，不是核心层对象，五元组表达不了），不进则扫描重建会把它们整批当孤儿 | 扫描重建的认领测试里造一个带配额单元的镜像，断言每个配额单元要么被认领、要么被显式归类为「配额单元」，**不许落进「孤儿」那一类**；判别力自证：把配额单元的类码改成码 1，该断言必须由绿转红 | D18（块里携带什么信息） 已定项 11 的登记表要加一格（格式级）；扫描重建路径存在 | 2026-09-09 D21（权威态与派生态的分界） 已定项 7 定案当场记，正文里点名欠这两笔 |
+| C224 | 未定分项没有「动不动格式」的判定 | **D15（格式冻结政策） 已定项 1 定的冻结前清单第 7 项，靠每条未定分项自己声明「动不动格式」（动 / 不动 / 界不定，没写过视同动），而 2026-09-09 现查全仓 18 条未定分项一条都没写过。** 少了它，第 7 项没有输入；而它此前那份六条决策名单同日现查漏 13 条，其中 D22（单元原子性怎么合成） 已定项 9（系统配置的字段表，第 1 层）与 D19（块指针的结构与宽度预算） 已定项 6（中央映射条目，第 2 层）都不在射程里 | **已还一半（2026-09-21，并进门禁 doc-decisions 的 blocking-verdict 格 `.claude/gate.d/doc-decisions.sh` 的 blocking-verdict 格）**：不另立一道——它与 门禁 doc-decisions 的 blocking-verdict 格的对象（同一批未定项）、权威清单（`gen-decision-items.py`）、登记行定位、归属（`kb-scribe`）全都相同，正文只差一条正则，手抄一份会分叉（`code-discipline.md`「重复要生成，不许手抄」）。门禁 doc-decisions 的 blocking-verdict 格因此改成**两把尺**，同一次解析上各判各的、各报各的数、各带各的出路，新加的那把是——判定写成「动不动格式：」后面跟动、不动、界不定三者之一，再跟一个带日期与依据的括注，缺那句判定即判红；判别力自证在 `fixtures/31-blocking-verdict.sh/` 双向证过，而且两把尺**各自**分得出：red 那份第 3 条两把尺都没写、第 4 条只缺「动不动格式」，两条各被对应那把尺点名。当日把全部 5 条未定项补齐——2026-09-09 立账时是 18 条，这期间定了 13 条。⚠️ 两把尺不许互相代替：门禁 doc-decisions 的 blocking-verdict 格量「这一版写不写出不同字节」，门禁 doc-experiments 的 multipath-registry 格量「它的答案将来动不动格式」，D2（RAID 条带策略） 未定项 21 就是 门禁 doc-decisions 的 blocking-verdict 格判「否」而 门禁 doc-experiments 的 multipath-registry 格判「动」。**仍欠判红那一半**：按 D15（格式冻结政策） 已定项 1 第 2 条，判红是**冻结请求发起时**的事（「凡判『动』或没写过，判红」），而冻结请求这个触发本身对组件 ① 没有执行路径 ⇒ 前置是 C225（组件的冻结时刻绕开门禁触发） | 无前置，纯欠工（18 条判定 + 一个脚本） | 2026-09-09 D15（格式冻结政策） 已定项 1 那一轮，反推腿方向 B |
+| C225 | 组件的冻结时刻绕开门禁触发 | **D15（格式冻结政策） 正文「谁判」那一段逐字「门禁一旦发现本次 diff 触碰了这个目录，自动切换到一套更严的前置检查」——冻结是 commit 触发的；而「四层之外的独立冻结组件」那一段逐字说组件 ① 的「冻结时刻是第一个写出类型 2 容器的镜像」，那是一次运行、不是一次提交。** ⇒ 冻结前清单（含第 1 项与第 7 项）对组件 ① **没有执行路径**：门禁永远不会为它点火，而那一刻格式已经永久化了 | 二选一，都要写下来：要么把组件 ① 的冻结时刻改成「第一次写出类型 2 容器的**代码**进仓那次提交」（回到 commit 触发），要么给它一条不同的闸——mkfs / 写路径里对该组件的第一次写做一次 spec 存在性与 `spec_hash` 自检，缺 spec 即拒绝写。判别力自证：删掉 spec 文件必须由绿转红。⚠️ **2026-09-21 用户定案取运行期的闸那一条**（mkfs / 写路径里对该组件的第一次写做 spec 存在性与 `spec_hash` 自检，缺 spec 即拒绝写），不取「改回 commit 触发」——理由是冻结时刻本来就是一次运行，只有运行期的闸罩得住。⚠️ **定案之后当天仍然做不成，两条独立的理由**：① 闸要读的 `format-spec/<组件>.toml` 一份都不存在（`ls format-spec` 当天零命中），那是 C119（冻结组件没有 spec 文件） 欠着的东西，而它的前置 C9（冻结后偷改格式） 等的是「第一次冻结发生」——闸做得出来（`.claude/singlefs-ai-sop/rules/sop-first.md`「先有脚本、后有被测对象，是正常的」），但判别力自证要的「删掉 spec 文件必须由绿转红」今天证不出差别，删不删都是同一种结果；② 闸接在 `crates/singlefs-core` 的 mkfs 与写路径上，而那几份文件当天正被另一个会话改着。⇒ 做的次序是先还 C119（冻结组件没有 spec 文件） 写出那几份 toml，再接这道闸 | 组件 ① 的冻结时刻已定（运行期的闸）；实现的前置是 C119（冻结组件没有 spec 文件） 先写出那几份 toml | 2026-09-09 D15（格式冻结政策） 已定项 1 那一轮，反推腿攻击面五 |
+| C226 | spec 是手抄的，没有从字段表生成 | **D15（格式冻结政策） 已定项 3 定了 `spec_hash` 恒对 `format-spec/<组件>.toml` 求，而那份 toml 今天注定手写**：2026-09-09 现查 `.claude/scripts/` 只有 `gen-decision-items.py` 一个生成器，没有任何从 kb 字段表投影到 toml 的机制。改了 kb 的字段表而忘了同步 toml，`spec_hash` 不变而权威定案已经变了——与 C94（登记的格式常量与后来的定案对不上） 是同一个形状 | 写一个从 kb 字段表（[layout/01-first-txn.md](layout/01-first-txn.md) 那张按盘上顺序逐行列字段的表是现成形态）投影出 `format-spec/<组件>.toml` 的生成器，**含行序**；门禁重新生成一遍与仓里那份逐字节比对，不一致判红。判别力自证：手改 toml 一个字节必须由绿转红 | 要先把被冻组件的字段表在 kb 里补齐（今天 [layout/01-first-txn.md](layout/01-first-txn.md) 里 0 个 `format-const` 标记，另有五处只定形态没定宽度） | 2026-09-09 D15（格式冻结政策） 已定项 3 那一轮，正推腿提出、反推腿的假绿路径 2 坐实 |
+| C227 | 黄金镜像的基准是它自己那份代码写的 | **D15（格式冻结政策）「两条会红的检查」第 2 条的黄金镜像回归，只比「今天的代码读不读得懂历史镜像」，不比「当初那份镜像写对没有」。** 第一份镜像若是错代码写出来的，回归会把错的那份当基准，此后每一轮都对着它判绿——`spec_hash` 罩不到这一格（它锚在声明上，不锚在字节上），D15（格式冻结政策） 已定项 3 已明写这一点 | 归档一份黄金镜像时，它的期望内容摘要必须由 **checker 这个独立解析器**算出来，不许由生成它的那条写路径算；两者不一致即拒绝归档。判别力自证：喂一份故意写错一个字段的镜像，归档必须被拒 | checker 与 mkfs / 写路径 2026-09-14 都有了（`crates/singlefs-checker`、`crates/singlefs-core`）；归档黄金镜像时用 checker 独立算期望摘要这道闸还没接 | 2026-09-09 D15（格式冻结政策） 已定项 3 那一轮，本地腿构造、主 agent 采纳 |
+| C236 | 稀疏旁表被定为必做却没有任何落点 | **D5（快照 / 空间记账机制） 正文逐字「⇒ 按 D5（快照 / 空间记账机制）自己给出的正确形态收口：**D5（快照 / 空间记账机制）为主 + 稀疏旁表为辅（ZFS 的 BRT 形态）**」，同一段末尾逐字「⇒ **「克隆 / 可写快照要加三条」那一节从备查变成必做。**」，而 D21（权威态与派生态的分界） 正文逐字把「**剩下的只有计数那一半的字段表**，欠在 D5（快照 / 空间记账机制） 的稀疏旁表那边」。**现查（2026-09-10）：「旁表」二字在 checks-owed.md / [layout/01-first-txn.md](layout/01-first-txn.md) / [invariants.md](invariants.md) / [verification-build.md](verification-build.md) 四个文件里各出现 0 次**，而 [decisions.md](decisions.md) 里 D5（快照 / 空间记账机制） 当时标着已定、五个分项零个未定 ⇒ 一个被自己的决策定为**必做**的盘上结构，没有分项、没有字段表、没有不变量、新池新建文件的表里没有行、验证计划里也没有它。C66（格式级空白没有分项号） 的形态 | 在 D5（快照 / 空间记账机制） 立一条未定项承载它（字段表、key 编码、住哪棵树、谁在提交时维护它），并判它「改不改新池新建文件的字节」；立项之后门禁阶段 31 / 32-new-pool-file-creation-fields / 38 才对它说得上话。判别力自证：把那条分项删掉，阶段 31（每个未定项有没有判过改不改新池新建文件的字节）必须判红 | **已还这一半（2026-09-10 用户定案）：分项已立成 D5（快照 / 空间记账机制） 已定项 6**，字节判「是」，门禁阶段 31 / 32-new-pool-file-creation-fields / 38 从此对它说得上话；[layout/01-first-txn.md](layout/01-first-txn.md) 的空白表加了一行。**仍欠的是那条会红的检查本身**——它要等 D5（快照 / 空间记账机制） 已定项 6 定完形态才写得出来 | 2026-09-09 D26（后台整理与放置回收） 已定项 5 第四轮反推腿打中，主 agent 逐个现查那四个文件坐实 |
+| C237 | 码 1 / 码 2 的指针里没有出生 (树, txg) 的位置 | **三处消费者都要它，而已定的指针头部装不下**：① D5（快照 / 空间记账机制） 的 O(1) 判定逐字 `birth = ptr.birth              // 指针内联字段，零次额外 I/O`；② D19（块指针的结构与宽度预算） 已定项 5 硬规则 1 逐字「**释放一律经映射，不经提示**」，而映射 key 候选㈠逐字是「key = 逻辑身份五元组 + 诞生代号（33 + 8 = 41 字节）」，其树 ID 段按 I-1.3（块头树 ID 一致） 在跨头共享时是**出生树**；③ E90（树 ID 进 AAD 与跨头共享） 量出的可行 AAD 形态逐字要求「指针要有出生 (树, txg) 两个字段的位置」。**而 D21（权威态与派生态的分界） 正文逐字把指针头部分解成「MAC 16 + nonce 12 + 算法类型 1 + extent 偏移 2）31」，四项加满** ⇒ 码 1 / 码 2 那两条边的指针今天两个字段都没有。⚠️ **码 3 那条边已经有了**：D8（核心索引结构） 已定项 6 逐字「身份引用就是 D18（块里携带什么信息） 已定项 11 给「别的树引用容器」的那 26 字节：出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8」，理由逐字就是「出生树逐条目携带，是因为克隆头（D6（快照实现模型） 已定项 1）共享 origin 的叶」。[layout/01-first-txn.md](layout/01-first-txn.md) 第三节把「块的诞生 txg（内联在指针里）」标「半定（机制已定，宽度无分项）」，而**出生树在那张表里一个字都没有** | 立一条编号分项承载它（候选落点 D19（块指针的结构与宽度预算）——字段住哪归它；「为什么非要它」归 D9（加密） 那次 AAD 重开，D18（块里携带什么信息） 已定项 11 正文逐字把这两笔归那次重开），分项要判「改不改新池新建文件的字节」。判别力自证：给指针头部加字段而不同步改 D22（单元原子性怎么合成） 已定项 7 的 59 与 `ROOT_RECORD_BYTES = 194`，阶段 38 / 39 必须判红 | **已还这一半（2026-09-10 用户定案）：分项已立成 D19（块指针的结构与宽度预算） 已定项 7**，字节判「是」，三条候选与各自的连锁数写在那一格里；[layout/01-first-txn.md](layout/01-first-txn.md) 第三节新增「指针里的出生**树** ID」一行，「块的诞生 txg」那一行的指向从 D5（快照 / 空间记账机制） 改成 D19（块指针的结构与宽度预算） 已定项 7。**仍欠的是那条会红的检查本身**——它要等已定项 7 在甲 / 乙 / 丙里选定才写得出来 | 2026-09-09 D26（后台整理与放置回收） 已定项 5 第四轮三腿（正推逐格复核连锁数、反推打中码 3 已解那一半），主 agent 现查坐实 |
+| C238 | 位置条目从 11 变 14 之后「53」这个派生数没人回扫 | **D19（块指针的结构与宽度预算） 已定项 4（2026-09-03）把位置条目定成「设备 ID 4 字节、物理偏移 6 字节（16 KiB 槽号）、密文校验和 4 字节 ⇒ 位置条目 14 字节」，D22（单元原子性怎么合成） 已定项 7 当天把树表单元指针从 53 改成 59 并逐字注了那一次改动。而由「31 + 22 = 53」派生出来的数散在别处没跟着改。**最硬的两处是直接与已定条款分叉**：E73（节点 key 区间的扇出代价） 逐字「按 D22（单元原子性怎么合成） 已定项 7 的树表单元指针实宽 **53 字节**重算」、E74（分配记录的条目数与整理开销） 逐字「按 D22（单元原子性怎么合成） 已定项 7 的树表单元指针实宽 53 字节算」——**它们点名的那条分项今天写的是 59**，正是 C62（分项定案值在 kb 里分叉） 的形态。停在旧值的其余各处（2026-09-10 现查）：kb 侧 D21（权威态与派生态的分界）`:246-247`、D4（校验和位置） 已定项 1 的射程与已定项 7 的依据（2026-09-19 瘦身前是 `:94` 与 `:250`）、D18（块里携带什么信息）`:666`、E43（扩展点字节上限）`:125`、E58（校验和粒度的端到端代价）`:25` / `:111` / `:217`、以及 C89（单元头收口的遗留重算） 自己的正文；源码侧 `e58_csum_grain.rs:87,92,156,491`、`e43_extension_point_budget.rs:69,71,498`、`e79_root_record.rs:20,32`。⚠️ **与 C89（单元头收口的遗留重算） 不是同一笔**：C89（单元头收口的遗留重算） 管的是单元头 55 → 91 → 105 那条轴，这一笔是位置条目 11 → 14 那条轴，而 C89（单元头收口的遗留重算） 的正文自己就踩在 53 上 | 给「树表单元指针实宽」在 D22（单元原子性怎么合成） 已定项 7 那张表上立一个 `format-const`，让阶段 27（格式常量在 kb 与实验源码之间同步）把它绑到源码；kb 侧按 59 逐处回扫重算，重算不翻转结论的要写明「不翻转」。判别力自证：把那个 `format-const` 改回 53，阶段 27 必须判红 | 无——立 `format-const` 与回扫都不依赖未实现的东西 | 2026-09-09 D26（后台整理与放置回收） 已定项 5 第四轮正推腿追 E20（指针变宽的 CPU 缓存代价） 的 40 字节档时带出，主 agent 现查全仓逐处坐实 |
+| C240 | 搬运时重新加密的代价没算过 | **D27（小数据打包容器） 已定项 9（2026-09-10 用户定案）取 AAD 绑容器身份 ⇒ 一个对象连同它的槽被搬到另一个容器时 AAD 变了，要重新加密。** 而 D27（小数据打包容器） 已定项 6 定的后台整理**就是**在搬对象，且它沿中央映射 key 序连续巡回、不设水位 ⇒ 这笔重新加密是常态开销不是偶发开销。D27（小数据打包容器） 在提出这一格时就逐字写过「那笔代价 E114（小数据打包容器的总账） 没算过」，2026-09-10 的定案没有改变这一点：E114（小数据打包容器的总账） 的账里只有写字节与元数据写，**一个加密操作都没计**。⚠️ 它与 C202（打包巡回的空转开销与迟滞 K 都没有数） 咬在同一个旋钮上——迟滞 `K` 取小则搬得勤、重新加密也付得勤，而 `K` 的数要 churn 概率，全仓没有（C174（smallfile 那一行的三列没测））。⚠️ **压紧或重写一个容器时它是按对象数放大的**：容器里 N 个对象要 N 次重新加密，N 在 512 B 档是 58、4 KiB 档是 7（D27（小数据打包容器） 已定项 2 的表） | 给 E114（小数据打包容器的总账） 或 E116（打包容器的账·补元数据写与整理策略） 补一列「整理一轮的加密操作数与字节数」，用 E6（加密算法选型） 已实测的吞吐折成时间，报绝对值；并给一条断言钉住「搬 N 个对象就是 N 次重新加密」这个线性关系。判别力自证：把 AAD 改成不含容器身份（即搬运不必重算），那一列必须塌成 0；改回来必须恢复 | 无前置，纯欠工。⚠️ 数值那一半要 `K` 才完整（C202（打包巡回的空转开销与迟滞 K 都没有数）），但**每次搬运的单位代价**不依赖 `K`，可以先算 | 2026-09-10 D27（小数据打包容器） 已定项 7 与已定项 9 定案时同步立账 |
+| C243 | 停机谓词那个量从来没有过轨迹 | **D26（后台整理与放置回收） 已定项 1 的停机谓词逐字是 `全空聚簇段数(现在) − segs0 ≥ 1`，而唯一量过放置政策的实验里那个量零命中。** 2026-09-10 现查：`grep -c "empty_segs\|全空聚簇段数" research/e7-index-bench/src/bin/e93_aging_placement.rs e93-aging-placement-2026-09-03.out` 两处**都是 0**。E93（老化下的放置与碎片度） 报的是 `fallback_pct`（回落率）这个**代理量**——它答的是「分配走不进聚簇段的占比」，不是「整理净腾出了几个全空段」。⇒ **一条用户定案的停机条件，它的那个物理量至今没有任何一条实验产物的轨迹**，起跑那一半（碎片度 `F = runs / L`）反而有硬数字。⚠️ 这一格与 C146（无空段时的回落政策全仓无定义） ① 咬在一起：那一条逐字说「整理的下一个目的地落回自己正在清空的段 ⇒ 每一条意图都正常完成，而全空段供给恒为零」——**恰恰是全空段数这个量在描述的现象，而它没有被量过** | 给 E93（老化下的放置与碎片度） 加一个「全空聚簇段数」的直接轨迹指标（不是回落率），逐轮报绝对值，并给一条钉绝对值的断言（不许只做臂间互比）。判别力自证：把「`R` 在意图期内不可作分配目的地」这条保护关掉，全空段数的净增量必须塌向 0；打开必须恢复 | 无前置，纯欠工——E93（老化下的放置与碎片度） 的模型里已经有段的概念（`alloc_bump` 与 `fallback_pct` 都建立在段上），加一个计数是加指标不是改模型 | 2026-09-10 D3（空间分配） 已定项 8 第一轮，正推腿指出判据⑤的「停机」那一半只有机制推理没有数字，主 agent 用 `grep -c` 现查坐实 ⚠️ 2026-09-13 E151（用户数据落点的到达序与容器臂） 把「全空聚簇段数」做成增量计数 + 全扫两条路径；第一次跑只报期末值（40 格全是 0），第二次跑报轨迹：bump 落点吃光初始 32 个全空段之后峰值 2（容器臂 2–4）、2000 轮里 97–128 轮（容器臂 128–561 轮）为正，打包前的落点换成最低空槽时打包净产出 8–9 个全空段 ⇒ 停机谓词那个量在这个模型里**有正读数，只是被前台 bump 分配器当场吃掉**；轨迹那一半算还了，判别力自证那一半（关掉 `R` 保护看净增量塌向 0）的模型形态由 E151（用户数据落点的到达序与容器臂） 第六次跑做出：排除 `R` 时意图完成后 `R` 全空 1999 / 1749 次（M = 0 / 9），不排除时 6–43 / 437–439 次——M = 0 上塌到 0.3%–2%，M = 9 上只到 25%（住着提交内生块的 `R` 不排除也搬不回去）；实现侧的自证登记在 [verification-build.md](verification-build.md) 必红用例表第九条，等整理进第一版。 |
+| C244 | 机械抽取选错行区间，产物本身没有断裂痕迹 | **`research/scripts/quote-kb.py` 保证「抄的没错」，不保证「该抄的都抄了」。** 2026-09-10 实测（D3（空间分配） 已定项 8 第一轮，主 agent 自己写的材料）：附录取 `93-老化下的放置与碎片度.md:13-30`，而**四条臂的定义在 31–34 行**——第 30 行正好是表头分隔行，抽出来的产物以一张空表收尾，回读逐字节一致、**退出码 0**。丢掉的那四行里有三样是承重的：`first_fit` 的括注「（**对照**：经典老化形态）」（E93（老化下的放置与碎片度） 把它注册成对照，而材料把它升格成候选）、`bump_seg` 自陈的「把它推广到全部 COW 写是候选政策，不是已定条款」（判据「动了几条已定条款」唯一的直接输入）、以及另外两条已量过的放置臂。⚠️ **它与 C234（三方材料的小节清单只覆盖被判那一项所在的文件） 不是同一个洞**：那一条管「整节漏了」，这一条管「一节里抄了一半」，而**小节清单对它一个字都说不出来**——清单那一行明明写着「抄」。⚠️ 材料正文同一轮还有第二处同形的：引 E93（老化下的放置与碎片度） 自陈限制 3 时切在句号处，删掉紧接的「真实脏集比均匀随机更接近成段那一档」，而成段正是两条候选唯一分得开的那一档 | 给 `quote-kb.py` 加一条收尾检查：抽出来的片段若以 markdown 表格的**表头分隔行**（`\|---\|`）结尾、或以未闭合的代码围栏结尾，判红并提示「行区间可能少了一行」。判别力自证：用 `93-老化下的放置与碎片度.md:13-30` 跑一次必须判红，改成 `13-34` 必须转绿。⚠️ 这只拦得住表格那一类；「切在句号处」那一类拦不住，判据要靠人 | 无前置，纯欠工（一个收尾检查加一条自证） | 2026-09-10 D3（空间分配） 已定项 8 第一轮，反推腿逐行核附录时打中，主 agent 现查两处行号坐实 |
+| C246 | 树表单元没有冻结层归属 | **D22（单元原子性怎么合成） 已定项 12 定「系统配置不带自己的树表单元指针」之后，树表单元不再跟着系统配置走，而它自己落在哪个冻结层，全仓没有条款。** D15（格式冻结政策） 已定项 2（2026-08-29 用户定案）那句「必须在第 1 层冻结时就做进去」原本的执行对象是系统配置里那张表；对象搬走之后，那句话**叫不醒任何人**。现查 D15（格式冻结政策） 全文，`根记录` / `根环` / `根槽` / `树表单元` **零命中** ⇒ 冻结四层里没有一层认领它 | 给树表单元（与实例表单元）写明冻结层归属。⚠️ 2026-09-11 D16（发布语义） 已定项 3 只答了 journal（立成四层之外的独立冻结组件），没替树表单元、实例表单元与根记录答；而 journal 点名项里的树 ID 挂在树表单元上 ⇒ 这一格同时是 journal 组件的冻结前置。门禁形态：凡是被 D15（格式冻结政策） 判定表点名要冻结的对象，都要能指到一个层号，指不到即判红。判别力自证：把某个对象的层号删掉，检查必须由绿转红 | 无前置（纯论证工）。与 C225（组件的冻结时刻绕开门禁触发） 同族 | 2026-09-10 「系统配置要不要自己的树表指针」那一轮三方论证，反推腿第二次抽样打中；主 agent 现查 D15（格式冻结政策） 全文零命中坐实 |
+| C247 | 树表单元与实例表单元的副本数从没枚举过 | **D22（单元原子性怎么合成） 已定项 12 之下，树表单元的冗余只剩它自己那两份位置条目副本（w = 2），而挂载关键链上其余三样分别是：系统配置**每盘一份**（devs 份，已定项 8 条 1）、journal 环**两盘镜像**（已定项 8 条 2）、根环 **R = 3 个区域**跨盘（已定项 2）。** 逐字出处：D22（单元原子性怎么合成） 已定项 7 字段表那一行「树表单元指针 \| **59** \| 指针头部 31 + 位置条目 **14** × 2 副本」；实例表单元同型。而 D21（权威态与派生态的分界） 第 10 行逐字把「根记录 + 树表单元 + 实例表单元」三者一并划进「根」这一格、「**丢了就丢数据**」。⇒ **`devs > 2` 的池上树表单元是这条链上严格最弱的一环**：掉两块特定的盘就能让它两副本全灭，而根环里还有健在的根记录。⚠️ **E87（固定结构的放置） 的模型里没有这个对象**——现查全文「树表」**0 次**，它穷举的是「系统配置副本数 × journal 环副本数」2×2 组合；时间上讲得通：E87（固定结构的放置） 与D22（单元原子性怎么合成） 已定项 7 同为 2026-09-02，间接层是当天才定的 | 照 E87（固定结构的放置） 的形态把树表单元 / 实例表单元加进失效组合穷举，给它们定一个副本数。判别力自证：把副本数改回 1，检查必须由绿转红 | 无前置（纯算术实验，可照 E87（固定结构的放置） 复用） | 2026-09-10 反推腿第二次抽样打中；主 agent 逐字核 E87（固定结构的放置） 全文 0 命中、D22（单元原子性怎么合成） 已定项 7 第 482 / 485 行坐实 |
+| C248 | 树表单元的自举豁免没写过 | **D19（块指针的结构与宽度预算） 已定项 5 把位置条目降为提示、中央映射为唯一解引用入口，而根记录那条树表单元指针的下半截就是位置条目。** 实例表单元有「不进容器索引」的同型豁免（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2），**树表单元没有** ⇒ 「根记录 →（位置条目）→ 树表单元」这一步今天不是权威解引用，而挂载必须走它 | 给树表单元写一条与实例表单元同型的自举豁免；落点挂 C196（中央映射树的根住哪全仓无条款） 的邻项，或 D22（单元原子性怎么合成） 已定项 7 补一句。门禁形态：挂载关键链上每一步解引用都要能指到「权威入口」或一条显式豁免，指不到即判红 | C196（中央映射树的根住哪全仓无条款） 未答 | 2026-09-10 反推腿第二次抽样打中（角 ④），主 agent 未独立复算 D19（块指针的结构与宽度预算） 已定项 5 的射程，**标为待复核** |
+| C249 | 两套点查模型手抄同一段布局代码，闸只钉两个点 | **E128（指针带出生 (树, txg) 之后的点查代价） 的 `Tree` / `generate_lookup_keys` / `bench` 三段是 `research/e7-index-bench/src/bin/e20_fanout.rs` 那三段的手抄件**，没有并成一份——并了会让 E20（指针变宽的 CPU 缓存代价） 已入库的 5 条变异（按原文匹配改它自己那个文件）当场失配。兜底是跨装置闸，而**闸只钉 DRAM 档 67 与 111 两个点**：抄漏若只影响别的条目宽或别的工作集档，两套装置照样各报各的数，没有任何东西会红。这正是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「立在装置之间」那条要防的形态，只是这一次闸的**射程**不够，不是没有闸 | 把两套装置的**全部共同档位**（不止 67 / 111）逐格比一遍，任一格超差判红；判别力自证：只改 E128（指针带出生 (树, txg) 之后的点查代价） 那份里的节点头常量而不改 E20（指针变宽的 CPU 缓存代价） 那份，闸必须由绿转红，而今天这个改法只挪 93 / 81 两档、67 与 111 两档照样过 | 要么给 E20（指针变宽的 CPU 缓存代价） 的变异表换一种不按原文匹配的绑法（那样两份就能并成一份，欠账自动消失），要么把闸扩到全部共同档位 | 2026-09-10 E128（指针带出生 (树, txg) 之后的点查代价） 立项时主 agent 自陈，跑 `bash research/scripts/mutate.sh` 时现查 `research/mutations/e20_fanout.tsv` 的匹配方式坐实 |
+| C250 | `previous_snapshot_txg` 的父链解析非单射 | **D8（核心索引结构） 已定项 8 ③ 把 `previous_snapshot_txg` 定成树表条目里的一个 8 字节 txg**，而要把它变成「父亲是哪棵树」得回树表找诞生 txg 等于它的那条条目；D16（发布语义） 逐字「（同一 checkpoint 内建两个快照是允许的：它们捕获同一状态、其间 deadlist 为空；但 checker 里的「上一个快照」要用 `(txg, 快照 id)` 打破并列。）」⇒ **txg → 树 不是单射，父链解析不唯一**。⚠️ **同一条非单射在别处已经被当成出局理由**：D19（块指针的结构与宽度预算） 已定项 7 逐字记着候选乙输在「D5（快照 / 空间记账机制） 逐字『崩溃后该号会被重发』⇒ txg → 出生树 不是单射」——**在乙那里判出局，在树表这一头没人提过**。D8（核心索引结构） 已定项 8 自己已经把 `(诞生 txg, 树 ID)` 定成平局判别子，而 `previous_snapshot_txg` 那一头只存了 txg 这一半。⚠️ **另有一处读法冲突，一并记着，未在本项目验证**：D8（核心索引结构） 已定项 8 ③ 把它释义成「这个头**从哪个快照分出来**」（= 克隆父亲），而它引的 D5（快照 / 空间记账机制） 那段用法（伪代码逐字 `p     = head.previous_snapshot_txg     // 活头头部一个标量`，归约证明里逐字「P 为此刻最新的快照」）用的是「这个头上**最近一次快照**」。链形谱系下两者重合；D6（快照实现模型） 已定项 1 把谱系变成树之后，一个 txg=10 克隆出来、又在 20 / 30 各打过快照的头，这两个量分别是 10 和 30 | 造一棵谱系：同一 checkpoint 里建两个快照（记作快照甲与快照乙），再从快照甲克隆出一个活头；断言按 `previous_snapshot_txg` 解析那个活头的父亲**唯一**且等于快照甲。判别力自证：把判别子从 `(txg, 树 ID)` 退回只用 txg，检查必须由绿转红 | 要么给 `previous_snapshot_txg` 补上树 ID 那一半（动 D8（核心索引结构） 已定项 8 的字段表，条目 121 → 129），要么写明父链解析不走它、另有载体（那要先定 C144（快照谱系的区间标号没有载体） 的落点）。两条都要用户定案，且都动 D15（格式冻结政策） 第 3 层的条目编码 | 2026-09-10 D19（块指针的结构与宽度预算） 已定项 7 那一轮三方论证，反推腿第 2.4 节；主 agent 逐字现查 D16（发布语义） 与 D8（核心索引结构） 已定项 8 ③ 坐实 |
+| C251 | 改了一个工具的行为，没人回扫谁踩在旧行为上 | **`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 的两条回扫纪律，对象是「新立的判据」与「被撤回的数值 / 结论」，都不覆盖「改了一个工具的行为」**。实测（2026-09-10）：`research/scripts/quote-kb.py` 的围栏从写死的三反引号改成按正文里最长的一串加一位，而 `.claude/rules/three-way-inference.md` 里有一句「抄完**看一眼产物的最后一行**：以 `\|---\|` 收尾、或以未闭合的代码围栏收尾，就是少了一行」**踩在旧行为上**——改完之后产物最后一行恒是外层围栏，那句判据当场失效，而没有任何一样东西会红。（是并发会话在用新版本抄东西时自己发现的，不是任何检查发现的。）⚠️ **同一次改动还暴露了旧行为的下游**：那个 bug 让一次 `15-格式冻结政策.md:50-60` 的抽取判红，抄的人当成取法问题绕开、改用单行正则只抄了其中一行，**丢掉的正是「冻结分四层，有严格依赖顺序」那一整块** | 把「工具的可观测行为」做成一份带版本的契约（例如 `quote-kb.py` 声明「产物的最后一行是外层围栏」），并让门禁在契约变化时列出全仓引用了该行为的位置。判别力自证：改回固定三反引号而不改那份契约，检查必须由绿转红 | 先要有「工具行为契约」这个东西——今天 `research/scripts/` 下没有任何脚本声明过自己的输出形状，所以这一条今天连拦的对象都构造不出来。⚠️ **它也可能根本不该做成检查**：`.claude/singlefs-ai-sop/rules/sop-first.md` 那条「上游的改动应当罕见」适用——一个实例不够立规矩，**再出现一次同形态就抬到上游的回扫纪律里，作为第三个对象** | 2026-09-10 并发会话在 D19（块指针的结构与宽度预算） 已定项 7 那一轮之后报来，主 agent 现查 `.claude/rules/three-way-inference.md` 那一句与 `research/scripts/quote-kb.py` 的改动坐实 |
+| C252 | E128 的 inode 那一对不稳定，装置没有隔离负载 | **E128（指针带出生 (树, txg) 之后的点查代价） 跑了四整轮，inode 那一对（93 → 109）的判决翻过一次向**：前三轮 `0/5 jia_never_slower`（比值 0.9686 / 0.9655 / 0.9764），第四轮 `5/5 jia_slower_every_round`（1.0885）。同一批产物里记账那一对（81 → 97）四轮同向 ⇒ **不是整套装置坏了，是 inode 那一对的判别力不够**。⚠️ **装置没有记录跑的时候机器上有什么**：本机同时有别的会话在跑构建，而跨装置闸那两档在第四轮比 E20（指针变宽的 CPU 缓存代价） 的基准高 4.9% 与 5.9%（前三轮是 −2.4% 到 +2.6%）⇒「整机偏慢导致工作集更大的那条臂多吃亏」是一个**候选解释，今天证不了也否不掉**。⚠️ 跨装置闸 15% 的容差对这一格太宽：它把一次 5–6% 的整机漂移放了过去，而那次漂移与翻向同轮 | 让实验自己记录并断言运行环境：跑之前采一次基线（同一条固定负载跑一遍），本轮与基线偏差超过阈值就**整轮作废**，而不是照样出判决。判别力自证：在跑的同时人为加一个占满内存带宽的负载，那道闸必须由绿转红 | 要先定「基线负载」是什么，以及阈值取多少——取宽了拦不住这次（5–6%），取窄了会在正常波动上误废整轮。⚠️ 也可能根本不该用挂钟：换成缓存缺失计数一类与整机速度无关的量，这一格就不需要闸。两条都没论证过 | 2026-09-10 D19（块指针的结构与宽度预算） 已定项 7 那一轮收尾时，`replay.sh` 的逐字节结构比对判红打出来；主 agent 现查四轮产物的 `verdict=` 与 `name=xdev` 两行坐实 |
+| C253 | 66 048 那笔定额两份 kb 说法相反 | **[layout/01-first-txn.md](layout/01-first-txn.md) 逐字「⚠️ 这个数取 key 33 字节那一档；……D19（块指针的结构与宽度预算） 已定项 6 取㈠（41 字节）时它不变——**但 41 不在 E109（位置权威三臂的运行时代价） 的扫描档里**，要引这个数当㈠的定额得先给它补一档重跑。」，而 D19（块指针的结构与宽度预算） 已定项 6 此前逐字写「树高仍是 4 ⇒ E109（位置权威三臂的运行时代价） 那笔 66 048 字节的发布定额一个字节不变」** ⇒ 同一个数，一处说要重跑才能引、一处直接引了。属 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 4 条「矛盾比空白更糟」。⚠️ **算术上它推得出来**（`(16384−76)/69 = 236`，`236⁴ ≈ 3.10×10⁹ ≥ 4.83×10⁸` ⇒ 高 4 ⇒ `4×16384+512 = 66048`，主 agent 独立复算），缺的是**扫描档里没有 41 这一格** ⇒ 它是推出来的不是量出来的，两者不许混着引 | 给 E109（位置权威三臂的运行时代价） 补 41 字节那一档重跑，产物落库；或者在两处都改成「按模型推得，非扫描档实测」。判别力自证：把 key 宽度改成一个会让树高变 5 的值，那个数必须跟着变 | E109（位置权威三臂的运行时代价） 的判据 2026-09-06 写死、产物已入库、`replay.sh` 已注册 ⇒ 按 E20（指针变宽的 CPU 缓存代价） → E128（指针带出生 (树, txg) 之后的点查代价） 与 E95（老化的节点布局臂） → E127（分裂合并之下组身份要不要存） 两次先例，加档要另立新号 | 2026-09-10 D19（块指针的结构与宽度预算） 已定项 6 那一轮反推腿，主 agent 逐字核两处原文坐实 |
+| C254 | 物理映射单元的消费方远不止两个，checker 零覆盖 | **D2（RAID 条带策略） 已定项 17 逐字「不让两个生命周期不同的对象共享同一个物理映射单元」，而 2026-09-10 立起来的判据（死亡触发事件是不是同一次提交）一回扫就打出远不止两个消费方**：索引节点（16 KiB）与数据单元（32 KiB）在 `io_min` = 64 KiB 的阵列上都判「算」，COW 不构成豁免（块重用让邻格在任意晚的时刻被重写）；journal 记录那一格比根槽更硬（只有两盘镜像）。**而现查 [invariants.md](invariants.md) 里 `io_min` 与「物理映射单元」各命中 0 次** ⇒ **checker 今天永不检查这两条硬要求**，它们从 2026-08-28 定下起就没有任何可判定形式。⚠️ 顺带：`grep -l io_min .claude/kb/decisions/*.md` 只 3 份，而定单元大小 / 对齐 / 落点粒度的那几份一处没提 | 给已定项 16 / 17 各写一条不变量：任一物理映射单元里不得同时住两个死亡触发事件不同的对象。判别力自证：造一台 `io_min` = 64 KiB 的镜像，把两个不同代的根槽放进同一个单元，检查必须由绿转红 | **先要 D2（RAID 条带策略） 已定项 15 定案**——按判据字面执行，16 KiB 节点与 32 KiB 单元在阵列上全部违规，⇒ 要么已定项 17 的射程比字面窄（写清窄在哪），要么先改分配器对齐（落点政策 2026-09-13 定在 D3（空间分配） 已定项 8：用户数据不进聚簇段、取已选设备内槽号最小的空槽，它不管对齐）。两条都要用户定案（2026-09-13 已定：取收窄射程，前置已满足） | 2026-09-10 D2（RAID 条带策略） 已定项 15 那一轮反推腿，主 agent 现查 `grep -c io_min .claude/kb/invariants.md` = 0 与 `grep -c 物理映射单元 .claude/kb/invariants.md` = 0 坐实 ⚠️ **2026-09-13 D2（RAID 条带策略） 已定项 15 收窄射程**：16 KiB 节点与 32 KiB 单元出射程，C254（物理映射单元的消费方远不止两个，checker 零覆盖） 只剩固定结构那一半；不变量现在写得出——「任一 io_min 单元内不得同时住两个死亡触发事件不同的固定结构」。 |
+| C255 | 两个未定项互指挡路条成环，门禁不判环 | **2026-09-10 实测：D19（块指针的结构与宽度预算） 已定项 6 逐字写「先答那问上游的『引用侧携带多少出生身份』」，而同日新立的 D19（块指针的结构与宽度预算） 已定项 8 逐字写「它是已定项 6 与已定项 7 共同的上游」⇒ 两格互指、成环**，而成环的根子是已定项 8 的问题陈述由已定项 6 的候选㈠ 参数化（「六段」这个数来自㈠ 的 key）。⚠️ **门禁阶段 31（每个未定项有没有判过改不改新池新建文件的字节）对环一个字都说不出来**——它只查每一项有没有那句判定，不查项与项之间的依赖有没有闭合。⚠️ 这个环存活了不到两小时（同日的三方论证反推腿打出），但它能存在本身说明**今天没有任何东西在看未定项之间的依赖图** | 把每条未定项的「挡路条指向谁」抽成一张有向图，有环即判红，并把环上的每一条打印出来。判别力自证：人为让两条未定项互指，检查必须由绿转红 | 先要一个可机械提取的「挡路条指向」写法——今天挡路条是自由散文（「先答那问上游的……」「等用户定案」「等某个实验」），提取不出来。⇒ 要么给挡路条定一个固定形态，要么这条只能靠人 | 2026-09-10 D19（块指针的结构与宽度预算） 已定项 8 那一轮三方论证的反推腿，主 agent 逐字核 `19-块指针的结构与宽度预算.md:104` 与 `:107` 坐实 |
+| C256 | 候选代号在同一决策相邻两项复用 | **D19（块指针的结构与宽度预算） 已定项 7 的候选是甲 / 乙 / 丙（丙 = 都不存），而同文件已定项 8 的草案也用甲 / 乙 / 丙 / 丁，两处的丙指的是完全不同的东西** ⇒ 检索到其中一条时分不出它属于哪一格。这与 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 5 条「编号只能做索引，不能做称呼」同族：那一条管的是编号被引用时要带简称，这一条管的是**同一套代号在相邻两格里指不同对象**。⚠️ 实测代价：2026-09-10 那一轮里主 agent 与两条腿都要靠上下文才能分清「丙」是哪一个 | 给候选代号加上它所属分项的前缀（如「已定项 7 的丙」），或者同一决策内不复用代号；门禁按「同一文件里同一个代号出现在两个分项的候选表里」判红。判别力自证：把两处的丙改成同一个含义，检查必须仍然红（它判的是复用不是含义） | 无。今天就写得出，只是要先扫一遍全仓有多少处复用 | 2026-09-10 D19（块指针的结构与宽度预算） 已定项 8 那一轮反推腿指出，主 agent 现查同文件两处候选表坐实 |
+| C257 | 裸写的分项号仍会被静默改判 | **门禁阶段 22 只堵住了「指名道姓」那一半。** 2026-09-10 收紧后，凡是把决策号紧挨着写在分项引用前面的那种形态，若那条决策正文里没有对应序号的分项就当场判红；而**不带编号的裸引用**（同一行里先提过别的决策、后面只写「已定项」加一个序号、不带决策号）仍按三级回退解析，第一级是**行内最近的那个编号**。⇒ 只要那条决策恰好也有第 k 条、且状态相同，就会被判到它头上并判绿，而读的人看不出引用处指错了。实测的相邻形态：`.claude/kb/decisions/02-RAID条带策略.md:542` 一行里有 3 处不带决策号的分项引用（序号 16 与 17），行内最近的编号是 D22（单元原子性怎么合成） 与 D5（快照 / 空间记账机制），两者都没有那两个序号的分项，所以今天靠「落到文件自身的决策号」才解析对——**它对不对取决于别的决策有几个分项，不取决于这一行写得对不对** | 把裸引用直接判红（`.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 5 条本来就要求「每次引用都要把名字带上」），或者只允许回退到文件自身的决策号、不许回退到行内最近的编号。判别力自证：造一份样本，让裸写的「已定项 k」所在行提到另一条**恰好有第 k 条且同状态**的决策，检查必须由绿转红 | 先扫一遍全仓有多少处裸引用——直接判红会一次拒掉一批既有正文，要么同批改完，要么先只在新增行上判 | 2026-09-10 给阶段 22 加「指名而不存在」判据时当场回扫得到（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「新立一条判据，当场拿它回扫已有的条目」） |
+| C258 | 销毁可写头这条路径的代价一个数都没有 | **D6（快照实现模型） 已定项 2 第一轮把乙与丙判出局，靠的全是条款推导，没有一个测量数**。四条候选里：乙（走遍历）的代价——一个头存活 N 个块、其中 M 个 `birth > origin.txg` 时，批数与 I/O 次数究竟是 N 的函数还是 M 的函数——仓里从没量过；甲（独立 livelist）自己也没验过，它有条目数，可 D6（快照实现模型） 判据 5 要的「每批最坏空间需求」的算式与「可 condense」的代价**一个数都没有**，所以第一轮的结论只到「乙过不了」，到不了「甲过得了」。 ⚠️ **同一笔账还盯着一句待用户复核的条款**：2026-09-10 给 D6（快照实现模型） 当时那一段「取多可写头、代价按付查找那条付」的第三格豁免补了射程注（豁免的主语是销毁快照、被豁免的量是每删快照的反向索引查找次数，不覆盖销毁一个可写头），而那一段是 2026-08-29 用户定案，射程注标着「待用户复核」 | 先补一个 E52（两种多可写头机制的运营代价） 形态的计数模型，跑前写死「批数是 N 的函数还是 M 的函数」这一问的判据；甲那一侧要单独量「每批最坏空间需求」与 condense 的代价。判别力自证：把乙那条臂的遍历改成只扫 `birth > origin.txg` 的那批块（等于假装有索引），批数对 N 的依赖必须由有变无，检查由绿转红 | 无。计数模型今天就写得出，不需要 QEMU；甲那一侧要等 livelist 的形态先定下来才量得了 | 2026-09-10 D6（快照实现模型） 已定项 2 第一轮：正推腿与反推腿各自明写自己的结论停在机制推导层面，主 agent 逐字核两份输出坐实 |
+| C259 | 判据表的问与判红条件不是同一个命题 | **跑前写死的判据表里，「问」与「判红条件」可以各说各的，而那样的一格没有判别力，答对了也不触发。** 实测（2026-09-10，D6（快照实现模型） 已定项 2 第一轮）：判据 6 的问是「四条候选里有没有哪一条能把『用错了』变成『挂不上』」，判红条件却写成「拿『这样更快』当理由 ⇒ 判红」——两者不是同一个命题，于是四条候选在那一问上全是 0、而判红条件一次也没触发，**那一格既没排除任何候选、也没给任何候选加分，却在表里看着像一条判据**。是反推腿逐格核判红条件时抓到的。这与 `.claude/singlefs-ai-sop/rules/test-discipline.md`「失败条款的前件可以写反，写反之后它永远不触发」同族：那一条管前件写反，这一条管**前件与问句根本不是一回事** ⚠️ **2026-09-11 第二次，形态多一层**：D19（块指针的结构与宽度预算） 已定项 6 第二轮第 6 格的问是「跨崩溃唯一」，判红条件与触发观测却写成「回退之后」「回退序列」——而「回退」在仓里是专名，指 D23（journal 的角色与格式） 已定项 14 的管理员回退；回退之后第一个新根的 txg 取根环里全部根记录的最大值 + 1，四条候选都撞不上 ⇒ 按字面这一格永远不触发。真正会触发的是实例切换与崩溃重挂之后的「收养」。是反推腿指出的，主 agent 按问句重判。**多出来的那一层**：问与判红条件用了两个日常近义、在仓里不同义的词，逐字比对问句与判红条件看不出毛病。 ⚠️ **2026-09-11 第三次（D19（块指针的结构与宽度预算） 已定项 6 第三轮），两处**：第 3 格的问点名「同一 checkpoint 里固定点写出的多版」，判红条件的第二个析取支写「两个活着的单元同 key」——固定点两版从不同时被已发布的根引用，按「活着 = 可达」读永不触发（第一个析取支「某一类给不出」连同问句仍罩着它）；「结果反过来我接不接受」承诺「任一格输照写」，而第 7 格的触发结果写的是「记要重开」、不叫输，承诺恰在唯一可能兑现的那一格上没有定义。两处都是反推腿指出的 | 每写一格判据，紧接着写一句「什么答案会让这一格触发」，并检查那句话是不是就是这一格的问句的否定。门禁形态：判据表的每一行都要有第三列写这句触发观测，缺列判红。判别力自证：造一份问与判红条件互不相干的判据表，检查必须红 | 无。今天就写得出——但判据表今天散在 research/prompts/ 各轮材料里，没有统一格式，要先定表的形状 | 2026-09-10 D6（快照实现模型） 已定项 2 第一轮反推腿指出，主 agent 逐字回核那一格的问与判红条件坐实 |
+| C260 | livelist 条目的预付没算进解开自己那个量 | **E130（每头一份 livelist 过不过有界销毁） 量出：候选甲每释放一个块要多写 24 字节（类型标签 2 + 位置条目 14 + birth txg 8），而 D3（空间分配） 的原则逐字「COW 系统必须保证『释放空间』这个操作本身不需要申请空间」。** D3（空间分配） 已定项 2 对墓碑那一笔给过解法，逐字「**墓碑就是「解开自己」的一部分**，计入那个量」，在写入那一刻预付。livelist 条目要走同一条路，就得把它加进「解开自己需要多少」这个量——**而那是 2026-08-31 用户定案的条款，今天一个字都没提 livelist**。 ⚠️ 不加会怎样：头里删一个块时要往 livelist 追一条 FREE 条目，盘满时这一步申请不到空间 ⇒ 删不动，正是 D3（空间分配） 那条原则要防的形态。 ⚠️ **它只在 D6（快照实现模型） 已定项 2 取甲时才要还**；取别的候选这笔账不存在 ⚠️ **2026-09-10 同日作废那个 24**：它里面的 14 字节是位置条目，而位置条目只是提示、释放一律经映射 ⇒ 条目身份要改用中央映射的 key，预付量要按那个 key 的宽度重算，见 C266（livelist 条目的身份用了会过期的位置提示） ⚠️ 载体定成一棵共享树之后，每次 FREE 预付的是共享树的一条条目（映射的 key 加树 ID 8），宽度随 C266（livelist 条目的身份用了会过期的位置提示） ⚠️ **预付量有数了（2026-09-13，E146（livelist 条目按映射 key 定身份之后的宽度与代价））**：按映射 key 定身份后每次 FREE 追加一条 35 字节叶条目（带事件字节 36、带提示 49）= 一个 32 KiB 单元的 10 / 10 / 14 个万分点，E130（每头一份 livelist 过不过有界销毁） 的 24 字节作废；进不进「解开自己需要多少」那条条款仍欠。 ⚠️ **2026-09-13 用户定案 D6（快照实现模型） 已定项 2 取 36 字节形态 ⇒ 每次 FREE 预付 36 字节；进不进「解开自己需要多少」那条条款仍欠。** | 造一个「盘写到只剩一个单元、然后在可写头里删一个自己出生的块」的镜像，断言删除成功且 livelist 追加的那条 FREE 条目有地方落。判别力自证：把预付量改回不含 livelist 那一项，检查必须由绿转红 | 条款已写（2026-09-14 用户定案：可写头里每次 FREE 追加的 36 字节 livelist 条目计入「最坏情况下解开自己需要多少」、写入时预付，D3（空间分配） 已定项 2）；检查仍欠：盘只剩一个单元时在可写头里删一个自己出生的块的镜像 | 2026-09-10 E130（每头一份 livelist 过不过有界销毁） 判据 6 量出 `free_path_extra_bytes=24`，主 agent 逐字核 D3（空间分配） 已定项 2 坐实那个量今天不含它 |
+| C261 | 跨装置闸只钉总数就钉得住错的源头 | **一条「立在装置之间」的断言，如果只钉一个总数，它照样会在一个来自别条决策的同量级数字上全绿。** 实测（2026-09-10，E130（每头一份 livelist 过不过有界销毁））：分配记录条目宽写成 30、注释挂 D3（空间分配） 已定项 7，而 D3（空间分配） 已定项 7 的字段表逐段相加是 4 + 6 + 2 + 8 = 20；30 是 D5（快照 / 空间记账机制） 已定项 5 的记账条目宽（key 22 + value 8）。当时的闸逐字是 `assert_eq!(ALLOC_REC_BYTES + 0, 22 + 8)`——**断言自身就写着另一条决策的分解式**，而它自洽、变异抓得到、门禁全绿。 ⚠️ 这与 `.claude/rules/mutation-sampling.md` 第五类（两个口径在基线那一臂上恰好同值）**不是同一个病**：那一类是两个口径算同一个量，这一类是**一个口径算的根本是另一个量**，而闸把它当同一个量钉住了 | 门禁形态：实验源码里凡是注释挂着「D<n> 已定项 k」的常量，都要能对上那条分项字段表的逐段之和；对不上判红。判别力自证：把某个常量换成另一条决策里同量级的数、注释不动，检查必须由绿转红。 今天的替代做法只是纪律：跨装置闸要钉**字段表的逐段**，不钉总数 | 前置：字段表要有可机读的形态。今天各决策的字段表是 markdown 表格，段名与宽度列的位置不统一，先要一个统一的抽取口径（`.claude/gate.d/doc-registries.sh` 的 field-table-sums 格已经在读表后合计，可复用它的解析） | 2026-09-10 D6（快照实现模型） 已定项 2 第二轮的正推腿逐段相加 D3（空间分配） 已定项 7 的字段表时抓到，主 agent 逐字核三处坐实 |
+| C263 | 判据表的判红条件里嵌了没核过的前提 | **跑前写死的判据表，判红条件里可以嵌一个当成事实的前提；前提错了，给出正确答案的腿会被那一格判红。** 实测（2026-09-10，D6（快照实现模型） 已定项 2 第二轮）：判据 6 的判红条件写「答『该合并』而不解释两者装的块集合**不相交** ⇒ 判红」，而 D6（快照实现模型） 已定项 2 正文逐字是「克隆自己出生的那批块**绝大多数**引用计数是 1」、D5（快照 / 空间记账机制） 正文逐字「跨头共享的块就是第二个活引用」⇒ 一个头被再克隆之后，同一个块同时落在两处，**相交非空**。 ⚠️ 同一张表还有第二处：**六格里没有一格的触发结果是「候选不成立」**，而材料自己写着「结果反过来我接不接受」那一条 ⇒ 那句话在表里没有一格接得住。 与 C259（判据表的问与判红条件不是同一个命题） 同族：那一条管问与判红条件不是一回事，这一条管**判红条件自己带了没核过的事实** ⚠️ **再测（2026-09-10，D6（快照实现模型） 已定项 2 三轮对抗第一轮）**：判据 1 的判红条件「只能住这块预留」**永远满足不了**（反推腿逐个核过，每个排队的需求都另有出路），且「触发时判谁输」写 `per_head`，而 D6（快照实现模型） 已定项 2 正文自己写着两臂都吃那 8 字节；判据 3 的判红条件用的是「按字节能不能重建」，而 D21（权威态与派生态的分界） 2026-09-09 用户定案逐字「「能不能重算」问的是语义，不是字节」 ⚠️ **三测（同日，三轮对抗第二轮）**：判据 1 的判红条件只收**错放**，而修补之后真实的失败方向是**漏放**，它看不见；判据 2 的判红条件「不改任何已定条款」与第一轮修补（本身就改 D5（快照 / 空间记账机制） 正文）自相抵触、恒真；判据 4 的判红条件今天恒真（`invariants.md` 里 livelist 出现 0 次）；判据 6 的背景句与 D19（块指针的结构与宽度预算） 已定项 5 硬规则 2「今天已满足」矛盾；「结果反过来我接不接受」只挂在判据 1 / 2 上，而洞落在判据 5 ① ⚠️ **四测（同日，三轮对抗第三轮）**：判据 5 的第一句判红条件永远触发不了（没有 promote 时克隆构成森林，删完子孙总能删到头）；判据 1 的机制清单漏了 condense；判据 3 分不出错的方向；材料漏抄了 C265（销毁可写头的释放边界写成了固定的克隆时刻）、C267（一个可写头在树表里没有一个能被指到的对象） 两行与 D8（核心索引结构） 已定项 8 的字段表 | 写判据表时，判红条件里凡是出现「而 X」这种当成事实的从句，都要标出它的出处并现查一遍；另外每张表至少要有一格，它的触发结果是「被判的那个候选不成立」。门禁形态：判据表要有一列写「这一格触发时判谁输」，缺列或全表没有一格判候选输，判红 | 前置：判据表今天散在 research/prompts/ 各轮材料里，没有统一格式，与 C259（判据表的问与判红条件不是同一个命题） 同一笔前置 | 2026-09-10 D6（快照实现模型） 已定项 2 第二轮反推腿指出两处，主 agent 逐字核 D6（快照实现模型）:160 与 D5（快照 / 空间记账机制）:107 坐实 |
+| C264 | 回读比对拿产物去对同一个抽取器 | **`research/scripts/quote-kb.py` 的回读比对，比的是「产物」与「`pick()` 取出来的那一段」——而两者出自同一个抽取器。** 抽取器取错了范围，比对照样逐字节一致，产物本身没有任何断裂痕迹。 实测（2026-09-10，D6（快照实现模型） 已定项 2 三轮对抗第一轮）：`@标题` 取法找节尾时不跳过代码栅栏，E131（livelist 的两条载体，数值与代价） 正文复跑命令块里有一行 `# 直接跑装置：`，被当成一级标题，取 E131（livelist 的两条载体，数值与代价） 整份的那条 `@标题` 取法只取到 15 行就停了——**回读比对通过、退出码 0**。是当天新接上的 `--checklist` 抓到的：清单里标「抄」的 7 节产物里没有。材料还没发出。 **已修的那一半**：`pick()` 与 `research/scripts/kb-sections.py` 都跳过代码栅栏，各带一段没修时必红的自检。 **回扫**：kb 源文件里代码栅栏中有 `#` 开头行的共 4 个（E125（顺序区写指针之上读到什么）、E130（每头一份 livelist 过不过有界销毁）、E131（livelist 的两条载体，数值与代价）、`prior-art.md`）；`research/prompts/` 历轮材料里从这 4 个文件抽的块 2 个，两个都是腿自己手选的行区间、区间内没有栅栏 ⇒ 这个病**以前没有截断过已发出的材料**。 ⚠️ **没修的那一半就是本条**：`--checklist` 只在被截掉的部分里含一个标「抄」的标题时才抓得到；若截断发生在一节中间、后面没有下级标题，清单一个字都说不出来。与 C244（机械抽取选错行区间，产物本身没有断裂痕迹） 同族 | 回读比对要有一条**不走 `pick()`** 的独立路径：例如对 `@标题` 取法，另用 `kb-sections.py` 的节边界（它是另一段代码）算一次节尾，两边对不上判红。判别力自证：把 `pick()` 的栅栏跳过删掉，新比对必须由绿转红，而旧比对仍然全绿 | 无。两个脚本都在本仓；要先确认两者对「节」的定义一致（`kb-sections.py` 只认 `##` 起的标题，`pick()` 认任意级） | 2026-09-10 三轮对抗第一轮备材料时 `quote-kb.py --checklist` 当场报 7 节缺失，主 agent 单独调 `pick()` 看到只取了 15 行、末行停在代码栅栏里 |
+| C265 | 销毁可写头的释放边界写成了固定的克隆时刻 | **决策已定、检查仍欠（2026-09-10，用户定案补上第二道销毁闸「还有自己活快照的可写头不许销毁」，正文住 D5（快照 / 空间记账机制） 第 2 条下面）**：**D5（快照 / 空间记账机制） 正文逐字「要释放的是 `birth > origin.txg` 的那批块，散落全树」，而同一份正文逐字把 `previous_snapshot_txg` 定义成「上一个快照的代号」、建快照时往前推，又逐字要求「新克隆的 `previous_snapshot_txg` 必须初始化为 origin 快照的 txg」** ⇒ 两者**只在头从没被打过快照时相等**。头被打过快照之后再销毁，按固定的 `origin.txg` 放块，会放掉它自己的快照仍在引用的块。构造：txg 10 克隆出头 H（`previous_snapshot_txg` = `origin.txg` = 10）；txg 20 H 写块 B（birth 20）；txg 25 对 H 打快照 S（`previous_snapshot_txg` 推到 25，快照 S 引用 块 B）；txg 40 销毁 H ⇒ 按 `birth > origin.txg` 判 块 B（20 > 10）要放，而 快照 S 还引用它。 **现查全仓没有「有快照的可写头不许销毁」这类条款**——只有「分叉点快照不许销毁」，管的是快照不是头 ⇒ 矛盾成立。按当前 `previous_snapshot_txg` 放则不出这个问题（块 B 的 20 ≤ 25，不放）。 ⚠️ D6（快照实现模型） 2026-09-10 补的那句射程注照抄了 D5（快照 / 空间记账机制） 这句，**不是独立的第二个出处**。 ⚠️ **与载体无关**：每头一棵树与共享树都继承它 | 造「txg 10 克隆出 H、txg 20 写 块 B、txg 25 对 H 打快照 S、txg 40 销毁 H」这个镜像，断言销毁 H 之后 快照 S 仍读得出 块 B；把释放边界换回固定的 `origin.txg`，检查必须由绿转红 | 改 D5（快照 / 空间记账机制） 正文那一句是推论，要三方：随 D6（快照实现模型） 已定项 2 三轮对抗第二轮「快照交接」那一格一起判，在那之前不改正文 | 2026-09-10 三轮对抗第一轮正推腿打出；主 agent 现查 D5（快照 / 空间记账机制） 开篇与第 151、156 行，并全仓 grep「不许销毁 / 不能销毁 / 先销毁快照」类条款坐实 |
+| C266 | livelist 条目的身份用了会过期的位置提示 | **E130（每头一份 livelist 过不过有界销毁）、E131（livelist 的两条载体，数值与代价） 与 C260（livelist 条目的预付没算进解开自己那个量） 都把 livelist 条目定成「类型标签 2 + 位置条目 14 + birth txg 8」，而那 14 字节是位置条目。** D19（块指针的结构与宽度预算） 已定项 5 逐字把位置条目「**降为提示**……它可能过期」，规则 1 逐字「**释放一律经映射，不经提示**（E96（混合架构的一致性） 实测：按提示解落点会误放约 5000 次 / 200 轮）」。块被搬走后提示刷新，FREE 记的是新落点、ALLOC 记的是旧落点 ⇒ condense 配不上 ⇒ 销毁时要么放错块、要么放不掉。⇒ 条目身份要改用中央映射的 key，而那个 key 是 D19（块指针的结构与宽度预算） 已定项 6，2026-09-10 刚判「候选集与分割轴都要重开」、两条候选都只对码 1 有定义 ⇒ **D6（快照实现模型） 已定项 2 的条目形态挂在 D19（块指针的结构与宽度预算） 已定项 6 上**。两条载体都中；24 字节、4/3 的占容量比都要作废重算 ⚠️ **2026-09-10 同日载体定成一棵共享树**（D6（快照实现模型） 已定项 3）⇒ 条目 = 映射的 key 加头的树 ID 前缀 8 字节，宽度仍随 D19（块指针的结构与宽度预算） 已定项 6 ⚠️ **2026-09-13 收口：D6（快照实现模型） 已定项 2 定条目身份 = 头树 ID 8 + 中央映射 key 27 + 事件类型 1，位置提示不进条目。** | **约束 2026-09-13 已写进 D6（快照实现模型） 已定项 2**（身份 = 头的树 ID 8 字节 + 中央映射 key，不许用位置条目）；条目宽度按 D19（块指针的结构与宽度预算） 已定项 6 重算仍欠，E132（livelist 载体·按真实树数与内部扇出重算） 扫的宽度要收到实值。会红的检查：造「头里写块 → 整理把它搬走（提示刷新）→ 释放 → 销毁头」的镜像，断言销毁放的是被引用那一块的现行落点、没有误放；把条目身份换回位置提示，检查必须由绿转红 | 前置：D19（块指针的结构与宽度预算） 已定项 6 先定映射的 key——2026-09-11 已定（按类复用写序键，码 1 key 27 字节），条目宽度按它重算没做 | 2026-09-10 D6（快照实现模型） 已定项 2 三轮对抗第一轮反推腿打出，主 agent 逐字核 D19（块指针的结构与宽度预算） 已定项 5 的表与规则 1、已定项 6 坐实 |
+| C267 | 一个可写头在树表里没有一个能被指到的对象 | ⚠️ **2026-09-14 用户定案给了那一段**：树表条目从 32 字节预留里切 8 字节做「头 ID」（预留剩 76，条目 200；预留 2026-09-16 随 C338（树表条目预留没有余量） 的定案从 24 加到 76），inode 树条目写自己的树 ID、extent 树条目写它服务的那个头、无归属的树写 0（D8（核心索引结构） 已定项 8、D5（快照 / 空间记账机制） 已定项 9）⇒ **「没有这一段」那一半已还，检查仍欠**（没有任何东西核「同一个头的两棵树头 ID 相等」「头 ID 指到的那条条目是一棵 inode 树」）。立账时的原文： **树表条目 121 字节的字段表里没有「属于哪个头」这一段**（D8（核心索引结构） 已定项 8 逐字：长度 2 + 树的种类 2 + flags 2 + 树 ID 8 + 根指针 59 + `previous_snapshot_txg` 8 + 诞生 txg 8 + 预留 32），**而一个头至少两棵数据树**：已提交的 `layout/01-first-txn.md` 预想「extent 树 1、inode 树 2」，新池新建文件就写出这两棵；D8（核心索引结构） 逐字要求克隆头「建克隆那次发布必须为新树写出这条水位行」。⇒ 「头从自己那条条目的预留里找到它的 livelist」指不到一个确定的条目——两条都行、按种类挑一条也行、每棵树各一个 livelist 也行，**没有条款挑**。⚠️ 推论（未走三方）：D8（核心索引结构） 已定项 8 ③ 的「`previous_snapshot_txg` 每头一份，住树表条目」同形——同一个头的两条条目各有一份，谁是权威、怎么保证一致，全仓没写 ⚠️ **2026-09-10 同日载体定成一棵共享树**：头到 livelist 的链接不再需要，但每头的 livelist 计数器与 C272（第二道销毁闸没有 O(1) 的检查法） 都还要一个能被指到的「头」 | 造一个两棵数据树的头，让两条条目的 `previous_snapshot_txg` 不相等，检查必须判红；或者规定「以某一种树的条目为准」后，让另一条条目的值漂走，检查必须仍然绿（证明它确实只读那一条） | 前置：D8（核心索引结构） 已定项 8 补「头」的落点，或规定以哪一种树的条目为准；要用户定案 | 2026-09-10 D6（快照实现模型） 已定项 2 三轮对抗第一轮反推腿打出，主 agent 现查已提交的 layout/01-first-txn 第 47 行与 D8（核心索引结构） 已定项 8 字段表坐实 |
+| C268 | 判据表把比谁省写成输赢 | **`.claude/rules/fs-design.md` 明令「「比谁省」不构成任何判据」（2026-08-30 用户定案），而 E131（livelist 的两条载体，数值与代价） 跑前写死的判据 4 写的正是「占容量：`shared` 不比 `per_head` 高 ⇒ `shared` 赢这一格」**，结论里还把「占容量省 1/4」列成 `per_head` 的一项优势交给用户。用户回的那句「我们本来就是用空间换复杂度的设想」恰好就是这条规则的意思。 ⚠️ 与 C259（判据表的问与判红条件不是同一个命题）、C263（判据表的判红条件里嵌了没核过的前提） 同族：三条都是跑前写死的判据表自己写坏了，而写的人每次都自查过 | 判据表进材料之前，逐格核它的判红条件用的量有没有被本仓规则明令排除（占容量、「比 X 省」、按字节判权威态）；门禁形态：判据表的判红条件列里出现「占容量 / ppm / 比 … 省」而「触发时判谁输」列不是「不判输赢」，判红 | 前置：判据表今天散在 research/prompts/ 各轮材料里，与 C259（判据表的问与判红条件不是同一个命题） 同一笔前置 | 2026-09-10 主 agent 在三轮对抗第一轮裁决时自查出来（反推腿点出了同表判据 1、3、5 的毛病，没点这一格） |
+| C270 | 分叉点闸的子计数数不数克隆 | **决策已定、检查仍欠（2026-09-10，用户定案 `children` 数克隆，写进 D5（快照 / 空间记账机制） 第 2 条）**：**D5（快照 / 空间记账机制） 已定项 18 逐字「判据是 O(1) 子计数 `children > 1` → 拒绝」，而 `children` 数不数从这个快照克隆出去的可写头，全仓只提这一次、没有定义。** C269（销毁可写头时留下的块没有去处） 的漏放构造两种读法下都成立；不数克隆时还多一条路：一个快照是某个克隆的 origin，它的原链头还活着时它就可以被销毁。本机 ZFS 源码对应的是 `ds_num_children`（`dsl_destroy.c` 第 72–74 行），它数不数克隆本仓未核 | 造「快照 S、它的原链头 甲头 活着、从 S 克隆出 乙头」的镜像，按两种读法各算一次 S 的子计数，断言销毁 S 被拒；把子计数改成只数原链，检查必须由绿转红 | 前置：D5（快照 / 空间记账机制） 补一句 `children` 的口径；可随 C269（销毁可写头时留下的块没有去处） 一起定 | 2026-09-10 D6（快照实现模型） 已定项 2 三轮对抗第二轮反推腿指出，主 agent 现查 D5（快照 / 空间记账机制） 第 152 行坐实只出现一次 |
+| C271 | livelist 的 FREE 在什么时刻记没有定义 | **已还一半（2026-09-10，用户定案 FREE 在块被杀掉那一刻就记，写进 D6（快照实现模型） 已定项 3）**：剩诞生 txg 的活头口径。**一个可写头里的块被它丢掉引用（被杀掉）那一刻，与这个块真正被放掉那一刻，可以隔很久**——中间隔着它自己的快照：块按 `birth ≤ previous_snapshot_txg` 进 deadlist，等快照销毁时级联才放。livelist 的 FREE 在哪一刻记，全仓没写。按「真正放时才记」：头打过快照 S、在 S 之后丢掉块 b（进 deadlist、livelist 里没有 FREE），之后 S 销毁、级联放掉 b；再销毁头时 livelist 里只有 b 的 ALLOC ⇒ **同一块放两次**。按「杀掉时就记」：ALLOC 与 FREE 抵消，销毁头时不碰 b，b 由级联放一次。 本机 ZFS 源码现查：`fs-refs/zfs/module/zfs/dsl_dataset.c` 杀块路径上，先于 `BP_GET_BIRTH(bp) > ds_prev_snap_txg` 那一步，就把出生晚于 `dd_origin_txg` 的块追加进 livelist 的待记队列——线索、未在本项目验证。 ⚠️ 连带一问：过滤用的「克隆时刻」要一个固定不变的字段，而 `previous_snapshot_txg` 会随快照推移；树表条目里的诞生 txg 对活头条目在反复重写时变不变，D8（核心索引结构） 已定项 8 没钉 | 造「克隆出头 H → H 写块 b → 打快照 S → H 丢掉 b → 销毁 S → 销毁 H」的镜像，断言 b 恰好被放一次；把 FREE 改成真正放时才记，检查必须由绿转红 | 前置：用户定案 livelist 的 FREE 在杀掉时记；诞生 txg 的活头口径由 D8（核心索引结构） 已定项 8 补一句 | 2026-09-10 D6（快照实现模型） 已定项 2 三轮对抗第三轮反推腿打出，主 agent 现查本机 ZFS 源码与 D8（核心索引结构） 已定项 8 坐实 |
+| C272 | 第二道销毁闸没有 O(1) 的检查法 | **「还有自己活快照的可写头不许销毁」（D5（快照 / 空间记账机制） 第 2 条下面，2026-09-10 用户定案）要在销毁请求进门那一刻判，而怎么判没写。** 分叉点闸有现成的 O(1) 子计数；这道闸要的是「这个头自己打出的活快照有几个」，树表条目里没有这一段，按树表枚举又不是 O(1)。⚠️ 头的树表条目预留 2026-09-16 起加宽到 76 字节，这个计数已列进预留的认购者（C338（树表条目预留没有余量））；此前 32 字节已认购满，放不下 | 造一个有两个自己快照的头，断言销毁被拒；删掉一个快照后仍被拒、删掉两个后放行；把检查改成只看分叉点子计数，检查必须由绿转红 | 前置：C267（一个可写头在树表里没有一个能被指到的对象） 先给「头」一个落点，计数才有地方住 | 2026-09-10 D6（快照实现模型） 已定项 2 三轮对抗第三轮反推腿指出，主 agent 现查 D5（快照 / 空间记账机制） 那道闸的正文坐实没有检查法 |
+| C274 | 重放收养的对象不推计数器水位 | **推测，没核全仓**：D8（核心索引结构） 已定项 8 ② 的树 ID 水位逐字「`新水位 = max(根环里全部根记录的该字段, 本次 checkpoint 发出的最高树 ID + 1)`」，它给「孤儿那一格不是错误」的五条依据全建在「孤儿是**未发布**的」上；而 D23（journal 的角色与格式） 已定项 14 的实例切换逐字「重发在飞 checkpoint，号 ≤ W 的事务照旧」，I-1.2（块头写序已发布） 把号 ≤ W 的单元判成已发布 ⇒ 在飞 checkpoint 里一个号 ≤ W 的事务建的树会随重放回来，**全仓没写重放施加那一条时推不推水位**（2026-09-11 现查 D8（核心索引结构） 与 D23（journal 的角色与格式） 两个文件，没做全仓搜）。若内存里的分配器按根环 max 起步、重放补回那棵树时不推水位，下一棵新建的树会重拿同一个 ID。同一个形状还管每一个按计数器发号、而作用域里不带实例代号的东西（D19（块指针的结构与宽度预算） 已定项 6 第二轮的出生序号、代理号两族的原形态）；作用域带实例代号的计数不撞在这里——每次可写挂载都取新实例代号（D18（块里携带什么信息） 已定项 11 那一行「再取新代号 = max(……) + 1 ……之后才动任何单元」），作用域随之换掉（2026-09-11 第三轮主 agent 现查坐实）。树 ID 水位本身不按实例计，这一格仍然开着 | 崩溃点重放里造「在飞 checkpoint 里号 ≤ W 的事务建树（或发号），崩溃重挂（或实例切换）之后先新建一棵树」，检查新旧两个 ID 两两不同；判别力自证：让恢复不推水位，检查必须红 | 事务层 + 崩溃点重放（两样 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay；层 0 第二条流 2026-09-17 起有三次可写挂载，但每次重开之前都是正常退出，没有重发在飞 checkpoint 的切换，这一格要的场景仍不在负载里） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 第二轮反推腿第 10.3 节提出（自标推测），主 agent 现查 D8（核心索引结构） 与 D23（journal 的角色与格式） 两处原文坐实「没写这一步」；2026-09-11 第三轮按「每次可写挂载都取新实例代号」把计数器那半句收窄 |
+| C275 | 跨文件 reflink 下 AAD 两段没有期望值来源 | D9（加密） 已定项 6 的 AAD 里对象 ID 与锚点偏移的期望值来源是「查找路径」，D9（加密） 逐字「一律不许来自明文侧，也不许从指针里读回来」；跨文件 reflink 之后读者的查找路径给的是**引用文件**的对象 ID 与偏移，而单元加密那一刻 AAD 里是**出生文件**的 ⇒ 加密开启后跨文件 reflink 要么读不出，要么得给这两段也立一套「声明 + 验收」。E90（树 ID 进 AAD 与跨头共享） 的「声明 + 祖先验收」只罩出生 (树, txg)，它的世界里没有跨文件 reflink——2026-09-11 现查 `grep -c reflink` 在 D9（加密）、E90（树 ID 进 AAD 与跨头共享）、E31（AAD 缺快照维） 三个文件都是 0（只核了这三个文件）。不区分映射 key 族 | 模型里造一次跨文件 reflink 之后的读，AAD 按查找路径取期望值，必须报失配；给出修复形态之后同一构造必须转过 | 加密的模型对拍；D9（加密） 那条要重开 | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 第二轮反推腿第 10.1 节，主 agent 现查三个文件的计数坐实 |
+| C276 | 权威态分界那段逐字节对照里两个数过期 | `21-权威态与派生态的分界.md` 第 245–247 行逐字「单元头（自描述，D18（块里携带什么信息）已定项 7 初值）91 + 指针头部……31 + 位置条目 ×2（dev 1 + 物理偏移 6 + 密文校验和 4）22」；今天码 1 头是 133（D18（块里携带什么信息） 已定项 14）、位置条目是设备 4 + 槽号 6 + 密文校验和 4 = 14、两份 28（D19（块指针的结构与宽度预算） 已定项 4）⇒ 那段的合计 144 与由它推出的对照结论都要重算，今天没人算 | **kb 这一半 2026-09-13 已收口**：D21（权威态与派生态的分界） 那张对照表按码 1 头 133、指针头部 47、位置条目 14 重算（2 副本 208 字节、4+2 条带 264 字节）；仍欠：把这两个数登记成 `format-const` 标记，交门禁阶段「格式常量在 kb 与实验源码之间同步」与 D18（块里携带什么信息）、D19（块指针的结构与宽度预算） 的登记值对账，对不上判红 | 无前置，纯欠工 | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 第二轮反推腿第 2.1 节 F2，主 agent 现查坐实 |
+| C277 | 腿引的行号是背景材料里的行号 | 三方论证的云端腿引「`文件:行号`」时，可能拿的是**背景材料附录里那一段**的行号，而不是源文件的行号。实测（2026-09-11，D19（块指针的结构与宽度预算） 已定项 6 第二轮正推腿）：它写 `invariants.md:1638`、`18-块里携带什么信息.md:1027-1041`，而 `invariants.md` 不到 300 行 ⇒ 内容可用，行号不能照搬进 kb；照搬进去就是一条指向不存在位置的引用，而引用处看起来处处有据 | 判决之前扫一遍腿的输出：凡是 `文件:行号` 超出该文件行数、或那一行与引文逐字对不上，判红并列出来；判别力自证：往样本里放一条指向第 1638 行的引用，检查必须红 | 无前置，纯欠工 | 2026-09-11 主 agent 核正推腿引文时发现 |
+| C278 | 前提表的支点原句不在附录里 | 三方材料的前提表引一条条款当支点时，**原句所在的那一行可以不在附录里**，只经别的文件转引出现；而同一行里常常还有别的承重句子，转引不会带上。实测（2026-09-11，D19（块指针的结构与宽度预算） 已定项 6 第三轮）：前提 F7 引「作废一个 checkpoint 必须换实例代号（D18（块里携带什么信息） 已定项 11）」，材料里这句出现 3 次，全是 F7 自己与 D8（核心索引结构） 正文的两处转引，原句那一行不在附录里（附录只补抄了那个文件的四段）。而同一行还写着「再取新代号 = max(……) + 1 ……之后才动任何单元；只读挂载不取号」——每次可写挂载都换实例代号。正推腿判「同一个实例代号下重挂两次」、据此要三条候选补 C274（重放收养的对象不推计数器水位） 那一步，正要这一句才判得了，是主 agent 现查原文改判的。⚠️ **同族第二型（2026-09-11，同一格的三轮对抗第一轮）落在判据那一侧**：判据表把 D27（小数据打包容器） 容器槽列进扫描重建那一格的射程、把搬迁之后 key 变不变列成一格，给反推腿的任务提示还点名问「打包之前那个对象的 key 与打包之后的是不是同一个、「搬出去」之后呢」；而定义打包的 D27（小数据打包容器） 已定项 1（「对象写完之后，由 D26（后台整理与放置回收） 的常驻整理把它搬进共享容器」）与定义「搬出去」的 D27（小数据打包容器） 已定项 10，小节清单都标「不抄，与映射 key 族无关」——判据要用的条款，理由写的却是「无关」（反推腿指出）。「怎么拦」一格的解法只罩前提表，判据这一侧还没有。同一格第二轮又撞一次：判据要试根槽写失败推进一格，挡住它的 D16（发布语义） 已定项 6「每次发布把 checkpoint_txg 加一」在清单上标「不抄，与映射 key 族无关」，是反推腿自己读原文补上的 | 前提表每一行的出处写成机器可读的（文件, 引号里的短语）；`quote-kb.py` 逐行核：短语出现在附录里，而且出现的那一段抽自出处写的那个文件；只在别的文件的转引段里出现的判红。判别力自证：造一张前提表，出处写一个文件、短语只出现在另一个文件的转引段里，检查必须红 | 前提表的出处列改成机器可读的形式 | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 第三轮反推腿指出，主 agent 用 `grep -c` 数材料坐实 |
+| C279 | 打包之后扫描重建同时看到旧单元与槽 | **D27（小数据打包容器） 已定项 1 的打包是后台整理把对象搬进容器、写路径不改，D19（块指针的结构与宽度预算） 已定项 5 的搬迁只改映射一条条目 ⇒ 原来那个独立码 1 单元的落点被复用之前，盘上同时有它和容器里的槽，两者 key 相同**（D19（块指针的结构与宽度预算） 已定项 6 的七条候选都要求搬迁前后 key 不变）。I-1.8（归并后版本全序） 的副本归并只把码 1 / 3 单元按「类身份段全部字段含写序」归并成组，槽不是码 1 单元，归不进去 ⇒ 扫描重建出的映射条目指向哪一个没有规则。指向旧落点时，那个落点在分配记录里已经空闲，而分配记录在扫描重建那一刻正是被重建的东西（D18（块里携带什么信息） 已定项 1 的射程注），挡不住它被复用；此后按 D19（块指针的结构与宽度预算） 已定项 5 的规则 1 经映射放掉的也是那个落点。⚠️ 规则不能直接取「诞生代号大的那个」：D18（块里携带什么信息） 已定项 1 那一节逐字写着「曾拟用诞生代号给同一身份的多版打包容器择新，正是这里否掉的那个用途」 | 扫描重建的择版本规则补一条「同 key 的独立码 1 单元与容器槽取哪一个」，写进 I-1.8（归并后版本全序） 或 D27（小数据打包容器） 新类的合法性不变量。判别力自证：造一个打包之后旧单元还没被覆写的镜像，扫描重建出的映射必须指向槽；把规则拿掉，检查必须红 | D27（小数据打包容器） 已定项 3 那个新类的类身份段（仍未写死）；D19（块指针的结构与宽度预算） 已定项 6 的 key 形态（2026-09-11 已定） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第一轮反推腿（顺带查出，七条候选相同），主 agent 核 I-1.8（归并后版本全序） 与 D18（块里携带什么信息） 已定项 1 的射程注 |
+| C280 | 中央映射装哪几类单元没有条款 | **已还一半（2026-09-12，D19（块指针的结构与宽度预算） 已定项 8 用户定案：全部指针进映射；映射树自己的节点、树表单元、实例表单元自举豁免，父指针里的位置条目是权威）**：剩下的是 checker 那一半，以及树表单元豁免那一条的条款（C248（树表单元的自举豁免没写过））。 **D19（块指针的结构与宽度预算） 已定项 5 逐字定中央映射是「解引用与释放判定的唯一入口」，已定项 6 的七条候选都给码 2 / 码 3 定了 key（按全部指针都进映射算）；而 [layout/01-first-txn.md](layout/01-first-txn.md)「映射的射程」那一行与 [01-first-txn.md](milestone/01-first-txn.md) 的预想都是只装码 1 数据单元、码 2 / 码 3 单元与映射树自己的节点不进映射。** layout/01-first-txn.md 那一行把两种口径的差别指到 D19（块指针的结构与宽度预算） 已定项 6 那一格，2026-09-11 现查那一格已不写这一差别（那一行已改指这里）。两头都没有条款：码 2 / 码 3 进不进；映射树自己的节点——进就自举成环，不进就要一条豁免，与树表单元那条（C248（树表单元的自举豁免没写过））、实例表单元那条（由根记录直接持有物理指针）同型。C196（中央映射树的根住哪全仓无条款） 只管到根 | 在 D19（块指针的结构与宽度预算） 写一条射程条款：映射装哪几类单元，不进映射的那几类（映射树节点、树表单元、实例表单元）怎么解引用；checker 判不进映射的那几类，父指针里的位置条目是权威而不是提示。判别力自证：造一个映射树节点只登记在映射里、父指针只带提示的镜像，挂载必须报自举失败 | D19（块指针的结构与宽度预算） 已定项 6 的 key 形态（2026-09-11 已定：按类复用写序键；只装码 1 时码 2 / 码 3 的 key 用不上）；C196（中央映射树的根住哪全仓无条款） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第一轮反推腿（顺带查出「映射树自己的节点」一问），主 agent 现查 layout/01-first-txn.md 那一行的指向落空 |
+| C282 | 环里最旧根没有定义 | **D3（空间分配） 已定项 7 的清扫准入（用户定案）与 I-7.4（近 K 代块未被复用） 的注都用「根环最旧根的 checkpoint_txg」，而根槽写失败重发时 checkpoint_txg 推进一格再发（D23（journal 的角色与格式） 已定项 14）、在飞 checkpoint 深度是两个（D16（发布语义） 已定项 5）** ⇒ 盘上的环不是一个 N 代滑动窗；按算术（最新 − N + 1）取，会放出仍被一个自证合法、实例有效的根引用的落点 | **定义 2026-09-13 已写进 D16（发布语义） 已定项 1**（「环里最旧有效根」逐字同这一格；E139（按盘回退下界的收严形态） 按它建模）；会红的检查仍欠，原写法：定义写成「盘上全部根槽里自证合法、实例有效的根的最小 checkpoint_txg；写失败的槽按旧内容算，拿不准就回读；在飞、没持久的发布不算」，写在 D3（空间分配） 已定项 7 那条谓词旁边。检查形态：造一个根槽写失败之后的镜像，按算术取最旧根的实现必须被 I-4.8（近 K 代根校验和自洽） 判红；判别力自证：换成按盘上内容取必须转绿 | 根环实现、崩溃点重放 harness（两样 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay） | 2026-09-11 D16（发布语义） 三方论证反推腿 1-B / 1-C，主 agent 核 D23（journal 的角色与格式） 已定项 14 索引行「根槽写失败重发时 checkpoint_txg 推进一格再发」坐实 |
+| C284 | 施加一条记录在指针层上做什么没有定义 | **D23（journal 的角色与格式） 已定项 14 的前缀口径（五条）按事务施加，前缀可以落在同一次发布的两个事务之间（E42（一事务几条记录） 那种切法）；而「施加一条记录」在指针层上具体做什么——换哪个指针、祖先谁来 COW、落点谁分配——全仓没有定义。** D23（journal 的角色与格式） 开篇「重放不要分配器」与「只施加一部分事务就要重新生成祖先」互相顶着；D13（验证路线） 已定项 7「核对一条记录只需格式解析 + 校验和 + 根环择新」管的是验记录，不是算期望态。记录核对器的范围与成本（D16（发布语义） 已定项 4）由它决定。⚠️ **空间侧的实例（2026-09-12，C126（切换预留的最坏量没有口径） 第一轮反推腿）**：重建态里「哪些落点算已分配」同样没定义——不登记则实例切换的重做把号 ≤ W 事务的数据当空闲覆写，全登记则记录点名的码 2 祖先被登记成已分配、却按已发布谓词要重写；C126（切换预留的最坏量没有口径） 的固定点那一项等它 ⚠️ **2026-09-13 用户定案（D16（发布语义） 已定项 4）：取「一次发布整体施加或整体不施加」，第二份 replay 停在句法层；条款已写，会红的检查仍欠。** ⚠️ 2026-09-13 总审核定案：D23（journal 的角色与格式） 已定项 15 定「施加一条记录 = 用记录头的新根段重建那次发布的根」，条款已写，会红的检查仍欠 | 定下施加在指针层上的语义，二选一：一次发布整体施加或整体不施加（记录核对器停在句法层）；或允许部分施加，并写清祖先与落点由谁定（记录核对器要自己实现树语义）。可判形式照 D13（验证路线） 已定项 1 的 M2：部分施加的结果等于某个整数个已提交事务的结果，且恢复路径不调用分配器；并写清施加一条记录时哪些落点登记进分配器（候选：码 1 登记、码 2 / 3 按已发布谓词未发布不登记），会红的形态：崩溃点重放里切换之后断言「重建态指针层引用的落点 ⊆ 分配器认为已分配的落点」 | D23（journal 的角色与格式） 补定义（纯论证工） | 2026-09-11 D16（发布语义） 三方论证反推腿 4-A，主 agent 核 D23（journal 的角色与格式） 已定项 14 五条口径与 E42（一事务几条记录） 坐实 建议列收窄：施加语义已定（整体施加或整体不施加），只欠会红的检查（切换后断言重建态引用 ⊆ 已分配）。 |
+| C285 | 字词损坏闸漏掉孤立的截断词 | **本地腿 2026-09-11 第二次抽样（`d16-items134-local-output-s2.md`）里有一个半截词「synt」（后接「correctly」，原词是 syntactically），`corruption-check.py` 与 `oov-check.py` 复跑都判绿（生词 0、拼接 0）。** 闸认复读、落单、拼接与实词自复读四类签名，「截断成一个不成词的前缀、后面照常空格」不在其中 ⇒ 这类损坏的输出会被当成干净证据用掉 | 给 `oov-check.py` 加一类签名：长度 ≥ 4、不在词表、是某个词表词的真前缀、前后都是空白或标点的 token 判红。自证样本用这份 s2 原件（必须红）与一份把「synt」补全的副本（必须绿），再回扫已入库的本地腿产物量误报 | 无前置（脚本活） | 2026-09-11 主 agent 读 s2 时发现，两道闸复跑判绿坐实 |
+| C286 | 只读后 remount 取不取新实例代号 | **D23（journal 的角色与格式） 已定项 14 对持续失败的处置是「转只读到下次挂载」；D18（块里携带什么信息） 已定项 11 只定了「可写挂载的顺序……再取新代号……之后才动任何单元；只读挂载不取号」与「作废一个 checkpoint 必须换实例代号」；而只读之后 remount 成可写算不算一次可写挂载、许不许，全仓没有一句**（2026-09-11 `grep -rn remount .claude/kb` 零命中）。按最弱读法（remount 不取号）：故障时没发布的 checkpoint T 被作废、固定点单元留在盘上；remount 之后内存从最后发布的根重载，下一个号仍是 T，由同一个实例重发——D18（块里携带什么信息） 已定项 11 那句的理由逐字「当前实例没有行，谓词对它只能问「诞生代号 ≤ 挂载根 txg」，重发同一个号一发布，诞生代号等于它的孤儿全部判已发布」⇒ 两批固定点单元都判已发布，扫描重建复活作废的那批。与 key 族无关，D19（块指针的结构与宽度预算） 已定项 6 的七条候选都受影响 | 两句都写出来：「转只读到下次挂载」不许中途 remount 成可写；从只读 remount 成可写算一次可写挂载、走取号流程。崩溃点重放加一条：只读 → 可写之后系统配置实例代号严格变大。判别力自证：让 remount 沿用原代号，检查必须红 | 事务层 + 崩溃点重放（两样 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay；层 0 第二条流 2026-09-17 起有三次可写挂载，但没有只读之后 remount 成可写，这一格要的场景仍不在负载里） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第二轮反推腿，主 agent 现查 D23（journal 的角色与格式） 已定项 14 与 D18（块里携带什么信息） 已定项 11 那一行坐实 |
+| C287 | 切换收养开放 checkpoint 的事务后再崩 | **推测（主 agent 核了条文；E104（扫描重建的现行版本判定） 的世界表里只找到恢复实例施加自己的事务再崩那一格，没有这一格）**：在飞 checkpoint 是开放与发布中两个（D16（发布语义） 丢失窗口那一段）。开放的 T+1 里事务 a 写完单元 X、记录已追加，事务 b（b > a）发出单元写后失败 ⇒ 实例切换，写行 (旧实例, T−1, W)。D23（journal 的角色与格式） 已定项 7 逐字「记录按事务号顺序追加，一个事务在发出单元写之后失败即实例切换、号更大的记录一条都不追加——这是实例表行的 W 能当精确前缀的依据」⇒ 按这句的字面 W = a；已定项 14「号 ≤ W 的事务照旧」⇒ a 留在开放的 T+1。T+1 发布之前再崩：所选根是新实例写的 T，重放只施加 (实例代号, checkpoint_txg) 严格大于根的记录、跨不过实例边界 ⇒ a 没被施加、也不在根里；而 I-1.2（块头写序已发布） 对码 1「要 b ≤ T_pub ∨ n ≤ W」⇒ X 判已发布，扫描重建按写序最大把一次已经丢掉的写复活。W 若只取被重发那个 checkpoint 里的最大事务号（开放 checkpoint 的事务全部 > W、按新写序重做），这一格封死；两种读法今天都没写死。与 key 族无关，D19（块指针的结构与宽度预算） 已定项 6 的七条候选都受影响。**2026-09-13 条款已写**：C199（实例代号递增与 jsn 断号即止互相矛盾） 第二轮定下记录水位按实例代号为主、切换时 W 取被重发的那个 checkpoint 里的最大事务号（D23（journal 的角色与格式） 已定项 14 的注 2 / 4，2026-09-14 用户复核确认），这一格按条文封死；会红的检查仍欠 | 写死切换时 W 的取法与开放 checkpoint 里已完成事务的去向；崩溃点重放加「切换之后、开放 checkpoint 发布之前再崩」这个世界，检查扫描重建出的现行版本与重放出的一致。判别力自证：按字面取 W，检查必须红 | 事务层 + 崩溃点重放（两样 2026-09-14 已有：`crates/singlefs-core`、门禁 checker-tier-layer0-replay；层 0 第二条流 2026-09-17 起有三次可写挂载，但每次重开之前都是正常退出，没有切换收养开放 checkpoint 之后再崩，这一格要的场景仍不在负载里） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 三轮对抗第二轮反推腿，主 agent 核 D23（journal 的角色与格式） 已定项 7 / 14、I-1.2（块头写序已发布）、D18（块里携带什么信息） 已定项 11 那一行与 E104（扫描重建的现行版本判定） 的世界表 |
+| C288 | 映射 key 定案的连带改动没落到别的决策 | **D19（块指针的结构与宽度预算） 已定项 6（2026-09-11 用户定案：按类复用写序键）要改几条别的已定条款，定案那天一条都没改**：① D18（块里携带什么信息） 已定项 7 的码 2 字段表与 D18（块里携带什么信息） 已定项 11 的码 3 类身份段各加 4 字节出生序号，放在头里哪个偏移——**2026-09-12 用户定案取甲：紧跟写序**（码 3 偏移 103，码 2 在写序 4 与载荷 CRC 4 之间，码 2 只定次序；nonce / MAC 那 28 字节紧接整个类身份段之后，写进 D18（块里携带什么信息） 已定项 14；三方论证 `research/prompts/c288-item1-r1-main-verification.md`）；② D18（块里携带什么信息） 已定项 12 那句「总宽仍是 10、三档头不变」与 D18（块里携带什么信息） 已定项 14 那一行代价里的码 3 131 → 135、码 2 三档 96 / 105 / 114 → 100 / 109 / 118（E134（映射 key 格式代价·槽基线与两条新臂） 的 `headers` 行），那一行是用户定案，改它要记一笔复核；同一批还有码 3 那张表之后的四处字面数，全部 +4：D18（块里携带什么信息） 已定项 11 偏移 89 那一行的「覆盖偏移 103」、「码 3 到偏移 102」、「声明长度 ≤ 32768 − 103」，以及 I-1.7（打包容器合法与判定顺序） 的同一句（2026-09-12 C288（映射 key 定案的连带改动没落到别的决策） 第 ① 条第一轮 Opus 反推腿 2.4）——**2026-09-12 已改**：码 3 头 107、码 2 三档 72 / 81 / 90，14 个实验源码改完、10 份产物重跑，三条用户定案里的数的复核落 C298（头宽加 4 改动了用户定案里的数），2026-09-13 已还；③ 指针变宽带出来的 D8（核心索引结构） 已定项 6、D8（核心索引结构） 已定项 8 与 D22（单元原子性怎么合成） 已定项 7 那几个宽度（随 D19（块指针的结构与宽度预算） 已定项 8 与 D19（块指针的结构与宽度预算） 已定项 7）——**2026-09-12 已改**：自举豁免的三类指针用户定案取 83，根记录 194 → 242、树表条目 121 → 145（每层 112 棵）、inode 内部条目 93 → 117（扇出 139 / 138 / 138），e103 改常量、产物重跑，用户定案里的数 2026-09-12 用户复核通过（C299（指针变宽改动了用户定案里的数））；这一轮没动、仍按子指针 59 算的实验源码有 e79、e98、e100、e101、e105、e115、e124、e126、e131、e132，其中 e100 / e115 / e124 / e126 那个 59 是系统配置预想表里的间接目录单元指针——它不在 D19（块指针的结构与宽度预算） 已定项 8 的三类豁免里，而系统配置在映射可用之前就要读它，归 D22（单元原子性怎么合成） 已定项 9；④ D16（发布语义） 那句「一个事务最多写一个单元的用户数据」要按罩全部码 1 单元读（D19（块指针的结构与宽度预算） 已定项 6 的 ⑪㈢）；⑤ D27（小数据打包容器） 的槽 key 与新类不变量「槽内 key 的类标签 == 1」（⑩㈠）；⑥ D18（块里携带什么信息） 已定项 1 的射程注：出生序号只做 key 的一段、不拿来择新（⑫㈠）；⑦ E120（档表取等比时公比怎么定）、E121（按 cap 切档与档数的最优点）、D27（小数据打包容器） 里那个树数乘数按新 key 重算（码 3 头宽那一半 2026-09-12 随第 ② 条改完），按码 2 三档 68 / 77 / 86 算的实验源码（E79（根记录的容量）、E105（extent 叶改码 3 的代价）、E116（打包容器的账·补元数据写与整理策略） 等）改成 72 / 81 / 90；⑧ layout/01-first-txn.md 的指针与单元头字节表仍按今天的宽度写 | 门禁把 D19（块指针的结构与宽度预算） 已定项 6 那张 key 表的逐段宽度与 D18（块里携带什么信息） 各类头的字段表对账：出生序号不在码 2 / 码 3 字段表里、或 key 宽与 27-format-constants.sh 的登记值对不上，判红；判别力自证：删掉字段表里出生序号那一行，检查必须由绿转红 | ① 已定（2026-09-12）；② 已改（2026-09-12）；③ 已改（2026-09-12） | 2026-09-11 D19（块指针的结构与宽度预算） 已定项 6 定案时列出 |
+| C289 | 码 2 的出生树取哪个字段没写 | **D19（块指针的结构与宽度预算） 已定项 6 的收严句逐字「出生树取类身份段里的出生树（码 3 偏移 43），出生 txg 取诞生代号（码 3 偏移 73；码 1、码 2 同取诞生代号）」**——出生 txg 那半句点了码 2，出生树那半句只点了码 3。码 2 的类身份段里没有叫「出生树」的字段，只有树 ID；而 I-1.3（块头树 ID 一致） 把「头里的树 ID 是出生树」的例外只给了码 3 与被快照共享的码 1，按字面码 2 的树 ID 是「实际引用它的树」。码 2 节点若跨头共享，这两处读法不能同真。与出生序号放在哪无关，C288（映射 key 定案的连带改动没落到别的决策） 第 ① 条的四条臂一样。⚠️ 「码 2 节点会不会跨头共享」两条云端腿都是推的，主 agent 没核 | 门禁：D19（块指针的结构与宽度预算） 已定项 6 那张 key 表的每一段，在每一类上都要指到该类字段表里的一个字段名，指不到判红；判别力自证：删掉码 2 那一段的出处，检查必须由绿转红 | 先答码 2 节点会不会跨头共享（D6（快照实现模型）） | 2026-09-12 C288（映射 key 定案的连带改动没落到别的决策） 第 ① 条第一轮，Sonnet 正推腿 4.2、Opus 反推腿 2.3（`research/prompts/c288-item1-r1-main-verification.md` 核实 8） |
+| C290 | 实例表每片记录数与头里的预留位对不上 | **D18（块里携带什么信息） 已定项 11 登记 `INSTANCE_TABLE_PAGE_RECORDS = 510` = ⌊(32768 − 103) / 64⌋**，而 D18（块里携带什么信息） 已定项 14 取臂甲、码 3 头含 nonce / MAC 预留位是 131：⌊(32768 − 131) / 64⌋ = 509，加出生序号后 ⌊(32768 − 135) / 64⌋ 仍是 509 ⇒ 这个格式常量少扣了那 28 字节，今天就与已定项 14 冲突。与出生序号放在哪无关 | 门禁：`INSTANCE_TABLE_PAGE_RECORDS` 要等于 ⌊(32768 − 码 3 含预留位的头宽) / 64⌋，不等判红（门禁 doc-registries 的 field-table-sums 格阶段对「一个分项多个 format-const」那一格今天整格跳过）；判别力自证：把头宽换回不含预留位的值，检查必须由红转绿 | **已还一半（2026-09-12）**：`INSTANCE_TABLE_PAGE_RECORDS` 改成 509 = ⌊(32768 − 135) / 64⌋，随 C288（映射 key 定案的连带改动没落到别的决策） 第 ② 条改头宽时一起改；2026-09-13 行宽改成 88 之后是 370 = ⌊(32768 − 135) / 88⌋（C304（实例表链指针记录装不下 83 宽的指针）），头宽那一截照旧扣 135；门禁那一条没做 | 2026-09-12 C288（映射 key 定案的连带改动没落到别的决策） 第 ① 条第一轮，Opus 反推腿 2.6；主 agent 算过（核实 6） |
+| C291 | 出生序号的分配规则只在实验源码里 | **D19（块指针的结构与宽度预算） 已定项 6 只写了计数作用域 (树, checkpoint 号, 实例代号)**；初值、步进、固定点里同一节点重写换不换号，kb 里没有条款。撑起那条用户定案的 E137（映射 key 形态的性能差距） 源码是完整的一套：从 0 起、每算一个码 2 key 加 1、每次 checkpoint 清零、节点重写删旧 key 按新号插（`research/e7-index-bench/src/bin/e137_map_key_performance.rs` 第 344、420、480 行）；D19（块指针的结构与宽度预算） 已定项 6 收严论证里「同一容器在两个 checkpoint 各拿到出生序号 0」与「多买到的只是运行期映射不撞」也只在「重写换号」下成立 ⇒ 不写进 kb，下一个实现者会自己再发明一套 ⚠️ 2026-09-13 总审核定案：D19（块指针的结构与宽度预算） 已定项 9 定出生序号从 0 起、树内码 2 / 码 3 共用计数、固定点重写换号，条款已写，会红的检查仍欠 | 门禁：E137（映射 key 形态的性能差距） 源码里的分配常量（初值、步进、清零时机）与 kb 条款逐项对账，缺条款判红 | 无 | 2026-09-12 C288（映射 key 定案的连带改动没落到别的决策） 第 ① 条第一轮，Opus 反推腿 P9（核实 2） |
+| C292 | 码 2 身份段零消费者的理由已不成立 | **D18（块里携带什么信息） 已定项 11 逐字「码 2 不进扫描重建的择版本规则：inode 树的内部节点与根是派生态，重建从叶重造」（2026-09-22 主 agent 现查改指：原来写的「D21（权威态与派生态的分界） 第 30 行」指着一个空行，而 D21（权威态与派生态的分界） 全文没有这句；与它相关的是 D21（权威态与派生态的分界） 已定项 4 那张表里「码 2 身份段只被活头引用」那一行）。原值一个消费者都没有」**，而 D19（块指针的结构与宽度预算） 已定项 8（2026-09-12 用户定案，全部指针进映射）之后，码 2 头里的写序 4 与出生序号是中央映射 key 的段，父指针与映射在运行期都读它们 ⇒ 这句理由为假；「派生态」这个判定大概站得住（重建时节点从叶重造，key 随之重造），**理由 2026-09-13 用户取 ① 后已改写（见本行后半）**。**2026-09-12 两轮三方论证**（`research/prompts/c292-r1-main-verification.md`、`research/prompts/c292-r2-main-verification.md`）：「派生态」对**只被活头引用**的码 2 节点成立；对**被活快照或克隆引用**的码 2 节点，没有一条重建规则既不给错答案、又不让池永久只读（只读是池级的，出口「销毁快照」本身要写），根子是 D18（块里携带什么信息） 已定项 11 那句「码 2 不进择版本规则」被当成了理由。四条岔路交用户：① 那部分按权威态对待，靠元数据多副本；② 给码 2 补择版本规则或发布号；③ 把「池级永久只读」补进「保守」的口径；④ 只把受影响的 key 范围设为只读⚠️ 诞生代号那一半在 D19（块指针的结构与宽度预算） 已定项 7 取甲时同样有消费者（D5（快照 / 空间记账机制） 的 O(1) 判定读指针里的出生 txg） | 门禁：派生态判定表里理由写「没有消费者」的每一行，与字段的消费者登记对账，有消费者即判红；判别力自证：给那一行的字段登记一个消费者，检查必须由绿转红 | 2026-09-12 用户取岔路 ②（给码 2 补择版本规则），落 D18（块里携带什么信息） 已定项 15；同日三轮三方论证没有找到一条没被打过的写法（`research/prompts/d18-item15-r3-main-verification.md`），用户撤回 ②，D18（块里携带什么信息） 已定项 15 撤回，回到 ① / ③ / ④；2026-09-13 用户取 ①（「部分可以进权威态 如果需要的话」），D21（权威态与派生态的分界） 码 2 那一行拆成两行、理由改写；仍欠的是这一行的对账门禁 | 2026-09-12 D19（块指针的结构与宽度预算） 已定项 8 第一轮 Opus 反推腿二·5、第二轮 Opus 正推腿第五节第 3 条（`research/prompts/d19-item8-r2-main-verification.md`） |
+| C293 | 全部指针进映射之后 E137 少算的两块 | **D19（块指针的结构与宽度预算） 已定项 8 取全部指针进映射，而撑它代价行的 E137（映射 key 形态的性能差距） 逐字「只建 extent 树与映射树；记账树、分配记录树、inode 树每次发布同样要 COW，三条臂相同，不建」「`all` 配置下 extent 节点自己的指针提示过期、也要走映射的那一部分，登记里没有，没量」**：全部指针进映射时这三棵树的码 2 每次 COW 都要在映射里删旧插新，extent 节点的提示过期要走映射——两块都只落在这一支上，「三条臂相同」对两种配置之间的比较不成立 ⇒ 那一列每次 fsync 与随机读的数是下界 | 补一个实验，把三棵树的码 2 映射删插与 extent 节点的提示过期读建进去，报两种配置的差；门禁：代价行引 E137（映射 key 形态的性能差距） `all` 配置的数时必须带「下界」口径，缺即判红 | 无 | 2026-09-12 D19（块指针的结构与宽度预算） 已定项 8 第一轮 Opus 反推腿二·4、第二轮 Opus 正推腿第五节第 7 条 |
+| C295 | 指针里的 key 段算不算 AAD 的查找路径 | **D9（加密） 已定项 16 逐字「AAD 每个字段的期望值只许来自 ① 读者的查找路径，或 ② 已被上一级 MAC 认证的密文侧字段。」「一律不许来自明文侧，也不许从指针里读回来。」**，而 D8（核心索引结构） 已定项 6 把码 3 那条边的 AAD 四段定成「照抄条目……全部来自查找路径」；D19（块指针的结构与宽度预算） 已定项 7 之后指针里带着出生 (树, txg)，这几段算「查找路径」还是「从指针里读回来」全仓没有条款 ⇒ 算前者，D9（加密） 那句要改写；算后者，AAD 那个消费者一律走 E90（树 ID 进 AAD 与跨头共享） 的「声明 + 祖先验收」 | 在 D9（加密） 写一句射程，说清指针里的 key 段属于哪一类期望值来源；门禁：AAD 期望值来源表每一项都要指到一类，指不到判红 | 无（加密不进第一个可运行版本，D9（加密） 已定项 10；它是交付前置，不挡新池新建文件） | 2026-09-12 D19（块指针的结构与宽度预算） 已定项 7 第一轮，Opus 反推腿 1.3 与第七节第 2 条 |
+| C296 | journal 重放时凑不齐映射 key | **D19（块指针的结构与宽度预算） 已定项 8 之后每个单元都有一条映射条目，重放在飞 checkpoint 时要给重新发布的单元凑出 key；反推腿说 journal 点名项的预想构成里没有写序、实例代号、出生序号（推的，主 agent 没核）**，而「施加一条记录在指针层上做什么」本身也没定义（C284（施加一条记录在指针层上做什么没有定义）） ⚠️ 2026-09-13 总审核定案：D23（journal 的角色与格式） 已定项 17 的点名项带类标签 / 出生树 / 出生 txg / key 尾段，重放能直接凑出映射 key，条款已写，会红的检查仍欠 | 在 D23（journal 的角色与格式） 写清点名项带不带 key 各段、重放按什么凑 key；门禁：点名项字段表与映射 key 各段对账 | C284（施加一条记录在指针层上做什么没有定义） | 2026-09-12 D19（块指针的结构与宽度预算） 已定项 7 第一轮，Opus 反推腿第七节第 3 条 |
+| C297 | inode 内部条目里出生树两份没有定处理 | **已还一半（2026-09-12，用户定案：两份并存、加密开不开都占位、不挪作他用；类型段 0 恒 0；写进 D8（核心索引结构） 已定项 6 与 I-9.2（条目身份与子头相符））**：剩下的是 checker。 **D8（核心索引结构） 已定项 6 的 inode 树内部条目 = 分隔 key 8 + 身份引用 26（含出生树 8）+ 子指针；D19（块指针的结构与宽度预算） 已定项 7 之后子指针也带出生树 8 ⇒ 同一个条目里出生树两份，条目 117**。一轮三方论证判下来：去掉身份引用里那一份撞 D9（加密） 已定项 16（码 3 那条边的 AAD 四段要照抄条目）；这类条目的指针不带出生树撞定宽与已定项 8；保留两份要补类型段 0 条目出生树的定义（D8（核心索引结构） 没定、I-9.2（条目身份与子头相符） 类型 0 分支不查，与 C289（码 2 的出生树取哪个字段没写） 同源）并立相等不变量 ⇒ 走第二轮三方论证 | 定处理之后：I-9.2（条目身份与子头相符） 扩到类型 0 与子指针里的出生树；判别力自证：把子指针里的出生树改成与身份引用不同，检查必须由绿转红 | 第二轮三方论证、用户定案 | 2026-09-12 D19（块指针的结构与宽度预算） 已定项 7 第一轮（`research/prompts/d19-item7-r1-main-verification.md` 第三节） |
+| C300 | deadlist 条目按 key 查映射查不到没有条款 | **全部指针进映射之后 deadlist / livelist 按映射 key 记（D19（块指针的结构与宽度预算） 第 137 行），释放一律经映射**；被记着的单元丢了、映射从扫描重建之后，那个 key 在映射里查不到——销毁快照时这一条怎么处置（判损坏停住会让销毁卡死，跳过则那一格的空间去向没人记）全仓没有条款 | checker：deadlist / livelist 里每条 key 在映射里要么查得到、要么有一条显式的「单元已丢」记录，两样都没有判红；判别力自证：删掉一个被 deadlist 记着的单元的映射条目，检查必须由绿转红 | 无 | 2026-09-12 C292（码 2 身份段零消费者的理由已不成立） 第一轮 Opus 序列 4（`research/prompts/c292-r1-main-verification.md`） |
+| C301 | deadlist 与 livelist 的态别没写 | **D21（权威态与派生态的分界） 的权威态清单是「单元 + 记账 + 根」，deadlist 与 livelist 落哪一格全仓没写**（D21（权威态与派生态的分界） 里 grep「deadlist」「livelist」0 处）；按 D21（权威态与派生态的分界） 第 22 行「记账……被问到那一刻要有答案，故取权威态」推是权威态，那是推的。C292（码 2 身份段零消费者的理由已不成立） 两轮论证里「重建能不能改写持有者」一格要靠它 | 门禁：D21（权威态与派生态的分界） 的态别清单与盘上结构登记对账，一个结构两边都没有态别即判红；判别力自证：删掉某个结构的态别行，检查必须由绿转红 | 无 | 2026-09-12 C292（码 2 身份段零消费者的理由已不成立） 第一轮 Opus 第八节第 3 条 |
+| C302 | 快照那一刻的码 2 历史版本取不出 | **码 2 不进择版本规则（D18（块里携带什么信息） 已定项 11），D8（核心索引结构） 已定项 6 把 inode 树重建的射程写死在单头镜像** ⇒ 被快照引用的码 2 节点丢了之后，快照那一刻的历史版本怎么从叶里挑出来全仓没有条款；C292（码 2 身份段零消费者的理由已不成立） 第二轮序列 B 由此给出错答案（按原 key 抄回共享内部节点，子项只能新发身份，活头杀它判立即释放，快照读到被复用的落点）。⚠️ 验收那句「逐节点相等」对 extent 内部节点按设计不可达：它的消息缓冲区内容不是权威态与子项的函数（D18（块里携带什么信息） 已定项 15 第三轮，`research/prompts/d18-item15-r3-main-verification.md`），验收要改成除位置条目与缓冲外相等 | **2026-09-13 用户取 C292（码 2 身份段零消费者的理由已不成立） 岔路 ①**：被快照引用的码 2 按权威态，不从叶里重建，「怎么挑出快照那一刻的版本」不再问。会红的形态改成：对拍工装里造「建快照之后活头改写同一 key 区间，再丢共享内部节点的全部副本」，重建必须报这部分数据损失、不许给出任何快照读数，给了即判红；判别力自证：把重建改回按原 key 抄回共享内部节点，检查必须由绿转红。原写法：模型：对拍工装里造「建快照之后活头改写同一 key 区间，再丢共享内部节点」，重建出的快照树必须与丢失前逐节点相等，不等判红 | C292（码 2 身份段零消费者的理由已不成立）（2026-09-12 用户撤回岔路 ②，D18（块里携带什么信息） 已定项 15 撤回，回到 ① / ③ / ④；2026-09-13 用户取 ①） | 2026-09-12 C292（码 2 身份段零消费者的理由已不成立） 第二轮 Opus 判据 2（`research/prompts/c292-r2-main-verification.md`） |
+| C303 | D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效 | **D2（RAID 条带策略） 正文两处写「边界 ③（条带成员表进不了密文）已经不挡路了」，依据是 D9（加密） 已定项 7 把让渡期结构放进明文豁免清单；已定项 7 已于 2026-09-07 随已定项 5 改取「只做 scrub」撤回。边界 ③ 今天挡不挡路没有人重判：无密钥侧不再搬，可能不再需要读成员表；scrub 要不要读它没有清单** | 判据落在 D9（加密） 已定项 5 的现行射程上：列出无密钥侧 scrub 要读的全部结构，条带成员表在里面就是挡路、不在就是不挡；写不出这张清单判红 | D9（加密） 已定项 5 的 scrub 要读哪些结构（今天没有清单） | 2026-09-12 知识腐烂回扫（D2（RAID 条带策略） 第 448 / 489 行） |
+| C304 | 实例表链指针记录装不下 83 宽的指针 | **D18（块里携带什么信息） 已定项 11 的实例表 kind = 1 链指针记录按「位置指针 59」定成 64 字节一行（`INSTANCE_ROW_BYTES = 64`、每片 509 条）；D19（块指针的结构与宽度预算） 已定项 7 / 8（2026-09-12）之后指向实例表单元的指针是 83（自举豁免三类同宽，D19（块指针的结构与宽度预算）「不进映射的三类」那段），1 + 1 + 83 + 预留 3 = 88 > 64，行宽、预留与每片条数都要重算** | **格式 2026-09-13 已收口**：行宽取 88（链指针记录 1 + 1 + 83 + 3），行记录预留 66，每片 370 条（数据行 369），D18（块里携带什么信息） 已定项 11 与三个 format-const 同改；会红的检查仍欠。原写法：门禁「格式常量在 kb 与实验源码之间同步」（门禁 code-source-discipline 的 format-constants 格）只比登记值与源码，不比登记值与别的定案；会红的形态是：按 D19（块指针的结构与宽度预算） 现行指针宽重算 kind = 1 记录，结果 > `INSTANCE_ROW_BYTES` 就判红 | D19（块指针的结构与宽度预算） 已定项 8 对实例表链指针是否也按 83 的确认 | 2026-09-12 知识腐烂回扫（D18（块里携带什么信息） 第 861 行） |
+| C305 | kb 里的内联算式没人加 | kb 正文里「N = a + b + … + z」形态的算式左右不等：[layout/01-first-txn.md](layout/01-first-txn.md) 四那格曾写「84 = 42 + 8 + 1 + 16 + 8 + 8 + 4 + 4 + 2 + 1」，右边加起来是 94（且漏了出生序号 4），门禁阶段「字段表加出来的数」（`.claude/gate.d/doc-registries.sh` 的 field-table-sums 格）只看「合计 N 字节」那种表后合计，行内算式一格都盖不到 | 门禁扫 kb 正文，凡「整数 = 项 + 项 + …」（每项是可选标签加一个整数、项里不含 ×÷/−）的算式，左右不等即红并打印那一行。判别力自证：往样本 kb 写一条「84 = 42 + 8 + 1 + 16 + 8 + 8 + 4 + 4 + 2 + 1」必须红，改成 94 必须绿 | 无前置，纯脚本工。⚠️ 2026-09-13 试扫全仓 17 条算式，含 × 的项不先排除会误判 5 条 | E142（新池新建文件的干跑） G1，2026-09-13 |
+| C306 | 码 2 头不自描述 key 宽 | 码 2 索引节点头的 key 区间宽随树走（inode 8、extent 24、记账 22、映射 27）而头里没有 key 宽字段，也没有条目数与条目宽；扫描期没有树表就找不到头校验和的终点，I-2.4（头校验和覆盖范围） 与 I-1.1（块头自述逻辑地址） 对码 2 判不了；「声明长度」对码 2 的语义 2026-09-13 由 D18（块里携带什么信息） 已定项 18 定成条目数 × 条目宽，I-2.3（补齐字节为零且参与校验和） 的射程同日扩到码 2 | checker 的扫描方向对一个只有码 2 单元、没有树表的镜像必须解得出每个码 2 的头并验头校验和；判别力自证：把 key 宽从 8 改 24 再喂同一段扫描器，判不出即红 | D18（块里携带什么信息） 已定项 7 补一条：key 区间定宽（取最宽 key 补零）或头里加 key 宽字段；条目数 / 条目宽住哪定案。**用户 2026-09-13 定向「码 2 可以自描述」**；E145（码 2 自描述头与映射树 key 宽的代价） 量出自描述头每节点多 5 字节、扇出与树高一格不掉，今天的头逐宽试探解得出登记树、解不出没登记的树——**条款已写、检查仍欠（2026-09-13 用户定案，2026-09-14 回扫落字）**：D18（块里携带什么信息） 已定项 7 的索引节点类身份段加了自描述三段（key 宽 1 + 条目数 2 + 条目宽 2，五段合计 19），完整偏移表在 D18（块里携带什么信息） 已定项 18、载荷布局在 D8（核心索引结构） 已定项 11 | E142（新池新建文件的干跑） G2 / G13 / G15，2026-09-13 |
+| C307 | 映射树两种 key 宽怎么装进一棵定宽 key 的树 | D19（块指针的结构与宽度预算） 已定项 6 给码 1 的 key 27、码 2 / 码 3 的 25，而一棵树的码 2 头 key 区间与条目宽都要一个定宽；E142（新池新建文件的干跑） 把码 2 / 码 3 的 key 补两字节零到 27 只是预想 | 映射树的节点解析器按一个宽解全部条目，混着两种宽的节点必须判损坏；判别力自证：往映射节点里塞一条 25 宽不补零的条目，解析必须红 | D19（块指针的结构与宽度预算） 已定项 6 补一句：补零到 27、两棵树、还是变长 key。E145（码 2 自描述头与映射树 key 宽的代价）：三条装法在 10 TB 池上树高都是 4，补零到 27 与两棵树叶扇出 294 / 306（两棵树多一条树表条目），自描述条目 58 / 56 字节、扇出 284 且丢掉节点内定宽二分——代价上补零与两棵树平手，差别只在条款怎么写 | E142（新池新建文件的干跑） G3，2026-09-13 |
+| C308 | 自证单元的字段偏移没定 | **已还一半（2026-10-02）**：根记录在 D22（单元原子性怎么合成） 已定项 7 与 [layout/01-first-txn.md](layout/01-first-txn.md) 七的表字段先后逐行相同、偏移与 checker 相同；系统配置整槽校验和罩整槽 4096；第一条 journal 记录的反向链写 0；系统配置字段表与 journal 记录头字段表的偏移现已写进 layout/01-first-txn.md 一与六。**仍欠**：偏移只以文字写在 kb 里，没有登记成 format-const，也没有「字节表第七节与 D22（单元原子性怎么合成） 已定项 7 偏移逐行相等」的会红检查。原写法：根记录的字段序 D22（单元原子性怎么合成） 已定项 7 的表与 [layout/01-first-txn.md](layout/01-first-txn.md) 七的表不同（树 ID 水位、回退下界 F、自证校验和、实例表指针四行的先后），两处都没写偏移；系统配置「整槽校验和」罩 413 还是 512 没写；第一条 journal 记录的反向链值没写（前一条不存在，D23（journal 的角色与格式） 已定项 10 只定覆盖前一条的整个记录头） | 三个自证单元各有一张带偏移列的字段表、由 format-const 登记，实现与 checker 各按偏移解；判别力自证：把字节表七的行序改成 D22（单元原子性怎么合成） 的序，两张表的偏移列必须相等 | D22（单元原子性怎么合成） 已定项 9（系统配置字段表）；D22（单元原子性怎么合成） 已定项 7 与 D23（journal 的角色与格式） 已定项 4 各加偏移列 | E142（新池新建文件的干跑） G4 / G6，2026-09-13 |
+| C309 | 32 字节校验和的算法没定 | 单元头校验和（D18（块里携带什么信息） 已定项 7）、根记录自证校验和（D22（单元原子性怎么合成） 已定项 7）、journal 记录头校验和（D23（journal 的角色与格式） 已定项 4）、系统配置整槽校验和都只定了 32 字节宽与覆盖范围，摘要函数一处没定（E76（载荷校验和的判别力） 与 D23（journal 的角色与格式） 已定项 13 自陈）；实现与 checker 各写一份时没有东西钉住两边用同一个函数 | 定了算法之后登记成格式常量、算法标识进系统配置（I-2.2（校验和算法全盘一致）），checker 用独立实现算同一段字节比对；判别力自证：把实现那份换成另一个函数，checker 必须红 | **条款已写、检查仍欠**：D18（块里携带什么信息） 已定项 17（2026-09-13 用户定案）定 32 字节字段放 CRC32C 4 字节 + 28 字节零，四个参数 2026-09-14 回扫时钉死在同一节（Castagnoli 多项式 0x1EDC6F41、反射实现、初值 0xFFFFFFFF、输出取反、结果按小端写进前 4 字节）；**「算法标识进不进系统配置」那一格 2026-09-14 用户定案还清**：系统配置自举头段加「校验和算法标识 1」，登记表 0 = 无效、1 = CRC-32C，第一版写 1（D22（单元原子性怎么合成） 已定项 9，系统配置 452 → 481）⇒ I-2.2（校验和算法全盘一致） 有了被比对的那个字段。**整条 C309（32 字节校验和的算法没定） 仍然开着的只剩检查那一半**：checker 侧那份独立实现、以及「实现与 checker 用同一个函数」的比对，一行代码都没有。定案之前 E142（新池新建文件的干跑） 装置取 SHA-256 只是预想；D19（块指针的结构与宽度预算） 已定项 2 已否截断 CRC。用户 2026-09-13 定向「如果和加密无关的话 可以便宜一点」；E144（头校验和算法的代价与判别力）：六条候选在头上单比特、双比特、随机改字节零漏，CRC32C 26 ns、SHA-256 676 ns（26 倍），14 个头占一次 fsync 0.1% 对 2.6%；CRC32C 是仓里已定过的函数，取它 32 字节字段用 4 字节、余 28 字节补零 | E142（新池新建文件的干跑） G5，2026-09-13 |
+| C310 | 事务切分纪律与记录数口径打架 | D16（发布语义） 已定项 5 末段逐字「事务切分纪律把一次写请求按单元切成若干事务各自取号，一个事务最多写一个单元的用户数据」，加 D23（journal 的角色与格式） 已定项 7 一条记录一个事务号 ⇒ 一次带 8 个数据单元的 fsync 至少 8 条记录、1 MiB 写 32 条记录（E142（新池新建文件的干跑） 产物 `journal_per_mebibyte`，两盘 262144 字节 journal 占写出数据 12%）；而 D23（journal 的角色与格式） 已定项 12 按「目标负载 12 项事务恰占 1 条记录」算 5.9 倍余量，E75（记录尺寸与环几何） 的环下界也按它算；D19（块指针的结构与宽度预算） 已定项 6 码 1 映射 key 的唯一性又全押在切分纪律上（同一事务写两个数据单元 key 相同，产物 `distinct_keys=1`） ⚠️ 2026-09-13 总审核定案：D23（journal 的角色与格式） 已定项 19 ③ 与 D16（发布语义） 已定项 9 把切分纪律与记录数口径合到一处，条款已写，会红的检查仍欠 | E75（记录尺寸与环几何） 加一条臂按切分纪律算 D25（目标负载优先级） 目标负载的记录数与环下界，与 D23（journal 的角色与格式） 已定项 12 那格不等即红 | 用户定案：切分纪律是不是「一事务一单元」；若是，D23（journal 的角色与格式） 已定项 12 的余量与 I-8.1（环几何够大） 的下界重算，若不是，D19（块指针的结构与宽度预算） 已定项 6 码 1 的 key 要重开。**用户 2026-09-13 定案：切分纪律是一事务一单元**（D16（发布语义） 已定项 5 末段照旧）。剩下的是重算：E143（一事务一单元下的 journal 账） 按 D25（目标负载优先级） 六个负载点算出今天条款下每次 fsync 的记录数等于数据单元数（seq 批 1 是 8 条、批 10 是 80 条），journal 恒占用户数据 12.5%；T_dirty 满窗 65 536 条、256 MiB，是 64 MiB 环的 4 倍，I-8.1（环几何够大） 按「任一事务」读只要 12 KiB、按「满窗装进环」读要 768 MiB 或 T_dirty 压到 170.7 MiB；D23（journal 的角色与格式） 已定项 12 那句「12 项恰占 1 条、5.9 倍余量」按的是被否的旧读法，要改；改法（改 D23（journal 的角色与格式） 已定项 12 的余量口径、改环长或 T_dirty、还是让一条记录装多个事务）2026-09-16 用户定案：一条记录装一个事务连同它的元数据（新池新建文件今天的形态），里程碑「覆盖写、释放、回退与复用」并行线一按 N 个数据单元 N 条记录写，E143（一事务一单元下的 journal 账） 的账照它重算；D23（journal 的角色与格式） 已定项 12 那句余量口径仍要改，检查仍欠；会红的检查那一半，用户 2026-09-23 判不收口、挪到后面的里程碑（里程碑「覆盖写、释放、回退与复用」收口表第 29 行） | E142（新池新建文件的干跑） G8 / G18，2026-09-13 |
+| C311 | journal 镜像两份的合取口径没定 | D22（单元原子性怎么合成） 已定项 8 定环两盘互为镜像，没说恢复时「一份合法即在」还是「两份都要」；两种读法下同一镜像的前缀不同（E142（新池新建文件的干跑） 探针「改坏一份记录」按任一份合法即在仍读到 1 条记录） | 崩溃点重放里造「记录只落了一盘」的状态，两种口径的恢复结果都要被 oracle 判过；判别力自证：把口径从任一份改成两份都要，那批状态的前缀长度必须变 | D22（单元原子性怎么合成） 已定项 8 或 D23（journal 的角色与格式） 已定项 14 补一句 | E142（新池新建文件的干跑） G9，2026-09-13 |
+| C312 | 第一条布局线的 incompat 位没赋值 | D12（目标介质） 已定项 1 逐字「每套布局必须各占一个 incompat 位」，而 [layout/01-first-txn.md](layout/01-first-txn.md) 一的系统配置 feature 位写全 0，第一个镜像写出去就没有布局身份，将来第二套布局的读者分不出它 | mkfs 写出的系统配置 incompat 位里必须置着当前布局线那一位，挂载遇到不认识的位拒绝；判别力自证：把那一位清零，checker 判红 | D12（目标介质） / D15（格式冻结政策） 给纯 SSD 线分配位号 ⚠️ 前置已还（2026-09-13 用户定案 D15（格式冻结政策） 已定项 4：incompat 位 0 = 第一条纯 SSD 布局线）；E142（新池新建文件的干跑） 装置同日做了「不认识不许挂」与「位 0 清零拒绝」（单测 + 两条变异：mkfs 不写位 0、解析器不拒绝未登记位），剩 checker 那条会红的检查 | E142（新池新建文件的干跑） G12，2026-09-13 |
+| C314 | 崩溃恢复落到旧根后可以复用被抛弃的根引用的单元 | **被抛弃的时间线今天只由崩溃恢复造出**（管理员回退是挂着时的一次向前发布，不抛弃任何根，D23（journal 的角色与格式） 已定项 14）：一段没有任何管理员回退的历史里，崩溃恢复因暂时读错落到较旧的根，实例表抛弃了较新的根，而被抛弃的根还在根环里、自证照样能过。关掉影子账，被抛弃的根引用的数据单元在下一次干净的挂载里被复用，之后恢复落在被抛弃的根上读不出（`research/prompts/m2-rollback-forward-r1-main-verification.md` 第二节 F3 表里 H6 那一格，攻方原型上量的）；「只在崩溃恢复落到旧根的那次挂载里隔离」挡不住它，被复用的写发生在下一次干净的挂载里（`research/prompts/m2-rollback-forward-r2-main-verification.md` 第二节 G6，读代码的判断、没量）。C281（回退后第一次发布会复用被抛弃时间线还引用的块） 2026-09-26 并入这一笔。⚠️ **2026-09-13 起它是 D16（发布语义） 已定项 8（暖机取戊）的前置：还清之前新池新建文件的字节表按不暖机写。** | 多次挂载的崩溃点重放里造这一形：崩溃恢复因暂时读错落到较旧的根、实例表抛弃较新的根 → 撤故障、下一次干净的挂载里照常分配 → 让新实例的根全读不出，恢复落回被抛弃的根；断言恢复挂上的根引用的单元一个都没被复用或抹头。判别力自证：关掉影子账（只供测试的开关 `ShadowLedger::Off`），这一形必须由绿转红 | 条款已写（2026-09-13 用户定案取影子账：被抛弃时间线的根离开根环之前，它们引用的单元不许重新分配也不许抹头，分配器多查环里每一个可读根的账——D23（journal 的角色与格式） 已定项 14 正文的回退例外；E150（回退复用被抛弃的根引用的单元） 两格零违例；I-7.4（近 K 代块未被复用） 正文 2026-09-14 对齐）；检查仍欠（多次挂载的录制流 2026-09-17 起有了：层 0 第二条流三次可写挂载含回退；格 2 用例与判别力自证齐全，格 1 只是穷举的隐含子集、没有专门断言，`m2-closeout-debts-check.md` 第 103 行，见里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 22 行）；查账集合 2026-09-16 用户定案取窄读法（只隔离被抛弃根独占的槽，D23（journal 的角色与格式） 已定项 14）。2026-09-26 起「要拦什么」换成崩溃恢复抛弃时间线那一形（第一轮判决 H6）；这一格里说的「格 1」「格 2」与它们的用例是改前挂载时回退那两格，用例随回退改形态的实现员改成由崩溃恢复造被抛弃的根；H6 那一形今天没有用例，点名 `ShadowLedger::Off` 的两份用例（`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs`、`admission_formula_on_the_mounted_state.rs`）都靠挂载时回退造被抛弃的根 | 2026-09-13 C199（实例代号递增与 jsn 断号即止互相矛盾） 第二轮三方论证反推腿（`research/prompts/c199-r2-main-verification.md` 3.3 / 3.4），主 agent 核 D23（journal 的角色与格式） 已定项 14 回退例外原文、I-7.4（近 K 代块未被复用）、D16（发布语义） 已定项 7，复跑模型逐字节一致 还清那天要一起改的清单：milestone/01-first-txn.md 步 1 / 步 6 的 txg 与 jsn 起点、layout/01-first-txn.md 六 / 七 / 空白表的 checkpoint_txg、「21 条写请求」清单、E142（新池新建文件的干跑） 重跑。 ⚠️ **模型层已做（2026-09-13，E150（回退复用被抛弃的根引用的单元））**：两格在计数模型里都可达（基线 3 / 5 个崩溃状态、19 / 26 个故障组合违例），F-A 影子账（被抛弃的根离开根环之前它们引用的单元不许复用，实现是分配器多查环里每一个可读根的账）与 F-B 墓碑（回退前用墓碑 FUA 覆写被抛弃的根槽）都零违例；代价：影子账多隔离 2–3 个单元直到被抛弃的最新根被轮转覆写（环容量 12 时第 11 次发布），墓碑每次回退多写环里被抛弃的根数那么多道 FUA、且让回退在新根持久之前就有持久效果（D23（journal 的角色与格式） 已定项 14「之前没有持久效果」那句要改）。**用户 2026-09-13 取 F-A 影子账，条款已写**（D23（journal 的角色与格式） 已定项 14 回退例外加一句、I-7.4（近 K 代块未被复用） 加一句）；模型层 E150（回退复用被抛弃的根引用的单元） 已还；崩溃点重放 harness 那条检查 2026-09-13 登记进 [verification-build.md](verification-build.md)「崩溃点重放第一版」必红用例表第八条（影子账关掉两格必须红、打开必须 0，层 0 固定脚本加一次回退与发布 D），等 harness 起来时一起做，不再单独漂着。 |
+| C315 | 树的种类码没有登记表 | D8（核心索引结构） 已定项 8 定了树表条目里有「树的种类 2 字节」，而它的码全仓没有一张登记表（对比 D18（块里携带什么信息） 已定项 11 的单元类登记表）：[layout/01-first-txn.md](layout/01-first-txn.md) 七的树表条目行把 extent 1 到映射 5 标「预想码」，2026-09-13 D6（快照实现模型） 已定项 2 与 D5（快照 / 空间记账机制） 已定项 6 让 livelist 6、稀疏旁表 7 也进第 1 版树表 ⇒ 七个码都是新池新建文件要写的字节而没有分项定它（C66（格式级空白没有分项号） 的形态）。 | 门禁：树表条目「树的种类」的取值集合要有一处登记位（表 + `doc-lint:registry`），E142（新池新建文件的干跑） 写出的码与登记表比对，对不上判红 | — | — ⚠️ 同日升格为 D8（核心索引结构） 已定项 9，当日用户定案（登记 0..7）；剩会红的检查（E142（新池新建文件的干跑） 写出的码与登记表比对）。 |
+| C317 | 判决只在一个几何取样点上量过没有检查 | **一个实验跑前写死的判决（例如 E127（分裂合并之下组身份要不要存） 判据 6 的 0.8）只在装置取的那一个几何（容量 8、插 16 删 16）上被检验过，而几何不是任何已定条款给的**：换成插 20 删 12，被判退役的那族臂从六格全输变成四格全赢（最好 0.876，仍不过阈值）；容量 32 时两族比值 0.999–1.007，模型没有分辨力。变异表钉的是单测的取样点（`.claude/rules/mutation-sampling.md` 第四类），没有一条变异动几何，判决对几何的敏感性没有任何东西在看 | 每个带跑前判决的计数实验报一行「几何敏感性」：至少在一个方向相反的几何取样点上重跑判决那一格，判决翻面就记「不稳定」、不翻就记两点；判别力自证：把判据阈值挪到两点之间，检查必须由绿转红 | `.claude/rules/mutation-sampling.md` 加第六类（对象是跑前写死的判决，不是变异）——2026-09-13 已加，三例在那一节里；「每个实验报几何敏感性一行」的检查还欠 | D26（后台整理与放置回收） 已定项 4 第五轮反推腿（`research/prompts/d26-r5-main-verification.md` 第三节），2026-09-13 ⚠️ 同日 D3（空间分配） 已定项 8 第二轮反推腿再撞一例：E151（用户数据落点的到达序与容器臂） 的 `PACK_SWEEP_PER_CHECKPOINT = 64` 与 `DIRTY_PER_CHECKPOINT = 64` 相等，打包器与负载被设成一比一的赛跑，副本上巡回预算提到 256 以上全空段峰值就超过初值；入库装置第三次跑（2026-09-13）扫 64 / 256 / 1024：容器臂压 runs 的倍数敏感（runs8 0.51 → 0.38），全空段答案不敏感（吃光后峰值 3–4 不动、期末都 0，副本上那个「超过初值」是初始段吃光前的瞬态）⇒ 这一例只有 runs 那一半成立；同日第四 / 五次跑再撞一例：家固定的目录提示拿几个尾部段当溢出段没扫过时提交内生块回落 99%，扫成 4 / 8 / 16 / 32 后 uniform 上 k = 8 就是 0——「溢出段数」这一维也不在几何取样点清单里，D14（双轨（大小文件 / 持久临时）） 已定项 2 第三轮反推腿抓的 |
+| C319 | 请求内单元按 key 升序发出没有条款也没有检查 | **D3（空间分配） 已定项 8 候选乙（按请求到达序聚簇进段）在成段重写负载上比甲好的那 8 个百分点，全押在「同一次写请求切出的若干事务按 key 升序连着取号」这一句上**，而 D16（发布语义） 已定项 5 逐字只说「事务切分纪律把一次写请求按单元切成若干事务各自取号」，没规定次序。E151（用户数据落点的到达序与容器臂） 第二次跑：请求内保持 key 序时 runs8 是 7270（与乙同档），反推腿副本上请求成组到达而请求内乱序时是 8117（与均匀置换只差 0.8%）⇒ 一个把一次请求的单元并发提交或按分配结果回填的实现会把乙悄悄变成丙，而盘上镜像完全合法、没有任何东西会红 | 提交路径记「同一请求内事务取号序与 key 序不一致的次数」，非 0 判红；或把「请求内按 key 升序取号」写进 D16（发布语义） 已定项 5 的切分纪律 | 前置已还：2026-09-13 用户定案写进 D16（发布语义） 已定项 5 的切分纪律；D3（空间分配） 已定项 8 定庚之后这一条只影响提交内生块那一半的聚簇，仍要拦；计数的模型形态同日由 E151（用户数据落点的到达序与容器臂） 第六次跑做出（按请求到达序恒 0、均匀置换 runs8 上 55980），实现侧的计数登记在 [verification-build.md](verification-build.md) 事务层第一版「运行时计数与准入自证」表；剩提交路径的实现 ⚠️ 2026-09-14 实现侧：`crates/singlefs-core` 的 `transaction::count_key_order_mismatches` 在新池新建文件上恒 0、8 把 key 倒过来计 7（里程碑步 5 验收）；「非 0 判红」那道闸还没接进 checker | D3（空间分配） 已定项 8 第二轮反推腿（`research/prompts/d3-r2-main-verification.md` 第 2.4 节），2026-09-13 |
+| C323 | 镜像大小全仓没有条款 | 单元区的末端（镜像大小）全仓没有条款，而空闲字节、全空聚簇段数、碎片度 runs 三个统计量都要它（D5（快照 / 空间记账机制） 已定项 7 定容量 = 单元区）；E142（新池新建文件的干跑） 按 mkfs 参数取 4 GiB 并在 `name=config` 里报出来（`device_bytes=4294967296`），[layout/01-first-txn.md](layout/01-first-txn.md) 五那一节的空闲 3 472 670 720 与 runs 4 都是这个预想的函数。它也是 C317（判决只在一个几何取样点上量过没有检查） 那一类：E142（新池新建文件的干跑） 的几何（2 盘、4 GiB、槽距 4096）只有一个取样点 | mkfs 把镜像大小写进系统配置（或按设备容量推出单元区末端）后，checker 用它复算三个统计量，对不上判红；E142（新池新建文件的干跑） 补一行「几何敏感性」（换一个镜像大小重跑，三个统计量随之变、别的行不变） | 镜像大小进不进系统配置字段表。⚠️ **2026-09-14 用户定案：不加字段**——单元区的末端 = 设备容量（由设备探测得出），系统配置不存「单元区槽数」这一行；D22（单元原子性怎么合成） 已定项 9 那张 481 字节的表里因此仍然没有它。⇒ **这一笔仍然开着，而且形状变窄了**：欠的不再是「要不要加字段」，是「探测出来的容量与盘上写着的统计量对不对得上，谁来核」。⚠️ 同日另有一处连带：D23（journal 的角色与格式） 已定项 19 ③ 定「环 ≤ 设备容量 ÷ 4」，预想镜像从 1 GiB 改成 4 GiB ⇒ [layout/01-first-txn.md](layout/01-first-txn.md) 五那一节的空闲字节改成 3 472 670 720、全空段数改成 3310、runs 改成 4，三个数仍然全是镜像大小的函数；主 agent 2026-09-27 定：`TEST_IMAGE_DEFAULT_BYTES`（`research/` 里镜像默认大小 4 GiB 的字面常量）不登记 format-const（C11b 报告候选表最后一行「没有条款落点」），这一笔仍是它唯一的落点 | 2026-09-13 E142（新池新建文件的干跑） 第六次跑 G22 |
+| C326 | runs 换口径之后 E93 的数还能不能引 | **D5（快照 / 空间记账机制） 已定项 4 第 10 项的 runs 2026-09-14 用户定案换了口径**：从 E93（老化下的放置与碎片度） 那条「按 key 序遍历已分配对象、数物理连续段」换成「**单元区空闲槽的连续段数、逐设备**」，同时从不带设备维变成带设备维。换口径是为了让它在提交时增量维护得出来（`.claude/rules/fs-design.md` 第一格），而 **D26（后台整理与放置回收） 已定项 6 的整理触发判定引的那些 runs 数全是按旧口径量的**——两个口径量的不是同一个量（一个数已分配对象的连续性、一个数空闲槽的连续性），阈值搬不过去。E151（用户数据落点的到达序与容器臂） 报的 runs 倍数同样按旧口径。 | checker 按新口径复算两盘的 runs，与记账树里那两行比对，不等判红；判别力自证：把 checker 那份改成数已分配对象的连续段，新池新建文件上两边必须由相等变不等（4 对 3） | ① E93（老化下的放置与碎片度） 按新口径重跑，或明写它的数只对旧口径成立、整理阈值另量；② D26（后台整理与放置回收） 已定项 6 的触发阈值按新口径重定 | 2026-09-14 用户 18 问定案 第 15 问 ① |
+| C329 | 写行那次发布之前推抬 F 的空发布没有检查 | 非干净结束之后的可写挂载（与实例切换、管理员回退）上，写行那次发布之前先推一次抬 F 的空发布：D18（块里携带什么信息） 已定项 11 要写行「与第一个新根同一次发布」，D16（发布语义） 已定项 1 的准入行「准入不够时先推空发布抬 F」没说这次挂载除外。抬 F 那个根落了而写行那次的根没落，下一次挂载选新实例的根，旧实例从此没有行，它非干净结束留下的孤儿按「i < i_now 且无行 ⇒ 已发布」翻面（C322（取号那一步的屏障怎么放没有条款） 第二轮攻方腿副本模型，四条取号臂同数） | 崩溃点重放覆盖第一次之后的可写挂载路径，逐状态数「本实例已有根落盘、而 [max(所选根的实例, 1), 本实例) 里有实例没有行」的状态，必须为 0；判别力自证：把写行挪到抬 F 那次空发布之后，计数必须由 0 转正 | 条款已写（2026-09-14 三轮三方 + 用户定案：写行那次是新实例的第一次发布、每次可写挂载都写行、之前不推抬 F 的空发布、元数据走 N_switch + 1 份的切换预留、行回收要根环每个槽都读成功，D18（块里携带什么信息） 已定项 11、D16（发布语义） 已定项 1 的准入行、D28（挂载期承诺量） 已定项 3；`research/prompts/c329-c330-r3-main-verification.md` 第四、五节）；检查仍欠：非首次挂载路径的录制流 2026-09-17 起有了（层 0 第二条流三次可写挂载含回退），而这条脚本上写行那次准入充裕、造不出对象，会红的检查要另造准入不够的负载（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 22 行） | 2026-09-14 C322（取号那一步的屏障怎么放没有条款） 第二轮攻方腿（`research/prompts/c322-r2-main-verification.md` 三） |
+| C330 | 中间实例那一行的 T_pub 取所选根的 txg | D18（块里携带什么信息） 已定项 11 的写行规则「给 [所选根的实例, 新实例) 每个实例写 (i, 所选根的 checkpoint_txg, …)」隐含中间实例的单元诞生代号都大于所选根的 txg。较新的根暂时读不出、恢复按「恒选最新可读且自证通过的根」退一格时，新实例第一次发布的 txg 从较旧的根往上数，可以等于那条读不出的根的 txg；那条根以后又读得出、被选中，中间实例那一行 T_pub = 所选根的 txg，它诞生于同一 txg、从没被任何根引用的孤儿按「b ≤ T_pub」翻成已发布（C322（取号那一步的屏障怎么放没有条款） 第三轮攻方腿按条文算的四次挂载历史：一次暂时读不出 + 两次崩，普通挂载与管理员回退都有） | 多次挂载的崩溃点重放里（至少一次恢复退一格）逐状态判：没被任何可达根引用、且诞生 checkpoint 不在挂载根时间线上的单元不许被已发布谓词判成已发布（只写前半句在合法镜像上会红：被盖掉的旧记账单元）；判别力自证：写行给中间实例取所选根的 txg，检查必须红 | 条款已写（2026-09-14 三轮三方 + 用户定案：中间实例写 (i, 0, 0)、所选根那个实例的 T_pub 取重放之后那个根的 txg、回退以 R_old 那一版表为底、每个被照旧事务的写序主人各一行、切换的所选根取被重发的在飞 checkpoint 所基于的根、空重发 W = 0，D18（块里携带什么信息） 已定项 11、D23（journal 的角色与格式） 已定项 14 与注 4；`research/prompts/c329-c330-r3-main-verification.md` 第四、五节）；检查仍欠：多次挂载的崩溃点重放（2026-09-17 起有了：层 0 第二条流三次可写挂载含回退，回退那次写中间实例行 (2, 0, 0)；会红的检查仍欠，见里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 22 行） | 2026-09-14 C322（取号那一步的屏障怎么放没有条款） 第三轮攻方腿（`research/prompts/c322-r3-main-verification.md` 五） |
+| C331 | 择根倒挂压过已确认的写 | 较旧实例的全部根暂时读不出时，新实例的第一次发布从更旧的根往上数 txg；那些根以后又读得出，txg 更高的它们被择新选中（D16（发布语义） 已定项 6 第 151 行逐字「根记录必须带 32 位实例代号……择新在 checkpoint_txg 平局时按实例代号高者赢」），新实例已确认的写被压过去（第一轮攻方腿 6 个故障；C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 的写回管的是谓词，挡不住择根）。新实例的第一条记录**不会**盖掉读不出那条根的记录：按 `crates/singlefs-core/src/journal.rs` 的 `record_offset`（(counter − 1) mod 槽数）与 `crates/singlefs-core/src/mount.rs` 的 `next_counter`（环里最大的 counter 加 1），它落在下一个槽，盖掉的是环里最旧那一条（counter 小 196608），而读不出那条根的记录恰是 counter 最大的；768 MiB 环在可达历史里没绕满过一圈，普通可写挂载上一条都没盖掉（2026-09-22 三方判决 `research/prompts/m2-rootchoice-repair-r1-main-verification.md` K2，主 agent 与核查员现查坐实） | 多次挂载的崩溃点重放里注入「较新实例的全部根暂时读不出、之后又读得出」，逐状态判：已确认返回的写，在之后每一次挂载选的根上都读得回；判别力自证：今天的择新规则在这个注入下必须红 | 定案改取 R2、实现在途：见证读判不出 ⟺ 有槽设备报读错且没有一块盘两槽都自证过（用户 2026-10-01 在 m3-ring-r1 定 S-辨，把一槽撕裂另一槽自证过的盘面与读不出分开；2026-10-02 在 m3-ring-r2 定一槽持续读错取甲-读错-每盘；2026-10-03 在 m3-ring-r3 终轮改取 R2，零轮；混合形（拒可写 / 可写不丢 / 可写丢）甲-读错-每盘 888 / 831 / 240，R2 1244 / 715 / 0；`research/prompts/m3-ring-r1-main-verification.md` 第四节第 3 条、`research/prompts/m3-ring-r2-main-verification.md` 第四节第 3 条、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 7、8 行与第四节第 3 条）；D23（journal 的角色与格式） 已定项 14 N-配置续那一段与实现还是 2026-09-28 取甲的那一版（见证读有一槽读不出或自证不过就判不出、按真，取号那一刻同判；用户 2026-09-28 定，被攻过两轮，判决 `research/prompts/unreadable-at-mount-r2-main-verification.md`），都还没改；取甲那一版的实现与 harness 用例已做（`crates/singlefs-core/src/mount.rs` 的 `newer_publish_witness`、`transaction.rs` 的 `self_verified_system_configurations_of_every_device`；`crates/singlefs-harness/tests/a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify.rs`，`crates/mutations.tsv` 两行）；仍欠的是「怎么拦」那一格要的多次挂载崩溃点重放里的注入（多次挂载的录制流已有：层 0 第二条流） | 2026-09-14 C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 第一轮攻方腿（`research/prompts/c329-c330-r1-main-verification.md` 第 47 行）、第二轮攻方腿（`c329-c330-r2-main-verification.md` 第 44 行）、第三轮辩方腿复核第二轮出局判决的那一格 ⚠️ **2026-09-17 C245（系统配置槽的写频率，两条条款说反话） 第二轮补**：回退与挂载内切换时「前缀末」没绑参数；回退按「R_old 覆盖到的计数器 + 1」写，会盖掉普通恢复还要施加的记录（辩方腿、攻方腿一致，攻方腿模型真值自己 173 个状态），按「这次挂载普通恢复的前缀末 + 1」写则 0；修法候选「计数器从全环最大 + 1 起」（ringmax）在反复「挂载 → 暖机记录落盘 → 根之前崩」时第 环长 − 1 次盖掉仍要重放的记录（攻方腿模型，只在它的模型上量过） |
+| C333 | 删行那次发布被重放 | 行回收删行的那次发布之后崩、下一次恢复重放它的记录时，重建态的树表与映射换成那次发布的（施加一条记录 = 换新根段的四个字段），实例表单元指针却照所选根留在删行之前那一版（D23（journal 的角色与格式） 已定项 15「实例表单元指针照所选根」）⇒ 重建态里实例表是旧链、记账却是那次发布的（旧链的片已记成释放、新链的片记成已分配），两边对不上（推理，没建模） | 崩溃点重放覆盖删行那次发布的全部崩溃点，逐状态判：重建态的实例表单元与分配记录一致（被引用的片没有记成释放）；判别力自证：删行那次发布的记录照今天的施加规则重放，推理成立时检查必须红 | 行回收的实现；多次挂载的录制流（2026-09-17 起有了：层 0 第二条流三次可写挂载含回退；行回收 `crates/` 里还没有）。2026-10-01 根环补洞判决：这一条的前提「记账是那次发布的」与施加记录时分配记录树根照抄所选根冲突，可能已经过期（推的，没核，`research/prompts/m3-ring-r1-main-verification.md` 第二节第 12 行）。定案、实现在途：用户 2026-10-02 定新根段回到三字段（含实例表指针与分配记录树根，头 487、点名项 64），根环终轮判决第 1 行把专用清扫发布崩在「记录已持久、根槽没持久」认作这一条挂着的那一形，三字段不吃这一击：施加一条记录时实例表指针、分配记录树根随新根段换成那次发布的，「实例表单元指针照所选根」（D23（journal 的角色与格式） 已定项 15）那一句随之改；检查要判的仍是「重建态的实例表单元与分配记录一致」，等字段落地、行回收有了之后在删行那次发布的全部崩溃点上跑（`research/prompts/m3-ring-r3-main-verification.md` 第二节第 1 行与第四节第 1 条） | 2026-09-14 C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 第二轮攻方腿（`research/prompts/c329-c330-r2-main-verification.md` 第 48 行） |
+| C334 | 切换的所选根没有会红的检查 | D18（块里携带什么信息） 已定项 11、D23（journal 的角色与格式） 已定项 14 与注 4 2026-09-14 写进：切换的所选根取被重发的在飞 checkpoint 所基于的根，行只落在 [这个根的实例, 新实例)，被重发那次自己写的行原样重发，每个被照旧事务的写序实例各一行，空重发 W = 0。这个定义只在 C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 第三轮攻方腿自己的模型上量过（四段剧本 0），没被攻过；它补的是全仓没有定义的前提——读成「恢复会选的最新可读根」时回退那次发布里的切换让 3 个被抛弃的单元判已发布，读成「这次挂载恢复所选的根」时暖机空发布里的切换让 3 个被挂载根引用的单元判未发布，今天的条款在这三格上同样错 | 多次挂载的录制流里，在回退那次发布、每一次暖机空发布、写行那次发布、一次普通发布各注入一个瞬时单元写错（探针写写得进），切换之后逐状态判：没被挂载根引用且不在时间线上的单元不许判已发布、被挂载根引用的不许判未发布；主人行的 W ≥ 被照旧的事务号、没发布过根的主人 T_pub = 0；被重发的 checkpoint 没有非零事务号时 W = 0；判别力自证：所选根换成「恢复会选的最新可读根」回退那一格必须红（3 个），换成「这次挂载恢复所选的根」且中间实例行后写时暖机那一格必须红（3 个），W 换成旧实例的事务计数器时暖机两格各红 1 个 | 多次挂载的录制流（2026-09-17 起有了：层 0 第二条流三次可写挂载含回退；切换的所选根那条定义还没被攻过，见里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 16 行；与 C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 同一个前置）；用户 2026-09-23 判不收口，挪到后面的里程碑（里程碑「覆盖写、释放、回退与复用」收口表第 16 行）；同日实例切换改成重新读盘择根（D23（journal 的角色与格式） 已定项 14），这一行要拦的那条定义随之改，检查形态等切换落地时重写；重写时带上 2026-09-22 三方的判决（`research/prompts/m2-rootchoice-repair-r1-main-verification.md` K5）：旧定义首句跟着在飞 checkpoint 走、括号跟着旧实例走，两半锚定的对象不同，连续第二次切换上退化成括号那一支，站不住 | 2026-09-14 C329（写行那次发布之前推抬 F 的空发布没有检查）、C330（中间实例那一行的 T_pub 取所选根的 txg） 第三轮攻方腿（`research/prompts/c329-c330-r3-main-verification.md` 四到六节，模型 `c329-c330-r3-opus-model/`） |
+| C336 | 写意图那一刻找不到快照的下一侧 | 销毁 S 写意图要 S 的下一侧（丙-区间要它的 txg 当上界，乙要它的号，丁 要它的段），而树表条目字段（`layout/01-first-txn.md` 第 369 行：树 ID、条目长度、种类、flags、根指针、`previous_snapshot_txg`、诞生 txg、头 ID、预留 76）没有前后快照的链接，树表按树 ID 升序排；今天只能从 S 的树 ID 往后扫到同一个头的下一个活快照，S 是最后一个时扫到表尾。走过的条目数 = S 与 N 之间建出的树数：20 轮里 1024 个头时 1023 到 11253 条（`out-lookup.jsonl`）。D5（快照 / 空间记账机制） 第 189 行「销毁快照的代价是 O(deadlist 条目数 + 桶数)」不含这一步 | 写意图那一步读的树表条目数与 S、N 之间的条目数无关；判别力自证：把链接或派生态拿掉，读数随头数线性涨 | 三选一（用户定案）：快照条目加前后链接、头条目记最新活快照（丙-区间 +16 / +8）；挂载时扫一遍树表在内存里建「头 → 快照链」的派生态（零字节）；接受扫描并改 D5（快照 / 空间记账机制） 第 189 行的界 | D5（快照 / 空间记账机制） 已定项 12 第三轮攻方腿 3.3（`d5-item12-r3-opus-output.md`） |
+| C337 | 被销毁的头何时不算活引用没有条款 | D5（快照 / 空间记账机制） 第 195–196 行「待删除结构（意图 key、删除中队列）算作活引用」；三方共同前提「被销毁的快照从写意图那一刻起不算活引用」要补进 D5（快照 / 空间记账机制）；对被销毁的可写头（克隆头）没有一句：`children`（05:153，O(1) 子计数）在销毁头写意图时减还是做完时减全仓没有条款。按 195–196 字面，挂着的销毁头意图仍引用克隆头的活集合，origin 的级联会在克隆头销毁意图做完之前放掉克隆头活集合里的继承块（`d5-item12-r3-opus-output.md` 2.5，三条臂同一步同放） | 条款定时刻；checker：`children` 与活着的克隆头数、未完成的销毁头意图数对得上；判别力自证：把减的时刻对调必须红 | D5（快照 / 空间记账机制） 第 195–196 行补句；C270（分叉点闸的子计数数不数克隆） 那条定案的连带 | D5（快照 / 空间记账机制） 已定项 12 第二轮、第三轮攻方腿 2.5 |
+| C339 | 故障计数的口径没有条款 | C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 三轮的「最少几个故障」都把「整块盘在回退扫描里读不出」记 1 个故障，而回退是一次可写恢复，可写挂载要「可写设备数够 w 的下限 ∧ 独占打开池中过半的设备」、「第一版 2 盘、掉一块只能只读挂载」（18:879）——一块盘整块读不出与在它上面做可写回退不能同时成立，除非那块盘读全失败、写照样成功。按逐槽计：丙 2 → 3、CJ 5 / 3 → 9 / 5、G 2 → 3、AJ 2 → 3，甲不变 | 多次挂载的录制流里故障按槽注入；条款写明第一版允不允许在「读全失败、写成功」的盘上做可写回退 | D18（块里携带什么信息） 已定项 11 / D2（RAID 条带策略） 已定项 13 的可写判定补读侧一句 | C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 第三轮攻方腿第一节 |
+| C342 | 树 ID 水位在根读不出时退回去重发 | 树 ID 水位 = 根环里全部根记录该字段的 max（D8（核心索引结构） 已定项 8 ②）；被抛弃时间线里建的克隆头的树 ID 在那些根读不出时被重发：C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 第三轮 f11 十条臂一样 155 条、最少 1 个故障（`c143r3_model.out` 第 960 行起）。与 C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 同形，但 C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 三轮的丙（身份带对象出生代）救不了它——树的身份就是树 ID | 多次挂载录制流：回退或挂载之后建的每棵树的 ID 与此前任何一个写成了根的树都不同；判别力自证：今天的取法在「藏住建树那次发布的根」下必须红 | 载体定案：记录头的新根段已带树 ID 水位（D23（journal 的角色与格式） 已定项 15），是否像 CJ 那样也取记录里的最大值 | C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 第一轮（H6）、第三轮攻方腿 2.3；用户 2026-09-23 定「也取记录里的」（D8（核心索引结构） 已定项 8 ②），实现随 C511（回退到无文件那一版之后诞生代怎么接） 第 3 步落地（`crates/singlefs-core/src/recovery.rs` 的 `highest_tree_identifier_watermark_in_the_ring`，用例 E 与一条变异钉着），待代码三方与崩溃验证；剩下根与它那条记录都读不出那一格盖不住 |
+| C343 | 实例表不可读时级 1 重建混进被抛弃的单元 | `18-块里携带什么信息.md:311`「表不可读时：只读挂载；扫描重建停在级 1——表没了就一条行都没有，全部旧实例的全部单元落进『无行 ⇒ 已发布』，被崩溃恢复抛弃的整段时间线也在内」。同号的新旧对象在这一格靠对象出生代分（丙之下分得开），但被抛弃时间线里写序更大的旧版会压过当前时间线的现行版本，三条臂一样 | 级 1 重建的产物按「未晋升只读」交付（D18（块里携带什么信息） 已定项 5），并在报告里点名有多少单元是按「无行 ⇒ 已发布」判的；判别力自证：一份实例表可读的同镜像重建结果必须不同 | 扫描重建实现 | C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 第一轮（H7）、D18（块里携带什么信息） 已定项 3 第三轮 |
+| C344 | 单调统计量的点删遇墓碑没有会红的检查 | D5（快照 / 空间记账机制） 已定项 3 第 2 条 2026-09-16 补了「点删的墓碑不参加取最大」，而检查还没有：把墓碑当数值折进 max 时四条候选 16 / 16 丢点删（`b.out`）、乙-D 3 步读到被点删的那一代（`c161-r3-model-output.txt` 的 `part=C` 行）；第一版每个 key 每次发布只写进树一次、直落叶（D8（核心索引结构） 已定项 10），撞不上——它在 write buffer 前端或节点缓冲让同一个 key 多条并存时才发生 | 读一个 key 时最新一条是墓碑就判死、被点删的那一代读不到；判别力自证：把这一句拿掉、退回朴素折叠，同一批用例必须由绿转红（`b_mutate_off_fix.out` 16 / 16） | write buffer 前端启用；事务层 + 模型对拍（门禁 harness-model-differential-and-scenarios 那五段取样点罩不到 write buffer，要为它加取样点） | C161（缓冲两级并存而衔接没定） 第三轮辩方腿 5.2（Model B）与攻方腿 2.5 各自撞上 |
+| C345 | 反向索引 / LRU 的陈旧检出没有时间线索 | D8（核心索引结构） 已定项 7 那句「在 seq 里再放一份 txg 是把 key 里已有的段抄第二遍」射程只到记账树（key 末段是代）；反向索引与 LRU 的 key 布局全仓没有，已定项 7 的骑手只要求它们的去重窗口被 `T_dirty` 界住。C52（陈旧当成合法） 的前置「格式层先给一个可比对的时间线索」不分树：位置定新旧、盘上同 key 多层并存的形态在这两棵树上检测器只有第一版 seq 可用，打平或挑错（`research/prompts/c161-r2-main-verification.md` 第四节：通用负载 4515 / 2385 / 2765 对 / 平 / 错）。D8（核心索引结构） 已定项 12 取一棵树只准一级之后，前端三棵树上每个 key 盘上只有一条，这一格留给以后开节点缓冲的形态 | 定这两棵树的 key 布局时同时定 C52（陈旧当成合法） 要的线索从哪来 | 反向索引 / LRU 的 key 布局定案 | C161（缓冲两级并存而衔接没定） 第二轮攻方腿第四节、第三轮辩方腿第四节 |
+| C346 | 后台重新聚簇没有定义 | D8（核心索引结构） 已定项 3 第 3 条「后台重新聚簇必须是增量、可中断、可续做的」是全仓唯一一句，没写它是只搬物理位置（单元头一个字节不变）还是重编 key。重编 key 时分批协议没定：装不下一次发布（默认有效 `T_dirty` 256 MiB，D16（发布语义） 已定项 5）的对象要跨发布，中间态让 I-9.9（locality 三值对照） 在合法镜像上判红（`output.txt` 的 `i99_legal_red`：perunit 232、copy 360、clone 39256）；记录直接换新值不带旧值的协议常规读就找不到（同一产物 `naive` 世界）；带新旧两个值的记录只能从 inode 记录 20 字节预留取、赋义是 incompat。续做的进度若来自一份不随发布回退的外部记录，崩溃加回退之后会删掉盘上记录仍指着的旧 key——仓里现成的做法是 D8（核心索引结构） 已定项 5 的 logged_ops 意图（意图住树里、随根回退、每次恢复续做），那一句没把重新聚簇绑上去 | 条款定定义（搬位置 / 重编 key）、分批协议（装得进一次发布的一次做完；装不下的走记录双值或先抄后切）、进度只从盘上意图与当前记录读；I-9.9（locality 三值对照） 能判分批中间态；判别力自证：分批做到一半的合法镜像 I-9.9（locality 三值对照） 不许红，记录换值不带旧值的协议常规读必须红 | D8（核心索引结构） 已定项 3 补条款（格式级：双值字段占预留、incompat）；用户定案 | D18（块里携带什么信息） 已定项 3 那条提议三轮（`research/prompts/d18-locality-r1-main-verification.md`、`d18-locality-r2-main-verification.md`、`d18-locality-r3-main-verification.md`） |
+| C347 | 祖先表读不出时克隆头认领什么没有条款 | 克隆头的扫描重建按祖先表判 origin 的件对本头可不可见（D11（索引节点要不要留消息缓冲区） 已定项 3 那张表：现行版本由写序 + 实例表 + 祖先表判）；祖先表读不出时克隆头拿不到克隆点，认领 origin 在克隆点之后写的件、也施加 origin 在克隆点之后写的墓碑（墓碑记录只有对象 ID + 对象出生代 + 区间，不带树）⇒ 读到别的头的数据，或自己的数据被别人的墓碑杀掉（`output.txt`：`clone3` 147728、`clone_p` 123912 个三条臂共同的格）；全仓没有一句写这时怎么办，模型取的是最宽的读法 | 条款定处置：祖先表读不出时克隆头只读挂载、扫描重建停在级 1 且只认领本头树 ID 的件与墓碑（与实例表读不出同一档），或别的处置；判别力自证：一份祖先表可读的同镜像重建结果必须不同 | D6（快照实现模型） 或 D18（块里携带什么信息） 已定项 5 补一句；扫描重建实现 | D18（块里携带什么信息） 已定项 3 那条提议第三轮攻方腿第三节「共同前提上的洞」第 3 条 |
+| C348 | T_dirty 按什么算没有口径 | D16（发布语义） 已定项 5 写 `T_dirty`「就是脏页内存预算本身」，没写 write buffer 前端的条目按什么算进去：按条目字节算，还是按发布时排空弄脏的节点算。D8（核心索引结构） 已定项 12 之下前端排空到叶，每条前端条目在发布时弄脏一整条路径：按字节算时 256 MiB 装约 790 万条、排空要写约 3.3 万个节点（超预算两倍）；按弄脏的节点算时一个 checkpoint 只装约 2.2 万条（留缓冲的形态 26 万条以上）（`c161-r3-model-output.txt` 里 `part` 列的第四段（脏页预算）那几行，推理加闭式，没穷举） | 条款写死算法；发布时弄脏的节点数不超过预算的断言，判别力自证：把前端条目按字节算、只插入负载下断言必须红 | write buffer 前端启用；事务层 | C161（缓冲两级并存而衔接没定） 第三轮攻方腿第四节第四小节（脏页预算那一格） |
+| C349 | 重组时节点消息缓冲区怎么搬没有条款 | D8（核心索引结构）、D11（索引节点要不要留消息缓冲区） 两份文件里「塌缩」「树变矮」「再平衡」「重分配」都是 0 次；按最弱读法——塌缩把孩子缓冲里的旧消息当新来的并进根缓冲（甲-R4 4 步、乙-D 6 步读到旧值，`research/prompts/c161-r2-opus-model/`）、再平衡只搬挪走的子树里有这个 key 的消息（甲-R4 3 步、乙-D / 乙-G 4 步；只含直写的同一段历史在 extent 树上 3 步，`c161-r3-model-output.txt` 里 `part=A` 的 `*_T2present` 行）——留缓冲的每一棵树都读错。射程是全部留缓冲的树（extent / dirent 按 D11（索引节点要不要留消息缓冲区） 已定项 6 的树轴留缓冲），D8（核心索引结构） 已定项 12 只省了前端三棵树上那一份 | 条款写三条重组规则：塌缩先把根缓冲按下推规则推进孩子再合并、再平衡按挪走的 pivot 区间搬消息、分裂按 pivot 区间各带走自己那一半；checker：内部节点缓冲里只有归它管的 key；运行时：每次重组前后每个 key 读出来的值不变。判别力自证：塌缩按「孩子缓冲当新来的」必须红（甲 4 步、乙-D 6 步），再平衡按最弱读法必须红（3–4 步），分裂时左半留下全部消息必须红（2–3 步，同一产物变异 M1–M3） | D11（索引节点要不要留消息缓冲区） 已定项 1 / 2 的节点缓冲启用（第一版 ε = 0）；事务层 + 模型对拍（门禁 harness-model-differential-and-scenarios 那五段取样点罩不到节点缓冲，要为它加取样点） | C161（缓冲两级并存而衔接没定） 第二轮攻方腿第二节（塌缩）、第三轮攻方腿 2.2（再平衡）与辩方腿第一节 |
+| C350 | 计时实验不记录跑时的机器负载 | **计时实验的产物里没有一个字段说跑的时候机器上有什么**，于是「数漂了」与「被别的负载挤了」分不开。2026-09-16 实测两例：E128（指针带出生 (树, txg) 之后的点查代价） 在负载 9–19 时跨装置闸连判两次超差（2 格、1 格），负载降到 2.5 之后同一条命令两格全过；E17（write buffer 合并上限） 同日四轮单线程 29.94 / 30.10 / 30.47 / 30.71M 条目/秒，三轮落在跑前区间下沿之外，而同四轮的并行加速与阳性对照一起偏低。两例都只能靠人回头看当时的 `uptime`，产物里查不到 | 计时实验的收尾行记下本轮的 `/proc/loadavg` 与 CPU 数，`replay.sh` 的区间断言在负载越过阈值时把那一格记成「本轮不判」，既不判红也不判绿；判别力自证：喂一份不带负载字段的产物，检查必须判红 | 无 | 2026-09-16 现查：E128（指针带出生 (树, txg) 之后的点查代价） 三次跑与 E17（write buffer 合并上限） 四轮；C252（E128 的 inode 那一对不稳定，装置没有隔离负载） 早已写过「装置没有记录跑的时候机器上有什么」 |
+| C351 | ε 0.65 的两项输入作废而数还留在正文里 | D11（索引节点要不要留消息缓冲区） 已定项 2 的 ε = 0.65、扇出 119、缓冲 665 条出自 pivot 48 与消息宽 16 的模型，而今天 pivot 是 105–117、消息宽 34–109，两个输入都不成立；已定项 7（2026-09-13）只写「第一版全树 ε = 0，等 E56（消息缓冲的收益 vs ε） 按今天的 pivot 与消息宽重跑之后再定」，**没有任何东西守那次重跑**——E56（消息缓冲的收益 vs ε） 不在 C89（单元头收口的遗留重算） 的重算清单里，而 D11（索引节点要不要留消息缓冲区） 正文那一节仍把 119 / 665 与那张倍数表当现行值陈述 | 门禁扫 D11（索引节点要不要留消息缓冲区） 正文，凡出现 0.65 / 119 / 665 的行，同一段内必须带「将来值」那句限定语并指到 E56（消息缓冲的收益 vs ε） 的重跑登记，缺即判红；判别力自证：删掉限定语，检查必须由绿转红 | E56（消息缓冲的收益 vs ε） 按今天的 pivot 与消息宽重跑 | `records/2026-09-13-总审核.md` 第五节第 18 行与第六节的第一条提议；2026-09-16 三方核查现查 |
+| C352 | day-1 写映射条目的定案，重开条件没人叫醒 | D19（块指针的结构与宽度预算） 已定项 12（2026-09-13 用户定案）定「码 2 / 码 3 的映射条目维持 day-1 写出」，是在仓里还没有任何释放与重用实验这个前提下做的；`records/2026-09-13-总审核.md` 第九节逐字把另一条路留成「乙留到有释放的实验之后」，而那句触发条件没有写进 D19（块指针的结构与宽度预算） 已定项 12 的正文 ⇒ 里程碑「覆盖写、释放、回退与复用」跑出覆盖写与释放之后，没有任何东西叫人回来重判 | 里程碑「覆盖写、释放、回退与复用」步 1（覆盖写）与步 2（释放）的验收跑通之后，门禁要求 D19（块指针的结构与宽度预算） 已定项 12 正文带一行「释放实验已跑，重判结论与依据」，缺即判红；判别力自证：把那一行删掉，检查必须由绿转红 | 里程碑「覆盖写、释放、回退与复用」步 1 与步 2（2026-09-16 起已落地；这一笔要的那一行重判仍没写） | `records/2026-09-13-总审核.md` 第九节 D19（块指针的结构与宽度预算） 那一行与第六节的第二条提议；2026-09-16 三方核查现查 |
+| C353 | journal 在恢复路径上的承重没有会红的检查 | D23（journal 的角色与格式） 已定项 15 给记录头加新根段之后，journal 记录在恢复路径上承重（E142（新池新建文件的干跑） 报 `journal_effect differing_states=3`），而**实现侧没有任何东西证明它承重**：把记录段整段抹掉之后恢复结果必须变，[verification-build.md](verification-build.md) 那张「harness 自己要证明会红的用例」表九条里没有这一条，门禁 checker-tier-layer0-replay 只比计数与 E142（新池新建文件的干跑） 产物。今天钉住那个 3 的只有干跑模型的逐字节复跑，那是模型不是实现 | 层 0 加一条用例：把本次发布的 journal 记录两份镜像整段置零，恢复结果与查 journal 的恢复逐状态比，差异态数必须大于 0，归 0 判红；判别力自证：把记录头的新根段拿掉，差异态必须回到 0、该用例必须由绿转红 | 层 0 的固定脚本要多于一次发布（E142（新池新建文件的干跑） 自陈判据 6 只对「记录持久而根槽没持久」那一族成立）——里程碑「覆盖写、释放、回退与复用」步 0；2026-09-17 已满足：第二条流到发布 E，`crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs` 的用例 ③ 断言 B 的根槽没持久时 journal 承重、差异态 1；判别力自证「拿掉记录头的新根段，差异态必须回到 0」还没有（`crates/mutations.tsv` 零命中） | `records/2026-09-13-总审核.md` 第六节的第三条提议；E142（新池新建文件的干跑） 判据 6；D23（journal 的角色与格式） 已定项 15 |
+| C354 | zoned 开线前那一轮三方没人叫醒 | D22（单元原子性怎么合成） 已定项 16 与 C217（P 大于设备数这条约束的理由没了而约束还在） 把两件事都延到「zoned 开线前再走三方」——撤 `r × P × chunk` 公式、`P` 大于设备数那条失了理由的约束——D22（单元原子性怎么合成） 未定项 6（zoned 的区写指针）同样挂到开线；而「开线」这个时刻没有任何门禁阶段会点火，按 `.claude/rules/format-evolution.md`「让格式永久化的那个动作，触发点必须与拦它的闸在同一条时间线上」，格式可能在一次运行里就永久化而闸从没被叫醒 | 门禁按 diff 判本次改动碰了 zoned 布局（zoned 专属目录，或 incompat 位表里 zoned 那一位从 0 变 1）时，要求 D22（单元原子性怎么合成） 已定项 2 根环那一格与未定项 6 各有一条三方判决记录，缺即判红；判别力自证：造一个只置 zoned incompat 位的 diff，门禁必须判红 | 布局清单与目录约定，与 C8（门禁范围判不出来）、C20（罕见布局无人跑） 同一份前置（布局清单 2026-09-21 随 C14（格式变了 checker 没跟） 有了：`.claude/gate.d/layouts.tsv`，一套布局一行、位号引 D15（格式冻结政策） 已定项 4；zoned 那一位今天既不在清单里、也没在已定项 4 里分出去，所以这一条的判据还没有对象——开 zoned 线时两处各追加一行，它才有得判）；目录约定仍欠 | `records/2026-09-13-总审核.md` 第六节的第四条提议；D22（单元原子性怎么合成） 已定项 16；C217（P 大于设备数这条约束的理由没了而约束还在） |
+| C355 | checkpoint 保留池池级扣而固定点每块要落两列 | D28（挂载期承诺量） 已定项 4 把 checkpoint 保留池并进准入不等式作池级一项、不按设备求和，而固定点写出的每一块按 D2（RAID 条带策略） 已定项 6 落两列；同一份 D28（挂载期承诺量） 已定项 3 对同类量（切换预留、暖机 c_max）是按设备各加的。E141（切换预留的挂载准入自证） 判据 3 已量出池级标量臂在「盘 0 是份额加 50、盘 1 是份额减 1」的池上判可写、按设备臂判只读，而它自陈保留池不在装置罩的那一项里 | 决策已定、检查仍欠：用户 2026-09-23 定丁（逐设备合取，D28（挂载期承诺量） 已定项 1 / 已定项 4）。挂载准入对拍：一格池（一块盘短 1 块、另一块富余）逐设备合取判只读；判别力自证：把 checkpoint 保留池改回池级标量扣一份，那一格必须由只读翻成可写 | E141（切换预留的挂载准入自证） 的装置已有两臂与取样点，缺的是把第八项加进去；实现侧的挂载准入，与 C126（切换预留的最坏量没有口径） 同一前置；`crates/` 实现准入式子（照丁 写，里程碑「覆盖写、释放、回退与复用」收口表第 5 行） | `records/2026-09-13-总审核.md` 第五节第 11 行与第六节的第五条提议；E141（切换预留的挂载准入自证） 判据 3。⚠️ **2026-09-17 三方第一轮（打中的挂起，待第二、三轮，判决 `research/prompts/c355-c363-r1-main-verification.md`）**：两块盘等量、只看 D28（挂载期承诺量） 已定项 1 那一道闸时池级扣一份放行之后固定点分不到；「挪进括号再求和」在两块盘上与「池级乘 2」逐状态相同，一块盘短时两者都放行而短盘分不到，只有逐设备合取挡得住（被攻过零轮）。共用前提另立 C370（需求、可用与 df 没有共同单位）、C371（活元数据没有定义）；实现侧另立 C368（分配器落点只看盘 0，盘不等大时断言失败）、C369（提交内生块段耗尽时没有回落）。 ⚠️ **2026-09-17 第二轮（判决 `research/prompts/c355-c363-r2-main-verification.md`）**：辩方腿打穿「挪进括号再求和与池级乘 2 逐状态相同」——那是丙的最弱读法，丙原文写「与暖机那一半同一取法」，而 E141（切换预留的挂载准入自证） 被测臂对暖机那一半是逐盘合取，丙按原文就是逐设备合取；攻方腿打出逐设备合取自己的三样前置：分配器按设备取落点（C368（分配器落点只看盘 0，盘不等大时断言失败））、C375（待删占用与已承诺预留按份还是按和记没有条款）、D2（RAID 条带策略） 已定项 2 自陈的「小盘先写满之后怎么选设备」；三样之前它在提交 `fbae43e` 上与池级乘 2 分不开。池级扣一份在等量盘上出局两轮都成立。⚠️ **2026-09-23 第三轮（判决 `research/prompts/c355-c363-r3-main-verification.md`）**：没有新数分辨两臂；第一版盘不等大维持拒绝（D3（空间分配） 已定项 8），乙与丁 唯一分得开的短盘那一格在第一版几何下没有对象（主 agent 的零轮观察）。交用户，用户 2026-09-23 定丁（没选主 agent 推荐的乙），推翻 D28（挂载期承诺量） 已定项 4 里 2026-09-13 的「作池级一项」。 |
+| C356 | 第九项按统计量之差算，净释放时为负且没有钳位 | D28（挂载期承诺量） 已定项 1 第九项逐字取「被抛弃根的已分配统计量减 R_old 的已分配统计量」，被抛弃时间线净释放时这个差为负，方向与它要表达的「被隔离、不可分配的量」相反，而条款没有写钳位；C318（影子账隔离的单元没进准入不等式） 的「怎么拦」列同一格写的却是「被抛弃时间线自 R_old 起的分配量」——两处对同一个量给了两个口径 | 准入的计数模型里加一格「被抛弃时间线净释放」的世界，断言第九项不小于 0 且可用不被高估（分配器发得出的槽数与准入算出的可用逐格相等），不钳位时该断言必须红；判别力自证：去掉钳位，那一格必须由绿转红 | E150（回退复用被抛弃的根引用的单元） 第二次跑的装置已有准入对账，缺的是净释放那一格的世界 | `records/2026-09-13-总审核.md` 第五节第 11 行与第六节的第六条提议；D28（挂载期承诺量） 已定项 1 第九项；C318（影子账隔离的单元没进准入不等式） |
+| C357 | 同一根轴上的两条重开判据没人合过 | D4（校验和位置） 已定项 1 的重开判据（随机小读设备侧倍数不小于 1.136）与已定项 5 的交叉点（随机页读占用户字节 1.0% 到 1.5%）落在同一根轴——随机小读在负载里占多少——而两处各自写「不据此重开」，没有任何一处把它们并排列出、给出合成规则；后果是同一个负载可以同时不触发两条，而两条加起来的代价从没被算过 | 立一张「重开判据轴表」：每条重开判据登记它量的是哪一根轴与阈值，同一根轴上出现两条以上时必须给合成规则（谁先触发、要不要相加），缺即判红；判别力自证：把其中一条判据的轴登记成别的轴，检查必须由绿转红 | D25（目标负载优先级） 的数值权重，今天没有——E140（单元含头逼出的跨单元页与读侧拷贝） 与 D4（校验和位置） 已定项 5 都自陈「要重开得先有 D25（目标负载优先级） 那种口径的数」；用户 2026-09-23 定在里程碑「覆盖写、释放、回退与复用」里量（收口表第 18 行），怎么量待定，要先写岔路单立实验 | `records/2026-09-13-总审核.md` 第六节的第七条提议；D4（校验和位置） 已定项 1 重开表、已定项 5、已定项 8；E140（单元含头逼出的跨单元页与读侧拷贝） 结论 3 |
+| C359 | 挂载判定的头宽停在 105 而定案是 134 | D21（权威态与派生态的分界） 的挂载判定逐字写「声明值 ≤ 单元大小 − 单元头 105 − 1」，而 D18（块里携带什么信息） 已定项 16（2026-09-13 用户定案，2026-09-14 加算法类型 1 字节）定的原点是含预留位的头末端——码 1 是 134、码 3 是 136；同一份 D21（权威态与派生态的分界） 另两处对照表写 133（2026-09-13 收口时的值），其后的合计 208 与 `133 + 47 + 14 × 6 = 264` 都按旧值算，而指针头部 47 今天是 50 ⇒ 改一个数会连带重算三处合计，不是一处替换 | 门禁：kb 里凡出现「单元头」加一个数的挂载判定式，那个数必须与 D18（块里携带什么信息） 已定项 16 登记的码 1 / 码 3 头宽相等，不等即判红；判别力自证：把其中一处改回 105，检查必须由绿转红 | 先把 D21（权威态与派生态的分界） 那三处合计按今天的头宽与指针头部重算 | 2026-09-16 三方核查现查，逐条证据在 `records/2026-09-16-总审核回扫核查.md` 第三节 |
+| C360 | 字节表 journal 那行的算法类型指到错的预留项 | [layout/01-first-txn.md](layout/01-first-txn.md) 六节 journal 那张表的「算法类型」行只指「D9（加密） day-1 预留第 4 项」，而 D9（加密） 正文把 journal 记录头那一份归在 day-1 预留**第 1 项**；同一份字节表七节那一行写的是「D9（加密） day-1 预留第 1 项（2026-09-14 射程扩到自证单元）；D22（单元原子性怎么合成） 已定项 7」⇒ 两行对同一类字段指向不同的条款，而门禁 doc-registries 的 field-refs 格只查「指得到一条真实存在的分项」，指错了哪一项它不判 | 门禁 doc-registries 的 field-refs 格加一半：字段指向的分项要与该字段所属单元类在 D9（加密） 里的归属一致，不一致即判红；判别力自证：把七节那一行改回第 4 项，检查必须由绿转红 | 无 | 2026-09-16 三方核查现查，逐条证据在 `records/2026-09-16-总审核回扫核查.md` 第三节 |
+| C361 | 打包容器新类的头宽与槽宽没有字段表 | D27（小数据打包容器） 已定项 1 / 2（2026-09-13 用户定案）的 cap 7、收益 6.9×、写字节比 1.143 由「容器头 107、每槽 47」算出，而 107 是码 3 的明文头（D18（块里携带什么信息） 已定项 11 登记表；D27（小数据打包容器） 已定项 3 明令不复用码 3），47 是 E114（小数据打包容器的总账） 自拟的口径（五元组 33 + 写序 10 + 槽表 4），不指向任何条款。D27（小数据打包容器） 已定项 3 自陈「类身份段带哪些字段仍未写死」，托付的已定项 7 / 9 只定了整容器一份 MAC 与 AAD 组成，没有交出字段表 ⇒ 定案用的三个数建在一张不存在的字段表上 | 门禁：新单元类的头宽与槽宽各有一处字段表登记位，E114（小数据打包容器的总账） 的输入常量与登记位比对，对不上判红；判别力自证：把 E114（小数据打包容器的总账） 的头宽改回 107，检查必须由绿转红 | 用户定案新类的类身份段字段表；定完 E114（小数据打包容器的总账） 按新头宽重跑，cap 7 那一档翻不翻要重判 | 2026-09-16 三方核查现查，`records/2026-09-13-总审核.md` 第五节第 26 行 |
+| C362 | 打包容器新类在登记表里的码没钉 | D27（小数据打包容器） 已定项 3（2026-09-08 用户定案）只写「取单元类登记表 4–15 里一个新码」，而 D18（块里携带什么信息） 已定项 11 登记表 4–15 整段「未登记 ⇒ 拒收」，没有为它预留任何一个；码一旦用过不许回收、退役码含义永久锁定 ⇒ 这一格要在第一个写出容器的镜像之前定，而今天没有任何东西会在那一刻叫醒人 | 运行期的闸：写路径第一次写出新单元类之前，要求 D18（块里携带什么信息） 已定项 11 登记表里该类有一个具体码，缺即拒绝写；判别力自证：把登记表那一行删掉，写容器必须被拒 | 用户定案：在 4–15 里挑一个码（新池新建文件不写容器，D27（小数据打包容器） 已定项 1 判改字节「否」，新池新建文件不逼它） | 2026-09-16 三方核查现查，`records/2026-09-13-总审核.md` 第五节第 26 行 |
+| C364 | 整理意图记录没有字段表 | D26（后台整理与放置回收） 已定项 1 / 2 要求整理意图记录装下区域 `R`、`c0`（签发那一刻的分配代）、`segs0`（签发那一刻的全空聚簇段数，必须以值写进去）与续做点四样，四样的宽度与编码全仓一处都没有；已定项 2 第 3 条逐字「零格式位：不新增任何盘上字段」，而同一项要求这几样住在一条随根回退的盘上记录里，两句要按「树里一条普通 key 的 value，不是新字段」读才相容，那个读法没有写下来 | 门禁：意图记录的 key 与 value 各有一处字段表登记位，整理装置写出的意图与登记位逐字段比对，对不上判红；判别力自证：把 `segs0` 从 value 里拿掉，检查必须由绿转红 | 无（新池新建文件与覆盖写、释放、回退与复用都不含整理意图） | 2026-09-16 三方核查现查，`records/2026-09-13-总审核.md` 第五节第 12 行。⚠️ **2026-09-17 三方第一轮（打中的挂起，待第二、三轮，判决 `research/prompts/c364-r1-main-verification.md`）**：R 取任意槽区间出局（区间起点落在两槽单元中间时意图被删而单元仍压在 R 里）；R 取「一个聚簇段、全池同号」与「一个聚簇段、按设备」今天分不开，并列交用户；segs0 三个选项字面上都中、不判，打中的归到 C372（全空聚簇段数两份定义相反）、C373（停机谓词判真时活意图删不删没有条款）与缺一条空转停机腿；续做点取「存」（推进规则写成「只越过已核实做完的、删意图前对整个 R 全量核目标态」）——「不存」要改 D26（后台整理与放置回收） 已定项 6 与已定项 2 两处用户定案里「续做点」的字；c0 取 8 字节无反例，缺「等于意图事务被分进的那个 checkpoint 的 txg」这句定义。整张字段表交用户定案。 ⚠️ **2026-09-17 第二轮（判决 `research/prompts/c364-r2-main-verification.md`）**：R 推荐「一个聚簇段、按设备」（三块盘搜索里全池同号配逐盘 segs0 中「R 已空而谓词判不出」、配全池 segs0 中「判有产出而 R 覆盖的盘没多」；按设备配逐盘零命中；第一版两盘同号时两者逐字节等价）；R 取任意槽区间不是无条件出局，它要一条全仓没有的「落点在 R 内按重叠还是按起点」的条款；续做点仍取「存」，前提是 D26（后台整理与放置回收） 已定项 6 那一行的「续做点」按存盘字段读，推进规则补「全量核不过就回到 R 起点」；D8（核心索引结构） 已定项 5 三态表第二行「已做完的部分被幂等地重跑」与「只越过已核实做完的」字面相反，续做要不要进度指针条款从没正面答，交用户时一起问；segs0 先定 C372（全空聚簇段数两份定义相反） × C373（停机谓词判真时活意图删不删没有条款） 再判；「空转停机腿」是 D26（后台整理与放置回收） 已定项 1 定案时的简化，不立账；logged_ops 只有放在根下的一棵树时站得住（放在系统配置或只在 journal 里时存不存续做点都会丢意图），与 C118（`deleted_inodes` 树的形态无落点） 一起交用户。第三轮三方 2026-09-16 发了腿没收尾，登记在 `research/prompts/abandoned-rounds.tsv`，去向见那张表（C245（系统配置槽的写频率，两条条款说反话） 与 C355（checkpoint 保留池池级扣而固定点每块要落两列） / C363（现算保留池时树高从哪读没有条款） 等里程碑二增补 1 定案后重出材料再派；C364（整理意图记录没有字段表） 等后台整理进里程碑）。 |
+| C365 | 恢复路径的链首不锚在所选根覆盖的最后一条 | 提交 `fbae43e` 的 `crates/singlefs-core/src/recovery.rs` 里 `replay_journal` 把水位之上的记录按 (实例, 计数器) 排序、从第一条接链（第 391–404 行），不锚在所选根覆盖的最后一条记录上、也不判链首的实例；D23（journal 的角色与格式） 已定项 14 注 1 逐字「链从所选根覆盖的最后一条记录之后接，下一条的实例代号与所选根不同即停……所选根是 mkfs 的第 0 代根时它一条记录都不覆盖……一条都不施加」，实现会施加暖机那一条。E142（新池新建文件的干跑） 装置是同一个算法，判据只比读回的文件、空发布不改文件，层 0 不红 | 层 0 重放的判据加「施加的记录集合」逐条与条款比；最短样本：暖机 txg 1 的记录落盘、根没落 → 崩 → 恢复施加 0 条；判别力自证：把链首改回「水位之上第一条」必须红 | 「所选根覆盖到的计数器」怎么求要先定，C245（系统配置槽的写频率，两条条款说反话） 第二轮在判 | 2026-09-17 C245（系统配置槽的写频率，两条条款说反话） 三方第一轮攻方腿读码，主 agent `git show fbae43e` 核过 ⚠️ **2026-09-17 C245（系统配置槽的写频率，两条条款说反话） 第二轮攻方腿真代码探针**（`c245_r2_replay_probe.rs`，钉 `fbae43e`，主 agent 复跑逐字节相同）：11 种盘面错 7 种——mkfs 根 + 暖机记录被施加、没提交的回退记录与没提交的切换记录被当成水位之上施加、两记录发布撕头与撕尾都被施加、一个跨两条记录的完整事务永远不施加（`!is_commit` 即停）；点名单元验证挡不住其中任何一种 |
+| C368 | 分配器落点只看盘 0，盘不等大时断言失败 | 2026-09-17 已实现：用户数据、开段、回落三处由每块盘各答一个、一致才分配，不一致或部分盘答不出在动状态之前返回 `PlacementRefusal`；用例 `unequal_devices.rs` 三条、变异在 `crates/mutations.tsv`。仍欠的写清：发布层把三种拒绝统一报成 `NoSpaceFor`，调用方分不出；模型对拍没有不等盘的取样点——增补 3 第 2 件的小盘段两块盘等大（`HistoryDeviceWidth::UnitAreaOf384Slots`），把「每块盘上都没有」报成「小盘写满」、只换原因的那条变异在五段上一段都不红（2026-09-19 实现员实测，代码三方第二轮判决第 44 行第 6 条）。 | harness 造一个两块不等大盘的池，填到小盘单元区末尾之后，分配必须按设备取落点或返回 `None`，不许 panic；判别力自证：删掉按设备取那一步必须红。随机历史另加一个两块盘不等大的取样点，把「每块盘上都没有」报成「小盘写满」的变异必须红 | 无 | 2026-09-17 C355（checkpoint 保留池池级扣而固定点每块要落两列） 三方第一轮攻方腿的实现探针（钉 `fbae43e`），主 agent 读码核过 |
+| C370 | 需求、可用与 df 没有共同单位 | D3（空间分配） 已定项 12 的 `可用 ≥ 需求` 与 D28（挂载期承诺量） 已定项 1 的式子都没写「需求」按逻辑字节还是按盘字节计；式子括号里的「已分配」逐盘记（字节表五节 212 992 / 212 992），Σ 之后「可用」是各盘之和；D28（挂载期承诺量） 已定项 3 那一节写「`df` 报可用」，而 D3（空间分配） 已定项 9 第 1 条的 s 是用户写的字节。按逻辑字节读，两块盘时准入放行约两倍；按盘字节读，`df` 报的量一半兑现不了。⚠️ **2026-09-17 第二轮收窄**：D5（快照 / 空间记账机制） 已定项 7 把「已分配」钉成逐盘物理字节，需求要与它同口径只能读成盘字节；真正缺的是 D16（发布语义） 已定项 1 那一套「可分配」与 `df` 没有设备维，以及写入时要预付的「解开自己」没有量（D3（空间分配） 已定项 2 那一节自陈「量还没算」，C634（单次 unlink 的墓碑字节没有 trace 检查） 同域）——第二轮攻方腿的模型里只有「两边都逐设备取小、且不预付」这一种 `df` 写法在三条臂上都不出假性 ENOSPC另有两份 `df`：D28（挂载期承诺量） 已定项 3 那一句与 D16（发布语义） 已定项 1 的 `df` 式子 | 条款写死三个量的单位与换算之后，准入对拍里「两盘等量、请求 u 个单元」那一格放行边界与逐盘真值相等，`df` 报 s 时写 s 字节成功；判别力自证：把需求换成另一种单位必须红 | 要用户定单位（C355（checkpoint 保留池池级扣而固定点每块要落两列） 交用户的前置） | 2026-09-17 C355（checkpoint 保留池池级扣而固定点每块要落两列） 三方第一轮三条腿都报「需求」没有条款，攻方腿给了两种读法的代价 |
+| C371 | 活元数据没有定义 | D16（发布语义） 已定项 1 的 `可分配 = min(可再分配 + 活元数据 − 保留池, df)` 与 `df` 式子都用「活元数据」，全仓只在式子里出现（2026-09-17 grep）；E139（按盘回退下界的收严形态） 装置按 `pool.metadata` 的块数计。它的读法决定 D16（发布语义） 已定项 1 那一道闸能不能兜住 C355（checkpoint 保留池池级扣而固定点每块要落两列） 第一轮打中池级扣一份的那一格 | 条款给出定义后，E139（按盘回退下界的收严形态） 装置的取法与条款逐字对上；判别力自证：把活元数据改成全部活着的元数据块，C355（checkpoint 保留池池级扣而固定点每块要落两列） 第一轮那一格必须由不中翻成中 | 无 | 同 C370（需求、可用与 df 没有共同单位） |
+| C372 | 全空聚簇段数两份定义相反 | D3（空间分配） 已定项 10 ① 逐字「「全空聚簇段数」= 段内 64 槽都没有未释放分配记录的段数」，而 D3（空间分配） 已定项 7 定释放时条目改写成「已释放 + 释放代」、defer 里的槽记录已是已释放；D26（后台整理与放置回收） 已定项 1 ① 逐字「读数口径取「**已发布**」——D16（发布语义） 的 defer 段不算空」。一个段里只剩 defer 槽时，按前者算全空、按后者不算；工作区实现（`DeviceFreeMap::mark_released` 只加 defer 计数、不动每段占用）取后者。整理搬空 R 的那一批提交时 R 的旧槽全在 defer 里，停机谓词在那一刻判还是 defer 排空之后判，结果完全不同（C364（整理意图记录没有字段表） 第一轮攻方腿的 64 槽扫描：按占用算，意图删掉那一刻 256 格里 0 格判得真） | 条款写死一种定义与「谓词在哪一刻判」之后，记账第 11 项的写行、整理的停机谓词、`DeviceFreeMap::empty_segments` 三处在一个只剩 defer 槽的段上给同一个判定；判别力自证：把实现换成另一种定义，那一格必须红 | 无 | 2026-09-17 C364（整理意图记录没有字段表） 三方第一轮攻方腿，主 agent 核 `03-空间分配.md` 第 180、392 行与 `26-后台整理与放置回收.md` 第 63 行 ⚠️ **2026-09-17 C364（整理意图记录没有字段表） 第二轮**：「按占用」配 C373（停机谓词判真时活意图删不删没有条款） 的「谓词只在意图照目标态删掉那一刻判」自相矛盾——那一刻 R 的旧槽都在 defer 里，按占用算不空，谓词结构上看不见 R 腾出来的那一段（攻方腿 64 槽扫描 256 格占用差恒比记录差少 1）；能同时成立的配对只有「按记录 + 删意图那一刻判」或「按占用 + defer 排空之后判」，后者没量 |
+| C373 | 停机谓词判真时活意图删不删没有条款 | D26（后台整理与放置回收） 已定项 1 第 2 条只写「**停机：产出谓词** `全空聚簇段数(现在) − segs0 ≥ 1`」，D8（核心索引结构） 已定项 5 只写「删除意图必须与最后一批工作在同一个事务里提交」；谓词判真而这条意图的目标态还没达成时（前台在 R 之外腾出一个段，或崩溃丢掉开放段游标后旧开放段排空），停机就删意图会违反「不可能出现意图没了但目标状态没达成」，停机不删意图则 R 一直锁着、续做再判仍真、意图永不完成。三种读法三种结果，全仓没有一句选 | 条款选定之后，整理的崩溃点重放里「删意图那一刻 R 内没有分配代 ≤ c0 的未释放落点」逐步断言，且每条意图在有界批数内被删；判别力自证：换成「谓词真就删意图」，第一轮攻方腿那段 4 步序列必须红 | 无 | 2026-09-17 C364（整理意图记录没有字段表） 三方第一轮攻方腿，主 agent 核两处条款之间没有第三句 ⚠️ **2026-09-17 C364（整理意图记录没有字段表） 第二轮**：三种读法里「谓词只在意图照目标态删掉那一刻判、决定签不签下一条」配 C372（全空聚簇段数两份定义相反） 的「按记录」，在两轮攻方腿模型里意图被删而目标态没达成、意图永不完成都零命中；配「按占用」自相矛盾（见 C372（全空聚簇段数两份定义相反） 那一行） |
+| C376 | 发布边界在链尾没有输入 | D23（journal 的角色与格式） 已定项 14 前缀判定第五条逐字「施加的单位是一次发布——合法前缀停在一次发布的两个事务之间时，那次发布整体不施加」，而记录头没有「本次发布第几条 / 共几条」这类字段、提交标记是事务级的（D23（journal 的角色与格式） 已定项 7），链尾那条之后读不出时判不出这次发布写完了没有。已定项 15 让每条记录带整次发布的新根段 ⇒ 链尾照施加会装上缺记录的发布，它引用而没被施加的记录点名的单元坏了或被复用时，fsync 已返回的那一版读不出——挂载内实例切换「失败那次的分配不存在」让新固定点单元可以落在原固定点单元的槽上，这一格一个介质故障都不要；链尾一律不施加则根槽读不出时丢已返回的数据。与链首怎么找、系统配置存不存 tail 无关 | 崩溃点重放加一条录制流：一次发布两个事务、第二条记录写报错 → 挂载内实例切换 → 重发 → 崩在之后任一状态，每个状态判「读回的是 fsync 已返回的那一版或之后写出的」；判别力自证：把链尾换回照施加，切换复用固定点单元槽的那几个状态必须红 | 条款先补一个链尾判别量（C245（系统配置槽的写频率，两条条款说反话） 第二轮列的三选一，交用户）；多记录发布的写者（里程碑「覆盖写、释放、回退与复用」） | 2026-09-17 C245（系统配置槽的写频率，两条条款说反话） 三方第二轮攻方腿（模型 + 真代码探针），主 agent 核条款三处与 `fbae43e` 的 `JournalRecord` 字段；用户 2026-09-23 定第五条的发布边界按 D23（journal 的角色与格式） 已定项 17 那条约定认末条（点名了共享内生块的那条就是末条，末条没到的发布整体不施加），写进已定项 14 第五条，决策已定、实现与检查随并行线一（收口表第 36 行） |
+| C380 | 环上有洞时释放代判不出唯一值 | 被施加的 journal 记录做的释放会写一个根槽从没写过的 txg（残留记录那条层 0 流的 txg 5），于是「释放代等于哪条根的 txg」没有唯一答案，checker 只能判 I-3.9（释放代落在停止引用它的那一格区间里） 那个区间；洞很长时区间会松到判不出错写的释放代。⚠️ 2026-10-01 判决不关这一条，改写成这几类对象：被抛弃或低于 F 的根、读不出的根槽、P1（取号之后、写行那次发布之前，单独一段 [根槽 FUA][屏障]，只补所选根那一版）不补的洞（`research/prompts/m3-ring-r1-main-verification.md` 第二节第 8 行） | 造一条环上连着几个 txg 没有根的历史，把释放代写成区间里另一个值，判据要能红——今天判不了；判别力自证：把区间收成单值，那 12 个合法状态必须由绿转红 | D16（发布语义） 已定项 1「生效」那一行与 I-3.1（已分配统计对得上） 口径那一族（里程碑二增补 2 收口表第 ② 行）一起判 | 2026-09-18 C374（释放代与树表诞生 txg 只有验收断言盯着） 的 checker 实现：主 agent 原措辞「释放代等于最早不再引用它的有效根的 txg」被残留记录那条流的 12 个合法状态证伪，改判区间 |
+| C381 | 根已落盘之后发布失败，分配器仍退回 | 发布的持久顺序是根记录 FUA 之后再转系统配置槽；系统配置槽那一步失败时根已落盘，恢复会选中它，而发布路径把分配器整个退回到这次发布之前（`crates/singlefs-core/src/transaction.rs` 第 1221、1258 行）；同一个写入口接着发下一次发布会把这次占过的槽再分出去，写到一半断电就把已落盘的根引用的单元盖掉（代码三方第二轮攻方：checker 五条红、重开读不出单元） | 造「系统配置槽写失败 → 同一个写入口发一次空发布、单元写完记录与根没写时断电」这段历史，恢复之后 checker 全绿、重开成功——今天 checker 五条红、重开报 `Recovery(UnitUnreadable)`；判别力自证：原样重试同内容的那条对照今天就绿 | D16（发布语义） 已定项 7 的失败语义要先定：根落盘之后的失败算不算这次发布成立，失败之后这个写入口还许不许接着发布；2026-09-18 用户定走三方立题。第一轮 2026-09-19 已判（`research/prompts/c381-r1-main-verification.md`）：今天的「一律退回」在攻方原历史与「根槽 FUA 报错而根已落盘」两处坐实是缺陷；D23（journal 的角色与格式） 已定项 14 的失败表（先探针写，瞬时走实例切换、持续转只读到下次挂载）已经答了失败之后写入口怎么走，`crates/` 里探针写、实例切换、转只读三样都没有；第二、三轮都判完了（2026-09-21）：第二轮判出三条候选栽在同一个共用前提上——失败表要的探针写盘上没落点、代码里没实现、判别力上分不出落点级的故障；用户定了两题（探针落点进地址空间表、失败表射程逐个失败点列表）、打回两题；第三轮攻那两题，候选甲（不立条款、明写 fsync 报错之后数据可以出现也可以不出现）站住并要加两样，候选乙（探针写改成写失败的那个落点）被推翻。按「第三轮之后停」这条线到此为止。四题用户都定了：第二轮定第 1 题（探针落点进地址空间表）与第 3 题（失败表射程逐个失败点列表），第三轮定第 2 题（按候选甲写回并加两样，`D16（发布语义）` 新立一条已定项）与第 4 题（改法 B：失败表判别子改成固定落点探针写 + 失败落点只读复核），「实例切换取的是内存里的根」那一题 2026-09-21 定另立一题，2026-09-23 用户改定「改条款：切换要重新读盘」（C458（实例切换取内存里的根，不重新读盘）），条款写进 D23（journal 的角色与格式） 已定项 14 与 D18（块里携带什么信息） 已定项 11。2026-09-21 写回的是第 2、4 题；第二轮那两题各自还缺落地前提（落点登记在哪张表与哪个偏移、射程那八格怎么判），各记一笔欠账。**代码那一半整个仍欠**：`crates/` 里探针写、只读复核、实例切换、转只读四样都没有。**事务号也在重用之列**——根槽那一步失败之后事务号已经进了持久记录，重试拿同一个号、jsn 也重、实例没换（判决判定三，攻方探针 `opus_probe_txn_chain.rs` 复跑坐实；⚠️「改回旧写法同样中」那句是推理坐实、没有 A/B 实测）。这一族要的是 `D23（journal 的角色与格式）` 已定项 7 后半句「失败即实例切换」落地，而 `crates/` 里探针写、只读复核、实例切换、转只读四样都没有。用户 2026-09-23 划一刀：代码那一半跟里程碑「覆盖写、释放、回退与复用」收口表第 16 行一起挪到后面的里程碑。 | `research/prompts/m2-wave2-code-r1-main-verification.md`、`research/prompts/c381-r2-main-verification.md`、`research/prompts/c381-r3-main-verification.md` 第二节第 7 行；攻方报告 `research/prompts/m2-wave2-code-r1-main-verification.md` 第三节 |
+| C383 | 同一次发布里同 key 的中间态折叠没有检查 | D8（核心索引结构） 已定项 13（2026-09-19 用户定案，只记录）要求同一次发布里同一个 key 的中间态不落叶，叶里只按到达序最后那次改动写一次，E 是墓碑时结果就是墓碑。第一版由 D19（块指针的结构与宽度预算） 已定项 12 的固定点让它恒成立；`crates/` 里一次覆盖写就是一次发布，没有同一次发布里多次改同一个 key 的路径，所以今天没有对象；用户定「暂时不做、不验证」 | 运行时断言：一次发布里每棵树每个 key 进叶至多一次，进的是到达序最后那一次；墓碑那一半与 C344（单调统计量的点删遇墓碑没有会红的检查） 同一个判据。判别力自证：把落叶改成逐个中间态都落，或把墓碑当数值取最大，同一批用例必须由绿转红 | 同一次发布里能装多个改同一个 key 的事务（事务层）；write buffer 前端、节点消息缓冲区或边插边 COW 任一启用；模型对拍 | 2026-09-19 用户定案 |
+| C385 | 首次写要不要读回，两条已定项说反话 | D4（校验和位置） 已定项 3 定「首次写不设例外：所有凑不满一个单元的写都走 RMW」，而 D14（双轨（大小文件 / 持久临时）） 已定项 3「换回来的」一栏把「独立 extent 首次写不必 RMW」算成收益（E66（补齐之后小文件怎么落） 设备侧 25.0 μs 对内联 247.8 μs）。两条只在「新单元的旧内容定义为全零、读回可省」时同时成立，这一点两条都没定；`crates/` 今天只有整份内容的写（`publish_first_file` / `publish_overwrite` 收整份内容，`build_data_unit` 在零缓冲上现装），没有部分写路径，所以今天没有对象 | 定下之后把「首次写读不读回」写成一条可判的规则；有部分写路径时造「新文件写 4 KiB」的用例，断言读回次数与定案一致（0 或 1），把读法换成另一种检查必须由绿转红 | 用户定案：两条怎么对齐（改 D4（校验和位置） 已定项 3 的「不设例外」，还是改 D14（双轨（大小文件 / 持久临时）） 已定项 3 的收益栏），要不要先走三方；部分写路径的实现 | 2026-09-19 D4（校验和位置） 按瘦身形态重写时子 agent 指出，主 agent 逐字核 D4（校验和位置） 已定项 3 定案句与 D14（双轨（大小文件 / 持久临时）） 第 336–337 行坐实 |
+| C386 | 节点大小结论欠一次按最终指针宽度的复跑，没有编号 | D4（校验和位置） 开头一段与 E20（指针变宽的 CPU 缓存代价） 第 67 行都记着「E7（离线索引 harness） 要用最终指针宽度复跑」，而这笔账一直没有 C 编号，没有任何东西会叫醒人；指针宽今天是 88（指向码 1）/ 86（指向码 2 / 3），E7（离线索引 harness） 页标题仍是 2026-08-27 的首轮 | E7（离线索引 harness） 按今天的指针宽复跑，D8（核心索引结构） 已定项 2 / 4 里靠它的节点大小结论逐条回看；E7（离线索引 harness） 页补上「影响的决策」表之后，门禁 doc-experiments 的 decision-links 格的时效检查会盯住「复跑之后没回看」 | 无（装置在 `research/`） | 2026-09-19 D4（校验和位置） 瘦身时子 agent 指出，主 agent 核 E20（指针变宽的 CPU 缓存代价） 第 67 行与 D4（校验和位置） 开头一段坐实 |
+| C387 | 常量模块手写，不是从 kb 生成 | D13（验证路线） 已定项 5 定 checker 与实现「只共享一份从 kb 生成的常量模块」，而 `crates/singlefs-format/src/lib.rs` 是手写的，仓里没有生成器（没有 `build.rs`，也没有生成脚本）；它与 kb 的同步今天只靠门禁 code-source-discipline 的 format-constants 格逐个核 `format-const` 标记的值——标记漏打的常量、kb 里改了表而没打标记的，两边会分叉而没人报警 | 写一个从 kb 字段表与 `format-const` 标记生成常量段的生成器，门禁比对「生成器输出 = 仓里那份」；判别力自证：手改一个常量值、或在 kb 里改一个值不改源码，门禁必须由绿转红 | 无（纯工具工） | 2026-09-19 D13（验证路线） 按瘦身形态重写时子 agent 指出，主 agent 核 `crates/singlefs-format/src/lib.rs` 文件头与 `ls crates/*/build.rs` 零命中坐实 |
+| C388 | checker 的判定宽度不自己探测 | D13（验证路线） 已定项 5 定「判定宽度由 checker 自己探测再与系统配置比」，而 `crates/singlefs-checker/src/lib.rs` 的 `DecisionWidth::Probed` 只在第 612–613 行的测试里构造，判定用的是系统配置声明值——系统配置把宽度写错时 checker 跟着错 | checker 判 I-7.5（根槽按判定宽度对齐） 与 I-8.2（记录头不跨原子单元） 之前自己探测判定宽度并与系统配置比，不等判红；判别力自证：造一个系统配置声明宽度与设备不符的镜像，检查必须由绿转红 | 镜像装置能模拟设备的 `physical_block_size` | 2026-09-19 D13（验证路线） 瘦身时子 agent 指出，主 agent grep `DecisionWidth` 坐实只在测试里用 |
+| C389 | Merkle 根链差分零代码 | D13（验证路线） 已定项 8 自研第 1 项「Merkle 根链差分」（COW 加每事务发新根独有的杠杆：没走 COW 就不该有新分配，父指针理应没变，校验和却变了）今天没有代码（`grep -rn 根链 crates` 零命中），也不在 `.claude/kb/verification-build.md` 的待做表里 | 相邻两个根之间做差分：新分配集合、父指针变化、校验和变化三者互相核，就地改写判红；判别力自证：在装置里把一次 COW 写改成原地覆盖，差分必须由绿转红 | 相邻两个根的镜像（层 0 录制流已有） | 2026-09-19 D13（验证路线） 瘦身时子 agent 指出，主 agent 核 D13（验证路线） 那一节与 verification-build.md 零命中坐实 |
+| C390 | 索引重建入口不强制排空 | D11（索引节点要不要留消息缓冲区） 已定项 5 定任何一次索引重建（改 ε、改节点大小、损坏恢复）之前各层缓冲必须先排空、由重建入口强制；C55（排空没排干净就换几何） 只管 RAID 几何再求值那一次，重建入口这一格没有会红的检查 | 重建入口开始前断言各层缓冲为空，不空拒绝重建；判别力自证：把入口的排空那一步去掉，带未排空缓冲调用重建，检查必须由绿转红 | 索引重建路径与节点消息缓冲区的实现（`crates/` 今天没有；`recovery.rs` 的 `rebuild_version` 是扫描重建现行版本，不是这里的索引重建） | 2026-09-19 D11（索引节点要不要留消息缓冲区） 瘦身时子 agent 指出，主 agent 核 D11（索引节点要不要留消息缓冲区） 已定项 5 与 C55（排空没排干净就换几何） 的射程坐实 |
+| C391 | 小数据打包容器欠 D25 的举证 | D25（目标负载优先级） 写「一条永久的格式分支只服务次要负载，按 `.claude/rules/fs-design.md` 的分支判据要单独证成」，D27（小数据打包容器） 正是这样一条分支，这笔举证（连同 fs-design 的五条硬要求）没还 | 按 fs-design「格式分支的判据」与五条硬要求逐条写 D27（小数据打包容器） 的举证，交用户判；门禁形态：举证一节在、且五条硬要求各有一行，缺一条判红 | 用户定这一轮什么时候开 | 2026-09-19 D27（小数据打包容器） 瘦身时子 agent 指出，主 agent 读 D27（小数据打包容器） 已定项 1 的欠与 D25（目标负载优先级） 原句坐实 |
+| C392 | 双轨翻转入口的穷举表没推 | D14（双轨（大小文件 / 持久临时）） 已定项 6 推导 D-1（穷举翻转入口） 要穷举所有能改变「对象 → 轨道」映射的入口（fs-design 硬要求 5），这张表全仓没有；v1 不做第二轨，只在提议格式级第二轨时才承重 | 提议第二轨时先交这张表，每个系统调用或内部事件一行；门禁形态：第二轨的提议里没有这张表判红 | 有人提议格式级第二轨 | 2026-09-19 D14（双轨（大小文件 / 持久临时）） 瘦身时子 agent 指出，主 agent 核 `grep -rn "穷举表\|翻转入口" .claude/kb` 只命中 D14（双轨（大小文件 / 持久临时））、E11（双轨：收益与翻转代价，自己量） 与变更史坐实 |
+| C395 | 代字段只有验收断言盯着 | 按 C374（释放代与树表诞生 txg 只有验收断言盯着） 的判据回扫盘上代字段（`m2-generation-fields-sweep-report.md` 第二节），不过 9 项：根记录与 journal 记录带的回退下界 F（只被别的不变量当输入）、单元头与点名项的诞生代号（I-1.2（块头写序已发布）、I-1.8（归并后版本全序）、I-3.5（引用区间的精确性）、I-3.6（deadlist 紧界） 在册而没实现）、树表条目 `previous_snapshot_txg`（`crates/singlefs-core/src/records.rs` 恒写 0、读出即丢）、已分配记录的分配代（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 44 行）、记账代、inode 改动计数（类型是裸 `u64`）、实例表行 T、父指针缓存的出生 txg 与写序与子单元头是否一致；另 I-3.9（释放代落在停止引用它的那一格区间里） 在「某条候选根的引用集合走不完」时整条报不适用，没有坏镜像罩着「那时另有一处释放代真错了」（同一报告第三节） | 每项先有一条不变量说它该取什么值，再由池级 checker 判：一份只红在它身上的坏镜像，`crates/mutations.tsv` 一条「判定恒真」变异在门禁 checker-tier-crates-mutation-replay 里红；I-3.9（释放代落在停止引用它的那一格区间里） 那一处补一份组合坏镜像（一条非最新候选根读不全、最新根上释放代写错），必须红而不是报不适用 | 不变量措辞（主 agent 逐条给，书记员写进 `.claude/kb/invariants.md`）；报告里「分不清」的四项（系统配置槽世代号、根记录与 journal 记录自身的 txg、实例表行 W）先判算不算这类代字段 | 2026-09-19 回扫（`m2-generation-fields-sweep-report.md`，里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 12 行的回扫那一步）立账 |
+| C397 | 反向判据的 N 没声明，事件数没人计 | **D23（journal 的角色与格式） 已定项 1 自带一条反向判据：记录核对器上线后累计 N 次全量验证里「记录核对器抓到而 checker + O1（内存模型对拍（HashMap 理想文件系统）） + 崩溃点重放三者都没抓到」的事件数仍为 0，就该重开轴二评估，N 逐字要求「在上线时先声明」。** 记录核对器 2026-09-14 已接在层 0 上（`crates/singlefs-checker-tier/src/crash.rs` 的 `check_records`，门禁 checker-tier-layer0-replay 每个崩溃状态都跑），而 N 全仓一处没有声明、那类事件也没有任何地方在计数 ⇒ 这条判据今天不可能触发，D23（journal 的角色与格式） 已定项 1 那条依据回到不可证伪 | 记录核对器每跑一轮落一行计数（判红的状态数、其中 checker 与三条 oracle 都不红的状态数），累计数与声明的 N 一起记进 [verification-build.md](verification-build.md)；门禁读那份计数：N 没声明、或累计已过 N 而没有人写下重开评估的结论，判红。判别力自证：把 N 设成 1 并喂一个「只有记录核对器红」的崩溃状态，检查必须由绿转红；换成三者都红的状态必须转绿 | N 由用户声明（D23（journal 的角色与格式） 已定项 1 逐字「N 在上线时先声明」）；记录核对器与层 0 全量枚举已有，计数落点没有 | 2026-09-19 第二批 D23（journal 的角色与格式） 瘦身时子 agent 指出，主 agent 现查 D23（journal 的角色与格式） 已定项 1 的反向判据原文、`crates/singlefs-checker-tier/src/crash.rs` 第 482 行的 `check_records`，并全仓 grep「反向判据」只命中 D23（journal 的角色与格式） 自己坐实 |
+| C398 | 认领之后怎么跳载荷，两条已定项说反话 | **D18（块里携带什么信息） 已定项 7 的认领规则逐字「扫描器解出一个单元头并认领它之后，就按声明长度把整段载荷跳过去」，而 D18（块里携带什么信息） 已定项 13 的射程逐字写这句「从来没和它的实验对上过」**——E88（冒名单元与孤儿单元的判别） 的模型按整单元跳（现查 `research/e7-index-bench/src/bin/e88_impostor_orphan.rs`：`decl` 与「声明长度」各出现 0 次，`scan` 里认领之后直接跳到下一个落点）。两条已定项对同一条规则给出两种跳法；而 D18（块里携带什么信息） 已定项 13 又把 `声明长度` 判进密文 ⇒ 加密开启时无密钥的扫描器读不到它，按 D18（块里携带什么信息） 已定项 7 的字面根本跳不动。`crates/` 里没有扫描重建路径（`grep -rn 认领 crates/*/src/*.rs` 零命中）⇒ 今天没有任何代码或检查会在两种读法之间报警 | 先把认领规则收成一条（按整单元跳，或按声明长度跳并写明无密钥侧怎么办），再落成 checker 里的可判形式：造一个「单元载荷内部埋着一份合法单元头的自备份镜像」样本，不带认领规则的扫描必须多收、带的必须恰收；同一个样本在加密开启（声明长度是密文）下重跑，结论必须不变。判别力自证：把认领规则关掉，第一条必须由绿转红 | 两条已定项先收成一条（纯论证工）；扫描重建路径 `crates/` 里还没有 | 2026-09-19 第二批 D18（块里携带什么信息） 瘦身时子 agent 指出，主 agent 现查 D18（块里携带什么信息） 已定项 7 的认领规则那一行、已定项 13 射程那一句与 `e88_impostor_orphan.rs` 的 `scan` 坐实；C89（单元头收口的遗留重算） 第 ② 笔欠的是「认领规则进 checker」，它预设跳法已经定了，够不着这条矛盾 |
+| C399 | nonce 不重用那条注的前提没人回看 | **I-6.1（nonce 不重用） 的补注给 D9（加密） 已定项 4 压了一条硬约束——nonce 的代号部分必须放在明文头、无密钥可读——理由逐字是「埋进密文的话 checker 没有密钥就连『这块用过哪个 nonce』都判断不出来」。** D9（加密） 已定项 5 于 2026-09-07 改取「只做 scrub」（无密钥的一侧只读只检测，不搬、不疏散、不回收）之后，「checker 没有密钥」这个场景还成不成立没人回看过（D18（块里携带什么信息） 已定项 14 的射程逐字记着这一格）。结论不受影响（重建要解密，nonce 无论如何得在明文头），受影响的是 I-6.1（nonce 不重用） 阶段 ② 的枚举者是谁：无密钥侧要不要跑全盘扫描、要不要把 nonce 纳入去重集合，全仓没有条款 | 把无密钥侧要跑的检查逐条列进 D9（加密） 已定项 5 的 scrub 结构清单（C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效） 的前置），I-6.1（nonce 不重用） 阶段 ② 占一行，写明谁枚举、有没有密钥；清单里缺这一行判红。判别力自证：把那一行删掉，检查必须由绿转红 | D9（加密） 已定项 5 的无密钥 scrub 结构清单，今天没有（C303（D2 边界 ③ 的依据随 D9 已定项 7 撤回而失效） 记着） | 2026-09-19 第二批 D18（块里携带什么信息） 瘦身时子 agent 指出，主 agent 现查 D18（块里携带什么信息） 已定项 14 射程、[invariants.md](invariants.md) 里 I-6.1（nonce 不重用） 那三段补注与 D9（加密） 已定项 5 正文坐实；C95（依据被撤回的已定项无人回看） 的射程是「实验 → 分项」与「决策条款 → 它引的决策条款」，罩不到不变量的补注 |
+| C400 | 单元头的 MAC 与指针里那份是不是两份 | **D18（块里携带什么信息） 已定项 16 给三类单元头留了 16 字节 MAC 位，而 D4（校验和位置） 把整单元校验和与 MAC 内联在父指针里**（`crates/singlefs-core/src/pointer.rs` 的 `PointerHead`，头部 50 字节含 MAC 16）；两份是不是同一个 MAC 存两遍，D18（块里携带什么信息） 已定项 14 的射程逐字写着「全仓空白」。加密开启后两份各罩什么、谁是权威、失配时按哪一份判，一处都没写过 ⇒ 每个单元恒定多付 16 字节，而没有任何检查会因为两份不一致而红 | 先写一句定案说清两份各罩什么：同一个 MAC 存两份 ⇒ 立一条「两份逐字节相等」的不变量；两份罩不同范围 ⇒ 各自写明覆盖区间。checker 侧的会红形态：造一个「指针里的 MAC 与单元头里的 MAC 不一致」的镜像，判红。判别力自证：把那条比对删掉，检查必须由绿转红 | 加密不进第一个可运行版本（D9（加密） 已定项 10），它是交付前置、不挡新池新建文件；定案要走一轮三方 | 2026-09-19 第二批 D18（块里携带什么信息） 瘦身时子 agent 指出，主 agent 现查 D18（块里携带什么信息） 已定项 14 射程末句、已定项 16 的 29 字节预留位与 `crates/singlefs-core/src/pointer.rs` 第 45 行的头部注释坐实 |
+| C401 | 已定项射程里的「未定」不进未定项清单 | **D18（块里携带什么信息） 已定项 19 的射程表里两个候选各标着「未定」：提交点身份取「(计数, 提交点 hash)」而不只是计数、以及「我是搬迁副本」标记加副本专属数据 CRC。** 而 D18（块里携带什么信息） 全文没有 `### 未定项` 一节、首行状态是「已定」⇒ 按分项走的门禁阶段（21 / 22 / 24 / 28 / 29 / 31 / 60）对这两格整个是盲的：门禁 doc-decisions 的 blocking-verdict 格判不了它们改不改新池新建文件的字节，门禁 doc-decisions 的 stale-open-items 格也不会在别处定了之后回来收它们。形态与 C212（固定结构的写小于 io_min） 记的那一条同族（两条硬要求住在「### 已定项」之前、没有分项号，七个阶段看不见），与 C66（格式级空白没有分项号） 互补：C66（格式级空白没有分项号） 从字节表反查，这一条从「未定」两个字正查 | 门禁扫决策正文里每一处「未定」字样：要么在同一份决策的 `### 未定项` 索引表里有对应分项，要么那一句里写明为什么不立分项；对不上判红并列出文件与行号。判别力自证：把一条已登记的未定项从索引表里删掉而正文仍写着未定，检查必须由绿转红。误判面可控：现查全仓带粗体的「未定」共 11 行 | 无前置（纯门禁工）；两个候选要不要立成 D18（块里携带什么信息） 的未定项，交用户 | 2026-09-19 第二批 D18（块里携带什么信息） 瘦身时子 agent 指出，主 agent 现查 D18（块里携带什么信息） 已定项 19 射程表那两行、并 grep 该文件「未定项」只命中文件头一句坐实 |
+| C402 | 改写旧依据的推论只走了本地腿 | **D22（单元原子性怎么合成） 已定项 25 的依据末行逐字「证据等级：数是观测；「所以那条旧依据要改写」是推论，只走了本地腿，两条云端腿欠着」。** `.claude/rules/three-way-inference.md` 要求任何用来推翻或确立一条决策的推论走三方，且一条腿的「没打中」至少抽两次样；这一格把 E33（两条钉块规则） 打空的那条旧依据改写进了正文，三条腿只到一条。全仓没有任何检查会因为「一条分项的依据自陈是推论而没有三方判决」而红 | 门禁扫决策分项的 `**依据**：` 块：凡自陈是推论的条目（带「是推论」「推的」「没走三方」这类记号），要指到一份 `research/prompts/*-main-verification.md`；指不到判红并列出分项。判别力自证：把某条已有三方判决的指针删掉，检查必须由绿转红 | 无前置（纯门禁工）；这一格本身要补两条云端腿，那是一轮三方 | 2026-09-19 第二批 D22（单元原子性怎么合成） 瘦身时子 agent 指出，主 agent 现查 D22（单元原子性怎么合成） 已定项 25 依据末行坐实 |
+| C403 | 引三方论证而没有腿况记录 | **D22（单元原子性怎么合成） 已定项 18 / 19 / 23 / 24 四条的依据都指着 2026-08-28 那一轮三方论证，而 D22（单元原子性怎么合成） 已定项 18 逐字记着「`research/prompts/` 下查不到对应的提示与本地腿输出」** ⇒ 那一轮的「三条腿都去找反例、都没找到」是未记录腿况的阴性结果。现查 `research/prompts/` 下与 D22（单元原子性怎么合成） 有关的文件只有未定项 6 那几轮，2026-08-28 那一轮一个文件都没有。`.claude/rules/three-way-inference.md` 明写本地腿缺席时必须显式报告、一条腿的「没打中」要抽两次样才算；没有腿况就分不出「腿跑了没打中」与「腿根本没跑」，而这两者在依据句里长得一模一样 | 门禁扫决策分项依据里每一处「三方」字样：要指到 `research/prompts/` 下真实存在的判决或腿输出文件；指不到就要在同一行写明腿况缺失，且那条依据不许写成阴性结论（「都没找到」「构造不出」）；两样都没有判红。判别力自证：把某条依据的判决文件名改成不存在的路径，检查必须由绿转红 | 无前置（纯门禁工）；要拿那一轮的阴性结果支撑新结论，先补跑一轮三方 | 2026-09-19 第二批 D22（单元原子性怎么合成） 瘦身时子 agent 指出，主 agent 现查 D22（单元原子性怎么合成） 已定项 18 / 19 / 23 / 24 四条依据与 `research/prompts/` 下的文件名坐实 |
+| C405 | 加密要并行与先串行提交没人合过 | **D9（加密） 已定项 3 定「加密路径必须能并行」（依据是 E6（加密算法选型） 量到屏蔽 AES-NI 时 AES-256-GCM 单核 244.74 MiB/s，低于任何现代 NVMe 的顺序带宽），D13（验证路线） 已定项 2 定事务层先承诺串行提交。** 两条压在同一根轴上（提交路径的吞吐天花板），而 D9（加密） 已定项 3 的射程逐字「加密路径的并行与 D13（验证路线） 已定项 2（先串行提交）怎么叠加没有评估过」，它的欠块逐字写着「无 C 编号」。后果：加密开启时天花板由谁定没有人算过——D13（验证路线） 已定项 2 射程写的交点是一次 checkpoint 约 1.1 万条条目（算式在 C58（串行提交撞天花板没人报警）），那个交点有没有因为加密而前移，一处没写 | 照 C357（同一根轴上的两条重开判据没人合过） 的形态登进那张「重开判据轴表」：加密开启时的提交吞吐天花板要给出合成规则（串行提交下单核加密算不算关键路径、交点挪到哪），缺合成规则判红。判别力自证：把其中一条的轴登记成别的轴，检查必须由绿转红 | 加密不进第一个可运行版本（D9（加密） 已定项 10），并行提交也还没开（D13（验证路线） 已定项 2）；今天能做的是把这一格登进轴表 | 2026-09-19 第二批 D9（加密） 瘦身时子 agent 指出，主 agent 现查 D9（加密） 已定项 3 的射程与欠块、D13（验证路线） 已定项 2 正文坐实 |
+| C406 | 读侧不判算法类型与压缩那三字节 | **D9（加密） 已定项 3 定算法类型登记表（0 未加密 / 1 ChaCha20-Poly1305 / 2 AES-256-GCM，读者遇到未登记的码显式失败、不按别的算法校验），已定项 14 定压缩算法码登记表（码 0 不压缩、压后长度同时写 0；不认识的码判该指针无法解引用；码 0 而压后长度非 0 判该指针损坏）。三条读侧判定今天一条都没有代码。** 现查 `crates/singlefs-core/src/pointer.rs` 的 `PointerHead::read_from` 逐字 `reader.skip(16 + 12 + 1 + 1 + 2 + 2)`（算法类型、压缩码、压后长度、extent 偏移一起跳过），`crates/singlefs-core/src/journal.rs` 的 `JournalRecord::parse` 逐字 `reader.skip(1 + 1)`，`crates/singlefs-core/src/root_record.rs` 的 `RootRecord::parse_slot` 四关是 magic / 整槽校验和 / fsid / flags、尾部那个算法类型字节一次没读；池级 checker 也不判。D9（加密） 已定项 3 与已定项 14 的欠块各自写着「没立账」 | 三条各造一份坏镜像（算法类型写 7、压缩码写 9、压缩码 0 而压后长度写 1），读路径与池级 checker 必须拒收；`crates/mutations.tsv` 各留一条「把那条判定改成恒真」的变异，门禁 checker-tier-crates-mutation-replay 必须红在它上面。判别力自证：把判定删掉，三份坏镜像必须由红转绿 | 无前置——第一版三处都写 0，判定今天就写得出，不依赖任何加密实现 | 2026-09-19 第二批 D9（加密） 瘦身时子 agent 指出，主 agent 现查 D9（加密） 已定项 3 与已定项 14 的射程与欠块，并逐个读 `PointerHead::read_from`、`JournalRecord::parse`、`RootRecord::parse_slot` 三处源码坐实 |
+| C407 | 三 oracle 合谋测试没有代码 | **D13（验证路线） 已定项 6 逐字要求「独立性要被验证，不许自称」：设计一个「三 oracle 合谋测试」，拿一个精心构造的坏实现（例如 nonce 永远为 0）去过三关，若三者全部放行，说明存在共同盲区，回头补 oracle。** 现查 `grep -rn 合谋 crates .claude/gate.d` 零命中，D13（验证路线） 已定项 6 的欠块逐字写着这个测试「没有 C 编号」⇒ 三条 oracle 的独立性至今只是声明，而 `CLAUDE.md` 把「没有 oracle」列为本工程第一条特殊性，功能正确性的全部故事就押在这三条上 | 合谋测试做成门禁阶段：一份已知坏镜像（或坏实现）喂给三条 oracle，至少一条必须红；三条全绿即判红并打印哪三条都放行了。判别力自证：同一个阶段对正常镜像必须转绿（阴性对照）；把其中一条 oracle 的判定关掉，必须仍有别的腿红，不红就说明共同盲区正在那里 | 三条 oracle 要都有代码：O2（独立解析器 + checker） 在 `crates/singlefs-checker`、O1（内存模型对拍（HashMap 理想文件系统）） 在 `crates/singlefs-harness/src/model.rs`（门禁 harness-model-differential-and-scenarios），O3（独立规约执行器） 零代码（C447（规约执行器没接进崩溃点重放与 RefFS 比对） 记着） | 2026-09-19 第二批 D13（验证路线） 瘦身时子 agent 指出，主 agent 现查 D13（验证路线） 已定项 6 正文与欠块、`grep -rn 合谋 crates .claude/gate.d` 零命中坐实 |
+| C408 | 代际增量 scrub 零代码 | **D13（验证路线） 已定项 8 自研第 2 项是代际增量 scrub（靠 I-1.2（块头写序已发布） 与 birth txg 维护一个「上次 scrub 扫到的 generation 水位」，只遍历 birth 大于水位的块），它撑着「让『每次提交都全量验证本次改动』在挂钟上可行、不必抽样」这句话。** 现查 `grep -rn scrub crates` 零命中，D13（验证路线） 已定项 8 的欠块逐字写着它「零代码没有 C 编号」⇒ 那句挂钟承诺今天没有任何实现或测量在背书。C194（代际增量 scrub 看不见被搬过的副本） 管的是它的射程缺口（被搬过的副本 birth 不变、永远落在水位之下），不是它有没有代码 | 实现之后做成门禁读数：同一份镜像上全量 scrub 与代际增量 scrub 判出的不变量违例集合必须相同（被搬过的副本那一格按 C194（代际增量 scrub 看不见被搬过的副本） 单列），不同即判红；水位推进之后增量 scrub 读到的块数必须严格少于全量。判别力自证：把水位固定成 0，增量 scrub 的块数必须等于全量，检查必须由绿转红 | birth txg 与写序已在盘上（D18（块里携带什么信息） 已定项 7）；scrub 本身没有代码 | 2026-09-19 第二批 D13（验证路线） 瘦身时子 agent 指出，主 agent 现查 D13（验证路线） 已定项 8 的射程与欠块、`grep -rn scrub crates` 零命中坐实 |
+| C409 | 层 1、层 2 在门禁里没有阶段 | **D13（验证路线） 已定项 9 把崩溃点重放分三层，并定「提交前 = 快速档全绿（必要条件）」与「里程碑收尾、动了崩溃点重放或判器的那一批提交之前，由主 agent 弹窗请用户跑一趟全量；跑红或用户不跑，提交照样可以进，记一笔未结的红或「这一阶段收尾没跑全量」，直到修掉或补跑」。** 现查 `.claude/gate.d/` 只有 门禁 checker-tier-layer0-replay 层 0（固定种子的最小复现负载、不抽样全量），层 1（上千写请求、按崩溃点所在子阶段分桶抽样、每次提交）与层 2（层 1 负载加大规模负载加多设备档位交叉、N≥5 轮、用户要求时或发布前）一个阶段都没有；D13（验证路线） 已定项 9 的欠块逐字「层 1、层 2 在门禁里没有阶段，没有 C 编号」⇒ 「里程碑收尾、动了崩溃点重放或判器的那一批提交之前，由主 agent 弹窗请用户跑一趟全量；跑红或用户不跑，提交照样可以进，记一笔未结的红或「这一阶段收尾没跑全量」，直到修掉或补跑」这条异步准入判据今天没有执行路径，而门禁汇总里看不出它缺席 | 层 1、层 2 各接一个门禁阶段；这一轮无对象时按 `.claude/singlefs-ai-sop/rules/show-me-test.md` 写退出码 77 明说未跑、不记通过。层 1 那个阶段的成功行要报「这一轮抽了多少个崩溃点、分在哪几个桶」，并把没抽到的桶逐个列名。判别力自证：把层 1 的抽样数设成 0，阶段必须判红而不是报绿 | 层 1、层 2 的负载（上千写请求、多设备档位交叉）还没有；层 0 已有（门禁 checker-tier-layer0-replay） | 2026-09-19 第二批 D13（验证路线） 瘦身时子 agent 指出，主 agent 现查 D13（验证路线） 已定项 9 的三层表、射程与欠块，并逐个看 `.claude/gate.d/` 下的阶段名坐实；引号里的句子照 D13（验证路线） 已定项 9 现文：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 两笔矛盾」一行 |
+| C410 | checker 两个方向共享什么没有检查 | **D13（验证路线） 已定项 12 定 checker 做遍历式与扫描式两个方向、对同一条不变量独立判断，「共享的只有格式解析」——这是它给冲突 1（`checker 即规范` 与「校验的两条路径不许共享工具」打架）开的那条出路。** 池级 checker 今天两个方向都有（`crates/singlefs-checker/src/walk.rs` 文件头），而那句「共享的只有格式解析」没有任何会红的形态盯着，D13（验证路线） 已定项 12 的欠块逐字记着它没有 C 编号 ⇒ 两个方向哪天共用了同一段遍历或同一份重建代码，冲突 1 那个单点就回来了，而门禁全绿 | 照 C12（增量语义共用） 的判据方向做检查：扫描式方向调用的函数集合与遍历式方向调用的函数集合，交集只许落在格式解析与常量里；取不到调用图、或交集越界即判红。⚠️ **不能直接借 C12（增量语义共用） 的工装**：那一条 2026-09-21 落成的门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格是 **crate 粒度**的依赖闭包交集，不是符号级，调用图那件工装根本没造出来。判别力自证：把扫描式方向改成调用遍历式的某个判定函数，检查必须由绿转红 | 取得到 `crates/singlefs-checker` 的调用图——这一条要的是**同一个 crate 内部**两个方向的符号集合，C12（增量语义共用） 的门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格判的是两个 crate 之间的依赖闭包，罩不到这一格，调用图仍要另建 | 2026-09-19 第二批 D13（验证路线） 瘦身时子 agent 指出，主 agent 现查 D13（验证路线） 已定项 12 正文与欠块、`crates/singlefs-checker/src/walk.rs` 文件头坐实 |
+| C411 | 分配记录的跨度段与单元类别不符没检查 | **D3（空间分配） 已定项 7 定「一条记录记一个存储单元」、跨度段说它覆盖几个 16 KiB 槽，而各单元类的大小不同**（D18（块里携带什么信息） 已定项 11 的登记表：码 1 数据单元 32768 是两槽，码 2 索引节点 16384 是一槽）⇒ 一条记录的跨度段与它所记单元的类别对不上时（比如给一个码 1 单元只记一槽），I-3.1（已分配统计对得上） 照样自洽——它按跨度段求和，而那个单元的第二个槽在盘上没有归属、可被重新分配 ⇒ 静默覆盖 | checker 全盘遍历时，每条分配记录按 key 读出它所记落点上的单元头、取单元类型标签，断言跨度段 × 16384 等于该类的单元大小。判别力自证：把某个码 1 单元那条记录的跨度段改成 1，检查必须由绿转红 | 要一张「类 → 单元大小」的表能被 checker 读到（D18（块里携带什么信息） 已定项 11 的登记表）；码 3 打包记录单元的大小随容器定，那一类先要有口径 | 2026-09-20 D3（空间分配） 按瘦身形态重写时现查：已定项 7 的欠段逐字说这条检查「还没有编号」，欠账表里搜不到对应编号 |
+| C412 | 整理的挂钟代价没量过 | **D3（空间分配） 已定项 14 是「后台整理常驻、自动、用户无需知道」这条硬承诺，而它今天没有任何挂钟数在背书。** D3（空间分配） 已定项 1 的依据引 E74（分配记录的条目数与整理开销），而 E74（分配记录的条目数与整理开销） 量的是整理路径重写多少个节点（载体强制付出多少），不是它要花多少墙钟；D3（空间分配） 瘦身前的正文自陈挂钟那一问仍欠实现，那句话已随 2026-09-20 的瘦身移出正文、在决策变更史里。⇒ 整理跑一轮要多久、会不会跟前台抢 I/O，一个数都没有 | 建一个计数实验或给 E74（分配记录的条目数与整理开销） 补一轮，量一批整理的挂钟，口径写明设备、负载、批大小，断言钉绝对值而不是只比相对倍数。判别力自证：把批大小翻倍，挂钟必须跟着涨 | D26（后台整理与放置回收） 的整理策略未定项 8 / 9 / 10 还开着，先定量哪一条策略；`crates/` 里没有整理（`grep -rn 整理 crates --include=*.rs` 只命中 `crates/singlefs-core/src/system_configuration.rs` 一处注释） | 2026-09-20 D3（空间分配） 瘦身现查：瘦身前那一版第 90 行自陈挂钟那一问仍欠实现，而欠账表里没有对应编号 |
+| C413 | 碎片度与全空段统计没有不变量 | **D26（后台整理与放置回收） 已定项 6 把 runs 与全空聚簇段数持久化进记账树当整理的触发输入，而 [invariants.md](invariants.md) 里「碎片度」与「全空段」各命中 0 次** ⇒ 这两个增量维护的统计量没有任何一条不变量盯着它们与全扫审计对不对得上。形态同 I-3.1（已分配统计对得上）：增量值错了，整理会在错的时机触发、或者永不触发，而 checker 一声不吭 | 往 [invariants.md](invariants.md) 加一条「碎片度与全空段统计对得上」：增量维护的值等于全扫重算的值，审计路径与增量路径不共享代码（E93（老化下的放置与碎片度） 已经这么建过）。判别力自证：把增量维护那一步少加一次，检查必须由绿转红 | runs 2026-09-14 换过口径（C326（runs 换口径之后 E93 的数还能不能引）），先按新口径定义全扫重算怎么做；载体是 D5（快照 / 空间记账机制） 已定项 3 的记账树 | 2026-09-20 D26（后台整理与放置回收） 按瘦身形态重写时现查：已定项 6 的欠段逐字说这条不变量还没进 [invariants.md](invariants.md)，`grep -c '碎片度\|全空段' .claude/kb/invariants.md` 为 0，欠账表里也搜不到 |
+| C414 | 挂载时不比对 io_min 与记录的槽距 | **D2（RAID 条带策略） 已定项 19 定了挂载闸 (a)「实际 `io_min` ≤ 系统配置记录的固定结构槽距」，而 `crates/singlefs-core/src/mount.rs` 里 `minimum_input_output_bytes` 命中 0 次** ⇒ 那道闸没有实现。镜像搬到 `io_min` 更大的设备上（E129（小于 io_min 的写在真设备上怎么出事） 实测 `dm-thin` 块 64 KiB、`io_min` 65536 而 `physical_block_size` 512，这种设备真的存在）照样挂得上，此后每次根槽写都小于 `io_min`、诱发设备侧多写，没有任何东西报警。与 C82（io_min 不在挂载比对清单） 的分界：那条问 D12（目标介质） 已定项 4 的比对项表里没有 `io_min` 这一行，这条问闸本身没写进代码 | 挂载时读系统配置几何段的两个字段，拿实际 `io_min` 比对记录的槽距，不满足就拒绝可写挂载。检查形态：造一份「槽距 4096、挂在 `io_min` 65536 的设备上」的镜像，断言可写挂载被拒。判别力自证：把那句比对去掉，检查必须由绿转红 | 无前置：条款已定（D2（RAID 条带策略） 已定项 19），系统配置两个字段与 `slot_spacing_for` 算式已在 `crates/singlefs-core/src/system_configuration.rs` | 2026-09-20 D2（RAID 条带策略） 瘦身时子 agent 报出，主 agent 现查 `grep -c minimum_input_output_bytes crates/singlefs-core/src/mount.rs` 为 0 坐实闸没实现 |
+| C415 | 变异表复跑共用编译缓存，陈旧产物能把变异记成被抓 | 门禁 checker-tier-crates-mutation-replay 把仓拷一份跑变异，`shutil.copytree` 保留源文件的 mtime，而 `GATE_MUTATION_TARGET_DIR` 跨轮、跨源码树复用：拷进来的源码比缓存里的产物旧时 cargo 判它是新的、不重编。2026-09-19 实测假红一次——`crates/mutations.tsv:28`（步 3：链首锚点错一位）报「点名的测试没跑到」，报错是 `unresolved import singlefs_checker::walk::allocation_record_count_under_root`，而那个函数就在工作区的 `walk.rs:1260`；同一张表换干净编译目录重跑 173 条全红在点名的测试上。危险的方向是反过来：某轮跑被硬杀、缓存里留着带变异的产物，下一轮拷进来的源码 mtime 更旧，点名的测试会为无关的原因变红而被记成「被抓」，那是假绿。 | 门禁 checker-tier-crates-mutation-replay 拷完把源码的 mtime 抬到当下，或者在缓存目录里存一份源码内容的哈希、对不上就先清掉缓存（哈希只在整表跑完时才写，硬杀之后下一轮必清）；判别力自证：造一个缓存里放着按旧源码编出来的产物、而拷进来的源码更新过的局面，不修必须报「没跑到」，修了必须 173 条全绿 | 无 | 2026-09-19 代码轮二 crash-verifier 跑 门禁 checker-tier-crates-mutation-replay 整表实测（`59.log` 与 `59-rerun.log`），主 agent 读 门禁 checker-tier-crates-mutation-replay 源码核过 |
+| C416 | 去重窗口被 T_dirty 界住那条骑手没人查 | **D8（核心索引结构） 已定项 7 把 `seq` 定成 4 字节之后，因果倒过来：它逐字给反向索引与 LRU 压了一条骑手——「反向索引与 LRU 定 key 时必须让去重窗口同样被 `T_dirty` 界住（代进 key，或别的等效办法）」，依据是「同一个 key 的待去重条目必然同属一个发布窗口」。** 而这条骑手今天没有任何东西在查：那两棵树的 key 布局还没定（D19（块指针的结构与宽度预算） 已定项 6 定的是中央映射的 key），定的时候没人会被提醒去兑现它；兑现不了就是 4 字节 `seq` 的依据当场不成立，而盘上格式已经按 4 字节写出去了 | 反向索引与 LRU 的 key 布局定案时，检查它的去重窗口上界是不是 ≤ `T_dirty`；定不出就判红并报出差多少。判别力自证：把某一棵树的窗口上界改成 `T_dirty + 1`，检查必须由绿转红 | 那两棵树的 key 布局今天没有条款（D8（核心索引结构） 已定项 7 只定了 `seq` 的宽与位置） | 2026-09-20 D19（块指针的结构与宽度预算） 瘦身时子 agent 报出「旧正文已定项 5 的欠里三条全仓没有 C 编号」，主 agent 现查 D8（核心索引结构） 已定项 7 的定案逐字坐实 |
+| C417 | 位置提示的刷新政策只建模过一种 | **D19（块指针的结构与宽度预算） 已定项 5 取混合（位置条目当提示、中央映射是权威入口），而提示什么时候刷新只有一种做法被量过。** E96（混合架构的一致性） 的「它答不了的」第 5 条逐字：「活根提示的刷新政策只有『随重写刷新』一种；『读失配时顺手刷提示』那种会改快照树以外的叶，没建臂」⇒ 提示过期率那一格的数只对第一种政策成立，而 D19（块指针的结构与宽度预算） 已定项 5 的依据表正是拿那个区间当「读只多 19–37%」的出处 | 给第二种政策建臂重跑 E96（混合架构的一致性），报两种政策各自的提示过期率与多跳率；断言钉绝对值。判别力自证：把两种政策的刷新时机写成同一个，两条臂的数必须相同、检查由绿转红 | 要先定「读失配时顺手刷提示」改不改快照树以外的叶——那一步碰的是 COW 之外的写，归 D26（后台整理与放置回收） 与 D22（单元原子性怎么合成） | 2026-09-20 D19（块指针的结构与宽度预算） 瘦身时子 agent 报出，主 agent 现查 E96（混合架构的一致性） 的「它答不了的」第 5 条坐实 |
+| C418 | 位置权威三臂的缓存命中维零测量 | **E109（位置权威三臂的运行时代价） 是 D19（块指针的结构与宽度预算） 已定项 5 取混合的主依据，而它自陈不答缓存命中这一维**：「它答不了的」第一条逐字「不答挂钟与缓存命中：映射层装不装得进内存是另一个实验……`map` 的读翻倍这一维在装不下缓存时可能远不止翻倍，E109（位置权威三臂的运行时代价） 量不到那一格」，并拿 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 的同型转折当旁证（装不下缓存就从几乎免费跳到约 1 次设备 I/O 每操作）⇒ 混合臂「读只多 19–37%」这个结论的适用范围没有下界 | 量一次映射层装不装得进内存：按容量 × 条目宽算出映射层大小，扫几档内存预算，报每档的读放大；断言在装得下那一档复现 E109（位置权威三臂的运行时代价） 的倍数、在装不下那一档报出跳变。判别力自证：把内存预算设成无穷大，两档必须给同一个数、检查由绿转红 | 中央映射条目的宽今天已定（D19（块指针的结构与宽度预算） 已定项 10：key 27、条目 55），算得出大小；挂钟轴要真设备 | 2026-09-20 D19（块指针的结构与宽度预算） 瘦身时子 agent 报出，主 agent 现查 E109（位置权威三臂的运行时代价） 的「它答不了的」第一条坐实 |
+| C420 | 用私有索引提交之后共用索引过期没有检查 | **几个会话共写一个仓时暂存区是共用的**（`.claude/singlefs-ai-sop/rules/session-wrapup.md` 逐字：「暂存区本身也是共用的：另一个会话随时可能把它的文件放进来」）。绕开它的办法是拿 `GIT_INDEX_FILE` 指一个私有索引去暂存与提交，共用索引一个字不动。**而提交之后共用索引仍停在旧 HEAD 上**：它里面那些文件存的是旧版内容，`git diff --cached` 于是把它们全列成「已暂存的改动」，另一个会话这时提交就会把刚进仓的东西整批**反向提交**回去，而它那一侧看到的只是一个内容合理的暂存区 | 提交后检查共用索引：`git diff --cached --name-only` 列出的文件里，不许有一个出现在刚做完的那次提交中；有就判红，出路给 `git read-tree HEAD` 加把对方的文件重新 `git add` 回去。判别力自证：用私有索引提交而不重置共用索引，检查必须由绿转红 | 无前置（纯工装工）。要连着定一条「什么时候该用私有索引」的约定：今天只有「共用索引里已经有别的会话的文件、而这一轮必须提交」这一种场合 | 2026-09-20 主 agent 用私有索引提交决策瘦身那 221 个文件（`c0b9c3b`）时当场撞上：提交后共用索引与新 HEAD 差 222 个文件，跑 `git read-tree HEAD` 再把对方那一个文件 add 回去才复原 |
+| C421 | 字词损坏闸把日期占位符判成缩写自粘 | **`research/scripts/corruption-check.py` 第 74 行的 `ACRO_DUP = re.compile(r"\b([A-Z]{2,})\1\b")` 把任何单独出现的 `YYYY` 拆成 `YY` + `YY`，判成「缩写自粘」。** 实测（2026-09-20）：一段 276 词、完全干净的英文，只因为逐字引了 `YYYY-MM-DD` 就被判红 12 处，退出码 1；`MMMM` 同样中，`AABB` 与 `HTTP` 不中。⇒ **凡是要给本地腿逐字引 kb 里日期占位符的提示，提示自身与模型答复都会被闸判红**，而 `.claude/rules/three-way-inference.md` 明令「闸判红之后那一轮作废重跑」——一条本该拦损坏的闸在这一类提示上变成了拦正常输出。agentdef-links 第一轮的本地攻方腿因此作废两次调用，靠把占位符改成小写 `yyyy-mm-dd` 才跑通 | 让 ACRO_DUP 不吃「同一个字母重复」这一类：要求两半至少有两个不同字母，或给日期占位符（`YYYY` / `MM` / `DD` / `MMMM`）一张豁免表。判别力自证：改完拿 `YYYY-MM-DD` 那段 276 词的干净语料跑一次必须判绿，再拿一段真的含 `CPUCPU` 形态的语料跑一次必须判红；两条都进 `corruption-check.py` 的自证 | 无前置（纯工装工）。改它要连 `research/scripts/oov-check.py` 一起看：两个闸由 `ask-local.sh` 串跑，另一个闸对同一段语料怎么判没核过 | 2026-09-20 agentdef-links 第一轮本地攻方腿跑闸时报出，主 agent 现查正则与实测语料坐实（`python3 research/scripts/corruption-check.py` 对 276 词干净语料退出码 1、报 12 处） |
+| C422 | 挂载选项通道不存在 | 系统运行配置「每次挂载可重设、要回写」在 `crates/` 里没有落点：`mount.rs`（1376 行）挂载选项零命中，`crates/singlefs-core/src/system_configuration.rs` 没有 T_time / T_dirty 字段 | 挂载时传一个与盘上不同的 T_time，重新挂载后读回来必须是新值；判别力自证：去掉回写那一步必须由绿转红 | 无 | 2026-09-20 用户定案：D22（单元原子性怎么合成） 已定项 26「系统配置的三档可改性」定系统运行配置每次挂载可重设、要回写，原话在决策变更史 |
+| C423 | 回写算不算一次发布 | 挂载时改了运行配置要写系统配置槽一次。这次写的世代号怎么走、算不算一次发布、进不进层 0 枚举、与取号那两写的次序，全仓零覆盖 | 层 0 录制流加一段「挂载时带新配置」，逐崩溃点判 I-7.7（系统配置实例代号不低于根环） 与择槽规则 | 挂载选项通道 | 2026-09-20 用户定案：D22（单元原子性怎么合成） 已定项 26「系统配置的三档可改性」定系统运行配置每次挂载可重设、要回写，原话在决策变更史 |
+| C424 | 生效配置不可见 | T_time 可调之后丢失窗口是挂载参数的函数，而盘上与运行时都没有「这次挂载生效的是多少」这个读数 ⇒ 事后没人说得清那次崩溃该丢多少 | checker 或一个只读工具能报出每块盘上系统运行配置的现值；崩溃后重放时它与录制时一致 | 挂载选项通道 | 2026-09-20 用户定案：D22（单元原子性怎么合成） 已定项 26「系统配置的三档可改性」定系统运行配置每次挂载可重设、要回写，原话在决策变更史 |
+| C425 | T_time 小于一次发布耗时时触发空转 | 越界给警告放行之后，T_time 小于「一次发布真正要花的时间」时上一次没发完下一次就触发，而在飞 checkpoint 深度只有 2（开放 + 发布中）⇒ 触发空转、脏数据一直攒。这一格的行为全仓没写 | 真机上把 T_time 设成小于实测发布耗时，跑一段负载，断言触发次数与实际发布次数的关系有界 | 挂载选项通道；真机 harness | 2026-09-20 用户定案：D16（发布语义） 已定项 5 改 `T_time` 用户可设、越界给警告，原话在决策变更史 |
+| C426 | 几何段逐字段的可改性没有逐条依据 | 三档划分里「几何段除节点大小外全归不可变」只有节点大小那一条有条款（D8（核心索引结构） 已定项 2 射程），别的字段（单元大小、落点粒度、位置条目宽度、journal 环几何、根环参数）没人逐条判过改了要付什么 | 每个字段在字段表里有一列「改了要付什么」，空着即判红 | 无 | 2026-09-20 D22（单元原子性怎么合成） 已定项 9 字段表按可改性重新分段时，几何段里除节点大小外的字段没有逐条「改了要付什么」的依据，原话在决策变更史 |
+| C429 | 路径回写不保形，也不核新路径指不指得到 | `rewrite-moved-paths.py` 把「纯文件名」「相对所在 crate 根的路径」一律升级成仓库根起的路径，而有些位置要的不是那种形状。2026-09-21 实测两处：`research/e7-index-bench/Cargo.toml` 的 `path =`（Cargo 按 crate 根解析）拼成 `src/bin/research/e7-index-bench/src/bin/…`，`cargo build` 报 can't find bin；`research/scripts/replay.sh` 登记表第 4 列（要 `results/` 底下的纯文件名）拼成 `results/research/results/…`，`diff` 报「对不上，127 行不同」——看着像产物变了，其实是登记表坏了。**而它报「✓ 改写了 34 个文件，回读都没有旧路径」：回读只证明旧路径消失，不证明新路径指得到东西** | 回写之后对每个写进去的新路径按它所在文件的解析口径做存在性断言（Markdown 链接按文件位置、Cargo 的 `path` 按 crate 根、其余按仓库根），指不到就判红并列出文件与那一行；第二处已另立会红的闸（`replay.sh` 在构建之前判第 4 列带斜杠就退 2，坏表退 2 / 真表退 0 双向证过） | 无 | 2026-09-21 全仓术语改名第二批 |
+| C430 | 以数据形式存在的名字没人管命名纪律 | `naming-lint` 的射程写明只查**我们声明的名字**（变量、字段、类型、常量……），而一类名字活在**字符串字面量与表格里**：实验装置的字段表标签（`("system_configuration_mac", 16)`，E100（系统配置的三段几何）、E115（系统配置字段表的完备性与字节预算）、E124（系统配置字段表按 D18 已定项 14 重算））、臂名（`Tail::SystemConfiguration => "tail_system_configuration"`，E23（journal 几何））、段序列的步骤种类串（`StepKind::SystemConfigurationSlot => "system_configuration_slot"`）。它们逐字落进留存产物与 kb 正文，是**人真正读到的那批名字**，却一条命名纪律都罩不到——2026-09-21 全仓术语改名时才发现 `system_configuration` 这个缩写在这一层活了下来，而同期 `naming-lint` 报全仓 0 违规 | 扫产物与 kb 表格里的「名字形态的串」（`key=` 的键名、`("名字", 数)` 的首列、`=> "名字"` 的右侧），按同一份缩写词表与单字母规则判；判别力自证喂一个含 `("system_configuration_mac", 16)` 的装置源码，必须判红 | 无 | 2026-09-21 用户看到 `system_configuration_mac` / `tail_system_configuration` 问「不是明确了不允许缩写么」，逐处现查后立 |
+| C431 | 腿把背景材料的行号当成 kb 文件自己的行号 | 三方的腿读的是拼好的背景材料（正文 + 清单 + 附录，上千行），顺手记下的行号是**材料里的行号**，贴在 kb 文件名后面就指向一个不存在的位置。`.claude/rules/three-way-inference.md` 已明令「引 kb 条款写 kb 文件名加那份文件自己的行号，行号去 kb 文件里现查，不从背景材料里数」，派发提示里也逐字写了，**2026-09-21 增补 1 第二轮里两条云端腿仍各犯一次**（`23-journal的角色与格式.md:669` 实际是背景材料第 669 行，kb 文件只 614 行；`invariants.md:1202-1208` 同理，那份只 458 行）——靠提示里写一句拦不住 | 核查员那一步机械判：腿报告里每个 `<路径>:<行号>` 形态的引用，先看那份文件有没有那么多行（超了直接判红、报出文件实际行数），再看引文是不是逐字出现在那一行附近；判别力自证喂一份「行号超过文件行数」的报告，必须判红 | 无 | 2026-09-21 增补 1 第二轮核查员交回，76 处里 2 处是这个形态 |
+| C432 | 一个 checkpoint 间隔的 journal 占用没有条款 | 约束 journal 环不溢出的两处条款，主语都是「任一操作 / 任一事务」：D23（journal 的角色与格式） 已定项 23 与 I-8.1（环几何够大）。甲（每次 fsync 一次全量发布）下「一个 checkpoint 间隔」与「一个事务」同外延，所以这个缺口从没暴露；WAL 类形态下一个 checkpoint 间隔跨 λ·T 个事务，**「一个间隔占多少 journal」第一次成为一个独立的量，而全仓没有一条条款约束它**。实测触发点（增补 1 第二轮三方，攻方）：`T_time` 取它自己的默认值 5 s 就越过环 ÷ F。 | 立一条「一个 checkpoint 间隔的 journal 占用不超过环的几分之几」的条款，再做成会红的检查：按 λ、T_time 与一个间隔内的事务数算出占用，越过门槛判红；判别力样本拿 `T_time` 默认值那一格（今天就越界）。 | 要先定 WAL 类形态进不进（增补 1 两轮三方的结论是三条岔路收成「甲（不改）」，所以这个缺口**今天不发作**——甲下它与「任一事务」同外延）；以后重开 WAL 类形态（D23（journal 的角色与格式） 已定项 1）时这条必须先答 | `.claude/kb/milestone/02-second-txn.md` 增补 1「还欠的三笔」第一笔；`research/prompts/m2-s1-r2-main-verification.md` |
+| C433 | 提交里的登记与被登记的文件不同进退 | 几个会话共写一个仓时，「这份改动是谁的」**不能按文件路径判**——真正的判准是「**这个文件是不是混合的**」：别人的行可以混在我也改过的文件里。2026-09-21 实测：`3cff909` 用 `git add -A` 再按路径清单退出别人的文件，而 `crates/singlefs-harness/src/lib.rs` 的 `pub mod crash_injection;` 与 `research/e7-index-bench/Cargo.toml` 的两个 `[[bin]]` 是别的会话加在**我也改过的那两份文件**里的行，被一起提交、对应源码却留在它的工作区 ⇒ **HEAD 自己编译不过**，`gate.sh --staged` 死在第一步，后面 21 个阶段全是连带红、一个都没真跑（既不算通过也不算失败）| **四条一起做**：⓪ 反向之二——整组改动被别人的提交带走：一组做完、停在工作区等通知的改动（2026-09-21 的 `.claude/handover/` 67 份**删除**），被另一个会话顺手 `git add -A` 带进了它的提交。删除比修改更难发现：做这组改动的人 `git status` 只看到目录不在了，等他去提交时会发现「没东西可提」而不知道它已经进了别人的提交。判据是提交前对每一批改动问一句「这是谁做的、他说过要提吗」，光按路径判不出来。① 正向——这次提交新增的登记（Rust 的 `mod`/`use crate::`、Cargo 的 `[[bin]] path`、`replay.sh` 的登记行、变异表的文件列），被它点名的文件不在这次提交的树里就判红；② 反向——这次提交删掉或没带上的文件，别处还有登记指着它就判红（「源码撤了、登记还在」同样编不过）；③ 判混合——提交前对每个暂存的文件比一次「这次提交碰的块」与「别人未提交改动碰的块」有没有交集，有交集就要求走 `research/scripts/stage-mine.py` 按块暂存。判别力自证各造一个小仓：加了 `mod x;` 而 `x.rs` 不在树里、删了 `x.rs` 而 `mod x;` 还在、两个会话改同一份文件的不同块，三个都必须判红 | 无 | 2026-09-21 归档与术语清扫那一轮跑 `gate.sh --staged` 撞出来；反向与「判混合」两条由别的会话补 |
+| C434 | 代码轮的开工快照没有会红的检查 | `.claude/rules/implementation-workflow.md`「代码轮派腿之前记一份开工快照」全靠主 agent 记得；2026-09-21 这一轮主 agent 漏了，核查员按定义拒绝开工才暴露出来，只能事后按 `git status` 的状态码倒推。倒推能做是因为那几份文件恰好没被别的会话动过，换一轮就未必 | 门禁形态：代码轮的判决文件要点名一份开工快照，快照里每份文件的 sha256 与派腿时刻对得上；判据落在判决与快照两份产物上，与门禁 doc-process-records 的 crates-adversarial-review 格按路径点名同形 | 无 | 2026-09-21 archive-rename-r1 轮，核查员按定义拒绝开工：`research/prompts/archive-rename-r1-main-verification.md` 开头 |
+| C435 | 装置与 crates 逐字节比对的配对键失配时静默少比 | E142（新池新建文件的干跑） 装置按区域名做 `find` 与 `crates/` 的快照配对（`research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs:4523`），两端名字对不上时那一格报 `equal=unknown … reason=no_impl_snapshot_given` 而不是 `equal=false`，F1 停机条款只认后者 ⇒ 不判红、只是少比两格。两端唯一的钩子是 `crates/singlefs-harness/src/new_pool_file_creation_regions.rs:78` 的一句注释（攻方腿 2026-09-21 打中；它用的是过期构建产物，真正可达的同型历史按代码推、没实测） | 配对失败要与「比了不等」分开报，并让 `snapshot_given=true` 而 `equal=unknown` 这个组合直接判红——那个组合自相矛盾。先补一条会红的检查，再谈改配对方式 | 无 | 2026-09-21 archive-rename-r1 轮攻方腿（配对键失配判据）：`archive-rename-r1-opus-output.md` |
+| C436 | 反引号里的路径，归档与文档指向两道都够不着 | `.claude/agents/three-way-materials.md:20` 与 `:28` 用反引号写着 `research/prompts/_m2-code-r1-diff.md` 全路径，那份已被归档删掉。三层各自够不着：`archive-past-rounds.py` 的 `still_an_input()` 扫的 `INPUT_TREES` 与 `rewrite_links()` 扫的 `SCAN` 都不含 `.claude/agents/`；共享门禁「链接指向」阶段（上游 `link-targets.py`）只判 `[文字](路径)` 形态的链接，而它的 `mask_code()` 会把反引号片段整段涂空（正推腿 2026-09-21 现查） | 两条路：把 `.claude/agents/` 加进归档的 `SCAN`（它会把引用改成只留文件名），或者让「链接指向」阶段也判反引号里长得像仓内路径的串。后者射程更大，要先量误判 | 无 | 2026-09-21 archive-rename-r1 轮正推腿 J3①：`archive-rename-r1-sonnet-output.md` |
+| C437 | 归档遇到 gitlink 会未捕获异常中止 | `research/scripts/archive-past-rounds.py --apply` 对 `research/results/` 下一个未改动的 gitlink（`160000` 子模块）调 `os.remove()` 会抛 `IsADirectoryError` 直接中止，后面的 `stale_exclusions()` 与 `missing_code_inputs()` 一条都跑不到（正推腿 2026-09-21 在临时仓里构造出来的；仓里现在没有子模块） | `past_round_files()` 按 `git ls-files --stage` 的模式位滤掉 `160000`，并在自检里造一个 gitlink 证明它被跳过 | 无 | 2026-09-21 archive-rename-r1 轮正推腿（删上一轮留本轮边界）：同上 |
+| C438 | 历史节里当天新写的错行不判 | 门禁 doc-experiments 的 quoted-result-lines 格把「## 历史版本」整节排除、不分新旧，于是当天新写进历史节的错引文完全不判（报「无对象可判」、退出码 77）。整节排除本身是对的（用户 2026-09-21 定：以前的是历史、仅作参考），错在不分新旧 | 判据要拆成两半：历史节里**这次改动新增的行**照判，早先就在那里的不判。做法是把 门禁 doc-experiments 的 quoted-result-lines 格现有的 diff 范围算法也用到历史节上 | 无 | 2026-09-21 archive-rename-r1 轮正推腿 J6①：同上 |
+| C439 | gate-ok 前移让同轮早先写的行不再被判 | 门禁 doc-experiments 的 quoted-result-lines 格按 `refs/singlefs/gate-ok` 算「这次改动新增或改写的行」，而那个 ref 在任意一次共享 `gate.sh` 全绿时前移；同一轮里该前移点之前写下的错引文，之后再跑就永远不在判定范围里了（正推腿 2026-09-21 现造现测，`.claude/agents/gate-triage.md:31` 是前移那一处） | 要么把基准改成「上一次提交」而不是「上一次全绿」，要么在前移时记下当轮起点；两种都要先想清多会话共用一个 ref 时谁定起点 | 无 | 2026-09-21 archive-rename-r1 轮正推腿 J6②：同上 |
+| C440 | 判决点名的模型目录归档后正文没说清 | 三方判决写「模型目录 `c381-r2-opus-model/`（10 个文件）」（C381（根已落盘之后发布失败，分配器仍退回） 第二轮），归档删掉其中 8 份之后 `ls` 出来只剩 2 份，而正文那句没变——读的人会以为丢了。门禁 doc-experiments 的 results-cited 格新加的第三道只扫 `.claude/kb/experiments.md` 与实验页里的产物引用，够不着 `research/prompts/` 下判决里的模型引用（别的会话 2026-09-21 指出，两份判决已手改成写明哪些在树里、哪些取法是什么） | 判据与 门禁 doc-experiments 的 results-cited 格第三道同形：点名的东西要么在树里、要么取得回来，正文还要说清是哪一种。先不扩射程（判决少、归档触及的更少），扩之前要先定判决里「点名一个目录」怎么算 | 无 | 2026-09-21 别的会话核归档删掉的 C381（根已落盘之后发布失败，分配器仍退回） 模型目录时指出 |
+| C441 | 全仓清扫工具会吃掉自己的判别力样本 | 术语清扫按登记表全仓替换时，把门禁 doc-text 的 term-renames 格自己的红绿两份样本也扫了：`fixtures/90-term-renames.sh/{red,green}/.claude/kb/term-renames.md` 的**旧名那一列**被换成新名，红绿两份内容变得一模一样，判别力当场归零——而 门禁 doc-text 的 term-renames 格本身照样报绿，只有阶段自检报「green 期望退出 0，实测 1」时才露出来（2026-09-21 实测）。同一形态对任何「按表替换全仓」的工具都成立：它的样本里必须留着被替换的那一侧 | 判据：一道检查的判别力样本被它自己扫过之后，红样本还红不红。做法是让清扫工具默认把 `fixtures/<自己的阶段名>/` 排除掉，排不掉就在自检里造一次「样本被自己扫过」的场景、要求红样本仍然红 | 无 | 2026-09-21 archive-rename 轮：`.claude/term-rename-exempt` 里那条 `fixtures/90-term-renames.sh/` 的登记 |
+| C443 | 读登记表的脚本把表头当成一条记录 | 2026-09-21 主 agent 按块合索引内容时，解析 `.claude/kb/term-renames.md` 的一次性脚本把表头那一行（四列分别是旧名、新名、匹配方式、是什么）当成了一条改名规则，于是全文「旧」→「新」：`.claude/kb/experiments-history.md` 六处 `E112（旧写者遇到不认识的树）` 变成「新写者」、`checks-owed.md` 一处同样。改出来的字通顺、看不出错，是 doc-lint 的「简称与登记位不符」把它抓出来的。`sweep-term.py` 自己不犯这个错（它按 `<!-- term-renames:table -->` 标记之后的表体读），犯错的是临时写的解析 | 判据：凡是读项目里登记表的代码，都要跳过表头与分隔行，并且在自检里喂一张只有表头的空表、断言解析出 0 条。做法是把读这张表的逻辑收进 `sweep-term.py` 暴露出来的一个函数，别处一律调它，不再各写一份 | 无 | 2026-09-21 archive-rename 轮：doc-lint 报 `.claude/kb/experiments-history.md` 9 处编号引用简称不符 |
+| C445 | 模型对拍的取样点不随写路径增长 | **新加一条写路径或一类操作，而 O1（内存模型对拍（HashMap 理想文件系统）） 的取样点没跟**：门禁 harness-model-differential-and-scenarios 判的是「那五段都跑了、模型对拍步数大于 0」，不判「这五段覆盖了哪几类操作」⇒ 新增的那一类在模型一侧一步都没被对过，而 门禁 harness-model-differential-and-scenarios 照样全绿。这个缺口已经在三条账里各自出现过一次：C344（单调统计量的点删遇墓碑没有会红的检查）、C349（重组时节点消息缓冲区怎么搬没有条款）、C383（同一次发布里同 key 的中间态折叠没有检查） 的前置列都写着「门禁 harness-model-differential-and-scenarios 那五段取样点罩不到 X，要为它加取样点」 | 写路径清单（事务层能发出的操作种类）与随机历史的取样点表逐项对齐：有一类操作在全部取样点上出现次数为 0 即判红，成功那句报出「覆盖了几类、没覆盖的是哪几类」且清单现算。判别力自证：给事务层加一类操作而不加取样点，检查必须由绿转红 | 要一份「写路径清单」的权威落点——今天没有：操作种类散在 `crates/singlefs-harness/src/history.rs` 的历史生成器里，没有一处枚举它们并声明「这一类要不要进取样点」。模型对拍本身 2026-09-19 已有（`crates/singlefs-harness/src/model.rs`、`model_comparison.rs`，门禁 harness-model-differential-and-scenarios） | C25（三个 oracle 零代码） 的判据「每个 oracle 各立一条欠检查」：2026-09-21 现查欠账表两张表里 O1（内存模型对拍（HashMap 理想文件系统）） 只被顺带提到（C191（同源性计数器只盖了一对）、C397（反向判据的 N 没声明，事件数没人计）、C407（三 oracle 合谋测试没有代码）），一条以它为主语的账都没有 |
+| C446 | 未实现的不变量没有前置登记，也没有到期 | **O2（独立解析器 + checker） 判的条数与不变量清单之间没有任何推进机制**：[invariants.md](invariants.md) 在用 69 条，池级 checker 判 29 条，其余 40 条状态列写着「未实现」而**没有一条写明它被什么挡着**。门禁 doc-registries 的 invariant-count-elsewhere 格判的是条数在几份文件之间对不对得上，declared-counts 格判的是那句「现共 N 条在用」与表里条数一致——两道都不看「未实现那几条什么时候该实现」。于是一条不变量可以从写下那天起永远停在「未实现」，而没有任何东西会说话 | 每条状态为「未实现」的不变量登记它被什么挡着（哪个里程碑步、哪条欠账编号、哪条未定分项），指向不存在的前置判红；**前置已经满足而状态仍写「未实现」的也判红**——那一条是可以开工而没人开工。判别力自证：把一条前置已满足的不变量标回「未实现」，检查必须由绿转红；把某条的前置改成一个不存在的编号，也必须红 | 无（纯登记工），但要先给那 40 条各写一个前置，这是一次性的人工活；判「前置满足了没有」要能机器读，所以前置只许写成编号（里程碑步号、C 编号、决策分项号），不许写散文 | C25（三个 oracle 零代码） 的判据「每个 oracle 各立一条欠检查」：2026-09-21 现查欠账表两张表里 O2（独立解析器 + checker） 只被顺带提到，一条以它为主语的账都没有。条数来自当天跑的 kb 腐烂检查（今天是门禁 doc-registries；那天的输出「不变量条数一致：在用 69 条」）与 [invariants.md](invariants.md) 第 12 行（「池级 checker 判 29 条」） |
+| C447 | 规约执行器没接进崩溃点重放与 RefFS 比对 | **D13（验证路线） 已定项 6 的三条 oracle 里，O3（独立规约执行器） 还没对崩溃点重放的每个状态出判定、与 RefFS 逐个比对**：O3（独立规约执行器） 是只照 kb 文字写的 Python 执行器（E170（O3规约执行器第一版）），第 1 次重跑在导出的批态与坏状态表上判得出、与实现一致、有判别力，但只吃导出的取样批态，没接进崩溃点重放；RefFS 在 `crates/singlefs-reference-filesystem`，已接上崩溃注入与故障注入的调用点（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批「12-2 交回」）⇒ 「三条互相独立的验证路线」这句话在崩溃点重放上今天只有两条撑着。D13（验证路线） 已定项 6 逐字要求 O3（独立规约执行器）「用另一种语言写（不用 Rust），只照 decisions 与 invariants 的文字重新推导」，并且「规约本身可能写错——必须配阳性对照才有意义」 | 两步。① 对象不存在时：门禁阶段显式报未实现、退 77（不记通过、不算覆盖），不许静默跳过；② 有对象之后：规约执行器对崩溃点重放的每个状态给出判定，与 RefFS 的判定逐个比对，不一致的落进 C191（同源性计数器只盖了一对） 那张同源性表。判别力自证：喂一个「规约执行器放行、RefFS 判红」的状态，必须记进不一致表并判红；两边都判红的必须不记 | 规约执行器能对崩溃点重放的每个状态出判定（今天只吃导出的批态）；两边对同一（历史、崩溃点）出判定行要不要翻译层没判（`research/prompts/m3-formal-r5-main-verification.md` 第二节同源性计数器那一格）。2026-09-21 现查时两样都零代码；E170（O3规约执行器第一版） 第 1 次重跑与 RefFS 接上调用点（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批）之后，剩下的是逐态出判定与比对 | C25（三个 oracle 零代码） 的判据「每个 oracle 各立一条欠检查」：2026-09-21 现查欠账表两张表里 O3（独立规约执行器） 只被顺带提到（C191（同源性计数器只盖了一对）、C407（三 oracle 合谋测试没有代码）），一条以它为主语的账都没有；2026-10-02 事件对手由 checker 改成 RefFS（`research/prompts/m3-formal-r5-main-verification.md` 第二节同源性计数器那一格）；2026-10-03 题面改成剩下的那部分（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批「12-2 交回」与 E170（O3规约执行器第一版） 第 1 次重跑三段交回） |
+| C449 | 两套基准算法让带不带 --staged 判出不同的改动范围 | **共享的 `diff_base` 取「上次门禁全绿那一点」（没有上游时读 `refs/singlefs/gate-ok`），而项目本地阶段（doc-process-records 的 crates-adversarial-review 格、knowledge-sync 格这类）各自写了简化版 `GATE_BASE > upstream > HEAD`** ⇒ 同一个工作区，带 `--staged` 跑（`gate.sh` 会把 `diff_base` 的结果设进 `GATE_BASE`）与不带跑，改动范围不是同一个：2026-09-21 实测，不带时基准是 HEAD `8186d5b`、门禁 doc-process-records 的 knowledge-sync 格报 3 个触发文件没点名；带 `--staged` 时基准是 `3cff909`、同一道报 17 个。两次都是真判据，而读的人会以为其中一次是错的 | 一道检查比对两套算法：拿同一个仓、同一个暂存区，分别用共享 `diff_base` 与项目阶段自己那套算基准，两者不同就判红并列出差在哪几个提交；判别力自证用一个「上次门禁绿之后别人提交过一次」的样本仓，必须红。⚠️ **有意取别的基准的阶段要另列，不然这道检查会冤枉它们**：一个阶段可以为了回答**另一个问题**而取别的基准——门禁 doc-process-records 的 batch-scope 格取 HEAD，因为它问的是「这一次提交要带哪些」，取「上次门禁全绿那一点」会把上一个提交的东西也算进来、每次提交之后必然误红；门禁 doc-process-records 的 knowledge-sync 格判据 ⑤ 同理。**2026-09-22 又加一种**：checker-tier-layer0-replay、checker-tier-qemu-device-streams、checker-tier-crates-mutation-replay、harness-model-differential-and-scenarios、checker-tier-research-build-and-replay 五道接了 `research/scripts/stage-must-run.sh`，它答的是「这一道读的路径相对 `refs/sop/staged-green`（上次整轮全绿的暂存树）变没变」，是与共享 `diff_base`、项目 `GATE_BASE` 都不同的第三套算法，这五道也要列进豁免表，不然这道检查会把它们的判据误判成「两套基准不一致」。⇒ 这道检查要带一张显式的豁免表，一行一条写明那个阶段取的是什么基准、它问的是哪个别的问题，表里没有的才拿去比对 | 无 | 2026-09-21 主 agent 实测（`.claude/singlefs-ai-sop/scripts/lib.sh` 的 `diff_base` 与 `.claude/gate.d/doc-process-records.sh` 的 crates-adversarial-review 格开头那几行并排读出来的） |
+| C450 | 归档删掉的 sync 记录还在役 | **门禁 doc-experiments 的 archive-past-rounds 格按「HEAD 里有、工作区没改过」删上一轮的实验记录，而 门禁 doc-process-records 的 knowledge-sync 格要求「上次门禁全绿以来的每个触发文件都有阶段同步记录点名」** ⇒ 上一轮提交时门禁没跑绿（`refs/singlefs/gate-ok` 没前移）的话，那一轮的 sync 记录既是「上一轮的、该删」又是「还在被 门禁 doc-process-records 的 knowledge-sync 格要着的」，两道直接打架：2026-09-21 实测，归档删掉 `archive-rename-sync.md` 之后，它点名的 17 个触发文件在 `--staged` 跑里全部变成「没在任何同步记录里点名」 | 门禁 doc-experiments 的 archive-past-rounds 格删一份 `*-sync.md` 之前先问它点名的触发文件还在不在当前基准的改动范围里：在就不删、并说明为什么留；判别力自证用一个「gate-ok 落在上上次提交」的样本仓，那份 sync 记录必须留住。⚠️ **2026-09-21 又撞了一次，根因比立账时写的更窄：两道的时间基准差一格**。门禁 doc-process-records 的 knowledge-sync 格的改动范围是 `diff(HEAD~1, 工作区)`（`refs/sop/gate-ok` 不存在时 `diff_base` 退回 `HEAD~1`），门禁 doc-experiments 的 archive-past-rounds 格看的是「相对 HEAD 改没改过」⇒ **每次提交之后，上一轮的同步记录必然同时满足「门禁 doc-experiments 的 archive-past-rounds 格说该删」与「门禁 doc-process-records 的 knowledge-sync 格说要留」**，不是偶发。当天实测：刚提交完那一轮，两份 sync 记录点名的触发文件相对 `HEAD~1` 分别还有 14 个和 7 个在范围里，而它们自己相对 HEAD 一个字节都没改。这一轮照判据「在就不删、并说明为什么留」处置，代价是每一轮都要给上一轮的记录再追加一句说明，永远退不了场。⚠️ **同一次还抓到 门禁 doc-process-records 的 knowledge-sync 格的第二条判据有同族问题**：它的「处置写『改了』而载体不在改动范围里」那一条假设同步记录与改动范围同期，而跨轮留存的旧记录点名的载体是更早一轮改的，相对今天的基准当然不在范围里——当天那两份旧记录因此报了 9 行，而那 9 行说的都是真话，改写它们才是假的 ⇒ 这一条要么把基准对齐，要么让 门禁 doc-process-records 的 knowledge-sync 格对「不是这一轮写的同步记录」不判处置行 | 无 | 2026-09-21 主 agent 实测 |
+| C452 | --staged 验的是暂存区而手上改的是工作区 | **`gate.sh --staged` 在「HEAD + 暂存区」的临时树上跑，而人改的是工作区**：改完忘了 `git add` 就开跑，整道门禁验的是上一版，跑完报的红与手上的代码对不上，而没有任何东西说一句 ⇒ 2026-09-21 实测白跑 38 分钟：门禁 doc-process-records 的 knowledge-sync 格那处修好在工作区、没进暂存区，第二次全量跑照旧报同一条红 | `--staged` 开跑前比一次暂存区与工作区：`git diff --name-only`（工作区相对暂存区）非空就把那几个路径逐个列出来、问一句是不是忘了 `git add`，其中落在这次暂存区里的路径判红（同一个文件两个版本，验的必定不是手上那版）。判别力自证：改一个已暂存的文件不 `git add` 再跑，必须红；只改没暂存过的文件（别的会话的在制品）不红 | 无 | 2026-09-21 主 agent 实测 |
+| C453 | 整表重排让按块暂存切不开 | **`research/scripts/stage-mine.py` 按 diff 块判「我的 / 别人的」，而另一个会话把一张表整体重排时，一次 diff 就把整张表变成少数几个大块** ⇒ 自己的一行与别人的十几行挤在同一块里，`--match` 与 `--foreign` 同时命中、它只能拒绝，`--split` 按行首切也没用（重排让相邻行全变）。2026-09-21 撞了两次，只能退化成在暂存区那份 blob 上直接改再 `git update-index`，而那条路绕过了 `--foreign` 的保护 | 两条都要能红：① `stage-mine.py` 在「块里同时有我的和别人的」时给出可执行的下一步（按行取而不是按块取：对纯行式表格按整行匹配挑行），不是只说「等对方先提交」；② 退化路径（直接写索引）要有护栏——写之前比一次那份 blob 里有没有 `--foreign` 命中的新增行，有就拒绝。判别力自证：造一个「我的一行夹在别人五行中间、整表重排」的样本，①必须挑得出我那一行，②直接写索引带上别人的行时必须拒绝 | 无 | 2026-09-21 主 agent 实测 |
+| C455 | 挂钟最贵的七道阶段没有判别力样本 | **`.claude/gate.d/` 里 7 道没有 `fixtures/<阶段>/{red,green}/`：15、21、47、52、54、70、87**（2026-09-21 起 门禁 checker-tier-qemu-device-streams 已配，从八道减到七道：它走的是 门禁 checker-tier-lkmm 那条「预录档 + 只供测试的开关」的路——`.qemu-prerecorded` 标记摆上就不起虚机、只拿同一段判定代码判某一轮真跑留下的输出，而且判全过退 3 不退 0，仓顶层误留这个标记会红、不会假绿。剩下七道里 54 与 87 同样喂得了预录输出，21、52、70 本来就不起重装置） ⇒ 层 0 崩溃点重放（46 分钟）、QEMU 真设备、replay 复跑、research 构建、脚本自证这几道最贵的，从来没人验过「被测对象真坏了它会不会红」（`show-me-test.md`「写完一个检查就问：被测对象真坏了，它会不会红？答不上来就是还没写完」）。门禁 code-tooling 的 fixture-claims 格只查「头部声称了样本而目录不存在」，压根不声称也不配的只出一句 warn、阶段照记 PASS | 两步。① 门禁 code-tooling 的 fixture-claims 格把「没有样本目录」从 warn 升成红，已有的 8 道逐个登记进一张豁免表、写明为什么暂时配不出（要虚机、要真设备这类）；② 逐道补样本：至少一个红样本（造一个该被它抓住的坏输入）与一个绿样本。判别力自证：给某一道的红样本改成合规输入，门禁 doc-registries 的 closeout-row27-preconditions 格必须由绿转红 | 无 | 2026-09-21 模拟提交流程的复核，主 agent 逐道现查坐实 |
+| C456 | 并发跑的编译目录跨会话撞同一个 | **门禁 checker-tier-crates-mutation-replay 的 `GATE_MUTATION_TARGET_DIR` 默认值只认 `$TMPDIR`，不带仓路径、不带会话号**，而工作进程的编号是每次调用从 1 现取的本地序号 ⇒ 同一台机器上两次不设它的调用（按 session-wrapup 第 4 条，一次普通 `gate.sh`、一次 `gate.sh --staged` 在临时 worktree 里跑，本来就会同时发生），它们的「工作进程 2」都指向同一个 `…-w2`。独立复核实测：`CARGO_TARGET_DIR` 相同的两个 cargo 并发跑，两边都打印 `Blocking waiting for file lock on build directory` 并各自正常跑完——**不会跑坏，但会互相排队等锁，把并发化想要的加速抵消掉** | 默认值带上仓路径的指纹（或会话号），两次不同仓 / 不同 worktree 的调用落到不同目录；判别力自证：同一台机器上并发起两次不设该变量的调用，两边的编译目录不许相同，改回原样自证转红 | 无 | 2026-09-21 独立复核（`crates/tiny` 上的隔离实验坐实锁行为） |
+| C457 | 被测试自己的线程池与外层进程池叠加超订阅 | **门禁 checker-tier-crates-mutation-replay 按「测试那一段是单线程的」把工作进程开到核数的一半、至多 16（本机 32 核开 16；每条变异另经 `research/scripts/run-with-memory-cap.sh` 按内存排队，`.claude/gate.d/checker-tier-crates-mutation-replay.sh` 第 19–22 行），而 `crates/singlefs-harness/tests/random_histories.rs` 的 `worker_threads_by_default()` 返回 `min(available_parallelism(), 16)`——这些随机历史测试自己就起最多 16 个线程** ⇒ `crates/mutations.tsv` 里点名它的那几行（条数现数：`grep -c random_histories crates/mutations.tsv`）被 16 个工作进程交错领走时，调度压力远超物理核数。独立复核实测：并发跑时 5 个工作进程同时卡在这个测试文件上超过 6–8 分钟，而串行跑同一测试单次普遍 1.5–3 分钟。不是正确性问题（两次跑结果一致），是并发化的反效果 | 两条路选一条：① 跑变异时把被测试的线程数按外层进程数压下去（给 `cargo test` 传环境变量），② 按「这条变异点名的测试自己起几个线程」给条目标重量，重的那些不与别的重的同时领。判别力自证：拿点名随机历史测试的那几行（条数照 `grep -c random_histories crates/mutations.tsv` 现数）单独跑，改前改后比总挂钟与峰值进程数 | 无 | 2026-09-21 独立复核（副本上量的） |
+| C458 | 实例切换取内存里的根，不重新读盘 | `D23（journal 的角色与格式）` 已定项 14 的实例切换，字面取的是「旧实例发布过根时是它**最后发布的根**」——调用方内存里记的那个，不是重新读盘择根。「盘已经推进、内存没推进」这种分歧下（`C381（根已落盘之后发布失败，分配器仍退回）` 的 H1 就是这种），已定条款自己的实例切换也可能读到旧根、重蹈 C381（根已落盘之后发布失败，分配器仍退回） 的覆辙。 | 造「系统配置槽写失败、根已落盘」之后走实例切换这段历史，切换取内存里的根 ⇒ 所选根比盘上的现行根旧 ⇒ 重发的 checkpoint 基于一个已经被超过的根；判别力自证：切换改成重新读盘择根，同一段历史必须转绿。 | 三件条款已定（D23（journal 的角色与格式） 已定项 14，用户 2026-09-24），挂载内实例切换的实现随收口表第 16、40 行在后面的里程碑 | `research/prompts/c381-r3-main-verification.md` 第二节 |
+| C459 | 探针写的落点没有登记位 | `D23（journal 的角色与格式）` 已定项 14 的失败表靠「对目标设备的固定落点做一次探针写」分流，而这个落点在盘上**没有登记位**。用户 2026-09-21 定「进地址空间表登记一行」，但 kb 里没有一张叫「地址空间表」的表（`.claude/kb/layout/01-first-txn.md` 零命中），落点偏移也没定，还缺一个格式常量。 | 门禁 code-source-discipline 的 format-constants 格按 `format-const` 标记核常量；落点登记之后，把 `.claude/kb/layout/01-first-txn.md` 里那一行的偏移改掉，门禁 code-source-discipline 的 format-constants 格与字节表检查必须红。 | 三样都要先定——① 登记在哪张表（候选：`.claude/kb/layout/01-first-txn.md` 的「零、盘面地图与新池新建文件的写清单」）；② 落点的偏移与宽度；③ 新格式常量走 `D15（格式冻结政策）` 已定项 9 的判定表判档次。定完之后 `crates/singlefs-format` 加常量、字节表加行、checker 跟着改（`.claude/rules/format-evolution.md`「硬约束」：改格式必须同步更新 `.claude/kb/invariants.md` 与 checker）。 | `research/prompts/c381-r2-main-verification.md` 第四之二节（用户定案表第 1 行） |
+| C460 | 失败表的射程没有逐个失败点列表 | `D23（journal 的角色与格式）` 已定项 14 的失败表管一次发布里的哪几次写失败，今天没有逐个写明。用户 2026-09-21 定「逐个失败点列一张表」，表还没列。本地腿两次抽样在这一点上判定相反（一次 conflict、一次 not applicable），两次的理由同指一事——原文两种读法都推得出来。 | 表列出来之后，把其中一格的归属改掉（例如把「第一道屏障」从「不在射程」改成「在射程」），失败表的用例必须红。 | 要逐个判八格以上各落不落在射程里：单元写、第一道屏障、记录写两盘、第二道屏障、根槽 FUA、系统配置槽两盘、取号那两次写、切换自己的取号与写行。攻方第三轮已经给了两条事实（两道屏障没有落点、根槽 FUA 那一格有落点也观测不到，`crates/singlefs-core/src/block_device.rs` 的 `barrier()` 不带偏移、`InputOutput(io::Error)` 不带落点），其余靠设计判断。 | `research/prompts/c381-r2-main-verification.md` 第四之二节（用户定案表第 3 行）、`c381-r3-main-verification.md` 第一节 K3-1 格 |
+| C462 | 空池恢复报的错名不副实 | `crates/singlefs-core/src/recovery.rs` 的 `choose_system_configuration` 在 `PoolReader::device_identities()` 返回空时报 `SystemConfigurationsDisagree`——一块盘都没有，谈不上「几份系统配置互相不一致」。成员名指向一个没发生的原因，照它排障会往错方向走。改前改后一样，不是 2026-09-21 那次改动引入的。 | 拿一个零设备的 `PoolReader` 调恢复，断言返回的错误成员说的是「池里一块盘都没有」而不是「几份系统配置不一致」；判别力自证：把成员改回 `SystemConfigurationsDisagree`，这条用例必须红。 | 要先定：单列一个错误成员，还是由上层挡掉空池、恢复这一层不接受零设备。`D22（单元原子性怎么合成）` 没写空池这一格。2026-10-01 判决：单列一个错误成员（约 30 行），实现在途（`research/prompts/m3-ring-r1-main-verification.md` 第二节第 11 行）。 | 2026-09-21 实现员交回（`/tmp/claude-1000/recovery-two-slots-impl/report.md` 设计问题二） |
+| C463 | 一块盘的系统配置两份全废之后静默成功 | 2026-09-21 起一块盘两个系统配置槽都无效时恢复改用别的盘那一份、照常挂上，而 `RecoveryReport` 里**没有任何字段**说「盘 X 的系统配置两份全废，该修」，也没有自愈重写。冗余被吃掉一份而无人知晓，下一次再坏一块就整池挂不上。 | 造「盘 1 两个系统配置槽都读不出、盘 0 完好」的池跑恢复：挂得上，且报告里要有一格点名盘 1 的系统配置全废；判别力自证：把那一格去掉，这条用例必须红。 | `D22（单元原子性怎么合成）` 已定项 8「系统配置每盘放一份」只定了放几份，没定「发现一份全废之后报不报、补不补」。要先定报出来就够还是当场自愈重写。2026-10-01 判决：只读与恢复路径报出来（新函数加一个字段），可写路径今天已拒三处；自愈与取号重写是同一个写，那一半随根环第二轮设计（m3-ring-r2）定，实现在途（`research/prompts/m3-ring-r1-main-verification.md` 第二节第 11 行）。报出来那一半已实现：`RecoveryReport` 字段 `devices_without_a_mountable_system_configuration_slot`（`crates/singlefs-core/src/recovery.rs`，`choose_system_configuration_naming_devices_without_a_mountable_slot` 填它），只读挂载有同名字段（`crates/singlefs-core/src/mounted_read.rs`），用例 `crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs`（盘 1 两槽都坏、盘 0 完好：照常读出文件、报告点名盘 1），去掉那一格的变异红（`crates/mutations.tsv` 里 C463（一块盘的系统配置两份全废之后静默成功） 开头的那一行：整条恢复的报告不交出两槽都不可择的盘）；可写挂载维持拒（C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙那道见证判，`records/2026-09-30-里程碑三开工第一轮.md` 同日条目）；自愈与取号重写仍欠，根环三轮判决（m3-ring-r1 至 m3-ring-r3）都没有定它，所以这一条不移进已还清。 | 2026-09-21 实现员交回（`/tmp/claude-1000/recovery-two-slots-impl/report.md` 设计问题三） |
+| C464 | I-1.8 对码 1 的全序键写窄了 | `I-1.8（归并后版本全序）` 给码 1 的全序键只有写序，给码 3 的是 (诞生代号, 实例代号, 事务号) 三元并写明「诞生代号打头」，括注的理由逐字是「同一实例连着两个 checkpoint 都不分配新事务号时两版写序逐字节相同」——**那种情况对码 1 一样成立**（一个事务跨两个 checkpoint 时两次发布的记录事务号相同，写序取事务号低 48 位），而码 1 没有诞生代号那一段打头。⇒ 判据在它自己写明的那一格上不成立。 | 造「一个事务跨两个 checkpoint、两次都写同一个 key 的码 1 数据单元」的镜像：两组的写序逐字节相同、诞生代号不同；按今天的 I-1.8 判红，而两版都是合法的已发布版本。判别力自证：键改成 (诞生代号, 写序)，同一份镜像转绿，而真正重号的那份仍红。 | 要先定码 1 的键取哪个：① 加诞生代号打头，与码 3 同形；② 维持写序，另立条款禁止「一个事务跨两个 checkpoint」。2026-09-21 池级 checker 补 I-1.8 时按字面实现①那一半（同组载荷相同）已落地，②那一半码 3 判、**码 1 停在 `TotalOrderKey::UndecidedForDataUnit`**（`crates/singlefs-checker/src/walk.rs`）等这条定案。与事务号重号那个实现 bug 是两件事，修了 bug 这一条照样成立。 | 2026-09-21 补 checker 时实现员按 I-1.8 字面实现后 11 条用例红，主 agent 现查 I-1.8 原文括注与 `D23（journal 的角色与格式）` 已定项 7 坐实 |
+| C465 | 门禁自己的并发让门禁里的性能断言变红 | **同一道门禁里，门禁 checker-tier-crates-mutation-replay（crates 变异表复跑）开核数一半、至多 16 个工作进程（本机 16），每个 cargo 的编译并行度按核数 ÷ 进程数收（本机 2），合起来吃满核，而「research 构建与单测」那一道跑的实验单测里有按挂钟判的性能断言** ⇒ 断言在自己这道门禁造出来的负载下红，而代码一个字没动。2026-09-21 实测两次全量门禁各红一个、且是不同的两个：`research/e7-index-bench/src/bin/e6_multicore.rs:215` 的「4 线程做同样总量应当更快」（那一刻 load average 35.7），与 `research/e7-index-bench/src/bin/e44_jsn_width.rs:269` 的「不 fdatasync 该至少快一倍」；两个各自单独复跑 5 轮全过。全仓这类断言就这 2 处，两次各中一个。⚠️ **它不是「测试写错了」**：那两条断言量的就是挂钟，是实验结论的背书；问题在于它们与制造负载的那一道跑在同一次门禁里 | 两条路都要写下来：① 把按挂钟判的断言与门禁的并发隔开——或者给这类断言标一个记号、让「research 构建与单测」那一道在门禁里跑时跳过它们并显式报「本次未跑」（退 77，不记通过），复跑留给不并发的场合；或者把 门禁 checker-tier-crates-mutation-replay 与这一道排成不重叠的次序。② 无论走哪条，这类断言要有一处登记位（例如源码里标 `// wallclock-assert: <量的是什么>`），否则下次新增一条没人认得出来。判别力自证：造一个「跑的时候人为加满负载」的样本，标了记号的必须报未跑而不是判红；没标记号的性能断言必须被登记位检查判红 | 无前置（两条断言与 门禁 checker-tier-crates-mutation-replay 都已在仓里） | 2026-09-21 主 agent 实测，两次全量门禁各红一个 |
+| C467 | 新补的四条不变量的覆盖率没被穷举用例钉住 | ⚠️ 2026-09-21 又加一条：`I-8.7（实例内事务号不重号）` 在新池新建文件那条流的层 0 上**一次都评估不到**（22 个状态实测 0 次）——那条流只有一个 checkpoint，同一实例凑不出两条非 0 事务号的记录，按判据报不适用。这是老实的报法（改成「单条也算评估过」它在那条流上就成了恒真判定），但那条流上这一格确实没有任何观测。`I-1.8（归并后版本全序）` ② 在新池新建文件的层 0（单一 checkpoint）上一条判定都不产出；覆盖写、释放、回退与复用的两条层 0 全量用例没把 I-1.8（归并后版本全序）、`I-7.3（环健康性）`、`I-8.6（反向链算法）` 放进 `must_evaluate` 断言。⇒ ② 可以在全部穷举状态上一次都没被评估过，而门禁照样全绿。另外理想模型把 `applied_transaction_high_water` 写死 0（`crates/singlefs-harness/src/model.rs` 四处），模型对拍那一路永远见不到 W > 0。 | 把 I-1.8（归并后版本全序）、I-7.3（环健康性）、I-8.6（反向链算法） 加进层 0 全量用例的 `must_evaluate` 断言；判别力自证：把 ② 的判定改成恒真，那条断言必须红。 | 与 `.claude/singlefs-ai-sop/rules/show-me-test.md`「扫到 0 项也不是通过」同形。 | `research/prompts/m2-checker-supp-code-r1-main-verification.md` 判定六 |
+| C469 | I-8.7 的两处射程今天判不了 | `I-8.7（实例内事务号不重号）` 2026-09-21 落地时有两处判据没写、实现员按现成形态做了判断，两处都还没有东西钉住：① **逐盘判还是两盘合判**——照 `I-8.6（反向链算法）` 逐盘做的，而「一块盘某条记录撕了、另一块好着」这种两种做法分得开的镜像今天没有用例；② **`D23（journal 的角色与格式）` 已定项 7「从 1 起」那半句没判**——判据只给了严格递增，而 journal 环是个窗口，回绕之后最早那几条记录已经不在环里，「这个实例的第一条是不是 1」在盘上读不出来。 | ① 造「盘 0 某条记录的事务号撕成 0xFF、盘 1 那条好着」的镜像：逐盘判会红一盘、合判可能被好的那盘盖过去，两种做法各要一条用例钉住选的是哪种。② 环回绕之后拿一份镜像，断言 I-8.7 对「这个实例的最小非 0 事务号是不是 1」报不适用而不是判绿——判别力自证：改成判绿，那条用例必须红。 | ① 要先定逐盘还是合判（判据原文没写）。② 要先定「从 1 起」这半句在环回绕之后还要不要判：不判就把射程写进判据，要判就得另找载体（实例表行的 W 或系统配置里记一笔）。 | 2026-09-21 实现员交回（`/tmp/claude-1000/i87-txn-number/report.md` 第三节「条款没写、我做了判断的三处」），主 agent 判前一处（「恰好一条非 0 的」报不适用）是对的、不记账，后两处记这一条 |
+| C470 | 事实表标新立的行没有独立证据 | **候选表的漏召回**：`research/scripts/stale-candidates.py` 的 `build_candidates` 对旧事实以「新立：」开头的行无条件跳过（第 270–271 行），`--check-facts` 那道闸只拦得住两种冒充形态——检索词在基准那一版有命中，或新事实里出现「落地 / 实现 / 已有 / 跑完 / 还清 / 有了」任一个（第 317 行，词表在第 73 行）。⇒ 写表人给一件**真变了**的事实选一个基准那一版零命中的检索词、标「新立：」、新事实又避开那六个词，三件事全过闸，那件事实的旧说法**一行都进不了候选表**；而阶段同步只强制逐行全看候选表那 138 行，事实表那 21 行没有任何一道闸要求主 agent 重读。判别子（检索词选得好不好）是写表人自己选的，闸看不到。工具作者自己在文件头第 35–37 行逐字写着这一格「管不到」 | 标「新立：」的行要点名它新立的那个东西的唯一登记位（新欠账编号、新门禁阶段的文件路径、新实验号），`--check-facts` 核「那个登记位在基准那一版取不到、在结束那一版取得到」；点不出登记位、或登记位在基准那一版就已经存在，判红。这把「新立」从写表人的一句断言换成可机检的事实。⚠️ **同一格还有第二半**：候选表的召回只有「检索词」一维，而一个概念名词在这个仓里有几百处别的用法（同一轮实测 252 行候选里 249 行判「不相干」，`残留` 一个词贡献 195 行、`归档` 54 行全不相干）。⇒ 事实表要多一维「载体范围」，而且**范围由这一阶段的 diff 自己算出来、不由写表人写**——写表人写就又落回这一条自己要拦的那个形态。判别力自证：拿一件真变了的事实标成「新立：」并点名一个基准那一版就有的编号，必须由绿转红 | 无前置（事实表与 `--check-facts` 今天就在跑） | 2026-09-22 `research/prompts/agentdef-r3-main-verification.md` 第三节：本地攻方两份干净样本一致答「候选表里不留痕、给不出判据」，主 agent 现查 `build_candidates` 与 `--check-facts` 之后把「最少一个动作」校正成三个，结论不变。⚠️ **立账当天就撞了一次，不是推演出来的形态**：同一天 c468-evidence 那一轮阶段同步，回扫第一次交回把五行事实里的三行标成「新立：」（检索词分别是新加那句话里的词与新轮名），候选表从 582 行塌到 1 行，而 `--check-facts` 判绿；主 agent 逐条对着定义的字面退回重做，改成「事实变了」之后候选表回到 252 行 |
+| C471 | 产物里同一个字段名在两条路径上指着相反的两个量 | E156（alloc-basis 四条岔路的代价数） 的装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs` 在 β1/β2 那条路径上把 `corrupted_check_holds` 填成「G27 成立」，而 β0 那条新路径上把同一个字段名填成它的反面（`corrupted_check_is_red`）。产物 `e156-alloc-basis-counts-2026-09-22-stage2.out` 那一行因此读起来正好相反：`corrupted_check_holds=true` 的真实含义是「G27 判红」。按字段名读产物的人会把「G27 抓到了」读成「G27 没抓到」。⇒ 这是 `.claude/singlefs-ai-sop/rules/show-me-test.md`「跨装置的检查要钉住『这个名字指的是哪个量』：两个量就登记两个名字，各钉各的值」那一格在**同一个装置内部**的形态。 | 造一份产物，同一个 `name=` 下同一个字段在两行里由两个不同的量填出来，检查要判红并点名那个字段；判别力自证：两行填同一个量时必须转绿。 | 今天没有任何东西检查「同一个 `name=` 下的同名字段在各行里是不是同一个量」——`replay.sh` 判逐字节一致（同一个错误复跑一次照样一致）、门禁 code-source-discipline 的 mutation-tables 格判变异锚点、门禁 doc-experiments 的 evidence-in-repo 格判正文引产物对不对得上，三道都够不着。2026-09-22 主 agent 现查坐实并当天修了 E156（alloc-basis 四条岔路的代价数） 那一处（改法与新产物 `stage3.out`，`stage2.out` 原样留着当那个 bug 在场时的证据），但**检查没有**。 | 2026-09-22 主 agent 读 E156（alloc-basis 四条岔路的代价数） stage2 产物时发现腿的结论句与产物字段读起来相反，查装置第 322 行与第 453 行坐实 |
+| C473 | 逐行判的报告不核引的原话在不在那一行 | `research/scripts/stale-candidates.py --check-report` 只核两件事：候选表每一行都有判定、判定以五种之一开头。它核不到另外两件**同样可机检**的事——报告里抄的「原文」与载体那一行是不是逐字相同、理由里引的原话是不是真在那一行上。⇒ 一份把理由引到别处去的报告判绿，而「逐行全看」本来就是要抓这个；判绿之后主 agent 的全看又只能凭眼睛。2026-09-22 实测：c468-evidence 那一轮 258 行判定，`--check-report` 判绿，主 agent 另写一段三十行的临时脚本逐行比对，抓到 6 行的理由**抄原话时不逐字**——丢掉了原文里的 `**` 强调标记（`.claude/kb/checks-owed.md:33` 与 `:208`、`.claude/kb/decisions/15-格式冻结政策.md:222`、`records/2026-08-29-审计轮-外部引用复核与阻塞集.md:70`）、丢掉了编号的简称括注并多加一个空格（`.claude/kb/experiments/07-离线索引harness.md:172`）、丢掉了「」（`.claude/kb/decisions/08-核心索引结构.md:247`）；其中两行去掉标记之后一个字都对不上。六行的**判定**主 agent 逐行读过原文，都站得住（那几行说的是黄金镜像回归、期望内容摘要由 checker 算、E7（离线索引 harness） 第一次有归档产物、确定性复跑逐字节比对、I-1.2（块头写序已发布） 说的被抛弃时间线的残留），错的是引文的逐字性 | `--check-report` 加两条：每行的「原文」列与 `git show <结束那一版>:<载体路径>` 的那一行逐字相同（归一化只许做表格转义的还原，`\|` 与 `&#124;` 还原成竖线）；理由里至少有一段 4 个字以上带引号的原话在那一行里**逐字**找得到，`**` 强调标记、编号的简称括注、「」一律算在逐字里（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「引产物就整行抄」）。判别力自证：把一行的原文改一个字、把理由里的引话去掉一对 `**`、把引话换成别行的话，三种都必须由绿转红；再造一行只差表格转义（`\|` 与 `&#124;`）的，必须仍判绿（不然归一化那一步就是摆设）。⚠️ **两种合法写法要先认下来，不然它误判的比抓到的多**：「」『』与反引号里的片段都算引原话；引话里用省略号标出的省略是合法的，按省略号分段、每段至少 4 个字、逐段都要在那一行里找得到。2026-09-22 原型第一版两样都不认，17 行里误判 3 行——认下来之后 0 行，同一份报告不改一个字 | 无前置（原型已经跑过一次，见出处） | 2026-09-22 主 agent 逐行全看 c468-evidence 那 252 行时当场抓到两处 |
+| C474 | 上一趟门禁留下的残留让下一趟必然红 | `research/scripts/test-environment-check.py` 的 clean 对「名字里没有 pid、没有进程开着、但不到 10 分钟没改」的条目一律不删（怕删掉正在跑的活），而门禁 harness-test-environment 的 machine-clean 格的分界只放过「**本趟**开跑之后才出现的」（C448（门禁自己留下的镜像让干净检查必红） 那次还清的机制）。⇒ 上一趟门禁刚留下、还不满 10 分钟的残留，正好落在「这一趟清不掉」与「下一趟不放过」之间，下一趟门禁**必然**判它红，而它与真正的「上一轮没清干净」在输出里长得一模一样。2026-09-22 实测撞了一次，白跑一趟全量门禁；同一天人看得见的那一半已补（clean 的汇总行报出不碰几项、其中几项只是太新，并逐个点名），机器那一半还欠 | 门禁每趟把开跑时刻写进一个文件（门禁 harness-test-environment 的 machine-clean 格现在往上找祖先里那个 `gate.sh` 进程读启动时刻，那个数只活在一次运行里、下一趟读不到）：门禁 harness-test-environment 的 machine-clean 格的分界取本趟那一个，clean 读**上一趟**那一个来判「这是上一趟门禁留下的、可以删」；门禁开跑前的预检见到「太新、这一趟清不掉」的项就拒绝开跑，并报还要等多久。判别力自证：造一个落在「上一趟开跑之后、本趟开跑之前」的条目，clean 必须删得掉、门禁 harness-test-environment 的 machine-clean 格必须不判它红；把上一趟那个时刻抹掉，必须回到判红 | 无前置 | 2026-09-22 同一天两趟全量门禁各红一次，都栽在这一格 |
+| C476 | 盘上内容可控时走得到的 panic 有 21 处 | 增补 3 第 6 件的只读普查（2026-09-22，清单入库在 `records/2026-09-22-panic面普查清单.md` 616 条逐处判定、走得到的那些在 `records/2026-09-22-panic面普查-走得到的那些.md`，源码快照哈希在 `research/prompts/m2-supp3-item6-panic-survey-snapshot/sources.sha256`）：`crates/singlefs-core/src/` 与 `crates/singlefs-checker/src/` 非测试代码 616 处断言点里，**走得到 21、走不到 595、判不了 0**。21 处分三族：**① 分配器**（9 处，盘上分配记录树的字段一个都不判就直接标位图：槽号下溢、跨度越界、两条记录罩同一个槽、记录里的设备身份不在池里、两盘记录不对称）；**② 条目宽度**（8 处，单元头判得很严而条目宽只判了 `entry_width ≥ key_width` 就按固定偏移切，`bytes.rs` 的 `ByteReader::take` 与 checker 四处条目解析全打在这里）；**③ 结构值不判就喂进断言**（4 处：两盘同槽断言而 `RootRecord::parse_slot` 不判位置条目、记账树里没有 inode 号水位那一行就炸、checker 按盘上自述的 `regions` 去下标 `[u32; 3]`）。**2026-09-22 实测坐实其中 10 处**：增补 3 第 5 件的坏盘输入快档 12 段历史撞出 136 次 panic，逐处与这 21 处对得上（`research/prompts/m2-supp3-item5-implementer-report.md`）；坏法够不着的三处是 R2（映射树根住根记录、不在树表下）、R7（被抛弃根那棵账）、R10（两盘记录不对称），够不着只说明坏法还不够，不说明它们不用修。 **2026-09-27 实审 A3a 判全接上真实路径**：①分配器族 R6–R9 那 9 处的判据（`allocation_records_fit_the_pool_geometry`）此前只挂在 `walk_to_file`、挂载走的 `rebuild_version` 一次不调（2026-09-22 已现查坐实）；A3a 第 33 / 24 条把 `rebuild_version` 改成与 `walk_to_file` 调同一组判定函数，这 9 处由此接上可写挂载路径。缺口表 `pointer.rs:108/149` 升序断言坐实走得到（副本探针：树表条目根指针与第 0 代根实例表指针两条位置条目对调，都让可写挂载 panic 在 `pointer.rs:222`），已按 I-2.5（位置条目按设备身份升序） 判（重建时对根记录四条指针、树表条目根指针、extent 树、inode 叶容器、分配记录树、记账树、映射树每个节点的指针判升序，逆序或相同报 `InvariantViolated`，`invariant` 字段填这条不变量的名字）。**A3a 清单外仍开着**：②条目宽度族 8 处、R11–R13（checker `image.rs` / `walk.rs`）；缺口表 `lib.rs:268`、`walk.rs`、`inode_tree.rs:88`（普查行号，没按今天的文件重查）；指针头部判的读法在 A3a 清单外还没换上的读者——`root_record.rs:131/135/136/137`、`records.rs:328/357/369`、`instance_table.rs:206`、`extent_tree.rs:322/327/688`、`allocation_record_tree.rs:774/869`（主工作区行号，实审 A3a 报告第三节）。**判全带来一处不在原 21 处普查里的新发现**：`transaction.rs:6339` 树表条目按树 ID 升序的断言仍走得到——I-7.8（根记录树 ID 水位不低于全池最大树 ID） 只挡「号越过水位」这一形，水位之下换次序照样走到这句断言（推的，没造镜像实测）；拦不拦、拦在哪，交主 agent 定（实审 A3a 报告第七节末、第十一节）。 | 逐处造一份盘上内容触发它的镜像，断言返回错误而不是 panic；判别力自证：改回 panic 那一版，用例必须红。21 处各一条。 | ⚠️ **两条观察比 21 处本身更要紧**：① **拦得住的判据仓里已经有，只是没接在挂载那条路上**——`recovery.rs` 的 `allocation_records_are_one_per_device`（定义在 1100）正好判分配器那一族的两格，而非测试代码里唯一调用点在 1258（`walk_to_file` 之内），**挂载走的 `rebuild_version`（541）一次都不调**（主 agent 现查坐实）。判据在、测试也过（测试调 `walk_to_file`），真实路径绕过它。② **同一个 checker 里守卫铺了一半**：`references_of_root` / `collect_tree_references` 那条走读守卫一道不缺，`walk_root` 主干一道都没有；`geometry.regions` 也一样，`walk.rs` 夹了 `.min(3)` 而 `image.rs` 没夹。⚠️ **射程之外**：普查的抓取脚本不抓整数溢出与除零，而 `Cargo.toml` 的 `overflow-checks = true` 在 release 也开；顺手撞见 6 处但**没有系统扫**，下一轮要么扩射程、要么别说「普查做完了」。 | 2026-09-22 增补 3 第 6 件只读普查交回；普查期间另一个会话在改 `crates/singlefs-core/`，普查员当场把 `crates/` 拷成快照冻结、按快照行号判，完整性闸逐个对上（616 判定行 = 616 位置、漏判 0 多判 0） |
+| C477 | 暂存的是整份文件，别的会话的改动跟着进来 | **`git add <文件>` 暂存的是整份文件，不是我改的那几行。** 几个会话共写一个仓时，一份文件里常常同时躺着两拨人的未提交改动；我往里加十行、`git add` 一下，另一拨人的两百多行就一起进了暂存区。门禁 doc-process-records 的 batch-scope 格（这一批要碰的触发文件有没有登记进范围）核的是「碰了哪几个文件」，核不了「这些文件里是谁的改动」，**在这种暂存区上照样判绿**。2026-09-22 实测：一批里 `.claude/gate.d/checker-tier-qemu-device-streams.sh` 暂存了 226+/58-、`checker-tier-crates-mutation-replay.sh` 暂存了 112+/44-，而我在这两份里各只写了 10 行；差出来的全是另一个会话那条线的半成品。抓到它的不是门禁，是阶段同步的回扫——它读 `git diff --cached` 时发现 门禁 checker-tier-qemu-device-streams 那一行在 `.claude/batch-scope` 里写的理由是「同 checker-tier-layer0-replay」（只为接入一道判据），与 284 行的体量对不上。`session-wrapup.md` 写着「把别人的半成品卷进提交，等于替他发布了没验完的东西」，但那是一句提醒，拦不住 `git add` | 门禁 doc-process-records 的 batch-scope 格加一条：登记表里每个触发文件，**暂存区里它的改动要能说清是谁的**。两种可落的形态——① 登记行里写下这一批在这个文件里改了大致几行（一个量级即可），暂存的实际行数超出一个倍数就判红，出路是「用 `research/scripts/stage-mine.py` 只暂存自己的块，或者在登记里把理由改成实情」；② 更硬的一版：登记行带一个「我的改动长什么样」的正则（例如新加的那几行里必有的标识符），暂存区里这个文件相对 HEAD 的每个 hunk 都要命中它，命中不了的 hunk 逐个列出来判红。判别力自证：把另一个会话的改动 `git add` 进来必须由绿转红；只暂存自己的块必须判绿 | 无前置（`stage-mine.py` 已经在跑，它按块暂存的能力正是这一条要的） | 2026-09-22 主 agent 自己踩的：往五道门禁阶段各加十行接一道判据，`git add` 把其中两份里别人的 284 行与 156 行一起卷进暂存区；门禁 doc-process-records 的 batch-scope 格判绿，回扫在写事实表时发现理由与 diff 体量对不上 |
+| C478 | 码 2 头的 key 区间是条目键区间还是子树覆盖区间 | D18（块里携带什么信息） 已定项 2 定「每一个码 2 索引节点都带 [min_key, max_key]」，理由逐字是「一个节点单独捡起来能自证它该覆盖哪一段 key」；而 checker 的 `check_index_node_keys`（`crates/singlefs-checker/src/lib.rs` 第 432 行）判的是「区间 = 首末两条**条目**的 key」。两个读法在叶层码 2 节点上同值（条目就是记录），在**孩子是码 3 容器的内部节点上分叉**：条目的 key 是分隔 key（= 该孩子创建时的最小 key，D8（核心索引结构） 已定项 6），而子树里真正到得了的最大 key 在最后那片容器的末尾。并行线三建 233 个 inode 之后根写出的区间是 [2, 2]（一片容器、容器号 2），子树覆盖的却是 [2, 234] ⇒ 按条款的理由句读，这个节点「自证它该覆盖哪一段 key」写的是假话；按 checker 今天的读法它是对的。这个值上盘，新池新建文件那一档两个读法同值（[1, 1]），分叉是并行线三第一次写出来的 | 决策已定、检查仍欠：用户 2026-09-23 定子树覆盖区间（D18（块里携带什么信息） 已定项 2），按它改 checker 的 `check_index_node_keys` 与写路径。判别力自证：造一个「区间写成条目键区间而子树覆盖更宽」的镜像，checker 必须判红——今天这个镜像就是并行线三的正常产物（根写出 [2, 2]、子树覆盖 [2, 234]） | 无——改 checker 与写路径都不依赖未实现的东西 | 2026-09-22 并行线三实现员交回第 2 问，主 agent 现查 check_index_node_keys 与 layout/01-first-txn.md 第 245 行的 [1, 1] 坐实 |
+| C479 | inode 号复用已发过的号今天造不出来 | 里程碑「覆盖写、释放、回退与复用」并行线三的验收逐字要一条变异「inode 号复用一个已发过的号 ⇒ 判红」，而今天号只从记账里的水位发、水位只增 ⇒ 这条写路径造不出来，那条变异没做。**这不是「不用做」**：I-9.6（水位大于两处最大号） 只判「水位 > 树内最大 key」，它拦得住「发的号不大于树里最大的」，拦不住「水位自己被改小之后重发」；回退之后号会被重发（I-9.6（水位大于两处最大号） 2026-09-16 随 D8（核心索引结构） 已定项 6 收窄那一段），那条路上水位会退回去 | 只供测试的开关把水位压回一个已发过的号，再建一个 inode，checker 必须判红（今天 I-9.6（水位大于两处最大号） 判得了这一格：水位不大于树内最大 key）；再造一个「水位压回去但树里那条记录已被换掉」的镜像，看 I-9.6（水位大于两处最大号） 还拦不拦得住，拦不住就要另立一条不变量。判别力自证：把开关关掉，检查必须由红转绿 | 要一个「把 inode 号水位压到指定值」的只供测试开关；它与收口表第 24 行那三个开关同一族 | 2026-09-22 并行线三实现员交回「没做什么」一节，主 agent 对着里程碑并行线三验收标准逐条核 |
+| C482 | 只供测试的开关有三个走了哪一条看不出来 | `.claude/rules/fs-design.md` 五条硬要求第 4 条逐字「**分支必须可观测**：运行时能看出走了哪一条。**走错分支是性能悬崖，而悬崖是不报错的**」。2026-09-22 逐个核五个开关，三个不满足：① **`JournalPolicy::ConsultWithoutNamedVerification`（关掉点名单元验证）**——`crates/singlefs-core/src/recovery.rs` 里 `let all_verified = !verify_named_units \|\| …` 把这一臂短路成真、一个单元都不读，而下面 `report.verification_passed += 1;` 照样每条提交记录加一 ⇒ 健康镜像上 `Consult` 与 `ConsultWithoutNamedVerification` 报出**逐字相同**的 `verification_passed`，而后者一次校验和比对都没做，**计数的名字还宣称「验过了」**；今天两臂分得开靠 `prefix_applied` / `effective_root`，而那要镜像上真有一个缺席的单元。② **强制抬 F 没有「正常触发」可以无视**：`crates/*/src/` 里零个产品路径调用 `raise_rollback_floor`，调用点只有 harness 与用例，而它的文档写着「正常的触发是准入不够」。③ **`ShadowLedger` 没有分支名**，只有 `MountOutput::isolated_slots_per_device` 这个读数分得开两臂，而账都读得出时 `On` 也可能是 0 | ① 把 `verification_passed` 改成只数真验过的，关掉验证那一臂另给一个计数（例 `verification_skipped`），并加一条断言：同一份健康镜像上两臂的这两个数必须不同；判别力自证：把改动退回去，那条断言必须红。② 要么实现「准入不够就抬 F」那条产品路径，要么把那句文档改成实话并在开关旁写明它今天只有测试入口。③ 给 `ShadowLedger` 一个运行时报得出的分支名，并加一条断言：两臂报的分支名不同。**三条当天都还了**：① `recovery.rs` 的 `report.verification_passed += 1;` 外面套了 `if verify_named_units {}`，关掉验证那一臂恒为 0，用例 `the_named_unit_verification_switch_shows_up_in_the_runtime_counter_on_a_healthy_image` 断言两臂前缀一样长而这个数一个大于 0、一个等于 0，变异把守卫去掉即红；② `mount.rs` 的 `raise_rollback_floor` 文档改成实话——`crates/*/src/` 里零个产品调用点，D16（发布语义） 已定项 1 那条「准入不够就抬 F」的产品触发还没实现，指到这一条欠账；③ `ShadowLedger::branch_name()` 落地、`MountOutput::shadow_ledger_branch` 报出来，`without_the_shadow_ledger_publishes_after_the_rollback_reuse_the_abandoned_data_slots_and_a_recovery_onto_the_abandoned_root_reads_a_torn_unit` 里两臂各断言一次「报的名字与传进去的相符」「两臂的名字不许相同」，变异把两臂合成一个名字即红 | 无——三处都不依赖未实现的东西；① 等修 panic 那条线让开 `recovery.rs` | 2026-09-22 收口表第 24 行第二条线交回第四节，主 agent 现查 `recovery.rs` 的 `all_verified` 短路与 `verification_passed += 1` 坐实 |
+| C486 | 整环清零的 55 秒与冷重开的 17 秒都没人管 | 并行线四 2026-09-22 让 mkfs 整环清零之后量出两个数，**用户当天认下、各记一笔**：① 每次都跑那一档门禁**多 54.9 秒**（开 433.18 秒、关 378.28 秒，+14.5%，A/B 实测），摊在几十个建文件镜像的目标上；想摘出去只有「给测试换小环」（环大小定死单元区起点，整张字节表跟着动）或「给 mkfs 加个别清的开关」（正是那一轮要拆的假设），两条都比 55 秒贵 ⇒ 留着。② **冷重开恢复 17.22 秒**第一次被量出来（真设备，`name=segment_timing`；同一趟里 mkfs 713.8 ms、取号 5.39 ms、暖机 9.22 ms、新池新建文件 9.72 ms）——冷挂载要扫整个 768 MiB 环，这个数**可能随环长线性涨**，而全仓没有一条条款或检查管它 | ① 立一条会红的形态：每次都跑那一档的挂钟超过写死的上界就判红，上界随这两个数定；判别力自证：把清环那一步去掉，那道检查的读数必须变。② 冷挂载的耗时要有口径与上界：先定 E152（按里程碑对比六家文件系统的文件性能） 的挂载维拿不拿它当口径，再定要不要为「冷挂载整环扫描不优化」立一条；量的时候至少两个环长，才分得出它是不是随环长线性涨 | ② 要两个环长各跑一次，而环长定死单元区起点 ⇒ 要先有「换环长」那条路（C475（非默认环长下单元区起点取编译期常量） 那一格） | 2026-09-22 并行线四第二轮交回「规模的账」与验收 ②，用户当天定「都先认下，各立一笔账」 |
+| C487 | device-streams 格拿活代码与不跟踪它的模型比 | 门禁 checker-tier-qemu-device-streams（QEMU）把虚机里真 `crates/` 跑出来的段序列与 E142（新池新建文件的干跑） 产物的 `name=segments` 行逐项比。⚠️ **E142（新池新建文件的干跑） 的装置是 `research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs`，一份独立手写模型，不读 `crates/` 的 mkfs 实现**（实验页「它答不了的」第 5 条自陈）⇒ `crates/` 2026-09-22 给 mkfs 加了八步清零之后，E142（新池新建文件的干跑） 第十二次跑重跑出来的 `path=mkfs` 段序列**一字没变**（309 行只差 `mkfs_operations=13 → 21` 一行，而那一行来自产物尾部 `crates/` 的只读快照、不是模型算的），门禁 checker-tier-qemu-device-streams 因此一直红在「虚机段序列与产物不一致」——**红得对，但出路指错了**：它的出路说「重跑 E142（新池新建文件的干跑）」，而重跑解决不了 | 决策已定（用户 2026-09-23 定「让模型照条款追平」），模型那一半已做到：`research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs` 的 mkfs 在第 2193、2195 行调 `record_zero_fill`，门禁 checker-tier-qemu-device-streams 读的产物（`research/scripts/replay.sh` 第 171 行登记的 `e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out`）mkfs 行 `operations=23 segments=12+1+1+1+4`，与 `crates/singlefs-harness/tests/new_pool_file_creation_publish.rs` 第 333–337 行逐字相同；检查仍欠：`.claude/gate.d/fixtures/checker-tier-qemu-device-streams.sh/` 的 red / green 样本 mkfs 行仍是 `operations=13 segments=4+1+1+1+4`，没有一格证「虚机段序列改一步 门禁 checker-tier-qemu-device-streams 由绿转红」，门禁 checker-tier-qemu-device-streams 真跑没人跑过。判别力自证：把虚机跑的段序列改一步，门禁 checker-tier-qemu-device-streams 必须由绿转红 | 无——不依赖未实现的东西 | 2026-09-22 E142（新池新建文件的干跑） 第十二次跑交回「核心发现」一节，主 agent 现查新旧产物只差一行坐实 |
+| C488 | 组提交摊薄了写字节，没摊薄的那一半没量过 | 增补 1（写放大）两轮三方判完、结论「甲（不改）」，交用户那三格里的第 ③ 格逐字：甲的组提交**摊薄写字节**（E155（每次持久化的写量：三种 fsync 形态与反事实上界）：k ≤ 16 内没有一组让甲追平 WAL 臂），**但不摊薄 fsync 的等待时间——两个量不是一件事**。⚠️ **等待时间那一半全仓没量过**：E155（每次持久化的写量：三种 fsync 形态与反事实上界） 量的是字节，不是延迟；用户 2026-09-22 认下第 ③ 格时另提一条——先量再认。而 D25（目标负载优先级） 已定项 7 定了并发 fsync 下限 16、不设上限 ⇒ 并发越高，等待时间那一半越重，而它今天是个空白 | 立一个计数实验量「一次 fsync 从发出到返回等了多久」在甲与 WAL 两臂上随并发数 k 怎么走（k 至少取到 16 以上，D25（目标负载优先级） 已定项 7），判据与阈值跑前写死；⚠️ **量出来的是本机值**（`.claude/kb/tooling.md`「仓里的性能数都只在本机成立」），写进结论时要带机器口径、不许当成普适上界。判别力自证：把组提交关掉，两臂的等待时间必须分得开 | 无——E155（每次持久化的写量：三种 fsync 形态与反事实上界） 的装置在，量延迟要另加一个计时口径（照 `.claude/singlefs-ai-sop/rules/test-discipline.md`「分段计时在被测进程里计」） | 2026-09-22 用户认下增补 1 交用户三格时另提 |
+| C489 | singlefs-core 那 1786 条广谱变异没跑 | 增补 3 第 7 件（广谱变异）量出来的账：`cargo mutants --list` 数出 **2697 条**（`singlefs-core` 1786 + `singlefs-checker` 911）；基线 `cargo test --all`（warm target）**366.99 秒**、CPU 1878%（约 19/32 核）⇒ 串行约 **11.5 天**、`--jobs 2` 约 **5.7 天**。⚠️ **`--jobs` 不能按 `nproc` 取**：单条变异自己的 `cargo test` 已经吃掉约 19/32 核，`--jobs 32` 会把并发核需求堆到约 608 核当量；cargo-mutants 的 jobserver 只管并发的 rustc / 链接进程数，管不住每条变异那个测试进程内部的线程数。⚠️ **「没红」那一桶最贵**：`cargo test` 默认在第一个失败的测试二进制之后就不再跑后面的目标 ⇒ 抓到的 7 秒收尾、没红的吃满整条 workspace，而这一件最关心的正是没红那一桶。⇒ **用户 2026-09-22 定：先跑 checker 那 911 条，core 那 1786 条另立这一笔** | 跑 `singlefs-core` 那 1786 条，出抓到 / 没红 / 无效三个数，没红的逐条按 `.claude/rules/mutation-sampling.md` 八类分。⚠️ 要在**独立 worktree** 上跑：主 agent 并发派的实现线会改 `crates/`，2026-09-22 实测相隔 51 秒两次 `cargo check` 报不同的错，那会把「无效」那一栏用无关的编译错污染，而它与真正的无效变异长得一模一样。⚠️ 量出来的挂钟是**本机值**（`.claude/kb/tooling.md`「仓里的性能数都只在本机成立」） | 无——配置已入库（`.cargo/mutants.toml`），三个桶的自证已做过（抓到 / 没红 / 无效各有一个已知样本分得出来） | 2026-09-22 增补 3 第 7 件第一轮交回，用户当天定「先跑 checker 一个 crate」 |
+| C492 | 树表 0 条的一版上写实例表行是误拒 | R1：被拒的历史零故障可达（建池、挂载、不写文件、正常退出、再挂载），拒完之后这个池没有任何一条可写的出路。条款要同时答「树表 0 条的一版上行写在哪」与「不写行行不行」，两种选法在盘上分得开 | 条款写定之后：一条崩溃点重放用例覆盖 R1 的历史（mkfs、可写挂载、不写文件、正常退出、再挂载），断言重开之后至少有一条写路径能成功发布，不再对这整段历史返回「无出路」的拒绝；判别力自证：把实现改回今天这个拒绝分支（`mount.rs` 判空池回退/挂载用的那一支），该断言必须由绿转红 | 要用户先定条款 | 2026-09-22 三方判决 `m2-refusals-presumed-r1-main-verification.md` 第三节 R1 |
+| C493 | 回退候选集条文与实现说反话 | R2：D23（journal 的角色与格式） 已定项 14 整段 `树表` 零命中，候选集只有「实例表判有效」「txg ≥ F_生效」两条；`crates/singlefs-core/src/mount.rs:1300` 用 `tree_table_has_no_entries` 加了一条条文里没有的排除理由 | **条文与实现已对上、判别力自证仍欠**：2026-09-23 实现拿掉了 `tree_table_has_no_entries` 那条排除，`crates/singlefs-core/src/mount.rs` 的 `RollbackCandidateExclusion` 只剩不在根环、低于 F_生效、在被抛弃的时间线上三个成员，与 D23（journal 的角色与格式） 已定项 14 的候选集对上，回退到树表 0 条的根照常做；对拍由理想模型照条款另写的候选集（`crates/singlefs-harness/src/model.rs` 第 1102 行）与增补 3 的随机历史逐步比对罩着。还欠：一条变异把那条排除加回来，模型对拍必须由绿转红 | 无——不依赖未实现的东西 | 2026-09-22 三方判决 `m2-refusals-presumed-r1-main-verification.md` 第三节 R2 |
+| C496 | 环里一条记录都读不出的那道拒绝的前提不承重 | R3：拒的时候手里已经有一条能把整版重建出来的根，而只读挂载在记录全没了时照样把文件读回来；随便哪条无关记录都放行 | 造两份镜像：(a) 环里一条记录都读不出、根能把整版重建出来；(b) 环里留一条与这一版无关的记录、根同样能重建；断言 (a) 被这道拒绝挡住、(b) 不受它影响、走正常重建路径；判别力自证：把判据换成「记录数 > 0 即可」，(a) (b) 的判定结果必须变得相同，该断言必须由绿转红 | 无——不依赖未实现的东西 | 2026-09-22 三方判决 `m2-refusals-presumed-r1-main-verification.md` 第三节 R3 |
+| C504 | 树表条目宽在走读里无守卫，今天没坏法打得到 | `crates/singlefs-checker/src/walk.rs` 的 `walk_root` → `walk_tree_table_entry` 先 `read_u64(entry, 0)`、`read_u16(entry, 10)`，再切 `entry[14..100]`：**这三步之前没有一处判过这个条目有多宽**。树表 key 宽 8，`index_node_view` 只判「条目宽 ≥ key 宽」⇒ 条目宽落在 8..199 之间就越界 panic。I-1.10（码 2 条目宽等于字段表宽） 那一道判的是「这棵树的根节点」的条目宽、住在这两处切片**之后**，罩不到树表自己；C307（映射树两种 key 宽怎么装进一棵定宽 key 的树） 也没写它。checker 里守卫是现成的（`walk.rs` 三处 `entry.len() < tree_table_entry_bytes()`），只是没铺到这一支。⚠️ **今天造不出坏法**：`crates/singlefs-checker-tier/src/bad_disk_input.rs` 明写「树表条目宽不是 200 就交回 None」，现有坏法一条都走不到那里，要新开一条不经 `reach_the_tree_table` 的 | **决策已定、检查仍欠**：用户 2026-09-23 定只加走读守卫、不动 I-1.10（码 2 条目宽等于字段表宽）——`walk_tree_table_entry` 两处切片之前判条目宽（checker 别处已有的 `entry.len() < tree_table_entry_bytes()` 那一形态），判红形态是「走读断了」不是判违例。配一条新坏法（改树表单元自己的头：条目宽 200 → 8、条目数 → 1、声明长度 → 8，重算节点两道与根槽自证一道），断言交回错误成员而不是 panic；判别力自证：把守卫那一步去掉，坏盘输入快档的 panic 计数必须由 0 变正 | 无——不依赖未实现的东西 | 2026-09-22 修 R2 / R7 / R10 三处 panic 那一轮交回时报出，主 agent 现查 `walk.rs` 的两处切片与 `bad_disk_input.rs` 那句拒绝坐实；实现已在主工作区（`walk.rs` 走读守卫、`bad_disk_input.rs` 的新坏法、`bad_disk_input_campaign.rs` 的用例、`crates/mutations.tsv` 一条变异），checker 那一组 2026-09-23 在两份同步过的副本上复核：拿掉守卫之后未知 panic 从 0 变 11；待代码三方与崩溃验证 |
+| C505 | 字词损坏闸把 Rust 的 `::` 误判成粘连 | `research/scripts/corruption-check.py` 的粘连判据是 `(?<![A-Za-z0-9])[:;,]\w`：它要求标点**前面**不是字母数字，那才像「一句话被截断后接上了下一句」。Rust 路径记号 `crate::module` 里**第二个冒号**前面是冒号、后面是词字符 ⇒ 每出现一次就误判一次。2026-09-22 实测：代码轮本地攻方的提示与模型答复里各有 19–20 处 `crate::module` 写法，两份文件各判红一次，**整轮抽样按规则作废**，要把提示里 19 处改成不含 `::` 的说法才跑得过。⚠️ 代价不只是重跑：`.claude/rules/three-way-inference.md` 明令闸判红那一轮作废重跑、不许记成「三方不一致」，所以每一次误判都吃掉一整轮；而**代码轮天然要谈 Rust 路径**，这个误判会反复来 | 一行修：负向断言里加上冒号，写成 `(?<![A-Za-z0-9:])[:;,]\w` —— 它只排掉「冒号紧跟冒号」这一种，真正要抓的形态（`**Attack P1**:it`，冒号前面是标记或空白）一个都不放过。⚠️ 照 `.claude/singlefs-ai-sop/rules/sop-first.md`「改了 `scripts/` 就造一个该被拦的输入，确认它真的会红」：改完要跑两个样本——含 `crate::module` 的必须判绿，含 `**X**:it` 的必须仍判红；两样都验过才算改完。⚠️ 另一半是**射程**：这道闸认得的损坏形态是登记过的四类，`.claude/rules/three-way-inference.md` 逐字写着「闸判绿之后照样通读」，这一条不因为修了误判而松 | 无——一行正则加两个自证样本，不依赖未实现的东西 | 2026-09-22 代码轮本地攻方交回时报出，主 agent 现查 `research/scripts/corruption-check.py` 第 90 行那条正则坐实 |
+| C506 | 每区槽数 S 写成编译期常量，条文说它住系统配置 | D22（单元原子性怎么合成） 已定项 1 的字段表逐字写：「**具体取多少不是格式决策**——格式承诺的是『S 是系统配置字段 + 挂载时判区间』」，区间 4..16（下界 k_tol + 2 = 4，上界由 I-7.4（近 K 代块未被复用） 扣住的块数挂载时算）。而实现把它写成 `crates/singlefs-format/src/lib.rs:186` 的 `pub const ROOT_RING_SLOTS_PER_REGION: u64 = 8;`——**编译期常量，不是系统配置字段**；主 agent 2026-09-23 现查：全仓对它**零处区间判**、kb 的 21 个 `format-const` 登记名里**零处登记**。⚠️ kb 里唯一提到 8 的地方（`.claude/kb/layout/01-first-txn.md`）自称「**预想**」。⇒ 门禁 code-source-discipline 的 format-constants 格绑不到它（自陈只管已登记的常量），门禁 checker-independence-and-sync 的 layout-checker-sync 格也够不着（自陈只判「格式变了 checker 没跟」） | 两件，都要用户先定 S 到底走哪一种：① 若维持「住系统配置」——把它从编译期常量改成从系统配置槽读的运行时值，挂载时判 4..16 区间、越界拒绝挂载；判别力自证：把系统配置里的 S 写成 3 或 17，挂载必须拒。② 若改成「就是格式常量」——改 D22（单元原子性怎么合成） 已定项 1 那半句，并把它登记进 `format-const`，让门禁 code-source-discipline 的 format-constants 格盯住。⚠️ **无论走哪一种，都要先给它一个 `format-const` 登记位**，那是 C94（登记的格式常量与后来的定案对不上） 第四列自陈仍欠的覆盖面那一半的具体一例 | 无——两条路都不依赖未实现的东西 | 2026-09-23 定义轮云端攻方在副本上把它从 8 改成 4、E156（alloc-basis 四条岔路的代价数） 的代价数整体平移而 26 行输出逐字不变，主 agent 另行现查 D22（单元原子性怎么合成） 原文、零区间判、零登记位坐实 |
+| C508 | 代码轮与定义轮的点名闸认「提到」不认「判过」 | 门禁 doc-process-records 的 crates-adversarial-review 格（`crates/` 改动要有三方判决点名）与 门禁 doc-process-records 的 agent-def-adversarial-review 格（定义改动同理）判「点名了没有」用的都是**整份判决里的子串匹配**（两处都是 `grep -qF -- "<路径>" "<判决>"`）。⇒ 判决里**任何一次提到这个路径都算数**，哪怕提的是「这份文件里没有那一句」。⚠️ **实测就在仓里**：2026-09-23 写 `m2-runner-in-repo-harness-r1-main-verification.md` 时，W2 那一节为了说明「共用文件里没有该给多宽写权限的条款」而提到 `.claude/agent-common.md`，门禁 doc-process-records 的 agent-def-adversarial-review 格当场把它算成「有去向」——而那一次改动本来是靠 `.claude/agent-def-review-exempt` 的哈希豁免过的，两条路同时成立，外面看不出是哪一条在起作用。⇒ 这两道闸判的是「判决里出现过这个路径」，不是「这个路径被判过」 | 让点名有个**认得出来的形态**，判决里写成一节或一张表（例如固定标题「### 这一轮被判过的文件」，闸只在那一节里找路径），闸改成只认那一节；正文别处提到同一个路径不算数。判别力自证：把一份路径从那一节挪到正文别处，门禁 doc-process-records 的 crates-adversarial-review 格与 门禁 doc-process-records 的 agent-def-adversarial-review 格都必须由绿转红。⚠️ 改完要回扫已有的判决：今天的判决多半没有那一节，要么补、要么给一段时间的挂账表（照 `.claude/audit-rows-pending` 那种只减不增的形态） | 无——两道闸都已存在，改的是匹配范围 | 2026-09-23 主 agent 现查两道闸的匹配语句（`56-crates-adversarial-review.sh` 与 `72-agent-def-adversarial-review.sh` 各一处 `grep -qF`），并在自己刚写的那份判决上撞到这个形态 |
+| C509 | 局部标号进了 kb 却不带作用域，跨轮撞车没人拦 | 三方论证的轮内标号（一轮的正文里用大写字母加数字给每一格起的那种记号）与决策内的定案分支标号**与编号同形**，每份 kb 靠自己文件头的 `doc-lint:not-numbers` 白名单把它们从「编号要带简称」那条检查里摘出去 ⇒ **它们在 kb 里可以裸写，而没有任何东西会说**。⚠️ **撞车已经发生**：`.claude/kb/decisions/16-发布语义.md` 与本文件里有一个这样的记号，指的是 `m2-emptypool-nonempty-r1` 那一轮的一格；2026-09-23 写收口表第 13 行时主 agent 让同一个记号指了 `m2-placement-falsepositive-r1` 那一轮的另一格——**同一个记号、两轮、两个意思**，恰好因为越过 doc-lint 那条「出现三次以上却没有登记位」才暴露，已改成点名判决文件、不写裸记号。⇒ 这是 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 5 条那条失败在白名单底下的复现：编号立不住是因为说明留在别处，而白名单恰好豁免了唯一会拦它的检查 | **2026-09-23 三次复发之后定下的写法：引一份判决里的一格，写那一格判的是什么，不写只在那一轮里有意义的记号。** 例如写「`<判决文件名>` 里判盘不等大落点那一格」，不写「`<判决文件名>` 的某记号那一格」。理由是 `.claude/singlefs-ai-sop/rules/kb-discipline.md` 第 1 条：那条事实被单独检索出来时要还站得住，而记号离开它那一轮就什么都不是；说清它判的是什么则自足。**决策内的分支标号仍按「带作用域」办**（写成决策编号加分项加分支名），那类标号有稳定的登记位。⇒ 判据分两半：轮内标号**改写成它判的那件事**，决策内标号**带上作用域**。做成检查：`doc-lint` 对 `not-numbers` 白名单里的记号，判它前面有没有紧跟一个作用域（决策编号加分项，或一个判决文件名）；没有就红。判别力自证：把一处带作用域的用法的前半截删掉，那道检查必须由绿转红。⚠️ **量过再立**：2026-09-23 全仓数出这类记号在 kb 里累计数百次，多数自带作用域，但要先回扫一遍才知道要不要配挂账表（照 `.claude/audit-rows-pending` 那种只减不增的形态） | 无——检查与回扫都不依赖未实现的东西 | 2026-09-23 主 agent 写收口表第 13 行时自己踩中，kb-scribe 停下报出 doc-lint 那条红；随后现查那两处旧记号指的是另一轮，全仓计数同日数出 |
+| C510 | 编造的日期没人拦 | **「日期不许是编的」这条禁令住在上游**（`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 的 M 段，判据是 `lib.sh` 的 `date_out_of_range`：早于本仓第一个提交宽限 7 天、或晚于最晚时区的今天，都不可能是真发生过的事），**而它只认正文里的两种形态**：历史条目的 `### 日期`、正文里的「实测（日期）」。2026-09-23 实测：门禁样本里 8 个文件名与 32 处正文写着 2026-01-01 / 2026-01-02，比本仓第一个提交（2026-08-26）早大半年；带一个 `records/2026-01-01-临时实测.md` 跑 64 道阶段加 doc-lint，**0 道点名它**。一个编造日期读起来和真日期一模一样，而门禁样本正是后来人照抄形态的样板 | **已还大半（2026-09-23，门禁 code-tooling 的 fixture-claims 格第 ④ 条，三方第一轮判完）**：判据 source 上游 `lib.sh` 的 `date_out_of_range`，本仓不另写一份。两维各判各的、各报各的数——文件名扫全仓路径（含 `decisions-history/<年-月>.md` 这种按月命名的：整月与允许区间没有交集才判红，不拿 `2026-08` 当 `2026-08-01` 比），正文扫 `.claude/gate.d/fixtures/` 下**全部文件**（不只 `.md`）。当天把 8 个文件名与 32 处正文、另加 60 / 61 / 门禁 doc-experiments 的 archive-past-rounds 格 `setup.sh` 里 17 处改成各自 fixture 的创建日。三方打中七条全部现查坐实后采纳，逐条见 `research/prompts/c510-date-gate-r1-main-verification.md`：① 一行只判第一个日期（`sort -u -t: -k1,1n` 拿行号当唯一键）；② 非 `.md` 一个字不扫；③ 按月命名的文件抓不到；④ 红绿样本罩不住三个变异；⑤ **判据失效时静默报绿**——把 `date_out_of_range` 改个名，这一条报 ✓ 且数看着完全正常，改法是拿 `1970-01-01` 做阳性对照、报不出越界就判红；⑥ `gate-stage` 措辞窄于射程；⑦ **索引里有而磁盘已删的文件被判红**（`git mv` 过又被别的会话 `git reset` 掉暂存，`--cached` 照样端出来），没有一条腿报出来，是真仓自己暴露的。判别力在 `fixtures/95-fixture-claims.sh/` 双向证过，坏日期由 `setup.sh` 在临时仓现造、不摆进仓里（C441（全仓清扫工具会吃掉自己的判别力样本））。**仍欠两样**：① `.claude/doc-lint-exclude` 里每行要写清它关掉了哪几类检查——只为绕开登记冲突而整份排除，等于把日期、指代、编号简称几条一起关掉，排除项该按检查分格、不按文件分格；② `setup.sh` 在临时仓里**运行时生成**的文件名这一维扫不到（它不在任何一次 `git ls-files` 里），今天仓里没有对象 | **射程不许再放大，这条是实测定的**：2026-09-23 扫全仓正文得 52 处越界，其中 20 处全部合法——`prior-art.md` 9 处（别家项目的真实日期）、`decisions-history/2026-09.md` 3 处（RFC 演进史 2015-08-07 → 2017-01-30）、`checks-owed.md` 8 处（这一行自己引 2026-01-01 当例子）。`date_out_of_range` 的下界假设是「本仓的事不可能早于本仓第一个提交」，**这只对说本仓自己事的日期成立**；上游 M 段只认那两种形态不是射程不够，是有意收窄。⚠️ 本条 2026-09-23 早先的版本提议「上游把 M 段射程扩到表格单元格与标题括注」，**当天被这次实测推翻、已撤回**；同一天写过的「那几处是运行时才生成所以扫不到」也是错的，三方攻方腿指出真病因是文件不叫 `.md`，按真病因改一行 pathspec 就修掉了 | 2026-09-23 用户看到 `fixtures/81-audit-contradictions.sh/red/records/2026-01-01-总审核.md` 问「我们禁止了这样的命名，为什么还出现」，逐处现查后立 |
+| C511 | 回退到无文件那一版之后诞生代怎么接 | 2026-09-23 拿掉「候选集排除树表 0 条」那条排除之后（C493（回退候选集条文与实现说反话） 还清），崩溃注入快档当场判出三条同形的新发现，原样（I-9.14（树表条目的诞生 txg 跨根不变））：`树 11 的树表条目诞生 txg 跨根不一：根 txg 4 记 4、…、根 txg 8 记 8、…` 加 I-9.10（对象出生代三处一致）：`inode 1 偏移 0 的数据单元 的对象出生代 4 与 inode 记录的 8 不符`。**机理**：回退到没有文件的一版之后，这个池只剩「再发一次第一个文件版本」这一条路，而那一次走 `previous: None`——**重新建树、重新发对象出生代**，与根环里那些旧根记的对不上。⇒ 「回退到没有文件的一版之后重新建树，诞生代怎么算」全仓没有条款。⚠️ **环里没有带文件的根时回退照常做**（那一半 R2 真的放开了，由 `rolling_back_to_a_warm_up_root_before_any_file_version_rewrites_only_the_instance_table` 钉住）；今天只在「环里还留着带文件版本的根」这一格上拒绝，成员是 `MountError::RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion`，在任何写之前返回、盘上逐字节不变 | 决策已定、检查仍欠：用户 2026-09-23 定 I-9.14（树表条目的诞生 txg 跨根不变） 按时间线收窄（被回退切掉的旧线不与现行线比，[invariants.md](invariants.md)），第 3 步照 D8（核心索引结构） 已定项 8 ② 修实现、I-7.8（根记录树 ID 水位不低于全池最大树 ID） 不改。I-9.14（树表条目的诞生 txg 跨根不变） 那一半已有检查（`birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollback_target_reddens_only_the_birth_invariant`、`birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_rollback_is_not_compared_and_every_invariant_holds` 与 `crates/mutations.tsv` 里这一笔的三条变异）；还欠：修完实现、拿掉那道拒绝之后，一条用例走「回退到无文件那一版 → 再发第一个文件版本」、断言 checker 全绿、I-7.8（根记录树 ID 水位不低于全池最大树 ID） 不红；判别力自证：把回退那一版的水位改回沿所基于的那一版带（今天的取法），偏回退的历史上 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 必须红 | 第 3 步先改两处实现：回退到无文件那一版时树 ID 水位取根环里全部根记录的 max 带过去（D8（核心索引结构） 已定项 8 ②；今天沿所基于的那一版带水位，`crates/singlefs-core/src/transaction.rs` 各处取 `previous_root.tree_identifier_watermark`），`publish_first_file` 里「水位 = 11 ⇒ 树还没建」那一判改看树表条数；改完才拿掉 `crates/singlefs-core/src/mount.rs` 的 `RollbackToVersionWithoutFileWhileTheRingStillHoldsAFileVersion`，拿掉之后 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 不许红；模型那一侧的必拒预测一起删。用户 2026-09-23 先选了「I-7.8（根记录树 ID 水位不低于全池最大树 ID） 也按时间线收窄」（`.claude/warnings/2026-09-23.md` 第一节），看到 D8（核心索引结构） 已定项 8 ② 之后改选照条款修实现 | 2026-09-23 走到底那一轮的崩溃注入快档判出，主 agent 现查 `crates/singlefs-core/src/mount.rs` 的那个错误成员坐实；**第 3 步实现已落（2026-09-23，待代码三方与崩溃验证）**：写行那次发布的水位取根环与记录新根段的 max（`mount.rs` 的 `tree_identifier_watermark_of_the_ring`），`publish_first_file` 改看树表条数，那道拒绝与它的下游（模型、映射、必见清单、用例、5 行变异）都拿掉了；用例 A 走「写文件版本 → 回退到暖机根 → 再发第一个文件版本」，checker 全绿、I-7.8（根记录树 ID 水位不低于全池最大树 ID） / I-9.14（树表条目的诞生 txg 跨根不变） / I-9.10（对象出生代三处一致） 都判过且成立；判别力：水位改回沿所基于的那一版带，用例 A 的断言红、用例 B 与偏回退的随机历史上 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 红 |
+| C520 | decision-links 格只认状态段恰好是已跑 | 实验改成已跑时，标题状态写成「已跑两轮」「已测」「**已跑**」「已跑 (…)」「已跑：…」这类跑完了的写法，门禁 doc-experiments 的 decision-links 格 ⑤ 后一半（改成已跑就要回看引了它的决策）不触发，欠账块里等它的决策没人回看；真仓有 8 页用这类写法（名单见 `research/prompts/gate-fix-forks-r3-opus-model/t1-titles.out` 第 3–10 行），门禁 doc-experiments 的 results-cited 格却把它们认作跑过 | 门禁 doc-experiments 的 decision-links 格与 门禁 doc-experiments 的 results-cited 格共用一个「跑过了」的谓词；红样本放这几种写法各一页、欠账块里等它的决策没回看，判红 | 定「跑过了」的全部写法（部分已跑、已跑但结论作废仍不算） | 三方判决 `research/prompts/gate-fix-forks-r3-main-verification.md` 里讨论 decision-links 格 ⑤ 后一半与 kb 腐烂检查并进 ⑨ 的那一节，表里状态写法那一行 |
+| C521 | 已跑实验重跑翻结论不触发回看 | 已跑的实验重跑、结论翻了，门禁 doc-experiments 的 decision-links 格 ⑤ 后一半只在「改成已跑」那一刻触发，引了它的决策（例：在欠账块里等它的）没人回看 | 已跑页的正文改了也要求回看引了它的每条决策；红样本放一页已跑的实验改结论、引它的决策没动，判红 | 先量代价——每改一次已跑页的正文，要回看的决策有几条 | 三方判决 `research/prompts/gate-fix-forks-r3-main-verification.md` 里讨论 decision-links 格 ⑤ 后一半与 kb 腐烂检查并进 ⑨ 的那一节，表里重跑、结论翻了那一行 |
+| C522 | amend 抹掉产物时 doc-experiments 两格放过一次 | 门禁 doc-experiments 的 results-cited 格、quoted-result-lines 格把「HEAD 里还在、工作区删了」的产物算找得到（这一批照归档规则删上一次提交留下的产物）；误删的产物经 `git commit --amend` 从所有提交里抹掉时，amend 之前那一次两道都放过，amend 之后才红 | 分得开「归档删的」与「误删的」再认；红样本造一段「本地提交带一份产物、工作区误删、准备 amend」的历史，判红 | 归档的删除要有可认的记录（归档脚本留一份清单），「只在 HEAD 已推出去时才认」这条改法会让「提交了没推、这一批归档上一次提交的产物」重新误红，不采 | 三方判决 `research/prompts/gate-fix-forks-r3-main-verification.md`「二、逐格判定」里 `git commit --amend` 抹掉产物那一行 |
+| C523 | change-range-single-source 格漏判与误拦的写法 | 门禁 code-tooling 的 change-range-single-source 格（改动范围只许一份取法）漏判 9 种写法：python `os.getenv('GATE_BASE')`、写死远端分支（`origin/master`）、`HEAD^`、`HEAD~`、字符串拼出 `HEAD~1`、`git status --porcelain` 列路径不带 quotepath、`--numstat` 不带 quotepath、`\|\| true`、同一行的 `\|\|` 属于后一条命令；误拦 5 种：调用折行后 `\|\|` 在下一行、下一行取 `$?`、`set -e` 下的调用、python 多行文档字符串里提到共用取法、heredoc 用法说明 | 判据补这几种写法，第 ③ 条按语句（接续行合并之后）而不是按行判；红绿样本各放一份这些写法 | 无 | 三方判决 `research/prompts/gate-fix-forks-r3-main-verification.md`「二、逐格判定」里 门禁 code-tooling 的 change-range-single-source 格漏判 9 种、误拦 5 种写法那一行（攻方报告 `research/prompts/gate-fix-forks-r3-opus-output.md` 那一节的表） |
+| C524 | segment-registry 格声明路径不唯一没有样本格 | `research/scripts/check-segment-registry.py` 里「字节布局表第八节开头声明的 path 集合剩不下恰好一条」走退 2 那一支，门禁 doc-registries 的 segment-registry 格的红样本放不进；把那一行的 `!= 1` 改成 `< 1`，门禁 code-tooling 的 research-script-selftests 格 `--selftest` 与 门禁 doc-registries 的 segment-registry 格样本都不红 | 另开一种退 2 的样本，或者给脚本的 `--selftest` 加第四刀（声明多出一条 path 必须退 2） | 无 | 三方判决 `research/prompts/gate-fix-forks-r3-main-verification.md`「二、逐格判定」里十个新变异那一段 |
+| C525 | 阶段在 cd 之后找自己旁边的文件 | `.claude/gate.d/` 下 23 道阶段在 `cd` 到项目根之后才用 `$(dirname "$0")` 找共用脚本或生成器；用相对路径调、又另给一个项目根时找不到。整轮门禁用绝对路径调阶段，碰不到 | 在 cd 之前取阶段自己的位置（31、门禁 doc-registries 的 segment-registry 格的写法）；立一条检查：阶段文件里 `cd` 到项目根的那一行之后出现 `$(dirname "$0")` 判红，名单现算（awk 找第一行 `cd "$ROOT"` 或 `cd "${1`，其后的非注释行里找 `dirname "$0"`） | 无 | 三方判决 `research/prompts/gate-fix-forks-r2-main-verification.md` 里讨论 segment-registry 格找不到脚本、blocking-verdict 格找不到生成器退 1 的那一节 |
+| C526 | prime-marks 格管不到 ASCII 单引号当角标 | 门禁 doc-text 的 prime-marks 格（全仓不许用角标写法）只判撇号类字符（U+2032 等五个）；用 ASCII 单引号当角标的变体名（`S1'`、`丙'` 这类）它判不了——与代码里的引号、带引号的中文词分不开 | 只在 markdown 正文（不在代码片段与围栏里）判「编号或天干后面紧跟一个或几个单引号、后面不是字母」，先对全仓量误判 | 量误判 | 用户 2026-09-24 定「全仓禁用角标」；门禁 doc-text 的 prime-marks 格头部；`.claude/rules/path-moves.md`「变体起新名字，不用角标」 |
+| C527 | 改名覆盖借错删除规则的一半 | D8（核心索引结构） 已定项 3 第 68 行写「改名覆盖已存在的目标 = 一次删除，必须走已定项 5（whiteout 删除）的 intent log」，而已定项 5（第 107 行）把删单个文件交给 `deleted_inodes` 与后台回收、logged_ops 只给无界操作；两条已定条款冲突，另外被覆盖的 inode 进不进 `deleted_inodes`、目标状态怎么写都没有取值 | 用户 2026-09-24 定不借：第 68 行把改名覆盖自己的规则写全（dirent 替换、旧 inode 的 nlink、nlink 为 0 时的去处、与改名是否同一个事务），不再写「走已定项 5」；写的时候照 `.claude/rules/fs-design.md`「借用式条款要把被借规则的每个参数都绑死」逐项给取值 | 无 | 三方判决 `research/prompts/gate-fix-forks-r1-main-verification.md`「决策 08 第 68 行借已定项 5」一节；`research/prompts/gate-fix-forks-r1-forks.md` 里改名覆盖那一行 |
+| C528 | 两条门禁路判的改动窗口不同 | 上游 `gate.sh --staged` 在里层把 `GATE_BASE` 设成上游 `diff_base` 的基准，不带 `--staged` 的整轮按共用脚本 `research/scripts/changed-paths.sh` 自己的基准；「全推出去了」时一个是 HEAD~1、一个是 HEAD，同一批改动两条路判的窗口不同。另两句错话：`research/scripts/archive-past-rounds.py:47` 写「门禁 doc-process-records 的 knowledge-sync 格的改动范围取 `GATE_BASE`（门禁跑时给的是 `diff_base`…）」，而门禁设的是 `GATE_DIFF_BASE`；上游样本自检不清 `GATE_DIFF_BASE` | 用户 2026-09-24 定共用脚本不认 `GATE_DIFF_BASE`：两条路的窗口差异照实写进 `research/scripts/changed-paths.sh` 文件头（已写）；还剩 `research/scripts/archive-past-rounds.py` 第 47 行那句改准；上游样本自检不清 `GATE_DIFF_BASE` 已填进上游三语仓等发版，`diff_base` 全推出去了时退到 HEAD~1 报给发版会话 | 上游改 | 三方判决 `research/prompts/gate-fix-forks-r2-main-verification.md`「共用脚本认不认 `GATE_DIFF_BASE`」一节；`research/prompts/gate-fix-forks-r1-forks.md` 里共用脚本基准那一行 |
+| C529 | 计时单测在高负载下不稳 | `research/e7-index-bench/src/bin/e6_multicore.rs` 的单测断言「4 线程做同样总量比 1 线程快」；机器负载高（别的会话在跑 cargo）时它会红，门禁 checker-tier-research-build-and-replay 的 research-unit-tests 格（research 构建与单测）第一次跑红、第二次绿 | 计时类断言不进门禁的单测（挪进实验的产物区间断言），或者给它一个负载前提、负载过高就报「本次未跑」 | 无 | 门禁修复那一段会话现跑 门禁 checker-tier-research-build-and-replay 的 research-unit-tests 格（负载 36–43 时红在这一条，重跑绿） |
+| C530 | fixture-claims 格靠散文子串认声称有样本 | 门禁 code-tooling 的 fixture-claims 格把阶段文件里任何一处出现 `fixtures/<阶段文件名>` 都当成「声称有判别力样本」；一句否定句（「装不进 fixtures/… 这样的沙箱」）也被当成声称，而 门禁 code-tooling 的 fixture-claims 格自己的出路正是让人写这种句子 | 把声称做成显式标记（`# gate-fixture: yes` / `# gate-fixture: none <为什么>`）；退一步至少只扫头部、排除带「没有 / 不 / 装不进」的行 | 无 | 门禁修复那一段会话的审核（`.claude/gate.d/code-tooling.sh` 的 fixture-claims 格读整份文件做子串匹配） |
+| C531 | 样本之间撞号没有检查 | 不同阶段的判别力样本各自造决策文件，编号会撞：编号 94 的样本决策同时登记在 门禁 doc-decisions 的 kb-shape 格与 门禁 doc-decisions 的 stale-open-items 格的样本里，编号 99 的同时登记在 门禁 doc-decisions 的 stale-open-items 格与 门禁 code-source-discipline 的 clause-enums 格的样本里；样本目录进不进 doc-lint 的排除表不同，撞号时 doc-lint 报「多处登记位」 | 给样本里造的编号划一个专用号段，或加一条检查：各样本目录里登记的编号两两不同 | 无 | 门禁修复那一段会话现查 `.claude/gate.d/fixtures/*/*/.claude/kb/decisions/` |
+| C532 | 归档产物只剩区间断言 | `research/scripts/replay.sh` 里判 `exact` 的 129 行，123 行的产物已按「每次提交删上一次的实验记录」归档进 git 历史、不在树里，复跑只剩「结论区间断言」：产物重跑出来的字节变了，只要结论还落在区间里就不红 | 复跑时从 git 历史取回归档的那一版逐字节比，或者把「逐字节」降级明写成「区间」 | 定归档规矩与逐字节复跑谁让谁 | 门禁修复那一段会话现跑 门禁 checker-tier-research-build-and-replay 的 experiment-replay 格（「产物已归档」一栏） |
+| C534 | 事实标新立就压掉回扫 | 阶段同步的事实表里，回扫员能把对已有对象（已有的门禁号、脚本、欠账号）的改动标成「新立：」、检索词写只在新文字里出现的新说法，这件事就一行候选都不出，`research/scripts/stale-candidates.py --check-facts` 照样判过。gate-audit 阶段同步的事实表 v1 里有六行是这样，C114（declared-counts 格只扫索引页） 因此漏掉，主 agent 按旧说法复搜才抓到 | `--check-facts` 对每一行标「新立：」的事实，取旧事实里点名的门禁号、反引号里的路径与 C / D / E 编号，在基准那一版里已经存在就判红，出路写「对象已经存在就不是新立，检索词改写成改之前仓里怎么描述它」；自证拿事实表 v1 那六行当红样本 | 无 | 主 agent 逐行全看 `research/prompts/gate-audit-judge-main.md`；事实表 v1 `research/prompts/gate-audit-facts.tsv` 与 v2 `research/prompts/gate-audit-facts-v2.tsv` |
+| C535 | 无实验段里的实验编号被当成引用 | 门禁 doc-experiments 的 decision-links 格把已定项依据段里的每个 `E<号>（` 都记成这条分项引的实验（`.claude/gate.d/doc-experiments.sh` 的 decision-links 格第 170–173 行），不看它在不在「无实验：」之后；第 335 行的双向检查用的就是这份集合。写「无实验：理由」的分项若在理由里提到一个实验，门禁把它当成引了那个实验。`records/2026-09-19-决策瘦身与双向登记.md` 第 161 行记下过这一条，没有欠账接着 | 依据段里「无实验：」之后的 `E<号>（` 不计入引用，或者判红、要求把它挪出依据段；红样本放一条「无实验：」理由里点名一个实验、实验页没有回指的分项 | 无 | gate-audit 阶段同步逐行判 `research/prompts/gate-audit-judge-all.md` 里 F7 那一行的理由；主 agent 现查 门禁 doc-experiments 的 decision-links 格第 158–173、335 行 |
+| C536 | inode 树的「左从右借」让容器号条件为假 | D8（核心索引结构） 已定项 6 给 inode 树定的「左从右借」：借走右容器最小的那条之后，左容器的最大 key 可以 ≥ 右容器号，I-9.4（容器号不超最小 key） 的「沿……」那一半当场为假（推的，今天实现没有删除，没有历史走到） | inode 树删除落地时改借法或改 I-9.4（容器号不超最小 key） 的判据；一条用例：左从右借一次之后跑 checker，I-9.4（容器号不超最小 key） 那一半必须判得出（改借法之前红、改后绿） | 开着：inode 树删除不在里程碑「覆盖写、释放、回退与复用」 | 2026-09-24 三方 `research/prompts/m2-treesplit-r1-main-verification.md` 「分裂与收缩规则」那一节 |
+| C537 | E91 与 E143 的头宽常量说的是哪个量没人核 | `research/e7-index-bench/src/bin/e91_ring_admission.rs` 第 17 行 `RECORD_HEADER_BYTES = 78`（注释「现行头宽」，而 78 只是十个字段）与 `e143_one_unit_per_transaction_journal.rs` 第 12 行 `JOURNAL_HEADER_BYTES_TODAY = 95`，两处说的是不是现行记录头宽、要不要跟 311 走，回扫判不出 | 读装置源码定量，是同一个量就把名字对上 `JOURNAL_HEADER_BYTES` 让门禁 code-source-discipline 的 format-constants 格罩住 | 开着，不挡里程碑「覆盖写、释放、回退与复用」 | `research/prompts/m2-header311-sweep-report.md` 第二节第 2 小节 |
+| C538 | 分配记录树释放链让保留池兜不住 | 老化之后一次覆盖写要改的分配记录叶平均 13.38、最多 68 片，末条点名最多 76 > 67，D28（挂载期承诺量） 已定项 4 的 ckpt_cost「Σ当前的高」在 3 万多次发布里一次都没兜住（`research/prompts/m2-keyspace-r1-opus-output.md` 的 S4 第 2 节，副本上量的、被攻过零轮）；与派生树选哪个候选无关，病根是「分配记录树给自己的节点记分配记录，且树多于一片叶」；攻方提的「分配记录树节点专区」在它的模型上把链压到最多 12 片，专区在 1 TiB 铺满时要多大没量。末条超过 67 由 D23（journal 的角色与格式） 已定项 17「末条再跨记录」接住，不在这一笔里 | 老化负载上一次发布弄脏的分配记录叶数与 ckpt_cost 并排，前者超出后者判红 | 用户 2026-09-24 定挪到后面的里程碑（K3） | `research/prompts/m2-keyspace-r1-main-verification.md` 第三节 S4 |
+| C541 | 原样重发把一次失败放大成整条发布流阻塞 | 这一版发布失败原样重发（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」）：串行提交下失败那次不成功，之后的发布全排在它后面；持续失败时永远重发，一次失败被放大成整卷写不进去 | 注入持续写失败：重发次数或时长越过上限时转只读或向调用者报错，不无限阻塞；判别力：去掉上限必须红 | 上限取多少、越过之后走哪一支没有条款（已定项 14 的两支随后面的里程碑） | 2026-09-24 用户原话「记一笔 防止阻塞放大击穿」，`records/2026-09-24-里程碑二收尾调度.md` 第三节 |
+| C542 | 取号前预演不读盘核，坏盘加旧根全被盖掉会烧号 | 取号之前在分配器副本上预演写行与暖机（D18（块里携带什么信息） 已定项 11「可写挂载的顺序」）时，不做释放前读盘核校验和、对不上就隔离那一步；这一串里有一份换下的单元核出对不上而被隔离，并且这一串自己的根把环里比它旧的有效根全盖掉（回退到环里最旧的那条根）时，预演判取得到，真发在取号之后被落点拒绝，烧掉一个实例代号，不丢数据。**挂载时回退那一支（回退到环里最旧的那条根）随管理员回退改成挂着时的一次向前发布、不取号（D23（journal 的角色与格式） 已定项 14）没了**；剩下普通可写挂载那一支：所选根是最新根时，这次挂载的写行与暖机能不能把环里比它旧的有效根全盖掉，推的是盖不掉（没量），可不可达由实现员用用例判 | 造普通可写挂载那一格：坏一份写行要换下的单元，这次挂载的写行与暖机盖掉环里比所选根旧的全部有效根；造得出就断言挂载在取号之前拒，判别力：今天的预演必须放行；造不出就把那条用例写进这一行、这一笔挪进已还清 | 用户 2026-09-24 定记欠账、不改：预演多读一遍盘会挪动已有故障注入用例的注入点。2026-09-25 代码轮第三轮攻方量出后果比这一栏写的重一步（`research/prompts/m2-final-code-r3-opus-output.md`「Z16-a」一节）。**场景**：单元区 312 / 316 / 324 / 336 槽、覆盖写 24 次、写行要换下的某个单元坏一份、回退到环里最旧的根。16 格打中，两次抽样相同。**结果**：预演放行，取号之后拒的是暖机那一次，写行那次已经落盘；它的根盖掉了回退目标所在的环槽，再试同一条回退报 `NotInRing`，管理员没法重试。**攻方试的「预演也读盘核」只在它的模型上量过**：这 16 格都改成在取号之前拒、号不涨、一个写都不发，其余 2603 段没多拒一段；瞬时故障那一半修不了。改不改待用户定。 | 2026-09-24 实十八报告 `research/prompts/m2-followups2-implementer-report.md` 第三节 2 |
+| C543 | 重建上一版只带实例表第 0 片 | 从盘上重建上一版（`crates/singlefs-core/src/recovery.rs` 的 `rebuild_version`）时只带实例表第 0 片，没沿链读进第 1 片起各片；今天不出错，释放走写行计划里带的旧链 | 造一条靠 `rebuild_version` 读第 1 片起的路径，读回的行数必须等于写进去的行数；判别力：今天的 `rebuild_version` 必须红 | 用户 2026-09-25 定记欠账、不改：今天没有路径靠它拿后面各片 | 2026-09-25 实十六接续报告 `research/prompts/m2-writepath-implementer-report.md` 第六节 Q4 |
+| C546 | 抬 F 被拒时扣住的槽不退回 | 抬 F 那一串发布被落点拒时，`mount.rs` 的 `release_reclaim_holds` 走不到、分配器不退回，被扣住的槽计数上是空闲、实际发不出去，而 D28（挂载期承诺量） 式子把它们算成可用 | 造抬 F 第一次空发布就被落点拒的历史，断言被拒之后扣住的槽已放开、分配器与被拒之前逐项相同；判别力：今天的代码必须红 | 实现缺口，归实二五。2026-09-25 实二五还了第一次那一半：抬 F 第一次空发布在任何写之前被拒时，分配器整个换回抬 F 之前那一份（用例按 `Debug` 整份比对）；第二次起那一半实二六还了：这一串在任何写之前在分配器拷贝上整串预演，第几次取不到落点都在预演里拒、一次都不发，分配器换回抬 F 之前那一份（`MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite`，用例 `a_raise_whose_second_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write`、`a_raise_whose_third_empty_publish_finds_no_slot_is_refused_by_the_rehearsal_before_any_write`）。剩两格照旧欠着：真发时落盘途中写错（`RaiseFloorSequencePublishFailed`，前面几次已落盘，用例 `a_raise_whose_second_empty_publish_fails_on_a_write_reports_that_one_publish_of_the_sequence_persisted`），与读盘核对不上、同预演分叉；这两格里扣住位留在进程里、下一次抬 F 做成才放，怎么放条款没写。整串预演由用户 2026-09-25 定为条款（D16（发布语义） 已定项 1「抬 F 那一串」）。 | 2026-09-25 `research/prompts/c363b-r1-main-verification.md` 第三节 V1 |
+| C548 | 记账树每次发布整批换代与每统计量每代一条不符 | 今天的实现每次发布写一套代 = txg 的行、不留旧代（行数恒 3 + 6 × 盘数）；D8（核心索引结构） 已定项 1 写的是「每个统计量 × 每一代各占一条」。这个出入分裂之前就有。它让记账树的形状只随行数与容量变：两块盘的池上永远 15 行、一个节点，80 块盘起才分裂，层 0 的记账树分裂流只能靠压小容量造。 | 对拍或 checker 判「记账行按代留」与条款一致，今天的实现必须红；或者改条款、写明整批换代。 | 条款与实现哪边改没定。 | 2026-09-25 `research/prompts/m2-treesplit-implementer-report.md` 第五节 B2。 |
+| C549 | 分配记录树固定点 64 轮的上限没有依据 | 到了上限在落盘之前拒，而今天的取样段一次都没走到它；多少轮必然收拢、会不会有不收拢的历史，都没有条款。 | 造一段让重写集逐轮变大的历史，量收拢要几轮；或者证明上界。 | 没有模型。 | 2026-09-25 实二一报告 `research/prompts/m2-keyspace-implementer-report.md` 第 2 条 |
+| C550 | 对拍模型里分配记录树节点数的上界偏松 | 4 GiB 盘上单元区墙的放行区间从约第 330 次发布提前到约第 24 次，墙附近判别力变弱。 | 墙附近取一段历史，模型与实现在同一步放行 / 拒绝。 | 收紧就得照抄实现的落点规则，两边就不独立了，怎么收紧没定。 | 2026-09-25 实二一报告 `research/prompts/m2-keyspace-implementer-report.md` 第 3 条 |
+| C551 | `build_pool` 的分配器没有根环表 | 连续覆盖写那条用例转过根环之后 I-3.1（已分配统计对得上） 红，用例因此只判 I-1.1（块头自述逻辑地址） 与 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）。绕法：转过根环之前先可写挂载一次，转环时用的是挂载重建的分配器——`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的 `build_a_full_ring_whose_oldest_root_is_the_second_version`（C558（回退目标是环里最旧的根时回退那次发布会写坏它） 那条用例的池）这样搭，之后重发与崩溃重开的镜像上判全部不变量。 | `build_pool` 装上根环表之后，同一条用例判全部不变量。 | 实现缺口。 | 2026-09-25 实二一报告 `research/prompts/m2-keyspace-implementer-report.md` 第 13 条；绕法见 2026-09-26 实三交回（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行） |
+| C553 | 盘在两次挂载之间改大小没有条款 | 镜像文件或块设备在两次挂载之间变大或变小，全仓没有一条条款说支不支持；今天根层跟着盘上槽数变的话，下一次挂载读旧树按 I-1.1（块头自述逻辑地址） 「层级不是它的位置规定的那一层」拒绝，不静默，没变根层的改大小没人判过 | 先定支不支持；支持就定改大小之后分配记录树怎么换根层、单元区末端怎么挪，并造「改大到跨过根层分界」「改小到截掉已分配槽」两种盘，挂载要么照新几何读得回、要么报一个点名的成员 | 条款空白，挪到后面的里程碑，不挡这一个 | 2026-09-25 `research/prompts/m2-e26-implementer-report.md` 第六节 Q3 |
+| C554 | 崩溃恢复抛弃的根暂时读不出时影子账算不到 | 被抛弃实例的根在重开时全部暂时读不出 ⇒ 影子账读不到它们的账、隔离 0；新实例复用了它们的槽；撤故障后再把新实例的根全改坏，恢复落在被抛弃实例的根上读不出。影子账开 / 关两臂逐字相同；与管理员回退无关（管理员回退不抛弃根），是多重故障下的一格（D23（journal 的角色与格式） 已定项 14 射程「挂着时回退的已知边角」②）。前半段今天的行为有用例钉着：崩溃恢复造出的被抛弃根 C 的根槽每次读都失败时，它独占的 14 个槽全掉出隔离集，`abandoned_roots_unreadable` 仍是 0（`crates/singlefs-harness/tests/unreadable_abandoned_root_slot.rs` 的 `an_abandoned_root_older_than_the_version_the_system_configuration_witnessed_is_neither_isolated_nor_counted_when_its_root_slot_is_unreadable`）；那条用例钉的是 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续实现之后的样子：系统配置没见证到的最新根被抛弃时仍不隔离、不计数，见证过的那一形已被挡住（记欠见 Q1，已定续、实现在做）。E158（择根与修复四岔路） 第 3 次跑第一段查到这一形丢写的机理：撤故障之后新实例写行那次发布取了与被藏根相同的 txg，根槽位置只由 txg 定，写行那次发布把被藏根的根槽盖掉了（阳性对照 PC-N 在今天那一臂上 `hidden_in_ring_after=false`、被抛弃集合为空）。代码审阅第 22 条并进这一条：重建影子账时第二次读实例表失败就无声关掉隔离——`crates/singlefs-core/src/mount.rs` 里先 `choose_root(devices, system_configuration)`、再对选中的根 `instance_table_of_root(devices, &newest)` 读实例表，读不出（交 None）时每条根都判成没被抛弃、一个槽不隔离，`abandoned_roots_unreadable` 仍是 0，而前面 `rebuild_previous_version` 已经读出过这张表。checker 那一侧：I-7.4（近 K 代块未被复用） 被抛弃根那一半 2026-09-27 起照实判（用户定，代码审阅第 7 条），这一形在池级 checker 上照实红，等这一条修好转绿 | 多次挂载的崩溃点重放里造这段历史（被抛弃实例的根重开时全部暂时读不出 → 新实例复用 → 撤故障 → 新实例的根全坏），断言恢复落到的根引用的单元没被复用，或挂载报错；判别力自证：今天的代码必须红。**验收**（乙改完之后要绿的三条）：调查员最短复现（`SINGLEFS_RANDOM_HISTORY_SHRINK_SEED=7463871032432355115` 跑 `shrink_one_failing_seed_from_the_environment`，3 步，`research/prompts/m2-investigate-gate74-reds-report.md`）不再判红；`writable_mount_of_a_formatted_pool.rs` 里那条 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 用例改判「只红 I-7.4（近 K 代块未被复用）」；`unreadable_abandoned_root_slot.rs` 的 `an_abandoned_root_older_than_the_version_the_system_configuration_witnessed_is_neither_isolated_nor_counted_when_its_root_slot_is_unreadable`（乙-配置续实现时已改名、按新行为钉：暂时读错、重读成功时择对根、不红；R 轮之后仍读不出则拒可写、只读照常） | 用户已定（2026-09-27 弹窗答复）：修法选乙 重读后再判，重读次数 R = 1（岔路单 `research/prompts/c554-fix-forks.md` 第 1 行最后一格：取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」；判「有一条更新的根读不出」用系统配置记的位置）；同一判据与重读要罩住代码审阅第 22 条那一格（重建影子账时第二次读实例表失败）。频率：门禁 harness-model-differential-and-scenarios 随机历史快档 96 段里 28 段是这一形，最短复现 3 步（`research/prompts/m2-investigate-gate74-reds-report.md`）。按 (区域, 槽) 让根槽读返回失败的开关已有（`singlefs_harness::fault_injection` 的 `RootRingSlotTarget` 与 `FaultSchedule::every_read_of_named_root_ring_slots_fails`，钉着今天行为的那条用例就用它）。乙-配置续已实现挂载读阶段那一半（`crates/singlefs-core/src/mount.rs` 重读一次仍读不出拒可写，`research/prompts/m2-impl-c554-yi-implementer-report.md`）；代码审阅第 22 条那一格已罩住；取号那一写改写见证值那一半待派（等 A3a 交回再派，记欠见 Q1）；模型跟上乙在做，记欠见 Q2。 | 2026-09-25 回退改形态第一轮三方攻方（`research/prompts/m2-rollback-forward-r1-main-verification.md`「越格：崩溃恢复抛弃的根暂时读不出时，影子账算不到它们」一节）；实八 2026-09-27 在崩溃注入种子基 + 2 的诊断里另见一形：(1, 4) 那次发布的根还在根环里、被抛弃时读不出、影子账看不到它、它的单元已被复用（`research/prompts/m2-impl8-implementer-report.md`「交你定的」第 3 条），实现员推与这一条同根源、没核，改法要连这一格一起看；E158（择根与修复四岔路） 第 3 次跑第一段执行员报告 `research/prompts/e158-r3-runner-seg1-report.md`「一、结论」两处阳性对照那一条第 1 点；代码审阅第 22 条（`research/prompts/m2-code-review-6c/00-handover-message.md` 第 47 行） |
+| C555 | 两盘最新系统配置槽都坏时取号撞号 | 崩在取号之后、第一条根之前的那次挂载，新实例号只留在各盘最新的系统配置槽与 journal 环（或单元写序）里；两块盘最新的系统配置槽都坏之后，系统配置读退回旧槽，下一次挂载的取号式子（D18（块里携带什么信息） 已定项 11：max(系统配置, 根环) + 1）看不到那个号、取到同一个号，两段记录撞号，checker 判 I-8.6（反向链算法） 红。实现照条款做也撞，主树今天的代码上照样红 | 最小历史 4 步（覆盖写到 txg 7 → 可写挂载取号 2、只落前 23 条写 → 两盘最新系统配置槽各翻坏一个字节 → 再可写挂载又取号 2），断言不撞号或在取号之前拒；判别力自证：今天的取号式子必须红 | 要先定条款有洞，或者故障模型本来不收这个故障（两块盘最新的系统配置槽在之后的写落盘之后都持续坏）；取号式子多读 journal 环一路的补丁在调查副本上 225 格 0 红，只写了单元就崩的那几格照样撞号 | 2026-09-25 安全设计轮第一轮攻方（`research/prompts/m2-safety-r1-main-verification.md` 第二节末「越格：种子 540096」那一格），调查报告 `research/prompts/seed540096-investigation/report.md`；用户 2026-09-25 原话「S6 撞号 先不要管 记成欠账」定记欠账（`records/2026-09-24-里程碑二收尾调度.md` 第三节 2026-09-25 补登的那一行；`research/prompts/m2-rollback-forward-r1-main-verification.md` 第 54 行） |
+| C558 | 回退目标是环里最旧的根时回退那次发布会写坏它 | 管理员回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14），它写的根槽按轮转取下一个；根环装满、回退目标 R_old 是环里最旧的根时，那一槽装的正是 R_old。单一故障的两条路上回退不丢，用例 `crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的三条 `the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_<失败方式>_is_resent_in_process_or_replayed_after_a_crash`（写之前被拒、写到一半撕开、写成全 0 各一条） 钉着（两块盘，回退到环里最旧的 B (1, 4)，回退那次发布 D（txg 28）的根槽写一字节不写、撕裂、写 0 三种各走两条路）：进程不崩时 D 冻结在分配器上，再回退一次在任何读写之前拒成 `PublishFrozenAfterAWriteFailureIsNotResentYet`，原样重发 D 之后冷启动读回 B 的内容；进程在重发之前崩时 D 的记录已持久，恢复由记录重建 D (2, 28)、读回 B 的内容。走得到「退不回去」的只剩多重故障：D 的根槽写坏、崩在重发之前，而 D 的记录点名的单元在恢复时也读不出，恢复落在 txg 27、B 已离环（推的，没造）。用户 2026-09-25 原话「2 改回去 必须要可以退回」（`records/2026-09-24-里程碑二收尾调度.md` 第三节用户 2026-09-25 那一行） | 在同一条用例的搭法上造多重故障那一格：根槽写撕裂或写 0、崩在重发之前，再让 D 的记录点名的单元有一个在两块盘上都读不出，看恢复落在哪、同一条回退还做不做得成；做不成就交主 agent 定改法，或定这一格在故障模型之外 | 造「点名单元在恢复时两块盘都读不出」的办法（推的：在崩溃镜像上改坏那个单元的两份，没试） | 主 agent 2026-09-26 审回退改形态 kb 写回规格时立（附加规格起草 agent 提的线索）；2026-09-26 实三判了可达性（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行） |
+| C560 | 满环时根槽写坏的恢复前镜像上记账多于遍历 | 根环装满时，一次发布的根槽写落在环里最旧那条根住的槽上；这次根槽写撕裂或写成 0、进程在重发之前崩，恢复之前的镜像上池级 checker 判 I-3.1（已分配统计对得上） 红、记账多于遍历：最新根的账还按「最旧那条根在环里」把只被它引用、已释放还在 defer 里的单元算已分配，而它的根槽没了、遍历里没有它；这次发布的记录已持久，但还没被哪次恢复施加，checker 不并它。恢复之后重开的镜像全绿。回退那一形（C558（回退目标是环里最旧的根时回退那次发布会写坏它） 那条用例的撕裂、写 0 两格）与普通覆盖写那一形在同一格上判出的违例逐字相同（实三草稿里量过，入库的只有回退那一形），与回退无关 | 先定 checker 在「最旧的根槽被这次没写成的根槽写盖掉、这次的记录还没被施加」这一格怎么判：当合法崩溃状态判成立（例如候选集并进由这条记录施加出来的那一版，推的），还是认成已知红；定了之后在普通覆盖写那一形上造一条用例断言照定的判，判别力自证：换回今天的判法，那条用例必须由绿转红。`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的三条 `the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_<失败方式>_is_resent_in_process_or_replayed_after_a_crash`（写之前被拒、写到一半撕开、写成全 0 各一条） 今天把回退那一形钉成「恢复之前只红 I-3.1（已分配统计对得上）」，checker 改了那条断言要跟着改 | 判法由主 agent 定；实四查可达与判法 | 2026-09-26 实三交回（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行 ②：主 agent 定立新欠账、实四查） |
+| C563 | 读根环一槽读坏就当没有根，别的调用方没判 | `crates/singlefs-core/src/recovery.rs` 的 `visit_valid_roots_with_ring_slots` 把一次读不出、自证不过的槽当没有根；除了抬 F 算上限（C562（抬 F 算上限时根槽读坏当没有根）），只读挂载的择根与「环里最旧有效根」（可再分配的门槛）也读根环，一读坏就少一条根在这两处各有什么后果没查，条款也没写。回退候选集那一格已由实现覆盖、条款在 D16（发布语义） 已定项 1「根槽这一次读坏」那一行：挂着时的管理员回退判候选与算 F 生效值，对这个进程知道住着根的槽读不出或自证不过重读一次、仍坏在任何写之前拒这次回退（`crates/singlefs-core/src/mount.rs` 的 `rollback_candidate`，`recovery::effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`，错误类型 `RootRingSlotKnownToHoldARootStillBadAfterOneReread`；读不出那一半是合入后验证一，`research/prompts/m2-impl-merge-verify-1-implementer-report.md` 第三节第 2 小节，自证不过那一半是改法 B 第 3 件，`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节第 3 行）；第三轮攻方报告 `research/prompts/m2-closeout-code-r3-opus-output.md` 第 249 行起那一节核过四处都走到，第 263 行起那一节攻回退扩写没打中 | 先逐个查剩下两格：少一条根会不会让择根选到更旧的、让「环里最旧有效根」变新而提前回收；有后果的照 C562（抬 F 算上限时根槽读坏当没有根） 那一格的分法定条款并写用例 | 调用方清单由实现员现查；条款由主 agent 定 | 2026-09-26 实四丙查因报告第五节第 1 问 |
+| C564 | 另外 6 条层 0 全量没人跑 | 门禁 checker-tier-layer0-replay `--full` 只跑 9 份层 0 用例文件里的 2 份（第一条流与固定脚本到 E）；另有 6 条标了 `#[ignore]` 的层 0 全量用例没有任何门禁或 agent 跑（层 0 规模第一轮攻方报告 `research/prompts/m2-layer0-scale-r1-opus-output.md:49`），它们的状态数也没量 | 把这 6 条接进 门禁 checker-tier-layer0-replay `--full`（带续跑），状态数照第二条流的方式量；接进之后删掉这一行 | 用户 2026-09-26 定这一次不跑、记欠账；等里程碑三多机分片 | 2026-09-26 层 0 规模第三轮判决 `research/prompts/m2-layer0-scale-r3-main-verification.md` 第四节 |
+| C566 | 环上有洞时多扣的槽随洞数无界增长 | 根环上有洞（「记录已持久、根槽没持久」的崩溃之后可写挂载，新实例第一个 txg = 洞 + 1，环里没有洞那条根）时，可再分配的门槛把本该放回的槽扣住：E156（alloc-basis 四条岔路的代价数） 第 4 次重跑在 S ∈ {4, 8, 16} × ρ ∈ {1, 1/4} × 两个回收时点 12 个取样点上，「前」洞的多扣峰值 Δ 在 h_缺 = 1、2、3、4 时是 10、18、26、34 槽（S = 4 只排得下 k ≤ 2，到 18），12 点逐点相同。记账第 1 项与 I-3.1（已分配统计对得上） 在洞上取什么形态没定：候选是「洞上 I-3.1（已分配统计对得上） 在合法状态判红，另给洞一条出路」与「改分配记录格式、改 D16（发布语义） 已定项 1 的谓词」 | 形态定下之后，在 E156（alloc-basis 四条岔路的代价数） 那条会转出洞的历史上按定下的形态断言多扣的槽数；判别力自证：今天的实现必须红（今天多扣随洞数增长） | 用户 2026-09-27 定留到里程碑三（弹窗原话「可以留到里程碑3 但是要考虑重排算法」）；用户 2026-09-28 弹窗定「重排」指重排根环的槽位（可写挂载时把洞补上，让环上没有洞），动写路径与崩溃点，走一轮三方再实现（`.claude/kb/milestone/03-third-txn.md` 二·4；原话「重排根环的槽位」，`records/2026-09-28-里程碑三作业点规划.md`「四条定案」表） | alloc-basis 岔路单第 1 行（`research/prompts/alloc-basis-forks.md` 第 9 行）；E156（alloc-basis 四条岔路的代价数） 第 4 次重跑报告 `research/prompts/e156-r4-runner-report.md`，产物 `research/results/e156-alloc-basis-counts-2026-09-26-r2.out` |
+| C567 | 分配与发布的代价随盘容量线性 | `crates/singlefs-core/src/allocator.rs` 的 `lowest_user_data_slot` 从单元区起点逐偶数槽扫、每个候选都拿全部开放的聚簇段比一遍，`make_room_for_record_on_device` 每次扫这块盘的全部记录，`crates/singlefs-core/src/transaction.rs` 每次发布 clone 一份分配器——分配与发布的代价随盘容量线性，与 `.claude/rules/fs-design.md`「记账是事务的副产品，不是事后的遍历」那张表第一行冲突：运行时决策路径（分配、ENOSPC 准入、defer 窗口、生命周期判定）不许遍历，且代价不许随盘容量增长。1 TiB 约 6400 万槽、三张 `Vec<bool>` 约 190 MB 是审阅员推的，没量 | 在本机能造的最大稀疏盘与一块小盘上各量一次分配、一次发布的耗时与内存，随盘容量涨判红；算法改完之后同一个量必须转绿 | 先量本机能造的最大稀疏盘上一次分配与一次发布的耗时与内存（量归实现员或执行员）；算法改动留里程碑三（用户 2026-09-27 定「先量、记欠账留里程碑三」）；用户 2026-09-26 另定 core 不优化算法、checker 先优化，两条怎么排在里程碑三开工前定（`.claude/kb/milestone/03-third-txn.md` 二·6：用户 2026-09-28 定先量、改动排段 4） | 代码审阅第 30 条（`research/prompts/m2-code-review-6c/00-handover-message.md` 第 55 行）；用户定案在 `records/2026-09-27-代码审阅38条去向.md`「用户定案」一节 |
+| C568 | 固定结构取严之后 io_min 1 MiB 的盘建不了卷 | `crates/singlefs-core/src/make_filesystem.rs` 的 `check_geometry` 把 `fixed_structure_extents` 列出的六段固定结构（两个系统配置槽、三个根环区域、journal 环）放在同一个设备内偏移空间里两两比，不分哪块盘背哪个区域（代码审阅第 16 条照字面取严的那一种，主 agent 2026-09-27 认，被攻过零轮）：区域长 S × 槽距不能越过区域间距 3 MiB，S = 8 时槽距 ≤ 384 KiB；槽距按 D2（RAID 条带策略） 已定项 19 是 4096 向上取整到 io_min 的整数倍，io_min 取 1 MiB 的设备（mdraid chunk 1 MiB 这类）mkfs 因此拒。只比同一块盘上真背根的区域（区域 0 与区域 2 同在盘 0、间距 6 MiB）能放宽到 S × 槽距 ≤ 6 MiB，但 mkfs 在每块盘上清三个区域时清零的几段会互相盖住 | 定下接不接受这类设备：接受就换判据（只比同一块盘上真背根的区域）并改 mkfs 清零那一步让它们不互相盖住，io_min 1 MiB 几何的 mkfs 用例必须成功；不接受就把「io_min 大到多少 mkfs 拒」写进 D2（RAID 条带策略） 已定项 19 的射程，用例钉住拒的那一格 | 交用户定接不接受；判据的落点 `check_geometry` 与 `fixed_structure_extents` 已有 | 代码审阅第 16 条（`research/prompts/m2-code-review-6c/00-handover-message.md` 第 41 行）；实审 A2a 报告 `research/prompts/m2-rev-a2a-implementer-report.md`「停下交主 agent 的设计问题」第 3 条；主 agent 判在 `records/2026-09-24-里程碑二收尾调度.md` 第三节「实审 A2a 交回」那一行 ③ |
+| C569 | 前一槽躺着残留记录时反向链两边判法不同 | I-8.6（反向链算法） 的「本实例写出的第一条记录反向链恒 0」，checker 判成两种情形：计数器 1，与「计数器 − 1 那一条属于别的实例」。新实例接着前缀末 + 1 写、其中一条没持久、那一槽还躺着上一条时间线的残留记录时，后一种情形把下一条判成本实例第一条、链应为 0 而报违例；恢复这时不判（恢复只在同实例前一条在盘上时比链，`crates/singlefs-core/src/recovery.rs` 的 `judge_back_chain_against_the_previous_record_on_disk`）。两边在这一格上判法不同，推的，没造镜像量 | 造这种镜像（残留记录坐在新实例某条没持久的记录那一槽上），按定下的判法断言 checker 的判定；判别力自证：把判法换成另一种必须由绿转红 | 交用户定收不收：收就把 I-8.6（反向链算法） 的「本实例第一条」改成不看前一槽上是谁、按计数器与实例表认，checker 跟着改；不收就在 I-8.6（反向链算法） 的射程里写明这一格判违例是有意的。主 agent 2026-09-27 判照条款字面不收、记欠账交用户（被攻过零轮） | `research/prompts/m2-rev-a2a-implementer-report.md`「checker 要跟着改什么」第 2 条；`research/prompts/m2-rev-b2-implementer-report.md` 第七节第 3 条；主 agent 判在 `records/2026-09-24-里程碑二收尾调度.md` 第三节第 215 行（2026-09-27 那一行）③ |
+| C570 | 抬 F 回收扣住的槽计数上空闲但分配器不发 | 抬 F 回收槽从隔离集摘除之后到 F 生效之前，这些槽在准入读数上已经算回空闲，但分配器实际还不发它们；式子（D28（挂载期承诺量） 已定项 1）没有一项装这段「扣住」的量，那一刻的准入判断比分配器真会给的更松（`crates/singlefs-core/src/admission.rs` 的 `AdmissionReading::of_allocator` 文档 ⚠️ 那一条） | 造一次挂载：抬 F 回收一批槽之后、F 生效之前立刻发起一次会把这些槽用掉的分配，断言分配器真的不发它们；准入放行、分配却失败（或反过来）判红；判别力自证：把「扣住」那一步去掉（分配器改成照发），检查必须变 | A4c 报告「要改成准入先拒需要的几样」第 4 条推给主 agent（推的，没实现）；准入先拒（`transaction.rs` 的 `settle_the_allocation_record_tree` 前置判）本身还没做，这一条与它同批 | 2026-09-27 A4c 报告（`research/prompts/m2-rev-a4c-implementer-report.md` 第三节第 4 条） |
+| C571 | df 算不算聚簇段内关着的空槽，假性 ENOSPC 待判 | 这次挂载里，D3（空间分配） 已定项 8 第 2 条为聚簇提交对用户数据关着的段内空槽（A4c 报告量到一段 79 对），`df` 报的可用空间要不要把这些槽算进去没有条款；若算，用户可能看着 `df` 报有空间却写入 ENOSPC，那会是 D3（空间分配） 已定项 9 第 1 条说的假性 ENOSPC 那一类（A4c 报告第三节第 5 条，推的，没量 `df` 的实现） | 量一次 `df`（或它对应的容量查询路径）在段内空槽被关着、真实可分配对已经不够时报的可用字节，与那次写实际拿到的 ENOSPC 对照：`df` 报的可用 > 0 而写入 ENOSPC，且那些空槽正是本条「段内关着」的空槽，判为假性 ENOSPC 命中；没有就把这一条改判「量过、不成立」。判别力自证：把「段内关着」那一步去掉（不预留段外成对空槽），检查必须变 | 先要有「段内关着的空槽计数」这个读数（C570（抬 F 回收扣住的槽计数上空闲但分配器不发） 或 A4c 报告第三节第 3 条：按段增量维护整对都空的槽对数），才谈得上量 `df` 会不会把它们算进去 | 2026-09-27 A4c 报告（`research/prompts/m2-rev-a4c-implementer-report.md` 第三节第 5 条） |
+| C572 | 回退目标引用隔离单元不进逐盘验 | 管理员回退目标引用一个隔离单元（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1：那个单元核出对不上、两份都留在已分配）时，复活判定按「仍分配、分配代相同」把它当两版共用，不进复活集、不逐盘验，回退照样做成；D23（journal 的角色与格式） 已定项 14「在任何写之前拒」一格给的理由「cur 的账里仍分配的单元分配器不会发出去，不在逐盘验之内」罩不住这一格——隔离单元恰恰是已经核出一份坏的 | 造一次隔离（覆盖写换掉一个单元，其中一块盘那一份核不上，两份都留在已分配），再把回退目标取到引用它的那一版；按定下的判法断言逐盘验覆盖到隔离单元、有一份读不出或对不上就拒；判别力自证：把「隔离单元也进逐盘验」这一步去掉（今天的实现），检查必须变红 | 等 Z3-A 乙与 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙落地后一并看（复活判定与逐盘核路径同在 `mount.rs`）；改法本身没实现、被攻过零轮（推的：隔离单元也进逐盘验，代价是多读几个单元） | 代码三方 m2-closeout-code-r1 攻方腿 Z1Q-A（`research/prompts/m2-closeout-code-r1-opus-output.md` 第 109–128 行）；判决 `research/prompts/m2-closeout-code-r1-main-verification.md`「一、各格判定」表 Z1Q-A 行 |
+| C573 | 固定点上界没算有普通分配那次发布多出的删插 | 规格「② 的读法」没写清有普通分配的一次发布，固定点上界要不要算进这次普通分配里的 extent / inode 节点、以及中央映射树因这次普通分配多出的删插；实审 A4d 取了算普通分配节点，ckpt_cost 仍按空发布上界（K1）算，两处都没写进条款：不算的话它们先把槽吃掉、固定点照样可能落不下；有普通分配的一次发布比空发布多删插，ckpt_cost 不是这一次的上界 | 造一次有普通分配的发布，固定点轮数超过按空发布 ckpt_cost 算出的上界，断言按定下的条款判（拒绝或改判上界）；条款定之前照旧在落点那一道拒（`PlacementRefused`），盘上不变；判别力自证：把「固定点上界 = ckpt_cost」这一步去掉，检查必须变 | 条款没定，交主 agent（候选原句见出处那份报告） | 2026-09-27 A4d 报告（`research/prompts/m2-rev-a4d-implementer-report.md`「七、交主 agent 的设计问题」第 1 条） |
+| C574 | 落得下那一判不核两槽对齐与各盘同槽 | 两槽的 inode 叶容器要 32768 对齐成对、各盘答的落点要同槽（开段各盘一致、回落各盘同槽），今天的落点规则里有，落得下那一判（准入先拒那一道）不判它们；条款没写落得下那一判要不要判它们 | 造一次会撞上「两槽不对齐」或「各盘落点不同槽」的发布，看它是在准入先拒还是落点那一道被拒；按定下的条款断言拒在哪一道；判别力自证：把这两条判据从落点规则里去掉，检查必须变 | 条款没定，交主 agent | 2026-09-27 A4d 报告（`research/prompts/m2-rev-a4d-implementer-report.md`「七、交主 agent 的设计问题」第 2 条） |
+| C575 | 一个错误成员装两种判据的载荷 | 落得下那一判拒时，`DeviceShortOfDemand.available` / `demand` 装的是「短的那一种单元落得下的字节 / 要的字节」，不是式子的可用(d) / 需求(d)；同一个成员被两种判据共用、载荷含义不同，函数文档写了两种怎么取但类型本身分不出 | 造两次拒绝（一次式子拒、一次落得下拒），断言两次报的成员或字段能分出是哪一判拒的；判别力自证：把两判合并读同一字段的今天写法必须红（今天分不出） | 改类型要动 `admission_formula_on_the_mounted_state.rs`，没试 | 2026-09-27 A4d 报告（`research/prompts/m2-rev-a4d-implementer-report.md`「七、交主 agent 的设计问题」第 3 条） |
+| C576 | 三条用例被准入先拒连带红，改法待选 | `devices_answering_different_places_for_a_commit_generated_block_are_refused_before_anything_is_written`、`user_data_slots_that_differ_across_devices_are_refused_before_anything_is_written` 等用例在准入先拒之后结局或数值可能改变；改法两条路（装只供测试的开关跳过准入、或改钉成 `SpaceAdmissionRefused`）与它们点名的第 12、76、77、78、80、145、149 行变异要不要换靶子没定 | 选定改法之后按选定的结局改钉这几条用例，变异表按新靶子核一遍；判别力自证：换回另一条改法，钉住的结局必须由绿转红 | 改法待主 agent 选 | 2026-09-27 A4d 报告（`research/prompts/m2-rev-a4d-implementer-report.md`「七、交主 agent 的设计问题」第 4 条；用例清单见报告第六节第 1、2 条） |
+| C578 | 乙的读缓存代价没量 | 读阶段第一遍就经缓存读，扫 journal 读成、非全零的每个记录槽都进缓存；环写满一圈之后是环长 × 盘数（默认 768 MiB 环、两块盘约 1.5 GiB，推的，没量），活到读阶段判完 | 量一次挂载读阶段的峰值内存，对照有无这道缓存两组；要不要只在判出 N 为真之后才开缓存（第一遍不收，重读那一遍整遍打到盘上），或另立「乙-窄读」，交主 agent 选；判别力自证：把缓存关掉，峰值内存必须降 | 改法待选 | 2026-09-27 实 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙报告（`research/prompts/m2-impl-c554-yi-implementer-report.md`「六、停下交主 agent 的设计问题」Q4） |
+| C582 | 挂载盘容量下界没条款该取哪个 | 挂载一侧盘容量下界没有条款写取哪个：`DeviceFreeMap` 的前置条件要「完整槽数 ≥ 单元区起始槽号」，mkfs 的下界更严（要装下 mkfs 写的实例表与树表第 0 版）；今天挂载一侧的实现取的是前者，条款没写该取哪个 | 造一块盘，容量落在『装得下单元区起点、装不下 mkfs 第 0 版写的东西』这个区间里，挂载与 mkfs 分别跑；按定下的条款判该拒的是哪一步；判别力自证：把挂载一侧的下界改回不检查，同一份镜像必须由拒绝变成走到更深处的坏结果 | 条款没定，交主 agent；今天实现取「完整槽数 ≥ 单元区起始槽号」 | 2026-09-27 实审 A3a 报告（`research/prompts/m2-rev-a3a-implementer-report.md` 第四节第 5 点） |
+| C584 | 写系统配置前与回退水位读不出仍当没有根 | C580（两处读不出无声放过没动） 挪进已还清时余下的两处，读根环读不出的槽仍当没有根：① `crates/singlefs-core/src/transaction.rs` 的 `PoolWriter::write_system_configuration_slot` 写系统配置之前算 F 生效值走 `recovery::effective_rollback_floor_rereading_unreadable_reads_once`，读不出的根槽与最新根读不出的实例表各重读一次，仍读不出照原来的退路（当没有根 / 不按表滤），不拒——这个写入口没有分配器的根环表、分不出哪个槽住着根；生效值取系统配置与根上的大者，只剩「那块盘两槽系统配置与带最高 F 的根同时读不出」这种叠加故障算得低（推的，没造过）；② 管理员回退 `crates/singlefs-core/src/mount.rs` 的 `roll_back_by_a_forward_publish` 算树 ID 与 inode 号水位那一遍用 `recovery::readable_roots`，读不出的槽当没有根，两个水位都再与内存里现行那一版的取 max（树 ID 那一半没有用例，记在 C586（回退取树 ID 水位的那一半没有用例））。第三轮攻方报告 `research/prompts/m2-closeout-code-r3-opus-output.md` 第 249 行起那一节判这两处单故障下无害（一个根槽坏压不低生效值与水位；推的，加同一报告第 296 行起那一节读故障逐个注入 0 段红），判决还没写 | 有后果的那一处造出那一格盘面（① 那块盘两槽系统配置与带最高 F 的根同时读不出；② 带更高水位的根读不出而内存里现行那一版的水位更低），断言照定下的判法处置；判别力自证：改回今天「当没有根」的读法，检查必须由绿转红 | 代码三方第三轮判决判这两处有没有后果；有后果的照 D16（发布语义） 已定项 1「根槽这一次读坏」那一行处置 | 2026-09-27 合入后验证一实现员报告 `research/prompts/m2-impl-merge-verify-1-implementer-report.md` 第 58–61 行（第三节第 2 小节，末条「没做」）；主 agent 2026-09-28 定 C580（两处读不出无声放过没动） 挂已还清、余下两处另立一笔（`records/2026-09-24-里程碑二收尾调度.md` 第 309 行） |
+| C587 | 扫描候选槽头被伪造头骗过 | 池级 checker 扫描方向对每个候选槽开头都当单元头解析，不判它是不是落在另一个单元中间；用户在合法 32K 数据单元内容里、单元内部第二个槽开头放一个校验和自洽的伪造码 2 头，能让 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 在健康池上判违反（假红）；候选槽为 None（整盘扫）时同样中招，真设备整盘扫也会中 | 造一份健康池（写一个用户数据单元，内容第二个槽开头放伪造码 2 头），断言 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 与别的不变量都判绿；今天的扫描代码在这份镜像上会误判 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 违反；判别力自证：把伪造头去掉，检查须转绿 | 扫描怎么知道单元边界，是设计题，归第二轮正文『扫描方向怎么知道一个槽是不是落在另一个单元里面』那一问（`research/prompts/_m3-prune-gpu-r2-body.md`） | 2026-09-28 `research/prompts/m3-prune-gpu-r1-f1-i78-report.md`（sha256 a99c418334c471ae14c6687610ca2c7adc6591ba088980ebe3e508a1c2c1f8ec）机理段；最小复现 `research/prompts/m3-prune-gpu-r1-f1-i78-kept/investigate_i78_minimal.rs`；机理行 `crates/singlefs-checker/src/walk.rs:2405`、`:2413`、`:2417`、`:2419`、`:2427`、`:6251`，同一读法另两处 `:2506`、`:4633` 没验 |
+| C588 | 记录核对器按写表次序错归发布 | 记录核对器按写表次序把记录归给排在它后面的第一条根，不看记录自己的 txg；发布先写根、后写它自己的两条 journal 记录时，层 0 的五样逐状态判定（两遍 oracle、池级 checker、记录核对器）一样都不红，按 D16（发布语义） 已定项 7 的顺序（记录 → 屏障 → 根槽）这一形本该判红 | 造一份「根持久、它自己的两条 journal 记录都没持久」的崩溃镜像，按攻方次序（根在记录前）交给记录核对器，断言它判红；判别力自证：把真实现也改成先根后记录，同一形态的 45 个状态里已知 27 个是真洞，改法接上之后须判红这 27 个之一，不许仍是 0 | 记录归哪次发布的判据要改（按 txg 还是按写表次序），归第二轮正文『记录归哪次发布按什么』那一问（`research/prompts/_m3-prune-gpu-r2-body.md`） | 2026-09-28 `research/prompts/m3-prune-gpu-r1-f2-order-report.md`（sha256 f6900b68e66c40482ae97585952e9a61b0844753e806aed37e4b636ea881856d）机理段；改动在 `research/prompts/m3-prune-gpu-r1-f2-order-kept/`；机理行 `crates/singlefs-harness/src/memory_pool.rs:1000`–`:1009`、`:1019`，`crates/singlefs-checker-tier/src/crash.rs:139` |
+| C589 | 实验索引表滞后而变更史现状行同步格仍绿 | 变更史现状行同步那一格（已删：变更史节顶不再写现状行，现状只在索引表里）曾只比对变更史每节顶上的现状行与 `decisions.md`/`experiments.md` 索引表字面是否一致，不判索引表本身对不对；实验一侧这个检查面是这一轮才从 0 行变成 162 行，如果某个实验的正文结论已经变了、索引表没跟着更新，`status-sync` 照样判「一致」（绿），决策一侧同一个限制已经存在，不算新洞 | 暂无：要拦住它得先有一个能自动判定「正文结论是不是变了」的检查，今天没有；构造：把某个实验页的结论段改掉、索引表故意不动，跑 `status-sync` 仍判绿，就是这条要拦的形态 | 需要一个独立于 `status-sync` 的「索引表跟没跟上正文」检查，是否值得单开、怎么判定「结论变没变」，都还没想 | 2026-09-28 三方判决 `research/prompts/changelog-format-r1-main-verification.md` 第 4 条；攻方报告 `research/prompts/changelog-format-r1-opus-output.md` ②-2 |
+| C590 | 变更史现状行同步格写回前不核并发 | `--write` 曾只重写变更史某节顶上的现状行，用 `open(..., 'w')` 整份重写，读到写之间没有对文件做二次核对；另一个会话同一时刻改了同一节的现状行，会被静默覆盖 | 造两个「写者」先后对同一节的现状行做出不同改动，中间插一次 `--write`，断言后一个改动没被覆盖；今天会被覆盖，判红 | 无 | 2026-09-28 三方判决 `research/prompts/changelog-format-r1-main-verification.md` 第 5 条；攻方报告 `research/prompts/changelog-format-r1-opus-output.md`（分工外顺带发现） |
+| C591 | 变更史搬迁后旧的日期加其N自引用没逐条改点 | `decisions-history.md`、`experiments-history.md` 从「按月原文、全局按日期编号」改成「按决策/实验分节、节内局部编号」之后，全仓写着「某日（其N）」指代这两份文件里一条具体历史条目的引用，旧编号大概率对不上新位置；`sweep` 摸底时这两份文件正被判决第 1 条的补抄脚本改大（决策文件从约 44250 行涨到 173758 行），命中数是移动靶，没能交出稳定的逐行表，只留下了方法与 4 组已核实的范例、12 处确认的假阳性（`research/prompts/changelog-format-r1-self-reference-sweep.md`） | `grep -rn --include='*.md' -E '20[0-9]{2}-[0-9]{2}-[0-9]{2}（其[^）]*）' . \| grep -v '^research/prompts/\|^research/results/'` 数出的命中里，凡是围栏外、被当成活指针引用、指向的内容已经挪了位置的，都要改成「decisions-history.md/experiments-history.md 的 D<n>/E<n>（简称） 节 <日期> 那一条『……』」这种不依赖编号的写法；判别力：改完同一条命令应当只在围栏内历史快照与新写法上命中 | 等这一轮并发改写（判决第 1 条补抄、里程碑二/三收尾那几批）落定、提交之后再摸底，现在摸底的结论会立刻部分过期 | 2026-09-28 三方判决 `research/prompts/changelog-format-r1-main-verification.md` 第 6 条；正推报告 `research/prompts/changelog-format-r1-sonnet-output.md` 问题 5；摸底报告 `research/prompts/changelog-format-r1-self-reference-sweep.md` |
+| C592 | 单独拿掉单元写与记录间那道屏障今天没判据会红 | 发布路径单元写之后、journal 记录之前那道屏障（`crates/singlefs-core/src/transaction.rs` 今天第 1058 行）被删掉时，崩溃注入的三条判据（池级 checker、理想模型、记录核对器）一条都不红：恢复施加记录前逐份读点名单元核 CRC（`crates/singlefs-core/src/recovery.rs` 第 3161–3179 行），核不上就整条不施加、落回上一版，理想模型认上一版。实测（2026-09-28，harness 档探针，`research/prompts/k3-9-mechanism/report.md`「四次运行」表）：删掉这道屏障、照常点名验证，1433 个崩溃状态三条判据 0、点名验证失败 903 次；同一批状态关掉点名验证，记录核对器红 752、理想模型红 752；没改的代码关掉点名验证，62 个状态全绿。「没有判据会红」只对每次都写新槽的历史成立：三方（`research/prompts/k3-9-barrier-r1-main-verification.md`）云端攻方在文件系统结局上没打中（不丢写、不施加半次、不接受坏状态，只抽一次），但历史里复用回收槽时池级 checker I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 在结局正确的状态上红（主 agent 复跑 floorreuse4：删屏障 271 个状态红 48，带屏障 73 个状态 0）——这道屏障今天撑着 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 射程④ 的同源前提。用户 2026-09-28 定：屏障维持现状，「多不多余」不再判；I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 射程写明这条前提，checker 不改 | 拿 floorreuse4 那一格（复用回收槽的历史）做一条用例，断言带屏障时 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 不红；`crates/mutations.tsv` 加一行删掉这道屏障、点名这条用例（删掉就红）。「两道防线同时拿掉必红」那一半由 `research/prompts/m2-rest-batch2/` 那批 harness 用例钉（合入后回填） | 无：并进下一批实现员 | 增补 3 第 3 件第 2 题（`research/prompts/m2-supp3-item3-code-r2-main-verification.md` 第四节第 2 题，判决里写作 K3-⑨）；用户 2026-09-28 弹窗选「三方判屏障是否多余」「钉两道防线至少留一道」「记成欠账」；调度记录 `records/2026-09-28-里程碑二剩余七项的非重型部分.md` |
+| C593 | 落后且缺一份单元的盘被永久拒可写 | D18（块里携带什么信息） 已定项 11「取号之前逐盘核带不带所选那一版」分别放行「只落后、单元都在」与「系统配置跟得上、只缺几份单元」，两样同时出现就判「不带」：一次正常崩溃（最后一次系统配置轮换没持久）加同一块盘上一份单元坏（单故障），可写挂载被拒、盘上不变、之后每次都拒，只读挂载读回数据完好；挂着之后的入口与会话每次改动（`crates/singlefs-core/src/mounted_session.rs` 第 284 行）用同一判法 | 造「一块盘轮换没持久 + 同盘一份单元坏」的盘面，断言可写挂载挂得上（攻方探针 A1 与第二个探针：`research/prompts/c245-r3-opus-model/c245_r3_opus_probe.rs`，今天断言的是拒，改法落地时反过来） | 条款先定：用户 2026-09-28 定先走三方再定——改法丁（落后与否看这块盘上有没有那一版的末条记录，`research/prompts/c245-r3-opus-model/yi-j-mount.diff`，被攻过零轮）与别的候选走一轮三方，判完交用户 | 2026-09-28 C245（系统配置槽的写频率，两条条款说反话） 第三轮攻方腿第四节，主 agent 复跑坐实（`research/prompts/c245-r3-main-verification.md` 第四节） |
+| C594 | 每次轮换之前现算整池 F 的读开销没量 | 每次发布轮换系统配置之前，每块盘现算一次整池 F（`crates/singlefs-core/src/transaction.rs` 的 `effective_rollback_floor_rereading_unreadable_reads_once`），要读整个根环与最新根的实例表链；这笔读开销随根环槽数与实例表长度涨，没人量过，只由 C245（系统配置槽的写频率，两条条款说反话） 第三轮攻方腿按代码步骤推出 | 一个计数实验：按根环槽数与实例表片数扫，报每次发布这一步读几个槽、几字节，钉绝对值 | 用户 2026-09-28 定先记账不量，等性能那一轮一起量 | 2026-09-28 `research/prompts/c245-r3-main-verification.md` 第三节 Q1 与交用户表第 3 行 |
+| C595 | 记账伪影与分开扫未进入库装置 | E16（journal 的角色：WAL vs 意图日志） 第五次跑入库装置两处欠：① 256 MiB 那一点同一 checkpoint 窗口重写同一单元时，甲按操作次数重复计块（产物里 1.969697、2.109173 两个远端比值是伪影，攻方副本改正后核得 0.9926）；② 『三个旋钮（树高、根下孩子数、扇出）分开扫』没有并进入库装置，今天分开扫的数据只在三方攻方副本上量过 | 在入库装置（`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`）里修记账（同一 checkpoint 窗口内重写同一单元只计一次，不按操作次数重复计）、加三个旋钮各自独立扫描的模式，重跑；钉一条绝对值断言（256 MiB 那一点重写同一单元的远端比值核到 0.9926 附近）与一条变异（改回按操作次数计块，断言必须变红） | 无，等用户开 | 判决 `research/prompts/d23-e16r5-r1-main-verification.md` 第二节 H7、第五节第 2 题、第六节 |
+| C596 | 撕裂的系统配置轮换之后只剩只读挂载 | C331（择根倒挂压过已确认的写） 取甲的代价（量的，`research/prompts/unreadable-at-mount-r2-main-verification.md` L1）：一次普通断电撕裂系统配置轮换、或一槽系统配置持续读错，之后每次可写挂载都拒，只读挂载不写盘，那一槽没有机会被重写，池永远只剩只读；C393（被抛弃根的账读不出时修复没有条款） 从映射也现算不成的那一形同样。一次可写挂载都做不成时怎么走出来，全仓没有条款 | 条款定下出路（管理员工具、只读挂载下的定点修复，或别的）之后：造撕裂轮换的盘面，按条款走出路，断言之后可写挂载做成且确认过的写不丢；判别力自证：把出路那一步拿掉必须仍然永远只读 | 定案、实现在途（用户 2026-10-01 在 m3-ring-r1 定 S-辨，2026-10-02 在 m3-ring-r2 采按盘读，2026-10-03 在 m3-ring-r3 终轮把持续读错改取 R2：见证读判不出 ⟺ 有槽设备报读错且没有一块盘两槽都自证过；一槽撕裂、另一槽自证过的盘面放开拒可写的两道，取号写重写坏的那一槽；`research/prompts/m3-ring-r1-main-verification.md` 第四节第 3 条、`research/prompts/m3-ring-r2-main-verification.md` 第二节第 9 行、`research/prompts/m3-ring-r3-main-verification.md` 第四节第 3 条）；R2 之后仍判不出的那一形（有槽读错、没有一块盘两槽都自证过）一次可写挂载都做不成，仍欠的是这一形的出路条款；「只读挂载不写盘」的条款（C32（无密钥的一侧写不写得出字节没有闸）、C33（scrub 检出之后做什么没有条款）、C75（降级挂载这道闸自己不会红）） | `research/prompts/unreadable-at-mount-r2-main-verification.md` L1；用户 2026-09-28 选甲时知情 |
+| C597 | 实例表行只增不删，删行的条件没有条款 | 每次可写挂载写一行实例表，今天没有删行代码（`crates/singlefs-core/src/mount.rs` 里写行只往后接），I-3.8（实例表行唯一且低于挂载根）「第一版行只增不删，删行的条件没人判」；行数每 369 行切换预留多一片（调查员实测第 367 轮跨片、每盘 104 → 112 槽） | 条款定下删行条件之后：连挂到跨片的录制流里断言行数按条款回收、预留不单调涨；判别力自证：把删行那一步拿掉必须红 | 条款落点已定、实现在途：用户 2026-10-01 在 m3-ring-r1 定现在做（先造整轮清扫器，再落删行）；m3-ring-r2 判决采落点：删行落在一次专用的清扫发布上，抹头先于清扫发布，读失败时任何行都不删；m3-ring-r3 终轮清扫条件两处收严（零轮），写回时定成：读成功的全零根槽与读不出同待遇（按「可能有该实例的根」算），这一次不删；其余的槽须自证过，否则重读一次，仍不过就这次不删（D23（journal 的角色与格式） 已定项 14、D18（块里携带什么信息） 已定项 11）；新根段回到三字段（用户 2026-10-02 定）后，清扫发布崩在「记录已持久、根槽没持久」不再打穿实例表指针；D18（块里携带什么信息） 已定项 11 里 I-3.8（实例表行唯一且低于挂载根） 草案的回收条件随清扫条件改；清扫条件已写进决策正文，清扫器还没写（`research/prompts/m3-ring-r1-main-verification.md` 第四节第 4 条、`research/prompts/m3-ring-r2-main-verification.md` 第二节第 10 行、`research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、9 行与回看决策）；仍欠的是删行条件的条款正文（回收条件、谁删、崩在删行那次发布中间怎么办）写进决策 | C335（根槽持续读不出时实例表只增不减） 关账时另立，调查员报告 `research/prompts/closeout-recheck-2026-09-28/c335-investigator-report.md`；用户 2026-09-28 定 |
+| C598 | 坏扇区不重映射时被抛弃根离开根环后都挂不上 | 第二轮攻方旁及（`research/prompts/unreadable-at-mount-r2-main-verification.md` L4，只在攻方副本上量过，主 agent 没核）：坏扇区不重映射时，被抛弃根离开根环之后那个读不出的槽回到空闲池又被占用，第 4 次挂载起可写、只读都挂不上；不分辨任何一条臂 | 在入库装置上复现那段历史，断言挂载的结局按条款；判别力自证待条款定 | 先在入库的 harness 用例上复现（攻方模型 `research/prompts/unreadable-at-mount-r2-opus-model/`）；坏扇区回到空闲池之后的处置没有条款 | 第二轮攻方腿，2026-09-28 |
+| C599 | 随机历史造不出被抛弃的根 | 收口表第 43 行调查员实测（`research/prompts/closeout-recheck-2026-09-28/row43-investigator-report.md`）：随机历史 1756 段里崩溃恢复那一步 1449 次全被 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙拒，生成器造不出被抛弃的根；影子账、被抛弃根带的 F、F 抬进空档那几条路随机历史一次都走不到，它们只有写死的用例 | 生成器加一步只靠崩溃恢复造被抛弃根（C 的系统配置轮换没落盘就崩、C 一时读不出，`crates/singlefs-harness/tests/common/mod.rs` 的 `abandon_the_third_version_by_a_crash_before_its_rotation` 那一形），快档里每条的计数报被抛弃根出现的段数，为 0 判红；判别力自证：拿掉那一步必须红 | 无 | 调查员 2026-09-28；收口表第 43 行复查 |
+| C600 | 吞写之后可写挂载被拒而模型说该成 | 大档故障注入（2026-09-29，`SINGLEFS_FAULT_INJECTION_FIRST_SEED=7463871032432355113 SINGLEFS_FAULT_INJECTION_SEEDS=512 SINGLEFS_FAULT_INJECTION_OPERATIONS=30 SINGLEFS_FAULT_INJECTION_FAULTS=6`）512 段报 2 条新发现：种子 7463871032432355222 吞掉起点段一次系统配置槽写之后，模型的 MountWritable 该成，实现以 `MountError::NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)` 拒；release 单跑 12.9 秒复现。那个拒法是提交 dbcc0d2f 进的；「设备吞写之后这种拒算不算允许的结局」没有条款，用户 2026-09-29 定先记欠账 | 条款定了之后二选一：模型在设备吞写之后认这种拒（大档回到 0 条新发现），或改挂载的判法；把种子 7463871032432355222 那段钉成一条 harness 用例，按条款判 | 设备吞写之后挂载该成还是该拒，没有条款；归里程碑三项五（[milestone/03-third-txn.md](milestone/03-third-txn.md) 作业点五·6） | 主 agent 捶打 harness 档慢档用例，2026-09-29 |
+| C601 | 判器查版本不比组合掩码高 32 位时没有会红的流 | 判器一个落点的组合掩码 2026-09-29 放到 64 位（σ 那条历史把系统配置 0 号槽写了 34 次）；把 `crash_judge_common.wgsl` 的 `version_of_location` 改成只比低 32 位，σ 的对拍（`record_checker_judges_absence_by_the_persisted_set.rs` 的 `the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times`）仍绿：挑错的是只差第 34 次写的两个版本，读到旧那份系统配置之后落到的根、结局、红项都不变，取样点不敏感 | 造一条一个落点超过 32 次写、且只差高位的两个版本让恢复落到不同根的流，加进对拍；那行变异（只比低 32 位）进 `crates/mutations.tsv`，改坏之后对拍红 | 要一段能让高位版本改变择根的历史 | 主 agent 放大掩码时证红没红，2026-09-29 |
+| C602 | 归档上一轮实验记录只在整轮门禁里判，提交不跑门禁就没人做 | 门禁 doc-experiments 的 archive-past-rounds 格只判「工作区里不许留上一轮及更早的实验记录」，删要照它的出路手跑 `research/scripts/archive-past-rounds.py --apply`；2026-09-22 之后的提交都没跑整轮门禁（提交信息自己写着「提交前门禁没跑」「先提交、再慢慢验证」，`refs/sop/staged-green` 停在 2026-09-22），那一格没有机会红，上一次成批归档停在 2026-09-21（提交 3cff909b 删 3945 份）。2026-09-30 主 agent 跑 `--check`（只读）：判红，积压 3559 份（`research/prompts/` 3306、`research/results/` 253），另留 208 份还被代码当输入的 | 把归档检查从整轮门禁里拎出来，做成每次提交都跑的轻步骤（跳过整轮门禁也照拦）；判别力：造一个留着上一轮记录的小仓，走「不跑整轮门禁」那条提交路，必须拦下；把这一步去掉必须放行 | 用户 2026-09-30 定两件：积压的这 3559 份在里程碑三第一轮五轮判决写完之后、那一轮提交之前跑 `--apply`，单独一笔提交；防再发取「提交流程里单列一步」，由工具实现员改，排进下一批 | 用户 2026-09-30 注意到「提交的时候会删除过去的实验数据，现在似乎不生效了」，主 agent 现查坐实 |
+| C603 | 测试与验证的资源浪费没有自检 | 2026-09-30 广谱变异与 harness 档在 24G 的内存包装里撞顶：内核 5 次 memcg 杀（被杀的 rustc 115–352 MB、cargo 14 MB），在跑的测试进程常驻约 6 MB、CPU 1–3%；文件后端写零按 4 MiB 分块真写，mkfs 每盘清 768 MiB journal 环（`crates/singlefs-core/src/block_device.rs` 第 96–102、249–258 行）；`-j 31` 的整轮 1170 秒而 `-j 16` 是 146 秒。「上限被测试镜像的页缓存吃满」是主 agent 推的，调查员在量（报告 `/tmp/claude-1000/m3-r1/memory-cap-investigation/report.md`）。全仓没有一道检查判「这一次跑用的内存、写盘量比该用的多」：内存包装的峰值表只用来定上限，不判涨没涨 | 两样：① 每类测试与每道重活跑完报内存峰值与写盘字节数、登记成表，下一次跑高出登记值的倍数超过阈值判红（判别力：把一条测试改成多建一个池，那一格必须红）；② 查实的浪费形态逐个立检查（第一形：往测试镜像真写整段零）。阈值与参照怎么取等调查员的数 | 用户 2026-09-30 定：harness 档与 checker 档都不定死内存上限（原话「我不想限制多小，但是代码要自检，不能出现性能浪费吧」「不用 暂时不用。但是代码要自检，不能出现性能浪费吧」）；判据等调查员量完由主 agent 拟、弹窗交用户 | 用户 2026-09-30「这种直接打上42GB内存的情况我不太能接受 因为之后不会每个人都是大内存」 |
+| C604 | 快档不开特性，崩溃放量与 GPU 对拍编进来零条 | checker 档快档命令 `cargo test --release -p singlefs-checker-tier --lib --tests` 不带 `--features`，而 `verdict-store`、`gpu` 两个特性默认不编（`crates/singlefs-checker-tier/Cargo.toml` 的 `[features]`）；`crates/singlefs-checker-tier/tests/` 顶层整份挂特性的测试文件 7 份（`grep -n '^#!\[cfg(' crates/singlefs-checker-tier/tests/*.rs`，例 `crash_amplification_two_flows_share_their_prefix.rs:6`、`crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs:9`、`crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs:5`）。门禁那一半已落：checker-tier-layer0-replay feature-gated-tests 格（`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头「带特性那一趟」）从 `tests/` 顶层的 `#[cfg(…)]` 与 `#![cfg(…)]` 现读特性、带特性另跑一趟，挂特性的文件跑到的用例为 0 报「本次未跑」并点名，GPU 对拍打的 `NOT_RUN_NO_GPU_ADAPTER` 逐条记本次未跑。仍欠 crates 那一半：`grep -rn NOT_RUN_NO_GPU_ADAPTER crates` 零命中，没卡的机器上开 `gpu` 特性仍是 panic 退 101（这一格红，不是假绿）。射程：feature-gated-tests 格只认 `#[cfg(…)]` 与 `#![cfg(…)]`，不认 `cfg_attr`：按特性用 `cfg_attr` 给用例挂 `ignore` 的写法，快档那一趟只算 ignored、带特性那一趟又不点它（test-script-align-r1 攻方把判法抽出来量过）；今天 `crates/` 里没有这种写法（`grep -rn 'cfg_attr' crates --include=*.rs` 只命中 `record_checker_judges_absence_by_the_persisted_set.rs:180` 一处按特性给字段挂的 `allow(dead_code)`）。这一格数「编进来几条」也只数 `tests/` 顶层的文件（`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `count_tests_run_by_file`），`crates/singlefs-checker-tier/src/lib.rs` 里挂特性的 6 个模块（`crash_amplification`、`crash_judge_dispatch`、`crash_judge_gpu`、`crash_verify_gpu`、`gpu_unit_checks`、`verdict_store`，共 45 条 `#[test]`）不在它的射程：带特性那一趟 `--lib` 照跑，库里挂特性的单测编进来 0 条也没有格会报。上游 `test-script-discipline.md`「分快慢两档」要剪枝自证与加速路径对拍一律进快档，没有那种硬件的机器上报「本次未跑」 | 门禁那一半（checker-tier-layer0-replay 快档带特性另起一趟、挂特性的文件逐个点名）已落；仍欠：GPU 对拍在没卡的机器上打 `NOT_RUN_NO_GPU_ADAPTER` 并返回成功，带特性那一趟逐条报「本次未跑」、不 panic；「没卡」照 C620（GPU 对拍认「没卡」只看 Vulkan 枚举，驱动坏了被当成本次未跑） 判：PCI 上也没有显示控制器类的 NVIDIA 设备才算没卡，PCI 上有卡而 Vulkan 枚举不出判红、不记本次未跑；本机插着卡，没卡那一支跑不到，会红的输入经补丁里判「没卡」的纯函数 `decide_gpu_test_start` 喂。feature-gated-tests 格把 `src/lib.rs` 里挂特性的模块一并数进「编进来几条」，库里挂特性的单测编进来 0 条报「本次未跑」并点名 | GPU 对拍「没卡」那一半：第 2 批 GPU 对拍的 crates 补丁合入（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波收拢（2026-10-01）」）；合入前开了 `gpu` 特性而没卡时是 panic 退 101（2026-10-01 调查员拿替身 crate 实测）。feature-gated-tests 格把 `src/lib.rs` 里挂特性的模块数进「编进来几条」那一半：无，是门禁本地改动（`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `count_tests_run_by_file`），不等补丁 | `records/2026-10-01-对接上游测试脚本规范.md` G7、G9，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T3-8、T4 两行；前置分两半：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 两笔矛盾」一行，正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.4 节第 4 条 |
+| C605 | 崩溃放量的复用与剪枝没有关掉再判的对照 | 崩溃放量的跨趟块复用（`verdict_store`）与前缀共享（`crash_identity`）两样，没有一条「小规模输入上关掉复用与剪枝跑一遍、判定与开着时逐项相同」的用例；现有用例只核复用了多少块，两条流又都是 0 红，复用键少罩一项输入时没有东西会红（上游 `test-script-discipline.md`「判定可复用：按输入存，按前缀剪」） | 跨趟复用（`verdict_store`）那一半要跨趟两次跑才抓得到「复用键少罩一项输入」：同一输入开、关复用各跑一次，库里存的就是它自己的判定，键漏不漏都读到同一个值、逐态相同、变异存活；改成先拿输入 A 填库，再拿与 A 只差一项被键漏掉的输入 B 在同一个库上跑，与 B 关掉复用的结果逐态比，不同判红；A、B 要挑真判定不同的一对（B 关掉复用判出的与 A 的判定不同），不然 B 读到 A 的判定也与 B 自己判的逐态相同，键漏一项的变异照样存活。前缀共享（`crash_identity`）那一半：同一小输入开、关前缀共享各跑一次，逐态判定相同，输入里要有一对只差被键漏掉那一项的点（`crash_amplification_two_flows_share_their_prefix.rs` 两条流尾巴同名不同数据，是现成的候选，没核过它们差的是不是键里的那一项）。键层另点变异：`crates/singlefs-checker-tier/src/crash_identity.rs` 的 `each_attribute_changes_the_reuse_key`（两项属性各改一次键要变）今天 `crates/mutations.tsv` 里没有一行点它（`grep -c each_attribute_changes_the_reuse_key crates/mutations.tsv` 输出 0），补一行「复用键少罩一项」的变异点名它红 | C604（快档先要把 `verdict-store` 编进来）。关复用与剪枝的开关要先加：`grep -rn 'no_reuse\|without_reuse\|reuse_off\|disable_reuse' crates/singlefs-checker-tier` 零命中（只试了这四种名字）。ignore 那一类照上游 `test-script-discipline.md`「判定可复用：按输入存，按前缀剪」算「按登记整批不判的一类、不算剪枝」：登记表一行一类、写明为什么不判，成功那句报跳过了多少、列出没判的是哪几类；这一半另算，不在这一条的对照里：「列出没判的是哪几类」今天做不到，驱动行没有类名字段、只报点数与态数（`research/scripts/crash-amplification.sh` 文件头「按登记整批不判」一段，入口写「类名取不出」），要先给驱动行补类名、登记表一行一类。第 2 批崩溃放量结果行补丁里的关掉再判对照用例假定「版本表不进复用键、前缀判定不受尾巴那一版影响」，推的没跑过：合入后提交时红，先定版本表进不进键（`records/2026-10-01-对接上游测试脚本规范.md` 第 485 行「崩溃放量结果行那一件交回」那一条） | `records/2026-10-01-对接上游测试脚本规范.md` G7，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行；补丁用例的假定：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行，正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L6 第 4 条 |
+| C606 | 崩溃放量入口不写展开深度，缩过规模的全量照样退 0 | 上游 `test-script-discipline.md`「入口脚本：不带参数就是全量」：规模变量被设过要在产物写出取值，全量的完成标记不认缩过规模的那一趟。入口那一半已落：`research/scripts/crash-amplification.sh` 不带 `--expand-up-to` 时把 `FULL_EXPAND_UP_TO`（28，文件头「全量的展开深度」，只登记在这一处）交给每一项，`CRASH_AMPLIFICATION_ITEM` 行写 `expand_up_to=` 与 `exhaustive=`、`_TOTAL` 行写 `expand_up_to=` 与 `scope=`，展开深度是全量的那一个而有一行不是 `exhaustive=true` 判红。仍欠 crates 那一半：用例不经入口直接跑时按 `DEFAULT_EXPAND_UP_TO` = 6 展开（`crash_amplification_fixed_script_through_rollback.rs:31`、`…_through_unmount.rs:38`）；展开上限变量 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO` 的值写错时悄悄退回默认；直接带 `SINGLEFS_CRASH_AMPLIFICATION_SHARE=i/n` 跑、只判了一部分也照样绿（后两样是调查员读代码推的，没跑） | 入口那一半（不带参数按全量的展开深度跑；ITEM 行带 `expand_up_to=` 与 `exhaustive=`；全量那一趟有一项 `exhaustive=false` 判红）已落；仍欠：规模变量的值认不出判红、不退回默认；直接带 `SINGLEFS_CRASH_AMPLIFICATION_SHARE=i/n`（n>1）跑、只判了自己那一份的，汇总行写明是哪一份，成功句不说全量、全量的完成标记不认它 | 第 2 批崩溃放量结果行的 crates 补丁合入（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波收拢（2026-10-01）」） | `records/2026-10-01-对接上游测试脚本规范.md` G8，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行 |
+| C607 | 随机取样点用例红了凭打出的种子复现不出 | 四个随机二进制判红都打种子（`crates/singlefs-harness/src/history.rs:4481` 起那一句），但三处凭打出的东西复现不出：随机历史偏重取样点（复用、回退、墙）的收缩用例按默认比重重新生成历史（调查员 2026-10-01 草稿探针：四段偏重取样点 48/48、48/48、32/32、32/32 全不同，快档对照 96 个种子 0 个不同）；单元区墙两段要 256 槽的盘与关空间准入，复现入口选不到；崩溃注入的复现行缺每段崩溃状态数与比重（推的，没跑）。上游 `test-script-discipline.md`「用例原子化：每一条都能单独跑」：凭种子能单独复现那一条 | 每种随机用例在快档里有一条自检：拿它判红时打出的复现行原样重跑，逐态与原趟相同，不同判红；种子复现补丁里 harness 档 8 条新测试合入后逐条按变异表证红：今天只有 2 条按变异表证过红，6 条集成自证只有一次真改坏的证据、不在表里，「复现行漏写比重」那一行没证到点名的测试 | 先给四个随机二进制各加一个注入失败的入口（或弄坏开关）：快档里没有红，拿不到「判红时打出的复现行」；8 条新测试那一半等种子复现补丁合入（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波看门狗记录（2026-10-01）」种子复现那一件交回那一条） | `records/2026-10-01-对接上游测试脚本规范.md` G6，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T1-2、T4 两行；8 条新测试证红：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行，正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L6 第 5 条 |
+| C608 | GPU 变异不罩内核与 GPU 对 CPU 的对拍 | `crates/mutations.tsv` 里开 `gpu` 的 12 行都改 GPU 一侧的宿主代码，红在 GPU 自己的单测或 GPU 与 GPU 互比；没有一行改 `.wgsl` 内核、`crash_verify_gpu.rs` 或 `gpu_unit_checks.rs`，也没有一行点名 GPU 对 CPU 的对拍必须红（上游 `test-script-discipline.md`「用上现有的硬件加速」：往加速那一侧塞已知故障，对拍要红） | 补变异：内核与这两份宿主代码各改坏一处判法，点名 GPU 对 CPU 的对拍用例红；没卡的机器上这几行变异记「本次未跑」（门禁 checker-tier-crates-mutation-replay 认 `NOT_RUN_NO_GPU_ADAPTER`），不记没红；「没卡」照 C620（GPU 对拍认「没卡」只看 Vulkan 枚举，驱动坏了被当成本次未跑） 判，PCI 上有卡而 Vulkan 枚举不出的机器判红、不记本次未跑 | C604；C601（判器查版本不比组合掩码高 32 位时没有会红的流） 是同一族的一例：把 `version_of_location` 改成只比低 32 位，GPU 对 CPU 的 σ 对拍照样绿，补变异时一并罩住 | `records/2026-10-01-对接上游测试脚本规范.md` G9，2026-10-01 |
+| C609 | 全量出的红没有统一的钉表 | 只有 E165（恢复重放有界穷举与变异杀伤界） 一张钉表（`.claude/gate.d/e165-pinned-red-examples.tsv`）与门禁 checker-tier-formal-verification 两格；`checker-tier-layer0-replay` `--full`、崩溃放量、checker-tier-qemu-device-streams、checker-tier-crates-mutation-replay 整表出的红，没有钉表，也没有「全量产物里的每个红在钉表里找得到」的格（上游 `test-script-discipline.md`「全量的红，钉回快档」） | 每一道慢档一张钉表（出红的那一行整行抄、带产物文件名、改回哪一处它就红），钉完在出红的那份代码上核一次：钉住的用例同样红、红在同一条断言上（上游 `test-script-discipline.md`「全量的红，钉回快档」）；加一格门禁：全量产物里的红逐个按整行文本在钉表里找得到，找不到判红 | 今天落不成：落成之前要先定的两件都还待定，「怎么拦」那一格门禁没有输入可读。① 判哪一份产物（`research/results/` 里同一道门禁有多份，取最新的还是全部）；② 变异整表的红是「没抓到」、QEMU 的红是设备流不一致，它们「出红的那一行」是什么、钉回快档钉成什么（「怎么拦」一栏只写了崩溃枚举这一形态）。E165（恢复重放有界穷举与变异杀伤界） 钉表自己还没整行抄：C627（恢复重放钉表整行抄只落了装置那一半） | `records/2026-10-01-对接上游测试脚本规范.md` G4，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行 |
+| C610 | 测试文件头还写着来历 | 上游 `test-script-discipline.md`「用例原子化：每一条都能单独跑」：用例名不带来历，来历进 commit message 或项目 kb；本仓测试文件头的文档注释里还写着来历（例 `crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs` 第 2 行「用户 2026-09-28 定」）：`crates/*/tests/*.rs` 里带日期的 `//!` 行 89 行、在 66 份文件里（2026-10-01 `grep -E '^//!.*[0-9]{4}-[0-9]{2}-[0-9]{2}' crates/*/tests/*.rs` 数），其中同一行没有 kb 指路（D、E、C、I 编号带括号简称、`.claude/kb/` 路径、已定项、未定项，再接一道 `grep -vE` 去掉这几样）的 70 行、52 份文件。`research/scripts/crash-case-check.py` 的 file-names 格出路已改成「来历进 commit message 或 .claude/kb/」（第 286 行） | 回扫一次把来历挪进 kb 或记录；一格门禁按结构判、不按词表：测试文件头的文档注释里一行带日期、同一行没有 kb 指路就判红。按「用户」「定」这类词表判两头都错：日期后跟「用户」或「定」的 70 行里 18 行同一行带 kb 指路（例 `crash_enumeration_position_addressed_trees.rs:2` 指向 D8（核心索引结构） 已定项 14），是指路不是来历，会假红；带日期的 89 行里 14 行既没有「用户」也没有「定」（例 `acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs:1`「实审 A3c（规格 …，写于 2026-09-27）」），会假绿。结构判据放过「有 kb 指路、又写用户何时定」的混合行（例 `crash_enumeration_record_spill_over_stream.rs:3`「已定项 17（用户 2026-09-24 定）」）：上游要求来历进 commit message 或项目 kb，混合行里「用户何时定」仍是来历，这一类算不算来历没人定过（零轮），要用户或三方定 | 无 | `records/2026-10-01-对接上游测试脚本规范.md` H1，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行 |
+| C611 | 长跑的项不按挂钟打进度 | 本地规则定进度间隔 5 分钟（`.claude/rules/implementation-workflow.md`「测试与崩溃检测优先多线程」）。已按挂钟或边跑边打的：崩溃放量入口每项的驱动输出边跑边转打（`research/scripts/crash-amplification.sh` 文件头「输出」一段、主循环 `\| tee -- "$item_output_file"`）；E165（恢复重放有界穷举与变异杀伤界） 第二段驱动与 `research/scripts/broad-mutation.py` 按 300 秒打（`research/scripts/e165-replay-mutation-kill-bounds.sh` 与 `broad-mutation.py` 的 `PROGRESS_INTERVAL_SECONDS = 300`）。仍不按挂钟打的：内层 `CRASH_AMPLIFICATION_BLOCK` 每判完一块打一行（`crates/singlefs-checker-tier/src/crash_amplification.rs`）；层 0 的 `LAYER0_PROGRESS` 每片打完才打（`crates/singlefs-checker-tier/src/crash.rs`），checker-tier-layer0-replay `--full` 转发的进度行只认它；形式化验证 pinned-red-examples-replay 格经 `research/scripts/e165-pin-red-examples.py` 的 `capture_output` 跑，跑完才看得到输出（跑多久没量）；包装每 60 秒的排队行被收 stderr 的调用方吞掉、crates 变异整表一格 6–8 分钟格内不打、QEMU 跑完之前不打（这三样照 `records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波看门狗记录（2026-10-01）」与「第 2 批第二波与三方（2026-10-01）」两节，没现查） | 「要拦什么」一栏点名还不按挂钟打的每一处，按挂钟每 5 分钟至少一行；每一处各一条快档用例用假时钟核「超过间隔必有一行」。现成形态只有 Python 的（`research/scripts/e165-replay-mutation-kill-bounds.sh` 里 `Progress(…, clock=…)` 那一处）；Rust 的发射点（`CRASH_AMPLIFICATION_BLOCK`、`LAYER0_PROGRESS`）要先改成能被时钟驱动，bash 阶段（QEMU 一格、crates 变异整表一格）没有对应形态，各写一条 | 无 | `records/2026-10-01-对接上游测试脚本规范.md` 上游对抗审 2-2，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行 |
+| C612 | 变异自证把包装的排队时间算进 2 秒限时 | `research/scripts/mutate.sh` 自证给每条变异限时 2 秒（`run_selftest` 里的 `selftest_time_limit=2`）；改前判结局时把 `timeout` 套在 `run-with-memory-cap.sh` 外面，包装排队拿锁、起 scope 的时间都算进 2 秒，机器一忙就先退 124 记成「超时」、撞顶那一支走不到；包装文件头「限时」一段（`research/scripts/run-with-memory-cap.sh`）禁止这种写法。2026-10-01 七份自证并行时每份都多红「⏱ … 2 秒没跑完」，顺序跑也偶发；自证各用例共用一个 `$scratch` 与假 workspace、读前一例留下的 `.cargo` 记录，违背上游 `test-script-discipline.md`「用例原子化：每一条都能单独跑」。这三样已改：限时交包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`（文件头「每条变异限时」一段、函数 `run_capped_cargo_test`），自证各例各用 `$scratch/<例名>` 一份目录（`run_selftest` 里 `prepare_case`、`run_case` 两个函数的 `case_directory`），`queued-admission` 一例让包装每次放行前停 2 秒（`run_selftest` 里 `run_case queued-admission` 那一例，`RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE`）仍判对。包装的 252（排不上）、254（被总上限挤掉）结局各自归类、整轮判失败（文件头「包装的另两种结局」一段；`judge_mutation` 里判结局的 `queuefull`、`squeezed` 两支），平常跑带了只供自证的变量（含 `MUTATE_BREAK`）退 2（文件头「只供自证」一段、`TEST_ONLY_VARIABLES` 与 `running_under_selftest` 那一判）：这两样已由第 2 批 `mutate.sh` 修补那一件改在工作区里，交回后主 agent 核过再销账 | 限时用包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`、自证各用例各用一份临时目录、一条自证格造包装排队仍判对、252 与 254 各自分类且都让整轮判失败、`MUTATE_BREAK` 只在自证起的子进程里认（平常跑设了退 2）：五样都已在脚本里；`mutate.sh --selftest` 登记为 light（`.claude/hooks/selftest-registry.tsv`），test-script-align-r3 正推复跑退 0、47 项，16 个开关各退 1（`research/prompts/test-script-align-r3-sonnet-output.md` 2.1、2.3.1 节） | 无 | `records/2026-10-01-对接上游测试脚本规范.md` 第 2 批调查员报告，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T3-6、T3-7、T4 三行；`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行（L7） |
+| C613 | 自证登记表靠读代码判轻重，脚本改了没人核 | `.claude/hooks/selftest-registry.tsv` 把每份脚本的 `--selftest` 登记成 light / heavy / heavy-if-set，登记成 light 的任何子 agent 都能跑；每一行靠读代码判，某份脚本以后把自证改成起 cargo、rustc、qemu、herd7、verus，没有检查会发现，钩子自证只核表没写坏、指到的文件都在。门禁样本档同样不核：经 `stage-selftest.sh` 喂样本时它在临时拷贝里执行每个样本的 `setup.sh`，钩子放行看的是阶段正文与登记行，样本 `setup.sh` 起什么不核（test-script-align-r1 攻方 T2-4 探针：`setup.sh` 里写 `cargo test`，照样放行）；同形不核的还有两处（`.claude/hooks/lib_heavy_tests.py` 文件头「罩不住的」一段）：被喂阶段目录里阶段 source 的共用库（`lib/`、`lib.sh`）与阶段读的登记表（`stage-inputs.tsv` 这类）不与仓里比；钩子只核登记的假 cargo，checker-tier-layer0-replay 样本的假 rustc 不核内容 | 跑登记成 light 的自证与样本档（`stage-selftest.sh` 起的整棵进程树，含样本的 `setup.sh`）时，跟踪起进程的系统调用（不靠采样进程树：一个 50 毫秒的进程采不到），查有没有起 cargo、rustc、qemu、herd7、verus 这类真工具，起了就判红并点名那一行。怎么认出真工具：解析后的可执行文件路径不在样本假工具目录（`.layer0-sample-tools`）与自证自己建的临时目录里；只问版本的（参数只有 `-V` 或 `--version`）不算起重活。一红一绿都要判对：登记为 light 的一份假脚本在 `--selftest` 里起 `~/.cargo/bin/cargo build --manifest-path <不存在的清单>` 判红（参数要让它立刻失败，造红例本身不起重活）；`mutate.sh --selftest` 起它自己写的假 cargo、`admission.py --selftest` 调真 cargo 的 `-V` 都不红。射程：起了进程之后才红，被改成真跑重活的自证要等它跑完才报，要拦在起之前得另想办法（test-script-align-r2 辩方试 strace 的 execve 注入没成，推的）。「只问版本的不算」与 `.claude/hooks/selftest-registry.tsv` 表头已对齐：表头第 10 行写「只问版本的（参数只有 `-V` 或 `--version`，例如 admission.py --selftest 调真 cargo 的 `-V`）不算起重活，不碍写 light」 | 无 | `records/2026-10-01-对接上游测试脚本规范.md` 第 2 批钩子那一件，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T2-4、T2-5、T4 三行；`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行（L7） |
+| C614 | 回退时墓碑树取错与删完对象无墓碑单镜像判不了 | 两种镜像单镜像 checker 判不出：① 管理员回退那次发布把墓碑树错取成 R_old 那一版（墓碑树随现行那一版，D23（journal 的角色与格式） 已定项 14）——攻方 13 种改坏里这一种对单镜像 checker 的 18 条判据一条都不红；② 已删完的对象：删完之后它既不在 inode 树、也不在 `deleted_inodes`，单镜像上没有东西说它存在过，「已删完的对象都有墓碑」写不成单镜像不变量 | 跨根比（层 0 的崩溃流或录制流）：① 回退那次发布之后墓碑树的记录多重集等于回退之前那一版的，改坏成取 R_old 必红；② 相邻两条根之间，前一根 inode 树里有、后一根里没有的 (号, 对象出生代)，后一根的墓碑树里要有一条在谱系上的墓碑，后一根是回退那次发布（它的谱系树里有 T_rb 等于它的 txg 的记录）时不判；改坏成意图那次不写墓碑必红（推的） | 墓碑树、谱系树有代码（三·2）；跨根比的判器 | 2026-10-01 `research/prompts/m3-delete-r3-main-verification.md` 第五节记欠账那一段；`research/prompts/m3-tomb-r1-main-verification.md` 第三节判 checker 那一格；与 C113（扫描重建时多版单元的现行版本判定无输入） 同组 |
+| C615 | 扫盘重建对挂着时的回退没有输入 | 管理员回退（挂着时的一次向前发布）之后，同一身份的 inode 叶与数据单元在盘上有几版都过已发布谓词，扫盘重建按择新键选中被回退掉的那一版：攻方副本上 A（txg 3）→ B、C 覆盖写 → 挂着回退到 A（D，txg 6）之后选中 C 那一版（诞生代号 5），D 引用的是 A 那一版（诞生代号 3）（`research/prompts/m3-tomb-r1-opus-model/run-e-lines.txt` 的 `E name=inode_leaf_versions` 行）。不分辨墓碑的臂，不写墓碑也一样错。写侧随谱系记录落地（回退那次发布写一条 (T_rb, T_old)，D18（块里携带什么信息） 已定项 24），读侧怎么用没有条款 | 扫盘重建按谱系父链择现行版本：同一份历史重建出的 inode 叶与数据单元必须是 A 那一版；不读谱系记录时同一份镜像必红。I-1.9（清扫水位内无可读垃圾） 第二句在这类镜像上不成立，那一句已写明管理员回退之后的镜像不在它的射程里 | 扫盘重建有代码（不在里程碑「删除与多次 COW」的出口里） | 2026-10-01 `research/prompts/m3-tomb-r1-main-verification.md` 第二节；用户定案 K-W5b「写侧随谱系落地，读侧记欠账」，原话在 `records/2026-10-01-删除与并发事务.md` 第四节；与 C113（扫描重建时多版单元的现行版本判定无输入） 同组 |
+| C616 | 谱系父链靠 txg 连号没有断言 | checker 判「在谱系上」时沿父链走：有谱系记录的 txg 跳到 T_old，其余 txg 的父是 txg − 1。后一步是 txg 分配规则的推论（非回退的发布 txg 恰好加一；崩溃恢复后新实例的第一个根取「环里最大 + 1」），核心层没有一处显式写它；以后改了其中一条（例如新实例第一个根不再取环里最大 + 1），checker 会把被抛弃的 txg 当成祖先，没有第二段代码对照（推的） | core 一处断言钉住两条：非回退的发布 txg = 上一版 txg + 1；崩溃恢复后新实例第一个根的 txg = 根环里最大 txg + 1；改坏成跳号，断言必红 | 无 | 2026-10-01 `research/prompts/m3-delete-r3-main-verification.md` 第三节判新不变量写法那一格；攻方报告 `research/prompts/m3-delete-r3-opus-output.md` 第 152、249 行 |
+| C617 | 删后回退留下的墓碑没有预付罩着 | 「删 → 回退到删之前」每一轮：回退把对象带回来、标签 6 里它那一份墓碑预付按 R_old 照抬，而上一次删除写的墓碑记录留在墓碑树里（墓碑随现行那一版、第一版不回收）——这一条 40 字节 × 2 份从此没有预付罩着，轮数无界，每 815 轮多一个容器（推的） | 准入对拍：反复「删 → 回退到删之前」N 轮之后，报墓碑树里实际记录数与标签 6 罩着的墓碑份额之差的绝对值；条款写定之前差额随 N 线性长，写定之后差额大于 0 必红 | 条款：回退之后多出来的墓碑记录记在谁的账上（D3（空间分配） 已定项 2） | 2026-10-01 `research/prompts/m3-delete-r3-main-verification.md` 第五节零轮表第 9 行；攻方报告 `research/prompts/m3-delete-r3-opus-output.md` 2.6 节 |
+| C618 | 删完之后不能再建带数据的文件 | 用户定 K-U5「不做，记欠账」：删完之后（有树、文件集合为空那一版）只能建 size 0 的新 inode、写行与空发布（D8（核心索引结构） 已定项 16）；在那一版上再建带数据的文件今天被拒（`FirstFileVersionOnAVersionThatAlreadyHasAFile { tree_table_entries: 7 }`，`research/prompts/m3-delete-r1-main-verification.md` 第三节判再建文件那一格） | 泛化到任意 inode（第一轮判决里泛化那一支：core 15 处 `FIRST_INODE_NUMBER`、模型与 checker）之后，一条用例「mkfs → A → unlink → 在新 inode 上写带数据的文件版本 → 冷恢复读回」；把写路径改回只认 inode 1，那条用例必红 | core 泛化到任意 inode | 2026-10-01 `research/prompts/m3-delete-r1-main-verification.md` 第五节 K-U5 那一行；用户定案原话在 `records/2026-10-01-删除与并发事务.md` 第四节 |
+| C619 | 墓碑树根长高那次发布没有崩溃流 | 墓碑第一版不回收、回退不撤墓碑，根装 135 个容器 × 815 条 = 110 025 次 unlink 之后墓碑树根要长高（用户定案 K-R3-3「写根长高」，D8（核心索引结构） 已定项 6）：长高那次发布多 2 个 16 KiB 节点 × 副本数，崩在它中间的状态今天没有一条流罩着 | 用只供测试的容量旋钮把一个墓碑容器装的记录数压小，造一条删够 136 个容器、让根长高的流，与三·4 的删除流一起跑在崩溃放量上全域 0 红；改坏成长高时不写分出的右半节点，那条流必红（推的） | 墓碑树与根长高有代码（三·2）；三·4 | 2026-10-01 `research/prompts/m3-delete-r3-main-verification.md` 第三节判墓碑树根满那一格；用户定案原话在 `records/2026-10-01-删除与并发事务.md` 第七节 |
+| C620 | GPU 对拍认「没卡」只看 Vulkan 枚举，驱动坏了被当成本次未跑 | 第 2 批 GPU 对拍补丁（`crates/singlefs-checker-tier/tests/common_gpu_adapter/mod.rs` 的 `decide_gpu_test_start`；补丁未合入，今天 `crates/` 里零命中：`grep -rn decide_gpu_test_start crates`）按 Vulkan 枚举里有没有 NVIDIA 独显判「没卡」：插着 NVIDIA 卡而 Vulkan 驱动坏了、枚举不出来的机器报「本次未跑」，不判红；上游 `test-script-discipline.md`「用上现有的硬件加速」：有那种硬件而用不上要报错，不悄悄退回 | 判「没卡」前另查 PCI：`/sys/bus/pci/devices/*` 里厂商号 0x10DE、class 是显示控制器类（前缀 0x03）的设备；PCI 上有卡而 Vulkan 枚举不出判红；一条单测喂「PCI 有卡、Vulkan 零个」判红。不拿 `nvidia-smi` 判：驱动坏了它同样报错，得出的正是「没卡」。只按厂商号数会把同一块卡的 HDA 音频功能也数进去（本机厂商号 0x10de 的 4 个 PCI 设备里 2 个 class 0x030000、2 个 class 0x040300） | 第 2 批 GPU 对拍补丁合入 | `records/2026-10-01-对接上游测试脚本规范.md` 第 2 批 GPU 对拍那一件，2026-10-01；`research/prompts/test-script-align-r1-main-verification.md` 第二节 T4 一行 |
+| C621 | 整理落地那天要动的已写回删除条款没有清单之外的检查 | 第二个意图使用者（CPU 整理）落地那一天，不论 logged_ops 怎么注册，下面八处已写回的条款都要动（不动已发布的意图字节）：D8（核心索引结构） 已定项 16 第 5 条「删完之后只能做」白名单（整理批是删空那一版上的第四种发布）、第 6 条挂载续做要先读出活整理意图并过 R 排他、`.claude/kb/layout/03-third-txn.md`「不删除的发布照抄」与重写角色集合登记、D28（挂载期承诺量） 已定项 1 式子缺「活整理意图 R 内的空槽」一项、合取 7 归式子还是落点、D8 已定项 5 第 2 条与三态表与 C1（意图续做做成常规路径） 按承诺类 / 提示类分开写、记账标签 6 现算加活整理意图那一项、D23（journal 的角色与格式） 已定项 14 回退表加 logged_ops 一行（随现行还是取 R_old 两腿相反：`research/prompts/m3-intent-r1-main-verification.md` 第三节 I4-回退）；另有 unlink 的挂载续做要 R 外空槽（攻方量过：改法「删除类发布不受 R 排他合取约束」4 个几何全 0，零轮） | 整理落地那一轮的三方材料把这八处逐条列进正文、各占一格；落地之后一条崩溃流「删除与整理交错 + 回退跨过整理意图 + 崩在整理批中间」全域 0 红，改坏「挂载续做过 R 排他」那一处必红 | 整理（D26（后台整理与放置回收））进里程碑 | 2026-10-01 `research/prompts/m3-intent-r1-main-verification.md` 第五节；攻方 `research/prompts/m3-intent-r1-opus-output.md` 2.1 节 c1–c8 |
+| C622 | 门禁的弄坏开关平常跑也认 | 上游 `test-script-discipline.md`「测试脚本自己也要被测试证明有效」：「开关只给自证用，平常跑时不认」。第 2 批已让 `research/scripts/crash-amplification.sh` 与 `research/scripts/mutate.sh` 只在自证起的子进程里认弄坏开关（三方 test-script-align-r1 T3-5、T3-7）；`.claude/gate.d/` 下各道门禁的 `*_BREAK` 开关（例 checker-tier-layer0-replay 的 `GATE_LAYER0_BREAK`、`GATE_MUTATION_BREAK`、`CODE_TOOLING_BREAK`）平常跑照读，环境里漏一个就会让整轮门禁照弄坏的判法判；`research/scripts/crash-amplification-item.sh` 自己的只供测试变量与 `CRASH_AMPLIFICATION_ITEM_BREAK` 平常跑也照认（入口那一份第 2 批已收）。同一形态在 `research/scripts/` 与 `.claude/hooks/` 也在：2026-10-01 `grep -l '_BREAK'` 数出研究脚本 48 份、钩子 9 份（含已收的 `crash-amplification.sh`、`mutate.sh`），例 `research/scripts/run-with-memory-cap.sh` 的 `RUN_WITH_MEMORY_CAP_BREAK`（每次跑编译出来的代码都经它）、`research/scripts/layer0-shard-run.sh` 的 `LAYER0_SHARD_RUN_BREAK`、`research/scripts/verus-proof-check.py` 的 `VERUS_PROOF_CHECK_BREAK`、`research/scripts/crash-amplification-two-hosts.sh` 的 `CRASH_AMPLIFICATION_TWO_HOSTS_BREAK` 与它的只供测试变量（2026-10-02 它的自证换成假驱动那一件报的），平常跑照读 | 标记放在样本根里（用户 2026-10-01 定取「M2 样本根里放」：「标记是样本目录里的一个文件（形态同 `.layer0-sample-tools`），阶段只在 `<根>/<标记>` 在时读 `*_BREAK`；开关本身仍从环境来」）：各道门禁只在 `<根>/<标记>` 在时读 `*_BREAK`，标记不在而环境里设了开关就退 2，这一判由共用库 `.claude/gate.d/lib/stage-cells.sh` 给，checker-tier-layer0-replay 不 source 共用库、自己照同一判；一格门禁扫 `.claude/gate.d/`、`research/scripts/` 与 `.claude/hooks/` 里读 `*_BREAK` 而不经这一判的；研究脚本与钩子照 `crash-amplification.sh`、`mutate.sh` 那样只在自证起的子进程里认、平常跑设了退 2 | 要开开关的样本目录各放一份标记文件、随样本进库（门禁样本要与仓 HEAD 加暂存区逐字节相同，`.claude/hooks/selftest-registry.tsv` 表头 samples-light 那一条）；逐个设开关去喂样本的复跑方欠在 C639（门禁阶段的弄坏开关没有复跑方） | `records/2026-10-01-对接上游测试脚本规范.md` 第 2 批 checker-tier-layer0-replay 样本执行位那一件，2026-10-01；用户定标记放样本根：`research/prompts/test-script-align-r3-main-verification.md` 第三节交用户表第 4 行，候选定义在正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.2.3 节 |
+| C623 | 崩溃放量取不出复用数没有棘轮 | `research/scripts/crash-amplification.sh` 对取不出复用数的项记 `reused=unknown`、计进 TOTAL 行的 `reuse_unknown`，不记 failed、不改退出码（文件头「复用数怎么取」）；弄坏开关 `accept-unknown-reuse` 证的是「取不出不被记成 0」，不是「该有时必须有」。`grep -rn states_reused crates` 零命中：驱动行补 `states_reused=` 的 crates 补丁合入之前每一项都取不出、照样退 0；合入之后驱动行哪天改名或少打这个字段，入口照样退 0、成功句写「复用数取不出」，没有一格红 | 棘轮：驱动行合入 `states_reused=` 之后，登记表里有复用层的项取不出复用数判红；「合入了没有」要入口自己认得出，不然驱动行少打字段与补丁还没合分不开。按项登记（用户 2026-10-01 定取「按项登记」：「`ITEMS` 每行加一列「这一项的驱动是否报 `states_reused=`」，按项翻开」）：`research/scripts/crash-amplification.sh` 的 `ITEMS` 每行加这一列，补丁合入那一次提交里把驱动会报的项翻开；登记为报的项取不出复用数判红、改退出码，登记为不报的照旧记 `reused=unknown`；入口自证造一项登记为报而驱动行没带 `states_reused=`，要红 | 驱动行补 `states_reused=` 的 crates 补丁合入（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批依赖表（新会话接手）」那一行） | 2026-10-01 `research/prompts/test-script-align-r1-main-verification.md` 第二节「T4 新缺口」一行；正推 `research/prompts/test-script-align-r1-sonnet-output.md`「T4-缺口：这一批该记而没记的」第 1 条；用户定按项登记：`research/prompts/test-script-align-r3-main-verification.md` 第三节交用户表第 2 行，选项原文在正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.2.1 节 |
+| C624 | 一律进快档的几类没逐类核在不在快档 | 上游 `test-script-discipline.md`「分快慢两档」一律进快档、不看快慢判据的几类：慢档每一种判法的小输入用例、剪枝自证、多线程与单线程的对拍、优化前后的对拍、加速路径与参照路径的对拍、从全量钉回来的红例；本仓没有逐类核它们在不在快档（多线程对拍用例在 `crash_injection_campaign.rs`、`crash_enumeration_fixed_script_stream.rs`、`crash_enumeration_resumes_from_its_progress_file.rs` 等），G7、G9 调查交回只落成了复用与剪枝、GPU 几笔。一条「多线程与单线程逐字对拍」的用例被标 `#[ignore]` 进了慢档，今天没有一格红 | 先逐类核一遍、缺的补进快档；一张「一律进快档的类」登记表（档位标在用例上或登记表里，不在脚本里另抄一份名单），一格门禁：登记为这几类的用例标了 `#[ignore]` 或快档编不进来就判红 | 那张登记表（今天没有） | 2026-10-01 `research/prompts/test-script-align-r1-main-verification.md` 第二节「T4 新缺口」一行；正推 `research/prompts/test-script-align-r1-sonnet-output.md`「T4-缺口：这一批该记而没记的」第 3 条；上游 `test-script-discipline.md`「门禁管哪一半」把「一律进快档的那几类对拍在不在快档里」列为项目可接的本地门禁 |
+| C625 | 弄坏开关文件头三样没有门禁 | 上游 `test-script-discipline.md`「测试脚本自己也要被测试证明有效」：弄坏开关在脚本文件头逐个列明开关名、弄坏哪一处、打开后哪一项该红；「门禁管哪一半」把「文件头列明的每个弄坏开关打开之后自证红在点名的那一项」列为项目可接的本地门禁。门禁阶段一侧，`.claude/gate.d/code-tooling.sh` 文件头列的「开关 → 判错的样本」只是注释，没有一格逐个打开阶段的开关去喂样本（欠在 C639（门禁阶段的弄坏开关没有复跑方））；研究脚本与钩子的弄坏开关也没有这样的格；F2 盘点记着一批文件的开关文件头缺「打开后哪一项该红」（`records/2026-10-01-对接上游测试脚本规范.md`「附：F2 弄坏开关盘点」）。一份文件头写「X_BREAK=foo 时必须判红」而不点名哪一项的脚本，今天没有格拦 | 一格门禁：研究脚本与钩子的文件头弄坏开关照 `research/scripts/mutate.sh` 的写法列（用户 2026-10-01 定取「B mutate.sh 写法」：「`MUTATE_BREAK=<名>  <弄坏哪一处>` 一行，下一行起写点名的项（自证用例标签，括号里写失败行句首）」），每个开关三样写全（开关名、弄坏哪一处、下一行起至少一个点名的项），缺一样判红；登记为 light 的自证逐个打开开关，失败行句首对上的项与文件头点名的不等判红；逐个打开、核红的项与表相等，照入口 `research/scripts/crash-amplification.sh` `--selftest` 末尾那一轮的做法（从文件头开关表现读），比的从格号换成点名的项 | 文件头先改成这一种写法，「缺一样判红」才有输入：正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.2.2 节按启发式数过，含 `_BREAK` 的 78 份文件里已是这种写法的 9 份、`crash-amplification.sh` 那种（第 N 格）2 份、两样都不是 61 份、文件头前 140 行没提到的 6 份；其余文件头补第三样（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批依赖表（新会话接手）」F2 那一行） | 2026-10-01 `research/prompts/test-script-align-r1-main-verification.md` 第二节「T4 新缺口」一行；正推 `research/prompts/test-script-align-r1-sonnet-output.md`「T4-缺口：这一批该记而没记的」第 4 条；用户定写法：`research/prompts/test-script-align-r3-main-verification.md` 第三节交用户表第 3 行，候选定义在正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.2.2 节；门禁一侧那句：`research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行（L3） |
+| C626 | 走 GPU 的计算类没有登记 | 上游 `test-script-discipline.md`「用上现有的硬件加速」：哪几类计算走加速硬件、用哪几台机器、各给多少额度，登记在项目的本地配置里，登记了的那几类只走加速路径；本仓 `gpu-cards.env.example` 只登记显卡先后与额度，走 GPU 的计算类由特性 `gpu` 与代码定。往 `crates/` 加一类新走 GPU 的计算，登记里没有它，今天没有一格红 | 模板 `gpu-cards.env.example` 登记走 GPU 的计算类，读配置的 `research/scripts/crash-amplification-lib.sh`、`research/scripts/crash-amplification-two-hosts.sh` 与选路的 `crates/singlefs-checker-tier/src/crash_amplification.rs` 照登记选路；一格门禁：代码里走 GPU 的计算类与登记逐个对上，多一类或少一类判红 | 读配置与选路的代码先改，模板那句「登记了的只走 GPU」才是真话；改好的模板草稿已有、仓根模板谁来写交用户定（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波看门狗记录（2026-10-01）」H9 那一条） | 2026-10-01 `research/prompts/test-script-align-r1-main-verification.md` 第二节「T4 新缺口」一行；正推 `research/prompts/test-script-align-r1-sonnet-output.md`「T4-缺口：这一批该记而没记的」第 5 条 |
+| C627 | 恢复重放钉表整行抄只落了装置那一半 | 上游 `test-script-discipline.md`「全量的红，钉回快档」：钉表每钉一条，出红的那一行整行抄下、带产物文件名。E165（恢复重放有界穷举与变异杀伤界） 钉表 `.claude/gate.d/e165-pinned-red-examples.tsv` 表头仍是「八段」，⑤ 是「文件:行号」、⑦⑧ 是红例账第 12、13 列；定案「账行原样接在 ⑧ 后面、一行 21 段」，装置 `crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs` 那一半的补丁已交回、未合入（今天装置仍按八段收行）；脚本 `research/scripts/e165-pin-red-examples.py`、表与门禁 checker-tier-formal-verification 的 pinned-red-examples-complete、pinned-red-examples-replay 两格还没改 | 钉表一行 21 段，⑧ 后面原样接红例账那一行（带产物文件名）；pinned-red-examples-complete 格按整行在钉表里找全量红例账的每一行，找不到判红；pinned-red-examples-replay 格逐行重放，改坏一段就红 | 装置补丁合入（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波收拢（2026-10-01）」）；补丁打上之后、钉表补全之前 pinned-red-examples-replay 格会红 | 2026-10-01 `research/prompts/test-script-align-r1-main-verification.md` 第二节「T4 新缺口」一行；正推 `research/prompts/test-script-align-r1-sonnet-output.md`「T4-缺口：这一批该记而没记的」第 6 条；`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波看门狗记录（2026-10-01）」H6 那一条 |
+| C628 | mkfs 做得出挂不成可写的池 | mkfs 的盘容量判据（`crates/singlefs-core/src/make_filesystem.rs` 的 `UnitAreaBeyondDevice`、`JournalRingTooLargeForDevice` 这几样）只判固定结构装不装得下，不判第一次可写挂载的准入（D3（空间分配） 已定项 4 的准入不等式）过不过得了。E168（删除借保留量的环窗口） 第一段 P0 在 mkfs 字面最小盘 17874944 字节（环 1 MiB、单元区 3 槽）上 mkfs 做成，第一次可写挂载在需求为 0 时被拒：`SpaceAdmissionRefusedBeforeAcquisition`，两块盘各 `AvailableBytesOnOneDevice(-344064)`、`demand: BytesOnOneDevice(0)`（`/tmp/claude-1000/e168-main-run/segment1-r4.out` 第 13、14 行，S = 4 与 S = 16 同）。这样的池建得出来、永远挂不成可写，今天没有一格红 | harness 用例：mkfs 在它接受的最小盘上做成之后，第一次可写挂载必须做成（或者 mkfs 必须拒），两边对不上判红；mkfs 的最小盘判据与准入的扣减项共用一处常量，不各写一份 | 先定改法：mkfs 多拒一类（最小盘按准入扣减现算），还是准入在第一次挂载时放宽；归 D3（空间分配） 或 mkfs 那条决策，改法定了再立用例 | 2026-10-01 E168（删除借保留量的环窗口） 第一段 P0 两行；`records/2026-10-01-删除与并发事务.md`「十四　批 6」 |
+| C634 | 单次 unlink 的墓碑字节没有 trace 检查 | D18（块里携带什么信息） 已定项 24 定了第一版一次 unlink 往墓碑树开放容器追加一条 40 字节整对象墓碑（一个 32 KiB 容器装 815 条），C84（墓碑单元的粒度没人定） 因此还清；它原来要的「单次 unlink 写出的墓碑字节不超过声明值」那条块层 trace 判据没有接到任何一格：三·2 的 unlink 实现写出多少墓碑字节、开放容器在那次发布里重写了几次，今天没有一格会红 | 块层 trace：固定脚本里每次 unlink 那几次发布，墓碑树写出的单元数与字节数等于按 D18（块里携带什么信息） 已定项 24 现算的值（开放容器有新记录才重写，满 815 条才开新容器），多写一个单元判红；与 C105（打包容器按发布频率重写的写放大） 的「单次 fsync 的墓碑容器字节 ≤ 声明值」共用一份录制 | 三·2 unlink 实现合入（`.claude/kb/milestone/03-third-txn.md`「三　删除（新事务）」） | 2026-10-01 56 字节墓碑旧值回扫（`/tmp/claude-1000/m3-sweep-tomb56/report.md` 表 1 `decisions/18:214` 那一行）；`records/2026-10-01-删除与并发事务.md`「十四　批 6」 |
+| C629 | QEMU 那一道的复用与形式化那一道两处同形 | checker-tier-qemu-device-streams 的输入登记了 `research/results/`（`.claude/gate.d/stage-inputs.tsv` 里它那一行），崩溃验证员第 1 步对它只查 `crates` 下的未跟踪文件、`research/results/` 不查（`.claude/skills/crash-test/commit-stages.md` 第 1 步，写明由 experiment-replay 格兜）：别的会话在那里留了没跟踪的产物时，工作区判绿写下的全绿标记在 `--staged` 的 worktree 里对不上，整轮门禁照跑一遍虚机（形式化那一道的同形缺口第一轮 A2 量到过，这一道是推的、没量）；那一行也没登记 `environment=`，换了 QEMU 或来宾内核，旧标记照样作数 | 崩溃验证员第 1 步对输入里有 `research/results/` 的每一道都查未跟踪文件，有就停下报告；`stage-inputs.tsv` 里带 `command=` 的每一行都要有 `environment=`，缺一行门禁判红（归哪一道门禁未定） | 改定义走三方或用户逐份豁免；QEMU 与来宾内核的版本取法先定（`vm-kernel.sh --check` 打不打得出一行版本） | 2026-10-01 `research/prompts/defs-m3-formal-gate-r2-main-verification.md` 第二节「第一轮 D1–D5 复核」一行；`research/prompts/defs-m3-formal-gate-r3-main-verification.md` 第二节「L4 已定与记账」一行 |
+| C630 | 崩溃验证员第 1 步停下的频率没量 | 形式化那一道在 `research/results/` 有别的会话没暂存的改动或没跟踪的产物时不跑、停下交主 agent（`.claude/skills/crash-test/commit-stages.md` 第 1 步）；几个会话共写一个仓时这一步停下有多频繁、停下之后多久跑得成，今天一个数都没有 | 崩溃验证员报告里固定一行「第 1 步停下：是 / 否，挡路的路径」；攒够几次提交之后数这一行，停下的超过一半判红，出路指改法（在暂存树上跑那一道，或指纹只按被判输入算） | 先攒几次提交的实况；阈值与改法归下一轮定义三方 | 2026-10-01 `research/prompts/defs-m3-formal-gate-r2-main-verification.md` 第二节「E4 写实句与清单」一行（E4-b）；`research/prompts/defs-m3-formal-gate-r3-main-verification.md` 第二节「L4 已定与记账」一行 |
+| C631 | 内存排不上时形式化那一道最坏约 12 小时才报没跑成 | 内存包装的 slice 被别的会话占满时，必红世界表每一轮各等满 3600 秒再退 252；崩溃验证员命令里不带 `capped.sh`，32 线程 12 轮最坏约 12 小时（再加空真 2 轮、证明 1 轮），线程上限 4 时 94 轮。推的，没量：要占满 slice 一小时以上（`research/prompts/defs-m3-formal-gate-r3-sonnet-output.md` 第 156 行） | 一道阶段里第一次退 252 之后，其余轮不再排队、整道报「没跑成：内存包装排不上」，出路照包装文件头；自证用一个永远排不上的假包装，整道挂钟不超过一次等待上限 | 先量：在占满的 slice 上量必红世界一格的挂钟，短于推的数就撤这一行 | 2026-10-01 `research/prompts/defs-m3-formal-gate-r3-main-verification.md` 第二节「L4 已定与记账」一行；辩方 `research/prompts/defs-m3-formal-gate-r3-sonnet-output.md` 第 156 行 |
+| C632 | Verus 工具指纹不罩 rustup 工具链的内容 | `research/scripts/verus-proof-check.py` 的 `tool-versions`（另记 `VERUS_ROOT` 与 `VERUS_USE_RUSTUP`）罩住 Verus 安装目录与 z3；Verus 编译时用的 rustup 工具链内容被换掉，那一行推的不变、旧判定照复用（第三轮攻方 L2-d 判「部分罩着」，推的，没量） | 换掉 rustup 工具链里一个文件（拷贝出来的工具链上做），`tool-versions` 那一行必须变、全绿标记必须不作数；进 `verus-proof-check.py --selftest` | 先量 L2-d：工具链里哪些文件进 Verus 的编译 | 2026-10-01 `research/prompts/defs-m3-formal-gate-r3-main-verification.md` 第二节「L2 G10」一行 |
+| C633 | 形式化那一道被信号停了的归类与出路文字没对齐 | ① L3-c（推的）：E165 一侧「装置被信号停了」那一行写着不算判定，`.claude/skills/gate/staged-gate.md` 与 `.claude/skills/crash-test/commit-stages.md` 照字面记真红；E165 退 253 与门禁分诊「formal-verification 的 253 按红记」字面冲突；E165 一侧 252 两种成因没分。② 文字残留：`.claude/gate.d/stage-inputs.tsv` 形式化那一行的注释仍只写「Verus 的 version、commit 与可执行文件的 sha256 经 environment=」，少了安装目录顶层摘要与 `VERUS_Z3_PATH`；`.claude/gate.d/checker-tier-formal-verification.sh` 红例重放那一格的汇总出路写「按回归修实现」、verus-proof 格写「修证明或实现」，都没有被信号停了的例外；文件头 `--tool-versions` 那一段没写 `VERUS_ROOT`、`VERUS_USE_RUSTUP` | 合成一个「装置被信号停了」的阶段输出，门禁分诊与崩溃验证员都要判成没跑成、不判红；弄坏开关样本核汇总出路：被信号停了时出路不指修实现或修证明 | ①改两份定义走三方或用户逐份豁免；②并进下一批工具簇 | 2026-10-01 `research/prompts/defs-m3-formal-gate-r3-main-verification.md` 第二节「L3 G11」一行；辩方 `research/prompts/defs-m3-formal-gate-r3-sonnet-output.md`「5. 3-12 自己列了、判决没记的旧字面」；`records/2026-10-01-里程碑三形式化接入.md`「第 5 批（新会话接手）」3-13 交回那一条 |
+| C635 | 上一次全量没有机器可读的标记 | 里程碑收尾、或动了崩溃点重放或判器的那一批提交时，看不出上一次 checker-tier-layer0-replay `--full` 与崩溃放量全量（`research/scripts/crash-amplification.sh` 不带参数）各是哪天跑的、什么结论：D13（验证路线） 已定项 9 定由主 agent 把「上一次全量」写进当前里程碑记录一行，没有门禁读它；checker-tier-layer0-replay 逐条的全绿标记（git common-dir 的 `singlefs-crash-case-green.<用例名>.<输入指纹>`）按输入指纹认、不记日期，崩溃放量入口每趟留的 `runs/entry-<UTC 时刻>-<进程号>/` 目录也没有门禁读 | 两样全量判绿时各写一份带日期与输入指纹的标记；提交前那一趟门禁核「这一批暂存改动碰了 D13（验证路线） 已定项 9 的路径清单，而标记早于这一批」时报出来 | 路径清单今天只写在 D13（验证路线） 已定项 9 正文里，门禁要读得先登记成一份文件 | 2026-10-01 `research/prompts/test-script-align-r2-main-verification.md` 第二节「U3 T1-3 写回照字面做不了」一行；辩方 `research/prompts/test-script-align-r2-sonnet-output.md` 第三节第 6 步 |
+| C636 | ckpt_cost 的 Σ 名单缺两棵删除树的根 | D28（挂载期承诺量） 已定项 4 的 ckpt_cost Σ 名单列了记录树、中央映射树、记账树、树表、谱系容器，没点名墓碑树根与 `deleted_inodes` 根；意图那次发布新写墓碑容器 2 槽、墓碑树根 1 槽、`deleted_inodes` 根 1 槽，这两个根算不算提交固定点、要不要进 Σ 名单，条款没写 | 实现先按删除线第三轮 W 的固定点根 4 那一读法写：两个根记在每批新写上界里的固定点根 4（`research/prompts/m3-delete-r3-sonnet-output.md` 第 66 行 W_ub 那一式），不进 Σ 名单；条款补上点名之后，用例拿点名的名单逐项对 ckpt_cost 的读数，差一项判红（推的，没有用例） | D28（挂载期承诺量） 已定项 4 的 Σ 名单要补一句，写明这两个根算不算提交固定点；三·2 的实现员写意图那次发布 | 2026-10-01 `research/prompts/m3-blanks-r1-main-verification.md` 第四节「ckpt_cost 的 Σ 名单没有点名墓碑树与 `deleted_inodes` 根」一行；正推 `research/prompts/m3-blanks-r1-sonnet-output.md` 第 227 行 |
+| C637 | checker 档用例按参数循环没有判 | 上游 `test-script-discipline.md`「用例原子化：每一条都能单独跑」要一条用例一个场景，「门禁管哪一半」把按参数循环的用例拆没拆开列为项目可接的一格；本仓 `research/scripts/crash-case-check.py` 的 one-scenario 格（门禁 harness-model-differential-and-scenarios 的一格）只扫 `crates/singlefs-harness/tests/*.rs`（`harness_test_paths`），checker 档 `crates/singlefs-checker-tier/tests/` 不扫：同一判法函数原样用在 checker 档 `tests/*.rs` 上，150 条用例判红 2 条（`crash_points_of_the_rollback_publish.rs:127`、`rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs:464`；正推探针 `research/prompts/test-script-align-r3-sonnet-model/one-scenario-on-tier.py`）。`crates/*/src/` 里的 `#[cfg(test)]` 单测两档都不在射程 | one-scenario 格把 `crates/singlefs-checker-tier/tests/*.rs` 一并扫进来：for 循环体每一轮新建一个池的用例判红，用例上写了「harness-test-granularity:one-scenario <理由>」的不判；判别力自证：`crash-case-check.py --selftest` 加一份 checker 档按参数循环的用例，必须红 | 那 2 条先拆开或照同一标记写明理由，不然这一格接上就红 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L1 |
+| C638 | 用例函数名带欠账号没有判 | 上游 `test-script-discipline.md`「用例原子化：每一条都能单独跑」要用例名不带里程碑、步号、批次这类来历，来历进 commit message 或项目 kb；`research/scripts/crash-case-check.py` 的 `MILESTONE_FILE_NAME` 认欠账号（`(^|_)c[0-9]{3}(_|$)`），只拿测试文件名比，`#[test]` 函数名没有格判：`crates/**/*.rs` 里 `#[test]` 函数 1321 条，以 `c<三位数>_` 开头的 21 条、分在 7 份文件（6 份在 `crates/singlefs-harness/tests/`，1 份是 `crates/singlefs-core/src/admission.rs`，例 `c393_tree_table_unreadable_on_every_read`）；另 5 条带实验号或 `m1_`、`m3_`、`m5_`（例 `lexical_digest_matches_the_e164_anchors`）。测试文件头里的来历欠在 C610（测试文件头还写着来历） | 一格门禁拿 `MILESTONE_FILE_NAME` 那条判据也判 `#[test]` 函数名（`crates/` 下 `tests/` 与 `src/` 里的单测都扫），带欠账号判红，出路「来历进 commit message 或 .claude/kb/」；判别力自证喂一条 `c123_` 开头的用例名，必须红 | 21 条先逐条读函数体，核 `c393` 这类是来历还是被测对象的名字（正推没逐条读）；带实验号与 `m<数>_` 的 5 条算不算来历没人定过（零轮），要用户或三方定 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L2 |
+| C639 | 门禁阶段的弄坏开关没有复跑方 | 上游 `test-script-discipline.md`「测试脚本自己也要被测试证明有效」：复跑的一方（自证自己，或门禁的自证）逐个打开开关、看它红在点名的那一项。`.claude/gate.d/` 下 16 份阶段里 14 份读 `_BREAK`，除共用库 `.claude/gate.d/lib/stage-cells.sh` 自己的嵌套自证（`STAGE_CELLS_BREAK`）外，没有一格逐个设阶段的开关去喂样本；`.claude/gate.d/code-tooling.sh` 文件头那张「开关 → 判错的样本」表只是注释，对应关系靠提交前人手在真仓跑样本核（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批依赖表（新会话接手）」`code-tooling.sh` 那一行）。test-script-align-r3 正推人手逐个打开 checker-tier-layer0-replay 文件头的 12 个开关，点名的样本与实测判错的有 6 个不相等（C646（弄坏开关文件头点名的判错项与实测不等）） | 一格门禁按每道阶段文件头的开关表，逐个在环境里设开关、经 `.claude/singlefs-ai-sop/scripts/stage-selftest.sh --item <阶段>` 喂样本，判错的样本集合与文件头点名的不等判红；被喂的样本根里要有 C622（门禁的弄坏开关平常跑也认） 那份标记文件，开关才被认 | 阶段文件头的开关表要能解析：C625（弄坏开关文件头三样没有门禁） 定的写法（`mutate.sh` 那种）管研究脚本与钩子，门禁阶段今天是另一种（`code-tooling.sh` 文件头：开关名、弄坏哪一处、冒号后点名判错的样本），门禁阶段也用同一种（用户 2026-10-02 定「是的 按照B」）；样本档登记为 samples-heavy 的几道（`.claude/hooks/selftest-registry.tsv` 表尾一节）复跑起真重活，归提交时；C646（弄坏开关文件头点名的判错项与实测不等） 先改，不然接上就红 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L3、2.3.2 节 |
+| C640 | 四份自证起真重活没登记成偏离 | 上游 `test-script-discipline.md`「测试脚本自己也要被测试证明有效」：自证用假的驱动，不起编译与重活，改脚本的人随时能跑。`.claude/hooks/selftest-registry.tsv` 里登记为 heavy 的 3 份（`research/scripts/compile-then-swap.py` 在临时 crate 上真跑 cargo build 与 cargo test --no-run、`research/scripts/crash-amplification-two-hosts.sh` 本机起两份真的 checker 档用例、`research/scripts/vm-bench.sh` 起虚机）与 heavy-if-set 的 1 份（`research/scripts/layer0-shard-run.sh`，设了 `SINGLEFS_HEAVY_TESTS` 时真编真跑）与这一条不合，哪儿都没登记成偏离（给上游的反馈 F1–F12 里也没有）；门禁 code-tooling 只有 vm-bench、two-hosts 两份在 `NOT_RUN_HERE` 写了不进每轮门禁的理由（理由是挂钟），`compile-then-swap.py` 在每轮门禁的 `SELFTEST_RUNNERS` 里真跑 | 四份各自换成假驱动（改登记成 light），换不成的登记成偏离（写明起的是什么重活、为什么换不成假的）；一格门禁：`.claude/hooks/selftest-registry.tsv` 里登记为 heavy 或 heavy-if-set 的每一行在偏离登记里都有一行，缺判红 | 偏离登记在 `.claude/hooks/selftest-registry.tsv` 那一行本身：登记为 heavy 或 heavy-if-set 的行，`#` 后的理由以「偏离上游：」起头，写明起的是什么重活、为什么换不成假的（用户 2026-10-02 要求「现在就解决」，主 agent 定登记在这里，不另起一张表）；四份里 `crash-amplification-two-hosts.sh` 与 `compile-then-swap.py` 的自证已换成假驱动、登记改 light（2026-10-02 主 agent 带前缀跑过，strace 下真 cargo、rustc、ssh、nvidia-smi、qemu 0 次），`vm-bench.sh` 与 `layer0-shard-run.sh` 两行理由已以「偏离上游：」起头、登记表表头写明这一句；仍欠的只有那一格门禁（heavy / heavy-if-set 行理由不以「偏离上游：」起头判红） | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L4 |
+| C641 | 两份入口脚本没按入口脚本格式核 | 上游 `test-script-discipline.md`「入口脚本：不带参数就是全量」：`--list-items`、项名写错退 2、每项结束一行（项名、退出码、判了多少、红了多少、复用了多少、秒）与总计；本仓只拿 `research/scripts/crash-amplification.sh` 逐节核过、改过。`research/scripts/replay.sh` 的位置参数是实验号，没有 `--list-items`、`--item`、`--selftest`（`grep -c` 三条各 0），文件头那三条完整性闸（跑前删本轮输出、收尾行 `emitted=` 与实际行数相等、退出码非 0 判红）没有一条有会红的自证，门禁 checker-tier-research-build-and-replay 的样本放的是假 `replay.sh`，测的是阶段；`research/scripts/broad-mutation.py` 每条一行 `BROAD_MUTATION_ITEM` 只有 `sequence=`、`outcome=`、`stage=`、`build_seconds=`、`test_seconds=`、`name=`，没有判了多少、红了多少、复用了多少，而它有复用这一层（已有定论的条跳过） | `replay.sh` 补 `--list-items`、实验号写错退 2 与 `--selftest`：三条完整性闸各配一个弄坏开关，打开必红；`broad-mutation.py` 每条一行补判了多少、红了多少、复用了多少（取不出的写取不出）；一格门禁核登记为入口脚本的每一份都带这几样，缺一样判红 | 哪几份算入口脚本没有登记：正推按上游定义数出 `crash-amplification.sh`、`broad-mutation.py`、`e165-replay-mutation-kill-bounds.sh`、`replay.sh` 四份（`mutate.sh` 必须带变异表，不算） | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L5 |
+| C642 | 单机配置跑不了崩溃放量全量 | 双机没开（`ENABLE_ACROSS_MACHINES` 不是 1）时，`research/scripts/crash-amplification.sh` 读不到配置里的清场命令，全量退 78（入口那句「✗ 多机配置没开双机（ENABLE_ACROSS_MACHINES 不是 1），读不到配置里的清场命令，清不了场」）：只有一台机器的环境今天跑不了崩溃放量全量。上游 `test-script-discipline.md`「用上现有的硬件加速」：要退回就改配置或显式传参 | 单机配置也登记清场命令，入口在 `ENABLE_ACROSS_MACHINES=0` 下读它、照样跑全量；入口自证造一份单机配置加假清场，全量那一路退 78 判红 | 改 `research/scripts/peer-host-lib.sh`（`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第一波看门狗记录（2026-10-01）」崩溃放量入口那一件交回那一条：要单机清场得改它，进第二波） | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L6 第 1 条 |
+| C643 | 变异基线被总上限挤掉报成基线红 | `research/scripts/mutate.sh` 的基线撞内存包装退 254（被总上限挤掉：内核在 slice 里挑了这一条杀，包装说结果不算数、要重跑）时照旧按基线不绿退 2、报「基线就是红的」（文件头「基线退 254 照旧按基线不绿退 2」）；基线退 252 已单列成「基线排不上」，254 没有 | 基线退 254 单列，报被总上限挤掉、结果不算数、要重跑，不说成基线红；自证用假包装让基线退 254，失败行仍是「基线就是红的」判红 | 无 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L6 第 2 条；`records/2026-10-01-对接上游测试脚本规范.md`「第 2 批第二波与三方（2026-10-01）」`mutate.sh` 并行理由那一件交回那一条 |
+| C644 | 换钩子的内置喂法没收花括号与参数通配 | `research/scripts/hook-swap.py` 不给 `--feeds` 时在草稿树里逐条喂内置的 `BUILTIN_FEEDS`，退出码都等于写的那一个才换上钩子；`.claude/hooks/heavy-test-guard.sh` 那一份内置喂法里没有一条带花括号或参数通配的命令，花括号与参数通配那一件交回时主 agent 现查的三条绕过探针（退 2）与两条正常写法（退 0）不在里面：以后换上的钩子在这几条上退回放行，换之前的先验照样过 | 那几条探针各进 `BUILTIN_FEEDS` 一行（绕过的写 `exit` 2、正常写法写 `exit` 0）；`hook-swap.py --selftest` 拿一份在花括号写法上放行的钩子去换，必须停在先验那一步 | 无 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V2 漏记 L1–L7」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 1.3 节 L6 第 3 条；`records/2026-10-01-对接上游测试脚本规范.md`「上游 0.0.63 发版（2026-10-01）」花括号与参数通配那一件交回那一条 |
+| C645 | 崩溃放量全量没有人能派 | D13（验证路线） 已定项 9 与 `.claude/main-agent.md`「禁止」第一条要里程碑收尾、动了崩溃点重放或判器的那一批提交之前请用户跑一趟全量（checker-tier-layer0-replay `--full` 与崩溃放量全量 `research/scripts/crash-amplification.sh` 不带参数两样）；checker-tier-layer0-replay `--full` 有去处（`.claude/skills/crash-test/commit-stages.md` 第 1b、2 步，在 HEAD + 暂存区的 worktree 里跑、逐条写全绿标记），崩溃放量全量没有：`.claude/gate.d/` 下没有它的阶段，崩溃验证员定义只跑那五道门禁、不含它，`.claude/main-agent.md`「什么时候派哪个 agent」表里没有哪一行派人跑它；用户要跑时没有能派的 runner、没有 worktree 隔离。判绿标记那一半欠在 C635（上一次全量没有机器可读的标记） | 崩溃放量全量照 checker-tier-layer0-replay `--full` 的样子有一个能派的去处（崩溃验证员定义里的一步，或一个只在用户要求时跑的门禁阶段）：在 HEAD + 暂存区的 worktree 里跑、命令带 `SINGLEFS_HEAVY_TESTS=user-request`；那一道里任一项判红、或有一项 `exhaustive=false`，整道判红；`.claude/main-agent.md`「什么时候派哪个 agent」表里有一行点名它 | 交崩溃验证员（用户 2026-10-02 定「交给崩溃验证员」）：`.claude/skills/crash-test/commit-stages.md` 加一步、`.claude/main-agent.md` 派发表点名、拦重型测试的钩子让崩溃验证员带 `SINGLEFS_HEAVY_TESTS=user-request` 能跑崩溃放量；改定义由用户这句话当面要求，记作逐份豁免 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「A4 崩溃放量全量没有人能派」一行、第三节交用户表第 5 行；攻方 `research/prompts/test-script-align-r3-opus-output.md` A4 节第 3 步 |
+| C646 | 弄坏开关文件头点名的判错项与实测不等 | 文件头写的「打开后哪一项判错」与实测不相等：`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头的 12 个开关里 6 个与 test-script-align-r3 正推逐个打开实测的不相等——`GATE_LAYER0_BREAK` 的 `no-findings-file`、`ignore-unfinished`、`ignore-red-states`、`no-truncation` 只写「red 或 green 样本判错」、没点名（实测依次是 green 与 red、red、red、red），`no-feature-pass`、`features-not-from-source` 只点 quick-features-green（实测 quick-features-gpu-not-run、-green、-red、-zero 四份都判错）；`.claude/hooks/lib_heavy_tests.py` 文件头写 `selftest-pattern-words-judged` 打开时「一格红」，实测两格 | 两份文件头改到与实测相等（逐个开关写全判错的样本或格）；C625（弄坏开关文件头三样没有门禁） 与 C639（门禁阶段的弄坏开关没有复跑方） 的格落成后按「红的项与点名的相等」判，这 7 个开关不改就红 | 无 | 2026-10-01 `research/prompts/test-script-align-r3-main-verification.md` 第二节「V3 前两轮的数」一行；正推 `research/prompts/test-script-align-r3-sonnet-output.md` 2.3.2 节、1.3 节 L6 第 3 条；`records/2026-10-01-对接上游测试脚本规范.md`「上游 0.0.63 发版（2026-10-01）」花括号与参数通配那一件交回那一条 |
+| C647 | 重放前缀核与 core 里同一概念各一个类型 | `crates/singlefs-replay-prefix/src/lib.rs` 里的 `PrefixKernelInstanceGeneration`、`PrefixKernelCheckpointTxg`、`PrefixKernelJournalRecordOrdinalWithinPublish`、`PrefixKernelJournalRecordPlaceInPublish` 与 `singlefs-core` 里同一概念的 `InstanceGeneration`、`CheckpointTxg`、`JournalRecordOrdinalWithinPublish`、`JournalRecordPlaceInPublish` 各是一个类型；胶水 `crates/singlefs-core/src/recovery.rs` 的 `replay_journal` 逐字段手抄映射（`JournalRecordPlaceInPublish` 两臂 `match` 逐个换成 `PrefixKernelJournalRecordPlaceInPublish`）。`.claude/singlefs-ai-sop/rules/code-discipline.md`「一个语义概念全仓一个名字」没还清 | 同一个语义概念在 `singlefs-replay-prefix` 与 `singlefs-core` 里各定义一个类型就红：核里带 `PrefixKernel` 前缀的四个类型与 core 里不带前缀的同概念四个并存，或胶水里有把一个类型逐变体换成另一个的 `match`；改成一处定义（`singlefs-core` 直接用核的四个类型，固有方法挪进核 crate 的 `verus!` 之外，胶水的手抄映射去掉）才绿。这一笔检查落在哪一处还没定 | 用户 2026-10-01 定「维持 `PrefixKernel…` 改名，`lib.rs` 那句注释改成实话，另记一笔欠账」，现在不走一处定义，检查拦不了；要拦先要有一处定义那一版：辩方原型 `research/prompts/m3-verus-land-code-r3-sonnet-model/h53/h53-prototype.diff`（4 份文件），辩方在副本上量 Verus「32 verified, 0 errors」、core `--lib` 139 passed、五个 harness 目标过，主 agent 没复跑；代价是核里多一块非验证的 `impl`、`Hash` 与 `Ord` 派生进 `verus!` 里的类型 | 2026-10-01 `research/prompts/m3-verus-land-code-r3-main-verification.md` 第二节 J4 一行、第三节 U3 一行、「用户定案」U3 一行；辩方 `research/prompts/m3-verus-land-code-r3-sonnet-output.md` 的 H5-3 一行与两条改法对照表 |
+| C648 | 可写挂载读阶段每个候选读几次盘没有用例钉 | 可写挂载的读阶段走 `ReadStageCache`（`crates/singlefs-core/src/mount.rs`），挂载时每个候选读几次盘、按什么次序读，没有用例钉；只读挂载那一半由 `crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs` 钉 | 在可写挂载上摆与只读那条用例同一种形状（锚点读得出、两次单条发布都施加），断言每个候选在盘上读几次、按什么次序读；让可写挂载的读阶段多读一次或换次序，这条用例必须红 | 无新前置，只读挂载那条用例的摆法可照；有一处是推的、没量：可写挂载上反向链要重读的槽在扫环时已按同一个（盘、偏移、长度）读过，命中缓存不再读盘（攻方推的），用例落成时量出真值 | 2026-10-01 `research/prompts/m3-verus-land-code-r3-main-verification.md` 第二节 J2 一行、第三节 U2 一行、「用户定案」U2 一行；攻方 `research/prompts/m3-verus-land-code-r3-opus-output.md`「`mount_read_only`、可写挂载与 `recover` 是不是同一条路」一节 |
+| C649 | Verus 判不到的两样回调结果 | 恢复重放取前缀的两个读盘回调（反向链 `judge_back_chain_against_the_previous_record_on_disk`、点名单元闭包）交回的结果，Verus 核的 spec 判不到：核只证「据以接受或断链的那一次回调交回了什么」，Verus 一侧只能写成「被施加的每条记录，回调交回了真」的后置条件；回调本身判得对不对只由 E165（恢复重放有界穷举与变异杀伤界） 与 harness 判 | 改坏回调自己的判法（反向链比对、点名单元两份都验），E165（恢复重放有界穷举与变异杀伤界） 的变异表或 harness 用例要红；Verus 一侧不会红，这一半只能留给它们 | 无新前置：spec 不能对具体盘求值，是结构上的限制；可写挂载读阶段读盘次数没有用例钉另记 C648（可写挂载读阶段每个候选读几次盘没有用例钉） | 2026-10-01 `research/prompts/m3-formal-r3-main-verification.md` 第四节第 2 笔、第二节句法层补强那一行 |
+| C650 | 择根与重放没有合判 | M4 的射程句（连同择根才排除已确认的完整发布被恢复丢掉）要择根与重放合起来才成立。两边各有了一半（用户 2026-10-02 定两边都做）：Verus 一侧，择根核 `choose_root_slot` 与取前缀核 `replay_core` 合成推论 `corollary_recovery_replays_from_the_newest_self_verified_root`（`crates/singlefs-replay-prefix/src/lib.rs`），必红世界是 `crates/singlefs-replay-prefix/verus-mutations.tsv` 里名字以这一笔的编号开头的 7 行；E165（恢复重放有界穷举与变异杀伤界） 一侧，第 3 次重跑第二段在三个合法历史域上调真 `choose_root`、`scan_journal`、`replay_journal`，界内、不带故障时已确认的完整发布不丢。**还欠**：改坏择根序的变体（比较不看实例代号、同 `checkpoint_txg` 平局取低、实例代号为主）在 E165（恢复重放有界穷举与变异杀伤界） 上红不红（第 3 次重跑第三段的驱动写在草稿目录的镜像里、还没装进仓，没有产物）；登记推的是合法、不带故障的历史造不出能让这几条变体择得不同的根环，带故障的那一族另记 C657（带故障的择根合判族没有） | 在一族状态上调真 `choose_root` 再调重放，判「已确认的完整发布不丢」；改坏择根序（同 `checkpoint_txg` 平局取低、实例代号为主这类）这一族要红。Verus 一侧由门禁 checker-tier-formal-verification 的必红世界格判，E165（恢复重放有界穷举与变异杀伤界） 一侧由第 3 次重跑第三段的变体判 | E165（恢复重放有界穷举与变异杀伤界） 第 3 次重跑第三段跑完（驱动装进仓、跑出产物） | 2026-10-01 `research/prompts/m3-formal-r3-main-verification.md` 第四节第 7 笔、第二节第四格与第三节版本序一行；2026-10-02 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 7 批用户弹窗定七问那一条（合判两边都做）、`research/prompts/m3-formal-r6-main-verification.md` 第四节写回清单 |
+| C651 | 全池没有可用的系统配置槽 0 时 checker 与实现找槽 1 的读法不同 | 系统配置槽 0 在全池都自证不过时槽 1 在哪：条款已定逐档（D22（单元原子性怎么合成） 已定项 16，用户 2026-10-02 定，推翻 2026-09-14 按常量 4096 读的那一读），连同 mkfs 先把每盘 [0, 根环基址) 写 0（D22（单元原子性怎么合成） 已定项 8 第 3 条）。池级 checker（`crates/singlefs-checker/src/image.rs` 的 `slot_one_read_at_every_slot_spacing_the_format_allows`）、恢复（`crates/singlefs-core/src/recovery.rs` 的 `slot_one_found_by_trying_every_slot_spacing_the_format_allows`）与 GPU 判器两份（`crash_judge_common.wgsl`、`crash_judge_checker.wgsl`）已按同一句读；验收的两张坏镜像（io_min 8192 的池两盘槽 0 抹成 0；旧池槽距 4096 写过系统配置、同 fsid 换 io_min 8192 重做 mkfs 再抹两盘槽 0）在 `crates/singlefs-harness/tests/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs`，两边结论不同即红。**还欠**：E170（O3规约执行器第一版） 的执行器还是暂代读法（收到第一个就停、不比世代号），没改到同一句、严格跑法没重跑；GPU 对拍只跑槽距 4096 的流，GPU 判器那两份改错了没有用例会红 | 坏盘输入里造「全池槽 0 都坏、槽 1 在非 4096 的槽距上」的镜像，checker 与实现的结论不同判红（已有）；O3（独立规约执行器） 严格跑法在这一类状态上给出判定；io_min 8192 那条流接进 GPU 对拍，GPU 判器与 CPU 逐态不同判红 | O3（独立规约执行器） 的执行器照同一句改（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批）；io_min 8192 那条流进 GPU 对拍归 checker 档 | 2026-10-02 写回员 9-2 交回（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 9 批「9-2 交回」那一条）「要主 agent 判」；E170（O3规约执行器第一版） 第二段欠一句表里槽 1 位置那一句（实验页 Q1 一行）；2026-10-02 三方判决 `research/prompts/m3-c651-r1-main-verification.md` 与它的两次用户定案、`research/prompts/m3-formal-r6-main-verification.md` 第二节两个出口那一格；实现员 11-5 交回（调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 11 批） |
+| C652 | 冗余形式没定就开 w ≥ 3 | 冗余取哪种形式没有条款：可变条带（D2（RAID 条带策略） 已定项 1、已定项 6、已定项 22，`w` 取 2–4）、恒镜像（`w` 恒 2，放弃 `w ≥ 3`）、后台纠删码（D2（RAID 条带策略） 未定项 21「备查（未采纳）」那一段）三选一。单元自包含只回答「这一格是谁、坏没坏」，不提供丢掉的字节，所以冗余仍要有；第一版 2 盘恒 `w = 2`，三个候选写出的都是两盘镜像。可变条带比恒镜像多付四样：条带成员表与容器索引（D2（RAID 条带策略） 已定项 12）、部分条带钉住与惰性重落（D2（RAID 条带策略） 已定项 11）、分配准入合取 4（D3（空间分配） 已定项 7）、C81（条带部分释放没有规则）；多买到的是空间（能用的空间 50% 到 75%），而 `.claude/rules/fs-design.md`「比谁省不构成任何判据」。要拦的是：没定冗余形式就放开 D2（RAID 条带策略） 已定项 18 的加盘准入、把那四样做进 `crates/` | 放开加盘准入让 `w ≥ 3` 可达的那次改动里，D2（RAID 条带策略） 没有一条定冗余形式的已定项就判红；冗余形式定成恒镜像时，`crates/` 里出现条带成员表或 `w ≥ 3` 的分配路径判红 | 三方论证与用户定案；代价数可用 E63（分配器每次写用几列）、E110（条带表在连续发布下的期望写放大）、E111（条带表的 key 与它的几何） | 2026-10-02 用户在对话里问「我们这种自包含的数据要不要条带」，定记进欠账表、不立决策未定项 |
+| C653 | 扫环胶水内存随盘数涨 | 扫环那一截进 Verus 之后，胶水 `scan_journal` 先把每块盘上每一份自证过的记录收进一个 Vec、连同键表交给扫环核 `first_copy_of_each_record_key` 建表，表建完 Vec 才释放，峰值约为盘数倍：攻方在原型上量出两盘 2.01 倍、四盘 3.93 倍（环 8192 槽，每条记录 67 个点名项）；线性外推到默认环（每盘 196 608 个记录槽），改前约 0.92 GB，改后两盘约 1.86 GB、四盘约 3.63 GB（推的，没在这个尺寸上量）。功能不错，代价随盘数涨 | 在默认环几何上经内存包装量 `scan_journal` 的峰值，随盘数的倍数超过登记的上界判红；判别力自证：胶水改成收齐之后不释放，必须红。改法二选一：核改成逐盘交、先到先得只证单步，或胶水逐盘合并，要在证明强度与内存之间取舍 | 取舍没定（代码轮第一轮判决定当时不改）；上界取多少没定 | 2026-10-02 `research/prompts/m3-formal-code-r1-main-verification.md` 第二节「Vec 收齐再建表的内存」一格、第三节第 6 条；攻方 `research/prompts/m3-formal-code-r1-opus-output.md` 量内存那一节 |
+| C654 | 必红世界期望条数随求解环境漂 | Verus 必红世界表 `crates/singlefs-replay-prefix/verus-mutations.tsv` 每行登记期望的证明错条数（`proof_errors=`）。用户定案「期望片段只数证明错」（`research/prompts/m3-verus-land-code-r3-main-verification.md`「用户定案」）下，条数记的是求解环境：攻方在核上只加一个没人用的 spec fn，「改判定·在飞上限不看」那一行就从 2 条变 3 条（多出的是在飞上限那条循环不变式），换线程、rlimit 与别的无关改动之后稳定在 3。条数会随无关的 spec 改动跳，跳了分不清是 spec 改坏了还是求解环境变了 | 必红世界每行除条数外再登记证明错落在哪个函数（或哪条 ensures、循环不变式），格按落点判、条数只报；判别力自证：核里加一个没人用的 spec fn，按条数判红而按落点判绿；把一行的替换文改成错落到别的函数，按落点判红 | 判法改不改没定（代码轮第一轮判决定当时不改判法） | 2026-10-02 `research/prompts/m3-formal-code-r1-main-verification.md` 第二节「必红表 99 行 2 → 3」一格、第三节第 6 条 |
+| C655 | 挂载透明逐字段表有字段没归类 | 挂载透明（可写挂载之后再恢复，比的对象是挂载后那次发布之前的那一版）的逐字段表按 `research/prompts/m3-formal-r4-main-verification.md` 第四节第 2 条、`research/prompts/m3-formal-r5-main-verification.md` 第二节逐字段表那一格改写，还没写进 kb。`research/prompts/m3-formal-r6-main-verification.md` 点名表里没碰的字段：根记录的 `mapping_root`、`allocation_record_tree_root`，墓碑 / 谱系 / deleted_inodes 三根指针，算法 / nonce / MAC，系统配置的槽世代号与 journal_tail。它们在「必须相同 / 模掉并改判关系 / 按确定关系判」里各归哪一类没定，挂载透明一判落地时不在比较里 | 逐字段表写成条款之后，根记录与系统配置的字段清单里有一个字段不在表里就判红；判别力自证：删掉表里一行，必须红 | 挂载透明的逐字段表先写进 kb；没归类的各归哪一类先定（第三轮辩方推：两根指针并进分配记录那一行，三根指针与算法三样必须相同，推的） | 2026-10-02 `research/prompts/m3-formal-r6-main-verification.md` 第二节「逐字段表没碰的字段」那一格、第四节新欠账；辩方 `research/prompts/m3-formal-r6-sonnet-output.md` 第 5.2 节 |
+| C656 | mkfs 中途崩溃的语义没有条款 | 用过的盘上重做 mkfs、在 mkfs 第一道屏障之前崩溃（新池的任何东西都还没持久），该挂上旧池、整池拒还是别的，没有条款。mkfs 清零 [0, 根环基址)（D22（单元原子性怎么合成） 已定项 8 第 3 条）收掉的是第一道屏障之后那一格；屏障之前清零开与关两臂都有挂上旧池的态，那是这一格没定义，不是清零的问题 | 条款写下 mkfs 中途崩溃该怎样之后：在用过的盘上枚举 mkfs 第一道屏障之前的崩溃态（层 0 或坏盘输入），结局与条款不同判红 | 条款（三方或用户定） | 2026-10-02 `research/prompts/m3-formal-r6-main-verification.md` 第二节 mkfs 中途崩溃那一格（主 agent 跑完开全量，攻方副本装置上的数，入库装置上没重做）与第四节新欠账 |
+| C658 | 崩溃注入第三截放过丢掉的一步复活 | 崩溃注入第三截（挂载途中再崩）里 O1（内存模型对拍（HashMap 理想文件系统）） 判官的允许版本 `versions_allowed` 取整段历史提交过的每一版（`crates/singlefs-checker-tier/src/crash_injection.rs` 第 2220 行起），二次崩溃之后「第一次恢复丢掉的那一步又读回来」它也放过（推的，没量）；RefFS 每次恢复之后以读出的状态重新起头（D13（验证路线） 已定项 3），能判这一类 | 一条二次崩溃的用例：第一次崩溃恢复读出丢了在飞那一步的那一版，接着写再崩溃，造一个让那一步的内容在第二次恢复里复活的坏实现，第三截要红；照今天的 `versions_allowed` 它绿，就是这一笔还欠 | 先量推的那一半 | 2026-10-02 `research/prompts/m3-formal-r5-main-verification.md` 第二节按发布边界那一格、第五节第 4 条；攻方 `research/prompts/m3-formal-r5-opus-output.md` 第三节 |
+| C659 | 同 fsid 重做 mkfs 后实例代号不变式红没查根因 | 同一个 fsid 在用过的盘上换槽距重做 mkfs 的那几格，每个读槽 1 的候选都有池级 checker 报 I-7.7（系统配置实例代号不低于根环） 红，mkfs 清零 [0, 根环基址) 之后仍剩几态报它，与读法无关；根因没查（攻方推：旧池的根留在新 mkfs 按新槽距清的那一段之外，与 C484（mkfs 不清根环，同 fsid 重来旧根还择得中） 同类） | 根因查清之后造一张坏镜像（同 fsid、用过的盘、换槽距重做 mkfs、再崩溃）：是 checker 误红就改 checker，是旧根留在盘上被择到就改 mkfs 清的范围，那几格 I-7.7（系统配置实例代号不低于根环） 的判定与条款一致 | 根因（读码，或在入库装置上重做那几格） | 2026-10-02 `research/prompts/m3-c651-r1-main-verification.md` 第二节末段（攻方「另一笔账」，复跑坐实）、第三节代价表清零那一行 |
+| C660 | 回收门槛改成一圈窗口之后按盘回退下界的装置要重跑 | D16（发布语义） 已定项 1 的回收门槛改成一圈窗口（锚在环里读得出的最新有效根，读不出的槽按最小 txg 算门槛、根环表记最大）之后，E139（按盘回退下界的收严形态） 的装置里没有窗口这一项，产物是旧门槛下跑出来的，已定项 1 定案里「形态取 E139（按盘回退下界的收严形态） 的臂 G2S」那一句不再与装置里跑的一字不差 | 装置照新条款加窗口这一项重跑，产物与已定项 1 定案里取臂 G2S 那一句逐条对一遍：对得上就把「不再一字不差」那一句收回，对不上改那一句或改装置；判别力自证：装置里把门槛改回旧式（环里最旧有效根），重跑的产物必须与新门槛下的产物不同 | 根环窗口的实现合入（五处同改：分配器、checker 候选过滤、checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛、影子账候选过滤、回退候选集） | `research/prompts/m3-ring-r3-main-verification.md` 第二节第 5 行与第三节 |
+| C661 | 规约执行器批里两条路径没有态 | E170（O3规约执行器第一版） 第 1 次重跑的批 1、批 2 里，「择到的根不是自证根里 txg 最大的那条」「③ 收到不少于 2 槽」两条路径都是 0 态，Q2「一致」不覆盖它们；D22（单元原子性怎么合成） 已定项 16 逐档新定的几格（几档都收得到取世代号最大、相同取偏移小）只有执行器的合成池单测覆盖，批态上没走到 | 导出批里放进走这两条路径的崩溃态，执行器与实现在这些态上逐态比，不一致即红；只有合成池单测覆盖、批里这两条路径仍是 0 态，就是这一笔还欠 | 导出装置造得出走这两条路径的崩溃态（今天两条层 0 流的批 1、批 2 里没有） | 2026-10-02 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批 E170（O3规约执行器第一版） 第 1 次重跑第三段交回那一条第 ① 点；`.claude/kb/experiments/170-O3规约执行器第一版.md` 现状表 Q2 一行与「路径计数」一节 |
+| C662 | 带故障的合法历史一族照取甲生成 | E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑的带故障合法历史一族（C331（择根倒挂压过已确认的写） 那一形）按今天实现的取甲生成历史（`crates/singlefs-core/src/mount.rs` 还是取甲）；C331（择根倒挂压过已确认的写） 的定案已改取 R2（D22（单元原子性怎么合成） 已定项 8、D23（journal 的角色与格式） 已定项 14），R2 进代码之后这一族生成的历史与条款不再是同一套写路径，它的读数不能当 R2 的证据 | R2 进代码之后照同一份登记重跑这一族；E165（恢复重放有界穷举与变异杀伤界） 页上这一族的读数写明生成时的取法，R2 进代码之后仍只有取甲那一次的读数、却被引作 R2 的依据，即红 | C331（择根倒挂压过已确认的写） 的 R2 进代码 | 2026-10-02 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 12 批 E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑执行员交回没开工那一条 |
+| C663 | 系统配置槽越界与不收之值两读者分类不同 | 系统配置槽的 R（根环区域数）、S（每区槽数）越界与 incompat 不认得加不收之值，实现与池级 checker 的分类与先后不同：实现 S 越界整池拒、R 那一字节不读，checker R、S 越界记不可择；incompat 与格式版本谁先判两边反着。D22（单元原子性怎么合成） 已定项 16 的「池级字段越界」没逐个点名哪些字段，也没写 incompat 与不收之值同在时谁先。GPU 判器一臂 ② 借槽距要「槽 0 无效加旧槽」的坏盘输入才分得开，今天层 0 流没有这种输入。合法历史走不到（推的） | 条款逐个点名池级字段与先后之后，在同一份坏镜像（手放的 R、S 越界槽，incompat 不认得且带不收之值的槽）上让实现与池级 checker 各判一次，结局不同即红；GPU 判器一臂补「槽 0 无效加旧槽」的坏盘输入与一行变异，删 ② 必须红 | 开一轮三方定分类与先后（判决原话「下一轮开一轮三方定分类与先后」） | 2026-10-02 `research/prompts/m3-formal-code-r2-main-verification.md` 第二节 K3-a、K4-a 两行与第三节第 6 条；攻方 `research/prompts/m3-formal-code-r2-opus-output.md` |
+| C664 | 挂载拒绝合法复算把两种拒因报成一个 | 挂载透明判拒绝合法时在崩溃镜像上复算拒的判据（D13（验证路线） 已定项 1 挂载透明）；实现把 D23（journal 的角色与格式） 已定项 14 单子上的「取号那一刻有一槽读不出」（`crates/singlefs-core/src/mount.rs` 的 `ExpectedInstanceAcquisitionFailed::DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness`）映到 `refusal_because_a_system_configuration_slot_turned_unreadable_after_the_read_stage`，与 N-配置同一个拒因。读错是瞬时的时，镜像上复算两槽都读得出，判法会把这一种合法拒判成不合法。不带故障的历史走不到 | 两种拒因分开报，复算各按各的判据；判别力自证：带读故障的档里造一个取号那一刻瞬时读错的态，合成一个拒因时判不合法、分开后判合法 | 挂载透明接进带读故障的档 | 2026-10-02 `research/prompts/m3-formal-code-r2-main-verification.md` 第二节 K2-d 一行与第三节第 6 条 |
+| C665 | 平局取后者的择根变体要同键异内容两槽才分得开 | 择根核的改坏变体 v1822（平局取后者赢，`crates/mutations.tsv` 第 1821 行；坏的是 D22（单元原子性怎么合成） 已定项 24「择新键完全相同取读根环次序里最前的」那一句）只在根环里同时有择新键 (`checkpoint_txg`, 实例代号) 相同而内容不同的两个自证过的槽时才择得不同；E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑第二段在四个合法域、KG、KA 上都没分开它（`research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out` 第 3 行 `variant=v1822 red_legal_domains=none differs_on=none`），带故障的合法历史一族与 KA 都没造这种根环，它落在「取样点不敏感」那一类是推的 | E165（恢复重放有界穷举与变异杀伤界） 加一族根环里放同键异内容两个自证过的槽的状态，在上面调真 `choose_root`、`scan_journal`、`replay_journal`：v1822 要红，原实现照「已确认的完整发布不丢」判；这一族建了 v1822 仍不红，就是这一笔还欠 | 同键异内容两槽这一族状态的造法（E165（恢复重放有界穷举与变异杀伤界） 与 KA 今天都没造） | 2026-10-03 调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 13 批 E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑第三段（写页）交回那一条第 ② 点；产物 `research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out` 第 3 行 |
+| C666 | 只坏第一次读那一种读故障时机没枚举 | E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑带故障的合法历史一族，生成器枚举的读故障时机是「坏到重读之前」；「只坏这次挂载里第一次读」那一种没枚举：实现第一次读系统配置槽在择系统配置那一步，那一读被择系统配置吃掉，择系统配置可能择到另一槽、之后的挂载走另一条路，这一族历史今天没有判 | E165（恢复重放有界穷举与变异杀伤界） 的生成器加「只坏这次挂载里第一次读」那一种时机，在上面调真 `choose_root`、`scan_journal`、`replay_journal` 照「已确认的完整发布不丢」判；这一族里择系统配置择到另一槽的态数是 0，就是这一笔还欠 | 这一族生成器没建（判决定记欠账、不建） | 2026-10-03 代码轮第三轮判决 `research/prompts/m3-formal-code-r3-main-verification.md` 第二节 K4-a 一行（攻方改法丙）与第五节「K4-a「只坏第一次读」时机一族」一行 |
+| C667 | 测试支撑的择根读法平局取后一个 | 测试支撑 `crates/singlefs-harness/src/history.rs` 第 2628 行（`newest_ring_root_floor`）注释写「按 checker 的读法：根环里最新那条根（(txg, 实例) 最大）」，用的是 `.max_by_key(|view| (view.checkpoint_txg, view.instance))`，键相同取后一个；D22（单元原子性怎么合成） 已定项 24 与池级 checker 键相同取读根环次序里最前的。辩方说还有别处同形，没逐个列 | 测试支撑里按 (txg, 实例) 择根的几处逐处改成与 D22（单元原子性怎么合成） 已定项 24 同一取法；根环里有同键两个自证过的槽的镜像上，测试支撑与池级 checker 取到的根不同即红 | 无（判决定记欠账、不进第 14 批） | 2026-10-03 代码轮第三轮判决 `research/prompts/m3-formal-code-r3-main-verification.md` 第二节「辩方 Z2」一行；辩方 `research/prompts/m3-formal-code-r3-sonnet-output.md` 第 152 行 |
+| C668 | 随机历史脚手架的引入者白名单能被别名写法绕过 | `crates/singlefs-checker-tier/src/crash_identity.rs` 按登记用例的白名单表（`RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED`）逐个引入者判谁引了随机历史脚手架（`crates/singlefs-harness/src/history.rs`）；引入者表靠路径解析填，第一段必须是工作区包名，所以 `use singlefs_harness as h; h::history::…`、`extern crate singlefs_harness as hh;`、`use singlefs_harness::*; history::…`、`use singlefs_harness::{self as sh}; sh::history::…` 这四类写法下 `history.rs` 不在引入者里：没登记的库模块这样引不被拦，`history.rs` 也不进那条用例的判法摘要（复用键对随机历史的改动不敏感）。`tests/` 下经 `#[path]` 共用的搭建模块（例：`crates/singlefs-harness/tests/common_admission/mod.rs`）按「测试目标自己的文件」放行，直接引 `history` 不受表管（这是实现的分法，用户 2026-10-02 定的是「按登记用例白名单」；推的）。今天 `crates` 下的 `.rs` 里这类别名写法 0 处，是潜伏缺口，判决定为记欠账、不改代码 | 补别名展开（`use … as`、`extern crate … as`、glob、`{self as …}`）之后，一个没登记的库模块写 `use singlefs_harness as h; h::history::…`，依赖那张白名单的用例必红；补之前同一个模块绿。攻方只在 `references_of` 的逐字拷贝上跑过，没接到真正的 `random_history_scaffolding_introducers_judged` 上（那要编 checker 档，推的）。推翻「能绕过」的现象：在真实仓里加这样的库模块，用例已经红 | 补别名展开要等有人真写别名引入、或用户要求；验红要跑 checker 档（提交时由主 agent 跑） | 2026-10-03 判决 `research/prompts/m3-leftover-code-r1-main-verification.md` 第二节「K5 白名单」那一行；正推报告 `research/prompts/m3-leftover-code-r1-sonnet-output.md` 第 189–195 行 |
+| C669 | 删除类发布的落点判要的槽数与 unlink 之后的可用量 | 两件观测记着，都不算缺陷：① 落点那一判对删除类发布要「普通分配 + ckpt_cost」（`crates/singlefs-core/src/transaction.rs` 的 `units_landing_is_judged`；ckpt_cost 里分配记录树按整棵树，`crates/singlefs-core/src/admission.rs`），4 GiB 盘上 ckpt_cost 540–546 槽、删除类发布实写每盘最多 20 槽，约 27 倍，小盘上 13 对 11–15；准入开着时落点判留出的 ckpt_cost 正是式子里扣的保留池，攻方没造出因此误拒的历史；② unlink（意图加最后一批）之后准入式子的可用量反降 20–24 槽/盘（三档小盘 18 格都是，掉到 0 或负的 5 格），因为环窗口是常驻扣项（D28（挂载期承诺量） 已定项 1）、删除自己的新写进了已分配、删掉的单元又被最近 4 个状态钉着；条款没有「删除之后的可用量不低于之前」这一句 | ①：出现一段准入开着、删除批实写放得下而落点那一判拒、推抬 F 推满仍不够的历史即红，造不出则不红；②：先有条款（要不要「删除之后可用量不低于之前」、差多少算内），再对同一份盘面分两路——甲 unlink 之后再建 4 个 size 0 的 inode，乙不删直接建 4 个——比两路的可用量与是否被拒，超出条款的差判红 | E168（删除借保留量的环窗口） 第二段在真实现上量（环窗口这一项在那一段才进式子）；② 还缺条款 | 2026-10-03 判决 `research/prompts/m3-unlink-code-r1-main-verification.md` 第二节 K3 那两行；攻方报告 `research/prompts/m3-unlink-code-r1-opus-output.md` 的 O1、O2 两节 |
+
+**状态**：欠检查清单里的条目全部未实现；开头写着「模型层已还」「已还一半」「决策已定、检查仍欠」「前置已还」的那几条只还了其中一部分，剩下的仍欠。
+C1（意图续做做成常规路径） 等意图日志有代码，C2（无界操作做成单事务） 等被判的那两个操作出现（事务层与块层写记录早就有了，而文件级 truncate 与目录删除 2026-09-21 现查零代码），
+C5（Z3 超时当通过） 等形式验证阶段，C6（块层语义假设写错） 等拿虚机的设备侧日志重建崩溃状态那一步，
+C7（过期块无检查） 等自造设备模型与 Merkle 有代码，C9（冻结后偷改格式） / C10（历史单元格式读不了） 等第一次冻结；
+**C8（门禁范围判不出来） 与 C20（罕见布局无人跑） 的前置各还剩一半**：布局清单 2026-09-21 随 C14（格式变了 checker 没跟） 有了（`.claude/gate.d/layouts.tsv`），C8（门禁范围判不出来） 还欠「专属路径与共享路径怎么分」的目录约定，C20（罕见布局无人跑） 还欠「上次完整跑过」的时间戳。
+
+还清的条目移到「已还清」一节，只留编号、简称与还清方式——
+留编号是因为别处仍在引用它们（门禁脚本头部、`decisions-history.md`），删掉编号那些引用就成了悬空符号。
+欠着的那张表里不留还清的行（一格开头写「已还（…）」或「销账」），表中间也不许有空行把它断开：这两样门禁 doc-registries 的 table-shape 格判红。
+
+```
+
+**出处 `.claude/kb/checks-owed.md:542-685`（整段抄，未转述）**
+
+```markdown
+### 已还清
+
+已经有会红的检查在跑，不再欠。留在这里只为让别处的引用还找得到它是什么。
+
+<!-- doc-lint:registry name-col=2 -->
+
+| # | 简称 | 怎么还的 | 还清日期 |
+|---|---|---|---|
+| C29 | 恢复先信 tail 会丢数据 | `.claude/kb/decisions/23-journal的角色与格式.md` 第 127 行「恢复不许先信 tail 再往前走：必须先全环扫描、逐条验证，再择最长合法前缀」；`crates/singlefs-core/src/recovery.rs` 的 `scan_journal` 整环逐条解析、不按 tail 过滤；用例 `a_stale_tail_does_not_hide_the_record_above_it_that_recovery_must_apply`（`crates/singlefs-harness/tests/recovery_reads_the_created_file_after_reopen.rs`），`crates/mutations.tsv` 第 249 行（扫描范围改成 tail 作过证的那些记录）靶它；整表复跑归提交时门禁 checker-tier-crates-mutation-replay | 2026-09-28 |
+| C131 | 栈深与保护窗口的量纲 | 题面消失：栈深所在的那条已定项撤回（`.claude/kb/decisions/01-数据可移动性-反向索引.md` 第 16 行「已撤回·此编号不再使用」），「受保护多少代」在 kb 里零处；根环深度与块重用界的区分由 D22（单元原子性怎么合成） 已定项 25 承载 | 2026-09-28 |
+| C262 | 小节清单标了抄而附录里没有 | `research/scripts/quote-kb.py --checklist` 清单标「抄」而附录缺节时退出码 4；`--selftest` 有一格专判「清单标抄而附录里缺那一节」，自检接在门禁 code-tooling 的 research-script-selftests 格 | 2026-09-28 |
+| C318 | 影子账隔离的单元没进准入不等式 | 准入读数扣第九项「被抛弃根独占量」（`.claude/kb/decisions/28-挂载期承诺量.md` 第 27 行；`crates/singlefs-core/src/admission.rs` 的 `available_on_each_device`）；用例 `after_a_recovery_abandoned_a_root_the_admission_reading_with_the_shadow_ledger_is_short_of_the_one_without_it_by_exactly_the_isolated_slots_on_each_device`（`crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs`），`crates/mutations.tsv` 第 373–375 行 | 2026-09-28 |
+| C338 | 树表条目预留没有余量 | 树表条目预留 76 字节有认购表（`.claude/kb/decisions/08-核心索引结构.md` 已定项 8 预留那一段），门禁 doc-registries 的 tree-table-reserve 格按它算和、超过预留就红（red 样本期望「认购合计 88 超过预留 76」）；2026-09-28 现跑认购合计 48、余 28 | 2026-09-28 |
+| C341 | K 代点删在 txg 跳号时留下删不掉的行 | 题面消失：`.claude/kb/decisions/05-快照-空间记账机制.md` 第 47 行改成每条根的记账树只装这条根那一代的行、不再点删（变更史 2026-09-23（其十八））；`crates/singlefs-core/src/transaction.rs` 记账树每次发布整批重写，跳号不留旧代的行 | 2026-09-28 |
+| C363 | 现算保留池时树高从哪读没有条款 | 树高发布那一刻从根节点码 2 头现读层级 + 1（`.claude/kb/decisions/28-挂载期承诺量.md` 第 106 行；`crates/singlefs-core/src/transaction.rs` 的 `height_read_from_the_root_node_header`）；用例 `every_empty_publish_under_the_node_format_capacities_fits_in_the_worst_case_checkpoint_cost_before_it`（`crates/singlefs-harness/tests/admission_checkpoint_cost_per_device_paths.rs`）比每次空发布实际写出的固定点槽数与准入扣的量 | 2026-09-28 |
+| C366 | 暖机路径把 txg 写进计数器与 tail | 计数器从记录头读、不按 txg 推，系统配置 tail 存 jsn 计数器（`.claude/kb/decisions/23-journal的角色与格式.md` 第 367、488 行）；用例 `a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg`（`crates/singlefs-harness/tests/warm_up_journal_counter.rs`），`crates/mutations.tsv` 第 89、351–353 行 | 2026-09-28 |
+| C377 | 回退复用水位之上记录点名的单元 | 题面消失：管理员回退改成挂着时的一次向前发布，账按这次发布调整之后的分配器现算、不从 R_old 那棵载入（`.claude/kb/decisions/23-journal的角色与格式.md` 第 374、385 行；变更史 2026-09-26（其二）） | 2026-09-28 |
+| C378 | 取号之后写行发布被拒，已烧掉的实例代号不回卷 | 认下这是已知行为：取号之后写行或暖机失败不回卷代号（`.claude/kb/decisions/23-journal的角色与格式.md` 第 456 行）；用例 `write_error_after_the_acquisition_leaves_the_new_instance_in_the_system_configuration_and_the_report_names_it`（`crates/singlefs-harness/tests/fault_injection_fast_tier.rs`），`crates/mutations.tsv` 第 300 行（改成回卷）靶它 | 2026-09-28 |
+| C394 | 释放判定不核映射条目位置项里的单元校验和 | 释放之前按映射条目位置项的单元校验和读盘核、对不上隔离那个槽（`.claude/kb/decisions/19-块指针的结构与宽度预算.md` 第 106 行）；用例 `released_unit_whose_copies_fail_the_checksum_in_its_mapping_entry_is_quarantined_instead_of_returning_to_the_free_pool` 与 `after_rebuilding_the_previous_version_from_disk_the_release_still_reads_and_quarantines_the_mismatching_copy`（`crates/singlefs-harness/tests/release_checksum_quarantine.rs`），`crates/mutations.tsv` 第 398 行 | 2026-09-28 |
+| C404 | mkfs 整段写 0 的依据是推的，代码也没写 | mkfs 经写零动作把三个根环区域与 journal 环整段写 0（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 176 行；`crates/singlefs-core/src/make_filesystem.rs`）；用例 `remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_old_pool`（`crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs`），`crates/mutations.tsv` 第 246–248 行 | 2026-09-28 |
+| C475 | 非默认环长下单元区起点取编译期常量 | 单元区起点随环长走、写进系统配置偏移 417（`.claude/kb/decisions/23-journal的角色与格式.md` 第 507 行）；用例 `a_one_gibibyte_journal_ring_puts_the_unit_area_right_after_the_ring_through_mount_and_checker`（`crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs`），`crates/mutations.tsv` 第 1323–1325 行 | 2026-09-28 |
+| C481 | 坏盘输入的基线镜像取不到树表 0 条的盘面 | 坏盘输入的基线加「树表 0 条」一档（`crates/singlefs-checker-tier/src/bad_disk_input.rs` 的 `BaseImageTier::TreeTableWithoutEntries`）；用例 `bad_disk_inputs_never_read_back_an_uncommitted_version_and_panic_only_at_known_sites`（`crates/singlefs-checker-tier/tests/bad_disk_input_campaign.rs`）断言每一档都抽到过镜像，`crates/mutations.tsv` 第 299 行；用例在 checker 档，提交时跑 | 2026-09-28 |
+| C483 | 挂载态读映射与树节点回退都没有条款 | ① 中央映射长成多层时挂载态整棵读进（`.claude/kb/decisions/19-块指针的结构与宽度预算.md` 第 110 行），用例 `central_mapping_grown_into_two_levels_is_read_whole_into_the_mount_state_and_the_file_reads_back`，`crates/mutations.tsv` 第 572 行；② 树节点位置提示读不出经映射回退（同一文件第 182 行），用例 `an_extent_tree_root_whose_location_hint_points_at_an_empty_slot_reads_back_through_the_central_mapping`；两条用例都在 `crates/singlefs-harness/tests/tree_nodes_and_the_central_mapping_on_mounted_read.rs` | 2026-09-28 |
+| C484 | mkfs 不清根环，同 fsid 重来旧根还择得中 | 用户定的路 ① 连根环一起清：mkfs 经写零动作把三个根环区域整段写 0（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 176 行）；用例 `remaking_the_pool_with_the_same_filesystem_identifier_leaves_no_root_of_the_old_pool`，`crates/mutations.tsv` 第 246 行（名义上清、实际不清）、247、248 行 | 2026-09-28 |
+| C485 | segment-registry 格不读活代码，段序列变了照样绿 | 门禁 doc-registries 的 segment-registry 格按钉住活代码的用例 `recorded_stream_matches_the_registered_mkfs_segment_sequence` 里写死的串比（`research/scripts/check-segment-registry.py` 的 `compare_against_pinning_test`）；2026-09-28 现跑它按设计红在 `.claude/kb/layout/01-first-txn.md` mkfs 那一行（kb 写 21 次操作、用例钉 23 次），那一处归写回布局表 | 2026-09-28 |
+| C490 | extent 叶 key 的 offset 段没定单位 | offset 段是文件字节偏移（`.claude/kb/decisions/08-核心索引结构.md` 第 58 行）；用例 `the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit`（`crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs`），`crates/mutations.tsv` 第 404 行 | 2026-09-28 |
+| C491 | 多条记录时共享内生块在哪条点名没定 | 一次发布共享的提交内生块只在最后一条记录里点名（`.claude/kb/decisions/23-journal的角色与格式.md` 第 471 行）；用例 `publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record`（`crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs`），`crates/mutations.tsv` 第 405 行；层 0 多记录流（`.claude/gate.d/stage-inputs.tsv` 的 `crash-case:layer0-multi-record-publish-stream`）提交时跑 | 2026-09-28 |
+| C494 | 新池新建文件 txg 常量的射程没有条款 | `NEW_POOL_FILE_CREATION_TXG` 只管 mkfs 那条流（`.claude/kb/decisions/22-单元原子性怎么合成.md` 第 336 行）；用例 `a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold`（`crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs`），`crates/mutations.tsv` 第 63 行 | 2026-09-28 |
+| C495 | 第一个文件版本核上一版记录没有条款 | 第一个文件版本先核上一条记录（`.claude/kb/decisions/23-journal的角色与格式.md` 第 372 行）；用例 `c495_first_file_version_whose_previous_record_is_unreadable_on_both_copies_is_refused_before_any_write` 与 `c495_first_file_version_whose_previous_record_belongs_to_another_version_is_refused_before_any_write`（`crates/singlefs-harness/tests/first_file_version_checks_the_previous_record.rs`），`crates/mutations.tsv` 第 359–361 行 | 2026-09-28 |
+| C497 | 实例表在 bump 次序里排第几没有条款 | 重写实例表的发布里实例表单元最先 bump（`.claude/kb/decisions/03-空间分配.md` 第 200 行）；用例 `c497_every_publish_that_rewrites_the_instance_table_bumps_it_before_every_other_commit_generated_block`（`crates/singlefs-harness/tests/presumed_clause_checks.rs`），`crates/mutations.tsv` 第 356、587 行 | 2026-09-28 |
+| C498 | 后续挂载与崩了再挂的暖机次数没有条款 | 后续挂载与崩了再挂的暖机次数现算（`.claude/kb/decisions/16-发布语义.md` 第 196 行）；用例 `c498_warm_up_publishes_after_remounts_rollback_and_a_crash_in_the_middle_of_a_mount_are_counted_by_the_clause`（`crates/singlefs-harness/tests/presumed_clause_checks.rs`），`crates/mutations.tsv` 第 357 行 | 2026-09-28 |
+| C499 | 干净关闭标记有没有没有条款 | 第一版没有干净关闭标记，每次挂载一律走恢复（`.claude/kb/decisions/23-journal的角色与格式.md` 第 370 行）；用例 `c499_remount_after_a_clean_close_and_after_a_crash_both_scan_the_whole_ring_and_recover_by_the_same_rules`（`crates/singlefs-harness/tests/presumed_clause_checks.rs`），`crates/mutations.tsv` 第 358 行 | 2026-09-28 |
+| C500 | 所选根那条记录读不出时链首接法没有条款 | 所选根那条记录读不出时的链首接法（`.claude/kb/decisions/23-journal的角色与格式.md` 第 365 行注 1）；用例 `without_an_anchor_the_chain_head_must_be_the_first_record_of_the_next_publish`（`crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs`）与 `when_the_last_record_of_the_chosen_roots_publish_is_unreadable_its_readable_earlier_record_is_no_anchor_and_the_next_publish_starts_the_chain`（`crates/singlefs-harness/tests/journal_last_record_flag_of_a_multi_record_publish.rs`），`crates/mutations.tsv` 第 36、448、512 行 | 2026-09-28 |
+| C502 | 抬 F 时现行版本里没有实例表单元 | 那个错误成员已删（全仓 `.rs` 零处），抬 F 从现行根的指针读实例表；用例 `raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root`（`crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs`），`crates/mutations.tsv` 第 433、434 行 | 2026-09-28 |
+| C503 | 隔离位清零的时机条文与实现说反话 | 隔离位在被抛弃的根被轮转覆写时清零（`.claude/kb/decisions/28-挂载期承诺量.md` 第 27 行）；用例 `the_isolation_bits_only_the_abandoned_root_holds_are_cleared_by_the_publish_that_overwrites_its_root_slot`（`crates/singlefs-harness/tests/unreadable_abandoned_root_slot.rs`），`crates/mutations.tsv` 第 429–431、435 行 | 2026-09-28 |
+| C513 | 复用豁免不判那次复用合不合法 | 记录核对器的复用豁免加上回收谓词那一判（`crates/singlefs-checker-tier/src/crash.rs` 的 `reuse_is_not_proven_illegal_by_the_reclaim_predicate`）；用例 `an_illegal_reuse_whose_later_write_landed_no_longer_excuses_the_missing_unit_in_the_record_checker`（`crates/singlefs-checker-tier/tests/record_checker_reuse_exemption_legality.rs`，checker 档，提交时跑），`crates/mutations.tsv` 第 402、403 行 | 2026-09-28 |
+| C517 | 固定点分配被拒之后同一进程里写不出去 | 挂载内按根环表回收；用例 `an_overwrite_that_goes_out_after_a_remount_goes_out_in_the_same_mount_as_well`（`crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs`），`crates/mutations.tsv` 第 425 行 | 2026-09-28 |
+| C518 | 一次挂载之内环转过一圈之后不回收 | 挂载内按根环表回收（`crates/singlefs-core/src/allocator.rs` 的 `RootRingOccupancy`）；用例 `turning_the_root_ring_in_one_writable_mount_reclaims_what_the_predicate_releases_and_the_next_publish_takes_it`（`crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs`），`crates/mutations.tsv` 第 424、426–428、432 行 | 2026-09-28 |
+| C579 | 判据在单故障合法状态上也拒可写 | 用户 2026-09-27 弹窗定维持 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙的字面：判不出按真、拒可写，只读挂载照常（原话「维持乙字面：拒可写」，`records/2026-09-24-里程碑二收尾调度.md` 第 299 行；调查员报告 `research/prompts/m2-investigate-three-reds-report.md` 第七节）；这一处置写在 D23（journal 的角色与格式） 已定项 14 射程。会红的检查：`crates/singlefs-harness/tests/warm_up_journal_counter.rs` 的 `c366_when_the_chosen_root_own_record_is_unreadable_the_writable_mount_is_refused_by_the_undecidable_witness_and_the_read_only_mount_opens_the_chosen_root` 造所选根 (1, 4) 即最新根、它那次发布的末条记录 jsn 4 两份都读不出的盘面，钉可写挂载拒成 `NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion)`（见证 4、判不出）、拒在取号之前与任何写之前（录制流一步没多、两块盘逐字节不变），只读挂载照常择 (1, 4)；判别力自证是 `crates/mutations.tsv` 里点名这条用例的那一行（乙把「判不出」按假处置，所选根自己那条记录读不出时可写挂载照做；改法 B 报告 `research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节 5c 与第七节加的，合入后验证二的证红表里抓到）。连带：C366（暖机路径把 txg 写进计数器与 tail） 挂载层三处 jsn 的取法（写行、暖机、轮换的 tail）改由同一文件的 `a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg` 钉（一次发布写两条记录，jsn 比 txg 多走一步） | 2026-09-28 |
+| C580 | 两处读不出无声放过没动 | 合入后验证一实现（`research/prompts/m2-impl-merge-verify-1-implementer-report.md` 第三节第 1、2 小节）：管理员回退 `crates/singlefs-core/src/mount.rs` 的 `rollback_candidate` 收这个进程的根环表（`ring_slots_known_to_hold_a_root_by`），「根环里有它」与 F_生效 两遍都对知道住着根的槽重读一次，F_生效 另把最新根的实例表读不出重读一次（`recovery::effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`），仍坏在任何写之前拒成 `RollbackError::CandidateJudgementStillUnreadableAfterOneReread`；挂着时抬 F 重算影子账改走 `recovery::readable_roots_rereading_ring_slots_known_to_hold_a_root_once`，知道住着根的槽读不出重读一次、仍坏报错；改法 B 第 3 件把「自证不过」也接进这两处（`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节第 3 行）。用例：`crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 的 `rolling_back_while_the_targets_root_ring_slot_stays_unreadable_is_refused_before_any_write`、`a_system_configuration_write_rereads_an_unreadable_root_ring_slot_once_before_taking_the_effective_floor`，`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的 `rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write`；变异三行（`crates/mutations.tsv` 里名字以「合入后验证一 Q7」开头的那三行）合入后验证二的证红表里都抓到。余下两处（写系统配置之前那一处重读一次之后仍走原来的退路、回退算水位那一遍）另立 C584（写系统配置前与回退水位读不出仍当没有根） | 2026-09-28 |
+| C577 | 系统配置没见证到的最新根，乙罩不到 | 两步：乙-配置续（取号那一写把见证值写进系统配置 tail，`research/prompts/m2-impl-c554-yi-carry-implementer-report.md`）与发布返回前加屏障（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`：根槽 FUA → 系统配置轮换 → 池屏障，屏障做完才返回，`research/prompts/m2-impl-c577-barrier-implementer-report.md`；新测试 `crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs` 钉「发布返回后每个崩溃点见证值 ≥ 末条记录计数器」，去掉屏障 `prove-red.sh` 3/3 红）。原点名的 `…known_red_form_of_closeout_row_43` 那两条用例造的是双故障形，账另立 C583（双故障形：每盘一槽系统配置坏加最新根一时读不出）。第三轮结清加屏障（用户 2026-09-27 定，`records/2026-09-24-里程碑二收尾调度.md` 第 292 行）落地的几样：② litmus「轮换之后屏障」两份，`litmus/publish-returns-after-the-rotation-barrier.litmus`（Never）与 `litmus/publish-returns-after-the-rotation-barrier-nofence.litmus`（Sometimes，去掉轮换之后那道 `smp_wmb()`），写者锚到 `transaction.rs::persist_the_root_then_rotate_the_system_configuration`、读者锚到 `recovery.rs::verified_system_configuration_slots`，绑定测试 `the_rotation_barrier_litmus_writer_follows_the_last_three_steps_of_every_recorded_publish` 比正例写者那一线与录制流里每次发布的最后三步逐项相同；herd7 判 Never / Sometimes 分不分得开没跑过，归提交时门禁 checker-tier-lkmm；③ 零单元发布轮换之后那道屏障报错：`crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs` 的 `a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error` 钉挂载返回 `MountError::Publish`（原因 `PublishError::BlockDevice`）、已落盘的发布 0 份、失败的 1 份、盘上落到盘 0 那道屏障为止，换回好设备之后再可写挂载取号 2、择到 (1, 1)；它钉的是文件镜像上的结局，「屏障报错时轮换其实没持久」那一种崩溃状态不罩（改法 A 报告 `research/prompts/m2-impl-r2-fixes-a-implementer-report.md` 第 11–12 行、第 200 行）；④ 屏障代价（每次发布多一次 FLUSH）第五步门禁 checker-tier-qemu-device-streams 六档重录时报数，数出来再由用户定要不要立实验（`research/prompts/_m2-closeout-code-r3-body.md` 第 53 行）；⑤ 双故障形两条改钉抬 F 之前恰好只红 I-7.4（近 K 代块未被复用），见 C583（双故障形：每盘一槽系统配置坏加最新根一时读不出） 那一行。第三轮攻方报告 `research/prompts/m2-closeout-code-r3-opus-output.md` 第 294 行起那一节攻这几样，没打中，只查出新 litmus 注释里一处用例路径过期（记在 C586（回退取树 ID 水位的那一半没有用例）） | 2026-09-27 |
+| C561 | 记录核对器的复用豁免在复用只落一半时假红 | 实六实现：`crates/singlefs-checker-tier/src/crash.rs` 的记录核对器拿持久集合当第四样入参（D13（验证路线） 已定项 7），一份副本缺席按扇区判；用例在 `crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs`（四格与 C513（复用豁免不判那次复用合不合法） 三个状态各一条，`UOOUOMSU` 第 79 段 262144 个状态的全量标 ignore：release 下新判法 0 个红、换回旧判法 32768 个红）；`crates/mutations.tsv` 末尾以「实六 」开头的几行证过红 | 2026-09-26 |
+| C451 | 开新测试周期时旧镜像没人删 | 题面消失：种子基永久固定、不再有新的测试周期（用户 2026-09-27 定，`crates/singlefs-checker-tier/src/crash_injection.rs` 的 `SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE` 文档注释），开新周期删旧镜像这件事不再发生 | 2026-09-27 |
+| C283 | 准入失败时不先推发布就报 ENOSPC | 实五实现：挂着的会话层准入拒或落点被拒都推抬 F 再重发，一次准入至多 8 次发布；可写挂载写行之后也推（D16（发布语义） 已定项 1「准入」那一行）。用例 `an_overwrite_whose_data_unit_has_no_slot_pair_outside_the_cluster_segments_is_refused_by_the_admission_and_published_after_raising_the_floor_in_the_session`、`after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes`、`crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck`（都在 `crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs`），`crates/mutations.tsv` 第 760–777 行里点名它们的那几条证过红 | 2026-09-26 |
+| C562 | 抬 F 算上限时根槽读坏当没有根 | 实五实现 D16（发布语义） 已定项 1「根槽这一次读坏」那一行：`crates/singlefs-core/src/mount.rs` 算上限时按这个进程的根环表分两类、知道住着根的重读一次、仍坏报 `MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`。用例 `known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged`、`known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write`、`root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise`、`the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling` | 2026-09-26 |
+| C565 | 挂载处推满仍不够怎么收尾没定 | 用户 2026-09-26 定挂载照样做成（D2（RAID 条带策略） 已定项 13 那一格的例外）；实五实现，用例 `mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount`（`crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:219`），`crates/mutations.tsv` 第 766 行（换成报拒绝）证过红 | 2026-09-26 |
+| C519 | 丢一整块盘时恢复丢掉刚确认的那一版 | 用户 2026-09-25 定「两份都验过才施加」：维持今天的实现，坏一块盘时退到更早那一版、已确认的最后一版丢掉，认下这个代价，写进 D23（journal 的角色与格式） 已定项 14 前缀第四条与「记录在」那一句；用例 `c519_known_loss_after_the_warm_up_covers_both_devices_losing_the_acknowledged_version_root_device_falls_back_to_the_row_publish_version`（`crates/singlefs-harness/tests/whole_device_loss_after_warm_up.rs`）钉住今天的结局，`crates/mutations.tsv` 第 361 行把 `replay_journal` 里位置条目的 `all` 改成 `any`，它就红 | 2026-09-26 |
+| C124 | 回退行与重放下界没有会红的检查 | 2026-09-26 随管理员回退改成挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14），实例表回退行与前缀里「所选根的实例有回退行时只施加到 W」那一条一起删掉而无对象，作废；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C281 | 回退后第一次发布会复用被抛弃时间线还引用的块 | 2026-09-26 并入 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）：管理员回退改成挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14），回退那次发布不从 R_old 那棵账重新载入、不抛弃任何根，这一笔的机理句（回退那次发布按 R_old 的账分配被抛弃时间线还引用的落点）无对象；被抛弃时间线今天只由崩溃恢复造出，复用它引用的块那一形归 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）；编号不回收，并入前的原文在 git 历史 | 2026-09-26 |
+| C332 | 回退实例两个根都读不出时回退被撤销 | 2026-09-26 随管理员回退改成挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14）作废：向前回退之后回退那条根坏了落回回退之前那一版，是一次已确认的发布丢了的通用形态，归 D16（发布语义） 已定项 7、8 的射程；旧镜像上带回退见证那一格由换 incompat 布局身份位挡在挂载之外（D15（格式冻结政策） 已定项 4）；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C340 | 回退之后记录链从哪条之后接没有定义 | 2026-09-26 随管理员回退改成挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14）而无对象，作废：回退不开新实例，那次发布的记录照普通发布接在前一条之后；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C501 | 回退行的 W 取什么没有条款 | 2026-09-26 随实例表回退行删掉（D18（块里携带什么信息） 已定项 11、D23（journal 的角色与格式） 已定项 14）而无对象，作废；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C514 | 回退行的 W 等整段重议 | 与 C501（回退行的 W 取什么没有条款） 同一次作废：2026-09-26 实例表回退行删掉之后无对象；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C547 | 回退见证表的删除规则与写满没有条款 | 2026-09-26 随回退见证表删掉（D23（journal 的角色与格式） 已定项 14、D22（单元原子性怎么合成） 已定项 9）而无对象，作废；编号不回收，作废前的原文在 git 历史 | 2026-09-26 |
+| C533 | 记录新根段缺实例表与分配记录树两个根指针 | 前提不成立——写行那条记录因实例边界不施加，「整次不施加」就是今天的行为；实一的复现用例 `crates/singlefs-harness/tests/row_publish_record_without_its_root.rs` 钉着；用户 2026-09-24 定销账。 | 2026-09-24 |
+| C94 | 登记的格式常量与后来的定案对不上 | 剩下那一半接进门禁 doc-registries 的 field-table-sums 格，布局表 14 处登记标记已加，doc-registries 的 field-table-sums 格、code-source-discipline 的 format-constants 格绿（2026-09-24）。 | 2026-09-24 |
+| C358 | 总审核第五节的文档级矛盾没有回扫闸 | 接进门禁 doc-registries 的 audit-contradictions 格，判别力 17 条变异全抓（2026-09-24）。 | 2026-09-24 |
+| C516 | 抬 F 那一串发布被拒时前面几次已落盘 | 用户 2026-09-25 推翻 2026-09-24 的「维持逐次发布」：抬 F 那一串动盘前整串预演，取不到落点就一次都不发（D16（发布语义） 已定项 1「抬 F 那一串」那一行，实二六）；落盘途中写错照旧交回已落盘几次（实三加的 `MountError::RaiseFloorSequencePublishFailed { publishes_persisted, cause }`）。 | 2026-09-24 |
+| C114 | declared-counts 格只扫索引页 | 门禁 doc-registries 的 declared-counts 格撤掉这一项，判据并进门禁 doc-experiments 的 decision-links 格第 ⑤ 条后一半：实验这次改成已跑时，决策正文引了它的每条决策都要在这次改动里点到它或回看过，扫的是 `decisions/*.md` 正文，认粗体、反引号、空格、半角括号的写法（`.claude/gate.d/doc-experiments.sh` 的 decision-links 格文件头，判别力样本在 `.claude/gate.d/fixtures/doc-experiments.sh/`）；「已跑的实验有没有对应的决策」归第 ⑨ 条。还窄的两处另记 C520（decision-links 格只认状态段恰好是已跑）与 C521（已跑实验重跑翻结论不触发回看） | 2026-09-24 |
+| C512 | 树表 0 条的一版上被换下的实例表记在哪没有条款 | 条款：树表 0 条的一版上写行那次发布写实例表与一片分配记录节点两个单元，分配记录树根指针住根记录（D16（发布语义） 已定项 9；D22（单元原子性怎么合成） 已定项 7，根记录 371 → 457 字节），重开时从那片节点重建这一版的账，用户 2026-09-23 定案。实现：`crates/singlefs-core/src/root_record.rs` 的 `allocation_record_tree_root`（[342, 428)）；`crates/singlefs-core/src/transaction.rs` 写行那次发布建这片节点、换下上一版实例表与上一片节点；`crates/singlefs-core/src/mount.rs` 的 `allocator_of_version_without_file` 从这片节点重建账；`crates/singlefs-checker/src/walk.rs` 的 `walk_root` 走读它。用例 `the_third_writable_mount_keeps_the_instance_table_that_the_row_publish_swapped_out_out_of_the_free_pool`（建池 → 挂载 → 退出 → 挂载写行 → 退出 → 第三次挂载，断言被换下的那片实例表没被当空闲槽发出去）；`crates/mutations.tsv` 里这一笔的两条变异（不把根写进根记录、重建时丢掉带已释放标志的记录）都红在它上面。R8 那道拒绝（`MountError::VersionWithoutFileNotWrittenByMakeFilesystem`）留着，依据换成「根记录那一项全零而实例表或树表不是 mkfs 那一版」，只对坏镜像与外来镜像说话，`a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator` 钉住 | 2026-09-23 |
+| C45 | 四层图里每个结构的态别没有登记 | 登记表 `.claude/kb/freeze-layer-membership.md`（一行一个结构：落 D15（格式冻结政策） 已定项 7 的哪一层或哪个独立冻结组件、态别、退不退出冻结、依据哪条分项）加门禁 doc-decisions 的 freeze-layer-membership 格（`.claude/gate.d/doc-decisions.sh` 的 freeze-layer-membership 格）判三条：① 四层与三个独立冻结组件、`crates/singlefs-format/src/lib.rs` 的每棵树、D18（块里携带什么信息） 已定项 11 的每个单元类都有行，漏一个判红；② 写「退出」的行态别必须是派生态；③ 依据点名的分项存在且已定。判别力自证在 `.claude/gate.d/fixtures/doc-decisions.sh/`，另在真表上证过两次：删掉 extent 树 key 编码那一行 ⇒ ① 红；记账树码 2 节点那行改成「权威态 + 退出」⇒ ② 红；还原后逐字节相同。⚠️ **态别判得对不对它管不了**：同一行改成「派生态 + 退出」三条都不红——两格自洽，错在态别本身，归人看。今天 7 行退出列写「判不动」（livelist 共享树、稀疏旁表树、deadlist 树三棵树的 key 编码与节点布局，以及容器索引），门禁每次逐个列出；树表单元那一行落哪一层写「没有条款」，那一格仍是 C246（树表单元没有冻结层归属） | 2026-09-23 |
+| C507 | 记录核对器的复用豁免比登记的候选宽，把真洞变哑 | 收严落在 `crates/singlefs-checker-tier/src/crash.rs` 的 `unit_copy_is_missing_under_the_persisted_set`（逐扇区看：更晚那次同盘、罩住这一扇区的写自己也要在枚举器给的持久集合里，才算把这一扇区让了出去，判定在 `explained_by_a_persisted_legal_later_write`）。**两半都量了**：① 误报那一半——陈旧 tail 那条流上收严之后仍是 0（8 个状态全绿）；② 真洞那一半——新用例 `a_unit_whose_only_later_write_to_the_same_slot_never_landed_is_reported_missing_by_the_record_checker`，收严版报 1、落地版报 0。三条变异在 `crates/mutations.tsv` 第 306–308 行，各自红在点名的测试上（把持久判定去掉 / 判反 / 索引取错）。⚠️ 那条用例**不是**照攻方腿那份盘面逐字复刻，而是重搭的同形状状态（持久集合切在那次复用发布的第一条单元写之前）——若把那次发布的根槽也留成持久，它自己的单元也全缺席，落地版同样报 1，两版就分不开了。 | 2026-09-23 |
+| C472 | 暂存区里多出来的触发文件没人拦 | 新立门禁 doc-process-records 的 batch-scope 格（这一批要碰的触发文件有没有登记进范围）：开工先把打算碰的触发文件逐个写进 `.claude/batch-scope`（一行一条、`#` 后面写为什么这一批非碰它不可，理由不许省），门禁 doc-process-records 的 batch-scope 格核六条——触发文件都在登记里（少一个就红，出路两条：从暂存区撤出去并记进欠账往后延，或者补一行并认下那一轮阶段同步）、登记的路径都是这一批的触发文件（上一批留下的登记会让下一批白放行）、每行都写了理由、路径从仓库根起、清单读得到且非空、门禁 doc-process-records 的 knowledge-sync 格还在读同一份清单。**它的基准是 HEAD 不是 `GATE_BASE`**：这一道问「这一次提交要带哪些」，取 `GATE_BASE` 会把上一个提交的触发文件也算进来、每次提交之后必然误红（与 C450（归档删掉的 sync 记录还在役） 躲开的是同一格）。触发文件的清单同日从 门禁 doc-process-records 的 knowledge-sync 格的内嵌 python 挪进 `.claude/gate.d/knowledge-sync-triggers.tsv`，两道门禁读同一份，门禁 doc-process-records 的 batch-scope 格第六条就是钉这件事。判别力自证：红样本五种坏法同时判红（没登记的触发文件、登记了却没碰的路径、没写理由的登记行、不是从仓库根起的路径、一份不再读那份清单的 门禁 doc-process-records 的 knowledge-sync 格）；green 三个触发文件分三种形态（工作区改、暂存新增、未跟踪）都登记了，判绿并报对数 | 2026-09-22 |
+| C468 | 判错的原始证据不落盘 | 门禁 doc-process-records 的 knowledge-sync 格（阶段同步记录）加判据 ⑤：这一次提交要带上的每份同步记录（还没进 HEAD 的那几份）要有「## 原始证据」小节，小节里恰好一张表，表头逐字 `材料 / 路径 / 行数`，至少一行；逐行核材料格非空、路径是仓库根起且在仓里现存、行数与那份文件的 `wc -l` 逐字相等。⑤ 的基准是 HEAD 而不是 `GATE_BASE`（①–④ 用后者）：拿 `GATE_BASE` 判会连上一个提交里已经写好的记录一起判，而那份是冻结证据、改不得，它的材料也归档了——理由写在脚本里 `uncommitted_records` 那一段。判别力自证：红样本五种坏法（整节缺掉、表头写错、表一行都没有、点名的候选表不在仓里、行数与 `wc -l` 对不上）各一份记录，逐个判红；green 两份记录各带一张对得上的表（含一个反引号包着的路径、一份不以换行结尾的材料）判绿并报对数 | 2026-09-22 |
+| C454 | --staged 跑绿不让基准前移，而且不说 | 上游 `scripts/gate.sh` 的 `--staged` 那一支，跑绿之后多打两行：这一轮没有给 `gate-ok` 前移（窗口是人为收窄的）、下一轮的 diff 基准仍从哪一个提交起算（从没写过就说「从未写过，退回默认算法」）、要前移就在工作区干净时不带 `--staged` 再跑一次。判红时不打，免得跟红的诊断抢注意力。三语仓（zh / en / ja）同一处都填了。判别力自证三种情形：`gate-ok` 从未写过时说「从未写过」、存在时报出它指向哪、退出码非 0 时一个字不打。⚠️ **这条简称从 2026-09-22 起只对上游 `scripts/gate.sh` 自己、以及它前移的 `refs/singlefs/gate-ok` 成立**：本仓的外壳 `research/scripts/gate-staged.sh` 调它之后另外前移 `refs/sop/staged-green`（整轮全绿时），所以「`--staged` 跑绿不前移任何东西」这句单独摘出来读已经不对 | 2026-09-21 |
+| C448 | 门禁自己留下的镜像让干净检查必红 | 门禁 harness-test-environment 的 machine-clean 格往上找祖先里那个 `gate.sh` 进程、读它的启动时刻当分界（门禁没有导出开跑时刻的环境变量，而这一阶段排在最后，用「本阶段开跑时刻」当分界方向正好反了），`research/scripts/test-environment-check.py` 加 `--produced-after`：晚于分界才出现的临时条目单列成「这一次跑自己产生的」、逐条列名、不判红；早于分界的照旧判红（那才是「上一轮没清干净」）。单跑这一阶段时祖先里没有 `gate.sh`，算不出分界就不分界、照旧全判。判别力自证三样：造一早一晚两个残留，不给分界 2 项全红、给分界只红早的那 1 项；在一个假 `gate.sh` 底下跑，它启动之后才造的那项归新档而先前的 5 项照旧红；脚本自带的 113 条断言全过 | 2026-09-21 |
+| C14 | 格式变了 checker 没跟 | 2026-09-21 门禁 checker-independence-and-sync 的 layout-checker-sync 格：`.claude/gate.d/layouts.tsv` 一套布局一行，登记布局名、incompat 位号、格式定义路径、checker 判定路径；四条判据——每行四列齐全、每条路径存在、位号与布局名逐字对得上 D15（格式冻结政策） 已定项 4 那张登记表（位号的唯一登记位在那里，清单只引用）、这次改动让某套布局的格式常量集合发生增删改而它的 checker 判定路径一个都没被碰即判红。出路二是把常量名登记进 `.claude/gate.d/layouts-checker-lag.tsv`（三列：常量名、一条开着的欠账编号、为什么今天不判），编号不在欠账表里也判红。⚠️ **变更探测器不是 D15（格式冻结政策） 已定项 3 定的那个 `spec_hash`**：那一个恒对 `format-spec/<组件>.toml` 求，而那份 toml 一个都还不存在（C119（冻结组件没有 spec 文件））；在它出现之前这一道拿「常量名 → 值的集合」当探测源（`.rs` 抽 `pub const`、`.md` 抽 `format-const` 标记，键是（路径, 常量名）而不是光常量名——按名字合并时 kb 字段表那一份会盖掉常量模块那一份，那一侧的改值就此看不见），spec toml 到位后换源、四条判据不变。判别力：red / green 样本双向证过（改了常量没碰 checker ⇒ 红；同一处改动 checker 跟着改 ⇒ 绿），另在副本上逐格证过三列、路径不存在、位号没登记、布局名与登记表不一致、滞后登记指向不存在的欠账、清单只有注释六种都判红，以及滞后登记只放行登记了的那一个常量。判不了的：checker 跟得对不对，那要人看 | 2026-09-21 |
+| C11 | feature bit 跳号 | 2026-09-21 两样一起：立 `.claude/kb/feature-bits.md`（七列照 D15（格式冻结政策） 已定项 10 定下的列序，D15（格式冻结政策） 已定项 10 逐字写着记账落在这个文件名上而它一直不存在，C11（feature bit 跳号） 因此一直挂不起来），加门禁 code-source-discipline 的 feature-bits 格。四条判据：① 记账表与 D15（格式冻结政策） 已定项 4 登记表逐位对得上，且记账表的「语义一句话」要逐字包含登记表同一位的「含义」；② 每张位图内位号严格递增、已分配的位是 `0..n-1` 不许跳号；③ `crates/*/src/**/*.rs` 里认出的 feature bit 常量（按 `_` 切段认 `INCOMPAT` / `COMPAT_RO` / `COMPAT`），值解得出位号的必须在记账表里；④ 同一个（类别, 位号）出现两行判红，两行语义不同时明说退役位被赋予新语义就是这个形状。另有两条防「扫到 0 项也报绿」：D15（格式冻结政策） 那张表读不出行、或每张位图的已分配位加未分配区间没有正好覆盖 `0..255` 一次，都判红。判别力：red 样本一次打出四条、7 条 `want=` 各钉一条判据的原话，green 钉住成功句里现算的跳过名单；另在样本外证过语义比对支与「没罩满 0..255」支都是活的。⚠️ 罩不到的：值不是位掩码字面量的常量（今天一处：`SUPPORTED_INCOMPAT_BITS`，成功句里点名）、以及不带常量名的裸字面量（`crates/singlefs-checker/src/lib.rs` 判 incompat 时写 `0x01`），这两格靠 review | 2026-09-21 |
+| C12 | 增量语义共用 | 2026-09-21 门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格，形态是 crate 粒度而不是符号级：① 按本仓 `crates/*/Cargo.toml` 建内部依赖图，`singlefs-checker` 与 `singlefs-core` 各取传递闭包求交集，减去 `singlefs-format` 后必须为空（取闭包不是只看直接依赖——绕一个中间 crate 时直接依赖表上一处都看不出来，副本上证过会红）；② checker 的源码零处引 `singlefs_core`；③ 共享的 `singlefs-format` 正文（`#[cfg(test)]` 之前）不许有分支或循环，D13（验证路线） 已定项 5 逐字「生成器只发射标量值」——少了这一条，把记账语义搬进共享模块就能绕开 ①②，而那是两侧同源最隐蔽的一条路。三条都判完才退出，red 样本一次打中三条、green 双向证过。另一半「把运行时某条记账分支的符号取反，I-3.1（已分配统计对得上） 必须变红」由 `crates/mutations.tsv` 第 23 行承担（条目名写的是「已分配行不随分配更新」、要红的是 I-3.1（已分配统计对得上），改法是把 `device_map.allocated_slots() * SLOT_BYTES` 换成 `0`，点名的 `cold_start_reads_the_second_content_and_the_pool_checker_stays_green` 第 353 行那个 `must_hold` 列表的第一项就是 I-3.1（已分配统计对得上）），由门禁 checker-tier-crates-mutation-replay 复跑——**立这一条的那一轮没跑 门禁 checker-tier-crates-mutation-replay**（逐条重编译量级是小时，C40（变异表没存） 那一半仍欠）。⚠️ 罩不到的：两边各自手写的那份语义对不对（归模型对拍与变异表）、外部 crate 之间的传递依赖（本仓没有它们的 `Cargo.toml`，要真跑 `cargo tree`）、以及把 checker 与实现放进同一个 crate 之后这套 crate 粒度判据要重写 | 2026-09-21 |
+| C25 | 三个 oracle 零代码 | 2026-09-21 三条账各自落表，判据（「不是实现了没，是它欠的账在不在册」）满足：C445（模型对拍的取样点不随写路径增长） 是 O1（内存模型对拍（HashMap 理想文件系统）） 的、C446（未实现的不变量没有前置登记，也没有到期） 是 O2（独立解析器 + checker） 的、C447（规约执行器没接进崩溃点重放与 RefFS 比对） 是 O3（独立规约执行器） 的。立账前先现查过「在不在册」：欠账表两张表里那三条路线编号的全部命中（C191（同源性计数器只盖了一对）、C229（引文对而编号错，摘句判据拦不住）、C397（反向判据的 N 没声明，事件数没人计）、C407（三 oracle 合谋测试没有代码） 与历史节）逐行核过都是顺带提到名字，一条以某条路线为主语的账都没有。⚠️ C25（三个 oracle 零代码） 要的三样里，「判什么」与「前置是什么」三条账各有一列写着；「什么时候该有」只有 C447（规约执行器没接进崩溃点重放与 RefFS 比对） 写得出确切位置（[verification-build.md](verification-build.md) 落地顺序步骤 6），C445（模型对拍的取样点不随写路径增长） 与 C446（未实现的不变量没有前置登记，也没有到期） 的「什么时候」就是各自前置满足那一刻，没有别的日程 | 2026-09-21 |
+| C44 | 引用核到的不是固定点树 | 2026-09-21 `research/scripts/verify-citations.sh` 改成按树分组：脚本里立一张树登记表（树名、根路径、是不是固定点），89 条断言每条各带一格树名，路径相对那棵树的根写、绝对路径由树根拼出来——**标错树就是读错文件、当场判红**，不存在标 A 读 B 还全绿。末尾按树分组报数、每棵树带根路径原样，一条断言都没有的树也列出来；两道闸：分组合计加没标树来源对不上断言总数判红、没标树来源大于 0 判红（C44（引用核到的不是固定点树） 逐字那一条）。自证 11 格（分组报数三格、缺树来源标注三格、分组报数算错、源码不在、模式没命中、命令跨树、命令没读标着的树），跑在两棵合成假树上、不碰本机真树，已登记进门禁 code-tooling 的 research-script-selftests 格复跑。⚠️ **它暴露出来的那个数**：89 条里 **38 条（43%）核的是本机内核树 `~/kbuild/linux-om`（现查 7.2.0），不在 `fetch-refs.sh` 的固定点里**，随时会被升级、改动或删掉——那一批的「已核实」只在这台机器的今天成立，脚本每轮把这一段⚠️ 打出来。立这一条时这个比例一个字都看不出来。顺带修了两处被它照出来的腐化：`test-environment-check.py` 引的行号（134 已经漂到 150，改成引那个变量名、不引行号）、`prior-art.md` 的「72 条承重引用」（实际 89 条，改完写明这个数该由脚本末行报出来、别手数） | 2026-09-21 |
+| C384 | 研究脚本与 hook 不在 shell-lint 的射程里 | 上游 SOP 0.0.52 的 `scripts/shell-lint.sh` 修了两处假红（定义与收尾写在同一行的函数按那一行判；行首缩进的直接调用也算命令位置），样本 onelinefunc、onelinebody、indentcall；本仓 `.claude/gate.d/code-tooling.sh` 的 research-gate-lint 格对 `research/scripts/` 与 `.claude/hooks/` 在 gate-lint 之外也跑 shell-lint，红样本加了一个子 shell 赋值的脚本、两样都要报出来；`research/scripts/{e129-thin-neighbour,e129-thin-rmw,e72-devtable-probe,stripe-map-probe}.sh` 里被误判的一行函数展开成多行（函数体不变）；现跑 门禁 code-tooling 的 research-gate-lint 格绿（25 个研究脚本、5 个 hook）。依据文件：阶段同步候选判定 `m2-closeout-tooling-sync-judge.md` F3 那一行。 | 2026-09-19 |
+| C396 | 环境检查脚本没接进里程碑出口与收尾 | 门禁 harness-test-environment 的 machine-clean 格（跑完测试之后机器还干不干净）接上 `research/scripts/test-environment-check.py check`：读它汇总行里的「判红 N 类」，N 不是 0 就红、汇总行读不到也红，出路是它自己打印的 `clean` 计划；红绿样本在 `.claude/gate.d/fixtures/harness-test-environment.sh/`（红样本只差「临时目录残留」那一类），由 门禁 doc-registries 的 closeout-row27-preconditions 格判；归属表登记给崩溃验证员与门禁分诊，跑完重阶段与提交前各跑一次。接上当天现查：`/tmp` 里 34 个当天跑测试留下的镜像被它判红、`clean --yes` 清掉之后 9 类全绿 | 2026-09-20 |
+| C382 | 研究脚本与 hook 的拒绝不在门禁自检的射程里 | 2026-09-18 新立门禁 code-tooling 的 research-gate-lint 格：把 `research/scripts/` 与 `.claude/hooks/` 交给共享的 gate-lint，red / green 两个样本（只带一句话的 die / 带上第二个参数）由 门禁 doc-registries 的 closeout-row27-preconditions 格判；同日给这两个目录里 84 处拒绝补上出路（`c382-gate-lint-fix-report.md`），各脚本的自证与门禁 46 号（未在这轮改名范围内）、code-tooling 的 research-script-selftests 格、agent-write-scope 格照旧绿。`research/scripts/relay-timing-lint.py` 那一处是别的会话还没提交的文件，门禁 code-tooling 的 research-gate-lint 格在它补上出路之前判红 | 2026-09-18 |
+| C22 | 刚释放的块立即重分配 | 2026-09-19 核清：① 镜像侧 I-4.8（近 K 代根校验和自洽） 由池级 checker 判（`crates/singlefs-checker/src/walk.rs`）；② 故障注入：`crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs` 那条用例把复用窗口压成 0（`reclaim_released_up_to(…, ReclaimedReuse::Immediately)`）并断言 I-4.8（近 K 代根校验和自洽） 红，`crates/mutations.tsv` 第 110 行（I-4.8（近 K 代根校验和自洽） 判定恒真）在门禁 checker-tier-crates-mutation-replay 里红在它上面。依据：`m2-closeout-recheck-b.md` 第 22 行 | 2026-09-19 |
+| C369 | 提交内生块段耗尽时没有回落 | 2026-09-17 实现、2026-09-18 过代码三方第一轮（`research/prompts/m2-wave1-code-r1-main-verification.md`；回落那一格另起里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 59、60 行）：`DeviceFreeMap::lowest_commit_generated_fallback_slot`，用例 `commit_generated_units_fall_back_when_the_segment_runs_out.rs` 四条，`crates/mutations.tsv` 第 86–94 行在门禁 checker-tier-crates-mutation-replay 里全红。C146（无空段时的回落政策全仓无定义） 第 ② 条随之还清一半，第 ① ③ 条（整理）仍开着。依据：`m2-closeout-recheck-b.md` 第 20 行 | 2026-09-19 |
+| C327 | 变异表的锚点腐化没有会红的检查 | 2026-09-16 门禁 code-source-discipline 的 mutation-tables 格加子串计数（仍不跑变异）：每张表逐条核「原文」在同名源码里恰好命中一次，命中不是 1 次就判红并列出表名、条目名、表行号与命中数，red / green 两个样本双向证过会红。同日先把 4 条腐化的锚点修到命中 1 次——e143 两条随常量改名跟上、e79 一条随 `LOC_ENTRY` 跟上、e67 一条多带一行上下文变唯一——各跑一次 `mutate.sh` 证明仍被抓（e143 十条全抓、e79 六条全抓、e67 的 M2 被抓），全仓 142 张表 1396 条复查全部命中 1 次 | 2026-09-16 |
+| C321 | 码 2 头的条目宽是单值而映射树条目按类两宽 | 2026-09-14 用户定案把映射 key 回到定宽 27（码 2 / 码 3 的 25 字节末尾补零，D19（块指针的结构与宽度预算） 已定项 10）⇒ 中央映射条目一律 55，码 2 头的「条目宽」那个 u16 有唯一取值，D8（核心索引结构） 已定项 11 的「定宽条目连续排列」「声明长度 = 条目数 × 条目宽」两句原样成立、不用哨兵；会红的检查是 D8（核心索引结构） 已定项 11 那两句本身（声明长度 ≠ 条目数 × 条目宽 判损坏），E142（新池新建文件的干跑） 第七次跑按 55 写 | 2026-09-14 |
+| C324 | 码 3 打包容器要不要 32768 对齐没写 | 2026-09-14 用户定案写进 D3（空间分配） 已定项 10 ⑤：码 3 打包容器按「数据单元」那一档取落点（起点 32768 对齐、两槽都空）；同一句还把提交内生块的 bump 次序写死（按树 ID 升序、树内先叶后根、中央映射树倒数第二、树表单元最末）⇒ 新池新建文件 t2 50240、t3 50242–50243，落点不再是装置的发明 | 2026-09-14 |
+| C325 | 码 2 的 key 宽字段定位它要先知道 k | 2026-09-14 用户定案把 key 宽字段从 81 + 2k 挪到**固定偏移 51**（key 区间之前，D18（块里携带什么信息） 已定项 18 / D8（核心索引结构） 已定项 11）⇒ 扫描期按 `[0, 51)` 定长前缀读出 k、再按 86 + 2k 定出整个头，一次解出，不用对 k 穷举；头宽公式一个字节没变 | 2026-09-14 |
+| C220 | 等价类仍是 2 与降级为待证互相欠着 | 决策侧：D12（目标介质） 改「待重算量」、D13（验证路线） 降为待证（2026-09-13）；门禁侧：D17（实现分层与第三方管道） 已定项 2 把判据换成段序列、等价类数写成 1，E142（新池新建文件的干跑） 单测 `registered_segment_sequences_match_every_recorded_path` 钉住四条路径的段序列（改切法红），产物 `name=segments` 行由 `replay.sh` exact 钉住；「加一个成员由绿转红」那种形态作废 | 2026-09-13 |
+| C239 | 分配器提示这一格的基线臂没有条款也没有装置 | 第 ① 笔：D3（空间分配） 已定项 8（2026-09-13 用户定案）定基线臂；第 ② 笔：E151（用户数据落点的到达序与容器臂） 在 E93（老化下的放置与碎片度） 的老化模型上补到达序、容器、全空聚簇段数、提交内生块量，第四 / 五次跑再补两条按目录聚的臂；E122（按目录聚在一起买到什么） 三条臂对减数臂的映射写清（`grouped` = E151（用户数据落点的到达序与容器臂） 的初始布局、`arrival` = 它的均匀置换臂、`random` 无对应）；每条臂有钉绝对值的断言与变异；判别力自证那一半由它的 `directory_hint` 臂替了——它就是「与减数臂几乎逐字相同的落点政策」，收益塌到 97%–99% | 2026-09-13 |
+| C316 | 提交步骤的登记位有四处且互不相同 | 登记位收成一处：[layout/01-first-txn.md](layout/01-first-txn.md) 八「根槽写路径的段序列登记表」，每条路径一行写段序列与每段步骤种类多重集（照产物 `kinds=` 字段抄），D13（验证路线）「一」的枚举与 [01-first-txn.md](milestone/01-first-txn.md) 链过去；① 门禁 doc-registries 的 segment-registry 格（`research/scripts/check-segment-registry.py`）把表格三行与整条流提示逐字比对 E142（新池新建文件的干跑） 产物四行 `name=segments` 的段序列、操作数、闭式与 `kinds=`，标预想的两行跳过并报数，产物路径从 `replay.sh` 的 E142（新池新建文件的干跑） 行动态解析；自证：改一个段序列数字必须红、只改一段里一个种类的重数也必须红（门禁 code-tooling 的 research-script-selftests 格阶段跑它）；② E142（新池新建文件的干跑） 第五次跑把录制器的步骤种类做成封闭枚举 `StepKind`，`name=segments` 行带每段种类多重集，单测钉成绝对值、变异 M21 把系统配置槽写录成单元写只被它抓到 | 2026-09-13 |
+| C320 | 小节清单标「不抄」而附录里有，没人核 | `research/scripts/quote-kb.py --checklist` 加反向核对：清单标「不抄」的小节，若它自己的标题行原样出现在附录里同一个源文件的抄录块中（比如被 `--extra 文件:A-B` 整段带进来），判红退出码 6、不写出口文件；比对按源文件收窄，避免「### 已定项」这类多文件同名小标题互相误报。自证三种形态：带进来判红、没带进来是绿、跨文件同名不误报（`--selftest`，门禁 code-tooling 的 research-script-selftests 格跑）。在 D3（空间分配） 已定项 8 第二轮那份清单上重放：D26（后台整理与放置回收） 已定项 3 与 D3（空间分配） 已定项 9 两节判红 | 2026-09-13 |
+| C313 | FUA 写算不算崩溃段的边界 | 2026-09-13 用户定案：FUA 写算段边界，D13（验证路线） 已定项 4 补句；E142（新池新建文件的干跑） 主臂按它枚举（第四次跑 262162 个状态，只数事务那 21 条写时 65543），单测 `fua_not_a_boundary_gives_134217754_states` 钉住另一读法给不同的数（2026-09-25 E142（新池新建文件的干跑） 第十五次跑随新布局改名） | 2026-09-13 |
+| C241 | 树表归谁，两条用户定案说反话 | 2026-09-13 用户指示旧有的冲突一并解决：D15（格式冻结政策） 已定项 2 去掉「系统配置」三个字，只留「树表 day-1 是开放列表」（树表住根记录的间接层，D22（单元原子性怎么合成） 已定项 7 / 12）；下游一起改——D18（块里携带什么信息） 明文泄漏表删去「系统配置：树表表长」一行、D22（单元原子性怎么合成） 已定项 9 的名词清单拿掉「树表」，layout/01-first-txn 早已按已定项 12 写成系统配置不带树表 | 2026-09-13 |
+| C123 | 用户定案被改后无人复核 | 2026-09-13 用户指示「其他的旧有的冲突和误解都需要解决」：D16（发布语义） 已定项 5 的丢失窗口按改后的口径 T_time + N_switch × (T_retry + T_redo) 收口，正文的待用户复核标记拿掉；门禁 doc-decisions 的 user-verdict-owed 格装置留着 | 2026-09-13 |
+| C298 | 头宽加 4 改动了用户定案里的数 | 2026-09-13 同一句用户指示：D18（块里携带什么信息） 已定项 12 / 14 与 D27（小数据打包容器） 已定项 13 按新数读，原定案成立（扇出与记录数一格没变、各臂排序不变），三处标记改成结论 | 2026-09-13 |
+| C215 | 回退深度的承诺与 K 的下限不能同时成立 | D16（发布语义） 已定项 1（2026-09-13 用户定案）把块重用的界改成 max(F_生效, 环里最旧有效根)、回退候选集改成有效 ∧ txg ≥ F_生效：平时 F 不动时深度是整个根环，盘紧时缩到最近 4 个状态；I-7.4（近 K 代块未被复用） 的 K 改由这个候选集表达，D23（journal 的角色与格式） 已定项 14 的深度那句随之改写；E139（按盘回退下界的收严形态） 全部故障世界零假候选 | 2026-09-13 |
+| C222 | I-7.4 的下限 2 与第一版两盘几何要的 3 打架 | 同一条定案：K 不再是运行时参数；抬 F 的上限取 min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根)，丢盘之后幸存盘上最新的根恒在候选集里、它引用的块恒不复用（E139（按盘回退下界的收严形态） 丢盘世界零假候选、零不可恢复）；「K ≥ 最坏择根回退 + 1」那条挂载准入不再需要，D5（快照 / 空间记账机制） 已定项 2 的记账保留跟着改由 F 定 | 2026-09-13 |
+| C299 | 指针变宽改动了用户定案里的数 | **2026-09-12 用户复核**（原话「可以 没问题」，针对 C299（指针变宽改动了用户定案里的数））：按新数读，D22（单元原子性怎么合成） 已定项 7（根记录 194 → 242）与 D8（核心索引结构） 已定项 8（树表条目 121 → 145、每层 112 棵、少装 6 棵）两条原定案成立；D18（块里携带什么信息） 已定项 2 与 D8（核心索引结构） 已定项 6 里「带 key 区间」的判定照旧，「代价 0」那句理由已换成实数 | 2026-09-12 |
+| C232 | 系统配置槽宽：类规则给了答案，字段表说未定 | **2026-09-10 用户定案**：按类归属走。系统配置槽本来就在「自证单元」类里（[invariants.md](invariants.md) 与 [decisions/18-块里携带什么信息.md](decisions/18-块里携带什么信息.md) 两处逐字），而 D20（承重面：单元的原子性与自包含） 给这一类的规则逐字「**等于运行时探测到的 `physical_block_size`，不许硬编码。**」⇒ 槽宽 = 挂载时探测的 `physical_block_size`。已把「系统配置槽」补进 D20（承重面：单元的原子性与自包含） 那一行的枚举，规则一字未改。⚠️ **立账时写的「两处打架」有一处是误读**：`decisions/18-块里携带什么信息.md` 第 775 行那个「占位，未定」是 **AAD 变体**那一列，不是槽宽——按列拆开看，码 16（根记录）与码 18（系统配置槽）的「单元大小 / 对齐」列**同为「槽宽」**，两行对宽度的处置一模一样，从来没有打架。**真实缺口只有一处**：D20（承重面：单元的原子性与自包含） 那行括号里的枚举漏了它。⚠️ **不解 C212（固定结构的写小于 io_min）**：`io_min` 更大的设备上那次写仍然违反 D2（RAID 条带策略） 已定硬要求 1 | 2026-09-10 |
+| C213 | 走旧代根的墙钟消费者没有承担者 | **销账，理由是那个消费者的形状不存在、不是已拦住**：它押在「代际增量 scrub 钉住一代根走到底」上，而 D13（验证路线） 对 scrub 的逐字定义是「维护一个『上次 scrub 扫到的 generation 水位』，只遍历 `birth generation > 水位` 的块」——水位型，不持有旧根。全仓 grep「scrub…旧根」只命中它自己与 D22（单元原子性怎么合成） 那一段，两处都是立账当天写的 ⇒ 稻草人。真正剩下的那一格（遍历跳）改立 C214（遍历跳的窗口余量没人守） | 2026-09-08 |
+| C3 | 读重试无硬上限 | **销账，理由是前提口径错了、不是已拦住**：D9（加密） 已定项 2（2026-08-28）定 MAC 取满 **128 位不截断**，而这条欠账的整个论证押在「截断 MAC 的伪造尝试次数必须有界」上 ⇒ 前提不存在了。该定案正文逐字写着可以销账 | 2026-08-28（决策日）／2026-09-03（销账落表） |
+| C4 | 项目规则清单不一致 | 门禁阶段 `.claude/gate.d/code-tooling.sh` 的 rules-manifest 格，双向证过会红 | 2026-08-29 |
+| C24 | 实验自己没有单测 | 13 个实验二进制共 69 个单测，每条用变异测试逐条证明会红 | 2026-08-29 |
+| C31 | 未定项被别处定了却没回收 | 门禁阶段 `.claude/gate.d/doc-decisions.sh` 的 stale-open-items 格，双向证过会红。⚠️ 它对 2026-08-29 文档拆分之前的历史无效，那半记在 C36（未定项检查的第三个盲区） | 2026-08-29 |
+| C38 | 外部文献不可复核 | `research/scripts/fetch-refs.sh` 把 7 份文献重新固定到 `~/code/fs-refs/docs/`，`pdf-text.py` 抽文本，逐字断言并入 `verify-citations.sh` ⇒ 承重引用 55 → 72 条 | 2026-08-29 |
+| C41 | 已定小节的前提也会陈旧 | 门禁阶段 `.claude/gate.d/doc-decisions.sh` 的 cross-decision-status 格，扫全部正文（不只未定项小节）比对「说的状态」与「状态行上写的状态」，在真实语料上抓到 4 处真缺陷、零假阳性，双向证过会红。⚠️ 它只认紧贴的写法，隔着名词短语的与被「」引作历史陈述的两种看不见，那半记在 C61（陈旧状态措辞的漏网写法） | 2026-09-01 |
+| C328 | journal 两份镜像何时算「记录在」没有条款 | 2026-09-14 用户收尾弹窗定「任一份自证校验和过即在」（D23（journal 的角色与格式） 已定项 14）；崩溃点重放里的检查同日由层 0 全量做出（`crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs`，262165 个状态与产物计数逐字比对）：jsn 3 只有一份持久、根槽未持久的那两个状态都读回文件，是 `file_read=7` 里的两个；恢复的取法在 `recovery::scan_journal`（两盘各扫、任一份自证过即入表）。判别力自证：把扫描改成只看一块盘，那两个状态里有一个读不到记录、`file_read` 掉到 6，平时那条 22 个状态的用例对着产物形状的断言判红（2026-09-14 实测） | 2026-09-14 |
+| C76 | 发布时序没有权威落点 | 决策 2026-09-02 已落地（D16（发布语义） 已定项 7：两道屏障与重放施加前验证点名单元）；原行欠的两条故障注入自证 2026-09-14 在层 0 做出：① 摘掉根槽前那道屏障，记录核对器判「根在案而记录缺席」1 个状态、oracle 不红（`crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs` 的 `removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker`）；② 点名单元缺席时不验的恢复施加记录、记录核对器判「恢复自称新态而单元缺席」，验的恢复停在 txg 2（同文件 `applying_a_record_whose_units_are_missing_is_caught_by_the_record_checker`；步 6 另有改坏单元那一条）。原行末尾「定时序时顺带裁 redo 为空的射程」不是这笔检查本身，这一次没有动它 | 2026-09-14 |
+| C322 | 取号那一步的屏障怎么放没有条款 | 2026-09-14 三轮三方后用户收尾弹窗定案：D23（journal 的角色与格式） 已定项 16 加取号之后那道屏障与两条实现义务，D18（块里携带什么信息） 已定项 11 写死取号读法、回卷号与屏障报错，D22（单元原子性怎么合成） 已定项 16 注逐盘 +1；代码 `crates/singlefs-core/src/transaction.rs` 的 `acquire_instance`（全部自证过的槽 + 根环取 max、世代号逐盘 +1、取号之后那道屏障、回卷）；I-7.7（系统配置实例代号不低于根环） 改成 ① ② 并在 checker 实现，层 0 全量 262165 个状态违例 2 → 0；判别力自证：`crates/singlefs-harness/tests/instance_acquisition.rs` 四条、坏镜像语料三份（变异见 records 2026-09-13-总审核 十一·八） | 2026-09-14 |
+| C135 | 无密钥要读的结构不在明文豁免清单里 | 2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬）而无对象，作废；编号不回收，作废前的原文在 git 历史 | 2026-09-07 |
+| C138 | 明文侧泄漏面超出已定项声明的范围 | 与 C135（无密钥要读的结构不在明文豁免清单里） 同一次作废：2026-09-07 D9（加密） 已定项 5 改取「只做 scrub」之后无对象；编号不回收 | 2026-09-07 |
+| C269 | 销毁可写头时留下的块没有去处 | 2026-09-10 用户定案补第二道销毁闸「还有自己活快照的可写头不许销毁」，正文住 D5（快照 / 空间记账机制） 第 2 条下面 | 2026-09-10 |
+| C223 | 把可写头退回到快照态这个动作全仓没有定义 | 2026-09-14 用户定案：第一版不提供「把可写头退回到快照态」，D6（快照实现模型） 已定项 4 写明；替代是从那个快照克隆一个新的可写头、旧头照常销毁 | 2026-09-14 |
+| C374 | 释放代与树表诞生 txg 只有验收断言盯着 | 2026-09-18 已还：立了 I-3.9（释放代落在停止引用它的那一格区间里） 与 I-9.14（树表条目的诞生 txg 跨根不变） 两条不变量，池级 checker 的 `walk::judge_release_generation_and_tree_table_birth` 判，两份坏镜像（释放代 4 改 3、树表条目诞生 txg 3 改 4）各只红在自己那一条，`crates/mutations.tsv` 两条「判定恒真」变异钉着；层 0 每个崩溃状态都判。依据：`.claude/kb/invariants.md` 的 I-3.9（释放代落在停止引用它的那一格区间里） / I-9.14（树表条目的诞生 txg 跨根不变） 两行与 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 的 `each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite` | 2026-09-18 |
+| C273 | 小节清单不认一级标题 | `research/scripts/kb-sections.py` 改认一级标题；`--selftest` 由门禁 code-tooling 的 research-script-selftests 格跑，设 `KB_SECTIONS_NO_H1=1` 强制走回旧行为时自检判红（2026-09-19 现跑两遍核过）。原行还在欠着的那张表里留到 2026-09-19，门禁 doc-registries 的 table-shape 格从那天起判这种行 | 2026-09-11 |
+| C34 | 明文映射层的态别三处打架 | 销账，理由是无对象、不是已拦住：2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬），此编号不再使用；作废前的六列原文逐字照抄在本文件「## 历史版本」的 2026-09-19（其九）那一条里 | 2026-09-07 |
+| C129 | 锁盘期的明文映射层没有任何一方认证过 | 销账，理由是无对象、不是已拦住：2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬），此编号不再使用；作废前的六列原文逐字照抄在本文件「## 历史版本」的 2026-09-19（其九）那一条里 | 2026-09-07 |
+| C137 | 搬运的源与目的在盘上分不开 | 销账，理由是无对象、不是已拦住：2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬），此编号不再使用；作废前的六列原文逐字照抄在本文件「## 历史版本」的 2026-09-19（其九）那一条里 | 2026-09-07 |
+| C150 | 让渡区的成员身份在盘上没有落点 | 销账，理由是无对象、不是已拦住：2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬），此编号不再使用；作废前的六列原文逐字照抄在本文件「## 历史版本」的 2026-09-19（其九）那一条里 | 2026-09-07 |
+| C151 | 无密钥搬运必然要写一张加密的权威表 | 销账，理由是无对象、不是已拦住：2026-09-07 随 D9（加密） 已定项 5 改取「只做 scrub」（不设明文映射层、不设明文反向索引、无密钥侧不搬），此编号不再使用；作废前的六列原文逐字照抄在本文件「## 历史版本」的 2026-09-19（其九）那一条里 | 2026-09-07 |
+| C427 | 替换文里的反斜杠转义写进源码 | 2026-09-20 两道一起加：门禁 code-source-discipline 的 mutation-tables 格静态扫两侧的变异表（`research/mutations/*.tsv` 三段表与 `crates/mutations.tsv` 六段表），原文或替换文里出现 `\n` 以外的反斜杠转义就判红，列出表名、条目名、表行号、哪一段、哪个转义，red / green 样本双向证过会红；门禁 checker-tier-crates-mutation-replay 把「替换文写进源码之后编不过」从「没红」里分出来单独报，各带各的出路（无效变异要改的是那一行替换文，不是去补用例），red 样本加一条 `missing_identifier` 的变异证过会红。踩的那一处：`crates/mutations.tsv` 第 180 行（增补 3 第 3 件）的替换文写 `\&report.outcome`，而 门禁 checker-tier-crates-mutation-replay 的 unescape 只还原 `\n`，字面反斜杠写进源码编不过，门禁 checker-tier-crates-mutation-replay 报的是「点名的测试没跑到」、出路指向「先造一条会红的用例」，方向是反的；去掉反斜杠之后单跑那一行，`crash_injection_fast_tier_recovers_only_into_versions_the_model_committed` 红。立这条判据当天回扫全仓 10 张变异表，改掉那一处之后可疑转义 0 处。罩不到的：替换文编不过的别的成因（语法、类型）静态扫不出来，仍只在 门禁 checker-tier-crates-mutation-replay 跑的时候发现 | 2026-09-20 |
+| C515 | 政策不一致计数恒 0，口径没改 | 计数删掉：`crates/` 里 `policy_mismatches` 11 处同步删光（实十六接续，报告 `research/prompts/m2-writepath-implementer-report.md` 第三节 N4），门禁 checker-tier-qemu-device-streams 的期望串与它的 10 份样本同步删掉那一段 | 2026-09-25 |
+| C539 | 锚点读得出时下一次发布的首条序号不是 1 | 读者按损坏断链（D23（journal 的角色与格式） 已定项 4），恢复与 checker 各一份坏镜像钉住（实二二三，报告 `research/prompts/m2-batch223-implementer-report.md` 第一节 b） | 2026-09-25 |
+| C540 | 末条标志坏在一次发布中间，读者切出两次发布 | 读者按损坏断链（D23（journal 的角色与格式） 已定项 4），恢复与 checker 各一份坏镜像钉住（实二二三，报告 `research/prompts/m2-batch223-implementer-report.md` 第一节 b） | 2026-09-25 |
+| C480 | inode 记录的 blocks 怎么算全仓没有条款 | D8（核心索引结构） 已定项 6 定口径 ⌈size ÷ 512⌉，写路径 `crates/singlefs-core/src/records.rs` 按它写（实六），checker 判 I-9.15（inode 记录的 blocks 等于 ⌈size ÷ 512⌉）（实十四） | 2026-09-24 |
+| C544 | 树表 0 条那一版分配记录条数撞墙 | 分配记录树按位置寻址、多叶照写（D8（核心索引结构） 已定项 14）；树表 0 条那一版写行时按位置建这一版自己的树；用例 `row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_keep_mounting_writable_past_812_allocation_records` 钉住池十二次挂载都挂得上可写（实二一） | 2026-09-25 |
+| C552 | 分配记录树根层的绝对槽数写读两侧各算一遍 | 收成一个函数：盘上绝对槽数只在 `crates/singlefs-core/src/allocator.rs` 的 `absolute_slot_count_of_device` 定义，写侧 `of_allocator`、读侧 `of_reader` 都走 `AllocationRecordTreeGeometry::of_device_sizes_in_bytes`；用例 `half_a_slot_past_a_root_level_boundary_leaves_the_writer_and_the_reader_on_the_same_root_level_and_every_tree_written_reads_back` 造盘尾半个槽、正压根层分界的盘，两侧不分叉（实二六；变异 `crates/mutations.tsv` 第 703–705 行） | 2026-09-25 |
+| C556 | checker 与层 0 不读系统配置里的 F | checker 的回退候选集下界取 F_生效：max(各块盘上最新的有效根所带 F 的最大值, 池里自证过、fsid 与本池相同的系统配置槽带的 F)（`crates/singlefs-checker/src/walk.rs` 的 `check_pool_image` 里 `effective_rollback_floor`），坏镜像 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 的 `every_root_carrying_the_raised_floor_unreadable_keeps_the_candidate_invariants_green_because_the_checker_reads_the_system_configuration_floor`（带 F 11 的根全改坏、系统配置里还是 11：一条都不红；系统配置里的 F 也改回 0 就红 I-2.1（校验和与内容匹配）、I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、I-4.8（近 K 代根校验和自洽）、I-7.4（近 K 代块未被复用））；层 0 录制流那一侧，记录核对器回收谓词的 F 界把系统配置槽写带的 F 也算进去（`crates/singlefs-checker-tier/src/crash.rs`），用例 `rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs` 的 `the_record_checker_bounds_the_effective_floor_by_the_floor_written_into_the_system_configuration`；I-7.12（系统配置 F 不低于同盘根上的 F） 的判定同一批做了；变异是 `crates/mutations.tsv` 里实二的「checker 不读系统配置里的 F」「checker 回退候选集的下界只读最新根带的 F」「记录核对器的回收谓词界不算系统配置槽写带的 F」三行（实二）；层 0 那一侧别处的 oracle 读不读系统配置里的 F 没有普查，归层 0 规模那一轮 | 2026-09-26 |
+| C557 | 卸载记号只由卸载入口打没有检查 | 录制流记每次发布的入口段（`crates/singlefs-harness/src/lib.rs` 的 `SharedStream::record_entry`、`entry_spans`，第一版只登记卸载入口），层 0 切写表时核带卸载记号的根槽写只落在卸载入口段里、落在外面当场断言停（`crates/singlefs-checker-tier/src/crash.rs` 的 `unmount_markers_outside_the_unmount_entry`，接在 `writes_and_segments_with_stream_indexes_and_entries`）；用例 `rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs` 的 `unmount_markers_are_judged_against_the_recorded_unmount_entry`（准入入口写的根被打上记号那一格列出来）与 `cutting_a_stream_with_an_unmount_marker_outside_any_recorded_unmount_entry_panics`；变异是 `crates/mutations.tsv` 里实二的「判定拿掉」「层 0 切写表不核」「录制流记入口那一段时区间是空的」三行。今天没有一条层 0 流调卸载，层 0 里这一道只核得到「没有带记号的根」；带卸载入口的层 0 流并进层 0 规模那一轮（主 agent 2026-09-26 定，调度记录第三节「实二交回」那一行 ⑤） | 2026-09-26 |
+| C419 | F 生效之后靠什么保持不回落 | 取 SysPre：抬 F 那一串先逐盘把新 F 写进系统配置、加屏障再发根（`crates/singlefs-core/src/mount.rs` 的 `raise_the_floor_through`），恢复取 F_生效 = max(各幸存盘最新持久有效根所带 F 的最大值, 系统配置里读得出的 F 的最大值)（`crates/singlefs-core/src/recovery.rs` 的 `effective_rollback_floor`）；会红的检查是 I-7.12（系统配置 F 不低于同盘根上的 F） 的池级判定与它的坏镜像，以及 C556（checker 与层 0 不读系统配置里的 F） 那一侧 checker 读系统配置里的 F | 2026-09-26 |
+| C545 | 空间准入罩不住分裂与聚簇段层 | 实审 A4d 实现准入先拒：`crates/singlefs-core/src/allocator.rs` 的 `DeviceFreeMap` 加 `unblocked_slots` / `unblocked_slot_pairs_per_segment` / `unblocked_slot_pairs`（增量维护）与 `unblocked_slot_pairs_outside_the_cluster_segments`；`crates/singlefs-core/src/admission.rs` 的 `admit_the_units_landing_on_every_device` 在 settle 之前先判普通分配的落点够不够，不够就 `PublishError::SpaceAdmissionRefused`，任何写之前拒。新文件 `admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs` 四条用例：`a_write_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_by_the_space_admission_before_any_write_while_the_byte_formula_admits`、`a_write_on_the_narrower_pool_whose_free_slot_pairs_are_all_inside_this_mounts_cluster_segments_is_refused_for_its_data_units_before_any_write`、`a_write_whose_data_unit_lands_but_whose_commit_generated_units_find_no_unblocked_slot_is_refused_by_the_space_admission_before_any_write`、`with_the_space_admission_switched_off_the_session_raises_the_floor_after_a_placement_refusal_and_publishes_the_write`；补丁目录变异行 `mutations-append.tsv`（15 行）、`mutations-replacements.tsv`（2 行）、`mutations-delete.txt`（8 个名），基线绿、逐条只红点名的那一条（`prove-red.sh` 证过） | 2026-09-27 |
+| C245 | 系统配置槽的写频率，两条条款说反话 | 两半都还了：门禁那一半 2026-09-28 接进 doc-decisions 的 write-frequency 格（今在 `.claude/gate.d/doc-decisions.sh`，登记表 `.claude/gate.d/write-frequency.tsv`），同一结构在决策正文里写成不同量级、否定登记的量级、「只在 / 仅」限定到别的量即判红，红样本含立账原句；推论那一半第三轮三方判完（`research/prompts/c245-r3-main-verification.md`）：21 : 500 作废，每次发布轮换的依据换成判据 N-配置，用户 2026-09-28 定那一类双故障在射程里，D23（journal 的角色与格式） 已定项 3 射程句已改 | 2026-09-28 |
+| C393 | 被抛弃根的账读不出时修复没有条款 | 条款定下「修复」= 从中央映射现算被抛弃根引用的落点、内存里隔离、计数往上报，映射也现算不成就重读一次再拒可写（D23（journal 的角色与格式） 已定项 14 影子账那一句；用户 2026-09-28 定，被攻过零轮，判决 `research/prompts/unreadable-at-mount-r2-main-verification.md` L3）；`crates/singlefs-core/src/mount.rs` 的 `placements_referenced_by_root_computed_from_the_mapping`；用例 `crates/singlefs-harness/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs`（树表与分配记录树两份一直读不出、只坏第一次、坏到重读钩子，都隔离 14、到 txg 31 不复用、I-7.4（近 K 代块未被复用） 成立），`crates/mutations.tsv` 里 C393（被抛弃根的账读不出时修复没有条款） 那两条变异中名字带「(b)-从映射现算」的一行让它红 | 2026-09-28 |
+| C379 | 记账的全空聚簇段数与分配器能开的段两个口径 | 题面消失：两个量分开登记，「全空聚簇段数」（记账行，只看已分配位）与「可开聚簇段」（分配器开段，还看隔离位与抬 F 扣住位）各有定义（D3（空间分配） 已定项 10 ①；用户 2026-09-28 定取 B，被攻过一轮，判决 `research/prompts/abandoned-floor-r1-main-verification.md` M3：自然历史里部分隔离的一段让两者差 1 段）；C372（全空聚簇段数两份定义相反） 不在它射程内，照旧开着 | 2026-09-28 |
+| C335 | 根槽持续读不出时实例表只增不减 | 题面不成立（调查员 2026-09-28 实测，`research/prompts/closeout-recheck-2026-09-28/c335-investigator-report.md`）：一个根槽持续读不出时可写挂载照常、逐轮与不注入的对照相同；行数每次可写挂载 +1 是因为没有删行代码、与坏槽无关，第 367 轮跨片、372 轮全部做成；预留推满仍不够时挂载照样可写。行只增不删那一半另立 C597（实例表行只增不删，删行的条件没有条款）；用户 2026-09-28 定关账另立 | 2026-09-28 |
+| C583 | 双故障形：每盘一槽系统配置坏加最新根一时读不出 | 用户 2026-09-28 弹窗定写成「不罩」的条款（原话「写成「不罩」的条款」，`records/2026-09-28-里程碑三作业点规划.md`「四条定案」表）：D22（单元原子性怎么合成） 已定项 8 射程写明容错承诺是单故障、每盘各坏一槽系统配置同时最新根一时读不出的双故障形不在承诺里；那一形今天池级 checker 恰好只红 I-7.4（近 K 代块未被复用），两条用例当登记钉着：`crates/singlefs-harness/tests/random_histories.rs` 的 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form` 与 `crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs` 的 `four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form`（说明文字以「被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头」开头；题面与用例来历：C577（系统配置没见证到的最新根，乙罩不到） 实现员报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md` 第 98–104 行；2026-09-27 定不在射程的原话在 `records/2026-09-24-里程碑二收尾调度.md`「用户定：三方的腿例外照派；双故障形不在射程记欠账」那一行）。将来要罩住它，先改 D22（单元原子性怎么合成） 已定项 8 的射程，再让同一形不再红 | 2026-09-28 |
+| C428 | 路径回写的自检与被检共用同一条跳过规则 | 销账，理由是无对象、不是已拦住：被判的 `research/scripts/rewrite-moved-paths.py` 2026-09-21 随全仓术语改名第二批删掉（提交 8186d5b5），树里没有 `statement_line` 这个函数了（`grep -rn statement_line research/scripts .claude` 只命中 `.claude/kb/checks-owed.md`）；继任的 `research/scripts/sweep-term.py` 检测正则独立合成、比替换表宽，不按行跳过，有意不换的只认 `.claude/term-rename-exempt` 登记，门禁 doc-text 的 term-renames 格跑它的 `--check`。原题要的「喂含「搬到」且含旧路径的现状句必须判红」那一格它的自证里没有 | 2026-10-01 |
+| C118 | `deleted_inodes` 树的形态无落点 | 立成分项 D8（核心索引结构） 已定项 16：key = inode 号 8 字节、无 value、不带对象出生代，第一个文件版本那次发布零根注册，队列 = inode 树里 nlink = 0 的号集合（派生态）；I-9.5（删除队列里的号仍在树里） 的坏镜像随三·3 做 | 2026-10-01 |
+| C84 | 墓碑单元的粒度没人定 | D18（块里携带什么信息） 已定项 24 定了粒度：意图那次每个对象写一条 40 字节整对象墓碑记录，打包进墓碑树的码 3 容器（打包记录类型 1，一个 32 KiB 容器 815 条），有新记录的那次发布才重写开放容器 | 2026-10-01 |
+| C375 | 待删占用与已承诺预留按份还是按和记没有条款 | 按全部副本之和记、每块盘扣 ⌈和 ÷ 副本数⌉：`crates/singlefs-core/src/admission.rs:99`（`share_of_one_device`）；那一格的准入用例 `c375_two_devices_of_seven_slots_with_checkpoint_cost_four_and_one_tombstone_container_refuse_one_data_unit`（同一文件第 1170 行）与 `crates/mutations.tsv` 第 376 行的变异钉住（`research/prompts/m3-delete-r3-sonnet-output.md` 3.1 节） | 2026-10-01 |
+| C585 | 会话发布放进发布途中取下的旧快照 | 改法 C（用户 2026-09-28 定）落在 `crates/singlefs-core/src/mount.rs` 的 `what_a_device_behind_the_version_lacks`：落后且缺那一版的单元、或那一版的根写在这块盘上而那一槽读一次重读一次都不是它，才拒；四个入口与可写挂载取号之前同一判。用例在 `crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs`（四个入口各一条发布途中取下的旧快照拒在任何写之前，另有区域 2、根环转过一圈、根槽读回坏字节各入口的格），变异行在 `crates/mutations.tsv`；代码三方 `research/prompts/m3-code-r1-main-verification.md` 至 `research/prompts/m3-code-r3-main-verification.md` 判过。三块盘的池今天 mkfs 不收，区域 2 落在第三块盘那一格等三块盘开线时补（`research/prompts/m3-code-r3-main-verification.md` 第四节） | 2026-10-01 |
+| C586 | 回退取树 ID 水位的那一半没有用例 | `crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 的 `the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it` 钉住，把 `.fold(current.root.tree_identifier_watermark, u64::max)` 改成 `.fold(0, u64::max)` 红在水位断言；变异行在 `crates/mutations.tsv`；代码三方 `research/prompts/m3-code-r1-main-verification.md` 判过 | 2026-10-01 |
+| C581 | extent 偏移非 0 没有判据 | 条款写进 D19（块指针的结构与宽度预算） 已定项 3：指针头部 extent 偏移非 0 判该指针所在的结构损坏，扩 I-2.4（头校验和覆盖范围） 的指针一半；checker 在走读跟随的每条指针上判（`crates/singlefs-checker/src/image.rs` 的 `judge_pointer_mac_and_nonce_are_zero`），core 每个读盘上指针头部的读者都判（`crates/singlefs-core/src/pointer.rs` 的 `read_judging_the_extent_offset_from`；用例在 `crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader.rs` 与 `crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs`），根记录里的指针偏移非 0 按这条根自证不过处置；变异行在 `crates/mutations.tsv`（名字带「C581」）；`research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 5、6 行；实例表链指针那一行变异与影子账读者那一行的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C294 | 指针里的 key 各段与被指单元头相等没有不变量 | 2026-10-01 判决新立 I-1.12（指针出生树等于被指单元头）：池级 checker `crates/singlefs-checker/src/walk.rs` 的 `judge_pointer_birth_tree_against_the_unit_header` 在走读里两处判（实例表链每一片、extent 数据单元），码 1、码 3 取被指单元头偏移 43，码 2 随 C289（码 2 的出生树取哪个字段没写） 不判；坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`（A 的 extent 树根里一条数据指针的出生树改成另一棵发过号的树）；变异行在 `crates/mutations.tsv`（名字里点名这条不变量）；`research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 3 行；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C466 | 几块盘的系统配置设备数对不上时 checker 判不出 | 2026-10-01 判决新立 I-7.15（各盘所选系统配置槽设备数相同）：池级 checker `crates/singlefs-checker/src/walk.rs` 的 `check_pool_image` 逐盘把所选槽的设备数同第一块盘所选槽的比，不等判红；坏镜像是盘 1 两个槽的设备数改成 3 并重封，只红它（`crates/singlefs-harness/tests/checker_known_bad_images.rs`）；变异行在 `crates/mutations.tsv`（名字里点名这条不变量）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 7 行；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C28 | 环几何不变量未实现 | 2026-10-01 判决把 I-8.1（环几何够大） 改成三个字段的等式加同一次发布记录数一格（最坏占用 = 在飞上限 × 4096，由环长与 F 倒算，取上界）：池级 checker `crates/singlefs-checker/src/image.rs` 的 `judge_journal_ring_geometry_fields_agree` 对每块盘每个可择的系统配置槽判三格，`crates/singlefs-checker/src/walk.rs` 的 `judge_records_of_one_publish_within_the_in_flight_record_limit` 判记录数一格，三格不等整池不作保；core 挂载同判（`crates/singlefs-core/src/recovery.rs` 的 `journal_ring_geometry_fields_recompute_from_the_ring_length`）；坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`（`each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant`）；变异行在 `crates/mutations.tsv`（名字里点名这条不变量）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 4 行与回看决策、`research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 3、4 行；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C47 | 根槽没按判定宽度对齐 | 2026-10-01 判决：I-7.5（根槽按判定宽度对齐）已实现，池级 checker `crates/singlefs-checker/src/image.rs` 的 `judge_root_slots_aligned_to_the_decision_width` 逐槽判，判定宽度取各盘所选系统配置声明的 max(`physical_block_size`, `io_min`) 里最大的（声明值，未探测）；mkfs 在任何写之前拒不按这个宽度对齐的几何（`crates/singlefs-core/src/make_filesystem.rs` 的 `first_slot_not_aligned_to_the_decision_width`）；异构池一份与逐槽判的坏镜像在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`；变异行在 `crates/mutations.tsv`（名字带「C47」，另有一行点名这条不变量）；探测比对仍欠 C388（checker 的判定宽度不自己探测）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 5 行与第四节用户定案第 1 条；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C461 | checker 判「挂不上的镜像」整片报不适用 | 早退那一半 2026-09-21 已改（全部盘都择不出才整片报不适用，用例 `the_pool_checker_still_judges_every_invariant_when_one_device_has_no_valid_system_configuration`）；另一半 2026-10-01 判决另开旁路报告、不进违例通道：`crates/singlefs-checker/src/image.rs` 的 `system_configuration_redundancy_report` 另报哪块盘少于两槽自证过、可写挂载会拒，I-8.5（tail 槽有效集非空） 取全池皆废才判红；用例 `a_device_short_of_self_verified_system_configuration_slots_is_reported_aside_while_the_tail_slot_invariant_holds` 与 `no_self_verified_system_configuration_slot_on_any_device_reddens_the_tail_slot_invariant_and_every_other_is_not_applicable`（都在 `crates/singlefs-harness/tests/checker_known_bad_images.rs`）；变异行在 `crates/mutations.tsv`（名字里点名这条不变量）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 6 行；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+| C657 | 带故障的择根合判族没有 | E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑建了带故障的择根合判族（C331（择根倒挂压过已确认的写） 那一形）并跑到界：三条改坏择根序的变体（比较不看实例代号、同 `checkpoint_txg` 平局取低、实例代号为主）在带故障的合法历史四个域上照样分不开（比较不看实例代号、平局取低两条只在 KA 上择得不同，实例代号为主那一条在 KG 与 KA 上），不是这一族抓得到的；三条由 Verus 必红世界（`crates/singlefs-replay-prefix/verus-mutations.tsv` 择根那一节）与对抗根环 KA 罩（D13（验证路线） 已定项 1 M1 落点那一句）。产物 `research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out` 收尾判决行（`variants_excluding_baseline=6 red=1 … not_red_within_bounds=5`）；调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 13 批 E165（恢复重放有界穷举与变异杀伤界） 第 4 次重跑第二段、第三段（写页）交回两条；平局取后者那一条变体另记 C665（平局取后者的择根变体要同键异内容两槽才分得开） | 2026-10-03 |
+| C367 | I-8.5 的字面后半句在合法镜像上不成立 | I-8.5（tail 槽有效集非空） 已改写，2026-10-01 判决取「池里至少一块盘的两个系统配置槽里有一个槽自证过」、不取「每块盘非空」：池级 checker `crates/singlefs-checker/src/image.rs` 的 `judge_some_device_carries_a_self_verified_system_configuration` 判，全池的槽都改坏红（`no_self_verified_system_configuration_slot_on_any_device_reddens_the_tail_slot_invariant_and_every_other_is_not_applicable`），干净镜像上这一条真被评估过且成立；单盘全废走旁路报告、不进违例通道；变异行在 `crates/mutations.tsv`（名字里点名这条不变量）；`research/prompts/m3-inv-a-r1-main-verification.md` 第二节第 6 行与第四节用户定案第 3 条；变异的证红还没跑，留给提交时的门禁 checker-tier-crates-mutation-replay | 2026-10-03 |
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:1-43`（整段抄，未转述）**
+
+```markdown
+## E7 离线索引 harness —— 首轮已跑（2026-08-27）
+
+**背景**：E1（节点大小 vs 可恢复性） / E2（key 布局对递归遍历的影响） / E4（范围重建 vs 逐项修改的交叉点） 都写着「依赖 D8（核心索引结构） 定案与 checker」，而 D8（核心索引结构） 的取值又要等这些实验，
+形成死锁。破法是承认一件事：**索引结构的选型不需要一个完整的文件系统**，
+只需要一个能在真实块设备上跑的独立索引引擎与一套负载回放器。
+
+**做什么**：写一个不含 VFS、不含 POSIX 语义、不含崩溃恢复的**索引 harness**——
+只有「在块设备上维护一棵树 / 一个 KV，支持 insert / point query / range scan / 范围删除」。
+在它上面把候选结构各实现一份，用同一组负载回放对比。
+
+**候选结构**（依据 [prior-art.md](../prior-art.md) 7.3）：
+
+| 候选 | 要量的东西 |
+|---|---|
+| B+tree（基线） | 点查最优时的读代价上限 |
+| 日志结构节点的 B+tree（D8（核心索引结构） 现方向） | 节点内追加 + 定期重排的实际收益与重排代价 |
+| Bε-tree（内部节点带消息缓冲） | 小写吸收能力、点查退化多少 |
+| Bε-tree + size-tiering + 过滤器（SplinterDB 形态） | 相对纯 Bε-tree 的写放大与点查差异 |
+| 表中其余四种候选任一 + key-value 分离（WiscKey 形态） | 大 value 移出索引后，compaction / 重排代价降多少，range scan 退化多少 |
+
+**测什么**：写放大、读放大、点查延迟分布、range scan 带宽、空间放大、CPU 占用。
+**每项都要分「冷缓存」和「热缓存」两组**——热缓存下所有结构都会看起来差不多。
+
+**判据**：得到一张「负载形态 × 结构」的表，每格是「测什么」列的六个指标。
+**这张表本身就是产出**，不需要它选出唯一赢家——D8（核心索引结构） 要的是「参数怎么取」，不是「选哪棵树」。
+
+**基线必须是 D8（核心索引结构） 现方向，不是教科书 B+tree。**
+D8（核心索引结构） 已定的形态是「日志结构节点 + write buffer 前端」，**它本身就是一个吸收小写的机制**。
+拿排序节点的朴素 B+tree 当基线，测出来的是「有没有批量」，不是「消息缓冲比 write buffer 多买到什么」。
+文献里的数字全部相对朴素基线：BetrFS 对的是 ext4/btrfs/XFS/ZFS，SplinterDB 对的是 RocksDB，
+**没有一个对照组带 write buffer 前端**——消息缓冲相对 D8（核心索引结构） 现方向的边际收益，现有文献一个数字都没给。
+
+**怎样才算失败**（分两类，不许混）：
+
+| 现象 | 判定 | 理由 |
+|---|---|---|
+| 各候选在所有负载上差异都小于测量噪声 | **整轮作废**，加大数据集并清缓存重做 | 多半是数据集小到全进了页缓存 |
+| Bε 在**无批量对照组**（朴素排序节点 B+tree）上没有显著优于对照 | **实现有问题，整轮作废** | 这是阳性对照：效应在文献里确凿存在，测不出来就是实现错了（缓冲比例设成 0、每次插入都触发下刷之类） |
+| Bε 相对 **D8（核心索引结构） 现方向基线**没有优势 | **这是合法结果，如实记录** | 它说明消息缓冲没买到 write buffer 还没买到的东西——这正是E7（离线索引 harness）要回答的问题 |
+
+⚠️ **必须保留那个无批量对照组**，否则「没有优势」分不清是「结论如此」还是「实现坏了」。
+两个对照组一起跑，才同时具备判别力和可证伪性。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:44-77`（整段抄，未转述）**
+
+```markdown
+### 首轮结果（2026-08-27，N=5 轮、五个不同种子、带块层独立读数）
+
+**更新路径的设备 I/O（每次操作）与点查的读次数**
+
+| 臂 | 更新 io/op（中位） | 极差/中位 | 点查 读/次 |
+|---|---|---|---|
+| **sorted_bplus**（无批量对照，阳性对照） | 1.9378 | 0.0% | 1.241 |
+| **logstruct_wb**（D8（核心索引结构） 现方向：日志结构节点 + write buffer 前端） | 1.5755 | 0.2% | 1.241 |
+| **betree**（内部节点带消息缓冲） | **0.4900** | 0.9% | **1.178** |
+
+> **Bε 相对 D8（核心索引结构） 现方向：3.22 倍**（更新路径）
+> **D8（核心索引结构） 现方向相对无批量对照：只有 1.23 倍**
+
+**这就是 [decisions.md](../decisions.md) D11（索引节点要不要留消息缓冲区） 前置 2 要的那个数。**
+此前文献里一个都没有——BetrFS 对的是 ext4/btrfs/XFS/ZFS，SplinterDB 对的是 RocksDB，
+**没有一个对照组带 write buffer 前端**。
+
+#### 三条硬要求逐条判定
+
+| 要求 | 观测 | 判定 |
+|---|---|---|
+| 1. 每条臂真的实现它声称的结构 | 把两条攒批臂的核心判据换成常量（缓冲=1）：logstruct_wb 0.866 → **1.502**（+73%），betree 0.171 → **1.702**（+897%）；sorted_bplus 不变（它本来就没缓冲） | **通过**。结构真的在参与 |
+| 2. 摊销架构对称 | logstruct_wb 与 betree 共用同一个节点缓存、同一个 checkpoint 节奏（每 4096 次操作）。sorted_bplus 故意写穿——**它是无批量对照，不参与对称性要求** | **通过** |
+| 3. 块层独立读数 + 该校验路径本身有判别力 | 五轮九格程序计数器与 `/sys/block/vda/stat` **逐轮相符**；摘掉 `O_DIRECT` 后块层读数全部归零而程序计数器不变，挂钟掉 73 倍 | **通过** |
+
+#### 两条解析对照（第三条独立路径）
+
+- `sorted_bplus`：每次 1 写 + `(1 − 64/1024)` 读 = **1.9375**，实测 **1.9378**。
+- `logstruct_wb`：512 个随机 key 落到约 400 个不同叶子、每叶一读一写 ⇒ 约 **1.56**，实测 **1.5755**。
+
+⚠️ **低极差不是确定性假象**：五轮种子各不相同（101/202/303/404/505），
+另两条臂的极差是 0.2% 与 0.9%。`sorted_bplus` 的 0.0% 来自它每次操作恰好一次写、
+读次数是 20 万次采样上的缺页率平均。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:78-120`（整段抄，未转述）**
+
+```markdown
+### 缓存/树比扫描（2026-08-27，4 档 × 5 种子 = 20 轮，全部有效）
+
+**更新路径 io/op（中位）**
+
+| 缓存页 | 占树 | 无批量对照 | D8（核心索引结构） 现方向 | Bε | **Bε / D8（核心索引结构）** | D8（核心索引结构） / 无批量 |
+|---|---|---|---|---|---|---|
+| 16 | 2% | 1.9844 | 1.5755 | 0.6384 | **2.47×** | 1.26× |
+| 64 | 6% | 1.9378 | 1.5755 | 0.4900 | **3.22×** | 1.23× |
+| 264 | 25% | 1.7437 | 1.5755 | 0.3176 | **4.96×** | 1.11× |
+| 1057 | **100%** | 1.0051 | **0.2515** | 0.1678 | **1.50×** | **4.00×** |
+
+**点查 读/次（中位）**：三臂在每一档上几乎相同（2% 档 1.78/1.78/1.72，
+100% 档全为 0.053），**Bε 略优而非略劣**——原因见外推边界那一节。
+
+块层与程序计数器：**60/60 格相符**。
+
+#### 两条结论
+
+**1. `Bε / D8`（核心索引结构） 不是单调的，峰值在中间。**
+2% → 25% 一路升到 4.96×，而缓存装得下整棵树时**骤降到 1.50×**。
+⇒ **Bε 的优势条件是「树装不下缓存」**——与 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 里 D5（快照 / 空间记账机制） 的优势条件
+（「计数器表装不下缓存」）同构：两者都是「把随机查找换成顺序/批量」，
+而那件事只在装不下时才值钱。
+
+**2. D8（核心索引结构） 现方向在 2% / 6% / 25% 三档的 io/op 逐位相同（1.5755）——缓存对它完全不起作用。**
+机制：**write buffer 按叶排序之后，每次 flush 就是一次覆盖整个叶子空间的顺序扫描，
+而 LRU 对「反复的、大于缓存的顺序扫描」命中率恰好为 0。**
+
+干预证实（保持同叶聚合不变，只打乱**组的处理顺序**）：
+
+| 缓存档 | 排序 flush | 打乱组顺序 | |
+|---|---|---|---|
+| 25% | 157,739 读 | **143,251 读（−9.2%）** | 顺序确是驱动量 |
+| 100% | 1,024 读 | **1,024 读（完全相同）** | **阴性对照**：全装得下时顺序无关 |
+
+⚠️ 那 9.2% 是**下界**：洗牌种子按组数派生，组数相同就得到相同排列，
+跨 flush 有相关性，削弱了效果。**方向与阴性对照都成立，量级偏保守。**
+
+> **由此得到一条设计要求：如果 write buffer 要排序，节点缓存必须是抗扫描的
+> （2Q / LRU-K 之类），否则排序摧毁局部性而不是创造它。**
+> 这一条对 [decisions.md](../decisions.md) D8（核心索引结构） 有直接影响，而 D8（核心索引结构） 正文目前只写了
+> 「write buffer 批量攒起来排序去重后批量插入」，**没有对缓存策略提任何要求**。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:121-158`（整段抄，未转述）**
+
+```markdown
+### 节点大小扫描（2026-08-27，3 档 × 5 种子 = 15 轮，**固定约 1 MB 缓存预算**）
+
+**口径的要害：内存预算固定，节点越大，装得下的节点越少。** 这才是真实的取舍。
+
+| 节点 | 缓存节点数 | 占树 | | 无批量对照 | D8（核心索引结构） 现方向 | Bε |
+|---|---|---|---|---|---|---|
+| **4 KiB** | 264 | 25% | io/op | 1.7437 | 1.5755 | **0.3176** |
+| | | | 字节/次 | 7,142 | 6,453 | **1,301** |
+| | | | 点查读/次 | 0.7766 | 0.7766 | 0.7361 |
+| **16 KiB** | 66 | 6% | io/op | 1.9359 | 1.5755 | **0.3994** |
+| | | | 字节/次 | 31,718 | 25,812 | **6,544** |
+| | | | 点查读/次 | 1.2249 | 1.2249 | 1.1624 |
+| **64 KiB** | 16 | 2% | io/op | 1.9844 | 1.5755 | **0.6384** |
+| | | | 字节/次 | 130,050 | 103,249 | **41,841** |
+| | | | 点查读/次 | 1.7792 | 1.7792 | 1.7175 |
+
+块层与程序计数器：**45/45 格相符**。
+
+#### 结论：固定内存预算下，大节点在三个轴上全都更差
+
+I/O 次数翻倍（Bε 0.318 → 0.638）、字节数 **32 倍**（1,301 → 41,841）、点查读次数翻倍。
+机制：**节点越大，同样的内存装得下的节点越少，命中率掉得比「每次读更多」赚回来的更快。**
+
+`logstruct_wb` 的 io/op 在三档**逐位相同（1.5755）**——同一个原因（排序 flush ⇒ 顺序扫描 ⇒ 命中率 0），
+节点大小不改变它触到的节点个数；但它的字节数涨了 **16 倍**。
+
+⚠️ **它撑不起「按介质分层布局」**：[decisions.md](../decisions.md) D8（核心索引结构） 约束 1 已定节点大小是
+mkfs 时写进系统配置的格式参数——**参数就够，不需要为此多开一套布局**
+（布局套数归 D12（目标介质） 已定项 1，今天不预先封顶）。
+E7（离线索引 harness）把「一次节点读」记为 1 次设备 I/O，**不论节点多大**；
+在虚机 + 宿主文件（近似 SSD）上**字节主导**，所以大节点是净亏。
+
+**寻道主导的一侧已实测（见E7（离线索引 harness）「寻道主导档」），结论同向而非相反**：
+在「每次 I/O 代价相同、与大小无关」这个极端上，大节点仍然不赢。
+⇒ **小节点在字节主导与寻道主导两端都赢**，节点大小不必按介质取相反方向。
+
+⇒ 对 [decisions.md](../decisions.md) D8（核心索引结构）「不照抄 128K–256K」这条：**两端都得到支持**。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:159-168`（整段抄，未转述）**
+
+```markdown
+### 寻道主导档（2026-08-27，QEMU 限流 4000 IOPS，**2 档 × 5 种子 = 10 轮**，两端对比）
+
+**N=5**：两个配置各 5 个种子（11/22/33/44/55），10 轮全部有完成标记，无作废轮。
+
+**口径**：本机没有旋转盘（`lsblk` 确认只有 nvme0n1，ROTA=0），所以这是
+**模型化设备上的实测，不是旋转盘实测**。模型 = QEMU `throttle-group x-iops-total=4000`，
+不设 `x-iops-size` ⇒ **每次 I/O 代价相同、与请求大小无关**，即寻道主导的极端。
+复跑：`VM_IOPS=4000 bash research/scripts/vm-bench.sh <musl 二进制> 11 none <cache> <node_pages>`。
+⚠️ **原始输出未留存**：E7（离线索引 harness）跑在 QEMU 里，当时没有把宿主抓回的结果落盘。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:169-185`（整段抄，未转述）**
+
+```markdown
+### 2026-08-29 复跑：数字复现了，但**校验路径没有复现**
+
+本轮把它在**本机的一个普通文件**上按 N=5、五个种子重跑了一遍，
+产物 `e7-index-2026-08-29-file.out`（这是E7（离线索引 harness）第一次有归档产物）。
+
+| 臂 | 本次中位 io/op | 正文记的 | 差 |
+|---|---|---|---|
+| 无批量对照（`sorted_bplus`） | 1.9373 | 1.9378 | −0.03% |
+| D8（核心索引结构） 现方向（`logstruct_wb`） | 1.5737 | 1.5755 | −0.11% |
+| Bε（`betree`） | 0.4913 | 0.4900 | +0.27% |
+
+⇒ **Bε 相对 D8（核心索引结构） 现方向：本次 3.20 倍**（正文记 3.22 倍，差 0.5%）；
+**D8（核心索引结构） 现方向相对无批量对照：本次 1.23 倍**（与正文一致）。
+
+⚠️ **普通文件上跑时 `blkstat=false`——块层独立读数那条校验路径拿不到。**
+所以那一轮复现的是数，不是校验。**同日已在虚机里把它补上**，见 E7（离线索引 harness）「同日在虚机里复跑：那条校验路径也复现了」一节。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:186-253`（整段抄，未转述）**
+
+```markdown
+### 同日在虚机里复跑：那条校验路径也复现了
+
+产物 `e7-index-2026-08-29-vm.out`。
+跑法见 [vm-harness.md](../vm-harness.md)：musl 静态编译 + `scripts/vm-bench.sh` 送进
+QEMU/KVM，来宾里是一块真的 virtio 盘（`/dev/vda`），`blkstat=true`。
+
+| 臂 | 程序读 = 块层读 | 程序写 = 块层写 |
+|---|---|---|
+| 无批量对照（`sorted_bplus`） | 187477 = 187477 ✓ / 查询 24873 = 24873 ✓ | 200000 = 200000 ✓ |
+| D8（核心索引结构） 现方向（`logstruct_wb`） | 157592 = 157592 ✓ / 查询 24873 = 24873 ✓ | 157592 = 157592 ✓ |
+| Bε（`betree`） | 48947 = 48947 ✓ / 查询 23890 = 23890 ✓ | 49787 = 49787 ✓ |
+
+⇒ **九个格子逐格相符**，与正文那条「块层独立读数逐轮相符」是同一个检查。
+⇒ 由此确认 `O_DIRECT` 真的绕过了缓存、块层没有合并或拆分请求、没有预读。
+
+**而且虚机与宿主的 `io_per_op` 逐位相同**（同一个默认种子 `0x51561234`）：
+1.937385 / 1.575920 / 0.493670。**换一套介质、换一个内核，计数一位不差。**
+
+⚠️ **时间数不可用**：本机 `/boot` 下唯一可读的内核是 `vmlinuz-6.17.0-lockdep`，
+锁校验开销很大——同一档在虚机里耗时约为宿主的 **2 倍**（29.7 s 对 14.5 s）。
+**计数类指标不受影响，时间类指标不许跨环境比。**
+
+⚠️ **口径差异要写明**：原轮跑在 QEMU 的块设备上、种子与本次不同；
+本次跑在 ext4 上的普通文件、`O_DIRECT` 仍然开着。三条臂差都在 0.3% 以内。
+「同日在虚机里复跑：那条校验路径也复现了」数字因此**只能靠重跑复核，不能靠翻档案复核**——重跑要 QEMU。
+
+**限流路径自证会红**：同样 300 次直接读，不限流 0.18 s；限流 100 IOPS 用 2.89 s
+（≈ 300/100 = 3 s）。不做这一步就分不清「没测出差异」和「限流根本没生效」。
+
+**模型自证**：挂钟与「I/O 次数 ÷ 限流值」的吻合度（中位数，N=5）
+
+| 档 | 臂 | io/op 中位 | 预测挂钟 | 实测挂钟中位 | 误差 |
+|---|---|---|---|---|---|
+| 4 KiB | 无批量对照 | 1.742435 | 87.12 s | 87.13 s | 0.01% |
+| 64 KiB | 无批量对照 | 1.984590 | 99.23 s | 99.18 s | 0.05% |
+| 4 KiB | Bε | 0.317940 | 15.90 s | 15.90 s | 0.00% |
+| 64 KiB | Bε | 0.639135 | 31.96 s | 31.91 s | 0.15% |
+| 4 KiB | D8（核心索引结构） 现方向 | 1.574990 | 78.75 s | 78.76 s | 0.01% |
+| 64 KiB | D8（核心索引结构） 现方向 | 1.574990 | 78.75 s | 78.65 s | 0.13% |
+
+⇒ **字节数在这个设备上完全不计价**：64 KiB 档每次操作读 130,041 字节、4 KiB 档 7,137 字节
+（**18 倍**），而挂钟只由 I/O 次数决定。模型如实做到了它声称的事。
+
+**块层校验仍然成立**：限流是在 QEMU 栈里插了一层 `throttle` 块驱动
+（`-blockdev driver=throttle` 取代原来的 `-drive`），I/O 路径变了，
+所以块层对照不能默认还成立。实测 **12/12 格逐位相符**（两个配置 × 三条臂 × update/query，
+程序自数的 reads/writes 与来宾 `/sys/block` 的 `blk_r`/`blk_w` 完全一致）。
+该校验路径此前已自证会红——摘掉直接 I/O 后块层计数归零而程序计数纹丝不动。
+
+**结果**
+
+| 臂 | 4 KiB 挂钟中位 | 64 KiB 挂钟中位 | 大节点 | 各自极差 |
+|---|---|---|---|---|
+| 无批量对照 | 87.13 s | 99.18 s | **差 13.8%** | 0.06% / 0.32% |
+| D8（核心索引结构） 现方向 | 78.76 s | 78.65 s | 持平（−0.14%） | 0.09% / 0.06% |
+| Bε | **15.90 s** | 31.91 s | **差 100.7%** | 0.72% / 0.33% |
+
+**极差 ≤0.72% 不是可疑，是机制性的**：挂钟 = I/O 次数 ÷ 限流值，
+而 I/O 次数在五个种子间只差 0.06%（4 KiB 无批量对照档：1.742510 / 1.741970 /
+1.742720 / 1.742435 / 1.741695）。**种子确实在变**——五个值各不相同，
+只是这个负载的结构是确定的，变的只有 key 序列。
+极差之小反过来又确认了「限流确实主导挂钟」。
+
+**⇒ 寻道主导的极端上大节点仍然不赢，没有反转。**
+
+原因：自变量是**固定内存预算**，节点越大装得下的越少、缺失率上去，
+**节点读次数反而更多**——这个效应压过了「一次读更多」。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:254-261`（整段抄，未转述）**
+
+```markdown
+### 寻道主导档证明不了什么
+
+- **不是旋转盘实测。** 是模型化设备。
+- **模型不含顺序合并。** 真实机械盘上相邻的小 I/O 会被合并成一次寻道，
+  而 QEMU 的 IOPS 限流逐个计费 ⇒ **本模型高估了小节点的代价**。
+  小节点即使被高估也仍然赢，**所以这条局限让结论更稳，不是更弱**。
+- **只测了两端（4 KiB 与 64 KiB），没测 16 KiB 中间档。** 单调性未验证。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:262-284`（整段抄，未转述）**
+
+```markdown
+### 这组数字不能证明什么
+
+- ⚠️ **树很小**：1024 个叶子 + 32 个内部 + 1 个根 = 1057 节点（约 4.3 MB），缓存 64 页（**6%**）。
+  真实的树大得多，而**缓存/树比正是驱动量**——这个比一变，三条臂的差距都会变。
+- ⚠️ **负载是对已存在 key 空间的随机更新，没有分裂/合并**。
+  分裂行为不在射程内，而 BetrFS 自陈相对更差的情形正是「节点切分与合并落在关键路径上」。
+- ⚠️ **点查那一列反直觉，原因是配置带来的**：查询用的是与更新**同一个均匀随机分布**，
+  于是最近更新过的 key 有很大机会还在缓存住的根/内部缓冲里，省掉一次叶子读。
+  **对冷 key 的查询会得到相反结果**——这条要单独量，目前没量。
+- ⚠️ 节点固定 4 KiB、值固定 8 字节，而 D8（核心索引结构） 已定项 2（2026-08-30）取 **16 KiB 常量**
+  ⇒ **E7（离线索引 harness） 的三条臂全部跑在一个已经不是本工程取值的节点大小上。**
+  16 KiB 上的重量见 E56（消息缓冲的收益 vs ε）。
+- ⚠️ **Bε 臂里缓冲容量与扇出是两个互不相干的常量**（`message_buffer_capacity = 200`、`FANOUT = 32`，
+  内部节点只放消息不放 pivot）⇒ 两者从不争同一块节点字节，
+  而那条张力是 Bε 的全部机制。**E7（离线索引 harness） 的节点大小扫描因此在同时改变节点大小与缓冲占比
+  （4 KiB 时 0.78、16 KiB 时 0.195、64 KiB 时 0.049），三档不可比。**
+  纠正见 E56（消息缓冲的收益 vs ε）。
+
+**口径**：`e7-index`，musl 静态，xorshift64\*；扇出 32、1024 叶、每叶 64 key、
+key 空间 65536；节点 4 KiB、每节点 255 槽；缓存 64 页、write buffer 512 条、
+Bε 缓冲 200 条、checkpoint 每 4096 次操作；每轮 20 万次更新 + 2 万次点查。
+虚机 2048M / 4 vCPU / 64 MiB virtio 盘，`cache=none,aio=native`；宿主 32 核 / 60 GiB；QEMU 8.2.2 + KVM。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:285-296`（整段抄，未转述）**
+
+```markdown
+### ⚠️ 那条解析式对照此前只活在散文里（2026-08-29 对抗验证补上）
+
+E7（离线索引 harness）列的第三条独立校验路径是「两条解析式与实测吻合（1.9375 vs 1.9378、约 1.56 vs 1.5755）」，
+而**代码里没有任何断言钉它**——四个单测钉的是页号不重叠、key 映射在界内、几何自洽，**全是结构性质**。
+⇒ 几何常量一改，1.9375 就静默作废，而 D11（索引节点要不要留消息缓冲区） 前置 2 引的
+**3.22 倍正是这套数算出来的**。
+
+补了一条 `the_no_batching_control_arm_has_an_analytic_io_per_op_of_1_9375`：
+`1 + (1 − 64/1024) = 1.9375`，并钉住 `LEAF_COUNT == 1024` 与 `FANOUT² == LEAF_COUNT`。
+⚠️ **它钉的是解析式与几何常量，不是实测值**——实测要设备与虚机，单测里跑不了，
+两者的比对仍然只能靠复跑。变异表存在 `research/mutations/e7_index.tsv`。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:297-314`（整段抄，未转述）**
+
+```markdown
+### 三条从 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 学来的硬要求（不满足就别开跑）
+
+E12（攒批的顺序追加 vs 不攒批的随机页读改写） 的教训是具体的：它的一条臂声称实现某个机制，实际是一个 stub，
+而两臂的摊销架构还不对称——**结果那个 17 万倍里，机制与攒批各贡献多少拆不开**。
+E7（离线索引 harness）不许重犯：
+
+1. **每条臂必须真的实现它声称的结构。**
+   臂的名字叫什么，代码里就得有那个东西。
+   ⚠️ **自检方式**：把该臂的核心判据换成一个恒真/恒假的常量，结果**必须显著变化**；
+   没变化说明那个结构根本没参与，**整轮作废**。
+   （E12（攒批的顺序追加 vs 不攒批的随机页读改写） 的臂 A 判据换成掷硬币结果一样——那就是这条自检会红的形态。）
+2. **所有臂的摊销架构必须对称**：同一个批量窗口、同一个刷盘时机、同一套发布语义。
+   [decisions.md](../decisions.md) D16（发布语义） 已定 checkpoint，**所有臂都在同一个 checkpoint 节奏下跑**。
+   否则量到的是「谁攒批」，不是「谁的结构好」。
+3. **设备 I/O 必须有块层独立读数**（虚机内 `/sys/block/*/stat`），逐格与程序内计数器比对；
+   且**这条校验路径本身要用故障注入证明有判别力**（摘掉 `O_DIRECT`，块层读数必须归零）。
+   `.claude/singlefs-ai-sop/rules/evidence-discipline.md`：校验路径本身也要证明它会红。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:315-327`（整段抄，未转述）**
+
+```markdown
+### 另加一个自变量：缓冲里放幂等完整值还是增量
+
+[decisions.md](../decisions.md) D11（索引节点要不要留消息缓冲区） 的代价判据已被改写为「缓冲里放的是**幂等完整值**（合并=后者胜，
+checker 不需要理解 value 语义）还是**增量 Δ**（合并依赖 value 语义）」。
+**这一条要作为自变量量出来**：同一条臂在两种条目形态下的写放大与合并代价各是多少。
+它决定 D11（索引节点要不要留消息缓冲区） 的代价 1 成不成立，而那条判据横跨 D8（核心索引结构） 与 D11（索引节点要不要留消息缓冲区）。
+
+**前置**：块设备、一个负载回放器、Rust 工具链。**不需要文件系统、不需要 checker、不需要 D8（核心索引结构） 定案。**
+
+**它解掉什么**：E1（节点大小 vs 可恢复性） 的节点大小、E2（key 布局对递归遍历的影响） 的 key 布局、E4（范围重建 vs 逐项修改的交叉点） 的范围重建交叉点、
+E8（大文件与小文件是否该走不同写路径） 的大小文件分流、E9（key 编码对遍历局部性的影响） 的全路径 vs inode 索引——五个实验的主体部分都可以在这个 harness 上先跑一遍，
+只把「需要真实 POSIX 语义与崩溃恢复」的那部分留到文件系统存在之后。
+
+```
+
+**出处 `.claude/kb/experiments/07-离线索引harness.md:328-338`（整段抄，未转述）**
+
+```markdown
+### 影响的决策
+
+| 决策分项 | 关系 | 回看 |
+|---|---|---|
+| D8（核心索引结构） 已定项 15 | 支撑 | 2026-09-20 不受影响：已定项 15 第 1 条「节点缓存必须抗扫描」压的是 E7（离线索引 harness） 那三档缓存 io/op 逐位相同与打乱组序的干预，第 3 条之下那句「关键路径上卡住的是加密不是合并」压的是它的 I/O 折算；D8（核心索引结构） 这次把那三条硬要求立成编号分项 15，规则一个字没动；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+| D8（核心索引结构） 已定项 4 | 支撑 | 2026-09-20 不受影响：D8（核心索引结构） 已定项 4 的「固定内存预算下大节点三个轴全都更差」那张表、以及寻道主导那一端的 13.8% 与 100.7%，都逐格取自 E7（离线索引 harness）；这次只把一句与 D12（目标介质） 今天对不上的现状句改成现值，数与结论一个字没动；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+| D11（索引节点要不要留消息缓冲区） 已定项 1 | 备料 | 2026-09-20 不受影响：E7（离线索引 harness） 给出的「Bε 相对 D8（核心索引结构） 现方向 3.22 倍」是 D11（索引节点要不要留消息缓冲区） 当年要的那个数，而它跑在 4 KiB 节点上，今天 D11（索引节点要不要留消息缓冲区） 已定项 1 的依据引的是 E56（消息缓冲的收益 vs ε）；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+| D12（目标介质） 已定项 1 | 不影响 | 2026-09-20 不受影响：E7（离线索引 harness） 只把布局套数当出处引一句，判据与结论都不落在 D12（目标介质） 上；那个括注这次按现查改成 D12（目标介质） 已定项 1 今天的「不预先封顶」，D12（目标介质） 一个字没动，改动的原文在 [experiments-history.md](../experiments-history.md)；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+| D16（发布语义） | 不影响 | 2026-09-20 不受影响：E7（离线索引 harness） 只把 D16（发布语义） 已定的 checkpoint 当四条臂共用的摊销节奏，判据与结论都不落在它上面；反过来是 D16（发布语义） 钉死 E7（离线索引 harness） 的对照组；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+| D5（快照 / 空间记账机制） | 不影响 | 2026-09-20 不受影响：E7（离线索引 harness） 只在「Bε 的优势条件是树装不下缓存」那一句拿 E12（攒批的顺序追加 vs 不攒批的随机页读改写） 里 D5（快照 / 空间记账机制） 的优势条件作同构类比，没有判据落在 D5（快照 / 空间记账机制） 上；同日全仓改名「系统配置」→「系统配置」只动措辞，结论、数与产物不变 |
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:1-4`（整段抄，未转述）**
+
+```markdown
+## D8 核心索引结构 —— 已定
+
+D8（核心索引结构） 管核心索引长什么样：一套 btree 实现配多个独立 keyspace 与两个前端、节点大小与它的上限判据、key 布局、whiteout 删除与无界操作的分批、inode 树的形态与 inode 记录的盘上字段表、write buffer 条目的 `seq`、树表条目的字段表与树的种类码登记表、码 2 索引节点的载荷布局与 key 比较序、前端与节点消息缓冲区的衔接、同一次发布里同一个 key 的状态折叠。**不预设 B-tree**，调查见 [prior-art.md](../prior-art.md) 第五节。不管的：记账统计量的载体、key 与合并规则在 D5（快照 / 空间记账机制）；多可写头下 key 要不要加一维快照、快照的实现模型在 D6（快照实现模型）；消息缓冲区的 ε 布局轴在 D11（索引节点要不要留消息缓冲区）；单元头、单元类型码与打包记录单元的装载纪律在 D18（块里携带什么信息）；指针的字段与宽度在 D19（块指针的结构与宽度预算）；发布语义与 checkpoint 边界在 D16（发布语义）；格式冻结的层次在 D15（格式冻结政策）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:28-40`（整段抄，未转述）**
+
+```markdown
+#### 已定项 1：记账取幂等完整值，接受 key 数量上升
+
+**定案**：**记账条目一律是「某个统计量在某一代的完整值」**，写入时整格覆盖；**不用增量 Δ**。合并规则按统计量分（D5（快照 / 空间记账机制） 已定项 3 第 2 条、登记表见 D5（快照 / 空间记账机制） 已定项 10）：非单调统计量「后者胜」（后者由 `seq` 定），单调统计量取最大值。取最大值同样幂等、可交换、可结合，本项的论证（幂等完整值胜过增量 Δ）不受影响。付出的是 key 数量上升（每个统计量 × 每一代各占一条）。
+
+**射程**：它定的是记账条目 value 的语义；载体（记账住一棵独立 keyspace 的 btree、条目是「(统计量, 维度元组, 代) → 完整值」）在 D5（快照 / 空间记账机制）。⚠️ **key 数量上升的量还没测**：「接受」是对方向的定案，量出来之前不许拿它去推「记账占多少空间」。⚠️ **兜底**：若某一类账确实做不到幂等（本项不预判有没有这一类），那一类必须另有一条与运行时**不共享判定代码**的独立重算路径。⚠️ 它同时改变 D11（索引节点要不要留消息缓冲区） 代价 1 的成立条件——该代价的判据是「缓冲里放的是幂等完整值还是增量 Δ」，本项把答案钉在幂等那一侧 ⇒ **代价 1 在本工程不成立**；D11（索引节点要不要留消息缓冲区） 的代价 2（可重建性退化）不受影响。
+
+**依据**：
+
+- E14（I-3.1 的判别力：幂等完整值 vs 增量 Δ）：同一棵树同一负载注入四类语义 bug，幂等完整值形态下 I-3.1（已分配统计对得上） 全抓、零盲区，增量 Δ 形态下一条都没抓到——Δ 形态下账本身就是权威内容，checker 只能拿同一个累加函数重放同一份 Δ 日志，它在和自己比。
+- 用户定案 2026-08-29：取幂等完整值，接受 key 数量上升（原话在变更史）。
+
+**欠**：C15（write buffer 混入 Δ）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:41-56`（整段抄，未转述）**
+
+```markdown
+#### 已定项 2：节点大小 16 KiB，钉成常量
+
+**定案**：**节点大小 16 KiB。mkfs 把 16 KiB 写进系统配置，实现按常量走，不按设备特性算**——格式里是一个常量，不是一条公式。
+<!-- format-const: NODE_BYTES = 16384 -->
+
+**射程**：⚠️ **登记 `format-const` 不等于冻结这个数**（2026-08-31 用户定案：「这个数需要可以调整」）。那条标记只保证 **kb 与实验源码写的是同一个数**，改它照常走 D8（核心索引结构） 的流程；它写进系统配置，仍然是 mkfs 参数。⚠️ **它现在只钉得住一部分源码**：门禁阶段「格式常量在 kb 与实验源码之间同步」（`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格）的形态是 `const 名 = 整数字面量`，`e56_epsilon.rs` 的 `16 * 1024`、`e43_extension_point_budget.rs` 与 `e52_head_mechanisms.rs` 的数组形式都不认。⚠️ **16 KiB 是 CPU 缓存轴上的选择，不是设备 I/O 轴上的**：E7（离线索引 harness） 量设备 I/O 时说小节点两端都赢、方向相反，两者量的是不同资源，不矛盾。上限那一维归已定项 4；E1（节点大小 vs 可恢复性） 的恢复时间那一半一旦给出比 16 KiB 更紧的上限，本项重开。
+
+**依据**：
+
+- E20（指针变宽的 CPU 缓存代价）：唯一超出 L3 的工作集上 16 KiB 是最小点；同一实验里 40 字节的指针头部在 4 KiB 节点付出的相对代价远高于 16 KiB 节点，大节点吸收指针变宽；同一条曲线上 8 KiB 的反常六轮稳定且无人解释 ⇒ 在解释掉它之前不许把节点大小写成「按设备特性算」。
+- E6（加密算法选型）：加密 / 校验单元的增益在 16 KiB 之后基本饱和。
+- E73（节点 key 区间的扇出代价）：码 2 头带上 key 区间之后树高一格都没涨，16 KiB 不用重开。
+- 用户定案 2026-08-30：16 KiB 钉成常量（原话在变更史）。
+
+**欠**：C56（没登记的格式常量仍会漂）、C386（节点大小结论欠一次按最终指针宽度的复跑，没有编号）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:57-87`（整段抄，未转述）**
+
+```markdown
+#### 已定项 3：key 布局 —— 改名与索引分开处理
+
+**定案**：**key = `(locality_id, inode, offset)`**，`locality_id` 在创建时从父目录继承，**改名时故意不更新**。offset 段是**文件字节偏移**（这个单元第一个字节在文件里的偏移，第 n 个单元从 0 起是 n × 净荷容量 32634）。
+
+- 命名走 dirent 树（`parent, name` → inode），改名就是删一条加一条，**O(1)**
+- 数据按 inode 编 key，与名字彻底解耦
+- scan 局部性来自继承的 `locality_id`，改名后**局部性缓慢退化，正确性不受影响**
+- 退化由 D3（空间分配） 已承诺的常驻后台整理修复，不是新增负担
+
+**批量改名**：`mv 大目录 别处` 在这个设计下**只改一条 dirent**。三处会把它重新变成无界操作，必须一开始就堵死：
+
+1. **`locality_id` 永远不许被改名更新。** 它是**提示，不是正确性的一部分**——可以是错的、可以过期。
+2. **改名覆盖已存在的目标 = 一次删除**，必须走已定项 5（whiteout 删除）的 intent log。
+3. **后台重新聚簇必须是增量、可中断、可续做的**，且随时可以停掉不做。
+
+**推论（可当 review 判据用）**：**任何让 rename 触及后代的设计改动，一律否决。**
+
+**inode 记录必须存一份 `locality_id`**：它既是数据 key 的首段、又永不随改名更新，而命名树的 value 只有 inode、数据单元头的五元组里也没有它，所以盘上只有 key 自己带着它——读者打开一个改过名的文件时必须有地方拿到它，否则改名之后数据只能靠扫描才找得到。落点是已定项 6（inode 记录的盘上字段表）；这个值按本项从父目录继承，而第一版没有目录，所以「没有父目录时取什么」也要一起定——第一版取 0，登记在已定项 6 的记录字段表。扫描重建时重编出来的 key 首段按 inode 记录 > 幸存 extent key > 0 给这个对象的全部 key 编同一个首段（2026-09-16 用户定案，D18（块里携带什么信息） 已定项 3 那条加字段的提议不收）。
+
+**射程**：它管数据 key 怎么编与改名怎么不触及后代，不管命名树自己的 key（dirent 树按 `(parent_inode, name)` 编，见已定项 5）。scan 局部性不一定要住在 key 序里：可以住 key 序（全路径索引，改名是 O(子树深度)）、住分配器（把子目录的数据放到父目录附近）、住第二索引（仍然贵，且要多维护一份一致性），本工程取「出生时继承、改名不更新的 locality 前缀」（较好，改名免费）。⚠️ 「它是提示、可以是错的」准许的是**不信它的含义**，不是**不存它的位**：作为地址首段它的取值精确且定义性。⚠️ **E9（key 编码对遍历局部性的影响） 的遍历局部性数只在一个口径下成立，引用必须连口径一起引**：**交错创建**（`interleave`，老化的代理）**加上 `cache_leaves = 8`**；`locality_id` 的收益是**新树的收益**，不是稳态收益，改名强度的现实性未校准——曲线可用，绝对刻度不可用。⚠️ 全路径索引的遍历优势也量出来了，但**不许拿它去替 D9（加密） 泄漏面与 D1（数据可移动性 / 反向索引） 稳定性做判断**——E9（key 编码对遍历局部性的影响） 对那两样一个字没说。⚠️ 「每次改名平均重写约 2700 个 key」这个数**缺口径**（查不到是哪一档改名、哪个种子），标为未核实；同表里 ext4 Orlov 分配器「遍历内核树快 30%」也是未核实——kb 内无出处无口径，要用先补。⚠️ 三段 key 在 D6（快照实现模型） 取多可写头之后曾经不完整（两个可写头各写一次同一个 `(locality_id, inode, offset)` 会落在同一个 key 槽、后写覆盖先写），2026-08-30 D6（快照实现模型） 已定项 1 取「每头一棵自己的树」之后消解——每头一棵树之下三段 key 在树内唯一，**两个头不再落进同一个 key 槽**。⚠️ **nonce 那条义务仍在**：D9（加密） 已定项 4 已定 nonce 每 extent 存，**生成时仍必须保证两个可写头之间不撞**（候选形态是按头划分 nonce 空间），它不再由身份唯一性免费得到，否则 I-6.1（nonce 不重用） 从「由身份唯一性保证」变成「由生成器保证」而没人保证它；该义务是推论，未走三方论证。⚠️ 后台重新聚簇是只搬物理位置还是重编 key、重编时怎么分批、进度从哪续做，全仓没有定义。
+
+**依据**：
+
+- E9（key 编码对遍历局部性的影响）：同一棵目录树同一个 LRU 上四条臂对比，`locality_id` 前缀比按 inode 编 key 少发设备读，值得做；depth-first 创建时三条真实臂逐位相同，缓存装得下整棵树时四条臂全部相等、效应消失；收益随改名次数衰减到几乎为零。
+- 机制论证（2026-08-25 定案时写下，原文在变更史）：全路径索引在本工程还要多付三条 BetrFS 不必付的代价——分隔 key 就是路径会把 D9（加密） 已定项 5 认定的敏感信息从一棵树扩到所有按路径编 key 的树、引用方身份是路径会让 D1（数据可移动性 / 反向索引） 的反向索引条目随改名全部失效、lifting 对 key 编码的额外要求与 D9（加密） 的 nonce 载体和 D6（快照实现模型） 的快照 ID 位置抢同一段 key 空间。
+- 用户定案 2026-09-16：扫描重建时给一个对象的全部 extent key 编同一个首段（原话在变更史）。
+- E157（并行线一两条条款的计数模型） 量出：定位一页的节点读取次数、树高与叶片数、换容量后字节区间还原那一格，两臂在全部取样点上逐点相等、分不开；唯一分得开的是 AAD 锚点那一格，文件字节偏移下 N 个 key 全算对、单元序号下只有 1 个算对。
+- D9（加密） 已定项 6 逐字「锚点偏移 = 该 extent 首次写出时的对象内起始偏移，读者现算 `key.offset − ptr.extent_off`」，而同一条决策已定项 12 第 2 项写明 AAD 字段组成是 day-1 永久契约 ⇒ 条款本来就预设了这个单位。
+
+**欠**：C346（后台重新聚簇没有定义）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:88-105`（整段抄，未转述）**
+
+```markdown
+#### 已定项 4：节点大小 —— 上限由恢复时间定，靠实验取值
+
+**定案**：大节点省 seek、树更浅，但**重扫代价随节点大小线性放大**，所以**不照抄 128K–256K**。**节点大小换的是「恢复时间」，不是「数据安全」，目标线该定在恢复时间上。取值靠 E1（节点大小 vs 可恢复性） 定：在「重扫代价 ≤ 目标线」的前提下取查找代价最低的那档。** 三条约束：
+
+1. **它是 mkfs 时的格式参数，不是挂载参数。** 自动选取只发生在 mkfs 一次。改它 = **重建索引**，不是重建文件系统（D21（权威态与派生态的分界） 已定索引是派生态、冻结第 2 层降级为本地缓存格式）。
+2. **默认策略必须是确定性的、可查的**，且 mkfs 要把「为什么选了这个值」打出来。
+3. **测试钉死的是「模拟设备的参数」，不是节点大小本身**——固定一组设备档位让自动规则照常跑，**连选取规则本身也一起被测**。要求只有一条：同一档位必须得到同一取值。
+
+**射程**：⚠️ **判据不是「全盘扫描重建成功率 ≥ 目标线」**——索引坏的永久损失恒 0 ⇒ 成功率这一维与节点大小**无关**，拿它当判据夹不出任何上限。⚠️ **目标线本身仍未定**，它是一个恢复时间预算（多久之内要把被破坏的那部分重扫回来），本项自己算不出来；E1（节点大小 vs 可恢复性） 剩下那一半仍欠 mkfs、checker 与一个能定点破坏镜像的工具。⚠️ 前置：索引可从单元自描述重建——E28（明文映射层能不能只靠单元自描述重建） 实测**元数据侧成立、数据块侧今天不成立**（缺口恰等于数据块总数，欠 D18（块里携带什么信息） 已定项 3）；⚠️ **「改它 = 重建索引」取消的是定性，不是代价**：整棵树按新尺寸重建是一次满量级的全盘 I/O，只是不丢数据；而且这个取消有未满足的前置——数据块自描述补上之前，「等于重建文件系统」在数据块那一侧仍然成立。桥接依据是索引树重建与明文映射层重建**读同一份输入**（每个单元自带「我是谁、我属于谁」），⚠️ 这一步是推理，E28（明文映射层能不能只靠单元自描述重建） 只测了明文映射层那一个实例；D11（索引节点要不要留消息缓冲区） 「不能拖」的全部理由就是这半句。⚠️ **第一期只有字节主导那一端在射程内**：D12（目标介质） 已定项 5 定第一条布局线是纯 SSD ⇒ 结论不变，**支撑从两端变一端**；寻道主导那一端要等 HDD 布局线开出来才重新在射程里。⚠️ **节点大小的自动选取判据里必须含指针宽度这一项**（E20（指针变宽的 CPU 缓存代价）：大节点吸收指针变宽，方向与重扫代价相反），此前没有。⚠️ **「按设备特性取相反方向」这个理由不成立**：两端最优方向相同，都偏小；节点大小仍是 mkfs 参数，要保留按介质调档需另找依据。
+
+**依据**：
+
+- E29（坏一个节点的爆炸半径）：索引坏的永久损失恒为 0（D21（权威态与派生态的分界） 已定索引是派生态、丢了只是慢），数据单元坏的损失与节点大小无关，只有重扫代价随节点大小线性放大（第 1 层节点的重扫量恰等于扇出）——所以上限只能定在恢复时间上，「爆炸半径」这个说法被它纠正。
+- E7（离线索引 harness）：**固定内存预算下大节点三个轴全都更差**（量的是 io/op、字节/次、点查读/次），机制是节点越大、同样的内存装得下的节点越少，命中率掉得比「每次读更多」赚回来的更快；寻道主导那一端方向相同，大节点仍差 ⇒ 「不照抄 128K–256K」在字节主导与寻道主导两端都得到支持。
+- 用户定案 2026-09-06：口径改写成「上限由恢复时间定」（原话在变更史）。
+
+**欠**：C386（节点大小结论欠一次按最终指针宽度的复跑，没有编号）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:106-151`（整段抄，未转述）**
+
+```markdown
+#### 已定项 5：whiteout 删除 —— 接受，但批量删除必须走 intent log
+
+**定案**：删大目录、截断大文件会产生海量墓碑，塞进一个事务必然爆掉。**做法（bcachefs 已验证的形态）**：凡是**可能修改无界数量 extent** 的操作（truncate、collapse、删大目录），**先把意图写进 logged_ops 树，再分批推进**；崩溃后恢复时续做未完成的意图。删除中的 inode 单独进 `deleted_inodes` 树，由后台回收——用户的 `rm` 返回，不等于所有 extent 都已释放。第一版 unlink 不往 logged_ops 树写条目：意图就是 inode 记录 nlink = 0 加 `deleted_inodes` 那一条（已定项 16）。logged_ops 树在第一个文件版本那次与 `deleted_inodes` 一起零根注册，字段表、回退时取哪一版、态别留到第一个写者（整理，D26（后台整理与放置回收） 已定项 2）落地时定（C364（整理意图记录没有字段表））。意图分两类：**承诺类**（unlink；truncate、删大目录）必须续做到底，可写挂载交回之前走到空；**提示类**（整理）可暂停、可在停机谓词下提前收、交给盘那条线上不续做，不挡挂载；续做入口按树分、共用发布路径。本条第 2 条与三态表、C1（意图续做做成常规路径） 的字面今天按承诺类写，整理落地时按类分开写（C621（整理落地那天要动的已写回删除条款没有清单之外的检查））。
+
+**硬要求**：无界规模的操作一律不许做成单个事务；意图必须**幂等**；whiteout 只在节点重写合并 bset 时清除，**不许有别的清除路径**。
+
+意图本身就是一条普通 key，骑在同一个事务层上，断电后只有三种状态：
+
+| 断电时机 | 恢复后看到 | 怎么收场 |
+|---|---|---|
+| 意图提交之前 | 没有意图 | 操作从未发生，用户那边也没返回成功 |
+| 意图已提交、工作做了一半 | 意图还在 | 恢复时**续做**，已做完的部分被幂等地重跑 |
+| 工作做完、意图未删 | 意图还在 | 续做一遍发现无事可做，然后删掉意图 |
+
+不可能出现「意图没了但目标状态没达成」——**删除意图必须与最后一批工作在同一个事务里提交**。
+
+1. **意图声明目标状态，绝不声明增量。**「把文件 X 截到 N 字节」可以重复执行，「再删 1000 个 extent」不能。
+2. **续做是每次恢复都跑的常规动作，不是修复手段**（否则会出现「平时不跑、真出事时才第一次跑」的代码路径）。
+3. **中间状态必须每一个都是合法的文件系统状态**——「删了一半 extent 的文件」本身就得合法。
+4. **一批里每个动作施加时先核它要删的东西还在**（随 D5（快照 / 空间记账机制） 已定项 12）——幂等的字面：一批按批开始时的状态为几个意图各算一份计划、施加时不复核，两个区间重叠的级联会把同一块放两次，统计量减两次、I-3.1（已分配统计对得上） 红。
+
+**范围重建 vs 逐项修改：两条都要有，且要有显式判据**（`.claude/rules/fs-design.md`「不追求万能方案」）：
+
+| 走法 | 代价 | 适用 |
+|---|---|---|
+| 逐项修改 | K × 随机访问 | 受影响的 key 稀疏散布 |
+| 范围重建 | N × 顺序访问 | 受影响的 key 在 key 序上连续 |
+
+**真正的开关不是 K/N，是「受影响的 key 连不连续」**：连续 ⇒ 范围重建可整节点丢弃或重写；不连续 ⇒ 只能逐项。**由此得到一条布局规则：让一起死的东西在 key 序上挨在一起。**
+
+- dirent 按 `(parent_inode, name)` 编 key → 删整个目录是范围操作
+- extent 按 `(inode, offset)` 编 key → 截断是范围操作
+- 同一快照的 key 带同一 snapshot 前缀 → 删快照有机会变成范围操作
+
+**这顺带从结构上解掉了 whiteout 膨胀**：范围删除直接丢弃整个节点，不用插 N 个墓碑。
+
+**射程**：朴素的交叉点是 `K/N > 顺序代价/随机代价`（机械盘约 1%、SSD 约 10%）。⚠️ 这两个数是**推理，不是实测**，说的是**耗时**，要靠 E4（范围重建 vs 逐项修改的交叉点） 量，那一半要 QEMU。⚠️ **第一期只取 SSD 那一档**（D12（目标介质） 已定项 5：第一条布局线是纯 SSD）。⚠️ 写放大那一半量到的交叉点，自变量是「布局」与「节点大小」而不是介质，不能拿它去证伪「机械盘约 1%、SSD 约 10%」——那说的是耗时。按 `.claude/rules/fs-design.md` 的五条要求，这个分支还欠：判据写成可计算的式子、留一个能强制走指定分支的测试开关、两条分支各自跑崩溃点重放、运行时能看出走了哪条。⚠️ **切换判据里不许出现「当前填充率」这类操作中途会变的量**——判据只能用操作期间稳定的输入。**与 D3（空间分配） 的交互（容易漏）**：意图未完成期间那些空间还没真的释放，空间统计必须把「待删除但未完成」计进去，否则会出现「我删了一大堆，`df` 却不动」。
+
+**依据**：
+
+- E30（交叉点的写放大那一半）：**写放大那一半已量**——在写放大口径下量出条目连续与条目散布两种布局在 4 KiB / 16 KiB 节点上的交叉点，两者相差两个数量级以上——开关是布局与节点大小，不是介质。
+- 用户定案 2026-09-16：加第 4 条硬要求「一批施加时先核要删的东西还在」（原话在变更史）。
+- 三方 `research/prompts/m3-intent-r1-main-verification.md`：意图分承诺类与提示类（两腿独立得出，一轮）；logged_ops 树现在零根注册是用户定案 K-I1（原话在变更史；被攻过零轮）。
+
+**欠**：C1（意图续做做成常规路径）、C2（无界操作做成单事务）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:152-219`（整段抄，未转述）**
+
+```markdown
+#### 已定项 6：inode 树的叶是码 3 打包记录单元，记录定长 140，已发布的 (inode 号, 对象出生代) 不复用
+<!-- doc-lint:not-numbers P1 P2 P3 P4 P5 P6 P7 P8 P9 -->
+
+**定案**：inode 树 = 码 2 内部节点（派生态，不留消息缓冲区，条目 120 字节、扇出 135）+ 码 3 打包记录单元做叶（打包记录类型 2，权威态单元，一叶 233 条 140 字节记录）；根恒为码 2；容器索引就是这棵树的内部节点；已发布的 (inode 号, 对象出生代) 不复用，下一个号是记账里一条取最大值合并的统计量。码 2 根装满时长一层——新根 1 个码 2、分出的右半 1 个码 2（右半没有容器身份），inode 树与墓碑树（D18（块里携带什么信息） 已定项 24）共用这一条；长高那次发布多 2 个 16 KiB 节点 × 副本数。根长高之前今天的代码在 `crates/singlefs-core/src/inode_tree.rs` 的 `MoreLeafContainersThanOneRootNodeHolds` 拒（推的单元数，零轮）。
+
+| 部件 | 是什么 | 态别 |
+|---|---|---|
+| 叶 | 一个 32 KiB 码 3 打包记录单元（D18（块里携带什么信息） 已定项 11），打包记录类型 2，装 233 条 140 字节记录；自带类身份段、记录数、记录宽、载荷校验和，扫描路径上的载荷完整性证据（C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据） 对码 2 的洞）对它不存在 | 权威态（单元） |
+| 内部节点 | 码 2 索引节点。头带 key 区间（min / max 各 8 字节，D18（块里携带什么信息） 已定项 2 留给 inode 树的那一格由此定「带」：理由与记账树同一条——一个节点单独捡起来能自证覆盖段，key 是 inode 号不是文件名、敏感性论证够不到）。**头是块头，落 D15（格式冻结政策） 第 1 层（冻结），与记账树节点头同一格（C102（索引节点头没有预留区，加字段不是 compat））；载荷布局（条目 120、ε = 0）落第 4 层，不永久** | 派生态，丢了从叶重建 |
+| 根 | 恒为码 2 索引节点，哪怕树只有一片叶，哪怕树是空的（零条目，key 区间写 [0, 0]，0 是无效 inode 号）。理由：D19（块指针的结构与宽度预算） 的指针不带被指对象的类与大小，树表指针指向的根若类会随树长大而变，读者按 16 KiB 读 32 KiB 是静默误读 | 派生态 |
+| 容器索引 | 就是这棵树的内部节点，不另立树：物理指针只住内部节点，dirent 树引用的是 inode 号。更新一条记录 = COW 叶 + 全部祖先（D23（journal 的角色与格式） 已定项 1 甲） | — |
+
+**内部节点条目 = 分隔 key 8 + 身份引用 26 + 子指针 86 = 120 字节**（扇出按今天的头 131 算 ⌊(16384 − 131) / 120⌋ = 135）。身份引用就是 D18（块里携带什么信息） 已定项 11 给「别的树引用容器」的那 26 字节：出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8。**类型段兼作「子节点是什么」**：0 ⇒ 子节点是码 2 索引节点（容器号、出生代两段恒 0；登记表里的 0 在容器头里仍是无效，两处含义靠所在结构区分），2 ⇒ 子节点是码 3 容器（读两个 16 KiB 槽）；其余值判条目损坏。合法集合按树分：inode 树 {0, 2}（I-9.2（条目身份与子头相符））、墓碑树 {0, 1}（I-9.23（墓碑树条目身份与子头相符））、谱系树 {0, 5}（I-9.17（谱系树条目身份与子头相符）），三棵树的内部条目同一形态。读者由此知道读几个槽；码 3 那条边的 AAD 五段（标签由类型 ≠ 0 推出，其余四段照抄条目）全部来自查找路径，D9（加密） 的 A6（AAD 期望值不来自明文侧）在这条边上不需要树的种类；码 2 那条边（内部节点指内部节点）的 AAD 仍是 C107（索引节点的 AAD 身份无落点）。出生树逐条目携带，是因为克隆头（D6（快照实现模型） 已定项 1）共享 origin 的叶，同一个内部节点里会混着出生树不同的条目；D19（块指针的结构与宽度预算） 已定项 7 让子指针头部也带出生树之后，身份引用里的出生树**照旧保留**——两份并存，加密开不开都占位、不挪作他用；类型段 0 条目身份引用里的出生树恒 0，与容器号、出生代两段同形；码 3 那条边 AAD 的出生树取身份引用那份，不取子指针那份。**分隔 key** = 该孩子创建时的最小 key，条目按分隔 key 单调递增，查找取最后一个分隔 key ≤ 目标 key 的条目。
+<!-- format-const: INODE_INTERNAL_ENTRY = 120 -->
+
+**内部节点不留消息缓冲区，inode 树的 ε = 0**——这是对 D11（索引节点要不要留消息缓冲区） 已定项 6 的树轴增补（布局轴「全部布局共用同一组 ε」不动）。分支变量是 D11（索引节点要不要留消息缓冲区） 已定项 4 那条谓词：**这棵树待下刷的消息能不能只从权威态（单元（带写序）+ 实例表 + 祖先表 + 墓碑单元）重算**。能 ⇒ 留缓冲（ε = 0.65）；不能 ⇒ 不留。inode 树不能：属性更新（mtime / nlink / mode 的新值）在到达叶之前没有权威态载体，缓冲进派生态节点就撞 D21（权威态与派生态的分界） 硬约束 6。extent / dirent / 反向索引能（E59（缓冲消息能不能只从单元重算） 的「单元 + 记账」一行三类全 0）；记账树按 D21（权威态与派生态的分界）「离线可由遍历重算」判能，但 E59（缓冲消息能不能只从单元重算） 那一列是神谕、未实测。它落 D15（格式冻结政策） 第 4 层（派生态），不是格式分支。**态别按重算性判，不按「树」这个词判**：一棵树的内部节点可从它的叶重算 ⇒ 派生态；叶若装着算不回来的值 ⇒ 权威态。记账是同一条判据的已定实例，权威记录点在 D21（权威态与派生态的分界）。
+
+**装载纪律按记录类型分**：「一容器一个代际」与「快照发布前先关闭开放容器」只对按代际回收的打包记录类型 1（墓碑）成立；类型 2 的记录逐条死亡，容器由 B 树分裂 / 合并回收，一片叶活很多代、反复重写，快照只是共享它。类型 2 的记录死亡不写墓碑，死亡由现行叶版本体现，择现行版本压在 C113（扫描重建时多版单元的现行版本判定无输入）。
+
+**容器身份不需要分配器**：inode 号在每一条时间线上单调（管理员回退的新根取 R_old 那一版的 inode 树、水位取 max(现行那一版内存里的, 环里读得出的根的)；崩溃恢复回到所选根的树与它的水位；两种之后发的号都大于那棵树里每一个 key）⇒ 插入永远落在最右的叶 ⇒ 分裂只发生在最右叶，**分裂点取末尾**——左半保留全部原有记录与身份，右半从触发分裂的那条新记录起，**右半容器号 = 那条新记录的 inode 号**，出生代 = 本次发布的 checkpoint_txg，**出生树 = 执行这次分裂的那棵树**（分裂是新建，与「COW 重写身份不变」是两件事）；第一个容器的号 = 第一条记录的 inode 号。内部节点同样在右端溢出、末尾分裂，右半是码 2、没有容器身份。合并：只许**左吸收右 / 左从右借**（右吸收左或右从左借会破「记录号 ≥ 容器号」），保留左半身份，右半退役走 COW 释放路径；合并时机是写路径策略（单测 / 模型对拍），不进格式。**记录数为 0 的类型 2 容器不落盘**（发布前必须合并掉；唯一的叶被删空时是不落盘、根变成零条目）。**跨头首次 COW 的重生**（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P6）：新身份 = (本头树 ID, 类型 2, 原容器号, 本次发布代号)——保留容器号、只换出生树与出生代，同时给旧身份写退役记录。重生只对类型 2：类型 1 容器归写者树独占、克隆不收进自己的容器索引（D18（块里携带什么信息） 已定项 11），从不跨头 COW。两条不同的断言并存：「容器被 COW 重写时身份不变」（内容同、位置变）与「分裂后左半身份不变」（内容少了、身份不变）。类型 1 的容器号仍按 C103（容器索引无落点） 那套单调分配，两条规则按记录类型分。
+
+**key 与 inode 号**：key = inode 号 8 字节，唯一性范围 (树 ID, inode)，位宽 64，声明生命周期创建总数上界 2^63。**已发布的 (inode 号, 对象出生代) 不复用**（D6（快照实现模型） 判据 9 的戒律）：`deleted_inodes` 后台回收窗口里复用会让新旧对象的 extent key 三段逐字相同。⚠️ **「已发布的」这四个字不是为了对齐措辞，是让现行设计自洽**：水位住记账（D5（快照 / 空间记账机制） 已定项 4 第 12 项），被抛弃 checkpoint 的那笔账随它一起丢 ⇒ **每一次普通崩溃**都会让那一代发过的 inode 号被重发。管理员回退是挂着时的一次向前发布，那次发布的 inode 号水位取 max(现行那一版内存里的, 环里读得出的根的)，已发过的号不重发（D23（journal 的角色与格式） 已定项 14）；崩溃恢复落到较旧的根时水位随所选根那棵账载入，被抛弃时间线里已发过的号会被重发，而恢复之后每一个新对象的出生代都大于环里读得出的每一条根与记录的 txg（D23（journal 的角色与格式） 已定项 14 注 3）——要几个故障才撞得上被抛弃时间线里已发布对象的出生代，崩溃恢复那一形没量过，见 C143（inode 号水位在崩溃恢复落到旧根后退回去重发）；对外暴露的对象身份 = (inode 号, 对象出生代)，凡按 inode 号认对象的结构都要带上出生代或随根回退。`deleted_inodes` 回收窗口里 extent key 三段逐字相同那一句说的是同一条时间线里的复用（旧对象已发布、它的 extent 在树里等后台回收），照旧被禁；崩溃恢复之后重发同一个号，新对象的 extent 落在所选根那棵 extent 树里，旧对象的 extent 随被抛弃的根一起不在树里——**这靠 extent 树与 `deleted_inodes` 都随所选根**；管理员回退那次发布的新根取 R_old 的 inode 树与 extent 树，`deleted_inodes` 也取 R_old 那一版的（否则 R_old 之后删掉、随 R_old 的 inode 树回来的对象会被后台回收再收一次；主 agent 2026-09-26 定，推的，被攻过零轮）；`deleted_inodes` 的形态（已定项 16）守这两条；盘上分开两者的是单元五元组里的对象出生代（D9（加密） 已定项 6）。**inode 记录在回收完成前留在 inode 树里（nlink = 0），`deleted_inodes` 只存号**。
+
+**下一个 inode 号是记账里的一条统计量**（D5（快照 / 空间记账机制） 已定项 4 第 12 项「inode 号水位」）：key = (统计量, 树 ID, 设备段, 代)，不带设备维，value = 下一个可用号，**合并规则取最大值**（幂等、交换、结合）；条目照样带 seq（已定项 15 第 3 条是格式要求，一棵 write buffer 树一套条目格式），只是**合并结果不依赖它**。选它而不是「后者胜」的理由是崩溃后 txg 重发那一格：同一个代段里先后出现大小两个值，取最大值给大的（浪费号、不复用号）；「未发布的等于没发生」只对常规挂载路径成立，扫描重建看的是盘。「标签 → 合并规则」是盘上语义，统计量登记表立成独立冻结组件（D15（格式冻结政策））。水位行只为可写头维护、随每次发布重写（D5（快照 / 空间记账机制） 已定项 2 的 K 代点删要求每行每发布重写），只读树没有这一行；读现行值 = 取该维度元组下代号最大的那一行，空 ⇒ 从未维护过、不是 0。克隆头：新头的水位 = origin 那一刻的运行时水位（含还在 write buffer 里没落盘的那条），建克隆那次发布必须为新树写出这条水位行；两个头此后各自分配，号会相交，唯一性靠 (树 ID, inode)。
+
+**记录字段表（定长 140，小端；对齐口径是记录内偏移，容器内第 n 条起点 136 + 140n（码 3 头 107 + nonce / MAC / 算法类型预留位 29，D18（块里携带什么信息） 已定项 16）不按 8 对齐，按非对齐读）**
+<!-- format-const: INODE_RECORD_BYTES = 140 -->
+<!-- format-const: INODE_LEAF_RECORDS = 233 -->
+
+| 偏移 | 字段 | 宽 |
+|---|---|---|
+| 0 | inode | 8 |
+| 8 | 对象出生代（创建那次发布的 checkpoint_txg；inode 号不复用后它不再承担复用判别，按五元组 / AAD 的 day-1 契约保留，扫描时与该对象每个数据单元头逐字段对照） | 8 |
+| 16 | locality_id（第一版无父目录取 0） | 8 |
+| 24 | mode / uid / gid / nlink，各 4 | 16 |
+| 40 | size / blocks / rdev，各 8 | 24 |
+| 64 | atime / mtime / ctime 秒，各 8 | 24 |
+| 88 | 改动计数（最后一次改动所在发布的 checkpoint_txg；提交锚 = 叶容器头的诞生代号；同一发布窗口内多次改动只有最后一版落盘——内部节点不缓冲；创建算一次改动，所以改动计数不低于记录偏移 8 的对象出生代，I-9.26（inode 改动计数落在出生代与容器诞生代号之间）） | 8 |
+| 96 | atime / mtime / ctime 纳秒，各 4 | 12 |
+| 108 | 填充（恒 0） | 4 |
+| 112 | flags（恒 0） | 8 |
+| 120 | 预留（恒 0） | 20 |
+
+**`blocks` 是逻辑长度的 512 字节块数**：`blocks` = ⌈`size` ÷ 512⌉，按文件长度向上取整，**不表示分到的空间**，不按这个对象分到几个数据单元算。新池新建文件那条记录 3000 字节 ⇒ 6；新建、还没写过数据的 inode ⇒ 0。
+
+不放 extent 指针（D14（双轨（大小文件 / 持久临时）） 已定项 3 内联阈值 0），btime 不进记录。**flags / 填充 / 预留三段同一政策：恒 0，读者遇到非 0 ⇒ 该记录 EIO（对象级，不拒整个容器）**——前向兼容政策不是损坏检出（载荷校验和照样过），落成 I-9.7（记录三段恒零），在 I-1.7（打包容器合法与判定顺序） 的中止链之外。将来给任一位 / 任一字节赋义按 D15（格式冻结政策）「改变已有字段含义」判 incompat，退役的字节永久报废。**记录内不存在 compat 扩展路径**：inode 属性都有语义依赖，D15（格式冻结政策） 判定表第一行够不着，且记录被反复重写、旧读者会把不认识的内容丢掉。预留 20 不承重：记录内任何赋义都是 incompat，宽度只决定那次要不要连记录宽一起改。**溢出路线按属性逐个判档**：无语义依赖的属性走新增 keyspace（D15（格式冻结政策） 判定表给 compat），有依赖的走 flags 位 / 预留（incompat）；属性 keyspace 今天没有落点（xattr 被推迟）。**记录宽必须等于登记表给类型 2 的宽**，不等判损坏（I-1.7（打包容器合法与判定顺序） 里在「类身份段」之后、I-1.2（块头写序已发布） 之前插一步，只需头字段）；改宽是 incompat。记录格式、码 3 类身份段对类型 2 的用法、inode 树的 key 编码是永久字节：**立成一个独立的已冻结组件**（C9（冻结后偷改格式） 按组件记），冻结时刻是第一个写出类型 2 容器的镜像；不动 D15（格式冻结政策） 的四层；类型 1 的记录格式（宽 40，D18（块里携带什么信息） 已定项 24）各自独立。
+
+**不变量**：I-9（inode 树结构） 一类，十四条，见 [invariants.md](../invariants.md)；状态列统一带前置「树的种类可识别（已定项 8）」，第一版镜像上可由类型 2 容器头里的出生树反推哪棵树是 inode 树。nlink == dirent 条数不在这里立——它的门（dirent 树存在）今天没有输入，随 dirent 树上线时一起立。第一版的唯一文件取 inode 1（0 无效），nlink = 1，不进孤儿回收。分裂 / 合并的身份传递与合并方向以外的写路径纪律是操作断言，走单测 / 模型对拍与崩溃点重放。
+
+**重建**：内部节点丢了，收集打包记录类型 2 的容器，按 (出生树, 容器号, 容器出生代) 分组，同身份多版的择现行 = C113（扫描重建时多版单元的现行版本判定无输入）；每叶 key 范围由记录算，内部节点的 key 区间由叶算；产物落 D18（块里携带什么信息） 已定项 5 的级 1（只读挂载），级 2 的见证者今天不存在。**extent 树的重建**：对象按 (树 ID, inode) 认、只看本头的 extent 树；这个对象的全部 extent key（幸存的与找回的）编同一个首段，取值 inode 记录 > 幸存 extent key > 0，记录完好时重建视图里的值就是记录里的值；取错只丢局部性。I-9.9（locality 三值对照） 在重建之后按侧判：一侧是从另一侧编出来的就输出「不可判定」。
+
+**新池新建文件写**：一个码 2 根节点（头带 key 区间 [1, 1]；一条条目：key 1、类型 2、出生树、容器号 1、出生代 3、指针）；一个码 3 叶（类型 2、容器号 1、出生代 3、记录数 1、记录宽 140）；一条记录（inode 1、出生代 3、locality 0、nlink 1、改动计数 3、三段 0）；记账里一条「inode 号水位 = 2」。
+
+**射程**：**唯一性的射程是一条已发布历史内**——每个容器号都是某条记录首次插入时的 inode 号；号在崩溃恢复落到较旧的根之后可以重发（管理员回退那次发布的水位取 max、不重发，D23（journal 的角色与格式） 已定项 14），所以同一棵树里两个容器可以同号，分开它们的是容器出生代（右半的出生代 = 触发分裂那次发布的 txg，而恢复之后新实例的每一个 txg 都大于环里读得出的每一条根与记录的 txg，D23（journal 的角色与格式） 已定项 14 注 3），同一次发布内「分裂 → 合并 → 再分裂」也造不出同身份两版。跨崩溃不成立：崩溃后 checkpoint 号会被重发，被抛弃那版与重试那版四段逐字相同、内容不同、都在盘上——这与数据单元的五元组、码 2 节点的 (树, 层级, 诞生代号) 是同一种暴露（根记录靠 D16（发布语义） 骑手条款 1 的实例代号分辨，别的单元类靠类身份段里的写序 (实例代号, 事务号) 分辨——容器不单独加实例代号，写序里那 4 字节就是它），常规路径由 D3（空间分配） 已定项 1 的谓词（分配记录）判，扫描重建路径按 C113（扫描重建时多版单元的现行版本判定无输入） 定案的 P2 / P3 规则判。⚠️ **判它安全的依据与树 ID 那条同源**：孤儿与活版的实例代号必不相等（D18（块里携带什么信息） 已定项 11「作废一个 checkpoint 必须换实例代号」），扫描重建的两道闸按写序择新。⚠️ **残留的疑点**：讲统计量合并规则那一句「『未发布的等于没发生』只对常规挂载路径成立，**扫描重建看的是盘**」读起来像是反方向的——它管的是「水位在一个代段里取最大值而不是后者胜」，与「未发布过的号可不可以重发」不是同一个命题，但两者挨得很近。⚠️ **重建的射程是单头镜像**：有克隆头时共享叶头里的出生树是 origin（I-1.3（块头树 ID 一致） 的 C110（跨头共享与加密后元数据类的块头一致性读法） 那一格），按出生树认领会把克隆头的树认残——多头镜像的归属划分要克隆祖先表（E90（树 ID 进 AAD 与跨头共享） 第二笔），落地前多头镜像的 inode 树重建没有输入。⚠️ 填充率没有下界：`⌈n/233⌉` 是新建树的值，1e6 顺序创建再删 90% 不合并是 9.98 倍空间放大；加宽记录能同时缩小爆炸半径（160 ⇒ 204 条），这笔取舍归 C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）。⚠️ **挡着「新池新建文件写」的九样，① ② 已定案，其余照录**：① 树表条目已由已定项 8 定；② 记账条目的 seq 住 value、宽 4 字节（已定项 7）；③ 统计量标签值（C71（不认识的统计量标签静默忽略））；④ 不带设备维的统计量的设备段取值、新建树的记账行初始化、读现行值的读法（C117（不带设备维的统计量的设备段没有取值））；⑤ 码 3 容器带不带扩展点（C108（扩展点归属对打包记录单元无判定））；⑥ 码 2 节点头的基础字节数（已由已定项 11 收口）；⑦ `deleted_inodes` 的形态（已定项 16）；⑧ ⑨ 记录格式与统计量登记表两个冻结组件的 spec 文件（C119（冻结组件没有 spec 文件））。⚠️ 跨头首次 COW 时容器身份要不要重生的另一半归 E90（树 ID 进 AAD 与跨头共享） 第二笔。⚠️ **`blocks` 不承担对外的 `st_blocks`**：stat 报的 `st_blocks` 怎么给（stat 时从 extent 树现算分到的单元）、SEEK_HOLE / SEEK_DATA，挪到做 POSIX 面的里程碑。`blocks` 按文件长度向上取整改新池新建文件的字节：那条记录偏移 48 的 8 字节从 64 变 6。
+
+**依据**：
+
+- E98（inode 记录与 inode 树的几何）：inode 记录的盘上形态——打包进码 3 不触发 D21（权威态与派生态的分界） 硬约束 6、住索引节点触发（14 个字段里 11 个算不回来）；改动计数单靠 checkpoint_txg 排不了同窗口内两个版本，所以内部节点不缓冲、同一发布窗口只有最后一版落盘。
+- E103（inode 打包路 ① 的更新代价）：路 ①（独立容器索引 + inode 树按身份引用）的读代价比容器索引并进内部节点高、还多一次单元读，而单次写不变——容器索引不另立树。
+- E104（扫描重建的现行版本判定）：不认退役记录时退役容器里已死的 inode 会复活；模型打出「重生取最小 inode 号当容器号会撞车」，所以重生保留容器号、只换出生树与出生代。
+- 四轮三方论证后用户定案 2026-09-05（材料 `_d8-item6-path.md`、`_d8-item6-r2-amended.md`、`_d8-item6-r3-conclusion.md`、`_d8-item6-r4-conclusion.md`、`_d8-item6-r5-landing.md`，四轮三腿输出 `research/prompts/d8-item6-r{1,2,3,4}-{sonnet,opus}-output.md` 与 `research/results/d8-item6-r{1,2,3,4}-local.out`）。
+- 用户定案 2026-09-12（C297（inode 内部条目里出生树两份没有定处理），两轮三方）：身份引用里的出生树与子指针里的那份两份并存，原话在变更史。
+- 用户定案 2026-09-16（C143（inode 号水位在崩溃恢复落到旧根后退回去重发），三轮三方）：唯一性收窄到 (inode 号, 对象出生代)，原话在变更史。
+- 用户定案 2026-09-23：`blocks` 按文件长度向上取整、不表示分到的空间，`st_blocks` 挪到做 POSIX 面的里程碑（主 agent 的提议，C480（inode 记录的 blocks 怎么算全仓没有条款）），原话在变更史。
+- 用户定案 2026-10-01：K-R3-3「写根长高」，`research/prompts/m3-delete-r3-main-verification.md` 第三节 G6-墓碑树根满（原话在变更史）。
+
+**欠**：C100（inode 容器丢失是永久损失而没有任何冗余条款覆盖它）、C102（索引节点头没有预留区，加字段不是 compat）、C103（容器索引无落点）、C104（扫描路径上码 1 / 2 的载荷完整性无自包含证据）、C106（开放容器数上界）、C107（索引节点的 AAD 身份无落点）、C110（跨头共享与加密后元数据类的块头一致性读法）、C113（扫描重建时多版单元的现行版本判定无输入）、C115（inode 属性的溢出路线无落点）、C116（叶容器的分裂 / 合并纪律没有会失败的检查）、C119（冻结组件没有 spec 文件）、C152（收窄后未发布号重发的扫描重建复核）、C347（祖先表读不出时克隆头认领什么没有条款）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:220-237`（整段抄，未转述）**
+
+```markdown
+#### 已定项 7：write buffer 条目的 `seq` —— 4 字节，住 value
+
+**定案**：**`seq` 宽 4 字节，住 value 不住 key**，射程覆盖记账 / 反向索引 / LRU 三棵 write buffer 树，**一棵树一套条目格式、三棵同宽**。宽度定死之后因果倒过来：**`T_dirty` 的上界从此是挂载时判定**（4 字节 = 32 位窗口，按 34 字节/条对应约 136 GiB）；D16（发布语义） 已定项 5 那句「`T_dirty` 是可调值，不是格式常量」原样成立，改的是它多了一个由格式定的上界。**在 seq 里再放一份 txg 是把 key 里已有的段抄第二遍**，不许。两条骑手：
+
+1. **反向索引与 LRU 定 key 时必须让去重窗口同样被 `T_dirty` 界住**（代进 key，或别的等效办法）。4 字节够用的依据是「同一个 key 的待去重条目必然同属一个发布窗口」，而那一条在记账树上由 D5（快照 / 空间记账机制） 已定项 5 的 key 末段是「代」推出来；那两棵树的 key 布局全仓一个字都没有，不兑现这条骑手，4 字节在它们身上没有依据。
+2. **同一个 key 的跨批次插入顺序必须与 `seq` 同向**，不许留成隐含假设——btree 层同 key 是「谁后写谁赢」，不是「谁 `seq` 大谁赢」，而按叶分区的并行 flush 下两个批次的物理落地先后不受 `seq` 约束。
+
+**射程**：它定的是条目里这一段的宽度与落点，不定别的段（记账 key 的 `(统计量类型标签, 树 ID, 设备, 代)` 四段在 D5（快照 / 空间记账机制） 已定项 5）。⚠️ 这一段不是与别段正交的：那四段在**同一个 checkpoint 内不唯一**（幂等完整值会被写很多次），去重规则「后者胜」逐字要求「后者」由条目自己携带 ⇒ 不定它，那四段合起来还不是一个定得下合并结果的 key。它**立在 D8（核心索引结构） 不立在 D5（快照 / 空间记账机制）**，因为 write buffer 覆盖「反向索引 / LRU / 记账」三类，立在记账那边会让另外两棵树各自重问一遍。⚠️ 记账条目因此从 30 字节（key 22 + value 8）变 **34**，E97（记账与分配记录的条目编码） / E71（记账 key 的条目数与宽度） / E54（记账的「代」要保留几代） / E99（write buffer 条目与 seq 的去重） 四页的数要重算。⚠️ 「inode 号水位」那条记账条目照样带 `seq`（已定项 15 第 3 条是格式要求），只是它的合并结果取最大值、不依赖 `seq`。⚠️ 取值规则（从几起、一次发布里怎么数）在已定项 10；前端与节点缓冲怎么衔接在已定项 12。
+
+**依据**：
+
+- E99（write buffer 条目与 seq 的去重）：量的正是同一个 key 的待去重条目在一个发布窗口内能有多少条、去重要几位——窗口需求落在 32 位以内，4 字节够。
+- E17（write buffer 合并上限）：第一版漏了条目序号，两条臂与真值当场对不上，逼出「条目必须自带 `seq`」这个可判定形态；按叶分区可并行的实测同时说明并行 flush 下物理落地先后不受 `seq` 约束，骑手 2 因此必须显式写下来。
+- 三条已定条款的字面冲突（三方论证，主 agent 逐条现查）：D5（快照 / 空间记账机制） 已定项 2 逐字「不用找 ⇒ 是点删不是扫描；触及的 key 数 = 统计量数」——`seq` 进 key 之后同一前缀下有多行，点删当场不成立；已定项 6 逐字「条目照样带 seq……只是**合并结果不依赖它**」——单调统计量取最大值要求两条相遇，而 `seq` 进 key 之后它们是不同的 key、根本不会相遇；D5（快照 / 空间记账机制） 已定项 5 的 key 定义本身不含 `seq`，而「后者由 `seq` 定」只有在 `seq` 不进 key 时才自洽。主 agent 补的第四条：`seq` 进 key 会让 key 不可构造——折叠后同一代只留一条，读者想查 `(标签, 树, 设备, 代)` 的值时不知道 `seq`，点查退化成前缀扫。
+- 用户定案 2026-09-06：宽度取 4 字节并把因果倒过来、射程扩到三棵树、`seq` 住 value（原话在变更史）。
+
+**欠**：C161（缓冲两级并存而衔接没定）、C162（seq 进 value 之后四个实验的数要重算）、C345（反向索引 / LRU 的陈旧检出没有时间线索）、C416（去重窗口被 T_dirty 界住那条骑手没人查）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:238-279`（整段抄，未转述）**
+
+```markdown
+#### 已定项 8：树表条目的字段表
+
+**定案**：**树表条目合计 200 字节** = **树 ID 8**（打头）+ 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8 + 诞生 txg 8 + **头 ID 8** + 预留 76。每层 ⌊(16384 − 131) / 200⌋ = ⌊16253 / 200⌋ = **81** 棵，二层封顶 81² = 6561 棵。⚠️ **分母的口径写死在这里**：16384 减**含预留位的码 2 头**（131 是树表单元自己的码 2 头，key 宽 8 ⇒ 115 + 16，D18（块里携带什么信息） 已定项 16 / 已定项 18；条目区起点是含预留位的头末尾，已定项 11），不减别的数。
+
+- **① 快照进树表**，每个快照一条条目；**诞生 txg 8 字节**，口径是**快照完成（发布）那一次 checkpoint 的 txg**，不是根节点的诞生代号（那是它最后一次 COW 的号，这棵树自己算不出来）。它给 I-3.7（活快照可枚举） 一个载体。
+- **② 树 ID 水位住根记录，取根环里全部根记录该字段的 max**。逐字形态：`新水位 = max(根环里全部根记录的该字段, 本次 checkpoint 发出的最高树 ID + 1)`，**每次发布随根记录重写**。「根环里全部根记录」读作根环里全部自证过的根（被抛弃时间线上的也算），并上环里全部自证通过的 journal 记录新根段带的该字段（D23（journal 的角色与格式） 已定项 15）：根所在的槽读不出而它那条记录还在时，恢复本来就从记录把那条根重建出来，记录带的水位就是那条根的水位；journal 记录要等它对应的树写好、根落盘之后才会被绕环盖掉。根与它那条记录都读不出（双重介质故障）的那一格盖不住，记在 C342（树 ID 水位在根读不出时退回去重发）。从 mkfs 之外的水位发第一个文件版本时，十二棵树的号从水位起连号发，次序照已定项 11 那一组 65536..65547（extent、inode、分配记录、记账、中央映射、livelist、稀疏旁表、deadlist、`deleted_inodes`、墓碑树、谱系树、logged_ops）。⚠️ **「累计」这两个字是承重的**：读成「本 checkpoint 发出的最高号」（不累计）时，树 ID 会随根轮出环被重发，而**那时被重发的号属于已发布的树**，D6（快照实现模型） 判据 9 正面命中 ⇒ 整条定案不成立。
+- **③ `previous_snapshot_txg` 每头一份，住树表条目**（8 字节）。它是**每个头一个标量**不是每个单元一份，答的是「这个头从哪个快照分出来」，与单元自己的内容无关 ⇒ 按 D1（数据可移动性 / 反向索引） 已定项 4 的判据它进不了单元的自包段。一条树表条目上有**两个各自独立的 8 字节 txg 字段**——诞生 txg（这条自己发布的号）与 `previous_snapshot_txg`（它前驱那个快照的号），对活头条目与快照条目都有定义。
+- **④ 兼容档取「树表条目自带长度」这一层，不取「索引节点每条目自带长度」那一层**：前者让旧读者**跳过**一棵不认识的树；后者让旧读者**解开**新树的节点，而**今天没有消费者**——它不是被判成本高，是被判**买不到今天要的东西**。
+- **㊀ 旧写者对不认识的记账行**（限「树 ID 不认识、统计量标签认识」这一半）：**写者必须把这类行原样带到新代**（值不变、只换代号；有前端的写者把这类行当前端条目写、随发布排空到叶，第一版写者没有前端（已定项 10）、直落叶，盘上布局相同、读不错）。
+- **㊁ flags 其余 15 位**：**未知位一律拒收——该条目 EIO**（对象级，不拒整个池）。**不取**「忽略未知位、继续按已知语义解释」，那是静默误读。配两条纪律：**必须被旧读者看见的改动走系统配置 incompat 位，不许塞进每条目的 flags**；**checker 不许走「跳过」**——I-3.1（已分配统计对得上） 逐字「已分配空间统计 == 实际遍历**所有**引用得到的和」无限定，checker 跳过一棵不认识的树，遍历和就短一截，判出来的是假阳性红而不是漏检，它遇到不认识的树的正确行为是**报「无法完整遍历」并停**。
+- **排序契约与嵌套层数**：**条目按树 ID 升序排；嵌套层数不设格式上限**。排序取树 ID 的理由：它是五元组、记账 key、容器索引里到处用的那个键，且 ② 让它随创建序严格递增。不设上限的理由：设上限等于多一个失败模式，而那个上限还随条目宽变。
+- **平局判别子取 `(诞生 txg, 树 ID)`，零字节**：D16（发布语义） 已定要用 `(txg, 快照 id)` 打破并列，而 ② 改住根记录之后树 ID **严格随创建序递增**（水位累计、只增不减，崩溃只烧号不回退——I-7.8（根记录树 ID 水位不低于全池最大树 ID) 把这一条变成可判的）⇒ `(诞生 txg, 树 ID)` 就是与创建序一致的全序，而树 ID 本来就在条目里。
+- **头 ID 8 字节的取值**：inode 树条目写自己的树 ID（65537），extent 树条目写它服务的那个头（65537），`deleted_inodes` 与墓碑树写 inode 树的树 ID（65537），谱系树写 0（全池一份），logged_ops 写 0（字段表未定，C364（整理意图记录没有字段表）），分配记录树 / 记账树 / livelist 共享树 / 稀疏旁表树 / deadlist 树写 0（无归属，与 D5（快照 / 空间记账机制） 给「全池 / 无归属」行的约定同一个数）；中央映射树不进树表。见 D5（快照 / 空间记账机制） 已定项 9。
+- **预留 76 字节**：已知认购者按「一段字节只有一个意思」排，**逐条登记在树表条目预留的认购表里**（门禁 doc-registries 的 tree-table-reserve 格按它算和：认购合计不许超过 76，表里每条要指得到一个还开着的欠账或一条已定分项）。合计 48，余 28。
+
+<!-- gate:tree-table-reserve total=76 -->
+
+| 认购者 | 住哪条条目 | 宽度 | 出处 |
+|---|---|---|---|
+| livelist 每头计数器 | 头条目 | 8 | C271（livelist 的 FREE 在什么时刻记没有定义） |
+| 第二道销毁闸的活快照计数 | 头条目 | 8 | C272（第二道销毁闸没有 O(1) 的检查法） |
+| origin 链接 / 克隆时刻 | 头条目 | 8 | C271（livelist 的 FREE 在什么时刻记没有定义） |
+| 快照谱系的区间标号 | 快照条目 | 16 | C144（快照谱系的区间标号没有载体） |
+| `children`（子快照计数） | 快照条目 | 8 | D5（快照 / 空间记账机制） 已定项 18 |
+
+⚠️ **inode 号水位不在表里**：C143（inode 号水位在崩溃恢复落到旧根后退回去重发） 2026-09-16 定案「不搬水位，水位照旧住记账」（D5（快照 / 空间记账机制） 已定项 4 第 12 项）⇒ 它不认购这里的字节。
+
+**改新池新建文件的字节：是**——树表单元 t8 的条目宽字段（200）、声明长度（7 × 200 = 1400）与 7 条条目的排布。
+
+**射程**：⚠️ **㊀ 的射程只到「树 ID 不认识」那一半，另一半的处方是相反的**：不认识**统计量标签**那一半由 C71（不认识的统计量标签静默忽略） 管，而它逐字要求「挂载时遇到不认识的统计量标签**必须按 compat_ro 拒绝可写挂载**」——㊀ 不覆盖也不推翻它。两半分得开的机制依据：D5（快照 / 空间记账机制） 已定项 5 的 key 定宽 ⇒ 不认识标签**含义**的写者照样能按固定偏移切出各段；成立的机制是已定项 1「记账条目取幂等完整值」，一条行的值对搬运者不透明也搬得动，而写者不认识那棵树就改不了它 ⇒ 值本来就不变。不搬的代价：D5（快照 / 空间记账机制） 已定项 2「只保留最近 K 代」⇒ 没人重写的行过 K 代消失。⚠️ **暴露面今天很窄**：只有一个统计量带树维（D5（快照 / 空间记账机制） 已定项 4 第 12 项，只为可写头维护）⇒ 不是可写头的树一行都没有；再加一个带树维的统计量，不搬的丢失量就按树数长。⚠️ **㊁ 拒收不丢数据依赖 ④ 的条目自带长度**：条目 EIO 但**位置还在** ⇒ 写者知道「那儿有一棵树我读不了」⇒ 不做跨它的 deadlist 合并；没有长度字段就定位不到下一条，这条推导不成立。⚠️ **㊁ 与本工程对另外两个 flags 字段已定的政策是同一条**：D18（块里携带什么信息）「偏移 7 是 8 个 flag 位……读者遇到非 0 位一律拒收……本工程不给这 8 位留「忽略陌生位」的通道」；已定项 6「flags / 填充 / 预留三段同一政策：恒 0，读者遇到非 0 ⇒ **该记录 EIO**」，已落成 I-9.7（记录三段恒零）⇒ 三个 flags 字段并成一条，不用再解释它们为什么不同。⚠️ **「位」和「种类」是两根轴**：D15（格式冻结政策） 已定项 2 那条 compat（新增 keyspace 对旧读者只是看不到新树）管的是**种类**，㊁ 管的是**位**——一棵旧读者自以为认识的树被加了位，它的语义变了，那不是加法。⚠️ **嵌套层数不设上限的代价是性能悬崖**，按 `.claude/rules/fs-design.md` 硬要求 4 必须可观测：「每次发布 COW 的树表单元数 = 层数」要能在运行时读出来——走错层数不报错，没有观测手段就永远发现不了。⚠️ **① 交付的那张表不够用**：D5（快照 / 空间记账机制) 点名的「全部根的 txg 列表」写在 D6（快照实现模型） 已定项 1（每头一棵自己的树）之前，而 D6（快照实现模型） 用一个反例打穿了它的前提（主线 txg=10 建可写快照 X、在 X 里于 txg=30 写一个块、主线 txg=35 建快照 Y，按 D5（快照 / 空间记账机制） 的条件判「Y 引用它」而 Y 根本看不见它）⇒ 要的不是「每个根一个 txg 标量」，是**谱系**；诞生 txg 这 8 字节仍然非有不可（I-3.5（引用区间的精确性） 要按 txg 升序枚举全部快照根与活头、I-3.6（deadlist 紧界） 要 `prev(S).txg`），欠的是**在它之上再加一层标号**（嵌套区间标号是两个数，而且随谱系变化要回头改写，与「诞生 txg 写一次不再动」是完全不同的格式性质）。同一个前提的三个消费者里定案只兑现了 I-3.7（活快照可枚举） 一个：I-3.5（引用区间的精确性） 的可判定形式建在「全部根按 txg 排成单一全序」上，谱系成树之后那一条恒假；D18（块里携带什么信息） 的代际回收走同一个区间测试，方向是过判 ⇒ 少回收 ⇒ 泄漏。⚠️ **③ 只补了活头头部的半格**：D5（快照 / 空间记账机制） 逐字「每个可写头各持一份 `previous_snapshot_txg` **与一份 deadlist**」「建快照时把**活头的 deadlist 整个交接给新快照**，活头换一个空的」⇒ 快照条目也要能指到一份 deadlist，而 deadlist 的盘上落点全仓一处都没有。⚠️ **丙-2 唯一盖不住的那一格判为不是错误**：某个 checkpoint 分配了树 ID 42、写出带 42 的单元头，根没写成就崩了 ⇒ 水位随那个根一起丢 ⇒ 下次挂载重发 42，而盘上留着带 42 的孤儿单元；判它不构成错误的依据是孤儿与活版的实例代号必不相等（D18（块里携带什么信息） 已定项 11「作废一个 checkpoint 必须换实例代号」）、I-1.2（块头写序已发布） 逐字「判不成已发布者必是未发布的撕裂事务垃圾或被抛弃时间线的残留」、扫描重建的两道闸与孤儿回收条件都不看树 ID、孤儿与活版共用五元组本来就是常态（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P1 加 10 字节写序正是为此）、D6（快照实现模型） 判据 9 的理由句说的是「树里的 key 变成可见」而孤儿不在任何树里。由此 D6（快照实现模型） 判据 9 的射程按它自己的理由句收窄成「**已发布**的快照标识单调不回收」（2026-09-06 用户定案，同一次）。⚠️ **inode 号水位另给答案**：D5（快照 / 空间记账机制） 已定项 4 第 12 项逐字「**带**（只为可写头维护）」⇒ 每个可写头一个标量、条数随头数长，而根记录也是定长槽 ⇒ 丙-2 同样搬不过去；2026-09-16 定案不搬水位，把唯一性收窄到「已发布的 (inode 号, 对象出生代) 不复用」（已定项 6）。⚠️ **树表容量在两处按不同条目宽算**：E79（根记录的容量） 与 D22（单元原子性怎么合成） 已定项 7 报的每层棵数是另一个模型（它把树表条目当成「树 ID 8 + 根指针 59」= 67 字节），方向不变（间接层躲不开、超过一层再嵌一层），只是门槛比 D22（单元原子性怎么合成） 正文写的低。⚠️ 预留里那两笔已知认购（deadlist 的落点、快照谱系的嵌套区间标号）**没有顺手命名成字段**——命名等于把两个未定项一并定了，那是两个决定。排序契约（① 树 ID 严格升序，② 合发号次序）由 I-9.16（树表条目按树 ID 严格升序且合发号次序） 判：重建与冷走读在读任何一棵树之前拒，池级 checker 另判一份（实审 A3b Q2 与树表排序实现，用户 2026-09-27 定立不变量并同步）。
+
+**依据**：
+
+- E112（旧写者遇到不认识的树）：跑前写死判据与接受条款下六格的静默结局与搬运代价——`Skip + Carry` 在挂得上的那些里零静默结局，`Ignore` 那一格记录被按错编码解释，`Refuse` 全挂不上且与 D15（格式冻结政策） 已定项 2 的 compat 档不相容；搬运代价每代只多写两行，跑前定的作废阈值未触发。
+- E113（不认识的树·补齐臂集）：臂集补成 5 flags × 3 记账、选法改成跑前写死的字典序之后，`RejectEntry` 在全部扫描点里一次都没输过，`Skip` 在第 1 关就输（隐形快照使 deadlist 合并认错邻居）、`Ignore` 输在第 2 关、攻击腿提的按位分档 `PerBit` 输在它没有第三种行为——㊁ 由此从「跳过该条目」重定为「该条目 EIO」；记账那一维取 `Carry` 不取 `Exempt`（`Exempt` 要改 D5（快照 / 空间记账机制） 已定项 2，那笔代价一个格子都没占）。
+- 用户定案 2026-09-06：四问（快照进树表、树 ID 水位住根记录、`previous_snapshot_txg` 每头一份、兼容档取条目自带长度）、㊀ ㊁、排序契约与嵌套层数、平局判别子、预留取 32 字节（原话在变更史）。
+- 用户定案 2026-09-23：② 的 max 也并上环里记录新根段带的水位（C342（树 ID 水位在根读不出时退回去重发） 前置那一问；C511（回退到无文件那一版之后诞生代怎么接） 第 3 步的实现员先选了这一边，用户同日认下，原话「journal 日志就是为了保证树能完整写入的」），原话在变更史；发号次序是主 agent 同日照格式常量次序定的，被攻过零轮。
+- 用户定案 2026-09-14：树 ID 挪到条目最前、根指针 83 → 86、预留里切 8 字节做头 ID（原话在变更史；依据是已定项 11 定码 2 条目里 key 一律是条目的前 key 宽 个字节，树 ID 不打头就要给通用解码规则加例外）。
+- 用户定案 2026-09-16：条目从 148 加宽到 200、预留 76，代价是每单元从 109 棵降到 81 棵、二层封顶从 11881 降到 6561，用户知情接受（原话在变更史）。
+
+**欠**：C144（快照谱系的区间标号没有载体）、C145（deadlist 在盘上没有落点）、C147（树 ID 水位的不变量还没有）、C148（树表条目变宽把间接层门槛压到二层）、C149（根槽重发之后 birth 口径松一格）、C156（记录编码误读没有不变量）、C157（树表容量在两处按不同条目宽算）、C158（checker 跳过不认识的树会判假阳性）、C159（E112 的臂集缺三条且天平不含挂不上的代价）、C160（记账臂的真实代价不在天平上）、C342（树 ID 水位在根读不出时退回去重发）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:280-310`（整段抄，未转述）**
+
+```markdown
+#### 已定项 9：树的种类码的登记表
+
+**定案**：树表条目里「树的种类」那 2 字节的取值，唯一登记位是已定项 9 这一节的登记表；**新树只追加不重用码**，0 保留为「无」。
+
+| 码 | 树 | 出处 |
+|---|---|---|
+| 0 | 无（树表条目不用它） | — |
+| 1 | extent 树 | D4（校验和位置） 已定项 7 |
+| 2 | inode 树 | 已定项 6 |
+| 3 | 分配记录树 | D3（空间分配） 已定项 3 |
+| 4 | 记账树 | D5（快照 / 空间记账机制） 已定项 3 |
+| 5 | 中央映射树 | D19（块指针的结构与宽度预算） 已定项 5 |
+| 6 | livelist 共享树 | D6（快照实现模型） 已定项 2 |
+| 7 | 稀疏旁表树 | D5（快照 / 空间记账机制） 已定项 6 |
+| 8 | deadlist 树 | D5（快照 / 空间记账机制） 已定项 11 |
+| 9 | `deleted_inodes` 树 | 已定项 16 |
+| 10 | 墓碑树 | D18（块里携带什么信息） 已定项 24 |
+| 11 | 谱系树 | D18（块里携带什么信息） 已定项 24 |
+| 12 | logged_ops 树 | 已定项 5 |
+
+新池新建文件写出的 **7** 条树表条目照此表（中央映射树的根住根记录、不进树表，D19（块指针的结构与宽度预算） 已定项 11；码 5 照登记）；E142（新池新建文件的干跑） 的 `TREE_KIND_*` 常量就是这八个值；`crates/singlefs-core/src/records.rs` 与 checker 的 `walk.rs` 用同一组常量（码 5 不进树表，那里没有它）。
+
+**射程**：它只登记「树的种类」这一段的取值，树 ID 是另一个量，两个量的值域不相交（树 ID ≥ 65536，取值在已定项 11）。与 D18（块里携带什么信息） 已定项 11 的单元类登记表是两张表、两个概念（用户不取合并）。码 8（deadlist）与 livelist 共享树、稀疏旁表同一个先例——都是「销毁快照时要读、而销毁不许全盘扫描」的结构，day-1 注册进树表比第一次建快照时惰性创建少一条「首次建树」路径；条目形态另立 D5（快照 / 空间记账机制） 已定项 12。**改新池新建文件的字节：是**——加码 8 那一次让树表从 6 条变 7 条、树 ID 水位从 18 变 19。
+
+**依据**：
+
+- 无实验：码值是取值约定，没有可量的量；登记表由用户 2026-09-13 定案（码 0..7）、2026-09-14 定案加码 8，两次都没有走三方论证、可推翻，原话在变更史。
+- 码 9..12：判决 `research/prompts/m3-blanks-r1-main-verification.md` 第二节种类码那一行（两腿各自得出）；树 ID 与种类码值域不相交由用户定案 2026-10-01 取（岔路单 `research/prompts/m3-blanks-r1-forks.md` 的「种类码与树 ID 的错开」一行，原话在变更史）。
+
+**欠**：C315（树的种类码没有登记表）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:311-322`（整段抄，未转述）**
+
+```markdown
+#### 已定项 10：第一版记账直落叶，`seq` 的取值规则
+
+**定案**：**第一版记账直落记账树叶，不走 write buffer 前端**；D5（快照 / 空间记账机制） 已定项 3 第 3 条读成「前端是后续优化」。**`seq` = 同一个 `(标签, 树, 设备, 代)` 在一次发布里被写进树的第几次**（不是运行期那个统计量被改的次数），**从 1 起**；第一版禁边插边 COW（D19（块指针的结构与宽度预算） 已定项 12 的固定点：每个码 2 / 码 3 一个实例一个 checkpoint 只写出一次，发布末尾一次性 COW）⇒ 每个 key 每次发布只写进树一次 ⇒ **恒 1**；合并规则取最大值的统计量也照写。
+
+**射程**：它定的是第一版走哪条路与 `seq` 怎么数，不定 `seq` 的宽度与落点（已定项 7）、也不定前端与节点缓冲的衔接（已定项 12，第一版两级都不开）。放开固定点、开前端或节点缓冲之后「恒 1」还成不成立，由已定项 13 的状态折叠接着管。
+
+**依据**：
+
+- 无实验：第一版走不走前端是实现排期的选择，没有可量的量；由用户 2026-09-13 在写代码前的总审核里定案，没有走三方论证、可推翻，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:323-355`（整段抄，未转述）**
+
+```markdown
+#### 已定项 11：码 2 的载荷布局与 key 比较序
+
+**定案**：码 2 节点头自描述（预留 2 之后是条目数 2 + 条目宽 2，key 宽 1 排在 key 区间之前，偏移表见 D18（块里携带什么信息） 已定项 18），基础字节数 81 → 86；含 29 字节预留位后头 = `115 + 2 × key 宽`。条目区从含预留位的头末尾（`115 + 2 × key 宽`）起，**定宽条目连续排列**，**声明长度 = 条目数 × 条目宽**；条目之后的空闲字节恒 0 且参与载荷 CRC。载荷 CRC 覆盖 `[86 + 2 × key 宽, 16384)`（起点是明文头末尾，口径与码 1 的 105、码 3 的 107 同）。**条目里 key 一律是条目的前 key 宽 个字节**——「读条目宽 → 按条目宽切条目 → 取前 key 宽 个字节当 key」是一条对全部码 2 树都成立的通用解码规则，扫描重建路径上不用另查一张「这棵树的 key 在条目里排第几」的表。key 的全序按逐字段无符号整数、字段自左向右比较，**盘上小端存储不构成 memcmp 序**。树 ID 从 65536 起编（种类字段 2 字节取不到的最小值，两个量的值域永不相交）：extent 65536、inode 65537、分配记录 65538、记账 65539、中央映射 65540、livelist 65541、稀疏旁表 65542、deadlist 65543、`deleted_inodes` 65544、墓碑树 65545、谱系树 65546、logged_ops 65547；mkfs 时水位 65536，第一个文件版本那次之后 65548。
+
+**改新池新建文件的字节：是**——六个码 2 单元的条目区起点（`115 + 2 × key 宽`：inode 树根 131、extent 163、分配记录 135、记账 159、映射 169、树表 131）、声明长度，以及树表条目的字段次序；树 ID 字段（树表条目里的树 ID 与头 ID、码 2 头里的树 ID、记账 key 的树 ID 段）与树 ID 水位的值也变，随树 ID 从 65536 起编。
+
+**多层码 2 树怎么长、怎么收**（记账树、中央映射树，以及照已定项 14 仍用码 2 btree 的树）：① 一次发布里分裂新建的节点与别的单元落在同一段，整条根到叶的路径照常 COW，不加写序步骤、不加屏障；② 叶装不下时从中间切；③ 收缩只摘空节点，根只剩一个孩子时降高一层，不做「低于一半合并」与借条目；④ 分隔 key 跟着维护：插到最左分隔 key 之下时把它压低，条目在兄弟间挪动之后把右边那个孩子的分隔 key 改成它新的最小 key；逐层可判：分隔 key ≤ 孩子节点头的最小 key，且 > 左邻孩子节点头的最大 key（D18（块里携带什么信息） 已定项 18 的 key 区间）；⑤ 树高 = 根节点码 2 头里的层级 + 1。
+
+- **一次发布里先删后插**：上一版有、这一版没有的 key 先按 key 升序删，再按 key 升序插这一版新有的；只决定形状，不决定写序（写的是最终态，已定项 13）。
+- **从盘上重建的树分隔 key 坏了**：重建只核拼得成树的几样（层级、节点不空、内部条目宽、不重复引用），不核分隔 key；下一次发布按分隔 key 删不掉时规划交回，可写挂载在取号之前拒，盘上不变。遇到这种盘之后怎么办（修复、只读挂载）没定。
+- **叶条目宽不由读树判**：读树只切 key，叶条目窄于字段表由解条目的一方各报各的；内部条目窄于 key + 86 由读树报。
+
+**内部节点的条目 = 本树 key + 子指针 86**：记账树 22 + 86 = 108、中央映射树 27 + 86 = 113。分配记录树与 extent 树按已定项 14 另起按 key 空间寻址的结构，结构在三方 `m2-keyspace-r1` 判；照码 2 btree 做时它们的内部条目是 96 与 110（extent 110 是用户 2026-09-24 早先定的）。
+
+<!-- format-const: ACCOUNTING_INTERNAL_ENTRY_BYTES = 108 -->
+<!-- format-const: CENTRAL_MAPPING_INTERNAL_ENTRY_BYTES = 113 -->
+
+**射程**：它管码 2 节点的载荷怎么排与 key 怎么比，不管头里各字段的偏移（D18（块里携带什么信息） 已定项 18）、也不管每棵树的条目里除 key 之外还有什么（各树自己的分项）。唯一因「key 打头」需要重排的是树表条目，已按这条改成树 ID 打头（已定项 8）。「定宽条目连续排列」与「声明长度 = 条目数 × 条目宽」在中央映射条目回到定宽 55 之后不用动（D19（块指针的结构与宽度预算） 已定项 10）——条目宽字段只有一个 u16，按类两宽时这两句顶不住。两条 2026-09-14 补的定案都是用户弹窗定案，没有走三方论证，可推翻。⚠️ 分裂、收缩、分裂点、写序四样被攻过零轮，三方原型只抽了一次样；「低于一半合并」与「追加时末尾切」在崩溃历史上与选中的那两样零对零，没选的理由是用户的取舍，不是安全性。「分裂单开一次发布」出局：只改结构的发布挤掉 D16（发布语义） 已定项 1 的「最近 4 个可退到的不同状态」。
+
+**依据**：
+
+- E145（码 2 自描述头与映射树 key 宽的代价）：量的正是码 2 头自描述要加的那几段与映射树 key 宽的代价——加到 86 之后扇出、树高、解头那几节都不掉档，自描述值得做。
+- 用户定案 2026-09-13：码 2 头自描述、基础 86、条目区起点、载荷 CRC 覆盖范围、key 比较序（原话在变更史）。
+- 用户定案 2026-09-14：条目里 key 一律是前 key 宽 个字节；「定宽条目连续排列」与「声明长度 = 条目数 × 条目宽」原样成立（原话在变更史）。
+- 用户定案 2026-09-24：extent 树内部条目 110 字节（原话在变更史）；E157（并行线一两条条款的计数模型） 在 110、136 两个取样点上结论都不翻面。
+- 无实验：分裂、收缩、分裂点、写序四样是三方原型（`research/prompts/m2-treesplit-r1-opus-model/`）在同一批崩溃历史上零对零之后由用户选的，没立实验号；分隔 key 跟着维护是那一轮主 agent 按打中定（原型 t1.out：沿用 D8（核心索引结构） 已定项 6 的「分隔 key 创建后不变」24 格全红、跟着维护 24 格全 0），判决 `research/prompts/m2-treesplit-r1-main-verification.md`。
+- 用户定案 2026-09-24：写序同段照常 COW、只摘空节点且根剩一个孩子时降高、从中间切、内部条目 = 本树 key + 子指针 86（原话在变更史）。
+- `research/prompts/m2-treesplit-implementer-report.md` 第五节 B1、B5、B6。
+- 用户定案 2026-10-01：树 ID 整体挪到 65536 起，与种类码的值域不相交（岔路单 `research/prompts/m3-blanks-r1-forks.md` 的「种类码与树 ID 的错开」一行，原话在变更史）。
+- 判决 `research/prompts/m3-blanks-r1-main-verification.md` 第二节种类码那一行：新树的种类码取 9..12（两腿各自得出）。
+
+**欠**：C306（码 2 头不自描述 key 宽）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:356-369`（整段抄，未转述）**
+
+```markdown
+#### 已定项 12：write buffer 前端与节点消息缓冲区的衔接 —— 一棵树只准一级
+
+**定案**：走 write buffer 前端的三棵树（记账 / 反向索引 / LRU）**ε 恒 0、内部节点不留消息缓冲区**；这三棵树上的写**一律进前端**——含已定项 8 ㊀ 那类旧写者搬运的记账行：有前端的写者把它当前端条目写，第一版写者没有前端（已定项 10）、直落叶，盘上布局相同、读不错；**发布前把前端排空到叶**，落叶时同 key 比同一窗口的到达序；发布集的前端条目在同一次发布里排空、按事务切，不跨发布（fsync = 一次全量发布）。其余树按 D11（索引节点要不要留消息缓冲区） 已定项 6 的树轴留不留缓冲。**第一版两级都不开**（已定项 10、D11（索引节点要不要留消息缓冲区） 已定项 7），不改新池新建文件的字节。
+
+**检查**：前端树的写路径只暴露前端入口（类型层）；运行时断言——一个 checkpoint 里前端树叶上的每一处逻辑改动（key → 值）都对得上一条这个 checkpoint 进过叶的前端条目，窗口中途 flush 的与发布时排空的都算、实例切换重发时保留；重组、索引重建、损坏恢复重建三个例外各配一条「前后每个 key 读出来的值不变」。它只能是运行时的：盘上分不出经前端排空与直写落叶。按字面写的三种断言（只认发布时排空的、只认这一次尝试的、按物理新叶数）在合法历史上会误报（`c161-r3-model-output.txt` 的 `G3_publish_only` / `G3_attempt` / `G3_physical` 行）。
+
+**射程**：**代价**：每次发布排空到叶的写出是「排空到根缓冲」那类形态的 3.4–10.7 倍（覆盖写负载 4.8–10.6 倍，同一产物 `part` 列的第三段），发布集的条目都得在这次发布里落叶、不能按预算分批；同一份脏页预算下前端装的条目少一个量级——`T_dirty` 按什么算没有口径。**买到的**：前端树上没有同 key 跨级并存，读的次序最短；陈旧检出（C52（陈旧当成合法））在这三棵树上没有对象。**没出局但没选的**：甲-R4（前端直落叶、节点缓冲只收不走前端的写）与乙-D（前端进根缓冲逐层下推、按位置定新旧）各只在塌缩上被打中一次，它们的陈旧检出要每条消息带发布号（与已定项 7「不许再放一份 txg」冲突），节点布局进 D15（格式冻结政策） 第 4 层。**连带**：重组时节点缓冲怎么搬（射程是全部留缓冲的树，这一项只省了前端三棵）；单调统计量的点删遇墓碑（D5（快照 / 空间记账机制） 已定项 3 第 2 条）；反向索引 / LRU 的时间线索；D11（索引节点要不要留消息缓冲区） 已定项 6 树轴的分支变量与已定项 5 的措辞。
+
+**依据**：
+
+- 无实验：这一格量的是设计形态在合法历史上会不会被分辨臂打中，依据是三轮三方（`research/prompts/c161-r1-main-verification.md`、`c161-r2-main-verification.md`、`c161-r3-main-verification.md` 各自第四节）——这一形在三轮试过的全部形状（乱序 flush、K 代点删、分裂与合并、部分发布、排空做到一半崩溃、删除、树高 4、索引重建、实例切换、管理员回退）上没被打中；出局的乙 + seq 全池单调两轮被打中（计数器不落盘；实例切换时计数器从所选根重新载入），还要 8 字节 seq 与落盘计数器。用户 2026-09-16 收尾弹窗定案，原话在变更史。
+
+**欠**：C161（缓冲两级并存而衔接没定）、C344（单调统计量的点删遇墓碑没有会红的检查）、C345（反向索引 / LRU 的陈旧检出没有时间线索）、C348（T_dirty 按什么算没有口径）、C349（重组时节点消息缓冲区怎么搬没有条款）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:370-381`（整段抄，未转述）**
+
+```markdown
+#### 已定项 13：索引树更新做状态折叠 —— 同一次发布里同一个 key 的中间状态不落叶
+
+**定案**：一棵索引树上的同一个 key 在同一次发布里被改了多次（A → B → C → D → E）时，落叶只做一次：叶里这个 key 的条目直接写成最终态 E，A–D 不写进任何节点。「同一周期」是一次发布：同一个 `checkpoint_txg`，fsync 触发的也是一次发布（D16（发布语义） 已定项 6）。**E 按同一次发布里的到达序取最后一次改动，不按值取**；E 是墓碑时，折叠的结果就是墓碑，不许把墓碑当数值与 A–D 一起取最大（C344（单调统计量的点删遇墓碑没有会红的检查） 实测这种朴素折叠四条候选 16 / 16 丢点删，`b.out`）。到达序在内存里由条目自己带着（已定项 15 第 3 条），不靠按 key 排序之后的相对位置。
+
+**射程**：**全部索引树的全部落叶路径**。第一版的直落叶（已定项 10）之外，以后开的 write buffer 前端排空（已定项 12：落叶时同 key 比同一窗口的到达序，比出来的最后一条就是 E）、节点消息缓冲区（D11（索引节点要不要留消息缓冲区） 已定项 6 的树轴）、边插边 COW（D3（空间分配） 已定项 5 允许、D19（块指针的结构与宽度预算） 已定项 12 第一版不取的那条实现）都照这个规矩落叶。**第一版已经满足它**：D19（块指针的结构与宽度预算） 已定项 12 的固定点让已定项 10 推出「每个 key 每次发布只写进树一次」、`seq` 恒 1；已定项 13 把这件事从固定点的推论提成独立条款，放开固定点之后照样成立，不改新池新建文件的字节。实现今天没有对象：`crates/singlefs-core/src/transaction.rs` 的 `publish_overwrite` 一次覆盖写就是一次发布（txg、事务号各加一），没有「同一次发布里几个事务改同一个 key」的路径；同一个 checkpoint 里装两个对象的用例改的是不同的 key。⚠️ **没答的两条**：① A–D 在树之外的去向不归它管——A–D 是同一个逻辑块被覆盖写几次得到的数据单元版本时，按 D16（发布语义） 已定项 2 的丢失窗口与切分纪律「一事务一单元」，A–D 各是一个事务，各有一个落了盘的数据单元与一条 journal 记录（D23（journal 的角色与格式） 已定项 7：一条记录一个事务号），这几个单元没有根引用、也不在 I-7.4（近 K 代块未被复用） 的保护里，它们要不要写、写了在同一次发布里怎么释放、记账怎么算，决策正文、欠账表、不变量清单里都没有管它的条款；② 已定项 7 的盘上 `seq` 在折叠之下恒 1（已定项 10 的「恒 1」从第一版扩到所有版本），而认 E 用的是内存里的到达序，盘上那 4 字节 `seq` 还拿不拿来当 `T_dirty` 上界的依据（已定项 7 定案里「`T_dirty` 的上界从此是挂载时判定」那一句），没答。⚠️ 「单调统计量在同一次发布里不减、所以两种取法给同一个数」是主 agent 的推论，没有检查。
+
+**依据**：
+
+- 无实验：用户定「这个是决策 记录 暂时不需要做和验证」，没开三方、没建实验，也没有可量的量；用户 2026-09-19 定案与同日对「同一周期 = 一次发布」的确认，原话在变更史。A–D 可以不落的三条支点是已有条款（主 agent 2026-09-19 现查）：D16（发布语义） 已定项 4 与 D23（journal 的角色与格式） 已定项 14 第五条（施加的单位是一次发布，合法前缀停在一次发布的两个事务之间时那次发布整体不施加，所以 replay 出来的只有发布边界上的状态）、D16（发布语义） 已定项 6（fsync 触发的也是一次发布，被 fsync 确认过的状态都落在发布边界上）、D16（发布语义） 已定项 14（快照发布点对齐 checkpoint 边界、钉在这个 checkpoint 全部数据变更之后，没有快照引用 A–D）。
+
+**欠**：C383（同一次发布里同 key 的中间态折叠没有检查）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:382-435`（整段抄，未转述）**
+
+```markdown
+#### 已定项 14：一套 btree 实现 + 多个独立 keyspace + 两个前端，派生树可以异构
+
+**定案**：**一套 btree 实现 + 多个独立 keyspace + 两个前端，管权威态的树与照分裂做的树；派生态的分配记录树与 extent 树（D21（权威态与派生态的分界） 已定项 5、9）可以另起按 key 空间寻址的结构，格式可以与码 2 btree 不同。**
+
+| 层 | 做什么 |
+|---|---|
+| 独立 keyspace | 每类数据一棵树（extent / inode / dirent / 反向索引 / 空闲空间 / 记账 …），互不干扰 |
+| 日志结构节点 | 节点内新 key 追加不插入，内存里定期重排；写顺序、可在只读锁下回写 |
+| **write buffer** 前端 | 高频小更新（反向索引、LRU、记账）批量攒起来排序去重后批量插入 |
+| **key cache** 前端 | 同一批 key 反复读写的（分配信息）走哈希表，不做全树查找 |
+
+**两棵派生树的结构**：
+
+- **分配记录树**：按绝对槽号按位置寻址。每片叶罩一段固定的槽 `[k × W, (k + 1) × W)`，W 取偶数（两槽数据单元永远不跨叶），且 W ≤ 叶条目容量 812（一条记录至少罩一个槽，叶永远装得下）；记录按起点槽落叶。往上各层按位置寻址，子节点罩哪一段由它在父节点里的位置算出。**没有记录的一段 = 全空闲**：那片叶不写，父节点那一格留空（用户 K1）。checker 逐节点核「这个节点罩的就是它的位置规定的那一段」与「记录的末槽不越过它所在叶的末槽」。
+- **extent 树**：两段，都按位置寻址。上段按 inode 号的位置寻址；下段一个文件一棵，按数据单元号的位置寻址（叶罩 144 个单元，内部扇出 147），洞就是缺席。**只有一个数据单元的文件不建下段**：上段叶条目里直接放那个数据指针；条目带一个标签字节区分「没有单元 / 下段根指针 / 内联数据指针」（用户 K2）。
+- **挂载怎么读**：分配记录树挂载时整棵读进挂载态（分配器本来就要）；extent 树按需，打开文件时按位置走下去（用户 K4）。
+- **实现取值**（实二一取，主 agent 2026-09-25 定，被攻过零轮）：
+  - **分配记录树**：
+    - 叶宽 W = 812（取叶条目容量 (16384 − 135) ÷ 20 本身），内部条目 96 字节（key 10 + 子指针 86），扇出 169。
+    <!-- format-const: ALLOCATION_RECORD_TREE_LEAF_SLOTS = 812 -->
+    <!-- format-const: ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES = 96 -->
+    <!-- format-const: ALLOCATION_RECORD_TREE_INTERNAL_FANOUT = 169 -->
+    - 层级 L 的节点罩 W × 169^L 个槽。
+    - 内部节点与根只写有孩子的格：每个孩子一条内部条目（key 10 + 子指针 86），条目的 key 取这个孩子按位置罩的那一段的起点（孩子所在的盘, 那一段的第一个槽号），按 key 排，没有孩子的格不占条目；读者按这个 key 认孩子，槽号不落在孩子那一层的格点上、盘不在池里、或认出的孩子不在这个父节点名下的，这条条目不指任何孩子（`crates/singlefs-core/src/allocation_record_tree.rs` 的 `child_named_by_entry_key`）。根节点头的 key 区间罩整个 key 空间，smallest_key = (0, 0)，largest_key = (0xFFFFFFFF, 2^48 − 1)。
+    - 根罩整个 key 空间、按盘分流；根层取最小的 R ≥ 1，使 Σ_盘 ⌈盘上槽数 ÷ (W × 169^(R−1))⌉ ≤ 169。4 GiB × 2 时根在第 2 层、树高 3。
+  - **extent 树**：
+    - 上段叶条目 113 字节 = key 24（(0, inode, 0)）+ 标签 1 + 载荷 88。标签 0 全零，只有读者认、写者不写；标签 1 是下段根的节点指针 86 字节加 2 字节零；标签 2 是那一个数据单元的数据指针 88 字节。
+    <!-- format-const: EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES = 113 -->
+    - 上段叶罩 143 个 inode，内部条目 110 字节（key 24 + 子指针 86），扇出 147。
+    - 上段叶节点头的 key 区间照 D18（块里携带什么信息） 已定项 2 射程段写这片叶按位置罩的那一段，不写叶里第一条与最后一条条目的 key：闭区间，第 k 片（从 0 起）smallest_key = (0, 143k, 0)，largest_key = (0, 143k + 142, 2^64 − 1)。
+    <!-- format-const: EXTENT_TREE_UPPER_LEAF_INODES = 143 -->
+    <!-- format-const: EXTENT_TREE_INTERNAL_ENTRY_BYTES = 110 -->
+    <!-- format-const: EXTENT_TREE_INTERNAL_FANOUT = 147 -->
+    - 下段叶罩 144 个单元，下段 key 的字节偏移 = 单元号 × 32634。上段与下段的内部条目，key 都取这个孩子按位置罩的那一段的起点（`crates/singlefs-core/src/extent_tree.rs` 的 `build_extent_internal_entry`）。
+    <!-- format-const: EXTENT_TREE_LOWER_LEAF_DATA_UNITS = 144 -->
+  - **发布路径的固定点**：猜重写集 → 在分配器拷贝上走释放（释放弄脏的叶先并进重写集）→ 取落点 → 算脏节点 → 不在集合里就并进去重来。第 64 轮还没收拢，就在任何落盘之前返回 `AllocationRecordTreeRewriteSetDidNotSettle`；64 没有依据，见新立的欠账。
+  - **盘上槽数**：取盘上整槽数，盘尾不足一槽的零头不算；写侧与读侧只有一处定义（`crates/singlefs-core/src/allocator.rs` 的 `absolute_slot_count_of_device`），分配记录树根层两侧同一个数（实二六取，主 agent 2026-09-25 定，被攻过零轮；用例 `half_a_slot_past_a_root_level_boundary_leaves_the_writer_and_the_reader_on_the_same_root_level_and_every_tree_written_reads_back`）。
+  - **打开文件时自报的读数**：`ExtentTreeReadsAtOpen` 数的是读了几个 extent 树节点，不是块层的设备读次数；提示过期、经中央映射回退时每跳多 2 次设备读，两个数不相等（实二六查出，主 agent 2026-09-25 认这个口径、不另加设备读数，被攻过零轮；用例 `opening_a_file_whose_lower_extent_segment_has_two_levels_reports_as_many_node_reads_as_the_block_layer_counts` 钉相等的那一格，`a_leaf_of_a_two_level_lower_extent_segment_with_a_stale_location_hint_reads_back_every_data_unit_through_the_central_mapping` 钉不等的那一格，都在 `crates/singlefs-harness/tests/tree_nodes_and_the_central_mapping_on_mounted_read.rs`）。
+- 两棵树的节点照样带 D18（块里携带什么信息） 已定项 18 的码 2 头（树 ID、层级、key 区间、诞生代号），树高照 D8（核心索引结构） 已定项 11「树高 = 根节点头层级 + 1」读。
+
+**射程**：⚠️ 异构只放给派生态、可重建的两棵树：分配记录树与 extent 树；记账树（权威态）、中央映射树、树表、实例表、inode 树照一套码 2 btree 做（D8（核心索引结构） 已定项 11 的分裂与收缩）。异构结构照样要：单个节点自描述（哪棵树、哪一层、管哪一段 key、第几代，D18（块里携带什么信息））、损坏可检出（D21（权威态与派生态的分界） 已定项 11）、每一种新写序进层 0 崩溃点、checker 另有一套判它的代码。那两棵的结构在三方 `m2-keyspace-r1` 判。⚠️ 「日志结构节点」说的是**内存里的排布**——盘上每次落盘是整单元 COW 重写，按已定项 11 的单一定宽条目数组写（声明长度恰等于条目数 × 条目宽），不是多段追加的 bset。⚠️ **write buffer 前端第一版不实装**（已定项 10：记账直落记账树叶）；前端与节点消息缓冲区怎么衔接在已定项 12，条目要满足的三条硬要求在已定项 15。索引结构可以多样、事务层不许多样那条纪律在 `.claude/rules/fs-design.md`，本项只定索引这一侧。⚠️ 叶宽 W 的具体取值、上段扇出、上段叶条目的完整字段表，条款没写到的由实现员照上面几条取、交回里写明，主 agent 定后补进这一节。⚠️ 三种新写序（长高多层时位置 0 那一串节点同一次发布写、矮下去多层时同一串一起释放、内联与下段互换）要进层 0，checker 判定随实现一起做。⚠️ 这一节的四项都被攻过零轮；「全局按位置＋内联」的崩溃历史没扫（用户定全量崩溃最后统一跑）。⚠️ 被否掉的候选：全局按 key 排（上段要分裂）、每文件一棵根住 inode 记录（要改已冻结的 inode 记录）、全局按位置不内联（一次挂载里连续建到第 14625 个小文件就假性报满，违反 D3（空间分配） 已定项 9 第 1 条）——理由在判决第三节。
+
+**依据**：
+
+- 无实验：一套 btree 实现配多 keyspace 的形态没有可量的量，依据是 2026-08-29 现查 `linux-6.17/fs/bcachefs/bcachefs_format.h` 的 `BCH_BTREE_IDS()` 宏（数 `x(` 行与带 `BTREE_IS_write_buffer` 的行，源码固定在 `~/code/fs-refs/`）：bcachefs 用**一套 btree 实现 + 21 棵树**，其中 **5 棵**走 write buffer（`lru` / `backpointers` / `deleted_inodes` / `rebalance_work` / `accounting`）；比「按访问模式选不同结构」好在**只有一套结构要调对**——异构方案意味着 N 套实现、N 套崩溃一致性 bug、N 套 checker。prior-art.md 的 bcachefs 那一行以这一段为准。
+- 用户定案 2026-09-24：派生树可以异构（原话在变更史）；多出来的那套实现、崩溃一致性与 checker 由层 0 流与 checker 各自覆盖，不再拿「只有一套结构要调对」挡。
+- 无实验：三方原型（`research/prompts/m2-keyspace-r1-opus-model/`）在同一批历史与代价模型上量过，没立实验号，选哪一个由用户定，判决 `research/prompts/m2-keyspace-r1-main-verification.md`。
+- 用户定案 2026-09-24：K1、K2、K4（原话在变更史）。
+- 实二一报告 `research/prompts/m2-keyspace-implementer-report.md`：实现员取值，主 agent 认，被攻过零轮。
+- 实二六报告 `research/prompts/m2-e26-implementer-report.md` 第六节 Q3、Q4：盘上槽数与打开文件自报读数两条取值，主 agent 认，被攻过零轮。
+- E142（新池新建文件的干跑） 第十五次跑第五段（`research/prompts/e142-r15-step5-runner-report.md` 第四节）：分配记录树内部与根节点那两格、extent 上段叶 key 区间那一格，独立装置的变体臂只有这一种读法逐字节对上 crates；这是归因，不是在装置主读法上验过，主读法按这几格改完的重跑在后面。
+
+**欠**：C211（节点落盘形态没有正文）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:436-453`（整段抄，未转述）**
+
+```markdown
+#### 已定项 15：write buffer 条目的三条硬要求
+
+**定案**：
+
+1. **排序会摧毁局部性而不是创造它 ⇒ 节点缓存必须是抗扫描的**（2Q / LRU-K 之类）。按叶排序之后每次 flush 就是一次覆盖整个叶子空间的顺序扫描，而 **LRU 对「反复的、大于缓存的顺序扫描」命中率恰好为 0**。**这是硬要求，不是建议。**
+2. **条目形态必须是幂等完整值，不许是增量 Δ**。记账那一棵咬得最紧——「释放了 4096 字节」的自然表达就是 Δ，处置见已定项 1 的定案。本工程因此与 bcachefs 分道：其 accounting 树是 delta 形态（`disk_accounting_format.h` 原文「updates are _deltas_」）。
+3. **条目必须自带序号（seq），这是格式要求**。flush 时按 key 排序**丢弃时间序**，而去重规则是「后者胜」⇒ **「后者」必须由条目自己携带**；用不稳定排序时同 key 条目的相对次序未定义，去重结果因此不确定。
+
+**射程**：三条管的是 write buffer 这条路上的条目与缓存策略，宽度与落点在已定项 7、取值规则在已定项 10、与节点消息缓冲区的衔接在已定项 12。⚠️ 要求 2 与要求 3 是两条不同的要求：幂等管「重复应用不出错」，序号管「谁覆盖谁是确定的」。⚠️ **已知代价**（bcachefs 原文）：write buffer 的更新无序且最终一致，flush 时按 key 排序丢弃时间序，且这个 sort-merge-sweep **本质单线程**，在多线程负载下它的效率是关键路径。这句有两种读法，实测结果相反——**线程读法**（合并的 CPU 吞吐撑不住多线程负载）**不成立**：单线程合并吞吐按每 4 KiB 用户写 3 条条目算远超盘的带宽，按叶分区还可并行；**I/O 读法**（flush 的树插入 I/O 是关键路径）**成立，且是三项里最大的一项**。⇒ **关键路径上真正卡住的是 D9（加密） 的加密，不是合并**；⚠️ E17（write buffer 合并上限） 只量了合并这一段，不含树插入与 I/O。
+
+**依据**：
+
+- E7（离线索引 harness）：本工程这一侧的 io/op 在缓存占树 2% / 6% / 25% 三档上逐位相同，干预证实保持同叶聚合不变、只打乱组的处理顺序就能让 25% 缓存档的读次数下降，100% 缓存档打乱前后完全相同（阴性对照）——LRU 对「反复的、大于缓存的顺序扫描」命中率恰好为 0，所以要求 1 是硬要求；同一装置量出 flush 的树插入 I/O 折算下来远大于加密与合并，I/O 读法成立。
+- E14（I-3.1 的判别力：幂等完整值 vs 增量 Δ）：增量 Δ 形态下 I-3.1（已分配统计对得上） 判别力归零，幂等完整值形态下全抓——要求 2 由它钉住。
+- E17（write buffer 合并上限）：第一版漏了 `seq`，两条臂与真值当场对不上，逼出要求 3 的可判定形态；同一实验的单线程合并吞吐与按叶分区的并行倍数把「sort-merge-sweep 本质单线程」的线程读法判为不成立。
+
+**欠**：C15（write buffer 混入 Δ）。
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:454-480`（整段抄，未转述）**
+
+```markdown
+#### 已定项 16：第一版 unlink：只立 deleted_inodes、从尾部分批、挂载里续做到空
+
+**定案**：
+
+1. **意图**：意图那次发布把 inode N 的记录写成 nlink = 0（size 不变），`deleted_inodes` 加 key = N（8 字节、无 value、不带对象出生代），往墓碑树开放容器追加一条墓碑（D18（块里携带什么信息） 已定项 24）；不立 logged_ops（K-U1 L4）。
+2. **分批**：从尾部按数据单元个数分批，每批释放尾部 K 个单元、size 改成「剩下单元数 × 净荷容量」；K 产品取 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`（144，自由选取），测试由只供测试的旋钮压小；删除批只重写被截掉那一片下段叶与它的祖先（K-R3-1，extent 写法的新分支，要过 `.claude/rules/fs-design.md` 五条硬要求）；最后一批释放剩下全部单元、删 inode 记录、删 `deleted_inodes` 那条 key，同一次发布；只有这一条路，不设一次做完的快路。意图那次、每一批与续做的每一批各占一个事务号，等于本实例的下一个（与普通发布同一套编号）。
+3. **建树**：`deleted_inodes` 在第一个文件版本那次发布零根注册；它是派生态：队列 = inode 树里 nlink = 0 的号集合（`research/prompts/m3-delete-r2-main-verification.md` 第三节 V7）。
+4. **读者与写入口**：`InodeRecord` 的 nlink 由 `parse` 读、`to_bytes` 写结构里的值；现造记录的入口拒「nlink = 0」与「没有这条记录」；从意图提交起只读挂载、冷走读、模型读回答「没有文件」；写入口拒 nlink = 0 的 inode（`research/prompts/m3-delete-r2-main-verification.md` 第二节第 1 行、第三节 V6）。
+5. **删空**：「有树、文件集合为空」是 `RebuiltVersion` / `PreviousVersion` / `PoolVersion` 的第三个成员，不借 `WithoutFile`；判定 = 树表有条目 ∧ inode 树零条目根（key 区间 `[0, 0]`，照已定项 6）∧ extent 树零条目根（key 区间按位置规定）∧ `deleted_inodes` 根指针置零；不看墓碑树与谱系树。删完之后只能做 `publish_new_inodes`（size 0）、写行与空发布（K-U5 X1）（`research/prompts/m3-delete-r3-main-verification.md` 第三节 G5）。删空的一版上覆盖写、顺序写、unlink 拒成已有的「没有文件版本可改」那一种拒绝（`UserChangeRefused::NoFileVersionToChange`）。
+6. **续做**：`mount_writable` 在写行与暖机之后、交回之前把队列走到空；不进取号前预演；会话里的队列每次从现行那一版读、不缓存；崩溃注入加 `WritableMountPhase::Continuation`（`research/prompts/m3-delete-r2-main-verification.md` 第三节 V3）。会话里每一次用户改动（含 unlink、写、建 inode）先把现行那一版的 `deleted_inodes` 队列走空，再做它自己；挂载续做照旧；unlink 一次调用 = 走空 + 意图 + 全部批（与续做共用同一个走空）。会话走空时删除类发布（意图那次与分批的每一批）被落点那一判以空间拒，推一串抬 F、回收后再试；每一次被拒的删除类发布各算一次准入（一次准入最多 `PUBLISHES_PER_ADMISSION_AT_MOST` = 8 次发布，`crates/singlefs-core/src/mount.rs`）；推满仍放不下交回「抬 F 之后仍没空间」的拒绝（`UserChangeRefused::NoSpaceAfterRaisingTheFloor`），已发成的留在盘上。挂载续做走空时删除类发布被落点那一判以空间拒，同样推抬 F 再试，预算口径与会话走空相同；推满仍放不下时挂载照样交回可写、队列留着，之后会话里每次用户改动先走空、走不动报空间不够，正常卸载照常（与 D16（发布语义） 已定项 1「准入」那一行同一定案）。任何一版里 `deleted_inodes` 至多一条 key；多于一个根装得下那一支拒成类型化错误、不是空间不够。
+7. **幂等的判据五条**：① 计划相等；①b 同一份崩溃镜像各自重挂载续做同一批，两份盘逐字节相同；② 删完再续做一个写都不发；③ 每个写点截断、重开续做到底，终态逻辑内容与不崩溃的终态相同、每个崩溃态 checker 全绿；④ 每个被判状态的记账标签 4、6 等于从这一版镜像现算的值。「逻辑内容」含 inode 每条（号、对象出生代、size、nlink）、extent 单元序号集与内容校验和、`deleted_inodes` key 集、墓碑记录多重集（含死亡 txg）、谱系记录多重集、标签 12 / 4 / 6、读者的答案；不含实例号、根与单元头里的 txg、改动计数、落点、单元头的诞生代号与写序、逐盘标签 1 / 2 / 5 / 10 / 11。另加 harness 层每种发布的重写角色集合钉绝对值（零轮）（`research/prompts/m3-delete-r2-main-verification.md` 第三节 V1；`research/prompts/m3-delete-r3-main-verification.md` 第三节 G2）。
+
+**射程**：第一版只做单文件 unlink、按 inode 号、无目录、不带 truncate（用户 2026-09-28 定）；删完之后不再建带数据的文件（K-U5，记欠账）；崩溃流接在 `crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs` 那条流后面 unlink 它的 3 单元文件（K-U6 F1），截断成 0 另立一条流。只改尾叶的 extent 分支、写入类发布按发布之后的标签判、重写角色集合钉绝对值被攻过零轮；第 6 条增补的会话里每次用户改动先走空、与任何一版至多一条 key，也被攻零轮。
+
+**依据**：
+
+- 无实验：数都在三方腿的副本原型上量（三份删除判决），入库装置「删除借保留量的环窗口」在量环窗口那一半、还没出量。
+- 三方判决 `research/prompts/m3-delete-r1-main-verification.md`、`research/prompts/m3-delete-r2-main-verification.md`、`research/prompts/m3-delete-r3-main-verification.md`。
+- 用户定案 2026-10-01：K-U1、K-U5、K-U6、K-R3-1（原话在变更史）。
+- 判决 `research/prompts/m3-blanks-r1-main-verification.md` 第二节队列上界与接口那一行：回退到意图那一版会把号带回队列，只有「会话里每次用户改动先走空」与「回退之后续做」两个臂在放开用户动作的历史上队列长度与有队列时的写次数两项都守住。
+- 用户定案 2026-10-01：会话里每一次用户改动先走空（岔路单 `research/prompts/m3-blanks-r1-forks.md` 的「会话里的续做点」一行，原话在变更史）。
+- 用户定案 2026-10-02：会话走空被空间拒推抬 F 再试；2026-10-03：每一次被拒的删除类发布各算一次准入、挂载续做被空间拒同样推抬 F 再试、推满仍放不下照 D16（发布语义） 已定项 1 做成可写、删除类发布各占一个事务号（原话在变更史）。
+- 代码轮判决 `research/prompts/m3-unlink-code-r1-main-verification.md` 第二节 K2 那一行（续做、走空与推抬 F）与第四节（挂载续做推满仍放不下的结局交用户）；实现：会话走空推抬 F 是 `crates/singlefs-core/src/mounted_session.rs` 的 `publish_the_queue_until_it_is_empty_raising_the_floor_for_space`，事务号是 `crates/singlefs-core/src/transaction.rs` 的 `publish_deletion_step`。
+- 主 agent 2026-10-02 定 Q-L 照收（调度记录 `records/2026-10-01-删除与并发事务.md` 第 320 行）：删空的一版上覆盖写、顺序写、unlink 拒成已有的那一种拒绝。
+
+**欠**：C618（删完之后不能再建带数据的文件）、C619（墓碑树根长高那次发布没有崩溃流）、C614（回退时墓碑树取错与删完对象无墓碑单镜像判不了）；C118（`deleted_inodes` 树的形态无落点） 还清。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:1-4`（整段抄，未转述）**
+
+```markdown
+## D16 发布语义 —— 已定
+
+D16（发布语义） 管发布这一格：一个新根什么时候发、一次发布按什么顺序落盘、发布计数器是哪一个数、这一批释放什么时候回可分配集合、新实例的第一个根怎么先覆盖两块盘、一次空发布写不写单元、journal 记录格式在 D15（格式冻结政策） 的冻结分层里算什么。不管的：journal 的记录字段、环几何与重放前缀在 D23（journal 的角色与格式）；根环参数、根记录与系统配置的字段表在 D22（单元原子性怎么合成）；快照的记账模型与生死边界表在 D5（快照 / 空间记账机制） 与 D6（快照实现模型）；准入不等式与挂载期承诺量在 D3（空间分配） 与 D28（挂载期承诺量）；一次发布事件内部的内存序在 `litmus/commit-publish.litmus`，那份钉的是写块内容 → `smp_wmb` → 写 generation，对频率一字未提。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:27-76`（整段抄，未转述）**
+
+```markdown
+#### 已定项 1：defer 窗口取按盘回退下界的收严形态，按状态数读
+
+**定案**：回退候选集保留最近 4 个可退到的不同状态——只数改过用户可见状态的根，推空与抬 F 产生的空发布根不算；同一个状态只数一次（去重的判法在「「非空」从盘上怎么认」那一段）。**根环容量是这句的边界**：两个状态来回交替超过根环一圈时，环里的根全是这两个状态，保留的就只有环里有的那几个，任何机制都给不出环里没有的状态。**窗口的单位是发布，不是秒**：defer 窗口保护的是「环里的根还能不能用」，普查过的消费者没有一个按秒计价。形态取 E139（按盘回退下界的收严形态） 的臂 G2S；回收门槛取一圈窗口之后，装置里没有窗口这一项，这一句不再与装置里跑的一字不差，欠里记着 E139（按盘回退下界的收严形态） 要重跑：
+
+| 项 | 定案 |
+|---|---|
+| 可再分配 | 已释放 ∧ 释放代 ≤ max(F_生效, 一圈窗口里最旧有效根) |
+| 环里最旧有效根 | 盘上全部根槽里自证合法、按实例表判仍然有效的根的最小 checkpoint_txg；写失败的槽按旧内容算，在飞、没持久的发布不算 |
+| 一圈窗口里最旧有效根 | N = 环里读得出的最新有效根的 txg（挂载重建分配器时取它、不取 first_txg − 1；进程内每记一条根时取这条根）；窗口 = txg > N − 3S（一圈，3S 是环长）；窗口里自证合法、按实例表判仍然有效的根的最小 checkpoint_txg。挂载时读不出的槽在窗口里只对应一两个 txg：门槛按最小的算，根环表记最大的（零轮，只在攻方模型上量过）。同取这个窗口的五处：分配器的回收门槛、checker 的候选过滤、checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛（max(F_生效, 窗口里最旧有效根)）、影子账的候选过滤、回退候选集 |
+| 回退下界 F | 根记录带 8 字节（D22（单元原子性怎么合成） 已定项 7，242 → 250），系统配置另记一份 8 字节（D22（单元原子性怎么合成） 已定项 9）。平时不动，窗口就是整个根环；准入不够时抬，正常卸载时抬到现行那一版的 txg |
+| 抬 F 的上限 | **准入抬 F**：min(每块盘上最新的持久有效根, 第 4 新的非空持久有效根)；非空有效根不足 4 个时取最旧的有效根。一次处置的目标 = min(这次释放的释放代, 第 4 新的非空根)。**卸载抬 F**：抬到现行那一版的 txg，不另判上限（等价于上限取最新的持久有效根，不按盘取小） |
+| 根槽这一次读坏 | 算准入抬 F 的上限、挂着时管理员回退判候选（根环里有没有目标）与算 F_生效 时读根环：挂载那一刻就读不出或自证不过、这个进程之后也没写过的槽，当没有根；挂载那一刻读得出、或这个进程写过且 FUA 返回过的槽，这一次读不出或自证不过就重读一次，仍坏就拒这次抬 F 或这次回退、报它自己的错误成员，不按有根或没根猜（抬 F 那一半用户 2026-09-26 定，推的，被攻过零轮；回退那一半主 agent 2026-09-28 定，被攻过一轮：代码三方第三轮判决 `research/prompts/m2-closeout-code-r3-main-verification.md` 第一节判替没写的条款做了选择、回退扩写拒错或放错那一格没打中（一次抽样））。可写挂载的择根按 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续处置（D23（journal 的角色与格式） 已定项 14：系统配置见证过比所选那一版新的发布就把读阶段重读一次，仍判真拒可写）；只读挂载的择根、「环里最旧有效根」怎么处置这一格没判，见 C563（读根环一槽读坏就当没有根，别的调用方没判） |
+| 生效 | F 另记进每块盘的系统配置（「抬 F 那一串」那一行写明先写后抬）；恢复后生效值 F_生效 = max(各幸存盘最新持久有效根所带 F 的最大值, 被抛弃时间线上的根所带 F 的最大值, 系统配置里读得出的 F 的最大值)；系统配置里读得出的取每块幸存盘两槽里全部自证过（校验和过且 fsid 与本池相同）的槽，与取号式子同一取法（D18（块里携带什么信息） 已定项 11） |
+| 回退候选集 | 按现行那一版的实例表判仍然有效 ∧ txg ≥ F_生效 ∧ txg 落在一圈窗口里（D23（journal 的角色与格式） 已定项 14 的挂着时回退取同一个集合） |
+| 抬 F 那一串 | 准入与卸载共用。动盘之前在分配器的拷贝上把这一串空发布整串预演：任一次取不到落点，就一次都不发、分配器原样换回抬 F 之前那一份（`MountError::RaiseFloorSequenceRefusedByTheRehearsalBeforeAnyWrite`）；**预演过了、第一次发布之前，先把新 F 写进每块盘的系统配置、过一道屏障**，之后才发第一条带新 F 的根；**先写那一步任何一块盘失败，这一串的根一条都不发、返回错误；已写进别的盘系统配置的新 F 留着、不回卷，F 的生效值只增不减**（主 agent 2026-09-26 定，推的，被攻过零轮）；空发布推到每块盘上都有一条带新 F 的根为止；真发时落盘途中写错，交回已落盘几次（`MountError::RaiseFloorSequencePublishFailed`），那一格里扣住的槽怎么放没有条款，见 C546（抬 F 被拒时扣住的槽不退回） |
+| 正常卸载 | 推一串空发布把 F 抬到现行那一版的 txg（「抬 F 那一串」照准入的走法，上限见「抬 F 的上限」那一行）；这一串写的根在根记录 flags 里带卸载记号（D22（单元原子性怎么合成） 已定项 7）；第一版几何（R = 3、区域归属 0 / 1 / 0）下空发布 2 或 3 次（现行 txg 除以 3 余 1 时 3 次，余 0 或余 2 时 2 次）；不加干净关闭标记，下次挂载照旧走恢复（D23（journal 的角色与格式） 已定项 14） |
+| 准入 | 可分配 = min(可再分配 + 活元数据 − 保留池, `df`)；准入不够、或准入放行而落点取不到时，先推空发布抬 F 再判（写行那次发布之前不推：它是新实例的第一次发布，元数据走切换预留，同一次发布里的用户数据重做照走准入、不够返回 ENOSPC）；**可写挂载的准入不够时，写行那次发布照走切换预留，写完行之后推抬 F 的空发布、再判**；一次准入最多 B = 4 + 2 k_tol 次发布（k_tol = 2 ⇒ 8），做满仍不够才报 ENOSPC；挂载处推满仍不够时挂载照样做成可写，之后的发布照发布准入判、不够报 ENOSPC，正常卸载照常（D2（RAID 条带策略） 已定项 13 那一格的例外）（用户 2026-09-26 定，被攻过零轮）；挂载续做的删除类发布被落点那一判以空间拒时同样推抬 F 再试，推满仍放不下挂载照样做成可写（D8（核心索引结构） 已定项 16 第 6 条，用户 2026-10-03 定） |
+| `df` | 没用过的 + 已释放的 + 活元数据 − 保留池 − 推空最坏残留 − 滞后量；保留池 = 2 × 5 + (B − 1) × c_max = 10 + 7 c_max，残留 = 5 + (B − 2) × c_max = 5 + 6 c_max；滞后量 = 释放代 > max(第 4 新的非空有效根, 环里最旧有效根) 且不是空发布放掉的已释放块 |
+| 环深下限 | 每区槽数 S ≥ k_tol + 2 = 4（D22（单元原子性怎么合成） 已定项 2 的 S 下界随之抬） |
+
+**「非空」从盘上怎么认**：一条有效根算非空 ⟺ 它的树表里用户可见的树（inode 树、extent 树）的根指针，与它前一条有效根（按 txg 排；有效 = 按实例表判仍然有效 ∧ txg ≥ 当前的 F）树表里的不同。比的是树表里这两棵树的条目、不是树表单元自己的落点——每一次发布（连空发布）都重写树表单元（`crates/singlefs-core/src/transaction.rs`），按落点比会把空发布全算成非空。**数「第 N 新的非空有效根」与「4 个不同状态」时去重**：从新到旧数，一条非空根只有在它的 (inode 树根指针, extent 树根指针) 与每一条比它新、已计入的根都不同时才计入——管理员回退发出的新根与它前一条有效根不同、按「「非空」从盘上怎么认」那一判法算非空，而它的状态与更早的某一条相同，不去重就会把同一个状态数两次（第二轮 X7：来回回退之后按内容只剩 2 个不同状态）。反方向只让 F 停住，直到第 4 个状态的根离开根环。
+
+**改新池新建文件的字节：是**：根记录加 F 8 字节；新池新建文件里 F 恒 0（mkfs 与第一次发布时非空有效根不足 4 个，上限取最旧有效根 txg 0）。系统配置加 F 8 字节，新池新建文件里写 0（D22（单元原子性怎么合成） 已定项 9）。
+
+**连带改的**：D22（单元原子性怎么合成） 已定项 7 的根记录加 F（242 → 250）、flags 占一位卸载记号，已定项 9 的系统配置加 F 8 字节，已定项 2 的 S 下界；D23（journal 的角色与格式） 已定项 14 的回退候选集加「txg ≥ F_生效」；D3（空间分配） 已定项 9 第 2 条写明界；I-7.4（近 K 代块未被复用） 的 K 改由 F 表达；I-7.9（回退下界 F 不高于抬 F 的上限） 按卸载记号分两支。
+
+**射程**：定的是 defer 窗口与回退下界怎么算，不定环几何、不定 c_max 的口径（c_max 是声明的最坏空发布开销，按 D28（挂载期承诺量） 已定项 4 按当时结构现算）。已知边角七样：
+
+- **「生效」取 SysPre**：F 只住根记录、根槽不镜像（已定项 7）时，带新 F 的根坏掉 F_生效 就回落，更早的根重新进回退候选集、而它们引用的块已被合法复用——I-7.4（近 K 代块未被复用） 在这段历史上不成立（`research/prompts/m2-step45-code-r2-main-verification.md` 第四节、`research/prompts/m2-step6-checker-r1-main-verification.md` 第四节）；病根是 F 只住根记录，与生效取哪条规则无关（第三轮 K4：带 F 的根全坏那一格，今天的规则、MAX、MAX+HOLD 候选坏 12 / 140 / 12，SysPre 0）。代价：系统配置多 8 字节（动格式）；每次抬 F（准入与卸载）每块盘多一次系统配置写、加一道屏障；checker 与层 0 要跟着读系统配置里的 F——今天的 checker 按根上带的 F 判，带 F 的根全坏时会误红 I-7.4（近 K 代块未被复用） 等五条（第三轮 Y7，推的，没实现），欠 C556（checker 与层 0 不读系统配置里的 F）。「先写后抬」是第三轮攻方提的，被攻过零轮，用户 2026-09-26 知情定。被抛弃时间线上的根带的 F 算进 F_生效（用户 2026-09-28 定「算进」，被攻过一轮，判决 `research/prompts/abandoned-floor-r1-main-verification.md` M2：被抛弃根带着比别处高的 F 时，不算的话 I-7.12（系统配置 F 不低于同盘根上的 F） 红、回退退得到那个 F 之下，而被抛弃时间线抬 F 时已按它回收过槽；实现 `crates/singlefs-core/src/recovery.rs` 的 `effective_rollback_floor_of_the_roots_read`，checker 另算一份 `crates/singlefs-checker/src/walk.rs`）；C331（择根倒挂压过已确认的写） 取甲之后，被抛弃根带着更高 F 的盘面只在构造的镜像上有（那一形要可写挂载时一槽系统配置一时读不出，甲 拒这样的可写挂载）。与 `research/prompts/alloc-basis-r3-main-verification.md` 的 F 口径岔路一起判的那一件仍开着。
+- F 回落之后第 0 代根重新进有效根、它的树表单元已被合法复用、此后每一次抬 F 都被拒到根环把它盖掉为止（`research/prompts/m2-emptypool-nonempty-r1-main-verification.md` 第一节 Z1）：前提是 F 回落，取 SysPre 之后在带 F 的根全坏那一格上不再出现（推的，第三轮没造那一形）。一次挂载里连续发布超过根环容量时挂载内不回收，checker 在合法状态上判 I-3.1（已分配统计对得上） 红（E153（账本形态与环上有洞的代价） 在 `crates/` 副本上量到），仍开着，归里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 ② 行。
+- **正常卸载的代价**：每次卸载多 2 或 3 次空发布，第一版几何上每次 8 个单元、两盘合计 21 次写调用、279040 字节（第一轮攻方 t10、t5a，副本上量的）；卸载之后 F = 现行那一版的 txg，回退候选集只剩现行那一版。用户选时知情的代价是「停机时崩溃兜底只剩最新一条根」（按条款推的）；第二轮在卸载之后再挂、最新 j 条根坏的 75 行上恢复全读对、可写挂载全挂上，这一条没出现：F 之下的根还在环里，它们的记录能把状态重放回这一串的末尾（第二轮判决 G4）。
+- **用户知情接受的代价三条**：删掉的空间要再发生 3 次改变用户可见状态的发布才回可分配集合，在那之前 `df` 不把它算空闲、按 `df` 写它是真 ENOSPC；`df` 少报 = 保留池 + 残留 = 15 + 13 c_max（c_max = 5 / 10 时 80 / 145 块）再加滞后量，而滞后量 = 4 × 最近四个窗口的释放量、**没有上界**（一窗删一个 8 块对象时平均约 34 块、最大 44 / 52，一窗删 32 个时 1044 块），删掉 s 字节 `df` 一个字节都不涨；c_max 按现算取，第一版池规模 9 块 ⇒ 保留池 73 块。
+- **最少保留 4 个状态只在一次处置里根槽写失败 ≤ k_tol 次时兑现**：S = 4、c₀ = 5、3 次失败那一格违反 24 次，按字面记一次输、按 k_tol 的射程在外；全枚举下 S = 4、c₀ = 1 也违反 160 次（同为超过容忍的格）。
+- **代价是选项本身的，不是这一族的缺陷**：一个被保留的状态钉住的是在它那一刻活着、后来才死的全部块，选最近 4 个就是每次删除都撞上——滞后量与「删了要等 3 次状态」都从这里来。
+- **E139（按盘回退下界的收严形态） 答不了的**：计数模型，按发布计不按墙钟；只建根一级的引用、没建 journal 记录重放；实例切换的挂载时预留由 D28（挂载期承诺量） 已定项 3 扣；容量 4000 块、两块盘；k_tol 固定 2；滞后量口径是写登记的人替状态数读法构造的；保留池扫描的最小值落在扫描下沿、真正要多少没量到；环深下限是探针的数。两轮前身 E135（动态回退下界） 与 E138（按盘回退下界与推空的空间要求） 的结论已被 E139（按盘回退下界的收严形态） 取代，不再当依据用。
+
+**依据**：
+
+- E139（按盘回退下界的收严形态）：臂 G2S 在全部故障世界（活化区间内崩溃不丢盘、先跳号再抬 F、推空期间 1..3 次根槽写失败、坏槽、开销升到 c_max）零假候选、零不可恢复，各格按自己的 `df` 假性 ENOSPC 为 0，一次准入的发布数实测最大 7 ≤ 8，跑前保留池下不卡死——定案取的就是这条臂（跑前登记 `e139-preregistration.md`，产物 `e139-tightened-floor-2026-09-12.out`）。
+- 四轮三方论证，第四轮判决 `research/prompts/d16-item1-r4-main-verification.md`；第三轮 `research/prompts/d16-item1-r3-main-verification.md`。
+- 用户三次定案（候选集可以一直缩、最少保留 4 个、「4」数的是可退到的不同状态、三种「哪 4 个」里选最近 4 个），原话在变更史；「非空」怎么认与「写行那次发布之前不推」同为用户定案，原话在变更史。
+- 用户定案 2026-09-25：抬 F 那一串改成整串预演，推翻 2026-09-24「维持逐次发布」（原话在变更史）；实现是实二六（`research/prompts/m2-e26-implementer-report.md`）。
+- 生效取 SysPre、卸载抬 F 到现行那一版的 txg（B1）、「4 个不同状态」去重与根环容量边界、候选按现行那一版的实例表判：无实验，三方原型（`research/prompts/m2-rollback-forward-r1-opus-model/`、`m2-rollback-forward-r2-opus-model/`、`m2-rollback-forward-r3-opus-model/`）在冻结副本上量过，没立实验号，原型上的数不是入库装置上的数；三轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md`、`m2-rollback-forward-r2-main-verification.md`、`m2-rollback-forward-r3-main-verification.md`（第三轮第三节站住的、第四节交用户的）。SysPre 的「先写后抬」被攻过零轮。系统配置里读得出的 F 取每块盘两槽里全部自证过的槽、先写那一步失败时一条根都不发且已写进的 F 不回卷，这两处是主 agent 2026-09-26 定的，推的，被攻过零轮。
+- 用户定案 2026-09-25（正常卸载时抬 F、取 B1）与 2026-09-26（C419（F 生效之后靠什么保持不回落） 取 SysPre，推翻 2026-09-25 定的「生效值取各盘 F 的最大值」；「4 个不同状态」加根环容量边界），原话在变更史。
+- 「根槽这一次读坏」那一行：抬 F 那一半是用户定案，原话在变更史，构造的反例在 `records/2026-09-24-里程碑二收尾调度.md` 第三节「实四丙交回」那一行；回退那一半是主 agent 2026-09-28 定（同一份调度记录第 309 行），经过在变更史。实现已合入：`crates/singlefs-core/src/recovery.rs` 的 `readable_roots_with_ring_slots_rereading_ring_slots_known_to_hold_a_root_once` 对这个进程知道住着根的槽「读不出或自证不过」都重读一次，仍坏报 `RootRingSlotKnownToHoldARootStillBadAfterOneReread`（带 `first_reading` / `reread`）；算上限那一遍是 `crates/singlefs-core/src/mount.rs` 的 `roots_of_the_ring_for_the_ceiling`（仍坏报 `MountError::RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`），抬 F 与卸载重算影子账与回收门槛那一遍仍坏报 `MountError::NewerStateStillUnreadableAfterOneReread`（`StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot`），管理员回退的 `rollback_candidate` 判候选与算 F_生效（`recovery.rs` 的 `effective_rollback_floor_rereading_known_ring_slots_and_the_newest_instance_table_once`）仍坏报 `RollbackError::CandidateJudgementStillUnreadableAfterOneReread`、在任何写之前。用例：`crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs` 的 `raising_the_floor_while_a_root_ring_slot_known_to_hold_a_root_stays_not_self_verified_is_refused_before_any_write`、`a_root_ring_slot_known_to_hold_a_root_not_self_verified_once_is_read_on_the_reread_and_the_floor_is_raised`、`rolling_back_while_the_targets_root_ring_slot_stays_unreadable_is_refused_before_any_write`；`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的 `rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write` 与 `crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs` 的 `rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write`（这个进程写过的根被改坏之后回退拒、盘上不变）（`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节第 3 行；合入后验证一收窄成只管读不出、之后由改法 B 还原成全句，见 `research/prompts/m2-impl-merge-verify-1-implementer-report.md` 第三节第 1 小节）。
+- 「准入」那一行的落点被拒也推、挂载处写行之后推：用户定案，原话在变更史；安全设计轮第三轮判决 `research/prompts/m2-safety-r3-main-verification.md`（会话里落点取不到 C283（准入失败时不先推发布就报 ENOSPC） 不管、只崩了再挂就把小盘挂死）。
+- 回收门槛取一圈窗口：三方判决 `research/prompts/m3-ring-r2-main-verification.md` 第二节第 4、5、6 行（窗口字面第一次抽样没打中；锚写死成环里读得出的最新有效根；分配器、checker、影子账候选过滤、回退候选集同改）与 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 3、4、5 行（第二次抽样没打中；读坏的中间根那一格门槛按最小 txg 算、根环表记最大，零轮；同改清单加 checker 的 I-3.1（已分配统计对得上） 丁-defer 门槛，合计五处；定案里「与装置里跑的一字不差」那一句改写）。用户定案：取一圈窗口、「抹」不做（原话在变更史）。无实验：窗口形态在三方副本上量过，没立实验号，副本上的数不是入库装置上的数，E139（按盘回退下界的收严形态） 重跑欠着（欠里记着）。
+
+**欠**：C282（环里最旧根没有定义）——定义与条款写在已定项 1 里，会红的检查仍欠；C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）（与 defer 窗口取多大无关，病根在 D23（journal 的角色与格式） 已定项 14 的影子账）；C329（写行那次发布之前推抬 F 的空发布没有检查）；C563（读根环一槽读坏就当没有根，别的调用方没判）；C660（回收门槛改成一圈窗口之后按盘回退下界的装置要重跑）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:77-89`（整段抄，未转述）**
+
+```markdown
+#### 已定项 2：checkpoint 的触发判据取时间与脏数据量，两者取先到
+
+**定案**：`触发 ⟺ (now − 上次 checkpoint 的时刻 ≥ T_time) ∨ (脏字节数 ≥ T_dirty)`。两个阈值是**系统配置声明值**，挂载时求值一次（形态与 D21（权威态与派生态的分界）「单元几何挂载时求值一次」同型）。
+
+**射程**：定的是什么时候触发，不定两个阈值取多少（已定项 5），也不定触发之后怎么切分事务（同样在已定项 5）。已知边角一样：`.claude/rules/fs-design.md` 硬要求 5 说的分支变量是那两个阈值、它们在挂载期间恒定，`now` 与脏字节数是被比较的量、会变，不是分支变量。
+
+**依据**：
+
+- 无实验：`∨` 这个形态是两条失败模式互相堵出来的，没有可量的量——只按脏数据量，空闲系统上最后一批写可以无限期不落、崩溃丢窗口无界；只按时间，突发写会把一个 checkpoint 的 journal 占用撑过环几何，而 I-8.1（环几何够大） 要的是「任一事务的最坏 journal 占用」有界。那个 `∨` 式子就是全部，没有魔数以外的自由度，`.claude/rules/fs-design.md` 硬要求 1「判据显式、可计算、写下来」因此满足。可量的量是两个阈值的取值与它们的可行域，在已定项 5。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:90-110`（整段抄，未转述）**
+
+```markdown
+#### 已定项 3：journal 记录格式是四层之外的第三个独立冻结组件
+
+**定案**：journal 不进 D15（格式冻结政策） 的四层链。它的记录格式——记录头（含已定待落地的事务号 + 提交标记、反向链、载荷校验和三笔增量）、点名项、载荷校验和的覆盖范围、事务边界——立成四层之外的第三个独立冻结组件；住系统配置的 journal 几何字段（记录尺寸、环大小、在飞记录数上限、tail 槽）是系统配置字段，随第 1 层冻。新记录格式走「新记录类型 + 系统配置 log-incompat 位」：环里有这种格式的记录时置位、环干净时清掉，不认识就拒绝挂载；永久要读得懂的只有判定「这条记录不施加」要用的那几个头字段（magic、类型、自述长度、`jsn`、`checkpoint_txg`、头校验和）。
+
+**冻结前置**（不早于它嵌进来的每一个外部定义）：第 2 层（点名项里的位置条目）；落点粒度那一格（D3（空间分配） 已定项 7 欠着的处置）；D18（块里携带什么信息） 已定项 11 的单元类登记表（点名项里的单元类型标签）；树 ID 所在的树表单元——它今天没有冻结层归属，所以这一条前置今天就挂着。**冻结时刻是提交 `format-frozen/journal-record.toml` 的那个 commit**，不许写成「第一个写出记录的镜像」。
+
+**射程**：只答 journal。树表单元、实例表单元与根记录的冻结层归属仍是 C246（树表单元没有冻结层归属） 那一格。三样已知边角：
+
+- **置位与清位是运行期动作**，不走提交这条时间线，要另配一道运行期的闸（写第一条新格式记录之前先持久置位，缺位即拒绝写），随组件的 spec 一起落。
+- **今天还冻不了**，挡着五样：点名项 56 字节只定了总宽，构成只有 [layout/01-first-txn.md](../layout/01-first-txn.md)「六、journal」的预想表，也没给加密字段留位（D23（journal 的角色与格式） 已定项 1 的 D 条「项的大小由记录类型决定」管着这件事）；记录头登记的格式常量是 78，三笔增量落地后是 95；spec 文件不存在；log-incompat 位还没有位号，也没进 D15（格式冻结政策） 那张 feature bit 记账表；冻结前清单第 1 项量宽度、第 7 项量未定分项，两项都看不见 `jsn` 解释口径打架那笔欠账，按今天的清单冻这个组件时两项都不红。
+- **「什么时候算环干净、可以清位」要按本工程的重放下界定**（D23（journal 的角色与格式） 已定项 14 的水位），不照搬现役实现。
+
+**依据**：
+
+- 无实验：冻结层归属是格式政策，能核的是各层之间的依赖顺序，没有可量的量；记录头宽度那笔字节账在 C94（登记的格式常量与后来的定案对不上）。
+- 三方论证（材料 `_d16-items134-background.md`，产物同目录 `d16-items134-*`：`d16-items134-sonnet-output.md`、`d16-items134-opus-output.md`、`d16-items134-local-output-s1.md` 与 `-s2.md`）：正推腿判「独立组件」是唯一与 D15（格式冻结政策） 已定项 1 自洽的答案，反推腿补上 log-incompat 位之后演进那一格赢，并打中两处前置；本地腿两次抽样的反例把字段挂错了层，主 agent 核后不采纳。判决取独立组件 + log-incompat 位，冻结前置按反推腿收严。
+- 现役参照：XFS 有 `XFS_SB_FEAT_INCOMPAT_LOG_ALL`，在主系统配置里置位、日志里没有受保护的条目时清掉（本机树 `fs/xfs/libxfs/xfs_format.h:426-441`、`fs/xfs/xfs_mount.c:1560`、`:1629-1639`），**未在本项目验证**；一处已知差异：XFS 的日志要重做逻辑与物理混合的条目，本工程的记录只承载指针层目标态。
+- 用户定案，原话在变更史。
+
+**欠**：C94（登记的格式常量与后来的定案对不上）、C119（冻结组件没有 spec 文件）（journal 记录格式是第三个，那一行的简称还写「两个」）、C246（树表单元没有冻结层归属）、C199（实例代号递增与 jsn 断号即止互相矛盾）（冻它之前要先还）、C225（组件的冻结时刻绕开门禁触发）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:111-130`（整段抄，未转述）**
+
+```markdown
+#### 已定项 4：一次发布整体施加或整体不施加，第二份 replay 停在句法层
+
+**定案**：「施加一条记录在指针层上做什么」那个二选一取「一次发布整体施加或整体不施加」。记录核对器那第二份 replay 实现因此停在句法层：前缀判定 + 择根 + 续做，不实现树语义、不重新生成祖先。与 D13（验证路线） 的关系照收窄后的四样：
+
+| # | 定了什么 | 依据 |
+|---|---|---|
+| ① | **共享**：与实现只共享 D13（验证路线） 已定项 5 那份生成常量；与 checker **默认不共享**，要共享得另行论证；不与 RefFS 共享恢复代码 | D13（验证路线） 冲突 1 的折中管的是 checker 自己遍历、扫描两个方向之间，不授权两个判决器之间共享（两条云端腿一致） |
+| ② | **入参拆成三份**：崩溃态镜像（择根与前缀判定看它）、记录流（崩溃态镜像环里的 journal 记录）、实现恢复后的镜像（比对的对象） | 恢复本身会改盘（实例切换写行、重发在飞 checkpoint，D23（journal 的角色与格式） 已定项 14），D13（验证路线） 定案写的「崩溃后镜像」在 harness 先恢复、后核对的顺序下是两份 |
+| ③ | **缺一个数**：前缀第一条要的「在飞记录数上限」本仓没有值（I-8.3（重放前缀严格连续）；D23（journal 的角色与格式） 已定项 1 的 C 条要它进系统配置） | 那个数在本仓零命中 |
+| ④ | **合谋测试**：记录核对器是第四个判决器；每个判决器都要有一个只有它抓得住、而且对可见状态或结构有害的坏实现。「摘掉根槽前的屏障」不够格——它抓到的缺失只伤记录核对器自己；候选待找：原来的候选回退行 W 截断随管理员回退改成挂着时的向前发布一起删掉（D23（journal 的角色与格式） 已定项 14），第二轮量到截断在今天的代码上本来就走不到。O3（独立规约执行器） 今天不在 [verification-build.md](../verification-build.md) 的落地步骤里 | 反推腿 4-D |
+
+**射程**：定的是第二份 replay 做什么、不做什么，**不定它要多少人工**——零代码时那个数没有可核的答案，只有 research 里三样工作的模型等价物当下界替身（`e42_transaction_records.rs` 240 行、`e77_publish_order.rs` 506 行、`e78_replay_start.rs` 556 行，反推腿 `wc -l`），第四样（把期望态算出来）一行模型都没有。指针层其余部分（允许部分施加时换哪个指针、祖先谁来 COW、落点谁分配）仍归 C284（施加一条记录在指针层上做什么没有定义）；D8（核心索引结构） 已定项 13（同一次发布里同 key 的中间态折叠）靠这一支：施加只落在发布边界上，同一次发布里的中间态才不会被 replay 出来。
+
+**依据**：
+
+- 无实验：第二份实现必须独立实现什么、允许共享什么，是验证路线的分工，没有可量的量；「要多少人工」在零代码时也没有可核的答案，只有行数下界替身。
+- 三方论证之后的用户定案收窄问法（问的是「那第二份实现必须独立实现什么、允许共享什么」加「它在合谋测试里站什么位置」），原话在变更史。
+
+**欠**：C284（施加一条记录在指针层上做什么没有定义）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:131-155`（整段抄，未转述）**
+
+```markdown
+#### 已定项 5：`T_time` 与 `T_dirty` 取多少，丢失窗口的口径
+
+**定案**：`T_time` 默认值 5 s，取可行区间 [200 ms, 5 s] 的上端——默认丢失窗口是 5 秒，取更小只减少摊销、不多买任何东西，拦住丢失的是那 5 秒本身。**`T_time` 用户可设，不限制**：挂载时传的值覆盖盘上的字段并回写；超出 [200 ms, 5 s] 不拒绝，只给警告（用户 2026-09-20）。`T_dirty` = 2 GiB（初值，写代码时再调）；它不由丢失窗口定——`∨` 规则下时间那一支已经保证了窗口，`T_dirty` 管的是**量**，它就是脏页内存预算本身。**`T_dirty` 是可调值，不是格式常量**：系统配置里那个字段是格式，字段里放什么数不是。**挂载时还要再夹一次**：有效 `T_dirty` = min(系统配置里那个字段, 环长 ÷ F)；环长是 mkfs 参数（默认 768 MiB、约束环 ≤ 设备容量 ÷ 4），所以「环装不装得下 `F ×` 最坏占用」不由一条 mkfs 时的下界保证，改成挂载时把脏字节预算压下去；默认环下有效值 = min(2 GiB, 256 MiB) = **256 MiB**，系统配置里 `T_dirty` 仍写 2 GiB、字段不动。
+
+**丢失窗口的口径**：取号 = 事务被分配进某个 checkpoint 那一刻，checkpoint 的切分只关闭成员资格——触发之后不再分配事务进它，已分配的事务把各自的单元写完，发布阶段等全部单元落盘（任何 COW checkpoint 都要等最慢的那次 I/O，ZFS 的 txg sync 同样等最慢的 vdev，未在本项目验证）。事务切分纪律是一事务一单元。落到取号上，事务切分纪律把一次写请求按单元切成若干事务各自取号，一个事务最多写一个单元的用户数据，**同一次请求切出的若干事务按其单元的 key 升序取号**（提交路径要记「同一请求内取号序与 key 序不一致的次数」、非 0 判红）。单元写的重试预算是墙钟 T_retry（具名可调参数，不是格式常量；用尽即按失败的性质走实例切换或转只读，D23（journal 的角色与格式） 已定项 14——它同时是丢失窗口的加项、挂载内实例切换的判据、以及连续切换计数的时间基准）。**由此崩溃最多丢的是 T_time + N_switch × (T_retry + T_redo)，不是恰好 5 秒**——一次挂载允许 N_switch 次实例切换，每次都要熬完 T_retry 再把在飞 checkpoint 重做一遍（T_redo），而重做期间开放的那个 checkpoint 发布不了、只能一直攒。这里的 `T_time` 是本次挂载生效的那个值，不是 5 秒这个常数；`T_time` 可调之后，2026-08 用户定案的「崩溃最多丢 5 秒的写」降级成**默认值下的承诺**，不是全局承诺。**「上次 checkpoint 的时刻」在重发时取重发那一刻**（取原来那一刻的话，切换期间触发条件一直成立而在飞深度只有两个，触发只能空转）；在飞 checkpoint 深度 = 开放 + 发布中两个；并发 fsync 的返回时刻被同 checkpoint 的其他事务拖住是组提交固有的代价。这是已定项 14 那条「快照发布点钉在这个 checkpoint 全部数据变更之后」的可执行形态。
+
+**射程**：定的是两个阈值取什么数与崩溃最多丢多少，不定环几何本身、也不定重做期间开放的那个 checkpoint 会不会堵住写者（D28（挂载期承诺量） 已定项 3 点名的那一格口径空白，D16（发布语义） 没写）。七样已知边角：
+
+- **`T_time` 的下界只适用于非 fsync 触发的发布**：那步推导以「一窗多次操作共享一次发布」为前提，fsync 密集负载下窗口由 fsync 自身触发。引用这条下界时连这句一起引；上界 5 s（用户定的丢失窗口）不受影响。
+- **「向上取整到 200 ms」与「预算取 0.1」都是选的，不是算出来的**：0.2 给 94 ms、0.05 给 410 ms（外推），下界随预算线性挪，改预算就要重算。
+- **由 `T_dirty` 推出的两个派生数按已定记录格式算**：D23（journal 的角色与格式） 已定项 12 的 4 KiB 定长记录（头 95 B、每项 56 B、71 项/条）下，同一个 `T_dirty` 满窗是 1847 条记录、占用 **7388 KiB**，I-8.1（环几何够大） 的环下界 F = 2 时 **14776 KiB**、F = 3 时 **22164 KiB**。两个阈值的定案值不变，变的只是这两个派生数的口径。
+- **一事务一单元下的记录账与这个派生数打架**：按六个负载点算，每次 fsync 的记录数等于数据单元数（seq 批 1 是 8 条、批 10 是 80 条），journal 恒占用户数据 12.5%，`T_dirty` 满窗 65 536 条记录、256 MiB，是字节表预想的 64 MiB 环的 4 倍。两条口径原样并列，改法要用户定。
+- **本机持续写带宽没有实测**（E58（校验和粒度的端到端代价） 那个 2045 MiB/s 是校验和实验里的顺序口径，不是写带宽，不许拿来换算），所以「5 秒能写多少字节」算不出来。
+- **`T_dirty` 与 `T_time` 是两种规则**：`T_dirty` 走夹取——有效值 = min(字段, 环长 ÷ F)，不动；`T_time` 走警告——越界不拒绝，只给警告。同一段里两个字段两种规则，不按同一规则读。
+- **`T_time` 默认值后期按盘给推荐**（用户 2026-09-20）：要先有一批盘的实测与探测输入，落在 D12（目标介质） 那条线上（第一条布局线是纯 SSD）。记成 `T_time` 默认值的重开条件，不是现在要做的事。
+
+**依据**：
+
+- E70（checkpoint 两个阈值的可行域）：两个阈值的可行域——`T_dirty` 的上界绑环几何但不承重（64 MiB 环就允许 16 GiB 脏数据，实际卡住它的是脏页内存与崩溃丢失窗口），`T_time` 的下界由摊销预算反解，按最差负载 multistream 定而不按主负载 seq 定，取摊销预算 `B = 0.1` 块/操作 ⇒ 反解 547 次操作 ⇒ 197 ms、向上取整记 200 ms，seq 负载一点下界都不需要。
+- E44（序号位宽的本机实测与代价）：本机 2785 fsync/秒，是把摊销预算反解成 `T_time` 下界的那个速率。
+- E91（已定格式下的环账与准入账）：按已定记录格式重算 `T_dirty` 满窗的 journal 占用与环下界，旧的 32 B/条目口径少算 1.80 倍。
+- 用户定案三次（两个阈值、丢失窗口口径的收口、挂载时再夹一次），原话在变更史。
+
+**欠**：C310（事务切分纪律与记录数口径打架）、C319（请求内单元按 key 升序发出没有条款也没有检查）、C425（T_time 小于一次发布耗时时触发空转）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:156-178`（整段抄，未转述）**
+
+```markdown
+#### 已定项 6：发布计数器，四个等号写成一条
+
+**定案**：每次发布把 checkpoint_txg 加一——fsync 触发的发布也是发布，没有「小发布不记号」的例外；根槽的轮转键（D22（单元原子性怎么合成） 已定项 2 的「区域 = txg mod R」里那个 txg）、记账的代（D5（快照 / 空间记账机制） 已定项 2）、恢复重放的水位（D23（journal 的角色与格式） 已定项 14）都是这同一个计数。不另设「发布代号」字段——它与 checkpoint_txg 是同一个东西。**四个等号**：fsync = 提前发布、区域 = txg mod R、一个 txg 一个号、记账代 = checkpoint 号，四处读的是同一个数，哪个实现读岔一处就会撞根槽或读错账。
+
+**四条骑手条款**（与定案同日采纳，不是可选项）：
+
+1. **根记录必须带 32 位实例代号**（与 D23（journal 的角色与格式） 已定项 9 的 journal 实例代号是同一个计数），择新在 checkpoint_txg 平局时按实例代号高者赢。机制：丢盘回退 + 盘失而复得会造出两条同 txg 的自证合法根——journal 靠实例代号分辨时间线，根环此前什么都没有。字段落点在 D22（单元原子性怎么合成） 已定项 7。
+2. **记账 key 的「代」段宽度 ≥ 48 位**：按本机 2785 发布/秒，32 位 17.8 天回绕。记账 key 的宽度算术自陈是假设，要按此重算。
+3. **`T_time` 下界的推导（197 ms）只适用于非 fsync 触发的发布**——那步推导以「一窗多次操作共享一次发布」为前提，fsync 密集负载下窗口由 fsync 自身触发。引用已定项 5 的下界时连这句一起引；上界 5 s（用户定的丢失窗口）不受影响。
+4. **记账条目的跨发布合并不再可行**（代进了 key，「后者胜」并不掉不同代的两条）⇒ 每代「统计量数 × 2」次写就是实付值，不是上界。代价，照实记。
+
+**射程**：定的是这个计数怎么加、四处怎么共用一个数，不定根环几何本身（D22（单元原子性怎么合成） 已定项 2）、也不定 journal 实例代号什么时候递增（D23（journal 的角色与格式） 已定项 9）。已知边角一样：这条定案当天的对抗测试实际跑在两条腿上——本地腿那一份后来被收窄后的字词损坏检查判红（`proposed proposed`，实词自复读那一类），按 `.claude/rules/three-way-inference.md`「闸判红之后那一轮作废」，**不许再拿它当「三方一致」引用**；定案本身不因此推翻，两条云端腿各自的判定性产出仍在。
+
+**依据**：
+
+- E48（根环几何的可行点）：轮转键就叫 txg 且逐次发布递增，9 个可行点全部建在这个读法上。
+- E50（根环槽数的上下界）：源码逐字「一圈时长（秒）= 槽总数 ÷ fsync 率。每次 fsync 发一次根」——已入库的根环算术只在「每次发布 checkpoint_txg 加一」这条等式下为真，不钉它那批实测追溯性作废。
+- E53（丢一整块盘之后根环还挂不挂得上）：丢盘回退 + 盘失而复得的那条历史，就是骑手条款 1（根记录带实例代号）要分辨的东西。
+- E44（序号位宽的本机实测与代价）：本机 2785 发布/秒，32 位 17.8 天回绕——骑手条款 2 的「≥ 48 位」是从这个速率来的。
+- 对抗测试（用户要求先攻再定）的原始输出 `c85-publication-counter-forward 那一轮的腿报告（产物在 git 里）`、`c85-publication-counter-reverse 那一轮的腿报告（产物在 git 里）`、`c85-publication-counter-local.out`；用户定案，原话在变更史。
+
+**欠**：C85（发布计数器的四个等号没写死）（条款已写成一条，会红的检查仍欠）、C88（根环的时间线判别未实现）（骑手条款 1 的 checker 侧，反推腿那一轮找出来的可达破绽）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:179-195`（整段抄，未转述）**
+
+```markdown
+#### 已定项 7：发布的持久顺序
+
+**定案**：一次发布的持久顺序恒为 COW 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障；fsync 等系统配置轮换持久之后才返回。恢复重放在施加任何记录之前，必须逐项验证点名单元的校验和。**系统配置槽在根槽持久之后再更新，每个 checkpoint 一次**，它是发布序列的最后一步、进层 0 枚举，一次发布的段序列因此唯一。**抬 F 那一串（准入与卸载）在它的第一次发布之前多一步**：先把新 F 写进每块盘的系统配置、过一道屏障（已定项 1「抬 F 那一串」）；这一次系统配置写不属于任何一次发布，每次发布内部的顺序照旧。**fsync 返回条件多一句**：新实例在本实例写成的根覆盖两块盘之前，fsync 不返回（做法与次数在已定项 8）；管理员回退是挂着时的一次向前发布（D23（journal 的角色与格式） 已定项 14），它的根持久之后才向管理员确认，与 fsync 同一个返回条件；实现待派，排在实审 A3c 之后（同在 `transaction.rs`），代价另登记一个小实验量。
+
+**射程**：定的是一次发布内部这几步的先后与 fsync 什么时候返回，不定屏障的真机代价、也不定根槽本身的冗余形态（D22（单元原子性怎么合成） 已定项 2）。三样已知边角：
+
+- **「fsync 等系统配置轮换持久之后才返回」的射程**：返回之后这一代的根只由那一个根槽罩着（根槽不镜像），见证它的系统配置已落盘。同一实例里退一代，靠 journal 重放追得上；**每个新实例（每次可写挂载、恢复、切换）的第一个根在下一次发布之前是单点**——那个槽读不出或它所在的盘掉了，恢复退到上一个实例的根，重放按严格前缀停在实例边界（D23（journal 的角色与格式） 已定项 14 的注 1），这次挂载里 fsync 已返回的事务丢，一个故障就够。要不要让新实例先把根写到两块盘上再确认，是已定项 8。
+- **屏障口径**：两道 FLUSH + 根槽 FUA + 系统配置轮换之后一道屏障 = 每次发布四个序点，比 D25（目标负载优先级） 推导的两个多两个——多的两个是第二道屏障与「发布返回前加屏障」的价钱，知情接受（后者用户 2026-09-27 定，起因是 C577（系统配置没见证到的最新根，乙罩不到） 那条用例在抬 F 之前更早红：发布路径根槽 FUA 之后轮换系统配置就返回，没有屏障）。
+- **第二道屏障买的是记录流完整性**，不是数据完整性：数据完整性的必要屏障恰一道（根槽之前）；不上第二道有 7 类「根在案而记录缺席」的状态，记录核对器与反向链的输入有洞。用户定案「需要」，两道都上。
+
+**依据**：
+
+- E77（发布的持久顺序）：崩溃子集穷举——不上根槽之前那道屏障，1024 个崩溃状态里 504 个违例；拿掉「重放施加前验证点名单元」这一步，b_rs 臂 63 处静默嫁接，所以它是承重步骤。
+- 用户定案，原话在变更史；「发布返回前加屏障」（系统配置轮换之后那一道，序点从三个变四个）是用户 2026-09-27 定的，起因、弹窗事实与岔路在 `research/prompts/c554-fix-forks.md` 第 4 行，实现已合入（`crates/singlefs-core/src/transaction.rs` 的 `persist_the_root_then_rotate_the_system_configuration`，实 C577（系统配置没见证到的最新根，乙罩不到） 报告 `research/prompts/m2-impl-c577-barrier-implementer-report.md`），代价仍另登记小实验量。
+
+**欠**：C26（屏障数从没量过）（真机每次 fsync 的屏障数仍没量）。崩溃点重放 harness 的两条自证用例（摘掉根槽前的屏障必须红、关掉重放验证必须红）随 C76（发布时序没有权威落点） 已还清。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:196-217`（整段抄，未转述）**
+
+```markdown
+#### 已定项 8：暖机取戊，新实例的根先覆盖两块盘
+
+**定案**：新实例在本实例写成（FUA 返回）的根覆盖两块盘之前，不让任何 fsync 返回；做法是连推空发布，第一版几何至多 R = 3 次。**第一版实付 2 次，而且它是格式常量不是运行时谓词**：根环三个区域的设备归属第一版写死 0 / 1 / 0（D2（RAID 条带策略） 已定项 7），于是 txg 1 落区域 1（盘 1）、txg 2 落区域 2（盘 0），两次正好覆盖两块盘 ⇒ 次数由归属唯一确定。登记成 `format-const` WARM_UP_EMPTY_PUBLISHES = 2 与 NEW_POOL_FILE_CREATION_TXG = 3（[layout/01-first-txn.md](../layout/01-first-txn.md) 八），条款在 D22（单元原子性怎么合成） 已定项 16 第 5 句。**后续挂载与挂载中途崩了再挂**：次数现算——写行那次发布的 txg 取 D23（journal 的角色与格式） 已定项 14 注 3 那个下界本身（max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1），之后每次空发布加一，按根环落点看落哪块盘，推到本实例的根覆盖每块盘为止，至多 R 次；取号之前的准入与取号之后推发布用同一份计划（`crates/singlefs-core/src/mount.rs` 的 `warm_up_publish_txgs`）。
+
+**射程**：定的是新实例确认之前要做什么，不定实例切换本身的判据（D23（journal 的角色与格式） 已定项 14）、不定空发布写出多少单元（已定项 9）。四样已知边角：
+
+- **前置 C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 的条款那一半已满足**（用户取影子账，条款写进 D23（journal 的角色与格式） 已定项 14 与 I-7.4（近 K 代块未被复用）），暖机已生效；**检查那一半仍欠**：多次挂载的录制流已有（层 0 第二条流），逐句核仍差格 1 的专门断言，C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 因此仍在未还表。
+- **归属改了那两个格式常量要重算**（加盘或开条带表时）；「至多 R = 3 次」那句仍是几何上界，不是第一版走得到的次数。第一版实付 2 次这一档没有走三方论证，可推翻。
+- **代价**：改已定项 7 的 fsync 返回条件（新实例确认前多一个条件）；新池新建文件的 checkpoint_txg 从 1 变 3，多两条空记录与两次根写；D28（挂载期承诺量） 已定项 3 的切换预留加「每次切换至多 R = 3 次空发布」，按 D28（挂载期承诺量） 已定项 4 现算的 c_max 取（池规模 9 块 ⇒ 27 块）；空发布占根环槽位，把旧的非空根更早挤出环。
+- **另两臂**：甲（不补）判据 2 一个故障就丢；丁（重放跨实例边界）出局。
+- **白推**：写行 txg ≡ 2 (mod 3) 时第一次空发布落在已经覆盖的盘 0 上，白推一次——副本装置上量到每次多写 147968 字节、多 2 道屏障、多 1 次 FUA、多占根环一槽，只重开不写时每次挂载都落在这一档，24 槽的根环 8 次挂载就整圈转完（入库装置上没重做）。这是写行 txg 取下界本身的直接后果，认下；「普通挂载的写行 txg 往后挪到只推 1 次的值」那条改法被攻过零轮，没采纳。
+
+**依据**：
+
+- E150（回退复用被抛弃的根引用的单元）：无暖机时 1 个故障就落到被抛弃的根上，暖机之后要 4 个；影子账与墓碑两种修法都零违例，用户取影子账。
+- E148（提交固定点按两棵记录树重算）：空发布在池规模、提交块聚簇时 9 块，切换预留那一半按它算。
+- E142（新池新建文件的干跑）：checkpoint_txg 1 → 3 的改动落到新池新建文件的字节上之后，262162 个状态零违例。
+- 两轮三方论证 `research/prompts/c199-r2-main-verification.md`；用户定案，原话在变更史。
+- 后续挂载那一句与白推：三方第一轮 `research/prompts/m2-presumed-clauses-r1-main-verification.md` K2（推到覆盖为止在后续挂载、回退、挂载中途崩了再挂三种起点上都构造不出不够），用户 2026-09-23 定照今天写、认白推，原话在变更史。
+
+**欠**：C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）（检查那一半）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:218-232`（整段抄，未转述）**
+
+```markdown
+#### 已定项 9：一次空发布也写单元
+
+**定案**：记账树存在时就写——空发布也是发布，按 D5（快照 / 空间记账机制） 已定项 2「每行每发布重写」重写记账行，连带记账树节点、分配记录、映射条目与树表单元。第一次可写挂载的暖机时树表 0 条 ⇒ 零单元；以后的空发布按 D28（挂载期承诺量） 已定项 4 现算的 c_max 块。**树表 0 条的一版上写行的那次发布写两个单元**：实例表与一片分配记录节点，分配记录树根指针住根记录（D22（单元原子性怎么合成） 已定项 7）；被换下的上一版实例表与上一片分配记录节点记成已释放，重开时从这片节点重建这一版的账。根记录那一项只有树表 0 条、写过行的那一版写非零，mkfs 的第 0 代与带文件的一版写全 0，零单元发布照抄上一版。
+
+**射程**：定的是空发布写不写单元、写哪几样，不定 c_max 怎么算（D28（挂载期承诺量） 已定项 4 按当时结构现算）、也不定空发布什么时候推（推抬 F 在已定项 1，暖机在已定项 8）。写行那次发布写的那片分配记录节点，单元头树 ID 写 0（实现今天的取法：那一版的树 ID 水位是 mkfs 的 65536，写分配记录树的 65538 会让 I-7.8（根记录树 ID 水位不低于全池最大树 ID） 当场红），没有条款；它进不进中央映射也没有条款——那一版没有映射树，D19（块指针的结构与宽度预算） 已定项 8 的自举豁免三类里没有它。
+
+**依据**：
+
+- E148（提交固定点按两棵记录树重算）：空发布的固定点按两棵记录树重算是池规模 9 块、新池新建文件规模 4 块，「以后的空发布按现算的 c_max 块」那句的数出自这里。
+- E142（新池新建文件的干跑）：第一次可写挂载的暖机那两次空发布逐字节写出来，树表 0 条时零单元。
+- 用户定案 2026-09-23（写行那次发布在树表 0 条的一版上写实例表与分配记录节点两个单元、分配记录树根指针住根记录），原话在变更史；实现与用例点名在 [checks-owed.md](../checks-owed.md) 已还清表 C512（树表 0 条的一版上被换下的实例表记在哪没有条款） 那一行。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:233-248`（整段抄，未转述）**
+
+```markdown
+#### 已定项 10：发布粒度取攒批，不是每个事务发一次
+
+**定案**：攒够一批脏节点（或到时间）再发布一次根，不是每个事务发一次。
+
+**射程**：定的是频率，不定一次发布事件内部的顺序——那在 `litmus/commit-publish.litmus`，它钉的是写块内容 → `smp_wmb` → 写 generation，对频率一字未提。两样已知边角：
+
+- **净代价分布**：格式侧几乎为零（journal 本来就要有），验证侧一大笔——中间态语义改写（已定项 12）、第二份 replay 实现（已定项 4 与 13），再加 D13（验证路线） 的「Merkle 根链差分」粒度变粗：一代根里塞了 K 个事务的改动，定位精度从「哪个事务」降到「哪个 checkpoint」，而 D13（验证路线） 已写明全量档的真代价是定位成本。
+- **发布语义决定「走几次」**：每事务发根 → K 批走 K 次；checkpoint → 同一窗口内的 K 批只走约一次，各批只留一条 journal 记录（小、顺序写）⇒ 分批大删除那一格的元数据写放大从 `K × M × H` 降为 `checkpoint 数 × M × H`。
+
+**依据**：
+
+- 无实验：定案靠两条互相独立的推理，当时没有可量的量。① 它与 D5（快照 / 空间记账机制） 已定的 ZFS birth txg 模型天然相容——ZFS 的 txg 本身就是 checkpoint（`zfs_txg_timeout` 默认 5 秒，或攒够一定脏数据量），一个 txg 批量大量操作、txg 结束才更新一次 uberblock；采纳 checkpoint 之后 birth txg 的号粒度问题自动消失，一个 txg 一个号，deadlist 的比较粒度就是 checkpoint 粒度、不必重算（未在本项目验证）。② **根是丢失写的最终见证者**：检测「盘上这块是不是它应该是的那个版本」需要一个外部见证者，块自身办不到（合法的旧版本与合法的新版本在块内层面同构，D18（块里携带什么信息） 有完整论证），而见证者必须在不同的失败域上——父节点若在同一次事件里也没写成就要祖父，递归到根 ⇒ checkpoint 发布的那个根是这条递归的终点，它的持久化必须比任何单个块更可靠（ZFS 的形态是 4 个 label × 每个 128 KiB 的 uberblock 环、且偶数与奇数 label 分两阶段写；本工程根自身的冗余形态由 D22（单元原子性怎么合成） 已定项 2 定）。频率的可量代价（两个阈值的可行域）在已定项 5。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:249-261`（整段抄，未转述）**
+
+```markdown
+#### 已定项 11：没有任何操作可以绕过 journal 直接发根
+
+**定案**：所有结构、所有操作先进同一个 journal、共用同一个 checkpoint 节奏。fsync 的效果是「提前触发一次发布」，**不是另开一条日志格式、另一套恢复逻辑**。判据是：journal 是所有提交的必经之路，还是某些路径的旁路——前者是一套机制、持久化分两级，合规；只有 fsync（或只有元数据、只有小写）走 journal、别的直接发根，就是 `.claude/rules/fs-design.md` 点名的「为 fsync 单开一套日志树」。
+
+**射程**：说的是挂载之后的操作；mkfs 种子写第 0 代根不经 journal（D13（验证路线） 已定项 1 自己列的根槽三种写者之一，mkfs 一条记录都不写），不在这句的射程里。已知边角一样：D23（journal 的角色与格式） 已定项 1 的轴一取甲压在这一条上，重开它要回答的依据里有这一条。
+
+**依据**：
+
+- 无实验：它是 `.claude/rules/fs-design.md`「一个事务层，所有结构共用」在发布这一格的形态，判的是机制的形状（必经之路还是旁路），不是一个能量出来的数；不写死就会退化成「为某个路径开第二套事务机制」。每次持久化的写量是另一个问题，归 D23（journal 的角色与格式） 已定项 1。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:262-274`（整段抄，未转述）**
+
+```markdown
+#### 已定项 12：中间状态的合法性语义改写成「根 + journal 任意前缀」
+
+**定案**：D8（核心索引结构）「中间状态必须每一个都是合法的文件系统状态」改写为「**根 + journal 任意前缀，replay 之后合法**」。
+
+**射程**：定的是合法性怎么判，不定前缀本身怎么截——前缀判定的完整口径是 D23（journal 的角色与格式） 已定项 14 的五条，缺一不可。已知边角一样：块复用那一侧的真正约束比 checkpoint 边界更严，按 journal 位置说（已定项 15 与 D22（单元原子性怎么合成） 已定项 4）。
+
+**依据**：
+
+- E42（一事务几条记录）：1601 个前缀里 1400 个被前缀切开（87.4%），一事务一条那一臂非法前缀恒 0——那是「任意前缀 replay 之后合法」的直接形式；跨多条而无边界字段时非法前缀恰等于被切开的前缀数，加边界字段之后 0。这条语义在模型上是可数的，而且数得出它什么时候破。
+- 用户定案，原话在变更史。
+
+**欠**：C42（残留记录冒充合法前缀）（上一条时间线留在环里的记录会被下一次恢复当作合法前缀重放）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:275-287`（整段抄，未转述）**
+
+```markdown
+#### 已定项 13：这份 journal replay 归记录核对器，不归 O2（独立解析器 + checker）
+
+**定案**：D13（验证路线） 已定 O2（独立解析器 + checker） 是一元谓词、只判单个镜像，所以这份 journal replay 归「记录核对器」。那是第二次实现 replay，而 replay 正是崩溃语义最容易出**共同误解**的地方——D13（验证路线） 的「三 oracle 合谋测试」要防的就是这个。**这是 D16（发布语义） 最贵的一笔。**
+
+**射程**：定的是归谁，做什么与允许共享什么在已定项 4。已知边角一样：D23（journal 的角色与格式） 轴一定甲之后「redo 为空」，最贵那一笔的大头随之消失，只剩前缀判定 + 择根 + 续做。⚠️ **「redo 为空」只对「根已持久」的发布成立**：E42（一事务几条记录） 实测 1601 个前缀里 1400 个被前缀切开（87.4%），被切开的比例与边界字段在不在无关——变的是这 1400 个非法还是合法（无边界字段臂 1400 非法，有边界字段臂 0）⇒ **恢复期重放非空是常态，不是边角。**
+
+**依据**：
+
+- 无实验：哪个判决器实现 replay 是验证路线的分工，没有可量的量；第二份实现的成本量级与它必须独立实现什么在已定项 4。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:288-300`（整段抄，未转述）**
+
+```markdown
+#### 已定项 14：快照发布点与 checkpoint 边界对齐，钉在全部数据变更之后
+
+**定案**：快照发布点必须与 checkpoint 边界对齐，且位置钉死在「本 checkpoint 全部数据变更之后」，快照不许出现在 checkpoint 中间。同一 checkpoint 内建两个快照是允许的：它们捕获同一状态、其间 deadlist 为空；但 checker 里的「上一个快照」要用 `(txg, 快照 id)` 打破并列。
+
+**射程**：定的是快照点落在哪，不定快照本身的记账模型（D5（快照 / 空间记账机制） 与 D6（快照实现模型））。已知边角一样：这条规则的可执行形态是已定项 5 那段丢失窗口口径——发布阶段等全部单元落盘，快照点就落在那之后。
+
+**依据**：
+
+- 无实验：理由是机制性的，没有可量的量——`birth` 的分辨率只到 checkpoint，**块无法表达「我生在本 checkpoint 里快照点之前还是之后」**；不钉死它，D5（快照 / 空间记账机制） 那张边界表里 `birth == S.txg` 与 `death == S.txg` 两行会同时失去确定答案，而它们一个是**数据丢失**、一个是**空间泄漏**。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:301-320`（整段抄，未转述）**
+
+```markdown
+#### 已定项 15：checkpoint C 中产生的释放，C 发布之前不进可分配集合
+
+**定案**：checkpoint C 中产生的一切释放，在 C 被发布之前不得进入可分配集合。两个理由，第二个是 D16（发布语义） 独有且更严的：
+
+1. **回滚**：崩溃后可能回到 C−1 的根，而生于 C 之前、死于 C 的块在那时仍然活着。
+2. **已定项 12 把 D8（核心索引结构） 的中间态语义改写成「根 + journal 任意前缀，replay 后合法」**：若一个块在 journal 位置 p 被释放、位置 q > p 被重新分配并写入新内容，那么重放到 `p < r < q` 的前缀会得到一棵指向该地址的树，**而盘上的字节已经是 q 的内容了**（物理写不受 journal 位置约束）。**这不是理论风险，是必然的错。**
+
+**射程**：定的是「什么时候可以回可分配集合」这条下界，不定窗口取多大（已定项 1）。三样已知边角：
+
+- **第二条理由是按 journal 位置说的** ⇒ 真正的约束是整个 journal 重放窗口，不是 checkpoint 边界；D22（单元原子性怎么合成） 已定项 4 收在那一形，缺了它的失败模式是「可检测（父指针校验和失配），不可恢复」。
+- **窗口容量与 ENOSPC 直接相关**（D3（空间分配）：释放空间这个操作本身不许申请空间），而攒批让「建了又删」在同一窗口内闭合的概率大幅上升 ⇒ **defer 窗口落在热路径上**。
+- **外部线索**：ZFS 有同型机制且更保守，`include/sys/txg.h` 的 `#define TXG_DEFER_SIZE 2 /* Number of txgs worth of frees we defer adding to in-core spacemaps */`，**未在本项目验证**；⚠️ 那个 2 为什么是 2，没查到一手解释，本工程的 defer 窗口要按自己的重放语义推，**不许照抄**。
+
+**依据**：
+
+- E82（准入的在飞合成）：把窗口内产生的释放记成可用的那条臂，20 格吃进 defer 该扣住的块——这条规则被静默绕过时的现象是可数的，准入侧的形态因此写进了 D28（挂载期承诺量） 已定项 2。
+- 用户定案，原话在变更史。
+
+**欠**：无（块复用那一侧的会红检查由 I-7.4（近 K 代块未被复用） 承担，欠账在已定项 1 列的那几笔）。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:321-333`（整段抄，未转述）**
+
+```markdown
+#### 已定项 16：checkpoint 与消息缓冲买同一样东西，E7（离线索引 harness） 的对照组钉死
+
+**定案**：checkpoint 与 D11（索引节点要不要留消息缓冲区） 的消息缓冲区买的是同一样东西，差别只在**摊销窗口住在哪**：checkpoint 的窗口住**内存**、不进格式；消息缓冲的窗口住**盘**、必须进格式。⇒ **D11（索引节点要不要留消息缓冲区） 的边际收益 = 「跨 checkpoint 的摊销」减去「checkpoint 内摊销」**。**E7（离线索引 harness） 的对照组必须是「有 checkpoint、无消息缓冲」。**
+
+**射程**：定的是那个对照组怎么设，不定 D11（索引节点要不要留消息缓冲区） 取哪一边——那由 D11（索引节点要不要留消息缓冲区） 自己定。已知边角一样：BetrFS 那组数字里这两块从没被拆开过（它同时有 4 MiB 节点的消息缓冲**和** 5 秒 checkpoint），**未在本项目验证**。
+
+**依据**：
+
+- 无实验：这是「对照组怎么设」的规定，不是实验结论；文献里没有一个对照组带 write buffer 前端，消息缓冲相对本工程现方向的边际收益，现有文献一个数字都没给，本项目也还没有可引的量。
+- 用户定案，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:334-356`（整段抄，未转述）**
+
+```markdown
+#### 已定项 17：fsync 报错之后，调用方能假设什么
+
+**定案**：
+
+- fsync 报错之后，这次发布的数据**可以出现也可以不出现**——调用方不许把「报错」读成「这次没成立」。
+- **报错之后不许假设可以照旧复用同一份内存态重试。**（`close(2)` 的 NOTES 段明写「Retrying the close() after a failure return is the wrong thing to do」；本工程取同一条语义。）
+- 要知道到底成没成立，调用方自己去读现行根：`crates/singlefs-core/src/recovery.rs` 的 `choose_system_configuration`、`choose_root` 对着仍打开的设备句柄就判得出，判据是「这次的 checkpoint_txg 是不是现行根」，不用卸载重挂。今天 `transaction.rs` 没有调它们的路径，缺的是一段胶水。
+- 这一条不定 fsync 什么时候返回，那是已定项 7。
+
+**射程**：
+
+- **只在「转只读」与「重做又失败」那几格上生效。** `D23`（journal 的角色与格式） 已定项 14 失败表判「切换」的那几格，调用方根本收不到错误（实例切换会把在飞 checkpoint 重发掉），这一条对那几格无话可说。
+- 管的是「报错之后调用方能假设什么」，不管失败本身怎么分流（那是 `D23`（journal 的角色与格式） 已定项 14），也不管持久顺序（已定项 7）。
+
+**依据**：
+
+- 无实验：这一条是对外语义的承诺，没有可量的量。撑它的是 `research/prompts/c381-r3-main-verification.md` 第一节 K1 那一格——H1（第六步系统配置槽轮换失败、前五步全成）上，「报错即没成立」这条语义**本身就是 `C381`（根已落盘之后发布失败，分配器仍退回） 的成因之一**：它让调用方以为没成立、拿旧状态接着发。
+- `research/prompts/c381-r3-main-verification.md` 第三节（候选甲站住，两样收严的来处：K2 的 POSIX 线索、K4-e 的射程限定）。
+- 用户定案 2026-09-21，原话在变更史。
+- ⚠️ **依据里要写明**：定案的后两句（禁止性条款、射程限定）**被攻过零轮**（`.claude/rules/three-way-inference.md`：攻方腿自己提的收严算没被攻过），用户 2026-09-21 知情接受。
+
+**欠**：`C381`（根已落盘之后发布失败，分配器仍退回）（改法落地之前这一格还开着）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:1-13`（整段抄，未转述）**
+
+```markdown
+## D23 journal 的角色与格式 —— 已定
+
+<!-- doc-lint:not-numbers CRC-64 SSE4.2 CRC32C SHA-256 CJ2 -->
+
+D23（journal 的角色与格式） 管 journal 是什么、写什么、崩溃之后怎么用它：记录承载什么与分配的先后（已定项 20）、每次 fsync 写什么（已定项 1）、环的几何、记录尺寸与在飞上限（已定项 2 / 12 / 18 / 19）、tail（已定项 3 / 18）、记录头与点名项的字节（已定项 4 / 7 / 8 / 9 / 10 / 11 / 13 / 15 / 17 / 21）、前缀判定与重放下界（已定项 14 / 22）、管理员回退、失败处置与实例切换（已定项 14 / 16）、与 journal 相关的三个死锁和保留池（已定项 23 / 24 / 25）、记录头的解析纪律（已定项 26）。不管的：发布的持久顺序、checkpoint 的触发与暖机归 D16（发布语义）；实例表的行格式与写行规则归 D18（块里携带什么信息） 已定项 11；根记录与根环归 D22（单元原子性怎么合成）；保留池与切换预留怎么进准入不等式归 D28（挂载期承诺量）；checker 与记录核对器各是什么归 D13（验证路线） 已定项 6 / 7；目标负载归 D25（目标负载优先级）。
+
+<!-- doc-lint:registry name-col=2 -->
+
+| 编号 | 简称 |
+|---|---|
+| T6 | 维持拒绝时拒不拒取决于池的历史 |
+| L8 | 并行线三跨记录层0流 |
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:45-90`（整段抄，未转述）**
+
+```markdown
+#### 已定项 1：journal 的角色本身
+
+**定案**：**取甲：每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录。祖先不延后。** 脏叶是全部脏叶，不只被 fsync 的那个文件的：fsync = 一次全量发布。
+
+- **两根轴不正交**：轴一（每次 fsync 发不发根）取「发根」之后，轴二（祖先落盘延不延后）只剩一个合法值。**延后祖先 ⇒ 新根不可能自洽 ⇒ 发不出一个反映本次 fsync 的根。** COW 下，要让本次 fsync 的叶从根可达，整条脊柱必须已在盘上；而「自洽」是 [invariants.md](../invariants.md) I-7（根环） 类的要求（从代号最大的根递归校验能走完权威态）。2×2 只有三格可实现：
+
+  | | 不延后祖先 | 延后祖先 |
+  |---|---|---|
+  | **每次 fsync 发根** | **甲** | **不存在** |
+  | 只在 checkpoint 发根 | `wal_full` | 乙 / 丙 |
+
+  ⇒ **轴一已定的「每次 fsync 发根」单独就把乙与丙一起判掉了**，且轴一那四条依据（环截断不了 / 多一条挂载期重放路径 / journal 进验证链 / 屏障一个没省）对乙**逐条原样成立**，不需要重新论证。丙（E22（记录点名祖先落点） 那个形态）同样不写祖先内容，只在轴一被重开时才有意义。
+- **甲下 redo 为空**，不是「甲下恢复无动作」：恢复期仍有「续做未完成意图」这条常规路径（[checks-owed.md](../checks-owed.md) C1（意图续做做成常规路径））。
+- **记录头的类型字段现在就是必需的，与轴二日后重不重开无关。** 类型字段的登记表（登记位 D22（单元原子性怎么合成） 已定项 17）：0 无效（判损坏）、1 普通记录；新类型只追加不重用码，未知类型按 A 条拒绝挂载。把它写成「为轴二留的期权」会让人以为付了钱、买到了轴二的可逆性——**它一分钱也没买到那个。**
+- **真正让轴二可逆的是四项，缺一不可**：
+
+  | # | 预留什么 | 为什么 |
+  |---|---|---|
+  | A | 记录头**类型字段** + **未知类型 ⇒ 拒绝挂载**，且该政策由**系统配置 incompat 位**承载 | 光有字段而政策是「跳过不认识的记录」，失败模式是**静默漏放一条发布指令**，比没有字段更糟 |
+  | B | 记录**自述长度**，且**先边界检查再算校验和** | 类型字段只说「这是什么」，不说「这有多长」。丙的记录长度正比于树高，装不进按甲的尺寸钉死的预算 |
+  | C | **journal 几何进系统配置**（环大小、最大记录字节、在飞记录数上限），**不许是代码常量** | 换轴二 ⇒ 最坏记录尺寸变 ⇒ 死锁 3 的几何不变量要跟着变。焊进代码就只能重建文件系统 |
+  | D | 项的大小**由记录类型决定** | D9（加密）已定 MAC 满 128 位不截断，丙的项更宽 |
+
+  ⚠️ **A 与 B 本来就欠着**（B 是已定项 26 的第二条），把它们记成「为轴二付的钱」是重复记账。
+- **重开轴二的可判据。** ⚠️ **这是设计期判据，不是运行期开关。** `.claude/rules/fs-design.md` 硬要求 5「分支变量不许在操作中途改变」——把「延不延后」做成按负载切换的运行时分支，会让崩溃语义在一次操作中途改变，当场违规。**轴二只能整体切换，且走 incompat 位。**
+
+<!-- doc-lint:registry name-col=2 -->
+
+| 闸 | 简称 | 判什么 | 现在测得了吗 |
+|---|---|---|---|
+| G23.0 | 轴一被重开 | 轴一被重开（否则后面几条不必看） | — |
+| G23.1 | 祖先链占比达标 | 单流同步写（QD=1、单线程）的 fsync 服务时间里，「写祖先链 + 根槽」占比 ≥ X%，**X 在实验注册时声明，不许事后定** | **不能**，E16（journal 的角色：WAL vs 意图日志） 口径明写只算块数不算时间。前置：事务层 + 真机 harness |
+| G23.2 | 甲丙差不收敛 | 攒批变大时，甲与丙的差**不**收敛 | **「差」取甲 / 丙每批块数之比**（用户 2026-09-28 定；今天用乙的数代丙）：E16（journal 的角色：WAL vs 意图日志） 第五次跑显示，按今天的宽度收不收敛随树高变，不是「批 ≤ 流数」的界——真实基线 1 TiB（4 层、根下 11 个孩子）上流数 ≤ 16 先涨后收敛（峰值在批 ≈ 流数），流数 ≥ 24 从批 = 1 起就收敛（`research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out` 的 `row_summary` 行，流数 64 那一行第 1818、1840 行：批 1 到批 64 比值从 3.500000 降到 3.169231）；树高 ≤ 3 全部流数从批 = 1 起收敛，树高 ≥ 5 扫到的流数全部先涨后收敛，树高 4 时门槛约为 2 × 根下孩子数（只在三方攻方副本上量过，主 agent 复跑逐字节相同，入库装置没重做，判决 `research/prompts/d23-e16r5-r1-main-verification.md` 第一节汇总表）。「3.40× → 3.71×」那组数是旧宽度（扇出恒 128、树高恒 4）下的。新写法被攻过零轮。⚠️ 丙尚未测 |
+| G23.3 | 四项盘上齐备 | 第 A–D 四项在盘上齐备 | **能，现在就该定** |
+
+- **反向判据（D23（journal 的角色与格式）必须自带）**：若记录核对器（D13（验证路线） 已定项 7：需要第二个输入的核对归它）上线后，累计 N 次全量验证里「记录核对器抓到而 checker + O1（内存模型对拍（HashMap 理想文件系统）） + 崩溃点重放三者都没抓到」的事件数仍为 **0**（N 在上线时先声明），则「乙毁掉记录核对器的逐字节比对」这条依据的增量价值实测为零，轴二应当重开评估。没有这一条，那条依据就是不可证伪的。
+
+**射程**：管每次 fsync 写什么、轴二能不能重开；目标负载归 D25（目标负载优先级）。定案只压在「两根轴不正交」这一条结构性依据上，与收益多少无关；定案当时给出的三条依据都降了级、不承重：「乙毁掉记录核对器的逐字节比对」暂不承重，「乙买不到『用错了变成挂不上』」射程用错撤下，「乙的收益形状」只剩奖金上界。乙的收益只在单流同步写上存在，而那恰是数据库与虚拟机镜像（D10（随机写 / 碎片化的真答案） 记为 COW 文件系统的共同软肋）⇒ 只能说「乙的奖金有界」，不能说「乙的收益不值一提」。轴一的写放大前提在里程碑「覆盖写、释放、回退与复用」增补 1 的三方第一轮被打中，第一轮那处打中在第二轮被翻掉（记录头里 188 字节的新根段今天已经在，施加就是换四个字段，所以「wal_full 自己改不掉」只对「每次 fsync 另写一个树表单元」那一形成立），两轮判完的结论是三条岔路收成甲、正文不动（`research/prompts/m2-s1-r1-main-verification.md`、`m2-s1-r2-main-verification.md`）。
+
+**依据**：
+
+- E16（journal 的角色：WAL vs 意图日志）：延后祖先的臂只在 checkpoint 发根、从没在 fsync 时发过根；攒批吃不掉延后祖先的收益随树高变（第五次跑：树高 ≤ 3 全部流数从批 = 1 起收敛，树高 4 门槛约为 2 × 根下孩子数，树高 ≥ 5 扫到的流数全部先涨后收敛）——它改的是「乙的收益形状」那条已降级依据的强度，不是结论。
+- 三方：2026-08-28 三方论证（材料 `_axis2-background.md`），正推腿给出「轴一 ⇒ 轴二」这条结构性依据，三条原依据怎么降级、腿况在变更史。
+
+**欠**：C1（意图续做做成常规路径）；反向判据的 N 没有声明，记录核对器已接在层 0 上（`crates/singlefs-checker-tier/src/crash.rs` 的 `check_records`），事件数没人计。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:91-115`（整段抄，未转述）**
+
+```markdown
+#### 已定项 2：journal 是定长环还是链式
+
+**定案**：**取定长环。** ⚠️ 候选理由「链式把 journal 写路径变成分配路径，于是进入死锁 2」过强，不采用：链式的增量是有界可算的，抬保留池就断开——它不是一个真环。真正判掉链式的是三条，都不经过死锁 2：
+
+1. **保留池必须涨一个量级，而涨保留池会加重假性 ENOSPC。** 链式下 journal 块本身要分配 ⇒ 保留池必须从 `ckpt_cost` 涨到 `ckpt_cost + 一个 checkpoint 窗口内的 journal 块`；而保留池对普通分配是纯税，假性 ENOSPC 只有准入治得了（已定项 24）⇒ **链式不是把代价变成死锁，是把它变成假性 ENOSPC。**
+2. **前缀判定与空间归属被绑死。** 定长环下「有效前缀到哪」只决定重放哪些记录；链式下还决定**哪些块分配器可以发出去**——前缀规则与 D21（权威态与派生态的分界）的记账权威是两个独立判定，却必须逐块一致，不一致就是静默泄漏或双分配；断号即止的截断点之后的链块要么泄漏、要么被重发而重放仍指着它。
+3. **死锁 3 不是被消掉，是从静态判据换成动态判据——这条是决定性的。**
+
+   | | 判据 | 什么时候算得出 |
+   |---|---|---|
+   | 定长环 | 最坏操作 ≤ 环大小 / F，F ≥ 2 | **mkfs 时算、mount 时校验**（同 XFS `XFS_MIN_LOG_FACTOR`） |
+   | 链式 | 最坏操作 ≤ **当前空闲** | 算不出——**当前空闲在操作中途会变** |
+
+   `.claude/rules/fs-design.md` 硬要求 5 逐字写着：「**只在操作期间不会变的输入上分支**……「当前填充率」会在操作中途越过阈值，**那是危险的分支变量**」。⇒ **链式把一条可判定的几何不变量，换成了本工程明令不许用的运行期变量。** 这不是权衡，是撞上已定的硬要求。
+
+**射程**：管 journal 的空间形态。与已定项 3 耦合：定长环下 tail 答错**只是多做功**（可降级），链式下是**泄漏或双分配**，tail 必须是权威态、要 tail-before-reuse 硬序、FUA 落在关键路径；**内联 tail + 链式是最坏格**（内联只能搭记录便车推进，链式下空闲期不写记录 ⇒ journal 块一直回收不了，空转变成空间泄漏）。⚠️ 环这一侧的几何不变量已写成 [invariants.md](../invariants.md) 的 I-8.1（环几何够大），**而它的 checker 未实现**——「写进清单」不等于「有东西在拦」。
+
+**依据**：
+
+- E25（环与链各要多大保留池）：checkpoint 卡死恰好在预测的那一档归零——环在 reserve = ckpt_cost，链在 ckpt_cost 加一个窗口的 journal 块。
+- E23（journal 几何）：环与链只差一项——链式每个 journal 块都要向分配器要一次块，环 0 次；链式没有死锁 3、环要几何不变量。
+- 三方：2026-08-29 三条腿一致判「链式进入死锁 2」过强（材料 `_d23-background.md`）。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:116-147`（整段抄，未转述）**
+
+```markdown
+#### 已定项 3：tail 住系统配置槽，改 jbd2 两处
+
+**定案**：**取系统配置形态**（tail 的权威副本住在一个固定位置，不内联在记录头），**并改两处**：
+
+| # | 改动 | 为什么 |
+|---|---|---|
+| 1 | **不许单副本原地覆写**，改 ≥2 槽轮换 + 代号 + 先逐个验证全部候选再择新 | D22（单元原子性怎么合成）已对根定过同一条纪律：一次撕裂会抹掉唯一见证者 |
+| 2 | **随每次发布写一次，是发布序列的最后一步** | D16（发布语义） 已定项 7 的注：根槽持久之后再更新系统配置槽、进层 0 枚举；D16（发布语义） 已定项 6 逐字「每次发布把 `checkpoint_txg` 加一——**fsync 触发的发布也是发布**」⇒ 「每个 checkpoint 一次」与「每次发布一次」是同一个频率，fsync 触发的发布同样要写系统配置槽 |
+
+- 原地覆写与 COW 不冲突：tail 与根槽、journal 记录头同属自证单元（发根本身就是覆写根环的一个槽），归 D22（单元原子性怎么合成）已定项 21 管；COW 对没有父的单元买不到东西。**tail 语义上是派生态**：权威判定仍是 `jsn` 连续前缀 + `checkpoint_txg`。
+- **由此逼出三条硬要求**：
+  1. **恢复不许先信 tail 再往前走：必须先全环扫描、逐条验证，再择最长合法前缀。** tail 陈旧时，`[tail_陈旧, tail_真实)` 这段已经被新一圈记录写掉了 ⇒ 从陈旧 tail 起往前走，**第一条就 `jsn != expected`** ⇒ 断号即止 ⇒ 连 `tail_真实` 之后仍然需要的记录也不重放。**那是数据丢失方向，不是「多做功」方向。** ⇒ 「陈旧 tail 只让恢复多做功」这句话**只在全环扫描式恢复下成立**。与 D22（单元原子性怎么合成）对根槽的「先逐个验证全部候选、再择新」是同一条纪律。
+  2. **重放必须幂等**：
+
+     > **每条 journal 记录的重放必须幂等**——同一条记录被重放两次与重放一次，结果相同。
+
+     「陈旧 tail 只是多做功」这句话的前提是它：没有幂等，陈旧 tail 就从「多做功」变成「重复施加已生效的记录」。与已定项 20「记录承载指针层的**目标态**」相容：目标态天然幂等（把指针写成某个值，写两次结果一样），逻辑意图不是（「计数加一」执行两次结果不同）。
+  3. **恢复算法救不了几何**：窗口撑爆环时两种恢复一起丢；环大小 ≥ 窗口是 [checks-owed.md](../checks-owed.md) C28（环几何不变量未实现）的职责，**不是恢复算法的**，两者不许互相顶替。
+- 块重用叠上来之后「陈旧 tail 只是多做功」不成立，恢复需要重放下界，取根的水位（已定项 14）；这对已定项 3 是收窄不是推翻：「先全环扫描、逐条验证、不许先信 tail」原样成立，变的是验证出的合法前缀里哪一段被施加。
+
+**射程**：管 tail 住哪、多久写一次、恢复怎么用它。字节表 [layout/01-first-txn.md](../layout/01-first-txn.md) 零与一两节按「每次发布一次」写：两次暖机空发布与新池新建文件各推进一次 tail。⚠️ 取系统配置形态时用过的代价表（E23（journal 几何） 的「两条臂差 21 : 500」）已作废：第一版每次发布都是 checkpoint，稳态多写从 21 次变成每次发布两盘各一槽；重放那一维今天不存在（恢复不读 tail、每次挂载全环扫描）。「每次发布轮换系统配置槽、返回前等它持久」今天的依据是判据 N-配置（已定项 14「可写挂载读到的更新状态读不出」，C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙、C577（系统配置没见证到的最新根，乙罩不到））：只减轮换次数或不等它持久就返回，「已确认的发布 + 根槽一时读不出 + 一份点名单元坏」时丢已确认的发布，而且那一格与「根槽 FUA 之前崩 + 一份单元坏」盘面逐字节相同、改读者分不开。这条依据成立在那一类双故障在容错射程里（用户 2026-09-28 定在）；落后支（D18（块里携带什么信息） 已定项 11）读 tail 不是这条依据。
+
+**依据**：
+
+- E24（恢复算法：先信 tail 会不会丢记录）：先信 tail 漏掉的条数恰等于窗口内写入的条数；全环扫描不丢，但把陈旧 tail 以来的记录全部重放一遍（逼出幂等）；窗口撑爆环时两条臂一起丢（恢复救不了几何）。
+- E23（journal 几何）：jbd2 形态与 XFS 内联形态在稳态额外写与空闲崩溃后的重放量上方向相反——按的是 tail 每 checkpoint 推进一次的旧前提，见射程。
+- 三方：2026-08-29（材料 `_d23-background.md`）。
+- 三方判决 `research/prompts/c245-r3-main-verification.md`（C245（系统配置槽的写频率，两条条款说反话） 第三轮）：每次发布轮换的依据换成判据 N-配置；攻方探针量出乙、丙在「已确认的发布 + 根槽一时读不出 + 一份点名单元坏」上丢已确认的发布、甲要四处故障才丢。
+- 用户定案 2026-09-28：那一类双故障在容错射程里（原话在变更史）。
+
+**欠**：C77（重放起点未定义）；C594（每次轮换之前现算整池 F 的读开销没量）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:148-177`（整段抄，未转述）**
+
+```markdown
+#### 已定项 4：记录头约束在单个原子单元内，头 311 字节
+
+**定案**：**记录头完整落在一个原子单元内**（[invariants.md](../invariants.md) I-8.2（记录头不跨原子单元））。头 **487 字节**：
+
+- **十个字段 78 字节**：magic 4 + 类型 2 + 算法类型 1 + 记录标志 1（位 0 = 本次发布末条，已定项 17；其余位写 0，读到非 0 当损坏） + 自述长度 4 + 点名项数 4 + `jsn` **10** + `checkpoint_txg` 8 + nonce 12 + 头部校验和 32。`jsn` 的 10 字节 = 实例代号 32 位 + 计数器 48 位（已定项 9）。`tail_lsn` 不在头里：已定项 3 逐字定了「tail 的权威副本住在一个固定位置，**不内联在记录头**」，而「内联在每条记录头的 `tail_lsn`」正是被否掉的那个 XFS 形态的定义。
+- **三笔已定增量 17 字节，不在那十个字段的 78 里**：已定项 7 的事务号 + 提交标记 **9 字节**、已定项 8 的反向链 **4 字节**、已定项 13 的载荷校验和 **4 字节**。
+- **本次发布内序号 4 字节**（无符号 32 位，从 1 起：一次发布切成 N 条记录时依次是 1..N，只有一条时是 1；空发布记录也写 1）：已定项 14 注 1 在所选根那条记录读不出时靠它接链首。4 字节的宽度与紧跟事务号、提交标记的落点是主 agent 按「不为省空间牺牲自包含」取的，可推翻。字段在头里的偏移：事务号 78、提交标记 86、本次发布内序号 87、反向链 91、载荷校验和 95、新根段 99、fsid 463、MAC 471、头末 487。一次发布的 N 条记录序号依次 1..N、与 jsn 同步；读者遇到这四格，都当那条记录损坏、断链即止，那次发布整体不施加：序号 0；一次发布之内跳号；锚点读得出时，下一次发布的首条序号不是 1（断在这一条）；同一 (实例代号, checkpoint_txg) 里带末条标志的那条之后还有记录（断在带标志的那条；「之后」按计数器读、不要求紧接着：计数器大于带标志那条的、读得出的同 (实例代号, checkpoint_txg) 记录都算，中间缺号不停；前提是同一实例里 journal 记录的 `checkpoint_txg` 随计数器不减，有这个前提时与「表里任何位置」的全表读法给出同样的施加结果）。与 I-8.9（一次发布的记录序号连续且只有末条带标志） 判的是同一件事。
+- **已定项 15 的新根段 364 字节**（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4）。
+- **fsid 8 与 MAC 16，都排在新根段之后**：
+  - **fsid 8**（系统配置 fsid 的低 8 字节，与单元头那 8 字节同口径，D18（块里携带什么信息） 已定项 7）。不带的话 I-1.4（块头 fsid 一致） 要给 journal 记录写一条豁免，而全环扫描就再也挡不住「上一个文件系统留在这块盘上的记录」——mkfs 整环写 0 只在 mkfs 真跑完时成立，重 mkfs 中途崩掉就不成立。带 8 字节之后不用豁免。
+  - **MAC 16**（放在 fsid 之后；nonce 12 与算法类型 1 十个字段里已有）。理由与根记录那 29 字节同一条（D22（单元原子性怎么合成） 已定项 7）：journal 记录头是自证结构，没有父指针带 MAC ⇒ 不 day-1 留位，开加密那天要么整条走明文豁免（泄漏 `checkpoint_txg`、新根段里的两条指针、点名项位置），要么就是一次布局变更；D9（加密） 已定项 3 的原则逐字是「为加密留的位所有卷都留、不挪作他用」。I-6（加密不变量）不列它。
+- 登记值就是 487（`JOURNAL_HEADER_BYTES`）；十个字段的 78 另登记为 `JOURNAL_HEADER_TEN_FIELD_BYTES`。**说 78 时要写明指的是十个字段，连同这一句一起引。** 487 占 512 扇区的 95%，其后还余 **25 字节**（装不下一个点名项，每项 56 字节）；4096 上余 **3609**（64 个点名项，⌊(4096 − 487) ÷ 56⌋ = ⌊3609 / 56⌋）。
+   <!-- format-const: JOURNAL_HEADER_BYTES = 487 stale=头 277 字节|的 277 字节头|合计 **277 字节**|JOURNAL_HEADER_BYTES: u64 = 277|JOURNAL_HEADER_BYTES: u64 = 84|JOURNAL_HEADER_BYTES: u64 = 86|JOURNAL_HEADER_BYTES: u64 = 78|512), 428|512), 426|512), 434|4096), 4012|4096), 4010|4096), 4018|512 上 428|512 上 426|头 86 字节|头 **307 字节**|登记值就是 307|⌊3789 / 56⌋ -->
+   <!-- format-const: JOURNAL_HEADER_TEN_FIELD_BYTES = 78 -->
+
+**射程**：⚠️ **那个原子宽度不由本工程定**：D20（承重面：单元的原子性与自包含）已定自证单元依赖**运行时探测**的 `physical_block_size`，不许把 512 焊进格式。⚠️ **这个值是格式常量，改它要三处一起动**：kb 标记与正文、实验源码的 `const` 与钉死它的单测、重跑实验并更新产物；由门禁阶段「格式常量在 kb 与实验源码之间同步」（`.claude/gate.d/code-source-discipline.sh` 的 format-constants 格）判红。记录尺寸取 4 KiB 定长之后对齐浪费恒为 0（已定项 12）；变长记录的对齐代价表只对变长记录成立。
+
+**依据**：
+
+- E23（journal 几何）：十个字段（跑时还带 `tail_lsn`）的头装得进一个 512 单元，不对齐、多条记录挤同一个原子单元时除第一条外都判不了撕裂——头要完整落在一个原子单元内。
+- E75（记录尺寸与环几何）：各个头部读法在 512 与 4096 两档 `physical_block_size` 上都装得进一个单元；定长 2 的幂尺寸下头永远不跨单元。
+- fsid 8 与 MAC 16：用户弹窗定案，没有走三方论证，可推翻，原话在变更史。
+- 本次发布内序号 4 字节：用户 2026-09-23 定（`research/prompts/m2-presumed-clauses-r1-main-verification.md` K4 的 Z6），是推的、被攻过零轮，原话在变更史。
+- 用户定案 2026-09-24：头 311 落地、末条标志放在原「填充 1」那个字节、序号的读者规则（原话在变更史）。
+- 用户定案 2026-09-24：锚点读得出时首条序号不是 1、末条标志之后还有同 txg 的记录，两格都当损坏断链（实二十报告 `research/prompts/m2-lastflag-implementer-report.md` 第六节 2、3），原话在变更史；无实验：两格都要 CRC-32C 碰巧对上或改出来的镜像才走得到。
+- 第四格的「之后」按计数器读、缺号不停，前提是同一实例里 journal 记录的 `checkpoint_txg` 随计数器不减：三方判决 `research/prompts/m3-formal-r2-main-verification.md` 第二节第 8 行与 `research/prompts/m3-formal-r3-main-verification.md` 第二节第四格补句一行，两条腿同向；前提另立不变量的判决是 `research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 9 行；用户定案（等前提判完一起写回），原话在变更史；无实验：补的是读者规则的射程，没有新的实验读数。
+- 新根段加实例表指针、分配记录树根指针与卸载记号三项（头 311 → 487、点名项 67 → 64）：三方判决 `research/prompts/m3-ring-r1-main-verification.md` 第二节第 2 行（今天的施加法在写行、首个文件、卸载三种发布上补出错根，推的）与第四节第 1 条，`research/prompts/m3-ring-r2-main-verification.md` 第二节第 2 行（首个文件、卸载两种发布补进去之后与当初会写的根逐字节相同、checker 绿，攻方在副本上量的），`research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、2 行（两位放进记录标志字节的形态被专用清扫发布打穿；施加处不从新根段来的只有卸载记号、实例表指针、分配记录树根三项）。用户定案「回到甲」（原话在变更史）。卸载记号占 4 字节是第一轮正推腿 H1-b 的算法（86 + 86 + 4），判决没有单独定宽。无实验：补的是施加处的字节，数都在三方副本上量过，没立实验号。
+
+**欠**：C94（登记的格式常量与后来的定案对不上）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:178-193`（整段抄，未转述）**
+
+```markdown
+#### 已定项 5：O2（独立解析器 + checker） 是一元谓词，逐字节比对归记录核对器
+
+**定案**：**O2（独立解析器 + checker） 是一元谓词，只判单个镜像**，不是「逐字节比对」——那是二元关系，需要第二个入参；需要第二个输入的核对归**记录核对器**，入参 `(崩溃前镜像, 记录流, 崩溃后镜像)`，权威记录在 D13（验证路线） 已定项 7。
+
+- ⇒ D23（journal 的角色与格式）否掉逻辑意图日志的第二条理由（「落点不确定使核对退化」）按字面是空的，**改写为「核对从句法变成语义」，且它不是独立的第二条理由，是第一条（重放要第二个实现）的一条封堵**：逻辑意图记录不点名任何盘上对象 ⇒ 核对方要自行实现树语义 + 记账 + 分配合法性 ⇒ 第二实现的成本原样搬到核对侧。
+- ⇒ **「否掉逻辑意图日志」这个结论不动**，第一条理由独立成立（已定项 20）。
+- ⇒ D23（journal 的角色与格式）的反向判据主语是**记录核对器**（已定项 1；主语写成 O2（独立解析器 + checker） 时按字面恒为 0——O2（独立解析器 + checker） 就是 checker——不可证伪）。
+
+**射程**：只管 D23（journal 的角色与格式） 怎么称呼这两个验证角色、它们各否掉什么；两者是什么、入参是什么、代码在哪，权威在 D13（验证路线） 已定项 6 / 7。
+
+**依据**：
+
+- 无实验：一元谓词不能变成二元关系，这是类型之争，没有可量的量；2026-08-29 三方论证（材料 `_o2-background.md`），逐条依据见 D13（验证路线） 已定项 7。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:194-205`（整段抄，未转述）**
+
+```markdown
+#### 已定项 6：目标负载优先级移出 journal 这条线
+
+**定案**：目标负载优先级移出 D23（journal 的角色与格式），见 D25（目标负载优先级）。它跨 D8（核心索引结构） / D10（随机写 / 碎片化的真答案） / D23（journal 的角色与格式），不是 journal 的问题；留在这里会被当成 journal 细节。**它不阻塞 D23（journal 的角色与格式） 任何一项**：轴二是被轴一结构性排除的，目标负载只影响已定项 1 里「乙的收益形状」那条已降级依据的强度，不影响结论。
+
+**射程**：只是一条指针，定了什么看 D25（目标负载优先级）。
+
+**依据**：
+
+- 无实验：这是一次挪位，理由是它跨三条决策、不是 journal 的问题，没有可量的量。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:206-225`（整段抄，未转述）**
+
+```markdown
+#### 已定项 7：一个事务可以跨多条记录，记录头带事务边界字段
+
+**定案**：**可以跨多条，记录头带事务边界字段**：事务号 8 + 提交标记 1 共 9 字节（已定项 4 的三笔增量之一；与已定项 8 的反向链是**不同的字段**，不许合并计价）。
+
+- 事务号按实例计数、从 1 起，同一事务的全部记录共享它，与 jsn 是两个计数；单元头写序存它的低 48 位、高 16 位恒 0，不新开字段（C113（扫描重建时多版单元的现行版本判定无输入） 定案复用这个字段）。事务号 0 留给不承载事务的空发布记录（已定项 19 ①）。
+- 记录按事务号顺序追加，一个事务在发出单元写之后失败即实例切换、号更大的记录一条都不追加——这是实例表行的 W 能当精确前缀的依据（第一版串行提交下 W 的前缀性本来就成立，D13（验证路线） 已定项 2；这条纪律买的是并行提交打开之后它仍然成立）。
+- **恢复算法**：在「jsn 严格连续 + 校验和 + 反向链」之后**再加一步**——**丢掉提交标记还没出现的那个事务的全部记录**。⚠️ **它不能靠反向链代劳**：被丢的尾巴在链上是**连续**的（它们本来就是顺序写的），链检查一条都拦不住。**两条闸管的是两件事**：链管「是不是同一条时间线」，提交标记管「这个事务写完了没有」。
+- ⚠️ **丢尾巴是常态不是边角**：前缀落在事务中间的是绝大多数崩溃点 ⇒ 恢复路径里那一步会被绝大多数崩溃点走到，它必须和主路径一样被崩溃点重放覆盖，不许当异常分支。
+- 判据已写成 I-8.8（前缀里的事务不被切开）（单张镜像那一半）与层 0 崩溃点重放（整数个事务那一半）；单张镜像那一半池级 checker 已判（`walk::check_pool_image` 的 `judge_commit_markers_per_transaction`），层 0 那一半仍欠，记在 C37（事务与记录的对应无定义）。
+
+**射程**：管事务与记录的对应；记录与时间线的对应是已定项 8，两条不是同一条——已定项 7 取任一答案，时间线那一格照样漏。⚠️ 它不是 D13（验证路线） 已定项 2（串行 / 并行）的推论——串行下同样会切开。I-8.2（记录头不跨原子单元） 只约束**记录头**，没有任何规则禁止一条大记录；一个事务写几个单元的用户数据归 D16（发布语义） 已定项 5 末段的切分纪律，它与记录数口径的冲突归 C310（事务切分纪律与记录数口径打架）。「一事务一条」那一侧还有两条没建模的代价：环回绕要连续空间、整条记录要先在内存里缓冲齐才能开始写。
+
+**依据**：
+
+- E42（一事务几条记录）：一事务一条与「跨多条 + 事务号 + 提交标记」都满足 I-4.3（提交原子），跨多条而没有边界字段时非法前缀恰等于被切开的前缀数、占绝大多数崩溃点——实验分不出对错，只分得出代价落在哪。
+- E45（事务跨多条记录的环占用）：它量出的「跨多条把环顶大 12 倍」是一条比 I-8.2（记录头不跨原子单元） 严的对齐规则造出来的，按字面倍数是 1.00×，拿它撤回已定项 7 依据的那一步不成立（实验结论作废）。
+- 用户定案「跨多条 + 边界字段」，理由「它严格更一般」，攻击轮复核维持；定案带来的三条义务（格式、恢复算法、不变量）用户口径是「算法要增强」，原话与经过在变更史。
+
+**欠**：C37（事务与记录的对应无定义）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:226-246`（整段抄，未转述）**
+
+```markdown
+#### 已定项 8：记录头带一条 32 位反向链
+
+**定案**：**记录头加一条反向链（前一条记录的 hash），宽度 32 位。** 覆盖哪些字段是已定项 10，hash 算法是已定项 11（完整 32 位 CRC32C），写路径上的取值口径是已定项 19 ②。
+
+- **它补的缺口**：D23（journal 的角色与格式）三条已定项（定长环 / 断号即止 / 全环扫描）**各自成立，凑在一起漏**：定长环的槽位由 `jsn` 决定 ⇒ 断号之后的残留记录不会消失、只会等着被覆盖；而恢复之后从「前缀末 + 1」接着写，**那正好接在残留序列的前面**（已定项 22）。
+- **同一个字段两个职责，两个都记**：分辨时间线；以及让记录核对器能用**与正向扫描完全不同的遍历**复核同一个前缀边界（正合 `.claude/singlefs-ai-sop/rules/evidence-discipline.md`「校验的两条路径不许共享同一段代码」）。只按验证独立性记，它会在「为了省字节」的权衡里第一个被砍掉。
+- **一旦 hash 覆盖了实例代号（已定项 10），反向链对「分辨时间线」这个职责就是冗余的**——实例代号那条出路是精确的，不是概率的；那时链剩下的职责是遍历独立性。
+- ⚠️ **一次误接受没有第二道防线**：I-8.3（重放前缀严格连续）、在飞记录数上限、`checkpoint_txg` 三条闸都不触发（两条时间线在同一个 checkpoint 窗口内，那个字段一模一样）⇒ 后果是**把一条已丢弃时间线的指针层目标态装进现行状态**，落在 I-7.4（近 K 代块未被复用） 保护窗口内时它完全合法、静默为旧数据。
+
+**射程**：⚠️ **误接受的分母是「空洞 → 恢复 → 续写 → 再崩」这个事故序列发生的次数，不是时间**；取的场景点（每天崩 10 次、十年）不是测量，本仓还没有崩溃频率遥测。链宽不随文件变大而需要变宽：一次事故里链只在一个接缝上被考验，随文件变大受压的是序号计数器（已定项 9）与环的几何（I-8.1（环几何够大））。⚠️ 接缝数口径压在「一次事故一个接缝」这条没建模的假设上，一次恢复若留下多个断点，分母跟着变 ⇒ **32 位与已定项 11 的 CRC32C 是同一个单点**，那个口径一倒两条一起倒，重开条件对两项同时生效（已定项 11 重开条件第 1 条）。⚠️ 代价侧（2 / 4 / 8 字节链在盘上多不多占单元，E49（反向链宽度 32 还是 64） 扫过六档头宽）只取决于记录头总字节 mod 8，**是偶然不是结构**，头宽再动就要重算；现行不含反向链的头是 307，不在扫过的档位里 ⇒ **重算之前不许把「选 16 不省东西」「64 位也免费」「两侧都不分岔」当结论引用。** ⚠️ XFS 的 `h_prev_block` 只在写入侧赋值、恢复侧不比对它，引它时只能引「字段形态」，不能引「现役这么防」。
+
+**依据**：
+
+- E32（上一条时间线的残留）：定长环 + 断号即止 + 从前缀末接着写，残留记录会被下一次恢复接上去重放；两条自然实现各违反一条判据、方向相反——缺口在规范里，不在实现里。
+- E36（槽位映射那一维）：槽位与序号解耦救不了，新旧记录等长时与按序号那一支逐格相同，只在记录长度恰好不同时碰巧挡住。
+- E39（反向链挡不挡得住残留记录）：开链的全部格子残留为 0 且一条自己的记录都没误杀；误接受率逐档贴住 2⁻ⁿ。
+- E51（反向链的碰撞机会有多少次）：碰撞机会的正确分母是接缝数（同源记录的链值构造性相等），按它 32 位全部档位够用；把每一次相邻比较都算一次机会的遍历分母是过计。
+- 用户定案：加反向链「字节代价小，而它同时买到两样」；宽度「如果 32 位够用 那么就 32」，原话在变更史；三方 2026-08-30 三条腿一致指向 32 位。
+
+**欠**：C42（残留记录冒充合法前缀）；C200（记录头改宽之后代价侧没重算）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:247-265`（整段抄，未转述）**
+
+```markdown
+#### 已定项 9：jsn = 实例代号 32 位 + 计数器 48 位
+
+**定案**：**实例代号 32 位 + 计数器 48 位，两个字段共 10 字节，不挤进一个 64 位。** 分开还多买一样：**比大小不必先解位域**，恢复路径少一处可以写错的移位。
+
+- 短板在代号那一格：代号与 fsync 率无关，每天崩 10 次、十年 = 36 500 次，16 位容量 65 535 只有 1.8 倍余量 ⇒ 加宽到 32 位（容量 4.29×10⁹，用不完）；计数器 48 位不加宽。
+- 计数器全池接着走、不按实例归零（已定项 14 第 3 条），48 位的寿命按全卷算。
+- ⚠️ **随之而来的一条义务：代号不许回滚，且要有人保证。** 代号一回滚，这条出路逐格退回没有代号时的样子（残留全数重放）。**这与 D9（加密） 已定项 8 对 nonce 水位的要求同型**——那里逐字要求水位「不许住在裸明文系统配置里……必须落在一个被 MAC 覆盖的字段上」。
+- **代号住哪儿、谁保护它**：住 journal 记录里是循环（恢复要先读记录才知道代号，而读记录正需要代号来判）；住系统配置则落进「不许回滚」那个要求 ⇒ 与 D9（加密） 已定项 8 的 nonce 水位**同一个载体问题**，两者应当一起定，不许各定各的。今天的做法：取号取 max(系统配置, 根环) + 1、写进每一份系统配置（已定项 16）。
+
+**射程**：⚠️ **敲定的两个数各有一处未测**：① 计数器那一档只在本机测过，**本机盘没有掉电保护（PLP）**，带 PLP 的企业盘 fsync 率可以高一到两个数量级，那一档本机测不到，仍是假设；本机测的还是 ext4 的 fsync 路径，是本工程 fsync 率的**上界代理**。② 代号那一档的「每天崩 10 次」是**取的场景点，不是测量**。⇒ **重开条件可判定**：拿到现场 fsync 率且它超过 10⁵/秒，计数器那一半重开。已定项 14 之后前缀规则不改：重放从所选根覆盖的最后一条记录之后接，所选根是最新实例的根时新记录都在同一实例里、严格连续；只有所选根退到更早实例时才碰到实例边界，那一格按严格前缀停，代价写在 D16（发布语义） 已定项 7 的注，要不要补是 D16（发布语义） 已定项 8。
+
+**依据**：
+
+- E44（序号位宽的本机实测与代价）：本机 fsync 率下 48 位计数器远超需要，「48 位不够」那条推理的前提在本机不成立；`jsn` 加宽到 10 / 12 字节在 512 与 4096 两种单元下点名项容量不变、一格都不多占单元。
+- E37（日志实例代号）：带实例代号的那一臂两条判据同时满足，前提是代号不许回滚——回滚一格就逐格退回残留全数重放。
+- 用户定案，原话在变更史。
+
+**欠**：C199（实例代号递增与 jsn 断号即止互相矛盾）；代号的载体与防回滚保护没有编号，挂在 D9（加密） 已定项 8 的 nonce 水位同一个载体问题上。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:266-282`（整段抄，未转述）**
+
+```markdown
+#### 已定项 10：`previous_hash` 覆盖前一条记录的整个记录头
+
+**定案**：**覆盖前一条记录的整个记录头，其中含 `jsn`。** `jsn` 是「实例代号 32 位 + 计数器 48 位」（已定项 9）⇒ **实例代号在链值的输入里** ⇒ 两条时间线的链值构造性不同，误接受率回到 2⁻ⁿ 那条曲线上，32 位够用的判断因此成立。
+
+- ⚠️ **取「整个记录头」而不是「只取 jsn」的理由**：多覆盖的字段**一个字节都不多花**（hash 的输入长度不进盘），而少覆盖一个字段就多一条「这个字段被改了链还对得上」的缝。
+- ⚠️ **一条实现纪律**：`header_csum` 那 32 字节**自己不能进 hash 输入**（它是头的一部分而又依赖头）——写死为按零参与（已定项 19 ②）。
+- **链值必须有一个「两条时间线保证不同」的输入**，否则误接受率是 **100%，与位宽无关**：若 `previous_hash` 取前一条的 `header_csum`，两条竞争记录的 magic / 类型 / `jsn`（都等于 expected）/ `checkpoint_txg`（同一窗口内一模一样）在点名项数相同、加密关闭时**构造性相等**。它与已定项 8 的宽度定案是两件事：宽度答「碰撞概率多大」，已定项 10 答「有没有东西可碰」。
+
+**射程**：管 hash 的输入；函数是已定项 11，宽度是已定项 8，本实例第一条恒 0、写路径不读盘是已定项 19 ②。
+
+**依据**：
+
+- E37（日志实例代号）：带实例代号的恢复在残留与新写两条判据上都是 0，精确而不是概率——把实例代号放进链值的输入，链就有了「两条时间线保证不同」的那个字段。
+- 用户定案，原话在变更史；三方 2026-08-30 反推腿读实验源码时指出链值的输入里没有标识时间线的字段，经过在变更史。
+
+**欠**：C42（残留记录冒充合法前缀）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:283-312`（整段抄，未转述）**
+
+```markdown
+#### 已定项 11：反向链的 hash 取完整 32 位 CRC32C
+
+**定案**：**取完整 32 位 CRC32C**，与 D19（块指针的结构与宽度预算） 已定项 2 已定的密文校验和同一个函数。
+
+- **主依据是「这个选择不承重」，不是「CRC32C 更好」**：32 位已判够用，且余量是**三个数量级** ⇒ 在 2⁻³² 这条曲线上，两个候选（完整 CRC32C、32 位截断的密码学 hash）**都够用**，选谁不改变风险量级；即使真损失 1 整比特（碰撞率翻倍），余量仍够。
+- **在「都够用」之上，按两条次要理由选 CRC32C**：
+
+  | 理由 | 它买到什么 |
+  |---|---|
+  | 与 D19（块指针的结构与宽度预算） 已定项 2 同函数 | 少一份实现、少一份 checker、少一类崩溃点重放 |
+  | 有 SSE4.2 的 `crc32` 指令 | 提交路径上少一次密码学计算。⚠️ **本工程一个周期都没测**，这条只作次要理由，不许当依据 |
+
+- **取「完整」不取「截断」**：截断的 CRC 不是短一点的 CRC，若链值取截断 CRC，2⁻ⁿ 那条曲线不适用。
+- ⚠️ **一条已撤回的理由**：「CRC 线性 ⇒ 差异落在 ≤32 比特窗口内时碰撞可证为 0，而截断的密码学 hash 只能给不可证的 2⁻³²」。**它不成立**：那个「窗口受限」的前提是被模型硬编码出来的——两条竞争记录的 `named_count` / `record_length` / `nonce` 被建成构造性相同，而它们是**两个不同的事务**，且 I-6.1（nonce 不重用） 要求 nonce 全盘唯一。
+- ⚠️ **由此还得到一条要记的反向风险**：**窗口条件不成立时，线性臂的尾部比密码学 hash 差。** CRC 的碰撞差异集是一个线性子空间——同一个差异模式**每次都碰**；截断的密码学 hash 是每对独立的 2⁻³²。在现有余量下这不改变结论，**但它是唯一一条指向另一边的证据，不许在引用定案时略过。**
+- **重开条件（两条，任一成立即重开）**：
+  1. 接缝数那个分母口径被推翻，余量掉到 10 倍以内；
+  2. 已定项 10 的覆盖范围变化，使「两条时间线保证不同」这个前件不再成立——那时误接受率 100%，与函数和位宽都无关。
+
+**射程**：只管反向链的函数；`header_csum` 的算法（CRC32C 4 字节 + 28 字节零）归 D18（块里携带什么信息） 已定项 17，`payload_csum` 的算法在已定项 13。
+
+**依据**：
+
+- E51（反向链的碰撞机会有多少次）：32 位按接缝数的分母全部档位够用，余量三个数量级——函数选择不承重。
+- E61（反向链 hash 算法的均匀性）：量三只排除得掉「有效位宽损失 ≥ 1 整比特」，两个候选都在其内；量二作废，连带撤回了「线性可证为 0」那条理由。
+- E40（密文校验和位宽）：截断的 CRC 把「单比特翻转必检」这条结构性质整个丢掉——取完整、不取截断。
+- 用户定案（改正后的量二不跑），原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:313-330`（整段抄，未转述）**
+
+```markdown
+#### 已定项 12：记录尺寸取 4 KiB
+
+**定案**：**记录尺寸定为 4 KiB，定长，写进系统配置**（XFS 把同一个参数写进系统配置的 `h_size`）。
+
+- 与已定项 4 相容：记录头 487 字节要完整落在一个 `physical_block_size` 内，而 4096 被 512 与 4096 两种探测值都整除。
+- 定长记录取 2 的幂尺寸之后，I-8.2（记录头不跨原子单元） 的对齐浪费**恒为 0**：记录背靠背摆下去，起始偏移恒是单元的整数倍。
+- 4 KiB 记录装 64 个点名项 <!-- format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD = 64 -->（已定项 4）；再大只抬高 I-8.1（环几何够大） 里那个「最坏事务占用」，进而抬高环大小下界，买不到别的。
+- **用户口径**：先按这个数落地，写代码时再调整。
+
+**射程**：⚠️ 余量那一格按的是「一次 fsync 一个事务」的读法（目标负载 12 项事务恰占 1 条记录），与 D16（发布语义） 已定项 5 末段的切分纪律（一个事务最多写一个单元的用户数据）不在同一口径：按切分纪律加已定项 7 一条记录一个事务号，seq 批 1 是 8 条记录、每条只装 1 到 5 个点名项，「12 项恰占 1 条」那一格不存在；余量口径与环几何怎么改归 C310（事务切分纪律与记录数口径打架），要用户定。目标负载（D25（目标负载优先级））若长大一个量级，这个数要重推，那时另立实验。环回绕与「装成一条要先在内存里缓冲整条记录」两条代价没建模。
+
+**依据**：
+
+- E75（记录尺寸与环几何）：4 KiB 上目标负载恰占一条记录、跨记录数 0，几个头部读法给的容量相同；环下界与另一个二进制已发表的那一格逐格相等；定长 2 的幂尺寸下对齐浪费恒 0。
+- 用户定案，原话在变更史。
+
+**欠**：C310（事务切分纪律与记录数口径打架）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:331-354`（整段抄，未转述）**
+
+```markdown
+#### 已定项 13：载荷完整性，`header_csum` 罩整条记录
+
+**定案**：`header_csum` **覆盖整条记录 `[0, 4096)`**，含点名项数组与其后的补齐，`header_csum` 自身那 32 字节按零参与（32 字节里放 CRC32C 4 字节 + 28 字节零，D18（块里携带什么信息） 已定项 17）；`payload_csum` 那 4 字节字段**保留**，仍罩点名项数组，算法取 CRC32C（与已定项 11 的反向链同一个，不引入第二种）。**第一版不再单独分辨「头落了、载荷只落一半」**——任一校验和不过就是该记录无效，恢复断链即止（已定项 18 / I-8.3（重放前缀严格连续) 同一句口径）。
+
+- 与 D18（块里携带什么信息） 已定项 17 逐字「自证结构（根记录、系统配置槽、journal 记录头）的校验和覆盖整个槽含补齐」一致：journal 记录是自证结构、槽就是那 4096 字节；只罩头的话，这条通用规则要为 journal 记录单开一个例外，而根记录与系统配置槽都没有这个例外。
+- **四个候选里另外三个各被一条已定条款挡掉，这是排除不是取舍**：
+
+  | 候选 | 挡它的 |
+  |---|---|
+  | 甲（一个校验和覆盖整条记录）| 会失去「头落尾没落」的可分辨性。第一版取的正是「整条」这个覆盖范围，同时保留 `payload_csum` 字段——也就是接受了这一行写的代价 |
+  | 丙（每个点名项自带它所指目标的校验和）| D4（校验和位置） 的校验和证明「指向的那个单元完好」，**不证明「这条点名项本身完整落盘」**，而载荷完整性问的是后者 |
+  | 丁（丙 + `named_count`）| 丙那个洞没补，只多一道数量核对 |
+
+- `payload_csum` 是头里的字段，**必须落在 `header_csum` 的覆盖范围之内**，否则改掉它本身是静默的（载荷与校验和一起改，两个都过）；`header_csum` 罩整条 `[0, 4096)` 之后这条天然满足。
+
+**射程**：⚠️ **代价是明写的**：分辨「头落了、载荷只落一半」与「载荷被改一个字节」原本靠两个校验和的**差异**，整条罩之后这两格与「整条没落全」在第一版判成同一种结局（记录无效）；买回来的是「与另外两个自证结构同一条规则」。要重开「只罩头」时，那张四格判据表原样可引。
+
+**依据**：
+
+- E76（载荷校验和的判别力）：另加的载荷校验和在检查、不是在回声头那一份（头落了载荷只落一半、载荷被改一个字节，都只有它红）；只有一个校验和的形态在类型上答不了「头落尾没落」；判决对两个摘要函数相同，是覆盖范围的产物。
+- 用户弹窗定案取整条（主 agent 推荐只罩头 `[0, 307)`），没有走三方论证，可推翻，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:355-447`（整段抄，未转述）**
+
+```markdown
+#### 已定项 14：重放的下界由所选根给出；管理员回退、失败处置与实例切换
+
+**定案**：**恢复只施加 `(实例代号, checkpoint_txg)` 严格大于所选根的记录；陈旧 tail 只是「从哪开始扫环」的优化，不再决定重放集合。**
+
+**前缀判定的完整口径是五条，缺一不可**（引用 I-8.3（重放前缀严格连续）时连这句一起引）：
+jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于根的水位**、
+提交标记齐全的事务才施加（D23（journal 的角色与格式）已定项 7）、
+施加前逐项验证点名单元（D16（发布语义）已定项 7，E77（发布的持久顺序）证明承重）——**一个点名单元的两份（两条位置条目）都读得出、校验和都对才施加**，有一份读不出或对不上，这条记录与它之后的都不施加。
+⚠️ **第五条：施加的单位是一次发布——合法前缀停在一次发布的两个事务之间时，那次发布整体不施加，前四条判出来的前缀再按发布边界截短一次；引用这四条时连这一条一起引。**（D16（发布语义） 已定项 4）**发布边界怎么认**：一次发布的末条 = 记录标志位 0 为 1 的那一条（已定项 4、17）；前缀里一次发布的末条没到，那次发布整体不施加。
+
+两份镜像何时算「记录在」：**任一份自证校验和过即在**（崩溃点重放里的检查由层 0 全量做出——jsn 3 只有一份持久的两个状态都读回文件）。点名单元不同：**两份都验过才施加**（前缀第四条）。代价：两块盘的池上一块盘整块掉了，记录在幸存盘上、点名单元有一份在掉了的盘上，那条记录不施加——恢复退到更早那一版，已确认（fsync 已返回）的最后一版丢掉；D16（发布语义） 已定项 8 的暖机管不到这一格。用户知情认下（C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格：「任一份验过」会不会放过 E77（发布的持久顺序） 要挡的一份新一份旧的嫁接没量过）。
+
+**跨实例边界、链首、比较序、计数器与切换时的 W**（注 1–4）：
+
+1. **前缀规则不跨实例边界**：链从所选根覆盖的最后一条记录之后接，下一条的实例代号与所选根不同即停（五条口径第一条原样）。**所选根覆盖的最后一条** = 与所选根同实例、同 `checkpoint_txg` 的记录里 jsn 最大的那条——一次发布切成多条记录时它们共享一个 `checkpoint_txg`（D16（发布语义） 已定项 6），那次发布的最后一条才是根覆盖到的末端。**那条读不出时**，链首接水位之上第一条可读记录，前提是它的「本次发布内序号」为 1（已定项 4）、`checkpoint_txg` = 所选根的 txg + 1；序号不是 1 说明下一次发布的开头缺了，断号即止。**「那条」按末条标志认**——所选根那次发布读得出的几条里没有一条带末条标志，就算「那条读不出」，走「序号为 1 的第一条可读记录当链首」那一支；不取读得出的同 txg 记录里 jsn 最大的那条（用户 2026-09-24 定，读法乙；三方 `research/prompts/m2-presumed-clauses-r1-main-verification.md` K4 那一支四条臂同中、没分出候选，这一读法被攻过零轮）。所选根是 mkfs 的第 0 代根时它一条记录都不覆盖，之后的记录全属于更新的实例 ⇒ 一条都不施加。代价写在 D16（发布语义） 已定项 7 的注，要不要让新实例先暖机是 D16（发布语义） 已定项 8。
+2. **记录水位 `(实例代号, checkpoint_txg)` 按实例代号为主比**，与 jsn 同序；择根照旧 txg 为主、实例代号破平局（D22（单元原子性怎么合成） 已定项 7），两处比的东西不同，各守各的序。按 txg 为主时，新实例的第一个根取「根环最大 + 1」，而被抛弃实例开放 checkpoint 里已提交的记录 txg 可以更大，会被当成水位之后施加到新实例的根上。
+3. **计数器全池接着走**：新实例从前缀末 + 1 接着写、不归零。前缀末的计数器取环里读得出的最大那一个：所选根自己那条记录两份都读不出时，新实例的第一条编在读得出的最大号 + 1，落回那条读不出的记录原来的槽（被重写的本来就读不出）；计数器从记录头读，不按 txg 推。定长环的槽位由 jsn 决定（槽位与序号解耦那条出路已被 E36（槽位映射那一维） 判掉），归零会让新实例的记录落到旧前缀还要用的槽上；已定项 9 的 48 位本来就按全卷寿命算。⚠️ **checkpoint_txg 也一样**：新实例（普通挂载、切换）的第一次发布的 checkpoint_txg ≥ max(根环里全部根记录的 txg, 环里全部自证通过的记录的 checkpoint_txg) + 1；普通挂载本来就全环扫描，切换不为算这个下界重扫 journal 环（内存里的 txg 已不小于这次挂载见过的一切；切换的所选根要读盘择，见实例切换那一句）。它与 C331（择根倒挂压过已确认的写） 的修法候选「记录扫描水位」是同一个量，C331（择根倒挂压过已确认的写） 还清时一起写。代价：跳号比今天大（最多到被抛弃时间线的长度），D5（快照 / 空间记账机制） 已定项 2 的点删随之改成「删掉 ≤ 当前代 − K 的全部代」。
+4. **切换时的 W 取被重发的那个 checkpoint 里的最大事务号**：开放 checkpoint 里已完成的事务全部 > W、按新写序重做。按第 2 条，它们的记录不在所选根之后；W 若取字面的「最后施加的事务号」，它们的单元会被谓词判成已发布而谁都不施加它们（C287（切换收养开放 checkpoint 的事务后再崩））。被重发的 checkpoint 里没有事务号非 0 的记录（重发的是空发布）时 W = 0（已定项 19 ①：事务号 0 不进 W 的 max）；W 写在每个被照旧事务的写序实例那一行，切换的所选根按实例切换那一句取。
+
+**第一版没有干净关闭标记**：每次挂载一律走恢复（全环扫描、逐条验证、择根，按五条口径与注 1–4 施加），不按上一次是不是干净关闭分支；准入、暖机、回退候选集、F 的生效都不读这样一个标记。
+
+**第一个文件版本接在哪条记录之后**：写第一个文件版本之前，要接的那一版之后的上一条记录必须解得出、且它的 `checkpoint_txg` 等于那一版的 txg——新记录的计数器取它的计数器 + 1、反向链取它的记录头（已定项 8、已定项 9）；不满足就在任何写之前拒绝（`crates/singlefs-core/src/transaction.rs` 的 `publish_first_file` 返回 `FirstFileVersionDoesNotFollowTheVersionItBuildsOn`），一个字节不写。
+
+**管理员回退是挂着时的一次向前发布**：管理员在一次可写挂载里从回退候选集选一个旧根 R_old，文件系统发一次普通发布（D16（发布语义） 已定项 7 的持久顺序），新根的用户可见树（inode 树、extent 树）与 `deleted_inodes` 的根指针取 R_old 那一版的；墓碑树、谱系树随现行那一版，不取 R_old，回退那次发布写一条谱系记录 (T_rb, T_old)（D18（块里携带什么信息） 已定项 24）；树表单元、分配记录树、中央映射树与记账统计量（D5（快照 / 空间记账机制） 已定项 4）按这次发布照调整之后的分配器现算，不从 R_old 那棵账载入（inode 号与树 ID 水位见表里「水位」一格）；实例表照 cur 的；checkpoint_txg 照常加一，**不新增实例、不取号、不写实例表行、不施加也不删除任何记录**。记号：cur = 现行那一版，new = 回退发出的新根，用户可见单元 = 数据单元与 extent 树、inode 树的单元。
+
+| 项 | 定案 |
+|---|---|
+| 候选集 | 根环里按 cur 的实例表判仍然有效 ∧ txg ≥ F_生效（D16（发布语义） 已定项 1）∧ txg 落在一圈窗口里（D16（发布语义） 已定项 1）∧ 带文件（那一版写过文件，不是还没写过文件的那一版）的根：(i, T) 可选 ⟺ cur 的实例表无 i 的行，或有行 (i, Ti, Wi) 且 T ≤ Ti——被崩溃恢复抛弃的时间线上的根一条都选不中 |
+| 释放 | cur 那一版的账里仍分配、而 new 不引用的落点，释放代 = new 的 txg；隔离单元（D19（块指针的结构与宽度预算） 已定项 5 硬规则 1：任一份核出对不上、两份都留在已分配的）除外，留在已分配（用户 2026-09-27 定） |
+| 复活 | R_old 引用的用户可见单元里，cur 的账记成已释放的，改回已分配，分配代写回 R_old 那一版账里的分配代 |
+| 水位 | inode 号水位与树 ID 水位 = max(cur 那一版内存里的水位, 环里读得出的根的水位)，不跟着 R_old 退回去 |
+| 记录 | 回退那次发布的记录事务号取 0、不推进实例内计数（与空发布同：不承载用户事务，D23（journal 的角色与格式） 已定项 19 ①）；新根带的 F 取现行那一版根上的，不算抬 F；jsn 接现行那一条（主 agent 2026-09-26 定，推的，被攻过零轮） |
+| 准入与记账 | 回退照旧不判准入式子；谱系容器归固定点角色、进 ckpt_cost 的 Σ 名单；记账标签 4、6 按新根这一版现算（inode 树与 `deleted_inodes` 取 R_old 的，所以被带回来的对象的墓碑份额照抬；标签 6 按新根现算时，n_live（D3（空间分配） 已定项 2）= R_old 那一版 inode 树各叶容器头的记录数之和减 `deleted_inodes` 的 key 数，第一版 inode 树一个根、至多 135 个容器），不判（`research/prompts/m3-delete-r2-main-verification.md` 第三节 V4；`research/prompts/m3-delete-r3-main-verification.md` 第三节 G3-回退；用户定案 K-W5「谱系记录」、K-W5b） |
+| 在任何写之前拒 | R_old 引用的用户可见单元在 cur 的账里没有记录，或仍分配而分配代与 R_old 那一版账里的不同；R_old 那一版或 cur 那一版的账有一个节点读不出；复活集里的每个单元（cur 的账记成已释放、这一次改回已分配的那些）在每块盘上的那一份都要读得出、校验和对得上，有一份不行就拒——它们的槽在 cur 的时间线上释放过，释放之后可能被一次没发布成的写盖掉一块盘上的那一份；cur 的账里仍分配的单元分配器不会发出去，不在逐盘验之内（与前缀第四条「两份都验过才施加」同一方向；主 agent 2026-09-26 定，推的，被攻过零轮） |
+
+崩在回退那次发布的任何一点，恢复落到的与任何一次普通发布没成时相同；回退的根持久之后才向管理员确认（D16（发布语义） 已定项 7）。回退深度由候选集定：平时是整个根环，盘紧时可缩到最近 4 个可退到的状态，每块盘上最新的持久有效根都在内。**被崩溃恢复抛弃的时间线的根离开根环之前，它们引用的单元不许重新分配也不许抹头——分配器多查环里每一个可读根的账、只隔离其中**只被被抛弃根引用**的槽——查账的集合取窄读法：按主语「被抛弃时间线的根」读，仍被有效根引用的槽不在其内——「有效根」指回退候选集里的根（按实例表判仍然有效 ∧ txg ≥ F_生效），每次挂载与每次抬 F 按当时的候选集重算；被抛弃根的账（树表或分配记录树）读不出时不跳过：从中央映射现算这条根引用的落点，只在内存里隔离、不写盘，计进 `abandoned_roots_unreadable` 往上报，映射也现算不成就重读一次，仍不成在取号之前拒可写、只读照常（C393（被抛弃根的账读不出时修复没有条款） 取 (b)-从映射现算，用户 2026-09-28 定，被攻过零轮，判决 `research/prompts/unreadable-at-mount-r2-main-verification.md` L3）；宽读法（凡被环里任一可读根引用过的槽都隔离）会让抬 F 在第一版 24 槽里买不到任何东西（影子账；隔离量怎么进准入不等式见 C318（影子账隔离的单元没进准入不等式））。** 同一次定案（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P3）把事务按单元切分 ⇒ 崩溃原子性的单位是一个单元、不是一次写请求（仓里没有任何决策承诺过写请求级原子性，这是一次对外语义的收缩）。
+
+**可写挂载读到的更新状态读不出（C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续，用户 2026-09-27 定；判据 N-配置续 照 `research/prompts/e158-r3-prereg.md` 第 348 行与 `research/prompts/e158-r4-prereg.md` 第 413 行）**：读阶段（择根、扫 journal、重放）读完，读池里每块盘两槽的系统配置：判不出 ⇒ 按真（判不出取 R2，权威写法在 D22（单元原子性怎么合成） 已定项 8：有槽设备报读错，且没有一块盘两槽都自证过；用户定「改取 R2」；这里的实现还是 2026-09-28 取甲的那一版，欠 C331（择根倒挂压过已确认的写））；不是判不出时取全部自证过的槽 journal tail 的最大值 c_见证，0 ⇒ 不判；所选那一版那次发布带末条标志的记录读得出（任一份）⇒ c_见证 > 它的计数器即为真；读不出而计数器等于 c_见证 的记录读得出 ⇒ 它的 (实例代号, checkpoint_txg) 大于所选那一版即为真；两条都读不出按真。为真就在这次挂载内有效的读缓存（只收读成且不是全零的落点）上把读阶段重做一遍（R = 1，取自 D16（发布语义） 已定项 1「根槽这一次读坏」那一行的「重读一次」，两次读之间不等），重做那一遍为假就用它往下走，仍为真就在取号之前拒可写挂载、盘上逐字节不变，只读挂载照常。重建分配器判抛弃用的最新那条根的实例表读不出，同样重读一次、仍读不出拒可写（代码审阅第 22 条）。**「续」**：取号那一写（`crates/singlefs-core/src/transaction.rs` 的 `write_acquired_instance`）不再把 tail 写成 0，改写取号那一刻按同一取法读到的见证值 c_见证（用户 2026-09-27 定「乙-配置续（推荐）」；实现员 2026-09-27 交回并打上，落点是 `write_acquired_instance` 里的 `highest_system_configuration_journal_tail`：每块盘两槽里全部自证过、fsid 与本池相同的系统配置槽 journal_tail 取最大，一份都没有时 0，在第一道屏障之后、第一个取号写之前读一次）。取号失败的回卷写（D18（块里携带什么信息） 已定项 11）带同一个见证值，不退回 0。mkfs 写 tail 0，mkfs 之后第一次取号读到 0、写 0：新池新建文件的字节不变。取号那一刻按同一个判不出（R2，见 D22（单元原子性怎么合成） 已定项 8）判：判不出就在第一个取号写之前拒（实现落点 `crates/singlefs-core/src/transaction.rs` 的 `self_verified_system_configurations_of_every_device`，还是取甲那一版，欠 C331（择根倒挂压过已确认的写））。系统配置没见证到的最新根，「续」落地之后由下一次挂载在自己的 c_见证 里看到；这一形记欠见 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 的 Q1。
+
+**失败的处置按失败的性质分两支**（C113（扫描重建时多版单元的现行版本判定无输入） 定案 P1 失败表）。**判别子是当下判得出的量，不是次数**：失败发生时先对**目标设备的固定落点做一次探针写**——写不进去 ⇒ 持续失败，走**转只读到下次挂载**；写得进去，再**对这次失败的那个落点做一次只读复核**：读得出 ⇒ 瞬时失败，走**实例切换**；读不出 ⇒ 落点级的持续坏，同样走**转只读到下次挂载**。⚠️ 复核这一步**只读不写**：写探针进失败落点会抹掉那里的权威数据（8 个失败点里 4 格的落点是根槽或系统配置槽），而固定落点这一步不许改——`D2`（RAID 条带策略） **已定项 13** 逐字「与 `D23`（journal 的角色与格式） 已定项 14 的两支判别子同一个动作」靠它成立（主 agent 现查：那句话在 `.claude/kb/decisions/02-RAID条带策略.md:225`，归属已定项 13「降级期间只读」，不是已定项 15）。**失败点是屏障时没有落点可复核**，那几格只有固定落点探针写这一步。可写设备数掉到 w 的下限以下、切换自己的预留拿不到，同样直接走只读支；连续切换次数越过 **N_switch = 3**（具名可调参数）也转只读，它是兜底的兜底，真正的判别子是探针写加落点只读复核。**收敛靠的是切换的第一步就是一次会失败的写**：切换要先取号，取号要写独占打开成功的每一份系统配置、全或无 ⇒「写不出去」这类故障最多让切换走一步（探针写先拦，侥幸过了全或无也立刻判失败）。
+
+- 切换要用的块在挂载准入时预留：**它是内存里的一个空间量**，每次挂载重算、崩溃即丢、**不落盘**——分配记录条目只有「已分配」与「已释放 + 释放代」两个态（D3（空间分配） 已定项 7），盘上没法表达第三个态，而落盘表达它本身就要写单元、回到「要写才能写」。预留量按 **(N_switch + 1) × 一次切换的最坏量**（一次挂载允许 N_switch 次切换，且实例表链每切一次长一行、写行要 COW 重写整条链，第 k 次比第 1 次贵；多的一份给这次挂载写行那次发布的元数据）；**这个量的口径与式子的权威正文在 D28（挂载期承诺量） 已定项 3**：一次切换的最坏量 = 实例表链重写（副本数 2 × 32768 × 片数，按设备算）+ 暖机空发布（至多 R 次 × 现算 c_max），**固定点重做与号 > W 的数据单元重写不另要空间**——切换是挂载内一次恢复，重建态里失败那次的分配不存在，重做走 checkpoint 的保留池；引这一段时引 D28（挂载期承诺量） 已定项 3。
+- **预留挡的是分配失败那一路，不挡写失败那一路**——写失败由探针写与取号全或无挡。
+- **「分配失败」按它发生在哪里拆三支**（不拆的话池一满就整卷只读，而释放空间要写盘、重挂又被预留合取挡住，撞了 `.claude/rules/fs-design.md` 那句「释放空间这个操作本身不需要申请空间」）——前台事务的用户数据分配失败 ⇒ **向调用者返回 ENOSPC**，checkpoint 照常发布、不动挂载状态；后台、可续做、非决策路径（重平衡、墓碑回收、scrub、整理）的分配失败 ⇒ **暂停那个活并记进意图**，不动挂载状态（`.claude/rules/fs-design.md` 第三格「无戒律」、D2（RAID 条带策略） 已定项 4 c「前台不停」）；**切换自己的预留拿不到** ⇒ 才转只读。
+- 根槽写失败重发时 checkpoint_txg 推进一格再发（根环区域 = `txg mod R`，D22（单元原子性怎么合成） 已定项 2，不推进就是反复重写同一个槽、把 R 个失败域用成一个）；⚠️ 由此「同一个根槽连续失败」不再是一条判据——槽位随 txg 轮转，N_switch ≤ R 时它永远够不着，留着它读起来像一道闸、实际是空的。
+- **实例切换** = 挂载内做一次恢复：取新实例代号、写行、重发在飞 checkpoint——所选根**重新读盘择根**：对着仍打开的设备句柄按恢复择根的同一套规则现选（`crates/singlefs-core/src/recovery.rs` 的 `choose_root`），不取调用方内存里记的根——根已落盘而系统配置槽那一步失败时，内存里记的根比盘上的现行根旧（C458（实例切换取内存里的根，不重新读盘））；行只落在 [这个根的实例, 新实例)，每个被照旧事务的写序实例 k 写 (k, k 最后发布的 txg（没发布过根时 0）, 被照旧的、写序属于 k 的最大事务号)，其余按 D18（块里携带什么信息） 已定项 11（旧实例发布过根、被照旧的事务都是它自己的时候，就是 (旧实例, 最后发布的 txg, 被重发的那个 checkpoint 里的最大事务号) 这一行），号 ≤ W 的事务照旧（开放 checkpoint 里已完成的事务全部 > W，C287（切换收养开放 checkpoint 的事务后再崩） 按这个 W 封死，注 4）、号 > W 的按新写序重做或向还没返回的调用者报错，固定点单元全部按新实例重写；不转只读、不等下次挂载，代价 = 一条行 + 整条实例表链重写 + 号 > W 的数据单元重写 + 一次固定点重做，频率未测。
+
+**这一版的失败处置**：发布不接受失败。一次发布失败之后把它冻结，下一次发布之前先逐字节原样重发它（checkpoint_txg、计数器、本次发布内序号、记录标志、单元的位置与字节都不变），重发成功才建下一次发布；于是合法历史里同一 (实例代号, checkpoint_txg) 不会有两条带末条标志的记录，恢复遇到它就是盘坏了，在任何写之前停下（`crates/singlefs-core/src/recovery.rs` 的 `RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided`）。原样重发管这一版的串行提交；探针写、两支分流、实例切换与根槽写失败推进 txg 仍在本项，随失败处置的代码在后面的里程碑做。原样重发在串行提交下会把一次失败放大成整条发布流阻塞，欠 C541（原样重发把一次失败放大成整条发布流阻塞）。
+
+**射程**：管恢复施加哪一段、回退与切换怎么做、失败怎么分流；实例表的行格式与写行规则归 D18（块里携带什么信息） 已定项 11，切换预留的量归 D28（挂载期承诺量） 已定项 3，defer 窗口与 F 归 D16（发布语义） 已定项 1。已知边角：
+
+- ⚠️ 它对已定项 3 是收窄不是推翻：「先全环扫描、逐条验证、不许先信 tail」原样成立——变的是验证出的合法前缀里**哪一段被施加**。
+- ⚠️ **影子账与按实例表判抛弃（`abandoned_by_table`）留着，理由是崩溃恢复，不是管理员回退**：一段没有任何管理员回退的历史里，崩溃恢复因暂时读错落到旧根、实例表抛弃了较新的根，关掉影子账，被抛弃的根引用的数据单元被复用，之后恢复落在它上面读不出（第一轮 H6）。「只在崩溃恢复落到旧根的那次挂载里隔离」挡不住它：被复用的写发生在下一次干净的挂载里（第二轮辩方 G6，读代码的判断、没量）。落 [checks-owed.md](../checks-owed.md) C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）。 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续（用户 2026-09-27 定）之后，系统配置见证过的较新的根暂时读不出不再被抛弃：可写挂载重读一次，仍读不出就拒可写；影子账留着的理由收窄成系统配置没见证到的那一形（那次发布的系统配置轮换没落盘）。
+- ⚠️ **C331（择根倒挂压过已确认的写） 判不出取 R2 之后的代价（取 R2 的权威写法在 D22（单元原子性怎么合成） 已定项 8；取甲时量的数在 `research/prompts/unreadable-at-mount-r2-main-verification.md` L1）**：撕裂的系统配置轮换（普通断电就造得出，被撕裂的那次发布没确认过）不再因判不出拒可写挂载；仍判不出的是有槽设备报读错、没有一块盘两槽都自证过那一形（一槽系统配置持续读错），可写挂载每次都拒，只读挂载不写盘，那一槽没有机会被重写——池只剩只读挂载；「只读挂载不写盘」对今天的代码量实（2016 条轨迹），条款上没有，见 C32（无密钥的一侧写不写得出字节没有闸）、C33（scrub 检出之后做什么没有条款）、C75（降级挂载这道闸自己不会红）。一次可写挂载都做不成时怎么走出来，没有条款（C596（撕裂的系统配置轮换之后只剩只读挂载））。C393（被抛弃根的账读不出时修复没有条款） 从映射也现算不成的那一形同样只剩只读挂载。
+- ⚠️ **挂着时回退的已知边角三样**：① 「R_old 仍分配的落点在 cur 的账里是同槽同分配代」这道核不在定案里，也补不上——已释放的记录记的是释放代（`crates/singlefs-core/src/allocator.rs:38`），核看不出「这个槽被复用过又释放了」；它放过的读不对的回退只在 F 回落时走得到（第三轮判决第二节 K1：F 生效取最大值的最小值时 15 格中 12 格，取 SysPre 时 0），靠 F 不回落挡。② 崩溃恢复抛弃的根在重开时全部暂时读不出，影子账读不到它们的账、隔离 0，之后别的实例复用了它们的槽，撤故障再把新实例的根全改坏，恢复落在被抛弃的根上读不出——与回退形态无关的多重故障，见 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）——乙-配置续之后这一形只剩被抛弃根是系统配置没见证到的那一种：见证过的在崩溃恢复那次挂载里重读一次仍读不出就拒可写，抛弃不了。③ 两个状态来回回退超过根环一圈时，可退到的不同状态少于 4 个（D16（发布语义） 已定项 1 的根环容量边界）。
+- 实现的链首锚在所选根覆盖的最后一条（`crates/singlefs-replay-prefix/src/lib.rs` 的 `counter_of_the_last_record_the_root_covers`，`crates/singlefs-core/src/recovery.rs` 的 `replay_journal` 经 `replay_core` 取前缀），对着它的会红检查欠在 C365（恢复路径的链首不锚在所选根覆盖的最后一条）。
+- 回退时标签 6 的 n_live 现算读法（「准入与记账」一格）被攻过零轮。
+- ⚠️ **只读复核买的是落点持续坏那一类，代价是它自己零轮。** 固定落点探针写单独用时，落点持续坏那一类会反复白切换（攻方在副本装置上量到 24 个持续故障场景合计 46 次，那个数没在入库装置重做过、不进 kb）；只读复核能分辨它。这条改法是攻方腿自己提的，**被攻过零轮**，用户 2026-09-21 知情接受。
+- **切换重新读盘择根带出的三件**：读盘选出的根比内存里记的新时，不重发在飞 checkpoint，以读盘选出的根为准接着走；切换写的实例表行与 W 按读盘选出的根写；回退那次发布里，管理员选的 R_old 必须在「以读盘选出的根为最新根」算出的回退候选集里，不在就拒绝、盘上逐字节不变。挂载内实例切换的实现随里程碑「覆盖写、释放、回退与复用」收口表第 16、40 行在后面的里程碑（C458（实例切换取内存里的根，不重新读盘））。
+- ⚠️ **零单元发布这一支不冻结**：发布末尾系统配置轮换之后那道屏障报错时，带单元 / 带记录的发布与轮换报错同一处置（冻结、原样重发）；零单元发布（`crates/singlefs-core/src/transaction.rs` 的 `publish_without_units`，末尾走 `persist_the_root_then_rotate_the_system_configuration` 那一路）这一支不冻结、整个挂载返回错误（失败经 `PublishError::BlockDevice`），下一次发布落在下一次挂载、换了实例代号；这是替条款没写的一支做的选择（判决 `research/prompts/m2-closeout-code-r2-main-verification.md` 第一节「最新根读不出、见证与屏障」那一格；`research/prompts/m2-impl-c577-barrier-implementer-report.md` 第 106–111 行「停下交主 agent 的设计问题」第 2 条）。钉它的用例是 `crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs` 的 `a_zero_unit_publish_whose_post_rotation_barrier_fails_is_not_frozen_and_the_whole_mount_returns_the_error`：只做过 mkfs 的池第一次可写挂载，写行那次零单元发布在盘 1 轮换之后那道屏障报错一次 ⇒ 挂载报 `MountError::Publish`、原因 `PublishError::BlockDevice`，写账已落盘的发布 0 份、失败的 1 份；录制流落到盘 0 那道屏障为止，盘 1 那一道没进录制流；换回不报错的设备之后再可写挂载，取号 2、择到 (实例 1, txg 1)。它只钉文件镜像上的结局：harness 的文件设备没有写缓存，盘 1 的轮换写在屏障报错之前已经进了镜像，「屏障报错时轮换其实没持久」那一种崩溃状态它不罩（`research/prompts/m2-impl-r2-fixes-a-implementer-report.md`「结论」第 4 行、「停下交主 agent 的」第 5 条）。
+- ⚠️ **C366（暖机路径把 txg 写进计数器与 tail） 那条定案在可写挂载这一层没有可达盘面**：注 3「前缀末的计数器取环里读得出的最大那一个」只在所选根自己那条记录两份都读不出时与 txg 分得开；那一形在可写挂载的读阶段被 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙判成「两条都读不出按真」，重读一次仍为真就在取号之前拒可写（C579（判据在单故障合法状态上也拒可写） 用户定维持乙字面），走不到取号、写行与暖机。今天钉住的是：函数层 `crates/singlefs-harness/tests/warm_up_journal_counter.rs` 的 `warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two`（环里末条 jsn 40 时暖机写 jsn 41、42，txg 仍是 1、2）；同一份文件的 `c366_when_the_chosen_root_own_record_is_unreadable_the_writable_mount_is_refused_by_the_undecidable_witness_and_the_read_only_mount_opens_the_chosen_root`：可写挂载拒在任何写之前、两块盘逐字节不变，只读挂载照常择 (实例 1, txg 4)、环里读得出的 jsn 1–3 一条不施加（`research/prompts/m2-investigate-three-reds-report.md` 第一节第 2 条、第七节；`research/prompts/m2-impl-r2-fixes-b-implementer-report.md` 第三节 5c 行）。
+- 实例表删行的清扫（D18（块里携带什么信息） 已定项 11 的「回收」一条）保护被抛弃根引用的单元：读成功的全零根槽与读不出同待遇（按「可能有该实例的根」算），这一次不删；其余的槽须自证过，否则重读一次、仍不过就这次不删（零轮，推的，没造盘面）。
+
+**依据**：
+
+- E78（重放的起点）：陈旧 tail 叠上块重用之后，「全环扫描 + 断号即止 + 幂等」三件套不闭合——失配即中止的恢复在健康镜像上自我中止，失配跳过的撕裂判别力归零；水位臂与尾删臂都过全部判据，取水位臂是因为水位就是根记录已有的 `(实例代号, checkpoint_txg)`（D22（单元原子性怎么合成） 已定项 7），零新增格式字段，而尾删臂要在恢复路径里加一个重试环。
+- E77（发布的持久顺序）：拿掉施加前的点名单元验证，单元与记录同段那一臂当场出静默嫁接——第四条承重。
+- E104（扫描重建的现行版本判定）：新根取 T_old + 1 时压不过被抛弃的根——注 2、注 3 新实例的第一次发布从环里最大 + 1 起靠它；它的另一半「不写回退行时被回退抛弃的单元在全规则臂上复活」仍承重——今天的设计就是不写回退行（墓碑第一轮判决 `research/prompts/m3-tomb-r1-main-verification.md` 第二节、`research/prompts/m3-delete-r3-main-verification.md` 第三节「墓碑第一轮「一轮」各行」）；扫盘重建认「挂载根是一次回退」靠谱系记录，读侧怎么用记欠账（K-W5b，与 C113（扫描重建时多版单元的现行版本判定无输入） 同组）。
+- E150（回退复用被抛弃的根引用的单元）：影子账在模型里两格零违例，多隔离的单元到被抛弃的最新根被轮转覆写为止。模型里的被抛弃时间线是管理员回退造出来的；今天影子账留着的理由是崩溃恢复抛弃的时间线（第一轮 H6），机理相同，模型没重跑那一形。
+- E142（新池新建文件的干跑）：干跑时装置取「两份镜像任一份合法即在」，改坏一份记录仍读到全部合法记录——「记录在」的口径由此收口。
+- 三方：`research/prompts/c199-r1-main-verification.md`、`research/prompts/c199-r2-main-verification.md`（注 1–4）；`research/prompts/c322-r3-main-verification.md`（取号屏障与跳过的号）；`research/prompts/c329-c330-r3-main-verification.md`（切换的所选根与 W 那一行）；`research/prompts/c143-r3-main-verification.md`（第一个新根的 txg 取 CJ2）；`research/prompts/m2-r1-main-verification.md` 第三节与 `research/prompts/m2-step45-code-r3-main-verification.md` 第六节 5（影子账查谁的账、有效根）；C113（扫描重建时多版单元的现行版本判定无输入） 定案（`_c113-r9-final.md`）。
+- 用户定案（重放下界、回退、失败表、切换预留口径、两份镜像的口径各一次），原话在变更史。
+- `research/prompts/c381-r3-main-verification.md` 第三节：候选乙（探针写改成写失败的那个落点）被三处独立打中——屏障上没有落点、8 个失败点里 4 格的落点是权威结构、与用户第二轮定的第 1 题（落点进地址空间表，买的就是「写坏了也不心疼」）对撞、`D2`（RAID 条带策略） 已定项 13 那句话会当场为假。
+- 用户定案 2026-09-21（改法 B），原话在变更史。
+- 用户定案 2026-09-23：切换的所选根重新读盘择根（`research/prompts/c381-r3-main-verification.md` 第二节记的零轮形态、第四节第 3 题），原话在变更史；被攻过零轮。
+- 用户定案 2026-09-23：注 3 的前缀末计数器取环里读得出的最大那一个（C366（暖机路径把 txg 写进计数器与 tail） 实现员查出所选根自己那条记录读不出时条款没写），原话在变更史；这条定案在可写挂载这一层没有可达盘面（射程「C366（暖机路径把 txg 写进计数器与 tail） 那条定案在可写挂载这一层没有可达盘面」那一条），C579（判据在单故障合法状态上也拒可写） 用户 2026-09-27 定维持乙字面、拒可写（`research/prompts/m2-investigate-three-reds-report.md`），原话在变更史。
+- 用户定案 2026-09-23：第五条的发布边界按已定项 17 那条约定认末条（C245（系统配置槽的写频率，两条条款说反话） 第二轮 `research/prompts/c245-r2-main-verification.md` 第四节列的三个判别量之一，被攻过零轮），原话在变更史。末条按记录标志位 0 认（已定项 17）；一次发布的记录里没读到带标志的那条，整次不施加。
+- 用户定案 2026-09-23：注 1 的锚点取同 txg 里 jsn 最大的那条、锚点读不出时靠本次发布内序号接链首，第一版没有干净关闭标记（三方第一轮 `research/prompts/m2-presumed-clauses-r1-main-verification.md` K3、K4；K4 的两个改法都被攻过零轮，本次发布内序号那一个是推的、没实现），原话在变更史。
+- 用户定案 2026-09-24：第一个文件版本写之前核上一条记录，照今天的实现写成条款（C495（第一个文件版本核上一版记录没有条款），三方 `research/prompts/m2-refusals-presumed-r1-main-verification.md` 第三节 R5：拒之前零字节写、被拒那一族零故障不可达），原话在变更史。
+- 用户定案 2026-09-24：切换重新读盘择根带出的三件照主 agent 推荐定（判决 `research/prompts/m2-newq-r1-main-verification.md` 第三节 N5–N7，原话在变更史）；无实验：三件都不改盘上格式、实现不在这个里程碑，差别只在语义。
+- 用户定案 2026-09-24：末条再跨记录、最后一条带标志位（原话在变更史；三方 `research/prompts/m2-treesplit-r1-main-verification.md` T6（维持拒绝时拒不拒取决于池的历史），按今天的字面认末条会施加半次发布，带标志位那一格 0 / 0）。
+- 用户定案 2026-09-24：末条按标志认、注 1 的锚点读法乙（原话在变更史；实十三报告 `research/prompts/m2-p6-header-implementer-report.md` 第四节 ① 列的两种读法）。
+- 用户定案 2026-09-24：这一版发布失败原样重发（实二十报告 `research/prompts/m2-lastflag-implementer-report.md` 第六节 1：同一实例失败后接着发，会留下两条同 (实例代号, checkpoint_txg) 都带末条标志的记录），原话在变更史；无实验：只定失败之后发什么，不改盘上格式。
+- `research/prompts/m2-final-code-r2-main-verification.md` 第三节 Z8（这一版发布失败原样重发，攻方没打中）；那一份的 Z9 与第四节改法 1–4 是回退见证的，随见证删掉不再承重。
+- 管理员回退改成挂着时的一次向前发布（候选集、释放、复活、水位、拒）、删前缀第五条与回退见证、影子账依据改指 H6：无实验，三方原型（`research/prompts/m2-rollback-forward-r1-opus-model/`、`m2-rollback-forward-r2-opus-model/`、`m2-rollback-forward-r3-opus-model/`）在冻结副本上量过，没立实验号，原型上的数不是入库装置上的数；三轮判决 `research/prompts/m2-rollback-forward-r1-main-verification.md`、`m2-rollback-forward-r2-main-verification.md`、`m2-rollback-forward-r3-main-verification.md`。水位取 max(内存, 环) 的收严（第三轮判决第二节 K1 的水位分句）被攻过零轮；用户定案 2026-09-25（向前发布、只在挂着的时候做）与 2026-09-26（第三轮交用户的四问），原话在变更史。
+- 主 agent 2026-09-26 定：回退那次发布之前逐盘验复活集里的每个单元（「在任何写之前拒」那一格最后一句），照用户 2026-09-25 原话「1 就是fsync失败后 两个盘掉一个盘。这个不能认，这个违背我们数据安全的承诺」（`records/2026-09-24-里程碑二收尾调度.md` 第三节那一时刻的一行），与 C519（丢一整块盘时恢复丢掉刚确认的那一版） 那一格「两份都验过才施加」同一方向；无实验，推的，被攻过零轮；多读的量随 R_old 之后释放的用户可见单元数涨，没量。
+- 用户定案 2026-09-25：点名单元两份都验过才施加、认下丢一整块盘时丢掉刚确认的那一版（C519（丢一整块盘时恢复丢掉刚确认的那一版） 实一复现：`crates/singlefs-harness/tests/whole_device_loss_after_warm_up.rs`），原话在变更史；无实验：照今天的实现写成条款，另一读法「任一份验过」会不会放过 E77（发布的持久顺序） 那种嫁接没量。
+- 用户定案 2026-09-27（C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续，先选乙、再补选「配置续（推荐）」）：可写挂载读到系统配置见证过的更新状态读不出，重读一次仍读不出就拒可写；取号那一写不再写 tail = 0，改写取号那一刻按同一取法读到的见证值（实现已合入，`crates/singlefs-core/src/transaction.rs` 的 `highest_system_configuration_journal_tail`）；判据 N-配置续 定义在 `research/prompts/e158-r3-prereg.md` 第 348 行与 `research/prompts/e158-r4-prereg.md` 第 413 行，原话在变更史。E158（择根与修复四岔路） 第 4 次跑：第三段 H1g 把乙-配置与乙-配置续分开（16/32 对 0/32），第二段（以装置撞键修过的 seg2b 为准）四族两者逐族相同，页上「2026-09-27：第 4 次跑」一节的岔路表第 1、2 行。
+- 回退时标签 6 的 n_live 现算读法：`research/prompts/m3-blanks-r1-main-verification.md` 第四节「回退那一刻 n_live 怎么现算」那一行（零轮；主 agent 采纳正推腿的读法）。
+- 三方判决 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 9 行：清扫把读成功的全零根槽当没有根，会抹掉仍在环里的被抛弃根引用的单元，违反这一项正文明文的保护；全零根槽不当「没有根」、每槽自证过或全零否则重读一次仍不过就不删，两处收严采纳（零轮，推的，没造盘面）。无实验：保护的对象是被抛弃时间线的残余，不是活数据。
+
+**欠**：C77（重放起点未定义）；C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元）；C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）；C331（择根倒挂压过已确认的写）；C334（切换的所选根没有会红的检查）；C365（恢复路径的链首不锚在所选根覆盖的最后一条）；C287（切换收养开放 checkpoint 的事务后再崩）；C126（切换预留的最坏量没有口径）；C493（回退候选集条文与实现说反话）；C381（根已落盘之后发布失败，分配器仍退回）——三方第二、三轮打中失败表那两支判别子（探针写在盘上没有落点、屏障类失败点连「失败的那个落点」都没有定义），用户已定「落点进地址空间表、射程逐个失败点列一张表」，第 2、4 题已定（`D16`（发布语义） 新立一条已定项、失败表改两步判别子），「实例切换取的是内存里的根」那一题定成切换重新读盘择根、带出的三件待定（`research/prompts/c381-r2-main-verification.md`、`c381-r3-main-verification.md`）；代码那一半（探针写、只读复核、实例切换、转只读）跟里程碑「覆盖写、释放、回退与复用」收口表第 16 行一起挪到后面的里程碑；C458（实例切换取内存里的根，不重新读盘）：切换重新读盘择根那条会红的检查；C539（锚点读得出时下一次发布的首条序号不是 1）；C540（末条标志坏在一次发布中间，读者切出两次发布）；C541（原样重发把一次失败放大成整条发布流阻塞）；C558（回退目标是环里最旧的根时回退那次发布会写坏它）；C596（撕裂的系统配置轮换之后只剩只读挂载）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:448-462`（整段抄，未转述）**
+
+```markdown
+#### 已定项 15：崩在记录持久之后、根槽持久之前，恢复由记录重建那次发布的根
+
+**定案**：**由记录重建那次发布的根：记录头加「新根段」= 树表单元指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 实例表单元指针 86 + 分配记录树根指针 86 + 卸载记号 4 = 364 字节 <!-- format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES = 364 -->，4096 记录装 64 个点名项。施加一条记录 = 把所选根的这七个字段换成记录里的（实例表指针、卸载记号、分配记录树根从新根段来，不再照抄所选根），不需要树语义。一次发布切成几条记录时，每条记录都带同一份新根段。已定项 14 条 2「严格大于所选根就施加」原样成立。**
+
+**射程**：管「记录在、根槽不在」那一格恢复施加什么；指针的宽度随 D19（块指针的结构与宽度预算） 已定项 7 / 11 走。施加一条记录时指针层上其余的事（分配器登记、overlay）不在这一格，归 C284（施加一条记录在指针层上做什么没有定义） 与 D28（挂载期承诺量） 已定项 2。
+
+**依据**：
+
+- E142（新池新建文件的干跑）：新根段加进记录头之后，「施加一条记录」在指针层上有了定义，忽略 journal 与查 journal 的恢复结果在一批状态上不同——journal 承重。
+- 用户定案，原话在变更史。
+- 用户定案 2026-10-01：「多条记录的发布每条都带同一份新根段」补进已定项 15（`research/prompts/m3-inv-b-r1-main-verification.md` 第四节第 3 条），原话在变更史。
+- 三方判决 `research/prompts/m3-ring-r3-main-verification.md` 第二节第 1、2 行：施加处的实例表指针、卸载记号、分配记录树根三项改从新根段来（首个文件、卸载两种发布补进去之后施加出来的根与当初会写的逐字节相同，攻方量的；专用清扫发布崩在记录已持久、根槽没持久时，实例表指针照抄所选根会让下一次可写挂载在取号之前被拒，攻方在副本上量的）；用户定案 2026-10-02「回到甲」，原话在变更史。无实验：数都在三方副本上，没立实验号。
+
+**欠**：C284（施加一条记录在指针层上做什么没有定义）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:463-478`（整段抄，未转述）**
+
+```markdown
+#### 已定项 16：mkfs 写实例代号 0，第一次可写挂载取 1
+
+**定案**：**mkfs 写 0，0 = 「mkfs、尚无实例」，不是有效实例；第一次可写挂载按 C113（扫描重建时多版单元的现行版本判定无输入） 定案 P2 取 max(系统配置, 根环) + 1 = 1，并写进每一份系统配置（一次系统配置槽写，世代号 +1）之后才动单元。mkfs 写出的单元写序 (0, 0)、第 0 代根实例代号 0；D18（块里携带什么信息） 已定项 11 那句「从 1 起、0 无效」读成「实例从 1 起，0 保留给 mkfs」。**
+
+- **取号那一步的屏障**：取号那两次系统配置写之后、本实例第一个非系统配置写之前至少一道完成了的屏障，首次挂载路径上暖机开场那道就算、不另发；那道屏障完成之前本实例的全部写者都不发单元、记录、根；那道屏障在任一块盘上报错 ⇒ 取号全或无失败，不许只重发屏障就继续。取号的 max 读法与回卷写带的号写在 D18（块里携带什么信息） 已定项 11，世代号按 D22（单元原子性怎么合成） 已定项 16 逐盘 + 1。
+
+**射程**：管实例代号从几起、取号那一步的次序；实例表的行怎么写归 D18（块里携带什么信息） 已定项 11。⚠️ 取号之后，写行或暖机那几次发布因块设备报错失败时，已写进系统配置的新代号**不回卷**——回卷只管取号自己那几次系统配置写（D18（块里携带什么信息） 已定项 11）；这个号就此烧掉，下一次可写挂载按 max + 1 取下一个，被烧掉的号按 D18（块里携带什么信息） 已定项 11 的写行规则得一行。这是已知行为，不当缺陷修。
+
+**依据**：
+
+- 无实验：实例代号的起点是编码约定；取号屏障的判别力在层 0 崩溃点重放里，不是计数实验。
+- 三方：`research/prompts/c322-r3-main-verification.md` 第五节（取号那一步的屏障，三轮三方之后用户定案）；实例代号的起点是用户定案。原话都在变更史。
+- 用户定案 2026-09-23：取号之后写行或暖机失败不回卷，认了、写成已知行为（里程碑「覆盖写、释放、回退与复用」收口表第 57 行），原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:479-498`（整段抄，未转述）**
+
+```markdown
+#### 已定项 17：点名项 56 字节的字段表
+
+**定案**：**一项一个单元（新池新建文件 8 项）：位置条目 14 × 2（偏移 0）+ 单元类型标签 1（28）+ 出生树 8（29）+ 出生 txg 8（37）+ key 尾段 10（45：码 1 写序；码 2 / 码 3 实例代号 4 + 出生序号 4 + 补零 2）+ flags 1（55）= 56 <!-- format-const: JOURNAL_NAMED_ENTRY_BYTES = 56 -->；不另带载荷 CRC（位置条目各带 4 字节校验和）。重放从点名项直接凑出映射 key。**
+
+- **记录点名的每一项自带校验和**：D4（校验和位置） 已定校验和内联进父指针，而记录点名的东西在记录持久时它的父还没发出 ⇒ 记录临时充当父，否则重放时那些单元没有任何完整性凭据；恢复重放施加前必须逐项验证点名单元（已定项 14 第四条）。
+- **一次发布切成 N 个事务、N 条记录时，这次发布共享的提交内生块（extent 树节点、inode 叶容器与根、分配记录树、记账树、中央映射树、树表单元）只在最后一条记录里点名**，前面几条不重复点名它们。
+- **共享的提交内生块多于最后一条记录装得下（4096 记录 64 项）时，末条再跨记录**：从最后一个事务那条记录起依次多写几条，装满一条再开下一条，只有真正的最后一条带「本次发布末条」标志；恢复按这个标志认一次发布的边界，一次发布的记录里没读到带标志的那条，整次不施加（已定项 14 第五条）。标志放在记录头十个字段里「填充 1」那个字节（改名「记录标志 1」），位 0 = 本次发布末条；每一次只有一条记录的发布（含空发布记录），那一条的位 0 也写 1——改新池新建文件的字节（w1、w4、t9 三条记录的这一字节与头部校验和 [46, 50)；w4、t9 两条的反向链 [91, 95) 也跟着变，E142（新池新建文件的干跑） 空白 G26 逐字节核过）。用户 2026-09-24 定。
+
+**射程**：管点名项的字节；位置条目的构成归 D19（块指针的结构与宽度预算） 已定项 4 / 11，映射 key 的形态归 D19（块指针的结构与宽度预算） 已定项 6 / 10。⚠️ 共享的提交内生块只在最后一条点名时，崩在最后一条持久之前，那些单元没有任何记录点名——重放的回收路径要认得出这一格，层 0 的小负载要覆盖它（C491（多条记录时共享内生块在哪条点名没定））。
+
+**依据**：
+
+- E16（journal 的角色：WAL vs 意图日志）：记录点名的东西其父此刻还没写到盘上，记录必须临时充当父——逼出「点名的每一项自带校验和」。
+- E77（发布的持久顺序）：点名项自带校验和、施加前逐项验证，是单元与记录之间那道屏障得以省掉的交换条件。
+- 用户定案，原话在变更史。
+- 用户定案 2026-09-23：共享的提交内生块只在最后一条记录里点名，原话在变更史。
+- 用户定案 2026-09-24：末条再跨记录、最后一条带标志位（原话在变更史；三方 `research/prompts/m2-treesplit-r1-main-verification.md` T6（维持拒绝时拒不拒取决于池的历史），按今天的字面认末条会施加半次发布，带标志位那一格 0 / 0）。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:499-513`（整段抄，未转述）**
+
+```markdown
+#### 已定项 18：在飞记录数上限的取值与语义，tail 字段的编码
+
+**定案**：在飞记录数上限 = 环槽数 ÷ F（`F` 是 I-8.1（环几何够大） 的安全系数），默认环下 196608 ÷ 3 = **65536**，写进系统配置；tail 8 字节存 jsn 的 48 位计数器，靠系统配置自己的两槽轮换取冗余，不另设 tail 槽；记录 n 落在环内偏移 `(计数器 − 1) mod 槽数 × 4096`。
+
+- **语义**：这个数的含义是**一次恢复重放的前缀最多 N 条**。读到一条校验和不过的记录时，恢复**断链即止**——停在它之前那一条，不追问它是「撕裂」还是「损坏」，也不因此拒绝只读挂载；可写挂载另按 C554（崩溃恢复抛弃的根暂时读不出时影子账算不到） 乙-配置续判（已定项 14）：系统配置见证过比断链处那一版新的发布、重读一次仍判真，拒可写。不是 XFS 那种「最后 N 条内的坏校验和算撕裂、之外算损坏拒绝挂载」。
+
+**射程**：⚠️ 代价：一条真正的「盘中段损坏」与一条「尾部撕裂」在第一版判成同一种结局，池照常挂上、损坏那一条之后的记录全部不施加。第一版串行提交（D13（验证路线） 已定项 2），任一时刻只有一条记录在飞 ⇒ XFS 那套在第一版里 N 恒 1，而它要的那个「N = 并发写出的记录数」与「环槽数 ÷ F」是两个量纲不同的数，同一个字段装不下两种语义。
+
+**依据**：
+
+- 无实验：取值是 I-8.1（环几何够大） 的算术（环槽数 ÷ F），语义是一次口径裁定——断链即止已经是 I-8.3（重放前缀严格连续) 的判据，这一句只是把「校验和不过」也并进同一条出口，不新增分支。
+- 用户弹窗定案，没有走三方论证，可推翻，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:514-530`（整段抄，未转述）**
+
+```markdown
+#### 已定项 19：空发布记录的事务号与提交标记、`previous_hash`、环长
+
+**定案**：
+
+- **① 空发布记录**：事务号 0 保留给不承载事务的记录，提交标记写 1；不进实例表 W 的 max，不进「丢掉提交标记没出现的尾巴」判定。
+- **② `previous_hash`** = CRC32C(**本实例内逻辑前一条**记录的头，其中 `header_csum` 那 32 字节按零参与)；**本实例写出的第一条记录恒 0**；写路径**不读盘**。反向链是**按实例**的——I-8.3（重放前缀严格连续) 逐字「跨实例边界即停」，重放本来就不会从一个实例的记录接到另一个实例的记录上，实例边界另有实例代号挡着；取「环上前一格的记录头」那一种，写路径每写一条记录就要先把环上那一格读回来，买到的只是「跨实例也能连上」，而那条链没有任何判定在用。字节表里 w1 那一行写 0 的理由是「本实例第一条」，不是「环上无前一条」。
+- **③ 环长**：环长是 **mkfs 参数**，**默认 768 MiB**；约束 **环 ≤ 设备容量 ÷ 4**，越界**拒绝 mkfs**。系统配置里仍只存「环长度（字节）」这一个字段，不另存容量或比例。**挂载时有效 `T_dirty` = min(`T_dirty` 字段, 环长 ÷ F)**——系统配置里 `T_dirty` 仍写 2 GiB，默认 768 MiB 环下有效值 = min(2 GiB, 256 MiB) = 256 MiB。单元区起始槽号随环长走，默认环下是 784 MiB（槽 50176）。`T_dirty` 的夹取是 I-8.1（环几何够大） 的直接推论——环装不下 `F ×` 最坏占用时，能脏的字节数必须跟着降，否则一次发布发不出去。
+
+**射程**：③ 的「参数 + 上界」让大盘上 768 MiB 只占容量的百分之几、小镜像按参数缩，`环 ≤ 容量 ÷ 4` 挡住「环吃掉整个盘」；⚠️ 连带：`.claude/kb/layout/01-first-txn.md` 的预想镜像是 **4 GiB**（1 GiB 的镜像在这条约束下装不下 768 MiB 的环）。实现：`crates/singlefs-core/src/make_filesystem.rs` 收环长参数、按最小那块盘的容量 ÷ 4 拒绝越界，默认值是 `crates/singlefs-format/src/lib.rs` 的 `JOURNAL_RING_DEFAULT_BYTES`。 挂载读者一侧另判环长：在飞上限（环槽数 ÷ F，已定项 18）≥ 1，且环末端不越过编译期单元区起点（768 MiB，`crates/singlefs-format/src/lib.rs` 的 `UNIT_AREA_START_SLOT` 与 `JOURNAL_RING_START_SLOT`）；越界整池拒绝挂载（实审 A3a 落地：`crates/singlefs-core/src/recovery.rs` 的 `SystemConfigurationValueOutsideWhatThisReaderAccepts::JournalRingBytesOutsideTheSupportedRange`）。
+
+**依据**：
+
+- E143（一事务一单元下的 journal 账）：按切分纪律，`T_dirty` 满窗要的环是预想 64 MiB 环的 4 倍，要么环 ≥ 768 MiB（F = 3）、要么 `T_dirty` 压小——默认环长与 `T_dirty` 夹取的来处。
+- ①、②、③ 都是用户弹窗定案，没有走三方论证，可推翻；主 agent 推荐的也是这几档，原话在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:531-555`（整段抄，未转述）**
+
+```markdown
+#### 已定项 20：记录承载指针层的目标态，分配先于 journal
+
+**定案**：**journal 记录承载「指针层的目标态」，不是逻辑意图，也不是全量物理重做。** 单元由 COW 写到各自最终位置并自带校验和（D22（单元原子性怎么合成） 已定项 18 里「COW + D4（校验和位置） 够」那一类），journal 只记「哪些子树根换到了哪个块 + 新根」。
+
+- **由此得到一条写路径的硬顺序：分配先于 journal。** journal 记录不是「事务的全部」，是「**已经写到盘上的东西的发布指令**」。
+- 判据：
+
+  | 判据 | 逻辑意图 | 全量物理重做 | **指针层目标态** |
+  |---|---|---|---|
+  | 幂等（I-4.4（意图只描述目标态）「只描述目标状态」） | 只有写成目标态才幂等 | 天然幂等 | **天然幂等** |
+  | 重放要不要分配器 | **要** | 不要 | **不要** |
+  | 记录大小（D16（发布语义）「小、顺序写」） | 小 | **大**（要带全部字节） | **小** |
+  | 记录核对器（D13（验证路线） 已定项 7）核对一条记录要什么 | 自行实现树语义 + 记账 + 分配合法性（核对从句法变成语义） | 逐字节比对 | **格式解析 + 校验和 + 根环择新** |
+
+- **否掉逻辑意图的第一条理由（独立成立）**：O2（独立解析器 + checker） 明令不许调用被测 crate 任何代码（D13（验证路线）），而逻辑意图的重放要重新实现分配器 + 树操作 + 校验和 + 记账，**约等于第二个文件系统**。第二条理由（落点不确定使核对退化）是第一条的一条封堵，不是独立理由（已定项 5）。
+- 记录形态与 D13（验证路线） 的验证手段互相挟持：验证手段的可行性决定记录形态，记录形态决定验证手段的产出等级，两者要一起定。
+
+**射程**：管记录里装什么、分配与记录谁先；施加一条记录在指针层上换哪几个字段是已定项 15，其余归 C284（施加一条记录在指针层上做什么没有定义）；重放幂等这条硬要求在已定项 3。
+
+**依据**：
+
+- 无实验：方向由 2026-08-28 三方论证按幂等、重放要不要分配器、记录大小、核对要什么四条判据推出（主 agent 裁决），四条都是结构性质，没有可量的对照；ZFS 的 ZIL 靠「把主写路径再调一遍」回避独立实现的成本，是线索，不是依据，在变更史。
+
+**欠**：C284（施加一条记录在指针层上做什么没有定义）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:556-576`（整段抄，未转述）**
+
+```markdown
+#### 已定项 21：世代号：记录粒度的全局单调号，不是 D5（快照 / 空间记账机制） 的 txg
+
+**定案**：**记录头要两个计数字段，职责不同、不可合并**：
+
+| 字段 | 粒度 | 用途 |
+|---|---|---|
+| `jsn` | **每条记录**，全局单调，10 字节（实例代号 32 位 + 计数器 48 位，已定项 9）| D22（单元原子性怎么合成） 要求②的世代号；前缀判定靠它 |
+| `checkpoint_txg` | 每个 checkpoint | 归属哪个 checkpoint，供 D5（快照 / 空间记账机制） 的 birth/death 记账 |
+
+- 理由：D5（快照 / 空间记账机制） 是「一个 checkpoint 一个 txg 号」⇒ 同一 checkpoint 窗口内的多条 journal 记录**共享同一个 txg**，彼此分不出先后，D22（单元原子性怎么合成） 要求的「被实际检查的世代号」就失去意义。
+- ⚠️ jsn 取到不回绕的宽度，**买到的是「免掉回绕比较」，不是新能力**：jbd2 的 tid 是 32 位且会回绕，靠 `tid_gt` 的有符号差比较；回绕比较正是独立实现最容易实现得不一样的地方。
+- ⚠️ **「用 txg 就不需要 cycle」只对轴①成立**，见 D22（单元原子性怎么合成） 那两个正交轴的表。
+
+**射程**：管两个计数的职责；两者在水位与择根里谁为主比，归已定项 14 第 2 条；「每次发布 checkpoint_txg + 1」归 D16（发布语义） 已定项 6。
+
+**依据**：
+
+- 无实验：职责划分由 D5（快照 / 空间记账机制） 的粒度直接推出，是定义之间的推导，没有可量的量。
+
+**欠**：C85（发布计数器的四个等号没写死）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:577-588`（整段抄，未转述）**
+
+```markdown
+#### 已定项 22：前缀判定：严格连续、断号即止
+
+**定案**：**前缀判据是 `jsn == expected`，不等即止。** 只用「`jsn` > 上次已应用」过滤**不够**：若序列里有空洞（5849 写成、5850 没写、5851 写成），「>」会把 5851 错接到 5849 后面，**破坏因果序**。还要一个**显式的在飞记录数上限**（取值与语义见已定项 18）。前缀判定的完整口径（五条）在已定项 14。
+
+**射程**：⚠️ 断号即止在**那一次**恢复里是对的（前缀停在 5849），它单独挡不住**上一条时间线的残留**：恢复之后接着写时，5851 那个槽里还躺着上一条时间线的记录，**校验和是好的、`jsn` 恰好等于 expected** ⇒ 第二次崩溃后的恢复把它接上去重放。在 D23（journal 的角色与格式）唯一测过的那种槽位映射（`slot = jsn % 槽数`）下这由构造必然发生，位置与序号解耦时退化成巧合，而解耦救不了。现有的三道闸（I-8.3（重放前缀严格连续）、在飞记录数上限、同一窗口里一模一样的 `checkpoint_txg`）都不触发；tail 推进不是出路（tail 只在 checkpoint 持久之后前移、残留从未被应用 ⇒ `tail ≤ min(残留 jsn)` 恒成立）；重放幂等也救不了（它是自反的：「**同一条记录**被重放两次与重放一次，结果相同」，残留是**另一条**记录，它点名的那些单元在被丢弃之后可能已被新时间线重分配）。这一格由已定项 8 / 9 / 10 挡：反向链、序号高位带实例代号、链值覆盖实例代号；恢复时物理作废残留槽要求原地覆写，对 zoned 不成立。
+
+**依据**：
+
+- 无实验：「>」会把空洞之后的记录错接到空洞之前，这是序列定义上的反例，不需要量；残留那一格的实验在已定项 8 的依据里。
+
+**欠**：C42（残留记录冒充合法前缀）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:589-609`（整段抄，未转述）**
+
+```markdown
+#### 已定项 23：三个死锁各自怎么破
+
+**定案**：journal 相关的三个死锁，两个落在格式上、事后补不进去：
+
+| # | 环 | 对本工程 |
+|---|---|---|
+| 1 | journal 满 → checkpoint → 发根 → **发根要不要写 journal** | D16（发布语义）那句「不绕过 journal」取读法甲（已定项 25）：发根本身不是一条 journal 追加 |
+| 2 | **COW 独有**：checkpoint → COW 写新节点 → 要分配 → 盘满 → 发不出根 | **保留池治这一条**，`reserve ≥ ckpt_cost` 即可（已定项 24）。⚠️ **D22（单元原子性怎么合成） 的 K 加重它**：盘快满时最该救命的空间正是被 K 扣住的 ⇒ **K 必须是运行时策略，不能是格式常量** |
+| 3 | 单条操作大于环 | 需要等价的几何不变量：**任一操作的最坏 journal 占用 ≤ 环大小 / F，F ≥ 2**（[invariants.md](../invariants.md) I-8.1（环几何够大）），mkfs 时算、mount 时校验 |
+
+- **死锁 3 推出一条依赖关系**：**D8（核心索引结构） 的意图分批机制不是「删大文件的便利设施」，它是 journal 满死锁的必要条件之一**——算不下的操作必须能拆成若干个各自合法的事务。
+
+**射程**：管这三个环怎么断；保留池与准入的分治在已定项 24，读法甲在已定项 25，环几何的具体取值在已定项 18 / 19。I-8.1（环几何够大） 的「占用」是空间量纲，允许一个事务跨多条记录（已定项 7）。⚠️ I-8.1（环几何够大） 的 checker 未实现。死锁 2 是 COW 独有的：原地写的 jbd2 / XFS 回家不需要新空间，没有这个环。
+
+**依据**：
+
+- E23（journal 几何）：定长环有死锁 3、要几何不变量，环太小时强制 checkpoint 的次数断崖式上升；链式没有死锁 3，但每个 journal 块都要向分配器要块、进入死锁 2 的环。
+- E19（defer 窗口下的假性 ENOSPC）：保留池恰等于一次 checkpoint 的开销就把 checkpoint 卡死打到 0——死锁 2 由保留池断开。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:610-634`（整段抄，未转述）**
+
+```markdown
+#### 已定项 24：死锁 2 与假性 ENOSPC 是两种故障，要分治
+
+**定案**：
+
+| 故障 | 谁治得了 |
+|---|---|
+| **checkpoint 卡死**（D23（journal 的角色与格式）死锁 2） | **保留池**，且 `reserve ≥ ckpt_cost` 就够；本工程的 ckpt_cost 按 D28（挂载期承诺量） 已定项 4 现算（各记录树高之和 + 记账节点），不设常数 |
+| **假性 ENOSPC** | **只有准入**。保留池反而加重它 |
+
+- **机制**：保留池是给 checkpoint 开的一道地板，对**普通分配**是纯税——前提是保留池已经大到不卡死；前提之外符号是反的，卡死之后空间根本不回收，小保留池反而拒绝得更多。而假性 ENOSPC 的成因是「defer 窗口与根环 K 扣住的量超过剩余空间」，**那不在保留池的射程内**。
+- **假性 ENOSPC 的破法是一条可计算的准入规则**：
+
+  > **剩余空间必须 > 每 checkpoint 搅动量 × (延迟代数 + 1) + 一次 checkpoint 的开销**
+
+  ⇒ 不许把盘填到 `容量 − 搅动量 × (延迟+1) − checkpoint 开销` 以上。这与 `.claude/rules/fs-design.md`「准入控制要在进门前先算最坏情况」同构——**「最坏情况」里必须含 defer 窗口与 K 扣住的那一块。**
+
+**射程**：保留池怎么进准入不等式、算不算挂载期承诺量归 D28（挂载期承诺量） 已定项 4，准入不等式的权威形式在 D28（挂载期承诺量） 已定项 1。⚠️ **搅动量在真实负载里是变量**，建模时当常数；怎么估它是真机压测那一半的问题。
+
+**依据**：
+
+- E19（defer 窗口下的假性 ENOSPC）：预留恰等于一次 checkpoint 的开销就把卡死打到 0；再加大预留只让假性 ENOSPC 按固定步长上涨；那条准入规则的预测与实测逐格一致。
+- E25（环与链各要多大保留池）：「保留池对普通分配是纯税」只在保留池大到不卡死时成立，卡死区间里小保留池反而拒绝得更多。
+
+**欠**：C83（提交固定点没人回答）。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:635-657`（整段抄，未转述）**
+
+```markdown
+#### 已定项 25：D16（发布语义）「不绕过 journal」取读法甲
+
+**定案**：D16（发布语义）那句
+
+> 「没有任何操作可以绕过 journal 直接发根。」
+
+**取读法甲**：
+
+| 读法 | 含义 | 结果 |
+|---|---|---|
+| **甲（采用）** | 任何最终反映到根里的**语义效果**必须先经由 journal；**发根这个动作本身不是一条 journal 追加** | 断开死锁 1 |
+| 乙（字面） | 发根也要走 journal ⇒ 发根要追加记录 ⇒ journal 满时发不出根 | **环闭合，死锁** |
+
+⇒ 它与 D22（单元原子性怎么合成） 兼容：**根环是 journal 之外的固定 K 槽，发根 = 覆写根环的一个槽，不是追加。** checkpoint 不是「操作」，是 journal 机制本身的一部分；普通用户操作仍然只能进 journal。
+
+**射程**：只管 D16（发布语义）那一句怎么读；发布的其余语义归 D16（发布语义）。
+
+**依据**：
+
+- 无实验：这是一句措辞的读法裁定，两种读法里一种直接闭合死锁环，没有可量的量；jbd2 / XFS 的破法（释放空间的路径消耗零日志空间）与读法甲相容，是线索，在变更史。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:658-674`（整段抄，未转述）**
+
+```markdown
+#### 已定项 26：记录头的两条解析纪律
+
+**定案**：
+
+1. **校验和覆盖的字节范围必须是显式的盘上常量，绝不能由语言的 `sizeof(struct)` 推出。** 独立解析器不会碰巧复制同一个 `sizeof`，这正是 checker 能抓、单一实现抓不住的错误类型。
+2. **记录自述长度必须先做边界检查，再用于校验和计算。**
+
+反向链那一条（让记录核对器能用与正向扫描完全不同的遍历复核同一个前缀边界）是已定项 8。
+
+**射程**：管解析 journal 记录头的次序与常量来源；覆盖范围本身（整条 `[0, 4096)`）在已定项 13；已定项 1 的 B 条（自述长度，先边界检查再算校验和）就是第 2 条。
+
+**依据**：
+
+- 无实验：两条都是从现役实现的缺陷现查出来的纪律（XFS 因为用了 `sizeof`，i386 与其他架构算出不同 CRC，至今背着 `XLOG_REC_SIZE` / `XLOG_REC_SIZE_OTHER` 两个常量和两遍校验的兼容疤；ZFS 的 ZILOG2 从块内读 `zc_nused` 决定校验范围，读之前先 `if (size < nused) return ECKSUM`），约束的是解析次序与常量来源，没有可量的量。
+
+**欠**：无。
+
+```
+
+**出处 `.claude/kb/decisions/13-验证路线.md:6-24`（整段抄，未转述）**
+
+```markdown
+
+| # | 分项 | 定案 |
+|---|---|---|
+| 1 | **crash refinement 先验哪一块** | 先验「一次发布 + 一次崩溃 + 一次恢复」这个封闭单元，第一个里程碑是任一 `jsn` 连续前缀不切开发布；挂载透明另立第四条性质；原候选 I-6.5（nonce 水位单调） 撤下 **状态：已定。** |
+| 2 | **事务层承不承诺串行提交** | 先串行，越过交点再开并行；将来并行提交时记录按事务号顺序追加 **状态：已定。** |
+| 3 | **自写参照实现（RefFS 形态）做到什么程度** | 做到极致取语义级：只在内存里按 POSIX 操作走，自己定义持久与崩溃后允许的状态，没有盘上格式；照 kb 另起、单独一个包、只收白名单输入 **状态：已定。** |
+| 4 | **崩溃点重放的崩溃状态集合怎么定义** | 写流按设备切段，段里每块有写的盘都被自己的屏障或 FUA 放行才关段；段内每次整写各取几态、任意组合，原地覆写多一态「新旧都读不出」；没持久放旧字节且真生成镜像；双写按设备各算 **状态：已定。** |
+| 5 | **checker 与被测实现允许共享什么** | 只共享一份从 kb 生成的常量模块，其余各写一份；判定宽度由 checker 自己探测再与系统配置比对，探不到报「声明值，未探测」 **状态：已定。** |
+| 6 | **三个互相独立的 oracle** | 内存模型对拍、独立解析器 + checker、独立规约执行器三个 oracle 各判一样；独立性要靠「三 oracle 合谋测试」验证，不许自称 **状态：已定。** |
+| 7 | **O2（独立解析器 + checker） 判什么** | O2（独立解析器 + checker） 的定义域是单个镜像，只判集合成员；需要第二个输入的检查归记录核对器（入参含枚举器给的持久集合），故意不给编号 **状态：已定。** |
+| 8 | **自研的两样** | Merkle 根链差分（相邻两代根递归比较，指针没变处不下钻）与代际增量 scrub（只遍历 birth generation 高于水位的块） **状态：已定。** |
+| 9 | **崩溃点重放怎么分层** | 三层都精确全量，枚举不完靠精确剪枝，一时跑不了的节点标 ignore 慢慢开；里程碑收尾与动了崩溃点重放或判器的那批提交前弹窗请用户跑全量档，红或不跑照样提交、记未结；先保失败可复现 **状态：已定。** |
+| 10 | **真正必须精确覆盖的 N 是什么** | 提交协议结构的等价类数，不是布局套数；落地是一个封闭的提交步骤枚举加穷尽 match **状态：已定。** |
+| 11 | **ignore 的节点什么时候开** | 否决按欠账轮转的账本；留下三条改管开的时机：确定性的覆盖记录、`T1`（层 1 挂钟预算） 是输入、判别力与覆盖分开检查 **状态：已定。** |
+| 12 | **冲突 1：checker 即规范与校验路径不许共享工具** | checker 做遍历与扫描两个方向，对同一条不变量各自独立判，共享的只有格式解析 **状态：已定。** |
+| 13 | **冲突 2：refinement 的 spec 与对拍的 model** | spec 与 model 在表述层面就写得不同；同源性要观测，≥ 5 次不一致而判 spec 错 0 次就合并、预算移给穷举 **状态：已定。** |
+| 14 | **与其他决策的连锁** | 哈希与 AEAD 在形式验证里只能当 uninterpreted function；日志结构三层绑架符号执行；checker 不必解析消息语义 **状态：已定。** |
+| 15 | **验证代码分两档** | harness 档（`singlefs-harness`）是单元与集成测试、随时跑；checker 档（`singlefs-checker-tier`）默认只在提交时跑快档，全量由用户要求时跑 **状态：已定。** |
+
+```
+
+**出处 `.claude/kb/decisions/08-核心索引结构.md:6-27`（整段抄，未转述）**
+
+```markdown
+
+**D8（核心索引结构）的分项只有一套编号**，不重排。
+
+| # | 分项 | 定案 |
+|---|---|---|
+| 1 | **记账怎么表达成幂等完整值** | 记账条目一律是某个统计量在某一代的完整值、整格覆盖，不用增量 Δ，接受 key 数量上升 **状态：已定。** |
+| 2 | **节点大小取多少** | 16 KiB：mkfs 写进系统配置，实现按常量走，不按设备特性算 **状态：已定。** |
+| 3 | **key 布局** | key = `(locality_id, inode, offset)`，`locality_id` 创建时从父目录继承、改名时故意不更新 **状态：已定。** |
+| 4 | **节点大小的上限由什么定** | 上限由恢复时间定，不由可恢复性定；取值在「重扫代价 ≤ 目标线」下取查找代价最低的那档，靠实验 **状态：已定。** |
+| 5 | **whiteout 删除** | 接受墓碑；可能修改无界数量 extent 的操作先写意图再分批推进；第一版 unlink 的意图住 `deleted_inodes`（已定项 16） **状态：已定。** |
+| 6 | **inode 记录的盘上字段表** | inode 树的叶是码 3 打包记录单元（类型 2，一叶 233 条定长 140 字节记录），内部节点是码 2、条目 120 字节、不留缓冲；已发布的 (inode 号, 对象出生代) 不复用 **状态：已定。** |
+| 7 | **write buffer 条目自带的 `seq`** | 宽 4 字节、住 value 不住 key，射程覆盖记账 / 反向索引 / LRU 三棵树，`T_dirty` 的上界因此是挂载时判定 **状态：已定。** |
+| 8 | **树表条目：树 ID 的分配与编码、树的种类、根指针以外还有什么** | 条目合计 200 字节、树 ID 8 打头；快照进树表；树 ID 水位取根环全部根记录该字段的 max；未知 flags 位拒收该条目 **状态：已定。** |
+| 9 | **树的种类码的登记表** | 码 0 无、1..8 是八棵既有的树、9..12 是 deleted_inodes、墓碑树、谱系树、logged_ops；新树只追加不重用码 **状态：已定。** |
+| 10 | **第一版记账走不走 write buffer 前端；`seq` 的取值规则** | 第一版记账直落记账树叶、不走前端；`seq` = 同一个 key 在一次发布里被写进树的第几次，从 1 起，第一版恒 1 **状态：已定。** |
+| 11 | **码 2 索引节点的载荷布局、种类到条目宽的表、key 比较序** | 码 2 头自描述、基础 86 字节，条目区从含预留位的头末尾起定宽连续排列，key 是条目的前 key 宽 个字节 **状态：已定。** |
+| 12 | **write buffer 前端与节点消息缓冲区的衔接** | 一棵树只准一级：走前端的三棵树 ε 恒 0、写一律进前端、发布前排空到叶；第一版两级都不开 **状态：已定。** |
+| 13 | **索引树更新做不做状态折叠** | 同一次发布里同一个 key 改了多次时落叶只做一次、直接写最终态 E，中间态不写进任何节点，E 按到达序认 **状态：已定。** |
+| 14 | **索引的总体结构** | 一套 btree 实现 + 多个独立 keyspace + 两个前端（write buffer、key cache）；派生态的分配记录树与 extent 树可以另起按 key 空间寻址的结构 **状态：已定。** |
+| 15 | **write buffer 条目的三条硬要求** | 节点缓存必须抗扫描；条目必须是幂等完整值、不许是增量 Δ；条目必须自带序号 `seq`，这是格式要求 **状态：已定。** |
+| 16 | **第一版 unlink 怎么删** | 第一版 unlink：只立 `deleted_inodes`，从尾部按 144 单元分批，挂载里续做到空 **状态：已定。** |
+
+```
+
+**出处 `.claude/kb/decisions/16-发布语义.md:6-26`（整段抄，未转述）**
+
+```markdown
+
+| # | 分项 | 定案 |
+|---|---|---|
+| 1 | **defer 窗口取多大** | 按盘回退下界的收严形态、按状态数读：候选集保留最近 4 个可退到的不同状态（去重、以根环装得下为界），可再分配 ⟺ 已释放 ∧ 释放代 ≤ max(F_生效, 窗口里最旧有效根)；F 另记进系统配置 **状态：已定。** |
+| 2 | **checkpoint 的触发判据** | 时间与脏数据量两者取先到：`触发 ⟺ (now − 上次 checkpoint 的时刻 ≥ T_time) ∨ (脏字节数 ≥ T_dirty)` **状态：已定。** |
+| 3 | **journal 在 D15（格式冻结政策） 的冻结分层里记第几层** | 不进四层，立成四层之外的第三个独立冻结组件；新记录格式走记录类型 + 系统配置 log-incompat 位 **状态：已定。** |
+| 4 | **记录核对器那第二份 replay 实现** | 一次发布整体施加或整体不施加；第二份实现停在句法层（前缀判定 + 择根 + 续做），在合谋测试里是第四个判决器 **状态：已定。** |
+| 5 | **`T_time` 与 `T_dirty` 取多少，丢失窗口的口径** | `T_time` = 5 s、越界只警告；`T_dirty` = 2 GiB、夹取成 min(字段, 环长 ÷ F)；崩溃最多丢 T_time + N_switch × (T_retry + T_redo) **状态：已定。** |
+| 6 | **发布计数器** | 每次发布 checkpoint_txg 加一，fsync 触发的也是发布；根槽轮转键、记账的代、重放水位是同一个计数 **状态：已定。** |
+| 7 | **发布的持久顺序** | 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽 → 屏障；重放施加前必须逐项验证点名单元 **状态：已定。** |
+| 8 | **新实例要不要先让本实例的根落到两块盘上** | 取戊：根覆盖两块盘之前不让 fsync 返回，连推空发布至多 R = 3 次 **状态：已定。** |
+| 9 | **一次空发布写不写单元** | 记账树存在时就写：空发布也是发布，按 D5（快照 / 空间记账机制） 已定项 2 重写记账行与连带的四样 **状态：已定。** |
+| 10 | **发布粒度** | 攒够一批脏节点（或到时间）再发布一次根，不是每个事务发一次；发布频率只由 D16（发布语义） 定 **状态：已定。** |
+| 11 | **能不能绕过 journal 直接发根** | 不能：所有结构、所有操作先进同一个 journal、共用同一个 checkpoint 节奏，fsync 只是提前触发一次发布 **状态：已定。** |
+| 12 | **中间状态的合法性语义** | D8（核心索引结构）「中间状态必须每一个都是合法的文件系统状态」改写成「根 + journal 任意前缀，replay 之后合法」 **状态：已定。** |
+| 13 | **这份 journal replay 归谁** | 归记录核对器，不归 O2（独立解析器 + checker）；它是第二次实现 replay，是 D16（发布语义） 最贵的一笔 **状态：已定。** |
+| 14 | **快照发布点的位置** | 与 checkpoint 边界对齐，钉在这个 checkpoint 全部数据变更之后；同窗两个快照用 `(txg, 快照 id)` 打破并列 **状态：已定。** |
+| 15 | **checkpoint C 中产生的释放什么时候进可分配集合** | C 被发布之前不得进入；两条理由，第二条按 journal 位置说，比 checkpoint 边界更严 **状态：已定。** |
+| 16 | **checkpoint 与消息缓冲的摊销窗口分界** | 两者买同一样东西，差别只在窗口住内存还是住盘；E7（离线索引 harness） 的对照组钉成「有 checkpoint、无消息缓冲」 **状态：已定。** |
+| 17 | **fsync 报错之后调用方能假设什么** | 报错之后这次发布可能已成也可能未成，不许假设可复用旧内存态重试；成没成由调用方自己读现行根判定 **状态：已定。** |
+
+```
+
+**出处 `.claude/kb/decisions/23-journal的角色与格式.md:15-44`（整段抄，未转述）**
+
+```markdown
+
+| # | 分项 | 定案 |
+|---|---|---|
+| 1 | **journal 的角色本身** | 取甲：每次 fsync 写脏叶 + 全部祖先 + 根槽 + 一条记录，祖先不延后；轴一与轴二不正交 **状态：已定。** |
+| 2 | **journal 是定长环还是链式** | 取定长环；决定性理由是链式把死锁 3 的判据从静态换成动态 **状态：已定。** |
+| 3 | **tail 住哪、谁是权威、什么时候持久** | 住系统配置槽，≥2 槽轮换，随每次发布写一次；恢复不许先信 tail，重放必须幂等，恢复救不了几何 **状态：已定。** |
+| 4 | **记录头能不能约束在单个原子单元内** | 能；头 487 字节 = 十个字段 78 + 四笔增量 21（事务边界 9、本次发布内序号 4、反向链 4、载荷校验和 4）+ 新根段 364 + fsid 8 + MAC 16 **状态：已定。** |
+| 5 | **O2（独立解析器 + checker） 到底是什么** | 一元谓词；否掉逻辑意图日志的第二条理由改写成第一条的封堵；反向判据的主语是记录核对器 **状态：已定。** |
+| 6 | **目标负载优先级** | 移出 journal 这条线，见 D25（目标负载优先级）；它不阻塞 journal 的任何一项 **状态：已定。** |
+| 7 | **一个事务恰不恰好产生一条 journal 记录** | 可以跨多条，记录头带事务号与提交标记；重放丢掉提交标记没出现的尾巴 **状态：已定。** |
+| 8 | **记录里分辨时间线的字段** | 记录头带一条反向链（前一条记录的 hash），宽 32 位 **状态：已定。** |
+| 9 | **序号与实例代号的位宽划分** | jsn = 实例代号 32 位 + 计数器 48 位，两个字段共 10 字节；代号不许回滚 **状态：已定。** |
+| 10 | **`previous_hash` 覆盖哪些字段** | 覆盖前一条记录的整个记录头，其中含 jsn，因而含实例代号 **状态：已定。** |
+| 11 | **反向链的 hash 算法** | 取完整 32 位 CRC32C，与密文校验和同一个函数 **状态：已定。** |
+| 12 | **记录尺寸** | 4 KiB 定长，写进系统配置 **状态：已定。** |
+| 13 | **载荷的完整性靠什么** | `header_csum` 罩整条记录 [0, 4096)；`payload_csum` 保留、罩点名项数组；任一不过即该记录无效 **状态：已定。** |
+| 14 | **重放的下界、管理员回退、失败处置与实例切换** | 只施加 (实例代号, checkpoint_txg) 严格大于所选根的记录；前缀口径五条；切换按一次恢复做，管理员回退是挂着时的一次向前发布 **状态：已定。** |
+| 15 | **崩在记录持久之后、根槽持久之前，恢复施加什么** | 由记录重建那次发布的根：记录头带 364 字节新根段，施加一条记录 = 换掉所选根的七个字段；一次发布的每条记录带同一份 **状态：已定。** |
+| 16 | **mkfs 与第一次可写挂载的实例代号** | mkfs 写 0（不是有效实例），第一次可写挂载取 1、写进每一份系统配置并过一道完成的屏障之后才动单元 **状态：已定。** |
+| 17 | **点名项 56 字节的字段表** | 一项一个单元：位置条目 14 × 2 + 类型 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1 **状态：已定。** |
+| 18 | **在飞记录数上限与 tail 的编码** | 上限 = 环槽数 ÷ F，含义是一次恢复重放的前缀最多 N 条；坏校验和一律断链即止；tail 存计数器 **状态：已定。** |
+| 19 | **空发布记录、`previous_hash`、环长** | 事务号 0 留给空发布；链按本实例逻辑前一条算；环长是 mkfs 参数，默认 768 MiB、≤ 容量 ÷ 4 **状态：已定。** |
+| 20 | **记录承载什么、分配与记录谁先** | 记录承载指针层的目标态，不是逻辑意图、也不是全量物理重做；分配先于 journal **状态：已定。** |
+| 21 | **记录头的两个计数字段** | jsn 每条记录全局单调、前缀判定靠它；checkpoint_txg 每个 checkpoint 一个；两者不可合并 **状态：已定。** |
+| 22 | **前缀判定** | `jsn == expected`，不等即止；另有一个显式的在飞记录数上限 **状态：已定。** |
+| 23 | **三个死锁各自怎么破** | 死锁 1 靠读法甲，死锁 2 靠保留池，死锁 3 靠几何不变量：最坏占用 ≤ 环大小 / F，F ≥ 2 **状态：已定。** |
+| 24 | **死锁 2 与假性 ENOSPC 是两种故障** | 卡死靠保留池，reserve ≥ ckpt_cost 就够；假性 ENOSPC 只有准入治得了，保留池反而加重它 **状态：已定。** |
+| 25 | **D16（发布语义）「不绕过 journal」那句取哪个读法** | 取读法甲：语义效果必须经 journal，发根不是一条 journal 追加，是覆写根环的一个槽 **状态：已定。** |
+| 26 | **记录头的两条解析纪律** | 校验和覆盖范围是显式盘上常量，不由 sizeof 推；自述长度先做边界检查再用于校验和 **状态：已定。** |
+
+```

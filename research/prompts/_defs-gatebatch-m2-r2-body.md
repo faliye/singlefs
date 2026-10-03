@@ -4,7 +4,7 @@
 
 ## 一、这一轮要判什么
 
-第一轮判决 `research/prompts/defs-gatebatch-m2-r1-main-verification.md` 第三节给了改法 Y1–Y8（被攻过零轮）。改法由通用 agent 做完交回（规格 `/tmp/claude-1000/gate-batch-m2-r1-fixes/spec.md`），被判的改动是它交回时的 diff `/tmp/claude-1000/gate-batch-m2-r1-fixes/my-changes.diff`（1707 行、6 个文件：`.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`；sha256 `87c52ef8912779cdb388d740327e54e42079d247bfff6d9f1f9b235a944c0f24`，材料员原样放进附录二）。这一轮只攻 Y1–Y8 的改后字面与代码，攻击面不重复第一轮（第一轮攻过：54 号范围那一问、判法进不进指纹、排除法漏认与减得太少、构建输入、闸的绕法与误拒、文字矛盾）。
+第一轮判决 `research/prompts/defs-gatebatch-m2-r1-main-verification.md` 第三节给了改法 Y1–Y8（被攻过零轮）。改法由通用 agent 做完交回（规格 `/tmp/claude-1000/gate-batch-m2-r1-fixes/spec.md`），被判的改动是它交回时的 diff `/tmp/claude-1000/gate-batch-m2-r1-fixes/my-changes.diff`（1707 行、6 个文件：`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`research/scripts/admission.py`、`.claude/hooks/lib_heavy_tests.py`、`.claude/hooks/heavy-test-guard.sh`、`.claude/rules/implementation-workflow.md`；sha256 `87c52ef8912779cdb388d740327e54e42079d247bfff6d9f1f9b235a944c0f24`，材料员原样放进附录二）。这一轮只攻 Y1–Y8 的改后字面与代码，攻击面不重复第一轮（第一轮攻过：54 号范围那一问、判法进不进指纹、排除法漏认与减得太少、构建输入、闸的绕法与误拒、文字矛盾）。
 
 | 格 | 被攻的 | 问题 |
 |---|---|---|

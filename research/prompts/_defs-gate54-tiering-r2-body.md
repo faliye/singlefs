@@ -6,7 +6,7 @@
 
 第一轮判决 `research/prompts/defs-gate54-tiering-r1-main-verification.md`：K1 照留；K2、K3 站不住，改。改法 f2、f3、f4a、f5 是第一轮攻方在自己的模型上提、量过的，**被攻过零轮**；实现员落进真文件时又在 S3a 那一格换了删标记的时机（第二、三两轮报告 `research/prompts/defs-gate54-tiering-implementer/r2-report.md`、`r3-report.md`）。这一轮攻的是**改后的形态**，并派一条辩方腿复核第一轮的判决。
 
-被判的文件（门禁 72 号按路径点名）：`.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`.claude/main-agent.md`（「暂存之后、提交之前跑门禁」那一行）、`.claude/agents/crash-verifier.md`（「做什么」第 1、2 条）、`.claude/agents/experiment-runner.md`（写范围一节与第 2 步）、`.claude/hooks/agent-write-scope.tsv`、`.claude/rules/implementation-workflow.md`（「复用上一次全量门禁的判定」一节与「门禁管哪一半」一段）、`README.md`（门禁那一段）。
+被判的文件（门禁 72 号按路径点名）：`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`、`.claude/main-agent.md`（「暂存之后、提交之前跑门禁」那一行）、`.claude/agents/crash-verifier.md`（「做什么」第 1、2 条）、`.claude/agents/experiment-runner.md`（写范围一节与第 2 步）、`.claude/hooks/agent-write-scope.tsv`、`.claude/rules/implementation-workflow.md`（「复用上一次全量门禁的判定」一节与「门禁管哪一半」一段）、`README.md`（门禁那一段）。
 
 | 格 | 改后的形态 | 在哪 |
 |---|---|---|

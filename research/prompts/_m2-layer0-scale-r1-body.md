@@ -13,7 +13,7 @@
 | L1 | **甲的前提**：一段写里，凡不是原地覆盖的写（COW 新写的单元、分配记录、映射条目等），它落的块不被任何「恢复可能选中的版本」引用、也不被 journal 重放读到 ⇒ 这一段里这些写的任意子集落盘，恢复出的可见状态与「这些写一个都没落盘」逐项相同；只有原地覆盖的写（根槽、系统配置槽、journal 环里的记录槽）要逐个子集枚举 | 前提对第二条流（今天的形状，以及加了向前回退与卸载之后的形状）每一段成不成立；有没有一种可达历史（复用、向前回退的复活、被抛弃时间线与影子账、抬 F、卸载那一串）让一次 COW 写落在某个仍可能被选中的版本引用的块上；「恢复可能选中的版本」的集合按哪条条款取（D16 已定项 1 的 F_生效、D23 已定项 14 的候选集与择根） |
 | L2 | **甲的前提怎么判红**：约简不能只靠论证，枚举器在每一段开跑前现判那一段的每一次写落不落在「可能被选中的版本」引用的块上，落上就这一段退回全量子集枚举并记一行 | 判法落在 `crates/singlefs-harness/src/crash.rs` 的哪一步；判它用的「引用集合」从哪来、会不会与被测实现共用同一段代码（`.claude/rules/fs-design.md`「审计与被审计用同一段代码」）；拿什么变异证明这道现判会红 |
 | L3 | **甲漏不漏**：约简之后，今天层 0 抓得到的每一条变异（`crates/mutations.tsv` 里点名层 0 测试的那几行）还抓不抓得到 | 哪一类错只在「COW 写的部分子集落盘」这种状态上露出来（例如一个本不该 COW、写成了原地覆盖的写；一个 COW 写落到了还在用的块上）；这类错在约简之下由谁抓——L2 的现判，还是别的 |
-| L4 | **乙：本机复用的粒度** | 按流复用（每条流的输入清单与全绿标记各一格）还是按段复用；今天 54 号 `--full` 按整批输入哈希记一格全绿标记（`.claude/gate.d/54-layer0-replay.sh` 的 `write_layer0_input_manifest` 与 `research/scripts/admission.py manifest`），拆成按流之后每条流的输入是哪几份文件；拆细会不会让一次真改动被跳过（`.claude/rules/implementation-workflow.md`「复用上一次全量门禁的判定」：判据是那一道读的输入变没变） |
+| L4 | **乙：本机复用的粒度** | 按流复用（每条流的输入清单与全绿标记各一格）还是按段复用；今天 54 号 `--full` 按整批输入哈希记一格全绿标记（`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `write_layer0_input_manifest` 与 `research/scripts/admission.py manifest`），拆成按流之后每条流的输入是哪几份文件；拆细会不会让一次真改动被跳过（`.claude/rules/implementation-workflow.md`「复用上一次全量门禁的判定」：判据是那一道读的输入变没变） |
 | L5 | **代价** | 甲之下第二条流（今天的段序列）剩多少个状态、闭式怎么算；本机 32 线程要跑多久（推的写明推的）；乙之下一次只改 checker、只改一条流用到的代码时要重跑哪几条流 |
 | L6 | **层 0 的其余用例**：`crates/singlefs-harness/tests/` 下名字带 `layer0` 的 9 份用例，54 号 `--full` 跑哪几份、各多少个状态 | 甲、乙对它们各起不起作用；有没有哪一份今天就是全量里最慢的 |
 | L7 | **断点续跑**（用户 2026-09-26：「层 0 第二条流 可以32核跑  但是跑的时候注意点 不要中断了 要可以中断续接 不然要中断了就很惨」）：今天的枚举只按片打 `LAYER0_PROGRESS` 进度行（`crash.rs` 的 `enumerate_layer0_in_state_slices`），中途被杀就从头跑，54 号 `--full` 也没有续跑。候选形态：切片按状态序号区间定、不随线程数变；每跑完一片把这一片的计数与第一处违例追加进一份进度文件并 fsync，进度文件按输入哈希与切片方案分格、放 `${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}` 下；重起时头部对得上就跳过已完成的片，按片序合并 | 续跑之后的计数行与一口气跑完的逐字节相同吗（拿什么用例钉住：中途杀掉、续跑、比对）；进度文件写到一半被杀（末行半截）怎么认；输入变了、切片方案变了、线程数变了各怎么办；续跑会不会让一片被数两次或漏数（跑完的状态数必须等于闭式）；强制从头跑的开关与 54 号怎么报「这一次是续跑的」 |
@@ -26,7 +26,7 @@
 - 切段：`crates/singlefs-harness/src/segments.rs:94` `split_into_segments`（屏障与 FUA 写切段，FUA 写关掉它所在的那一段，D13（验证路线） 已定项 4）；闭式 `segments.rs:147` `closed_form_state_count`，另有 `crates/singlefs-harness/src/crash.rs:524` 同名一份。
 - 枚举：`crash.rs:1354` `enumerate_layer0_selecting`、`:1728` `enumerate_layer0_in_state_slices`（按区间切片多线程）、`:1870` `enumerate_layer0`。
 - 两条流：第一条流 `crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs`；第二条流（固定脚本）`crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs`。另有 7 份名字带 `layer0` 的用例（L6）。
-- 全绿标记：`.claude/gate.d/54-layer0-replay.sh` 文件头第 2–34 行（快档、全量、按输入哈希分格的全绿标记），输入哈希由 `research/scripts/admission.py manifest` 算。
+- 全绿标记：`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头第 2–34 行（快档、全量、按输入哈希分格的全绿标记），输入哈希由 `research/scripts/admission.py manifest` 算。
 - `crates/` 的层 0 枚举与切段里没有约简：`grep -rn 'reduc\|约简' crates/singlefs-harness/src/` 照冻结副本命中 8 行，全在 `src/bin/e158_root_choice_repair.rs`（字段名 `skipped_by_the_reduction_rule`，E158 择根修复那条线的另一回事），`segments.rs`、`crash.rs` 与名字带 `layer0` 的用例零命中（材料员照冻结副本现跑，原样输出在附录二之三；主 agent 按它改了这一句）。
 
 ## 三、条款（材料员整段抄进附录）

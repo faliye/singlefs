@@ -32,7 +32,7 @@
 
 ### G1 层 0 全量归主 agent
 
-要答：主 agent 照 main-agent.md 那一行写出的命令（带 `SINGLEFS_HEAVY_TESTS=commit`、经 `run-with-memory-cap.sh 16G`、`bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`）会不会被 `heavy-test-guard.sh` 拒或放错类；崩溃验证员、门禁分诊员照改后的定义做，54 号快档核标记时标记从哪来、这批输入没有标记时谁在哪一步补；三份文件（main-agent、crash-verifier、gate-triage）与 implementation-workflow.md、54 号文件头对同一件事的说法还有没有不一致。
+要答：主 agent 照 main-agent.md 那一行写出的命令（带 `SINGLEFS_HEAVY_TESTS=commit`、经 `run-with-memory-cap.sh 16G`、`bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>`）会不会被 `heavy-test-guard.sh` 拒或放错类；崩溃验证员、门禁分诊员照改后的定义做，54 号快档核标记时标记从哪来、这批输入没有标记时谁在哪一步补；三份文件（main-agent、crash-verifier、gate-triage）与 implementation-workflow.md、54 号文件头对同一件事的说法还有没有不一致。
 
 ### G2 内存包装与重型清单
 

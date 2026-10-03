@@ -38,7 +38,7 @@
 
 ### G1 层 0 全量归主 agent
 
-要答：主 agent 照 main-agent.md 那一行写出的命令（带 `SINGLEFS_HEAVY_TESTS=commit`、经 `run-with-memory-cap.sh 16G`、`bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`）会不会被 `heavy-test-guard.sh` 拒或放错类；崩溃验证员、门禁分诊员照改后的定义做，54 号快档核标记时标记从哪来、这批输入没有标记时谁在哪一步补；三份文件（main-agent、crash-verifier、gate-triage）与 implementation-workflow.md、54 号文件头对同一件事的说法还有没有不一致。
+要答：主 agent 照 main-agent.md 那一行写出的命令（带 `SINGLEFS_HEAVY_TESTS=commit`、经 `run-with-memory-cap.sh 16G`、`bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>`）会不会被 `heavy-test-guard.sh` 拒或放错类；崩溃验证员、门禁分诊员照改后的定义做，54 号快档核标记时标记从哪来、这批输入没有标记时谁在哪一步补；三份文件（main-agent、crash-verifier、gate-triage）与 implementation-workflow.md、54 号文件头对同一件事的说法还有没有不一致。
 
 ### G2 内存包装与重型清单
 
@@ -99,7 +99,7 @@
 | ## 代码轮派腿之前记一份开工快照 | 抄 | G4「要答」整行引用（implementation-workflow.md「代码轮派腿之前记一份开工快照」），且 G4 格描述「sha256sum -c」「倒推副本」都出自这一节 |
 | ## 复用上一次全量门禁的判定：按「那一道读的输入变没变」判，不按「改了哪个目录」判 | 抄 | G1「57 号写明没有复用」一句对应这一节里「没登记在那张表里的阶段（57 号 herd7 就是）没有复用判定」 |
 | ## 重型测试只在提交时跑 | 抄 | G1、G2 两格描述（层 0 全量归主 agent、崩溃验证员只跑 54 快档与 55/57/59、15/74 号按轻阶段）都逐句对应这一节的表与正文 |
-| ## 测试与崩溃检测优先多线程 | 抄 | G1「要答」点名的命令（`bash <根>/.claude/gate.d/54-layer0-replay.sh --full <根>`、主 agent 在 HEAD + 暂存区的 worktree 里跑）出自这一节末段「门禁管哪一半」 |
+| ## 测试与崩溃检测优先多线程 | 抄 | G1「要答」点名的命令（`bash <根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <根>`、主 agent 在 HEAD + 暂存区的 worktree 里跑）出自这一节末段「门禁管哪一半」 |
 
 ### 小节清单：`.claude/rules/three-way-inference.md`（kb-sections.py 全量生成，未经任何过滤）
 
@@ -209,7 +209,7 @@
 ```markdown
 ## 重型测试只在提交时跑
 
-**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与会跑到名字含 `layer0` 的测试二进制的 `cargo test`）、QEMU（55 号、`qemu-system-*`、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`、`herd7`）、`crates` 变异整表（59 号、参数里有 `crates/mutations.tsv` 的 `mutate.sh`）、全量 `cargo test`（`--all`、`--workspace`、在仓根或 `research/` 这两个工作区根上不挑目标裸跑、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152（按里程碑对比六家文件系统的文件性能） 装置（`e152-file-system-benchmark`、`e152-run.sh`）。逐条的判法以 `.claude/hooks/heavy-test-guard.sh` 文件头「重型测试，按类」为准。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑；15、74 号虽然在里面跑 `cargo test`，按轻阶段对待。
+**重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与会跑到名字含 `layer0` 的测试二进制的 `cargo test`）、QEMU（55 号、`qemu-system-*`、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`、`herd7`）、`crates` 变异整表（59 号、参数里有 `crates/mutations.tsv` 的 `mutate.sh`）、全量 `cargo test`（`--all`、`--workspace`、在仓根或 `research/` 这两个工作区根上不挑目标裸跑、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152（按里程碑对比六家文件系统的文件性能） 装置（`e152-file-system-benchmark`、`e152-run.sh`）。逐条的判法以 `.claude/hooks/heavy-test-guard.sh` 文件头「重型测试，按类」为准。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑；15、74 号虽然在里面跑 `cargo test`，按轻阶段对待。
 
 | 场合 | 跑不跑 |
 |---|---|
@@ -243,7 +243,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量由主 agent 在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量由主 agent 在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 

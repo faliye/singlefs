@@ -202,10 +202,10 @@ index 42145e4..51ed117 100755
  self_link_report=$(python3 - "$KB" <<'PY'
  import os, re, sys, glob
  kb = sys.argv[1]
-diff --git a/.claude/gate.d/54-layer0-replay.sh b/.claude/gate.d/54-layer0-replay.sh
+diff --git a/.claude/gate.d/checker-tier-layer0-replay.sh b/.claude/gate.d/checker-tier-layer0-replay.sh
 index 1eed270..931b80a 100755
---- a/.claude/gate.d/54-layer0-replay.sh
-+++ b/.claude/gate.d/54-layer0-replay.sh
+--- a/.claude/gate.d/checker-tier-layer0-replay.sh
++++ b/.claude/gate.d/checker-tier-layer0-replay.sh
 @@ -227,7 +227,8 @@ report_manifest_differences() {
  # print_staged_worktree_full_commands：出路里建「HEAD + 暂存区」worktree、在里面用那棵树里的 54 号跑 --full 的命令。
  # 建法与共享 gate.sh --staged 相同：worktree add --detach HEAD，再 apply --index 暂存区的 diff（diff 为空就不套）。
@@ -214,7 +214,7 @@ index 1eed270..931b80a 100755
 +  echo '                在项目根、暂存之后，把下面三行命令放进同一次 Bash 调用（三行共用 layer0_full_base 这个变量，分开跑它就是空的）：'
 +  echo '                layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
    echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }'
-   echo '                SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
+   echo '                SINGLEFS_HEAVY_TESTS=commit bash research/scripts/run-with-memory-cap.sh 16G bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
  }
 diff --git a/.claude/gate.d/75-decision-experiment-links.sh b/.claude/gate.d/75-decision-experiment-links.sh
 index 44c603c..d3451e4 100755
@@ -275,14 +275,14 @@ index acc83d8..dc6bd51 100755
            "→ 提交之外任务确实要跑的：主 agent 先弹窗问用户，用户同意了才带 `SINGLEFS_HEAVY_TESTS=user-request` 跑；"
            "子 agent 在交回里写明要跑什么、为什么，交主 agent 去问（派发提示里点名要你跑的也一样，写明被这道闸拒了）。")
 @@ -716,10 +716,10 @@ def selftest(hook_dir):
-             ("主 agent export 之后跑 54 号全量", None, "export SINGLEFS_HEAVY_TESTS=commit && bash /tmp/wt/.claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
+             ("主 agent export 之后跑 54 号全量", None, "export SINGLEFS_HEAVY_TESTS=commit && bash /tmp/wt/.claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 0),
              ("主 agent 前缀往包装里传", None, "nice -n 19 env SINGLEFS_HEAVY_TESTS=commit bash research/scripts/capped.sh 8 bash -c 'cargo test --workspace'", 0),
              ("主 agent 跑一个测试目标不是重型", None, "cargo test -p singlefs-core --test core_contract", 0),
--            ("崩溃验证员带前缀跑 54 号全量", crash, commit + "bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
+-            ("崩溃验证员带前缀跑 54 号全量", crash, commit + "bash .claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 0),
 -            ("崩溃验证员带前缀跑层 0 测试目标", crash,
 -             commit + "nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 0),
 -            ("崩溃验证员带前缀直接执行层 0 测试二进制", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G " + layer0_binary, 0),
-+            ("崩溃验证员带前缀跑 54 号全量：层 0 不归它", crash, commit + "bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 2),
++            ("崩溃验证员带前缀跑 54 号全量：层 0 不归它", crash, commit + "bash .claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 2),
 +            ("崩溃验证员带前缀跑层 0 测试目标：层 0 不归它", crash,
 +             commit + "nice -n 19 bash research/scripts/run-with-memory-cap.sh 16G cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 2),
 +            ("崩溃验证员带前缀直接执行层 0 测试二进制：层 0 不归它", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G " + layer0_binary, 2),
@@ -294,9 +294,9 @@ index acc83d8..dc6bd51 100755
              ("主 agent 不经内存包装跑测试目标：这一道不判主 agent", None, "cargo test -p singlefs-core --lib", 0),
              ("崩溃验证员带前缀不经内存包装跑层 0 测试目标", crash, commit + "cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0", 2),
 -            ("崩溃验证员带前缀经内存包装跑 54 号全量", crash,
--             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 0),
+-             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 0),
 +            ("崩溃验证员带前缀经内存包装跑 54 号全量：层 0 不归它", crash,
-+             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/54-layer0-replay.sh --full /tmp/wt", 2),
++             commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/checker-tier-layer0-replay.sh --full /tmp/wt", 2),
              ("崩溃验证员带前缀经内存包装跑 55 号", crash, commit + "bash research/scripts/run-with-memory-cap.sh 16G bash .claude/gate.d/55-qemu-first-transaction.sh", 0),
              ("崩溃验证员带前缀经内存包装跑 57 号", crash, commit + "bash research/scripts/run-with-memory-cap.sh 8G bash .claude/gate.d/57-lkmm.sh", 0),
              ("门禁分诊带前缀经内存包装跑 gate.sh --staged", triage, commit + "bash research/scripts/run-with-memory-cap.sh 24G bash .claude/scripts/gate.sh --staged", 0),
@@ -353,8 +353,8 @@ index cdb1486..4976215 100644
 +| 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 上一行的三方（代码轮）→ 提交时照「暂存之后、提交之前跑门禁」那一行：层 0 全量主 agent 跑，`crash-verifier` 跑 QEMU、herd7、crates 变异表 |
  | 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧 `implementation-writer`（输入给分诊报告），`research/` 那侧 `experiment-designer` 写重跑登记 → `experiment-runner` |
  | 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 下一行 |
--| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/54-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行（建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `gate.sh --staged` 并分诊（`gate.sh` 里 54 号跑快档并核全绿标记，55、59 照 `stage-inputs.tsv` 复用上一次全绿判定，57 号没有复用、每次现跑）；用户要求时两处都换成 `=user-request` |
-+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/54-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行命令，三行放进同一次 Bash 调用（它们共用一个 shell 变量；建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯；全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊：54、55、59、74 号只在这一趟里能复用上一次整轮全绿的判定，判据在 `research/scripts/stage-must-run.sh` 文件头；要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑；用户要求时各处都换成 `=user-request` |
+-| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行（建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `gate.sh --staged` 并分诊（`gate.sh` 里 54 号跑快档并核全绿标记，55、59 照 `stage-inputs.tsv` 复用上一次全绿判定，57 号没有复用、每次现跑）；用户要求时两处都换成 `=user-request` |
++| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入、54 号脚本本身或工具链（`cargo -V`、`rustc -V`；这三样都进全绿标记的键），主 agent 自己在后台跑 `.claude/gate.d/checker-tier-layer0-replay.sh` 里 `print_staged_worktree_full_commands` 打印的那三行命令，三行放进同一次 Bash 调用（它们共用一个 shell 变量；建 HEAD + 暂存区的 worktree、带 `SINGLEFS_HEAVY_TESTS=commit` 经内存包装跑那棵树里的 `--full`、删 worktree；命令只在那一处写，不在这里抄）（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记），看门狗用 `--processes` 盯；全量判绿、全绿标记写好之后才往下，不然整轮门禁里的 54 号必红 → 派 `crash-verifier` 跑 55、57、59，命令带 `SINGLEFS_HEAVY_TESTS=commit` → `gate-triage` 带 `SINGLEFS_HEAVY_TESTS=commit` 跑 `research/scripts/gate-staged.sh`（它跑 `gate.sh --staged`，整轮全绿才前移 `refs/sop/staged-green`）并分诊：54、55、59、74 号只在这一趟里能复用上一次整轮全绿的判定，判据在 `research/scripts/stage-must-run.sh` 文件头；要跑时 54 号跑快档并核全绿标记，57 号没有复用、每次现跑；用户要求时各处都换成 `=user-request` |
  | 改了一个数或格式常量、撤回一条结论、新立一条判据 | `sweep`（四种活与各自要给的输入见它的定义） |
  | 定案之后写回 kb | `kb-scribe`（主 agent 给逐条规格）；规格动了某条分项的「**依据**」段时，同一份规格要带上那个实验页 `### 影响的决策` 表里对应那几行（门禁 75 号那条双向检查两侧要同时到位，而判一个实验撑不撑一条分项是主 agent 的活）；它翻了分项状态、33 号红（变异表锚点腐化）→ 红在 `research/mutations/` 的表：`experiment-runner` 只修锚点；红在 `crates/mutations.tsv`（`relabel-item.py` 改写了 `crates/` 下的源码）：派 `implementation-writer` 修锚点，走代码轮 |
  | 要建计数实验，或重跑已有实验 | 主 agent 写岔路单（`.claude/rules/three-way-inference.md`「交岔路时写岔路单」；不是为岔路建的实验写同格式的问题单）→ `experiment-designer` 写跑前登记或重跑登记 → 主 agent 删掉登记里待删的问法（有的话）→ `experiment-runner` → 每段交回主 agent 对着岔路单判够不够：一行开着的都不剩就停、交岔路表；续派时派发提示点名还差的那几行（续派闸 `.claude/hooks/runner-dispatch-guard.sh` 查这一句） |
@@ -405,8 +405,8 @@ index c286594..2901d28 100644
  
  ## 在本项目里
  
--共享正文不管内存序与虚机（它写明那两样由项目自己定）。本项目的四样各落在一道门禁：崩溃点重放是 `.claude/gate.d/54-layer0-replay.sh`，QEMU 真设备是 `55-qemu-first-transaction.sh`，LKMM 内存序是 `57-lkmm.sh`，模型对拍是 `74-model-differential.sh`。前三样是重型测试，谁在什么时候跑、带什么前缀，照 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行；子 agent 不跑，钩子 `.claude/hooks/heavy-test-guard.sh` 会拒。
-+共享正文不管内存序与虚机（它写明那两样由项目自己定）。本项目的四样各落在一道门禁：崩溃点重放是 `.claude/gate.d/54-layer0-replay.sh`，QEMU 真设备是 `55-qemu-first-transaction.sh`，LKMM 内存序是 `57-lkmm.sh`，模型对拍是 `74-model-differential.sh`。前三样是重型测试，谁在什么时候跑、带什么前缀，照 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行；子 agent 里只有崩溃验证员与门禁分诊员各跑登记给自己的那几道，别的子 agent 不跑，钩子 `.claude/hooks/heavy-test-guard.sh` 会拒。
+-共享正文不管内存序与虚机（它写明那两样由项目自己定）。本项目的四样各落在一道门禁：崩溃点重放是 `.claude/gate.d/checker-tier-layer0-replay.sh`，QEMU 真设备是 `55-qemu-first-transaction.sh`，LKMM 内存序是 `57-lkmm.sh`，模型对拍是 `74-model-differential.sh`。前三样是重型测试，谁在什么时候跑、带什么前缀，照 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行；子 agent 不跑，钩子 `.claude/hooks/heavy-test-guard.sh` 会拒。
++共享正文不管内存序与虚机（它写明那两样由项目自己定）。本项目的四样各落在一道门禁：崩溃点重放是 `.claude/gate.d/checker-tier-layer0-replay.sh`，QEMU 真设备是 `55-qemu-first-transaction.sh`，LKMM 内存序是 `57-lkmm.sh`，模型对拍是 `74-model-differential.sh`。前三样是重型测试，谁在什么时候跑、带什么前缀，照 `.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」与 `.claude/main-agent.md`「暂存之后、提交之前跑门禁」那一行；子 agent 里只有崩溃验证员与门禁分诊员各跑登记给自己的那几道，别的子 agent 不跑，钩子 `.claude/hooks/heavy-test-guard.sh` 会拒。
 diff --git a/.claude/skills/gate/SKILL.md b/.claude/skills/gate/SKILL.md
 index 67dc2d8..9dd2f98 100644
 --- a/.claude/skills/gate/SKILL.md

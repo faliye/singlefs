@@ -25,7 +25,7 @@
 
 ## 二、实现今天的样子（主 agent 的观测，2026-09-27）
 
-- 入库装置今天在 `crates/singlefs-harness/src/bin/` 下（`e158_root_choice_repair.rs`、`e161_crash_state_dedup_and_time_split.rs` 等），harness 带 `--all-targets` 连带编它们（singlefs-99 两次报的原样错误：`error[E0425]: cannot find value unit_check_fields`，`e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处）。
+- 入库装置今天在 `crates/singlefs-harness/src/bin/` 下（`e158_root_choice_repair.rs`、`e161_crash_state_dedup_and_time_split.rs` 等），harness 带 `--all-targets` 连带编它们（别的会话两次报的原样错误：`error[E0425]: cannot find value unit_check_fields`，`e161_crash_state_dedup_and_time_split.rs:5062` 等 5 处）。
 - 自证现跑（原样末行）：
   - `bash .claude/hooks/write-guard.sh --selftest` → `✓ 自检通过（查了 51 种情形）：…experiment-runner 写主工作区 crates/ 下的 .rs（改、新建、.. 绕路）按先编后换拒绝并点名 compile-then-swap.py，implementation-writer 与主 agent 写同一处、执行员写草稿目录与 crates/mutations.tsv 放行…`
   - `bash .claude/hooks/bash-command-detector.sh --selftest` → `✓ 自检通过（查了 481 种）：…`

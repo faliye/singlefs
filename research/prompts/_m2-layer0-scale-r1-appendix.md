@@ -277,7 +277,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 ```markdown
 ## 重型测试只在提交时跑
 
-**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+**重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
 
 | 场合 | 跑不跑 |
 |---|---|
@@ -311,7 +311,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 
@@ -418,7 +418,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 
 材料员核实：这 8 行都命中同一个字段名 `skipped_by_the_reduction_rule`（`e158_root_choice_repair.rs` 第 1210/1242/1284/1307/1329/1330/1549/1558 行），与正文第一节「甲：合法约简」谈的层 0 枚举约简是两回事；但字面上「零命中」这句陈述不成立，三条腿读到正文第二节时会看到一句与本附录实测不一致的话，是否改写正文由主 agent 定，材料员不改正文。
 
-### 二之四：`.claude/gate.d/54-layer0-replay.sh`，主工作区现行版摘录
+### 二之四：`.claude/gate.d/checker-tier-layer0-replay.sh`，主工作区现行版摘录
 
 #### 文件头，第 1-34 行
 
@@ -429,7 +429,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #
 # 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问）：
 #
-#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
+#   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
 #     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
 #     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿标记按输入哈希分格：
 #     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>`，不进工作树；放 common-dir，各 worktree 读写的是同一组。
@@ -437,7 +437,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #     这一趟没写成标记就退出（判红、被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；「跑的过程中输入变了」那一支判红不删：
 #     两条流读到的不一定是开跑那一批，它说不出那一批的好坏。被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
 #     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
-#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+#   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
 #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
 #     有、里面记的哈希相同、LAYER0 / CHECKER / LAYER0B 三种计数行各恰好一行、LAYER0 与 LAYER0B 两行各自带 exhaustive=true，才判绿，
@@ -447,7 +447,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #
 # 输入：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的路径（唯一登记位，复用判定读的也是它），外加判这一格的 54 号与工具链。
 # 文件集是 git 眼里这些路径下磁盘上真有的文件（已跟踪的加没被忽略的未跟踪的）；逐个按内容算 sha256，「sha256  路径」按路径排序；
-# 清单末尾再加两行：跑的这一份 54 号的 sha256（名字 `<判它的 54 号：54-layer0-replay.sh>`）、`cargo -V` 与 `rustc -V` 原样输出的 sha256
+# 清单末尾再加两行：跑的这一份 54 号的 sha256（名字 `<判它的 54 号：checker-tier-layer0-replay.sh>`）、`cargo -V` 与 `rustc -V` 原样输出的 sha256
 # （名字 `<工具链：…>`）；整张再算一次 sha256。报的文件数只数登记路径下的文件。这两行只进哈希，不进复用与改动范围那两问：
 # 同一份 crates/ 换了判它的 54 号或工具链，前一趟那一格就不再作数。
 # 按内容算、不按 git 对象算：工作区跑的全量与 `--staged` 临时 worktree 里的同一份内容算出同一个数。
@@ -504,7 +504,7 @@ worker_threads_are_acceptable() { # <流的名字> <实际起的工作线程数>
   if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then
     echo "  ✗ $1：本机 $machine_cores 核、SINGLEFS_LAYER0_THREADS=$SINGLEFS_LAYER0_THREADS（$threads_origin），全量枚举却只起了 1 个工作线程"
     echo "     → 怎么办：看 crash.rs 的 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS、state_slices 切出来的片数够不够分给每个线程；"
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/checker-tier-layer0-replay.sh。"
     return 1
   fi
   return 0

@@ -1,0 +1,13 @@
+name=k1_table label=clean_issued_from_65536 entries=11 inode_tree=65537 literal_red=[] relative_red=[]
+name=k1_table label=clean_issued_from_65548 entries=11 inode_tree=65549 literal_red=['extent', 'inode', 'deleted_inodes', 'tombstone'] relative_red=[]
+name=k1_table label=clean_issued_from_65560 entries=11 inode_tree=65561 literal_red=['extent', 'inode', 'deleted_inodes', 'tombstone'] relative_red=[]
+name=k1_table label=e171_row271_deleted_inodes_head_zero entries=11 inode_tree=65537 literal_red=['deleted_inodes'] relative_red=['deleted_inodes']
+name=k1_table label=e171_row271_on_reissued_table entries=11 inode_tree=65549 literal_red=['extent', 'inode', 'deleted_inodes', 'tombstone'] relative_red=['deleted_inodes']
+name=k1_table label=reissued_table_inode_head_copies_the_old_65537 entries=11 inode_tree=65549 literal_red=['extent', 'deleted_inodes', 'tombstone'] relative_red=['inode']
+name=k1_table label=lineage_head_not_zero entries=11 inode_tree=65537 literal_red=['lineage'] relative_red=['lineage']
+name=k1_table label=no_inode_tree_entry entries=10 inode_tree=None literal_red=[] relative_red=['extent', 'deleted_inodes', 'tombstone']
+name=k1_table label=two_inode_tree_entries entries=12 inode_tree=65537 literal_red=['inode_second'] relative_red=[]
+name=k1_table label=empty_table entries=0 inode_tree=None literal_red=[] relative_red=[]
+name=k2_first_fit label=default_768MiB unit_area_start=50176 aligned_64=True open_segment_start=50240 t1=50180 t1_minus_U=4 mutated_scan_from_U_plus_64_t1=50240
+name=k2_first_fit label=128MiB unit_area_start=9216 aligned_64=True open_segment_start=9280 t1=9220 t1_minus_U=4 mutated_scan_from_U_plus_64_t1=9280
+name=k2_first_fit label=1GiB unit_area_start=66560 aligned_64=True open_segment_start=66624 t1=66564 t1_minus_U=4 mutated_scan_from_U_plus_64_t1=66624

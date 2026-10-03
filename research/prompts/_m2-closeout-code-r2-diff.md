@@ -7,7 +7,7 @@
 **分三段放，按正文与派发提示给的形态**：
 - src 与测试的 diff（69 个文件）全放，第二节；
 - `crates/mutations.tsv` 的 diff 只放行数（`311 45 crates/mutations.tsv`，`git diff --numstat` 原样）与新增行的变异名列（311 个，第三节）；
-- `crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs` 是别的会话（singlefs-e1）的 E161 装置，不在这一轮判的范围内，只列路径、不放 diff（第四节）。
+- `crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs` 是别的会话的 E161 装置，不在这一轮判的范围内，只列路径、不放 diff（第四节）。
 
 ## 一、`git diff --stat` 全表（`crates/`，71 个文件）
 
@@ -40607,4 +40607,4 @@ I-9.16 树表排序：checker 的不变量清单里没有 I-9.16（判它时断�
 
 ## 四、别的会话的文件，只列路径
 
-`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`（新文件，+5957 行；`git diff --stat` 那一行：`.../bin/e161_crash_state_dedup_and_time_split.rs | 5957 +++++++++`；单飞 singlefs-e1 那一批的 E161 装置，不在这一轮判的范围内，判决里按路径点名、写明归属，不在这份材料里放它的内容）。
+`crates/singlefs-harness/src/bin/e161_crash_state_dedup_and_time_split.rs`（新文件，+5957 行；`git diff --stat` 那一行：`.../bin/e161_crash_state_dedup_and_time_split.rs | 5957 +++++++++`；单飞别的会话那一批的 E161 装置，不在这一轮判的范围内，判决里按路径点名、写明归属，不在这份材料里放它的内容）。

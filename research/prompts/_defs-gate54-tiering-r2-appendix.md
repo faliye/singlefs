@@ -10,7 +10,7 @@
 | 改 `crates/`：探索性的、条款没写全、要用户边看边拍板 | 主 agent 自己写、直接和用户对话 → 上一行的三方（代码轮）→ `crash-verifier` |
 | 跑变异表、看抓到 / 无效 / 没红 | `mutation-triage` → 要补取样点、补断言的：`crates/` 那侧 `implementation-writer`（输入给分诊报告），`research/` 那侧 `experiment-designer` 写重跑登记 → `experiment-runner` |
 | 一个阶段任务结束：里程碑一步、一轮判决、一段实验、一批定义或脚本改完，这一批交回到齐、暂存之前 | `sweep` 写事实表（阶段同步第一段；输入给改动范围与做成的事，只用过、没留改动的也写；交回的事实表过了 `research/scripts/stale-candidates.py --check-facts`）→ 候选表按组切段，每段不超过约 200 行，一段派一个 `sweep` 逐行判（第二段；输入同样给做成的事）→ 交回齐了主 agent 跑 `stale-candidates.py --check-report 候选表 各份报告`，退出码 0 才往下，再**逐行全看**：每一条判定都对着载体今天的原文核一遍，不抽样、不按判定种类挑。判错的那一段重派，重派交回照样全看 → 主 agent 逐处判，自己改或交 `kb-scribe` → 主 agent 写 `research/prompts/<阶段>-sync.md`（格式见门禁 68 号文件头，68 号判形式）→ 下一行 |
-| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/54-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage` |
+| 暂存之后、提交之前跑门禁 | 主 agent 用 `research/scripts/stage-mine.py` 暂存 → 这一批改了门禁 54 号在 `.claude/gate.d/stage-inputs.tsv` 登记的输入，就在 HEAD + 暂存区的 worktree 里后台跑那棵树里的 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`（层 0 全量只在这一步跑，判绿按输入哈希写全绿标记，整轮门禁的 54 号只核标记）→ `gate-triage` |
 | 撤回一个数、改格式常量、新立一条判据 | `sweep` |
 | 定案之后写回 kb | `kb-scribe`（主 agent 给逐条规格）；规格动了某条分项的「**依据**」段时，同一份规格要带上那个实验页 `### 影响的决策` 表里对应那几行（门禁 75 号那条双向检查两侧要同时到位，而判一个实验撑不撑一条分项是主 agent 的活）；它翻了分项状态、33 号红（变异表锚点腐化）→ `experiment-runner` 只修锚点 |
 | 要建计数实验，或重跑已有实验 | 主 agent 写岔路单（`.claude/rules/three-way-inference.md`「交岔路时写岔路单」；不是为岔路建的实验写同格式的问题单）→ `experiment-designer` 写跑前登记或重跑登记 → 主 agent 删掉登记里待删的问法（有的话）→ `experiment-runner` → 每段交回主 agent 对着岔路单判够不够：一行开着的都不剩就停、交岔路表；续派时派发提示点名还差的那几行（续派闸 `.claude/hooks/runner-dispatch-guard.sh` 查这一句） |
@@ -23,7 +23,7 @@
 ```markdown
 ## 做什么
 
-1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `54-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
+1. 每个阶段开跑前各照共用约束「不做」一节看一次负载；另有别的 `gate.sh` 正在跑 54 号、或有 `checker-tier-layer0-replay.sh --full` 在跑时，不起 54 号，等它结束。
 2. 按共用约束 `.claude/agent-common.md`「门禁」一节从阶段归属表取登记给你的阶段，一次只跑一个：`nice -n 19 bash .claude/gate.d/<文件>`，54 号默认不带 `--full`（快档加核全绿标记），派发提示点名要层 0 全量时才带；每个记开始与结束时刻（`date -u`）和退出码。单个阶段超过 Bash 单次上限就后台跑，退出码写进文件（`{ nice -n 19 bash .claude/gate.d/<文件>; echo "exit=$?"; } > <草稿目录>/<阶段>.log 2>&1`；退出码只认日志里的 `exit=` 那一行，不认起后台的那条命令自己的 `$?`），结束后读输出。别的会话同时在跑 cargo 时，编译会卡在「Blocking waiting for file lock」，照实记等了多久，不算这个阶段的耗时。
 3. 每个阶段原样抄它的「✓」行，或「✗」行与紧跟的「→」；退出码 77 记「本次未跑」，不记通过。
 4. 计数行原样抄：崩溃状态数、恢复结果、与 E142 产物或闭式比对的那几行。输出里读不到判定行的阶段记「作废」，不记通过。
@@ -90,7 +90,7 @@
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 
@@ -122,8 +122,8 @@
 bash .claude/scripts/gate.sh              # 共享阶段 + .claude/gate.d/ 的项目阶段（含层 0 快档与全绿标记核对、QEMU 真设备，要十几分钟；层 0 全量不在里面）
 
 cargo test --workspace                    # 平时的单测；层 0 全量标 ignored，这里只跑缩小版
-bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放快档，并核这批输入有没有全量的全绿标记
-bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记
+bash .claude/gate.d/checker-tier-layer0-replay.sh   # 单跑层 0 崩溃点重放快档，并核这批输入有没有全量的全绿标记
+bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记
 bash .claude/gate.d/55-qemu-first-transaction.sh  # 单跑 QEMU 两块 virtio 盘上的第一个事务
 bash .claude/scripts/lkmm.sh              # 单跑 LKMM，需要 herd7 与一棵内核树
 bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装置归项目）
@@ -148,7 +148,7 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 
 正文 `research/prompts/_defs-gate54-tiering-r1-body.md`，背景材料 `_defs-gate54-tiering-r1-background.md`，diff `_defs-gate54-tiering-r1-diff.md`，开工快照 `defs-gate54-tiering-r1-snapshot/sha256sums.txt`。判决只引产物与文件原文，腿的结论句当线索。
 
-被判的定义与脚本（门禁 72 号按路径点名）：`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/main-agent.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/gate.d/54-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`。
+被判的定义与脚本（门禁 72 号按路径点名）：`.claude/agents/experiment-runner.md`、`.claude/agents/crash-verifier.md`、`.claude/main-agent.md`、`.claude/hooks/agent-write-scope.tsv`、`.claude/gate.d/checker-tier-layer0-replay.sh`、`.claude/gate.d/stage-inputs.tsv`。
 
 ```
 
@@ -227,9 +227,9 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 ```markdown
 ## 四、要落的改动（主 agent 定，不交用户）
 
-1. `.claude/gate.d/54-layer0-replay.sh`：「碰没碰输入」的前缀换成 `stage-inputs.tsv` 登记的三条（f2）；标记按输入哈希分格、`--full` 开跑只删自己那一格（f3）；快档另核标记里两条流都是 `exhaustive=true`（f4a）；出路句改成「暂存之后，在 HEAD + 暂存区的 worktree 里跑 `--full <它的根>`」（f5）。每一处先在副本里证明会红。
+1. `.claude/gate.d/checker-tier-layer0-replay.sh`：「碰没碰输入」的前缀换成 `stage-inputs.tsv` 登记的三条（f2）；标记按输入哈希分格、`--full` 开跑只删自己那一格（f3）；快档另核标记里两条流都是 `exhaustive=true`（f4a）；出路句改成「暂存之后，在 HEAD + 暂存区的 worktree 里跑 `--full <它的根>`」（f5）。每一处先在副本里证明会红。
 2. `.claude/main-agent.md`：收尾全量从「一个阶段任务结束」那一行挪到「暂存之后、提交之前跑门禁」那一行：主 agent 用 `stage-mine.py` 暂存之后，先在 HEAD + 暂存区的 worktree 里跑 54 号 `--full`，再派 `gate-triage`；触发条件写成「这一批改了 54 号在 `stage-inputs.tsv` 登记的输入」。
-3. `.claude/agents/crash-verifier.md`：54 号默认不带 `--full`，派发提示点名要全量时才带；判「别的 54 号在跑」时不只看 `gate.sh`，也看 `54-layer0-replay.sh --full`。
+3. `.claude/agents/crash-verifier.md`：54 号默认不带 `--full`，派发提示点名要全量时才带；判「别的 54 号在跑」时不只看 `gate.sh`，也看 `checker-tier-layer0-replay.sh --full`。
 4. K1 照留。
 
 这几处改法都是攻方在自己的模型上提、量过的，**被攻过零轮**。改完要再攻一轮（第二轮），攻的是改后的形态：f5 的 worktree 在建完之后别人又往暂存区放东西（攻方报告第五节自己点名的老问题）、f3 的分格与旧标记的清理。
@@ -276,8 +276,8 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 ```markdown
 # 门禁 54 号分档：交回报告
 
-改好的文件：`.claude/gate.d/54-layer0-replay.sh`（338 行，sha256 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`）。
-改前备份：`/tmp/claude-1000/gate54-tiering/54-layer0-replay.sh.orig`（sha256 `5bd04b7b…`，门禁修复会话那一处改动已在里面）；与它的 diff：`/tmp/claude-1000/gate54-tiering/54.diff`（+221 / −25 行）。
+改好的文件：`.claude/gate.d/checker-tier-layer0-replay.sh`（338 行，sha256 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`）。
+改前备份：`/tmp/claude-1000/gate54-tiering/checker-tier-layer0-replay.sh.orig`（sha256 `5bd04b7b…`，门禁修复会话那一处改动已在里面）；与它的 diff：`/tmp/claude-1000/gate54-tiering/54.diff`（+221 / −25 行）。
 没暂存、没提交。`stage-inputs.tsv` 没改（`git diff --quiet HEAD -- .claude/gate.d/stage-inputs.tsv` 退出码 0）。
 
 ```
@@ -300,7 +300,7 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 
 标记：`$(git -C <根> rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-full-green`，真仓里就是 `.git/singlefs-layer0-full-green`。内容（自证临时仓里写出的一份原样见附录 A 开头）：`input_hash=`、`input_file_count=`、`input_paths=`、`started_utc=`、`finished_utc=`、`judged_root=`、`worker_threads=`、`LAYER0 …`、`CHECKER …`、`LAYER0B …` 三行原样，再逐文件一行 `input_file <sha256>  <路径>`。
 
-输入哈希：路径取 `stage-inputs.tsv` 里 `54-layer0-replay.sh` 那一行（`crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/`）；文件集是 `git ls-files -z --cached --others --exclude-standard -- <这几条>` 里磁盘上真存在的文件，`LC_ALL=C sort -zu` 排序，逐个 `sha256sum`，整张清单再 `sha256sum` 一次。不按 git 对象算；附录 A「--staged 那条路」一段证明工作区跑的 --full 与临时 worktree 里的快档对同一份内容算出同一个哈希。
+输入哈希：路径取 `stage-inputs.tsv` 里 `checker-tier-layer0-replay.sh` 那一行（`crates/ Cargo.toml Cargo.lock .claude/kb/layout/ research/results/`）；文件集是 `git ls-files -z --cached --others --exclude-standard -- <这几条>` 里磁盘上真存在的文件，`LC_ALL=C sort -zu` 排序，逐个 `sha256sum`，整张清单再 `sha256sum` 一次。不按 git 对象算；附录 A「--staged 那条路」一段证明工作区跑的 --full 与临时 worktree 里的快档对同一份内容算出同一个哈希。
 
 ```
 
@@ -313,7 +313,7 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 不在真仓里做这几样，是因为合成日志跑出来的 --full 会在真仓 common-dir 里留一份假的全绿标记。
 
 1. **标记相等判绿**：附录 A「自证一」，退出码 0，成功句报「第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 5 条通过、1 条 ignored」并原样带出标记里的 `LAYER0` / `CHECKER` / `LAYER0B` 三行与 `全量跑完于 2026-09-24`。
-2. **改一个输入文件一个字节判红**：`cmp` 报 `differ: byte 13, line 1`；附录 A「自证二」，退出码 1，列出「内容不同：crates/singlefs-harness/src/lib.rs」，出路句是「这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/54-layer0-replay.sh --full`」。改回那个字节再跑，退出码 0（证明红的就是那一个字节）。
+2. **改一个输入文件一个字节判红**：`cmp` 报 `differ: byte 13, line 1`；附录 A「自证二」，退出码 1，列出「内容不同：crates/singlefs-harness/src/lib.rs」，出路句是「这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`」。改回那个字节再跑，退出码 0（证明红的就是那一个字节）。
 3. **删掉标记判红**：附录 A「自证三」，退出码 1，同一句出路。真仓里也现跑了一次（下一节），真仓本来就没有标记，同样判红。
 4. **--full 判红时不写标记**：附录 A「自证四」两支——合成日志里 `LAYER0` 下一行不是 `CHECKER`（门禁修复会话那一支判红，退出码 1）、假 cargo 退 101（「层 0 崩溃点重放的用例判红」，退出码 1）；两次跑完都是「[标记不在]」（开跑前标记在，开跑先删、判红不写）。紧接着跑快档，退出码 1、报没有标记。
 
@@ -326,12 +326,12 @@ bash research/scripts/vm-bench.sh --selftest  # 单跑虚机装置自检（装�
 ````markdown
 ## 真仓里快档真跑一次
 
-命令：`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（不带 `--full`，工作区，没设 `SINGLEFS_STAGED_TREE`，所以复用那一问答「要跑」，改动范围那一问答「碰了」）。开跑 2026-09-24（挂钟 4 分 4 秒，大半是 release 编译）。ps 看到的 cargo 命令行是 `cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --nocapture`（没有 `--include-ignored`）。
+命令：`nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh`（不带 `--full`，工作区，没设 `SINGLEFS_STAGED_TREE`，所以复用那一问答「要跑」，改动范围那一问答「碰了」）。开跑 2026-09-24（挂钟 4 分 4 秒，大半是 release 编译）。ps 看到的 cargo 命令行是 `cargo test --release -p singlefs-harness --test first_transaction_step_seven_layer0 -- --nocapture`（没有 `--include-ignored`）。
 全文 `/tmp/claude-1000/gate54-tiering/real-quick-run.log`，其中 `LAYER0_PROGRESS` 转发行 123 行（`grep -c`）；末尾原样：
 
 ```
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但没有层 0 全量的全绿标记（.git/singlefs-layer0-full-green）
-     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/54-layer0-replay.sh --full`
+     → 怎么办：这批输入的层 0 全量没在收尾跑过：跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`
 exit=1
 finish=2026-09-24
 ```
@@ -371,9 +371,9 @@ shell-lint 退出码 0
 3. **哈希里没有 54 号脚本自己和登记表文件**：按派发只算登记的路径。登记表改了会让文件集变、哈希跟着变；54 号脚本改了（比如收严线程判定）不会让标记失效。要不要把脚本自己算进去，主 agent 定。
 4. **快档照旧把 `LAYER0_PROGRESS` 转到门禁输出**：真仓一次 123 行。那是给全量看进度用的，快档不需要，但删不删属于行为改动，没动。
 5. **跟着要改的定义与文档**（约束里不许我碰，列给主 agent / sweep）：
-   - `.claude/agents/crash-verifier.md` 第 23、24 行：照 `stage-owners.tsv` 第 37 行跑 `nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`，现在只跑快档；要它跑全量得写 `--full`。
-   - `.claude/main-agent.md`：「任务收尾」是哪一步、在那一步跑 `bash .claude/gate.d/54-layer0-replay.sh --full`，还没写（记录里的要求：`records/2026-09-19-里程碑二遗留收拢.md` 第 147 行「改之前先写清『任务收尾』是哪一步（阶段同步那一步）」）。
-   - `README.md` 第 107 行：`bash .claude/gate.d/54-layer0-replay.sh   # 单跑层 0 崩溃点重放全量（release）`，现在这条命令是快档。
+   - `.claude/agents/crash-verifier.md` 第 23、24 行：照 `stage-owners.tsv` 第 37 行跑 `nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh`，现在只跑快档；要它跑全量得写 `--full`。
+   - `.claude/main-agent.md`：「任务收尾」是哪一步、在那一步跑 `bash .claude/gate.d/checker-tier-layer0-replay.sh --full`，还没写（记录里的要求：`records/2026-09-19-里程碑二遗留收拢.md` 第 147 行「改之前先写清『任务收尾』是哪一步（阶段同步那一步）」）。
+   - `README.md` 第 107 行：`bash .claude/gate.d/checker-tier-layer0-replay.sh   # 单跑层 0 崩溃点重放全量（release）`，现在这条命令是快档。
    - `.claude/rules/implementation-workflow.md` 第 65 行说 54 号判线程数；这一判现在只在 `--full` 里。
    - `.claude/kb/milestone/02-second-txn.md` 第 379 行（收口表第 41 行）的状态要回写。
 6. 文件头「池级 checker（23 条不变量）」是原文照留，没现查它是不是还对。
@@ -399,11 +399,11 @@ shell-lint 退出码 0
 
 依据：判决 `research/prompts/defs-gate54-tiering-r1-main-verification.md` 第三节 K3 那张表与第四节第 1 条；攻方报告 `research/prompts/defs-gate54-tiering-r1-opus-output.md` 第五节。
 
-改好的文件：`.claude/gate.d/54-layer0-replay.sh`（393 行，sha256 `c3f9360fc9d1ceb0d22e421e380feacf78c38351cfd5554788a3cda545cf3537`）。
-- 改前是 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`：动手前现核过，与攻方、开工快照里的那一份相同。备份在 `r2/54-layer0-replay.sh.r1`。
+改好的文件：`.claude/gate.d/checker-tier-layer0-replay.sh`（393 行，sha256 `c3f9360fc9d1ceb0d22e421e380feacf78c38351cfd5554788a3cda545cf3537`）。
+- 改前是 `86ff561e868cab9ffb138a2e5fbcd668c467caea6939592c32485a162e017ec9`：动手前现核过，与攻方、开工快照里的那一份相同。备份在 `r2/checker-tier-layer0-replay.sh.r1`。
 - diff 在 `r2/r2.diff`（+102 / −47）。
 - 18 处都用 `research/scripts/replace-once.py` 改，每处都是「命中 1 次，已替换并回读确认」。
-- 18 对旧文本 / 新文本在 `r2/edits/old*.txt`、`new*.txt`。先在草稿副本 `r2/54-layer0-replay.sh` 上改、做完全部自证，再把同样 18 对套到真文件上；套完 `cmp` 报真文件与自证用的副本逐字节相同。
+- 18 对旧文本 / 新文本在 `r2/edits/old*.txt`、`new*.txt`。先在草稿副本 `r2/checker-tier-layer0-replay.sh` 上改、做完全部自证，再把同样 18 对套到真文件上；套完 `cmp` 报真文件与自证用的副本逐字节相同。
 - 没暂存、没提交。没碰 `stage-inputs.tsv`（它在工作区里与 HEAD 差 1 行，是主 agent 改的，登记给 54 号的三条是 `crates/ Cargo.toml Cargo.lock`）、定义文件、kb、`crates/`。
 
 ```
@@ -458,7 +458,7 @@ shell-lint 退出码 0
 r1 那一行复现了攻方的误红：S3a 1 格，S3b 3 格。r2 下 S3b 8 格全绿。
 **S3a「验证员跑过、门禁起在途中」在 r2 下仍然误红**。原因是派发要的形态「开跑只删自己要写的那一格」：验证员与收尾是同一批输入、同一个哈希，收尾开跑删掉的正是验证员写的那一格（输出里「收尾 --full 正在跑：[标记不在]」）。攻方量过的 f3 是「开跑一格都不删」，所以它那一格是绿的。
 
-我另在副本里量了一个变体，**没有落进真文件**：开跑不删，这一趟没写成标记就退出（判红）时，靠 EXIT trap 删这批输入那一格。脚本 `r2/variant/54-layer0-replay.sh`，场景 `r2/model/s3a-variant.sh`，输出 `outputs/s3a-variant.out`。结果：
+我另在副本里量了一个变体，**没有落进真文件**：开跑不删，这一趟没写成标记就退出（判红）时，靠 EXIT trap 删这批输入那一格。脚本 `r2/variant/checker-tier-layer0-replay.sh`，场景 `r2/model/s3a-variant.sh`，输出 `outputs/s3a-variant.out`。结果：
 - S3a 6 格只剩「验证员没跑、开跑前 / 途中」两格红，这两格本来就该红。
 - 同一输入先绿一趟、第二趟 cargo 判红之后，那一格被删、门禁判红。
 - 代价：跑到一半被 SIGKILL，上一趟同一输入的绿格会留着。
@@ -497,7 +497,7 @@ f3 的其余自证在 `r2/selftest-output.txt`：
 ````markdown
 ## 真仓快档
 
-`nice -n 19 bash .claude/gate.d/54-layer0-replay.sh`（工作区，不带 `--full`），日志 `r2/real-quick-run.log`。2026-09-24 开跑，14 秒后结束，release 产物是现成的；转发的 `LAYER0_PROGRESS` 行 123 行。其余原样：
+`nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh`（工作区，不带 `--full`），日志 `r2/real-quick-run.log`。2026-09-24 开跑，14 秒后结束，release 产物是现成的；转发的 `LAYER0_PROGRESS` 行 123 行。其余原样：
 
 ```
   ✗ 快档绿了（第一个事务那条流 5 条通过、1 条 ignored；两次发布那条流 8 条通过、1 条 ignored），但这批输入（哈希 a721893541f8fd59…，94 个文件）没有层 0 全量的全绿标记（.git/singlefs-layer0-full-green.a721893541f8fd59a182a7738a0390e57b8871553ee5bb49a606eb51cc81a47b）
@@ -505,7 +505,7 @@ f3 的其余自证在 `r2/selftest-output.txt`：
      → 怎么办：这批输入的层 0 全量没在收尾跑过。暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 --full <它的根>（与 gate.sh --staged 同一建法）：
                 在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"
                 git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }
-                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
+                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"
 exit=1
 ```
 
@@ -574,10 +574,10 @@ shell-lint 退出码 0
 ```markdown
 ## 结果
 
-真文件 `.claude/gate.d/54-layer0-replay.sh`：397 行，sha256 `232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7`。
-- 改前是第二轮那一份 `c3f9360f…`：动手前现核过；备份在 `r3/54-layer0-replay.sh.r2`，本轮 diff 在 `r3/r3.diff`（+9 / −5）。
+真文件 `.claude/gate.d/checker-tier-layer0-replay.sh`：397 行，sha256 `232c8c0de11bf6561f9ca1736652745f387d05832ad0a5c99a08bc80c0386bf7`。
+- 改前是第二轮那一份 `c3f9360f…`：动手前现核过；备份在 `r3/checker-tier-layer0-replay.sh.r2`，本轮 diff 在 `r3/r3.diff`（+9 / −5）。
 - 5 处都用 `replace-once.py` 改，每处都是「命中 1 次，已替换并回读确认」；旧/新文本对在 `r3/edits/`。
-- 先改草稿副本 `r3/54-layer0-replay.sh`、跑完全部场景，再套到真文件上；套完 `cmp` 报「真文件与 r3 自证用的草稿副本逐字节相同」。
+- 先改草稿副本 `r3/checker-tier-layer0-replay.sh`、跑完全部场景，再套到真文件上；套完 `cmp` 报「真文件与 r3 自证用的草稿副本逐字节相同」。
 
 | 编号 | 改了什么 |
 |---|---|
@@ -590,10 +590,10 @@ shell-lint 退出码 0
 第 2 条（旧格只增不减）照你说的不改，「common-dir 里现有 N 格」那一句保留。
 
 README 与规则，都用 `replace-once.py`，一处一改，每处命中 1 次。改前副本和 diff 在 `r3/README.md.before`、`r3/README.diff`、`r3/implementation-workflow.md.before`、`r3/implementation-workflow.diff`。
-- `README.md` 第 108 行（别的会话已经把原来的第 107 行拆成快档第 107 行与 --full 第 108 行）：改成 `bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记`。
+- `README.md` 第 108 行（别的会话已经把原来的第 107 行拆成快档第 107 行与 --full 第 108 行）：改成 `bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>  # 层 0 全量（release）：暂存之后在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑（建法见快档判红时的出路句），判绿按输入哈希写一格全绿标记`。
 - 第 107 行（快档）现在的说法是对的，没动。
 - **另改了第 104 行**：它说整轮 `gate.sh`「含层 0 全量」，现在是假的。改成「含层 0 快档与全绿标记核对、QEMU 真设备，要十几分钟；层 0 全量不在里面」。「十几分钟」没核。
-- `.claude/rules/implementation-workflow.md` 第 65 行改成：「崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1……判红」。只写怎么做，没写经过。
+- `.claude/rules/implementation-workflow.md` 第 65 行改成：「崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1……判红」。只写怎么做，没写经过。
 
 ```
 
@@ -761,7 +761,7 @@ doc-lint 退出码 0
 | 8 | 全量测挂在哪个节点 | 原话：「每次主 agent 执行完任务后统一执行」 | 收口表第 41 行：层 0 全量不再每次门禁都跑，改在主 agent 一个任务收尾时统一跑一次；门禁 54 号怎么分档要改（快档每次、全量在收尾），改之前先写清「任务收尾」是哪一步（阶段同步那一步） |
 ```
 
-**出处 `.claude/gate.d/54-layer0-replay.sh:1-397`（整段抄，未转述）**
+**出处 `.claude/gate.d/checker-tier-layer0-replay.sh:1-397`（整段抄，未转述）**
 
 ```markdown
 #!/usr/bin/env bash
@@ -770,14 +770,14 @@ doc-lint 退出码 0
 #
 # 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问）：
 #
-#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
+#   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
 #     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
 #     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿标记按输入哈希分格：
 #     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>`，不进工作树；放 common-dir，各 worktree 读写的是同一组。
 #     开跑一格都不删：同一批输入的结果是确定的，前一趟写下的那一格在这一趟跑的过程中照样算数。这一趟没写成标记就退出（判红、跑的过程中输入变了、
 #     被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
 #     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
-#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+#   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档：两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
 #     有、里面记的哈希相同、计数行恰好三行、LAYER0 与 LAYER0B 两行都是 exhaustive=true，才判绿，成功句报快档计数、原样带出那一格的全量计数行与时刻。
 #     没有那一格判红（列出 common-dir 里最近写的一格与这一次不同的文件；不带哈希的旧名字 singlefs-layer0-full-green 不再认），
@@ -811,7 +811,7 @@ for stage_argument in "$@"; do
     --full) layer0_tier="full" ;;
     -*)
       echo "  ✗ 认不出的参数：$stage_argument"
-      echo "     → 怎么办：只认 --full 与项目根，顺序不限：bash .claude/gate.d/54-layer0-replay.sh [--full] [项目根]"
+      echo "     → 怎么办：只认 --full 与项目根，顺序不限：bash .claude/gate.d/checker-tier-layer0-replay.sh [--full] [项目根]"
       exit 2 ;;
     *) root_argument="$stage_argument" ;;
   esac
@@ -910,7 +910,7 @@ worker_threads_are_acceptable() { # <流的名字> <实际起的工作线程数>
   if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then
     echo "  ✗ $1：本机 $machine_cores 核、SINGLEFS_LAYER0_THREADS=$SINGLEFS_LAYER0_THREADS（$threads_origin），全量枚举却只起了 1 个工作线程"
     echo "     → 怎么办：看 crash.rs 的 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS、state_slices 切出来的片数够不够分给每个线程；"
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/checker-tier-layer0-replay.sh。"
     return 1
   fi
   return 0
@@ -964,7 +964,7 @@ report_manifest_differences() {
 print_staged_worktree_full_commands() {
   echo '                在项目根、暂存之后：layer0_full_base="$(mktemp -d)"; git diff --cached --binary > "$layer0_full_base/staged.patch"'
   echo '                git worktree add --detach "$layer0_full_base/tree" HEAD && { [ ! -s "$layer0_full_base/staged.patch" ] || git -C "$layer0_full_base/tree" apply --index "$layer0_full_base/staged.patch"; }'
-  echo '                bash "$layer0_full_base/tree/.claude/gate.d/54-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
+  echo '                bash "$layer0_full_base/tree/.claude/gate.d/checker-tier-layer0-replay.sh" --full "$layer0_full_base/tree"; git worktree remove --force "$layer0_full_base/tree"'
 }
 
 # report_newest_other_marker <这一次的清单>：这批输入没有自己那一格时，拿 common-dir 里最近写的一格与这一次比，列出不同的文件；
@@ -1140,7 +1140,7 @@ fi
 full_finished_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 marker_being_written="$full_green_marker_path.partial.$$"
 if ! {
-  echo "# 层 0 全量全绿标记：.claude/gate.d/54-layer0-replay.sh --full 判绿之后写，按输入哈希分格，整轮门禁的快档按这批输入的哈希读这一格。不进工作树，别手改。"
+  echo "# 层 0 全量全绿标记：.claude/gate.d/checker-tier-layer0-replay.sh --full 判绿之后写，按输入哈希分格，整轮门禁的快档按这批输入的哈希读这一格。不进工作树，别手改。"
   echo "input_hash=$layer0_input_hash"
   echo "input_file_count=$layer0_input_file_count"
   echo "input_paths=$layer0_input_paths_text"
@@ -1176,7 +1176,7 @@ echo "  ✓ 全绿标记写进 $full_green_marker_path（输入哈希 ${layer0_i
 #
 # 宁宽勿窄：多写一条路径只会多跑几趟，少写一条会让一次真的改动被跳过。拿不准就写上。
 # 只写从仓库根起的路径；目录写成带斜杠的前缀（git diff 的路径限定就按前缀匹配）。
-54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
+checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	# 跑 crates 的崩溃点重放；两条流的用例编译期与运行期都不读 .claude/kb/layout/ 与 research/results/（段序列与布局表的比对归 52 号）
 55-qemu-first-transaction.sh	crates/ Cargo.toml Cargo.lock research/scripts/ research/results/	# 起虚机跑 crates 的装置，虚机与复跑脚本都在 research/scripts/
 59-crates-mutation-replay.sh	crates/ Cargo.toml Cargo.lock	# 按 crates/mutations.tsv 逐条改坏 crates/ 里的源码再跑点名的测试
 74-model-differential.sh	crates/ Cargo.toml Cargo.lock	# 拿 crates 里的实现与只住内存的理想模型对拍
@@ -1313,7 +1313,7 @@ base=/tmp/claude-1000/gate54-tiering
 repo="$base/selftest-repo"
 export PATH="$base/fake-bin:$PATH"
 unset SINGLEFS_LAYER0_THREADS SINGLEFS_STAGED_TREE GATE_BASE
-stage=".claude/gate.d/54-layer0-replay.sh"
+stage=".claude/gate.d/checker-tier-layer0-replay.sh"
 marker="$(git -C "$repo" rev-parse --path-format=absolute --git-common-dir)/singlefs-layer0-full-green"
 run_step() { # <标题> <命令…>
   local title="$1"; shift

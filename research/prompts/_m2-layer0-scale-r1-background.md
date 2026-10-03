@@ -13,7 +13,7 @@
 | L1 | **甲的前提**：一段写里，凡不是原地覆盖的写（COW 新写的单元、分配记录、映射条目等），它落的块不被任何「恢复可能选中的版本」引用、也不被 journal 重放读到 ⇒ 这一段里这些写的任意子集落盘，恢复出的可见状态与「这些写一个都没落盘」逐项相同；只有原地覆盖的写（根槽、系统配置槽、journal 环里的记录槽）要逐个子集枚举 | 前提对第二条流（今天的形状，以及加了向前回退与卸载之后的形状）每一段成不成立；有没有一种可达历史（复用、向前回退的复活、被抛弃时间线与影子账、抬 F、卸载那一串）让一次 COW 写落在某个仍可能被选中的版本引用的块上；「恢复可能选中的版本」的集合按哪条条款取（D16 已定项 1 的 F_生效、D23 已定项 14 的候选集与择根） |
 | L2 | **甲的前提怎么判红**：约简不能只靠论证，枚举器在每一段开跑前现判那一段的每一次写落不落在「可能被选中的版本」引用的块上，落上就这一段退回全量子集枚举并记一行 | 判法落在 `crates/singlefs-harness/src/crash.rs` 的哪一步；判它用的「引用集合」从哪来、会不会与被测实现共用同一段代码（`.claude/rules/fs-design.md`「审计与被审计用同一段代码」）；拿什么变异证明这道现判会红 |
 | L3 | **甲漏不漏**：约简之后，今天层 0 抓得到的每一条变异（`crates/mutations.tsv` 里点名层 0 测试的那几行）还抓不抓得到 | 哪一类错只在「COW 写的部分子集落盘」这种状态上露出来（例如一个本不该 COW、写成了原地覆盖的写；一个 COW 写落到了还在用的块上）；这类错在约简之下由谁抓——L2 的现判，还是别的 |
-| L4 | **乙：本机复用的粒度** | 按流复用（每条流的输入清单与全绿标记各一格）还是按段复用；今天 54 号 `--full` 按整批输入哈希记一格全绿标记（`.claude/gate.d/54-layer0-replay.sh` 的 `write_layer0_input_manifest` 与 `research/scripts/admission.py manifest`），拆成按流之后每条流的输入是哪几份文件；拆细会不会让一次真改动被跳过（`.claude/rules/implementation-workflow.md`「复用上一次全量门禁的判定」：判据是那一道读的输入变没变） |
+| L4 | **乙：本机复用的粒度** | 按流复用（每条流的输入清单与全绿标记各一格）还是按段复用；今天 54 号 `--full` 按整批输入哈希记一格全绿标记（`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `write_layer0_input_manifest` 与 `research/scripts/admission.py manifest`），拆成按流之后每条流的输入是哪几份文件；拆细会不会让一次真改动被跳过（`.claude/rules/implementation-workflow.md`「复用上一次全量门禁的判定」：判据是那一道读的输入变没变） |
 | L5 | **代价** | 甲之下第二条流（今天的段序列）剩多少个状态、闭式怎么算；本机 32 线程要跑多久（推的写明推的）；乙之下一次只改 checker、只改一条流用到的代码时要重跑哪几条流 |
 | L6 | **层 0 的其余用例**：`crates/singlefs-harness/tests/` 下名字带 `layer0` 的 9 份用例，54 号 `--full` 跑哪几份、各多少个状态 | 甲、乙对它们各起不起作用；有没有哪一份今天就是全量里最慢的 |
 | L7 | **断点续跑**（用户 2026-09-26：「层 0 第二条流 可以32核跑  但是跑的时候注意点 不要中断了 要可以中断续接 不然要中断了就很惨」）：今天的枚举只按片打 `LAYER0_PROGRESS` 进度行（`crash.rs` 的 `enumerate_layer0_in_state_slices`），中途被杀就从头跑，54 号 `--full` 也没有续跑。候选形态：切片按状态序号区间定、不随线程数变；每跑完一片把这一片的计数与第一处违例追加进一份进度文件并 fsync，进度文件按输入哈希与切片方案分格、放 `${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}` 下；重起时头部对得上就跳过已完成的片，按片序合并 | 续跑之后的计数行与一口气跑完的逐字节相同吗（拿什么用例钉住：中途杀掉、续跑、比对）；进度文件写到一半被杀（末行半截）怎么认；输入变了、切片方案变了、线程数变了各怎么办；续跑会不会让一片被数两次或漏数（跑完的状态数必须等于闭式）；强制从头跑的开关与 54 号怎么报「这一次是续跑的」 |
@@ -26,7 +26,7 @@
 - 切段：`crates/singlefs-harness/src/segments.rs:94` `split_into_segments`（屏障与 FUA 写切段，FUA 写关掉它所在的那一段，D13（验证路线） 已定项 4）；闭式 `segments.rs:147` `closed_form_state_count`，另有 `crates/singlefs-harness/src/crash.rs:524` 同名一份。
 - 枚举：`crash.rs:1354` `enumerate_layer0_selecting`、`:1728` `enumerate_layer0_in_state_slices`（按区间切片多线程）、`:1870` `enumerate_layer0`。
 - 两条流：第一条流 `crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs`；第二条流（固定脚本）`crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs`。另有 7 份名字带 `layer0` 的用例（L6）。
-- 全绿标记：`.claude/gate.d/54-layer0-replay.sh` 文件头第 2–34 行（快档、全量、按输入哈希分格的全绿标记），输入哈希由 `research/scripts/admission.py manifest` 算。
+- 全绿标记：`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头第 2–34 行（快档、全量、按输入哈希分格的全绿标记），输入哈希由 `research/scripts/admission.py manifest` 算。
 - `crates/` 的层 0 枚举与切段里没有约简：`grep -rn 'reduc\|约简' crates/singlefs-harness/src/` 照冻结副本命中 8 行，全在 `src/bin/e158_root_choice_repair.rs`（字段名 `skipped_by_the_reduction_rule`，E158 择根修复那条线的另一回事），`segments.rs`、`crash.rs` 与名字带 `layer0` 的用例零命中（材料员照冻结副本现跑，原样输出在附录二之三；主 agent 按它改了这一句）。
 
 ## 三、条款（材料员整段抄进附录）
@@ -580,7 +580,7 @@ jsn 严格连续（断号即止）、**`(实例代号, checkpoint_txg)` 大于�
 ```markdown
 ## 重型测试只在提交时跑
 
-**重型测试**：层 0 全量（`.claude/gate.d/54-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
+**重型测试**：层 0 全量（`.claude/gate.d/checker-tier-layer0-replay.sh` 与 `--test` 目标名含 `layer0` 的测试）、QEMU（55 号、`vm-bench.sh`）、herd7（57 号、`.claude/scripts/lkmm.sh`）、`crates` 变异整表（59 号）、全量 `cargo test`（`--all`、`--workspace`、`check.sh`）、整轮门禁（`gate.sh`、`gate-staged.sh`）、全部实验复跑（87 号）、E152 装置。`.claude/gate.d/` 下 54、55、57、59、87 之外的阶段不是重型，谁都能跑。
 
 | 场合 | 跑不跑 |
 |---|---|
@@ -614,7 +614,7 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 - **跑的过程中报进度**：每片报区间与已跑的数，长用例的日志一直在涨。
 - **不能并行的写明为什么**：共享状态、次序本身就是被测对象，写在那条用例的注释里。
 
-**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/54-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/54-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
+**门禁管哪一半**：崩溃点重放由门禁 54 号判：整轮门禁跑快档，再按这批输入的内容哈希核那一格层 0 全量的全绿标记（两条流都是 `exhaustive=true` 才算）；全量在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑 `bash <它的根>/.claude/gate.d/checker-tier-layer0-replay.sh --full <它的根>`，没有显式把线程数设成 1、机器多于 1 核却只用了 1 个线程，判红（`.claude/gate.d/checker-tier-layer0-replay.sh`；红的那一支只拿合成日志核过）。别的测试是不是能并行而没并行，门禁看不出，靠实现员与代码三方。
 
 ```
 
@@ -721,7 +721,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 
 材料员核实：这 8 行都命中同一个字段名 `skipped_by_the_reduction_rule`（`e158_root_choice_repair.rs` 第 1210/1242/1284/1307/1329/1330/1549/1558 行），与正文第一节「甲：合法约简」谈的层 0 枚举约简是两回事；但字面上「零命中」这句陈述不成立，三条腿读到正文第二节时会看到一句与本附录实测不一致的话，是否改写正文由主 agent 定，材料员不改正文。
 
-### 二之四：`.claude/gate.d/54-layer0-replay.sh`，主工作区现行版摘录
+### 二之四：`.claude/gate.d/checker-tier-layer0-replay.sh`，主工作区现行版摘录
 
 #### 文件头，第 1-34 行
 
@@ -732,7 +732,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #
 # 分两档（用户 2026-09-19 定，原话「每次主 agent 执行完任务后统一执行」，records/2026-09-19-里程碑二遗留收拢.md「五之二」第 8 问）：
 #
-#   bash <worktree>/.claude/gate.d/54-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
+#   bash <worktree>/.claude/gate.d/checker-tier-layer0-replay.sh --full <worktree>    主 agent 暂存之后，在 HEAD + 暂存区的 worktree 里用那棵树里的 54 号跑一次
 #     两条流的全量枚举（「全量」「多线程」两段说的就是它），不问复用、不问改动范围，照跑。worktree 的建法与 `gate.sh --staged` 相同，命令在快档的出路句里。
 #     开跑与跑完各算一次输入的内容哈希，对不上（跑的过程中输入被改了）判红。全绿标记按输入哈希分格：
 #     `$(git rev-parse --git-common-dir)/singlefs-layer0-full-green.<输入哈希>`，不进工作树；放 common-dir，各 worktree 读写的是同一组。
@@ -740,7 +740,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #     这一趟没写成标记就退出（判红、被 TERM / INT / HUP 打断）时，退出前删这批输入那一格；「跑的过程中输入变了」那一支判红不删：
 #     两条流读到的不一定是开跑那一批，它说不出那一批的好坏。被 SIGKILL 杀掉来不及删，前一趟那一格留着。别的格不动；全绿才写这一格。
 #     标记里有输入哈希、逐文件的「sha256  路径」、开跑与跑完的时刻、工作线程数、两条流的计数行与 CHECKER 行原样。
-#   bash .claude/gate.d/54-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
+#   bash .claude/gate.d/checker-tier-layer0-replay.sh [项目根]           整轮门禁的默认（gate.sh 只传项目根）
 #     快档先核登记的每一条路径 git 至少列得出一个文件（git ls-files -co --exclude-standard -- <那一条>），有一条列不出判红，之后才问复用与改动范围。
 #     两条流的测试二进制在 release 下只跑不标 ignored 的用例，一条都没通过判红；再按这批输入的哈希找那一格：
 #     有、里面记的哈希相同、LAYER0 / CHECKER / LAYER0B 三种计数行各恰好一行、LAYER0 与 LAYER0B 两行各自带 exhaustive=true，才判绿，
@@ -750,7 +750,7 @@ checker 的全盘遍历、无界删除的意图分批、代际增量 scrub。
 #
 # 输入：`.claude/gate.d/stage-inputs.tsv` 里登记给本阶段的路径（唯一登记位，复用判定读的也是它），外加判这一格的 54 号与工具链。
 # 文件集是 git 眼里这些路径下磁盘上真有的文件（已跟踪的加没被忽略的未跟踪的）；逐个按内容算 sha256，「sha256  路径」按路径排序；
-# 清单末尾再加两行：跑的这一份 54 号的 sha256（名字 `<判它的 54 号：54-layer0-replay.sh>`）、`cargo -V` 与 `rustc -V` 原样输出的 sha256
+# 清单末尾再加两行：跑的这一份 54 号的 sha256（名字 `<判它的 54 号：checker-tier-layer0-replay.sh>`）、`cargo -V` 与 `rustc -V` 原样输出的 sha256
 # （名字 `<工具链：…>`）；整张再算一次 sha256。报的文件数只数登记路径下的文件。这两行只进哈希，不进复用与改动范围那两问：
 # 同一份 crates/ 换了判它的 54 号或工具链，前一趟那一格就不再作数。
 # 按内容算、不按 git 对象算：工作区跑的全量与 `--staged` 临时 worktree 里的同一份内容算出同一个数。
@@ -807,7 +807,7 @@ worker_threads_are_acceptable() { # <流的名字> <实际起的工作线程数>
   if [[ "$2" == 1 && "$machine_cores" -gt 1 && ! ( "$threads_origin" == "显式设的" && "$SINGLEFS_LAYER0_THREADS" == 1 ) ]]; then
     echo "  ✗ $1：本机 $machine_cores 核、SINGLEFS_LAYER0_THREADS=$SINGLEFS_LAYER0_THREADS（$threads_origin），全量枚举却只起了 1 个工作线程"
     echo "     → 怎么办：看 crash.rs 的 Layer0Parallelism::from_environment 读没读到 SINGLEFS_LAYER0_THREADS、state_slices 切出来的片数够不够分给每个线程；"
-    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/54-layer0-replay.sh。"
+    echo "                真要单线程跑（比对单进程读数），显式写 SINGLEFS_LAYER0_THREADS=1 bash .claude/gate.d/checker-tier-layer0-replay.sh。"
     return 1
   fi
   return 0

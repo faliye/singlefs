@@ -18,11 +18,11 @@
 - `crates/mutations.tsv`：65 行第 5 列 `-p singlefs-harness --test <搬走的目标>` 改成 `-p singlefs-checker`，6 行第 2 列路径改到 `crates/singlefs-checker/tests/`；门禁 33 号 1354 条锚点各命中一次。
 - `.claude/hooks/lib_heavy_tests.py` `cargo_use`：清单与范围提前算；次序是 `--workspace / --all` → 工作区根裸跑 → 范围等于全部成员 → **checker 包判**（`members.get("singlefs-checker")` 在范围里，且不挑目标、或 `--tests` / `--all-targets` / `--test`）→ 旧的名字含 `layer0` 判 → 登记的崩溃枚举用例带 `--ignored` 判；`classify` 里直接执行的测试二进制先查 `checker_test_targets`（只认离命令最近的仓，仓外才退回本 hook 所在仓）。`KIND_CATEGORY` 加 `checker-tier-cargo`、`checker-tier-binary` → 「checker 档」。自证 174 种全绿。
 - `.claude/hooks/heavy-test-guard.sh`：`AGENT_KINDS["crash-verifier"]` 加那两个 kind；`POLICY` 句改；自证 699 种全绿。主 agent 不带前缀单跑 `cargo test --release -p singlefs-checker --test first_transaction_step_seven_layer0` 实测被拒。
-- `.claude/gate.d/54-layer0-replay.sh`：`run_layer0_test_binary`（两条流各一次 `cargo test --release -p singlefs-harness --test <流>`）换成 `run_checker_package_tests`（一次 `cargo test --release -p singlefs-checker -- --nocapture`）；`run_checker_quick_tier` 把每个测试二进制那一行 `test result` 的 passed / ignored 加总，`passed_total == 0` 判红；标记不作数的用例逐条往 `GATE_NOT_RUN_FILE` 写一行、打 `!`、`exit 0`（原来 `✗` 与 `exit 1`）。`--full` 那一路没动。`research/scripts/admission.py` 自证 280 格全绿（54 号那几格的期望改成报「本次未跑」）。
+- `.claude/gate.d/checker-tier-layer0-replay.sh`：`run_layer0_test_binary`（两条流各一次 `cargo test --release -p singlefs-harness --test <流>`）换成 `run_checker_package_tests`（一次 `cargo test --release -p singlefs-checker -- --nocapture`）；`run_checker_quick_tier` 把每个测试二进制那一行 `test result` 的 passed / ignored 加总，`passed_total == 0` 判红；标记不作数的用例逐条往 `GATE_NOT_RUN_FILE` 写一行、打 `!`、`exit 0`（原来 `✗` 与 `exit 1`）。`--full` 那一路没动。`research/scripts/admission.py` 自证 280 格全绿（54 号那几格的期望改成报「本次未跑」）。
 - `.claude/gate.d/94-checker-implementation-disjoint.sh`：`DEPENDENCY_TABLE`、`DEPENDENCY_ITEM_TABLE` 两个正则去掉 `dev-`；绿样本的 checker `Cargo.toml` 加 `[dev-dependencies] singlefs-core` 仍判绿。
 - `research/scripts/crash-case-check.py`：判法改成「直接调 `enumerate_layer0` 一族（非 `quick_tier`）的测试函数要住在 `singlefs-checker` 包；那个包里标 `#[ignore]` 的要登记成 `crash-case:`，不标的是快档不用登记」；真仓 11 条全过；5 个弄坏开关各自判红。
 - `.claude/gate.d/stage-inputs.tsv`：8 行 `crash-case:`，第三列都是 `test=singlefs-checker:…`；新登记 `crash-case:layer0-position-addressed-tree-streams`（没有 `count-line=`：它每条流各打一行同前缀的 `LAYER0_POSITION_ADDRESSED`）。
-- 实测：`cargo build --all-targets --offline` 通过（21 s 增量）。`SINGLEFS_HEAVY_TESTS=user-request SINGLEFS_GATE_FULL=1 bash .claude/gate.d/54-layer0-replay.sh .` **快档判红**：`first_transaction_step_seven_layer0` 里 `layer0_quick_tier_matches_the_full_tally_shape`、`positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle`、`removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker` 三条 FAILED（`research/prompts/verification-split-tmp-evidence/gate54-quick-run.log`）。主 agent 的归因：C577（系统配置没见证到的最新根，乙罩不到） 在发布末尾多加了一道屏障（`crates/singlefs-core/src/transaction.rs:553`、`:1188`），第一条流的钉值（`QUICK_TIER_STATES = 54`、`FULL_STATES_WITH_TWO_STATES_PER_WRITE = 67_108_885`）还是旧的；会话 singlefs-99 报告它下一步「合入后验证」要改这些钉值。**这一归因是推的，没在 HEAD 上单独复现**——腿要核。
+- 实测：`cargo build --all-targets --offline` 通过（21 s 增量）。`SINGLEFS_HEAVY_TESTS=user-request SINGLEFS_GATE_FULL=1 bash .claude/gate.d/checker-tier-layer0-replay.sh .` **快档判红**：`first_transaction_step_seven_layer0` 里 `layer0_quick_tier_matches_the_full_tally_shape`、`positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle`、`removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker` 三条 FAILED（`research/prompts/verification-split-tmp-evidence/gate54-quick-run.log`）。主 agent 的归因：C577（系统配置没见证到的最新根，乙罩不到） 在发布末尾多加了一道屏障（`crates/singlefs-core/src/transaction.rs:553`、`:1188`），第一条流的钉值（`QUICK_TIER_STATES = 54`、`FULL_STATES_WITH_TWO_STATES_PER_WRITE = 67_108_885`）还是旧的；别的会话报告它下一步「合入后验证」要改这些钉值。**这一归因是推的，没在 HEAD 上单独复现**——腿要核。
 - 规则与定义：`.claude/rules/verification.md` 新立（开头「定义」一节两句话，之后两档表、harness 轻重、checker 档快档与全量、用例住哪、从上游收回的四节、门禁管哪一半）；`.claude/rules/implementation-workflow.md`「重型测试只在提交时跑」整节改成「checker 档只在提交时跑，harness 随时跑」；`CLAUDE.md` 规则清单加一行；`.claude/main-agent.md` 4 处、`.claude/agent-common.md` 2 处、`.claude/agents/implementation-writer.md` 3 处、`crash-verifier.md` 2 处、`gate-triage.md` 1 处、`mutation-triage.md` 1 处。两个包的 `Cargo.toml` `description` 各写一句定义。
 - kb：D13（验证路线） 新立已定项 15；已定项 9 定案表层 0 那一行的触发改成「checker 档的全量：用户要求或夜间跑；提交时默认只跑快档」、射程改成现值；已定项 5 射程末尾加「集成测试不算共享」一句。变更史 2026-09-27（其十九）。
 - 上游三语仓（`../singlefs-ai-sop-{zh,en,ja}`，未 bump、未提交）：`rules/test-discipline.md` 删「崩溃一致性只能靠崩溃点重放验证」「功能正确性靠模型对拍」「checker 即规范」三节、「门禁管哪一半」改通用；`rules/evidence-discipline.md` 删末节「文件系统特有的反推缺口」；`scripts/gate.sh` 未实现清单只留「最终判据」「命名纪律（shell）」两个共享键、项目键从项目根 `.claude/gate-not-implemented.tsv` 读；`scripts/selftest.sh` 600 例全绿；`skills/gate/SKILL.md` 两段改通用。本仓 `.claude/gate-not-implemented.tsv` 登记「崩溃点重放」「模型对拍」。没动：`skills/crash-test/SKILL.md`、`GLOSSARY.md:47-48`、`scripts/env.sh:35`。
@@ -147,7 +147,7 @@
 
 | 小节 | 抄 / 不抄 | 理由 |
 |---|---|---|
-| # 验证代码分两档：harness 日常测试 / checker 提交时验证（singlefs-8b，用户定案） | 抄 | 主 agent 指明整份抄：用户原话与去向 |
+| # 验证代码分两档：harness 日常测试 / checker 提交时验证（用户定案） | 抄 | 主 agent 指明整份抄：用户原话与去向 |
 | （验证代码分两档：harness 标题之下、第一个下级标题之前的正文：第 2-4 行） | 抄 | 与上一行标题合并抄入；主 agent 指明整份抄：用户原话与去向 |
 | ## 用户原话 | 抄 | 主 agent 指明整份抄：用户原话与去向 |
 | ## 拆之前的样子 | 抄 | 主 agent 指明整份抄：用户原话与去向 |
@@ -545,9 +545,9 @@ herd7 / LKMM 与 QEMU 不归上游 singlefs-ai-sop 管：相关的脚本、样�
 **出处 `records/2026-09-27-验证两档拆分.md:1-4`（整段抄，未转述）**
 
 ```markdown
-# 验证代码分两档：harness 日常测试 / checker 提交时验证（singlefs-8b，用户定案）
+# 验证代码分两档：harness 日常测试 / checker 提交时验证（用户定案）
 
-来源：用户 2026-09-27 在会话 singlefs-8b 里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
+来源：用户 2026-09-27 在别的会话里的定案，主 agent 自己做全部改动，不派 subagent（用户原话「这个任务你不要排subagent了 全部你来做」），改完之后派三方腿验证（用户随后补「三方腿都是 subagent， 改完后可以走三方腿验证」）。
 
 ```
 
