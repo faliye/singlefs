@@ -1,0 +1,33 @@
+   Compiling m3r1-opus-proto v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/m3r1-opus-proto)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.42s
+     Running tests/z2_reread_one_transient_root_slot_read_error.rs (/tmp/claude-1000/m3-code-r1-opus/target2/debug/deps/z2_reread_one_transient_root_slot_read_error-ace24bd1ce28fbad)
+
+running 1 test
+SwappedForTheCutAfterTheRootSlotWrite session_publish clean=Ok reads_of_the_root_slot=3
+SwappedForTheCutAfterTheRootSlotWrite session_publish fail_read=1 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite session_publish fail_read=2 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite session_publish fail_read=3 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount clean=Ok reads_of_the_root_slot=15
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=1 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=2 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=3 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=4 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=5 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=6 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=7 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=8 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=9 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=10 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=11 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=12 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=13 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=14 outcome=Ok
+SwappedForTheCutAfterTheRootSlotWrite writable_mount fail_read=15 outcome=Ok
+NewestSystemConfigurationSlotCorrupted session_publish clean=Ok reads_of_the_root_slot=3
+NewestSystemConfigurationSlotCorrupted session_publish fail_read=1 outcome=Ok
+NewestSystemConfigurationSlotCorrupted session_publish fail_read=2 outcome=Ok
+NewestSystemConfigurationSlotCorrupted session_publish fail_read=3 outcome=Ok
+test one_transient_read_error_on_the_root_slot_does_not_refuse_a_behind_device_holding_the_root ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.06s
+

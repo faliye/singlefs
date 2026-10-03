@@ -1,0 +1,129 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-code-r2-opus/work/crates/singlefs-core)
+warning: unused doc comment
+    --> crates/singlefs-core/src/mount.rs:3395:1
+     |
+3395 | / /// 落后支缺根那一半：那一版的根写进了根环（`root_of_the_version`），它该在的根环槽（`root_ring::target_for_publish` 按 txg 算）
+3396 | | /// 住在 `device` 这块盘上，读那一槽一次，不是它（读坏、或自证得过而是另一条根）就重读一次，仍不是它才交回两次读到的
+3397 | | /// （D16（发布语义） 已定项 1「根槽这一次读坏」：知道住着根的槽重读一次仍坏才算；挂着之后现行那一版的根槽是这个进程写过、FUA ...
+3398 | | /// 根没写进根环、或那一槽不在这块盘上的交回 `None`，不读盘。只读盘：至多读那一槽两次。
+     | |_--------------------------------------------------------------------------------------^
+     |   |
+     |   rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+     = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-code-r2-opus/work/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 17.04s
+  Executable unittests src/lib.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/singlefs_harness-1f7158c606bb977e)
+  Executable tests/a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is-d5b0d2465a8966ea)
+  Executable tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_floor_raise_refused_for_space_counts_as_short_of_space-78b8354fbd3a8053)
+  Executable tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable-8f1305646da5988e)
+  Executable tests/a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side-e1eb0b38d93db80a)
+  Executable tests/a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify-84fabc264b983804)
+  Executable tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error-f15f0cfc870ed347)
+  Executable tests/accounting_and_mapping_tree_split.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/accounting_and_mapping_tree_split-abb85722236d0d1f)
+  Executable tests/accounting_tree_node_full.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/accounting_tree_node_full-fe6c26fe058011bf)
+  Executable tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics-6a51b2458ca1fa9f)
+  Executable tests/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish-2634d4d4f3e61327)
+  Executable tests/admission_checkpoint_cost_per_device_paths.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/admission_checkpoint_cost_per_device_paths-59ffdcc07ffe4280)
+  Executable tests/admission_formula_on_the_mounted_state.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/admission_formula_on_the_mounted_state-fad5e07b0d0bd349)
+  Executable tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/admission_raises_the_floor_before_refusing-72cca653cd107891)
+  Executable tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments-e4d71fa8230e57ec)
+  Executable tests/allocation_record_tree_root_level_of_writer_and_reader.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/allocation_record_tree_root_level_of_writer_and_reader-3af0073cfcd0c5b4)
+  Executable tests/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor-4e5bde91c51aa3a9)
+  Executable tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping-e0eacea626db2583)
+  Executable tests/checker_cross_links_malformed_nodes_and_mapping_entries.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/checker_cross_links_malformed_nodes_and_mapping_entries-cd032b07ae929b55)
+  Executable tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/checker_judges_reserved_bytes_and_widths_it_used_to_skip-e9af9cf6aafc275b)
+  Executable tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/checker_known_bad_images-a08244baa9be419d)
+  Executable tests/checker_narrow_invariants_and_abandoned_roots.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/checker_narrow_invariants_and_abandoned_roots-d7e57aff35b79861)
+  Executable tests/commit_generated_units_fall_back_when_the_segment_runs_out.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/commit_generated_units_fall_back_when_the_segment_runs_out-84dd7271a31ceeee)
+  Executable tests/core_review_geometry_back_chain_and_empty_inode.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/core_review_geometry_back_chain_and_empty_inode-2b22755fe309290e)
+  Executable tests/core_review_tree_table_duplicates_and_slot_one_search.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/core_review_tree_table_duplicates_and_slot_one_search-936c96328a9bfc8c)
+  Executable tests/core_review_unit_area_start_and_publish_limits.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/core_review_unit_area_start_and_publish_limits-b4d1da65d2318aad)
+  Executable tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/corrupt_on_disk_content_is_refused_instead_of_panicking-4fe2e6ae2cc0d8bb)
+  Executable tests/data_unit_allocation_and_write.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/data_unit_allocation_and_write-2085cca047af4cb7)
+  Executable tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration-a308867762071946)
+  Executable tests/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write-b46f6fef3e8bb003)
+  Executable tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/entries_after_mount_refuse_swapped_or_behind_devices-7e14242ee9c4c3ad)
+  Executable tests/fault_injection_fast_tier.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/fault_injection_fast_tier-3017700af5863fd3)
+  Executable tests/first_file_version_checks_the_previous_record.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/first_file_version_checks_the_previous_record-2d584eead9b61620)
+  Executable tests/fsync_drop_and_devices_without_the_selected_version.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/fsync_drop_and_devices_without_the_selected_version-d59de0984eefbbff)
+  Executable tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/index_node_header_width_computed_three_ways_agrees_for_every_key_width-921abdba3a74f940)
+  Executable tests/instance_acquisition.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/instance_acquisition-80b7f86285559110)
+  Executable tests/instance_table_chain_read.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/instance_table_chain_read-4d411a852169eff1)
+  Executable tests/instance_table_page_full.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/instance_table_page_full-cc05fa611f446c94)
+  Executable tests/instance_table_second_page_write.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/instance_table_second_page_write-b5ec6b03b2ded41e)
+  Executable tests/journal_last_record_flag_of_a_multi_record_publish.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/journal_last_record_flag_of_a_multi_record_publish-467ca279c1f233c7)
+  Executable tests/many_inodes_write_and_read.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/many_inodes_write_and_read-c45802fe397fe674)
+  Executable tests/mapping_tree_capacity_admission.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/mapping_tree_capacity_admission-8f92fcfb96c2aa7c)
+  Executable tests/mkfs_bytes_judged_by_the_checker.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/mkfs_bytes_judged_by_the_checker-a65dbd8ff1123e80)
+  Executable tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/mkfs_on_image_files_punches_the_zeroed_ranges-a42a635dc651a477)
+  Executable tests/model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file-717cae77ca33c750)
+  Executable tests/mounted_read_by_offset.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/mounted_read_by_offset-64dc9d3b2ff96bcd)
+  Executable tests/multi_record_publishes_of_transaction_zero.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/multi_record_publishes_of_transaction_zero-97e168143750a3f0)
+  Executable tests/multi_unit_file_write_and_read.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/multi_unit_file_write_and_read-23c4d21e62276ec8)
+  Executable tests/new_pool_file_creation_publish.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/new_pool_file_creation_publish-f3d990ab90287d15)
+  Executable tests/new_pool_file_creation_write_regions.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/new_pool_file_creation_write_regions-8e0ab19a2f142709)
+  Executable tests/overwrite_in_one_instance.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/overwrite_in_one_instance-7951dd0f04c8dee0)
+  Executable tests/presumed_clause_checks.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/presumed_clause_checks-390fe068dfba711c)
+  Executable tests/publish_failure_resent_unchanged.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/publish_failure_resent_unchanged-25218ed060d197de)
+  Executable tests/publish_order_matches_litmus.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/publish_order_matches_litmus-8394e50fbc75b7d9)
+  Executable tests/r2opus_entries_proto.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/r2opus_entries_proto-c4b9d13e22442de4)
+  Executable tests/r2opus_zero_length_on_three_backends.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/r2opus_zero_length_on_three_backends-c827eeab027a770c)
+  Executable tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic-cf4a203b1c6fbec1)
+  Executable tests/random_histories.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/random_histories-95dd21b94c84c8d2)
+  Executable tests/rebuild_with_an_unreadable_data_unit.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/rebuild_with_an_unreadable_data_unit-c9e30af1822b1be9)
+  Executable tests/recovery_reads_the_created_file_after_reopen.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/recovery_reads_the_created_file_after_reopen-f2182afbb0be551f)
+  Executable tests/release_checksum_quarantine.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/release_checksum_quarantine-22a7799de5395083)
+  Executable tests/reuse_after_raising_the_floor.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/reuse_after_raising_the_floor-ad40f0f12b81b0c5)
+  Executable tests/reused_allocation_record_overlap.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/reused_allocation_record_overlap-bb882b0319745442)
+  Executable tests/rollback_by_a_forward_publish.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/rollback_by_a_forward_publish-88f5eddf0b8b6203)
+  Executable tests/root_ring_turn_in_one_mount.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/root_ring_turn_in_one_mount-40e9d78cbec3c1a7)
+  Executable tests/row_publish_admission.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/row_publish_admission-c6a440d8cda31bb1)
+  Executable tests/row_publish_checks_before_acquisition.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/row_publish_checks_before_acquisition-bafdbba7db4d1c59)
+  Executable tests/row_publish_record_without_its_root.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/row_publish_record_without_its_root-f1579f6ccb0de470)
+  Executable tests/sequential_write_one_record_per_data_unit.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/sequential_write_one_record_per_data_unit-6ec041d5406cf6a8)
+  Executable tests/sequential_write_split_into_one_unit_transactions.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/sequential_write_split_into_one_unit_transactions-562f6f2ea6bc76f8)
+  Executable tests/sparse_device_zero_fill.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/sparse_device_zero_fill-6fcd6b858e42057d)
+  Executable tests/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend-d0e4db460ddf5557)
+  Executable tests/system_configuration_fields_core_and_checker_refuse_the_same_table.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_fields_core_and_checker_refuse_the_same_table-82df6ad8032783eb)
+  Executable tests/system_configuration_mutability_classes.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_mutability_classes-d81a0c5ba8b37537)
+  Executable tests/system_configuration_per_device_redundancy.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_per_device_redundancy-c975863786274178)
+  Executable tests/system_configuration_rollback_floor_and_layout_identity.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_rollback_floor_and_layout_identity-f39a032e6f5f2926)
+  Executable tests/system_configuration_slot_is_overwritten_only_after_a_barrier.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_slot_is_overwritten_only_after_a_barrier-efd28d768ef0fa53)
+  Executable tests/system_configuration_slots_per_region.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/system_configuration_slots_per_region-42fa596caf585928)
+  Executable tests/test_only_switches_force_every_branch.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/test_only_switches_force_every_branch-76e509139727b9bc)
+  Executable tests/tree_nodes_and_the_central_mapping_on_mounted_read.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/tree_nodes_and_the_central_mapping_on_mounted_read-7e69e926f1cd8d7c)
+  Executable tests/tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker-ca99c47902e7440e)
+  Executable tests/unequal_devices.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/unequal_devices-f9112e1f94e4e165)
+  Executable tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over-39e2ef7670778a67)
+  Executable tests/unreadable_abandoned_root_slot.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/unreadable_abandoned_root_slot-8383cad387edf1cf)
+  Executable tests/warm_up_journal_counter.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/warm_up_journal_counter-78c4ee68f2540fe4)
+  Executable tests/whole_device_loss_after_warm_up.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/whole_device_loss_after_warm_up-2440ff9c171fd125)
+  Executable tests/writable_mount_of_a_formatted_pool.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/writable_mount_of_a_formatted_pool-20d65f3cb9589986)
+  Executable tests/writable_mount_refuses_a_device_identity_handed_in_twice.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/writable_mount_refuses_a_device_identity_handed_in_twice-fcaa5bb04f09635a)
+  Executable tests/writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration-85d7e332bbc2c07e)
+  Executable tests/writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk-5d4447263f577eb5)
+  Executable tests/writable_mount_takes_a_second_instance.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/writable_mount_takes_a_second_instance-111c006326431dd6)
+  Executable tests/write_accounting_per_structure.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/write_accounting_per_structure-f076562ada493cd8)
+  Executable tests/zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in-07df2013cf207268)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-code-r2-opus/work/crates/singlefs-core)
+warning: unused doc comment
+    --> crates/singlefs-core/src/mount.rs:3395:1
+     |
+3395 | / /// 落后支缺根那一半：那一版的根写进了根环（`root_of_the_version`），它该在的根环槽（`root_ring::target_for_publish` 按 txg 算）
+3396 | | /// 住在 `device` 这块盘上，读那一槽一次，不是它（读坏、或自证得过而是另一条根）就重读一次，仍不是它才交回两次读到的
+3397 | | /// （D16（发布语义） 已定项 1「根槽这一次读坏」：知道住着根的槽重读一次仍坏才算；挂着之后现行那一版的根槽是这个进程写过、FUA ...
+3398 | | /// 根没写进根环、或那一槽不在这块盘上的交回 `None`，不读盘。只读盘：至多读那一槽两次。
+     | |_--------------------------------------------------------------------------------------^
+     |   |
+     |   rustdoc does not generate documentation for macro invocations
+     |
+     = help: to document an item produced by a macro, the macro must produce the documentation as part of its expansion
+     = note: `#[warn(unused_doc_comments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.71s
+  Executable unittests src/lib.rs (/tmp/claude-1000/m3-code-r2-opus/target/debug/deps/singlefs_core-35f3c975d30e0b15)

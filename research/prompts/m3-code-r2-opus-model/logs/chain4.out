@@ -1,0 +1,25 @@
+APPLIED Z0_zero_length_before_the_request_check 1 处
+WRONG Z0_zero_length_before_the_request_check h5 rc=0 H5-SUMMARY cells=22 disagreements=6 2 ok-binaries
+RESTORED Z0_zero_length_before_the_request_check ['crates/singlefs-core/src/block_device.rs']
+APPLIED AC_only_region_zero_device_in_the_three_other_entries 3 处
+WRONG AC_only_region_zero_device_in_the_three_other_entries entries rc=0 test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.16s failed=[]
+RESTORED AC_only_region_zero_device_in_the_three_other_entries ['crates/singlefs-core/src/mount.rs']
+DONE
+APPLIED COMBO_RG_RP_Z0_E1 6 处
+FULL COMBO_RG_RP_Z0_E1 streams=4 binaries=90 rc_files=90 nonzero=[] core_lib=test result: ok. 138 passed
+FULL COMBO_RG_RP_Z0_E1 failed_tests=[]
+RESTORED COMBO_RG_RP_Z0_E1 ['crates/singlefs-core/src/block_device.rs', 'crates/singlefs-core/src/mount.rs']
+DONE
+APPLIED COMBO_EC_R3 7 处
+FULL COMBO_EC_R3 streams=4 binaries=90 rc_files=90 nonzero=[] core_lib=test result: ok. 138 passed
+FULL COMBO_EC_R3 failed_tests=[]
+RESTORED COMBO_EC_R3 ['crates/singlefs-core/src/mount.rs']
+DONE
+before-kill pid=2378114 files:
+52 -rw-rw-r-- 1 fy5090 fy5090 4294967296 Oct  1 09:00 /tmp/singlefs-step67-punch-zeroed-ranges-2378114-0-dev0.img
+48 -rw-rw-r-- 1 fy5090 fy5090 4294967296 Oct  1 09:00 /tmp/singlefs-step67-punch-zeroed-ranges-2378114-1-dev1.img
+after-kill files:
+52 -rw-rw-r-- 1 fy5090 fy5090 4294967296 Oct  1 09:00 /tmp/singlefs-step67-punch-zeroed-ranges-2378114-0-dev0.img
+48 -rw-rw-r-- 1 fy5090 fy5090 4294967296 Oct  1 09:00 /tmp/singlefs-step67-punch-zeroed-ranges-2378114-1-dev1.img
+removed /tmp/singlefs-step67-punch-zeroed-ranges-2378114-0-dev0.img
+removed /tmp/singlefs-step67-punch-zeroed-ranges-2378114-1-dev1.img

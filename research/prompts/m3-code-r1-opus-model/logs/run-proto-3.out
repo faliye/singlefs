@@ -1,0 +1,19 @@
+reread-orig rc=0
+release build rc=0
+STALE=/tmp/claude-1000/m3-code-r1-opus/target2/release/deps/z2_stale_snapshot_from_any_publish_of_a_history-e9039527ecd7ac3c CRASH=/tmp/claude-1000/m3-code-r1-opus/target2/release/deps/z2_every_crash_state_of_a_publish_then_a_writable_mount-47161cdcc348d59f
+crash rollback rc=0 seconds=23
+stale m3 rc files: 8 seconds=182
+shard 0 rc=0
+shard 1 rc=0
+shard 2 rc=0
+shard 3 rc=0
+shard 4 rc=0
+shard 5 rc=0
+shard 6 rc=0
+shard 7 rc=0
+stale-m1 A_only_device_zero rc=0
+stale-m1 E_any_self_verified_root rc=0
+stale-m1 C_mount_never_root rc=0
+stale-m1 B_txg_only rc=0
+crash rollback T06 rc=0
+mount.rs restored

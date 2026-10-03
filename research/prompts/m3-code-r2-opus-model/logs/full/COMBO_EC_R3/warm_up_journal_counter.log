@@ -1,0 +1,9 @@
+
+running 3 tests
+test warm_up_after_a_journal_counter_other_than_zero_counts_records_on_from_it_while_txg_stays_one_and_two ... ok
+test c366_when_the_chosen_root_own_record_is_unreadable_the_writable_mount_is_refused_by_the_undecidable_witness_and_the_read_only_mount_opens_the_chosen_root ... ok
+test a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg has been running for over 60 seconds
+test a_writable_mount_after_a_two_record_publish_numbers_its_records_and_tail_from_the_jsn_one_ahead_of_the_txg ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 66.01s
+

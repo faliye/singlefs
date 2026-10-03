@@ -1,0 +1,5 @@
+/home/fy5090/.local/bin/cargo
+判对 0 个、判错 1 个：library-version-is-staged-tree-marker-check-clean-unmarked(期望3→实测1，缺 want 2 条)
+  ✗ admission.py stage-marker-check 退 2：判不了这一道的全绿标记（上一行是原因）
+     → 怎么办：看 .claude/gate.d/stage-inputs.tsv 里这一道那一行还在不在、cargo -V 与 rustc -V 跑不跑得出，修好再查
+exit=1

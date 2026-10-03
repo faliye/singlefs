@@ -1,0 +1,6 @@
+2ea8b99d3f805992c68f434ee9a6f64c88367ebc2a646eeb0b89a7acd6b18d5e  .claude/kb/checks-owed.md
+e09ab08b63a3ec572cd528b39bff1ec1fe0dcf3bb0b3e5bf40f5ca6eb20a4420  .claude/kb/decisions/18-块里携带什么信息.md
+98a79e4596164cb52feb3d6e40f26c74cc39244c0e9ac4878631af82516bb4c0  .claude/kb/decisions/16-发布语义.md
+cf3b3d3ce92bf7c1ee2d44ada7a0ba926af39b1980f097df477d8f7d4ed4ea30  .claude/kb/decisions/23-journal的角色与格式.md
+520e7d909aaa28dbd2c116a90dd1a36729bb7bb76304d8006595e8be592aa290  .claude/kb/decisions/17-实现分层与第三方管道.md
+dd45d2f9383d394034adbb0476ff93d9a955242905fc8ebfb3ac326fad43739d  .claude/kb/decisions/22-单元原子性怎么合成.md

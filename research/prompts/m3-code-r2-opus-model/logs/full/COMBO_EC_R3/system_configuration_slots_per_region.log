@@ -1,0 +1,8 @@
+
+running 3 tests
+test the_pool_checker_refuses_the_same_out_of_range_slots_per_region_the_mount_refuses ... ok
+test the_ring_geometry_follows_the_slots_per_region_on_disk_not_a_compile_time_constant ... ok
+test mounting_refuses_a_slots_per_region_outside_the_interval_and_accepts_four_eight_and_sixteen ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.58s
+

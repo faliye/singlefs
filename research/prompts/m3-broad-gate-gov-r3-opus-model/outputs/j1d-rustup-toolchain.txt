@@ -1,0 +1,3 @@
+不设 RUSTUP_TOOLCHAIN：rustc 1.98.0 (88d9e12ae 2026-08-18)
+RUSTUP_TOOLCHAIN=nightly-x86_64-unknown-linux-gnu：rustc 1.100.0-nightly (330d31712 2026-09-17)
+工具链变了；--unit-environment 认的变量：没有；带进单元的固定五个：SINGLEFS_HEAVY_TESTS PATH HOME CARGO_HOME RUSTUP_HOME

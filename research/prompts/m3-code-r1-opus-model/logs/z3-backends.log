@@ -1,0 +1,26 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/singlefs-checker-tier)
+   Compiling m3r1-opus-proto v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/m3r1-opus-proto)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.67s
+     Running tests/z3_zero_fill_on_the_file_backend_against_the_other_backends.rs (/tmp/claude-1000/m3-code-r1-opus/target2/debug/deps/z3_zero_fill_on_the_file_backend_against_the_other_backends-efd02d5f20c81a11)
+
+running 2 tests
+test real_errnos_from_fallocate ... ERRNO EOPNOTSUPP outcome=Ok counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 1 } range_zeroed=true range_untouched=false
+ERRNO ENOSYS outcome=Ok counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 1 } range_zeroed=true range_untouched=false
+ERRNO ENOSPC outcome=InputOutput(raw_os_error=Some(28), kind=StorageFull) counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } range_zeroed=false range_untouched=true
+ERRNO EINTR outcome=InputOutput(raw_os_error=Some(4), kind=Interrupted) counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } range_zeroed=false range_untouched=true
+ERRNO EPERM outcome=InputOutput(raw_os_error=Some(1), kind=PermissionDenied) counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } range_zeroed=false range_untouched=true
+ERRNO EIO outcome=InputOutput(raw_os_error=Some(5), kind=Uncategorized) counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } range_zeroed=false range_untouched=true
+ERRNO EINVAL outcome=InputOutput(raw_os_error=Some(22), kind=InvalidInput) counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } range_zeroed=false range_untouched=true
+ok
+test zero_fills_on_the_three_backends ... ZERO_FILL offset=0 length=0 file=InputOutput(raw_os_error=Some(22), kind=InvalidInput) file_counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } direct=Ok sparse=Ok
+ZERO_FILL offset=1048576 length=0 file=InputOutput(raw_os_error=Some(22), kind=InvalidInput) file_counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } direct=Ok sparse=Ok
+ZERO_FILL offset=4096 length=0 file=InputOutput(raw_os_error=Some(22), kind=InvalidInput) file_counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } direct=Ok sparse=Ok
+ZERO_FILL offset=0 length=512 file=Ok file_counts=ZeroFillLandingCounts { punched_calls: 1, written_as_zero_bytes_calls: 0 } direct=Ok sparse=Ok
+ZERO_FILL offset=1048064 length=512 file=Ok file_counts=ZeroFillLandingCounts { punched_calls: 1, written_as_zero_bytes_calls: 0 } direct=Ok sparse=Ok
+ZERO_FILL offset=1048576 length=512 file=OutOfRange { offset: DeviceOffsetInBytes(1048576), length: 512, device_size: 1048576 } file_counts=ZeroFillLandingCounts { punched_calls: 0, written_as_zero_bytes_calls: 0 } direct=OutOfRange { offset: DeviceOffsetInBytes(1048576), length: 512, device_size: 1048576 } sparse=OutOfRange { offset: DeviceOffsetInBytes(1048576), length: 512, device_size: 1048576 }
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

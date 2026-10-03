@@ -1,0 +1,7 @@
+rc=0 :: 第 26 行 ③ 带 env 行、带前缀、主 agent
+rc=0 :: --unit-environment 带前缀
+rc=2 :: --unit-environment 不带前缀
+rc=0 :: --marker-check 带前缀
+rc=2 :: --marker-check 不带前缀
+rc=0 :: 第 26 行 ③ 空 env 行、带前缀、主 agent
+rc=2 :: --unit-environment 带前缀、子 agent

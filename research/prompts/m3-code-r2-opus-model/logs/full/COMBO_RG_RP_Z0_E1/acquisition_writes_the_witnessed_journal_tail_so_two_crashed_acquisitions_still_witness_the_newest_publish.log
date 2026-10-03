@@ -1,0 +1,13 @@
+
+running 8 tests
+test a_rolled_back_acquisition_writes_the_witnessed_tail_back_instead_of_zero ... ok
+test a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_first_device_lags_one_rotation ... ok
+test a_later_acquisition_writes_the_largest_tail_of_the_pool_into_every_device_when_the_second_device_lags_one_rotation ... ok
+test the_first_acquisition_after_mkfs_still_writes_tail_zero_so_the_new_pool_file_creation_bytes_do_not_change ... ok
+test an_acquisition_refuses_the_second_device_that_lost_only_its_newest_slot_before_writing_anything ... ok
+test an_acquisition_refuses_the_first_device_that_lost_only_its_newest_slot_before_writing_anything ... ok
+test two_crashed_acquisitions_in_a_row_still_witness_the_newest_publish_so_the_writable_mount_refuses_instead_of_abandoning_its_unreadable_root ... ok
+test three_crashed_acquisitions_in_a_row_carry_the_witness_from_acquisition_write_to_acquisition_write ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.94s
+

@@ -1,0 +1,21 @@
+
+running 11 tests
+test c393_allocation_record_tree_unreadable_on_every_read has been running for over 60 seconds
+test c393_allocation_record_tree_unreadable_only_on_the_first_read_of_each_copy has been running for over 60 seconds
+test c393_allocation_record_tree_unreadable_until_the_reread_hook has been running for over 60 seconds
+test c393_allocation_record_tree_unreadable_only_on_the_first_read_of_each_copy ... ok
+test c393_allocation_record_tree_unreadable_on_every_read ... ok
+test c393_allocation_record_tree_unreadable_until_the_reread_hook ... ok
+test c393_checker_on_a_persistently_damaged_tree_table_without_reuse ... ok
+test c393_positive_control_the_hook_is_called_when_the_newest_instance_table_is_unreadable ... ok
+test c393_checker_on_a_persistently_damaged_allocation_record_tree_without_reuse ... ok
+test c393_readable_allocation_record_tree_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31 ... ok
+test c393_readable_tree_table_control_isolates_14_and_nothing_of_c_is_reused_through_txg_31 ... ok
+test c393_tree_table_unreadable_on_every_read ... ok
+test c393_tree_table_unreadable_only_on_the_first_read_of_each_copy has been running for over 60 seconds
+test c393_tree_table_unreadable_until_the_reread_hook has been running for over 60 seconds
+test c393_tree_table_unreadable_only_on_the_first_read_of_each_copy ... ok
+test c393_tree_table_unreadable_until_the_reread_hook ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 262.79s
+

@@ -1,0 +1,10 @@
+i03-baseline-lie	原样门禁 exit=1	g03-baseline-differs exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：登记的基线 1.0 与那一版记的 300.0 不同
+i05-not-larger	原样门禁 exit=1	g05-not-larger exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：升档那趟的 3600 没比原来的 3600 大
+i06m-memory-multiple	原样门禁 exit=1	g06m-memory-multiple exit=0	登记表第 3 行（第 2 条 caught-by-memory，版本 e5ca1a7e00000000）：升档那趟的 36864M 不到基线 21474836480 的 2 倍（倍数门槛是驱动
+i07-no-trailer	原样门禁 exit=1	g07-trailer exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：first 那趟的日志末尾没有驱动写的那一行（BROAD_MUTATION_EVIDENCE
+i07b-trailer-wrong	原样门禁 exit=1	g07b-trailer-prefix exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：first 那趟的日志末尾没有驱动写的那一行（BROAD_MUTATION_EVIDENCE
+i08-no-wrapper	原样门禁 exit=1	g08-wrapper exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：first 那趟的日志里没有包装打的「超过限时 900 秒」；escalated
+i09-columns	原样门禁 exit=1	g09-columns exit=0	登记表第 4 行段数是 14，不是 15
+i10-no-escalated-field	原样门禁 exit=1	g10-escalated-field exit=0	✗ 驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）：
+i11-name-differs	原样门禁 exit=1	g11-sequence-only exit=0	--summary 说第 1 条是升档判的 caught-by-timeout，登记表里没有这一版（e5ca1a7e00000000）复核得过的那一行
+i14-logs-elsewhere	原样门禁 exit=1	g14-anywhere exit=0	登记表第 4 行（第 1 条 caught-by-timeout，版本 e5ca1a7e00000000）：first 那趟的日志 logs/1.first.log 不在 versions/<那一版>/escalation/ �

@@ -1,0 +1,12 @@
+reread-orig rc=101
+reread-no-reread rc=101
+mount.rs restored
+z3 rc=0
+build wrapper rc=0
+build mkfs test rc=0
+mkfs test binary /tmp/claude-1000/m3-code-r1-opus/target2/debug/deps/mkfs_on_image_files_punches_the_zeroed_ranges-a42a635dc651a477
+mkfs test on tmpfs rc=0
+mkfs test with fallocate=EOPNOTSUPP rc=101
+mkfs test with fallocate=ENOSPC rc=101
+crash-counts rc=0
+stale-m1 rc=0

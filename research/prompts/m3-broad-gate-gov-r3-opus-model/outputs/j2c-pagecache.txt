@@ -1,0 +1,6 @@
+① 基线（写 400M 的文件）exit=0
+   记下的峰值 100663296 字节（上限 96M = 100663296 字节）
+② 变异那一趟 exit=250
+   照 escalate_step 的式子升档上限 = 192M
+③ 升档那一趟 exit=254
+run-with-memory-cap: 被 slice singlefs-r3attack.slice 的总上限挤掉了

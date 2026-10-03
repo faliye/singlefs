@@ -1,0 +1,7 @@
+上限 200M exit=250
+run-with-memory-cap: 撞了内存上限 200M
+209715200	200M	r3-over
+上限 300M exit=254
+run-with-memory-cap: 被 slice singlefs-r3attack.slice 的总上限挤掉了
+run-with-memory-cap: → 这一条的结果不算数，重跑它；常这样说明排队按峰值表放进来的几条实际占的比表里记的多，bash /tmp/claude-1000/m3-gov-r3-attack/rerun/trees/base/research/scripts/run-with-memory-cap.sh --status 看 slice 里是谁
+209715200	200M	r3-over

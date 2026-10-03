@@ -1,0 +1,7 @@
+
+running 2 tests
+test each_mutability_class_writes_its_own_field_table_budget_389_4_36_60 ... ok
+test splitting_the_system_configuration_into_four_mutability_classes_changes_no_byte_on_disk ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

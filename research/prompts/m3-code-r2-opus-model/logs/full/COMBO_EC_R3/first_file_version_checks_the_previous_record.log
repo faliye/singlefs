@@ -1,0 +1,7 @@
+
+running 2 tests
+test c495_first_file_version_whose_previous_record_belongs_to_another_version_is_refused_before_any_write ... ok
+test c495_first_file_version_whose_previous_record_is_unreadable_on_both_copies_is_refused_before_any_write ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 47.07s
+

@@ -1,0 +1,339 @@
+15a16,22
+> //!
+> //! C585（会话发布放进发布途中取下的旧快照；里程碑三二·2，用户定改法 C）：落后支改成「落后，并且缺现行那一版的单元，**或**现行那一版的根
+> //! 写在这块盘上而那个根环槽里不是它」才拒，四个入口与可写挂载取号之前的逐盘核同一判。攻方
+> //! （`research/prompts/m2-closeout-code-r3-opus-output.md`「X6-a」）把一次发布 P 途中（单元与记录已写、根槽 FUA 未写）取下的、P 的根
+> //! 住的那块盘换上来，会话覆盖写照常做成、池级 checker 红 I-3.1；抬 F、卸载、回退当时靠「已知根槽读坏」拒掉，不是落后支拒的。
+> //! 这里每个入口一条钉「在任何写之前拒成落后支缺根那一半、两块盘逐字节不变」；另钉两形不误拒：切在 P 的根槽 FUA 之后的那块盘
+> //! （根已落、轮换没写，等同崩溃状态）会话照常发布，切在根槽之前的那块盘上可写挂载照常施加 P 的记录挂上（P 的根不在根环里，不核缺根那一半）。
+19c26,29
+< use common_admission::{content_of, start_plain, PoolUnderTest, OVERWRITE_BYTES};
+---
+> use common_admission::{
+>     checker_violations_on, content_of, plain_devices_on, start_plain, PoolUnderTest,
+>     OVERWRITE_BYTES,
+> };
+28c38,39
+<     RollbackError, RollbackTarget, ShadowLedger, Unmounted,
+---
+>     RingSlotReadingOtherThanTheVersionRoot, RollbackError, RollbackTarget, ShadowLedger, Unmounted,
+>     VersionLackingOnADeviceBehindIt, VersionRootNotInItsRingSlot,
+31c42,43
+< use singlefs_core::recovery::verified_system_configuration_slots;
+---
+> use singlefs_core::recovery::{verified_system_configuration_slots, BadRootRingSlotReading};
+> use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlot};
+34a47
+> use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
+268,269c281,286
+<         !behind.units_missing.is_empty(),
+<         "{entry:?}：现行那一版有单元在旧快照上不在"
+---
+>         matches!(
+>             &behind.lacking,
+>             VersionLackingOnADeviceBehindIt::UnitsMissing(units_missing) if !units_missing.is_empty()
+>         ),
+>         "{entry:?}：现行那一版有单元在旧快照上不在：{:?}",
+>         behind.lacking
+643a661,961
+>     );
+> }
+> 
+> // ─── C585：发布途中取下的、那次发布的根住的那块盘（落后支缺根那一半） ───
+> 
+> /// 会话里那次覆盖写 P 的录制流切在哪：P 的根槽 FUA 写之前（单元与记录已写、根槽没写：C585 那一形），或之后（根已落、系统配置轮换还没写）。
+> #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+> enum WhereThePublishIsCut {
+>     BeforeItsRootSlotWrite,
+>     AfterItsRootSlotWrite,
+> }
+> 
+> /// 会话做完 P 之后的池（会话的现行那一版是 P），盘表里 P 的根住的那块盘换成「P 之前的盘面 + P 的录制流切下的那一截」，另一块是 P 做完的样子。
+> struct RootDeviceOfThePublishTakenMidPublish {
+>     pool: PoolUnderTest<SparseBlockDevice>,
+>     devices: SparseDevices,
+>     root_device_of_the_publish: DeviceIdentity,
+>     ring_slot_of_the_publish_root: RootRingSlot,
+> }
+> 
+> /// 起点同 Y2-a（第一个文件之后会话里覆盖写两次，txg 5），P 是会话里第三次覆盖写（txg 6），录下它的写流。
+> /// 切下的那块盘：落后于 P（它的系统配置轮换在根槽之后），而 P 的单元都在它上面（单元与记录都在根槽之前写）——今天的落后支（缺单元才拒）
+> /// 放它过去。这两样在这里先核，钉的是攻方那一形，不是别的形。
+> fn root_device_of_the_publish_taken_mid_publish(
+>     cut: WhereThePublishIsCut,
+> ) -> RootDeviceOfThePublishTakenMidPublish {
+>     let (mut pool, _, before_the_publish) = pool_with_a_snapshot_after_the_first_file();
+>     let stream = SharedStream::retaining_contents();
+>     let mut recorded: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
+>         plain_devices_on(&before_the_publish)
+>             .into_iter()
+>             .map(|(identity, device)| {
+>                 (
+>                     identity,
+>                     RecordingBlockDevice::with_shared_stream(identity, device, stream.clone()),
+>                 )
+>             })
+>             .collect();
+>     let (content, write_time_seconds) = overwrite_after(&pool, 0);
+>     pool.session
+>         .as_mut()
+>         .expect("这一刻有可写会话")
+>         .publish_user_change(
+>             &mut recorded,
+>             UserChange::Overwrite(FirstFile {
+>                 content: &content,
+>                 write_time_seconds,
+>             }),
+>         )
+>         .expect("P：会话里第三次覆盖写");
+>     pool.write_time_seconds = write_time_seconds;
+>     let after_the_publish = MemoryPool {
+>         devices: recorded
+>             .iter()
+>             .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
+>             .collect(),
+>         device_size_in_bytes: before_the_publish.device_size_in_bytes,
+>     };
+>     pool.devices = plain_devices_on(&after_the_publish);
+>     let publish = pool.current_file_version().clone();
+>     assert_eq!(
+>         publish.root.checkpoint_txg,
+>         CheckpointTxg(6),
+>         "P 是 txg 6 那一版"
+>     );
+>     let geometry = pool.parameters.geometry;
+>     let ring_slot_of_the_publish_root = target_for_publish(
+>         publish.root.checkpoint_txg,
+>         geometry.root_ring_slots_per_region,
+>     );
+>     let root_device_of_the_publish = pool.parameters.region_devices
+>         [usize::try_from(ring_slot_of_the_publish_root.region).expect("区域号小于 3")];
+>     let root_slot_offset = slot_offset(
+>         ring_slot_of_the_publish_root,
+>         geometry.fixed_structure_slot_spacing,
+>     );
+>     let operations = stream.retained_operations();
+>     let root_slot_write = operations
+>         .iter()
+>         .position(|retained| {
+>             retained.operation.device == root_device_of_the_publish
+>                 && retained.operation.offset == root_slot_offset
+>                 && retained.operation.kind == RecordedOperationKind::WriteForceUnitAccess
+>         })
+>         .expect("P 的录制流里有它的根槽 FUA 写");
+>     let operations_through_the_cut = match cut {
+>         WhereThePublishIsCut::BeforeItsRootSlotWrite => root_slot_write,
+>         WhereThePublishIsCut::AfterItsRootSlotWrite => root_slot_write + 1,
+>     };
+>     let mut cut_image = before_the_publish.clone();
+>     cut_image.apply(&operations[..operations_through_the_cut]);
+>     let devices: SparseDevices = [DeviceIdentity(0), DeviceIdentity(1)]
+>         .into_iter()
+>         .map(|identity| {
+>             let image = if identity == root_device_of_the_publish {
+>                 &cut_image
+>             } else {
+>                 &after_the_publish
+>             };
+>             (identity, copy_of_device(image, identity))
+>         })
+>         .collect();
+>     let cut_device = &devices
+>         .iter()
+>         .find(|(identity, _)| *identity == root_device_of_the_publish)
+>         .expect("盘表里有 P 的根住的那块盘")
+>         .1;
+>     assert_ne!(
+>         cut_device.image, after_the_publish.devices[&root_device_of_the_publish],
+>         "{cut:?}：切下的那块盘与 P 做完的样子不同（系统配置轮换还没写）"
+>     );
+>     let spacing = u64::from(geometry.fixed_structure_slot_spacing);
+>     let newest_self_verified = verified_system_configuration_slots(
+>         &devices,
+>         root_device_of_the_publish,
+>         spacing,
+>         &pool.parameters.filesystem_identifier,
+>     )
+>     .into_iter()
+>     .max_by_key(|slot| slot.quantities.slot_generation)
+>     .expect("切下的那块盘上有自证过的系统配置");
+>     assert!(
+>         (
+>             newest_self_verified.quantities.journal_instance,
+>             newest_self_verified.quantities.journal_tail
+>         ) < (publish.record.instance, publish.record.counter),
+>         "{cut:?}：切下的那块盘落后于 P（系统配置停在 P 之前那次发布）"
+>     );
+>     for unit in publish.units.iter().filter(|unit| !unit.bytes.is_empty()) {
+>         let mut bytes_on_the_cut_device = vec![0u8; unit.bytes.len()];
+>         cut_device
+>             .read_at(unit.slot.to_device_offset(), &mut bytes_on_the_cut_device)
+>             .expect("读 P 的单元在切下的那块盘上的落点");
+>         assert_eq!(
+>             bytes_on_the_cut_device, unit.bytes,
+>             "{cut:?}：P 的单元 {:?} 在切下的那块盘上",
+>             unit.identity
+>         );
+>     }
+>     RootDeviceOfThePublishTakenMidPublish {
+>         pool,
+>         devices,
+>         root_device_of_the_publish,
+>         ring_slot_of_the_publish_root,
+>     }
+> }
+> 
+> /// 落后支缺根那一半拒的：点名 P 的根住的那块盘，缺的是根——那个根环槽两次读都自证不过（mkfs 清零之后这一槽 P 之前没写过）。
+> fn assert_refused_as_behind_without_the_root(
+>     refusal: Option<EntryRefusal>,
+>     entry: EntryAfterTheMount,
+>     root_device_of_the_publish: DeviceIdentity,
+>     ring_slot_of_the_publish_root: RootRingSlot,
+> ) {
+>     let devices_behind: Vec<DeviceBehindTheCurrentVersion> = match refusal {
+>         Some(EntryRefusal::Session(
+>             UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
+>         ))
+>         | Some(EntryRefusal::Mount(
+>             MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
+>         ))
+>         | Some(EntryRefusal::Rollback(RollbackError::CallerInputsDisagreeWithTheDisk(
+>             CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
+>                 devices,
+>             },
+>         ))) => devices,
+>         other => panic!(
+>             "{entry:?}：该被落后支缺根那一半拒，实际 {}",
+>             describe(&other)
+>         ),
+>     };
+>     let lacking: Vec<(DeviceIdentity, VersionLackingOnADeviceBehindIt)> = devices_behind
+>         .into_iter()
+>         .map(|behind| (behind.device, behind.lacking))
+>         .collect();
+>     assert_eq!(
+>         lacking,
+>         vec![(
+>             root_device_of_the_publish,
+>             VersionLackingOnADeviceBehindIt::RootNotInItsRingSlot(VersionRootNotInItsRingSlot {
+>                 ring_slot: ring_slot_of_the_publish_root,
+>                 first_reading: RingSlotReadingOtherThanTheVersionRoot::Bad(
+>                     BadRootRingSlotReading::NotSelfVerified
+>                 ),
+>                 reread: RingSlotReadingOtherThanTheVersionRoot::Bad(
+>                     BadRootRingSlotReading::NotSelfVerified
+>                 ),
+>             }),
+>         )],
+>         "{entry:?}：点名 P 的根住的那块盘，单元都在、缺的是 P 的根"
+>     );
+> }
+> 
+> /// C585 的一格：P 的根住的那块盘换成切在 P 的根槽 FUA 之前的样子，经 `entry` 交进去。在任何写之前拒成落后支缺根那一半，
+> /// 两块盘逐字节不变、会话的现行版本不动。改回「落后且缺单元才拒」时会话发布照常做成（之后池级 checker 红 I-3.1），
+> /// 另三个入口拒在读根环那一步（`RootRingSlotKnownToHoldARoot`），报的不是落后支。
+> fn root_device_taken_before_the_publish_root_slot_write_through(entry: EntryAfterTheMount) {
+>     let RootDeviceOfThePublishTakenMidPublish {
+>         mut pool,
+>         mut devices,
+>         root_device_of_the_publish,
+>         ring_slot_of_the_publish_root,
+>     } = root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::BeforeItsRootSlotWrite);
+>     let images_before = images_of(&devices);
+>     let current_before = pool.current_file_version().root;
+>     let refusal = go_through(entry, &mut pool, &mut devices);
+>     assert_refused_as_behind_without_the_root(
+>         refusal,
+>         entry,
+>         root_device_of_the_publish,
+>         ring_slot_of_the_publish_root,
+>     );
+>     assert_eq!(
+>         images_of(&devices),
+>         images_before,
+>         "{entry:?}：两块盘逐字节不变"
+>     );
+>     assert_eq!(
+>         pool.current_file_version().root,
+>         current_before,
+>         "{entry:?}：会话的现行版本不动"
+>     );
+> }
+> 
+> #[test]
+> fn a_session_publish_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write(
+> ) {
+>     root_device_taken_before_the_publish_root_slot_write_through(
+>         EntryAfterTheMount::SessionPublish,
+>     );
+> }
+> 
+> #[test]
+> fn a_normal_unmount_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write(
+> ) {
+>     root_device_taken_before_the_publish_root_slot_write_through(EntryAfterTheMount::NormalUnmount);
+> }
+> 
+> #[test]
+> fn a_floor_raise_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write(
+> ) {
+>     root_device_taken_before_the_publish_root_slot_write_through(
+>         EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
+>     );
+> }
+> 
+> #[test]
+> fn an_administrator_rollback_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write(
+> ) {
+>     root_device_taken_before_the_publish_root_slot_write_through(
+>         EntryAfterTheMount::AdministratorRollback,
+>     );
+> }
+> 
+> /// 不误拒：P 的根住的那块盘切在 P 的根槽 FUA 之后（根已落、系统配置轮换没写）。它落后、单元都在、根槽里就是 P 的根——
+> /// 与「根落盘之后、轮换之前崩」同一个盘面，会话照常发布，做完之后池级 checker 不红。
+> #[test]
+> fn a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused() {
+>     let RootDeviceOfThePublishTakenMidPublish {
+>         mut pool,
+>         mut devices,
+>         ..
+>     } = root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::AfterItsRootSlotWrite);
+>     let refusal = go_through(EntryAfterTheMount::SessionPublish, &mut pool, &mut devices);
+>     assert!(
+>         refusal.is_none(),
+>         "根槽里是 P 的根：不误拒，实际 {}",
+>         describe(&refusal)
+>     );
+>     let after = MemoryPool {
+>         devices: devices
+>             .iter()
+>             .map(|(identity, device)| (*identity, device.image.clone()))
+>             .collect(),
+>         device_size_in_bytes: pool.device_bytes,
+>     };
+>     assert_eq!(
+>         checker_violations_on(&after),
+>         Vec::<String>::new(),
+>         "做完之后池级 checker 不红"
+>     );
+> }
+> 
+> /// 不误拒：同一组盘（P 的根住的那块切在根槽 FUA 之前）上可写挂载。所选那一版是在 txg 5 的根上施加 P 的记录得来的，P 的根不在根环里，
+> /// 落后支不核缺根那一半；P 的单元都在，照常挂上、所选那一版就是 P（攻方 X6-a「崩了再可写挂载」那一格：择 P、之后 checker 0）。
+> #[test]
+> fn a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts(
+> ) {
+>     let RootDeviceOfThePublishTakenMidPublish { pool, devices, .. } =
+>         root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::BeforeItsRootSlotWrite);
+>     let publish_root = pool.current_file_version().root;
+>     let mut copies = copies_of(&devices);
+>     let mounted = mount_writable(&pool.parameters, &mut copies)
+>         .unwrap_or_else(|error| panic!("P 的根不在根环里、单元都在：照常可写挂载，实际 {error:?}"));
+>     assert_eq!(
+>         (
+>             mounted.output.effective_root.instance,
+>             mounted.output.effective_root.checkpoint_txg
+>         ),
+>         (publish_root.instance, publish_root.checkpoint_txg),
+>         "所选那一版是施加 P 的记录得来的 P"

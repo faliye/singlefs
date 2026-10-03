@@ -1,0 +1,3 @@
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+  Executable tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs (/tmp/claude-1000/m3-code-r1-opus/target2/debug/deps/mkfs_on_image_files_punches_the_zeroed_ranges-a42a635dc651a477)

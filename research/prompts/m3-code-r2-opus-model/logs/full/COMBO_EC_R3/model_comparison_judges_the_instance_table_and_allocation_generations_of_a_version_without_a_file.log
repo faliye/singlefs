@@ -1,0 +1,10 @@
+
+running 5 tests
+test a_wrong_allocation_generation_of_the_instance_table_written_by_the_row_publish_is_reported ... ok
+test a_wrong_allocation_generation_of_the_tree_table_the_row_publish_did_not_rewrite_is_reported ... ok
+test a_row_publish_that_hands_in_no_page_of_the_instance_table_is_reported ... ok
+test a_wrong_row_in_the_instance_table_written_by_the_row_publish_is_reported ... ok
+test the_row_publish_on_a_version_without_a_file_is_compared_by_its_whole_instance_table_and_every_role_both_ways ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.09s
+

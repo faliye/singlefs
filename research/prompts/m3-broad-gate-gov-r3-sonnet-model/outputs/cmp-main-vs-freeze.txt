@@ -1,0 +1,11 @@
+same research/scripts/broad-mutation.py
+same research/scripts/admission.py
+same .claude/gate.d/checker-tier-broad-mutation.sh
+same .claude/skills/crash-test/commit-stages.md
+same .claude/rules/verification.md
+same research/scripts/run-with-memory-cap.sh
+same research/scripts/detached-run.sh
+same .claude/gate.d/stage-inputs.tsv
+same .claude/hooks/lib_heavy_tests.py
+same .claude/hooks/heavy-test-guard.sh
+same research/scripts/mutation-prune.py

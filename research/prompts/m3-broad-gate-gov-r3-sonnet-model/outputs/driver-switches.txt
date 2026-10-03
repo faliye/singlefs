@@ -1,0 +1,12 @@
+escalated-not-summarised	74 格里 1 格判错
+escalation-evidence-unchecked	74 格里 6 格判错
+escalation-same-limit	74 格里 2 格判错
+escalation-skipped	74 格里 5 格判错
+fingerprint-path-blind	74 格里 1 格判错
+global-key-no-build-lines	74 格里 8 格判错
+global-key-no-file-lines	74 格里 1 格判错
+global-key-no-limits-line	74 格里 2 格判错
+global-key-no-toolchain-line	74 格里 1 格判错
+global-key-no-tool-lines	74 格里 2 格判错
+timeout-floor-in-global-key	74 格里 6 格判错
+unit-environment-fixed-list	74 格里 1 格判错

@@ -1,0 +1,7 @@
+88d08339133252027f3875beb559e215a649ce4c14ec47e0b628f1c25df255a8  .claude/kb/layout/01-first-txn.md
+0f1fbf7fd39d5330f3b6c262e79cceab59259c0371b3e906fda341f83049a801  .claude/kb/checks-owed.md
+08194433c2cb3bb15336b99bdfbc127d7e60417aefb8273b99d5d1c00c3622c9  .claude/kb/decisions/22-单元原子性怎么合成.md
+571dfc06209500e453fa93bffc1ca3ad7e17ed642b4a58e0984a43d0741eb8f6  .claude/kb/decisions/02-RAID条带策略.md
+d415d3d5809a4e707632adf7c8a1b28df6564a4da8210818ae220039c963d5f9  .claude/kb/experiments/170-O3规约执行器第一版.md
+f0d58c15d2a84aa307959ee6230c1210e69b33d871c8e902bd509b17011269d9  .claude/kb/decisions/23-journal的角色与格式.md
+4f8b8643f9c24c0332605162b6f1c4e98089f91f8993ef758ce5d0f8912a2149  .claude/kb/invariants.md

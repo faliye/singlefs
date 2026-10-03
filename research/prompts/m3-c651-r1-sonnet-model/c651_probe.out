@@ -1,0 +1,61 @@
+
+running 1 test
+test c651_probe ... C651PROBE 槽距4096 完好
+  core: Ok(盘0 槽距4096 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1][槽距4096 世代1] 盘1:[槽距4096 世代1][槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [] }
+  checker I-8.5: Holds
+C651PROBE 槽距4096 只盘0槽0坏
+  core: Ok(盘0 槽距4096 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1] 盘1:[槽距4096 世代1][槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0] }
+  checker I-8.5: Holds
+C651PROBE 槽距4096 两盘槽0都坏
+  core: Ok(盘0 槽距4096 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1] 盘1:[槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0, 1] }
+  checker I-8.5: Holds
+C651PROBE 槽距8192 完好
+  core: Ok(盘0 槽距8192 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距8192 世代1][槽距8192 世代1] 盘1:[槽距8192 世代1][槽距8192 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [] }
+  checker I-8.5: Holds
+C651PROBE 槽距8192 只盘0槽0坏
+  core: Ok(盘0 槽距8192 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距8192 世代1] 盘1:[槽距8192 世代1][槽距8192 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0] }
+  checker I-8.5: Holds
+C651PROBE 槽距8192 两盘槽0都坏
+  core: Ok(盘0 槽距8192 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0: 盘1:
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [0, 1], devices_whose_writable_mount_would_be_refused: [0, 1] }
+  checker I-8.5: Violated("池里 2 块盘的系统配置槽一个都没自证过：tail 没有见证者")
+C651PROBE 槽距8192 槽0未坏 4096 处有旧池残留(世代1)
+  core: Ok(盘0 槽距8192 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距8192 世代1][槽距8192 世代1] 盘1:[槽距8192 世代1][槽距8192 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [] }
+  checker I-8.5: Holds
+C651PROBE 槽距8192 两盘槽0坏 4096 处有旧池残留(世代1)
+  core: Ok(盘0 槽距4096 世代1 fsid"singlefs-old-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1] 盘1:[槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0, 1] }
+  checker I-8.5: Holds
+C651PROBE 槽距8192 两盘槽0坏 盘1槽1坏且盘1的4096处有旧池残留
+  core: Err(SystemConfigurationsDisagree)
+  checker 可择槽: 盘0: 盘1:[槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [0], devices_whose_writable_mount_would_be_refused: [0, 1] }
+  checker I-8.5: Holds
+C651PROBE 槽距4096 两盘槽0未坏 8192 处有旧池残留(世代9)
+  core: Ok(盘0 槽距4096 世代1 fsid"singlefs-new-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1][槽距4096 世代1] 盘1:[槽距4096 世代1][槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [] }
+  checker I-8.5: Holds
+C651PROBE 槽距4096 两盘槽0坏 8192 处有旧池残留(世代9, 旧池槽距8192)
+  core: Ok(盘0 槽距8192 世代9 fsid"singlefs-old-poo")
+  checker 可择槽: 盘0:[槽距4096 世代1] 盘1:[槽距4096 世代1]
+  checker 冗余旁路: SystemConfigurationRedundancyReport { devices_without_a_self_verified_slot: [], devices_whose_writable_mount_would_be_refused: [0, 1] }
+  checker I-8.5: Holds
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+

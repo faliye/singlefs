@@ -1,0 +1,50 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work/crates/singlefs-core)
+warning: function `punch_hole_keeping_the_file_length` is never used
+   --> crates/singlefs-core/src/block_device.rs:365:4
+    |
+365 | fn punch_hole_keeping_the_file_length(
+    |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s
+     Running unittests src/lib.rs (/tmp/claude-1000/m3-code-r1-opus/target/debug/deps/singlefs_core-35f3c975d30e0b15)
+
+running 12 tests
+test block_device::tests::aligned_scratch_starts_on_a_4096_boundary_for_every_length ... ok
+test block_device::tests::only_unsupported_errnos_send_a_failed_hole_punch_to_the_zero_byte_fallback ... ok
+test block_device::tests::unaligned_and_out_of_range_requests_are_rejected_before_touching_the_file ... ok
+test block_device::tests::a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes ... ok
+test block_device::tests::writing_zeroes_rejects_unaligned_and_out_of_range_ranges_before_touching_the_file ... ok
+test block_device::tests::queue_attributes_are_read_from_the_sysfs_tree_and_missing_ones_are_none ... ok
+test block_device::tests::punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length ... FAILED
+test block_device::tests::writing_zeroes_clears_the_whole_range_across_chunk_boundaries_and_nothing_outside_it ... FAILED
+test block_device::tests::an_unsupported_hole_punch_falls_back_to_writing_zero_bytes_across_chunk_boundaries ... ok
+test block_device::tests::creating_an_image_that_already_exists_is_refused_and_leaves_the_old_bytes_alone ... ok
+test block_device::tests::write_then_read_returns_the_same_bytes_and_zero_fill_elsewhere ... ok
+test block_device::tests::direct_input_output_backend_round_trips_aligned_and_rejects_unaligned_requests ... ok
+
+failures:
+
+---- block_device::tests::punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length stdout ----
+
+thread 'block_device::tests::punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length' (1191518) panicked at crates/singlefs-core/src/block_device.rs:874:17:
+assertion `left == right` failed: 偏移 4608 在清零段内，没被清干净
+  left: 195
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- block_device::tests::writing_zeroes_clears_the_whole_range_across_chunk_boundaries_and_nothing_outside_it stdout ----
+
+thread 'block_device::tests::writing_zeroes_clears_the_whole_range_across_chunk_boundaries_and_nothing_outside_it' (1191522) panicked at crates/singlefs-core/src/block_device.rs:789:13:
+偏移 4194304 那一扇区没被清干净
+
+
+failures:
+    block_device::tests::punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length
+    block_device::tests::writing_zeroes_clears_the_whole_range_across_chunk_boundaries_and_nothing_outside_it
+
+test result: FAILED. 10 passed; 2 failed; 0 ignored; 0 measured; 124 filtered out; finished in 0.83s
+
+error: test failed, to rerun pass `-p singlefs-core --lib`

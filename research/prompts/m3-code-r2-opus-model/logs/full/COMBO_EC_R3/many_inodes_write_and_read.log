@@ -1,0 +1,9 @@
+
+running 4 tests
+test more_leaf_containers_than_one_root_node_holds_is_refused_before_anything_reaches_the_disk ... ok
+test creating_one_inode_below_the_threshold_keeps_one_container_and_bumps_the_watermark_by_one ... ok
+test creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_end_and_reads_back_cold ... ok
+test publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transaction_over_two_records_and_only_the_second_ends_the_publish ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.86s
+

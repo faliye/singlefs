@@ -1,0 +1,1268 @@
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/mutations.tsv /tmp/claude-1000/m3-code-r2/tree/crates/mutations.tsv
+--- /tmp/claude-1000/m3-code-r1/tree/crates/mutations.tsv	2026-09-30 23:28:44.721221876 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/mutations.tsv	2026-10-01 06:07:42.098918226 +0000
+@@ -1482,9 +1482,17 @@
+ C585 改法 C：可写挂载所选那一版施加过 journal 记录也当根写进了根环（崩在根槽 FUA 之前的那一形被缺根那一半误拒）	crates/singlefs-core/src/mount.rs	    } else {\n        RootOfTheVersionInTheRing::NotWritten\n    };	    } else {\n        RootOfTheVersionInTheRing::Written {\n            instance: start.effective_root.instance,\n            checkpoint_txg: start.effective_root.checkpoint_txg,\n        }\n    };	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts	a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts
+ C586：回退那次的树 ID 水位只取环里读得出的根，不与内存里现行那一版的取 max	crates/singlefs-core/src/mount.rs	        .fold(current.root.tree_identifier_watermark, u64::max);	        .fold(0, u64::max);	-p singlefs-harness --test unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over -- the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it	the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it
+ 文件后端写零退回真写（C603：不打洞，每次都逐块写 0，一池 1.5 GiB 的 0 进页缓存）	crates/singlefs-core/src/block_device.rs	                punch_hole_keeping_the_file_length(&self.file, offset, length)	                Err(io::Error::from_raw_os_error(libc::EOPNOTSUPP))	-p singlefs-harness --test mkfs_on_image_files_punches_the_zeroed_ranges	mkfs_on_two_image_files_hands_only_the_written_bytes_to_write_calls_and_punches_every_zeroed_range
+-文件后端打洞报不支持的退路一个 0 都不写（交回成功而段里还是旧字节）	crates/singlefs-core/src/block_device.rs	                write_zeroes_in_chunks(offset, length, &zeros, |chunk_offset, chunk| {	                write_zeroes_in_chunks(offset, 0, &zeros, |chunk_offset, chunk| {	-p singlefs-core --lib -- block_device::tests::	an_unsupported_hole_punch_falls_back_to_writing_zero_bytes_across_chunk_boundaries
++文件后端打洞报不支持的退路一个 0 都不写（交回成功而段里还是旧字节）	crates/singlefs-core/src/block_device.rs	                    return write_zeroes_in_chunks(\n                        offset,\n                        length,\n	                    return write_zeroes_in_chunks(\n                        offset,\n                        0,\n	-p singlefs-core --lib -- block_device::tests::	an_unsupported_hole_punch_falls_back_to_writing_zero_bytes_across_chunk_boundaries
+ 文件后端打洞不带 FALLOC_FL_KEEP_SIZE（内核报 EOPNOTSUPP，每次写零都落进退路真写 0）	crates/singlefs-core/src/block_device.rs	            libc::FALLOC_FL_PUNCH_HOLE | libc::FALLOC_FL_KEEP_SIZE,	            libc::FALLOC_FL_PUNCH_HOLE,	-p singlefs-core --lib -- block_device::tests::	punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length
+ 文件后端打洞交回成功却一个洞都没打（段里还是旧字节）	crates/singlefs-core/src/block_device.rs	                punch_hole_keeping_the_file_length(&self.file, offset, length)	                Ok::<(), io::Error>(())	-p singlefs-core --lib -- block_device::tests::	punching_ranges_off_the_filesystem_block_boundaries_reads_back_zero_keeps_the_neighbours_and_the_file_length
+ 文件后端打洞报别的错也退回真写零（EIO、EBADF、EINVAL 被退路吞掉；用户 2026-09-30 定只在不支持时退）	crates/singlefs-core/src/block_device.rs	        Some(_) | None => HolePunchFailure::OtherFailure,	        Some(_) | None => HolePunchFailure::PunchingUnsupported,	-p singlefs-core --lib -- block_device::tests::	a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes
+-文件后端打洞报别的错却交回成功（错被吞掉、一个 0 都不写，段里还是旧字节）	crates/singlefs-core/src/block_device.rs	            HolePunchFailure::OtherFailure => Err(BlockDeviceError::InputOutput(punch_error)),	            HolePunchFailure::OtherFailure => Ok(()),	-p singlefs-core --lib -- block_device::tests::	a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes
++文件后端打洞报别的错却交回成功（错被吞掉、一个 0 都不写，段里还是旧字节）	crates/singlefs-core/src/block_device.rs	                    return Err(BlockDeviceError::InputOutput(punch_error));	                    return Ok(());	-p singlefs-core --lib -- block_device::tests::	a_hole_punch_failing_with_an_input_output_error_is_reported_and_writes_no_zero_bytes
+ 文件后端 ENOSYS 不算不支持打洞（内核没有 fallocate 时照常报错、不退回真写零）	crates/singlefs-core/src/block_device.rs	        Some(libc::EOPNOTSUPP | libc::ENOSYS) => HolePunchFailure::PunchingUnsupported,	        Some(libc::EOPNOTSUPP) => HolePunchFailure::PunchingUnsupported,	-p singlefs-core --lib -- block_device::tests::	only_unsupported_errnos_send_a_failed_hole_punch_to_the_zero_byte_fallback
++m3-code-r1 H1：落后支缺根那一半不重读（会话发布：根槽里是现行那一版的落后盘碰上一次瞬时读错就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let reread = reading_other_than_the_version_root()?;	    let reread = first_reading;	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot	a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot
++m3-code-r1 H1：落后支缺根那一半不重读（可写挂载：根槽里是所选那一版的落后盘碰上一次瞬时读错就被拒成缺根）	crates/singlefs-core/src/mount.rs	    let reread = reading_other_than_the_version_root()?;	    let reread = first_reading;	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot	a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot
++m3-code-r1 H2：落后支缺根那一半只查盘表里 region 0 那块盘的根槽（根住盘 1 的那一版缺根放过去）	crates/singlefs-core/src/mount.rs	    let device_of_the_ring_slot = parameters_of_the_pool.region_devices\n        [usize::try_from(ring_slot.region).expect("区域号是 txg 对区域数取模，小于 3")];	    let device_of_the_ring_slot = parameters_of_the_pool.region_devices[0];	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_session_publish_onto_device_one_holding_the_publish_root_taken_before_its_root_slot_write_is_refused_before_any_write	a_session_publish_onto_device_one_holding_the_publish_root_taken_before_its_root_slot_write_is_refused_before_any_write
++m3-code-r1 H2：落后支缺根那一半把根槽里自证得过的任何根都当成现行那一版的（根环转过一圈、上一圈的旧根放过去）	crates/singlefs-core/src/mount.rs	            if root.instance == instance && root.checkpoint_txg == checkpoint_txg =>	            if true || root.instance == instance && root.checkpoint_txg == checkpoint_txg =>	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_session_publish_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write	a_session_publish_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write
++m3-code-r1 H3：可写挂载一律当所选那一版没写进根环（取号之前的逐盘核不核缺根那一半）	crates/singlefs-core/src/mount.rs	    let root_of_the_selected_version = if start.effective_root.instance\n	    let root_of_the_selected_version = if false && start.effective_root.instance\n	-p singlefs-harness --test entries_after_mount_refuse_swapped_or_behind_devices -- a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write	a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write
++m3-code-r1 H5：文件后端长度 0 的写零照调 fallocate（内核报 EINVAL，与 O_DIRECT 后端、稀疏盘结局不同）	crates/singlefs-core/src/block_device.rs	        if length == 0 {\n            return Ok(());\n        }	        if false && length == 0 {\n            return Ok(());\n        }	-p singlefs-core --lib -- block_device::tests::	a_zero_length_zero_fill_ends_the_same_on_the_file_backend_and_both_arms_of_the_direct_backend
++m3-code-r1 H8：文件后端打洞报 EINTR 当成别的错（分路表）	crates/singlefs-core/src/block_device.rs	        Some(libc::EINTR) => HolePunchFailure::InterruptedBySignal,	        Some(libc::EINTR) => HolePunchFailure::OtherFailure,	-p singlefs-core --lib -- block_device::tests::	only_unsupported_errnos_send_a_failed_hole_punch_to_the_zero_byte_fallback
++m3-code-r1 H8：文件后端打洞报 EINTR 当成别的错（被信号打断的那一次写零照常报错、不重打）	crates/singlefs-core/src/block_device.rs	        Some(libc::EINTR) => HolePunchFailure::InterruptedBySignal,	        Some(libc::EINTR) => HolePunchFailure::OtherFailure,	-p singlefs-core --lib -- block_device::tests::	a_hole_punch_interrupted_by_a_signal_is_punched_again_without_falling_back_or_reporting_an_error
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs	2026-09-27 18:06:47.454891801 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs	2026-10-01 06:07:42.096666047 +0000
+@@ -19083,7 +19083,9 @@
+                     | UserChangeRefused::NoFileVersionToChange
+                     | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+                     | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+-                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
++                    | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
++                        ..
++                    },
+                 ) => &[],
+                 Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+                 Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused_change)) => {
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs	2026-09-27 17:00:47.792559976 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs	2026-10-01 06:07:42.097569534 +0000
+@@ -832,7 +832,7 @@
+                     ..
+                 }
+                 // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
+-                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+                 // 盘上的实例代号或 txg 到顶：取号之前拒，一个写都没发。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                 // 写行与暖机之后推的抬 F 报错（实审 A1b Q5，账在错里）：这个二进制每次都在新建的池上挂，取号之前的准入不会不够、走不到推抬 F；
+@@ -1249,7 +1249,7 @@
+                     ..
+                 }
+                 // 有盘落后于现行那一版又缺它的单元：挂着之后的入口在任何写之前拒，这个二进制不换盘，走不到。
+-                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++                | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
+                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
+                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/block_device.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/block_device.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/block_device.rs	2026-09-30 23:52:34.315497487 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/block_device.rs	2026-10-01 06:07:42.097569534 +0000
+@@ -148,6 +148,7 @@
+ #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+ pub enum ZeroFillLanding {
+     /// 先打洞；`fallocate` 报不支持打洞（`HolePunchFailure::PunchingUnsupported`）就退回逐块写 0，
++    /// 被信号打断（`HolePunchFailure::InterruptedBySignal`）原样重打，
+     /// 报别的错（`HolePunchFailure::OtherFailure`）照常交回 [`BlockDeviceError::InputOutput`]，不退、不写 0。
+     PunchHoleOrWriteZeroBytesIfUnsupported,
+     /// 只供测试的开关（`.claude/rules/fs-design.md`「五条硬要求」第 2 条）：不调 `fallocate`，当作它报了 `EOPNOTSUPP`。
+@@ -155,6 +156,9 @@
+     ActAsIfPunchingWereUnsupported,
+     /// 只供测试的开关：不调 `fallocate`，当作它报了 `EIO`；与真失败走同一段判定，落进照常报错那条路。
+     ActAsIfPunchingFailedWithAnInputOutputError,
++    /// 只供测试的开关：这一次写零的第一次打洞不调 `fallocate`，当作它报了 `EINTR`；与真失败走同一段判定，落进原样重打那条路，
++    /// 重打那一次照 [`ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported`] 真调 `fallocate`。
++    ActAsIfTheFirstPunchWereInterruptedBySignal,
+ }
+ 
+ /// 打洞失败之后走哪条路，按 `fallocate` 交回的 errno 分（用户 2026-09-30 定「只在不支持时退」）。
+@@ -163,6 +167,9 @@
+     /// 文件系统不支持打洞（`EOPNOTSUPP`，Linux 上与 `ENOTSUP` 同值）或内核没有 `fallocate`（`ENOSYS`）：
+     /// 退回逐块写 0，整段照样变成全 0。
+     PunchingUnsupported,
++    /// 打洞被信号打断（`EINTR`）：`fallocate(2)` 在动文件之前就返回了，原样再打一次洞；不算不支持、不退回逐块写 0，也不报错
++    /// （代码三方 m3-code-r1 Z3-b 采）。
++    InterruptedBySignal,
+     /// 别的错（读写错、`EBADF`、`EINVAL`、`ENOSPC`，以及没有 errno 的）：照常报成块设备 I/O 错，不被退路吞掉。
+     OtherFailure,
+ }
+@@ -171,6 +178,7 @@
+ fn classify_hole_punch_failure(error: &io::Error) -> HolePunchFailure {
+     match error.raw_os_error() {
+         Some(libc::EOPNOTSUPP | libc::ENOSYS) => HolePunchFailure::PunchingUnsupported,
++        Some(libc::EINTR) => HolePunchFailure::InterruptedBySignal,
+         Some(_) | None => HolePunchFailure::OtherFailure,
+     }
+ }
+@@ -182,6 +190,8 @@
+     pub punched_calls: u64,
+     /// 退回逐块写 0 的写零次数。
+     pub written_as_zero_bytes_calls: u64,
++    /// 打洞被信号打断（`EINTR`）、原样重打的次数（按打洞的次数数，不按写零的次数数）。
++    pub punch_attempts_interrupted_by_signal: u64,
+ }
+ 
+ /// 文件后端：一个镜像文件当一块盘。物理块大小按参数给（本机 NVMe 是 512，D22（单元原子性怎么合成） 已定项 9 那一节现查）。
+@@ -199,6 +209,7 @@
+ const NO_ZERO_FILL_LANDED_YET: ZeroFillLandingCounts = ZeroFillLandingCounts {
+     punched_calls: 0,
+     written_as_zero_bytes_calls: 0,
++    punch_attempts_interrupted_by_signal: 0,
+ };
+ 
+ impl FileBackedBlockDevice {
+@@ -357,7 +368,7 @@
+ 
+ /// 在 `file` 的 `[offset, offset + length)` 上打洞、不改文件长度：之后读这一段是全 0，
+ /// 整块的文件系统块被释放，头尾不满一块的部分由内核就地写 0（`fallocate(2)`「Deallocating file space」）。
+-/// 返回非 0 时交回 `errno`，由调用方按 `classify_hole_punch_failure` 决定退回逐块写 0 还是照常报错。
++/// 返回非 0 时交回 `errno`，由调用方按 `classify_hole_punch_failure` 决定退回逐块写 0、原样重打还是照常报错。
+ #[allow(
+     unsafe_code,
+     reason = "std 没有 fallocate 的安全封装；全 crate 只在这一处放开 unsafe（C603（测试与验证的资源浪费没有自检））"
+@@ -373,8 +384,8 @@
+         libc::off_t::try_from(length).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+     // SAFETY: `fallocate` 只读它的四个整数参数，不碰进程内存；描述符取自 `file`，
+     // 而 `file` 借用到这次调用返回，调用期间不会被关掉或换成别的文件。偏移与长度由上面的 `try_from`
+-    // 转成非负的 `off_t`，放不下就在转换处拒；唯一的调用方 `write_zeroes_at` 先过 `check_request`（对齐、落在设备范围内），
+-    // 即使越界内核也只返回 errno。返回值在下面查了。
++    // 转成非负的 `off_t`，放不下就在转换处拒；越界的请求到不了这里：唯一的调用方 `write_zeroes_at` 先过 `check_request`
++    // （对齐、落在设备范围内），长度 0 也在 `write_zeroes_at` 里先交回、不到这里。越过文件末尾的打洞内核交回 0、什么都不做，同样不碰内存。返回值在下面查了。
+     let return_code = unsafe {
+         libc::fallocate(
+             file.as_raw_fd(),
+@@ -426,35 +437,64 @@
+         length: u64,
+     ) -> Result<(), BlockDeviceError> {
+         self.check_request(offset, length)?;
+-        let punched = match self.zero_fill_landing {
+-            ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported => {
+-                punch_hole_keeping_the_file_length(&self.file, offset, length)
+-            }
+-            ZeroFillLanding::ActAsIfPunchingWereUnsupported => {
+-                Err(io::Error::from_raw_os_error(libc::EOPNOTSUPP))
+-            }
+-            ZeroFillLanding::ActAsIfPunchingFailedWithAnInputOutputError => {
+-                Err(io::Error::from_raw_os_error(libc::EIO))
+-            }
+-        };
+-        let punch_error = match punched {
+-            Ok(()) => {
+-                self.zero_fill_landing_counts.punched_calls += 1;
+-                return Ok(());
+-            }
+-            Err(punch_error) => punch_error,
+-        };
+-        match classify_hole_punch_failure(&punch_error) {
+-            HolePunchFailure::PunchingUnsupported => {
+-                self.zero_fill_landing_counts.written_as_zero_bytes_calls += 1;
+-                let zeros = vec![0u8; zero_fill_chunk_length(length)];
+-                write_zeroes_in_chunks(offset, length, &zeros, |chunk_offset, chunk| {
+-                    self.file
+-                        .write_all_at(chunk, chunk_offset.0)
+-                        .map_err(BlockDeviceError::InputOutput)
+-                })
++        // 长度 0 不调系统调用：`fallocate(2)` 对长度 0 报 `EINVAL`，而另两个后端（`O_DIRECT` 后端、内存稀疏盘）对它交回 `Ok`、
++        // 一个字节不动（代码三方 m3-code-r1 Z3-a）。同一个请求三个后端结局相同，这里照它们交回 `Ok`，不记进落地计数。
++        if length == 0 {
++            return Ok(());
++        }
++        // 循环：每一轮打一次洞。跨轮的状态只有这一次写零里被信号打断的次数（`punch_attempts_interrupted`，只增）；
++        // 出口三个：打成洞、报不支持（退回逐块写 0）、报别的错。被打断就原样再打，轮数的上界是这期间送到的信号数
++        // （与 std 的 `write_all_at` 对 `ErrorKind::Interrupted` 的处理同一个口径）。
++        let mut punch_attempts_interrupted: u64 = 0;
++        loop {
++            let punched = match self.zero_fill_landing {
++                ZeroFillLanding::ActAsIfTheFirstPunchWereInterruptedBySignal
++                    if punch_attempts_interrupted == 0 =>
++                {
++                    Err(io::Error::from_raw_os_error(libc::EINTR))
++                }
++                ZeroFillLanding::PunchHoleOrWriteZeroBytesIfUnsupported
++                | ZeroFillLanding::ActAsIfTheFirstPunchWereInterruptedBySignal => {
++                    punch_hole_keeping_the_file_length(&self.file, offset, length)
++                }
++                ZeroFillLanding::ActAsIfPunchingWereUnsupported => {
++                    Err(io::Error::from_raw_os_error(libc::EOPNOTSUPP))
++                }
++                ZeroFillLanding::ActAsIfPunchingFailedWithAnInputOutputError => {
++                    Err(io::Error::from_raw_os_error(libc::EIO))
++                }
++            };
++            let punch_error = match punched {
++                Ok(()) => {
++                    self.zero_fill_landing_counts.punched_calls += 1;
++                    return Ok(());
++                }
++                Err(punch_error) => punch_error,
++            };
++            match classify_hole_punch_failure(&punch_error) {
++                HolePunchFailure::PunchingUnsupported => {
++                    self.zero_fill_landing_counts.written_as_zero_bytes_calls += 1;
++                    let zeros = vec![0u8; zero_fill_chunk_length(length)];
++                    return write_zeroes_in_chunks(
++                        offset,
++                        length,
++                        &zeros,
++                        |chunk_offset, chunk| {
++                            self.file
++                                .write_all_at(chunk, chunk_offset.0)
++                                .map_err(BlockDeviceError::InputOutput)
++                        },
++                    );
++                }
++                HolePunchFailure::InterruptedBySignal => {
++                    punch_attempts_interrupted += 1;
++                    self.zero_fill_landing_counts
++                        .punch_attempts_interrupted_by_signal += 1;
++                }
++                HolePunchFailure::OtherFailure => {
++                    return Err(BlockDeviceError::InputOutput(punch_error));
++                }
+             }
+-            HolePunchFailure::OtherFailure => Err(BlockDeviceError::InputOutput(punch_error)),
+         }
+     }
+ 
+@@ -707,6 +747,20 @@
+         ))
+     }
+ 
++    /// 镜像的删除守卫：用例做完、断言失败、panic 都在离开作用域时删掉镜像（`command-safety.md`「测试镜像一律放临时目录」）。
++    /// 删不掉只打一行，不在 Drop 里 panic（panic 途中再 panic 会直接中止进程）。
++    struct ImageRemovedOnDrop(std::path::PathBuf);
++
++    impl Drop for ImageRemovedOnDrop {
++        fn drop(&mut self) {
++            if let Err(error) = std::fs::remove_file(&self.0) {
++                if error.kind() != io::ErrorKind::NotFound {
++                    eprintln!("删不掉测试镜像 {}：{error}", self.0.display());
++                }
++            }
++        }
++    }
++
+     #[test]
+     fn write_then_read_returns_the_same_bytes_and_zero_fill_elsewhere() {
+         let path = temporary_image_path("roundtrip");
+@@ -858,6 +912,7 @@
+             ZeroFillLandingCounts {
+                 punched_calls: 2,
+                 written_as_zero_bytes_calls: 0,
++                punch_attempts_interrupted_by_signal: 0,
+             },
+             "两次写零都该落成打洞"
+         );
+@@ -928,6 +983,7 @@
+             ZeroFillLandingCounts {
+                 punched_calls: 0,
+                 written_as_zero_bytes_calls: 1,
++                punch_attempts_interrupted_by_signal: 0,
+             },
+             "这一次写零该落进退路"
+         );
+@@ -1008,6 +1064,7 @@
+             ZeroFillLandingCounts {
+                 punched_calls: 0,
+                 written_as_zero_bytes_calls: 0,
++                punch_attempts_interrupted_by_signal: 0,
+             },
+             "这一次写零既没打成洞，也没落进退路"
+         );
+@@ -1023,7 +1080,7 @@
+         std::fs::remove_file(&path).expect("清理镜像");
+     }
+ 
+-    /// 按 errno 分路：只有 `EOPNOTSUPP`（与 `ENOTSUP` 同值）与 `ENOSYS` 退回逐块写 0，
++    /// 按 errno 分路：只有 `EOPNOTSUPP`（与 `ENOTSUP` 同值）与 `ENOSYS` 退回逐块写 0，`EINTR` 原样重打，
+     /// 读写错、`EBADF`、`EINVAL`、`ENOSPC`、`EPERM` 与没有 errno 的错都照常报。
+     #[test]
+     fn only_unsupported_errnos_send_a_failed_hole_punch_to_the_zero_byte_fallback() {
+@@ -1048,12 +1105,185 @@
+             );
+         }
+         assert_eq!(
++            classify_hole_punch_failure(&io::Error::from_raw_os_error(libc::EINTR)),
++            HolePunchFailure::InterruptedBySignal,
++            "EINTR 是被信号打断、什么都没做，该原样重打，不退回逐块写 0、不报错"
++        );
++        assert_eq!(
+             classify_hole_punch_failure(&io::Error::from(io::ErrorKind::InvalidInput)),
+             HolePunchFailure::OtherFailure,
+             "没有 errno 的错（偏移装不进 off_t 那一类）该照常报错"
+         );
+     }
+ 
++    /// 打洞被信号打断（测试开关当作第一次 `fallocate` 报了 `EINTR`，与真失败走同一段按 errno 分路的判定）：原样重打一次、
++    /// 真打成洞，交回 `Ok`——不退回逐块写 0（经 write 系统调用一个字节都没交出去）、不报错；整段读回 0、段外原样不动；
++    /// 落地计数记一次打洞、一次被打断。
++    #[test]
++    fn a_hole_punch_interrupted_by_a_signal_is_punched_again_without_falling_back_or_reporting_an_error(
++    ) {
++        const IMAGE_BYTES: u64 = 65536;
++        const DIRT: u8 = 0xC3;
++        const ZERO_START: u64 = 4096;
++        const ZERO_LENGTH: u64 = 16384;
++        let path = temporary_image_path("interrupted-punch");
++        let _image_removed_on_drop = ImageRemovedOnDrop(path.clone());
++        let mut device = FileBackedBlockDevice::create_image_file_exclusively(
++            &path,
++            IMAGE_BYTES,
++            PhysicalBlockSizeInBytes(512),
++        )
++        .expect("建镜像")
++        .with_test_only_zero_fill_landing(
++            ZeroFillLanding::ActAsIfTheFirstPunchWereInterruptedBySignal,
++        );
++        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
++        device
++            .write_at(
++                DeviceOffsetInBytes(0),
++                &vec![DIRT; image_length],
++                WriteDurability::Plain,
++            )
++            .expect("填脏");
++        let handed_before = bytes_handed_to_write_calls_by_this_thread();
++        let zero_fill_outcome =
++            device.write_zeroes_at(DeviceOffsetInBytes(ZERO_START), ZERO_LENGTH);
++        let handed_during_zero_fill = bytes_handed_to_write_calls_by_this_thread() - handed_before;
++        assert!(
++            zero_fill_outcome.is_ok(),
++            "被信号打断的打洞该原样重打、交回 Ok，实际是 {zero_fill_outcome:?}"
++        );
++        assert_eq!(
++            device.zero_fill_landing_counts(),
++            ZeroFillLandingCounts {
++                punched_calls: 1,
++                written_as_zero_bytes_calls: 0,
++                punch_attempts_interrupted_by_signal: 1,
++            },
++            "这一次写零被打断一次、重打成洞，没落进退路"
++        );
++        assert_eq!(
++            handed_during_zero_fill, 0,
++            "重打的是洞、不是逐块写 0；交出去 {handed_during_zero_fill} 字节说明 EINTR 落进了退路"
++        );
++        let mut whole_image = vec![0xFFu8; image_length];
++        device
++            .read_at(DeviceOffsetInBytes(0), &mut whole_image)
++            .expect("读回整个镜像");
++        for (index, byte) in whole_image.iter().enumerate() {
++            let position = u64::try_from(index).expect("下标装得进 u64");
++            if (ZERO_START..ZERO_START + ZERO_LENGTH).contains(&position) {
++                assert_eq!(*byte, 0, "偏移 {position} 在清零段内，没被清干净");
++            } else {
++                assert_eq!(*byte, DIRT, "偏移 {position} 在清零段外，不该被动");
++            }
++        }
++    }
++
++    /// 一次长度 0 的写零在一个后端上的结局：交回什么、本线程经 write 系统调用交出去几个字节、镜像变没变。
++    #[derive(Debug, PartialEq, Eq)]
++    struct ZeroLengthZeroFillOutcome {
++        returned: String,
++        bytes_handed_to_write_calls: u64,
++        is_the_image_unchanged: bool,
++    }
++
++    /// 在 `device` 上于偏移 0、中间、设备末尾各写零一次、长度都是 0，交回每一次的结局。`device` 的镜像事先填满 `dirt`。
++    fn zero_length_zero_fills_on(
++        device: &mut dyn BlockDevice,
++        image_bytes: u64,
++        dirt: u8,
++    ) -> Vec<ZeroLengthZeroFillOutcome> {
++        let image_length = usize::try_from(image_bytes).expect("镜像长装得进 usize");
++        [0, image_bytes / 2, image_bytes]
++            .into_iter()
++            .map(|offset| {
++                let handed_before = bytes_handed_to_write_calls_by_this_thread();
++                let returned = format!(
++                    "{:?}",
++                    device.write_zeroes_at(DeviceOffsetInBytes(offset), 0)
++                );
++                let bytes_handed_to_write_calls =
++                    bytes_handed_to_write_calls_by_this_thread() - handed_before;
++                let mut whole_image = vec![0u8; image_length];
++                device
++                    .read_at(DeviceOffsetInBytes(0), &mut whole_image)
++                    .expect("读回整个镜像");
++                ZeroLengthZeroFillOutcome {
++                    returned,
++                    bytes_handed_to_write_calls,
++                    is_the_image_unchanged: whole_image.iter().all(|byte| *byte == dirt),
++                }
++            })
++            .collect()
++    }
++
++    /// 长度 0 的写零（代码三方 m3-code-r1 Z3-a）：文件后端与 `O_DIRECT` 后端（绕开页缓存、走页缓存两臂）在偏移 0、中间、
++    /// 设备末尾三处结局逐项相同——交回 `Ok`、经 write 系统调用一个字节都没交出去、镜像一个字节不动。文件后端另核落地计数一样都不记
++    /// （长度 0 不调 `fallocate`；调了内核报 `EINVAL`，交回的就是 `InputOutput`）。`O_DIRECT` 后端没有落地计数，比到「交回什么、
++    /// 交出去几个字节、镜像变没变」这三步为止。内存稀疏盘（`singlefs_harness::memory_pool::SparseBlockDevice`）在 harness 档，
++    /// 核心层的单测拿不到它，不在这里比。
++    #[test]
++    fn a_zero_length_zero_fill_ends_the_same_on_the_file_backend_and_both_arms_of_the_direct_backend(
++    ) {
++        const IMAGE_BYTES: u64 = 65536;
++        const DIRT: u8 = 0x5A;
++        let image_length = usize::try_from(IMAGE_BYTES).expect("镜像长装得进 usize");
++        let expected: Vec<ZeroLengthZeroFillOutcome> = (0..3)
++            .map(|_| ZeroLengthZeroFillOutcome {
++                returned: "Ok(())".to_string(),
++                bytes_handed_to_write_calls: 0,
++                is_the_image_unchanged: true,
++            })
++            .collect();
++
++        let file_path = temporary_image_path("zero-length-file");
++        let _file_image_removed_on_drop = ImageRemovedOnDrop(file_path.clone());
++        let mut file_device = FileBackedBlockDevice::create_image_file_exclusively(
++            &file_path,
++            IMAGE_BYTES,
++            PhysicalBlockSizeInBytes(512),
++        )
++        .expect("建镜像");
++        file_device
++            .write_at(
++                DeviceOffsetInBytes(0),
++                &vec![DIRT; image_length],
++                WriteDurability::Plain,
++            )
++            .expect("填脏");
++        let file_outcomes = zero_length_zero_fills_on(&mut file_device, IMAGE_BYTES, DIRT);
++        assert_eq!(
++            file_device.zero_fill_landing_counts(),
++            NO_ZERO_FILL_LANDED_YET,
++            "长度 0 的写零既不打洞也不退回逐块写 0"
++        );
++        assert_eq!(
++            file_outcomes, expected,
++            "文件后端：长度 0 的写零交回 Ok、什么都不做"
++        );
++
++        for policy in [
++            PageCachePolicy::BypassWithDirectInputOutput,
++            PageCachePolicy::GoThroughPageCache,
++        ] {
++            let direct_path = temporary_image_path("zero-length-direct");
++            let _direct_image_removed_on_drop = ImageRemovedOnDrop(direct_path.clone());
++            std::fs::write(&direct_path, vec![DIRT; image_length]).expect("建填脏的镜像");
++            let mut direct_device = DirectInputOutputBlockDevice::open_existing(
++                &direct_path,
++                policy,
++                PhysicalBlockSizeSource::Declared(PhysicalBlockSizeInBytes(512)),
++            )
++            .expect("打开（临时目录在 ext4 上，O_DIRECT 打得开）");
++            let direct_outcomes = zero_length_zero_fills_on(&mut direct_device, IMAGE_BYTES, DIRT);
++            assert_eq!(
++                direct_outcomes, file_outcomes,
++                "{policy:?}：长度 0 的写零与文件后端结局逐项相同"
++            );
++        }
++    }
++
+     /// 写零与写走同一条前置判定：偏移或长度不按物理块对齐、或者越过设备末尾，都在动盘之前拒绝。
+     #[test]
+     fn writing_zeroes_rejects_unaligned_and_out_of_range_ranges_before_touching_the_file() {
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/mounted_session.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/mounted_session.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/mounted_session.rs	2026-09-30 11:28:36.396675249 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/mounted_session.rs	2026-10-01 06:07:42.097633015 +0000
+@@ -102,8 +102,8 @@
+     /// 还没写）、那次发布的根又住在这块盘上的，单元都在而根槽里不是现行那一版：不核缺根那一半时发布照样做成、池级 checker 红 I-3.1
+     /// （C585（会话发布放进发布途中取下的旧快照），用户定改法 C）。只剩一槽自证、那一槽停在上一次轮换的盘落后而单元都在、根槽里是它，不在这里。
+     /// 读过每块盘的两个系统配置槽、落后那几块上现行那一版单元的落点与它的根槽，一个写都没发：盘上逐字节不变、会话不动。
+-    /// 调用方要做的是换回这个池现行的盘。成员名只说了缺单元那一半：改名要动 harness 与 checker 档里按名字认它的几处。
+-    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++    /// 调用方要做的是换回这个池现行的盘。
++    DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+         devices: Vec<DeviceBehindTheCurrentVersion>,
+     },
+     /// 发布被拒、不是空间不够的那两种（内容装不下、释放判定对不上、块设备错、冻结着一次没重发……）：`cause` 原样，不因它推。
+@@ -291,7 +291,7 @@
+         );
+         if !devices_behind.is_empty() {
+             return Err(
+-                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                     devices: devices_behind,
+                 },
+             );
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/mount.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/mount.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-09-30 11:28:36.396624730 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-10-01 06:07:42.097645975 +0000
+@@ -270,12 +270,12 @@
+     /// 挂着之后收盘表的入口（抬 F、准入抬 F、一次准入里再推一串、正常卸载）在参数、盘表与「可见」都核过之后，交进来的这几块盘落后于
+     /// 现行那一版、又缺它的单元或它的根（[`DeviceBehindTheCurrentVersion`]，与可写挂载取号之前逐盘核的落后支同一判，「所选那一版」换成调用方持着的
+     /// 现行那一版；D18（块里携带什么信息） 已定项 11「挂着之后收盘表的每个入口……核三样」，用户 2026-09-27 定；缺根那一半是 C585
+-    /// （会话发布放进发布途中取下的旧快照） 用户定的改法 C）。成员名只说了缺单元那一半：改名要动 harness 与 checker 档里按名字认它的几处。不核这一判时，
++    /// （会话发布放进发布途中取下的旧快照） 用户定的改法 C）。不核这一判时，
+     /// 同池一份旧快照的盘经这些入口照常收到本池的写、系统配置被轮换到「跟得上」，之后可写挂载的落后支就认不出它
+     /// （代码三方 m2-closeout-code-r2「同池旧快照的盘经入口洗白」）。只读过每块盘的两个系统配置槽、落后那几块盘上现行那一版单元的落点
+     /// 与（单元都在时）现行那一版的根槽，
+     /// 在任何写之前返回（抬 F 与卸载在动分配器之前）：盘上逐字节不变。调用方要做的是换回这个池现行的盘，不是改参数或盘表的次序。
+-    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++    DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+         devices: Vec<DeviceBehindTheCurrentVersion>,
+     },
+     /// 盘上读来的一个编号已到它那一格的顶、下一次要用的号（它加一）装不下（代码审阅第 36 条）：可写挂载要的新实例代号
+@@ -518,8 +518,8 @@
+         disagreeing_fields: Vec<MakeFilesystemParameterField>,
+         disagreeing_device_table: Vec<DeviceTableDisagreement>,
+     },
+-    /// 同 `MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits`：清单不空。
+-    DevicesBehindTheCurrentVersionAndMissingItsUnits {
++    /// 同 `MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot`：清单不空。
++    DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+         devices: Vec<DeviceBehindTheCurrentVersion>,
+     },
+ }
+@@ -537,9 +537,9 @@
+                 disagreeing_fields,
+                 disagreeing_device_table,
+             },
+-            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                 devices,
+-            } => MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++            } => MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices },
+         }
+     }
+ }
+@@ -2073,7 +2073,7 @@
+ /// # Errors
+ /// 盘表里有身份交了不止一次（`DeviceIdentitiesHandedInMoreThanOnce`）、调用方的参数或盘表（盘数与 `devs`、每块盘的本盘设备号）
+ /// 与盘上择到的系统配置不一致、或有盘不「可见」（`CallerParametersDisagreeWithTheSelectedSystemConfiguration`）、有盘落后于现行那一版又缺它的单元或它的根
+-/// （`DevicesBehindTheCurrentVersionAndMissingItsUnits`），都在回收、影子账与任何写之前；
++/// （`DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot`），都在回收、影子账与任何写之前；
+ /// 现行那一版的根指着的实例表读不出或解不开（`InstanceTableMalformed`）；`new_floor` 低于盘上现算的 F 生效值
+ /// （`RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided`）；`new_floor` 超过上限；算上限的错（[`rollback_floor_ceiling`]，
+ /// 含知道住着根的根环槽重读仍坏 `RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`）；现行那一版的 txg 已到顶、这一串的 txg 装不下
+@@ -2306,7 +2306,7 @@
+         | MountError::WritableDeviceCountBelowTheStripeWidthLowerBound { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+         // txg 到顶不是空间不够；可写挂载那一处抬 F 的错装进的那个成员只由可写挂载交回、抬 F 自己报不出来。
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
+@@ -3834,7 +3834,7 @@
+         devices_behind_the_current_version(devices, &parameters_of_the_pool, current);
+     if !devices_behind.is_empty() {
+         return Err(CallerInputsCheckRefused::Disagreeing(
+-            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                 devices: devices_behind,
+             },
+         ));
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/src/history.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/src/history.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/src/history.rs	2026-09-28 09:48:28.251409999 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/src/history.rs	2026-10-01 06:07:42.097645975 +0000
+@@ -2388,8 +2388,8 @@
+         MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. } => {
+             "CallerParametersDisagreeWithTheSelectedSystemConfiguration"
+         }
+-        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => {
+-            "DevicesBehindTheCurrentVersionAndMissingItsUnits"
++        MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. } => {
++            "DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot"
+         }
+         MountError::SequenceNumberPastTheTopOfItsRange(_) => "SequenceNumberPastTheTopOfItsRange",
+         MountError::FloorRaiseFailedAfterTheMountsPublishes(failed) => {
+@@ -2831,7 +2831,7 @@
+             | UserChangeRefused::NoFileVersionToChange
+             | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+             | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+-            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
++            | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. },
+         ) => &[],
+         Err(UserChangeRefused::Publish { floor_raises, .. }) => floor_raises,
+         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(refused)) => &refused.floor_raises,
+@@ -2919,8 +2919,9 @@
+             "UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable".to_string(),
+             ObservedRefusalReason::Unexplained,
+         ),
+-        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. } => (
+-            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits".to_string(),
++        UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. } => (
++            "UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot"
++                .to_string(),
+             ObservedRefusalReason::Unexplained,
+         ),
+         UserChangeRefused::Publish { cause, .. } => (
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/src/model_comparison.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/src/model_comparison.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/src/model_comparison.rs	2026-09-28 09:48:28.251746548 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/src/model_comparison.rs	2026-10-01 06:07:42.097756906 +0000
+@@ -781,7 +781,7 @@
+         // （没换过盘）、用建池的那一份参数，走不到。
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+         // 盘上的实例代号或 txg 已到顶：坏镜像才有。
+         | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
+     }
+@@ -832,7 +832,7 @@
+         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+     }
+@@ -906,7 +906,7 @@
+         | MountError::RequestedFloorBelowTheEffectiveFloorWhoseRaiseIsUndecided { .. }
+         | MountError::DeviceIdentitiesHandedInMoreThanOnce { .. }
+         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
+-        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. }
++        | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
+         | MountError::SequenceNumberPastTheTopOfItsRange(_)
+         | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+     }
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/common_admission/mod.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/common_admission/mod.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/common_admission/mod.rs	2026-09-27 17:00:47.793353374 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/common_admission/mod.rs	2026-10-01 06:07:42.097756906 +0000
+@@ -258,7 +258,9 @@
+                 | UserChangeRefused::NoFileVersionToChange
+                 | UserChangeRefused::DevicesWithoutASelfVerifiedSystemConfiguration { .. }
+                 | UserChangeRefused::OwnDeviceNumbersDifferFromTheDeviceTable { .. }
+-                | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { .. },
++                | UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
++                    ..
++                },
+             ) => {}
+         }
+         outcome
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs	2026-09-30 11:28:36.396675249 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs	2026-10-01 06:07:42.097756906 +0000
+@@ -20,6 +20,15 @@
+ //! 住的那块盘换上来，会话覆盖写照常做成、池级 checker 红 I-3.1；抬 F、卸载、回退当时靠「已知根槽读坏」拒掉，不是落后支拒的。
+ //! 这里每个入口一条钉「在任何写之前拒成落后支缺根那一半、两块盘逐字节不变」；另钉两形不误拒：切在 P 的根槽 FUA 之后的那块盘
+ //! （根已落、轮换没写，等同崩溃状态）会话照常发布，切在根槽之前的那块盘上可写挂载照常施加 P 的记录挂上（P 的根不在根环里，不核缺根那一半）。
++//!
++//! 代码三方 m3-code-r1（判决 `research/prompts/m3-code-r1-main-verification.md` 第三节 H1–H3）补的几格：
++//! - H1：切在 P 的根槽 FUA 之后的那块盘（落后、单元都在、根槽里是 P），缺根那一半第一次读那一槽碰上一次瞬时读错、重读读得出 P，
++//!   会话发布与可写挂载都照常做成（攻方原型 `research/prompts/m3-code-r1-opus-model/proto/tests/z2_reread_one_transient_root_slot_read_error.rs`
++//!   的甲那一形；去掉重读时两处都拒成落后支）。
++//! - H2：P 的根住盘 1（txg 7，区域 1），与根环转过一圈、P 的根槽里是上一圈自证得过的另一条根（txg 27 那一槽里住着 txg 3）——
++//!   「只查盘 0 的根槽」「根槽里自证得过就算是它」两种改错各让一格红。
++//! - H3：同一块切在根槽之后的盘上可写挂载，所选那一版就是择到的根（写进了根环），那一槽在缺根那一半连着两次读错：
++//!   拒成 `BehindTheSelectedVersionAndItsRootNotInItsRingSlot`，拒在任何写之前、两块盘逐扇区不变。
+ 
+ mod common_admission;
+ 
+@@ -34,14 +43,19 @@
+ use singlefs_core::mount::{
+     mount_writable, raise_rollback_floor_to_the_admission_ceiling, roll_back_by_a_forward_publish,
+     unmount, CallerInputsDisagreeingWithTheDisk, DeviceBehindTheCurrentVersion,
+-    DeviceTableDisagreement, MountError, OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn,
+-    RingSlotReadingOtherThanTheVersionRoot, RollbackError, RollbackTarget, ShadowLedger, Unmounted,
++    DeviceTableDisagreement, DeviceWithoutTheSelectedVersion, MountError,
++    OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn, RingSlotReadingOtherThanTheVersionRoot,
++    RollbackError, RollbackTarget, SelectedVersionLackingOnDevice, ShadowLedger, Unmounted,
+     VersionLackingOnADeviceBehindIt, VersionRootNotInItsRingSlot,
+ };
+ use singlefs_core::mounted_session::{MountedSession, UserChange, UserChangeRefused};
+ use singlefs_core::recovery::{verified_system_configuration_slots, BadRootRingSlotReading};
+ use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlot};
+ use singlefs_core::transaction::{FirstFile, PoolVersion, TransactionOutput};
++use singlefs_harness::fault_injection::{
++    FaultCounting, FaultDeviceSelector, FaultInjectingBlockDevice, FaultOccurrence, FaultPlacement,
++    FaultSchedule, InjectedFault, NamedRootRingSlots, RootRingSlotTarget, SharedFaultPlan,
++};
+ use singlefs_harness::history::HistoryDeviceWidth;
+ use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
+ use singlefs_harness::{RecordedOperationKind, RecordingBlockDevice, SharedStream};
+@@ -238,13 +252,13 @@
+ ) {
+     let devices_behind: Vec<DeviceBehindTheCurrentVersion> = match refusal {
+         Some(EntryRefusal::Session(
+-            UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++            UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices },
+         ))
+         | Some(EntryRefusal::Mount(
+-            MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++            MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices },
+         ))
+         | Some(EntryRefusal::Rollback(RollbackError::CallerInputsDisagreeWithTheDisk(
+-            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                 devices,
+             },
+         ))) => devices,
+@@ -535,9 +549,8 @@
+             );
+         } else {
+             assert!(
+-                outcome.as_ref().is_err_and(
+-                    |refusal| refusal.contains("SomeSystemConfigurationSlotUnreadOrUnverified")
+-                ),
++                outcome.as_ref().is_err_and(|mount_refusal| mount_refusal
++                    .contains("SomeSystemConfigurationSlotUnreadOrUnverified")),
+                 "{entry:?}：写坏的那一槽还自证不过，之后的可写挂载按甲拒：{outcome:?}"
+             );
+         }
+@@ -632,12 +645,12 @@
+     for refusal in refusals {
+         let devices_behind: Vec<DeviceIdentity> = match refusal {
+             Some(EntryRefusal::Session(
+-                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                     devices: behind_devices,
+                 },
+             ))
+             | Some(EntryRefusal::Mount(
+-                MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++                MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                     devices: behind_devices,
+                 },
+             )) => behind_devices.iter().map(|behind| behind.device).collect(),
+@@ -678,13 +691,36 @@
+     ring_slot_of_the_publish_root: RootRingSlot,
+ }
+ 
+-/// 起点同 Y2-a（第一个文件之后会话里覆盖写两次，txg 5），P 是会话里第三次覆盖写（txg 6），录下它的写流。
+-/// 切下的那块盘：落后于 P（它的系统配置轮换在根槽之后），而 P 的单元都在它上面（单元与记录都在根槽之前写）——今天的落后支（缺单元才拒）
+-/// 放它过去。这两样在这里先核，钉的是攻方那一形，不是别的形。
++/// P 的 txg：起点（第一个文件之后会话里覆盖写两次，txg 5）之后的下一次，根环槽在区域 0（盘 0）、槽 2，那一槽 P 之前没写过。
++const PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO: CheckpointTxg = CheckpointTxg(6);
++/// P 的 txg：根环槽在区域 1（盘 1，`region_devices` 是 [盘 0, 盘 1, 盘 0]）、槽 2，那一槽 P 之前没写过。
++const PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ONE: CheckpointTxg = CheckpointTxg(7);
++/// P 的 txg：根环 3 × 8 = 24 槽转过一圈，P 的根环槽（区域 0、槽 1）里住着上一圈 txg 3（第一个文件那一版）自证得过的根。
++const PUBLISH_TXG_ONE_LAP_AFTER_THE_FIRST_FILE: CheckpointTxg = CheckpointTxg(27);
++/// txg 27 那一版的根槽上一圈住着的那条根：第一个文件那一版（实例 1、txg 3）。
++const ROOT_OF_THE_FIRST_FILE_A_LAP_BEFORE: RingSlotReadingOtherThanTheVersionRoot =
++    RingSlotReadingOtherThanTheVersionRoot::AnotherRoot {
++        instance: InstanceGeneration(1),
++        checkpoint_txg: CheckpointTxg(3),
++    };
++/// P 之前没写过那一槽（mkfs 清零之后）：两次读都自证不过。
++const NEVER_WRITTEN_RING_SLOT: RingSlotReadingOtherThanTheVersionRoot =
++    RingSlotReadingOtherThanTheVersionRoot::Bad(BadRootRingSlotReading::NotSelfVerified);
++
++/// 起点同 Y2-a（第一个文件之后会话里覆盖写两次，txg 5），会话里再覆盖写到 `publish_txg` 的前一版，P 是下一次覆盖写（txg `publish_txg`），
++/// 录下它的写流。切下的那块盘：落后于 P（它的系统配置轮换在根槽之后），而 P 的单元都在它上面（单元与记录都在根槽之前写）——
++/// 落后支缺单元那一半放它过去。这两样在这里先核，钉的是攻方那一形，不是别的形。
+ fn root_device_of_the_publish_taken_mid_publish(
+     cut: WhereThePublishIsCut,
++    publish_txg: CheckpointTxg,
+ ) -> RootDeviceOfThePublishTakenMidPublish {
+-    let (mut pool, _, before_the_publish) = pool_with_a_snapshot_after_the_first_file();
++    let (mut pool, _, _) = pool_with_a_snapshot_after_the_first_file();
++    let txg_before_the_extra_overwrites = pool.current_file_version().root.checkpoint_txg;
++    for _ in txg_before_the_extra_overwrites.0 + 1..publish_txg.0 {
++        pool.overwrite(OVERWRITE_BYTES)
++            .expect("会话里覆盖写到 P 的前一版");
++    }
++    let before_the_publish = pool.image();
+     let stream = SharedStream::retaining_contents();
+     let mut recorded: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
+         plain_devices_on(&before_the_publish)
+@@ -719,9 +755,9 @@
+     pool.devices = plain_devices_on(&after_the_publish);
+     let publish = pool.current_file_version().clone();
+     assert_eq!(
+-        publish.root.checkpoint_txg,
+-        CheckpointTxg(6),
+-        "P 是 txg 6 那一版"
++        publish.root.checkpoint_txg, publish_txg,
++        "P 是 txg {} 那一版",
++        publish_txg.0
+     );
+     let geometry = pool.parameters.geometry;
+     let ring_slot_of_the_publish_root = target_for_publish(
+@@ -805,22 +841,24 @@
+     }
+ }
+ 
+-/// 落后支缺根那一半拒的：点名 P 的根住的那块盘，缺的是根——那个根环槽两次读都自证不过（mkfs 清零之后这一槽 P 之前没写过）。
++/// 落后支缺根那一半拒的：点名 P 的根住的那块盘，缺的是根——那个根环槽两次读到的都是 `reading_of_the_ring_slot`
++/// （这一槽 P 之前没写过：mkfs 清零之后自证不过；根环转过一圈：上一圈那条自证得过的根）。
+ fn assert_refused_as_behind_without_the_root(
+     refusal: Option<EntryRefusal>,
+     entry: EntryAfterTheMount,
+     root_device_of_the_publish: DeviceIdentity,
+     ring_slot_of_the_publish_root: RootRingSlot,
++    reading_of_the_ring_slot: RingSlotReadingOtherThanTheVersionRoot,
+ ) {
+     let devices_behind: Vec<DeviceBehindTheCurrentVersion> = match refusal {
+         Some(EntryRefusal::Session(
+-            UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++            UserChangeRefused::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices },
+         ))
+         | Some(EntryRefusal::Mount(
+-            MountError::DevicesBehindTheCurrentVersionAndMissingItsUnits { devices },
++            MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { devices },
+         ))
+         | Some(EntryRefusal::Rollback(RollbackError::CallerInputsDisagreeWithTheDisk(
+-            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnits {
++            CallerInputsDisagreeingWithTheDisk::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot {
+                 devices,
+             },
+         ))) => devices,
+@@ -839,28 +877,32 @@
+             root_device_of_the_publish,
+             VersionLackingOnADeviceBehindIt::RootNotInItsRingSlot(VersionRootNotInItsRingSlot {
+                 ring_slot: ring_slot_of_the_publish_root,
+-                first_reading: RingSlotReadingOtherThanTheVersionRoot::Bad(
+-                    BadRootRingSlotReading::NotSelfVerified
+-                ),
+-                reread: RingSlotReadingOtherThanTheVersionRoot::Bad(
+-                    BadRootRingSlotReading::NotSelfVerified
+-                ),
++                first_reading: reading_of_the_ring_slot,
++                reread: reading_of_the_ring_slot,
+             }),
+         )],
+         "{entry:?}：点名 P 的根住的那块盘，单元都在、缺的是 P 的根"
+     );
+ }
+ 
+-/// C585 的一格：P 的根住的那块盘换成切在 P 的根槽 FUA 之前的样子，经 `entry` 交进去。在任何写之前拒成落后支缺根那一半，
+-/// 两块盘逐字节不变、会话的现行版本不动。改回「落后且缺单元才拒」时会话发布照常做成（之后池级 checker 红 I-3.1），
+-/// 另三个入口拒在读根环那一步（`RootRingSlotKnownToHoldARoot`），报的不是落后支。
+-fn root_device_taken_before_the_publish_root_slot_write_through(entry: EntryAfterTheMount) {
++/// C585 的一格：P（txg `publish_txg`）的根住的那块盘换成切在 P 的根槽 FUA 之前的样子，经 `entry` 交进去。在任何写之前拒成
++/// 落后支缺根那一半（那一槽两次读到的都是 `reading_of_the_ring_slot`），两块盘逐字节不变、会话的现行版本不动。交回 P 的根住的那块盘。
++/// 改回「落后且缺单元才拒」时会话发布照常做成（之后池级 checker 红 I-3.1），另三个入口拒在读根环那一步（`RootRingSlotKnownToHoldARoot`），
++/// 报的不是落后支。
++fn root_device_taken_before_the_publish_root_slot_write_through(
++    entry: EntryAfterTheMount,
++    publish_txg: CheckpointTxg,
++    reading_of_the_ring_slot: RingSlotReadingOtherThanTheVersionRoot,
++) -> DeviceIdentity {
+     let RootDeviceOfThePublishTakenMidPublish {
+         mut pool,
+         mut devices,
+         root_device_of_the_publish,
+         ring_slot_of_the_publish_root,
+-    } = root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::BeforeItsRootSlotWrite);
++    } = root_device_of_the_publish_taken_mid_publish(
++        WhereThePublishIsCut::BeforeItsRootSlotWrite,
++        publish_txg,
++    );
+     let images_before = images_of(&devices);
+     let current_before = pool.current_file_version().root;
+     let refusal = go_through(entry, &mut pool, &mut devices);
+@@ -869,6 +911,7 @@
+         entry,
+         root_device_of_the_publish,
+         ring_slot_of_the_publish_root,
++        reading_of_the_ring_slot,
+     );
+     assert_eq!(
+         images_of(&devices),
+@@ -880,6 +923,7 @@
+         current_before,
+         "{entry:?}：会话的现行版本不动"
+     );
++    root_device_of_the_publish
+ }
+ 
+ #[test]
+@@ -887,13 +931,19 @@
+ ) {
+     root_device_taken_before_the_publish_root_slot_write_through(
+         EntryAfterTheMount::SessionPublish,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++        NEVER_WRITTEN_RING_SLOT,
+     );
+ }
+ 
+ #[test]
+ fn a_normal_unmount_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write(
+ ) {
+-    root_device_taken_before_the_publish_root_slot_write_through(EntryAfterTheMount::NormalUnmount);
++    root_device_taken_before_the_publish_root_slot_write_through(
++        EntryAfterTheMount::NormalUnmount,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++        NEVER_WRITTEN_RING_SLOT,
++    );
+ }
+ 
+ #[test]
+@@ -901,6 +951,8 @@
+ ) {
+     root_device_taken_before_the_publish_root_slot_write_through(
+         EntryAfterTheMount::FloorRaiseToTheAdmissionCeiling,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++        NEVER_WRITTEN_RING_SLOT,
+     );
+ }
+ 
+@@ -909,6 +961,8 @@
+ ) {
+     root_device_taken_before_the_publish_root_slot_write_through(
+         EntryAfterTheMount::AdministratorRollback,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++        NEVER_WRITTEN_RING_SLOT,
+     );
+ }
+ 
+@@ -920,7 +974,10 @@
+         mut pool,
+         mut devices,
+         ..
+-    } = root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::AfterItsRootSlotWrite);
++    } = root_device_of_the_publish_taken_mid_publish(
++        WhereThePublishIsCut::AfterItsRootSlotWrite,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++    );
+     let refusal = go_through(EntryAfterTheMount::SessionPublish, &mut pool, &mut devices);
+     assert!(
+         refusal.is_none(),
+@@ -947,7 +1004,10 @@
+ fn a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts(
+ ) {
+     let RootDeviceOfThePublishTakenMidPublish { pool, devices, .. } =
+-        root_device_of_the_publish_taken_mid_publish(WhereThePublishIsCut::BeforeItsRootSlotWrite);
++        root_device_of_the_publish_taken_mid_publish(
++            WhereThePublishIsCut::BeforeItsRootSlotWrite,
++            PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++        );
+     let publish_root = pool.current_file_version().root;
+     let mut copies = copies_of(&devices);
+     let mounted = mount_writable(&pool.parameters, &mut copies)
+@@ -961,3 +1021,264 @@
+         "所选那一版是施加 P 的记录得来的 P"
+     );
+ }
++
++// ─── 代码三方 m3-code-r1 H2：P 的根住盘 1；根环转过一圈 ───
++
++/// H2 的一格（攻方改错 A「缺根那一半只读 region 0 那块盘的根槽」）：P 是 txg 7，根环槽在区域 1、住盘 1。盘 1 换成切在 P 的根槽 FUA
++/// 之前的样子，会话发布在任何写之前拒成落后支缺根那一半、点名盘 1。只查盘 0 的根槽时盘 1 的缺根不核、会话照常发布。
++#[test]
++fn a_session_publish_onto_device_one_holding_the_publish_root_taken_before_its_root_slot_write_is_refused_before_any_write(
++) {
++    let root_device_of_the_publish = root_device_taken_before_the_publish_root_slot_write_through(
++        EntryAfterTheMount::SessionPublish,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ONE,
++        NEVER_WRITTEN_RING_SLOT,
++    );
++    assert_eq!(
++        root_device_of_the_publish,
++        DeviceIdentity(1),
++        "txg 7 的根环槽在区域 1、住盘 1"
++    );
++}
++
++/// H2 的一格（攻方改错 E「根槽里自证得过的根都算是它」）：根环转过一圈，P 是 txg 27，根环槽（区域 0、槽 1）里住着上一圈
++/// 第一个文件那一版（txg 3）自证得过的根。P 的根住的那块盘换成切在 P 的根槽 FUA 之前的样子，会话发布在任何写之前拒成
++/// 落后支缺根那一半，两次读到的都是 `AnotherRoot`（实例 1、txg 3）。自证得过就算是它时上一圈的旧根被当成 P 的根、会话照常发布。
++#[test]
++fn a_session_publish_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write(
++) {
++    let root_device_of_the_publish = root_device_taken_before_the_publish_root_slot_write_through(
++        EntryAfterTheMount::SessionPublish,
++        PUBLISH_TXG_ONE_LAP_AFTER_THE_FIRST_FILE,
++        ROOT_OF_THE_FIRST_FILE_A_LAP_BEFORE,
++    );
++    assert_eq!(
++        root_device_of_the_publish,
++        DeviceIdentity(0),
++        "txg 27 的根环槽在区域 0、住盘 0"
++    );
++}
++
++// ─── 代码三方 m3-code-r1 H1、H3：缺根那一半的「重读一次」 ───
++
++/// 缺根那一半第一次读 P 的根槽，在会话发布里是那一槽被读的第几次（从 1 数）：会话发布读根环之前只核这一判。
++const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_SESSION_PUBLISH: u64 = 1;
++/// 缺根那一半第一次读 P 的根槽，在可写挂载里是那一槽被读的第几次（从 1 数）：读阶段（择根、见证读、重建）先读过它 7 次，
++/// 不出错时第 8 次就是取号之前逐盘核那一判的读，也是这一槽在取号之前的最后一次读（攻方原型扫出来的；
++/// [`a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write`]
++/// 从第 8 次起读坏、恰好坏两次就拒成缺根，钉住它是那一判的第一次读）。
++const ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT: u64 = 8;
++
++/// 盘表里每块盘包上同一份注入计划：P 的根环槽 `ring_slot` 上的读（整池数、只数落在这一槽里的读）按 `occurrence` 报块设备错。
++fn with_reads_of_the_publish_root_slot_failing(
++    devices: SparseDevices,
++    pool: &PoolUnderTest<SparseBlockDevice>,
++    ring_slot: RootRingSlot,
++    occurrence: FaultOccurrence,
++) -> (
++    Vec<(DeviceIdentity, FaultInjectingBlockDevice<SparseBlockDevice>)>,
++    SharedFaultPlan,
++) {
++    let plan = SharedFaultPlan::armed(
++        DEVICE_WIDTH.fixed_geometry(),
++        FaultSchedule {
++            fault: InjectedFault::ReadFails,
++            device: FaultDeviceSelector::EveryDevice,
++            placement: FaultPlacement::WithinNamedRootRingSlots(RootRingSlotTarget {
++                named_slots: NamedRootRingSlots::NONE.with(ring_slot),
++                region_devices: pool.parameters.region_devices,
++                fixed_structure_slot_spacing: pool.parameters.geometry.fixed_structure_slot_spacing,
++            }),
++            counting: FaultCounting::AcrossThePool,
++            occurrence,
++        },
++    );
++    let wrapped = devices
++        .into_iter()
++        .map(|(identity, device)| {
++            (
++                identity,
++                FaultInjectingBlockDevice::new(identity, device, plan.clone()),
++            )
++        })
++        .collect();
++    (wrapped, plan)
++}
++
++/// H1 的一格：P 的根住的那块盘切在 P 的根槽 FUA 之后（落后、单元都在、根槽里是 P），会话发布时缺根那一半第一次读那一槽读坏、
++/// 重读读得出 P：照常发布，那一次注入真发生了。去掉重读（第一次读不是它就拒）时拒成落后支缺根那一半。
++#[test]
++fn a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++) {
++    let RootDeviceOfThePublishTakenMidPublish {
++        mut pool,
++        devices,
++        ring_slot_of_the_publish_root,
++        ..
++    } = root_device_of_the_publish_taken_mid_publish(
++        WhereThePublishIsCut::AfterItsRootSlotWrite,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++    );
++    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++        devices,
++        &pool,
++        ring_slot_of_the_publish_root,
++        FaultOccurrence::TheNthMatchingCall(
++            ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_SESSION_PUBLISH,
++        ),
++    );
++    let (content, write_time_seconds) = overwrite_after(&pool, 0);
++    let outcome = pool
++        .session
++        .as_mut()
++        .expect("这一刻有可写会话")
++        .publish_user_change(
++            &mut wrapped,
++            UserChange::Overwrite(FirstFile {
++                content: &content,
++                write_time_seconds,
++            }),
++        );
++    assert_eq!(
++        plan.fired_count(),
++        1,
++        "P 的根槽上那一次读坏真发生了：{:?}",
++        plan.fired()
++    );
++    assert!(
++        outcome.is_ok(),
++        "一次瞬时读错、重读读得出 P：会话照常发布，实际 {:?}",
++        outcome.err()
++    );
++}
++
++/// H1 的一格：同一组盘（P 的根住的那块切在根槽 FUA 之后）上可写挂载，所选那一版就是择到的 P（写进了根环），
++/// 取号之前逐盘核时缺根那一半第一次读那一槽读坏、重读读得出 P：照常挂上、所选那一版是 P，那一次注入真发生了。
++/// 去掉重读时拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`。
++#[test]
++fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot(
++) {
++    let RootDeviceOfThePublishTakenMidPublish {
++        pool,
++        devices,
++        ring_slot_of_the_publish_root,
++        ..
++    } = root_device_of_the_publish_taken_mid_publish(
++        WhereThePublishIsCut::AfterItsRootSlotWrite,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++    );
++    let publish_root = pool.current_file_version().root;
++    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++        copies_of(&devices),
++        &pool,
++        ring_slot_of_the_publish_root,
++        FaultOccurrence::TheNthMatchingCall(ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT),
++    );
++    let mounted = mount_writable(&pool.parameters, &mut wrapped);
++    assert_eq!(
++        plan.fired_count(),
++        1,
++        "P 的根槽上那一次读坏真发生了：{:?}",
++        plan.fired()
++    );
++    let mounted = mounted
++        .unwrap_or_else(|error| panic!("一次瞬时读错、重读读得出 P：照常可写挂载，实际 {error:?}"));
++    assert_eq!(
++        (
++            mounted.output.effective_root.instance,
++            mounted.output.effective_root.checkpoint_txg
++        ),
++        (publish_root.instance, publish_root.checkpoint_txg),
++        "所选那一版是 P"
++    );
++}
++
++/// H3：同一组盘（P 的根住的那块切在根槽 FUA 之后）上可写挂载，所选那一版就是择到的 P，取号之前逐盘核时缺根那一半读那一槽
++/// 连着两次读坏（从第 8 次起每一次都坏，真发生的恰好是两次：读一次、重读一次）：拒成 `WritableMountRefusedByDevicesWithoutTheSelectedVersion`，
++/// 点名 P 的根住的那块盘、缺的是根（两次都读不出），拒在任何写之前（整池一次写都没发）、两块盘逐扇区不变。
++/// 可写挂载一律不核缺根那一半（所选那一版一律当成没写进根环）时，这一形挂得上或拒成别的。
++#[test]
++fn a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write(
++) {
++    let RootDeviceOfThePublishTakenMidPublish {
++        pool,
++        devices,
++        root_device_of_the_publish,
++        ring_slot_of_the_publish_root,
++    } = root_device_of_the_publish_taken_mid_publish(
++        WhereThePublishIsCut::AfterItsRootSlotWrite,
++        PUBLISH_TXG_WITH_ITS_ROOT_ON_DEVICE_ZERO,
++    );
++    let publish_root = pool.current_file_version().root;
++    let images_before = images_of(&devices);
++    let (mut wrapped, plan) = with_reads_of_the_publish_root_slot_failing(
++        copies_of(&devices),
++        &pool,
++        ring_slot_of_the_publish_root,
++        FaultOccurrence::EveryMatchingCallFromTheNthOnward(
++            ROOT_SLOT_READ_OF_THE_BEHIND_CHECK_IN_A_WRITABLE_MOUNT,
++        ),
++    );
++    let refusal = mount_writable(&pool.parameters, &mut wrapped).err();
++    let devices_without = match refusal {
++        Some(MountError::WritableMountRefusedByDevicesWithoutTheSelectedVersion {
++            selected_version,
++            devices: devices_without,
++            ..
++        }) => {
++            assert_eq!(
++                selected_version,
++                RollbackTarget {
++                    instance: publish_root.instance,
++                    checkpoint_txg: publish_root.checkpoint_txg,
++                },
++                "所选那一版是择到的 P"
++            );
++            devices_without
++        }
++        other => {
++            panic!("该拒成 WritableMountRefusedByDevicesWithoutTheSelectedVersion，实际 {other:?}")
++        }
++    };
++    let lacking: Vec<(DeviceIdentity, Option<VersionRootNotInItsRingSlot>)> = devices_without
++        .into_iter()
++        .map(|DeviceWithoutTheSelectedVersion { device, lacking }| {
++            let root_not_in_its_ring_slot = match lacking {
++                SelectedVersionLackingOnDevice::BehindTheSelectedVersionAndItsRootNotInItsRingSlot {
++                    root_not_in_its_ring_slot,
++                    ..
++                } => Some(root_not_in_its_ring_slot),
++                SelectedVersionLackingOnDevice::BehindTheSelectedVersionAndMissingItsUnits {
++                    ..
++                } => None,
++            };
++            (device, root_not_in_its_ring_slot)
++        })
++        .collect();
++    let unreadable =
++        RingSlotReadingOtherThanTheVersionRoot::Bad(BadRootRingSlotReading::Unreadable);
++    assert_eq!(
++        lacking,
++        vec![(
++            root_device_of_the_publish,
++            Some(VersionRootNotInItsRingSlot {
++                ring_slot: ring_slot_of_the_publish_root,
++                first_reading: unreadable,
++                reread: unreadable,
++            })
++        )],
++        "点名 P 的根住的那块盘，缺的是根（那一槽读一次、重读一次都读不出），不是单元"
++    );
++    let images_after: Vec<SparseDevice> = wrapped
++        .iter()
++        .map(|(_, device)| device.wrapped_device().image.clone())
++        .collect();
++    assert_eq!(plan.calls().writes, 0, "拒在任何写之前：整池一次写都没发");
++    assert_eq!(images_after, images_before, "两块盘逐扇区不变");
++    assert_eq!(
++        plan.fired_count(),
++        2,
++        "那一槽真读坏的恰好两次（缺根那一半读一次、重读一次）：{:?}",
++        plan.fired()
++    );
++}
+diff -ruN '--exclude=target' /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs
+--- /tmp/claude-1000/m3-code-r1/tree/crates/singlefs-harness/tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs	2026-09-30 23:28:44.720931543 +0000
++++ /tmp/claude-1000/m3-code-r2/tree/crates/singlefs-harness/tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs	2026-10-01 06:07:42.097815576 +0000
+@@ -7,10 +7,13 @@
+ //! 取线程这一份、不取进程那一份，因为同一个测试二进制里别的用例在别的线程上并行写各自的镜像。
+ //! 镜像放 `std::env::temp_dir()`，那个目录所在的文件系统要支持打洞（ext4、xfs、btrfs、tmpfs 都支持）；报不支持打洞时写零退回真写、这条用例判红，
+ //! 报别的错时 mkfs 照常交回块设备 I/O 错（用户 2026-09-30 定「只在不支持时退」）。
++//! 两份镜像（各 4 GiB 稀疏、清零之前已写的那部分实占）由删除守卫删：用例做完、断言失败、panic 都删
++//! （`.claude/singlefs-ai-sop/rules/command-safety.md`「测试镜像一律放临时目录」；代码三方 m3-code-r1 Z3-d：只在末尾删时红一次留一份）。
+ 
+ mod common;
+ 
+ use std::os::unix::fs::MetadataExt;
++use std::path::PathBuf;
+ 
+ use common::{image_path, parameters, IMAGE_BYTES};
+ use singlefs_core::address::DeviceIdentity;
+@@ -34,11 +37,28 @@
+         .expect("wchar 是十进制数")
+ }
+ 
++/// 这条用例建出的镜像：守卫离开作用域时逐个删掉，不管用例是做完、断言失败还是 panic 着离开的。
++/// 建成一份记一份（建镜像那一步失败的那一份不记：同名文件不是这一次建的）。删不掉只打一行，不在 Drop 里 panic
++/// （panic 途中再 panic 会直接中止进程，后面那几份就删不到了）。
++struct ImageFilesRemovedOnDrop {
++    paths: Vec<PathBuf>,
++}
++
++impl Drop for ImageFilesRemovedOnDrop {
++    fn drop(&mut self) {
++        for path in &self.paths {
++            if let Err(error) = std::fs::remove_file(path) {
++                eprintln!("删不掉测试镜像 {}：{error}", path.display());
++            }
++        }
++    }
++}
++
+ #[test]
+ fn mkfs_on_two_image_files_hands_only_the_written_bytes_to_write_calls_and_punches_every_zeroed_range(
+ ) {
+     let stream = SharedStream::new();
+-    let mut paths = Vec::new();
++    let mut images = ImageFilesRemovedOnDrop { paths: Vec::new() };
+     let mut devices = Vec::new();
+     for device_number in 0..2u32 {
+         let path = image_path("punch-zeroed-ranges", device_number);
+@@ -56,7 +76,7 @@
+                 stream.clone(),
+             ),
+         ));
+-        paths.push(path);
++        images.paths.push(path);
+     }
+ 
+     let handed_before = bytes_handed_to_write_calls_by_this_thread();
+@@ -112,7 +132,7 @@
+         u64::try_from(zero_fill_calls).expect("步数装得进 u64"),
+         "录制层记的每一步写零都落成了打洞"
+     );
+-    for path in &paths {
++    for path in &images.paths {
+         let metadata = std::fs::metadata(path).expect("读镜像元数据");
+         assert_eq!(metadata.len(), IMAGE_BYTES, "打洞不改镜像长度");
+         let allocated_bytes = metadata.blocks() * 512;
+@@ -122,9 +142,4 @@
+             path.display()
+         );
+     }
+-
+-    drop(devices);
+-    for path in &paths {
+-        std::fs::remove_file(path).expect("清理镜像");
+-    }
+ }

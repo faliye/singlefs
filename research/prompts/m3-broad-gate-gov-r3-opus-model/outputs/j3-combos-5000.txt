@@ -1,0 +1,5 @@
+trials=5000 seed=7
+summary_exit=0 gate_exit=0 truth_green=True gate_says_inconsistent=False count=1001
+summary_exit=0 gate_exit=1 truth_green=False gate_says_inconsistent=False count=162
+summary_exit=8 gate_exit=1 truth_green=False gate_says_inconsistent=False count=3837
+mismatches=0

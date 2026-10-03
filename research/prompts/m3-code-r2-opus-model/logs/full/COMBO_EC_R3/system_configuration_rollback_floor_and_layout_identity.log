@@ -1,0 +1,12 @@
+
+running 7 tests
+test make_filesystem_writes_rollback_floor_zero_and_only_the_new_layout_identity_bit_into_every_system_configuration_slot ... ok
+test every_self_verified_system_configuration_slot_hands_out_its_own_rollback_floor ... ok
+test mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_bit_zero_and_bit_one ... ok
+test mounting_a_pool_whose_system_configuration_carries_the_retired_layout_bit_is_refused_before_any_write_when_it_carries_only_the_retired_bit_zero ... ok
+test the_checker_accepts_the_unmount_marker_on_a_root_and_refuses_every_other_flag_bit ... ok
+test system_configuration_write_after_make_filesystem_carries_the_rollback_floor_already_on_the_device ... ok
+test unknown_layout_on_one_device_with_damaged_slots_on_the_other_reports_the_layout_and_damage_everywhere_reports_no_valid_system_configuration ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+
