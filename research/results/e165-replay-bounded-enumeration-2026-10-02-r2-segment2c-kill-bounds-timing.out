@@ -1,0 +1,222 @@
+# E165 第 2 次重跑第二段补跑（2c）驱动的计时与负载（不进逐字比对；登记 research/prompts/e165-r2-prereg.md 5.6、SQ14 附带）：--jobs 2 --threads 4（线程上限 8），E165_KILL_BOUNDS_MEMORY_CAP=8G；树是第四段冻结根 /tmp/claude-1000/e165-r2-segment4/root 原地（--root 指它）
+# 分 12 批起驱动（前台单条命令不许超 240 秒，驱动按 --item 补没跑的）：批 1 baseline tsv-23 tsv-24；批 2 tsv-36 tsv-226 tsv-350 tsv-402；批 3 起每批两个；批 10 被 VS Code 重启打断（137）后重跑；批 12 写收尾三行；批 13（不带 --item）确认已收尾什么都不跑
+# 批 1 开跑前 uptime： 11:34:14 up 3 days, 53 min,  4 users,  load average: 12.83, 17.92, 21.43
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465705 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 16G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --of
+# 开跑前 ps： 465767 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465768 /home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --offline --no-fail-fast -p singlefs-format -p singlefs-core -p singlefs-
+# 批 1 收尾 uptime： 11:36:38 up 3 days, 55 min,  4 users,  load average: 20.09, 18.59, 21.14
+# 批 2 开跑前 uptime： 11:36:46 up 3 days, 55 min,  4 users,  load average: 19.30, 18.47, 21.07
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465705 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 16G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --of
+# 开跑前 ps： 465767 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465768 /home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --offline --no-fail-fast -p singlefs-format -p singlefs-core -p singlefs-
+# 批 2 收尾 uptime： 11:40:27 up 3 days, 59 min,  4 users,  load average: 19.32, 18.91, 20.71
+# 批 3 开跑前 uptime： 11:40:32 up 3 days, 59 min,  4 users,  load average: 19.37, 18.93, 20.71
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465705 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 16G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --of
+# 开跑前 ps： 465767 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465768 /home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --offline --no-fail-fast -p singlefs-format -p singlefs-core -p singlefs-
+# 批 3 收尾 uptime： 11:42:54 up 3 days,  1:01,  4 users,  load average: 17.00, 17.77, 20.02
+# 批 4 开跑前 uptime： 11:42:58 up 3 days,  1:01,  4 users,  load average: 16.44, 17.64, 19.96
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465705 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 16G bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 cargo test --of
+# 开跑前 ps： 465767 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 开跑前 ps： 465768 /home/fy5090/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin/cargo test --offline --no-fail-fast -p singlefs-format -p singlefs-core -p singlefs-
+# 批 4 收尾 uptime： 11:45:38 up 3 days,  1:04,  4 users,  load average: 21.36, 21.68, 21.27
+# 批 5 开跑前 uptime： 11:45:42 up 3 days,  1:04,  4 users,  load average: 19.81, 21.35, 21.17
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 5 收尾 uptime： 11:47:54 up 3 days,  1:06,  4 users,  load average: 12.31, 18.51, 20.19
+# 批 6 开跑前 uptime： 11:47:57 up 3 days,  1:06,  4 users,  load average: 11.65, 18.27, 20.10
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 6 收尾 uptime： 11:50:07 up 3 days,  1:09,  4 users,  load average: 9.81, 15.02, 18.64
+# 批 7 开跑前 uptime： 11:50:10 up 3 days,  1:09,  4 users,  load average: 9.81, 15.02, 18.64
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 7 收尾 uptime： 11:52:14 up 3 days,  1:11,  4 users,  load average: 8.50, 12.80, 17.37
+# 批 8 开跑前 uptime： 11:52:17 up 3 days,  1:11,  4 users,  load average: 8.05, 12.63, 17.29
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 8 收尾 uptime： 11:54:25 up 3 days,  1:13,  4 users,  load average: 7.50, 10.93, 16.08
+# 批 9 开跑前 uptime： 11:54:28 up 3 days,  1:13,  4 users,  load average: 6.98, 10.77, 16.00
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 9 收尾 uptime： 11:56:33 up 3 days,  1:15,  4 users,  load average: 7.21, 9.66, 14.94
+# 批 10 开跑前 uptime： 11:56:36 up 3 days,  1:15,  4 users,  load average: 6.71, 9.52, 14.86
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 10 开跑前 uptime： 11:58:49 up 3 days,  1:17,  5 users,  load average: 3.29, 7.61, 13.48
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 10 收尾 uptime： 12:01:00 up 3 days,  1:20,  4 users,  load average: 13.04, 9.54, 13.40
+# 批 11 开跑前 uptime： 12:01:03 up 3 days,  1:20,  4 users,  load average: 12.72, 9.53, 13.37
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 11 收尾 uptime： 12:04:11 up 3 days,  1:23,  4 users,  load average: 30.12, 20.01, 16.73
+# 批 12 开跑前 uptime： 12:04:16 up 3 days,  1:23,  4 users,  load average: 28.75, 19.90, 16.71
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 12 收尾 uptime： 12:06:46 up 3 days,  1:25,  4 users,  load average: 22.52, 19.95, 17.14
+# 批 13 开跑前 uptime： 12:06:49 up 3 days,  1:25,  4 users,  load average: 22.80, 20.05, 17.19
+# 开跑前 ps： 120276 /usr/bin/bash -c trap "stop_requested=1" TERM INT : > "$1" peak_file="$2" cgroup_root="$3" shift 3 exec 4>&2 2>/dev/null "$@" 2>&4 4>&- command_exit=$? 
+# 批 13 收尾 uptime： 12:06:49 up 3 days,  1:25,  4 users,  load average: 22.80, 20.05, 17.19
+# 批 1 退出码：0
+# 批 1 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 26.3 秒，跑 10.4 秒，1373 行
+  baseline：编译 0.0 秒，跑 0.0 秒，合计 0.0 秒
+  tsv-23：编译 41.2 秒，跑 21.7 秒，合计 63.7 秒
+  tsv-24：编译 42.0 秒，跑 16.9 秒，合计 69.1 秒
+  基线 baseline-at-end：编译 26.6 秒，跑 11.8 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 3 个变体，挂钟 69.1 秒（不含开头与收尾的基线）
+# 批 1 stdout：
+  变体 27 个；点名 3 个；已有行 0 个；这一次要跑 3 个：baseline tsv-23 tsv-24
+已还原，基线与开头逐字相同
+  还有 24 个变体没有行：tsv-36 tsv-226 tsv-350 tsv-402 tsv-444 tsv-508 tsv-509 tsv-510 tsv-511 tsv-512 tsv-513 tsv-514 tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 2 退出码：0
+# 批 2 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 27.4 秒，跑 12.3 秒，1373 行
+  tsv-226：编译 43.5 秒，跑 20.7 秒，合计 65.1 秒
+  tsv-36：编译 43.9 秒，跑 21.5 秒，合计 75.9 秒
+  tsv-350：编译 40.1 秒，跑 20.5 秒，合计 61.4 秒
+  tsv-402：编译 37.7 秒，跑 19.4 秒，合计 66.4 秒
+  基线 baseline-at-end：编译 26.8 秒，跑 11.5 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 4 个变体，挂钟 142.3 秒（不含开头与收尾的基线）
+# 批 2 stdout：
+  变体 27 个；点名 4 个；已有行 0 个；这一次要跑 4 个：tsv-36 tsv-226 tsv-350 tsv-402
+已还原，基线与开头逐字相同
+  还有 20 个变体没有行：tsv-444 tsv-508 tsv-509 tsv-510 tsv-511 tsv-512 tsv-513 tsv-514 tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 3 退出码：0
+# 批 3 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 28.3 秒，跑 10.0 秒，1373 行
+  tsv-508：编译 35.0 秒，跑 19.4 秒，合计 64.2 秒
+  tsv-444：编译 35.0 秒，跑 19.5 秒，合计 64.3 秒
+  基线 baseline-at-end：编译 27.9 秒，跑 11.2 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 64.3 秒（不含开头与收尾的基线）
+# 批 3 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-444 tsv-508
+已还原，基线与开头逐字相同
+  还有 18 个变体没有行：tsv-509 tsv-510 tsv-511 tsv-512 tsv-513 tsv-514 tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 4 退出码：0
+# 批 4 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 31.6 秒，跑 18.4 秒，1373 行
+  tsv-510：编译 50.3 秒，跑 25.9 秒，合计 78.0 秒
+  tsv-509：编译 49.8 秒，跑 26.4 秒，合计 78.7 秒
+  基线 baseline-at-end：编译 21.9 秒，跑 9.9 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 78.7 秒（不含开头与收尾的基线）
+# 批 4 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-509 tsv-510
+已还原，基线与开头逐字相同
+  还有 16 个变体没有行：tsv-511 tsv-512 tsv-513 tsv-514 tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 5 退出码：0
+# 批 5 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 27.9 秒，跑 11.9 秒，1373 行
+  tsv-511：编译 35.6 秒，跑 19.1 秒，合计 56.4 秒
+  tsv-512：编译 36.0 秒，跑 19.1 秒，合计 57.4 秒
+  基线 baseline-at-end：编译 25.5 秒，跑 9.7 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 57.4 秒（不含开头与收尾的基线）
+# 批 5 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-511 tsv-512
+已还原，基线与开头逐字相同
+  还有 14 个变体没有行：tsv-513 tsv-514 tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 6 退出码：0
+# 批 6 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 23.9 秒，跑 9.7 秒，1373 行
+  tsv-514：编译 34.2 秒，跑 16.0 秒，合计 60.5 秒
+  tsv-513：编译 34.4 秒，跑 17.9 秒，合计 61.1 秒
+  基线 baseline-at-end：编译 24.0 秒，跑 10.3 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 61.1 秒（不含开头与收尾的基线）
+# 批 6 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-513 tsv-514
+已还原，基线与开头逐字相同
+  还有 12 个变体没有行：tsv-607 tsv-608 tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 7 退出码：0
+# 批 7 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 24.0 秒，跑 9.7 秒，1373 行
+  tsv-608：编译 34.7 秒，跑 18.9 秒，合计 55.3 秒
+  tsv-607：编译 34.8 秒，跑 19.0 秒，合计 56.1 秒
+  基线 baseline-at-end：编译 23.8 秒，跑 9.7 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 56.1 秒（不含开头与收尾的基线）
+# 批 7 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-607 tsv-608
+已还原，基线与开头逐字相同
+  还有 10 个变体没有行：tsv-914 tsv-915 tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 8 退出码：0
+# 批 8 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 23.7 秒，跑 9.6 秒，1373 行
+  tsv-914：编译 34.4 秒，跑 18.6 秒，合计 54.7 秒
+  tsv-915：编译 34.5 秒，跑 17.9 秒，合计 61.8 秒
+  基线 baseline-at-end：编译 23.2 秒，跑 9.6 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 61.8 秒（不含开头与收尾的基线）
+# 批 8 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-914 tsv-915
+已还原，基线与开头逐字相同
+  还有 8 个变体没有行：tsv-916 tsv-997 tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 9 退出码：0
+# 批 9 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 22.8 秒，跑 9.6 秒，1373 行
+  tsv-997：编译 33.4 秒，跑 18.5 秒，合计 53.6 秒
+  tsv-916：编译 34.0 秒，跑 16.9 秒，合计 60.0 秒
+  基线 baseline-at-end：编译 22.7 秒，跑 9.6 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 60.0 秒（不含开头与收尾的基线）
+# 批 9 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-916 tsv-997
+已还原，基线与开头逐字相同
+  还有 6 个变体没有行：tsv-998 Z1 Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 10 退出码：0
+# 批 10 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 23.4 秒，跑 9.8 秒，1373 行
+  tsv-998：编译 37.9 秒，跑 19.4 秒，合计 58.2 秒
+  Z1：编译 37.9 秒，跑 14.2 秒，合计 61.5 秒
+  基线 baseline-at-end：编译 25.0 秒，跑 10.3 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 61.6 秒（不含开头与收尾的基线）
+# 批 10 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：tsv-998 Z1
+已还原，基线与开头逐字相同
+  还有 4 个变体没有行：Z2 Z3 Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 11 退出码：0
+# 批 11 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 25.2 秒，跑 10.3 秒，1373 行
+  Z3：编译 55.7 秒，跑 26.5 秒，合计 84.8 秒
+  Z2：编译 56.6 秒，跑 24.5 秒，合计 92.0 秒
+  基线 baseline-at-end：编译 50.0 秒，跑 10.3 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 92.0 秒（不含开头与收尾的基线）
+# 批 11 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：Z2 Z3
+已还原，基线与开头逐字相同
+  还有 2 个变体没有行：Z4 Z5；重跑同一条命令（不带 --item）只补这些
+# 批 12 退出码：0
+# 批 12 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 26.8 秒，跑 10.2 秒，1373 行
+  Z4：编译 38.7 秒，跑 19.3 秒，合计 62.4 秒
+  Z5：编译 39.1 秒，跑 19.2 秒，合计 68.0 秒
+  基线 baseline-at-end：编译 33.5 秒，跑 10.8 秒，1373 行
+fatal: not a git repository (or any of the parent directories): .git
+  这一次 2 个变体，挂钟 68.0 秒（不含开头与收尾的基线）
+# 批 12 stdout：
+  变体 27 个；点名 2 个；已有行 0 个；这一次要跑 2 个：Z4 Z5
+已还原，基线与开头逐字相同
+  ✓ 27 个变体都有行，收尾三行已写：/tmp/claude-1000/e165-r2-segment2c/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out
+  · 红例账照落，不钉进 .claude/gate.d/e165-pinned-red-examples.tsv（r2 登记 5.6：钉表要带 --profile r2 才重放得出，接不接由主 agent 定）
+# 批 13 退出码：0
+# 批 13 stderr：
+# 批 13 stdout：
+  /tmp/claude-1000/e165-r2-segment2c/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out 已经收尾（name=done），27 个变体都有行，这一次什么都不跑
+# 批 10 被打断那一次的 stderr：
+fatal: not a git repository (or any of the parent directories): .git
+  基线 baseline：编译 23.2 秒，跑 9.6 秒，1373 行

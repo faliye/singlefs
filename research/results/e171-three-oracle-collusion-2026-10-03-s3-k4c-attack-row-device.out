@@ -1,0 +1,47 @@
+E7RESULT name=config segment=s1 mode=row streams=2 sector_bytes=512 first_batch_divisor=7 second_batch_divisor=14 third_batch_divisor=23 torn_states_per_segment=4 torn_scan_ordinals_per_segment=100000 third_batch_sampled=false positive_control=none disabled_oracle=none
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_o1_every_errored_call_but_the_unmount_is_judged_by_the_comparison local=0 crates=0 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_o1_not_applicable_only_after_the_unmount_or_a_disagreement local=0 crates=0 holds=true
+E7RESULT name=stream stream=new_pool_file_creation ending=stopped_by_an_error:call_0:err:DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness exported=false not_exported_why=no_root_write_to_judge operations=0 writes=0 segments=0 tearable_writes=0 calls=1 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=0
+E7RESULT name=call stream=new_pool_file_creation call=0 label=acquire first_operation=0 return_point=0 status=err:DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness o1_comparison=disagrees:模型说该成、实现拒了
+E7RESULT name=batch stream=new_pool_file_creation batch=1 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=batch stream=new_pool_file_creation batch=2 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=batch stream=new_pool_file_creation batch=3 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=s4 stream=new_pool_file_creation rebuilt_states=0 digest_mismatches=0
+E7RESULT name=crash_facts_mask stream=new_pool_file_creation states=0 mismatches=0
+E7RESULT name=s3 stream=new_pool_file_creation states=0 o2_direct_differs_from_judge_crash_image=0
+E7RESULT name=file stream=new_pool_file_creation file=call-outcomes.tsv bytes=228 sha256=2467e063cb9332204b1932a110e245fa473af450a121c79310a36b0edc040899
+E7RESULT name=file stream=new_pool_file_creation file=stream-status.tsv bytes=177 sha256=d338feba47fb8498af47cfd9567911dc668e0aa48de7c1abda026f18ed39e416
+E7TIMING name=stream_time stream=new_pool_file_creation elapsed_ns=5399910 drive_ns=5341228 observe_ns=0 write_ns=0
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_o1_every_errored_call_but_the_unmount_is_judged_by_the_comparison local=0 crates=0 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_o1_not_applicable_only_after_the_unmount_or_a_disagreement local=0 crates=0 holds=true
+E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=stopped_by_an_error:call_0:err:DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness exported=false not_exported_why=no_root_write_to_judge operations=0 writes=0 segments=0 tearable_writes=0 calls=1 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=0
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=0 label=acquire first_operation=0 return_point=0 status=err:DeviceWithAnUnreadOrUnverifiedSystemConfigurationSlotWhenReadingTheWitness o1_comparison=disagrees:模型说该成、实现拒了
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=1 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=3 states=0 segments_touched=0 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=0 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7RESULT name=s4 stream=fixed_script_through_e_then_unmount rebuilt_states=0 digest_mismatches=0
+E7RESULT name=crash_facts_mask stream=fixed_script_through_e_then_unmount states=0 mismatches=0
+E7RESULT name=s3 stream=fixed_script_through_e_then_unmount states=0 o2_direct_differs_from_judge_crash_image=0
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=call-outcomes.tsv bytes=228 sha256=2467e063cb9332204b1932a110e245fa473af450a121c79310a36b0edc040899
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=stream-status.tsv bytes=177 sha256=d338feba47fb8498af47cfd9567911dc668e0aa48de7c1abda026f18ed39e416
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=5174234 drive_ns=5138473 observe_ns=0 write_ns=0
+E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 streams_not_exported=2 o1_comparison_red_calls=2 o1_crash_judge_red_states=0 o2_red_states=0
+E7RESULT name=done emitted=27

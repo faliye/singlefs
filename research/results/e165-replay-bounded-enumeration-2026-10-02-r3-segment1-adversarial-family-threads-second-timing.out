@@ -1,0 +1,12 @@
+E7TIMING name=elapsed scope=positive_controls elapsed_seconds=26.298 threads=4
+E7TIMING name=elapsed scope=domain domain=A n=1 states=146 elapsed_seconds=0.003 threads=4
+E7TIMING name=elapsed scope=domain domain=A n=2 states=10658 elapsed_seconds=0.035 threads=4
+E7TIMING name=elapsed scope=domain domain=A n=3 states=778034 elapsed_seconds=1.883 threads=4
+E7TIMING name=elapsed scope=domain domain=A n=4 states=56796482 elapsed_seconds=151.821 threads=4
+E7TIMING name=elapsed scope=domain domain=A6 n=1 states=146 elapsed_seconds=0.004 threads=4
+E7TIMING name=elapsed scope=domain domain=A6 n=2 states=10658 elapsed_seconds=0.035 threads=4
+E7TIMING name=elapsed scope=domain domain=A6 n=3 states=778034 elapsed_seconds=1.776 threads=4
+E7TIMING name=elapsed scope=domain domain=AC n=1 states=290 elapsed_seconds=0.004 threads=4
+E7TIMING name=elapsed scope=domain domain=AC n=2 states=42050 elapsed_seconds=0.097 threads=4
+E7TIMING name=elapsed scope=domain domain=AC n=3 states=6097250 elapsed_seconds=12.753 threads=4
+E7TIMING name=elapsed scope=run states=64513748 elapsed_seconds=195.872 threads=4

@@ -1,0 +1,16 @@
+# 量的时候的负载（uptime 原样，跑之前）
+ 13:49:58 up 2 days,  3:08,  4 users,  load average: 37.24, 35.51, 26.59
+ 13:51:23 up 2 days,  3:10,  4 users,  load average: 36.34, 35.54, 27.38
+# --bounds segment1 --family adversarial，E165_THREADS=5
+E7TIMING name=elapsed scope=positive_controls elapsed_seconds=9.149 threads=5
+E7TIMING name=elapsed scope=domain domain=A n=1 states=146 elapsed_seconds=0.005 threads=5
+E7TIMING name=elapsed scope=domain domain=A n=2 states=10658 elapsed_seconds=0.029 threads=5
+E7TIMING name=elapsed scope=domain domain=A n=3 states=778034 elapsed_seconds=0.996 threads=5
+E7TIMING name=elapsed scope=domain domain=A n=4 states=56796482 elapsed_seconds=65.802 threads=5
+E7TIMING name=elapsed scope=domain domain=A6 n=1 states=146 elapsed_seconds=0.002 threads=5
+E7TIMING name=elapsed scope=domain domain=A6 n=2 states=10658 elapsed_seconds=0.036 threads=5
+E7TIMING name=elapsed scope=domain domain=A6 n=3 states=778034 elapsed_seconds=1.430 threads=5
+E7TIMING name=elapsed scope=domain domain=AC n=1 states=290 elapsed_seconds=0.002 threads=5
+E7TIMING name=elapsed scope=domain domain=AC n=2 states=42050 elapsed_seconds=0.088 threads=5
+E7TIMING name=elapsed scope=domain domain=AC n=3 states=6097250 elapsed_seconds=7.541 threads=5
+E7TIMING name=elapsed scope=run states=64513748 elapsed_seconds=85.464 threads=5

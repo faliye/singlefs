@@ -1,0 +1,13 @@
+compare old=e166-parallel-commit-shared-state-partition-2026-10-01.out new=e166-parallel-commit-shared-state-partition-r2-main-2026-10-02.out
+Q-11 conclusion_lines old=309 new=309 paired=309 differing_pairs=2 unpaired=0 differences=2
+Q-11 DIFF pair=59 class=yi differing_keys=duplicate_total
+Q-11   OLD E7RESULT name=verdict question=Q-4 arm=A字面 stage=Q1甲 judgement=judged cells=8 cells_with_duplicates=4 duplicate_total=46944 no_duplicate_in_any_cell=false
+Q-11   NEW E7RESULT name=verdict question=Q-4 arm=A字面 stage=Q1甲 judgement=judged cells=8 cells_with_duplicates=4 duplicate_total=70416 no_duplicate_in_any_cell=false
+Q-11 DIFF pair=61 class=yi differing_keys=duplicate_total
+Q-11   OLD E7RESULT name=verdict question=Q-4 arm=A字面 stage=Q1丙 judgement=judged cells=8 cells_with_duplicates=4 duplicate_total=46944 no_duplicate_in_any_cell=false
+Q-11   NEW E7RESULT name=verdict question=Q-4 arm=A字面 stage=Q1丙 judgement=judged cells=8 cells_with_duplicates=4 duplicate_total=70416 no_duplicate_in_any_cell=false
+Q-12 scope=verdict(D=2 算出的格) jia=0 yi=2 bing=0
+Q-12 scope=geometry_sensitivity jia=0 yi=0 bing=0
+Q-13 lines old=1315 new=1315 paired=1315 unpaired=0
+Q-13 classes same=1228 yi_derived_ratio_ok=74 anchor_section_seven=13 other=0
+Q-13 devices=1 (cell,trajectory,rounds) classes same=368 yi_derived_ratio_ok=16 anchor_section_seven=0 other=0

@@ -1,0 +1,10 @@
+freeze_check before=true differences=0 detail=none
+snapshot_digest=149640557b61cdd78cb3f81ecde5505abc8731f70316351fbfb3045488f428ee files=237 snapshot_ns=180931886 rows=1
+row row_number=901 row_name=E171_装置_取号逐盘核「少于两槽」写成「不多于两槽」、不带故障的盘上每次取号都拒（代码轮第三轮判决_K4-c_攻方造法；O1-对拍那一栏该红，装置不记红时这一行没红） lane=0 substituted_from=- line_matches_the_registration=true mutated_row_name=E171_装置_取号逐盘核「少于两槽」写成「不多于两槽」、不带故障的盘上每次取号都拒（代码轮第三轮判决_K4-c_攻方造法；O1-对拍那一栏该红，装置不记红时这一行没红） mutation_line_sha256=ab01ca1fc28484fd434fe5827faeecb8842e6d27d530bb3e06538522b25d53b4 copy_ns=170258394 compile_ns=28159694036 compile_kind=incremental status=ok device_exit=0 device_ns=166616155 o3_status=no_exported_stream o3_exit=- o3_ns=- o3_streams=-
+table lanes=1 threads_per_lane=4 rows=1 table_wall_ns=28497485779 sum_of_row_ns=28496568585
+freeze_check before=false differences=0 detail=none
+freeze_check before=true differences=0 detail=none
+snapshot_digest=149640557b61cdd78cb3f81ecde5505abc8731f70316351fbfb3045488f428ee files=237 snapshot_ns=181864518 rows=1
+row row_number=0 row_name=空变异（E171_装置_取号逐盘核「少于两槽」写成「不多于两槽」、不带故障的盘上每次取号都拒（代码轮第三轮判决_K4-c_攻方造法；O1-对拍那一栏该红，装置不记红时这一行没红）） lane=0 substituted_from=- line_matches_the_registration=true mutated_row_name=空变异（E171_装置_取号逐盘核「少于两槽」写成「不多于两槽」、不带故障的盘上每次取号都拒（代码轮第三轮判决_K4-c_攻方造法；O1-对拍那一栏该红，装置不记红时这一行没红）） mutation_line_sha256=ab01ca1fc28484fd434fe5827faeecb8842e6d27d530bb3e06538522b25d53b4 copy_ns=169872648 compile_ns=28469477887 compile_kind=incremental status=ok device_exit=0 device_ns=225886203962 o3_status=ran o3_exit=0 o3_ns=464845460 o3_streams=new_pool_file_creation,fixed_script_through_e_then_unmount
+table lanes=1 threads_per_lane=4 rows=1 table_wall_ns=254992987527 sum_of_row_ns=254990399957
+freeze_check before=false differences=0 detail=none

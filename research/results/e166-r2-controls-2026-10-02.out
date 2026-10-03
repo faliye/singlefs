@@ -1,0 +1,42 @@
+# E166 第 2 次重跑 PC-d / PC-c（登记第五节 5.2）：旧产物 e166-parallel-commit-shared-state-partition-2026-10-01.out 的三份拷贝，用 compare.py 与旧产物比
+beta 改了： [(1007, 'judgement', 'definition_implied', 'pc_flipped'), (1061, 'duplicate_total', '0', '1')]
+gamma 改了： [(97, 'T_total', '32', '48', 'control_cell')]
+=== PC-d alpha
+compare old=e166-parallel-commit-shared-state-partition-2026-10-01.out new=/tmp/claude-1000/e166-r2-run/pc-alpha.out
+Q-11 conclusion_lines old=309 new=309 paired=309 differing_pairs=0 unpaired=0 differences=0
+Q-12 scope=verdict(D=2 算出的格) jia=0 yi=0 bing=0
+Q-12 scope=geometry_sensitivity jia=0 yi=0 bing=0
+Q-13 lines old=1315 new=1315 paired=1315 unpaired=0
+Q-13 classes same=1315 yi_derived_ratio_ok=0 anchor_section_seven=0 other=0
+Q-13 devices=1 (cell,trajectory,rounds) classes same=384 yi_derived_ratio_ok=0 anchor_section_seven=0 other=0
+=== PC-d beta
+compare old=e166-parallel-commit-shared-state-partition-2026-10-01.out new=/tmp/claude-1000/e166-r2-run/pc-beta.out
+Q-11 conclusion_lines old=309 new=309 paired=309 differing_pairs=2 unpaired=0 differences=2
+Q-11 DIFF pair=2 class=jia differing_keys=judgement
+Q-11   OLD E7RESULT name=verdict question=Q-1 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-11   NEW E7RESULT name=verdict question=Q-1 arm=A stage=Q1甲 judgement=pc_flipped cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-11 DIFF pair=56 class=bing differing_keys=duplicate_total
+Q-11   OLD E7RESULT name=verdict question=Q-4 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-11   NEW E7RESULT name=verdict question=Q-4 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=1 no_duplicate_in_any_cell=true
+Q-12 scope=verdict(D=2 算出的格) jia=1 yi=0 bing=1
+Q-12 scope=geometry_sensitivity jia=0 yi=0 bing=0
+Q-13 lines old=1315 new=1315 paired=1315 unpaired=0
+Q-13 classes same=1313 yi_derived_ratio_ok=0 anchor_section_seven=0 other=2
+Q-13 devices=1 (cell,trajectory,rounds) classes same=384 yi_derived_ratio_ok=0 anchor_section_seven=0 other=0
+Q-13 OTHER pair=1007 class=jia differing_keys=judgement
+Q-13   OLD E7RESULT name=verdict question=Q-1 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-13   NEW E7RESULT name=verdict question=Q-1 arm=A stage=Q1甲 judgement=pc_flipped cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-13 OTHER pair=1061 class=bing differing_keys=duplicate_total
+Q-13   OLD E7RESULT name=verdict question=Q-4 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=0 no_duplicate_in_any_cell=true
+Q-13   NEW E7RESULT name=verdict question=Q-4 arm=A stage=Q1甲 judgement=definition_implied cells=8 cells_with_duplicates=0 duplicate_total=1 no_duplicate_in_any_cell=true
+=== PC-d gamma
+compare old=e166-parallel-commit-shared-state-partition-2026-10-01.out new=/tmp/claude-1000/e166-r2-run/pc-gamma.out
+Q-11 conclusion_lines old=309 new=309 paired=309 differing_pairs=0 unpaired=0 differences=0
+Q-12 scope=verdict(D=2 算出的格) jia=0 yi=0 bing=0
+Q-12 scope=geometry_sensitivity jia=0 yi=0 bing=0
+Q-13 lines old=1315 new=1315 paired=1315 unpaired=0
+Q-13 classes same=1314 yi_derived_ratio_ok=1 anchor_section_seven=0 other=0
+Q-13 devices=1 (cell,trajectory,rounds) classes same=384 yi_derived_ratio_ok=0 anchor_section_seven=0 other=0
+=== PC-c cmp 拷贝 beta 与旧产物
+/tmp/claude-1000/e166-r2-run/pc-beta.out e166-parallel-commit-shared-state-partition-2026-10-01.out differ: byte 506471, line 1007
+cmp_exit=1

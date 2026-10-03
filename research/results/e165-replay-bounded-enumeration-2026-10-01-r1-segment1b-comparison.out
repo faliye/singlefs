@@ -1,0 +1,66 @@
+# R1 比对（这一遍 segment1b）：装置在第三轮冻结副本的拷贝上编、跑，不在主工作区上
+# 二进制编于 /tmp/claude-1000/e165-r1-segment1b/tree（拷自 /tmp/claude-1000/m3-verus-land-code-r3/tree），CARGO_TARGET_DIR=/tmp/claude-1000/e165-r1-segment1b/target，装置源码 sha256 24a4b2ebd917ca151ef1699ee26ab99ebc396e14b029889762a8e7ff66a96896
+# 段首 sha256sum -c crates-sha256.txt（在拷贝根上）: 217 OK、217 非 OK；crates/ 下清单外文件 0
+# 段尾 sha256sum -c crates-sha256.txt（在拷贝根上）: 217 OK、217 非 OK；crates/ 下清单外文件 0
+# 命令：compare.sh <今天> <入库> <标签>（wc -l 两边大于 0；sha256；cmp -s；不同时 cmp、diff 第一处）
+[RQ1-legal-10threads] wc -l 今天=910 入库=910
+[RQ1-legal-10threads] sha256 今天 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[RQ1-legal-10threads] sha256 入库 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[RQ1-legal-10threads] 结果: 相同
+[RQ2-adversarial-10threads] wc -l 今天=172 入库=172
+[RQ2-adversarial-10threads] sha256 今天 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[RQ2-adversarial-10threads] sha256 入库 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[RQ2-adversarial-10threads] 结果: 相同
+[R1-legal-5threads-vs-banked] wc -l 今天=910 入库=910
+[R1-legal-5threads-vs-banked] sha256 今天 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[R1-legal-5threads-vs-banked] sha256 入库 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[R1-legal-5threads-vs-banked] 结果: 相同
+[R1-adversarial-5threads-vs-banked] wc -l 今天=172 入库=172
+[R1-adversarial-5threads-vs-banked] sha256 今天 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[R1-adversarial-5threads-vs-banked] sha256 入库 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[R1-adversarial-5threads-vs-banked] 结果: 相同
+[RQ3-legal-5-vs-10threads] wc -l 今天=910 入库=910
+[RQ3-legal-5-vs-10threads] sha256 今天 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[RQ3-legal-5-vs-10threads] sha256 入库 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[RQ3-legal-5-vs-10threads] 结果: 相同
+[RQ3-adversarial-5-vs-10threads] wc -l 今天=172 入库=172
+[RQ3-adversarial-5-vs-10threads] sha256 今天 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[RQ3-adversarial-5-vs-10threads] sha256 入库 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[RQ3-adversarial-5-vs-10threads] 结果: 相同
+# 阳性对照（5.2）：把入库产物拷进草稿目录，取文件中间一行把 violations= 后的数加一，再用同一条比对命令比
+# legal 改第 455 行
+# 改的那一行原文: E7RESULT name=violations domain=U_verify_off ring_slots=64 n=3 criterion=J6_premise_holds violations=0 judged=1944 witness=none
+[CTL-legal-modified-vs-orig] wc -l 今天=910 入库=910
+[CTL-legal-modified-vs-orig] sha256 今天 14513bcceaa0ac6a01a490ea7cd8750aba5eb082a66b4a041f261e9d87a4bc4c
+[CTL-legal-modified-vs-orig] sha256 入库 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[CTL-legal-modified-vs-orig] 结果: 不同
+[CTL-legal-modified-vs-orig] cmp: /tmp/claude-1000/e165-r1-segment1b/ctl-legal.out /tmp/claude-1000/e165-r1-segment1b/ctl-legal-mod.out differ: byte 64238, line 455
+[CTL-legal-modified-vs-orig] 不同行数（diff 里以 < 起头的行数，入库侧）: 1
+[CTL-legal-modified-vs-orig] diff: 455c455
+[CTL-legal-modified-vs-orig] diff: < E7RESULT name=violations domain=U_verify_off ring_slots=64 n=3 criterion=J6_premise_holds violations=0 judged=1944 witness=none
+[CTL-legal-modified-vs-orig] diff: ---
+[CTL-legal-modified-vs-orig] diff: > E7RESULT name=violations domain=U_verify_off ring_slots=64 n=3 criterion=J6_premise_holds violations=1 judged=1944 witness=none
+[CTL-legal-orig-vs-orig] wc -l 今天=910 入库=910
+[CTL-legal-orig-vs-orig] sha256 今天 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[CTL-legal-orig-vs-orig] sha256 入库 eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5
+[CTL-legal-orig-vs-orig] 结果: 相同
+# adversarial 改第 86 行
+# 改的那一行原文: E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A0 violations=0 judged=146 witness=none
+[CTL-adversarial-modified-vs-orig] wc -l 今天=172 入库=172
+[CTL-adversarial-modified-vs-orig] sha256 今天 d61e0c8d43fe344a7459dd0d3cc2769f7725f9c80430f6ed34fc19f547191b65
+[CTL-adversarial-modified-vs-orig] sha256 入库 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[CTL-adversarial-modified-vs-orig] 结果: 不同
+[CTL-adversarial-modified-vs-orig] cmp: /tmp/claude-1000/e165-r1-segment1b/ctl-adversarial.out /tmp/claude-1000/e165-r1-segment1b/ctl-adversarial-mod.out differ: byte 14870, line 86
+[CTL-adversarial-modified-vs-orig] 不同行数（diff 里以 < 起头的行数，入库侧）: 1
+[CTL-adversarial-modified-vs-orig] diff: 86c86
+[CTL-adversarial-modified-vs-orig] diff: < E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A0 violations=0 judged=146 witness=none
+[CTL-adversarial-modified-vs-orig] diff: ---
+[CTL-adversarial-modified-vs-orig] diff: > E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A0 violations=1 judged=146 witness=none
+[CTL-adversarial-orig-vs-orig] wc -l 今天=172 入库=172
+[CTL-adversarial-orig-vs-orig] sha256 今天 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[CTL-adversarial-orig-vs-orig] sha256 入库 3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e
+[CTL-adversarial-orig-vs-orig] 结果: 相同
+# 更正第 3、4 行：那两行里「非 OK」的数是写脚本时转义写错，取了全部行数；下面是重数的原样输出
+# 段首 非 OK 行数: 0（check-start.txt 共 217 行，OK 217）
+# 段尾 非 OK 行数: 0（check-end.txt 共 217 行，OK 217）
+# 两遍 sha256sum -c 退出码：段首 0（precheck.txt），段尾 0

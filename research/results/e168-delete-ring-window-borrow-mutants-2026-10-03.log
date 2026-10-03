@@ -1,0 +1,14 @@
+✅ [E168 梯子 3S + 2 那一点写成 3S + 3] rc=101 test=ladder_of_file_sizes_crosses_the_ring_for_both_batch_sizes
+✅ [E168 切片执行器按跑完的先后取片、不按片的次序合并] rc=101 test=slices_on_four_threads_print_the_lines_of_one_thread_in_slice_order_and_stop_at_the_first_stopping_slice
+✅ [E168 线程数先读 SINGLEFS_THREAD_CAP、后读 E168_THREADS] rc=101 test=thread_count_reads_e168_threads_first_then_the_shared_cap_then_the_available_parallelism
+✅ [E168 大片同时跑的上限取线程数（P4 的片不再一次一片）] rc=101 test=large_slices_run_at_most_their_own_thread_cap_and_leave_a_thread_for_the_rest
+✅ [E168 P1 改回原定义（只要第 1、2 步做得成）] rc=101 test=smallest_usable_disk_under_reading_c_fills_while_the_steps_one_and_two_disk_and_the_disk_two_slots_smaller_do_not
+✅ [E168 阳性对照的 free_0 改回读 N = 1 那块盘] rc=101 test=positive_control_reads_free_0_on_the_disk_it_fills_with_the_n_unit_file
+✅ [E168 P1 的环按记录数取档时向下取整] rc=101 test=p1_journal_ring_for_a_file_of_88_data_units_is_two_mebibytes_and_one_mebibyte_refuses_the_write
+✅ [E168 P1 找不到盘时原因字段恒打 none] rc=101 test=smallest_usable_line_names_the_journal_record_limit_when_the_ring_may_not_grow
+✅ [E168 抬 F 预演在分配器拷贝上记的根算进谷值] rc=101 test=valley_keeps_the_roots_recorded_on_the_session_allocator_and_drops_those_the_floor_raise_rehearsal_recorded_on_a_copy
+✅ [E168 抬 F 预演第 k 次被拒时拷贝上的根数记成 k] rc=101 test=floor_raises_of_a_refused_step_count_the_rehearsal_roots_and_refuse_a_chain_that_landed_outside_the_refusal
+✅ [E168 阳性对照 verdict 行把不合的格数打在 without_refusal 下] rc=101 test=positive_control_verdict_counts_the_refusal_and_the_session_floor_raise_refusal_apart_and_stops_on_either
+✅ [E168 阳性对照有一格不合也不停] rc=101 test=positive_control_verdict_counts_the_refusal_and_the_session_floor_raise_refusal_apart_and_stops_on_either
+✅ [E168 U12 读法乙：B 臂被落点直接拒也算经会话推抬 F] rc=101 test=positive_control_u12_holds_for_a_session_refusal_whose_floor_raise_was_refused_in_the_rehearsal_and_not_for_a_landing_refusal
+✅ [E168 U12 那个数把 B 臂没出拒绝的格也算进去] rc=101 test=positive_control_verdict_counts_the_refusal_and_the_session_floor_raise_refusal_apart_and_stops_on_either

@@ -1,0 +1,154 @@
+E7RESULT name=config segment=s1 mode=baseline streams=2 sector_bytes=512 first_batch_divisor=7 second_batch_divisor=14 third_batch_divisor=23 torn_states_per_segment=4 torn_scan_ordinals_per_segment=100000 third_batch_sampled=true positive_control=none disabled_oracle=none
+E7RESULT name=s1 stream=both check=device_bytes local=4294967296 crates=4294967296 holds=true
+E7RESULT name=s1 stream=both check=physical_block_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=both check=minimum_input_output_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=both check=sector_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=both check=filesystem_identifier local=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] crates=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] holds=true
+E7RESULT name=s1 stream=both check=fixed_write_time_seconds local=1788000000 crates=1788000000 holds=true
+E7RESULT name=s1 stream=both check=first_file_bytes local=3000 crates=3000 holds=true
+E7RESULT name=s1 stream=both check=first_file_content local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=first_acquired_instance_is_one local=InstanceGeneration(1) crates=InstanceGeneration(1) holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2] holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_writes local=41 crates=41 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_root_writes local=3 crates=3 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_count local=2 crates=2 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_bytes local=4294967296 crates=4294967296 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_operations_equal_build_pool local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_mkfs_operations_equal_build_pool local=25 crates=25 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_warm_up_return_point_equal_build_pool local=47 crates=47 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_full_states local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_quick_tier_states local=46 crates=46 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_two_state_closed_form local=16777240 crates=16777240 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_enumeration_tables_state_count local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_flow_facts_state_count local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_o1_model_stops_only_at_the_unmount local=None crates=None holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_every_call_is_judged_or_is_the_unmount local=true crates=true holds=true
+E7RESULT name=stream stream=new_pool_file_creation ending=completed exported=true not_exported_why=- operations=57 writes=41 segments=11 tearable_writes=8 calls=3 full_states=16777260 quick_tier_states=46 sampled_states=82 model_stopped_at_call=none
+E7RESULT name=call stream=new_pool_file_creation call=0 label=acquire first_operation=0 return_point=4 status=ok o1_comparison=not_modelled
+E7RESULT name=call stream=new_pool_file_creation call=1 label=warm_up first_operation=4 return_point=22 status=ok o1_comparison=not_modelled
+E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=57 status=ok o1_comparison=agrees
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=0 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=3 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=6 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=10 scanned=8 found=0 wanted=4
+E7RESULT name=batch stream=new_pool_file_creation batch=1 states=53 segments_touched=12 states_with_a_torn_write=20 o1_crash_judge_red=0 o1_crash_judge_green=53 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o1 states=53 total_ns=28781 median_ns=360 p95_ns=1440 max_ns=1570
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o2 states=53 total_ns=113367094 median_ns=1158095 p95_ns=5435023 max_ns=5501783
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=recovery states=53 total_ns=6245070 median_ns=59131 p95_ns=390775 max_ns=403215
+E7RESULT name=batch stream=new_pool_file_creation batch=2 states=7 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=7 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o1 states=7 total_ns=2440 median_ns=360 p95_ns=370 max_ns=370
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o2 states=7 total_ns=8151147 median_ns=1161826 p95_ns=1183456 max_ns=1183456
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=recovery states=7 total_ns=412997 median_ns=58991 p95_ns=59561 max_ns=59561
+E7RESULT name=batch stream=new_pool_file_creation batch=3 states=22 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=22 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o1 states=22 total_ns=7670 median_ns=350 p95_ns=410 max_ns=420
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o2 states=22 total_ns=25581612 median_ns=1160436 p95_ns=1175695 max_ns=1176656
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=recovery states=22 total_ns=1298478 median_ns=58891 p95_ns=60650 max_ns=60851
+E7RESULT name=s4 stream=new_pool_file_creation rebuilt_states=82 digest_mismatches=0
+E7RESULT name=crash_facts_mask stream=new_pool_file_creation states=82 mismatches=0
+E7RESULT name=s3 stream=new_pool_file_creation states=82 o2_direct_differs_from_judge_crash_image=0
+E7RESULT name=file stream=new_pool_file_creation file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+E7RESULT name=file stream=new_pool_file_creation file=ops.tsv bytes=4293 sha256=f6f57075c22ae45dead0dc2f1942d837901a91bc0a6c35e371fcc71c29070d0b
+E7RESULT name=file stream=new_pool_file_creation file=ops-payload.bin bytes=517632 sha256=d0f2928b9462af5cb45d550fc824209cbbfe4a8b5a4dab803a849535cb2e18e3
+E7RESULT name=file stream=new_pool_file_creation file=calls.tsv bytes=54 sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab
+E7RESULT name=file stream=new_pool_file_creation file=torn.tsv bytes=622 sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311
+E7RESULT name=file stream=new_pool_file_creation file=torn-payload.bin bytes=32768 sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754
+E7RESULT name=file stream=new_pool_file_creation file=states.tsv bytes=9855 sha256=9f556acc7db0847539d7b4466cda13dd92dca97ddab2475ad1dfefebe9b154e5
+E7RESULT name=file stream=new_pool_file_creation file=impl-verdicts.tsv sha256_without_timing=4f21e41bfbafd409dc6d59718c52fab62716726de185f765322a25daf57d0f6a
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=impl-verdicts.tsv bytes=4214 sha256=1943e72fe9303c7e830bd781aaf18441f46f9ef6e5777c64717b7856a7bbd993
+E7RESULT name=file stream=new_pool_file_creation file=quick-tier.tsv bytes=42 sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c
+E7RESULT name=file stream=new_pool_file_creation file=manifest.tsv sha256_without_timing=e0b297d934a054184f94a9a589bf39d4a4ac19ea97ba847b3e29448c702643d3
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=manifest.tsv bytes=895 sha256=e00569ab3d86335a53819a11a83a58deff71b649983eb85f43f713db5d709746
+E7RESULT name=file stream=new_pool_file_creation file=oracle-verdicts.tsv bytes=7120 sha256=99b7dad2c9dcaf58cb380393cc46773dc45372d722c79612ac6a66350fe0b4c2
+E7RESULT name=file stream=new_pool_file_creation file=call-outcomes.tsv bytes=105 sha256=3bb3a74ed7cf2eeadd4530d46966f014f9dc680bfdac24f169f4154cdfdf2d69
+E7RESULT name=file stream=new_pool_file_creation file=stream-status.tsv bytes=83 sha256=8a98b77c581adf82cb049aa1adee597f83e1e094ef4229ecf69776c8c84275aa
+E7TIMING name=stream_time stream=new_pool_file_creation elapsed_ns=385136428 drive_ns=36704987 observe_ns=334568976 write_ns=11669355
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=first_acquired_instance_is_one local=InstanceGeneration(1) crates=InstanceGeneration(1) holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_raise_floor_publishes local=2 crates=2 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_e_data_unit_slot local=Some(50176) crates=Some(50176) holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_unmount_txgs local=[18,19] crates=[18,19] holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,20,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,20,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_writes local=477 crates=477 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_root_writes local=19 crates=19 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_count local=2 crates=2 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_bytes local=4294967296 crates=4294967296 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_full_states local=1662648564 crates=1662648564 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_quick_tier_states local=278 crates=278 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_two_state_closed_form local=1662648449 crates=1662648449 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_enumeration_tables_state_count local=1662648564 crates=1662648564 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_flow_facts_state_count local=1662648564 crates=1662648564 holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_o1_model_stops_only_at_the_unmount local=Some(14) crates=Some(14) holds=true
+E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_every_call_is_judged_or_is_the_unmount local=true crates=true holds=true
+E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=completed exported=true not_exported_why=- operations=595 writes=477 segments=78 tearable_writes=46 calls=15 full_states=1662648564 quick_tier_states=278 sampled_states=890 model_stopped_at_call=14
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=0 label=acquire first_operation=0 return_point=4 status=ok o1_comparison=not_modelled
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=1 label=warm_up first_operation=4 return_point=22 status=ok o1_comparison=not_modelled
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=2 label=publish first_operation=22 return_point=57 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=3 label=publish first_operation=57 return_point=92 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=4 label=mount_writable first_operation=92 return_point=179 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=5 label=publish first_operation=179 return_point=214 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=6 label=roll_back first_operation=214 return_point=245 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=7 label=publish first_operation=245 return_point=284 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=8 label=publish first_operation=284 return_point=323 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=9 label=publish first_operation=323 return_point=362 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=10 label=publish first_operation=362 return_point=401 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=11 label=publish first_operation=401 return_point=440 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=12 label=raise_floor first_operation=440 return_point=498 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=13 label=publish first_operation=498 return_point=537 status=ok o1_comparison=agrees
+E7RESULT name=call stream=fixed_script_through_e_then_unmount call=14 label=unmount first_operation=537 return_point=595 status=ok o1_comparison=not_modelled
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=0 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=3 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=6 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=10 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=14 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=15 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=19 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=23 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=27 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=31 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=35 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=39 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=43 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=47 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=51 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=55 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=56 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=60 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=64 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=68 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=69 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=73 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=77 scanned=8 found=0 wanted=4
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=1 states=397 segments_touched=79 states_with_a_torn_write=115 o1_crash_judge_red=0 o1_crash_judge_green=349 o1_crash_judge_not_applicable=48 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o1 states=397 total_ns=2223068 median_ns=6120 p95_ns=9960 max_ns=14891
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o2 states=397 total_ns=12664065577 median_ns=31412235 p95_ns=60969091 max_ns=68329468
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=recovery states=397 total_ns=159082522 median_ns=405755 p95_ns=613047 max_ns=1692539
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=119 segments_touched=17 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=105 o1_crash_judge_not_applicable=14 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o1 states=119 total_ns=663585 median_ns=6180 p95_ns=8830 max_ns=10950
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o2 states=119 total_ns=3790927645 median_ns=31252581 p95_ns=59990781 max_ns=61222257
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=recovery states=119 total_ns=43932818 median_ns=385275 p95_ns=511386 max_ns=567677
+E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=3 states=374 segments_touched=17 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=330 o1_crash_judge_not_applicable=44 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o1 states=374 total_ns=2121697 median_ns=6010 p95_ns=10141 max_ns=12010
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o2 states=374 total_ns=11911255791 median_ns=31557276 p95_ns=60053307 max_ns=61743685
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=recovery states=374 total_ns=136842358 median_ns=383025 p95_ns=495556 max_ns=574037
+E7RESULT name=s4 stream=fixed_script_through_e_then_unmount rebuilt_states=890 digest_mismatches=0
+E7RESULT name=crash_facts_mask stream=fixed_script_through_e_then_unmount states=890 mismatches=0
+E7RESULT name=s3 stream=fixed_script_through_e_then_unmount states=890 o2_direct_differs_from_judge_crash_image=0
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops.tsv bytes=50147 sha256=b46474482c727550cf66ca6130d5798761e31861611bf52f805348e96d40bceb
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops-payload.bin bytes=7104000 sha256=a95c3d7a1bae509e9be89e516f418f3ea2ec58cbeb32088599a04247bdffd77f
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=calls.tsv bytes=321 sha256=3170af975da1862300086e3c08f52a14f3ceb3920c6e8ab0044760108fb529f8
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn.tsv bytes=3677 sha256=6dba83810dd26ea3269a8e8447606ca95a069ffb6b1bf8d12a5bd4956c0e0fa8
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn-payload.bin bytes=188416 sha256=f6701bbfbefa36877d97961923a08cbce3bcce7002586c84e872b0dbef671706
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=states.tsv bytes=499717 sha256=8c8ffbd5a0694a404f4b0fcfeaecbde4d5e5eb744b776e3951d8f757f00e0ed3
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv sha256_without_timing=994b2285083d522b5a3fffd729eba2ffd4a57bb3a8974c63acddbaafa81dc90a
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv bytes=51101 sha256=20bab2cfb40c05422cf1861e9d19e91325e624c4794959d3431816e1f69264e1
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=quick-tier.tsv bytes=45 sha256=9cbf31ebda49e12196d98a347843a30d000b888f3f3f5877c18314f40b36487f
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=manifest.tsv sha256_without_timing=ff0fc324125c9430711e7165665a941dc40431717993ecb3ac391a2a1ca49d2a
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=manifest.tsv bytes=912 sha256=c3d80750a127544ed929d2d56a7645957f27f9a549ada1cbb393cbd47d38af06
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=oracle-verdicts.tsv bytes=174558 sha256=d82864d93596e2a2a5787e26b9108ccedb0c78dc046598ae172984f125b09f5a
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=call-outcomes.tsv bytes=534 sha256=d3f89a0c09c9194080d684232b6ddb43d5a12219a4d23df9d5450c2386551135
+E7RESULT name=file stream=fixed_script_through_e_then_unmount file=stream-status.tsv bytes=84 sha256=ab42582f03e4e36ff95d73d3eef2ce1e0b9258470d18f639ca3fa1895d92a3df
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=62676196107 drive_ns=592620758 observe_ns=60344714102 write_ns=1708728538
+E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0
+E7RESULT name=done emitted=130

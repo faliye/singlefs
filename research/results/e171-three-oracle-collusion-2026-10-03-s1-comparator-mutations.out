@@ -1,0 +1,22 @@
+E7RESULT name=config table_rows=9 unit_test_modules=test_collusion_matrix,test_collusion_pipeline timeout_seconds=300
+E7RESULT name=anchor mutation=X1_Q1全放行谓词漏掉O3 hits=1 files=collusion_report.py
+E7RESULT name=anchor mutation=X2_O3严格判定把欠一句当红 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X3_O3严格与暂代两列对调 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X7_触达只比写流不比调用结局与恢复报告 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X8_触达恒判触达 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X9_挑法用向下取整 hits=1 files=select_bad_implementations.py
+E7RESULT name=anchor mutation=X10_补位不跳过已在表里的行 hits=1 files=bad_implementation_table.py
+E7RESULT name=anchor mutation=X11_Q3关一条不把那一列当不红 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X12_Q1覆盖门槛大于等于写成大于 hits=1 files=collusion_matrix.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=X1_Q1全放行谓词漏掉O3 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=X2_O3严格判定把欠一句当红 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=X3_O3严格与暂代两列对调 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=X7_触达只比写流不比调用结局与恢复报告 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=X8_触达恒判触达 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=X9_挑法用向下取整 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=X10_补位不跳过已在表里的行 unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=X11_Q3关一条不把那一列当不红 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=X12_Q1覆盖门槛大于等于写成大于 unit_test_exit=1
+E7RESULT name=verdict mutations=9 caught=9 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=22

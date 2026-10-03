@@ -1,0 +1,56 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling unicode-ident v1.0.26
+   Compiling quote v1.0.47
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling libc v0.2.189
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/e168-main-run/tree-r8-unpatched/crates/singlefs-checker-tier)
+    Finished `release` profile [optimized + debuginfo] target(s) in 29.51s
+     Running unittests src/bin/e168_delete_ring_window_borrow.rs (target/release/deps/e168_delete_ring_window_borrow-143752b25657e788)
+
+running 27 tests
+test tests::allocation_record_tree_root_level_steps_up_right_past_the_registered_boundaries ... ok
+test tests::filling_lands_the_available_bytes_within_one_slot_at_or_below_zero ... ok
+test tests::floor_raises_of_a_refused_step_count_the_rehearsal_roots_and_refuse_a_chain_that_landed_outside_the_refusal ... ok
+test tests::large_slices_run_at_most_their_own_thread_cap_and_leave_a_thread_for_the_rest ... ok
+test tests::m5_needs_three_strictly_rising_last_points ... ok
+test tests::make_filesystem_smallest_device_matches_the_registered_anchors ... ok
+test tests::positive_control_reads_free_0_on_the_disk_it_fills_with_the_n_unit_file ... ok
+test tests::m3_is_not_saturated_when_the_second_last_point_rises_and_the_last_falls_back ... ok
+test tests::segment_one_on_p2_s4_prints_the_same_lines_on_one_thread_and_on_eight_threads ... ignored, 要补丁表副本：主工作区那份的 delete_path_hooks 是桩，一调就打停机行退 3；在套过补丁表的副本里 `-- --ignored` 跑
+test tests::ring_length_is_three_regions_times_the_slots_per_region ... ok
+test tests::thread_count_reads_e168_threads_first_then_the_shared_cap_then_the_available_parallelism ... ok
+test tests::allocation_record_tree_positions_match_the_registered_anchors ... ok
+test tests::m1_counts_an_apex_equal_to_the_reserve_as_covered ... ok
+test tests::ladder_of_file_sizes_crosses_the_ring_for_both_batch_sizes ... ok
+test tests::positive_control_verdict_counts_the_refusal_and_the_session_floor_raise_refusal_apart_and_stops_on_either ... ok
+test tests::reserve_by_the_clauses_is_eight_plus_thirteen_checkpoint_costs ... ok
+test tests::valley_hook_drops_the_roots_recorded_before_the_delete_and_keeps_those_recorded_after ... ok
+test tests::smallest_unbuilt_delta_counts_the_ring_window_per_slot ... ok
+test tests::valley_keeps_the_roots_recorded_on_the_session_allocator_and_drops_those_the_floor_raise_rehearsal_recorded_on_a_copy ... ok
+test tests::positive_control_u12_holds_for_a_session_refusal_whose_floor_raise_was_refused_in_the_rehearsal_and_not_for_a_landing_refusal ... ok
+test tests::unmarking_the_filled_slots_gives_back_every_count_the_fill_took ... ok
+test tests::the_s7_ledger_rewrite_is_published_with_the_formula_judgement_skipped_like_every_delete_publish ... ok
+test tests::smallest_usable_line_names_the_journal_record_limit_when_the_ring_may_not_grow ... ok
+test tests::a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds ... ok
+test tests::smallest_usable_disk_under_reading_c_fills_while_the_steps_one_and_two_disk_and_the_disk_two_slots_smaller_do_not ... ok
+test tests::p1_journal_ring_for_a_file_of_88_data_units_is_two_mebibytes_and_one_mebibyte_refuses_the_write ... ok
+test tests::slices_on_four_threads_print_the_lines_of_one_thread_in_slice_order_and_stop_at_the_first_stopping_slice ... ok
+
+test result: ok. 26 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.42s
+

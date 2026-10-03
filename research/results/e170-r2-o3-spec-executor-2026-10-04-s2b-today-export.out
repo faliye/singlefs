@@ -1,0 +1,584 @@
+name=config script_sha256=0dac1f94ecfc2225a5fddd30987ece52169e0c6bce50bddc4c7e05ba54da5795 repo_root=/home/fy5090/code/singlefs memory_cap=8G threads=8 seed_hex=85441ae491419411 date=2026-10-04
+name=config snapshot=research/target/e170-r2-today-tree cargo_target_dir=research/target/e170-r2-today-tree-cargo-target dumps=research/target/e170-r2-today-dumps work=research/target/e170-r2-today-export-work
+name=step step=snapshot skipped=false command=tar -C /home/fy5090/code/singlefs --exclude=target -cf - Cargo.toml Cargo.lock .cargo crates | tar -C /home/fy5090/code/singlefs/research/target/e170-r2-today-tree -xf -
+name=today_tree snapshot_digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a files=277 workspace_digest_before_copy=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a workspace_digest_after_copy=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a snapshot_equals_workspace_before_copy=true
+name=today_tree git_head=fcc4d3404c806b83f335d1c95eb303e5fe287fd2
+name=today_tree git_status_porcelain_lines=226
+name=today_tree git_status_porcelain_line=M  Cargo.lock
+name=today_tree git_status_porcelain_line=M  Cargo.toml
+name=today_tree git_status_porcelain_line=MM crates/mutations.tsv
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/bad_disk_input.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/bin/new_pool_file_creation_on_device.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_amplification.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_identity.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_injection.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_tables.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/device_log.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/gpu_unit_checks.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/layer0_progress.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/verdict_store.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/a_publish_returns_only_after_the_system_configuration_rotation_is_durable.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/bad_disk_input_campaign.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/common_crash_points/mod.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_rollback.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_amplification_fixed_script_through_unmount.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_amplification_pipeline_records_checks_and_reuses.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_amplification_two_flows_share_their_prefix.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_acquisition_barrier.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_fixed_script_stream.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_floor_raise_pushed_by_admission.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_new_pool_file_creation_stream.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_position_addressed_trees.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_record_spill_over_stream.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_resumes_from_its_progress_file.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_tree_split_streams.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_a_formatted_pool.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/tests/crash_enumeration_writable_mount_of_an_io_min_8192_pool.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_facts_gpu_verifier_agrees_with_the_cpu_reference.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_injection_campaign.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_injection_writable_mount_after_the_crash.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_points_tree_identifier_watermark_orphans.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/crash_segments_per_device_and_torn_in_place_overwrites.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/tests/gpu_adapter_probe_reports_not_run_without_an_adapter_and_red_when_no_card_starts.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/tests/gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/gpu_unit_checks_agree_with_the_cpu_and_catch_a_flipped_byte.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-checker-tier/tests/gpu_unit_checks_every_gpu_test_takes_its_cards_through_gpu_test_start.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/in_place_overwrite_torn_state_count.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/record_checker_judges_absence_by_the_persisted_set.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker/src/image.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker/src/lib.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker/src/walk.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/Cargo.toml
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/address.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/admission.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/allocation_record_tree.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/allocator.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/block_device.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/code_two_tree.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/container_tree.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/deleted_inodes.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/extent_tree.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/inode_tree.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/instance_table.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/journal.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/lib.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/lineage_tree.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/make_filesystem.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/mount.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/mounted_read.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/mounted_session.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/pointer.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/records.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/recovery.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/root_record.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/root_ring.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/system_configuration.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/tombstone_tree.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/transaction.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/unit.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/unlink.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/write_accounting.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-format/src/lib.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/Cargo.toml
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/fault_injection.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/history.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/lib.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/model.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/model_comparison.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/src/mount_transparency.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/src/numeric_environment_variable.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/src/reference_filesystem_translation.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/a_floor_raise_refused_for_space_counts_as_short_of_space.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs
+name=today_tree git_status_porcelain_line=D  crates/singlefs-harness/tests/a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/a_writable_mount_with_system_configuration_slot_zero_unreadable.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/admission_checkpoint_cost_per_device_paths.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/admission_ring_window_and_tombstone_prepay_on_the_publish_path.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/checker_judges_reference_intervals_and_every_new_root_segment_field.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/checker_known_bad_images.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/common/mod.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/common_admission/mod.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/common_admission_pool/mod.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/common_pointer_head_corruption/mod.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/common_root_ring_holes/mod.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/common_tree_split/mod.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/core_review_geometry_back_chain_and_empty_inode.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/core_review_tree_table_duplicates_and_slot_one_search.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/corrupt_on_disk_content_is_refused_instead_of_panicking.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/crash_recovery_judge_refuses_a_root_older_than_the_newest_persisted_one.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/data_unit_allocation_and_write.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/fault_injection_fast_tier.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/first_file_version_checks_the_previous_record.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/index_node_header_width_computed_three_ways_agrees_for_every_key_width.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/instance_acquisition.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/instance_table_chain_read.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/instance_table_page_full.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/instance_table_second_page_write.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/journal_last_record_flag_of_a_multi_record_publish.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/journal_replay_applies_no_more_records_than_the_in_flight_limit.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/journal_ring_geometry_fields_are_recomputed_when_choosing_the_system_configuration.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/journal_scan_keeps_the_first_copy_of_a_duplicated_record_key.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/many_inodes_write_and_read.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/mkfs_bytes_judged_by_the_checker.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mkfs_on_image_files_punches_the_zeroed_ranges.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mkfs_refuses_geometries_whose_root_slots_do_not_align.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/model_answers_unmount_with_the_floor_at_the_current_version.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/mounted_read_by_offset.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mounted_read_tells_a_narrow_inode_internal_entry_from_a_child_pointer_it_cannot_dereference.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mounted_recovery_reads_each_candidate_once_in_order.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/multi_record_publishes_of_transaction_zero.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/new_pool_file_creation_publish.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/overwrite_in_one_instance.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/presumed_clause_checks.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/publish_failure_resent_unchanged.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/random_histories.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/rebuild_with_an_unreadable_data_unit.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/rebuilt_root_takes_every_new_root_segment_field_from_the_record.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/reference_filesystem_translation_of_histories.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/release_checksum_quarantine.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/rollback_target_outside_the_one_revolution_window_is_not_a_candidate.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/root_choice_on_a_tied_checkpoint_txg_takes_the_higher_instance_in_a_later_slot.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/row_publish_admission.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/row_publish_checks_before_acquisition.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/row_publish_record_without_its_root.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/sequential_write_one_record_per_data_unit.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/sequential_write_split_into_one_unit_transactions.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/sparse_device_zero_fill.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/system_configuration_fields_core_and_checker_refuse_the_same_table.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/system_configuration_mutability_classes.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/system_configuration_rollback_floor_and_layout_identity.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/system_configuration_slot_is_overwritten_only_after_a_barrier.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/system_configuration_slots_per_region.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/tree_identifier_watermark_after_the_first_file_root_is_abandoned.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/unequal_devices.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unlink_in_histories_judged_by_the_model.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unlink_single_file_publishes.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/unreadable_abandoned_root_slot.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/warm_up_journal_counter.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/whole_device_loss_after_warm_up.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/writable_mount_refusal_judged_against_the_d23_list.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/writable_mount_refusal_on_a_crash_state_without_read_faults.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/writable_mount_takes_a_second_instance.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/write_accounting_per_structure.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/write_entries_refuse_an_inode_being_deleted.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/tests/zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-reference-filesystem/Cargo.toml
+name=today_tree git_status_porcelain_line=A  crates/singlefs-reference-filesystem/src/lib.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-replay-prefix/Cargo.toml
+name=today_tree git_status_porcelain_line=A  crates/singlefs-replay-prefix/src/lib.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-replay-prefix/verus-mutations.tsv
+name=today_tree source=crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs sha256=72366333a2e7f029b5c072e9fcfdfdb243ab7fd7cc3c2b2ef1e8b730042969ce
+name=today_tree source=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs sha256=0a15dabdac3543c933e56e275f3e612e328d0dfba8b70bfe796552f343995a54
+name=today_tree source=crates/singlefs-format/src/lib.rs sha256=bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f
+name=today_tree source=Cargo.lock sha256=8ee46ee73ba30d367cb9f4ad2c0350c73a259dfa14bf0baf60d1202da7409c4b
+name=format_constants constant=JOURNAL_HEADER_TEN_FIELD_BYTES value=78 line=216 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NEW_ROOT_SEGMENT_BYTES value=364 line=220 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_HEADER_BYTES value=487 line=223 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NAMED_ENTRY_BYTES value=56 line=226 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NAMED_ENTRIES_PER_RECORD value=64 line=229 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_RECORD_BYTES value=4096 line=213 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=ROOT_RECORD_BYTES value=457 line=210 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=SYSTEM_CONFIGURATION_SLOT_BYTES value=4096 line=257 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=TREE_IDENTIFIER_WATERMARK_AT_MKFS value=65536 line=206 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH value=65548 line=207 matches=1 file=crates/singlefs-format/src/lib.rs
+name=step_exit step=snapshot exit=0 counted=true
+name=snapshot_check step=build when=begin digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=step step=build skipped=false command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo build --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export --bin e171_three_oracle_collusion
+name=snapshot_check step=build when=end digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=step_exit step=build exit=0 counted=true stdout_lines=0 stderr_lines=24
+name=snapshot_check step=z1 when=begin digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=step step=z1 skipped=false command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump
+name=snapshot_check step=z1 when=end digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=device_line step=z1 line=E7RESULT name=config segment=s1 streams=2 sector_bytes=512 first_batch_divisor=7 second_batch_divisor=14 third_batch_divisor=23 torn_states_per_segment=4 torn_scan_ordinals_per_segment=100000 judge_threads=1 compared_with_a_previous_export=false
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=physical_block_bytes local=512 crates=512 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=minimum_input_output_bytes local=512 crates=512 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=sector_bytes local=512 crates=512 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=filesystem_identifier local=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] crates=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=fixed_write_time_seconds local=1788000000 crates=1788000000 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=first_file_bytes local=3000 crates=3000 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=both check=first_file_content local=true crates=true holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2] holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_writes local=41 crates=41 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_root_writes local=3 crates=3 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_count local=2 crates=2 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_operations_equal_build_pool local=true crates=true holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_mkfs_operations_equal_build_pool local=25 crates=25 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_warm_up_return_point_equal_build_pool local=47 crates=47 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_full_states local=16777260 crates=16777260 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_quick_tier_states local=46 crates=46 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_two_state_closed_form local=16777240 crates=16777240 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_enumeration_tables_state_count local=16777260 crates=16777260 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_flow_facts_state_count local=16777260 crates=16777260 holds=true
+name=device_line step=z1 line=E7RESULT name=stream stream=new_pool_file_creation operations=57 writes=41 segments=11 tearable_writes=8 calls=3 full_states=16777260 quick_tier_states=46 sampled_states=82
+name=device_line step=z1 line=E7RESULT name=call stream=new_pool_file_creation call=0 label=acquire first_operation=0 return_point=4 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=new_pool_file_creation call=1 label=warm_up first_operation=4 return_point=22 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=57 status=ok
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=0 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=3 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=6 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=10 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=batch stream=new_pool_file_creation batch=1 states=53 segments_touched=12 states_with_a_torn_write=20 pool_checker_and_record_checker_both_pass=53 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=batch stream=new_pool_file_creation batch=2 states=7 segments_touched=1 states_with_a_torn_write=0 pool_checker_and_record_checker_both_pass=7 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=batch stream=new_pool_file_creation batch=3 states=22 segments_touched=1 states_with_a_torn_write=0 pool_checker_and_record_checker_both_pass=22 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=s4 stream=new_pool_file_creation rebuilt_states=82 digest_mismatches=0
+name=device_line step=z1 line=E7RESULT name=crash_facts_mask stream=new_pool_file_creation states=82 mismatches=0
+name=device_line step=z1 line=E7RESULT name=rejudge stream=new_pool_file_creation states=82 mismatches=0
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=ops.tsv bytes=4293 sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=ops-payload.bin bytes=517632 sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=calls.tsv bytes=54 sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=torn.tsv bytes=622 sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=torn-payload.bin bytes=32768 sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=states.tsv bytes=9855 sha256=9454c63745934e435ffccd99da7e1b390b87d38756999dfe4b4a118237539578
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=impl-verdicts.tsv sha256_without_timing=4f21e41bfbafd409dc6d59718c52fab62716726de185f765322a25daf57d0f6a
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=quick-tier.tsv bytes=42 sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c
+name=device_line step=z1 line=E7RESULT name=file stream=new_pool_file_creation file=manifest.tsv sha256_without_timing=a1d75c6274961efe8a98c21bc6f8677e0e416ccdee11c5dc5d4ebc328abe1f52
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_raise_floor_publishes local=2 crates=2 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_e_data_unit_slot local=50176 crates=50176 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_unmount_txgs local=[18,19] crates=[18,19] holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,20,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,24,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] holds=false
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_writes local=477 crates=481 holds=false
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_root_writes local=19 crates=19 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_count local=2 crates=2 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_full_states local=1662648564 crates=1678377204 holds=false
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_quick_tier_states local=278 crates=278 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_two_state_closed_form local=1662648449 crates=1678377089 holds=false
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_enumeration_tables_state_count local=1678377204 crates=1678377204 holds=true
+name=device_line step=z1 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_flow_facts_state_count local=1678377204 crates=1678377204 holds=true
+name=device_line step=z1 line=E7RESULT name=stream stream=fixed_script_through_e_then_unmount operations=599 writes=481 segments=78 tearable_writes=46 calls=15 full_states=1678377204 quick_tier_states=278 sampled_states=890
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=0 label=acquire first_operation=0 return_point=4 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=1 label=warm_up first_operation=4 return_point=22 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=2 label=publish first_operation=22 return_point=57 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=3 label=publish first_operation=57 return_point=92 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=4 label=mount_writable first_operation=92 return_point=179 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=5 label=publish first_operation=179 return_point=214 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=6 label=roll_back first_operation=214 return_point=249 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=7 label=publish first_operation=249 return_point=288 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=8 label=publish first_operation=288 return_point=327 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=9 label=publish first_operation=327 return_point=366 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=10 label=publish first_operation=366 return_point=405 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=11 label=publish first_operation=405 return_point=444 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=12 label=raise_floor first_operation=444 return_point=502 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=13 label=publish first_operation=502 return_point=541 status=ok
+name=device_line step=z1 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=14 label=unmount first_operation=541 return_point=599 status=ok
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=0 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=3 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=6 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=10 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=14 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=15 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=19 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=23 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=27 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=31 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=35 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=39 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=43 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=47 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=51 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=55 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=56 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=60 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=64 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=68 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=69 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=73 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=77 scanned=8 found=0 wanted=4
+name=device_line step=z1 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=1 states=397 segments_touched=79 states_with_a_torn_write=115 pool_checker_and_record_checker_both_pass=397 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=119 segments_touched=17 states_with_a_torn_write=0 pool_checker_and_record_checker_both_pass=119 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=3 states=374 segments_touched=17 states_with_a_torn_write=0 pool_checker_and_record_checker_both_pass=374 pool_checker_red_states=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z1 line=E7RESULT name=s4 stream=fixed_script_through_e_then_unmount rebuilt_states=890 digest_mismatches=0
+name=device_line step=z1 line=E7RESULT name=crash_facts_mask stream=fixed_script_through_e_then_unmount states=890 mismatches=0
+name=device_line step=z1 line=E7RESULT name=rejudge stream=fixed_script_through_e_then_unmount states=890 mismatches=0
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops.tsv bytes=50551 sha256=e1ece9472dd081378d41cb1ae6b8a455ca260d79202cbfad2c0a43844fe304d3
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops-payload.bin bytes=7202304 sha256=8d695cacc3e7e55c4cd9094921146a0b8b21737adfccf3ec0c22eac619a3c8e1
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=calls.tsv bytes=321 sha256=7704453d14f741f66de0e302c79d0eb12199c801e6a3610ee5c06d76e993adbf
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn.tsv bytes=3677 sha256=fc9d85af34d515739d9957d8d6c09e5569e5cfac26eed0db8f7e9443ebf9f976
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn-payload.bin bytes=188416 sha256=f6701bbfbefa36877d97961923a08cbce3bcce7002586c84e872b0dbef671706
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=states.tsv bytes=503283 sha256=282ee66282f6406ef42af91ae40bbac2e1472764bb7027e2b444e0b5b56eefe7
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv sha256_without_timing=994b2285083d522b5a3fffd729eba2ffd4a57bb3a8974c63acddbaafa81dc90a
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=quick-tier.tsv bytes=45 sha256=a4092ffa48645161abec6568d3ef8009466bc2f7c0babc4a3ba2412bfa2be95f
+name=device_line step=z1 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=manifest.tsv sha256_without_timing=75b2d0dac68d0be9f8cf9da06dc16725b3331a5eb06fc71cf40a2e31cf0abeb1
+name=device_line step=z1 line=E7RESULT name=verdict s1_failed_checks=4 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 rejudge_mismatches=0 states_where_pool_checker_or_record_checker_is_red=0 v2_compared=false v2_differing_files=0 v2_differing_files_without_timing=0
+name=device_line step=z1 line=E7RESULT name=done emitted=118
+name=step_exit step=z1 exit=3 counted=true stdout_lines=130 stderr_lines=0
+name=step step=z1r skipped=true reason=z1_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump-repeat --compare-with /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump
+name=step step=z3-copy skipped=true reason=z1_did_not_finish_with_exit_0 command=cp -r /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-second-run
+name=step step=z3 skipped=true reason=z3-copy_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states-second-run --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-second-run --seed-hex 85441ae491419411
+name=snapshot_check step=z5 when=begin digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=step step=z5 skipped=false command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e171_three_oracle_collusion -- baseline --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e171-baseline-run1
+name=snapshot_check step=z5 when=end digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=device_line step=z5 line=E7RESULT name=config segment=s1 mode=baseline streams=2 sector_bytes=512 first_batch_divisor=7 second_batch_divisor=14 third_batch_divisor=23 torn_states_per_segment=4 torn_scan_ordinals_per_segment=100000 third_batch_sampled=true positive_control=none disabled_oracle=none
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=physical_block_bytes local=512 crates=512 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=minimum_input_output_bytes local=512 crates=512 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=sector_bytes local=512 crates=512 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=filesystem_identifier local=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] crates=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=fixed_write_time_seconds local=1788000000 crates=1788000000 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=first_file_bytes local=3000 crates=3000 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=both check=first_file_content local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=first_acquired_instance_is_one local=InstanceGeneration(1) crates=InstanceGeneration(1) holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2] holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_writes local=41 crates=41 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_root_writes local=3 crates=3 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_count local=2 crates=2 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_operations_equal_build_pool local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_mkfs_operations_equal_build_pool local=25 crates=25 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_warm_up_return_point_equal_build_pool local=47 crates=47 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_full_states local=16777260 crates=16777260 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_quick_tier_states local=46 crates=46 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_two_state_closed_form local=16777240 crates=16777240 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_enumeration_tables_state_count local=16777260 crates=16777260 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_flow_facts_state_count local=16777260 crates=16777260 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_o1_model_stops_only_at_the_unmount local=None crates=None holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_every_call_is_judged_or_is_the_unmount local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=stream stream=new_pool_file_creation ending=completed exported=true not_exported_why=- operations=57 writes=41 segments=11 tearable_writes=8 calls=3 full_states=16777260 quick_tier_states=46 sampled_states=82 model_stopped_at_call=none
+name=device_line step=z5 line=E7RESULT name=call stream=new_pool_file_creation call=0 label=acquire first_operation=0 return_point=4 status=ok o1_comparison=not_modelled
+name=device_line step=z5 line=E7RESULT name=call stream=new_pool_file_creation call=1 label=warm_up first_operation=4 return_point=22 status=ok o1_comparison=not_modelled
+name=device_line step=z5 line=E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=57 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=0 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=3 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=6 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=new_pool_file_creation segment=10 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=batch stream=new_pool_file_creation batch=1 states=53 segments_touched=12 states_with_a_torn_write=20 o1_crash_judge_red=0 o1_crash_judge_green=53 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=batch stream=new_pool_file_creation batch=2 states=7 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=7 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=batch stream=new_pool_file_creation batch=3 states=22 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=22 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=s4 stream=new_pool_file_creation rebuilt_states=82 digest_mismatches=0
+name=device_line step=z5 line=E7RESULT name=crash_facts_mask stream=new_pool_file_creation states=82 mismatches=0
+name=device_line step=z5 line=E7RESULT name=s3 stream=new_pool_file_creation states=82 o2_direct_differs_from_judge_crash_image=0
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=ops.tsv bytes=4293 sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=ops-payload.bin bytes=517632 sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=calls.tsv bytes=54 sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=torn.tsv bytes=622 sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=torn-payload.bin bytes=32768 sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=states.tsv bytes=9855 sha256=9454c63745934e435ffccd99da7e1b390b87d38756999dfe4b4a118237539578
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=impl-verdicts.tsv sha256_without_timing=4f21e41bfbafd409dc6d59718c52fab62716726de185f765322a25daf57d0f6a
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=quick-tier.tsv bytes=42 sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=manifest.tsv sha256_without_timing=a1d75c6274961efe8a98c21bc6f8677e0e416ccdee11c5dc5d4ebc328abe1f52
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=oracle-verdicts.tsv bytes=7120 sha256=99b7dad2c9dcaf58cb380393cc46773dc45372d722c79612ac6a66350fe0b4c2
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=call-outcomes.tsv bytes=105 sha256=3bb3a74ed7cf2eeadd4530d46966f014f9dc680bfdac24f169f4154cdfdf2d69
+name=device_line step=z5 line=E7RESULT name=file stream=new_pool_file_creation file=stream-status.tsv bytes=83 sha256=8a98b77c581adf82cb049aa1adee597f83e1e094ef4229ecf69776c8c84275aa
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=first_acquired_instance_is_one local=InstanceGeneration(1) crates=InstanceGeneration(1) holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_raise_floor_publishes local=2 crates=2 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_e_data_unit_slot local=Some(50176) crates=Some(50176) holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=second_stream_unmount_txgs local=[18,19] crates=[18,19] holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,20,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2,24,2,1,2,2,18,2,1,2,16,2,1,2,16,2,1,2,24,2,1,2,24,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2,28,2,1,2,2,16,2,1,2,16,2,1,2] holds=false
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_writes local=477 crates=481 holds=false
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_root_writes local=19 crates=19 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_count local=2 crates=2 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_device_bytes local=4294967296 crates=4294967296 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_full_states local=1662648564 crates=1678377204 holds=false
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_quick_tier_states local=278 crates=278 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_two_state_closed_form local=1662648449 crates=1678377089 holds=false
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_enumeration_tables_state_count local=1678377204 crates=1678377204 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_flow_facts_state_count local=1678377204 crates=1678377204 holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_o1_model_stops_only_at_the_unmount local=Some(14) crates=Some(14) holds=true
+name=device_line step=z5 line=E7RESULT name=s1 stream=fixed_script_through_e_then_unmount check=fixed_script_through_e_then_unmount_every_call_is_judged_or_is_the_unmount local=true crates=true holds=true
+name=device_line step=z5 line=E7RESULT name=stream stream=fixed_script_through_e_then_unmount ending=completed exported=true not_exported_why=- operations=599 writes=481 segments=78 tearable_writes=46 calls=15 full_states=1678377204 quick_tier_states=278 sampled_states=890 model_stopped_at_call=14
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=0 label=acquire first_operation=0 return_point=4 status=ok o1_comparison=not_modelled
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=1 label=warm_up first_operation=4 return_point=22 status=ok o1_comparison=not_modelled
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=2 label=publish first_operation=22 return_point=57 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=3 label=publish first_operation=57 return_point=92 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=4 label=mount_writable first_operation=92 return_point=179 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=5 label=publish first_operation=179 return_point=214 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=6 label=roll_back first_operation=214 return_point=249 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=7 label=publish first_operation=249 return_point=288 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=8 label=publish first_operation=288 return_point=327 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=9 label=publish first_operation=327 return_point=366 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=10 label=publish first_operation=366 return_point=405 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=11 label=publish first_operation=405 return_point=444 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=12 label=raise_floor first_operation=444 return_point=502 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=13 label=publish first_operation=502 return_point=541 status=ok o1_comparison=agrees
+name=device_line step=z5 line=E7RESULT name=call stream=fixed_script_through_e_then_unmount call=14 label=unmount first_operation=541 return_point=599 status=ok o1_comparison=not_modelled
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=0 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=3 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=6 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=10 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=14 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=15 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=19 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=23 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=27 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=31 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=35 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=39 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=43 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=47 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=51 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=55 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=56 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=60 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=64 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=68 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=69 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=73 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=torn_scan stream=fixed_script_through_e_then_unmount segment=77 scanned=8 found=0 wanted=4
+name=device_line step=z5 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=1 states=397 segments_touched=79 states_with_a_torn_write=115 o1_crash_judge_red=0 o1_crash_judge_green=349 o1_crash_judge_not_applicable=48 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=119 segments_touched=17 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=105 o1_crash_judge_not_applicable=14 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=3 states=374 segments_touched=17 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=330 o1_crash_judge_not_applicable=44 o1_crash_judge_off=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0
+name=device_line step=z5 line=E7RESULT name=s4 stream=fixed_script_through_e_then_unmount rebuilt_states=890 digest_mismatches=0
+name=device_line step=z5 line=E7RESULT name=crash_facts_mask stream=fixed_script_through_e_then_unmount states=890 mismatches=0
+name=device_line step=z5 line=E7RESULT name=s3 stream=fixed_script_through_e_then_unmount states=890 o2_direct_differs_from_judge_crash_image=0
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops.tsv bytes=50551 sha256=e1ece9472dd081378d41cb1ae6b8a455ca260d79202cbfad2c0a43844fe304d3
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=ops-payload.bin bytes=7202304 sha256=8d695cacc3e7e55c4cd9094921146a0b8b21737adfccf3ec0c22eac619a3c8e1
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=calls.tsv bytes=321 sha256=7704453d14f741f66de0e302c79d0eb12199c801e6a3610ee5c06d76e993adbf
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn.tsv bytes=3677 sha256=fc9d85af34d515739d9957d8d6c09e5569e5cfac26eed0db8f7e9443ebf9f976
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=torn-payload.bin bytes=188416 sha256=f6701bbfbefa36877d97961923a08cbce3bcce7002586c84e872b0dbef671706
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=states.tsv bytes=503283 sha256=282ee66282f6406ef42af91ae40bbac2e1472764bb7027e2b444e0b5b56eefe7
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv sha256_without_timing=994b2285083d522b5a3fffd729eba2ffd4a57bb3a8974c63acddbaafa81dc90a
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=quick-tier.tsv bytes=45 sha256=a4092ffa48645161abec6568d3ef8009466bc2f7c0babc4a3ba2412bfa2be95f
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=manifest.tsv sha256_without_timing=75b2d0dac68d0be9f8cf9da06dc16725b3331a5eb06fc71cf40a2e31cf0abeb1
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=oracle-verdicts.tsv bytes=174564 sha256=bebd8b1e6a302b8da41d26946a162af22a7c2bc0b9dc2cf363d0d3d94c22dee2
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=call-outcomes.tsv bytes=534 sha256=6b4341f09f80e5c5a2a1aee439a9ea06a01f36979ab52f4b953c154eedc75681
+name=device_line step=z5 line=E7RESULT name=file stream=fixed_script_through_e_then_unmount file=stream-status.tsv bytes=84 sha256=a1d177b2c49ee1befdbd5e4b6966c8145fe9df5fc2f0671c8e05d1d95e28d222
+name=device_line step=z5 line=E7RESULT name=verdict s1_failed_checks=4 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0
+name=device_line step=z5 line=E7RESULT name=done emitted=130
+name=step_exit step=z5 exit=3 counted=true stdout_lines=154 stderr_lines=0
+name=step step=z4-copy skipped=true reason=z5_did_not_finish_with_exit_0 command=cp -r /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e171-baseline-run1 /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2
+name=step step=z4-bad-states skipped=true reason=z4-copy_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2 --seed-hex 85441ae491419411
+name=step step=z4-known-bad skipped=true reason=z4-bad-states_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e171_three_oracle_collusion -- known-bad-images --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2 --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/known-bad-s2 --e170-bad-rows
+name=export_directory directory=e170-dump present=true files=20
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/base-sectors.bin sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 lines=-
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/calls.tsv sha256=7704453d14f741f66de0e302c79d0eb12199c801e6a3610ee5c06d76e993adbf lines=15
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/impl-verdicts.tsv sha256=fbc85b2691464e6ce4fb0a3f27c99b1de0b754cde73552ffcd6e91a45c3dc0e3 lines=890
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/manifest.tsv sha256=137d14ba6c6c0399d01f1e170795bc4024d289700b4c974c09161211e1475901 lines=17
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/ops-payload.bin sha256=8d695cacc3e7e55c4cd9094921146a0b8b21737adfccf3ec0c22eac619a3c8e1 lines=-
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/ops.tsv sha256=e1ece9472dd081378d41cb1ae6b8a455ca260d79202cbfad2c0a43844fe304d3 lines=599
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/quick-tier.tsv sha256=a4092ffa48645161abec6568d3ef8009466bc2f7c0babc4a3ba2412bfa2be95f lines=2
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/states.tsv sha256=282ee66282f6406ef42af91ae40bbac2e1472764bb7027e2b444e0b5b56eefe7 lines=890
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/torn-payload.bin sha256=f6701bbfbefa36877d97961923a08cbce3bcce7002586c84e872b0dbef671706 lines=-
+name=export_file directory=e170-dump path=fixed_script_through_e_then_unmount/torn.tsv sha256=fc9d85af34d515739d9957d8d6c09e5569e5cfac26eed0db8f7e9443ebf9f976 lines=46
+name=export_file directory=e170-dump path=new_pool_file_creation/base-sectors.bin sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 lines=-
+name=export_file directory=e170-dump path=new_pool_file_creation/calls.tsv sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab lines=3
+name=export_file directory=e170-dump path=new_pool_file_creation/impl-verdicts.tsv sha256=c31d17ab4d7320f291e5cb587f266f973b023222a43768df84e790517ed6b881 lines=82
+name=export_file directory=e170-dump path=new_pool_file_creation/manifest.tsv sha256=93d7729747337fcd67810004f0c4a17a235d7f015a1c9f08f7450e719616427f lines=17
+name=export_file directory=e170-dump path=new_pool_file_creation/ops-payload.bin sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565 lines=-
+name=export_file directory=e170-dump path=new_pool_file_creation/ops.tsv sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936 lines=57
+name=export_file directory=e170-dump path=new_pool_file_creation/quick-tier.tsv sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c lines=2
+name=export_file directory=e170-dump path=new_pool_file_creation/states.tsv sha256=9454c63745934e435ffccd99da7e1b390b87d38756999dfe4b4a118237539578 lines=82
+name=export_file directory=e170-dump path=new_pool_file_creation/torn-payload.bin sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754 lines=-
+name=export_file directory=e170-dump path=new_pool_file_creation/torn.tsv sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311 lines=8
+name=manifest_check directory=e170-dump stream=fixed_script_through_e_then_unmount manifest_sha256=137d14ba6c6c0399d01f1e170795bc4024d289700b4c974c09161211e1475901 ok=9 not_ok=0
+name=export_states directory=e170-dump stream=fixed_script_through_e_then_unmount batch=1 states=397
+name=export_states directory=e170-dump stream=fixed_script_through_e_then_unmount batch=2 states=119
+name=export_states directory=e170-dump stream=fixed_script_through_e_then_unmount batch=3 states=374
+name=manifest_check directory=e170-dump stream=new_pool_file_creation manifest_sha256=93d7729747337fcd67810004f0c4a17a235d7f015a1c9f08f7450e719616427f ok=9 not_ok=0
+name=export_states directory=e170-dump stream=new_pool_file_creation batch=1 states=53
+name=export_states directory=e170-dump stream=new_pool_file_creation batch=2 states=7
+name=export_states directory=e170-dump stream=new_pool_file_creation batch=3 states=22
+name=export_directory directory=e170-dump-repeat present=false
+name=export_directory directory=e170-bad-states-second-run present=false
+name=export_directory directory=e171-baseline-run1 present=true files=26
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/base-sectors.bin sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 lines=-
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/call-outcomes.tsv sha256=6b4341f09f80e5c5a2a1aee439a9ea06a01f36979ab52f4b953c154eedc75681 lines=15
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/calls.tsv sha256=7704453d14f741f66de0e302c79d0eb12199c801e6a3610ee5c06d76e993adbf lines=15
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/impl-verdicts.tsv sha256=de1cb72d0b449254acd144e9a3eda0dc8ab9b9825fbe44d063e6c9285c1c9cdf lines=890
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/manifest.tsv sha256=1699c2b114687a732c61b6fb82e02e485f9b076b2aa79f0808f255e1e4b2a8ab lines=17
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/ops-payload.bin sha256=8d695cacc3e7e55c4cd9094921146a0b8b21737adfccf3ec0c22eac619a3c8e1 lines=-
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/ops.tsv sha256=e1ece9472dd081378d41cb1ae6b8a455ca260d79202cbfad2c0a43844fe304d3 lines=599
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/oracle-verdicts.tsv sha256=bebd8b1e6a302b8da41d26946a162af22a7c2bc0b9dc2cf363d0d3d94c22dee2 lines=890
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/quick-tier.tsv sha256=a4092ffa48645161abec6568d3ef8009466bc2f7c0babc4a3ba2412bfa2be95f lines=2
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/states.tsv sha256=282ee66282f6406ef42af91ae40bbac2e1472764bb7027e2b444e0b5b56eefe7 lines=890
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/stream-status.tsv sha256=a1d177b2c49ee1befdbd5e4b6966c8145fe9df5fc2f0671c8e05d1d95e28d222 lines=5
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/torn-payload.bin sha256=f6701bbfbefa36877d97961923a08cbce3bcce7002586c84e872b0dbef671706 lines=-
+name=export_file directory=e171-baseline-run1 path=fixed_script_through_e_then_unmount/torn.tsv sha256=fc9d85af34d515739d9957d8d6c09e5569e5cfac26eed0db8f7e9443ebf9f976 lines=46
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/base-sectors.bin sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35 lines=-
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/call-outcomes.tsv sha256=3bb3a74ed7cf2eeadd4530d46966f014f9dc680bfdac24f169f4154cdfdf2d69 lines=3
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/calls.tsv sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab lines=3
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/impl-verdicts.tsv sha256=4fa53328d581f60a2be61d43484b87ac521151c70eeb503af66cd71d652d357f lines=82
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/manifest.tsv sha256=211b692325e56550afd346e82eee718890d115fe668c2d7fa80eedcc2f71fd0e lines=17
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/ops-payload.bin sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565 lines=-
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/ops.tsv sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936 lines=57
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/oracle-verdicts.tsv sha256=99b7dad2c9dcaf58cb380393cc46773dc45372d722c79612ac6a66350fe0b4c2 lines=82
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/quick-tier.tsv sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c lines=2
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/states.tsv sha256=9454c63745934e435ffccd99da7e1b390b87d38756999dfe4b4a118237539578 lines=82
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/stream-status.tsv sha256=8a98b77c581adf82cb049aa1adee597f83e1e094ef4229ecf69776c8c84275aa lines=5
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/torn-payload.bin sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754 lines=-
+name=export_file directory=e171-baseline-run1 path=new_pool_file_creation/torn.tsv sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311 lines=8
+name=manifest_check directory=e171-baseline-run1 stream=fixed_script_through_e_then_unmount manifest_sha256=1699c2b114687a732c61b6fb82e02e485f9b076b2aa79f0808f255e1e4b2a8ab ok=9 not_ok=0
+name=export_states directory=e171-baseline-run1 stream=fixed_script_through_e_then_unmount batch=1 states=397
+name=export_states directory=e171-baseline-run1 stream=fixed_script_through_e_then_unmount batch=2 states=119
+name=export_states directory=e171-baseline-run1 stream=fixed_script_through_e_then_unmount batch=3 states=374
+name=manifest_check directory=e171-baseline-run1 stream=new_pool_file_creation manifest_sha256=211b692325e56550afd346e82eee718890d115fe668c2d7fa80eedcc2f71fd0e ok=9 not_ok=0
+name=export_states directory=e171-baseline-run1 stream=new_pool_file_creation batch=1 states=53
+name=export_states directory=e171-baseline-run1 stream=new_pool_file_creation batch=2 states=7
+name=export_states directory=e171-baseline-run1 stream=new_pool_file_creation batch=3 states=22
+name=export_directory directory=e170-bad-states-copy-s2 present=false
+name=export_directory directory=known-bad-s2 present=false
+name=z1_vs_z1r_summary compared=false reason=z1_or_z1r_directory_missing
+name=snapshot_check step=all when=end digest=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a recorded=34f7ef600a2f193310b557b89367dfe4d19f7986bb1577b24a390a437ff52f8a holds=true
+name=done steps_exit_zero=2 steps_exit_nonzero=2 steps_skipped=6 snapshot_checks_failed=0 product=research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out

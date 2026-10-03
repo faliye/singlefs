@@ -1,0 +1,36 @@
+--- units=2
+chain 8 K2 64 P1 T 15
+P2 T 22
+P3free sigma 12870 T 64
+  K1 size min 15 max 29 serial 15
+  m1 min 27 max 42 positive 12870 noncross max 11 noncross positive 12870
+  |T∩C| 49 K2 \ T 0 T\K2 cross 0 T\K2 0
+  I_rec |I∩T| 16 K1 cover min 0 max 13 K2 cover 16 K2 extra 0
+  I_full |I∩T| 6 K1 cover min 0 max 6 K2 cover 6 K2 extra 0
+P3ord sigma 3747 T 46
+  K1 size min 15 max 29 serial 15
+  m1 min 13 max 28 positive 3747 noncross max 7 noncross positive 3747
+  |T∩C| 35 K2 \ T 18 T\K2 cross 0 T\K2 0
+  I_rec |I∩T| 1 K1 cover min 0 max 1 K2 cover 1 K2 extra 15
+  I_full |I∩T| 2 K1 cover min 0 max 2 K2 cover 2 K2 extra 4
+P1 I_rec 0
+P1 I_full 0
+P1 K2 vs T: K2 \ T 49 cross T 7
+--- units=1
+chain 6 K2 36 P1 T 11
+P2 T 10
+P3free sigma 3432 T 36
+  K1 size min 11 max 17 serial 11
+  m1 min 11 max 20 positive 3432 noncross max 9 noncross positive 3432
+  |T∩C| 25 K2 \ T 0 T\K2 cross 0 T\K2 0
+  I_rec |I∩T| 8 K1 cover min 0 max 7 K2 cover 8 K2 extra 0
+  I_full |I∩T| 4 K1 cover min 0 max 4 K2 cover 4 K2 extra 0
+P3ord sigma 973 T 26
+  K1 size min 11 max 17 serial 11
+  m1 min 5 max 14 positive 973 noncross max 5 noncross positive 973
+  |T∩C| 19 K2 \ T 10 T\K2 cross 0 T\K2 0
+  I_rec |I∩T| 1 K1 cover min 0 max 1 K2 cover 1 K2 extra 7
+  I_full |I∩T| 2 K1 cover min 0 max 2 K2 cover 2 K2 extra 2
+P1 I_rec 0
+P1 I_full 0
+P1 K2 vs T: K2 \ T 25 cross T 5

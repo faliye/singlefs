@@ -1,0 +1,20 @@
+E7TIMING name=row_time row=0 copy_ns=168679473 compile_ns=23310951801 compile_kind=incremental device_ns=38076826619 o3_ns=472026490
+E7TIMING name=row_time row=1 copy_ns=169891819 compile_ns=23770904503 compile_kind=incremental device_ns=38179841165 o3_ns=493022574
+E7TIMING name=row_time row=6 copy_ns=170876324 compile_ns=24327485598 compile_kind=incremental device_ns=192070914 o3_ns=-
+E7TIMING name=row_time row=8 copy_ns=172099400 compile_ns=55820599137 compile_kind=incremental device_ns=39572892238 o3_ns=759557174
+E7TIMING name=row_time row=18 copy_ns=171592994 compile_ns=55746052212 compile_kind=incremental device_ns=40121241850 o3_ns=751920155
+E7TIMING name=row_time row=28 copy_ns=171502374 compile_ns=55670181048 compile_kind=incremental device_ns=39471057894 o3_ns=739896480
+E7TIMING name=row_time row=64 copy_ns=170114459 compile_ns=57059066815 compile_kind=incremental device_ns=39950591933 o3_ns=874474453
+E7TIMING name=row_time row=83 copy_ns=170134788 compile_ns=57066914603 compile_kind=incremental device_ns=39950513714 o3_ns=922729691
+E7TIMING name=row_time row=84 copy_ns=169790261 compile_ns=57312371940 compile_kind=incremental device_ns=39873008511 o3_ns=888935659
+E7TIMING name=row_time_summary column=compile_ns rows=9 min_ns=23310951801 median_ns=55746052212 max_ns=57312371940
+E7TIMING name=row_time_summary column=copy_ns rows=9 min_ns=168679473 median_ns=170134788 max_ns=172099400
+E7TIMING name=row_time_summary column=device_ns rows=9 min_ns=192070914 median_ns=39572892238 max_ns=40121241850
+E7TIMING name=row_time_summary column=o3_ns rows=8 min_ns=472026490 median_ns=751920155 max_ns=922729691
+E7TIMING name=table lanes=1 threads_per_lane=6 rows=3 table_wall_ns=149337985366 sum_of_row_ns=149332577280
+E7TIMING name=table lanes=3 threads_per_lane=2 rows=3 table_wall_ns=96793547780 sum_of_row_ns=289168592956
+E7TIMING name=table lanes=3 threads_per_lane=2 rows=3 table_wall_ns=98246895429 sum_of_row_ns=294408646827
+E7TIMING name=table lanes=1 threads_per_lane=6 rows=1 table_wall_ns=61877476078 sum_of_row_ns=61874803015
+E7TIMING name=table lanes=1 threads_per_lane=6 rows=1 table_wall_ns=43925895802 sum_of_row_ns=43923306241
+E7TIMING name=table lanes=1 threads_per_lane=6 rows=1 table_wall_ns=61948326466 sum_of_row_ns=61947507646
+E7TIMING name=comparator_wall_ns ns=358213373

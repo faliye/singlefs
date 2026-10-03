@@ -1,0 +1,6 @@
+units=1 txg_a%3=2 mode=ordered root_a=0 root_b=0
+interleavings 2431135 distinct_segment_signatures 28432 distinct_orders 24309
+|T| 82944 |T_exact| 184 |T∩T_exact| 184 |T∩C| 82369 |T∩T_exact∩C| 165
+L11 min 0 max 150 streams_with_misses 2431101 streams_without 34 signatures_with_misses 28431
+L2  min 0 max 82354 streams_with_misses 2431101
+L11 on serial stream 150

@@ -1,0 +1,14 @@
+--- units=2
+P3free sigma 12870 |T| 64 |T_exact| 64 |T∩C| 49 |T∩T_exact∩C| 49
+  L11 min 27 max 42 positive 12870 zero 0
+  L11 on serial stream 42
+P3ord sigma 3747 |T| 46 |T_exact| 46 |T∩C| 35 |T∩T_exact∩C| 35
+  L11 min 13 max 28 positive 3747 zero 0
+  L11 on serial stream 28
+--- units=1
+P3free sigma 3432 |T| 36 |T_exact| 36 |T∩C| 25 |T∩T_exact∩C| 25
+  L11 min 11 max 20 positive 3432 zero 0
+  L11 on serial stream 20
+P3ord sigma 973 |T| 26 |T_exact| 26 |T∩C| 19 |T∩T_exact∩C| 19
+  L11 min 5 max 14 positive 973 zero 0
+  L11 on serial stream 14

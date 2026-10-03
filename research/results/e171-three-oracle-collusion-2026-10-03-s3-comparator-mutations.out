@@ -1,0 +1,78 @@
+E7RESULT name=config table_rows=37 unit_test_modules=test_collusion_matrix,test_collusion_pipeline,test_o3_columns,test_o3_comparison timeout_seconds=300
+E7RESULT name=anchor mutation=X1_Q1全放行谓词漏掉O3 hits=1 files=collusion_report.py
+E7RESULT name=anchor mutation=X2_O3严格判定把欠一句当红 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X3_O3严格与暂代两列对调 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X7_触达只比写流不比调用结局与恢复报告 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X8_触达恒判触达 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X9_挑法用向下取整 hits=1 files=select_bad_implementations.py
+E7RESULT name=anchor mutation=X10_补位不跳过已在表里的行 hits=1 files=bad_implementation_table.py
+E7RESULT name=anchor mutation=X11_Q3关一条不把那一列当不红 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X12_Q1覆盖门槛大于等于写成大于 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X16_冻结核对漏掉冻结范围里多出来的文件 hits=1 files=frozen_o3.py
+E7RESULT name=anchor mutation=X17_冻结核对不比种子 hits=1 files=frozen_o3.py
+E7RESULT name=anchor mutation=X18_执行器产物里底镜像恢复不出的流读反 hits=1 files=frozen_o3.py
+E7RESULT name=anchor mutation=X19_执行器产物里摘要对不上的态数数成对得上的 hits=1 files=frozen_o3.py
+E7RESULT name=anchor mutation=X20_起执行器不带流名 hits=1 files=frozen_o3.py
+E7RESULT name=anchor mutation=X21_判坏镜像不叠补丁 hits=1 files=o3_bad_image_judge.py
+E7RESULT name=anchor mutation=X22_判坏镜像之后不把执行器的恢复函数换回去 hits=1 files=o3_bad_image_judge.py
+E7RESULT name=anchor mutation=X23_底态名取行号最大的那一行 hits=1 files=o3_bad_image_judge.py
+E7RESULT name=anchor mutation=X24_O3严格读法到不了的结论字也套在暂代读法上 hits=1 files=collusion_report.py
+E7RESULT name=anchor mutation=X25_Q2甲读法看暂代判定 hits=1 files=bad_images_report.py
+E7RESULT name=anchor mutation=X26_执行器没跑完的行当成O3没跑 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X27_Q3核选行要两条红写成一条红 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X28_线道里一行出错不记录 hits=1 files=row_driver.py
+E7RESULT name=anchor mutation=X29_执行器每态判定不排序 hits=1 files=baseline_checks.py
+E7RESULT name=anchor mutation=X30_Q2几何只比O2红不红 hits=1 files=bad_images_report.py
+E7RESULT name=anchor mutation=X31_O3阳性对照不看执行器判了什么 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X32_Q3核比执行器每态判定写成相等才算不同 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X33_回查把卸载出错也数进去 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X34_回查不数停下之后没比的错误调用 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X35_回查认错结局的前缀写错 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X36_不适用来源把对拍判出不同也算不合规 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X37_不适用来源把卸载也算不合规 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X38_不适用来源的合规判反 hits=1 files=collusion_matrix.py
+E7RESULT name=anchor mutation=X39_判决行数的是流不是行 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X40_row_s5_行两个计数写反 hits=1 files=collusion_report.py
+E7RESULT name=anchor mutation=X41_去掉装置自己的变异行时不认名字前缀 hits=1 files=bad_implementation_table.py
+E7RESULT name=anchor mutation=X42_A7_的计数把装置自己的变异行也数进去 hits=1 files=comparator.py
+E7RESULT name=anchor mutation=X43_A6_的挑法读没去掉装置行的表 hits=1 files=comparator.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=X1_Q1全放行谓词漏掉O3 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=X2_O3严格判定把欠一句当红 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=X3_O3严格与暂代两列对调 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=X7_触达只比写流不比调用结局与恢复报告 unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=X8_触达恒判触达 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=X9_挑法用向下取整 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=X10_补位不跳过已在表里的行 unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=X11_Q3关一条不把那一列当不红 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=X12_Q1覆盖门槛大于等于写成大于 unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=X16_冻结核对漏掉冻结范围里多出来的文件 unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=X17_冻结核对不比种子 unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=X18_执行器产物里底镜像恢复不出的流读反 unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=X19_执行器产物里摘要对不上的态数数成对得上的 unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=X20_起执行器不带流名 unit_test_exit=1
+E7RESULT name=mutation number=15 outcome=✅ mutation=X21_判坏镜像不叠补丁 unit_test_exit=1
+E7RESULT name=mutation number=16 outcome=✅ mutation=X22_判坏镜像之后不把执行器的恢复函数换回去 unit_test_exit=1
+E7RESULT name=mutation number=17 outcome=✅ mutation=X23_底态名取行号最大的那一行 unit_test_exit=1
+E7RESULT name=mutation number=18 outcome=✅ mutation=X24_O3严格读法到不了的结论字也套在暂代读法上 unit_test_exit=1
+E7RESULT name=mutation number=19 outcome=✅ mutation=X25_Q2甲读法看暂代判定 unit_test_exit=1
+E7RESULT name=mutation number=20 outcome=✅ mutation=X26_执行器没跑完的行当成O3没跑 unit_test_exit=1
+E7RESULT name=mutation number=21 outcome=✅ mutation=X27_Q3核选行要两条红写成一条红 unit_test_exit=1
+E7RESULT name=mutation number=22 outcome=✅ mutation=X28_线道里一行出错不记录 unit_test_exit=1
+E7RESULT name=mutation number=23 outcome=✅ mutation=X29_执行器每态判定不排序 unit_test_exit=1
+E7RESULT name=mutation number=24 outcome=✅ mutation=X30_Q2几何只比O2红不红 unit_test_exit=1
+E7RESULT name=mutation number=25 outcome=✅ mutation=X31_O3阳性对照不看执行器判了什么 unit_test_exit=1
+E7RESULT name=mutation number=26 outcome=✅ mutation=X32_Q3核比执行器每态判定写成相等才算不同 unit_test_exit=1
+E7RESULT name=mutation number=27 outcome=✅ mutation=X33_回查把卸载出错也数进去 unit_test_exit=1
+E7RESULT name=mutation number=28 outcome=✅ mutation=X34_回查不数停下之后没比的错误调用 unit_test_exit=1
+E7RESULT name=mutation number=29 outcome=✅ mutation=X35_回查认错结局的前缀写错 unit_test_exit=1
+E7RESULT name=mutation number=30 outcome=✅ mutation=X36_不适用来源把对拍判出不同也算不合规 unit_test_exit=1
+E7RESULT name=mutation number=31 outcome=✅ mutation=X37_不适用来源把卸载也算不合规 unit_test_exit=1
+E7RESULT name=mutation number=32 outcome=✅ mutation=X38_不适用来源的合规判反 unit_test_exit=1
+E7RESULT name=mutation number=33 outcome=✅ mutation=X39_判决行数的是流不是行 unit_test_exit=1
+E7RESULT name=mutation number=34 outcome=✅ mutation=X40_row_s5_行两个计数写反 unit_test_exit=1
+E7RESULT name=mutation number=35 outcome=✅ mutation=X41_去掉装置自己的变异行时不认名字前缀 unit_test_exit=1
+E7RESULT name=mutation number=36 outcome=✅ mutation=X42_A7_的计数把装置自己的变异行也数进去 unit_test_exit=1
+E7RESULT name=mutation number=37 outcome=✅ mutation=X43_A6_的挑法读没去掉装置行的表 unit_test_exit=1
+E7RESULT name=verdict mutations=37 caught=37 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=78

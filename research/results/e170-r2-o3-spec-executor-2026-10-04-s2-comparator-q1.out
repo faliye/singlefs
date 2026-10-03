@@ -1,0 +1,51 @@
+name=config batches=1,2 pairs=4 not_compared=input,label,name,source,state,stream,time_ns,worker renamed=strict->strict_before_witness,provisional->provisional_before_witness first_new_gap=G23
+name=q1_counts input=I1 kind=states fields_differ=0 legal_flip=0 patched_flip_without_predicate=0 not_in_to_in=0 other_verdict_change=0 in_range_a=0 in_range_b=0 same=576 compared=576 missing=0 out_of_range_total=0 legal_flip_with_W=0 legal_flip_with_T=0 q1g_before_not_in_with_W_true=0 q1g_before_not_in_with_T_false=0
+name=b4_count input=I1 v1_states=576 v2_states=576 batch_1=450 batch_2=126
+name=q1_counts input=I2 kind=states fields_differ=0 legal_flip=0 patched_flip_without_predicate=0 not_in_to_in=0 other_verdict_change=0 in_range_a=0 in_range_b=0 same=576 compared=576 missing=0 out_of_range_total=0 legal_flip_with_W=0 legal_flip_with_T=0 q1g_before_not_in_with_W_true=0 q1g_before_not_in_with_T_false=0
+name=b4_count input=I2 v1_states=576 v2_states=576 batch_1=450 batch_2=126
+name=q1_in_range input=I3 category=in_range_a key=e170:fixed_script_through_e_then_unmount:11 row_name=P8-Mk|family=P|base=Mk v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I3 category=in_range_a key=e170:fixed_script_through_e_then_unmount:5 row_name=P8-F|family=P|base=F v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I3 category=in_range_a key=e170:new_pool_file_creation:11 row_name=P8-Mk|family=P|base=Mk v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I3 category=in_range_a key=e170:new_pool_file_creation:5 row_name=P8-F|family=P|base=F v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_counts input=I3 kind=images fields_differ=0 legal_flip=0 patched_flip_without_predicate=0 not_in_to_in=0 other_verdict_change=0 in_range_a=4 in_range_b=0 same=82 compared=86 missing=0 out_of_range_total=0 legal_flip_with_W=0 legal_flip_with_T=0 q1g_before_not_in_with_W_true=22 q1g_before_not_in_with_T_false=0
+name=b4_count input=I3 v1_states=86 v2_states=86 e170=78 known_bad=0 base=8
+name=anchor_check id=B5 input=I3 key=e170:fixed_script_through_e_then_unmount:11 row_name=P8-Mk holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=10 witness_branch=last_record witness_compared=9
+name=anchor_check id=B6 input=I3 key=e170:fixed_script_through_e_then_unmount:13 row_name=N1-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:fixed_script_through_e_then_unmount:14 row_name=N2-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:fixed_script_through_e_then_unmount:15 row_name=N3-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:fixed_script_through_e_then_unmount:16 row_name=N4-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:fixed_script_through_e_then_unmount:17 row_name=N5-Mk- holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B5 input=I3 key=e170:fixed_script_through_e_then_unmount:5 row_name=P8-F holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=19 witness_branch=last_record witness_compared=18
+name=anchor_check id=B5 input=I3 key=e170:new_pool_file_creation:11 row_name=P8-Mk holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=2 witness_branch=last_record witness_compared=1
+name=anchor_check id=B6 input=I3 key=e170:new_pool_file_creation:13 row_name=N1-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:new_pool_file_creation:14 row_name=N2-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:new_pool_file_creation:15 row_name=N3-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:new_pool_file_creation:16 row_name=N4-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I3 key=e170:new_pool_file_creation:17 row_name=N5-Mk- holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B5 input=I3 key=e170:new_pool_file_creation:5 row_name=P8-F holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=3 witness_branch=last_record witness_compared=2
+name=q1_in_range input=I4 category=in_range_a key=e170:fixed_script_through_e_then_unmount:11 row_name=P8-Mk|family=P|base=Mk v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I4 category=in_range_a key=e170:fixed_script_through_e_then_unmount:5 row_name=P8-F|family=P|base=F v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I4 category=in_range_a key=e170:new_pool_file_creation:11 row_name=P8-Mk|family=P|base=Mk v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_in_range input=I4 category=in_range_a key=e170:new_pool_file_creation:5 row_name=P8-F|family=P|base=F v1_strict=in v2_strict=not_in failed_predicates=W
+name=q1_counts input=I4 kind=images fields_differ=0 legal_flip=0 patched_flip_without_predicate=0 not_in_to_in=0 other_verdict_change=0 in_range_a=4 in_range_b=0 same=121 compared=125 missing=0 out_of_range_total=0 legal_flip_with_W=0 legal_flip_with_T=0 q1g_before_not_in_with_W_true=20 q1g_before_not_in_with_T_false=0
+name=b4_count input=I4 v1_states=125 v2_states=125 e170=76 known_bad=41 base=8
+name=anchor_check id=B5 input=I4 key=e170:fixed_script_through_e_then_unmount:11 row_name=P8-Mk holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=10 witness_branch=last_record witness_compared=9
+name=anchor_check id=B6 input=I4 key=e170:fixed_script_through_e_then_unmount:13 row_name=N1-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:fixed_script_through_e_then_unmount:14 row_name=N2-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:fixed_script_through_e_then_unmount:15 row_name=N3-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:fixed_script_through_e_then_unmount:16 row_name=N4-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:fixed_script_through_e_then_unmount:17 row_name=N5-Mk- holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B5 input=I4 key=e170:fixed_script_through_e_then_unmount:5 row_name=P8-F holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=19 witness_branch=last_record witness_compared=18
+name=anchor_check id=B5 input=I4 key=e170:new_pool_file_creation:11 row_name=P8-Mk holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=2 witness_branch=last_record witness_compared=1
+name=anchor_check id=B6 input=I4 key=e170:new_pool_file_creation:13 row_name=N1-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:new_pool_file_creation:14 row_name=N2-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:new_pool_file_creation:15 row_name=N3-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:new_pool_file_creation:16 row_name=N4-F holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B6 input=I4 key=e170:new_pool_file_creation:17 row_name=N5-Mk- holds=true v1_strict=in v2_strict=in witness_true=false tail_check=true
+name=anchor_check id=B5 input=I4 key=e170:new_pool_file_creation:5 row_name=P8-F holds=true v1_strict=in v2_strict=not_in failed_predicates=W witness_counter=3 witness_branch=last_record witness_compared=2
+name=anchor_assertions_of_v2 file=e170-r2-o3-spec-executor-2026-10-04-s2-v2-i1.out lines=14 holds_true=14 holds_false=0 not_run=0 detail=A6@new_pool_file_creation=true,A1@new_pool_file_creation=true,A2@new_pool_file_creation=true,A3@new_pool_file_creation=true,A4@new_pool_file_creation=true,A5@new_pool_file_creation=true,A13@new_pool_file_creation=true,A12@new_pool_file_creation=true,A7@new_pool_file_creation=true,B1@new_pool_file_creation=true,A6@fixed_script_through_e_then_unmount=true,A11@fixed_script_through_e_then_unmount=true,B2@new_pool_file_creation=true,B3@new_pool_file_creation=true
+name=anchor_assertions_of_v2 file=e170-r2-o3-spec-executor-2026-10-04-s2-v2-i2.out lines=14 holds_true=14 holds_false=0 not_run=0 detail=A6@new_pool_file_creation=true,A1@new_pool_file_creation=true,A2@new_pool_file_creation=true,A3@new_pool_file_creation=true,A4@new_pool_file_creation=true,A5@new_pool_file_creation=true,A13@new_pool_file_creation=true,A12@new_pool_file_creation=true,A7@new_pool_file_creation=true,B1@new_pool_file_creation=true,A6@fixed_script_through_e_then_unmount=true,A11@fixed_script_through_e_then_unmount=true,B2@new_pool_file_creation=true,B3@new_pool_file_creation=true
+name=i5_counts ran=53 passed=53 not_passed=0 final_ok=true
+name=q1_positive_control input=I2 changed_key=new_pool_file_creation:1 out_of_range_before=0 out_of_range_after=1 added=1 exactly_one=true copy=/tmp/claude-1000/e170-r2-segment2/official-scratch/q1-positive-control-I2.out
+name=verdict fields_differ=0 legal_flip=0 patched_flip_without_predicate=0 not_in_to_in=0 other_verdict_change=0 in_range_a=8 in_range_b=0 same=1355 compared=1363 missing=0 out_of_range_total=0 legal_flip_with_W=0 legal_flip_with_T=0 q1g_before_not_in_with_W_true=42 q1g_before_not_in_with_T_false=0
+name=done emitted=51

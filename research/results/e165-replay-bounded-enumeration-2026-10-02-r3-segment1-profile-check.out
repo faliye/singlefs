@@ -1,0 +1,80 @@
+# E165 第 3 次重跑第一段（登记 research/prompts/e165-r3-prereg.md 修订 1）旧产物与 r2 档的复得对照（作废条款 TV1、TV2、TV9）
+# 装置 crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs sha256 2ee57fe0eddafc06a03d4873d772259aa557806f777b76ce64ffbb586a7af6ad（主工作区与第一段根里逐字节相同）；
+# 二进制 /tmp/claude-1000/e165-r3-segment1/target/release/e165_replay_bounded_enumeration sha256 661d8e7c3467ef71b15218d8022966beecbb59c7913cc14c8a0c1a68fcc4d6b6（根 /tmp/claude-1000/e165-r3-segment1/root 上 cargo build --release，CARGO_TARGET_DIR=/tmp/claude-1000/e165-r3-segment1/target）；根清单 segment1-root-after-overlay.sha256 sha256 96dfb902556f04c29fbfcbc06050315217133c96560ad775edc91f877289f1dc，段首与段尾 sha256sum -c 都退 0
+# 命令：E165_THREADS=<线程数> bash research/scripts/run-with-memory-cap.sh 512M <二进制> <参数>，grep '^E7RESULT ' 之后整份与入库那份比；r1 档不给 --profile
+# 比对 r3 档与 r2 档用下面抄进来的脚本（删五类新行、三行按差额换回，再逐行比）：
+#   #!/usr/bin/env python3
+#   """E165 r3 第一段 TV2 比对：r3 档对抗一族的 E7RESULT 行，去掉登记 r3 5.6 的新行之后，与同一份二进制 r2 档同一条命令的 E7RESULT 行逐行比。
+#   用法：profile_check.py <r2 档 E7RESULT 文件> <r3 档 E7RESULT 文件>。退出码 0 = 逐行相同；1 = 有不同；2 = 读不到（行数 0）。
+#   删掉的五类行（只在 r3 档有）：拆开的四格违例行、i812_states 行、criteria=r3_i812 判决行、J6Qn_i812_split 的对照行。
+#   去掉之后仍然必然不同的三处，按「恰好差多少」换回去再比（比逐字相同更紧：差的数必须恰等于删掉的行数）：
+#     config 行与 scope=run 判决行里的 profile=r3 换回 profile=r2；scope=run 判决行 control_readings 减去删掉的对照行数；done 行 emitted 减去删掉的全部行数。"""
+#   import re
+#   import sys
+#   
+#   NEW_ROW_CLASSES = [
+#       ("split_cell_rows", lambda line: " criterion=J6Qn_premise_holds_i812_" in line or " criterion=J6Qn_premise_fails_i812_" in line),
+#       ("i812_states_rows", lambda line: line.startswith("E7RESULT name=i812_states ")),
+#       ("verdict_r3_i812_rows", lambda line: " criteria=r3_i812 " in line),
+#       ("control_rows", lambda line: line.startswith("E7RESULT name=control criterion=J6Qn_i812_split ")),
+#   ]
+#   
+#   
+#   def read_result_lines(path):
+#       with open(path, encoding="utf-8") as handle:
+#           return [line.rstrip("\n") for line in handle if line.startswith("E7RESULT ")]
+#   
+#   
+#   def main():
+#       r2_lines = read_result_lines(sys.argv[1])
+#       r3_lines = read_result_lines(sys.argv[2])
+#       print(f"rows_r2={len(r2_lines)} rows_r3={len(r3_lines)}")
+#       if not r2_lines or not r3_lines:
+#           print("读到 0 行：这一次作废（TV8）")
+#           return 2
+#       kept, removed = [], {name: 0 for name, _ in NEW_ROW_CLASSES}
+#       for line in r3_lines:
+#           owner = [name for name, belongs in NEW_ROW_CLASSES if belongs(line)]
+#           if owner:
+#               removed[owner[0]] += 1
+#           else:
+#               kept.append(line)
+#       for name, belongs in NEW_ROW_CLASSES:
+#           in_r2 = sum(1 for line in r2_lines if belongs(line))
+#           print(f"removed_{name}={removed[name]} same_class_rows_in_r2={in_r2}")
+#           if in_r2:
+#               return 1
+#       removed_total = sum(removed.values())
+#       removed_controls = removed["control_rows"]
+#       adjusted = []
+#       for line in kept:
+#           if line.startswith("E7RESULT name=config ") or line.startswith("E7RESULT name=verdict scope=run "):
+#               assert " profile=r3 " in line, line
+#               line = line.replace(" profile=r3 ", " profile=r2 ")
+#           if line.startswith("E7RESULT name=verdict scope=run "):
+#               line = re.sub(r"control_readings=(\d+)", lambda m: f"control_readings={int(m.group(1)) - removed_controls}", line)
+#           if line.startswith("E7RESULT name=done "):
+#               line = re.sub(r"emitted=(\d+)", lambda m: f"emitted={int(m.group(1)) - removed_total}", line)
+#           adjusted.append(line)
+#       print(f"removed_total={removed_total} rows_r3_after_removal={len(adjusted)}")
+#       if adjusted == r2_lines:
+#           print("identical=true")
+#           return 0
+#       print("identical=false")
+#       for position, (left, right) in enumerate(zip(r2_lines, adjusted)):
+#           if left != right:
+#               print(f"first_difference_at_row={position + 1}\n  r2: {left}\n  r3: {right}")
+#               break
+#       else:
+#           print("rows_differ_in_count_only")
+#       return 1
+#   
+#   
+#   sys.exit(main())
+E7RESULT name=old_product_check label=r1-segment1-legal arguments="--bounds segment1 --family legal" exit=0 product=e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out rows_today=910 rows_stored=910 sha256_today=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 sha256_stored=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 sha256_registered=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 identical_to_stored=true identical_to_registered=true
+E7RESULT name=old_product_check label=r1-light-legal arguments="--bounds light --family legal" exit=0 product=e165-replay-bounded-enumeration-2026-10-01-light-legal-family.out rows_today=876 rows_stored=876 sha256_today=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c sha256_stored=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c sha256_registered=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c identical_to_stored=true identical_to_registered=true
+E7RESULT name=old_product_check label=r1-segment1-adversarial arguments="--bounds segment1 --family adversarial" exit=0 product=e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out rows_today=172 rows_stored=172 sha256_today=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e sha256_stored=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e sha256_registered=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e identical_to_stored=true identical_to_registered=true
+E7RESULT name=old_product_check label=r2-segment1-adversarial arguments="--bounds segment1 --family adversarial --profile r2" exit=0 product=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-adversarial-family-2026-10-02.out rows_today=257 rows_stored=257 sha256_today=14f5ec4b0bc8c6c0c77f7107858e291533498c195b4713cc4a10d7b3d5068805 sha256_stored=14f5ec4b0bc8c6c0c77f7107858e291533498c195b4713cc4a10d7b3d5068805 sha256_registered=14f5ec4b0bc8c6c0c77f7107858e291533498c195b4713cc4a10d7b3d5068805 identical_to_stored=true identical_to_registered=true
+E7RESULT name=r3_against_r2_check arguments_r2="--bounds segment1 --family adversarial --profile r2" arguments_r3="--bounds segment1 --family adversarial --profile r3" exit=0 rows_r2=257 rows_r3=380 removed_split_cell_rows=40 same_class_rows_in_r2=0 removed_i812_states_rows=10 same_class_rows_in_r2=0 removed_verdict_r3_i812_rows=3 same_class_rows_in_r2=0 removed_control_rows=70 same_class_rows_in_r2=0 removed_total=123 rows_r3_after_removal=257 identical=true
+E7RESULT name=threads_check threads_first=8 threads_second=4 rows_first=380 rows_second=380 sha256_first=19092224bbcb43cd17f77594d74ec824d863bb274dd7f3f49c6f874d8c4f5eb6 sha256_second=19092224bbcb43cd17f77594d74ec824d863bb274dd7f3f49c6f874d8c4f5eb6 identical=true
+# 补记：上面「命令」那一行的 512M 是 r1 档三条与 r2 档那一遍的上限；r3 档两遍（线程 8、4）经 2G 上限、环境里设了 RUN_WITH_MEMORY_CAP_PARALLEL_REASON；r2 档那一遍第一次起跑退出码 252（slice 已满，命令没跑，输出不算），改 512M 重起得到上面那份。

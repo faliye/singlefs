@@ -1,0 +1,2 @@
+E169DIRECT name=summary input=all_durable distinct_inputs=6192 states=88560 mismatched_inputs=0 mismatched_states=0
+E169DIRECT name=summary input=strict_segment distinct_inputs=979 states=88560 mismatched_inputs=0 mismatched_states=0
