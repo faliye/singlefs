@@ -48,15 +48,15 @@
 | `research/scripts/layer0-shard-configuration-check.sh` | 同路径（新） | 拷过去，775；54 号与驱动脚本的运行条件共用这一份判法 |
 | `multi-host.env.example` | 仓根（新） | 拷过去；7 个键，占位值，不写主机名 |
 | `research/scripts/admission.py.diff`（另附改完的整份） | `research/scripts/admission.py` | `patch -p1`（对今天主工作区的那一份 dry-run 过，能打上） |
-| `.claude/gate.d/54-layer0-replay.sh.diff`（另附整份） | `.claude/gate.d/54-layer0-replay.sh` | 同上 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh.diff`（另附整份） | `.claude/gate.d/checker-tier-layer0-replay.sh` | 同上 |
 | `.claude/gate.d/stage-inputs.tsv.diff`（另附整份） | `.claude/gate.d/stage-inputs.tsv` | 同上；两条流的全量行第三列加 `shard=across-machines`（会改这两条用例的输入指纹，它们的全绿标记本来就因 crates 改了而失效） |
 | `.claude/hooks/lib_heavy_tests.py.diff`（另附整份） | `.claude/hooks/lib_heavy_tests.py` | 同上；`KNOWN_SCRIPT_LOCATIONS` 加驱动脚本，`classify` 认它是 `crash-case-cargo`（`--selftest` 不算） |
 | `.claude/kb/milestone/03-third-txn.md.diff`（另附整份） | `.claude/kb/milestone/03-third-txn.md` | 同上；第六节「仓里已有的」改成现状、「开工前要先定的」换成「定案」五条、历史版本加 2026-09-27 一条 |
 
 sha256（`find . -type f | sort | xargs sha256sum`，deliver/ 里现算）：
 ```
-e7aaa247f421414272da9edba6115fc62d02a9dc84e5a922be8a05f98b30800d  ./.claude/gate.d/54-layer0-replay.sh
-d29c2ec18e34fbecd3cb12827d8fc13e41c8579e375576a4f7e2d6bbd389c8a8  ./.claude/gate.d/54-layer0-replay.sh.diff
+e7aaa247f421414272da9edba6115fc62d02a9dc84e5a922be8a05f98b30800d  ./.claude/gate.d/checker-tier-layer0-replay.sh
+d29c2ec18e34fbecd3cb12827d8fc13e41c8579e375576a4f7e2d6bbd389c8a8  ./.claude/gate.d/checker-tier-layer0-replay.sh.diff
 f0a04099b2e948f7f14e145c190dd6eecf757bafe829c848d804bcc58e534d84  ./.claude/gate.d/stage-inputs.tsv
 c61d0b48c2cf3cc608b29781fb06ee6e604274acf719122ea40ff2fd94b3458a  ./.claude/gate.d/stage-inputs.tsv.diff
 6973c12f19f207fb49950bd171e181131141e719ebb3229c1c79964900fd16a0  ./.claude/hooks/lib_heavy_tests.py

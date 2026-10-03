@@ -1,0 +1,134 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 55M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿与派出去的实现员各跑各的
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/bf_r3_gap.rs (target/release/deps/bf_r3_gap-583382721a8b60c7)
+
+running 1 test
+test device_and_region_faults ... R3D_JOBS 86
+R3D_DONE jobs=86 seconds=46.6
+R3D :: disk-swap-mount:refused NewerStateStillUnreadableAfterOneReread(PublishWit = 156 first=A/raise1 disk1-back1
+R3D :: disk-swap-mount:refused WritableMountRefusedByDevicesWithoutTheSelectedVer = 156 first=A/raise1 disk0-back1
+R3D :: disk-swap:beta-lenient-evaluated(sum) = 47556 first=-
+R3D :: disk-swap:beta-lenient-red = 2 first=R/rb1,ni1 disk0-back2 pool_red=["I-2.1", "I-3.1", "I-3.9", "I-4.8", "I-7.4", "I-9.1"] :: β-lenient：盘 0 槽 50292 类 3 诞生代号 7 ≤ R⁻ txg 8 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50322 出生 10 :: txg 0 [实例 0] | txg 1 [实例 1] | txg 2 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 8 [实例 1] | txg 10 [实例 1]
+R3D :: disk-swap:beta-strict-evaluated(sum) = 47556 first=-
+R3D :: disk-swap:beta-strict-red = 2 first=R/rb1,ni1 disk0-back2 pool_red=["I-2.1", "I-3.1", "I-3.9", "I-4.8", "I-7.4", "I-9.1"] :: β-strict：盘 0 槽 50292 类 3 诞生代号 7 ≤ R⁻ txg 8 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50322 出生 10 :: txg 0 [实例 0] | txg 1 [实例 1] | txg 2 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 8 [实例 1] | txg 10 [实例 1]
+R3D :: disk-swap:betagap-lenient-evaluated(sum) = 46394 first=-
+R3D :: disk-swap:betagaprow-lenient-evaluated(sum) = 46794 first=-
+R3D :: disk-swap:gap-first-placements(sum) = 2180 first=-
+R3D :: disk-swap:gap-shape R⁻ txg # [实例 #] → R txg ## [实例 #] = 94 first=A/raise1 disk0-back1 :: R⁻ txg 7 [实例 1] → R txg 10 [实例 1]
+R3D :: disk-swap:gap-shape R⁻ txg # [实例 #·由记录施加] → R txg ## [实例 #] = 4 first=A/ow,remount disk0-back2 :: R⁻ txg 8 [实例 1·由记录施加] → R txg 10 [实例 2]
+R3D :: disk-swap:gap-shape R⁻ txg ## [实例 #] → R txg ## [实例 #] = 10 first=R/raise1,raise1 disk0-back1 :: R⁻ txg 10 [实例 1] → R txg 13 [实例 1]
+R3D :: disk-swap:gap-states = 108 first=A/raise1 disk0-back1 :: R⁻ txg 7 [实例 1] → R txg 10 [实例 1] :: txg 1 [实例 1] | txg 2 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 10 [实例 1]
+R3D :: disk-swap:gap-states&pool-red = 108 first=A/raise1 disk0-back1
+R3D :: disk-swap:gap-states-with-new = 108 first=A/raise1 disk0-back1 :: R⁻ txg 7 [实例 1] → R txg 10 [实例 1] 新落点 16 个、第一次出现 16 个
+R3D :: disk-swap:images = 312 first=A/raise1 disk0-back1
+R3D :: disk-swap:pool-red = 240 first=A/raise1 disk0-back1 ["I-2.1", "I-3.1", "I-4.8", "I-7.4"]
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-3.9", "I-4.8", "I-7.4", "I-9.1"] = 2 first=R/rb1,ni1 disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-3.9", "I-4.8", "I-7.4"] = 2 first=R/rb1,rb3 disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7", "I-9.1"] = 2 first=A/ow,remount disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-7.7"] = 44 first=A/remount,rb1 disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-4.8", "I-7.4", "I-9.1"] = 10 first=R/ow,ow disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-3.1", "I-4.8", "I-7.4"] = 48 first=A/raise1 disk0-back1
+R3D :: disk-swap:pool-red=["I-2.1", "I-4.8", "I-7.4", "I-7.7", "I-9.1"] = 2 first=R/ow,remount disk0-back2
+R3D :: disk-swap:pool-red=["I-2.1", "I-4.8", "I-7.4", "I-7.7"] = 24 first=A/ow,remount disk1-back1
+R3D :: disk-swap:pool-red=["I-2.1", "I-4.8", "I-7.4", "I-9.1"] = 8 first=R/ow,ow disk0-back1
+R3D :: disk-swap:pool-red=["I-2.1", "I-4.8", "I-7.4"] = 98 first=A/raise1 disk1-back1
+R3D :: disk-swap:tf-lenient-evaluated(sum) = 45172 first=-
+R3D :: disk-swap:tf-strict-evaluated(sum) = 45172 first=-
+R3D :: disk-swap:tfgap-lenient-evaluated(sum) = 44082 first=-
+R3D :: disk-swap:tfgaprow-lenient-evaluated(sum) = 44482 first=-
+R3D :: newest-slot-zero:beta-lenient-evaluated(sum) = 13648 first=-
+R3D :: newest-slot-zero:beta-strict-evaluated(sum) = 13648 first=-
+R3D :: newest-slot-zero:betagap-lenient-evaluated(sum) = 13648 first=-
+R3D :: newest-slot-zero:betagaprow-lenient-evaluated(sum) = 13648 first=-
+R3D :: newest-slot-zero:images = 86 first=A/raise1 newest-slot
+R3D :: newest-slot-zero:tf-lenient-evaluated(sum) = 13060 first=-
+R3D :: newest-slot-zero:tf-strict-evaluated(sum) = 13060 first=-
+R3D :: newest-slot-zero:tfgap-lenient-evaluated(sum) = 13060 first=-
+R3D :: newest-slot-zero:tfgaprow-lenient-evaluated(sum) = 13060 first=-
+R3D :: none:beta-lenient-evaluated(sum) = 15392 first=-
+R3D :: none:beta-strict-evaluated(sum) = 15392 first=-
+R3D :: none:betagap-lenient-evaluated(sum) = 15392 first=-
+R3D :: none:betagaprow-lenient-evaluated(sum) = 15392 first=-
+R3D :: none:images = 86 first=A/raise1
+R3D :: none:tf-lenient-evaluated(sum) = 14636 first=-
+R3D :: none:tf-strict-evaluated(sum) = 14636 first=-
+R3D :: none:tfgap-lenient-evaluated(sum) = 14636 first=-
+R3D :: none:tfgaprow-lenient-evaluated(sum) = 14636 first=-
+R3D :: region0-zero:beta-lenient-evaluated(sum) = 11500 first=-
+R3D :: region0-zero:beta-lenient-red = 2 first=R/rb1,ni1 region0 pool_red=["I-3.1", "I-3.9"] :: β-lenient：盘 0 槽 50292 类 3 诞生代号 7 ≤ R⁻ txg 8 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50322 出生 10 :: txg 1 [实例 1] | txg 2 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 7 [实例 1] | txg 8 [实例 1] | txg 10 [实例 1]
+R3D :: region0-zero:beta-strict-evaluated(sum) = 11500 first=-
+R3D :: region0-zero:beta-strict-red = 2 first=R/rb1,ni1 region0 pool_red=["I-3.1", "I-3.9"] :: β-strict：盘 0 槽 50292 类 3 诞生代号 7 ≤ R⁻ txg 8 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50322 出生 10 :: txg 1 [实例 1] | txg 2 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 7 [实例 1] | txg 8 [实例 1] | txg 10 [实例 1]
+R3D :: region0-zero:betagap-lenient-evaluated(sum) = 7120 first=-
+R3D :: region0-zero:betagaprow-lenient-evaluated(sum) = 7362 first=-
+R3D :: region0-zero:gap-first-placements(sum) = 4354 first=-
+R3D :: region0-zero:gap-shape R⁻ txg # [实例 #] → R txg # [实例 #] = 62 first=A/raise1 region0 :: R⁻ txg 2 [实例 1] → R txg 4 [实例 1]
+R3D :: region0-zero:gap-shape R⁻ txg # [实例 #] → R txg ## [实例 #] = 17 first=A/remount,rb1 region0 :: R⁻ txg 8 [实例 2] → R txg 10 [实例 2]
+R3D :: region0-zero:gap-shape R⁻ txg ## [实例 #] → R txg ## [实例 #] = 3 first=A/raise1,remount region0 :: R⁻ txg 11 [实例 2] → R txg 13 [实例 2]
+R3D :: region0-zero:gap-states = 82 first=A/raise1 region0 :: R⁻ txg 2 [实例 1] → R txg 4 [实例 1] :: txg 1 [实例 1] | txg 2 [实例 1] | txg 4 [实例 1] | txg 5 [实例 1] | txg 7 [实例 1] | txg 8 [实例 1] | txg 10 [实例 1]
+R3D :: region0-zero:gap-states&pool-red = 82 first=A/raise1 region0
+R3D :: region0-zero:gap-states-with-new = 82 first=A/raise1 region0 :: R⁻ txg 2 [实例 1] → R txg 4 [实例 1] 新落点 26 个、第一次出现 26 个
+R3D :: region0-zero:images = 86 first=A/raise1 region0
+R3D :: region0-zero:pool-red = 82 first=A/raise1 region0 ["I-3.1"]
+R3D :: region0-zero:pool-red=["I-3.1", "I-3.9"] = 4 first=R/rb1,ni1 region0
+R3D :: region0-zero:pool-red=["I-3.1", "I-7.9"] = 2 first=R/raise1,raise1 region0
+R3D :: region0-zero:pool-red=["I-3.1"] = 76 first=A/raise1 region0
+R3D :: region0-zero:tf-lenient-evaluated(sum) = 10900 first=-
+R3D :: region0-zero:tf-strict-evaluated(sum) = 10900 first=-
+R3D :: region0-zero:tfgap-lenient-evaluated(sum) = 6546 first=-
+R3D :: region0-zero:tfgaprow-lenient-evaluated(sum) = 6788 first=-
+R3D :: region1-zero:beta-lenient-evaluated(sum) = 11382 first=-
+R3D :: region1-zero:beta-strict-evaluated(sum) = 11382 first=-
+R3D :: region1-zero:betagap-lenient-evaluated(sum) = 7902 first=-
+R3D :: region1-zero:betagaprow-lenient-evaluated(sum) = 7990 first=-
+R3D :: region1-zero:gap-first-placements(sum) = 3308 first=-
+R3D :: region1-zero:gap-shape R⁻ txg # [实例 #] → R txg # [实例 #] = 82 first=A/raise1 region1 :: R⁻ txg 3 [实例 1] → R txg 5 [实例 1]
+R3D :: region1-zero:gap-shape R⁻ txg # [实例 #] → R txg ## [实例 #] = 2 first=R/remount,raise1 region1 :: R⁻ txg 9 [实例 2] → R txg 11 [实例 2]
+R3D :: region1-zero:gap-states = 84 first=A/raise1 region1 :: R⁻ txg 3 [实例 1] → R txg 5 [实例 1] :: txg 2 [实例 1] | txg 3 [实例 1] | txg 5 [实例 1] | txg 6 [实例 1] | txg 8 [实例 1] | txg 9 [实例 1]
+R3D :: region1-zero:gap-states&pool-red = 76 first=A/raise1 region1
+R3D :: region1-zero:gap-states-with-new = 76 first=A/raise1 region1 :: R⁻ txg 3 [实例 1] → R txg 5 [实例 1] 新落点 26 个、第一次出现 26 个
+R3D :: region1-zero:images = 86 first=A/raise1 region1
+R3D :: region1-zero:pool-red = 78 first=A/raise1 region1 ["I-3.1", "I-7.9"]
+R3D :: region1-zero:pool-red=["I-3.1", "I-7.9"] = 15 first=A/raise1 region1
+R3D :: region1-zero:pool-red=["I-3.1"] = 61 first=A/ni1,ow region1
+R3D :: region1-zero:pool-red=["I-7.9"] = 2 first=A/raise1,remount region1
+R3D :: region1-zero:tf-lenient-evaluated(sum) = 11014 first=-
+R3D :: region1-zero:tf-strict-evaluated(sum) = 11014 first=-
+R3D :: region1-zero:tfgap-lenient-evaluated(sum) = 7706 first=-
+R3D :: region1-zero:tfgaprow-lenient-evaluated(sum) = 7794 first=-
+R3D :: region2-zero:beta-lenient-evaluated(sum) = 12196 first=-
+R3D :: region2-zero:beta-lenient-red = 15 first=A/rb3,ni1 region2 pool_red=["I-3.1", "I-3.9"] :: β-lenient：盘 0 槽 50254 类 3 诞生代号 4 ≤ R⁻ txg 7 [实例 1]；R txg 9 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50240 出生 3；种类 2 根槽 50314 出生 9 :: txg 0 [实例 0] | txg 1 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 9 [实例 1]
+R3D :: region2-zero:beta-strict-evaluated(sum) = 12196 first=-
+R3D :: region2-zero:beta-strict-red = 15 first=A/rb3,ni1 region2 pool_red=["I-3.1", "I-3.9"] :: β-strict：盘 0 槽 50254 类 3 诞生代号 4 ≤ R⁻ txg 7 [实例 1]；R txg 9 [实例 1]；再次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 50240 出生 3；种类 2 根槽 50314 出生 9 :: txg 0 [实例 0] | txg 1 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 9 [实例 1]
+R3D :: region2-zero:betagap-lenient-evaluated(sum) = 7590 first=-
+R3D :: region2-zero:betagaprow-lenient-evaluated(sum) = 7800 first=-
+R3D :: region2-zero:gap-first-placements(sum) = 4398 first=-
+R3D :: region2-zero:gap-shape R⁻ txg # [实例 #] → R txg # [实例 #] = 69 first=A/raise1 region2 :: R⁻ txg 1 [实例 1] → R txg 3 [实例 1]
+R3D :: region2-zero:gap-shape R⁻ txg ## [实例 #] → R txg ## [实例 #] = 4 first=A/raise1,remount region2 :: R⁻ txg 10 [实例 1] → R txg 12 [实例 2]
+R3D :: region2-zero:gap-states = 73 first=A/raise1 region2 :: R⁻ txg 1 [实例 1] → R txg 3 [实例 1] :: txg 1 [实例 1] | txg 3 [实例 1] | txg 4 [实例 1] | txg 6 [实例 1] | txg 7 [实例 1] | txg 9 [实例 1] | txg 10 [实例 1]
+R3D :: region2-zero:gap-states&pool-red = 73 first=A/raise1 region2
+R3D :: region2-zero:gap-states-with-new = 73 first=A/raise1 region2 :: R⁻ txg 1 [实例 1] → R txg 3 [实例 1] 新落点 24 个、第一次出现 24 个
+R3D :: region2-zero:images = 86 first=A/raise1 region2
+R3D :: region2-zero:pool-red = 76 first=A/raise1 region2 ["I-3.1"]
+R3D :: region2-zero:pool-red=["I-3.1", "I-3.9"] = 22 first=A/rb1,ow region2
+R3D :: region2-zero:pool-red=["I-3.1"] = 51 first=A/raise1 region2
+R3D :: region2-zero:pool-red=["I-3.9"] = 3 first=R/ow,remount region2
+R3D :: region2-zero:tf-lenient-evaluated(sum) = 11798 first=-
+R3D :: region2-zero:tf-strict-evaluated(sum) = 11798 first=-
+R3D :: region2-zero:tfgap-lenient-evaluated(sum) = 7400 first=-
+R3D :: region2-zero:tfgaprow-lenient-evaluated(sum) = 7610 first=-
+R3D :: time-ms:pool-checker = 25588 first=-
+R3D :: time-ms:tree-floor = 3638 first=-
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 46.59s
+

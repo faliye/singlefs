@@ -1,0 +1,9 @@
+✗ 第 4 批合入后 I-8.10：树分裂坏镜像补完校验和不再把根照抄进 journal 记录的新根段：内存包装的结局，退出码 252（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
+第 4 批合入后 I-8.10：树表排序探针改了根不把根照抄进 journal 记录的新根段	抓到	the_checker_reddens_only_the_tree_table_ordering_when_the_tombstone_and_lineage_entries_swapped_their_kinds 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
+✗ 第 4 批合入后同步助手：同实例前一条改过时不再重算这一条的反向链：内存包装的结局，退出码 252（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
+增补 3 第 4 件：一块盘两个系统配置槽都无效就整体 return Err（每盘一份的冗余当场作废，D22 已定项 8 第 1 条）	抓到	both_system_configuration_slots_unreadable_on_device_one_still_read_the_file_back 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
+增补 3 第 4 件：只在已经择到一份之后才容许跳过整盘（坏的是次序里第一块盘时照旧挂不上）	抓到	both_system_configuration_slots_unreadable_on_device_zero_still_read_the_file_back 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/005.log）
+增补 3 第 4 件：失败时点名的换成最后一块两槽皆废的盘，不是设备次序里第一块	抓到	no_valid_system_configuration_slot_on_any_device_fails_and_names_the_first_device 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/006.log）
+✗ 点名 6 条：跑了 6 条，跳过 0 条，有没红或无效的（逐条列在上面）
+→ 怎么办：没红的换一条真会改行为的变异或补断言；无效的改替换文；照 .claude/rules/mutation-sampling.md 分类
+exit=1

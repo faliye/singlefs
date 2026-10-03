@@ -1,0 +1,16 @@
+fop-content-blind	判对 26 个、判错 0 个：无
+fop-path-blind	判对 26 个、判错 0 个：无
+vk-no-toolchain	判对 26 个、判错 0 个：无
+vk-no-source	判对 26 个、判错 0 个：无
+vk-no-global	判对 25 个、判错 1 个：library-version-is-staged-tree-version-key-red(期望1→实测0，缺 want 2 条)
+vk-no-judge	判对 26 个、判错 0 个：无
+gkl-no-rules	判对 26 个、判错 0 个：无
+gkl-no-toolchain	判对 26 个、判错 0 个：无
+gkl-no-files	判对 26 个、判错 0 个：无
+gkl-no-env	判对 26 个、判错 0 个：无
+gkl-no-tools	判对 26 个、判错 0 个：无
+gkl-no-exclusions	判对 25 个、判错 1 个：library-version-is-staged-tree-global-key-red(期望1→实测0，缺 want 3 条)
+gkl-no-limits	判对 26 个、判错 0 个：无
+exd-always-none	判对 25 个、判错 1 个：library-version-is-staged-tree-global-key-red(期望1→实测0，缺 want 3 条)
+limits-constant	判对 21 个、判错 5 个：library-version-is-staged-tree-green(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-marker-clean-written(期望0→实测1，缺 want 3 条) library-version-is-staged-tree-marker-unstaged-skipped(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-unstaged-change-green(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-version-key-red(期望1→实测1，缺 want 1 条)
+export-no-cargo	判对 15 个、判错 11 个：library-version-is-staged-tree-export-range-red(期望1→实测0，缺 want 2 条) library-version-is-staged-tree-file-differs-red(期望1→实测1，缺 want 1 条) library-version-is-staged-tree-global-key-missing-red(期望1→实测1，缺 want 1 条) library-version-is-staged-tree-global-key-red(期望1→实测1，缺 want 2 条) library-version-is-staged-tree-green(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-marker-clean-written(期望0→实测1，缺 want 3 条) library-version-is-staged-tree-marker-unstaged-skipped(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-new-file-red(期望1→实测1，缺 want 1 条) library-version-is-staged-tree-source-fingerprint-red(期望1→实测1，缺 want 2 条) library-version-is-staged-tree-unstaged-change-green(期望0→实测1，缺 want 2 条) library-version-is-staged-tree-version-key-red(期望1→实测1，缺 want 1 条)

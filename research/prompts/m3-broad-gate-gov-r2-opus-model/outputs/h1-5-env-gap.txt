@@ -1,0 +1,8 @@
+（不设）	global_key=d70784907e11d2a8	admission_build_env=4f53cda18c2baa0c
+RUSTFLAGS=-C overflow-checks=off	global_key=5a70dcc3d314f611	admission_build_env=0861ed8c02647506
+CARGO_PROFILE_DEV_OVERFLOW_CHECKS=false	global_key=a65e82f0ebce9180	admission_build_env=49417784ed342ae7
+CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS=-C overflow-checks=off	global_key=d70784907e11d2a8	admission_build_env=4c7d893e7789d3c4
+RUSTC_WRAPPER=/usr/bin/env	global_key=d70784907e11d2a8	admission_build_env=ac0cb936f1bd0b52
+CARGO_BUILD_TARGET=x86_64-unknown-linux-musl	global_key=d70784907e11d2a8	admission_build_env=b68123be01b0531b
+~/.cargo/config.toml 写 [profile.dev] overflow-checks = false（HOME=env-gap-home.shrfa6oa）	global_key=d70784907e11d2a8	admission_build_env=f02a97876043b57d
+同一个 HOME、删掉那份 config.toml	global_key=d70784907e11d2a8	admission_build_env=4f53cda18c2baa0c

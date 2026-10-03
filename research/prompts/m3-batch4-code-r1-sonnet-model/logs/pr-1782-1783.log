@@ -1,0 +1,5 @@
+✗ 二·1 I-7.16 判定恒真：系统配置两槽世代号差值不判	没红	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 没判红（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
+✗ 二·1 I-7.16 判定恒真：系统配置槽世代号奇偶不判	没红	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 没判红（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
+✗ 点名 2 条：跑了 2 条，跳过 0 条，有没红或无效的（逐条列在上面）
+→ 怎么办：没红的换一条真会改行为的变异或补断言；无效的改替换文；照 .claude/rules/mutation-sampling.md 分类
+exit=1

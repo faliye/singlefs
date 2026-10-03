@@ -1,0 +1,26 @@
+[dirty] 判绿那一刻：git diff --quiet 退 1；索引 lib.rs blob d7f40408cccc，工作区 lib.rs blob a731cee3e518
+[dirty] 阶段判绿之后写标记（第 377 行那一条）：退 0
+[dirty] 之后暂存 U：索引 lib.rs blob a731cee3e518（判绿时格判的不是这一份）
+[dirty] 下一次提交第 1 步 stage-marker-check 退 0：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.f3a982e20feec333e5906766e3839ce245f969cac75f892d79bbc5f631f7df7d <跑完的时刻>
+[dirty] 整轮 --staged 的临时树上 gate-reuse 退 10（10 = 可跳过、0 = 要跑）：这一道这批输入（指纹 f3a982e20feec333…，248 个文件）有全绿标记：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.f3a982e20feec333e5906766e3839ce245f969cac75f892d79bbc5f631f7df7d <跑完的时刻>
+[commit-first] 判绿那一刻：git diff --quiet 退 1；索引 lib.rs blob d7f40408cccc，工作区 lib.rs blob a731cee3e518
+[commit-first] 阶段判绿之后写标记（第 377 行那一条）：退 0
+[commit-first] 先把判绿的 S1 提交了（索引就是 S1，空提交也照记一次提交）
+[commit-first] 之后暂存 U：索引 lib.rs blob a731cee3e518（判绿时格判的不是这一份）
+[commit-first] 下一次提交第 1 步 stage-marker-check 退 0：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.f3a982e20feec333e5906766e3839ce245f969cac75f892d79bbc5f631f7df7d <跑完的时刻>
+[commit-first] 整轮 --staged 的临时树上 gate-reuse 退 10（10 = 可跳过、0 = 要跑）：这一道这批输入（指纹 f3a982e20feec333…，248 个文件）有全绿标记：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.f3a982e20feec333e5906766e3839ce245f969cac75f892d79bbc5f631f7df7d <跑完的时刻>
+[untracked] 判绿那一刻：git diff --quiet 退 0；索引 lib.rs blob d7f40408cccc，工作区 lib.rs blob d7f40408cccc
+[untracked] 阶段判绿之后写标记（第 377 行那一条）：退 0
+[untracked] 之后暂存 U：索引 lib.rs blob d7f40408cccc（判绿时格判的不是这一份）
+[untracked] 下一次提交第 1 步 stage-marker-check 退 0：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.3cd1adff98c453fbefbc46f993f0588f5f4f9756f938022eb709157df55a9f00 <跑完的时刻>
+[untracked] 整轮 --staged 的临时树上 gate-reuse 退 10（10 = 可跳过、0 = 要跑）：这一道这批输入（指纹 3cd1adff98c453fb…，249 个文件）有全绿标记：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.3cd1adff98c453fbefbc46f993f0588f5f4f9756f938022eb709157df55a9f00 <跑完的时刻>
+[partial] 判绿那一刻：git diff --quiet 退 1；索引 lib.rs blob d7f40408cccc，工作区 lib.rs blob a731cee3e518
+[partial] 阶段判绿之后写标记（第 377 行那一条）：退 0
+[partial] 之后暂存 U：索引 lib.rs blob a731cee3e518（判绿时格判的不是这一份）
+[partial] 下一次提交第 1 步 stage-marker-check 退 0：ok <repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.385526c4a912035a90c873d2ebe5298ba5a57f9a97be21bb3292b6e246513970 <跑完的时刻>
+[partial] 整轮 --staged 的临时树上 gate-reuse 退 0（10 = 可跳过、0 = 要跑）：还没有过整轮全绿的暂存树（refs/sop/staged-green 不存在）
+[clean] 判绿那一刻：git diff --quiet 退 0；索引 lib.rs blob d7f40408cccc，工作区 lib.rs blob d7f40408cccc
+[clean] 阶段判绿之后写标记（第 377 行那一条）：退 0
+[clean] 之后暂存 U：索引 lib.rs blob 3579a57793a2（判绿时格判的不是这一份）
+[clean] 下一次提交第 1 步 stage-marker-check 退 1：这批输入（指纹 02f4c3d7a6dae62b…）没有全绿标记：<repo>/.git/singlefs-stage-green.checker-tier-broad-mutation.sh.02f4c3d7a6dae62b99b529836bf318e05a72872895d1a0214c1bfd6b4eb86c26
+[clean] 整轮 --staged 的临时树上 gate-reuse 退 0（10 = 可跳过、0 = 要跑）：还没有过整轮全绿的暂存树（refs/sop/staged-green 不存在）

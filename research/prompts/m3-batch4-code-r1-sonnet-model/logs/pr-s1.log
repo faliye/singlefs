@@ -1,0 +1,8 @@
+二·1 I-1.12 判定恒真：指针出生树不与被指单元头比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
+二·1 I-3.13 判定恒真：记账行代段不与这一版 txg 比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
+二·1 I-4.9 判定恒真：非最新候选根引用的单元诞生代号不判	抓到	each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
+二·1 I-3.12 判定恒真：实例表行 T 不与引用它的根比	抓到	an_instance_table_row_whose_published_txg_reaches_the_root_referencing_it_reddens_only_the_instance_table_row_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
+二·1 I-4.1 判定恒真：重放之后那一版走不完也不红	抓到	a_replayed_version_whose_tree_table_does_not_read_back_reddens_only_the_replayed_version_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/005.log）
+二·1 I-4.1 点名单元验不过也照施加	抓到	a_replay_stopped_by_a_named_unit_that_does_not_verify_leaves_the_replayed_version_invariant_not_applicable 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/006.log）
+✓ 点名 6 条：跑了 6 条，跳过 0 条，跑的都抓到了
+exit=0

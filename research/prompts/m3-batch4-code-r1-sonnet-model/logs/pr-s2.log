@@ -1,0 +1,8 @@
+二·1 I-8.1 F ≥ 2 那一格恒真	抓到	each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
+二·1 I-8.1 在飞上限等式恒真	抓到	each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
+二·1 I-8.1 最坏占用等式恒真	抓到	each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
+二·1 I-8.1 同一次发布记录数不与在飞上限比	抓到	each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
+二·1 I-7.5 根槽对齐恒真	抓到	each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/005.log）
+二·1 I-8.5 全池皆废也不红	抓到	no_self_verified_system_configuration_slot_on_any_device_reddens_the_tail_slot_invariant_and_every_other_is_not_applicable 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/006.log）
+✓ 点名 6 条：跑了 6 条，跳过 0 条，跑的都抓到了
+exit=0

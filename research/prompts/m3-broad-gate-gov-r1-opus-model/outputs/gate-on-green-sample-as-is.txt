@@ -1,0 +1,11 @@
+  · 样本只跑 .gate-cells 点名的格：library-version-is-staged-tree（/tmp/claude-1000/m3-broad-gate-gov-r1-opus/rerun/run/library-version-is-staged-tree-green 是样本，不是这道阶段所在的仓）
+── library-version-is-staged-tree：广谱变异库目录此刻那一版的源码与被判的暂存树在导出范围上逐文件相同、导出范围与登记的相同、记下的工具链与此刻的 rustc -Vv 相同
+  ✗ 广谱变异库目录 /tmp/claude-1000/m3-broad-gate-gov-r1-opus/rerun/run/library-version-is-staged-tree-green/.broad-sample/home 此刻那一版（1fc77b805df0426f，导出自 0123456789ab）不是被判的这棵暂存树：
+     按驱动的 version_key 算出的版本指纹不是 tree.source 记的 1fc77b805df0426f
+     → 怎么办：主 agent 照 .claude/skills/crash-test/commit-stages.md 第 2b 步：--sync-tree --commit 到包着这一次暂存树的提交，再 --changed-since HEAD，跑完再跑这一道；暂存区之后又变了就重来一遍
+── 汇总：checker-tier-broad-mutation.sh 跑了 1 格（样本根的 .gate-cells 点名）
+  library-version-is-staged-tree：红（退出 1）
+  ✗ checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）
+     → library-version-is-staged-tree：库目录不是这一次暂存树那一版：主 agent 照 .claude/skills/crash-test/commit-stages.md 第 2b 步起驱动：先 --sync-tree --commit 到包着这一次暂存树的提交，再 --changed-since HEAD 现判改到的、沿用其余的，跑完再跑这一道；暂存区之后又变了就重来一遍；工具链换了就在新工具链下照样重来（旧版的结论留在它自己的版本目录里）
+     → 改完只重跑红的格：bash .claude/gate.d/checker-tier-broad-mutation.sh --check library-version-is-staged-tree
+exit=1

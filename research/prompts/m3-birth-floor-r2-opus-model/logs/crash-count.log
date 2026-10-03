@@ -1,0 +1,26 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 580M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 6 条日常的在跑，照理由并行：同批几条三方腿各跑各的原型
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.40s
+     Running tests/bf_r2_crash.rs (target/release/deps/bf_r2_crash-824f007148c195b0)
+
+running 1 test
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [raiseTo8] writes=65 segments=13 closed_form_states=196630 layer0_states=196665 outcomes=["RaiseFloorTo { txg: 8 }:ok"]
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [raiseTo5] writes=65 segments=13 closed_form_states=196630 layer0_states=196665 outcomes=["RaiseFloorTo { txg: 5 }:ok"]
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [raiseTo9] writes=65 segments=13 closed_form_states=196630 layer0_states=196665 outcomes=["RaiseFloorTo { txg: 9 }:ok"]
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [remount] writes=67 segments=13 closed_form_states=393238 layer0_states=393273 outcomes=["Remount:ok"]
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [rb1] writes=21 segments=4 closed_form_states=65543 layer0_states=65553 outcomes=["RollBack { index: 1 }:ok"]
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [rb2] writes=21 segments=4 closed_form_states=65543 layer0_states=65553 outcomes=["RollBack { index: 2 }:ok"]
+R2C_TOTAL states_judged=0
+test tree_floor_over_crash_states_of_the_wrapped_history ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.66s
+

@@ -1,0 +1,3 @@
+4f8b8643f9c24c0332605162b6f1c4e98089f91f8993ef758ce5d0f8912a2149  .claude/kb/invariants.md
+1112a4c9d6c2b23be6da2dda296715fb1d39cbfdc5da668dd26fa03fe3427baa  .claude/kb/decisions/18-块里携带什么信息.md
+f0d58c15d2a84aa307959ee6230c1210e69b33d871c8e902bd509b17011269d9  .claude/kb/decisions/23-journal的角色与格式.md

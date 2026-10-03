@@ -186,7 +186,7 @@ SWEEP_TOTAL streams=170 arm_a_misses_a_red_stream=0 streams_with_any_observation
 
 ### 3.1 54 号 `--full` 跑哪几份
 
-主工作区现行 `.claude/gate.d/54-layer0-replay.sh` 的 `--full` 只起两个测试二进制，都带 `--include-ignored`：第 341 行 `if ! run_layer0_test_binary first_transaction_step_seven_layer0 "$log"; then`、第 374 行 `if ! run_layer0_test_binary second_transaction_step_zero_layer0 "$log_b"; then`（带 `--include-ignored` 的那一句在第 147 行）。快档也只跑这两份。
+主工作区现行 `.claude/gate.d/checker-tier-layer0-replay.sh` 的 `--full` 只起两个测试二进制，都带 `--include-ignored`：第 341 行 `if ! run_layer0_test_binary first_transaction_step_seven_layer0 "$log"; then`、第 374 行 `if ! run_layer0_test_binary second_transaction_step_zero_layer0 "$log_b"; then`（带 `--include-ignored` 的那一句在第 147 行）。快档也只跑这两份。
 
 名字带 `layer0` 的 9 份用例（冻结副本，`grep -c '#\[ignore'` 与 `grep -c '#\[test\]'` 现数）：
 

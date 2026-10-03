@@ -1,0 +1,10 @@
+[一] 排除表旧、CPU 倍数 3：版本指纹 563fcfa653ec66ba，全局键 042361b354cba42c
+[一] 排除表加一行、CPU 倍数 3：版本指纹 563fcfa653ec66ba，全局键 140bc0966d63c172
+[一] 排除表旧、CPU 倍数 4：版本指纹 563fcfa653ec66ba，全局键 ec6f46d818514ccf
+[一] 结论表里那一行记的是旧全局键，carry_decision 在新全局键下交 (False, 'global-key-changed')
+[一] --changed-since 的计划三条都要现判（全局键变了），select_items 选中的序号：[3]（这一版里已有现判结论的 1、2 不重判）
+[一] 不跑 ③ 直接 --summary 退 0：BROAD_MUTATION_GATE total=3 concluded=3 carried=1 fresh=2 missed=0 without_conclusion=0 flipped=0 verdict=green
+[二] --summary 退 8：BROAD_MUTATION_GATE total=3 concluded=1 carried=0 fresh=1 missed=0 without_conclusion=2 flipped=0 verdict=red | NO_CONCLUSION	2	timeout	crates/singlefs-core/src/sample.rs:2:9: replace x2 | NO_CONCLUSION	3	memory-cap	crates/singlefs-core/src/sample.rs:3:9: replace x3 |   → 怎么办：没有结论的用 SINGLEFS_HEAVY_TESTS=commit python3 /tmp/claude-1000/m3-broad-gate-gov-r1-opus/tree/research/scripts/broad-mutation.py --changed-since <上一次判过的提交> 补齐（沿用得了的落沿用行，沿用不了的现判）；没红的加一条能杀它的测试再判，确是等价变异就写测试留档后从清单排除
+[二] 照出路 --changed-since：计划三条都要现判，select_items 选中的序号：[]
+[二] --item 2 --item 3 不带 --rerun：选中 []；驱动说：· 第 2 条已有定论（超时），跳过；要重跑加 --rerun | · 第 3 条已有定论（内存撞顶），跳过；要重跑加 --rerun
+[二] 结论表只收 ('caught', 'missed', 'unviable')（process_item 里 outcome in DECISIVE_OUTCOMES 才 record_conclusion），carry_decision 只沿用 ('caught',)：下一版里这两条也是现判，再超时、再撞顶就再红

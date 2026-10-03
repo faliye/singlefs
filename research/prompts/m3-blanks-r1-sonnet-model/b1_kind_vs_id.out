@@ -1,0 +1,24 @@
+== ① 同一函数体里既提种类码又提树 ID 的函数（冻结副本 crates/ 下全部 .rs）
+mixed_functions=10
+cross_use_lines=1
+   singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs 1450 builder.feed_word(kind as u64);
+  mixed singlefs-core/src/mount.rs:5121 fn version_to_publish_the_rollback_after
+  mixed singlefs-core/src/records.rs:303 fn to_bytes
+  mixed singlefs-core/src/records.rs:331 fn parse
+  mixed singlefs-core/src/records.rs:420 fn widths_of_every_record_match_the_byte_table
+  mixed singlefs-core/src/recovery.rs:2246 fn tree_table_entries_ascend_strictly_in_the_issuing_order
+  mixed singlefs-core/src/recovery.rs:3852 fn walk_to_file_in_the_unit_area_starting_at
+  mixed singlefs-core/src/transaction.rs:6094 fn publish_admitted
+  mixed singlefs-harness/tests/mounted_read_by_offset.rs:267 fn build_synthetic_multi_unit_image
+  mixed singlefs-harness/tests/new_pool_file_creation_publish.rs:584 fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_hold
+  mixed singlefs-harness/tests/new_pool_file_creation_publish.rs:1206 fn tree_table_holds_eleven_entries_keyed_by_tree_identifier
+== ② 取值方案 × 树 ID：同值的格数
+甲 9..12: 第一次发布后同值=[11, 12] 水位涨到 65535 前迟早撞上的码=[11, 12]
+乙-1 高段 0x8001..0x8004: 第一次发布后同值=[] 水位涨到 65535 前迟早撞上的码=[32769, 32770, 32771, 32772]
+乙-2 16..19: 第一次发布后同值=[16, 17, 18, 19] 水位涨到 65535 前迟早撞上的码=[16, 17, 18, 19]
+丙 码 9..12 + ID 从 65536 起: 第一次发布后同值=[] 水位涨到 65535 前迟早撞上的码=[]
+种类 1..8 对树 ID：最小树 ID 11 > 8，用一条大小比较就能分开（范围分离）；9、10 是空档，只剩 2 个，装不下 4 棵新树
+== ③ 三个候选各要同步的出现处（grep 计数）
+四个新种类常量（候选甲、乙都要改取值的地方；按名引用，改常量取值不动这些行）: 次数,文件数=(48, 6)
+树 ID 常量按名引用（丙改取值也不动这些行）: 次数,文件数=(148, 13)
+裸数 11..18（含无关处，上界）: 次数,文件数=(3504, 184)

@@ -1,0 +1,3097 @@
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/bf-proto/Cargo.toml m3-birth-floor-r1-opus/tree/crates/bf-proto/Cargo.toml
+--- m3-batch4-freeze/tree/crates/bf-proto/Cargo.toml	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/bf-proto/Cargo.toml	2026-10-01 17:47:10.530638364 +0000
+@@ -0,0 +1,13 @@
++[package]
++name = "bf-proto"
++version = "0.1.0"
++publish = false
++edition = "2021"
++description = "m3-birth-floor-r1 攻方原型（只在草稿副本上）：诞生代号下界三种写法在合法历史、崩溃状态与坏镜像上"
++
++[dependencies]
++singlefs-checker = { path = "../singlefs-checker" }
++singlefs-core = { path = "../singlefs-core" }
++singlefs-format = { path = "../singlefs-format" }
++singlefs-harness = { path = "../singlefs-harness" }
++singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/bf-proto/src/lib.rs m3-birth-floor-r1-opus/tree/crates/bf-proto/src/lib.rs
+--- m3-batch4-freeze/tree/crates/bf-proto/src/lib.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/bf-proto/src/lib.rs	2026-10-01 18:03:03.863672323 +0000
+@@ -0,0 +1,354 @@
++//! m3-birth-floor-r1 攻方原型的驱动（只在草稿副本上）：内存稀疏盘上建池，按一串操作推进，每步之后交整份镜像；
++//! 录制流开内容保留，崩溃状态按层 0 的切段与全量展开枚举（`singlefs_checker_tier::crash::judge_layer0_state_range`）。
++use std::collections::BTreeMap;
++
++use singlefs_checker::image::{chosen_system_configurations, valid_roots, ImageReader};
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters};
++use singlefs_core::mount::{
++    mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, ParametersAndDeviceTableOfTheMount,
++    RollbackTarget, ShadowLedger,
++};
++use singlefs_core::mounted_session::{MountedSession, UserChange};
++use singlefs_core::transaction::{acquire_instance, publish_first_file, warm_up, FirstFile, PoolVersion, PoolWriter};
++use singlefs_core::unit::data_unit_payload_capacity;
++use singlefs_harness::history::HistoryDeviceWidth;
++use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
++use singlefs_harness::scenario::{first_file_content, FIXED_WRITE_TIME_SECONDS};
++use singlefs_harness::segments::FixedGeometry;
++use singlefs_harness::{RecordingBlockDevice, RetainedOperation, SharedStream};
++
++pub type Device = RecordingBlockDevice<SparseBlockDevice>;
++
++/// 驱动的一步。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum Op {
++    /// 覆盖写一个数据单元以内的内容（字节数、填充种子）。
++    Overwrite { bytes: usize, seed: u64 },
++    /// 顺序写 `units` 个满数据单元。
++    SequentialWrite { units: usize, seed: u64 },
++    /// 建 `count` 个空 inode。
++    NewInodes { count: u64 },
++    /// 回退到根环里从新到旧第 `index` 条（按 (txg, 实例) 排、去重）。
++    RollBack { index: usize },
++    /// 抬 F 到 `txg`。
++    RaiseFloorTo { txg: u64 },
++    /// 抬 F：现行 F 加 `steps`。
++    RaiseFloorBy { steps: u64 },
++    /// 关掉会话、重新可写挂载（写行与暖机）。
++    Remount,
++    /// 回退那次发布崩在根槽 FUA 之前：它的单元与记录（与之前的屏障）都已持久、根槽写与之后的写都没持久；会话随进程一起没了。
++    /// 之后接 `Remount`：恢复按记录施加出这一版（D23（journal 的角色与格式） 已定项 15），根槽从没落盘。
++    RollBackCrashBeforeRoot { index: usize },
++}
++
++/// 一步的结局。
++#[derive(Clone, Debug)]
++pub enum Outcome {
++    Applied,
++    Refused(String),
++}
++
++pub struct Driver {
++    pub width: HistoryDeviceWidth,
++    pub parameters: MakeFilesystemParameters,
++    pub devices: Vec<(DeviceIdentity, Device)>,
++    pub stream: SharedStream,
++    pub session: Option<MountedSession>,
++    /// (实例, txg) → 那一版的文件内容（层 0 oracle 的版本表用）。
++    pub contents: BTreeMap<(u64, u64), Vec<u8>>,
++    pub step: u64,
++    before_content: Option<Vec<u8>>,
++    /// 最近一次记下的文件内容：崩溃之后会话没了、现行版本读不到时，挂载写出的那几条根照它记。
++    last_content: Option<Vec<u8>>,
++}
++
++fn content_of(bytes: usize, seed: u64) -> Vec<u8> {
++    (0..bytes)
++        .map(|index| u8::try_from((index as u64).wrapping_mul(31).wrapping_add(seed * 7) % 251).expect("小于 256"))
++        .collect()
++}
++
++impl Driver {
++    /// mkfs → 取号 → 暖机 → 新池新建文件（同一个进程，会话照 history 起点 AfterFirstFile 那样建）。
++    #[must_use]
++    pub fn after_first_file() -> Self {
++        let width = HistoryDeviceWidth::FourGibibytes;
++        let parameters = width.parameters();
++        let stream = SharedStream::retaining_contents();
++        let mut devices: Vec<(DeviceIdentity, Device)> = [DeviceIdentity(0), DeviceIdentity(1)]
++            .into_iter()
++            .map(|identity| {
++                (
++                    identity,
++                    RecordingBlockDevice::with_shared_stream(
++                        identity,
++                        SparseBlockDevice::new(width.device_bytes(), PhysicalBlockSizeInBytes(512)),
++                        stream.clone(),
++                    ),
++                )
++            })
++            .collect();
++        let genesis = make_filesystem(&parameters, &mut devices).expect("mkfs");
++        let mut allocator = allocator_after_make_filesystem(&parameters, &devices, &genesis);
++        let parameters_and_device_table =
++            ParametersAndDeviceTableOfTheMount::of_a_pool_on_disk(&devices).expect("读池");
++        let content = first_file_content();
++        let (instance, output) = {
++            let mut writer = PoolWriter::new(&parameters, &mut devices);
++            let instance = acquire_instance(&mut writer).expect("取号");
++            let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++            let output = publish_first_file(
++                &mut writer,
++                &mut allocator,
++                warmed.roots.last().expect("暖机两代根"),
++                FirstFile { content: &content, write_time_seconds: FIXED_WRITE_TIME_SECONDS },
++                instance,
++                &warmed.last_record_bytes,
++            )
++            .expect("第一个文件");
++            (instance, output)
++        };
++        let mut contents = BTreeMap::new();
++        contents.insert((instance.0.into(), output.root.checkpoint_txg.0), content);
++        let session = MountedSession {
++            allocator,
++            current: PoolVersion::WithFile(output),
++            instance,
++            shadow_ledger: ShadowLedger::On,
++            parameters_and_device_table,
++        };
++        Driver { width, parameters, devices, stream, session: Some(session), contents, step: 0, before_content: None, last_content: None }
++    }
++
++    /// 从这个起点另起一份：盘的字节、会话与版本表拷一份，录制流新开一条（空的）。起点只建一次池，每段历史从它拷。
++    #[must_use]
++    pub fn fork(&self) -> Self {
++        let stream = SharedStream::retaining_contents();
++        let devices = self
++            .devices
++            .iter()
++            .map(|(identity, device)| {
++                let mut sparse = SparseBlockDevice::new(self.width.device_bytes(), PhysicalBlockSizeInBytes(512));
++                sparse.image = device.wrapped_device().image.clone();
++                (*identity, RecordingBlockDevice::with_shared_stream(*identity, sparse, stream.clone()))
++            })
++            .collect();
++        let session = self.session.as_ref().map(|session| MountedSession {
++            allocator: session.allocator.clone(),
++            current: session.current.clone(),
++            instance: session.instance,
++            shadow_ledger: session.shadow_ledger,
++            parameters_and_device_table: session.parameters_and_device_table.clone(),
++        });
++        Driver {
++            width: self.width,
++            parameters: self.parameters.clone(),
++            devices,
++            stream,
++            session,
++            contents: self.contents.clone(),
++            step: self.step,
++            before_content: None,
++            last_content: self.last_content.clone(),
++        }
++    }
++
++    #[must_use]
++    pub fn image(&self) -> MemoryPool {
++        MemoryPool {
++            devices: self
++                .devices
++                .iter()
++                .map(|(identity, device)| (*identity, device.wrapped_device().image.clone()))
++                .collect(),
++            device_size_in_bytes: self.width.device_bytes(),
++        }
++    }
++
++    #[must_use]
++    pub fn geometry(&self) -> FixedGeometry {
++        FixedGeometry {
++            fixed_structure_slot_spacing: self.parameters.geometry.fixed_structure_slot_spacing,
++            journal_ring_bytes: self.parameters.geometry.journal_ring_bytes,
++            root_ring_slots_per_region: self.parameters.geometry.root_ring_slots_per_region,
++        }
++    }
++
++    #[must_use]
++    pub fn retained_operations(&self) -> Vec<RetainedOperation> {
++        self.stream.retained_operations()
++    }
++
++    fn current_content(&self) -> Option<Vec<u8>> {
++        let session = self.session.as_ref()?;
++        let version = session.current.file_version()?;
++        self.contents.get(&(session.instance.0.into(), version.root.checkpoint_txg.0)).cloned()
++    }
++
++    /// 现行那一版记成 `content`；这一步里新出现在根环里、txg 低于现行那一版的根（推的抬 F 空发布、写行与暖机）记成 `before`。
++    fn note_current(&mut self, content: Option<Vec<u8>>) {
++        let before = self.before_content.take();
++        let Some(session) = self.session.as_ref() else { return };
++        let Some(version) = session.current.file_version() else { return };
++        let key = (u64::from(version.root.instance.0), version.root.checkpoint_txg.0);
++        let current_txg = version.root.checkpoint_txg.0;
++        if let Some(content) = content {
++            self.last_content = Some(content.clone());
++            self.contents.insert(key, content);
++        }
++        if let Some(before) = before.or_else(|| self.last_content.clone()) {
++            for (txg, instance) in self.ring_roots_newest_first() {
++                let key = (u64::from(instance), txg);
++                if txg < current_txg && !self.contents.contains_key(&key) {
++                    self.contents.insert(key, before.clone());
++                }
++            }
++        }
++    }
++
++    /// 根环里读得出的根，(txg, 实例) 从新到旧、去重。
++    #[must_use]
++    pub fn ring_roots_newest_first(&self) -> Vec<(u64, u32)> {
++        let image = self.image();
++        let Some(geometry) = chosen_system_configurations(&image)
++            .into_iter()
++            .find_map(|(_, chosen)| chosen.map(|(_, geometry)| geometry))
++        else {
++            return Vec::new();
++        };
++        let mut roots: Vec<(u64, u32)> =
++            valid_roots(&image as &dyn ImageReader, &geometry).into_iter().map(|(_, _, view)| (view.checkpoint_txg, view.instance)).collect();
++        roots.sort_unstable_by(|left, right| right.cmp(left));
++        roots.dedup();
++        roots
++    }
++
++    fn apply_rollback(&mut self, index: usize) -> Outcome {
++                let roots = self.ring_roots_newest_first();
++            let Some((txg, instance)) = roots.get(index.min(roots.len().saturating_sub(1))).copied() else {
++                return Outcome::Refused("根环空".into());
++            };
++            let target_content = self.contents.get(&(u64::from(instance), txg)).cloned();
++            let Some(session) = self.session.as_mut() else { return Outcome::Refused("没有会话".into()) };
++            let PoolVersion::WithFile(current) = &mut session.current else {
++                return Outcome::Refused("现行版本没有文件".into());
++            };
++            match roll_back_by_a_forward_publish(
++                &self.parameters,
++                &mut self.devices,
++                &mut session.allocator,
++                current,
++                RollbackTarget { instance: InstanceGeneration(instance.into()), checkpoint_txg: CheckpointTxg(txg) },
++            ) {
++                Ok(_) => {
++                    self.note_current(target_content);
++                    Outcome::Applied
++                }
++                Err(error) => Outcome::Refused(format!("{error:?}")),
++            }
++    }
++
++    pub fn apply(&mut self, op: Op) -> Outcome {
++        self.step += 1;
++        let write_time_seconds = FIXED_WRITE_TIME_SECONDS + self.step;
++        let before_content = self.current_content().or_else(|| self.last_content.clone());
++        self.before_content = before_content.clone();
++        match op {
++            Op::Overwrite { bytes, seed } | Op::SequentialWrite { units: bytes, seed } => {
++                let content = match op {
++                    Op::Overwrite { .. } => content_of(bytes.min(data_unit_payload_capacity()), seed),
++                    _ => content_of(bytes * data_unit_payload_capacity(), seed),
++                };
++                let Some(session) = self.session.as_mut() else { return Outcome::Refused("没有会话".into()) };
++                let file = FirstFile { content: &content, write_time_seconds };
++                let change = match op {
++                    Op::Overwrite { .. } => UserChange::Overwrite(file),
++                    _ => UserChange::SequentialWrite(file),
++                };
++                match session.publish_user_change(&mut self.devices, change) {
++                    Ok(published) => {
++                        // 推过的抬 F 空发布：内容不变。
++                        let _ = published;
++                        self.note_current(Some(content));
++                        Outcome::Applied
++                    }
++                    Err(error) => Outcome::Refused(format!("{error:?}")),
++                }
++            }
++            Op::NewInodes { count } => {
++                let Some(session) = self.session.as_mut() else { return Outcome::Refused("没有会话".into()) };
++                match session.publish_user_change(&mut self.devices, UserChange::NewInodes { count, write_time_seconds }) {
++                    Ok(_) => {
++                        self.note_current(before_content);
++                        Outcome::Applied
++                    }
++                    Err(error) => Outcome::Refused(format!("{error:?}")),
++                }
++            }
++            Op::RollBackCrashBeforeRoot { index } => {
++                let image_before = self.image();
++                let operations_before = self.stream.retained_operations().len();
++                let outcome = self.apply_rollback(index);
++                if !matches!(outcome, Outcome::Applied) {
++                    return outcome;
++                }
++                let operations = self.stream.retained_operations();
++                let (writes, _) = singlefs_harness::memory_pool::writes_and_segments(&operations[operations_before..], &self.geometry());
++                let first_root = writes
++                    .iter()
++                    .position(|write| write.kind == singlefs_harness::segments::StepKind::RootRecordFua)
++                    .expect("回退那次发布写根槽");
++                for (identity, device) in &mut self.devices {
++                    let mut image = image_before.devices.get(identity).expect("盘").clone();
++                    for write in writes[..first_root].iter().filter(|write| write.device == *identity) {
++                        write.contents.apply_to(&mut image, write.offset);
++                    }
++                    device.wrapped_device_mut().image = image;
++                }
++                self.session = None;
++                Outcome::Applied
++            }
++            Op::RollBack { index } => self.apply_rollback(index),
++            Op::RaiseFloorTo { .. } | Op::RaiseFloorBy { .. } => {
++                let Some(session) = self.session.as_mut() else { return Outcome::Refused("没有会话".into()) };
++                let shadow_ledger = session.shadow_ledger;
++                let PoolVersion::WithFile(current) = &mut session.current else {
++                    return Outcome::Refused("现行版本没有文件".into());
++                };
++                let new_floor = match op {
++                    Op::RaiseFloorTo { txg } => txg,
++                    Op::RaiseFloorBy { steps } => current.root.rollback_floor.0 + steps,
++                    _ => unreachable!("上面只放进这两种"),
++                };
++                match raise_rollback_floor(
++                    &self.parameters,
++                    &mut self.devices,
++                    &mut session.allocator,
++                    current,
++                    CheckpointTxg(new_floor),
++                    shadow_ledger,
++                ) {
++                    Ok(_) => {
++                        self.note_current(before_content);
++                        Outcome::Applied
++                    }
++                    Err(error) => Outcome::Refused(format!("{error:?}")),
++                }
++            }
++            Op::Remount => {
++                self.session = None;
++                match mount_writable(&self.parameters, &mut self.devices) {
++                    Ok(mounted) => {
++                        let (_, session) = MountedSession::of_the_mount(mounted);
++                        self.session = Some(session);
++                        self.note_current(before_content);
++                        Outcome::Applied
++                    }
++                    Err(error) => Outcome::Refused(format!("{error:?}")),
++                }
++            }
++        }
++    }
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/bf-proto/tests/bf_after_step.rs m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_after_step.rs
+--- m3-batch4-freeze/tree/crates/bf-proto/tests/bf_after_step.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_after_step.rs	2026-10-01 17:48:08.666932201 +0000
+@@ -0,0 +1,170 @@
++//! m3-birth-floor-r1 攻方原型：内存稀疏盘上的写死历史与放开扫，每一步之后的整份镜像上判诞生代号下界三种写法（CS1 / CS2）与池级 checker。
++//! 历史取驱动的操作（覆盖写、顺序写、建 inode、回退、抬 F、重新可写挂载）。环境变量 BF_SET 选哪一组历史。
++use std::collections::BTreeMap;
++use std::sync::Mutex;
++
++use bf_proto::{Driver, Op, Outcome};
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker::walk::proto_b::birth_floor_judgements;
++
++#[derive(Default, Clone)]
++struct Aggregate {
++    evaluated: u64,
++    violations: u64,
++    images_red: u64,
++    first: Option<String>,
++}
++
++fn ow(seed: u64) -> Op {
++    Op::Overwrite { bytes: 1000 + (seed as usize % 3000), seed }
++}
++
++/// 一组历史：名字、操作串。
++fn histories(set: &str) -> Vec<(String, Vec<Op>)> {
++    let mut out = Vec::new();
++    let prefixes: Vec<(&str, Vec<Op>)> = vec![
++        ("ow4", vec![ow(1), ow(2), ow(3), ow(4)]),
++        ("ni300-ow-ni1", vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }]),
++        ("sw3-ow-sw2", vec![Op::SequentialWrite { units: 3, seed: 1 }, ow(2), Op::SequentialWrite { units: 2, seed: 3 }]),
++        ("ni300-sw3-ni1-ow", vec![Op::NewInodes { count: 300 }, Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 1 }, ow(2)]),
++        ("sw3-ni240-ow-ni5", vec![Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 240 }, ow(2), Op::NewInodes { count: 5 }]),
++    ];
++    let mut tails: Vec<(String, Vec<Op>)> = Vec::new();
++    for steps in [1u64, 2, 3, 4, 5, 6, 8] {
++        tails.push((format!("raise{steps}"), vec![Op::RaiseFloorBy { steps }]));
++        tails.push((format!("ow-raise{steps}"), vec![ow(50), Op::RaiseFloorBy { steps }]));
++        tails.push((format!("ni-raise{steps}"), vec![Op::NewInodes { count: 2 }, Op::RaiseFloorBy { steps }]));
++        tails.push((format!("sw1-raise{steps}"), vec![Op::SequentialWrite { units: 1, seed: 9 }, Op::RaiseFloorBy { steps }]));
++        tails.push((format!("remount-raise{steps}"), vec![Op::Remount, Op::RaiseFloorBy { steps }]));
++        tails.push((format!("rb0-raise{steps}"), vec![Op::RollBack { index: 2 }, Op::RaiseFloorBy { steps }]));
++    }
++    // 回退目标离开根环：再写 26 次。
++    tails.push(("turn-ow26".to_string(), (60..86).map(ow).collect()));
++    tails.push(("turn-ni-ow25".to_string(), std::iter::once(Op::NewInodes { count: 3 }).chain((60..85).map(ow)).collect()));
++    match set {
++        "sweep" => {
++            for (prefix_name, prefix) in &prefixes {
++                for index in 0..=5usize {
++                    for (tail_name, tail) in &tails {
++                        let mut ops = prefix.clone();
++                        ops.push(Op::RollBack { index });
++                        ops.extend(tail.iter().copied());
++                        out.push((format!("{prefix_name}/rb{index}/{tail_name}"), ops));
++                    }
++                }
++            }
++        }
++        "double" => {
++            // 两次回退：回退到一条回退根、或回退之后再回退到更早的根。
++            for (prefix_name, prefix) in &prefixes {
++                for first in 1..=4usize {
++                    for second in 0..=6usize {
++                        for (tail_name, tail) in tails.iter().filter(|(name, _)| name.starts_with("raise") || name.starts_with("ow-raise") || name.starts_with("turn-ow")) {
++                            let mut ops = prefix.clone();
++                            ops.push(Op::RollBack { index: first });
++                            ops.push(ow(70));
++                            ops.push(Op::NewInodes { count: 1 });
++                            ops.push(Op::RollBack { index: second });
++                            ops.extend(tail.iter().copied());
++                            out.push((format!("{prefix_name}/rb{first}/ow/ni/rb{second}/{tail_name}"), ops));
++                        }
++                    }
++                }
++            }
++        }
++        other => panic!("BF_SET={other} 不认得"),
++    }
++    out
++}
++
++#[test]
++fn birth_floor_variants_after_each_step() {
++    let set = std::env::var("BF_SET").unwrap_or_else(|_| "sweep".to_string());
++    let limit: usize = std::env::var("BF_LIMIT").ok().and_then(|v| v.parse().ok()).unwrap_or(usize::MAX);
++    let skip: usize = std::env::var("BF_SKIP").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
++    let threads: usize = std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
++    let all: Vec<(String, Vec<Op>)> = histories(&set).into_iter().skip(skip).take(limit).collect();
++    let started = std::time::Instant::now();
++    let aggregate: Mutex<BTreeMap<String, Aggregate>> = Mutex::new(BTreeMap::new());
++    let refused: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
++    let images = Mutex::new(0u64);
++    let next = Mutex::new(0usize);
++    std::thread::scope(|scope| {
++        for _ in 0..threads {
++            scope.spawn(|| loop {
++                let index = {
++                    let mut next = next.lock().expect("锁");
++                    if *next >= all.len() {
++                        return;
++                    }
++                    *next += 1;
++                    *next - 1
++                };
++                let (name, ops) = &all[index];
++                let mut driver = Driver::after_first_file();
++                let mut local: BTreeMap<String, Aggregate> = BTreeMap::new();
++                let mut local_images = 0u64;
++                for (step, op) in std::iter::once(None).chain(ops.iter().map(Some)).enumerate() {
++                    if let Some(op) = op {
++                        if let Outcome::Refused(reason) = driver.apply(*op) {
++                            let short: String = reason.chars().take(60).collect();
++                            *refused.lock().expect("锁").entry(format!("{op:?}=>{short}").chars().take(120).collect()).or_insert(0) += 1;
++                        }
++                    }
++                    let image = driver.image();
++                    local_images += 1;
++                    let violated: Vec<&str> = check_pool_image(&image)
++                        .into_iter()
++                        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++                        .map(|(invariant, _)| invariant)
++                        .collect();
++                    let mut note = |key: String, evaluated: u64, violations: u64, first: Option<String>| {
++                        let entry = local.entry(key).or_default();
++                        entry.evaluated += evaluated;
++                        entry.violations += violations;
++                        if violations > 0 || (first.is_some() && evaluated > 0) {
++                            entry.images_red += u64::from(violations > 0);
++                            if entry.first.is_none() {
++                                entry.first = first.map(|text| format!("{name} step={step} :: {text}"));
++                            }
++                        }
++                    };
++                    note("pool-checker-red-images".to_string(), 1, u64::from(!violated.is_empty()), (!violated.is_empty()).then(|| format!("{violated:?}")));
++                    for (key, tally) in birth_floor_judgements(&image) {
++                        note(key, tally.evaluated, tally.violations, tally.first_violation);
++                    }
++                }
++                *images.lock().expect("锁") += local_images;
++                let mut aggregate = aggregate.lock().expect("锁");
++                for (key, entry) in local {
++                    let total = aggregate.entry(key).or_default();
++                    total.evaluated += entry.evaluated;
++                    total.violations += entry.violations;
++                    total.images_red += entry.images_red;
++                    if total.first.is_none() {
++                        total.first = entry.first;
++                    }
++                }
++            });
++        }
++    });
++    println!(
++        "BF_RUN set={set} histories={} images={} seconds={:.1}",
++        all.len(),
++        images.into_inner().expect("锁"),
++        started.elapsed().as_secs_f64()
++    );
++    for (key, count) in refused.into_inner().expect("锁") {
++        println!("BF_REFUSED {key} count={count}");
++    }
++    for (key, entry) in aggregate.into_inner().expect("锁") {
++        println!(
++            "BF name={key} evaluated={} violations={} images_red={} first={}",
++            entry.evaluated,
++            entry.violations,
++            entry.images_red,
++            entry.first.unwrap_or_else(|| "-".to_string())
++        );
++    }
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/bf-proto/tests/bf_bad_images.rs m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_bad_images.rs
+--- m3-batch4-freeze/tree/crates/bf-proto/tests/bf_bad_images.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_bad_images.rs	2026-10-01 19:03:06.456933428 +0000
+@@ -0,0 +1,414 @@
++//! m3-birth-floor-r1 攻方原型：从合法历史的镜像出发，把一个（或一串）单元的诞生代号改小，指它的指针、中央映射 key、分配记录的分配代、
++//! journal 点名项一起跟着改，校验和沿引用链补到根槽与记录（记录改完重接反向链）：盘上处处自洽，唯独诞生代号比它真正写出的那次发布早。
++//! 每份坏镜像上判诞生代号下界三种写法（CS1）与池级 checker，看谁红。
++use std::collections::BTreeSet;
++
++use bf_proto::{Driver, Op, Outcome};
++use singlefs_checker::image::{ImageReader, InvariantVerdict};
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker::walk::proto_b::birth_floor_judgements;
++use singlefs_core::address::{CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes};
++use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
++use singlefs_core::journal::{back_chain_of, record_offset, JournalRecord};
++use singlefs_core::recovery::PoolReader;
++use singlefs_core::unit::unit_filesystem_identifier;
++use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
++use singlefs_harness::memory_pool::MemoryPool;
++
++const SLOT: u64 = 16384;
++const DEVICES: [u32; 2] = [0, 1];
++
++fn read(pool: &MemoryPool, device: u32, offset: u64, length: usize) -> Vec<u8> {
++    let aligned = length.div_ceil(512) * 512;
++    let mut bytes = PoolReader::read(pool, DeviceIdentity(device), DeviceOffsetInBytes(offset), aligned).expect("读");
++    bytes.truncate(length);
++    bytes
++}
++
++fn write(pool: &mut MemoryPool, device: u32, offset: u64, bytes: &[u8]) {
++    pool.devices.get_mut(&DeviceIdentity(device)).expect("盘").write(DeviceOffsetInBytes(offset), bytes);
++}
++
++fn get_u64(bytes: &[u8], offset: usize) -> u64 {
++    u64::from_le_bytes(bytes[offset..offset + 8].try_into().expect("8 字节"))
++}
++
++fn set_u64(bytes: &mut [u8], offset: usize, value: u64) {
++    bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
++}
++
++/// 按类重封：先载荷 CRC，再头校验和（码 1：头 105、CRC 在 101；码 3：头 107、CRC 在 89；码 2：头 86 + 2k、CRC 在 76 + 2k）。
++fn reseal_unit(bytes: &mut [u8]) {
++    let (header_end, payload_crc_offset) = match bytes[6] {
++        1 => (105usize, 101usize),
++        3 => (107, 89),
++        _ => (86 + 2 * usize::from(bytes[51]), 76 + 2 * usize::from(bytes[51])),
++    };
++    let payload_crc = crc32_castagnoli(&bytes[header_end..]);
++    bytes[payload_crc_offset..payload_crc_offset + 4].copy_from_slice(&payload_crc.to_le_bytes());
++    singlefs_core::unit::seal_header_checksum(bytes, header_end);
++}
++
++fn birth_offset(bytes: &[u8]) -> usize {
++    match bytes[6] {
++        1 => 75,
++        3 => 73,
++        _ => 52 + 2 * usize::from(bytes[51]),
++    }
++}
++
++fn unit_length(class: u8) -> usize {
++    match class {
++        2 => 16384,
++        _ => 32768,
++    }
++}
++
++/// 单元区里盘 0 上头 magic 对、类标签 1 / 2 / 3 的起点槽：(槽, 字节数)。
++fn units_of(pool: &MemoryPool) -> Vec<(u64, usize)> {
++    let mut slots: BTreeSet<u64> = ImageReader::candidate_unit_slots(pool, 0).unwrap_or_default().into_iter().collect();
++
++    slots
++        .into_iter()
++        .filter_map(|slot| {
++            let header = read(pool, 0, slot * SLOT, 8);
++            (&header[..4] == b"SFSU" && matches!(header[6], 1..=3)).then(|| (slot, unit_length(header[6])))
++        })
++        .collect()
++}
++
++/// 根环全部槽：(盘, 偏移)。区域 r 在盘 [0, 1, 0][r] 上，起点 64 × 16384 + r × 3 MiB，槽距 4096。
++fn root_slots() -> Vec<(u32, u64)> {
++    (0..3u64)
++        .flat_map(|region| (0..8u64).map(move |slot| ([0u32, 1, 0][usize::try_from(region).expect("区域")], 64 * SLOT + region * 3 * (1 << 20) + slot * 4096)))
++        .collect()
++}
++
++fn location_pattern(device: u32, slot: u64, checksum: u32) -> Vec<u8> {
++    [device.to_le_bytes().to_vec(), slot.to_le_bytes()[..6].to_vec(), checksum.to_le_bytes().to_vec()].concat()
++}
++
++fn positions(haystack: &[u8], needle: &[u8]) -> Vec<usize> {
++    (0..=haystack.len().saturating_sub(needle.len())).filter(|index| haystack[*index..*index + needle.len()] == *needle).collect()
++}
++
++fn fsid_low() -> u64 {
++    unit_filesystem_identifier(&singlefs_harness::history::HistoryDeviceWidth::FourGibibytes.parameters().filesystem_identifier)
++}
++
++fn journal_counters(pool: &MemoryPool) -> Vec<u64> {
++    (1..100_000u64)
++        .take_while(|counter| {
++            JournalRecord::parse(&read(pool, 0, record_offset(*counter, JOURNAL_RING_DEFAULT_BYTES).0, usize::try_from(JOURNAL_RECORD_BYTES).expect("4096")), fsid_low()).is_some()
++        })
++        .collect()
++}
++
++/// journal 里每条记录：点名项与新根段指针里位置条目是 (盘, slot, old) 的换成 new；`birth` 给出时，那一项的诞生代号 from → to。
++/// 改完从头把反向链重接一遍。
++fn rewrite_journal(pool: &mut MemoryPool, slot: u64, old: u32, new: u32, birth: Option<(u64, u64)>) {
++    let counters = journal_counters(pool);
++    for device in DEVICES {
++        for counter in &counters {
++            let offset = record_offset(*counter, JOURNAL_RING_DEFAULT_BYTES).0;
++            let Some(mut record) = JournalRecord::parse(&read(pool, device, offset, 4096), fsid_low()) else { continue };
++            let mut touched = false;
++            for named in &mut record.named {
++                if named.locations[0].slot.0 == slot && named.locations[0].unit_checksum == old {
++                    for location in &mut named.locations {
++                        location.unit_checksum = new;
++                    }
++                    if let Some((from, to)) = birth {
++                        assert_eq!(named.birth_txg.0, from, "点名项的诞生代号本来是 {from}");
++                        named.birth_txg = CheckpointTxg(to);
++                    }
++                    touched = true;
++                }
++            }
++            for pointer in [&mut record.new_tree_table, &mut record.new_mapping_root] {
++                if pointer.locations[0].slot.0 == slot && pointer.locations[0].unit_checksum == old {
++                    for location in &mut pointer.locations {
++                        location.unit_checksum = new;
++                    }
++                    if let Some((from, to)) = birth {
++                        assert_eq!(pointer.head.birth_txg.0, from, "新根段指针的诞生代号本来是 {from}");
++                        pointer.head.birth_txg = CheckpointTxg(to);
++                    }
++                    touched = true;
++                }
++            }
++            if touched {
++                write(pool, device, offset, &record.to_bytes());
++            }
++        }
++        for window in counters.windows(2) {
++            let previous = read(pool, device, record_offset(window[0], JOURNAL_RING_DEFAULT_BYTES).0, 4096);
++            let offset = record_offset(window[1], JOURNAL_RING_DEFAULT_BYTES).0;
++            let mut later = JournalRecord::parse(&read(pool, device, offset, 4096), fsid_low()).expect("改前自证过的记录");
++            let chain = back_chain_of(&previous);
++            if later.back_chain != chain {
++                later.back_chain = chain;
++                write(pool, device, offset, &later.to_bytes());
++            }
++        }
++    }
++}
++
++/// 一个单元的整单元校验和从 old 变成 new：父单元里的位置条目、根槽、journal 里的点名项逐个补上，被补的父单元重封、再往上补。
++fn propagate(pool: &mut MemoryPool, units: &[(u64, usize)], mut changes: Vec<(u64, u32, u32)>) {
++    // 先进先出：同一个单元先后变两次（c1 → c2 → c3）时，引用它的地方要先补 c1 → c2、再补 c2 → c3。
++    while !changes.is_empty() {
++        let (slot, old, new) = changes.remove(0);
++        if old == new {
++            continue;
++        }
++        for (container, length) in units.iter().copied() {
++            if container == slot {
++                continue;
++            }
++            let before = read(pool, 0, container * SLOT, length);
++            let mut bytes = before.clone();
++            let mut touched = false;
++            for device in DEVICES {
++                for position in positions(&bytes, &location_pattern(device, slot, old)) {
++                    bytes[position..position + 14].copy_from_slice(&location_pattern(device, slot, new));
++                    touched = true;
++                }
++            }
++            if touched {
++                reseal_unit(&mut bytes);
++                for device in DEVICES {
++                    write(pool, device, container * SLOT, &bytes);
++                }
++                changes.push((container, crc32_castagnoli(&before), crc32_castagnoli(&bytes)));
++            }
++        }
++        for (device, offset) in root_slots() {
++            let mut bytes = read(pool, device, offset, 512);
++            let mut touched = false;
++            for location_device in DEVICES {
++                for position in positions(&bytes, &location_pattern(location_device, slot, old)) {
++                    bytes[position..position + 14].copy_from_slice(&location_pattern(location_device, slot, new));
++                    touched = true;
++                }
++            }
++            if touched {
++                let digest = wide_checksum_with_field_zeroed(&bytes, 512, 138);
++                bytes[138..170].copy_from_slice(&digest);
++                write(pool, device, offset, &bytes);
++            }
++        }
++        rewrite_journal(pool, slot, old, new, None);
++    }
++}
++
++/// 把 `slot` 那个单元的诞生代号从 `from` 改成 `to`，并改：指它的指针（码 2 节点里、根槽里）的诞生代号、中央映射条目 key 的出生 txg
++/// （key 宽 27 的节点，条目 key 偏移 9）与节点头里与它相同的最小 / 最大 key、分配记录树叶（key 宽 10）里两盘的未释放记录分配代、
++/// journal 点名项与新根段指针；校验和沿引用链补上去。交回改了几处（单元、指针、映射 key、分配记录、journal）。
++fn lower_birth(pool: &mut MemoryPool, slot: u64, from: u64, to: u64) -> [usize; 4] {
++    let units = units_of(pool);
++    let length = units.iter().find(|(start, _)| *start == slot).expect("登记过的单元").1;
++    let before = read(pool, 0, slot * SLOT, length);
++    let mut bytes = before.clone();
++    let offset = birth_offset(&bytes);
++    assert_eq!(get_u64(&bytes, offset), from, "槽 {slot} 的诞生代号本来是 {from}");
++    set_u64(&mut bytes, offset, to);
++    reseal_unit(&mut bytes);
++    for device in DEVICES {
++        write(pool, device, slot * SLOT, &bytes);
++    }
++    let (old, new) = (crc32_castagnoli(&before), crc32_castagnoli(&bytes));
++    let mut counts = [0usize; 4];
++    let mut changes = vec![(slot, old, new)];
++    // 指针与映射 key：在补位置条目之前、按旧校验和找。
++    for (container, container_length) in units.iter().copied() {
++        if container == slot {
++            continue;
++        }
++        let container_before = read(pool, 0, container * SLOT, container_length);
++        let mut container_bytes = container_before.clone();
++        let key_width = usize::from(container_bytes[51]);
++        let mut touched = false;
++        for position in positions(&container_bytes, &location_pattern(0, slot, old)) {
++            if container_bytes[6] == 2 && key_width == 27 && position >= 27 {
++                // 中央映射条目：key 27 + 两条位置条目。
++                let key_start = position - 27;
++                let old_key = container_bytes[key_start..key_start + 27].to_vec();
++                if get_u64(&container_bytes, key_start + 9) == from {
++                    set_u64(&mut container_bytes, key_start + 9, to);
++                    let new_key = container_bytes[key_start..key_start + 27].to_vec();
++                    for header_key in [52usize, 52 + 27] {
++                        if container_bytes[header_key..header_key + 27] == old_key[..] {
++                            container_bytes[header_key..header_key + 27].copy_from_slice(&new_key);
++                        }
++                    }
++                    counts[1] += 1;
++                    touched = true;
++                }
++            } else if position >= 8 && get_u64(&container_bytes, position - 8) == from {
++                set_u64(&mut container_bytes, position - 8, to);
++                counts[0] += 1;
++                touched = true;
++            }
++        }
++        if touched {
++            for device in DEVICES {
++                for position in positions(&container_bytes, &location_pattern(device, slot, old)) {
++                    container_bytes[position..position + 14].copy_from_slice(&location_pattern(device, slot, new));
++                }
++            }
++            reseal_unit(&mut container_bytes);
++            for device in DEVICES {
++                write(pool, device, container * SLOT, &container_bytes);
++            }
++            changes.push((container, crc32_castagnoli(&container_before), crc32_castagnoli(&container_bytes)));
++        }
++    }
++    for (device, root_offset) in root_slots() {
++        let mut root_bytes = read(pool, device, root_offset, 512);
++        let mut touched = false;
++        for position in positions(&root_bytes, &location_pattern(0, slot, old)) {
++            if position >= 8 && get_u64(&root_bytes, position - 8) == from {
++                set_u64(&mut root_bytes, position - 8, to);
++                counts[0] += 1;
++                touched = true;
++            }
++        }
++        if touched {
++            for location_device in DEVICES {
++                for position in positions(&root_bytes, &location_pattern(location_device, slot, old)) {
++                    root_bytes[position..position + 14].copy_from_slice(&location_pattern(location_device, slot, new));
++                }
++            }
++            let digest = wide_checksum_with_field_zeroed(&root_bytes, 512, 138);
++            root_bytes[138..170].copy_from_slice(&digest);
++            write(pool, device, root_offset, &root_bytes);
++        }
++    }
++    rewrite_journal(pool, slot, old, new, Some((from, to)));
++    counts[3] += 1;
++    // 分配记录树叶（key 宽 10）：两盘各一条未释放记录，分配代 from → to。
++    for (container, container_length) in units.iter().copied() {
++        let container_before = read(pool, 0, container * SLOT, container_length);
++        if container_before[6] != 2 || container_before[51] != 10 {
++            continue;
++        }
++        let mut container_bytes = container_before.clone();
++        let count = usize::from(u16::from_le_bytes([container_bytes[102], container_bytes[103]]));
++        let mut touched = false;
++        for index in 0..count {
++            let record = 135 + 20 * index;
++            let mut slot_bytes = [0u8; 8];
++            slot_bytes[..6].copy_from_slice(&container_bytes[record + 4..record + 10]);
++            let span_field = u16::from_le_bytes([container_bytes[record + 10], container_bytes[record + 11]]);
++            if u64::from_le_bytes(slot_bytes) == slot && span_field & 0x8000 == 0 && get_u64(&container_bytes, record + 12) == from {
++                set_u64(&mut container_bytes, record + 12, to);
++                counts[2] += 1;
++                touched = true;
++            }
++        }
++        if touched {
++            reseal_unit(&mut container_bytes);
++            for device in DEVICES {
++                write(pool, device, container * SLOT, &container_bytes);
++            }
++            changes.push((container, crc32_castagnoli(&container_before), crc32_castagnoli(&container_bytes)));
++        }
++    }
++    let units = units_of(pool);
++    // 第一项（被改的单元自己）已补过指针与根槽，这里只补它往上的父单元链；其余各项照常补。
++    propagate(pool, &units, changes);
++    counts
++}
++
++/// 镜像上最新那条根引用的、由那次发布新写的单元（诞生代号 = 那条根的 txg）：(槽, 类, 码 2 时的 key 宽)。
++fn units_born_at(pool: &MemoryPool, txg: u64) -> Vec<(u64, u8, u8)> {
++    units_of(pool)
++        .into_iter()
++        .filter_map(|(slot, length)| {
++            let bytes = read(pool, 0, slot * SLOT, length.min(4096));
++            (get_u64(&bytes, birth_offset(&bytes)) == txg).then(|| (slot, bytes[6], bytes[51]))
++        })
++        .collect()
++}
++
++fn report(label: &str, image: &MemoryPool) {
++    let violated: Vec<(&str, String)> = check_pool_image(image)
++        .into_iter()
++        .filter_map(|(invariant, verdict)| match verdict {
++            InvariantVerdict::Violated(detail) => Some((invariant, detail.chars().take(160).collect())),
++            _ => None,
++        })
++        .collect();
++    println!("BI {label} pool_checker_violated={violated:?}");
++    for (key, tally) in birth_floor_judgements(image) {
++        if key.starts_with("CS1:") {
++            println!(
++                "BI {label} {key} evaluated={} violations={} first={}",
++                tally.evaluated,
++                tally.violations,
++                tally.first_violation.unwrap_or_else(|| "-".to_string())
++            );
++        }
++    }
++}
++
++fn ow(seed: u64) -> Op {
++    Op::Overwrite { bytes: 1000 + (seed as usize % 3000), seed }
++}
++
++fn image_after(ops: &[Op]) -> MemoryPool {
++    let mut driver = Driver::after_first_file();
++    for op in ops {
++        assert!(matches!(driver.apply(*op), Outcome::Applied), "{op:?} 被拒");
++    }
++    driver.image()
++}
++
++#[test]
++fn bad_images_with_a_lowered_birth() {
++    // BI-0：干净镜像（三段历史的终态）。
++    let rollback_kept = [ow(1), ow(2), ow(3), Op::RollBack { index: 2 }];
++    let rollback_raised = [ow(1), ow(2), ow(3), ow(4), Op::RollBack { index: 3 }, Op::RaiseFloorTo { txg: 5 }];
++    let plain = [ow(1), ow(2), ow(3)];
++    for (label, ops, newest_txg) in [("rollback-kept", &rollback_kept[..], 7u64), ("rollback-raised", &rollback_raised[..], 8u64), ("plain", &plain[..], 6u64)] {
++        let clean = image_after(ops);
++        report(&format!("{label}/clean"), &clean);
++        let born = units_born_at(&clean, newest_txg);
++        println!("BI {label} units_born_at_{newest_txg}={born:?}");
++    }
++    // BI-1：回退根自己新写的单元（码 2，非用户可见树）诞生代号 txg 7 → 6，R_old 还在候选集里。
++    let clean = image_after(&rollback_kept);
++    for (slot, class, key_width) in units_born_at(&clean, 7) {
++        let mut bad = clean.clone();
++        let counts = lower_birth(&mut bad, slot, 7, 6);
++        report(&format!("BI-1 slot={slot} class={class} key_width={key_width} counts={counts:?}"), &bad);
++    }
++    // BI-1b：同上，R_old 已被抬 F 越过（回退根在 txg 8，抬 F 那几次空发布在它后面）。回退根 txg 8 新写的单元 8 → 7。
++    let clean = image_after(&rollback_raised);
++    for (slot, class, key_width) in units_born_at(&clean, 8) {
++        let mut bad = clean.clone();
++        let counts = lower_birth(&mut bad, slot, 8, 7);
++        report(&format!("BI-1b slot={slot} class={class} key_width={key_width} counts={counts:?}"), &bad);
++    }
++    // BI-3：不回退的历史，最新根 txg 6 新写的单元逐个 6 → 5（只改一个）。
++    let clean = image_after(&plain);
++    for (slot, class, key_width) in units_born_at(&clean, 6) {
++        let mut bad = clean.clone();
++        let counts = lower_birth(&mut bad, slot, 6, 5);
++        report(&format!("BI-3 slot={slot} class={class} key_width={key_width} counts={counts:?}"), &bad);
++    }
++    // BI-2：不回退的历史，最新根 txg 6 新写的用户可见单元（数据单元、extent 树、inode 树）整条链一起 6 → 5，先子后父。
++    let mut bad = clean.clone();
++    let user_visible: Vec<u64> = std::env::var("BI2_SLOTS")
++        .ok()
++        .map(|text| text.split(',').filter_map(|part| part.parse().ok()).collect())
++        .unwrap_or_default();
++    for slot in &user_visible {
++        let counts = lower_birth(&mut bad, *slot, 6, 5);
++        println!("BI BI-2 lowered slot={slot} counts={counts:?}");
++    }
++    if !user_visible.is_empty() {
++        report(&format!("BI-2 slots={user_visible:?}"), &bad);
++    }
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/bf-proto/tests/bf_crash_states.rs m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_crash_states.rs
+--- m3-batch4-freeze/tree/crates/bf-proto/tests/bf_crash_states.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/bf-proto/tests/bf_crash_states.rs	2026-10-01 18:03:03.863885292 +0000
+@@ -0,0 +1,274 @@
++//! m3-birth-floor-r1 攻方原型：一段历史（起点之后的全部操作）录下的写流，按层 0 的切段与全量展开（每段任意真子集，原地覆写取三态）
++//! 枚举崩溃状态，每个状态跑层 0 的整套判定（两种 journal 政策的恢复、两份 oracle、池级 checker、记录核对器），再判诞生代号下界三种写法；
++//! BF_MOUNT=1 时再把这个崩溃镜像可写挂载一次（恢复、写行、暖机），挂载之后的镜像上再判一遍池级 checker 与三种写法。
++//! 每段跑之前用 `closed_form_state_count` 与带撕裂第三态的状态数算全量，超过 BF_MAX_STATES（默认 1_000_000）的那段不跑、只报数。
++use std::collections::BTreeMap;
++use std::sync::Mutex;
++
++use bf_proto::{Driver, Op, Outcome};
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker::walk::proto_b::birth_floor_judgements;
++use singlefs_checker_tier::crash::{full_expansion, judge_layer0_state_range, layer0_state_count_with_torn_in_place_overwrites};
++use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::mount::mount_writable;
++use singlefs_harness::memory_pool::{closed_form_state_count, writes_and_segments_with_stream_indexes, MemoryPool, PublishedVersion, SparseBlockDevice};
++use singlefs_harness::segments::StepKind;
++
++#[derive(Default, Clone)]
++struct Aggregate {
++    evaluated: u64,
++    violations: u64,
++    states_red: u64,
++    first: Option<String>,
++}
++
++fn ow(seed: u64) -> Op {
++    Op::Overwrite { bytes: 1000 + (seed as usize % 3000), seed }
++}
++
++/// 一段历史：名字、起点前缀（只跑一次、不枚举）、枚举崩溃状态的后缀。
++type History = (String, &'static str, Vec<Op>);
++
++fn prefix_ops(prefix: &str) -> Vec<Op> {
++    match prefix {
++        "A" => vec![],
++        "ow3" => vec![ow(1), ow(2), ow(3)],
++        "ni300-ow-ni1" => vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }],
++        "sw3-ow-sw2" => vec![Op::SequentialWrite { units: 3, seed: 1 }, ow(2), Op::SequentialWrite { units: 2, seed: 3 }],
++        "sw3-ni240-ow-ni5" => vec![Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 240 }, ow(2), Op::NewInodes { count: 5 }],
++        "sw3-ow-sw2/rb2" => vec![Op::SequentialWrite { units: 3, seed: 1 }, ow(2), Op::SequentialWrite { units: 2, seed: 3 }, Op::RollBack { index: 2 }],
++        "sw3-ni240-ow-ni5/rb2-ni2" => vec![Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 240 }, ow(2), Op::NewInodes { count: 5 }, Op::RollBack { index: 2 }, Op::NewInodes { count: 2 }],
++        "ni300-ow-ni1/rbcrash2-remount" => vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }, Op::RollBackCrashBeforeRoot { index: 2 }, Op::Remount],
++        "ow3/rb2-remount" => vec![ow(1), ow(2), ow(3), Op::RollBack { index: 2 }, Op::Remount],
++        "ni300-ow-ni1-ow/rb3" => vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }, ow(2), Op::RollBack { index: 3 }],
++        "sw3-ow-sw2-ow/rb3" => vec![Op::SequentialWrite { units: 3, seed: 1 }, ow(2), Op::SequentialWrite { units: 2, seed: 3 }, ow(4), Op::RollBack { index: 3 }],
++        "sw3-ni240-ow-ni5/rb3" => vec![Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 240 }, ow(2), Op::NewInodes { count: 5 }, Op::RollBack { index: 3 }],
++        "sw3-ni240-ow-ni5/rbcrash3-remount-raise5" => vec![Op::SequentialWrite { units: 3, seed: 1 }, Op::NewInodes { count: 240 }, ow(2), Op::NewInodes { count: 5 }, Op::RollBackCrashBeforeRoot { index: 3 }, Op::Remount, Op::RaiseFloorTo { txg: 5 }],
++        "ni300-ow-ni1-ow/rbcrash3-remount-raise5" => vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }, ow(2), Op::RollBackCrashBeforeRoot { index: 3 }, Op::Remount, Op::RaiseFloorTo { txg: 5 }],
++        "ni300-ow-ni1-ow/rb3-raise5" => vec![Op::NewInodes { count: 300 }, ow(1), Op::NewInodes { count: 1 }, ow(2), Op::RollBack { index: 3 }, Op::RaiseFloorTo { txg: 5 }],
++        other => panic!("前缀 {other} 不认得"),
++    }
++}
++
++fn histories(set: &str) -> Vec<History> {
++    let mut out: Vec<History> = Vec::new();
++    match set {
++        "probe" => {
++            for prefix in ["ow3", "ni300-ow-ni1"] {
++                for (name, suffix) in [
++                    ("ow", vec![ow(9)]),
++                    ("ni1", vec![Op::NewInodes { count: 1 }]),
++                    ("sw1", vec![Op::SequentialWrite { units: 1, seed: 9 }]),
++                    ("rb2", vec![Op::RollBack { index: 2 }]),
++                    ("raise1", vec![Op::RaiseFloorBy { steps: 1 }]),
++                    ("remount", vec![Op::Remount]),
++                    ("rb2-raise2", vec![Op::RollBack { index: 2 }, Op::RaiseFloorBy { steps: 2 }]),
++                ] {
++                    out.push((format!("{prefix}/{name}"), prefix, suffix));
++                }
++            }
++        }
++        "run1" => {
++            for prefix in ["ni300-ow-ni1-ow/rb3", "sw3-ow-sw2-ow/rb3", "sw3-ni240-ow-ni5/rb3"] {
++                out.push((format!("{prefix}/[raiseTo5]"), prefix, vec![Op::RaiseFloorTo { txg: 5 }]));
++            }
++            out.push(("ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1]".into(), "ni300-ow-ni1-ow/rbcrash3-remount-raise5", vec![Op::RollBack { index: 1 }]));
++        }
++        "x" => {
++            for prefix in ["ni300-ow-ni1-ow/rb3", "sw3-ow-sw2-ow/rb3", "sw3-ni240-ow-ni5/rb3"] {
++                out.push((format!("{prefix}/[raiseTo5]"), prefix, vec![Op::RaiseFloorTo { txg: 5 }]));
++                out.push((format!("{prefix}/[ni2,raiseTo5]"), prefix, vec![Op::NewInodes { count: 2 }, Op::RaiseFloorTo { txg: 5 }]));
++            }
++            for prefix in ["sw3-ni240-ow-ni5/rbcrash3-remount-raise5", "ni300-ow-ni1-ow/rbcrash3-remount-raise5", "ni300-ow-ni1-ow/rb3-raise5"] {
++                out.push((format!("{prefix}/[remount]"), prefix, vec![Op::Remount]));
++                out.push((format!("{prefix}/[rb0]"), prefix, vec![Op::RollBack { index: 0 }]));
++                out.push((format!("{prefix}/[rb1]"), prefix, vec![Op::RollBack { index: 1 }]));
++            }
++        }
++        "main" => {
++            out.push(("ni300-ow-ni1/[rb2,raise2]".into(), "ni300-ow-ni1", vec![Op::RollBack { index: 2 }, Op::RaiseFloorBy { steps: 2 }]));
++            for steps in 1..=4u64 {
++                out.push((format!("sw3-ow-sw2/rb2/[raise{steps}]"), "sw3-ow-sw2/rb2", vec![Op::RaiseFloorBy { steps }]));
++                out.push((format!("sw3-ni240-ow-ni5/rb2-ni2/[raise{steps}]"), "sw3-ni240-ow-ni5/rb2-ni2", vec![Op::RaiseFloorBy { steps }]));
++                out.push((format!("ni300-ow-ni1/rbcrash2-remount/[raise{steps}]"), "ni300-ow-ni1/rbcrash2-remount", vec![Op::RaiseFloorBy { steps }]));
++                out.push((format!("ow3/rb2-remount/[raise{steps}]"), "ow3/rb2-remount", vec![Op::RaiseFloorBy { steps }]));
++            }
++        }
++        "core" => {
++            for prefix in ["ow3", "ni300-ow-ni1", "sw3-ow-sw2", "sw3-ni240-ow-ni5"] {
++                for index in 1..=3usize {
++                    for (name, suffix) in [
++                        ("raise1", vec![Op::RaiseFloorBy { steps: 1 }]),
++                        ("raise2", vec![Op::RaiseFloorBy { steps: 2 }]),
++                        ("raise3", vec![Op::RaiseFloorBy { steps: 3 }]),
++                        ("remount-raise3", vec![Op::Remount, Op::RaiseFloorBy { steps: 3 }]),
++                        ("raise2-remount", vec![Op::RaiseFloorBy { steps: 2 }, Op::Remount]),
++                        ("rb0-raise2", vec![Op::RollBack { index: 0 }, Op::RaiseFloorBy { steps: 2 }]),
++                    ] {
++                        let mut ops = vec![Op::RollBack { index }];
++                        ops.extend(suffix);
++                        out.push((format!("{prefix}/rb{index}/{name}"), prefix, ops));
++                    }
++                }
++            }
++        }
++        other => panic!("BF_SET={other} 不认得"),
++    }
++    out
++}
++
++fn mounted_image_of(base: &MemoryPool, image: &singlefs_harness::memory_pool::CrashImage<'_>, parameters: &singlefs_core::make_filesystem::MakeFilesystemParameters) -> Option<MemoryPool> {
++    let mut devices: Vec<(singlefs_core::address::DeviceIdentity, SparseBlockDevice)> = base
++        .devices
++        .iter()
++        .map(|(identity, sparse)| {
++            let mut device = SparseBlockDevice::new(base.device_size_in_bytes, PhysicalBlockSizeInBytes(512));
++            device.image = sparse.clone();
++            for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
++                if *is_persisted && write.device == *identity {
++                    write.contents.apply_to(&mut device.image, write.offset);
++                }
++            }
++            (*identity, device)
++        })
++        .collect();
++    let mounted = mount_writable(parameters, &mut devices).ok();
++    mounted.map(|_| MemoryPool {
++        devices: devices.iter().map(|(identity, device)| (*identity, device.image.clone())).collect(),
++        device_size_in_bytes: base.device_size_in_bytes,
++    })
++}
++
++#[test]
++fn birth_floor_variants_over_layer0_crash_states() {
++    let set = std::env::var("BF_SET").unwrap_or_else(|_| "core".to_string());
++    let only: Option<String> = std::env::var("BF_ONLY").ok();
++    let count_only = std::env::var("BF_COUNT_ONLY").is_ok();
++    let mount_after = std::env::var("BF_MOUNT").is_ok_and(|value| value == "1");
++    let max_states: u64 = std::env::var("BF_MAX_STATES").ok().and_then(|v| v.parse().ok()).unwrap_or(1_000_000);
++    let threads: usize = std::env::var("SINGLEFS_THREAD_CAP").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
++    let start = Driver::after_first_file();
++    let mut grand_total_states = 0u64;
++    let mut starts: BTreeMap<&'static str, Driver> = BTreeMap::new();
++    for (name, prefix, ops) in histories(&set) {
++        if only.as_ref().is_some_and(|only| !name.contains(only.as_str())) {
++            continue;
++        }
++        let started = std::time::Instant::now();
++        let prefix_start = starts.entry(prefix).or_insert_with(|| {
++            let mut driver = start.fork();
++            for op in prefix_ops(prefix) {
++                assert!(matches!(driver.apply(op), Outcome::Applied), "起点前缀 {prefix} 的 {op:?} 被拒");
++            }
++            driver
++        });
++        let mut driver = prefix_start.fork();
++        let base = driver.image();
++        let mut outcomes = Vec::new();
++        for op in &ops {
++            let outcome = driver.apply(*op);
++            outcomes.push(format!("{op:?}:{}", match outcome { Outcome::Applied => "ok".to_string(), Outcome::Refused(reason) => format!("REFUSED {}", reason.chars().take(80).collect::<String>()) }));
++        }
++        let operations = driver.retained_operations();
++        let (writes, segments, _) = writes_and_segments_with_stream_indexes(&operations, &driver.geometry());
++        let closed = closed_form_state_count(&segments);
++        let torn = layer0_state_count_with_torn_in_place_overwrites(&base, &writes, &segments, &full_expansion);
++        let largest_segment = segments.iter().map(Vec::len).max().unwrap_or(0);
++        println!("BF_HISTORY name={name} ops={} writes={} segments={} largest_segment={largest_segment} closed_form_states={closed} layer0_states={torn} outcomes={outcomes:?}", ops.len(), writes.len(), segments.len());
++        if count_only {
++            continue;
++        }
++        if torn > max_states {
++            println!("BF_SKIPPED name={name} layer0_states={torn} > {max_states}");
++            continue;
++        }
++        let judged_root_index = writes
++            .iter()
++            .rposition(|write| write.kind == StepKind::RootRecordFua)
++            .expect("历史里至少一次根槽写");
++        let versions: Vec<PublishedVersion> = driver
++            .contents
++            .iter()
++            .map(|((instance, txg), content)| PublishedVersion {
++                instance: InstanceGeneration(u32::try_from(*instance).expect("实例号")),
++                checkpoint_txg: CheckpointTxg(*txg),
++                content: content.clone(),
++            })
++            .collect();
++        let parameters = driver.parameters.clone();
++        let aggregate: Mutex<BTreeMap<String, Aggregate>> = Mutex::new(BTreeMap::new());
++        // 只为估时：BF_STATE_LIMIT 截前 N 个状态（正式跑不设）。
++        let judged_states = std::env::var("BF_STATE_LIMIT").ok().and_then(|v| v.parse::<u64>().ok()).map_or(torn, |limit| limit.min(torn));
++        let chunk = judged_states.div_ceil(threads as u64);
++        std::thread::scope(|scope| {
++            for thread in 0..threads as u64 {
++                let mut range = (thread * chunk).min(judged_states)..((thread + 1) * chunk).min(judged_states);
++                // 只为看终态：BF_LAST_ONLY 只判全部持久那一个状态（正式跑不设）。
++                if std::env::var("BF_LAST_ONLY").is_ok() {
++                    range = if thread == 0 { torn - 1..torn } else { 0..0 };
++                }
++                let (base, writes, segments, versions, aggregate, parameters, name) = (&base, &writes, &segments, &versions, &aggregate, &parameters, &name);
++                scope.spawn(move || {
++                    let mut local: BTreeMap<String, Aggregate> = BTreeMap::new();
++                    let mut note = |key: String, evaluated: u64, violations: u64, first: Option<String>| {
++                        let entry = local.entry(key).or_default();
++                        entry.evaluated += evaluated;
++                        entry.violations += violations;
++                        entry.states_red += u64::from(violations > 0);
++                        if entry.first.is_none() && (violations > 0 || first.as_ref().is_some_and(|text| !text.is_empty())) {
++                            entry.first = first;
++                        }
++                    };
++                    let _ = judge_layer0_state_range(base, writes, segments, judged_root_index, versions, &full_expansion, range, &mut |ordinal, image, judgement| {
++                        let red = judgement.red_items();
++                        note("layer0-red-states".to_string(), 1, u64::from(!red.is_empty()), (!red.is_empty()).then(|| format!("{name} state={ordinal} {red:?}")));
++                        let skip_birth_floor = std::env::var("BF_NO_BF").is_ok();
++                        for (key, tally) in if skip_birth_floor { BTreeMap::new() } else { birth_floor_judgements(image) } {
++                            note(format!("crash:{key}"), tally.evaluated, tally.violations, tally.first_violation.map(|text| format!("{name} state={ordinal} :: {text}")));
++                        }
++                        if mount_after {
++                            match mounted_image_of(base, image, parameters) {
++                                Some(mounted) => {
++                                    let violated: Vec<&str> = check_pool_image(&mounted)
++                                        .into_iter()
++                                        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++                                        .map(|(invariant, _)| invariant)
++                                        .collect();
++                                    note("mounted:pool-checker-red".to_string(), 1, u64::from(!violated.is_empty()), (!violated.is_empty()).then(|| format!("{name} state={ordinal} {violated:?}")));
++                                    for (key, tally) in birth_floor_judgements(&mounted) {
++                                        note(format!("mounted:{key}"), tally.evaluated, tally.violations, tally.first_violation.map(|text| format!("{name} state={ordinal} :: {text}")));
++                                    }
++                                }
++                                None => note("mounted:mount-refused".to_string(), 1, 0, Some(format!("{name} state={ordinal}"))),
++                            }
++                        }
++                    });
++                    let mut aggregate = aggregate.lock().expect("锁");
++                    for (key, entry) in local {
++                        let total = aggregate.entry(key).or_default();
++                        total.evaluated += entry.evaluated;
++                        total.violations += entry.violations;
++                        total.states_red += entry.states_red;
++                        if total.first.is_none() {
++                            total.first = entry.first;
++                        }
++                    }
++                });
++            }
++        });
++        grand_total_states += judged_states;
++        println!("BF_DONE name={name} states={judged_states} of={torn} seconds={:.1}", started.elapsed().as_secs_f64());
++        for (key, entry) in aggregate.into_inner().expect("锁") {
++            println!(
++                "BF name={name} :: {key} evaluated={} violations={} states_red={} first={}",
++                entry.evaluated,
++                entry.violations,
++                entry.states_red,
++                entry.first.unwrap_or_else(|| "-".to_string())
++            );
++        }
++    }
++    println!("BF_TOTAL states_judged={grand_total_states}");
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-checker/src/walk/proto_b.rs m3-birth-floor-r1-opus/tree/crates/singlefs-checker/src/walk/proto_b.rs
+--- m3-batch4-freeze/tree/crates/singlefs-checker/src/walk/proto_b.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-checker/src/walk/proto_b.rs	2026-10-01 19:05:06.634655943 +0000
+@@ -0,0 +1,1071 @@
++//! 攻方原型（m3-inv-b-r1，只在副本上）：正文 B1–B6 与底稿主表各行的候选措辞各写成一个只读谓词，
++//! 不进 `IMPLEMENTED_INVARIANTS`、不改 `check_pool_image`。每个谓词名字前缀是格名（B2-all、B3-lower……）。
++use super::*;
++
++/// 一个谓词在一个镜像上的结果：评估次数、违例次数、第一处违例。
++#[derive(Clone, Debug, Default, PartialEq, Eq)]
++pub struct ProtoTally {
++    pub evaluated: u64,
++    pub violations: u64,
++    pub first_violation: Option<String>,
++}
++
++#[derive(Default)]
++struct Proto {
++    by_name: BTreeMap<&'static str, ProtoTally>,
++}
++
++impl Proto {
++    fn judge(&mut self, name: &'static str, holds: bool, detail: impl FnOnce() -> String) {
++        let entry = self.by_name.entry(name).or_default();
++        entry.evaluated += 1;
++        if !holds {
++            entry.violations += 1;
++            if entry.first_violation.is_none() {
++                entry.first_violation = Some(detail());
++            }
++        }
++    }
++}
++
++fn root_segment_of(record: &[u8]) -> Vec<u8> {
++    let mut segment = Vec::with_capacity(188);
++    segment.extend_from_slice(&record[36..122]);
++    segment.extend_from_slice(&record[256..342]);
++    segment.extend_from_slice(&record[122..130]);
++    segment.extend_from_slice(&record[130..138]);
++    segment
++}
++
++fn full_records_of_device(
++    reader: &dyn ImageReader,
++    geometry: &PoolGeometry,
++    device: u32,
++    filesystem_identifier_low: u64,
++) -> BTreeMap<u64, crate::JournalRecordView> {
++    let record_bytes = usize::try_from(JOURNAL_RECORD_BYTES).expect("4096");
++    let slots: Vec<u64> = (0..geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES).collect();
++    let mut records = BTreeMap::new();
++    for slot in slots {
++        let offset = geometry.journal_ring_start_slot * SLOT_BYTES + slot * JOURNAL_RECORD_BYTES;
++        let Some(bytes) = reader.read(device, offset, record_bytes) else {
++            continue;
++        };
++        if let Ok(record) = check_journal_record(&bytes, filesystem_identifier_low) {
++            records.insert(record.counter, record);
++        }
++    }
++    records
++}
++
++/// 候选集（照 `check_pool_image` 的算法另写一份，只读）：最新根无条件在内；别的按最新根的实例表判不抛弃且 txg ≥ F 生效值。
++fn candidate_indexes_of(
++    reader: &dyn ImageReader,
++    geometry: &PoolGeometry,
++    roots: &[(u64, u64, crate::RootView)],
++    newest_index: usize,
++) -> Vec<usize> {
++    let rows = instance_table_rows_of_root_without_judging(reader, &roots[newest_index].2.record_bytes)
++        .unwrap_or_default();
++    let abandoned = |root: &crate::RootView| abandoned_by_instance_table_rows(&rows, root);
++    let mut newest_on_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
++    for (region, _, root) in roots {
++        if abandoned(root) {
++            continue;
++        }
++        let device = geometry.region_devices[usize::try_from(*region).expect("区域")];
++        let slot = newest_on_device.entry(device).or_insert(root);
++        if (root.checkpoint_txg, root.instance) > (slot.checkpoint_txg, slot.instance) {
++            *slot = root;
++        }
++    }
++    let abandoned_floor = roots
++        .iter()
++        .filter(|(_, _, root)| abandoned(root))
++        .map(|(_, _, root)| root.rollback_floor)
++        .max()
++        .unwrap_or(0);
++    let floor = verified_system_configuration_slots(reader)
++        .into_iter()
++        .flat_map(|(_, slots)| slots.into_iter().map(|(view, _)| view))
++        .filter(|view| view.filesystem_identifier == geometry.filesystem_identifier)
++        .map(|view| view.rollback_floor)
++        .fold(
++            newest_on_device
++                .values()
++                .map(|root| root.rollback_floor)
++                .max()
++                .unwrap_or(0)
++                .max(abandoned_floor),
++            u64::max,
++        );
++    roots
++        .iter()
++        .enumerate()
++        .filter(|(index, (_, _, root))| {
++            *index == newest_index || (!abandoned(root) && root.checkpoint_txg >= floor)
++        })
++        .map(|(index, _)| index)
++        .collect()
++}
++
++fn unit_bytes_of_class(class: u8) -> usize {
++    match class {
++        2 => node_bytes(),
++        _ => data_unit_bytes(),
++    }
++}
++
++/// 交回每个谓词的结果（名字 → 次数与第一处违例）。
++#[must_use]
++pub fn proto_judgements(reader: &dyn ImageReader) -> BTreeMap<&'static str, ProtoTally> {
++    let mut proto = Proto::default();
++    let chosen: Vec<_> = chosen_system_configurations(reader)
++        .into_iter()
++        .filter_map(|(device, chosen)| chosen.map(|(view, geometry)| (device, view, geometry)))
++        .collect();
++    let Some((_, _, geometry)) = chosen.first().cloned() else {
++        return proto.by_name;
++    };
++    let fsid_low = u64::from_le_bytes(geometry.filesystem_identifier[..8].try_into().expect("8"));
++    judge_b6_system_configuration(reader, &geometry, &mut proto);
++    let roots = valid_roots(reader, &geometry);
++    judge_b6_root_positions(&roots, &geometry, &mut proto);
++    let journal: Vec<(u32, BTreeMap<u64, crate::JournalRecordView>)> = reader
++        .devices()
++        .into_iter()
++        .map(|device| (device, full_records_of_device(reader, &geometry, device, fsid_low)))
++        .collect();
++    judge_b6_journal_txg(&journal, &mut proto);
++    judge_b2(&journal, &roots, &mut proto);
++    judge_b3_named(reader, &journal, &mut proto);
++    if roots.is_empty() {
++        return proto.by_name;
++    }
++    let newest_index = roots
++        .iter()
++        .enumerate()
++        .max_by_key(|(_, (_, _, root))| (root.checkpoint_txg, root.instance))
++        .map(|(index, _)| index)
++        .expect("非空");
++    let candidates = candidate_indexes_of(reader, &geometry, &roots, newest_index);
++    let mut cache = IndexNodeCache::new();
++    judge_b3_birth(reader, &roots, &candidates, &mut cache, &mut proto);
++    judge_b5(reader, &roots, &candidates, &mut proto);
++    judge_b4_b1(reader, &roots, &candidates, &mut cache, &mut proto);
++    proto.by_name
++}
++
++/// B6 世代号：世代号 ≥ 2 的自证过的槽 i，世代号 mod 2 == i；两槽都自证过时，两个 1 或相差恰为 1（底稿 ② 表第一行）。
++fn judge_b6_system_configuration(reader: &dyn ImageReader, geometry: &PoolGeometry, proto: &mut Proto) {
++    for (device, readings) in system_configuration_slot_readings(reader) {
++        let generations: Vec<Option<u64>> = readings
++            .iter()
++            .map(|reading| match reading {
++                crate::image::SystemConfigurationSlotReading::Usable(view, _)
++                    if view.filesystem_identifier == geometry.filesystem_identifier =>
++                {
++                    Some(view.slot_generation)
++                }
++                _ => None,
++            })
++            .collect();
++        for (slot, generation) in generations.iter().enumerate() {
++            if let Some(generation) = generation {
++                if *generation >= 2 {
++                    proto.judge("B6-sc-parity", *generation % 2 == slot as u64, || {
++                        format!("盘 {device} 槽 {slot} 世代号 {generation}")
++                    });
++                }
++            }
++        }
++        if let (Some(zero), Some(one)) = (generations[0], generations[1]) {
++            proto.judge(
++                "B6-sc-pair",
++                (zero == 1 && one == 1) || zero.abs_diff(one) == 1,
++                || format!("盘 {device} 两槽世代号 {zero} / {one}"),
++            );
++        }
++    }
++}
++
++/// B6 根记录位置：区域 = txg mod R、槽 = (txg div R) mod S；txg 0 只判槽号 0。
++fn judge_b6_root_positions(
++    roots: &[(u64, u64, crate::RootView)],
++    geometry: &PoolGeometry,
++    proto: &mut Proto,
++) {
++    for (region, slot, root) in roots {
++        let txg = root.checkpoint_txg;
++        let holds = if txg == 0 {
++            *slot == 0
++        } else {
++            *region == txg % geometry.regions
++                && *slot == (txg / geometry.regions) % geometry.slots_per_region
++        };
++        proto.judge("B6-root", holds, || {
++            format!("根 (实例 {}, txg {txg}) 住区域 {region} 槽 {slot}", root.instance)
++        });
++    }
++}
++
++/// B6 journal txg：同一块盘按计数器排，txg 不减；实例换了时严格大于前面每一条。
++fn judge_b6_journal_txg(
++    journal: &[(u32, BTreeMap<u64, crate::JournalRecordView>)],
++    proto: &mut Proto,
++) {
++    for (device, records) in journal {
++        let mut previous: Option<&crate::JournalRecordView> = None;
++        let mut highest_before: Option<u64> = None;
++        for record in records.values() {
++            if let Some(previous) = previous {
++                proto.judge("B6-jtxg-nondecreasing", record.checkpoint_txg >= previous.checkpoint_txg, || {
++                    format!(
++                        "盘 {device} 计数器 {} (实例 {}, txg {}) 之后计数器 {} (实例 {}, txg {})",
++                        previous.counter, previous.instance, previous.checkpoint_txg,
++                        record.counter, record.instance, record.checkpoint_txg
++                    )
++                });
++                if record.instance != previous.instance {
++                    let highest = highest_before.unwrap_or(0);
++                    proto.judge("B6-jtxg-new-instance", record.checkpoint_txg > highest, || {
++                        format!(
++                            "盘 {device} 计数器 {} (实例 {}, txg {}) 换实例，前面最大 txg {highest}",
++                            record.counter, record.instance, record.checkpoint_txg
++                        )
++                    });
++                }
++            }
++            highest_before = Some(highest_before.map_or(record.checkpoint_txg, |h| h.max(record.checkpoint_txg)));
++            previous = Some(record);
++        }
++    }
++}
++
++fn describe_segment_difference(record_segment: &[u8], root_segment: &[u8]) -> String {
++    let names = [(0, 86, "树表指针"), (86, 172, "映射根"), (172, 180, "水位"), (180, 188, "F")];
++    names
++        .iter()
++        .filter(|(start, end, _)| record_segment[*start..*end] != root_segment[*start..*end])
++        .map(|(_, _, name)| *name)
++        .collect::<Vec<_>>()
++        .join("、")
++}
++
++/// B2：同 (实例, txg) 配对的根与记录，新根段四字段逐字节相等；B2-max 只比这一块盘上那一组计数器最大的那条，
++/// B2-all 比那一组每一条，B2-last 只比带末条标志的那条。
++fn judge_b2(
++    journal: &[(u32, BTreeMap<u64, crate::JournalRecordView>)],
++    roots: &[(u64, u64, crate::RootView)],
++    proto: &mut Proto,
++) {
++    for (device, records) in journal {
++        let mut groups: BTreeMap<(u32, u64), Vec<&crate::JournalRecordView>> = BTreeMap::new();
++        for record in records.values() {
++            groups.entry((record.instance, record.checkpoint_txg)).or_default().push(record);
++        }
++        for ((instance, txg), group) in &groups {
++            for (_, _, root) in roots
++                .iter()
++                .filter(|(_, _, root)| root.instance == *instance && root.checkpoint_txg == *txg)
++            {
++                let segment = root_segment_of(&root.record_bytes);
++                let highest = group.iter().max_by_key(|record| record.counter).expect("非空");
++                proto.judge("B2-max", highest.new_root_segment == segment, || {
++                    format!(
++                        "盘 {device} (实例 {instance}, txg {txg}) 计数器 {} 的新根段与根不等：{}",
++                        highest.counter,
++                        describe_segment_difference(&highest.new_root_segment, &segment)
++                    )
++                });
++                for record in group {
++                    proto.judge("B2-all", record.new_root_segment == segment, || {
++                        format!(
++                            "盘 {device} (实例 {instance}, txg {txg}) 计数器 {} 的新根段与根不等：{}",
++                            record.counter,
++                            describe_segment_difference(&record.new_root_segment, &segment)
++                        )
++                    });
++                    if record.record_flags_byte & 1 == 1 {
++                        proto.judge("B2-last", record.new_root_segment == segment, || {
++                            format!("盘 {device} (实例 {instance}, txg {txg}) 末条 {}", record.counter)
++                        });
++                    }
++                }
++            }
++        }
++    }
++}
++
++/// B3 点名项：位置条目指的那一份整单元校验和相符时，类标签、诞生代号、写序实例、尾段、出生树（码 1 / 码 3）与点名项逐字段相等。
++fn judge_b3_named(
++    reader: &dyn ImageReader,
++    journal: &[(u32, BTreeMap<u64, crate::JournalRecordView>)],
++    proto: &mut Proto,
++) {
++    for (device, records) in journal {
++        for record in records.values() {
++            for (index, named) in record.named.iter().enumerate() {
++                for (location_device, location_slot, checksum) in named.locations {
++                    let Some(unit) = reader.read(
++                        location_device,
++                        location_slot * SLOT_BYTES,
++                        unit_bytes_of_class(named.unit_class),
++                    ) else {
++                        continue;
++                    };
++                    if crc32_castagnoli_table(&unit) != checksum {
++                        proto.judge("B3-named-skipped", true, String::new);
++                        continue;
++                    }
++                    let Some(identity) = birth_identity_in_the_header(&unit) else {
++                        proto.judge("B3-named", false, || {
++                            format!("盘 {device} 计数器 {} 点名项 {index}：头类标签 {} 不在 1/2/3", record.counter, unit[6])
++                        });
++                        continue;
++                    };
++                    let key_instance = u32::from_le_bytes(named.key_tail[0..4].try_into().expect("4"));
++                    let key_tail = match identity.tail {
++                        TailOfTheBirthIdentity::TransactionNumber(_) => read_six_byte_unsigned(&named.key_tail, 4),
++                        TailOfTheBirthIdentity::BirthSequence(_) => u64::from(read_u32(&named.key_tail, 4)),
++                    };
++                    let birth_tree_holds = match unit[6] {
++                        2 => true,
++                        _ => read_u64(&unit, 43) == named.birth_tree,
++                    };
++                    let holds = unit[6] == named.unit_class
++                        && identity.write_order.birth_txg() == named.birth_txg
++                        && identity.write_order.instance() == key_instance
++                        && identity.tail.birth_identity_tail_number() == key_tail
++                        && birth_tree_holds;
++                    proto.judge("B3-named", holds, || {
++                        format!(
++                            "盘 {device} 计数器 {} (实例 {}, txg {}) 点名项 {index}：点名 (类 {}, 树 {}, txg {}, 实例 {key_instance}, 尾 {key_tail})，头 (类 {}, txg {}, 实例 {}, 尾 {})",
++                            record.counter, record.instance, record.checkpoint_txg,
++                            named.unit_class, named.birth_tree, named.birth_txg,
++                            unit[6], identity.write_order.birth_txg(), identity.write_order.instance(),
++                            identity.tail.birth_identity_tail_number()
++                        )
++                    });
++                }
++            }
++        }
++    }
++}
++
++/// 一条根的树表里 inode 树那一条的根指针（读不出、没有、全零都交 `None`）。
++fn inode_tree_root_pointer_of(
++    reader: &dyn ImageReader,
++    record: &[u8],
++    cache: &mut IndexNodeCache,
++) -> Option<PointerView> {
++    let tree_table_pointer = parse_node_pointer(&record[36..122]);
++    if tree_table_pointer.all_zero {
++        return None;
++    }
++    let tree_table = read_index_node_without_judging(reader, &tree_table_pointer, cache)?;
++    tree_table
++        .entries
++        .iter()
++        .filter(|entry| entry.len() >= tree_table_entry_bytes() && read_u16(entry, 10) == TREE_KIND_INODE)
++        .map(|entry| parse_node_pointer(&entry[14..100]))
++        .find(|pointer| !pointer.all_zero)
++}
++
++/// B3 诞生代号：候选集里引用落点 p 的根中 txg 最小的 R_first，R_prev 为候选集里 txg 严格小于 R_first 的根中最大的那条；
++/// birth ≤ R_first.txg（B3-upper），R_prev 存在且引用集合数得全时 birth > R_prev.txg（B3-lower）。
++fn judge_b3_birth(
++    reader: &dyn ImageReader,
++    roots: &[(u64, u64, crate::RootView)],
++    candidates: &[usize],
++    cache: &mut IndexNodeCache,
++    proto: &mut Proto,
++) {
++    let mut scanned_with_inode_root: Vec<(u64, u32, RootReferences, Option<PointerView>)> = candidates
++        .iter()
++        .map(|index| {
++            let root = &roots[*index].2;
++            (
++                root.checkpoint_txg,
++                root.instance,
++                references_of_root(reader, &root.record_bytes, ReferenceScanDepth::EveryReferencedPlacement, cache),
++                inode_tree_root_pointer_of(reader, &root.record_bytes, cache),
++            )
++        })
++        .collect();
++    scanned_with_inode_root.sort_by_key(|(txg, instance, _, _)| (*txg, *instance));
++    let inode_roots: Vec<Option<PointerView>> =
++        scanned_with_inode_root.iter().map(|(_, _, _, pointer)| pointer.clone()).collect();
++    let scanned: Vec<(u64, u32, RootReferences)> = scanned_with_inode_root
++        .into_iter()
++        .map(|(txg, instance, references, _)| (txg, instance, references))
++        .collect();
++    let placements: BTreeSet<(u32, u64)> = scanned
++        .iter()
++        .flat_map(|(_, _, references)| references.placements.iter().copied())
++        .collect();
++    for placement in placements {
++        let Some(header) = reader.read(placement.0, placement.1 * SLOT_BYTES, UNIT_HEADER_SCAN_BYTES) else {
++            continue;
++        };
++        let Some(birth) = birth_txg_in_a_usable_unit_header(&header) else {
++            continue;
++        };
++        let first = scanned
++            .iter()
++            .find(|(_, _, references)| references.placements.contains(&placement))
++            .map(|(txg, instance, _)| (*txg, *instance))
++            .expect("并集里的落点至少一条根引用");
++        proto.judge("B3-upper", birth <= first.0, || {
++            format!("盘 {} 槽 {} 诞生代号 {birth} > R_first (实例 {}, txg {})", placement.0, placement.1, first.1, first.0)
++        });
++        let previous = scanned.iter().rev().find(|(txg, _, _)| *txg < first.0);
++        if let Some((previous_txg, previous_instance, previous_references)) = previous {
++            if previous_references.is_complete {
++                // 攻方自己提的收严 V1（只在这份模型上量过、被攻过零轮）：R_first 的 inode 树根指针出生 txg ≤ R_prev.txg
++                // 且那个根落点 R_prev 不引用（R_first 整棵用户可见树是从候选集外的一版继承来的：回退根，或接在它后面的写行根）时，下界不判。
++                let first_position = scanned
++                    .iter()
++                    .position(|(txg, instance, _)| (*txg, *instance) == first)
++                    .expect("R_first 在 scanned 里");
++                let inherits = inode_roots[first_position].as_ref().is_some_and(|pointer| {
++                    pointer.birth_txg <= *previous_txg
++                        && !previous_references
++                            .placements
++                            .contains(&(pointer.locations[0].device, pointer.locations[0].slot))
++                });
++                if inherits {
++                    proto.judge("B3-lower-v1-exempted", true, String::new);
++                } else {
++                    proto.judge("B3-lower-v1", birth > *previous_txg, || {
++                        format!(
++                            "盘 {} 槽 {} 类 {} 诞生代号 {birth} ≤ R_prev (实例 {previous_instance}, txg {previous_txg})，R_first (实例 {}, txg {})",
++                            placement.0, placement.1, header[6], first.1, first.0
++                        )
++                    });
++                }
++                proto.judge("B3-lower", birth > *previous_txg, || {
++                    format!(
++                        "盘 {} 槽 {} 类 {} 诞生代号 {birth} ≤ R_prev (实例 {previous_instance}, txg {previous_txg})，R_first (实例 {}, txg {})",
++                        placement.0, placement.1, header[6], first.1, first.0
++                    )
++                });
++            } else {
++                proto.judge("B3-lower-skipped-incomplete", true, String::new);
++            }
++        }
++    }
++}
++
++/// B5：(a) 候选集里任一根 R 指着的实例表每一行 T < R.txg（B5a；B5a-all-roots 换成根环里全部自证过的根）；
++/// (b) 同一实例的行在候选集两张表里 T、W 相同。
++fn judge_b5(
++    reader: &dyn ImageReader,
++    roots: &[(u64, u64, crate::RootView)],
++    candidates: &[usize],
++    proto: &mut Proto,
++) {
++    let mut rows_by_instance: BTreeMap<u32, Vec<(u64, u64, u64, u32)>> = BTreeMap::new();
++    for (index, (_, _, root)) in roots.iter().enumerate() {
++        let Some(rows) = instance_table_rows_of_root_without_judging(reader, &root.record_bytes) else {
++            continue;
++        };
++        let is_candidate = candidates.contains(&index);
++        for row in &rows {
++            proto.judge("B5a-all-roots", row.published_checkpoint_txg < root.checkpoint_txg, || {
++                format!(
++                    "根 (实例 {}, txg {}) 的实例表行 (实例 {}, T {}, W {})",
++                    root.instance, root.checkpoint_txg, row.instance, row.published_checkpoint_txg,
++                    row.applied_transaction_high_water_mark
++                )
++            });
++            if is_candidate {
++                proto.judge("B5a", row.published_checkpoint_txg < root.checkpoint_txg, || {
++                    format!(
++                        "候选根 (实例 {}, txg {}) 的实例表行 (实例 {}, T {}, W {})",
++                        root.instance, root.checkpoint_txg, row.instance, row.published_checkpoint_txg,
++                        row.applied_transaction_high_water_mark
++                    )
++                });
++                rows_by_instance.entry(row.instance).or_default().push((
++                    row.published_checkpoint_txg,
++                    row.applied_transaction_high_water_mark,
++                    root.checkpoint_txg,
++                    root.instance,
++                ));
++            }
++        }
++    }
++    for (instance, sightings) in rows_by_instance {
++        let (first_t, first_w, _, _) = sightings[0];
++        for (t, w, root_txg, root_instance) in &sightings {
++            proto.judge("B5b", *t == first_t && *w == first_w, || {
++                format!(
++                    "实例 {instance} 的行：根 (实例 {}, txg {}) 记 (T {first_t}, W {first_w})，根 (实例 {root_instance}, txg {root_txg}) 记 (T {t}, W {w})",
++                    sightings[0].3, sightings[0].2
++                )
++            });
++        }
++    }
++}
++
++fn accounting_rows_below(
++    reader: &dyn ImageReader,
++    cache: &mut IndexNodeCache,
++    node: &crate::IndexNodeView,
++    rows: &mut Vec<Vec<u8>>,
++) -> bool {
++    if node.level == 0 {
++        rows.extend(node.entries.iter().cloned());
++        return true;
++    }
++    let key_width = KEY_SCHEMA_ACCOUNTING.width();
++    let mut complete = true;
++    for entry in &node.entries {
++        let child_pointer = parse_node_pointer(&entry[key_width..key_width + node_pointer_bytes()]);
++        match read_index_node_without_judging(reader, &child_pointer, cache) {
++            Some(child) => complete &= accounting_rows_below(reader, cache, &child, rows),
++            None => complete = false,
++        }
++    }
++    complete
++}
++
++fn inode_leaf_pointers_below(
++    reader: &dyn ImageReader,
++    cache: &mut IndexNodeCache,
++    node: &crate::IndexNodeView,
++    leaves: &mut Vec<PointerView>,
++) {
++    for entry in &node.entries {
++        let child_pointer = parse_node_pointer(&entry[34..120]);
++        match InodeInternalEntryType::of(read_u16(entry, 16)) {
++            InodeInternalEntryType::LeafContainer => leaves.push(child_pointer),
++            InodeInternalEntryType::InternalNode => {
++                if let Some(child) = read_index_node_without_judging(reader, &child_pointer, cache) {
++                    inode_leaf_pointers_below(reader, cache, &child, leaves);
++                }
++            }
++            InodeInternalEntryType::Unregistered(_) => {}
++        }
++    }
++}
++
++/// B4（previous_snapshot_txg、记账代、inode 改动计数）与 B1（实例表指针的出生身份、数据指针与树根指针的出生树）。
++fn judge_b4_b1(
++    reader: &dyn ImageReader,
++    roots: &[(u64, u64, crate::RootView)],
++    candidates: &[usize],
++    cache: &mut IndexNodeCache,
++    proto: &mut Proto,
++) {
++    for index in candidates {
++        let root = &roots[*index].2;
++        let txg = root.checkpoint_txg;
++        let record = &root.record_bytes;
++        // B1 实例表指针。
++        let instance_table_pointer = parse_node_pointer(&record[170..256]);
++        if !instance_table_pointer.all_zero {
++            if let Some(unit) = read_unit_without_judging(reader, &instance_table_pointer, data_unit_bytes()) {
++                if let Some(identity) = birth_identity_in_the_header(&unit) {
++                    proto.judge(
++                        "B1-instance-table-pointer-identity",
++                        identity.write_order.birth_txg() == instance_table_pointer.birth_txg
++                            && identity.write_order.instance() == instance_table_pointer.instance
++                            && identity.tail.birth_identity_tail_number() == instance_table_pointer.tail,
++                        || format!(
++                            "根 (实例 {}, txg {txg}) 实例表指针 (txg {}, 实例 {}, 尾 {}) 头 (txg {}, 实例 {}, 尾 {})",
++                            root.instance, instance_table_pointer.birth_txg, instance_table_pointer.instance,
++                            instance_table_pointer.tail, identity.write_order.birth_txg(),
++                            identity.write_order.instance(), identity.tail.birth_identity_tail_number()
++                        ),
++                    );
++                    proto.judge("B1-instance-table-pointer-birth-tree", read_u64(&unit, 43) == instance_table_pointer.birth_tree, || {
++                        format!("根 (实例 {}, txg {txg}) 实例表指针出生树 {} 头 {}", root.instance, instance_table_pointer.birth_tree, read_u64(&unit, 43))
++                    });
++                }
++            }
++        }
++        let tree_table_pointer = parse_node_pointer(&record[36..122]);
++        if tree_table_pointer.all_zero {
++            continue;
++        }
++        let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, cache) else {
++            continue;
++        };
++        proto.judge("B1-tree-table-pointer-birth-tree-vs-tree-id", tree_table.tree_identifier == tree_table_pointer.birth_tree, || {
++            format!("根 (实例 {}, txg {txg}) 树表指针出生树 {} 头树 ID {}", root.instance, tree_table_pointer.birth_tree, tree_table.tree_identifier)
++        });
++        for entry in &tree_table.entries {
++            if entry.len() < tree_table_entry_bytes() {
++                continue;
++            }
++            let tree = read_u64(entry, 0);
++            let kind = read_u16(entry, 10);
++            let previous_snapshot_txg = read_u64(entry, 100);
++            let holds = if kind == TREE_KIND_INODE {
++                previous_snapshot_txg == 0 || previous_snapshot_txg <= txg
++            } else {
++                previous_snapshot_txg == 0
++            };
++            proto.judge("B4-previous-snapshot-txg", holds, || {
++                format!("根 (实例 {}, txg {txg}) 树 {tree} 种类 {kind} previous_snapshot_txg {previous_snapshot_txg}", root.instance)
++            });
++            let tree_root = parse_node_pointer(&entry[14..100]);
++            if tree_root.all_zero {
++                continue;
++            }
++            let Some(node) = read_index_node_without_judging(reader, &tree_root, cache) else {
++                continue;
++            };
++            proto.judge("B1-tree-root-pointer-birth-tree-vs-tree-id", node.tree_identifier == tree_root.birth_tree, || {
++                format!("根 (实例 {}, txg {txg}) 树 {tree} 根指针出生树 {} 头树 ID {}", root.instance, tree_root.birth_tree, node.tree_identifier)
++            });
++            match kind {
++                TREE_KIND_ACCOUNTING => {
++                    let mut rows = Vec::new();
++                    accounting_rows_below(reader, cache, &node, &mut rows);
++                    for row in rows {
++                        let generation = read_u64(&row, 14);
++                        proto.judge("B4-accounting-generation", generation == txg, || {
++                            format!("根 (实例 {}, txg {txg}) 记账行代段 {generation}（统计量 {}，设备 {}）", root.instance, read_u16(&row, 0), read_u32(&row, 10))
++                        });
++                    }
++                }
++                TREE_KIND_INODE => {
++                    let mut leaves = Vec::new();
++                    if node.level > 0 {
++                        inode_leaf_pointers_below(reader, cache, &node, &mut leaves);
++                    }
++                    for leaf in leaves {
++                        let Some(unit) = read_unit_without_judging(reader, &leaf, data_unit_bytes()) else {
++                            continue;
++                        };
++                        let Ok(view) = packed_unit_view(&unit) else {
++                            continue;
++                        };
++                        let container_birth = read_u64(&unit, 73);
++                        for inode_record in &view.records {
++                            if inode_record.len() < 96 {
++                                continue;
++                            }
++                            let inode = read_u64(inode_record, 0);
++                            let object_birth = read_u64(inode_record, 8);
++                            let change = read_u64(inode_record, 88);
++                            proto.judge("B4-change-count-upper", change <= container_birth, || {
++                                format!("根 txg {txg} inode {inode} 改动计数 {change} > 容器诞生代号 {container_birth}")
++                            });
++                            proto.judge("B4-change-count-lower", object_birth <= change, || {
++                                format!("根 txg {txg} inode {inode} 对象出生代 {object_birth} > 改动计数 {change}")
++                            });
++                        }
++                    }
++                }
++                TREE_KIND_EXTENT => {
++                    if let Some((_, data_pointers)) = extent_tree_without_judging(reader, &tree_root, cache) {
++                        for data_pointer in data_pointers {
++                            if data_pointer.all_zero {
++                                continue;
++                            }
++                            let Some(unit) = read_unit_without_judging(reader, &data_pointer, data_unit_bytes()) else {
++                                continue;
++                            };
++                            proto.judge("B1-data-pointer-birth-tree", read_u64(&unit, 43) == data_pointer.birth_tree, || {
++                                format!("根 txg {txg} 数据指针出生树 {} 头 {}", data_pointer.birth_tree, read_u64(&unit, 43))
++                            });
++                        }
++                    }
++                }
++                _ => {}
++            }
++        }
++    }
++}
++
++/// B7 原型开关：I-3.9 的守卫取哪一种（只在副本上，按线程设）。`Today` 是冻结副本的「任一候选根走不完就整条不适用」，
++/// `Narrowed` 是正文 B7 的「比 L 晚的候选根都走得全才判」，`Unguarded` 是完全不看走没走全（对照：该在对照格上误红）。
++#[derive(Clone, Copy, Debug, PartialEq, Eq)]
++pub enum I39Guard {
++    Today,
++    Narrowed,
++    Unguarded,
++}
++
++thread_local! {
++    static I39_GUARD: std::cell::Cell<I39Guard> = const { std::cell::Cell::new(I39Guard::Narrowed) };
++}
++
++pub fn set_i39_guard(guard: I39Guard) {
++    I39_GUARD.with(|cell| cell.set(guard));
++}
++
++pub(super) fn i39_guard() -> I39Guard {
++    I39_GUARD.with(std::cell::Cell::get)
++}
++
++/// 盘 0 journal 环里自证过的记录：(计数器, 实例, txg, 记录标志字节)。只供原型打印。
++#[must_use]
++pub fn journal_summary(reader: &dyn ImageReader) -> Vec<(u64, u32, u64, u8)> {
++    let Some((_, _, geometry)) = chosen_system_configurations(reader)
++        .into_iter()
++        .filter_map(|(device, chosen)| chosen.map(|(view, geometry)| (device, view, geometry)))
++        .next()
++    else {
++        return Vec::new();
++    };
++    let fsid_low = u64::from_le_bytes(geometry.filesystem_identifier[..8].try_into().expect("8"));
++    full_records_of_device(reader, &geometry, 0, fsid_low)
++        .values()
++        .map(|record| (record.counter, record.instance, record.checkpoint_txg, record.record_flags_byte))
++        .collect()
++}
++
++// ---------------------------------------------------------------------------------------------------------------
++// m3-birth-floor-r1 攻方（只在副本上）：诞生代号下界的三种写法（原措辞、V1、V2）在两种候选集上（CS1 只取根环里的候选根；
++// CS2 再并上 `check_pool_image` 补进候选集的「由记录施加出来、根槽从没落盘的那一版」）。不进 `IMPLEMENTED_INVARIANTS`。
++// V1：R_first 的树表里 inode 树根指针出生 txg ≤ R_prev.txg 且那个落点 R_prev 不引用 ⇒ R_first 名下的落点都不判下界。
++// V2（攻方提的收严，零轮）：只免「R_first 树表里出生 txg ≤ R_prev.txg 且落点 R_prev 不引用的用户可见树根（extent 1、inode 2、
++// deleted_inodes 9）之下」的落点；R_first 自己新写的落点照原措辞判。
++// ---------------------------------------------------------------------------------------------------------------
++
++struct BirthFloorVersion {
++    txg: u64,
++    instance: u32,
++    references: RootReferences,
++    user_tree_roots: Vec<(u16, PointerView)>,
++    applied_only: bool,
++}
++
++fn user_tree_roots_of(
++    reader: &dyn ImageReader,
++    record: &[u8],
++    cache: &mut IndexNodeCache,
++) -> Vec<(u16, PointerView)> {
++    let tree_table_pointer = parse_node_pointer(&record[36..122]);
++    if tree_table_pointer.all_zero {
++        return Vec::new();
++    }
++    let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, cache) else {
++        return Vec::new();
++    };
++    tree_table
++        .entries
++        .iter()
++        .filter(|entry| entry.len() >= tree_table_entry_bytes())
++        .filter_map(|entry| {
++            let kind = read_u16(entry, 10);
++            let pointer = parse_node_pointer(&entry[14..100]);
++            (matches!(kind, TREE_KIND_EXTENT | TREE_KIND_INODE | TREE_KIND_DELETED_INODES) && !pointer.all_zero)
++                .then_some((kind, pointer))
++        })
++        .collect()
++}
++
++fn placements_under_tree_root(
++    reader: &dyn ImageReader,
++    cache: &mut IndexNodeCache,
++    pointer: &PointerView,
++    kind: u16,
++) -> BTreeSet<(u32, u64)> {
++    let mut references = RootReferences {
++        placements: BTreeSet::new(),
++        tree_table_birth_txg: BTreeMap::new(),
++        tree_table_placement: None,
++        allocation_records: Vec::new(),
++        depth: ReferenceScanDepth::EveryReferencedPlacement,
++        is_complete: true,
++    };
++    references.note(pointer);
++    if let Some(node) = read_index_node_without_judging(reader, pointer, cache) {
++        collect_tree_references(reader, cache, &mut references, pointer, &node, kind);
++    }
++    references.placements
++}
++
++fn version_of_record(
++    reader: &dyn ImageReader,
++    record: &[u8],
++    txg: u64,
++    instance: u32,
++    applied_only: bool,
++    cache: &mut IndexNodeCache,
++) -> BirthFloorVersion {
++    BirthFloorVersion {
++        txg,
++        instance,
++        references: references_of_root(reader, record, ReferenceScanDepth::EveryReferencedPlacement, cache),
++        user_tree_roots: user_tree_roots_of(reader, record, cache),
++        applied_only,
++    }
++}
++
++#[derive(Default)]
++struct NamedTallies {
++    by_name: BTreeMap<String, ProtoTally>,
++}
++
++impl NamedTallies {
++    fn judge(&mut self, name: String, holds: bool, detail: impl FnOnce() -> String) {
++        let entry = self.by_name.entry(name).or_default();
++        entry.evaluated += 1;
++        if !holds {
++            entry.violations += 1;
++            if entry.first_violation.is_none() {
++                entry.first_violation = Some(detail());
++            }
++        }
++    }
++    fn count(&mut self, name: String, detail: impl FnOnce() -> String) {
++        let entry = self.by_name.entry(name).or_default();
++        entry.evaluated += 1;
++        if entry.first_violation.is_none() {
++            entry.first_violation = Some(detail());
++        }
++    }
++}
++
++fn judge_birth_floor_on(
++    reader: &dyn ImageReader,
++    versions: &mut Vec<BirthFloorVersion>,
++    cache: &mut IndexNodeCache,
++    tallies: &mut NamedTallies,
++    set: &str,
++) {
++    versions.sort_by_key(|version| (version.txg, version.instance));
++    let placements: BTreeSet<(u32, u64)> = versions
++        .iter()
++        .flat_map(|version| version.references.placements.iter().copied())
++        .collect();
++    let mut inherited_cache: BTreeMap<(usize, usize), BTreeSet<(u32, u64)>> = BTreeMap::new();
++    for placement in placements {
++        let Some(header) = reader.read(placement.0, placement.1 * SLOT_BYTES, UNIT_HEADER_SCAN_BYTES) else {
++            continue;
++        };
++        let Some(birth) = birth_txg_in_a_usable_unit_header(&header) else {
++            continue;
++        };
++        let class = header[6];
++        let first_index = versions
++            .iter()
++            .position(|version| version.references.placements.contains(&placement))
++            .expect("并集里的落点至少一版引用");
++        let first = &versions[first_index];
++        // I-3.5 ①：引用这个落点的版本在 (txg, 实例) 序上连续无洞（只为 F3 数一下，与下界的三种写法无关）。
++        let referencing: Vec<usize> = versions
++            .iter()
++            .enumerate()
++            .filter(|(_, version)| version.references.placements.contains(&placement))
++            .map(|(index, _)| index)
++            .collect();
++        let contiguous = referencing.last().copied().unwrap_or(0) + 1 - referencing.first().copied().unwrap_or(0) == referencing.len();
++        tallies.judge(format!("{set}:i35-1-contiguous"), contiguous, || {
++            let txgs: Vec<u64> = referencing.iter().map(|index| versions[*index].txg).collect();
++            format!("盘 {} 槽 {} 类 {class} 诞生代号 {birth}：引用它的版本 txg {txgs:?}", placement.0, placement.1)
++        });
++        tallies.judge(format!("{set}:upper"), birth <= first.txg, || {
++            format!("盘 {} 槽 {} 类 {class} 诞生代号 {birth} > R_first (实例 {}, txg {})", placement.0, placement.1, first.instance, first.txg)
++        });
++        let Some(previous_index) = versions.iter().rposition(|version| version.txg < first.txg) else {
++            continue;
++        };
++        let previous = &versions[previous_index];
++        if !previous.references.is_complete {
++            tallies.count(format!("{set}:skipped-incomplete"), String::new);
++            continue;
++        }
++        let lower_holds = birth > previous.txg;
++        let describe = |label: &str| {
++            format!(
++                "{label}：盘 {} 槽 {} 类 {class} 诞生代号 {birth} ≤ R_prev (实例 {}, txg {}{})，R_first (实例 {}, txg {}{})",
++                placement.0,
++                placement.1,
++                previous.instance,
++                previous.txg,
++                if previous.applied_only { "，由记录施加" } else { "" },
++                first.instance,
++                first.txg,
++                if first.applied_only { "，由记录施加" } else { "" },
++            )
++        };
++        tallies.judge(format!("{set}:lower"), lower_holds, || describe("原措辞"));
++        // 继承来的用户可见树根：出生 txg ≤ R_prev.txg 且落点 R_prev 不引用。
++        let inherited: Vec<(u16, PointerView)> = first
++            .user_tree_roots
++            .iter()
++            .filter(|(_, pointer)| {
++                pointer.birth_txg <= previous.txg
++                    && !previous
++                        .references
++                        .placements
++                        .contains(&(pointer.locations[0].device, pointer.locations[0].slot))
++            })
++            .copied()
++            .collect();
++        let v1_condition = inherited.iter().any(|(kind, _)| *kind == TREE_KIND_INODE);
++        let under_inherited = inherited_cache
++            .entry((first_index, previous_index))
++            .or_insert_with(|| {
++                inherited
++                    .iter()
++                    .flat_map(|(kind, pointer)| placements_under_tree_root(reader, cache, pointer, *kind))
++                    .collect()
++            })
++            .contains(&placement);
++        if v1_condition {
++            tallies.count(format!("{set}:v1-exempted"), String::new);
++            if lower_holds {
++                // V1 把原措辞判得出的一格免掉了：这条 R_first 自己新写的、或继承来却出生晚于 R_prev 的落点。
++                tallies.count(format!("{set}:v1-exempted-where-lower-holds"), || {
++                    format!("盘 {} 槽 {} 类 {class} 诞生代号 {birth} > R_prev txg {}，R_first txg {}，在继承来的子树下 {under_inherited}", placement.0, placement.1, previous.txg, first.txg)
++                });
++            }
++        } else {
++            tallies.judge(format!("{set}:v1"), lower_holds, || describe("V1"));
++        }
++        if under_inherited {
++            tallies.count(format!("{set}:v2-exempted"), String::new);
++        } else {
++            tallies.judge(format!("{set}:v2"), lower_holds, || describe("V2"));
++        }
++        // V3（攻方提的收严，零轮）：V2 再加一条——继承来的树根要「压得住」它下面的每个单元（下面每个落点的头里诞生代号 ≤ 树根指针的出生 txg）；
++        // 合法的回退根继承的是整棵旧树，旧树里没有比它的根更晚出生的单元。只改小一个树根的诞生代号，它的孩子比它晚，这一条就不免。
++        let under_dominating_inherited = inherited.iter().any(|(kind, pointer)| {
++            let under = placements_under_tree_root(reader, cache, pointer, *kind);
++            under.contains(&placement)
++                && under.iter().all(|(device, slot)| {
++                    reader
++                        .read(*device, slot * SLOT_BYTES, UNIT_HEADER_SCAN_BYTES)
++                        .and_then(|header| birth_txg_in_a_usable_unit_header(&header))
++                        .is_none_or(|below| below <= pointer.birth_txg)
++                })
++        });
++        if under_dominating_inherited {
++            tallies.count(format!("{set}:v3-exempted"), String::new);
++        } else {
++            tallies.judge(format!("{set}:v3"), lower_holds, || describe("V3"));
++        }
++        if !lower_holds {
++            let class_name = match (v1_condition, under_inherited) {
++                (true, true) => "red-class:v1-root-and-under-inherited",
++                (true, false) => "red-class:v1-root-not-under-inherited",
++                (false, true) => "red-class:not-v1-root-under-inherited",
++                (false, false) => "red-class:neither",
++            };
++            tallies.count(format!("{set}:{class_name}"), || describe(class_name));
++        }
++    }
++}
++
++/// 诞生代号下界的三种写法在 CS1、CS2 上各判一遍；名字是「候选集:谓词」。另交 `CS2:applied-only-versions`（这张镜像上并进来的版本数）。
++#[must_use]
++pub fn birth_floor_judgements(reader: &dyn ImageReader) -> BTreeMap<String, ProtoTally> {
++    let mut tallies = NamedTallies::default();
++    let chosen: Vec<_> = chosen_system_configurations(reader)
++        .into_iter()
++        .filter_map(|(device, chosen)| chosen.map(|(view, geometry)| (device, view, geometry)))
++        .collect();
++    let Some((_, _, geometry)) = chosen.first().cloned() else {
++        return tallies.by_name;
++    };
++    let fsid_low = u64::from_le_bytes(geometry.filesystem_identifier[..8].try_into().expect("8"));
++    let roots = valid_roots(reader, &geometry);
++    if roots.is_empty() {
++        return tallies.by_name;
++    }
++    let newest_index = roots
++        .iter()
++        .enumerate()
++        .max_by_key(|(_, (_, _, root))| (root.checkpoint_txg, root.instance))
++        .map(|(index, _)| index)
++        .expect("非空");
++    let candidates = candidate_indexes_of(reader, &geometry, &roots, newest_index);
++    let mut cache = IndexNodeCache::new();
++    let mut ring_versions: Vec<BirthFloorVersion> = candidates
++        .iter()
++        .map(|index| {
++            let root = &roots[*index].2;
++            version_of_record(reader, &root.record_bytes, root.checkpoint_txg, root.instance, false, &mut cache)
++        })
++        .collect();
++    judge_birth_floor_on(reader, &mut ring_versions, &mut cache, &mut tallies, "CS1");
++    // CS2：同 `check_pool_image` 的候选集补法（F 生效值另算一遍，与 `candidate_indexes_of` 同一份算法）。
++    let rows = instance_table_rows_of_root_without_judging(reader, &roots[newest_index].2.record_bytes)
++        .unwrap_or_default();
++    let floor = effective_floor_of(reader, &geometry, &roots, &rows);
++    let journal = scanned_journal_records_by_device(reader, &geometry, fsid_low);
++    let applied = versions_applied_only_by_records(&journal, &roots, &rows, floor);
++    if applied.is_empty() {
++        // 没有由记录施加出来的版本：CS2 与 CS1 是同一组版本，判定逐项相同，照抄一份（省一遍走读）。
++        let copied: Vec<(String, ProtoTally)> = tallies
++            .by_name
++            .iter()
++            .filter_map(|(name, tally)| name.strip_prefix("CS1:").map(|rest| (format!("CS2:{rest}"), tally.clone())))
++            .collect();
++        tallies.by_name.extend(copied);
++        return tallies.by_name;
++    }
++    let mut all_versions = ring_versions;
++    for version in &applied {
++        tallies.count("CS2:applied-only-versions".to_string(), || {
++            format!("实例 {}、txg {}", version.instance, version.checkpoint_txg)
++        });
++        let Some(base) = &version.root_record_of_the_version_it_was_applied_on else {
++            continue;
++        };
++        let mut record = base.clone();
++        record[24..28].copy_from_slice(&version.instance.to_le_bytes());
++        record[28..36].copy_from_slice(&version.checkpoint_txg.to_le_bytes());
++        record[36..122].copy_from_slice(&version.new_root_segment[NEW_ROOT_SEGMENT_TREE_TABLE_POINTER]);
++        record[256..342].copy_from_slice(&version.new_root_segment[NEW_ROOT_SEGMENT_MAPPING_ROOT_POINTER]);
++        all_versions.push(version_of_record(
++            reader,
++            &record,
++            version.checkpoint_txg,
++            version.instance,
++            true,
++            &mut cache,
++        ));
++    }
++    judge_birth_floor_on(reader, &mut all_versions, &mut cache, &mut tallies, "CS2");
++    tallies.by_name
++}
++
++fn effective_floor_of(
++    reader: &dyn ImageReader,
++    geometry: &PoolGeometry,
++    roots: &[(u64, u64, crate::RootView)],
++    rows: &[InstanceTableRow],
++) -> u64 {
++    let abandoned = |root: &crate::RootView| abandoned_by_instance_table_rows(rows, root);
++    let mut newest_on_device: BTreeMap<u32, &crate::RootView> = BTreeMap::new();
++    for (region, _, root) in roots {
++        if abandoned(root) {
++            continue;
++        }
++        let device = geometry.region_devices[usize::try_from(*region).expect("区域")];
++        let slot = newest_on_device.entry(device).or_insert(root);
++        if (root.checkpoint_txg, root.instance) > (slot.checkpoint_txg, slot.instance) {
++            *slot = root;
++        }
++    }
++    let abandoned_floor = roots
++        .iter()
++        .filter(|(_, _, root)| abandoned(root))
++        .map(|(_, _, root)| root.rollback_floor)
++        .max()
++        .unwrap_or(0);
++    verified_system_configuration_slots(reader)
++        .into_iter()
++        .flat_map(|(_, slots)| slots.into_iter().map(|(view, _)| view))
++        .filter(|view| view.filesystem_identifier == geometry.filesystem_identifier)
++        .map(|view| view.rollback_floor)
++        .fold(
++            newest_on_device
++                .values()
++                .map(|root| root.rollback_floor)
++                .max()
++                .unwrap_or(0)
++                .max(abandoned_floor),
++            u64::max,
++        )
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-checker/src/walk.rs m3-birth-floor-r1-opus/tree/crates/singlefs-checker/src/walk.rs
+--- m3-batch4-freeze/tree/crates/singlefs-checker/src/walk.rs	2026-10-01 16:19:21.021673186 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-checker/src/walk.rs	2026-10-01 16:47:03.106721584 +0000
+@@ -3287,13 +3287,15 @@
+             "最新根那棵账里有已释放记录时，每条候选根都按「走到叶」扫过（`judge_release_generation_and_tree_table_birth` 定的深度）"
+         );
+     }
+-    if !scanned.iter().all(|root| root.references.is_complete) {
++    let guard = proto_b::i39_guard();
++    if guard == proto_b::I39Guard::Today && !scanned.iter().all(|root| root.references.is_complete) {
+         judgements.not_applicable(
+             "I-3.9",
+             "有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全",
+         );
+         return;
+     }
++    let mut skipped_behind_an_incomplete_later_root = 0u64;
+     let mut witnessed_records = 0u64;
+     for record in released {
+         let placement = (record.device, record.slot);
+@@ -3307,6 +3309,15 @@
+             // 盘上那条记录仍写着已释放，D16（发布语义） 已定项 1 / D3（空间分配） 已定项 7）。这个镜像上找不到那条根，这一条判不了。
+             continue;
+         };
++        // 正文 B7 收窄的守卫：比 L 晚的候选根有一条走不完，这个落点可能藏在它读不出的节点下面（L 算小、T 算早），这一条不判。
++        if guard == proto_b::I39Guard::Narrowed
++            && scanned.iter().any(|root| {
++                root.checkpoint_txg > last_referencing_txg && !root.references.is_complete
++            })
++        {
++            skipped_behind_an_incomplete_later_root += 1;
++            continue;
++        }
+         witnessed_records += 1;
+         let first_root_without_it = scanned
+             .iter()
+@@ -3328,6 +3339,12 @@
+             }
+         });
+     }
++    if witnessed_records == 0 && skipped_behind_an_incomplete_later_root > 0 {
++        judgements.not_applicable(
++            "I-3.9",
++            "带已释放标志的记录都落在比 L 晚、又走不完的候选根后面：T 定不下",
++        );
++    }
+     if witnessed_records == 0 {
+         judgements.not_applicable(
+             "I-3.9",
+@@ -6424,3 +6441,4 @@
+         }
+     }
+ }
++pub mod proto_b;
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs
+--- m3-batch4-freeze/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs	2026-10-01 16:19:21.022442810 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/checker_known_bad_images.rs	2026-10-01 16:47:03.107118532 +0000
+@@ -5440,3 +5440,81 @@
+         "只有 I-3.9 红：{verdicts:?}"
+     );
+ }
++
++// ───── 攻方原型（m3-inv-b-r1，只在副本上）：B7 组合坏镜像与对照格 ─────
++
++use singlefs_checker::walk::proto_b::{set_i39_guard, I39Guard};
++
++fn proto_b7_report(label: &str, image: &MemoryPool) {
++    for guard in [I39Guard::Today, I39Guard::Narrowed, I39Guard::Unguarded] {
++        set_i39_guard(guard);
++        let verdicts = check_pool_image(image);
++        let i39 = verdicts
++            .iter()
++            .find(|(name, _)| *name == "I-3.9")
++            .map(|(_, verdict)| verdict.clone())
++            .expect("I-3.9 在清单里");
++        println!(
++            "PROTO_B7 image={label} guard={guard:?} i39={i39:?} violated={:?}",
++            violated_invariants(&verdicts)
++        );
++    }
++    set_i39_guard(I39Guard::Narrowed);
++}
++
++/// 翻一个单元两份各一个载荷字节，不重封、不补引用链：位置条目校验和对不上，只读不判那一遍读不出它。
++fn proto_flip_both_copies(image: &mut MemoryPool, slot: u64, length: usize) {
++    for device in DEVICES {
++        let mut bytes = read(image, device, slot * SLOT, length);
++        bytes[length - 100] ^= 0xff;
++        write(image, device, slot * SLOT, &bytes);
++    }
++}
++
++#[test]
++fn proto_b7_combined_bad_image_after_the_overwrite() {
++    let clean = image_after_the_overwrite("proto-b7-combined");
++    proto_b7_report("clean", &clean);
++    let mut released_only = clean.clone();
++    assert_eq!(
++        mutate_allocation_leaves(
++            &mut released_only,
++            &UNITS_AFTER_OVERWRITE,
++            ALLOCATION_LEAVES_AFTER_OVERWRITE,
++            |bytes| rewrite_released_generations(bytes, 4, 3),
++        ),
++        24
++    );
++    proto_b7_report("release-4-to-3-only", &released_only);
++    let mut unreadable_only = clean.clone();
++    proto_flip_both_copies(&mut unreadable_only, ALLOCATION_LEAVES[0], 16384);
++    proto_b7_report("A-leaf-50245-unreadable-only", &unreadable_only);
++    let mut combined = released_only.clone();
++    proto_flip_both_copies(&mut combined, ALLOCATION_LEAVES[0], 16384);
++    proto_b7_report("combined", &combined);
++    let mut combined_both_leaves = released_only.clone();
++    proto_flip_both_copies(&mut combined_both_leaves, ALLOCATION_LEAVES[0], 16384);
++    proto_flip_both_copies(&mut combined_both_leaves, ALLOCATION_LEAVES[1], 16384);
++    proto_b7_report("combined-both-A-leaves", &combined_both_leaves);
++}
++
++/// 对照格：比 L 晚的候选根走不完、而落点正藏在它读不出的节点下面。步 5 那段历史抬 F 到 11（空发布 txg 15、16 不换用户可见树），
++/// 再覆盖写一次（txg 17）释放 txg 14 那一版的用户可见单元（释放代 17，真 L = 16）；把 txg 16 那条根自己的树表两份都翻坏，
++/// 它的引用集合数不全、那几个落点藏在读不出的树表下面，算出的 L = 15、T = 16。
++#[test]
++fn proto_b7_control_a_later_incomplete_root_hides_the_placement() {
++    let mut pool = pool_before_raising_the_floor("proto-b7-control");
++    raise_the_floor(&mut pool, CheckpointTxg(11), CheckpointTxg(0));
++    let raised_txg = pool.output.root.checkpoint_txg;
++    let tree_table_of_the_last_raise = pool.output.unit(TransactionUnit::TreeTable).slot.0;
++    overwrite_and_advance(&mut pool, &content_seeded(1200, 3), InstanceGeneration(2));
++    let overwrite_txg = pool.output.root.checkpoint_txg;
++    println!(
++        "PROTO_B7 control last_raise_txg={raised_txg:?} its_tree_table_slot={tree_table_of_the_last_raise} overwrite_txg={overwrite_txg:?}"
++    );
++    let clean = pool.memory_pool();
++    proto_b7_report("control-clean", &clean);
++    let mut hidden = clean.clone();
++    proto_flip_both_copies(&mut hidden, tree_table_of_the_last_raise, 16384);
++    proto_b7_report("control-later-root-tree-table-unreadable", &hidden);
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_b3_rollback.rs m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_b3_rollback.rs
+--- m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_b3_rollback.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_b3_rollback.rs	2026-10-01 16:47:03.107345870 +0000
+@@ -0,0 +1,147 @@
++//! 攻方原型（m3-inv-b-r1，只在副本上）：B3 下界（I-3.5 ② 按回退候选集判）在管理员回退的合法历史上误红，两段写死的历史。
++//! 用户决定的那几步（回退到第几条、抬 F 抬到哪、之后写几次）另一条用例放开扫。
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::proto_b::proto_judgements;
++use singlefs_harness::history::{
++    execute_history_observing, ContentChoice, ContentLength, FloorTargetChoice, GeneratedHistory,
++    HistoryEnding, HistoryOperation, HistorySeed, HistoryStartingPoint, RollbackTargetChoice,
++};
++use singlefs_harness::SharedStream;
++
++thread_local! {
++    static V1_RED_STEPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
++}
++
++fn overwrite(seed: u64) -> HistoryOperation {
++    HistoryOperation::PublishOverwrite(ContentChoice {
++        length: ContentLength::InsideOneDataUnit { selector: 1000 + seed },
++        fill_seed: seed,
++    })
++}
++
++/// 跑一段写死的历史，逐步打印：这一步之后池级 checker 红了哪几条、B3-lower 判了几次红几次、第一处红。交回 B3-lower 红的步数。
++fn run(label: &str, operations: Vec<HistoryOperation>, print: bool) -> (usize, bool) {
++    let history = GeneratedHistory {
++        seed: HistorySeed(0),
++        starting_point: HistoryStartingPoint::AfterFirstFile,
++        operations,
++    };
++    let stream = SharedStream::new();
++    let mut step = 0usize;
++    let mut red_steps = 0usize;
++    let mut v1_red_steps = 0usize;
++    let run = execute_history_observing(&history, &stream, &mut |observation| {
++        let violated: Vec<&str> = check_pool_image(observation.image)
++            .into_iter()
++            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++            .map(|(name, _)| name)
++            .collect();
++        let proto = proto_judgements(observation.image);
++        let lower = proto.get("B3-lower").cloned().unwrap_or_default();
++        let v1 = proto.get("B3-lower-v1").cloned().unwrap_or_default();
++        let v1_exempted = proto.get("B3-lower-v1-exempted").cloned().unwrap_or_default();
++        if lower.violations > 0 {
++            red_steps += 1;
++        }
++        if v1.violations > 0 {
++            v1_red_steps += 1;
++        }
++        if print {
++            println!(
++                "PROTO_B3 {label} step={step} op={:?} checker_violated={violated:?} b3_lower_evaluated={} b3_lower_red={} v1_evaluated={} v1_red={} v1_exempted={} first={}",
++                observation.operation.map(|operation| operation.kind()),
++                lower.evaluated,
++                lower.violations,
++                v1.evaluated,
++                v1.violations,
++                v1_exempted.evaluated,
++                lower.first_violation.unwrap_or_else(|| "-".to_string())
++            );
++        }
++        step += 1;
++    });
++    let completed = matches!(run.ending, HistoryEnding::Completed);
++    if print {
++        println!("PROTO_B3 {label} completed={completed} steps_observed={step} b3_lower_red_steps={red_steps} v1_red_steps={v1_red_steps}");
++    }
++    V1_RED_STEPS.with(|cell| cell.set(cell.get() + v1_red_steps));
++    (red_steps, completed)
++}
++
++#[test]
++fn proto_b3_rollback_then_raise_the_floor_above_the_rollback_target() {
++    // A（txg 3）→ 覆盖写四次（4–7）→ 回退到从新到旧第 4 条（txg 4）→ 抬 F 到 0 + 5 = 5。
++    run(
++        "raise",
++        vec![
++            overwrite(1),
++            overwrite(2),
++            overwrite(3),
++            overwrite(4),
++            HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot { index_from_newest: 3 }),
++            HistoryOperation::RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: 5 }),
++        ],
++        true,
++    );
++}
++
++#[test]
++fn proto_b3_rollback_then_the_target_turns_out_of_the_root_ring() {
++    // A（txg 3）→ 覆盖写两次（4、5）→ 回退到 txg 4（从新到旧第 2 条）→ 再覆盖写到 txg 4 那条根轮出根环（R × S = 24）。
++    let mut operations = vec![
++        overwrite(1),
++        overwrite(2),
++        HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot { index_from_newest: 1 }),
++    ];
++    for seed in 10..34 {
++        operations.push(overwrite(seed));
++    }
++    run("turn", operations, true);
++}
++
++/// 放开用户决定的那几步：前缀固定为 A 之后覆盖写 k 次（k ∈ {2, 4}），回退目标取根环从新到旧第 i 条（i ∈ 0..=5），
++/// 之后要么抬 F（steps ∈ {0, 2, 4, 6, 8}），要么不抬、再覆盖写 w 次（w ∈ {0, 3}）。数每一格 B3-lower 红没红。
++#[test]
++fn proto_b3_sweep_the_user_steps() {
++    let mut cells = 0usize;
++    let mut red_cells = 0usize;
++    let mut incomplete = 0usize;
++    for k in [2u64, 4] {
++        for index in 0..=5u64 {
++            let prefix: Vec<HistoryOperation> = (1..=k)
++                .map(overwrite)
++                .chain(std::iter::once(HistoryOperation::RollBackWhileMounted(
++                    RollbackTargetChoice::RingRoot { index_from_newest: index },
++                )))
++                .collect();
++            let mut tails: Vec<(String, Vec<HistoryOperation>)> = Vec::new();
++            for steps in [0u64, 2, 4, 6, 8] {
++                tails.push((
++                    format!("raise{steps}"),
++                    vec![HistoryOperation::RaiseRollbackFloor(FloorTargetChoice { steps_above_current_floor: steps })],
++                ));
++            }
++            for writes in [0u64, 3] {
++                tails.push((format!("write{writes}"), (100..100 + writes).map(overwrite).collect()));
++            }
++            for (tail_name, tail) in tails {
++                let mut operations = prefix.clone();
++                operations.extend(tail);
++                let (red_steps, completed) = run("sweep", operations, false);
++                cells += 1;
++                if !completed {
++                    incomplete += 1;
++                }
++                if red_steps > 0 {
++                    red_cells += 1;
++                    println!("PROTO_B3_SWEEP red k={k} rollback_index={index} tail={tail_name} red_steps={red_steps} completed={completed}");
++                }
++            }
++        }
++    }
++    println!(
++        "PROTO_B3_SWEEP cells={cells} red_cells={red_cells} not_completed={incomplete} v1_red_steps_over_all_cells={}",
++        V1_RED_STEPS.with(std::cell::Cell::get)
++    );
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_histories.rs m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_histories.rs
+--- m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_histories.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_histories.rs	2026-10-01 16:47:03.107390550 +0000
+@@ -0,0 +1,158 @@
++//! 攻方原型（m3-inv-b-r1，只在副本上）：随机历史每一步之后的镜像上跑 `proto_b` 的候选措辞谓词，数每个谓词判了几次、红了几次、
++//! 第一处红在哪段历史的哪一步。历史照 `singlefs_harness::history` 的生成器与执行器，比重与种子区间从环境变量取。
++use std::collections::BTreeMap;
++use std::sync::Mutex;
++
++use singlefs_checker::walk::proto_b::proto_judgements;
++use singlefs_harness::history::{
++    execute_history_observing, generate_history_with_weights, GenerationWeights, HistoryEnding,
++    HistorySeed,
++};
++use singlefs_harness::SharedStream;
++
++#[derive(Default, Clone)]
++struct Aggregate {
++    evaluated: u64,
++    violations: u64,
++    images_with_violation: u64,
++    first: Option<String>,
++}
++
++fn env_u64(name: &str, default: u64) -> u64 {
++    std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
++}
++
++fn weights_named(name: &str) -> &'static GenerationWeights {
++    match name {
++        "broad" => &GenerationWeights::BROAD,
++        "reuse" => &GenerationWeights::REUSE_AFTER_RAISING_THE_FLOOR,
++        "rollback" => &GenerationWeights::ROLLBACK_AFTER_RAISING_THE_FLOOR,
++        "wall" => &GenerationWeights::TOWARD_THE_ALLOCATION_RECORD_WALL,
++        other => panic!("比重名 {other} 不认得"),
++    }
++}
++
++#[test]
++fn proto_predicates_over_random_histories() {
++    let first_seed = env_u64("PROTO_FIRST_SEED", 1_000_000);
++    let seeds = env_u64("PROTO_SEEDS", 4);
++    let operations = usize::try_from(env_u64("PROTO_OPERATIONS", 30)).expect("步数");
++    let weights_name = std::env::var("PROTO_WEIGHTS").unwrap_or_else(|_| "broad".to_string());
++    let weights = weights_named(&weights_name);
++    let threads = env_u64("SINGLEFS_THREAD_CAP", 1).max(1);
++    let started = std::time::Instant::now();
++    let aggregate: Mutex<BTreeMap<&'static str, Aggregate>> = Mutex::new(BTreeMap::new());
++    let endings: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
++    let images = Mutex::new(0u64);
++    let next = Mutex::new(first_seed);
++    std::thread::scope(|scope| {
++        for _ in 0..threads {
++            scope.spawn(|| loop {
++                let seed = {
++                    let mut next = next.lock().expect("锁");
++                    if *next >= first_seed + seeds {
++                        return;
++                    }
++                    *next += 1;
++                    *next - 1
++                };
++                let history = generate_history_with_weights(HistorySeed(seed), operations, weights);
++                let stream = SharedStream::new();
++                let mut step = 0usize;
++                let mut local: BTreeMap<&'static str, Aggregate> = BTreeMap::new();
++                let mut local_images = 0u64;
++                let run = execute_history_observing(&history, &stream, &mut |observation| {
++                    local_images += 1;
++                    let kinds: String = history.operations[..step.min(history.operations.len())]
++                        .iter()
++                        .map(|operation| format!("{:?}", operation.kind()))
++                        .collect::<Vec<_>>()
++                        .join(">");
++                    // B7：同一张镜像上 I-3.9 在今天的守卫与收窄的守卫下各判一次，数判定不同的镜像与收窄之后判红的镜像。
++                    {
++                        use singlefs_checker::image::InvariantVerdict;
++                        use singlefs_checker::walk::proto_b::{set_i39_guard, I39Guard};
++                        let verdict_under = |guard: I39Guard| {
++                            set_i39_guard(guard);
++                            singlefs_checker::walk::check_pool_image(observation.image)
++                                .into_iter()
++                                .find(|(name, _)| *name == "I-3.9")
++                                .map(|(_, verdict)| verdict)
++                                .expect("I-3.9 在清单里")
++                        };
++                        let today = verdict_under(I39Guard::Today);
++                        let narrowed = verdict_under(I39Guard::Narrowed);
++                        let mut note = |name: &'static str, red: bool| {
++                            let entry = local.entry(name).or_default();
++                            entry.evaluated += 1;
++                            if red {
++                                entry.violations += 1;
++                                entry.images_with_violation += 1;
++                                if entry.first.is_none() {
++                                    entry.first = Some(format!("seed={seed} step={step} today={today:?} narrowed={narrowed:?}"));
++                                }
++                            }
++                        };
++                        note("B7-narrowed-differs-from-today", today != narrowed);
++                        note("B7-narrowed-violated", matches!(narrowed, InvariantVerdict::Violated(_)));
++                        note(
++                            "B7-today-not-applicable-for-an-incomplete-root",
++                            matches!(&today, InvariantVerdict::NotApplicable(reason) if reason.contains("走不完")),
++                        );
++                    }
++                    for (name, tally) in proto_judgements(observation.image) {
++                        let entry = local.entry(name).or_default();
++                        entry.evaluated += tally.evaluated;
++                        entry.violations += tally.violations;
++                        if tally.violations > 0 {
++                            entry.images_with_violation += 1;
++                            if entry.first.is_none() {
++                                entry.first = Some(format!(
++                                    "seed={seed} step={step} start={:?} ops=[{kinds}] :: {}",
++                                    history.starting_point,
++                                    tally.first_violation.clone().unwrap_or_default()
++                                ));
++                            }
++                        }
++                    }
++                    step += 1;
++                });
++                let ending = match &run.ending {
++                    HistoryEnding::NewFinding { .. } => "new_finding".to_string(),
++                    HistoryEnding::KnownRed { .. } => "known_red".to_string(),
++                    HistoryEnding::Completed => "completed".to_string(),
++                    #[allow(unreachable_patterns)]
++                    _ => "other".to_string(),
++                };
++                *endings.lock().expect("锁").entry(ending).or_insert(0) += 1;
++                *images.lock().expect("锁") += local_images;
++                let mut aggregate = aggregate.lock().expect("锁");
++                for (name, local_entry) in local {
++                    let entry = aggregate.entry(name).or_default();
++                    entry.evaluated += local_entry.evaluated;
++                    entry.violations += local_entry.violations;
++                    entry.images_with_violation += local_entry.images_with_violation;
++                    if entry.first.is_none() {
++                        entry.first = local_entry.first;
++                    }
++                }
++            });
++        }
++    });
++    let aggregate = aggregate.into_inner().expect("锁");
++    println!(
++        "PROTO_RUN weights={weights_name} first_seed={first_seed} seeds={seeds} operations={operations} images={} endings={:?} seconds={:.1}",
++        images.into_inner().expect("锁"),
++        endings.into_inner().expect("锁"),
++        started.elapsed().as_secs_f64()
++    );
++    for (name, entry) in aggregate {
++        println!(
++            "PROTO name={name} evaluated={} violations={} images_red={} first={}",
++            entry.evaluated,
++            entry.violations,
++            entry.images_with_violation,
++            entry.first.unwrap_or_else(|| "-".to_string())
++        );
++    }
++}
+diff -ruN '--exclude=target' m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_multi_record_crash.rs m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_multi_record_crash.rs
+--- m3-batch4-freeze/tree/crates/singlefs-harness/tests/inv_b_proto_multi_record_crash.rs	1970-01-01 00:00:00.000000000 +0000
++++ m3-birth-floor-r1-opus/tree/crates/singlefs-harness/tests/inv_b_proto_multi_record_crash.rs	2026-10-01 16:47:03.107429680 +0000
+@@ -0,0 +1,311 @@
++//! 攻方原型（m3-inv-b-r1，只在副本上）：一次发布切成多条记录（产品路径：顺序写 N ≥ 2 个数据单元，一个数据单元一条记录）时，
++//! 崩溃状态与它之后的可写挂载、再发布的镜像上跑 `proto_b` 的候选措辞谓词。
++//!
++//! 历史：mkfs → 取号 1 → 暖机 → A（第一个文件，jsn 3，txg 3）→ 顺序写两个数据单元的 B（jsn 4、5，txg 4）→ 顺序写三个数据单元的 C
++//! （jsn 6、7、8，txg 5）。前缀固定到 B 做完；C 那次发布的写按 `writes_and_segments`（与层 0 同一条切段规则）切段，
++//! 每段之前的段全持久，段内整写子集逐个枚举（段内写数 ≤ `PROTO_SUBSET_LIMIT` 的段全枚举；更大的段只取全持久那一个状态，数写在输出里）。
++//! 每个状态四张镜像：崩溃镜像、可写挂载之后、再覆盖写一次之后、再顺序写两个数据单元之后。盘是内存稀疏盘。
++mod common;
++
++use std::collections::BTreeMap;
++use std::sync::Mutex;
++
++use common::{crash_state_devices, file_content, geometry, memory_pool_of_sparse_devices, parameters, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES};
++use singlefs_checker::image::InvariantVerdict;
++use singlefs_checker::walk::check_pool_image;
++use singlefs_checker::walk::proto_b::{proto_judgements, set_i39_guard, I39Guard};
++use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
++use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
++use singlefs_core::block_device::PhysicalBlockSizeInBytes;
++use singlefs_core::make_filesystem::{make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
++use singlefs_core::mount::mount_writable;
++use singlefs_core::transaction::{
++    acquire_instance, publish_first_file, publish_overwrite, publish_sequential_write, warm_up, FirstFile,
++    PoolVersion, PoolWriter,
++};
++use singlefs_core::unit::data_unit_payload_capacity;
++use singlefs_harness::memory_pool::{closed_form_state_count, writes_and_segments, MemoryPool, SparseBlockDevice};
++use singlefs_harness::{RecordingBlockDevice, SharedStream};
++
++const DISKS: [DeviceIdentity; 2] = [DeviceIdentity(0), DeviceIdentity(1)];
++
++fn content_needing(data_units: usize, seed: usize) -> Vec<u8> {
++    let payload_capacity = data_unit_payload_capacity();
++    (0..(data_units - 1) * payload_capacity + payload_capacity / 2)
++        .map(|index| u8::try_from((index * 13 + seed * 5 + 3) % 251).expect("小于 256"))
++        .collect()
++}
++
++#[derive(Default, Clone)]
++struct Aggregate {
++    evaluated: u64,
++    violations: u64,
++    images_red: u64,
++    first: Option<String>,
++}
++
++fn env_usize(name: &str, default: usize) -> usize {
++    std::env::var(name).ok().and_then(|v| v.parse().ok()).unwrap_or(default)
++}
++
++fn judge(image: &MemoryPool, label: &str, aggregate: &mut BTreeMap<String, Aggregate>) {
++    if std::env::var("PROTO_DUMP").is_ok_and(|wanted| label.contains(&wanted)) {
++        println!("PROTO_MR_DUMP {label} journal={:?}", singlefs_checker::walk::proto_b::journal_summary(image));
++    }
++    set_i39_guard(I39Guard::Today);
++    let verdicts = check_pool_image(image);
++    let violated: Vec<&str> = verdicts
++        .iter()
++        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
++        .map(|(name, _)| *name)
++        .collect();
++    let entry = aggregate.entry("checker-any-violated".to_string()).or_default();
++    entry.evaluated += 1;
++    if !violated.is_empty() {
++        entry.violations += 1;
++        entry.images_red += 1;
++        if entry.first.is_none() {
++            entry.first = Some(format!("{label} :: {violated:?}"));
++        }
++    }
++    for (name, tally) in proto_judgements(image) {
++        let entry = aggregate.entry(name.to_string()).or_default();
++        entry.evaluated += tally.evaluated;
++        entry.violations += tally.violations;
++        if tally.violations > 0 {
++            entry.images_red += 1;
++            if entry.first.is_none() {
++                entry.first = Some(format!("{label} :: {}", tally.first_violation.unwrap_or_default()));
++            }
++        }
++    }
++}
++
++#[test]
++fn proto_predicates_over_crash_states_of_a_multi_record_publish() {
++    let subset_limit = env_usize("PROTO_SUBSET_LIMIT", 10);
++    let threads = env_usize("SINGLEFS_THREAD_CAP", 1).max(1);
++    let started = std::time::Instant::now();
++    let stream = SharedStream::retaining_contents();
++    let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> = DISKS
++        .iter()
++        .map(|identity| {
++            (
++                *identity,
++                RecordingBlockDevice::with_shared_stream(
++                    *identity,
++                    SparseBlockDevice::new(IMAGE_BYTES, PhysicalBlockSizeInBytes(512)),
++                    stream.clone(),
++                ),
++            )
++        })
++        .collect();
++    let publish_parameters = parameters();
++    let genesis = make_filesystem(&publish_parameters, &mut devices).expect("mkfs");
++    let mut allocator = PoolAllocator::new(
++        DISKS.iter().map(|device| DeviceFreeMap::new(*device, IMAGE_BYTES)).collect(),
++    );
++    allocator.mark_format_time_units(
++        Placement { slot: INSTANCE_TABLE_SLOT, span: 2 },
++        Placement { slot: TREE_TABLE_GENESIS_SLOT, span: 1 },
++    );
++    let operations_before_the_third;
++    {
++        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
++        let instance = acquire_instance(&mut writer).expect("取号");
++        let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
++        let content = file_content();
++        let first = publish_first_file(
++            &mut writer,
++            &mut allocator,
++            warmed.roots.last().expect("暖机两代根"),
++            FirstFile { content: &content, write_time_seconds: FIXED_WRITE_TIME_SECONDS },
++            instance,
++            &warmed.last_record_bytes,
++        )
++        .expect("A");
++        let second_content = content_needing(2, 1);
++        let second = publish_sequential_write(
++            &mut writer,
++            &mut allocator,
++            &first,
++            FirstFile { content: &second_content, write_time_seconds: FIXED_WRITE_TIME_SECONDS + 60 },
++            InstanceGeneration(1),
++        )
++        .expect("B");
++        operations_before_the_third = stream.retained_operations().len();
++        let third_content = content_needing(env_usize("PROTO_C_UNITS", 3), 2);
++        let third = publish_sequential_write(
++            &mut writer,
++            &mut allocator,
++            &second,
++            FirstFile { content: &third_content, write_time_seconds: FIXED_WRITE_TIME_SECONDS + 120 },
++            InstanceGeneration(1),
++        )
++        .expect("C");
++        println!(
++            "PROTO_MR history B=(txg {:?}, 记录 {} 条) C=(txg {:?}, 记录 {} 条, 末条 jsn {})",
++            second.root.checkpoint_txg,
++            second.earlier_records_of_this_publish.len() + 1,
++            third.root.checkpoint_txg,
++            third.earlier_records_of_this_publish.len() + 1,
++            third.record.counter
++        );
++    }
++    let operations = stream.retained_operations();
++    let mut base = MemoryPool::with_devices(&DISKS, IMAGE_BYTES);
++    base.apply(&operations[..operations_before_the_third]);
++    let (writes, segments) = writes_and_segments(&operations[operations_before_the_third..], &geometry());
++    println!(
++        "PROTO_MR segments={} sizes={:?} closed_form_state_count={}",
++        segments.len(),
++        segments.iter().map(Vec::len).collect::<Vec<_>>(),
++        closed_form_state_count(&segments)
++    );
++    // 状态表：(段号, 段内持久掩码)。
++    let mut states: Vec<(usize, u64)> = vec![(0, 0)];
++    let mut skipped_states = 0u64;
++    for (segment_index, segment) in segments.iter().enumerate() {
++        let full = (1u64 << segment.len()) - 1;
++        if segment.len() <= subset_limit {
++            states.extend((1..=full).map(|mask| (segment_index, mask)));
++        } else {
++            states.push((segment_index, full));
++            let mut structured: Vec<u64> = Vec::new();
++            if segment.iter().all(|write| writes[*write].kind.name() == writes[segment[0]].kind.name())
++                && format!("{:?}", writes[segment[0]].kind) == "JournalRecord"
++            {
++                // 记录段太大不全枚举时的结构化取样：按每块盘上的偏移把写排成记录序（第 r 条），两盘同一个记录集合；
++                // 取：只有后 k 条、只有前 k 条、只有第一条与最后一条、缺中间一条。
++                let mut offsets: Vec<u64> = segment.iter().map(|write| writes[*write].offset.0).collect();
++                offsets.sort_unstable();
++                offsets.dedup();
++                let records = offsets.len();
++                let mask_of = |kept: &dyn Fn(usize) -> bool| -> u64 {
++                    segment
++                        .iter()
++                        .enumerate()
++                        .filter(|(_, write)| {
++                            let order = offsets.iter().position(|offset| *offset == writes[**write].offset.0).expect("在表里");
++                            kept(order)
++                        })
++                        .fold(0u64, |mask, (bit, _)| mask | (1 << bit))
++                };
++                for k in 1..records {
++                    structured.push(mask_of(&|order| order >= records - k));
++                    structured.push(mask_of(&|order| order < k));
++                }
++                structured.push(mask_of(&|order| order == 0 || order == records - 1));
++                for missing in 1..records - 1 {
++                    structured.push(mask_of(&|order| order != missing));
++                }
++                structured.sort_unstable();
++                structured.dedup();
++                structured.retain(|mask| *mask != full && *mask != 0);
++            }
++            skipped_states += full - 1 - u64::try_from(structured.len()).expect("条数");
++            states.extend(structured.into_iter().map(|mask| (segment_index, mask)));
++        }
++    }
++    println!("PROTO_MR states_enumerated={} states_skipped_in_large_segments={skipped_states}", states.len());
++    let aggregate: Mutex<BTreeMap<String, Aggregate>> = Mutex::new(BTreeMap::new());
++    let mount_outcomes: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
++    let next = Mutex::new(0usize);
++    std::thread::scope(|scope| {
++        for _ in 0..threads {
++            scope.spawn(|| loop {
++                let index = {
++                    let mut next = next.lock().expect("锁");
++                    if *next >= states.len() {
++                        return;
++                    }
++                    *next += 1;
++                    *next - 1
++                };
++                let (segment_index, mask) = states[index];
++                let mut persisted = vec![false; writes.len()];
++                for earlier in &segments[..segment_index] {
++                    for write in earlier {
++                        persisted[*write] = true;
++                    }
++                }
++                for (bit, write) in segments[segment_index].iter().enumerate() {
++                    if mask & (1 << bit) != 0 {
++                        persisted[*write] = true;
++                    }
++                }
++                let kinds: Vec<String> = segments[segment_index]
++                    .iter()
++                    .map(|write| format!("{}@{}", writes[*write].kind.name(), writes[*write].device.0))
++                    .collect();
++                let label = format!("seg={segment_index} kinds={kinds:?} mask={mask:b}");
++                let mut local: BTreeMap<String, Aggregate> = BTreeMap::new();
++                let crash_stream = SharedStream::new();
++                let mut crash_devices = crash_state_devices(&base, &writes, &persisted, &crash_stream);
++                judge(&memory_pool_of_sparse_devices(&crash_devices), &format!("{label} stage=crash"), &mut local);
++                let outcome = match mount_writable(&parameters(), &mut crash_devices) {
++                    Err(error) => format!("refused:{}", format!("{error:?}").chars().take(60).collect::<String>()),
++                    Ok(mounted) => {
++                        judge(&memory_pool_of_sparse_devices(&crash_devices), &format!("{label} stage=mounted"), &mut local);
++                        let mut allocator = mounted.allocator;
++                        match mounted.current {
++                            PoolVersion::WithoutFile(_) => "mounted-without-file".to_string(),
++                            PoolVersion::WithFile(current) => {
++                                let instance = current.root.instance;
++                                let overwrite_content = content_needing(1, 7);
++                                let mut writer = PoolWriter::new(&publish_parameters, crash_devices.as_mut_slice());
++                                match publish_overwrite(
++                                    &mut writer,
++                                    &mut allocator,
++                                    &current,
++                                    FirstFile { content: &overwrite_content, write_time_seconds: FIXED_WRITE_TIME_SECONDS + 180 },
++                                    instance,
++                                ) {
++                                    Err(error) => format!("overwrite-refused:{}", format!("{error:?}").chars().take(60).collect::<String>()),
++                                    Ok(overwritten) => {
++                                        let sequential_content = content_needing(2, 9);
++                                        let sequential = publish_sequential_write(
++                                            &mut writer,
++                                            &mut allocator,
++                                            &overwritten,
++                                            FirstFile { content: &sequential_content, write_time_seconds: FIXED_WRITE_TIME_SECONDS + 240 },
++                                            instance,
++                                        );
++                                        drop(writer);
++                                        // 覆盖写之后那张镜像取不到（写入口借着盘）：两次发布之后一起判，再各判不了；所以只判最后这张与挂载之后那张。
++                                        judge(&memory_pool_of_sparse_devices(&crash_devices), &format!("{label} stage=after-overwrite-and-sequential"), &mut local);
++                                        match sequential {
++                                            Ok(_) => "mounted-and-published-twice".to_string(),
++                                            Err(error) => format!("sequential-refused:{}", format!("{error:?}").chars().take(60).collect::<String>()),
++                                        }
++                                    }
++                                }
++                            }
++                        }
++                    }
++                };
++                *mount_outcomes.lock().expect("锁").entry(outcome).or_insert(0) += 1;
++                let mut aggregate = aggregate.lock().expect("锁");
++                for (name, local_entry) in local {
++                    let entry = aggregate.entry(name).or_default();
++                    entry.evaluated += local_entry.evaluated;
++                    entry.violations += local_entry.violations;
++                    entry.images_red += local_entry.images_red;
++                    if entry.first.is_none() {
++                        entry.first = local_entry.first;
++                    }
++                }
++            });
++        }
++    });
++    println!("PROTO_MR outcomes={:?} seconds={:.1}", mount_outcomes.into_inner().expect("锁"), started.elapsed().as_secs_f64());
++    for (name, entry) in aggregate.into_inner().expect("锁") {
++        println!(
++            "PROTO_MR name={name} evaluated={} violations={} images_red={} first={}",
++            entry.evaluated,
++            entry.violations,
++            entry.images_red,
++            entry.first.unwrap_or_else(|| "-".to_string())
++        );
++    }
++}
+--- m3-batch4-freeze/tree/Cargo.toml	2026-10-01 08:17:23.622350295 +0000
++++ m3-birth-floor-r1-opus/tree/Cargo.toml	2026-10-01 17:47:10.539483057 +0000
+@@ -9,6 +9,7 @@
+     "crates/singlefs-harness",
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
++    "crates/bf-proto",
+ ]
+ exclude = ["research"]
+ 

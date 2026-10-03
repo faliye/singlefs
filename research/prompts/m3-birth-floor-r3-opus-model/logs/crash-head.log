@@ -1,0 +1,39 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 579M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿与派出去的实现员各跑各的
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.06s
+     Running tests/bf_r2_crash.rs (target/release/deps/bf_r2_crash-824f007148c195b0)
+
+running 1 test
+test tree_floor_over_crash_states_of_the_wrapped_history ... R2C_HISTORY name=jring=1MiB sw=16 d=0 [raiseTo8] writes=65 segments=13 closed_form_states=196630 layer0_states=196665 outcomes=["RaiseFloorTo { txg: 8 }:ok"]
+R2C_DONE name=jring=1MiB sw=16 d=0 [raiseTo8] states=700 from=0 of=196665 seconds=32.7
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: beta-red-state:layer0-green evaluated=700 violations=696 states=696 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-lenient evaluated=907200 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 :: β-lenient：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 11 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1250 出生 11；种类 2 根槽 1254 出生 11
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-re-lenient evaluated=28000 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-re-strict evaluated=28000 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-strict evaluated=907200 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 :: β-strict：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 11 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1250 出生 11；种类 2 根槽 1254 出生 11
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:betagap-lenient evaluated=866600 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:betagaprow-lenient evaluated=866600 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tf-lenient evaluated=879200 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 :: TF-lenient：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 11 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1250 出生 11；种类 2 根槽 1254 出生 11
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tf-strict evaluated=879200 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 :: TF-strict：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 11 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1250 出生 11；种类 2 根槽 1254 出生 11
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tfgap-lenient evaluated=838600 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tfgaprow-lenient evaluated=838600 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: layer0-red-states evaluated=700 violations=4 states=4 first=jring=1MiB sw=16 d=0 [raiseTo8] state=0 ["pool_checker:I-3.1"]
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: state:I-3.1=not-applicable evaluated=696 violations=696 states=696 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: state:I-3.1=violated evaluated=4 violations=4 states=4 first=jring=1MiB sw=16 d=0 [raiseTo8] state=0
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: tf-red-state:I-3.1=not-applicable evaluated=696 violations=696 states=696 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 layer0_red=[]
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: tf-red-state:I-3.1=violated evaluated=4 violations=4 states=4 first=jring=1MiB sw=16 d=0 [raiseTo8] state=0 layer0_red=["pool_checker:I-3.1"]
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: tf-red-state:layer0-green evaluated=700 violations=696 states=696 first=jring=1MiB sw=16 d=0 [raiseTo8] state=500 versions=txg 8 [实例 1] | txg 11 [实例 1] | txg 12 [实例 1] | txg 13 [实例 1] | txg 14 [实例 1] | txg 15 [实例 1] | txg 16 [实例 1] | txg 17 [实例 1] | txg 18 [实例 1] | txg 19 [实例 1] | txg 20 [实例 1] | txg 21 [实例 1] | txg 22 [实例 1] | txg 23 [实例 1] | txg 24 [实例 1] | txg 25 [实例 1] | txg 26 [实例 1] | txg 27 [实例 1] | txg 28 [实例 1] | txg 29 [实例 1] | txg 30 [实例 1] | txg 31 [实例 1] | txg 32 [实例 1·由记录施加] | txg 33 [实例 2] | txg 34 [实例 2]
+R2C_TOTAL states_judged=700
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.16s
+

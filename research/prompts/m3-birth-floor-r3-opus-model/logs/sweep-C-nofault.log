@@ -1,0 +1,45 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 210M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿与派出去的实现员各跑各的
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.04s
+     Running tests/bf_r2_sweep.rs (target/release/deps/bf_r2_sweep-d44c533548c3e468)
+
+running 1 test
+test tree_floor_and_beta_over_final_images ... R2_JOBS 728
+R2_DONE images=728 seconds=52.7
+R2 none:CS1:beta-lenient evaluated=187388 violations=0 images=0 first=-
+R2 none:CS1:beta-re-lenient evaluated=8492 violations=0 images=0 first=-
+R2 none:CS1:beta-re-strict evaluated=8492 violations=0 images=0 first=-
+R2 none:CS1:beta-strict evaluated=187388 violations=0 images=0 first=-
+R2 none:CS1:betagap-lenient evaluated=175922 violations=0 images=0 first=-
+R2 none:CS1:betagaprow-lenient evaluated=175922 violations=0 images=0 first=-
+R2 none:CS1:gap-skipped-placements evaluated=11466 violations=11466 images=364 first=C/rbcrash1-remount/[ow,raise1] :: gap 跳过：盘 0 槽 50184 类 1 诞生代号 7 ≤ R⁻ txg 9 [实例 1]；R txg 11 [实例 2]；再次出现；在继承树（不论压不压得住）下 true；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50306 出生 8
+R2 none:CS1:reappear-below-floor evaluated=8492 violations=8492 images=728 first=C/rb1/[ow] :: 再次出现且 birth ≤ R⁻：盘 0 槽 50184 类 1 诞生代号 7 ≤ R⁻ txg 9 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 true；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50306 出生 8
+R2 none:CS1:tf-lenient evaluated=178896 violations=0 images=0 first=-
+R2 none:CS1:tf-strict evaluated=178896 violations=0 images=0 first=-
+R2 none:CS1:tfgap-lenient evaluated=170884 violations=0 images=0 first=-
+R2 none:CS1:tfgaprow-lenient evaluated=170884 violations=0 images=0 first=-
+R2 none:CS2:beta-lenient evaluated=193212 violations=0 images=0 first=-
+R2 none:CS2:beta-re-lenient evaluated=8492 violations=0 images=0 first=-
+R2 none:CS2:beta-re-strict evaluated=8492 violations=0 images=0 first=-
+R2 none:CS2:beta-strict evaluated=193212 violations=0 images=0 first=-
+R2 none:CS2:betagap-lenient evaluated=193212 violations=0 images=0 first=-
+R2 none:CS2:betagaprow-lenient evaluated=193212 violations=0 images=0 first=-
+R2 none:CS2:reappear-below-floor evaluated=8492 violations=8492 images=728 first=C/rb1/[ow] :: 再次出现且 birth ≤ R⁻：盘 0 槽 50184 类 1 诞生代号 7 ≤ R⁻ txg 9 [实例 1]；R txg 10 [实例 1]；再次出现；在继承树（不论压不压得住）下 true；R 的树：种类 1 根槽 50291 出生 7；种类 2 根槽 50306 出生 8
+R2 none:CS2:tf-lenient evaluated=184720 violations=0 images=0 first=-
+R2 none:CS2:tf-strict evaluated=184720 violations=0 images=0 first=-
+R2 none:CS2:tfgap-lenient evaluated=184720 violations=0 images=0 first=-
+R2 none:CS2:tfgaprow-lenient evaluated=184720 violations=0 images=0 first=-
+R2 none:pool-checker evaluated=728 violations=0 images=0 first=-
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 52.70s
+

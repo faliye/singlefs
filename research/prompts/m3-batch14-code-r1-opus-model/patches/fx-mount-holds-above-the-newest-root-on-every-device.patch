@@ -1,0 +1,46 @@
+--- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 18:36:57.060635015 +0000
+@@ -1842,10 +1842,30 @@
+                 .map(|unreadable| unreadable.lowest_txg_it_can_hold),
+         )
+         .min();
+-    allocator.reclaim_released_up_to(
+-        reclaim_floor(effective_floor, oldest_valid_root_in_the_window),
+-        ReclaimedReuse::Immediately,
+-    );
++    // FX（m3-batch14-code-r1 攻方原型，零轮）：F_生效 高于「每块盘上最新有效根取小」时（卸载那一串先写了系统配置、根没落满每块盘就崩），
++    // 当场放开的只到那个最小值；其余扣到这次挂载的暖机落满每块盘之后（`mount_writable_...` 里暖机那一圈之后放开）。
++    let newest_valid_root_on_every_device: Option<CheckpointTxg> = devices
++        .iter()
++        .map(|(device, _)| {
++            roots_with_ring_slots
++                .iter()
++                .filter(|(ring_slot, root)| {
++                    !is_abandoned(root)
++                        && system_configuration.immutable.region_devices
++                            [usize::try_from(ring_slot.region).expect("区域号")]
++                            == *device
++                })
++                .map(|(_, root)| root.checkpoint_txg)
++                .max()
++        })
++        .collect::<Option<Vec<CheckpointTxg>>>()
++        .and_then(|newest| newest.into_iter().min());
++    let floor_of_the_reclaim = reclaim_floor(effective_floor, oldest_valid_root_in_the_window);
++    let floor_released_now = newest_valid_root_on_every_device.map_or(floor_of_the_reclaim, |newest| {
++        reclaim_floor(effective_floor.min(newest), oldest_valid_root_in_the_window)
++    });
++    allocator.reclaim_released_up_to(floor_released_now, ReclaimedReuse::Immediately);
++    allocator.reclaim_released_up_to(floor_of_the_reclaim, ReclaimedReuse::HeldUntilFloorTakesEffect);
+     let shadow_ledger_computed = match shadow_ledger {
+         ShadowLedger::On => isolate_slots_referenced_only_by_abandoned_roots(
+             devices,
+@@ -4617,6 +4637,8 @@
+         warm_up_publishes.push(next.clone());
+         current = next;
+     }
++    // FX：暖机落满每块盘之后，挂载重建分配器时扣住的那一截放开。
++    allocator.release_reclaim_holds();
+     // 取号之前在拷贝上取的落点就是真发起来取的：同一个分配器、同一串分配动作。这一串里有一份换下的单元读盘核校验和对不上时不比——
+     // 真发时那一份的分配记录留在已分配，拷贝上没做那一步、照常释放，那一槽若在这一串里被回收（崩溃恢复落到环里最旧的那条根、其余全被抛弃），两边可以不同
+     // （`dry_run_of_the_publishes_after_acquisition` 的文档注释）；那一格取号之前判的与真发的不是同一串，是这一版留着的缺口。

@@ -1,0 +1,63 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 134M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方攻方腿与派出去的实现员各跑各的
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.07s
+     Running tests/bf_r3_gap.rs (target/release/deps/bf_r3_gap-583382721a8b60c7)
+
+running 1 test
+test gap_frequency_over_crash_states_and_remount ... R3G_HISTORY name=prefix=A crash-in=rb1 outcome=Applied writes=17 segments=4 closed_form_states=4103 layer0_states=4108 shape=["{\"unit_write\": 12}", "{\"journal_record\": 2}", "{\"root_record_fua\": 1}", "{\"system_configuration_slot\": 2}"]
+R3G_DONE name=prefix=A crash-in=rb1 states=4108 from=0 of=4108 seconds=145.1
+R3G name=prefix=A crash-in=rb1 :: after[ow]:beta-lenient-evaluated(sum) = 623712 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:beta-strict-evaluated(sum) = 623712 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:betagap-lenient-evaluated(sum) = 623712 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:betagaprow-lenient-evaluated(sum) = 623712 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:images = 4103 first=prefix=A crash-in=rb1 state=0
+R3G name=prefix=A crash-in=rb1 :: after[ow]:tf-lenient-evaluated(sum) = 623656 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:tf-strict-evaluated(sum) = 623656 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:tfgap-lenient-evaluated(sum) = 623656 first=-
+R3G name=prefix=A crash-in=rb1 :: after[ow]:tfgaprow-lenient-evaluated(sum) = 623656 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:beta-lenient-evaluated(sum) = 590920 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:beta-strict-evaluated(sum) = 590920 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:betagap-lenient-evaluated(sum) = 590920 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:betagaprow-lenient-evaluated(sum) = 590920 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:images = 4103 first=prefix=A crash-in=rb1 state=0
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:tf-lenient-evaluated(sum) = 590832 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:tf-strict-evaluated(sum) = 590832 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:tfgap-lenient-evaluated(sum) = 590832 first=-
+R3G name=prefix=A crash-in=rb1 :: after[rb3]:tfgaprow-lenient-evaluated(sum) = 590832 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:beta-lenient-evaluated(sum) = 386332 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:beta-strict-evaluated(sum) = 386332 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:betagap-lenient-evaluated(sum) = 386332 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:betagaprow-lenient-evaluated(sum) = 386332 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:images = 4108 first=prefix=A crash-in=rb1 state=0
+R3G name=prefix=A crash-in=rb1 :: crash:tf-lenient-evaluated(sum) = 386260 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:tf-strict-evaluated(sum) = 386260 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:tfgap-lenient-evaluated(sum) = 386260 first=-
+R3G name=prefix=A crash-in=rb1 :: crash:tfgaprow-lenient-evaluated(sum) = 386260 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:beta-lenient-evaluated(sum) = 541652 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:beta-strict-evaluated(sum) = 541652 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:betagap-lenient-evaluated(sum) = 541652 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:betagaprow-lenient-evaluated(sum) = 541652 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:images = 4103 first=prefix=A crash-in=rb1 state=0
+R3G name=prefix=A crash-in=rb1 :: mount:refused NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySy = 5 first=prefix=A crash-in=rb1 state=4100
+R3G name=prefix=A crash-in=rb1 :: mount:tf-lenient-evaluated(sum) = 541596 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:tf-strict-evaluated(sum) = 541596 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:tfgap-lenient-evaluated(sum) = 541596 first=-
+R3G name=prefix=A crash-in=rb1 :: mount:tfgaprow-lenient-evaluated(sum) = 541596 first=-
+R3G name=prefix=A crash-in=rb1 :: time-ms:judge-crash = 149163 first=-
+R3G name=prefix=A crash-in=rb1 :: time-ms:materialize = 637 first=-
+R3G name=prefix=A crash-in=rb1 :: time-ms:mount = 54088 first=-
+R3G name=prefix=A crash-in=rb1 :: time-ms:pool-checker = 709246 first=-
+R3G name=prefix=A crash-in=rb1 :: time-ms:tree-floor = 107134 first=-
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 145.10s
+

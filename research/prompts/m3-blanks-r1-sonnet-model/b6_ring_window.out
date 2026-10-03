@@ -1,0 +1,25 @@
+E name=ring_window columns: S L c0 | vertex(W 为单位) 顶点出现在删除后第几次发布 首次回收距释放几次发布 | 窗口甲 窗口乙(起点 c0) | 甲罩得住 乙罩得住 | 乙在第几次发布越过可用
+E note=乙逐次（每次发布重读环）不改结果：起点那一刻写入类发布已按 (c0+1)×W 扣窗口、把可用用到只剩这么多，之后环里根数涨了，可用不会回来
+E S=4 L=12 c0=4 | vertex=11 at=11 delay=11 | A=13 Bstart=5 | A_covers=True Bstart_covers=False | Bstart_fails_at=6
+E S=4 L=12 c0=6 | vertex=11 at=11 delay=11 | A=13 Bstart=7 | A_covers=True Bstart_covers=False | Bstart_fails_at=8
+E S=4 L=12 c0=6 | vertex=11 at=11 delay=11 | A=13 Bstart=7 | A_covers=True Bstart_covers=False | Bstart_fails_at=8
+E S=4 L=12 c0=10 | vertex=11 at=11 delay=11 | A=13 Bstart=11 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=4 L=12 c0=11 | vertex=11 at=11 delay=11 | A=13 Bstart=12 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=4 L=12 c0=12 | vertex=11 at=11 delay=11 | A=13 Bstart=13 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=8 L=24 c0=4 | vertex=23 at=23 delay=23 | A=25 Bstart=5 | A_covers=True Bstart_covers=False | Bstart_fails_at=6
+E S=8 L=24 c0=6 | vertex=23 at=23 delay=23 | A=25 Bstart=7 | A_covers=True Bstart_covers=False | Bstart_fails_at=8
+E S=8 L=24 c0=12 | vertex=23 at=23 delay=23 | A=25 Bstart=13 | A_covers=True Bstart_covers=False | Bstart_fails_at=14
+E S=8 L=24 c0=22 | vertex=23 at=23 delay=23 | A=25 Bstart=23 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=8 L=24 c0=23 | vertex=23 at=23 delay=23 | A=25 Bstart=24 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=8 L=24 c0=24 | vertex=23 at=23 delay=23 | A=25 Bstart=25 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=16 L=48 c0=4 | vertex=47 at=47 delay=47 | A=49 Bstart=5 | A_covers=True Bstart_covers=False | Bstart_fails_at=6
+E S=16 L=48 c0=6 | vertex=47 at=47 delay=47 | A=49 Bstart=7 | A_covers=True Bstart_covers=False | Bstart_fails_at=8
+E S=16 L=48 c0=24 | vertex=47 at=47 delay=47 | A=49 Bstart=25 | A_covers=True Bstart_covers=False | Bstart_fails_at=26
+E S=16 L=48 c0=46 | vertex=47 at=47 delay=47 | A=49 Bstart=47 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=16 L=48 c0=47 | vertex=47 at=47 delay=47 | A=49 Bstart=48 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E S=16 L=48 c0=48 | vertex=47 at=47 delay=47 | A=49 Bstart=49 | A_covers=True Bstart_covers=True | Bstart_fails_at=None
+E name=slots_4GiB_K144 W=368: S=4:甲=4784槽 乙满环=4784槽 乙新池(c=4)=1840槽 乙新池(c=6)=2576槽 S=8:甲=9200槽 乙满环=9200槽 乙新池(c=4)=1840槽 乙新池(c=6)=2576槽 S=16:甲=18032槽 乙满环=18032槽 乙新池(c=4)=1840槽 乙新池(c=6)=2576槽
+E name=computability 甲=系统配置字段 root_ring_slots_per_region × ROOT_RING_REGIONS（挂载时读出，池寿命不变，O(1)）；乙=RootRingOccupancy.occupants 的条数（挂载时读环填进内存，每次发布记根时更新，O(1) 读内存；但读不出的槽不在表里）
+E name=unreadable S=4 L=12 unreadable_slots=2 win_乙满环读出=11 win_甲=13 gap_slots_of_W=2
+E name=unreadable S=8 L=24 unreadable_slots=2 win_乙满环读出=23 win_甲=25 gap_slots_of_W=2
+E name=unreadable S=16 L=48 unreadable_slots=2 win_乙满环读出=47 win_甲=49 gap_slots_of_W=2

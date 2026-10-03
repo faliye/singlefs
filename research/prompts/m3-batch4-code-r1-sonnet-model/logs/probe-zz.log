@@ -1,0 +1,20 @@
+run-with-memory-cap: 这个会话已有 8 条日常的在跑，照理由并行：同一会话派出的几个 agent 各跑各的，不是同一条链重复起
+run-with-memory-cap: 排队（已等 0 秒，至多 150 秒）：slice 已占 39.8 GiB，这一条要 3.0 GiB（峰值表里没有这条，按它的上限 3G 算），总上限 40.1 GiB；账上在跑 10 条
+run-with-memory-cap: 排了 17 秒，起跑（singlefs-memory-cap-1069042-1258916885）
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch4-code-r1-sonnet/tree/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch4-code-r1-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.37s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-59244bb7d1d08fb1)
+
+running 2 tests
+PROBE extent-data-pointer checker violated = ["I-2.4"]
+PROBE clean core mount_read_only = Ok, open+read = Ok(Ok(1))
+PROBE extent-data-pointer-offset-1 core mount_read_only = Ok, open+read = Ok(Ok(1))
+test zz_probe_extent_offset_on_the_extent_data_pointer ... ok
+PROBE F=2 checker violated = []; I-8.1 = Holds; I-7.13 = Holds
+PROBE clean core mount_read_only = Ok, open+read = Ok(Ok(1))
+PROBE F=2-consistent core mount_read_only = Err(Recovery(SystemConfigurationValueRefused { device: DeviceIdentity(0), value: JournalSafetyFactorNotTheFirstVersionValue { recorded_safety_factor: 2, first_version_safety_factor: 3 } }))
+test zz_probe_safety_factor_two_with_consistent_fields ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 55 filtered out; finished in 0.33s
+

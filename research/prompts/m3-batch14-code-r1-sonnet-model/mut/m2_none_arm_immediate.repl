@@ -1,0 +1,4 @@
+                None => allocator
+                    .reclaim_released_up_to(floor_of_the_reclaim, ReclaimedReuse::Immediately),
+            };
+            reclaimed.extend(

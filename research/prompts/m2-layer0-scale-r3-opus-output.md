@@ -184,7 +184,7 @@ SCENARIO S8_back_to_baseline toolchain=[cargo 1.98.0 (797e8a9bc 2026-08-05);rust
 
 | 场景 | 改了什么 | 二进制变了什么 | 进不进补后的指纹 |
 |---|---|---|---|
-| S1 | 仓根上一层目录的 `.cargo/config.toml`：`[profile.release] overflow-checks = false` 与 `[env]` | 溢出检查关了（仓根 `Cargo.toml` 第 17 行 `overflow-checks = true` 被压过去）；编译期与运行期都多了一个环境变量 | 不进：补的 `.cargo/` 是仓里那一份，git 列不到仓外。54 号 `--full` 的出路建议 `layer0_full_base="$(mktemp -d)"`（`.claude/gate.d/54-layer0-replay.sh` 第 224 行），worktree 往上一层就是 `/tmp`，任何本机用户都能建 `/tmp/.cargo/config.toml` |
+| S1 | 仓根上一层目录的 `.cargo/config.toml`：`[profile.release] overflow-checks = false` 与 `[env]` | 溢出检查关了（仓根 `Cargo.toml` 第 17 行 `overflow-checks = true` 被压过去）；编译期与运行期都多了一个环境变量 | 不进：补的 `.cargo/` 是仓里那一份，git 列不到仓外。54 号 `--full` 的出路建议 `layer0_full_base="$(mktemp -d)"`（`.claude/gate.d/checker-tier-layer0-replay.sh` 第 224 行），worktree 往上一层就是 `/tmp`，任何本机用户都能建 `/tmp/.cargo/config.toml` |
 | S2 | `CARGO_HOME` 指到另一个目录，里面的 `config.toml` 写 `[build] rustflags`（默认的 `~/.cargo/config.toml` 同理，今天本机没有这个文件，现查过） | `cfg!(opus_probe)` 变真 | 不进：`CARGO_HOME` 不属于补的那几族，家目录下的配置也不在仓里 |
 | S3 | `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS` | 同上 | 不进（`CARGO_TARGET_*` 不在 `CARGO_BUILD_*` 与 `CARGO_PROFILE_*` 里） |
 | S6 | `CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUNNER` | cargo 经它起测试二进制，能改运行环境、参数，也能根本不跑 | 不进 |

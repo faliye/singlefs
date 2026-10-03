@@ -1,0 +1,7 @@
+E name=capacity leaf_entries_key8_entry8=2031 internal_entries=172 two_level_keys=349332 three_level_keys=60085104
+E name=inode_supply max_inodes_under_one_inode_root=31455 ratio_to_deleted_inodes_root=15.49
+E name=queue_peak shape=甲 一次调用：先走空旧队列，再写意图，再跑完全部批 max_over_3000_seeds=1 mean=1.00
+E name=queue_peak shape=丙 一次调用：不先走空，直接写意图，再跑批 max_over_3000_seeds=6 mean=2.55
+E name=queue_peak shape=乙 一次调用：写意图后立即返回，批由续做做 max_over_3000_seeds=40 mean=19.06
+E name=overflow_calls_needed shape=乙 calls_before_the_root_overflows=2032
+E name=growth_nodes entries=2032 nodes_after_split=3 extra_slots_per_device=2 (一个新根 + 一个右半，D8 已定项 11「多层码 2 树怎么长」)

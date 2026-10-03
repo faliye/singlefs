@@ -18,7 +18,7 @@
 ## 约束
 
 - 要动的 crates 文件：`crates/singlefs-checker/src/image.rs`、`crates/singlefs-checker/src/walk.rs`、`crates/singlefs-checker/src/lib.rs`、`crates/singlefs-harness/tests/checker_known_bad_images.rs`，新测试一份 `crates/singlefs-harness/tests/a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error.rs`；`litmus/` 下新加两份（正例与 `-nofence` 对照）。份数不设上限。
-- 同时在改 `crates/` 的，你都不碰：合入后验证一（core `mount.rs`、`recovery.rs`、`transaction.rs`，harness `model_comparison.rs`、`history.rs`、`bin/first_transaction_on_device.rs`、`bin/e158_root_choice_repair.rs`，几十份测试）；别的会话 singlefs-8b 在挪 11 份测试进 `crates/singlefs-checker/tests/`（层 0 文件与三份崩溃枚举用例）与两个包的 `Cargo.toml`。
+- 同时在改 `crates/` 的，你都不碰：合入后验证一（core `mount.rs`、`recovery.rs`、`transaction.rs`，harness `model_comparison.rs`、`history.rs`、`bin/first_transaction_on_device.rs`、`bin/e158_root_choice_repair.rs`，几十份测试）；别的会话在挪 11 份测试进 `crates/singlefs-checker/tests/`（层 0 文件与三份崩溃枚举用例）与两个包的 `Cargo.toml`。
 - 交补丁：在副本里改，交 `patch/`（`crates.patch` 含 `litmus/`、`mutations-append.tsv`），交回前对主工作区 `git apply --check`。
 - 重型测试：不跑。每条 `cargo test` 带 `--lib`、`--test <目标>` 或 `--bin` 之一。
 - 线程上限：4。每条 cargo 经 `research/scripts/capped.sh 4`。

@@ -1,0 +1,14 @@
+E name=geometry fanout=135 records_per_container=815 containers_one_root_holds=135 unlinks_until_root_full=110025
+E name=first_growth unlink_number=110026 nodes_before=1 nodes_after=3 extra_nodes=2 extra_bytes_per_device=32768
+E name=tree_shape containers=1 records=815 internal_nodes=1 height_incl_leaf=2
+E name=tree_shape containers=135 records=110025 internal_nodes=1 height_incl_leaf=2
+E name=tree_shape containers=136 records=110840 internal_nodes=3 height_incl_leaf=3
+E name=tree_shape containers=1227 records=1000005 internal_nodes=11 height_incl_leaf=3
+E name=tree_shape containers=18225 records=14853375 internal_nodes=136 height_incl_leaf=3
+E name=tree_shape containers=18226 records=14854190 internal_nodes=139 height_incl_leaf=4
+E name=knob rpc=815 root_fanout=135 unlinks_until_growth=110026 unlinks_until_third_level=14853376
+E name=knob rpc=1 root_fanout=135 unlinks_until_growth=136 unlinks_until_third_level=18226
+E name=knob rpc=1 root_fanout=2 unlinks_until_growth=3 unlinks_until_third_level=5
+E name=knob rpc=3 root_fanout=2 unlinks_until_growth=7 unlinks_until_third_level=13
+E name=second_growth containers=18225 unlinks=14853375 nodes_before=136 nodes_after=139
+E name=refusal_class note=结构上限拒不是 ENOSPC：df 空闲不变、写 s 字节仍成功；拒 unlink 违反 D3 已定项 17 射程「墓碑树根满时长高，不因结构拒删除」

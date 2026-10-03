@@ -1,0 +1,24 @@
+[穷举] FAULT 去掉 L（只有 X 抛弃最新根）深度 7
+  检查的状态（每个历史前缀一张镜像）: 856845
+  plain        红的镜像 35648
+  opusI        红的镜像 0
+  both         红的镜像 12878
+  sc_le        红的镜像 0
+  sc_lt        红的镜像 0
+  holes_plain  红的镜像 722726
+  holes_lt     红的镜像 0
+  app_lt       红的镜像 0
+   plain 红单元按 R_first 归类 {'A_whole': 111530, 'B_partial': 26910, 'C_rollback_none': 0, 'D_nonrollback': 0}
+[穷举] FAULT 去掉 X（只有 L 丢根槽）深度 6
+  检查的状态（每个历史前缀一张镜像）: 376484
+  plain        红的镜像 18382
+  opusI        红的镜像 6
+  both         红的镜像 8515
+  sc_le        红的镜像 0
+  sc_lt        红的镜像 0
+  holes_plain  红的镜像 247518
+  holes_lt     红的镜像 0
+  app_lt       红的镜像 0
+   plain 红单元按 R_first 归类 {'A_whole': 47224, 'B_partial': 17040, 'C_rollback_none': 0, 'D_nonrollback': 18}
+   首例 opusI: ((('W',), ('W',), ('R', ('o', 0)), ('N',), ('F', 4), ('L', 2)), [(('d', 3, ()), 2)])
+   首例 both: ((('W',), ('W',), ('R', ('o', 0)), ('N',), ('F', 4), ('L', 2)), [(('d', 3, ()), 2)])

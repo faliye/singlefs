@@ -1,0 +1,9 @@
+beee8234cea1dd9f86a211490d86930b25fd0e5824ef4142fde5c0a03f3129fc  .claude/kb/milestone/03-third-txn.md
+3095058cc20cd9e279643895717130ab94a3d9a1479e2b515c336776d4a1a794  .claude/kb/layout/03-third-txn.md
+31059e9d64303e358c4a8684e857debf4bc03a95e77983220c5946026be9bd10  .claude/kb/checks-owed.md
+b4dc1b21b19612bf7f899753d6a1f48eda2f0b194d2646d3338fcf5b34914ce0  .claude/kb/decisions/08-核心索引结构.md
+a83e6430a842fcbd19e17f454a3d3a8edbd8f33b832098ba582261a5ad5d8279  .claude/kb/decisions/18-块里携带什么信息.md
+9c2fc930e9f2238bad034ad3ea402fa2a837fdfd03c8522e9825d56c64c76036  .claude/kb/decisions/23-journal的角色与格式.md
+a049e79677f081144d7987f6cb8fefd1d3a950150eecb67612de959b994d16d0  .claude/kb/decisions/03-空间分配.md
+acdc3ea23590268bcbcb80010789374776c696eb4686d32ed2ed601e285c3fc6  .claude/kb/decisions/28-挂载期承诺量.md
+31521cb8947e819306c760a9c5e306d5ba625aeb65a0e19b269de36b3bf29441  .claude/kb/decisions/05-快照-空间记账机制.md

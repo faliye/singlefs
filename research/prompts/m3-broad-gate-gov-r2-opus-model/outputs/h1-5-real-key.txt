@@ -1,0 +1,7 @@
+tree.source fingerprint=e1ba257413cbad99 global_key_in_pointer=None
+recorded global-key.txt sha256=fbd2f8c116d249bc lines=16
+current (gate algorithm) sha256=1474ec27f69e1d61 lines=16
+conclusions.tsv global_key values=['fbd2f8c116d249bc']
+byte-identical=False
+only-recorded	exclusions 38b0045beee9719532c87e7190d1cbf08a65e114812cd122d1f5ef1cd0461268
+only-current	exclusions 0ed6758525bbadd34240e1caa15e1803c6da97cca3dbd27b556ae02782167d2a

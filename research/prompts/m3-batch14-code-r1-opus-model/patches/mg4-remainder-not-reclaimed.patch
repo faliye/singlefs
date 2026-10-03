@@ -1,0 +1,13 @@
+--- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 19:07:38.629142468 +0000
+@@ -2964,10 +2964,6 @@
+                 ),
+                 None => Vec::new(),
+             };
+-            reclaimed.extend(allocator.reclaim_released_up_to(
+-                floor_of_the_reclaim,
+-                ReclaimedReuse::HeldUntilFloorTakesEffect,
+-            ));
+             reclaimed
+         }
+     };

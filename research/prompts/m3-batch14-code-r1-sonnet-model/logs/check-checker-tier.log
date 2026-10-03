@@ -1,0 +1,11 @@
+    Checking verus_builtin v0.0.0-2026-09-16-0054
+    Checking singlefs-format v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-format)
+    Checking singlefs-reference-filesystem v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-reference-filesystem)
+    Checking libc v0.2.189
+    Checking singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-checker)
+    Checking vstd v0.0.0-2026-09-20-0158
+    Checking singlefs-replay-prefix v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-replay-prefix)
+    Checking singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-core)
+    Checking singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-harness)
+    Checking singlefs-checker-tier v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-sonnet/w/crates/singlefs-checker-tier)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 7.57s

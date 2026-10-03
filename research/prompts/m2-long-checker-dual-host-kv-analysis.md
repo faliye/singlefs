@@ -1,6 +1,6 @@
 # checker 档长活：双机分片与 KV 存储的分析（2026-09-28）
 
-会话 singlefs-8f，主 agent 写。问题来自 singlefs-99 转来的四问（用户同日原样重发）；用户同日定这一轮由 singlefs-8f 全权负责，找出问题就改。改了什么、改到哪，调度记录在 `records/2026-09-28-门禁59号提速与双机分片.md`。
+主 agent 写。问题来自别的会话转来的四问（用户同日原样重发）；用户同日定这一轮由别的会话全权负责，找出问题就改。改了什么、改到哪，调度记录在 `records/2026-09-28-门禁59号提速与双机分片.md`。
 
 凡写「推的」都是没量过、由量过的数外推的；凡写「量过」都带出处。第二台的主机名、路径、服务单元一律不写。
 
@@ -9,7 +9,7 @@
 | 阶段 | 规模（现数） | 挂钟 | 卡在哪 |
 |---|---|---|---|
 | 59 号 crates 变异表复跑 | `crates/mutations.tsv` 非注释行 1401（暂存区；工作区另有别的会话追加的 2 行）；变异落在 core 724、checker-tier 282、池级 checker 219、harness 145、format 30、`litmus/` 1 行；点名的包 harness 891、checker-tier 375、core 107、format 26、池级 checker 2；没有一行带 `--release`；不同的 cargo 参数 735 种 | 量过的只有 2026-09-25 那一趟 724 行：「59 号本身已跑 3428 秒判完 602 条，均速约 5.7 秒/条」（`/tmp/claude-1000/gate-triage-head/progress.md`），结局「抓到 687 条、没红 12 条、无效 19 条……超时 6 条」（`gate-staged.out:5049`）。按同一均速外推 1401 行约 2.2 小时，推的；6 条超时各占一个工作进程 1800 秒，不在均速里 | ① 内存排队：「slice 已占 38.9 GiB，这一条要 4.0 GiB（峰值表里没有这条，按它的上限 4G 算），总上限 40.1 GiB；账上在跑 11 条」（`gate-staged.out:5264`），16 个工作进程实际只并发 10–11 条。峰值表现在已记下 613 条 59 号的命令，中位 1.32 GiB、p90 2.73 GiB、最大 8.00 GiB（`research/scripts/memory-peaks.tsv`，按 `cargo test --offline` 起头的键统计），下一趟排队会松很多；② 尾巴：随机历史一类的重测试与超时的那几条；③ 只能整道复用：`crates/` 下任何一处变了（包括往变异表追加一行）整张重跑，跑到一半被杀从头来 |
-| 54 号全量里的崩溃枚举用例 | 登记 8 条（`.claude/gate.d/stage-inputs.tsv` 第 36–43 行）。认分片的 3 条：第一条流 16 777 260 个状态、第二条流 1 662 648 564、并行线一 1 358 954 634（各自测试文件里的 `FULL_STATES` 常量与闭式断言）；不认分片的 5 条：树分裂七条流 78 905 428、位置寻址树、会话推的抬 F、C561 σ 全量 2¹⁸、崩溃注入快档 | 第一条流双机量过：两片 338.6 秒与约 310 秒（`.git/singlefs-layer0-logs/layer0-first-stream-20260927T172628Z-128021/` 的 merge 日志 `shard_elapsed_milliseconds=338323,310008`）。第二条流速率量过：「本机 23,700 个/秒、第二台 24,800 个/秒，全流约 9.8 小时；54 号全量推约 18 小时」（`records/2026-09-24-里程碑二收尾调度.md` 第 317 行）。并行线一按同一速率推约 7.8 小时，树分裂单机推约 55 分钟，都是推的 | CPU：每个状态都要恢复加池级 checker，E161（崩溃放量的去重与分段耗时） 判了 checker 判定不能按走到的单元复用（`records/2026-09-24-里程碑二收尾调度.md` 第 327 行：「checker 判定按走到的单元复用出错（k4_walk 3、k4_units 6），只能逐状态算」）。54 号 `--full` 逐条串行跑用例（`.claude/gate.d/54-layer0-replay.sh` 第 492 行起的循环）：跑不认分片的那 5 条时第二台空着 |
+| 54 号全量里的崩溃枚举用例 | 登记 8 条（`.claude/gate.d/stage-inputs.tsv` 第 36–43 行）。认分片的 3 条：第一条流 16 777 260 个状态、第二条流 1 662 648 564、并行线一 1 358 954 634（各自测试文件里的 `FULL_STATES` 常量与闭式断言）；不认分片的 5 条：树分裂七条流 78 905 428、位置寻址树、会话推的抬 F、C561 σ 全量 2¹⁸、崩溃注入快档 | 第一条流双机量过：两片 338.6 秒与约 310 秒（`.git/singlefs-layer0-logs/layer0-first-stream-20260927T172628Z-128021/` 的 merge 日志 `shard_elapsed_milliseconds=338323,310008`）。第二条流速率量过：「本机 23,700 个/秒、第二台 24,800 个/秒，全流约 9.8 小时；54 号全量推约 18 小时」（`records/2026-09-24-里程碑二收尾调度.md` 第 317 行）。并行线一按同一速率推约 7.8 小时，树分裂单机推约 55 分钟，都是推的 | CPU：每个状态都要恢复加池级 checker，E161（崩溃放量的去重与分段耗时） 判了 checker 判定不能按走到的单元复用（`records/2026-09-24-里程碑二收尾调度.md` 第 327 行：「checker 判定按走到的单元复用出错（k4_walk 3、k4_units 6），只能逐状态算」）。54 号 `--full` 逐条串行跑用例（`.claude/gate.d/checker-tier-layer0-replay.sh` 第 492 行起的循环）：跑不认分片的那 5 条时第二台空着 |
 | 55 号 QEMU 真设备 | 6 个模式各起一台虚机、并行（`.claude/gate.d/55-qemu-device-streams.sh` 第 11–21 行） | 没找到单独量过的数。2026-09-16 那一趟「54、55、57、59 合计 58.1 分钟（54 号 46 分 48 秒）」（`records/2026-09-16-subagent拆分提案.md` 第 382 行），当时 59 号只有 40 行，55 + 57 + 59 合计约 11 分钟；推今天 55 号在十分钟量级 | 虚机起停与编译；已经在本机并行 |
 | 57 号 herd7 | `litmus/` 下 8 份 | 同一行 2026-09-16 的合计里；推是分钟量级 | 无 |
 | 87 号实验复跑 | `research/scripts/replay.sh` 登记表 161 行，默认跑 exact 行、慢的与计时行压在 `GATE_REPLAY_FULL=1` 后面 | 「87 号全量复跑与 15 号全编译（合起来十几分钟）」（`records/2026-09-16-subagent拆分提案.md` 第 535 行） | 已经按 `REPLAY_JOBS`（核数一半）并发（`replay.sh` 第 881 行） |
@@ -60,7 +60,7 @@
 | `crates/singlefs-checker-tier/Cargo.toml` 加依赖、`Cargo.lock` | `Cargo.lock` 在 8 条崩溃枚举用例与 54、55、59、74、87 号的登记输入里：全部全绿标记作废，整道全量再跑一次（用户 2026-09-28 已定接完再跑一趟全量，`records/2026-09-24-里程碑二收尾调度.md` 第 311 行） |
 | `crates/singlefs-checker-tier/src/layer0_progress.rs`、`crash.rs`，新存储模块 | 同上 |
 | `research/scripts/layer0-shard-run.sh` 第 ⑤、⑥ 步（账本拷回 → 块导入或经网络送块） | 三条认分片的用例（按内容进指纹） |
-| `.claude/gate.d/54-layer0-replay.sh` 的进度目录、`research/scripts/admission.py`（判日志的那一段若改） | 54 号整道复用；判法摘要变了的用例 |
+| `.claude/gate.d/checker-tier-layer0-replay.sh` 的进度目录、`research/scripts/admission.py`（判日志的那一段若改） | 54 号整道复用；判法摘要变了的用例 |
 | `research/scripts/layer0-shard-run-selftest.sh` 与样本、`.claude/rules/implementation-workflow.md`「双机分片」那一条 | 无 |
 
 依赖放哪要注意：里程碑三第十一项写的是「只进 harness」（`.claude/kb/milestone/03-third-txn.md` 第 95 行），那句写在验证代码分两档之前；今天崩溃枚举在 `singlefs-checker-tier`，而 harness 档不许依赖 checker 档（`.claude/rules/verification.md`「定义与名字」），依赖应当只进 checker 档。
@@ -76,7 +76,7 @@
 
 **要用户定的**：
 
-1. **第五步的 59 号会在派活前判红。** 暂存区的 `crates/mutations.tsv` 第 1377 行改的是 `litmus/…`，暂存区的 `stage-inputs.tsv` 第 31 行没有 `litmus/`，第五步那棵树里的 59 号在 `59-crates-mutation-replay.sh` 第 237–245 行就停（按代码读的，没跑）。另有一行点名 `publish_order_matches_litmus`，那份测试在副本里读不到 `litmus/` 会 panic，就算过了范围检查也会记成假的「抓到」。修法在主工作区（第 1 件），没有暂存。要不要把它并进第五步那次提交，或者第五步先把那一行挪走，要你定；用户说了这一轮不向别的会话汇报，所以没有告诉 singlefs-99。
+1. **第五步的 59 号会在派活前判红。** 暂存区的 `crates/mutations.tsv` 第 1377 行改的是 `litmus/…`，暂存区的 `stage-inputs.tsv` 第 31 行没有 `litmus/`，第五步那棵树里的 59 号在 `59-crates-mutation-replay.sh` 第 237–245 行就停（按代码读的，没跑）。另有一行点名 `publish_order_matches_litmus`，那份测试在副本里读不到 `litmus/` 会 panic，就算过了范围检查也会记成假的「抓到」。修法在主工作区（第 1 件），没有暂存。要不要把它并进第五步那次提交，或者第五步先把那一行挪走，要你定；用户说了这一轮不向别的会话汇报，所以没有告诉别的会话。
 2. 按条记录多久过期：这一轮照全绿标记用 `SINGLEFS_REUSE_HOURS`（默认 24 小时）。键里已经带工具链与构建环境，放长能多复用；要不要放长。
 3. 59 号双机：照 54 号那样「配置在就开」，跑的时候两台清场停服务；还是默认关、要时才开。
 4. KV：崩溃判定块与门禁任务的记录用一个库还是分开（推荐分开）；依赖进 checker 档不进 harness；两台怎么写等 E162（崩溃放量判定块存储选型） S3。

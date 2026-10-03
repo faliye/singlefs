@@ -1,0 +1,48 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -7235,3 +7235,45 @@
+         }
+     }
+ }
++
++/// 攻方腿副本里加的口子（m3-batch4-code-r1 攻方，只在副本里）：R-独 重放的结局，给与 core `recover` 的 `effective_root` 逐状态差分用。
++/// 取法与 `check_pool_image` 里 I-4.1 那一段相同：池里第一块择到系统配置的盘那一份几何、根环里 (txg, 实例) 最大的根。
++#[must_use]
++pub fn attack_replay_outcome_for_differential(reader: &dyn ImageReader) -> String {
++    let chosen: Vec<_> = crate::image::chosen_system_configurations(reader)
++        .into_iter()
++        .filter_map(|(device, chosen)| chosen.map(|(view, geometry)| (device, view, geometry)))
++        .collect();
++    let Some((_, _, geometry)) = chosen.first() else {
++        return "checker:no-system-configuration".to_string();
++    };
++    let filesystem_identifier_low =
++        u64::from_le_bytes(geometry.filesystem_identifier[..8].try_into().expect("8 字节"));
++    let roots = crate::image::valid_roots(reader, geometry);
++    let Some((_, _, newest)) = roots
++        .iter()
++        .max_by_key(|(_, _, root)| (root.checkpoint_txg, root.instance))
++    else {
++        return "checker:no-root".to_string();
++    };
++    let records_by_device =
++        scanned_journal_records_by_device(reader, geometry, filesystem_identifier_low);
++    let reads = records_the_replay_reads(&records_by_device);
++    let limit = geometry.journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR;
++    match replay_the_next_mount_would_do(reader, &reads, newest, limit) {
++        ReplayTheNextMountWouldDo::AnchorUndecided => "checker:anchor-undecided".to_string(),
++        ReplayTheNextMountWouldDo::ChosenRootTxgHasNoSuccessor => {
++            "checker:no-successor".to_string()
++        }
++        ReplayTheNextMountWouldDo::StoppedAtANamedUnitThatDoesNotVerify => format!(
++            "checker:stopped-at-named-unit chosen=({},{})",
++            newest.instance, newest.checkpoint_txg
++        ),
++        ReplayTheNextMountWouldDo::NothingApplied => {
++            format!("({},{})", newest.instance, newest.checkpoint_txg)
++        }
++        ReplayTheNextMountWouldDo::Applied { last_record, .. } => {
++            format!("({},{})", last_record.instance, last_record.checkpoint_txg)
++        }
++    }
++}

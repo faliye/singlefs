@@ -180,7 +180,7 @@ research/prompts/m2-layer0-scale-r2-opus-output.md
 | `research/scripts/admission.py:271` | `git ls-files -z --cached --others --exclude-standard` | ✓ |
 | `admission.py:276`（引用两次） | `os.path.isfile` 过滤 | ✓ |
 | `Cargo.toml:17`（主树与冻结） | `overflow-checks = true` | ✓ 两处都命中 |
-| `.claude/gate.d/54-layer0-replay.sh:224` | `layer0_full_base="$(mktemp -d)"` | ✓（嵌在 echo 字符串里，字面仍命中） |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:224` | `layer0_full_base="$(mktemp -d)"` | ✓（嵌在 echo 字符串里，字面仍命中） |
 | `tests/common/mod.rs:40`（冻结） | `std::env::temp_dir()` | ✓ |
 | `second_transaction_step_zero_layer0.rs` 第 456/457/458/526/534/535/538/589/977/1156 行（冻结） | prepare 调用、expand 谓词、`.content = third_content()`、五处枚举调用 | ✓ 十处全部逐字符命中，`457` 与 `535` 两行逐字相同（与「逐字相同」的说法一致） |
 | `l7-resume-prototype-crash-rs.patch` 第 56/79/82 行 | `slice_line`、`Layer0Tally::default()`、`unwrap_or(0)` | ✓ 三处全部命中 |

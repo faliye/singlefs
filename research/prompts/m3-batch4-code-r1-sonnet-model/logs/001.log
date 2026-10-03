@@ -1,0 +1,100 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 1916M 的 2 倍，照理由放行：变异之后要重编 core/checker 与测试二进制，峰值表里的实测值是不重编的
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出的几个 agent 各跑各的，不是同一条链重复起
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch4-code-r1-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.55s
+     Running tests/checker_narrow_invariants_and_abandoned_roots.rs (target/debug/deps/checker_narrow_invariants_and_abandoned_roots-5405339f25f759c7)
+
+running 19 tests
+test a_device_whose_slot_zero_does_not_verify_has_its_slot_one_looked_for_at_the_spacing_another_device_records ... ok
+test a_journal_named_entry_whose_location_entries_are_not_in_ascending_device_order_reddens_only_the_location_order_invariant ... ok
+test a_journal_record_whose_counter_is_zero_reddens_the_back_chain_invariant ... ok
+test a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant ... FAILED
+test a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant ... FAILED
+test a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds ... FAILED
+test a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant ... FAILED
+test a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant ... FAILED
+test container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant ... FAILED
+test an_older_version_naming_again_a_placement_inside_a_subtree_it_shares_with_a_newer_version_reddens_the_disjoint_ranges_invariant ... ok
+test the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open ... FAILED
+test the_second_sentence_of_the_instance_carrier_invariant_is_judged_on_the_readable_carriers_when_a_slot_is_unreadable ... ok
+test the_first_sentence_of_the_instance_carrier_invariant_is_not_judged_when_a_slot_is_unreadable ... ok
+test two_leaf_containers_in_key_order_hold_every_invariant ... FAILED
+test an_unreadable_root_ring_slot_leaves_the_abandoned_half_of_the_reuse_invariant_not_judged ... ok
+test overlapping_records_in_the_allocation_record_tree_the_root_record_holds_redden_only_the_disjointness_invariant ... ok
+test a_released_record_in_the_allocation_record_tree_the_root_record_holds_is_judged_by_the_release_generation_invariant ... ok
+test erasing_a_unit_only_an_abandoned_root_references_reddens_only_the_reuse_invariant ... ok
+test an_abandoned_root_whose_units_a_mount_blind_to_it_handed_out_again_reddens_only_the_reuse_invariant ... ok
+
+failures:
+
+---- a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant stdout ----
+
+thread 'a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant' (1035609) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:1330:5:
+assertion `left == right` failed: 只该红映射 key 那一条：[("I-1.11", "映射条目：码 3 的 key 尾段在出生序号之后的补零 2 字节是 [1, 0]，不是 0"), ("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: ["I-1.11", "I-8.10"]
+ right: ["I-1.11"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant stdout ----
+
+thread 'a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant' (1035608) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:1351:9:
+assertion `left == right` failed: 类标签 1：只该红映射 key 那一条：[("I-1.11", "映射条目：码 1 的 key 里的出生树 65537 与它指的单元头里的出生树 65536 不符"), ("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: ["I-1.11", "I-8.10"]
+ right: ["I-1.11"]
+
+---- a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds stdout ----
+
+thread 'a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds' (1035607) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:819:5:
+assertion `left == right` failed: 合法的三层 inode 树一条都不许红：[("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: [("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+ right: []
+
+---- a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant stdout ----
+
+thread 'a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant' (1035611) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:938:5:
+assertion `left == right` failed: 只该红 I-9.4：[("I-9.4", "左容器 1 的最大 key 10 不小于右容器号 8"), ("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: ["I-9.4", "I-8.10"]
+ right: ["I-9.4"]
+
+---- a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant stdout ----
+
+thread 'a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant' (1035635) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:836:5:
+assertion `left == right` failed: 只该红 I-9.2：[("I-9.2", "inode 内部条目类型段 0：孩子的类标签 2（要 2），身份引用的出生树 / 容器号 / 出生代 0 / 7 / 0（要三段为 0）"), ("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: ["I-9.2", "I-8.10"]
+ right: ["I-9.2"]
+
+---- container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant stdout ----
+
+thread 'container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant' (1035660) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:953:5:
+assertion `left == right` failed: 只该红 I-9.4：[("I-9.4", "沿叶序容器号不严格递增：容器 1 之后是容器 0"), ("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: ["I-9.4", "I-8.10"]
+ right: ["I-9.4"]
+
+---- the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open stdout ----
+
+thread 'the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open' (1035668) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:1374:5:
+assertion `left == right` failed: 码 2 的出生树随 C289 定，今天不判
+  left: [("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+ right: []
+
+---- two_leaf_containers_in_key_order_hold_every_invariant stdout ----
+
+thread 'two_leaf_containers_in_key_order_hold_every_invariant' (1035671) panicked at crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs:926:5:
+assertion `left == right` failed: 两片叶按序排好，一条都不许红：[("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+  left: [("I-8.10", "盘 0 journal 计数器 3 那条带末条标志的记录（实例 1、txg 3）的新根段与区域 0 槽 1 那条同代根的四段不逐字节相同")]
+ right: []
+
+
+failures:
+    a_legal_type_zero_inode_entry_is_walked_down_to_the_leaf_and_every_invariant_holds
+    a_mapping_key_whose_birth_tree_is_not_the_one_in_the_unit_header_reddens_only_the_mapping_key_invariant
+    a_mapping_key_whose_padding_after_the_birth_sequence_is_not_zero_reddens_only_the_mapping_key_invariant
+    a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant
+    a_type_zero_inode_entry_whose_container_segment_is_not_zero_reddens_only_the_entry_identity_invariant
+    container_numbers_going_backwards_along_the_leaf_order_redden_only_the_container_number_invariant
+    the_birth_tree_in_a_mapping_key_of_an_index_node_is_not_judged_while_its_field_is_open
+    two_leaf_containers_in_key_order_hold_every_invariant
+
+test result: FAILED. 11 passed; 8 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.48s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_narrow_invariants_and_abandoned_roots`

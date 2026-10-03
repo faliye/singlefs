@@ -108,7 +108,7 @@ $ awk 'NR==707' selftest/crash.rs
 | `m2-layer0-scale-r1-sonnet-output.md` 第 135 行起两行（乙的清单两条流行） | ✓ 精确匹配，135/136 恰好是两条流各自的登记行 |
 | `research/scripts/admission.py:271` `git ls-files -z --cached --others --exclude-standard -- ...` | ✓ 精确匹配（未提交新文件，稳定） |
 | `.claude/gate.d/stage-inputs.tsv:20`（54 号登记行） | ✓ 精确匹配 |
-| `.claude/gate.d/54-layer0-replay.sh:156–160`（`worker_threads_of_full_run` 函数体） | ✓ 精确匹配（该文件整体有未提交改动，但这 5 行本身未被改动） |
+| `.claude/gate.d/checker-tier-layer0-replay.sh:156–160`（`worker_threads_of_full_run` 函数体） | ✓ 精确匹配（该文件整体有未提交改动，但这 5 行本身未被改动） |
 | 主工作区 `.gitignore:3` `target/`，`git check-ignore -v --no-index crates/singlefs-core/src/target/mod.rs` | ✓ 命令原样重跑，输出与报告逐字一致（`.gitignore` 未被改动） |
 | C22「刚释放的块立即重分配」（配 `ReuseWindow::ForcedToZero`） | ✓ 简称与 `checks-owed.md` 已还清表登记的简称精确一致；`ReuseWindow::ForcedToZero` 在冻结副本 3 处代码位置存在 |
 | C513「复用证得出违反回收谓词不开脱」 | **观察**：`checks-owed.md` 里 C513 登记的简称是「复用豁免不判那次复用合不合法」，与 opus 报告括注里的措辞不是同一个简称（含义上接近——是对 C513 要求的判据的转述，不是对它简称的照抄）；C513 的编号本身与题面对应正确。按 `kb-discipline.md` 第 5 条「编号只能做索引……每次引用都要把名字带上：写成编号（简称）」的字面要求，此处括注应是登记的简称、不该是转述句 |

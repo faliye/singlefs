@@ -1,0 +1,1 @@
+--no-fail-fast -p singlefs-harness --test entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration --test entries_after_mount_refuse_swapped_or_behind_devices --test entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write --test checker_known_bad_images

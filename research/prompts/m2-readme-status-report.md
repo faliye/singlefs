@@ -76,7 +76,7 @@ $ git status --short multi-host.env.example
 | S6 | 无 | 代码审阅提出的 38 条正分批在这个里程碑里修 | 同上第 205 行「代码审阅 38 条：…分批「照分批全在里程碑二修」」；之后第 206–229 行多数是这批（实审 A / B / C）的交回与开工 |
 | S7 | 无 | C554（崩溃恢复抛弃的根暂时读不出时影子账算不到）那一形用户定了要改 | 同上第 196 行「C554 用户定案：不许认，要改」；简称照 `.claude/kb/checks-owed.md:475` |
 | S8 | 无 | 这一版的简报等收尾时写 | 十步表第 9 步；`ls briefs/` |
-| S9 | 无 | 下一个里程碑十项设想是草稿、等这个里程碑收口才开工；第六项双机分片用户定了提前做、已接进门禁 54 号 | `03-third-txn.md:1,3`；`records/…收尾调度.md:199`「用户指示把里程碑三第六项…提前到现在做」；`.claude/gate.d/54-layer0-replay.sh` 文件头「双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）」一段 |
+| S9 | 无 | 下一个里程碑十项设想是草稿、等这个里程碑收口才开工；第六项双机分片用户定了提前做、已接进门禁 54 号 | `03-third-txn.md:1,3`；`records/…收尾调度.md:199`「用户指示把里程碑三第六项…提前到现在做」；`.claude/gate.d/checker-tier-layer0-replay.sh` 文件头「双机分片（里程碑三第六项，用户 2026-09-27 定默认不分片）」一段 |
 | S10 | 无 | 不能挂到系统里用：没有 FUSE、内核模块、目录与 POSIX 接口；快照、加密、压缩不在这个里程碑；别存数据；格式是软的 | `02-second-txn.md:26-28`「不在里面：目录与 POSIX 面、FUSE…快照与克隆、加密、压缩」；`grep -rnwiE 'fuse\|readdir\|DirectoryEntry\|directory_entry\|dirent\|posix' crates --include=*.rs` 零命中；`briefs/2026-09-14.md:6-7`；`.claude/rules/format-evolution.md` 开头 |
 | S11 | 无 | 验证表「崩溃点重放」一行：两条流、登记的崩溃枚举用例逐条跑逐条记标记、固定脚本那条流重写重跑之前不作数、「门禁全绿只构成第一个事务在模型层的崩溃一致性证据」 | `CLAUDE.md:110`（「一句话版本」最后一条，限定词「层 0 用例只改到编得过、下游钉的值没有重核」照抄）；`.claude/gate.d/stage-inputs.tsv` 五行 `crash-case:`；54 号文件头 `--full` 一段 |
 | S12 | 无 | 「在用的 79 条不变量里判 46 条」 | `grep -c '^\| I-.*已实现' .claude/kb/invariants.md` → `46`；`.claude/kb/invariants.md:17`「现共 79 条在用」 |

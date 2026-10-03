@@ -1,0 +1,15 @@
+BASELINE 判对 10 判错 2：library-version-is-staged-tree-green(期望0→实测1) library-version-is-staged-tree-unstaged-change-green(期望0→实测1)
+MUTANT M1-pending	tree.source.pending 在判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT M2-only-recorded	那一版有、暂存树没有（暂存区删了文件）判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT M3-version-key	按驱动 version_key 复算的版本指纹不等判红	翻面的样本 2 份：library-version-is-staged-tree-green(1→0) library-version-is-staged-tree-unstaged-change-green(1→0)
+MUTANT M4-merge-conflict	索引里有合并冲突判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT M5-source-fingerprint	逐文件相同而源码指纹不同判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT M6-toolchain-missing	那一版没记工具链判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT M7-empty-staged	导出范围里一个文件都没有判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N1-exit-not-0-8	--summary 退的不是 0 也不是 8 判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N2-verdict-exit-mismatch	判定行与退出码对不上判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N3-green-with-counts	判定行写 green 而计数不为零判红	翻面的样本 1 份：gate-verdict-silent-driver-red(1→0)
+MUTANT N4-sum-not-total	concluded 加 without_conclusion 不等于 total 判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N5-detail-vs-counts	明细行数与计数不同判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N6-total-zero	清单 0 条判红	翻面的样本 0 份：无（没有样本盯着这一支）
+MUTANT N7-unknown-verdict	verdict 不是 green / red 判红	翻面的样本 0 份：无（没有样本盯着这一支）

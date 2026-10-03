@@ -92,7 +92,7 @@ second_transaction_supplement_three_fault_injection second_transaction_supplemen
 - `.claude/gate.d/stage-inputs.tsv` 的 crash-case 行：layer0-first-stream、layer0-second-stream、layer0-parallel-line-one-stream、layer0-tree-split-streams（注释里写着 78905428 这个数）、c561-sigma-full（注释里写着 2^18）、floor-raise-pushed-by-the-session、crash-injection-fast-tier。用例钉的数都跟着变。
 - litmus：`litmus/first-txn-*.litmus` 与 `commit-publish*.litmus` 的 P0 只写到根槽，不写系统配置槽和它之后的屏障。`publish_order_matches_litmus.rs` 那条红的只是步数（33 变 35）。要不要给「轮换之后屏障」补一条 litmus，交主 agent 定；litmus 我没改。
 - E142 独立模型 `research/e7-index-bench/src/bin/e142_first_transaction_dry_run.rs`：暖机（第 2719 行）和第一个事务（第 3083 行）写完系统配置槽之后都没有屏障。产物 `name=segments`、登记表 `.claude/kb/layout/01-first-txn.md` 八那一节（第 402、403 行两条路径，第 410 行整条流 `2+2+1+2+2+1+26+2+1+2`、67108885）和门禁 52 号会跟着对不上。模型、产物、kb 都不归我。
-- 55 号装置样本（`first_transaction_on_device`，别的会话 singlefs-39 在重录）：每块盘每次发布多一次 FLUSH，`name=device_calls` 的 barriers= 跟着变；`src/bin/first_transaction_on_device.rs` 第 2019、2025、2034、2039 行的单测也钉着屏障数（harness 的 bin 目标，我没跑）。
+- 55 号装置样本（`first_transaction_on_device`，别的会话在重录）：每块盘每次发布多一次 FLUSH，`name=device_calls` 的 barriers= 跟着变；`src/bin/first_transaction_on_device.rs` 第 2019、2025、2034、2039 行的单测也钉着屏障数（harness 的 bin 目标，我没跑）。
 - `crates/singlefs-harness/src/crash.rs` 归 A3b，我没碰。
 
 ## `:1082` 那条的看法（交主 agent，这里有一处条款没定）

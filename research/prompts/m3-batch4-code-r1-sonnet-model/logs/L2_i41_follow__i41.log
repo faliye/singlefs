@@ -1,0 +1,22 @@
+
+running 2 tests
+test a_replay_stopped_by_a_named_unit_that_does_not_verify_leaves_the_replayed_version_invariant_not_applicable ... ok
+test a_replayed_version_whose_tree_table_does_not_read_back_reddens_only_the_replayed_version_invariant ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 53 filtered out; finished in 0.99s
+
+run-with-memory-cap: 上限 8G 超过实测峰值 553M 的 2 倍，照理由放行：变异之后要重编 core/checker 与测试二进制，峰值表里的实测值是不重编的
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一会话派出的几个 agent 各跑各的，不是同一条链重复起
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch4-code-r1-sonnet/tree/crates/singlefs-checker)
+warning: function `readable_record_of_the_same_publish_follows` is never used
+    --> crates/singlefs-checker/src/walk.rs:6232:4
+     |
+6232 | fn readable_record_of_the_same_publish_follows(
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch4-code-r1-sonnet/tree/crates/singlefs-harness)
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.68s
+     Running tests/checker_known_bad_images.rs (target/debug/deps/checker_known_bad_images-59244bb7d1d08fb1)

@@ -1,0 +1,81 @@
+row 46: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=步 5：抬 F 回收的槽不扣住、生效之前就能发出去
+   test=slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect
+row 2174: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=三·2 删除批第 12 批丙 1（用户 2026-10-03 定「丙 1 进下一批」）：卸载那一串回收的槽照旧扣到生效，续做推满仍放不下之后卸载在预演里取不到落点
+   test=a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_conti
+row 2175: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=三·2 删除批第 12 批丙 1：卸载那一串回收的槽照旧扣到生效，续做走到空、F 没抬、可删的单元在 defer 里的盘上卸载被拒
+   test=a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims
+row 2176: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=三·2 删除批第 12 批丙 1 (a)：卸载那一串回收的槽照旧扣到生效，先写系统配置之后掉电那一刀摆不出来
+   test=an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version
+row 2177: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=三·2 删除批第 12 批丙 1 (b)：卸载那一串回收的槽照旧扣到生效，只剩一块盘那一刀摆不出来
+   test=after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_fl
+row 2273: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=删除批第 14 批 GA：卸载那一格回收的槽整截当场放开（改回丙1，不按每块盘上最新有效根取小），h2 窄盘续做之后单盘幸存读回
+   test=after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_befo
+row 2274: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=删除批第 14 批 GA：卸载那一格回收的槽整截当场放开（改回丙1，不按每块盘上最新有效根取小），h4 4 GiB 盘第二次卸载之后单盘幸存读回
+   test=after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before
+row 2275: anchor_hits=1 same=False src=crates/singlefs-core/src/transaction.rs
+   name=删除批第 14 批 Q-F 乙：unlink 的意图照旧带这条记录上一版的写入时间，不写调用方给的
+   test=the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it
+row 2276: anchor_hits=1 same=False src=crates/singlefs-core/src/transaction.rs
+   name=删除批第 14 批 Q-F 乙：unlink 的中间一批另取时间（取这一批的改动计数），不照抄意图那次写进记录的值
+   test=the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it
+row 2277: anchor_hits=1 same=False src=crates/singlefs-core/src/transaction.rs
+   name=删除批第 14 批 U8：重写墓碑树根的那次发布不按这次的形状算 H，照旧读上一版根节点的码 2 头（长高那次 H 少 1）
+   test=the_third_tombstone_container_grows_the_tree_and_keeps_the_old_root_in_place
+row 2278: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=删除批第 14 批 N2：续做那一步在第二个单元写上报块设备错时，挂载交回的失败账是空的（不带失败那一次已落下的写）
+   test=a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_write
+row 2279: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=删除批第 14 批 N2：续做那一步在journal 记录写上报块设备错时，挂载交回的失败账是空的（不带失败那一次已落下的写）
+   test=a_continuation_step_failing_on_its_journal_record_write_hands_back_every_landed_write
+row 2280: anchor_hits=1 same=False src=crates/singlefs-core/src/mount.rs
+   name=删除批第 14 批 N2：续做那一步在根槽写上报块设备错时，挂载交回的失败账是空的（不带失败那一次已落下的写）
+   test=a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_write
+row 2281: anchor_hits=1 same=False src=crates/singlefs-core/src/transaction.rs
+   name=删除批第 14 批 N2：抬 F 先写系统配置那一步在第二块盘的写上报错时，错里的写账是空的（不带已落下的那一个系统配置写）
+   test=a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_hands_back_every_landed_write
+row 2282: anchor_hits=1 same=False src=crates/singlefs-core/src/transaction.rs
+   name=C511 第 3 步：从水位起连号发十二棵树的号不先判装不装得下（盘上读来的水位离 u64::MAX 不到十二个号时越界 panic，不交回错误成员）
+   test=first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any_write
+=== row 2273
+label: 删除批第 14 批 GA：卸载那一格回收的槽整截当场放开（改回丙1，不按每块盘上最新有效根取小），h2 窄盘续做之后单盘幸存读回
+anchor hits: 1
+test after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_before ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.28s
+  PANIC: thread 'after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_before' (3871228) panicked at crates/singlefs-harness/tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs:239:5: | assertion `left == right` failed: 剩下那块盘走到的根 txg 与每个活文件的内容与卸载之前同一块盘上读出的相同
+exit: 101
+restored: True
+=== row 2274
+label: 删除批第 14 批 GA：卸载那一格回收的槽整截当场放开（改回丙1，不按每块盘上最新有效根取小），h4 4 GiB 盘第二次卸载之后单盘幸存读回
+anchor hits: 1
+test after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 5.13s
+  PANIC: thread 'after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before' (3872263) panicked at crates/singlefs-harness/tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs:239:5: | assertion `left == right` failed: 剩下那块盘走到的根 txg 与每个活文件的内容与卸载之前同一块盘上读出的相同：当场�
+exit: 101
+restored: True
+=== row 2275
+label: 删除批第 14 批 Q-F 乙：unlink 的意图照旧带这条记录上一版的写入时间，不写调用方给的
+anchor hits: 1
+test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.11s
+  PANIC: thread 'the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it' (3873419) panicked at crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs:562:5: | assertion `left == right` failed: 意图那一版两块盘上那条记录的 atime、mtime、ctime 秒都是给的时间（上一版是 1788000060） | left: [[1788000060, 1788000060, 1788000060], [1
+exit: 101
+restored: True
+##### m3_no_abandoned_filter
+anchor hits: 1
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.66s
+test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 15.62s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.80s
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.18s
+test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 3.38s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.17s
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 16.86s
+exit: 0
+restored: True

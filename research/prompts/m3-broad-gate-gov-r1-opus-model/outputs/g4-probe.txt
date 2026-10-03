@@ -1,0 +1,15 @@
+PROBE 驱动 --summary（门禁 gate-verdict 格起的那一条）	kind=None	类=—	谁都放行（不算重型）
+PROBE 驱动 --list-items --changed-since HEAD（文件头说只读）	kind=None	类=—	谁都放行（不算重型）
+PROBE 驱动 --check-ignored（文件头：不编不跑、不要前缀）	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 驱动 --selftest（登记 light）	kind=None	类=—	谁都放行（不算重型）
+PROBE 第 2b 步 ② --sync-tree --commit	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 第 2b 步 ③ --changed-since HEAD	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 里程碑末全量 --milestone-full（几天）	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE --import-results（往结果表里导入别处的行）	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE --item 1 --rerun（已有定论也重跑）	kind=broad-mutation	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 门禁整道（第 2b 步 ④）	kind=broad-mutation-stage	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 门禁 --check gate-verdict（只读库目录、起 --summary）	kind=broad-mutation-stage	类=广谱变异	子 agent 拒（带不带前缀）；主 agent 不带前缀拒、带 =commit / =user-request 放行
+PROBE 门禁 --list	kind=None	类=—	谁都放行（不算重型）
+PROBE 门禁 --tool-versions	kind=None	类=—	谁都放行（不算重型）
+PROBE python3 读 stdin 喂的代码（文件头自认罩不住）	kind=None	类=—	谁都放行（不算重型）
+PROBE python3 跑一份 import 驱动、调它函数的脚本（文件头自认罩不住）	kind=None	类=—	谁都放行（不算重型）

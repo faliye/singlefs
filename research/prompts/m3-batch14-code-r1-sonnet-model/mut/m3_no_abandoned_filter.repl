@@ -1,0 +1,1 @@
+                    device_of_txg(root.checkpoint_txg) == *device

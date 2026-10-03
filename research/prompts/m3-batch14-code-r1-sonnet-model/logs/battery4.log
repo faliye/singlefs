@@ -1,0 +1,32 @@
+##### m2_none_arm_immediate
+anchor hits: 1
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 22.56s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.09s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 37.41s
+Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+Running tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_a_writable_mount_refuse_a_device_without_a_se
+Running tests/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_a_writable_mount_refuse_other_parameters_and_de
+Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_mount_refuse_swapped_or_behind_devices-e59ff60d6e420f7c)
+exit: 0
+restored: True
+
+real	1m7.173s
+user	5m15.693s
+sys	0m5.351s
+##### m3_no_abandoned_filter
+anchor hits: 1
+test result: ok. 69 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.30s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.10s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.38s
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 33.86s
+Running tests/checker_known_bad_images.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+Running tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_a_writable_mount_refuse_a_device_without_a_se
+Running tests/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_a_writable_mount_refuse_other_parameters_and_de
+Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs (/tmp/claude-1000/m3-batch14-code-r1-sonnet/target/debug/deps/entries_after_mount_refuse_swapped_or_behind_devices-e59ff60d6e420f7c)
+exit: 0
+restored: True
+
+real	1m6.056s
+user	4m47.512s
+sys	0m5.144s

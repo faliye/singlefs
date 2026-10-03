@@ -1,0 +1,11 @@
+--- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 17:45:40.898006999 +0000
+@@ -2959,7 +2959,7 @@
+                 &device_of_txg,
+             ) {
+                 Some(newest_valid_root_on_every_device) => allocator.reclaim_released_up_to(
+-                    floor_of_the_reclaim.min(newest_valid_root_on_every_device),
++                    { let _ = newest_valid_root_on_every_device; floor_of_the_reclaim },
+                     ReclaimedReuse::Immediately,
+                 ),
+                 None => Vec::new(),

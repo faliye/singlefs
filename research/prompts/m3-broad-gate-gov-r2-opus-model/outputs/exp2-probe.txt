@@ -1,0 +1,4 @@
+EXCLUSIONS_FILE = /tmp/claude-1000/gov-r2-attack/rr/exp2/research/scripts/broad-mutation-ignored-exclusions.tsv
+门禁第一格算全局键用的 exclusions_digest_of(EXCLUSIONS_FILE) = 281b3133ea67eca2
+暂存区那一份的 sha256 = 0ed6758525bbadd3
+驱动第二段排除用例用的 load_exclusions() 条数 = 4

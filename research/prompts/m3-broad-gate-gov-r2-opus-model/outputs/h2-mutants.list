@@ -1,0 +1,16 @@
+fop-content-blind	text = "".join(f"{path}\n" for path in sorted(manifest))
+fop-path-blind	text = "".join(f"{digest}\n" for digest in sorted(manifest.values()))
+vk-no-toolchain	return hashlib.sha256(f"{source_fingerprint}\njudge {JUDGE_RULES_VERSION}\nglobal {global_key_digest}\n".encod
+vk-no-source	return hashlib.sha256(f"{toolchain}judge {JUDGE_RULES_VERSION}\nglobal {global_key_digest}\n".encode()).hexdig
+vk-no-global	return hashlib.sha256(f"{source_fingerprint}\n{toolchain}judge {JUDGE_RULES_VERSION}\n".encode()).hexdigest()
+vk-no-judge	return hashlib.sha256(f"{source_fingerprint}\n{toolchain}global {global_key_digest}\n".encode()).hexdigest()
+gkl-no-rules	lines = ["toolchain " + " | ".join(toolchain.strip().splitlines())]
+gkl-no-toolchain	lines = [f"rules {rules}"]
+gkl-no-files	pass
+gkl-no-env	pass
+gkl-no-tools	lines += []
+gkl-no-exclusions	pass
+gkl-no-limits	pass
+exd-always-none	return "none"
+limits-constant	return "limits"
+export-no-cargo	paths = [path for path in copied if not path.startswith("research/")]

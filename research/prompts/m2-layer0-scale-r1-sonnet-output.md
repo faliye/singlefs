@@ -39,7 +39,7 @@ $ grep -n 'reduc\|约简' crates/singlefs-harness/src/segments.rs crates/singlef
 
 `enumerate_layer0_versions`（`crash.rs:1851-1866`）与 `enumerate_layer0`（`crash.rs:1870-1885`）——分别是两条流 `--full` 唯一调用的入口——把 `expand` 参数硬编码成 `&|_segment_index, _segment| true`：**每一段都全展开，没有约简**。`expand` 这个钩子本身已经存在（`Layer0StatePlan::new`，`crash.rs:1484-1509`，第 1497 行 `if expand(segment_index, segment) { next_ordinal += (1u64 << segment.len()) - 1; }`），但今天**唯一**用它做"跳过展开"的地方是"快档"用例：`second_transaction_step_zero_layer0.rs:457`：`let expand = |_segment_index: usize, segment: &[usize]| segment.len() < 10;`——判据是**段长度**，不是 L1 要求的"块引用 / journal 读取"语义，而且这条 `expand` 从未接到 `enumerate_layer0_versions`/`enumerate_layer0`（--full 的入口），只接到 `enumerate_layer0_selecting_versions`（`crash.rs:1670-1688`）供快档用例单独调用。
 
-⇒ **约简的钩子已经存在，约简的判据不存在**；54 号门禁 `--full`（全量，`.claude/gate.d/54-layer0-replay.sh:340-396`）走的是 `enumerate_layer0_versions`/`enumerate_layer0`，今天这条路径**没有、也接不到**任何约简。
+⇒ **约简的钩子已经存在，约简的判据不存在**；54 号门禁 `--full`（全量，`.claude/gate.d/checker-tier-layer0-replay.sh:340-396`）走的是 `enumerate_layer0_versions`/`enumerate_layer0`，今天这条路径**没有、也接不到**任何约简。
 
 ### 判定
 
@@ -108,12 +108,12 @@ $ grep -n 'singlefs_core::' crates/singlefs-harness/src/crash.rs | grep -i 'allo
 ### 今天的现状（现查）
 
 ```
-$ grep -n '^54-layer0-replay' .claude/gate.d/stage-inputs.tsv
-20:54-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	command=cargo command=rustc	# ……
+$ grep -n '^checker-tier-layer0-replay' .claude/gate.d/stage-inputs.tsv
+20:checker-tier-layer0-replay.sh	crates/ Cargo.toml Cargo.lock	command=cargo command=rustc	# ……
 ```
 一整棵 `crates/` 树是单一登记路径，两条主流（以及 L6 的 7 份）共用同一格全绿标记，按 `research/scripts/admission.py` 的 `input_manifest`（`admission.py:302-316`）与 `listed_input_files`（`admission.py:268-276`）算出**单一** `layer0_input_hash`。
 
-依赖闭包（现查）：workspace 只有 4 个 crate（`Cargo.toml:5-9`：`singlefs-format`、`singlefs-core`、`singlefs-harness`、`singlefs-checker`），`singlefs-harness` 依赖另外三个（`crates/singlefs-harness/Cargo.toml:8-11`）。54 号跑两条流用 `cargo test --release -p singlefs-harness --test "$1"`（`.claude/gate.d/54-layer0-replay.sh:148`）——**每个 `tests/*.rs` 文件是 Cargo 里独立的测试二进制**，只链接这 4 个 crate 的库代码，不链接彼此的源文件。
+依赖闭包（现查）：workspace 只有 4 个 crate（`Cargo.toml:5-9`：`singlefs-format`、`singlefs-core`、`singlefs-harness`、`singlefs-checker`），`singlefs-harness` 依赖另外三个（`crates/singlefs-harness/Cargo.toml:8-11`）。54 号跑两条流用 `cargo test --release -p singlefs-harness --test "$1"`（`.claude/gate.d/checker-tier-layer0-replay.sh:148`）——**每个 `tests/*.rs` 文件是 Cargo 里独立的测试二进制**，只链接这 4 个 crate 的库代码，不链接彼此的源文件。
 
 9 份带 `layer0` 的用例全部 `mod common;`（现查逐一 grep）：
 ```
@@ -130,11 +130,11 @@ $ for f in first_transaction_step_seven_layer0.rs second_transaction_step_zero_l
 沿用表头已有的"同一个实验另有一种调用方式写 `<键>/<方式>`"记法（`stage-inputs.tsv` 文件头注释第 9–10 行），新增两行、保留原有整行不动（原行仍可给"55 号快档"这类别的用途用，改不改由主 agent 定）：
 
 ```
-54-layer0-replay.sh/first-transaction	crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs crates/singlefs-harness/tests/common/ crates/singlefs-harness/src/ crates/singlefs-core/src/ crates/singlefs-format/src/ crates/singlefs-checker/src/ Cargo.toml Cargo.lock crates/singlefs-harness/Cargo.toml crates/singlefs-core/Cargo.toml crates/singlefs-format/Cargo.toml crates/singlefs-checker/Cargo.toml	command=cargo command=rustc	# 第一条流自己的编译依赖闭包
-54-layer0-replay.sh/second-transaction	crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs crates/singlefs-harness/tests/common/ crates/singlefs-harness/src/ crates/singlefs-core/src/ crates/singlefs-format/src/ crates/singlefs-checker/src/ Cargo.toml Cargo.lock crates/singlefs-harness/Cargo.toml crates/singlefs-core/Cargo.toml crates/singlefs-format/Cargo.toml crates/singlefs-checker/Cargo.toml	command=cargo command=rustc	# 第二条流自己的编译依赖闭包
+checker-tier-layer0-replay.sh/first-transaction	crates/singlefs-harness/tests/first_transaction_step_seven_layer0.rs crates/singlefs-harness/tests/common/ crates/singlefs-harness/src/ crates/singlefs-core/src/ crates/singlefs-format/src/ crates/singlefs-checker/src/ Cargo.toml Cargo.lock crates/singlefs-harness/Cargo.toml crates/singlefs-core/Cargo.toml crates/singlefs-format/Cargo.toml crates/singlefs-checker/Cargo.toml	command=cargo command=rustc	# 第一条流自己的编译依赖闭包
+checker-tier-layer0-replay.sh/second-transaction	crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs crates/singlefs-harness/tests/common/ crates/singlefs-harness/src/ crates/singlefs-core/src/ crates/singlefs-format/src/ crates/singlefs-checker/src/ Cargo.toml Cargo.lock crates/singlefs-harness/Cargo.toml crates/singlefs-core/Cargo.toml crates/singlefs-format/Cargo.toml crates/singlefs-checker/Cargo.toml	command=cargo command=rustc	# 第二条流自己的编译依赖闭包
 ```
 
-**改法（对 `.claude/gate.d/54-layer0-replay.sh`）**：`write_layer0_input_manifest`（`54-layer0-replay.sh:775-782`）改成对每条流各调一次 `admission.py manifest`（键分别取 `54-layer0-replay.sh/first-transaction`、`.../second-transaction`），算出两个 `layer0_input_hash`；全绿标记按两个哈希分别命名（如 `singlefs-layer0-full-green.<第一条流哈希>.first-transaction`），快档判绿逻辑（`54-layer0-replay.sh:271-324`）相应拆成两次独立判断，各自的 `run_quick_tier_of_stream`（`54-layer0-replay.sh:248-268`）调用不变。
+**改法（对 `.claude/gate.d/checker-tier-layer0-replay.sh`）**：`write_layer0_input_manifest`（`checker-tier-layer0-replay.sh:775-782`）改成对每条流各调一次 `admission.py manifest`（键分别取 `checker-tier-layer0-replay.sh/first-transaction`、`.../second-transaction`），算出两个 `layer0_input_hash`；全绿标记按两个哈希分别命名（如 `singlefs-layer0-full-green.<第一条流哈希>.first-transaction`），快档判绿逻辑（`checker-tier-layer0-replay.sh:271-324`）相应拆成两次独立判断，各自的 `run_quick_tier_of_stream`（`checker-tier-layer0-replay.sh:248-268`）调用不变。
 
 ### 会不会让一次真改动被跳过
 
@@ -149,7 +149,7 @@ $ for f in first_transaction_step_seven_layer0.rs second_transaction_step_zero_l
 | 子问题 | 判定 | 依据 |
 |---|---|---|
 | 按流拆还是按段拆 | **规则没说**（背景材料把两种都列成候选，未定） | L4 行原文"按流复用……还是按段复用" |
-| 拆细会不会让真改动被跳过 | **规则没说**（背景材料只问，我给出安全条件：共享代码必须重叠登记） | `stage-inputs.tsv:20`、`Cargo.toml:5-9`、`54-layer0-replay.sh:148` |
+| 拆细会不会让真改动被跳过 | **规则没说**（背景材料只问，我给出安全条件：共享代码必须重叠登记） | `stage-inputs.tsv:20`、`Cargo.toml:5-9`、`checker-tier-layer0-replay.sh:148` |
 
 ### 推翻条件
 
@@ -201,7 +201,7 @@ $ grep -n '18 写的段' /tmp/claude-1000/l0scale-r1-frozen/crates/singlefs-harn
 453:/// 平时跑的那一份：三个 18 写的段与三个 10 写的段不展开（只以整段持久进入后面的状态），其余每段任意子集。
 581:/// 全量：固定脚本到 E 为止 54 段、闭式 2 104 413 个状态（八个 18 写段各 262143、七个 10 写段各 1023、两个 4 写段各 15，其余 2 写段各 3、1 写段各 1）。
 ```
-同一份文件里"18 写段"的个数在三处注释里分别是**两个**（第 4 行）、**三个**（第 453 行）、**八个**（第 581 行）——同一个属性、同一份"固定脚本到 E"，三个数互不相同。这说明脚本在多轮迭代里变长过，注释没有跟着同步更新，**手数注释得不到可信数字**，唯一权威的是运行时打印的 `LAYER0B` 行（`54-layer0-replay.sh:382` 读它）。
+同一份文件里"18 写段"的个数在三处注释里分别是**两个**（第 4 行）、**三个**（第 453 行）、**八个**（第 581 行）——同一个属性、同一份"固定脚本到 E"，三个数互不相同。这说明脚本在多轮迭代里变长过，注释没有跟着同步更新，**手数注释得不到可信数字**，唯一权威的是运行时打印的 `LAYER0B` 行（`checker-tier-layer0-replay.sh:382` 读它）。
 
 ### 套算法算一次示意值（不当结论，只示范算法怎么用）
 
@@ -247,7 +247,7 @@ CF_甲 = 2_104_413 − [8×(2^18−1) + 7×(2^10−1)]
 
 ### 今天的现状（现查）
 
-`enumerate_layer0_in_state_slices`（`crash.rs:1728-1847`）已经把 `[0, state_count)` 切成区间片、工作线程按原子计数器 `next_slice_index`（`crash.rs:1791`附近）领片跑，跑完一片打一行 `LAYER0_PROGRESS`（`crash.rs:1801-1812`），但**没有任何东西把这一行以外的信息落到磁盘**——中途 kill 掉，下一次只能从 `state_count=0` 重新起跑。`.claude/gate.d/54-layer0-replay.sh` 的 `--full` 路径（`54-layer0-replay.sh:327-431`）同样没有断点：`trap`（`:337`）只在退出时清理临时目录与判红时删全绿标记，不写任何可续跑的中间状态。
+`enumerate_layer0_in_state_slices`（`crash.rs:1728-1847`）已经把 `[0, state_count)` 切成区间片、工作线程按原子计数器 `next_slice_index`（`crash.rs:1791`附近）领片跑，跑完一片打一行 `LAYER0_PROGRESS`（`crash.rs:1801-1812`），但**没有任何东西把这一行以外的信息落到磁盘**——中途 kill 掉，下一次只能从 `state_count=0` 重新起跑。`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `--full` 路径（`checker-tier-layer0-replay.sh:327-431`）同样没有断点：`trap`（`:337`）只在退出时清理临时目录与判红时删全绿标记，不写任何可续跑的中间状态。
 
 切片长度今天**依赖线程数**：`state_slices`（`crash.rs:1556-1578`）在 `Layer0SliceLength::ScaledToWorkerThreads` 模式下，`states_per_slice` 由 `LAYER0_MINIMUM_SLICE_COUNT`（`crash.rs:1375`，64）、`LAYER0_SLICES_PER_WORKER_THREAD`（`crash.rs:1377`，16）与 `worker_threads` 共同决定（`crash.rs:1561-1565`：`slice_count = max(64, threads*16)`，`states_per_slice = ceil(state_count/slice_count)`）——**用 16 线程跑出来的切片边界，与用 32 线程跑出来的不是同一组区间**。这正是 L7 派发提示点名的风险之一（"切片按状态序号区间定、不随线程数变"）：今天不满足这条。
 
@@ -255,19 +255,19 @@ CF_甲 = 2_104_413 − [8×(2^18−1) + 7×(2^10−1)]
 
 `--full` 路径调用 `enumerate_layer0_versions`（走 `enumerate_layer0_selecting_versions` → `enumerate_layer0_in_state_slices`，`observe_state=None`，`CountOnly` 保留档，`crash.rs:1858-1865`），**不需要观察者**——续跑只需要持久化每片的 `Layer0Tally`，不需要持久化逐状态的镜像或恢复报告，数据量可控。
 
-### 改法（对冻结副本 `crates/` 与 `.claude/gate.d/54-layer0-replay.sh` 的改动）
+### 改法（对冻结副本 `crates/` 与 `.claude/gate.d/checker-tier-layer0-replay.sh` 的改动）
 
 **步骤 1——切片边界与线程数解耦**：`crates/singlefs-harness/src/crash.rs`，`state_slices`（`crash.rs:1556-1578`）新增一种 `Layer0SliceLength` 变体（`crash.rs:1407-1412` 处扩枚举），例如 `ResumableFixedCount(NonZeroU64)`：`states_per_slice` 取一个只依赖 `state_count` 的固定值（不读 `worker_threads`），`Layer0Parallelism::from_environment`（`crash.rs:1428-1469`）在续跑模式下改用这个变体而不是 `ScaledToWorkerThreads`。这样切片边界只由 `state_count` 决定，16 线程与 32 线程续跑同一批状态时算出同一组区间——工作线程数仍然可以变（`next_slice_index.fetch_add`，`crash.rs`工作线程循环那一段，是与线程数无关的任务队列，不需要改）。
 
 **步骤 2——每片完成时追加进度行**：在 `enumerate_layer0_in_state_slices` 的合并循环里（`merged.absorb_following_slice(in_order.tally)` 那一行，`crash.rs:1827`），紧接着这一行之后，若调用方传入了一个进度文件句柄，把 `in_order.slice_index`、`in_order.tally` 序列化成一行 JSON（或与 `LAYER0_PROGRESS` 同风格的 `key=value` 行）追加写入并 `fsync`——**只序列化 `Layer0Tally`（纯计数 + 字符串），不序列化 `observed_states`**（`--full` 路径本来就是 `None`，见上一节）。这是新增的一个可选参数（`Option<&mut File>`），不改变现有调用方（`observe_state`那几个测试用例）的行为。
 
-**步骤 3——进度文件的位置与命名**：放 `${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}` 下（与 `.claude/gate.d/59-crates-mutation-replay.sh:32-33,97` 的编译产物缓存同一约定：跨轮复用的东西放 `GATE_CROSS_RUN_TMPDIR`，不放会被每轮清空的 `TMPDIR`），文件名按输入哈希（L4 拆分之后是 `second-transaction` 那个哈希）与切片方案参数（固定的 `states_per_slice` 值）一起编码，例如 `singlefs-layer0-progress.<输入哈希>.<states_per_slice>`——**输入变了或切片方案变了，文件名就不同，天然不会被误用**（不需要在文件内容里再判一次，命名本身就是判据，这与全绿标记按输入哈希分格的既有做法同构，`54-layer0-replay.sh:29,332`）。
+**步骤 3——进度文件的位置与命名**：放 `${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}` 下（与 `.claude/gate.d/59-crates-mutation-replay.sh:32-33,97` 的编译产物缓存同一约定：跨轮复用的东西放 `GATE_CROSS_RUN_TMPDIR`，不放会被每轮清空的 `TMPDIR`），文件名按输入哈希（L4 拆分之后是 `second-transaction` 那个哈希）与切片方案参数（固定的 `states_per_slice` 值）一起编码，例如 `singlefs-layer0-progress.<输入哈希>.<states_per_slice>`——**输入变了或切片方案变了，文件名就不同，天然不会被误用**（不需要在文件内容里再判一次，命名本身就是判据，这与全绿标记按输入哈希分格的既有做法同构，`checker-tier-layer0-replay.sh:29,332`）。
 
 **步骤 4——末行半截怎么认**：写入方每行末尾写一个该行自己的 CRC32C（`crates/singlefs-core::checksum::crc32_castagnoli`，与 D23 已定项 11 记录反向链同一个校验和函数，不新引入依赖），格式 `slice=<n> states=<...> ... crc=<十六进制>`；读入方逐行校验，第一行**CRC 对不上或整行不完整（没有换行结尾）就在那一行截断**，只承认它之前的完整行——对应"进程被杀、最后一行写了一半"的场景（append 到普通文件不是原子的，最后一次 `write` 可能只落了一部分字节）。
 
 **步骤 5——恢复时的跳过逻辑**：`enumerate_layer0_in_state_slices` 新增入参 `resume_from: Option<&[FinishedSlice的tally]>`（按片号索引的数组，缺的片留空）；`next_slice_index`（`crash.rs`）的工作线程领片循环改成：先把 `resume_from` 里已有的片直接喂给合并循环（不再派给工作线程），再让工作线程从 `next_slice_index` 起领**没有**记录在 `resume_from` 里的片。
 
-**步骤 6——54 号脚本改法**：`.claude/gate.d/54-layer0-replay.sh` 的 `--full` 路径（`54-layer0-replay.sh:340-396`）在跑 `second_transaction_step_zero_layer0` 之前，先看进度文件存不存在（按步骤 3 的命名，同一个输入哈希+切片方案）：存在就把它的路径通过环境变量（例如 `SINGLEFS_LAYER0_RESUME_FILE`）传给 `cargo test`，测试内部读取步骤 5 的 `resume_from`；成功句里加一行"续跑：从第 N/M 片接着跑"或"全新起跑"（对应派发提示"54 号怎么报『这一次是续跑的』"）。新增 `--full --fresh`（或环境变量 `SINGLEFS_LAYER0_FORCE_FRESH=1`）忽略已有进度文件、强制从头跑（对应"强制从头跑的开关"）。
+**步骤 6——54 号脚本改法**：`.claude/gate.d/checker-tier-layer0-replay.sh` 的 `--full` 路径（`checker-tier-layer0-replay.sh:340-396`）在跑 `second_transaction_step_zero_layer0` 之前，先看进度文件存不存在（按步骤 3 的命名，同一个输入哈希+切片方案）：存在就把它的路径通过环境变量（例如 `SINGLEFS_LAYER0_RESUME_FILE`）传给 `cargo test`，测试内部读取步骤 5 的 `resume_from`；成功句里加一行"续跑：从第 N/M 片接着跑"或"全新起跑"（对应派发提示"54 号怎么报『这一次是续跑的』"）。新增 `--full --fresh`（或环境变量 `SINGLEFS_LAYER0_FORCE_FRESH=1`）忽略已有进度文件、强制从头跑（对应"强制从头跑的开关"）。
 
 ### 逐条回答派发提示的子问题
 
@@ -281,7 +281,7 @@ CF_甲 = 2_104_413 − [8×(2^18−1) + 7×(2^10−1)]
 
 | 子问题 | 判定 | 依据 |
 |---|---|---|
-| 今天有没有断点续跑 | **一致**（背景材料"今天……没有续跑"与现查相符） | `54-layer0-replay.sh:337`（trap 不写中间状态）、`crash.rs:1728-1847`（无落盘） |
+| 今天有没有断点续跑 | **一致**（背景材料"今天……没有续跑"与现查相符） | `checker-tier-layer0-replay.sh:337`（trap 不写中间状态）、`crash.rs:1728-1847`（无落盘） |
 | 切片是否随线程数变 | **一致**（背景材料把这个列为要解决的风险，我现查确认今天确实随线程数变） | `crash.rs:1556-1565`，`LAYER0_SLICES_PER_WORKER_THREAD`（`:1377`） |
 | 续跑机制是否有算法基础 | **规则没说**（背景材料没有论证，我补充：`absorb_following_slice` 的结合律 + 既有的顺序合并逻辑已经是续跑的算法基础） | `crash.rs:955-1015`，`crash.rs:1794,1814-1828` |
 
@@ -304,7 +304,7 @@ CF_甲 = 2_104_413 − [8×(2^18−1) + 7×(2^10−1)]
 | L5（闭式公式） | 一致 | `CF_甲 = 1 + Σ[expand(i) ? (2^\|段\|-1) : 0]`，与今天的公式结构兼容 |
 | L5（具体数字：423写/5575802973 对 279写/2104413） | **冲突**，答不出确数 | 背景材料的实测数与冻结副本自身的测试断言互相矛盾，且冻结副本内部三处注释（2/3/8 个 18 写段）互相矛盾 |
 | L5（32 线程挂钟） | 规则没说，双方都标"推的" | 两档估计相差 5 个数量级（0.004 秒 对 2.2 小时），需要实测 |
-| L7（今天有没有续跑） | 一致 | 现查确认 `54-layer0-replay.sh`、`crash.rs` 都没有落盘续跑状态 |
+| L7（今天有没有续跑） | 一致 | 现查确认 `checker-tier-layer0-replay.sh`、`crash.rs` 都没有落盘续跑状态 |
 | L7（切片是否随线程数变） | 一致 | `state_slices` 的 `states_per_slice` 由 `worker_threads` 参与计算，今天确实随线程数变 |
 | L7（续跑算法基础） | 规则没说 → 我补：`absorb_following_slice` 的结合律已经是基础 | 既有的顺序合并逻辑天然支持"部分片来自文件、部分片新跑" |
 

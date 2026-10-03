@@ -1,0 +1,6 @@
+C47 mkfs：不判系统配置槽与根槽按判定宽度 max(pbs, io_min) 对齐（pbs 512 + io_min 3072 整个收下）	抓到	physical_block_size_512_with_io_min_3072_is_refused_at_the_first_root_slot_before_any_write 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
+C47 mkfs：判定宽度只取 io_min、不取 max(pbs, io_min)（pbs 4096 + io_min 3072 报的槽与宽度都错）	抓到	physical_block_size_4096_with_io_min_3072_is_refused_at_system_configuration_slot_one_before_any_write 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
+I-8.1 core 同判：择系统配置不复算环几何三个字段	抓到	an_in_flight_record_limit_other_than_the_one_recomputed_from_the_ring_length_is_refused_by_both_mounts 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
+I-8.1 core 同判：不判安全系数 F 等于格式常量	抓到	a_safety_factor_other_than_the_first_version_value_is_refused_by_both_mounts 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
+✓ 点名 4 条：跑了 4 条，跳过 0 条，跑的都抓到了
+exit=0

@@ -125,7 +125,7 @@ E7RESULT name=segments path=transaction operations=33 segments=24+2+1+2 closed_f
 E7RESULT name=segments path=post_mkfs_stream operations=53 segments=2+2+1+2+2+1+26+2+1+2 closed_form=67108885 kinds=[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[unit_write×24,system_configuration_slot×2,barrier×2]|[journal_record×2,barrier×2]|[root_record_fua]|[system_configuration_slot×2]
 ```
 
-改后 `skip-first-transaction-barrier` 档与 `direct` 档逐字相同（`transaction` 回到 33 步 `24+2+1+2`）：这条改动本身让「程序自己发了什么」这份记录，与「没有故障时的样子」看起来一样——因为程序确实发了那道屏障，只是它没能到真设备。改法命中的判据由此挪到了「设备侧」（`FaultInjectingBlockDevice` 的 `barriers_forwarded` / `barriers_swallowed` 计数，或真设备场景下 QEMU 的 `blklogwrites` 独立日志），不再挪到「录制流本身缺一步」——这正是 `first_transaction_on_device.rs` 文件头第 8–9 行原有的文档注释（本次没有改动那两行）已经写的口径：「第一个事务在盘 0 上漏掉…屏障，而录制器照样记下它——程序以为发了，盘上没收到，宿主那一侧必须判红」。55 号那一侧的判据要不要跟着调整（`.claude/kb/vm-harness.md`「设备侧独立录制：blklogwrites 模式」一节讲的独立日志比对），按主 agent 派发提示「55 号那一侧怎么比由 singlefs-39 改，你只交数」——本报告只交这四行数，不改 55 号脚本、不判它的比对逻辑。
+改后 `skip-first-transaction-barrier` 档与 `direct` 档逐字相同（`transaction` 回到 33 步 `24+2+1+2`）：这条改动本身让「程序自己发了什么」这份记录，与「没有故障时的样子」看起来一样——因为程序确实发了那道屏障，只是它没能到真设备。改法命中的判据由此挪到了「设备侧」（`FaultInjectingBlockDevice` 的 `barriers_forwarded` / `barriers_swallowed` 计数，或真设备场景下 QEMU 的 `blklogwrites` 独立日志），不再挪到「录制流本身缺一步」——这正是 `first_transaction_on_device.rs` 文件头第 8–9 行原有的文档注释（本次没有改动那两行）已经写的口径：「第一个事务在盘 0 上漏掉…屏障，而录制器照样记下它——程序以为发了，盘上没收到，宿主那一侧必须判红」。55 号那一侧的判据要不要跟着调整（`.claude/kb/vm-harness.md`「设备侧独立录制：blklogwrites 模式」一节讲的独立日志比对），按主 agent 派发提示「55 号那一侧怎么比由别的会话改，你只交数」——本报告只交这四行数，不改 55 号脚本、不判它的比对逻辑。
 
 ## 变异证红
 
@@ -279,8 +279,8 @@ test result: FAILED. 21 passed; 3 failed; 2 ignored; 0 measured; 0 filtered out;
 ## 没做什么
 
 - 没走三方对抗、没提交；层 0 全量、QEMU、herd7、crates 变异整表（59 号）归 `crash-verifier`。
-- 没跑 `.claude/gate.d/55-qemu-first-transaction.sh`、`vm-bench.sh`；没起虚机——55 号那一侧怎么比对（判据要不要跟着这次改动调整）按派发提示「由 singlefs-39 改，你只交数」，本报告只交上面那两组「改前/改后」的 `name=segments` 行。
+- 没跑 `.claude/gate.d/55-qemu-first-transaction.sh`、`vm-bench.sh`；没起虚机——55 号那一侧怎么比对（判据要不要跟着这次改动调整）按派发提示「由别的会话改，你只交数」，本报告只交上面那两组「改前/改后」的 `name=segments` 行。
 - 没碰 `crates/singlefs-harness/src/bin/e158_root_choice_repair.rs`（另一个会话在改，见「33 号红」一节）；没碰 Z3-A 乙涉及的 `mount.rs`、`mounted_session.rs`、`lib.rs`；没碰 B3c-3 涉及的 `transaction.rs`、`model.rs`、`model_comparison.rs`、`history.rs`；没碰层 0 发现日志涉及的 `crash.rs`、`layer0_progress.rs`、`lib.rs`。
 - `crates/mutations.tsv` 主表一个字节没改，只在副本里追加了 1 行做证红用；追加内容原样交在 `patch/mutations-append.tsv`，由 `apply-writer-patch.py` 合并进主表。
-- 没有判「skip-first-transaction-barrier 那一档在新包装次序下，`first_transaction_device_log_check` 的『盘 0 必须有 divergence』那条判据还能不能继续用录制流本身判出来」——这正是本轮改动之后录制流不再缺步骤、判据要挪到设备侧计数或 blklogwrites 独立日志的原因，交主 agent / singlefs-39 处理。
+- 没有判「skip-first-transaction-barrier 那一档在新包装次序下，`first_transaction_device_log_check` 的『盘 0 必须有 divergence』那条判据还能不能继续用录制流本身判出来」——这正是本轮改动之后录制流不再缺步骤、判据要挪到设备侧计数或 blklogwrites 独立日志的原因，交主 agent / 别的会话处理。
 - 交回前删掉了草稿目录里用来生成「改前」skip 档数据的临时构建产物：`repo/target/`（release + debug 都在这份 target 里，交回前删除）与 `hostrun/` 下的两块 4 GiB 稀疏文件（`d0/nvme0n1`、`d1/nvme0n1`，跑完即删）；`repo/`（不含 target，约 260 MB 源码副本）与 `orig-snapshot/`、`new-snapshot/`、`patch/`、各份 `.log` 留着交主 agent 核对，体积都在几百 KB 到几 MB 量级。

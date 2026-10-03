@@ -35,7 +35,7 @@
 - `crates/singlefs-harness/tests/second_transaction_supplement_three_random_history.rs`
 - `crates/singlefs-harness/tests/second_transaction_step_zero_layer0.rs`
 - `crates/mutations.tsv` 第 129–141 行
-- `.claude/gate.d/54-layer0-replay.sh`
+- `.claude/gate.d/checker-tier-layer0-replay.sh`
 
 ## 四、核查员查出的引用错
 
@@ -43,7 +43,7 @@
 |---|---|---|---|
 | 1 | Opus | 报告里内联的 `SHA256SUMS` 只抄了 11 行，实际 12 行（多 `y5-panic-probe.diff`） | 不动 |
 | 2 | Sonnet | 回收集合字段写在 `allocator.rs:574`，实为第 575 行（574 是它的文档注释） | 不动 |
-| 3 | Sonnet | `54-layer0-replay.sh:61-62` 引作判红条件，实为第 54 行 | 不动 |
+| 3 | Sonnet | `checker-tier-layer0-replay.sh:61-62` 引作判红条件，实为第 54 行 | 不动 |
 | 4 | Sonnet | 「六条变异都要判红」那句说在里程碑的验收标准段，实际在「设想实现」第 2 件（第 403 行） | 不动：它由此得出的「B1 只在一个取样点上跑过」另有依据（实现员报告） |
 
 ## 四之二、主 agent 另外核的

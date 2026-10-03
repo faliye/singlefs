@@ -50,18 +50,18 @@ $ awk 'NR==55' invariants-selftest.md | grep -c '回退候选集里每一个根'
 | `Cargo.toml:5-9` 4 个 crate | ✓ | 精确匹配 |
 | `singlefs-harness/Cargo.toml:8-11` 三个依赖 | ✓ | 精确匹配 |
 | `stage-inputs.tsv:20` | ✓ | 精确匹配（主树，此文件无快照，按设计轮规则核） |
-| `54-layer0-replay.sh:148` cargo test 命令 | ✓ | 精确匹配（主树） |
+| `checker-tier-layer0-replay.sh:148` cargo test 命令 | ✓ | 精确匹配（主树） |
 | 9 份 layer0 用例 `mod common;`/`mod common_tree_split;`（含 `:25-26`、`:21-22` 两处双 mod） | ✓ | 原样重跑同一组 grep，逐文件逐行核对，与报告表述完全一致 |
 | `crash.rs:522-529`、`segments.rs:146-158` 两份同名 closed_form_state_count | ✓ | 两处公式与代码一致 |
 | `crash.rs:955-1015` absorb_following_slice | ✓ | 函数存在，签名与位置一致 |
 | `crash.rs:1375,1377` 两个常量（64、16） | ✓ | 精确匹配 |
 | `crash.rs:1556-1578`、`:1561-1565` state_slices 与 slice_count 公式 | ✓ | 精确匹配 |
-| `54-layer0-replay.sh:337` trap | ✓ | 精确匹配（主树） |
+| `checker-tier-layer0-replay.sh:337` trap | ✓ | 精确匹配（主树） |
 | `:524-579`/`:575-578` one_state_slices 测试 | ✓ | 函数名与 assert_eq 精确匹配 |
 | `crash.rs:1617-1625` evaluate_state_slice 签名 | ✓ | 精确匹配（base/writes/plan 只读，slice: Range<u64>） |
 | `crash.rs:891` derive(PartialEq) | ✓ | 精确匹配 |
 | `59-crates-mutation-replay.sh:32-33,97` GATE_CROSS_RUN_TMPDIR | ✓ | 精确匹配（主树） |
-| `54-layer0-replay.sh:29,332` 全绿标记按输入哈希命名 | ✓ | 精确匹配（主树） |
+| `checker-tier-layer0-replay.sh:29,332` 全绿标记按输入哈希命名 | ✓ | 精确匹配（主树） |
 | `crates/mutations.tsv` 第 54、23 行内容 | ✓ | 主树与冻结副本两份文件逐字节相同，内容与报告转述一致 |
 | `.claude/kb/decisions/16-发布语义.md:27`「已定项 1 的回收谓词」引文 | **✗** | 第 27 行是「#### 已定项 1」标题行；抄的原文「可再分配 = 已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」实际在第 33 行（HEAD 版与工作区版均如此，非交回后被改） |
 | `.claude/kb/decisions/16-发布语义.md:174`「已定项 7」持久顺序引文 | **✗** | 第 174 行是标题行；抄的原文「COW 单元 / 节点 → 屏障 → journal 记录 → 屏障 → 根槽（FUA）→ 系统配置槽」实际在第 176 行 |
@@ -84,7 +84,7 @@ Sonnet 计：核 42 处，✓ 35，✗ 7。**七处 ✗ 是同一种模式**：�
 | `mount.rs:831` shadow_ledger match | ✓ | 精确匹配，是变异补丁的实际锚点 |
 | `mount.rs:1327` 抬 F 扣住刚回收槽的注释 | ✓ | 内容与转述一致 |
 | `recovery.rs:668,680` choose_root/rollback_witness.abandons | ✓ | 精确匹配 |
-| `54-layer0-replay.sh:341,374` 两条流的 run_layer0_test_binary 调用 | ✓ | 精确匹配（主树） |
+| `checker-tier-layer0-replay.sh:341,374` 两条流的 run_layer0_test_binary 调用 | ✓ | 精确匹配（主树） |
 | `:147` include-ignored 判据 | ✓ | 精确匹配 |
 | `:156-160` worker_threads_of_full_run 全函数 | ✓ | 五行函数体逐字节相同 |
 | `crash.rs:1740` spawned_worker_threads | ✓ | 精确匹配 |
@@ -97,7 +97,7 @@ Sonnet 计：核 42 处，✓ 35，✗ 7。**七处 ✗ 是同一种模式**：�
 | `.claude/kb/decisions/23-journal的角色与格式.md:384` | ✓ | 内容与转述一致（此为转述非逐字引用，语义相符） |
 | `.claude/rules/implementation-workflow.md:73`「合并要确定」 | ✓ | 精确匹配，是该条款自己的内容行（非标题行），与 Sonnet 那七处形成对照 |
 | 9 份 layer0 用例的 `#[test]`/`#[ignore]` 计数表 | ✓ | 原样重跑 `grep -c`，9 行数字（6/1、9/1、2/1、1/0、2/1、1/0、3/0、6/3、3/1）逐行相同 |
-| `grep -rn include-ignored .claude/gate.d/*.sh .claude/agents/*.md` 只命中 54 号自己 | ✓ | 原样重跑，只在 54-layer0-replay.sh 命中 5 处，别处零命中 |
+| `grep -rn include-ignored .claude/gate.d/*.sh .claude/agents/*.md` 只命中 54 号自己 | ✓ | 原样重跑，只在 checker-tier-layer0-replay.sh 命中 5 处，别处零命中 |
 | `.claude/agents/crash-verifier.md` 第 26 行起第 2 步 | ✓ | 第 26 行确为步骤"2."，内容与转述一致 |
 | 模型目录 `SHA256SUMS` 20 个文件 | ✓ | `sha256sum -c` 全部 OK |
 | **复跑：L3 第 304 行三个数**（`PROBE_WHICH=C` on m304 补丁副本） | ✓ 精确复现 | `ARMS C arm_a_states=78 arm_a_bad=0 arm_a2_states=108 arm_a2_bad=12 full_sampled_cow_states=2596 full_sampled_bad_beyond_arm_a=828`；`ARMSEG`/`ARM_A2_BAD` 摘要行与报告「六、原样输出」逐字节相同（`FULL_DIFF` 随机采样的具体样例行不同，属预期内的随机子集展示，不影响判据数） |

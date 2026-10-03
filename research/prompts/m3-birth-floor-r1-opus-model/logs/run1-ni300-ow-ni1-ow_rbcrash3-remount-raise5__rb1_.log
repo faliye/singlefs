@@ -1,0 +1,31 @@
+run-with-memory-cap: 上限 8G 超过实测峰值 59M 的 2 倍，照理由放行：攻方原型，峰值表里没有这一条
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/bf_crash_states.rs (target/release/deps/bf_crash_states-6dec93cc2291a099)
+
+running 1 test
+BF_HISTORY name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] ops=1 writes=21 segments=4 largest_segment=16 closed_form_states=65543 layer0_states=65548 outcomes=["RollBack { index: 1 }:ok"]
+test birth_floor_variants_over_layer0_crash_states has been running for over 60 seconds
+BF_DONE name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] states=65548 of=65548 seconds=674.5
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:lower evaluated=9045768 violations=524384 states_red=65548 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 原措辞：盘 0 槽 50180 类 1 诞生代号 3 ≤ R_prev (实例 1, txg 7)，R_first (实例 2, txg 9)
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:red-class:v1-root-and-under-inherited evaluated=524384 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: red-class:v1-root-and-under-inherited：盘 0 槽 50180 类 1 诞生代号 3 ≤ R_prev (实例 1, txg 7)，R_first (实例 2, txg 9)
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:upper evaluated=10881112 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:v1 evaluated=7079328 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:v1-exempted evaluated=1966440 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:v1-exempted-where-lower-holds evaluated=1442056 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 盘 0 槽 50368 类 3 诞生代号 9 > R_prev txg 7，R_first txg 9，在继承来的子树下 false
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:v2 evaluated=8521384 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS1:v2-exempted evaluated=524384 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:applied-only-versions evaluated=65548 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 实例 1、txg 8
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:lower evaluated=10094536 violations=524384 states_red=65548 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 原措辞：盘 0 槽 50180 类 1 诞生代号 3 ≤ R_prev (实例 1, txg 7)，R_first (实例 1, txg 8，由记录施加)
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:red-class:v1-root-and-under-inherited evaluated=524384 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: red-class:v1-root-and-under-inherited：盘 0 槽 50180 类 1 诞生代号 3 ≤ R_prev (实例 1, txg 7)，R_first (实例 1, txg 8，由记录施加)
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:upper evaluated=11929880 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:v1 evaluated=8521384 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:v1-exempted evaluated=1573152 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:v1-exempted-where-lower-holds evaluated=1048768 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 盘 0 槽 50303 类 2 诞生代号 8 > R_prev txg 7，R_first txg 8，在继承来的子树下 false
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:v2 evaluated=9570152 violations=0 states_red=0 first=-
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: crash:CS2:v2-exempted evaluated=524384 violations=0 states_red=0 first=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] state=32774 :: 
+BF name=ni300-ow-ni1-ow/rbcrash3-remount-raise5/[rb1] :: layer0-red-states evaluated=65548 violations=0 states_red=0 first=-
+BF_TOTAL states_judged=65548
+test birth_floor_variants_over_layer0_crash_states ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 674.52s
+

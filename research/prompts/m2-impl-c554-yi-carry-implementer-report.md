@@ -156,7 +156,7 @@ E158 第 3 次跑登记 `research/prompts/e158-r3-prereg.md` 第 348 行 N-配�
 
 **checker**：没有判「取号写 tail = 0」的地方。`grep -rn 'journal_tail' crates/singlefs-checker/src/` 只有 `lib.rs:138`（字段）与 `lib.rs:225`（解析）两行。没改 checker，所以没有「受影响的层 0 流与崩溃枚举用例」那一节要写。
 
-**门禁 55 号 second-instance 档与 E142**：55 号第二个实例那一档里取号那两份系统配置槽写的字节会变，预录样本要重录（调度记录第 256 行已经归了 singlefs-39）。E142 第一个事务的字节不变：T 的 the_first_acquisition 钉住了 mkfs 之后第一次取号写 tail 0。
+**门禁 55 号 second-instance 档与 E142**：55 号第二个实例那一档里取号那两份系统配置槽写的字节会变，预录样本要重录（调度记录第 256 行已经归了别的会话）。E142 第一个事务的字节不变：T 的 the_first_acquisition 钉住了 mkfs 之后第一次取号写 tail 0。
 
 ## 七、交回前的验证（末尾原样）
 

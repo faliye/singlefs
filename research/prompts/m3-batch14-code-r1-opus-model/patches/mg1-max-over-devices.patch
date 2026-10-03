@@ -1,0 +1,11 @@
+--- crates/singlefs-core/src/mount.rs	2026-10-03 17:21:13.629094603 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 19:07:21.240733668 +0000
+@@ -2388,7 +2388,7 @@
+         .into_iter()
+         .collect::<Option<Vec<CheckpointTxg>>>()?
+         .into_iter()
+-        .min()
++        .max()
+ }
+ 
+ /// 抬 F 那一串做完之后两个入口共有的东西；准入那一格另带它判过的上限。

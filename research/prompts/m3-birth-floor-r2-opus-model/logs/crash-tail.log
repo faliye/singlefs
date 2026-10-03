@@ -1,0 +1,35 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 581M 的 2 倍，照理由放行：攻方原型，峰值表里没有这几条
+run-with-memory-cap: 这个会话已有 6 条日常的在跑，照理由并行：同批几条三方腿各跑各的原型
+warning: function `i39_guard` is never used
+   --> crates/singlefs-checker/src/walk/proto_b.rs:702:15
+    |
+702 | pub(super) fn i39_guard() -> I39Guard {
+    |               ^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-checker` (lib) generated 1 warning
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.07s
+     Running tests/bf_r2_crash.rs (target/release/deps/bf_r2_crash-824f007148c195b0)
+
+running 1 test
+R2C_HISTORY name=jring=1MiB sw=16 d=0 [raiseTo8] writes=65 segments=13 closed_form_states=196630 layer0_states=196665 outcomes=["RaiseFloorTo { txg: 8 }:ok"]
+R2C_DONE name=jring=1MiB sw=16 d=0 [raiseTo8] states=700 from=195965 of=196665 seconds=54.3
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: beta-red-state:layer0-green evaluated=700 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-lenient evaluated=850840 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 :: β-lenient：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 13 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1278 出生 13；种类 2 根槽 1410 出生 13
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-re-lenient evaluated=28000 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-re-strict evaluated=28000 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:beta-strict evaluated=850840 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 :: β-strict：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 13 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1278 出生 13；种类 2 根槽 1410 出生 13
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:betagap-lenient evaluated=810240 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tf-lenient evaluated=822840 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 :: TF-lenient：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 13 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1278 出生 13；种类 2 根槽 1410 出生 13
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tf-strict evaluated=822840 violations=1400 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 :: TF-strict：盘 0 槽 1168 类 3 诞生代号 4 ≤ R⁻ txg 8 [实例 1]；R txg 13 [实例 1]；第一次出现；在继承树（不论压不压得住）下 false；R 的树：种类 1 根槽 1278 出生 13；种类 2 根槽 1410 出生 13
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: crash:CS2:tfgap-lenient evaluated=782240 violations=0 states=0 first=-
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: layer0-red-states evaluated=700 violations=700 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 ["pool_checker:I-3.1"]
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: state:I-3.1=violated evaluated=700 violations=700 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: tf-red-state:I-3.1=violated evaluated=700 violations=700 states=700 first=jring=1MiB sw=16 d=0 [raiseTo8] state=196565 layer0_red=["pool_checker:I-3.1"]
+R2C name=jring=1MiB sw=16 d=0 [raiseTo8] :: tf-red-state:layer0-green evaluated=700 violations=0 states=0 first=-
+R2C_TOTAL states_judged=700
+test tree_floor_over_crash_states_of_the_wrapped_history ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 55.06s
+
