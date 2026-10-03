@@ -1,0 +1,3 @@
+exit=1
+want=超过 20 秒没出结局，按红记（C5：超时不当通过）
+want=verus-proof：红（退出 1）

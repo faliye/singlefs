@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=.claude/gate.d/unsafe-allowances.tsv:2 singlefs-core 放开了 unsafe，理由栏是 -（不少于 20 个字）
+want=理由栏写为什么非放开不可、不放开的替代为什么不行
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

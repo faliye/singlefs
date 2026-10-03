@@ -1,0 +1,4 @@
+exit=0
+want=的 1 行每行改坏之后 Verus 都报错
+want=1 行输出里夹着 rlimit 用尽、另有证明错，红计入
+want=verus-must-red-worlds：绿

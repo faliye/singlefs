@@ -1,0 +1,5 @@
+exit=1
+want=E7RESULT name=device_log device=2 declared_entries=424
+want=direct 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行
+want=device-streams：红（退出 1）
+want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

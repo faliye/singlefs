@@ -1,0 +1,4 @@
+exit=1
+want=第 2 行「夹到上限时返回原值」的第五段「verified, 1 errors」不是 proof_errors=<证明错条数>
+want=必红世界表第五段一律写 proof_errors=M
+want=verus-must-red-worlds：红（退出 1）

@@ -1,0 +1,3 @@
+# 样本用的登记表：core 可以放开一处，harness 不许
+singlefs-core	forbid,deny	crates/singlefs-core/src/block_device.rs	punch_hole_keeping_the_file_length	样本的理由：std 没有 fallocate 的安全封装，不放开就只能继续逐块写零	用户 2026-09-30 弹窗定 records/sample-decision.md
+singlefs-harness	forbid	-	-	-	-

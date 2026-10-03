@@ -1,0 +1,3 @@
+#!/bin/sh
+# 样本 verus-proof-killed-red 的替身 Verus：一起来就 kill -9 自己（照外面 kill -9 掉一次 Verus 那样）。经内存包装起时包装退 137（命令自己的退出码，不在 250–254 里）。
+kill -KILL $$

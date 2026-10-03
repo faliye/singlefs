@@ -1,0 +1,3 @@
+exit=1
+want=Resource limit (rlimit) exceeded
+want=verus-proof：红（退出 1）

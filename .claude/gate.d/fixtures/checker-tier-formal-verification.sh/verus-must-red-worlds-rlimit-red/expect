@@ -1,0 +1,4 @@
+exit=1
+want=Resource limit (rlimit) exceeded
+want=这一行红在算力额度上，不是证明失败
+want=verus-must-red-worlds：红（退出 1）

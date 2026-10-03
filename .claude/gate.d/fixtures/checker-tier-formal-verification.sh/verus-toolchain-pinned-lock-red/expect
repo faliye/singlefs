@@ -1,0 +1,3 @@
+exit=1
+want=Cargo.lock 里 vstd 的版本是 
+want=verus-toolchain-pinned：红（退出 1）

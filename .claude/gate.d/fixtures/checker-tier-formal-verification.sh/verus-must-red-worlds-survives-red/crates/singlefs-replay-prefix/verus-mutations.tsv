@@ -1,0 +1,2 @@
+# 样本用的必红世界表：变异名、文件、原文、替换文、proof_errors=<证明错条数>
+等号也算超上限	crates/singlefs-replay-prefix/src/lib.rs	    if value > limit {	    if value >= limit {	proof_errors=1

@@ -1,0 +1,3 @@
+exit=1
+want=Verus 安装的 commit 是 3cf1832000000000000000000000000000000000
+want=verus-toolchain-pinned：红（退出 1）

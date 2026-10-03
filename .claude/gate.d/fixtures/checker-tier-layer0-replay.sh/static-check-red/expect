@@ -1,0 +1,5 @@
+exit=1
+want=── 开跑前的静态判据
+want=forgot_to_register_full：标了 #[ignore] 却没有登记成 crash-case
+want=no_declaration.rs：第一行没有「//! checker 档模块：…」（它导入的是 crash）
+want=开跑前的静态判据：crash-case-check --only placement,modules 退 1（逐处列在上面），这一趟不起 cargo

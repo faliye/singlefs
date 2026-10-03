@@ -1,0 +1,11 @@
+# 样本用的 Verus 登记表：release 与 package 行照真仓，crate 行是样本核的数
+release	0.2026.09.20.aef82ed	aef82eda71838deef4a8cd0260fda6c9504be9b9	7b870fa12bc589015c2fab60a8b3d9f07c7b1adb3444eb0fadffcbf7f0447b33	singlefs/formal-tools/verus-0.2026.09.20/verus-x86-linux
+package	vstd	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/vstd	068cac977afcf0f5d5b736f8fa3ceb79114a1f3634c59ba6671331a99dd022ac
+package	verus_builtin_macros	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/builtin_macros	66e70cb448dc0fd414f570871f07397f0de0235af67df5eee448a485c5d3e8d1
+package	verus_builtin	0.0.0-2026-09-16-0054	1b9b1d7c09d6a2c17f150c3e48ad27d9b7300615	source/builtin	46f932ee8945f7083ba15bbb9780be57b269c7fcf99622fbe0a1b682c7db059f
+package	verus_state_machines_macros	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	source/state_machines_macros	44b527d1f3f2b169c9fe186681824fd347a06f0a1d9afe29b1c8108b61985961
+package	verus_syn	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/syn	a5bc7d13c41c1635dedb635c82e6c26d852ebee78b928d78f0eef1e94affa008
+package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/prettyplease	0052db78e25abd4a063ac154bfb8e616aa017725154a3dba5d6e9816551f8f97
+crate	crates/singlefs-replay-prefix	3
+kernel	crates/singlefs-replay-prefix/src/lib.rs
+must-red-worlds	crates/singlefs-replay-prefix/verus-mutations.tsv

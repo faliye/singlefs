@@ -1,0 +1,3 @@
+exit=1
+want=postcondition not satisfied
+want=verus-proof：红（退出 1）

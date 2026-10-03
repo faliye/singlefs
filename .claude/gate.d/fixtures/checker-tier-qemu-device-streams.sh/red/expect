@@ -1,4 +1,5 @@
 exit=1
-want=file-overwrite 盘 0：盘上收到的写（23）没有多于新池新建文件那段（23）
-want=这一档该在新池新建文件之后再发布一次
+want=E7RESULT name=device_log device=2 declared_entries=557
+want=raise-rollback-floor 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行
+want=device-streams：红（退出 1）
 want=checker-tier-qemu-device-streams.sh：1 格里 1 格红（device-streams）

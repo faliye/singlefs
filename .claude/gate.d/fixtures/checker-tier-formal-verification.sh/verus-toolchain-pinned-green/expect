@@ -1,0 +1,3 @@
+exit=0
+want=Cargo.lock 与本机缓存里 1 个包的版本、出处与源码指纹都与登记相同
+want=verus-toolchain-pinned：绿

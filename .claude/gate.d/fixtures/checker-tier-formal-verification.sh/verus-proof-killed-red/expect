@@ -1,0 +1,6 @@
+exit=1
+want=Verus 被信号停了（退 137，信号 9），这一次的输出不算判定
+want=→ 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137
+want=→ verus-proof：
+want=✗ 行写「被信号停了」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改证明或实现
+want=verus-proof：红（退出 1）

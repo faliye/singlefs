@@ -1,0 +1,3 @@
+exit=1
+want=不在，而 crate 已经接了 Verus
+want=verus-proof：红（退出 1）

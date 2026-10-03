@@ -1,0 +1,5 @@
+exit=3
+want=本次未跑（这不是通过）：checker 档 crates/singlefs-checker-tier/tests/gpu_pair.rs 整份挂特性 gpu,verdict-store，快档跑到它的用例 0 条
+want=本次未跑（这不是通过）：checker 档 crates/singlefs-checker-tier/tests/store_only.rs 整份挂特性 verdict-store，快档跑到它的用例 0 条
+want=! feature-gated-tests 不算全绿：3 个挂特性的测试文件（特性 gpu,sample-accelerator,verdict-store）跑到 3 条，本次未跑 2 处：编进来 0 条的文件 2 个（tests/gpu_pair.rs tests/store_only.rs），没卡没跑的 GPU 对拍 0 条
+want=逐格：layer0-replay：有 1 条崩溃枚举用例全量本次未跑；feature-gated-tests：有 2 处本次未跑

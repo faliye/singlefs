@@ -1,0 +1,6 @@
+exit=2
+want=样本档：
+want=里的假工具有 2 处不对，不往下走（往下走 cargo 就是真的那一个，在样本目录里起真编译）：
+want=· PATH 最前面放了标记目录，cargo 却解到
+want=· 假 cargo 不可执行（-rw-r--r--）：
+want=给标记目录里的假 cargo、假 rustc 补上执行位

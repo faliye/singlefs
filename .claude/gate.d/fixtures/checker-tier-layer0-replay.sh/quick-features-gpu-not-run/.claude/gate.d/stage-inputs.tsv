@@ -1,0 +1,2 @@
+checker-tier-layer0-replay.sh	crates/ Cargo.toml	command=cargo command=rustc	# 样本：本阶段那一行
+crash-case:plain-stream	crates/ Cargo.toml	test=singlefs-checker-tier:plain_stream:plain_stream_full	# 样本：快档只核它的全绿标记（样本里没有，报本次未跑）

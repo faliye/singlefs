@@ -1,0 +1,12 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=singlefs-harness 放开 unsafe_code 的地方 1 处，根是 forbid、应当 0 处
+want=crates/singlefs-harness/tests/poke_the_raw_descriptor.rs:3
+want=singlefs-harness 的 unsafe 关键字 1 处，根是 forbid、应当 0 处
+want=crates/singlefs-harness/tests/poke_the_raw_descriptor.rs:7
+want=singlefs-harness 在登记表里没有放开
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

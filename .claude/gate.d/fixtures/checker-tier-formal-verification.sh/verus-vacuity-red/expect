@@ -1,0 +1,3 @@
+exit=1
+want=fn clamp_to_limit：函数体头插 assert(false) 照样验得过
+want=verus-vacuity：红（退出 1）

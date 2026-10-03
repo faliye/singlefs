@@ -1,0 +1,2 @@
+# 样本用的必红世界表：变异名、文件、原文、替换文、proof_errors=<证明错条数>
+夹到上限时返回原值	crates/singlefs-replay-prefix/src/lib.rs	        limit\n    } else {	        value\n    } else {	proof_errors=1

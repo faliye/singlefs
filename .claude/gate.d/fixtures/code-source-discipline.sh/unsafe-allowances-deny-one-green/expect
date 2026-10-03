@@ -1,0 +1,8 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=crates/ 里放开 unsafe 的地方与登记表对上：扫了 2 个 crate、4 个 .rs
+want=singlefs-core 根 deny、放开 1 处、unsafe 1 处、2 个 .rs
+want=登记了但仓里没有的 crate 0 个：无
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：绿
+want=code-source-discipline.sh：1 格里 1 格绿（unsafe-allowances），0 格本次未跑（无）

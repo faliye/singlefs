@@ -1,0 +1,3 @@
+exit=1
+want=crates/singlefs-replay-prefix/Cargo.toml 除 vstd 之外还依赖 singlefs-format
+want=verus-proof：红（退出 1）
