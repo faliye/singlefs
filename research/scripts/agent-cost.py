@@ -12,6 +12,10 @@
 口径（与 records/2026-09-28-agent体系用量时间与调度分析.md 第一节同）：一次调用是一条带 usage 的 assistant 消息、按消息 id 去重；
 上下文 = cache_read + cache_creation + input；折算 = 新输入 ×1 + 读缓存 ×0.1 + 5 分钟缓存写 ×1.25 + 1 小时缓存写 ×2 + 输出 ×5（相对量，不是账单）；
 等待 = 相邻两次调用间隔超过 3 分钟。第一版分析用的五份脚本在 research/prompts/agent-cost-2026-09-28/，这一份把它们收进仓、加自证。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句冒号前的名字，括号里是那条「✗ 自检：」的开头）：
+  AGENT_COST_BREAK=no-dedupe  read_transcript() 不按消息 id 去重，同一个消息 id 的流式重复行各算一次
+      子 agent 用量（「✗ 自检：子 agent 用量：应当 1 个、3 次调用（同一个消息 id 的重复行只算一次）」）
 """
 import bisect
 import collections

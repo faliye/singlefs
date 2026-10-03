@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # research/scripts/layer0-shard-run.sh --selftest 的本体：不碰第二台。拷一份仓进临时目录、git init，登记一条 shard=across-machines 的用例，
 # 「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），本机两个进程各跑一片，走驱动脚本同一条路：
-# 工具链与输入指纹两边比、清场与复原（回读）、两片、拷账本、merge、判、写 54 号那一格全绿标记。
+# 工具链与输入指纹两边比、清场与复原（回读）、两片、拷账本、merge、判、写 checker-tier-layer0-replay 那一格全绿标记。
 # 默认用假 cargo（不编译、不跑用例）：登记的是临时仓里新写的一条标了 #[ignore] 的替身用例，三趟都不带 --include-ignored，不算重型；
 # 假 cargo 分片跑时往进度目录写账本、merge 时核两份账本在不在、记的输入指纹对不对，打与层 0 同形的计数行与带 shards= 的线程行。
 # 带 SINGLEFS_HEAVY_TESTS（commit 或 user-request）时换真 cargo：登记 crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs
 # 里不标 ignore 的小流用例（第一条流按甲二展开 29 个状态），release 下真编真跑；不带时成功行写明真 cargo 那一趟本次未跑。逐格核：
 #   ① 不分片跑那条用例打的计数行，与双机分片 merge 之后记进全绿标记的那一行逐字相同；标记作数；清场复原了；第二台这一趟的目录删了
-#   ② --merged-log（门禁 54 号调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
+#   ② --merged-log（门禁 checker-tier-layer0-replay 调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
 #   ③ 「第二台」的 rustc -Vv 第一行不同 ⇒ 拒（工具链不同），标记不动
 #   ④ 「第二台」那一片没写账本 ⇒ 判红，删这批输入那一格标记
 #   ⑤ 配置缺键、配置文件不在 ⇒ 开跑之后头一步的配置判法拒（退 1），出路指到 multi-host.env.example
@@ -21,17 +21,43 @@
 #      「第二台」那棵树 git init 过、找不回主仓；驱动在 ② 把驱动所在主仓（临时仓）的规范副本拷过去，第二台算得出同一个输入指纹，判绿，这一趟的树删了
 #   ⑩ ③ 之后失败（清场之后回读没过）⇒ 退 1，「第二台」上这一趟的树照 ⑦ 删掉，两片的进度目录留着
 #   ⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G ⇒ 第二台那一条 run-with-memory-cap.sh 带同一个值（假 cargo 在 1/2 那一片记下它）；没设（① 那一趟）就不带
-#   ⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=2G ⇒ 覆盖配置的 PEER_MEMORY_CAP（第二台那一片的 scope memory.max 是 2G）；没设（① 那一趟）照配置的 1G；
+#   ⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=<覆盖值> ⇒ 覆盖配置的 PEER_MEMORY_CAP（第二台那一片的 scope memory.max 是覆盖值）；没设（① 那一趟）照配置值；
 #      设成不带单位的数 ⇒ 拒（退 1）
-#   ⑬ 两片跑到一半给驱动（只给它自己，kill "$!"）发 TERM ⇒ 驱动先停两片（假 cargo 在两片里记下的进程号都不在了），再复原、回读、
-#      删「第二台」这一趟的树，退 143；两片的进度目录还在
+#   ⑧ ⑫ 的配置值 / 覆盖值按模式取：假 cargo 1G / 2G；真 cargo 8G / 12G（取值时第二台还在这个上限里编测试二进制；编译挪出去之后测试那一趟要多少没量过，
+#      没往回改）。scope 的 memory.max 只在假 cargo 模式核
+#   ⑬ 两片跑到一半给驱动（只给它自己，kill "$!"）发 TERM ⇒ 驱动先停两片（两片的测试进程里记下的进程号都不在了），再复原、回读、
+#      删「第二台」这一趟的树，退 143；两片的进度目录还在。等两片都停住的上限：假 cargo 60 秒，真 cargo 1 小时（第二台那棵树每一趟从头编），驱动先退了就不等。
+#      这一趟设只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=5（第二台那一片的外层晚 5 秒写退出码文件）：驱动要等外层写完再删，
+#      不然删完它又写出一份 runs/<这一趟>.shard-1-of-2.exit；第 1/2 片记下外层的进程号，自证等它退了（至多 120 秒）再看 runs/
+#   ⑯ 第二台编测试二进制经 run-with-memory-cap.sh、在编译的上限 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 里（自证设：假 cargo 3G，真 cargo 16G），
+#      不在那一片的 PEER_MEMORY_CAP 里：编译那一趟记下的 cgroup 是 singlefs-memory-cap- 的 scope、memory.max 是编译的上限；驱动 ④ 那一行写着它
+#   ⑰ 编译的上限太小（假 cargo 64M、编译那一趟先占 256 MiB；真 cargo 128M、真编）⇒ 驱动退 1、报「编译上限太小」，第二台这一趟的树删了
+# 两片的测试进程里的自证记录（⑭ 标准输出指向、⑧ ⑪ ⑫ cgroup、⑬ 停住等驱动来停）与编译那一趟的记录（⑯ cgroup、⑰ 先占内存）在临时目录的
+#   shard-hooks.sh、build-hooks.sh 里：假 cargo 自己调；真 cargo 模式 PATH 最前面放一层 cargo，别的照转给真的，cargo test … --no-run --message-format=json
+#   时先调编译那一趟的记录，再把它交出的测试可执行文件换成临时目录里的替身（先调两片的记录，再 exec 真的测试二进制），所以真 cargo 下这几格也判得到。
+# 自证起的命令不算进调用方会话的「日常一条」：开头清掉 CLAUDE_CODE_SESSION_ID（照 run-with-memory-cap.sh 自证 in_context 的写法；本机当第二台时
+#   驱动起的那几条包装带着整份环境，调用方的会话里已有一条日常的在跑就退 252）。为了每次都判得到，假 cargo 模式下自证用假会话号经真包装占一条
+#   日常的（16M 的 sleep），① 那一趟前后都在跑。
 #   ⑭ 双机开关（定义在 research/scripts/layer0-shard-configuration-check.sh）：配置齐、「第二台」连得上、写了 ENABLE_ACROSS_MACHINES=1 ⇒ 判法退 0、报「双机：开，GPU：关」，
 #      --emit-assignments 打 ENABLE_ACROSS_MACHINES=1 与没写的 ENABLE_GPU=0；去掉那一行（没写开关）⇒ 判法报「双机：关」退 3（不是「不能用」的报错），
 #      --emit-assignments 同样退 3、不打赋值
 #   ⑮ 开关写了 0、1 之外的值（ENABLE_ACROSS_MACHINES=yes、ENABLE_GPU=2）⇒ 判不过（退 1），说出是哪个键
 # 弄坏开关（配置判法的）MULTI_HOST_CONFIGURATION_BREAK=switch-off-is-on 打开时 ⑭ 判错，switch-value-unchecked 打开时 ⑮ 判错。
-# 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ 判错，
-# no-sop-copy 打开时 ⑨ 判错，no-peer-cleanup-on-failure 打开时 ⑩ 判错。
+# 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ ⑪ ⑫ 判错（真 cargo、假 cargo 两种模式都是这三格，写法以驱动文件头那一项为准），
+# no-sop-copy 打开时 ⑨ 判错，no-peer-cleanup-on-failure 打开时 ⑩ ⑬ ⑰ 判错，peer-build-under-shard-cap 打开时 ⑯ ⑰ 判错，peer-build-cap-unexplained 打开时 ⑰ 判错，
+# peer-exit-not-awaited 打开时 ⑬ 判错（no-peer-findings-copy、no-sop-copy、peer-exit-not-awaited 三项的失败句首写在驱动文件头）。
+# 弄坏开关（本自证的，开关一行，下一行起是打开后判错的格）：
+#   LAYER0_SHARD_SELFTEST_BREAK=package-mismatch  登记与不分片那一趟的 -p 写成用例不在的那个包（真 cargo 模式写成 singlefs-harness，即用例搬进
+#     singlefs-checker-tier 之后还写死的旧包名；假 cargo 模式写成 singlefs-checker-tier，假 cargo 照真 cargo 报 no test target、退 101）
+#       「不分片跑登记的那条用例」、①（驱动编测试二进制那一步失败），以及靠 ① 产物的几格
+#   LAYER0_SHARD_SELFTEST_BREAK=real-binaries-unhooked  真 cargo 模式下不换测试可执行文件、不记编译那一趟（改前的取样：只有假 cargo 记）；只在真 cargo 模式判
+#     （假 cargo 模式下打开不改任何格）
+#       「⑭ 两片的测试进程」（第 0/2 片没记下标准输出；第 1/2 片没记下标准输出）「⑬ 两片跑到一半」（发 TERM 之前两片没都停在那里）
+#       「⑯ 第二台编测试二进制」（编译那一趟没记下）
+#   LAYER0_SHARD_SELFTEST_BREAK=keeps-session  不清调用方的会话号 CLAUDE_CODE_SESSION_ID（改前的跑法）；只在假 cargo 模式判（真 cargo 带 SINGLEFS_HEAVY_TESTS，包装不算日常）
+#       「① 单独跑」（第二台编测试二进制那一条包装退 252），以及同一趟里判的「⑭ 两片的测试进程」「⑧ 第二台那一片经」「⑯ 第二台编测试二进制」，
+#       靠 ① 产物的「① 不分片的计数行」「① merge 那一行」「⑦ 发现日志」「③ 「第二台」rustc」「⑪ 本机设了」「⑫ 设了」，共 10 格
+#       （自证占位那一条只在 ① 那一趟前后在跑，之后的几趟照常）
 # 成功行报核了几格（现算）。
 #
 # admission: always 自证判的是这一刻的驱动脚本与仓，每次调都要现跑
@@ -62,20 +88,107 @@ expect() { # expect <名> <判据的退出码：0 为过> <不过时的细节>
 
 selftest_case_key="crash-case:sharded-selftest"
 copy="$work/repository"
+# 两片（0/2、1/2）的测试进程开头 source 的自证记录：⑭ 标准输出指向哪里，⑧ ⑪ ⑫ 第二台那一片的 cgroup，⑬ 记下进程号、停住等驱动来停
+cat > "$work/shard-hooks.sh" <<'SHARD_HOOKS'
+if [[ -n "${LAYER0_SHARD_SELFTEST_STDOUT_KINDS:-}" ]]; then
+  # ⑭：记下这一片的标准输出指向哪里（普通文件的路径，还是 pipe:[…]）
+  echo "shard=$SINGLEFS_LAYER0_SHARD stdout=$(readlink "/proc/$$/fd/1")" >> "$LAYER0_SHARD_SELFTEST_STDOUT_KINDS"
+fi
+if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_CGROUP:-}" ]]; then
+  own_cgroup="$(sed -n 's/^0:://p' /proc/self/cgroup)"
+  { cat /proc/self/cgroup; printf 'memory.max=%s\nreserve=%s\n' "$(cat "/sys/fs/cgroup$own_cgroup/memory.max" 2>/dev/null)" "${RUN_WITH_MEMORY_CAP_RESERVE-unset}"; } >> "$LAYER0_SHARD_SELFTEST_PEER_CGROUP"
+fi
+if [[ -n "${LAYER0_SHARD_SELFTEST_HOLD_FILE:-}" ]]; then
+  # ⑬：记下自己的进程号，停在这里等驱动收到 TERM 来停；至多 60 秒，hold 文件被删（自证放走）就退 101。
+  #   第 1/2 片先记下第二台那一片的外层（写退出码文件的那个 bash：祖先里命令行带 .shard-1-of-2.exit 的第一个，找不到记 0），自证等它退了再看 runs/
+  if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 ]]; then
+    peer_outer="$PPID"
+    while (( peer_outer > 1 )) && ! grep -qaF '.shard-1-of-2.exit' "/proc/$peer_outer/cmdline" 2>/dev/null; do
+      peer_outer="$(sed 's/.*) //' "/proc/$peer_outer/stat" 2>/dev/null | cut -d' ' -f2)"
+      [[ "$peer_outer" =~ ^[0-9]+$ ]] || peer_outer=0
+    done
+    (( peer_outer > 1 )) || peer_outer=0
+    echo "peer_outer=$peer_outer" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
+  fi
+  echo "shard=$SINGLEFS_LAYER0_SHARD pid=$$" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
+  for ((held_rounds = 0; held_rounds < 600; held_rounds++)); do
+    [[ -e "$LAYER0_SHARD_SELFTEST_HOLD_FILE" ]] || exit 101
+    sleep 0.1
+  done
+  exit 101
+fi
+SHARD_HOOKS
+# 编测试二进制那一趟（cargo test … --no-run）开头 source 的自证记录：⑯ 这一次编译所在的 cgroup 与 memory.max（连同工作目录），⑰ 先占一块内存
+cat > "$work/build-hooks.sh" <<'BUILD_HOOKS'
+if [[ -n "${LAYER0_SHARD_SELFTEST_BUILD_CGROUP:-}" ]]; then
+  build_cgroup="$(sed -n 's/^0:://p' /proc/self/cgroup)"
+  printf 'cwd=%s cgroup=%s memory.max=%s\n' "$PWD" "$build_cgroup" "$(cat "/sys/fs/cgroup$build_cgroup/memory.max" 2>/dev/null)" >> "$LAYER0_SHARD_SELFTEST_BUILD_CGROUP"
+fi
+if [[ -n "${LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB:-}" ]]; then
+  python3 -c 'import sys, time; block = b"\x01" * (int(sys.argv[1]) * 1048576); time.sleep(1)' "$LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB" || exit 101
+fi
+BUILD_HOOKS
 rsync -a --exclude target --exclude .git --exclude multi-host.env "$repository_root/" "$copy/"
 git -C "$copy" init -q
 real_rustc="$(command -v rustc)"
 if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
   cargo_mode="真 cargo（SINGLEFS_HEAVY_TESTS=${SINGLEFS_HEAVY_TESTS}）"
+  # 用例所在的包：973e1f58 把这份测试文件从 singlefs-harness 搬进了 singlefs-checker-tier
+  selftest_package="singlefs-checker-tier"
+  mismatched_package="singlefs-harness"
   selftest_function="the_first_stream_quick_tier_sharded_by_the_environment_keeps_its_pinned_counts"
   selftest_target="crash_enumeration_sharded_across_processes"
   selftest_cargo="$(command -v cargo)"
+  if [[ "${LAYER0_SHARD_SELFTEST_BREAK:-}" == real-binaries-unhooked ]]; then
+    echo "  ! 弄坏开关 LAYER0_SHARD_SELFTEST_BREAK=real-binaries-unhooked：真 cargo 模式不换测试可执行文件、不记编译那一趟"
+  else
+    # 真测试二进制里没有自证的记录：cargo test … --no-run --message-format=json 交出的测试可执行文件换成替身（先 source 两片的记录，再 exec 真的）
+    mkdir -p "$work/real-cargo-bin" "$work/test-binary-shims"
+    cat > "$work/test-binary-shims.py" <<'TEST_BINARY_SHIMS'
+import hashlib, json, os, shlex, sys
+shim_directory, hooks = sys.argv[1], sys.argv[2]
+for line in sys.stdin:
+    try:
+        message = json.loads(line)
+    except ValueError:
+        sys.stdout.write(line)
+        continue
+    target = message.get("target") or {}
+    executable = message.get("executable")
+    if message.get("reason") == "compiler-artifact" and executable and "test" in target.get("kind", []):
+        shim = os.path.join(shim_directory, "shim-" + hashlib.sha256(executable.encode()).hexdigest()[:16])
+        with open(shim + ".tmp", "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 真 cargo 模式的测试二进制替身：两片先 source 自证记录，再 exec 真的测试二进制\n")
+            handle.write('case "${SINGLEFS_LAYER0_SHARD-}" in 0/2|1/2) source %s ;; esac\n' % shlex.quote(hooks))
+            handle.write('exec %s "$@"\n' % shlex.quote(executable))
+        os.chmod(shim + ".tmp", 0o755)
+        os.replace(shim + ".tmp", shim)
+        message["executable"] = shim
+        line = json.dumps(message) + "\n"
+    sys.stdout.write(line)
+TEST_BINARY_SHIMS
+    {
+      printf '#!/usr/bin/env bash\n# 真 cargo 模式 PATH 最前面那一层：别的照转给真的；编测试二进制那一趟先 source 编译的记录，再换交出的测试可执行文件\n'
+      printf 'if [[ " $* " == *" --no-run "* && " $* " == *" --message-format=json "* ]]; then\n'
+      printf '  source %q\n' "$work/build-hooks.sh"
+      printf '  messages="$(%q "$@")"; status=$?\n' "$selftest_cargo"
+      printf '  printf "%%s\\n" "$messages" | python3 %q %q %q || exit 101\n' "$work/test-binary-shims.py" "$work/test-binary-shims" "$work/shard-hooks.sh"
+      printf '  exit "$status"\nfi\nexec %q "$@"\n' "$selftest_cargo"
+    } > "$work/real-cargo-bin/cargo"
+    chmod +x "$work/real-cargo-bin/cargo"
+    selftest_cargo="$work/real-cargo-bin/cargo"
+    export PATH="$work/real-cargo-bin:$PATH"
+  fi
 else
   cargo_mode="假 cargo（真 cargo 那一趟本次未跑：带 SINGLEFS_HEAVY_TESTS=commit 或 user-request 才跑）"
+  # 替身用例写进的包；假 cargo 从它旁边的 stand-in-package 读这个名字，-p 点的不是它就照真 cargo 报错
+  selftest_package="singlefs-harness"
+  mismatched_package="singlefs-checker-tier"
   selftest_function="stand_in_for_the_driver_selftest"
   selftest_target="sharded_driver_selftest_stand_in"
-  printf '#[test]\n#[ignore]\nfn %s() {}\n' "$selftest_function" > "$copy/crates/singlefs-harness/tests/$selftest_target.rs"
+  printf '#[test]\n#[ignore]\nfn %s() {}\n' "$selftest_function" > "$copy/crates/$selftest_package/tests/$selftest_target.rs"
   mkdir -p "$work/stand-in-bin"
+  printf '%s\n' "$selftest_package" > "$work/stand-in-bin/stand-in-package"
   selftest_cargo="$work/stand-in-bin/cargo"
   cat > "$selftest_cargo" <<'STAND_IN_CARGO'
 #!/usr/bin/env bash
@@ -86,7 +199,19 @@ else
 if [[ "$(basename "$0")" == stand-in-test-binary ]]; then set -- test "$@"; fi
 if [[ "${1:-}" == -V ]]; then echo "cargo 0.0.0-layer0-shard-selftest"; exit 0; fi
 [[ "${1:-}" == test ]] || { echo "假 cargo 只认 -V 与 test：$*"; exit 101; }
+# 照真 cargo：-p 点的包不是替身用例所在的那个（旁边 stand-in-package 里写的），就报找不到测试目标、退 101
+requested_package="" requested_target="" previous_argument=""
+for argument in "$@"; do
+  [[ "$previous_argument" == -p ]] && requested_package="$argument"
+  [[ "$previous_argument" == --test ]] && requested_target="$argument"
+  previous_argument="$argument"
+done
+if [[ -n "$requested_package" && "$requested_package" != "$(cat "$(dirname "$0")/stand-in-package")" ]]; then
+  echo "error: no test target named \`$requested_target\` in \`$requested_package\` package" >&2
+  exit 101
+fi
 if [[ " $* " == *" --no-run "* ]]; then
+  source "$(dirname "$0")/../build-hooks.sh"
   test_target="" previous_argument=""
   for argument in "$@"; do [[ "$previous_argument" == --test ]] && test_target="$argument"; previous_argument="$argument"; done
   printf '{"reason":"compiler-artifact","target":{"name":"%s","kind":["test"]},"manifest_path":"%s/Cargo.toml","executable":"%s"}\n' \
@@ -109,23 +234,7 @@ case "${SINGLEFS_LAYER0_SHARD-}" in
     printf '%s\n%s\n' "$count_line" "$passed" ;;
   0/2|1/2)
     [[ -n "${SINGLEFS_LAYER0_PROGRESS_DIRECTORY:-}" && -n "${SINGLEFS_LAYER0_INPUT_FINGERPRINT:-}" ]] || { echo "分片跑没设进度目录或输入指纹"; exit 101; }
-    if [[ -n "${LAYER0_SHARD_SELFTEST_STDOUT_KINDS:-}" ]]; then
-      # ⑭：记下这一片的标准输出指向哪里（普通文件的路径，还是 pipe:[…]）
-      echo "shard=$SINGLEFS_LAYER0_SHARD stdout=$(readlink "/proc/$$/fd/1")" >> "$LAYER0_SHARD_SELFTEST_STDOUT_KINDS"
-    fi
-    if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_CGROUP:-}" ]]; then
-      own_cgroup="$(sed -n 's/^0:://p' /proc/self/cgroup)"
-      { cat /proc/self/cgroup; printf 'memory.max=%s\nreserve=%s\n' "$(cat "/sys/fs/cgroup$own_cgroup/memory.max" 2>/dev/null)" "${RUN_WITH_MEMORY_CAP_RESERVE-unset}"; } >> "$LAYER0_SHARD_SELFTEST_PEER_CGROUP"
-    fi
-    if [[ -n "${LAYER0_SHARD_SELFTEST_HOLD_FILE:-}" ]]; then
-      # ⑬：记下自己的进程号，停在这里等驱动收到 TERM 来停；至多 60 秒，hold 文件被删（自证放走）就退 101
-      echo "shard=$SINGLEFS_LAYER0_SHARD pid=$$" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
-      for ((held_rounds = 0; held_rounds < 600; held_rounds++)); do
-        [[ -e "$LAYER0_SHARD_SELFTEST_HOLD_FILE" ]] || exit 101
-        sleep 0.1
-      done
-      exit 101
-    fi
+    source "$(dirname "$0")/../shard-hooks.sh"
     shard_index="${SINGLEFS_LAYER0_SHARD%/2}"
     ledger="$SINGLEFS_LAYER0_PROGRESS_DIRECTORY/layer0-shard-stand-in-shard-${shard_index}-of-2.tally"
     mkdir -p "$SINGLEFS_LAYER0_PROGRESS_DIRECTORY" && printf 'input_fingerprint=%s\n' "$SINGLEFS_LAYER0_INPUT_FINGERPRINT" > "$ledger" || exit 101
@@ -148,8 +257,27 @@ STAND_IN_CARGO
   ln -s cargo "$work/stand-in-bin/stand-in-test-binary"
   export PATH="$work/stand-in-bin:$PATH"
 fi
+if [[ "${LAYER0_SHARD_SELFTEST_BREAK:-}" == package-mismatch ]]; then
+  echo "  ! 弄坏开关 LAYER0_SHARD_SELFTEST_BREAK=package-mismatch：登记与不分片那一趟的 -p 写成用例不在的 $mismatched_package"
+  selftest_package="$mismatched_package"
+fi
+# 第二台那一片的内存上限：配置的 PEER_MEMORY_CAP 与 ⑫ 设的覆盖值。假 cargo 不编译，1G / 2G；真 cargo 第二台那一片先在这个上限里
+# cargo test --release --no-run 编测试二进制，1G 编不下（rustc 被 cgroup OOM 杀），取 8G / 12G（依据：峰值表里 singlefs-checker-tier
+# release --no-run 量到的最大一条 4.29 GiB）。覆盖值要与配置值不同，⑫ 才分得出「照覆盖」与「照配置」
+if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
+  peer_memory_cap=8G peer_memory_cap_override=12G
+else
+  peer_memory_cap=1G peer_memory_cap_override=2G
+fi
+# 第二台编测试二进制的上限（⑯）与撞顶那一趟的上限（⑰）：假 cargo 3G、64M（编译那一趟先占 256 MiB）；真 cargo 16G、128M（真编，从头编撞得上）
+if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
+  peer_build_memory_cap=16G peer_build_memory_cap_too_small=128M build_allocate_mib=""
+else
+  peer_build_memory_cap=3G peer_build_memory_cap_too_small=64M build_allocate_mib=256
+fi
+gibibytes_in_bytes() { echo $(( ${1%G} * 1073741824 )); } # gibibytes_in_bytes <nG>：scope 的 memory.max 读出来的字节数
 printf '%s\t%s\t%s\t%s\n' "$selftest_case_key" "crates/ Cargo.toml Cargo.lock" \
-  "test=singlefs-harness:$selftest_target:$selftest_function count-line=LAYER0_SHARDED exhaustive=LAYER0_SHARDED threads=LAYER0_SHARDED shard=across-machines" \
+  "test=$selftest_package:$selftest_target:$selftest_function count-line=LAYER0_SHARDED exhaustive=LAYER0_SHARDED threads=LAYER0_SHARDED shard=across-machines" \
   "# 驱动脚本自证临时登记的用例" >> "$copy/.claude/gate.d/stage-inputs.tsv"
 selftest_bin_directory="$(dirname "$selftest_cargo")"
 write_configuration() { # write_configuration <文件> <PEER_CARGO_BIN_DIRECTORY>
@@ -158,7 +286,7 @@ write_configuration() { # write_configuration <文件> <PEER_CARGO_BIN_DIRECTORY
 PEER_SSH_HOST=selftest-peer-is-this-machine
 PEER_REPOSITORY_DIRECTORY=$work/peer
 PEER_CARGO_BIN_DIRECTORY=$2
-PEER_MEMORY_CAP=1G
+PEER_MEMORY_CAP=$peer_memory_cap
 ENABLE_ACROSS_MACHINES=1
 QUIESCE_STOP_COMMAND=touch $work/quiesced
 QUIESCE_STOPPED_CHECK_COMMAND=test -e $work/quiesced
@@ -173,13 +301,23 @@ export SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
 # 假 cargo 的替身用例标了 ignore，不带它就不算重型
 export SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0
 unset SINGLEFS_LAYER0_SHARD SINGLEFS_LAYER0_PROGRESS_DIRECTORY SINGLEFS_LAYER0_INPUT_FINGERPRINT SINGLEFS_LAYER0_START_OVER
-# ⑪ ⑫ 之外的各格都是「没设」：余量与第二台上限的覆盖开关不从调用方漏进来
-unset RUN_WITH_MEMORY_CAP_RESERVE SINGLEFS_LAYER0_PEER_MEMORY_CAP
+# ⑪ ⑫ 之外的各格都是「没设」：余量与第二台上限的覆盖开关不从调用方漏进来；编译的上限由自证设（⑯）
+unset RUN_WITH_MEMORY_CAP_RESERVE SINGLEFS_LAYER0_PEER_MEMORY_CAP LAYER0_SHARD_SELFTEST_BUILD_CGROUP LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE
+export SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP="$peer_build_memory_cap"
+# 自证起的命令不算进调用方会话的「日常一条」（文件头）；假 cargo 模式下自证用假会话号占一条日常的，① 那一趟带着同一个会话号起
+fake_session="layer0-shard-run-selftest-$$"
+if [[ "${LAYER0_SHARD_SELFTEST_BREAK:-}" == keeps-session ]]; then
+  echo "  ! 弄坏开关 LAYER0_SHARD_SELFTEST_BREAK=keeps-session：不清调用方的会话号"
+  session_settings=(CLAUDE_CODE_SESSION_ID="$fake_session")
+else
+  session_settings=(-u CLAUDE_CODE_SESSION_ID)
+fi
+unset CLAUDE_CODE_SESSION_ID
 driver="$copy/research/scripts/layer0-shard-run.sh"
 admission_module="$copy/research/scripts/admission.py"
 
 # 不分片跑一次那条用例：计数行是 merge 之后要逐字相同的那一行
-(cd "$copy" && cargo test --release -p singlefs-harness --test "$selftest_target" -- --exact "$selftest_function" --nocapture) > "$work/unsharded.log" 2>&1
+(cd "$copy" && cargo test --release -p "$selftest_package" --test "$selftest_target" -- --exact "$selftest_function" --nocapture) > "$work/unsharded.log" 2>&1
 unsharded_exit=$?
 unsharded_count_line="$(grep '^LAYER0_SHARDED ' "$work/unsharded.log")"
 expect "不分片跑登记的那条用例：退 0，恰好一行 LAYER0_SHARDED 计数行" "$([[ $unsharded_exit == 0 && $(grep -c '^LAYER0_SHARDED ' "$work/unsharded.log") == 1 ]]; echo $?)" \
@@ -187,8 +325,26 @@ expect "不分片跑登记的那条用例：退 0，恰好一行 LAYER0_SHARDED 
 
 # ① 单独跑：两片、merge、判、写标记（假 cargo 在第二台那一片记下自己的 cgroup，⑧ 核它在内存包装的 scope 里）
 export LAYER0_SHARD_SELFTEST_PEER_CGROUP="$work/peer-cgroup"
-LAYER0_SHARD_SELFTEST_STDOUT_KINDS="$work/stdout-kinds" bash "$driver" "$selftest_case_key" "$copy" > "$work/standalone.log" 2>&1
+holder_pid="" holder_sleep=""
+if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
+  # 假会话号里先占一条日常的（明写等待上限：slice 一时放不下就排队），① 那一趟前后都在跑
+  env -u SINGLEFS_HEAVY_TESTS CLAUDE_CODE_SESSION_ID="$fake_session" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600 RUN_WITH_MEMORY_CAP_PEAKS="$work/holder-peaks.tsv" \
+    RUN_WITH_MEMORY_CAP_KEY="layer0-shard-run.sh 自证 ①：同一个会话里先占着的一条" \
+    bash "$copy/research/scripts/run-with-memory-cap.sh" 16M bash -c 'echo "$$" > "$0"; exec sleep 600' "$work/holder.pid" > "$work/holder.out" 2>&1 &
+  holder_pid=$!
+  for ((holder_rounds = 0; holder_rounds < 6100; holder_rounds++)); do
+    [[ -s "$work/holder.pid" ]] && break
+    kill -0 "$holder_pid" 2>/dev/null || break
+    sleep 0.1
+  done
+  holder_sleep="$(cat "$work/holder.pid" 2>/dev/null)"
+fi
+LAYER0_SHARD_SELFTEST_BUILD_CGROUP="$work/build-cgroup" LAYER0_SHARD_SELFTEST_STDOUT_KINDS="$work/stdout-kinds" \
+  env "${session_settings[@]}" bash "$driver" "$selftest_case_key" "$copy" > "$work/standalone.log" 2>&1
 standalone_exit=$?
+# 占位那一条只停它自己记下的 sleep（核过进程名），包装随之收尾
+if [[ -n "$holder_sleep" && "$(cat "/proc/$holder_sleep/comm" 2>/dev/null)" == sleep ]]; then kill "$holder_sleep"; fi
+if [[ -n "$holder_pid" ]]; then wait "$holder_pid"; fi
 # ⑭ 两片的标准输出都是文件、不是管道：读输出的一方（显示用的 tail、第二台的 ssh）断了，测试进程照样写文件，
 #    不会因写断掉的管道 panic、连带删掉进度文件（2026-09-28 预演第二台那一片续跑读回 0 片的成因）
 stdout_kind_problems=()
@@ -207,8 +363,8 @@ marker_exit=$?
 marker_count_line="$(grep '^LAYER0_SHARDED ' <<< "$marker_output")"
 marker_path="$(head -1 <<< "$marker_output" | cut -d' ' -f2)"
 expect "① 单独跑：退 0，两片各跑了（LAYER0_SHARD mode=run 0/2、1/2），这批输入那一格全绿标记作数" \
-  "$([[ $standalone_exit == 0 && $marker_exit == 0 ]] && grep -q 'SINGLEFS_LAYER0_SHARD=0/2' "$work/standalone.log" && grep -q '④ 两片都跑完' "$work/standalone.log"; echo $?)" \
-  "驱动脚本退 $standalone_exit，标记核 $marker_exit（$marker_output）；驱动脚本输出尾部：$(tail -15 "$work/standalone.log" | tr '\n' '|')"
+  "$([[ $standalone_exit == 0 && $marker_exit == 0 ]] && { [[ -n "${SINGLEFS_HEAVY_TESTS:-}" || -n "$holder_sleep" ]]; } && grep -q 'SINGLEFS_LAYER0_SHARD=0/2' "$work/standalone.log" && grep -q '④ 两片都跑完' "$work/standalone.log"; echo $?)" \
+  "驱动脚本退 $standalone_exit，标记核 $marker_exit（$marker_output）；$([[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]] && { [[ -n "$holder_sleep" ]] && echo "占位那一条在跑（sleep $holder_sleep）；" || echo "占位那一条没起来：$(tail -n 2 "$work/holder.out" 2>/dev/null | tr '\n' '|')；"; })驱动脚本输出尾部：$(tail -15 "$work/standalone.log" | tr '\n' '|')"
 expect "① 不分片的计数行与双机分片 merge 之后记进标记的那一行逐字相同" "$([[ -n "$unsharded_count_line" && "$marker_count_line" == "$unsharded_count_line" ]]; echo $?)" \
   "不分片「$unsharded_count_line」，标记里「$marker_count_line」"
 expect "① merge 那一行按片报线程（shards=2、shard_worker_threads=），记进了标记" "$(grep -q '^parallel_finished=LAYER0_PARALLEL_FINISHED .*shards=2 shard_worker_threads=' "$marker_path"; echo $?)" \
@@ -220,23 +376,38 @@ expect "① 清了场、跑完复原了（回读过），第二台这一趟的�
 
 # ⑧ 第二台那一片经内存包装起
 peer_cap_problems=()
-grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash research/scripts/run-with-memory-cap.sh 1G 起' "$work/standalone.log" \
-  || peer_cap_problems+=("驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh 1G 起")
+grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 bash research/scripts/run-with-memory-cap.sh $peer_memory_cap 起" "$work/standalone.log" \
+  || peer_cap_problems+=("驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh $peer_memory_cap 起")
 if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]] && ! grep -q 'singlefs-memory-cap-' "$work/peer-cgroup" 2>/dev/null; then
   peer_cap_problems+=("假 cargo 在第二台那一片记下的 cgroup 不在 singlefs-memory-cap- 的 scope 里：$(tr '\n' ' ' < "$work/peer-cgroup" 2>/dev/null)")
 fi
-expect "⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP=1G）" "${#peer_cap_problems[@]}" \
+expect "⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起（上限是配置的 PEER_MEMORY_CAP=$peer_memory_cap）" "${#peer_cap_problems[@]}" \
   "$(IFS='；'; echo "${peer_cap_problems[*]}")"
 unset LAYER0_SHARD_SELFTEST_PEER_CGROUP
 
-# ② --merged-log：门禁 54 号调的那一条
+# ⑯ 第二台编测试二进制在编译的上限里（① 那一趟的编译记录：工作目录在第二台 runs/ 底下的那一行）
+build_cap_problems=()
+peer_build_record="$(grep "^cwd=$work/peer/runs/" "$work/build-cgroup" 2>/dev/null | head -1)"
+if [[ -z "$peer_build_record" ]]; then
+  build_cap_problems+=("第二台编译那一趟没记下（记下的：$(tr '\n' '|' < "$work/build-cgroup" 2>/dev/null)）")
+else
+  [[ "$peer_build_record" == *" cgroup="*singlefs-memory-cap-* ]] || build_cap_problems+=("第二台编译那一趟不在 singlefs-memory-cap- 的 scope 里：$peer_build_record")
+  [[ "$peer_build_record" == *" memory.max=$(gibibytes_in_bytes "$peer_build_memory_cap")" ]] \
+    || build_cap_problems+=("第二台编译那一趟的 memory.max 不是编译的上限 $peer_build_memory_cap（$(gibibytes_in_bytes "$peer_build_memory_cap") 字节）：$peer_build_record")
+fi
+grep -qF "第二台的编译经 bash research/scripts/run-with-memory-cap.sh $peer_build_memory_cap）" "$work/standalone.log" \
+  || build_cap_problems+=("驱动 ④ 那一行没写第二台的编译经 run-with-memory-cap.sh $peer_build_memory_cap")
+expect "⑯ 第二台编测试二进制经 run-with-memory-cap.sh、在编译的上限 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP=$peer_build_memory_cap 里，不在那一片的 PEER_MEMORY_CAP=$peer_memory_cap 里" \
+  "${#build_cap_problems[@]}" "$(IFS='；'; echo "${build_cap_problems[*]}")"
+
+# ② --merged-log：门禁 checker-tier-layer0-replay 调的那一条
 bash "$driver" --merged-log "$selftest_case_key" "$copy" "$fingerprint" "$work/merged.log" > "$work/merged-driver.log" 2>&1
 merged_exit=$?
 expect "② --merged-log：退 0，merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数" \
   "$([[ $merged_exit == 0 ]] && grep -q 'LAYER0_SHARD mode=merge shards=2 ' "$work/merged.log" && [[ "$(grep '^LAYER0_SHARDED ' "$work/merged.log")" == "$unsharded_count_line" ]]; echo $?)" \
   "退 $merged_exit；驱动脚本输出尾部：$(tail -10 "$work/merged-driver.log" | tr '\n' '|')"
 
-# ⑦ 发现日志：merge 那一份是 <日志文件>.findings.tsv（54 号读的那一份），两片的在各自日志旁边，第二台上那一份拷回之后删了，三份路径都打进输出
+# ⑦ 发现日志：merge 那一份是 <日志文件>.findings.tsv（checker-tier-layer0-replay 读的那一份），两片的在各自日志旁边，第二台上那一份拷回之后删了，三份路径都打进输出
 findings_problems=()
 merge_findings="$work/merged.log.findings.tsv"
 local_findings="$work/merged.log.shard-0-of-2.log.findings.tsv"
@@ -357,7 +528,7 @@ expect "⑥ 没登记 shard=across-machines 的用例 ⇒ 拒（退 1），出�
   "退 $not_shardable_exit；输出：$(tail -3 "$work/not-shardable.log" | tr '\n' '|')"
 
 # ⑨ 树里没有规范副本、「第二台」那棵树找不回主仓：树是临时仓的 orphan worktree（git common-dir 指回临时仓，本机的准入模块从临时仓找得到规范副本），
-# 文件按硬链接从临时仓铺过去、不带规范副本；驱动用这棵树里的那一份（与门禁 54 号 --full 调 $ROOT/research/scripts/layer0-shard-run.sh 同形）
+# 文件按硬链接从临时仓铺过去、不带规范副本；驱动用这棵树里的那一份（与门禁 checker-tier-layer0-replay --full 调 $ROOT/research/scripts/layer0-shard-run.sh 同形）
 tree_without_sop_copy="$work/tree-without-sop-copy"
 peer_runs_before_sop_cell="$(ls -A "$work/peer/runs" 2>/dev/null)"
 if git -C "$copy" worktree add -q --orphan -b layer0-shard-selftest-tree "$tree_without_sop_copy" > "$work/worktree-add.log" 2>&1 \
@@ -382,9 +553,19 @@ expect "⑩ ③ 之后失败（清场之后回读没过）⇒ 退 1，「第二�
      && grep -q '清场之后回读没过' "$work/quiesce-check-fails.log" && grep -q '⑦ 删掉第二台上这一趟的树与编译目录' "$work/quiesce-check-fails.log"; echo $?)" \
   "退 $quiesce_check_fails_exit；跑之前第二台 runs/ 下「${peer_runs_before_cleanup_cell//$'\n'/ }」，跑之后「$(ls -A "$work/peer/runs" 2>/dev/null | tr '\n' ' ')」；进度目录 $work/peer/progress/$fingerprint $([[ -d "$work/peer/progress/$fingerprint" ]] && echo 在 || echo 不在)；输出尾部：$(tail -6 "$work/quiesce-check-fails.log" | tr '\n' '|')"
 
+# ⑰ 编译的上限太小：驱动退 1、报「编译上限太小」，第二台这一趟的树删了（假 cargo 的编译那一趟先占 256 MiB；真 cargo 真编）
+peer_runs_before_build_cap_cell="$(ls -A "$work/peer/runs" 2>/dev/null)"
+build_cap_settings=(SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP="$peer_build_memory_cap_too_small")
+if [[ -n "$build_allocate_mib" ]]; then build_cap_settings+=(LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB="$build_allocate_mib"); fi
+env "${build_cap_settings[@]}" bash "$driver" "$selftest_case_key" "$copy" > "$work/build-cap-too-small.log" 2>&1
+build_cap_too_small_exit=$?
+expect "⑰ 编译的上限太小（SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP=$peer_build_memory_cap_too_small）⇒ 驱动退 1、报「编译上限太小」，第二台这一趟的树删了" \
+  "$([[ $build_cap_too_small_exit == 1 && "$(ls -A "$work/peer/runs" 2>/dev/null)" == "$peer_runs_before_build_cap_cell" ]] && grep -q '编译上限太小' "$work/build-cap-too-small.log"; echo $?)" \
+  "退 $build_cap_too_small_exit；第二台 runs/ 下「$(ls -A "$work/peer/runs" 2>/dev/null | tr '\n' ' ')」；输出尾部：$(tail -8 "$work/build-cap-too-small.log" | tr '\n' '|')"
+
 # ⑪ ⑫ 余量与第二台上限的覆盖：设了就带给第二台那一条包装 / 覆盖配置；没设的情形核 ① 那一趟（假 cargo 记下的在 $work/peer-cgroup）
 export LAYER0_SHARD_SELFTEST_PEER_CGROUP="$work/peer-cgroup-overridden"
-RUN_WITH_MEMORY_CAP_RESERVE=10G SINGLEFS_LAYER0_PEER_MEMORY_CAP=2G bash "$driver" "$selftest_case_key" "$copy" > "$work/overridden.log" 2>&1
+RUN_WITH_MEMORY_CAP_RESERVE=10G SINGLEFS_LAYER0_PEER_MEMORY_CAP="$peer_memory_cap_override" bash "$driver" "$selftest_case_key" "$copy" > "$work/overridden.log" 2>&1
 overridden_exit=$?
 SINGLEFS_LAYER0_PEER_MEMORY_CAP=2 bash "$driver" "$selftest_case_key" "$copy" > "$work/unitless-peer-cap.log" 2>&1
 unitless_peer_cap_exit=$?
@@ -402,17 +583,17 @@ fi
 expect "⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G ⇒ 第二台那一条 run-with-memory-cap.sh 带同一个值；没设就不带" "${#reserve_problems[@]}" \
   "$(IFS='；'; echo "${reserve_problems[*]}")"
 peer_cap_override_problems=()
-grep -q '第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash research/scripts/run-with-memory-cap.sh 2G 起' "$work/overridden.log" \
-  || peer_cap_override_problems+=("设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=2G 那一趟，驱动 ④ 那一行上限不是 2G")
+grep -qF "第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 RUN_WITH_MEMORY_CAP_RESERVE=10G bash research/scripts/run-with-memory-cap.sh $peer_memory_cap_override 起" "$work/overridden.log" \
+  || peer_cap_override_problems+=("设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=$peer_memory_cap_override 那一趟，驱动 ④ 那一行上限不是 $peer_memory_cap_override")
 if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
-  grep -qx 'memory.max=2147483648' "$work/peer-cgroup-overridden" 2>/dev/null \
-    || peer_cap_override_problems+=("设了 2G 那一趟，第二台那一片的 scope：$(grep '^memory.max=' "$work/peer-cgroup-overridden" 2>/dev/null)")
-  grep -qx 'memory.max=1073741824' "$work/peer-cgroup" 2>/dev/null \
-    || peer_cap_override_problems+=("没设的 ① 那一趟，第二台那一片的 scope 不是配置的 1G：$(grep '^memory.max=' "$work/peer-cgroup" 2>/dev/null)")
+  grep -qx "memory.max=$(gibibytes_in_bytes "$peer_memory_cap_override")" "$work/peer-cgroup-overridden" 2>/dev/null \
+    || peer_cap_override_problems+=("设了 $peer_memory_cap_override 那一趟，第二台那一片的 scope：$(grep '^memory.max=' "$work/peer-cgroup-overridden" 2>/dev/null)")
+  grep -qx "memory.max=$(gibibytes_in_bytes "$peer_memory_cap")" "$work/peer-cgroup" 2>/dev/null \
+    || peer_cap_override_problems+=("没设的 ① 那一趟，第二台那一片的 scope 不是配置的 $peer_memory_cap：$(grep '^memory.max=' "$work/peer-cgroup" 2>/dev/null)")
 fi
 [[ $unitless_peer_cap_exit == 1 ]] && grep -q 'SINGLEFS_LAYER0_PEER_MEMORY_CAP 要写第二台那一片的内存上限' "$work/unitless-peer-cap.log" \
   || peer_cap_override_problems+=("SINGLEFS_LAYER0_PEER_MEMORY_CAP=2（不带单位）没被拒：退 $unitless_peer_cap_exit，$(tail -3 "$work/unitless-peer-cap.log" | tr '\n' '|')")
-expect "⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=2G ⇒ 覆盖配置的 PEER_MEMORY_CAP（第二台那一片的 scope 是 2G）；没设照配置的 1G；不带单位的拒" \
+expect "⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=$peer_memory_cap_override ⇒ 覆盖配置的 PEER_MEMORY_CAP（第二台那一片的 scope 是 $peer_memory_cap_override）；没设照配置的 $peer_memory_cap；不带单位的拒" \
   "${#peer_cap_override_problems[@]}" "$(IFS='；'; echo "${peer_cap_override_problems[*]}")"
 
 # ⑬ 两片跑到一半给驱动发 TERM（假 cargo 在两片里各记下进程号、停着等）；只给驱动自己发（kill "$!"），不发给它的子进程
@@ -420,17 +601,34 @@ hold_file="$work/shards-held"
 : > "$hold_file"
 peer_runs_before_interrupt="$(ls -A "$work/peer/runs" 2>/dev/null)"
 export LAYER0_SHARD_SELFTEST_HOLD_FILE="$hold_file"
-bash "$driver" "$selftest_case_key" "$copy" > "$work/interrupted.log" 2>&1 &
+# 第二台那一片的外层晚 5 秒写退出码文件（只供测试的开关）：驱动要等它写完再删第二台这一趟的东西，不然删完它又写出一份
+SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=5 bash "$driver" "$selftest_case_key" "$copy" > "$work/interrupted.log" 2>&1 &
 interrupted_driver=$!
 unset LAYER0_SHARD_SELFTEST_HOLD_FILE
-for ((waited_rounds = 0; waited_rounds < 600; waited_rounds++)); do
+# 等两片都停住：上限假 cargo 60 秒、真 cargo 1 小时（第二台那棵树每一趟从头编测试二进制）；驱动先退了就不等
+hold_wait_rounds=600
+if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then hold_wait_rounds=36000; fi
+for ((waited_rounds = 0; waited_rounds < hold_wait_rounds; waited_rounds++)); do
   [[ "$(grep -c '^shard=' "$hold_file")" == 2 ]] && break
+  kill -0 "$interrupted_driver" 2>/dev/null || break
   sleep 0.1
 done
 mapfile -t held_processes < <(sed -n 's/^shard=.* pid=//p' "$hold_file")
+peer_outer="$(sed -n 's/^peer_outer=//p' "$hold_file" | head -1)"
 kill -TERM "$interrupted_driver"
 wait "$interrupted_driver"
 interrupted_exit=$?
+# 等第二台那一片的外层退了再看 runs/（它退之前还可能写出退出码文件）：至多 120 秒；核命令行还是它（进程号没被重用）
+peer_outer_problem=""
+if [[ ! "$peer_outer" =~ ^[1-9][0-9]*$ ]]; then
+  peer_outer_problem="第 1/2 片没记下第二台那一片的外层（记下的：${peer_outer:-无}）"
+else
+  for ((outer_rounds = 0; outer_rounds < 1200; outer_rounds++)); do
+    grep -qaF '.shard-1-of-2.exit' "/proc/$peer_outer/cmdline" 2>/dev/null || break
+    sleep 0.1
+  done
+  if grep -qaF '.shard-1-of-2.exit' "/proc/$peer_outer/cmdline" 2>/dev/null; then peer_outer_problem="第二台那一片的外层（进程 $peer_outer）驱动退了 120 秒之后还在"; fi
+fi
 still_running=()
 for held_process in "${held_processes[@]}"; do
   held_state="$(ps -o stat= -p "$held_process" 2>/dev/null)"
@@ -440,12 +638,13 @@ rm -f -- "$hold_file"  # 没停掉的两片看到它不在就自己退
 interrupt_problems=()
 [[ $interrupted_exit == 143 ]] || interrupt_problems+=("驱动退 $interrupted_exit，不是 143")
 [[ ${#held_processes[@]} == 2 ]] || interrupt_problems+=("发 TERM 之前两片没都停在那里（记下 ${#held_processes[@]} 个进程号）")
+[[ -z "$peer_outer_problem" ]] || interrupt_problems+=("$peer_outer_problem")
 (( ${#still_running[@]} == 0 )) || interrupt_problems+=("TERM 之后两片还在跑：${still_running[*]}")
 grep -q '复原之后回读过了' "$work/interrupted.log" || interrupt_problems+=("没复原回读")
 [[ ! -e "$work/quiesced" ]] || interrupt_problems+=("清场标记还在（没复原）")
 [[ "$(ls -A "$work/peer/runs" 2>/dev/null)" == "$peer_runs_before_interrupt" ]] || interrupt_problems+=("第二台 runs/ 下多了：$(ls -A "$work/peer/runs" | tr '\n' ' ')")
 [[ -d "$work/peer/progress/$fingerprint" && -d "$git_common_directory/singlefs-layer0-progress/$fingerprint" ]] || interrupt_problems+=("两片的进度目录不在了")
-expect "⑬ 两片跑到一半给驱动发 TERM ⇒ 先停两片，再复原、回读、删第二台这一趟的树，退 143，进度目录还在" "${#interrupt_problems[@]}" \
+expect "⑬ 两片跑到一半给驱动发 TERM（第二台那一片的外层晚 5 秒写退出码文件）⇒ 先停两片、等那一片的外层写完退出码文件，再复原、回读、删第二台这一趟的树，退 143，进度目录还在" "${#interrupt_problems[@]}" \
   "$(IFS='；'; echo "${interrupt_problems[*]}")；驱动输出尾部：$(tail -8 "$work/interrupted.log" | tr '\n' '|')"
 
 if (( failures > 0 )); then

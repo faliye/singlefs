@@ -19,6 +19,12 @@
 
 ⚠️ **单字复读不算**（「慢慢」「刚刚」「每每」是正常中文），把它算进去会让检测器
 对任何中文文本都判红，那就没有判别力了。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一例的标签，括号里是那条「✗ 自检：」的开头）：
+  CORRUPTION_CHECK_BREAK=keep-prompt-code  without_prompt_code() 不把提示里出现过的代码片段从输出里去掉
+      照抄提示里的 Rust 路径（「✗ 自检：照抄提示里的 Rust 路径：应当判绿」）
+  CORRUPTION_CHECK_BREAK=no-substitution  letter_substitutions() 一处单字母系统性替换都不报
+      单字母替换（「✗ 自检：单字母替换：应当判红」）
 """
 import sys, re, unicodedata
 import os as preflight_os, sys as preflight_sys  # noqa: E402

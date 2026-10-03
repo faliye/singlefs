@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# 层 0 崩溃重放按双机分片跑一条崩溃枚举用例（里程碑三第六项，.claude/kb/milestone/03-third-txn.md 第六节）：本机跑第 0/2 片、
+# 层 0 崩溃重放按双机分片跑一条崩溃枚举用例：本机跑第 0/2 片、
 # 第二台跑第 1/2 片（SINGLEFS_LAYER0_SHARD，切法与账本在 crates/singlefs-checker-tier/src/layer0_progress.rs），第二台的账本拷回本机，
 # 本机 SINGLEFS_LAYER0_SHARD=merge/2 再跑同一条用例（只读两份账本、核齐、按切片序号并，不枚举）。
 #
 #   layer0-shard-run.sh <崩溃枚举用例的键> <树根>
-#       两台各跑一片、merge，merge 那一趟的日志照门禁 54 号 --full 判（admission.py crash-case-judge），判绿写 54 号那一格全绿标记
-#       （同一组标记、同一个输入指纹，crash-case-record）；判红删这批输入那一格。树根是 HEAD + 暂存区那棵树（建法同 54 号 --full）。
+#       两台各跑一片、merge，merge 那一趟的日志照门禁 checker-tier-layer0-replay --full 判（admission.py crash-case-judge），判绿写 checker-tier-layer0-replay 那一格全绿标记
+#       （同一组标记、同一个输入指纹，crash-case-record）；判红删这批输入那一格。树根是 HEAD + 暂存区那棵树（建法同 checker-tier-layer0-replay --full）。
 #   layer0-shard-run.sh --merged-log <崩溃枚举用例的键> <树根> <输入指纹> <日志文件>
-#       门禁 54 号 --full 在分片开着时调：只做两片与 merge，merge 那一趟的整段输出写进日志文件，退出码是那一趟的；判与写标记归 54 号。
+#       门禁 checker-tier-layer0-replay --full 在分片开着时调：只做两片与 merge，merge 那一趟的整段输出写进日志文件，退出码是那一趟的；判与写标记归 checker-tier-layer0-replay。
 #   layer0-shard-run.sh --selftest
 #       转给 research/scripts/layer0-shard-run-selftest.sh：不碰第二台，本机两个进程各跑一片走同一条路（含 merge、判与标记）。
 #
@@ -16,48 +16,66 @@
 # .claude/singlefs-ai-sop/ 另拷进那棵树（它在 .gitignore 里，HEAD + 暂存区的 worktree 里没有；本机的准入模块经 git common-dir 回退到主仓找得到，
 # 第二台那棵树 git init 过、没有主仓可回退）：树里有就拷树里的，没有就拷驱动所在主仓那一份（先驱动这棵树里的，再驱动这棵树的 git common-dir
 # 所在的那份仓，与 .claude/scripts/preflight.sh 找它的次序相同），拷完回读 scripts/preflight.py 在不在；
-# ③ 两台各算这条用例的输入指纹（admission.py crash-case-manifest，参数与 54 号相同），不同就拒；清场（配置里写了的话，回读验证，
+# ③ 两台各算这条用例的输入指纹（admission.py crash-case-manifest，参数与 checker-tier-layer0-replay 相同），不同就拒；清场（配置里写了的话，回读验证，
 # 复原挂在 EXIT 上，跑红了也复原）；④ 两片同时跑，各记 pid、各 wait 取退出码、各写自己的日志，LAYER0_PROGRESS 边跑边转出来；
 # ⑤ 第二台的账本拷回本机进度目录；⑥ 本机 merge；⑦ 删掉第二台上这一趟的树与编译目录（两片的进度目录留着：被杀之后下一趟接着跑）。
 # 第二台上这一趟的目录建好之后在哪一步失败退出，⑦ 都挂在 EXIT 上照做（删树与第二台上那一片的发现日志，进度目录留着）。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停两片——本机那一片从它的进程起、第二台那一片从它在第二台上记下的进程号起（第二台上
 # runs/<这一趟>.shard-1-of-2.pid，核它的工作目录是这一趟的树），都按父子关系逐层冻住（STOP）、从最底层起 TERM、放开，等至多 30 秒，
-# 还在的 KILL，回读一个不剩——再照 EXIT 上那一套复原、回读、删第二台这一趟的树，全部做完才退；收尾时不再理会这三个信号与 SIGPIPE
+# 还在的 KILL，回读一个不剩，第二台那一片再等它的外层写完退出码文件（至多 30 秒）——再照 EXIT 上那一套复原、回读、删第二台这一趟的树，全部做完才退；收尾时不再理会这三个信号与 SIGPIPE
 # （读输出的一方先没了，写不出去也照样往下做）。两片的进度目录留着，下一趟接着跑。前台那几步（rsync、算指纹、merge）里收到的，
 # 等那一步跑完再照这一套收尾；KILL 接不住，那时第二台上这一趟的树留着，手动删。
-# 进度目录：本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>（与 54 号相同），第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>。
+# 进度目录：本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>（与 checker-tier-layer0-replay 相同），第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>。
 # 线程：本机那一片取 SINGLEFS_LAYER0_THREADS（没设取本机 nproc），第二台那一片取第二台的 nproc；两台的 nproc 都清掉 OMP_NUM_THREADS、
 # OMP_THREAD_LIMIT 再跑（nproc 认这两个变量，漏进来就把核数压成它们的值）。SINGLEFS_LAYER0_START_OVER=1 交给两片，
 # merge 那一趟不带。只接登记了 shard=across-machines 的用例（它的枚举经 Layer0Resume::from_environment 认分片开关）。
 # 内存：第二台那一片在第二台上经那棵树副本里的 research/scripts/run-with-memory-cap.sh 起，上限取配置的 PEER_MEMORY_CAP（第二台不在本机的进程树里，
-# 本机包在外面的那一层罩不到它）；本机那一片与 merge 照旧，由起 54 号 / 这个驱动的那一层包装管。第二台那一片退 250–254 是包装自己的结局
+# 本机包在外面的那一层罩不到它）；本机那一片与 merge 照旧，由起 checker-tier-layer0-replay / 这个驱动的那一层包装管。第二台那一片退 250–254 是包装自己的结局
 # （含义见 run-with-memory-cap.sh 文件头「退出码」），那一片的输出不算结果，判红。
+# PEER_MEMORY_CAP 只罩第二台跑测试二进制那一趟；第二台编测试二进制（cargo test --release --no-run）另经同一个包装、上限
+# SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP（写法同 PEER_MEMORY_CAP，默认 16G：本机 60 GiB 减去常驻约 12 GiB、同时至多 3 件重活，每件 16 GiB，
+# 与 research/scripts/mutate.sh 的 MUTATE_MEMORY_MAX 同一个算法；峰值表里 singlefs-checker-tier release --no-run 量到的最大一条是 4.29 GiB；
+# 第二台的内存与本机不同时要重算）。两台对称：本机编测试二进制也不在那一片的上限里。编译撞了这个上限（包装退 250）报明「编译上限太小」。
 # 环境变量 SINGLEFS_LAYER0_PEER_MEMORY_CAP 设了就覆盖配置的 PEER_MEMORY_CAP（写法同它：正整数加 K / M / G / T），没设照配置。
 # 本机环境里设了 RUN_WITH_MEMORY_CAP_RESERVE（包装的余量），同一个值带给第二台那一条 run-with-memory-cap.sh；没设就不带，第二台照包装的默认余量。
 # 「第二台」是本机（只供测试）时，这两个变量不从本机环境漏给那一片（真的第二台经 ssh 也拿不到本机环境），只认驱动带过去的。
 # 判与写标记：merge 那一趟的日志交 admission.py crash-case-judge 判，判绿交 crash-case-record 写；核数与线程数由它们自己现取，这里不转。
 # 登记的崩溃枚举用例都标了 #[ignore]，三趟 cargo test 都带 --include-ignored --exact <用例函数>；只供测试的开关
 # SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0 时不带 --include-ignored（--selftest 那条小流用例不标 ignore，不必把别的 ignore 用例放进过滤范围）。
+# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=<秒>：第二台那一片的外层（跑完写退出码文件的那个 bash）写之前先停这么多秒，
+# 只给 --selftest 的 ⑬ 把「收到 TERM 删完第二台这一趟的东西之后，外层才写出退出码文件」的竞态撑开。
 #
 # 配置（本地、git 忽略）：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，键与写法见仓根 multi-host.env.example；
-# 在不在、齐不齐、第二台连不连得上由 research/scripts/layer0-shard-configuration-check.sh 判（门禁 54 号拿同一份判走不走分片）。
+# 在不在、齐不齐、第二台连不连得上由 research/scripts/layer0-shard-configuration-check.sh 判（门禁 checker-tier-layer0-replay 拿同一份判走不走分片）。
 # 这一份与配置判法按内容进登记了 shard=across-machines 的用例的输入指纹（research/scripts/admission.py 的 SHARD_DRIVER_FILES）：两片与 merge 的
 # cargo 由这里起、不经 admission.py crash-case-command，改了这里那几条用例的旧全绿标记不再作数。
 # 重型：跑的是标了 ignore 的崩溃枚举用例（--include-ignored），只在提交时（SINGLEFS_HEAVY_TESTS=commit）或用户要求时跑；--selftest 不算。
 #
 # 日志与发现日志（用户 2026-09-27 定全量与发现双份，records/2026-09-24-里程碑二收尾调度.md「层 0 放量的发现日志」那一行；行格式以 crates/singlefs-checker-tier/src/crash.rs 为准）：
 # 三趟 cargo 各设 SINGLEFS_LAYER0_FINDINGS_FILE，发现日志一律是那一趟的日志同名加 .findings.tsv，开跑前先删掉旧的。--merged-log 时两片的日志放在
-# 给的日志文件旁边（<日志文件>.shard-0-of-2.log、.shard-1-of-2.log），merge 那一趟的发现日志是 <日志文件>.findings.tsv——门禁 54 号读的就是这一份；
+# 给的日志文件旁边（<日志文件>.shard-0-of-2.log、.shard-1-of-2.log），merge 那一趟的发现日志是 <日志文件>.findings.tsv——门禁 checker-tier-layer0-replay 读的就是这一份；
 # 单独跑时三份日志放 <git common-dir>/singlefs-layer0-logs/<这一趟>/。第二台那一片的发现日志先写在第二台 runs/<这一趟>.shard-1-of-2.findings.tsv，
-# 两片跑完拷回本机、放在那一片的日志旁边，再删第二台上那一份。三份路径都打进输出；发现表归 54 号读、归 54 号判，这里不判。
-# 弄坏开关（只给证红用）LAYER0_SHARD_RUN_BREAK=<项>：no-peer-findings-copy 不拷回第二台那一片的发现日志，no-merge-findings 不给 merge 那一趟设发现日志；
-# 各自打开时 --selftest 的 ⑦ 那一格判错。peer-without-memory-cap 第二台那一片不经 run-with-memory-cap.sh 起，打开时 --selftest 的 ⑧ 那一格判错。
-# no-sop-copy 不往第二台那棵树拷规范副本，打开时 --selftest 的 ⑨ 那一格判错；no-peer-cleanup-on-failure 失败退出时不删第二台上这一趟的树，
-# 打开时 --selftest 的 ⑩ 那一格判错。
+# 两片跑完拷回本机、放在那一片的日志旁边，再删第二台上那一份。三份路径都打进输出；发现表归 checker-tier-layer0-replay 读、归 checker-tier-layer0-replay 判，这里不判。
+# 弄坏开关（只给证红用）LAYER0_SHARD_RUN_BREAK=<项>：no-merge-findings 不给 merge 那一趟设发现日志，打开时 --selftest 的 ⑦ 那一格判错。
+# peer-build-under-shard-cap 第二台编测试二进制照改前放进那一片的上限 PEER_MEMORY_CAP 里，打开时 --selftest 的 ⑯、⑰ 两格判错（⑰ 设的小编译上限不起作用，照编成、退 0）；
+# peer-build-cap-unexplained 编译撞了编译上限也只报「第二台编测试二进制失败」、不说上限太小（改前的报法），打开时 --selftest 的 ⑰ 那一格判错。
+# no-peer-cleanup-on-failure 失败退出时不删第二台上这一趟的树，打开时 --selftest 的 ⑩、⑬、⑰ 三格判错（都看第二台 runs/ 下这一趟的东西删没删）。
+# 下面四项照 research/scripts/mutate.sh 的写法：开关一行写弄坏哪一处，下一行起写打开后 --selftest 判错的格（「格名开头」，括号里写失败行格名之后的句首）：
+#   LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap  第二台那一片不经 run-with-memory-cap.sh 起
+#       「⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起」（驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh）
+#       「⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G」（设了余量那一趟，驱动 ④ 那一行没写第二台经 RUN_WITH_MEMORY_CAP_RESERVE=10G 起包装）
+#       「⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G」（设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G 那一趟，驱动 ④ 那一行上限不是 12G）
+#       以上取自真 cargo（带 SINGLEFS_HEAVY_TESTS）模式；假 cargo 模式判错的也是这三格，⑫ 的格名与句首里的 12G 换成 2G，其余同上
+#   LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy  两片跑完不拷回第二台那一片的发现日志
+#       「⑦ 发现日志」（第二台那一片没拷回到）
+#   LAYER0_SHARD_RUN_BREAK=no-sop-copy  照改前只把树拷到第二台（树里有规范副本就随树走），不另拷规范副本：树里没有它的那一趟第二台算不出输入指纹
+#       「⑨ 树里没有规范副本」（退 1；）
+#   LAYER0_SHARD_RUN_BREAK=peer-exit-not-awaited  收到 TERM 停了第二台那一片的测试二进制就往下删，不等那一片的外层写完退出码文件（改前的写法）
+#       「⑬ 两片跑到一半给驱动发 TERM」（第二台 runs/ 下多了：）
 #
 # 配置在不在、判不判得过不写成运行条件（--selftest 不要配置）：开跑之后第一件事调配置判法，判不过照它的原因与出路退 1。
 #
-# admission: always 每次调都跑这一刻这棵树上的一条崩溃枚举用例；复用判定在门禁 54 号的全绿标记里，不在这里
+# admission: always 每次调都跑这一刻这棵树上的一条崩溃枚举用例；复用判定在门禁 checker-tier-layer0-replay 的全绿标记里，不在这里
 # run-condition: command cargo rustc python3 rsync ssh nproc git
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -76,7 +94,7 @@ usage_ok=1
 if [[ "$layer0_shard_mode" == merged-log && ( ! "$given_fingerprint" =~ ^[0-9a-f]{64}$ || -z "$merged_log_file" ) ]]; then usage_ok=0; fi
 if (( ! usage_ok )); then
   echo "  ✗ 用法：layer0-shard-run.sh <crash-case:键> <树根>，或 --merged-log <crash-case:键> <树根> <输入指纹> <日志文件>，或 --selftest"
-  echo "     → 怎么办：键照 .claude/gate.d/stage-inputs.tsv 里 crash-case: 那一行写；树根是 HEAD + 暂存区那棵树（建法见门禁 54 号 --full 的出路句）"
+  echo "     → 怎么办：键照 .claude/gate.d/stage-inputs.tsv 里 crash-case: 那一行写；树根是 HEAD + 暂存区那棵树（建法见门禁 checker-tier-layer0-replay --full 的出路句）"
   exit 2
 fi
 tree_root="$(cd "$tree_root" && pwd)"
@@ -110,6 +128,15 @@ if [[ -n "${SINGLEFS_LAYER0_PEER_MEMORY_CAP:-}" ]]; then
       "写成例 24G；不设它就照配置的 PEER_MEMORY_CAP"
   peer_memory_cap="$SINGLEFS_LAYER0_PEER_MEMORY_CAP"
 fi
+# 第二台编测试二进制的上限（文件头「内存」一段）：SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP，默认 16G
+peer_build_memory_cap="${SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP:-16G}"
+[[ "$peer_build_memory_cap" =~ ^[1-9][0-9]*[KMGT]$ ]] \
+  || fail "SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 要写第二台编测试二进制的内存上限（正整数加 K / M / G / T，单位必写），读到「${peer_build_memory_cap}」" \
+    "写成例 16G；不设它取默认 16G"
+# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=<秒>：第二台那一片的外层写退出码文件之前先停这么多秒（文件头「只供测试的开关」）
+peer_exit_pause="${SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE:-}"
+[[ -z "$peer_exit_pause" || "$peer_exit_pause" =~ ^[1-9][0-9]*$ ]] \
+  || fail "SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE 只许写正整数秒，读到「${peer_exit_pause}」" "不设它；只有 --selftest 的 ⑬ 设它"
 
 # 这条用例登记的包、测试目标、用例函数（第三列的 test=）；要登记了 shard=across-machines
 registration_row="$(awk -F'\t' -v key="$case_key" '$1 == key' "$tree_root/.claude/gate.d/stage-inputs.tsv")"
@@ -118,10 +145,10 @@ IFS=: read -r case_package case_target case_function <<< "${test_token#test=}"
 [[ -n "$registration_row" && -n "$case_package" && -n "$case_target" && -n "$case_function" ]] \
   || fail "stage-inputs.tsv 里找不到这一行或它的 test=<包>:<测试目标>:<用例函数>" "照 research/scripts/admission.py 文件头「崩溃枚举用例行」登记"
 python3 "$admission_module" crash-case-shardable "$tree_root" "$case_key" >/dev/null \
-  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/54-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
+  || fail "这条用例没登记 shard=across-machines（它的枚举不认分片开关，分了片也是每台各跑全量）" "单机跑它：bash .claude/gate.d/checker-tier-layer0-replay.sh --full <树根>；要分片先让用例经 Layer0Resume::from_environment 取续跑设置，再在登记行第三列加 shard=across-machines"
 
 if ! git_common_directory="$(git -C "$tree_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || [[ -z "$git_common_directory" ]]; then
-  fail "$tree_root 不是 git 工作树（取不到 git common-dir）" "在 HEAD + 暂存区的 worktree 里跑，建法见门禁 54 号 --full 的出路句"
+  fail "$tree_root 不是 git 工作树（取不到 git common-dir）" "在 HEAD + 暂存区的 worktree 里跑，建法见门禁 checker-tier-layer0-replay --full 的出路句"
 fi
 run_label="${case_key#crash-case:}-$(date -u +%Y%m%dT%H%M%SZ)-$$"
 peer_run_directory="$PEER_REPOSITORY_DIRECTORY/runs/$run_label"
@@ -184,7 +211,7 @@ stop_one_process_by_pid() { # stop_one_process_by_pid <进程号>：只停这一
   echo "进程 $1 停了"
 }
 stop_shards_and_exit() { # stop_shards_and_exit <信号名> <退出码>：先停两片，再 exit（EXIT 上复原、回读、删第二台这一趟的树）
-  local stop_output
+  local stop_output peer_exit_wait_command
   trap '' TERM INT HUP PIPE
   echo "  ! 收到 $1：先停两片，再复原、回读、删第二台这一趟的树（两片的进度目录留着），做完再退"
   if [[ -n "$local_shard_process" ]]; then
@@ -196,14 +223,30 @@ stop_shards_and_exit() { # stop_shards_and_exit <信号名> <退出码>：先停
     fi
   fi
   if (( peer_shard_started )); then
-    # 进程号文件要等第二台那一片起来才有：至多等 10 秒；核它的工作目录是这一趟的包目录（进程号没被别的进程重用）
+    # 进程号文件要等第二台那一片起来才有：至多等 10 秒；核它的工作目录是这一趟的包目录（进程号没被别的进程重用）。
+    # 停了之后再等那一片的外层写完退出码文件（至多 30 秒）：外层要等内存包装收尾才写，比 EXIT 上删第二台这一趟的东西晚的话，
+    # 删完它又写出一份退出码文件留在第二台 runs/ 下。弄坏开关 peer-exit-not-awaited 下不等（改前的写法）
+    peer_exit_wait_command=""
+    if [[ "$layer0_shard_break" == peer-exit-not-awaited ]]; then
+      echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-exit-not-awaited：停了第二台那一片的测试二进制就往下删，不等那一片的外层写完退出码文件"
+    else
+      peer_exit_wait_command="for ((exit_rounds = 0; exit_rounds < 300; exit_rounds++)); do [[ -s $(printf '%q' "$peer_exit_file") ]] && break; sleep 0.1; done
+if [[ -s $(printf '%q' "$peer_exit_file") ]]; then echo \"；那一片的外层写完了退出码文件（退 \$(cat $(printf '%q' "$peer_exit_file"))）\"; else echo '；那一片的外层 30 秒内没写退出码文件'; fi"
+    fi
     if stop_output="$(run_on_peer "$peer_run_directory" "$(declare -f process_is_alive stop_one_process_by_pid)
 for ((pid_rounds = 0; pid_rounds < 100; pid_rounds++)); do [[ -s $(printf '%q' "$peer_pid_file") ]] && break; sleep 0.1; done
 peer_shard_pid=\"\$(cat $(printf '%q' "$peer_pid_file") 2>/dev/null)\"
 if [[ -z \"\$peer_shard_pid\" ]]; then echo '没有进程号文件：那一片没起来'
 elif [[ \"\$(readlink /proc/\$peer_shard_pid/cwd 2>/dev/null)\" != \"\$(pwd -P)\"* ]]; then echo \"进程号 \$peer_shard_pid 已经不在（或不是这一趟的）\"
-else stop_one_process_by_pid \"\$peer_shard_pid\"; fi")"; then
-      echo "  · 第二台那一片（测试二进制）：$stop_output"
+else stop_one_process_by_pid \"\$peer_shard_pid\"; fi
+stop_status=\$?
+$peer_exit_wait_command
+exit \$stop_status")"; then
+      echo "  · 第二台那一片（测试二进制）：${stop_output//$'\n'/}"
+      if [[ "$stop_output" == *'30 秒内没写退出码文件'* ]]; then
+        echo "  ! 第二台那一片的外层 30 秒内没写退出码文件：下面删了这一趟的东西之后，它还可能再写出 $peer_exit_file"
+        echo "     → 怎么办：过几分钟到第二台看那个文件在不在，在就手动删（只删这一个文件）"
+      fi
     else
       echo "  ✗ 第二台那一片没停下：$stop_output"
       echo "     → 怎么办：ssh 到第二台，照 $peer_pid_file 里的进程号 python3 .claude/singlefs-ai-sop/scripts/proc.py stop <进程号>"
@@ -282,12 +325,15 @@ else
 fi
 
 # ② 树拷到第二台这一趟的专用目录（新建的空目录，不带 --delete），在那里 git init；规范副本另拷（树的那一趟不带它：树里那一份可能是指回本机的符号链接）
+#   弄坏开关 no-sop-copy 下照改前：树原样拷过去（树里有规范副本就随树走），不另拷
+tree_copy_exclusions=(--exclude target --exclude .git --exclude /.claude/singlefs-ai-sop)
+if [[ "$layer0_shard_break" == no-sop-copy ]]; then tree_copy_exclusions=(--exclude target --exclude .git); fi
 run_on_peer / "mkdir -p $(printf '%q' "$peer_run_directory") $(printf '%q' "$PEER_REPOSITORY_DIRECTORY/progress")" || fail "第二台建不了 $peer_run_directory" "看 PEER_REPOSITORY_DIRECTORY 可不可写"
 peer_run_directory_pending=1
-copy_to_peer --exclude target --exclude .git --exclude /.claude/singlefs-ai-sop "$tree_root/" "$(peer_path "$peer_run_directory")/" || fail "树 rsync 到第二台失败" "看第二台盘满没满、$PEER_REPOSITORY_DIRECTORY 可不可写"
+copy_to_peer "${tree_copy_exclusions[@]}" "$tree_root/" "$(peer_path "$peer_run_directory")/" || fail "树 rsync 到第二台失败" "看第二台盘满没满、$PEER_REPOSITORY_DIRECTORY 可不可写"
 if [[ "$layer0_shard_break" == no-sop-copy ]]; then
-  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=no-sop-copy：规范副本不拷到第二台"
-  sop_copy_text="规范副本没拷（弄坏开关 no-sop-copy）"
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=no-sop-copy：照改前只拷树（树里有规范副本就随树走），不另拷规范副本"
+  sop_copy_text="规范副本没另拷（弄坏开关 no-sop-copy）"
 else
   sop_copy_text="规范副本 $sop_copy_source 拷到第二台（${sop_copy_origin}）"
   copy_to_peer "$sop_copy_source/" "$(peer_path "$peer_run_directory/.claude/singlefs-ai-sop")/" \
@@ -298,7 +344,7 @@ fi
 run_on_peer "$peer_run_directory" "git init -q ." || fail "第二台上 git init 失败" "看第二台装没装 git"
 echo "  · ② 树拷到第二台 $peer_run_directory；$sop_copy_text"
 
-# ③ 两台各算这条用例的输入指纹（参数与门禁 54 号相同：准入模块的判法摘要、工具链与构建环境；登记了 shard=across-machines 的，
+# ③ 两台各算这条用例的输入指纹（参数与门禁 checker-tier-layer0-replay 相同：准入模块的判法摘要、工具链与构建环境；登记了 shard=across-machines 的，
 # 这一份驱动脚本与配置判法由准入模块按内容加进清单）
 local_manifest="$scratch_directory/manifest.local"
 local_summary="$(python3 "$admission_module" crash-case-manifest "$tree_root" "$case_key" "$local_manifest" \
@@ -310,7 +356,7 @@ peer_fingerprint="${peer_summary%% *}"
 [[ "$local_fingerprint" == "$peer_fingerprint" ]] \
   || fail "两台算出的输入指纹不同（本机 ${local_fingerprint:0:16}…，第二台 ${peer_fingerprint:0:16}…）：构建环境（~/.cargo/config、RUSTFLAGS 这一类）或树不一样" "对一对两台的 ~/.cargo/config*、环境变量 RUSTFLAGS / CARGO_*，改成一样再跑"
 if [[ "$layer0_shard_mode" == merged-log && "$local_fingerprint" != "$given_fingerprint" ]]; then
-  fail "本机算出的输入指纹 ${local_fingerprint:0:16}… 与 54 号给的 ${given_fingerprint:0:16}… 不同" "别在有人改这些路径的树里跑；在 HEAD + 暂存区的 worktree 里重跑 54 号 --full"
+  fail "本机算出的输入指纹 ${local_fingerprint:0:16}… 与 checker-tier-layer0-replay 给的 ${given_fingerprint:0:16}… 不同" "别在有人改这些路径的树里跑；在 HEAD + 暂存区的 worktree 里重跑 checker-tier-layer0-replay --full"
 fi
 echo "  · ③ 两台的输入指纹相同：${local_fingerprint:0:16}…（${local_file_count} 个文件，减去用例读不到的 ${local_excluded_count} 个）"
 
@@ -340,6 +386,13 @@ peer_memory_cap_text="${peer_memory_reserve_text}bash research/scripts/run-with-
 if [[ "$layer0_shard_break" == peer-without-memory-cap ]]; then
   peer_memory_cap_text=""
   echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap：第二台那一片不经 run-with-memory-cap.sh 起"
+fi
+# 第二台编测试二进制另经同一个包装、上限是编译的 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP，不在那一片的 PEER_MEMORY_CAP 里（两台对称：本机编译也不在）；
+#   弄坏开关 peer-build-under-shard-cap 下照改前放进那一片的上限里
+peer_build_cap_text="${peer_memory_reserve_text}bash research/scripts/run-with-memory-cap.sh $(printf '%q' "$peer_build_memory_cap") "
+if [[ "$layer0_shard_break" == peer-build-under-shard-cap ]]; then
+  peer_build_cap_text="${peer_memory_reserve_text}bash research/scripts/run-with-memory-cap.sh $(printf '%q' "$peer_memory_cap") "
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=peer-build-under-shard-cap：第二台编测试二进制放进那一片的上限 PEER_MEMORY_CAP=$peer_memory_cap 里"
 fi
 case "${SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED:-1}" in
   1) libtest_arguments=(--include-ignored "${libtest_arguments[@]}") ;;
@@ -384,12 +437,24 @@ mapfile -t local_test_binary_lines < <(test_binary_from_cargo_messages "$case_ta
 (( ${#local_test_binary_lines[@]} == 2 )) || fail "本机从 cargo 的输出里取不到测试可执行文件（$local_build_messages）" "看 $local_log.build 与 $local_build_messages"
 local_test_binary="${local_test_binary_lines[0]}"; local_package_directory="${local_test_binary_lines[1]}"
 local_cargo_executable="$(rustup which cargo 2>/dev/null || command -v cargo)"
-peer_build_messages="$(run_on_peer "$peer_run_directory" "${peer_memory_cap_text}$(printf '%q ' cargo test --release -p "$case_package" --test "$case_target" --no-run --message-format=json) 2> .layer0-shard-build.log")" \
-  || fail "第二台编测试二进制失败（cargo test --no-run）" "ssh 到第二台看 $peer_run_directory/.layer0-shard-build.log"
+if peer_build_messages="$(run_on_peer "$peer_run_directory" "${peer_build_cap_text}$(printf '%q ' cargo test --release -p "$case_package" --test "$case_target" --no-run --message-format=json) 2> .layer0-shard-build.log")"; then
+  peer_build_exit=0
+else
+  peer_build_exit=$?
+fi
+if [[ "$peer_build_exit" != 0 ]]; then
+  echo "    第二台编测试二进制那一趟的标准错误尾部（第二台 $peer_run_directory/.layer0-shard-build.log，失败退出时随这一趟的树删掉）："
+  run_on_peer "$peer_run_directory" "tail -n 12 .layer0-shard-build.log" 2>/dev/null | sed 's/^/      /'
+  if [[ "$peer_build_exit" == 250 && "$layer0_shard_break" != peer-build-cap-unexplained ]]; then
+    fail "第二台编测试二进制撞了编译的内存上限 ${peer_build_memory_cap}（cargo test --no-run 那一趟，包装退 250）：编译上限太小" \
+      "调大 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 再跑（写法同 PEER_MEMORY_CAP，默认 16G 的依据在 research/scripts/layer0-shard-run.sh 文件头「内存」一段）"
+  fi
+  fail "第二台编测试二进制失败（cargo test --no-run 那一趟退 $peer_build_exit）" "看上面那几行标准错误；退 250–254 是内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」）"
+fi
 mapfile -t peer_test_binary_lines < <(test_binary_from_cargo_messages "$case_target" <<< "$peer_build_messages")
 (( ${#peer_test_binary_lines[@]} == 2 )) || fail "第二台从 cargo 的输出里取不到测试可执行文件" "ssh 到第二台看 $peer_run_directory/.layer0-shard-build.log"
 peer_test_binary="${peer_test_binary_lines[0]}"; peer_package_directory="${peer_test_binary_lines[1]}"
-echo "  · ④ 两台各编好测试二进制：本机 $local_test_binary，第二台 $peer_test_binary"
+echo "  · ④ 两台各编好测试二进制：本机 $local_test_binary，第二台 $peer_test_binary（第二台的编译经 ${peer_build_cap_text% }）"
 mkdir -p -- "$local_progress_directory" || fail "建不了本机进度目录 $local_progress_directory" "看它可不可写"
 ( cd "$local_package_directory" && exec 9>"$local_progress_directory/.layer0-shard-run.lock" \
     && { flock -n 9 || { echo "✗ 本机进度目录 $local_progress_directory 的锁被占着：上一趟本机那一片还在跑"; echo "     → 怎么办：等上一趟本机那一片跑完再起（进度留着，这一趟接着续跑）；它该停，就按进程号停它，别删锁文件"; exit 75; }; } \
@@ -401,7 +466,9 @@ tail -n +1 -F --pid="$local_shard_process" "$local_log" 2>/dev/null | { grep --l
 peer_shard_command="exec 9>$(printf '%q' "$peer_progress_directory/.layer0-shard-run.lock") && { flock -n 9 || { echo '✗ 第二台进度目录的锁被占着：上一趟第二台那一片还在跑'; echo '     → 怎么办：等第二台上一趟那一片跑完再起（进度留着，这一趟接着续跑）；它该停，就按进程号停它，别删锁文件'; exit 75; }; } && echo \$\$ > $(printf '%q' "$peer_pid_file") && cd $(printf '%q' "$peer_package_directory") && exec env SINGLEFS_HEAVY_TESTS=${SINGLEFS_HEAVY_TESTS:-} ${start_over_text}CARGO=\"$cargo_executable_text\" SINGLEFS_LAYER0_SHARD=1/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=$(printf '%q' "$peer_progress_directory") SINGLEFS_LAYER0_INPUT_FINGERPRINT=$local_fingerprint SINGLEFS_LAYER0_THREADS=$peer_cores SINGLEFS_LAYER0_FINDINGS_FILE=$(printf '%q' "$peer_findings_file") $(printf '%q ' "$peer_test_binary" "${libtest_arguments[@]}")"
 # 只让 setsid nohup 那一条进后台（它的输入输出都重定向了）：写成 `A && B && setsid … &` 的话，`&` 把整串放进后台子进程，
 # 那个子进程握着 ssh 的输出通道、等第二台那一片跑完才退，ssh 就一直不返回（2026-09-28 预演第二条流卡在这里）
-run_on_peer "$peer_run_directory" "mkdir -p $(printf '%q' "$peer_progress_directory") && rm -f -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_exit_file") $(printf '%q' "$peer_output_file") || exit 1; setsid nohup bash -c $(printf '%q' "${peer_memory_cap_text}bash -c $(printf '%q' "$peer_shard_command") > $(printf '%q' "$peer_output_file") 2>&1; echo \$? > $(printf '%q' "$peer_exit_file")") < /dev/null > /dev/null 2>&1 &" \
+peer_exit_pause_text=""
+if [[ -n "$peer_exit_pause" ]]; then peer_exit_pause_text="sleep $peer_exit_pause; "; fi
+run_on_peer "$peer_run_directory" "mkdir -p $(printf '%q' "$peer_progress_directory") && rm -f -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_exit_file") $(printf '%q' "$peer_output_file") || exit 1; setsid nohup bash -c $(printf '%q' "${peer_memory_cap_text}bash -c $(printf '%q' "$peer_shard_command") > $(printf '%q' "$peer_output_file") 2>&1; peer_shard_exit=\$?; ${peer_exit_pause_text}echo \$peer_shard_exit > $(printf '%q' "$peer_exit_file")") < /dev/null > /dev/null 2>&1 &" \
   || fail "第二台那一片起不来" "ssh 到第二台看 $peer_output_file"
 peer_shard_started=1
 {
@@ -483,20 +550,20 @@ if [[ "$merge_exit" == 0 ]] && ! grep -q 'LAYER0_SHARD mode=merge shards=2 ' "$m
 echo "  · ⑥ 三份发现日志：本机 0/2 $local_findings_file；第二台 1/2 $fetched_peer_findings_file；merge $merge_findings_file"
 if [[ "$layer0_shard_mode" == merged-log ]]; then
   cp -- "$merge_log" "$merged_log_file"
-  echo "  · ⑥ merge 那一趟退 $merge_exit，整段输出交给 54 号判（$merged_log_file），发现日志交给 54 号读（$merge_findings_file）"
+  echo "  · ⑥ merge 那一趟退 $merge_exit，整段输出交给 checker-tier-layer0-replay 判（$merged_log_file），发现日志交给 checker-tier-layer0-replay 读（$merge_findings_file）"
   [[ "$merge_exit" == 0 ]] && exit 0
   exit 1
 fi
 if [[ "$merge_exit" != 0 ]]; then
   echo "    merge 那一趟的日志尾部（全文 $merge_log）："
   tail -40 "$merge_log" | sed 's/^/      /'
-  fail_after_the_run "merge 那一趟退 $merge_exit（上面是它的尾部；merge-line-missing 是日志里没有 LAYER0_SHARD mode=merge shards=2 那一行）" "账本核不齐时 panic 那一句说清缺哪一片、哪一处不同；计数断言红了与单机全量红了是同一回事，照 54 号 --full 的出路查"
+  fail_after_the_run "merge 那一趟退 $merge_exit（上面是它的尾部；merge-line-missing 是日志里没有 LAYER0_SHARD mode=merge shards=2 那一行）" "账本核不齐时 panic 那一句说清缺哪一片、哪一处不同；计数断言红了与单机全量红了是同一回事，照 checker-tier-layer0-replay --full 的出路查"
 fi
 judged_lines_file="$scratch_directory/judged"
 case_started_utc="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 if ! judge_output="$(python3 "$admission_module" crash-case-judge "$tree_root" "$case_key" "$merge_log" "$judged_lines_file")"; then
   printf '%s\n' "$judge_output" | sed 's/^/       /'
-  fail_after_the_run "merge 那一趟跑过了，日志却判不绿（上面逐条列出）" "计数行、test result、exhaustive=true、每一片的工作线程，照 54 号 --full 同一句出路查"
+  fail_after_the_run "merge 那一趟跑过了，日志却判不绿（上面逐条列出）" "计数行、test result、exhaustive=true、每一片的工作线程，照 checker-tier-layer0-replay --full 同一句出路查"
 fi
 finish_manifest="$scratch_directory/manifest.finish"
 finish_summary="$(python3 "$admission_module" crash-case-manifest "$tree_root" "$case_key" "$finish_manifest" \

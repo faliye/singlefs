@@ -18,6 +18,13 @@
   doc-consolidate.py migrate <文件> --out <输出> [--drop-history] [--report <报告.md>]
   doc-consolidate.py loss-check <改前> <改后> [--dropped-history]
   doc-consolidate.py --selftest
+
+弄坏开关（只给 --selftest 证红用，migrate 与 loss-check 不认）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句冒号前的名字，
+括号里是那条「✗ 自检：」的开头）。不设开关时 --selftest 把 BREAK_MODES 里每个开关各开一次跑 migrate_document()，核 loss-check 都红
+（没红的那一项是「弄坏开关 <名>」，失败句「✗ 自检：弄坏开关 <名>：故意丢一个数，loss-check 没红」）；设了认不得的取值退 2。
+  DOC_CONSOLIDATE_BREAK=drop-number  migrate_document() 把正文里第一处两位以上的数（标题行与日期除外）删掉一个，样本里丢的是产物名 e142-r18-… 里的 142
+      产物名或引名里的日期被删了（「✗ 自检：产物名或引名里的日期被删了」）、
+      干净整理不该有丢失（「✗ 自检：干净整理不该有丢失：」）
 """
 import argparse
 import collections
@@ -250,8 +257,16 @@ SAMPLE = '''# 里程碑二收尾调度（2026-09-24）
 '''
 
 
+BREAK_MODES = ('drop-number',)  # 弄坏开关 DOC_CONSOLIDATE_BREAK 认的取值，只给 --selftest 用（文件头逐个写了打开后哪几项红）
+
+
 def selftest():
-    after, report = migrate_document(SAMPLE, '2026-09-24', drop_history=True)
+    break_mode = os.environ.get('DOC_CONSOLIDATE_BREAK', '')
+    if break_mode and break_mode not in BREAK_MODES:
+        print(f'✗ 自检：DOC_CONSOLIDATE_BREAK={break_mode} 认不得')
+        print(f'  → 取值只有 {" ".join(BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
+        return 2
+    after, report = migrate_document(SAMPLE, '2026-09-24', drop_history=True, break_mode=break_mode or None)
     problems = []
     if '（2026-09-24；报告' in after or '用户 2026-09-24 定' in after:
         problems.append('文件日期没删')
@@ -272,16 +287,21 @@ def selftest():
         problems.append(f'干净整理不该有丢失：{missing}')
     if history_only != ['2026-09-25']:
         problems.append(f'历史节独有的应只有那一节自己的日期（3 行的 3 是单位数不算），实际 {history_only}')
-    broken, _report = migrate_document(SAMPLE, '2026-09-24', drop_history=True, break_mode='drop-number')
-    broken_missing, _ = loss_check_document(SAMPLE, broken, '2026-09-24', dropped_history=True)
-    if not broken_missing:
-        problems.append('故意丢一个数，loss-check 没红')
+    caught = []
+    for mode in BREAK_MODES:
+        broken, _report = migrate_document(SAMPLE, '2026-09-24', drop_history=True, break_mode=mode)
+        broken_missing, _ = loss_check_document(SAMPLE, broken, '2026-09-24', dropped_history=True)
+        if not broken_missing:
+            problems.append(f'弄坏开关 {mode}：故意丢一个数，loss-check 没红')
+        else:
+            caught.append(f'{mode} {broken_missing}')
     if problems:
         for problem in problems:
             print('✗ 自检：' + problem)
         print('  → 改 doc-consolidate.py 的对应分支，再跑 --selftest')
         return 1
-    print(f'✓ 自检通过：文件日期与标题日期删了、产物名与引名不动、同日小节合并、历史节删了、零丢失，故意丢数被抓（{broken_missing}）')
+    print(f'✓ 自检通过：文件日期与标题日期删了、产物名与引名不动、同日小节合并、历史节删了、零丢失，'
+          f'弄坏开关 {len(caught)} 个各开一次、故意丢数都被抓（{"；".join(caught)}）')
     return 0
 
 
@@ -306,7 +326,7 @@ def main():
         path = arguments.files[0]
         before_text = open(path, encoding='utf-8').read()
         file_date = file_date_of(path)
-        after_text, report = migrate_document(before_text, file_date, arguments.drop_history, os.environ.get('DOC_CONSOLIDATE_BREAK'))
+        after_text, report = migrate_document(before_text, file_date, arguments.drop_history)
         with open(arguments.out, 'w', encoding='utf-8') as handle:
             handle.write(after_text)
         missing, history_only = loss_check_document(before_text, after_text, file_date, arguments.drop_history)

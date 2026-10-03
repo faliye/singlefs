@@ -24,8 +24,11 @@
 
 自证（--selftest）里有一格判长串掩码：一段 65536 字的连续 `[A-Za-z0-9_.-]` 串（不带扩展名）后面跟一个已归档产物的名字，
 掩码在子进程里跑、1 秒内要做完，换出来的与不加左边界时逐字相同（逐字比在短串上做：不加左边界的那一条在长串上跑不完）。
-弄坏开关 SWEEP_TERM_BREAK=<项>：archived-names-unprotected 不保护已归档产物的名字，已归档那几格判红；
-product-name-no-left-boundary 去掉产物名字的左边界，长串掩码那一格因超时判红。
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一格的名字，括号里是那条「✗ 自检失败：」的开头）：
+  SWEEP_TERM_BREAK=archived-names-unprotected  不保护已归档产物的名字，照旧名换掉
+      已归档产物（「✗ 自检失败：已归档产物的名字被换掉了，或换完仍判红」）
+  SWEEP_TERM_BREAK=product-name-no-left-boundary  去掉产物名字的左边界（PRODUCT_FILE_NAME_PATTERN_WITHOUT_LEFT_BOUNDARY）
+      长串掩码（「✗ 自检失败：长串掩码那一格判错：65536 字的连续串掩码用了」…「超时（上限 1 秒）」）
 
 退出码：--check 0 搜不出旧名、1 还有旧名；--apply 0 换完、3 有文件没换上（那几份原文件没动、临时文件已删）；
 2 登记表或豁免表有问题。

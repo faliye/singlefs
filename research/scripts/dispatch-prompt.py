@@ -13,6 +13,10 @@
 骨架里的固定行与派发闸（.claude/hooks/runner-dispatch-guard.sh）判的是同一套：重型测试一行、开工先读（没有定义的类型）、
 定义的 required-inputs 每组一行、实现员的「要动的 crates 文件」、写回员的「规格检查已判」、执行员的「这一段回答的岔路」。
 退出码：0 打出骨架或提示里没有占位；2 用法错、定义不在；3 --check 发现占位。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头）：
+  DISPATCH_PROMPT_BREAK=ignore-placeholders  placeholders() 一处占位都不认
+      --check 带占位的骨架（「✗ 自检：--check 对带占位的骨架应当退 3 并逐行列出」）
 """
 import os
 import re
@@ -27,7 +31,7 @@ from project_preflight import preflight  # noqa: E402
 REPOSITORY_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 BROKEN = os.environ.get("DISPATCH_PROMPT_BREAK", "")
 PLACEHOLDER = re.compile(r"<填[^>]*>")
-HEAVY_TEST_OWNERS = {"crash-verifier", "gate-triage"}
+HEAVY_TEST_OWNERS = set()   # 子 agent 一个都不跑重型测试，骨架一律带「重型测试：不跑」
 HEAVY_WORK_TYPES = {"implementation-writer", "experiment-runner", "three-way-attack", "investigator", "tooling-writer", "clerk", "mutation-triage"}
 # 定义之外、派发闸另判的行：类型 → 那一行的骨架
 EXTRA_LINES = {
@@ -128,8 +132,8 @@ def selftest():
             failures.append(f"实现员骨架应当带线程上限，「要动的 crates 文件」只一行（定义已经要了就不再加）：\n{text_writer}")
         text_gate = skeleton("gate-triage", agents, {}, None)
         checked += 1
-        if "重型测试：不跑" in text_gate:
-            failures.append("门禁分诊员的骨架不该有「重型测试：不跑」")
+        if "重型测试：不跑" not in text_gate:
+            failures.append("原来跑重型测试的类型名，骨架也要带「重型测试：不跑」")
         draft = os.path.join(work, "draft.md")
         open(draft, "w", encoding="utf-8").write(text)
         import io, contextlib
@@ -156,7 +160,7 @@ def selftest():
         print("    → 怎么办：看 skeleton() 与 check_prompt()；DISPATCH_PROMPT_BREAK=ignore-placeholders 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 项）：有定义的类型按 required-inputs 逐组一行、--set 填进去；没有定义的带开工先读；实现员带要动的文件与线程上限；"
-          "门禁分诊员不带重型测试行；--check 对占位退 3、填完退 0")
+          "每种类型都带重型测试行；--check 对占位退 3、填完退 0")
     return 0
 
 

@@ -22,6 +22,23 @@
      （门禁 doc-experiments 的 decision-links 格那条双向检查的另一侧）；
   ⑤ 写决策变更史（.claude/kb/decisions-history.md）的，新串里要有「### 」或「#### 」标题行与「快查·改前：」「快查·改后：」两行。
 ②③ 只判新串比旧串多出来的：旧串里原有的不怪这份规格。认不出规格（两种写法都不是、一条都没有）退 2。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一例的标签，括号里是那条「✗ 自检：」的开头）：
+  KB_SPEC_CHECK_BREAK=any-hits  check_entries() 不判旧串恰好命中一次（①）
+      旧串 0 次（「✗ 自检：旧串 0 次：应当判红」）
+  KB_SPEC_CHECK_BREAK=any-name  reference_problems() 编号后面跟什么简称都算对（②）
+      简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）
+  KB_SPEC_CHECK_BREAK=dated-time  pointer_problems() 同一行带日期的时间指代也判红（③）
+      时间指代带日期不算（「✗ 自检：时间指代带日期不算：应当判绿」）
+  KB_SPEC_CHECK_BREAK=no-history  check_entries() 不判决策变更史的形态（⑤）
+      变更史用旧形态（「✗ 自检：变更史用旧形态：应当判红」）
+  KB_SPEC_CHECK_BREAK=no-pairing  check_entries() 不判依据段与实验页的配对（④）
+      依据段加实验号没配对（「✗ 自检：依据段加实验号没配对：应当判红」）
+  KB_SPEC_CHECK_BREAK=no-pointers  check_entries() 不调 pointer_problems()（③）
+      新加位置指代（「✗ 自检：新加位置指代：应当判红」）、新加时间指代（「✗ 自检：新加时间指代：应当判红」）
+  KB_SPEC_CHECK_BREAK=no-references  check_entries() 不调 reference_problems()（②）
+      编号没带简称（「✗ 自检：编号没带简称：应当判红」）、简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）、
+      判决段名撞了登记编号（「✗ 自检：判决段名撞了登记编号：应当判红」）
 """
 import glob
 import json

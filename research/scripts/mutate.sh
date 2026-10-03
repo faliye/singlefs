@@ -9,9 +9,16 @@
 # 替换必须命中，命中数为 0 直接报错退出 —— 静默失效的替换会让整份证明变成假的
 # （singlefs-ai-sop/rules/command-safety.md「脚本改文件之后要回读确认」）。
 #
-#   mutate.sh --selftest    拿一个假的 cargo 在临时 workspace 里走一遍各种结局（抓到、没红、无效、超时、内存撞顶、基线撞顶、scope 起不来），
+#   mutate.sh --selftest    拿一个假的 cargo 走一遍各种结局（抓到、没红、无效、超时、内存撞顶、基线撞顶、scope 起不来），
 #                           再走一遍并行的几样（进程数不同 stdout 逐字相同、各用各的副本、丢一份结果整道判红、锚点腐化派活之前退 3），
-#                           再走一遍 required-features（挂了的 bin 带上 --features 跑得起来，没挂的 bin 的 cargo 参数与改前逐字相同）
+#                           再走一遍 required-features（挂了的 bin 带上 --features 跑得起来，没挂的 bin 的 cargo 参数与改前逐字相同），
+#                           再走一遍包装排队（包装每次放行前多停 2 秒，五种结局照样各归各类：限时不算排队的时间），
+#                           再走一遍包装的另两种结局（假包装退 252 排不上、退 254 被总上限挤掉：各归各类、整轮判失败），
+#                           再走一遍平常跑带只供自证的变量（每个变量各一次，都退 2、一次 cargo 都不调），
+#                           再走一遍会话里平常跑并行（不经自证的标记：一份原样副本配假包装，照包装的「日常一条」判，账上先放一条这个会话在跑的）：
+#                           MUTATE_JOBS=4 照样各条判对、整轮退 0，每次包装带各自的并行理由、--check 不带，调用方设了的理由不覆盖，基线排不上报「基线排不上」。
+#                           每一例各用一份自己的临时目录：假 cargo、假 workspace、编译目录、包装的锁与账（RUN_WITH_MEMORY_CAP_STATE_DIR）
+#                           与峰值表（RUN_WITH_MEMORY_CAP_PEAKS）都在里面，不读别的例留下的东西，也不读写主仓的峰值表
 #
 # bin 在 Cargo.toml 的 [[bin]] 里挂了 required-features 的：每次 cargo test 带 `--features <包名>/<feature>,…`，
 #   feature 从那一节现读，不在命令行上手敲、不写死在这里；没挂的 bin，cargo 的参数与改前逐字相同（`test --release --bin <名>`）。
@@ -31,9 +38,15 @@
 #   每条变异的判定写进自己的结果文件，父进程按表里的次序逐个读、逐行打到 stdout；工作进程一个字都不往 stdout 写。
 #   stdout 与进程数无关：MUTATE_JOBS=1 与 =4 逐字相同；头一行在 stderr，是两次跑唯一不同的那一行。
 #   派出去（表里）多少条、被认领多少条、收回多少份判定，数一遍对不上就退 8，不许少一条还报绿（command-safety.md「并行不许把失败吃掉」）。
+#   会话里平常跑（包装文件头「日常一条」：从 Claude Code 会话里起、不带 SINGLEFS_HEAVY_TESTS 的，同一个会话账上已有一条在跑、这一条没给至少 8 个字的理由就退 252）：
+#   这里自己起的每次包装（基线、每条变异、还原之后那一次）都带 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=「同一次 mutate.sh 的第 <i> 个工作进程，各用各的副本与编译目录……」，
+#   不然第 2 个工作进程起就排不上。调用方已经设了（非空）的照原样传、不覆盖。只设在这几次包装的环境里、不 export：
+#   --check 与别的命令看不见它，包装把它清掉之后才起 cargo，不给 mutate.sh 之外的命令放宽「日常一条」。
 #
-# 退出码：0 每条都判完、没有判失败的；1 有没红、超时、内存撞顶或抓名字的规则有盲区；2 用法、环境或基线不绿；3 锚点不是恰好命中一次；
-#   4 还原之后没回到全绿；5 跑的时候工作区里的源码被改过；6 源文件与二进制对不上；7 带上限的 scope 起不来；8 收回的判定与派出去的对不上。
+# 退出码：0 每条都判完、没有判失败的；1 有没红、超时、内存撞顶、排不上（包装退 252）、被总上限挤掉（包装退 254）或抓名字的规则有盲区；
+#   2 用法、环境或基线不绿（基线排不上也退 2，报「基线排不上」），或平常跑时带了只供自证的变量（见「只供自证」）；3 锚点不是恰好命中一次；
+#   4 还原之后没回到全绿；5 跑的时候工作区里的源码被改过；6 源文件与二进制对不上；7 带上限的 scope 起不来；8 收回的判定与派出去的对不上；
+#   254 基线被内存总上限挤掉：包装的结局原样转出，这一次不算数、一条变异都没跑，整张表重跑。
 #
 # 每次 cargo test（基线、每条变异、还原之后那一次）都放进内存上限里跑（research/scripts/run-with-memory-cap.sh：systemd 的临时 scope，
 # MemoryMax=<上限>、MemorySwapMax=0），撞上限只杀这一次 cargo test 里的进程，不把整机拖进 OOM
@@ -43,31 +56,177 @@
 #                      一条变异按一件重活的份额给；同时跑几条时合计由 run-with-memory-cap.sh 管（见「并行」那一段）。换机器、同时跑的重活变多都要重算（这些数只在本机成立）。
 #   撞了上限记「内存撞顶」，与「超时」同一类：这条破坏让被测代码无界分配，不是「没抓到」，也不算「抓到」；整轮判失败，收尾单列计数。
 #   带上限的 scope 起不来（没有用户级 systemd、D-Bus 连不上）就退 7，一条都不跑，不退回无上限去跑。
-# 弄坏开关 MUTATE_BREAK（只给 --selftest 证明它会红用，几个用逗号连）：memoryascaught 把撞顶记成抓到、memorynotfail 撞顶不让整轮判失败、
-#   droprow 工作进程把表里第 2 条的判定丢掉不写、countblind 父进程不数派出去与收回来的条数（只读在的那几份）、
-#   sharedcopy 所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）、
-#   nofeatures 不读 required-features、cargo test 一律不带 --features（改前的跑法）；
-#   RUN_WITH_MEMORY_CAP_BREAK=nocap 原样传给 run-with-memory-cap.sh，就是改前那种不设上限的跑法。
+# 每条变异限时 MUTATE_TIMEOUT（正整数秒，默认 120），交给包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT（scope 的 RuntimeMaxSec）：从命令起跑算、不算排队的时间；
+#   到点 systemd 停掉 scope 里的进程，包装退 253，这一条记「超时」。不在包装外面套 timeout：套在外面的把排队拿锁、起 scope 的时间也算进去，
+#   机器一忙，撞顶的、抓到的那几条先被记成超时（run-with-memory-cap.sh 文件头「限时」一段）。基线与还原之后那一次不限时。
+# 包装的另两种结局（run-with-memory-cap.sh 文件头「退出码」一段）各单列一类，与超时、撞顶一样整轮判失败、收尾单列计数：
+#   退 252「排不上」：内存不够排不上——等满 RUN_WITH_MEMORY_CAP_WAIT_SECONDS 秒还放不下、这一条要的量比总上限还大，或日常一条被拒
+#     （包装文件头「日常一条」一段；这里自己起的几次带着并行理由，见「并行」那一段，被拒的是调用方给的理由不够 8 个字），命令一行都没跑。记「⏳ 排不上」：这一条没判；不落进「编译失败、无效」那一支
+#     （输出是空的，按「有没有 running N tests」判就成了无效、不判失败）。
+#   退 254「被总上限挤掉」：整个 slice 满了，内核在 slice 里挑了这一条杀，不是它自己撞了上限；包装说它的结果不算数、要重跑。
+#     记「🚧 被总上限挤掉」：不落进「测试进程没跑完、破坏被看见了」那一支（cargo 打的 process didn't exit successfully 是被挤掉造成的）。
+#   有这两种的，收尾在 stderr 说要整张表重跑。基线退 252 报「基线排不上」、退 2（不说成「基线就是红的」）；基线退 254 报「基线被内存总上限挤掉」、
+#   原样退 254（不说成「基线就是红的」，也不并进退 2）；
+#   还原之后那一次退这两个码，按还原后不绿退 4。
+# 包装自己的话（排队时每 60 秒报一行在等什么、撞顶与超时的说明）打在 mutate.sh 开跑时的 stderr 上，工作进程里起的也一样，不混进判结局的输出：
+#   cargo 的 stdout 与 stderr 在 scope 里并成一路（命令前面包一层 bash -c 'exec "$@" 2>&1'）交回判结局，包装的 stderr 另走。
+#   包了这一层，峰值表的键照旧是「cargo test --release --bin <名>[ --features …]」：用 RUN_WITH_MEMORY_CAP_KEY 给成与包之前逐字相同。
+# 只供自证（自证起的子进程里才认；平常跑时有一个非空就退 2 拒跑、一次 cargo 都不调，--selftest 本身不拒）：
+#   MUTATE_BREAK（下面那张表）；MUTATE_SELFTEST_MEMORY_CAP_RUNNER=<脚本> 换掉内存包装（自证拿假包装演 252、254 两种结局）；
+#   原样传给包装的 RUN_WITH_MEMORY_CAP_BREAK、RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE、RUN_WITH_MEMORY_CAP_SELFTEST_TARGET（包装文件头说这几个只给它的自证用）。
+#   「自证起的子进程」的标记：MUTATE_SELFTEST_MARK=<文件>，那份文件在、内容是 SELFTEST_MARK_CONTENT 那一行；只有 run_selftest 设它，读完就清，不传给包装与 cargo。
+# 弄坏开关（几个用逗号连；自证里每次 run_case 起的里层 mutate.sh 都带着调用方设的值）。
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 run_selftest 里 run_case 的标签，括号里是那几条「✗ 自检：」的开头）：
+#   MUTATE_BREAK=memoryascaught  撞顶记成抓到
+#       every-outcome（「五种结局的表输出里应当有」缺「🧱 [撞内存]」与「计数：内存撞顶 1 条」、「撞了内存上限的那一条不许记成抓到」）、
+#       caught-and-memory（「只有一条抓到、一条内存撞顶的表应当判失败退 1」）、queued-admission（「包装每次放行前停 2 秒时……输出里应当有」缺「🧱 [撞内存]」）
+#   MUTATE_BREAK=memorynotfail   撞顶不让整轮判失败
+#       caught-and-memory（同上）
+#   MUTATE_BREAK=droprow         工作进程把表里第 2 条的判定丢掉不写
+#       every-outcome、caught-and-memory、parallel、queued-admission（都退 8：「应当整轮判失败退 1」「照样让整轮退 1」那几条）、daily-parallel（退 8：「四条应当都判抓到、整轮退 0」）；
+#       lost-result 本来就带着它跑，照样退 8
+#   MUTATE_BREAK=countblind      父进程不数派出去与收回来的条数（只读在的那几份）
+#       lost-result（「丢了一份判定时应当退 8」）
+#   MUTATE_BREAK=sharedcopy      所有工作进程挤在第 1 份副本与第 1 个编译目录上（并行之前要防的那种并发改同一份源码）
+#       parallel（「MUTATE_JOBS=4 时变异应当落在至少 2 份副本上」，核数 ≥ 4 才判这一条）；几个工作进程并发改同一份源码，
+#       every-outcome、caught-and-memory、daily-parallel 与「stdout 应当逐字相同」可能跟着红，红不红不定
+#   MUTATE_BREAK=nofeatures      不读 required-features、cargo test 一律不带 --features（改前的跑法）
+#       required-features（「挂了 required-features 的 bin 应当每次带」：基线退 101、整轮退 2）
+#   MUTATE_BREAK=outertimeout    限时套回包装外面：timeout <秒> bash run-with-memory-cap.sh …，按退出码 124 判超时（改前的跑法）
+#       queued-admission（「包装每次放行前停 2 秒时……」：抓到、没红、无效、撞内存那几条都被记成「⏱ 超时」）；
+#       别的例里包装自己慢过 2 秒的那几条也会被记成超时，红不红不定
+#   MUTATE_BREAK=swallowwrapper  包装的 stderr 并进判结局的输出（改前的跑法：排队时每 60 秒那一行看不见）
+#       every-outcome（「包装自己的话应当打在 mutate.sh 的 stderr 上」）
+#   MUTATE_BREAK=queueasinvalid  包装退 252 不单列，落进「编译失败、无效」那一支（改前的判法）
+#       queue-full（「包装退 252 的那一条应当记「⏳ [抓到] 内存包装排不上」……整轮退 1」：记成「⏭  [抓到]」无效、退 0）
+#   MUTATE_BREAK=squeezedascrashed  包装退 254 不单列，落进「测试进程没跑完」那一支（改前的判法）
+#       squeezed（「包装退 254 的那一条应当记「🚧 [抓到] 被内存总上限挤掉」……整轮退 1」：记成「💥 [抓到]」没跑完、退 0）
+#   MUTATE_BREAK=honorbreakoutsideselftest  平常跑时也认只供自证的变量，不拒（改前的跑法）
+#       outside-selftest-<变量名> 五格（「平常跑时带了只供自证的变量 <变量名> 应当退 2」：五个变量各一次，都照跑、退 0）
+#   MUTATE_BREAK=noparallelreason  平常跑不给自己起的包装设并行理由（改前的跑法：只有自证替它设）
+#       daily-parallel（「会话里平常跑、MUTATE_JOBS=4……四条应当都判抓到、整轮退 0」与「每次包装应当带各自的并行理由」：基线就被假包装拒、退 2）；
+#       在会话里跑（有 CLAUDE_CODE_SESSION_ID）时，经真包装、开几个工作进程的那几例也跟着红：every-outcome、caught-and-memory、parallel、lost-result
+#       （真包装照「日常一条」拒同一例里第二条同时起的基线，退 2）；不在会话里跑的不红
+#   MUTATE_BREAK=overridecallerreason  调用方设了的并行理由也换成自己的
+#       daily-caller-reason（「调用方设了的并行理由应当原样传给包装」）、daily-baseline-refused（调用方那句不够 8 个字的被换掉，基线照跑、退 0）
+#   MUTATE_BREAK=baselinequeueasred  基线退 252 不单列，报成「基线就是红的」（改前的判法）
+#       daily-baseline-refused（「基线排不上应当退 2、报「基线排不上」」）
+#   MUTATE_BREAK=baselinesqueezedasred  基线退 254 不单列，报成「基线就是红的」、退 2（改前的判法）
+#       baseline-squeezed（「基线被总上限挤掉应当原样退 254、报「基线被内存总上限挤掉」」）
+#   MUTATE_BREAK=exportparallelreason  并行理由 export 给 mutate.sh 之后起的每一条命令（--check 也看得见），不只设在自己起的那几次包装上
+#       daily-parallel（「--check 那一次不该带并行理由」）
+#   RUN_WITH_MEMORY_CAP_BREAK=nocap  原样传给 run-with-memory-cap.sh：不进 scope、不设上限也不限时直接跑（改前的跑法）
+#       every-outcome（撞内存、超时那两条跑完了、记成没红）、unavailable（「D-Bus 连不上时应当退 7」：照跑了）、baseline-memory（「基线就撞上限时应当退 2」：基线没撞顶）、
+#       queued-admission（同 every-outcome；不进 scope 也就不排队，HANG 那一条跑满 30 秒）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
 SELF_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-MEMORY_CAP_RUNNER="$(dirname "$SELF_PATH")/run-with-memory-cap.sh"
 MEMORY_CAP_HIT_EXIT=250          # run-with-memory-cap.sh：撞了上限
 MEMORY_CAP_UNAVAILABLE_EXIT=251  # run-with-memory-cap.sh：带上限的 scope 起不来
+MEMORY_ADMISSION_REFUSED_EXIT=252  # run-with-memory-cap.sh：内存不够排不上，命令一行都没跑
+TIME_LIMIT_HIT_EXIT=253          # run-with-memory-cap.sh：超过 RUN_WITH_MEMORY_CAP_TIME_LIMIT
+SLICE_TOTAL_HIT_EXIT=254         # run-with-memory-cap.sh：被总上限挤掉，结果不算数
+OUTER_TIMEOUT_EXIT=124           # timeout(1) 到点：只在弄坏开关 outertimeout 下出现
 MEMORY_MAX="${MUTATE_MEMORY_MAX:-16G}"
+ROW_TIME_LIMIT="${MUTATE_TIMEOUT:-120}"   # 每条变异的限时（秒），见文件头「每条变异限时」一段
 BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"
+CALLER_PARALLEL_REASON="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-}"   # 调用方设了的并行理由原样传、不覆盖（文件头「并行」那一段）
 MAXIMUM_WORKERS_BY_PROCESSOR=16  # 核数那一项的上限，与 checker-tier-crates-mutation-replay 的 worker_count_for 相同
 COLLECTION_POLL_SECONDS=0.5      # 父进程隔这么久看一次哪几条判完了，按表序接着往 stdout 打
 
 is_broken() { [[ ",$BROKEN_JUDGEMENT," == *",$1,"* ]]; }
 
+# 只供自证的变量（文件头「只供自证」）：判是不是自证起的子进程，标记读完就清；平常跑时有一个非空就拒（在 --selftest 那一支之后判）
+SELFTEST_MARK_CONTENT="mutate.sh --selftest 起的子进程"
+TEST_ONLY_VARIABLES=(MUTATE_BREAK MUTATE_SELFTEST_MEMORY_CAP_RUNNER RUN_WITH_MEMORY_CAP_BREAK RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE RUN_WITH_MEMORY_CAP_SELFTEST_TARGET)
+running_under_selftest=0
+if [[ -n "${MUTATE_SELFTEST_MARK:-}" && -f "${MUTATE_SELFTEST_MARK:-}" ]] \
+   && [[ "$(cat -- "$MUTATE_SELFTEST_MARK")" == "$SELFTEST_MARK_CONTENT" ]]; then
+  running_under_selftest=1
+fi
+unset MUTATE_SELFTEST_MARK
+MEMORY_CAP_RUNNER="$(dirname "$SELF_PATH")/run-with-memory-cap.sh"
+if ((running_under_selftest)) && [[ -n "${MUTATE_SELFTEST_MEMORY_CAP_RUNNER:-}" ]]; then
+  MEMORY_CAP_RUNNER="$MUTATE_SELFTEST_MEMORY_CAP_RUNNER"   # 自证拿假包装演 252、254（文件头「只供自证」）
+fi
+
 # ── 自证：假的 cargo 按被测源码里写的 BEHAVIOR 演一种结局，不编译任何东西 ──
 run_selftest() {
   local scratch failures=0 checked=0 output status
+  # 每条变异的限时（秒）；queued-admission 那一例让包装每次放行前停同样的秒数，限时套在包装外面（outertimeout）时那几条必然先到点
+  local selftest_time_limit=2
+  # 自证里的包装：每例自己的锁、账与峰值表，与主仓的峰值表和别的会话的账互不读写。
+  # 峰值表从空的起，基线记下的峰值只有几 M，之后给 64M 就超过它的 2 倍：撞内存那一条要的正是 64M，理由写在这里。
+  # 几个工作进程在同一例里同时起包装：同一个会话里起的「日常一条」靠 mutate.sh 自己给每次包装设的并行理由放行，这里不替它设（设了就把它盖住）；
+  # 排队等得下就等，不因为调用方是不是会话而改判。
+  local -a selftest_wrapper_environment=(
+    "RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=自证里假 cargo 一律给 64M 上限，撞内存那一条就是要撞它"
+    "RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600"
+  )
+  local case_script="$SELF_PATH"   # run_case 跑哪一份 mutate.sh：会话里平常跑并行那一组换成自己的副本
   scratch="$(mktemp -d "${TMPDIR:-/tmp}/mutate-selftest-XXXXXX")"
-  mkdir -p "$scratch/bin" "$scratch/research/bench/src/bin" "$scratch/research/mutations"
-  cat >"$scratch/bin/cargo" <<'FAKE_CARGO'
+  # 自证起的子进程的标记：只有这里设（文件头「只供自证」）；子进程读完就清
+  printf '%s\n' "$SELFTEST_MARK_CONTENT" >"$scratch/mark"
+  export MUTATE_SELFTEST_MARK="$scratch/mark"
+  # 假包装：施加了变异的那几次（被测源码里的 BEHAVIOR 不是 PASS）照 FAKE_WRAPPER_OUTCOME 演包装的一种结局，
+  # 别的（--check、基线、还原之后）原样交给真包装 FAKE_WRAPPER_REAL
+  cat >"$scratch/fake-memory-cap.sh" <<'FAKE_WRAPPER'
+#!/usr/bin/env bash
+behavior="$(sed -n 's/.*BEHAVIOR: \([A-Z]*\).*/\1/p' bench/src/bin/fake_bench.rs 2>/dev/null | head -1)"
+if [[ "${1:-}" == --check ]]; then exec bash "$FAKE_WRAPPER_REAL" "$@"; fi
+# baseline-squeezed：没施加变异的那几次（基线）就被总上限挤掉
+if [[ "$behavior" == PASS && "${FAKE_WRAPPER_OUTCOME:-}" == baseline-squeezed ]]; then
+  echo "run-with-memory-cap: 被总上限挤掉（假包装，基线），退 254" >&2; exit 254
+fi
+if [[ "$behavior" == PASS ]]; then exec bash "$FAKE_WRAPPER_REAL" "$@"; fi
+case "${FAKE_WRAPPER_OUTCOME:-}" in
+  queue-full) echo "run-with-memory-cap: 等满还放不下（假包装），退 252" >&2; exit 252 ;;
+  squeezed) printf 'running 2 tests\nerror: test failed, to rerun pass `--bin fake-bench`\n\nCaused by:\n  process didn'"'"'t exit successfully: `target/release/deps/fake_bench-0123456789abcdef` (signal: 9, SIGKILL: kill)\n'
+            echo "run-with-memory-cap: 被总上限挤掉（假包装），退 254" >&2; exit 254 ;;
+  *) echo "假包装认不出 FAKE_WRAPPER_OUTCOME「${FAKE_WRAPPER_OUTCOME:-}」" >&2; exit 2 ;;
+esac
+FAKE_WRAPPER
+  chmod +x "$scratch/fake-memory-cap.sh"
+  # 假包装（会话里平常跑并行那一组）：照 run-with-memory-cap.sh 文件头「日常一条」判——有 CLAUDE_CODE_SESSION_ID、不带 SINGLEFS_HEAVY_TESTS 的，
+  # 同一个会话在账上（FAKE_DAILY_LEDGER）已有一条活着的而这一条的理由不够 8 个字，退 252、命令不跑；放行的记账、不进 scope 直接跑、跑完销账。
+  # 每次被调往 FAKE_DAILY_LOG 记一行「check / admitted / refused|理由」
+  cat >"$scratch/fake-daily-memory-cap.sh" <<'FAKE_DAILY_WRAPPER'
+#!/usr/bin/env bash
+reason="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-}"
+if [[ "${1:-}" == --check ]]; then printf 'check|%s\n' "$reason" >>"$FAKE_DAILY_LOG"; exit 0; fi
+shift
+exec {lock_fd}>>"$FAKE_DAILY_LEDGER/lock"
+flock "$lock_fd"
+if [[ -z "${SINGLEFS_HEAVY_TESTS:-}" && -n "${CLAUDE_CODE_SESSION_ID:-}" ]]; then
+  running=0
+  for entry in "$FAKE_DAILY_LEDGER"/*.entry; do
+    [[ -f "$entry" ]] || continue
+    read -r entry_session entry_pid <"$entry"
+    if [[ "$entry_session" == "$CLAUDE_CODE_SESSION_ID" ]] && kill -0 "$entry_pid" 2>/dev/null; then running=$((running + 1)); fi
+  done
+  if ((running > 0 && ${#reason} < 8)); then
+    printf 'refused|%s\n' "$reason" >>"$FAKE_DAILY_LOG"
+    echo "run-with-memory-cap（假包装）: 这个会话已经有 $running 条日常的在跑，同一个会话同时只许一条，命令没跑，退 252" >&2
+    exit 252
+  fi
+fi
+printf '%s %s\n' "${CLAUDE_CODE_SESSION_ID:-}" "$$" >"$FAKE_DAILY_LEDGER/$$.entry"
+printf 'admitted|%s\n' "$reason" >>"$FAKE_DAILY_LOG"
+flock -u "$lock_fd"
+exec {lock_fd}>&-
+env -u RUN_WITH_MEMORY_CAP_PARALLEL_REASON -u RUN_WITH_MEMORY_CAP_TIME_LIMIT -u RUN_WITH_MEMORY_CAP_KEY "$@"
+status=$?
+rm -f -- "$FAKE_DAILY_LEDGER/$$.entry"
+exit "$status"
+FAKE_DAILY_WRAPPER
+
+  # 建一例自己的目录 $scratch/<标签>/：假 cargo、假 workspace（research/）、几张变异表、包装的锁与账。$1 标签；
+  # $2 被测源码里写的 BEHAVIOR（默认 PASS）；$3 bin 那一节追加的一行（默认不加，required-features 那一例给它挂 feature）
+  prepare_case() {
+    local case_directory="$scratch/$1" behavior="${2:-PASS}" bin_extra_line="${3:-}"
+    mkdir -p "$case_directory/bin" "$case_directory/research/bench/src/bin" "$case_directory/research/mutations" "$case_directory/memory-cap-state"
+    cat >"$case_directory/bin/cargo" <<'FAKE_CARGO'
 #!/usr/bin/env bash
 # 假 cargo：只认 mutate.sh 调的 `cargo test --release --bin <名字>`，按被测源码里的 BEHAVIOR 演一种结局；
 # 每次被调记一行「当前目录|CARGO_TARGET_DIR|BEHAVIOR|参数」（并行的自证拿前两段数各用了几份副本、几个编译目录）
@@ -96,27 +255,34 @@ case "$behavior" in
   *) echo "假 cargo 认不出 BEHAVIOR「$behavior」" >&2; exit 2 ;;
 esac
 FAKE_CARGO
-  chmod +x "$scratch/bin/cargo"
-  printf '[workspace]\nmembers = ["bench"]\n' >"$scratch/research/Cargo.toml"
-  printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$scratch/research/bench/Cargo.toml"
-  printf '// 注释行\nfn main() {} // BEHAVIOR: PASS\n' >"$scratch/research/bench/src/bin/fake_bench.rs"
-  printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n没红\t// 注释行\t// 改过的注释行\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n超时\tBEHAVIOR: PASS\tBEHAVIOR: HANG\n无效\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n' \
-    >"$scratch/research/mutations/every-outcome.tsv"
-  printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n' >"$scratch/research/mutations/caught-and-memory.tsv"
-  printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n' >"$scratch/research/mutations/caught-only.tsv"
-  printf '抓到一\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到二\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到三\tBEHAVIOR: PASS\tBEHAVIOR: RED\n' \
-    >"$scratch/research/mutations/three-caught.tsv"
-  printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n锚点腐化\tBEHAVIOR: GONE\tBEHAVIOR: RED\n' >"$scratch/research/mutations/stale-anchor.tsv"
-  printf '改注释\t// 注释行\t// 改过的注释行\n' >"$scratch/research/mutations/comment-only.tsv"
+    chmod +x "$case_directory/bin/cargo"
+    printf '[workspace]\nmembers = ["bench"]\n' >"$case_directory/research/Cargo.toml"
+    printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$case_directory/research/bench/Cargo.toml"
+    [[ -n "$bin_extra_line" ]] && printf '%s\n' "$bin_extra_line" >>"$case_directory/research/bench/Cargo.toml"
+    printf '// 注释行\nfn main() {} // BEHAVIOR: %s\n' "$behavior" >"$case_directory/research/bench/src/bin/fake_bench.rs"
+    local tables="$case_directory/research/mutations"
+    printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n没红\t// 注释行\t// 改过的注释行\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n超时\tBEHAVIOR: PASS\tBEHAVIOR: HANG\n无效\tBEHAVIOR: PASS\tBEHAVIOR: BROKEN\n' \
+      >"$tables/every-outcome.tsv"
+    printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n撞内存\tBEHAVIOR: PASS\tBEHAVIOR: HOG\n' >"$tables/caught-and-memory.tsv"
+    printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n' >"$tables/caught-only.tsv"
+    printf '抓到一\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到二\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到三\tBEHAVIOR: PASS\tBEHAVIOR: RED\n' \
+      >"$tables/three-caught.tsv"
+    printf '抓到一\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到二\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到三\tBEHAVIOR: PASS\tBEHAVIOR: RED\n抓到四\tBEHAVIOR: PASS\tBEHAVIOR: RED\n' \
+      >"$tables/four-caught.tsv"
+    printf '抓到\tBEHAVIOR: PASS\tBEHAVIOR: RED\n锚点腐化\tBEHAVIOR: GONE\tBEHAVIOR: RED\n' >"$tables/stale-anchor.tsv"
+    printf '改注释\t// 注释行\t// 改过的注释行\n' >"$tables/comment-only.tsv"
+  }
 
-  # 跑一次 mutate.sh：$1 标签、$2 变异表，其余是额外的环境变量；stdout 落 $scratch/<标签>.stdout、stderr 落 .stderr、两样接起来落 .out，
-  # 退出码落 $scratch/<标签>.rc，假 cargo 的调用记录落 $scratch/<标签>.cargo
+  # 在 prepare_case 建好的那一例目录里跑一次 mutate.sh：$1 标签、$2 变异表，其余是额外的环境变量；
+  # stdout 落 $scratch/<标签>.stdout、stderr 落 .stderr、两样接起来落 .out，退出码落 .rc，假 cargo 的调用记录落 .cargo
   run_case() {
-    local label="$1" table="$2"
+    local label="$1" table="$2" case_directory="$scratch/$1"
     shift 2
     : >"$scratch/$label.cargo"
-    if (cd "$scratch/research" && env PATH="$scratch/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" MUTATE_MEMORY_MAX=64M MUTATE_TIMEOUT=2 \
-          MUTATE_TARGET_DIR="$scratch/target" "$@" bash "$SELF_PATH" fake-bench bench/src/bin/fake_bench.rs "$table" \
+    if (cd "$case_directory/research" && env PATH="$case_directory/bin:$PATH" FAKE_CARGO_LOG="$scratch/$label.cargo" MUTATE_MEMORY_MAX=64M \
+          MUTATE_TIMEOUT="$selftest_time_limit" MUTATE_TARGET_DIR="$case_directory/target" \
+          RUN_WITH_MEMORY_CAP_STATE_DIR="$case_directory/memory-cap-state" RUN_WITH_MEMORY_CAP_PEAKS="$case_directory/memory-peaks.tsv" \
+          "${selftest_wrapper_environment[@]}" "$@" bash "$case_script" fake-bench bench/src/bin/fake_bench.rs "$table" \
           >"$scratch/$label.stdout" 2>"$scratch/$label.stderr"); then
       echo 0 >"$scratch/$label.rc"
     else
@@ -126,6 +292,7 @@ FAKE_CARGO
   }
   fail() { echo "  ✗ 自检：$1"; failures=$((failures + 1)); }   # gate-lint:detail
 
+  prepare_case every-outcome
   run_case every-outcome mutations/every-outcome.tsv
   output="$(cat "$scratch/every-outcome.out")"; status="$(cat "$scratch/every-outcome.rc")"
   checked=$((checked + 1))
@@ -140,20 +307,35 @@ FAKE_CARGO
   if grep -E '^(✅|❌|💥|⏭|⚠️) +\[撞内存\]' <<<"$output" >/dev/null; then
     fail "撞了内存上限的那一条不许记成抓到、没红、没跑完或无效：$(grep -F '[撞内存]' <<<"$output")"
   fi
+  # 包装自己的话（排队时每 60 秒那一行与撞顶的说明走同一个 stderr）：工作进程里起的包装，它的 stderr 也要打到 mutate.sh 的 stderr 上，
+  # 不并进判结局的输出（并进去就看不见，改前就是这样）。撞内存那一条的包装必然说一句「撞了内存上限」
+  checked=$((checked + 1))
+  grep -qF "run-with-memory-cap: 撞了内存上限 64M" "$scratch/every-outcome.stderr" \
+    || fail "包装自己的话应当打在 mutate.sh 的 stderr 上（撞内存那一条的包装说的「run-with-memory-cap: 撞了内存上限 64M」），实际 stderr：$(cat "$scratch/every-outcome.stderr")"
 
+  prepare_case caught-and-memory
   run_case caught-and-memory mutations/caught-and-memory.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/caught-and-memory.rc")"
   [[ "$status" == 1 ]] || fail "只有一条抓到、一条内存撞顶的表应当判失败退 1（撞顶与超时同类），实际退 $status：$(cat "$scratch/caught-and-memory.out")"
 
+  # 没挂 required-features 的 bin、上限之内正常的变异：照旧判抓到、整轮退 0，每次 cargo 的参数与改前逐字相同（这一例自己的调用记录）
+  prepare_case caught-only
   run_case caught-only mutations/caught-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/caught-only.rc")"
   output="$(cat "$scratch/caught-only.out")"
   [[ "$status" == 0 ]] && grep -qF "计数：内存撞顶 0 条（上限 64M）、超时 0 条" <<<"$output" \
     || fail "上限之内正常的变异照旧判抓到、整轮退 0 并报「内存撞顶 0 条」，实际退 $status：$output"
+  local unexpected_arguments
+  checked=$((checked + 1))
+  unexpected_arguments="$(cut -d'|' -f4- "$scratch/caught-only.cargo" | grep -vxF 'test --release --bin fake-bench')"
+  if [[ ! -s "$scratch/caught-only.cargo" || -n "$unexpected_arguments" ]]; then
+    fail "没挂 required-features 的 bin，cargo 的参数应当逐字是「test --release --bin fake-bench」，实际调了 $(wc -l <"$scratch/caught-only.cargo") 次、对不上的：${unexpected_arguments:-（一次都没调）}"
+  fi
 
   # 带上限的 scope 起不来：退 7，假 cargo 一次都没被调（连基线都没跑，不退回无上限）
+  prepare_case unavailable
   run_case unavailable mutations/caught-only.tsv DBUS_SESSION_BUS_ADDRESS=unix:path=/nonexistent XDG_RUNTIME_DIR=/nonexistent
   checked=$((checked + 1))
   status="$(cat "$scratch/unavailable.rc")"
@@ -169,7 +351,10 @@ FAKE_CARGO
   ((expected_workers > MAXIMUM_WORKERS_BY_PROCESSOR)) && expected_workers=$MAXIMUM_WORKERS_BY_PROCESSOR
   ((expected_workers > 4)) && expected_workers=4
   ((expected_workers < 1)) && expected_workers=1
+  # 同一个场景跑两次（MUTATE_JOBS=1 与 =4）再比对：各在自己的目录里跑，比的是两次的输出，不是一次读另一次留下的状态
+  prepare_case serial
   run_case serial mutations/every-outcome.tsv MUTATE_JOBS=1
+  prepare_case parallel
   run_case parallel mutations/every-outcome.tsv MUTATE_JOBS=4
   checked=$((checked + 1))
   cmp -s "$scratch/serial.stdout" "$scratch/parallel.stdout" \
@@ -199,12 +384,14 @@ FAKE_CARGO
   fi
 
   # 丢一份判定：收回的比派出去的少，整道退 8，不许少一条还报绿；再拿掉那道闸（countblind），同一个丢法要静默判绿，才说明退 8 是那道闸给的
+  prepare_case lost-result
   run_case lost-result mutations/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK="droprow${BROKEN_JUDGEMENT:+,$BROKEN_JUDGEMENT}"
   checked=$((checked + 1))
   status="$(cat "$scratch/lost-result.rc")"
   if [[ "$status" != 8 ]] || ! grep -qF "派出去 3 条" "$scratch/lost-result.stderr" || ! grep -qF "收回 2 份" "$scratch/lost-result.stderr"; then
     fail "丢了一份判定时应当退 8 并报「派出去 3 条……收回 2 份」，实际退 $status：$(cat "$scratch/lost-result.out")"
   fi
+  prepare_case lost-result-unchecked
   run_case lost-result-unchecked mutations/three-caught.tsv MUTATE_JOBS=3 MUTATE_BREAK=droprow,countblind
   checked=$((checked + 1))
   status="$(cat "$scratch/lost-result-unchecked.rc")"
@@ -213,6 +400,7 @@ FAKE_CARGO
   fi
 
   # MUTATE_JOBS 不是正整数：退 2，一次 cargo 都不调
+  prepare_case bad-jobs
   run_case bad-jobs mutations/caught-only.tsv MUTATE_JOBS=0
   checked=$((checked + 1))
   status="$(cat "$scratch/bad-jobs.rc")"
@@ -220,7 +408,18 @@ FAKE_CARGO
     fail "MUTATE_JOBS=0 应当退 2、点名 MUTATE_JOBS、一次 cargo 都不调，实际退 $status、调了 $(wc -l <"$scratch/bad-jobs.cargo") 次：$(cat "$scratch/bad-jobs.out")"
   fi
 
+  # MUTATE_TIMEOUT 不是正整数秒（包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT 只认正整数秒）：开跑之前退 2，一次 cargo 都不调，
+  # 不等基线跑完、第一条变异时才被包装按用法错退 251、报成「scope 起不来」
+  prepare_case bad-timeout
+  run_case bad-timeout mutations/caught-only.tsv MUTATE_TIMEOUT=1.5
+  checked=$((checked + 1))
+  status="$(cat "$scratch/bad-timeout.rc")"
+  if [[ "$status" != 2 || -s "$scratch/bad-timeout.cargo" ]] || ! grep -qF "MUTATE_TIMEOUT" "$scratch/bad-timeout.stderr"; then
+    fail "MUTATE_TIMEOUT=1.5 应当退 2、点名 MUTATE_TIMEOUT、一次 cargo 都不调，实际退 $status、调了 $(wc -l <"$scratch/bad-timeout.cargo") 次：$(cat "$scratch/bad-timeout.out")"
+  fi
+
   # 锚点腐化：派活之前就退 3，连基线都不跑、一条判定都不打（并行下不能让前面几条先跑了、后面那条才炸）
+  prepare_case stale-anchor
   run_case stale-anchor mutations/stale-anchor.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/stale-anchor.rc")"
@@ -230,16 +429,9 @@ FAKE_CARGO
   fi
 
   # ── required-features ──
-  # 没挂 required-features 的 bin：每次 cargo 的参数与改前逐字相同（上面 caught-only 那一次的调用记录）
-  local unexpected_arguments
-  checked=$((checked + 1))
-  unexpected_arguments="$(cut -d'|' -f4- "$scratch/caught-only.cargo" | grep -vxF 'test --release --bin fake-bench')"
-  if [[ ! -s "$scratch/caught-only.cargo" || -n "$unexpected_arguments" ]]; then
-    fail "没挂 required-features 的 bin，cargo 的参数应当逐字是「test --release --bin fake-bench」，实际调了 $(wc -l <"$scratch/caught-only.cargo") 次、对不上的：${unexpected_arguments:-（一次都没调）}"
-  fi
   # 挂了两个 feature 的 bin：从清单现读、带「包名/feature」跑，基线绿、变异照常判抓到；
   # 不读（MUTATE_BREAK=nofeatures，改前的跑法）假 cargo 照真 cargo 退 101，停在基线、退 2
-  printf 'required-features = ["fake-feature", "fake-other"]\n' >>"$scratch/research/bench/Cargo.toml"
+  prepare_case required-features PASS 'required-features = ["fake-feature", "fake-other"]'
   run_case required-features mutations/caught-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/required-features.rc")"
@@ -248,11 +440,10 @@ FAKE_CARGO
      || ! grep -qF "✅ [抓到] 红：tests::adds" "$scratch/required-features.stdout"; then
     fail "挂了 required-features 的 bin 应当每次带「--features bench/fake-feature,bench/fake-other」跑、抓到那一条、退 0，实际退 $status、对不上的参数：${unexpected_arguments:-无}：$(cat "$scratch/required-features.out")"
   fi
-  printf '[package]\nname = "bench"\n\n[[bin]]\nname = "fake-bench"\npath = "src/bin/fake_bench.rs"\n' >"$scratch/research/bench/Cargo.toml"
 
   # 基线（没改的源码）就撞上限：退 2 并说是内存上限，不说成「基线就是红的」。
   # 表里的原文要在 HOG 版源码里命中得上（锚点在基线之前核，命中不上就先退 3 了），所以用只改注释的那张表
-  printf '// 注释行\nfn main() {} // BEHAVIOR: HOG\n' >"$scratch/research/bench/src/bin/fake_bench.rs"
+  prepare_case baseline-memory HOG
   run_case baseline-memory mutations/comment-only.tsv
   checked=$((checked + 1))
   status="$(cat "$scratch/baseline-memory.rc")"
@@ -260,24 +451,209 @@ FAKE_CARGO
     fail "基线就撞上限时应当退 2 并报「基线……撞了内存上限 64M」，实际退 $status：$(cat "$scratch/baseline-memory.out")"
   fi
 
+  # ── 包装排队 ──
+  # 包装每次放行前多停 $selftest_time_limit 秒（RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE，拿着这一例自己的锁停），与每条变异的限时一样长：
+  # 限时从命令起跑算、不算排队，五种结局照样各归各类，只有 HANG 那一条记超时；限时套在包装外面（outertimeout，改前的跑法）时排队就吃满限时，
+  # 抓到、没红、无效、撞内存几条全被记成超时。一个工作进程，免得几条在同一把锁上串着停、把这一例拖长
+  prepare_case queued-admission
+  run_case queued-admission mutations/every-outcome.tsv MUTATE_JOBS=1 RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE="$selftest_time_limit"
+  output="$(cat "$scratch/queued-admission.out")"; status="$(cat "$scratch/queued-admission.rc")"
+  checked=$((checked + 1))
+  [[ "$status" == 1 ]] || fail "包装每次放行前停 $selftest_time_limit 秒时，五种结局各一条的表照样整轮判失败退 1，实际退 $status：$output"
+  for wanted in "✅ [抓到] 红：tests::adds" "❌ [没红]" "⏭  [无效]" "⏱  [超时]" "🧱 [撞内存] 撞了内存上限 64M（内存撞顶）" \
+                "计数：内存撞顶 1 条（上限 64M）、超时 1 条" "已还原，基线仍全绿"; do
+    checked=$((checked + 1))
+    grep -qF -- "$wanted" <<<"$output" || fail "包装每次放行前停 $selftest_time_limit 秒时（限时不算排队），输出里应当有「$wanted」，实际：$output"
+  done
+  checked=$((checked + 1))
+  if grep -E '^⏱ +\[' <<<"$output" | grep -vF '⏱  [超时]' >/dev/null; then
+    fail "包装每次放行前停 $selftest_time_limit 秒时，只有 HANG 那一条该记超时，排队的时间不许把别的几条算成超时：$(grep -E '^⏱ +\[' <<<"$output")"
+  fi
+
+  # ── 包装的另两种结局 ──
+  # 假包装在施加了变异的那一次退 252（排不上：命令没跑、输出是空的）：记「⏳ 排不上」、整轮退 1、单列计数，不记成「⏭  无效」；
+  # 退 254（被总上限挤掉：输出里有 cargo 的 process didn't exit successfully）：记「🚧 被总上限挤掉」、整轮退 1、单列计数，不记成「💥 没跑完」
+  local real_memory_cap_runner outcome_label wrapper_exit expected_line expected_count wrong_symbol
+  real_memory_cap_runner="$(dirname "$SELF_PATH")/run-with-memory-cap.sh"
+  for outcome_label in queue-full squeezed; do
+    case "$outcome_label" in
+      queue-full) wrapper_exit=252; expected_line="⏳ [抓到] 内存包装排不上（run-with-memory-cap.sh 退 252）"
+                  expected_count="排不上 1 条、被总上限挤掉 0 条"; wrong_symbol="⏭" ;;
+      squeezed) wrapper_exit=254; expected_line="🚧 [抓到] 被内存总上限挤掉（run-with-memory-cap.sh 退 254"
+                expected_count="排不上 0 条、被总上限挤掉 1 条"; wrong_symbol="💥" ;;
+    esac
+    prepare_case "$outcome_label"
+    run_case "$outcome_label" mutations/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
+      FAKE_WRAPPER_REAL="$real_memory_cap_runner" FAKE_WRAPPER_OUTCOME="$outcome_label"
+    status="$(cat "$scratch/$outcome_label.rc")"
+    checked=$((checked + 1))
+    if [[ "$status" != 1 ]] || ! grep -qF -- "$expected_line" "$scratch/$outcome_label.stdout" \
+       || ! grep -qF -- "$expected_count" "$scratch/$outcome_label.stdout" || grep -E "^$wrong_symbol +\[" "$scratch/$outcome_label.stdout" >/dev/null \
+       || ! grep -qF "整张表重跑" "$scratch/$outcome_label.stderr"; then
+      fail "包装退 $wrapper_exit 的那一条应当记「$expected_line」、计数里有「$expected_count」、不记成「$wrong_symbol」、stderr 说整张表重跑、整轮退 1，实际退 $status：$(cat "$scratch/$outcome_label.out")"
+    fi
+  done
+
+  # 基线就被总上限挤掉（假包装在没施加变异的那几次退 254）：原样退 254、报「基线被内存总上限挤掉」、一条变异都不跑，不说成「基线就是红的」
+  prepare_case baseline-squeezed
+  run_case baseline-squeezed mutations/caught-only.tsv MUTATE_SELFTEST_MEMORY_CAP_RUNNER="$scratch/fake-memory-cap.sh" \
+    FAKE_WRAPPER_REAL="$real_memory_cap_runner" FAKE_WRAPPER_OUTCOME=baseline-squeezed
+  status="$(cat "$scratch/baseline-squeezed.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != "$SLICE_TOTAL_HIT_EXIT" ]] || ! grep -qF "基线被内存总上限挤掉" "$scratch/baseline-squeezed.stderr" \
+     || grep -qF "基线就是红的" "$scratch/baseline-squeezed.stderr" || grep -qF "[抓到]" "$scratch/baseline-squeezed.stdout"; then
+    fail "基线被总上限挤掉应当原样退 $SLICE_TOTAL_HIT_EXIT、报「基线被内存总上限挤掉」、一条变异都不跑，不说成「基线就是红的」，实际退 $status：$(cat "$scratch/baseline-squeezed.out")"
+  fi
+
+  # ── 会话里平常跑并行 ──
+  # 包装的「日常一条」（run-with-memory-cap.sh 文件头）：同一个会话账上已有一条日常的在跑、这一条没给至少 8 个字的理由，退 252、命令不跑。
+  # 这一组不经自证的标记（平常跑），跑的是这一份 mutate.sh 的原样副本（设了弄坏开关的话，只把 BROKEN_JUDGEMENT 那一行写死成同一个值：平常跑不认 MUTATE_BREAK），
+  # 放在这一例自己的目录里，同目录的 run-with-memory-cap.sh 换成上面的假「日常一条」包装。
+  # 账上先放一条这个会话的、进程号是自证自己的（一直活着）：每一次都要带理由才放行，不靠几个工作进程碰巧同时起
+  local repository_root test_only_variable daily_label daily_log admitted_reasons unmatched_reasons distinct_reasons check_reasons
+  local caller_reason="调用方自己给的理由：派出去的两个执行员各跑各的" short_caller_reason="不够八字"
+  local -a daily_environment=(MUTATE_SELFTEST_MARK= CLAUDE_CODE_SESSION_ID=mutate-selftest-session SINGLEFS_HEAVY_TESTS= RUN_WITH_MEMORY_CAP_PARALLEL_REASON=)
+  for test_only_variable in "${TEST_ONLY_VARIABLES[@]}"; do
+    daily_environment+=("$test_only_variable=")   # 调用方环境里设着的弄坏开关不漏进平常跑（漏进去就退 2，红的不是这一格要判的）
+  done
+  repository_root="$(cd "$(dirname "$SELF_PATH")/../.." && pwd)"
+  # 建一例：prepare_case 那一套，加上 tooling/research/scripts/ 下的 mutate.sh 副本与假包装、tooling/.claude 指回仓里（preflight 从那里找）、账上那一条
+  prepare_daily_case() {
+    local label="$1" tooling="$scratch/$1/tooling"
+    prepare_case "$label"
+    mkdir -p "$tooling/research/scripts" "$scratch/$label/daily-ledger"
+    ln -s "$repository_root/.claude" "$tooling/.claude"
+    if [[ -n "$BROKEN_JUDGEMENT" ]]; then
+      BAKED="$BROKEN_JUDGEMENT" SOURCE="$SELF_PATH" DESTINATION="$tooling/research/scripts/mutate.sh" python3 - <<'PY' || return 1
+import os, shlex, sys
+old = 'BROKEN_JUDGEMENT="${MUTATE_BREAK:-}"\n'
+with open(os.environ["SOURCE"], encoding="utf-8") as handle:
+    text = handle.read()
+if text.count(old) != 1:
+    sys.stderr.write("mutate.sh 里 %r 应当恰好一行，实际 %d 行\n" % (old, text.count(old))); sys.exit(1)
+with open(os.environ["DESTINATION"], "w", encoding="utf-8") as handle:
+    handle.write(text.replace(old, "BROKEN_JUDGEMENT=%s\n" % shlex.quote(os.environ["BAKED"])))
+PY
+    else
+      cp -- "$SELF_PATH" "$tooling/research/scripts/mutate.sh" || return 1
+    fi
+    cp -- "$scratch/fake-daily-memory-cap.sh" "$tooling/research/scripts/run-with-memory-cap.sh" || return 1
+    printf 'mutate-selftest-session %s\n' "$$" >"$scratch/$label/daily-ledger/already-running.entry"
+  }
+  run_daily_case() {
+    local label="$1" table="$2"
+    shift 2
+    case_script="$scratch/$label/tooling/research/scripts/mutate.sh"
+    run_case "$label" "$table" "${daily_environment[@]}" FAKE_DAILY_LEDGER="$scratch/$label/daily-ledger" FAKE_DAILY_LOG="$scratch/$label.daily" "$@"
+    case_script="$SELF_PATH"
+    touch "$scratch/$label.daily"
+  }
+  for daily_label in daily-parallel daily-caller-reason daily-baseline-refused; do
+    prepare_daily_case "$daily_label" || fail "建「$daily_label」那一例的副本失败（上面是原因）"
+  done
+
+  # MUTATE_JOBS=4、四条都抓得到的表：调用方没给理由，mutate.sh 自己给每次包装设，照样各条判对、整轮退 0
+  run_daily_case daily-parallel mutations/four-caught.tsv MUTATE_JOBS=4
+  status="$(cat "$scratch/daily-parallel.rc")"
+  daily_log="$scratch/daily-parallel.daily"
+  checked=$((checked + 1))
+  if [[ "$status" != 0 || "$(grep -c '^✅ \[抓到[一二三四]\] 红：tests::adds' "$scratch/daily-parallel.stdout")" != 4 ]] \
+     || ! grep -qF "已还原，基线仍全绿" "$scratch/daily-parallel.stdout"; then
+    fail "会话里平常跑、MUTATE_JOBS=4（假包装照「日常一条」判，账上已有这个会话的一条在跑）：四条应当都判抓到、整轮退 0，实际退 $status：$(cat "$scratch/daily-parallel.out")"
+  fi
+  # 每次包装（基线 $expected_workers 次、四条变异、还原之后 $expected_workers 次）都放行、各带「第 <i> 个工作进程」的理由，几个工作进程的理由各不相同
+  checked=$((checked + 1))
+  admitted_reasons="$(sed -n 's/^admitted|//p' "$daily_log")"
+  unmatched_reasons="$(grep -v '^同一次 mutate.sh 的第 [0-9]* 个工作进程，各用各的副本' <<<"$admitted_reasons")"
+  distinct_reasons="$(sort -u <<<"$admitted_reasons" | grep -c .)"
+  if grep -q '^refused|' "$daily_log" || [[ "$(grep -c '^admitted|' "$daily_log")" != $((2 * expected_workers + 4)) ]] \
+     || [[ -n "$unmatched_reasons" || "$distinct_reasons" != "$expected_workers" ]]; then
+    fail "会话里平常跑、MUTATE_JOBS=4 时每次包装应当带各自的并行理由（「同一次 mutate.sh 的第 <i> 个工作进程，各用各的副本……」，$expected_workers 个工作进程各一句）、一次都不被拒、共放行 $((2 * expected_workers + 4)) 次，实际假包装的记录：$(cat "$daily_log")"
+  fi
+  # 理由只设在自己起的那几次包装上：--check 那一次不带（export 出去就看得见）
+  checked=$((checked + 1))
+  check_reasons="$(sed -n 's/^check|//p' "$daily_log")"
+  if [[ "$(grep -c '^check|' "$daily_log")" != 1 || -n "$check_reasons" ]]; then
+    fail "--check 那一次不该带并行理由（理由只给 mutate.sh 自己起的那几次包装，不放宽别的命令），实际假包装的记录：$(cat "$daily_log")"
+  fi
+
+  # 调用方设了的理由原样传、不覆盖
+  run_daily_case daily-caller-reason mutations/caught-only.tsv MUTATE_JOBS=4 RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$caller_reason"
+  status="$(cat "$scratch/daily-caller-reason.rc")"
+  daily_log="$scratch/daily-caller-reason.daily"
+  checked=$((checked + 1))
+  admitted_reasons="$(sed -n 's/^admitted|//p' "$daily_log")"
+  unmatched_reasons="$(grep -vxF -- "$caller_reason" <<<"$admitted_reasons")"
+  if [[ "$status" != 0 || -z "$admitted_reasons" || -n "$unmatched_reasons" ]] || grep -q '^refused|' "$daily_log"; then
+    fail "调用方设了的并行理由应当原样传给包装（每次都是「$caller_reason」）、照常判抓到退 0，实际退 $status、假包装的记录：$(cat "$daily_log")"
+  fi
+
+  # 调用方给的理由不够 8 个字（不覆盖）：基线就被拒，报「基线排不上」、退 2、一次 cargo 都不调，不说成「基线就是红的」
+  run_daily_case daily-baseline-refused mutations/caught-only.tsv RUN_WITH_MEMORY_CAP_PARALLEL_REASON="$short_caller_reason"
+  status="$(cat "$scratch/daily-baseline-refused.rc")"
+  checked=$((checked + 1))
+  if [[ "$status" != 2 || -s "$scratch/daily-baseline-refused.cargo" ]] || ! grep -qF "基线排不上" "$scratch/daily-baseline-refused.stderr" \
+     || grep -qF "基线就是红的" "$scratch/daily-baseline-refused.stderr"; then
+    fail "基线排不上应当退 2、报「基线排不上」、一次 cargo 都不调，不说成「基线就是红的」，实际退 $status、调了 $(wc -l <"$scratch/daily-baseline-refused.cargo") 次：$(cat "$scratch/daily-baseline-refused.out")"
+  fi
+
+  # ── 平常跑带只供自证的变量 ──
+  # 不是自证起的子进程（标记清空）而带着只供自证的变量：每个变量各试一次，都退 2、点名那个变量、一次 cargo 都不调
+  local variable variable_value outside_label
+  for variable in "${TEST_ONLY_VARIABLES[@]}"; do
+    case "$variable" in
+      MUTATE_BREAK) variable_value="memoryascaught${BROKEN_JUDGEMENT:+,$BROKEN_JUDGEMENT}" ;;
+      MUTATE_SELFTEST_MEMORY_CAP_RUNNER) variable_value="$scratch/fake-memory-cap.sh" ;;
+      RUN_WITH_MEMORY_CAP_BREAK) variable_value=nocap ;;
+      RUN_WITH_MEMORY_CAP_SELFTEST_ADMIT_PAUSE) variable_value=1 ;;
+      *) variable_value="$scratch/not-a-wrapper.sh" ;;
+    esac
+    outside_label="outside-selftest-$variable"
+    prepare_case "$outside_label"
+    run_case "$outside_label" mutations/caught-only.tsv MUTATE_SELFTEST_MARK= "$variable=$variable_value"
+    status="$(cat "$scratch/$outside_label.rc")"
+    checked=$((checked + 1))
+    if [[ "$status" != 2 || -s "$scratch/$outside_label.cargo" ]] || ! grep -qF "只给自证用的变量" "$scratch/$outside_label.stderr" \
+       || ! grep -qF "$variable" "$scratch/$outside_label.stderr"; then
+      fail "平常跑时带了只供自证的变量 $variable 应当退 2、点名它、一次 cargo 都不调，实际退 $status、调了 $(wc -l <"$scratch/$outside_label.cargo") 次：$(cat "$scratch/$outside_label.out")"
+    fi
+  done
+
   rm -rf -- "${scratch:?}"
   if ((failures)); then
     echo "  ✗ mutate.sh 自检 $failures 处不对（查了 $checked 项）"
-    echo "  → 怎么办：照上面逐条改——判结局的在 judge_mutation（退出码 124 / $MEMORY_CAP_HIT_EXIT / $MEMORY_CAP_UNAVAILABLE_EXIT 的分支），基线与收尾计数在主流程，"
+    echo "  → 怎么办：照上面逐条改——判结局的在 judge_mutation（退出码 $TIME_LIMIT_HIT_EXIT / $MEMORY_CAP_HIT_EXIT / $MEMORY_CAP_UNAVAILABLE_EXIT / $MEMORY_ADMISSION_REFUSED_EXIT / $SLICE_TOTAL_HIT_EXIT 的分支），"
+    echo "    限时与包装 stderr 的去向在 run_capped_cargo_test，基线与收尾计数在主流程，"
     echo "    并行的在 worker_count_and_head_line、run_worker 与 print_judged_rows_in_table_order，required-features 在 read_required_features；"
+    echo "    平常跑拒只供自证的变量在 --selftest 那一支后面（running_under_selftest），并行理由在 run_capped_cargo_test（CALLER_PARALLEL_REASON），基线排不上、基线被总上限挤掉在基线那一段；"
     echo "    MUTATE_BREAK 或 RUN_WITH_MEMORY_CAP_BREAK 设着的话这里本来就该红"
     exit 1
   fi
   echo "  ✓ mutate.sh 自检通过（查了 $checked 项：抓到、没红、无效、超时、内存撞顶五种结局各归各类，撞顶不记成抓到或没红、整轮判失败并单列计数，\
-上限之内正常的变异照旧判抓到退 0，scope 起不来退 7 且一次 cargo 都没跑，基线撞顶退 2 并说是内存上限；\
+包装自己的话打在 stderr 上，上限之内正常的变异照旧判抓到退 0，scope 起不来退 7 且一次 cargo 都没跑，基线撞顶退 2 并说是内存上限，基线被总上限挤掉原样退 254；\
 并行：MUTATE_JOBS=1 与 =4 的 stdout 逐字相同、没红的照样判失败、头一行报开了几个、各工作进程各用一份副本与编译目录，\
-丢一份判定退 8 而拿掉那道闸就静默判绿，MUTATE_JOBS 写错退 2，锚点腐化派活之前退 3；\
-required-features：没挂的 bin 的 cargo 参数逐字不变，挂了两个的带「包名/feature」跑得起来、照常判抓到）"
+丢一份判定退 8 而拿掉那道闸就静默判绿，MUTATE_JOBS、MUTATE_TIMEOUT 写错退 2，锚点腐化派活之前退 3；\
+required-features：没挂的 bin 的 cargo 参数逐字不变，挂了两个的带「包名/feature」跑得起来、照常判抓到；\
+包装每次放行前停 $selftest_time_limit 秒，五种结局照样各归各类、只有 HANG 那一条记超时；\
+包装退 252 记排不上、退 254 记被总上限挤掉，都整轮判失败并单列计数；平常跑带只供自证的 ${#TEST_ONLY_VARIABLES[@]} 个变量各一次都退 2；\
+会话里平常跑并行（假包装照「日常一条」判）：MUTATE_JOBS=4 各条判对退 0、每次包装带各自的并行理由而 --check 不带，调用方的理由不覆盖，基线排不上退 2 报「基线排不上」）"
 }
 
 if [[ "${1:-}" == "--selftest" ]]; then
   run_selftest
   exit 0
+fi
+# 平常跑：只供自证的变量有一个非空就拒，一次 cargo 都不调（自证起的子进程除外，文件头「只供自证」）
+if ((!running_under_selftest)) && ! is_broken honorbreakoutsideselftest; then
+  test_only_given=()
+  for variable in "${TEST_ONLY_VARIABLES[@]}"; do
+    [[ -n "${!variable:-}" ]] && test_only_given+=("$variable")
+  done
+  if ((${#test_only_given[@]})); then
+    echo "mutate: 平常跑时带了只给自证用的变量：${test_only_given[*]}；拒跑，一条变异都没跑" >&2
+    echo "        → 怎么办：unset ${test_only_given[*]} 再跑；要证红就跑 bash $SELF_PATH --selftest（它起的子进程才认这几个变量）" >&2
+    exit 2
+  fi
 fi
 BIN="$1"; SRC="$2"; TABLE="$3"
 
@@ -365,11 +741,20 @@ if [[ -n "$REQUESTED_JOBS" && ! "$REQUESTED_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "        → 怎么办：写成 1、2、4 这样的正整数再跑；不设就按核数的一半（至多 $MAXIMUM_WORKERS_BY_PROCESSOR）与表里的条数取小" >&2
   exit 2
 fi
+if [[ ! "$ROW_TIME_LIMIT" =~ ^[1-9][0-9]*$ ]]; then
+  echo "mutate: MUTATE_TIMEOUT 写成了「$ROW_TIME_LIMIT」，要写正整数秒（交给包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT，它只认正整数秒），一条变异都没跑" >&2
+  echo "        → 怎么办：写成 120、600 这样的正整数再跑；不设就是 120 秒" >&2
+  exit 2
+fi
 REQUESTED_CARGO_JOBS="${MUTATE_CARGO_JOBS:-}"
 if [[ -n "$REQUESTED_CARGO_JOBS" && ! "$REQUESTED_CARGO_JOBS" =~ ^[1-9][0-9]*$ ]]; then
   echo "mutate: MUTATE_CARGO_JOBS 写成了「$REQUESTED_CARGO_JOBS」，要写正整数，一条变异都没跑" >&2
   echo "        → 怎么办：写成正整数再跑；不设就用调用方的 CARGO_BUILD_JOBS，那也没设就取 核数 ÷ 工作进程数" >&2
   exit 2
+fi
+if is_broken exportparallelreason && [[ -z "${RUN_WITH_MEMORY_CAP_PARALLEL_REASON:-}" ]]; then
+  # 弄坏开关：并行理由 export 给之后起的每一条命令（--check 也看得见），不只设在自己起的那几次包装上
+  export RUN_WITH_MEMORY_CAP_PARALLEL_REASON="mutate.sh 起的每一条命令都照并行放行（弄坏开关 exportparallelreason）"
 fi
 # 开跑之前先试一次带上限的 scope 起不起得来：起不来就一条都不跑，不退回无上限（run-with-memory-cap.sh 自己把原因打到 stderr）
 if bash "$MEMORY_CAP_RUNNER" --check "$MEMORY_MAX"; then memory_cap_check=0; else memory_cap_check=$?; fi
@@ -490,15 +875,40 @@ done
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
   touch "$(copy_directory_of "$worker_index")/$SRC"
 done
-# 在第 $1 个工作进程的副本上、用它的编译目录跑一次不限时的 cargo test（基线与还原之后那一次）
-run_tests_in_copy() {
-  ( cd "$(copy_directory_of "$1")" && CARGO_TARGET_DIR="$(target_directory_of "$1")" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"} )
+# 经内存包装跑一次 cargo test：$1 副本目录、$2 编译目录、$3 限时秒数（空串不限时：基线与还原之后那一次）、$4 第几个工作进程（写进并行理由）。
+# cargo 的 stdout 与 stderr 在 scope 里并成一路打到这里的 stdout（判结局读它）；包装自己的 stderr（排队时每 60 秒那一行、撞顶与超时的说明）
+# 打到开跑时的 stderr（WRAPPER_STDERR_FD），工作进程里起的也看得见，不混进判结局的输出。
+# 限时交给包装的 RUN_WITH_MEMORY_CAP_TIME_LIMIT：从起跑算、不算排队，到点包装退 253（文件头「每条变异限时」一段）
+CARGO_TEST_COMMAND=(cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"})
+exec {WRAPPER_STDERR_FD}>&2
+run_capped_cargo_test() {
+  local copy_directory="$1" target_directory="$2" time_limit="$3" worker_index="$4" wrapper_stderr_fd="$WRAPPER_STDERR_FD"
+  local -a limit_environment=(-u RUN_WITH_MEMORY_CAP_TIME_LIMIT) outer_timeout=() parallel_environment=()
+  # 会话里的「日常一条」：自己起的每次包装带一句并行理由，调用方设了的原样传、不覆盖；只设在这一次包装的环境里（文件头「并行」那一段）
+  if [[ -z "$CALLER_PARALLEL_REASON" ]] || is_broken overridecallerreason; then
+    is_broken noparallelreason \
+      || parallel_environment=("RUN_WITH_MEMORY_CAP_PARALLEL_REASON=同一次 mutate.sh 的第 $worker_index 个工作进程，各用各的副本与编译目录（mutate.sh 进程 $$、这一轮共 $WORKER_COUNT 个，被测 $BIN）")
+  fi
+  if [[ -n "$time_limit" ]]; then
+    if is_broken outertimeout; then
+      outer_timeout=(timeout "$time_limit")      # 弄坏开关：改前的跑法，排队拿锁、起 scope 的时间也算进限时
+    else
+      limit_environment=("RUN_WITH_MEMORY_CAP_TIME_LIMIT=$time_limit")
+    fi
+    is_broken swallowwrapper && wrapper_stderr_fd=1   # 弄坏开关：改前的跑法，包装的话并进判结局的输出、看不见
+  fi
+  ( cd "$copy_directory" && exec env "${limit_environment[@]}" ${parallel_environment[@]+"${parallel_environment[@]}"} \
+      CARGO_TARGET_DIR="$target_directory" RUN_WITH_MEMORY_CAP_KEY="${CARGO_TEST_COMMAND[*]}" \
+      ${outer_timeout[@]+"${outer_timeout[@]}"} bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" bash -c 'exec "$@" 2>&1' mutate-cargo-test "${CARGO_TEST_COMMAND[@]}" ) \
+    2>&"$wrapper_stderr_fd"
 }
+# 在第 $1 个工作进程的副本上、用它的编译目录跑一次不限时的 cargo test（基线与还原之后那一次）
+run_tests_in_copy() { run_capped_cargo_test "$(copy_directory_of "$1")" "$(target_directory_of "$1")" "" "$1"; }
 
 # 基线必须全绿，否则后面「红了」分不清是变异造成的还是本来就红。每份副本各跑一次、一起跑，按副本号逐个收退出码
 baseline_pids=()
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
-  run_tests_in_copy "$worker_index" >/dev/null 2>&1 &
+  run_tests_in_copy "$worker_index" >/dev/null &
   baseline_pids+=($!)
 done
 baseline_exits=()
@@ -513,6 +923,15 @@ for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
     echo "mutate: 基线（没改过的源码）就撞了内存上限 $MEMORY_MAX${copy_note}：先查被测代码为什么吃这么多，确实要这么多就调大 MUTATE_MEMORY_MAX 再来" >&2; exit 2
   elif [[ $baseline_exit -eq $MEMORY_CAP_UNAVAILABLE_EXIT ]]; then
     echo "mutate: 跑基线时带内存上限的 scope 起不来了${copy_note}，一条变异都没跑；修好用户级 systemd / D-Bus 再来" >&2; exit 7
+  elif [[ $baseline_exit -eq $MEMORY_ADMISSION_REFUSED_EXIT ]] && ! is_broken baselinequeueasred; then
+    echo "mutate: 基线排不上：第 $worker_index 份副本上内存包装退 $MEMORY_ADMISSION_REFUSED_EXIT，命令一行都没跑（包装的话在上面），一条变异都没跑" >&2
+    echo "        → 怎么办：看上面包装列出的占着的那几条——同一个会话已有一条日常的在跑而调用方给的 RUN_WITH_MEMORY_CAP_PARALLEL_REASON 不够 8 个字的，" >&2
+    echo "          改长或 unset 它（mutate.sh 自己给每个工作进程设）；内存不够排不上的，等它们跑完再整张表重跑，不许拿掉上限去跑" >&2
+    exit 2
+  elif [[ $baseline_exit -eq $SLICE_TOTAL_HIT_EXIT ]] && ! is_broken baselinesqueezedasred; then
+    echo "mutate: 基线被内存总上限挤掉：第 $worker_index 份副本上内存包装退 $SLICE_TOTAL_HIT_EXIT（包装的话在上面），这一次不算数、一条变异都没跑，原样退 $SLICE_TOTAL_HIT_EXIT" >&2
+    echo "        → 怎么办：等占着总上限的那几条跑完，再整张表重跑；不许拿掉上限去跑" >&2
+    exit "$SLICE_TOTAL_HIT_EXIT"
   elif [[ $baseline_exit -ne 0 ]]; then
     echo "mutate: 基线就是红的${copy_note}，先修好再来" >&2; exit 2
   fi
@@ -554,13 +973,14 @@ mutate: [$name] 替换没命中，证明作废
   # 实测踩过（2026-09-01，E73）：`tree_height` 的循环无界，变异把扇出下界的 guard 改松之后
   # 扇出为 1 时 `cap` 不增长，整轮挂死，只能靠 `kill` 收场。
   # ⇒ 每条变异单独限时。默认 120 秒——本仓最慢的单测不到 1 秒，撞到它就是真挂了。
+  #   限时交给包装（RUN_WITH_MEMORY_CAP_TIME_LIMIT，从起跑算），不在包装外面套 timeout：套在外面的把排队的时间也算进去（文件头「每条变异限时」一段）。
   # ⚠️ **第六种结局：内存先于超时撞顶。** 无界分配的破坏几十秒就能吃满整机，等不到 120 秒；2026-09-25 E142 的一条变异两次把整机拖进 OOM。
   # ⇒ 每条变异同时放进内存上限（MUTATE_MEMORY_MAX，见文件头），撞顶与超时同一类记。
-  out="$(cd "$copy_directory" && CARGO_TARGET_DIR="$target_directory" timeout "${MUTATE_TIMEOUT:-120}" bash "$MEMORY_CAP_RUNNER" "$MEMORY_MAX" cargo test --release --bin "$BIN" ${cargo_feature_arguments[@]+"${cargo_feature_arguments[@]}"} 2>&1)"
+  out="$(run_capped_cargo_test "$copy_directory" "$target_directory" "$ROW_TIME_LIMIT" "$worker_index")"
   row_exit=$?
   cp "$PRISTINE" "$copy_directory/$SRC"   # 还原：下一条从开跑时那一份改，领完之后那一次测试也跑在还原过的源码上
-  if [[ $row_exit -eq 124 ]]; then
-    record_verdict "$row_index" timeout 1 "⏱  [$name] ${MUTATE_TIMEOUT:-120} 秒没跑完 —— 这条破坏让被测代码不终止了，不是「没抓到」" ""
+  if [[ $row_exit -eq $TIME_LIMIT_HIT_EXIT ]] || { is_broken outertimeout && [[ $row_exit -eq $OUTER_TIMEOUT_EXIT ]]; }; then
+    record_verdict "$row_index" timeout 1 "⏱  [$name] 起跑之后 $ROW_TIME_LIMIT 秒没跑完（排队的时间不算）—— 这条破坏让被测代码不终止了，不是「没抓到」" ""
     return
   fi
   if [[ $row_exit -eq $MEMORY_CAP_HIT_EXIT ]]; then
@@ -575,8 +995,18 @@ mutate: [$name] 替换没命中，证明作废
   fi
   if [[ $row_exit -eq $MEMORY_CAP_UNAVAILABLE_EXIT ]]; then
     touch "$STOP_FLAG"
-    record_verdict "$row_index" unavailable 1 "" "mutate: [$name] 跑到一半带内存上限的 scope 起不来了（上面是 run-with-memory-cap.sh 的报错），后面的变异不跑：$out
+    record_verdict "$row_index" unavailable 1 "" "mutate: [$name] 跑到一半带内存上限的 scope 起不来了（run-with-memory-cap.sh 的报错在这一轮 stderr 的前面几行），后面的变异不跑
         → 怎么办：修好用户级 systemd / D-Bus 整张表重跑；不许拿掉上限去跑"
+    return
+  fi
+  # 包装退 252：内存不够排不上，命令一行都没跑；退 254：被总上限挤掉，结果不算数（文件头「包装的另两种结局」一段）。
+  # 都在下面两支之前判：252 的输出是空的，会落进「编译失败、无效」；254 的输出里有 process didn't exit successfully，会落进「没跑完」
+  if [[ $row_exit -eq $MEMORY_ADMISSION_REFUSED_EXIT ]] && ! is_broken queueasinvalid; then
+    record_verdict "$row_index" queuefull 1 "⏳ [$name] 内存包装排不上（run-with-memory-cap.sh 退 $MEMORY_ADMISSION_REFUSED_EXIT），命令一行都没跑 —— 这一条没判，不是「无效」，也不算盲区或命中" ""
+    return
+  fi
+  if [[ $row_exit -eq $SLICE_TOTAL_HIT_EXIT ]] && ! is_broken squeezedascrashed; then
+    record_verdict "$row_index" squeezed 1 "🚧 [$name] 被内存总上限挤掉（run-with-memory-cap.sh 退 $SLICE_TOTAL_HIT_EXIT：整个 slice 满了，内核挑了这一条杀）—— 结果不算数，不是「破坏被看见了」" ""
     return
   fi
   # ⚠️ **编译失败不等于「没抓到」。** 一个改坏了语法或穷尽性的变异根本跑不到测试，
@@ -640,7 +1070,7 @@ run_worker() {
     judge_mutation "$worker_index" "$row_index"
   done
   [[ -e "$STOP_FLAG" ]] && return 0
-  if run_tests_in_copy "$worker_index" >/dev/null 2>&1; then restore_exit=0; else restore_exit=$?; fi
+  if run_tests_in_copy "$worker_index" >/dev/null; then restore_exit=0; else restore_exit=$?; fi
   echo "$restore_exit" >"$SHARD_ROOT/restore-$worker_index.exit"
 }
 
@@ -654,6 +1084,8 @@ done
 fail=0
 timeout_count=0
 memory_hit_count=0
+queue_full_count=0
+squeezed_count=0
 next_row=0
 stopped_verdict=""
 print_judged_rows_in_table_order() {
@@ -667,6 +1099,8 @@ print_judged_rows_in_table_order() {
     [[ -f "$RESULTS/$next_row.line" ]] && cat "$RESULTS/$next_row.line"
     [[ "$verdict_category" == timeout ]] && timeout_count=$((timeout_count + 1))
     [[ "$verdict_category" == memory ]] && memory_hit_count=$((memory_hit_count + 1))
+    [[ "$verdict_category" == queuefull ]] && queue_full_count=$((queue_full_count + 1))
+    [[ "$verdict_category" == squeezed ]] && squeezed_count=$((squeezed_count + 1))
     ((verdict_fails)) && fail=1
     next_row=$((next_row + 1))
   done
@@ -733,8 +1167,12 @@ elif ((claimed_count != mutation_count || collected_count != mutation_count || n
   echo "          齐就去查认领与收束那一段（run_worker、record_verdict、print_judged_rows_in_table_order）；工作进程被信号杀的，先查是不是被 OOM 或人停了" >&2
   exit 8
 fi
-# 与超时同一类的两种结局单列计数：它们既不是抓到也不是没红，整轮已经判失败
-echo "计数：内存撞顶 $memory_hit_count 条（上限 $MEMORY_MAX）、超时 $timeout_count 条"
+# 与超时同一类的四种结局单列计数：它们既不是抓到也不是没红，整轮已经判失败
+echo "计数：内存撞顶 $memory_hit_count 条（上限 $MEMORY_MAX）、超时 $timeout_count 条、排不上 $queue_full_count 条、被总上限挤掉 $squeezed_count 条"
+if ((queue_full_count + squeezed_count)); then
+  echo "mutate: $queue_full_count 条排不上（包装退 $MEMORY_ADMISSION_REFUSED_EXIT）、$squeezed_count 条被总上限挤掉（包装退 $SLICE_TOTAL_HIT_EXIT），这几条没判，整轮判失败" >&2
+  echo "        → 怎么办：bash research/scripts/run-with-memory-cap.sh --status 看 slice 里谁占着，等它们跑完再整张表重跑；不许拿掉上限去跑" >&2
+fi
 
 # 还原之后那一次：每个工作进程领完之后在自己的副本上各跑了一次
 for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
@@ -746,7 +1184,7 @@ for ((worker_index = 1; worker_index <= WORKER_COUNT; worker_index++)); do
   fi
   restore_exit="$(cat "$restore_file")"
   if [[ "$restore_exit" != 0 ]]; then
-    echo "mutate: 还原后没回到全绿（第 $worker_index 份副本，退出码 $restore_exit；$MEMORY_CAP_HIT_EXIT 是撞了内存上限，$MEMORY_CAP_UNAVAILABLE_EXIT 是带上限的 scope 起不来）" >&2
+    echo "mutate: 还原后没回到全绿（第 $worker_index 份副本，退出码 $restore_exit；$MEMORY_CAP_HIT_EXIT 是撞了内存上限，$MEMORY_CAP_UNAVAILABLE_EXIT 是带上限的 scope 起不来，$MEMORY_ADMISSION_REFUSED_EXIT 是排不上，$SLICE_TOTAL_HIT_EXIT 是被总上限挤掉）" >&2
     exit 4
   fi
 done

@@ -19,6 +19,9 @@
 它只看、只报，不停任何子 agent、不杀任何进程：子 agent 与脚本不强制结束，结束不结束由主 agent 看了报告定（用户 2026-09-17）。
 退出码：0 被看的子 agent 全部交回或被停、没有告警；3 有告警；4 定时回报（没有告警、子 agent 还在跑，到点叫醒主 agent 看一眼）；2 用法错。
 带 --processes-only 时 0 是看门狗起的时候就在跑的那些进程都退出了（起的时候一个都没有也退 0，报告里写明是哪一种）。
+退出时出路句印的重起命令是 watch.sh 认得的写法（主 agent 经它起看门狗，它不认这里的 --agents / --processes-only）：盯点名的子 agent 印
+`bash research/scripts/watch.sh <agent 号>,…`，--discover 印不带 agent 号的 `bash research/scripts/watch.sh`，--processes-only 印 `bash research/scripts/watch.sh --processes`。
+AGENT_WATCH_BREAK=restarthint 印回这里自己的选项，自检里出路句那两格必须判错。
 「交回」按交回工具（SubagentHandback）成功返回判：只结束本轮、没交回的子 agent 还在等后台任务，不算结束。
 交回之后只有新指令撤销它（续做消息，认法见 is_new_instruction）；交回之后被自己后台任务的完成通知叫醒、又调了工具再结束本轮的，仍算交回。
 「被停」认两处：子 agent 会话记录里的 `[Request interrupted`（停在工具调用中途）；主会话记录（<会话 id>.jsonl）里 TaskStop 对它的成功结果，
@@ -67,12 +70,20 @@ queued_command），与主会话记录里 SendMessage 发给它的成功结果�
 下一步给整棵子树从最底层往上逐个停的次序。归属照「交回之后后台还在跑」那套：它或它的上层开着哪个子 agent（或主 agent）后台任务的输出文件，
 认不出写认不出。读不到 cmdline、cwd、environ 的（进程刚退出、权限不够）跳过不报；lib_heavy_tests.py 导入失败时报告里写明这一类没查。
 --ack 进程:PID 确认。双机分片的驱动脚本 layer0-shard-run.sh 按它参数里树根下键那一行登记判（lib_heavy_tests.py 文件头）：
-驱动自检（research/scripts/layer0-shard-run-selftest.sh）在临时仓里登记 harness 档包的替身用例，它一趟趟起的驱动与假 cargo 不报。
+驱动自检（research/scripts/layer0-shard-run-selftest.sh）在临时仓里登记 harness 档包的替身用例；树根里那一行读不到的（lib_heavy_tests.py 照重型算）靠下一段放行。
+登记成轻的自证底下不判：一个进程起的脚本（bash / sh、python 后面那个，直接执行的取它自己）照 lib_heavy_tests.py 的 classify_selftest 判
+（同一份登记表 .claude/hooks/selftest-registry.tsv，命令词要解到本仓那一份），是登记成 light、或 heavy-if-set:<变量> 而它环境里那个变量没设的自证，
+它自己照判，它底下整棵不判。`<名>.sh --selftest` 先 exec 进同目录 `<名>-selftest.sh` 本体的（layer0-shard-run.sh、gate-staged.sh、stage-must-run.sh；
+exec 之后参数里没有 --selftest，下面「样本自检底下不判」那条认不出），本体不带参数时按 `<名>.sh --selftest` 那一行判，`<名>.sh` 的正文里还要写着本体的文件名。
+不在它底下、而参数里的路径或当前目录落在它临时目录里的也不报：它的临时目录是它底下进程的参数与当前目录里出现过的、临时根（它环境里的 TMPDIR，没有是 /tmp）
+下一层名字像 mktemp / mkdtemp 起的（tmp.XXXXXXXXXX、tmpXXXXXXXX）那一层，它还在跑时才算。仓副本里路径尾部相同的自证、设了那个变量的、登记成 heavy 的、
+表外的照判；路径只是像临时目录、没有登记成轻的自证在跑着用它的照报。报告那一行写出这两类各几个。2026-10-01 layer0-shard-run.sh --selftest
+exec 进本体之后，本体在 mktemp 临时仓里起的驱动每一趟报一次「重型测试没带前缀」（进程 1810646、1819322，records/2026-10-01-对接上游测试脚本规范.md 第 625、626 行）。
 样本自检底下不判：一个进程的参数里有一个是 stage-selftest.sh（按文件名认）或恰好是 --selftest，它自己照判，它底下整棵不判
-（stage-selftest.sh 在临时目录里带 --force 拿样本起 54 号与 checker-tier-lkmm.sh、checker-tier-crates-mutation-replay.sh 这些重型阶段，
---selftest 建的临时仓里起 gate.sh）；报告那一行写出不判了几个。门禁阶段按文件名认（lib_heavy_tests.py 的 STAGE_KIND：54-layer0-replay.sh 与
-去了编号的 checker-tier-* 四道；checker-tier-research-build-and-replay.sh 只在跑复跑那一格时算重型，--check research-unit-tests 只跑单测那一格的不算）。
-lib_heavy_tests.py 另认的一类「提交时才跑的检查」（COMMIT_CHECK_KINDS：不重型的门禁阶段、上游几道 lint 与样本自检、研究脚本与钩子的 --selftest）
+（stage-selftest.sh 在临时目录里带 --force 拿样本起 checker-tier-layer0-replay 与 checker-tier-lkmm.sh、checker-tier-crates-mutation-replay.sh 这些重型阶段，
+--selftest 建的临时仓里起 gate.sh）；报告那一行写出不判了几个。门禁阶段按文件名认（lib_heavy_tests.py 的 STAGE_KIND：checker-tier-layer0-replay.sh 与
+另四道 checker-tier-*；checker-tier-research-build-and-replay.sh 只在跑复跑那一格时算重型，--check research-unit-tests 只跑单测那一格的不算）。
+lib_heavy_tests.py 另认的一类「提交时才跑的检查」（COMMIT_CHECK_KINDS：不重型的门禁阶段、上游几道 lint，以及 .claude/hooks/selftest-registry.tsv 登记为 heavy 或没登记的样本与 --selftest）
 这里不报：执行前的闸拒它们，收工钩子 gate-reuse-check.sh 每次收工起的 gate-overlap.py 也在这一类，报了就是每次收工叫醒一次。
 AGENT_WATCH_BREAK=heavycommitcheck 把这一类照重型报，自检里「不重型的门禁阶段不报」那一格必须判错。
 执行前的闸 heavy-test-guard.sh 不看上层进程，判法不变。射程之外：在同一个 shell 里 source 进来跑、不另起进程的。2026-09-24 实十九把重型测试写进 run-chain.sh，
@@ -86,6 +97,218 @@ AGENT_WATCH_BREAK=heavycommitcheck 把这一类照重型报，自检里「不重
 这一类告警是它之外的第二道。它只报不杀（同一份文件头「只看、只报」）；--ack 进程:PID 确认。
 2026-09-25 两次整机 OOM：E142 的变异跑道里一条变异让测试无界分配，涨到 53.6 GiB 与 56.6 GiB 才被内核杀掉，连带杀了本地模型服务与 Claude Code 会话
 （records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。
+
+弄坏开关 AGENT_WATCH_BREAK=<项>（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
+（项名是那条失败落在哪个自证函数里：selftest_in、selftest_session_watch_in、selftest_leftover_background、selftest_pipe_upstream、
+selftest_heavy_tests、selftest_heavy_selftest_tree、selftest_memory，临时目录那三格写格名；括号里是那几条「✗ 自检：」的开头；红了自证退 1）：
+  AGENT_WATCH_BREAK=ack  split_acknowledged() 不认 --ack，确认过的告警照样叫醒
+      selftest_in（「✗ 自检：「工具调用过长」被 --ack 确认之后看门狗应当到点退出码 4 并写「已确认接着盯」」、「✗ 自检：派发 125 分钟、--ack 了「跑满 2 小时」那一格时看门狗不该叫醒」）、
+      selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」）、
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）、selftest_memory（「✗ 自检：过线进程 --ack 进程:」）、
+      selftest_session_watch_in（「✗ 自检：--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4」、「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、
+      「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」）
+  AGENT_WATCH_BREAK=acksneverpruned  pruned_acks() 不作废条件已经不在的确认，全部留着
+      selftest_session_watch_in（「✗ 自检：条件类告警的确认」）
+  AGENT_WATCH_BREAK=acksnotpersisted  read_acks() 不读状态目录里记下的确认
+      selftest_session_watch_in（「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」、「✗ 自检：已有一个在盯时给的 --ack 应当记进状态目录」、
+      「✗ 自检：条件类告警的确认」）
+  AGENT_WATCH_BREAK=backgroundwait  waiting_on_its_own_background_tasks() 一律交 False，结束本轮在等自己后台任务的也报「无动静」
+      selftest_in（「✗ 自检：子 agent waitinglong」、「✗ 自检：子 agent textsettled」、「✗ 自检：子 agent stopsequence」、「✗ 自检：前台命令超时被挪进后台」）、
+      selftest_session_watch_in（「✗ 自检：子 agent progressstale」）
+  AGENT_WATCH_BREAK=banned  agent_alerts() 不报禁用命令（pgrep -f / pkill -f / killall）
+      selftest_in（「✗ 自检：子 agent banned」、「✗ 自检：子 agent bannedafterheredoc」）
+  AGENT_WATCH_BREAK=bannedrefused  agent_alerts() 被钩子拒了的禁用命令也报
+      selftest_in（「✗ 自检：子 agent bannedrefused」）
+  AGENT_WATCH_BREAK=bannedwindow  agent_alerts() 不看禁用命令发出多久，窗口之外的旧命令也报
+      selftest_in（「✗ 自检：子 agent bannedold」）
+  AGENT_WATCH_BREAK=context  agent_alerts() 上下文过线也不报「该交接」
+      selftest_in（「✗ 自检：子 agent hugecontext」）
+  AGENT_WATCH_BREAK=contextzero  agent_alerts() 不看 --context-tokens 是不是 0，线写 0 也照报「该交接」
+      selftest_in（「✗ 自检：子 agent hugecontext 在 --context-tokens 0 时」）
+  AGENT_WATCH_BREAK=cost  自检里把用量样本的 full_cache_rewrite_tokens 读成 0
+      selftest_in（「✗ 自检：用量样本的 full_cache_rewrite_tokens 应当是」）
+  AGENT_WATCH_BREAK=cpu  process_alerts() 不看 CPU 涨没涨，在算的进程也报「进程无输出」
+      selftest_in（「✗ 自检：写着的文件一小时没动、CPU 一直在涨的进程」、「✗ 自检：CPU 在涨的进程」）
+  AGENT_WATCH_BREAK=deadline  run() 不按回报周期截短复检间隔
+      selftest_in（「✗ 自检：复检间隔比回报周期长时看门狗没有按回报周期退出」）
+  AGENT_WATCH_BREAK=detections  read_detections() 一条检出都不读（每条都当别的会话的跳过）
+      selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner healthy」」、「✗ 自检：检出记录属于「session」「主 agent None」」）、selftest_session_watch_in（「✗ 自检：hook 检出」）
+  AGENT_WATCH_BREAK=detectiontype  read_detections() 检出的主体不写 agent 号、只写类型
+      selftest_session_watch_in（「✗ 自检：hook 检出」）
+  AGENT_WATCH_BREAK=discoverfallback  build_report() 带 --discover 而一个没结束的都找不到时，退回「会话里最近动过的全部子 agent」
+      selftest_session_watch_in（「✗ 自检：--discover 时会话里的子 agent 都交回了应当接着盯到点退 4、不报全部交回」）
+  AGENT_WATCH_BREAK=discovernone  discovered_agent_ids() 一个都找不出来
+      selftest_session_watch_in（「✗ 自检：--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4」、
+      「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash research/scripts/watch.sh」、「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：条件类告警的确认」）
+  AGENT_WATCH_BREAK=display  command_for_display() 不剥 Bash 工具的那层包装，原样显示
+      selftest_in（「✗ 自检：Bash 工具包着的命令在报告里应当显示成「cargo test --release」」、「✗ 自检：Bash 工具包着的命令在报告里应当显示成「grep 'x' f」」）
+  AGENT_WATCH_BREAK=finished  AgentTranscript._read() 调过交回工具、没有未完的工具调用也不记成已交回
+      selftest_in（「✗ 自检：子 agent finished：应当告警 无」、「✗ 自检：子 agent toolafterhandback：应当告警 无」、「✗ 自检：子 agent inquiryhandedback：应当告警 无」、
+      「✗ 自检：子 agent finished 应当算交回或被停」、「✗ 自检：子 agent notifiedafterhandback 应当算交回或被停」、「✗ 自检：子 agent toolafterhandback 应当算交回或被停」、
+      「✗ 自检：子 agent inquiryhandedback 应当算交回或被停」、「✗ 自检：被看的子 agent 都交回或被停时看门狗应当退出码 0」、「✗ 自检：一个结束本轮没交回、一个已交回时看门狗应当退出码 4」、
+      「✗ 自检：定时回报的出路句应当是」）、
+      selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」、「✗ 自检：交回 30 秒、宽限 2 分钟的 leftovergrace 应当记成宽限里」、
+      「✗ 自检：被看的子 agent 全部交回、它丢下的后台进程还在时」、「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」、
+      「✗ 自检：--processes-only 带 --session-dir 时也应当报」、「✗ 自检：被看的子 agent 刚交回、后台进程还在宽限里时」；
+      run_leftover_watch 那几次看门狗等不到交回、到 60 秒没退的，退出码记成「超时（60 秒没退出）」照原判据判红，不抛异常）、
+      selftest_session_watch_in（「✗ 自检：--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4」、「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、
+      「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」、「✗ 自检：--discover 时会话里的子 agent 都交回了应当接着盯到点退 4、不报全部交回」）
+  AGENT_WATCH_BREAK=handback  AgentTranscript._read() 只结束本轮、没调交回工具的也记成已交回
+      selftest_in（「✗ 自检：子 agent nowake」、「✗ 自检：子 agent orphantask」、「✗ 自检：子 agent queuedresume」、「✗ 自检：子 agent inquiryfailed」、
+      「✗ 自检：子 agent textsettled 的状态应当是「本轮结束、没交回」」、「✗ 自检：子 agent stopsequence 的状态应当是「本轮结束、没交回」」、「✗ 自检：子 agent waiting 应当不算交回或被停」、
+      「✗ 自检：子 agent nowake 应当不算交回或被停」、「✗ 自检：子 agent wokenup 应当不算交回或被停」、「✗ 自检：子 agent waitinglong 应当不算交回或被停」、「✗ 自检：子 agent movedbackground 应当不算交回或被停」、
+      「✗ 自检：子 agent queuedresume 应当不算交回或被停」、「✗ 自检：前台命令超时被挪进后台」、「✗ 自检：一个结束本轮没交回、一个已交回时看门狗应当退出码 4 并列出「还没交回、没被停的子 agent（1 个，另有还没会话记录的 0 个）：waiting」」、
+      「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash research/scripts/watch.sh waiting」」、「✗ 自检：复检间隔 240 秒、回报周期 3 秒时看门狗应当到点退出码 4」）、
+      selftest_session_watch_in（「✗ 自检：子 agent progressstale」）、selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」、
+      「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」）
+  AGENT_WATCH_BREAK=handoveranytype  agent_alerts() 不分类型，所有子 agent 上下文过线都报「该交接」
+      selftest_session_watch_in（「✗ 自检：子 agent attackhuge」）
+  AGENT_WATCH_BREAK=heavycommitcheck  heavy_test_report() 把「提交时才跑的检查」照重型报
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavyexempt  heavy_test_report() 底下有带前缀重型进程的上层也报
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavyprefix  heavy_test_report() 不认 SINGLEFS_HEAVY_TESTS 前缀，带了前缀的也报
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavysampleselftest  heavy_test_report() 不放行样本自检（stage-selftest.sh、--selftest）底下的整棵
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、「✗ 自检：报告那一行应当写出样本自检底下不判的进程数」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavyscan  heavy_test_report() 一个进程都不扫
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、
+      「✗ 自检：没带前缀的层 0 进程的告警应当写类别「层 0」、「没带 SINGLEFS_HEAVY_TESTS=commit」」、「✗ 自检：带 SINGLEFS_HEAVY_TESTS=yes 的告警应当写「带的是 SINGLEFS_HEAVY_TESTS=yes」」、
+      「✗ 自检：timeout 包着没带前缀的只报 timeout 那一个」、「✗ 自检：报告里应当有一行」、「✗ 自检：报告那一行应当写出样本自检底下不判的进程数」、「✗ 自检：看门狗 --processes-only 盯着没带前缀的层 0 进程时应当报」、
+      「✗ 自检：看门狗 --agents 盯着没带前缀的层 0 进程时应当报」、「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）、
+      selftest_heavy_selftest_tree（「✗ 自检：没有自证祖先、同一条双机分片驱动命令应当报」、「✗ 自检：设了 SAMPLE_REAL_TOOLS 的同一份自证（heavy-if-set）底下的驱动应当报」、
+      「✗ 自检：仓副本里路径尾部相同的自证底下的驱动应当报」、「✗ 自检：报告那一行应当写出登记成轻的自证底下不判、它临时目录里不报的进程数」）
+  AGENT_WATCH_BREAK=heavyselftestancestor  registered_light_selftest() 一律交 None：登记成轻的自证认不出，它底下整棵照判、它的临时目录也不收
+      selftest_heavy_selftest_tree（「✗ 自检：登记成轻的自证（exec 进本体）底下、它临时仓里起的双机分片驱动不该报」、
+      「✗ 自检：不在自证底下、路径落在登记成轻的自证临时目录里的驱动不该报」、「✗ 自检：报告那一行应当写出登记成轻的自证底下不判、它临时目录里不报的进程数」）
+  AGENT_WATCH_BREAK=heavyselftestanycopy  registered_light_selftest() 不核命令词是不是本仓那一份：路径尾部相同的仓副本里的自证照登记表放行
+      selftest_heavy_selftest_tree（「✗ 自检：仓副本里路径尾部相同的自证底下的驱动应当报」）
+  AGENT_WATCH_BREAK=heavyselftestcondition  registered_light_selftest() 不看自证进程的环境：heavy-if-set:<变量> 设了也当轻的
+      selftest_heavy_selftest_tree（「✗ 自检：设了 SAMPLE_REAL_TOOLS 的同一份自证（heavy-if-set）底下的驱动应当报」）
+  AGENT_WATCH_BREAK=heavyselftestpathonly  heavy_test_report() 路径里有一层名字像 mktemp 临时目录的就不报，不看有没有登记成轻的自证在用它（放宽的判法）
+      selftest_heavy_selftest_tree（「✗ 自检：没有自证祖先、同一条双机分片驱动命令应当报」、「✗ 自检：设了 SAMPLE_REAL_TOOLS 的同一份自证（heavy-if-set）底下的驱动应当报」、
+      「✗ 自检：仓副本里路径尾部相同的自证底下的驱动应当报」）
+  AGENT_WATCH_BREAK=heavyselftesttemporary  heavy_test_report() 不放行落在登记成轻的自证临时目录里、却不在它底下的进程
+      selftest_heavy_selftest_tree（「✗ 自检：不在自证底下、路径落在登记成轻的自证临时目录里的驱动不该报」、「✗ 自检：报告那一行应当写出登记成轻的自证底下不判、它临时目录里不报的进程数」）
+  AGENT_WATCH_BREAK=heavytopmost  heavy_test_report() 一条链上每一层都报，不只报最上面那个
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavywatchdog  heavy_test_report() 不跳过另一个看门狗连同它的自检
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heavywrapper  heavy_test_report() 把 bash -c '…' 这一层也单判
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」应当只报 ['timeout 包着没带前缀的', '不带前缀直接起的 checker-tier-cr」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）
+  AGENT_WATCH_BREAK=heredoc  command_without_heredoc_bodies() 不去 heredoc 正文，正文里写的命令也当成在执行
+      selftest_in（「✗ 自检：子 agent bannedheredoc」）
+  AGENT_WATCH_BREAK=holders  background_task_processes() 一个都不列
+      selftest_in（「✗ 自检：结束本轮等自己的后台任务时应当列出开着那个输出文件的进程」）
+  AGENT_WATCH_BREAK=idle  agent_alerts() 不报「无动静」
+      selftest_in（「✗ 自检：子 agent idle」）
+  AGENT_WATCH_BREAK=infoalertwakes  split_informational() 把只记不叫醒的条件告警照旧叫醒
+      selftest_in（「✗ 自检：只有「等待循环」这类只记不叫醒的告警时」）
+  AGENT_WATCH_BREAK=infowakes  read_detections() 只记不叫醒的检出也叫醒
+      selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner healthy」」）、selftest_session_watch_in（「✗ 自检：hook 检出」）
+  AGENT_WATCH_BREAK=inquiry  routine_inquiry_alert() 一律不报「跑满 N 小时要主 agent 问一次」
+      selftest_in（「✗ 自检：子 agent inquiry61」、「✗ 自检：子 agent inquiry125」、「✗ 自检：子 agent inquirymessagebefore」、
+      「✗ 自检：派发 125 分钟、--ack 了「跑满 1 小时」那一格时看门狗应当照报 2 小时那一格并退出码 3」、「✗ 自检：派发 125 分钟、--ack 了「跑满 2 小时」那一格时看门狗不该叫醒」）、
+      selftest_session_watch_in（「✗ 自检：整点询问应当附上 progress.md 的末几行」）
+  AGENT_WATCH_BREAK=inquiryack  split_acknowledged() 不认短写「<agent 号>:跑满 N 小时」的确认
+      selftest_in（「✗ 自检：派发 125 分钟、--ack 了「跑满 2 小时」那一格时看门狗不该叫醒」）、selftest_session_watch_in（「✗ 自检：--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4」、
+      「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」）
+  AGENT_WATCH_BREAK=inquirydelivered  AgentTranscript._read() 不认忙时排进队、附件自带 origin coordinator 的消息
+      selftest_in（「✗ 自检：子 agent inquirydeliveredafter」、「✗ 自检：子 agent inquiryqueuedafter」）
+  AGENT_WATCH_BREAK=inquiryended  routine_inquiry_alert() 不看主会话里的任务通知，已结束（failed / killed / stopped）的也报
+      selftest_in（「✗ 自检：子 agent inquiryfailed」）
+  AGENT_WATCH_BREAK=inquiryreset  routine_inquiry_alert() 从主 agent 上一次消息起重新计时（改前的判法）
+      selftest_in（「✗ 自检：子 agent inquirymessagebefore」）
+  AGENT_WATCH_BREAK=inquirysent  AgentTranscript.last_main_agent_message_timestamp() 不读主会话记录里 SendMessage 的成功结果
+      selftest_in（「✗ 自检：子 agent inquirysentafter」）
+  AGENT_WATCH_BREAK=keepscratch  selftest() 的临时目录走回 mkdtemp 不删
+      通过那条路（「✗ 自检：通过那条路上临时目录没删」）、red 那条路（「✗ 自检：red 那条路上临时目录没删」）、crash 那条路（「✗ 自检：crash 那条路上临时目录没删」）
+  AGENT_WATCH_BREAK=leftover  output_files_held_open() 一个开着输出文件的进程都不找
+      selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」、「✗ 自检：交回 30 秒、宽限 2 分钟的 leftovergrace 应当记成宽限里、给出宽限到期的时刻」、
+      「✗ 自检：被看的子 agent 全部交回、它丢下的后台进程还在时」、「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」、「✗ 自检：--processes-only 带 --session-dir 时也应当报」、
+      「✗ 自检：被看的子 agent 刚交回、后台进程还在宽限里时看门狗应当等宽限过了再查、报」）、selftest_heavy_tests（「✗ 自检：没带前缀的层 0 进程的告警应当写类别「层 0」、「没带 SINGLEFS_HEAVY_TESTS=commit」」）、
+      selftest_memory（「✗ 自检：过线进程的告警应当写常驻内存、阈值、已跑多久与归属「子 agent memowner」」）
+  AGENT_WATCH_BREAK=leftoverack  split_acknowledged() 不认「交回之后后台还在跑」的 --ack 进程:PID
+      selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」的进程都用 --ack 进程:<pid> 确认过时不该叫醒」）
+  AGENT_WATCH_BREAK=leftoverexit  run() 只剩宽限里的后台进程时也照样退出
+      selftest_leftover_background（「✗ 自检：被看的子 agent 刚交回、后台进程还在宽限里时看门狗应当等宽限过了再查、报」）
+  AGENT_WATCH_BREAK=leftovergrace  leftover_background_report() 不等 --leftover-background-grace-minutes 宽限
+      selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」、「✗ 自检：交回 30 秒、宽限 2 分钟的 leftovergrace 应当记成宽限里、给出宽限到期的时刻」）
+  AGENT_WATCH_BREAK=leftovernotified  AgentTranscript.ended() 不认任务通知 failed / killed / stopped 为结束
+      selftest_in（「✗ 自检：子 agent inquiryfailed」）、selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」）
+  AGENT_WATCH_BREAK=loop  agent_alerts() 不报等待循环
+      selftest_in（「✗ 自检：子 agent waitloop」、「✗ 自检：只有「等待循环」这类只记不叫醒的告警时」）
+  AGENT_WATCH_BREAK=loopnoise  read_detections() 只有「没有 timeout 的等待循环」的检出也叫醒
+      selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner healthy」」）
+  AGENT_WATCH_BREAK=memorypoll  memory_alarm_between_checks() 两次整查之间不单查常驻内存
+      selftest_memory（「✗ 自检：看门狗 --processes-only 起了之后才冒出来的过线进程」、「✗ 自检：看门狗 --agents 起了之后才冒出来的过线进程」）
+  AGENT_WATCH_BREAK=memoryscan  memory_report() 一个进程都不查常驻内存
+      selftest_memory（「✗ 自检：「进程常驻内存过线」应当只报写满 256 MiB 的进程」、「✗ 自检：过线进程的告警应当写常驻内存、阈值、已跑多久与归属「子 agent memowner」」、
+      「✗ 自检：过线进程的「怎么办」应当写怎么看还涨不涨、按进程号停它的命令、查清之前别照原样重派、带上限重派与 --ack 进程:」、「✗ 自检：报告里应当有一行」、「✗ 自检：看门狗 --processes-only 盯着常驻内存过线的进程时应当报」、
+      「✗ 自检：看门狗 --agents 盯着常驻内存过线的进程时应当报」、「✗ 自检：过线进程 --ack 进程:」、「✗ 自检：看门狗 --processes-only 起了之后才冒出来的过线进程」、「✗ 自检：看门狗 --agents 起了之后才冒出来的过线进程」）
+  AGENT_WATCH_BREAK=memoryunit  memory_report() 的线按 MiB 算（--process-rss-gibibytes 乘 1024²）
+      selftest_in（「✗ 自检：--processes-only 时写着的文件一小时没动、CPU 也不涨的进程」、「✗ 自检：--processes-only 时一直在写文件的进程」）、
+      selftest_heavy_tests（「✗ 自检：「重型测试没带前缀」的 5 个进程都 --ack 进程:<pid> 之后看门狗不该叫醒」）、selftest_memory（「✗ 自检：「进程常驻内存过线」应当只报写满 256 MiB 的进程」、「✗ 自检：报告里应当有一行」、
+      「✗ 自检：过线进程 --ack 进程:」、「✗ 自检：看门狗 --processes-only 起了之后才冒出来的过线进程」、「✗ 自检：看门狗 --agents 起了之后才冒出来的过线进程」）
+  AGENT_WATCH_BREAK=movedbackground  background_start_in_result() 不认「… was moved to the background」
+      selftest_in（「✗ 自检：子 agent movedbackground」、「✗ 自检：前台命令超时被挪进后台」）
+  AGENT_WATCH_BREAK=nosingleinstance  acquire_single_instance() 不拦同一个会话的第二个看门狗
+      selftest_session_watch_in（「✗ 自检：同一个会话已有一个看门狗在盯时应当退 5 并写明」）
+  AGENT_WATCH_BREAK=nowake  agent_alerts() 不报「结束本轮却不会醒」
+      selftest_in（「✗ 自检：子 agent nowake」、「✗ 自检：子 agent orphantask」、「✗ 自检：子 agent queuedresume」、「✗ 自检：子 agent inquiryfailed」）
+  AGENT_WATCH_BREAK=orphan  AgentTranscript.orphaned_background_tasks() 一律交空
+      selftest_in（「✗ 自检：子 agent orphantask」）
+  AGENT_WATCH_BREAK=otheragent  read_detections() 不按被看的子 agent 筛检出
+      selftest_in（「✗ 自检：检出记录属于「session」「experiment-runner 别的子agent」」）
+  AGENT_WATCH_BREAK=ownrefusal  read_detections() 主 agent 自己的命令被 hook 拒的不单记
+      selftest_in（「✗ 自检：检出记录属于「session」「主 agent None」」）
+  AGENT_WATCH_BREAK=pipeancestor  stdin_pipe_writers() 不往上记读端自己的祖先（自己那一支也算成上游写端）
+      selftest_pipe_upstream（「✗ 自检：stdin 管道的写端只在自己的祖先」）
+  AGENT_WATCH_BREAK=pipeupstream  pipe_upstream_activity() 不看管道上游的写端
+      selftest_pipe_upstream（「✗ 自检：stdin 是管道、上游」、「✗ 自检：上游」）
+  AGENT_WATCH_BREAK=pipeupstreamalways  pipe_upstream_activity() 恒报上游在动
+      selftest_in（「✗ 自检：写着的文件一小时没动、CPU 也不涨的进程」、「✗ 自检：--processes-only 时写着的文件一小时没动、CPU 也不涨的进程」）、selftest_pipe_upstream（「✗ 自检：上游」、「✗ 自检：stdin 是管道、上游」、
+      「✗ 自检：stdin 管道的写端只在自己的祖先」）
+  AGENT_WATCH_BREAK=processexit  run_processes_only() 盯的进程都退出了也不退
+      selftest_in（「✗ 自检：--processes-only 盯着的进程退出了」、「✗ 自检：--processes-only 起的时候一个要盯的进程都没有」）
+  AGENT_WATCH_BREAK=progressnote  progress_note() 告警里不附 progress.md 的末几行
+      selftest_session_watch_in（「✗ 自检：整点询问应当附上 progress.md 的末几行」）
+  AGENT_WATCH_BREAK=progressstale  agent_alerts() 不报「进度文件不涨」
+      selftest_session_watch_in（「✗ 自检：子 agent progressstale」）
+  AGENT_WATCH_BREAK=repeat  agent_alerts() 不报同一命令反复且输出不变
+      selftest_in（「✗ 自检：子 agent repeat」）
+  AGENT_WATCH_BREAK=restarthint  restart_command() 与 run_processes_only() 的出路句印回本脚本自己的选项，不印 watch.sh 认得的写法
+      selftest_in（「✗ 自检：定时回报的出路句应当是「→ 接着盯就用 run_in_background 再起一个看门狗：bash research/scripts/watch.sh waiting」」）、
+      selftest_session_watch_in（「✗ 自检：--discover 的出路句应当是不带 agent 号的 bash research/scripts/watch.sh」）
+  AGENT_WATCH_BREAK=resume  AgentTranscript._read() 交回之后的续做消息不撤销交回
+      selftest_in（「✗ 自检：子 agent queuedresume」、「✗ 自检：子 agent continued 应当不算交回或被停」、「✗ 自检：子 agent resumedthinking 应当不算交回或被停」、
+      「✗ 自检：子 agent queuedresume 应当不算交回或被停」）
+  AGENT_WATCH_BREAK=resumeturn  AgentTranscript._read() 结束本轮之后来的续做消息不算被叫醒
+      selftest_in（「✗ 自检：子 agent resumedafterturnend」、「✗ 自检：子 agent resumedafterturnend 的状态应当是「思考中」」）
+  AGENT_WATCH_BREAK=settle  AgentTranscript._read() 只有文字、过了 TEXT_SETTLE_SECONDS 也不判结束本轮
+      selftest_in（「✗ 自检：子 agent textsettled」、「✗ 自检：子 agent inquiryfailed」、「✗ 自检：子 agent textsettled 的状态应当是「本轮结束、没交回」」）
+  AGENT_WATCH_BREAK=stale  process_alerts() 不报「进程无输出」
+      selftest_in（「✗ 自检：写着的文件一小时没动、CPU 也不涨的进程」、「✗ 自检：CPU 在涨的进程」、「✗ 自检：--processes-only 时写着的文件一小时没动、CPU 也不涨的进程」）、selftest_pipe_upstream（「✗ 自检：上游」、
+      「✗ 自检：stdin 是管道、上游」、「✗ 自检：stdin 管道的写端只在自己的祖先」）
+  AGENT_WATCH_BREAK=stalepending  AgentTranscript._read() 不剔掉只落了发起、等不到结果的工具调用
+      selftest_in（「✗ 自检：子 agent stalependingthenresult：应当告警 无，实际 ['工具调用过长']」）
+  AGENT_WATCH_BREAK=taskstop  AgentTranscript.__init__() 不认主会话记录里 TaskStop 的成功结果
+      selftest_in（「✗ 自检：子 agent stoppedidle」、「✗ 自检：子 agent stoppedtwice」、「✗ 自检：子 agent stoppedidle 应当算交回或被停」、「✗ 自检：子 agent stoppedtwice 应当算交回或被停」、
+      「✗ 自检：被看的子 agent 都交回或被停时看门狗应当退出码 0」）、selftest_leftover_background（「✗ 自检：「交回之后后台还在跑」应当只报交回、被 TaskStop 停掉、任务通知 failed 的三个」）
+  AGENT_WATCH_BREAK=timeout  agent_alerts() 不报「工具调用过长」
+      selftest_in（「✗ 自检：子 agent longtool」、「✗ 自检：子 agent inquirysentafter」、「✗ 自检：有告警（工具调用过长）时看门狗应当退出码 3」、「✗ 自检：「工具调用过长」被 --ack 确认之后看门狗应当到点退出码 4 并写「已确认接着盯」」）、
+      selftest_session_watch_in（「✗ 自检：--ack 应当落进状态目录、下一次起不带 --ack 也读回」、「✗ 自检：条件类告警的确认」）
+  AGENT_WATCH_BREAK=toolrevoke  AgentTranscript._read() 交回之后又调了工具就撤销交回
+      selftest_in（「✗ 自检：子 agent toolafterhandback」、「✗ 自检：子 agent toolafterhandback 应当算交回或被停」）
+  AGENT_WATCH_BREAK=zombie  still_running() 把僵尸当还在跑
+      selftest_in（「✗ 自检：--processes-only 盯着的进程退出了」）
 """
 import argparse
 import glob
@@ -168,6 +391,8 @@ HEAVY_TESTS_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.
 # 自证的临时目录由同一处的共用库建（通过、判红、抛异常三条路上都删），那三格也由它判
 SELFTEST_SCRATCH_LIBRARY_PATH = os.path.join(os.path.dirname(HEAVY_TESTS_LIBRARY_PATH), "lib_selftest_scratch.py")
 SELFTEST_ROLE_VARIABLE = "AGENT_WATCH_SELFTEST_ROLE"   # 自证拉起自己的子进程走判红、抛异常那两条路时设的角色
+SELFTEST_READY_VARIABLE = "AGENT_WATCH_SELFTEST_READY_FILE"   # 自证拉起的看门狗第一次进两次整查之间的等待前建这个文件（mark_selftest_ready），自证按它等
+SELFTEST_READY_TIMEOUT_SECONDS = 120   # 自证按条件等子进程起来的上限；到点不报错，照原判据接着判
 HEAVY_TEST_VARIABLE = "SINGLEFS_HEAVY_TESTS"
 HEAVY_TEST_OCCASIONS = ("commit", "user-request")
 HEAVY_TEST_ALERT = "重型测试没带前缀"
@@ -914,8 +1139,9 @@ def agent_alerts(transcript, now, thresholds):
     # 2026-09-19 实测：同一个执行员被续派三次（第一段、补判、第二段），上下文涨到 95 万，平均每次调用 62.6 万、累计读缓存 2.36 亿，
     # 真正的输出只有 2.9 万——没有任何告警，是用户问起才看见的。
     # 这条只叫主 agent 来看，不是停的理由（用户同日：「不应该限制 280K……应该告诉主 agent 看看任务是不是异常，如果不是就继续跑」）。
-    # 只对实现员与执行员报「该交接」：它们的定义要求上下文过 60 万就停在能交接的点交回，到这条线还没交回就是没照做；别的类型不报
-    if (BROKEN_DETECTION != "context" and transcript.last_context_tokens >= thresholds.context_tokens
+    # 只对实现员与执行员报「该交接」，别的类型不报；线写 0 不报（子 agent 上下文多大都不交回）
+    if (BROKEN_DETECTION != "context" and (thresholds.context_tokens > 0 or BROKEN_DETECTION == "contextzero")
+            and transcript.last_context_tokens >= thresholds.context_tokens
             and (transcript.agent_type in HANDOVER_AGENT_TYPES or BROKEN_DETECTION == "handoveranytype")):
         heaviest = sorted(transcript.tool_result_characters.items(), key=lambda item: item[1][1], reverse=True)[:HANDOVER_TOP_OUTPUTS_SHOWN]
         heaviest_text = "、".join(f"{category} {count} 次共 {characters // 1000}k 字" for category, (count, characters) in heaviest) or "没数到工具结果"
@@ -1261,7 +1487,7 @@ def is_watchdog_process(arguments):
 
 def is_sample_selftest_process(arguments):
     """样本自检：参数里有一个是 stage-selftest.sh（按文件名认），或有一个恰好是 --selftest。它自己照判，它底下整棵不判：
-    stage-selftest.sh 在临时目录里带 --force 拿样本起 54 号与 checker-tier-* 那几道重型阶段，`--selftest` 建的临时仓里起 gate.sh，都不是真在跑的重型测试。"""
+    stage-selftest.sh 在临时目录里带 --force 拿样本起 checker-tier-layer0-replay 与 checker-tier-* 那几道重型阶段，`--selftest` 建的临时仓里起 gate.sh，都不是真在跑的重型测试。"""
     return any(argument == "--selftest" or os.path.basename(argument) == "stage-selftest.sh" for argument in arguments)
 
 
@@ -1317,6 +1543,98 @@ def owners_by_background_output(pids, table, session_dirs, stop_at_pid):
     return owners
 
 
+# 「重型测试没带前缀」里登记成轻的自证（文件头那一段）：`<名>.sh --selftest` exec 进同目录 `<名>-selftest.sh` 本体的，本体按 `<名>.sh` 的登记判
+SELFTEST_BODY_SUFFIX = "-selftest"
+# 自证的临时目录：临时根下一层、名字像 mktemp（tmp.XXXXXXXXXX）或 python 的 mkdtemp（tmpXXXXXXXX）起的
+SELFTEST_TEMPORARY_NAME = re.compile(r"^tmp\.?[A-Za-z0-9_]{6,}$")
+
+
+def process_environment(pid):
+    """/proc/<pid>/environ 读成 {变量: 值}；读不到抛 OSError。"""
+    with open(f"/proc/{pid}/environ", "rb") as handle:
+        entries = handle.read().split(b"\0")
+    environment = {}
+    for entry in entries:
+        name, separator, value = entry.partition(b"=")
+        if separator:
+            environment[name.decode("utf-8", "replace")] = value.decode("utf-8", "replace")
+    return environment
+
+
+def launched_script(library, arguments):
+    """进程起的是哪个脚本：(命令词, 它的参数)。bash / sh 这类与 python 起的取解释器后面那个脚本，直接执行的取 argv[0]；
+    bash -c、python -c / -m、从标准输入读的交 (None, [])。"""
+    shell_words = library.shell_words
+    name = os.path.basename(arguments[0])
+    if name in shell_words.SHELL_NAMES:
+        invocation = shell_words.shell_invocation(arguments[1:])
+        if invocation.code_string is not None or invocation.script_index is None:
+            return None, []
+    elif shell_words.PYTHON_NAME.match(name):
+        invocation = shell_words.python_invocation(arguments[1:])
+        if invocation.code_string is not None or invocation.module is not None or invocation.script_index is None:
+            return None, []
+    else:
+        return arguments[0], arguments[1:]
+    index = invocation.script_index + 1
+    if index >= len(arguments):
+        return None, []
+    return arguments[index], arguments[index + 1:]
+
+
+def registered_light_selftest(library, arguments, directory, environment):
+    """这个进程是不是登记成轻的自证：起的脚本照 lib_heavy_tests.py 的 classify_selftest 判（同一份登记表，命令词要解到本仓那一份），
+    登记成 light、或 heavy-if-set:<变量> 而 environment 里那个变量没设。`<名>-selftest.sh` 本体不带参数时另按同目录 `<名>.sh --selftest` 判，
+    `<名>.sh` 的正文里要写着本体的文件名（它 exec 进本体）。是就交一句说明，不是交 None。"""
+    if BROKEN_DETECTION == "heavyselftestancestor":
+        return None
+    word, rest = launched_script(library, arguments)
+    if not word:
+        return None
+    if BROKEN_DETECTION == "heavyselftestcondition":
+        environment = {}
+    candidates = [(word, rest, None)]
+    stem, extension = os.path.splitext(word)
+    if stem.endswith(SELFTEST_BODY_SUFFIX) and not rest:
+        candidates.append((stem[: -len(SELFTEST_BODY_SUFFIX)] + extension, ["--selftest"], word))
+    for candidate, candidate_arguments, body in candidates:
+        if BROKEN_DETECTION == "heavyselftestanycopy":
+            key = library.selftest_registry_key(candidate, directory)
+            if key is not None:
+                candidate = os.path.join(library.SELFTEST_REGISTRY_ROOT, key)
+        is_selftest, test = library.classify_selftest(candidate, candidate_arguments, directory, environment)
+        if not is_selftest or test is not None:
+            continue
+        if body is None:
+            return " ".join([word, *rest])
+        front = library.shell_words.resolve_path(directory, os.path.expanduser(candidate))
+        try:
+            with open(front, encoding="utf-8", errors="replace") as handle:
+                if os.path.basename(body) in handle.read():
+                    return f"{body}（{candidate} --selftest exec 进来的本体）"
+        except (OSError, TypeError):
+            continue
+    return None
+
+
+def process_paths(pid, arguments):
+    """进程参数里的绝对路径与它的当前目录（都 normpath 过）；当前目录读不到就不算它。"""
+    paths = [os.path.normpath(argument) for argument in arguments if argument.startswith("/")]
+    try:
+        paths.append(os.path.normpath(os.readlink(f"/proc/{pid}/cwd")))
+    except OSError:
+        pass
+    return paths
+
+
+def selftest_temporary_root(path, temporary_base):
+    """path 落在临时根下一层名字像 mktemp / mkdtemp 起的目录里时交那一层（临时根/tmp.XXXX），不是交 None。"""
+    if not path.startswith(temporary_base.rstrip("/") + "/"):
+        return None
+    top = path[len(temporary_base.rstrip("/")) + 1:].split("/", 1)[0]
+    return os.path.join(temporary_base, top) if SELFTEST_TEMPORARY_NAME.match(top) else None
+
+
 def heavy_test_report(root_pid, excluded_pids, session_dirs):
     """这个 Claude 实例底下在跑的重型测试没带 SINGLEFS_HEAVY_TESTS=commit 或 =user-request（判法见文件头）：返回 (报告行, [(告警名, 说明, 下一步)])。"""
     if BROKEN_DETECTION == "heavyscan":
@@ -1329,21 +1647,35 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
     for pid, info in table.items():
         children.setdefault(info["parent"], []).append(pid)
     flagged, judgement_errors = {}, []   # flagged：进程号 → (认出的重型用法, SINGLEFS_HEAVY_TESTS 的值)
-    # frontier 里每项是 (进程号, 它或它的上层是不是样本自检)：样本自检底下的进程不判（判法见文件头「重型测试没带前缀」）
-    examined, shell_layers, under_sample_selftest, frontier = 0, 0, 0, [(root_pid, False)]
+    # frontier 里每项是 (进程号, 它或它的上层是不是样本自检, 它或它的上层里最近的登记成轻的自证的进程号)：这两类底下的进程不判（判法见文件头「重型测试没带前缀」）
+    examined, shell_layers, under_sample_selftest, frontier = 0, 0, 0, [(root_pid, False, None)]
+    under_registered_selftest, registered_selftest_members = 0, {}   # 登记成轻的自证的进程号 → 它底下的进程号
     while frontier:
-        parent, below_sample_selftest = frontier.pop()
+        parent, below_sample_selftest, selftest_owner = frontier.pop()
         for child in sorted(children.get(parent, [])):
             arguments = process_arguments(child)
             if arguments and is_watchdog_process(arguments) and BROKEN_DETECTION != "heavywatchdog":
                 continue   # 别的看门狗与它的自检：整棵不扫
+            owner = selftest_owner
+            if owner is None and arguments and child not in excluded_pids and table[child]["state"] not in EXITED_PROCESS_STATES:
+                try:
+                    if registered_light_selftest(library, arguments, os.readlink(f"/proc/{child}/cwd"), process_environment(child)):
+                        owner = child   # 它自己照判，它底下整棵不判
+                except OSError:
+                    pass   # 刚退出、权限不够：不当自证
+                except Exception as error:   # 共用判定自己的 bug：写进报告，这个进程不当自证
+                    judgement_errors.append(f"  进程 {child} 没判成是不是登记成轻的自证（{type(error).__name__}：{error}）：{command_for_display(table[child]['command'])[:100]}")
             frontier.append((child, below_sample_selftest or (bool(arguments) and is_sample_selftest_process(arguments)
-                                                              and BROKEN_DETECTION != "heavysampleselftest")))
+                                                              and BROKEN_DETECTION != "heavysampleselftest"), owner))
             if child in excluded_pids or table[child]["state"] in EXITED_PROCESS_STATES or not arguments:
                 continue
             examined += 1
             if below_sample_selftest:
                 under_sample_selftest += 1
+                continue
+            if selftest_owner is not None:
+                under_registered_selftest += 1
+                registered_selftest_members.setdefault(selftest_owner, []).append((child, arguments))
                 continue
             if is_shell_code_string_process(library, arguments) and BROKEN_DETECTION != "heavywrapper":
                 shell_layers += 1
@@ -1351,7 +1683,7 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
             try:
                 directory = os.readlink(f"/proc/{child}/cwd")
                 tests = library.classify_process(arguments, directory)
-                # 「提交时才跑的检查」（不重型的门禁阶段、上游几道 lint、研究脚本与钩子的自证）不在进程这一层报：执行前的闸 heavy-test-guard.sh 拒，
+                # 「提交时才跑的检查」（不重型的门禁阶段、上游几道 lint、登记表外或登记为 heavy 的自证）不在进程这一层报：执行前的闸 heavy-test-guard.sh 拒，
                 # 收工钩子 gate-reuse-check.sh 每次收工起的 gate-overlap.py 也是这一类，在这里报就是每次收工叫醒一次（文件头「重型测试没带前缀」）
                 if BROKEN_DETECTION != "heavycommitcheck":
                     tests = [test for test in tests if test.kind not in getattr(library, "COMMIT_CHECK_KINDS", frozenset())]
@@ -1361,6 +1693,30 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
                 continue   # 刚退出、权限不够：跳过不报
             except Exception as error:   # 共用判定自己的 bug：这一个进程没判成，写进报告，别的照判
                 judgement_errors.append(f"  进程 {child} 没判成（{type(error).__name__}：{error}）：{command_for_display(table[child]['command'])[:100]}")
+    # 登记成轻的自证的临时目录：它底下进程的参数与当前目录里出现过的、临时根（它环境里的 TMPDIR，没有是 /tmp）下一层像 mktemp 起的那一层；
+    # 不在它底下、参数里的路径或当前目录落在里面的重型进程不报（文件头「重型测试没带前缀」）
+    selftest_temporary_roots = set()
+    for owner, members in registered_selftest_members.items():
+        try:
+            temporary_base = os.path.normpath(process_environment(owner).get("TMPDIR") or "/tmp")
+        except OSError:
+            continue
+        for member, member_arguments in members:
+            for path in process_paths(member, member_arguments):
+                root = selftest_temporary_root(path, temporary_base)
+                if root is not None:
+                    selftest_temporary_roots.add(root)
+    in_selftest_temporary = 0
+    for pid in sorted(flagged):
+        paths = process_paths(pid, process_arguments(pid) or [])
+        if BROKEN_DETECTION == "heavyselftestpathonly":
+            inside = any(SELFTEST_TEMPORARY_NAME.match(part) for path in paths for part in path.split("/"))
+        else:
+            inside = BROKEN_DETECTION != "heavyselftesttemporary" and any(
+                path == root or path.startswith(root + "/") for path in paths for root in selftest_temporary_roots)
+        if inside:
+            del flagged[pid]
+            in_selftest_temporary += 1
 
     def descendants_of(pid):
         found, stack = set(), [pid]
@@ -1419,7 +1775,8 @@ def heavy_test_report(root_pid, excluded_pids, session_dirs):
                        f"要停就从最底层往上逐个停整棵子进程，按这个次序逐个跑 `{PROCESS_STOP_COMMAND} <进程号>`：{shown}；"
                        f"或者给归属的那个子 agent 发消息让它自己停；判定接着跑就 --ack 进程:{pid}"))
     summary = (f"{HEAVY_TEST_ALERT}：查了这个 Claude 实例底下 {examined} 个进程（其中 bash -c 那一层 {shell_layers} 个不单判，"
-               f"样本自检底下 {under_sample_selftest} 个不判），"
+               f"样本自检底下 {under_sample_selftest} 个不判，登记成轻的自证底下 {under_registered_selftest} 个不判、"
+               f"不在它底下而路径落在它临时目录里的 {in_selftest_temporary} 个不报），"
                f"认出重型 {len(flagged)} 个、带前缀的 {len(prefixed)} 个，报 {len(alerts)} 条")
     return [summary, *judgement_errors], alerts
 
@@ -1504,6 +1861,15 @@ def command_for_display(command):
     return " ".join(shown.split())
 
 
+def mark_selftest_ready():
+    """只给自证用：环境里有 AGENT_WATCH_SELFTEST_READY_FILE 时，看门狗第一次进两次整查之间的等待前建这个文件
+    （这时已取完检出偏移、拿到单例锁、记下要盯的进程、做完第一次整查）。自证按它等看门狗起来，不按固定秒数等：
+    负载高时 python 起得慢，固定等 1.5、2 秒的格会赶在看门狗起来之前动手。平时不设这个变量，什么都不做。"""
+    path = os.environ.get(SELFTEST_READY_VARIABLE)
+    if path and not os.path.exists(path):
+        open(path, "a").close()
+
+
 def processes_to_watch(root_pid, excluded_pids):
     """--processes-only 盯的进程：{进程号: 起始时刻}。这个实例底下整棵子树，不只叶子；
     看门狗自己那一支、COMMAND_MARKERS_NOT_WATCHED、已经退出的（僵尸）不算，它们的子孙照样往下找。"""
@@ -1584,13 +1950,15 @@ def run_processes_only(arguments, process_root_pid, excluded_pids):
         if time.time() >= report_deadline:
             print_report(lines, alerts)
             print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警，盯着的进程还有 {len(running)} 个没退出。")
-            print("   → 接着盯就再起一个看门狗 --processes-only")
+            print("   → 接着盯就用 run_in_background 再起一个看门狗："
+                  f"{'--processes-only' if BROKEN_DETECTION == 'restarthint' else 'bash research/scripts/watch.sh --processes'}")
             return 4
         next_check_in = min(arguments.interval_seconds, report_deadline - time.time())
         if leftover_pending_until is not None:
             next_check_in = min(next_check_in, leftover_pending_until.timestamp() + 1 - time.time())
         # 两次整查之间每隔 --detection-poll-seconds 单查一遍常驻内存，过线就提前整查（整查那一次报告警、退 3）
         next_full_check = time.time() + max(0.0, next_check_in)
+        mark_selftest_ready()
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(0.0, next_full_check - time.time())))
             if memory_alarm_between_checks(process_root_pid, excluded_pids, arguments):
@@ -1723,11 +2091,20 @@ def print_report(lines, alerts):
         print("没有告警。")
 
 
-def print_active_list(active_ids, unstarted_ids):
+def restart_command(active_ids, unstarted_ids, discover):
+    """出路句里照抄就能起的那条命令：主 agent 经 watch.sh 起看门狗，它不认 agent-watch.py 自己的 --agents / --processes-only。"""
+    if BROKEN_DETECTION == "restarthint":
+        return f"--agents {','.join(active_ids + unstarted_ids)}"
+    if discover:
+        return "bash research/scripts/watch.sh"
+    return f"bash research/scripts/watch.sh {','.join(active_ids + unstarted_ids)}"
+
+
+def print_active_list(active_ids, unstarted_ids, discover=False):
     if not active_ids and not unstarted_ids:
         return
     print(f"还没交回、没被停的子 agent（{len(active_ids)} 个，另有还没会话记录的 {len(unstarted_ids)} 个）：{','.join(active_ids + unstarted_ids)}")
-    print(f"   → 接着盯就再起一个看门狗 --agents {','.join(active_ids + unstarted_ids)}")
+    print(f"   → 接着盯就用 run_in_background 再起一个看门狗：{restart_command(active_ids, unstarted_ids, discover)}")
 
 
 def own_process_chain(table, start_pid):
@@ -1943,7 +2320,7 @@ def run(arguments):
             return 3 if alerts else 0
         if alerts:
             print_report(lines, alerts)
-            print_active_list(*active_lists)
+            print_active_list(*active_lists, discover)
             return 3
         # 全部交回照旧退出，这一次 build_report 已经把「交回之后后台还在跑」查过了；只剩宽限里的，等宽限过了再查一次才退
         if all_done and (leftover_pending_until is None or BROKEN_DETECTION == "leftoverexit"):
@@ -1953,13 +2330,14 @@ def run(arguments):
         if time.time() >= report_deadline:
             print_report(lines, alerts)
             print(f"定时回报：已经看了 {arguments.max_minutes:g} 分钟，没有告警。")
-            print_active_list(*active_lists)
+            print_active_list(*active_lists, discover)
             return 4
         next_full_check = time.time() + arguments.interval_seconds
         if BROKEN_DETECTION != "deadline":
             next_full_check = min(next_full_check, report_deadline)
         if all_done:
             next_full_check = min(next_full_check, leftover_pending_until.timestamp() + 1)
+        mark_selftest_ready()
         while time.time() < next_full_check:
             time.sleep(min(arguments.detection_poll_seconds, max(next_full_check - time.time(), 0)))
             detections_offset, detection_alerts, new_notes = read_detections(
@@ -1975,7 +2353,7 @@ def run(arguments):
                     lines = lines + detection_notes + [f"已确认接着盯（--ack {subject}:{name}）：{explanation}"
                                                        for subject, name, explanation, _ in acknowledged]
                     print_report(lines, alerts)
-                    print_active_list(*active_lists)
+                    print_active_list(*active_lists, discover)
                     return 3
 
 
@@ -2037,6 +2415,21 @@ def handback_records(minutes_ago, tool_id, message_id):
                       stop_reason="tool_use", message_id=message_id, usage={"input_tokens": 10, "cache_read_input_tokens": 1000}),
             record_at(minutes_ago - 0.1, "user", [{"type": "tool_result", "tool_use_id": tool_id,
                                                    "content": [{"type": "text", "text": '{"success":true,"message":"Report delivered to your caller."}'}]}])]
+
+
+def wait_until(condition, timeout_seconds=SELFTEST_READY_TIMEOUT_SECONDS):
+    """自证按条件等（子进程起到要测的样子），不按固定秒数等：条件成立回 True，到点回 False，调用方照原判据接着判。"""
+    deadline = time.time() + timeout_seconds
+    while not condition():
+        if time.time() >= deadline:
+            return False
+        time.sleep(0.05)
+    return True
+
+
+def wait_for_selftest_ready(ready_path, watcher, timeout_seconds=SELFTEST_READY_TIMEOUT_SECONDS):
+    """等自证拉起的看门狗建就绪文件（mark_selftest_ready）：建了回 True；看门狗先退了或到点回 False，调用方照原判据接着判。"""
+    return wait_until(lambda: os.path.exists(ready_path) or watcher.poll() is not None, timeout_seconds) and os.path.exists(ready_path)
 
 
 def selftest_leftover_background(work, thresholds, failures, watch_runs, probed_processes):
@@ -2110,10 +2503,17 @@ def selftest_leftover_background(work, thresholds, failures, watch_runs, probed_
         stop_holder("leftovergrace")
 
         def run_leftover_watch(agent_ids, session_directory, extra_arguments, timeout=60):
+            """看门狗到 timeout 秒还没退：不抛出去，退出码记成「超时（N 秒没退出）」交回，那一格照原判据判红、打 ✗ 行，别的格接着跑。"""
             watch_runs.append(["leftover", agent_ids, *extra_arguments])
-            return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", agent_ids, "--session-dir", session_directory,
-                                   "--process-root-pid", "0", "--interval-seconds", "1", "--max-minutes", "1", *extra_arguments],
-                                  capture_output=True, text=True, timeout=timeout)
+            try:
+                return subprocess.run([sys.executable, os.path.abspath(__file__), "watch", "--agents", agent_ids, "--session-dir", session_directory,
+                                       "--process-root-pid", "0", "--interval-seconds", "1", "--max-minutes", "1", *extra_arguments],
+                                      capture_output=True, text=True, timeout=timeout)
+            except subprocess.TimeoutExpired as expired:
+                partial = expired.stdout or ""
+                if isinstance(partial, bytes):
+                    partial = partial.decode("utf-8", errors="replace")
+                return subprocess.CompletedProcess(expired.cmd, f"超时（{timeout} 秒没退出）", partial, "")
 
         handed_back_pid = wanted_alerting["leftoverhandedback"]
         wanted_alert_line = f"⚠️ {LEFTOVER_BACKGROUND_ALERT}（leftoverhandedback）：进程 {handed_back_pid} 已跑 "
@@ -2159,7 +2559,9 @@ def selftest_pipe_upstream(work, thresholds, failures, probed_processes):
     """管道尾在等上游：上游在算（只涨 CPU、不写管道）的不报「进程无输出」、报一行「在等上游」；上游睡着的、写端只在自己祖先手里的照报。
     管道尾的输出文件一小时没动，形状照 2026-09-24 被误报的 `cargo test … 2>&1 | tail -30`。返回查了几个管道。"""
     pipelines = {}
-    for label, upstream_command in (("busy", [sys.executable, "-c", "import time\ndeadline = time.time() + 60\nwhile time.time() < deadline:\n    pass\n"]),
+    busy_ready = os.path.join(work, "pipe-busy-ready")   # 在算的上游进了忙等就建它：起来之前它的 CPU 不涨
+    for label, upstream_command in (("busy", [sys.executable, "-c", f"import time\nopen({busy_ready!r}, 'w').close()\n"
+                                                                    "deadline = time.time() + 60\nwhile time.time() < deadline:\n    pass\n"]),
                                     ("sleeping", ["sleep", "60"])):
         tail_output = os.path.join(work, f"pipe-{label}-tail.log")
         with open(tail_output, "a") as tail_handle:
@@ -2177,7 +2579,10 @@ def selftest_pipe_upstream(work, thresholds, failures, probed_processes):
         ancestor_fed = subprocess.Popen(["tail", "-1"], stdin=subprocess.PIPE, stdout=tail_handle, stderr=subprocess.DEVNULL)
     probed_processes.append(ancestor_fed)
     try:
-        time.sleep(4)
+        # 按条件等在算的上游进了忙等，再补足 4 秒（「进程无输出」要已跑 3 秒）：负载高时 python 起得慢，固定等 4 秒时它可能还没起来
+        pipes_started = time.time()
+        wait_until(lambda: os.path.exists(busy_ready))
+        time.sleep(max(0.0, 4 - (time.time() - pipes_started)))
         process_lines, found = process_alerts(os.getpid(), set(), thresholds)
         busy_upstream, busy_reader = pipelines["busy"]
         sleeping_upstream, sleeping_reader = pipelines["sleeping"]
@@ -2280,11 +2685,23 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
         start("带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay", ["bash", selftest_runner, "--selftest", sample_stage])
         start("不带前缀直接起的 checker-tier-crates-mutation-replay", ["bash", sample_stage, sample_tree])
         start("不带前缀直接起的不重型门禁阶段", ["bash", sample_light_stage, sample_tree])
-        time.sleep(1.5)   # 等 timeout 起子进程、sh 起 sleep、假看门狗起它的假重型进程
-        table = process_table()
+        # 按条件等孙辈起来（timeout 起 sh、sh 起 sleep，假看门狗起它的假重型进程，两个样本自检起底下那一道，bash -c 起 sleep），不按固定秒数：
+        # 负载高时等 1.5 秒不够，孙辈还没起，停止次序与「样本自检底下不判」的数就对不上
+        table = {}
 
         def children_of(pid):
             return sorted(child for child, info in table.items() if info["parent"] == pid)
+
+        def grandchildren_started():
+            table.clear()
+            table.update(process_table())
+            timeout_children = children_of(started["timeout 包着没带前缀的"].pid)
+            return (bool(timeout_children) and bool(children_of(timeout_children[0]))
+                    and all(children_of(started[label].pid) for label in (
+                        "另一个看门狗的自检底下没带前缀的", "stage-selftest.sh 拿样本起的 checker-tier-crates-mutation-replay",
+                        "带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay", "bash -c 里带前缀、还没起")))
+
+        wait_until(grandchildren_started)
 
         timeout_pid = started["timeout 包着没带前缀的"].pid
         script_pid = (children_of(timeout_pid) or [None])[0]
@@ -2358,6 +2775,124 @@ def selftest_heavy_tests(work, failures, probed_processes, watch_runs):
     return len(started)
 
 
+def selftest_heavy_selftest_tree(work, failures, probed_processes):
+    """「重型测试没带前缀」里登记成轻的自证（文件头那一段）的自检：造一个仓根与一份登记表（lib_heavy_tests.py 的 selftest_registry_swapped 换过去），
+    登记 research/scripts/sample-shard-run.sh 为 heavy-if-set:SAMPLE_REAL_TOOLS；它带 --selftest 时 exec 进同目录 sample-shard-run-selftest.sh 本体，
+    本体 mktemp 建临时仓、在里面起双机分片驱动 layer0-shard-run.sh（只是睡；树根里没有 stage-inputs.tsv，lib_heavy_tests.py 照重型算）。五格：
+    自证父进程 + 它临时仓里的驱动 ⇒ 不报；没有自证祖先的同一条驱动命令（另一个临时仓）⇒ 报；设了 SAMPLE_REAL_TOOLS 的同一份自证底下 ⇒ 报；
+    仓副本里路径尾部相同的自证底下 ⇒ 报；不在自证底下、路径落在第一格那份自证临时目录里的驱动 ⇒ 不报；另核报告那一行写出两类各几个。返回起了几个进程。"""
+    library, problem = heavy_tests_library()
+    if library is None:
+        failures.append(f"登记成轻的自证那几格判不了：{problem}")
+        return 0
+    base = os.path.join(work, "selftest-tree")
+    temporary_base = os.path.join(base, "tmp-base")
+    registered_root, copy_root = os.path.join(base, "registered"), os.path.join(base, "copy")
+    os.makedirs(temporary_base)
+    front_text = '[[ "${1:-}" != --selftest ]] || exec bash "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/sample-shard-run-selftest.sh"\nexit 0\n'
+    body_text = ('work="$(mktemp -d)"\n'
+                 'mkdir -p "$work/repository/research/scripts"\n'
+                 "printf 'sleep 60\\n' > \"$work/repository/research/scripts/layer0-shard-run.sh\"\n"
+                 "printf '%s\\n' \"$work\" > \"$SAMPLE_SELFTEST_TREE_READY\"\n"
+                 'bash "$work/repository/research/scripts/layer0-shard-run.sh" crash-case:sharded-selftest "$work/repository"\n')
+    for root in (registered_root, copy_root):
+        scripts = os.path.join(root, "research", "scripts")
+        os.makedirs(scripts)
+        for name, text in (("sample-shard-run.sh", front_text), ("sample-shard-run-selftest.sh", body_text)):
+            with open(os.path.join(scripts, name), "w") as handle:
+                handle.write(text)
+    registry = os.path.join(base, "selftest-registry.tsv")
+    with open(registry, "w") as handle:
+        handle.write("research/scripts/sample-shard-run.sh\theavy-if-set:SAMPLE_REAL_TOOLS\t# 看门狗自检：--selftest exec 进本体，本体在 mktemp 临时仓里起驱动\n")
+    clean_environment = {key: value for key, value in os.environ.items() if key not in (HEAVY_TEST_VARIABLE, "SAMPLE_REAL_TOOLS")}
+    clean_environment["TMPDIR"] = temporary_base
+    started, ready_files = {}, {}
+
+    def start(label, argv, extra=None):
+        started[label] = subprocess.Popen(argv, env=dict(clean_environment, **(extra or {})), cwd=work, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        probed_processes.append(started[label])
+
+    def start_selftest(label, root, extra=None):
+        ready_files[label] = os.path.join(base, f"ready-{len(ready_files)}")
+        start(label, ["bash", os.path.join(root, "research", "scripts", "sample-shard-run.sh"), "--selftest"],
+              dict(extra or {}, SAMPLE_SELFTEST_TREE_READY=ready_files[label]))
+
+    def driver_command(tree):
+        repository = os.path.join(tree, "repository")
+        return ["bash", os.path.join(repository, "research", "scripts", "layer0-shard-run.sh"), "crash-case:sharded-selftest", repository]
+
+    table = {}
+
+    def driver_under(pid):
+        """pid 底下那个双机分片驱动（bash 起的 layer0-shard-run.sh，它底下的 sleep 也起了才算）的进程号；还没起是 None。"""
+        for child, info in table.items():
+            if info["parent"] == pid and "layer0-shard-run.sh" in info["command"] and any(other["parent"] == child for other in table.values()):
+                return child
+        return None
+
+    def selftests_running():
+        table.clear()
+        table.update(process_table())
+        return all(os.path.exists(ready_files[label]) and driver_under(started[label].pid) for label in ready_files)
+
+    try:
+        start_selftest("登记成轻的自证", registered_root)
+        start_selftest("设了 SAMPLE_REAL_TOOLS 的自证", registered_root, {"SAMPLE_REAL_TOOLS": "1"})
+        start_selftest("仓副本里的自证", copy_root)
+        standalone_tree = tempfile.mkdtemp(dir=temporary_base)
+        os.makedirs(os.path.join(standalone_tree, "repository", "research", "scripts"))
+        with open(os.path.join(standalone_tree, "repository", "research", "scripts", "layer0-shard-run.sh"), "w") as handle:
+            handle.write("sleep 60\n")
+        start("没有自证祖先的驱动", driver_command(standalone_tree))
+        wait_until(selftests_running)
+        with open(ready_files["登记成轻的自证"]) as handle:
+            selftest_temporary = handle.read().strip()
+        start("落在自证临时目录里、不在它底下的驱动", driver_command(selftest_temporary))
+        wait_until(lambda: any(info["parent"] == started["落在自证临时目录里、不在它底下的驱动"].pid for info in process_table().values()))
+        drivers = {label: driver_under(started[label].pid) for label in ready_files}
+        drivers["没有自证祖先的驱动"] = started["没有自证祖先的驱动"].pid
+        drivers["落在自证临时目录里、不在它底下的驱动"] = started["落在自证临时目录里、不在它底下的驱动"].pid
+        with library.selftest_registry_swapped(registry, registered_root):
+            lines, found = heavy_test_report(os.getpid(), set(), set())
+        alerted = {}
+        for name, explanation, _ in found:
+            reported = re.match(r"进程 (\d+) ", explanation)
+            if name == HEAVY_TEST_ALERT and reported:
+                alerted[int(reported.group(1))] = explanation
+        shown = f"驱动 {drivers}，自证 {({label: started[label].pid for label in ready_files})}，实际报了 {sorted(alerted)}，报告：{lines}"
+        if drivers["登记成轻的自证"] in alerted or started["登记成轻的自证"].pid in alerted or drivers["登记成轻的自证"] is None:
+            failures.append(f"登记成轻的自证（exec 进本体）底下、它临时仓里起的双机分片驱动不该报，本体自己也不该报：{shown}")
+        if drivers["没有自证祖先的驱动"] not in alerted:
+            failures.append(f"没有自证祖先、同一条双机分片驱动命令应当报：{shown}")
+        if drivers["设了 SAMPLE_REAL_TOOLS 的自证"] not in alerted:
+            failures.append(f"设了 SAMPLE_REAL_TOOLS 的同一份自证（heavy-if-set）底下的驱动应当报：{shown}")
+        if drivers["仓副本里的自证"] not in alerted:
+            failures.append(f"仓副本里路径尾部相同的自证底下的驱动应当报：{shown}")
+        if drivers["落在自证临时目录里、不在它底下的驱动"] in alerted:
+            failures.append(f"不在自证底下、路径落在登记成轻的自证临时目录里的驱动不该报：{shown}")
+        if not any(re.search(r"登记成轻的自证底下 [1-9]\d* 个不判、不在它底下而路径落在它临时目录里的 [1-9]\d* 个不报", line) for line in lines):
+            failures.append(f"报告那一行应当写出登记成轻的自证底下不判、它临时目录里不报的进程数（这里各至少 1 个），实际 {lines}")
+    finally:
+        # 只停自己起的进程连同它们的子孙（exec 之后的本体、本体起的驱动、驱动起的 sleep）：先记下整棵子树，子孙先停
+        table = process_table()
+        subtree_pids = []
+        for process in started.values():
+            stack = [process.pid]
+            while stack:
+                pid = stack.pop()
+                if pid in table:
+                    subtree_pids.append(pid)
+                    stack.extend(child for child, info in table.items() if info["parent"] == pid)
+        for pid in reversed(subtree_pids):
+            try:
+                os.kill(pid, signal.SIGKILL)
+            except OSError:
+                pass
+        for process in started.values():
+            process.wait()
+    return len(started)
+
+
 def selftest_memory(work, failures, probed_processes, watch_runs):
     """「进程常驻内存过线」的自检：拿自检进程当 Claude 实例，阈值压到 0.125 GiB。
     一个写满 256 MiB 的进程报（归属认出开着输出文件的子 agent memowner）、一个只睡的小进程不报，阈值 0 不查；
@@ -2382,7 +2917,7 @@ def selftest_memory(work, failures, probed_processes, watch_runs):
         probed_processes.append(process)
         return process
 
-    def wait_until_resident(process, minimum_bytes, timeout_seconds=20):
+    def wait_until_resident(process, minimum_bytes, timeout_seconds=60):
         deadline = time.time() + timeout_seconds
         while time.time() < deadline:
             resident = resident_memory_bytes(process.pid)
@@ -2401,7 +2936,7 @@ def selftest_memory(work, failures, probed_processes, watch_runs):
             hog = start([sys.executable, "-c", hog_code], stdout=output_handle)
         small = start([sys.executable, "-c", "import time\ntime.sleep(120)\n"])
         if not wait_until_resident(hog, 200 * 1024 * 1024):
-            failures.append(f"写满 256 MiB 的进程 {hog.pid} 20 秒里常驻内存没到 200 MiB，这一段自检没法判")
+            failures.append(f"写满 256 MiB 的进程 {hog.pid} 60 秒里常驻内存没到 200 MiB，这一段自检没法判")
             return len(started)
         lines, found = memory_report(os.getpid(), set(), {memory_session}, thresholds)
         alerted = alerted_pids(found)
@@ -2437,20 +2972,24 @@ def selftest_memory(work, failures, probed_processes, watch_runs):
                             f"实际退出码 {acknowledged_run.returncode}，输出：{acknowledged_run.stdout[-500:]}")
         hog.kill()
         hog.wait()
-        # 两次整查之间的单查：复检间隔 240 秒、回报时刻 30 秒，过线进程在看门狗起了 6 秒之后才冒出来（第一次整查里等后台任务那一节要取两秒 CPU 样，
-        # 冒得早了会被第一次整查直接看见，判不出单查），应当几秒之内叫醒（单查坏了就要等到 30 秒那次整查）
+        # 两次整查之间的单查：复检间隔 240 秒，过线进程在看门狗做完第一次整查之后才冒出来（按它建的就绪文件等，不按固定秒数：
+        # 冒得早了会被第一次整查直接看见，判不出单查），应当由单查叫醒、在回报时刻那次整查之前退出（单查坏了就要等到那次整查）。
+        # 回报时刻 90 秒、按就绪文件等：负载高时 python 起得慢，原先「起了 6 秒之后冒出来、20 秒内退」两头都会被起动时间吃掉
+        late_watch_seconds = 90
         for label, extra in (("--processes-only", ["--processes-only"]), ("--agents", ["--agents", "memowner"])):
             watch_runs.append(["memory", label, "单查"])
+            late_ready = os.path.join(work, f"ready-memory-{label.strip('-')}")
+            watch_started = time.time()
             watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--process-root-pid", str(os.getpid()),
                                         "--session-dir", memory_session, "--process-rss-gibibytes", "0.125", "--interval-seconds", "240",
-                                        "--detection-poll-seconds", "0.5", "--max-minutes", "0.5", *extra],
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            watch_started = time.time()
-            time.sleep(6)
+                                        "--detection-poll-seconds", "0.5", "--max-minutes", str(late_watch_seconds / 60), *extra],
+                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                       env=dict(os.environ, **{SELFTEST_READY_VARIABLE: late_ready}))
+            wait_for_selftest_ready(late_ready, watcher)
             late_hog = start([sys.executable, "-c", hog_code])
-            output, _ = watcher.communicate(timeout=120)
+            output, _ = watcher.communicate(timeout=late_watch_seconds + 120)
             elapsed = time.time() - watch_started
-            if watcher.returncode != 3 or f"⚠️ {MEMORY_ALERT}（进程）：进程 {late_hog.pid} " not in output or elapsed >= 20:
+            if watcher.returncode != 3 or f"⚠️ {MEMORY_ALERT}（进程）：进程 {late_hog.pid} " not in output or elapsed >= late_watch_seconds:
                 failures.append(f"看门狗 {label} 起了之后才冒出来的过线进程 {late_hog.pid} 应当由两次整查之间的单查在几秒之内叫醒（退出码 3），"
                                 f"实际退出码 {watcher.returncode}、{elapsed:.1f} 秒才退，输出：{output[-400:]}")
             late_hog.kill()
@@ -2532,15 +3071,20 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
     checks += 1
     if first.returncode != 4 or "discoveredlong" not in first.stdout or "还没交回、没被停的子 agent" not in first.stdout:
         failures.append(f"--discover 应当自己找出没结束的 discoveredlong、确认过的不叫醒、到点退 4，实际 {first.returncode}：{first.stdout[-500:]}")
+    if "   → 接着盯就用 run_in_background 再起一个看门狗：bash research/scripts/watch.sh\n" not in first.stdout:
+        failures.append(f"--discover 的出路句应当是不带 agent 号的 bash research/scripts/watch.sh（一个会话一个看门狗），实际：{first.stdout[-300:]}")
     second = discover_watch(["--max-minutes", "0.03"])
     checks += 1
     if second.returncode != 4 or "已确认接着盯（--ack discoveredlong:工具调用过长）" not in second.stdout:
         failures.append(f"--ack 应当落进状态目录、下一次起不带 --ack 也读回，实际 {second.returncode}：{second.stdout[-400:]}")
+    # 在盯的那一个拿到锁、做完第一次整查（按它建的就绪文件等，不按固定秒数）之后再起第二个；第二个查完就停它（自己起的进程号），不等它到点。
+    # 负载高时 python 起得慢：固定等 2 秒时它可能还没拿到锁，回报周期 9 秒时第二个起来之前它可能已经到点退了
+    holder_ready = os.path.join(work, "ready-discover-holder")
     holder = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--discover", "--session-dir", session, "--process-root-pid", "0",
-                               "--interval-seconds", "1", "--max-minutes", "0.15", "--detections-file", os.path.join(work, "no-detections.jsonl")],
-                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=environment)
+                               "--interval-seconds", "1", "--max-minutes", "1", "--detections-file", os.path.join(work, "no-detections.jsonl")],
+                              stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=dict(environment, **{SELFTEST_READY_VARIABLE: holder_ready}))
     try:
-        time.sleep(2)
+        wait_for_selftest_ready(holder_ready, holder)
         duplicate = discover_watch(["--ack", "attackhuge:hook 检出", "--max-minutes", "0.03"])
         checks += 1
         if duplicate.returncode != SINGLE_INSTANCE_EXIT or "已有一个看门狗在盯" not in duplicate.stdout:
@@ -2549,6 +3093,7 @@ def selftest_session_watch_in(work, session, scratch, thresholds, failures, watc
         if "attackhuge:hook 检出" not in read_acks(os.path.join(state_root, os.path.basename(session))):
             failures.append("已有一个在盯时给的 --ack 应当记进状态目录，好让在盯的那一个读到")
     finally:
+        holder.terminate()
         holder.communicate(timeout=60)
     # 会话里的子 agent 都交回了：--discover 没有要盯的，接着盯到点（新派的会接上），不退回「会话里最近动过的全部」、不报「全部交回」
     quiet_session = os.path.join(work, "session-all-done")
@@ -2654,6 +3199,10 @@ def selftest_in(work):
     # 那条调用已经死了，不许再按「工具调用过长」报（2026-09-22 三条腿续做后实测假报）。
     write_transcript(session, "stalepending", [bash_use(20, "t1", "cargo test --release", "m1"),
                                               bash_use(0.5, "t2", "cargo build", "m2")])
+    # 同一种死掉的调用，之后接的是一次跑完的工具调用（有结果）：最后一条记录是结果，不是新的发起。
+    # 上一格里最近的未完调用是 t2，挑最近那一个时 t1 显不出来，剔不剔都不报；这一格不剔掉 t1 就报「工具调用过长」。
+    write_transcript(session, "stalependingthenresult", [bash_use(20, "t1", "cargo test --release", "m1"),
+                                                        bash_use(1, "t2", "ls", "m2"), bash_result(0.9, "t2")])
     write_transcript(session, "healthy", [bash_use(0.5, "t1", "cargo build", "m1")])
     write_transcript(session, "hugecontext", [record_at(0.5, "assistant", [{"type": "tool_use", "id": "t1", "name": "Bash", "input": {"command": "cargo build"}}],
                                                         stop_reason="tool_use", message_id="m1", usage={"input_tokens": 10, "cache_read_input_tokens": 700_000})],
@@ -2803,7 +3352,7 @@ def selftest_in(work):
         "finished": set(), "healthy": set(), "boundedloop": set(), "interrupted": set(), "repeatchanging": set(), "waiting": set(), "continued": set(),
         "stoppedidle": set(), "stoppedcontinued": set(), "stoppedtwice": set(), "wokenup": set(), "resumedafterturnend": set(), "nowake": {"结束本轮却不会醒"}, "waitinglong": set(), "orphantask": {"结束本轮却不会醒"}, "heldtask": set(), "textsettled": set(), "stopsequence": set(), "textstreaming": set(),
         "toolafterhandback": set(), "movedbackground": set(), "queuedresume": {"结束本轮却不会醒"},
-        "hugecontext": {HANDOVER_ALERT}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "stalepending": set(), "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
+        "hugecontext": {HANDOVER_ALERT}, "waitloop": {"等待循环"}, "longtool": {"工具调用过长"}, "stalepending": set(), "stalependingthenresult": set(), "repeat": {"同一命令反复且输出不变"}, "banned": {"禁用命令"}, "bannedrefused": set(), "bannedold": set(), "bannedheredoc": set(), "bannedafterheredoc": {"禁用命令"}, "idle": {"无动静"},
         "inquiry61": {"跑满 1 小时要主 agent 问一次"}, "inquiry125": {"跑满 2 小时要主 agent 问一次"}, "inquiryhandedback": set(),
         "inquirymessagebefore": {"跑满 1 小时要主 agent 问一次"}, "inquirydeliveredafter": set(), "inquiryqueuedafter": set(),
         "inquirysentafter": {"工具调用过长"}, "inquiryfailed": {"结束本轮却不会醒"},
@@ -2814,6 +3363,11 @@ def selftest_in(work):
         got = {name for name, _, _ in agent_alerts(transcript, now, thresholds)}
         if got != wanted:
             failures.append(f"子 agent {agent_id}：应当告警 {sorted(wanted) or '无'}，实际 {sorted(got) or '无'}")
+    # 线写 0 不报「该交接」：同一份 70 万上下文的 hugecontext，--context-tokens 0 时一条「该交接」都不该有
+    zero_line = argparse.Namespace(**dict(vars(thresholds), context_tokens=0))
+    got_at_zero_line = {name for name, _, _ in agent_alerts(AgentTranscript("hugecontext", find_transcript("hugecontext", session)), now, zero_line)}
+    if HANDOVER_ALERT in got_at_zero_line:
+        failures.append(f"子 agent hugecontext 在 --context-tokens 0 时不该报「{HANDOVER_ALERT}」，实际 {sorted(got_at_zero_line)}")
     held_lines = background_task_processes(AgentTranscript("heldtask", find_transcript("heldtask", session)))
     if not any(f"进程 {holder.pid} 已跑" in line for line in held_lines):
         failures.append(f"结束本轮等自己的后台任务时应当列出开着那个输出文件的进程 {holder.pid}，实际 {held_lines or '一个都没列'}")
@@ -2843,12 +3397,18 @@ def selftest_in(work):
     busy_file = os.path.join(work, "busy-output.log")
     open(busy_file, "w").close()
     # 在算、只在结束时写的进程：写着的文件一小时没动，CPU 一直在涨（2026-09-19 c381-r1 攻方腿探针的形状）
+    busy_ready = os.path.join(work, "busy-ready")   # busy 开了文件、进了忙等就建它
     busy = subprocess.Popen([sys.executable, "-c", "import os, time\n"
                              f"handle = open({busy_file!r}, 'a')\nos.utime({busy_file!r}, (time.time() - 3600, time.time() - 3600))\n"
+                             f"open({busy_ready!r}, 'w').close()\n"
                              "deadline = time.time() + 30\nwhile time.time() < deadline:\n    pass\n"])
     probed_processes = [sleeper, busy]
+    probes_started = time.time()
     try:
-        time.sleep(4)
+        # 按条件等两个进程进到要测的样子（sleeper exec 成 sleep，busy 开着文件进了忙等），再补足 4 秒（「进程无输出」要已跑 3 秒）：
+        # 负载高时 python 起得慢，固定等 4 秒时 busy 可能还没开文件
+        wait_until(lambda: os.path.exists(busy_ready) and (process_arguments(sleeper.pid) or [""])[0] == "sleep")
+        time.sleep(max(0.0, 4 - (time.time() - probes_started)))
         process_lines, found = process_alerts(os.getpid(), set(), thresholds)
         if not any(name == "进程无输出" and str(sleeper.pid) in explanation for name, explanation, _ in found):
             failures.append(f"写着的文件一小时没动、CPU 也不涨的进程 {sleeper.pid} 没报「进程无输出」")
@@ -2899,9 +3459,13 @@ def selftest_in(work):
     if watched.returncode != 4 or wanted_active_line not in watched.stdout:
         failures.append(f"一个结束本轮没交回、一个已交回时看门狗应当退出码 4 并列出「{wanted_active_line}」，"
                         f"实际退出码 {watched.returncode}，输出：{watched.stdout[-300:]}")
+    # 出路句印的是 watch.sh 认得的写法（照抄能起），不是 agent-watch.py 自己的 --agents（watch.sh 退 2「不认识的选项」）
+    wanted_restart_line = "   → 接着盯就用 run_in_background 再起一个看门狗：bash research/scripts/watch.sh waiting\n"
+    if wanted_restart_line not in watched.stdout:
+        failures.append(f"定时回报的出路句应当是「{wanted_restart_line.strip()}」，实际输出：{watched.stdout[-300:]}")
     try:
         started = time.time()
-        watched = run_watch(["--agents", "waiting", "--interval-seconds", "240", "--max-minutes", "0.05"], timeout=30)
+        watched = run_watch(["--agents", "waiting", "--interval-seconds", "240", "--max-minutes", "0.05"], timeout=90)   # 坏了要等 240 秒；90 秒留给负载高时起得慢
         if watched.returncode != 4:
             failures.append(f"复检间隔 240 秒、回报周期 3 秒时看门狗应当到点退出码 4，实际 {watched.returncode}")
     except subprocess.TimeoutExpired:
@@ -2917,11 +3481,15 @@ def selftest_in(work):
             ("session", self_background, "experiment-runner", "别的子agent", 4, None),
             ("session", "写被拒", "主 agent", None, 4, "主 agent 自己的命令被 hook 拒了")):
         watch_runs.append(["--detections-file", session_label, finding_text, agent_type, agent_id])
+        # 看门狗取完检出偏移、做完第一次整查（按它建的就绪文件等，不按固定秒数）之后再写检出：负载高时 python 起得慢，
+        # 固定等 1.5 秒时它可能还没取偏移，这一条检出落在偏移之前、读不到
+        detection_ready = os.path.join(work, f"ready-detections-{len(watch_runs)}")
         watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--agents", "healthy", "--session-dir", session,
                                     "--interval-seconds", "2", "--detection-poll-seconds", "0.5", "--max-minutes", "0.12",
                                     "--process-root-pid", "0", "--detections-file", detections_file],
-                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        time.sleep(1.5)
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                   env=dict(os.environ, **{SELFTEST_READY_VARIABLE: detection_ready}))
+        wait_for_selftest_ready(detection_ready, watcher)
         with open(detections_file, "a", encoding="utf-8") as handle:
             handle.write(json.dumps({"session_id": session_label, "agent_type": agent_type, "agent_id": agent_id,
                                      "command": "pgrep -f x", "findings": [finding_text]}, ensure_ascii=False) + "\n")
@@ -2947,6 +3515,9 @@ def selftest_in(work):
     silent = subprocess.Popen(["bash", "-c", f"exec 3>>'{silent_file}'; touch -d '1 hour ago' '{silent_file}'; exec sleep 60"])
     probed_processes += [writer, silent]
     try:
+        # 按条件等：writer 写出了第一行、silent exec 成了 sleep，再起看门狗（负载高时 python 起得慢，
+        # writer 还没开文件时它写着的只有继承来的标准输出，会被当成不写的进程报「进程无输出」）
+        wait_until(lambda: os.path.isfile(writing_file) and os.path.getsize(writing_file) > 0 and (process_arguments(silent.pid) or [""])[0] == "sleep")
         writer_and_silent_run = run_process_watch(["--max-minutes", "0.5", "--process-report-minutes", "0.02", "--process-stale-minutes", "0.05",
                                      "--process-max-minutes", "600"])
         alert_lines = [line for line in writer_and_silent_run.stdout.splitlines() if line.startswith("⚠️")]
@@ -2959,13 +3530,22 @@ def selftest_in(work):
         for process in (writer, silent):
             process.kill()
             process.wait()
-    short = subprocess.Popen(["sleep", "2"])   # 自检在 subprocess.run 里等看门狗，这两秒退出的进程没人收尸，就是个僵尸
+    # 看门狗记下要盯的进程、做完第一次整查（按它建的就绪文件等）之后才停 short，停了先不收尸，就是个僵尸。
+    # 不用「两秒就退」的 sleep 2：负载高时看门狗起得比两秒慢，起来时 short 已是僵尸、不算要盯的，判成「就没有要盯的进程」
+    short = subprocess.Popen(["sleep", "300"])
     probed_processes.append(short)
     try:
-        finished = run_process_watch(["--max-minutes", "0.25"])
-        if finished.returncode != 0 or "都退出了" not in finished.stdout:
+        exit_ready = os.path.join(work, "ready-processes-exit")
+        watch_runs.append(["--processes-only", "--max-minutes", "0.25"])
+        exit_watcher = subprocess.Popen([sys.executable, os.path.abspath(__file__), "watch", "--processes-only", "--process-root-pid", str(os.getpid()),
+                                         "--interval-seconds", "1", "--max-minutes", "0.25"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                                        env=dict(os.environ, **{SELFTEST_READY_VARIABLE: exit_ready}))
+        wait_for_selftest_ready(exit_ready, exit_watcher)
+        short.kill()
+        finished_output, _ = exit_watcher.communicate(timeout=120)
+        if exit_watcher.returncode != 0 or "都退出了" not in finished_output:
             failures.append(f"--processes-only 盯着的进程退出了（僵尸没人收尸也算）应当退出码 0 并写「都退出了」，"
-                            f"实际退出码 {finished.returncode}，输出：{finished.stdout[-300:]}")
+                            f"实际退出码 {exit_watcher.returncode}，输出：{finished_output[-300:]}")
     finally:
         short.kill()
         short.wait()
@@ -2976,10 +3556,11 @@ def selftest_in(work):
         failures.append(f"--processes-only 没给 --session-dir 时报告里应当写明「交回之后后台还在跑」这一类没查，实际输出：{nothing.stdout[-300:]}")
     leftover_cases_checked = selftest_leftover_background(work, thresholds, failures, watch_runs, probed_processes)
     heavy_processes_started = selftest_heavy_tests(work, failures, probed_processes, watch_runs)
+    heavy_processes_started += selftest_heavy_selftest_tree(work, failures, probed_processes)
     memory_processes_started = selftest_memory(work, failures, probed_processes, watch_runs)
     session_watch_checks = selftest_session_watch(work, thresholds, failures, watch_runs)
     for mixed in (["watch", "--processes-only", "--agents", "healthy"], ["cost", "--processes-only"]):
-        mixed_run = subprocess.run([sys.executable, os.path.abspath(__file__), *mixed], capture_output=True, text=True, timeout=30)
+        mixed_run = subprocess.run([sys.executable, os.path.abspath(__file__), *mixed], capture_output=True, text=True, timeout=120)
         if mixed_run.returncode != 2:
             failures.append(f"{' '.join(mixed)} 应当退出码 2（--processes-only 不和子 agent、用量混用），实际 {mixed_run.returncode}")
     for wrapped_command, wanted_display in (
@@ -3006,10 +3587,11 @@ def selftest_in(work):
           f"交回、被 TaskStop 停掉、最近一次任务通知是 failed 的子 agent 过了宽限还有进程开着它后台任务的输出文件报「交回之后后台还在跑」（交回不到宽限、没交回还在等、"
           f"stopped 之后又被续做的不报，进程没了不报，--ack 进程:<pid> 不叫醒），被看的全部交回时退出前也报、只剩宽限里的等宽限过了再查，--processes-only 带 --session-dir 也报、不带就写明没查；"
           f"checker 档包 singlefs-checker-tier 的测试二进制在跑而环境里没有 {HEAVY_TEST_VARIABLE}=commit / =user-request 的报「{HEAVY_TEST_ALERT}」（带别的值照报，带这两个值的、"
-          f"bash -c 里写着带前缀而还没起的、timeout 包着带前缀的不报，另一个看门狗的自检那一支整棵不扫，stage-selftest.sh 与带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay 不报、直接起的照报，不重型的门禁阶段（提交时才跑的检查）不报，一条链只报最上面那个、下一步给从最底层往上的停止次序，归属认出开着输出文件的子 agent），"
+          f"bash -c 里写着带前缀而还没起的、timeout 包着带前缀的不报，另一个看门狗的自检那一支整棵不扫，stage-selftest.sh 与带 --selftest 的脚本底下起的 checker-tier-crates-mutation-replay 不报、直接起的照报，不重型的门禁阶段（提交时才跑的检查）不报，一条链只报最上面那个、下一步给从最底层往上的停止次序，归属认出开着输出文件的子 agent；"
+          f"登记成轻的自证（--selftest exec 进本体的也认）底下与它临时目录里起的驱动不报，没有自证祖先的、设了 heavy-if-set 那个变量的、仓副本里的自证底下的照报），"
           f"--processes-only 与 --agents 两条路都报、--ack 进程:<pid> 不叫醒；常驻内存过阈值的进程报「{MEMORY_ALERT}」（写常驻内存、阈值、归属与出路，"
           f"只睡的小进程不报，阈值 0 不查），两条路整查都报、--ack 进程:<pid> 不叫醒，看门狗起了之后才过线的由两次整查之间的单查几秒内叫醒（{memory_processes_started} 个进程）"
-          f"；上下文过线只对实现员与执行员报「该交接」并列出吃上下文最多的工具输出，等后台任务时 progress.md 久没改报「进度文件不涨」、整点询问附 progress.md 末几行，"
+          f"；上下文过线只对实现员与执行员报「该交接」并列出吃上下文最多的工具输出、线写 0 不报，等后台任务时 progress.md 久没改报「进度文件不涨」、整点询问附 progress.md 末几行，"
           f"hook 检出的主体是 agent 号；--discover 一个会话一个看门狗（自己找没结束的子 agent、已有一个在盯就退 5）、--ack 落文件下一次读回、条件消失的确认作废（{session_watch_checks} 格）"
           f"（查了 {len(expectations) + 1 + leftover_cases_checked + 1} 个子 agent、{len(probed_processes)} 个进程"
           f"（其中假的重型进程 {heavy_processes_started} 个）、{len(watch_runs)} 次看门狗）")

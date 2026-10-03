@@ -16,6 +16,15 @@
     agent-handover.py --selftest                              # 造一份假会话记录走一遍，临时目录用完即删（判红、抛异常也删）；AGENT_HANDOVER_BREAK=<项> 时必须判红
 
 退出码：0 写成；2 参数或找不到会话记录；1 自检不过。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一格的名字，括号里是那条「✗ 自检：」的开头）：
+  AGENT_HANDOVER_BREAK=continuations  read_transcript() 不收主 agent 发来的续做消息（origin 为 coordinator 的那几条）
+      续做消息（「✗ 自检：交接摘要里没有「续做消息」」）
+  AGENT_HANDOVER_BREAK=written  read_transcript() 不记写类工具（WRITE_TOOLS）写过的文件
+      写过的文件与现在的 sha256（「✗ 自检：交接摘要里没有「写过的文件与现在的 sha256」」）
+  AGENT_HANDOVER_BREAK=keepscratch  selftest() 的临时目录走回 mkdtemp 不删
+      通过的这一次（「✗ 自检：通过的这一次，临时目录用完没删」）、red 那条路（「✗ 自检：red 那条路上临时目录没删」）、
+      crash 那条路（「✗ 自检：crash 那条路上临时目录没删」）
 """
 import argparse
 import glob

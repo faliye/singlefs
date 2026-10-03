@@ -30,27 +30,54 @@
 #   第二台的停下之后先取回 --fetch 点名的路径（写到一半的产物不随树一起丢），
 #   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL——再删第二台这一趟的树，做完才退。
 # 退出码：那条命令的退出码（250–254 是内存包装自己的结局，含义见 run-with-memory-cap.sh 文件头「退出码」，那一次的输出不算结果）；
-#   2 用法错（命令一行都没跑）；255 这个脚本自己没跑成（配置、工具链、拷树、起不来、等不到结局，或命令退 0 而点名取回的路径不在）。
+#   2 用法错，或弄坏开关 MULTI_HOST_RUN_BREAK 设在 --selftest 之外（命令一行都没跑）；255 这个脚本自己没跑成（配置、工具链、拷树、起不来、等不到结局，或命令退 0 而点名取回的路径不在）。
 #   命令退非 0 时点名的路径不在，只提一句，退出码照旧是命令的。
 # 驱动打的每一行都不写配置里第二台的主机、别名与目录：第二台的输出与错误输出经 peer_host_redact 换成「第二台」「第二台的目录」再打。
 # 共用库 research/scripts/peer-host-lib.sh 只调它的对外函数，不改它。
 #
-# gate-similar: layer0-shard-run.sh 它把一条登记了分片的崩溃枚举用例切成两片、两台各跑一片再 merge 并写 54 号的全绿标记，步骤与输入指纹都绑在那一类用例上；它按内容进三条用例的输入指纹（admission.py 的 SHARD_DRIVER_FILES），并进来改一行就废三格标记
+# gate-similar: layer0-shard-run.sh 它把一条登记了分片的崩溃枚举用例切成两片、两台各跑一片再 merge 并写 checker-tier-layer0-replay 的全绿标记，步骤与输入指纹都绑在那一类用例上；它按内容进三条用例的输入指纹（admission.py 的 SHARD_DRIVER_FILES），并进来改一行就废三格标记
 # gate-similar: mutation-shard-run.sh 它是 checker-tier-crates-mutation-replay 专用的变异表分行驱动：按用时分两堆、两台各跑一份 checker-tier-crates-mutation-replay、拷回按条记录核过再导入，判定归 checker-tier-crates-mutation-replay；这里只挪一条任意命令，不分行、不导记录，两份共用的第二台那几段已经抽在 peer-host-lib.sh
 #
-# 弄坏开关 MULTI_HOST_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；各项打开时 --selftest 对应那一格判错）：
-#   local-reads-configuration  不带 --peer 也读配置（「默认本机跑、不读配置」判错）
-#   local-without-memory-cap   不带 --peer 时不经 run-with-memory-cap.sh 跑（「默认本机跑」那一格的 cgroup 判错）
-#   peer-exit-dropped          第二台那条命令退几都退 0（「退出码原样带回」判错）
-#   peer-without-memory-cap    第二台那条命令不经副本里的 run-with-memory-cap.sh 跑（「--peer 跑成」那一格的 cgroup 判错）
-#   no-peer-cap-limit          --memory-cap 比配置的 PEER_MEMORY_CAP 大也照跑（「上限不大于 PEER_MEMORY_CAP」判错）
-#   no-toolchain-check         不比两台工具链（「工具链不同就拒」判错）
-#   fetch-altered              取回之后往每个取回的文件末尾加一个字节（「--fetch 取回的文件逐字相同」判错）
-#   no-peer-cleanup            跑完（成功、失败都算）不删第二台这一趟的树（「跑完删第二台那一趟的目录」判错）
-#   no-peer-stop-on-signal     收到 TERM 不停第二台那条命令（「收到 TERM 先停第二台那条命令」判错）
-#   no-redact                  第二台的输出不经 peer_host_redact 就打（「输出里没有配置里的主机与目录」判错）
-#   switch-off-falls-back-to-local  配置里双机没开时退回本机跑（「双机开关没开 ⇒ --peer 拒」判错）
-#   sync-ignored-files         树整个拷过去（只排除 .git、target），被 git 忽略的文件也拷（「--peer 跑成」那一格的「被忽略的文件没拷过去」判错）
+# 弄坏开关 MULTI_HOST_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时自证退 1）。只在 --selftest 起的驱动里生效：自证在它的临时目录里放一份标记文件，
+#   路径经 MULTI_HOST_RUN_SELFTEST_MARK 带给它起的驱动，文件在、内容是 MULTI_HOST_SELFTEST_MARK_CONTENT 那一行才认开关（驱动读完就 unset，不带给命令）；
+#   别处设了它就拒、退 2，命令一行都没跑。逐项写开关名、弄坏哪一处、打开后自证哪几格红
+# （项名是自证 expect 的格名，一行一项；失败行是「✗ <格名>：<细节>」，括号里抄细节的句首，随跑变的路径、进程号写成 …）：
+#   MULTI_HOST_RUN_BREAK=local-reads-configuration  不带 --peer 也读配置（自证的配置是坏的，判不过、退 255）
+#       Ⓐ 默认本机跑：配置是坏的、调用方的会话里已有一条日常的在跑也照跑、退 0、在本机仓根跑、第二台一个目录都没建（「退 255，在「」跑」）
+#       Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：」后面是空的）
+#       Ⓐ 默认本机跑 --fetch：取回的与仓根那一份逐字相同（「cmp: …/local/repo/out/local.txt: No such file or directory」）
+#   MULTI_HOST_RUN_BREAK=local-without-memory-cap  不带 --peer 时不经 run-with-memory-cap.sh 跑
+#       Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：0::/user.slice/…」）
+#   MULTI_HOST_RUN_BREAK=peer-exit-dropped  第二台那条命令退几都退 0
+#       Ⓑ --peer 退出码原样带回：第二台那条命令退 7 ⇒ 驱动退 7（「退 0」）
+#   MULTI_HOST_RUN_BREAK=peer-without-memory-cap  第二台那条命令不经副本里的 run-with-memory-cap.sh 跑
+#       Ⓑ --peer 经副本里的 run-with-memory-cap.sh 跑（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：0::/user.slice/…」）
+#   MULTI_HOST_RUN_BREAK=no-peer-cap-limit  --memory-cap 比配置的 PEER_MEMORY_CAP 大也照跑
+#       Ⓑ --memory-cap 2G 比配置的 PEER_MEMORY_CAP 1G 大 ⇒ 拒（退 2），命令没跑（「退 0，命令跑了」）
+#   MULTI_HOST_RUN_BREAK=no-toolchain-check  不比两台工具链
+#       Ⓒ 第二台的 rustc -Vv 不同 ⇒ 拒（退 255，说两台的工具链不同），命令没跑、第二台没建这一趟的目录（「退 0，命令跑了」）
+#   MULTI_HOST_RUN_BREAK=fetch-altered  取回之后往每个取回的文件末尾加一个字节
+#       Ⓐ 默认本机跑 --fetch：取回的与仓根那一份逐字相同（「cmp: EOF on …」）
+#       Ⓓ --fetch 取回的一个文件、一个目录与第二台上算的 sha256 逐字相同（「退 0；核对：out/random.bin: FAILED」）
+#   MULTI_HOST_RUN_BREAK=no-peer-cleanup  跑完（成功、失败都算）不删第二台这一趟的树
+#       Ⓔ Ⓑ Ⓓ 那几趟（含退 7 的那一趟）跑完，第二台 runs/ 下什么都不剩（「Ⓑ 那边留着：peer-ok peer-ok.exit …」）
+#       Ⓕ 第二台那条命令在跑时收到 TERM ⇒ 退 143，第二台那条命令不在了，runs/ 下什么都不剩（「退 143，第二台那条命令的进程号「…」不在了；runs/ 下留着 3 条」）
+#   MULTI_HOST_RUN_BREAK=no-peer-stop-on-signal  收到 TERM 不停第二台那条命令
+#       Ⓕ 第二台那条命令在跑时收到 TERM ⇒ 退 143，第二台那条命令不在了，runs/ 下什么都不剩（「退 143，第二台那条命令的进程号「…」还活着」）
+#   MULTI_HOST_RUN_BREAK=no-redact  第二台的输出不经 peer_host_redact 就打
+#       Ⓖ 输出里没有配置里的主机名与第二台的目录，命令打的那两样换成了「第二台」「第二台的目录」（「有的：peer/run.out」）
+#   MULTI_HOST_RUN_BREAK=switch-off-falls-back-to-local  配置里双机没开时退回本机跑
+#       Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录（「退 0，命令跑了」）
+#   MULTI_HOST_RUN_BREAK=selftest-keeps-session  自证起驱动时不清调用方的会话号 CLAUDE_CODE_SESSION_ID（改前的跑法；只有自证读这一项）
+#       Ⓐ 默认本机跑：配置是坏的、调用方的会话里已有一条日常的在跑也照跑、退 0、在本机仓根跑、第二台一个目录都没建（「退 252，在「」跑」）
+#       Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：」后面是空的）
+#       Ⓐ 默认本机跑 --fetch：取回的与仓根那一份逐字相同（「cmp: …/local/repo/out/local.txt: No such file or directory」）
+#   MULTI_HOST_RUN_BREAK=sync-ignored-files  树整个拷过去（只排除 .git、target），被 git 忽略的文件也拷
+#       Ⓑ --peer 跑成：退 0，在第二台 runs/<标签>/ 那棵副本里跑（有规范副本、提交过一次），被 git 忽略的 .env 没拷过去（「退 0，在「…/runs/peer-ok」跑，提交 …，.env 拷过去了」）
+#   MULTI_HOST_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认
+#       Ⓘ MULTI_HOST_RUN_BREAK 设在 --selftest 之外（不带自证的标记）⇒ 拒（退 2，说设在 --selftest 之外），命令没跑（「退 0，命令跑了」）
+# 判法的开关 MULTI_HOST_CONFIGURATION_BREAK 也带进这份自证，打开后红哪几格写在 research/scripts/layer0-shard-configuration-check.sh 文件头；
+# 共用库的开关 PEER_HOST_LIB_BREAK 同样带进来，打开后红哪几格写在 research/scripts/peer-host-lib.sh 文件头。
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）：「第二台」是本机上的另一个目录，命令在本机跑、环境照 ssh 那样只给最少几样。
 #
 # admission: always 每次调都在这一刻这棵树上跑一条调用方给的命令；要不要重跑由调用方判，不在这里
@@ -65,6 +92,12 @@ source "$multi_host_script_directory/peer-host-lib.sh"
 MULTI_HOST_LOCAL_DEFAULT_MEMORY_CAP=8G
 
 multi_host_break_is() { [[ ",${MULTI_HOST_RUN_BREAK:-}," == *",$1,"* ]]; }
+
+MULTI_HOST_SELFTEST_MARK_CONTENT="multi-host-run.sh --selftest 起的驱动"
+multi_host_inside_selftest() { # 这个驱动是不是 --selftest 起的：MULTI_HOST_RUN_SELFTEST_MARK 指的文件在、第一行对得上（文件头「弄坏开关」那一段）
+  [[ -n "${MULTI_HOST_RUN_SELFTEST_MARK:-}" && -f "$MULTI_HOST_RUN_SELFTEST_MARK" ]] \
+    && [[ "$(head -n 1 -- "$MULTI_HOST_RUN_SELFTEST_MARK")" == "$MULTI_HOST_SELFTEST_MARK_CONTENT" ]]
+}
 
 multi_host_usage_error() { # <原因>：用法错，命令一行都没跑，退 2
   echo "  ✗ multi-host-run.sh 用法错：$1" >&2
@@ -369,22 +402,30 @@ multi_host_main() {
 # 在临时目录里搭一棵小仓（本仓的 .claude/scripts、research/scripts、规范副本的符号链接、一个被 git 忽略的 .env），
 # 「第二台」是本机上的另一个目录（SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），配置写在场景目录里（SINGLEFS_MULTI_HOST_CONFIG）。
 # 命令都经真的 run-with-memory-cap.sh（上限 256M）。逐格（弄坏开关见文件头，各让对应那一格判错）：
-#   Ⓐ 默认本机跑：配置是坏的也照跑、退 0、在本机仓根跑、第二台一个目录都没建；经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）；
+#   Ⓐ 默认本机跑：配置是坏的、调用方的会话里已有一条日常的在跑（自证用假会话号经真包装占一条 16M 的 sleep，Ⓐ 带同一个会话号起）也照跑、退 0、
+#      在本机仓根跑、第二台一个目录都没建；经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）；
 #      --fetch 取回的文件与仓根那一份逐字相同
 #   Ⓑ --peer 跑成：退 0，在第二台 runs/<标签>/ 那棵副本里跑（副本里有规范副本、提交过一次），被 git 忽略的 .env 没拷过去；经副本里的 run-with-memory-cap.sh 跑；
 #      命令退 7 ⇒ 驱动退 7；--memory-cap 比 PEER_MEMORY_CAP 大 ⇒ 拒（退 2）、命令没跑
 #   Ⓒ 第二台的 rustc -Vv 不同 ⇒ 拒（退 255，说两台的工具链不同），命令没跑、第二台没建这一趟的目录
 #   Ⓓ --fetch 一个文件、一个目录：取回的逐字相同（与命令在第二台上算的 sha256 对）
 #   Ⓔ Ⓑ Ⓓ 那几趟跑完（含退 7 那一趟）第二台 runs/ 下什么都不剩
-#   Ⓕ 第二台那条命令在跑时给驱动（只给它自己，kill "$!"）发 TERM ⇒ 退 143，第二台那条命令不在了，runs/ 下什么都不剩
+#   Ⓕ 第二台那条命令在跑时给驱动（只给它自己，kill "$!"）发 TERM ⇒ 120 秒内退 143，第二台那条命令不在了，runs/ 下什么都不剩；
+#      第二台那条命令只握 0、1、2（不握驱动那一头的管道：握着的话，起它那一步要等它跑完才回来）
+# 场景里起驱动一律清掉 CLAUDE_CODE_SESSION_ID 与 SINGLEFS_HEAVY_TESTS（照 run-with-memory-cap.sh 自证 in_context 的写法）：自证起的命令不算进
+#   调用方会话的「日常一条」（调用方的会话里常有一条日常的在跑，经真包装起的 Ⓐ 就会被拒、退 252）
 #   Ⓖ 输出（驱动的标准输出与标准错误）里没有配置里的主机名与第二台的目录，而命令打的那两样换成了「第二台」「第二台的目录」
 #   Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，说在配置里写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑
+#   Ⓘ 弄坏开关设在自证之外（起驱动时去掉自证的标记）⇒ 拒（退 2），命令没跑
+# 自证在临时目录里放标记文件、export MULTI_HOST_RUN_SELFTEST_MARK 指向它：场景里起的驱动认得出是自证起的，调用方设的弄坏开关才生效
 
 multi_host_selftest() {
   local repository_root work template sop_source checked=0 failures=0
   repository_root="$(cd "$multi_host_script_directory/../.." && pwd)"
   work="$(mktemp -d)"
   multi_host_selftest_work="$work"
+  printf '%s\n' "$MULTI_HOST_SELFTEST_MARK_CONTENT" > "$work/selftest-mark"
+  export MULTI_HOST_RUN_SELFTEST_MARK="$work/selftest-mark"
   trap 'echo "  · 自证的临时目录（$(du -sh "$multi_host_selftest_work" 2>/dev/null | cut -f1)）删掉"; rm -rf -- "${multi_host_selftest_work:?}"' EXIT
   expect() { # expect <格名> <判据的退出码：0 为过> <不过时的细节>
     checked=$((checked + 1))
@@ -428,9 +469,10 @@ multi_host_selftest() {
       echo "QUIESCE_STARTED_CHECK_COMMAND="
     } > "$scene/multi-host.env"
   }
-  scene_command_for() { # <场景名>：scene_command 设成在这个场景里起驱动的前缀（弄坏开关从调用方的环境里留着）
-    local scene="$work/$1"
-    scene_command=(env -u RUN_WITH_MEMORY_CAP_RESERVE -u RUN_WITH_MEMORY_CAP_KEY SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
+  scene_command_for() { # <场景名>：scene_command 设成在这个场景里起驱动的前缀（弄坏开关从调用方的环境里留着；会话号与 SINGLEFS_HEAVY_TESTS 清掉，见上面的说明）
+    local scene="$work/$1" session_settings=(-u CLAUDE_CODE_SESSION_ID)
+    if multi_host_break_is selftest-keeps-session; then session_settings=(); fi
+    scene_command=(env "${session_settings[@]}" -u SINGLEFS_HEAVY_TESTS -u RUN_WITH_MEMORY_CAP_RESERVE -u RUN_WITH_MEMORY_CAP_KEY SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
       MULTI_HOST_RUN_POLL_SECONDS=1 MULTI_HOST_RUN_FETCH_DIRECTORY="$scene/fetch" RUN_WITH_MEMORY_CAP_PEAKS="$scene/peaks.tsv"
       bash "$scene/repo/research/scripts/multi-host-run.sh")
   }
@@ -447,15 +489,29 @@ multi_host_selftest() {
     find "$work/$1/peer-home/runs" -mindepth 1 -maxdepth 1 2>/dev/null | wc -l
   }
 
-  # Ⓐ 默认本机跑：配置是坏的（判法一读就拒），不带 --peer 照跑
-  local scene
+  # Ⓐ 默认本机跑：配置是坏的（判法一读就拒），不带 --peer 照跑。调用方的会话里已有一条日常的在跑：自证用假会话号经真包装占一条
+  #   （16M 的 sleep，明写等待上限，slice 一时放不下就排队），Ⓐ 带同一个会话号起；场景清掉会话号，Ⓐ 就不算进那个会话的「日常一条」
+  local scene holder_pid holder_sleep="" holder_rounds fake_session="multi-host-run-selftest-$$"
   prepare_scene local
   scene="$work/local"
+  env -u SINGLEFS_HEAVY_TESTS CLAUDE_CODE_SESSION_ID="$fake_session" RUN_WITH_MEMORY_CAP_WAIT_SECONDS=600 RUN_WITH_MEMORY_CAP_PEAKS="$scene/peaks.tsv" \
+    RUN_WITH_MEMORY_CAP_KEY="multi-host-run.sh 自证 Ⓐ：同一个会话里先占着的一条" \
+    bash "$template/research/scripts/run-with-memory-cap.sh" 16M bash -c 'echo "$$" > "$0"; exec sleep 300' "$scene/holder.pid" > "$scene/holder.out" 2>&1 &
+  holder_pid=$!
+  for (( holder_rounds = 0; holder_rounds < 6100; holder_rounds++ )); do
+    [[ -s "$scene/holder.pid" ]] && break
+    peer_host_process_is_alive "$holder_pid" || break
+    sleep 0.1
+  done
+  holder_sleep="$(cat "$scene/holder.pid" 2>/dev/null)"
   printf '这一行不是 KEY=值：默认本机跑读了它就会被拒\n' > "$scene/multi-host.env"
-  run_in local run --memory-cap 256M --fetch out/local.txt -- bash -c "pwd > $(printf '%q' "$scene/where"); cat /proc/self/cgroup > $(printf '%q' "$scene/cgroup"); mkdir -p out && printf '本机产物\n' > out/local.txt"
-  expect "Ⓐ 默认本机跑：配置是坏的也照跑、退 0、在本机仓根跑、第二台一个目录都没建" \
-    "$([[ "$(exit_of local run)" == 0 && "$(cat "$scene/where" 2>/dev/null)" == "$scene/repo" && ! -e "$scene/peer-home/runs" ]]; echo $?)" \
-    "退 $(exit_of local run)，在「$(cat "$scene/where" 2>/dev/null)」跑；stderr 尾部：$(tail_of local run)"
+  CLAUDE_CODE_SESSION_ID="$fake_session" run_in local run --memory-cap 256M --fetch out/local.txt -- bash -c "pwd > $(printf '%q' "$scene/where"); cat /proc/self/cgroup > $(printf '%q' "$scene/cgroup"); mkdir -p out && printf '本机产物\n' > out/local.txt"
+  # 占位那一条只停它自己记下的 sleep（核过进程名），包装随之收尾
+  if [[ -n "$holder_sleep" && "$(cat "/proc/$holder_sleep/comm" 2>/dev/null)" == sleep ]]; then kill "$holder_sleep"; fi
+  wait "$holder_pid"
+  expect "Ⓐ 默认本机跑：配置是坏的、调用方的会话里已有一条日常的在跑也照跑、退 0、在本机仓根跑、第二台一个目录都没建" \
+    "$([[ -n "$holder_sleep" && "$(exit_of local run)" == 0 && "$(cat "$scene/where" 2>/dev/null)" == "$scene/repo" && ! -e "$scene/peer-home/runs" ]]; echo $?)" \
+    "退 $(exit_of local run)，在「$(cat "$scene/where" 2>/dev/null)」跑；占位那一条$([[ -n "$holder_sleep" ]] && echo "在跑（sleep $holder_sleep）" || echo "没起来：$(tail -n 2 "$scene/holder.out" 2>/dev/null | tr '\n' '|')")；stderr 尾部：$(tail_of local run)"
   expect "Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）" \
     "$(grep -q 'singlefs-memory-cap-' "$scene/cgroup" 2>/dev/null; echo $?)" \
     "命令记下的 cgroup：$(tr '\n' ' ' < "$scene/cgroup" 2>/dev/null)"
@@ -520,15 +576,35 @@ pwd; echo selftest-multi-host-peer-name"
     sleep 0.1
   done
   sleeper_pid="$(cat "$scene/sleeper.pid" 2>/dev/null)"
+  # 第二台那条命令握着的 0、1、2 之外的 fd（脱离会话起的那一份不该握驱动那一头的管道）
+  local sleeper_fd_path sleeper_fd extra_fds="" driver_stuck=0
+  if [[ -n "$sleeper_pid" ]]; then
+    for sleeper_fd_path in "/proc/$sleeper_pid/fd"/*; do
+      sleeper_fd="${sleeper_fd_path##*/}"
+      if [[ "$sleeper_fd" =~ ^[0-9]+$ ]] && (( sleeper_fd > 2 )); then extra_fds+="$sleeper_fd -> $(readlink "$sleeper_fd_path")；"; fi
+    done
+  fi
   kill -TERM "$driver_pid"
+  # 驱动收到 TERM 要当场收尾：至多等 120 秒（第二台那条 sleep 300 自己走完之前）；还没退就记下、停它（只停这一格自己起的那个进程号）
+  for (( waited = 0; waited < 1200; waited++ )); do
+    peer_host_process_is_alive "$driver_pid" || break
+    sleep 0.1
+  done
+  if peer_host_process_is_alive "$driver_pid"; then
+    driver_stuck=1
+    kill -KILL "$driver_pid"
+  fi
   if wait "$driver_pid"; then signalled_exit=0; else signalled_exit=$?; fi
   if [[ -n "$sleeper_pid" ]] && peer_host_process_is_alive "$sleeper_pid"; then
     sleeper_alive=1
     kill -TERM "$sleeper_pid"  # 弄坏开关下没停掉的那一条：只停这一格自己起的那个进程号
   fi
   expect "Ⓕ 第二台那条命令在跑时收到 TERM ⇒ 退 143，第二台那条命令不在了，runs/ 下什么都不剩" \
-    "$([[ "$signalled_exit" == 143 && -n "$sleeper_pid" && "$sleeper_alive" == 0 && "$(peer_runs_left signalled)" == 0 ]]; echo $?)" \
-    "退 $signalled_exit，第二台那条命令的进程号「$sleeper_pid」$([[ "$sleeper_alive" == 1 ]] && echo 还活着 || echo 不在了)；runs/ 下留着 $(peer_runs_left signalled) 条；stderr 尾部：$(tail -n 4 "$scene/run.err" | tr '\n' '|')"
+    "$([[ "$driver_stuck" == 0 && "$signalled_exit" == 143 && -n "$sleeper_pid" && "$sleeper_alive" == 0 && "$(peer_runs_left signalled)" == 0 ]]; echo $?)" \
+    "$([[ "$driver_stuck" == 1 ]] && echo "驱动收到 TERM 之后 120 秒还没退（发了 KILL）；")退 $signalled_exit，第二台那条命令的进程号「$sleeper_pid」$([[ "$sleeper_alive" == 1 ]] && echo 还活着 || echo 不在了)；runs/ 下留着 $(peer_runs_left signalled) 条；stderr 尾部：$(tail -n 4 "$scene/run.err" | tr '\n' '|')"
+  expect "Ⓕ 第二台那条命令只握 0、1、2，不握驱动那一头的管道" \
+    "$([[ -n "$sleeper_pid" && -z "$extra_fds" ]]; echo $?)" \
+    "第二台那条命令的进程号「$sleeper_pid」；多握着的：${extra_fds:-（没读到）}"
 
   # Ⓖ 输出里没有配置里的主机与目录
   local all_outputs=("$work/peer/run.out" "$work/peer/run.err" "$work/peer/seven.err" "$work/fetch/run.err" "$work/signalled/run.err")
@@ -544,16 +620,37 @@ pwd; echo selftest-multi-host-peer-name"
     "$([[ "$(exit_of switched-off run)" == 255 && ! -e "$scene/ran" && ! -e "$scene/peer-home/runs" ]] && grep -q 'ENABLE_ACROSS_MACHINES=1' "$scene/run.err"; echo $?)" \
     "退 $(exit_of switched-off run)，命令$([[ -e "$scene/ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail_of switched-off run)"
 
+  # Ⓘ 弄坏开关设在自证之外：起驱动时去掉自证的标记，弄坏开关照调用方的再加一项 peer-exit-dropped
+  prepare_scene outside
+  scene="$work/outside"
+  scene_command_for outside
+  local outside_exit
+  if env -u MULTI_HOST_RUN_SELFTEST_MARK MULTI_HOST_RUN_BREAK="${MULTI_HOST_RUN_BREAK:+$MULTI_HOST_RUN_BREAK,}peer-exit-dropped" "${scene_command[@]}" \
+       --memory-cap 256M -- bash -c "touch $(printf '%q' "$scene/ran")" > "$scene/run.out" 2> "$scene/run.err" < /dev/null; then
+    outside_exit=0
+  else
+    outside_exit=$?
+  fi
+  expect "Ⓘ MULTI_HOST_RUN_BREAK 设在 --selftest 之外（不带自证的标记）⇒ 拒（退 2，说设在 --selftest 之外），命令没跑" \
+    "$([[ "$outside_exit" == 2 && ! -e "$scene/ran" ]] && grep -q '设在 --selftest 之外' "$scene/run.err"; echo $?)" \
+    "退 $outside_exit，命令$([[ -e "$scene/ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail -n 3 "$scene/run.err" 2>/dev/null | tr '\n' '|')"
+
   if (( failures > 0 )); then
     echo "  ✗ multi-host-run.sh 自证有 $failures 格判错（共 $checked 格）"
     echo "     → 怎么办：设了 MULTI_HOST_RUN_BREAK 或 MULTI_HOST_CONFIGURATION_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 research/scripts/multi-host-run.sh 与 peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒）"
+  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then
   multi_host_selftest
   exit $?
 fi
+if [[ -n "${MULTI_HOST_RUN_BREAK:-}" ]] && ! multi_host_break_is break-honored-anywhere && ! multi_host_inside_selftest; then
+  echo "  ✗ MULTI_HOST_RUN_BREAK=$MULTI_HOST_RUN_BREAK 设在 --selftest 之外：弄坏开关只在自证起的驱动里生效，这一次什么都没做（退 2，命令一行都没跑）" >&2
+  echo "     → 怎么办：去掉它再跑（env -u MULTI_HOST_RUN_BREAK bash research/scripts/multi-host-run.sh …）；要证红就跑 MULTI_HOST_RUN_BREAK=<项> bash research/scripts/multi-host-run.sh --selftest" >&2
+  exit 2
+fi
+unset MULTI_HOST_RUN_SELFTEST_MARK
 multi_host_main "$@"

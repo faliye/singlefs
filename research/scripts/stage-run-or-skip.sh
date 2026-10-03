@@ -12,8 +12,12 @@
 # 退出码 77 与 1 都由这个函数直接 exit，调用它的阶段不用再接；返回 0 时阶段接着往下跑。
 #
 #   bash research/scripts/stage-run-or-skip.sh --selftest   自证四格：判定脚本退 0 往下跑、退 1 退 77、
-#   退 2 判红、文件不在（127）判红；格数由成功行现算。STAGE_RUN_OR_SKIP_BREAK=treat-unknown-as-skip 把「其余判红」
-#   换回「非 0 一律跳过」的旧写法，自证必须判红。
+#   退 2 判红、文件不在（127）判红；格数由成功行现算。
+# 弄坏开关 STAGE_RUN_OR_SKIP_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几格红
+# （项名是自证 CASES 表里的格名，一行一项；失败行是「✗ 自证「<格名>」：期望退 …」，括号里抄格名之后那一段的句首）：
+#   STAGE_RUN_OR_SKIP_BREAK=treat-unknown-as-skip  stage_run_or_skip 换回「非 0 一律跳过」的旧写法（「其余判红」那一支没了）
+#       判定退 2 判红（「期望退 1 且输出含「退 2（它只许退 0 要跑、1 可跳过）」，实得退 77」）
+#       判定脚本不在判红（「期望退 1 且输出含「退 127（它只许退 0 要跑、1 可跳过）」，实得退 77」）
 stage_run_or_skip() {
   local judge_script="$1" skip_basis="$2" skip_howto="$3"
   shift 3

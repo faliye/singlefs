@@ -6,7 +6,7 @@
 #   mutation-shard-run.sh <树根>       门禁 checker-tier-crates-mutation-replay（.claude/gate.d/checker-tier-crates-mutation-replay.sh）在本地多机配置写了 ENABLE_ACROSS_MACHINES=1
 #                                      （判法 layer0-shard-configuration-check.sh 退 0）时调（只由 checker-tier-crates-mutation-replay 调，输出进 checker-tier-crates-mutation-replay 的 stderr）；不认环境变量开。
 #                                      退 0：两份都跑完、拷回的记录全收，或判法退 3（双机：关，报一行「双机：关」、不连第二台）；
-#                                      退 1：有一步没成（没判的行留给 checker-tier-crates-mutation-replay 最后那一趟）；退 2：用法错，或在选行模式下被调
+#                                      退 1：有一步没成（没判的行留给 checker-tier-crates-mutation-replay 最后那一趟）；退 2：用法错，或在选行模式下被调，或弄坏开关 MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外
 #   mutation-shard-run.sh --selftest   自证：「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），
 #                                      假 cargo、真的内存包装，逐格见文件末尾 mutation_shard_selftest 的说明；格数由成功行现算
 #
@@ -41,17 +41,41 @@
 # 两份的输出存进 <树根的 git common-dir>/singlefs-mutation-shard-logs/<这一趟>/（local.log、peer.log，只留最新 3 趟）。
 # 驱动打的每一行、存下的输出都不写配置里的主机、目录与清场命令：第二台上的错误输出与 peer.log 经 research/scripts/peer-host-lib.sh 的 peer_host_redact 换成「第二台」。
 # 第二台共用的那几段（跑命令、拷文件、脱离会话起与轮询、按进程号停、清场复原）在 research/scripts/peer-host-lib.sh。
-# 重型：真跑是两台各跑一部分 crates/mutations.tsv，与 checker-tier-crates-mutation-replay 同一类（.claude/hooks/lib_heavy_tests.py 按名字认它）；--selftest 不算重型，算「提交时才跑的检查」（同一份判定）。
+# 重型：真跑是两台各跑一部分 crates/mutations.tsv，与 checker-tier-crates-mutation-replay 同一类（.claude/hooks/lib_heavy_tests.py 按名字认它）；--selftest 不算重型，在 .claude/hooks/selftest-registry.tsv 登记为 light，改了就跑（同一份判定）。
 #
-# 弄坏开关 MUTATION_SHARD_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个）：
-#   import-skipped             拷回的记录不经 import、直接放进本机记录目录（自证「行键对不上的那一条被拒」两格判错）
-#   no-final-pass              checker-tier-crates-mutation-replay 调完驱动不再整张判一遍（checker-tier-crates-mutation-replay 读这一项；自证「与单机逐字相同」「最后一趟全部复用」判错）
-#   environment-opens          checker-tier-crates-mutation-replay 见 GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开、不看配置的开关（checker-tier-crates-mutation-replay 读这一项；自证「配置没开双机、环境变量写 1：报双机：关、不调驱动」判错）
-#   switch-off-ignored         判法退 3（双机：关）当成判不过、退 1（自证「驱动直接起、配置没开双机：报双机：关、退 0、不连第二台」判错）
-#   peer-without-memory-cap    第二台那一份不经 run-with-memory-cap.sh 起（自证「第二台那一份经内存包装起」判错）
-#   no-peer-cleanup-on-failure ④ 之后失败退出时不删第二台这一趟的树（自证「底座指纹不同：第二台这一趟的树删了」判错）
-#   peer-kept-in-run-tree      第二台的记录、编译目录与峰值表放进这一趟的树里（自证「跨趟保留的留着」判错）
-#   另有共用库的 PEER_HOST_LIB_BREAK=no-redact：第二台的输出不换私有的字（自证「输出里没有配置的主机、第二台的目录」判错）
+# 弄坏开关 MUTATION_SHARD_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时自证退 1）。只在 --selftest 起的进程里生效：自证在它的临时目录里放一份标记文件，
+#   路径经 MUTATION_SHARD_RUN_SELFTEST_MARK 带给它起的驱动与 checker-tier-crates-mutation-replay（驱动起的本机那一份也带着），
+#   文件在、内容是 MUTATION_SHARD_SELFTEST_MARK_CONTENT 那一行才认开关；别处设了它，驱动拒、退 2，checker-tier-crates-mutation-replay 判红，什么都没判。
+#   逐项写开关名、弄坏哪一处、打开后自证哪几格红
+# （项名是自证 expect 的格名，一行一项；失败行是「✗ <格名>：<细节>」，括号里抄细节的句首，随跑变的路径、进程号、指纹写成 …）：
+#   MUTATION_SHARD_RUN_BREAK=import-skipped  拷回的记录不经 import、直接放进本机记录目录
+#       ① checker-tier-crates-mutation-replay 接驱动那一趟判绿，stdout 与单机那一趟逐字相同（「退 1；diff：」）
+#       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的按条记录行：  … 按条记录：复用抓到 5 条」）
+#       ② import 拒了行键对不上的那一条、逐条列出（「stderr 里导入那几行：」后面是空的）
+#   MUTATION_SHARD_RUN_BREAK=no-final-pass  checker-tier-crates-mutation-replay 调完驱动不再整张判一遍（checker-tier-crates-mutation-replay 读这一项）
+#       ① checker-tier-crates-mutation-replay 接驱动那一趟判绿，stdout 与单机那一趟逐字相同（「退 1；diff：」）
+#       ① 最后那一趟全部复用（复用抓到 6 条、现跑变异至多 0 条）（「stderr 里的按条记录行：」后面是空的）
+#       ③ 第二台那一份判完 1 条就停：第二台那一份退 1，checker-tier-crates-mutation-replay 最后那一趟复用 4 条、补跑缺的 2 行，stdout 仍与单机逐字相同（「退 0；按条记录行：」）
+#       ④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判，stdout 与单机逐字相同（「退 1」）
+#   MUTATION_SHARD_RUN_BREAK=environment-opens  checker-tier-crates-mutation-replay 见 GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开、不看配置的开关（checker-tier-crates-mutation-replay 读这一项）
+#       单机那一趟（配置没开双机、环境变量 GATE_MUTATION_ACROSS_MACHINES=1）判绿、报了双机：关、没调驱动（「退 0；stderr 尾部：」）
+#   MUTATION_SHARD_RUN_BREAK=switch-off-ignored  判法退 3（双机：关）当成判不过、退 1
+#       ⑧ 驱动直接起、配置没写 ENABLE_ACROSS_MACHINES=1：报一行双机：关、退 0、第二台这一趟的目录没建（「退 1；输出：  ✗ 双机分片的本地配置判不过」）
+#   MUTATION_SHARD_RUN_BREAK=peer-without-memory-cap  第二台那一份不经 run-with-memory-cap.sh 起
+#       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表 4 行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
+#   MUTATION_SHARD_RUN_BREAK=no-peer-cleanup-on-failure  ④ 之后失败退出（含收到信号）时不删第二台这一趟的树
+#       ④ 两台底座指纹不同：驱动拒、两份都没起、第二台这一趟的树删了（「stderr：  ✗ 双机分片：两台算出的底座指纹不同」）
+#       ⑥ 两份都在跑时收到 TERM：退 143，两份卡住的假 cargo 都不在了，复原了，第二台这一趟的树删了（「退 143；卡住的假 cargo 2 个（…），还活着的「」；第二台留着 1 个目录」）
+#   MUTATION_SHARD_RUN_BREAK=peer-kept-in-run-tree  第二台的记录、编译目录与峰值表放进这一趟的树里
+#       ① 第二台这一趟的树删了，跨趟保留的记录与峰值表在 mutation-kept 下留着（「mutation-runs 底下留着 0 个目录；mutation-kept 底下：」）
+#       ① 第二台那一份经 run-with-memory-cap.sh 起：跨趟保留的峰值表里有它的键（「跨趟保留的峰值表  行，没有键「mutation-shard-run.sh 第二台那一份」那一行」）
+#       ① 第二台每条变异的峰值记在跨趟保留的峰值表里（「峰值表里没有 cargo test --offline 的行」）
+#       ② import 拒了行键对不上的那一条、逐条列出（「stderr 里导入那几行：  … 导入：收了 6 条、拒了 0 条」）
+#   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认（驱动与 checker-tier-crates-mutation-replay 都读这一项）
+#       ⑨ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外（不带自证的标记）：驱动拒、退 2，说设在 --selftest 之外（「退 0；输出：」）
+#       ⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：checker-tier-crates-mutation-replay 判红（退 1）、说设在 --selftest 之外（「退 0；输出：」）
+#   共用库的 PEER_HOST_LIB_BREAK=no-redact  peer_host_redact 原样转出、不换私有的字
+#       ① 输出里没有配置的主机、第二台的目录与清场命令（「…/singlefs-mutation-shard-logs/…/peer.log 里有」）
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）；MUTATION_SHARD_RUN_PEER_STOP_AFTER_ROWS=<k>
 #   给第二台那一份设 GATE_MUTATION_STOP_AFTER_ROWS=k 与 GATE_MUTATION_WORKERS=1（造「第二台那一份中途停了」：一个工作进程，判完 k 条就不再领活）。
 #
@@ -67,6 +91,13 @@ source "$mutation_shard_script_directory/peer-host-lib.sh"
 MUTATION_SHARD_PEER_WRAPPER_KEY="mutation-shard-run.sh 第二台那一份"
 
 mutation_shard_break_is() { [[ ",${MUTATION_SHARD_RUN_BREAK:-}," == *",$1,"* ]]; }
+
+# 自证起的进程的标记（文件头「弄坏开关」那一段）；checker-tier-crates-mutation-replay 里抄着同一行，改的时候两处一起改
+MUTATION_SHARD_SELFTEST_MARK_CONTENT="mutation-shard-run.sh --selftest 起的进程"
+mutation_shard_inside_selftest() {
+  [[ -n "${MUTATION_SHARD_RUN_SELFTEST_MARK:-}" && -f "$MUTATION_SHARD_RUN_SELFTEST_MARK" ]] \
+    && [[ "$(head -n 1 -- "$MUTATION_SHARD_RUN_SELFTEST_MARK")" == "$MUTATION_SHARD_SELFTEST_MARK_CONTENT" ]]
+}
 
 mutation_shard_fail() { # <原因> <出路>
   echo "  ✗ 双机分片：$1"
@@ -377,6 +408,9 @@ mutation_shard_selftest() {
   repository_root="$(cd "$mutation_shard_script_directory/../.." && pwd)"
   work="$(mktemp -d)"
   mutation_shard_selftest_work="$work"
+  # 自证起的驱动与 checker-tier-crates-mutation-replay 认弄坏开关的标记：场景里起的都带着它
+  printf '%s\n' "$MUTATION_SHARD_SELFTEST_MARK_CONTENT" > "$work/selftest-mark"
+  export MUTATION_SHARD_RUN_SELFTEST_MARK="$work/selftest-mark"
   trap 'echo "  · 自证的临时目录（$(du -sh "$mutation_shard_selftest_work" 2>/dev/null | cut -f1)）删掉"; rm -rf -- "${mutation_shard_selftest_work:?}"' EXIT
   expect() { # expect <格名> <判据的退出码：0 为过> <不过时的细节>
     checked=$((checked + 1))
@@ -655,16 +689,42 @@ FAKE_CARGO
     "$([[ "$switched_off_exit" == 0 ]] && [[ "$(grep -c '双机：关' "$work/single/switched-off.out")" == 1 ]] && [[ ! -d "$work/single/peer-home/mutation-runs" ]]; echo $?)" \
     "退 $switched_off_exit；输出：$(tail -3 "$work/single/switched-off.out" | tr '\n' ' ')"
 
+  # ⑨ ⑩ 弄坏开关设在自证之外（起时去掉自证的标记，弄坏开关照调用方的再各加一项）：驱动拒、退 2；checker-tier-crates-mutation-replay 判红、退 1
+  local outside_driver_exit outside_stage_exit
+  if scene_environment single env -u MUTATION_SHARD_RUN_SELFTEST_MARK MUTATION_SHARD_RUN_BREAK="${MUTATION_SHARD_RUN_BREAK:+$MUTATION_SHARD_RUN_BREAK,}import-skipped" \
+       bash "$work/single/repo/research/scripts/mutation-shard-run.sh" "$work/single/repo" > "$work/single/outside-driver.out" 2>&1; then
+    outside_driver_exit=0
+  else
+    outside_driver_exit=$?
+  fi
+  expect "⑨ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外（不带自证的标记）：驱动拒、退 2，说设在 --selftest 之外" \
+    "$([[ "$outside_driver_exit" == 2 ]] && grep -q '设在 --selftest 之外' "$work/single/outside-driver.out"; echo $?)" \
+    "退 $outside_driver_exit；输出：$(tail -3 "$work/single/outside-driver.out" | tr '\n' ' ')"
+  if scene_environment single env -u MUTATION_SHARD_RUN_SELFTEST_MARK MUTATION_SHARD_RUN_BREAK="${MUTATION_SHARD_RUN_BREAK:+$MUTATION_SHARD_RUN_BREAK,}no-final-pass" \
+       bash "$work/single/repo/.claude/gate.d/checker-tier-crates-mutation-replay.sh" "$work/single/repo" > "$work/single/outside-stage.out" 2>&1; then
+    outside_stage_exit=0
+  else
+    outside_stage_exit=$?
+  fi
+  expect "⑩ MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：checker-tier-crates-mutation-replay 判红（退 1）、说设在 --selftest 之外" \
+    "$([[ "$outside_stage_exit" == 1 ]] && grep -q '设在 research/scripts/mutation-shard-run.sh --selftest 之外' "$work/single/outside-stage.out"; echo $?)" \
+    "退 $outside_stage_exit；输出：$(tail -3 "$work/single/outside-stage.out" | tr '\n' ' ')"
+
   if (( failures > 0 )); then
     echo "  ✗ mutation-shard-run.sh 自证有 $failures 格判错（共 $checked 格）"
     echo "     → 怎么办：设了 MUTATION_SHARD_RUN_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看驱动与 research/scripts/peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、拷回核过再导入、最后一趟全部复用且与单机逐字相同、第二台中途停了补跑、行键对不上被拒、底座指纹与工具链不同就拒、收到 TERM 先停两份、配置没开双机就报双机：关不分、环境变量开不了双机）"
+  echo "  ✓ mutation-shard-run.sh 自证 $checked 格都对（两台各判一份、拷回核过再导入、最后一趟全部复用且与单机逐字相同、第二台中途停了补跑、行键对不上被拒、底座指纹与工具链不同就拒、收到 TERM 先停两份、配置没开双机就报双机：关不分、环境变量开不了双机、弄坏开关设在自证之外驱动与门禁都拒）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then
   mutation_shard_selftest
   exit $?
+fi
+if [[ -n "${MUTATION_SHARD_RUN_BREAK:-}" ]] && ! mutation_shard_break_is break-honored-anywhere && ! mutation_shard_inside_selftest; then
+  echo "  ✗ MUTATION_SHARD_RUN_BREAK=$MUTATION_SHARD_RUN_BREAK 设在 --selftest 之外：弄坏开关只在自证起的进程里生效，这一次什么都没分（退 2）"
+  echo "     → 怎么办：去掉它再跑（env -u MUTATION_SHARD_RUN_BREAK …）；要证红就跑 MUTATION_SHARD_RUN_BREAK=<项> bash research/scripts/mutation-shard-run.sh --selftest"
+  exit 2
 fi
 mutation_shard_main "$@"

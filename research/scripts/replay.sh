@@ -96,7 +96,7 @@ E115|e115-system-configuration-completeness||e115-system-configuration-completen
 E80|e80-partial-stripe||e80-partial-stripe-2026-09-02.out|exact
 E81|e81-commit-fixpoint||e81-commit-fixpoint-2026-09-02.out|exact
 E82|e82-admission-overlay||e82-admission-overlay-2026-09-02.out|exact
-E83|e83-tombstone-grain||e83-tombstone-grain-2026-09-03.out|exact
+E83|e83-tombstone-grain||e83-tombstone-grain-2026-10-04-r2.out|exact
 E84|e84-tombstone-pinning||e84-tombstone-pinning-2026-09-03.out|exact
 E85|e85-unit-header||e85-unit-header-2026-09-02.out|exact
 E86|e86-scan-step||e86-scan-step-2026-09-02.out|exact
@@ -119,7 +119,7 @@ E98|e98-inode-record||e98-inode-record-2026-09-07.out|exact
 E99|e99-writebuffer-sequence||e99-writebuffer-seq-2026-09-03.out|exact
 E100|e100-system-configuration-slot||e100-system-configuration-slot-2026-09-03.out|exact
 E101|e101-node-tag-reserve||e101-node-tag-reserve-2026-09-03.out|exact
-E102|e102-unit-class-registry||e102-unit-class-registry-2026-09-12.out|exact
+E102|e102-unit-class-registry||e102-unit-class-registry-2026-10-04.out|exact
 E103|e103-inode-update-cost||e103-inode-update-cost-2026-09-14-round2.out|exact
 E104|e104-current-version||e104-current-version-2026-09-05.out|exact
 E105|e105-extent-leaf-packed||e105-extent-leaf-packed-2026-09-12.out|exact
@@ -216,6 +216,51 @@ E162|@driver_e162_power_cut_selftest||e162-verdict-store-power-cut-2026-09-27-se
 E161|@driver_e161_feasibility||e161-crash-state-dedup-and-time-split-feasibility-2026-09-27.out|timing
 E163|@driver_e163_r1_merge||e163-gpu-multicard-crc32c-2026-09-27-r1-merge.out|exact
 E164|e164-crash-amplification-design-function-test|models|e164-crash-amplification-design-function-test-2026-09-28-models.out|exact
+E167|e167-multi-inflight-crash-cut||e167-multi-inflight-crash-cut-2026-10-01-r2.out|exact
+E167|e167-multi-inflight-crash-cut|second|e167-multi-inflight-crash-cut-second-2026-10-01-r3.out|exact
+E167|e167-multi-inflight-crash-cut|third|e167-multi-inflight-crash-cut-third-2026-10-01.out|exact
+E168|@driver_e168_s1_history||e168-delete-ring-window-borrow-s1-history-2026-10-03.out|exact
+E168|@driver_e168_positive_controls||e168-delete-ring-window-borrow-positive-controls-2026-10-03.out|exact
+E165|@driver_e165||e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out|exact
+E165|@driver_e165_light||e165-replay-bounded-enumeration-2026-10-01-light-legal-family.out|exact
+E165|@driver_e165_adversarial||e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out|exact
+E165|@driver_e165_segment2||e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out|exact
+E165|@driver_e165_r2_segment3_multi_disk||e165-replay-bounded-enumeration-2026-10-02-r2-segment3-multi-disk-2026-10-02.out|exact
+E165|@driver_e165_r2_segment4_table_both_legal||e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-legal-family.out|exact
+E165|@driver_e165_r2_segment4_table_both_adversarial||e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-adversarial-family.out|exact
+E165|@driver_e165_r2_segment4_table_both_multi_disk||e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-multi-disk.out|exact
+E165|@driver_e165_r2_segment4_reversed_disk_order_legal||e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-legal-family.out|exact
+E165|@driver_e165_r2_segment4_reversed_disk_order_multi_disk||e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-multi-disk.out|exact
+E165|@driver_e165_r3_segment1_adversarial||e165-replay-bounded-enumeration-2026-10-02-r3-segment1-adversarial-family.out|exact
+E165|@driver_e165_r3_segment2_root_choice||e165-replay-bounded-enumeration-2026-10-03-r3-segment2-root-choice.out|exact
+E165|@driver_e165_r3_segment3_root_choice_kill_bounds||e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out|exact
+E165|@driver_e165_r4_segment1_root_choice_faults||e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out|exact
+E165|@driver_e165_r4_segment2_root_choice_faults_kill_bounds||e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out|exact
+E166|e166-parallel-commit-shared-state-partition||e166-parallel-commit-shared-state-partition-r2-main-2026-10-02.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery||e169-parallel-commit-append-and-prefix-recovery-2026-10-01-r3.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|segment-two|e169-parallel-commit-append-and-prefix-recovery-segment-two-2026-10-01-r2.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|segment-three|e169-parallel-commit-append-and-prefix-recovery-segment-three-2026-10-01.out|exact
+E169|e169-parallel-commit-append-and-prefix-recovery|replay-core-inputs|e169-parallel-commit-append-and-prefix-recovery-replay-core-inputs-2026-10-01.out|exact
+E170|@driver_e170||e170-r1-o3-spec-executor-2026-10-03-s2-export.out|exact
+E170|@driver_e170_s3_bad_states_export||e170-o3-spec-executor-2026-10-02-s3-bad-states-export-2026-10-03.out|exact
+E170|@driver_e170_s3_bad_states||e170-o3-spec-executor-2026-10-02-s3-bad-states-2026-10-03.out|exact
+E170|@driver_e170_s3_q2_comparator||e170-o3-spec-executor-2026-10-02-s3-q2-comparator.out|exact
+E170|@driver_e170_s3_mutations||e170-o3-spec-executor-2026-10-02-s3-mutations-2026-10-02.out|exact
+E170|@driver_e170_r1_s3_bad_states_export||e170-r1-o3-spec-executor-2026-10-03-s3-bad-states-export.out|exact
+E170|@driver_e170_r1_s2_q2_comparator||e170-r1-o3-spec-executor-2026-10-03-s2-q2-comparator.out|exact
+E170|@driver_e170_r1_s3_bad_states||e170-r1-o3-spec-executor-2026-10-03-s3-bad-states.out|exact
+E170|@driver_e170_r1_s3_mutations||e170-r1-o3-spec-executor-2026-10-03-s3-mutations.out|exact
+E171|@driver_e171_s1_baseline||e171-three-oracle-collusion-2026-10-03-s1-baseline-run1.out|exact
+E171|@driver_e171_s1_known_bad_images||e171-three-oracle-collusion-2026-10-03-s1-known-bad-images.out|exact
+E171|@driver_e171_s2_bad_states_export||e171-three-oracle-collusion-2026-10-03-s2-bad-states-export.out|exact
+E171|@driver_e171_s2_known_bad_images||e171-three-oracle-collusion-2026-10-03-s2-known-bad-images.out|exact
+E171|@driver_e171_s2_images_o3||e171-three-oracle-collusion-2026-10-03-s2-images-o3.out|exact
+E171|@driver_e171_s2_o3_control_baseline||e171-three-oracle-collusion-2026-10-03-s2-o3-control-baseline.out|exact
+E171|@driver_e171_s2_comparator||e171-three-oracle-collusion-2026-10-03-s2-comparator.out|exact
+E171|@driver_e171_s3_comparator_mutations||e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7.out|exact
+E171|@driver_e171_s4_comparator||e171-three-oracle-collusion-2026-10-03-s4-comparator.out|exact
+E171|@driver_e171_s4_f4_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out|exact
+E171|@driver_e171_s4_f4_substitutes_comparator||e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-comparator.out|exact
 TSV
 )
 
@@ -505,6 +550,526 @@ driver_e142() {
 # 计时字段一律以 _elapsed_ns 或 _ratio 结尾，按 timing 比结构；PC3 的判定行随计时可能翻，翻了是新观测。线程数钉 10；内存上限跟 REPLAY_MEMORY_CAP（默认 8G，2026-09-27 收窄前曾写死 16G，改成跟脚本头默认值一致）。
 driver_e161_feasibility() {
   (cd .. && set -o pipefail && E161_THREADS=10 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e161_crash_state_dedup_and_time_split -- feasibility | grep '^E7RESULT ')
+}
+
+# E165（恢复重放有界穷举与变异杀伤界）第一段（登记 `research/prompts/e165-preregistration.md` 5.5）：入库装置，只跑合法历史一族
+# （`--family legal`；对抗一族停在登记停机条款 H4，见登记第十二节修订 7，数没入库）。装置另打 `E7TIMING` 耗时行，产物只留 E7RESULT 行；
+# 计数与线程数无关（10 线程与 7 线程两遍逐字节相同），线程数钉 10。`driver_e165_light` 是 `--bounds light` 那一档。
+driver_e165() {
+  (cd .. && set -o pipefail && E165_THREADS=10 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal | grep '^E7RESULT ')
+}
+driver_e165_light() {
+  (cd .. && set -o pipefail && E165_THREADS=10 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds light --family legal | grep '^E7RESULT ')
+}
+# 第一段对抗一族（登记修订第 9 条收窄 H4 之后，2026-10-01 入库；16 线程与 7 线程两遍逐字节相同）。
+driver_e165_adversarial() {
+  (cd .. && set -o pipefail && E165_THREADS=10 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial | grep '^E7RESULT ')
+}
+# 第二段（第 2 次重跑 r2 登记 `research/prompts/e165-r2-prereg.md` 5.6、9.1–9.5，补跑 2c）：26 个变体各一份副本、各编一次，整段约 15 分钟（2026-10-02 同机负载 12–30，--jobs 2 --threads 4；26 个变体都跑，估计 15 至 20 分钟，没整轮量过）。
+# 驱动在副本里改 recovery.rs、自己经内存包装跑每个二进制，这里不再包一层。产物里每行的复跑命令写的是 research/results/ 下的路径，
+# 这里的输出落在临时目录，比对前把两个文件名换回那个写法；红例账的 sha256 在产物的 name=verdict 行里，账一字不差才对得上。
+# 驱动的 REGISTERED 钉的是第四段冻结根的表（`crates/mutations.tsv` 9d5fd9fc…）与 recovery.rs、lib.rs 的哈希，主工作区的 crates/ 变了它就停在 RH1，
+# 所以复跑要 --root 指冻结根：默认 /tmp/claude-1000/e165-r2-segment4/root（清单与建法见登记 r2 修订 4，第 819–820 行一带），那份没了就照修订 4 重建一份、
+# 用 E165_R2_FROZEN_ROOT 指过去；根里要有 research/scripts、research/mutations、第一段 r2 的 segment1b 两份产物与 .claude/scripts/preflight.sh。
+# 驱动 --selftest 不带 --root；这一份基线是 1373 行（修订 4 挪了三项自检之后），同一棵根上复得出，别的树复不出来先对冻结根清单。
+driver_e165_segment2() {
+  local scratch="$OUT_DIR/e165-segment2"
+  local frozen_root="${E165_R2_FROZEN_ROOT:-/tmp/claude-1000/e165-r2-segment4/root}"
+  mkdir -p "$scratch/out"
+  (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="变体与基线装置峰值只量过合法历史一族，留十倍余量" \
+      bash research/scripts/e165-replay-mutation-kill-bounds.sh --root "$frozen_root" --scratch "$scratch" \
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out" \
+      --ledger "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-red-examples.tsv" --jobs 2 --threads 4 >&2) || return 1
+  sed -e 's#--output e165-#--output research/results/e165-#' -e 's#--ledger e165-#--ledger research/results/e165-#' \
+    "$scratch/out/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-kill-bounds.out"
+}
+# 第 2 次重跑（登记 `research/prompts/e165-r2-prereg.md`）第三段与第四段：入库装置，`--profile r2`。产物是第一段冻结根（登记 r2 修订 2、4）上编出的
+# 二进制跑的：第三段那份是修订 4 把三条读实现结局的启动自检挪成单测之后的装置（产物名带 -2026-10-02 后缀；挪之前的第三段产物
+# `…-r2-segment3-multi-disk.out` 留着、今天的装置复不出它），第四段几份是 `--table both`（两种建表法各判一遍逐态比）与盘次序反过来。
+# 这里在主工作区上 `cargo run`：装置同一份（sha256 a0fdc9e2…），`crates/` 里别的文件主工作区与冻结根可能不同（别的会话在改），那样复出来对不上是新观测，
+# 先对着冻结根清单（`research/prompts/e165-r2-prereg.md` 修订 4）查。计数与线程数无关（多盘一族 8 与 4 线程两遍逐字节相同），线程数钉 8。
+driver_e165_r2_segment3_multi_disk() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 | grep '^E7RESULT ')
+}
+driver_e165_r2_segment4_table_both_legal() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --profile r2 --table both | grep '^E7RESULT ')
+}
+driver_e165_r2_segment4_table_both_adversarial() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r2 --table both | grep '^E7RESULT ')
+}
+driver_e165_r2_segment4_table_both_multi_disk() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --profile r2 --table both | grep '^E7RESULT ')
+}
+driver_e165_r2_segment4_reversed_disk_order_legal() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family legal --only R --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+}
+driver_e165_r2_segment4_reversed_disk_order_multi_disk() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family multi_disk --only M,MC --profile r2 --table both --disk-order reversed | grep '^E7RESULT ')
+}
+# 第 3 次重跑（登记 `research/prompts/e165-r3-prereg.md`）：`--profile r3`，入库装置；第一段是对抗一族按「同一实例里 journal 记录的 txg 随计数器不减」拆行（5.6），
+# 第二段是择根与重放合判一族 `--family root_choice`（5.3、5.5），计数与线程数无关（两段都是 8 与 4 线程两遍整份逐字节相同），线程数钉 8。
+# 产物是第一段、第二段冻结根上编出的二进制跑的；这里在主工作区上 `cargo run`，`crates/` 里别的文件（`recovery.rs`、`lib.rs` 等，别的会话在改）与冻结根可能不同，
+# 复出来对不上是新观测，先对着冻结根清单（第一段 `/tmp/claude-1000/e165-r3-segment1/segment1-root-after-overlay.sha256`、第二段 `/tmp/claude-1000/e165-r3-segment2/segment2-root-after-overlay.sha256`）查。
+driver_e165_r3_segment1_adversarial() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family adversarial --profile r3 | grep '^E7RESULT ')
+}
+driver_e165_r3_segment2_root_choice() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice --profile r3 | grep '^E7RESULT ')
+}
+# 第 3 次重跑第三段（登记 `research/prompts/e165-r3-prereg.md` 5.8、9.1、9.3）：变体 1822–1827 各一份副本、各编一次，驱动带 --profile r3 调装置
+# （--profile r3 --bounds segment1 --family root_choice），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层；
+# 产物里每行的复跑命令写的 --output 是产物的文件名（--root 指冻结根时驱动只写 basename，不管产物落在哪），这里的输出落在临时目录，同样只写 basename，原样比，不做替换。
+# 驱动的 REGISTERED_R3 钉的是第二段冻结根的 recovery.rs、lib.rs、crates/mutations.tsv 的哈希与两个函数的区间，主工作区的 crates/ 变了它就停在 RH1，
+# 所以复跑要 --root 指冻结根：默认 /tmp/claude-1000/e165-r3-segment2/root（清单 `segment2-root-after-overlay.sha256`，233 个文件），那份没了就照登记第十二节修订 2 的第 10 条重建一份、
+# 用 E165_R3_FROZEN_ROOT 指过去。TV7 的比对对象是脚本所在的仓里的第二段产物（research/results/e165-replay-bounded-enumeration-2026-10-03-r3-segment2-root-choice.out）。
+# 整段（基线两遍加变体六个，每个冷编一次再跑一遍 70 秒量级的装置）的用时跑之前没量过；--jobs × --threads 不超过 6，重型复跑，只在提交时由主 agent 跑。
+driver_e165_r3_segment3_root_choice_kill_bounds() {
+  local scratch="$OUT_DIR/e165-r3-segment3"
+  local frozen_root="${E165_R3_FROZEN_ROOT:-/tmp/claude-1000/e165-r3-segment2/root}"
+  mkdir -p "$scratch/out"
+  (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=1G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（第二段 446 MiB），变体留余量" \
+      bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r3 --root "$frozen_root" --scratch "$scratch" \
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+  cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r3-segment3-root-choice-kill-bounds.out"
+}
+# 第 4 次重跑第一段（登记 `research/prompts/e165-r4-prereg.md` 5.3 至 5.6、第七节与修订 1、2）：入库装置，`--profile r4 --family root_choice_faults`，
+# 带读故障的择根合判一族（KF、KF3、KF9、KFW、KG、KA；闸取实现的取甲）。计数与线程数无关（6 与 3 线程两遍整份逐字节相同，线程数钉 8）；整遍峰值 RSS 约 1.7 GB，
+# REPLAY_MEMORY_CAP 默认 8G 够。产物是第一段根（`/tmp/claude-1000/e165-r4-segment1b/root`，清单 `root-manifest-after-overlay.sha256`）上编出的二进制跑的；
+# 这里在主工作区上 `cargo run`，`crates/` 里别的文件（别的会话在改，尤其 `mount.rs`、`transaction.rs`：条款改取 R2 之后实现一落地，这一族要重跑、产物会变）与那份根可能不同，
+# 复出来对不上是新观测，先对着根清单查。
+driver_e165_r4_segment1_root_choice_faults() {
+  (cd .. && set -o pipefail && E165_THREADS=8 bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e165_replay_bounded_enumeration -- --bounds segment1 --family root_choice_faults --profile r4 | grep '^E7RESULT ')
+}
+# 第 4 次重跑第二段（登记 `research/prompts/e165-r4-prereg.md` 9.1、9.3 与修订 3）：变体 v1822–v1827（根里 `crates/mutations.tsv` 的第 1821–1826 行）各一份副本、各编一次，
+# 驱动带 --profile r4 调装置（--profile r4 --bounds segment1 --family root_choice_faults），不落红例账。驱动在副本里改 recovery.rs 或 lib.rs、自己经内存包装跑每个二进制，这里不再包一层。
+# 驱动的 R4_REGISTERED 钉的是第一段根的 recovery.rs、lib.rs、crates/mutations.tsv 的哈希与两个函数的区间，主工作区的 crates/ 变了它就停在开工核对，
+# 所以复跑要 --root 指第一段根：默认 /tmp/claude-1000/e165-r4-segment1b/root（清单 `root-manifest-after-overlay-final.sha256`，246 个文件），那份没了就照登记第十二节修订 2 的「根」条重建一份、
+# 用 E165_R4_FROZEN_ROOT 指过去。TV7 的比对对象是脚本所在的仓里的第一段产物（research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out）。
+# 内存上限取 8G（第一段整遍峰值约 1.66 GB；2026-10-03 第一趟 4G、--jobs 2 时 tsv-1823 撞顶退 250，补跑 8G 才得出结果，登记修订 3）；--jobs 2 --threads 3，整轮约 10 分钟
+# （第二段那一次变体各编各跑 130 秒量级，开头收尾基线各 66 秒量级），重型复跑，只在提交时由主 agent 跑。
+# 产物里每行的复跑命令写的 --output 是产物的文件名（--root 指第一段根时驱动只写 basename），这里的输出落在临时目录，同样只写 basename，原样比。
+driver_e165_r4_segment2_root_choice_faults_kill_bounds() {
+  local scratch="$OUT_DIR/e165-r4-segment2"
+  local frozen_root="${E165_R4_FROZEN_ROOT:-/tmp/claude-1000/e165-r4-segment1b/root}"
+  mkdir -p "$scratch/out"
+  (cd .. && E165_KILL_BOUNDS_MEMORY_CAP=8G RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="装置峰值只在基线上量过（第一段约 1.66 GB），tsv-1823 在 4G 撞过顶，留余量" \
+      bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r4 --root "$frozen_root" --scratch "$scratch" \
+      --output "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out" --jobs 2 --threads 3 >&2) || return 1
+  cat "$scratch/out/e165-replay-bounded-enumeration-2026-10-03-r4-segment2-root-choice-faults-kill-bounds.out"
+}
+
+# E168（删除借保留量的环窗口）第一段（登记 `research/prompts/e168-preregistration.md` 5.0、5.8、第十一节 S1、S2 与第十二节修订 1–17）：入库装置
+# `crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs`。装置的行以 `E name=` 开头、收尾 `E name=done`，不用 E7RESULT 协议：
+# 照 driver_e163_r1_merge 的先例在驱动里包一层（e168_wrap：行首 `E name=` 换成 `E7RESULT name=`，收尾行补 `emitted=`），入库产物就是包过的样子，
+# 换回去与装置的原样输出逐字节相同（2026-10-03 四份逐份核过）。
+# s1-history 在主工作区上跑（不调删除入口）。positive-controls 与 segment1 要删除入口，主工作区那一份是桩、一调就打停机行退 3，
+# positive-controls 在临时目录里拷一份 `crates/`、套删除路径补丁表 `research/mutations/e168_delete_ring_window_borrow_delete_path.tsv`
+# （每行旧串恰好命中一次，不中就整行跑不了：登记停机条款 S2）再编、跑（先例：driver_e165_segment2 在副本里改了再编）。segment1 一遍约 9 小时、36G，不进登记表（用户 2026-10-03 定），复跑照实验页「复跑」那一节手工步骤、由用户点名跑。
+# 入库产物是 2026-10-03 那一次（第一段 r8）在当时主工作区 `crates/` 的快照上编、跑的，快照逐文件的 sha256 在
+# `e168-delete-ring-window-borrow-segment1-tree-2026-10-03.sha256`（不含补丁表）；之后别的会话改过 `crates/singlefs-core/` 里的几份文件
+# （extent_tree.rs、records.rs、recovery.rs 等），今天复出来对不上是新观测，先对着那份清单查。
+# 计数与线程数无关（单测 segment_one_on_p2_s4_prints_the_same_lines_on_one_thread_and_on_eight_threads），线程数照那一次钉 4、P4 的片一次一片。
+# 重型：positive-controls 峰值约 15 GB（上限 20G），s1-history 峰值约 2.3 GB（上限 4G），
+# 只在提交时由主 agent 跑；E168_POSITIVE_CONTROLS_MEMORY_CAP、E168_S1_HISTORY_MEMORY_CAP 可以覆盖上限。
+e168_wrap() {
+  awk '/^E name=/{ sub(/^E name=/, "E7RESULT name="); n++; if ($0 == "E7RESULT name=done") { print $0 " emitted=" n; next } print }'
+}
+e168_patched_tree() { # e168_patched_tree <副本目录>：拷主工作区的 crates/、Cargo 清单与 .cargo，套删除路径补丁表
+  local tree="$1"
+  rm -rf "$tree" && mkdir -p "$tree" || return 1
+  (cd .. && rsync -a --exclude target Cargo.toml Cargo.lock .cargo crates "$tree/") || return 1
+  (cd .. && python3 -c 'import sys
+root=sys.argv[2]; bad=0
+for line in open(sys.argv[1],encoding="utf-8"):
+    line=line.rstrip("\n")
+    if not line or line.startswith("#"): continue
+    _,path,old,new=line.split("\t"); old=old.replace("\\n","\n"); new=new.replace("\\n","\n")
+    text=open(root+"/"+path,encoding="utf-8").read(); hits=text.count(old); print(path,hits); bad+=hits!=1
+    if hits==1: open(root+"/"+path,"w",encoding="utf-8").write(text.replace(old,new,1))
+sys.exit(1 if bad else 0)' research/mutations/e168_delete_ring_window_borrow_delete_path.tsv "$tree") >&2
+}
+driver_e168_s1_history() {
+  (cd .. && set -o pipefail && bash research/scripts/run-with-memory-cap.sh "${E168_S1_HISTORY_MEMORY_CAP:-4G}" cargo run -q --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow -- s1-history | e168_wrap)
+}
+driver_e168_positive_controls() {
+  local tree="$OUT_DIR/e168-positive-controls-tree" wrapper="$PWD/scripts/run-with-memory-cap.sh"
+  e168_patched_tree "$tree" || return 1
+  (cd "$tree" && set -o pipefail && E168_THREADS=4 E168_LARGE_SLICE_THREADS=1 bash "$wrapper" "${E168_POSITIVE_CONTROLS_MEMORY_CAP:-20G}" cargo run -q --release -p singlefs-checker-tier --bin e168_delete_ring_window_borrow -- positive-controls | e168_wrap)
+}
+
+# E170（O3规约执行器第一版）第一段（登记 `research/prompts/e170-preregistration.md` 5.3、5.8、第十一节 V2 与修订 1 的 V2b）：入库导出装置
+# 连跑两趟，第二趟逐文件与第一趟比，只留第二趟的 E7RESULT 行（E7TIMING 是耗时与带耗时的两个文件的 sha256，不比）。
+# 导出文件落在临时目录：不碰 research/target/e170-dumps/，第二段按那里的 sha256 认导出（登记 V8）。
+# 第 1 次重跑（`research/prompts/e170-r1-prereg.md` 第十一节 V2 与 V2b）：第 11 批改了 mkfs（每盘多一步写零）之后，同一份源码重新生成的输出在装置自检里
+# 两行不同（mkfs 操作数 23 变 25、暖机返回点 45 变 47），八个不带耗时的导出文件仍逐字节相同；所以这一行改指 `…r1-…-2026-10-03-s2-export.out`
+# （第 1 次重跑第二段的重导），第一次的 `e170-o3-spec-executor-2026-10-02-s1-export.out` 留档、不再是这一行比对的对象。
+# 出处（git 标识、与第一次导出的逐文件比）在 `e170-r1-o3-spec-executor-2026-10-03-s2-export-provenance.out`，不进复跑。
+driver_e170() {
+  local scratch="$OUT_DIR/e170-dumps"
+  (cd .. && set -o pipefail \
+    && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory "$scratch/first-run" >/dev/null \
+    && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory "$scratch/second-run" --compare-with "$scratch/first-run" | grep '^E7RESULT ')
+}
+
+# E170 第三段（登记 5.5、5.8「第三段」、第九节）：坏状态与比对器。四个驱动共用一份临时导出：第一个用到它的驱动现导出、再在同一个目录里
+# 造坏状态（`bad-states`，种子是第二段冻结的执行器 sha256 前 16 位，`e170-o3-spec-executor-2026-10-02-s2-executor.out` 的 name=freeze_seed），
+# 完成标记在了才算现成，后面几个接着用。`bad-states` 与 `…-s3-bad-states.out` 两行同样因第 11 批的实现变了而改指今天重新生成的
+# `…-2026-10-03.out`（装置自检那两行 23 / 45 变 25 / 47，实现在坏状态行上的判定也变了：Q3-f 的数、`bad-impl-verdicts.tsv` 的 sha256 与行数；
+# 四个由 `bad-states` 造的文件 `bad-states.tsv`、`bad-patches.bin`、`bad-expected.tsv`、`bad-seed.tsv` 与第一次逐字节相同），旧产物留档。
+# 执行器那一侧是 Python（`research/e7-index-bench/src/bin/e170_o3_spec_executor/`，不是编译出来的代码，
+# 不经内存包装），产物不带耗时，exact 比；冻结那一份判定与 freeze 行取第二段产物（它在 research/results/ 里）。
+e170_s3_dumps() {
+  local dumps="$OUT_DIR/e170-s3-dumps"
+  if [[ ! -f "$OUT_DIR/e170-s3-dumps.done" ]]; then
+    rm -rf "$dumps" || return 1
+    (cd .. && set -o pipefail \
+      && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory "$dumps" >/dev/null \
+      && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states --dump-directory "$dumps" --seed-hex 8546b1258e427c34 | grep '^E7RESULT ' > "$OUT_DIR/e170-s3-bad-states-export.lines") || return 1
+    : > "$OUT_DIR/e170-s3-dumps.done"
+  fi
+  printf '%s\n' "$dumps"
+}
+# 在执行器目录里跑第三段的一个 Python 脚本（$1），产物写进临时文件再打出来；余下参数原样给它。
+e170_s3_python() {
+  local script="$1"; shift
+  local dumps output research_root
+  dumps="$(e170_s3_dumps)" || return 1
+  research_root="$PWD"
+  output="$OUT_DIR/e170-s3-${script%.py}.out"
+  rm -f "$output"
+  (cd "$research_root/e7-index-bench/src/bin/e170_o3_spec_executor" && PYTHONDONTWRITEBYTECODE=1 python3 "$script" --dumps "$dumps" \
+      --frozen-verdicts "$research_root/results/e170-o3-spec-executor-2026-10-02-s2-executor.out" --output "$output" "$@" >&2) || return 1
+  cat "$output"
+}
+driver_e170_s3_bad_states_export() {
+  e170_s3_dumps >/dev/null || return 1
+  cat "$OUT_DIR/e170-s3-bad-states-export.lines"
+}
+driver_e170_s3_bad_states() { e170_s3_python comparator_q3_bad_states.py; }
+driver_e170_s3_q2_comparator() { e170_s3_python comparator_q2_implementation_verdicts.py; }
+driver_e170_s3_mutations() {
+  mkdir -p "$OUT_DIR/e170-s3-mutation-work" || return 1
+  e170_s3_python mutation_driver.py --table "$PWD/mutations/e170_o3_spec_executor.tsv" --scratch "$OUT_DIR/e170-s3-mutation-work"
+}
+
+# E170 第 1 次重跑第二、三段（登记 `research/prompts/e170-r1-prereg.md` 5.3、5.8、第九节）：四个驱动共用一份临时导出（今天的 `dump`，再在同一目录里
+# 用新模式 `bad-states-second-run` 造坏状态，种子是第一段冻结的执行器 sha256 前 16 位，`e170-r1-o3-spec-executor-2026-10-03-s1-executor.out`
+# 的 name=freeze_seed）。执行器那一侧是第 1 次重跑的新目录 `e170_second_run_o3_spec_executor/`（Python，不经内存包装）；冻结那一份判定取第二段产物
+# `…-s2-executor.out`（带耗时与进程号，不进复跑，在 research/results/ 里当固定输入），冻结行取第一段产物。产物不带耗时，exact 比。
+e170_r1_dumps() {
+  local dumps="$OUT_DIR/e170-r1-dumps"
+  if [[ ! -f "$OUT_DIR/e170-r1-dumps.done" ]]; then
+    rm -rf "$dumps" || return 1
+    (cd .. && set -o pipefail \
+      && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory "$dumps" >/dev/null \
+      && bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states-second-run --dump-directory "$dumps" --seed-hex 85441ae491419411 | grep '^E7RESULT ' > "$OUT_DIR/e170-r1-bad-states-export.lines") || return 1
+    : > "$OUT_DIR/e170-r1-dumps.done"
+  fi
+  printf '%s\n' "$dumps"
+}
+# 在新执行器目录里跑一个 Python 脚本（$1），产物写进临时文件再打出来；余下参数原样给它（--dumps 与 --output 这里加）。
+e170_r1_python() {
+  local script="$1"; shift
+  local dumps output research_root
+  dumps="$(e170_r1_dumps)" || return 1
+  research_root="$PWD"
+  output="$OUT_DIR/e170-r1-${script%.py}.out"
+  rm -f "$output"
+  (cd "$research_root/e7-index-bench/src/bin/e170_second_run_o3_spec_executor" && PYTHONDONTWRITEBYTECODE=1 python3 "$script" --dumps "$dumps" "$@" --output "$output" >&2) || return 1
+  cat "$output"
+}
+driver_e170_r1_s3_bad_states_export() {
+  e170_r1_dumps >/dev/null || return 1
+  cat "$OUT_DIR/e170-r1-bad-states-export.lines"
+}
+driver_e170_r1_s2_q2_comparator() {
+  e170_r1_python comparator_q2_implementation_verdicts.py \
+    --frozen-verdicts "$PWD/results/e170-r1-o3-spec-executor-2026-10-03-s2-executor.out" \
+    --freeze-reference "$PWD/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out"
+}
+driver_e170_r1_s3_bad_states() {
+  e170_r1_python comparator_q3_bad_states.py --freeze-reference "$PWD/results/e170-r1-o3-spec-executor-2026-10-03-s1-executor.out"
+}
+driver_e170_r1_s3_mutations() {
+  mkdir -p "$OUT_DIR/e170-r1-mutation-work" || return 1
+  e170_r1_python mutation_driver_with_batch_and_bad_state_checks.py --table "$PWD/mutations/e170_second_run_o3_spec_executor.tsv" \
+    --frozen-verdicts "$PWD/results/e170-r1-o3-spec-executor-2026-10-03-s2-executor.out" --scratch "$OUT_DIR/e170-r1-mutation-work"
+}
+
+# E171（三oracle合谋测试）第一段（登记 `research/prompts/e171-preregistration.md` 5.3、5.6、5.8「第一段」、第十一节 Z1 与 S2）：入库装置
+# `e171_three_oracle_collusion` 与研究一侧（`research/e7-index-bench/src/bin/e171_three_oracle_collusion/`，Python，不是编译出来的代码，不经内存包装）。
+# 每个驱动各带自己的临时目录（复跑是并发起的，不共用可写状态）；每条经内存包装的命令都设 OVER_PEAK_REASON：复跑统一给 REPLAY_MEMORY_CAP，没有按驱动量过。
+# 产物只留 E7RESULT 行：不带耗时、不带路径（比对器的 config 行只写目录的名字），exact 比；耗时在 E7TIMING 行里，不入库。
+# 第一段两份（baseline-run1、known-bad-images）不带 O3：O3 那几列要等 E170 第 1 次重跑冻结执行器，第二段才有。
+# 比对器的 A4–A7 读今天的 `crates/mutations.tsv`（坏实现表 117 行按名字取、挑法脚本现算步长 8 与 4 的行数、改实现的行 844 行）：
+# 表里别处加了核心实现的行、或改了那 117 行，这几行会变，不是装置坏了。
+# E170 导出装置在 `bad-states` 模式、第一次的表（`bad-states`，不是 `bad-states-second-run`）上造 P 行与 N 行；第一段的 known-bad-images 用占位种子
+# 0000000000000000（P、N 行与种子无关），第二段的盲测族用冻结执行器的种子（见下）。它在 E170 第 1 次重跑里加了第二套表，第一套的输出与加之前逐字节相同。
+e171_device() {
+  RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+    bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e171_three_oracle_collusion -- "$@"
+}
+e171_e170_exporter() {
+  RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+    bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" cargo run -q --release -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- "$@"
+}
+driver_e171_s1_baseline() {
+  local scratch="$OUT_DIR/e171-baseline"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  (cd .. && set -o pipefail && e171_device baseline --output-directory "$scratch/baseline-run1" | grep '^E7RESULT ')
+}
+driver_e171_s1_known_bad_images() {
+  local scratch="$OUT_DIR/e171-known-bad"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  (cd .. && set -o pipefail \
+    && e171_device baseline --output-directory "$scratch/baseline-run1" >/dev/null \
+    && cp -r "$scratch/baseline-run1" "$scratch/e170-bad-states-copy" \
+    && e171_e170_exporter bad-states --dump-directory "$scratch/e170-bad-states-copy" --seed-hex 0000000000000000 >/dev/null \
+    && e171_device known-bad-images --dump-directory "$scratch/e170-bad-states-copy" --output-directory "$scratch/known-bad" --e170-bad-rows | grep '^E7RESULT ')
+}
+# E171 第二段（登记 `research/prompts/e171-preregistration.md` 5.4、5.5、第十二节修订）：O3 用 E170 第 1 次重跑冻结的执行器
+#（`research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor/`，冻结行在 `e170-r1-o3-spec-executor-2026-10-03-s1-executor.out`；
+# 盲测族种子取那份产物 `name=freeze_seed` 行的 85441ae491419411）。第一段的比对器与变异表产物（`e171-…-s1-comparator.out`、`…-s1-comparator-mutations.out`）
+# 是第一段那一版比对器、九条变异跑出来的，留在 `research/results/` 里当历史；比对器、变异表在第二段改了，那两份不再复跑，由下面的 s2 两份取代。
+# 坏镜像那三份（bad-states-export、known-bad-images、images-o3）共用「基线 → 拷一份 → E170 导出装置 bad-states（冻结的种子）」这三步，各带自己的临时目录。
+# images-o3 的 config 行写两个目录名（e170-bad-states-copy-s2、known-bad-s2）与两个源文件的 sha256（本实验那份 `o3_bad_image_judge.py` 与它拷来的 E170
+# `comparator_q3_bad_states.py`）：改了这两份源文件或目录名，这份产物就对不上，不是装置坏了。
+e171_s2_prepare_bad_states() {
+  local scratch="$1"
+  (cd .. && set -o pipefail \
+    && e171_device baseline --output-directory "$scratch/baseline-run1" >"$scratch/baseline-run1.stdout" \
+    && cp -r "$scratch/baseline-run1" "$scratch/e170-bad-states-copy-s2" \
+    && e171_e170_exporter bad-states --dump-directory "$scratch/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >"$scratch/e170-bad-states.stdout")
+}
+e171_s2_known_bad() {
+  local scratch="$1"
+  (cd .. && set -o pipefail \
+    && e171_device known-bad-images --dump-directory "$scratch/e170-bad-states-copy-s2" --output-directory "$scratch/known-bad-s2" --e170-bad-rows >"$scratch/known-bad-images.stdout")
+}
+e171_s2_python() {
+  PYTHONDONTWRITEBYTECODE=1 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+    bash research/scripts/run-with-memory-cap.sh "$REPLAY_MEMORY_CAP" python3 "$@"
+}
+driver_e171_s2_bad_states_export() {
+  local scratch="$OUT_DIR/e171-s2-bad-states"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  e171_s2_prepare_bad_states "$scratch" || return 1
+  grep '^E7RESULT ' "$scratch/e170-bad-states.stdout"
+}
+driver_e171_s2_known_bad_images() {
+  local scratch="$OUT_DIR/e171-s2-known-bad"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  e171_s2_prepare_bad_states "$scratch" && e171_s2_known_bad "$scratch" || return 1
+  grep '^E7RESULT ' "$scratch/known-bad-images.stdout"
+}
+driver_e171_s2_images_o3() {
+  local scratch="$OUT_DIR/e171-s2-images-o3"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  e171_s2_prepare_bad_states "$scratch" && e171_s2_known_bad "$scratch" || return 1
+  (cd .. && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
+      --e170-dumps "$scratch/e170-bad-states-copy-s2" --known-bad-dir "$scratch/known-bad-s2" --output "$scratch/images-o3.out" >&2) || return 1
+  grep '^E7RESULT ' "$scratch/images-o3.out"
+}
+driver_e171_s2_o3_control_baseline() {
+  local scratch="$OUT_DIR/e171-s2-o3-control"
+  rm -rf "$scratch" && mkdir -p "$scratch" || return 1
+  e171_s2_prepare_bad_states "$scratch" || return 1
+  (cd .. && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py control \
+      --dumps "$scratch/baseline-run1" --e170-dumps "$scratch/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control.out" >&2) || return 1
+  grep '^E7RESULT ' "$scratch/o3-control.out"
+}
+# 比对器那一份（第二段）：基线两趟、E170 导出装置的 dump、冻结的执行器在基线上（A3 的 O3 一份）、已知坏镜像与 E170 的 P、N、盲测各行（O2 与 O3）、关一条（O1、O2）、
+# 阳性对照四条（基线与空变异各一趟）、逐行驱动的九行（空变异与第一刀里的 1、6、8、18、28 与表里的 64、83、84；三条线道、每条线道两个线程）、
+# Q3-核的机制试跑（第一刀的第 8 行，关 O1、关 O2、驱动不跑执行器各一趟）；目录的名字（baseline-run1、rows-s2-trial、disable-O1……）进产物，改了名产物就变。
+driver_e171_s2_comparator() {
+  local scratch="$OUT_DIR/e171-s2-comparator" dumps control name flag
+  dumps="$scratch/dumps"
+  rm -rf "$scratch" && mkdir -p "$dumps" "$scratch/work" || return 1
+  (cd .. && set -o pipefail \
+    && e171_device baseline --output-directory "$dumps/baseline-run1" >"$scratch/baseline-run1.stdout" \
+    && e171_device baseline --output-directory "$dumps/baseline-run2" >/dev/null \
+    && e171_e170_exporter dump --output-directory "$dumps/e170-dump" >/dev/null \
+    && cp -r "$dumps/baseline-run1" "$dumps/e170-bad-states-copy-s2" \
+    && e171_e170_exporter bad-states --dump-directory "$dumps/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
+    && e171_device known-bad-images --dump-directory "$dumps/e170-bad-states-copy-s2" --output-directory "$dumps/known-bad-s2" --e170-bad-rows >/dev/null \
+    && e171_device baseline --output-directory "$dumps/disable-O1" --disable-oracle O1 >/dev/null \
+    && e171_device baseline --output-directory "$dumps/disable-O2" --disable-oracle O2 >/dev/null \
+    && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
+         --e170-dumps "$dumps/e170-bad-states-copy-s2" --known-bad-dir "$dumps/known-bad-s2" --output "$scratch/images-o3.out" >&2 \
+    && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py control \
+         --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
+    && (root="$PWD" && cd research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
+          RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+          bash "$root/research/scripts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
+          --batches 1,2 --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
+  for control in O1-对拍 O1-崩溃判官 O2; do
+    (cd .. && e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
+      && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+           --work-root "$scratch/work" --output-root "$dumps/rows-controls-$control" --empty-mutation --positive-control "$control" \
+           --memory-cap "$REPLAY_MEMORY_CAP" >&2) || return 1
+  done
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$scratch/work" --output-root "$dumps/rows-controls-O3" --empty-mutation --positive-control O3 \
+      --o3-control-bad-states "$dumps/e170-bad-states-copy-s2" --memory-cap "$REPLAY_MEMORY_CAP" >&2 \
+    && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$scratch/work" --output-root "$dumps/rows-s2-trial" --empty-mutation --rows 1,6,8,18,28,64,83,84 --lanes 3 --threads 2 \
+      --memory-cap "$REPLAY_MEMORY_CAP" >"$scratch/driver-tables.log") || return 1
+  for name in O1 O2 no-executor; do
+    flag="--disable-oracle ${name}"
+    [[ "$name" == no-executor ]] && flag="--no-executor"
+    # shellcheck disable=SC2086
+    (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+        --work-root "$scratch/work" --output-root "$dumps/rows-s2-q3core-$name" --rows 8 $flag --memory-cap "$REPLAY_MEMORY_CAP" \
+        | grep '^table ' >>"$scratch/driver-tables.log") || return 1
+  done
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/comparator.py --output "$scratch/comparator.out" \
+      --mutations-table crates/mutations.tsv --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$scratch/baseline-run1.stdout" \
+      --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-dump" --o3-baseline "$scratch/o3-baseline.out" \
+      --disabled O1:"$dumps/disable-O1" --disabled O2:"$dumps/disable-O2" \
+      --rows-root "$dumps/rows-s2-trial" --driver-output "$scratch/driver-tables.log" \
+      --known-bad-dir "$dumps/known-bad-s2" --e170-expected-dir "$dumps/e170-bad-states-copy-s2" --image-judgements "$scratch/images-o3.out" \
+      --control "O1-对拍:baseline:$dumps/control-baseline-O1-对拍" --control "O1-对拍:empty_mutation:$dumps/rows-controls-O1-对拍/row-0/dump" \
+      --control "O1-崩溃判官:baseline:$dumps/control-baseline-O1-崩溃判官" --control "O1-崩溃判官:empty_mutation:$dumps/rows-controls-O1-崩溃判官/row-0/dump" \
+      --control "O2:baseline:$dumps/control-baseline-O2" --control "O2:empty_mutation:$dumps/rows-controls-O2/row-0/dump" \
+      --control "O3:baseline:$scratch/o3-control-baseline.out" --control "O3:empty_mutation:$dumps/rows-controls-O3/row-0/o3-control.out" \
+      --q3-core "O1:$dumps/rows-s2-trial:$dumps/rows-s2-q3core-O1" --q3-core "O2:$dumps/rows-s2-trial:$dumps/rows-s2-q3core-O2" \
+      --q3-core "no_executor:$dumps/rows-s2-trial:$dumps/rows-s2-q3core-no-executor" >&2) || return 1
+  grep '^E7RESULT ' "$scratch/comparator.out"
+}
+driver_e171_s3_comparator_mutations() {
+  local scratch="$OUT_DIR/e171-s3-comparator-mutations" research_root="$PWD"
+  rm -rf "$scratch" && mkdir -p "$scratch/work" || return 1
+  (cd "$research_root/e7-index-bench/src/bin/e171_three_oracle_collusion" && PYTHONDONTWRITEBYTECODE=1 python3 mutation_driver.py \
+      --table "$research_root/mutations/e171_three_oracle_collusion.tsv" --scratch "$scratch/work" --output "$scratch/mutations.out" >&2) || return 1
+  grep '^E7RESULT ' "$scratch/mutations.out"
+}
+# E171 s4 整表（登记修订 5）：第二段比对器那一串前置（基线两趟、E170 导出装置 dump 与 bad-states、已知坏镜像、关一条两趟、冻结执行器在基线与坏镜像上、
+# 阳性对照四条在基线与空变异各一趟），加修过的逐行驱动跑全部 117 行（两条线道、每条 2 线程，各趟都从同一份冻住的树拍快照）与 Q3-核三趟，再出比对器。
+# 推的挂钟约两小时（s4 整表 5 569.6 秒、Q3-核三趟各约两分钟）。117 行的读数与 A4–A7 都读今天的 `crates/`：实现、O2、O1、装置或 `crates/mutations.tsv`
+# 里那 117 行变了，产物就变，不是复跑坏了。目录的名字（baseline-run1、rows-s4、disable-O1、disable-O2）进产物，改了名产物就变。
+driver_e171_s4_comparator() {
+  local scratch="$OUT_DIR/e171-s4-comparator" dumps frozen control rows name flag entry
+  dumps="$scratch/dumps"
+  frozen="$scratch/frozen-tree"
+  rm -rf "$scratch" && mkdir -p "$dumps" "$scratch/work" "$frozen" || return 1
+  (cd .. && for entry in Cargo.toml Cargo.lock .cargo crates; do rsync -a --exclude target "$entry" "$frozen/" || exit 1; done) || return 1
+  (cd .. && set -o pipefail \
+    && e171_device baseline --output-directory "$dumps/baseline-run1" >"$scratch/baseline-run1.stdout" \
+    && e171_device baseline --output-directory "$dumps/baseline-run2" >/dev/null \
+    && e171_e170_exporter dump --output-directory "$dumps/e170-pinned-dump" >/dev/null \
+    && cp -r "$dumps/baseline-run1" "$dumps/e170-bad-states-copy-s2" \
+    && e171_e170_exporter bad-states --dump-directory "$dumps/e170-bad-states-copy-s2" --seed-hex 85441ae491419411 >/dev/null \
+    && e171_device known-bad-images --dump-directory "$dumps/e170-bad-states-copy-s2" --output-directory "$dumps/known-bad-s2" --e170-bad-rows >/dev/null \
+    && e171_device baseline --output-directory "$dumps/disable-O1" --disable-oracle O1 >/dev/null \
+    && e171_device baseline --output-directory "$dumps/disable-O2" --disable-oracle O2 >/dev/null \
+    && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py judge \
+         --e170-dumps "$dumps/e170-bad-states-copy-s2" --known-bad-dir "$dumps/known-bad-s2" --output "$scratch/images-o3.out" >&2 \
+    && e171_s2_python research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py control \
+         --dumps "$dumps/baseline-run1" --e170-dumps "$dumps/e170-bad-states-copy-s2" --row-name P1-F --output "$scratch/o3-control-baseline.out" >&2 \
+    && (root="$PWD" && cd research/e7-index-bench/src/bin/e170_second_run_o3_spec_executor && PYTHONDONTWRITEBYTECODE=1 \
+          RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="复跑统一给 REPLAY_MEMORY_CAP，没有按驱动分别量过" \
+          bash "$root/research/scripts/run-with-memory-cap.sh" "$REPLAY_MEMORY_CAP" python3 executor_main.py --dumps "$dumps/baseline-run1" \
+          --batches 1,2 --workers 6 --output "$scratch/o3-baseline.out" >&2)) || return 1
+  for control in O1-对拍 O1-崩溃判官 O2; do
+    (cd .. && e171_device baseline --output-directory "$dumps/control-baseline-$control" --positive-control "$control" >/dev/null \
+      && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+           --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-controls-$control" --empty-mutation \
+           --positive-control "$control" --memory-cap "$REPLAY_MEMORY_CAP" >&2) || return 1
+  done
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-controls-O3" --empty-mutation --positive-control O3 \
+      --o3-control-bad-states "$dumps/e170-bad-states-copy-s2" --memory-cap "$REPLAY_MEMORY_CAP" >&2 \
+    && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-s4" --all --lanes 2 --threads 2 \
+      --keep-compile-failures-as-they-are --memory-cap "$REPLAY_MEMORY_CAP" >"$scratch/table-driver.out") || return 1
+  rows=$(cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/comparator.py --print-q3-core-rows \
+           --rows-root "$dumps/rows-s4" --baseline-dir "$dumps/baseline-run1" | grep -o 'q3_core_rows=[0-9,]*' | cut -d= -f2)
+  [[ -n "$rows" ]] || return 1
+  for name in O1 O2 no-executor; do
+    flag="--disable-oracle ${name}"
+    [[ "$name" == no-executor ]] && flag="--no-executor"
+    # shellcheck disable=SC2086
+    (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+        --work-root "$scratch/work" --snapshot-from "$frozen" --output-root "$dumps/rows-s4-q3core-$name" --rows "$rows" $flag --lanes 2 --threads 2 \
+        --memory-cap "$REPLAY_MEMORY_CAP" >"$scratch/q3core-$name-driver.out") || return 1
+  done
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/comparator.py --output "$scratch/comparator.out" \
+      --mutations-table crates/mutations.tsv --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$scratch/baseline-run1.stdout" \
+      --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-pinned-dump" --o3-baseline "$scratch/o3-baseline.out" \
+      --disabled O1:"$dumps/disable-O1" --disabled O2:"$dumps/disable-O2" \
+      --control "O1-对拍:baseline:$dumps/control-baseline-O1-对拍" --control "O1-对拍:empty_mutation:$dumps/rows-controls-O1-对拍/row-0/dump" \
+      --control "O1-崩溃判官:baseline:$dumps/control-baseline-O1-崩溃判官" --control "O1-崩溃判官:empty_mutation:$dumps/rows-controls-O1-崩溃判官/row-0/dump" \
+      --control "O2:baseline:$dumps/control-baseline-O2" --control "O2:empty_mutation:$dumps/rows-controls-O2/row-0/dump" \
+      --control "O3:baseline:$scratch/o3-control-baseline.out" --control "O3:empty_mutation:$dumps/rows-controls-O3/row-0/o3-control.out" \
+      --known-bad-dir "$dumps/known-bad-s2" --e170-expected-dir "$dumps/e170-bad-states-copy-s2" --image-judgements "$scratch/images-o3.out" \
+      --rows-root "$dumps/rows-s4" --driver-output "$scratch/table-driver.out" \
+      --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
+      --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  grep '^E7RESULT ' "$scratch/comparator.out"
+}
+# E171 F4 扩表（登记 5.2「扩表」、第十节 F4）：先整条跑 driver_e171_s4_comparator（它的草稿目录留着 s4 的导出、冻住的树与编译目录），再在同一份冻住的树、
+# 同一个工作根上跑扩表 164 行（`bad-implementations-expansion-164.tsv`，补位跳过 117 行那张表的名字），比对器把 rows-s4 与 rows-s4-f4 并成一张、
+# 带 `--expansion-rows`、段名 s4-f4。推的挂钟约四小时（s4 那一串约两小时、扩表 164 行约两小时）。读数读今天的 `crates/`，同 s4 那一条的口径。
+# 编不过的行补位那一趟（第八段起驱动在编不过之后照登记 5.2 补位）见下面的 driver_e171_s4_f4_substitutes_comparator。s4 与这一条的整表都带
+# `--keep-compile-failures-as-they-are`：两份产物是编不过不补位的那一版驱动跑的，不带它，第 33、59、127、163、206、243 行会补位、产物就变。
+driver_e171_s4_f4_comparator() {
+  local s4="$OUT_DIR/e171-s4-comparator" dumps
+  driver_e171_s4_comparator >/dev/null || return 1
+  dumps="$s4/dumps"
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$s4/work" --snapshot-from "$s4/frozen-tree" --output-root "$dumps/rows-s4-f4" \
+      --selected-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv \
+      --other-selected-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-117.tsv --all --lanes 2 --threads 2 \
+      --keep-compile-failures-as-they-are --memory-cap "$REPLAY_MEMORY_CAP" >"$s4/table-f4-driver.out") || return 1
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/comparator.py --output "$s4/comparator-f4.out" \
+      --mutations-table "$s4/frozen-tree/crates/mutations.tsv" --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$s4/baseline-run1.stdout" \
+      --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-pinned-dump" --o3-baseline "$s4/o3-baseline.out" \
+      --disabled O1:"$dumps/disable-O1" --disabled O2:"$dumps/disable-O2" \
+      --control "O1-对拍:baseline:$dumps/control-baseline-O1-对拍" --control "O1-对拍:empty_mutation:$dumps/rows-controls-O1-对拍/row-0/dump" \
+      --control "O1-崩溃判官:baseline:$dumps/control-baseline-O1-崩溃判官" --control "O1-崩溃判官:empty_mutation:$dumps/rows-controls-O1-崩溃判官/row-0/dump" \
+      --control "O2:baseline:$dumps/control-baseline-O2" --control "O2:empty_mutation:$dumps/rows-controls-O2/row-0/dump" \
+      --control "O3:baseline:$s4/o3-control-baseline.out" --control "O3:empty_mutation:$dumps/rows-controls-O3/row-0/o3-control.out" \
+      --known-bad-dir "$dumps/known-bad-s2" --e170-expected-dir "$dumps/e170-bad-states-copy-s2" --image-judgements "$s4/images-o3.out" \
+      --segment s4-f4 --rows-root "$dumps/rows-s4" --rows-root "$dumps/rows-s4-f4" \
+      --expansion-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv \
+      --driver-output "$s4/table-driver.out" --driver-output "$s4/table-f4-driver.out" \
+      --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
+      --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  grep '^E7RESULT ' "$s4/comparator-f4.out"
+}
+# E171 编不过的 6 行补位（登记 5.2、第一节读法 5「替换之后编不过」）：先整条跑 driver_e171_s4_f4_comparator（它的草稿目录留着 s4 与 F4 的导出、冻住的树与编译目录；
+# 两趟整表都带 `--keep-compile-failures-as-they-are`，所以第 33、59、127、163、206、243 行在两份输出根里的结局还是编不过），再在同一份冻住的树、同一个工作根上
+# 只跑那六行（`--rerun-compile-failed-from` 两个输出根；原行先编，编不过就换同一文件组的下一行、至多三次，补位跳过 117 行与扩表两张表的全部名字，
+# 补位那一趟不带 `--keep-compile-failures-as-they-are`），比对器把 rows-s4、rows-s4-f4 并上补位根（`--substitution-rows-root`）、段名 s4-f4-substitutes。
+# 推的挂钟约四个半小时（F4 那一串约四小时、补位 6 行 1 277.9 秒）。读今天的 `crates/`，同 s4 那一条的口径；补位挑中哪几行取决于 `crates/mutations.tsv` 与那六行
+# 今天编不编得过，表或实现变了换上的行就变、产物就变。目录的名字（rows-s4-f4-substitutes）进产物的 config 行。
+driver_e171_s4_f4_substitutes_comparator() {
+  local s4="$OUT_DIR/e171-s4-comparator" dumps
+  driver_e171_s4_f4_comparator >/dev/null || return 1
+  dumps="$s4/dumps"
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/row_driver.py --repo-root "$PWD" \
+      --work-root "$s4/work" --snapshot-from "$s4/frozen-tree" --output-root "$dumps/rows-s4-f4-substitutes" \
+      --selected-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-117.tsv \
+      --other-selected-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv \
+      --rerun-compile-failed-from "$dumps/rows-s4" --rerun-compile-failed-from "$dumps/rows-s4-f4" --lanes 2 --threads 2 \
+      --memory-cap "$REPLAY_MEMORY_CAP" >"$s4/substitution-driver.out") || return 1
+  grep -q '^rerun_compile_failed rows=33,59,127,163,206,243$' "$s4/substitution-driver.out" || return 1
+  (cd .. && PYTHONDONTWRITEBYTECODE=1 python3 research/e7-index-bench/src/bin/e171_three_oracle_collusion/comparator.py --output "$s4/comparator-f4-substitutes.out" \
+      --mutations-table "$s4/frozen-tree/crates/mutations.tsv" --baseline-dir "$dumps/baseline-run1" --baseline-device-output "$s4/baseline-run1.stdout" \
+      --baseline-repeat-dir "$dumps/baseline-run2" --e170-dump "$dumps/e170-pinned-dump" --o3-baseline "$s4/o3-baseline.out" \
+      --disabled O1:"$dumps/disable-O1" --disabled O2:"$dumps/disable-O2" \
+      --control "O1-对拍:baseline:$dumps/control-baseline-O1-对拍" --control "O1-对拍:empty_mutation:$dumps/rows-controls-O1-对拍/row-0/dump" \
+      --control "O1-崩溃判官:baseline:$dumps/control-baseline-O1-崩溃判官" --control "O1-崩溃判官:empty_mutation:$dumps/rows-controls-O1-崩溃判官/row-0/dump" \
+      --control "O2:baseline:$dumps/control-baseline-O2" --control "O2:empty_mutation:$dumps/rows-controls-O2/row-0/dump" \
+      --control "O3:baseline:$s4/o3-control-baseline.out" --control "O3:empty_mutation:$dumps/rows-controls-O3/row-0/o3-control.out" \
+      --known-bad-dir "$dumps/known-bad-s2" --e170-expected-dir "$dumps/e170-bad-states-copy-s2" --image-judgements "$s4/images-o3.out" \
+      --segment s4-f4-substitutes --rows-root "$dumps/rows-s4" --rows-root "$dumps/rows-s4-f4" --substitution-rows-root "$dumps/rows-s4-f4-substitutes" \
+      --expansion-rows research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad-implementations-expansion-164.tsv \
+      --driver-output "$s4/table-driver.out" --driver-output "$s4/q3core-O1-driver.out" --driver-output "$s4/q3core-O2-driver.out" \
+      --driver-output "$s4/q3core-no-executor-driver.out" --driver-output "$s4/table-f4-driver.out" --driver-output "$s4/substitution-driver.out" \
+      --q3-core "O1:$dumps/rows-s4:$dumps/rows-s4-q3core-O1" --q3-core "O2:$dumps/rows-s4:$dumps/rows-s4-q3core-O2" \
+      --q3-core "no_executor:$dumps/rows-s4:$dumps/rows-s4-q3core-no-executor" >&2) || return 1
+  grep '^E7RESULT ' "$s4/comparator-f4-substitutes.out"
 }
 
 driver_e156() {

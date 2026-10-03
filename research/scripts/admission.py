@@ -19,7 +19,7 @@
       environment=<仓内脚本>[:<参数>…]    不是前提，是门禁复用判定的一项输入：bash <根>/<脚本> <参数…> 打出来的东西
                                           （例 herd7 的版本）。不在 git 树里的东西靠它进复用判定，见 ①
       正则、值、路径与参数里不许有空白（条件之间按空白切）。实验行写了门禁的种类、门禁行写了实验的种类，自查都判错。
-  崩溃枚举用例行（键是 crash-case:<名>，门禁 54 号逐条按复用判定跑、逐条记全绿标记）：路径写整个 crates/ 与 Cargo 清单、锁，
+  崩溃枚举用例行（键是 crash-case:<名>，门禁 checker-tier-layer0-replay 逐条按复用判定跑、逐条记全绿标记）：路径写整个 crates/ 与 Cargo 清单、锁，
     不按用例手列；算输入时自动减去用例读不到的文件（见「崩溃枚举用例」一节）。第三列认六种：
       test=<包>:<测试目标>:<用例函数>     恰好一条：跑的是 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数>；
                                          用例函数的每一处定义都要标 #[ignore]（不带 --ignored 的 cargo test 不跑它，重型测试闸按这一条认它）：
@@ -35,7 +35,7 @@
       threads-variable=<环境变量名>      至多一条：用例读线程数的环境变量（没登记是 SINGLEFS_LAYER0_THREADS）；crash-case-command 把它设成配的线程数
                                          （盖掉调用方环境里的），标记里 configured_worker_threads= 记它
       shard=across-machines              至多一条：这条用例的枚举认双机分片开关（SINGLEFS_LAYER0_SHARD，crates/singlefs-checker-tier/src/layer0_progress.rs），
-                                         门禁 54 号 --full 在本地分片配置可用时把它交给 research/scripts/layer0-shard-run.sh 两台各跑一片再 merge；
+                                         门禁 checker-tier-layer0-replay --full 在本地分片配置可用时把它交给 research/scripts/layer0-shard-run.sh 两台各跑一片再 merge；
                                          登记了它的用例，驱动脚本与它 eval 的配置判法（SHARD_DRIVER_FILES）按内容进这条用例的输入清单
 
 输入指纹里的构建环境（build_environment_lines；实验的指纹与 manifest / crash-case-manifest 带 --build-environment 时进清单）：
@@ -57,7 +57,8 @@
      （gate-reuse，research/scripts/stage-must-run.sh 转到这里，判法与原来那份逐格相同）。
      登记了 environment= 的门禁另要两样：环境与这一道上一次判绿时记下的相同（阶段判绿之后调 gate-record-environment，
      记进 git common-dir 的 singlefs-gate-environment.<阶段>），且记下的那一趟判的树在这几条路径上与这一次的暂存树相同；
-     没记下、取不出、对不上都按要跑处理。
+     没记下、取不出、对不上都按要跑处理。全绿标记那一条路（stage-marker-check、gate-reuse 先看的那一格）同样比环境：
+     此刻环境的 sha256 进 stage-fingerprint 的指纹，环境换了旧标记就对不上；环境取不出来时指纹算不出，按没有标记处理。
      实验：登记的路径下每个文件的 sha256、登记行本身、cargo -V 与 rustc -V 汇成一个输入指纹；
      research/results/ 里有一份产物头上记着同一个键、同一个指纹 ⇒ 拒绝重跑（退 77）。
   ② 前提没齐 ⇒ 拒。实验退 3；门禁经 gate-preconditions 退 1，阶段照判红（不退 77：前提没齐时这一道一格都没判）。
@@ -65,9 +66,10 @@
   ③ 跑的场合（重型测试前缀、内存包装）归 .claude/hooks/heavy-test-guard.sh 与 run-with-memory-cap.sh，这里不管。
 
 子命令（<根> 是被判仓的根）：
-  stage-fingerprint <根> <阶段文件名>    这一道登记输入在被判那棵树上的指纹：打「<sha256> <文件数>」
+  stage-fingerprint <根> <阶段文件名>    这一道登记输入在被判那棵树上的指纹（登记了 environment= 的连同此刻的环境）：打「<sha256> <文件数>」
   stage-marker-check <根> <阶段文件名>   这一道这批输入有没有作数的全绿标记：退 0 有（第一行 ok <路径> <时刻>），退 1 没有或过了 SINGLEFS_REUSE_HOURS
-  stage-marker-write <根> <阶段文件名>   判绿之后写这一格标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 自己调），打路径；gate-reuse 先看它再看暂存树
+  stage-marker-write <根> <阶段文件名>   判绿之后写这一格标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、
+                                         checker-tier-formal-verification 自己调），打路径；gate-reuse 先看它再看暂存树
   gate-reuse <根> <阶段文件名>   门禁的复用判定：退 0 要跑，退 10 可跳过（stage-must-run.sh 翻成它原来的 1）；
                                  模块自己出错一律退 0（按要跑处理），不许出错就跳过
   experiment <根> <实验键>       实验的准入：退 0 放行，stdout 是要写在产物最前面的几行（E7INPUT 开头）；
@@ -87,9 +89,9 @@
                                  CRASH_CASE_JUDGING_SUBCOMMANDS 那几项指的函数）顺着引用的模块级名字求闭包，闭包里每个定义的原文按名字排好，
                                  加分派表那几项、main 与模块级其余语句（不是 def / class / 名字赋值的：import、元组解包、if / try 块、`if __name__` 那一段）；
                                  分派表那几项的值不是函数名、闭包里用到非标准库的 import 时算不出（退 2）；判法之外的部分改了摘要不变
-                                 （门禁 54 号给它，不再给整份模块与 54 号）
+                                 （门禁 checker-tier-layer0-replay 给它，不再给整份模块与 checker-tier-layer0-replay）
   crash-case-command <根> <键> <输入指纹> [--start-over]
-                                 --full 跑这一条的命令与环境（54 号原样执行）：stdout 以 NUL 分隔，本机核数、线程数、explicit|default、续跑的进度目录，
+                                 --full 跑这一条的命令与环境（checker-tier-layer0-replay 原样执行）：stdout 以 NUL 分隔，本机核数、线程数、explicit|default、续跑的进度目录，
                                  其后是整条命令（env 设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY、SINGLEFS_LAYER0_INPUT_FINGERPRINT、SINGLEFS_LAYER0_THREADS，
                                  登记了 threads-variable= 的另把那个变量设成同一个数（盖掉调用方环境里的），
                                  --start-over 时设 SINGLEFS_LAYER0_START_OVER=1、不然清掉它，分片开关 SINGLEFS_LAYER0_SHARD 一律清掉，
@@ -122,7 +124,7 @@
 强制重跑：设 SINGLEFS_EXPERIMENT_RERUN_REASON=<理由>。只越过 ①，不越过 ②；理由原样写进产物头。
 弄坏开关（只给自证用，证明那几格会红）：ADMISSION_BREAK=skip-unchanged（不比指纹）、skip-preconditions（不判前提）、
 raise-in-gate-reuse（门禁复用判定里抛异常，stage-must-run.sh 必须按要跑处理）、skip-gate-preconditions（门禁的前提不判）、
-ignore-gate-environment（门禁复用判定不比环境）、skip-build-environment（构建环境不进指纹）、ignore-linked-directories（指向目录的
+ignore-gate-environment（门禁复用判定不比环境）、environment-outside-stage-marker（environment= 不进门禁全绿标记的指纹）、skip-build-environment（构建环境不进指纹）、ignore-linked-directories（指向目录的
 符号链接照旧滤掉）、exclude-mentioned-test-targets（别的测试目标被代码点了名也减掉）、threads-by-worker-count（照旧只看
 worker_threads=1 判「只用了一个线程」，不看这一趟跑了几片）、first-definition-only（用例函数只看第一处定义）、
 ignore-attribute-without-space（`# [ignore]` 不认）、concat-include-only（只认不带路径前缀的 include!(concat!(…))）、
@@ -134,7 +136,7 @@ shardable-outside-judging-digest（分派表里 crash-case-shardable 那一项�
 target-own-files-only（判 #[ignore] 只读测试目标自己的源文件，不顺 include! / #[path] / mod）、include-alias-subtracts（有 use 引进 include 族宏
 照样减文件）、runner-arguments-from-configuration-directory-only（runner 参数的相对路径不从登记用例的包目录解）、digest-skips-other-statements
 （模块级其余语句只进 `if __name__` 那一段）、digest-allows-non-name-dispatch（分派表的值不是名字照原文进）、digest-allows-imported-names
-（判法闭包里的 import 不查）、judge-takes-forwarded-threads（crash-case-judge / record 照旧收 54 号转过来的核数与线程数）、cores-from-nproc
+（判法闭包里的 import 不查）、judge-takes-forwarded-threads（crash-case-judge / record 照旧收 checker-tier-layer0-replay 转过来的核数与线程数）、cores-from-nproc
 （本机核数照旧取 nproc）、thread-variable-ignored（threads-variable= 不认：命令只设、标记只记 SINGLEFS_LAYER0_THREADS）、
 threads-skip-self-contained-finish-line（计数行自己带线程数的不判线程）。
 
@@ -152,9 +154,9 @@ runner / wrapper 指的程序与参数里的脚本按内容进指纹，它们再
 指纹不变、旧标记照样作数。判法摘要看不见的：靠 ast 里的静态引用求闭包，getattr、字符串拼出来的函数名、exec、globals() / setattr 改模块级名字
 这一类引到的定义不进；标准库模块被改（monkeypatch）、判法运行时读的文件（登记表之外的）不进；Python 自身（解释器、标准库）升级不进。
 元组解包、if / try / for 块里的定义与 import 整条原文进摘要（模块级其余语句）；分派表的值写成 lambda、判法挪进 import 的非标准库模块，算不出摘要（拒算）。
-54 号不进指纹：核数与线程数不再由它转给 crash-case-judge / crash-case-record（它们自己现取），它里面还定着结论的只剩流程的次序
+checker-tier-layer0-replay 不进指纹：核数与线程数不再由它转给 crash-case-judge / crash-case-record（它们自己现取），它里面还定着结论的只剩流程的次序
 （开跑与跑完各算一次指纹、先判日志再写标记）与两处第二道判红（cargo 退非 0、发现日志）——这两处的第一道（test result 恰好 1 passed、
-登记的计数行）在判法摘要里；改了它旧标记照样作数，由 --selftest 的「54 号」那几格核，快档的范围那一问照样把它算进去。双机分片的驱动脚本按内容进登记了 shard= 的用例，
+登记的计数行）在判法摘要里；改了它旧标记照样作数，由 --selftest 的「checker-tier-layer0-replay」那几格核，快档的范围那一问照样把它算进去。双机分片的驱动脚本按内容进登记了 shard= 的用例，
 它 source 的 preflight.sh 这一类不进；分片关着（照单机跑）时驱动脚本照样在指纹里，改了它这两条照样重跑（多跑，接受）。
 用例函数标没标 #[ignore] 按同名的每一处 fn <名>( 判（连同顺着 include! / #[path] / mod 带进来的源文件）：同一个测试目标里别的模块有同名、
 合法不标 ignore 的快用例时误判没标（多拒、自查判错，方向是多跑一步，接受）；带进来的判不出时（include! 参数不是字面量、mod 指的文件找不到、
@@ -207,15 +209,15 @@ PRODUCT_FIELD_FORM = re.compile(r"^product-field=(?P<key>[^:]+):(?P<line_name>[^
 REPLAY_ROW_FORM = re.compile(r"^(E[0-9]+[A-Z0-9]*)\|([^|]*)\|([^|]*)\|([^|]*)\|(exact|timing)$")
 GATE_CONDITION_FORM = re.compile(r"^(?P<kind>command|readwrite|probe|environment)=(?P<value>\S+)$")
 
-# 崩溃枚举用例（门禁 54 号逐条跑、逐条记全绿标记）
+# 崩溃枚举用例（门禁 checker-tier-layer0-replay 逐条跑、逐条记全绿标记）
 CRASH_CASE_KEY_PREFIX = "crash-case:"
 CRASH_CASE_KEY_FORM = re.compile(r"^crash-case:[a-z0-9][a-z0-9-]*$")
 CRASH_CASE_CONDITION_FORM = re.compile(r"^(?P<kind>test|count-line|exhaustive|threads|threads-variable|shard)=(?P<value>\S+)$")
 # threads-variable= 的值：用例读线程数的环境变量名
 THREADS_VARIABLE_FORM = re.compile(r"^[A-Z_][A-Z0-9_]*$")
-# shard= 只认这一个值：两台机器各跑一片再 merge（双机分片，里程碑三第六项）
+# shard= 只认这一个值：两台机器各跑一片再 merge（双机分片）
 CRASH_CASE_SHARD_ACROSS_MACHINES = "across-machines"
-# 登记了 shard=across-machines 的用例，54 号 --full 在分片开着时交给驱动脚本跑：它自己起两片与 merge 的 cargo、判两片与账本，不经 crash-case-command，
+# 登记了 shard=across-machines 的用例，checker-tier-layer0-replay --full 在分片开着时交给驱动脚本跑：它自己起两片与 merge 的 cargo、判两片与账本，不经 crash-case-command，
 # 起法不在判法摘要里；它 eval 配置判法打出的赋值。这两份按内容进这条用例的输入清单（路径从被判的仓根起；不在的进「找不到」一句）
 SHARD_DRIVER_FILES = ("research/scripts/layer0-shard-run.sh", "research/scripts/layer0-shard-configuration-check.sh")
 # crash-case-command 起用例时从调用方环境里清掉的分片开关：调用方设着它，单机跑的那一趟会只跑一片或去 merge
@@ -223,7 +225,7 @@ LAYER0_SHARD_VARIABLE = "SINGLEFS_LAYER0_SHARD"
 CRASH_CASE_TEST_FORM = re.compile(r"^(?P<package>[A-Za-z0-9_-]+):(?P<target>[A-Za-z0-9_]+):(?P<function>[A-Za-z_][A-Za-z0-9_]*)$")
 COUNT_LINE_PREFIX_FORM = re.compile(r"^[A-Z][A-Z0-9_]*$")
 CRASH_CASE_MARKER_PREFIX = "singlefs-crash-case-green."
-STAGE_MARKER_PREFIX = "singlefs-stage-green."          # checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿之后按输入指纹写的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
+STAGE_MARKER_PREFIX = "singlefs-stage-green."          # checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification 判绿之后按输入指纹写的全绿标记（用户 2026-09-27 定：照 checker-tier-layer0-replay 写标记、只跑变了的）
 LAYER0_PARALLEL_FINISHED_PREFIX = "LAYER0_PARALLEL_FINISHED "
 PASSED_ONE_TEST_FORM = re.compile(r"^test result: ok\. 1 passed; 0 failed; ")
 MARKER_DIFFERENCES_LISTED_AT_MOST = 20
@@ -238,7 +240,7 @@ CRASH_CASE_JUDGING_ENTRIES = ("judge_crash_case_log", "judge_worker_threads", "c
                               "crash_case_of_key", "crash_cases_of", "crash_case_launch", "started_worker_threads_text",
                               "configured_worker_threads_text")
 # 分派表 COMMANDS 里这几项子命令：「子命令 → 函数」进摘要，函数也当入口（有人把 crash-case-judge 指到别的函数，摘要跟着变）；
-# crash-case-shardable 定 54 号 --full 这一条单机跑还是交给双机分片的驱动脚本
+# crash-case-shardable 定 checker-tier-layer0-replay --full 这一条单机跑还是交给双机分片的驱动脚本
 CRASH_CASE_JUDGING_SUBCOMMANDS = ("crash-case-command", "crash-case-judge", "crash-case-record", "crash-case-marker-check", "crash-case-marker-path",
                                   "crash-case-shardable")
 # 原文进摘要、不顺着它的引用往下走的定义：main 引自证，顺下去自证就进来了
@@ -513,7 +515,7 @@ def unlisted_input_paths(root, input_paths):
 
 
 def toolchain_line(root):
-    """`cargo -V && rustc -V` 原样输出去掉末尾换行、再补一个换行的 sha256，名字 <工具链：…>（门禁 54 号的输入指纹也是这一行）。"""
+    """`cargo -V && rustc -V` 原样输出去掉末尾换行、再补一个换行的 sha256，名字 <工具链：…>（门禁 checker-tier-layer0-replay 的输入指纹也是这一行）。"""
     outputs = []
     for command in (["cargo", "-V"], ["rustc", "-V"]):
         try:
@@ -1017,7 +1019,7 @@ def environment_text(environment_lines):
 
 
 def gate_environment_record_path(root, stage):
-    """git common-dir 里这一道的环境记录（各 worktree 共用一份，与门禁 54 号的全绿标记放在一处）；取不到 common-dir 返回 None。"""
+    """git common-dir 里这一道的环境记录（各 worktree 共用一份，与门禁 checker-tier-layer0-replay 的全绿标记放在一处）；取不到 common-dir 返回 None。"""
     return_code, output = git_output(root, "rev-parse", "--path-format=absolute", "--git-common-dir")
     common_directory = output.strip() if return_code == 0 else ""
     if not common_directory:
@@ -1121,8 +1123,9 @@ def gate_reuse(root, stage):
     return_code, _output = git_output(root, "rev-parse", "--is-inside-work-tree")
     if return_code != 0:
         return EXIT_GATE_MUST_RUN, f"判不出来：{root} 不是 git 工作树，按要跑处理"
-    # 先看这一道在被判那棵树上的全绿标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿时自己写，按登记输入的指纹分格，住 git common-dir）：
-    # 在且没过复用上限就可跳过——崩溃验证员在工作区跑过的那一趟，整轮门禁不用再跑一遍。指纹算不出、没登记这一行的照旧往下按暂存树判。
+    # 先看这一道在被判那棵树上的全绿标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification
+    # 判绿时自己写，按登记输入的指纹分格——登记了 environment= 的连同此刻的环境——住 git common-dir）：
+    # 在且没过复用上限就可跳过——主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑一遍。指纹算不出、没登记这一行的照旧往下按暂存树判。
     if not break_is_set("stage-marker-ignored"):
         try:
             fingerprint, file_count, _paths = stage_fingerprint(root, stage)
@@ -1182,11 +1185,11 @@ def gate_reuse(root, stage):
     return EXIT_GATE_MUST_RUN, f"这几条路径与上次整轮全绿那棵树不同：{changed}"
 
 
-# ── 崩溃枚举用例（门禁 54 号：逐条按复用判定跑、逐条记全绿标记）────────────────
+# ── 崩溃枚举用例（门禁 checker-tier-layer0-replay：逐条按复用判定跑、逐条记全绿标记）────────────────
 #
 # 一条用例的输入 = 登记路径（整个 crates/ 与 Cargo 清单、锁）下 git 列得出的文件，减去用例读不到的文件，再加准入模块（这一份）里
-# 崩溃枚举用例的判法摘要、工具链、构建环境与这条用例的登记行（54 号按 --judging-digest、--toolchain、--build-environment 给；
-# 54 号自己不进：起用例的命令与环境由这一份的 crash-case-command 交出，在判法摘要里）；登记了 shard=across-machines 的另加双机分片的驱动脚本与
+# 崩溃枚举用例的判法摘要、工具链、构建环境与这条用例的登记行（checker-tier-layer0-replay 按 --judging-digest、--toolchain、--build-environment 给；
+# checker-tier-layer0-replay 自己不进：起用例的命令与环境由这一份的 crash-case-command 交出，在判法摘要里）；登记了 shard=across-machines 的另加双机分片的驱动脚本与
 # 配置判法（SHARD_DRIVER_FILES，按内容：分片开着时起两片与 merge 的是驱动脚本，不经 crash-case-command）。用例读不到的文件有三种：
 #   ① 别的测试目标 X 独占的文件：它所在的包没有构建脚本（build.rs 或 package.build）、没写 [[test]] 与 package.autotests，包里没有
 #      参数是算出来的 include! / include_str! / include_bytes!（COMPILE_TIME_COMPUTED_INCLUDE：套 concat!、env!、option_env! 或别的宏，
@@ -1734,7 +1737,7 @@ def crash_case_manifest(root, case, named_lines):
 
 def shard_driver_lines(root, case):
     """登记了 shard=across-machines 的用例：SHARD_DRIVER_FILES 每一份一行 (名字, 内容)，排在登记行之前；没登记的交空表。
-    不在的那一份内容记「找不到 <路径>」（驱动脚本不在时 54 号照单机跑，指纹照样算得出）。弄坏开关 shard-driver-outside-manifest 下交空表。"""
+    不在的那一份内容记「找不到 <路径>」（驱动脚本不在时 checker-tier-layer0-replay 照单机跑，指纹照样算得出）。弄坏开关 shard-driver-outside-manifest 下交空表。"""
     if not case.is_shardable_across_machines or break_is_set("shard-driver-outside-manifest"):
         return []
     lines = []
@@ -1995,7 +1998,7 @@ def write_crash_case_marker(root, case, fingerprint, manifest_text, recorded_lin
     marker_path = crash_case_marker_path(root, case, fingerprint)
     if marker_path is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处写")
-    text = ("# 崩溃枚举用例的全绿标记：.claude/gate.d/54-layer0-replay.sh --full 判绿之后经 research/scripts/admission.py crash-case-record 写，"
+    text = ("# 崩溃枚举用例的全绿标记：.claude/gate.d/checker-tier-layer0-replay.sh --full 判绿之后经 research/scripts/admission.py crash-case-record 写，"
             "按用例与它的输入指纹分格；整轮门禁的快档与下一趟 --full 按这一格判复用。不进工作树，别手改。\n"
             f"case={case.key}\ntest={case.test_text()}\ninput_hash={fingerprint}\n"
             + "".join(f"{name}={value}\n" for name, value in details)
@@ -2037,7 +2040,7 @@ def machine_core_count(environment):
 def crash_case_worker_threads(case, environment):
     """--full 跑崩溃枚举用例的线程数：(本机核数, 线程数, "explicit" 或 "default")。调用方设了 SINGLEFS_LAYER0_THREADS（非空）就用它，
     没设取本机核数（machine_core_count）；用例读的线程变量（case.thread_variable）调用方设着什么都不认，由 crash-case-command 盖成这个数。
-    crash-case-command、crash-case-judge、crash-case-record 各自现取（54 号不转线程参数）。
+    crash-case-command、crash-case-judge、crash-case-record 各自现取（checker-tier-layer0-replay 不转线程参数）。
     核数读不到、SINGLEFS_LAYER0_THREADS 不是正整数，都抛 InputManifestError。"""
     cores = machine_core_count(environment)
     configured = environment.get(LAYER0_THREADS_VARIABLE, "")
@@ -2049,7 +2052,7 @@ def crash_case_worker_threads(case, environment):
 
 
 def crash_case_launch(root, case, fingerprint, start_over, environment):
-    """--full 跑一条崩溃枚举用例的命令与环境（门禁 54 号原样执行；54 号不进指纹，这一段在判法摘要里）：
+    """--full 跑一条崩溃枚举用例的命令与环境（门禁 checker-tier-layer0-replay 原样执行；checker-tier-layer0-replay 不进指纹，这一段在判法摘要里）：
     返回 (本机核数, 线程数, "explicit" 或 "default", 续跑的进度目录, 整条命令的词)。
     命令是 env 设好续跑的三个变量与线程数再起 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数> --nocapture：
     进度目录 <git common-dir>/singlefs-layer0-progress/<这批输入的指纹>、SINGLEFS_LAYER0_INPUT_FINGERPRINT=<指纹>；start_over 时
@@ -2130,7 +2133,7 @@ def crash_case_judging_digest_text(source):
     （def、class、名字赋值）求闭包；闭包里每个定义的原文按名字排好，再加分派表那几项（子命令 → 函数）、main 的原文（不往下顺：main 引自证，
     顺下去自证就进来了）与模块级其余语句（不是 def / class / 名字赋值的：import、元组解包、if / try / for 块、`if __name__` 那一段，模块文档串除外）
     的原文，按出现的次序；其余语句引到的模块级定义也进闭包。闭包之外的部分（实验准入、门禁复用、排除法、构建环境、自证）改了摘要不变。
-    拒算（抛 InputManifestError，54 号照判红）：分派表里少了那几项、那几项的值不是名字（lambda、functools.partial 这一类，指的函数顺不下去）、
+    拒算（抛 InputManifestError，checker-tier-layer0-replay 照判红）：分派表里少了那几项、那几项的值不是名字（lambda、functools.partial 这一类，指的函数顺不下去）、
     闭包里用到 import 进来的非标准库名字或闭包里的定义自己 import 非标准库模块（判法挪进别的模块，那份模块的原文不进）。
     弄坏开关：whole-module-in-judging-digest 下原文是整份模块，judging-digest-without-dispatch 下不加分派那几项，digest-skips-other-statements 下
     其余语句只加 `if __name__` 那一段（改前的判法），digest-allows-non-name-dispatch 下值不是名字的照原文进，digest-allows-imported-names 下不查 import。"""
@@ -2206,7 +2209,8 @@ def crash_case_judging_digest_line():
 # ── 命令行 ────────────────────────────────────────────────────────────────────
 
 def stage_fingerprint(root, stage):
-    """一道门禁阶段的输入指纹：登记路径下逐文件清单 + 登记表 + 阶段脚本自己 + 登记行 + 工具链 + 构建环境。返回 (sha256, 文件数, 路径)。
+    """一道门禁阶段的输入指纹：登记路径下逐文件清单 + 登记表 + 阶段脚本自己 + 登记行 + 工具链 + 构建环境，登记了 environment= 的再加此刻环境的 sha256。
+    返回 (sha256, 文件数, 路径)。
     与 gate_reuse 比对的路径同一份（少一条输入就永远不重跑的那个理由同样成立）。"""
     stage_rows = rows_of_key(read_registration_rows(root), stage)
     if not any(row.input_paths for row in stage_rows):
@@ -2215,6 +2219,11 @@ def stage_fingerprint(root, stage):
     input_paths += [REGISTRATION_TABLE, f".claude/gate.d/{stage}"]
     registration_text = "".join(row.fingerprint_text() for row in stage_rows).encode("utf-8", "surrogateescape")
     named_lines = [(f"<登记行：{stage}>", registration_text), toolchain_line(root)] + build_environment_lines(root)
+    if not break_is_set("environment-outside-stage-marker"):
+        # 登记了 environment= 的：此刻的环境（逐条现跑，与 judge_gate_environment 同一份）进指纹，环境换了旧标记就对不上；取不出来抛 InputManifestError
+        _environment_lines, environment_digest = current_gate_environment(root, stage_rows)
+        if environment_digest is not None:
+            named_lines.append((f"<环境：{stage}>", environment_digest.encode()))
     _manifest, fingerprint, file_count = input_manifest(root, input_paths, named_lines)
     return fingerprint, file_count, input_paths
 
@@ -2257,7 +2266,8 @@ def write_stage_marker(root, stage, fingerprint, file_count):
     marker_path = stage_marker_path(root, stage, fingerprint)
     if marker_path is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处写")
-    text = ("# 门禁阶段的全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 判绿之后经 research/scripts/admission.py stage-marker-write 写，按阶段与它登记输入的指纹分格；"
+    text = ("# 门禁阶段的全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification "
+            "判绿之后经 research/scripts/admission.py stage-marker-write 写，按阶段与它登记输入（登记了 environment= 的连同环境）的指纹分格；"
             "gate-reuse 按这一格判复用。不进工作树，别手改。\n"
             f"stage={stage}\ninput_hash={fingerprint}\ninput_file_count={file_count}\n"
             f"finished_utc={time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}\njudged_root={os.path.abspath(root)}\n"
@@ -2404,7 +2414,7 @@ def command_manifest(arguments):
     requested = named_line_requests(arguments[3:], ("--toolchain", "--registration-row", "--build-environment")) if len(arguments) >= 3 else None
     if requested is None:
         say("  ✗ 用法：admission.py manifest <项目根> <键> <清单文件> [--extra-file <名字> <文件>]... [--registration-row] [--toolchain] [--build-environment]")
-        say("     → 怎么办：末尾那几行按参数次序加，例 --extra-file \"<判它的 54 号：54-layer0-replay.sh>\" <54 号的路径> --toolchain --build-environment")
+        say("     → 怎么办：末尾那几行按参数次序加，例 --extra-file \"<判它的门禁：checker-tier-layer0-replay.sh>\" <checker-tier-layer0-replay.sh 的路径> --toolchain --build-environment")
         return EXIT_REGISTRATION_ERROR
     root, key, manifest_file = arguments[0], arguments[1], arguments[2]
     try:
@@ -2552,7 +2562,7 @@ def option_values(options, names):
 
 def forwarded_worker_threads(arguments):
     """弄坏开关 judge-takes-forwarded-threads 下 crash-case-judge / crash-case-record 照旧收的 --machine-cores / --threads / --threads-origin
-    （54 号转过来的，改前的写法）：交 (核数, 线程数, 来源) 或 None。开关没开时交 None、调用方不认这三个参数。"""
+    （checker-tier-layer0-replay 转过来的，改前的写法）：交 (核数, 线程数, 来源) 或 None。开关没开时交 None、调用方不认这三个参数。"""
     if not break_is_set("judge-takes-forwarded-threads"):
         return None
     values = option_values(arguments, ("--machine-cores", "--threads", "--threads-origin"))
@@ -2593,7 +2603,7 @@ def command_crash_case_judge(arguments):
 
 def command_crash_case_command(arguments):
     """--full 跑一条崩溃枚举用例的命令与环境（crash_case_launch），stdout 以 NUL 分隔：本机核数、线程数、explicit 或 default、续跑的进度目录，
-    其后是整条命令的词。有错退 2，原因打在 stdout（不带 ✗，54 号自己打 ✗ 与出路）。"""
+    其后是整条命令的词。有错退 2，原因打在 stdout（不带 ✗，checker-tier-layer0-replay 自己打 ✗ 与出路）。"""
     start_over = arguments[3:] == ["--start-over"]
     if len(arguments) not in (3, 4) or (len(arguments) == 4 and not start_over) or not re.fullmatch(r"[0-9a-f]{64}", arguments[2] if len(arguments) > 2 else ""):
         print("  ✗ 用法：admission.py crash-case-command <项目根> <键> <输入指纹> [--start-over]")
@@ -2750,7 +2760,7 @@ def point_replay_row_at(work, product_name):
 
 
 def run_stage_marker_cells(selftest, module):
-    """checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、过上限不作数、输入改了就没有它的格。"""
+    """checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification 的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、过上限不作数、输入改了就没有它的格。"""
     work = tempfile.mkdtemp(prefix="admission-stage-marker-")
     try:
         build_selftest_repository(work)
@@ -2902,7 +2912,7 @@ def run_selftest():
                                      capture_output=True)
         manifest_file = os.path.join(work, "manifest.out")
         exit_code, output, messages = run_quietly([sys.executable, module, "manifest", work, "59-demo.sh", manifest_file,
-                                                   "--extra-file", "<判它的 54 号：54-layer0-replay.sh>", table_path, "--toolchain"])
+                                                   "--extra-file", "<判它的门禁：checker-tier-layer0-replay.sh>", table_path, "--toolchain"])
         with open(manifest_file, "rb") as handle:
             module_manifest = handle.read()
         selftest.expect("清单与另算的一遍（sha256sum、sort -zu、cargo -V && rustc -V）逐字节相同",
@@ -2916,7 +2926,7 @@ def run_selftest():
                                                    {BREAK_VARIABLE: "raise-in-gate-reuse", "SINGLEFS_STAGED_TREE": "0" * 40})
         selftest.expect("门禁复用判定出异常时 stage-must-run.sh 判要跑", exit_code == 0 and "按要跑处理" in output,
                         f"退 {exit_code}，stdout「{output.strip()}」")
-        # ⑩b checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay 的全绿标记（用户 2026-09-27 定：照 54 号写标记、只跑变了的）
+        # ⑩b checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification 的全绿标记（用户 2026-09-27 定：照 checker-tier-layer0-replay 写标记、只跑变了的）
         run_stage_marker_cells(selftest, module)
 
         # ⑪ 门禁行的第三列：前提（command= / readwrite= / probe=）、环境进复用判定（environment=，拿假 herd7 当桩）、中文路径
@@ -2932,7 +2942,7 @@ def run_selftest():
         run_crash_case_log_cells(selftest)
         run_judging_digest_cells(selftest, module)
         run_thread_source_cells(selftest, module)
-        # ⑯ 门禁 54 号这一份的流程：拷进临时仓（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑
+        # ⑯ 门禁 checker-tier-layer0-replay 这一份的流程：拷进临时仓（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑
         run_layer0_stage_cells(selftest, module)
 
         # ⑬ 真仓的登记表自己写对没有（语法：实验键、条件的种类分门禁与实验、@ 引用、probe= / environment= 指的脚本在不在）
@@ -2948,7 +2958,7 @@ def run_selftest():
         print("     → 怎么办：照上面每一格的说明改被测的那一段；判据与为什么这么定见文件头。弄坏开关那几格红不了，说明那一格分不出差别")
         return 1
     print(f"  ✓ admission.py 自证通过：{selftest.checked} 格都对（含弄坏开关 skip-unchanged、skip-preconditions、skip-gate-preconditions、"
-          "ignore-gate-environment、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count、"
+          "ignore-gate-environment、environment-outside-stage-marker、skip-build-environment、ignore-linked-directories、exclude-mentioned-test-targets、threads-by-worker-count、"
           "first-definition-only、ignore-attribute-without-space、concat-include-only、computed-include-subtracts-non-test-files、runner-program-only、"
           "whole-module-in-judging-digest、judging-digest-without-dispatch、single-worker-threads-field、threads-ignore-shards、"
           "shardable-outside-judging-digest、shard-driver-outside-manifest、keep-caller-shard-switch、target-own-files-only、include-alias-subtracts、"
@@ -3085,7 +3095,23 @@ def run_gate_environment_cells(selftest, module):
         exit_code, output, _messages = reuse("57-demo.sh", base_tree)
         selftest.expect("输入与环境都没变时判可跳过，依据句带出 herd7 的版本", exit_code == 1 and "7.57-selftest-1" in output,
                         f"退 {exit_code}，stdout「{output.strip()}」")
+        exit_code, output, _messages = run_quietly([sys.executable, module, "stage-marker-write", work, "57-demo.sh"], with_tools)
+        selftest.expect("登记了 environment= 的门禁判绿之后写全绿标记", exit_code == 0 and os.path.isfile(output.strip()), f"退 {exit_code}，stdout「{output.strip()}」")
+        # 弄坏开关那一格的现场：环境不进指纹的那一份判法，写标记、查标记都是它。只在查那一步打开开关的话，写下的标记按带环境的式子算、
+        # 查的按不带环境的式子算，两个指纹本来就对不上，那一格判不出开关的作用；所以 herd7 换之前在开关下另写一份
+        exit_code, output, _messages = run_quietly([sys.executable, module, "stage-marker-write", work, "57-demo.sh"],
+                                                   dict(with_tools, **{BREAK_VARIABLE: "environment-outside-stage-marker"}))
+        selftest.expect("弄坏开关 environment-outside-stage-marker 下照样写得出全绿标记（「herd7 换了、旧标记不作数」那一格弄坏开关一支的现场）",
+                        exit_code == 0 and os.path.isfile(output.strip()), f"退 {exit_code}，stdout「{output.strip()}」")
         write_executable(fake_herd7, FAKE_HERD7_SCRIPT % "2")
+        # 环境进全绿标记的指纹：只换了 herd7、输入一字没改，判绿时写的标记不作数（开关 environment-outside-stage-marker 下这一格红）
+        exit_code, output, _messages = run_quietly([sys.executable, module, "stage-marker-check", work, "57-demo.sh"], with_tools)
+        selftest.expect("herd7 的版本变了，输入没变时写的全绿标记不作数", exit_code == 1 and "没有全绿标记" in output,
+                        f"退 {exit_code}，stdout「{output.strip()}」（弄坏开关 environment-outside-stage-marker 下就是这样：环境没进标记的指纹）")
+        exit_code, _output, _messages = run_quietly([sys.executable, module, "stage-marker-check", work, "57-demo.sh"],
+                                                    dict(with_tools, **{BREAK_VARIABLE: "environment-outside-stage-marker"}))
+        selftest.expect("弄坏开关 environment-outside-stage-marker 下「herd7 换了、旧标记不作数」那一格红（旧标记照样作数）", exit_code == 0,
+                        f"弄坏之后仍退 {exit_code}：这一格分不出环境进没进标记的指纹")
         exit_code, output, _messages = reuse("57-demo.sh", base_tree)
         selftest.expect("herd7 的版本变了判要跑，依据句带出记下的与现在的两个版本",
                         exit_code == 0 and "不同" in output and "7.57-selftest-1" in output and "7.57-selftest-2" in output,
@@ -3155,7 +3181,7 @@ LINKED_INTO_SELFTEST_REPOSITORIES = (".claude/singlefs-ai-sop", ".claude/scripts
 
 
 def link_sop_copy(work):
-    """临时仓里跑真仓脚本的副本（replay.sh、54 号与它们调的 stage-must-run.sh 这一类）时，副本开头按相对路径 source .claude/scripts/preflight.sh，
+    """临时仓里跑真仓脚本的副本（replay.sh、checker-tier-layer0-replay 与它们调的 stage-must-run.sh 这一类）时，副本开头按相对路径 source .claude/scripts/preflight.sh，
     垫片再找规范副本里的 preflight.sh：LINKED_INTO_SELFTEST_REPOSITORIES 那两样在临时仓里建成指向真仓那一份的符号链接（缺了 source 落空、
     preflight 一步没判，随后的 set -- 把参数清空），并写进临时仓的 .gitignore（不算进改动范围）。"""
     os.makedirs(os.path.join(work, ".claude"), exist_ok=True)
@@ -3999,7 +4025,7 @@ def run_thread_source_cells(selftest, module):
         forwarded = ("--machine-cores", str(cores), "--threads", "1", "--threads-origin", "explicit")
         cells = [("没设 SINGLEFS_LAYER0_THREADS：64 片 1 个线程", (), None, 1 if cores > 1 else 0),
                  ("调用方显式设 SINGLEFS_LAYER0_THREADS=1：64 片 1 个线程", (), {LAYER0_THREADS_VARIABLE: "1"}, 0),
-                 ("没设 SINGLEFS_LAYER0_THREADS、转过来 --threads 1 --threads-origin explicit（54 号改前的转法）", forwarded, None, EXIT_REGISTRATION_ERROR)]
+                 ("没设 SINGLEFS_LAYER0_THREADS、转过来 --threads 1 --threads-origin explicit（checker-tier-layer0-replay 改前的转法）", forwarded, None, EXIT_REGISTRATION_ERROR)]
         for label, extra_arguments, changes, expected in cells:
             got_exit = judge(extra_arguments, changes)
             selftest.expect(f"crash-case-judge 自己现取线程数：{label} ⇒ 退 {expected}", got_exit == expected, f"退 {got_exit}")
@@ -4187,13 +4213,13 @@ def stream_log(prefix, worker_threads=32, resumed_slices=0, freshly_run_slices=6
 
 
 def run_layer0_stage_cells(selftest, module):
-    """门禁 54 号这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 54-layer0-replay.sh），
+    """门禁 checker-tier-layer0-replay 这一份的流程：拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下，名字照旧是 checker-tier-layer0-replay.sh），
     假 cargo、rustc、nproc 在 PATH 最前面。核：逐条跑、续跑的三个环境变量与线程数（由 crash-case-command 交出）、判绿写标记（线程分记配的与起的）、
     快档跑一遍 checker 档包并核标记、缺一格报本次未跑不判红、第二趟全复用、只重跑输入变了的那一条、--start-over、显式设线程数、只剩 1 片要跑不误红、1 个线程跑了 64 片判红、0 passed 判红、
-    cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、快档不带 SINGLEFS_GATE_FULL=1 时只改登记表报本次未跑、只改 54 号与只改准入模块判法之外的部分
-    照样核标记而判绿（54 号不进指纹）、改准入模块的判法判红（都不退 77）。"""
+    cargo 退非 0 判红而别的照跑、跑的过程中输入变了不写标记、快档不带 SINGLEFS_GATE_FULL=1 时只改登记表报本次未跑、只改 checker-tier-layer0-replay 与只改准入模块判法之外的部分
+    照样核标记而判绿（checker-tier-layer0-replay 不进指纹）、改准入模块的判法判红（都不退 77）。"""
     repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
-    real_stage = os.path.join(repository_root, ".claude/gate.d/54-layer0-replay.sh")
+    real_stage = os.path.join(repository_root, ".claude/gate.d/checker-tier-layer0-replay.sh")
     work = tempfile.mkdtemp(prefix="admission-selftest-stage54-")
     try:
         run_quietly(["git", "init", "-q", "-b", "master", work], GIT_IDENTITY)
@@ -4204,7 +4230,7 @@ def run_layer0_stage_cells(selftest, module):
         write_text(os.path.join(work, "crates/singlefs-checker-tier/src/lib.rs"), "pub fn two() -> u32 { 2 }\n")
         for _key, target, function, _conditions in LAYER0_STAGE_CASES:
             write_text(os.path.join(work, f"crates/singlefs-checker-tier/tests/{target}.rs"), f"#[test]\n#[ignore]\nfn {function}() {{}}\n")
-        rows = ["54-layer0-replay.sh\tcrates/ Cargo.toml\tcommand=cargo command=rustc\t# 样本"]
+        rows = ["checker-tier-layer0-replay.sh\tcrates/ Cargo.toml\tcommand=cargo command=rustc\t# 样本"]
         rows += [f"{key}\tcrates/ Cargo.toml\ttest=singlefs-checker-tier:{target}:{function}{' ' + conditions if conditions else ''}\t# 样本"
                  for key, target, function, conditions in LAYER0_STAGE_CASES]
         write_text(os.path.join(work, REGISTRATION_TABLE), "".join(row + "\n" for row in rows))
@@ -4212,7 +4238,7 @@ def run_layer0_stage_cells(selftest, module):
         shutil.copy(module, os.path.join(work, "research/scripts/admission.py"))
         for helper in ("stage-must-run.sh", "change-touches-crates.sh", "stage-run-or-skip.sh"):
             shutil.copy(os.path.join(SELFTEST_HERE, helper), os.path.join(work, "research/scripts", helper))
-        stage_copy = os.path.join(work, ".claude/stage-under-test/54-layer0-replay.sh")
+        stage_copy = os.path.join(work, ".claude/stage-under-test/checker-tier-layer0-replay.sh")
         os.makedirs(os.path.dirname(stage_copy))
         shutil.copy(real_stage, stage_copy)
         write_text(os.path.join(work, ".gitignore"), ".control/\n.tools/\n")
@@ -4270,20 +4296,20 @@ def run_layer0_stage_cells(selftest, module):
         set_logs()
         exit_code, output, calls = stage("--full")
         runs = full_runs(calls)
-        selftest.expect("54 号 --full：没有本地分片配置（临时仓里没有 layer0-shard-configuration-check.sh 判得过的配置）⇒ 打一行「双机分片：关」、逐条单机跑",
+        selftest.expect("checker-tier-layer0-replay --full：没有本地分片配置（临时仓里没有 layer0-shard-configuration-check.sh 判得过的配置）⇒ 打一行「双机分片：关」、逐条单机跑",
                         "双机分片：关" in output, f"输出尾部：{output.strip()[-600:]}")
         fingerprints = {key: expected_fingerprint(key) for key, _target, _function, _conditions in LAYER0_STAGE_CASES}
         progress_settings_ok = all(
             call[3] == os.path.join(common_directory, "singlefs-layer0-progress", fingerprints[key]) and call[4] == fingerprints[key] and call[5] == "unset"
             for call, (key, _target, _function, _conditions) in zip(runs, LAYER0_STAGE_CASES))
-        selftest.expect("54 号 --full 头一趟：三条用例在 release 下逐条跑（--include-ignored --exact 各自的用例函数），各写一格标记",
+        selftest.expect("checker-tier-layer0-replay --full 头一趟：三条用例在 release 下逐条跑（--include-ignored --exact 各自的用例函数），各写一格标记",
                         exit_code == 0 and [(call[0], call[1], call[6], call[7]) for call in runs]
                         == [(target, function, "1", "1") for _key, target, function, _c in LAYER0_STAGE_CASES]
                         and len(markers()) == 3, f"退 {exit_code}，跑了 {runs}，标记 {markers()}，输出尾部：{output.strip()[-800:]}")
-        selftest.expect("54 号 --full 设续跑的环境变量：进度目录 <common-dir>/singlefs-layer0-progress/<这条用例的指纹>、输入指纹是这条用例的；"
+        selftest.expect("checker-tier-layer0-replay --full 设续跑的环境变量：进度目录 <common-dir>/singlefs-layer0-progress/<这条用例的指纹>、输入指纹是这条用例的；"
                         "调用方环境里的 SINGLEFS_LAYER0_START_OVER=1 在不带 --start-over 时被清掉",
                         progress_settings_ok and len(set(fingerprints.values())) == 3, f"跑的时候看到 {runs}，这几条用例的指纹 {fingerprints}")
-        selftest.expect(f"54 号 --full 的线程数由 crash-case-command 交出：调用方没设 SINGLEFS_LAYER0_THREADS，用例看到的是本机核数 {cores}"
+        selftest.expect(f"checker-tier-layer0-replay --full 的线程数由 crash-case-command 交出：调用方没设 SINGLEFS_LAYER0_THREADS，用例看到的是本机核数 {cores}"
                         "（PATH 里的 nproc 打 1、OMP_NUM_THREADS=1 都不认）",
                         len(runs) == 3 and all(call[8] == str(cores) for call in runs), f"跑的时候看到 {runs}")
 
@@ -4294,7 +4320,7 @@ def run_layer0_stage_cells(selftest, module):
             with open(os.path.join(common_directory, names[0]), encoding="utf-8") as handle:
                 return handle.read()
         stream_a_marker, case_c_marker = marker_text("stream-a"), marker_text("case-c")
-        selftest.expect(f"54 号 --full 写的标记里线程分两格：configured_worker_threads= 记配的（没设，取本机核数 {cores}），"
+        selftest.expect(f"checker-tier-layer0-replay --full 写的标记里线程分两格：configured_worker_threads= 记配的（没设，取本机核数 {cores}），"
                         "started_worker_threads= 记登记了 threads= 的用例起了几个（32 个工作线程），没登记的记读不到；没有旧的 worker_threads= 那一格",
                         f"\nconfigured_worker_threads=SINGLEFS_LAYER0_THREADS={cores}（没设，取本机核数），本机 {cores} 核\n" in stream_a_marker
                         and "\nstarted_worker_threads=LAYER0：32 个工作线程跑了 64 片" in stream_a_marker
@@ -4302,28 +4328,28 @@ def run_layer0_stage_cells(selftest, module):
                         and not any(line.startswith("worker_threads=") for line in (stream_a_marker + case_c_marker).split("\n")),
                         f"stream-a 那一格：{stream_a_marker[:600]}；case-c 那一格：{case_c_marker[:400]}")
         exit_code, output, calls = stage()
-        selftest.expect("54 号快档：跑一遍 checker 档包不标 ignored 的用例（一次 cargo test -p singlefs-checker-tier），三条用例的标记都作数，判绿、不报本次未跑",
+        selftest.expect("checker-tier-layer0-replay 快档：跑一遍 checker 档包不标 ignored 的用例（一次 cargo test -p singlefs-checker-tier），三条用例的标记都作数，判绿、不报本次未跑",
                         exit_code == 0 and all(key in output for key, _t, _f, _c in LAYER0_STAGE_CASES) and not full_runs(calls)
                         and len(calls) == 1 and calls[0][0] == "" and "本次未跑" not in output,
                         f"退 {exit_code}，cargo 调了 {calls}，输出尾部：{output.strip()[-600:]}")
         exit_code, output, calls = stage("--full")
-        selftest.expect("54 号 --full 第二趟：输入没变，三条全复用、一条都不跑", exit_code == 0 and not full_runs(calls) and output.count(" 复用：") == 3,
+        selftest.expect("checker-tier-layer0-replay --full 第二趟：输入没变，三条全复用、一条都不跑", exit_code == 0 and not full_runs(calls) and output.count(" 复用：") == 3,
                         f"退 {exit_code}，跑了 {full_runs(calls)}，输出尾部：{output.strip()[-600:]}")
         write_text(os.path.join(work, "crates/singlefs-checker-tier/tests/case_c.rs"), "#[test]\n#[ignore]\nfn case_c_full() { let changed = 1; }\n")
         exit_code, output, calls = stage("--full")
-        selftest.expect("54 号 --full：只改了 case_c 独占的测试文件，只重跑 case_c，另两条复用",
+        selftest.expect("checker-tier-layer0-replay --full：只改了 case_c 独占的测试文件，只重跑 case_c，另两条复用",
                         exit_code == 0 and [call[0] for call in full_runs(calls)] == ["case_c"], f"退 {exit_code}，跑了 {full_runs(calls)}")
         stream_b_marker = [name for name in markers() if ".stream-b." in name]
         for name in stream_b_marker:
             os.remove(os.path.join(common_directory, name))
         exit_code, output, calls = stage()
-        selftest.expect("54 号快档：删掉 stream-b 那一格标记，快档照样绿、退 0，那一条报「本次未跑」并点名 crash-case:stream-b，出路是 --full（D13 已定项 15：全量默认不在提交时跑）",
+        selftest.expect("checker-tier-layer0-replay 快档：删掉 stream-b 那一格标记，快档照样绿、退 0，那一条报「本次未跑」并点名 crash-case:stream-b，出路是 --full（D13 已定项 15：全量默认不在提交时跑）",
                         exit_code == 0 and "✗" not in output and "本次未跑" in output and "crash-case:stream-b" in output and "--full" in output,
                         f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
         set_logs(stream_b=stream_log("LAYER0B", worker_threads=1, resumed_slices=63, freshly_run_slices=1))
         exit_code, output, calls = stage("--full", "--start-over")
         runs = full_runs(calls)
-        selftest.expect("54 号 --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格",
+        selftest.expect("checker-tier-layer0-replay --full --start-over：设 SINGLEFS_LAYER0_START_OVER=1；只剩 1 片要跑、起 1 个线程不误红，写回那一格",
                         exit_code == 0 and [(call[0], call[5]) for call in runs] == [("crash_enumeration_fixed_script_stream", "1")]
                         and any(".stream-b." in name for name in markers()), f"退 {exit_code}，跑了 {runs}，输出尾部：{output.strip()[-600:]}")
         for name in [name for name in markers() if ".stream-b." in name]:
@@ -4331,12 +4357,12 @@ def run_layer0_stage_cells(selftest, module):
         set_logs()
         exit_code, output, messages = run_in_environment(["bash", stage_copy, "--full", work], dict(environment, SINGLEFS_LAYER0_THREADS="7"))
         runs = full_runs(invocations())
-        selftest.expect("54 号 --full 显式设 SINGLEFS_LAYER0_THREADS=7：用例看到 7，标记里 configured_worker_threads= 记「显式设的」",
+        selftest.expect("checker-tier-layer0-replay --full 显式设 SINGLEFS_LAYER0_THREADS=7：用例看到 7，标记里 configured_worker_threads= 记「显式设的」",
                         exit_code == 0 and [(call[0], call[8]) for call in runs] == [("crash_enumeration_fixed_script_stream", "7")]
                         and f"configured_worker_threads=SINGLEFS_LAYER0_THREADS=7（显式设的），本机 {cores} 核" in marker_text("stream-b"),
                         f"退 {exit_code}，跑了 {runs}，输出尾部：{(output + messages).strip()[-600:]}")
         exit_code, output, _calls = run_in_environment(["bash", stage_copy, "--start-over", work], environment)
-        selftest.expect("54 号 --start-over 不带 --full：退 2，说只跟 --full 一起用", exit_code == 2 and "只跟 --full 一起用" in output,
+        selftest.expect("checker-tier-layer0-replay --start-over 不带 --full：退 2，说只跟 --full 一起用", exit_code == 2 and "只跟 --full 一起用" in output,
                         f"退 {exit_code}，输出「{output.strip()}」")
         stream_b_markers = [name for name in markers() if ".stream-b." in name]
         stream_b_marker_path = os.path.join(common_directory, stream_b_markers[0]) if stream_b_markers else ""
@@ -4346,7 +4372,7 @@ def run_layer0_stage_cells(selftest, module):
             write_text(stream_b_marker_path, tampered_marker)
         set_logs(stream_b=stream_log("LAYER0B", worker_threads=1))
         exit_code, output, calls = stage("--full")
-        selftest.expect("54 号 --full：这批输入那一格在而不作数就重跑，重跑判红时删掉那一格（先绿后红，前一趟的不再作数）",
+        selftest.expect("checker-tier-layer0-replay --full：这批输入那一格在而不作数就重跑，重跑判红时删掉那一格（先绿后红，前一趟的不再作数）",
                         bool(stream_b_marker_path) and exit_code == 1 and [call[0] for call in full_runs(calls)] == ["crash_enumeration_fixed_script_stream"]
                         and not os.path.exists(stream_b_marker_path),
                         f"改之前 stream-b 那一格{'在' if stream_b_marker_path else '不在（上一格没写成）'}；退 {exit_code}，跑了 {full_runs(calls)}，标记 {markers()}")
@@ -4362,7 +4388,7 @@ def run_layer0_stage_cells(selftest, module):
                 os.remove(os.path.join(common_directory, name))
             set_logs(stream_b=logs.get("stream_b"), exits=exits)
             exit_code, output, calls = stage("--full")
-            selftest.expect(f"54 号 --full：stream-b {label} ⇒ 这一条判红、不写标记，退 1",
+            selftest.expect(f"checker-tier-layer0-replay --full：stream-b {label} ⇒ 这一条判红、不写标记，退 1",
                             exit_code == 1 and phrase in output and not any(".stream-b." in name for name in markers())
                             and [call[0] for call in full_runs(calls)] == ["crash_enumeration_fixed_script_stream"],
                             f"退 {exit_code}，跑了 {full_runs(calls)}，标记 {markers()}，输出尾部：{output.strip()[-600:]}")
@@ -4372,7 +4398,7 @@ def run_layer0_stage_cells(selftest, module):
         for name in [name for name in markers() if ".stream-a." in name]:
             os.remove(os.path.join(common_directory, name))
         exit_code, output, calls = stage("--full")
-        selftest.expect("54 号 --full：stream-a 判红之后接着跑下一条，stream-b 与 case-c 照样判绿、写标记",
+        selftest.expect("checker-tier-layer0-replay --full：stream-a 判红之后接着跑下一条，stream-b 与 case-c 照样判绿、写标记",
                         exit_code == 1 and [call[0] for call in full_runs(calls)] == [target for _k, target, _f, _c in LAYER0_STAGE_CASES]
                         and not any(".stream-a." in name for name in markers())
                         and any(".stream-b." in name for name in markers()) and any(".case-c." in name for name in markers()),
@@ -4380,14 +4406,14 @@ def run_layer0_stage_cells(selftest, module):
         set_logs()
         write_text(os.path.join(control, "touch-during-run"), os.path.join(work, "crates/singlefs-checker-tier/src/lib.rs"))
         exit_code, output, calls = stage("--full")
-        selftest.expect("54 号 --full：跑的过程中共用的 src/lib.rs 被改了 ⇒ 那一条判红、不写标记，出路里列出变了的文件",
+        selftest.expect("checker-tier-layer0-replay --full：跑的过程中共用的 src/lib.rs 被改了 ⇒ 那一条判红、不写标记，出路里列出变了的文件",
                         exit_code == 1 and "跑的过程中它的输入变了" in output and "crates/singlefs-checker-tier/src/lib.rs" in output
                         and not any(".stream-a." in name for name in markers()), f"退 {exit_code}，标记 {markers()}，输出尾部：{output.strip()[-600:]}")
 
         run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, markers, set_logs, expected_fingerprint, common_directory)
         run_crash_case_command_shard_switch_cells(selftest, work)
 
-        # 范围那一问：只改登记表、只改 54 号、只改准入模块的改动，快档不带 SINGLEFS_GATE_FULL=1 照样核标记（不退 77）
+        # 范围那一问：只改登记表、只改 checker-tier-layer0-replay、只改准入模块的改动，快档不带 SINGLEFS_GATE_FULL=1 照样核标记（不退 77）
         set_logs()
         stage("--full")
         run_quietly(["git", "-C", work, "add", "-A"])
@@ -4399,7 +4425,7 @@ def run_layer0_stage_cells(selftest, module):
             invocations()
             return exit_code, output + messages
         exit_code, output = quick_tier_without_forcing()
-        selftest.expect("54 号快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77", exit_code == 77,
+        selftest.expect("checker-tier-layer0-replay 快档（不带 SINGLEFS_GATE_FULL=1）：提交之后一个改动都没有，范围那一问答「没碰」，退 77", exit_code == 77,
                         f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
         every_case = [key for key, _target, _function, _conditions in LAYER0_STAGE_CASES]
         copied_module = os.path.join(work, "research/scripts/admission.py")
@@ -4407,7 +4433,7 @@ def run_layer0_stage_cells(selftest, module):
         scope_cells = [
             ("只改登记表（stream-b 那一行第三列去掉 threads=LAYER0B）", os.path.join(work, REGISTRATION_TABLE),
              lambda text: text.replace(" threads=LAYER0B", "", 1), ["crash-case:stream-b"]),
-            ("只改 54 号（加一行注释；54 号不进指纹）", stage_copy, lambda text: text + "# 样本：只改 54 号\n", []),
+            ("只改 checker-tier-layer0-replay （加一行注释；checker-tier-layer0-replay 不进指纹）", stage_copy, lambda text: text + "# 样本：只改 checker-tier-layer0-replay\n", []),
             ("只改准入模块判法之外的部分（文件尾加一行注释）", copied_module, lambda text: text + "# 样本：只改准入模块\n", []),
             ("只改准入模块的判法（judge_worker_threads 把「至少两片」改成「至少三片」）", copied_module,
              lambda text: edit_inside_definition(text, "judge_worker_threads", "freshly_run_slices >= 2 and", "freshly_run_slices >= 3 and"), every_case),
@@ -4418,21 +4444,21 @@ def run_layer0_stage_cells(selftest, module):
             try:
                 changed_text = change(original_text)
             except ValueError as error:
-                selftest.expect(f"54 号快档：{label} 这一格的改动做得出来", False, str(error))
+                selftest.expect(f"checker-tier-layer0-replay 快档：{label} 这一格的改动做得出来", False, str(error))
                 continue
             write_text(path, changed_text)
             exit_code, output = quick_tier_without_forcing()
             write_text(path, original_text)
             if named_cases:
-                selftest.expect(f"54 号快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记，退 0 而报「本次未跑」并点名 {'、'.join(named_cases)}，不退 77",
+                selftest.expect(f"checker-tier-layer0-replay 快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记，退 0 而报「本次未跑」并点名 {'、'.join(named_cases)}，不退 77",
                                 exit_code == 0 and "没有作数的全绿标记" in output and "本次未跑" in output and all(key in output for key in named_cases),
                                 f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
             else:
-                selftest.expect(f"54 号快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记（不退 77），三条标记都作数，判绿、不报本次未跑",
+                selftest.expect(f"checker-tier-layer0-replay 快档（不带 SINGLEFS_GATE_FULL=1）：{label} ⇒ 照样核标记（不退 77），三条标记都作数，判绿、不报本次未跑",
                                 exit_code == 0 and all(key in output for key in every_case) and "没有作数的全绿标记" not in output and "本次未跑" not in output,
                                 f"退 {exit_code}，输出尾部：{output.strip()[-600:]}")
     except (OSError, shutil.Error) as error:
-        selftest.expect("54 号这一份拷得进临时仓、跑得起来", False, f"{error}（真仓的 54 号在 {real_stage}）")
+        selftest.expect("checker-tier-layer0-replay 这一份拷得进临时仓、跑得起来", False, f"{error}（真仓的 checker-tier-layer0-replay 在 {real_stage}）")
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -4519,7 +4545,7 @@ def run_crash_case_command_shard_switch_cells(selftest, work):
 
 
 def run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, markers, set_logs, expected_fingerprint, common_directory):
-    """54 号 --full 在分片开着时：登记了 shard=across-machines 的 stream-a 交给驱动脚本 --merged-log（参数是键、树根、这批输入的指纹、日志文件），
+    """checker-tier-layer0-replay --full 在分片开着时：登记了 shard=across-machines 的 stream-a 交给驱动脚本 --merged-log（参数是键、树根、这批输入的指纹、日志文件），
     另两条照旧单机跑；驱动脚本交回的日志照单机的判法判、写同一格标记；驱动脚本退非 0 判红、删那一格。假的检查与驱动脚本放进临时仓，跑完删掉。"""
     check_path = os.path.join(work, "research/scripts/layer0-shard-configuration-check.sh")
     driver_path = os.path.join(work, "research/scripts/layer0-shard-run.sh")
@@ -4553,7 +4579,7 @@ def run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, mark
                 driver_calls = [line.split("\t") for line in handle.read().split("\n") if line]
             os.remove(invocations_path)
         expected_arguments = f"--merged-log crash-case:stream-a {work} {expected_fingerprint('crash-case:stream-a')} "
-        selftest.expect("54 号 --full 分片开着：打一行「双机分片：开」；stream-a（登记了 shard=across-machines）交给驱动脚本 --merged-log，"
+        selftest.expect("checker-tier-layer0-replay --full 分片开着：打一行「双机分片：开」；stream-a（登记了 shard=across-machines）交给驱动脚本 --merged-log，"
                         "另两条单机跑；三条都判绿、各写一格",
                         exit_code == 0 and "双机分片：开" in output and len(driver_calls) == 1 and driver_calls[0][0].startswith(expected_arguments)
                         and driver_calls[0][1] == "unset"
@@ -4566,7 +4592,7 @@ def run_layer0_stage_shard_cells(selftest, work, control, stage, full_runs, mark
         os.remove(os.path.join(control, "driver-exit"))
         if os.path.exists(invocations_path):
             os.remove(invocations_path)
-        selftest.expect("54 号 --full 分片开着：驱动脚本退非 0 ⇒ stream-a 判红、不写标记，另两条复用",
+        selftest.expect("checker-tier-layer0-replay --full 分片开着：驱动脚本退非 0 ⇒ stream-a 判红、不写标记，另两条复用",
                         exit_code == 1 and "stream-a" in output and not any(".stream-a." in name for name in markers()) and not full_runs(calls),
                         f"退 {exit_code}，cargo 跑了 {full_runs(calls)}，标记 {markers()}，输出尾部：{output.strip()[-600:]}")
     finally:
@@ -4589,7 +4615,7 @@ done < <(git -C "$root" ls-files -z --cached --others --exclude-standard -- crat
 stage_script_hash="$(sha256sum < "$stage_script" | cut -d' ' -f1)"
 toolchain_versions="$(cd "$root" && cargo -V && rustc -V)" || exit 1
 toolchain_versions_hash="$(printf '%s\n' "$toolchain_versions" | sha256sum | cut -d' ' -f1)"
-printf '%s  %s\n' "$stage_script_hash" "<判它的 54 号：54-layer0-replay.sh>"
+printf '%s  %s\n' "$stage_script_hash" "<判它的门禁：checker-tier-layer0-replay.sh>"
 printf '%s  %s\n' "$toolchain_versions_hash" "<工具链：${toolchain_versions//$'\n'/；}>"
 '''
 

@@ -16,12 +16,23 @@
 - 顶上标题的直接子节：抄，按自己的标题取；再往下的子节：抄、理由以「随」起头，由父节带到；
 - `### 已定项` / `### 未定项` 的分项索引表：不抄，行区间（标题下一行到第一个 `####` 之前）作 --extra 按行取；它下面的 `####` 分项各按自己的标题取；
 - `## 历史版本` 及其子节：不抄（正文只引现状；--no-history 之外的默认）。
-读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页、C 编号对应的欠账表、I 编号对应的不变量清单，加 --files 给的。
+读的文件：正文里写出的 `.claude/kb/…md` 路径、D / E 编号对应的决策与实验页、C 编号对应的欠账表、I 编号对应的不变量清单，加 --files 给的；
+正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（读法与 quote-kb.py --cited 同一份，代码围栏里的声明不算）。
 产出（都排他新建，已存在就停）：research/prompts/_<轮>-checklist.md、_<轮>-appendix.md、_<轮>-background.md、<轮>-snapshot/kb-sha256.txt。
 退出码：0 做成；1 checklist-specs.py 或 quote-kb.py 判红（原样转打它们的输出，按那里的下一步改）；2 用法错、正文不在、产出已存在。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头）：
+  THREE_WAY_MATERIALS_BREAK=skip-index-extra  mark_checklist() 把分项索引表标「不抄」却不把它的行区间交给 --extra
+      附录（「✗ 自检：附录应当含索引表行、分项正文、细节、别的一节与开篇，不含历史节」）、
+      背景材料（「✗ 自检：背景材料应当含正文与附录，快照应当列那份 kb 文件」）
+  THREE_WAY_MATERIALS_BREAK=ignore-not-numbers  cited_files() 不认正文的 `<!-- doc-lint:not-numbers … -->`，声明过的 E1 照当实验号拉
+      not-numbers（「✗ 自检：not-numbers 声明了 E1」）
+  THREE_WAY_MATERIALS_BREAK=skip-declared-kind  cited_files() 正文声明了哪个字母的记号，就把这个字母的编号全跳过（没声明的 E165 也不拉）
+      not-numbers（「✗ 自检：not-numbers 声明了 E1」）、没声明的照拉（「✗ 自检：没声明的 E165 照拉」）
 """
 import glob
 import hashlib
+import importlib.util
 import os
 import re
 import shutil
@@ -45,12 +56,23 @@ INDEX_TABLE_TITLES = ("### 已定项", "### 未定项")
 HISTORY_TITLE = "历史版本"
 
 
+def not_numbers_declared(body_text):
+    """正文里 `<!-- doc-lint:not-numbers … -->` 声明的记号；读法只在 quote-kb.py 的 not_numbers_declared 一处（它的 --cited 用同一份）。"""
+    spec = importlib.util.spec_from_file_location("quote_kb", os.path.join(SCRIPT_DIRECTORY, "quote-kb.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.not_numbers_declared(body_text)
+
+
 def cited_files(body_text, root):
-    """正文里引到的 kb 文件，按出现次序去重；不在的不列。"""
+    """正文里引到的 kb 文件，按出现次序去重；不在的不列。`doc-lint:not-numbers` 声明的记号不当编号。"""
     found = []
     for path in KB_PATH.findall(body_text):
         found.append(path)
+    declared = set() if BROKEN == "ignore-not-numbers" else not_numbers_declared(body_text)
     for kind, number in NUMBER.findall(body_text):
+        if f"{kind}{number}" in declared or (BROKEN == "skip-declared-kind" and any(token.startswith(kind) for token in declared)):
+            continue
         number = int(number)
         if kind == "D":
             found += sorted(glob.glob(os.path.join(root, ".claude", "kb", "decisions", f"{number:02d}-*.md")))
@@ -233,15 +255,30 @@ def selftest():
             code_again, lines_again = build("t-r1", work, [], [], keep_history=False, quiet=True)
             if code_again != 2 or "产出已存在" not in "\n".join(lines_again):
                 failures.append(f"产出已存在时应当退 2 并说明，实际 {code_again}：{lines_again[:1]}")
+        # 正文用 doc-lint:not-numbers 声明了 E1（txg 顶格那一域，不是实验号）：不拉 E1 的实验页；没声明的 E165 照拉
+        os.makedirs(os.path.join(work, ".claude", "kb", "experiments"))
+        for name in ("1-节点大小vs可恢复性.md", "165-恢复重放有界穷举.md"):
+            open(os.path.join(work, ".claude", "kb", "experiments", name), "w", encoding="utf-8").write(f"## {name[:-3]} —— 样本\n\n开篇 {name[:3]}。\n")
+        open(os.path.join(work, "research", "prompts", "_t-r2-body.md"), "w", encoding="utf-8").write(
+            "# t-r2 正文\n\n<!-- doc-lint:not-numbers E1 -->\n\n判 E1（txg 顶格那一域） 站不站得住，压在 E165（恢复重放有界穷举） 上。\n")
+        code_declared, lines_declared = build("t-r2", work, [], [], keep_history=False, quiet=True)
+        snapshot_path = os.path.join(work, "research", "prompts", "t-r2-snapshot", "kb-sha256.txt")
+        snapshot = open(snapshot_path, encoding="utf-8").read() if os.path.isfile(snapshot_path) else ""
+        checked += 1
+        if code_declared != 0 or "1-节点大小vs可恢复性.md" in snapshot:
+            failures.append(f"not-numbers 声明了 E1：应当做成（退出码 0）且不拉 E1 的实验页，实际 {code_declared}，快照：{snapshot!r}；{' '.join(lines_declared)[-300:]}")
+        checked += 1
+        if code_declared != 0 or "165-恢复重放有界穷举.md" not in snapshot:
+            failures.append(f"没声明的 E165 照拉：应当做成（退出码 0）且快照列 E165 的实验页，实际 {code_declared}，快照：{snapshot!r}；{' '.join(lines_declared)[-300:]}")
     finally:
         shutil.rmtree(work, ignore_errors=True)
     for failure in failures:
         print(f"  ✗ 自检：{failure}")   # gate-lint:detail
     if failures:
-        print("    → 怎么办：看 mark_checklist() 与 build()；THREE_WAY_MATERIALS_BREAK=skip-index-extra 设着的话这里本来就该红")
+        print("    → 怎么办：看 mark_checklist()、cited_files() 与 build()；THREE_WAY_MATERIALS_BREAK 设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 项）：索引表不抄而按行区间补抄、分项与细节按自己的标题或随父节抄、历史节不抄、"
-          "附录与背景材料含该抄的每一段、快照列了 kb 文件、产出已存在时拒绝覆盖")
+          "附录与背景材料含该抄的每一段、快照列了 kb 文件、产出已存在时拒绝覆盖、not-numbers 声明的记号不当编号而没声明的照拉")
     return 0
 
 

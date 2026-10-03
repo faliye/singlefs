@@ -9,6 +9,11 @@
 #
 # 纪律沿用 rules/command-safety.md：镜像落 TMPDIR 不落仓库；虚机 pid 写文件，
 # 按字面量 pid 清理，不按名字匹配。读不到退出标记一律判「不明」，绝不当成 0。
+#
+# 弄坏开关 VM_BENCH_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
+# （自证的例没有标签，项名直接写那条「✗」失败行的句首，括号里写那一行接着报的）：
+#   VM_BENCH_BREAK=keepselftestscratch  --selftest 建好桩程序目录之后不挂 EXIT 的 trap（读不到退出标记、die 退出时桩程序目录与日志指针不删）
+#       「读不到退出标记那条路（die）没走到或临时目录没删」（按代码推的、没跑过：「：子进程退出码 …，TMPDIR 里留下「singlefs-vmself.……」」，留下的是没删的桩程序目录）
 set -uo pipefail
 
 VM_MEM="${VM_MEM:-2048}"
@@ -129,7 +134,7 @@ INIT
   # VM_CPU 让上层控制来宾看到哪些 CPU 特性（例如屏蔽 AES-NI：VM_CPU="host,-aes"）。
   # 不设时用 host，否则默认 CPU 模型不暴露 AES-NI，会把「算法慢」和「没有指令集」混为一谈。
   local cpuarg=( -cpu "${VM_CPU:-host}" )
-  timeout "$VM_TIMEOUT" qemu-system-x86_64 \
+  timeout "$VM_TIMEOUT" "$QEMU_SYSTEM_BINARY" \
     -enable-kvm -m "$VM_MEM" -smp "$VM_CPUS" -no-reboot -nographic -serial mon:stdio -display none \
     "${cpuarg[@]}" \
     -kernel "$kernel" -initrd "$work/initramfs.cpio.gz" \
@@ -200,6 +205,40 @@ if [[ "${VM_DISK_PREALLOCATE:-0}" == 1 ]]; then
   ok "盘镜像用 fallocate 预分配"
 fi
 
+# blklogwrites 一支（run_one 里 VM_IOPS 为空、VM_BLKLOGWRITES_DIR 非空才走它）用打了补丁的 QEMU：系统 QEMU 8.2.2 的 blklogwrites 在数据段数
+# ≥ 1023 时写日志回 EINVAL、来宾拿到 EIO（research/qemu/blklogwrites-linearize-over-iov-max.patch）。路径来自主工作树根的本地配置 qemu.env
+# （模板 qemu.env.example；SINGLEFS_QEMU_CONFIG 可另指一份），配置缺、二进制缺、开跑前 qemu-blklogwrites-check.sh 判红都拒绝，不退回系统 QEMU。
+# 别的分支照用 PATH 上的 qemu-system-x86_64。
+QEMU_SYSTEM_BINARY=qemu-system-x86_64
+if [[ -z "${VM_IOPS:-}" && -n "${VM_BLKLOGWRITES_DIR:-}" ]]; then
+  vm_bench_script_directory="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  patched_qemu_howto="跑 research/scripts/build-patched-qemu.sh 装补好的 QEMU，照仓根 qemu.env.example 建 qemu.env、写上它最后打印的 SINGLEFS_QEMU_HOME=…，再重跑"
+  if [[ -n "${SINGLEFS_QEMU_CONFIG:-}" ]]; then
+    qemu_configuration_file="$SINGLEFS_QEMU_CONFIG"
+  else
+    qemu_common_directory="$(git -C "$vm_bench_script_directory" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" \
+      || die "$vm_bench_script_directory 不在 git 工作树里，找不到主工作树根上的 qemu.env" "设 SINGLEFS_QEMU_CONFIG 指到 qemu.env；$patched_qemu_howto"
+    qemu_configuration_file="$(dirname "$qemu_common_directory")/qemu.env"
+  fi
+  [[ -f "$qemu_configuration_file" ]] || die "blklogwrites 一支要补好的 QEMU，没有配置 $qemu_configuration_file（不退回系统 QEMU）" "$patched_qemu_howto"
+  patched_qemu_home=""
+  while IFS= read -r qemu_configuration_line || [[ -n "$qemu_configuration_line" ]]; do
+    [[ "$qemu_configuration_line" =~ ^[[:space:]]*(#.*)?$ ]] && continue
+    [[ "$qemu_configuration_line" =~ ^SINGLEFS_QEMU_HOME=(.*)$ ]] \
+      || die "$qemu_configuration_file 里有认不出的行：$qemu_configuration_line" "只写一行 SINGLEFS_QEMU_HOME=<绝对路径>（照 qemu.env.example）"
+    [[ -z "$patched_qemu_home" ]] || die "$qemu_configuration_file 里 SINGLEFS_QEMU_HOME 写了两遍" "只留一行 SINGLEFS_QEMU_HOME=<绝对路径>"
+    patched_qemu_home="${BASH_REMATCH[1]}"
+    if [[ "$patched_qemu_home" =~ ^\'(.*)\'$ || "$patched_qemu_home" =~ ^\"(.*)\"$ ]]; then patched_qemu_home="${BASH_REMATCH[1]}"; fi
+  done < "$qemu_configuration_file"
+  [[ "$patched_qemu_home" == /* ]] || die "$qemu_configuration_file 里没有 SINGLEFS_QEMU_HOME=<绝对路径>" "$patched_qemu_howto"
+  QEMU_SYSTEM_BINARY="$patched_qemu_home/bin/qemu-system-x86_64"
+  [[ -x "$QEMU_SYSTEM_BINARY" && -x "$patched_qemu_home/bin/qemu-io" ]] \
+    || die "$patched_qemu_home 里没有可执行的 bin/qemu-system-x86_64 与 bin/qemu-io（配置 $qemu_configuration_file）" "$patched_qemu_howto"
+  blklogwrites_check_output="$(bash "$vm_bench_script_directory/qemu-blklogwrites-check.sh" "$patched_qemu_home/bin/qemu-io" 2>&1)" \
+    || { printf '%s\n' "$blklogwrites_check_output" >&2; die "$patched_qemu_home/bin/qemu-io 的 blklogwrites 核不过（输出在上面），不用这一份 QEMU" "$patched_qemu_howto"; }
+  ok "blklogwrites 一支用补好的 QEMU：$QEMU_SYSTEM_BINARY（开跑前 qemu-blklogwrites-check.sh 核过）"
+fi
+
 if [[ "${1:-}" == "--selftest" ]]; then
   say ""
   say "  自检：跑一个必然成功的、一个必然失败的、一个查得到 /dev/vda 的。"
@@ -207,7 +246,6 @@ if [[ "${1:-}" == "--selftest" ]]; then
   say ""
   tmp="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-vmself.XXXXXX")"
   # 读不到退出标记时 die 直接退出，走不到下面那句 rm：桩程序目录挂进 EXIT 的 trap，哪条路退都删。
-  # VM_BENCH_BREAK=keepselftestscratch 拿掉这一步（只给证红用），下面「读不到退出标记那条路」那一格必须判红。
   [[ "${VM_BENCH_BREAK:-}" == keepselftestscratch ]] || trap 'rm -rf "${tmp:?}"; cleanup_work' EXIT
   # 用 busybox sh 当「二进制」：它在 initramfs 里一定跑得起来
   printf '#!/bin/sh\nexit 0\n'  > "$tmp/ok";   chmod +x "$tmp/ok"

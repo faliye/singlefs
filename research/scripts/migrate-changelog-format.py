@@ -68,17 +68,32 @@
   --mention-scope  点名从哪里认：all（默认，标题加整段正文）；heading-and-quick（标题加「> 快查·」几行，认不出一个索引表里有的号时退回 all）。
   --today       写进两份变更史自己「## 历史版本」那一行的日期，默认取 Asia/Tokyo 的今天。
 
-弄坏开关 MIGRATE_CHANGELOG_BREAK=<项>（--selftest 在每一项下都必须判红）：
-  content-lenient    内容自检不比正文，只比日期与标题：「输出里改坏一个字」那一格喊不出来
-  copies-ignored     内容自检按集合比、不按次数比：「同一节里多抄一份」那一格喊不出来
-  untouched-off      单份文件不核没折叠的块：「没折叠的块被改了一个字节」那一格喊不出来
-  no-recheck         写前不复核 sha256：「读到写之间按月文件被改过」那一格照写不误
-  ordinal-always     不管该不该编号都编号：样本的期望输出对不上
-  write-order-file   写入次序取文件次序（不倒过来）：样本的期望输出对不上
-  fold-single-dates  只有一条的日期块也折叠：样本的期望输出对不上
-  abort-on-conflict  一份跳过就不再写后面的（改前那种整批收场）：「一份被并发改过，别的照写」那一格喊不出来
-  fill-skip-one      补抄缺口少插第一份：补完的自检（出现在哪几节）喊不出来
-  fill-touch-existing 补抄缺口顺手改了已有的一行：「只加行」那一项喊不出来
+弄坏开关（--selftest 在每一项下都必须判红）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
+（selftest() 的格没有另起的标签，项名就是那一格失败句的开头；括号里是那条「✗ 自证失败：」的开头）：
+  MIGRATE_CHANGELOG_BREAK=content-lenient  内容自检不比正文，只比日期与标题
+      输出里改坏一个字（「✗ 自证失败：输出里改坏一个字，内容自检没点名那一条」）
+  MIGRATE_CHANGELOG_BREAK=copies-ignored  内容自检按集合比、不按次数比
+      同一节多抄一份（「✗ 自证失败：同一节多抄一份，内容自检没喊」）
+  MIGRATE_CHANGELOG_BREAK=untouched-off  单份文件不核没折叠的块
+      没折叠的块被改了一个字节（「✗ 自证失败：没折叠的块被改了一个字节，单份文件自检没喊」）
+  MIGRATE_CHANGELOG_BREAK=no-recheck  写前不复核 sha256
+      读写之间按月文件被改过（「✗ 自证失败：读写之间按月文件被改过，退出码 0，该是 3」「✗ 自证失败：读写之间按月文件被改过，决策变更史照写不误」）、
+      一份被并发改过（「✗ 自证失败：一份被并发改过，退出码 0，该是 3」）；另有 6 条跟着红（收尾点名、照出路重跑与补抄缺口那几格）
+  MIGRATE_CHANGELOG_BREAK=ordinal-always  不管该不该编号都编号
+      样本整跑（「✗ 自证失败：.claude/kb/decisions-history.md 与期望不一样」「✗ 自证失败：.claude/kb/experiments-history.md 与期望不一样」
+      「✗ 自证失败：.claude/kb/tooling.md 与期望不一样」）；另有 8 条跟着红（内容自检、并发与补抄那几格）
+  MIGRATE_CHANGELOG_BREAK=write-order-file  写入次序取文件次序（不倒过来）
+      样本整跑（「✗ 自证失败：.claude/kb/decisions-history.md 与期望不一样」「✗ 自证失败：.claude/kb/tooling.md 与期望不一样」
+      「✗ 自证失败：.claude/kb/checks-owed.md 与期望不一样」）；另有 2 条跟着红（照出路重跑、--fill-gaps --from-worktree）
+  MIGRATE_CHANGELOG_BREAK=fold-single-dates  只有一条的日期块也折叠
+      样本整跑（「✗ 自证失败：.claude/kb/tooling.md 与期望不一样」）
+  MIGRATE_CHANGELOG_BREAK=abort-on-conflict  一份跳过就不再写后面的（改前那种整批收场）
+      一份被跳过时（「✗ 自证失败：一份被跳过时别的输出也没写」）、一份被并发改过（「✗ 自证失败：一份被并发改过，别的那份没写」）；
+      另有 3 条跟着红（收尾点名、照出路重跑、补抄缺口时并发改过）
+  MIGRATE_CHANGELOG_BREAK=fill-skip-one  补抄缺口少插第一份
+      补抄缺口（「✗ 自证失败：补抄缺口退出码 1，该是 0」，另有一行「✗ 补完的自检没过，一份都没写」）；另有 10 条补抄那几格跟着红
+  MIGRATE_CHANGELOG_BREAK=fill-touch-existing  补抄缺口顺手改了已有的一行
+      补抄缺口（「✗ 自证失败：补抄缺口退出码 1，该是 0」，另有一行「✗ 补完的自检没过，一份都没写」）；另有 10 条补抄那几格跟着红
 
 退出码：0 成功（或干跑）；1 用法不对、结构认不出、自检红、写失败；3 有输出因为输入在读写之间被改过而跳过（别的照写了）。
 """

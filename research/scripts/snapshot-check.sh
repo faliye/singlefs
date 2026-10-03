@@ -10,6 +10,10 @@
 # 2026-09-20 起主 agent 为这类核对敲了几百次 grep / sha256sum，每次都在 50 万上下文里。这一条命令把它做完，判决里抄它的输出。
 # 输出每行一个文件：一致 / 工作区改了（HEAD 与快照一致，是别的会话未提交的改动）/ 提交改了（HEAD 也不是快照那一版）/ 文件不在。
 # 退出码：0 全部一致；1 有对不上的；2 用法错、快照目录不在。
+# 弄坏开关 SNAPSHOT_CHECK_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
+# （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
+#   SNAPSHOT_CHECK_BREAK=ignore-mismatch  check_snapshot 不比 sha256，对不上的也判「一致」
+#       「三种对不上应当各判各的、退 1」（实际退 1，工作区改了的 one.md 与提交改了的 two.md 都报成「一致」，只有文件不在的 three.md 判对）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}

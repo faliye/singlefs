@@ -13,7 +13,15 @@
 #   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）。
 # 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）：「第二台」是本机上的另一个目录，命令在本机跑，
 #   环境照 ssh 那样只给最少几样（HOME、USER、LOGNAME、LANG、XDG_RUNTIME_DIR、DBUS_SESSION_BUS_ADDRESS、CARGO_HOME、RUSTUP_HOME 与 PATH），本机别的环境变量不漏过去。
-# 弄坏开关 PEER_HOST_LIB_BREAK=no-redact（只给证红用）：peer_host_redact 原样转出、不换私有的字（mutation-shard-run.sh 的自证里「输出里没有配置的主机」那一格判错）。
+# 弄坏开关 PEER_HOST_LIB_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时调用方的自证退 1）。这一份没有自证，红在两份 source 它的脚本的 --selftest 里：
+#   research/scripts/mutation-shard-run.sh 与 research/scripts/multi-host-run.sh，两份的失败行都是「✗ <格名>：<细节>」。
+# 逐项写开关名、弄坏哪一处、打开后哪一份自证的哪几格红（项名是格名，前面写是哪一份；括号里抄细节的句首，随跑变的路径写成 …）：
+#   PEER_HOST_LIB_BREAK=no-redact  peer_host_redact 原样转出、不换私有的字
+#       mutation-shard-run.sh 的「① 输出里没有配置的主机、第二台的目录与清场命令」（「…/singlefs-mutation-shard-logs/…/peer.log 里有」）
+#       multi-host-run.sh 的「Ⓖ 输出里没有配置里的主机名与第二台的目录，命令打的那两样换成了「第二台」「第二台的目录」」（「有的：peer/run.out」）
+#   PEER_HOST_LIB_BREAK=detached-keeps-caller-fds  peer_host_start_detached 起的那一份不关继承来的 fd（改前的写法）
+#       multi-host-run.sh 的「Ⓕ 第二台那条命令只握 0、1、2，不握驱动那一头的管道」（「多握着的：63 -> pipe:[…]」）
+#       与 no-redact 一起开时 multi-host-run.sh 的 Ⓕ 两格都红：起第二台那条命令那一步要等它跑完才回来，收到 TERM 之后 120 秒还没退（「驱动收到 TERM 之后 120 秒还没退」）
 
 peer_host_is_this_machine=0
 peer_host_quiesced=0
@@ -179,8 +187,15 @@ peer_host_stop_process_tree() { # <进程号>：这个进程连同全部后代�
 peer_host_start_detached() { # <目录> <进程号文件> <退出码文件> <输出文件> <命令文本>：在第二台的这个目录里脱离 ssh 会话起（setsid nohup），
   # 起的那个 bash 先把自己的进程号写进进程号文件，命令的输出写进输出文件，跑完把退出码写进退出码文件；ssh 马上返回
   local directory="$1" pid_file="$2" exit_file="$3" output_file="$4" command_text="$5"
-  local detached_text
-  detached_text="echo \$\$ > $(printf '%q' "$pid_file"); $command_text > $(printf '%q' "$output_file") 2>&1; echo \$? > $(printf '%q' "$exit_file")"
+  local detached_text close_text=""
+  # 脱离会话起的那个 bash 先关掉 0、1、2 之外继承来的 fd，它与它起的命令只握 0、1、2：本机当第二台时，peer_host_run 给标准错误接的
+  #   >(peer_host_redact) 那条管道（bash 的进程替换，fd 多是 63）会一路传下来；留着它，换字那个进程要等这份活跑完才读到结尾，
+  #   peer_host_run 跟着等，起这一份就成了在前台等它跑完、驱动收到信号也收不了尾（换字是 python 时 bash 直接 exec 它、碰巧不等；
+  #   PEER_HOST_LIB_BREAK=no-redact 换成 cat 就等到命令跑完）。ssh 起的第二台本来就只有这三个，关了也一样
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," != *,detached-keeps-caller-fds,* ]]; then
+    close_text='for peer_host_fd_path in /proc/$$/fd/*; do peer_host_fd="${peer_host_fd_path##*/}"; if [[ "$peer_host_fd" =~ ^[0-9]+$ ]] && (( peer_host_fd > 2 )); then exec {peer_host_fd}>&-; fi; done; '
+  fi
+  detached_text="${close_text}echo \$\$ > $(printf '%q' "$pid_file"); $command_text > $(printf '%q' "$output_file") 2>&1; echo \$? > $(printf '%q' "$exit_file")"
   # 只让 setsid nohup 那一条进后台（它的输入输出都重定向了）：整串放进后台的话，后台那个子进程握着 ssh 的输出通道，ssh 要等它跑完才返回
   peer_host_run "$directory" "rm -f -- $(printf '%q' "$pid_file") $(printf '%q' "$exit_file") $(printf '%q' "$output_file") || exit 1; setsid nohup bash -c $(printf '%q' "$detached_text") < /dev/null > /dev/null 2>&1 &"
 }

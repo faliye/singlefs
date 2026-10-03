@@ -16,11 +16,17 @@
 
 用法：
     gate-structure-check.py [仓根]      不给就取这份脚本往上两级
-    gate-structure-check.py --selftest  GATE_STRUCTURE_CHECK_BREAK=<项> 时必须判红：
-        table-ignored    文件头没有格名表的阶段悄悄跳过          11-no-table.sh 那一条找不到
-        list-ignored     不比 --list 与格名表                     12-names.sh、13-title.sh 那两条找不到
-        heavy-ignored    不看替身有没有被调                       14-heavy.sh 那一条找不到
-        unknown-ignored  不判 --check 写错格名的退出码            15-lenient.sh 那一条找不到
+    gate-structure-check.py --selftest  GATE_STRUCTURE_CHECK_BREAK=<项> 时必须判红（下面那张表）
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里 cases 的标签，括号里是那几条判错行的开头；
+每一项红时都另有一条「bad：输出里找不到「✗ 5/6 道阶段的结构不对：…」」与汇总行「✗ gate-structure-check 自证 3 份仓里有判错的」）：
+  GATE_STRUCTURE_CHECK_BREAK=table-ignored  文件头没有格名表的阶段悄悄跳过
+      bad（「bad：输出里找不到「11-no-table.sh：文件头没有格名表」」）
+  GATE_STRUCTURE_CHECK_BREAK=list-ignored  不比 --list 与格名表
+      bad（「bad：输出里找不到「12-names.sh：--list 打出的格与格名表不一致：…」」、「bad：输出里找不到「13-title.sh：--list 打出的格与格名表不一致：…」」）
+  GATE_STRUCTURE_CHECK_BREAK=heavy-ignored  不看替身有没有被调
+      bad（「bad：输出里找不到「14-heavy.sh：--list 起了重活：cargo」」、「bad：输出里找不到「14-heavy.sh：--check 写错的格名起了重活：cargo」」）
+  GATE_STRUCTURE_CHECK_BREAK=unknown-ignored  不判 --check 写错格名的退出码
+      bad（「bad：输出里找不到「15-lenient.sh：--check 不存在的格退 0，该退 2」」）
 退出码：0 每道都对；1 有不对的（逐道列出）；2 用法错；77 门禁目录里一道阶段都没有。
 """
 import os

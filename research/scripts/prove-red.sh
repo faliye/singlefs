@@ -10,12 +10,20 @@
 #   layer0-run 不跳过 layer0 目标、baseline-ignored 不看基线红没红、never-caught 一条都不记抓到、
 #   no-should-panic 结果行不认「 - should panic」后缀（#[should_panic] 的用例红了被判成无效或没红）、
 #   error-line-invalid 回到「有一行 error: 就算编不过」（cargo 测试红了也打 error: test failed，点名的没红会被判成无效）。
+# 编译目录那三格的开关（开关一行，下一行起是打开后判错的自证项）：
+#   PROVE_RED_BREAK=unbound-second-argument  开头照改前的写法拿 $2 拼 CARGO_TARGET_DIR 的默认值（set -u 下只给 --selftest 一个参数时当场退 1）；
+#     只在自证起的那一层子进程（PROVE_RED_SELFTEST_PROLOGUE 设着）里生效，外层照常跑完才报得出是哪一格
+#       「不设 CARGO_TARGET_DIR、只给 --selftest：开头那几行走得过去、不替调用方设编译目录」（子进程退 1，输出 $2: unbound variable）
+#   PROVE_RED_BREAK=second-argument-target  CARGO_TARGET_DIR 的默认值照改前 $2 的取法拿第二个参数拼
+#       「--copy 不在第一个（--memory 1G --copy <副本>）：编译目录是 <副本>/target」（取成 1G/target）
+#   PROVE_RED_BREAK=caller-target-overridden  调用方设了的 CARGO_TARGET_DIR 也换成 <副本>/target
+#       「调用方设了 CARGO_TARGET_DIR：照它的、不覆盖」
 #
 # 判法与次序：
 #   ① --copy 必须是一份副本：目录在、里面有 crates/mutations.tsv、不是这份脚本所在的主工作区（在主工作区上改坏源码会波及别的会话）；
 #   ② 逐个找变异名对应的行（六段：名、文件、原文、替换文、cargo test 的参数、必须红的测试名）；找不到、或参数里没有 -p <crate>、
 #      没有 --lib / --test / --bin 之一的，整次拒绝（一条都不跑，退 2）——不挑目标的 cargo test 会跑到名字带 layer0 的测试二进制；
-#   ③ --test 的目标名字里带 layer0 的跳过、逐条列出（层 0 归提交时的崩溃验证员）；
+#   ③ --test 的目标名字里带 layer0 的跳过、逐条列出（层 0 归提交时的主 agent）；
 #   ④ 每组不同的参数先跑一次基线（不改源码），基线红就停（退 2）；
 #   ⑤ 每条变异：原文在文件里恰好命中一次才改，经 research/scripts/run-with-memory-cap.sh <上限> 跑 cargo test <参数>，
 #      输出里有「test <模块路径::>必须红的测试名 ... FAILED」（#[should_panic] 的用例名字与「 ... 」之间多一段「 - should panic」，同样认）算抓到；
@@ -30,12 +38,13 @@ SCRIPT_DIRECTORY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 副本路径与主仓不同、或 bindgen 的环境变了，librocksdb-sys 的 C++ 会在基线那一次重编；cc 按 cargo 的并行度开编译器，
 # 32 路一起编 RocksDB 撞过 12G 与 16G 的上限（退 250），6 路编过得去。调用方另给 CARGO_BUILD_JOBS 就照它的。
 export CARGO_BUILD_JOBS="${CARGO_BUILD_JOBS:-6}"
-# CARGO_TARGET_DIR 要给证红自己专用的目录，不与别的编译共用：每条变异改坏源码再还原，还原后的文件 mtime 可能比变异那次编出的产物旧，
-# cargo 就把变异产物当成新的接着用——2026-09-28 在共用目录里另一份副本的测试就跑在了「步数不计数」那条变异的库上。
-# 没给就用副本自己的 target。
-export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$2/target}"
+# CARGO_TARGET_DIR 的默认值（副本自己的 target）在下面的 python 里解析完 --copy 之后才定、只设给 cargo 那几次（cargo_environment）：
+# 这里不从位置参数取——只给 --selftest 时没有 $2（set -u 下当场退 1），--copy 不在第一个时 $2 也不是副本。
+if [[ "${PROVE_RED_BREAK:-}" == unbound-second-argument && -n "${PROVE_RED_SELFTEST_PROLOGUE:-}" ]]; then
+  export CARGO_TARGET_DIR="${CARGO_TARGET_DIR:-$2/target}"   # 弄坏开关（文件头）：改前的写法
+fi
 python3 /dev/fd/3 "$SCRIPT_DIRECTORY" "$@" 3<<'PY'
-import os, re, shutil, subprocess, sys, tempfile
+import os, re, shlex, shutil, subprocess, sys, tempfile
 
 SCRIPT_DIRECTORY = sys.argv[1]
 MAIN_ROOT = os.path.realpath(os.path.join(SCRIPT_DIRECTORY, "..", ".."))
@@ -95,15 +104,27 @@ def failed_to_compile(text):
     return re.search(r"^error:", text, re.M) is not None and re.search(r"^test result: ", text, re.M) is None
 
 
-def run_cargo(copy, arguments, memory, log_path, cargo):
+def cargo_environment(copy, target_directory=None):
+    """cargo 那几次的环境：调用方设了（非空）CARGO_TARGET_DIR 照它的，没设就是副本自己的 target（target_directory 只给弄坏开关用）。
+    证红要自己专用的编译目录，不与别的编译共用：每条变异改坏源码再还原，还原后的文件 mtime 可能比变异那次编出的产物旧，
+    cargo 就把变异产物当成新的接着用——2026-09-28 在共用目录里另一份副本的测试就跑在了「步数不计数」那条变异的库上。"""
+    environment = dict(os.environ)
+    if BROKEN == "caller-target-overridden" or not environment.get("CARGO_TARGET_DIR"):
+        environment["CARGO_TARGET_DIR"] = target_directory or os.path.join(copy, "target")
+    return environment
+
+
+def run_cargo(copy, arguments, memory, log_path, cargo, environment):
     with open(log_path, "w", encoding="utf-8") as log:
-        result = subprocess.run(["bash", MEMORY_WRAPPER, memory, cargo, "test", *arguments], cwd=copy, stdout=log, stderr=subprocess.STDOUT)
+        result = subprocess.run(["bash", MEMORY_WRAPPER, memory, cargo, "test", *arguments], cwd=copy, stdout=log, stderr=subprocess.STDOUT,
+                                env=environment)
     return result.returncode, open(log_path, encoding="utf-8", errors="replace").read()
 
 
-def prove(copy, memory, crate, names, cargo="cargo"):
+def prove(copy, memory, crate, names, cargo="cargo", target_directory=None):
     """→ (退出码, [输出行])。"""
     copy = os.path.realpath(copy)
+    environment = cargo_environment(copy, target_directory)
     if not os.path.isfile(os.path.join(copy, "crates", "mutations.tsv")):
         return 2, [f"✗ {copy} 里没有 crates/mutations.tsv，不像仓副本", "→ 怎么办：rsync -a --exclude target --exclude .git <仓根>/ <草稿目录>/copy/ 拷一份再给 --copy"]
     if copy == MAIN_ROOT and BROKEN != "main-allowed":
@@ -119,7 +140,7 @@ def prove(copy, memory, crate, names, cargo="cargo"):
         if why:
             refusals.append(f"{name}：{why}")
         elif layer0_target(row) and BROKEN != "layer0-run":
-            skipped.append(f"{name}：目标名字带 layer0，留给提交时的崩溃验证员")
+            skipped.append(f"{name}：目标名字带 layer0，留给提交时的主 agent")
         else:
             chosen.append(row)
     if refusals:
@@ -128,7 +149,7 @@ def prove(copy, memory, crate, names, cargo="cargo"):
     os.makedirs(logs, exist_ok=True)
     output = [f"- 跳过 {line}" for line in skipped]
     for arguments in sorted({row[4] for row in chosen}):
-        code, text = run_cargo(copy, arguments.split(), memory, os.path.join(logs, "baseline.log"), cargo)
+        code, text = run_cargo(copy, arguments.split(), memory, os.path.join(logs, "baseline.log"), cargo, environment)
         if 250 <= code <= 254:
             return code, output + [f"✗ 基线那一次撞了内存包装的结局（退出码 {code}，含义见 run-with-memory-cap.sh 文件头）", "→ 怎么办：照那一行的含义处理，不绕开包装重跑"]
         if code != 0 and BROKEN != "baseline-ignored":
@@ -146,7 +167,7 @@ def prove(copy, memory, crate, names, cargo="cargo"):
         log_path = os.path.join(logs, f"{index:03d}.log")
         try:
             open(path, "w", encoding="utf-8").write(original_text.replace(anchor, replacement.replace("\\n", "\n"), 1))
-            code, text = run_cargo(copy, arguments.split(), memory, log_path, cargo)
+            code, text = run_cargo(copy, arguments.split(), memory, log_path, cargo, environment)
         finally:
             open(path, "w", encoding="utf-8").write(original_text)
             os.utime(path)
@@ -184,11 +205,14 @@ def selftest():
         fake_bin = os.path.join(work, "bin")
         os.makedirs(fake_bin)
         fake_cargo = os.path.join(fake_bin, "cargo")
+        target_log = os.path.join(work, "target-directories.txt")
         # 假 cargo 照源码里那个数打 libtest / cargo 的原样形态：42 基线全绿；45 是 #[should_panic] 的用例没 panic
         # （结果行在名字与「 ... 」之间多一段「 - should panic」，cargo 收尾还打一行 error: test failed）；46 替换之后编不过；
         # 47 点名的测试绿、别的测试红（同样带 error: test failed 与 test result: 行）；别的数照旧只打点名的那一行 FAILED。
+        # 每起一次先往 target_log 记一行它看到的 CARGO_TARGET_DIR（编译目录那两格核它）
         open(fake_cargo, "w").write(
             "#!/usr/bin/env bash\n"
+            f"printf '%s\\n' \"${{CARGO_TARGET_DIR-<未设>}}\" >> {shlex.quote(target_log)}\n"
             "case \"$(cat crates/demo/src/lib.rs)\" in\n"
             "*'{ 42 }'*) printf 'running 2 tests\\ntest tests::answer_is_42 ... ok\\ntest tests::answer_panics - should panic ... ok\\n\\n"
             "test result: ok. 2 passed; 0 failed; 0 ignored\\n'; exit 0 ;;\n"
@@ -242,35 +266,75 @@ def selftest():
         checked_cases += 1
         if code != 2 or not any("主工作区" in line for line in lines):
             failures.append(f"--copy 指主工作区应当以「主工作区」为由拒绝，实际 {code} {lines}")
+        # 编译目录三格：开头那几行不碰位置参数（只给 --selftest 也走得过去）；默认值在解析完 --copy 之后定，次序不限；调用方设了的不覆盖
+        caller_target = os.environ.pop("CARGO_TARGET_DIR", None)
+        try:
+            probe = subprocess.run(["bash", os.path.join(SCRIPT_DIRECTORY, "prove-red.sh"), "--selftest"], capture_output=True, text=True,
+                                   env=dict(os.environ, PROVE_RED_SELFTEST_PROLOGUE="1"))
+            checked_cases += 1
+            if probe.returncode != 0 or "PROVE_RED_PROLOGUE CARGO_TARGET_DIR=<未设>" not in probe.stdout.splitlines():
+                failures.append(f"不设 CARGO_TARGET_DIR、只给 --selftest：开头那几行应当走得过去、不替调用方设编译目录（子进程打 CARGO_TARGET_DIR=<未设>、退 0），"
+                                f"实际退 {probe.returncode}，输出 {(probe.stdout + probe.stderr).strip()!r}")
+            if os.path.exists(target_log):
+                os.unlink(target_log)
+            code, lines = run(["--memory", "1G", "--copy", copy, "demo", "caught"], cargo=fake_cargo)
+            seen = open(target_log).read().splitlines() if os.path.exists(target_log) else []
+            checked_cases += 1
+            if code != 0 or not seen or set(seen) != {os.path.join(os.path.realpath(copy), "target")}:
+                failures.append(f"--copy 不在第一个（--memory 1G --copy <副本>）：编译目录应当是 <副本>/target、照常抓到退 0，实际退 {code}，cargo 看到的 {seen} {lines}")
+            if os.path.exists(target_log):
+                os.unlink(target_log)
+            os.environ["CARGO_TARGET_DIR"] = os.path.join(work, "caller-target")
+            code, lines = run(["--copy", copy, "demo", "caught"], cargo=fake_cargo)
+            seen = open(target_log).read().splitlines() if os.path.exists(target_log) else []
+            checked_cases += 1
+            if code != 0 or not seen or set(seen) != {os.path.join(work, "caller-target")}:
+                failures.append(f"调用方设了 CARGO_TARGET_DIR：应当照它的、不覆盖，实际退 {code}，cargo 看到的 {seen}")
+        finally:
+            os.environ.pop("CARGO_TARGET_DIR", None)
+            if caller_target is not None:
+                os.environ["CARGO_TARGET_DIR"] = caller_target
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
-            print("  → 看 prove() / refusal_for() / layer0_target() / named_test_failed() / failed_to_compile() 的判法；PROVE_RED_BREAK 设着的话这里本来就该红")
+            print("  → 看 prove() / refusal_for() / layer0_target() / named_test_failed() / failed_to_compile() 的判法，编译目录那三格看 run() / cargo_environment() 与开头 python3 之前那几行；"
+                  "PROVE_RED_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ prove-red 自检通过：会红的抓到并写回源码，should_panic 红了抓到，编不过判无效，别的测试红判没红，不挑目标的整次拒绝，layer0 目标跳过并列出，主工作区拒绝（查了 {checked_cases} 种）")
+        print(f"  ✓ prove-red 自检通过：会红的抓到并写回源码，should_panic 红了抓到，编不过判无效，别的测试红判没红，不挑目标的整次拒绝，layer0 目标跳过并列出，主工作区拒绝，"
+              f"不设 CARGO_TARGET_DIR 只给 --selftest 走得过开头，--copy 不在第一个时编译目录照样是副本的 target，调用方设了的不覆盖（查了 {checked_cases} 种）")
         return 0
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def main():
-    arguments = sys.argv[2:]
-    if arguments == ["--selftest"]:
-        return selftest()
+def run(arguments, cargo="cargo"):
+    """→ (退出码, [输出行])：先解析 --copy / --memory（两个的次序不限），再证红；编译目录的默认值由 prove 照解析出的副本定。"""
+    raw_arguments = list(arguments)
     copy, memory = None, default_memory_cap()
     while arguments and arguments[0] in ("--copy", "--memory"):
         if len(arguments) < 2:
-            print("✗ 选项后面没给值\n→ 怎么办：prove-red.sh --copy <仓副本> [--memory <上限>] <crate> <变异名…>")
-            return 2
+            return 2, ["✗ 选项后面没给值", "→ 怎么办：prove-red.sh --copy <仓副本> [--memory <上限>] <crate> <变异名…>"]
         if arguments[0] == "--copy":
             copy = arguments[1]
         else:
             memory = arguments[1]
         arguments = arguments[2:]
     if copy is None or len(arguments) < 2:
-        print("✗ 用法不对\n→ 怎么办：prove-red.sh --copy <仓副本> [--memory <上限>] <crate> <变异名…>")
-        return 2
-    code, lines = prove(copy, memory, arguments[0], arguments[1:])
+        return 2, ["✗ 用法不对", "→ 怎么办：prove-red.sh --copy <仓副本> [--memory <上限>] <crate> <变异名…>"]
+    # 弄坏开关 second-argument-target：改前 $2 的取法，--copy 不在第一个时取错
+    target_directory = os.path.join(raw_arguments[1], "target") if BROKEN == "second-argument-target" and len(raw_arguments) > 1 else None
+    return prove(copy, memory, arguments[0], arguments[1:], cargo=cargo, target_directory=target_directory)
+
+
+def main():
+    arguments = sys.argv[2:]
+    if arguments == ["--selftest"]:
+        if os.environ.get("PROVE_RED_SELFTEST_PROLOGUE"):
+            # 自证起的那一层子进程：只证开头那几行走得过去，打它此刻看到的 CARGO_TARGET_DIR 就退（编译目录那一格核这一行）
+            print(f"PROVE_RED_PROLOGUE CARGO_TARGET_DIR={os.environ.get('CARGO_TARGET_DIR', '<未设>')}")
+            return 0
+        return selftest()
+    code, lines = run(arguments)
     for line in lines:
         print(line)
     return code

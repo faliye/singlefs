@@ -9,9 +9,13 @@
 # 为什么：2026-09-20 起 8 天里「合入后验证」派了 3 个实现员、平均 14.3M 折算，是实现员里最贵的一种；它做的前三步（打补丁、编、逐个跑测试）
 # 是 apply-writer-patch.py 加几条命令，只有「红了改钉值」要判断——那一步红了才派实现员。
 # 做法：每个补丁目录经 research/scripts/apply-writer-patch.py 打（退 2 就整批停）；然后经 run-with-memory-cap.sh 与 capped.sh 跑
-# `cargo test --no-fail-fast` 只挑 harness 档的四个包（不碰 checker 档包 singlefs-checker-tier，那归提交时的崩溃验证员）、`cargo fmt --check`、
+# `cargo test --no-fail-fast` 只挑 harness 档的四个包（不碰 checker 档包 singlefs-checker-tier，那归提交时的主 agent）、`cargo fmt --check`、
 # `cargo clippy -D warnings`；日志落 $MERGE_AND_VERIFY_LOG_DIRECTORY（默认 /tmp/claude-1000/merge-and-verify/<时间>）。
 # 退出码：0 全绿；1 有红（测试、fmt、clippy 或 apply 退 1）；2 补丁核不过（apply 退 2）、用法错。
+# 弄坏开关 MERGE_AND_VERIFY_BREAK=<项>（只给证红用；打开时自证退 1）。逐项写开关名、弄坏哪一处、打开后自证哪几项红
+# （自证的三例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
+#   MERGE_AND_VERIFY_BREAK=ignore-red  verify() 抓到 FAILED 行、cargo test 退非 0 都不记红，一律报测试全绿
+#       「一条测试红时应当退 1、列出那条测试与只重跑它的命令」（实际退出码 0，报「✓ 测试全绿（0 个测试二进制）」）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}

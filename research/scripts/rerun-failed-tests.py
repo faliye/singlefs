@@ -83,7 +83,7 @@ def failed_tests_by_target(log_text):
 
 
 def command_lines(commands, package):
-    # 一律带 --include-ignored：红的若是标了 #[ignore] 的耗时用例，不带它 libtest 会把点名的那几条直接跳过，看着跑了、其实一条没跑
+    # 一律带 --include-ignored：红的若是标了 #[ignore] 的慢档用例，不带它 libtest 会把点名的那几条直接跳过，看着跑了、其实一条没跑
     return [shlex.join(["cargo", "test", "-p", package, *selector, "--", "--include-ignored", "--exact", *names]) for selector, names in commands]
 
 

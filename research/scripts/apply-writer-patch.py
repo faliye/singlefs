@@ -18,6 +18,16 @@
 自上次崩溃验证全绿（git common-dir 里最新的 singlefs-crash-case-green.* 标记）以来打过的补丁到 CRASH_VERIFY_HINT_PATCHES 个（5，推的）就打一行提示：
 只提示、不拦，跑不跑由用户定。
 退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对，一个字没改。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一份补丁目录的名字，括号里是那条「✗ 自检：」的开头）：
+  APPLY_WRITER_PATCH_BREAK=append-duplicates  plan() 不核追加的变异名在表里有没有
+      duplicate（「✗ 自检：追加已有的名字应当拒绝」）
+  APPLY_WRITER_PATCH_BREAK=apply-unchecked  plan() 里 git apply --check 不过也照样往下走
+      stale（「✗ 自检：打不上的补丁应当在核的时候拒绝」：到真打时才失败，报的不是 apply --check）
+  APPLY_WRITER_PATCH_BREAK=checker-section-ignored  plan() 不看动了 checker 的补丁报告里有没有「受影响的层 0 流与崩溃枚举用例」一节
+      checker（「✗ 自检：动 checker 而报告没那一节应当拒绝」）
+  APPLY_WRITER_PATCH_BREAK=no-hint  apply() 打过的补丁数到 CRASH_VERIFY_HINT_PATCHES 也不打提示
+      onlytable（「✗ 自检：打过的补丁数到提示线应当打提示」）
 """
 import glob
 import hashlib
@@ -134,7 +144,7 @@ def apply(patch_directory, root, dry_run, gate33):
     count = patches_since_last_crash_verification(root, log_path)
     if count >= CRASH_VERIFY_HINT_PATCHES and BROKEN != "no-hint":
         lines.append(f"! 自上次崩溃验证全绿以来已打 {count} 个实现员补丁（提示线 {CRASH_VERIFY_HINT_PATCHES}，推的）：弹窗问用户要不要用 "
-                     "SINGLEFS_HEAVY_TESTS=user-request 派 crash-verifier 跑一次（54 号按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
+                     "SINGLEFS_HEAVY_TESTS=user-request 由主 agent 跑一次（checker-tier-layer0-replay 按用例复用，只跑输入变了的崩溃枚举用例）；只提示，不拦")
     lines.append(f"调度表可贴的一行：| {os.path.basename(os.path.normpath(patch_directory))} | 已打（{time.strftime('%m-%d %H:%M', time.localtime())}） | code-source-discipline {gate.returncode} |")
     return (0 if gate.returncode == 0 else 1), lines
 

@@ -24,8 +24,14 @@
   history-consolidate.py loss-check <改前文件> <改后文件> [--report <报告.md>] [--repo <仓根>]
   history-consolidate.py --selftest
 
-退出码：0 没有丢失；3 有丢失（报告里逐个列出）；1 用法不对或自检没过。
-环境变量 HISTORY_CONSOLIDATE_BREAK=drop-number 让 migrate 故意丢一个数，自检拿它证明 loss-check 会红。
+退出码：0 没有丢失；3 有丢失（报告里逐个列出）；1 用法不对或自检没过；2 --selftest 时弄坏开关设了认不得的取值。
+
+弄坏开关（只给 --selftest 证红用，migrate 与 loss-check 不认）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句冒号前的名字，
+括号里是那条「✗ 自检：」的开头）。不设开关时 --selftest 把 BREAK_MODES 里每个开关各开一次跑 migrate()，核 loss-check 都红
+（没红的那一项是「弄坏开关 <名>」，失败句「✗ 自检：弄坏开关 <名>：故意丢一个数，loss-check 没红」）；设了认不得的取值退 2。
+  HISTORY_CONSOLIDATE_BREAK=drop-number  transform_entry() 把条目正文里第一处两位以上的数（日期与「- **改前**」行除外）删掉一个，样本里每个家节条目各丢一个
+      干净迁移不该有丢失（「✗ 自检：干净迁移不该有丢失：」）、
+      快查·改后没留成结论句（「✗ 自检：快查·改后没留成结论句」）
 """
 import argparse
 import collections
@@ -614,8 +620,16 @@ SAMPLE = '''# 决策变更史
 '''
 
 
+BREAK_MODES = ('drop-number',)  # 弄坏开关 HISTORY_CONSOLIDATE_BREAK 认的取值，只给 --selftest 用（文件头逐个写了打开后哪几项红）
+
+
 def selftest():
-    after, report, _before_blocks, _git = migrate(SAMPLE, repo=None)
+    break_mode = os.environ.get('HISTORY_CONSOLIDATE_BREAK', '')
+    if break_mode and break_mode not in BREAK_MODES:
+        print(f'✗ 自检：HISTORY_CONSOLIDATE_BREAK={break_mode} 认不得')
+        print(f'  → 取值只有 {" ".join(BREAK_MODES)}（文件头「弄坏开关」一段）；平常跑 --selftest 不设它')
+        return 2
+    after, report, _before_blocks, _git = migrate(SAMPLE, repo=None, break_mode=break_mode or None)
     checked, losses = loss_check(SAMPLE, after, repo=None)
     problems = []
     if losses:
@@ -647,16 +661,21 @@ def selftest():
         problems.append('文件自己文末的「## 历史版本」节没有原样留在文末')
     if len(report['multi_day_blocks']) != 1:
         problems.append(f'同日多条应报 1 个块，报了 {report["multi_day_blocks"]}')
-    broken, _r, _b, _g = migrate(SAMPLE, repo=None, break_mode='drop-number')
-    _checked, broken_losses = loss_check(SAMPLE, broken, repo=None)
-    if not broken_losses:
-        problems.append('故意丢一个数，loss-check 没红')
+    caught = []
+    for mode in BREAK_MODES:
+        broken, _r, _b, _g = migrate(SAMPLE, repo=None, break_mode=mode)
+        _checked, broken_losses = loss_check(SAMPLE, broken, repo=None)
+        if not broken_losses:
+            problems.append(f'弄坏开关 {mode}：故意丢一个数，loss-check 没红')
+        else:
+            caught.append(f'{mode} {broken_losses[0][1]}')
     if problems:
         for problem in problems:
             print('✗ 自检：' + problem)
         print('  → 改 history-consolidate.py 的对应分支，再跑 --selftest')
         return 1
-    print(f'✓ 自检通过：干净迁移零丢失，指针 1 条，快查 / 现状 / 同日日期 / （其N）都删了，故意丢数被抓（{broken_losses[0][1]}）')
+    print(f'✓ 自检通过：干净迁移零丢失，指针 1 条，快查 / 现状 / 同日日期 / （其N）都删了，'
+          f'弄坏开关 {len(caught)} 个各开一次、故意丢数都被抓（{"；".join(caught)}）')
     return 0
 
 
@@ -678,7 +697,7 @@ def main():
             print('  → 给一份输入文件与 --out')
             sys.exit(1)
         before_text = open(arguments.files[0], encoding='utf-8').read()
-        after_text, report, _blocks, _git = migrate(before_text, arguments.repo, os.environ.get('HISTORY_CONSOLIDATE_BREAK'))
+        after_text, report, _blocks, _git = migrate(before_text, arguments.repo)
         with open(arguments.out, 'w', encoding='utf-8') as handle:
             handle.write(after_text)
         checked, losses = loss_check(before_text, after_text, arguments.repo)

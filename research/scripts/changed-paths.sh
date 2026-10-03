@@ -32,10 +32,34 @@
 # 住在 research/scripts/ 而不是 .claude/gate.d/：共享门禁（gate.sh）把 gate.d 下每个 *.sh 都当阶段跑，
 # 阶段调用的共用 shell 脚本照 stage-must-run.sh、change-touches-crates.sh 的惯例放这里；自证由门禁 code-tooling 跑。
 # `--selftest` 在临时 git 仓里自证：三种来源（工作区改、暂存新增、未跟踪）各放一个中文路径，逐字核两个函数的输出。
-# 判别力：LIB_CHANGED_PATHS_BREAK=quotepath 让取法漏掉 core.quotepath=false、=untracked 让它丢掉未跟踪文件、
-# =fallback 让 gate 取法不认 GATE_BASE、=empty-merge-base 让 merge-base 取不到时交出空串、
-# =untracked-lines 让新增行丢掉未跟踪文件、=swallow 让路径取法吞掉 git 的失败、
-# =header-anywhere 让「+++ 」在正文里也当文件头认、=binary 让未跟踪的二进制文件也整份读，八种自证都必须判红。
+# 弄坏开关 LIB_CHANGED_PATHS_BREAK=<项>（只给证红用，一次给一个；打开时自证退 1）。
+# 逐项写开关名、弄坏哪一处、打开后自证哪几项红：项名是自证里 check 的标签，一行一项；失败行列在「✗ 共用库 research/scripts/changed-paths.sh 的自证没过」
+# 下面，句首就是标签，整行是「<标签>：期望「…」，实测「…」」，括号里抄那一行的实测（制表符写成 <制表符>）：
+#   LIB_CHANGED_PATHS_BREAK=quotepath  gate_changed_paths 与 gate_added_lines 的 git 调用漏掉 -c core.quotepath=false
+#       未跟踪也算、中文路径不转义（实测「"\345\267\262\350\267\237\350\270\252.md" | …」：中文路径成了带引号的八进制串）
+#       tracked-only 不带未跟踪（实测「"\345\267\262\350\267\237\350\270\252.md" | …」）
+#       diff-filter=A 只要新增、未跟踪算新增（实测「"\346\232\202\345\255\230\346\226\260\345\242\236.md" | …」）
+#       新增行：改过的行、暂存新增的整份、未跟踪的整份，中文路径不转义（实测「」）
+#       新增行只看给的路径、删掉的旧行不算（实测「」）
+#       新增行：路径带空格、正文里以「++ 」开头的一行照样归到那份文件（实测「」）
+#       HEAD 还没出生：基准是空树、未跟踪文件照常交出（实测「<空树> "\346\226\260.md"」）
+#   LIB_CHANGED_PATHS_BREAK=untracked  gate_changed_paths 带 untracked 时也不加未跟踪文件
+#       未跟踪也算、中文路径不转义（实测「已跟踪.md | 暂存新增.md | 第二个提交.md」）
+#       diff-filter=A 只要新增、未跟踪算新增（实测「暂存新增.md」）
+#       HEAD 还没出生：基准是空树、未跟踪文件照常交出（实测「<空树> 」）
+#   LIB_CHANGED_PATHS_BREAK=fallback  gate_diff_base gate 不认 GATE_BASE，直接取上游的 merge-base
+#       GATE_BASE 是个提交就用它（实测是上游那个提交的哈希）
+#   LIB_CHANGED_PATHS_BREAK=empty-merge-base  merge-base 取不到时交出空串，不回退到 HEAD
+#       上游与 HEAD 没有共同祖先就回退到 HEAD（实测「」）
+#   LIB_CHANGED_PATHS_BREAK=untracked-lines  gate_added_lines 不读未跟踪文件
+#       新增行：改过的行、暂存新增的整份、未跟踪的整份，中文路径不转义（实测「已跟踪.md<制表符>第二版 | 暂存新增.md<制表符>新」）
+#       新增行：路径带制表符时退非 0（实测「0」：带制表符的那份未跟踪文件根本没读）
+#   LIB_CHANGED_PATHS_BREAK=swallow  gate_changed_paths 第一条 git diff 失败时吞掉退出码
+#       基准解析不到：两个取法都退非 0，不交半截结果（实测「0 1 空」）
+#   LIB_CHANGED_PATHS_BREAK=header-anywhere  「+++ 」在正文里也当文件头认
+#       新增行：路径带空格、正文里以「++ 」开头的一行照样归到那份文件（实测「以两个加号开头的新增行<制表符>紧跟的一行」）
+#   LIB_CHANGED_PATHS_BREAK=binary  未跟踪的二进制文件也整份读
+#       新增行：未跟踪的二进制文件不读（实测「1」）
 #
 #   bash research/scripts/changed-paths.sh --selftest      # 自证
 #   LIB_CHANGED_PATHS_BREAK=quotepath bash research/scripts/changed-paths.sh --selftest   # 必须判红

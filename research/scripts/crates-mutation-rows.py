@@ -53,6 +53,14 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
     import 不导用时（另一台的快慢不代表本机）。
   用时从包装起跑到返回分两段记：排队（调包装到命令在 scope 里起来）与跑（起来到返回）。命令起来的那一刻由包在命令外面的一层 bash 记进
     这一趟源码副本总目录底下的一个文件（不在那一条的 TMPDIR 里，不进「删前留有几个文件」）；包装的峰值表仍按原命令记键（RUN_WITH_MEMORY_CAP_KEY）。
+  包装排队时每 60 秒往 stderr 报一行（research/scripts/run-with-memory-cap.sh 的 WAITING_REPORT_EVERY_SECONDS）；这里收包装的 stderr 判结局，
+    那几行（WRAPPER_QUEUE_LINE）边跑边另转打到本进程的 stderr，行首带是哪一行变异或哪一批基线（run_forwarding_queue_lines）；收进来判结局的输出与 stdout 都不变。
+
+并行理由（包装文件头「日常一条」：从 Claude Code 会话里起、不带 SINGLEFS_HEAVY_TESTS 的，同一个会话账上已有一条在跑、这一条没给至少 8 个字的理由就退 252）：
+  这里起的每次包装（基线的批与每条变异）都带 RUN_WITH_MEMORY_CAP_PARALLEL_REASON=「同一次 checker-tier-crates-mutation-replay（本模块进程 <pid>）的第 <i> 个工作进程，
+  各用各的源码副本与编译目录（这一轮共 <n> 个）」，<i> 是那个工作进程的片号（编译目录 -w<i> 那个号）；不设的话会话里平常跑时第 2 个工作进程起就排不上、记成「排不上没跑」。
+  调用方已经设了（非空）的照原样传、不覆盖。只设在那一次包装的环境里（run_under_wrapper），不进本进程与 --check 那一次的环境；包装把它清掉之后才起 cargo。
+  做法照 research/scripts/mutate.sh 文件头「并行」那一段。提交时的门禁带 SINGLEFS_HEAVY_TESTS=commit，不算日常，不受这条影响。
 
 基线（派变异之前，按批在没改坏的副本上跑一遍点名的测试）：
   批的键 = 这一行 cargo 参数里 `--` 之前那一段 + `--` 之后以 `--` 起头的开关；过滤词取这一批要跑基线的各行 `--` 之后非开关词的并集，
@@ -60,13 +68,28 @@ checker-tier-crates-mutation-replay 经 import 调 run_stage（阶段文件里�
   同样经内存包装、同样的上限与限时。每一行的点名测试在基线输出里要恰好对上一个用例、结果都是 ok，否则这一行记「基线不绿」：
   不算抓到、不算没红、它的变异不跑，整道判红。已有作数的抓到记录或基线 ok 记录的行不再跑基线。
 
+本次未跑（2026-10-01 加）：点名的测试在本机没跑到被改坏的那一处时，打一行 `NOT_RUN_NO_GPU_ADAPTER test=<用例名> reason=<一句>` 后返回成功（GPU 对拍用例在没卡的机器上）。
+  变异那一趟的 libtest 参数里补 --show-output（with_shown_output，插在第一个 `--` 之后）：成功用例的输出 libtest 默认不交出来；
+  不用 --nocapture：单线程跑时它把用例的输出插进「test <名字> ... 」与结果之间，结果行就认不出。基线那一批不补。
+  点名的测试结果是 ok、输出里有一行 test= 对上点名的测试（只比 :: 分开的末一段）的，这一条记「本次未跑」（not_run_reason）：不算抓到、不算没红，逐条打出来；
+  整道不因它判红，成功句写明抓到几条、本次未跑几条，全绿标记不写；一条抓到的都没有、只有本次未跑的退 77（选行模式照旧退 3 / 1）。
+  GATE_MUTATION_NOT_RUN_RECORD=<文件> 设了，每条本次未跑往里追加一行（阶段把它转给 gate.sh 的 GATE_NOT_RUN_FILE）；写不进去整道判红。
+  只有「抓到」复用，本次未跑的下一趟照跑。
+
 弄坏开关（GATE_MUTATION_BREAK，只给证红用，逗号分隔可给几个）：
   nobaseline           跳过基线：点名的测试在没改坏的副本上本来就红的行照样记抓到（checker-tier-crates-mutation-replay 红样本、本模块自证都必须判错）
   basewithoutsource    底座指纹不含 crates/ 下的被测源码：改一份被测源码之后照样全部复用（自证必须判错）
   timingsignored       派活不看用时表（自证「上一次跑得久的先派」那一格必须判错）
   importunchecked      import 不核行键与底座指纹，照单全收（自证「行键对不上的记录被拒」那一格必须判错）
   keepmutationtmp      每条变异的 TMPDIR 不删（checker-tier-crates-mutation-replay 两份样本都必须判错）
+  notrunasmissed       点名的测试打了 NOT_RUN_NO_GPU_ADAPTER 也当没红记（checker-tier-crates-mutation-replay 的 not-run 样本、本模块自证「点名的测试打了 NOT_RUN」那一格都必须判错）
   emptyreplacementrefused  替换文空着也判不成形（checker-tier-crates-mutation-replay 绿样本里的删行变异、code-source-discipline 绿样本里的删行变异、本模块自证「删行变异照常判」那一格都必须判错）
+  queuelineswallowed   内存包装排队报的那几行不转打到本进程的 stderr、只收进变量（本模块自证「包装排队报的那一行边跑边转打」那一格必须判错）
+下面两个开关一行一个，下一行起写打开后必须判错的自证项：
+  noparallelreason     自己起的包装不设并行理由（改前的跑法）
+    本模块自证「会话里平常跑（假包装照日常一条演）、4 个工作进程：各条照样判对，每次包装带自己那个工作进程的并行理由」
+  overridecallerreason 调用方设了的并行理由也换成自己的
+    本模块自证「调用方设了的并行理由原样传给每次包装、不覆盖」
 只供测试的开关：GATE_MUTATION_STOP_AFTER_ROWS=<k> 现跑的变异判完 k 条就不再派活、等在跑的收完，整道判红退出（造「跑到一半被杀」）。
 """
 import calendar
@@ -85,6 +108,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 
 sys.dont_write_bytecode = True
@@ -126,6 +150,9 @@ START_STAMP_SCRIPT = 'printf "%s" "$EPOCHREALTIME" > "$1"; shift; exec "$@"'
 VERDICTS_KILLED_BY_WRAPPER = ("timeout", "memory", "squeezed")
 VERDICTS_THAT_DID_NOT_RUN = ("refused", "unavailable")
 TEST_NAME_FORM = re.compile(r"[A-Za-z_][A-Za-z0-9_]*(::[A-Za-z_][A-Za-z0-9_]*)*")
+# 点名的测试在本机没跑到被改坏的那一处时打的一行（见文件头「本次未跑」）；变异那一趟补 --show-output，libtest 才把成功用例的这一行交出来
+NOT_RUN_LINE = re.compile(r"^\s*NOT_RUN_NO_GPU_ADAPTER test=(\S+)(?: reason=(.*))?$", re.M)
+LIBTEST_SHOW_OUTPUT = "--show-output"
 BYTES_PER_STAT_BLOCK = 512   # os.stat 的 st_blocks 按 512 字节一块数（POSIX）
 EXIT_SELECTION_ONLY = 3      # 只判了选中的行、都抓到：不是整道结论，门禁汇总记失败，不会被当成通过
 # 源码里一处字符串字面量或注释的起头（找字面量时跳过注释用）
@@ -136,7 +163,7 @@ PATH_ATTRIBUTE_AFTER_LITERAL = re.compile(r"\s*\]")
 STAGE_VARIABLES = ("GATE_MUTATION_WORKERS", "GATE_MUTATION_CARGO_JOBS", "GATE_MUTATION_MEMORY_MAX", "GATE_MUTATION_TIMEOUT",
                    "GATE_MUTATION_ROW_SELECTION", "GATE_MUTATION_START_OVER", "GATE_MUTATION_LONG_ROW_SECONDS",
                    "GATE_MUTATION_STOP_AFTER_ROWS", "GATE_MUTATION_TARGET_DIR", "GATE_MUTATION_MEMORY_CAP_RUNNER",
-                   "GATE_MUTATION_RECORDS_HOME", "SINGLEFS_GATE_FULL", "SINGLEFS_REUSE_HOURS")
+                   "GATE_MUTATION_RECORDS_HOME", "GATE_MUTATION_NOT_RUN_RECORD", "SINGLEFS_GATE_FULL", "SINGLEFS_REUSE_HOURS")
 
 Row = collections.namedtuple("Row", "line_number name path old new arguments expected fields")
 FIELD_NAMES = ("变异名", "文件", "原文", "替换文", "cargo test 参数", "必须红的测试名")
@@ -646,8 +673,28 @@ def baseline_problem(row, returncode, output, memory_max, timeout_seconds):
     return f"一行都没出现（那一批退出码 {returncode}；参数筛不到它，或名字认不出）"
 
 
-def verdict_of_run(row, returncode, output, memory_max, timeout_seconds):
-    """一条变异跑完之后判哪一档：(档, 那一条要打印的话)。"""
+def with_shown_output(arguments):
+    """变异那一趟的 cargo test 参数：libtest 参数里补 --show-output（插在第一个 `--` 之后；没有 `--` 就补 `-- --show-output`；已经有了不再补）。"""
+    words = list(arguments)
+    if "--" not in words:
+        return words + ["--", LIBTEST_SHOW_OUTPUT]
+    index = words.index("--")
+    if LIBTEST_SHOW_OUTPUT in words[index + 1:]:
+        return words
+    return words[:index + 1] + [LIBTEST_SHOW_OUTPUT] + words[index + 1:]
+
+
+def not_run_reason(expected, output):
+    """输出里 NOT_RUN_NO_GPU_ADAPTER 那一行的 test= 对上点名的测试（只比 :: 分开的末一段）时交它 reason= 之后那一句（没写交「没写为什么」），对不上交 None。"""
+    wanted = expected.split("::")[-1]
+    for found in NOT_RUN_LINE.finditer(output):
+        if found.group(1).split("::")[-1] == wanted:
+            return (found.group(2) or "").strip() or "没写为什么"
+    return None
+
+
+def verdict_of_run(row, returncode, output, memory_max, timeout_seconds, environment=None):
+    """一条变异跑完之后判哪一档：(档, 那一条要打印的话)。environment 只看弄坏开关（notrunasmissed）。"""
     tail = output_tail(output)
     outcome = wrapper_outcome(returncode, memory_max, timeout_seconds)
     # 包装报的几种结局先判：被停、被杀的测试二进制可能已经打出了半截输出，不许拿它判抓到或没红
@@ -663,6 +710,11 @@ def verdict_of_run(row, returncode, output, memory_max, timeout_seconds):
                            f"（{'、'.join(sorted(results))}），判不出红的是哪一个；把点名写全到模块路径\n{tail}")
     if returncode != 0 and any("FAILED" in outcomes for outcomes in results.values()):
         return "caught", caught_text(row)
+    # 点名的测试是 ok、又打了 NOT_RUN_NO_GPU_ADAPTER：没跑到被改坏的那一处，记本次未跑（文件头「本次未跑」），不记没红
+    reason = not_run_reason(row.expected, output) if results and not break_is(environment or {}, "notrunasmissed") else None
+    if reason is not None and all(outcome == "ok" for outcomes in results.values() for outcome in outcomes):
+        return "notrun", (f"{TABLE}:{row.line_number} {row.name}：本次未跑——点名的测试 {row.expected} 打了 NOT_RUN_NO_GPU_ADAPTER（{reason}）后返回成功，"
+                          "没跑到被改坏的那一处；不算抓到、也不算没红")
     if results:
         return "failure", f"{TABLE}:{row.line_number} {row.name}：{row.expected} 没红（退出码 {returncode}）\n{tail}"
     if re.search(r"^error(\[E\d+\])?: ", output, re.M) or "could not compile" in output:
@@ -689,7 +741,7 @@ def init_worker(sequence_counter, shard_root, context):
     work, target_directory = prepare_shard(worker_sequence, shard_root, context)
     environment = dict(context["environment"])
     environment["CARGO_TARGET_DIR"] = target_directory
-    WORKER_STATE.update(work=work, environment=environment, context=context, shard_root=shard_root,
+    WORKER_STATE.update(work=work, environment=environment, context=context, shard_root=shard_root, worker_sequence=worker_sequence,
                         per_mutation_temporary_root=os.path.join(shard_root, PER_MUTATION_TEMPORARY_DIRECTORY_NAME))
     # 源码副本建在父进程的 shard_root 底下、由父进程收尾时整个删；编译目录留着跨轮复用。
     # 不在这里挂 atexit：进程池的工作进程走 os._exit 退出，atexit 在这里一次都不跑。
@@ -733,6 +785,32 @@ def measure_and_remove_temporary_directory(directory, context):
     return file_count, allocated_bytes, apparent_bytes, os.path.lexists(directory)
 
 
+# 内存包装排队时报的那几行（run-with-memory-cap.sh：「排队（已等 …」每 60 秒一行，「排了 … 秒，起跑」放行时一行）
+WRAPPER_QUEUE_LINE = re.compile(r"^run-with-memory-cap: 排(队（|了 )")
+
+
+def run_forwarding_queue_lines(command, label, sink=None, **popen_keywords):
+    """跑一条经内存包装的命令、收它的 stdout 与 stderr，交回 subprocess.CompletedProcess（与 capture_output=True, text=True, errors="replace" 收的逐字相同）；
+    stderr 里包装排队报的那几行（WRAPPER_QUEUE_LINE）边跑边转打到 sink（默认本进程的 stderr），行首带 label，不进 stdout（文件头「用时」一段之后那一段）。"""
+    sink = sink if sink is not None else sys.stderr
+    forward = not break_is(popen_keywords.get("env") or os.environ, "queuelineswallowed")
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, errors="replace", **popen_keywords)
+    stderr_lines = []
+
+    def pump():
+        for line in process.stderr:
+            stderr_lines.append(line)
+            if forward and WRAPPER_QUEUE_LINE.match(line):
+                print(f"  … {label}：{line.rstrip()}", file=sink, flush=True)
+
+    reader = threading.Thread(target=pump, name="wrapper-stderr", daemon=True)
+    reader.start()
+    stdout = process.stdout.read()
+    process.wait()
+    reader.join()
+    return subprocess.CompletedProcess(command, process.returncode, stdout, "".join(stderr_lines))
+
+
 def run_under_wrapper(arguments, temporary_directory, stamp_name):
     """经内存包装跑一次 cargo test --offline <参数>：(subprocess 的结果, 用时)。限时交给包装（从起跑算、不算排队），TMPDIR 是这一次自己的。"""
     state, context = WORKER_STATE, WORKER_STATE["context"]
@@ -742,9 +820,17 @@ def run_under_wrapper(arguments, temporary_directory, stamp_name):
                        RUN_WITH_MEMORY_CAP_TIME_LIMIT=str(context["timeout_seconds"]),
                        RUN_WITH_MEMORY_CAP_KILL_GRACE=str(TIMEOUT_KILL_GRACE_SECONDS),
                        RUN_WITH_MEMORY_CAP_KEY=" ".join(command))
+    # 会话里的「日常一条」：每次包装带这个工作进程自己的并行理由，调用方设了的原样传、不覆盖；只设在这一次包装的环境里（文件头「并行理由」一段）
+    if not state["environment"].get("RUN_WITH_MEMORY_CAP_PARALLEL_REASON") or break_is(context["environment"], "overridecallerreason"):
+        if not break_is(context["environment"], "noparallelreason"):
+            environment["RUN_WITH_MEMORY_CAP_PARALLEL_REASON"] = (
+                f"同一次 checker-tier-crates-mutation-replay（本模块进程 {context['stage_process']}）的第 {state['worker_sequence']} 个工作进程，"
+                f"各用各的源码副本与编译目录（这一轮共 {context['worker_count']} 个）")
     called = time.time()
-    run = subprocess.run(["bash", context["memory_cap_runner"], context["memory_max"], "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
-                         + command, cwd=state["work"], env=environment, capture_output=True, text=True, errors="replace")
+    kind, _dash, line_number = stamp_name.partition("-")
+    label = f"基线（批首行是变异表第 {line_number} 行）" if kind == "baseline" else f"变异表第 {line_number} 行"
+    run = run_forwarding_queue_lines(["bash", context["memory_cap_runner"], context["memory_max"], "bash", "-c", START_STAMP_SCRIPT, "started-at", stamp_path]
+                                     + command, label, cwd=state["work"], env=environment)
     returned = time.time()
     started = None
     with contextlib.suppress(OSError, ValueError):
@@ -810,13 +896,13 @@ def judge_row(row):
     with open(full, "w", encoding="utf-8") as handle:
         handle.write(pristine.replace(row.old, row.new))
     try:
-        run, seconds = run_under_wrapper(row.arguments.split(), temporary_directory, f"line-{row.line_number}")
+        run, seconds = run_under_wrapper(with_shown_output(row.arguments.split()), temporary_directory, f"line-{row.line_number}")
     finally:
         with open(full, "w", encoding="utf-8") as handle:
             handle.write(pristine)
         # 不论退出码是几都删（含限时、撞顶被杀）：被杀的测试 Drop 守卫不跑，它建的镜像只有这里删得掉
         removal = measure_and_remove_temporary_directory(temporary_directory, context)
-    verdict, text = verdict_of_run(row, run.returncode, run.stdout + run.stderr, context["memory_max"], context["timeout_seconds"])
+    verdict, text = verdict_of_run(row, run.returncode, run.stdout + run.stderr, context["memory_max"], context["timeout_seconds"], context["environment"])
     if verdict in VERDICTS_KILLED_BY_WRAPPER:
         file_count, allocated_bytes, _apparent_bytes, is_still_there = removal
         first_line, line_break, rest = text.partition("\n")
@@ -1103,7 +1189,8 @@ def run_stage(root, environment=None):
         default_target = os.path.join(environment.get("GATE_CROSS_RUN_TMPDIR") or environment.get("TMPDIR") or "/tmp", "singlefs-crates-mutation-target")
         context = dict(root=root, copied=copied, environment=environment, memory_max=memory_max, timeout_seconds=timeout_seconds,
                        memory_cap_runner=memory_cap_runner, base=base, records_directory=records_directory, timings_directory=timings_directory,
-                       row_keys=row_keys, shared_target_directory=environment.get("GATE_MUTATION_TARGET_DIR", "").strip() or default_target)
+                       row_keys=row_keys, shared_target_directory=environment.get("GATE_MUTATION_TARGET_DIR", "").strip() or default_target,
+                       worker_count=worker_count, stage_process=os.getpid())
         try:
             outcome = run_pool(context, worker_count, batches, ordered_candidates, baseline_ok_lines, numeric_settings["GATE_MUTATION_STOP_AFTER_ROWS"])
         except concurrent.futures.process.BrokenProcessPool:
@@ -1141,7 +1228,8 @@ def run_stage(root, environment=None):
         return 1
     return report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, dict(
         root=root, worker_count=worker_count, cargo_jobs=cargo_jobs, reused=len(reused), reused_baseline=reused_baseline_count,
-        fresh_mutations=len(outcome["mutation"]), fresh_batches=len(batches), records_directory=records_directory))
+        fresh_mutations=len(outcome["mutation"]), fresh_batches=len(batches), records_directory=records_directory,
+        not_run_record=environment.get("GATE_MUTATION_NOT_RUN_RECORD", "").strip()))
 
 
 def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_path, skip_baseline, counts):
@@ -1153,6 +1241,7 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     caught, failures, invalid = by_verdict["caught"], by_verdict["failure"], by_verdict["invalid"]
     memory_hits, timeouts, squeezed = by_verdict["memory"], by_verdict["timeout"], by_verdict["squeezed"]
     refused, unavailable, baseline_bad = by_verdict["refused"], by_verdict["unavailable"], by_verdict["baseline"]
+    not_run = by_verdict["notrun"]
     for text in caught:
         say(text)
     # 各栏各数各的；「计数：」这一行的格式别的定义与规则照栏读（mutation-triage），基线另起一行报
@@ -1163,6 +1252,13 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
     else:
         say(f"  基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 {len(rows) - len(baseline_bad)} 行，基线不绿 {len(baseline_bad)} 行"
             f"（按 cargo 参数分 {len(baseline_batches(rows))} 批；共 {len(rows)} 行）")
+    # 本次未跑的逐条列出来（文件头「本次未跑」）：不算抓到、不算没红；「计数：」那一行的格式不动，另起一行报
+    not_run_record_problem = None
+    if not_run:
+        say(f"  本次未跑：{len(not_run)} 条（点名的测试在本机打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功，没跑到被改坏的那一处：不算抓到、不算没红，这一趟不是整张表的结论）")
+        for text in not_run:
+            say(f"    · {text}")
+        not_run_record_problem = write_not_run_record(counts.get("not_run_record", ""), not_run)
     removals = [removal for _line, _verdict, _text, removal in judgements if removal is not None]
     killed_removals = [removal for _line, verdict, _text, removal in judgements if removal is not None and verdict in VERDICTS_KILLED_BY_WRAPPER]
     left_behind = outcome["left_behind"]
@@ -1205,16 +1301,28 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
                          for name in left_behind],
                         ["看 judge_row / judge_batch 末尾 measure_and_remove_temporary_directory 那一步跑到没有、删不删得掉（只读的目录、没退干净的进程又把它建回来）；",
                          "这一道收尾时连同源码副本一起删掉，现场只剩上面列的名字。别拿掉这一步：被杀的测试 Drop 守卫不跑，它建的镜像全堆在这一轮的 TMPDIR 里，一轮能堆几百 G。"])
-    red = bool(invalid or failures or memory_hits or timeouts or squeezed or refused or unavailable or baseline_bad or left_behind)
+    if not_run_record_problem:
+        print_rejection(f"本次未跑的 {len(not_run)} 条没写进 GATE_MUTATION_NOT_RUN_RECORD 那份记录（{not_run_record_problem}），门禁汇总就看不见它们", [],
+                        ["看那份文件所在的目录满没满、有没有写权限；记不下本次未跑的这一趟按红记，免得被当成全判过。"])
+    red = bool(invalid or failures or memory_hits or timeouts or squeezed or refused or unavailable or baseline_bad or left_behind or not_run_record_problem)
     note(f"  … 这一轮 {counts['worker_count']} 个工作进程，每个 cargo 编译并行度 {counts['cargo_jobs']}，每条变异内存上限 {memory_max}、限时 {timeout_seconds} 秒；"
          f"复用抓到 {counts['reused']} 条、复用基线 ok {counts['reused_baseline']} 行，现跑变异 {counts['fresh_mutations']} 条、现跑基线 {counts['fresh_batches']} 批")
     if selection_path:
         # 只判了一部分：不写全绿标记；都抓到也退 3（门禁汇总记失败，不会被当成通过），有红退 1
         say(f"  … 只判了选中的 {len(rows)} 行，不是整道结论（GATE_MUTATION_ROW_SELECTION={selection_path}；"
-            f"{'有红，见上面' if red else '选中的都红在点名的测试上'}；按条记录写进了 {counts['records_directory']}）")
+            f"{'有红，见上面' if red else (f'选中的里抓到 {len(caught)} 条、本次未跑 {len(not_run)} 条' if not_run else '选中的都红在点名的测试上')}；"
+            f"按条记录写进了 {counts['records_directory']}）")
         return 1 if red else EXIT_SELECTION_ONLY
     if red:
         return 1
+    if not_run:
+        # 有本次未跑的：不说全抓到、不写全绿标记（没判全的一趟不算上次成功）；一条抓到的都没有就退 77（无对象判到）
+        if not caught:
+            say(f"  · crates 变异表复跑：{len(rows)} 条全是本次未跑（见上），一条都没判到被改坏的那一处：这一道记本次未跑，不是通过；全绿标记没写")
+            return 77
+        say(f"  ✓ crates 变异表复跑：{len(rows)} 条里抓到 {len(caught)} 条、本次未跑 {len(not_run)} 条（本次未跑的逐条见上，不算抓到；这一趟不是整张表都红在点名的测试上，"
+            f"全绿标记没写）；没红、无效、内存撞顶、超时、被总上限挤掉、排不上 0 条，每条一个自己的 TMPDIR、结束时都删掉了")
+        return 0
     # ⚠️ 进程数、复用几条不写进 stdout：它们是两次跑唯一不同的输入，写进成功行就让「GATE_MUTATION_WORKERS=1 与 =16 的 stdout 逐字相同」当场为假
     say(f"  ✓ crates 变异表复跑：{len(rows)} 条变异各自红在点名的测试上（原文都恰好命中一次；点名的测试在没改坏的副本上都恰好一个 ok；"
         f"每条在内存上限 {memory_max} 里跑、内存撞顶 0 条，每条经 run-with-memory-cap.sh 排队、被总上限挤掉与排不上 0 条，每条限时 {timeout_seconds} 秒、超时 0 条，"
@@ -1223,6 +1331,18 @@ def report(rows, judgements, outcome, memory_max, timeout_seconds, selection_pat
                                                         freshly_run_mutation_rows=counts["fresh_mutations"], freshly_run_baseline_batches=counts["fresh_batches"],
                                                         row_records=counts["records_directory"]))
     return 0
+
+
+def write_not_run_record(path, texts):
+    """每条本次未跑往 GATE_MUTATION_NOT_RUN_RECORD 那份文件追加一行（阶段转给 gate.sh 的 GATE_NOT_RUN_FILE）；没设不写。写不进去交那一句，写成交 None。"""
+    if not path:
+        return None
+    try:
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write("".join(f"{STAGE} 本次未跑：{text}\n" for text in texts))
+    except OSError as error:
+        return f"{path}：{error}"
+    return None
 
 
 def write_stage_marker_with_counts(root, counts):
@@ -1405,7 +1525,8 @@ def command_import(arguments):
 
 FAKE_CARGO = r'''#!/usr/bin/env python3
 # 自证用的假 cargo：-V 打一行版本；test 读 crates/tiny/src/lib.rs 里「// TEST <名字> NEEDS <原文>」「// TEST <名字> READS <相对 crate 根的路径>」，
-# 原文在、文件在就 ok，不在就 FAILED；每起一次往 $FAKE_CARGO_LOG 追加一行「<参数>\t<lib.rs 的 sha256 前 12 位>」
+# 原文在、文件在就 ok，不在就 FAILED；「// TEST <名字> NOTRUN <一句>」照 GPU 对拍用例在没卡的机器上：一律 ok，带 --show-output 时照 libtest 的样子
+# 在末尾交出它打的 NOT_RUN_NO_GPU_ADAPTER 那一行；每起一次往 $FAKE_CARGO_LOG 追加一行「<参数>\t<lib.rs 的 sha256 前 12 位>」
 import hashlib, os, sys
 arguments = sys.argv[1:]
 if arguments[:1] in (["-V"], ["--version"]):
@@ -1419,6 +1540,7 @@ with open(os.environ["FAKE_CARGO_LOG"], "a", encoding="utf-8") as log:
 after = arguments[arguments.index("--") + 1:] if "--" in arguments else []
 filters = [word for word in after if not word.startswith("-")]
 failed = False
+shown = []
 for line in source.splitlines():
     words = line.split(" ", 4)
     if len(words) < 5 or words[:2] != ["//", "TEST"]:
@@ -1426,16 +1548,62 @@ for line in source.splitlines():
     name, how, what = words[2], words[3], words[4]
     if filters and not any(word in "tests::" + name for word in filters):
         continue
+    if how == "NOTRUN":
+        print(f"test tests::{name} ... ok")
+        if "--show-output" in after:
+            shown.append(f"---- tests::{name} stdout ----\nNOT_RUN_NO_GPU_ADAPTER test={name} reason={what}\n")
+        continue
     ok = (what in source.replace(line, "")) if how == "NEEDS" else os.path.isfile(os.path.join("crates", "tiny", what))
     failed = failed or not ok
     print(f"test tests::{name} ... {'ok' if ok else 'FAILED'}")
+if shown:
+    print("\nsuccesses:\n\n" + "\n".join(shown))
 sys.exit(101 if failed else 0)
+'''
+# 自证用的假内存包装（排队那一格）：先像真包装排队时那样往 stderr 报一行，再等调用方把这一行转打出来（$QUEUE_LINE_SINK 里出现它，至多 10 秒）：
+# 等到了往 stdout 打一行、stderr 再打一行命令自己的、退 0；等不到退 9（转打要在命令跑着的时候，不是跑完之后）
+SELFTEST_QUEUEING_WRAPPER = '''#!/usr/bin/env bash
+echo "run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：自证造的一行" >&2
+for _ in $(seq 1 200); do
+  if grep -q '自证造的一行' "$QUEUE_LINE_SINK" 2>/dev/null; then echo "test result: ok"; echo "命令自己的 stderr" >&2; exit 0; fi
+  sleep 0.05
+done
+exit 9
 '''
 FAKE_MEMORY_CAP_RUNNER = '''#!/usr/bin/env bash
 # 自证用的假内存包装：--check 退 0；其余去掉上限那一个参数、原样执行命令
 if [[ "${1:-}" == "--check" ]]; then exit 0; fi
 shift
 exec "$@"
+'''
+# 自证用的假内存包装（日常一条那两格）：照 run-with-memory-cap.sh 的「日常一条」演——环境里有 CLAUDE_CODE_SESSION_ID、没有 SINGLEFS_HEAVY_TESTS 的算日常；
+# 账（$DAILY_LEDGER 目录，在跑的一条一个文件）上已有一条日常的在跑、这一条的 RUN_WITH_MEMORY_CAP_PARALLEL_REASON 不足 8 个字，就退 252、命令不跑。
+# 每起一次往 $DAILY_WRAPPER_LOG 记一行「<并行理由>\t<CARGO_TARGET_DIR>」；命令跑完再在账上留 0.3 秒，几个工作进程才在账上重叠。--check 退 0。
+SELFTEST_DAILY_WRAPPER = r'''#!/usr/bin/env bash
+if [[ "${1:-}" == "--check" ]]; then exit 0; fi
+shift
+reason="${RUN_WITH_MEMORY_CAP_PARALLEL_REASON-}"
+printf '%s\t%s\n' "$reason" "${CARGO_TARGET_DIR-}" >> "$DAILY_WRAPPER_LOG"
+entry=""
+if [[ -n "${CLAUDE_CODE_SESSION_ID:-}" && -z "${SINGLEFS_HEAVY_TESTS:-}" ]]; then
+  shopt -s nullglob
+  exec 9>"$DAILY_LEDGER/.lock"
+  flock 9
+  others=("$DAILY_LEDGER"/entry.*)
+  if (( ${#others[@]} > 0 && ${#reason} < 8 )); then
+    exec 9>&-
+    echo "  ✗ 这个会话（$CLAUDE_CODE_SESSION_ID）已经有一条日常的在跑，同一个会话同时只许一条；命令没跑（自证的假包装）" >&2
+    exit 252
+  fi
+  entry="$DAILY_LEDGER/entry.$$"
+  : > "$entry"
+  exec 9>&-
+fi
+"$@"
+status=$?
+sleep 0.3
+if [[ -n "$entry" ]]; then rm -f -- "$entry"; fi
+exit "$status"
 '''
 SELFTEST_SOURCE = '''// 本模块自证的样本 crate（假 cargo 按下面几行判）
 // TEST adds NEEDS left + right
@@ -1455,6 +1623,9 @@ SELFTEST_TABLE_ROWS = [
 ]
 SELFTEST_READS_OUTSIDE_TEST = "// TEST reads_answer READS ../../fixture-data/answer.txt\n"
 SELFTEST_READS_OUTSIDE_ROW = "reads-outside\tcrates/tiny/src/lib.rs\t{ 0 - value }\t{ 1 - value }\t-p tiny --lib -- reads_answer\treads_answer"
+# 点名的测试照 GPU 对拍用例在没卡的机器上那样打一行 NOT_RUN_NO_GPU_ADAPTER 就返回成功：改坏的那一处它碰不到（文件头「本次未跑」）
+SELFTEST_NOT_RUN_TEST = "// TEST gpu_parity NOTRUN 样本：本机没有 GPU 适配器\n"
+SELFTEST_NOT_RUN_ROW = "card-path-changed\tcrates/tiny/src/lib.rs\t{ value / 2 }\t{ value / 4 }\t-p tiny --lib -- gpu_parity\tgpu_parity"
 # 替换文空着的删行变异（真表里删掉一句调用、删掉 litmus 里一道屏障的那一类）
 SELFTEST_DELETION_ROW = "halve-deleted\tcrates/tiny/src/lib.rs\t{ value / 2 }\t\t-p tiny --lib -- halves\thalves"
 # 派活之前那几样各踩一样的行（接在 4 行正常变异与删行变异之后：变异表第 7–11 行），ROW 那一行改的 docs/outside.rs 另写进样本仓
@@ -1537,6 +1708,63 @@ def replace_in_file(path, old, new):
     selftest_write(path, text.replace(old, new))
 
 
+def selftest_queue_line_cells(selftest, work):
+    """包装排队报的那一行边跑边转打到 stderr（带是哪一行）；收进来的 stdout、stderr 与 capture_output 收的逐字相同、stdout 不多一行。"""
+    wrapper = os.path.join(work, "queueing-wrapper.sh")
+    selftest_write(wrapper, SELFTEST_QUEUEING_WRAPPER, executable=True)
+    sink_path = os.path.join(work, "queue-line-sink.txt")
+    with open(sink_path, "w", encoding="utf-8", buffering=1) as sink:
+        run = run_forwarding_queue_lines(["bash", wrapper], "变异表第 7 行", sink=sink, env=dict(os.environ, QUEUE_LINE_SINK=sink_path))
+    with open(sink_path, encoding="utf-8") as handle:
+        forwarded = handle.read()
+    selftest.check("包装排队报的那一行边跑边转打到 stderr（带是哪一行），收进来判结局的输出不变",
+                   run.returncode == 0 and run.stdout == "test result: ok\n"
+                   and run.stderr == "run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：自证造的一行\n命令自己的 stderr\n"
+                   and forwarded == "  … 变异表第 7 行：run-with-memory-cap: 排队（已等 60 秒，至多 3600 秒）：自证造的一行\n",
+                   f"退 {run.returncode}（9 是假包装等了 10 秒没见到转打）；stdout {run.stdout!r}；stderr {run.stderr!r}；转打出来的 {forwarded!r}")
+
+
+PARALLEL_REASON_FORM = re.compile(r"^同一次 checker-tier-crates-mutation-replay（本模块进程 \d+）的第 (\d+) 个工作进程，各用各的源码副本与编译目录（这一轮共 4 个）$")
+
+
+def selftest_daily_cells(selftest, work):
+    """会话里不带 SINGLEFS_HEAVY_TESTS 平常跑（假包装照「日常一条」演）：4 个工作进程照样各条判对，每次包装带自己那个工作进程的并行理由
+    （理由里的片号与那一次的编译目录对得上）；调用方设了的并行理由原样传、不覆盖。"""
+    wrapper = os.path.join(work, "daily-memory-cap.sh")
+    selftest_write(wrapper, SELFTEST_DAILY_WRAPPER, executable=True)
+    ledger, wrapper_log = os.path.join(work, "daily-ledger"), os.path.join(work, "daily-wrapper.log")
+    os.makedirs(ledger)
+    repository = os.path.join(work, "daily")
+    build_selftest_repository(repository, SELFTEST_TABLE_ROWS)
+    shared_target = selftest.base_environment["GATE_MUTATION_TARGET_DIR"]
+    daily = dict(GATE_MUTATION_MEMORY_CAP_RUNNER=wrapper, GATE_MUTATION_WORKERS="4", GATE_MUTATION_START_OVER="1",
+                 CLAUDE_CODE_SESSION_ID="crates-mutation-rows-selftest-session", SINGLEFS_HEAVY_TESTS="", RUN_WITH_MEMORY_CAP_PARALLEL_REASON="",
+                 DAILY_LEDGER=ledger, DAILY_WRAPPER_LOG=wrapper_log)
+
+    def wrapper_lines():
+        with open(wrapper_log, encoding="utf-8") as handle:
+            lines = [line.split("\t") for line in handle.read().splitlines()]
+        os.unlink(wrapper_log)
+        return lines
+
+    plain = selftest.run(repository, **daily)
+    seen = wrapper_lines() if os.path.exists(wrapper_log) else []
+    mismatched = []
+    for reason, target_directory in seen:
+        form = PARALLEL_REASON_FORM.match(reason)
+        if form is None or target_directory != (shared_target if form.group(1) == "1" else f"{shared_target}-w{form.group(1)}"):
+            mismatched.append(f"理由「{reason}」、编译目录 {target_directory}")
+    selftest.check("会话里平常跑（假包装照日常一条演）、4 个工作进程：各条照样判对，每次包装带自己那个工作进程的并行理由",
+                   plain[0] == 0 and "计数：抓到 4 条、没红 0 条" in plain[1] and "排不上没跑 0 条" in plain[1] and len(seen) == 5 and not mismatched,
+                   f"退 {plain[0]}；包装起了 {len(seen)} 次（要 1 批基线 + 4 条变异）；理由不对的 {mismatched}；{plain[1]}")
+    caller_reason = "调用方给的并行理由（自证）"
+    passed_through = selftest.run(repository, **dict(daily, RUN_WITH_MEMORY_CAP_PARALLEL_REASON=caller_reason))
+    seen = wrapper_lines() if os.path.exists(wrapper_log) else []
+    selftest.check("调用方设了的并行理由原样传给每次包装、不覆盖",
+                   passed_through[0] == 0 and len(seen) == 5 and all(reason == caller_reason for reason, _target in seen),
+                   f"退 {passed_through[0]}；包装看到的理由 {sorted({reason for reason, _target in seen})}")
+
+
 def run_selftest():
     work = tempfile.mkdtemp(prefix="crates-mutation-rows-selftest-")
     saved_environment = dict(os.environ)
@@ -1546,6 +1774,8 @@ def run_selftest():
         os.environ.clear()
         os.environ.update(selftest.base_environment)
         run_selftest_cells(selftest, work)
+        selftest_queue_line_cells(selftest, work)
+        selftest_daily_cells(selftest, work)
     finally:
         os.environ.clear()
         os.environ.update(saved_environment)
@@ -1555,11 +1785,13 @@ def run_selftest():
         for failure in selftest.failures:
             print(f"      {failure}")
         print("     → 怎么办：设了 GATE_MUTATION_BREAK 的，这就是要的结果（那个开关把对应的判法弄坏了）；没设的，照上面那几格去看 run_stage、base_fingerprint、")
-        print("       dispatch_order、command_import、escaping_literals、read_table 与 row_problems 里对应的那一段。")
+        print("       dispatch_order、command_import、escaping_literals、read_table 与 row_problems 里对应的那一段；并行理由那两格看 run_under_wrapper。")
         return 1
     print(f"  ✓ crates-mutation-rows.py 自证 {selftest.cells} 格都对（复用、改一行只重跑那一行、改源码全部重跑、跑到一半续跑、基线不绿、"
           "久的先派、选行只判一部分退 3、导入核行键与底座指纹、只留 3 个底座指纹目录、记录里没有主机名、拷贝范围两样、"
-          "替换文空着的删行变异照常判、派活之前那几样 checker-tier-crates-mutation-replay 与 static-check 同一份判法）")
+          "替换文空着的删行变异照常判、派活之前那几样 checker-tier-crates-mutation-replay 与 static-check 同一份判法、"
+          "点名的测试打了 NOT_RUN 记本次未跑且变异那一趟补了 --show-output、只有本次未跑的退 77、"
+          "会话里平常跑时每次包装带自己那个工作进程的并行理由且调用方设了的不覆盖）")
     return 0
 
 
@@ -1715,6 +1947,31 @@ def run_selftest_cells(selftest, work):
     selftest.check("checker-tier-crates-mutation-replay 派活之前判的是同一份：同样几行判红、删行变异不报、假 cargo 一次都没起",
                    staged[0] == 1 and staged[3] == [] and all(f"{TABLE}:{line_number} " in staged[1] for _kind, line_number in expected_problems)
                    and f"{TABLE}:6 " not in staged[1], staged[1])
+    # 十六：点名的测试打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功（第 6 行）：记本次未跑、逐条打出来，不算抓到也不算没红，整道不判红、成功句不说全抓到，
+    #       往 GATE_MUTATION_NOT_RUN_RECORD 报一行；变异那一趟补了 --show-output（假 cargo 只在带它时交出那一行）。弄坏开关 notrunasmissed 下当没红记，这一格判错
+    not_run_root = os.path.join(work, "not-run")
+    build_selftest_repository(not_run_root, SELFTEST_TABLE_ROWS + [SELFTEST_NOT_RUN_ROW], SELFTEST_NOT_RUN_TEST)
+    not_run_pristine = source_hash(not_run_root)
+    not_run_record = os.path.join(work, "not-run-record.txt")
+    not_run = selftest.run(not_run_root, GATE_MUTATION_NOT_RUN_RECORD=not_run_record)
+    recorded_lines = open(not_run_record, encoding="utf-8").read().splitlines() if os.path.exists(not_run_record) else []
+    success_lines = [line for line in not_run[1].splitlines() if line.startswith("  ✓ crates 变异表复跑")]
+    selftest.check("点名的测试打了 NOT_RUN：记本次未跑、逐条列出、计数里抓到 4 条没红 0 条、整道不判红、成功句不说全抓到、记录里一行",
+                   not_run[0] == 0 and "本次未跑：1 条" in not_run[1]
+                   and f"{TABLE}:6 card-path-changed：本次未跑——点名的测试 gpu_parity 打了 NOT_RUN_NO_GPU_ADAPTER（样本：本机没有 GPU 适配器）" in not_run[1]
+                   and "计数：抓到 4 条、没红 0 条" in not_run[1] and len(success_lines) == 1 and "抓到 4 条、本次未跑 1 条" in success_lines[0]
+                   and "各自红在点名的测试上" not in not_run[1] and len(recorded_lines) == 1 and "card-path-changed" in recorded_lines[0],
+                   not_run[1] + "\n".join(recorded_lines))
+    shown_runs = [line for line in mutation_invocations(not_run[3], not_run_pristine) if "-- --show-output gpu_parity\t" in line]
+    selftest.check("变异那一趟的 libtest 参数里补了 --show-output（插在 -- 之后），基线那一批不补",
+                   len(shown_runs) == 1 and not any("--show-output" in line for line in not_run[3] if line.endswith("\t" + not_run_pristine)),
+                   "\n".join(not_run[3]))
+    # 十七：一条抓到的都没有、只有本次未跑的：退 77（不是通过，也不是红）
+    only_not_run_root = os.path.join(work, "not-run-only")
+    build_selftest_repository(only_not_run_root, [SELFTEST_NOT_RUN_ROW], SELFTEST_NOT_RUN_TEST)
+    only_not_run = selftest.run(only_not_run_root)
+    selftest.check("只有本次未跑、一条都没抓到：退 77", only_not_run[0] == 77 and "本次未跑：1 条" in only_not_run[1]
+                   and "这一道记本次未跑，不是通过" in only_not_run[1], only_not_run[1])
 
 
 def run_command_capturing(command, arguments, **keywords):

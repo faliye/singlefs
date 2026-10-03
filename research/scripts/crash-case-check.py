@@ -3,8 +3,8 @@
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/stage-inputs.tsv
 """测试源码的四样静态判据，判法只在这一份里；三道门禁各调各的那几样：
 
-  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记成 crash-case:（54 号开跑前判）
-  modules       checker 档每个测试文件第一行声明它测哪几个模块（54 号开跑前判）
+  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记成 crash-case:（checker-tier-layer0-replay 开跑前判）
+  modules       checker 档每个测试文件第一行声明它测哪几个模块（checker-tier-layer0-replay 开跑前判）
   file-names    测试文件名不按里程碑、步号起（code-source-discipline 的一格）
   one-scenario  harness 档一条用例一个场景（harness-model-differential-and-scenarios 的一格）
 
@@ -21,7 +21,7 @@
   ② 它要住在 crates/singlefs-checker-tier/tests/（checker 档，D13 已定项 15，.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）：
      写在别的包（harness 这类日常测试包）里判红，那会让 cargo test 那个包的人跑到全量枚举；
   ③ checker 档包里标了 #[ignore] 的（全量那条），.claude/gate.d/stage-inputs.tsv 里要有一行键是 crash-case:<名>、第三列
-     test=singlefs-checker-tier:<测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——标了 ignore 又没登记的 54 号 --full 不跑，谁都不跑；
+     test=singlefs-checker-tier:<测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——标了 ignore 又没登记的 checker-tier-layer0-replay --full 不跑，谁都不跑；
      不标 #[ignore] 的是 checker 档的快档（小流、几步的合成流），随 cargo test -p singlefs-checker-tier 跑，不要求登记。
   测试函数上面的注释里写了「crash-case-check:not-a-crash-case <理由>」（理由至少 4 个字）的不判：写明为什么不算用例。
   modules：crates/singlefs-checker-tier/tests/*.rs 第一行「//! checker 档模块：<模块，按 TIER_MODULES 的次序用、隔开>」与它从
@@ -34,6 +34,38 @@
   一条用例里不建池的多场景（改的是同一个池）；名字里按里程碑起、却不是 MILESTONE_FILE_NAME 认得的那几种写法。
 每一样各报一段：有问题的逐处列、再一句汇总带出路；没问题的一句成功行带查了多少；那一样一个对象都没有的报「本次无对象可判」。
 退出码：0 选中的都齐（至少一样判过）；1 有缺的（逐个列出）；2 用法错或读不了登记表；77 选中的每一样都无对象可判。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头；
+每一项红时都另有汇总行「✗ 自检 8 种里有 N 处判错」）：
+  CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen  one_scenario_problems() 不报循环里每轮新建池的用例
+      循环里每轮新建池（「✗ 自检：循环里每轮新建池的 harness 用例应当报出来」）
+  CRASH_CASE_CHECK_BREAK=helpers-unseen  enumerating_helpers() 不认同一文件里调全量枚举的 helper
+      经同文件 helper（「✗ 自检：harness 包里经同文件 helper 调全量枚举的用例应当报住错了包」）、
+      through_a_named_sweep（「✗ 自检：harness 包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
+  CRASH_CASE_CHECK_BREAK=ignore-unseen  crash_enumeration_tests() 不认 #[ignore]
+      标了 ignore 没登记（「✗ 自检：checker 档包里标了 ignore 没登记的用例应当报缺登记」）
+  CRASH_CASE_CHECK_BREAK=milestone-names-unseen  test_file_name_problems() 不报按里程碑起名的测试文件
+      按里程碑起名（「✗ 自检：按里程碑起名的测试文件应当报出来」）
+  CRASH_CASE_CHECK_BREAK=module-declaration-unchecked  module_declaration_problems() 不比第一行声明的模块与导入的模块
+      声明与导入对不上（「✗ 自检：声明与导入对不上的 checker 档测试文件应当报出来」）
+  CRASH_CASE_CHECK_BREAK=only-ignored  judge() 不认 --only，四样都判
+      --only file-names（「✗ 自检：--only file-names 应当只判 file-names 一样」）
+  CRASH_CASE_CHECK_BREAK=package-unchecked  problems_in() 不判崩溃枚举用例住在哪个包
+      写在 harness 包里（「✗ 自检：写在 harness 包里的崩溃枚举用例应当报住错了包」）、
+      经同文件 helper（「✗ 自检：harness 包里经同文件 helper 调全量枚举的用例应当报住错了包」）、
+      sweeps_every_prefix（「✗ 自检：harness 包里自己逐个造崩溃状态的 sweeps_every_prefix 应当报住错了包」）、
+      crash_image_on_each_boundary（「✗ 自检：harness 包里自己逐个造崩溃状态的 crash_image_on_each_boundary 应当报住错了包」）、
+      through_a_named_sweep（「✗ 自检：harness 包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
+  CRASH_CASE_CHECK_BREAK=quick-tier-counts  crash_enumeration_tests() 把快档 quick_tier 那几个也算成全量枚举
+      干净的样本（「✗ 自检：干净的样本应当认出 2 条（注明不是用例的那条不算）、0 处问题」）
+  CRASH_CASE_CHECK_BREAK=rows-ignored  problems_in() 不判标了 #[ignore] 的有没有登记成 crash-case
+      标了 ignore 没登记（「✗ 自检：checker 档包里标了 ignore 没登记的用例应当报缺登记」）
+  CRASH_CASE_CHECK_BREAK=self-sweep-unseen  sweeps_crash_states_itself() 不认自己逐个造崩溃状态的用例
+      sweeps_every_prefix（「✗ 自检：harness 包里自己逐个造崩溃状态的 sweeps_every_prefix 应当报住错了包」）、
+      crash_image_on_each_boundary（「✗ 自检：harness 包里自己逐个造崩溃状态的 crash_image_on_each_boundary 应当报住错了包」）、
+      through_a_named_sweep（「✗ 自检：harness 包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
+  CRASH_CASE_CHECK_BREAK=waiver-ignored  crash_enumeration_tests() 不认「crash-case-check:not-a-crash-case」的注明
+      干净的样本（「✗ 自检：干净的样本应当认出 2 条（注明不是用例的那条不算）、0 处问题」）
 """
 import glob
 import os
@@ -283,11 +315,11 @@ REMEDIES = {
                   ".claude/gate.d/stage-inputs.tsv；小流的快档不标 ignore、不用登记（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
     "modules": ["checker 档每个测试文件第一行写「//! checker 档模块：<它导入的模块，按 " + "、".join(TIER_MODULES) + " 的次序用、隔开>」，",
                 "一个都不导入的写「无（为什么）」（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
-    "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历写进文件头的文档注释",
-                   "（.claude/rules/verification.md「定义与名字」）；改名照 .claude/rules/path-moves.md「怎么做」改全仓引用。"],
+    "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
+                   "（.claude/singlefs-ai-sop/rules/test-script-discipline.md「用例原子化：每一条都能单独跑」）；改名照 .claude/rules/path-moves.md「怎么做」改全仓引用。"],
     "one-scenario": ["harness 档一条用例只装一个场景：循环体挪进带参数的函数，每个取值一条 #[test]，红了只重跑那一条；",
                      "确是一个场景的（同一个池上按次序做几轮）在用例上面写一行 // harness-test-granularity:one-scenario <理由>",
-                     "（.claude/rules/verification.md「harness 档里再分轻用例与耗时用例」）。"],
+                     "（.claude/rules/verification.md「harness 档里再分快档用例与慢档用例」）。"],
 }
 
 

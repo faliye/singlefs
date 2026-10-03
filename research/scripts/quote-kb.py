@@ -23,7 +23,18 @@
 自证会红：`quote-kb.py --selftest` 走一遍三种取法，再用 QUOTE_KB_CORRUPT=1
 强制进入「抄漏一行」那条分支，确认回读比对判红（`.claude/rules/fs-design.md` 硬要求 2：
 每条分支必须能被测试强制进入）。自证的临时目录由 `.claude/hooks/lib_selftest_scratch.py` 建，通过、判红、抛异常
-三条路上都删，这三格也由它判；QUOTE_KB_BREAK=keepscratch 走回 mkdtemp 不删，那三格必须判红。
+三条路上都删，这三格也由它判。QUOTE_KB_CORRUPT 是自证自己设、自己清的注入，不是弄坏开关。
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是临时目录那三格的名字，括号里是那条「✗ 自检：」的开头）：
+  QUOTE_KB_BREAK=keepscratch  selftest() 的临时目录走回 mkdtemp 不删
+      通过那条路（「✗ 自检：通过那条路上临时目录没删」）、red 那条路（「✗ 自检：red 那条路上临时目录没删」）、
+      crash 那条路（「✗ 自检：crash 那条路上临时目录没删」）
+  QUOTE_KB_BREAK=ignore-not-numbers  cited_kb_files() 不认 `<!-- doc-lint:not-numbers … -->` 声明，声明过的记号照当编号拉 kb 文件
+      not-numbers 那一格（「✗ 自检：正文用 doc-lint:not-numbers 声明了 E1」）
+  QUOTE_KB_BREAK=not-numbers-in-fence  not_numbers_declared() 把代码围栏里的声明也算上
+      围栏那一格（「✗ 自检：代码围栏里的 not-numbers 声明不算」）
+
+--cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算，与 doc-lint 同读法）；
+three-way-materials.py 收编号用的是同一个 not_numbers_declared()。
 
 退出码：
     3   回读比对不一致（抄出来的与源文件不一致）
@@ -252,24 +263,46 @@ def check_checklist_reverse(checklist, produced):
     return hits
 
 
+NOT_NUMBERS_MARK = re.compile(r'<!--\s*doc-lint:not-numbers\s+(.*?)\s*-->')
+
+
+def not_numbers_declared(text):
+    """正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号：它们不是编号，不按编号拉 kb 文件。
+    读法与 doc-lint 的 H 段相同：代码围栏里的声明不算。three-way-materials.py 收编号时调的也是这一份。"""
+    declared, fence = set(), False
+    for line in text.split('\n'):
+        if line.lstrip(' \t').startswith('```'):
+            fence = not fence
+            continue
+        if fence and os.environ.get('QUOTE_KB_BREAK') != 'not-numbers-in-fence':
+            continue
+        for words in NOT_NUMBERS_MARK.findall(line):
+            declared.update(words.split())
+    return declared
+
+
 def cited_kb_files(text, root):
-    """正文里提到的 kb 文件：显式路径，加上 D<n>（ / E<n>（ / C<n>（ / I-<n>.<m>（ 这几类编号所在的文件。
+    """正文里提到的 kb 文件：显式路径，加上 D<n>（ / E<n>（ / C<n>（ / I-<n>.<m>（ 这几类编号所在的文件；
+    `doc-lint:not-numbers` 里声明的记号不算编号（not_numbers_declared）。
 
     C234（三方材料的小节清单只覆盖被判那一项所在的文件）：清单只给被判那一项所在的文件做，
     别的文件里那一半闸门问题就无声消失。2026-09-09 立账、写明了怎么拦，2026-09-11 又被打中一次
     （D19 未定项 6 第二轮材料漏了 D23 / D16 / D1 三个文件，第 6 格的全部机制住在 D23）。
     """
+    declared = set() if os.environ.get('QUOTE_KB_BREAK') == 'ignore-not-numbers' else not_numbers_declared(text)
     found = set(re.findall(r'\.claude/kb/[^\s`)（|]+\.md', text))
     for letter, folder in (('D', 'decisions'), ('E', 'experiments')):
         for number in set(re.findall(r'(?<![A-Za-z0-9-])' + letter + r'(\d+)（', text)):
+            if letter + number in declared:
+                continue
             hits = set()
             for stem in (f'{int(number):02d}-', f'{int(number)}-'):
                 hits.update(glob.glob(os.path.join(root, '.claude/kb', folder, stem + '*.md')))
             if len(hits) == 1:
                 found.add(os.path.relpath(hits.pop(), root))
-    if re.search(r'(?<![A-Za-z0-9-])C\d+（', text):
+    if set(re.findall(r'(?<![A-Za-z0-9-])(C\d+)（', text)) - declared:
         found.add('.claude/kb/checks-owed.md')
-    if re.search(r'(?<![A-Za-z0-9-])I-\d+\.\d+（', text):
+    if set(re.findall(r'(?<![A-Za-z0-9-])(I-\d+\.\d+)（', text)) - declared:
         found.add('.claude/kb/invariants.md')
     return found
 
@@ -393,6 +426,23 @@ def selftest_in(work):
         print("  ✗ 自检：清单补齐之后 --cited 仍然报缺")
         print("     → 怎么办：check_cited() 没有正确识别出清单已经补齐，去查它判断「这个文件是否已有小节清单」的逻辑。")
         return 1
+    os.makedirs(os.path.join(cited_root, '.claude/kb/experiments'))
+    for name in ('1-节点大小vs可恢复性.md', '165-恢复重放有界穷举.md'):
+        with open(os.path.join(cited_root, '.claude/kb/experiments', name), 'w', encoding='utf-8') as f:
+            f.write('## 样本\n')
+    declared_body = '<!-- doc-lint:not-numbers E1 -->\n这一轮判 E1（txg 顶格那一域） 站不站得住，压在 E165（样本） 上。\n'
+    declared_hits = sorted(cited_kb_files(declared_body, cited_root))
+    if declared_hits != ['.claude/kb/experiments/165-恢复重放有界穷举.md']:
+        print(f"  ✗ 自检：正文用 doc-lint:not-numbers 声明了 E1，--cited 应当只认 E165 那一份实验页，实认 {declared_hits}")
+        print("     → 怎么办：cited_kb_files() 要跳过 not_numbers_declared() 读出的记号、没声明的照认；QUOTE_KB_BREAK=ignore-not-numbers 设着的话这里本来就该红。")
+        return 1
+    fenced_body = '```\n<!-- doc-lint:not-numbers E1 -->\n```\n这一轮判 E1（样本） 与 E165（样本）。\n'
+    fenced_hits = sorted(cited_kb_files(fenced_body, cited_root))
+    if fenced_hits != ['.claude/kb/experiments/1-节点大小vs可恢复性.md', '.claude/kb/experiments/165-恢复重放有界穷举.md']:
+        print(f"  ✗ 自检：代码围栏里的 not-numbers 声明不算，E1 与 E165 都应当认，实认 {fenced_hits}")
+        print("     → 怎么办：not_numbers_declared() 要跳过围栏里的行（与 doc-lint 同读法）；QUOTE_KB_BREAK=not-numbers-in-fence 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），围栏里的声明不算")
     print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 

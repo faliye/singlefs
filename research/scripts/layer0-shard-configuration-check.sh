@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# 层 0 崩溃重放双机分片（里程碑三第六项，.claude/kb/milestone/03-third-txn.md 第六节）的本地配置：在不在、键齐不齐、写得对不对、
-# 第二台连不连得上、它上面有没有 cargo，双机与 GPU 两个开关开没开。门禁 54 号 --full 拿它定走不走分片；research/scripts/layer0-shard-run.sh 拿它当运行条件；
+# 层 0 崩溃重放双机分片的本地配置：在不在、键齐不齐、写得对不对、
+# 第二台连不连得上、它上面有没有 cargo，双机与 GPU 两个开关开没开。门禁 checker-tier-layer0-replay --full 拿它定走不走分片；research/scripts/layer0-shard-run.sh 拿它当运行条件；
 # 门禁 checker-tier-crates-mutation-replay 的双机驱动 research/scripts/mutation-shard-run.sh 与通用跨机脚本 research/scripts/multi-host-run.sh --peer 读同一份。
-# PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 research/scripts/run-with-memory-cap.sh 起那一片；本机那一片由起 54 号的那一层包装管），
+# PEER_MEMORY_CAP 是第二台那一片的内存上限（驱动脚本在第二台上经 research/scripts/run-with-memory-cap.sh 起那一片；本机那一片由起 checker-tier-layer0-replay 的那一层包装管），
 # 写法照 run-with-memory-cap.sh：正整数加 K / M / G / T，单位必写。
 #
 #   layer0-shard-configuration-check.sh [<仓根>]
@@ -21,9 +21,16 @@
 # 临时 worktree 里跑也读主工作树那一份）；文件 git 忽略、不进仓，模板是仓根的 multi-host.env.example。
 # 写法：一行一个 KEY=值（值不做 shell 展开；两头成对的单引号或双引号去掉一层），# 起头的行与空行不算；认不出的行、不认得的键、
 # 缺键都判不能分片。八个必写键的意思见 multi-host.env.example；两个开关键见上。
-# 弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=<项>（只给证红用；research/scripts/layer0-shard-run.sh --selftest 里对应那一格判错）：
-#   switch-off-is-on        ENABLE_ACROSS_MACHINES 没写或写 0 也按开判（「没写开关 ⇒ 双机：关」判错）
-#   switch-value-unchecked  两个开关键写了 0、1 之外的值也不报错（「开关写了别的值 ⇒ 判不过」判错）
+# 弄坏开关 MULTI_HOST_CONFIGURATION_BREAK=<项>（只给证红用；打开时调用方的自证退 1）。这一份没有自证，红在两份调用方的 --selftest 里：
+#   research/scripts/layer0-shard-run.sh 与 research/scripts/multi-host-run.sh，两份的失败行都是「✗ <格名>：<细节>」。
+# 逐项写开关名、弄坏哪一处、打开后哪一份自证的哪几格红（项名是格名，前面写是哪一份；括号里抄细节的句首，随跑变的路径写成 …）：
+#   MULTI_HOST_CONFIGURATION_BREAK=switch-off-is-on  ENABLE_ACROSS_MACHINES 没写或写 0 也按开判
+#       layer0-shard-run.sh 的「⑭ 写了 ENABLE_ACROSS_MACHINES=1 ⇒ 退 0、双机：开，GPU：关，赋值里 ENABLE_GPU=0；没写开关 ⇒ 判法报「双机：关」退 3（不是判不过），
+#         --emit-assignments 同样退 3、不打赋值」（「写了 1：退 0 / emit 退 0（…）；没写：退 0 / emit 退 0（双机：开，…）」）
+#       multi-host-run.sh 的「Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录」（「退 0，命令跑了」）
+#   MULTI_HOST_CONFIGURATION_BREAK=switch-value-unchecked  两个开关键写了 0、1 之外的值也不报错
+#       layer0-shard-run.sh 的「⑮ 开关写了 0、1 之外的值（ENABLE_ACROSS_MACHINES=yes、ENABLE_GPU=2）⇒ 判不过（退 1），说出是哪个键」
+#         （「ENABLE_ACROSS_MACHINES=yes 退 3（双机：关（…）），ENABLE_GPU=2 退 0（双机：开，…）」）；multi-host-run.sh 的自证不红（没有写别的值的那一格）
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1 时不连第二台、不查它的 cargo（layer0-shard-run.sh --selftest 用，
 # 那时「第二台」是本机上的另一个目录）。
 #

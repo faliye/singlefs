@@ -6,7 +6,7 @@
 用法：
     compile-then-swap.py <草稿副本> <目标> --scratch <草稿目录> [--root 仓根] [--release]
     compile-then-swap.py --clean --scratch <草稿目录>     # 删掉这条脚本在草稿目录里建的仓副本与编译目录
-    compile-then-swap.py --selftest                        # COMPILE_THEN_SWAP_BREAK=<项> 时必须判红
+    compile-then-swap.py --selftest                        # 假 cargo，不起真编译；COMPILE_THEN_SWAP_BREAK=<项> 时必须判红
 
 <目标> 写相对仓根的路径（crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs）或绝对路径；只收 crates/<crate>/src/bin/ 下的
 <名>.rs 与 <名>/main.rs。<草稿副本> 与 <草稿目录> 都要在仓外。
@@ -26,11 +26,54 @@
 退出码：0 换上了；1 编不过（一个字节没写）；2 参数或路径不对（没编、一个字节没写）；3 编的时候主工作区那份被改了（一个字节没写）；
 4 换上时失败或回读对不上（看提示行）。
 
-弄坏开关（只给自证判红用，生效时往 stderr 打一行）：COMPILE_THEN_SWAP_BREAK=
-  swap-on-failure   编不过也换上
-  skip-race-check   不核主工作区那份在编的时候改没改
-  in-place-write    不改名换上，直接在目标原来的 inode 上截断重写
-不认识的值直接拒绝，免得拼错的开关被当成「没开」。
+自证（--selftest）：每一项各建一份自己的临时仓（workspace 加 crates/demo）与草稿目录，PATH 最前面放一份假 cargo
+（FAKE_CARGO_SCRIPT），不起真编译。假 cargo 只认 build() 调的 `cargo build|test --offline [--no-run] -p <包> --bin <名>`，
+按当前目录（应当是仓副本）里那份 bin 源码的标记演三种结局：没标记的编过；「FAKE_CARGO: build-fails」两条都编不过；
+「FAKE_CARGO: test-build-fails」cargo build 编过、cargo test --no-run 编不过；找不到那个 bin 时照真 cargo 退 101。
+每次被调往 COMPILE_THEN_SWAP_FAKE_CARGO_LOG 记一行「当前目录|CARGO_TARGET_DIR|参数」，每一项核它被调了哪几条、在不在仓副本里调。
+PATH 上解到的 cargo 不是那一项自己的假 cargo，那一项不跑、判红。成功那句报查了几项、假 cargo 一共被调几次。
+项（selftest() 里 SELFTEST_CASES 的标签）与它判的结局：
+  build-fails          编不过的草稿（E0425 那一类）退 1、主工作区一个字节不写，cargo test 不再起
+  test-build-fails     bin 编过而 #[cfg(test)] 编不过的也退 1、不写
+  new-bin-build-fails  新 bin 编不过就不建
+  changed-during-build 编的时候主工作区那份被改了，退 3、不盖
+  swap-existing        编过的草稿整份换上、换的是新 inode
+  create-new-bin       编过的新 bin 建出来
+  swap-error           换上时目标目录写不进去，退 4、报「时失败」、目标一个字节没动
+  readback-mismatch    换上之后别的进程又写了一份，回读对不上退 4
+  non-bin-source       crate 里 bin 以外的源文件不收（退 2、不编）
+  draft-inside-repo    草稿副本放在主工作区里不收
+  outside-crates       crates/ 以外的 .rs 不收，那里有自己的 Cargo.toml 也不收
+  tree-removed         跑完之后仓副本不在草稿目录里
+  clean-removes-work   --clean 删得掉编译目录
+以 root 跑时目录的只读权限挡不住写，swap-error 会红。
+
+弄坏开关（只给自证判红用，生效时往 stderr 打一行）：COMPILE_THEN_SWAP_BREAK=<一个值>。不认识的值直接拒绝，免得拼错的开关被当成「没开」。
+逐项写开关名、弄坏哪一处，下一行起写打开后自证哪几项红（括号里是那条「✗ 自检 <项>：」后面的开头）：
+  swap-on-failure     编不过也换上
+      build-fails、test-build-fails（「退出码 0（应当 1）」）、new-bin-build-fails（「退出码 0（应当 1）」「目标 sha256」）
+  skip-test-build     只跑 cargo build，不跑 cargo test --no-run（#[cfg(test)] 里编不过的放过去）
+      test-build-fails（「退出码 0（应当 1）」）；changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、
+      tree-removed、clean-removes-work（「假 cargo 的调用 ['build']（应当 ['build', 'test']）」）
+  build-in-root       cargo 在主工作区里编，不在仓副本里编（草稿副本没进编译）
+      build-fails、test-build-fails（「退出码 0（应当 1）」）；凡调到假 cargo 的项（build-fails、test-build-fails、new-bin-build-fails、
+      changed-during-build、swap-existing、create-new-bin、swap-error、readback-mismatch、tree-removed、clean-removes-work）都报「假 cargo 在」
+  skip-race-check     不核主工作区那份在编的时候改没改
+      changed-during-build（「退出码 0（应当 3）」）
+  in-place-write      不改名换上，直接在目标原来的 inode 上截断重写
+      swap-existing（「换上之后 inode 没变」）、swap-error（「退出码 0（应当 4）」：只读目录挡不住在原 inode 上写）
+  swap-error-ignored  换上时抛错不停下，接着往下走
+      swap-error（「输出里没有「时失败」」：落到回读那一支才停）
+  skip-readback       换上之后不回读
+      readback-mismatch（「退出码 0（应当 4）」）
+  keep-tree           编完不删仓副本
+      tree-removed（「跑完之后仓副本还在草稿目录里」）
+  draft-in-repo       不核草稿副本在不在主工作区里
+      draft-inside-repo（「退出码 0（应当 2）」）
+  any-crates-source   不核目标是不是 src/bin/ 下的装置，crate 里别的 .rs 拿文件名当 bin 名
+      non-bin-source（「退出码 1（应当 2）」：假 cargo 照真 cargo 找不到那个 bin、退 101）
+  outside-crates      不核目标在不在 crates/ 里
+      outside-crates（「退出码 1（应当 2）」：仓副本里没有 tools/，假 cargo 找不到那个 bin）
 """
 import hashlib
 import os
@@ -49,7 +92,8 @@ from project_preflight import preflight  # noqa: E402
 from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
 
 BREAK_VARIABLE = "COMPILE_THEN_SWAP_BREAK"
-KNOWN_BREAK_MODES = ("swap-on-failure", "skip-race-check", "in-place-write")
+KNOWN_BREAK_MODES = ("swap-on-failure", "skip-test-build", "build-in-root", "skip-race-check", "in-place-write", "swap-error-ignored",
+                     "skip-readback", "keep-tree", "draft-in-repo", "any-crates-source", "outside-crates")
 WORK_DIRECTORY_NAME = "compile-then-swap"
 COPIED_ROOT_ENTRIES = ("Cargo.toml", "Cargo.lock", ".cargo", "rust-toolchain", "rust-toolchain.toml", "crates")
 ERROR_LINES_SHOWN = 40
@@ -86,18 +130,20 @@ def sha256_of(data):
     return "不存在" if data is None else hashlib.sha256(data).hexdigest()
 
 
-def locate_bin(target, root):
+def locate_bin(target, root, mode=""):
     """目标 → (crate 目录, 包名, bin 名)；不是 crates/<crate>/src/bin/ 下的装置就抛 BadInput。"""
     crates_directory = os.path.join(root, "crates")
-    if not target.endswith(".rs") or not is_inside(os.path.dirname(target), crates_directory):
+    check_crates = mode != "outside-crates"
+    if not target.endswith(".rs") or (check_crates and not is_inside(os.path.dirname(target), crates_directory)):
         raise BadInput(f"目标 {target} 不是主工作区 crates/ 下的 .rs，这条脚本不换它\n"
                        "→ 怎么办：目标写 crates/<crate>/src/bin/<名>.rs（相对仓根）；crates/ 以外的文件照原来的办法改")
     crate_directory = os.path.dirname(target)
     while not os.path.isfile(os.path.join(crate_directory, "Cargo.toml")):
-        crate_directory = os.path.dirname(crate_directory)
-        if not is_inside(crate_directory, crates_directory):
+        parent = os.path.dirname(crate_directory)
+        if parent == crate_directory or (check_crates and not is_inside(parent, crates_directory)):
             raise BadInput(f"目标 {target} 往上找不到 crate 的 Cargo.toml\n"
                            "→ 怎么办：目标要在 crates/<crate>/ 里面；先 ls crates/ 核 crate 名")
+        crate_directory = parent
     try:
         with open(os.path.join(crate_directory, "Cargo.toml"), "rb") as handle:
             manifest = tomllib.load(handle)
@@ -114,6 +160,8 @@ def locate_bin(target, root):
         bin_name = parts[2][:-len(".rs")]
     elif len(parts) == 4 and parts[:2] == ["src", "bin"] and parts[3] == "main.rs":
         bin_name = parts[2]
+    elif mode == "any-crates-source":
+        bin_name = os.path.splitext(parts[-1])[0]
     else:
         raise BadInput(f"目标 {target} 不是 {os.path.relpath(crate_directory, root)}/src/bin/ 下的装置（<名>.rs 或 <名>/main.rs）\n"
                        "→ 怎么办：这条脚本只换入库装置；crate 里别的源文件归 implementation-writer，写进报告交主 agent")
@@ -135,12 +183,14 @@ def copy_workspace(root, tree):
             shutil.copy2(source, os.path.join(tree, entry))
 
 
-def build(tree, target_directory, package, bin_name, release, log_path):
-    """两条 cargo 依次跑；交回 (都编过没有, 失败那条的错误行)。"""
+def build(tree, target_directory, package, bin_name, release, log_path, mode=""):
+    """两条 cargo 在 tree 里依次跑；交回 (都编过没有, 失败那条的错误行)。"""
     environment = dict(os.environ, CARGO_TARGET_DIR=target_directory)
     profile = ["--release"] if release else []
     commands = [["nice", "-n", "19", "cargo", "build", "--offline", "-p", package, "--bin", bin_name, *profile],
                 ["nice", "-n", "19", "cargo", "test", "--offline", "--no-run", "-p", package, "--bin", bin_name, *profile]]
+    if mode == "skip-test-build":
+        commands = commands[:1]
     with open(log_path, "a", encoding="utf-8") as log:
         for command in commands:
             log.write(f"$ {' '.join(command)}\n")
@@ -175,8 +225,8 @@ def create_new_file(target, data):
             pass
 
 
-def swap(draft, target, scratch, root, release=False, after_build=None):
-    """交回 (退出码, 提示行)。after_build 只给自证用：编完、核改没改之前调一次。"""
+def swap(draft, target, scratch, root, release=False, after_build=None, after_swap=None):
+    """交回 (退出码, 提示行)。after_build、after_swap 只给自证用：编完、核改没改之前调一次；换上之后、回读之前调一次。"""
     mode = break_mode()
     root = os.path.realpath(root)
     draft = os.path.abspath(draft)
@@ -186,10 +236,12 @@ def swap(draft, target, scratch, root, release=False, after_build=None):
         raise BadInput(f"草稿副本 {draft} 不存在或不是文件\n"
                        "→ 怎么办：先把主工作区那份拷进草稿目录（cp crates/…/<名>.rs <草稿目录>/），在那一份上改，再把它的路径交给这条脚本")
     for label, path in (("草稿副本", draft), ("草稿目录", scratch)):
+        if label == "草稿副本" and mode == "draft-in-repo":
+            continue
         if os.path.realpath(path) == root or is_inside(path, root):
             raise BadInput(f"{label} {path} 在主工作区里\n"
                            "→ 怎么办：放进派发提示给的草稿目录（/tmp/claude-1000/<轮>/ 这类仓外位置）")
-    crate_directory, package, bin_name = locate_bin(target, root)
+    crate_directory, package, bin_name = locate_bin(target, root, mode)
     try:
         draft_bytes = open(draft, "rb").read()
         draft_bytes.decode("utf-8")
@@ -210,9 +262,10 @@ def swap(draft, target, scratch, root, release=False, after_build=None):
         os.makedirs(os.path.dirname(tree_target), exist_ok=True)
         with open(tree_target, "wb") as handle:
             handle.write(draft_bytes)
-        built, errors = build(tree, target_directory, package, bin_name, release, log_path)
+        built, errors = build(root if mode == "build-in-root" else tree, target_directory, package, bin_name, release, log_path, mode)
     finally:
-        shutil.rmtree(tree, ignore_errors=True)
+        if mode != "keep-tree":
+            shutil.rmtree(tree, ignore_errors=True)
     lines.append(f"编译输出：{log_path}；编译目录 {target_directory} 留着给下一次增量编，收工前 --clean --scratch {scratch}")
     if not built:
         lines += [f"✗ 草稿副本在仓副本里编不过，主工作区 {os.path.relpath(target, root)} 一个字节没写：", *errors,  # gate-lint:summary
@@ -240,11 +293,14 @@ def swap(draft, target, scratch, root, release=False, after_build=None):
                     raise ReplaceRefused(f"{target} 在换上前一刻又被改了\n→ 怎么办：重跑这条脚本")
             lines += replace_file_contents_by_rename(target, draft_bytes.decode("utf-8"), check_before_rename=unchanged_since_check)
     except (OSError, ReplaceRefused) as error:
-        lines += [f"✗ 换上 {os.path.relpath(target, root)} 时失败：{error}",
-                  "→ 怎么办：核主工作区那份此刻的字节（sha256sum）是不是还是开跑时那份；是就查目录权限与剩余空间后重跑，不是就交主 agent"]
-        return EXIT_SWAP_FAILED, lines
+        if mode != "swap-error-ignored":
+            lines += [f"✗ 换上 {os.path.relpath(target, root)} 时失败：{error}",
+                      "→ 怎么办：核主工作区那份此刻的字节（sha256sum）是不是还是开跑时那份；是就查目录权限与剩余空间后重跑，不是就交主 agent"]
+            return EXIT_SWAP_FAILED, lines
+    if after_swap is not None:
+        after_swap()
     after = read_bytes_or_none(target)
-    if after != draft_bytes:
+    if after != draft_bytes and mode != "skip-readback":
         lines += [f"✗ 换上之后回读 {os.path.relpath(target, root)}，sha256 {sha256_of(after)} 与草稿副本不同",
                   "→ 怎么办：有别的进程同时在写这一份；把现状写进报告交主 agent，不再重跑"]
         return EXIT_SWAP_FAILED, lines
@@ -262,106 +318,277 @@ def clean(scratch):
 
 
 SELFTEST_MANIFEST = '[package]\nname = "demo"\nversion = "0.1.0"\nedition = "2021"\n'
+OUTSIDE_CRATES_MANIFEST = '[package]\nname = "demo2"\nversion = "0.1.0"\nedition = "2021"\n'
+LIBRARY_SOURCE = "pub fn value() -> u32 {\n    1\n}\n"
 GOOD_BIN = "fn main() {\n    println!(\"{}\", demo::value());\n}\n"
 GOOD_BIN_CHANGED = "fn main() {\n    println!(\"{}\", demo::value() + 1);\n}\n"
-BAD_BIN = "fn main() {\n    println!(\"{}\", unit_check_fields);\n}\n"
-BAD_TEST_MODULE = GOOD_BIN + "#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {\n        missing_helper();\n    }\n}\n"
+BAD_BIN = "fn main() {\n    println!(\"{}\", unit_check_fields);\n}\n// FAKE_CARGO: build-fails\n"
+BAD_TEST_MODULE = (GOOD_BIN + "#[cfg(test)]\nmod tests {\n    #[test]\n    fn t() {\n        missing_helper();\n    }\n}\n"
+                   "// FAKE_CARGO: test-build-fails\n")
+OTHER_WRITER_TEXT = GOOD_BIN + "// 别的会话的改动\n"
+BOTH_CARGO_COMMANDS = ("build", "test")
+FAKE_CARGO_LOG_VARIABLE = "COMPILE_THEN_SWAP_FAKE_CARGO_LOG"
+FAKE_CARGO_SCRIPT = r"""#!/usr/bin/env bash
+# 假 cargo：compile-then-swap.py --selftest 把它放在 PATH 最前面（文件头「自证」一段）。只认 build() 调的
+# `cargo build|test --offline [--no-run] -p <包> --bin <名> [--release]`；按当前目录（应当是仓副本）里那份 bin 源码的
+# FAKE_CARGO 标记演编过、编不过、测试编不过；每次被调往 $COMPILE_THEN_SWAP_FAKE_CARGO_LOG 记一行「当前目录|CARGO_TARGET_DIR|参数」
+set -u
+printf '%s|%s|%s\n' "$PWD" "${CARGO_TARGET_DIR:-}" "$*" >>"${COMPILE_THEN_SWAP_FAKE_CARGO_LOG:?假 cargo 没拿到调用记录文件}"
+subcommand="${1:-}"
+bin=""
+previous=""
+for argument in "$@"; do
+  [[ "$previous" == --bin ]] && bin="$argument"
+  previous="$argument"
+done
+case "$subcommand" in
+  build) failing_marker='FAKE_CARGO: build-fails' ;;
+  test) failing_marker='FAKE_CARGO: (build-fails|test-build-fails)' ;;
+  *) echo "假 cargo 认不出子命令「$subcommand」：只认 build、test" >&2; exit 2 ;;
+esac
+if [[ ! -f Cargo.toml ]]; then
+  echo "error: could not find \`Cargo.toml\` in \`$PWD\` or any parent directory"
+  exit 101
+fi
+source_file=""
+for candidate in crates/*/src/bin/"$bin".rs crates/*/src/bin/"$bin"/main.rs; do
+  [[ -f "$candidate" ]] && source_file="$candidate"
+done
+if [[ -z "$source_file" ]]; then
+  echo "error: no bin target named \`$bin\`"
+  exit 101
+fi
+if grep -qE "$failing_marker" "$source_file"; then
+  echo "error[E0425]: cannot find value \`unit_check_fields\` in this scope"
+  echo " --> $source_file:2:20"
+  echo "error: could not compile \`demo\` due to 1 previous error"
+  exit 101
+fi
+echo "    Finished \`dev\` profile [unoptimized + debuginfo] target(s) in 0.01s"
+exit 0
+"""
+
+
+def write_text(path, text):
+    with open(path, "w", encoding="utf-8") as handle:
+        handle.write(text)
+
+
+class SelftestFixture:
+    """一项一份：临时仓（workspace 加 crates/demo，src/bin/e1_demo.rs 是 GOOD_BIN）、草稿目录、假 cargo 与它的调用记录。"""
+
+    def __init__(self, work):
+        self.root = os.path.join(work, "repo")
+        self.bin_directory = os.path.join(self.root, "crates", "demo", "src", "bin")
+        self.target = os.path.join(self.bin_directory, "e1_demo.rs")
+        self.new_target = os.path.join(self.bin_directory, "e2_demo.rs")
+        self.library = os.path.join(self.root, "crates", "demo", "src", "lib.rs")
+        self.scratch = os.path.join(work, "scratch")
+        self.fake_bin = os.path.join(work, "fake-bin")
+        self.fake_cargo = os.path.join(self.fake_bin, "cargo")
+        self.cargo_log = os.path.join(work, "fake-cargo.log")
+        for directory in (self.bin_directory, self.scratch, self.fake_bin):
+            os.makedirs(directory)
+        write_text(os.path.join(self.root, "Cargo.toml"), '[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\n')
+        write_text(os.path.join(self.root, "crates", "demo", "Cargo.toml"), SELFTEST_MANIFEST)
+        write_text(self.library, LIBRARY_SOURCE)
+        write_text(self.target, GOOD_BIN)
+        write_text(self.fake_cargo, FAKE_CARGO_SCRIPT)
+        os.chmod(self.fake_cargo, 0o755)
+        write_text(self.cargo_log, "")
+
+    def draft(self, text, name="draft.rs"):
+        path = os.path.join(self.scratch, name)
+        write_text(path, text)
+        return path
+
+    def cargo_calls(self):
+        """假 cargo 的调用记录：每次一个 (当前目录, CARGO_TARGET_DIR, 参数)。"""
+        with open(self.cargo_log, encoding="utf-8") as handle:
+            return [tuple(line.rstrip("\n").split("|", 2)) for line in handle if line.strip()]
+
+
+def check_swap(fixture, draft_path, target, want_code, want_bytes, want_calls, after_build=None, after_swap=None,
+               want_new_inode=False, want_line=None):
+    """跑一次 swap，交回问题列表（空就是判对了）。want_calls 是假 cargo 依次该被调的子命令。"""
+    inode_before = os.stat(target).st_ino if os.path.exists(target) else None
+    try:
+        code, lines = swap(draft_path, target, fixture.scratch, fixture.root, after_build=after_build, after_swap=after_swap)
+    except BadInput as error:
+        code, lines = EXIT_BAD_INPUT, str(error).splitlines()
+    got_bytes = read_bytes_or_none(target)
+    target_directory = os.path.dirname(target)
+    leftovers = [name for name in os.listdir(target_directory) if name.startswith(".")] if os.path.isdir(target_directory) else []
+    problems = []
+    if code != want_code:
+        problems.append(f"退出码 {code}（应当 {want_code}）")
+    if got_bytes != want_bytes:
+        problems.append(f"目标 sha256 {sha256_of(got_bytes)}（应当 {sha256_of(want_bytes)}）")
+    if leftovers:
+        problems.append(f"目标目录里留下临时文件 {leftovers}")
+    if want_new_inode and inode_before is not None and got_bytes is not None and os.stat(target).st_ino == inode_before:
+        problems.append("换上之后 inode 没变：在原 inode 上写的，正在读它的进程会读到半份")
+    if code not in (EXIT_SWAPPED, EXIT_BAD_INPUT) and not any(line.lstrip().startswith("→") for line in lines):
+        problems.append("拒绝没带「→」出路")
+    if want_line is not None and not any(want_line in line for line in lines):
+        problems.append(f"输出里没有「{want_line}」")
+    calls = fixture.cargo_calls()
+    subcommands = [arguments.split(" ", 1)[0] for _, _, arguments in calls]
+    if subcommands != list(want_calls):
+        problems.append(f"假 cargo 的调用 {subcommands}（应当 {list(want_calls)}）")
+    work = os.path.join(fixture.scratch, WORK_DIRECTORY_NAME)
+    wanted_places = (os.path.realpath(os.path.join(work, "tree")), os.path.realpath(os.path.join(work, "target")))
+    misplaced = [(directory, cargo_target) for directory, cargo_target, _ in calls
+                 if (os.path.realpath(directory), os.path.realpath(cargo_target)) != wanted_places]
+    if misplaced:
+        problems.append(f"假 cargo 在 {misplaced[0][0]}（CARGO_TARGET_DIR {misplaced[0][1]}）里被调，"
+                        f"应当在仓副本 {wanted_places[0]}（{wanted_places[1]}）")
+    if problems:
+        problems.append(f"输出末三行 {lines[-3:]}")
+    return problems
+
+
+def case_build_fails(fixture):
+    return check_swap(fixture, fixture.draft(BAD_BIN), fixture.target, EXIT_BUILD_FAILED, GOOD_BIN.encode(), ["build"])
+
+
+def case_test_build_fails(fixture):
+    return check_swap(fixture, fixture.draft(BAD_TEST_MODULE), fixture.target, EXIT_BUILD_FAILED, GOOD_BIN.encode(),
+                      BOTH_CARGO_COMMANDS)
+
+
+def case_new_bin_build_fails(fixture):
+    return check_swap(fixture, fixture.draft(BAD_BIN), fixture.new_target, EXIT_BUILD_FAILED, None, ["build"])
+
+
+def case_changed_during_build(fixture):
+    def someone_edits():
+        write_text(fixture.target, OTHER_WRITER_TEXT)
+    return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_CHANGED_DURING_BUILD,
+                      OTHER_WRITER_TEXT.encode(), BOTH_CARGO_COMMANDS, after_build=someone_edits)
+
+
+def case_swap_existing(fixture):
+    return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                      BOTH_CARGO_COMMANDS, want_new_inode=True)
+
+
+def case_create_new_bin(fixture):
+    return check_swap(fixture, fixture.draft(GOOD_BIN), fixture.new_target, EXIT_SWAPPED, GOOD_BIN.encode(), BOTH_CARGO_COMMANDS)
+
+
+def case_swap_error(fixture):
+    def directory_turns_read_only():
+        os.chmod(fixture.bin_directory, 0o555)
+    try:
+        return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAP_FAILED, GOOD_BIN.encode(),
+                          BOTH_CARGO_COMMANDS, after_build=directory_turns_read_only, want_line="时失败")
+    finally:
+        os.chmod(fixture.bin_directory, 0o755)
+
+
+def case_readback_mismatch(fixture):
+    def another_writer():
+        write_text(fixture.target, OTHER_WRITER_TEXT)
+    return check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAP_FAILED, OTHER_WRITER_TEXT.encode(),
+                      BOTH_CARGO_COMMANDS, after_swap=another_writer, want_line="与草稿副本不同")
+
+
+def case_non_bin_source(fixture):
+    return check_swap(fixture, fixture.draft("pub fn value() -> u32 { 2 }\n", "lib.rs"), fixture.library, EXIT_BAD_INPUT,
+                      LIBRARY_SOURCE.encode(), [])
+
+
+def case_draft_inside_repo(fixture):
+    inside = os.path.join(fixture.root, "draft-inside.rs")
+    write_text(inside, GOOD_BIN_CHANGED)
+    return check_swap(fixture, inside, fixture.target, EXIT_BAD_INPUT, GOOD_BIN.encode(), [])
+
+
+def case_outside_crates(fixture):
+    crate = os.path.join(fixture.root, "tools", "demo2")
+    os.makedirs(os.path.join(crate, "src", "bin"))
+    write_text(os.path.join(crate, "Cargo.toml"), OUTSIDE_CRATES_MANIFEST)
+    return check_swap(fixture, fixture.draft(GOOD_BIN), os.path.join(crate, "src", "bin", "x.rs"), EXIT_BAD_INPUT, None, [])
+
+
+def case_tree_removed(fixture):
+    problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                          BOTH_CARGO_COMMANDS)
+    if os.path.exists(os.path.join(fixture.scratch, WORK_DIRECTORY_NAME, "tree")):
+        problems.append("跑完之后仓副本还在草稿目录里：交回闸会拦")
+    return problems
+
+
+def case_clean_removes_work(fixture):
+    problems = check_swap(fixture, fixture.draft(GOOD_BIN_CHANGED), fixture.target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
+                          BOTH_CARGO_COMMANDS)
+    clean(fixture.scratch)
+    if os.path.exists(os.path.join(fixture.scratch, WORK_DIRECTORY_NAME)):
+        problems.append("--clean 之后编译目录还在")
+    return problems
+
+
+# 标签与文件头「自证」一段逐项对应；每一项各用一份 SelftestFixture，不读别的项留下的东西
+SELFTEST_CASES = (
+    ("build-fails", case_build_fails),
+    ("test-build-fails", case_test_build_fails),
+    ("new-bin-build-fails", case_new_bin_build_fails),
+    ("changed-during-build", case_changed_during_build),
+    ("swap-existing", case_swap_existing),
+    ("create-new-bin", case_create_new_bin),
+    ("swap-error", case_swap_error),
+    ("readback-mismatch", case_readback_mismatch),
+    ("non-bin-source", case_non_bin_source),
+    ("draft-inside-repo", case_draft_inside_repo),
+    ("outside-crates", case_outside_crates),
+    ("tree-removed", case_tree_removed),
+    ("clean-removes-work", case_clean_removes_work),
+)
+
+
+def run_selftest_case(case):
+    """一项一份临时目录，PATH 最前面放这一项的假 cargo；跑完还原环境、删临时目录。交回 (问题列表, 假 cargo 被调了几次)。"""
+    work = tempfile.mkdtemp(prefix="compile-then-swap-selftest-")
+    saved = {name: os.environ.get(name) for name in ("PATH", FAKE_CARGO_LOG_VARIABLE)}
+    try:
+        fixture = SelftestFixture(work)
+        os.environ["PATH"] = fixture.fake_bin + os.pathsep + (saved["PATH"] or "")
+        os.environ[FAKE_CARGO_LOG_VARIABLE] = fixture.cargo_log
+        resolved = shutil.which("cargo")
+        if resolved is None or os.path.realpath(resolved) != os.path.realpath(fixture.fake_cargo):
+            return [f"PATH 上解到的 cargo 是 {resolved}，不是这一项的假 cargo {fixture.fake_cargo}：这一项不跑，免得起真编译"], 0
+        try:
+            problems = case(fixture)
+        except Exception as error:  # 一项抛了异常只记这一项红，别的项照跑
+            problems = [f"抛了 {type(error).__name__}：{error}"]
+        return problems, len(fixture.cargo_calls())
+    finally:
+        for name, value in saved.items():
+            if value is None:
+                os.environ.pop(name, None)
+            else:
+                os.environ[name] = value
+        shutil.rmtree(work, ignore_errors=True)
 
 
 def selftest():
-    work = tempfile.mkdtemp(prefix="compile-then-swap-selftest-")
-    failures, checked = [], 0
-    try:
-        root = os.path.join(work, "repo")
-        bin_directory = os.path.join(root, "crates", "demo", "src", "bin")
-        os.makedirs(bin_directory)
-        with open(os.path.join(root, "Cargo.toml"), "w") as handle:
-            handle.write('[workspace]\nresolver = "2"\nmembers = ["crates/demo"]\n')
-        with open(os.path.join(root, "crates", "demo", "Cargo.toml"), "w") as handle:
-            handle.write(SELFTEST_MANIFEST)
-        with open(os.path.join(root, "crates", "demo", "src", "lib.rs"), "w") as handle:
-            handle.write("pub fn value() -> u32 {\n    1\n}\n")
-        target = os.path.join(bin_directory, "e1_demo.rs")
-        with open(target, "w") as handle:
-            handle.write(GOOD_BIN)
-        scratch = os.path.join(work, "scratch")
-        os.makedirs(scratch)
-
-        def draft(name, text):
-            path = os.path.join(scratch, name)
-            with open(path, "w") as handle:
-                handle.write(text)
-            return path
-
-        def run(label, draft_path, target_path, want_code, want_bytes, after_build=None, want_new_inode=False):
-            nonlocal checked
-            checked += 1
-            inode_before = os.stat(target_path).st_ino if os.path.exists(target_path) else None
-            try:
-                code, lines = swap(draft_path, target_path, scratch, root, after_build=after_build)
-            except BadInput as error:
-                code, lines = EXIT_BAD_INPUT, str(error).splitlines()
-            got_bytes = read_bytes_or_none(target_path)
-            leftovers = [name for name in os.listdir(os.path.dirname(target_path)) if name.startswith(".")] \
-                if os.path.isdir(os.path.dirname(target_path)) else []
-            problems = []
-            if code != want_code:
-                problems.append(f"退出码 {code}（应当 {want_code}）")
-            if got_bytes != want_bytes:
-                problems.append(f"目标 sha256 {sha256_of(got_bytes)}（应当 {sha256_of(want_bytes)}）")
-            if leftovers:
-                problems.append(f"目标目录里留下临时文件 {leftovers}")
-            if want_new_inode and inode_before is not None and got_bytes is not None and os.stat(target_path).st_ino == inode_before:
-                problems.append("换上之后 inode 没变：在原 inode 上写的，正在读它的进程会读到半份")
-            if code not in (EXIT_SWAPPED, EXIT_BAD_INPUT) and not any(line.lstrip().startswith("→") for line in lines):
-                problems.append("拒绝没带「→」出路")
-            if problems:
-                failures.append(f"{label}：{'；'.join(problems)}；输出 {lines[-3:]}")
-
-        good = GOOD_BIN.encode()
-        run("编不过的草稿（E0425 那一类）不写主工作区", draft("bad.rs", BAD_BIN), target, EXIT_BUILD_FAILED, good)
-        run("bin 编过而 #[cfg(test)] 编不过的也不写", draft("bad-test.rs", BAD_TEST_MODULE), target, EXIT_BUILD_FAILED, good)
-        new_target = os.path.join(bin_directory, "e2_demo.rs")
-        run("新 bin 编不过就不建", draft("bad-new.rs", BAD_BIN), new_target, EXIT_BUILD_FAILED, None)
-
-        def someone_edits():
-            with open(target, "w") as handle:
-                handle.write(GOOD_BIN + "// 别的会话的改动\n")
-        run("编的时候主工作区那份被改了就不盖", draft("good-race.rs", GOOD_BIN_CHANGED), target, EXIT_CHANGED_DURING_BUILD,
-            (GOOD_BIN + "// 别的会话的改动\n").encode(), after_build=someone_edits)
-        with open(target, "w") as handle:
-            handle.write(GOOD_BIN)
-        run("编过的草稿整份换上、换的是新 inode", draft("good.rs", GOOD_BIN_CHANGED), target, EXIT_SWAPPED, GOOD_BIN_CHANGED.encode(),
-            want_new_inode=True)
-        run("编过的新 bin 建出来", draft("good-new.rs", GOOD_BIN), new_target, EXIT_SWAPPED, good)
-        library = os.path.join(root, "crates", "demo", "src", "lib.rs")
-        run("crate 里 bin 以外的源文件不收", draft("lib.rs", "pub fn value() -> u32 { 2 }\n"), library, EXIT_BAD_INPUT,
-            b"pub fn value() -> u32 {\n    1\n}\n")
-        inside = os.path.join(root, "draft-inside.rs")
-        with open(inside, "w") as handle:
-            handle.write(GOOD_BIN)
-        run("草稿副本放在主工作区里不收", inside, target, EXIT_BAD_INPUT, GOOD_BIN_CHANGED.encode())
-        outside_crates = os.path.join(root, "tools", "x.rs")
-        run("crates/ 以外的 .rs 不收", draft("x.rs", GOOD_BIN), outside_crates, EXIT_BAD_INPUT, None)
-        checked += 1
-        if os.path.exists(os.path.join(scratch, WORK_DIRECTORY_NAME, "tree")):
-            failures.append("跑完之后仓副本还在草稿目录里：交回闸会拦")
-        checked += 1
-        clean(scratch)
-        if os.path.exists(os.path.join(scratch, WORK_DIRECTORY_NAME)):
-            failures.append("--clean 之后编译目录还在")
-    except BadInput as error:
-        failures.append(f"自检现场本身被拒：{error}")
-    finally:
-        shutil.rmtree(work, ignore_errors=True)
+    failures, cargo_calls = [], 0
+    for label, case in SELFTEST_CASES:
+        problems, calls = run_selftest_case(case)
+        cargo_calls += calls
+        if problems:
+            failures.append(f"{label}：{'；'.join(problems)}")
     for failure in failures:
-        print(f"  ✗ 自检：{failure}")  # gate-lint:detail
+        print(f"  ✗ 自检 {failure}")  # gate-lint:detail
     if failures:
-        print(f"  → 看 swap() / build() / locate_bin() 的判法；{BREAK_VARIABLE} 设着的话这里本来就该红")
+        print(f"  → 看 swap() / build() / locate_bin() 的判法；{BREAK_VARIABLE} 设着的话这里本来就该红"
+              "（文件头「弄坏开关」逐个写了红在哪几项）")
         return 1
-    print(f"  ✓ compile-then-swap 自检通过（查了 {checked} 种）：编不过的（bin 本身、#[cfg(test)]、新 bin）一个字节不写，"
-          "编的时候主工作区那份被改了不盖，编过的整份换上且换的是新 inode、新 bin 建得出来，bin 以外的源文件、crates/ 以外的 .rs、"
-          "放在主工作区里的草稿都不收，仓副本跑完就删、--clean 删得掉编译目录")
+    print(f"  ✓ compile-then-swap 自检通过（查了 {len(SELFTEST_CASES)} 项，假 cargo 一共被调 {cargo_calls} 次，不起真编译）："
+          "编不过的（bin 本身、#[cfg(test)]、新 bin）一个字节不写，编的时候主工作区那份被改了不盖，编过的整份换上且换的是新 inode、"
+          "新 bin 建得出来，换上失败与回读对不上都退 4，bin 以外的源文件、crates/ 以外的 .rs、放在主工作区里的草稿都不收，"
+          "cargo 只在仓副本里调，仓副本跑完就删、--clean 删得掉编译目录")
     return 0
 
 
