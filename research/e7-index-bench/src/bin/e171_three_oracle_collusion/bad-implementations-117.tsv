@@ -1,0 +1,117 @@
+1	1	crates/singlefs-core/src/admission.rs	0	C318 实现：准入读数的「被抛弃根独占量」不取影子账隔离的槽、恒 0（影子账隔离的单元又不进不等式）	15642eb5e39f
+2	2	crates/singlefs-core/src/admission.rs	7	D28 已定项 3 实现：实例表链的片数向下取整（370 行算成一片）	e5eaaceedacc
+3	2	crates/singlefs-core/src/admission.rs	15	实五 ND（D28 已定项 1：可用不再扣 defer 待释放）：defer 里的槽扣两次（已分配里一次、另加一次）	803a81a7028c
+4	2	crates/singlefs-core/src/admission.rs	23	实审 A4b：中央映射树叶层一次都不按会切算	b240c9e0d23f
+5	2	crates/singlefs-core/src/admission.rs	31	实审 A4d：K1 漏掉罩整个 key 空间的根	d78e96210028
+6	1	crates/singlefs-core/src/allocation_record_tree.rs	0	K1：分配记录树按槽号找叶时叶宽算成两倍（记录进了不罩它的叶，按位置寻址的核判出）	4e994f9ef97b
+7	2	crates/singlefs-core/src/allocation_record_tree.rs	7	K1 单测：分配记录树按槽号找叶时叶宽算成两倍（叶的边界不在 812 的整数倍上）	7c045a579033
+8	1	crates/singlefs-core/src/allocator.rs	0	空闲不随分配减（I-5.2 要红）	16ec71e44229
+9	2	crates/singlefs-core/src/allocator.rs	7	步 5：提交内生块的 bump 游标不绕开开段之后才隔离或扣住的槽	a836d4b989c8
+10	2	crates/singlefs-core/src/allocator.rs	14	增补 2：提交内生块段耗尽不回落（抬 F 的空发布在唯一全空段被扣住时又报 NoSpaceFor）	a1a9ffe21eb8
+11	2	crates/singlefs-core/src/allocator.rs	22	增补 3 第 1 件（代码三方第一轮第 3 条）：随机历史快档判出「复用改写已回收记录时不改分配代」（N2）	217469aeb5c7
+12	2	crates/singlefs-core/src/allocator.rs	29	步 0 开关一（复用窗口置 0）：回收下界退回 0（不再无视 F），释放的落点一个都不回收	a6433e2374f5
+13	2	crates/singlefs-core/src/allocator.rs	36	C518（一次挂载之内环转过一圈之后不回收）：挂载内不回收时，一次挂载里转过根环的历史又停在已知红第 0 条（C518 那一处）	c6eeb65822b3
+14	2	crates/singlefs-core/src/allocator.rs	44	增补 3 第 2 件（代码三方第二轮判决第三节第 2 条，攻方变异 m2j）：分配器提交内生块那一处把「每块盘上都没有」报成「小盘写满」；抬 F 的空发布拿不到固定点那条写死用例判出（接替原第 166 行：单元区墙取样点换到 256 槽小盘之后只走得到用户数据那一处）	d3a4311edd30
+15	2	crates/singlefs-core/src/allocator.rs	51	实审 A2c 第 15 条：用户数据落点不从这张图的单元区起点起扫	6d1ee440a604
+16	1	crates/singlefs-core/src/block_device.rs	0	增补 3 第 3 件（用户 2026-09-20 定案第 9 条）：镜像文件不排他创建，撞上同名接着用旧镜像	6eb72f44fd68
+17	2	crates/singlefs-core/src/block_device.rs	7	文件后端 ENOSYS 不算不支持打洞（内核没有 fallocate 时照常报错、不退回真写零）	59c465df406c
+18	1	crates/singlefs-core/src/code_two_tree.rs	0	树分裂 核心规则：叶切在末尾（左半留 n − 1 条）而不是从中间切	d98101386f1e
+19	2	crates/singlefs-core/src/code_two_tree.rs	7	树分裂 上一版的叶一律不算照抄（没碰到的叶也整片重写）	91999f5da1d7
+20	2	crates/singlefs-core/src/code_two_tree.rs	14	树分裂 读树时不核内部节点的子树覆盖区间	c6f8577750a1
+21	1	crates/singlefs-core/src/extent_tree.rs	0	K2：extent 树下段根的层级取「罩的单元数大于单元数」的最低一层（144 个单元装满一片叶时白长一层）	afcbcbf908fe
+22	2	crates/singlefs-core/src/extent_tree.rs	4	K2 单测：extent 树上段根的层级取「罩的 inode 数不小于最大 inode 号」的最低一层（inode 143 还算在第 0 片叶里）	c9a6ce82c798
+23	1	crates/singlefs-core/src/inode_tree.rs	0	并行线三 C116：分裂出来的右半容器号不是触发分裂那条新记录的 inode 号	e090f27ea3b7
+24	1	crates/singlefs-core/src/instance_table.rs	0	实例表第二片：读者收下位置指针没清零的「无下一片」	fec37df3f268
+25	2	crates/singlefs-core/src/instance_table.rs	5	实例表第二片：片数向下取整（370 行算一片）	cf125f04dd5b
+26	1	crates/singlefs-core/src/journal.rs	0	并行线一：记录读者不判点名项区越没越过 4096（并行线一验收第 4 条第三个变异：点名项超过 67 仍塞进一条记录 ⇒ 记录解析拒收）	eef360900a56
+27	2	crates/singlefs-core/src/journal.rs	5	实二十：记录头读者把末条标志位 0 读反（带标志的读成不是末条）	fd0f4a108c59
+28	1	crates/singlefs-core/src/make_filesystem.rs	0	新池新建文件 步 1：mkfs 不核根环区域归属是不是第一版写死的 0 / 1 / 0	350167260488
+29	2	crates/singlefs-core/src/make_filesystem.rs	7	实审 A2a 第 16 条：根槽装不下根记录不在开头拒（走到 to_slot 的断言）	933c0542110e
+30	2	crates/singlefs-core/src/make_filesystem.rs	14	实审 A2b 环短于三条记录：恰好三条也拒（边界）	2ff413741862
+31	2	crates/singlefs-core/src/make_filesystem.rs	21	A3b 善后一：mkfs 判单元落不落在盘内只算到实例表（树表那一槽在盘外照往下写）	66bec7ff9af0
+32	1	crates/singlefs-core/src/mount.rs	0	步 3：不写行（实例表照抄）	74b18c84938e
+33	2	crates/singlefs-core/src/mount.rs	7	步 4：回退候选集的 F 用最新根自己带的 F 而不是 F_生效	b093430c0295
+34	2	crates/singlefs-core/src/mount.rs	15	步 5：抬 F 生效之后不放开扣住的槽	742d1ec48e41
+35	2	crates/singlefs-core/src/mount.rs	23	步 5：算抬 F 上限时有效根的树表读不出，按「树表里没有这两棵树」猜而不是拒绝	71b7c1644cea
+36	2	crates/singlefs-core/src/mount.rs	31	增补 3 第 2 件（代码三方第二轮判决第三节第 3 条，攻方变异 m4a）：根环转过之后回收门槛取「环里最旧有效根 + 1」；逼近分配记录墙那一段照跑 checker 判出	71ec2b156c2d
+37	2	crates/singlefs-core/src/mount.rs	39	增补 2 第 21 行（C366，挂载层）：写行那次发布的 jsn 取 txg（所选根自己那条记录读不出时写行 txg 5、jsn 应是 4）	6d454f491473
+38	2	crates/singlefs-core/src/mount.rs	47	增补 2 收口表第 58 行：可写挂载在暖机里失败时已落盘的账只交写行、漏掉前几次暖机	1e9b2866ef90
+39	2	crates/singlefs-core/src/mount.rs	54	实二五 C546（抬 F 被拒时扣住的槽不退回）：第一次空发布在任何写之前被拒时分配器不换回抬 F 之前那一份	3b00e31a95f8
+40	2	crates/singlefs-core/src/mount.rs	62	实二六（代码三方 m2-final-code-r3 判决第四节第 1 条，C546 第二次起那一半）：抬 F 那一串真发时第二次落盘途中报错、交回的已落盘份数成了 0（接替第 495 行：它点名的用例随「落点被拒」那一格挪进预演而删掉）	eb25fefa9e8d
+41	2	crates/singlefs-core/src/mount.rs	70	实二七（fsync 失败掉盘的核查，调度记录 2026-09-24 第三节；D2 已定项 13 挂载准入、D18 已定项 11 可写挂载的顺序与前提）：树表 0 条那一版的分配记录树节点在单元清单里记成树表	22f8061467ce
+42	2	crates/singlefs-core/src/mount.rs	78	实二（回退改形态：SysPre 与 B1，D16 已定项 1 / 7、D22 已定项 7 / 9、I-7.9 / I-7.12、C556 / C557）：卸载把 F 抬到现行那一版带的 F（原地不动）而不是它的 txg	b14a841b61f6
+43	2	crates/singlefs-core/src/mount.rs	86	实三（D23 已定项 14「这一版的失败处置」、C558）：回退入口不先判冻结着的发布	030219028afe
+44	2	crates/singlefs-core/src/mount.rs	94	实五 C283：一次准入最多 8 次发布改成 10 次（推满的判据松了，推满仍不够那一格多推一串）	fcef7e71e97b
+45	2	crates/singlefs-core/src/mount.rs	102	实五 445：挂载那一刻就读不出的槽也重读、仍坏就拒（挡住了条款说当没有根的那一格）	023c98c68fc5
+46	2	crates/singlefs-core/src/mount.rs	109	实审A1b Q1：抬 F 在预演里被落点拒不算空间不够（挂载写行之后推的那一串取不到落点就整次失败）	a05aa4e911f1
+47	2	crates/singlefs-core/src/mount.rs	117	实审A1b Q2：一次准入里再推一串不核调用方的参数（预算用完那一格照样交回）	d5671fae0462
+48	2	crates/singlefs-core/src/mount.rs	125	实审 A2c Q5：抬 F 报错时不交回之前推成的那几串	c5ae1fe2af6c
+49	2	crates/singlefs-core/src/mount.rs	133	C554 乙：c_见证 取系统配置槽 tail 的最小值（只剩较旧那一槽的见证）	9098a4bc2454
+50	2	crates/singlefs-core/src/mount.rs	141	Z3-A 乙：挂着之后收盘表的入口不核盘「可见」（管理员回退收到空盘）	774a735747c1
+51	2	crates/singlefs-core/src/mount.rs	149	C554 乙 模型跟进：可写挂载只写上一个实例那一行、不写中间实例行（烧掉的号那一形护；崩溃恢复写 (2, 0, 0) 那一形乙之后拒可写、checker 那份改走事务层）	328de0db43f0
+52	2	crates/singlefs-core/src/mount.rs	156	合入后验证一：C554 乙关掉，崩溃恢复抛弃根又造得出被抛弃的根（落到实例 2）	293b6256b09e
+53	2	crates/singlefs-core/src/mount.rs	164	代码三方第二轮 Y2-b：挂着之后收盘表的入口不比本盘设备号（管理员回退）	5754e74ef393
+54	2	crates/singlefs-core/src/mount.rs	172	C585 改法 C：落后支去掉根槽那一半、回到落后且缺单元才拒（正常卸载放进发布途中取下的、那次发布的根住的那块盘）	5f2074cd8e77
+55	2	crates/singlefs-core/src/mount.rs	180	m3-code-r1 H2：落后支缺根那一半只查盘表里 region 0 那块盘的根槽（根住盘 1 的那一版缺根放过去）	23a169293706
+56	2	crates/singlefs-core/src/mount.rs	188	m3-code-r2 J3：正常卸载、准入抬 F、管理员回退上缺根那一半把根槽里自证得过的根都当成现行那一版的（准入抬 F，根环转过一圈、txg 27）	67a23814fa6b
+57	2	crates/singlefs-core/src/mount.rs	196	m3-code-r3 L1：落后支缺根那一半只在第一次读不出时才重读（准入抬 F：根槽里是现行那一版的落后盘，第一次读回的字节坏一位、自证不过就被拒成缺根）	90de0b6375c3
+58	1	crates/singlefs-core/src/mounted_read.rs	0	并行线二：位置提示过期转查中央映射时多跳计数不加（D19 已定项 5 硬规则 3 的观测点等于没有）	b34d2e5309a7
+59	2	crates/singlefs-core/src/mounted_read.rs	7	C483 ②：挂载态打开时 inode 树根只按位置提示读（不经映射回退）	91313790af6c
+60	2	crates/singlefs-core/src/mounted_read.rs	14	实审 A2a 第 21 条：只读挂载把没有 extent 条目的 inode 当写过内容	77d23604908d
+61	1	crates/singlefs-core/src/mounted_session.rs	0	实五 P3pl（D16 已定项 1「准入」那一行：准入放行而落点取不到也推）：会话只在准入拒时推抬 F，落点被拒原样交回	7f1fa64b586f
+62	2	crates/singlefs-core/src/mounted_session.rs	5	Z3-A 乙：会话发布之前不核盘「可见」（别的池的盘）	25a4624c4cee
+63	1	crates/singlefs-core/src/pointer.rs	0	A3a 第 29 条：指针头部 MAC / nonce 非 0 不判	2e1832bc7f31
+64	1	crates/singlefs-core/src/records.rs	0	extent 叶记录的读者不判条目宽（按 112 的固定偏移切 24 字节的条目）	fc06e850313e
+65	2	crates/singlefs-core/src/records.rs	8	C480：blocks 向下取整（⌊size ÷ 512⌋，新池新建文件那 3000 字节写成 5）	a1fe0db4a783
+66	1	crates/singlefs-core/src/recovery.rs	0	逐盘核退回只核总数	97362055b3fd
+67	2	crates/singlefs-core/src/recovery.rs	7	增补 3 第 4 件：失败时点名的换成最后一块两槽皆废的盘，不是设备次序里第一块	c995d8b8cd7d
+68	2	crates/singlefs-core/src/recovery.rs	15	普查 R7：分配记录的几何判不判跨度（被抛弃根那棵账里的坏记录又喂进 isolate 的跨度断言）	9c67167f26e5
+69	2	crates/singlefs-core/src/recovery.rs	22	实例表第二片：读者读到第 0 片就停，按实例表判被抛弃看不到第二片上的行	0e81a0a45326
+70	2	crates/singlefs-core/src/recovery.rs	30	实二十：层 0 L8：恢复把不带末条标志的记录也当末条（半次发布施加上去）	bff9fa2c9892
+71	2	crates/singlefs-core/src/recovery.rs	38	实审 A2a 第 25 条：链值不等的记录照样进重放前缀	9f8c87579ea2
+72	2	crates/singlefs-core/src/recovery.rs	45	实审 A2b 第 27 条：分配记录读者不经共用判定	8483ca537f47
+73	2	crates/singlefs-core/src/recovery.rs	53	实审 A2b 第 37 条：逐档试一槽可择的都没有时丢掉 incompat 位图不认识的那一槽	d4ee352257eb
+74	2	crates/singlefs-core/src/recovery.rs	61	A3a 第 33 条：重建读分配记录树退回只核位置	adba948d07c4
+75	2	crates/singlefs-core/src/recovery.rs	68	A3a 第 38 条：physical_block_size 不判上界（根槽盖到下一个槽）	7f4b1929847f
+76	2	crates/singlefs-core/src/recovery.rs	76	实审 A3d：重建不判分配记录每个落点每盘各一条（两盘的账不对称：可写挂载改红在下一道分配记录代的判定上）	a8aae8398925
+77	2	crates/singlefs-core/src/recovery.rs	84	实审 A3b Q6：算生效 F 时最新根的实例表重读仍读不出改回「不按表滤」（算 F 那一段本身）	0d8d4580e16d
+78	2	crates/singlefs-core/src/recovery.rs	91	I-9.16 树表排序：核心层不判 ② 发号次序（重建放过互换种类的树表）	24120af2ebcf
+79	2	crates/singlefs-core/src/recovery.rs	99	代码三方第二轮之后规格第 3 条（D16 第 37 行全句）：知道住着根的槽自证不过不重读（管理员回退，step_four 那一形）	2af541a68dfa
+80	2	crates/singlefs-core/src/recovery.rs	107	胶水把核报的「所选根那次发布带末条标志的多于一条」当不变量破坏 panic（G6 改回去）	943b0d3d240a
+81	2	crates/singlefs-core/src/recovery.rs	114	recover 的 Consult 一臂调 replay_journal 的 verify_named_units 从「policy 是 Consult」改成 false（形式化题面第三轮第四节第 9 条，R3-9 之三）：验的那一臂也不验点名单元	b595e5bb6750
+82	2	crates/singlefs-core/src/recovery.rs	122	扫环胶水不照核交回的位置取、读到的每一份都插（同一 (实例代号, 计数器) 后读到的那份覆盖先读到的，R3-10 的胶水一侧）	75d4fcd44182
+83	1	crates/singlefs-core/src/root_record.rs	0	代码三方 m2-wave3-code-r1 第四节第 4 条：根记录里分配记录树根指针的偏移错一位（写者 342 写到 343，记录总长 457 不变；全零指针的往返单测看不出）	1efecfd03bd0
+84	1	crates/singlefs-core/src/root_ring.rs	0	根环一个区域按 S − 1 个槽算：最后一个根槽不清，旧池留在那一槽的根活下来	c5a3c85e3f7e
+85	1	crates/singlefs-core/src/system_configuration.rs	0	系统配置四类：运行配置那一档的字节预算从 36 改成 35（D22 已定项 26 的 389 / 4 / 36 / 60 里动一个数）	d41988152086
+86	2	crates/singlefs-core/src/system_configuration.rs	7	实一（回退改形态：格式与系统配置，D22 已定项 9 / 15、D15 已定项 4、D22 已定项 7）：写系统配置槽时 F 那 8 字节写成 0、不写字段里的值	99ebf8e26724
+87	2	crates/singlefs-core/src/system_configuration.rs	14	实审 C11b 在飞上限两份各算：core 那份把 F 多算 1（core 与装置在环长上对不上）	35cd0e2d6867
+88	1	crates/singlefs-core/src/transaction.rs	0	映射查到 key 就算（落点指错不核记录）	79533897aa3e
+89	2	crates/singlefs-core/src/transaction.rs	7	步 3：第一个文件版本的 txg 写死 3，不从它要建在上面的那一版接着算（2026-09-23 用户定案：`NEW_POOL_FILE_CREATION_TXG` 只管 mkfs 那条流）	95f9b7ed315a
+90	2	crates/singlefs-core/src/transaction.rs	15	增补 2 第 11 行：新池新建文件的改动计数写回 1（字段表定义是最后一次改动所在发布的 checkpoint_txg = 3）	434000734c8e
+91	2	crates/singlefs-core/src/transaction.rs	23	并行线三：建 N 个 inode 之后记账里的水位不加 N（I-9.6 要在盘上判红）	4b3240a0b7bb
+92	2	crates/singlefs-core/src/transaction.rs	31	步 1 验收第 4 条：inode 记录的写入时间留成 A 的（覆盖写照抄上一版的写入时间）	1075b816d5f9
+93	2	crates/singlefs-core/src/transaction.rs	39	增补 2 第 8 行（C495）：拿掉第一个文件版本那道核验（上一条记录解不出或 txg 对不上都照写）	a68291ac2b0b
+94	2	crates/singlefs-core/src/transaction.rs	46	并行线一：C491：共享的提交内生块挪到一次发布的第一条记录里点名（末条只点名自己那个数据单元）	ec67c0d6b5b3
+95	2	crates/singlefs-core/src/transaction.rs	54	C518（一次挂载之内环转过一圈之后不回收）：第一个文件版本之前调用方直发的零单元根不补记进根环表（表判出跳号、停下）	124b60604eba
+96	2	crates/singlefs-core/src/transaction.rs	62	实二十：多条记录的发布每条都带末条标志	496325f31dd8
+97	2	crates/singlefs-core/src/transaction.rs	70	C394 N1：「先重读一次」写成重读两次（条款只重读一次，不多次重试）	7e53fc7c5274
+98	2	crates/singlefs-core/src/transaction.rs	78	实例表第二片写路径：树表 0 条的一版上写行时旧链只释放第 0 片	8b8073ee79cd
+99	2	crates/singlefs-core/src/transaction.rs	85	步 1 变异：defer 行写 0（树分裂换锚点：记账行按行种类取值）	673592fce861
+100	2	crates/singlefs-core/src/transaction.rs	93	实二二三 d（D19 已定项 5，用户 2026-09-25 定）：映射条目两条位置项指同一块盘时不拒（另一块盘那一份没核就释放）	814d605e606e
+101	2	crates/singlefs-core/src/transaction.rs	101	实二五 D19 已定项 5（核出对不上先重读一次）：读得出而对不上不重读、当场隔离	0315bf1e8062
+102	2	crates/singlefs-core/src/transaction.rs	109	实二（回退改形态：SysPre 与 B1，D16 已定项 1 / 7、D22 已定项 7 / 9、I-7.9 / I-7.12、C556 / C557）：抬 F 先写系统配置那一步不带新 F、照带盘上旧的生效值	3a6d16eb5b48
+103	2	crates/singlefs-core/src/transaction.rs	117	实审 A2c 第 34 条：第一个文件版本换下 mkfs 那几片时不逐盘核（在册就交给释放）	fb49f9b7a760
+104	2	crates/singlefs-core/src/transaction.rs	124	实审 A2c 第 26 条：树表 0 条的一版上写行数记录条数只数一个角色	64ebb5e5a1c5
+105	2	crates/singlefs-core/src/transaction.rs	132	实审 B3c-3（树表 0 条的一版上写行那一版比实例表与分配代）：写行那次发布把这一版的分配记录报成零单元发布那一臂（不交回）	978d4529bfed
+106	2	crates/singlefs-core/src/transaction.rs	140	实审 A3c Q1：屏障之后取见证值那一遍读不出的盘不拒、照写取号写	ef6cef922c52
+107	2	crates/singlefs-core/src/transaction.rs	148	C331 甲 V4（用户 2026-09-28 定）：取号那一刻缺一槽照样取号，回到「一份都没有才拒」	d056fe99f816
+108	1	crates/singlefs-core/src/unit.rs	0	增补 3 第 1 件（代码三方第一轮第 4 条）：随机历史快档判出「checker 判绿的镜像上冷启动读回报错」（B6：补齐字节从最后一个载荷字节算起）	b2f18ffee9f3
+109	2	crates/singlefs-core/src/unit.rs	6	A3a 第 29 条：码 2 读者不判 29 字节预留位	abebad6cd099
+110	1	crates/singlefs-core/src/write_accounting.rs	0	增补 1：树表单元的写记到中央映射树名下（合计不变，按种类钉的字节表红）	19ffd5418e65
+111	1	crates/singlefs-core/src/write_request_split.rs	0	实审 A2a 第 21 条：没写过的 inode 长度 0 也按除法给一个单元	33bd7451555d
+112	1	crates/singlefs-replay-prefix/src/lib.rs	0	步 3：前缀跨实例边界（把别的实例的记录也接上）	7d3a144c6d52
+113	2	crates/singlefs-replay-prefix/src/lib.rs	7	P6 后一半：锚点读不出时不看本次发布内序号，链首接在下一次发布的第二条上（三方第一轮 K4-b）	7d7442a05ba2
+114	2	crates/singlefs-replay-prefix/src/lib.rs	14	实二二三 b（C539，D23 已定项 4 读者规则）：锚点读得出时下一次发布的首条序号不是 1 照接	be0e12abf325
+115	2	crates/singlefs-replay-prefix/src/lib.rs	21	取前缀核锚点筛选不看 txg（攻方 K19）：别的发布的末条标志让恢复停在报错上	7dcbfa7fb61d
+116	2	crates/singlefs-replay-prefix/src/lib.rs	28	取前缀核读盘形状（代码轮第三轮 J1、用户定案 U1）：锚点读不出那一支不判序号（H5-2 删回去），链首序号不是 1 时先调反向链回调、多重读一次上一条记录	c36c7f312668
+117	2	crates/singlefs-replay-prefix/src/lib.rs	35	取前缀核读盘形状（C648 攻方 S03，可写挂载、上一条记录 0 号盘那一份全零那一格）：反向链回调每个候选调两次，可写挂载时读缓存不收的零份每个候选在块层重读两次	274ff0c7f6c7

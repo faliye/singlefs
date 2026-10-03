@@ -7372,7 +7372,7 @@ mod tests {
         assert_eq!(NONCE_MAC_RESERVED_BYTES, 29, "nonce 12 + MAC 16 + 算法类型 1（D18 已定项 16，2026-09-14 用户定案）");
         assert_eq!(DATA_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES, 134, "码 1 载荷从 134 起");
         assert_eq!(PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES, 136, "码 3 记录区从 136 起");
-        assert_eq!((DATA_UNIT_BYTES - (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)) / JOURNAL_NAMED_ENTRY_BYTES, 582, "I-1.7 的 cap(136, 56)");
+        assert_eq!((DATA_UNIT_BYTES - (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)) / JOURNAL_NAMED_ENTRY_BYTES, 582, "按点名项宽 56 算的码 3 容量（不是墓碑宽：第一版墓碑 40 字节、容量 815，I-1.7 与 D18 已定项 24）");
         assert_eq!((DATA_UNIT_BYTES - (PACKED_UNIT_HEADER_BYTES + NONCE_MAC_RESERVED_BYTES)) / INSTANCE_ROW_BYTES, 370, "实例表一片 370 条");
         // D23 已定项 18 / 19 ③：环 768 MiB ⇒ 196608 个 4 KiB 槽，在飞上限 = 槽数 ÷ 3 = 65536；单元区起于槽 50176。
         assert_eq!(JOURNAL_RING_BYTES, 805_306_368);

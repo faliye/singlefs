@@ -517,3 +517,18 @@ path = "src/bin/e16_fifth_run_peak_under_today_widths.rs"
 [[bin]]
 name = "e164-crash-amplification-design-function-test"
 path = "src/bin/e164_crash_amplification_design_function_test.rs"
+
+# E167（多在飞发布的崩溃枚举切法）：跑前登记 research/prompts/e167-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e167-multi-inflight-crash-cut"
+path = "src/bin/e167_multi_inflight_crash_cut.rs"
+
+# E169（并行提交的追加纪律与前缀恢复）：跑前登记 research/prompts/e169-preregistration.md。独立手写模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e169-parallel-commit-append-and-prefix-recovery"
+path = "src/bin/e169_parallel_commit_append_and_prefix_recovery.rs"
+
+# E166（并行提交的共享状态分法）：跑前登记 research/prompts/e166-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e166-parallel-commit-shared-state-partition"
+path = "src/bin/e166_parallel_commit_shared_state_partition.rs"

@@ -50,6 +50,19 @@
 //!   E83 / E84 / E98 必须重跑，如实写。
 //! - 读不到 ≠ 读到 0：未登记码的判定返回 `Err`，不许退化成「0 个单元」。
 //!
+//! ## 第二次跑（墓碑记录 56 → 40 字节）的改法，跑前登记 `research/prompts/e102-r2-prereg.md`
+//!
+//! 上面的判据、失败条款与反向接受条款原样留着并列（原文写 103 / 93，单测钉的是 107 / 105，按字面各算一遍）。
+//! 第二次读法乙：墓碑记录宽取 40（D18 已定项 24 第 2 条），码 3 记录区起点取 136（含 29 字节预留位，已定项 16）。
+//!
+//! - 判据 3：钉 cap(136, 40) = 815、cap(136, 140) = 233，并算 815 / 233 各自成立的记录区起点闭区间，
+//!   两端各多 1 字节必须掉 1 格；两区间的交与 136 到两端的余量另报。h = 107 的行与 r = 56 的行留作回归与敏感性取样点。
+//! - 判据 4：N = cap(136, 40)，五元组指认不到 N − 1，类身份段 + 解析 0。
+//! - 判据 5：解析原点取 136；40 / 140 先后各 10 条错分 5（gcd 20，周期 2），40 / 41 错分 9；不混装恒 0。
+//! - 反向接受条款（改写）：若 cap(136, 40) ≠ 815 或 cap(136, 140) ≠ 233 ⇒ P8 的这一改写不成立，
+//!   用到那个容量的 E83 / E84 / E98 必须重跑，如实写。815 / 233 是 kb 登记值（`TOMBSTONE_CONTAINER_RECORDS`、`INODE_LEAF_RECORDS`），不是从容量式推出来的。
+//! - 新加失败条款 F4：宽度 / 原点旋钮不动输出（`name=positive_control` 任一行 ok=false）⇒ 那一维没进模型，整轮作废。
+//!
 //! ## 它答不了的
 //!
 //! 纯算术：不建 AAD 密码学模型（域分隔只按「编码能否相同」判，不判 MAC），不跑扫描器，
@@ -71,9 +84,28 @@ const DATA_UNIT_HEADER_BYTES: u64 = 105;
 const PACKED_BODY_BYTES: u64 = 65;
 /// D18 已定项 11 打包记录单元头（kb 里 `format-const: PACKED_UNIT_HEADER_BYTES`）；单测钉它 == 前缀 + 类身份段。
 const PACKED_UNIT_HEADER_BYTES: u64 = 107;
-/// E83 的墓碑区间记录量级假设；E98 的 inode 记录。
-const TOMBSTONE_RECORD_BYTES: u64 = 56;
+/// nonce 12 + MAC 16 + 算法类型 1 的预留位（D18 已定项 16；kb 里 `format-const: NONCE_MAC_ALGORITHM_RESERVED_BYTES`）。
+const NONCE_MAC_ALGORITHM_RESERVED_BYTES: u64 = 29;
+/// 码 3 记录区起点 = 含预留位的头末端 107 + 29（D18 已定项 16；kb 里 `format-const: PACKED_UNIT_RECORDS_OFFSET`）。
+const PACKED_UNIT_RECORDS_OFFSET: u64 = 136;
+/// 容量、指认力、解析、下游数共用的记录区原点；读法乙取 `PACKED_UNIT_RECORDS_OFFSET`（登记「读法」一节）。
+/// 装置是独立手写模型，不引 `crates/`；这个别名让「原点漏了预留位」只有一处可改。
+const PACKED_RECORDS_AREA_ORIGIN: u64 = PACKED_UNIT_RECORDS_OFFSET;
+/// 墓碑区间记录：对象 ID 8 + 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8（D18 已定项 24 第 2 条；kb 里 `format-const: TOMBSTONE_RECORD_BYTES`）。
+const TOMBSTONE_RECORD_BYTES: u64 = 40;
+/// 第一次跑的墓碑记录宽（E83 的量级假设）。只当回归与方向相反的取样点，不是格式常量。
+const FIRST_RUN_TOMBSTONE_RECORD_BYTES: u64 = 56;
+/// E98 的 inode 记录（kb 里 `format-const: INODE_RECORD_BYTES`）。
 const INODE_RECORD_BYTES: u64 = 140;
+/// kb 登记的两个下游容量，判 P8 改写用的门槛（`format-const: TOMBSTONE_CONTAINER_RECORDS`、`format-const: INODE_LEAF_RECORDS`）。
+const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;
+const INODE_LEAF_RECORDS: u64 = 233;
+/// 原反向接受条款字面写的头宽 103（判据 3 原文）。
+const ORIGINAL_CLAUSE_HEADER_BYTES: u64 = 103;
+/// 容量取样点的记录宽：现行 40、第一次 56、inode 140。
+const SAMPLED_RECORD_BYTES: [u64; 3] = [TOMBSTONE_RECORD_BYTES, FIRST_RUN_TOMBSTONE_RECORD_BYTES, INODE_RECORD_BYTES];
+/// 容量取样点的头宽：原九点 + 新八点（88 / 89 / 128 / 129 是 816 区间两端内外，128 / 129 / 168 / 169 是 815 区间两端内外，134 / 136 是码 1 / 码 3 记录区起点）。
+const SAMPLED_HEADER_BYTES: [u64; 17] = [64, 65, 76, 88, 89, DATA_UNIT_HEADER_BYTES, PACKED_UNIT_HEADER_BYTES, 120, 121, 128, 129, 134, PACKED_UNIT_RECORDS_OFFSET, 148, 149, 168, 169];
 /// 标签 1 字节。
 const TAG_VALUES: u64 = 256;
 
@@ -238,12 +270,17 @@ enum Parse {
     Corrupt,
 }
 
-/// **判据 5**：定宽解析。只认头里的三个数。
-fn parse_packed(count: u64, width: u64, declared_length: u64) -> Parse {
-    if width == 0 || count.saturating_mul(width).saturating_add(PACKED_UNIT_HEADER_BYTES) > declared_length {
+/// **判据 5**：定宽解析。只认头里的三个数；`declared_length` 从单元起点量，`records_origin` 是记录区起点。
+fn parse_packed_from_origin(count: u64, width: u64, declared_length: u64, records_origin: u64) -> Parse {
+    if width == 0 || count.saturating_mul(width).saturating_add(records_origin) > declared_length {
         return Parse::Corrupt;
     }
     Parse::Records(count)
+}
+
+/// 第二次的解析：原点取 `PACKED_RECORDS_AREA_ORIGIN`（136）。
+fn parse_packed(count: u64, width: u64, declared_length: u64) -> Parse {
+    parse_packed_from_origin(count, width, declared_length, PACKED_RECORDS_AREA_ORIGIN)
 }
 
 fn greatest_common_divisor(first_value: u64, second_value: u64) -> u64 {
@@ -261,6 +298,89 @@ fn misparsed_when_mixed(first_width: u64, first_count: u64, second_width: u64, s
     let _ = first_count; // 前段全对齐，只影响起点，不影响后段的对齐判定
     let period = first_width / greatest_common_divisor(first_width, second_width);
     (0..second_count).filter(|second_record_index| second_record_index % period != 0).count() as u64
+}
+
+/// 判据 4 的一行：装满一个容器的条数、五元组指认不到几条、类身份段 + 解析指认不到几条。
+fn identity_report(records_origin: u64, record_bytes: u64) -> (u64, u64, u64) {
+    let full_container_records = capacity(records_origin, record_bytes);
+    let parsed_records = match parse_packed_from_origin(full_container_records, record_bytes, UNIT_BYTES, records_origin) {
+        Parse::Records(parsed_count) => parsed_count,
+        Parse::Corrupt => 0,
+    };
+    (
+        full_container_records,
+        unnamed_by_five_tuple(full_container_records),
+        unnamed_by_packed_identity(full_container_records, parsed_records),
+    )
+}
+
+/// 两个闭区间的交；不相交返回 `None`（读不到 ≠ 读到空区间的两端）。
+fn joint_interval(first: (u64, u64), second: (u64, u64)) -> Option<(u64, u64)> {
+    let joint_low = first.0.max(second.0);
+    let joint_high = first.1.min(second.1);
+    (joint_low <= joint_high).then_some((joint_low, joint_high))
+}
+
+/// 点到闭区间两端的余量 (到下沿, 到上沿)；点在区间外返回 `None`。
+fn margins_inside(interval: (u64, u64), point: u64) -> Option<(u64, u64)> {
+    (interval.0 <= point && point <= interval.1).then(|| (point - interval.0, interval.1 - point))
+}
+
+/// **Q4**：P8 在 40 下的改写——记录区起点 `records_origin` 下两个下游容量都等于 kb 登记值。
+fn p8_rewrite_holds_at(records_origin: u64) -> bool {
+    capacity(records_origin, TOMBSTONE_RECORD_BYTES) == TOMBSTONE_CONTAINER_RECORDS
+        && capacity(records_origin, INODE_RECORD_BYTES) == INODE_LEAF_RECORDS
+}
+
+/// 阳性对照（登记第五节那张表）：拧一个旋钮，输出必须变成表里的数。`expected` 是登记里另算的绝对值。
+struct PositiveControl {
+    knob: &'static str,
+    observed: String,
+    expected: &'static str,
+}
+
+fn positive_controls() -> Vec<PositiveControl> {
+    let (records_at_wide_records, unnamed_by_five_tuple_at_wide_records, _) =
+        identity_report(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES);
+    let wide_interval = header_interval_for(capacity(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES), FIRST_RUN_TOMBSTONE_RECORD_BYTES);
+    let tombstone_container_records = capacity(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES);
+    vec![
+        PositiveControl {
+            knob: "record_bytes_40_to_56_at_hdr_136_capacity",
+            observed: capacity(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES).to_string(),
+            expected: "582",
+        },
+        PositiveControl {
+            knob: "hdr_just_below_interval_136_to_128_capacity_at_rec_40",
+            observed: capacity(128, TOMBSTONE_RECORD_BYTES).to_string(),
+            expected: "816",
+        },
+        PositiveControl {
+            knob: "hdr_just_above_interval_136_to_169_capacity_at_rec_40",
+            observed: capacity(169, TOMBSTONE_RECORD_BYTES).to_string(),
+            expected: "814",
+        },
+        PositiveControl {
+            knob: "record_bytes_40_to_56_interval_at_hdr_136",
+            observed: format!("{}-{}", wide_interval.0, wide_interval.1),
+            expected: "121-176",
+        },
+        PositiveControl {
+            knob: "record_bytes_40_to_56_identity_records_and_unnamed_by_five_tuple",
+            observed: format!("{records_at_wide_records}-{unnamed_by_five_tuple_at_wide_records}"),
+            expected: "582-581",
+        },
+        PositiveControl {
+            knob: "one_record_more_than_full_container_parse",
+            observed: format!("{:?}", parse_packed(tombstone_container_records + 1, TOMBSTONE_RECORD_BYTES, UNIT_BYTES)),
+            expected: "Corrupt",
+        },
+        PositiveControl {
+            knob: "mixed_first_width_40_to_41_with_140_misparsed",
+            observed: misparsed_when_mixed(41, 10, INODE_RECORD_BYTES, 10).to_string(),
+            expected: "9",
+        },
+    ]
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -315,6 +435,7 @@ fn main() {
 
     output_lines.push(emitter.emit_raw(&format!(
         "name=config unit={UNIT_BYTES} common_prefix={COMMON_PREFIX_BYTES} data_hdr={DATA_UNIT_HEADER_BYTES} packed_body={PACKED_BODY_BYTES} packed_hdr={PACKED_UNIT_HEADER_BYTES} \
+         packed_records_offset={PACKED_UNIT_RECORDS_OFFSET} reserved={NONCE_MAC_ALGORITHM_RESERVED_BYTES} \
          tomb_rec={TOMBSTONE_RECORD_BYTES} inode_rec={INODE_RECORD_BYTES} tag_values={TAG_VALUES} registry={} used_names={} \
          model=arithmetic file_ops=0",
         REGISTRY.len(),
@@ -349,13 +470,14 @@ fn main() {
     )));
 
     // 判据 3：容量与头宽区间
-    for &record_bytes in [TOMBSTONE_RECORD_BYTES, INODE_RECORD_BYTES].iter() {
-        for &header_bytes in [64u64, 65, 76, DATA_UNIT_HEADER_BYTES, PACKED_UNIT_HEADER_BYTES, 120, 121, 148, 149].iter() {
+    for &record_bytes in SAMPLED_RECORD_BYTES.iter() {
+        for &header_bytes in SAMPLED_HEADER_BYTES.iter() {
             output_lines.push(emitter.emit_raw(&format!(
                 "name=capacity rec={record_bytes} hdr={header_bytes} cap={}",
                 capacity(header_bytes, record_bytes)
             )));
         }
+        // h = 107（类身份段末尾）：第一次的行格式，敏感性取样点与逐字节回归
         let packed_header_capacity = capacity(PACKED_UNIT_HEADER_BYTES, record_bytes);
         let (lowest_header_bytes, highest_header_bytes) = header_interval_for(packed_header_capacity, record_bytes);
         output_lines.push(emitter.emit_raw(&format!(
@@ -364,17 +486,45 @@ fn main() {
             capacity(lowest_header_bytes - 1, record_bytes),
             capacity(highest_header_bytes + 1, record_bytes)
         )));
+        // h = 136（记录区起点，读法乙）：主几何
+        let records_offset_capacity = capacity(PACKED_RECORDS_AREA_ORIGIN, record_bytes);
+        let (lowest_origin_bytes, highest_origin_bytes) = header_interval_for(records_offset_capacity, record_bytes);
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=capacity_interval_at_records_offset rec={record_bytes} cap_at_records_offset={records_offset_capacity} hdr_lo={lowest_origin_bytes} hdr_hi={highest_origin_bytes} \
+             cap_at_lo_minus_1={} cap_at_hi_plus_1={}",
+            capacity(lowest_origin_bytes - 1, record_bytes),
+            capacity(highest_origin_bytes + 1, record_bytes)
+        )));
     }
 
-    // 判据 4：指认力
-    let packed_record_count = capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES);
+    // Q4：P8 在 40 下的改写（下游数）与原反向接受条款（按字面）
+    let tombstone_container_records = capacity(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES);
+    let inode_leaf_records = capacity(PACKED_RECORDS_AREA_ORIGIN, INODE_RECORD_BYTES);
+    let tombstone_interval = header_interval_for(tombstone_container_records, TOMBSTONE_RECORD_BYTES);
+    let inode_interval = header_interval_for(inode_leaf_records, INODE_RECORD_BYTES);
+    let joint_hdr_interval = joint_interval(tombstone_interval, inode_interval);
+    let joint_margins = joint_hdr_interval.and_then(|interval| margins_inside(interval, PACKED_RECORDS_AREA_ORIGIN));
+    let text_of = |value: Option<u64>| value.map_or_else(|| "NA".to_string(), |present| present.to_string());
     output_lines.push(emitter.emit_raw(&format!(
-        "name=identity records={packed_record_count} unnamed_by_five_tuple={} unnamed_by_packed_identity={}",
-        unnamed_by_five_tuple(packed_record_count),
-        unnamed_by_packed_identity(packed_record_count, match parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES) {
-            Parse::Records(parsed_count) => parsed_count,
-            Parse::Corrupt => 0,
-        })
+        "name=downstream_at_records_offset records_offset={PACKED_RECORDS_AREA_ORIGIN} tomb_rec={TOMBSTONE_RECORD_BYTES} cap_tomb={tombstone_container_records} \
+         kb_tomb={TOMBSTONE_CONTAINER_RECORDS} inode_rec={INODE_RECORD_BYTES} cap_inode={inode_leaf_records} kb_inode={INODE_LEAF_RECORDS} \
+         joint_hdr_lo={} joint_hdr_hi={} margin_to_lo={} margin_to_hi={}",
+        text_of(joint_hdr_interval.map(|interval| interval.0)),
+        text_of(joint_hdr_interval.map(|interval| interval.1)),
+        text_of(joint_margins.map(|margins| margins.0)),
+        text_of(joint_margins.map(|margins| margins.1))
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=reverse_acceptance_original literal_hdr={ORIGINAL_CLAUSE_HEADER_BYTES} cap_rec_56={} cap_rec_140={} note=literal_clause_not_the_downstream_any_more",
+        capacity(ORIGINAL_CLAUSE_HEADER_BYTES, FIRST_RUN_TOMBSTONE_RECORD_BYTES),
+        capacity(ORIGINAL_CLAUSE_HEADER_BYTES, INODE_RECORD_BYTES)
+    )));
+
+    // 判据 4：指认力
+    let (packed_record_count, unnamed_five_tuple_count, unnamed_packed_identity_count) =
+        identity_report(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES);
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=identity records={packed_record_count} unnamed_by_five_tuple={unnamed_five_tuple_count} unnamed_by_packed_identity={unnamed_packed_identity_count}"
     )));
 
     // 判据 5：解析与混装
@@ -421,6 +571,45 @@ fn main() {
         free_codes(&REGISTRY)
     )));
 
+    // 阳性对照（F4）：每个宽度 / 原点旋钮拧一下，输出必须变成登记第五节表里的数
+    let mut knobs_all_moved_output = true;
+    for positive_control in positive_controls() {
+        let knob_moved_output_as_expected = positive_control.observed == positive_control.expected;
+        knobs_all_moved_output &= knob_moved_output_as_expected;
+        output_lines.push(emitter.emit_raw(&format!(
+            "name=positive_control knob={} observed={} expected={} moved_as_expected={knob_moved_output_as_expected}",
+            positive_control.knob, positive_control.observed, positive_control.expected
+        )));
+    }
+
+    // 判决行：各量各报各的，不合成一个 true / false；字段名都按「过了为 true」写
+    let original_clause_not_triggered = capacity(ORIGINAL_CLAUSE_HEADER_BYTES, FIRST_RUN_TOMBSTONE_RECORD_BYTES) == 583
+        && capacity(ORIGINAL_CLAUSE_HEADER_BYTES, INODE_RECORD_BYTES) == 233;
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=Q4_tomb_capacity cap={tombstone_container_records} kb={TOMBSTONE_CONTAINER_RECORDS} equals_kb={}",
+        tombstone_container_records == TOMBSTONE_CONTAINER_RECORDS
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=Q4_inode_capacity cap={inode_leaf_records} kb={INODE_LEAF_RECORDS} equals_kb={}",
+        inode_leaf_records == INODE_LEAF_RECORDS
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=Q4_records_offset_inside_joint_interval records_offset={PACKED_RECORDS_AREA_ORIGIN} inside={}",
+        joint_margins.is_some()
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=original_clause_literal_103 not_triggered={original_clause_not_triggered}"
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=F4_width_and_origin_knobs all_moved_output_as_expected={knobs_all_moved_output}"
+    )));
+    output_lines.push(emitter.emit_raw(&format!(
+        "name=verdict quantity=P8_check_discriminates_h128_h136_h149 rejects_h128={} accepts_h136={} rejects_h149={}",
+        !p8_rewrite_holds_at(128),
+        p8_rewrite_holds_at(PACKED_RECORDS_AREA_ORIGIN),
+        !p8_rewrite_holds_at(149)
+    )));
+
     for line in &output_lines {
         println!("{line}");
     }
@@ -439,8 +628,29 @@ mod tests {
         assert_eq!(PACKED_UNIT_HEADER_BYTES, 107, "D18 已定项 11：42 + 65");
         assert_eq!(PACKED_UNIT_HEADER_BYTES, COMMON_PREFIX_BYTES + PACKED_BODY_BYTES, "头 = 共同前缀 + 类身份段");
         assert_eq!(AAD_PACKED_BODY, 26, "树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8");
-        assert_eq!(TOMBSTONE_RECORD_BYTES, 56, "E83 量级假设");
+        assert_eq!(TOMBSTONE_RECORD_BYTES, 40, "D18 已定项 24 第 2 条");
+        assert_eq!(TOMBSTONE_RECORD_BYTES, 8 + 8 + 8 + 8 + 8, "对象 ID + 对象出生代 + 区间起 + 区间止 + 死亡 txg");
+        assert_eq!(FIRST_RUN_TOMBSTONE_RECORD_BYTES, 56, "E83 量级假设，第一次的宽");
         assert_eq!(INODE_RECORD_BYTES, 140, "E98");
+        assert_eq!(NONCE_MAC_ALGORITHM_RESERVED_BYTES, 29, "D18 已定项 16：nonce 12 + MAC 16 + 算法类型 1");
+        assert_eq!(NONCE_MAC_ALGORITHM_RESERVED_BYTES, 12 + 16 + 1);
+        assert_eq!(PACKED_UNIT_RECORDS_OFFSET, 136, "D18 已定项 16：含预留位的码 3 头");
+        assert_eq!(
+            PACKED_UNIT_RECORDS_OFFSET,
+            PACKED_UNIT_HEADER_BYTES + NONCE_MAC_ALGORITHM_RESERVED_BYTES,
+            "记录区起点 = 类身份段末尾 + 预留位"
+        );
+        assert_eq!(PACKED_RECORDS_AREA_ORIGIN, 136, "读法乙：容量、指认力、解析、下游数的原点取记录区起点，不取 107");
+        assert_eq!(TOMBSTONE_CONTAINER_RECORDS, 815, "D18 已定项 24 第 2 条；layout 的 format-const");
+        assert_eq!(INODE_LEAF_RECORDS, 233, "D18 已定项 11 / D8 已定项 16 的 format-const");
+        // 加法写法：815 条 × 40 + 136 之后单元里还剩 32 字节
+        assert_eq!(
+            UNIT_BYTES,
+            PACKED_UNIT_RECORDS_OFFSET + TOMBSTONE_CONTAINER_RECORDS * TOMBSTONE_RECORD_BYTES + 32,
+            "815 条装完剩 32 字节，再装一条 40 字节装不下"
+        );
+        assert_eq!(UNIT_BYTES, PACKED_UNIT_RECORDS_OFFSET + INODE_LEAF_RECORDS * INODE_RECORD_BYTES + 12, "233 条装完剩 12 字节");
+        assert_eq!(ORIGINAL_CLAUSE_HEADER_BYTES, 103, "原反向接受条款字面");
     }
 
     /// **判据 1 的绝对值**：提案登记表下映不到 0、一名多码 0、未登记 0。
@@ -479,52 +689,133 @@ mod tests {
         ));
     }
 
-    /// **判据 3 的绝对值 + 反向接受条款**：107 字节头下 583 / 233 不动（93、103 时同值），区间两端各多 1 字节掉 1 格。
+    /// **判据 3 原条（第一次几何的回归，字面 56 / 140，不读墓碑宽常量）**：107 字节头下 583 / 233 不动（105、103 时同值），区间两端各多 1 字节掉 1 格。
     #[test]
-    fn criterion3_downstream_capacities_do_not_move_under_the_packed_header() {
-        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 583, "E83 / E84 的 583");
-        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 583);
-        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), 233, "E98 的 233");
-        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, INODE_RECORD_BYTES), 233);
+    fn criterion3_first_run_geometry_rec_56_still_gives_583_and_233_under_hdr_107() {
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, 56), 583, "E83 / E84 的 583");
+        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, 56), 583);
+        assert_eq!(capacity(ORIGINAL_CLAUSE_HEADER_BYTES, 56), 583, "原反向接受条款字面 cap(103, 56)");
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, 140), 233, "E98 的 233");
+        assert_eq!(capacity(DATA_UNIT_HEADER_BYTES, 140), 233);
+        assert_eq!(capacity(ORIGINAL_CLAUSE_HEADER_BYTES, 140), 233, "原反向接受条款字面 cap(103, 140)");
         // 583 成立的头宽闭区间 [65, 120]
-        assert_eq!(header_interval_for(583, TOMBSTONE_RECORD_BYTES), (65, 120));
-        assert_eq!(capacity(64, TOMBSTONE_RECORD_BYTES), 584);
-        assert_eq!(capacity(121, TOMBSTONE_RECORD_BYTES), 582);
+        assert_eq!(header_interval_for(583, 56), (65, 120));
+        assert_eq!(capacity(64, 56), 584);
+        assert_eq!(capacity(121, 56), 582);
         // 233 成立的头宽闭区间 [9, 148]
-        assert_eq!(header_interval_for(233, INODE_RECORD_BYTES), (9, 148));
-        assert_eq!(capacity(8, INODE_RECORD_BYTES), 234);
-        assert_eq!(capacity(149, INODE_RECORD_BYTES), 232);
+        assert_eq!(header_interval_for(233, 140), (9, 148));
+        assert_eq!(capacity(8, 140), 234);
+        assert_eq!(capacity(149, 140), 232);
     }
 
-    /// **判据 4 的绝对值**：五元组指认不到 582 条；打包类身份段 + 解析恰 0。
+    /// **判据 3 第二次（读法乙）的绝对值**：整张取样表逐格钉死，数来自登记第七节 B 类（`anchors.py` 另算），不由 `capacity` 推出。
+    #[test]
+    fn criterion3_capacity_table_equals_the_independently_computed_registration_table() {
+        let sampled_headers: [u64; 17] = [64, 65, 76, 88, 89, 105, 107, 120, 121, 128, 129, 134, 136, 148, 149, 168, 169];
+        assert_eq!(SAMPLED_HEADER_BYTES, sampled_headers, "取样头宽与登记 Q2 一致");
+        assert_eq!(SAMPLED_RECORD_BYTES, [40, 56, 140]);
+        let expected_by_record_bytes: [[u64; 17]; 3] = [
+            [817, 817, 817, 817, 816, 816, 816, 816, 816, 816, 815, 815, 815, 815, 815, 815, 814],
+            [584, 583, 583, 583, 583, 583, 583, 583, 582, 582, 582, 582, 582, 582, 582, 582, 582],
+            [233, 233, 233, 233, 233, 233, 233, 233, 233, 233, 233, 233, 233, 233, 232, 232, 232],
+        ];
+        for (record_index, &record_bytes) in SAMPLED_RECORD_BYTES.iter().enumerate() {
+            for (header_index, &header_bytes) in SAMPLED_HEADER_BYTES.iter().enumerate() {
+                assert_eq!(
+                    capacity(header_bytes, record_bytes),
+                    expected_by_record_bytes[record_index][header_index],
+                    "cap({header_bytes}, {record_bytes})"
+                );
+            }
+        }
+    }
+
+    /// **判据 3 第二次**：815 / 233 成立的记录区起点闭区间，两端各多 1 字节掉 1 格；h = 107 的敏感性取样点与 r = 56 的方向相反点。
+    #[test]
+    fn criterion3_intervals_edges_drop_one_cell_and_136_sits_inside_the_joint_interval() {
+        assert_eq!(header_interval_for(815, 40), (129, 168), "815 条成立的记录区起点区间");
+        assert_eq!((capacity(128, 40), capacity(169, 40)), (816, 814), "区间两端外各掉 1 格");
+        assert_eq!(header_interval_for(233, 140), (9, 148));
+        assert_eq!((capacity(8, 140), capacity(149, 140)), (234, 232));
+        assert_eq!(header_interval_for(816, 40), (89, 128), "只换宽不换头：h = 107 的 816 区间");
+        assert_eq!((capacity(88, 40), capacity(129, 40)), (817, 815));
+        assert_eq!(header_interval_for(582, 56), (121, 176), "方向相反的点：r = 56 在 h = 136 的区间");
+        assert_eq!((capacity(120, 56), capacity(177, 56)), (583, 581));
+        // 两区间的交与 136 到两端的余量
+        assert_eq!(joint_interval((129, 168), (9, 148)), Some((129, 148)));
+        assert_eq!(joint_interval((89, 128), (9, 148)), Some((89, 128)));
+        assert_eq!(joint_interval((129, 168), (200, 300)), None, "不相交时读不到交，不当成空区间的两端");
+        assert_eq!(margins_inside((129, 148), PACKED_RECORDS_AREA_ORIGIN), Some((7, 12)));
+        assert_eq!(margins_inside((129, 148), 128), None);
+        assert_eq!(margins_inside((129, 148), 149), None);
+        assert_eq!(129 + 7, 136);
+        assert_eq!(136 + 12, 148);
+    }
+
+    /// **Q4 与反向接受条款**：读法乙下两个下游容量等于 kb 登记值；判别力自证——挪到区间外检查必须由绿转红。
+    #[test]
+    fn criterion3_downstream_capacities_at_records_offset_equal_the_kb_values_and_the_check_discriminates() {
+        assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES), 815, "TOMBSTONE_CONTAINER_RECORDS");
+        assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, INODE_RECORD_BYTES), 233, "INODE_LEAF_RECORDS");
+        assert_eq!(capacity(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES), 582, "按 56 与 136 的容量，已定项 11");
+        assert_eq!(capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES), 816, "只换宽不换头：h = 107 下 40 字节的容量");
+        assert!(!p8_rewrite_holds_at(128), "128 在 815 区间外：检查必须红");
+        assert!(p8_rewrite_holds_at(136));
+        assert!(!p8_rewrite_holds_at(149), "149 在 233 区间外：检查必须红");
+        assert!(!p8_rewrite_holds_at(PACKED_UNIT_HEADER_BYTES), "h = 107 下 816 ≠ 815");
+    }
+
+    /// **判据 4 的绝对值**：装满一个墓碑容器 815 条，五元组指认不到 814 条；打包类身份段 + 解析恰 0。
     #[test]
     fn criterion4_five_tuple_names_one_object_packed_identity_names_all() {
-        let packed_record_count = capacity(PACKED_UNIT_HEADER_BYTES, TOMBSTONE_RECORD_BYTES);
-        assert_eq!(unnamed_by_five_tuple(packed_record_count), 582);
+        assert_eq!(identity_report(PACKED_RECORDS_AREA_ORIGIN, TOMBSTONE_RECORD_BYTES), (815, 814, 0));
+        assert_eq!(identity_report(PACKED_RECORDS_AREA_ORIGIN, FIRST_RUN_TOMBSTONE_RECORD_BYTES), (582, 581, 0), "r = 56 的方向相反点");
+        assert_eq!(identity_report(PACKED_UNIT_HEADER_BYTES, FIRST_RUN_TOMBSTONE_RECORD_BYTES), (583, 582, 0), "第一次几何的回归：原点 107、宽 56");
         assert_eq!(unnamed_by_five_tuple(1), 0, "装 1 条时五元组刚好够——已定项 8 原话成立的唯一情形");
-        let parsed = match parse_packed(packed_record_count, TOMBSTONE_RECORD_BYTES, UNIT_BYTES) {
-            Parse::Records(parsed_count) => parsed_count,
-            Parse::Corrupt => 0,
-        };
-        assert_eq!(unnamed_by_packed_identity(packed_record_count, parsed), 0);
     }
 
     /// **判据 5 的绝对值 + 阳性 / 阴性对照**：多一条即损坏；混装错分 5；不混装 0。
     #[test]
     fn criterion5_fixed_width_parsing_rejects_overflow_and_counts_mixing_errors() {
-        assert_eq!(parse_packed(583, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Records(583));
-        assert_eq!(parse_packed(584, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Corrupt, "584 × 56 + 107 = 32811 > 32768");
+        // 第二次（读法乙）：原点 136，宽 40
+        assert_eq!(parse_packed(815, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Records(815));
+        assert_eq!(parse_packed(816, TOMBSTONE_RECORD_BYTES, UNIT_BYTES), Parse::Corrupt, "816 × 40 + 136 = 32776 > 32768");
+        assert_eq!(815 * 40 + PACKED_UNIT_RECORDS_OFFSET + 32, UNIT_BYTES, "815 条恰好差 32 字节装满");
         assert_eq!(parse_packed(1, 0, UNIT_BYTES), Parse::Corrupt, "宽 0 不是记录");
-        // 声明长度可以小于单元：声明 1000 时最多 (1000 − 107) / 56 = 15 条
-        assert_eq!(parse_packed(15, TOMBSTONE_RECORD_BYTES, 1000), Parse::Records(15));
-        assert_eq!(parse_packed(16, TOMBSTONE_RECORD_BYTES, 1000), Parse::Corrupt);
-        // 阳性对照：56 / 140 混装各 10 条，period = 56 / gcd(56,140) = 56 / 28 = 2 ⇒ 错分 5
+        // 声明长度可以小于单元：声明 1000 时最多 (1000 − 136) / 40 = 21 条
+        assert_eq!(parse_packed(21, TOMBSTONE_RECORD_BYTES, 1000), Parse::Records(21));
+        assert_eq!(parse_packed(22, TOMBSTONE_RECORD_BYTES, 1000), Parse::Corrupt);
+        // 敏感性取样点：原点 107、宽 40 时 816 收 817 坏，声明 1000 时 22 收 23 坏
+        assert_eq!(parse_packed_from_origin(816, 40, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES), Parse::Records(816));
+        assert_eq!(parse_packed_from_origin(817, 40, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES), Parse::Corrupt, "817 × 40 + 107 = 32787 > 32768");
+        assert_eq!(parse_packed_from_origin(22, 40, 1000, PACKED_UNIT_HEADER_BYTES), Parse::Records(22));
+        assert_eq!(parse_packed_from_origin(23, 40, 1000, PACKED_UNIT_HEADER_BYTES), Parse::Corrupt);
+        // 第一次几何的回归（字面 56，原点 107）：583 收、584 坏，声明 1000 时 15 收 16 坏
+        assert_eq!(parse_packed_from_origin(583, 56, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES), Parse::Records(583));
+        assert_eq!(parse_packed_from_origin(584, 56, UNIT_BYTES, PACKED_UNIT_HEADER_BYTES), Parse::Corrupt, "584 × 56 + 107 = 32811 > 32768");
+        assert_eq!(parse_packed_from_origin(15, 56, 1000, PACKED_UNIT_HEADER_BYTES), Parse::Records(15));
+        assert_eq!(parse_packed_from_origin(16, 56, 1000, PACKED_UNIT_HEADER_BYTES), Parse::Corrupt);
+        // 阳性对照：40 / 140 混装各 10 条，period = 40 / gcd(40,140) = 40 / 20 = 2 ⇒ 错分 5
         assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, INODE_RECORD_BYTES, 10), 5);
-        // 互素宽度全错：56 与 57，period 56 ⇒ 10 条里只有 i=0 对齐 ⇒ 错 9
+        // 互素宽度：40 与 41，period 40 ⇒ 10 条里只有 i=0 对齐 ⇒ 错 9；48 与 140 gcd 4，period 12 ⇒ 错 9
+        assert_eq!(misparsed_when_mixed(40, 10, 41, 10), 9, "5 不是这条式子在任何宽度下的常数");
+        assert_eq!(misparsed_when_mixed(48, 10, 140, 10), 9);
+        // 第一次几何的回归（字面 56）：56 / 140 错分 5，56 / 57 错 9
+        assert_eq!(misparsed_when_mixed(56, 10, 140, 10), 5);
         assert_eq!(misparsed_when_mixed(56, 10, 57, 10), 9);
         // 阴性对照：不混装恒 0
         assert_eq!(misparsed_when_mixed(TOMBSTONE_RECORD_BYTES, 10, TOMBSTONE_RECORD_BYTES, 10), 0);
         assert_eq!(misparsed_when_mixed(INODE_RECORD_BYTES, 3, INODE_RECORD_BYTES, 300), 0);
+    }
+
+    /// **F4 阳性对照表**：每个宽度 / 原点旋钮拧一下，输出就是登记第五节表里的数，七行都过。
+    #[test]
+    fn positive_controls_move_the_output_to_the_registered_values() {
+        let controls = positive_controls();
+        assert_eq!(controls.len(), 7);
+        for control in &controls {
+            assert_eq!(control.observed, control.expected, "旋钮 {}", control.knob);
+        }
     }
 
     /// **判据 6 的绝对值**：incompat 静默漏 0 且拒挂；跳过政策静默漏恰 k；未登记记录类型可验不可用。
