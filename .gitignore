@@ -26,3 +26,6 @@ __pycache__/
 
 # 打了 blklogwrites 补丁的 QEMU 装在哪（research/scripts/vm-bench.sh 读），本机路径，模板在仓根 qemu.env.example
 /qemu.env
+
+# E168 第一段产物：115 MB 超过 GitHub 单文件 100 MB 限制，不入库；本地文件保留
+/research/results/e168-delete-ring-window-borrow-segment1-2026-10-03.out
