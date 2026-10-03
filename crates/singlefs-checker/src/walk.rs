@@ -8,10 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, ALLOCATION_RECORD_BYTES, ALLOCATION_RECORD_TREE_INTERNAL_ENTRY_BYTES,
-    DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES, EXTENT_TREE_INTERNAL_ENTRY_BYTES,
-    EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES, INODE_INTERNAL_ENTRY, JOURNAL_RECORD_BYTES,
-    MAPPING_ENTRY_BYTES, NODE_BYTES, NODE_POINTER_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES,
-    SLOT_BYTES, TREE_TABLE_ENTRY_BYTES,
+    CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES, EXTENT_LEAF_RECORD_BYTES,
+    EXTENT_TREE_INTERNAL_ENTRY_BYTES, EXTENT_TREE_UPPER_LEAF_ENTRY_BYTES, INODE_INTERNAL_ENTRY,
+    JOURNAL_RECORD_BYTES, JOURNAL_SAFETY_FACTOR, MAPPING_ENTRY_BYTES, NODE_BYTES,
+    NODE_POINTER_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, SLOT_BYTES,
+    TREE_IDENTIFIER_WATERMARK_AT_MKFS, TREE_TABLE_ENTRY_BYTES,
 };
 
 use crate::position_addressed::{
@@ -24,20 +25,37 @@ use crate::position_addressed::{
 };
 
 use crate::image::{
-    chosen_system_configurations, judge_location_entries_order, judge_location_order,
-    judge_own_device_number_is_the_device_identity, judge_pointer_mac_and_nonce_are_zero,
+    chosen_system_configurations, decision_width_declared_by_the_chosen_system_configurations,
+    judge_journal_ring_geometry_fields_agree, judge_location_entries_order, judge_location_order,
+    judge_own_device_number_is_the_device_identity, judge_pointer_extent_offset_is_zero,
+    judge_pointer_mac_and_nonce_are_zero, judge_root_records_live_in_the_slot_their_txg_names,
+    judge_root_slots_aligned_to_the_decision_width,
+    judge_some_device_carries_a_self_verified_system_configuration,
+    judge_system_configuration_slot_generations_follow_the_rotation,
     judge_system_configuration_values_the_reader_accepts, parse_data_pointer, parse_node_pointer,
     read_referenced_unit, root_slot_positions, system_configuration_slot_readings, valid_roots,
     verified_system_configuration_slots, ImageReader, InvariantVerdict, Judgements,
-    PointerLocation, PointerView, PoolGeometry, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    PointerLocation, PointerView, PoolGeometry,
+    ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
+    DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
+    FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+    HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES,
+    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
+    INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
+    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
+    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
+    PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, REFERENCE_INTERVALS_ARE_EXACT,
+    TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+    UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
 };
 use crate::{
     back_chain_of_record_header, check_index_node_keys, check_internal_node_separators,
     check_journal_record, check_unit, checksum_field_holds, crc32_castagnoli_table,
     index_node_view, key_schema_for_tree_kind, packed_unit_view, read_six_byte_unsigned, read_u16,
-    read_u32, read_u64, Verdict, FORMAT_VERSION_OFFSET, KEY_SCHEMA_ACCOUNTING,
-    KEY_SCHEMA_ALLOCATION, KEY_SCHEMA_EXTENT, KEY_SCHEMA_INODE, KEY_SCHEMA_MAPPING,
-    KEY_SCHEMA_TREE_TABLE, UNIT_FORMAT_VERSION_THIS_CHECKER_READS,
+    read_u32, read_u64, NamedEntryView, Verdict, FORMAT_VERSION_OFFSET, KEY_SCHEMA_ACCOUNTING,
+    KEY_SCHEMA_ALLOCATION, KEY_SCHEMA_CONTAINER_NUMBER, KEY_SCHEMA_EXTENT, KEY_SCHEMA_INODE,
+    KEY_SCHEMA_MAPPING, KEY_SCHEMA_TREE_TABLE, UNIT_FORMAT_VERSION_THIS_CHECKER_READS,
 };
 
 const TREE_KIND_EXTENT: u16 = 1;
@@ -47,9 +65,16 @@ const TREE_KIND_ACCOUNTING: u16 = 4;
 const TREE_KIND_LIVELIST: u16 = 6;
 const TREE_KIND_SPARSE_SIDE_TABLE: u16 = 7;
 const TREE_KIND_DEADLIST: u16 = 8;
-/// 七棵进树表的树的种类，按发号次序（D8（核心索引结构） 已定项 8 ②「八棵树的号从水位起连号发，次序照格式常量 11..18 那一组」：
-/// extent、inode、分配记录、记账、中央映射、livelist、稀疏旁表、deadlist；中央映射树不进树表，这里没有它）。
-const TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER: [u16; 7] = [
+/// 第一个文件版本那次零根注册的四棵树（D8（核心索引结构） 已定项 16 第 3 条、D18（块里携带什么信息） 已定项 24 第 1 / 5 / 6 条）的种类码，
+/// 是 D8（核心索引结构） 已定项 9 登记表的码 9..12（只追加不重用码，接在 8 之后），checker 按自己读的条款另写一份。
+const TREE_KIND_DELETED_INODES: u16 = 9;
+const TREE_KIND_TOMBSTONE: u16 = 10;
+const TREE_KIND_LINEAGE: u16 = 11;
+const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
+/// 十一棵进树表的树的种类，按发号次序（D8（核心索引结构） 已定项 8 ②「十二棵树的号从水位起连号发，次序照已定项 11 那一组 65536..65547」：
+/// extent、inode、分配记录、记账、中央映射、livelist、稀疏旁表、deadlist，再接 D18（块里携带什么信息） 已定项 24 第 6 条列的
+/// `deleted_inodes`、墓碑树、谱系树、logged_ops；中央映射树不进树表，这里没有它）。
+const TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER: [u16; 11] = [
     TREE_KIND_EXTENT,
     TREE_KIND_INODE,
     TREE_KIND_ALLOCATION,
@@ -57,8 +82,17 @@ const TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER: [u16; 7] = [
     TREE_KIND_LIVELIST,
     TREE_KIND_SPARSE_SIDE_TABLE,
     TREE_KIND_DEADLIST,
+    TREE_KIND_DELETED_INODES,
+    TREE_KIND_TOMBSTONE,
+    TREE_KIND_LINEAGE,
+    TREE_KIND_LOGGED_OPERATIONS,
 ];
+const PACKED_TYPE_TOMBSTONE: u16 = 1;
 const PACKED_TYPE_INODE: u16 = 2;
+/// 谱系记录的打包记录类型（D18（块里携带什么信息） 已定项 24 第 5 条，不复用登记过的 3）。
+const PACKED_TYPE_LINEAGE: u16 = 5;
+/// `deleted_inodes` 根的条目：key = inode 号 8 字节、无 value（D8（核心索引结构） 已定项 16）。
+const DELETED_INODES_ENTRY_BYTES: usize = 8;
 const PACKED_TYPE_INSTANCE_TABLE: u16 = 4;
 /// inode 树内部条目的类型段 0：子单元是码 2 的 inode 树内部节点（I-9.2（条目身份与子头相符）「类型段 ∈ {0, 2}」）。
 const INODE_ENTRY_TYPE_INTERNAL_NODE: u16 = 0;
@@ -105,6 +139,9 @@ const fn registered_record_width(record_type: u16) -> Option<usize> {
     match record_type {
         PACKED_TYPE_INODE => Some(140),
         PACKED_TYPE_INSTANCE_TABLE => Some(88),
+        // 墓碑记录 40、谱系记录 16（D18（块里携带什么信息） 已定项 24 第 2、5 条）。
+        PACKED_TYPE_TOMBSTONE => Some(40),
+        PACKED_TYPE_LINEAGE => Some(16),
         _ => None,
     }
 }
@@ -118,6 +155,15 @@ const STATISTIC_INODE_WATERMARK: u16 = 12;
 const STATISTIC_NO_DEVICE_DIMENSION: u32 = 0xFFFF_FFFF;
 /// inode 记录 140 里 `size` 与 `blocks` 两个字段的偏移（D8（核心索引结构） 已定项 6 的偏移表），按字段表另写一份、不用实现的解析。
 const INODE_RECORD_SIZE_OFFSET: usize = 40;
+/// inode 记录里对象出生代（偏移 8）与改动计数（偏移 88）的位置（D8（核心索引结构） 已定项 6 的字段表）：I-9.26 比这两个与容器诞生代号。
+const INODE_RECORD_OBJECT_BIRTH_OFFSET: usize = 8;
+const INODE_RECORD_CHANGE_COUNT_OFFSET: usize = 88;
+/// 码 3 单元头里的诞生代号（D18（块里携带什么信息） 已定项 11 的类身份段表：偏移 73）。
+const PACKED_UNIT_BIRTH_TXG_OFFSET: usize = 73;
+/// 记账 key（统计量 2 + 8 + 设备 4 + 代 8，`KEY_SCHEMA_ACCOUNTING`）里代段的偏移：I-3.13 拿它比这一版的 txg。
+const ACCOUNTING_KEY_GENERATION_OFFSET: usize = 2 + 8 + 4;
+/// 树表条目里 `previous_snapshot_txg` 的偏移（树 ID 8 + 种类 2 + 2 + 2 + 根指针 86；之后 8 字节是出生 txg），I-9.25 判它。
+const TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86;
 const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
 /// `blocks` 的计量单位：512 字节一块，`blocks` = ⌈`size` ÷ 512⌉，是逻辑长度的块数、不表示分到的空间（D8（核心索引结构） 已定项 6，
 /// C480（inode 记录的 blocks 怎么算全仓没有条款） 用户 2026-09-23 定）。
@@ -144,8 +190,8 @@ fn inode_internal_entry_bytes() -> usize {
 fn accounting_entry_bytes() -> usize {
     usize::try_from(ACCOUNTING_ENTRY_BYTES).expect("34")
 }
-/// 中央映射条目今天走读要几个字节：key 27 + 位置条目 14 × 2。**不是「该有多宽」**（那归 C307），
-/// 只是「切到偏移 55 之前得有 55 个字节」。
+/// 中央映射条目今天走读要几个字节：key 27 + 位置条目 14 × 2。条目一律 55 已由 D19（块指针的结构与宽度预算） 已定项 10 定，
+/// 但这里**不判条目宽是不是正好 55**（把映射树接进 I-1.10 还欠在 C307），只是「切到偏移 55 之前得有 55 个字节」。
 fn mapping_entry_bytes() -> usize {
     usize::try_from(MAPPING_ENTRY_BYTES).expect("55")
 }
@@ -153,8 +199,9 @@ fn mapping_entry_bytes() -> usize {
 /// 条目宽是索引节点头里的一个**盘上字段**，`index_node_view` 只判了它 ≥ key 宽
 /// （extent 24、inode 8、分配记录 10、记账 22），够不着「装得下整条记录」。
 ///
-/// ⚠️ **中央映射树（种类 5）不在这张表里**：它的条目宽归 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树），
-/// 那条还开着，所以 I-1.10（码 2 条目宽等于字段表宽） 明写不判它。`key_schema_for_tree_kind` 罩 5 个种类、这里只罩 4 个，
+/// ⚠️ **中央映射树（种类 5）不在这张表里**：它的条目宽 D19（块指针的结构与宽度预算） 已定项 10 已定一律 55，
+/// 但把种类 5 接进这张表、让 I-1.10（码 2 条目宽等于字段表宽） 也判它，还欠在 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树），
+/// 所以今天 I-1.10 不判它。`key_schema_for_tree_kind` 罩 5 个种类、这里只罩 4 个，
 /// 两张表的差就是那一棵。
 fn field_table_width_of_tree_kind(kind: u16) -> Option<usize> {
     match kind {
@@ -162,6 +209,9 @@ fn field_table_width_of_tree_kind(kind: u16) -> Option<usize> {
         TREE_KIND_INODE => Some(inode_internal_entry_bytes()),
         TREE_KIND_ALLOCATION => Some(allocation_record_bytes()),
         TREE_KIND_ACCOUNTING => Some(accounting_entry_bytes()),
+        TREE_KIND_DELETED_INODES => Some(DELETED_INODES_ENTRY_BYTES),
+        // 墓碑树、谱系树的根条目照 inode 树内部节点的 120 字节形态（D18（块里携带什么信息） 已定项 24 第 1、5 条）。
+        TREE_KIND_TOMBSTONE | TREE_KIND_LINEAGE => Some(inode_internal_entry_bytes()),
         _ => None,
     }
 }
@@ -177,6 +227,9 @@ enum KeyRangeReading {
     /// 按位置寻址的两棵树（分配记录树、extent 树，D8（核心索引结构） 已定项 14）：每个节点的区间是它的位置规定罩的那一段
     /// （D18（块里携带什么信息） 已定项 2 对按位置寻址的树那一句），不贴紧首末条目，由走读那一方按位置判；读节点这一步只判条目 key 严格递增、节点不空。
     PrescribedByThePositionJudgedByTheCaller,
+    /// 同上，读的是 extent 树上段的根：层级 0 的根兼叶可以一条条目都没有（第一个文件删完之后的零条目根，D8（核心索引结构） 已定项 16 第 5 条），
+    /// 别的节点照旧不许空。
+    PrescribedByThePositionOfTheExtentUpperRootJudgedByTheCaller,
 }
 
 /// 多层码 2 树一个节点的条目宽在走读里怎么对待。
@@ -184,7 +237,7 @@ enum KeyRangeReading {
 enum EntryWidthInTheWalk {
     /// 按 I-1.10（码 2 条目宽等于字段表宽） 判：记账树叶 34、内部节点 108。
     JudgedAsInvariantOneTen { field_table_bytes: usize },
-    /// 只守走读按固定偏移切要几个字节，不判「该有多宽」：中央映射树（C307 还开着，I-1.10 不罩它）。
+    /// 只守走读按固定偏移切要几个字节，不判「该有多宽」：中央映射树（条目宽已定 55，见 D19（块指针的结构与宽度预算） 已定项 10；I-1.10 还不罩它，接进射程欠在 C307）。
     GuardedForTheWalkOnly { bytes_the_walk_needs: usize },
 }
 
@@ -207,7 +260,7 @@ impl EntryWidthInTheWalk {
 enum EntryFieldTableRegistration {
     /// extent、inode、分配记录、记账四棵：条目宽 0 而条目数非 0 报 I-1.10——宽 0 不是任何登记宽（实审 A3-checker-2，主 agent 定）。
     Registered,
-    /// 树表与中央映射树：I-1.10 那一行明写不罩（映射树的条目宽归 C307，树表条目宽两边都没写、账在 C476），
+    /// 树表与中央映射树：I-1.10 那一行明写不罩（映射树的条目宽已定 55、接进 I-1.10 欠在 C307，树表条目宽两边都没写、账在 C476），
     /// 条目宽 0 而条目数非 0 只记走读失败、不报违例。
     NotRegistered,
 }
@@ -300,6 +353,278 @@ struct Walk<'reader> {
     mount_root_checkpoint_txg: u64,
     /// 遍历方向上判过出生身份的被引用单元数：一个都没有时 I-1.2 与 I-4.2 报「不适用」，不报成立。
     referenced_units_judged_against_their_pointer: u64,
+    /// 正在走的是哪一版、它的 `checkpoint_txg`：I-9.25 与 I-3.13 按这一版的 txg 判，I-4.9 只在不是最新的候选根上判。
+    version_being_walked: VersionBeingWalked,
+    /// 走过的被引用单元（按位置条目第 0 条的落点认，与 `visited_units` 同一个键）→ 头里的诞生代号：别的版本再引用它时不重读，
+    /// I-4.9（非最新候选根引用的单元不晚于它） 照这张表判。
+    birth_txg_of_walked_units: BTreeMap<(u32, u64), u64>,
+    /// I-4.9 在不是最新的候选根上判过几个被引用单元：一个都没有（候选集只剩最新那条根）时整条报不适用。
+    units_judged_against_an_older_candidate_root: u64,
+    /// 跟着指针记下的每个落点 (设备, 槽) → 它是哪个单元（那条指针第 0 条位置条目的落点，与 `visited_units`、`birth_txg_of_walked_units`
+    /// 同一个键）：I-3.5 比相邻两版引用了哪些单元时，两份副本的落点折成一个单元。
+    unit_of_each_placement: BTreeMap<(u32, u64), (u32, u64)>,
+    /// 跟着指针记下的落点里，记的那一刻走读正在一棵用户可见树（extent、inode、`deleted_inodes`）里往下走的那些 → 那棵树
+    /// （I-3.5 (b) 认「落在 R 树表里某棵用户可见树的子树里」按它）。别的版本共享这棵子树时不重走，照这张表接上。
+    user_visible_tree_of_each_placement: BTreeMap<(u32, u64), UserVisibleTreeOfTheWalk>,
+    /// 走读此刻在哪棵用户可见树里往下走；不在任何一棵里是 `None`。
+    user_visible_tree_being_walked: Option<UserVisibleTreeOfTheWalk>,
+    /// 正在走的这一版树表里每棵根指针非全零的用户可见树，带根指针的出生 txg（I-3.5 (b) 拿它比 R⁻.txg）。
+    user_visible_tree_roots_of_this_version: Vec<UserVisibleTreeRootOfAVersion>,
+    /// 走过的树表单元 (设备, 槽) → 它每一条条目里 I-9.25 与 I-3.5 读的几样：别的版本共享这片树表时照这份判，不重读盘。
+    tree_table_entries_of_a_walked_tree_table: BTreeMap<(u32, u64), Vec<TreeTableEntryOfTheWalk>>,
+    /// 走过的实例表各片（按第 0 条位置条目的落点）→ 头里的诞生代号：I-3.5 要它。不进 `birth_txg_of_walked_units`——
+    /// 那张表 I-4.9 也读，而实例表单元按 I-1.2 那一行的例外不进 I-4.9。
+    birth_txg_of_walked_instance_table_pages: BTreeMap<(u32, u64), u64>,
+    /// 已经走完的每一版（根环里的候选根与由记录施加出来的那几版）：I-3.5 在全部走完之后逐对比。
+    versions_walked_for_the_appearance_rule: Vec<VersionReferencesForTheAppearanceRule>,
+}
+
+/// 用户可见树的种类码：回退取回退目标那一版的几棵（extent、inode、`deleted_inodes`，`crates/singlefs-core/src/mount.rs`
+/// 的 `version_to_publish_the_rollback_after`；D23（journal 的角色与格式） 已定项 14）。I-3.5 (b) 只认这几棵里的单元。
+const USER_VISIBLE_TREE_KINDS: [u16; 3] =
+    [TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_DELETED_INODES];
+
+/// 一棵用户可见树：种类与树 ID。I-3.5 按它给落点打标签。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct UserVisibleTreeOfTheWalk {
+    kind: u16,
+    tree: u64,
+}
+
+/// 一版树表里一棵根指针非全零的用户可见树，带根指针头里的出生 txg。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct UserVisibleTreeRootOfAVersion {
+    tree: UserVisibleTreeOfTheWalk,
+    root_pointer_birth_txg: u64,
+}
+
+/// 树表的一条条目里 I-9.25 与 I-3.5 读的几样（D8（核心索引结构） 已定项 8 的字段表：树 ID 0、种类 10、根指针 14..100、
+/// `previous_snapshot_txg` 100）。走读第一次读到这片树表时记下。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct TreeTableEntryOfTheWalk {
+    tree: u64,
+    kind: u16,
+    previous_snapshot_txg: u64,
+    /// 种类是用户可见树、根指针非全零时是那棵树的根；别的条目 `None`。
+    user_visible_root: Option<UserVisibleTreeRootOfAVersion>,
+}
+
+/// 一条树表条目按字段表切出来的几样；条目比字段表窄（走读守卫那一格，`walk_tree_table_entry` 记走读失败）时 `None`。
+fn tree_table_entry_of_the_walk(entry: &[u8]) -> Option<TreeTableEntryOfTheWalk> {
+    if entry.len() < tree_table_entry_bytes() {
+        return None;
+    }
+    let tree = read_u64(entry, 0);
+    let kind = read_u16(entry, 10);
+    let root_pointer = parse_node_pointer(&entry[14..100]);
+    let user_visible_root = (USER_VISIBLE_TREE_KINDS.contains(&kind) && !root_pointer.all_zero)
+        .then_some(UserVisibleTreeRootOfAVersion {
+            tree: UserVisibleTreeOfTheWalk { kind, tree },
+            root_pointer_birth_txg: root_pointer.birth_txg,
+        });
+    Some(TreeTableEntryOfTheWalk {
+        tree,
+        kind,
+        previous_snapshot_txg: read_u64(entry, TREE_TABLE_ENTRY_PREVIOUS_SNAPSHOT_TXG_OFFSET),
+        user_visible_root,
+    })
+}
+
+/// 走完的一版在 I-3.5 眼里的样子：它是哪一版、引用了哪些单元（各落在哪棵用户可见树里）、树表里几棵用户可见树的根、走读断没断。
+struct VersionReferencesForTheAppearanceRule {
+    instance: u32,
+    checkpoint_txg: u64,
+    /// 这一版引用的单元（落点折成第 0 条位置条目的落点）→ 它落在哪棵用户可见树里（不在任何一棵里是 `None`）。
+    units: BTreeMap<(u32, u64), Option<UserVisibleTreeOfTheWalk>>,
+    user_visible_tree_roots: Vec<UserVisibleTreeRootOfAVersion>,
+    /// 这一版走读一条走读失败都没记：记了就是引用集合数不全，它参与的每一对报不适用。
+    references_are_complete: bool,
+}
+
+/// 回退候选集里相邻两版之间有没有洞（I-3.5 的缺口条款；I-3.1 在短环上洞里的误红归下一批调查，那一处要接同一份判法，
+/// `research/prompts/m3-birth-floor-r3-main-verification.md` 第二节第 5 行）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HoleInTheCandidateSet {
+    /// R.txg = R⁻.txg + 1。
+    NoHole,
+    /// 有洞，但最新根的实例表行证明 R 所在的实例直接接在 R⁻ 那一版上（gap-row）：这一对照常判。
+    HoleBridgedByTheInstanceTableRows,
+    /// 有洞、实例表行接不上：用户可见树子树里的单元不判（N3），别的照 (a) 判。
+    HoleNotBridgedByTheInstanceTableRows,
+}
+
+/// 相邻两版 (R⁻, R) 之间的洞：R⁻ 那一侧是同 txg 并成的一条（几个实例都算 R⁻ 的实例）。接得上 ⟺ 对 R⁻ 的某个实例 i：
+/// 最新根的实例表里有一行 (i, T = R⁻.txg)，R 的实例 v > i，且 i 与 v 之间的每个实例 j 都有一行、都是 (j, 0, 0)。
+/// 迭代上界是实例表的行数（不按实例代号逐个数，代号是盘上读来的 4 字节）。
+fn hole_in_the_candidate_set_between(
+    previous_txg: u64,
+    previous_instances: &BTreeSet<u32>,
+    version_txg: u64,
+    version_instance: u32,
+    instance_table_rows_of_the_newest_root: &[InstanceTableRow],
+) -> HoleInTheCandidateSet {
+    if previous_txg.checked_add(1) == Some(version_txg) {
+        return HoleInTheCandidateSet::NoHole;
+    }
+    let bridged_from = |previous_instance: u32| {
+        if version_instance <= previous_instance {
+            return false;
+        }
+        let row_of_the_previous_version =
+            instance_table_rows_of_the_newest_root.iter().any(|row| {
+                row.instance == previous_instance && row.published_checkpoint_txg == previous_txg
+            });
+        let rows_between: Vec<&InstanceTableRow> = instance_table_rows_of_the_newest_root
+            .iter()
+            .filter(|row| row.instance > previous_instance && row.instance < version_instance)
+            .collect();
+        let instances_between: BTreeSet<u32> =
+            rows_between.iter().map(|row| row.instance).collect();
+        let every_instance_between_has_a_row = u64::try_from(instances_between.len())
+            .expect("实例表行数装得进 u64")
+            == u64::from(version_instance - previous_instance - 1);
+        let every_row_between_published_nothing = rows_between.iter().all(|row| {
+            row.published_checkpoint_txg == 0 && row.applied_transaction_high_water_mark == 0
+        });
+        row_of_the_previous_version
+            && every_instance_between_has_a_row
+            && every_row_between_published_nothing
+    };
+    if previous_instances
+        .iter()
+        .any(|previous_instance| bridged_from(*previous_instance))
+    {
+        return HoleInTheCandidateSet::HoleBridgedByTheInstanceTableRows;
+    }
+    HoleInTheCandidateSet::HoleNotBridgedByTheInstanceTableRows
+}
+
+/// I-3.5（引用区间的精确性） 的出现规则（TF + β + gap + gap-row + N3，`research/prompts/m3-birth-floor-r3-main-verification.md`、
+/// 用户 2026-10-03 定丙；措辞是 `.claude/kb/invariants.md` I-3.5 那一行）：回退候选集（走过的每一版，与 I-7.4 同一份）按 txg 升序，
+/// 同 txg 的几条并成一条（R⁻ 侧引用集合取并，R 侧逐条各判一次），相邻两条 (R⁻, R) 逐对判。R 引用而 R⁻ 不引用的每个单元 b
+/// （第一次出现与再次出现都判）满足 (a) birth(b) > R⁻.txg；或 (b) b 落在 R 树表里一棵用户可见树的子树里，那棵树的根指针出生 txg
+/// 严格小于 R⁻.txg，且 R 里那棵子树每个读得出的单元头的诞生代号都不大于那个出生 txg。birth(b) 取单元头里的诞生代号，头读不出的不判。
+/// 有洞（[`hole_in_the_candidate_set_between`]）而实例表行接不上时，用户可见树子树里的单元不判（N3）。R 或 R⁻ 走读记过失败的那一对不判；
+/// 一个单元都没判到时整条报不适用。
+fn judge_the_appearance_rule_of_adjacent_candidate_versions(
+    versions: &[VersionReferencesForTheAppearanceRule],
+    birth_txg_of_walked_units: &BTreeMap<(u32, u64), u64>,
+    birth_txg_of_walked_instance_table_pages: &BTreeMap<(u32, u64), u64>,
+    instance_table_rows_of_the_newest_root: &[InstanceTableRow],
+    judgements: &mut Judgements,
+) {
+    let birth_txg_of = |unit: &(u32, u64)| {
+        birth_txg_of_walked_units
+            .get(unit)
+            .or_else(|| birth_txg_of_walked_instance_table_pages.get(unit))
+            .copied()
+    };
+    let mut versions_of_each_txg: BTreeMap<u64, Vec<&VersionReferencesForTheAppearanceRule>> =
+        BTreeMap::new();
+    for version in versions {
+        versions_of_each_txg
+            .entry(version.checkpoint_txg)
+            .or_default()
+            .push(version);
+    }
+    let groups: Vec<(u64, Vec<&VersionReferencesForTheAppearanceRule>)> =
+        versions_of_each_txg.into_iter().collect();
+    let mut units_judged: u64 = 0;
+    for adjacent in groups.windows(2) {
+        let (previous_txg, previous_versions) = (adjacent[0].0, &adjacent[0].1);
+        let versions_at_this_txg = &adjacent[1].1;
+        let previous_references_are_complete = previous_versions
+            .iter()
+            .all(|previous_version| previous_version.references_are_complete);
+        let units_referenced_by_the_previous_version: BTreeSet<(u32, u64)> = previous_versions
+            .iter()
+            .flat_map(|previous_version| previous_version.units.keys().copied())
+            .collect();
+        let previous_instances: BTreeSet<u32> = previous_versions
+            .iter()
+            .map(|previous_version| previous_version.instance)
+            .collect();
+        for version in versions_at_this_txg {
+            if !previous_references_are_complete || !version.references_are_complete {
+                continue;
+            }
+            let hole = hole_in_the_candidate_set_between(
+                previous_txg,
+                &previous_instances,
+                version.checkpoint_txg,
+                version.instance,
+                instance_table_rows_of_the_newest_root,
+            );
+            let trees_inherited_whole: BTreeSet<UserVisibleTreeOfTheWalk> = version
+                .user_visible_tree_roots
+                .iter()
+                .filter(|root| {
+                    root.root_pointer_birth_txg < previous_txg
+                        && version
+                            .units
+                            .iter()
+                            .filter(|(_, tree)| **tree == Some(root.tree))
+                            .filter_map(|(unit, _)| birth_txg_of(unit))
+                            .all(|birth_txg| birth_txg <= root.root_pointer_birth_txg)
+                })
+                .map(|root| root.tree)
+                .collect();
+            for (unit, user_visible_tree) in &version.units {
+                if units_referenced_by_the_previous_version.contains(unit) {
+                    continue;
+                }
+                if hole == HoleInTheCandidateSet::HoleNotBridgedByTheInstanceTableRows
+                    && user_visible_tree.is_some()
+                {
+                    continue;
+                }
+                let Some(birth_txg) = birth_txg_of(unit) else {
+                    continue;
+                };
+                units_judged += 1;
+                let born_after_the_previous_version = birth_txg > previous_txg;
+                let in_a_tree_inherited_whole =
+                    user_visible_tree.is_some_and(|tree| trees_inherited_whole.contains(&tree));
+                judgements.judge(
+                    REFERENCE_INTERVALS_ARE_EXACT,
+                    born_after_the_previous_version || in_a_tree_inherited_whole,
+                    || {
+                        format!(
+                            "相邻两版 (实例 {previous_instances:?}、txg {previous_txg}) → (实例 {}、txg {})（{hole:?}）：后一版引用、前一版不引用的单元盘 {} 槽 {}（用户可见树 {user_visible_tree:?}）诞生代号 {birth_txg} 不大于前一版的 txg，也不在一棵整棵继承下来的用户可见树里（根指针出生 txg 小于前一版的 txg、子树里读得出的诞生代号都不大于它）",
+                            version.instance, version.checkpoint_txg, unit.0, unit.1
+                        )
+                    },
+                );
+            }
+        }
+    }
+    if units_judged == 0 {
+        judgements.not_applicable(
+            REFERENCE_INTERVALS_ARE_EXACT,
+            "回退候选集里相邻两版之间一个新出现、头读得出的单元都没判到：候选集只剩一版，或相邻两版有一版走读记过失败，或缺口那一对新出现的只有用户可见树里的单元",
+        );
+    }
+}
+
+/// 走读此刻在走哪一版（D16（发布语义） 已定项 1 的回退候选集里的根，或由记录施加出来、根槽从没落盘的那一版），带它的 `checkpoint_txg`。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum VersionBeingWalked {
+    /// (txg, 实例) 最大的那条根：先走它。
+    NewestRoot { checkpoint_txg: u64 },
+    /// 回退候选集里不是最新的根（I-4.9 只判这一类）。
+    OlderCandidateRoot { checkpoint_txg: u64 },
+    /// 由记录施加出来、根槽从没落盘的那一版（[`versions_applied_only_by_records`]）。
+    AppliedOnlyByRecords { checkpoint_txg: u64 },
+}
+
+impl VersionBeingWalked {
+    const fn checkpoint_txg(self) -> u64 {
+        match self {
+            Self::NewestRoot { checkpoint_txg }
+            | Self::OlderCandidateRoot { checkpoint_txg }
+            | Self::AppliedOnlyByRecords { checkpoint_txg } => checkpoint_txg,
+        }
+    }
 }
 
 /// 实例表里的一行（D18（块里携带什么信息） 已定项 11 的字段表：`kind` 1 + 实例代号 4 + 所选根的 `checkpoint_txg` 8 +
@@ -477,8 +802,9 @@ impl<'reader> Walk<'reader> {
     ///    已发布谓词判成已发布——「未提交」在本工程里就是「按那个谓词判不成已发布」，被引用的块必须已提交。
     ///    谓词与 I-1.8（归并后版本全序） 扫描方向用的是同一份 [`PublishedPredicate`]。
     ///
-    /// **打包记录类型 4 的实例表单元不进这两格**：I-1.2 那一行的「**例外**」逐字写着它不走这条谓词，
-    /// 它的现行版本由根记录持有的物理指针唯一确定。调用点因此不在 `walk_root` 读实例表那一段上。
+    /// **打包记录类型 4 的实例表单元不进这个函数**：I-1.2 那一行的「**例外**」写着它只免谓词那一半，
+    /// 它的现行版本由根记录持有的物理指针唯一确定；它的出生身份与指针相等那一格在 `walk_instance_table_chain` 里单判
+    /// （[`Self::judge_birth_identity_against_the_pointer`]），不进 I-4.2、也不进 I-4.9 与「判过几个被引用单元」那个数。
     fn judge_birth_identity_of_a_referenced_unit(
         &mut self,
         unit: &[u8],
@@ -489,21 +815,13 @@ impl<'reader> Walk<'reader> {
             return;
         };
         self.referenced_units_judged_against_their_pointer += 1;
-        let matches_the_pointer = identity.write_order.birth_txg() == pointer.birth_txg
-            && identity.write_order.instance() == pointer.instance
-            && identity.tail.birth_identity_tail_number() == pointer.tail;
-        self.judgements.judge("I-1.2", matches_the_pointer, || {
-            format!(
-                "{what}：头里的出生身份（诞生代号 {}、写序实例 {}、{} {}）与引用它的指针记的（诞生代号 {}、实例 {}、尾段 {}）不符",
-                identity.write_order.birth_txg(),
-                identity.write_order.instance(),
-                identity.tail.name(),
-                identity.tail.birth_identity_tail_number(),
-                pointer.birth_txg,
-                pointer.instance,
-                pointer.tail
-            )
-        });
+        let birth_txg = identity.write_order.birth_txg();
+        self.birth_txg_of_walked_units.insert(
+            (pointer.locations[0].device, pointer.locations[0].slot),
+            birth_txg,
+        );
+        self.judge_unit_birth_against_an_older_candidate_root(birth_txg, what);
+        self.judge_birth_identity_against_the_pointer(identity, pointer, what);
         let mount_root_instance = self.mount_root_instance;
         let mount_root_checkpoint_txg = self.mount_root_checkpoint_txg;
         let published = PublishedPredicate {
@@ -520,6 +838,32 @@ impl<'reader> Walk<'reader> {
                 "{what}：头里的诞生代号 {}、写序实例 {} 按已发布谓词判不成已发布（挂载根实例 {mount_root_instance}、txg {mount_root_checkpoint_txg}，实例表行 {rows:?}）——被引用的块必须是已提交的块",
                 identity.write_order.birth_txg(),
                 identity.write_order.instance()
+            )
+        });
+    }
+
+    /// I-1.2（块头写序已发布） 遍历方向那一格：头里的诞生代号、写序实例与尾段（码 1 事务号、码 2 / 码 3 出生序号）与引用它的指针记的相同。
+    /// 被引用单元（[`Self::judge_birth_identity_of_a_referenced_unit`]）与实例表链上每一片（打包记录类型 4 按 I-1.2 那一行的例外只免谓词那一半，
+    /// `research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 3 行）都判它。
+    fn judge_birth_identity_against_the_pointer(
+        &mut self,
+        identity: BirthIdentityInTheHeader,
+        pointer: &PointerView,
+        what: &str,
+    ) {
+        let matches_the_pointer = identity.write_order.birth_txg() == pointer.birth_txg
+            && identity.write_order.instance() == pointer.instance
+            && identity.tail.birth_identity_tail_number() == pointer.tail;
+        self.judgements.judge("I-1.2", matches_the_pointer, || {
+            format!(
+                "{what}：头里的出生身份（诞生代号 {}、写序实例 {}、{} {}）与引用它的指针记的（诞生代号 {}、实例 {}、尾段 {}）不符",
+                identity.write_order.birth_txg(),
+                identity.write_order.instance(),
+                identity.tail.name(),
+                identity.tail.birth_identity_tail_number(),
+                pointer.birth_txg,
+                pointer.instance,
+                pointer.tail
             )
         });
     }
@@ -555,6 +899,62 @@ impl<'reader> Walk<'reader> {
             mount_root_instance,
             mount_root_checkpoint_txg,
             referenced_units_judged_against_their_pointer: 0,
+            version_being_walked: VersionBeingWalked::NewestRoot {
+                checkpoint_txg: mount_root_checkpoint_txg,
+            },
+            birth_txg_of_walked_units: BTreeMap::new(),
+            units_judged_against_an_older_candidate_root: 0,
+            unit_of_each_placement: BTreeMap::new(),
+            user_visible_tree_of_each_placement: BTreeMap::new(),
+            user_visible_tree_being_walked: None,
+            user_visible_tree_roots_of_this_version: Vec::new(),
+            tree_table_entries_of_a_walked_tree_table: BTreeMap::new(),
+            birth_txg_of_walked_instance_table_pages: BTreeMap::new(),
+            versions_walked_for_the_appearance_rule: Vec::new(),
+        }
+    }
+
+    /// I-4.9（非最新候选根引用的单元不晚于它）：正在走的是回退候选集里不是最新的一条根时，它引用的一个单元的诞生代号不大于这条根的
+    /// `checkpoint_txg`（D16（发布语义） 已定项 7：单元先于根落盘）。最新那条根归 I-4.2（无被引用未提交块），由记录施加出来的那一版不在射程里。
+    fn judge_unit_birth_against_an_older_candidate_root(&mut self, birth_txg: u64, what: &str) {
+        if let VersionBeingWalked::OlderCandidateRoot { checkpoint_txg } = self.version_being_walked
+        {
+            self.units_judged_against_an_older_candidate_root += 1;
+            self.judgements.judge(
+                UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
+                birth_txg <= checkpoint_txg,
+                || {
+                    format!(
+                        "{what}：诞生代号 {birth_txg} 大于引用它的候选根的 txg {checkpoint_txg}"
+                    )
+                },
+            );
+        }
+    }
+
+    /// I-1.12（指针出生树等于被指单元头）：走读跟随的一条指针偏移 34 的出生树等于被指单元头里的出生树——码 1、码 3 取头偏移 43；
+    /// 码 2 取哪个字段随 C289（码 2 的出生树取哪个字段没写） 定，不判。inode 内部条目指着叶容器那一类由 I-9.2（条目身份与子头相符） 罩住，
+    /// 调用点不在那里。
+    fn judge_pointer_birth_tree_against_the_unit_header(
+        &mut self,
+        unit: &[u8],
+        pointer: &PointerView,
+        what: &str,
+    ) {
+        match birth_tree_in_the_header_as_the_mapping_key_names_it(unit) {
+            Some(BirthTreeInTheHeader::AtOffsetFortyThree(birth_tree_in_the_header)) => {
+                self.judgements.judge(
+                    POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
+                    pointer.birth_tree == birth_tree_in_the_header,
+                    || {
+                        format!(
+                            "{what}：指针记的出生树 {} 与单元头里的出生树 {birth_tree_in_the_header} 不符",
+                            pointer.birth_tree
+                        )
+                    },
+                );
+            }
+            Some(BirthTreeInTheHeader::FieldStillOpenUnderC289) | None => {}
         }
     }
 
@@ -572,6 +972,39 @@ impl<'reader> Walk<'reader> {
     fn begin_walking_a_version(&mut self) {
         self.placements_referenced_in_this_version.clear();
         self.walk_parent_unit = None;
+        self.user_visible_tree_being_walked = None;
+        self.user_visible_tree_roots_of_this_version.clear();
+    }
+
+    /// 一版走完：把它引用的单元（落点折成单元，带用户可见树的标签）、树表里几棵用户可见树的根与走读断没断记下，留给 I-3.5 逐对比。
+    /// `walk_failures_before` 是走这一版之前走读失败记了几条。
+    fn note_the_version_just_walked_for_the_appearance_rule(
+        &mut self,
+        instance: u32,
+        checkpoint_txg: u64,
+        walk_failures_before: usize,
+    ) {
+        let units = self
+            .placements_referenced_in_this_version
+            .keys()
+            .map(|placement| {
+                let unit = *self.unit_of_each_placement.get(placement).expect(
+                    "这一版引用过的每个落点都经 `note_references_of_a_pointer_followed_by_the_walk` 记过（这一版或先走的那一版）",
+                );
+                (
+                    unit,
+                    self.user_visible_tree_of_each_placement.get(placement).copied(),
+                )
+            })
+            .collect();
+        self.versions_walked_for_the_appearance_rule
+            .push(VersionReferencesForTheAppearanceRule {
+                instance,
+                checkpoint_txg,
+                units,
+                user_visible_tree_roots: self.user_visible_tree_roots_of_this_version.clone(),
+                references_are_complete: self.walk_failures.len() == walk_failures_before,
+            });
     }
 
     /// 往下走 `unit` 里的指针之前调：之后跟着指针记下的落点都算在 `unit` 下面（`placements_referenced_below_a_walked_unit`）。
@@ -616,6 +1049,12 @@ impl<'reader> Walk<'reader> {
             if !expanded.insert(unit) {
                 continue;
             }
+            if let Some(birth_txg) = self.birth_txg_of_walked_units.get(&unit).copied() {
+                self.judge_unit_birth_against_an_older_candidate_root(
+                    birth_txg,
+                    &format!("别的版本先走过的盘 {} 槽 {} 的单元", unit.0, unit.1),
+                );
+            }
             let Some(below) = self.placements_referenced_below_a_walked_unit.get(&unit) else {
                 continue;
             };
@@ -636,9 +1075,16 @@ impl<'reader> Walk<'reader> {
         span: u64,
         what: &str,
     ) {
+        let unit = (pointer.locations[0].device, pointer.locations[0].slot);
         for (index, location) in pointer.locations.iter().enumerate() {
             self.note_reference(location, span, what);
             let placement = (location.device, location.slot);
+            self.unit_of_each_placement.entry(placement).or_insert(unit);
+            if let Some(tree) = self.user_visible_tree_being_walked {
+                self.user_visible_tree_of_each_placement
+                    .entry(placement)
+                    .or_insert(tree);
+            }
             let is_an_earlier_location_entry_of_this_pointer = pointer.locations[..index]
                 .iter()
                 .any(|earlier| (earlier.device, earlier.slot) == placement);
@@ -802,6 +1248,7 @@ impl<'reader> Walk<'reader> {
         }
         judge_location_order(&mut self.judgements, &pointer, what);
         judge_pointer_mac_and_nonce_are_zero(&mut self.judgements, &pointer, what);
+        judge_pointer_extent_offset_is_zero(&mut self.judgements, &pointer, what);
         self.note_references_of_a_pointer_followed_by_the_walk(&pointer, 1, what);
         let Some(unit) = read_referenced_unit(
             self.reader,
@@ -840,8 +1287,18 @@ impl<'reader> Walk<'reader> {
             | (KeyRangeReading::SubtreeCoverageOfInternalNodesJudgedByTheCaller, 0) => {
                 check_index_node_keys(&view, schema)
             }
+            (KeyRangeReading::PrescribedByThePositionOfTheExtentUpperRootJudgedByTheCaller, 0)
+                if view.entries.is_empty() =>
+            {
+                if schema.width() == view.key_width {
+                    Ok(())
+                } else {
+                    Err(Verdict::KeyWidthMismatch)
+                }
+            }
             (KeyRangeReading::SubtreeCoverageOfInternalNodesJudgedByTheCaller, _)
-            | (KeyRangeReading::PrescribedByThePositionJudgedByTheCaller, _) => {
+            | (KeyRangeReading::PrescribedByThePositionJudgedByTheCaller, _)
+            | (KeyRangeReading::PrescribedByThePositionOfTheExtentUpperRootJudgedByTheCaller, _) => {
                 check_internal_node_separators(&view, schema)
             }
         };
@@ -853,6 +1310,12 @@ impl<'reader> Walk<'reader> {
 
     fn walk_root(&mut self, record: &[u8], is_newest: bool) {
         self.begin_walking_a_version();
+        let checkpoint_txg = read_u64(record, ROOT_RECORD_CHECKPOINT_TXG_OFFSET);
+        self.version_being_walked = if is_newest {
+            VersionBeingWalked::NewestRoot { checkpoint_txg }
+        } else {
+            VersionBeingWalked::OlderCandidateRoot { checkpoint_txg }
+        };
         // 实例表：根记录直接持有第 0 片（自证单元，I-1.3 豁免），后面各片由前一片的链指针记录指着。
         let first_page_pointer = parse_node_pointer(&record[170..256]);
         let mount_root_instance = u32::from_le_bytes(record[24..28].try_into().expect("4 字节"));
@@ -880,31 +1343,24 @@ impl<'reader> Walk<'reader> {
     }
 
     /// 由记录施加出来、根槽从没落盘的那一版（[`versions_applied_only_by_records`] 认出来的）：它没有根记录，
-    /// 树表指针与映射根指针在那条记录的新根段里，从那里走下去，判定与根环里的候选根同一套。
-    /// 根记录里另外两样——实例表指针与「树表 0 条那一版的分配记录树的根」——记录的新根段（188 字节）里没有它们的位置：
-    /// 由记录重建的根，这两样照它施加在其上那一版的根（D23（journal 的角色与格式） 已定项 15「实例表单元指针照所选根」，
-    /// 施加一条记录只换新根段那四个字段），从那条根的根记录里取来走；那条根不在回退候选集里（低于 F，或被别的条件滤掉）也照走这两样
-    /// （主 agent 2026-09-27 定，零轮；崩溃注入快档种子 7463871032432355136 第 91 段那两条 I-3.1 就是漏了它施加在其上那一版的实例表，
-    /// `research/prompts/m2-investigate-crash-injection-reds-report.md` 第三节）。
-    /// 环里找不到它施加在其上那一版的根（同实例、txg 比它小的根一条都读不出）时这两样走不到：这一格没有条款，照旧只走新根段。
+    /// 树表指针、映射根指针、实例表指针与「树表 0 条那一版的分配记录树的根」都在那条记录的新根段里（D23（journal 的角色与格式）
+    /// 已定项 15：施加一条记录 = 把所选根的七个字段换成记录里的，用户 2026-10-02「回到甲」），从那里走下去，判定与根环里的候选根同一套。
     fn walk_version_applied_only_by_records(&mut self, version: &VersionAppliedOnlyByRecords) {
         self.begin_walking_a_version();
-        if let Some(record_of_the_root_it_was_applied_on) =
-            &version.root_record_of_the_version_it_was_applied_on
-        {
-            let first_page_pointer = parse_node_pointer(
-                &record_of_the_root_it_was_applied_on[ROOT_RECORD_INSTANCE_TABLE_POINTER],
+        self.version_being_walked = VersionBeingWalked::AppliedOnlyByRecords {
+            checkpoint_txg: version.checkpoint_txg,
+        };
+        let first_page_pointer =
+            parse_node_pointer(&version.new_root_segment[NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER]);
+        self.walk_instance_table_chain(&first_page_pointer, None);
+        let allocation_record_tree_root =
+            &version.new_root_segment[NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER];
+        if !parse_node_pointer(allocation_record_tree_root).all_zero {
+            self.walk_allocation_record_tree(
+                allocation_record_tree_root,
+                0,
+                "树表 0 条那一版的分配记录树",
             );
-            self.walk_instance_table_chain(&first_page_pointer, None);
-            let allocation_record_tree_root =
-                &record_of_the_root_it_was_applied_on[ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT];
-            if !parse_node_pointer(allocation_record_tree_root).all_zero {
-                self.walk_allocation_record_tree(
-                    allocation_record_tree_root,
-                    0,
-                    "树表 0 条那一版的分配记录树",
-                );
-            }
         }
         let (tree_table_pointer, mapping_root_pointer) =
             version.tree_table_and_mapping_root_pointers();
@@ -920,7 +1376,8 @@ impl<'reader> Walk<'reader> {
     }
 
     /// 一版的树表（树 ID 0）与它下面每一条树表条目，再加中央映射树的根：根环里的根从根记录里取这两条指针，
-    /// 由记录施加出来的那一版从记录的新根段里取（两处都是 86 字节的码 2 指针）。树表读不出时映射根也不走（走读已经断了）。
+    /// 由记录施加出来的那一版从记录的新根段里取（两处都是 86 字节的码 2 指针）。树表读不出时映射根也不走（走读已经断了）；
+    /// 树表别的版本先走过时条目不重走，映射根照样往下走（共享的就并进这一版）。
     /// `version_name` 是这一版的称呼（哪条根、或由哪条记录施加出来），I-9.16 判红时写进第一处违例。
     fn walk_tree_table_and_central_mapping_root(
         &mut self,
@@ -929,31 +1386,44 @@ impl<'reader> Walk<'reader> {
         version_name: &str,
     ) {
         // 树表单元：不属于任何树（树 ID 0）。
-        let Some(tree_table) = self.read_index_node(
+        let tree_table_pointer_view = parse_node_pointer(tree_table_pointer);
+        let tree_table_placement = (
+            tree_table_pointer_view.locations[0].device,
+            tree_table_pointer_view.locations[0].slot,
+        );
+        let tree_table_walked_by_an_earlier_version =
+            !tree_table_pointer_view.all_zero && self.visited_units.contains(&tree_table_placement);
+        let tree_table = self.read_index_node(
             tree_table_pointer,
             0,
             KEY_SCHEMA_TREE_TABLE,
             "树表单元",
             KeyRangeReading::FirstAndLastEntries,
             EntryFieldTableRegistration::NotRegistered,
-        ) else {
-            return;
-        };
-        judge_tree_table_entries_ordering(&mut self.judgements, &tree_table.entries, version_name);
-        let tree_table_locations = parse_node_pointer(tree_table_pointer).locations;
-        let previous_parent_unit = self
-            .start_walking_below((tree_table_locations[0].device, tree_table_locations[0].slot));
-        for entry in &tree_table.entries {
-            self.walk_tree_table_entry(entry);
+        );
+        match tree_table {
+            Some(tree_table) => self.walk_the_entries_of_a_tree_table_walked_first_by_this_version(
+                &tree_table,
+                tree_table_placement,
+                version_name,
+            ),
+            // 别的版本先走过这片树表（零单元发布、卸载与抬 F 的空发布照抄上一版的树表与映射根）：它下面的落点已经并进这一版
+            // （`read_index_node` 里的 `merge_placements_below_a_unit_walked_by_an_earlier_version`），条目照先走那一版记下的判；
+            // 映射根照样往下并（这一版也引用它，I-3.5 比相邻两版的引用集合要它，`research/prompts/m3-birth-floor-r3-main-verification.md`）。
+            None if tree_table_walked_by_an_earlier_version => {
+                self.judge_the_tree_table_entries_an_earlier_version_walked(tree_table_placement);
+            }
+            // 树表读不出、头用不了：走读已经断了，映射根也不走。
+            None => return,
         }
-        self.stop_walking_below(previous_parent_unit);
         // 中央映射树不进树表，引用它的是那条映射根指针（根记录里的，或由记录施加出来那一版的新根段里的）：
         // I-1.3（块头树 ID 一致） 的「实际引用它的树」按那条指针头部的出生树取（D19（块指针的结构与宽度预算） 已定项 7），
-        // 与树表条目里的树 ID 对树表指着的根是同一个读法。号不写死 15：回退到树表 0 条的一版之后再发第一个文件版本，
-        // 八棵树从水位重新发号（C511（回退到无文件那一版之后诞生代怎么接））。
+        // 与树表条目里的树 ID 对树表指着的根是同一个读法。号不写死映射树的号（mkfs 那条流上是 65540）：回退到树表 0 条的一版之后再发第一个文件版本，
+        // 十二棵树从水位重新发号（C511（回退到无文件那一版之后诞生代怎么接））。
         // 映射树可以是多层（D8（核心索引结构） 已定项 11）：整棵走下去，每个节点按父条目核层级、区间与分隔 key（I-1.1）。
-        // 叶的条目宽**只守走读要几个字节，不判「映射条目该有多宽」**：后者归 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树），
-        // 那一条还开着，I-1.10（码 2 条目宽等于字段表宽） 的射程里也没有中央映射树（`field_table_width_of_tree_kind` 不认种类 5）。
+        // 叶的条目宽**只守走读要几个字节，不判「映射条目该有多宽」**：后者 D19（块指针的结构与宽度预算） 已定项 10 已定一律 55，
+        // 但 I-1.10（码 2 条目宽等于字段表宽） 的射程里还没有中央映射树（`field_table_width_of_tree_kind` 不认种类 5），
+        // 接进去欠在 C307（映射树两种 key 宽怎么装进一棵定宽 key 的树）。
         let mapping_tree = MultiLevelTreeInTheWalk {
             tree: parse_node_pointer(mapping_root_pointer).birth_tree,
             schema: KEY_SCHEMA_MAPPING,
@@ -968,6 +1438,46 @@ impl<'reader> Walk<'reader> {
         let mut leaf_entries = Vec::new();
         self.walk_code_two_subtree(mapping_root_pointer, None, &mapping_tree, &mut leaf_entries);
         self.walk_central_mapping_entries(&leaf_entries);
+    }
+
+    /// 这一版第一个走到的树表：判条目次序（I-9.16）与每一条的 previous_snapshot_txg（I-9.25），把条目里 I-9.25 与 I-3.5 读的几样记下
+    /// （别的版本共享这片树表时照它判），再逐条往下走；走进用户可见树时给记下的落点打上那棵树的标签（I-3.5）。
+    fn walk_the_entries_of_a_tree_table_walked_first_by_this_version(
+        &mut self,
+        tree_table: &crate::IndexNodeView,
+        tree_table_placement: (u32, u64),
+        version_name: &str,
+    ) {
+        judge_tree_table_entries_ordering(&mut self.judgements, &tree_table.entries, version_name);
+        // I-9.27 只看同一张表里条目之间的关系、与哪一版无关：共享这片树表的别的版本不重判（与 I-9.16 同）。
+        judge_tree_table_entry_head_identifiers(
+            &mut self.judgements,
+            &tree_table.entries,
+            version_name,
+        );
+        let entries_of_the_walk: Vec<TreeTableEntryOfTheWalk> = tree_table
+            .entries
+            .iter()
+            .filter_map(|entry| tree_table_entry_of_the_walk(entry))
+            .collect();
+        self.tree_table_entries_of_a_walked_tree_table
+            .insert(tree_table_placement, entries_of_the_walk.clone());
+        for entry in &entries_of_the_walk {
+            self.judge_previous_snapshot_txg_of_a_tree_table_entry(*entry);
+        }
+        self.user_visible_tree_roots_of_this_version = entries_of_the_walk
+            .iter()
+            .filter_map(|entry| entry.user_visible_root)
+            .collect();
+        let previous_parent_unit = self.start_walking_below(tree_table_placement);
+        for entry in &tree_table.entries {
+            self.user_visible_tree_being_walked = tree_table_entry_of_the_walk(entry)
+                .and_then(|entry_of_the_walk| entry_of_the_walk.user_visible_root)
+                .map(|root| root.tree);
+            self.walk_tree_table_entry(entry);
+            self.user_visible_tree_being_walked = None;
+        }
+        self.stop_walking_below(previous_parent_unit);
     }
 
     /// 中央映射树叶里的条目逐条走（D19（块指针的结构与宽度预算） 已定项 6 / 10：key 27 = 类标签 1 + 出生树 8 + 出生 txg 8 +
@@ -1341,6 +1851,22 @@ impl<'reader> Walk<'reader> {
             } = self.walk_code_two_subtree(&entry[14..100], None, &accounting_tree, &mut rows)
             {
                 self.accounting_seen = true;
+                // I-3.13：记账代 = checkpoint 号（D16（发布语义） 已定项 6），每条根的记账树只装这条根那一代的行；只判走全了的树。
+                let accounting_version_txg = self.version_being_walked.checkpoint_txg();
+                for row in &rows {
+                    let row_generation = read_u64(row, ACCOUNTING_KEY_GENERATION_OFFSET);
+                    self.judgements.judge(
+                        ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
+                        row_generation == accounting_version_txg,
+                        || {
+                            format!(
+                                "记账树（树 {tree}）里统计量 {}、盘 {} 那一行的代段 {row_generation} 不是这一版的 txg {accounting_version_txg}",
+                                read_u16(row, 0),
+                                read_u32(row, 10)
+                            )
+                        },
+                    );
+                }
                 for row in &rows {
                     self.accounting
                         .insert((read_u16(row, 0), read_u32(row, 10)), read_u64(row, 22));
@@ -1377,7 +1903,8 @@ impl<'reader> Walk<'reader> {
         // I-1.10：头里自述的条目宽等于这棵树登记的条目字段表宽度，**先于**按字段表解条目判
         // （与 I-1.7（打包容器合法与判定顺序） 判码 3 记录宽同一纪律）。不等就不往下解：下面每一支都按
         // 24 / 34 / 112 / 120 这些固定偏移切条目，窄一个字节就当场越界（普查 R13）。
-        // 中央映射树（种类 5）走不到这里判：`field_table_width_of_tree_kind` 里没有它，C307 还开着。
+        // 中央映射树（种类 5）走不到这里判：`field_table_width_of_tree_kind` 里没有它；条目宽已定 55（D19（块指针的结构与宽度预算） 已定项 10），
+        // 把种类 5 接进这一判欠在 C307。
         if let Some(entry_field_table_bytes) = field_table_width_of_tree_kind(kind) {
             let entry_width = node.entry_width;
             self.judgements
@@ -1397,6 +1924,208 @@ impl<'reader> Walk<'reader> {
                 tree,
                 (root_locations[0].device, root_locations[0].slot),
             );
+        }
+        // 墓碑树、谱系树：码 2 根之下是码 3 容器（类型段墓碑 {0, 1}、谱系 {0, 5}，D18（块里携带什么信息） 已定项 24）。
+        // 这里只走到每片容器、判它的头与容器格式（单元算进可达与已有统计）；墓碑与谱系的专门不变量（I-9.17–I-9.24）归下一步。
+        let node_locations = parse_node_pointer(&entry[14..100]).locations;
+        let node_placement = (node_locations[0].device, node_locations[0].slot);
+        if kind == TREE_KIND_TOMBSTONE {
+            self.walk_container_tree_root(
+                &node,
+                node_placement,
+                tree,
+                PACKED_TYPE_TOMBSTONE,
+                "墓碑树",
+            );
+        }
+        if kind == TREE_KIND_LINEAGE {
+            self.walk_container_tree_root(
+                &node,
+                node_placement,
+                tree,
+                PACKED_TYPE_LINEAGE,
+                "谱系树",
+            );
+        }
+    }
+
+    /// I-9.25：`previous_snapshot_txg` 只写在 inode 树那条条目里，0 = 不适用；inode 树那条不大于这一版的 txg
+    /// （D5（快照 / 空间记账机制） 已定项 9；「≤ 根 txg」那一半用户 2026-10-01 补定）。走到的每一版（候选集里每条，含由记录施加出来的）
+    /// 拿自己的 txg 判自己树表里的每一条：树表被几版共享时每一版各判一次（[`Self::judge_the_tree_table_entries_an_earlier_version_walked`]），
+    /// 不只在第一个走到它的那一版判（主 agent 2026-10-03 定改回 kb 字面）。
+    fn judge_previous_snapshot_txg_of_a_tree_table_entry(
+        &mut self,
+        entry: TreeTableEntryOfTheWalk,
+    ) {
+        let version_txg = self.version_being_walked.checkpoint_txg();
+        let TreeTableEntryOfTheWalk {
+            tree,
+            kind,
+            previous_snapshot_txg,
+            ..
+        } = entry;
+        let previous_snapshot_txg_holds = if kind == TREE_KIND_INODE {
+            previous_snapshot_txg <= version_txg
+        } else {
+            previous_snapshot_txg == 0
+        };
+        self.judgements.judge(
+            PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
+            previous_snapshot_txg_holds,
+            || {
+                format!(
+                    "树 {tree}（种类 {kind}）的树表条目 previous_snapshot_txg {previous_snapshot_txg}：不是 inode 树的条目恒 0，inode 树的不大于这一版的 txg {version_txg}"
+                )
+            },
+        );
+    }
+
+    /// 这一版的树表单元别的版本先走过（`visited_units`）：不重读盘，照先走那一版记下的条目判这一版的 I-9.25，
+    /// 这一版树表里几棵用户可见树的根也照它取（I-3.5）。先走那一版头用不了、没记下条目的，这里没有对象。
+    fn judge_the_tree_table_entries_an_earlier_version_walked(
+        &mut self,
+        tree_table_placement: (u32, u64),
+    ) {
+        let Some(entries) = self
+            .tree_table_entries_of_a_walked_tree_table
+            .get(&tree_table_placement)
+            .cloned()
+        else {
+            return;
+        };
+        for entry in &entries {
+            self.judge_previous_snapshot_txg_of_a_tree_table_entry(*entry);
+        }
+        self.user_visible_tree_roots_of_this_version = entries
+            .iter()
+            .filter_map(|entry| entry.user_visible_root)
+            .collect();
+    }
+
+    /// 墓碑树或谱系树的码 2 根（或根长高之后的内部节点）往下走：条目 120 字节（分隔 key 8 + 身份引用 26 + 子指针 86），
+    /// 类型段 = `record_type` 的走到码 3 容器（判容器头、出生树、容器格式，单元记进这一版走到的落点），类型段 0 的走进下一层码 2 节点
+    /// （层级 = 父层级 − 1），别的类型段记走读失败、不往下走。用 checker 自己的读法，不调 `singlefs_core`（D13（验证路线） 已定项 5）。
+    /// 递归的上界：每进一层类型段 0，层级减一（层级 0 的码 2 节点在这两棵树里没有条款定的形状，记走读失败）。
+    ///
+    /// 往下记的落点都记在 `node_placement` 这个节点下面（`placements_referenced_below_a_walked_unit`）：别的版本共享这个节点时
+    /// 照这张表把它下面的容器并进那一版（I-5.1 与 I-3.5 都要），不记在外面那片树表下面。
+    fn walk_container_tree_root(
+        &mut self,
+        node: &crate::IndexNodeView,
+        node_placement: (u32, u64),
+        tree: u64,
+        record_type: u16,
+        name: &str,
+    ) {
+        let previous_parent_unit = self.start_walking_below(node_placement);
+        self.walk_the_entries_of_a_container_tree_node(node, tree, record_type, name);
+        self.stop_walking_below(previous_parent_unit);
+    }
+
+    /// [`Self::walk_container_tree_root`] 那一个节点的条目逐条走（循环里有 `continue`，所以与换走读父单元那两步分开写）。
+    fn walk_the_entries_of_a_container_tree_node(
+        &mut self,
+        node: &crate::IndexNodeView,
+        tree: u64,
+        record_type: u16,
+        name: &str,
+    ) {
+        for entry in &node.entries {
+            let entry_type = read_u16(entry, 16);
+            let identity = (
+                read_u64(entry, 8),
+                entry_type,
+                read_u64(entry, 18),
+                read_u64(entry, 26),
+            );
+            let child = parse_node_pointer(&entry[34..120]);
+            let what = format!("{name}内部条目的子指针");
+            judge_location_order(&mut self.judgements, &child, &what);
+            judge_pointer_mac_and_nonce_are_zero(&mut self.judgements, &child, &what);
+            if entry_type == 0 {
+                if node.level <= 1 {
+                    self.walk_failures.push(format!(
+                        "{name}层级 {} 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状",
+                        node.level
+                    ));
+                    continue;
+                }
+                let schema = KEY_SCHEMA_CONTAINER_NUMBER;
+                let Some(child_node) = self.read_index_node(
+                    &entry[34..120],
+                    tree,
+                    schema,
+                    &format!("{name}根之下的内部节点"),
+                    KeyRangeReading::FirstAndLastEntries,
+                    EntryFieldTableRegistration::Registered,
+                ) else {
+                    continue;
+                };
+                self.judgements
+                    .judge("I-1.1", child_node.level + 1 == node.level, || {
+                        format!(
+                            "{name}内部节点层级 {} 不是父层级 {} − 1",
+                            child_node.level, node.level
+                        )
+                    });
+                if child_node.level + 1 == node.level
+                    && child_node.entry_width == inode_internal_entry_bytes()
+                {
+                    self.walk_container_tree_root(
+                        &child_node,
+                        (child.locations[0].device, child.locations[0].slot),
+                        tree,
+                        record_type,
+                        name,
+                    );
+                }
+                continue;
+            }
+            if entry_type != record_type {
+                self.walk_failures.push(format!(
+                    "{name}内部条目的类型段 {entry_type} 不在 {{0, {record_type}}} 里"
+                ));
+                continue;
+            }
+            self.note_references_of_a_pointer_followed_by_the_walk(&child, 2, &what);
+            let Some(unit) = read_referenced_unit(
+                self.reader,
+                &mut self.judgements,
+                &child.locations,
+                data_unit_bytes(),
+                &what,
+            ) else {
+                self.walk_failures
+                    .push(format!("{name}的容器两份都读不到对得上的"));
+                continue;
+            };
+            let child_placement = (child.locations[0].device, child.locations[0].slot);
+            if !self.visited_units.insert(child_placement) {
+                self.merge_placements_below_a_unit_walked_by_an_earlier_version(child_placement);
+                continue;
+            }
+            let container_name = format!("{name}的容器");
+            self.judgements
+                .judge("I-1.3", read_u64(&unit, 43) == tree, || {
+                    format!(
+                        "{container_name}的出生树 {} 不是 {tree}",
+                        read_u64(&unit, 43)
+                    )
+                });
+            let header_identity = (
+                read_u64(&unit, 43),
+                read_u16(&unit, 51),
+                read_u64(&unit, 53),
+                read_u64(&unit, 61),
+            );
+            if header_identity != identity {
+                self.walk_failures.push(format!(
+                    "{name}内部条目的身份 {identity:?} 与容器头 {header_identity:?} 不符"
+                ));
+            }
+            self.judge_birth_identity_of_a_referenced_unit(&unit, &child, &container_name);
+            // 容器格式（类标签、记录类型、记录宽与声明长度）按 I-1.7 那一套判；记录本身的不变量归 I-9.17 起那几条。
+            let _records = self.judge_packed_container(&unit, record_type, &container_name);
         }
     }
 
@@ -1472,6 +2201,11 @@ impl<'reader> Walk<'reader> {
             let child = parse_node_pointer(&entry[34..120]);
             judge_location_order(&mut self.judgements, &child, "inode 内部条目的子指针");
             judge_pointer_mac_and_nonce_are_zero(
+                &mut self.judgements,
+                &child,
+                "inode 内部条目的子指针",
+            );
+            judge_pointer_extent_offset_is_zero(
                 &mut self.judgements,
                 &child,
                 "inode 内部条目的子指针",
@@ -1618,7 +2352,21 @@ impl<'reader> Walk<'reader> {
                                 "inode {inode} 的记录 blocks {blocks} 不等于 ⌈size {size_in_bytes} ÷ {INODE_RECORD_BLOCKS_FIELD_UNIT_BYTES}⌉ = {logical_length_in_blocks}"
                             )
                         });
-                self.inode_object_birth.insert(inode, read_u64(&record, 8));
+                // I-9.26：对象出生代 ≤ 改动计数 ≤ 这片容器头的诞生代号（D8（核心索引结构） 已定项 6 偏移 88；下界「创建算一次改动」
+                // 用户 2026-10-01 补定）。上界不是等于：容器因别的记录改动而重写时，没改的那条记录的改动计数小于容器诞生代号是合法的。
+                let object_birth = read_u64(&record, INODE_RECORD_OBJECT_BIRTH_OFFSET);
+                let change_count = read_u64(&record, INODE_RECORD_CHANGE_COUNT_OFFSET);
+                let container_birth_txg = read_u64(unit, PACKED_UNIT_BIRTH_TXG_OFFSET);
+                self.judgements.judge(
+                    INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
+                    object_birth <= change_count && change_count <= container_birth_txg,
+                    || {
+                        format!(
+                            "inode {inode} 的改动计数 {change_count} 不在对象出生代 {object_birth} 与所在容器的诞生代号 {container_birth_txg} 之间"
+                        )
+                    },
+                );
+                self.inode_object_birth.insert(inode, object_birth);
                 smallest_inode_in_this_container =
                     Some(smallest_inode_in_this_container.map_or(inode, |seen| seen.min(inode)));
                 largest_inode_in_this_container =
@@ -1798,6 +2546,7 @@ impl<'reader> Walk<'reader> {
             };
             judge_location_order(&mut self.judgements, &pointer, &pointer_what);
             judge_pointer_mac_and_nonce_are_zero(&mut self.judgements, &pointer, &pointer_what);
+            judge_pointer_extent_offset_is_zero(&mut self.judgements, &pointer, &pointer_what);
             self.note_references_of_a_pointer_followed_by_the_walk(&pointer, 2, &what);
             let Some(unit) = read_referenced_unit(
                 self.reader,
@@ -1821,6 +2570,12 @@ impl<'reader> Walk<'reader> {
             else {
                 break;
             };
+            self.judge_pointer_birth_tree_against_the_unit_header(&unit, &pointer, &what);
+            if let Some(birth_identity) = birth_identity_in_the_header(&unit) {
+                self.birth_txg_of_walked_instance_table_pages
+                    .insert(page_placement, birth_identity.write_order.birth_txg());
+                self.judge_birth_identity_against_the_pointer(birth_identity, &pointer, &what);
+            }
             let identity = (
                 read_u64(&unit, 43),
                 read_u16(&unit, 51),
@@ -1952,6 +2707,11 @@ impl<'reader> Walk<'reader> {
             &pointer,
             "extent 记录的数据指针",
         );
+        judge_pointer_extent_offset_is_zero(
+            &mut self.judgements,
+            &pointer,
+            "extent 记录的数据指针",
+        );
         self.note_references_of_a_pointer_followed_by_the_walk(
             &pointer,
             2,
@@ -1977,6 +2737,7 @@ impl<'reader> Walk<'reader> {
             return;
         }
         self.judge_birth_identity_of_a_referenced_unit(&unit, &pointer, "数据单元");
+        self.judge_pointer_birth_tree_against_the_unit_header(&unit, &pointer, "数据单元");
         self.judgements
             .judge("I-1.3", read_u64(&unit, 43) == tree, || {
                 format!(
@@ -2184,7 +2945,12 @@ impl<'reader> Walk<'reader> {
             tree,
             KEY_SCHEMA_EXTENT,
             &what,
-            KeyRangeReading::PrescribedByThePositionJudgedByTheCaller,
+            match position {
+                None => {
+                    KeyRangeReading::PrescribedByThePositionOfTheExtentUpperRootJudgedByTheCaller
+                }
+                Some(_) => KeyRangeReading::PrescribedByThePositionJudgedByTheCaller,
+            },
             EntryFieldTableRegistration::Registered,
         ) else {
             return;
@@ -2601,6 +3367,57 @@ const ALLOCATION_RECORD_GENERATION_OFFSET: usize = 12;
 const TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8;
 /// 树表条目里种类 2 字节的偏移（树 ID 8 + 条目长度 2 之后）。
 const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 8 + 2;
+/// 树表条目里头 ID 8 字节的偏移（树 ID 8 + 条目长度 2 + 种类 2 + flags 2 + 根指针 86 + `previous_snapshot_txg` 8 + 诞生 txg 8，
+/// D8（核心索引结构） 已定项 8 的字段表），I-9.27 判它。
+const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: usize = 8 + 2 + 2 + 2 + 86 + 8 + 8;
+/// 一个数据单元占几个 16 KiB 槽（32768 字节，起点 32768 对齐 ⇒ 起点槽号是它的整数倍）：I-5.5 按槽对找落点。
+const DATA_UNIT_SLOTS: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
+
+/// I-9.27：树表条目的头 ID 按种类该等于什么（`.claude/kb/invariants.md` I-9.27 那一行；D8（核心索引结构） 已定项 8「头 ID 8 字节的取值」
+/// 句末的关系判据：判的是关系，不拿字面 65537 比）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum HeadIdentifierOfATreeTableEntry {
+    /// 种类 2（inode 树）：等于这条条目自己的树 ID。
+    ItsOwnTreeIdentifier,
+    /// 种类 1（extent 树）、9（`deleted_inodes`）、10（墓碑树）：等于同一张树表里种类 2 条目的树 ID；
+    /// 种类 2 条目多于一条时放宽成「等于其中某一条的」（收严留给多头那一批），一条都没有时判红。
+    TreeIdentifierOfAnInodeTreeEntryOfTheSameTable,
+    /// 种类 3、4、6、7、8、11、12（无归属，D5（快照 / 空间记账机制） 已定项 9）：等于 0。
+    Zero,
+    /// 别的种类码：那一行不判。
+    NotJudged,
+}
+
+impl HeadIdentifierOfATreeTableEntry {
+    const fn of_tree_kind(kind: u16) -> Self {
+        match kind {
+            TREE_KIND_INODE => Self::ItsOwnTreeIdentifier,
+            TREE_KIND_EXTENT | TREE_KIND_DELETED_INODES | TREE_KIND_TOMBSTONE => {
+                Self::TreeIdentifierOfAnInodeTreeEntryOfTheSameTable
+            }
+            TREE_KIND_ALLOCATION
+            | TREE_KIND_ACCOUNTING
+            | TREE_KIND_LIVELIST
+            | TREE_KIND_SPARSE_SIDE_TABLE
+            | TREE_KIND_DEADLIST
+            | TREE_KIND_LINEAGE
+            | TREE_KIND_LOGGED_OPERATIONS => Self::Zero,
+            _ => Self::NotJudged,
+        }
+    }
+
+    /// 判红时写进第一处违例的那半句：这一条的头 ID 该等于什么。
+    fn expectation(self, tree: u64, inode_tree_identifiers: &[u64]) -> String {
+        match self {
+            Self::ItsOwnTreeIdentifier => format!("inode 树条目的头 ID 该等于它自己的树 ID {tree}"),
+            Self::TreeIdentifierOfAnInodeTreeEntryOfTheSameTable => format!(
+                "该等于同一张树表里种类 2 条目的树 ID（这张表里的种类 2 条目：{inode_tree_identifiers:?}）"
+            ),
+            Self::Zero => "该等于 0".to_string(),
+            Self::NotJudged => "这一种不判".to_string(),
+        }
+    }
+}
 
 /// I-9.16（树表条目按树 ID 严格升序且合发号次序）：一版的树表判一次，两道任一道不成立即判红，第一处违例写明是哪一版、哪两条（下标从 0 数）。
 /// ① 盘上相邻两条的树 ID（条目打头 8 字节）严格升序；② 按发号次序（[`TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER`]），
@@ -2664,6 +3481,55 @@ fn judge_tree_table_entries_ordering(
     });
 }
 
+/// I-9.27（树表条目的头 ID 取值）：一版的树表判一次（树表被几版共享时只在第一个走到它的那一版判，同 I-9.16），每条条目按种类判一格
+/// （[`HeadIdentifierOfATreeTableEntry`]），第一处违例写明是哪一版、第几条（下标从 0 数）。树表 0 条的版本一格也不判。
+/// checker 自己按字段表切一份，不与实现共用代码（D13（验证路线） 已定项 5）。
+/// 条目宽不到头 ID 那 8 字节（盘上字段，`index_node_view` 只保证 ≥ key 宽 8）时读不出头 ID：这张树表不判，记成射程里判不了的那一部分
+/// （同 I-9.16 读不出种类那一格的处置）。
+fn judge_tree_table_entry_head_identifiers(
+    judgements: &mut Judgements,
+    tree_table_entries: &[Vec<u8>],
+    version_name: &str,
+) {
+    let head_identifiers_are_readable = tree_table_entries
+        .iter()
+        .all(|entry| entry.len() >= TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET + 8);
+    if !head_identifiers_are_readable {
+        judgements.part_of_the_range_not_judged(
+            HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES,
+            "树表单元自述的条目宽不到头 ID 那 8 字节（条目偏移 116 起）：这张树表的头 ID 读不出",
+        );
+        return;
+    }
+    let tree_identifier_of = |entry: &Vec<u8>| read_u64(entry, 0);
+    let kind_of = |entry: &Vec<u8>| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET);
+    let inode_tree_identifiers: Vec<u64> = tree_table_entries
+        .iter()
+        .filter(|entry| kind_of(entry) == TREE_KIND_INODE)
+        .map(tree_identifier_of)
+        .collect();
+    for (index, entry) in tree_table_entries.iter().enumerate() {
+        let tree = tree_identifier_of(entry);
+        let kind = kind_of(entry);
+        let head_identifier = read_u64(entry, TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET);
+        let expected = HeadIdentifierOfATreeTableEntry::of_tree_kind(kind);
+        let holds = match expected {
+            HeadIdentifierOfATreeTableEntry::ItsOwnTreeIdentifier => head_identifier == tree,
+            HeadIdentifierOfATreeTableEntry::TreeIdentifierOfAnInodeTreeEntryOfTheSameTable => {
+                inode_tree_identifiers.contains(&head_identifier)
+            }
+            HeadIdentifierOfATreeTableEntry::Zero => head_identifier == 0,
+            HeadIdentifierOfATreeTableEntry::NotJudged => continue,
+        };
+        judgements.judge(HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES, holds, || {
+            format!(
+                "{version_name}的树表：第 {index} 条（树 ID {tree}、种类 {kind}）的头 ID 是 {head_identifier}，{}",
+                expected.expectation(tree, &inode_tree_identifiers)
+            )
+        });
+    }
+}
+
 /// 一条分配记录在盘上的样子。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AllocationRecordView {
@@ -2695,7 +3561,11 @@ enum TreeKindForReferenceScan {
     Inode,
     Allocation,
     Accounting,
-    /// 条目格式还没有条款的树（livelist 6、稀疏旁表 7、deadlist 8 与这一版不认识的码）：day-1 注册的那三棵根指针为零、
+    /// `deleted_inodes`：只有一个码 2 根（层级 0），条目不引用别的单元。
+    DeletedInodes,
+    /// 墓碑树、谱系树：码 2 根之下是码 3 容器（条目照 inode 树内部节点的 120 字节形态）。
+    ContainerTree,
+    /// 条目格式还没有条款的树（livelist 6、稀疏旁表 7、deadlist 8、logged_ops 12 与这一版不认识的码）：day-1 注册的那几棵根指针为零、
     /// 走到这里就是它们真有了根节点，那时这条根的引用集合数不全。
     WithoutWalkableEntryFormat(u16),
 }
@@ -2707,6 +3577,8 @@ impl TreeKindForReferenceScan {
             TREE_KIND_INODE => TreeKindForReferenceScan::Inode,
             TREE_KIND_ALLOCATION => TreeKindForReferenceScan::Allocation,
             TREE_KIND_ACCOUNTING => TreeKindForReferenceScan::Accounting,
+            TREE_KIND_DELETED_INODES => TreeKindForReferenceScan::DeletedInodes,
+            TREE_KIND_TOMBSTONE | TREE_KIND_LINEAGE => TreeKindForReferenceScan::ContainerTree,
             unregistered => TreeKindForReferenceScan::WithoutWalkableEntryFormat(unregistered),
         }
     }
@@ -3225,7 +4097,252 @@ fn collect_tree_references(
             // 记账行不引用别的单元；多层时根之下的节点各占一个槽（D8（核心索引结构） 已定项 11：内部条目 = key 22 + 子指针 86）。
             note_every_node_below(reader, cache, references, node, KEY_SCHEMA_ACCOUNTING);
         }
+        // `deleted_inodes` 根的条目只是号，不引用别的单元（根自己由调用方记）。
+        TreeKindForReferenceScan::DeletedInodes => {}
+        TreeKindForReferenceScan::ContainerTree => {
+            if node.level == 1 && node.entry_width >= inode_internal_entry_bytes() {
+                for entry in &node.entries {
+                    references.note(&parse_node_pointer(&entry[34..120]));
+                }
+            } else {
+                // 根长高之后（层级 > 1）的引用集合这一遍还不往下数，如实记成数不全。
+                references.is_complete = false;
+            }
+        }
         TreeKindForReferenceScan::WithoutWalkableEntryFormat(_) => references.is_complete = false,
+    }
+}
+
+/// 走读到的一版里 I-5.5 要的三样：称呼（判红时写进第一处违例）、`checkpoint_txg` 与它的树表指针
+/// （根环里的根取根记录偏移 36 起的 86 字节，由记录施加出来的那一版取记录新根段里的那一条）。
+struct VersionToJudgeTheFirstDataUnitOf<'record> {
+    name: String,
+    checkpoint_txg: u64,
+    tree_table_pointer: &'record [u8],
+}
+
+/// I-5.5（从 mkfs 水位建树那一版的 t1 落点）：走读到的每一版（回退候选集里每条根，含由记录施加出来的那几版）各自重读一遍树表，
+/// ① 树表非空，且种类 1（extent 树）条目的树 ID 等于 mkfs 种下的水位 65536；② 树表里每条条目的诞生 txg（条目偏移 108）都等于这一版的
+/// `checkpoint_txg`——两样都成立就是从 mkfs 水位第一次建树的那一版：它的 extent 树引用的数据单元里，每块盘上落点槽号最小的那一个
+/// 要等于这一版的分配记录在那块盘上算出的落点（[`first_data_unit_slot_the_allocation_records_leave_on_a_device`]：从单元区起始槽号 U 起，
+/// 起点最小、32768 对齐、两槽都空、不在开放段里的那一对；U 是所选系统配置偏移 417）。不写死 U + 4：mkfs 的实例表（U、U + 1）被 COW 走、
+/// 过了回收门槛之后，实现照 D3（空间分配） 已定项 8 第 1 条把数据放在 U（用户 2026-10-04 定 I-5.5 按分配记录现算，判决
+/// `research/prompts/m3-formal-code-b17-r1-main-verification.md` 第二节 K2）。这一版没有数据单元时不判，不满足 ①② 的版本不判。
+/// 只读、不判别的不变量：主走读按 `visited_units` 只走一遍共享子树，共享的 extent 树只算进第一条走到它的版本，这一条要的是
+/// 「这一版自己引用了哪些数据单元」（与 [`references_of_root`] 同一个缘故）。
+///
+/// 下面几格 `.claude/kb/invariants.md` I-5.5 那一行没写，判不了，记成射程里判不了的那一部分（没有违例时整条报不适用、带理由），不替条款定：
+/// 树表读不出、条目宽不到字段表的 200 字节（认不出这一版是不是这一类）；种类 1 条目不止一条（① 读哪一条）；
+/// 认出来的那一版 extent 树读不全（数据单元数不全）；它有数据单元、而池里某块盘上一个都没有（那块盘上「最小的那一个」没有对象）；
+/// 种类 3（分配记录树）条目不是恰好一条、或那棵树读不全（落点算不出）。
+fn judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark(
+    reader: &dyn ImageReader,
+    versions: &[VersionToJudgeTheFirstDataUnitOf<'_>],
+    unit_area_start_slot: u64,
+    judgements: &mut Judgements,
+) {
+    let invariant = FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK;
+    let devices = reader.devices();
+    let mut cache = IndexNodeCache::new();
+    for version in versions {
+        let tree_table_pointer = parse_node_pointer(version.tree_table_pointer);
+        if tree_table_pointer.all_zero {
+            continue;
+        }
+        let Some(tree_table) =
+            read_index_node_without_judging(reader, &tree_table_pointer, &mut cache)
+        else {
+            judgements.part_of_the_range_not_judged(
+                invariant,
+                "有一版的树表读不出：认不出它是不是从 mkfs 水位第一次建树的那一版",
+            );
+            continue;
+        };
+        if tree_table.entries.is_empty() {
+            continue;
+        }
+        if tree_table
+            .entries
+            .iter()
+            .any(|entry| entry.len() < tree_table_entry_bytes())
+        {
+            judgements.part_of_the_range_not_judged(
+                invariant,
+                "有一版的树表条目宽不到字段表的 200 字节：认不出它是不是从 mkfs 水位第一次建树的那一版",
+            );
+            continue;
+        }
+        let extent_entries: Vec<&Vec<u8>> = tree_table
+            .entries
+            .iter()
+            .filter(|entry| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET) == TREE_KIND_EXTENT)
+            .collect();
+        let extent_entry = match extent_entries.as_slice() {
+            [] => continue,
+            [only_extent_entry] => *only_extent_entry,
+            [_, _, ..] => {
+                judgements.part_of_the_range_not_judged(
+                    invariant,
+                    "有一版的树表里种类 1（extent 树）条目不止一条：认法 ① 读哪一条，I-5.5 那一行没写",
+                );
+                continue;
+            }
+        };
+        let is_built_from_the_mkfs_watermark = read_u64(extent_entry, 0)
+            == TREE_IDENTIFIER_WATERMARK_AT_MKFS
+            && tree_table.entries.iter().all(|entry| {
+                read_u64(entry, TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET) == version.checkpoint_txg
+            });
+        if !is_built_from_the_mkfs_watermark {
+            continue;
+        }
+        let extent_root = parse_node_pointer(&extent_entry[14..100]);
+        if extent_root.all_zero {
+            continue;
+        }
+        let Some((_, data_pointers)) =
+            extent_tree_without_judging(reader, &extent_root, &mut cache)
+        else {
+            judgements.part_of_the_range_not_judged(
+                invariant,
+                "从 mkfs 水位第一次建树的那一版 extent 树读不全：它引用的数据单元数不全",
+            );
+            continue;
+        };
+        let mut smallest_data_unit_slot_on_each_device: BTreeMap<u32, u64> = BTreeMap::new();
+        for location in data_pointers
+            .iter()
+            .filter(|pointer| !pointer.all_zero)
+            .flat_map(|pointer| pointer.locations)
+        {
+            smallest_data_unit_slot_on_each_device
+                .entry(location.device)
+                .and_modify(|smallest_slot| *smallest_slot = (*smallest_slot).min(location.slot))
+                .or_insert(location.slot);
+        }
+        if smallest_data_unit_slot_on_each_device.is_empty() {
+            continue;
+        }
+        let allocation_entries: Vec<&Vec<u8>> = tree_table
+            .entries
+            .iter()
+            .filter(|entry| read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET) == TREE_KIND_ALLOCATION)
+            .collect();
+        let [allocation_entry] = allocation_entries.as_slice() else {
+            judgements.part_of_the_range_not_judged(
+                invariant,
+                "从 mkfs 水位第一次建树的那一版树表里种类 3（分配记录树）条目不是恰好一条：落点按哪一棵分配记录树算，I-5.5 那一行没写",
+            );
+            continue;
+        };
+        let Some((_, allocation_records)) = allocation_record_tree_without_judging(
+            reader,
+            &parse_node_pointer(&allocation_entry[14..100]),
+            &mut cache,
+        ) else {
+            judgements.part_of_the_range_not_judged(
+                invariant,
+                "从 mkfs 水位第一次建树的那一版分配记录树读不全：落点算不出",
+            );
+            continue;
+        };
+        for device in &devices {
+            match smallest_data_unit_slot_on_each_device.get(device) {
+                Some(&smallest_slot) => {
+                    let expected_slot = first_data_unit_slot_the_allocation_records_leave_on_a_device(
+                        &allocation_records,
+                        *device,
+                        version.checkpoint_txg,
+                        unit_area_start_slot,
+                        open_cluster_segment_named_by_the_tree_table_on_a_device(
+                            &tree_table_pointer,
+                            *device,
+                        ),
+                    );
+                    judgements.judge(invariant, smallest_slot == expected_slot, || {
+                        format!(
+                            "{}（从 mkfs 水位第一次建树的那一版）：盘 {device} 上落点最小的数据单元在槽 {smallest_slot}，不是这一版的分配记录从单元区起始槽号 {unit_area_start_slot} 起算出的落点 {expected_slot}",
+                            version.name
+                        )
+                    });
+                }
+                None => judgements.part_of_the_range_not_judged(
+                    invariant,
+                    "从 mkfs 水位第一次建树的那一版有数据单元、而池里有一块盘上一个都没有：那块盘上判不判，I-5.5 那一行没写",
+                ),
+            }
+        }
+    }
+}
+
+/// 一块盘上的开放段：起点是 64 的整数倍的 [`CLUSTER_SEGMENT_SLOTS`] 个槽（D3（空间分配） 已定项 10 ①）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct OpenClusterSegment {
+    first_slot: u64,
+}
+
+impl OpenClusterSegment {
+    fn holds_slot(self, slot: u64) -> bool {
+        self.first_slot <= slot && slot < self.first_slot + CLUSTER_SEGMENT_SLOTS
+    }
+}
+
+/// I-5.5 拿哪一段当这一版在这块盘上的开放段：这一版树表单元在这块盘上那一份所在的段（树表单元最末从开放段 bump，
+/// D3（空间分配） 已定项 10 ⑤）。树表指针在这块盘上没有位置条目时交回 `None`（这块盘上不排除哪一段）。
+fn open_cluster_segment_named_by_the_tree_table_on_a_device(
+    tree_table_pointer: &PointerView,
+    device: u32,
+) -> Option<OpenClusterSegment> {
+    tree_table_pointer
+        .locations
+        .iter()
+        .find(|location| location.device == device)
+        .map(|location| OpenClusterSegment {
+            first_slot: location.slot - location.slot % CLUSTER_SEGMENT_SLOTS,
+        })
+}
+
+/// I-5.5 的判据（用户 2026-10-04 定：按这一版的分配记录现算，D3（空间分配） 已定项 8 第 1 条、已定项 10 ② ③）：
+/// 从单元区起始槽号 U 起，这一版在 `device` 上起点最小、起点 32768 对齐（槽号是 [`DATA_UNIT_SLOTS`] 的整数倍；U 是 64 的整数倍，
+/// 读系统配置时判过）、两槽都空、不在开放段里的那一对槽的起点。「空」= 没有被「已释放、或分配代早于这一版」的分配记录罩着。
+/// 不看盘尾：比每一个被占的槽都靠后的那一对总是空的，交回的落点越过盘尾时与任何真落点都不等，照样判红。
+/// 迭代上界：跳过开放段至多一次（候选只增不减），其余每一轮跳过的那一对里至少有一个被占的槽，合计不超过被占槽数 + 1 轮。
+///
+/// 下面几样 checker 在这一版的盘面上复算不出，只能近似（攻方报告 `research/prompts/m3-formal-code-b17-r1-opus-output.md`
+/// 「K2-1、K2-2 打中之后的四句」第 2 句与「改法表」），都照实写进 `.claude/kb/invariants.md` I-5.5 那一行：
+/// - 回收门槛：已释放的记录一律当占着。实现按「释放代 ≤ max(F_生效, 环里最旧有效根)」回收（D3（空间分配） 已定项 7 清扫准入），
+///   这一版根里的 F、txg 与根环槽数盘上有，被抛弃的根与挂载那一刻读不出的槽盘上没有，门槛复算不出；记录在被重新分配之前一直写着已释放。
+///   ⇒ 写死从 U + 4 起扫的坏实现（攻方 H1）在「U、U + 1 已回收、还没被重新分配」的那几版上判成立，抓不到。
+/// - 这一版自己分配的记录（未释放、分配代等于这一版的 txg）当空：它们就是这一版取落点时还空着的槽（数据单元与提交内生块都在里面）。
+/// - 开放段盘上没有字段：拿这一版树表单元所在的段当它（[`open_cluster_segment_named_by_the_tree_table_on_a_device`]）；
+///   这次挂载更早开过、已经用尽的段认不出（段用尽才换段，用尽的段里剩不下起点对齐的空槽对）。
+/// - 分配准入合取（D3（空间分配） 已定项 7）里隔离位（影子账）、抬 F 扣住位、保护期内的 R 盘上都没有：没有分配记录罩着的槽一律当空。
+fn first_data_unit_slot_the_allocation_records_leave_on_a_device(
+    allocation_records: &[AllocationRecordView],
+    device: u32,
+    version_checkpoint_txg: u64,
+    unit_area_start_slot: u64,
+    open_cluster_segment: Option<OpenClusterSegment>,
+) -> u64 {
+    let occupied_slots: BTreeSet<u64> = allocation_records
+        .iter()
+        .filter(|record| {
+            record.device == device
+                && (record.is_released || record.generation < version_checkpoint_txg)
+        })
+        .flat_map(|record| record.slot..record.slot.saturating_add(record.span_slots))
+        .collect();
+    let mut candidate = unit_area_start_slot;
+    loop {
+        if let Some(segment) = open_cluster_segment.filter(|segment| segment.holds_slot(candidate))
+        {
+            candidate = segment.first_slot + CLUSTER_SEGMENT_SLOTS;
+            continue;
+        }
+        if (candidate..candidate + DATA_UNIT_SLOTS).all(|slot| !occupied_slots.contains(&slot)) {
+            return candidate;
+        }
+        candidate += DATA_UNIT_SLOTS;
     }
 }
 
@@ -3276,13 +4393,9 @@ fn judge_release_generations(
             "最新根那棵账里有已释放记录时，每条候选根都按「走到叶」扫过（`judge_release_generation_and_tree_table_birth` 定的深度）"
         );
     }
-    if !scanned.iter().all(|root| root.references.is_complete) {
-        judgements.not_applicable(
-            "I-3.9",
-            "有候选根走不完（单元读不出，或走到条目格式没有条款的形状）：引用集合数不全",
-        );
-        return;
-    }
+    // 守卫按记录收窄（`research/prompts/m3-inv-b-r1-main-verification.md` 第二节第 10 行）：比 L 晚的候选根有一条走不完，
+    // 这个落点可能藏在它读不出的节点下面（L 算小、T 算早），这一条跳过；L 及更早的根走不完不碍事——L 取的是还引用它的最大 txg。
+    let mut skipped_behind_an_incomplete_later_root = 0u64;
     let mut witnessed_records = 0u64;
     for record in released {
         let placement = (record.device, record.slot);
@@ -3296,6 +4409,13 @@ fn judge_release_generations(
             // 盘上那条记录仍写着已释放，D16（发布语义） 已定项 1 / D3（空间分配） 已定项 7）。这个镜像上找不到那条根，这一条判不了。
             continue;
         };
+        let a_later_root_is_incomplete = scanned
+            .iter()
+            .any(|root| root.checkpoint_txg > last_referencing_txg && !root.references.is_complete);
+        if a_later_root_is_incomplete {
+            skipped_behind_an_incomplete_later_root += 1;
+            continue;
+        }
         witnessed_records += 1;
         let first_root_without_it = scanned
             .iter()
@@ -3316,6 +4436,12 @@ fn judge_release_generations(
                 ),
             }
         });
+    }
+    if skipped_behind_an_incomplete_later_root > 0 {
+        judgements.part_of_the_range_not_judged(
+            "I-3.9",
+            "有带已释放标志的记录落在比还引用它的最后一条根晚、又走不完的候选根后面（单元读不出，或走到条目格式没有条款的形状）：那几条的 L 与 T 定不下",
+        );
     }
     if witnessed_records == 0 {
         judgements.not_applicable(
@@ -3564,13 +4690,13 @@ fn tree_table_pointer_of_the_version_the_next_mount_applies_first(
     let records_as_the_recovery_reads_them = records_as_the_recovery_reads_them(records_by_device);
     records_as_the_recovery_reads_them
         .iter()
-        .find(|(counter, record)| {
+        .find(|((_, counter), record)| {
             record.commit_marker == CommitMarker::Present
                 && record.instance == newest_root.instance
                 && record.checkpoint_txg == next_txg
                 && record_can_enter_a_replay_prefix(
                     &records_as_the_recovery_reads_them,
-                    **counter,
+                    *counter,
                     record,
                 )
         })
@@ -3730,6 +4856,8 @@ fn user_visible_tree_root_pointers(
             TreeKindForReferenceScan::Extent => &mut pointers.extent_tree,
             TreeKindForReferenceScan::Allocation
             | TreeKindForReferenceScan::Accounting
+            | TreeKindForReferenceScan::DeletedInodes
+            | TreeKindForReferenceScan::ContainerTree
             | TreeKindForReferenceScan::WithoutWalkableEntryFormat(_) => continue,
         };
         if pointer_of_this_tree
@@ -4230,7 +5358,8 @@ impl LocationEntryChecksumsForQuarantine<'_> {
 
 /// 收口表第 43 行取丁-defer（用户 2026-09-28 定，被攻过一轮；`research/prompts/abandoned-floor-r1-main-verification.md` M1）：
 /// I-3.1（已分配统计对得上） 的「实际遍历」并上这样的槽——F_生效 之下、没被抛弃的根引用着，候选集那一遍没走到，而最新根的分配记录树里
-/// 罩住它的记录是已释放、释放代高于 F_生效 的（还在 defer 里，抬 F 还不许回收，记账照算已分配）。逐盘交回槽数。
+/// 罩住它的记录是已释放、释放代高于回收门槛 `reclaim_threshold` = max(F_生效, 一圈窗口里最旧有效根) 的（还在 defer 里，分配器还不许回收，
+/// 记账照算已分配；门槛 2026-10-02 起取一圈窗口，D16（发布语义） 已定项 1）。逐盘交回槽数。
 /// 最新根的树表或分配记录树读不出时一槽都不并（照旧判）。
 fn deferred_slots_referenced_only_below_the_floor_per_device(
     reader: &dyn ImageReader,
@@ -4238,7 +5367,7 @@ fn deferred_slots_referenced_only_below_the_floor_per_device(
     newest_root: &crate::RootView,
     roots_below_the_floor: &[&crate::RootView],
     walked_slots: &BTreeSet<(u32, u64)>,
-    effective_rollback_floor: u64,
+    reclaim_threshold: u64,
     cache: &mut IndexNodeCache,
 ) -> BTreeMap<u32, u64> {
     let mut deferred_per_device: BTreeMap<u32, u64> = BTreeMap::new();
@@ -4265,7 +5394,8 @@ fn deferred_slots_referenced_only_below_the_floor_per_device(
             continue;
         };
         for record in records {
-            if record.is_released && record.generation > effective_rollback_floor {
+            if allocation_record_is_released_above_the_reclaim_threshold(&record, reclaim_threshold)
+            {
                 released_above_the_floor.extend(
                     (record.slot..record.slot + record.span_slots)
                         .map(|slot| (record.device, slot)),
@@ -4273,7 +5403,7 @@ fn deferred_slots_referenced_only_below_the_floor_per_device(
             }
         }
     }
-    let mut deferred: BTreeSet<(u32, u64)> = BTreeSet::new();
+    let mut slots_referenced_by_the_roots_below_the_floor: Vec<(u32, u64)> = Vec::new();
     for root in roots_below_the_floor {
         let mut walk_of_the_root_below_the_floor = Walk::starting_with(
             reader,
@@ -4284,18 +5414,91 @@ fn deferred_slots_referenced_only_below_the_floor_per_device(
         );
         walk_of_the_root_below_the_floor.walk_root(&root.record_bytes, false);
         for (device, start_slot, span_slots) in walk_of_the_root_below_the_floor.references.keys() {
-            for slot in *start_slot..*start_slot + *span_slots {
-                let key = (*device, slot);
-                if !walked_slots.contains(&key) && released_above_the_floor.contains(&key) {
-                    deferred.insert(key);
-                }
-            }
+            slots_referenced_by_the_roots_below_the_floor
+                .extend((*start_slot..*start_slot + *span_slots).map(|slot| (*device, slot)));
         }
     }
+    let deferred = deferred_slots_among_the_references_of_the_selected_roots(
+        slots_referenced_by_the_roots_below_the_floor,
+        walked_slots,
+        &released_above_the_floor,
+    );
     for (device, _) in deferred {
         *deferred_per_device.entry(device).or_insert(0) += 1;
     }
     deferred_per_device
+}
+
+/// 一条根按最新根指着的实例表是有效的还是被抛弃的（D23（journal 的角色与格式） 已定项 14 候选集：(i, T) 有效 ⟺ 无 i 的行，
+/// 或有行 (i, Ti, Wi) 且 T ≤ Ti）。丁-defer 选根与它的回收门槛都按它分。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RootStandingInTheNewestRootsTable {
+    Valid,
+    Abandoned,
+}
+
+/// 丁-defer 的选根式（收口表第 43 行，用户 2026-09-28 定）：引用要并进 I-3.1（已分配统计对得上） 的「实际遍历」的根，
+/// 是按最新根的实例表有效、txg 在 F_生效 之下的那几条。被抛弃的根不并：它们独占的槽由影子账隔离、在现行账里不是已释放。
+/// 「被抛弃的根也并」那一式（遗留判决 LR5）在合法盘面上与这一式并进同一组槽，只在双故障形下可能不同，
+/// 等价性留档在 `tests` 的小世界穷举里（`deferred_selection_merging_the_abandoned_roots_too_selects_the_same_slots_on_every_small_world_but_the_double_fault_form`）。
+fn root_references_are_merged_into_the_deferred_slots_below_the_floor(
+    standing: RootStandingInTheNewestRootsTable,
+    checkpoint_txg: u64,
+    effective_rollback_floor: u64,
+) -> bool {
+    match standing {
+        RootStandingInTheNewestRootsTable::Valid => checkpoint_txg < effective_rollback_floor,
+        RootStandingInTheNewestRootsTable::Abandoned => false,
+    }
+}
+
+/// 丁-defer 的门槛与分配器的回收门槛同一个：max(F_生效, 一圈窗口里最旧有效根)（D16（发布语义） 已定项 1，五处同改之一；
+/// `research/prompts/m3-ring-r3-main-verification.md` 第二节第 5 行）——释放代落在 (F_生效, 窗口里最旧有效根] 的槽分配器已经回收、
+/// 不在「已分配」里，再按 F_生效 并进来就多算。窗口里一条有效根都没有时取 F_生效。
+fn deferred_slots_reclaim_threshold(
+    standing_and_txg_of_each_readable_root: impl IntoIterator<
+        Item = (RootStandingInTheNewestRootsTable, u64),
+    >,
+    window: OneRevolutionWindow,
+    effective_rollback_floor: u64,
+) -> u64 {
+    standing_and_txg_of_each_readable_root
+        .into_iter()
+        .filter(|(standing, checkpoint_txg)| match standing {
+            RootStandingInTheNewestRootsTable::Valid => window.contains(*checkpoint_txg),
+            RootStandingInTheNewestRootsTable::Abandoned => false,
+        })
+        .map(|(_, checkpoint_txg)| checkpoint_txg)
+        .min()
+        .map_or(
+            effective_rollback_floor,
+            |oldest_valid_root_in_the_window| {
+                oldest_valid_root_in_the_window.max(effective_rollback_floor)
+            },
+        )
+}
+
+/// 最新根的账里这条记录还在 defer 里：已释放、释放代高于回收门槛（分配器还不许回收，记账照算已分配）。
+fn allocation_record_is_released_above_the_reclaim_threshold(
+    record: &AllocationRecordView,
+    reclaim_threshold: u64,
+) -> bool {
+    record.is_released && record.generation > reclaim_threshold
+}
+
+/// 丁-defer 并进来的槽：选中的根引用着（`slots_referenced_by_the_selected_roots`，(盘, 槽)，可以重复）、候选集那一遍没走到、
+/// 最新根的账里还在 defer 里的。
+fn deferred_slots_among_the_references_of_the_selected_roots(
+    slots_referenced_by_the_selected_roots: impl IntoIterator<Item = (u32, u64)>,
+    walked_slots: &BTreeSet<(u32, u64)>,
+    released_above_the_reclaim_threshold: &BTreeSet<(u32, u64)>,
+) -> BTreeSet<(u32, u64)> {
+    slots_referenced_by_the_selected_roots
+        .into_iter()
+        .filter(|key| {
+            !walked_slots.contains(key) && released_above_the_reclaim_threshold.contains(key)
+        })
+        .collect()
 }
 
 /// 隔离的记录（D19（块指针的结构与宽度预算） 已定项 5：释放之前读盘核出对不上的那个单元，每块盘上的分配记录都留在已分配，
@@ -4894,7 +6097,8 @@ struct ScannedJournalRecord {
     instance: u32,
     /// 记录头里的 checkpoint_txg：这条记录施加出来的是哪一版（「由记录施加出来、根槽从没落盘的那一版」按它认）。
     checkpoint_txg: u64,
-    /// 记录头里的新根段 188 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8，D23（journal 的角色与格式） 已定项 4）：
+    /// 记录头里的新根段 364 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4，
+    /// D23（journal 的角色与格式） 已定项 4 / 已定项 15）：
     /// 这条记录施加出来的那一版从哪个树表、哪个映射根走下去。
     new_root_segment: Vec<u8>,
     /// 记录头里的事务号（D23（journal 的角色与格式） 已定项 7）：I-8.7（实例内事务号不重号） 判的就是它。
@@ -4907,10 +6111,12 @@ struct ScannedJournalRecord {
     record_flags_byte: u8,
     slot: u64,
     back_chain: u32,
-    /// CRC32C(这一条的 311 字节头，`header_csum` 那 32 字节按零参与)——I-8.6（反向链算法） 的算式。
+    /// CRC32C(这一条的 487 字节头，`header_csum` 那 32 字节按零参与)——I-8.6（反向链算法） 的算式。
     chain_value_the_next_record_must_carry: u32,
     /// 每个点名项的两条位置条目（D23（journal 的角色与格式） 已定项 17）：I-2.5（位置条目按设备身份升序） 逐项判。
     named_entry_locations: Vec<[PointerLocation; 2]>,
+    /// 点名项解出来的样子（类标签、出生树、诞生代号、key 尾段与两条位置条目）：I-8.11（点名项与被指单元头相同） 逐项判。
+    named_entries: Vec<NamedEntryView>,
 }
 
 /// 一块盘的 journal 环里自证过的记录，按 jsn 计数器索引。计数器与环槽一一对应（记录 n 落 `(计数器 − 1) mod 槽数 × 4096`，
@@ -4960,6 +6166,7 @@ fn scanned_journal_records_of_device(
                         })
                     })
                     .collect(),
+                named_entries: record.named,
             },
         );
     }
@@ -5022,16 +6229,19 @@ fn expected_back_chain_of(
     }
 }
 
-/// 恢复眼里的 journal 环：每个计数器取按盘的次序（`reader.devices()`，与恢复扫环按 `device_identities()` 的次序相同）第一块盘上
-/// 自证过的那一份。I-8.6（反向链算法） 那一判逐盘判两份（一块盘上的链坏了另一块不该跟着坏）；认「恢复施加过 / 下一次挂载会施加」
+/// 恢复眼里的 journal 环：键是 (实例代号, 计数器)，每个键取按盘的次序（`reader.devices()`，与恢复扫环按 `device_identities()` 的次序相同）
+/// 第一块盘上自证过的那一份——与实现扫环建表同一个键（`crates/singlefs-core/src/recovery.rs` 的 `scan_journal`），两块盘同一计数器坐着
+/// 不同实例的记录时两条都留（I-4.1 那一行：`records_the_replay_reads` 先改了键，这两处同改，主 agent 2026-10-03 定）。I-8.6（反向链算法） 那一判逐盘判两份（一块盘上的链坏了另一块不该跟着坏）；认「恢复施加过 / 下一次挂载会施加」
 /// 哪几条记录时照恢复的读法只看这一份（实审 A2a 报告「checker 要跟着改什么」第 1 条，`research/prompts/m2-rev-a2a-implementer-report.md`）。
 fn records_as_the_recovery_reads_them(
     records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
-) -> BTreeMap<u64, &ScannedJournalRecord> {
-    let mut first_copies: BTreeMap<u64, &ScannedJournalRecord> = BTreeMap::new();
+) -> BTreeMap<(u32, u64), &ScannedJournalRecord> {
+    let mut first_copies: BTreeMap<(u32, u64), &ScannedJournalRecord> = BTreeMap::new();
     for (_, records) in records_by_device {
         for (counter, record) in records {
-            first_copies.entry(*counter).or_insert(record);
+            first_copies
+                .entry((record.instance, *counter))
+                .or_insert(record);
         }
     }
     first_copies
@@ -5039,25 +6249,22 @@ fn records_as_the_recovery_reads_them(
 
 /// I-8.6「不等的记录不进重放前缀」（代码审阅 6c 第 25 条，用户 2026-09-27 定恢复补反向链检查、checker 的前缀口径跟着对齐）：
 /// 照恢复的判法（`crates/singlefs-core/src/recovery.rs` 的 `judge_back_chain_against_the_previous_record_on_disk`，实审 A2a）——
-/// 本实例内逻辑前一条（同一实例、计数器小 1）在盘上、它的头算出来的链值与这一条的反向链不等，这一条进不了前缀。
+/// 本实例内逻辑前一条（同一实例、计数器小 1，在 [`records_as_the_recovery_reads_them`] 里按 (实例代号, 计数器 − 1) 找）在盘上、
+/// 它的头算出来的链值与这一条的反向链不等，这一条进不了前缀。
 /// 恢复只判这一种：前缀都接在所选根覆盖的那一条之后、同一实例，计数器 1、前一条是别的实例、前一条不在盘上都不判
 /// （A2a 报告那一节第 2 条；I-8.6 那一判对前两种照条款判「链恒 0」，前缀这里不跟着判）。计数器 0 进不了前缀
 /// （jsn 从所选根覆盖的那一条 + 1 起严格连续，计数器从 1 起，D23（journal 的角色与格式） 已定项 18）。
 fn record_can_enter_a_replay_prefix(
-    records_as_the_recovery_reads_them: &BTreeMap<u64, &ScannedJournalRecord>,
+    records_as_the_recovery_reads_them: &BTreeMap<(u32, u64), &ScannedJournalRecord>,
     counter: u64,
     record: &ScannedJournalRecord,
 ) -> bool {
     let Some(previous_counter) = counter.checked_sub(1) else {
         return false;
     };
-    match records_as_the_recovery_reads_them.get(&previous_counter) {
-        Some(previous) if previous.instance == record.instance => {
-            record.back_chain == previous.chain_value_the_next_record_must_carry
-        }
-        Some(_record_of_another_instance) => true,
-        None => true,
-    }
+    records_as_the_recovery_reads_them
+        .get(&(record.instance, previous_counter))
+        .is_none_or(|previous| record.back_chain == previous.chain_value_the_next_record_must_carry)
 }
 
 /// 逐盘扫一遍 journal 环，把自证过的记录按盘收齐：判 journal 的四条不变量（I-8.6（反向链算法）、
@@ -5085,7 +6292,7 @@ fn scanned_journal_records_by_device(
         .collect()
 }
 
-/// I-8.6（反向链算法）：任一 journal 记录的反向链 = CRC32C(**本实例内逻辑前一条**记录的 311 字节头，`header_csum` 那 32 字节
+/// I-8.6（反向链算法）：任一 journal 记录的反向链 = CRC32C(**本实例内逻辑前一条**记录的 487 字节头，`header_csum` 那 32 字节
 /// 按零参与)；**本实例写出的第一条记录反向链恒 0**。逐盘判：环两盘互为镜像，一块盘上的链坏了另一块不该跟着坏。
 /// 「本实例内逻辑前一条」= 同一实例、计数器小 1 的那一条，三种情形穷举：
 /// ① 计数器 == 1 ⇒ 全池第一条，必是本实例第一条 ⇒ 反向链恒 0；
@@ -5522,17 +6729,90 @@ fn judge_publish_ordinals_and_last_record_flags(
     }
 }
 
-/// 记录新根段里两条指针的落点（D23（journal 的角色与格式） 已定项 4 的字段表：树表指针 86、映射根指针 86，再往后是树 ID 水位 8 与 F 8）。
+/// 记录新根段七段的落点（D23（journal 的角色与格式） 已定项 4 / 已定项 15 的字段表：树表指针 86、映射根指针 86、树 ID 水位 8、F 8、
+/// 实例表指针 86、分配记录树根指针 86、卸载记号 4）。
 const NEW_ROOT_SEGMENT_TREE_TABLE_POINTER: std::ops::Range<usize> = 0..86;
 const NEW_ROOT_SEGMENT_MAPPING_ROOT_POINTER: std::ops::Range<usize> = 86..172;
-/// 根记录里新根段之外、由记录重建的根照所选根的两条指针（D22（单元原子性怎么合成） 已定项 7 的偏移表：实例表指针 86 在 170，
-/// 树表 0 条那一版的分配记录树的根 86 在 342）。
+const NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK: std::ops::Range<usize> = 172..180;
+const NEW_ROOT_SEGMENT_ROLLBACK_FLOOR: std::ops::Range<usize> = 180..188;
+const NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER: std::ops::Range<usize> = 188..274;
+const NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER: std::ops::Range<usize> = 274..360;
+const NEW_ROOT_SEGMENT_UNMOUNT_MARKER: std::ops::Range<usize> = 360..364;
+/// 根记录里与新根段七段同名的七段（D22（单元原子性怎么合成） 已定项 7 的偏移表：flags 20（位 0 是卸载记号）、树表指针 36、
+/// 树 ID 水位 122、F 130、实例表指针 170、映射根指针 256、树表 0 条那一版的分配记录树根 342）。
+const ROOT_RECORD_FLAGS: std::ops::Range<usize> = 20..24;
+const ROOT_RECORD_TREE_TABLE_POINTER: std::ops::Range<usize> = 36..122;
+const ROOT_RECORD_TREE_IDENTIFIER_WATERMARK: std::ops::Range<usize> = 122..130;
+const ROOT_RECORD_ROLLBACK_FLOOR: std::ops::Range<usize> = 130..138;
 const ROOT_RECORD_INSTANCE_TABLE_POINTER: std::ops::Range<usize> = 170..256;
+const ROOT_RECORD_MAPPING_ROOT_POINTER: std::ops::Range<usize> = 256..342;
+
+/// I-8.10 逐字节比的七对：(这一段叫什么, 新根段里的落点, 根记录里的落点)。卸载记号对的是根记录 flags 整 4 字节：
+/// 两边同一个编码（位 0），根记录 flags 其余位非 0 的根自证不过、进不了这里，新根段那 4 字节位 0 之外非 0 的记录也进不了这里（RR1）。
+const NEW_ROOT_SEGMENT_FIELDS_COMPARED_WITH_THE_ROOT: &[(
+    &str,
+    std::ops::Range<usize>,
+    std::ops::Range<usize>,
+)] = &[
+    (
+        "树表指针",
+        NEW_ROOT_SEGMENT_TREE_TABLE_POINTER,
+        ROOT_RECORD_TREE_TABLE_POINTER,
+    ),
+    (
+        "映射根指针",
+        NEW_ROOT_SEGMENT_MAPPING_ROOT_POINTER,
+        ROOT_RECORD_MAPPING_ROOT_POINTER,
+    ),
+    (
+        "树 ID 水位",
+        NEW_ROOT_SEGMENT_TREE_IDENTIFIER_WATERMARK,
+        ROOT_RECORD_TREE_IDENTIFIER_WATERMARK,
+    ),
+    (
+        "回退下界 F",
+        NEW_ROOT_SEGMENT_ROLLBACK_FLOOR,
+        ROOT_RECORD_ROLLBACK_FLOOR,
+    ),
+    (
+        "实例表指针",
+        NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER,
+        ROOT_RECORD_INSTANCE_TABLE_POINTER,
+    ),
+    (
+        "分配记录树根指针",
+        NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER,
+        ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT,
+    ),
+    (
+        "卸载记号",
+        NEW_ROOT_SEGMENT_UNMOUNT_MARKER,
+        ROOT_RECORD_FLAGS,
+    ),
+];
 /// 根记录里实例代号 4 字节与 `checkpoint_txg` 8 字节的偏移（D22（单元原子性怎么合成） 已定项 7 的偏移表，与 `check_root_slot` 读的同一处）：
 /// I-9.16 判红时拿它们说是哪一版根。
 const ROOT_RECORD_INSTANCE_OFFSET: usize = 24;
 const ROOT_RECORD_CHECKPOINT_TXG_OFFSET: usize = 28;
+/// 根记录里「树表 0 条那一版的分配记录树的根」86 在 342（D22（单元原子性怎么合成） 已定项 7 的偏移表）。
 const ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT: std::ops::Range<usize> = 342..428;
+
+/// 一圈窗口（D16（发布语义） 已定项 1「一圈窗口里最旧有效根」，用户 2026-10-02 定）：N = 镜像根环里读得出的最新有效根的 txg，
+/// 窗口 = txg > N − 3S（3S 是环长，根环槽数）。同取这个窗口的五处里 checker 占两处：候选过滤（还有「由记录施加出来的那一版」
+/// 判回收用的最旧有效根）与 I-3.1（已分配统计对得上） 丁-defer 的门槛。窗口之外的有效根是环上有洞时留在洞那一槽里的上一圈的根，
+/// 分配器的回收门槛不再被它压住（`crates/singlefs-core/src/allocator.rs` 的 `RootRingOccupancy::oldest_valid_root_in_the_window`）。
+#[derive(Clone, Copy, Debug)]
+struct OneRevolutionWindow {
+    newest_valid_root_txg: u64,
+    root_ring_slot_count: u64,
+}
+
+impl OneRevolutionWindow {
+    /// txg 落在窗口里：txg > N − 3S，写成 txg + 3S > N（N < 3S 时整个环都在窗口里，不减出负数）。
+    fn contains(self, checkpoint_txg: u64) -> bool {
+        checkpoint_txg.saturating_add(self.root_ring_slot_count) > self.newest_valid_root_txg
+    }
+}
 
 /// 由记录施加出来、根槽从没落盘的那一版：一条 journal 记录自带新根段（树表指针与映射根指针），恢复把它施加在所选根之上，
 /// 这一版就成了现行版；之后写行那次发布把它换下的单元放进 defer——那些单元仍占着空间、仍算在「已分配」里，
@@ -5541,10 +6821,6 @@ struct VersionAppliedOnlyByRecords {
     instance: u32,
     checkpoint_txg: u64,
     new_root_segment: Vec<u8>,
-    /// 它施加在其上那一版的根记录：根环里同一实例、txg 比它小的根里 txg 最大的那一条（施加一条记录只换新根段那四个字段，
-    /// 实例表指针与树表 0 条那一版的分配记录树的根照所选根；一个实例写行之后它的每一版照抄同一张实例表，隔着几条也是同一份）。
-    /// 那条根在不在回退候选集里都取。环里一条都读不出时是 None。
-    root_record_of_the_version_it_was_applied_on: Option<Vec<u8>>,
 }
 
 impl VersionAppliedOnlyByRecords {
@@ -5567,8 +6843,8 @@ impl VersionAppliedOnlyByRecords {
 ///    记录要带提交标记（D23（journal 的角色与格式） 已定项 7：不带的是恢复要丢的尾巴）。
 /// ② **它的根槽读不出**：根环里自证过的根没有一条是 (i, 这个 txg)。读得出的那一版照常由根环那一路走。
 /// ③ **不低于回退下界**：txg ≥ 最新根带的 F，与根环里的候选根同一条（D16（发布语义） 已定项 1）。
-/// ④ **它换下的单元还没到回收的时候**：根环里有一条没被实例表判抛弃的根，txg 比它小。
-///    理由：一个单元只被这一版引用时，它的释放代大于这一版的 txg；回收要「释放代 ≤ max(F_生效, 环里最旧有效根)」
+/// ④ **它换下的单元还没到回收的时候**：一圈窗口（[`OneRevolutionWindow`]）里有一条没被实例表判抛弃的根，txg 比它小。
+///    理由：一个单元只被这一版引用时，它的释放代大于这一版的 txg；回收要「释放代 ≤ max(F_生效, 一圈窗口里最旧有效根)」
 ///    （D3（空间分配） 已定项 7）。环里最旧的有效根比这一版老 ⇒ 最旧有效根 < 这一版 < 释放代，③ 又让 F ≤ 这一版 ⇒ 回收不了，
 ///    它们还算在已分配里；反过来环里最旧的有效根已经比这一版新，这一版里只有它引用的单元释放代都不超过那条根，已可回收复用，
 ///    再把它并进来就是拿已经不归它的槽去比。
@@ -5579,6 +6855,7 @@ fn versions_applied_only_by_records(
     roots: &[(u64, u64, crate::RootView)],
     instance_table_rows: &[InstanceTableRow],
     rollback_floor: u64,
+    window: OneRevolutionWindow,
 ) -> Vec<VersionAppliedOnlyByRecords> {
     let is_abandoned = |instance: u32, checkpoint_txg: u64| {
         instance_table_rows
@@ -5587,7 +6864,10 @@ fn versions_applied_only_by_records(
     };
     let Some(oldest_valid_root_txg) = roots
         .iter()
-        .filter(|(_, _, root)| !is_abandoned(root.instance, root.checkpoint_txg))
+        .filter(|(_, _, root)| {
+            !is_abandoned(root.instance, root.checkpoint_txg)
+                && window.contains(root.checkpoint_txg)
+        })
         .map(|(_, _, root)| root.checkpoint_txg)
         .min()
     else {
@@ -5596,7 +6876,7 @@ fn versions_applied_only_by_records(
     let mut versions: BTreeMap<(u32, u64), Vec<u8>> = BTreeMap::new();
     // 按恢复的读法（每个计数器取第一块盘上的那一份）：反向链对不上的记录不进重放前缀（I-8.6（反向链算法）），不算被哪一次恢复施加过。
     let records_as_the_recovery_reads_them = records_as_the_recovery_reads_them(records_by_device);
-    for (counter, record) in &records_as_the_recovery_reads_them {
+    for ((_, counter), record) in &records_as_the_recovery_reads_them {
         let applied_by_a_recovery = record.commit_marker == CommitMarker::Present
             && record_can_enter_a_replay_prefix(
                 &records_as_the_recovery_reads_them,
@@ -5629,13 +6909,6 @@ fn versions_applied_only_by_records(
                 instance,
                 checkpoint_txg,
                 new_root_segment,
-                root_record_of_the_version_it_was_applied_on: roots
-                    .iter()
-                    .filter(|(_, _, root)| {
-                        root.instance == instance && root.checkpoint_txg < checkpoint_txg
-                    })
-                    .max_by_key(|(_, _, root)| root.checkpoint_txg)
-                    .map(|(_, _, root)| root.record_bytes.clone()),
             },
         )
         .collect()
@@ -5708,6 +6981,540 @@ fn judge_blocks_referenced_by_abandoned_roots(
     }
 }
 
+/// I-8.10（记录新根段与同代根相同）：逐盘，按 (实例代号, `checkpoint_txg`) 分组，组里带末条标志（记录标志位 0）的恰一条时，
+/// 它的新根段七段与根环里同 (实例代号, `checkpoint_txg`) 的每条自证过的根的同名七段逐字节相同（D23（journal 的角色与格式） 已定项 15；
+/// 用户 2026-10-03 定从四段扩到七段）：新根段 [0..86) = 根 [36..122)、[86..172) = [256..342)、[172..180) = [122..130)、
+/// [180..188) = [130..138)、[188..274) = [170..256)、[274..360) = [342..428)、[360..364) = flags [20..24)
+/// （[`NEW_ROOT_SEGMENT_FIELDS_COMPARED_WITH_THE_ROOT`]）。
+/// 末条标志不唯一的组归 I-8.9（一次发布的记录序号连续且只有末条带标志），不判；同 (实例, txg) 有两条以上不同内容的根不另分，逐条比。
+fn judge_new_root_segment_of_the_last_record_against_the_roots(
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+    roots: &[(u64, u64, crate::RootView)],
+    judgements: &mut Judgements,
+) {
+    let mut pairs_compared: u64 = 0;
+    for (device, records) in records_by_device {
+        let mut last_records_of_each_publish: BTreeMap<(u32, u64), Vec<u64>> = BTreeMap::new();
+        for (counter, record) in records {
+            if record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0 {
+                last_records_of_each_publish
+                    .entry((record.instance, record.checkpoint_txg))
+                    .or_default()
+                    .push(*counter);
+            }
+        }
+        for ((instance, checkpoint_txg), counters) in last_records_of_each_publish {
+            let [counter] = counters.as_slice() else {
+                continue;
+            };
+            let segment = &records[counter].new_root_segment;
+            for (region, slot, root) in roots {
+                if (root.instance, root.checkpoint_txg) != (instance, checkpoint_txg) {
+                    continue;
+                }
+                pairs_compared += 1;
+                let root_bytes = &root.record_bytes;
+                let differing_fields: Vec<&str> = NEW_ROOT_SEGMENT_FIELDS_COMPARED_WITH_THE_ROOT
+                    .iter()
+                    .filter(|(_, in_the_segment, in_the_root)| {
+                        segment[in_the_segment.clone()] != root_bytes[in_the_root.clone()]
+                    })
+                    .map(|(name, _, _)| *name)
+                    .collect();
+                judgements.judge(
+                    LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
+                    differing_fields.is_empty(),
+                    || {
+                        format!(
+                            "盘 {device} journal 计数器 {counter} 那条带末条标志的记录（实例 {instance}、txg {checkpoint_txg}）的新根段与区域 {region} 槽 {slot} 那条同代根这几段不逐字节相同：{}",
+                            differing_fields.join("、")
+                        )
+                    },
+                );
+            }
+        }
+    }
+    if pairs_compared == 0 {
+        judgements.not_applicable(
+            LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
+            "环里没有哪条带末条标志、同 (实例, txg) 只此一条的记录在根环里有同代的自证根：新根段没有可比的根",
+        );
+    }
+}
+
+/// I-8.11（点名项与被指单元头相同）：环里每条自证过的记录（逐盘）的每个点名项的每条位置条目，按类读那一份（码 2 一个节点，码 1 / 码 3
+/// 一个数据单元宽；类标签不在登记表里的不知道多长，不读），整单元校验和与位置条目里的相符时，单元头里的类标签、诞生代号、写序实例代号与尾段
+/// （码 1 事务号 6 字节；码 2 / 码 3 出生序号 4 + 补零 2，按 6 字节整数比同时判了补零恒 0）与点名项逐字段相同；出生树只判码 1、码 3
+/// （头偏移 43），码 2 随 C289（码 2 的出生树取哪个字段没写） 不判。校验和不相符的不判：落点被合法复用之后，那里就不是它点名的单元了。
+fn judge_named_entries_against_the_unit_headers(
+    reader: &dyn ImageReader,
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+    judgements: &mut Judgements,
+) {
+    let mut locations_compared: u64 = 0;
+    for (device, records) in records_by_device {
+        for (counter, record) in records {
+            for (index, named) in record.named_entries.iter().enumerate() {
+                let unit_bytes = match MappingKeyUnitClass::of(named.unit_class) {
+                    MappingKeyUnitClass::DataUnit | MappingKeyUnitClass::PackedRecordUnit => {
+                        data_unit_bytes()
+                    }
+                    MappingKeyUnitClass::IndexNode => node_bytes(),
+                    MappingKeyUnitClass::Unregistered(_) => continue,
+                };
+                for (location_device, location_slot, checksum) in named.locations {
+                    let Some(unit) =
+                        reader.read(location_device, location_slot * SLOT_BYTES, unit_bytes)
+                    else {
+                        continue;
+                    };
+                    if crc32_castagnoli_table(&unit) != checksum {
+                        continue;
+                    }
+                    locations_compared += 1;
+                    let named_instance = read_u32(&named.key_tail, 0);
+                    let named_tail = read_six_byte_unsigned(&named.key_tail, 4);
+                    let identity_matches =
+                        birth_identity_in_the_header(&unit).is_some_and(|identity| {
+                            identity.write_order.birth_txg() == named.birth_txg
+                                && identity.write_order.instance() == named_instance
+                                && identity.tail.birth_identity_tail_number() == named_tail
+                        });
+                    let birth_tree_matches =
+                        match birth_tree_in_the_header_as_the_mapping_key_names_it(&unit) {
+                            Some(BirthTreeInTheHeader::AtOffsetFortyThree(birth_tree)) => {
+                                birth_tree == named.birth_tree
+                            }
+                            Some(BirthTreeInTheHeader::FieldStillOpenUnderC289) | None => true,
+                        };
+                    let holds =
+                        unit[6] == named.unit_class && identity_matches && birth_tree_matches;
+                    judgements.judge(NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, holds, || {
+                        format!(
+                            "盘 {device} journal 计数器 {counter} 那条记录第 {index} 个点名项（类 {}、出生树 {}、诞生代号 {}、实例 {named_instance}、尾段 {named_tail}）与盘 {location_device} 槽 {location_slot} 那一份单元头（类 {}）不符",
+                            named.unit_class, named.birth_tree, named.birth_txg, unit[6]
+                        )
+                    });
+                }
+            }
+        }
+    }
+    if locations_compared == 0 {
+        judgements.not_applicable(
+            NAMED_ENTRY_MATCHES_THE_UNIT_HEADER,
+            "环里没有哪个点名项的位置条目指着一份整单元校验和与它相符的单元：点名项没有可比的单元头",
+        );
+    }
+}
+
+/// I-8.12（同实例记录的 txg 不减）：逐盘，同一实例代号的自证记录按 jsn 计数器从小到大，`checkpoint_txg` 不减；
+/// 只比同实例的前后两条，中间夹着别的实例的记录不管；换实例之后严格大于不判（设备失而复得下没核）。
+fn judge_journal_record_txg_per_instance(
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+    judgements: &mut Judgements,
+) {
+    for (device, records) in records_by_device {
+        let mut previous_record_of_each_instance: BTreeMap<u32, (u64, u64)> = BTreeMap::new();
+        for (counter, record) in records {
+            if let Some((previous_counter, previous_txg)) = previous_record_of_each_instance
+                .insert(record.instance, (*counter, record.checkpoint_txg))
+            {
+                judgements.judge(
+                    JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE,
+                    record.checkpoint_txg >= previous_txg,
+                    || {
+                        format!(
+                            "盘 {device} 实例 {} 的 journal 记录：计数器 {previous_counter} 的 txg {previous_txg} 之后，计数器 {counter} 的 txg {} 变小了",
+                            record.instance, record.checkpoint_txg
+                        )
+                    },
+                );
+            }
+        }
+    }
+}
+
+/// I-3.12（实例表行 T 低于引用它的根的 txg）：根环里每条自证过的根，它自己指着的实例表（沿链读，只读不判）每一行 (i, T, W) 满足
+/// T < 这条根的 `checkpoint_txg`（D18（块里携带什么信息） 已定项 11、D23（journal 的角色与格式） 已定项 14）。链上某一片读不出的根不判；
+/// 一行都没判到时整条报不适用。
+fn judge_instance_table_rows_against_the_roots_referencing_them(
+    reader: &dyn ImageReader,
+    roots: &[(u64, u64, crate::RootView)],
+    judgements: &mut Judgements,
+) {
+    let mut rows_judged: u64 = 0;
+    for (_, _, root) in roots {
+        let Some(rows) = instance_table_rows_of_root_without_judging(reader, &root.record_bytes)
+        else {
+            continue;
+        };
+        for row in rows {
+            rows_judged += 1;
+            judgements.judge(
+                INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
+                row.published_checkpoint_txg < root.checkpoint_txg,
+                || {
+                    format!(
+                        "实例 {}、txg {} 的根指着的实例表里，实例 {} 那一行的 T {} 不小于这条根的 txg",
+                        root.instance,
+                        root.checkpoint_txg,
+                        row.instance,
+                        row.published_checkpoint_txg
+                    )
+                },
+            );
+        }
+    }
+    if rows_judged == 0 {
+        judgements.not_applicable(
+            INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
+            "根环里没有哪条根指着一张读得出、有行的实例表",
+        );
+    }
+}
+
+/// [`JOURNAL_RING_GEOMETRY_FIELDS_AGREE`]（I-8.1）读 journal 环的那一格：逐盘，环里同一实例、同一 `checkpoint_txg` 的自证记录
+/// （同一次发布）不多于系统配置里记的在飞记录数上限条，每个 (盘, 实例, txg) 判一格。上限取池里第一块择到系统配置的盘那一份
+/// （各盘的几何本来是同一份，`check_pool_image` 走根环也只取它）。环里一条记录都没有时这一格没有对象，三个字段等式那一半照判。
+fn judge_records_of_one_publish_within_the_in_flight_record_limit(
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+    declared_in_flight_record_limit: u64,
+    judgements: &mut Judgements,
+) {
+    for (device, records) in records_by_device {
+        let mut records_per_publish: BTreeMap<(u32, u64), u64> = BTreeMap::new();
+        for record in records.values() {
+            *records_per_publish
+                .entry((record.instance, record.checkpoint_txg))
+                .or_insert(0) += 1;
+        }
+        for ((instance, checkpoint_txg), record_count) in records_per_publish {
+            judgements.judge(
+                JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
+                record_count <= declared_in_flight_record_limit,
+                || {
+                    format!(
+                        "盘 {device} journal 环里实例 {instance}、txg {checkpoint_txg} 的自证记录 {record_count} 条，多于系统配置记的在飞上限 {declared_in_flight_record_limit}"
+                    )
+                },
+            );
+        }
+    }
+}
+
+/// 恢复照 D23（journal 的角色与格式） 已定项 14 取重放前缀、施加之后的结局，checker 自己复刻一份（R-独，`research/prompts/m3-inv-a-r1-main-verification.md`
+/// 第二节第 2 行）：只读，不与实现共用代码（D13（验证路线） 已定项 5）。
+enum ReplayTheNextMountWouldDo<'records> {
+    /// 所选根那次发布读得出的记录里带末条标志的多于一条：锚点认哪一条条款没写，实现在任何写之前拒挂（已定项 14「这一版的失败处置」）。
+    AnchorUndecided,
+    /// 所选根的 `checkpoint_txg` 已是 u64 的最大值，接在它后面的发布取不到 txg：实现报损坏、一条都不施加。
+    ChosenRootTxgHasNoSuccessor,
+    /// 前缀停在一条点名单元两份没都验过的记录上（第四条）：起点含介质损坏，用户 2026-10-01 定这种镜像不算 I-4.1 的合法镜像。
+    StoppedAtANamedUnitThatDoesNotVerify,
+    /// 一次发布都没施加：所选根那一版就是下一次挂载择到的那一版，它走不走得完归 I-7.2（最新根可遍历）。
+    NothingApplied,
+    /// 施加了 `publishes` 次发布、共 `records` 条记录；`last_record` 是最后一次发布的末条，施加出来的那一版照它的新根段
+    /// （已定项 15：一次发布的每条记录带同一份新根段）。
+    Applied {
+        publishes: u64,
+        records: u64,
+        last_record_counter: u64,
+        last_record: &'records ScannedJournalRecord,
+    },
+}
+
+/// 恢复读者眼里的一条记录：提交标记只许 0 / 1、记录标志位 0 之外全 0、本次发布内序号不是 0——三样有一样不成，实现的记录读者当这条记录损坏、
+/// 读不出（`crates/singlefs-core/src/journal.rs` 解记录头那一段；D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 17）。
+/// checker 的扫描（`check_journal_record`）收下它们，好让 I-8.8 / I-8.9 判红；重放这里照恢复的读法把它们当读不出。
+fn record_reads_as_the_recovery_reader_reads_it(record: &ScannedJournalRecord) -> bool {
+    let commit_marker_recognized = match record.commit_marker {
+        CommitMarker::Absent | CommitMarker::Present => true,
+        CommitMarker::Unrecognized(_) => false,
+    };
+    commit_marker_recognized
+        && record.record_flags_byte & !RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH == 0
+        && record.ordinal_within_publish != 0
+}
+
+/// 重放前缀读的那一份环：键是 (实例代号, 计数器)，每个键取按盘的次序第一块盘上恢复读者读得出的那一份
+/// （「两份镜像任一份自证校验和过即在」，已定项 14）。与实现扫环建表同一个键（`crates/singlefs-core/src/recovery.rs` 的 `scan_journal`
+/// 按 (实例代号, 计数器) 先到先得）：两块盘同一计数器坐着不同实例的记录时两条都留下，不拿先读到的那块盘上的别的实例那一条挤掉
+/// 所选根那个实例的（`research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 8 行）。
+fn records_the_replay_reads(
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+) -> BTreeMap<(u32, u64), &ScannedJournalRecord> {
+    let mut first_copies: BTreeMap<(u32, u64), &ScannedJournalRecord> = BTreeMap::new();
+    for (_, records) in records_by_device {
+        for (counter, record) in records {
+            if record_reads_as_the_recovery_reader_reads_it(record) {
+                first_copies
+                    .entry((record.instance, *counter))
+                    .or_insert(record);
+            }
+        }
+    }
+    first_copies
+}
+
+/// 重放前缀的反向链一关（I-8.6（反向链算法）「不等的记录不进重放前缀」）：本实例内逻辑前一条 = 同一实例、计数器小 1 的那一条，
+/// 在 [`records_the_replay_reads`] 里按 (实例代号, 计数器) 找；在、而它的头算出来的链值与这一条的反向链不等，这一条进不了前缀；
+/// 不在不判（与实现 `judge_back_chain_against_the_previous_record_on_disk` 按 (实例, 计数器 − 1) 找、找不到不判同一个读法）。
+/// 计数器 0 进不了前缀（计数器从 1 起，D23（journal 的角色与格式） 已定项 18）。
+fn record_back_chain_lets_it_into_the_replay_prefix(
+    records_the_replay_reads: &BTreeMap<(u32, u64), &ScannedJournalRecord>,
+    counter: u64,
+    record: &ScannedJournalRecord,
+) -> bool {
+    let Some(previous_counter) = counter.checked_sub(1) else {
+        return false;
+    };
+    records_the_replay_reads
+        .get(&(record.instance, previous_counter))
+        .is_none_or(|previous| record.back_chain == previous.chain_value_the_next_record_must_carry)
+}
+
+/// 一条记录的点名单元是不是每一个都两份都读得出、整单元校验和都对（前缀第四条「一个点名单元的两份都读得出、校验和都对才施加」）。
+/// 类标签不在登记表里的点名项不知道该读多长：当验不过。
+fn named_units_of_the_record_verify_on_both_copies(
+    reader: &dyn ImageReader,
+    record: &ScannedJournalRecord,
+) -> bool {
+    record.named_entries.iter().all(|named| {
+        let unit_bytes = match MappingKeyUnitClass::of(named.unit_class) {
+            MappingKeyUnitClass::DataUnit | MappingKeyUnitClass::PackedRecordUnit => {
+                data_unit_bytes()
+            }
+            MappingKeyUnitClass::IndexNode => node_bytes(),
+            MappingKeyUnitClass::Unregistered(_) => return false,
+        };
+        named
+            .locations
+            .iter()
+            .all(|(location_device, location_slot, checksum)| {
+                reader
+                    .read(*location_device, location_slot * SLOT_BYTES, unit_bytes)
+                    .is_some_and(|unit| crc32_castagnoli_table(&unit) == *checksum)
+            })
+    })
+}
+
+/// 带末条标志的这一条之后，同一实例里计数器更大、读得出的记录有没有同一个 `checkpoint_txg` 的（已定项 4 读者规则「带标志的那条之后还有记录」：
+/// 按计数器往后找，同实例里先遇到 txg 更大的就停——同一实例 txg 随计数器不减时与全表读法同一个结果）。
+fn readable_record_of_the_same_publish_follows(
+    records_the_replay_reads: &BTreeMap<(u32, u64), &ScannedJournalRecord>,
+    counter: u64,
+    record: &ScannedJournalRecord,
+) -> bool {
+    for later in records_the_replay_reads
+        .range((record.instance, counter.saturating_add(1))..=(record.instance, u64::MAX))
+        .map(|(_, later)| *later)
+    {
+        if later.checkpoint_txg > record.checkpoint_txg {
+            return false;
+        }
+        if later.checkpoint_txg == record.checkpoint_txg {
+            return true;
+        }
+    }
+    false
+}
+
+/// R-独：照 D23（journal 的角色与格式） 已定项 14 的全部规则复刻下一次挂载会施加哪一段记录。
+///
+/// - **锚点**（注 1，读法乙）：所选根同实例、同 `checkpoint_txg`、带末条标志的记录。恰一条 ⇒ 链首是它的计数器 + 1；
+///   零条 ⇒ 链首取水位之上第一条可读记录，它要序号 1、`checkpoint_txg` = 所选根 + 1；多于一条 ⇒ 锚点认不定。
+/// - 只看「水位之上」的记录：同实例、`checkpoint_txg` 大于所选根（注 1「前缀规则不跨实例边界」，注 2 按实例为主比）。
+///   在飞上限按环长与格式常量 F 现算（已定项 18），逐条数到上限就停。
+/// - 逐条：计数器接得上（断号即止）、反向链对得上（I-8.6 的前缀口径，[`record_back_chain_lets_it_into_the_replay_prefix`]）、一次发布的首条序号是 1、
+///   发布之内 txg 不变且序号逐一递增、前一条不带提交标记时事务号不变（第三条）、末条带提交标记、带末条标志的那条之后同一次发布没有可读记录；
+///   这些有一样不成就停在这一条之前。
+/// - 点名单元两份都验过才收（第四条）；验不过就停，结局是「起点含介质损坏」。
+/// - 第五条：前缀按发布边界截，末条没到的那次发布整体不施加。
+fn replay_the_next_mount_would_do<'records>(
+    reader: &dyn ImageReader,
+    records_the_replay_reads: &BTreeMap<(u32, u64), &'records ScannedJournalRecord>,
+    chosen_root: &crate::RootView,
+    in_flight_record_limit: u64,
+) -> ReplayTheNextMountWouldDo<'records> {
+    let anchors: Vec<u64> = records_the_replay_reads
+        .iter()
+        .filter(|(_, record)| {
+            record.instance == chosen_root.instance
+                && record.checkpoint_txg == chosen_root.checkpoint_txg
+                && record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0
+        })
+        .map(|((_, counter), _)| *counter)
+        .collect();
+    let mut expected_next_counter = match anchors.as_slice() {
+        [] => None,
+        [anchor] => Some(
+            anchor
+                .checked_add(1)
+                .expect("计数器是记录头里 6 字节读来的，加一不会越过 u64"),
+        ),
+        [_, _, ..] => return ReplayTheNextMountWouldDo::AnchorUndecided,
+    };
+    let Some(chain_start_txg_without_anchor) = chosen_root.checkpoint_txg.checked_add(1) else {
+        return ReplayTheNextMountWouldDo::ChosenRootTxgHasNoSuccessor;
+    };
+    let mut open_publish: Vec<&ScannedJournalRecord> = Vec::new();
+    let mut publishes_applied: u64 = 0;
+    let mut records_applied: u64 = 0;
+    let mut last_applied: Option<(u64, &ScannedJournalRecord)> = None;
+    let above_the_chosen_root = records_the_replay_reads.iter().filter(|(_, record)| {
+        record.instance == chosen_root.instance
+            && record.checkpoint_txg > chosen_root.checkpoint_txg
+    });
+    for (records_taken_before_this_one, ((_, counter), record)) in
+        (0_u64..).zip(above_the_chosen_root)
+    {
+        let (counter, record) = (*counter, *record);
+        if records_taken_before_this_one >= in_flight_record_limit {
+            break;
+        }
+        let continues_the_chain = match expected_next_counter {
+            Some(expected) => counter == expected,
+            None => {
+                record.checkpoint_txg == chain_start_txg_without_anchor
+                    && record.ordinal_within_publish == 1
+            }
+        };
+        if !continues_the_chain
+            || !record_back_chain_lets_it_into_the_replay_prefix(
+                records_the_replay_reads,
+                counter,
+                record,
+            )
+        {
+            break;
+        }
+        let fits_the_open_publish = match open_publish.last() {
+            None => record.ordinal_within_publish == 1,
+            Some(previous) => {
+                record.checkpoint_txg == previous.checkpoint_txg
+                    && u64::from(record.ordinal_within_publish)
+                        == u64::from(previous.ordinal_within_publish) + 1
+                    && (previous.commit_marker == CommitMarker::Present
+                        || record.transaction == previous.transaction)
+            }
+        };
+        if !fits_the_open_publish {
+            break;
+        }
+        let ends_its_publish =
+            record.record_flags_byte & RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH != 0;
+        if ends_its_publish
+            && (record.commit_marker != CommitMarker::Present
+                || readable_record_of_the_same_publish_follows(
+                    records_the_replay_reads,
+                    counter,
+                    record,
+                ))
+        {
+            break;
+        }
+        if !named_units_of_the_record_verify_on_both_copies(reader, record) {
+            return ReplayTheNextMountWouldDo::StoppedAtANamedUnitThatDoesNotVerify;
+        }
+        expected_next_counter = Some(
+            counter
+                .checked_add(1)
+                .expect("计数器是记录头里 6 字节读来的，加一不会越过 u64"),
+        );
+        open_publish.push(record);
+        if ends_its_publish {
+            publishes_applied += 1;
+            records_applied += u64::try_from(open_publish.len()).expect("一次发布的记录条数");
+            open_publish.clear();
+            last_applied = Some((counter, record));
+        }
+    }
+    match last_applied {
+        None => ReplayTheNextMountWouldDo::NothingApplied,
+        Some((last_record_counter, last_record)) => ReplayTheNextMountWouldDo::Applied {
+            publishes: publishes_applied,
+            records: records_applied,
+            last_record_counter,
+            last_record,
+        },
+    }
+}
+
+/// [`TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE`]（I-4.1）：所选根（重放之后那一版）指向的树全可遍历。
+/// 所选根取根环里 (txg, 实例) 最大的那条（与 I-7.2 同一个择法）；重放照 [`replay_the_next_mount_would_do`]；施加出来的那一版 =
+/// 所选根换上末条记录的新根段七段（实例表指针与树表 0 条那一版的分配记录树的根也从新根段来，已定项 15，与实现恢复拼新根同一个读法），
+/// 用一份另起的走读走一遍（判定丢掉，那些归别的不变量），走读断了（任一单元两份都读不对、头用不了、条目解不开）判红。
+/// 一条都不施加、锚点认不定、所选根 txg 没有后继、前缀停在点名单元验不过（起点含介质损坏）都报不适用。
+fn judge_trees_of_the_replayed_version_are_traversable(
+    reader: &dyn ImageReader,
+    records_by_device: &[(u32, BTreeMap<u64, ScannedJournalRecord>)],
+    chosen_root: &crate::RootView,
+    journal_ring_bytes: u64,
+    filesystem_identifier_low: u64,
+    judgements: &mut Judgements,
+) {
+    let in_flight_record_limit = journal_ring_bytes / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR;
+    let records_the_replay_reads = records_the_replay_reads(records_by_device);
+    match replay_the_next_mount_would_do(
+        reader,
+        &records_the_replay_reads,
+        chosen_root,
+        in_flight_record_limit,
+    ) {
+        ReplayTheNextMountWouldDo::AnchorUndecided => judgements.not_applicable(
+            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+            "所选根那次发布读得出的记录里带末条标志的多于一条：锚点认哪一条条款没写，实现在任何写之前拒挂，重放不出一版",
+        ),
+        ReplayTheNextMountWouldDo::ChosenRootTxgHasNoSuccessor => judgements.not_applicable(
+            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+            "所选根的 checkpoint_txg 是 u64 的最大值：接在它后面的发布取不到 txg，重放不出一版",
+        ),
+        ReplayTheNextMountWouldDo::StoppedAtANamedUnitThatDoesNotVerify => {
+            judgements.not_applicable(
+                TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+                "重放前缀停在一条点名单元两份没都验过的记录上：起点含介质损坏，不在 I-4.1 判的合法镜像里",
+            );
+        }
+        ReplayTheNextMountWouldDo::NothingApplied => judgements.not_applicable(
+            TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+            "所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2",
+        ),
+        ReplayTheNextMountWouldDo::Applied {
+            publishes,
+            records,
+            last_record_counter,
+            last_record,
+        } => {
+            let replayed_version = VersionAppliedOnlyByRecords {
+                instance: last_record.instance,
+                checkpoint_txg: last_record.checkpoint_txg,
+                new_root_segment: last_record.new_root_segment.clone(),
+            };
+            let mut walk_of_the_replayed_version = Walk::starting_with(
+                reader,
+                Judgements::default(),
+                filesystem_identifier_low,
+                chosen_root.instance,
+                chosen_root.checkpoint_txg,
+            );
+            walk_of_the_replayed_version.walk_version_applied_only_by_records(&replayed_version);
+            let walk_failures = walk_of_the_replayed_version.walk_failures;
+            judgements.judge(
+                TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE,
+                walk_failures.is_empty(),
+                || {
+                    format!(
+                        "所选根（实例 {}、txg {}）之上重放 {publishes} 次发布、{records} 条记录（末条计数器 {last_record_counter}）施加出的那一版走不完：{}",
+                        chosen_root.instance,
+                        chosen_root.checkpoint_txg,
+                        walk_failures.join("；")
+                    )
+                },
+            );
+        }
+    }
+}
+
 /// 走读记下的被引用落点（(设备, 起点槽, 跨度) → 第一次引用它的是谁）逐盘加起来是多少槽。
 /// I-3.1（已分配统计对得上） 拿走完全部候选版本之后那一份算，I-3.11（已分配减 defer 等于最新根走读） 拿只走过最新根那一刻的那一份算：
 /// 两条是同一个走法、同一个加法，差别只在取哪一刻。
@@ -5743,9 +7550,11 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     // 根环起点、单元区起始槽号）：实现整池拒绝挂载
     // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 报违例、别的不变量同「挂不上的镜像」一样不作保
     // （用户 2026-09-27 定系统配置越界整池拒，实审 A3-checker-2）。只有一部分槽带越界值时不拿别的槽照判下去。
+    let system_configuration_slot_readings_of_each_device =
+        system_configuration_slot_readings(reader);
     let any_system_configuration_slot_carries_a_refused_value =
         judge_system_configuration_values_the_reader_accepts(
-            &system_configuration_slot_readings(reader),
+            &system_configuration_slot_readings_of_each_device,
             &mut root_ring_judgements,
         );
     if any_system_configuration_slot_carries_a_refused_value {
@@ -5757,6 +7566,37 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         }
         return root_ring_judgements.into_report();
     }
+    // I-8.1 的三个字段等式（在飞上限、最坏占用、F = 格式常量）任一盘任一可择槽有一格不等：实现择系统配置时同判、整池拒绝挂载
+    // （`RecoveryFailure::SystemConfigurationValueRefused`），checker 与上面 I-7.13 那一支同口径——报 I-8.1 违例、别的不变量一律不作保
+    // （`research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 4 行）。三格先判进一份只装它们的判定里：整池不作保时
+    // 别的不变量（连同已判过成立的 I-7.13）都报不适用；三格都成立时再判进这一份，照常往下判。
+    let mut judgements_of_the_journal_ring_geometry_fields_alone = Judgements::default();
+    judge_journal_ring_geometry_fields_agree(
+        &system_configuration_slot_readings_of_each_device,
+        &mut judgements_of_the_journal_ring_geometry_fields_alone,
+    );
+    if judgements_of_the_journal_ring_geometry_fields_alone
+        .violation_count(JOURNAL_RING_GEOMETRY_FIELDS_AGREE)
+        > 0
+    {
+        for invariant in crate::image::IMPLEMENTED_INVARIANTS {
+            judgements_of_the_journal_ring_geometry_fields_alone.not_applicable(
+                invariant,
+                "池里有一槽可择的系统配置 journal 环几何三个字段（在飞上限、最坏占用、F）有一格不等：实现整池拒绝挂载，这不是一个挂得上的镜像",
+            );
+        }
+        return judgements_of_the_journal_ring_geometry_fields_alone.into_report();
+    }
+    judge_journal_ring_geometry_fields_agree(
+        &system_configuration_slot_readings_of_each_device,
+        &mut root_ring_judgements,
+    );
+    // I-8.5（V-池）：全池皆废判红；一块盘交得出可择的系统配置就照常往下判（单盘全废走旁路报告，不进违例通道）。
+    // 带越界值的槽、环几何三格不等的槽整池拒挂，上面那两支整池报不适用、不判这一条。
+    judge_some_device_carries_a_self_verified_system_configuration(
+        &system_configuration_slot_readings_of_each_device,
+        &mut root_ring_judgements,
+    );
     if chosen.is_empty() {
         for invariant in crate::image::IMPLEMENTED_INVARIANTS {
             root_ring_judgements.not_applicable(
@@ -5779,7 +7619,35 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 )
             },
         );
+        // I-7.15：各盘所选的系统配置槽设备数相同（不要求等于盘表：降级镜像里 checker 手里的盘可以少于设备数）。
+        // 实现那一侧 `choose_system_configuration` 在几块盘的设备数对不上时报 `SystemConfigurationsDisagree`、整池挂不上。
+        root_ring_judgements.judge(
+            DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
+            view.device_count == chosen[0].1.device_count,
+            || {
+                format!(
+                    "盘 {device} 择到的系统配置设备数 {} 与盘 {} 的 {} 不同",
+                    view.device_count, chosen[0].0, chosen[0].1.device_count
+                )
+            },
+        );
     }
+    judge_system_configuration_slot_generations_follow_the_rotation(
+        &system_configuration_slot_readings_of_each_device,
+        &mut root_ring_judgements,
+    );
+    let chosen_geometries: Vec<PoolGeometry> = chosen
+        .iter()
+        .map(|(_, _, geometry_of_this_device)| *geometry_of_this_device)
+        .collect();
+    let decision_width =
+        decision_width_declared_by_the_chosen_system_configurations(&chosen_geometries)
+            .expect("上面判过 chosen 非空：至少一块盘择到了系统配置");
+    judge_root_slots_aligned_to_the_decision_width(
+        &geometry,
+        decision_width,
+        &mut root_ring_judgements,
+    );
     let devices = reader.devices();
     let regions = usize::try_from(geometry.regions).expect("R");
     let region_devices = &geometry.region_devices[..regions.min(3)];
@@ -5806,6 +7674,16 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             .expect("8 字节"),
     );
     let roots = valid_roots(reader, &geometry);
+    judge_root_records_live_in_the_slot_their_txg_names(
+        &roots,
+        &geometry,
+        &mut root_ring_judgements,
+    );
+    judge_instance_table_rows_against_the_roots_referencing_them(
+        reader,
+        &roots,
+        &mut root_ring_judgements,
+    );
     // 每块盘两槽里自证过、fsid 与本池相同的系统配置槽（与实现取号同一读法，D18（块里携带什么信息） 已定项 11）：
     // I-7.12 逐盘比，回退候选集的 F 生效值取它们带的 F 的最大值（C556（checker 与层 0 不读系统配置里的 F））。
     let verified_system_configurations_of_this_pool: Vec<(
@@ -5849,6 +7727,22 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         &journal_records_by_device,
         &mut root_ring_judgements,
     );
+    judge_journal_record_txg_per_instance(&journal_records_by_device, &mut root_ring_judgements);
+    judge_records_of_one_publish_within_the_in_flight_record_limit(
+        &journal_records_by_device,
+        geometry.declared_in_flight_record_limit,
+        &mut root_ring_judgements,
+    );
+    judge_named_entries_against_the_unit_headers(
+        reader,
+        &journal_records_by_device,
+        &mut root_ring_judgements,
+    );
+    judge_new_root_segment_of_the_last_record_against_the_roots(
+        &journal_records_by_device,
+        &roots,
+        &mut root_ring_judgements,
+    );
     root_ring_judgements.judge("I-7.1", !roots.is_empty(), || {
         "根环里一条自证过的根都没有".to_string()
     });
@@ -5860,11 +7754,22 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         return root_ring_judgements.into_report();
     }
     judge_root_ring_health(&roots, &mut root_ring_judgements);
-    // 择根：按 (txg, 实例) 取最大（D22（单元原子性怎么合成） 已定项 7，与实现 `recovery::choose_root` 同一个读法）。
+    // 择根：按 (txg, 实例) 取最大（D22（单元原子性怎么合成） 已定项 7，与实现 `recovery::choose_root` 同一个读法）；
+    // 最大的不止一条时取读根环次序里最前的那条（`roots` 按 `root_slot_positions` 的区域、槽次序排，与 `recovery::every_root_ring_slot` 同序）：
+    // 只在严格更大时才换。`max_by_key` 在键相同时交回最后一个，与 `choose_root` 相反（代码轮第二轮判决辩方 D3）。
     let newest_index = roots
         .iter()
         .enumerate()
-        .max_by_key(|(_, (_, _, root))| (root.checkpoint_txg, root.instance))
+        .fold(
+            None,
+            |newest_so_far: Option<(usize, (u64, u32))>, (index, (_, _, root))| {
+                let choice_key = (root.checkpoint_txg, root.instance);
+                match newest_so_far {
+                    Some((_, newest_key)) if choice_key <= newest_key => newest_so_far,
+                    Some(_) | None => Some((index, choice_key)),
+                }
+            },
+        )
         .map(|(index, _)| index)
         .expect("上面判过根环里至少一条自证过的根");
     let mut walk = Walk::starting_with(
@@ -5876,6 +7781,11 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     );
     // 先走最新的根：它的走读断没断就是 I-7.2；记账行只取最新根下面的。
     walk.walk_root(&roots[newest_index].2.record_bytes, true);
+    walk.note_the_version_just_walked_for_the_appearance_rule(
+        roots[newest_index].2.instance,
+        roots[newest_index].2.checkpoint_txg,
+        0,
+    );
     let newest_failures = walk.walk_failures.clone();
     // I-3.11（已分配减 defer 等于最新根走读）要的「从最新有效根走读到的、这块盘上被引用的槽数」：走法与 I-3.1 同一个
     // （`note_reference` 记下的 (设备, 起点槽, 跨度)），只取最新根——这一刻 `references` 里还只有最新根这一遍记下的。
@@ -5953,9 +7863,15 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             highest_floor_on_the_newest_valid_and_the_abandoned_roots,
             u64::max,
         );
-    // 掉出遍历的根槽按理由各记一次（两样都占的两边都记）：I-3.1 判红时这几个数就是「遍历为什么少算」的机理标识。
+    // 一圈窗口（D16（发布语义） 已定项 1）：N 取最新根（它按自己的实例表恒有效），3S 是根环槽数。
+    let window = OneRevolutionWindow {
+        newest_valid_root_txg: newest_txg,
+        root_ring_slot_count: geometry.regions * geometry.slots_per_region,
+    };
+    // 掉出遍历的根槽按理由各记一次（几样都占的各边都记）：I-3.1 判红时这几个数就是「遍历为什么少算」的机理标识。
     let mut root_slots_dropped_as_abandoned = 0u64;
     let mut root_slots_dropped_below_floor = 0u64;
+    let mut root_slots_dropped_outside_the_window = 0u64;
     let candidate_indexes: Vec<usize> = roots
         .iter()
         .enumerate()
@@ -5963,13 +7879,19 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             // 被抛弃：按最新根指着的实例表判（D23（journal 的角色与格式） 已定项 14 候选集）。
             let abandoned = abandoned_by_the_newest_roots_table(root);
             let below_floor = root.checkpoint_txg < effective_rollback_floor;
-            let walked = *index == newest_index || (!abandoned && !below_floor);
+            // 一圈窗口之外（D16（发布语义） 已定项 1，五处同改之一）：环上有洞时洞那一槽里留着的上一圈的根。
+            let outside_the_window = !window.contains(root.checkpoint_txg);
+            let walked =
+                *index == newest_index || (!abandoned && !below_floor && !outside_the_window);
             if !walked {
                 if abandoned {
                     root_slots_dropped_as_abandoned += 1;
                 }
                 if below_floor {
                     root_slots_dropped_below_floor += 1;
+                }
+                if outside_the_window {
+                    root_slots_dropped_outside_the_window += 1;
                 }
             }
             walked
@@ -5982,6 +7904,11 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             let mismatches_before = walk.judgements.violation_count("I-2.1");
             let failures_before = walk.walk_failures.len();
             walk.walk_root(&root.record_bytes, false);
+            walk.note_the_version_just_walked_for_the_appearance_rule(
+                root.instance,
+                root.checkpoint_txg,
+                failures_before,
+            );
             // 这条候选根引用的单元有一个校验和对不上或头用不了，就是它指着的块被复用或抹头了（I-7.4（近 K 代块未被复用）），
             // 从它出发的遍历也就不自洽（I-4.8（近 K 代根校验和自洽））；两条按每条候选根各判一格。
             let walked_into_reused_or_erased_unit = walk.judgements.violation_count("I-2.1")
@@ -6008,11 +7935,17 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
         &roots,
         &instance_table_rows,
         effective_rollback_floor,
+        window,
     );
     for version in &versions_applied_only_by_records {
         let mismatches_before = walk.judgements.violation_count("I-2.1");
         let failures_before = walk.walk_failures.len();
         walk.walk_version_applied_only_by_records(version);
+        walk.note_the_version_just_walked_for_the_appearance_rule(
+            version.instance,
+            version.checkpoint_txg,
+            failures_before,
+        );
         let walked_into_reused_or_erased_unit = walk.judgements.violation_count("I-2.1")
             > mismatches_before
             || walk.walk_failures.len() > failures_before;
@@ -6030,12 +7963,63 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
                 )
             });
     }
+    judge_the_appearance_rule_of_adjacent_candidate_versions(
+        &walk.versions_walked_for_the_appearance_rule,
+        &walk.birth_txg_of_walked_units,
+        &walk.birth_txg_of_walked_instance_table_pages,
+        &walk.instance_table_rows,
+        &mut walk.judgements,
+    );
+    // I-5.5：回退候选集里每条根与由记录施加出来的那几版，各自重读树表与 extent 树（只读），认出从 mkfs 水位第一次建树的那一版再判落点；
+    // U 取所选系统配置偏移 417（`geometry` 是第一块择到系统配置的盘的那一份，I-7.13 判过它是环长现算的那个槽）。
+    let versions_to_judge_the_first_data_unit_of: Vec<VersionToJudgeTheFirstDataUnitOf<'_>> =
+        candidate_indexes
+            .iter()
+            .map(|index| {
+                let root = &roots[*index].2;
+                VersionToJudgeTheFirstDataUnitOf {
+                    name: format!("根（实例 {}、txg {}）", root.instance, root.checkpoint_txg),
+                    checkpoint_txg: root.checkpoint_txg,
+                    tree_table_pointer: &root.record_bytes[36..122],
+                }
+            })
+            .chain(versions_applied_only_by_records.iter().map(|version| {
+                VersionToJudgeTheFirstDataUnitOf {
+                    name: format!(
+                        "由记录施加出来的那一版（实例 {}、txg {}）",
+                        version.instance, version.checkpoint_txg
+                    ),
+                    checkpoint_txg: version.checkpoint_txg,
+                    tree_table_pointer: version.tree_table_and_mapping_root_pointers().0,
+                }
+            }))
+            .collect();
+    judge_first_data_unit_of_the_versions_building_trees_from_the_mkfs_watermark(
+        reader,
+        &versions_to_judge_the_first_data_unit_of,
+        geometry.unit_area_start_slot,
+        &mut walk.judgements,
+    );
+    if walk.units_judged_against_an_older_candidate_root == 0 {
+        walk.judgements.not_applicable(
+            UNIT_BIRTH_NOT_LATER_THAN_A_CANDIDATE_ROOT_REFERENCING_IT,
+            "回退候选集里只有最新那条根、或不是最新的候选根一个被引用单元都没走到：没有「不是最新的候选根」可判（最新那条归 I-4.2）",
+        );
+    }
     judge_blocks_referenced_by_abandoned_roots(
         reader,
         &geometry,
         &roots,
         newest_index,
         &instance_table_rows,
+        filesystem_identifier_low,
+        &mut walk.judgements,
+    );
+    judge_trees_of_the_replayed_version_are_traversable(
+        reader,
+        &journal_records_by_device,
+        &roots[newest_index].2,
+        geometry.journal_ring_bytes,
         filesystem_identifier_low,
         &mut walk.judgements,
     );
@@ -6204,7 +8188,7 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     // 不看各段的次序，所以插在「遍历的候选根槽」之后、与它挨着读。
     let mechanism = move || {
         format!(
-            "；机理：根环槽数 {root_ring_slot_count}、最新根 txg {newest_txg}、环里自证过的根槽 {readable_root_slot_count} 个、最老的自证过的根 txg {oldest_readable_root_txg}、遍历的候选根槽 {walked_root_slot_count} 个、并进遍历的由记录施加出来的版本 {walked_versions_applied_only_by_records} 个、被实例表判抛弃的根槽 {root_slots_dropped_as_abandoned} 个、回退下界 F {effective_rollback_floor}、低于 F 的根槽 {root_slots_dropped_below_floor} 个"
+            "；机理：根环槽数 {root_ring_slot_count}、最新根 txg {newest_txg}、环里自证过的根槽 {readable_root_slot_count} 个、最老的自证过的根 txg {oldest_readable_root_txg}、遍历的候选根槽 {walked_root_slot_count} 个、并进遍历的由记录施加出来的版本 {walked_versions_applied_only_by_records} 个、被实例表判抛弃的根槽 {root_slots_dropped_as_abandoned} 个、回退下界 F {effective_rollback_floor}、低于 F 的根槽 {root_slots_dropped_below_floor} 个、一圈窗口之外的根槽 {root_slots_dropped_outside_the_window} 个"
         )
     };
     // I-3.1 / I-5.2：最新根下面记账树的「已分配」「空闲」逐盘对遍历得到的和与容量。
@@ -6232,14 +8216,34 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             (*start_slot..*start_slot + *span_slots).map(move |slot| (*device, slot))
         })
         .collect();
+    let standing_in_the_newest_roots_table = |root: &crate::RootView| {
+        if abandoned_by_the_newest_roots_table(root) {
+            RootStandingInTheNewestRootsTable::Abandoned
+        } else {
+            RootStandingInTheNewestRootsTable::Valid
+        }
+    };
     let roots_below_the_floor: Vec<&crate::RootView> = roots
         .iter()
         .map(|(_, _, root)| root)
         .filter(|root| {
-            !abandoned_by_the_newest_roots_table(root)
-                && root.checkpoint_txg < effective_rollback_floor
+            root_references_are_merged_into_the_deferred_slots_below_the_floor(
+                standing_in_the_newest_roots_table(root),
+                root.checkpoint_txg,
+                effective_rollback_floor,
+            )
         })
         .collect();
+    let deferred_threshold = deferred_slots_reclaim_threshold(
+        roots.iter().map(|(_, _, root)| {
+            (
+                standing_in_the_newest_roots_table(root),
+                root.checkpoint_txg,
+            )
+        }),
+        window,
+        effective_rollback_floor,
+    );
     let deferred_below_the_floor_against_every_walked_version =
         deferred_slots_referenced_only_below_the_floor_per_device(
             reader,
@@ -6247,7 +8251,7 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
             newest_root_view,
             &roots_below_the_floor,
             &walked_slots_of_every_walked_version,
-            effective_rollback_floor,
+            deferred_threshold,
             &mut index_node_cache,
         );
     let quarantined_exempted_against_the_newest_root = quarantined_slots_exempted_per_device(
@@ -6363,5 +8367,769 @@ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, Invarian
     judgements.judge("I-7.8", watermark > highest_seen, || {
         format!("根环水位最大 {watermark}，盘上出现过的最大树 ID {highest_seen}")
     });
+    // 再判最新那条根自己的水位（`m3-inv-a-r1` 判决第二节第 9 行，零轮）：只把最新那条根的水位压低时，上面取 max 那一格被更早的根盖住，
+    // 而恢复按所选根的水位往下发号（core 的 `recover` 在这种镜像上报 I-7.8）。先判上面那一格，它的违例说明不变。
+    let newest_root_watermark = roots[newest_index].2.tree_identifier_watermark;
+    judgements.judge("I-7.8", newest_root_watermark > highest_seen, || {
+        format!(
+            "最新那条根（txg {newest_txg}）的水位 {newest_root_watermark}，盘上出现过的最大树 ID {highest_seen}"
+        )
+    });
     judgements.into_report()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use singlefs_format::{
+        TREE_IDENTIFIER_ACCOUNTING, TREE_IDENTIFIER_ALLOCATION_RECORDS,
+        TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST, TREE_IDENTIFIER_DELETED_INODES,
+        TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE, TREE_IDENTIFIER_LINEAGE,
+        TREE_IDENTIFIER_LIVELIST, TREE_IDENTIFIER_LOGGED_OPERATIONS,
+        TREE_IDENTIFIER_SPARSE_SIDE_TABLE, TREE_IDENTIFIER_TOMBSTONE,
+        TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+    };
+
+    /// checker 自己那份种类码与格式常量里的树 ID 值域不相交（D8（核心索引结构） 已定项 9 射程、已定项 11，
+    /// 用户 2026-10-01 定案「树 ID 整体挪开」）：每个种类码都小于 65536（树的种类那 2 字节取不到的最小值），
+    /// 每个树 ID 与两个水位都不小于它。
+    #[test]
+    fn every_tree_kind_code_the_checker_reads_is_below_every_tree_identifier() {
+        let first_value_the_kind_field_cannot_hold = u64::from(u16::MAX) + 1;
+        for kind in TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER {
+            assert!(
+                u64::from(kind) < first_value_the_kind_field_cannot_hold,
+                "种类码 {kind} 小于 65536"
+            );
+        }
+        for identifier in [
+            TREE_IDENTIFIER_EXTENT,
+            TREE_IDENTIFIER_INODE,
+            TREE_IDENTIFIER_ALLOCATION_RECORDS,
+            TREE_IDENTIFIER_ACCOUNTING,
+            TREE_IDENTIFIER_CENTRAL_MAPPING,
+            TREE_IDENTIFIER_LIVELIST,
+            TREE_IDENTIFIER_SPARSE_SIDE_TABLE,
+            TREE_IDENTIFIER_DEADLIST,
+            TREE_IDENTIFIER_DELETED_INODES,
+            TREE_IDENTIFIER_TOMBSTONE,
+            TREE_IDENTIFIER_LINEAGE,
+            TREE_IDENTIFIER_LOGGED_OPERATIONS,
+            TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+            TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
+        ] {
+            assert!(
+                identifier >= first_value_the_kind_field_cannot_hold,
+                "树 ID（或水位）{identifier} 不小于 65536：与 checker 读的种类码值域不相交"
+            );
+        }
+    }
+
+    /// 一条只带键、反向链与链值的扫描记录（别的字段这几条用例不读）。
+    fn scanned_record_of(
+        instance: u32,
+        back_chain: u32,
+        chain_value_the_next_record_must_carry: u32,
+    ) -> ScannedJournalRecord {
+        ScannedJournalRecord {
+            instance,
+            checkpoint_txg: 0,
+            new_root_segment: Vec::new(),
+            transaction: 0,
+            commit_marker: CommitMarker::Present,
+            ordinal_within_publish: 1,
+            record_flags_byte: RECORD_FLAG_LAST_RECORD_OF_THE_PUBLISH,
+            slot: 0,
+            back_chain,
+            chain_value_the_next_record_must_carry,
+            named_entry_locations: Vec::new(),
+            named_entries: Vec::new(),
+        }
+    }
+
+    /// 两块盘同一计数器坐着不同实例的记录（盘 0 计数器 4 是实例 2 的，盘 1 计数器 4 是实例 1 的）：恢复眼里的环按 (实例代号, 计数器)
+    /// 建键，两条都留下，不拿先读到的盘 0 那条挤掉实例 1 的（I-4.1 那一行：`records_the_replay_reads` 先改、这一处同改）。
+    #[test]
+    fn the_ring_as_the_recovery_reads_it_keeps_both_records_of_two_instances_at_the_same_counter() {
+        let records_by_device = vec![
+            (0, BTreeMap::from([(4, scanned_record_of(2, 0, 0x22))])),
+            (1, BTreeMap::from([(4, scanned_record_of(1, 0x0b, 0x11))])),
+        ];
+        let ring = records_as_the_recovery_reads_them(&records_by_device);
+        assert_eq!(
+            ring.keys().copied().collect::<Vec<_>>(),
+            vec![(1, 4), (2, 4)],
+            "两条都在，按 (实例代号, 计数器) 认"
+        );
+        assert_eq!(
+            ring[&(1, 4)].chain_value_the_next_record_must_carry,
+            0x11,
+            "实例 1 那一条是盘 1 上那一份"
+        );
+    }
+
+    /// 反向链那一关按 (实例代号, 计数器 − 1) 找本实例内逻辑前一条：计数器 3 上先读到的是实例 2 的记录、实例 1 的那一条在盘 1 上，
+    /// 实例 1 计数器 4 那一条的反向链与实例 1 计数器 3 那条的链值不等 ⇒ 进不了前缀；对得上 ⇒ 进得去。
+    /// 按计数器找时先读到的是实例 2 的那条，当成「前一条是别的实例」放过去。
+    #[test]
+    fn the_back_chain_gate_looks_up_the_predecessor_of_the_same_instance_past_another_instance_at_that_counter(
+    ) {
+        let records_by_device = vec![
+            (0, BTreeMap::from([(3, scanned_record_of(2, 0, 0x22))])),
+            (1, BTreeMap::from([(3, scanned_record_of(1, 0, 0x11))])),
+        ];
+        let ring = records_as_the_recovery_reads_them(&records_by_device);
+        assert!(
+            !record_can_enter_a_replay_prefix(&ring, 4, &scanned_record_of(1, 0x12, 0)),
+            "实例 1 计数器 4 的反向链 0x12 与实例 1 计数器 3 的链值 0x11 不等：不进前缀"
+        );
+        assert!(
+            record_can_enter_a_replay_prefix(&ring, 4, &scanned_record_of(1, 0x11, 0)),
+            "对得上：进前缀"
+        );
+    }
+
+    /// 一圈窗口（D16（发布语义） 已定项 1）：N = 35、环长 24 ⇒ 窗口 = txg > 11；N 小于环长时整个环都在窗口里。
+    #[test]
+    fn the_one_revolution_window_keeps_the_txgs_above_the_newest_minus_the_ring_length() {
+        let window = OneRevolutionWindow {
+            newest_valid_root_txg: 35,
+            root_ring_slot_count: 24,
+        };
+        assert!(!window.contains(11), "35 − 24 = 11 不在窗口里");
+        assert!(window.contains(12), "12 在窗口里");
+        assert!(window.contains(35), "N 自己在窗口里");
+        let young_ring = OneRevolutionWindow {
+            newest_valid_root_txg: 7,
+            root_ring_slot_count: 24,
+        };
+        assert!(young_ring.contains(0), "N < 环长：第 0 代也在窗口里");
+    }
+
+    // ---- 丁-defer 选根式的小世界（遗留判决 `research/prompts/m3-leftover-code-r1-main-verification.md` LR5） ----
+    //
+    // 取值域与上界（穷举的范围就是这几条）：
+    // - 一块盘（盘 0），单元槽 0..SMALL_WORLD_UNIT_SLOT_COUNT（2 个），每个单元跨 1 槽；一版引用的单元是这 2 槽的任一子集。
+    // - 根环 SMALL_WORLD_ROOT_RING_SLOT_COUNT（4）个位置，txg t 的根落在位置 t mod 4（与 `root_ring::target_for_publish` 一样按 txg 取槽），
+    //   一圈窗口照 `OneRevolutionWindow` 取 txg + 4 > N；位置上一条根被同余的新 txg 盖掉就出了环。
+    // - 从 mkfs（实例 1、txg 1、引用槽 0、F = 0）起，最多施加 SMALL_WORLD_OPERATION_LIMIT（5）步，每步三种之一：
+    //   发布（同一实例 txg + 1，引用换成「现行引用 ∪ 可分配的槽」的任一子集：换下的记成已释放、释放代 = 新 txg，新引用的记成已分配）；
+    //   抬 F（F 抬到 (F, 现行 txg] 里任一值：先写系统配置，再推一次带新 F 的空发布）；
+    //   崩溃恢复落到环里一条根 L（按现行那一版的表有效、txg ≥ F、在以现行 txg 为锚的窗口里，含现行那一版自己）：环里 txg 高于 L 的根
+    //   所属的实例各记一行 (实例, L 的 txg)、并进 L 的表；新实例代号 = 用过的最大 + 1，写行 txg = 环里最大 txg + 1，写行那次发布从 L 起，
+    //   引用照「发布」那样任选。
+    //   可分配的槽 = 现行没引用、账里没有记录或已释放且释放代 ≤ 回收门槛（max(F, 以现行 txg 为锚的窗口里最旧有效根)）、
+    //   环里按现行那一版的表被抛弃的根都不引用（影子账隔离）的槽。
+    // - 判的那一刻，环里有根的位置任取一个子集读不出（含现行那一版自己的根槽：那时最新根换成读得出的最大那条，账与表都取它的）。
+    // - 不在小世界里的：由记录施加出来、根槽从没落盘的那一版（候选集另补的那一种），读得出而走读读到一半断掉的根，
+    //   系统配置读不出（F 生效值只取根上的）。
+    //
+    // 判法：每个（盘面、读不出的位置子集）上，按 `deferred_slots_reclaim_threshold`、
+    // `allocation_record_is_released_above_the_reclaim_threshold`、`deferred_slots_among_the_references_of_the_selected_roots`
+    // 各算一遍丁-defer 并进的槽：选根一次用 `root_references_are_merged_into_the_deferred_slots_below_the_floor`（原式），
+    // 一次用「被抛弃 ∨ txg < F」（被抛弃根引用的也并，LR5 的那一式）。两式只在这一形下可能不同：
+    // 多并的槽 S 在最新根的账里是已释放、释放代 g，换下它的那一版 r（释放之前的现行那一版，引用 S）的根还在环里、而那一槽读不出——
+    // 一次故障是把根抛弃的那次恢复（读坏或崩溃），另一次是 r 的根槽读不出。r 读得出时：r ≥ F 且在窗口里就被候选集走到；
+    // r < F 原式已并进 S；r 在窗口之外或出了环，窗口里有效的根都 ≥ g、门槛 ≥ g，S 不算 defer。
+
+    const SMALL_WORLD_UNIT_SLOT_COUNT: u64 = 2;
+    const SMALL_WORLD_ROOT_RING_SLOT_COUNT: u64 = 4;
+    const SMALL_WORLD_OPERATION_LIMIT: usize = 5;
+    const SMALL_WORLD_DEVICE: u32 = 0;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct SmallWorldVersion {
+        instance: u32,
+        checkpoint_txg: u64,
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    enum SmallWorldRecord {
+        Allocated,
+        Released {
+            release_generation: u64,
+            /// 换下这一槽的那次发布之前的现行那一版（引用着这一槽）：只给判例外那一形用，盘上没有这个字段。
+            version_released_from: SmallWorldVersion,
+        },
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct SmallWorldRoot {
+        version: SmallWorldVersion,
+        rollback_floor: u64,
+        referenced_unit_slots: BTreeSet<u64>,
+        account: BTreeMap<u64, SmallWorldRecord>,
+        /// 实例表：实例 → 它最后一版的 txg Ti；(i, T) 被抛弃 ⟺ 有 i 的行且 T > Ti。
+        instance_table_rows: BTreeMap<u32, u64>,
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+    struct SmallWorldPool {
+        /// 根环位置 → 住在那里的根。
+        ring: BTreeMap<u64, SmallWorldRoot>,
+        current: SmallWorldRoot,
+        system_configuration_floor: u64,
+        highest_instance_used: u32,
+    }
+
+    fn small_world_standing(
+        instance_table_rows: &BTreeMap<u32, u64>,
+        version: SmallWorldVersion,
+    ) -> RootStandingInTheNewestRootsTable {
+        match instance_table_rows.get(&version.instance) {
+            Some(last_txg_of_the_instance)
+                if version.checkpoint_txg > *last_txg_of_the_instance =>
+            {
+                RootStandingInTheNewestRootsTable::Abandoned
+            }
+            Some(_) | None => RootStandingInTheNewestRootsTable::Valid,
+        }
+    }
+
+    fn small_world_window(newest_txg: u64) -> OneRevolutionWindow {
+        OneRevolutionWindow {
+            newest_valid_root_txg: newest_txg,
+            root_ring_slot_count: SMALL_WORLD_ROOT_RING_SLOT_COUNT,
+        }
+    }
+
+    /// 写进一条新根之前那一刻可分配的槽：门槛按 `instance_table_rows` 判有效、以 `anchor_txg` 为窗口的锚。
+    fn small_world_allocatable_unit_slots(
+        pool: &SmallWorldPool,
+        base: &SmallWorldRoot,
+        instance_table_rows: &BTreeMap<u32, u64>,
+        anchor_txg: u64,
+    ) -> BTreeSet<u64> {
+        let reclaim_threshold = deferred_slots_reclaim_threshold(
+            pool.ring.values().map(|root| {
+                (
+                    small_world_standing(instance_table_rows, root.version),
+                    root.version.checkpoint_txg,
+                )
+            }),
+            small_world_window(anchor_txg),
+            pool.system_configuration_floor,
+        );
+        let isolated_by_the_shadow_ledger: BTreeSet<u64> = pool
+            .ring
+            .values()
+            .filter(|root| {
+                small_world_standing(instance_table_rows, root.version)
+                    == RootStandingInTheNewestRootsTable::Abandoned
+            })
+            .flat_map(|root| root.referenced_unit_slots.iter().copied())
+            .collect();
+        (0..SMALL_WORLD_UNIT_SLOT_COUNT)
+            .filter(|unit_slot| {
+                !base.referenced_unit_slots.contains(unit_slot)
+                    && !isolated_by_the_shadow_ledger.contains(unit_slot)
+                    && match base.account.get(unit_slot) {
+                        None => true,
+                        Some(SmallWorldRecord::Allocated) => false,
+                        Some(SmallWorldRecord::Released {
+                            release_generation, ..
+                        }) => *release_generation <= reclaim_threshold,
+                    }
+            })
+            .collect()
+    }
+
+    /// `candidates` 的全部子集。
+    fn small_world_subsets(candidates: &BTreeSet<u64>) -> Vec<BTreeSet<u64>> {
+        let members: Vec<u64> = candidates.iter().copied().collect();
+        (0..1u32 << members.len())
+            .map(|membership_mask| {
+                members
+                    .iter()
+                    .enumerate()
+                    .filter(|(member_index, _)| membership_mask & (1 << member_index) != 0)
+                    .map(|(_, unit_slot)| *unit_slot)
+                    .collect()
+            })
+            .collect()
+    }
+
+    /// 从 `base` 那一版发一版新的、写进根环、成为现行那一版。
+    fn small_world_publish(
+        pool: &SmallWorldPool,
+        base: &SmallWorldRoot,
+        version: SmallWorldVersion,
+        referenced_unit_slots: BTreeSet<u64>,
+        instance_table_rows: BTreeMap<u32, u64>,
+    ) -> SmallWorldPool {
+        let mut account = base.account.clone();
+        for released in base
+            .referenced_unit_slots
+            .difference(&referenced_unit_slots)
+        {
+            account.insert(
+                *released,
+                SmallWorldRecord::Released {
+                    release_generation: version.checkpoint_txg,
+                    version_released_from: base.version,
+                },
+            );
+        }
+        for allocated in referenced_unit_slots.difference(&base.referenced_unit_slots) {
+            account.insert(*allocated, SmallWorldRecord::Allocated);
+        }
+        let root = SmallWorldRoot {
+            version,
+            rollback_floor: pool.system_configuration_floor,
+            referenced_unit_slots,
+            account,
+            instance_table_rows,
+        };
+        let mut next = pool.clone();
+        next.ring.insert(
+            version.checkpoint_txg % SMALL_WORLD_ROOT_RING_SLOT_COUNT,
+            root.clone(),
+        );
+        next.current = root;
+        next
+    }
+
+    fn small_world_successors(pool: &SmallWorldPool) -> Vec<SmallWorldPool> {
+        let mut successors = Vec::new();
+        let current = &pool.current;
+        let next_version_of_this_instance = SmallWorldVersion {
+            instance: current.version.instance,
+            checkpoint_txg: current.version.checkpoint_txg + 1,
+        };
+        // 发布。
+        let allocatable = small_world_allocatable_unit_slots(
+            pool,
+            current,
+            &current.instance_table_rows,
+            current.version.checkpoint_txg,
+        );
+        let reachable: BTreeSet<u64> = current
+            .referenced_unit_slots
+            .union(&allocatable)
+            .copied()
+            .collect();
+        for referenced_unit_slots in small_world_subsets(&reachable) {
+            successors.push(small_world_publish(
+                pool,
+                current,
+                next_version_of_this_instance,
+                referenced_unit_slots,
+                current.instance_table_rows.clone(),
+            ));
+        }
+        // 抬 F：先写系统配置，再推一次带新 F 的空发布。
+        for new_floor in pool.system_configuration_floor + 1..=current.version.checkpoint_txg {
+            let mut raised = pool.clone();
+            raised.system_configuration_floor = new_floor;
+            successors.push(small_world_publish(
+                &raised,
+                current,
+                next_version_of_this_instance,
+                current.referenced_unit_slots.clone(),
+                current.instance_table_rows.clone(),
+            ));
+        }
+        // 崩溃恢复落到环里一条根 L。
+        let window = small_world_window(current.version.checkpoint_txg);
+        let highest_txg_in_the_ring = pool
+            .ring
+            .values()
+            .map(|root| root.version.checkpoint_txg)
+            .max()
+            .expect("环里至少有现行那一版");
+        for landed in pool.ring.values() {
+            let landed_txg = landed.version.checkpoint_txg;
+            let can_land = small_world_standing(&current.instance_table_rows, landed.version)
+                == RootStandingInTheNewestRootsTable::Valid
+                && landed_txg >= pool.system_configuration_floor
+                && window.contains(landed_txg);
+            if !can_land {
+                continue;
+            }
+            let mut instance_table_rows = landed.instance_table_rows.clone();
+            for newer in pool
+                .ring
+                .values()
+                .filter(|root| root.version.checkpoint_txg > landed_txg)
+            {
+                let row = instance_table_rows
+                    .entry(newer.version.instance)
+                    .or_insert(landed_txg);
+                *row = (*row).min(landed_txg);
+            }
+            let mut recovered = pool.clone();
+            recovered.highest_instance_used += 1;
+            recovered.current = landed.clone();
+            let row_publish_version = SmallWorldVersion {
+                instance: recovered.highest_instance_used,
+                checkpoint_txg: highest_txg_in_the_ring + 1,
+            };
+            let allocatable_after_the_recovery = small_world_allocatable_unit_slots(
+                &recovered,
+                landed,
+                &instance_table_rows,
+                landed_txg,
+            );
+            let reachable_after_the_recovery: BTreeSet<u64> = landed
+                .referenced_unit_slots
+                .union(&allocatable_after_the_recovery)
+                .copied()
+                .collect();
+            for referenced_unit_slots in small_world_subsets(&reachable_after_the_recovery) {
+                successors.push(small_world_publish(
+                    &recovered,
+                    landed,
+                    row_publish_version,
+                    referenced_unit_slots,
+                    instance_table_rows.clone(),
+                ));
+            }
+        }
+        successors
+    }
+
+    fn small_world_slot_keys(unit_slots: &BTreeSet<u64>) -> impl Iterator<Item = (u32, u64)> + '_ {
+        unit_slots
+            .iter()
+            .map(|unit_slot| (SMALL_WORLD_DEVICE, *unit_slot))
+    }
+
+    /// 两式在一个（盘面、读不出的位置）上各并进的槽，连同判的那一刻的最新根。
+    struct SmallWorldDeferredSlotsOfBothSelections<'pool> {
+        original: BTreeSet<(u32, u64)>,
+        merging_the_abandoned_roots_too: BTreeSet<(u32, u64)>,
+        newest: &'pool SmallWorldRoot,
+    }
+
+    /// 两式在一个（盘面、读不出的位置）上各并进哪些槽。读不出之后环里一条根都不剩时交 `None`。
+    fn small_world_deferred_slots_of_both_selections<'pool>(
+        pool: &'pool SmallWorldPool,
+        unreadable_positions: &BTreeSet<u64>,
+    ) -> Option<SmallWorldDeferredSlotsOfBothSelections<'pool>> {
+        let readable: Vec<&SmallWorldRoot> = pool
+            .ring
+            .iter()
+            .filter(|(position, _)| !unreadable_positions.contains(position))
+            .map(|(_, root)| root)
+            .collect();
+        let newest = *readable
+            .iter()
+            .max_by_key(|root| (root.version.checkpoint_txg, root.version.instance))?;
+        let standing =
+            |version: SmallWorldVersion| small_world_standing(&newest.instance_table_rows, version);
+        let effective_rollback_floor = readable
+            .iter()
+            .filter(|root| {
+                root.version == newest.version
+                    || standing(root.version) == RootStandingInTheNewestRootsTable::Abandoned
+            })
+            .map(|root| root.rollback_floor)
+            .fold(pool.system_configuration_floor, u64::max);
+        let window = small_world_window(newest.version.checkpoint_txg);
+        let walked_slots: BTreeSet<(u32, u64)> = readable
+            .iter()
+            .filter(|root| {
+                root.version == newest.version
+                    || (standing(root.version) == RootStandingInTheNewestRootsTable::Valid
+                        && root.version.checkpoint_txg >= effective_rollback_floor
+                        && window.contains(root.version.checkpoint_txg))
+            })
+            .flat_map(|root| small_world_slot_keys(&root.referenced_unit_slots))
+            .collect();
+        let reclaim_threshold = deferred_slots_reclaim_threshold(
+            readable
+                .iter()
+                .map(|root| (standing(root.version), root.version.checkpoint_txg)),
+            window,
+            effective_rollback_floor,
+        );
+        let released_above_the_reclaim_threshold: BTreeSet<(u32, u64)> = newest
+            .account
+            .iter()
+            .filter(|(unit_slot, record)| {
+                let (generation, is_released) = match record {
+                    SmallWorldRecord::Allocated => (0, false),
+                    SmallWorldRecord::Released {
+                        release_generation, ..
+                    } => (*release_generation, true),
+                };
+                allocation_record_is_released_above_the_reclaim_threshold(
+                    &AllocationRecordView {
+                        device: SMALL_WORLD_DEVICE,
+                        slot: **unit_slot,
+                        span_slots: 1,
+                        generation,
+                        is_released,
+                    },
+                    reclaim_threshold,
+                )
+            })
+            .map(|(unit_slot, _)| (SMALL_WORLD_DEVICE, *unit_slot))
+            .collect();
+        let original = deferred_slots_among_the_references_of_the_selected_roots(
+            readable
+                .iter()
+                .filter(|root| {
+                    root_references_are_merged_into_the_deferred_slots_below_the_floor(
+                        standing(root.version),
+                        root.version.checkpoint_txg,
+                        effective_rollback_floor,
+                    )
+                })
+                .flat_map(|root| small_world_slot_keys(&root.referenced_unit_slots)),
+            &walked_slots,
+            &released_above_the_reclaim_threshold,
+        );
+        // LR5 那一式：被抛弃 ∨ txg < F（不经原式的选根函数，原式被改坏时这一式不跟着变）。
+        let merging_the_abandoned_roots_too =
+            deferred_slots_among_the_references_of_the_selected_roots(
+                readable
+                    .iter()
+                    .filter(|root| {
+                        standing(root.version) == RootStandingInTheNewestRootsTable::Abandoned
+                            || root.version.checkpoint_txg < effective_rollback_floor
+                    })
+                    .flat_map(|root| small_world_slot_keys(&root.referenced_unit_slots)),
+                &walked_slots,
+                &released_above_the_reclaim_threshold,
+            );
+        Some(SmallWorldDeferredSlotsOfBothSelections {
+            original,
+            merging_the_abandoned_roots_too,
+            newest,
+        })
+    }
+
+    /// LR5：「被抛弃根引用的也并」与原式在小世界的每个盘面上并进同一组槽，只在双故障形下可能不同
+    /// （取值域、上界、两式与双故障形的写法见上面那一段注释）。
+    #[test]
+    fn deferred_selection_merging_the_abandoned_roots_too_selects_the_same_slots_on_every_small_world_but_the_double_fault_form(
+    ) {
+        let mkfs_root = SmallWorldRoot {
+            version: SmallWorldVersion {
+                instance: 1,
+                checkpoint_txg: 1,
+            },
+            rollback_floor: 0,
+            referenced_unit_slots: BTreeSet::from([0]),
+            account: BTreeMap::from([(0, SmallWorldRecord::Allocated)]),
+            instance_table_rows: BTreeMap::new(),
+        };
+        let mkfs_pool = SmallWorldPool {
+            ring: BTreeMap::from([(1, mkfs_root.clone())]),
+            current: mkfs_root,
+            system_configuration_floor: 0,
+            highest_instance_used: 1,
+        };
+        let mut seen: BTreeSet<SmallWorldPool> = BTreeSet::from([mkfs_pool.clone()]);
+        let mut frontier = vec![mkfs_pool];
+        for _ in 0..SMALL_WORLD_OPERATION_LIMIT {
+            let mut next_frontier = Vec::new();
+            for pool in &frontier {
+                for successor in small_world_successors(pool) {
+                    if seen.insert(successor.clone()) {
+                        next_frontier.push(successor);
+                    }
+                }
+            }
+            frontier = next_frontier;
+        }
+        let mut judged_worlds = 0u64;
+        let mut worlds_where_the_original_merges_something = 0u64;
+        let mut worlds_in_the_double_fault_form_where_the_two_differ = 0u64;
+        for pool in &seen {
+            let occupied_positions: BTreeSet<u64> = pool.ring.keys().copied().collect();
+            for unreadable_positions in small_world_subsets(&occupied_positions) {
+                let Some(SmallWorldDeferredSlotsOfBothSelections {
+                    original,
+                    merging_the_abandoned_roots_too,
+                    newest,
+                }) = small_world_deferred_slots_of_both_selections(pool, &unreadable_positions)
+                else {
+                    continue;
+                };
+                judged_worlds += 1;
+                if !original.is_empty() {
+                    worlds_where_the_original_merges_something += 1;
+                }
+                if original == merging_the_abandoned_roots_too {
+                    continue;
+                }
+                for (_, unit_slot) in
+                    original.symmetric_difference(&merging_the_abandoned_roots_too)
+                {
+                    let version_released_from = match newest.account.get(unit_slot) {
+                        Some(SmallWorldRecord::Released {
+                            version_released_from,
+                            ..
+                        }) => *version_released_from,
+                        Some(SmallWorldRecord::Allocated) | None => panic!(
+                            "并进来的槽 {unit_slot} 在最新根的账里不是已释放：{pool:?}，读不出 {unreadable_positions:?}"
+                        ),
+                    };
+                    let position =
+                        version_released_from.checkpoint_txg % SMALL_WORLD_ROOT_RING_SLOT_COUNT;
+                    let releasing_parent_is_in_the_ring_and_unreadable = pool
+                        .ring
+                        .get(&position)
+                        .is_some_and(|root| root.version == version_released_from)
+                        && unreadable_positions.contains(&position);
+                    assert!(
+                        releasing_parent_is_in_the_ring_and_unreadable,
+                        "两式在槽 {unit_slot} 上不同，而换下它的那一版 {version_released_from:?} 的根不是「在环里、读不出」（推翻 LR5 的等价）：\
+                         原式 {original:?}，被抛弃根引用的也并 {merging_the_abandoned_roots_too:?}；盘面 {pool:?}，读不出的位置 {unreadable_positions:?}"
+                    );
+                }
+                worlds_in_the_double_fault_form_where_the_two_differ += 1;
+            }
+        }
+        assert_eq!(
+            (
+                seen.len(),
+                judged_worlds,
+                worlds_where_the_original_merges_something,
+                worlds_in_the_double_fault_form_where_the_two_differ,
+            ),
+            (180_794, 2_710_980, 10_204, 1_082),
+            "盘面数、判过的（盘面、读不出的位置）数、原式并进了槽的数、双故障形下两式不同的数"
+        );
+    }
+
+    /// 默认 768 MiB 环的单元区起始槽号（I-5.5 那几条合成用例的 U）。
+    const UNIT_AREA_START_SLOT_OF_THE_DEFAULT_JOURNAL_RING: u64 = 50176;
+
+    /// 盘 0 上一条分配记录。
+    fn allocation_record_on_device_zero(
+        slot: u64,
+        span_slots: u64,
+        generation: u64,
+        is_released: bool,
+    ) -> AllocationRecordView {
+        AllocationRecordView {
+            device: 0,
+            slot,
+            span_slots,
+            generation,
+            is_released,
+        }
+    }
+
+    /// I-5.5 的落点不进开放段（D3（空间分配） 已定项 10 ②）：U 起的那一段 64 槽全被更早的版本占着，下一段是这一版的开放段
+    /// （树表单元在里面），落点越过开放段、落在再下一段的起点。
+    #[test]
+    fn the_first_data_unit_slot_skips_the_open_cluster_segment_of_the_version() {
+        let unit_area_start = UNIT_AREA_START_SLOT_OF_THE_DEFAULT_JOURNAL_RING;
+        let version_checkpoint_txg = 7;
+        let allocation_records = [
+            allocation_record_on_device_zero(unit_area_start, CLUSTER_SEGMENT_SLOTS, 5, false),
+            allocation_record_on_device_zero(
+                unit_area_start + CLUSTER_SEGMENT_SLOTS + 12,
+                1,
+                version_checkpoint_txg,
+                false,
+            ),
+        ];
+        assert_eq!(
+            first_data_unit_slot_the_allocation_records_leave_on_a_device(
+                &allocation_records,
+                0,
+                version_checkpoint_txg,
+                unit_area_start,
+                Some(OpenClusterSegment {
+                    first_slot: unit_area_start + CLUSTER_SEGMENT_SLOTS,
+                }),
+            ),
+            unit_area_start + 2 * CLUSTER_SEGMENT_SLOTS,
+            "U 那一段占满、下一段是开放段：落点是再下一段的起点"
+        );
+    }
+
+    /// 已释放的记录一律当占着（回收门槛复算不出的那个近似）：U、U + 1 与 U + 2 两条记录是这一版自己释放的（释放代等于这一版的 txg），
+    /// 落点不取 U，取 U + 4。
+    #[test]
+    fn a_released_allocation_record_keeps_its_slots_out_of_the_first_data_unit_slot() {
+        let unit_area_start = UNIT_AREA_START_SLOT_OF_THE_DEFAULT_JOURNAL_RING;
+        let version_checkpoint_txg = 29;
+        let allocation_records = [
+            allocation_record_on_device_zero(unit_area_start, 2, version_checkpoint_txg, true),
+            allocation_record_on_device_zero(unit_area_start + 2, 1, version_checkpoint_txg, true),
+        ];
+        assert_eq!(
+            first_data_unit_slot_the_allocation_records_leave_on_a_device(
+                &allocation_records,
+                0,
+                version_checkpoint_txg,
+                unit_area_start,
+                None,
+            ),
+            unit_area_start + 4,
+            "U、U + 1 与 U + 2 已释放（当占着）：落点是 U + 4"
+        );
+    }
+
+    /// 一条字段表宽（200 字节）的树表条目，只填 I-9.27 读的三样：树 ID（偏移 0）、种类（偏移 10）、头 ID（偏移 116）。
+    fn tree_table_entry_with_head_identifier(
+        tree: u64,
+        kind: u16,
+        head_identifier: u64,
+    ) -> Vec<u8> {
+        let mut entry = vec![0u8; tree_table_entry_bytes()];
+        entry[..8].copy_from_slice(&tree.to_le_bytes());
+        entry[TREE_TABLE_ENTRY_KIND_OFFSET..TREE_TABLE_ENTRY_KIND_OFFSET + 2]
+            .copy_from_slice(&kind.to_le_bytes());
+        entry[TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET..TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET + 8]
+            .copy_from_slice(&head_identifier.to_le_bytes());
+        entry
+    }
+
+    /// 一张树表上 I-9.27 的判定。
+    fn head_identifier_verdict_of(tree_table_entries: &[Vec<u8>]) -> InvariantVerdict {
+        let mut judgements = Judgements::default();
+        judge_tree_table_entry_head_identifiers(
+            &mut judgements,
+            tree_table_entries,
+            "合成的那一版",
+        );
+        judgements
+            .into_report()
+            .into_iter()
+            .find(|(invariant, _)| *invariant == HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES)
+            .expect("I-9.27 在清单里")
+            .1
+    }
+
+    /// I-9.27 多于一条种类 2 条目时放宽成「等于其中某一条的树 ID」（`.claude/kb/invariants.md` I-9.27 那一行，收严留给多头那一批）：
+    /// 表里两条 inode 树（65537、65549），extent 树条目的头 ID 写第二条的树 ID 65549——成立；只认第一条的读法在这里误红。
+    #[test]
+    fn an_extent_entry_naming_the_second_of_two_inode_tree_entries_holds_the_head_identifier_relation(
+    ) {
+        let tree_table_entries = [
+            tree_table_entry_with_head_identifier(65536, TREE_KIND_EXTENT, 65549),
+            tree_table_entry_with_head_identifier(65537, TREE_KIND_INODE, 65537),
+            tree_table_entry_with_head_identifier(65549, TREE_KIND_INODE, 65549),
+        ];
+        assert_eq!(
+            head_identifier_verdict_of(&tree_table_entries),
+            InvariantVerdict::Holds,
+            "extent 树条目的头 ID 等于两条 inode 树条目里第二条的树 ID：放宽之后成立"
+        );
+    }
+
+    /// 同一张两条 inode 树的表，extent 树条目的头 ID 写成两条都不是的 65550：放宽之后照样红。
+    #[test]
+    fn an_extent_entry_naming_neither_of_two_inode_tree_entries_violates_the_head_identifier_relation(
+    ) {
+        let tree_table_entries = [
+            tree_table_entry_with_head_identifier(65536, TREE_KIND_EXTENT, 65550),
+            tree_table_entry_with_head_identifier(65537, TREE_KIND_INODE, 65537),
+            tree_table_entry_with_head_identifier(65549, TREE_KIND_INODE, 65549),
+        ];
+        assert!(
+            matches!(
+                head_identifier_verdict_of(&tree_table_entries),
+                InvariantVerdict::Violated(_)
+            ),
+            "extent 树条目的头 ID 不等于表里任何一条 inode 树条目的树 ID：判红"
+        );
+    }
 }

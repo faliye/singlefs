@@ -162,6 +162,10 @@ pub enum Verdict {
     /// 系统配置偏移 417 自述的单元区起始槽号不落在聚簇段边界上（不是 `CLUSTER_SEGMENT_SLOTS` 的整数倍，D3（空间分配） 已定项 10 ①）：
     /// 这样的单元区怎么分段条款没写，第一版不支持。
     UnitAreaStartOffTheClusterSegmentBoundary,
+    /// journal 记录新根段末尾卸载记号那 4 字节（记录偏移 459，D23（journal 的角色与格式） 已定项 15）位 0 之外有位为 1：
+    /// 与根记录 flags 同一个编码，读者与恢复把这条记录当损坏（`crates/singlefs-core/src/root_record.rs` 的
+    /// `of_unmount_marker_field_of_a_new_root_segment` 交 `None`），checker 照同一口径不收它（m3-root-ring-code-r1 判决 RR1）。
+    UnmountMarkerBitsOtherThanBitZero,
 }
 
 /// 系统配置槽解出来的几个要紧字段。
@@ -554,6 +558,8 @@ pub const KEY_SCHEMA_MAPPING: KeySchema = KeySchema {
     field_widths: &[1, 8, 8, 4, 6],
 };
 pub const KEY_SCHEMA_TREE_TABLE: KeySchema = KeySchema { field_widths: &[8] };
+/// 墓碑树与谱系树的 key：容器号 8 字节（D18（块里携带什么信息） 已定项 24 第 1、5 条，根条目照 inode 树内部节点的 120 字节形态）。
+pub const KEY_SCHEMA_CONTAINER_NUMBER: KeySchema = KeySchema { field_widths: &[8] };
 
 impl KeySchema {
     #[must_use]
@@ -581,15 +587,18 @@ impl KeySchema {
     }
 }
 
-/// 树的种类码 → key 形态（D8（核心索引结构） 已定项 9 / 已定项 11）；livelist 6、稀疏旁表 7、deadlist 8 三棵 day-1 只注册、没有节点要解。
+/// 树的种类码 → key 形态（D8（核心索引结构） 已定项 9 / 已定项 11）；livelist 6、稀疏旁表 7、deadlist 8 三棵 day-1 只注册、没有节点要解，
+/// logged_ops 12 字段表未定（D8（核心索引结构） 已定项 5）。`deleted_inodes` 9 的 key 是 inode 号 8 字节（D8（核心索引结构） 已定项 16），
+/// 墓碑树 10、谱系树 11 的 key 是容器号 8 字节（D18（块里携带什么信息） 已定项 24）。
 #[must_use]
 pub fn key_schema_for_tree_kind(kind: u16) -> Option<KeySchema> {
     match kind {
         1 => Some(KEY_SCHEMA_EXTENT),
-        2 => Some(KEY_SCHEMA_INODE),
+        2 | 9 => Some(KEY_SCHEMA_INODE),
         3 => Some(KEY_SCHEMA_ALLOCATION),
         4 => Some(KEY_SCHEMA_ACCOUNTING),
         5 => Some(KEY_SCHEMA_MAPPING),
+        10 | 11 => Some(KEY_SCHEMA_CONTAINER_NUMBER),
         _ => None,
     }
 }
@@ -691,7 +700,7 @@ pub fn packed_unit_view(unit: &[u8]) -> Result<PackedUnitView, Verdict> {
 }
 
 /// journal 记录头的偏移（D23（journal 的角色与格式） 已定项 4 的字段表）：magic 4 + 类型 2 + 算法类型 1 之后是记录标志 1；
-/// 事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，再是反向链 4、载荷校验和 4、新根段 188、fsid 8、MAC 16，头到 311 为止。
+/// 事务号 8 与提交标记 1 之后紧跟本次发布内序号 4，再是反向链 4、载荷校验和 4、新根段 364、fsid 8、MAC 16，头到 487 为止。
 const JOURNAL_MAGIC: &[u8; 4] = b"SFSJ";
 const JOURNAL_RECORD_FLAGS_OFFSET: usize = 7;
 const JOURNAL_HEADER_CHECKSUM_OFFSET: usize = 46;
@@ -701,7 +710,11 @@ const JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET: usize = 87;
 const JOURNAL_BACK_CHAIN_OFFSET: usize = 91;
 const JOURNAL_PAYLOAD_CHECKSUM_OFFSET: usize = 95;
 const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: usize = 99;
-const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 287;
+const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: usize = 463;
+/// 新根段里卸载记号那 4 字节：新根段 99 起，前六段 86 + 86 + 8 + 8 + 86 + 86 = 360 之后（D23（journal 的角色与格式） 已定项 15）。
+const JOURNAL_UNMOUNT_MARKER_OFFSET: usize = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 360;
+/// 卸载记号只许位 0（正常卸载那一串写 1），编码与根记录 flags 位 0 相同（D22（单元原子性怎么合成） 已定项 7）。
+const JOURNAL_UNMOUNT_MARKER_BIT: u32 = 1;
 
 /// 点名项解出来的样子（D23（journal 的角色与格式） 已定项 17）。
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -745,22 +758,24 @@ pub struct JournalRecordView {
     /// 不在这里拒其余位非 0 的记录，I-8.9（一次发布的记录序号连续且只有末条带标志） 判红——拒了它就看不见。
     pub record_flags_byte: u8,
     pub back_chain: u32,
-    /// 新根段 188 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8）。
+    /// 新根段 364 字节原样（树表指针 86 + 映射根指针 86 + 树 ID 水位 8 + F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4，
+    /// D23（journal 的角色与格式） 已定项 15）。
     pub new_root_segment: Vec<u8>,
     pub new_tree_identifier_watermark: u64,
     pub new_rollback_floor: u64,
     pub named: Vec<NamedEntryView>,
 }
 
-/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 311 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
+/// 反向链的口径（D23（journal 的角色与格式） 已定项 19 ②）：前一条记录 487 字节头的 CRC-32C，`header_csum` 那 32 字节按 0 参与。
 #[must_use]
 pub fn back_chain_of_record_header(record: &[u8]) -> u32 {
-    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("311")].to_vec();
+    let mut header = record[..usize::try_from(JOURNAL_HEADER_BYTES).expect("487")].to_vec();
     header[JOURNAL_HEADER_CHECKSUM_OFFSET..JOURNAL_HEADER_CHECKSUM_OFFSET + 32].fill(0);
     crc32_castagnoli_bitwise(&header)
 }
 
-/// 判一条 journal 记录：magic、`header_csum` 罩整条 4096（D23（journal 的角色与格式） 已定项 13）、类型、记录长度、fsid、载荷 CRC、点名项 flags。
+/// 判一条 journal 记录：magic、`header_csum` 罩整条 4096（D23（journal 的角色与格式） 已定项 13）、类型、记录长度、fsid、
+/// 卸载记号位 0 之外全 0、载荷 CRC、点名项 flags。
 pub fn check_journal_record(
     record: &[u8],
     expected_filesystem_identifier: u64,
@@ -784,8 +799,11 @@ pub fn check_journal_record(
     if read_u64(record, JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET) != expected_filesystem_identifier {
         return Err(Verdict::FilesystemIdentifierMismatch);
     }
+    if read_u32(record, JOURNAL_UNMOUNT_MARKER_OFFSET) & !JOURNAL_UNMOUNT_MARKER_BIT != 0 {
+        return Err(Verdict::UnmountMarkerBitsOtherThanBitZero);
+    }
     let named_count = usize::try_from(read_u32(record, 12)).expect("点名项数");
-    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("311");
+    let header_bytes = usize::try_from(JOURNAL_HEADER_BYTES).expect("487");
     let entry_bytes = usize::try_from(JOURNAL_NAMED_ENTRY_BYTES).expect("56");
     let payload_end = header_bytes + named_count * entry_bytes;
     if payload_end > record_bytes {
