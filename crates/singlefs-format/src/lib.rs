@@ -109,6 +109,21 @@ pub const INODE_INTERNAL_ENTRY: u64 = 120;
 /// 一个 32 KiB 码 3 容器装几条 inode 记录：(32768 − 136) ÷ 140。format-const: INODE_LEAF_RECORDS
 pub const INODE_LEAF_RECORDS: u64 = 233;
 
+/// 墓碑记录定长 40：对象 ID 8 + 对象出生代 8 + 区间起 8 + 区间止 8 + 死亡 txg 8（D18（块里携带什么信息） 已定项 24 第 2 条，打包记录类型 1）。
+pub const TOMBSTONE_RECORD_BYTES: u64 = 40;
+
+/// 一个 32 KiB 码 3 墓碑容器装几条：(32768 − 136) ÷ 40（D18（块里携带什么信息） 已定项 24 第 2 条）。
+pub const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;
+
+/// 谱系记录定长 16：T_rb 8 + T_old 8（D18（块里携带什么信息） 已定项 24 第 5 条，打包记录类型 5）。
+pub const LINEAGE_RECORD_BYTES: u64 = 16;
+
+/// 一个 32 KiB 码 3 谱系容器装几条：(32768 − 136) ÷ 16（D18（块里携带什么信息） 已定项 24 第 5 条）。
+pub const LINEAGE_CONTAINER_RECORDS: u64 = 2039;
+
+/// `deleted_inodes` 树节点的条目：key = inode 号 8 字节、无 value、不带对象出生代（D8（核心索引结构） 已定项 16 第 1 条）。
+pub const DELETED_INODES_ENTRY_BYTES: u64 = 8;
+
 /// 实例表记录定长 88（D18（块里携带什么信息） 已定项 11 打包记录类型 4）。format-const: INSTANCE_ROW_BYTES
 pub const INSTANCE_ROW_BYTES: u64 = 88;
 
@@ -168,21 +183,28 @@ pub const NEW_POOL_FILE_CREATION_ACCOUNTING_ROWS: u64 = 15;
 /// 树表条目：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2 + 根指针 86 + previous_snapshot_txg 8 + 诞生 txg 8 + 头 ID 8 + 预留 76（D8（核心索引结构） 已定项 8；重排与头 ID 2026-09-14 用户定案，加宽到 200 是 2026-09-16 用户定案）。format-const: TREE_TABLE_ENTRY_BYTES
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
-/// 新池新建文件写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist）。
-pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 7;
+/// 新池新建文件写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist，
+/// 加 `deleted_inodes`、墓碑树、谱系树、logged_ops 四棵零根注册的树：D8（核心索引结构） 已定项 16 第 3 条、D18（块里携带什么信息） 已定项 24 第 6 条）。
+pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 11;
 
-/// 树 ID 从 11 起、与树的种类码错开（D8（核心索引结构） 已定项 11）。
-pub const TREE_IDENTIFIER_EXTENT: u64 = 11;
-pub const TREE_IDENTIFIER_INODE: u64 = 12;
-pub const TREE_IDENTIFIER_ALLOCATION_RECORDS: u64 = 13;
-pub const TREE_IDENTIFIER_ACCOUNTING: u64 = 14;
-pub const TREE_IDENTIFIER_CENTRAL_MAPPING: u64 = 15;
-pub const TREE_IDENTIFIER_LIVELIST: u64 = 16;
-pub const TREE_IDENTIFIER_SPARSE_SIDE_TABLE: u64 = 17;
-pub const TREE_IDENTIFIER_DEADLIST: u64 = 18;
-/// 树 ID 水位：mkfs 写 11，第一次发布后写 19（D8（核心索引结构） 已定项 8 ②）。
-pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 11;
-pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 19;
+/// 树 ID 从 65536 起（树的种类那 2 字节取不到的最小值），与树的种类码值域不相交（D8（核心索引结构） 已定项 11，用户 2026-10-01 定案整体挪开）。
+pub const TREE_IDENTIFIER_EXTENT: u64 = 65536;
+pub const TREE_IDENTIFIER_INODE: u64 = 65537;
+pub const TREE_IDENTIFIER_ALLOCATION_RECORDS: u64 = 65538;
+pub const TREE_IDENTIFIER_ACCOUNTING: u64 = 65539;
+pub const TREE_IDENTIFIER_CENTRAL_MAPPING: u64 = 65540;
+pub const TREE_IDENTIFIER_LIVELIST: u64 = 65541;
+pub const TREE_IDENTIFIER_SPARSE_SIDE_TABLE: u64 = 65542;
+pub const TREE_IDENTIFIER_DEADLIST: u64 = 65543;
+/// 第一个文件版本那次零根注册的四棵树（D8（核心索引结构） 已定项 5 / 已定项 16 第 3 条；D18（块里携带什么信息） 已定项 24 第 1 / 5 / 6 条），
+/// 接在 deadlist 之后，次序照 D18 已定项 24 第 6 条列的：`deleted_inodes`、墓碑树、谱系树、logged_ops（树 ID 取值见 D8（核心索引结构） 已定项 11）。
+pub const TREE_IDENTIFIER_DELETED_INODES: u64 = 65544;
+pub const TREE_IDENTIFIER_TOMBSTONE: u64 = 65545;
+pub const TREE_IDENTIFIER_LINEAGE: u64 = 65546;
+pub const TREE_IDENTIFIER_LOGGED_OPERATIONS: u64 = 65547;
+/// 树 ID 水位：mkfs 写 65536，第一个文件版本那次之后写 65548（D8（核心索引结构） 已定项 8 ② / 已定项 11）。
+pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
+pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 65548;
 
 /// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。format-const: ROOT_RECORD_BYTES
 pub const ROOT_RECORD_BYTES: u64 = 457;
@@ -193,17 +215,18 @@ pub const JOURNAL_RECORD_BYTES: u64 = 4096;
 /// journal 记录头的十个基础字段（D23（journal 的角色与格式） 已定项 4）。format-const: JOURNAL_HEADER_TEN_FIELD_BYTES
 pub const JOURNAL_HEADER_TEN_FIELD_BYTES: u64 = 78;
 
-/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8（D23（journal 的角色与格式） 已定项 15）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
-pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 188;
+/// journal 记录头的新根段：树表指针 86 + 中央映射树根指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 86 + 分配记录树根指针 86 + 卸载记号 4
+/// （D23（journal 的角色与格式） 已定项 15；后三项随用户 2026-10-02「回到甲」加，卸载记号 4 字节是判决没单独定宽、照第一轮正推腿的算法取的）。format-const: JOURNAL_NEW_ROOT_SEGMENT_BYTES
+pub const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u64 = 364;
 
-/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 188 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
-pub const JOURNAL_HEADER_BYTES: u64 = 311;
+/// journal 记录头：78 + 事务号 8 + 提交标记 1 + 本次发布内序号 4 + 反向链 4 + 载荷校验和 4 + 新根段 364 + fsid 8 + MAC 16（D23（journal 的角色与格式） 已定项 4 / 已定项 7 / 已定项 8 / 已定项 13 / 已定项 14 注 1 / 已定项 15；fsid 与 MAC 2026-09-14 用户定案；本次发布内序号 2026-09-23 用户定案，随并行线一落地）。format-const: JOURNAL_HEADER_BYTES
+pub const JOURNAL_HEADER_BYTES: u64 = 487;
 
 /// journal 点名项：位置条目 14 × 2 + 类标签 1 + 出生树 8 + 出生 txg 8 + key 尾段 10 + flags 1（D23（journal 的角色与格式） 已定项 17）。format-const: JOURNAL_NAMED_ENTRY_BYTES
 pub const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 
-/// 一条 4 KiB 记录装几个点名项：(4096 − 311) ÷ 56 的整数部分（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD
-pub const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 67;
+/// 一条 4 KiB 记录装几个点名项：(4096 − 487) ÷ 56 的整数部分（D23（journal 的角色与格式） 已定项 4 / 已定项 17）。format-const: JOURNAL_NAMED_ENTRIES_PER_RECORD
+pub const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
 
 /// journal 环从槽 1024（16 MiB）起（D23（journal 的角色与格式） 已定项 2）。
 pub const JOURNAL_RING_START_SLOT: u64 = 1024;
@@ -400,10 +423,10 @@ mod tests {
         assert_eq!(ACCOUNTING_ENTRY_BYTES, 34, "记账条目");
         assert_eq!(TREE_TABLE_ENTRY_BYTES, 200, "树表条目");
         assert_eq!(ROOT_RECORD_BYTES, 457, "根记录");
-        assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 188, "journal 新根段");
-        assert_eq!(JOURNAL_HEADER_BYTES, 311, "journal 记录头");
+        assert_eq!(JOURNAL_NEW_ROOT_SEGMENT_BYTES, 364, "journal 新根段");
+        assert_eq!(JOURNAL_HEADER_BYTES, 487, "journal 记录头");
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56, "journal 点名项");
-        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67, "一条记录装几个点名项");
+        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64, "一条记录装几个点名项");
         assert_eq!(
             JOURNAL_RING_DEFAULT_BYTES / JOURNAL_RECORD_BYTES / JOURNAL_SAFETY_FACTOR,
             65536,
@@ -413,6 +436,40 @@ mod tests {
             UNIT_AREA_START_SLOT,
             JOURNAL_RING_START_SLOT + JOURNAL_RING_DEFAULT_BYTES / SLOT_BYTES,
             "单元区紧接 journal 环之后"
+        );
+    }
+
+    /// 删除写出的三个宽（D18 已定项 24 第 2 条、D8 已定项 16 第 1 条）写成字面量，原来的算式留在这里：
+    /// 墓碑记录 = 五段各 8 字节，一个码 3 容器从记录区起点到单元末尾按 40 字节装满的条数，`deleted_inodes` 条目就是 inode 号那 8 字节 key。
+    #[test]
+    fn deletion_widths_equal_the_field_sums_and_the_container_capacity_they_stand_for() {
+        assert_eq!(
+            TOMBSTONE_RECORD_BYTES,
+            8 + 8 + 8 + 8 + 8,
+            "墓碑记录 = 对象 ID + 对象出生代 + 区间起 + 区间止 + 死亡 txg"
+        );
+        assert_eq!(
+            TOMBSTONE_CONTAINER_RECORDS,
+            (DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES,
+            "一个 32 KiB 墓碑容器从记录区起点 136 装到单元末尾的条数"
+        );
+        assert_eq!(
+            TOMBSTONE_CONTAINER_RECORDS, 815,
+            "D18 已定项 24 第 2 条写的 815"
+        );
+        assert_eq!(LINEAGE_RECORD_BYTES, 8 + 8, "谱系记录 = T_rb + T_old");
+        assert_eq!(
+            LINEAGE_CONTAINER_RECORDS,
+            (DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / LINEAGE_RECORD_BYTES,
+            "一个 32 KiB 谱系容器从记录区起点 136 装到单元末尾的条数"
+        );
+        assert_eq!(
+            LINEAGE_CONTAINER_RECORDS, 2039,
+            "D18 已定项 24 第 5 条写的 2039"
+        );
+        assert_eq!(
+            DELETED_INODES_ENTRY_BYTES, 8,
+            "`deleted_inodes` 条目只有 key：inode 号 8 字节，无 value、不带对象出生代"
         );
     }
 
@@ -478,8 +535,8 @@ mod tests {
         );
         assert_eq!(
             JOURNAL_NEW_ROOT_SEGMENT_BYTES,
-            NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8,
-            "新根段 = 树表指针 + 中央映射树根指针 + 树 ID 水位 8 + 回退下界 F 8"
+            NODE_POINTER_BYTES + NODE_POINTER_BYTES + 8 + 8 + NODE_POINTER_BYTES + NODE_POINTER_BYTES + 4,
+            "新根段 = 树表指针 + 中央映射树根指针 + 树 ID 水位 8 + 回退下界 F 8 + 实例表指针 + 分配记录树根指针 + 卸载记号 4（D23 已定项 15）"
         );
         assert_eq!(
             JOURNAL_NAMED_ENTRY_BYTES,
@@ -569,9 +626,41 @@ mod tests {
         );
     }
 
-    /// 树 ID 与树的种类码错开：种类码 0..8，树 ID 从 11 起，水位在最后一个之后。
+    /// 十二棵树（八棵加第一个文件版本那次零根注册的四棵）的树 ID 与两个水位逐个等于 D8（核心索引结构） 已定项 11 登记的值
+    /// （用户 2026-10-01 定案「树 ID 整体挪开」）：从 65536 起连号，起点是树的种类那 2 字节取不到的最小值，水位在最后一个之后。
     #[test]
-    fn tree_identifiers_start_after_kind_codes_and_watermark_follows_the_last() {
+    fn tree_identifiers_are_the_registered_values_in_a_row_from_the_first_value_the_kind_field_cannot_hold(
+    ) {
+        for (identifier, registered_value, tree_name) in [
+            (TREE_IDENTIFIER_EXTENT, 65536, "extent 树"),
+            (TREE_IDENTIFIER_INODE, 65537, "inode 树"),
+            (TREE_IDENTIFIER_ALLOCATION_RECORDS, 65538, "分配记录树"),
+            (TREE_IDENTIFIER_ACCOUNTING, 65539, "记账树"),
+            (TREE_IDENTIFIER_CENTRAL_MAPPING, 65540, "中央映射树"),
+            (TREE_IDENTIFIER_LIVELIST, 65541, "livelist 共享树"),
+            (TREE_IDENTIFIER_SPARSE_SIDE_TABLE, 65542, "稀疏旁表树"),
+            (TREE_IDENTIFIER_DEADLIST, 65543, "deadlist 树"),
+            (TREE_IDENTIFIER_DELETED_INODES, 65544, "deleted_inodes 树"),
+            (TREE_IDENTIFIER_TOMBSTONE, 65545, "墓碑树"),
+            (TREE_IDENTIFIER_LINEAGE, 65546, "谱系树"),
+            (TREE_IDENTIFIER_LOGGED_OPERATIONS, 65547, "logged_ops 树"),
+            (TREE_IDENTIFIER_WATERMARK_AT_MKFS, 65536, "mkfs 时的水位"),
+            (
+                TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
+                65548,
+                "第一个文件版本那次之后的水位",
+            ),
+        ] {
+            assert_eq!(
+                identifier, registered_value,
+                "{tree_name}：D8 已定项 11 登记的值"
+            );
+        }
+        assert_eq!(
+            TREE_IDENTIFIER_EXTENT,
+            u64::from(u16::MAX) + 1,
+            "起点是树的种类那 2 字节取不到的最小值：种类码与树 ID 的值域不相交"
+        );
         let identifiers = [
             TREE_IDENTIFIER_EXTENT,
             TREE_IDENTIFIER_INODE,
@@ -581,15 +670,23 @@ mod tests {
             TREE_IDENTIFIER_LIVELIST,
             TREE_IDENTIFIER_SPARSE_SIDE_TABLE,
             TREE_IDENTIFIER_DEADLIST,
+            TREE_IDENTIFIER_DELETED_INODES,
+            TREE_IDENTIFIER_TOMBSTONE,
+            TREE_IDENTIFIER_LINEAGE,
+            TREE_IDENTIFIER_LOGGED_OPERATIONS,
         ];
         for (position, identifier) in identifiers.iter().enumerate() {
             let expected = TREE_IDENTIFIER_WATERMARK_AT_MKFS
-                + u64::try_from(position).expect("八棵树的序号装得进 u64");
+                + u64::try_from(position).expect("十二棵树的序号装得进 u64");
             assert_eq!(*identifier, expected, "树 ID 连号");
         }
         assert_eq!(
             TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
-            TREE_IDENTIFIER_DEADLIST + 1
+            TREE_IDENTIFIER_LOGGED_OPERATIONS + 1
+        );
+        assert_eq!(
+            NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES, 11,
+            "D18 已定项 24 第 6 条：树表 7 → 11 条"
         );
         assert_eq!(
             u64::try_from(ROOT_RING_REGION_DEVICES.len()).expect("三个区域"),
