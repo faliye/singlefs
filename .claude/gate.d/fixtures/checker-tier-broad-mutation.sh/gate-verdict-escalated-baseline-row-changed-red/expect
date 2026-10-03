@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=那一版 baseline.tsv 第 2 行的 threads 是「16」，登记的是「8」
+want=gate-verdict：红

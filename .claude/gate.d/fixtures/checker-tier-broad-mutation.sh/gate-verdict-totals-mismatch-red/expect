@@ -1,0 +1,5 @@
+exit=1
+want=驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）
+want=汇总行 total=5091，判定行 total=6
+want=汇总行超时、内存撞顶、只过了第一段、驱动错、没跑加起来是 5085，判定行 without_conclusion=0
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

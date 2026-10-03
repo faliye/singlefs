@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=first 那趟的日志 logs/1.first.log 不在 versions/<那一版>/escalation/ 下
+want=gate-verdict：红

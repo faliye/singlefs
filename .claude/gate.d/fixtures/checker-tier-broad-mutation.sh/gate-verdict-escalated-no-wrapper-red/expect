@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=first 那趟的日志里没有包装打的「超过限时 900 秒」
+want=gate-verdict：红

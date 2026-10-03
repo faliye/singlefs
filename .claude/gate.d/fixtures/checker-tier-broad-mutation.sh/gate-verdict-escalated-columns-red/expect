@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=登记表第 2 行段数是 15，不是 16
+want=gate-verdict：红

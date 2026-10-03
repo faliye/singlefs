@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=first 那趟的日志 escalation/1.one-build.999.first.log 不在 versions/<那一版>/escalation/ 下：没有驱动写的证据（手写的行）
+want=gate-verdict：红

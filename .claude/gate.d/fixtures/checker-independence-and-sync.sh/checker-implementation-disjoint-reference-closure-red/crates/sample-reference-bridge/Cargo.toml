@@ -1,0 +1,5 @@
+[package]
+name = "sample-reference-bridge"
+
+[dependencies]
+singlefs-core = { path = "../singlefs-core" }

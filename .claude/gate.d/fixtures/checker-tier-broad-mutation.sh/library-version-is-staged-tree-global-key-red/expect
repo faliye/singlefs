@@ -1,0 +1,4 @@
+exit=1
+want=全局键与那一版记的不同
+want=那一版记的「exclusions none」
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

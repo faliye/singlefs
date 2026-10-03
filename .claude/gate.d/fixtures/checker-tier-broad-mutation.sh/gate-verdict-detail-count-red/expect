@@ -1,0 +1,4 @@
+exit=1
+want=驱动 --summary 的判定行、汇总行、计数、明细与退出码对不上（驱动的提交门禁判法失灵）
+want=明细与计数不同：NO_CONCLUSION 2 行、MISSED 0 行，判定行 without_conclusion=0
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

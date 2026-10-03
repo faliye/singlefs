@@ -1,0 +1,5 @@
+[package]
+name = "sample-checker-bridge"
+
+[dependencies]
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }

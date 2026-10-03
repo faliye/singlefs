@@ -1,0 +1,6 @@
+[package]
+name = "singlefs-checker-tier"
+
+[dependencies]
+singlefs-harness = { path = "../singlefs-harness" }
+singlefs-checker = { path = "../singlefs-checker" }

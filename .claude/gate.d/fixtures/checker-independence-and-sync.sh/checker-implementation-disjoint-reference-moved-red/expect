@@ -1,0 +1,5 @@
+exit=1
+want=crates/singlefs-reference-filesystem 不在，而包 `singlefs-reference-filesystem` 还在别处、或还有包依赖它
+want=包放在 crates/reference-filesystem
+want=singlefs-harness 依赖它
+want=checker-implementation-disjoint：红（退出 1）

@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过（1 处
+want=--summary 说第 1 条是升档判的 caught-by-timeout，登记表里没有这一版（e5ca1a7e00000000）复核得过的那一行
+want=gate-verdict：红

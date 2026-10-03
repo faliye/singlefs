@@ -1,0 +1,3 @@
+exit=1
+want=驱动 --summary 打了 1 行 BROAD_MUTATION_SUMMARY、0 行 BROAD_MUTATION_GATE，各该恰好一行
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

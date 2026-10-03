@@ -1,0 +1,3 @@
+exit=1
+want=汇总行的 fingerprint=ed83d6cca1ecaf2b 不是库目录 tree.source 那一版（970a802431217260）：判的不是同一版
+want=在这一道判的时候换了（开格之前钉住的与两格跑完再读的不同）

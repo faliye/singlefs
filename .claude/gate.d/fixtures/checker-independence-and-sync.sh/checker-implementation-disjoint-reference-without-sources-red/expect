@@ -1,0 +1,3 @@
+exit=1
+want=crates/singlefs-reference-filesystem 下一个 .rs 都没有
+want=checker-implementation-disjoint：红（退出 1）

@@ -1,0 +1,3 @@
+exit=1
+want=有 2 行 ESCALATED 明细，判定行却没有 escalated=
+want=gate-verdict：红

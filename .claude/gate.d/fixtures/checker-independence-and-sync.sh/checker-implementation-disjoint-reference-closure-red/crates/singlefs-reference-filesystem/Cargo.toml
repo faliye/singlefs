@@ -1,0 +1,9 @@
+[package]
+name = "singlefs-reference-filesystem"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }
+sample-external-parser = "1"
+
+[dev-dependencies]
+sample-reference-bridge = { path = "../sample-reference-bridge" }

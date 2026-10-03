@@ -1,0 +1,3 @@
+exit=1
+want=不查全绿标记：登记的输入路径上工作区与暂存区不同（1 处：没暂存的改动 crates/sample/src/lib.rs）
+want=第 2b 步 ② 也不起

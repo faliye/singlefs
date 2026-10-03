@@ -1,0 +1,4 @@
+exit=1
+want=广谱变异提交门禁判红：这一版 6 条里 3 条没有结论、0 条没红
+want=NO_CONCLUSION 6 none crates/singlefs-core/src/sample.rs:24:9: replace == with != in add
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（gate-verdict）

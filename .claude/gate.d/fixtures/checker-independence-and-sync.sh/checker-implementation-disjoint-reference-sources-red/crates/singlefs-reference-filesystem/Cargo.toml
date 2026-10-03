@@ -1,0 +1,8 @@
+[package]
+name = "singlefs-reference-filesystem"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }
+
+[dev-dependencies]
+oracle = { package = "singlefs-core", path = "../singlefs-core" }

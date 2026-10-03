@@ -1,0 +1,3 @@
+exit=1
+want=里有 tree.source.pending：上一次 --sync-tree 没做完，库目录那一版判不了
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

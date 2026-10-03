@@ -1,0 +1,8 @@
+exit=1
+want=RefFS 包的源码里有 2 处引 `singlefs_checker` / `singlefs_checker_tier` / `singlefs_core` / `singlefs_harness`
+want=src/lib.rs:2：use singlefs_checker::check as checker_verdict;
+want=tests/reference_against_the_implementation.rs:5：assert_eq!(singlefs_checker_tier::engine_sample(), oracle_rows);
+want=RefFS 包的源码里有 1 处用别名 `oracle::` 引那四个包（RefFS 的 Cargo.toml 里 package = 指到 singlefs-core）
+want=tests/reference_against_the_implementation.rs:4：oracle::commit();
+want=singlefs-reference-filesystem → singlefs-core（singlefs-reference-filesystem 的 Cargo.toml 里写成别名 `oracle`）
+want=checker-implementation-disjoint：红（退出 1）

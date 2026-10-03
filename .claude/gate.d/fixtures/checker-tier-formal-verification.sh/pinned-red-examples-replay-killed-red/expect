@@ -1,0 +1,5 @@
+exit=1
+want=装置被信号停了（退 -9，信号 9）
+want=→ pinned-red-examples-replay：
+want=✗ 行写「被信号停了」的照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办，这一次的输出不算判定，不改变异行或实现
+want=pinned-red-examples-replay：红（退出 1）

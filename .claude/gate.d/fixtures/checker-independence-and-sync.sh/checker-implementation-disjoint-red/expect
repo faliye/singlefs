@@ -11,5 +11,6 @@ want=src/lib.rs:5：pub const fn clamp
 want=harness 档包的依赖闭包里有 checker 档包 `singlefs-checker-tier`
 want=harness 档的源码里有 1 处引 checker 档包
 want=tests/daily_case.rs:3
+want=⑤ ⑥ 两条本次未跑（⑦ 照判）
 want=样本只跑 .gate-cells 点名的格：checker-implementation-disjoint
 want=checker-implementation-disjoint：红（退出 1）

@@ -1,0 +1,6 @@
+[package]
+name = "singlefs-checker"
+
+[dependencies]
+singlefs-format = { path = "../singlefs-format" }
+sample-checker-bridge = { path = "../sample-checker-bridge" }

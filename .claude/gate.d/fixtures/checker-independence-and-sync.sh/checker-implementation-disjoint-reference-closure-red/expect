@@ -1,0 +1,6 @@
+exit=1
+want=RefFS 包 `singlefs-reference-filesystem` 的依赖闭包（dev-dependencies 也算）里有 3 个不在 {它自己, `singlefs-format`} 里
+want=singlefs-reference-filesystem → sample-external-parser
+want=singlefs-reference-filesystem → sample-reference-bridge → singlefs-core
+want=样本只跑 .gate-cells 点名的格：checker-implementation-disjoint
+want=checker-implementation-disjoint：红（退出 1）

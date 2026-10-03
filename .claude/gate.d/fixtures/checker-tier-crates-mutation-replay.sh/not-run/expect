@@ -1,0 +1,8 @@
+exit=0
+want=✓ add-becomes-sub：adds_two_and_three_to_five 红了
+want=计数：抓到 1 条、没红 0 条、无效 0 条、内存撞顶 0 条、超时 0 条、被总上限挤掉 0 条、排不上没跑 0 条、scope 起不来没跑 0 条（共 2 条）
+want=基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 2 行，基线不绿 0 行（按 cargo 参数分 1 批；共 2 行）
+want=本次未跑：1 条（点名的测试在本机打了 NOT_RUN_NO_GPU_ADAPTER 后返回成功
+want=crates/mutations.tsv:3 card-scaling-changed：本次未跑——点名的测试 scaling_on_the_card_matches_the_cpu 打了 NOT_RUN_NO_GPU_ADAPTER（样本：本机没有 GPU 适配器）后返回成功
+want=✓ crates 变异表复跑：2 条里抓到 1 条、本次未跑 1 条
+want=crates-mutation-rows：绿

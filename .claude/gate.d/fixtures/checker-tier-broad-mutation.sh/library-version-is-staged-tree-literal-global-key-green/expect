@@ -1,0 +1,3 @@
+exit=0
+want=广谱变异库目录那一版（54cb89f92c3f87f5，导出自 0123456789ab）就是被判的暂存树：导出范围 crates Cargo.toml Cargo.lock litmus .cargo 里 6 个文件逐个相同，工具链相同，全局键 27 行逐行相同
+want=library-version-is-staged-tree：绿

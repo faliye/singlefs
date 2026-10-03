@@ -1,0 +1,3 @@
+exit=1
+want=判定行 escalated=3，ESCALATED 明细 2 行
+want=gate-verdict：红

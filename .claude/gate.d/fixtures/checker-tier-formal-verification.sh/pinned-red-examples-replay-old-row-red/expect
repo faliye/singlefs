@@ -1,0 +1,4 @@
+exit=1
+want=第 20 行没整行抄红例账（8 段的旧格式，要 21 段）
+want=--backfill
+want=pinned-red-examples-replay：红（退出 1）

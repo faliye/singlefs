@@ -1,0 +1,4 @@
+exit=1
+want=逐文件相同而源码指纹不同
+want=tree.source 记的 0000000000000000）：manifest.tsv 与 tree.source 不是同一次写的
+want=checker-tier-broad-mutation.sh：1 格里 1 格红（library-version-is-staged-tree）

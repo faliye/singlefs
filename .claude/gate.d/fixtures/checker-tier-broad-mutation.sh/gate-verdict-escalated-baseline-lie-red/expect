@@ -1,0 +1,4 @@
+exit=1
+want=升档判的抓到复核不过
+want=登记的基线 1.0 与那一版 baseline.tsv 第 2 行记的 10.0 不同
+want=gate-verdict：红
