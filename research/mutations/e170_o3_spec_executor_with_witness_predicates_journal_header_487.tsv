@@ -1,0 +1,5 @@
+X32_记录头回到311格式	("new_root_instance_table_pointer", 86), ("new_root_allocation_records_root_pointer", 86), ("new_root_unmount_marker", 4),\n    ("file_system_identity_low_eight_bytes", 8), ("message_authentication_code", 16),\n]\nJOURNAL_RECORD_FIELDS = spans_from_row_order(JOURNAL_RECORD_FIELD_ROWS)\nJOURNAL_HEADER_BYTES = 487	("file_system_identity_low_eight_bytes", 8), ("message_authentication_code", 16),\n]\nJOURNAL_RECORD_FIELDS = spans_from_row_order(JOURNAL_RECORD_FIELD_ROWS)\nJOURNAL_HEADER_BYTES = 311
+X33_新根段去掉卸载记号	("new_root_allocation_records_root_pointer", 86), ("new_root_unmount_marker", 4),	("new_root_allocation_records_root_pointer", 86),
+X34_重建的根照抄所选根的实例表指针	instance_table_pointer=last_applied.field_bytes("new_root_instance_table_pointer")	instance_table_pointer=root.field_bytes("instance_table_pointer")
+X35_点名项区仍从311起	item_array = raw[layout.JOURNAL_HEADER_BYTES:layout.JOURNAL_HEADER_BYTES + named_item_count * layout.NAMED_ITEM_BYTES]	item_array = raw[311:311 + named_item_count * layout.NAMED_ITEM_BYTES]
+X36_反向链按前一条的311字节算	header = self.raw[:layout.JOURNAL_HEADER_BYTES]	header = self.raw[:311]

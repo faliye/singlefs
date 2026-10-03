@@ -1,0 +1,111 @@
+# E165（恢复重放有界穷举与变异杀伤界）第 1 次重跑第二段：9.3 判定标签集合与依据（登记 research/prompts/e165-r1-prereg.md 第九节）。
+# 五列，制表符分隔：键、版本、标签、在不在集合里（yes 在 / no 不在 / none 空集）、见证输入或「没有这样的输入」的理由。
+# 键：r<登记时 crates/mutations.tsv 的行号>；355 与 23、414 与 406 原文与替换文逐字相同，共用 r23、r406 的行（驱动的 SAME_AS）。Z1 到 Z4 是自造表。
+# 版本：old 是 HEAD（提交 fcc4d340）的 crates/singlefs-core/src/recovery.rs，行号指它；today 是登记第三节 sha256 的 crates/singlefs-replay-prefix/src/lib.rs（lib.rs）与 recovery.rs。
+# 集合 = 存在一个输入、原式满足这条描述而变异式不满足的标签（9.3 判法）。取读法：PD3、PD15、PD16、PD19 的「末条」与 PD7 的锚点照 9.3 前言取实现读出来的那一条；
+#   变异改了读法本身时（512 改锚点、518 改末条读法），随读法走的别的标签（PD6、PD10 的「没锚点」、PD12 到 PD14 的「一次发布之内」）也跟变异后的读法走、不另算——
+#   9.3 只把这条约定写给了 PD3、PD7、PD15、PD16、PD19，延伸到 PD6、PD10、PD12 到 PD14 是执行员的取法，写在报告里请主 agent 认。
+# 核对：把旧、新两版算法各抄成一份带变异开关的模型，在随机输入上找变异与原式结局不同的输入、按原式当时的状态算各标签的条件，聚类与本表一致（模型不入库，路径与 sha256 在这一段的报告里）。
+# 这张表只写判定标签，不判变异能不能编、红不红；那是第三段的事。
+r23	old	PD1	yes	root 实例 1、所选根那次发布没有读成末条的记录（无锚点）、一条实例 2 的记录 txg 等于根 txg 加一、序号 1、带提交标记、读成末条：原式 3079 要求同实例，它进不了 above、一条不施加；变异去掉 `record.instance == root.instance &&`，它进 above、过 3114 与 3115、整次施加（prefix_applied 1 对 0，above_water 也多 1）
+r23	old	PD6,PD7	no	无锚点一支的 txg 判（3114）与有锚点一支的键比较（3110 到 3113，键里带实例代号，实例不同的记录有锚点时照断）都没动
+r23	today	PD1	yes	同一输入：lib.rs:1258 `is_above_the_chosen_root` 要求同实例，变异改成实例更大也算；这条记录在 lib.rs:1419（txg 等于根加一）、lib.rs:1428（序号 1）都过，整次施加；report.above_water 也多 1（lib.rs:1547 到 1549）
+r23	today	PD6,PD7	no	lib.rs:1419 的 txg 判与 lib.rs:1408 的键比较没动，有锚点时别的实例的记录进了候选也在 lib.rs:1408 断
+r24	old	PD7	yes	有锚点（所选根那次发布的末条计数器 5），水位之上第一条计数器 6、序号 1、末条带提交标记：原式链首要 6，施加；变异 3096 要 7，6 在 3111 断，一条不施加
+r24	old	PD3,PD11	no	锚点怎么取（2962 到 2987）没动；链首序号判（3130 到 3134）没动
+r24	today	PD7	yes	同一输入：lib.rs:1564 的链首计数器改成锚点加二，6 在 lib.rs:1408 到 1410 断
+r24	today	PD3,PD11	no	锚点怎么取（lib.rs:1179 到 1247）没动；lib.rs:1428 没动
+r36	old	PD6	yes	无锚点，水位之上第一条 txg 等于根 txg 加二、序号 1、带提交标记、读成末条：原式 3114 的 txg 比较断在链首；变异 `false && A || B` 等于只剩 B（3115 的序号判），txg 不再判，这条接上并施加
+r36	old	PD10	no	序号那一半 B（3115）留着，序号不是 1 的链首照断
+r36	today	PD6	yes	同一输入：lib.rs:1419 的 txg 判被 `false &&` 关掉，lib.rs:1428 只判序号，txg 不对的链首接上并施加
+r36	today	PD10	no	序号判（lib.rs:1428）没动
+r226	old	PD18	yes	点名验证关着（verify_named_units 为假），一条合法的单条发布：原式 3195 到 3197 不加，verification_passed 为 0；变异无条件加，为 1
+r226	old	PD17	no	点名单元的判（3173 到 3187）没动
+r226	today	PD18	yes	同一输入：lib.rs:1748 到 1753 的 Skip 臂本来不加，变异把整个 match 换成无条件加一
+r226	today	PD17	no	点名单元的判（lib.rs:1474 到 1477）没动
+r354	old	PD17	yes	一条记录点名一个单元、有两条位置条目、一条读不出：原式 3178 的 `.all` 判未验过，verification_failed 加一并断；变异 `.any` 判验过，接上（另：位置条目为空时 `.all` 真、`.any` 假，原式接上、变异断）
+r354	old	PD18	no	只数真验过的（3195 到 3197）没动，变异接上的那条照加一，与描述一致
+r354	today	PD17	yes	同一输入：recovery.rs:3090（replay_journal 里 named_units_verified 闭包）的 `.all` 改 `.any`；核在 lib.rs:1474 到 1477 把闭包当黑盒调
+r354	today	PD18	no	lib.rs:1748 到 1753 没动
+r406	old	PD19	yes	所选根之后一次发布两条记录（第一条没带末条标志、第二条带）：原式 3200 在第一条后攒着、第二条到了整次施加 2 条；变异 `if false` 每条接上就施加，第一条后就施加 1 条，施加的单位不是一次发布
+r406	old	PD12	yes	同一次发布第一条（txg T、没带末条标志）接上，第二条 txg 为 T 加一、序号 1、带末条标志：原式 3138 在攒着的非空时断，什么都不施加；变异每条都清空攒着的、3135 起的整段比较不再执行，第二条接上并施加
+r406	old	PD13	yes	第一条序号 1、没带末条标志，第二条同 txg、序号 1（重复）：原式 3143 的序号加一判在第二条上断；变异第二条走攒着为空的路，3130 只判序号为 1，过
+r406	old	PD14	yes	第一条没带提交标记、事务号 5，第二条同 txg、序号 1、事务号 6：描述的条件成立，原式断（3152；这条输入同时满足 PD13 的条件），变异不断。只满足 PD14 的输入（序号 2）被变异的 3130 序号判挡住，没有这样的输入
+r406	old	PD11,PD15,PD16,PD20	no	3130 到 3134 在变异里对每条记录都判（攒着的永远为空），原式断的首条序号不是 1 的情形照断；3161、3168 没动；读法函数 record_ends_its_publish（2932 到 2937）没动，3161、3168 两处照它读，只有 3200 一处不照它
+r406	today	PD19	yes	同一输入：lib.rs:1792 到 1795 的 `if false` 让每条接上就施加，第一条后施加 1 条
+r406	today	PD12	yes	同一输入：lib.rs:1446 到 1454 的攒着非空才判 txg，变异之后攒着的永远为空，lib.rs:1452 不再执行
+r406	today	PD13	yes	同一输入：lib.rs:1455 到 1459 不再执行，第二条走 lib.rs:1428 的攒着为空一支，序号 1 过
+r406	today	PD14	yes	同一输入（序号 1、事务号变）：lib.rs:1460 到 1463 不再执行；只满足 PD14 的输入（序号 2）被 lib.rs:1428 挡住，没有这样的输入
+r406	today	PD11,PD15,PD16,PD20	no	lib.rs:1428 对每条记录都判；lib.rs:1465、1468 没动；record_ends_its_publish（lib.rs:1048 到 1056）没动
+r448	old	-	none	变异去掉 3115 的 `|| ordinal_within_publish != FIRST`，但无锚点时 expected_next 为空、攒着的为空，3130 到 3133 对同一条记录照判序号；两处之间只有反向链判（3121 到 3126，只会断、不改任何状态），断的位置与报告都相同，没有输入让结局不同
+r448	old	PD10,PD11	no	PD10 被 3130 到 3133 挡住；PD11 的判（3130 到 3133）没动
+r448	today	PD10	yes	无锚点（所选根那次发布没有读成末条的记录），水位之上第一条 txg 等于根加一、序号 2、带提交标记、读成末条：原式 lib.rs:1428 断在链首；变异加了 `&& expected_next.is_some()`，无锚点时链首（expected_next 为空，lib.rs:1415 到 1422 只判 txg）不再判序号，接上并施加
+r448	today	PD11	no	有锚点时 expected_next 不为空，lib.rs:1428 照判
+r512	old	PD3	yes	所选根那次发布读得出一条没带末条标志的记录（计数器 7）、带标志的那条读不出：原式 2967 到 2975 过滤出 0 条，无锚点；变异不看标志、取最大计数器，锚点是 7
+r512	old	PD4	yes	所选根那次发布读得出两条都带末条标志的记录：原式 2976 到 2984 报 RootPublishCarriesMoreThanOneLastRecordFlagWhoseAnchorIsUndecided、一条不施加；变异 `.max()` 至多一条，不报
+r512	old	PD7,PD6,PD10	no	PD7 的锚点照 PD3 取到的那一条，变异从它取到的锚点接着判，链首计数器等于它加一；PD6、PD10 的「没锚点」随变异后的读法走（文件头取法）。若「没锚点」按盘上标志算：无锚点而变异有锚点的输入（所选根那次发布只有没带标志的记录、其后一条 txg 为根加二的记录）原式断在 3114、变异接上，PD6 会进集合（模型上核过），登记时与今天两版同；PD10 仍被 3130 挡住
+r512	today	PD3	yes	同一输入：lib.rs:1229 到 1231 的过滤去掉末条标志、只留最近的一条，锚点是 7
+r512	today	PD4	yes	同一输入：lib.rs:1235 到 1241 的 `len() > 1` 永远不成立（变异后至多一条），不报
+r512	today	PD7,PD6,PD10	no	同登记时那一版；lib.rs:1428 对有锚点的链首照判序号
+r513	old	PD4	yes	所选根那次发布读得出两条都带末条标志的记录：原式 2976 到 2984 报错、一条不施加；变异 `if false` 不报，锚点取 `.first()`（2986），照常接链
+r513	old	PD3	no	有两条带标志的记录时 PD3 的「那一条」没有定义，管这一格的是 PD4；只有一条或没有时 2967 到 2975 没动
+r513	today	PD4	yes	同一输入：lib.rs:1235 到 1241 `if false` 不报，lib.rs:1245 取第一条
+r513	today	PD3	no	同登记时那一版
+r514	old	PD13	yes	同一次发布第一条序号 1、没带末条标志，第二条同 txg、序号 3（跳号）：原式 3143 到 3147 断；变异 `if false` 不断，第二条接上
+r514	old	PD11,PD12,PD14	no	3130 的首条序号判只在攒着为空时判，第二条攒着的非空，不管它；3138、3152 没动
+r514	today	PD13	yes	同一输入：lib.rs:1455 到 1459 `if false`，第二条接上
+r514	today	PD11,PD12,PD14	no	lib.rs:1428 只在攒着为空时判；lib.rs:1452、1460 没动
+r515	old	PD14	yes	第一条没带提交标记、没带末条标志、事务号 5，第二条同 txg、序号 2、事务号 6：原式 3152 到 3156 断；变异 `if false` 不断
+r515	old	PD13,PD15	no	3143、3161 没动
+r515	today	PD14	yes	同一输入：lib.rs:1460 到 1463 `if false`，第二条接上
+r515	today	PD13,PD15	no	lib.rs:1455、1465 没动
+r516	old	PD15	yes	所选根之后一条记录：读成末条、不带提交标记：原式 3161 断、一条不施加；变异 `if false` 接上并整次施加
+r516	old	PD19	no	这次发布只在它的末条接上之后才施加（3200 没动），变异多接上的就是那条末条，与描述一致
+r516	today	PD15	yes	同一输入：lib.rs:1465 `if false`，接上并施加
+r516	today	PD19	no	lib.rs:1792 没动
+r517	old	PD15	yes	一个事务跨两条记录：第一条没带提交标记、没带末条标志，第二条带两者：原式 3161 只判读成末条的，第一条接上、第二条到了整次施加 2 条；变异 `if !record.is_commit` 在第一条就断，一条不施加（描述括号：不是末条的记录不因没带提交标记断）
+r517	old	PD14,PD19	no	3152 没动；变异的第一条没接上，末条没有接上所以不施加，与 PD19 一致
+r517	today	PD15	yes	同一输入：lib.rs:1465 改成不看末条，第一条在 lib.rs:1466 断
+r517	today	PD14,PD19	no	lib.rs:1460、1792 没动
+r518	old	PD20	yes	一条记录标志位 0 为 0（后面还有记录）：原式 2935 读成「不是末条」；变异 `MoreRecordsOfThePublishFollow => true` 读成末条
+r518	old	PD3,PD15,PD16,PD19,PD11,PD12,PD13,PD14	no	PD3、PD15、PD16、PD19 的「末条」照 9.3 前言取实现读出来的那一条，变异把读法本身改了，它们随读法走；PD11 到 PD14 的「一次发布」同样随读法走（文件头取法）。若按盘上标志算，变异每条都当末条之后攒着的永远为空，PD12 到 PD14 与 PD19 的判法同 r406（模型上核过），登记时与今天两版同
+r518	today	PD20	yes	同一输入：recovery.rs:3064 到 3066 把 MoreRecordsOfThePublishFollow 换成核的 LastRecordOfThePublish（核 lib.rs:1048 到 1056 的 record_ends_its_publish 本身没动，读到的已经是错的）
+r518	today	PD3,PD15,PD16,PD19,PD11,PD12,PD13,PD14	no	同登记时那一版
+r613	old	PD11	yes	有锚点，所选根之后第一条计数器接得上、序号 2、带提交标记、读成末条：原式 3130 到 3133 断；变异 `if false &&` 不断，接上并施加
+r613	old	PD10	no	无锚点一支的链首序号判在 3115，没动，序号不是 1 的无锚点链首照断
+r613	today	PD11	yes	同一输入：lib.rs:1428 到 1430 `if false &&` 不断
+r613	today	PD10	yes	无锚点，水位之上第一条 txg 等于根加一、序号 2：原式 lib.rs:1428 断在链首；变异关掉 lib.rs:1428，无锚点一支（lib.rs:1415 到 1422）只判 txg，接上并施加。今天这一判合成一处，两支共用它
+r614	old	PD16	yes	读成末条的一条之后同 (实例, txg) 还有一条读得出的记录：原式 3168 到 3171 断在这一条、不施加；变异 `if false &&` 不断，施加
+r614	old	PD15	no	3161 没动
+r614	today	PD16	yes	同一输入：lib.rs:1468 到 1473 `if false &&`，施加
+r614	today	PD15	no	lib.rs:1465 没动
+r920	old	PD8	yes	前一条在盘上、链值不等：原式 3125 断；变异 `Broken => {}` 不断，接上
+r920	old	PD9	no	前一条不在盘上的一臂（3124）没动
+r920	today	PD8	yes	同一输入：recovery.rs:3083 `Broken => true` 改成 `false`，回调不报断，核接上
+r920	today	PD9	no	recovery.rs:3082 没动
+r921	old	PD9	yes	前一条不在盘上（扫环时没读到）：原式 3124 不断；变异把 PreviousRecordNotOnDisk 单列一臂 `=> break`，断
+r921	old	PD8	no	Holds 与 Broken 两臂没动
+r921	today	PD9	yes	同一输入：recovery.rs:3082 `PreviousRecordNotOnDisk => false` 改成 `true`，回调报断
+r921	today	PD8	no	Holds 与 Broken 两臂没动
+r922	old	PD8	yes	前一条在盘上、链值相等：原式 3029 判 Holds、不断；变异 `!=` 判 Broken、断（链值不等的反过来接上）
+r922	old	PD9	no	前一条不在盘上时在 3016、3019、3036 就返回，不到比较那一行
+r922	today	PD8	yes	同一输入：recovery.rs:2976 `==` 改 `!=`
+r922	today	PD9	no	recovery.rs:2963、2966、2983 在比较之前返回
+r1003	old	PD5	yes	所选根的 txg 为 u64 最大值：原式 3099 到 3106 的 checked_add 溢出报 UnitMalformed；变异裸加一，发布档开着溢出检查（仓根 Cargo.toml:15 到 19），panic
+r1003	old	PD6	no	根 txg 小于最大值时 chain_start_txg_without_anchor 的值不变
+r1003	today	PD5	yes	同一输入：lib.rs:1567 到 1569 `if false`，往下 lib.rs:1570 `root_checkpoint_txg.0 + 1` 在溢出检查下 panic（lib.rs 是工作区成员，仓根 Cargo.toml:15 到 19 对它生效）
+r1003	today	PD6	no	根 txg 小于最大值时 lib.rs:1570 的值不变
+r1004	old	PD5	yes	所选根的 txg 为 u64 最大值减一：原式 checked_add(1) 不溢出，正常往下；变异 checked_add(2) 溢出，报 UnitMalformed（描述：报它当且仅当 txg 是最大值）
+r1004	old	PD6	yes	无锚点，水位之上第一条 txg 等于根 txg 加一、序号 1、带提交标记、读成末条：原式 3114 过，施加；变异的 chain_start_txg_without_anchor 是根 txg 加二，3114 断在链首
+r1004	today	PD5	yes	同一输入：lib.rs:1567 改成 `>= u64::MAX - 1`，根 txg 为最大值减一时报 ChosenRootCheckpointTxgHasNoSuccessor（recovery.rs:3129 到 3133 换成 UnitMalformed）
+r1004	today	PD6	no	lib.rs:1570 的 `+ 1` 与 lib.rs:1419 的比较没动，根 txg 小于最大值减一时没有输入让结局不同（模型在根 txg 为 5 的 36123 个随机输入上今天版零偏离、旧版 3193 个）
+Z1	old	PD2	yes	在飞上限 3、所选根之后一条合法单条发布：原式 `take(in_flight_limit)` 取到、施加；变异 `.min(0)` 一条都不取，一条不施加
+Z1	today	PD2	yes	同一输入：lib.rs:1717 的 `>= in_flight_limit` 改成 `>= in_flight_limit.min(0)`，第一个候选就停
+Z2	old	PD2	yes	在飞上限 1、所选根之后两次合法单条发布：原式只取 1 条、施加 1 条；变异 `.max(usize::MAX)` 不设上限，两条都施加
+Z2	today	PD2	yes	同一输入：lib.rs:1717 改成 `>= in_flight_limit.max(usize::MAX)`，计数到不了
+Z3	old	PD17	yes	验点名单元开着、一条记录点名的单元校验和对不上：原式 3173 到 3187 判未验过，verification_failed 加一并断；变异 `let all_verified = true || …` 短路、一个单元不读，接上
+Z3	old	PD18	no	3195 到 3197 没动：验点名单元开着时接上一条加一，变异接上的那条照加，与描述一致
+Z3	today	PD17	yes	同一输入：lib.rs:1475 `Verify => true || named_units_verified(index)` 短路，接上
+Z3	today	PD18	no	lib.rs:1748 到 1753 没动
+Z4	old	PD2	yes	在飞上限 1、所选根之后两次合法单条发布：原式只取 1 条；变异 `take(in_flight_limit + 1)` 取 2 条，两条都施加
+Z4	today	PD2	yes	同一输入：lib.rs:1717 改成 `>= in_flight_limit + 1`

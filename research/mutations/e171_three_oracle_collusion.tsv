@@ -1,0 +1,67 @@
+X1_Q1全放行谓词漏掉O3	Q1_ORACLES_STRICT = (ORACLE_ONE, ORACLE_TWO, ORACLE_THREE_STRICT)	Q1_ORACLES_STRICT = (ORACLE_ONE, ORACLE_TWO)
+X2_O3严格判定把欠一句当红	return o3_verdict_of(o3, stream, state, 0) == O3_VERDICT_NOT_IN	return o3_verdict_of(o3, stream, state, 0) in (O3_VERDICT_NOT_IN, O3_VERDICT_SPEC_GAP)
+X3_O3严格与暂代两列对调	    if oracle == ORACLE_THREE_STRICT:\n        return o3_verdict_of(o3, stream, state, 0) == O3_VERDICT_NOT_IN\n    if oracle == ORACLE_THREE_PROVISIONAL:\n        return o3_verdict_of(o3, stream, state, 1) == O3_VERDICT_NOT_IN	    if oracle == ORACLE_THREE_STRICT:\n        return o3_verdict_of(o3, stream, state, 1) == O3_VERDICT_NOT_IN\n    if oracle == ORACLE_THREE_PROVISIONAL:\n        return o3_verdict_of(o3, stream, state, 0) == O3_VERDICT_NOT_IN
+X7_触达只比写流不比调用结局与恢复报告	return TouchReport(write_stream_differs, outcomes_differ, recovery_differs, ignored_differs)	return TouchReport(write_stream_differs, False, False, ignored_differs)
+X8_触达恒判触达	return self.write_stream_differs or self.call_outcomes_differ or self.recovery_report_differs	return True
+X9_挑法用向下取整	    m = -(-n // k)	    m = max(1, n // k)
+X10_补位不跳过已在表里的行	        if candidate in names_in_the_table_of_rows or candidate in names_already_substituted:	        if candidate in names_already_substituted:
+X11_Q3关一条不把那一列当不红	    return columns - {closed}	    return columns
+X12_Q1覆盖门槛大于等于写成大于	    return counted_rows >= minimum	    return counted_rows > minimum
+X16_冻结核对漏掉冻结范围里多出来的文件	    differences.extend(f"{name}:not_in_the_freeze" for name in frozen_files_in(directory) if name not in hashes)	    differences.extend([])
+X17_冻结核对不比种子	    if seed_from_directory(directory) != seed_of(lines):	    if False:
+X18_执行器产物里底镜像恢复不出的流读反	elif name == "base_recovery" and fields.get("recovered") == "false":	elif name == "base_recovery" and fields.get("recovered") == "true":
+X19_执行器产物里摘要对不上的态数数成对得上的	reading.digest_mismatch_states += fields.get("digest") == "mismatch"	reading.digest_mismatch_states += fields.get("digest") == "match"
+X20_起执行器不带流名	"--dumps", dumps, "--streams", ",".join(streams), "--batches", batches,	"--dumps", dumps, "--batches", batches,
+X21_判坏镜像不叠补丁	        for device, offset, payload in current["patches"]:	        for device, offset, payload in ():
+X22_判坏镜像之后不把执行器的恢复函数换回去	        executor_core.recover = original_recover	        pass
+X23_底态名取行号最大的那一行	if label not in labels or row_id < labels[label][0]:	if label not in labels or row_id > labels[label][0]:
+X24_O3严格读法到不了的结论字也套在暂代读法上	    if is_strict_reading and strict_reading_unreachable:	    if strict_reading_unreachable:
+X25_Q2甲读法看暂代判定	        return not self.o2_is_red() and not self.o3_strict_is_red()	        return not self.o2_is_red() and not self.o3_provisional_is_red()
+X26_执行器没跑完的行当成O3没跑	    if status == O3_STATUS_EXECUTOR_FAILED:\n        return {}, None	    if status == O3_STATUS_EXECUTOR_FAILED:\n        return None, None
+X27_Q3核选行要两条红写成一条红	if len(red_columns(row.run, FIRST_BATCH, row.o3, False)) >= 2]	if len(red_columns(row.run, FIRST_BATCH, row.o3, False)) >= 1]
+X28_线道里一行出错不记录	except Exception as error:  # 一行的驱动出错不拖垮别的线道；记下来、最后退非 0	except KeyError as error:  # 一行的驱动出错不拖垮别的线道；记下来、最后退非 0
+X29_执行器每态判定不排序	    return [text for _, text in sorted(rows)]	    return [text for _, text in rows]
+X30_Q2几何只比O2红不红	signature = lambda row: (row.o2_is_red(), o3_text(row.o3_strict), o3_text(row.o3_provisional))	signature = lambda row: (row.o2_is_red(), "-", "-")
+X31_O3阳性对照不看执行器判了什么	                return int(fields.get("red_strict") == "true")	                return 1
+X32_Q3核比执行器每态判定写成相等才算不同	o3_differs = str(o3_state_lines_without_timing(full_o3) != o3_state_lines_without_timing(other_o3)).lower()	o3_differs = str(o3_state_lines_without_timing(full_o3) == o3_state_lines_without_timing(other_o3)).lower()
+X33_回查把卸载出错也数进去	call.outcome.startswith(ERRORED_OUTCOME_PREFIX) and call.label != UNMOUNT_LABEL and call.model_word in MODEL_NOT_ASKED_WORDS	call.outcome.startswith(ERRORED_OUTCOME_PREFIX) and call.model_word in MODEL_NOT_ASKED_WORDS
+X44_回查又把对拍不同停下之后没比的错误调用数进去	MODEL_NOT_ASKED_WORDS = ("not_modelled",)	MODEL_NOT_ASKED_WORDS = ("not_modelled", "skipped_after_the_model_stopped")
+X35_回查认错结局的前缀写错	ERRORED_OUTCOME_PREFIX = "err"	ERRORED_OUTCOME_PREFIX = "p"
+X36_不适用来源把对拍判出不同也算不合规	stream.calls[stopped].label == UNMOUNT_LABEL or stream.calls[stopped].is_a_model_disagreement()))	stream.calls[stopped].label == UNMOUNT_LABEL))
+X37_不适用来源把卸载也算不合规	stopped < len(stream.calls) and (stream.calls[stopped].label == UNMOUNT_LABEL or	stopped < len(stream.calls) and (stream.calls[stopped].label == "" or
+X38_不适用来源的合规判反	counts[name] = 0 if source_is_registered else sum(	counts[name] = 0 if not source_is_registered else sum(
+X39_判决行数的是流不是行	any(errored_calls_left_unjudged(row.run).values())	sum(errored_calls_left_unjudged(row.run).values())
+X40_row_s5 行两个计数写反	str(unjudged[name]) for name in STREAM_NAMES	str(other_source[name]) for name in STREAM_NAMES
+X41_去掉装置自己的变异行时不认名字前缀	        if line.startswith(OWN_INSTRUMENT_ROW_PREFIX):	        if False:
+X42_A7 的计数把装置自己的变异行也数进去	implementation_table = [row for row in table if not row.name.startswith(OWN_INSTRUMENT_ROW_PREFIX)]	implementation_table = list(table)
+X43_A6 的挑法读没去掉装置行的表	[sys.executable, script, table_without_the_device_rows, str(step)] + extra	[sys.executable, script, mutations_table, str(step)] + extra
+X45_关O1时不去掉模型停下的那一行	STREAM_STATUS_KEYS_OF_O1 = ("model_stopped_at_call",)	STREAM_STATUS_KEYS_OF_O1 = ()
+X46_关O2时也去掉模型停下的那一行	dropped_status_keys = STREAM_STATUS_KEYS_OF_O1 if closed == "O1" else ()	dropped_status_keys = STREAM_STATUS_KEYS_OF_O1
+X47_关一条时stream-status整份不比	return [columns for columns in read_rows(path) if not (columns and columns[0] in dropped_keys)]	return []
+X48_上一行改过的文件不置修改时间	        os.utime(os.path.join(lane_tree, relative_path), ns=(moment_ns, moment_ns))	        pass
+X49_编之前的回查不看修改时间	if os.stat(lane_path).st_mtime_ns <= record.last_compile_finished_ns:	if False:
+X50_编完不核依赖包重编了没有	        elif freshness[package]:	        elif False:
+X51_判决行不数没核过重编的行	row.driver_fields.get("status") == STATUS_OK and REBUILD_CHECK_FIELD not in row.driver_fields for row in rows)	False for row in rows)
+X52_扩表不去掉与步长8重叠的行	if name in names_of_the_registered_step:	if False:
+X53_扩表从117编号	FIRST_EXPANSION_ROW_NUMBER = 118	FIRST_EXPANSION_ROW_NUMBER = 117
+X54_扩表把装置自己的变异行也算进挑法	text_without_the_device_rows, _ = without_the_rows_of_the_device_itself(table_text)	text_without_the_device_rows = table_text
+X55_两个输出根里同一行不拒	if number in found:	if False:
+X56_驱动补位不跳过别的表的名字	names |= {row.name for row in read_selected_rows(path)}	pass
+X57_扩表核对只比行数	str(expansion == recomputed).lower()	str(len(expansion) == len(recomputed)).lower()
+X58_分母按表分开时两组对调	row.number not in expansion_numbers	row.number in expansion_numbers
+X59_只读第一个输出根	for rows_root in rows_roots:	for rows_root in rows_roots[:1]:
+X60_编不过之后不补位	    if selected is None or failed.substitutions_used == MAXIMUM_SUBSTITUTIONS_PER_ROW:	    if True:
+X61_编不过之后的补位不计次数	substitutions_used=failed.substitutions_used + 1, failed_attempts=attempts)	substitutions_used=failed.substitutions_used, failed_attempts=attempts)
+X62_补位的组把装置自己的变异行也算进去	return [row.name for row in table if row.file == file and not row.name.startswith(OWN_INSTRUMENT_ROW_PREFIX)]	return [row.name for row in table if row.file == file]
+X63_换上的行编之前不过时结局不记编不过	        return dataclasses.replace(chosen, status=STATUS_COMPILE_FAILED)	        return chosen
+X64_补位那一趟把结局不是编不过的行也领	            if read_result(os.path.join(rows_root, entry)).get("status") == STATUS_COMPILE_FAILED:	            if True:
+X65_驱动不记试过而没用上的名字	    fields.update(failed_attempt_fields(choice.failed_attempts))	    fields.update({})
+X66_编不过之后不领补位直接跑装置	        keep_the_tail_of_the_compile_log(row_directory, len(choice.failed_attempts) + 1)	        keep_the_tail_of_the_compile_log(row_directory, len(choice.failed_attempts) + 1)\n        break
+X67_比对器补位不核原行是不是编不过	        if original_fields.get("status") != "compile_failed":	        if False:
+X68_比对器补位不核补位自的名字	        if new_fields.get("status") != "compile_failed" and new_fields.get("substituted_from") != original_fields.get("row_name"):	        if False:
+X69_结果行写表里的原名不写换上的行	        return driver_fields["mutated_row_name"]	        return driver_fields.get("row_name", name_in_the_table)
+X70_补位合计把补不上的也算换上	        substituted += substitute != "none"	        substituted += 1
+X71_行分析不套补位	    merged, _ = rows_with_substitutes(row_directories(rows_roots), substitution_roots or [])	    merged = row_directories(rows_roots)
+X72_编不过的日志序号与试过的名字不同号	f"compile-failed-{failed_attempt_number}.log"	f"compile-failed-{failed_attempt_number + 1}.log"
+X73_复跑开关不起作用	        if getattr(arguments, "keep_compile_failures_as_they_are", False):	        if False:
+X74_补位那一趟同一行在两个输出根里不拒	            if number in root_of_number:	            if False:

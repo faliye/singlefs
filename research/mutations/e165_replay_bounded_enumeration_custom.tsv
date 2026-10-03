@@ -1,0 +1,11 @@
+# E165（恢复重放有界穷举与变异杀伤界）第二段自造的四条变异（登记 research/prompts/e165-preregistration.md 第九节甲表 Z1–Z4）：四列，制表符分隔——变异名、文件、原文、替换文（格式同 crates/mutations.tsv 前四列；\n 表示换行）。
+# 只在 research/scripts/e165-replay-mutation-kill-bounds.sh 建的副本里改第二列点名的源文件，量的是「界内红不红、首红的 N」，不点名测试；门禁 checker-tier-crates-mutation-replay 不跑这张表。
+# 第 1 次重跑（research/prompts/e165-r1-prereg.md 9.4）：判定搬进 crates/singlefs-replay-prefix/src/lib.rs 之后，四行原地改了文件列与锚点，名字与语义不动（钉红例的脚本按名字认 Z 行）；
+#   改之前这张表的 sha256 是 8f9f737c1bc593e8401a5fe43f6bacf8cedd284fee1e411f0ff46c9f96c543bc，旧原文在 recovery.rs 里今天命中 0 次。
+# 第 2 次重跑（research/prompts/e165-r2-prereg.md 9.3）：Z1–Z4 一个字不改，末尾加 Z5（J7b 在真代码上的阳性对照，SQ5）；
+#   改之前这张表的 sha256 是 4cbfe17c932b4fd21fcad4080e28a0632fa60919684e12f22f323437bf1d8a25。
+Z1 一条都不施加	crates/singlefs-replay-prefix/src/lib.rs	if records_taken_toward_the_in_flight_limit >= in_flight_limit {	if records_taken_toward_the_in_flight_limit >= in_flight_limit.min(0) {
+Z2 不看在飞上限	crates/singlefs-replay-prefix/src/lib.rs	if records_taken_toward_the_in_flight_limit >= in_flight_limit {	if records_taken_toward_the_in_flight_limit >= in_flight_limit.max(usize::MAX) {
+Z3 不验点名单元	crates/singlefs-replay-prefix/src/lib.rs	NamedUnitVerification::Verify => named_units_verified(index),	NamedUnitVerification::Verify => true || named_units_verified(index),
+Z4 在飞上限多取一条	crates/singlefs-replay-prefix/src/lib.rs	if records_taken_toward_the_in_flight_limit >= in_flight_limit {	if records_taken_toward_the_in_flight_limit >= in_flight_limit + 1 {
+Z5 施加出的根抄所选根的卸载记号	crates/singlefs-core/src/recovery.rs	unmount_marker: UnmountMarker::NotWrittenByTheUnmountSequence,	unmount_marker: root.unmount_marker,

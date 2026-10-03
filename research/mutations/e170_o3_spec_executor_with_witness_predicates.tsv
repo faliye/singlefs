@@ -1,0 +1,16 @@
+X21_W恒假	witness_true = branch_outcome.witness_true	witness_true = False
+X22_W第一支大于改不小于	witness_counter > flagged_record_counter	witness_counter >= flagged_record_counter
+X23_去掉见证值为0则W假	if witness_counter == 0:	if False:
+X24_两条都读不出改成W假	return WitnessBranchOutcome(BRANCH_BOTH_UNREADABLE, "-", True)	return WitnessBranchOutcome(BRANCH_BOTH_UNREADABLE, "-", False)
+X25_第二支键比较改txg为主	return (instance, checkpoint_txg)	return (checkpoint_txg, instance)
+X26_见证值只取盘0的槽	for witnessed_device in sorted(pool.slot_one_reading_by_device):	for witnessed_device in sorted(pool.slot_one_reading_by_device)[:1]:
+X27_T恒真	tail_check = TAIL_CHECK_TRUE if witness_counter >= rotation_tail else TAIL_CHECK_FALSE	tail_check = TAIL_CHECK_TRUE
+X28_T用begun代替ack	acknowledged = allowed.acknowledged_version_index	acknowledged = allowed.begun_version_index
+X29_T的不小于改大于	witness_counter >= rotation_tail	witness_counter > rotation_tail
+X30_tau取末条记录的计数器	rotation_tail=max(self_verified_tails) if self_verified_tails else None	rotation_tail=last_record_counter if self_verified_tails else None
+X31_tau取轮换写里最小的	max(self_verified_tails)	min(self_verified_tails)
+XC3_Q1比对器不比landed	NOT_COMPARED = {"name", "time_ns", "worker", "input", "source", "label", "stream", "state"}	NOT_COMPARED = {"name", "time_ns", "worker", "input", "source", "label", "stream", "state", "landed"}
+XC4_Q2比对器的K取v2的witness_true不取W_ref	members = {key for key, _, reference in pairs if reference_witness_value(reference) == "true"}	members = {key for key, v2, _ in pairs if v2_witness_value(v2) == "true"}
+XC5_误红只数I1	and "T" in fields.get("failed_predicates", "-").split(",")]	and "T" in fields.get("failed_predicates", "-").split(",") and label == "I1"]
+XC6_W_ref恒假	witness_text = "-" if witness.witness_true is None else str(witness.witness_true).lower()	witness_text = "-" if witness.witness_true is None else "false"
+XC7_T_ref在ack是版本0时当真	return TailCheckReference("not_evaluated", "ack_is_version_zero", None)	return TailCheckReference("true", "ack_is_version_zero", None)

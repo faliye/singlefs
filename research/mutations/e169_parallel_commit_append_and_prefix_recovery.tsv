@@ -1,0 +1,30 @@
+# E169（并行提交的追加纪律与前缀恢复）第一、二段的变异表：跑前登记 research/prompts/e169-preregistration.md 第九节 M1–M13（第一段）、M14、M15（第二段）；「第二段补_」开头的几条不在登记里，盯第二段新写的跨发布次序、两条枚举路径各自的 jsn 名次与按配置去重的返回、闭段、轨迹；第三段 M16、M17 在表末，「第三段补_」开头的几条不在登记里，盯等待模型新写的屏障合并、根序与串落的跨发布次序、R2 的「罩住」、预留的耗时。每条在登记或单测写的取样点上改变输出。
+M1_甲整段去掉前面事务记录全部已发出	AppendArm::JiaWhole => later_first < earlier_last,	AppendArm::JiaWhole => false,
+M2_甲交错去掉首条按号	AppendArm::JiaInterleaved => later_first < earlier_first,	AppendArm::JiaInterleaved => false,
+M3_乙整段把预留改成发出时取号	let reserves_jsn_at_acquisition = append_arm == AppendArm::YiReservedWhole && discipline == AppendDiscipline::Kept;	let reserves_jsn_at_acquisition = append_arm == AppendArm::YiReservedWhole && discipline == AppendDiscipline::Kept && false;
+M4_乙整段作废不写占位	let narrow_void_leaves_fillers = reserves_jsn_at_acquisition;	let narrow_void_leaves_fillers = reserves_jsn_at_acquisition && false;
+M5_系统配置写改成两态	const SYSTEM_CONFIGURATION_DURABILITY: WriteDurabilityStates = WriteDurabilityStates::NewMissingOrTorn;	const SYSTEM_CONFIGURATION_DURABILITY: WriteDurabilityStates = WriteDurabilityStates::NewOrMissing;
+M6_FUA不关段	const ROOT_SLOT_WRITE_CLOSES_ITS_SEGMENT: bool = true;	const ROOT_SLOT_WRITE_CLOSES_ITS_SEGMENT: bool = false;
+M7_丙0删472那一判	if rules.check_commit_before_transaction_change && !previous_record.is_commit && record.transaction != previous_record.transaction {	if rules.check_commit_before_transaction_change && !previous_record.is_commit && record.transaction != previous_record.transaction && false {
+M8_丙0删480那一判	if rules.check_commit_on_last_record && !record.is_commit && record.ends_its_publish {	if rules.check_commit_on_last_record && !record.is_commit && record.ends_its_publish && false {
+M9_丙0删463那一判	if record.txg != previous_record.txg {	if record.txg != previous_record.txg && false {
+M10_严格连续改成jsn大于期望也接	if record.jsn != expected_jsn {	if record.jsn < expected_jsn {
+M11_丙0删484那一判	if record.ends_its_publish && readable_record_of_the_same_publish_follows(records_by_jsn, index) {	if record.ends_its_publish && readable_record_of_the_same_publish_follows(records_by_jsn, index) && false {
+M12_丙0删493那一判	if !named_units_verified(record) {	if !named_units_verified(record) && false {
+M13_丙3的模式P改成段里两个或更多残缺事务	let judged_corrupt = incomplete_a_followed_by_complete_b_in(&strict_segment);	let judged_corrupt = two_or_more_incomplete_transactions_in(&strict_segment);
+M14_多飞根序去掉F与C的次序约束	if rules.roots_in_txg_order && publish_position > 0 {	if rules.roots_in_txg_order && publish_position > 0 && false {
+M15_fsync返回去掉条件2	if blocked {	if blocked && false {
+第二段补_按配置去重的返回去掉条件2	if !self.is_appended(earlier, configuration) {	if false {
+第二段补_按配置去重不记闭段点	next.closer_pending = operation.closes_a_segment();	next.closer_pending = false;
+第二段补_按配置去重不计闭段点上的待追加	let gained = u64::from(completes_a_closer && pending_next[transaction_index].is_some_and(|value| value > 0));	let gained = 0u64;
+第二段补_发布模板的序号改成发布内次序	let ordinal = 1 + rank_keys.iter().filter(|other_key| **other_key < key).count();	let ordinal = 1 + position_in_publish;
+第二段补_直接枚举的序号多算一名	let ordinal = 1 + jsns_ascending.iter().filter(|smaller| *smaller < jsn).count();	let ordinal = 1 + jsns_ascending.iter().filter(|smaller| *smaller <= jsn).count();
+第二段补_甲交错跨发布去掉首条按号	AppendArm::JiaInterleaved => issued_counts[other_position] > earlier_first,	AppendArm::JiaInterleaved => true,
+第二段补_甲整段跨发布改成只等首条	AppendArm::JiaWhole => issued_counts[other_position] > earlier_last,	AppendArm::JiaWhole => issued_counts[other_position] > earlier_first,
+M16_等待模型去掉追加者的h	WaitStepKind::AppenderStep => costs.cpu_step,	WaitStepKind::AppenderStep => 0,
+M17_等待模型忽略慢头的Δ	PreparationProfile::SlowHead if transaction == 1 => costs.slow_head_delay,	PreparationProfile::SlowHead if transaction == 1 => 0,
+第三段补_连着的屏障不合并	let step_duration = if kind == WaitStepKind::Barrier && follows_a_barrier { 0 } else { wait_step_cost(kind, costs) };	let step_duration = if kind == WaitStepKind::Barrier && follows_a_barrier && false { 0 } else { wait_step_cost(kind, costs) };
+第三段补_根序不等前一次的根槽	root_slot_predecessors.push((previous, PredecessorRole::CrossPublish));	let _ = previous;
+第三段补_R2覆盖取记录自己的完成	let cover = first_covering_operation_after(plan, timeline, last_record);	let cover = last_record;
+第三段补_串落不等前一次发布	predecessors.push((*previous_final_barrier, PredecessorRole::CrossPublish));	let _ = previous_final_barrier;
+第三段补_预留不计时	WaitStepKind::ReservationStep => costs.cpu_step,	WaitStepKind::ReservationStep => 0,

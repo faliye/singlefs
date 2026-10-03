@@ -1,0 +1,21 @@
+V1 最低空对改成最高空对（甲 7 的起点 0、2、4 变成 30、28、26）	.find(|pair| taken_pairs & (1 << pair) == 0)	.rev().find(|pair| taken_pairs & (1 << pair) == 0)
+V2 重复数口径「持有数 − 1」改成「持有数 > 1 记 1」（乙 1 的 n = 3 三个事务同持一项的调度少计）	duplicates += u32::try_from(holders - 1).expect("持有数很小");	duplicates += u32::from(holders > 1);
+V3 A 的 LOCKED 一步拆成读、写两步（锁失效，Q-1 在 n = 2 同形由 0 变 4）	(Arm::WholeLock, ArmVariant::Normal) => vec![StepKind::WholeLocked],	(Arm::WholeLock, ArmVariant::Normal) => vec![StepKind::WholeSnapshot, StepKind::WholeWriteBack],
+V4 O整 的提交不核版本号（Q-1 在 n = 2 同形由 0 变 4，乙 5 的重算合计 4 变 0）	transaction.seen_version == state.shared.version	true
+V5 O读 的校验去掉「用户数据对仍空」（Q1乙、不相交、n = 3 的 Q-1 由 0 变正）	let user_pair_still_free = held.user_pairs[0] == NO_PAIR || shared.user_taken & (1 << held.user_pairs[0]) == 0;	let user_pair_still_free = true;
+V6 O读 让事务号在 SNAP 里从拷贝取（Q1乙、不相交、n = 2 的 Q-5 由 0 变正）	const OPTIMISTIC_COMMIT_TIME_GROUPS: u8 = GROUP_TRANSACTION_NUMBER | GROUP_JOURNAL | GROUP_ROOT_RING;	const OPTIMISTIC_COMMIT_TIME_GROUPS: u8 = GROUP_JOURNAL | GROUP_ROOT_RING;
+V7 P区 的 CLAIM 不推进 inode 水位（Q-3 在 n = 2 同形由 0 变 6）	shared.inode_watermark += reserved;	shared.inode_watermark += 0;
+V8 P区 的 COMMIT 不释放区（K = n − 1 那一格的死锁数与 Q-9 变，K = n 不动）	state.shared.region_busy &= !transaction.claimed_regions;	state.shared.region_busy |= 0;
+V9 P设 撤标占时不判别人是否也标着同一槽（乙 7 去锁 D = 2 的 n = 2 那一行）	if !held_by_another_transaction {	if true {
+V10 P设 的 CHECK 不撤自己的标占就重算（乙 7 加锁 D = 2 的 n = 2 各数）	state.shared.device_taken[device] &= !(1 << pair);	state.shared.device_taken[device] |= 0;
+V11 根环槽式子 (txg div 3) mod S 改成 txg mod S（甲 2 的 S = 4）	let slot = (u32::from(txg) / ROOT_RING_REGIONS) % slots_per_region;	let slot = u32::from(txg) % slots_per_region;
+V12 journal 环槽式子去掉「− 1」（甲 3 的环槽 5、6、7 变 6、7、8）	(u32::from(counter) - 1) % ring_slots	u32::from(counter) % ring_slots
+V13 树 ID 一次发 12 个改成 11 个（甲 6 的期末水位 65548 变 65547，乙 2 的 48 变 44、1296 变 1188，补 1 无文件 216 变 198、34992 变 32076）	const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65548;	const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65547;
+V14 新 inode 水位 = 上一版 + 新建数 − 1（甲 5 的期末水位 5 变 2）	view.inode_watermark = view.inode_watermark + shape.new_inodes;	view.inode_watermark = view.inode_watermark + shape.new_inodes - 1;
+V15 枚举器在每个分叉点只走下标最小的那个事务（丙 1 的调度数 6、90 变 1）	            for transaction_index in enabled_indices {	            for transaction_index in enabled_indices.into_iter().take(1) {
+V16 O整 的重算计数不加一（乙 5 的 4、1140 变 0）	let retries_after_restart = transaction.retries + 1;	let retries_after_restart = transaction.retries;
+V17 A字面 把事务号放进锁里（Q-5 在 n = 2 同形由 18 变 0）	const LITERAL_LOCK_INSIDE_GROUPS: u8 =\n    GROUP_USER | GROUP_COMMIT_SLOTS | GROUP_ROOT_RING | GROUP_JOURNAL | GROUP_INODE;\nconst LITERAL_LOCK_OUTSIDE_GROUPS: u8 = GROUP_TRANSACTION_NUMBER | GROUP_TREE;	const LITERAL_LOCK_INSIDE_GROUPS: u8 =\n    GROUP_USER | GROUP_COMMIT_SLOTS | GROUP_ROOT_RING | GROUP_JOURNAL | GROUP_INODE | GROUP_TRANSACTION_NUMBER;\nconst LITERAL_LOCK_OUTSIDE_GROUPS: u8 = GROUP_TREE;
+V18 记忆化计数的键漏掉各事务已重算次数（丙 3 的 n = 2 记忆化与逐叶不等，乙 7 加锁 D = 2）	        let memo_key = *state;	        let mut memo_key = *state;\n        for transaction in memo_key.transactions.iter_mut() {\n            transaction.retries = 0;\n        }
+V19 Q-9 同步轮次里提交次序改成下标倒序（默认形状上不敏感；一小组自定义形状上每轮提交数 [2, 1] 变 [1, 2]）	(0..transaction_count).collect()	(0..transaction_count).rev().collect()
+V20 两个水位常量同减 1：mkfs 65535、发布后 65547，发号个数仍 12（甲 6 的起点 65536 变 65535、期末水位 65548 变 65547；乙 2、补 1 不动）	const TREE_IDENTIFIER_WATERMARK_AT_MKFS: TreeIdentifierNumber = 65536;\nconst TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65548;	const TREE_IDENTIFIER_WATERMARK_AT_MKFS: TreeIdentifierNumber = 65535;\nconst TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: TreeIdentifierNumber = 65547;
+V21 take_resources 给 tree_start 赋值时先把水位截成 16 位再加宽回来（65536 变 0，撞上「0 = 没发」的哨兵；甲 6 起点 0,0,0，乙 2 的 A去锁、O整不、O读不 变 T=0/0，补 1 无文件 T 列变 0/0）	held.tree_start = view.tree_watermark;	held.tree_start = u32::from(view.tree_watermark as u16);

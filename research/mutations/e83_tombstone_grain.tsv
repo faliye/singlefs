@@ -1,5 +1,9 @@
-M1_打包容量忘了扣单元头	(UNIT_BYTES - UNIT_HEADER_BYTES) / TOMBSTONE_RECORD_BYTES	UNIT_BYTES / TOMBSTONE_RECORD_BYTES
+M1_打包容量忘了扣单元头	(UNIT_BYTES - self.records_offset_bytes) / self.record_bytes	UNIT_BYTES / self.record_bytes
 M2_物理系数丢了副本	(units, units * UNIT_BYTES * PHYSICAL_COPIES_PER_UNIT)	(units, units * UNIT_BYTES)
 M3_perobject按extent算	RecordGrain::PerObject => load.objects,	RecordGrain::PerObject => load.objects * load.extents_per_object,
-M4_打包向下取整	records.div_ceil(packed_capacity())	records / packed_capacity()
-M5_独占载体也打包	Carrier::DedicatedUnit => records,	Carrier::DedicatedUnit => records.div_ceil(packed_capacity()),
+M4_打包向下取整	records.div_ceil(geometry.packed_capacity())	records / geometry.packed_capacity()
+M5_独占载体也打包	Carrier::DedicatedUnit => records,	Carrier::DedicatedUnit => records.div_ceil(geometry.packed_capacity()),
+M6_记录宽打回56	const TOMBSTONE_RECORD_BYTES: u64 = 40;	const TOMBSTONE_RECORD_BYTES: u64 = 56;
+M7_记录区起点漏了预留位	const MAIN_GEOMETRY: Geometry = Geometry {\n    records_offset_bytes: PACKED_UNIT_RECORDS_OFFSET,	const MAIN_GEOMETRY: Geometry = Geometry {\n    records_offset_bytes: PACKED_UNIT_HEADER_BYTES,
+M8_预留位少一字节	const NONCE_MAC_ALGORITHM_RESERVED_BYTES: u64 = 29;	const NONCE_MAC_ALGORITHM_RESERVED_BYTES: u64 = 28;
+M9_rflip少算1	(UNIT_BYTES - records_offset_bytes) / 2 + 1	(UNIT_BYTES - records_offset_bytes) / 2

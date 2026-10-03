@@ -1,0 +1,35 @@
+M1_FUA写不关段	may_close = true; // FUA 关段	may_close = false; // FUA 关段
+M2_系统配置槽写不取第三态	let is_in_place = kind == StepKind::SystemConfigurationSlot && geometry.system_configuration_has_third_state;	let is_in_place = false;
+M3_前面各段允许撕裂	prefix = with_value(prefix, write_index, PERSISTED);	prefix = with_value(prefix, write_index, if table[write_index].is_in_place { TORN } else { PERSISTED });
+M4_交错要求B在A第一道屏障之后才开写	let transaction_b_may_start = true;	let transaction_b_may_start = position_b > 0 || chain_a[..position_a].iter().any(|event| matches!(event, Event::Barrier(_)));
+M5_积去掉两条链都停在中途的对	product.push(state_of_a | state_of_b);	if state_of_a == 0 || state_of_b == 0 || state_of_a == full_state_of_a || state_of_b == full_state_of_b { product.push(state_of_a | state_of_b); }
+M6_不合法前缀谓词把A和B写反	transaction_b_records_all_persisted && !transaction_a_records_all_persisted	transaction_a_records_all_persisted && !transaction_b_records_all_persisted
+M7_闭式从零起算	1 + segments.iter().map(|segment| segment_expansion(table, segment) - 1).sum::<u128>()	0 + segments.iter().map(|segment| segment_expansion(table, segment) - 1).sum::<u128>()
+M8_罩住段串两个写永不合并	if at_most[first][second] && at_most[second][first] {	if at_most[first][second] && at_most[second][first] && false {
+M9_Σ_ord漏掉记录先于记录的约束	const ORDERED_KINDS: &[StepKind] = &[StepKind::JournalRecord, StepKind::RootRecordFua, StepKind::SystemConfigurationSlot];	const ORDERED_KINDS: &[StepKind] = &[StepKind::RootRecordFua, StepKind::SystemConfigurationSlot];
+M10_区域归属0_1_0写成0_0_0	const ROOT_REGION_DISK: [usize; 3] = [0, 1, 0];	const ROOT_REGION_DISK: [usize; 3] = [0, 0, 0];
+M11_精确可达集里FUA写不先于后面的写	if armed_by_barrier || table[earlier].kind == StepKind::RootRecordFua {	if armed_by_barrier {
+M12_漏数计数器拿T而不是T交C去减	.filter(|state| is_cross_transaction(table, **state) && !contains(covered, **state))	.filter(|state| !contains(covered, **state))
+M13_根槽写的先后约束按盘号对	table[*candidate_index].kind == wanted.kind && (wanted.kind == StepKind::RootRecordFua || table[*candidate_index].disk == wanted.disk)	table[*candidate_index].kind == wanted.kind && table[*candidate_index].disk == wanted.disk
+M14_屏障钉住的写不按盘	walk.armed |= walk.issued & context.writes_on_disk[usize::from(disk)];	walk.armed |= walk.issued;
+M15_FUA写不进先于后面的写	walk.forced |= bit;	walk.forced |= 0;
+M16_搜索里当前段后面可接当前段	} else if !(role >= last && !(role == 1 && last == 1)) {	} else if !(role >= last) {
+M17_枚举域漏掉全零状态	    emit(0, 0);\n    let mut prefix_code = 0u64;	    let mut prefix_code = 0u64;
+M18_合并签名时取字典序最大的流	entry.1 = entry.1.min(representative);	entry.1 = entry.1.max(representative);
+M19_叶子上记字典序最大的流	if walk.path < entry.1 {	if walk.path > entry.1 || entry.1 == u64::MAX {
+M20_最大一段的动态规划不看盘放行	if may_close && two_state + in_place > 0 && unreleased == 0 {	if may_close && two_state + in_place > 0 {
+M21_按记录的不合法前缀谓词把A的一侧写反	code & self.record_a_any != self.record_a_ones	code & self.record_a_any == self.record_a_ones
+M22_L3b拿真值而不是真值交精确可达集去减	let reachable_truth: Vec<StateCode> = truth.iter().copied().filter(|state| contains(exact, *state)).collect();	let reachable_truth: Vec<StateCode> = truth.iter().copied().collect();
+M23_段串成员判定把当前段也要求全持久	                if position < current {	                if position <= current {
+M24_L11目标集丢掉精确可达集的过滤	.filter(|state| is_cross_transaction(table, *state) && contains(exact, *state))	.filter(|state| is_cross_transaction(table, *state))
+M25_L11目标集丢掉跨事务的过滤	.filter(|state| is_cross_transaction(table, *state) && contains(exact, *state))	.filter(|state| contains(exact, *state))
+M26_L11删一态的计数把被删状态比反	target.iter().filter(|&&code| Some(code) == removed || !code_in_digit_masks(masks, code)).count()	target.iter().filter(|&&code| Some(code) != removed || !code_in_digit_masks(masks, code)).count()
+M27_L11有漏流数的门槛挪成不等于一	.filter(|(_, &miss)| miss > 0)	.filter(|(_, &miss)| miss != 1)
+M28_L11取最小最大流时并列取路径大的	strictly || (a == b && rows[candidate].representative_path < rows[current].representative_path)	strictly || (a == b && rows[candidate].representative_path > rows[current].representative_path)
+M29_L11方法B用加而不是减	u32::try_from(target.len() - hits)	u32::try_from(target.len() + hits)
+M30_L11阳性对照PC2不要求多一	let pc2_ok = after == before + 1 && before == read.minimum as usize;	let pc2_ok = after == before && before == read.minimum as usize;
+M31_L11阳性对照PC1的见证状态改成单独的b1	let witness = state_with_only(table, &[unit_of_a.as_str(), unit_of_b.as_str()]);	let witness = state_with_only(table, &[unit_of_b.as_str()]);
+M32_L11门槛挪动的翻面判定写反	let flips = before != "never_leaks" && after == "never_leaks";	let flips = before == "never_leaks" && after == "never_leaks";
+M33_L11不高于L2的自检写成不低于	miss as usize <= evaluation.truth_cross - row.cross_states as usize	miss as usize >= evaluation.truth_cross - row.cross_states as usize
+M34_序号还原只取一位	(0..self.write_count).map(|write| ((code >> (2 * write)) & 0b11) * self.weight[write]).sum()	(0..self.write_count).map(|write| ((code >> (2 * write)) & 0b01) * self.weight[write]).sum()
+M35_位集有无判反	self.words[(index >> 6) as usize] & (1u64 << (index & 63)) != 0	self.words[(index >> 6) as usize] & (1u64 << (index & 63)) == 0

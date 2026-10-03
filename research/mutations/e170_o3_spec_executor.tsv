@@ -1,0 +1,12 @@
+X1_择根取txg与实例代号最小	largest_key = max(candidate.choice_key for candidate in candidates)	largest_key = min(candidate.choice_key for candidate in candidates)
+X2_择根平局实例代号低者赢	return (self.unsigned("checkpoint_txg"), self.unsigned("instance"))	return (self.unsigned("checkpoint_txg"), -self.unsigned("instance"))
+X3_前缀只要jsn大于上一条	record = records.get(expected_counter)	expected_counter = min((counter for counter in records if counter >= expected_counter), default=expected_counter)\n        record = records.get(expected_counter)
+X4_不看末条标志每条都当末条	return bool(self.unsigned("record_flags") & layout.JOURNAL_RECORD_FLAG_LAST_OF_PUBLISH)	return True
+X5_施加前不验点名单元	if not all(named_unit_verifies_on_both_copies(item, image, cache, gaps) for item in record.named_items()):	if False:
+X6_系统配置择槽取世代号最小	largest_generation = max(slot.unsigned("slot_generation") for slot in choosable_slots)	largest_generation = min(slot.unsigned("slot_generation") for slot in choosable_slots)
+X7_根槽不验自证校验和	if crc32c(covered) != int.from_bytes(stored[:layout.SELF_CHECKSUM_VALUE_BYTES], "little"):\n        return False\n    return layout.little_endian_unsigned(raw, FIELDS["flags"])	if False:\n        return False\n    return layout.little_endian_unsigned(raw, FIELDS["flags"])
+X8_允许集合不算下界ack一律版本0	if largest_index is not None:	if False:
+X9_版本只比实例代号与txg不比新根段	landed_is_allowed = recovery.landed is not None and any(version.projection == recovery.landed for version in allowed.allowed)	landed_is_allowed = recovery.landed is not None and any((version.projection.instance, version.projection.checkpoint_txg) == (recovery.landed.instance, recovery.landed.checkpoint_txg) for version in allowed.allowed)
+X10_记录水位改成txg为主比	above = [record for record in records.values() if record.watermark > root_watermark	above = [record for record in records.values() if (record.watermark[1], record.watermark[0]) > (root_watermark[1], root_watermark[0])
+X11_读不出的记录槽跳过接着找下一个计数器	stop_reason = "jsn_not_readable_or_gap"  # D23 已定项 22 断号即止；已定项 18 校验和不过断链即止\n            break	following = [counter for counter in records if counter > expected_counter]\n            if not following:\n                stop_reason = "jsn_not_readable_or_gap"\n                break\n            expected_counter = min(following)\n            continue
+XC1_比对器把实现的放行读成恒真	return columns[6] == "-" and columns[7] == "false" and columns[8] == "false"	return True
