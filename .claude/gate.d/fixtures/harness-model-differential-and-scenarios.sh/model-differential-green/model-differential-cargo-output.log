@@ -413,7 +413,7 @@ test allocation_record_wall_sampling_with_the_checker_refuses_only_above_one_nod
 已知红第 0 条（增补 2 收口表第 ② 行（一次挂载转过一整圈根环时 checker 在合法状态上判 I-3.1 红））：0 段；前几个种子 []
 已知红第 1 条（增补 2 收口表第 43 行）：0 段；前几个种子 []
 用时 19.4 秒
-test unit_area_wall_sampling_on_small_devices_passes_only_a_placement_refused_on_every_device ... ok
+test unit_area_wall_sampling_on_small_devices_with_the_space_admission_skipped_runs_to_the_end_without_reaching_the_placement_wall ... ok
 
 test result: ok. 17 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 19.42s
 

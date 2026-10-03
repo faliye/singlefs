@@ -1,0 +1,4 @@
+exit=1
+want=写范围闸没挂全工具
+want=matcher 合起来没覆盖：MultiEdit
+want=把 write-guard.sh 那一条的 matcher 写成 "Write|Edit|MultiEdit"

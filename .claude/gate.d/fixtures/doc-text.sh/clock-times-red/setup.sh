@@ -5,9 +5,10 @@
 # 「N 点 / N 时」与时段词的四个判据行各一份 md，一行一种写法（取自仓里清掉之前的原写法），每行都该点名，判据行名字也要对上；
 # 不挨日期时区的钟点（时:分、时:分:秒、带毫秒、区间、「月-日 时:分」、反引号里两位小时的）一份 md，
 # 光秃的时区词一份 md，ISO 与机器时间戳（T 形态、Z 结尾、diff 头与 stat 的带秒带偏移）一份 md；
+# 英文十二小时制（时后面跟 am / pm：贴着写、隔空格、大写、带点、带「:分」，第一行是外部限额通知的原样、后面跟时区词）一份 md；
 # 放行标记写在 md 里（不认）、写在 rs 里却没写理由（不认），各一行照判钟点。
 # 这份源码本身不出现那几个撇号字符、字面钟点与时区词：冒号由变量拼进去，时区词由 "" 断开拼进变量，
-# 数字与「点」「时」、日期与时段词之间也用 "" 断开——否则门禁 doc-text.sh 扫样本现场时会先把这份 setup.sh 判红，多红几行。
+# 数字与「点」「时」「am / pm」、日期与时段词之间也用 "" 断开——否则门禁 doc-text.sh 扫样本现场时会先把这份 setup.sh 判红，多红几行。
 set -e
 colon=:
 jst="J""ST"
@@ -31,5 +32,6 @@ printf '%s\n' "跑于 2026-09-27（${jst}），本机" "本机时钟是 ${utc}�
 printf '%s\n' "派腿时刻 2026-09-27T09${colon}55${colon}07+00${colon}00。" "交回于 …T23${colon}15Z" \
   "legs dispatched at 2026-09-28T00${colon}31${colon}09+00${colon}00" > records/iso.md
 printf -- "--- a/x.rs\t2026-09-24 16${colon}27${colon}05.398761624 +0000\nModify: 2026-09-24 18${colon}48${colon}58.254848952 +0000\n" > records/diff.md
+printf '%s\n' "通知写 resets Oct 4 4""pm ${utc}）" "11 ""AM 截止" "交回于 3""p.m." "10${colon}30 ""am 起跑" > records/twelve-hour.md
 printf '%s\n' "用户 23${colon}10 定  # clock-times:allow 写在 md 里不认" > records/allow-in-md.md
 printf '%s\n' "// 跑于 23${colon}10  // clock-times:allow" "fn main() {}" > crates/demo/src/no_reason.rs

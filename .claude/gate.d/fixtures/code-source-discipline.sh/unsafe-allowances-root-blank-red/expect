@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=crates/singlefs-core/src/lib.rs 没写 #![forbid(unsafe_code)] 也没写 #![deny(unsafe_code)]
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

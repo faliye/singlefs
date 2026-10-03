@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=crates/singlefs-core/src/block_device.rs:13 的 // SAFETY: 注释没写出它依赖的前提：没提到文件描述符、偏移、长度
+want=这一格只查这几个词有没有出现，写得对不对靠 review
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

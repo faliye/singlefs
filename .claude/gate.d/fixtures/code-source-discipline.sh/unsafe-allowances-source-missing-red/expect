@@ -1,0 +1,9 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=.claude/gate.d/unsafe-allowances.tsv:2 singlefs-core 的出处不成立：出处栏指向的 records/decision-that-is-not-in-the-repo.md 不是仓里的文件
+want=或「用户 YYYY-MM-DD 弹窗定」加那份记录的路径；记录文件要真在仓里
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

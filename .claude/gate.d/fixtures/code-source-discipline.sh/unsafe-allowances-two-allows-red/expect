@@ -1,0 +1,11 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：unsafe-allowances
+want=singlefs-core 放开 unsafe_code 的地方 2 处，根是 deny、应当 1 处
+want=crates/singlefs-core/src/block_device.rs:3
+want=crates/singlefs-core/src/block_device.rs:4
+want=新增一处放开要改 .claude/gate.d/unsafe-allowances.tsv 的登记并走三方
+want=── 汇总：code-source-discipline.sh 跑了 1 格（样本根的 .gate-cells 点名）
+want=unsafe-allowances：红（退出 1）
+want=code-source-discipline.sh：1 格里 1 格红（unsafe-allowances）
+want=→ unsafe-allowances：
+want=bash .claude/gate.d/code-source-discipline.sh --check unsafe-allowances

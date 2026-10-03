@@ -9,7 +9,7 @@ set -e
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 here="$PWD"
 git init -q -b master .origin-repository
-mkdir -p .origin-repository/research/e7-index-bench/src/bin .origin-repository/research/results .origin-repository/.claude/kb .origin-repository/research/prompts
+mkdir -p .origin-repository/research/e7-index-bench/src/bin .origin-repository/research/results .origin-repository/.claude/kb
 printf 'fn main() { println!("e920"); }\n' > .origin-repository/research/e7-index-bench/src/bin/e920_worktree_stale.rs
 printf 'E7RESULT name=e920 rows=1\n' > .origin-repository/research/results/e920-worktree-stale-2026-09-01.out
 printf '# 欠账\n\n| C920 | 样本欠账 | 还没还 |\n\n## 历史版本\n' > .origin-repository/.claude/kb/worktree-owed.md
@@ -30,6 +30,8 @@ cat > .claude/kb/worktree-owed.md <<'EOF'
 
 ## 历史版本
 EOF
+# research/prompts/ 在主仓里没有文件、没进 git，链接 worktree 里没有这个目录，要在这里建
+mkdir -p research/prompts
 cat > research/prompts/worktree-r1-opus.md <<'EOF'
 # worktree-r1 云端攻方
 

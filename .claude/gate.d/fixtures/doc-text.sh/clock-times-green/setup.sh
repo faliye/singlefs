@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # 绿样本现场，文件全由这里现写：
 # 正常写法——变体起了新名字、ASCII 单引号；只写日期；
-# 与「N 点」、时段词近似却不是钟点的写法（序号、个数、光秃时段词、用户原话引文里的「东京时间」、标识符里的时区词），都该放行；
+# 与「N 点」、时段词近似却不是钟点的写法（序号、个数、光秃时段词、用户原话引文里的「东京时间」、标识符里的时区词、
+# 数字后面跟着以 am / pm 起头的英文词与版本号），都该放行；
 # 长得像钟点的冒号对（产物行的 名字=值、Python 切片、字典与逗号列表、时区偏移、引号与反引号里的代码字面、百分比、time -v 的格式说明、
 # 「门禁号:行号」表格、门禁文件名、同一行带「文件:行号」的编号对）一行一类，靠上下文规则放行：
 # LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=clock-times 时这里判红；
@@ -16,7 +17,7 @@ mkdir -p .claude/kb records .claude/singlefs-ai-sop/rules .claude/gate.d/fixture
 printf '%s\n' '## 候选' '' "取 K13（K9 的收严版），不取 K9。引号 '甲' 与 don't 这类写法不管。" > .claude/kb/候选.md
 printf '# 记录\n\n用户 2026-09-26 弹窗定甲二。\n' > records/记录.md
 printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量由用户要求或夜间跑' '用户 2026-09-28 定' '同一天下午续跑' '用户原话「东京时间7点前」' \
-  "\`${jst}_OFFSET\`、\`started_${utc}\` 这类标识符" > records/近似写法.md
+  "\`${jst}_OFFSET\`、\`started_${utc}\` 这类标识符" "2 AMD 显卡、3 amps、5 ppm、pm2 进程、30 rpm、v1.2am" > records/近似写法.md
 {
   printf '%s\n' 'remount_chosen=2:12 device_chosen=1:16 values=1:16.000,3:12.000,5:14.000'
   printf '%s\n' 'adjacent_differences=0->1:10,1->2:8 steps_by_changed_leaf_count=1:108,2:36'
@@ -29,7 +30,7 @@ printf '%s\n' '第 3 点前后两句' '3 点意见' '1000 个崩溃点' '全量�
   printf '%s\n' 'Elapsed (wall clock) time (h:mm:ss or m:ss): 0:03.21'
   printf '%s\n' '| 共用脚本不在 | 21:38 | 31:68 |'
   printf '%s\n' '| kb 目录不在 | —— | 21:39、24:27、27:39 |'
-  printf '%s\n' '门禁 20:54-layer0-replay.sh 那一行'
+  printf '%s\n' '门禁 20:09-sample-stage.sh 那一行'
   printf '%s\n' '触发的那一处（decisions/06-快照实现模型.md:42），06:42 正是没抽到的那一行'
   printf '%s\n' '撞键 `3:10`：冷重开是 `2:11`'
   printf '%s\n' 'taken_jst=2026-09-27T01:20:12+09:00 started_jst=2026-09-15T03:12'
