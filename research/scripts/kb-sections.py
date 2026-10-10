@@ -27,11 +27,18 @@
 用法：
 
     kb-sections.py 文件.md [文件.md ...]      # 打印清单，抄 / 不抄两列留空待填
+    kb-sections.py --help                      # 打这一段用法（-h 同），退 0
+    kb-sections.py --selftest
+
+退出码：0 打出清单（或 --help）；2 没给文件、不认的选项、文件不存在或读不了（stderr 写哪一份、怎么办，不抛 traceback）。
 
 自证会红：`kb-sections.py --selftest` 造一份「标题之前有正文」的样本，
 断言清单里有那一行；再用 KB_SECTIONS_NO_PREAMBLE=1 强制走回旧行为，确认判红。
+弄坏开关（只给 --selftest 证红用）：
+  KB_SECTIONS_BREAK=raw-arguments  main() 不先判 --help、不认的选项与读不了的文件（改前的样子）
+      命令行那一格（「selftest: 命令行 ['--help'] 应当退 0」）
 """
-import io, os, re, sys, tempfile
+import io, os, re, subprocess, sys, tempfile
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -125,21 +132,54 @@ def selftest():
         frows = [t for t, _ in sections(g)]
         if any('栅栏里' in r for r in frows):
             print('selftest: 代码栅栏里的 `## ` 行被当成标题发了一行'); return 1
-        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题）')
+        # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；读不了的文件（目录）报文件名与出路、不抛 traceback
+        cli_cases = [(['--help'], 0, '用法：'), (['-h'], 0, '用法：'), (['--bogus'], 2, '不认的选项：--bogus'),
+                     ([d], 2, f'读不了 {d}'), ([os.path.join(d, 'nothere.md')], 2, '这些文件不存在')]
+        for arguments, want_code, want_text in cli_cases:
+            child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
+            said = child.stdout + child.stderr
+            if child.returncode != want_code or want_text not in said or 'Traceback' in said or (want_code and '→ 怎么办' not in said):
+                print(f'selftest: 命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），'
+                      f'实际退 {child.returncode}：{said[-300:]}')
+                print('           → 看 main() 开头那几道判；KB_SECTIONS_BREAK=raw-arguments 设着的话这里本来就该红')
+                return 1
+        print(f'selftest: 通过（{len(rows)} 行，开头那段正文单独占一行；栅栏里的 `## ` 不算标题；'
+              f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的、不存在的退 2 带出路）')
         print('           证明会红：KB_SECTIONS_NO_PREAMBLE=1 / KB_SECTIONS_NO_H1=1 各再跑一遍，对应那一行必须消失')
         return 0
 
 
-if __name__ == '__main__':
-    preflight(__file__)
-    args = sys.argv[1:]
+def main(args):
+    """命令行入口：→ 退出码。清单打到 stdout，拒绝打到 stderr。"""
     if not args:
-        print(__doc__); sys.exit(2)
+        print(__doc__); return 2
     if args[0] == '--selftest':
-        sys.exit(selftest())
+        return selftest()
+    guarded = os.environ.get('KB_SECTIONS_BREAK') != 'raw-arguments'   # 弄坏开关：--help、不认的选项、读不了的文件都不先判
+    if guarded and args[0] in ('--help', '-h'):
+        print(__doc__); return 0
+    options = [p for p in args if p.startswith('-')]
+    if guarded and options:
+        print(f'kb-sections: 不认的选项：{" ".join(options)}', file=sys.stderr)
+        print('  → 怎么办：只认 --help（-h）与 --selftest；要列小节就只给文件路径：kb-sections.py 文件.md [文件.md ...]', file=sys.stderr)
+        return 2
     missing = [p for p in args if not os.path.exists(p)]
     if missing:
         print('kb-sections: 这些文件不存在：' + ' '.join(missing), file=sys.stderr)
-        print('下一步：核对路径，或先 ls 一下那个目录。', file=sys.stderr)
-        sys.exit(2)
-    print(render(args))
+        print('  → 怎么办：核对路径（相对路径相对当前工作目录，kb 文件一般写成 .claude/kb/…），或先 ls 一下那个目录。', file=sys.stderr)
+        return 2
+    try:
+        text = render(args)
+    except (OSError, UnicodeDecodeError) as error:
+        if not guarded:
+            raise
+        print(f'kb-sections: 读不了 {getattr(error, "filename", None) or "其中一份文件"}（{error.__class__.__name__}：{error}）', file=sys.stderr)
+        print('  → 怎么办：给的要是 UTF-8 的 markdown 文件（不是目录），核对路径再跑', file=sys.stderr)
+        return 2
+    print(text)
+    return 0
+
+
+if __name__ == '__main__':
+    preflight(__file__)
+    sys.exit(main(sys.argv[1:]))

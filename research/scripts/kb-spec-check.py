@@ -6,6 +6,7 @@
 用法：
     kb-spec-check.py <规格.json 或 规格.md> [--root 仓根]
     kb-spec-check.py --selftest          # KB_SPEC_CHECK_BREAK=<项> 时必须判红
+    kb-spec-check.py --help              # 打这一段用法（-h 同），退 0
 
 规格的两种写法（kb-spec-drafter 两份都写，主 agent 手写的用哪种都行）：
   JSON：[{"file": "<仓根起的路径>", "old": "<旧串>", "new": "<新串>", "basis": "<依据>"}, …]，或 {"entries": [同上]}
@@ -20,8 +21,9 @@
      时间指代在同一行带 YYYY-MM-DD 日期时不算，自称只在行首或标点之后才算；
   ④ 改了决策正文里「**依据**」段、增删了引的实验号的，同一份规格里要有那个实验页（.claude/kb/experiments/<号>-*.md）的一条改动
      （门禁 doc-experiments 的 decision-links 格那条双向检查的另一侧）；
-  ⑤ 写决策变更史（.claude/kb/decisions-history.md）的，新串里要有「### 」或「#### 」标题行与「快查·改前：」「快查·改后：」两行。
-②③ 只判新串比旧串多出来的：旧串里原有的不怪这份规格。认不出规格（两种写法都不是、一条都没有）退 2。
+  ⑤ 写决策变更史（.claude/kb/decisions-history.md）的，新串里要有「### <日期>」行或顶格「- 」变更项，不许有「#### 」子条目、「快查·」两行与「**现状**：」行（.claude/rules/changelog-format.md）。
+②③ 只判新串比旧串多出来的：旧串里原有的不怪这份规格。认不出规格（两种写法都不是、一条都没有）退 2；
+不认的选项、--root 缺值、规格文件读不了也退 2（写哪一份、怎么办，不抛 traceback）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一例的标签，括号里是那条「✗ 自检：」的开头）：
   KB_SPEC_CHECK_BREAK=any-hits  check_entries() 不判旧串恰好命中一次（①）
@@ -39,6 +41,8 @@
   KB_SPEC_CHECK_BREAK=no-references  check_entries() 不调 reference_problems()（②）
       编号没带简称（「✗ 自检：编号没带简称：应当判红」）、简称与登记位不一致（「✗ 自检：简称与登记位不一致：应当判红」）、
       判决段名撞了登记编号（「✗ 自检：判决段名撞了登记编号：应当判红」）
+  KB_SPEC_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、--root 缺值与读不了的规格（改前的样子）
+      命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
 """
 import glob
 import json
@@ -243,12 +247,26 @@ def check_entries(entries, root):
 
 def run(arguments):
     root = REPOSITORY_ROOT
+    guarded = BROKEN != "raw-arguments"   # 弄坏开关：--help、不认的选项、读不了的文件都不先判
+    if guarded and arguments[:1] in (["--help"], ["-h"]):
+        print(__doc__)
+        return 0
     if "--root" in arguments:
         position = arguments.index("--root")
+        if guarded and position + 1 >= len(arguments):
+            print("✗ --root 后面没给值\n→ 怎么办：kb-spec-check.py <规格.json 或 规格.md> [--root 仓根]")
+            return 2
         root = os.path.abspath(arguments[position + 1])
         arguments = arguments[:position] + arguments[position + 2:]
+    options = [argument for argument in arguments if argument.startswith("-")]
+    if guarded and options:
+        print(f"✗ 不认的选项：{' '.join(options)}\n→ 怎么办：只认 --root（用法跑 kb-spec-check.py --help）")
+        return 2
     if len(arguments) != 1:
         print("✗ 要给一份规格文件\n→ 怎么办：kb-spec-check.py <规格.json 或 规格.md> [--root 仓根]")
+        return 2
+    if guarded and not os.path.isfile(arguments[0]):
+        print(f"✗ 读不了规格 {arguments[0]}（文件不在，或不是普通文件）\n→ 怎么办：核对路径（相对路径相对当前工作目录）；规格写法见 kb-spec-check.py --help「规格的两种写法」")
         return 2
     entries = load_spec(arguments[0])
     if not entries:
@@ -261,7 +279,7 @@ def run(arguments):
         print(f"  ✗ 规格 {len(entries)} 条里有 {len(problems)} 处会让门禁红（逐处列在上面）")  # gate-lint:summary
         print("  → 怎么办：按每处改规格原文再跑一次这个脚本；改不动的（要判断的）交主 agent，不派书记员")
         return 1
-    print(f"  ✓ 规格 {len(entries)} 条：旧串各恰好 1 次，编号引用、指代、依据配对与变更史快查都过（查了 {len(entries)} 条）")
+    print(f"  ✓ 规格 {len(entries)} 条：旧串各恰好 1 次，编号引用、指代、依据配对与变更史形态都过（查了 {len(entries)} 条）")
     return 0
 
 
@@ -310,12 +328,23 @@ def selftest():
         parsed = load_spec(markdown)
         if len(parsed) != 1 or parsed[0]["old"] != "| C120 | 锚点腐化 | 旧行 |" or parsed[0]["new"] != "| C120 | 锚点腐化 | 新行 |":
             failures.append(f"markdown 规格没认对：{parsed}")
+        # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；规格读不了报文件名与出路、不抛 traceback
+        import subprocess
+        cli_cases = [(["--help"], 0, "用法："), (["-h"], 0, "用法："), (["--bogus", markdown], 2, "不认的选项：--bogus"),
+                     ([os.path.join(work, "nothere.json"), "--root", work], 2, f"读不了规格 {os.path.join(work, 'nothere.json')}"),
+                     ([work, "--root", work], 2, f"读不了规格 {work}"), ([markdown, "--root"], 2, "--root 后面没给值")]
+        for arguments, want_code, want_text in cli_cases:
+            child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
+            said = child.stdout + child.stderr
+            if child.returncode != want_code or want_text not in said or "Traceback" in said or (want_code and "→ 怎么办" not in said):
+                failures.append(f"命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），实际退 {child.returncode}：{said[-300:]}")
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
             print("  → 看 check_entries() / reference_problems() / pointer_problems() / parse_markdown_spec() 的判法；KB_SPEC_CHECK_BREAK 设着的话这里本来就该红")
             return 1
-        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，markdown 规格认得出（{len(cases) + 1} 种）")
+        print(f"  ✓ kb-spec-check 自检通过：旧串次数、编号简称、段名撞登记、位置与时间指代、依据配对、变更史形态各有红绿样本，markdown 规格认得出（{len(cases) + 1} 种）；"
+              f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的规格、--root 缺值退 2 带出路")
         return 0
     finally:
         import shutil

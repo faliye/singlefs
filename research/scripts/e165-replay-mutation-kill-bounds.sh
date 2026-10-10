@@ -53,6 +53,21 @@
 #   E165_KILL_BOUNDS_BREAK=r4noprofile  调装置不带 --profile r4
 #       「r4 整轮应当退 0」（实际退非 0：假装置不认没有 --profile r4 的 --family root_choice_faults）、「r4 整轮里假装置每一次被调都应当带 --profile r4」
 #
+#   第 5 次重跑 research/prompts/e165-r5-prereg.md 9.3（第二段）与修订 1「修1.九」乙（第五段 5-乙）：
+#   --pins r5   三个模式（不给 --profile、--profile r3、--profile r4）都认：开工核对改用 R5_PINS 那一套（第一段根 /tmp/claude-1000/e165-r5-segment1/root 上的
+#       recovery.rs、replay-prefix lib.rs、crates/mutations.tsv 的 sha256 与函数区间；名字、标签、KA / KG 钉值、custom_keys 同旧的），V7 / TV7 的比对对象换成第一段的重跑产物；
+#       自造表、标签表、内存包装与第一段产物一律取脚本所在的仓（第一段根里只有 Cargo.toml、Cargo.lock、.cargo、crates/）。不给 --pins 时三个模式照旧取原来三套，一个字不改。
+#   --gate r2   只在 --profile r4 --pins r5 同给时认（别的组合退 2、一条都不跑）：调装置在 --bounds segment1 --family root_choice_faults 之后加 --gate r2；
+#       基线 family=root_choice_faults 的 name=config 行要带 witness_gate=r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots（5-甲 的装置在 --gate r2 时
+#       实际写的闸字段与值，见 5-甲 产物第一行），缺了退 7、变体一个不编；TV7 的比对对象换成 5-甲 的产物；
+#       驱动自己写的产物：config 行带 gate=r2 与根里装置的 sha256，每个 kill_bound 行与收尾判决行带 gate=r2（这几处是驱动的写法，装置不写）。
+#       R5_GATE_R2_PINS 是 5-甲 的根（第一段根盖上 5-甲 的装置与变异表）上的值：变异表 sha256 与 5-甲 产物名都已填真值，两份源文件与两个函数区间同第一段根（5-甲 不改它们）。
+#   下面两项是 r5 的弄坏开关（外面打开时自证的每一趟都带着它）：
+#   E165_KILL_BOUNDS_BREAK=r5pinsignored  给了 --pins r5 照样用原来那套钉值
+#       「r5：给了 --pins r5 应当按 r5 钉值核对、在旧钉值的假仓上停在 RH1」（三个模式各一格；实际退 0）
+#   E165_KILL_BOUNDS_BREAK=r4gateignored  给了 --gate r2 而调装置不带 --gate r2
+#       「r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2」（实际退 7：基线缺 R2 的闸字段、变体一个不编）
+#
 #   e165-replay-mutation-kill-bounds.sh --list-items
 #       逐行列变体（基线 1 个、crates/mutations.tsv 里 21 种不同的替换、自造 5 条，共 27 行），不编不跑。
 #   e165-replay-mutation-kill-bounds.sh --select-rows --output <产物>
@@ -111,14 +126,17 @@
 #
 # 并行：--jobs 个变体同时做，每个变体的编译与装置各用 --threads 条线程；经 research/scripts/capped.sh N 起时 jobs × threads 不许超过 N。
 # 内存：跑编译出来的二进制一律经 research/scripts/run-with-memory-cap.sh（上限 E165_KILL_BOUNDS_MEMORY_CAP，默认 512M：
-#   2026-10-01 量到基线 --bounds segment1 --family legal 的峰值 47 MiB，变体的用量没逐个量过，留十倍）；退出码 250–254 的那一次不算结果，
-#   那个变体不落行，整条退 1。cargo build 不跑编出来的代码，不经包装。
+#   2026-10-01 量到基线 --bounds segment1 --family legal 的峰值 47 MiB，变体的用量没逐个量过，留十倍）；退出码 245（显存不够：起止之间内核报了
+#   NV_ERR_NO_MEMORY，单独报「显存不够」）与 250–254 的那一次不算结果，那个变体不落行，整条退 1（判法 wrapper_own_problem，三套变体共用）。
+#   cargo build 不跑编出来的代码，不经包装。
 #
 # 退出码：0 点名的都落了行（或本来就都有）；1 有变体没得出结果（包装结局、装置没跑完）、--recheck 对不上、或自证判红；2 用法不对；
 #   3 锚点腐化；4 停机条款 H1（含自造表的 Z 行名字与登记不等）；5 作废条款 V6（收尾基线与开头不同，或仓里的 crates/ 在跑的时候变了）；6 作废条款 V7；
 #   7 基线里缺 J6Qn_ 行（装置没带 --profile r2，r2 9.4 第 6 条）。
 # 弄坏开关 E165_KILL_BOUNDS_BREAK=<项>（只给 --selftest 证明它会红用，逗号分隔可给几个；不认识的项当场退出）。
 # 逐项写开关名、弄坏哪一处、打开后自证哪几项红（自证的例没有标签，项名直接写那条「✗ 自检：」失败行的句首，括号里写那一行接着报的）：
+#   E165_KILL_BOUNDS_BREAK=gpumemoryasresult  wrapper_own_problem 不认 245（显存不够），照装置自己的退出码往下比
+#       「经假内存包装跑一趟、包装退 245 时应当判不算结果、报显存不够」（实际退 245，判的 None）
 #   E165_KILL_BOUNDS_BREAK=progressnever  进度间隔的判断永不触发、一行进度都不打
 #       「假时钟上过了进度间隔（300 秒）应当各打一行、没到不打」（实际：差一秒 None；到了 None；再过一个间隔 None）
 #       「整轮里一个变体跑过进度间隔应当打出点名它的进度行」（实际退 0、进度行 []）
@@ -140,7 +158,7 @@
 #       「r3：假变体的 KA 读数不等于钉值应当报 ka_pin=mismatch 且整轮退 1」（实际退 0）
 #   E165_KILL_BOUNDS_BREAK=r3noprofile  调装置不带 --profile r3
 #       「r3 整轮应当退 0」（实际退 1：假装置不认没有 --profile r3 的 --family root_choice）、「r3 整轮里假装置每一次被调都应当带 --profile r3」
-# 下面六项外面打开时，自证的每一趟都带着它（drive() 把外面给的并进那一趟自己点名的；r2 那四项照旧只由 r2 那几趟带），红在下面点名的项；
+# 下面七项外面打开时，自证的每一趟都带着它（drive() 把外面给的并进那一趟自己点名的；r2 那四项照旧只由 r2 那几趟带），红在下面点名的项；
 # 自证里对照那几例自己打开同一项（证明前一例的红来自那一处检查），外面打开时那几例本来就开着、不另红：
 #   E165_KILL_BOUNDS_BREAK=noanchorcheck  不核锚点、命中 0 次的那条照「改坏」（什么都没改）跑
 #       「锚点命中 0 次应当报「锚点腐化」退 3」（实际退 0）、「锚点腐化时一次都不许编、不许写产物」（实际编了 7 次）、
@@ -153,6 +171,8 @@
 #       「选行 ②：同名两行应当报 more_than_one_row_with_this_name、退 1、不编」（实际退 0、编 0 次）
 #   E165_KILL_BOUNDS_BREAK=nodupcheck  同名多行时不报、取第一行
 #       「选行 ②：同名两行应当报 more_than_one_row_with_this_name、退 1、不编」（实际退 0、编 0 次）
+#   E165_KILL_BOUNDS_BREAK=owntablesplit  选行回到自己切 crates/mutations.tsv（四段以上就收、不看哪一段空着），不经 research/scripts/crates-mutation-rows.py 的 read_table
+#       「选行 ⑧：登记名那一行不成形（cargo 参数那一段空着）应当报 no_row_with_this_name、点名第 2 行、退 1、不编」（实际退 0）
 #   E165_KILL_BOUNDS_BREAK=nolocationcheck  不核命中处在不在 9.2 的函数里
 #       「选行 ③：原文在 9.2 的函数之外应当报 outside_the_registered_functions、点名第 5 行、退 1、不编」（实际退 0、编 0 次）
 #   E165_KILL_BOUNDS_BREAK=recoveryonly  改坏时只写 recovery.rs、不看第二列
@@ -173,6 +193,7 @@ export E165_KILL_BOUNDS_SELF_PATH
 exec python3 - "$@" <<'PYTHON'
 import concurrent.futures
 import hashlib
+import importlib.util
 import io
 import json
 import os
@@ -272,7 +293,8 @@ EXIT_OK, EXIT_INCOMPLETE, EXIT_USAGE, EXIT_ANCHOR, EXIT_HALT_H1, EXIT_VOID_V6, E
 BREAK_MODES = ("noanchorcheck", "rerunall", "progressnever", "byrownumber", "nodupcheck", "nolocationcheck", "recoveryonly",
                "j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour",
                "r3itemsmissing", "r3firstredswap", "r3kapinunchecked", "r3noprofile",
-               "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile")
+               "r4itemsmissing", "r4firstredswap", "r4kgcountsasred", "r4kgpinunchecked", "r4noprofile",
+               "r5pinsignored", "r4gateignored", "gpumemoryasresult", "owntablesplit")
 # 外面打开时自证的 r2 那几趟原样传进去的四项（文件头「弄坏开关」）
 R2_BREAK_MODES = ("j6qnfromj6", "noprofile", "noprofilecheck", "zfirstfour")
 # 外面打开时自证的 r3 那几趟原样传进去的四项（登记 r3 9.3 第 6 条的表）；别的趟不带
@@ -365,6 +387,53 @@ R4_REGISTERED = {
     "segment1_product": "research/results/e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out",
 }
 R4_REGISTERED["kg_columns"] = {rule: {f"{m},{u}": list(reading) for (m, u), reading in cells.items()} for rule, cells in R4_KG_RULE_READINGS.items()}
+
+# ── 第 5 次重跑的钉值（登记 research/prompts/e165-r5-prereg.md 9.3 第 1、2 条，第二段）：--pins r5 选它；不给 --pins 时三个模式照旧取上面三套，一个字不改。
+# 都是第一段根（/tmp/claude-1000/e165-r5-segment1/root，清单 root-manifest-at-start.sha256 的 sha256 95237ecf…）上 2026-10-04 现算的：两份源文件与 crates/mutations.tsv 的整份 sha256，
+# 函数区间照 r1 9.2 的取法（fn 行到其后第一个只有 } 的行）；names 的第一项换成根里 crates/mutations.tsv 的表行号（只用来起名），名字、标签、KA 钉值、labels、KG 钉值、custom_keys 不动。
+R5_FILES_SHA256 = {
+    RECOVERY_PATH: "4454f6d3eab170121ccb92778e7d4525cdaa6a10a6c6bf16d7c213d0edc22632",
+    LIB_PATH: "9966f42f396d22c2a90bdd35864557edd7ce45285be3d6b796ba9f8d18aa2fa4",
+}
+R5_TABLE_SHA256 = "bc2627f85100b155c14b2d7720488e2a49c7a87a20a45325343a22870942249d"
+R5_R2_TABLE_ROWS = [23, 24, 36, 224, 347, 348, 399, 407, 441, 505, 506, 507, 508, 509, 510, 511, 604, 605, 908, 909, 910, 990, 991]
+R5_ROOT_CHOICE_TABLE_ROWS = [1810, 1811, 1812, 1813, 1814, 1815]
+R5_ROOT_CHOICE_FUNCTIONS = [(LIB_PATH, "choose_root_slot", 3980, 4019), (RECOVERY_PATH, "choose_root", 1268, 1305)]
+R5_PRODUCT_PREFIX = "research/results/e165-replay-bounded-enumeration-2026-10-04-r5-"
+R5_PINS = {
+    "r2": dict(REGISTERED, files_sha256=R5_FILES_SHA256, table_sha256=R5_TABLE_SHA256,
+               functions=[
+                   (LIB_PATH, "record_ends_its_publish", 3101, 3109),
+                   (LIB_PATH, "readable_record_of_the_same_publish_follows", 3113, 3228),
+                   (LIB_PATH, "counter_of_the_last_record_the_root_covers", 3232, 3300),
+                   (LIB_PATH, "is_above_the_chosen_root", 3303, 3312),
+                   (LIB_PATH, "maximum_transaction_of", 3315, 3361),
+                   (LIB_PATH, "judge_the_candidate", 3372, 3537),
+                   (LIB_PATH, "replay_core", 3543, 3975),
+                   (RECOVERY_PATH, "judge_back_chain_against_the_previous_record_on_disk", 3404, 3436),
+                   (RECOVERY_PATH, "replay_journal", 3467, 3614),
+               ],
+               names=[(row, name, tags) for row, (_registered_row, name, tags) in zip(R5_R2_TABLE_ROWS, REGISTERED["names"])],
+               # V7 的比对对象：第一段重跑的 r2 档合法历史、对抗两份（登记第十一节末尾比对对象表第 4、5 行的重跑）
+               segment1_products=[R5_PRODUCT_PREFIX + "segment1-r2-legal-family.out", R5_PRODUCT_PREFIX + "segment1-r2-adversarial-family.out"]),
+    "r3": dict(R3_REGISTERED, files_sha256=R5_FILES_SHA256, table_sha256=R5_TABLE_SHA256, functions=list(R5_ROOT_CHOICE_FUNCTIONS),
+               names=[(row, name, pin) for row, (_registered_row, name, pin) in zip(R5_ROOT_CHOICE_TABLE_ROWS, R3_REGISTERED["names"])],
+               # TV7 的比对对象：第一段重跑的 r3 择根那一份（比对对象表第 15 行的重跑）
+               segment2_product=R5_PRODUCT_PREFIX + "segment1-r3-root-choice.out"),
+    "r4": dict(R4_REGISTERED, files_sha256=R5_FILES_SHA256, table_sha256=R5_TABLE_SHA256, functions=list(R5_ROOT_CHOICE_FUNCTIONS),
+               names=[(row, name, pin) for row, (_registered_row, name, pin) in zip(R5_ROOT_CHOICE_TABLE_ROWS, R4_REGISTERED["names"])],
+               # TV7 的比对对象：第一段重跑的 r4 带故障那一份（比对对象表第 16 行的重跑）
+               segment1_product=R5_PRODUCT_PREFIX + "segment1-r4-root-choice-faults.out"),
+}
+# 第五段 5-乙（登记修订 1「修1.九」乙第 1–4 条）：--gate r2 只在 --profile r4 --pins r5 同给时认；调装置在 R4_BOUNDS_ARGUMENTS 之后加这两项。
+R4_GATE_R2_ARGUMENTS = ["--gate", "r2"]
+# 基线 family=root_choice_faults 的 name=config 行要带的 R2 闸字段与值：5-甲 的装置在 --gate r2 时实际写的（产物 R5_GATE_R2_PINS["segment1_product"] 第一行的 witness_gate=…）
+R4_GATE_R2_CONFIG_FIELD = ("witness_gate", "r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots")
+# 5-乙 跑在 5-甲 的根上（/tmp/claude-1000/e165-r5-segment3/root5：第一段根盖上 5-甲 改过的装置与 crates/mutations.tsv，登记修1.十一「根、清单、在哪编」）：
+# 变异表 sha256 是那份根上的 crates/mutations.tsv 的；TV7 的比对对象是 5-甲 的产物（取脚本所在的仓的 research/results/，同别的几套是路径名）。
+# 两份源文件与两个函数区间仍是第一段根上的（5-甲 不改它们；开工核对时对着根现判，对不上停在 RH1）。
+R5_GATE_R2_TABLE_SHA256 = "c9a03eb4af85a8e4c7206dfa3609593390516b80ca52be7090aced5696e84046"
+R5_GATE_R2_PINS = dict(R5_PINS["r4"], table_sha256=R5_GATE_R2_TABLE_SHA256, segment1_product=R5_PRODUCT_PREFIX + "segment5-r2-gate-root-choice-faults.out")
 BREAK = set(filter(None, os.environ.get("E165_KILL_BOUNDS_BREAK", "").split(",")))
 for mode in BREAK:
     if mode not in BREAK_MODES:
@@ -458,22 +527,45 @@ def unescape(text):
 class Setup:
     """这一次跑的仓根与登记值；自证时换成假的仓与假的登记值。"""
 
-    def __init__(self, root, selftest, profile="r2"):
+    def __init__(self, root, selftest, profile="r2", pins=None, gate=None):
         self.root = root
         self.selftest = selftest
         self.profile = profile
-        self.registered = dict(REGISTERED if profile == "r2" else R3_REGISTERED if profile == "r3" else R4_REGISTERED)
+        # --pins r5（登记 r5 9.3 第 1、2 条）；弄坏开关 r5pinsignored：给了也照样用原来那套
+        self.pins = pins
+        self.gate = gate
+        uses_r5_pins = pins == "r5" and "r5pinsignored" not in BREAK
+        if uses_r5_pins:
+            self.registered = dict(R5_GATE_R2_PINS if gate == "r2" else R5_PINS[profile])
+        else:
+            self.registered = dict(REGISTERED if profile == "r2" else R3_REGISTERED if profile == "r3" else R4_REGISTERED)
         if selftest:
-            with open(os.path.join(root, "selftest-registered.json" if profile == "r2" else "selftest-registered-r3.json" if profile == "r3" else "selftest-registered-r4.json"), encoding="utf-8") as handle:
+            name = "selftest-registered" if profile == "r2" else "selftest-registered-r3" if profile == "r3" else "selftest-registered-r4"
+            if uses_r5_pins:
+                name += "-r5-gate-r2" if gate == "r2" else "-r5"
+            with open(os.path.join(root, name + ".json"), encoding="utf-8") as handle:
                 self.registered = json.load(handle)
         self.cargo = [os.path.join(root, "fake-cargo")] if selftest else ["cargo"]
         # r3 模式的 --root 是第二段冻结根（只有 Cargo.toml、Cargo.lock、.cargo、crates/）：内存包装与第二段产物取脚本所在的仓（自证里取假仓）。
         self.script_root = root if selftest else DEFAULT_ROOT
-        self.memory_cap_runner = os.path.join(root if profile == "r2" else self.script_root, "research/scripts/run-with-memory-cap.sh")
+        # r2 模式原来的冻结根自己带 research/（自造表、标签表、内存包装、第一段产物都从根里读）；--pins r5 的根是第一段根，只有 crates/ 那几样，
+        # 这几样改取脚本所在的仓（登记 r5 第十一节「根、清单、在哪编」：驱动的自造表与 research/scripts 取脚本所在的仓）。
+        self.research_root = self.script_root if pins == "r5" else root
+        self.memory_cap_runner = os.path.join(self.research_root if profile == "r2" else self.script_root, "research/scripts/run-with-memory-cap.sh")
 
     def bounds_arguments(self):
-        """每次整份跑装置的界参数：r2 是 --bounds segment2；r3 是 --bounds segment1 --family root_choice（登记 r3 9.3 第 3 条）。"""
-        return ["--bounds", "segment2"] if self.profile == "r2" else list(R3_BOUNDS_ARGUMENTS) if self.profile == "r3" else list(R4_BOUNDS_ARGUMENTS)
+        """每次整份跑装置的界参数：r2 是 --bounds segment2；r3 是 --bounds segment1 --family root_choice（登记 r3 9.3 第 3 条）；
+        r4 是 --bounds segment1 --family root_choice_faults，给了 --gate r2 时再加 --gate r2（登记 r5 修1.九乙第 1 条；弄坏开关 r4gateignored 不加）。"""
+        if self.profile == "r2":
+            return ["--bounds", "segment2"]
+        if self.profile == "r3":
+            return list(R3_BOUNDS_ARGUMENTS)
+        gate = list(R4_GATE_R2_ARGUMENTS) if self.gate == "r2" and "r4gateignored" not in BREAK else []
+        return list(R4_BOUNDS_ARGUMENTS) + gate
+
+    def pins_arguments(self):
+        """复跑命令里要带的 --pins / --gate（照这一次给的原样写）。"""
+        return (["--pins", self.pins] if self.pins else []) + (["--gate", self.gate] if self.gate else [])
 
     def wrap(self, kind, command):
         """跑编译出来的二进制：经内存包装（自证里的假二进制是 shell 脚本，直接跑）。command 第一项是二进制，档参数接在它后面（r2 9.4 第 2 条；r3 同法带 --profile r3）。"""
@@ -499,9 +591,47 @@ class Setup:
         return ["bash", self.memory_cap_runner, cap] + command, environment
 
 
+DEVICE_SOURCE_PATH = "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"
+
+
+def pins_config_text(setup):
+    """给了 --pins r5 / --gate r2 时产物 config 行多带的字段（登记 r5 修1.九乙第 3 条：config 行带上根里装置的 sha256）；都不给时是空串，原来三套的 config 行一个字不变。"""
+    text = ""
+    if setup.pins:
+        text += f" pins={setup.pins} pins_registration=research/prompts/e165-r5-prereg.md"
+    if setup.gate:
+        device = os.path.join(setup.root, DEVICE_SOURCE_PATH)
+        text += f" gate={setup.gate} device_sha256={sha256_of_file(device) if os.path.exists(device) else 'missing'}"
+    return text
+
+
 def read_source(setup, path):
     with open(os.path.join(setup.root, path), encoding="utf-8") as handle:
         return handle.read()
+
+
+_CRATES_MUTATION_ROWS = []
+
+
+def mutation_table_rows(setup):
+    """crates/mutations.tsv 里成形的行：[(表行号, 各段原样)]。切表与成形照 research/scripts/crates-mutation-rows.py 的 read_table
+    （门禁 checker-tier-crates-mutation-replay 与 prove-red.sh 同一份）；弄坏开关 owntablesplit 下照改前自己切（四段以上就收）。"""
+    if "owntablesplit" in BREAK:
+        rows = []
+        for number, line in enumerate(read_source(setup, TABLE_PATH).split("\n"), 1):
+            if line.startswith("#") or not line.strip():
+                continue
+            fields = line.split("\t")
+            if len(fields) >= 4:
+                rows.append((number, fields))
+        return rows
+    if not _CRATES_MUTATION_ROWS:
+        specification = importlib.util.spec_from_file_location("crates_mutation_rows_for_e165_kill_bounds", os.path.join(SCRIPT_DIRECTORY, "crates-mutation-rows.py"))
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        _CRATES_MUTATION_ROWS.append(module)
+    rows, _malformed, _memory_from_table, _timeout_from_table = _CRATES_MUTATION_ROWS[0].read_table(os.path.join(setup.root, TABLE_PATH))
+    return [(row.line_number, list(row.fields)) for row in rows]
 
 
 def function_ranges(setup):
@@ -541,7 +671,7 @@ def compare_tag_sets(registered, today):
 def load_tag_table(setup):
     """research/mutations/e165_replay_bounded_enumeration_tags.tsv：键 → 版本 → [(标签们, 在不在, 依据)]；集合 = 标 yes 的标签。"""
     table = {}
-    with open(os.path.join(setup.root, TAGS_TABLE_PATH), encoding="utf-8") as handle:
+    with open(os.path.join(setup.research_root, TAGS_TABLE_PATH), encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
             if line.startswith("#") or not line.strip():
                 continue
@@ -568,14 +698,10 @@ def tags_of(table, key, version):
 def select_by_name(setup, ranges, texts):
     """RQ4（r1 9.1）：登记的每个变异名在今天的 crates/mutations.tsv 里按第一列逐字找；那一行要满足四条：恰 1 行、
     第二列是 recovery.rs 或 lib.rs、原文在那份文件里命中 1 次、命中处的起行或末行落在 9.2 的函数里。不按行号选。"""
-    table_lines = read_source(setup, TABLE_PATH).split("\n")
+    table_lines = read_source(setup, TABLE_PATH).split("\n")   # 只给弄坏开关 byrownumber 按登记时的行号取行
     by_name = {}
-    for number, line in enumerate(table_lines, 1):
-        if line.startswith("#") or not line.strip():
-            continue
-        fields = line.split("\t")
-        if len(fields) >= 4:
-            by_name.setdefault(fields[0], []).append((number, fields))
+    for number, fields in mutation_table_rows(setup):
+        by_name.setdefault(fields[0], []).append((number, fields))
     selected = []
     for registered_row, name, registered_tags in setup.registered["names"]:
         entry = {"registered_row": registered_row, "name": name, "registered_tags": registered_tags, "failure": None, "today_row": None,
@@ -613,7 +739,7 @@ def select_by_name(setup, ranges, texts):
 def custom_rows(setup, texts):
     """自造表每行：四段、文件列是 recovery.rs 或 lib.rs；原文命中次数与所在函数一并交回。"""
     rows = []
-    with open(os.path.join(setup.root, CUSTOM_TABLE_PATH), encoding="utf-8") as handle:
+    with open(os.path.join(setup.research_root, CUSTOM_TABLE_PATH), encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, 1):
             if line.startswith("#") or not line.strip():
                 continue
@@ -970,6 +1096,19 @@ def restore_and_remove(setup, directory, keep, target=None):
     return restored
 
 
+GPU_MEMORY_HIT_EXIT = 245   # run-with-memory-cap.sh：显存不够（命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY），结果不算数
+
+
+def wrapper_own_problem(returncode):
+    """内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」）：这一次不算结果，交原因；装置自己的退出码交 None。
+    245（显存不够）单独一支；弄坏开关 gpumemoryasresult 下当装置自己的退出码。"""
+    if returncode == GPU_MEMORY_HIT_EXIT and "gpumemoryasresult" not in BREAK:
+        return f"内存包装退出码 {returncode}：显存不够（起止之间内核报了 NV_ERR_NO_MEMORY），这一次不算结果"
+    if 250 <= returncode <= 254:
+        return f"内存包装退出码 {returncode}，这一次不算结果"
+    return None
+
+
 def run_segment_two(setup, binary, threads, log_directory):
     command, environment = setup.wrap("segment2 run", [binary] + setup.bounds_arguments())
     environment["E165_THREADS"] = str(threads)
@@ -1027,7 +1166,7 @@ def counter_difference(baseline_line, mutant_line):
 
 
 def rerun_command(item, options):
-    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh --scratch <草稿目录> --output {options['output_shown']} "
+    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh{options.get('pins_text', '')} --scratch <草稿目录> --output {options['output_shown']} "
             f"--ledger {options['ledger_shown']} --recheck --item {item['name']}")
 
 
@@ -1052,9 +1191,10 @@ def process_item(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 --bounds segment2")
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    if 250 <= completed.returncode <= 254:
+    wrapper_problem = wrapper_own_problem(completed.returncode)
+    if wrapper_problem:
         restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": f"内存包装退出码 {completed.returncode}，这一次不算结果",
+        return {"lines": [], "ledger": [], "problem": wrapper_problem,
                 "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     domains, per_domain = compare_with_baseline(baseline["rows"], mutant_rows)
@@ -1153,7 +1293,7 @@ def build_and_run_baseline(setup, options, name):
         options["progress"].finished(label, counted=False)
     rows = result_rows(completed.stdout)
     if completed.returncode != 0 or not rows or not rows[-1].startswith("E7RESULT name=done "):
-        raise Stop(EXIT_INCOMPLETE, f"  ✗ 基线没跑完或退出码不是 0（{completed.returncode}；日志 {directory}/run.log）\n  → 怎么办：退出码 250–254 是内存包装的结局，照它报的办；别的先单跑基线看")
+        raise Stop(EXIT_INCOMPLETE, f"  ✗ 基线没跑完或退出码不是 0（{completed.returncode}；日志 {directory}/run.log）\n  → 怎么办：退出码 245（显存不够）与 250–254 是内存包装的结局，照它报的办（245 先 nvidia-smi 看谁在用卡、等它跑完）；别的先单跑基线看")
     print(f"  基线 {name}：编译 {build_seconds:.1f} 秒，跑 {run_seconds:.1f} 秒，{len(rows)} 行", file=sys.stderr)
     return {"binary": binary, "rows": rows, "exit": completed.returncode, "directory": directory}
 
@@ -1162,7 +1302,7 @@ def check_against_segment_one(setup, baseline):
     """作废条款 V7：基线每个 (域, N) 的行必须逐字出现在第一段的产物里。"""
     known = set()
     for product in setup.registered["segment1_products"]:
-        with open(os.path.join(setup.root, product), encoding="utf-8") as handle:
+        with open(os.path.join(setup.research_root, product), encoding="utf-8") as handle:
             known.update(line.rstrip("\n") for line in handle)
     place_rows = [row for row in baseline["rows"] if " domain=" in row and " n=" in row and " name=verdict " not in row]
     absent = [row for row in place_rows if row not in known]
@@ -1515,6 +1655,18 @@ def check_the_profile_rows_r4(baseline):
                                         "  → 怎么办：装置要认 --profile r4 --family root_choice_faults（r4 登记 5.1）、驱动调它时要带上；这一次变体一个都没编")
 
 
+def check_the_gate_rows_r4(setup, baseline):
+    """登记 r5 修1.九乙第 4 条：给了 --gate r2 时，基线 family=root_choice_faults 的 name=config 行要带 R2 的闸字段（R4_GATE_R2_CONFIG_FIELD：witness_gate=r2_…）；缺了就是装置没收到
+    或不认 --gate r2，退 7、变体一个不编。不给 --gate 时不判。"""
+    if setup.gate != "r2":
+        return
+    field, value = R4_GATE_R2_CONFIG_FIELD
+    configs = [parse_row(row) for row in baseline["rows"] if " name=config " in row and " family=root_choice_faults" in row]
+    if not configs or any(config.get(field) != value for config in configs):
+        raise Stop(EXIT_NOT_PROFILE_R2, f"  ✗ 装置没带 --gate r2：基线 family=root_choice_faults 的 name=config 行 {len(configs)} 行，缺 {field}={value}\n"
+                                        f"  → 怎么办：装置要认 --profile r4 --family root_choice_faults --gate r2 并在 config 行写 {field}={value}（5-甲），驱动调它时要带上；这一次变体一个都没编")
+
+
 def check_against_segment_one_product(setup, baseline):
     """作废条款 TV7（r4 9.3 第 3 条与第六节末段）：开头基线的 E7RESULT 行必须与第一段的产物逐行相同（同一份根、同一份源码编出来的）；
     读不到、一行都没有按 TV8 不当结果。"""
@@ -1557,24 +1709,25 @@ def baseline_item_line_r4(setup, item, baseline, options):
     rows = baseline["rows"]
     digest = hashlib.sha256("\n".join(rows).encode("utf-8")).hexdigest()
     kg_pin = r4_baseline_kg_today_pin(setup, r4_parse(rows)[0]) if rows else "no_rows"
-    return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none outcome=baseline "
+    return (f"E7RESULT name=kill_bound item=baseline table=none table_row=none rows_sharing_this_replacement=none{options.get('gate_field', '')} outcome=baseline "
             f"result_rows={len(rows)} result_rows_sha256={digest} run_exit={baseline['exit']} "
             f"rows_identical_to_segment1_product={str(baseline.get('verbatim_rows', 0) == len(rows)).lower()} kg_today_pin={kg_pin} "
             f"rerun=\"{rerun_command_r4(item, options)}\" title=基线（不改） complete=yes")
 
 
 def rerun_command_r4(item, options):
-    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r4 --root <第一段根> --scratch <草稿目录> "
+    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r4{options.get('pins_text', '')} --root <第一段根> --scratch <草稿目录> "
             f"--output {options['output_shown']} --item {item['name']}")
 
 def process_item_r4(setup, item, baseline, options):
-    """做一个变体，返回 {lines, ledger（恒空）, problem, timing}。整份 --bounds segment1 --family root_choice_faults 跑完，逐 (域, M, U, 被判时故障, 历史标签) 与基线比，不早停。"""
+    """做一个变体，返回 {lines, ledger（恒空）, problem, timing}。整份 --bounds segment1 --family root_choice_faults 跑完，逐 (域, M, U, 被判时故障, 历史标签) 与基线比，不早停。
+    给了 --gate r2 时每一行在 rows_sharing_this_replacement 之后多一个 gate=r2（登记 r5 修1.九乙第 3 条）。"""
     directory = os.path.join(options["work"], item["name"])
     started = time.monotonic()
 
     def head(row):
         return (f"E7RESULT name=kill_bound item={item['name']} table={item['table']} table_row={row} "
-                f"rows_sharing_this_replacement={'+'.join(str(shared) for shared in item['rows']) or 'none'}")
+                f"rows_sharing_this_replacement={'+'.join(str(shared) for shared in item['rows']) or 'none'}{options.get('gate_field', '')}")
 
     def tail(title):
         return f"rerun=\"{rerun_command_r4(item, options)}\" title={title.replace(' ', '_')} complete=yes"
@@ -1592,9 +1745,10 @@ def process_item_r4(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    if 250 <= completed.returncode <= 254:
+    wrapper_problem = wrapper_own_problem(completed.returncode)
+    if wrapper_problem:
         restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": f"内存包装退出码 {completed.returncode}，这一次不算结果",
+        return {"lines": [], "ledger": [], "problem": wrapper_problem,
                 "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
@@ -1731,7 +1885,7 @@ def baseline_item_line_r3(item, baseline, options):
 
 
 def rerun_command_r3(item, options):
-    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r3 --root <第二段冻结根> --scratch <草稿目录> "
+    return (f"bash research/scripts/e165-replay-mutation-kill-bounds.sh --profile r3{options.get('pins_text', '')} --root {'<r5 第一段根>' if options.get('pins_text') else '<第二段冻结根>'} --scratch <草稿目录> "
             f"--output {options['output_shown']} --item {item['name']}")
 
 
@@ -1760,9 +1914,10 @@ def process_item_r3(setup, item, baseline, options):
         return {"lines": lines, "ledger": [], "problem": None, "timing": (build_seconds, 0.0, time.monotonic() - started)}
     mark(options, item["name"], "跑 " + " ".join(setup.bounds_arguments()))
     completed, run_seconds = run_segment_two(setup, binary, options["threads"], directory)
-    if 250 <= completed.returncode <= 254:
+    wrapper_problem = wrapper_own_problem(completed.returncode)
+    if wrapper_problem:
         restore_and_remove(setup, directory, keep=False, target=target_of(item))
-        return {"lines": [], "ledger": [], "problem": f"内存包装退出码 {completed.returncode}，这一次不算结果",
+        return {"lines": [], "ledger": [], "problem": wrapper_problem,
                 "timing": (build_seconds, run_seconds, time.monotonic() - started)}
     mutant_rows = result_rows(completed.stdout)
     finished = bool(mutant_rows) and mutant_rows[-1].startswith("E7RESULT name=done ")
@@ -1855,7 +2010,7 @@ def main_run(setup, options, item_names, recheck):
                 f"device_arguments={'+'.join([] if 'noprofile' in BREAK else DEVICE_PROFILE_ARGUMENTS) or 'none'} "
                 f"bounds=segment2 items={len(items)} table_rows={len(selected_rows)} "
                 f"custom_rows={sum(1 for item in items if item['table'] == CUSTOM_TABLE_PATH)} recovery_sha256={sha_at_start[RECOVERY_PATH]} "
-                f"lib_sha256={sha_at_start[LIB_PATH]} widening=none"], False)
+                f"lib_sha256={sha_at_start[LIB_PATH]} widening=none{pins_config_text(setup)}"], False)
         if not os.path.exists(options["ledger"]):
             append_lines(options["ledger"], [LEDGER_HEADER], False)
 
@@ -2025,7 +2180,7 @@ def main_run_r3(setup, options, item_names):
             f"E7RESULT name=config experiment=E165 segment=3 profile=r3 registration=research/prompts/e165-r3-prereg.md "
             f"device_arguments={'+'.join(([] if 'r3noprofile' in BREAK else R3_DEVICE_PROFILE_ARGUMENTS) + R3_BOUNDS_ARGUMENTS) or 'none'} "
             f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
-            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none"], False)
+            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"], False)
 
     def flush_in_order():
         nonlocal torn
@@ -2164,6 +2319,7 @@ def main_run_r4(setup, options, item_names):
     options["progress"].start()
     baseline = build_and_run_baseline(setup, options, "baseline")
     check_the_profile_rows_r4(baseline)
+    check_the_gate_rows_r4(setup, baseline)
     check_against_segment_one_product(setup, baseline)
     baseline_line = baseline_item_line_r4(setup, by_name["baseline"], baseline, options)
     if "baseline" in recorded and recorded["baseline"][0] != baseline_line:
@@ -2177,9 +2333,9 @@ def main_run_r4(setup, options, item_names):
     if not os.path.exists(options["output"]):
         append_lines(options["output"], [
             f"E7RESULT name=config experiment=E165 segment=2 profile=r4 registration=research/prompts/e165-r4-prereg.md "
-            f"device_arguments={'+'.join(([] if 'r4noprofile' in BREAK else R4_DEVICE_PROFILE_ARGUMENTS) + R4_BOUNDS_ARGUMENTS) or 'none'} "
+            f"device_arguments={'+'.join(([] if 'r4noprofile' in BREAK else R4_DEVICE_PROFILE_ARGUMENTS) + setup.bounds_arguments()) or 'none'} "
             f"items={len(items)} table_rows={len(items) - 1} recovery_sha256={sha_at_start[RECOVERY_PATH]} lib_sha256={sha_at_start[LIB_PATH]} "
-            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none"], False)
+            f"table_sha256={sha256_of_file(os.path.join(setup.root, TABLE_PATH))} widening=none{pins_config_text(setup)}"], False)
 
     def flush_in_order():
         nonlocal torn
@@ -2272,7 +2428,7 @@ def main_run_r4(setup, options, item_names):
         f"red={outcomes.get('red', 0)} red_only_by_kj0_or_kj3={outcomes.get('red_only_by_kj0_or_kj3', 0)} "
         f"not_red_within_bounds={outcomes.get('not_red_within_bounds', 0)} invalid={outcomes.get('invalid', 0)} "
         f"run_did_not_finish={outcomes.get('run_did_not_finish', 0)} not_compared={outcomes.get('not_compared', 0)} "
-        f"ka_pin_mismatches={len(pin_mismatches)} kg_pin_mismatches={len(kg_mismatches)} baseline_equals_segment1_product=true",
+        f"ka_pin_mismatches={len(pin_mismatches)} kg_pin_mismatches={len(kg_mismatches)} baseline_equals_segment1_product=true{options.get('gate_field', '')}",
     ]
     total = len(result_rows(open(options["output"], encoding="utf-8").read())) + len(closing) + 1
     append_lines(options["output"], closing + [f"E7RESULT name=done emitted={total}"], False)
@@ -2296,7 +2452,7 @@ def measure(setup, options, name):
     directory = os.path.join(options["work"], "measure-" + name)
     binary, problem, build_seconds = prepare_and_build(setup, item, directory, options["threads"], wrap_build_for_measure=True)
     peak = "没读到"
-    peaks_path = os.path.join(setup.root, "research/scripts/memory-peaks.tsv")
+    peaks_path = os.path.join(setup.research_root, "research/scripts/memory-peaks.tsv")
     if os.path.exists(peaks_path):
         for line in open(peaks_path, encoding="utf-8"):
             fields = line.rstrip("\n").split("\t")
@@ -2408,11 +2564,8 @@ def build_row_selection(setup, output_shown):
     # RQ7（附带）：9.2 的函数里还有哪些 crates/mutations.tsv 行不在 23 个名字之中；只列，不判标签。
     registered_names = {name for _row, name, _tags in setup.registered["names"]}
     additional = 0
-    for number, line in enumerate(read_source(setup, TABLE_PATH).split("\n"), 1):
-        if line.startswith("#") or not line.strip():
-            continue
-        fields = line.split("\t")
-        if len(fields) < 4 or fields[1] not in SOURCE_FILES or fields[0] in registered_names:
+    for number, fields in mutation_table_rows(setup):
+        if fields[1] not in SOURCE_FILES or fields[0] in registered_names:
             continue
         old = unescape(fields[2])
         if texts[fields[1]].count(old) != 1:
@@ -2635,11 +2788,15 @@ arguments = sys.argv[1:]
 with open(os.environ.get('FAKE_BIN_LOG', os.devnull), 'a') as log:
     log.write(' '.join(arguments) + '\\n')
 profile = None
+gate = None
 rest = []
 index = 0
 while index < len(arguments):
     if arguments[index] == '--profile':
         profile = arguments[index + 1]
+        index += 2
+    elif arguments[index] == '--gate':
+        gate = arguments[index + 1]
         index += 2
     else:
         rest.append(arguments[index])
@@ -2647,7 +2804,7 @@ while index < len(arguments):
 if 'root_choice_faults' in rest and profile != 'r4':
     print('  ✗ --family root_choice_faults 只在 --profile r4 时有', file=sys.stderr)
     sys.exit(2)
-rows = ['E7RESULT name=config experiment=E165 bounds=segment1 family=root_choice_faults profile=r4']
+rows = ['E7RESULT name=config experiment=E165 bounds=segment1 family=root_choice_faults profile=r4' + (' witness_gate=r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots' if gate == 'r2' else '')]
 cells = [('KF', 1, 0), ('KF', 1, 1), ('KF', 1, 2), ('KF3', 1, 0), ('KF9', 1, 0), ('KFW', 1, 0), ('KG', 1, 0), ('KG', 1, 2)]
 subcells = [('none', 'inside_the_promise'), ('RN', 'inside_the_promise'), ('RI', 'outside_the_promise')]
 
@@ -2726,6 +2883,24 @@ def selftest():
             return handle.read()
 
     with tempfile.TemporaryDirectory(prefix="e165-kill-bounds-selftest-") as temporary:
+        # 内存包装自己的结局：不是自证模式的 Setup（经包装起），包装换成假的（它所在的根下 research/scripts/run-with-memory-cap.sh 只退给定的码），
+        # 走 run_segment_two 跑一趟，再照三套变体共用的 wrapper_own_problem 判
+        wrapper_root = os.path.join(temporary, "wrapper-root")
+        os.makedirs(os.path.join(wrapper_root, "research/scripts"))
+        wrapper_codes = {}
+        for wrapper_exit in (245, 252, 101):
+            write(os.path.join(wrapper_root, "research/scripts/run-with-memory-cap.sh"),
+                  f"#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 {wrapper_exit}\nexit {wrapper_exit}\n")
+            wrapper_log = os.path.join(temporary, f"wrapper-{wrapper_exit}")
+            os.makedirs(wrapper_log)
+            wrapped, _ = run_segment_two(Setup(wrapper_root, False), "/bin/true", 1, wrapper_log)
+            wrapper_codes[wrapper_exit] = (wrapped.returncode, wrapper_own_problem(wrapped.returncode))
+        expect(wrapper_codes[245][0] == 245 and "显存不够" in (wrapper_codes[245][1] or "") and "不算结果" in (wrapper_codes[245][1] or ""),
+               f"经假内存包装跑一趟、包装退 245 时应当判不算结果、报显存不够（实际退 {wrapper_codes[245][0]}，判的 {wrapper_codes[245][1]}）",
+               "看 wrapper_own_problem 的 245 那一支")
+        expect(wrapper_codes[252][1] is not None and "显存不够" not in wrapper_codes[252][1] and wrapper_codes[101][1] is None,
+               f"包装退 252 应当判不算结果（不说显存不够）、装置自己退 101 不算包装的结局（实际 {wrapper_codes[252][1]}、{wrapper_codes[101][1]}）",
+               "看 wrapper_own_problem 的 250–254 那一支")
         root = os.path.join(temporary, "root")
         os.makedirs(os.path.join(root, "crates/singlefs-core/src"))
         os.makedirs(os.path.join(root, "crates/singlefs-replay-prefix/src"))
@@ -2942,6 +3117,15 @@ def selftest():
         write(os.path.join(root, TABLE_PATH), good_table.replace("\t" + LIB_PATH + "\tlet delta", "\tcrates/other.rs\tlet delta"))
         completed, builds, product = select_run("sel-other-file")
         expect(completed.returncode == 1 and "failed_condition=file_column_is_not_a_registered_source" in product, f"选行 ④：文件列不是登记的两份应当报 file_column_is_not_a_registered_source，实际退 {completed.returncode}", "看 select_by_name")
+        # ⑧ 登记名那一行不成形（cargo 参数那一段空着）：切表照 crates-mutation-rows.py 的 read_table，不收它；弄坏开关 owntablesplit 开着时照收
+        write(os.path.join(root, TABLE_PATH), good_table.replace("\tlet alpha = 9; // FLAG_RED\t-p x\tt\n", "\tlet alpha = 9; // FLAG_RED\t\tt\n", 1))
+        completed, builds, product = select_run("sel-malformed")
+        expect(completed.returncode == 1 and len(builds) == 0 and "failed_condition=no_row_with_this_name" in product and "not_selected_rows=2 " in verdict_of(product),
+               f"选行 ⑧：登记名那一行不成形（cargo 参数那一段空着）应当报 no_row_with_this_name、点名第 2 行、退 1、不编，实际退 {completed.returncode}、编 {len(builds)} 次",
+               "看 mutation_table_rows（切表照 crates-mutation-rows.py 的 read_table）")
+        completed, builds, product = select_run("sel-malformed-broken", broken="owntablesplit")
+        expect(completed.returncode == 0, f"弄坏开关 owntablesplit 开着时应当照收那一行、选到（证明上一例的「选不到」来自 read_table 判它不成形），实际退 {completed.returncode}",
+               "看 BREAK 的 owntablesplit")
         write(os.path.join(root, TABLE_PATH), good_table)
         # ⑤ 改坏时只写 recovery.rs、不看第二列：文件列是 lib.rs 的那一条由红转「锚点腐化」
         completed, builds = drive(paths("rec-only") + ["--item", "tsv-5"], broken="recoveryonly")
@@ -3248,6 +3432,103 @@ def selftest():
                "两个函数、档与界参数、首红的判据次序、KG 上六种本地择根序每格的钉值（KG M = 2、U = 3 一格 v1826 是 309 609 / 346 005 / 49 680、今天的序是 265 923 / 284 607 / 0）",
                "看 R4_REGISTERED、R4_DEVICE_PROFILE_ARGUMENTS、R4_BOUNDS_ARGUMENTS、R4_KG_RULE_READINGS")
 
+        # 十一、r5 补的格（登记 r5 9.3 第 3 条、修1.九乙第 4 条）。三个假仓的源文件都等于原来那套假钉值；r5 那一套（selftest-registered*-r5.json）的两份源文件 sha256 写成全 0，
+        # 所以「给了 --pins r5」必须停在 RH1、一次不编，「不给」照常跑（上面几节）。弄坏开关 r5pinsignored 外面打开时这三格红；每格后面自己打开它跑一次对照。
+        def r5_variant_of(path, **changes):
+            with open(path, encoding="utf-8") as handle:
+                registration = json.load(handle)
+            registration.update(changes)
+            return json.dumps(registration)
+
+        zero_hashes = {RECOVERY_PATH: "0" * 64, LIB_PATH: "0" * 64}
+        write(os.path.join(root, TABLE_PATH), r2_table)
+        write(os.path.join(root, CUSTOM_TABLE_PATH), good_custom)
+        register(names=[[2, "J6 二 J6Qn 三", []], [3, "只有 J6Qn 三", []]])
+        write(os.path.join(root, "selftest-registered-r5.json"), r5_variant_of(os.path.join(root, "selftest-registered.json"), files_sha256=zero_hashes))
+        write(os.path.join(root3, "selftest-registered-r3-r5.json"), r5_variant_of(os.path.join(root3, "selftest-registered-r3.json"), files_sha256=zero_hashes))
+        write(os.path.join(root4, "selftest-registered-r4-r5.json"), r5_variant_of(os.path.join(root4, "selftest-registered-r4.json"), files_sha256=zero_hashes))
+        for mode, mode_paths, mode_root in (("r2", paths("r5-pins-r2"), root), ("r3", paths3("r5-pins-r3"), root3), ("r4", paths4("r5-pins-r4"), root4)):
+            output_path = mode_paths[mode_paths.index("--output") + 1]
+            completed, builds = drive(mode_paths + ["--pins", "r5"], fake_root=mode_root)
+            expect(completed.returncode == EXIT_HALT_H1 and "停机条款 RH1" in completed.stdout and len(builds) == 0 and not os.path.exists(output_path),
+                   f"r5：给了 --pins r5 应当按 r5 钉值核对、在旧钉值的假仓上停在 RH1（{mode} 模式：退 4、一次不编、不写产物），实际退 {completed.returncode}、编 {len(builds)} 次",
+                   "看 Setup：--pins r5 要选 R5_PINS（自证里是 selftest-registered*-r5.json）")
+            completed, builds = drive([word.replace("r5-pins-", "r5-pins-ignored-") for word in mode_paths] + ["--pins", "r5"], broken="r5pinsignored", fake_root=mode_root)
+            expect(completed.returncode != EXIT_HALT_H1 and len(builds) > 0,
+                   f"弄坏开关 r5pinsignored 开着时同一趟（{mode} 模式）应当照旧钉值跑过开工核对、编得到（证明上一例的 RH1 来自选了 r5 那一套），实际退 {completed.returncode}、编 {len(builds)} 次",
+                   "看 BREAK 的 r5pinsignored")
+        completed, builds = drive(["--profile", "r4", "--pins", "r6", "--list-items"], fake_root=root4)
+        expect(completed.returncode == EXIT_USAGE, f"r5：--pins 只认 r5，给 r6 应当退 2，实际退 {completed.returncode}", "看 main 的 --pins")
+        # --gate r2：只在 --profile r4 --pins r5 同给时认，别的组合退 2、一次不编
+        for tag, arguments in (("no-pins", paths4("r5-gate-no-pins") + ["--gate", "r2"]),
+                               ("r3", paths3("r5-gate-r3") + ["--pins", "r5", "--gate", "r2"]),
+                               ("r2", paths("r5-gate-r2") + ["--pins", "r5", "--gate", "r2"]),
+                               ("r1", paths4("r5-gate-r1") + ["--pins", "r5", "--gate", "r1"])):
+            completed, builds = drive(arguments, fake_root=root3 if tag == "r3" else root if tag == "r2" else root4)
+            expect(completed.returncode == EXIT_USAGE and len(builds) == 0,
+                   f"r5：--gate r2 只在 --profile r4 --pins r5 同给时认（{tag} 那一种组合应当退 2、一次不编），实际退 {completed.returncode}、编 {len(builds)} 次", "看 main 的 --gate 判断")
+        # --gate r2 那一套的变异表 sha256 与假仓里的表对不上 ⇒ 停在 RH1、一次不编
+        write(os.path.join(root4, "selftest-registered-r4-r5-gate-r2.json"),
+              r5_variant_of(os.path.join(root4, "selftest-registered-r4.json"), table_sha256="0" * 64, segment1_product="seg5.out"))
+        completed, builds = drive(paths4("r5-gate-table-mismatch") + ["--pins", "r5", "--gate", "r2"], fake_root=root4)
+        expect(completed.returncode == EXIT_HALT_H1 and f"{TABLE_PATH} 的 sha256 不等于登记的 {'0' * 64}" in completed.stdout and len(builds) == 0,
+               f"r5：--gate r2 那一套的变异表钉值与仓里的表对不上时应当停在 RH1、一次不编，实际退 {completed.returncode}、编 {len(builds)} 次", "看 check_the_registered_inputs 的变异表一支")
+        # --gate r2 整轮：假装置每一次被调都带 --gate r2、基线 config 行带 gate=r2、TV7 比 5-甲 那份产物（seg5.out）；产物每个 kill_bound 行与收尾判决行带 gate=r2
+        write(os.path.join(root4, "selftest-registered-r4-r5-gate-r2.json"),
+              r5_variant_of(os.path.join(root4, "selftest-registered-r4.json"), segment1_product="seg5.out"))
+        os.makedirs(os.path.join(root4, os.path.dirname(DEVICE_SOURCE_PATH)), exist_ok=True)
+        write(os.path.join(root4, DEVICE_SOURCE_PATH), "// 自检用的假装置源码\n")
+        device_sha256 = hashlib.sha256("// 自检用的假装置源码\n".encode()).hexdigest()
+        gate_product = subprocess.run([os.path.join(temporary, "target4/release/e165_replay_bounded_enumeration"), "--profile", "r4", "--bounds", "segment1",
+                                       "--family", "root_choice_faults", "--gate", "r2"], env=dict(os.environ, FAKE_BIN_LOG=os.devnull), stdout=subprocess.PIPE, text=True, check=True).stdout
+        write(os.path.join(root4, "seg5.out"), gate_product)
+        completed, builds = drive(paths4("r5-gate") + ["--pins", "r5", "--gate", "r2"], fake_root=root4)
+        output = read(os.path.join(temporary, "r5-gate.out"))
+        calls = [line for line in read(binary_log).split("\n") if line]
+        kill_lines = [line for line in output.split("\n") if line.startswith("E7RESULT name=kill_bound ")]
+        verdict_lines = [line for line in output.split("\n") if line.startswith("E7RESULT name=verdict ")]
+        config_lines = [line for line in output.split("\n") if line.startswith("E7RESULT name=config ")]
+        expect(completed.returncode == EXIT_OK and len(builds) == 8 and calls
+               and all(line.startswith("--profile r4 --bounds segment1 --family root_choice_faults --gate r2") for line in calls)
+               and len(kill_lines) == 7 and all(" gate=r2 " in line for line in kill_lines)
+               and len(verdict_lines) == 1 and verdict_lines[0].endswith(" gate=r2")
+               and len(config_lines) == 1 and f" pins=r5 pins_registration=research/prompts/e165-r5-prereg.md gate=r2 device_sha256={device_sha256}" in config_lines[0]
+               and "device_arguments=--profile+r4+--bounds+segment1+--family+root_choice_faults+--gate+r2 " in config_lines[0],
+               f"r5：--gate r2 整轮应当退 0、假装置每一次被调都带 --gate r2、产物带 gate=r2（kill_bound 7 行、判决行、config 行带装置 sha256），实际退 {completed.returncode}、编 {len(builds)} 次、"
+               f"前几次调用 {calls[:2]!r}、kill_bound {len(kill_lines)} 行、{completed.stdout[-300:]}",
+               "看 Setup.bounds_arguments、check_the_gate_rows_r4、pins_config_text 与 process_item_r4 的 head")
+        completed, builds = drive(paths4("r5-gate-ignored") + ["--pins", "r5", "--gate", "r2"], broken="r4gateignored", fake_root=root4)
+        expect(completed.returncode == EXIT_NOT_PROFILE_R2 and "装置没带 --gate r2" in completed.stdout and len(builds) == 1
+               and not os.path.exists(os.path.join(temporary, "r5-gate-ignored.out")),
+               f"弄坏开关 r4gateignored 开着时同一趟应当报「装置没带 --gate r2」退 7、变体一个不编、不写产物（基线缺 R2 的闸字段），实际退 {completed.returncode}、编 {len(builds)} 次",
+               "看 BREAK 的 r4gateignored 与 check_the_gate_rows_r4")
+        # 登记写死的 r5 数：钉值取第一段根上的（9.3 第 1 条），名字、标签、KA / KG 钉值、custom_keys 同旧的；原来三套一个字不改（9.3 第 2 条）
+        expect([row for row, _name, _tags in R5_PINS["r2"]["names"]] == [23, 24, 36, 224, 347, 348, 399, 407, 441, 505, 506, 507, 508, 509, 510, 511, 604, 605, 908, 909, 910, 990, 991]
+               and [(name, tags) for _row, name, tags in R5_PINS["r2"]["names"]] == [(name, tags) for _row, name, tags in REGISTERED["names"]]
+               and [(path, name) for path, name, _first, _last in R5_PINS["r2"]["functions"]] == [(path, name) for path, name, _first, _last in REGISTERED["functions"]]
+               and R5_PINS["r2"]["functions"][-1] == (RECOVERY_PATH, "replay_journal", 3467, 3614) and R5_PINS["r2"]["custom_keys"] == ["Z1", "Z2", "Z3", "Z4", "Z5"]
+               and R5_PINS["r2"]["segment1_products"] == ["research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family.out",
+                                                          "research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-adversarial-family.out"]
+               and all(R5_PINS[mode]["files_sha256"][RECOVERY_PATH].startswith("4454f6d3") and R5_PINS[mode]["files_sha256"][LIB_PATH].startswith("9966f42f")
+                       and R5_PINS[mode]["table_sha256"].startswith("bc2627f8") for mode in ("r2", "r3", "r4"))
+               and [row for row, _name, _pin in R5_PINS["r3"]["names"]] == [1810, 1811, 1812, 1813, 1814, 1815] == [row for row, _name, _pin in R5_PINS["r4"]["names"]]
+               and [(name, pin) for _row, name, pin in R5_PINS["r3"]["names"]] == [(name, pin) for _row, name, pin in R3_REGISTERED["names"]]
+               and [(name, pin) for _row, name, pin in R5_PINS["r4"]["names"]] == [(name, pin) for _row, name, pin in R4_REGISTERED["names"]]
+               and R5_PINS["r4"]["labels"] == R4_REGISTERED["labels"] and R5_PINS["r4"]["kg_columns"] == R4_REGISTERED["kg_columns"]
+               and R5_PINS["r3"]["functions"] == R5_PINS["r4"]["functions"] == [(LIB_PATH, "choose_root_slot", 3980, 4019), (RECOVERY_PATH, "choose_root", 1268, 1305)]
+               and R5_PINS["r3"]["segment2_product"] == "research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-root-choice.out"
+               and R5_PINS["r4"]["segment1_product"] == "research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r4-root-choice-faults.out"
+               and R5_GATE_R2_PINS["table_sha256"] == "c9a03eb4af85a8e4c7206dfa3609593390516b80ca52be7090aced5696e84046" != R5_TABLE_SHA256
+               and R5_GATE_R2_PINS["segment1_product"] == "research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment5-r2-gate-root-choice-faults.out"
+               and R5_GATE_R2_PINS["files_sha256"] == R5_FILES_SHA256 and R5_GATE_R2_PINS["functions"] == R5_PINS["r4"]["functions"] and R5_GATE_R2_PINS["names"] == R5_PINS["r4"]["names"]
+               and R4_GATE_R2_ARGUMENTS == ["--gate", "r2"]
+               and R4_GATE_R2_CONFIG_FIELD == ("witness_gate", "r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots")
+               and REGISTERED["files_sha256"][RECOVERY_PATH].startswith("3d79b99e") and R3_REGISTERED["files_sha256"][RECOVERY_PATH].startswith("9337dc1b")
+               and R4_REGISTERED["files_sha256"][RECOVERY_PATH].startswith("264664af") and R4_REGISTERED["table_sha256"].startswith("db2981d0"),
+               "r5 登记写死的：三个模式的 r5 钉值（第一段根上的 recovery.rs 4454f6d3…、lib.rs 9966f42f…、表 bc2627f8…，r2 的 23 个名字在根里第 23–991 行、九个函数，"
+               "r3 / r4 的六个名字在第 1810–1815 行、两个函数，比对对象是第一段的重跑产物）、名字与钉值同旧的、--gate r2 那一套（5-甲 根上的表 c9a03eb4…、5-甲 产物名、装置 config 行的 witness_gate=r2_… 键值、两个源文件与函数区间同 r4 那一套）、原来三套的哈希没动",
+               "看 R5_PINS、R5_GATE_R2_PINS、R4_GATE_R2_ARGUMENTS")
+
     for what, fix in failures:
         print(f"  ✗ 自检：{what}")
         print(f"  → 怎么办：{fix}")
@@ -3261,6 +3542,7 @@ def main(arguments):
     scratch = output = ledger = measure_name = None
     root = DEFAULT_ROOT
     profile = "r2"
+    pins = gate = None
     action = "run"
     recheck = False
     position = 0
@@ -3275,11 +3557,20 @@ def main(arguments):
             recheck = True
             position += 1
             continue
-        if position + 1 >= len(arguments) or argument not in ("--scratch", "--output", "--ledger", "--item", "--jobs", "--threads", "--measure", "--root", "--profile"):
+        if position + 1 >= len(arguments) or argument not in ("--scratch", "--output", "--ledger", "--item", "--jobs", "--threads", "--measure", "--root", "--profile",
+                                                              "--pins", "--gate"):
             raise Stop(EXIT_USAGE, f"  ✗ 不认识的参数或缺值：{argument}\n  → 怎么办：用法见文件头")
         value = arguments[position + 1]
         position += 2
-        if argument == "--profile":
+        if argument == "--pins":
+            if value != "r5":
+                raise Stop(EXIT_USAGE, f"  ✗ --pins 只认 r5，收到「{value}」\n  → 怎么办：不给 --pins 是原来那三套钉值；第 5 次重跑第二段用 --pins r5")
+            pins = value
+        elif argument == "--gate":
+            if value != "r2":
+                raise Stop(EXIT_USAGE, f"  ✗ --gate 只认 r2，收到「{value}」\n  → 怎么办：不给 --gate 是取甲；第 5 次重跑第五段 5-乙 用 --profile r4 --pins r5 --gate r2")
+            gate = value
+        elif argument == "--profile":
             if value not in ("r2", "r3", "r4"):
                 raise Stop(EXIT_USAGE, f"  ✗ --profile 只认 r2、r3 与 r4，收到「{value}」\n  → 怎么办：不给 --profile 是 r2 那一套；第三段用 --profile r3；第 4 次重跑第二段用 --profile r4")
             profile = value
@@ -3301,8 +3592,13 @@ def main(arguments):
             options["jobs" if argument == "--jobs" else "threads"] = int(value)
     if action == "selftest":
         return selftest()
+    if gate is not None and (profile != "r4" or pins != "r5"):
+        raise Stop(EXIT_USAGE, f"  ✗ --gate r2 只在 --profile r4 --pins r5 同给时认，这一次是 --profile {profile}、--pins {pins or '（没给）'}（登记 r5 修1.九乙第 1 条）\n"
+                               "  → 怎么办：写成 --profile r4 --pins r5 --gate r2；这一次一条都没跑")
     selftest_root = os.environ.get("E165_KILL_BOUNDS_SELFTEST_ROOT")
-    setup = Setup(selftest_root or root, selftest_root is not None, profile)
+    setup = Setup(selftest_root or root, selftest_root is not None, profile, pins, gate)
+    options["pins_text"] = "".join(" " + word for word in setup.pins_arguments())
+    options["gate_field"] = f" gate={gate}" if gate else ""
     if profile in ("r3", "r4") and (action in ("select", "measure") or recheck or ledger is not None):
         raise Stop(EXIT_USAGE, f"  ✗ {profile} 模式不认 --select-rows、--measure、--recheck 与 --ledger（登记 {profile} 9.3：红例账不落，选行在整轮开头做）\n"
                                f"  → 怎么办：{profile} 模式只有 --list-items、--clean 与整轮（--scratch、--output、--item、--jobs、--threads）")

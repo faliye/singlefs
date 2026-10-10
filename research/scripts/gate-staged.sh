@@ -40,9 +40,8 @@ if [[ $gate_rc -eq 0 ]]; then
     echo "  ! 跑的过程中暂存区变了（${staged_tree:0:12} → ${now_tree:0:12}）：refs/sop/staged-green 不前移"
     echo "     → 怎么办：绿的是开跑时那一棵，现在这一棵没人验过。等暂存区停下来再跑一趟，或者直接提交开跑时那一批。"
   else
-    # ref 指向「包着那棵暂存树的提交」，不是裸树：`git update-ref` 对 refs/heads/ 之外默认不写 reflog，
-    # 裸树也读不出时刻，复用上限那一条就永远不触发（2026-09-22 实测，第一版栽在这里）。
-    # 包一层提交，时刻从提交自己身上读，仍然只有一条 ref、不落盘第二份状态。
+    # ref 指向「包着那棵暂存树的提交」，不是裸树：admission.py 的 gate_reuse 按 <ref>^{commit} 取它，取不到一律判要跑；
+    # 仍然只有一条 ref、不落盘第二份状态。
     green_commit="$(git commit-tree "$staged_tree" -m "gate --staged 整轮全绿：这棵暂存树上每一道都绿过")"
     git update-ref refs/sop/staged-green "$green_commit"
     echo "  ✓ 整轮全绿，refs/sop/staged-green 前移到 ${green_commit:0:12}（包着暂存树 ${staged_tree:0:12}）：下一趟里输入没变的阶段可以复用这次的判定"

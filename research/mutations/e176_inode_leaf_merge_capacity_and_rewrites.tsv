@@ -1,0 +1,16 @@
+V1_M1删空摘片时位置记法不记右边各片	position_rewritten.extend(*first_dropped_position..self.containers.len());	position_rewritten.extend(*first_dropped_position..*first_dropped_position);
+V2_位置记法从摘掉位置的下一格起数	position_rewritten.extend(*first_dropped_position..self.containers.len());	position_rewritten.extend((*first_dropped_position + 1)..self.containers.len());
+V3_拒的判断大于135改大于等于135	if is_limited_to_one_root_node && containers_it_would_take > ROOT_NODE_LEAF_CONTAINER_CAPACITY {	if is_limited_to_one_root_node && containers_it_would_take >= ROOT_NODE_LEAF_CONTAINER_CAPACITY {
+V4_被拒时活数把被拒那一条也算上	let live_inodes_not_counting_the_refused_insert = tree_after_the_refused_insert.live_inode_count();	let live_inodes_not_counting_the_refused_insert = tree_after_the_refused_insert.live_inode_count() + 1;
+V5_一片上限233改234	pub const LEAF_RECORD_CAPACITY: usize = 233;	pub const LEAF_RECORD_CAPACITY: usize = 234;
+V6_M2合并条件和小于等于233改小于233	self.containers[left_position].inode_numbers.len() + self.containers[left_position + 1].inode_numbers.len() <= LEAF_RECORD_CAPACITY	self.containers[left_position].inode_numbers.len() + self.containers[left_position + 1].inode_numbers.len() < LEAF_RECORD_CAPACITY
+V7_M2只查X与右邻不查左邻与X	let left_fits = position > 0 && self.pair_fits_in_one_container(position - 1);	let left_fits = false;
+V8_M3借的条件小于f改小于f减1	if records_in_the_borrower >= floor {	if records_in_the_borrower >= floor - 1 {
+V9_M3借R最大的m条	.inode_numbers.drain(..moved_count).collect();	.inode_numbers.drain(records_in_the_lender - moved_count..).collect();
+V10_M3借完不查R与它右邻	self.merge_until_no_pair_fits(lender_container_number, order, changes);	let _ = (lender_container_number, order);
+V11_内容记法把被摘掉的片也算一次重写	self.content_rewritten_positions.len()	self.content_rewritten_positions.len() + self.containers_dropped
+V12_C1的不设上限开关失效	LeafContainerLimit::Unlimited => false,	LeafContainerLimit::Unlimited => true,
+V13_M2那一臂的序列生成器种子加1	generator: WorkloadGenerator::new(sequence.workload, sequence.seed),	generator: WorkloadGenerator::new(sequence.workload, sequence.seed + u64::from(arm_variant.name == "M2")),
+V14_先查左边时两对都装得下改成先并右边那一对	NeighbourCheckOrder::LeftPairFirst if left_fits => Some(PairToAbsorb::WithLeftNeighbour),	NeighbourCheckOrder::LeftPairFirst if left_fits && !right_fits => Some(PairToAbsorb::WithLeftNeighbour),
+V15_借到刚好够下限的条数改成均分的条数	BorrowAmount::JustEnoughForTheFloor => floor - records_in_the_borrower,	BorrowAmount::JustEnoughForTheFloor => (records_in_the_lender - records_in_the_borrower) / 2,
+V16_先查左边那个窗口的第二条臂换成M2主	("left_first", [0, 4, 5])	("left_first", [0, 1, 5])

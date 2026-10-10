@@ -1,0 +1,17 @@
+V1_R-S择现行取写序最小	let candidate = (unit.write_order, unit_id);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 > current.0 {	let candidate = (unit.write_order, unit_id);\n        newest\n            .entry(group)\n            .and_modify(|current| {\n                if candidate.0 < current.0 {
+V2_删空的类型2容器照样写	if plan.inode_containers[position].records.is_empty() {	if false && plan.inode_containers[position].records.is_empty() {
+V3_记账每盘行数6改5	const ACCOUNTING_PER_DEVICE_ROWS: u64 = 6;	const ACCOUNTING_PER_DEVICE_ROWS: u64 = 5;
+V4_G紧放回规则失效	self.reclaim_released_records_where(|record| record.generation < txg);	let _ = txg;
+V5_R-G对象门控关掉	if reader == Reader::SelectCurrentGatedByObject && !inode_tree_objects.contains	if false && reader == Reader::SelectCurrentGatedByObject && !inode_tree_objects.contains
+V6_deleted_inodes取nlink不为0	if record.nlink == 0 && inputs.passes_death_records	if record.nlink >= 1 && inputs.passes_death_records
+V7_墓碑匹配丢掉对象出生代	.any(|tombstone| tombstone.object_birth == object_birth),	.any(|tombstone| tombstone.object == tombstone.object || object_birth == 0),
+V8_轨迹峰值取期末值	if measurement.resurrected > self.resurrected_peak {	if true {
+V9_判定门槛0改1	const RESURRECTION_THRESHOLD: u64 = 0;	const RESURRECTION_THRESHOLD: u64 = 1;
+V10_臂P死亡记录不写分配记录树	self.death_time.insert(*key, txg);	if key.namespace != Namespace::AllocationRecordsAllocated && key.namespace != Namespace::AllocationUnitsOfTheVersion {\n                self.death_time.insert(*key, txg);\n            }
+V11_扫描读到被覆写的旧单元	if self.units[previous].is_readable {	if false && self.units[previous].is_readable {
+V12_根环每区槽数8改7	const ROOT_RING_SLOTS_PER_REGION: u64 = 8;	const ROOT_RING_SLOTS_PER_REGION: u64 = 7;
+V13_回收门槛小于等于改小于	.record_root(txg);\n                self.reclaim_released_records_where(|record| record.generation <= floor)	.record_root(txg);\n                self.reclaim_released_records_where(|record| record.generation < floor)
+V14_用户数据不排除这次挂载的聚簇段	if self.geometry != Geometry::Tight {\n                let segment_start	if false && self.geometry != Geometry::Tight {\n                let segment_start
+V15_回收的槽当场抹掉	let reclaimed_placements = self.allocator.record_root(txg);	let reclaimed_placements = self.allocator.record_root(txg);\n        for (reclaimed_slot, _) in &reclaimed_placements {\n            if let Some(occupant) = self.disk.occupant_of_slot.get(reclaimed_slot) {\n                self.disk.units[*occupant].is_readable = false;\n            }\n        }
+V16_覆盖写不释放多出来的旧单元	plan.released_units.extend(previous.file_units.iter().copied());\n    plan.data_units = vec![PlannedUnit::Rewritten; u64_as_index(data_units)];	plan.released_units.extend(previous.file_units.iter().take(u64_as_index(data_units)).copied());\n    plan.data_units = vec![PlannedUnit::Rewritten; u64_as_index(data_units)];
+V17_环窗门槛23改22	const RING_WINDOW_IN_PUBLISHES: u64 = 23;	const RING_WINDOW_IN_PUBLISHES: u64 = 22;

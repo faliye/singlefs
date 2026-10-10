@@ -22,7 +22,7 @@
 //! - **D18 已定项 3**：逻辑身份五元组 33 字节。**D19 已定项 4**：位置条目 14 字节。
 //! - **D19 已定项 5**：中央映射是解引用唯一入口，value 是 w 份位置条目。
 //! - **D3 已定项 7**：分配记录 key =(设备 4, 16 KiB 槽号 6)，value = 分配代 8 ⇒ 条目 18；粒度 16384。
-//! - **D23（journal 的角色与格式）**：journal 记录头 311（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 本次发布内序号 4 + 已定项 15 新根段 188 + fsid 8 + MAC 16），登记名 JOURNAL_HEADER_BYTES。
+//! - **D23（journal 的角色与格式）**：journal 记录头 487（十个字段 78 + 已定项 7 / 8 / 13 三笔已定增量 17 + 本次发布内序号 4 + 已定项 15 新根段 364 + fsid 8 + MAC 16），登记名 JOURNAL_HEADER_BYTES。
 //! - **D2 已定项 9**：第一版 2 盘恒 w = 2。
 //!
 //! ## 三个假设（不是条款，标出来免得当成常量用 —— C187）
@@ -81,7 +81,7 @@ const W: u64 = 2; // D2 已定项 9
 const MAP_KEY: u64 = 33; // D18 已定项 3
 const LOC_ENTRY: u64 = 14; // D19 已定项 4
 const ALLOC_ENTRY: u64 = 18; // D3 已定项 7
-const JOURNAL_HEADER_BYTES: u64 = 311; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
+const JOURNAL_HEADER_BYTES: u64 = 487; // D23（journal 的角色与格式），登记名 JOURNAL_HEADER_BYTES
 
 // ── 假设，不是条款（C187）──────────────────────────────────────────
 const SLOT_TABLE_ENTRY: u64 = 4; // 假设：写这份装置时 D27 第 3 项还没定（今天是已定项 3）
@@ -347,10 +347,10 @@ mod tests {
         assert_eq!(alloc_leaves, 113);
         assert_eq!(alloc_leaves * NODE * W, 3_702_784);
         let journal_w = N * (JOURNAL_HEADER_BYTES + MAP_ENTRY);
-        assert_eq!(journal_w, 37_200_000);
+        assert_eq!(journal_w, 54_800_000);
         let l = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true);
-        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 37_200_000);
-        assert_eq!(l.move_write, 166_240_384);
+        assert_eq!(l.move_write, 113_049_600 + 12_288_000 + 3_702_784 + 54_800_000);
+        assert_eq!(l.move_write, 183_840_384);
     }
 
     /// 反向接受条款要判的那个符号：bg_key 的回本比，逐档钉住。
@@ -361,7 +361,7 @@ mod tests {
         let saved = pad.occupancy - l.occupancy;
         assert_eq!(saved, 3_220_275_200);
         let p = payback(&pad, &l);
-        assert!((p - 0.051623).abs() < 1e-6, "512 B 档回本比实测 {p}");
+        assert!((p - 0.057088).abs() < 1e-6, "512 B 档回本比实测 {p}");
         // 16 KiB 档 cap = 1 ⇒ 一点不省 ⇒ 回本比无穷
         let l16 = pack_ledger(N, 16384, SLOT_EXTRA, 0, 1, true);
         assert!(payback(&pad, &l16).is_infinite());
@@ -383,9 +383,10 @@ mod tests {
         // 改成 D3 已定项 7 逐字「一条记一个单元」之后 2.092080（journal 头 78 那一版）；
         // 头 78 → 95 之后 2.092608；头 95 → 277（D23 已定项 15 的新根段 182）之后 2.098260；
         // 头 277 → 307（已定项 4 加 fsid 8 与 MAC 16、新根段 182 → 188）之后 2.099192；
-        // 头 307 → 311（已定项 4 加本次发布内序号 4）之后 2.099316。
+        // 头 307 → 311（已定项 4 加本次发布内序号 4）之后 2.099316；
+        // 头 311 → 487（新根段 188 → 364）之后 2.104781。
         // 每一版的数都逐字抄自当时那份产物的 name=payback_fill size=512 b=1 journal=true 行。
-        assert!((p - 2.099316).abs() < 1e-5, "实测 {p}");
+        assert!((p - 2.104781).abs() < 1e-5, "实测 {p}");
     }
 
     /// bg_ideal 是上界：它的回本比必须严格小于另外两条臂。
@@ -444,8 +445,8 @@ mod tests {
         assert_eq!(leaves_touched_scattered(alloc_changed, alloc_changed.div_ceil(alloc_leaf_cap()), N), 226);
         let key = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let fill_n = pack_ledger(N, 512, SLOT_EXTRA, 1, N, true).move_write;
-        assert_eq!(key, 166_240_384);
-        assert_eq!(fill_n, 169_943_168);
+        assert_eq!(key, 183_840_384);
+        assert_eq!(fill_n, 187_543_168);
     }
 
     /// 稳态占用：均匀独立死亡下，打包形态在任何 d 上都不比 pad 差。
@@ -506,29 +507,31 @@ mod tests {
         assert_eq!(l.move_read, 3_276_800_000);
     }
 
-    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 37 200 000
-    /// （每搬一个对象一条记录，头 311 + 映射条目 61 = 372 字节 × 100 000）。
+    /// journal 那一项是假设：关掉它，512 B 档的搬迁写正好少 54 800 000
+    /// （每搬一个对象一条记录，头 487 + 映射条目 61 = 548 字节 × 100 000）。
     #[test]
     fn journal_is_an_assumption() {
         let with = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, true).move_write;
         let without = pack_ledger(N, 512, SLOT_EXTRA, 0, 1, false).move_write;
-        assert_eq!(with, without + 37_200_000);
+        assert_eq!(with, without + 54_800_000);
     }
 
-    /// A1：头 311 的分项和（D23 已定项 4 正文）。不从 `crates/` 引，独立钉这个和。
+    /// A1：头 487 的分项和（D23 已定项 4 正文）；A2：新根段 364 的分项和（已定项 4 第四个分项、已定项 15 定案）。
+    /// 不从 `crates/` 引，独立钉这两个和。
     #[test]
     fn header_bytes_equals_the_decision_23_breakdown() {
         let ten_field_bytes = 78u64;
         let committed_increments = 9 + 4 + 4;
         let publish_sequence_bytes = 4u64;
-        let new_root_segment_bytes = 188u64;
+        let new_root_segment_bytes = 86u64 + 86 + 8 + 8 + 86 + 86 + 4; // 树表指针 + 映射根指针 + 树 ID 水位 + F + 实例表指针 + 分配记录树根指针 + 卸载记号
         let fsid_bytes = 8u64;
         let mac_bytes = 16u64;
+        assert_eq!(new_root_segment_bytes, 364);
         assert_eq!(
             ten_field_bytes + committed_increments + publish_sequence_bytes + new_root_segment_bytes + fsid_bytes + mac_bytes,
             JOURNAL_HEADER_BYTES
         );
-        assert_eq!(JOURNAL_HEADER_BYTES, 311);
+        assert_eq!(JOURNAL_HEADER_BYTES, 487);
     }
 
     // ────────── 第八节：头宽 `H` 这个旋钮的几何敏感性 ──────────

@@ -22,7 +22,17 @@ REPLACE_BATCH_WRITE_EACH=1 强制走回逐处写盘的旧行为，--selftest 在
 
 退出码：0 写成功（或 --dry-run 核过）；1 锚点命中数不对，一个文件都没写；2 用法不对；3 写完回读不一致；
 4 没换上：预演时被拒，一个文件都没换；预演过了、真换时失败，已经换上的文件逐个列出。
+核的时候每一处都核完（对不上的那一处不施加、接着核下一处），对不上的逐处列全再退 1（--dry-run 同样）：
+命中 0 次的附上文件里最像的一段与第一处不同（replace-once.py 的 nearest_hint，同一份算法），文件读不了的点名那个文件。
+
+弄坏开关（只给 --selftest 证红用）：
+  REPLACE_BATCH_BREAK=stop-at-first  plan_in_memory() 第一处对不上就停（改前的判法）
+      一次核完（「✗ 自证：四处里第 1、3、4 处对不上」）
+  replace-once.py 的 REPLACE_ONCE_BREAK=no-nearest 同样让这一格红（最像的一段是从那里取的）
 """
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import pathlib
@@ -38,18 +48,42 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 
+def replace_once_module():
+    """replace-once.py 当模块读进来：命中 0 次时找「文件里最像的一段」只有它的 nearest_hint 一份。"""
+    spec = importlib.util.spec_from_file_location("replace_once", os.path.join(os.path.dirname(os.path.realpath(__file__)), "replace-once.py"))
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def plan_in_memory(edits):
-    texts = {}
+    """每一处都核完（对不上的不施加、接着核下一处），→ (各文件改完的文本, [对不上的每一处的说明])；说明表空着才算全过。"""
+    texts, errors, unreadable, nearest_hint = {}, [], {}, None
     for index, edit in enumerate(edits, 1):
-        path = edit["file"]
+        path = edit.get("file", "")
         expected_hits = edit.get("count", 1)
+        if path in unreadable:
+            errors.append(f"第 {index} 处 {path}：{unreadable[path]}")
+            continue
         if path not in texts:
-            texts[path] = pathlib.Path(path).read_text(encoding="utf-8")
+            try:
+                texts[path] = pathlib.Path(path).read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError) as error:
+                unreadable[path] = f"读不了这个文件（{error.__class__.__name__}：{error}）"
+                errors.append(f"第 {index} 处 {path}：{unreadable[path]}")
+                continue
         hits = texts[path].count(edit["old"])
         if hits != expected_hits:
-            return None, f"第 {index} 处 {path}：期望命中 {expected_hits} 次，实际 {hits}：{edit['old'][:60]!r}"
+            detail = f"第 {index} 处 {path}：期望命中 {expected_hits} 次，实际 {hits}：{edit['old'][:60]!r}"
+            if hits == 0:
+                nearest_hint = nearest_hint or replace_once_module().nearest_hint
+                detail += "".join(f"\n  {line.strip()}" for line in nearest_hint(texts[path], edit["old"]))
+            errors.append(detail)
+            if os.environ.get("REPLACE_BATCH_BREAK") == "stop-at-first":   # 弄坏开关：改前的判法，第一处对不上就停
+                return None, errors
+            continue
         texts[path] = texts[path].replace(edit["old"], edit["new"])
-    return texts, None
+    return (None if errors else texts), errors
 
 
 def apply_each_edit_to_disk(edits):
@@ -111,10 +145,13 @@ def run(edits, dry_run):
             print("→ 对一下原文再跑（这是逐处写盘的旧行为，前面几处已经落盘了）")
             return 1
         return 0
-    texts, error = plan_in_memory(edits)
-    if error:
-        print(f"✗ {error}")
-        print("→ 什么都没写：对一下这一处的原文（空白、全半角、同义字），改规格再跑")
+    texts, errors = plan_in_memory(edits)
+    if errors:
+        for error in errors:
+            print(f"✗ {error}")  # gate-lint:detail
+        print(f"✗ {len(edits)} 处里 {len(errors)} 处对不上（逐处列在上面{'' if len(errors) == 1 else '；同一个文件里排在对不上那一处后面的，是按没施加它的文本核的'}）"
+              f"{'，--dry-run 没写' if dry_run else '，什么都没写'}")  # gate-lint:summary
+        print("→ 怎么办：对一下每一处的原文（空白、全半角、同义字；命中 0 次的看上面「最像的一段」与第一处不同），改规格再整份重跑")
         return 1
     if dry_run:
         print(f"✓ {len(edits)} 处都命中得对（{len(texts)} 个文件），--dry-run 没写")
@@ -155,6 +192,25 @@ def selftest():
             print("✗ 自证：期望命中 2 次、实际 1 次也放行了")
             print("→ 看 plan_in_memory() 是不是按 count 比命中数")
             return 1
+        # 一次核完：三处里第 1、3 处对不上（命中 0 次的附最像的一行），--dry-run 与真跑都逐处列全、一个文件都不写
+        third = pathlib.Path(directory, "third.md")
+        third.write_text("第一行 甲\n第二行 乙\n", encoding="utf-8")
+        before = (first.read_text(encoding="utf-8"), third.read_text(encoding="utf-8"))
+        batch = [{"file": str(third), "old": "第二行 丙", "new": "X"}, {"file": str(first), "old": "AB", "new": "ab"},
+                 {"file": str(first), "old": "丙", "new": "C", "count": 2}, {"file": str(pathlib.Path(directory, "nothere.md")), "old": "a", "new": "b"}]
+        for dry_run in (True, False):
+            captured = io.StringIO()
+            with contextlib.redirect_stdout(captured):
+                exit_code = run(batch, dry_run=dry_run)
+            said = captured.getvalue()
+            wanted = ["第 1 处", "最像的一段在第 2 行", "旧串是「丙」，文件里是「乙」", "第 3 处", "期望命中 2 次，实际 1", "第 4 处", "读不了这个文件",
+                      "4 处里 3 处对不上"]
+            if exit_code != 1 or any(piece not in said for piece in wanted) or "第 2 处" in said \
+                    or (first.read_text(encoding="utf-8"), third.read_text(encoding="utf-8")) != before:
+                print(f"✗ 自证：四处里第 1、3、4 处对不上，{'--dry-run' if dry_run else '真跑'}应当退 1、逐处列全（命中 0 次的附最像的一行）、不列对得上的第 2 处、"
+                      f"一个文件都不写，实际退 {exit_code}：\n{said}")
+                print("→ 看 plan_in_memory() 是不是核完每一处再判；REPLACE_BATCH_BREAK=stop-at-first 设着的话这里本来就该红")
+                return 1
     # 写回的方式：inode 要换、在读的进程读旧内容、权限位与符号链接保住、硬链接与只读拒绝、失败不留临时文件（判据在 lib_atomic_replace.py）
     running_script = "#!/usr/bin/env bash\n" + "echo 前面这几行正在被 bash 边跑边读\n" * 20 + "run_step 甲\nexit $?\n"
     problems = problems_with_replacement_by_rename(
@@ -183,7 +239,7 @@ def selftest():
                   "第一个文件被先换上了、或留了临时文件——这一批留了半套")
             print("→ 看 replace_planned_texts() 是不是先把整批逐个预演完、全过了才开始改名换上")
             return 1
-    print("✓ replace-batch 自证：锚点不中时一个文件都不写，全中时按序写对，命中数不等就拒绝；"
+    print("✓ replace-batch 自证：锚点不中时一个文件都不写，全中时按序写对，命中数不等就拒绝，几处对不上时（--dry-run 同样）一次逐处列全、命中 0 次的附最像的一行；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
           "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件；"
           "批里有一个文件会被拒时一个文件都不换")
@@ -199,7 +255,17 @@ def main(arguments):
         print("✗ 用法：replace-batch.py [--dry-run] 规格.json，或 replace-batch.py --selftest")
         print("→ 规格是 JSON 数组，每项 {\"file\", \"old\", \"new\", \"count\"（可省，默认 1）}")
         return 2
-    edits = json.loads(pathlib.Path(positional[0]).read_text(encoding="utf-8"))
+    try:
+        edits = json.loads(pathlib.Path(positional[0]).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, ValueError) as error:
+        print(f"✗ 读不了规格 {positional[0]}（{error.__class__.__name__}：{error}）")
+        print("→ 怎么办：核对路径；规格是 JSON 数组，每项 {\"file\", \"old\", \"new\", \"count\"（可省，默认 1）}")
+        return 2
+    if not isinstance(edits, list) or not all(isinstance(edit, dict) and isinstance(edit.get("old"), str) and isinstance(edit.get("new"), str)
+                                              and isinstance(edit.get("file"), str) for edit in edits):
+        print(f"✗ 规格 {positional[0]} 不是 JSON 数组、或有一项缺 file / old / new（都要是字符串）")
+        print("→ 怎么办：规格是 JSON 数组，每项 {\"file\", \"old\", \"new\", \"count\"（可省，默认 1）}")
+        return 2
     return run(edits, dry_run)
 
 

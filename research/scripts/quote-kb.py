@@ -32,9 +32,13 @@
       not-numbers 那一格（「✗ 自检：正文用 doc-lint:not-numbers 声明了 E1」）
   QUOTE_KB_BREAK=not-numbers-in-fence  not_numbers_declared() 把代码围栏里的声明也算上
       围栏那一格（「✗ 自检：代码围栏里的 not-numbers 声明不算」）
+  QUOTE_KB_BREAK=bare-lacking-hint  lacking_checklist_message() 走回改前的说法：不点是哪个编号引出的、不给照抄的命令
+      退 5 的说明那一格（「✗ 自检：退 5 的说明应当点出 I-7.4 引出了 invariants.md」）
 
 --cited 认编号时，正文里 `<!-- doc-lint:not-numbers 记号 … -->` 声明的记号不当编号（代码围栏里的声明不算，与 doc-lint 同读法）；
-three-way-materials.py 收编号用的是同一个 not_numbers_declared()。
+认编号的读法只有 cited_kb_sources() 一份：three-way-materials.py 收材料时调它的宽读法（不要求「（」），--cited 用严格读法，宽读法认出的是超集。
+退 5 时逐个写缺的文件是正文里哪个记号引出的，给一条能照抄的 `python3 research/scripts/kb-sections.py <文件> >> <清单>`，
+并写明接上的那几张要逐行标抄不抄、标完重跑。
 
 退出码：
     3   回读比对不一致（抄出来的与源文件不一致）
@@ -281,30 +285,83 @@ def not_numbers_declared(text):
     return declared
 
 
-def cited_kb_files(text, root):
-    """正文里提到的 kb 文件：显式路径，加上 D<n>（ / E<n>（ / C<n>（ / I-<n>.<m>（ 这几类编号所在的文件；
-    `doc-lint:not-numbers` 里声明的记号不算编号（not_numbers_declared）。
+KB_PATH_IN_TEXT = re.compile(r'\.claude/kb/[^\s`)（|]+\.md')
+# 编号的四种形态：(字母, 严格读法要的形态, 宽读法要的形态)。严格读法（--cited 判清单全不全）要编号后面紧跟全角括号「（」；
+# 宽读法（three-way-materials.py 收材料）不要求括号、不变量号连类号 I-<n> 也认。同一段正文，宽读法认出的编号是严格读法的超集。
+NUMBER_SHAPES = (
+    ('D', r'(?<![A-Za-z0-9-])(D\d+)（', r'(?<![A-Za-z0-9-])(D\d+)(?![0-9])'),
+    ('E', r'(?<![A-Za-z0-9-])(E\d+)（', r'(?<![A-Za-z0-9-])(E\d+)(?![0-9])'),
+    ('C', r'(?<![A-Za-z0-9-])(C\d+)（', r'(?<![A-Za-z0-9-])(C\d+)(?![0-9])'),
+    ('I', r'(?<![A-Za-z0-9-])(I-\d+\.\d+)（', r'(?<![A-Za-z0-9-])(I-\d+(?:\.\d+)?)(?![0-9])'),
+)
+
+
+def cited_kb_sources(text, root, loose=False):
+    """正文里提到的 kb 文件与引出它的记号：→ [(相对仓根的路径, 记号)]，一个文件一行，显式路径在前、编号在后，各按正文里第一次出现的次序。
+    记号是正文里写出的路径本身，或 D<n> / E<n> / C<n> / I-<n>.<m> 编号；`doc-lint:not-numbers` 里声明的记号不算编号（not_numbers_declared）。
+    认编号的读法只有这一份：quote-kb.py --cited（cited_kb_files，严格读法）与 three-way-materials.py 收材料（loose=True，宽读法）都调它。
+    严格读法：编号后面紧跟「（」，D / E 编号要恰好对上一份决策或实验页；宽读法：不要求括号、对上几份拉几份。
+    宽读法认出的是严格读法的超集，材料按宽读法拉齐的文件，--cited 按严格读法判时一份不缺。路径不在的照样列，由调用方判。
 
     C234（三方材料的小节清单只覆盖被判那一项所在的文件）：清单只给被判那一项所在的文件做，
     别的文件里那一半闸门问题就无声消失。2026-09-09 立账、写明了怎么拦，2026-09-11 又被打中一次
     （D19 未定项 6 第二轮材料漏了 D23 / D16 / D1 三个文件，第 6 格的全部机制住在 D23）。
     """
     declared = set() if os.environ.get('QUOTE_KB_BREAK') == 'ignore-not-numbers' else not_numbers_declared(text)
-    found = set(re.findall(r'\.claude/kb/[^\s`)（|]+\.md', text))
-    for letter, folder in (('D', 'decisions'), ('E', 'experiments')):
-        for number in set(re.findall(r'(?<![A-Za-z0-9-])' + letter + r'(\d+)（', text)):
-            if letter + number in declared:
-                continue
+    sources = [(path, path) for path in KB_PATH_IN_TEXT.findall(text)]
+    numbers = []
+    for letter, strict, wide in NUMBER_SHAPES:
+        numbers += [(match.start(), letter, match.group(1)) for match in re.finditer(wide if loose else strict, text)]
+    for _position, letter, token in sorted(numbers):
+        if token in declared:
+            continue
+        if letter in ('D', 'E'):
+            folder, number = ('decisions' if letter == 'D' else 'experiments'), int(token[1:])
             hits = set()
-            for stem in (f'{int(number):02d}-', f'{int(number)}-'):
+            for stem in (f'{number:02d}-', f'{number}-'):
                 hits.update(glob.glob(os.path.join(root, '.claude/kb', folder, stem + '*.md')))
-            if len(hits) == 1:
-                found.add(os.path.relpath(hits.pop(), root))
-    if set(re.findall(r'(?<![A-Za-z0-9-])(C\d+)（', text)) - declared:
-        found.add('.claude/kb/checks-owed.md')
-    if set(re.findall(r'(?<![A-Za-z0-9-])(I-\d+\.\d+)（', text)) - declared:
-        found.add('.claude/kb/invariants.md')
-    return found
+            if len(hits) == 1 or (loose and hits):
+                sources += [(os.path.relpath(hit, root), token) for hit in sorted(hits)]
+        else:
+            sources.append(('.claude/kb/checks-owed.md' if letter == 'C' else '.claude/kb/invariants.md', token))
+    ordered, seen = [], set()
+    for path, token in sources:
+        if path not in seen:
+            seen.add(path)
+            ordered.append((path, token))
+    return ordered
+
+
+def cited_kb_files(text, root):
+    """正文里提到的 kb 文件（严格读法，--cited 用）：显式路径，加上 D<n>（ / E<n>（ / C<n>（ / I-<n>.<m>（ 这几类编号所在的文件。读法在 cited_kb_sources。"""
+    return {path for path, _token in cited_kb_sources(text, root)}
+
+
+def lacking_checklist_message(lacking, sources, checklist):
+    """--cited 缺清单（退 5）时的说明：每个缺的文件写是正文里哪个记号引出的，给一条能照抄的 kb-sections.py 命令。→ [行]。"""
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'kb-sections.py')
+    relative_script = os.path.relpath(script)
+    shown_script = relative_script if not relative_script.startswith('..') else script
+    trigger = dict(sources)
+    lines = [f"quote-kb: 正文提到了 {len(lacking)} 个 kb 文件，清单里没有它们的小节清单："]
+    if os.environ.get('QUOTE_KB_BREAK') == 'bare-lacking-hint':   # 弄坏开关：改前的说法，不点编号、不给命令
+        lines += [f"    {m}" for m in lacking]
+        lines.append("  → 用 research/scripts/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）")
+        return lines
+    present = [m for m in lacking if os.path.isfile(m)]
+    absent = [m for m in lacking if not os.path.isfile(m)]
+    for m in lacking:
+        source = trigger.get(m, m)
+        how = "正文里写了这个路径" if source == m else f"正文里的 {source} 引出"
+        lines.append(f"    {m}（{how}）" + ("" if m in present else "：这份文件不在"))
+    if present:
+        lines.append("  → 怎么办：给每个文件各生成一张清单、接到清单末尾（照抄，一行一个文件）：")
+        lines += [f"      python3 {shown_script} {m} >> {checklist}" for m in present]
+        lines.append("    接上的那几张「抄 / 不抄」「理由」两列是空的：逐行标「抄」或「不抄」（不抄写理由），标完重跑同一条命令（C234）；")
+        lines.append("    清单是 three-way-materials.py 生成的，就不用手接：改好别处之后跑它给的 --resume 那一条，它补上缺的几张（默认全抄）再接着做附录、背景材料与快照")
+    if absent:
+        lines.append(f"  → 怎么办：{'、'.join(absent)} 不在：正文里那个路径或编号写错了，改正文；或者在正文里用 <!-- doc-lint:not-numbers 记号 --> 声明它不是编号")
+    return lines
 
 
 def check_cited(checklist, cited_text, root):
@@ -443,6 +500,27 @@ def selftest_in(work):
         print("     → 怎么办：not_numbers_declared() 要跳过围栏里的行（与 doc-lint 同读法）；QUOTE_KB_BREAK=not-numbers-in-fence 设着的话这里本来就该红。")
         return 1
     print("  ✓ 自检：--cited 不把 doc-lint:not-numbers 声明的记号当编号（E1 不拉、E165 照拉），围栏里的声明不算")
+    # 退 5 的说明：点出是哪个编号引出的、给能照抄的 kb-sections.py 命令、写明接上的清单要逐行标抄不抄；不在的文件单说
+    os.makedirs(os.path.join(cited_root, '.claude/kb'), exist_ok=True)
+    with open(os.path.join(cited_root, '.claude/kb/invariants.md'), 'w', encoding='utf-8') as f:
+        f.write('# 不变量清单\n\n## I-7 根环 —— 类\n\n### I-7.4 样本\n')
+    invariant_body = '这一轮判 I-7.4（样本不变量） 站不站得住。\n'
+    invariant_sources = cited_kb_sources(invariant_body, cited_root)
+    saved_directory = os.getcwd()
+    os.chdir(cited_root)
+    try:
+        message = '\n'.join(lacking_checklist_message(['.claude/kb/invariants.md', '.claude/kb/nothere.md'],
+                                                      invariant_sources, 'checklist.md'))
+    finally:
+        os.chdir(saved_directory)
+    wanted = ['.claude/kb/invariants.md（正文里的 I-7.4 引出）', 'kb-sections.py .claude/kb/invariants.md >> checklist.md',
+              '逐行标「抄」或「不抄」', '.claude/kb/nothere.md 不在']
+    if invariant_sources != [('.claude/kb/invariants.md', 'I-7.4')] or any(piece not in message for piece in wanted):
+        print(f"  ✗ 自检：退 5 的说明应当点出 I-7.4 引出了 invariants.md、给照抄的 kb-sections.py 命令、写明逐行标抄不抄、单说不在的文件，"
+              f"实际读出 {invariant_sources}，说明：\n{message}")
+        print("     → 怎么办：看 lacking_checklist_message() 与 cited_kb_sources()；QUOTE_KB_BREAK=bare-lacking-hint 设着的话这里本来就该红。")
+        return 1
+    print("  ✓ 自检：退 5 的说明点出引出那份文件的编号、给照抄的 kb-sections.py 命令、写明逐行标抄不抄，不在的文件单说")
     print("  ✓ 自检：清单标「抄」而附录里没有时判红（C262）")
     return 0
 
@@ -488,13 +566,11 @@ def main(argv):
                   file=sys.stderr)
             return 6
     if cited:
-        lacking = check_cited(checklist, open(cited, encoding='utf-8').read(), os.getcwd())
+        cited_text = open(cited, encoding='utf-8').read()
+        lacking = check_cited(checklist, cited_text, os.getcwd())
         if lacking:
-            print(f"quote-kb: 正文提到了 {len(lacking)} 个 kb 文件，清单里没有它们的小节清单：", file=sys.stderr)
-            for m in lacking:
-                print(f"    {m}", file=sys.stderr)
-            print("  → 用 research/scripts/kb-sections.py 给这几个文件各生成一张清单，逐行判抄不抄再重跑（C234）",
-                  file=sys.stderr)
+            for line in lacking_checklist_message(lacking, cited_kb_sources(cited_text, os.getcwd()), checklist):
+                print(line, file=sys.stderr)
             return 5
     with open(dest, 'w', encoding='utf-8') as f:
         f.write('\n'.join(produced))

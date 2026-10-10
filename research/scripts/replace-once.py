@@ -16,7 +16,13 @@
 
 退出码：0 写成功；2 参数或文件问题；3 旧串命中 0 次；4 旧串命中多于一次；5 写完回读与预期不符；
 6 没换上（有多个硬链接、建不了临时文件、写或改名失败），原文件没动、临时文件已删。
+命中 0 次时附上文件里最像旧串的那一段（行号、相似度）与第一处不同（旧串在那里是什么、文件里是什么），算法在 nearest_hint()。
+
+弄坏开关（只给 --selftest 证红用）：
+  REPLACE_ONCE_BREAK=no-nearest  nearest_hint() 什么都不给（改前的说法）
+      命中 0 次附最像的一行（「✗ --selftest 没通过：」下面「命中 0 次时本该附上最像的一行」那一条）
 """
+import difflib
 import os
 import sys
 import tempfile
@@ -29,6 +35,57 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 
+def shown_piece(piece):
+    """说明里给人看的一小段：空的、只有空白的写成 repr，别的原样（超长截断）。"""
+    if piece.strip() == '':
+        return repr(piece)
+    return piece if len(piece) <= 40 else piece[:40] + '…'
+
+
+def nearest_hint(content, old_text):
+    """旧串命中 0 次时，文件里最像它的那一段：→ [说明行]（已带缩进），文件是空的返回 []。
+    相似度：旧串有几行，就拿同样几行的窗口逐行滑过整份文件；每一窗算旧串里有几个字按次序出现在这一窗里（difflib.SequenceMatcher
+    的 matching blocks 之和），占旧串的比例最高的一窗算最像（同分取 ratio 高的、再同取靠前的），旧串只是长行里的一截时也认得出。
+    再按它的 opcodes 找出第一处不同（跳过这一窗在旧串两头之外多出来的字），写出旧串在那里是什么、文件里是什么。
+    replace-batch.py 命中 0 次时调的也是这一份。"""
+    if os.environ.get('REPLACE_ONCE_BREAK') == 'no-nearest':   # 弄坏开关：改前的说法，不附最像的一行
+        return []
+    target = old_text.strip('\n')
+    if not target:
+        return []
+    lines = content.split('\n')
+    width = target.count('\n') + 1
+    best = None
+    for index in range(max(1, len(lines) - width + 1)):
+        window = '\n'.join(lines[index:index + width])
+        matcher = difflib.SequenceMatcher(None, target, window, autojunk=False)
+        # quick_ratio 给的是按字数（不管次序）能对上的上界：上界都比不过已有的最好那一窗就不细算
+        if best and matcher.quick_ratio() * (len(target) + len(window)) / 2 / len(target) < best[0]:
+            continue
+        covered = sum(block.size for block in matcher.get_matching_blocks()) / len(target)
+        score = (covered, matcher.ratio())
+        if best is None or score > best[:2]:
+            best = (covered, score[1], index, window, matcher)
+    if best is None or best[0] == 0:
+        return []
+    covered, _ratio, index, window, matcher = best
+    span = f'第 {index + 1} 行' if width == 1 else f'第 {index + 1}-{index + width} 行'
+    shown = window if len(window) <= 200 else window[:200] + '…'
+    hint = [f'     文件里最像的一段在{span}（旧串的 {covered:.0%} 按次序出现在这一段里）：{shown}']
+    for tag, old_start, old_end, file_start, file_end in matcher.get_opcodes():
+        if tag == 'equal' or (tag == 'insert' and old_start in (0, len(target))):
+            continue
+        if tag == 'delete':
+            difference = f'旧串多了「{shown_piece(target[old_start:old_end])}」（文件里这里没有）'
+        elif tag == 'insert':
+            difference = f'文件里这里多了「{shown_piece(window[file_start:file_end])}」（旧串里没有）'
+        else:
+            difference = f'旧串是「{shown_piece(target[old_start:old_end])}」，文件里是「{shown_piece(window[file_start:file_end])}」'
+        hint.append(f'     第一处不同在旧串第 {old_start + 1} 个字起：{difference}')
+        break
+    return hint
+
+
 def replace_once(path, old_text, new_text):
     """返回 (退出码, 说明)。只有退出码 0 时文件被改过。"""
     if old_text == '':
@@ -39,7 +96,9 @@ def replace_once(path, old_text, new_text):
         content = handle.read()
     occurrences = content.count(old_text)
     if occurrences == 0:
-        return 3, f'旧串在 {path} 里命中 0 次，一个字节没写\n     → 先用 grep 找到那一行，把旧串按文件里的原样（含空格与标点）抄进来'
+        hint = ''.join(f'\n{line}' for line in nearest_hint(content, old_text))
+        return 3, (f'旧串在 {path} 里命中 0 次，一个字节没写{hint}\n'
+                   '     → 先用 grep 找到那一行，把旧串按文件里的原样（含空格与标点）抄进来')
     if occurrences > 1:
         return 4, f'旧串在 {path} 里命中 {occurrences} 次，一个字节没写\n     → 把旧串往前后多带几个字，直到只命中一次'
     replaced = content.replace(old_text, new_text, 1)
@@ -67,6 +126,10 @@ def selftest_in(workspace):
     code, _ = replace_once(sample, '丙', '丁')
     if code != 3:
         problems.append(f'命中 0 次本该退出码 3，实际 {code}')
+    code, message = replace_once(sample, '第二行 丙', '丁')
+    if code != 3 or '最像的一段在第 2 行' not in message or '旧串是「丙」，文件里是「乙」' not in message:
+        problems.append(f'命中 0 次时本该附上最像的一行（第 2 行）与第一处不同（「丙」对「乙」），实际退 {code}：{message!r}'
+                        '（REPLACE_ONCE_BREAK=no-nearest 设着的话这一条本来就该红）')
     code, _ = replace_once(sample, '乙', '丁')
     if code != 4:
         problems.append(f'命中 2 次本该退出码 4，实际 {code}')
@@ -96,7 +159,7 @@ def selftest_in(workspace):
             print(f'     {problem}')
         print('     → 怎么办：看 replace_once 里对应分支的退出码与是否写文件；方括号开头的几条看 lib_atomic_replace.py 里同名那一格')
         return 1
-    print('  ✓ --selftest 通过：命中 0 次拒绝（3）、2 次拒绝（4）、空串拒绝（2），都一个字节没写；命中 1 次写成功并回读确认；'
+    print('  ✓ --selftest 通过：命中 0 次拒绝（3）并附上最像的一行与第一处不同、2 次拒绝（4）、空串拒绝（2），都一个字节没写；命中 1 次写成功并回读确认；'
           '换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、'
           '经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件')
     return 0

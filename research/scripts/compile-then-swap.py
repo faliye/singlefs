@@ -240,7 +240,7 @@ def swap(draft, target, scratch, root, release=False, after_build=None, after_sw
             continue
         if os.path.realpath(path) == root or is_inside(path, root):
             raise BadInput(f"{label} {path} 在主工作区里\n"
-                           "→ 怎么办：放进派发提示给的草稿目录（/tmp/claude-1000/<轮>/ 这类仓外位置）")
+                           "→ 怎么办：放进派发提示给的草稿目录（工作根 ~/.local/share/singlefs/work/<轮>/ 这类仓外位置）")
     crate_directory, package, bin_name = locate_bin(target, root, mode)
     try:
         draft_bytes = open(draft, "rb").read()

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 双机分片共用的第二台那几段：读本地配置、在第二台上跑命令、拷文件、比工具链、找规范副本、清场与复原、
+# 双机分片共用的第二台那几段：读本地配置、在第二台上跑命令、拷文件、比工具链、找规范副本、清场（不复原）、
 # 脱离 ssh 会话起一份活并轮询、按进程号连同后代停一棵进程树、把输出里配置的主机与目录换成「第二台」。
 # 被 source 的函数库，只定义函数与几个全局变量、不改 shell 选项，不单独调；research/scripts/mutation-shard-run.sh（门禁 checker-tier-crates-mutation-replay 的双机分片驱动）source 它。
 # gate-overlap:copy-kept layer0-shard-run.sh 改它会让登记了 shard=across-machines 的三条崩溃枚举用例的全绿标记作废（admission.py 的 SHARD_DRIVER_FILES 按内容进输入指纹），KV 接入那一批再把它迁到这一份上
@@ -9,7 +9,7 @@
 #
 # 全局变量（peer_host_load_configuration 设）：PEER_SSH_HOST PEER_REPOSITORY_DIRECTORY PEER_CARGO_BIN_DIRECTORY PEER_MEMORY_CAP
 #   QUIESCE_STOP_COMMAND QUIESCE_STOPPED_CHECK_COMMAND QUIESCE_START_COMMAND QUIESCE_STARTED_CHECK_COMMAND、peer_host_is_this_machine；
-#   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_restore 复原后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
+#   peer_host_quiesced（peer_host_quiesce 清过场置 1，peer_host_quiesce_left 报过之后置 0）；peer_host_toolchain_text（peer_host_compare_toolchains 设）；
 #   peer_host_detached_outcome（peer_host_wait_detached 设：exit <码>、vanished、unreachable、never-started）。
 # 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）：「第二台」是本机上的另一个目录，命令在本机跑，
 #   环境照 ssh 那样只给最少几样（HOME、USER、LOGNAME、LANG、XDG_RUNTIME_DIR、DBUS_SESSION_BUS_ADDRESS、CARGO_HOME、RUSTUP_HOME 与 PATH），本机别的环境变量不漏过去。
@@ -22,6 +22,9 @@
 #   PEER_HOST_LIB_BREAK=detached-keeps-caller-fds  peer_host_start_detached 起的那一份不关继承来的 fd（改前的写法）
 #       multi-host-run.sh 的「Ⓕ 第二台那条命令只握 0、1、2，不握驱动那一头的管道」（「多握着的：63 -> pipe:[…]」）
 #       与 no-redact 一起开时 multi-host-run.sh 的 Ⓕ 两格都红：起第二台那条命令那一步要等它跑完才回来，收到 TERM 之后 120 秒还没退（「驱动收到 TERM 之后 120 秒还没退」）
+#   PEER_HOST_LIB_BREAK=restore-after-run  peer_host_quiesce_left 照改前跑配置的 QUIESCE_START_COMMAND 复原
+#       mutation-shard-run.sh 的「① 照配置清了场、跑完没复原」（「stderr：…」）与「⑥ 两份都在跑时收到 TERM」（「退 143；…」）
+#       multi-host-run.sh 的自证不红（它不清场）
 
 peer_host_is_this_machine=0
 peer_host_quiesced=0
@@ -125,20 +128,20 @@ peer_host_quiesce() { # 照配置清场（配置里写了才做），跑完回�
     return 0
   fi
   echo "  ✗ 照配置清场之后回读没过（配置的 QUIESCE_STOPPED_CHECK_COMMAND 退非 0）"
-  echo "     → 怎么办：手动跑配置里的清场命令，回读到它退 0 为止；复原命令在退出时照跑"
+  echo "     → 怎么办：手动跑配置里的清场命令，回读到它退 0 为止"
   return 1
 }
 
-peer_host_restore() { # 清过场就照配置复原并回读（命令与输出不打）；调用方挂在 EXIT 上
+peer_host_quiesce_left() { # 清过场就报一句「清了场、没复原」（调用方挂在 EXIT 上）：复原由用户手动做，这里不跑复原命令（命令不打，里面有服务名）。
+  # 弄坏开关 restore-after-run 下照改前跑配置的复原命令（只给证红用）
   (( peer_host_quiesced )) || return 0
   peer_host_quiesced=0
-  bash -c "$QUIESCE_START_COMMAND" >/dev/null 2>&1
-  if bash -c "$QUIESCE_STARTED_CHECK_COMMAND" >/dev/null 2>&1; then
-    echo "  · 照配置复原了，回读过了"
-  else
-    echo "  ✗ 照配置复原之后回读没过（配置的 QUIESCE_STARTED_CHECK_COMMAND 退非 0）"
-    echo "     → 怎么办：手动跑配置里的复原命令，回读到它退 0 为止"
+  if [[ ",${PEER_HOST_LIB_BREAK:-}," == *,restore-after-run,* ]]; then
+    bash -c "${QUIESCE_START_COMMAND:-}" >/dev/null 2>&1
+    echo "  ! 弄坏开关 PEER_HOST_LIB_BREAK=restore-after-run：照配置跑了复原命令"
+    return 0
   fi
+  echo "  · 清了场、没复原：清场停下的服务一直停着；要复原手动跑私有复原脚本（配置的 QUIESCE_START_COMMAND），再跑 QUIESCE_STARTED_CHECK_COMMAND 回读到它退 0"
 }
 
 # 下面四个函数也经 declare -f 带到第二台上跑：只用 bash、ps 与 /proc，不引这四个之外的函数

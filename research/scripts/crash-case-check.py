@@ -3,7 +3,7 @@
 # run-condition: none 只读仓里的 Rust 源码与 .claude/gate.d/stage-inputs.tsv
 """测试源码的四样静态判据，判法只在这一份里；三道门禁各调各的那几样：
 
-  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记成 crash-case:（checker-tier-layer0-replay 开跑前判）
+  placement     崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表（checker-tier-layer0-replay 开跑前判）
   modules       checker 档每个测试文件第一行声明它测哪几个模块（checker-tier-layer0-replay 开跑前判）
   file-names    测试文件名不按里程碑、步号起（code-source-discipline 的一格）
   one-scenario  harness 档一条用例一个场景（harness-model-differential-and-scenarios 的一格）
@@ -20,9 +20,14 @@
      或调了同一文件里一个（传递地）这样做的函数，算崩溃枚举用例；只造一个固定崩溃态的不算；
   ② 它要住在 crates/singlefs-checker-tier/tests/（checker 档，D13 已定项 15，.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）：
      写在别的包（harness 这类日常测试包）里判红，那会让 cargo test 那个包的人跑到全量枚举；
-  ③ checker 档包里标了 #[ignore] 的（全量那条），.claude/gate.d/stage-inputs.tsv 里要有一行键是 crash-case:<名>、第三列
-     test=singlefs-checker-tier:<测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——标了 ignore 又没登记的 checker-tier-layer0-replay --full 不跑，谁都不跑；
+  ③ checker 档包里标了 #[ignore] 的（全量那条）要登记进崩溃点重放：崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv（入口
+     research/scripts/crash-point-replay.sh 照它跑）有一项点名的重型部分落到 <测试目标>:<这个函数名>（测试目标是文件名去掉 .rs）——
+     点名的 crash-case: 行（.claude/gate.d/stage-inputs.tsv 里键是 crash-case:<名>、第三列 test=singlefs-checker-tier:<测试目标>:<函数名>），
+     或点名的放量分项（research/scripts/crash-amplification.sh 的 ITEMS 里那一行的测试目标与用例函数）。读法在 research/scripts/lib_crash_point_replay_items.py
+     的 registered_functions。标了 ignore 又没登记的入口不跑，谁都不跑；
      不标 #[ignore] 的是 checker 档的快档（小流、几步的合成流），随 cargo test -p singlefs-checker-tier 跑，不要求登记。
+  ④ 合表本身核得过（同一份核法 lib_crash_point_replay_items.py 的 problems：每条 crash-case: 与每个放量分项恰好被一项点名、
+     轻型的测试目标取自同一项的重型部分，写法在合表表头）；有问题逐处报成 placement 的问题。
   测试函数上面的注释里写了「crash-case-check:not-a-crash-case <理由>」（理由至少 4 个字）的不判：写明为什么不算用例。
   modules：crates/singlefs-checker-tier/tests/*.rs 第一行「//! checker 档模块：<模块，按 TIER_MODULES 的次序用、隔开>」与它从
      singlefs_checker_tier:: 导入的模块逐个相同；一个都不导入的写「无（为什么）」。
@@ -36,7 +41,7 @@
 退出码：0 选中的都齐（至少一样判过）；1 有缺的（逐个列出）；2 用法错或读不了登记表；77 选中的每一样都无对象可判。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一项失败句的开头，括号里是那条「✗ 自检：」的开头；
-每一项红时都另有汇总行「✗ 自检 8 种里有 N 处判错」）：
+每一项红时都另有汇总行「✗ 自检 13 种里有 N 处判错」）：
   CRASH_CASE_CHECK_BREAK=fresh-pool-loop-unseen  one_scenario_problems() 不报循环里每轮新建池的用例
       循环里每轮新建池（「✗ 自检：循环里每轮新建池的 harness 用例应当报出来」）
   CRASH_CASE_CHECK_BREAK=helpers-unseen  enumerating_helpers() 不认同一文件里调全量枚举的 helper
@@ -48,6 +53,10 @@
       按里程碑起名（「✗ 自检：按里程碑起名的测试文件应当报出来」）
   CRASH_CASE_CHECK_BREAK=module-declaration-unchecked  module_declaration_problems() 不比第一行声明的模块与导入的模块
       声明与导入对不上（「✗ 自检：声明与导入对不上的 checker 档测试文件应当报出来」）
+  CRASH_CASE_CHECK_BREAK=module-declaration-scans-strings  module_declaration_problems() 把字符串字面量里的模块路径也算成导入
+      字符串字面量提了没真导入的模块（「✗ 自检：字符串字面量里提过的模块不该算成真的导入」）
+  CRASH_CASE_CHECK_BREAK=writable-mount-phases-unlisted  TIER_MODULES 里去掉 writable_mount_phases（模块表缺了这一项）
+      声明了它、也导入了它的测试文件（「✗ 自检：声明并导入 writable_mount_phases、次序对的 checker 档测试文件不该报」）
   CRASH_CASE_CHECK_BREAK=only-ignored  judge() 不认 --only，四样都判
       --only file-names（「✗ 自检：--only file-names 应当只判 file-names 一样」）
   CRASH_CASE_CHECK_BREAK=package-unchecked  problems_in() 不判崩溃枚举用例住在哪个包
@@ -66,6 +75,12 @@
       through_a_named_sweep（「✗ 自检：harness 包里自己逐个造崩溃状态的 through_a_named_sweep 应当报住错了包」）
   CRASH_CASE_CHECK_BREAK=waiver-ignored  crash_enumeration_tests() 不认「crash-case-check:not-a-crash-case」的注明
       干净的样本（「✗ 自检：干净的样本应当认出 2 条（注明不是用例的那条不算）、0 处问题」）
+  CRASH_CASE_CHECK_BREAK=crash-case-rows-only  problems_in() 照改前只认 stage-inputs.tsv 的 crash-case: 行，不认合表点名的放量分项
+      合表点名的放量分项（「✗ 自检：标了 ignore、只由合表点名的放量分项登记的用例不该报缺登记」）
+  CRASH_CASE_CHECK_BREAK=items-table-unchecked  problems_in() 不报合表的问题（④）
+      合表没点名的 crash-case（「✗ 自检：登记了 crash-case: 却没被合表点名，placement 应当报出来」）
+  合表核法自己的开关 CRASH_POINT_REPLAY_ITEMS_BREAK（表在 research/scripts/lib_crash_point_replay_items.py 文件头）也由这份自证证红：
+  每一格判错打「✗ 自检：合表核法 <格名>：…」，汇总行同上。
 """
 import glob
 import os
@@ -79,11 +94,14 @@ REPOSITORY_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 sys.path.insert(0, os.path.join(REPOSITORY_ROOT, ".claude", "singlefs-ai-sop", "scripts"))
 from preflight import preflight  # noqa: E402
 BROKEN = os.environ.get("CRASH_CASE_CHECK_BREAK", "")
+# 崩溃点重放合表的读法与核法只在这一份库里（入口 research/scripts/crash-point-replay.sh 用同一份）
+sys.path.insert(0, SCRIPT_DIRECTORY)
+import lib_crash_point_replay_items as replay_items  # noqa: E402
 
 CHECKER_PACKAGE = "singlefs-checker-tier"
 HARNESS_PACKAGE = "singlefs-harness"
 ITEMS = {
-    "placement": "崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记成 crash-case:",
+    "placement": "崩溃枚举用例住 checker 档包、标了 #[ignore] 的都登记进崩溃点重放合表",
     "modules": "checker 档每个测试文件第一行声明它测哪几个模块",
     "file-names": "测试文件名不按里程碑、步号起",
     "one-scenario": "harness 档一条用例一个场景",
@@ -197,8 +215,10 @@ def registered_cases(root):
 
 def problems_in(root):
     """placement：→ (认出的崩溃枚举用例, 问题)。读不了登记表抛 OSError。"""
-    registered = registered_cases(root)
-    registered_targets = {(target, function) for _, target, function in registered}
+    if BROKEN == "crash-case-rows-only":
+        registered_targets = {(target, function) for _, target, function in registered_cases(root)}
+    else:
+        registered_targets = replay_items.registered_functions(root)
     tests = crash_enumeration_tests(root)
     problems = []
     for package_directory, target, function, ignored, where in tests:
@@ -206,19 +226,31 @@ def problems_in(root):
             problems.append(f"{where} {function}：直接调全量崩溃枚举，却写在 {package_directory} 包里（崩溃枚举用例要住在 crates/{CHECKER_PACKAGE}/tests/）")
             continue
         if ignored and (target, function) not in registered_targets and BROKEN != "rows-ignored":
-            problems.append(f"{where} {function}：标了 #[ignore] 却没有登记成 crash-case（.claude/gate.d/stage-inputs.tsv 里没有 test={CHECKER_PACKAGE}:{target}:{function}），谁都不跑它")
+            problems.append(f"{where} {function}：标了 #[ignore] 却没有登记成 crash-case、由崩溃点重放合表点名（.claude/gate.d/stage-inputs.tsv 里没有 "
+                            f"test={CHECKER_PACKAGE}:{target}:{function} 的 crash-case: 行，或那一行与放量分项都没被 {replay_items.ITEMS_TABLE} 的一项点名），"
+                            "入口 research/scripts/crash-point-replay.sh 不跑它，谁都不跑它")
+    if BROKEN != "items-table-unchecked":
+        problems += [f"崩溃点重放合表：{problem}" for problem in replay_items.problems(root)]
     return tests, problems
 
 
 FRESH_POOL_CALL = re.compile(r"\b(?:build_pool\w*|build_through_\w+|format_pool)\s*\(|\bMemoryPool::with_devices\s*\(")
-TIER_MODULES = ["crash", "layer0_progress", "crash_injection", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_amplification", "verdict_store", "gpu_unit_checks",
+TIER_MODULES = ["crash", "layer0_progress", "crash_injection", "writable_mount_phases", "bad_disk_input", "device_log", "on_device_modes", "crash_identity", "crash_amplification", "verdict_store", "gpu_unit_checks",
     "crash_facts",
     "crash_verify_gpu",
     "crash_judge_tables",
     "crash_judge_gpu",
     "crash_judge_dispatch",
 ]
+if BROKEN == "writable-mount-phases-unlisted":
+    TIER_MODULES.remove("writable_mount_phases")
 MODULE_DECLARATION = re.compile(r"^//! checker 档模块：(.+)$")
+# 字符串字面量：扫「从 singlefs_checker_tier:: 导入了什么」之前先挖掉，不然字符串里提它（例如某个绕开
+# 入口的调用整行抄进字符串常量里当样本）会被认成真的导入。只认转义写法的普通双引号串，原始字符串
+# （r"…"、r#"…"#）今天 tests/ 下没有真用到；带 re.DOTALL 是因为字符串里的 `\` 续行会跨行，`.` 不开
+# DOTALL 吃不到换行符，没开会让这一条字符串往后吞掉一大段真代码（现判过：crash_enumeration_multi_
+# record_publish_stream.rs 的续行字符串就踩过这一下）。
+STRING_LITERAL = re.compile(r'"(?:\\.|[^"\\])*"', re.DOTALL)
 # 按里程碑、步号、增补号、并行线号、欠账号起的测试文件名：名字说的是它在哪一步写出来的，不是它测什么
 MILESTONE_FILE_NAME = re.compile(r"(^|_)(first|second|third)_transaction(_|$)|_step_(zero|one|two|three|four|five|six|seven|eight|nine)(_|$)"
                                  r"|(^|_)supplement_(one|two|three|four)(_|$)|(^|_)parallel_line_(one|two|three)(_|$)|(^|_)c[0-9]{3}(_|$)")
@@ -271,7 +303,8 @@ def module_declaration_problems(root):
         tier_files += 1
         text = open(path, encoding="utf-8", errors="replace").read()
         declared = MODULE_DECLARATION.match(text.split("\n", 1)[0])
-        used = sorted({name for name in re.findall(r"singlefs_checker_tier::(\w+)", text) if name in TIER_MODULES}, key=TIER_MODULES.index)
+        scan_text = text if BROKEN == "module-declaration-scans-strings" else STRING_LITERAL.sub("", text)
+        used = sorted({name for name in re.findall(r"singlefs_checker_tier::(\w+)", scan_text) if name in TIER_MODULES}, key=TIER_MODULES.index)
         relative = os.path.relpath(path, root)
         if not declared:
             problems.append(f"{relative}：第一行没有「//! checker 档模块：…」（它导入的是 {'、'.join(used) or '无'}）")
@@ -292,8 +325,10 @@ def judge(root, items):
         if item == "placement":
             scanned = len(placement_source_paths(root))
             tests, problems = problems_in(root)
+            table_items, _ = replay_items.read_items(root)
             results[item] = (scanned, problems,
-                             f"崩溃枚举用例都住在 {CHECKER_PACKAGE} 包里、标了 #[ignore] 的都登记了（扫了 {scanned} 份测试源码，认出 {len(tests)} 条；"
+                             f"崩溃枚举用例都住在 {CHECKER_PACKAGE} 包里、标了 #[ignore] 的都登记进了崩溃点重放合表（扫了 {scanned} 份测试源码，认出 {len(tests)} 条；"
+                             f"合表 {len(table_items)} 项核过；"
                              "按测试函数直接调 enumerate_layer0 一族、自己逐个造崩溃状态、或经同一文件里的函数传递地这样做认；"
                              "经 tests/<子目录>/ 里的共用函数间接调的、宏展开出来的认不出）")
         elif item == "modules":
@@ -312,7 +347,8 @@ def judge(root, items):
 REMEDIES = {
     "placement": [f"把那个测试文件挪进 crates/{CHECKER_PACKAGE}/tests/（共用模块经 #[path = \"../../singlefs-harness/tests/common/mod.rs\"] mod common; 指回去），",
                   "全量那条标 #[ignore] 并把 crash-case:<名> 那一行（第三列 test=singlefs-checker-tier:<测试目标>:<函数名> 与 count-line 等）登记进",
-                  ".claude/gate.d/stage-inputs.tsv；小流的快档不标 ignore、不用登记（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
+                  ".claude/gate.d/stage-inputs.tsv，再放进崩溃点重放合表 .claude/gate.d/crash-point-replay-items.tsv 它那条流的那一项（写法在合表表头）；",
+                  "合表报的问题照那一句改；小流的快档不标 ignore、不用登记（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
     "modules": ["checker 档每个测试文件第一行写「//! checker 档模块：<它导入的模块，按 " + "、".join(TIER_MODULES) + " 的次序用、隔开>」，",
                 "一个都不导入的写「无（为什么）」（.claude/rules/verification.md「崩溃枚举用例住哪、怎么登记」）。"],
     "file-names": ["测试文件按它测什么起名：领域在前、场景在后，不带里程碑、步号、增补号、并行线号、欠账号，来历进 commit message 或 .claude/kb/",
@@ -368,7 +404,23 @@ def run(root, items):
 
 
 SELFTEST_CASES = ["登记了的与快档放行、注明不是用例的不算", "标了 ignore 没登记", "住错了包（直接调、经 helper、自己逐个造崩溃状态）",
-                  "固定崩溃态不算枚举", "每轮新建池与豁免", "模块声明缺与对不上", "按里程碑起名", "--only 只判点名的"]
+                  "固定崩溃态不算枚举", "每轮新建池与豁免", "模块声明缺与对不上", "writable_mount_phases 的次序（排在 crash_injection 之后）", "字符串字面量里的模块路径不算真导入", "按里程碑起名", "--only 只判点名的",
+                  "合表点名的放量分项算登记", "合表没点名的 crash-case 报出来", "合表核法（lib_crash_point_replay_items.py 的 selftest_cells）"]
+
+
+def placement_world(work, name, stage_rows, table_rows, pipeline_rows):
+    """placement 的一个小仓：checker 档 tests/streamy.rs 里一条标了 ignore、调全量枚举的用例 streamy_full；stage-inputs.tsv、合表、放量 ITEMS 照给的写。"""
+    root = os.path.join(work, name)
+    os.makedirs(os.path.join(root, "crates", CHECKER_PACKAGE, "tests"))
+    os.makedirs(os.path.join(root, ".claude", "gate.d"))
+    os.makedirs(os.path.join(root, "research", "scripts"))
+    open(os.path.join(root, "crates", CHECKER_PACKAGE, "tests", "streamy.rs"), "w").write(
+        "#[test]\n#[ignore]\nfn streamy_full() {\n    enumerate_layer0(&stream);\n}\n")
+    open(os.path.join(root, ".claude", "gate.d", "stage-inputs.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in stage_rows))
+    open(os.path.join(root, ".claude", "gate.d", "crash-point-replay-items.tsv"), "w").write("# 样本\n" + "".join(row + "\t# 样本\n" for row in table_rows))
+    open(os.path.join(root, "research", "scripts", "crash-amplification.sh"), "w").write(
+        "ITEMS=(\n" + "".join(f"  $'{row}\\t全量'\n" for row in pipeline_rows) + ")\n")
+    return root
 
 
 def selftest():
@@ -389,7 +441,24 @@ def selftest():
         open(os.path.join(harness_tests_directory, "daily.rs"), "w").write("#[test]\nfn daily_quick() {\n    enumerate_layer0_quick_tier_versions(&s);\n}\n")
         open(os.path.join(work, ".claude", "gate.d", "stage-inputs.tsv"), "w").write(
             f"# 样本\ncrash-case:demo\tcrates/\ttest={CHECKER_PACKAGE}:plain:registered_case count-line=x\t#样本\n")
+        open(os.path.join(work, ".claude", "gate.d", "crash-point-replay-items.tsv"), "w").write("# 样本合表\ndemo\tcrash-case:demo\t-\tplain\t# 样本\n")
         failures = []
+        # 合表点名的放量分项也算登记（ITEMS 里那一行的测试目标与用例函数）；合表没点名的 crash-case: 照合表核法报出来
+        through_pipeline = placement_world(work, "through-pipeline", [], ["streamy\t-\tstreamy-piped\tstreamy"],
+                                                ["streamy-piped\\tstreamy\\tstreamy_full"])
+        _, problems = problems_in(through_pipeline)
+        if problems:
+            failures.append(f"标了 ignore、只由合表点名的放量分项登记的用例不该报缺登记，实际 {problems}")
+        orphan = placement_world(work, "orphan-crash-case",
+                                 [f"crash-case:streamy\tcrates/\ttest={CHECKER_PACKAGE}:streamy:streamy_full",
+                                  f"crash-case:orphan\tcrates/\ttest={CHECKER_PACKAGE}:streamy:orphan_full"],
+                                 ["streamy\tcrash-case:streamy\t-\tstreamy"], [])
+        _, problems = problems_in(orphan)
+        if not any("crash-case:orphan 没有被合表里哪一项点名" in problem for problem in problems):
+            failures.append(f"登记了 crash-case: 却没被合表点名，placement 应当报出来，实际 {problems}")
+        table_cells, table_failures = replay_items.selftest_cells()
+        for cell_name, failure in table_failures:
+            failures.append(f"合表核法 {cell_name}：{failure}")
         tests, problems = problems_in(work)
         if len(tests) != 2 or problems:
             failures.append(f"干净的样本应当认出 2 条（注明不是用例的那条不算）、0 处问题（checker 档包里不标 ignore 的快档放行），实际 {len(tests)} 条、{problems}")
@@ -418,6 +487,15 @@ def selftest():
         open(os.path.join(harness_tests_directory, "second_transaction_step_one_sample.rs"), "w").write("#[test]\nfn sample() {}\n")
         open(os.path.join(tests_directory, "module_mismatch.rs"), "w").write("//! checker 档模块：crash\nuse singlefs_checker_tier::layer0_progress::X;\n")
         open(os.path.join(tests_directory, "no_declaration.rs"), "w").write("use singlefs_checker_tier::crash::Y;\n")
+        open(os.path.join(tests_directory, "string_literal_names_a_module.rs"), "w").write(
+            "//! checker 档模块：无（只读这个包的源码文本，不调它的任何模块）\n"
+            "const SAMPLE_LINE: &str = \"singlefs_checker_tier::gpu_unit_checks::gpu_cards_by_priority(&every_card)\";\n")
+        open(os.path.join(tests_directory, "writable_phases_in_order.rs"), "w").write(
+            "//! checker 档模块：crash、crash_injection、writable_mount_phases\nuse singlefs_checker_tier::crash::A;\n"
+            "use singlefs_checker_tier::crash_injection::B;\nuse singlefs_checker_tier::writable_mount_phases::C;\n")
+        open(os.path.join(tests_directory, "writable_phases_out_of_order.rs"), "w").write(
+            "//! checker 档模块：crash、writable_mount_phases、crash_injection\nuse singlefs_checker_tier::crash::A;\n"
+            "use singlefs_checker_tier::crash_injection::B;\nuse singlefs_checker_tier::writable_mount_phases::C;\n")
         _count, scenario = one_scenario_problems(work)
         if not any("several_scenarios" in problem for problem in scenario):
             failures.append(f"循环里每轮新建池的 harness 用例应当报出来，实际 {scenario}")
@@ -428,6 +506,12 @@ def selftest():
             failures.append(f"声明与导入对不上的 checker 档测试文件应当报出来，实际 {modules}")
         if not any("no_declaration.rs" in problem for problem in modules):
             failures.append(f"第一行没声明模块的 checker 档测试文件应当报出来，实际 {modules}")
+        if any("writable_phases_in_order.rs" in problem for problem in modules):
+            failures.append(f"声明并导入 writable_mount_phases、次序对的 checker 档测试文件不该报，实际 {modules}")
+        if not any("writable_phases_out_of_order.rs" in problem for problem in modules):
+            failures.append(f"writable_mount_phases 排在 crash_injection 之前的声明应当报出来，实际 {modules}")
+        if any("string_literal_names_a_module.rs" in problem for problem in modules):
+            failures.append(f"字符串字面量里提过的模块不该算成真的导入，实际 {modules}")
         _count, file_names = test_file_name_problems(work)
         if not any("second_transaction_step_one_sample" in problem for problem in file_names):
             failures.append(f"按里程碑起名的测试文件应当报出来，实际 {file_names}")
@@ -445,7 +529,8 @@ def selftest():
             return 1
         print("  ✓ crash-case-check 自检通过：checker 档包里登记了的放行、不标 ignore 的快档放行，注明不是用例的不算，标了 ignore 没登记的报缺登记，"
               "写在 harness 包里的（直接调或经同文件 helper 调、自己逐个造崩溃状态）报住错了包，每轮新建池的、没声明模块的、按里程碑起名的各报出来，"
-              f"--only 只判点名的那几样（查了 {checked} 种）")
+              "合表点名的放量分项算登记、合表没点名的 crash-case 报出来，"
+              f"--only 只判点名的那几样（查了 {checked} 种；合表核法 {len(table_cells)} 格）")
         return 0
     finally:
         import shutil

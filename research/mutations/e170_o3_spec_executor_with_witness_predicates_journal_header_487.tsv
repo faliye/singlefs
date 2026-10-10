@@ -3,3 +3,5 @@ X33_新根段去掉卸载记号	("new_root_allocation_records_root_pointer", 86)
 X34_重建的根照抄所选根的实例表指针	instance_table_pointer=last_applied.field_bytes("new_root_instance_table_pointer")	instance_table_pointer=root.field_bytes("instance_table_pointer")
 X35_点名项区仍从311起	item_array = raw[layout.JOURNAL_HEADER_BYTES:layout.JOURNAL_HEADER_BYTES + named_item_count * layout.NAMED_ITEM_BYTES]	item_array = raw[311:311 + named_item_count * layout.NAMED_ITEM_BYTES]
 X36_反向链按前一条的311字节算	header = self.raw[:layout.JOURNAL_HEADER_BYTES]	header = self.raw[:311]
+XC8_照抄核对只比目标名不比条目文本	identical = target_identical and text_identical and helpers_identical	identical = target_identical
+XC9_归一不去收尾逗号	"", without_whitespace)	"", without_whitespace) if False else without_whitespace

@@ -37,7 +37,7 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
             --timeout 秒（默认 $GATE_VERUS_TIMEOUT_SECONDS，再默认 600）  --threads N（默认 $SINGLEFS_THREAD_CAP，再默认 nproc）
             --jobs J（空真与必红世界几处同时验，默认 $GATE_VERUS_JOBS，再默认 min(处数, max(1, N / 4))；每一处的 Verus 取 N / J 条线程）
             --memory-cap 上限（每次 Verus 经 research/scripts/run-with-memory-cap.sh，默认 $GATE_VERUS_MEMORY_MAX，再默认 4G；
-              限时交给它的 RUN_WITH_MEMORY_CAP_TIME_LIMIT，退 253 就是超时；退 250、251、252、254 是包装自己的结局，那一处判「没跑成」：
+              限时交给它的 RUN_WITH_MEMORY_CAP_TIME_LIMIT，退 253 就是超时；退 245、250、251、252、254 是包装自己的结局，那一处判「没跑成」：
               这一格退 1，✗ 行写「没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 <码>」，行尾原样带上包装自己往 stderr 打的 ✗ 与 → 那几行，
               → 照包装文件头「退出码」一段、按码给，不指向证明、核或必红世界表；252 分两种成因各给一种：包装说「等多久都放不下」的（这一处要的量比总上限还大）
               给「上限写小」，别的（排队等满）给「看 --status、空出来再重跑」）
@@ -51,6 +51,25 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
               已经起了的照常收；没起的那几处并成一条 ✗「没跑成：内存包装排不上，没再排队（同一道里 <格>「<哪一处>」那一处退了 252…）：这一格 N 处 Verus 没起——<逐个列名>」，
               → 用先排不上那一处的出路（照包装文件头「退出码」一段）。环境里有 VERUS_PROOF_CHECK_QUEUE_REFUSED_FILE（门禁 checker-tier-formal-verification 整道跑时给一份空文件）的，
               第一次拿到 252 时往那份文件写一行「哪一处<TAB>出路」，后面几格开跑前读到它就一处都不起包装、照上面那样报；所以整道最坏只等一次等待上限
+  verus-proof-check.py list-items <根>
+      逐行打可点名的项「项<TAB>格[<TAB>说明]」：toolchain（verus-toolchain-pinned）、proof（verus-proof）各一项，
+      空真每处 requires 一项 vacuity:<核的相对路径>:<requires 那一行的行号>（说明是函数或闭包），必红世界每行一项 must-red:<变异名>（说明是表里第几行）。
+      只读登记表、核与必红世界表，不起 Verus、不编；核没进仓时只列 toolchain 与 proof；登记表或表写坏了判红退 1。
+  逐项点名与按条复用（vacuity、must-red-worlds 收 --item；proof 与 toolchain 各只有一项，给 --item 退 2）：
+      --item <项>（可给多次，取并集）只判点名的项，项名写错或缺项名退 2 并列出这一格可点名的项；点名单跑一项与它在整格里跑的判定相同（自证 item-alone-equals-whole-*）。
+      --verdict-library <目录> 给了就按条记判定（判定库 research/scripts/lib_verdict_library.py）：proof、vacuity、must-red-worlds 每一项判绿当场原子落盘，
+        下一趟这一项的键相同就复用、不起 Verus；--no-reuse 只记不读（照样全部现判）。不给 --verdict-library 不读不写。toolchain 每趟现核、不复用。
+      键分两列（判定库文件头「键分两列」）：
+        判法版本：这份脚本与 lib_verdict_library.py 两份内容的摘要（judge_version）；变了整格每一项都现判，原因写「判法版本 变了」。
+        输入指纹（逐样摘要按名字排好再取 sha256）——共用的几样：核 crate（登记的 crate 目录整个，跳过 target/ 与登记表 must-red-worlds 行点名的必红世界表）、
+          verus-pins.tsv 整份、工具链（tool-versions 打的那一行）、限时（--timeout）；共用的有一样变了，整格每一项都现判。
+        proof 只有共用的几样；空真每处另加「这一处」（项名与函数说明）；必红世界每行另加「这一行」（五段原样）。
+        必红世界表 Verus 不读、只有这份判法读，所以不进共用的几样：改表里一行只现判那一行，证明与空真照复用；表头、注释与空行不进任何一项的键
+          （自证 reuse-must-red-table-row-only、reuse-must-red-table-comment-only）。核 crate 里别的文件改了（src/lib.rs 加一个空行也算）三格全现判
+          （自证 reuse-crate-other-file-all-cells）。
+      只记绿：红、没跑成、被信号停了、超时的不记。每项一行「· <项>：绿|红，现判（<原因>）|复用（<记下的日期与一句判定>）」，
+        末了「· 按条：现判 N、复用 M（现判的原因：<原因> <数>…）」，原因是 无记录、关了复用、没给判定库、记录读不出、这一行本身不对、<输入里哪几样或判法版本> 变了；
+        环境里有 FORMAL_ITEM_TALLY_FILE 的（门禁给的）另往那份文件追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」。
   verus-proof-check.py fingerprint <包目录>      打印包源码的内容指纹与文件数（填登记表用）
   verus-proof-check.py tool-versions [<根>] [--verus-root 目录]   打印一行：version.json 的 version、commit，安装目录里 verus、rust_verify、z3、vstd.vir、
       libvstd.rlib 各自的 sha256（不在的写「没有」），安装目录顶层全部普通文件的整体摘要（install_top_level_sha256：逐个「文件名 NUL 它的 sha256 换行」按文件名字节序接起来再取 sha256，
@@ -74,7 +93,7 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
 
 弄坏开关 VERUS_PROOF_CHECK_BREAK=<项>[,<项>…]（只给证红用；--selftest 与门禁样本在开着时都必须判错）。
 逐项写开关名、弄坏哪一处（括号里是开着时判错的门禁样本），下一行起写打开后自证哪几格判错（项名是 selftest() 的格名，括号里是那一行判错行的开头；
-每一项红时都另有汇总行「✗ verus-proof-check 自证 57 格里 N 格判错：<格名…>」）：
+每一项红时都另有汇总行「✗ verus-proof-check 自证 <格数> 格里 N 格判错：<格名…>」）：
   VERUS_PROOF_CHECK_BREAK=commit-unchecked  toolchain 不比 version.json 的 commit（样本 verus-toolchain-pinned-commit-red 判绿）
       toolchain-commit（「toolchain-commit 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=fingerprint-unchecked  toolchain 不比包源码的内容指纹（样本 verus-toolchain-pinned-fingerprint-red 判绿）
@@ -117,8 +136,9 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
   VERUS_PROOF_CHECK_BREAK=rlimit-counted-in-proof-errors  必红世界数证明错时把 rlimit 用尽也算进去（样本 verus-must-red-worlds-rlimit-with-proof-error-green 判红）
       must-red-rlimit-10-counts-proof-errors-only（「must-red-rlimit-10-counts-proof-errors-only 这一格判错」）、
       must-red-rlimit-with-proof-error（「must-red-rlimit-with-proof-error 这一格判错」）
-  VERUS_PROOF_CHECK_BREAK=wrapper-exit-as-proof-red  包装自己退 250、251、252、254 照旧报成这一格的问题、给这一格自己的出路（自证里的假包装退 250）
-      proof-wrapper-exit（「proof-wrapper-exit 这一格判错」）、must-red-wrapper-exit（「must-red-wrapper-exit 这一格判错」）；
+  VERUS_PROOF_CHECK_BREAK=wrapper-exit-as-proof-red  包装自己退 245、250、251、252、254 照旧报成这一格的问题、给这一格自己的出路（自证里的假包装退 250 与 245）
+      proof-wrapper-exit（「proof-wrapper-exit 这一格判错」）、must-red-wrapper-exit（「must-red-wrapper-exit 这一格判错」）、
+      proof-wrapper-245（「proof-wrapper-245 这一格判错」）；
       另有 3 格跟着判错：must-red-mixed-not-run-and-red、must-red-wrapper-lines-carried、proof-wrapper-too-big
   VERUS_PROOF_CHECK_BREAK=tool-versions-launcher-only  tool-versions 只打 version.json 与 verus 的 sha256，不看 rust_verify、z3、vstd 与 VERUS_Z3_PATH
       tool-versions-z3（「tool-versions-z3 这一格判错」）；另有 5 格跟着判错：tool-versions-install-top-level、tool-versions-z3-path-empty、
@@ -150,6 +170,29 @@ Verus 每次都直接起（不经 cargo verus：它按内容缓存，内容不�
       proof-killed-no-proof-howto（「proof-killed-no-proof-howto 这一格判错」）
   VERUS_PROOF_CHECK_BREAK=wrapper-queue-lines-swallowed  内存包装排队报的那几行只收进变量、不转打到本进程的 stderr（假包装报一行排队、等它被转打出来）
       wrapper-queue-line-forwarded（「wrapper-queue-line-forwarded 这一格判错」）
+逐项点名与按条复用的几项：
+  VERUS_PROOF_CHECK_BREAK=list-items-pipe-unhandled  list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
+      list-items-closed-pipe（「list-items-closed-pipe 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=item-filter-ignored  --item 不起作用、照判全部（写错的项名也不退 2）
+      item-select-one、item-unknown（「… 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-crate  键里不带核 crate（核改了照旧复用）
+      reuse-crate-changed（「reuse-crate-changed 这一格判错」）；另有 1 格跟着判错：reuse-crate-other-file-all-cells
+  VERUS_PROOF_CHECK_BREAK=reuse-key-with-must-red-table  共用键里不跳过必红世界表（改表里一行，证明、空真与别的必红世界行全部现判）
+      reuse-must-red-table-row-only、reuse-must-red-table-comment-only（「… 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-toolchain  键里不带工具链（Verus 安装里多一份库照旧复用）
+      reuse-toolchain-changed（「reuse-toolchain-changed 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-judge-version  判法版本一律交空串（这份脚本或判定库改了照旧复用）
+      reuse-judge-version-changed（「reuse-judge-version-changed 这一格判错」）
+  VERUS_PROOF_CHECK_BREAK=reuse-key-without-row  键里不带「这一行 / 这一处」（同一格几项共用一个键，只判过 A 就拿它的判定当 B 的）
+      reuse-row-own-key（「reuse-row-own-key 这一格判错」）；另有 4 格跟着判错：reuse-red-not-recorded、reuse-resume-after-kill、reuse-must-red-table-row-only、
+        prune-after-change
+  VERUS_PROOF_CHECK_BREAK=reuse-ignores-key  这一项判绿过就复用，不比键
+      prune-after-change（剪枝自证：改了一行之后开着复用与关掉复用逐项判定不同）；另有 4 格跟着判错：reuse-crate-changed、reuse-toolchain-changed、
+        reuse-must-red-table-row-only、reuse-crate-other-file-all-cells
+  VERUS_PROOF_CHECK_BREAK=reuse-records-red  红的也记成绿
+      reuse-red-not-recorded（「reuse-red-not-recorded 这一格判错」）；另有 1 格跟着判错：reuse-resume-after-kill
+  VERUS_PROOF_CHECK_BREAK=reuse-records-whole-cell-only  一项判完不当场落盘，整格判完、一处问题都没有才一起记（被打断或有一项红，判过的全不留）
+      reuse-resume-after-kill（第一趟 C 那一处被 kill -9，第二趟同一条命令要只判 C：「reuse-resume-after-kill 这一格判错」）
 管不到的：spec 本身写得对不对；核与调它的 singlefs-core 之间（recovery.rs 调核那一段）没被证明的部分；插入点只认「requires 整行起头、函数体的 { 单独起行或是闭包那一行的头一个 {」
   这种写法（verusfmt 与本仓的写法），别的写法认不出就判红要求改写法。
 """
@@ -160,6 +203,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -174,6 +218,8 @@ preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(pr
 from project_preflight import preflight  # noqa: E402
 
 SCRIPT_DIRECTORY = os.path.dirname(os.path.realpath(__file__))
+sys.path.insert(0, SCRIPT_DIRECTORY)
+from lib_verdict_library import Tally, VerdictLibrary, digest_file, digest_text, digest_tree  # noqa: E402
 REGISTRY = ".claude/gate.d/verus-pins.tsv"
 EXIT_GREEN, EXIT_RED, EXIT_USAGE, EXIT_NOT_RUN = 0, 1, 2, 77
 WRAPPER_TIMEOUT_EXIT = 253
@@ -185,7 +231,8 @@ EXPECTED_PROOF_ERRORS = re.compile(r"proof_errors=([1-9][0-9]*)")
 EXPECTATION_HOWTO = ("必红世界表第五段一律写 proof_errors=M：M 是改坏的副本在登记的 rlimit 上 Verus 报的证明错条数"
                      "（error 起头的报错，除去含 Resource limit (rlimit) exceeded 的与以 aborting due to 起头的），至少 1；"
                      "不写输出片段、不写「verified, M errors」（Verus 把 rlimit 用尽也计进 errors，换个 rlimit 那个数就变）")
-WRAPPER_OWN_EXITS = {250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上", 254: "被总上限挤掉"}
+WRAPPER_OWN_EXITS = {245: "显存不够（起止之间内核报了 NV_ERR_NO_MEMORY）", 250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上",
+                     254: "被总上限挤掉"}
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "run-with-memory-cap.sh")
 # 包装自己的结局（WRAPPER_OWN_EXITS）那一处没跑成时给的出路，照 run-with-memory-cap.sh 文件头「退出码」一段、按码给（wrapper_howto）
 WRAPPER_HOWTO_HEAD = "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办："
@@ -195,6 +242,7 @@ WRAPPER_HOWTO_BY_EXIT = {
     251: "251 是包装用法错或起不了 scope：照包装自己打的 → 修（systemctl --user status 看用户级 systemd 在不在），修好再重跑这一格",
     252: "252 是排队等满还放不下：先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
     254: "254 是 slice 满了被挤掉：先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格",
+    245: "245 是这一处退了非 0 而同一段时间内核报了显存不够（Verus 不上卡，多半是别的进程撞的）：nvidia-smi 看谁在用卡，等它跑完再重跑这一格",
 }
 # 252 的另一种成因：包装打「等多久都放不下」（这一处要的量比 slice 的总上限还大，不等），重跑多少次都一样
 WRAPPER_TOO_BIG_MARK = "等多久都放不下"
@@ -221,6 +269,8 @@ RLIMIT_ATTRIBUTE = re.compile(r"verifier\s*::\s*rlimit\b|verifier\s*\(\s*rlimit\
 FUNCTION_LINE = re.compile(r"^\s*(pub(\([^)]*\))?\s+)?(open\s+|closed\s+)?(proof\s+|spec\s+|exec\s+)?fn\s+(\w+)")
 DIAGNOSTIC_LOCATION = re.compile(r"^\s*-->\s+(\S+?):(\d+):(\d+)")
 BREAK = {item for item in os.environ.get("VERUS_PROOF_CHECK_BREAK", "").split(",") if item}
+# 门禁给的一份文件：每格判完往里追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」（lib_verdict_library.Tally.append_to），门禁整道相加
+ITEM_TALLY_FILE_VARIABLE = "FORMAL_ITEM_TALLY_FILE"
 
 
 class Red(Exception):
@@ -676,7 +726,7 @@ def check_toolchain(root, options):
         for message, howto in problems:
             report_red(message, howto)
         return EXIT_RED
-    print(f"  ✓ Verus {registry.tag}（commit {registry.commit[:12]}…）与登记相同，{zip_note}；Cargo.lock 与本机缓存里 {len(registry.packages)} 个包的版本、出处与源码指纹都与登记相同")
+    print(f"  ✓ Verus {registry.tag}（commit {registry.commit[:12]}…）与登记相同，{zip_note}；Cargo.lock 与本机缓存里 {len(registry.packages)} 个包的版本、出处与源码指纹都与登记相同；按条：toolchain 一项，不复用（每趟现核）")
     return EXIT_GREEN
 
 
@@ -719,8 +769,90 @@ def prepared(root, options):
     return registry, kernels, manifest, executable
 
 
+class UsageError(Exception):
+    """--item 点名了没有的项、或给了这一格不收的 --item：退 2，列出可点名的项。"""
+
+    def __init__(self, message, available):
+        super().__init__(message)
+        self.message, self.available = message, available
+
+
+# ── 按条判定：键与复用（判定库 lib_verdict_library.py；判据在文件头「按条复用」一段）──
+
+def judge_version():
+    """判法版本：这份脚本与它 import 的判定库，两份内容的摘要。自证给 options["judge_version"] 时用那一个（造「判法版本变了」）；
+    弄坏开关 reuse-key-without-judge-version 下一律交空串（判法变了照旧复用）。"""
+    if "reuse-key-without-judge-version" in BREAK:
+        return ""
+    return digest_text(digest_file(os.path.realpath(__file__)) + digest_file(os.path.join(SCRIPT_DIRECTORY, "lib_verdict_library.py")))
+
+
+def shared_components(root, registry, options):
+    """Verus 那几项共用的输入：核 crate 整个目录（跳过必红世界表：Verus 不读它，每行只进它自己那一项的键）、verus-pins.tsv、工具链（tool-versions 那一行）、限时。
+    判法版本不在这里，是判定库的另一列（verdict_library）。算一次存进 options（同一格里每一项共用）；没给判定库时不算（交空表，lookup 也不看它）。"""
+    if not options.get("verdict_library"):
+        return []
+    if options.get("shared_components") is None:
+        components = []
+        if "reuse-key-without-crate" not in BREAK:
+            crate = os.path.join(root, registry.crate_directory)
+            table = os.path.relpath(os.path.join(root, registry.must_red_table), crate)
+            skipped = () if "reuse-key-with-must-red-table" in BREAK or table.split(os.sep)[0] == os.pardir else (table,)
+            components.append(("核 crate", digest_tree(crate, skipped_files=skipped)))
+        components.append(("verus-pins.tsv", digest_file(os.path.join(root, REGISTRY))))
+        if "reuse-key-without-toolchain" not in BREAK:
+            components.append(("工具链", digest_text(tool_versions_text(root, options.get("verus_root")))))
+        components.append(("限时", digest_text(str(options["timeout"]))))
+        options["shared_components"] = components
+    return options["shared_components"]
+
+
+def verdict_library(options, kind):
+    version = judge_version() if "reuse-key-without-judge-version" in BREAK else (options.get("judge_version") or judge_version())
+    return VerdictLibrary(options.get("verdict_library"), kind, version, reuse=options.get("reuse", True))
+
+
+def lookup(store, item, components):
+    if "reuse-ignores-key" in BREAK and store.directory is not None and store.reuse:
+        return store.lookup_by_item_only(item)
+    return store.lookup(item, components)
+
+
+def selected_items(options, available, cell):
+    """--item 点名的项（给几次取并集），按 available 的次序交回；没给交 available；点了没有的抛 UsageError。弄坏开关 item-filter-ignored 下一律交 available。"""
+    wanted = options.get("items") or []
+    if not wanted or "item-filter-ignored" in BREAK:
+        return list(available)
+    unknown = [item for item in wanted if item not in available]
+    if unknown:
+        raise UsageError(f"{cell} 格里没有点名的项：{'、'.join(unknown)}", available)
+    return [item for item in available if item in wanted]
+
+
+def report_item(item, verdict, how, seconds=None):
+    """每项一行：项名、判定（绿 / 红）、现判还是复用、现判的用了几秒。"""
+    print(f"  · {item}：{verdict}，{how}" + (f"，{seconds:.1f} 秒" if seconds is not None else ""))  # gate-lint:detail
+
+
+def finish_tally(tally, cell):
+    print(f"  · 按条：{tally.text()}")  # gate-lint:detail
+    tally.append_to(os.environ.get(ITEM_TALLY_FILE_VARIABLE), cell)
+
+
 def check_proof(root, options):
     registry, kernels, manifest, executable = prepared(root, options)
+    if options.get("items"):
+        raise UsageError("verus-proof 格只有一项（proof），不收 --item", ["proof"])
+    store, tally = verdict_library(options, "proof"), Tally()
+    components = shared_components(root, registry, options)
+    reused, reason = lookup(store, "proof", components)
+    tally.count(reused, reason)
+    if reused:
+        report_item("proof", "绿", f"复用（{reason}）")
+        finish_tally(tally, "verus-proof")
+        print(f"  ✓ Verus 验 {registry.crate_directory}：复用上一次判绿的判定（登记 {registry.verified_count}，--no-cheating，--rlimit {registry.rlimit}）；按条现判 0、复用 1")
+        return EXIT_GREEN
+    started = time.monotonic()
     problems = []
     if "cheating-unchecked" not in BREAK:
         for marker in cheating_markers(root, kernels):
@@ -751,11 +883,20 @@ def check_proof(root, options):
         elif not results.get("is-verifying-entire-crate", False):
             problems.append(("Verus 报这一次没验整个 crate", "别给 --verify-module 这类只验一部分的选项"))
     if problems:
+        report_item("proof", "红", f"现判（{reason}）", time.monotonic() - started)
+        if "reuse-records-red" in BREAK:
+            store.record("proof", components, "（弄坏开关 reuse-records-red：红也记成绿）")
+        finish_tally(tally, "verus-proof")
         report_cell(problems)
         return EXIT_RED
     verified = outcome["json"]["verification-results"].get("verified") if outcome["json"] else "?"
+    report_item("proof", "绿", f"现判（{reason}）", time.monotonic() - started)
+    failed_record = store.record("proof", components, f"{verified} verified、0 errors")
+    if failed_record:
+        print(f"  ! {failed_record}：下一趟这一项照判")
+    finish_tally(tally, "verus-proof")
     print(f"  ✓ Verus 验 {registry.crate_directory}：{verified} verified、0 errors（登记 {registry.verified_count}），--no-cheating，--rlimit {registry.rlimit}，"
-          f"{len(kernels)} 份核里 0 处作弊标记，限时 {options['timeout']} 秒内出结局")
+          f"{len(kernels)} 份核里 0 处作弊标记，限时 {options['timeout']} 秒内出结局；按条{tally.text()}")
     return EXIT_GREEN
 
 
@@ -787,27 +928,75 @@ def requires_insertion_points(text):
     return points
 
 
-def verify_in_parallel(root, registry, manifest, executable, options, edits, key):
+def verify_in_parallel(root, registry, manifest, executable, options, edits, key, judged=None):
     """edits：[(说明, {相对仓根的文件: 新内容})]；每一处一份副本、一次 Verus。交回与 edits 同序的 outcome。
+    judged(下标, outcome, 秒数) 给了就在那一处出结局时当场调（按条判定在这里判完就落盘，打断之后判过的不丢）。
     一处拿到内存包装的 252 之后，还没起的那几处不建副本、不起包装（QueueRefusal），交 skipped_outcome；已经起了的照常收。"""
+    if not edits:
+        return []
     jobs = options["jobs"] or min(len(edits), max(1, options["threads"] // 4))
     threads = max(1, options["threads"] // jobs)
     state = queue_refusal(options)
 
-    def one(edit):
+    def one(index, edit):
+        started = time.monotonic()
         earlier = state.refused() if state is not None else None
         if earlier:
-            return skipped_outcome(earlier)
-        with tempfile.TemporaryDirectory(prefix="verus-proof-check-") as work:
-            crate_copy = copy_crate(root, registry, work)
-            for relative, content in edit[1].items():
-                with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
-                    handle.write(content)
-            return run_verus(executable, crate_copy, verus_arguments(registry, manifest, threads), options, key, label=edit[0])
+            outcome = skipped_outcome(earlier)
+        else:
+            with tempfile.TemporaryDirectory(prefix="verus-proof-check-") as work:
+                crate_copy = copy_crate(root, registry, work)
+                for relative, content in edit[1].items():
+                    with open(os.path.join(work, relative), "w", encoding="utf-8") as handle:
+                        handle.write(content)
+                outcome = run_verus(executable, crate_copy, verus_arguments(registry, manifest, threads), options, key, label=edit[0])
+        if judged is not None:
+            judged(index, outcome, time.monotonic() - started)
+        return outcome
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=jobs) as pool:
-        futures = [pool.submit(one, edit) for edit in edits]
+        futures = [pool.submit(one, index, edit) for index, edit in enumerate(edits)]
         return [future.result() for future in futures]
+
+
+class ItemJudging:
+    """一格里逐项判：每项出结局时（verify_in_parallel 的 judged）判出这一项的问题，判绿就当场记进判定库；问题按项的次序交回。
+    弄坏开关 reuse-records-whole-cell-only 下不当场记，等整格判完、一处问题都没有才一起记（被打断或有一项红，判过的全不留）；
+    reuse-records-red 下红的也记成绿。"""
+
+    def __init__(self, store, judge_one, cell):
+        self.store, self.judge_one, self.cell = store, judge_one, cell
+        self.lock = threading.Lock()
+        self.problems, self.lines, self.summaries, self.pending = {}, {}, {}, []
+
+    def __call__(self, index, outcome, seconds, item, components, reason):
+        problems, summary = self.judge_one(index, outcome)
+        failed_record = None
+        if not problems or "reuse-records-red" in BREAK:
+            if "reuse-records-whole-cell-only" in BREAK:
+                with self.lock:
+                    self.pending.append((item, components, summary))
+            else:
+                failed_record = self.store.record(item, components, summary)
+        with self.lock:
+            self.problems[index] = problems
+            self.summaries[index] = summary
+            self.lines[index] = (item, "红" if problems else "绿", f"现判（{reason}）", seconds, failed_record)
+
+    def finish(self, count):
+        """按项的次序打每项那一行、交回全部问题；whole-cell-only 下整格没问题才把攒着的一起记。"""
+        problems = []
+        for index in range(count):
+            if index in self.lines:
+                item, verdict, how, seconds, failed_record = self.lines[index]
+                report_item(item, verdict, how, seconds)
+                if failed_record:
+                    print(f"  ! {failed_record}：下一趟这一项照判")
+            problems += self.problems.get(index, [])
+        if not problems:
+            for item, components, summary in self.pending:
+                self.store.record(item, components, summary)
+        return problems
 
 
 def with_assert_false(line):
@@ -815,9 +1004,10 @@ def with_assert_false(line):
     return head + "{ assert(false);" + tail
 
 
-def check_vacuity(root, options):
-    registry, kernels, manifest, executable = prepared(root, options)
-    edits, expected, all_at_once = [], [], []
+def vacuity_points(root, registry, kernels):
+    """空真的每一处：[(项名, 说明, {相对仓根的文件: 插了断言的内容}, (相对 crate 的文件, 插的那一行, requires 那一行))] 与每份核全部插进去的那一份（弄坏开关用）。
+    项名 vacuity:<核的相对路径>:<requires 那一行的行号>。"""
+    points, all_at_once = [], []
     for kernel in kernels:
         text = open(kernel, encoding="utf-8").read()
         relative = os.path.relpath(kernel, root)
@@ -827,44 +1017,76 @@ def check_vacuity(root, options):
             changed = list(lines)
             changed[brace] = with_assert_false(changed[brace])
             every_point[brace] = with_assert_false(every_point[brace])
-            edits.append((f"{relative} {label}", {relative: "\n".join(changed)}))
-            expected.append((os.path.relpath(kernel, os.path.join(root, registry.crate_directory)), brace + 1, requires_line))
+            points.append((f"vacuity:{relative}:{requires_line}", f"{relative} {label}", {relative: "\n".join(changed)},
+                           (os.path.relpath(kernel, os.path.join(root, registry.crate_directory)), brace + 1, requires_line)))
         all_at_once.append((relative, {relative: "\n".join(every_point)}))
-    if not edits:
+    return points, all_at_once
+
+
+def vacuity_item_problems(label, expected, outcome, options):
+    """空真一处的问题（(卡在哪, 下一步)），交回 (问题, 一句判定)。"""
+    path, line, requires_line = expected
+    problem = outcome_problem(outcome, options)
+    if problem:
+        return [(f"{label}（第 {requires_line} 行的 requires）：{problem}",
+                 problem_howto(outcome, "插断言的副本判不出来：看报错，修好再跑；超时见 GATE_VERUS_TIMEOUT_SECONDS"))], ""
+    if outcome["timed_out"]:
+        return [], "超时（弄坏开关 timeout-as-pass）"
+    results = outcome["json"]["verification-results"]
+    if results.get("success") and results.get("errors", 0) == 0:
+        if "vacuity-accepts-verified" not in BREAK:
+            return [(f"{label}：函数体头插 assert(false) 照样验得过——第 {requires_line} 行起的前置条件不可满足（空真），这个函数的 ensures 什么也没证",
+                     "改前置条件让它可满足（常见：两条互相矛盾、范围写反）；改完这一格插的 assert(false) 要在那一行报 assertion failed")], ""
+        return [], "验得过（弄坏开关 vacuity-accepts-verified）"
+    blocks = diagnostic_blocks(outcome["diagnostics"])
+    if not any("assertion failed" in message and path == block_path and line == block_line for message, block_path, block_line in blocks):
+        if "vacuity-all-at-once" in BREAK and "闭包" in label:
+            return [], ""
+        listed = "；".join(f"{block_path}:{block_line} {message}" for message, block_path, block_line in blocks[:6])
+        return [(f"{label}：插的 assert(false) 在 {path}:{line}，Verus 报的错不在那一行（{listed or '没有配上位置的报错'}）",
+                 "插入点认错了或副本编不过：看 requires_insertion_points 认的 {{ 是不是函数体的那一个")], ""
+    return [], f"{path}:{line} 报 assertion failed"
+
+
+def check_vacuity(root, options):
+    registry, kernels, manifest, executable = prepared(root, options)
+    points, all_at_once = vacuity_points(root, registry, kernels)
+    if not points:
         raise NotRun(f"{len(kernels)} 份核里一处 requires 都没有：没有前置条件，空真这一格无对象可判")
+    chosen = selected_items(options, [point[0] for point in points], "verus-vacuity")
+    points = [point for point in points if point[0] in chosen]
+    store, tally = verdict_library(options, "vacuity"), Tally()
+    shared = shared_components(root, registry, options)
+    pending = []
+    for item, label, change, expected in points:
+        components = shared + ([] if "reuse-key-without-row" in BREAK else [("这一处", digest_text(f"{item}\t{label}"))]) if shared else []
+        reused, reason = lookup(store, item, components)
+        tally.count(reused, reason)
+        if reused:
+            report_item(item, "绿", f"复用（{reason}）")
+        else:
+            pending.append((item, label, change, expected, components, reason))
     if "vacuity-all-at-once" in BREAK:
         # 弄坏：一份核的全部插入点插进同一份副本只跑一遍。外层函数入口的 assert(false) 一失败，里面闭包那一处就验得过、不单报
-        shared = dict(zip((relative for relative, _change in all_at_once),
-                          verify_in_parallel(root, registry, manifest, executable, options, all_at_once, "vacuity")))
-        outcomes = [shared[label.split(" ", 1)[0]] for label, _change in edits]
+        together = dict(zip((relative for relative, _change in all_at_once),
+                            verify_in_parallel(root, registry, manifest, executable, options, all_at_once, "vacuity")))
+        problems = []
+        for item, label, _change, expected, _components, reason in pending:
+            item_problems, _summary = vacuity_item_problems(label, expected, together[label.split(" ", 1)[0]], options)
+            report_item(item, "红" if item_problems else "绿", f"现判（{reason}）")
+            problems += item_problems
     else:
-        outcomes = verify_in_parallel(root, registry, manifest, executable, options, edits, "vacuity")
-    problems = []
-    for (label, _change), (path, line, requires_line), outcome in zip(edits, expected, outcomes):
-        problem = outcome_problem(outcome, options)
-        if problem:
-            problems.append((f"{label}（第 {requires_line} 行的 requires）：{problem}",
-                             problem_howto(outcome, "插断言的副本判不出来：看报错，修好再跑；超时见 GATE_VERUS_TIMEOUT_SECONDS")))
-            continue
-        if outcome["timed_out"]:
-            continue
-        results = outcome["json"]["verification-results"]
-        if results.get("success") and results.get("errors", 0) == 0:
-            if "vacuity-accepts-verified" not in BREAK:
-                problems.append((f"{label}：函数体头插 assert(false) 照样验得过——第 {requires_line} 行起的前置条件不可满足（空真），这个函数的 ensures 什么也没证",
-                                 "改前置条件让它可满足（常见：两条互相矛盾、范围写反）；改完这一格插的 assert(false) 要在那一行报 assertion failed"))
-            continue
-        blocks = diagnostic_blocks(outcome["diagnostics"])
-        if not any("assertion failed" in message and path == block_path and line == block_line for message, block_path, block_line in blocks):
-            if "vacuity-all-at-once" in BREAK and "闭包" in label:
-                continue
-            listed = "；".join(f"{block_path}:{block_line} {message}" for message, block_path, block_line in blocks[:6])
-            problems.append((f"{label}：插的 assert(false) 在 {path}:{line}，Verus 报的错不在那一行（{listed or '没有配上位置的报错'}）",
-                             "插入点认错了或副本编不过：看 requires_insertion_points 认的 {{ 是不是函数体的那一个"))
+        judging = ItemJudging(store, lambda index, outcome: vacuity_item_problems(pending[index][1], pending[index][3], outcome, options), "verus-vacuity")
+        verify_in_parallel(root, registry, manifest, executable, options, [(label, change) for _item, label, change, _expected, _components, _reason in pending],
+                           "vacuity", judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][0], pending[index][4], pending[index][5]))
+        problems = judging.finish(len(pending))
+    finish_tally(tally, "verus-vacuity")
     if problems:
         report_cell(problems)
         return EXIT_RED
-    print(f"  ✓ 空真：{len(kernels)} 份核里 {len(edits)} 处 requires，每一处在函数体头插 assert(false) 都在插的那一行报 assertion failed（前置条件可满足）")
+    named = f"（--item 点名的 {len(points)} 处）" if options.get("items") else ""
+    print(f"  ✓ 空真：{len(kernels)} 份核里 {len(points)} 处 requires{named}，每一处在函数体头插 assert(false) 都在插的那一行报 assertion failed（前置条件可满足）；"
+          f"按条{tally.text()}")
     return EXIT_GREEN
 
 
@@ -889,9 +1111,53 @@ def must_red_rows(root, registry):
     return rows
 
 
+def must_red_item(row):
+    return f"must-red:{row['name']}"
+
+
+def must_red_row_problems(row, outcome, options, registry):
+    """必红世界一行改坏之后的结局判出的问题，交回 (问题, 一句判定)；一句判定里带「rlimit 用尽夹证明错」时成功句把它数进去。"""
+    problem = outcome_problem(outcome, options)
+    if problem:
+        return [(f"第 {row['number']} 行「{row['name']}」：{problem}",
+                 problem_howto(outcome, "必红世界要红在证明上：改坏之后编不过的变异不算，换一处只改判定的改法"))], ""
+    if outcome["timed_out"]:
+        return [], "超时（弄坏开关 timeout-as-pass）"
+    results = outcome["json"]["verification-results"]
+    if not integer_counts(results):
+        return [(f"第 {row['number']} 行「{row['name']}」：Verus 的 JSON 里没有整数的 verified 与 errors（读到 verified {results.get('verified')!r}、"
+                 f"errors {results.get('errors')!r}、vir 错 {results.get('encountered-vir-error')}），判不出这一行红没红",
+                 "vir 错是改坏的副本没走到验证（类型或模式错）：换一处只改判定的改法；没有 vir 错就是 Verus 换了 JSON 的写法："
+                 "照新写法改 research/scripts/verus-proof-check.py 的 integer_counts")], ""
+    rlimit_exhausted = RLIMIT_EXHAUSTED in outcome["diagnostics"]
+    proof_errors = proof_error_messages(outcome["diagnostics"])
+    counted = proof_error_messages(outcome["diagnostics"], count_rlimit="rlimit-counted-in-proof-errors" in BREAK)
+    if rlimit_exhausted and (not proof_errors or "rlimit-any-line-voids" in BREAK) and "rlimit-counts-as-red" not in BREAK:
+        listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
+        return [(f"第 {row['number']} 行「{row['name']}」：Verus 输出里有 {RLIMIT_EXHAUSTED}，除它与 aborting due to 之外没有别的报错（--rlimit {registry.rlimit}；"
+                 f"verified {results.get('verified')}、errors {results.get('errors')}：{listed}），这一行的红不作数",
+                 f"这一行红在算力额度上，不是证明失败：改替换文或调高登记的 rlimit（{REGISTRY} 的 rlimit 行）")], ""
+    summary = f"证明错 {len(counted)} 条" + ("，rlimit 用尽夹证明错" if rlimit_exhausted else "")
+    if results.get("errors", 0) < 1 and "mutation-accepts-green" not in BREAK:
+        return [(f"第 {row['number']} 行「{row['name']}」改坏之后 Verus 照样验过（verified {results.get('verified')}、errors 0）：证明没盯住这一处",
+                 "补证明或收紧 spec，让这一处改坏就验不过；确是等价变异就从表里删掉并写明为什么")], summary
+    if (row["proof_errors"] is not None and len(counted) != row["proof_errors"]
+            and "proof-error-count-unchecked" not in BREAK and "mutation-accepts-green" not in BREAK):
+        listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
+        return [(f"第 {row['number']} 行「{row['name']}」红了，但证明错 {len(counted)} 条，表里写的是 proof_errors={row['proof_errors']}"
+                 f"（--rlimit {registry.rlimit}；verified {results.get('verified')}、errors {results.get('errors')}；报的是：{listed}）",
+                 "先看红的是不是这条变异要盯的那一处（证明换了一条路红的就改证明或换改法）；确是它，照这一次的证明错条数改第五段。"
+                 "条数只数 error 起头的证明错，含 Resource limit (rlimit) exceeded 的与 aborting due to 那一句不计")], summary
+    return [], summary
+
+
 def check_must_red_worlds(root, options):
     registry, _kernels, manifest, executable = prepared(root, options)
     rows = must_red_rows(root, registry)
+    chosen = selected_items(options, [must_red_item(row) for row in rows], "verus-must-red-worlds")
+    rows = [row for row in rows if must_red_item(row) in chosen]
+    store, tally = verdict_library(options, "must-red-worlds"), Tally()
+    shared = shared_components(root, registry, options)
     problems, edits, judged = [], [], []
     rlimit_with_proof_error = 0
     for row in rows:
@@ -917,48 +1183,36 @@ def check_must_red_worlds(root, options):
             continue
         edits.append((row["name"], {row["file"]: text.replace(row["original"], row["replacement"], 1)}))
         judged.append(row)
-    outcomes = verify_in_parallel(root, registry, manifest, executable, options, edits, "must-red-worlds") if edits else []
-    for row, outcome in zip(judged, outcomes):
-        problem = outcome_problem(outcome, options)
-        if problem:
-            problems.append((f"第 {row['number']} 行「{row['name']}」：{problem}",
-                             problem_howto(outcome, "必红世界要红在证明上：改坏之后编不过的变异不算，换一处只改判定的改法")))
-            continue
-        if outcome["timed_out"]:
-            continue
-        results = outcome["json"]["verification-results"]
-        if not integer_counts(results):
-            problems.append((f"第 {row['number']} 行「{row['name']}」：Verus 的 JSON 里没有整数的 verified 与 errors（读到 verified {results.get('verified')!r}、"
-                             f"errors {results.get('errors')!r}、vir 错 {results.get('encountered-vir-error')}），判不出这一行红没红",
-                             "vir 错是改坏的副本没走到验证（类型或模式错）：换一处只改判定的改法；没有 vir 错就是 Verus 换了 JSON 的写法："
-                             "照新写法改 research/scripts/verus-proof-check.py 的 integer_counts"))
-            continue
-        rlimit_exhausted = RLIMIT_EXHAUSTED in outcome["diagnostics"]
-        proof_errors = proof_error_messages(outcome["diagnostics"])
-        counted = proof_error_messages(outcome["diagnostics"], count_rlimit="rlimit-counted-in-proof-errors" in BREAK)
-        if rlimit_exhausted and (not proof_errors or "rlimit-any-line-voids" in BREAK) and "rlimit-counts-as-red" not in BREAK:
-            listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
-            problems.append((f"第 {row['number']} 行「{row['name']}」：Verus 输出里有 {RLIMIT_EXHAUSTED}，除它与 aborting due to 之外没有别的报错（--rlimit {registry.rlimit}；"
-                             f"verified {results.get('verified')}、errors {results.get('errors')}：{listed}），这一行的红不作数",
-                             f"这一行红在算力额度上，不是证明失败：改替换文或调高登记的 rlimit（{REGISTRY} 的 rlimit 行）"))
-            continue
-        if rlimit_exhausted:
-            rlimit_with_proof_error += 1
-        if results.get("errors", 0) < 1 and "mutation-accepts-green" not in BREAK:
-            problems.append((f"第 {row['number']} 行「{row['name']}」改坏之后 Verus 照样验过（verified {results.get('verified')}、errors 0）：证明没盯住这一处",
-                             "补证明或收紧 spec，让这一处改坏就验不过；确是等价变异就从表里删掉并写明为什么"))
-        elif (row["proof_errors"] is not None and len(counted) != row["proof_errors"]
-              and "proof-error-count-unchecked" not in BREAK and "mutation-accepts-green" not in BREAK):
-            listed = "；".join(f"{path}:{line} {message}" for message, path, line in diagnostic_blocks(outcome["diagnostics"])[:6])
-            problems.append((f"第 {row['number']} 行「{row['name']}」红了，但证明错 {len(counted)} 条，表里写的是 proof_errors={row['proof_errors']}"
-                             f"（--rlimit {registry.rlimit}；verified {results.get('verified')}、errors {results.get('errors')}；报的是：{listed}）",
-                             "先看红的是不是这条变异要盯的那一处（证明换了一条路红的就改证明或换改法）；确是它，照这一次的证明错条数改第五段。"
-                             "条数只数 error 起头的证明错，含 Resource limit (rlimit) exceeded 的与 aborting due to 那一句不计"))
+    # 原文、第五段、rlimit 属性没过的行没起 Verus，按项各打一行红
+    passed = {row["number"] for row in judged}
+    for row in rows:
+        if row["number"] not in passed:
+            report_item(must_red_item(row), "红", "现判（没起 Verus：这一行本身不对）")
+            tally.count(False, "这一行本身不对")
+    pending = []
+    for row, edit in zip(judged, edits):
+        item = must_red_item(row)
+        components = shared + ([] if "reuse-key-without-row" in BREAK else
+                               [("这一行", digest_text("\t".join((row["name"], row["file"], row["original"], row["replacement"], row["expected"]))))]) if shared else []
+        reused, reason = lookup(store, item, components)
+        tally.count(reused, reason)
+        if reused:
+            report_item(item, "绿", f"复用（{reason}）")
+        else:
+            pending.append((row, edit, item, components, reason))
+    judging = ItemJudging(store, lambda index, outcome: must_red_row_problems(pending[index][0], outcome, options, registry), "verus-must-red-worlds")
+    verify_in_parallel(root, registry, manifest, executable, options, [edit for _row, edit, _item, _components, _reason in pending], "must-red-worlds",
+                       judged=lambda index, outcome, seconds: judging(index, outcome, seconds, pending[index][2], pending[index][3], pending[index][4]))
+    problems += judging.finish(len(pending))
+    rlimit_with_proof_error = sum(1 for summary in judging.summaries.values() if "rlimit 用尽夹证明错" in summary)
+    finish_tally(tally, "verus-must-red-worlds")
     if problems:
         report_cell(problems)
         return EXIT_RED
-    print(f"  ✓ 必红世界：{registry.must_red_table} 的 {len(rows)} 行每行改坏之后 Verus 都报错，证明错条数与第五段 proof_errors= 相同；原文都恰好命中一次；"
-          f"没有一行只红在 rlimit 用尽上（--rlimit {registry.rlimit}；{rlimit_with_proof_error} 行输出里夹着 rlimit 用尽、另有证明错，红计入，rlimit 用尽不计入证明错条数）")
+    named = f"（--item 点名的 {len(rows)} 行）" if options.get("items") else ""
+    print(f"  ✓ 必红世界：{registry.must_red_table} 的 {len(rows)} 行{named}每行改坏之后 Verus 都报错，证明错条数与第五段 proof_errors= 相同；原文都恰好命中一次；"
+          f"没有一行只红在 rlimit 用尽上（--rlimit {registry.rlimit}；{rlimit_with_proof_error} 行输出里夹着 rlimit 用尽、另有证明错，红计入，rlimit 用尽不计入证明错条数）；"
+          f"按条{tally.text()}")
     return EXIT_GREEN
 
 
@@ -1026,6 +1280,12 @@ def rustup_toolchain_fields(toolchain_text):
 
 
 def tool_versions(root, override):
+    print(tool_versions_text(root, override))
+    return EXIT_GREEN
+
+
+def tool_versions_text(root, override):
+    """tool-versions 打的那一行（不带换行）；按条判定的「工具链」一样就是它的摘要。"""
     try:
         registry = read_registry(root)
     except Red:
@@ -1075,10 +1335,8 @@ def tool_versions(root, override):
             located = (shutil.which(z3_override) or "") if bare else z3_override
             extra += f" VERUS_Z3_PATH={z3_override}:{located or '找不到'}:{file_sha256(located) if located else '没有'}"
     if version is None:
-        print(f"verus 没装（{directory} 里没有 version.json） verus_sha256={digest}{extra}")
-    else:
-        print(f"verus version={version.get('version')} commit={version.get('commit')} toolchain={(version.get('toolchain') or '').split(' ')[0]} verus_sha256={digest}{extra}")
-    return EXIT_GREEN
+        return f"verus 没装（{directory} 里没有 version.json） verus_sha256={digest}{extra}"
+    return f"verus version={version.get('version')} commit={version.get('commit')} toolchain={(version.get('toolchain') or '').split(' ')[0]} verus_sha256={digest}{extra}"
 
 
 # ── 命令行 ──
@@ -1088,14 +1346,23 @@ def parse_options(arguments):
                "timeout": int(os.environ.get("GATE_VERUS_TIMEOUT_SECONDS") or 600),
                "threads": int(os.environ.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1),
                "jobs": int(os.environ.get("GATE_VERUS_JOBS") or 0),
-               "memory_cap": os.environ.get("GATE_VERUS_MEMORY_MAX") or "4G"}
+               "memory_cap": os.environ.get("GATE_VERUS_MEMORY_MAX") or "4G",
+               "items": [], "verdict_library": None, "reuse": True}
     positional = []
     flags = {"--verus-root": "verus_root", "--cargo-home": "cargo_home", "--timeout": "timeout", "--threads": "threads",
-             "--jobs": "jobs", "--memory-cap": "memory_cap"}
+             "--jobs": "jobs", "--memory-cap": "memory_cap", "--verdict-library": "verdict_library"}
     position = 0
     while position < len(arguments):
         argument = arguments[position]
-        if argument in flags:
+        if argument == "--item":
+            if position + 1 >= len(arguments) or not arguments[position + 1]:
+                raise ValueError("--item 后面缺项名（可点名的项：verus-proof-check.py list-items <根>）")
+            options["items"].append(arguments[position + 1])
+            position += 2
+        elif argument == "--no-reuse":
+            options["reuse"] = False
+            position += 1
+        elif argument in flags:
             if position + 1 >= len(arguments):
                 raise ValueError(f"{argument} 后面缺值")
             value = arguments[position + 1]
@@ -1115,9 +1382,16 @@ CHECKS = {"toolchain": check_toolchain, "proof": check_proof, "vacuity": check_v
 
 
 def run_check(name, root, options):
-    options = dict(options, queue_refusal=QueueRefusal())
+    options = dict(options, queue_refusal=QueueRefusal(), shared_components=None)
     try:
+        if name == "toolchain" and options.get("items"):
+            raise UsageError("verus-toolchain-pinned 格只有一项（toolchain），不收 --item", ["toolchain"])
         return CHECKS[name](os.path.abspath(root), options)
+    except UsageError as usage:
+        report_red(usage.message, "照下面列的项名写（verus-proof-check.py list-items <根> 也列），给几次 --item 取并集")
+        for item in usage.available:
+            print(f"       {item}")  # gate-lint:detail
+        return EXIT_USAGE
     except Red as red:
         report_red(red.message, red.howto)
         return EXIT_RED
@@ -1126,11 +1400,45 @@ def run_check(name, root, options):
         return EXIT_NOT_RUN
 
 
+def list_items(root):
+    """逐行打「项<TAB>格[<TAB>说明]」：toolchain、proof 各一项，空真每处 requires 一项，必红世界每行一项。只读登记表、核与表，不起 Verus、不编。"""
+    root = os.path.abspath(root)
+    lines = ["toolchain\tverus-toolchain-pinned", "proof\tverus-proof"]
+    if not os.path.isfile(os.path.join(root, REGISTRY)):
+        # 登记表不在（只摆了红例两格的样本根）：只列两项固定的；真要判时那几格自己报登记表不在、判红
+        print("\n".join(lines))
+        return EXIT_GREEN
+    try:
+        registry = read_registry(root)
+        try:
+            kernels = kernel_files(root, registry)
+        except NotRun:
+            kernels = []
+        points, _all_at_once = vacuity_points(root, registry, kernels)
+        lines += [f"{item}\tverus-vacuity\t{label}" for item, label, _change, _expected in points]
+        if kernels:
+            lines += [f"{must_red_item(row)}\tverus-must-red-worlds\t第 {row['number']} 行" for row in must_red_rows(root, registry)]
+    except Red as red:
+        report_red(f"列不出可点名的项：{red.message}", red.howto)
+        return EXIT_RED
+    for line in lines:
+        print(line)
+    return EXIT_GREEN
+
+
 def main(arguments):
     if arguments[:1] == ["--selftest"]:
         return selftest()
+    if arguments[:1] == ["list-items"]:
+        if len(arguments) != 2 or not os.path.isdir(arguments[1]):
+            report_red("list-items 要恰好一个仓根", "例：verus-proof-check.py list-items /path/to/singlefs")
+            return EXIT_USAGE
+        if "list-items-pipe-unhandled" not in BREAK:
+            # 接 | head 时读的一头先关了：照 SIGPIPE 的惯例安静退出（被 SIGPIPE 停，shell 里退 141），不打 BrokenPipeError 的回溯
+            signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+        return list_items(arguments[1])
     if not arguments or arguments[0] not in (*CHECKS, "fingerprint", "tool-versions"):
-        report_red("用法：verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根> [选项] | fingerprint <包目录> | tool-versions [<根>] | --selftest",
+        report_red("用法：verus-proof-check.py <toolchain|proof|vacuity|must-red-worlds> <根> [选项] | list-items <根> | fingerprint <包目录> | tool-versions [<根>] | --selftest",
                    "看文件头的用法一节")
         return EXIT_USAGE
     try:
@@ -1162,6 +1470,8 @@ here = os.path.dirname(os.path.realpath(__file__))
 commit = json.load(open(os.path.join(here, "version.json")))["verus"]["commit"]
 no_cheating = "--no-cheating" in sys.argv
 rlimit = float(sys.argv[sys.argv.index("--rlimit") + 1]) if "--rlimit" in sys.argv[:-1] else None
+if os.environ.get("SELFTEST_VERUS_TRACE"):
+    open(os.environ["SELFTEST_VERUS_TRACE"], "a").write("起了一次\n")
 files = []
 for directory, _s, names in os.walk("src"):
     for name in sorted(names):
@@ -1174,7 +1484,7 @@ for path in sorted(files):
     for number, line in enumerate(lines, 1):
         if "SELFTEST_SLEEP" in line:
             time.sleep(30)
-        if "SELFTEST_KILLED" in line:
+        if "SELFTEST_KILLED" in line or (os.environ.get("SELFTEST_KILL_MARK") and os.environ["SELFTEST_KILL_MARK"] in line):
             os.kill(os.getpid(), 9)
         if re.match(r"^\s*(pub\s+)?(proof\s+)?fn\s", line):
             functions += 1
@@ -1272,7 +1582,7 @@ def selftest():
                 f"package\tvstd\t0.0.1\t{'c' * 40}\tsource/vstd\t{fingerprint}\n"
                 "crate\tcrates/core\t%d\n" % count +
                 "kernel\tcrates/core/src/kernel.rs\n"
-                "must-red-worlds\tcrates/core/verus-mutations.tsv\n" + (f"rlimit\t{rlimit}\n" if rlimit is not None else ""))
+                "must-red-worlds\tcrates/core/verus-must-red-worlds.tsv\n" + (f"rlimit\t{rlimit}\n" if rlimit is not None else ""))
             open(os.path.join(root, "Cargo.lock"), "w").write(f'version = 4\n\n[[package]]\nname = "vstd"\nversion = "{lock_version}"\n')
             open(os.path.join(root, "crates", "core", "Cargo.toml"), "w").write(
                 '[package]\nname = "core-sample"\nedition = "2021"\n\n[dependencies]\n' + ('vstd = "=0.0.1"\n' if wired else "") + extra_dependency)
@@ -1280,7 +1590,7 @@ def selftest():
             if with_kernel:
                 open(os.path.join(root, "crates", "core", "src", "kernel.rs"), "w").write(kernel)
             rows = must_red if must_red is not None else ["收紧改松\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\tif value > limit { limit } else { value } // SELFTEST_BROKEN\tproof_errors=1"]
-            open(os.path.join(root, "crates", "core", "verus-mutations.tsv"), "w").write("# 自证用\n" + "".join(row + "\n" for row in rows))
+            open(os.path.join(root, "crates", "core", "verus-must-red-worlds.tsv"), "w").write("# 自证用\n" + "".join(row + "\n" for row in rows))
             return root
 
         options = {"verus_root": install, "cargo_home": cargo_home, "launcher": [], "timeout": 5, "threads": 2, "jobs": 2,
@@ -1375,6 +1685,176 @@ def selftest():
             "JSON 缺数\tcrates/core/src/kernel.rs\tif value > limit { limit } else { value }\t"
             "if value > limit { limit } else { value } // SELFTEST_BROKEN SELFTEST_NO_COUNTS\tproof_errors=1"]),
                1, "Verus 的 JSON 里没有整数的 verified 与 errors")
+        # ── 逐项点名与按条复用（文件头「逐项点名与按条复用」）──
+        import io
+        import contextlib
+        item_line = re.compile(r"^  · (\S.*?)：(绿|红)，(现判|复用)", re.M)
+
+        def run_items(check, root, environment=None, **changes):
+            """跑一格交回 (退出码, 输出, {项: (绿/红, 现判/复用)})；changes 盖进 options（items、verdict_library、judge_version、reuse），environment 临时设进 os.environ。"""
+            saved_environment = {name: os.environ.get(name) for name in (environment or {})}
+            os.environ.update(environment or {})
+            buffer = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    got = run_check(check, root, dict(options, **changes))
+            finally:
+                for name, value in saved_environment.items():
+                    if value is None:
+                        os.environ.pop(name, None)
+                    else:
+                        os.environ[name] = value
+            output = buffer.getvalue()
+            return got, output, {match.group(1): (match.group(2), match.group(3)) for match in item_line.finditer(output)}
+
+        def judge_cell(label, passed, detail):
+            nonlocal cases
+            cases += 1
+            if not passed:
+                wrong.append(label)
+                print(f"    {label} 这一格判错：{detail}")  # gate-lint:detail
+
+        green_row = "改坏{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // SELFTEST_BROKEN {0}\tproof_errors=1"
+        survives_row = "改注释{0}\tcrates/core/src/kernel.rs\tif value > limit {{ limit }} else {{ value }}\tif value > limit {{ limit }} else {{ value }} // 只是注释 {0}\tproof_errors=1"
+        # 三行必红世界改的是同一处原文：原文要恰好命中一次，三行各自改一份副本
+        mixed_root = make_root("itemsmixed", must_red=[green_row.format("A"), survives_row.format("B"), green_row.format("C")])
+        vacuity_lines = [requires_line for requires_line, _brace, _label in requires_insertion_points(SELFTEST_KERNEL)]
+        listed_items = ["toolchain", "proof", *(f"vacuity:crates/core/src/kernel.rs:{line}" for line in vacuity_lines),
+                        "must-red:改坏A", "must-red:改注释B", "must-red:改坏C"]
+        trace_path = os.path.join(work, "verus-trace.txt")
+        open(trace_path, "w").close()
+        os.environ["SELFTEST_VERUS_TRACE"] = trace_path
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            listed_exit = list_items(mixed_root)
+        os.environ.pop("SELFTEST_VERUS_TRACE", None)
+        listed = [line.split("\t")[0] for line in buffer.getvalue().strip().split("\n")]
+        judge_cell("list-items", listed_exit == 0 and listed == listed_items, f"期望退 0、逐行 {listed_items}，实测退 {listed_exit}、{listed}")
+        judge_cell("list-items-no-verus", open(trace_path).read() == "", f"list-items 起了 Verus：{open(trace_path).read()!r}")
+        # 读的一头先关了（接 | head 的样子）：被 SIGPIPE 安静停掉，stderr 一个字都没有
+        read_end, write_end = os.pipe()
+        os.close(read_end)
+        closed_pipe = subprocess.run([sys.executable, os.path.realpath(__file__), "list-items", mixed_root], stdout=write_end, stderr=subprocess.PIPE, text=True)
+        os.close(write_end)
+        judge_cell("list-items-closed-pipe", closed_pipe.returncode == -signal.SIGPIPE and closed_pipe.stderr == "",
+                   f"期望被 SIGPIPE 停（{-signal.SIGPIPE}）、stderr 空，实测 {closed_pipe.returncode}：{closed_pipe.stderr.strip()[-200:]!r}")
+        got, output, verdicts = run_items("must-red-worlds", mixed_root, items=["must-red:改注释B"])
+        judge_cell("item-select-one", got == 1 and list(verdicts) == ["must-red:改注释B"], f"--item must-red:改注释B 期望只判这一行（退 1），实测退 {got}、判了 {list(verdicts)}")
+        got, output, _verdicts = run_items("must-red-worlds", mixed_root, items=["must-red:没有这一行"])
+        judge_cell("item-unknown", got == EXIT_USAGE and "must-red:改坏A" in output, f"点名没有的项期望退 2、列出可点名的项，实测退 {got}：{output.strip()[-300:]}")
+        got, output, _verdicts = run_items("proof", mixed_root, items=["proof"])
+        judge_cell("item-proof-refused", got == EXIT_USAGE, f"proof 格给 --item 期望退 2，实测退 {got}")
+        # 点名单跑一项与它在整格里跑的判定相同（必红世界一绿一红一绿；空真里外层可满足、闭包不可满足）
+        _got, _output, whole = run_items("must-red-worlds", mixed_root)
+        alone = {item: run_items("must-red-worlds", mixed_root, items=[item])[2].get(item) for item in whole}
+        judge_cell("item-alone-equals-whole-must-red", len(whole) == 3 and alone == whole and whole["must-red:改注释B"][0] == "红",
+                   f"整格 {whole}，逐项单跑 {alone}")
+        closure_root = make_root("itemsclosure", kernel=closure_vacuous)
+        _got, _output, whole = run_items("vacuity", closure_root)
+        alone = {item: run_items("vacuity", closure_root, items=[item])[2].get(item) for item in whole}
+        judge_cell("item-alone-equals-whole-vacuity", len(whole) == 3 and alone == whole and sorted(verdict for verdict, _how in whole.values()) == ["红", "绿", "绿"],
+                   f"整格 {whole}，逐项单跑 {alone}")
+        # 按条复用：头一趟全现判、记下；第二趟全复用；关了复用全现判；核 crate、工具链变了全现判，原因分栏点名
+        store_directory = os.path.join(work, "verdict-library")
+        reuse_root = make_root("reuse", must_red=[green_row.format("A"), green_row.format("B"), green_row.format("C")])
+        got, output, _verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory)
+        judge_cell("reuse-first-run-records", got == 0 and "现判 3、复用 0（现判的原因：无记录 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        got, output, verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory)
+        judge_cell("reuse-second-run-reuses", got == 0 and "现判 0、复用 3" in output and all(how == "复用" for _verdict, how in verdicts.values()),
+                   f"退 {got}：{output.strip()[-300:]}")
+        got, output, _verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory, reuse=False)
+        judge_cell("reuse-off", got == 0 and "现判 3、复用 0（现判的原因：关了复用 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        for check, count in (("proof", 1), ("vacuity", 2)):
+            run_items(check, reuse_root, verdict_library=store_directory)
+            got, output, _verdicts = run_items(check, reuse_root, verdict_library=store_directory)
+            judge_cell(f"reuse-{check}", got == 0 and f"现判 0、复用 {count}" in output, f"第二趟期望全复用，实测退 {got}：{output.strip()[-300:]}")
+        # 判法版本是另一列：输入一样都没变、只换判法版本，整格全现判、原因点名判法版本；再照真判法版本跑一趟记回去，后面几格比的是真判法版本
+        got, output, _verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory, judge_version="自证造的另一版判法")
+        judge_cell("reuse-judge-version-changed", got == 0 and "现判 3、复用 0（现判的原因：判法版本 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        run_items("must-red-worlds", reuse_root, verdict_library=store_directory)
+        with open(os.path.join(reuse_root, "crates", "core", "src", "kernel.rs"), "a") as handle:
+            handle.write("// 核改了一行注释\n")
+        got, output, _verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory)
+        judge_cell("reuse-crate-changed", got == 0 and "现判 3、复用 0（现判的原因：核 crate 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        with open(os.path.join(install, "libextra.so"), "w") as handle:
+            handle.write("安装目录里多一份库\n")
+        try:
+            got, output, _verdicts = run_items("must-red-worlds", reuse_root, verdict_library=store_directory)
+        finally:
+            os.remove(os.path.join(install, "libextra.so"))
+        judge_cell("reuse-toolchain-changed", got == 0 and "现判 3、复用 0（现判的原因：工具链 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        # 每一行的键里有这一行自己：只判过 A，B 不能拿 A 的判定
+        own_store = os.path.join(work, "verdict-library-own")
+        own_root = make_root("reuseown", must_red=[green_row.format("A"), survives_row.format("B")])
+        run_items("must-red-worlds", own_root, verdict_library=own_store, items=["must-red:改坏A"])
+        got, output, verdicts = run_items("must-red-worlds", own_root, verdict_library=own_store)
+        judge_cell("reuse-row-own-key", got == 1 and verdicts.get("must-red:改注释B") == ("红", "现判") and "现判 1、复用 1" in output,
+                   f"期望 A 复用、B 现判判红，实测退 {got}、{verdicts}")
+        # 红的不记：同一份输入第二趟照判、照红
+        red_store = os.path.join(work, "verdict-library-red")
+        run_items("must-red-worlds", own_root, verdict_library=red_store)
+        got, output, verdicts = run_items("must-red-worlds", own_root, verdict_library=red_store)
+        judge_cell("reuse-red-not-recorded", got == 1 and verdicts.get("must-red:改注释B") == ("红", "现判"), f"第二趟期望 B 照判照红，实测退 {got}、{verdicts}")
+        # 一项判完当场落盘：第一趟 C 那一处被外面 kill -9（不在键里的环境），A、B 已记；第二趟同一条命令只判 C
+        resume_store = os.path.join(work, "verdict-library-resume")
+        resume_root = make_root("resume", must_red=[green_row.format("A"), green_row.format("B"), green_row.format("C SELFTEST_KILLME")])
+        first, _output, _verdicts = run_items("must-red-worlds", resume_root, environment={"SELFTEST_KILL_MARK": "SELFTEST_KILLME"}, verdict_library=resume_store)
+        got, output, verdicts = run_items("must-red-worlds", resume_root, verdict_library=resume_store)
+        judge_cell("reuse-resume-after-kill", first == 1 and got == 0 and "现判 1、复用 2" in output, f"第一趟退 {first}，第二趟退 {got}：{output.strip()[-300:]}")
+        # 必红世界表不进共用键：改表里一行的替换文只现判那一行，证明与空真全复用；表头加一行注释一项都不现判；核 crate 里别的文件改了三格全现判
+        table_store = os.path.join(work, "verdict-library-table")
+        table_root = make_root("reusetable", must_red=[green_row.format("A"), green_row.format("B"), green_row.format("C")])
+        table_cells = ("proof", "vacuity", "must-red-worlds")
+        for check in table_cells:
+            run_items(check, table_root, verdict_library=table_store)
+        table_path = os.path.join(table_root, "crates", "core", "verus-must-red-worlds.tsv")
+        with open(table_path, encoding="utf-8") as handle:
+            table_text = handle.read()
+        with open(table_path, "w", encoding="utf-8") as handle:
+            handle.write(table_text.replace("// SELFTEST_BROKEN B", "// SELFTEST_BROKEN B 换了替换文"))
+        after = {check: run_items(check, table_root, verdict_library=table_store) for check in table_cells}
+        judge_cell("reuse-must-red-table-row-only",
+                   all(got == 0 for got, _output, _verdicts in after.values())
+                   and "现判 1、复用 2（现判的原因：这一行 变了 1）" in after["must-red-worlds"][1] and after["must-red-worlds"][2].get("must-red:改坏B") == ("绿", "现判")
+                   and "现判 0、复用 1" in after["proof"][1] and "现判 0、复用 2" in after["vacuity"][1],
+                   "期望必红世界只现判 B、证明与空真全复用，实测 " + "；".join(f"{check} 退 {got}：{output.strip()[-200:]}" for check, (got, output, _verdicts) in after.items()))
+        with open(table_path, encoding="utf-8") as handle:
+            table_text = handle.read()
+        with open(table_path, "w", encoding="utf-8") as handle:
+            handle.write("# 表头另加的一行注释\n\n" + table_text)
+        after = {check: run_items(check, table_root, verdict_library=table_store) for check in table_cells}
+        judge_cell("reuse-must-red-table-comment-only",
+                   all(got == 0 for got, _output, _verdicts in after.values())
+                   and "现判 0、复用 3" in after["must-red-worlds"][1] and "现判 0、复用 1" in after["proof"][1] and "现判 0、复用 2" in after["vacuity"][1],
+                   "期望三格全复用，实测 " + "；".join(f"{check} 退 {got}：{output.strip()[-200:]}" for check, (got, output, _verdicts) in after.items()))
+        with open(os.path.join(table_root, "crates", "core", "src", "lib.rs"), "a", encoding="utf-8") as handle:
+            handle.write("\n")
+        after = {check: run_items(check, table_root, verdict_library=table_store) for check in table_cells}
+        judge_cell("reuse-crate-other-file-all-cells",
+                   all(got == 0 for got, _output, _verdicts in after.values())
+                   and "现判 3、复用 0（现判的原因：核 crate 变了 3）" in after["must-red-worlds"][1]
+                   and "现判 1、复用 0（现判的原因：核 crate 变了 1）" in after["proof"][1] and "现判 2、复用 0（现判的原因：核 crate 变了 2）" in after["vacuity"][1],
+                   "期望三格全现判、原因是核 crate 变了，实测 " + "；".join(f"{check} 退 {got}：{output.strip()[-200:]}" for check, (got, output, _verdicts) in after.items()))
+        # 剪枝自证：小输入上开着复用与关掉复用，逐项判定相同；输入没变（全复用）与改了一行（只现判那一行、B 转红）各比一次
+        prune_store = os.path.join(work, "verdict-library-prune")
+        prune_root = make_root("prune", must_red=[green_row.format("A"), green_row.format("B"), green_row.format("C")])
+        for check in ("proof", "vacuity", "must-red-worlds"):
+            run_items(check, prune_root, verdict_library=prune_store)
+        on = {check: run_items(check, prune_root, verdict_library=prune_store)[2] for check in ("proof", "vacuity", "must-red-worlds")}
+        off = {check: run_items(check, prune_root)[2] for check in ("proof", "vacuity", "must-red-worlds")}
+        judge_cell("prune-unchanged-input", {check: {item: verdict for item, (verdict, _how) in items.items()} for check, items in on.items()}
+                   == {check: {item: verdict for item, (verdict, _how) in items.items()} for check, items in off.items()} and len(on["must-red-worlds"]) == 3,
+                   f"开着复用 {on}，关掉 {off}")
+        table_path = os.path.join(prune_root, "crates", "core", "verus-must-red-worlds.tsv")
+        with open(table_path, encoding="utf-8") as handle:
+            table_text = handle.read()
+        with open(table_path + ".new", "w", encoding="utf-8") as handle:
+            handle.write(table_text.replace("// SELFTEST_BROKEN B", "// 只是注释 B"))
+        os.replace(table_path + ".new", table_path)
+        on = run_items("must-red-worlds", prune_root, verdict_library=prune_store)[2]
+        off = run_items("must-red-worlds", prune_root)[2]
+        judge_cell("prune-after-change", {item: verdict for item, (verdict, _how) in on.items()} == {item: verdict for item, (verdict, _how) in off.items()}
+                   and off.get("must-red:改坏B", ("?",))[0] == "红", f"开着复用 {on}，关掉 {off}")
         # 内存包装自己退 250（撞了自己的上限）：那一处判「没跑成」，出路照包装文件头，不指向证明或必红世界表（开关 wrapper-exit-as-proof-red 下这两格判错）
         fake_wrapper = os.path.join(work, "fake-memory-cap-wrapper.sh")
         with open(fake_wrapper, "w", encoding="utf-8") as handle:
@@ -1384,6 +1864,16 @@ def selftest():
         try:
             expect("proof-wrapper-exit", "proof", green, 1, "没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 250")
             expect("must-red-wrapper-exit", "must-red-worlds", green, 1, "→ 怎么办：照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办")
+        finally:
+            MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
+        # 内存包装退 245（显存不够）：同样判「没跑成」、点名显存不够，不报成证明的问题（开关 wrapper-exit-as-proof-red 下这一格同样判错）
+        gpu_wrapper = os.path.join(work, "gpu-memory-cap-wrapper.sh")
+        with open(gpu_wrapper, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 245（显存不够）\nexit 245\n")
+        saved_runner, saved_launcher = MEMORY_CAP_RUNNER, options["launcher"]
+        MEMORY_CAP_RUNNER, options["launcher"] = gpu_wrapper, None
+        try:
+            expect("proof-wrapper-245", "proof", green, 1, "没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 245（显存不够")
         finally:
             MEMORY_CAP_RUNNER, options["launcher"] = saved_runner, saved_launcher
         # 经包装起、命令被外面 kill -9（包装退 137，不在 250–254 里）：判红，✗ 写 Verus 被信号停了，出路照包装文件头（开关 killed-as-proof-red 下判错）
@@ -1658,7 +2148,10 @@ def selftest():
                      "wrapper-exit-as-proof-red", "tool-versions-launcher-only", "tool-versions-five-files-only", "tool-versions-empty-z3-path-as-unset",
                      "tool-versions-bare-z3-from-current-directory", "not-run-masks-red", "wrapper-output-dropped", "wrapper-252-one-howto",
                      "wrapper-queue-lines-swallowed", "tool-versions-verus-environment-ignored", "killed-as-proof-red",
-                     "tool-versions-rustup-ignored", "queue-refused-keeps-queueing"):
+                     "tool-versions-rustup-ignored", "queue-refused-keeps-queueing",
+                     "item-filter-ignored", "reuse-key-without-crate", "reuse-key-with-must-red-table", "reuse-key-without-toolchain", "reuse-key-without-row",
+                     "reuse-ignores-key",
+                     "reuse-records-red", "reuse-records-whole-cell-only"):
             completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                        env=dict(os.environ, VERUS_PROOF_CHECK_BREAK=item))
             if completed.returncode == 0:

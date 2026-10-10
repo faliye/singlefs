@@ -39,7 +39,7 @@
 //!   extent 叶记录 112 = key 24 + 指针 88（D19 已定项 7/8）。
 //! - extent 树内部节点条目宽在 `crates/` 里零命中（`grep -rn 'EXTENT_INTERNAL\|extent_internal' crates/`
 //!   退出码 1）⇒ 当旋钮，110 与 136 两个取样点各报一次（登记第三节、第八·二节）。
-//! - journal 记录 4096、记录头 311、点名项 56 ⇒ 67 项/条（D23 已定项 12/17）——这两个量本段不判定，
+//! - journal 记录 4096、记录头 487、点名项 56 ⇒ 64 项/条（D23 已定项 12/17）——这两个量本段不判定，
 //!   只在 A1/B2 锚点里出现，供第二段复用。
 //!
 //! ## 它不答什么
@@ -67,12 +67,19 @@ const fn extent_node_header_bytes(key_bytes: u64) -> u64 {
 /// 上面那条公式在 `key_bytes = 24`（extent 叶 key 宽）下的值，与 B1/B5/A3 对拍：163。
 const EXTENT_NODE_HEADER_BYTES: u64 = extent_node_header_bytes(EXTENT_LEAF_KEY_BYTES);
 
-const JOURNAL_HEADER_BYTES: u64 = 311;
+const JOURNAL_HEADER_BYTES: u64 = 487;
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
 const JOURNAL_RECORD_BYTES: u64 = 4096;
-/// 一条记录装多少点名项：与 A1/B2 对拍，67。本段不消费它，留给第二段。
-const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 67;
-const _: () = assert!(JOURNAL_NAMED_ENTRIES_PER_RECORD == (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES);
+
+/// 一条 4096 记录在给定头宽下装几个点名项：`⌊(4096 − 头宽) ÷ 56⌋`（D23 已定项 4 末条）。
+/// 头宽作参数而不读全局常量，单测才能在 487 之外的取样点（456 / 457 / 512 / 513）上钉住它。
+const fn named_entries_per_record_for_header_bytes(header_bytes: u64) -> u64 {
+    (JOURNAL_RECORD_BYTES - header_bytes) / JOURNAL_NAMED_ENTRY_BYTES
+}
+
+/// 一条记录装多少点名项：与 A1/B2 对拍，64。本段不消费它，留给第二段。
+const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
+const _: () = assert!(JOURNAL_NAMED_ENTRIES_PER_RECORD == named_entries_per_record_for_header_bytes(JOURNAL_HEADER_BYTES));
 
 const DATA_UNIT_BYTES: u64 = 32768;
 const DATA_UNIT_HEADER_FIXED_BYTES: u64 = 105;
@@ -308,7 +315,7 @@ fn main() {
          b1_leaf_capacity_16384={} b2_named_entries_per_record_check={} b3_payload_capacity_today={} \
          b3_payload_capacity_reserve28={}",
         extent_leaf_capacity(16384),
-        (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES,
+        named_entries_per_record_for_header_bytes(JOURNAL_HEADER_BYTES),
         payload_capacity(29),
         payload_capacity(28),
     )));
@@ -502,18 +509,28 @@ mod tests {
     // ── A1–A5 / B1–B3 锚点（登记第七节，逐字对拍） ──────────────────────
 
     #[test]
-    fn 锚点甲一与锚点乙二_一条记录装六十七个点名项() {
-        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67);
-        assert!(67 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES);
-        assert!(JOURNAL_RECORD_BYTES < 68 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES);
+    fn 锚点甲一与锚点乙二_一条记录装六十四个点名项() {
+        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64);
+        assert!(64 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES <= JOURNAL_RECORD_BYTES);
+        assert!(JOURNAL_RECORD_BYTES < 65 * JOURNAL_NAMED_ENTRY_BYTES + JOURNAL_HEADER_BYTES);
     }
 
-    /// B7：头 311 时的余数（33，D23 已定项 4「4096 上余 3785」）——全部单测里唯一分得开 307 与
-    /// 311 的一条。写成加法，不写减法：减法在变异把常量改大时会编译期溢出
+    /// B7：头 487 时的余数（25，D23 已定项 4「4096 上余 3609」）——分得开同一档里
+    /// 487 与 488 两个头宽的一条。写成加法，不写减法：减法在变异把常量改大时会编译期溢出
     /// （`.claude/singlefs-ai-sop/rules/test-discipline.md`「常量断言写加法，别写减法」）。
     #[test]
-    fn named_entries_per_record_remainder_matches_head_311() {
-        assert_eq!(JOURNAL_HEADER_BYTES + JOURNAL_NAMED_ENTRIES_PER_RECORD * JOURNAL_NAMED_ENTRY_BYTES + 33, JOURNAL_RECORD_BYTES);
+    fn named_entries_per_record_remainder_matches_head_487() {
+        assert_eq!(JOURNAL_HEADER_BYTES + JOURNAL_NAMED_ENTRIES_PER_RECORD * JOURNAL_NAMED_ENTRY_BYTES + 25, JOURNAL_RECORD_BYTES);
+    }
+
+    /// B8：每条记录装几项的纯函数在 64 那一档的两侧边界上钉绝对值：装 64 项的头宽区间是 [457, 512]，
+    /// 456 装 65、513 装 63。不经全局常量，所以不撞上面那条编译期断言。
+    #[test]
+    fn named_entries_per_record_for_header_bytes_straddles_the_sixty_four_item_band() {
+        assert_eq!(named_entries_per_record_for_header_bytes(456), 65);
+        assert_eq!(named_entries_per_record_for_header_bytes(457), 64);
+        assert_eq!(named_entries_per_record_for_header_bytes(512), 64);
+        assert_eq!(named_entries_per_record_for_header_bytes(513), 63);
     }
 
     #[test]

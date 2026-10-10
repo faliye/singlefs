@@ -1,0 +1,22 @@
+M1_Z判活写成k小于等于单元数	unit_index_in_file < record.data_units()	unit_index_in_file <= record.data_units()
+M2_T区间判定写成严格大于	unit_index_in_file * DATA_UNIT_PAYLOAD_BYTES >= *range_start	unit_index_in_file * DATA_UNIT_PAYLOAD_BYTES > *range_start
+M3_退役记录按谱系滤拿容器诞生txg	BaseArm::RetirementOnLineage => inputs.chain.contains(retirement.death_txg),	BaseArm::RetirementOnLineage => inputs.chain.contains(retirement_unit.write_order.birth_txg),
+M4_删空不写退役记录	self.retired_identities.push(emptied_leaf.identity);	let _ = emptied_leaf.identity;
+M5_N2借时不换身份	right_leaf.identity = renewed_identity;	let _ = renewed_identity;
+M6_N1借时不抬分隔key	right_leaf.separator = smallest_key_after_borrow;	let _ = smallest_key_after_borrow;
+M7_合并方向反过来保留右身份	let retired_identity = right.identity;	let retired_identity = std::mem::replace(&mut self.leaves[left_position].identity, right.identity);
+M8_E-I不丢数据单元	unit_birth_txg <= *whole_death_txg	unit_birth_txg <= *whole_death_txg && reader.effect != UnlinkEffectArm::AtIntent
+M9_E-L-r一律施行	UnlinkEffectArm::AtLastBatchRead => !object_is_in_the_tree_before_tombstones,	UnlinkEffectArm::AtLastBatchRead => true,
+M10_读者不看已发布谓词	&& is_published_by_the_instance_table(unit, inputs)	&& (true || is_published_by_the_instance_table(unit, inputs))
+M11_W边界写成严格小于	ReadableWindow::RingWindow => publishes_since_replaced <= READABLE_WINDOW_RING_PUBLISHES,	ReadableWindow::RingWindow => publishes_since_replaced < READABLE_WINDOW_RING_PUBLISHES,
+M12_N1谓词写成小于等于	Some(left_largest_key) => left_largest_key < *right_separator,	Some(left_largest_key) => left_largest_key <= *right_separator,
+M13_同号多条取先读到的	*existing_order >= candidate_order	true || *existing_order >= candidate_order
+M14_splitmix64增量常数改一位	self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C15);	self.state = self.state.wrapping_add(0x9E37_79B9_7F4A_7C14);
+M15_整对象墓碑不按谱系滤	let whole_object_tombstone_is_on_the_chain = inputs.chain.contains(tombstone.death_txg);	let whole_object_tombstone_is_on_the_chain = true;
+M16_B-stub吸收时不写桩	self.leave_a_stub_in_place(right_position);	self.leaves.remove(right_position);
+M17_B-stub择新跳过零条目版本	UnitBody::Retirements { .. }) => {\n            is_candidate(unit, inputs, window)	UnitBody::Retirements { .. }) => {\n            is_candidate(unit, inputs, window) && !matches!(&unit.body, UnitBody::InodeLeaf { records, .. } if records.is_empty())
+M18_B-tsz供出规则取写序最小	BaseArm::TombstonesOnly => Provenance::LargestChangeCounter,	BaseArm::TombstonesOnly => Provenance::OldestWriteOrder,
+M19_B-tsz不施行整对象墓碑	if whole_object_tombstone_is_on_the_chain || inputs.overlay.whole_object_tombstones_ignore_lineage {	if (whole_object_tombstone_is_on_the_chain || inputs.overlay.whole_object_tombstones_ignore_lineage) && reader.base != BaseArm::TombstonesOnly {
+M20_撞I-9.13的计数写成记录数小于等于1	.any(|record_count| record_count == 0)	.any(|record_count| record_count <= 1)
+M21_叶片总数不数桩	leaves_in_the_leaf_order: length_as_u64(self.version.leaves.len()),	leaves_in_the_leaf_order: length_as_u64(self.version.leaves.len()) - self.version.stub_count(),
+M22_桩算进合并的邻片	fn is_a_merge_neighbour(leaf: &WorkingLeaf) -> bool {\n    !leaf.records.is_empty()\n}	fn is_a_merge_neighbour(leaf: &WorkingLeaf) -> bool {\n    let _ = leaf;\n    true\n}

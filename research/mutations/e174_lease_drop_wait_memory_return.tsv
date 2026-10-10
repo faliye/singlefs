@@ -1,0 +1,28 @@
+M1_等待臂的Wait换成Poll	Arm::WaitLatest => PollMode::WaitLatest,	Arm::WaitLatest => PollMode::Poll,
+M2_拆缓冲张数向上取整换成向下取整	let piece_count = size_bytes.div_ceil(MAXIMUM_PIECE_BYTES);	let piece_count = size_bytes / MAXIMUM_PIECE_BYTES;
+M3_把BAR1下的Used当成进程占着的	(ReportSection::Processes, "Used GPU Memory") if listed_process_is_this_process => {	(ReportSection::BarOneMemory, "Used") => {
+M4_建缓冲时每张取一半	let piece_byte_lengths = vec![piece_bytes_each; usize::try_from(piece_count)	let piece_byte_lengths = vec![piece_bytes_each / 2; usize::try_from(piece_count)
+M5_扣住不丢组在第6步照样丢缓冲	if !cell.is_hold_control() {	if true {
+M6_t0记在poll开始之前	let lease_drop_instant = host.now_microseconds();	let lease_drop_instant = poll_started_at;
+M7_在飞档第4步也等完	if matches!(liveness, Liveness::Done) {	if true {
+M8_含不含的判定把大于换成大于等于	let exceeding = measurements.iter().filter(|(value, tau)| *value > signed(*tau)).count();	let exceeding = measurements.iter().filter(|(value, tau)| *value >= signed(*tau)).count();
+M9_已做完档零头门槛5毫秒改成5001微秒	const DONE_WAIT_ZERO_OVERHEAD_LIMIT_MICROSECONDS: u64 = 5_000;	const DONE_WAIT_ZERO_OVERHEAD_LIMIT_MICROSECONDS: u64 = 5_001;
+M10_在飞档超出门槛20毫秒改成20001微秒	const IN_FLIGHT_EXCESS_LIMIT_MICROSECONDS: u64 = 20_000;	const IN_FLIGHT_EXCESS_LIMIT_MICROSECONDS: u64 = 20_001;
+M11_不等待臂门槛1毫秒改成1001微秒	const POLL_NO_WAIT_LIMIT_MICROSECONDS: u64 = 1_000;	const POLL_NO_WAIT_LIMIT_MICROSECONDS: u64 = 1_001;
+M12_下一次就不含的下标0改成1	if first_clear_index == 0 {	if first_clear_index == 1 {
+M13_tau的取整余量2改成1	self.pre_spread_mebibytes + READING_ROUNDING_ALLOWANCE_MEBIBYTES	self.pre_spread_mebibytes + 1
+M14_第2笔第3笔有一笔有效改成都要有效	self.lease_is_valid(1) && (self.lease_is_valid(2) || self.lease_is_valid(3))	self.lease_is_valid(1) && (self.lease_is_valid(2) && self.lease_is_valid(3))
+M15_同一进程多行占用改成只取最后一行	Some(reading.process_used_mebibytes.unwrap_or(0) + used)	Some(used)
+M16_每张缓冲不封顶1GiB	let piece_bytes_each = size_bytes.min(MAXIMUM_PIECE_BYTES);	let piece_bytes_each = size_bytes;
+M17_分配器至少多出S的比较改成不严格	if at_peak.allocated_bytes < before.allocated_bytes + size_bytes {	if at_peak.allocated_bytes <= before.allocated_bytes + size_bytes {
+M18_外层计时包住T_wait的比较翻转	if record.outer_microseconds < record.wait_microseconds {	if record.outer_microseconds > record.wait_microseconds {
+M19_打乱种子174改成175	const SHUFFLE_SEED: u64 = 174;	const SHUFFLE_SEED: u64 = 175;
+M20_补轮不设三次上限	MAXIMUM_REFILL_ROUNDS_PER_CELL.saturating_sub(refills_done)	MAXIMUM_REFILL_ROUNDS_PER_CELL
+M21_扣住不丢组的失败不停整轮	job.cell.is_hold_control() && child_text.contains(VoidReason::HoldControlDidNotHold.label())	false
+M22_K9把大于等于翻成小于	if record.submit_to_poll_microseconds >= covered_microseconds {	if record.submit_to_poll_microseconds < covered_microseconds {
+M23_K7左边不含e	record.wait_microseconds + record.submit_to_poll_microseconds >= covered_microseconds;	record.wait_microseconds >= covered_microseconds;
+M24_扣住不丢组窗口读数比较翻转	if next_mebibytes + record.tau_mebibytes() < record.pre_mebibytes + size_mebibytes {	if next_mebibytes + record.tau_mebibytes() > record.pre_mebibytes + size_mebibytes {
+M25_窗口读数不大于tau改成小于tau	let satisfies = |sample: &WindowSample| sample.used_mebibytes.is_some_and(|used| self.lease_remainder_of(used) <= tau);	let satisfies = |sample: &WindowSample| sample.used_mebibytes.is_some_and(|used| self.lease_remainder_of(used) < tau);
+M26_子进程作废时那一轮仍算有效	if !done.child_void.is_empty() || self.failure_detail.is_some() {	if self.failure_detail.is_some() {
+M27_清单次序反过来	pending.sort_by_key(|job| job_order_key(job, arm_count));	pending.sort_by_key(|job| std::cmp::Reverse(job_order_key(job, arm_count)));
+M28_作废的借据仍读完整个窗口	if record.is_void() {	if false {

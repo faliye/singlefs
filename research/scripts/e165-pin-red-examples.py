@@ -1,16 +1,22 @@
 #!/usr/bin/env python3
 # admission: always 每一次调都判此刻的红例账、钉住的表与变异表，上一次的结论不替这一次作保
 # run-condition: none 追加、补钉与 --check 只读写点名的文件；--replay 要的 cargo 与装置由它自己判，缺了判红或报本次未跑
-"""E165 红例钉进快速档：把全量那一档红例账里的每个红例按输入原样钉进 .claude/gate.d/e165-pinned-red-examples.tsv，并判钉得全不全、今天还绿不绿。
+"""E165 红例钉进快档：把全量那一档红例账里的每个红例按输入原样钉进 .claude/gate.d/e165-pinned-red-examples.tsv，并判钉得全不全、今天还绿不绿。
 
 用户 2026-10-01 定「全量形式化红了的例子 可以加到快速形式化中」「这个应该在每一次跑完之后就加入 门禁来控制比较好」
 （调度记录 records/2026-10-01-里程碑三形式化接入.md 第三节）。表的格式写在表自己的文件头。
 
 用法（<根> 默认取这份脚本往上两级的仓；--table 默认 <根>/.claude/gate.d/e165-pinned-red-examples.tsv）：
+  档（㉒）：出这份账的那一趟装置的档参数。取同一趟 kill-bounds 产物（配法见下）第一行 E7RESULT name=config 的 device_arguments=（参数用 + 连），
+      只认装置 split_off_the_profile_options 认的四个：--profile、--marker-parity、--table、--disk-order（钉住的红例逐行重放时装置只认这四个，别的不进逐态行）；
+      --bounds、--family、--only、--max-n 只选跑哪些域与 N，不进档；别的参数（例 --gate、--max-u）认不出进不进逐态行，判红、这份账一行都不钉。
+      写成规范的一串：「--profile <档名>」，后面只接不是默认值的那几个（--marker-parity odd、--table scan|both、--disk-order reversed，依这个次序），空格分隔；
+      产物没有 device_arguments=（装置有 --profile 之前的几趟）或没有 config 行是 --profile r1（装置不给 --profile 取 r1）。
+      同一个（①, ⑥）在不同档下各钉一行，不算冲突；同一档下 ⑦ 不同照旧判红。① 不带档（装置 --pinned-cases 拿 ②③ 与逐态行的 state= 重算 ①，与档无关）。
   e165-pin-red-examples.py [--root 根] [--table 表] [--kill-bounds 产物]… <红例账…>
-      追加：账里还没钉的行追加进表，一行 21 段：自己的 ①–⑧ 后面原样接账那一行的 13 段（⑨–㉑）。
-      已钉过的不重复：表里有一行 ⑨ 起与这一行账逐字节相同，且 ⑥ 等于这一次换出的名字或 ⑤ 就是这一行账。
-      同一个（①, ⑥）而 ⑨ 起不同的（另一趟的账，⑱ 首红与否或 ⑨⑩ 的变体与表行不同）另钉一行。
+      追加：账里还没钉的行追加进表，一行 22 段：自己的 ①–⑧ 后面原样接账那一行的 13 段（⑨–㉑），再接这份账的档（㉒）。
+      已钉过的不重复：表里有一行 ⑨–㉑ 与这一行账逐字节相同、㉒ 等于这份账的档，且 ⑥ 等于这一次换出的名字或 ⑤ 就是这一行账。
+      同一个（①, ⑥, ㉒）而 ⑨ 起不同的（另一趟的账，⑱ 首红与否或 ⑨⑩ 的变体与表行不同）另钉一行。
       账里没有反例状态的行（序号 none，驱动报 no_single_state_differs）钉不了，只数不钉。
       ⑥ 写「<表>#<变异名>」，换名与 --check 同一套：每份账配同一趟的 kill-bounds 产物，不给 --kill-bounds 按文件名配（与 --check 相同），
       给了就逐份对应（第 i 个产物配第 i 份账，个数要相等；第二段驱动收尾时这样调）；配对的四样（见 --check 一节）有一样不过就判红、一行都不钉，不退回按今天的行号换名；
@@ -18,12 +24,24 @@
       table= 与 title=，table= 要是这种变体的表（tsv-<行号> 是 crates/mutations.tsv，Z<n> 是 research/mutations/e165_replay_bounded_enumeration_custom.tsv），
       在今天的那张表里找第 1 列（空格记成 _）等于 title= 的数据行，恰好一行就用它的变异名：那一趟之后变异表增删过行也对得上，不按今天的行号换。
       table= 不对、按名字找不到、找到不止一行的，逐行报出来、不钉，别的行照钉，退 1。
-      同一个（①, ⑥）在表里的 ⑦ 与账里的不同：一行都不钉、判红。
+      同一个（①, ⑥, ㉒）在表里（或这一次前面的账里）的 ⑦ 与账里的不同：一行都不钉、判红。
       写：读表时记 sha256，同目录临时文件写完、改名换上之前再算一次，变了就不写（别的会话刚写过，重跑）；写完回读，新钉的每一行都要在。
   e165-pin-red-examples.py --check [--root 根] [--table 表] [<红例账…>]
-      门禁 pinned-red-examples-complete 格：不给账就取 <根>/research/results/e165-*-red-examples.tsv 全部。账里每一行（有反例状态的）都要钉着：
-      表里有一行 ① 等于这一行算出的指纹、⑦ 等于账的第 12 列、⑨ 起用制表符接起来与账那一行逐字节相同，
-      且 ⑤ 就是这一行账或 ⑥ 是出这份账的那一趟给这个变体的名字。同一个输入钉着、只是 ⑨ 起不同的，逐行报「没整行钉」。
+      门禁 pinned-red-examples-complete 格：不给账就取 <根>/research/results/e165-*-red-examples.tsv 全部。
+      作废的账登记进 <根>/.claude/gate.d/e165-void-red-example-ledgers.tsv（一行三段：账的路径、理由不少于 8 个字、实验页里写明作废的那一处 文件:行号；表不在当一行都没登记），
+      登记了的跳过（给了账也跳过）；登记表先判：缺段或有段空着、理由太短、出处不是「文件:行号」、登记的账不在、
+      同一份登记两次、登记的账配得上一份有收尾行且 ledger_sha256 等于它此刻 sha256 的同一趟产物（那一趟是完整的），有一样就判红、一份账都不判，
+      出路照表头改那一行（完整的那一种：删掉那一行）。出处只判写法，不核那一行写没写作废。账都登记作废了退 77。
+      被同档后一趟取代的完整账登记进 <根>/.claude/gate.d/e165-superseded-red-example-ledgers.tsv（一行四段：被取代的账、取代它的账、理由不少于 8 个字、
+      实验页里写明取代关系的那一处 文件:行号；表不在当一行都没登记），登记了的跳过（给了账也跳过），取代它的账照常判钉全（给了账而没给它的，补进这一次判的账）。
+      这张表先判：缺段或有段空着、理由太短、出处不是「文件:行号」、两份账有一份不在、两份是同一份、被取代的登记两次或也登记作废、
+      取代它的账自己登记作废或登记成被取代；两份账各自同一趟 kill-bounds 产物的 device_arguments= 照「档」一段取档，取不到或档不同；
+      被取代的账每一行按（第 3 列域, 第 4 列 N, 第 5 列枚举序号, ①）在取代它的账里一行配一行（① 是第 3、4 列与第 12 列 state= 算的输入指纹，同一个键几行就要几行），
+      配不上的；有一样就判红、一份账都不判，出路照表头改那一行。成功那句报「跳过作废账 N 份、被取代的账 M 份：逐个列名（被取代的写取代它的是哪份）」。
+      账里每一行（有反例状态的）都要钉着：
+      表里有一行 ① 等于这一行算出的指纹、⑦ 等于账的第 12 列、⑨–㉑ 用制表符接起来与账那一行逐字节相同、㉒ 等于这份账的档（按档判钉全），
+      且 ⑤ 就是这一行账或 ⑥ 是出这份账的那一趟给这个变体的名字。同一个输入钉着、只是 ⑨ 起不同的，逐行报「没整行钉」；
+      整行都对、只是 ㉒ 不是这份账的档的，逐行报「钉的档不对」（出路：照这份账的档重钉）。
       那一趟的名字不按今天的变异表换（表在跑完之后删一行，后面的 tsv-<行号> 就全错一位），取同一趟的 kill-bounds 产物：
       账 <目录>/<前缀>-red-examples.tsv 配同一目录的 <前缀>-kill-bounds.out（E165 第二段驱动 e165-replay-mutation-kill-bounds.sh 一趟写这一对）。
       配对四样都要过，有一样不过就判红：产物在；产物的收尾行 E7RESULT name=verdict 在、它的 ledger_sha256= 等于这份账此刻的 sha256（驱动写完账才写这一行）；
@@ -33,28 +51,51 @@
       门禁那一格照原样起（--check --root <根>），按账的文件名找产物，不多传参数；--check 不收 --kill-bounds。
       没钉全的出路逐份给 python3 research/scripts/e165-pin-red-examples.py <账>：追加按同一趟产物的 title= 到今天的变异表里按名字找变异，
       那一趟之后变异表增删过行也钉得进；按名字找不到或找到几行的逐行报出来、不钉，不钉进错的名字。
-      表自己也判（--check、--replay 与追加都先判）：每行 21 段（8 段的旧行报「没整行抄红例账」，出路给 --backfill）、① 是 64 位十六进制、
+      表自己也判（--check、--replay 与追加都先判）：每行 22 段（8 段的旧行报「没整行抄红例账」、21 段的报「没写档」，出路都给 --backfill）、① 是 64 位十六进制、
       ① 等于拿 ②③⑦ 重算的指纹、⑪⑫⑬ 与 ②③④ 相同、⑳㉑ 与 ⑦⑧ 相同（不同的点名哪一行哪一段，与装置 --pinned-cases 同一种报法）、
-      （⑥, ⑨ 起的整行）不重复。少一行判红，出路给补进去的命令。一份账都没有退 77。
+      ㉒ 是规范写法的档、（⑥, ⑨–㉑ 的整行, ㉒）不重复。少一行判红，出路给补进去的命令。一份账都没有退 77。
   e165-pin-red-examples.py --backfill [--root 根] [--table 表]
-      补钉：表里 8 段的旧行（整行抄红例账之前钉的）按 ⑤（<账文件名>:<行号>）回 <根>/research/results/<账文件名> 取那一行，原样接成 ⑨–㉑。
-      取回的要是 13 段的账行、第 3、4、5、12、13 段与这一行的 ②③④⑦⑧ 逐字相同；账不在、没有那一行、段数不对或对不上的逐行报出来、不填，
-      取得到的照补；有取不到的退 1。写法与追加相同（读表时记 sha256、换上之前复核、写完回读补过的每一行）。没有 8 段的行退 0。
+      补钉：表里 8 段的旧行（整行抄红例账之前钉的）按 ⑤（<账文件名>:<行号>）回 <根>/research/results/<账文件名> 取那一行，原样接成 ⑨–㉑；
+      8 段与 21 段的行（钉档之前钉的）都补 ㉒：⑤ 点的那份账按文件名配同一趟的 kill-bounds 产物，照上面「档」一段取。
+      取回的要是 13 段的账行、第 3、4、5、12、13 段与这一行的 ②③④⑦⑧ 逐字相同；账不在、没有那一行、段数不对或对不上、配的产物不在或 device_arguments= 认不出的逐行报出来、不填，
+      取得到的照补；有取不到的退 1。写法与追加相同（读表时记 sha256、换上之前复核、写完回读补过的每一行）。没有要补的行退 0。
   e165-pin-red-examples.py --replay [--root 根] [--table 表] [--binary 可执行文件] [--memory-cap 上限|none] [--threads N] [--target 编译目录]
       门禁 pinned-red-examples-replay 格：先判每行 ⑥ 点名的变异（<表>#<名>，几个用 + 连）还在它的表里（第 1 列等于那个名字的数据行），
       再用装置 e165_replay_bounded_enumeration --pinned-cases <表> 在今天的实现上逐行判：stdout 里以「E7RESULT name=state 」起头的行
       条数等于表的数据行数、第 i 行与第 i 个数据行的 ⑦ 逐字节相同、装置退 0（约定：每行一行结果，有行对不上或指纹漂了退非 0）。
+      按档分组起装置：㉒ 相同的行一组，每组按块起，命令是「<装置> --pinned-cases <块表> <㉒ 按空格切开>」（例 --profile r2）；
+      块表只留这一块的行、每行只留 ①–㉑（装置只认 21 段，㉒ 不交给它），别的数据行换成 #、行号不变。
       不给 --binary 时：装置源码（crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs）里没有 --pinned-cases 就退 77
       （变异那一半照判，红了照红）；有就 cargo build --release --locked -p singlefs-checker-tier --bin e165_replay_bounded_enumeration
       （CARGO_TARGET_DIR 默认 ${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-e165-pinned-target）再跑。
       装置经 research/scripts/run-with-memory-cap.sh（上限默认 $GATE_E165_PINNED_MEMORY_MAX，再默认 2G）与 capped.sh N 起；--memory-cap none 直接起（样本的桩用）；
-      经包装起而包装自己退 250–254 的，判「没跑成」：退 1，✗ 行写「没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 <码>」，
+      经包装起而包装自己退 245 或 250–254 的，判「没跑成」：退 1，✗ 行写「没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 <码>」，
       → 照包装文件头「退出码」一段，不指向变异行或实现；
       装置被信号停了的（直接起时 subprocess 交负的信号号，经包装或 bash 起时退 128 + 信号号、不在 250–254 里，例 137 = 外面 kill -9），判红，
       ✗ 行写「装置被信号停了」、这一次的输出不算判定，→ 照包装文件头「退出码」一段（撞自己上限的由包装认成 250，外面停的同样退 137），不写修实现；
       --binary 以 .sh 结尾的经 bash 起（样本目录里的桩不带执行位）。
       编装置与跑装置时每过 300 秒（PROGRESS_INTERVAL_SECONDS，.claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」定的进度间隔）往 stderr 打一行
       「E165_PINNED_PROGRESS 挂钟 <秒> 秒：<在做什么> 还在跑；装置已打 n/m 行结果」（编装置那一步不带行数）；判定照旧等它跑完、按全部输出判。
+  e165-pin-red-examples.py --list-items [--root 根] [--table 表]
+      逐行打可点名的项「项<TAB>格<TAB>说明」：complete（pinned-red-examples-complete，一项），钉表每个数据行一项 pinned:<表里的行号>
+      （pinned-red-examples-replay，说明是 ⑤、⑥ 与「档 <㉒>」，没写档的写「没写档」）。只读钉表，不编、不起装置；表不在判红退 1。
+  逐项点名与按条复用（只给 --replay；别的模式给 --item 退 2）：
+      --item <项>（可给多次，取并集）只重放点名的行，项名写错或缺项名退 2 并列出可点名的项；点了的行照样先判表本身与点名的变异还在。
+        点名单跑一行与它在整格里跑的判定相同（自证 item-alone-equals-whole）：装置按块起，一块只留这一块的几行（别的数据行换成 #，行号不变），
+        一行的判定只看它自己打的那一行与 ⑦ 相同、装置的报错里没点它的行号；同一块里别的行红不连累它。
+      --block-rows N（默认 DEFAULT_BLOCK_ROWS）一块交给装置几行；一块判完，那一块里判绿的行当场落盘（装置退 0、行数对得上的块才记），
+        被打断或包装没跑成之后同一条命令重跑，判过的块复用、只补没判的。
+      --verdict-library <目录> 给了就按条记判定（判定库 research/scripts/lib_verdict_library.py）：每一行的键相同就复用，一行都不用现判时不编装置、不起重放；
+        --no-reuse 只记不读。不给 --verdict-library 不读不写。complete（--check）每趟现判、不复用。
+      键分两列（判定库文件头「键分两列」）：
+        判法版本：这份脚本与 lib_verdict_library.py 两份内容的摘要（judge_version）；变了整格每一行都现判，原因写「判法版本 变了」。
+        输入指纹（逐样摘要按名字排好再取 sha256）——共用的一样：装置（e165_replay_bounded_enumeration 的 cargo 依赖闭包，research/scripts/admission.py 的 cargo_closure_input_paths 现算，
+          crate 根下 cargo 不读的文件不在里面，例 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv；
+          input_manifest 逐文件取内容，加仓根 Cargo.toml、Cargo.lock 与 cargo -V、rustc -V；给了 --binary 的另加那份可执行文件的内容，这时闭包算不出就记一句原因；
+          不给 --binary 而闭包算不出判红）；变了整格每一行都现判。
+        输入指纹里每一行另加：这一行（22 段原样）、档（㉒，单列一样，变了原因写「档 变了」）、引的变异行（⑥ 点名的每一条变异在 crates/mutations.tsv 或 research/mutations/e165_replay_bounded_enumeration_custom.tsv 里那一行原样）。
+      只记绿。每行一行「· pinned:<行号>：绿|红，现判（<原因>）|复用（<记下的日期与一句判定>）」，末了「· 按条：现判 N、复用 M（现判的原因：…）」；
+        环境里有 FORMAL_ITEM_TALLY_FILE 的（门禁给的）另往那份文件追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」。
   e165-pin-red-examples.py --selftest
       在临时仓里造账、变异表、产物与桩装置，逐格判；弄坏开关逐个打开，每个都要让至少一格判错。
 退出码：0 绿（追加：钉好了或没有要钉的；补钉：都补上了或没有要补的）；1 红；2 用法错；77 本次未跑（--check 没有账、--replay 装置不认 --pinned-cases）。
@@ -67,7 +108,8 @@
   fingerprint-unchecked  --check 不拿 ②③⑦ 重算 ①         check-tampered 那一格判绿
   variant-unchecked      --replay 不判变异还在不在          replay-variant-missing 那一格（样本 pinned-red-examples-replay-variant-red）判绿
   replay-ignores-output  --replay 只看装置退出码，不比 ⑦    replay-mismatch 那一格（样本 pinned-red-examples-replay-red）判绿
-  wrapper-exit-as-replay-red  --replay 不认包装自己的 250–254，照装置退非 0 报回归   replay-wrapper-exit 那一格（自证里的假包装退 252）判错
+  wrapper-exit-as-replay-red  --replay 不认包装自己的 245、250–254，照装置退非 0 报回归   replay-wrapper-exit（自证里的假包装退 252）、
+                                                     replay-wrapper-245（假包装退 245，显存不够）两格判错
   killed-as-regression   --replay 不认装置被信号停了，照装置退非 0 报回归、出路写修实现
                                                      replay-killed（桩装置 kill -9 自己）、replay-wrapper-137（假包装退 137）两格判错
   names-from-today-table --check 照今天的变异表换 tsv-<行号>，不认产物里的名字   check-shifted-table（自证里删一行、末尾加一行、行号错位的合成表）判红
@@ -76,6 +118,23 @@
   title-not-compared     --check 产物里有 title= 就算钉着，不比 ⑥               check-title-other-variant 那一格判绿
   variant-sets-unchecked --check 不比账与产物的变体与行数                   check-variant-sets-differ 那一格判绿
   ledger-digest-unchecked  --check 不核产物收尾行记的账 sha256、不认没收尾     check-ledger-digest、check-run-unfinished 两格判绿
+作废红例账登记表（.claude/gate.d/e165-void-red-example-ledgers.tsv）的三项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
+  void-ledgers-ignored   --check 不读登记表，登记作废的账照判
+      自证 check-void-skipped、check-void-skipped-given、check-void-all-skipped 判错（没收尾的账照判、判红）；样本 pinned-red-examples-complete-void-green 判红
+  void-rows-unchecked    登记表的缺段、理由太短、出处不是「文件:行号」、账不在、登记两次都不判
+      自证 check-void-missing、check-void-short-reason、check-void-columns、check-void-place、check-void-duplicate 判绿；样本 pinned-red-examples-complete-void-missing-red 判绿
+  void-complete-accepted   登记的账配得上完整的同一趟产物也不判
+      自证 check-void-complete、check-void-complete-howto 判错
+被取代红例账登记表（.claude/gate.d/e165-superseded-red-example-ledgers.tsv）的四项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
+  superseded-replacement-pin-unchecked  被取代的账跳过时不把取代它的账补进这一次判的账（只点名被取代的账时，取代它的账没钉全也判不到）
+      自证 check-superseded-given、check-superseded-replacement-unpinned 判错（只给被取代的账：退 77，没判取代它的账）
+  superseded-coverage-unchecked  不核被取代的账每一行按（域, N, 枚举序号, ①）在取代它的账里有对应行
+      自证 check-superseded-coverage、check-superseded-coverage-count、check-superseded-coverage-state 判绿；样本 pinned-red-examples-complete-superseded-uncovered-red 判绿
+  superseded-profile-unchecked   不核两份账同档（各自同一趟产物的 device_arguments=）
+      自证 check-superseded-profile、check-superseded-profile-unreadable 判绿
+  superseded-rows-unchecked      登记表的缺段、理由太短、出处写法、账不在、两份同一份、登记两次、与作废表重登、取代它的账自己登记了都不判（解析不了的行略过）
+      自证 check-superseded-columns、check-superseded-short-reason、check-superseded-place、check-superseded-missing、check-superseded-replacement-missing、
+      check-superseded-self、check-superseded-duplicate、check-superseded-also-void、check-superseded-replacement-void、check-superseded-chain 判错
 整行抄红例账（一行 21 段）的几项，开关一行、下一行起写打开之后判错的自证格与门禁样本（样本在 .claude/gate.d/fixtures/checker-tier-formal-verification.sh/ 下）：
   whole-row-unchecked    --check 不比 ⑨ 起的整行，只认 ①、⑦ 与 ⑤ / ⑥（整行抄之前的判法）
       自证 check-whole-row-differs 判绿；样本 pinned-red-examples-complete-whole-row-red 判绿
@@ -100,11 +159,48 @@
 --replay 的进度行：
   progress-silent        编装置、跑装置时不打进度行（跑完之前什么都看不到）
       自证 replay-progress 判错（假时钟下装置跑过进度间隔，一行 E165_PINNED_PROGRESS 都没有）
+--replay 的逐项点名与按条复用：
+  item-filter-ignored    --item 不起作用、照重放全部（写错的项名也不退 2）
+      自证 item-select-one、item-unknown 判错；reuse-row-own-key 跟着判错
+  reuse-key-without-closure  键里不带装置的 cargo 依赖闭包（装置依赖的 crate 改了照旧复用）
+      自证 reuse-closure-changed 判错
+  （闭包减掉 crate 根下 cargo 不读的文件归 research/scripts/admission.py：它的 ADMISSION_BREAK=closure-keeps-crate-root-files 下
+      自证 reuse-crate-root-file-unchanged 判错：依赖 crate 根下放一份、改一行 verus-must-red-worlds.tsv，三行全现判）
+  reuse-key-without-row  键里不带这一行自己（同一个 ⑥、同一个 ⑦ 的两行共用一个键，只判过一行就拿它的判定当另一行的）
+      自证 reuse-row-own-key 判错
+  reuse-key-without-judge-version  判法版本一律交空串（这份脚本或判定库改了照旧复用）
+      自证 reuse-judge-version-changed 判错
+  list-items-pipe-unhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError 的回溯、退 1）
+      自证 list-items-closed-pipe 判错
+  reuse-key-without-mutation-row  键里不带 ⑥ 引的变异行（变异表里那一行改了照旧复用）
+      自证 reuse-mutation-row-changed 判错
+  reuse-ignores-key      这一行判绿过就复用，不比键
+      自证 prune-after-change 判错（剪枝自证：桩改了之后开着复用与关掉复用逐行判定不同）；reuse-mutation-row-changed、reuse-device-changed、reuse-closure-changed 跟着判错
+  reuse-records-red      红的也记成绿
+      自证 reuse-red-not-recorded 判错
+  reuse-records-whole-cell-only  一块判完不当场落盘，整格判完、一行红都没有才一起记（被打断或有一行红，判过的全不留）
+      自证 reuse-resume-after-kill 判错（一块一行，X 那一块被 kill -9，第二趟同一条命令要只判 X）；reuse-red-not-recorded 跟着判错
+钉表认档（㉒）的几项，开关一行、下一行起写打开之后判错的自证格与门禁样本：
+  profile-read-as-r1     取档不读产物的 device_arguments=，一律当 --profile r1（r2 档的账钉成 r1 档）
+      自证 pin-profile-r2、pin-two-profiles、backfill-profile 判错
+  same-profile-conflict-ignored  追加不判同一档下同一个（①, ⑥）⑦ 不同，照钉
+      自证 conflict、conflict-same-profile 判错
+  check-ignores-profile  --check 不比 ㉒，钉成别的档也算钉着
+      自证 check-profile-differs 判绿；样本 pinned-red-examples-complete-profile-red 判绿
+  replay-without-profile --replay 起装置不带 ㉒ 的档参数（装置一律按 r1 档重放）
+      自证 replay-two-profiles、replay-profile-arguments 判错；样本 pinned-red-examples-replay-profiles-green 判红
+  profile-column-unchecked  表里 21 段的行（没写档）照收、当 --profile r1
+      自证 check-profile-missing、replay-profile-missing 判错；样本 pinned-red-examples-replay-profile-missing-red 判绿
+  profile-arguments-unchecked  device_arguments= 里认不出的参数（例 --gate）照略过，不判红
+      自证 pin-profile-unknown-argument 判错
+  reuse-key-without-profile  按条复用的键不带档（「这一行」不算 ㉒、不单列「档」）
+      自证 reuse-row-own-profile 判错（只差 ㉒ 的两行，只判过一行就拿它的判定当另一行的）
 """
 import glob
 import hashlib
 import os
 import re
+import signal
 import subprocess
 import sys
 import tempfile
@@ -113,6 +209,8 @@ import time
 
 sys.dont_write_bytecode = True
 from lib_atomic_replace import ReplaceRefused, replace_file_contents_by_rename  # noqa: E402
+from lib_verdict_library import Tally, VerdictLibrary, digest_file, digest_text  # noqa: E402
+import importlib.util  # noqa: E402
 import os as preflight_os, sys as preflight_sys  # noqa: E402
 # 开跑之前先判准入与运行条件（.claude/singlefs-ai-sop/rules/preflight-discipline.md）；不写 __pycache__
 preflight_sys.dont_write_bytecode = True
@@ -124,6 +222,22 @@ DEFAULT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIRECTORY))
 TABLE = ".claude/gate.d/e165-pinned-red-examples.tsv"
 LEDGER_GLOB = "research/results/e165-*-red-examples.tsv"
 LEDGER_SUFFIX, KILL_BOUNDS_SUFFIX = "-red-examples.tsv", "-kill-bounds.out"
+# 作废红例账登记表（--check 跳过登记的账）：一行三段「账的路径<TAB>理由<TAB>实验页里写明作废的那一处 文件:行号」，写法在表自己的文件头
+VOID_LEDGERS_TABLE = ".claude/gate.d/e165-void-red-example-ledgers.tsv"
+VOID_LEDGER_COLUMNS, VOID_REASON_MINIMUM_CHARACTERS = 3, 8
+VOID_PLACE_FORM = re.compile(r"^\S.*:[1-9][0-9]*$")
+# 被取代红例账登记表（--check 跳过登记的被取代账、取代它的账照常判钉全）：一行四段「被取代的账<TAB>取代它的账<TAB>理由<TAB>实验页里写明取代关系的那一处 文件:行号」，
+# 写法在表自己的文件头；理由字数与出处写法与作废表同一套（VOID_REASON_MINIMUM_CHARACTERS、VOID_PLACE_FORM）
+SUPERSEDED_LEDGERS_TABLE = ".claude/gate.d/e165-superseded-red-example-ledgers.tsv"
+SUPERSEDED_LEDGER_COLUMNS = 4
+VOID_LEDGERS_HOWTO = (f"照 {VOID_LEDGERS_TABLE} 的文件头改那一行：账不在的，路径写错就改对、账已删就删掉那一行；缺段、理由不到 8 个字、作废出处不是「文件:行号」的补全；"
+                      "登记的账配得上一份有收尾行、ledger_sha256 对得上的产物的，那一趟是完整的、不是作废的：删掉那一行，它照常要钉全；"
+                      f"它被同档后一趟的账取代了的，删掉那一行、改登记进 {SUPERSEDED_LEDGERS_TABLE}（写法在那张表的文件头）")
+SUPERSEDED_LEDGERS_HOWTO = (f"照 {SUPERSEDED_LEDGERS_TABLE} 的文件头改那一行：缺段、理由不到 8 个字、出处不是「文件:行号」的补全；账不在的路径写错就改对、账已删就删掉那一行；"
+                            "两份写成同一份、登记两次、也登记在作废表里的删掉多的那一行；取代它的账自己登记了作废或被取代的，第二段改成真正取代它、照常钉全的那一份；"
+                            "两份账的档不同（各自同一趟产物的 device_arguments=）或取不到档的，不是同档取代：删掉那一行，被取代的那份照常钉全"
+                            "（python3 research/scripts/e165-pin-red-examples.py <被取代的账>；同档 ⑦ 冲突照追加的出路办）；"
+                            "被取代的账有行在取代它的账里没有同一个（域, N, 枚举序号, ①）的，取代它的账没覆盖它：删掉那一行，被取代的那份照常钉全，或交主 agent 定重跑出一份覆盖它的账再登记")
 CRATES_TABLE = "crates/mutations.tsv"
 CUSTOM_TABLE = "research/mutations/e165_replay_bounded_enumeration_custom.tsv"
 DEVICE_SOURCE = "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"
@@ -131,17 +245,35 @@ DEVICE_BINARY = "e165_replay_bounded_enumeration"
 DEVICE_FLAG = "--pinned-cases"
 RESULT_PREFIX = "E7RESULT name=state "
 LEDGER_COLUMNS, TABLE_OWN_COLUMNS = 13, 8
-TABLE_COLUMNS = TABLE_OWN_COLUMNS + LEDGER_COLUMNS
-COLUMN_MARKS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑"
+# 装置 --pinned-cases 认的段数（①–㉑）；钉表另在最后接 ㉒ 档，交给装置之前去掉
+DEVICE_COLUMNS = TABLE_OWN_COLUMNS + LEDGER_COLUMNS
+PROFILE_INDEX = DEVICE_COLUMNS
+TABLE_COLUMNS = DEVICE_COLUMNS + 1
+COLUMN_MARKS = "①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳㉑㉒"
 # 抄来的账行与钉表自己的段要相同的几对：（账的第几段, 钉表自己的第几段）；账第 3、4、5 段是域、N、序号，第 12、13 段是两条逐态行
 COPIED_PAIRS = ((3, 2), (4, 3), (5, 4), (12, 7), (13, 8))
-TABLE_PROBLEMS_HOWTO = ("8 段的旧行（没整行抄红例账）跑 python3 research/scripts/e165-pin-red-examples.py --backfill 补成 21 段（按 ⑤ 回账里取原行）；"
-                        "别的是手改坏了：表只由这份脚本写，从 git 找回再钉")
+TABLE_PROBLEMS_HOWTO = ("8 段的旧行（没整行抄红例账）与 21 段的行（没写档）跑 python3 research/scripts/e165-pin-red-examples.py --backfill 补成 22 段"
+                        "（按 ⑤ 回账里取原行、回同一趟的 kill-bounds 产物取档）；别的是手改坏了：表只由这份脚本写，从 git 找回再钉")
+# 档（㉒）：装置 split_off_the_profile_options 认的四个参数进档；只选域与 N 的四个不进；别的认不出、判红（文件头「档」一段）
+PROFILE_OPTIONS = ("--profile", "--marker-parity", "--table", "--disk-order")
+PROFILE_OPTION_DEFAULTS = {"--marker-parity": "even", "--table": "direct", "--disk-order": "normal"}
+SELECTION_OPTIONS = ("--bounds", "--family", "--only", "--max-n")
+DEFAULT_PROFILE = "--profile r1"
+PROFILE_FORM = re.compile(r"--profile r[1-9][0-9]*( --marker-parity odd)?( --table (?:scan|both))?( --disk-order reversed)?")
+PROFILE_HOWTO = ("档取同一趟 kill-bounds 产物第一行 E7RESULT name=config 的 device_arguments=：装置钉住的红例逐行重放只认 --profile、--marker-parity、--table、--disk-order，"
+                 "--bounds、--family、--only、--max-n 只选域与 N；别的参数先查装置（crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs 的 split_off_the_profile_options）"
+                 "认不认它、进不进逐态行，进的加进这份脚本的 PROFILE_OPTIONS（不进的加进 SELECTION_OPTIONS）再钉，不手填 ㉒")
 EXIT_GREEN, EXIT_RED, EXIT_USAGE, EXIT_NOT_RUN = 0, 1, 2, 77
 BREAK = {item for item in os.environ.get("E165_PIN_RED_EXAMPLES_BREAK", "").split(",") if item}
+# --replay 一块交给装置几行（--block-rows 改）：一块判完那几行当场落盘，被打断之后同一条命令只补没判的块
+DEFAULT_BLOCK_ROWS = 32
+# 门禁给的一份文件：--replay 判完往里追加一行「格<TAB>现判数<TAB>复用数<TAB>原因分栏」（lib_verdict_library.Tally.append_to），门禁整道相加
+ITEM_TALLY_FILE_VARIABLE = "FORMAL_ITEM_TALLY_FILE"
+_ADMISSION_MODULE = []
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "run-with-memory-cap.sh")
 # 内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」一段）：经它起时装置这一次没跑成，输出不算判定
-WRAPPER_OWN_EXITS = {250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上", 253: "超过限时", 254: "被总上限挤掉"}
+WRAPPER_OWN_EXITS = {245: "显存不够（起止之间内核报了 NV_ERR_NO_MEMORY）", 250: "撞了这一条自己的内存上限", 251: "包装用法错或起不了 scope", 252: "内存不够排不上",
+                     253: "超过限时", 254: "被总上限挤掉"}
 # --replay 编装置、跑装置时的进度行（文件头 --replay 一段）：间隔照 .claude/rules/implementation-workflow.md「测试与崩溃检测优先多线程」；时钟、轮询间隔与去处自证换成假的
 PROGRESS_INTERVAL_SECONDS = 300
 PROGRESS_POLL_SECONDS = 1.0
@@ -223,6 +355,58 @@ def read_kill_bounds(path):
             record[key] = match.group(1) if match else None
         records.append(record)
     return records, ledger_digest
+
+
+def profile_of_device_arguments(text):
+    """device_arguments= 的值（参数用 + 连）→ 规范的档（文件头「档」一段）；认不出 raise ValueError（说明哪一个）。
+    开关 profile-read-as-r1 下一律交 --profile r1；profile-arguments-unchecked 下认不出的参数略过。"""
+    if "profile-read-as-r1" in BREAK:
+        return DEFAULT_PROFILE
+    tokens = [token for token in (text or "").split("+") if token]
+    values, position = {}, 0
+    while position < len(tokens):
+        token = tokens[position]
+        if token in PROFILE_OPTIONS or token in SELECTION_OPTIONS:
+            if position + 1 >= len(tokens):
+                raise ValueError(f"{token} 后面缺值")
+            if token in PROFILE_OPTIONS:
+                if token in values:
+                    raise ValueError(f"{token} 给了不止一次")
+                values[token] = tokens[position + 1]
+            position += 2
+            continue
+        if "profile-arguments-unchecked" in BREAK:
+            position += 1
+            continue
+        raise ValueError(f"认不出的参数 {token}（不知道它进不进钉住的红例逐行重放的逐态行）")
+    parts = ["--profile", values.get("--profile", "r1")]
+    for option in PROFILE_OPTIONS[1:]:
+        if option in values and values[option] != PROFILE_OPTION_DEFAULTS[option]:
+            parts += [option, values[option]]
+    profile = " ".join(parts)
+    if not PROFILE_FORM.fullmatch(profile):
+        raise ValueError(f"档「{profile}」不是装置认的写法（{PROFILE_FORM.pattern}）")
+    return profile
+
+
+def run_profile(product):
+    """同一趟 kill-bounds 产物 → 规范的档：第一行 E7RESULT name=config 的 device_arguments=；没有那一段或没有 config 行是 --profile r1。
+    认不出 raise Red。"""
+    for line in open(product, encoding="utf-8").read().split("\n"):
+        if line.startswith("E7RESULT name=config "):
+            match = re.search(r" device_arguments=(\S*)", line)
+            try:
+                return profile_of_device_arguments(match.group(1) if match else "")
+            except ValueError as problem:
+                raise Red(f"{os.path.basename(product)} 的 device_arguments= 认不出档：{problem}", PROFILE_HOWTO)
+    return DEFAULT_PROFILE
+
+
+def row_profile(fields):
+    """钉表一行的档（㉒）；21 段的行（没写档）只在开关 profile-column-unchecked 下当 --profile r1，平时交 None。"""
+    if len(fields) == TABLE_COLUMNS:
+        return fields[PROFILE_INDEX]
+    return DEFAULT_PROFILE if len(fields) == DEVICE_COLUMNS and "profile-column-unchecked" in BREAK else None
 
 
 def shown_path(path, root):
@@ -366,23 +550,23 @@ UNRESOLVED_HOWTO = ("按名字找不到的：那一趟之后这条变异被删�
                     "再跑同一条命令；已钉进的不重复，不手填 ⑥")
 
 
-def pinned_fields(ledger_path, row, variant):
+def pinned_fields(ledger_path, row, variant, profile):
     fields = row["fields"]
     domain, size, ordinal, original, mutant = fields[2], fields[3], fields[4], fields[11], fields[12]
     fingerprint = input_fingerprint(domain, size, original)
     if fingerprint is None:
         raise Red(f"{os.path.basename(ledger_path)}:{row['number']} 第 12 列认不出 state=", "账的第 12 列是原实现的逐态行（E7RESULT name=state …），手改坏了从 git 找回")
-    return [fingerprint, domain, size, ordinal, f"{os.path.basename(ledger_path)}:{row['number']}", variant, original, mutant, *fields]
+    return [fingerprint, domain, size, ordinal, f"{os.path.basename(ledger_path)}:{row['number']}", variant, original, mutant, *fields, profile]
 
 
 def copied_ledger_row(fields):
-    """钉表一行 ⑨ 起用制表符接起来：整行抄的那一行账（8 段的旧行交空串）。"""
-    return "\t".join(fields[TABLE_OWN_COLUMNS:])
+    """钉表一行 ⑨–㉑ 用制表符接起来：整行抄的那一行账（8 段的旧行交空串；㉒ 档不算在里面）。"""
+    return "\t".join(fields[TABLE_OWN_COLUMNS:DEVICE_COLUMNS])
 
 
 def first_differing_column(fields, ledger_fields):
-    """钉表一行 ⑨ 起与账那一行第一处不同的段，写成「⑱（账第 10 段）」；段数不同写段数。"""
-    copied = fields[TABLE_OWN_COLUMNS:]
+    """钉表一行 ⑨–㉑ 与账那一行第一处不同的段，写成「⑱（账第 10 段）」；段数不同写段数。"""
+    copied = fields[TABLE_OWN_COLUMNS:DEVICE_COLUMNS]
     if len(copied) != len(ledger_fields):
         return f"⑨ 起是 {len(copied)} 段、账那一行是 {len(ledger_fields)} 段"
     for index, (pinned_value, ledger_value) in enumerate(zip(copied, ledger_fields)):
@@ -416,9 +600,14 @@ def table_problems(rows):
                 continue
             problems.append(f"第 {row['number']} 行没整行抄红例账（{TABLE_OWN_COLUMNS} 段的旧格式，要 {TABLE_COLUMNS} 段）")
             continue
-        if len(fields) != TABLE_COLUMNS:
-            problems.append(f"第 {row['number']} 行是 {len(fields)} 段，要 {TABLE_COLUMNS} 段（自己的 {TABLE_OWN_COLUMNS} 段后面接红例账一行的 {LEDGER_COLUMNS} 段）")
+        if len(fields) == DEVICE_COLUMNS and "profile-column-unchecked" not in BREAK:
+            problems.append(f"第 {row['number']} 行没写档（{DEVICE_COLUMNS} 段，要 {TABLE_COLUMNS} 段：㉒ 是出这一行的那一趟的档）")
             continue
+        if len(fields) not in (TABLE_COLUMNS, DEVICE_COLUMNS):
+            problems.append(f"第 {row['number']} 行是 {len(fields)} 段，要 {TABLE_COLUMNS} 段（自己的 {TABLE_OWN_COLUMNS} 段后面接红例账一行的 {LEDGER_COLUMNS} 段，再接 ㉒ 档）")
+            continue
+        if len(fields) == TABLE_COLUMNS and not PROFILE_FORM.fullmatch(fields[PROFILE_INDEX]):
+            problems.append(f"第 {row['number']} 行的 ㉒「{fields[PROFILE_INDEX]}」不是规范写法的档（{PROFILE_FORM.pattern}）")
         if not re.fullmatch(r"[0-9a-f]{64}", fields[0]):
             problems.append(f"第 {row['number']} 行的 ① 不是 64 位小写十六进制")
         elif input_fingerprint(fields[1], fields[2], fields[6]) != fields[0] and "fingerprint-unchecked" not in BREAK:
@@ -428,9 +617,9 @@ def table_problems(rows):
                 copied_index = TABLE_OWN_COLUMNS + ledger_column - 1
                 if fields[copied_index] != fields[own_column - 1]:
                     problems.append(f"第 {row['number']} 行：{COLUMN_MARKS[copied_index]}（红例账第 {ledger_column} 段）与 {COLUMN_MARKS[own_column - 1]} 不同")
-        key = (fields[5], copied_ledger_row(fields))
+        key = (fields[5], copied_ledger_row(fields), row_profile(fields))
         if key in seen:
-            problems.append(f"第 {row['number']} 行的 ⑥ 与 ⑨ 起的整行都与前面一行相同（重复钉了）")
+            problems.append(f"第 {row['number']} 行的 ⑥、⑨–㉑ 的整行与 ㉒ 都与前面一行相同（重复钉了）")
         seen.add(key)
     return problems
 
@@ -457,9 +646,11 @@ def write_table(table, new_text, digest_at_read):
 def run_names_for_append(root, ledgers, products):
     """追加换名用的那一趟的名字，与 --check 同一套：每份账配同一趟的产物（run_variant_names 的四样），
     products 给了（--kill-bounds，与账逐份对应，第二段驱动收尾时这样调）用给的那一份，不给按文件名配；
-    有一份配不上就 raise Red，一行都不钉。{账: {(变体, 表行): (table=, title=)} 或 None（只在开关下）}。"""
-    names = {}
+    有一份配不上就 raise Red，一行都不钉。交（{账: {(变体, 表行): (table=, title=)} 或 None（只在开关下）}, {账: 档}）：
+    档取同一趟产物的 device_arguments=（文件头「档」一段），认不出 raise Red；开关 append-pairing-optional 下配不上的当 --profile r1。"""
+    names, profiles = {}, {}
     for index, ledger in enumerate(ledgers):
+        product = (products[index] if products else None) or paired_kill_bounds(ledger)
         try:
             names[ledger] = run_variant_names(root, ledger, read_ledger(ledger), products[index] if products else None)
         except Red as red:
@@ -468,7 +659,14 @@ def run_names_for_append(root, ledgers, products):
             names[ledger] = None
         if "append-names-from-today-table" in BREAK:
             names[ledger] = None
-    return names
+        if product and os.path.isfile(product):
+            try:
+                profiles[ledger] = run_profile(product)
+            except Red as red:
+                raise Red(f"{red.message}（追加按出这份账的那一趟的档钉，认不出就一行都没钉）", red.howto)
+        else:
+            profiles[ledger] = DEFAULT_PROFILE
+    return names, profiles
 
 
 def append(root, table, ledgers, products):
@@ -477,15 +675,17 @@ def append(root, table, ledgers, products):
     if problems:
         raise Red(f"钉住的表 {table} 本身不对：" + "；".join(problems[:5]), TABLE_PROBLEMS_HOWTO)
     digest_at_read = file_digest(table)
-    run_names = run_names_for_append(root, ledgers, products)
+    run_names, profiles = run_names_for_append(root, ledgers, products)
+    # 冲突与去重都按档分开：同一个（①, ⑥）在不同档下各钉一行（文件头「档」一段）
     by_key = {}
     for row in existing:
-        by_key.setdefault((row["fields"][0], row["fields"][5]), row["fields"])
-    by_variant = {(row["fields"][5], copied_ledger_row(row["fields"])) for row in existing}
-    by_origin = {(row["fields"][4], copied_ledger_row(row["fields"])) for row in existing}
+        by_key.setdefault((row["fields"][0], row["fields"][5], row_profile(row["fields"])), row["fields"])
+    by_variant = {(row["fields"][5], copied_ledger_row(row["fields"]), row_profile(row["fields"])) for row in existing}
+    by_origin = {(row["fields"][4], copied_ledger_row(row["fields"]), row_profile(row["fields"])) for row in existing}
     names = VariantNames(root)
     new_rows, already, without_example, conflicts, total, unresolved = [], 0, 0, [], 0, []
     for ledger in ledgers:
+        profile = profiles[ledger]
         for row in read_ledger(ledger):
             total += 1
             if not has_example(row):
@@ -496,27 +696,28 @@ def append(root, table, ledgers, products):
             except Unresolved as problem:
                 unresolved.append(str(problem))
                 continue
-            fields = pinned_fields(ledger, row, variant)
-            key, whole = (fields[0], fields[5]), copied_ledger_row(fields)
+            fields = pinned_fields(ledger, row, variant, profile)
+            key, whole = (fields[0], fields[5], profile), copied_ledger_row(fields)
             if "pin-twice" not in BREAK:
-                if key in by_key and by_key[key][6] != fields[6]:
-                    conflicts.append(f"{fields[4]}（{fields[5]}）：表里 ⑦ 是 {by_key[key][6][:120]}…，账里是 {fields[6][:120]}…")
+                if key in by_key and by_key[key][6] != fields[6] and "same-profile-conflict-ignored" not in BREAK:
+                    conflicts.append(f"{fields[4]}（{fields[5]}，档 {profile}）：表里 ⑦ 是 {by_key[key][6][:120]}…，账里是 {fields[6][:120]}…")
                     continue
-                if (fields[5], whole) in by_variant or (fields[4], whole) in by_origin or ("dedupe-by-input-variant" in BREAK and key in by_key):
+                if ((fields[5], whole, profile) in by_variant or (fields[4], whole, profile) in by_origin
+                        or ("dedupe-by-input-variant" in BREAK and key in by_key)):
                     already += 1
                     continue
             new_rows.append(fields)
             by_key.setdefault(key, fields)
-            by_variant.add((fields[5], whole))
-            by_origin.add((fields[4], whole))
+            by_variant.add((fields[5], whole, profile))
+            by_origin.add((fields[4], whole, profile))
     for problem in unresolved:
         print(f"     没钉：{problem}")  # gate-lint:detail
     unresolved_note = f"；{len(unresolved)} 行按 title 找不到唯一的变异、没钉" if unresolved else ""
     if conflicts:
         for conflict in conflicts[:5]:
             print(f"     {conflict}")  # gate-lint:detail
-        raise Red(f"{len(conflicts)} 行账与表里同一个（输入, 变异）的原实现逐态行不同，一行都没钉",
-                  "原实现在这个输入上的行为变了：先弄清是实现改了行为（要三方认）还是账跑在别的树上，再决定改表还是重跑")
+        raise Red(f"{len(conflicts)} 行账与表里（或这一次前面的账里）同一档下同一个（输入, 变异）的原实现逐态行不同，一行都没钉",
+                  "同一档下原实现在这个输入上的行为变了：先弄清是实现改了行为（要三方认）还是账跑在别的树上，再决定改表还是重跑")
     if not new_rows:
         if unresolved:
             raise Red(f"{len(ledgers)} 份账 {total} 行：{already} 行已钉、{without_example} 行没有反例状态{unresolved_note}，一行都没新钉", UNRESOLVED_HOWTO)
@@ -545,12 +746,12 @@ class ChangedSinceRead(Exception):
 def backfill(root, table):
     text, rows = read_table(table)
     digest_at_read = file_digest(table)
-    old_rows = [row for row in rows if len(row["fields"]) == TABLE_OWN_COLUMNS]
+    old_rows = [row for row in rows if len(row["fields"]) in (TABLE_OWN_COLUMNS, DEVICE_COLUMNS)]
     if not old_rows:
-        print(f"  ✓ {os.path.relpath(table, root)} 的 {len(rows)} 行都不是 {TABLE_OWN_COLUMNS} 段的旧行，没有要补的")
+        print(f"  ✓ {os.path.relpath(table, root)} 的 {len(rows)} 行都不是 {TABLE_OWN_COLUMNS} 段或 {DEVICE_COLUMNS} 段的旧行，没有要补的")
         return EXIT_GREEN
     ledger_directory = os.path.dirname(LEDGER_GLOB)
-    ledger_lines, filled, unrecoverable = {}, {}, []
+    ledger_lines, profiles, filled, unrecoverable = {}, {}, {}, []
     for row in old_rows:
         fields = row["fields"]
         name, _colon, number = fields[4].rpartition(":")
@@ -560,9 +761,25 @@ def backfill(root, table):
         if name not in ledger_lines:
             path = os.path.join(root, ledger_directory, name)
             ledger_lines[name] = open(path, encoding="utf-8").read().split("\n") if os.path.isfile(path) else None
+            # 档：⑤ 点的那份账按文件名配同一趟的产物，取它的 device_arguments=（文件头「档」一段）；取不到记原因
+            product = paired_kill_bounds(path)
+            if product is None or not os.path.isfile(product):
+                profiles[name] = (None, f"⑤ 点的红例账配的 kill-bounds 产物 {shown_path(product, root) if product else '（文件名不以 ' + LEDGER_SUFFIX + ' 收尾）'} 不在，取不到档")
+            else:
+                try:
+                    profiles[name] = (run_profile(product), None)
+                except Red as red:
+                    profiles[name] = (None, red.message)
         lines = ledger_lines[name]
         if lines is None:
             unrecoverable.append((row, f"⑤ 点的红例账 {ledger_directory}/{name} 不在"))
+            continue
+        profile, profile_problem = profiles[name]
+        if profile is None:
+            unrecoverable.append((row, profile_problem))
+            continue
+        if len(fields) == DEVICE_COLUMNS:
+            filled[row["number"]] = fields + [profile]
             continue
         if not 1 <= int(number) <= len(lines):
             unrecoverable.append((row, f"{ledger_directory}/{name} 没有第 {number} 行（共 {len(lines)} 行）"))
@@ -578,16 +795,16 @@ def backfill(root, table):
             if differing:
                 unrecoverable.append((row, f"{ledger_directory}/{name} 第 {number} 行与这一行对不上（{'、'.join(differing)} 不同）：账在钉过之后被改过，或 ⑤ 的行号错位"))
                 continue
-        filled[row["number"]] = fields + ledger_fields
+        filled[row["number"]] = fields + ledger_fields + [profile]
     for row, reason in unrecoverable:
         print(f"     取不到原行：第 {row['number']} 行（⑤ {row['fields'][4]}）：{reason}")  # gate-lint:detail
     unrecoverable_howto = ("逐行照上面的原因找回那份账钉这一行时的原样（git log --all --diff-filter=D --name-only -- '*<账文件名>*'，git show <提交>:<路径>，"
                            "放回 research/results/）再跑 --backfill；找不回的这一行交主 agent 定（重跑出那份账的那一趟再钉），不手填、不照别的账行填")
     if not filled:
-        raise Red(f"{os.path.relpath(table, root)} 里 {len(old_rows)} 行 {TABLE_OWN_COLUMNS} 段的旧行一行都取不到原行，一行都没补", unrecoverable_howto)
+        raise Red(f"{os.path.relpath(table, root)} 里 {len(old_rows)} 行 {TABLE_OWN_COLUMNS} 段或 {DEVICE_COLUMNS} 段的旧行一行都取不到原行或档，一行都没补", unrecoverable_howto)
     new_text = "\n".join("\t".join(filled[number]) if number in filled else line for number, line in enumerate(text.split("\n"), 1))
     new_rows = [{"number": row["number"], "fields": filled.get(row["number"], row["fields"])} for row in rows]
-    problems = table_problems([row for row in new_rows if len(row["fields"]) != TABLE_OWN_COLUMNS])
+    problems = table_problems([row for row in new_rows if len(row["fields"]) not in (TABLE_OWN_COLUMNS, DEVICE_COLUMNS)])
     if problems:
         raise Red(f"补完之后的表本身不对，一行都没写：" + "；".join(problems[:5]), TABLE_PROBLEMS_HOWTO)
     write_table(table, new_text, digest_at_read)
@@ -598,8 +815,14 @@ def backfill(root, table):
         raise Red(f"写完回读：补过的 {len(filled)} 行里 {len(lost)} 行不在原来的行号上（第 {'、'.join(str(number) for number in lost[:5])} 行）",
                   "别的会话在改名换上之后又写过；重跑 --backfill")
     if unrecoverable:
-        raise Red(f"补了 {len(filled)} 行（回读都在）；{len(unrecoverable)} 行取不到原行，没补、留着 {TABLE_OWN_COLUMNS} 段", unrecoverable_howto)
-    print(f"  ✓ 补钉：{len(filled)} 行 {TABLE_OWN_COLUMNS} 段的旧行都按 ⑤ 取回账行接成 {TABLE_COLUMNS} 段，回读都在；表里现有 {len(after)} 行")
+        raise Red(f"补了 {len(filled)} 行（回读都在）；{len(unrecoverable)} 行取不到原行或档，没补、留着原来的段数", unrecoverable_howto)
+    whole_rows = sum(1 for row in old_rows if row["number"] in filled and len(row["fields"]) == TABLE_OWN_COLUMNS)
+    by_profile = {}
+    for fields in filled.values():
+        by_profile[fields[PROFILE_INDEX]] = by_profile.get(fields[PROFILE_INDEX], 0) + 1
+    profile_text = "、".join(f"{profile} {count} 行" for profile, count in sorted(by_profile.items()))
+    print(f"  ✓ 补钉：{len(filled)} 行都补成 {TABLE_COLUMNS} 段（{whole_rows} 行 {TABLE_OWN_COLUMNS} 段的旧行按 ⑤ 取回账行；档按 ⑤ 那份账同一趟的产物取：{profile_text}），"
+          f"回读都在；表里现有 {len(after)} 行")
     return EXIT_GREEN
 
 
@@ -609,11 +832,165 @@ def current_digest(path):
 
 # ── 格一：账都钉着 ──
 
+def read_void_ledgers(root):
+    """作废红例账登记表：交（{账的绝对路径: 仓根起的路径}, [问题]）。表不在交（{}, []）。
+    判：每行三段都不空、理由不少于 VOID_REASON_MINIMUM_CHARACTERS 个字、作废出处写成「文件:行号」、登记的账在、同一份不登记两次，
+    登记的账配不上一份有收尾行、ledger_sha256 等于它此刻 sha256 的同一趟产物（配得上说明那一趟是完整的）。
+    开关 void-rows-unchecked 下前四样不判（缺段的行照收），void-complete-accepted 下最后一样不判。"""
+    path = os.path.join(root, VOID_LEDGERS_TABLE)
+    if not os.path.isfile(path):
+        return {}, []
+    registered, problems = {}, []
+    for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+        if not raw.strip() or raw.startswith("#"):
+            continue
+        fields = raw.split("\t")
+        if (len(fields) != VOID_LEDGER_COLUMNS or not all(field.strip() for field in fields)) and "void-rows-unchecked" not in BREAK:
+            problems.append(f"第 {number} 行是 {len(fields)} 段、{sum(1 for field in fields if not field.strip())} 段空着（要 {VOID_LEDGER_COLUMNS} 段：账的路径、理由、作废出处 文件:行号，制表符分隔，都不许空）")
+            continue
+        relative, reason, place = (fields + ["", "", ""])[:VOID_LEDGER_COLUMNS]
+        ledger = os.path.normpath(os.path.join(root, relative))
+        if "void-rows-unchecked" not in BREAK:
+            if len(reason.strip()) < VOID_REASON_MINIMUM_CHARACTERS:
+                problems.append(f"第 {number} 行的理由「{reason.strip()}」不到 {VOID_REASON_MINIMUM_CHARACTERS} 个字")
+            if not VOID_PLACE_FORM.match(place.strip()):
+                problems.append(f"第 {number} 行的作废出处「{place.strip()}」不是「文件:行号」")
+            if not os.path.isfile(ledger):
+                problems.append(f"第 {number} 行登记的账 {relative} 不在")
+                continue
+            if ledger in registered:
+                problems.append(f"第 {number} 行登记的账 {relative} 前面已登记过")
+                continue
+        product = paired_kill_bounds(ledger)
+        if product and os.path.isfile(product) and os.path.isfile(ledger) and "void-complete-accepted" not in BREAK:
+            _records, ledger_digest = read_kill_bounds(product)
+            if ledger_digest == file_digest(ledger):
+                problems.append(f"第 {number} 行登记的账 {relative} 配得上一份有收尾行、ledger_sha256 对得上的产物 {shown_path(product, root)}：那一趟是完整的，不是作废的")
+        registered[ledger] = relative
+    return registered, problems
+
+
+def coverage_rows(ledger_path):
+    """账每一行的（第 3 列域, 第 4 列 N, 第 5 列枚举序号, ①）→ 这个键的行号（按出现次序）。
+    ① 是 input_fingerprint(第 3 列, 第 4 列, 第 12 列)：钉表算 ① 用的那几列；没有反例状态的行（第 12 列空）记 None。账写坏了 raise Red。"""
+    rows = {}
+    for row in read_ledger(ledger_path):
+        fields = row["fields"]
+        rows.setdefault((fields[2], fields[3], fields[4], input_fingerprint(fields[2], fields[3], fields[11])), []).append(row["number"])
+    return rows
+
+
+def read_superseded_ledgers(root, void_registered):
+    """被取代红例账登记表：交（{被取代的账的绝对路径: (仓根起的路径, 取代它的账的绝对路径)}, [问题]）。表不在交（{}, []）。
+    判（文件头 --check 一段）：写法（四段不空、理由、出处、两份都在、不是同一份、不登记两次、不与作废表重登、取代它的账自己没登记），
+    两份同档、被取代的账每一行在取代它的账里一行配一行。开关 superseded-rows-unchecked 下写法不判（解析不了的行略过），
+    superseded-profile-unchecked 下不判档，superseded-coverage-unchecked 下不判覆盖。"""
+    path = os.path.join(root, SUPERSEDED_LEDGERS_TABLE)
+    if not os.path.isfile(path):
+        return {}, []
+    rows_unchecked = "superseded-rows-unchecked" in BREAK
+    entries, problems, parsed = {}, [], []
+    for number, raw in enumerate(open(path, encoding="utf-8").read().split("\n"), 1):
+        if not raw.strip() or raw.startswith("#"):
+            continue
+        fields = raw.split("\t")
+        if len(fields) != SUPERSEDED_LEDGER_COLUMNS or not all(field.strip() for field in fields):
+            if not rows_unchecked:
+                problems.append(f"第 {number} 行是 {len(fields)} 段、{sum(1 for field in fields if not field.strip())} 段空着（要 {SUPERSEDED_LEDGER_COLUMNS} 段："
+                                "被取代的账、取代它的账、理由、取代出处 文件:行号，制表符分隔，都不许空）")
+            continue
+        old_relative, new_relative, reason, place = (field.strip() for field in fields)
+        old, new = os.path.normpath(os.path.join(root, old_relative)), os.path.normpath(os.path.join(root, new_relative))
+        row_problems = []
+        if len(reason) < VOID_REASON_MINIMUM_CHARACTERS:
+            row_problems.append(f"第 {number} 行的理由「{reason}」不到 {VOID_REASON_MINIMUM_CHARACTERS} 个字")
+        if not VOID_PLACE_FORM.match(place):
+            row_problems.append(f"第 {number} 行的取代出处「{place}」不是「文件:行号」")
+        for which, relative, ledger in (("被取代的账", old_relative, old), ("取代它的账", new_relative, new)):
+            if not os.path.isfile(ledger):
+                row_problems.append(f"第 {number} 行{which} {relative} 不在")
+        if old == new:
+            row_problems.append(f"第 {number} 行被取代的账与取代它的账是同一份 {old_relative}")
+        if old in entries:
+            row_problems.append(f"第 {number} 行被取代的账 {old_relative} 前面已登记过")
+        if old in void_registered:
+            row_problems.append(f"第 {number} 行被取代的账 {old_relative} 也登记在作废表 {VOID_LEDGERS_TABLE} 里")
+        if new in void_registered:
+            row_problems.append(f"第 {number} 行取代它的账 {new_relative} 登记在作废表 {VOID_LEDGERS_TABLE} 里：取代它的账要照常钉全")
+        if not rows_unchecked:
+            problems.extend(row_problems)
+        present = os.path.isfile(old) and os.path.isfile(new) and old != new
+        parsed.append((number, old_relative, old, new_relative, new, present))
+        entries.setdefault(old, (old_relative, new))
+    for number, old_relative, old, new_relative, new, present in parsed:
+        if new in entries and not rows_unchecked:
+            problems.append(f"第 {number} 行取代它的账 {new_relative} 自己也登记成被取代（被 {shown_path(entries[new][1], root)} 取代）：取代它的账要照常钉全，不能再被跳过")
+        if not present:
+            continue
+        if "superseded-profile-unchecked" not in BREAK:
+            profiles = []
+            for relative, ledger in ((old_relative, old), (new_relative, new)):
+                product = paired_kill_bounds(ledger)
+                if product is None or not os.path.isfile(product):
+                    shown = shown_path(product, root) if product else f"（文件名不以 {LEDGER_SUFFIX} 收尾）"
+                    problems.append(f"第 {number} 行：{relative} 配的 kill-bounds 产物 {shown} 不在，取不到档")
+                    profiles.append(None)
+                    continue
+                try:
+                    profiles.append(run_profile(product))
+                except Red as red:
+                    problems.append(f"第 {number} 行：{red.message}")
+                    profiles.append(None)
+            if None not in profiles and profiles[0] != profiles[1]:
+                problems.append(f"第 {number} 行：被取代的账 {old_relative} 那一趟的档是「{profiles[0]}」，取代它的账 {new_relative} 那一趟是「{profiles[1]}」：档不同，不是同档取代")
+        if "superseded-coverage-unchecked" not in BREAK:
+            try:
+                old_rows, new_rows = coverage_rows(old), coverage_rows(new)
+            except Red as red:
+                problems.append(f"第 {number} 行：{red.message}")
+                continue
+            uncovered = []
+            for key, numbers in old_rows.items():
+                extra = len(numbers) - len(new_rows.get(key, []))
+                if extra > 0:
+                    uncovered.extend((line, key) for line in numbers[-extra:])
+            if uncovered:
+                shown = "、".join(f"第 {line} 行（域 {key[0]}、N {key[1]}、序号 {key[2]}）" for line, key in uncovered[:5])
+                problems.append(f"第 {number} 行：被取代的账 {old_relative} 有 {len(uncovered)} 行在取代它的账 {new_relative} 里没有对应行"
+                                f"（按域、N、枚举序号与 ① 一行配一行）：{shown}")
+    return entries, problems
+
+
 def check(root, table, ledgers):
+    void_ledgers, void_problems = ({}, []) if "void-ledgers-ignored" in BREAK else read_void_ledgers(root)
+    if void_problems:
+        for problem in void_problems[:10]:
+            print(f"     作废账登记：{problem}")  # gate-lint:detail
+        raise Red(f"作废红例账登记表 {VOID_LEDGERS_TABLE} 有 {len(void_problems)} 处不对", VOID_LEDGERS_HOWTO)
+    superseded, superseded_problems = read_superseded_ledgers(root, void_ledgers)
+    if superseded_problems:
+        for problem in superseded_problems[:10]:
+            print(f"     被取代账登记：{problem}")  # gate-lint:detail
+        raise Red(f"被取代红例账登记表 {SUPERSEDED_LEDGERS_TABLE} 有 {len(superseded_problems)} 处不对", SUPERSEDED_LEDGERS_HOWTO)
     if not ledgers:
         ledgers = sorted(glob.glob(os.path.join(root, LEDGER_GLOB)))
+    skipped = [ledger for ledger in ledgers if os.path.normpath(ledger) in void_ledgers]
+    skipped_superseded = [ledger for ledger in ledgers if os.path.normpath(ledger) in superseded and os.path.normpath(ledger) not in void_ledgers]
+    ledgers = [ledger for ledger in ledgers if os.path.normpath(ledger) not in void_ledgers and os.path.normpath(ledger) not in superseded]
+    # 被取代的账跳过的前提是取代它的账钉全：没在这一次判的账里的补进来（开关 superseded-replacement-pin-unchecked 下不补）
+    replacing = {}
+    for ledger in skipped_superseded:
+        replacement = superseded[os.path.normpath(ledger)][1]
+        replacing.setdefault(replacement, []).append(ledger)
+        if ("superseded-replacement-pin-unchecked" not in BREAK and os.path.isfile(replacement)
+                and replacement not in {os.path.normpath(judged) for judged in ledgers}):
+            ledgers.append(replacement)
+    skipped_names = ([shown_path(ledger, root) for ledger in skipped]
+                     + [f"{shown_path(ledger, root)}（被 {shown_path(superseded[os.path.normpath(ledger)][1], root)} 取代）" for ledger in skipped_superseded])
+    skipped_text = (f"跳过作废账 {len(skipped)} 份、被取代的账 {len(skipped_superseded)} 份"
+                    + ("：" + "、".join(skipped_names) if skipped_names else ""))
     if not ledgers:
-        raise NotRun(f"{LEDGER_GLOB} 一份红例账都没有：这一格无对象可判")
+        raise NotRun(f"{LEDGER_GLOB} 除了登记作废的（{skipped_text}）一份红例账都没有：这一格无对象可判")
     _text, rows = read_table(table)
     problems = table_problems(rows)
     if problems:
@@ -622,7 +999,8 @@ def check(root, table, ledgers):
     for row in rows:
         by_fingerprint.setdefault(row["fields"][0], []).append(row)
     names = VariantNames(root)
-    missing, counted, without_example, paired, whole_row_differs = [], 0, 0, 0, 0
+    missing, counted, without_example, paired, whole_row_differs, profile_differs = [], 0, 0, 0, 0, 0
+    ledger_profiles = {}
     for ledger in ledgers:
         ledger_rows = read_ledger(ledger)
         run_names = run_variant_names(root, ledger, ledger_rows)
@@ -630,6 +1008,10 @@ def check(root, table, ledgers):
             paired += 1
         if "names-from-today-table" in BREAK:
             run_names = None
+        # 按档判钉全：这份账的档取同一趟产物的 device_arguments=（产物不在只在开关 kill-bounds-optional 下走到这里，那时不比档）
+        product = paired_kill_bounds(ledger)
+        profile = run_profile(product) if product and os.path.isfile(product) else None
+        ledger_profiles[profile or "（档认不出）"] = ledger_profiles.get(profile or "（档认不出）", 0) + 1
         for row in ledger_rows:
             if not has_example(row):
                 without_example += 1
@@ -638,10 +1020,19 @@ def check(root, table, ledgers):
             origin = f"{os.path.basename(ledger)}:{row['number']}"
             fingerprint = input_fingerprint(row["fields"][2], row["fields"][3], row["fields"][11])
             same_input = [pinned_row for pinned_row in by_fingerprint.get(fingerprint, []) if pinned_row["fields"][6] == row["fields"][11]]
+            if profile is not None and "check-ignores-profile" not in BREAK:
+                other_profile = [pinned_row for pinned_row in same_input if row_profile(pinned_row["fields"]) != profile
+                                 and copied_ledger_row(pinned_row["fields"]) == "\t".join(row["fields"])]
+                same_input = [pinned_row for pinned_row in same_input if row_profile(pinned_row["fields"]) == profile]
+                if other_profile and not same_input:
+                    profile_differs += 1
+                    missing.append((ledger, f"{origin}（钉的档不对：表第 {other_profile[0]['number']} 行整行与账这一行相同，㉒ 是「{row_profile(other_profile[0]['fields'])}」，"
+                                            f"这份账那一趟是「{profile}」）"))
+                    continue
             if "whole-row-unchecked" in BREAK:
                 candidates = [pinned_row["fields"] for pinned_row in same_input]
             else:
-                # 整行抄：钉着的那一行 ⑨ 起用制表符接起来要与账这一行逐字节相同
+                # 整行抄：钉着的那一行 ⑨–㉑ 用制表符接起来要与账这一行逐字节相同
                 candidates = [pinned_row["fields"] for pinned_row in same_input if copied_ledger_row(pinned_row["fields"]) == "\t".join(row["fields"])]
                 if same_input and not candidates:
                     whole_row_differs += 1
@@ -672,10 +1063,17 @@ def check(root, table, ledgers):
         commands = [f"python3 research/scripts/e165-pin-red-examples.py {shown_path(ledger, root)}"
                     for ledger in sorted({ledger for ledger, _origin in missing})]
         whole_note = f"（其中 {whole_row_differs} 行表里钉着同一个输入，但没有一行 ⑨ 起与账那一行逐字节相同）" if whole_row_differs else ""
+        if profile_differs:
+            whole_note += f"（其中 {profile_differs} 行整行钉着、㉒ 不是这份账那一趟的档）"
+        unpinned_replacements = [ledger for ledger in sorted({os.path.normpath(ledger) for ledger, _origin in missing}) if ledger in replacing]
+        for replacement in unpinned_replacements:
+            whole_note += (f"（{shown_path(replacement, root)} 取代了登记的被取代账 {'、'.join(shown_path(ledger, root) for ledger in replacing[replacement])}："
+                           "取代它的账钉全了，被取代的才跳过）")
         raise Red(f"{len(ledgers)} 份红例账 {counted} 行里 {len(missing)} 行没钉进 {os.path.relpath(table, root)}{whole_note}",
-                  f"补进去，一份账一条：{'；'.join(commands)}（已钉的不重复，⑨ 起不同的另钉一行整行抄；追加按文件名配同一趟的产物、按它的 title= 到今天的变异表里按名字找变异，按名字找不到或找到几行的逐行报、不钉，照它的出路办）")
-    print(f"  ✓ {len(ledgers)} 份红例账 {counted} 行都钉在 {os.path.relpath(table, root)}，钉着的那一行 ⑨ 起与账那一行逐字节相同（{without_example} 行没有反例状态、不钉；"
-          f"{paired} 份账与同一趟的 kill-bounds 产物配对都过，⑥ 按那一趟的名字认）；表里 {len(rows)} 行，① 都与 ②③⑦ 重算的相同，⑪⑫⑬⑳㉑ 与 ②③④⑦⑧ 相同")
+                  f"补进去，一份账一条：{'；'.join(commands)}（已钉的不重复，⑨ 起不同的另钉一行整行抄；追加按文件名配同一趟的产物、按它的 title= 到今天的变异表里按名字找变异，按名字找不到或找到几行的逐行报、不钉，照它的出路办；档取同一趟产物的 device_arguments=，同一个输入与变异在别的档下钉着的照钉一行这一档的）")
+    profiles_text = "、".join(f"{profile} {count} 份" for profile, count in sorted(ledger_profiles.items()))
+    print(f"  ✓ {len(ledgers)} 份红例账 {counted} 行都钉在 {os.path.relpath(table, root)}，钉着的那一行 ⑨–㉑ 与账那一行逐字节相同、㉒ 是那份账的档（{without_example} 行没有反例状态、不钉；"
+          f"{paired} 份账与同一趟的 kill-bounds 产物配对都过，⑥ 按那一趟的名字认；账的档：{profiles_text}）；表里 {len(rows)} 行，① 都与 ②③⑦ 重算的相同，⑪⑫⑬⑳㉑ 与 ②③④⑦⑧ 相同；{skipped_text}")
     return EXIT_GREEN
 
 
@@ -715,13 +1113,173 @@ def run_reporting_progress(command, cwd, environment, what, rows_total=None):
     return subprocess.CompletedProcess(command, process.returncode, "".join(received["stdout"]), "".join(received["stderr"]))
 
 
-def replay(root, table, options):
+class UsageError(Exception):
+    """--item 点名了没有的项：退 2，列出可点名的项。"""
+
+    def __init__(self, message, available):
+        super().__init__(message)
+        self.message, self.available = message, available
+
+
+def admission_module():
+    """research/scripts/admission.py（装置的 cargo 依赖闭包 cargo_closure_input_paths、逐文件清单 input_manifest、工具链 toolchain_line），第一次用到时才读进来。"""
+    if not _ADMISSION_MODULE:
+        specification = importlib.util.spec_from_file_location("admission_for_e165_pin_red_examples", os.path.join(SCRIPT_DIRECTORY, "admission.py"))
+        module = importlib.util.module_from_spec(specification)
+        specification.loader.exec_module(module)
+        _ADMISSION_MODULE.append(module)
+    return _ADMISSION_MODULE[0]
+
+
+def pinned_item(row):
+    return f"pinned:{row['number']}"
+
+
+def list_items(root, table):
+    """逐行打「项<TAB>格[<TAB>说明]」：complete（pinned-red-examples-complete）一项，钉表每个数据行一项 pinned:<表里的行号>（说明是 ⑤、⑥ 与「档 <㉒>」）。只读钉表，不编、不起装置。"""
     _text, rows = read_table(table)
+    print("complete\tpinned-red-examples-complete")
+    for row in rows:
+        fields = row["fields"]
+        note = f"{fields[4]} {fields[5]}" if len(fields) >= 6 else f"{len(fields)} 段"
+        if len(fields) >= 6:
+            note += f" 档 {fields[PROFILE_INDEX]}" if len(fields) == TABLE_COLUMNS else " 没写档"
+        print(f"{pinned_item(row)}\tpinned-red-examples-replay\t{note}")
+    return EXIT_GREEN
+
+
+# 自证造「判法版本变了」用：里面放一个值时 judge_version 交它（只有自证放，门禁与命令行从不放）
+JUDGE_VERSION_FOR_SELFTEST = []
+
+
+def judge_version():
+    """判法版本：这份脚本与它 import 的判定库，两份内容的摘要（判定库的另一列，不进输入指纹）。弄坏开关 reuse-key-without-judge-version 下一律交空串。"""
+    if "reuse-key-without-judge-version" in BREAK:
+        return ""
+    if JUDGE_VERSION_FOR_SELFTEST:
+        return JUDGE_VERSION_FOR_SELFTEST[0]
+    return digest_text(digest_file(os.path.realpath(__file__)) + digest_file(os.path.join(SCRIPT_DIRECTORY, "lib_verdict_library.py")))
+
+
+def device_inputs_digest(root, binary):
+    """装置那一样：e165_replay_bounded_enumeration 的 cargo 依赖闭包（admission.py 的 cargo_closure_input_paths 现算）逐文件内容、仓根 Cargo.toml 与 Cargo.lock、
+    工具链（cargo -V 与 rustc -V）；给了 --binary 的另加那份可执行文件的内容（样本与自证的桩），这时闭包算不出就记一句算不出的原因。
+    不给 --binary 而闭包算不出：抛 Red（键罩不全就不许复用）。弄坏开关 reuse-key-without-closure 下闭包不进。"""
+    admission = admission_module()
+    parts = [digest_file(binary)] if binary else []
+    if "reuse-key-without-closure" not in BREAK:
+        try:
+            paths = admission.cargo_closure_input_paths(root, "singlefs-checker-tier", DEVICE_BINARY) + ["Cargo.toml", "Cargo.lock"]
+            _manifest, fingerprint, _count = admission.input_manifest(root, paths, [admission.toolchain_line(root)])
+            parts.append(fingerprint)
+        except (admission.RegistrationError, admission.InputManifestError) as error:
+            if not binary:
+                raise Red(f"算不出装置 {DEVICE_BINARY} 的 cargo 依赖闭包（{error}），按条判定的键罩不全",
+                          "先让 python3 research/scripts/admission.py paths <根> checker-tier-formal-verification.sh:pinned-red-examples-replay 列得出路径；不给判定库（去掉 --verdict-library）照旧整格现判")
+            parts.append(digest_text(f"算不出闭包：{error}"))
+    return digest_text("\n".join(parts))
+
+
+def mutation_rows_text(root, variant):
+    """⑥ 点名的每一条变异（<表>#<名>，几个用 + 连）在它的表里那一行原样（第 1 列等于名字的数据行，几行都取）；表不在、行不在各记一句。"""
+    pieces = []
+    for part in variant.split("+"):
+        relative, _hash, name = part.partition("#")
+        path = os.path.join(root, relative)
+        if not os.path.isfile(path):
+            pieces.append(f"{part}\t表不在")
+            continue
+        lines = [raw for raw in open(path, encoding="utf-8").read().split("\n") if raw.strip() and not raw.startswith("#") and raw.split("\t")[0] == name]
+        pieces.append(f"{part}\t" + ("\n".join(lines) if lines else "行不在"))
+    return "\n".join(pieces)
+
+
+def row_components(root, row, shared):
+    components = list(shared)
+    # 档进键：「这一行」带 ㉒，另单列一样「档」（开关 reuse-key-without-profile 下两处都不带）
+    row_text = "\t".join(row["fields"][:DEVICE_COLUMNS] if "reuse-key-without-profile" in BREAK else row["fields"])
+    if "reuse-key-without-row" not in BREAK:
+        components.append(("这一行", digest_text(row_text)))
+    if "reuse-key-without-profile" not in BREAK:
+        components.append(("档", digest_text(row_profile(row["fields"]) or "")))
+    if "reuse-key-without-mutation-row" not in BREAK:
+        components.append(("引的变异行", digest_text(mutation_rows_text(root, row["fields"][5]))))
+    return components
+
+
+def lookup(store, item, components):
+    if "reuse-ignores-key" in BREAK and store.directory is not None and store.reuse:
+        return store.lookup_by_item_only(item)
+    return store.lookup(item, components)
+
+
+def report_item(item, verdict, how, seconds=None):
+    """每项一行：项名、判定（绿 / 红）、现判还是复用、现判的用了几秒（一块里几行共用一次装置，秒数是那一块的）。"""
+    print(f"  · {item}：{verdict}，{how}" + (f"，{seconds:.1f} 秒（这一块）" if seconds is not None else ""))  # gate-lint:detail
+
+
+def blocked_table(table_text, block_numbers):
+    """只留 block_numbers 那几个数据行的表：别的数据行换成单独一个 #（装置当注释跳过），行号与原表相同，装置报「第 N 行」照原表的行号；
+    留下的数据行去掉 ㉒ 档、只留 ①–㉑（装置 --pinned-cases 只认 21 段，档由命令行带进去）。"""
+    lines = table_text.split("\n")
+    kept = []
+    for number, raw in enumerate(lines, 1):
+        if raw.strip() and not raw.startswith("#") and number not in block_numbers:
+            kept.append("#")
+        elif raw.strip() and not raw.startswith("#"):
+            kept.append("\t".join(raw.split("\t")[:DEVICE_COLUMNS]))
+        else:
+            kept.append(raw)
+    return "\n".join(kept)
+
+
+def run_device_block(root, table_text, block, binary, options, work, profile):
+    """一块（同一档的几行）：只留这几行的表交给装置 --pinned-cases，后面接这一档的参数（㉒ 按空格切开），交 CompletedProcess。
+    包装自己的结局与被信号停了照旧抛 Red（这一块之前判完的已经落盘）。开关 replay-without-profile 下不带档参数。"""
+    block_table = os.path.join(work, f"pinned-block-{block[0]['number']}.tsv")
+    with open(block_table, "w", encoding="utf-8") as handle:
+        handle.write(blocked_table(table_text, {row["number"] for row in block}))
+    # 以 .sh 结尾的（样本的桩）经 bash 起：样本目录里的文件不带执行位（script-modes.sh 不看 fixtures/）
+    profile_arguments = [] if "replay-without-profile" in BREAK else profile.split(" ")
+    command = (["bash", binary] if binary.endswith(".sh") else [binary]) + [DEVICE_FLAG, block_table, *profile_arguments]
+    wrapped = options["memory_cap"] != "none"
+    if wrapped:
+        command = ["bash", MEMORY_CAP_RUNNER, options["memory_cap"],
+                   "bash", os.path.join(SCRIPT_DIRECTORY, "capped.sh"), str(options["threads"]), *command]
+    environment = dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="门禁里逐行重放钉住的红例，与同一趟别的格各用各的上限",
+                       RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="门禁的上限按钉住的表最大时给，表只涨不缩")
+    completed = run_reporting_progress(command, root, environment, f"装置 {DEVICE_FLAG} 逐行重放钉住的 {len(block)} 行（档 {profile}，第 {block[0]['number']} 行起这一块）", len(block))
+    if wrapped and completed.returncode in WRAPPER_OWN_EXITS and "wrapper-exit-as-replay-red" not in BREAK:
+        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
+        raise Red(f"没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
+                  f"钉住的 {len(block)} 行这一次的输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
+                  "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；"
+                  "251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；"
+                  "253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；245 是同一段时间内核报了显存不够：nvidia-smi 看谁在用卡，等它跑完再重跑这一格；"
+                  "不拿掉包装跑，不改钉住的表、变异行或实现")
+    signal_number = -completed.returncode if completed.returncode < 0 else completed.returncode - 128 if 128 < completed.returncode <= 128 + 64 else None
+    if signal_number is not None and "killed-as-regression" not in BREAK:
+        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
+        raise Red(f"装置被信号停了（退 {completed.returncode}，信号 {signal_number}）：钉住的 {len(block)} 行这一次没判完，输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
+                  "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
+                  "查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），那件事不再发生之后重跑这一格；不拿掉包装跑，不改钉住的表、变异行或实现")
+    return completed
+
+
+def replay(root, table, options):
+    text, rows = read_table(table)
     problems = table_problems(rows)
     if problems:
         raise Red("钉住的表本身不对：" + "；".join(problems[:5]), TABLE_PROBLEMS_HOWTO)
     if not rows:
         raise NotRun(f"{os.path.relpath(table, root)} 一行都没有：这一格无对象可判")
+    available = [pinned_item(row) for row in rows]
+    wanted = options.get("items") or []
+    if wanted and "item-filter-ignored" not in BREAK:
+        unknown = [item for item in wanted if item not in available]
+        if unknown:
+            raise UsageError(f"pinned-red-examples-replay 格里没有点名的项：{'、'.join(unknown)}", available)
+        rows = [row for row in rows if pinned_item(row) in wanted]
     missing_variants = []
     if "variant-unchecked" not in BREAK:
         tables = {}
@@ -738,7 +1296,24 @@ def replay(root, table, options):
             print(f"     不在了：{item}")  # gate-lint:detail
         raise Red(f"{len(rows)} 行里 {len(missing_variants)} 处点名的「改回去就红」的变异不在它的表里了",
                   "变异行被删或改了名：找回那一行（改法被悄悄撤回时它要先响），确是改名就照新名改这张表（要写明为什么）")
+    store, tally = VerdictLibrary(options.get("verdict_library"), "pinned-red-examples-replay", judge_version(), reuse=options.get("reuse", True)), Tally()
     binary = options["binary"]
+    shared = [("装置", device_inputs_digest(root, binary))] if store.directory else []
+    pending = []
+    for row in rows:
+        components = row_components(root, row, shared) if shared else []
+        reused, reason = lookup(store, pinned_item(row), components)
+        tally.count(reused, reason)
+        if reused:
+            report_item(pinned_item(row), "绿", f"复用（{reason}）")
+        else:
+            pending.append((row, components, reason))
+    named = f"（--item 点名的 {len(rows)} 行）" if wanted else ""
+    if not pending:
+        print(f"  · 按条：{tally.text()}")  # gate-lint:detail
+        tally.append_to(os.environ.get(ITEM_TALLY_FILE_VARIABLE), "pinned-red-examples-replay")
+        print(f"  ✓ 钉住的 {len(rows)} 行{named}：点名的变异都还在它们的表里；每一行都复用上一次判绿的判定，没编装置、没起重放；按条{tally.text()}")
+        return EXIT_GREEN
     if binary is None:
         source = os.path.join(root, DEVICE_SOURCE)
         if not os.path.isfile(source) or DEVICE_FLAG not in open(source, encoding="utf-8").read():
@@ -750,39 +1325,56 @@ def replay(root, table, options):
             raise Red(f"编装置没成（{' '.join(command[3:])} 退 {completed.returncode}）：{' | '.join(completed.stderr.strip().split(chr(10))[-4:])}",
                       "先让它在平时的工具链上编得过；缓存缺包 cargo fetch --locked")
         binary = os.path.join(options["target"], "release", DEVICE_BINARY)
-    # 以 .sh 结尾的（样本的桩）经 bash 起：样本目录里的文件不带执行位（script-modes.sh 不看 fixtures/）
-    command = ["bash", binary, DEVICE_FLAG, os.path.abspath(table)] if binary.endswith(".sh") else [binary, DEVICE_FLAG, os.path.abspath(table)]
-    wrapped = options["memory_cap"] != "none"
-    if wrapped:
-        command = ["bash", MEMORY_CAP_RUNNER, options["memory_cap"],
-                   "bash", os.path.join(SCRIPT_DIRECTORY, "capped.sh"), str(options["threads"]), *command]
-    environment = dict(os.environ, RUN_WITH_MEMORY_CAP_PARALLEL_REASON="门禁里逐行重放钉住的红例，与同一趟别的格各用各的上限",
-                       RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON="门禁的上限按钉住的表最大时给，表只涨不缩")
-    completed = run_reporting_progress(command, root, environment, f"装置 {DEVICE_FLAG} 逐行重放钉住的 {len(rows)} 行", len(rows))
-    if wrapped and completed.returncode in WRAPPER_OWN_EXITS and "wrapper-exit-as-replay-red" not in BREAK:
-        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
-        raise Red(f"没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 {completed.returncode}（{WRAPPER_OWN_EXITS[completed.returncode]}，上限 {options['memory_cap']}），"
-                  f"钉住的 {len(rows)} 行这一次的输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
-                  "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：250 是装置要的比上限多，把 GATE_E165_PINNED_MEMORY_MAX（或 --memory-cap）设大再跑；"
-                  "251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；"
-                  "253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑；不拿掉包装跑，不改钉住的表、变异行或实现")
-    signal_number = -completed.returncode if completed.returncode < 0 else completed.returncode - 128 if 128 < completed.returncode <= 128 + 64 else None
-    if signal_number is not None and "killed-as-regression" not in BREAK:
-        tail = " | ".join(line for line in completed.stderr.strip().split("\n")[-4:] if line.strip())
-        raise Red(f"装置被信号停了（退 {completed.returncode}，信号 {signal_number}）：钉住的 {len(rows)} 行这一次没判完，输出不算判定{'（' + tail[:300] + '）' if tail else ''}",
-                  "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办：撞了这一条自己的上限由包装认成 250，外面 kill -9 同样退 137——这一次是外面停的："
-                  "查是谁在那一刻停了它（同一时刻的 ps、journalctl --user、看门狗的记录），那件事不再发生之后重跑这一格；不拿掉包装跑，不改钉住的表、变异行或实现")
-    results = [line for line in completed.stdout.split("\n") if line.startswith(RESULT_PREFIX)]
-    mismatches = [] if "replay-ignores-output" in BREAK else \
-        [f"第 {row['number']} 行（{row['fields'][4]}）：要 {row['fields'][6][:160]}，装置打的是 {(results[index] if index < len(results) else '（没打）')[:160]}"
-         for index, row in enumerate(rows) if index >= len(results) or results[index] != row["fields"][6]]
-    if completed.returncode != 0 or mismatches or (len(results) != len(rows) and "replay-ignores-output" not in BREAK):
+    block_rows = max(1, options.get("block_rows") or DEFAULT_BLOCK_ROWS)
+    # 按档分组（㉒ 相同的一组，组的次序照第一次出现），每组再按块起装置、每块带这一组的档参数
+    groups = {}
+    for entry in pending:
+        groups.setdefault(row_profile(entry[0]["fields"]), []).append(entry)
+    blocks = [(profile, entries[start:start + block_rows]) for profile, entries in groups.items() for start in range(0, len(entries), block_rows)]
+    exits, results_count, mismatches, stderr_tails, held = [], 0, [], [], []
+    with tempfile.TemporaryDirectory(prefix="e165-pinned-blocks-") as work:
+        for profile, block in blocks:
+            started = time.monotonic()
+            completed = run_device_block(root, text, [row for row, _components, _reason in block], binary, options, work, profile)
+            seconds = time.monotonic() - started
+            results = [line for line in completed.stdout.split("\n") if line.startswith(RESULT_PREFIX)]
+            results_count += len(results)
+            exits.append(completed.returncode)
+            if completed.stderr.strip():
+                stderr_tails.append(completed.stderr.strip().split("\n")[-1][:200])
+            block_clean = completed.returncode == 0 and len(results) == len(block)
+            for index, (row, components, reason) in enumerate(block):
+                got_line = results[index] if index < len(results) else None
+                matched = got_line == row["fields"][6] or "replay-ignores-output" in BREAK
+                named_in_errors = f"第 {row['number']} 行（" in completed.stderr
+                # 这一行的判定只看它自己：打的那一行与 ⑦ 相同、装置的报错里没点它的行号（同一块里别的行红不连累它，点名单跑与整格里跑判定相同）；
+                # 落盘还要这一块干净（装置退 0、行数对得上），不干净的这一块一行都不记
+                green = matched and not named_in_errors
+                recordable = green and (block_clean or "replay-ignores-output" in BREAK)
+                if not matched:
+                    mismatches.append(f"第 {row['number']} 行（{row['fields'][4]}，档 {profile}）：要 {row['fields'][6][:160]}，装置打的是 {(got_line or '（没打）')[:160]}")
+                report_item(pinned_item(row), "绿" if green else "红", f"现判（{reason}）", seconds)
+                if recordable or "reuse-records-red" in BREAK:
+                    if "reuse-records-whole-cell-only" in BREAK:
+                        held.append((pinned_item(row), components))
+                    else:
+                        failed_record = store.record(pinned_item(row), components, "装置逐行打的结果与 ⑦ 逐字节相同")
+                        if failed_record:
+                            print(f"  ! {failed_record}：下一趟这一行照判")
+    print(f"  · 按条：{tally.text()}")  # gate-lint:detail
+    tally.append_to(os.environ.get(ITEM_TALLY_FILE_VARIABLE), "pinned-red-examples-replay")
+    failed_exit = next((code for code in exits if code != 0), 0)
+    judged_rows = len(pending)
+    if failed_exit != 0 or mismatches or (results_count != judged_rows and "replay-ignores-output" not in BREAK):
         for mismatch in mismatches[:5]:
             print(f"     {mismatch}")  # gate-lint:detail
-        raise Red(f"钉住的 {len(rows)} 行在今天的实现上：装置退 {completed.returncode}、打了 {len(results)} 行结果、{len(mismatches)} 行与 ⑦ 不同"
-                  f"{'（' + completed.stderr.strip().split(chr(10))[-1][:200] + '）' if completed.stderr.strip() else ''}",
+        raise Red(f"钉住的 {judged_rows} 行（现判的）在今天的实现上：装置退 {failed_exit}、打了 {results_count} 行结果、{len(mismatches)} 行与 ⑦ 不同"
+                  f"{'（' + stderr_tails[-1] + '）' if stderr_tails else ''}",
                   "今天的实现在钉住的输入上与原实现不同：是改动引入的回归就修实现；装置报指纹漂了就先查装置的枚举次序与状态编码变没变")
-    print(f"  ✓ 钉住的 {len(rows)} 行：点名的变异都还在它们的表里；装置 {DEVICE_FLAG} 逐行打的结果都与 ⑦ 逐字节相同")
+    for item, components in held:
+        store.record(item, components, "装置逐行打的结果与 ⑦ 逐字节相同")
+    print(f"  ✓ 钉住的 {len(rows)} 行{named}：点名的变异都还在它们的表里；装置 {DEVICE_FLAG} 逐行打的结果都与 ⑦ 逐字节相同"
+          f"（按档 {len(groups)} 组：{'、'.join(f'{profile} {len(entries)} 行' for profile, entries in groups.items())}；{len(blocks)} 块、每块至多 {block_rows} 行，每块带它那一组的档）；按条{tally.text()}")
     return EXIT_GREEN
 
 
@@ -793,22 +1385,33 @@ def main(arguments):
         return selftest()
     options = {"root": DEFAULT_ROOT, "table": None, "kill_bounds": [], "binary": None, "threads": int(os.environ.get("SINGLEFS_THREAD_CAP") or os.cpu_count() or 1),
                "memory_cap": os.environ.get("GATE_E165_PINNED_MEMORY_MAX") or "2G",
-               "target": os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or os.environ.get("TMPDIR") or "/tmp", "singlefs-e165-pinned-target")}
+               "target": os.path.join(os.environ.get("GATE_CROSS_RUN_TMPDIR") or os.environ.get("TMPDIR") or "/tmp", "singlefs-e165-pinned-target"),
+               "items": [], "verdict_library": None, "reuse": True, "block_rows": DEFAULT_BLOCK_ROWS}
     mode, ledgers, position = "append", [], 0
-    valued = {"--root": "root", "--table": "table", "--binary": "binary", "--memory-cap": "memory_cap", "--threads": "threads", "--target": "target"}
+    valued = {"--root": "root", "--table": "table", "--binary": "binary", "--memory-cap": "memory_cap", "--threads": "threads", "--target": "target",
+              "--verdict-library": "verdict_library", "--block-rows": "block_rows"}
     while position < len(arguments):
         argument = arguments[position]
-        if argument in ("--check", "--replay", "--backfill"):
+        if argument in ("--check", "--replay", "--backfill", "--list-items"):
             mode = argument[2:]
             position += 1
-        elif argument in valued or argument == "--kill-bounds":
-            if position + 1 >= len(arguments):
-                report_red(f"{argument} 后面缺值", "看文件头的用法一节")
+        elif argument == "--no-reuse":
+            options["reuse"] = False
+            position += 1
+        elif argument in valued or argument in ("--kill-bounds", "--item"):
+            if position + 1 >= len(arguments) or (argument == "--item" and not arguments[position + 1]):
+                report_red(f"{argument} 后面缺值", "看文件头的用法一节；可点名的项：e165-pin-red-examples.py --list-items")
                 return EXIT_USAGE
             if argument == "--kill-bounds":
                 options["kill_bounds"].append(arguments[position + 1])
+            elif argument == "--item":
+                options["items"].append(arguments[position + 1])
             else:
-                options[valued[argument]] = int(arguments[position + 1]) if argument == "--threads" else arguments[position + 1]
+                try:
+                    options[valued[argument]] = int(arguments[position + 1]) if argument in ("--threads", "--block-rows") else arguments[position + 1]
+                except ValueError:
+                    report_red(f"{argument} 要整数，读到 {arguments[position + 1]!r}", "看文件头的用法一节")
+                    return EXIT_USAGE
             position += 2
         elif argument.startswith("--"):
             report_red(f"认不出的选项 {argument}", "看文件头的用法一节")
@@ -827,6 +1430,22 @@ def main(arguments):
         report_red(f"追加给了 {len(options['kill_bounds'])} 个 --kill-bounds、{len(ledgers)} 份红例账：给就逐份对应，第 i 个产物配第 i 份账",
                    "不给 --kill-bounds（按文件名配：<前缀>-red-examples.tsv 配同一目录的 <前缀>-kill-bounds.out），或每份账给一个同一趟的产物")
         return EXIT_USAGE
+    if options["items"] and mode != "replay":
+        report_red(f"--item 只给 --replay 用（--{mode} 不收）：pinned-red-examples-complete 只有一项（complete）",
+                   "去掉 --item；可点名的项：python3 research/scripts/e165-pin-red-examples.py --list-items")
+        return EXIT_USAGE
+    if mode == "list-items":
+        if ledgers:
+            report_red("--list-items 不收红例账", "去掉位置参数再跑")
+            return EXIT_USAGE
+        if "list-items-pipe-unhandled" not in BREAK:
+            # 接 | head 时读的一头先关了：照 SIGPIPE 的惯例安静退出（被 SIGPIPE 停，shell 里退 141），不打 BrokenPipeError 的回溯
+            signal.signal(signal.SIGPIPE, signal.SIG_DFL)
+        try:
+            return list_items(root, table)
+        except Red as red:
+            report_red(red.message, red.howto)
+            return EXIT_RED
     if mode == "backfill" and ledgers:
         report_red("--backfill 不收红例账：每行按自己的 ⑤ 回 research/results/ 取原行",
                    "去掉位置参数再跑：python3 research/scripts/e165-pin-red-examples.py --backfill")
@@ -846,6 +1465,11 @@ def main(arguments):
         if mode == "backfill":
             return backfill(root, table)
         return replay(root, table, options)
+    except UsageError as usage:
+        report_red(usage.message, "照下面列的项名写（e165-pin-red-examples.py --list-items 也列），给几次 --item 取并集")
+        for item in usage.available:
+            print(f"       {item}")  # gate-lint:detail
+        return EXIT_USAGE
     except Red as red:
         report_red(red.message, red.howto)
         return EXIT_RED
@@ -889,9 +1513,10 @@ def selftest():
         write(os.path.relpath(ledger, root), "# 账头\n" + "".join("\t".join(fields) + "\n" for fields in ledger_rows))
         kill_bounds = os.path.join(root, "research/results/e165-selftest-kill-bounds.out")
 
-        def run_product(ledger_path):
-            """同一趟的产物：每个变体一行（red_examples= 等于账里它的行数），收尾行记账的 sha256。"""
-            return ("E7RESULT name=kill_bound item=baseline table=none table_row=none outcome=baseline title=基线 complete=yes\n"
+        def run_product(ledger_path, device_arguments=None):
+            """同一趟的产物：每个变体一行（red_examples= 等于账里它的行数），收尾行记账的 sha256；给了 device_arguments 另在头上写一行 config（档从它取）。"""
+            config = f"E7RESULT name=config experiment=E165 segment=2 device_arguments={device_arguments} bounds=segment2\n" if device_arguments is not None else ""
+            return (config + "E7RESULT name=kill_bound item=baseline table=none table_row=none outcome=baseline title=基线 complete=yes\n"
                     "E7RESULT name=kill_bound item=tsv-2 table=crates/mutations.tsv table_row=2 outcome=red red_examples=1 title=红的一条 complete=yes\n"
                     "E7RESULT name=kill_bound item=tsv-3 table=crates/mutations.tsv table_row=3 outcome=red red_examples=2 title=红的两条 complete=yes\n"
                     "E7RESULT name=kill_bound item=tsv-3 table=crates/mutations.tsv table_row=9 outcome=red red_examples=2 title=同一处的另一行 complete=yes\n"
@@ -905,6 +1530,10 @@ def selftest():
         with open(stub, "w", encoding="utf-8") as handle:
             handle.write("#!/usr/bin/env bash\n# 桩装置：--pinned-cases <表> 逐个数据行打 ⑦；STUB_MODE=wrong 把最后一行打错，=fail 退 1，=killed 打一行之后 kill -9 自己\n"
                          "[[ \"$1\" == --pinned-cases ]] || exit 2\n"
+                         "[[ -n \"${STUB_TRACE:-}\" ]] && echo 起了一次 >> \"$STUB_TRACE\"\n"
+                         "if [[ -n \"${STUB_KILL_DOMAIN:-}\" ]] && grep -v '^#' \"$2\" | grep -q \"domain=$STUB_KILL_DOMAIN \"; then kill -9 \"$$\"; fi\n"
+                         "if [[ \"${STUB_MODE:-}\" == wrong-x ]]; then grep -v '^#' \"$2\" | grep . | cut -f7 | sed '/domain=X / s/returned:/returned:WRONG/'; "
+                         "echo \"E7RESULT name=pinned_cases rows=$(grep -v '^#' \"$2\" | grep -c .)\"; exit 0; fi\n"
                          "if [[ \"${STUB_MODE:-}\" == killed ]]; then grep -v '^#' \"$2\" | grep . | head -n 1 | cut -f7; kill -9 \"$$\"; fi\n"
                          "if [[ \"${STUB_MODE:-}\" == slow ]]; then grep -v '^#' \"$2\" | grep . | head -n 1 | cut -f7; sleep 0.6; grep -v '^#' \"$2\" | grep . | tail -n +2 | cut -f7; "
                          "echo \"E7RESULT name=pinned_cases rows=$(grep -v '^#' \"$2\" | grep -c .)\"; exit 0; fi\n"
@@ -1016,7 +1645,7 @@ def selftest():
         # 8 段的旧行：--check 与 --replay 都报没整行抄、出路给 --backfill（开关 old-rows-accepted 下 replay 判绿）
         old_row_table = edited_table(lambda fields, index: fields.__delitem__(slice(TABLE_OWN_COLUMNS, None)) if index == 2 else None)
         write(TABLE, old_row_table)
-        expect("check-old-row", ["--check", ledger], 1, "没整行抄红例账（8 段的旧格式，要 21 段）")
+        expect("check-old-row", ["--check", ledger], 1, "没整行抄红例账（8 段的旧格式，要 22 段）")
         old_row_output = expect("replay-old-row", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "第 4 行没整行抄红例账")
         if "--backfill" not in old_row_output:
             wrong.append("replay-old-row-howto")
@@ -1030,7 +1659,7 @@ def selftest():
         # 补钉：三行都截成 8 段，--backfill 按 ⑤ 回账里取原行，补完与追加钉出来的逐字节相同
         all_old = edited_table(lambda fields, index: fields.__delitem__(slice(TABLE_OWN_COLUMNS, None)))
         write(TABLE, all_old)
-        expect("backfill", ["--backfill"], 0, "补钉：3 行 8 段的旧行都按 ⑤ 取回账行接成 21 段")
+        expect("backfill", ["--backfill"], 0, "补钉：3 行都补成 22 段（3 行 8 段的旧行按 ⑤ 取回账行；档按 ⑤ 那份账同一趟的产物取：--profile r1 3 行）")
         if open(table_path, encoding="utf-8").read() != pinned_text:
             wrong.append("backfill-restores-whole-rows")
             print("    backfill-restores-whole-rows 这一格判错：补完的表应当与追加钉出来的逐字节相同")  # gate-lint:detail
@@ -1143,8 +1772,121 @@ def selftest():
         expect("check-ledger-digest", both, 1, "账与产物不是同一趟")
         write(os.path.relpath(run_kill_bounds, root), "".join(line + "\n" for line in run_text.split("\n") if line.startswith("E7RESULT name=kill_bound ")))
         expect("check-run-unfinished", both, 1, "没有收尾行 E7RESULT name=verdict")
+        # 作废红例账登记表：没收尾的那一趟（r1）登记作废，--check 跳过它、成功那句逐个列名（开关 void-ledgers-ignored 下照判、判红）；
+        # 登记表本身不对的五种判红（开关 void-rows-unchecked 下坏的那一行不判、r1 照跳过，判绿）；登记了配得上完整产物的账判红、出路删掉那一行（开关 void-complete-accepted 下判 77）
+        void_table = os.path.join(root, VOID_LEDGERS_TABLE)
+        void_good = "research/results/e165-selftest-r1-red-examples.tsv\t段中断了、没有收尾行，作废\tkb/165.md:346\n"
+        void_header = "# 自证用的作废红例账登记表\n"
+        write(VOID_LEDGERS_TABLE, void_header + void_good)
+        expect("check-void-skipped", ["--check"], 0, "1 份红例账 3 行都钉在")
+        expect("check-void-skipped-given", both, 0, "跳过作废账 1 份、被取代的账 0 份：research/results/e165-selftest-r1-red-examples.tsv")
+        expect("check-void-all-skipped", ["--check", run_ledger], 77, "一份红例账都没有")
+        for label, bad_line, want_text in (
+                ("check-void-missing", "research/results/e165-gone-red-examples.tsv\t删掉了的一趟，登记还留着\tkb/165.md:1\n", "登记的账 research/results/e165-gone-red-examples.tsv 不在"),
+                ("check-void-short-reason", "research/results/e165-selftest-red-examples.tsv\t作废\tkb/165.md:1\n", "第 3 行的理由「作废」不到 8 个字"),
+                ("check-void-columns", "research/results/e165-selftest-red-examples.tsv\t只写了理由没写出处的一行\n", "是 2 段"),
+                ("check-void-place", "research/results/e165-selftest-red-examples.tsv\t出处没写行号的一行登记\tkb/165.md\n", "第 3 行的作废出处「kb/165.md」不是「文件:行号」"),
+                ("check-void-duplicate", void_good, "前面已登记过")):
+            write(VOID_LEDGERS_TABLE, void_header + void_good + bad_line)
+            expect(label, both, 1, want_text)
+        write(VOID_LEDGERS_TABLE, void_header + void_good + "research/results/e165-selftest-red-examples.tsv\t其实跑完了却登记成作废\tkb/165.md:2\n")
+        complete_output = expect("check-void-complete", both, 1, "配得上一份有收尾行、ledger_sha256 对得上的产物 research/results/e165-selftest-kill-bounds.out")
+        if "删掉那一行" not in complete_output:
+            wrong.append("check-void-complete-howto")
+            print(f"    check-void-complete-howto 这一格判错：出路要写删掉那一行，实测：{complete_output.strip()[-300:]}")  # gate-lint:detail
+        cases += 1
+        os.remove(void_table)
         os.remove(run_kill_bounds)
         os.remove(run_ledger)
+        # 被取代红例账登记表：old 那一趟（同档、完整）与 ledger 是同一批反例状态，变体名、表行与第 7 列不同、没钉；登记成被 ledger 取代，--check 跳过它、
+        # 成功那句列名带取代它的那份；取代它的账照常判钉全（只给 old 时补进来判，开关 superseded-replacement-pin-unchecked 下不补、退 77）；
+        # 覆盖不全（开关 superseded-coverage-unchecked 下判绿）、档不同或取不到档（superseded-profile-unchecked 下判绿）、写法不对（superseded-rows-unchecked 下不判）都判红
+        superseded_table = os.path.join(root, SUPERSEDED_LEDGERS_TABLE)
+        old_ledger = os.path.join(root, "research/results/e165-selftest-old-red-examples.tsv")
+        old_kill_bounds = os.path.join(root, "research/results/e165-selftest-old-kill-bounds.out")
+        new_ledger = os.path.join(root, "research/results/e165-selftest-new-red-examples.tsv")
+        new_kill_bounds = os.path.join(root, "research/results/e165-selftest-new-kill-bounds.out")
+        old_rows = [list(fields) for fields in ledger_rows]
+        for fields, (variant, rows_text) in zip(old_rows, (("tsv-4", "4"), ("tsv-5", "5+11"), ("Z1", "2"), ("tsv-5", "5+11"))):
+            fields[0], fields[1] = variant, rows_text
+            if has_example({"fields": fields}):
+                fields[6] += ",+J7a"
+
+        def write_run(ledger_path, product_path, rows, device_arguments=None, finished=True):
+            """写一趟的账与同一趟的产物：每个（变体, 第一个表行）一行 kill_bound（red_examples= 等于账里这个变体的行数），finished 时写收尾行。"""
+            write(os.path.relpath(ledger_path, root), "# 账头\n" + "".join("\t".join(fields) + "\n" for fields in rows))
+            first_rows = {}
+            for fields in rows:
+                first_rows.setdefault(fields[0], set()).add(fields[1].split("+")[0])
+            product_text = f"E7RESULT name=config experiment=E165 segment=2 device_arguments={device_arguments}\n" if device_arguments is not None else ""
+            for item, table_rows in first_rows.items():
+                for table_row in sorted(table_rows):
+                    product_text += (f"E7RESULT name=kill_bound item={item} table={CUSTOM_TABLE if item.startswith('Z') else CRATES_TABLE} table_row={table_row} outcome=red "
+                                     f"red_examples={sum(1 for fields in rows if fields[0] == item)} title=变体{item} complete=yes\n")
+            if finished:
+                product_text += f"E7RESULT name=verdict scope=segment2 red={len(first_rows)} ledger_sha256={file_digest(ledger_path)}\n"
+            write(os.path.relpath(product_path, root), product_text)
+
+        def superseded_rows(*lines):
+            write(SUPERSEDED_LEDGERS_TABLE, "# 自证用的被取代红例账登记表\n" + "".join("\t".join(line) + "\n" for line in lines))
+
+        old_relative, ledger_relative = "research/results/e165-selftest-old-red-examples.tsv", "research/results/e165-selftest-red-examples.tsv"
+        new_relative, gone_relative = "research/results/e165-selftest-new-red-examples.tsv", "research/results/e165-gone-red-examples.tsv"
+        superseded_good = (old_relative, ledger_relative, "同档后一趟覆盖了同一批反例状态", "kb/165.md:1011")
+        write_run(old_ledger, old_kill_bounds, old_rows)
+        expect("check-superseded-unregistered", ["--check"], 1, "2 份红例账 6 行里 3 行没钉进")
+        superseded_rows(superseded_good)
+        expect("check-superseded-skipped", ["--check"], 0, f"跳过作废账 0 份、被取代的账 1 份：{old_relative}（被 {ledger_relative} 取代）")
+        expect("check-superseded-given", ["--check", old_ledger], 0, "1 份红例账 3 行都钉在")
+        write(TABLE, "\n".join(line for line in pinned_text.split("\n") if "\tZ1 " not in line and "#Z1" not in line) + "\n")
+        expect("check-superseded-replacement-unpinned", ["--check", old_ledger], 1, f"{ledger_relative} 取代了登记的被取代账 {old_relative}")
+        write(TABLE, pinned_text)
+        for label, rows, want_text in (
+                ("check-superseded-coverage", old_rows + [["Z1", "2", "M", "2", "9", "counters", "+J4", "true", "true", "true", "cmd",
+                                                            state_line("M", 9, "shape=9c0", "returned:a"), state_line("M", 9, "shape=9c0", "returned:b")]],
+                 f"有 1 行在取代它的账 {ledger_relative} 里没有对应行（按域、N、枚举序号与 ① 一行配一行）：第 6 行（域 M、N 2、序号 9）"),
+                ("check-superseded-coverage-count", old_rows + [list(old_rows[0])], "有 1 行在取代它的账"),
+                ("check-superseded-coverage-state", [[*old_rows[0][:11], state_line("L", 3, "shape=1c9", "returned:a"), old_rows[0][12]], *old_rows[1:]],
+                 "第 2 行（域 L、N 2、序号 3）")):
+            write_run(old_ledger, old_kill_bounds, rows)
+            expect(label, ["--check"], 1, want_text)
+        write_run(old_ledger, old_kill_bounds, old_rows, "--profile+r2")
+        expect("check-superseded-profile", ["--check"], 1, f"被取代的账 {old_relative} 那一趟的档是「--profile r2」，取代它的账 {ledger_relative} 那一趟是「--profile r1」：档不同")
+        os.remove(old_kill_bounds)
+        expect("check-superseded-profile-unreadable", ["--check"], 1, "配的 kill-bounds 产物 research/results/e165-selftest-old-kill-bounds.out 不在，取不到档")
+        write_run(old_ledger, old_kill_bounds, old_rows)
+        reason, place = "同档后一趟覆盖了同一批反例状态", "kb/165.md:1011"
+        for label, lines, want_text in (
+                ("check-superseded-columns", [superseded_good, (old_relative, ledger_relative, "只写了理由没写出处的一行")], "第 3 行是 3 段"),
+                ("check-superseded-short-reason", [(old_relative, ledger_relative, "取代", place)], "第 2 行的理由「取代」不到 8 个字"),
+                ("check-superseded-place", [(old_relative, ledger_relative, reason, "kb/165.md")], "第 2 行的取代出处「kb/165.md」不是「文件:行号」"),
+                ("check-superseded-missing", [superseded_good, (gone_relative, ledger_relative, reason, place)], f"第 3 行被取代的账 {gone_relative} 不在"),
+                ("check-superseded-replacement-missing", [(old_relative, gone_relative, reason, place)], f"第 2 行取代它的账 {gone_relative} 不在"),
+                ("check-superseded-self", [(old_relative, old_relative, reason, place)], "是同一份"),
+                ("check-superseded-duplicate", [superseded_good, superseded_good], f"第 3 行被取代的账 {old_relative} 前面已登记过")):
+            superseded_rows(*lines)
+            expect(label, ["--check"], 1, want_text)
+        # 取代它的账自己登记成被取代（old 被 ledger 取代、ledger 又被 new 取代）
+        write_run(new_ledger, new_kill_bounds, ledger_rows)
+        superseded_rows(superseded_good, (ledger_relative, new_relative, reason, place))
+        expect("check-superseded-chain", ["--check"], 1, f"第 2 行取代它的账 {ledger_relative} 自己也登记成被取代")
+        # 与作废表重登：没收尾的那一趟登记作废，同时登记成被取代或当取代它的账
+        void_header = "# 自证用的作废红例账登记表\n"
+        write_run(old_ledger, old_kill_bounds, old_rows, finished=False)
+        write(VOID_LEDGERS_TABLE, void_header + f"{old_relative}\t段中断了、没有收尾行，作废\tkb/165.md:346\n")
+        superseded_rows(superseded_good)
+        expect("check-superseded-also-void", ["--check"], 1, f"第 2 行被取代的账 {old_relative} 也登记在作废表")
+        write_run(old_ledger, old_kill_bounds, old_rows)
+        write_run(new_ledger, new_kill_bounds, ledger_rows, finished=False)
+        write(VOID_LEDGERS_TABLE, void_header + f"{new_relative}\t段中断了、没有收尾行，作废\tkb/165.md:346\n")
+        superseded_rows((old_relative, new_relative, reason, place))
+        expect("check-superseded-replacement-void", ["--check"], 1, f"第 2 行取代它的账 {new_relative} 登记在作废表")
+        # 两种都有：成功那句先列作废的、再列被取代的（带取代它的那份）
+        superseded_rows(superseded_good)
+        expect("check-superseded-and-void", ["--check"], 0,
+               f"跳过作废账 1 份、被取代的账 1 份：{new_relative}、{old_relative}（被 {ledger_relative} 取代）")
+        for path in (void_table, superseded_table, old_ledger, old_kill_bounds, new_ledger, new_kill_bounds):
+            os.remove(path)
         conflicting = [list(fields) for fields in ledger_rows]
         conflicting[0][11] = state_line("L", 3, "shape=1c0", "returned:z")
         other_ledger = os.path.join(root, "research/results/e165-selftest-conflict-red-examples.tsv")
@@ -1188,6 +1930,16 @@ def selftest():
             expect("replay-wrapper-exit", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1, "没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 252")
         finally:
             MEMORY_CAP_RUNNER = saved_runner
+        # 包装退 245（显存不够）：同样判「没跑成」、点名显存不够，不报回归（开关 wrapper-exit-as-replay-red 下这一格同样判错）
+        gpu_wrapper = os.path.join(work, "gpu-memory-cap-wrapper.sh")
+        with open(gpu_wrapper, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 自证用的假内存包装：什么都不起，退 245（显存不够）\nexit 245\n")
+        saved_runner, MEMORY_CAP_RUNNER = MEMORY_CAP_RUNNER, gpu_wrapper
+        try:
+            expect("replay-wrapper-245", ["--replay", "--binary", stub, "--memory-cap", "1G"], 1,
+                   "没跑成：内存包装 research/scripts/run-with-memory-cap.sh 退 245（显存不够")
+        finally:
+            MEMORY_CAP_RUNNER = saved_runner
         # 装置被信号停了（直接起时 kill -9 自己；经包装起时包装退 137，外面 kill -9 就是这样）：出路照包装文件头，不写修实现（开关 killed-as-regression 下这两格判错）
         killed_howto = "照 research/scripts/run-with-memory-cap.sh 文件头「退出码」一段办"
         killed = expect("replay-killed", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "装置被信号停了（退 -9，信号 9）", {"STUB_MODE": "killed"})
@@ -1207,13 +1959,273 @@ def selftest():
         expect("replay-variant-missing", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "不在它的表里了")
         write(CRATES_TABLE, crates_table)
 
+        # ── 逐项点名与按条复用（文件头「逐项点名与按条复用」）──
+        item_line = re.compile(r"^  · (pinned:\d+)：(绿|红)，(现判|复用)", re.M)
+
+        def run_items(arguments, environment=None, at=None):
+            """跑一次 main（根默认 root），交 (退出码, 输出, {项: (绿/红, 现判/复用)})。"""
+            saved = dict(os.environ)
+            os.environ.update(environment or {})
+            buffer = io.StringIO()
+            try:
+                with contextlib.redirect_stdout(buffer):
+                    got = main(["--root", at or root, *arguments])
+            finally:
+                os.environ.clear()
+                os.environ.update(saved)
+            output = buffer.getvalue()
+            return got, output, {match.group(1): (match.group(2), match.group(3)) for match in item_line.finditer(output)}
+
+        def judge_cell(label, passed, detail):
+            nonlocal cases
+            cases += 1
+            if not passed:
+                wrong.append(label)
+                print(f"    {label} 这一格判错：{detail}")  # gate-lint:detail
+
+        write(TABLE, pinned_text)
+        replay_arguments = ["--replay", "--binary", stub, "--memory-cap", "none"]
+        _text, pinned_rows = read_table(table_path)
+        pinned_items = [pinned_item(row) for row in pinned_rows]
+        x_items = [pinned_item(row) for row in pinned_rows if row["fields"][1] == "X"]
+        stub_trace = os.path.join(work, "stub-trace.txt")
+        open(stub_trace, "w").close()
+        got, output, _verdicts = run_items(["--list-items"], {"STUB_TRACE": stub_trace})
+        listed = [line.split("\t")[0] for line in output.strip().split("\n")]
+        judge_cell("list-items", got == 0 and listed == ["complete", *pinned_items] and len(pinned_items) == 3, f"退 {got}，列出 {listed}")
+        judge_cell("list-items-no-device", open(stub_trace).read() == "", "--list-items 起了装置")
+        # 读的一头先关了（接 | head 的样子）：被 SIGPIPE 安静停掉，stderr 一个字都没有
+        read_end, write_end = os.pipe()
+        os.close(read_end)
+        closed_pipe = subprocess.run([sys.executable, os.path.realpath(__file__), "--root", root, "--list-items"], stdout=write_end, stderr=subprocess.PIPE, text=True)
+        os.close(write_end)
+        judge_cell("list-items-closed-pipe", closed_pipe.returncode == -signal.SIGPIPE and closed_pipe.stderr == "",
+                   f"期望被 SIGPIPE 停（{-signal.SIGPIPE}）、stderr 空，实测 {closed_pipe.returncode}：{closed_pipe.stderr.strip()[-200:]!r}")
+        got, output, verdicts = run_items([*replay_arguments, "--item", pinned_items[1]])
+        judge_cell("item-select-one", got == 0 and list(verdicts) == [pinned_items[1]], f"--item {pinned_items[1]} 期望只判这一行，实测退 {got}、判了 {list(verdicts)}")
+        got, output, _verdicts = run_items([*replay_arguments, "--item", "pinned:999"])
+        judge_cell("item-unknown", got == EXIT_USAGE and pinned_items[0] in output, f"点名没有的项期望退 2、列出可点名的项，实测退 {got}：{output.strip()[-300:]}")
+        got, output, _verdicts = run_items(["--check", "--item", "complete"])
+        judge_cell("item-not-for-check", got == EXIT_USAGE, f"--check 给 --item 期望退 2，实测退 {got}")
+        # 点名单跑一行与它在整格里跑的判定相同（桩把 X 域那一行打错：整格红、X 那一行红、别的两行绿）
+        _got, _output, whole = run_items(replay_arguments, {"STUB_MODE": "wrong-x"})
+        alone = {item: run_items([*replay_arguments, "--item", item], {"STUB_MODE": "wrong-x"})[2].get(item) for item in whole}
+        judge_cell("item-alone-equals-whole", len(whole) == 3 and alone == whole and all(whole[item][0] == "红" for item in x_items)
+                   and sorted(verdict for verdict, _how in whole.values()) == ["红", "绿", "绿"], f"整格 {whole}，逐行单跑 {alone}")
+        # 按条复用：头一趟全现判、记下；第二趟全复用、不起装置；关了复用全现判；桩（装置）、引的变异行、自己的行各进键
+        store_directory = os.path.join(work, "verdict-library")
+        with_store = [*replay_arguments, "--verdict-library", store_directory]
+        got, output, _verdicts = run_items(with_store)
+        judge_cell("reuse-first-run-records", got == 0 and "现判 3、复用 0（现判的原因：无记录 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        open(stub_trace, "w").close()
+        got, output, verdicts = run_items(with_store, {"STUB_TRACE": stub_trace})
+        judge_cell("reuse-second-run-reuses", got == 0 and "现判 0、复用 3" in output and open(stub_trace).read() == ""
+                   and all(how == "复用" for _verdict, how in verdicts.values()), f"退 {got}、装置起了 {open(stub_trace).read().count(chr(10))} 次：{output.strip()[-300:]}")
+        got, output, _verdicts = run_items([*with_store, "--no-reuse"])
+        judge_cell("reuse-off", got == 0 and "现判 3、复用 0（现判的原因：关了复用 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        # 判法版本是另一列：输入一样都没变、只换判法版本，整格全现判、原因点名判法版本；再照真判法版本跑一趟记回去，后面几格比的是真判法版本
+        JUDGE_VERSION_FOR_SELFTEST.append("自证造的另一版判法")
+        try:
+            got, output, _verdicts = run_items(with_store)
+        finally:
+            JUDGE_VERSION_FOR_SELFTEST.clear()
+        judge_cell("reuse-judge-version-changed", got == 0 and "现判 3、复用 0（现判的原因：判法版本 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        run_items(with_store)
+        write(CRATES_TABLE, crates_table.replace("红的一条\tcrates/x.rs\ta\t", "红的一条\tcrates/x.rs\ta2\t"))
+        got, output, _verdicts = run_items(with_store)
+        write(CRATES_TABLE, crates_table)
+        judge_cell("reuse-mutation-row-changed", got == 0 and "现判 1、复用 2（现判的原因：引的变异行 变了 1）" in output, f"退 {got}：{output.strip()[-300:]}")
+        got, output, _verdicts = run_items(with_store)
+        judge_cell("reuse-mutation-row-restored", got == 0 and "现判 0、复用 3" in output, f"变异行改回去之后期望全复用（键回到头一趟那一份），实测退 {got}：{output.strip()[-300:]}")
+        stub_text = open(stub, encoding="utf-8").read()
+
+        def replace_stub(new_text):
+            with open(stub + ".new", "w", encoding="utf-8") as handle:
+                handle.write(new_text)
+            os.chmod(stub + ".new", 0o755)
+            os.replace(stub + ".new", stub)
+        replace_stub(stub_text + "# 桩改了一行注释\n")
+        got, output, _verdicts = run_items(with_store)
+        judge_cell("reuse-device-changed", got == 0 and "现判 3、复用 0（现判的原因：装置 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        replace_stub(stub_text)
+        # 每一行的键里有这一行自己：表里另有一行与第一行同一个 ⑥、同一个 ⑦，只 ⑩ 不同；只判过第一行，那一行不能拿它的判定
+        twin_fields = list(pinned_rows[0]["fields"])
+        twin_fields[9] = twin_fields[9] + "+5"
+        write(TABLE, pinned_text.rstrip("\n") + "\n" + "\t".join(twin_fields) + "\n")
+        twin_item = f"pinned:{len(pinned_text.rstrip(chr(10)).split(chr(10))) + 1}"
+        own_store = os.path.join(work, "verdict-library-own")
+        run_items([*replay_arguments, "--verdict-library", own_store, "--item", pinned_items[0]])
+        got, output, verdicts = run_items([*replay_arguments, "--verdict-library", own_store])
+        judge_cell("reuse-row-own-key", got == 0 and verdicts.get(twin_item) == ("绿", "现判") and "现判 3、复用 1" in output,
+                   f"期望 {pinned_items[0]} 复用、{twin_item} 现判，实测退 {got}、{verdicts}")
+        write(TABLE, pinned_text)
+        # 红的不记：桩把 X 那一行打错，第二趟 X 照判、照红
+        red_store = os.path.join(work, "verdict-library-red")
+        run_items([*replay_arguments, "--verdict-library", red_store], {"STUB_MODE": "wrong-x"})
+        got, output, verdicts = run_items([*replay_arguments, "--verdict-library", red_store], {"STUB_MODE": "wrong-x"})
+        judge_cell("reuse-red-not-recorded", got == 1 and all(verdicts.get(item) == ("红", "现判") for item in x_items) and "现判 1、复用 2" in output,
+                   f"第二趟期望 X 那一行照判照红、别的复用，实测退 {got}、{verdicts}")
+        # 一块判完当场落盘：一块一行，X 那一块装置被 kill -9（不在键里的环境），前两块已记；第二趟同一条命令只判 X
+        resume_store = os.path.join(work, "verdict-library-resume")
+        first, _output, _verdicts = run_items([*replay_arguments, "--verdict-library", resume_store, "--block-rows", "1"], {"STUB_KILL_DOMAIN": "X"})
+        got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", resume_store, "--block-rows", "1"])
+        judge_cell("reuse-resume-after-kill", first == 1 and got == 0 and "现判 1、复用 2" in output, f"第一趟退 {first}，第二趟退 {got}：{output.strip()[-300:]}")
+        # 剪枝自证：小输入上开着复用与关掉复用，逐项判定相同；输入没变（全复用）与装置改了（全现判、X 转红）各比一次
+        prune_store = os.path.join(work, "verdict-library-prune")
+        run_items([*replay_arguments, "--verdict-library", prune_store])
+        on = run_items([*replay_arguments, "--verdict-library", prune_store])[2]
+        off = run_items(replay_arguments)[2]
+        judge_cell("prune-unchanged-input", {item: verdict for item, (verdict, _how) in on.items()} == {item: verdict for item, (verdict, _how) in off.items()}
+                   and len(on) == 3 and all(how == "复用" for _verdict, how in on.values()), f"开着复用 {on}，关掉 {off}")
+        replace_stub(stub_text.replace("[[ \"$1\" == --pinned-cases ]] || exit 2\n", "[[ \"$1\" == --pinned-cases ]] || exit 2\nSTUB_MODE=wrong-x\n", 1))
+        on = run_items([*replay_arguments, "--verdict-library", prune_store])[2]
+        off = run_items(replay_arguments)[2]
+        replace_stub(stub_text)
+        judge_cell("prune-after-change", {item: verdict for item, (verdict, _how) in on.items()} == {item: verdict for item, (verdict, _how) in off.items()}
+                   and all(off.get(item, ("?",))[0] == "红" for item in x_items), f"开着复用 {on}，关掉 {off}")
+        # 装置的 cargo 依赖闭包进键：临时 git 仓里摆一个最小工作区（checker 档包带装置 bin、依赖一个 path crate），只改那个依赖的源码，三行全现判
+        closure_root = os.path.join(work, "closure-root")
+        for relative in (TABLE, CRATES_TABLE, CUSTOM_TABLE):
+            os.makedirs(os.path.dirname(os.path.join(closure_root, relative)), exist_ok=True)
+            with open(os.path.join(closure_root, relative), "w", encoding="utf-8") as handle:
+                handle.write(open(os.path.join(root, relative), encoding="utf-8").read())
+        closure_files = {"Cargo.toml": '[workspace]\nmembers = ["crates/singlefs-checker-tier", "crates/dep"]\n', "Cargo.lock": "# 锁\n",
+                         "crates/singlefs-checker-tier/Cargo.toml": '[package]\nname = "singlefs-checker-tier"\nversion = "0.0.0"\n\n[dependencies]\ndep = { path = "../dep" }\n',
+                         f"crates/singlefs-checker-tier/src/bin/{DEVICE_BINARY}.rs": f"// 认 {DEVICE_FLAG}\nfn main() {{}}\n",
+                         "crates/dep/Cargo.toml": '[package]\nname = "dep"\nversion = "0.0.0"\n', "crates/dep/src/lib.rs": "pub fn one() -> u32 { 1 }\n"}
+        for relative, content in closure_files.items():
+            os.makedirs(os.path.dirname(os.path.join(closure_root, relative)) or closure_root, exist_ok=True)
+            with open(os.path.join(closure_root, relative), "w", encoding="utf-8") as handle:
+                handle.write(content)
+        subprocess.run(["git", "init", "-q", closure_root], capture_output=True)
+        closure_store = os.path.join(work, "verdict-library-closure")
+        run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
+        with open(os.path.join(closure_root, "crates/dep/src/lib.rs"), "a", encoding="utf-8") as handle:
+            handle.write("// 依赖改了一行\n")
+        got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
+        judge_cell("reuse-closure-changed", got == 0 and "现判 3、复用 0（现判的原因：装置 变了 3）" in output, f"退 {got}：{output.strip()[-300:]}")
+        os.makedirs(os.path.join(closure_root, "crates/singlefs-checker-tier/tests"))
+        with open(os.path.join(closure_root, "crates/singlefs-checker-tier/tests/not_read_by_the_bin.rs"), "w", encoding="utf-8") as handle:
+            handle.write("// cargo 编装置读不到 tests/\n")
+        got, output, _verdicts = run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root)
+        judge_cell("reuse-closure-unchanged", got == 0 and "现判 0、复用 3" in output, f"退 {got}：{output.strip()[-300:]}")
+        # crate 根下 cargo 不读的文件（Verus 必红世界表 verus-must-red-worlds.tsv 这一类）不进装置那一样：新放一份、再改一行，三行都复用
+        # （admission.py 的 ADMISSION_BREAK=closure-keeps-crate-root-files 下这一格判错：三行全现判，原因「装置 变了」）
+        root_file_outputs = []
+        for content in ("名\t第一行\n", "名\t第一行 \n"):
+            with open(os.path.join(closure_root, "crates/dep/verus-must-red-worlds.tsv"), "w", encoding="utf-8") as handle:
+                handle.write(content)
+            root_file_outputs.append(run_items([*replay_arguments, "--verdict-library", closure_store], at=closure_root))
+        judge_cell("reuse-crate-root-file-unchanged", all(got == 0 and "现判 0、复用 3" in output for got, output, _verdicts in root_file_outputs),
+                   "；".join(f"退 {got}：{output.strip()[-200:]}" for got, output, _verdicts in root_file_outputs))
+
+        # ── 钉表认档（文件头「档」一段）──
+        # r2 档的账：同样三个输入、同样三个变异，原实现逐态行多判一条（counters 后面多 ,j6qn），state= 不变（① 相同）；产物 device_arguments=--profile+r2+--bounds+segment2
+        def r2_line(line):
+            return line.replace("counters=states", "counters=states,j6qn", 1)
+
+        r2_rows = [[*fields[:11], r2_line(fields[11]), r2_line(fields[12])] if fields[4] != "none" else list(fields) for fields in ledger_rows]
+        r2_ledger = os.path.join(root, "research/results/e165-selftest-p2-red-examples.tsv")
+        r2_kill_bounds = os.path.join(root, "research/results/e165-selftest-p2-kill-bounds.out")
+        write(os.path.relpath(r2_ledger, root), "# r2 档的账\n" + "".join("\t".join(fields) + "\n" for fields in r2_rows))
+        write(os.path.relpath(r2_kill_bounds, root), run_product(r2_ledger, "--profile+r2+--bounds+segment2"))
+        write(TABLE, pinned_text)
+        # 两档：r1 档已钉的三行在，r2 档的同一个（①, ⑥）⑦ 不同，不算冲突、另钉三行（开关 profile-read-as-r1 下当 r1 档、判冲突）
+        expect("pin-two-profiles", [r2_ledger], 0, "钉进 3 行（1 份账 4 行：0 行已钉")
+        two_profile_text = open(table_path, encoding="utf-8").read()
+        new_lines = two_profile_text[len(pinned_text):].strip("\n").split("\n")
+        judge_cell("pin-profile-r2", two_profile_text.startswith(pinned_text) and len(new_lines) == 3
+                   and all(line.split("\t")[PROFILE_INDEX] == "--profile r2" and len(line.split("\t")) == TABLE_COLUMNS for line in new_lines)
+                   and all(line.split("\t")[PROFILE_INDEX] == DEFAULT_PROFILE for line in pinned_text.split("\n") if line.strip() and not line.startswith("#")),
+                   f"r2 档的账要钉成 ㉒「--profile r2」的三行、r1 档那三行不动，实测新加的：{[line.split(chr(9))[-1] for line in new_lines]}")
+        expect("check-two-profiles", ["--check", ledger, r2_ledger], 0, "账的档：--profile r1 1 份、--profile r2 1 份")
+        # 档不对：r2 档那三行的 ㉒ 写成 r1（整行都对），--check 逐行报「钉的档不对」（开关 check-ignores-profile 下判绿）
+        write(TABLE, pinned_text + two_profile_text[len(pinned_text):].replace("\t--profile r2\n", "\t--profile r1\n"))
+        expect("check-profile-differs", ["--check", r2_ledger], 1, "钉的档不对：表第")
+        # 没写档：r2 档那三行截成 21 段，--check 与 --replay 都报「没写档」、出路给 --backfill（开关 profile-column-unchecked 下当 r1、不报没写档）
+        missing_profile_text = pinned_text + two_profile_text[len(pinned_text):].replace("\t--profile r2\n", "\n")
+        write(TABLE, missing_profile_text)
+        expect("check-profile-missing", ["--check", ledger, r2_ledger], 1, f"行没写档（21 段，要 {TABLE_COLUMNS} 段")
+        missing_output = expect("replay-profile-missing", ["--replay", "--binary", stub, "--memory-cap", "none"], 1, "行没写档")
+        judge_cell("replay-profile-missing-howto", "--backfill" in missing_output, f"出路要给 --backfill，实测：{missing_output.strip()[-300:]}")
+        # 补档：r1 三行与 r2 三行都截成 21 段（再把一行截成 8 段），--backfill 按 ⑤ 那份账同一趟的产物补回两档，与追加钉出来的逐字节相同（开关 profile-read-as-r1 下 r2 那三行补成 r1）
+        stripped_text = "\n".join(line[:-len("\t--profile r1")] if line.endswith("\t--profile r1") else line[:-len("\t--profile r2")] if line.endswith("\t--profile r2") else line
+                                  for line in two_profile_text.split("\n"))
+        write(TABLE, "\n".join("\t".join(line.split("\t")[:TABLE_OWN_COLUMNS]) if line.startswith(two_profile_text.split("\n")[-2][:64]) else line
+                               for line in stripped_text.split("\n")))
+        expect("backfill-profile", ["--backfill"], 0, "档按 ⑤ 那份账同一趟的产物取：--profile r1 3 行、--profile r2 3 行")
+        judge_cell("backfill-profile-restores", open(table_path, encoding="utf-8").read() == two_profile_text, "补完两档的表应当与追加钉出来的逐字节相同")
+        write(TABLE, two_profile_text)
+        # 同一档下 ⑦ 不同：另一份 r2 档的账同一个输入、同一个变异，原实现多判一条（,j7a），一行都不钉、判红（开关 same-profile-conflict-ignored 下照钉）
+        conflict_r2_rows = [list(fields) for fields in r2_rows]
+        conflict_r2_rows[0][11] = conflict_r2_rows[0][11].replace("counters=states,j6qn", "counters=states,j6qn,j7a", 1)
+        conflict_r2_ledger = os.path.join(root, "research/results/e165-selftest-p2b-red-examples.tsv")
+        write(os.path.relpath(conflict_r2_ledger, root), "# 另一趟 r2 档的账\n" + "".join("\t".join(fields) + "\n" for fields in conflict_r2_rows))
+        write("research/results/e165-selftest-p2b-kill-bounds.out", run_product(conflict_r2_ledger, "--profile+r2"))
+        expect("conflict-same-profile", [conflict_r2_ledger], 1, "同一档下同一个（输入, 变异）的原实现逐态行不同，一行都没钉")
+        judge_cell("conflict-same-profile-unwritten", open(table_path, encoding="utf-8").read() == two_profile_text, "同档冲突判红之后表还是被写了")
+        os.remove(conflict_r2_ledger)
+        os.remove(os.path.join(root, "research/results/e165-selftest-p2b-kill-bounds.out"))
+        # device_arguments= 认不出的参数（--gate 进不进逐态行不知道）：一行都不钉、判红（开关 profile-arguments-unchecked 下略过它、照钉）
+        write(os.path.relpath(r2_kill_bounds, root), run_product(r2_ledger, "--profile+r4+--gate+r2"))
+        write(TABLE, pinned_text)
+        expect("pin-profile-unknown-argument", [r2_ledger], 1, "认不出的参数 --gate")
+        write(os.path.relpath(r2_kill_bounds, root), run_product(r2_ledger, "--profile+r2+--bounds+segment2"))
+        # 规范写法：默认值不写、只选域与 N 的不进、次序固定（开关 profile-read-as-r1 下全成 r1）
+        normalized = []
+        for text_given, want in (("--profile+r2+--marker-parity+even+--bounds+segment2+--family+all", "--profile r2"),
+                                 ("--table+both+--marker-parity+odd+--profile+r3+--disk-order+normal", "--profile r3 --marker-parity odd --table both"),
+                                 ("", DEFAULT_PROFILE)):
+            try:
+                normalized.append(profile_of_device_arguments(text_given) == want)
+            except ValueError:
+                normalized.append(False)
+        judge_cell("profile-normalized", all(normalized), f"三种 device_arguments= 的规范写法逐个对不对：{normalized}")
+        # 按档重放：桩照档打（r2 档在 counters 后面加 ,j6qn，像装置 r2 档多判 J6Qn），每组带它的档（开关 replay-without-profile 下桩一律按 r1 打，r2 那三行红）
+        write(TABLE, two_profile_text)
+        profile_stub = os.path.join(work, "profile-stub.sh")
+        profile_trace = os.path.join(work, "profile-trace.txt")
+        with open(profile_stub, "w", encoding="utf-8") as handle:
+            handle.write("#!/usr/bin/env bash\n# 照档打的桩：--pinned-cases <表> [档参数…]；⑦ 去掉 ,j6qn 再按档加回（r2 档多判一条）；每起一次把档参数记一行\n"
+                         "[[ \"$1\" == --pinned-cases && -f \"$2\" ]] || exit 2\n"
+                         "printf '%s\\n' \"${*:3}\" >> \"$PROFILE_TRACE\"\n"
+                         "if [[ \" ${*:3} \" == *' --profile r2 '* ]]; then extra=,j6qn; else extra=; fi\n"
+                         "grep -v '^#' \"$2\" | grep . | cut -f7 | sed \"s/counters=states,j6qn/counters=states/; s/counters=states/counters=states$extra/\"\n"
+                         "echo \"E7RESULT name=pinned_cases rows=$(grep -v '^#' \"$2\" | grep -c .)\"\n")
+        open(profile_trace, "w").close()
+        expect("replay-two-profiles", ["--replay", "--binary", profile_stub, "--memory-cap", "none"], 0, "按档 2 组：--profile r1 3 行、--profile r2 3 行", {"PROFILE_TRACE": profile_trace})
+        judge_cell("replay-profile-arguments", open(profile_trace, encoding="utf-8").read() == "--profile r1\n--profile r2\n",
+                   f"要按档起两次、各带 --profile r1 与 --profile r2，实测：{open(profile_trace, encoding='utf-8').read()!r}")
+        got, output, _verdicts = run_items(["--list-items"])
+        profile_items = [line for line in output.split("\n") if line.startswith("pinned:")]
+        judge_cell("list-items-profile", got == 0 and len(profile_items) == 6 and sum(1 for line in profile_items if line.endswith("档 --profile r2")) == 3,
+                   f"--list-items 要每行一项、说明带档，实测退 {got}：{profile_items}")
+        # 键里有档：表里另有一行与第一行只差 ㉒（r2），只判过第一行，那一行不能拿它的判定（开关 reuse-key-without-profile 下复用）
+        twin_profile = list(pinned_rows[0]["fields"])
+        twin_profile[PROFILE_INDEX] = "--profile r2"
+        write(TABLE, pinned_text.rstrip("\n") + "\n" + "\t".join(twin_profile) + "\n")
+        twin_profile_item = f"pinned:{len(pinned_text.rstrip(chr(10)).split(chr(10))) + 1}"
+        profile_store = os.path.join(work, "verdict-library-profile")
+        run_items([*replay_arguments, "--verdict-library", profile_store, "--item", pinned_items[0]])
+        got, output, verdicts = run_items([*replay_arguments, "--verdict-library", profile_store])
+        judge_cell("reuse-row-own-profile", got == 0 and verdicts.get(pinned_items[0]) == ("绿", "复用") and verdicts.get(twin_profile_item) == ("绿", "现判"),
+                   f"期望 {pinned_items[0]} 复用、只差档的 {twin_profile_item} 现判，实测退 {got}、{verdicts}")
+        write(TABLE, pinned_text)
+        os.remove(r2_ledger)
+        os.remove(r2_kill_bounds)
+
     breaks_missed, breaks_proven = [], 0
     if not wrong and not BREAK:
         for item in ("pin-twice", "titles-unchecked", "no-recheck-before-write", "check-ignores-missing", "fingerprint-unchecked", "variant-unchecked", "replay-ignores-output",
                      "wrapper-exit-as-replay-red", "killed-as-regression", "names-from-today-table", "kill-bounds-optional", "title-missing-ignored",
                      "title-not-compared", "variant-sets-unchecked", "ledger-digest-unchecked",
                      "whole-row-unchecked", "old-rows-accepted", "copied-columns-unchecked", "dedupe-by-input-variant", "backfill-unverified",
-                     "variant-by-line-number", "append-names-from-today-table", "append-pairing-optional", "progress-silent"):
+                     "variant-by-line-number", "append-names-from-today-table", "append-pairing-optional", "progress-silent",
+                     "item-filter-ignored", "reuse-key-without-closure", "reuse-key-without-row", "reuse-key-without-mutation-row", "reuse-ignores-key",
+                     "reuse-records-red", "reuse-records-whole-cell-only", "void-ledgers-ignored", "void-rows-unchecked", "void-complete-accepted",
+                     "profile-read-as-r1", "same-profile-conflict-ignored", "check-ignores-profile", "replay-without-profile", "profile-column-unchecked",
+                     "profile-arguments-unchecked", "reuse-key-without-profile", "reuse-key-without-judge-version", "list-items-pipe-unhandled", "superseded-replacement-pin-unchecked", "superseded-coverage-unchecked",
+                     "superseded-profile-unchecked", "superseded-rows-unchecked"):
             completed = subprocess.run([sys.executable, os.path.realpath(__file__), "--selftest"], capture_output=True, text=True,
                                        env=dict(os.environ, E165_PIN_RED_EXAMPLES_BREAK=item))
             if completed.returncode == 0:

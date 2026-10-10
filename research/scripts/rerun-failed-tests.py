@@ -10,7 +10,14 @@
 认的段头：`Running tests/<目标>.rs (…)` → `--test <目标>`；`Running unittests src/lib.rs (…)` → `--lib`；
 `Running unittests src/bin/<名>.rs (…)` → `--bin <名>`；`Doc-tests` 段不认（文档测试按名字重跑不了），有失败就判红要人看。
 完整性闸：每一段收到的 `test <名> ... FAILED` 条数要等于那一段 `test result:` 行报的 failed 数，对不上判红、stdout 不出命令。
+结果行与汇总行的解析在 research/scripts/lib_libtest_result_lines.py（全仓一份）：#[should_panic] 的用例那一段「 - should panic」不进名字。
 一个失败都没有：打印「没有失败的用例」到 stderr、退出 0、stdout 为空。
+弄坏开关 RERUN_FAILED_TESTS_BREAK（只给自证证红用），一项一行，下一行起写打开后判错的自证格：
+  merge-sections   段头之后的段并进第一段
+    「按段取失败用例」「最后一段缺 test result 行应当判出问题」「FAILED 行与 test result 对不上应当判出问题」
+  own-failed-line  回到自己的正则 `^test (\\S+) \\.\\.\\. FAILED`，不经 lib_libtest_result_lines.py（认不了「 - should panic」）
+    「should panic 的失败用例按全名重跑」
+  lib_libtest_result_lines.py 的 LIBTEST_RESULT_LINES_BREAK=should-panic-in-name 同样让「should panic 的失败用例按全名重跑」判错。
 """
 import os
 import re
@@ -22,12 +29,25 @@ import os as preflight_os, sys as preflight_sys  # noqa: E402
 preflight_sys.dont_write_bytecode = True
 preflight_sys.path.insert(0, preflight_os.path.join(preflight_os.path.dirname(preflight_os.path.realpath(__file__)), '..', '..', '.claude', 'scripts'))
 from project_preflight import preflight  # noqa: E402
+import importlib.util  # noqa: E402
 
 SECTION_HEADER = re.compile(r"^\s*Running (?:unittests )?(\S+?\.rs) \(")
 DOCTEST_HEADER = re.compile(r"^\s*Doc-tests (\S+)")
-FAILED_LINE = re.compile(r"^test (\S+) \.\.\. FAILED\s*$")
-RESULT_LINE = re.compile(r"^test result: \w+\. \d+ passed; (\d+) failed;")
+OWN_FAILED_LINE = re.compile(r"^test (\S+) \.\.\. FAILED\s*$")   # 只给弄坏开关 own-failed-line 用：改前自己的那一份
 BREAK_VARIABLE = "RERUN_FAILED_TESTS_BREAK"
+_LIBTEST_SPECIFICATION = importlib.util.spec_from_file_location(
+    "lib_libtest_result_lines_for_rerun_failed_tests", os.path.join(os.path.dirname(os.path.realpath(__file__)), "lib_libtest_result_lines.py"))
+libtest_result_lines = importlib.util.module_from_spec(_LIBTEST_SPECIFICATION)
+_LIBTEST_SPECIFICATION.loader.exec_module(libtest_result_lines)
+
+
+def failed_name_of(line):
+    """一行是 FAILED 的结果行就交用例全名（不带「 - should panic」），不是交 None。"""
+    if os.environ.get(BREAK_VARIABLE) == "own-failed-line":
+        found = OWN_FAILED_LINE.match(line)
+        return found.group(1) if found else None
+    parsed = libtest_result_lines.result_line(line)
+    return parsed.full_name if parsed is not None and parsed.outcome == "FAILED" else None
 
 
 def target_selector_of(source_path):
@@ -58,13 +78,13 @@ def failed_tests_by_target(log_text):
             continue
         if current is None:
             continue
-        failed = FAILED_LINE.match(line)
-        if failed:
-            current["failed"].append(failed.group(1))
+        failed = failed_name_of(line)
+        if failed is not None:
+            current["failed"].append(failed)
             continue
-        result = RESULT_LINE.match(line)
+        result = libtest_result_lines.summary_line(line)
         if result:
-            current["reported"] = (current["reported"] or 0) + int(result.group(1))
+            current["reported"] = (current["reported"] or 0) + result.failed
     commands = []
     for section in sections:
         if section["reported"] is None:
@@ -134,6 +154,17 @@ def selftest():
     _commands, problems = failed_tests_by_target(miscounted)
     if not any("收到 0 条 FAILED" in problem for problem in problems):
         failures.append(f"FAILED 行与 test result 对不上应当判出问题，实际 {problems}")
+    should_panic = "\n".join([
+        "     Running unittests src/lib.rs (target/debug/deps/sample-0123456789abcdef)",
+        "test tests::answer_is_42 ... ok",
+        "test tests::answer_panics - should panic ... FAILED",
+        "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out",
+    ])
+    commands, problems = failed_tests_by_target(should_panic)
+    lines = command_lines(commands, "sample")
+    expected = ["cargo test -p sample --lib -- --include-ignored --exact tests::answer_panics"]
+    if problems or lines != expected:
+        failures.append(f"should panic 的失败用例按全名重跑：期望 {expected}，实际 {lines}，问题 {problems}")
     with tempfile.TemporaryDirectory() as directory:
         empty_log = os.path.join(directory, "clean.log")
         with open(empty_log, "w", encoding="utf-8") as handle:
@@ -145,7 +176,7 @@ def selftest():
             print(f"  ✗ rerun-failed-tests 自检：{failure}")  # gate-lint:detail
         print(f"     → 看 failed_tests_by_target() 的分段与条数核对；{BREAK_VARIABLE} 设着的话这里本来就该红")
         return 1
-    print("  ✓ rerun-failed-tests 自检通过（4 格：按段分目标、缺 test result、条数对不上、没有失败）")
+    print("  ✓ rerun-failed-tests 自检通过（5 格：按段分目标、缺 test result、条数对不上、should panic 的按全名重跑、没有失败）")
     return 0
 
 

@@ -16,9 +16,11 @@
 # 判据只有一句：**这一道读的那几条路径，在 `refs/sop/staged-green` 那棵树与这一次的暂存树之间，git 说变没变。**
 # 在这之前先看一眼全绿标记：checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification
 # 判绿时按登记输入（登记了 environment= 的连同此刻的环境）在被判那棵树上的指纹写 git common-dir 里的
-# `singlefs-stage-green.<阶段文件名>.<指纹>`（admission.py stage-marker-write），在且没过 SINGLEFS_REUSE_HOURS 就可跳过——
+# `singlefs-stage-green.<阶段文件名>.<指纹>`（admission.py stage-marker-write），在就可跳过——
 # 主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑第二遍（用户 2026-09-27 定：照 checker-tier-layer0-replay 写标记、只跑变了的）。
 # 路径清单在 `.claude/gate.d/stage-inputs.tsv`，那是唯一登记位；清单自己也进比对（清单变了必定重跑）。
+# 阶段文件名参数也可以写 <阶段>.sh:<格名>（admission.py 的按格复用：checker-tier-formal-verification 每格各登记一行、各问一次），判法与整道的相同，
+# 进比对的阶段脚本是冒号之前那一份，登记行第三列写 closure=<包>:<bin> 的另把那个 bin 的 cargo 依赖闭包现算进输入；这一份不用为它多做什么。
 #
 # 为什么用树不用提交、为什么只一条 ref：
 #   `refs/sop/gate-ok` 断言的是「**不带 --staged 的整轮**在哪个**提交**上绿过」，用来算 diff 窗口；
@@ -33,12 +35,11 @@
 #   所以这一道只在 `SINGLEFS_STAGED_TREE` 给了树对象时才许复用——那个值由 research/scripts/gate-staged.sh 算一次、
 #   传给整轮、跑绿之后前移同一棵。没有这个变量（有人直接跑 gate.sh）一律当成要跑。
 #
+# 复用只看两样：输入变没变、上次判绿作不作数（全绿标记在，或上次整轮全绿那棵暂存树），不看判绿那一次是多久以前。
 # 管不到的：
 #   **环境变了而内容没变**——rustc 升级、系统库换了，树一模一样而结论已经不作数。
-#   把版本串纳入比对要么落盘、要么塞进 ref 名，两样都跟「只一条 ref、不落盘」冲突；
-#   这里用**复用上限**替代：绿判定超过 SINGLEFS_REUSE_HOURS 小时（默认 24）就强制跑一趟并重新前移。
-#   `Cargo.lock` 在各阶段的清单里，依赖变化看得见；工具链升级看不见，靠上限兜。
-#   `SINGLEFS_GATE_FULL=1` 强制当成要跑。
+#   登记了 environment= 的阶段（工具版本这类不在 git 树里的输入）由 admission.py 另进比对；没登记的看不见，
+#   要重判就 `SINGLEFS_GATE_FULL=1` 强制当成要跑。
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}

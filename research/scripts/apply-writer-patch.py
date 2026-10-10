@@ -17,7 +17,11 @@
 都对了才 git apply、改名换上新的变异表，跑 .claude/gate.d/code-source-discipline.sh 的 mutation-tables 那一格（--check mutation-tables），把这一次记进 <git common-dir>/singlefs-applied-writer-patches.tsv。
 自上次崩溃验证全绿（git common-dir 里最新的 singlefs-crash-case-green.* 标记）以来打过的补丁到 CRASH_VERIFY_HINT_PATCHES 个（5，推的）就打一行提示：
 只提示、不拦，跑不跑由用户定。
-退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对，一个字没改。
+副本锁（主 agent 2026-10-10 的失误：research/scripts/prove-red.sh --copy 正在副本里就地施加变异时，往同一份副本打了补丁）：
+  --root 指的不是这份脚本所在的主工作区时，开头在 <副本根>/.prove-red.lock 上试拿排他锁（flock，不等），拿到了打完再放、拿不到就拒绝、退 2、一个字没改，
+  出路写「副本上有证红在跑，等它跑完或换一份副本」。prove-red.sh 跑的时候拿着同一把锁（它按路径载入这里的 hold_copy_lock / release_copy_lock，锁的写法只在这一处）。
+  锁随持有的进程放：正常收尾时删掉锁文件；被杀时内核放掉锁、文件留着，下一个照样拿得到。
+退出码：0 打上了（code-source-discipline 绿）；1 打上了但 code-source-discipline 红；2 核的时候就不对、或副本上有证红在跑，一个字没改。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一份补丁目录的名字，括号里是那条「✗ 自检：」的开头）：
   APPLY_WRITER_PATCH_BREAK=append-duplicates  plan() 不核追加的变异名在表里有没有
@@ -28,7 +32,10 @@
       checker（「✗ 自检：动 checker 而报告没那一节应当拒绝」）
   APPLY_WRITER_PATCH_BREAK=no-hint  apply() 打过的补丁数到 CRASH_VERIFY_HINT_PATCHES 也不打提示
       onlytable（「✗ 自检：打过的补丁数到提示线应当打提示」）
+  APPLY_WRITER_PATCH_BREAK=copy-lock-ignored  apply() 不试拿副本锁，副本上有证红在跑也照打
+      locked（「✗ 自检：副本锁被占着时应当拒绝、退 2、一个字不改」）
 """
+import fcntl
 import glob
 import hashlib
 import os
@@ -47,6 +54,49 @@ CRASH_VERIFY_HINT_PATCHES = int(os.environ.get("CRASH_VERIFY_HINT_PATCHES", "5")
 CHECKER_SECTION = "受影响的层 0 流与崩溃枚举用例"
 LOG_NAME = "singlefs-applied-writer-patches.tsv"
 MARKER_PREFIX = "singlefs-crash-case-green."
+COPY_LOCK_NAME = ".prove-red.lock"   # 副本锁（文件头「副本锁」）：放在副本根
+
+
+def hold_copy_lock(root):
+    """在 <root>/.prove-red.lock 上试拿排他锁、不等：拿到交回打开的描述符（里面写持有者的进程号），被占着交回 None；建不了锁文件抛 OSError。
+    拿到之后核一次路径还指着同一份文件：上一个持有者收尾时删了锁文件，拿到的就是删掉的那一份，重开再拿。"""
+    path = os.path.join(root, COPY_LOCK_NAME)
+    for _attempt in range(3):
+        descriptor = os.open(path, os.O_RDWR | os.O_CREAT | os.O_CLOEXEC, 0o644)
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            os.close(descriptor)
+            return None
+        try:
+            same_file = os.fstat(descriptor).st_ino == os.stat(path).st_ino
+        except FileNotFoundError:
+            same_file = False
+        if same_file:
+            os.ftruncate(descriptor, 0)
+            os.write(descriptor, f"{os.getpid()}\n".encode())
+            return descriptor
+        os.close(descriptor)
+    return None
+
+
+def release_copy_lock(root, descriptor):
+    """放掉 hold_copy_lock 拿到的锁：锁文件还是自己拿着的那一份就先删掉，再关描述符（关了内核就放锁）。"""
+    path = os.path.join(root, COPY_LOCK_NAME)
+    try:
+        if os.fstat(descriptor).st_ino == os.stat(path).st_ino:
+            os.unlink(path)
+    except FileNotFoundError:
+        pass
+    os.close(descriptor)
+
+
+def copy_lock_holder(root):
+    """锁文件里写的持有者进程号（读不到写「不明」），只给拒绝那一句用。"""
+    try:
+        return open(os.path.join(root, COPY_LOCK_NAME), encoding="utf-8").read().strip() or "不明"
+    except OSError:
+        return "不明"
 
 
 def git(root, *arguments, check=False):
@@ -118,6 +168,24 @@ def patches_since_last_crash_verification(root, log_path):
 
 
 def apply(patch_directory, root, dry_run, gate33):
+    """副本上先试拿副本锁（文件头「副本锁」），拿到了再核、再打，打完放锁；主工作区不拿。"""
+    lock = None
+    if os.path.realpath(root) != os.path.realpath(REPOSITORY_ROOT) and BROKEN != "copy-lock-ignored":
+        try:
+            lock = hold_copy_lock(root)
+        except OSError as error:
+            return 2, [f"✗ 在 {root} 上建不了副本锁 {COPY_LOCK_NAME}：{error}", "→ 怎么办：看 --root 指的目录在不在、可不可写；一个字都没改"]
+        if lock is None:
+            return 2, [f"✗ 副本 {root} 上有证红在跑（{COPY_LOCK_NAME} 被进程 {copy_lock_holder(root)} 占着），这一次不打",
+                       "→ 怎么办：副本上有证红在跑，等它跑完或换一份副本；一个字都没改"]
+    try:
+        return apply_holding_the_lock(patch_directory, root, dry_run, gate33)
+    finally:
+        if lock is not None:
+            release_copy_lock(root, lock)
+
+
+def apply_holding_the_lock(patch_directory, root, dry_run, gate33):
     problems, merged, patch = plan(patch_directory, root)
     if problems:
         return 2, [f"✗ {problem}" for problem in problems] + ["→ 怎么办：一个字都没改。照每处改补丁目录（或退给实现员），再跑一次"]
@@ -203,12 +271,28 @@ def selftest():
         code, lines = apply(only_table, root, False, gate33)
         if code != 0 or not any("崩溃验证全绿以来已打" in line for line in lines):
             failures.append(f"打过的补丁数到提示线应当打提示，实际 {code} {lines}")
+        # 副本锁（文件头「副本锁」）：这一份当成证红在跑、拿着锁，apply 要拒绝、一个字不改；放了锁再打就照打，打完锁文件不留
+        locked = patch_directory("locked", append="locked-row\tf\to\tr\t-p demo --lib\tt\n")
+        table_path = os.path.join(root, "crates", "mutations.tsv")
+        before = open(table_path).read()
+        held = hold_copy_lock(root)
+        try:
+            code, lines = apply(locked, root, False, gate33)
+            after_refusal = open(table_path).read()
+        finally:
+            if held is not None:
+                release_copy_lock(root, held)
+        if held is None or code != 2 or not any("副本上有证红在跑" in line for line in lines) or after_refusal != before:
+            failures.append(f"副本锁被占着时应当拒绝、退 2、一个字不改，实际 {code} {lines}（锁{'拿到了' if held is not None else '没拿到'}）")
+        code, lines = apply(locked, root, False, gate33)
+        if code != 0 or "locked-row\t" not in open(table_path).read() or os.path.exists(os.path.join(root, COPY_LOCK_NAME)):
+            failures.append(f"副本锁没被占着时应当照打、打完不留锁文件，实际 {code} {lines}")
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
             print("  → 看 plan() / apply() 的判法；APPLY_WRITER_PATCH_BREAK 设着的话这里本来就该红")
             return 1
-        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名、打不上的都在核的时候拒绝，到提示线打提示（查了 5 种）")
+        print("  ✓ apply-writer-patch 自检通过：好补丁打上、变异表按名字追加替换删除，动 checker 没那一节、追加重名、打不上的都在核的时候拒绝，到提示线打提示，副本锁被占着时拒绝、没占时照打（查了 6 种）")
         return 0
     finally:
         import shutil

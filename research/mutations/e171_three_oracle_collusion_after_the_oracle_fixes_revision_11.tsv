@@ -1,0 +1,16 @@
+# E171 第 1 次重跑·修订 11（按输入复用）的研究一侧变异表：登记 research/prompts/e171-r1-prereg.md 修订 11 第 11.8 节 RV1–RV15。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经同目录 mutation_driver.py --unit-test-module test_revision_11 跑；原文在研究一侧目录（test_*.py 与 mutation_driver.py 除外）恰好命中一次。
+RV1 驱动行 [closure] 用没改坏的文件内容（RP3 改坏之后内容相同那一格：原式取到，变异取不到）	            overrides[mutation.file] = bad_implementation_table.apply_mutation(text, applied).encode("utf-8")	            overrides[mutation.file] = text.encode("utf-8")
+RV2 [limit] 不进键（RP3 改 L）	    return [f"seconds {seconds}"]	    return ["none"]
+RV3 [upstream] 取上游单元名、不取文件 sha256（RP3 改上游一个文件）	            lines += [f"{role} {relative} {sha256_file(os.path.join(location, relative))}" for relative in files_under(location)]	            lines += [f"{role} {unit_name}"]
+RV4 驱动行 [research] 只取 row_driver.py（RP3 改驱动 import 的模块）	DRIVER_RESEARCH_FILES = ("row_driver.py", "device_timing.py", "frozen_o3.py", "run_directory.py", "bad_implementation_table.py")	DRIVER_RESEARCH_FILES = ("row_driver.py",)
+RV5 [build] 不取工具链（RP3 改工具链文本）	    lines = [f"toolchain {sha256_bytes(toolchain.encode('utf-8'))}"]	    lines = []
+RV6 [args] 去掉 --positive-control 那一对（RP3 改参数：两项对照原式两个键，变异一个键）	VOLATILE_ARGUMENT_OPTIONS = ("--output-directory",	VOLATILE_ARGUMENT_OPTIONS = ("--positive-control", "--output-directory",
+RV7 [env] 设了的变量当没设（RP3 设一个环境变量）	    return [f"{name} {'set' if name in environment else 'unset'}" for name in names]	    return [f"{name} unset" for name in names]
+RV8 读数相等不比导出目录（RP7：原式 identical=false，变异 true）	            differing += directory_differences(left, right, role)	            differing += []
+RV9 入库条件：装置退 253 也入库（RP1 超时不入库那一格）	        return False, "timeout"	        return True, ""
+RV10 入库条件：250–254 也入库（RP1 包装结局不入库那一格）	        return False, f"wrapper-outcome-{exit_code}"	        return True, ""
+RV11 永远现跑的集合少 step-9（RP1 永远现跑那一格）	    ReadingUnit("step-9", "step-9", "baseline-run2", "device", "baseline --streams 1,2,3 --writable-mount-probe", fresh_always=True),	    ReadingUnit("step-9", "step-9", "baseline-run2", "device", "baseline --streams 1,2,3 --writable-mount-probe", fresh_always=False),
+RV12 入库直接写进 entries/、不经 staging/（RP5）	        building = os.path.join(self.staging, f"{os.getpid()}-{secrets.token_hex(8)}")	        building = target
+RV13 取用不核 manifest.sha256（RP8）	    problems = manifest_problems(entry)	    problems = []
+RV14 账本把取来的记成现跑（RP1 账本 N、M 那一格）	        state = marker["state"]	        state = STATE_FRESH if marker["state"] == STATE_REUSED else marker["state"]
+RV15 取来的单元不看判法、直接记绿（单元编排层端到端第三遍：假判法在取来的 step-1 上判红，原式红、变异绿）	    green = ORIGINAL["finish_unit"](settings, item, intervals)	    green = ORIGINAL["finish_unit"](settings, item, intervals) or (bool(states) and all(state == reuse.STATE_REUSED for state in states))

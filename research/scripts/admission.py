@@ -6,13 +6,23 @@
 登记表是 .claude/gate.d/stage-inputs.tsv（唯一登记位，门禁阶段与实验各占几行）。一行一条，制表符分隔：
     <键> <制表符> <读的路径，空格分隔> [<制表符> <准入条件，空格分隔>] <制表符> #<为什么是这几条>
   键：门禁阶段写文件名（checker-tier-crates-mutation-replay.sh）；实验写实验号（E142），同一个实验另有一种调用方式的写
-      实验号加斜杠加方式名（E142/layer0）。
+      实验号加斜杠加方式名（E142/layer0）；复跑表（research/scripts/replay.sh）里同一个实验不止一行的，每一行在 replay.sh 的
+      ADMISSION_ROW_KEYS 里指明它问哪个键（见「复跑表按行的准入键」一段）。阶段里的一格各登记自己读的输入的写 <阶段文件名>:<格名>（checker-tier-formal-verification.sh:verus-proof，
+      按格复用：阶段每格各问一次 stage-must-run.sh，gate-reuse / stage-fingerprint / stage-marker-write / gate-record-environment 的阶段参数就写这个键；
+      进比对的阶段脚本是冒号之前那一份，整张登记表不进比对、这一格自己的登记行（键、路径、第三列）进，全绿标记与环境记录的文件名带着整个键）。
   路径：从仓库根起；目录写成带斜杠的前缀。写成 @<别的键> 就是「那个键登记的全部路径」（只在实验行里用）。
   准入条件（第三列）：实验行认两种：
       question-row=<文件>#<行号>:<正则>          那份文件里第一列是 <行号> 的表格行，最后一格（状态）要匹配正则
-      product-field=<实验键>:<行名>:<字段>=<值>   research/scripts/replay.sh 登记给那个实验键的产物里，
+      product-field=<实验键>:<行名>:<字段>=<值>   research/scripts/replay.sh 登记给那个实验键的产物里（准入键是它的那一行），
                                                   最后一行 `E7RESULT name=<行名>` 的 <字段> 要等于 <值>
-    门禁行认四种：
+    门禁行认五种：
+      closure=<包>:<bin>                  不是前提，是输入的来源：这个包的这个 bin 编译读的 crate 目录（cargo 依赖闭包），现算后接在第二列路径之后，不手列 crate。
+                                          闭包 = 包在仓根工作区里，Cargo.toml 的 [dependencies]、[build-dependencies]（含 [target.*] 底下的，optional 也算）里 path= 指到的包顺着传递闭包
+                                          （{ workspace = true } 取仓根 [workspace.dependencies] 的 path；dev-dependencies 不算）。每个 crate 目录整个取，再减去 cargo 编这个 bin 读不到的：
+                                          tests/、benches/、examples/，与包自己 src/bin/ 下别的 bin 的源码（别的 crate 的 src/bin/ 整个减）；
+                                          被留着的源码里 include! / include_str! / include_bytes! / #[path = "…"]（字面量，相对该文件所在目录，注释里的不算）点名到被减的目录，那个目录不减，
+                                          点名到仓内别的 crate 的文件，那个文件进输入；有 build.rs、[[bin]] / [[test]] / [[bench]] / [[example]]、[lib] path、build / auto* 开关，
+                                          或留着的源码里有参数是算出来的 include!，这个 crate 整个目录留着。输出是 git 路径限定（减去的写成 :(exclude)路径）。包或 bin 找不到登记有错
       command=<可执行名>                  PATH 里找得到它
       readwrite=<路径>                    那个路径在、可读也可写（相对路径从仓库根起）
       probe=<仓内脚本>[:<参数>…]          bash <根>/<脚本> <参数…> 退 0（工作目录是仓库根）
@@ -20,7 +30,7 @@
                                           （例 herd7 的版本）。不在 git 树里的东西靠它进复用判定，见 ①
       正则、值、路径与参数里不许有空白（条件之间按空白切）。实验行写了门禁的种类、门禁行写了实验的种类，自查都判错。
   崩溃枚举用例行（键是 crash-case:<名>，门禁 checker-tier-layer0-replay 逐条按复用判定跑、逐条记全绿标记）：路径写整个 crates/ 与 Cargo 清单、锁，
-    不按用例手列；算输入时自动减去用例读不到的文件（见「崩溃枚举用例」一节）。第三列认六种：
+    不按用例手列；算输入时自动减去用例读不到的文件（见「崩溃枚举用例」一节）。第三列认七种：
       test=<包>:<测试目标>:<用例函数>     恰好一条：跑的是 cargo test --release -p <包> --test <测试目标> -- --include-ignored --exact <用例函数>；
                                          用例函数的每一处定义都要标 #[ignore]（不带 --ignored 的 cargo test 不跑它，重型测试闸按这一条认它）：
                                          同名的每一处 fn <用例函数>( 都算（cfg 二选一的、子模块里同名的也算），有一处没标就算没标；
@@ -34,9 +44,25 @@
                                          那一行带 shards= 的（双机分片 merge 那一趟）逐片判，见 judge_threads_of_each_shard
       threads-variable=<环境变量名>      至多一条：用例读线程数的环境变量（没登记是 SINGLEFS_LAYER0_THREADS）；crash-case-command 把它设成配的线程数
                                          （盖掉调用方环境里的），标记里 configured_worker_threads= 记它
+      features=<特性,特性…>              至多一条：用例要编进的 cargo 特性（逗号隔开，各为小写字母、数字、_、-），crash-case-command 在 -p <包> 之后带 --features；
+                                         要经引擎、进判定库的用例（崩溃注入的两项随机历史）才登记，不带它的行命令照旧。多机配置（${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，
+                                         按 git common-dir 找）写了 ENABLE_GPU=1 而特性里有 verdict-store 的，另加 gpu（与 research/scripts/crash-point-replay.sh 快档同一个做法）；
+                                         最后的特性里有 gpu 且 ENABLE_GPU=1 的，整条经 research/scripts/gpu-quiesce-run.sh 起（照多机配置清场、跑完不复原），
+                                         环境里交清场之后那一份显卡先后（GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED，没写取 GPU_CARDS_BY_PRIORITY，都没写清掉）、清掉 GPU_COMPUTATION_CLASSES 与退役的 SINGLEFS_GPU_CARDS_CONFIG；
+                                         带 features= 的另设 BINDGEN_EXTRA_CLANG_ARGS（librocksdb-sys 的 bindgen 找头文件，取 research/scripts/crash-amplification-lib.sh 的
+                                         CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS，读不到照调用方环境，编不过时 cargo 自己红）。不与 shard=across-machines 并存：
+                                         分片的驱动脚本自己拼 cargo、不带特性，并存时分片那一趟会漏掉特性，登记就拒
       shard=across-machines              至多一条：这条用例的枚举认双机分片开关（SINGLEFS_LAYER0_SHARD，crates/singlefs-checker-tier/src/layer0_progress.rs），
                                          门禁 checker-tier-layer0-replay --full 在本地分片配置可用时把它交给 research/scripts/layer0-shard-run.sh 两台各跑一片再 merge；
                                          登记了它的用例，驱动脚本与它 eval 的配置判法（SHARD_DRIVER_FILES）按内容进这条用例的输入清单
+
+复跑表按行的准入键（research/scripts/replay.sh 里 ADMISSION_ROW_KEYS 那一段 heredoc；replay-row-keys、experiment 与 product-field= 都读它）：
+  一行一条，制表符分隔：<准入键> <制表符> <复跑表那一行的前三列，原样抄：实验号|二进制|参数> <制表符> <产物头谁写>
+    产物头谁写：device  那一行跑的装置自己问准入、把 E7INPUT 行打在产物最前面（装置入口传的键要与这里的键逐字相同）；
+               replay  那一行跑的东西不接准入（crates 的导出 bin 这一类），replay.sh 把准入放行时给的 E7INPUT 行接在新产物最前面。
+  没写在这里的行，准入键是实验号、产物头由装置写。键的实验号要与那一行的实验号相同；每一条恰好指到复跑表一行，同一行只许指一次。
+  登记了准入的键被复跑表两行以上共用（同一个实验几行、只按实验号登记）判错：准入只按一个键比产物，分不清哪一行对哪一份。
+  这一段写错时，experiment 按登记有错退 2；replay.sh 开跑前经 replay-row-keys 判，判错整份不开跑。
 
 输入指纹里的构建环境（build_environment_lines；实验的指纹与 manifest / crash-case-manifest 带 --build-environment 时进清单）：
   仓根与它往上每一层目录的 .cargo/config、.cargo/config.toml、rust-toolchain、rust-toolchain.toml，CARGO_HOME（没设取 ~/.cargo）下的
@@ -67,7 +93,7 @@
 
 子命令（<根> 是被判仓的根）：
   stage-fingerprint <根> <阶段文件名>    这一道登记输入在被判那棵树上的指纹（登记了 environment= 的连同此刻的环境）：打「<sha256> <文件数>」
-  stage-marker-check <根> <阶段文件名>   这一道这批输入有没有作数的全绿标记：退 0 有（第一行 ok <路径> <时刻>），退 1 没有或过了 SINGLEFS_REUSE_HOURS
+  stage-marker-check <根> <阶段文件名>   这一道这批输入有没有作数的全绿标记：退 0 有（第一行 ok <路径> <时刻>），退 1 没有
   stage-marker-write <根> <阶段文件名>   判绿之后写这一格标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、
                                          checker-tier-formal-verification 自己调），打路径；gate-reuse 先看它再看暂存树
   gate-reuse <根> <阶段文件名>   门禁的复用判定：退 0 要跑，退 10 可跳过（stage-must-run.sh 翻成它原来的 1）；
@@ -79,6 +105,8 @@
                                  把这个键的输入逐文件清单（「sha256  路径」，按路径字节序）写进清单文件，末尾按参数次序
                                  加「sha256  <名字>」行；stdout 打「<整张清单的 sha256> <文件数>」。另算一遍逐字节相同的写法见 --selftest 那一格
   keys <根>                      列出登记表里的实验键，一行一个
+  replay-row-keys <根>           复跑表每一行打一行「<前三列><制表符><准入键><制表符><产物头谁写><制表符><登记了准入：yes|no>」，按表里的次序
+                                 （replay.sh 开跑前读它）；按行的准入键那一段写错、指明的键没登记、登记了准入的键被两行以上共用，退 2，stdout 逐条打 ✗ 与出路
   crash-cases <根>               核登记的崩溃枚举用例（第三列的写法、包与测试目标在不在、用例函数在不在、它标没标 #[ignore]），每条打一行
                                  「<键><制表符><包><制表符><测试目标><制表符><用例函数>」；登记有错退 2，原因打在 stdout（不带 ✗，阶段自己打 ✗ 与出路）
   crash-case-manifest <根> <键> <清单文件> [--extra-file <名字> <文件>]... [--judging-digest] [--toolchain] [--build-environment]
@@ -95,7 +123,7 @@
                                  其后是整条命令（env 设 SINGLEFS_LAYER0_PROGRESS_DIRECTORY、SINGLEFS_LAYER0_INPUT_FINGERPRINT、SINGLEFS_LAYER0_THREADS，
                                  登记了 threads-variable= 的另把那个变量设成同一个数（盖掉调用方环境里的），
                                  --start-over 时设 SINGLEFS_LAYER0_START_OVER=1、不然清掉它，分片开关 SINGLEFS_LAYER0_SHARD 一律清掉，
-                                 再起 cargo test --release …）；线程数：调用方设了
+                                 再起 cargo test --release …，登记了 features= 的在 -p <包> 之后带 --features，GPU 开着的整条另经 gpu-quiesce-run.sh）；线程数：调用方设了
                                  SINGLEFS_LAYER0_THREADS 用它（explicit），没设取本机核数（default）；本机核数取 os.cpu_count() 与 CPU 亲和的小者，
                                  不认 OMP_NUM_THREADS。交不出退 2，原因打在 stdout
   crash-case-marker-check <根> <键> <指纹> <清单文件>
@@ -138,7 +166,14 @@ target-own-files-only（判 #[ignore] 只读测试目标自己的源文件，不
 （模块级其余语句只进 `if __name__` 那一段）、digest-allows-non-name-dispatch（分派表的值不是名字照原文进）、digest-allows-imported-names
 （判法闭包里的 import 不查）、judge-takes-forwarded-threads（crash-case-judge / record 照旧收 checker-tier-layer0-replay 转过来的核数与线程数）、cores-from-nproc
 （本机核数照旧取 nproc）、thread-variable-ignored（threads-variable= 不认：命令只设、标记只记 SINGLEFS_LAYER0_THREADS）、
-threads-skip-self-contained-finish-line（计数行自己带线程数的不判线程）。
+features-not-passed（crash-case-command 不带登记行的 features=）、features-passed-to-every-case（没登记 features= 的行也带 --features verdict-store）、
+gpu-case-not-quiesced（ENABLE_GPU=1 而特性里有 gpu 的用例不经 gpu-quiesce-run.sh 起）、
+threads-skip-self-contained-finish-line（计数行自己带线程数的不判线程）、
+closure-only-replay-prefix（closure= 的闭包退回只算 crates/singlefs-replay-prefix/：core 改了红例两格不重跑，自证 checker-tier-formal-verification 按格复用的 ① 那一条红）、
+closure-keeps-crate-root-files（closure= 的闭包照旧留着 crate 根下 cargo 不读的文件（Cargo.toml、build.rs、src/、.cargo/、rust-toolchain* 之外的）：改必红世界表
+crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 一行红例重放整格现判，自证「closure：crate 根下 cargo 不读的文件」那几格红）、
+proof-key-without-replay-prefix（自证造临时仓的登记表时，verus-proof 那格的键拿掉 crates/singlefs-replay-prefix/：只改 replay-prefix 时 verus-proof 不重跑，自证 ② 那一条红）、
+ignore-row-keys（复跑表按行的准入键那一段不认，每一行的键一律是实验号：E142 两行那种表判「准入只按实验号比产物」，自证「复跑表按行的准入键」那几格红）。
 
 管不到的：跑的是不是按今天的源码编出来的二进制（指纹按源码算，跑的是 target/ 里的旧二进制时两边对不上，
 replay.sh 与 cargo run 开跑前都会重编）；登记的路径少写了一条（那条输入变了不会放行，要靠强制开关，登记行本身进指纹，
@@ -165,6 +200,8 @@ cfg 关掉的 mod 指的文件不在也算）按没标算（多拒）。macro_ru
 包里有构建脚本、[[test]]、autotests 时整包不减。登记的四条里第二条流全量约 2.3 天（推的），这几种改动都会让它重跑。
 减掉之后仍可能让用例红的：src/bin/ 下的文件编不过时 cargo test 也编不过（集成测试要先编本包的 bin），这一种交给构建与 clippy 那几道，
 不靠崩溃枚举用例的标记。linker（配置文件里的 target.*.linker、环境变量 CARGO_TARGET_*_LINKER）指的程序不按内容进。
+closure= 减掉的 crate 根下文件（Cargo.toml、build.rs、src/、.cargo/、rust-toolchain* 之外的）：编出来的 bin 在运行期按当前目录拼路径去读它们
+（不经 CARGO_MANIFEST_DIR、也不经 include!）看不见，改了不重跑。
 """
 import ast
 import glob
@@ -207,12 +244,40 @@ EXPERIMENT_KEY_FORM = re.compile(r"^E[0-9]+[A-Z0-9]*(/[a-z0-9][a-z0-9-]*)?$")
 QUESTION_ROW_FORM = re.compile(r"^question-row=(?P<path>[^#]+)#(?P<row>[^:]+):(?P<pattern>.+)$")
 PRODUCT_FIELD_FORM = re.compile(r"^product-field=(?P<key>[^:]+):(?P<line_name>[^:]+):(?P<field>[^=]+)=(?P<value>\S+)$")
 REPLAY_ROW_FORM = re.compile(r"^(E[0-9]+[A-Z0-9]*)\|([^|]*)\|([^|]*)\|([^|]*)\|(exact|timing)$")
-GATE_CONDITION_FORM = re.compile(r"^(?P<kind>command|readwrite|probe|environment)=(?P<value>\S+)$")
+# 复跑表按行的准入键：replay.sh 里这一段 heredoc（写法见文件头「复跑表按行的准入键」）；产物头谁写只认这两种
+REPLAY_ROW_KEYS_START = "ADMISSION_ROW_KEYS=$(cat <<'TSV'\n"
+REPLAY_ROW_KEYS_END_LINE = "TSV"
+REPLAY_ROW_HEADER_WRITERS = ("device", "replay")
+GATE_CONDITION_FORM = re.compile(r"^(?P<kind>command|readwrite|probe|environment|closure)=(?P<value>\S+)$")
+# 按格复用的登记键（门禁阶段里的一格，例 checker-tier-formal-verification.sh:verus-proof）：登记行的写法同阶段键，
+# 阶段脚本是冒号之前那一份；全绿标记、环境记录的文件名带着整个键，冒号在文件名里合法
+STAGE_CELL_KEY_FORM = re.compile(r"^[a-z0-9][a-z0-9-]*\.sh:[a-z0-9][a-z0-9-]*$")
+# closure=<包>:<bin> 的值（门禁行第三列，不是前提而是输入的来源）：这个包的 bin 编译读的 crate 目录（cargo 依赖闭包），见 cargo_closure_input_paths
+CLOSURE_CONDITION_FORM = re.compile(r"^(?P<package>[A-Za-z0-9_-]+):(?P<binary>[A-Za-z0-9_-]+)$")
+# 闭包里的 crate 目录下 cargo 编某个 bin 时读不到的几个子目录（测试、基准、示例）；别的 bin 的源码另按名字减
+CLOSURE_UNREAD_DIRECTORIES = ("tests", "benches", "examples")
+# crate 根下 cargo 编 bin 会读的（清单、构建脚本、源码，与按当前目录找的配置与工具链文件）；根下别的文件与目录减掉，被 include! / #[path] 点名的照旧拿回来
+CLOSURE_CRATE_ROOT_READ_NAMES = ("Cargo.toml", "build.rs", "src", ".cargo", "rust-toolchain", "rust-toolchain.toml")
+CLOSURE_MANIFEST_DIRECTORY_MENTION = "CARGO_MANIFEST_DIR"   # 源码里出现它，可能在运行期按 crate 目录读根下的文件：这个 crate 根下的一份都不减
+CLOSURE_REPLAY_PREFIX_DIRECTORY = "crates/singlefs-replay-prefix"   # 弄坏开关 closure-only-replay-prefix 下闭包只剩这一个目录（改前 Verus 四格的输入）
+CLOSURE_INCLUDE_LITERAL = re.compile(r'\binclude(?:_str|_bytes)?\s*!\s*[(\[{]\s*b?r?#*"([^"\\\n]*)"')
+CLOSURE_PATH_ATTRIBUTE_LITERAL = re.compile(r'#\s*\[\s*path\s*=\s*b?r?#*"([^"\\\n]*)"')
 
 # 崩溃枚举用例（门禁 checker-tier-layer0-replay 逐条跑、逐条记全绿标记）
 CRASH_CASE_KEY_PREFIX = "crash-case:"
 CRASH_CASE_KEY_FORM = re.compile(r"^crash-case:[a-z0-9][a-z0-9-]*$")
-CRASH_CASE_CONDITION_FORM = re.compile(r"^(?P<kind>test|count-line|exhaustive|threads|threads-variable|shard)=(?P<value>\S+)$")
+CRASH_CASE_CONDITION_FORM = re.compile(r"^(?P<kind>test|count-line|exhaustive|threads|threads-variable|shard|features)=(?P<value>\S+)$")
+# features= 的值：逗号隔开的 cargo 特性名
+CRASH_CASE_FEATURES_FORM = re.compile(r"^[a-z0-9][a-z0-9_-]*(,[a-z0-9][a-z0-9_-]*)*$")
+# 带特性的用例怎么起（crash_case_launch）：多机配置里 ENABLE_GPU=1 加 gpu 特性、经清场包装起；librocksdb-sys 的 bindgen 头文件目录取崩溃放量那份库里的值
+VERDICT_STORE_FEATURE = "verdict-store"
+GPU_FEATURE = "gpu"
+MULTI_HOST_CONFIGURATION_VARIABLE = "SINGLEFS_MULTI_HOST_CONFIG"
+MULTI_HOST_CONFIGURATION_NAME = "multi-host.env"
+GPU_QUIESCE_SCRIPT = "research/scripts/gpu-quiesce-run.sh"
+BINDGEN_LIBRARY_SCRIPT = "research/scripts/crash-amplification-lib.sh"
+BINDGEN_VARIABLE = "BINDGEN_EXTRA_CLANG_ARGS"
+BINDGEN_ASSIGNMENT_FORM = re.compile(r'^CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="([^"]*)"', re.MULTILINE)
 # threads-variable= 的值：用例读线程数的环境变量名
 THREADS_VARIABLE_FORM = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 # shard= 只认这一个值：两台机器各跑一片再 merge（双机分片）
@@ -384,8 +449,13 @@ def parse_gate_condition(token):
     match = GATE_CONDITION_FORM.match(token)
     if not match:
         raise RegistrationError(f"认不出的门禁准入条件：{token}（门禁行只认 command=<可执行名>、readwrite=<路径>、"
-                                "probe=<仓内脚本>[:<参数>…]、environment=<仓内脚本>[:<参数>…]）")
+                                "probe=<仓内脚本>[:<参数>…]、environment=<仓内脚本>[:<参数>…]、closure=<包>:<bin>）")
     kind, value = match.group("kind"), match.group("value")
+    if kind == "closure":
+        closure_match = CLOSURE_CONDITION_FORM.match(value)
+        if not closure_match:
+            raise RegistrationError(f"门禁准入条件 {token} 要写成 closure=<包名>:<bin 名>")
+        return kind, closure_match.groupdict()
     if kind in ("probe", "environment"):
         script, *arguments = value.split(":")
         if not script or script.startswith("/") or ".." in script.split("/"):
@@ -409,8 +479,8 @@ def lint_registration_rows(rows, root=None):
     for row in rows:
         is_experiment = bool(EXPERIMENT_KEY_FORM.match(row.key))
         is_crash_case = bool(CRASH_CASE_KEY_FORM.match(row.key))
-        if not is_experiment and not is_crash_case and not row.key.endswith(".sh"):
-            problems.append(f"第 {row.line_number} 行：键 {row.key} 既不是门禁阶段文件名（*.sh）、实验键（E<号>[/<方式>]），"
+        if not is_experiment and not is_crash_case and not row.key.endswith(".sh") and not STAGE_CELL_KEY_FORM.match(row.key):
+            problems.append(f"第 {row.line_number} 行：键 {row.key} 既不是门禁阶段文件名（*.sh）、阶段里的一格（<阶段>.sh:<格名>）、实验键（E<号>[/<方式>]），"
                             "也不是崩溃枚举用例（crash-case:<小写字母、数字、->）")
         if not row.input_paths:
             problems.append(f"第 {row.line_number} 行：{row.key} 没有登记路径")
@@ -432,6 +502,8 @@ def lint_registration_rows(rows, root=None):
                 kind, parts = parse_gate_condition(token)
                 if root is not None and kind in ("probe", "environment") and not os.path.isfile(os.path.join(root, parts["script"])):
                     problems.append(f"第 {row.line_number} 行：门禁行 {row.key} 的 {token} 指的脚本 {parts['script']} 不在")
+                if root is not None and kind == "closure":
+                    cargo_closure_input_paths(root, parts["package"], parts["binary"])
             except RegistrationError as error:
                 problems.append(f"第 {row.line_number} 行：{error}")
         if is_experiment:
@@ -763,24 +835,95 @@ def stored_fingerprints(root, key):
     return found
 
 
-def replay_products_of(root, experiment_key):
-    """research/scripts/replay.sh 登记表里这个实验号那几行的留存产物（仓库根起的路径）。"""
+class ReplayRow:
+    """复跑表的一行连同它的准入键：identity 是前三列原样（实验号|二进制|参数），product 是第四列，explicit 是按行的准入键那一段指明过它。"""
+
+    def __init__(self, experiment, identity, product, key, header_writer, explicit):
+        self.experiment = experiment
+        self.identity = identity
+        self.product = product
+        self.key = key
+        self.header_writer = header_writer
+        self.explicit = explicit
+
+
+def replay_row_key_entries(text):
+    """replay.sh 里按行的准入键那一段：返回 ([(行号, 键, 前三列, 产物头谁写)], 写法错的说明)。没有这一段返回两个空表。"""
+    entries, problems = [], []
+    if REPLAY_ROW_KEYS_START not in text:
+        return entries, problems
+    if text.count(REPLAY_ROW_KEYS_START) != 1:
+        return entries, [f"{REPLAY_SCRIPT} 里按行的准入键那一段（{REPLAY_ROW_KEYS_START.strip()}）有 {text.count(REPLAY_ROW_KEYS_START)} 处，只许一处"]
+    start = text.index(REPLAY_ROW_KEYS_START) + len(REPLAY_ROW_KEYS_START)
+    first_line_number = text[:start].count("\n") + 1
+    for offset, line in enumerate(text[start:].split("\n")):
+        if line == REPLAY_ROW_KEYS_END_LINE:
+            break
+        if not line.strip():
+            continue
+        where = f"{REPLAY_SCRIPT} 第 {first_line_number + offset} 行（按行的准入键）"
+        columns = line.split("\t")
+        if len(columns) != 3:
+            problems.append(f"{where}要三列、制表符分隔（键、复跑表那一行的前三列、产物头谁写），实际 {len(columns)} 列")
+            continue
+        key, identity, header_writer = columns
+        identity_parts = identity.split("|")
+        if not EXPERIMENT_KEY_FORM.match(key):
+            problems.append(f"{where}的键 {key} 不是实验键的写法（E<号> 或 E<号>/<方式>，方式只用小写字母、数字与连字符）")
+        elif len(identity_parts) != 3:
+            problems.append(f"{where}第二列 {identity} 要写成复跑表那一行的前三列「实验号|二进制|参数」，实际 {len(identity_parts)} 段")
+        elif key.split("/")[0] != identity_parts[0]:
+            problems.append(f"{where}的键 {key} 与它指的那一行的实验号 {identity_parts[0]} 不同")
+        if header_writer not in REPLAY_ROW_HEADER_WRITERS:
+            problems.append(f"{where}第三列 {header_writer} 认不出，产物头谁写只认 {'、'.join(REPLAY_ROW_HEADER_WRITERS)}")
+        entries.append((first_line_number + offset, key, identity, header_writer))
+    else:
+        problems.append(f"{REPLAY_SCRIPT} 里按行的准入键那一段没有收尾的 {REPLAY_ROW_KEYS_END_LINE} 行")
+    return entries, problems
+
+
+def replay_rows_with_keys(root):
+    """research/scripts/replay.sh 复跑表的每一行连同它的准入键：返回 ([ReplayRow], 按行的准入键那一段写错的说明)。
+    没被那一段指明的行，键是实验号、产物头由装置写。弄坏开关 ignore-row-keys 下那一段整个不认（改前的样子）。"""
     replay_path = os.path.join(root, REPLAY_SCRIPT)
     if not os.path.isfile(replay_path):
-        return []
-    products = []
+        return [], []
     with open(replay_path, encoding="utf-8", errors="replace") as handle:
-        for line in handle.read().split("\n"):
-            match = REPLAY_ROW_FORM.match(line)
-            if match and match.group(1) == experiment_key:
-                products.append(os.path.join(RESULTS_DIRECTORY, match.group(4)))
-    return products
+        text = handle.read()
+    table = []
+    for line in text.split("\n"):
+        match = REPLAY_ROW_FORM.match(line)
+        if match:
+            table.append((match.group(1), "|".join(match.group(1, 2, 3)), match.group(4)))
+    entries, problems = ([], []) if break_is_set("ignore-row-keys") else replay_row_key_entries(text)
+    chosen = {}
+    for line_number, key, identity, header_writer in entries:
+        hits = sum(1 for _experiment, row_identity, _product in table if row_identity == identity)
+        if hits != 1:
+            problems.append(f"{REPLAY_SCRIPT} 第 {line_number} 行给 {key} 指的「{identity}」在复跑表里有 {hits} 行，要恰好一行")
+        elif identity in chosen:
+            problems.append(f"{REPLAY_SCRIPT} 第 {line_number} 行又给「{identity}」指明了一次键（{key}），同一行只许指明一次")
+        else:
+            chosen[identity] = (key, header_writer)
+    rows = []
+    for experiment, identity, product in table:
+        key, header_writer = chosen.get(identity, (experiment, "device"))
+        rows.append(ReplayRow(experiment, identity, product, key, header_writer, identity in chosen))
+    return rows, problems
+
+
+def replay_products_of(root, experiment_key):
+    """research/scripts/replay.sh 登记表里准入键是这个键的那几行的留存产物（仓库根起的路径）；按行的准入键那一段写错抛 RegistrationError。"""
+    rows, problems = replay_rows_with_keys(root)
+    if problems:
+        raise RegistrationError("；".join(problems))
+    return [os.path.join(RESULTS_DIRECTORY, row.product) for row in rows if row.key == experiment_key]
 
 
 def judge_inputs_unchanged(root, key, fingerprint):
     """① 输入没变：返回 (没变?, 说明)。有一份产物头上记着同一个键、同一个指纹就算没变。"""
     stored = stored_fingerprints(root, key)
-    replay_products = replay_products_of(root, key) if "/" not in key else []
+    replay_products = replay_products_of(root, key)
     matching = [entry for entry in stored if entry.fingerprint == fingerprint]
     if matching:
         preferred = next((entry for entry in matching if entry.product_path in replay_products), matching[0])
@@ -887,6 +1030,7 @@ def admit_experiment(root, key):
             raise RegistrationError(f"登记给 {key} 的路径里有 {len(unlisted)} 条 git 一个文件都列不出来：{' '.join(unlisted)}")
         for token in conditions:
             parse_condition(token)
+        replay_products_of(root, key)   # 复跑表按行的准入键那一段写错，在这里按登记有错报，不留到下面判「输入没变」时抛出去
         fingerprint, file_count, _input_paths = experiment_fingerprint(root, rows, key)
         missing, satisfied = ([], []) if break_is_set("skip-preconditions") else judge_preconditions(root, key, conditions)
     except RegistrationError as error:
@@ -1109,6 +1253,170 @@ def record_gate_environment(root, stage):
             "下一趟输入与环境都没变就复用这一次的判定")
 
 
+# ── 按格复用：登记键 <阶段>.sh:<格名>、closure=<包>:<bin> 现算 crate 目录 ──────────────────
+
+def stage_script_name(stage):
+    """登记键对应的阶段脚本文件名：<阶段>.sh 就是它自己，<阶段>.sh:<格名> 是冒号之前那一份（清单里要进比对的阶段脚本）。"""
+    return stage.split(":", 1)[0]
+
+
+def manifest_dependency_tables(sections):
+    """Cargo.toml 里编 bin 要的依赖表：[dependencies]、[build-dependencies]，与 [target.*] 底下同名的两种；dev-dependencies 不算（编 bin 不编它）。"""
+    tables = [sections.get("dependencies") or {}, sections.get("build-dependencies") or {}]
+    for target_sections in (sections.get("target") or {}).values():
+        if isinstance(target_sections, dict):
+            tables += [target_sections.get("dependencies") or {}, target_sections.get("build-dependencies") or {}]
+    return tables
+
+
+def closure_dependency_directories(root, package):
+    """包 package 的 path= 依赖顺着传递闭包：返回 [仓根起的 crate 目录]，第一个是 package 自己。optional = true 的也算（特性开不开这里不判，宽）；
+    { workspace = true } 的取仓根 Cargo.toml [workspace.dependencies] 里的 path；指到仓外的路径不算（git 管不到）。包不在工作区成员里、清单读不出，抛 RegistrationError。"""
+    packages = workspace_package_directories(root)
+    if package not in packages:
+        raise RegistrationError(f"包 {package} 不在仓根 Cargo.toml 的工作区成员里（读到的：{' '.join(sorted(packages)) or '一个成员都读不出'}）")
+    workspace_dependencies = ((manifest_sections(os.path.join(root, "Cargo.toml")) or {}).get("workspace") or {}).get("dependencies") or {}
+    directories, queue = [], [packages[package]]
+    while queue:
+        directory = queue.pop(0)
+        if directory in directories:
+            continue
+        sections = manifest_sections(os.path.join(root, directory, "Cargo.toml"))
+        if sections is None:
+            raise RegistrationError(f"{directory}/Cargo.toml 读不出，cargo 依赖闭包算不了")
+        directories.append(directory)
+        for table in manifest_dependency_tables(sections):
+            for dependency_name, specification in table.items():
+                base = directory
+                if isinstance(specification, dict) and specification.get("workspace") is True:
+                    specification, base = workspace_dependencies.get(dependency_name), "."
+                if isinstance(specification, dict) and isinstance(specification.get("path"), str):
+                    dependency_directory = os.path.normpath(os.path.join(base, specification["path"]))
+                    if not dependency_directory.startswith("..") and not os.path.isabs(dependency_directory):
+                        queue.append(dependency_directory)
+    return directories
+
+
+def crate_has_binary(root, directory, binary):
+    """crate 目录里有没有名叫 binary 的 bin：src/bin/<名>.rs、src/bin/<名>/main.rs、src/main.rs（包名等于它）、[[bin]] name = 它。"""
+    sections = manifest_sections(os.path.join(root, directory, "Cargo.toml")) or {}
+    return (os.path.isfile(os.path.join(root, directory, "src", "bin", binary + ".rs"))
+            or os.path.isfile(os.path.join(root, directory, "src", "bin", binary, "main.rs"))
+            or ((sections.get("package") or {}).get("name") == binary and os.path.isfile(os.path.join(root, directory, "src", "main.rs")))
+            or any(isinstance(entry, dict) and entry.get("name") == binary for entry in sections.get("bin") or []))
+
+
+def closure_directory_unread_paths(root, directory, target_binary):
+    """闭包里一个 crate 目录里 cargo 编目标 bin 时读不到的路径，及目录里 include!/#[path] 点名到的仓内别处：返回 (减去的路径, 点名到的路径)；
+    返回 None 表示这个 crate 整个目录都留着（不减）：有构建脚本、[[bin]] / [[test]] / [[bench]] / [[example]]、[lib] path、auto* 开关，
+    或 src 里（目标 bin 与别的 bin 之外的源码）有参数是算出来的 include!（读的是哪一份认不出）。
+    减的是 tests/、benches/、examples/、别的 bin 的源码（target_binary 不是 None 时只减 src/bin/ 下不是目标的，是 None 时整个 src/bin/），
+    与 crate 根下 CLOSURE_CRATE_ROOT_READ_NAMES 之外的文件与目录（必红世界表 verus-must-red-worlds.tsv 这一类，cargo 不读）；
+    读到的源码里（去掉注释）出现 CARGO_MANIFEST_DIR 的，根下的一份都不减（运行期可能按 crate 目录读它们）。
+    被 include! / #[path = "…"]（字面量，相对该文件所在目录）点名到的，从减去的里拿回来，点名到仓内别处的另算进输入。
+    弄坏开关 closure-keeps-crate-root-files：根下 cargo 不读的照旧留着（改必红世界表一行，红例重放整格现判）。"""
+    sections = manifest_sections(os.path.join(root, directory, "Cargo.toml")) or {}
+    package_section = sections.get("package") or {}
+    if (any(key in sections for key in ("bin", "test", "bench", "example")) or (sections.get("lib") or {}).get("path")
+            or any(key in package_section for key in ("build", "autobins", "autotests", "autoexamples", "autobenches"))
+            or os.path.exists(os.path.join(root, directory, "build.rs"))):
+        return None
+    unread = [f"{directory}/{name}/" for name in CLOSURE_UNREAD_DIRECTORIES]
+    bin_directory = os.path.join(root, directory, "src", "bin")
+    if os.path.isdir(bin_directory):
+        if target_binary is None:
+            unread.append(f"{directory}/src/bin/")
+        else:
+            for entry in sorted(os.listdir(bin_directory)):
+                if (entry[:-3] if entry.endswith(".rs") else entry) != target_binary:
+                    unread.append(f"{directory}/src/bin/{entry}" + ("/" if os.path.isdir(os.path.join(bin_directory, entry)) else ""))
+    root_unread = []
+    if not break_is_set("closure-keeps-crate-root-files"):
+        for entry in sorted(os.listdir(os.path.join(root, directory))):
+            if entry not in CLOSURE_CRATE_ROOT_READ_NAMES and entry not in CLOSURE_UNREAD_DIRECTORIES:
+                root_unread.append(f"{directory}/{entry}" + ("/" if os.path.isdir(os.path.join(root, directory, entry)) else ""))
+    unread += root_unread
+
+    def inside(path, prefix):
+        return path == prefix.rstrip("/") or path.startswith(prefix if prefix.endswith("/") else prefix + "/")
+    mentioned, manifest_directory_mentioned = [], False
+    for walked_directory, subdirectories, file_names in os.walk(os.path.join(root, directory, "src")):
+        subdirectories.sort()
+        for file_name in sorted(file_names):
+            relative = os.path.relpath(os.path.join(walked_directory, file_name), root)
+            if not file_name.endswith(".rs") or any(inside(relative, prefix) for prefix in unread):
+                continue
+            with open(os.path.join(root, relative), encoding="utf-8", errors="replace") as handle:
+                code = rust_code_without_comments(handle.read())
+            if COMPILE_TIME_COMPUTED_INCLUDE.search(code):
+                return None
+            manifest_directory_mentioned = manifest_directory_mentioned or CLOSURE_MANIFEST_DIRECTORY_MENTION in code
+            for literal in CLOSURE_INCLUDE_LITERAL.findall(code) + CLOSURE_PATH_ATTRIBUTE_LITERAL.findall(code):
+                resolved = os.path.normpath(os.path.join(os.path.dirname(relative), literal))
+                if not resolved.startswith("..") and not os.path.isabs(resolved):
+                    mentioned.append(resolved)
+    if manifest_directory_mentioned:
+        unread = [prefix for prefix in unread if prefix not in root_unread]
+    kept_back = [prefix for prefix in unread if any(inside(path, prefix) for path in mentioned)]
+    return [prefix for prefix in unread if prefix not in kept_back], [path for path in mentioned if not inside(path, directory + "/")]
+
+
+def cargo_closure_input_paths(root, package, binary):
+    """cargo 编包 package 的 bin binary 读的仓内路径（git 路径限定，带 :(exclude) 的几条是减去的）：package 的 path= 依赖闭包里每个 crate 目录，
+    减去读不到的（closure_directory_unread_paths：tests/ 这几样、别的 bin、crate 根下 cargo 不读的），加上 include! / #[path] 点名到的仓外 crate 的文件。登记表第三列写 closure=<包>:<bin>，不手列 crate。
+    包或 bin 找不到抛 RegistrationError。弄坏开关 closure-only-replay-prefix：闭包退回 Verus 四格的输入，只剩 crates/singlefs-replay-prefix/（core 改了红例两格不重跑）。"""
+    if break_is_set("closure-only-replay-prefix"):
+        return [CLOSURE_REPLAY_PREFIX_DIRECTORY + "/"]
+    directories = closure_dependency_directories(root, package)
+    if not crate_has_binary(root, directories[0], binary):
+        raise RegistrationError(f"包 {package}（{directories[0]}）里没有名叫 {binary} 的 bin（src/bin/{binary}.rs、src/bin/{binary}/main.rs、[[bin]] name 都没有）")
+    positives, excluded, mentioned = [], [], []
+    for directory in directories:
+        unread = closure_directory_unread_paths(root, directory, binary if directory == directories[0] else None)
+        positives.append(directory + "/")
+        if unread is not None:
+            excluded += unread[0]
+            mentioned += unread[1]
+    # 点名到的文件若落在别处减去的路径里（一个 crate 的 include! 指进另一个 crate 的 tests/），exclude 是全局的，要把那条减去的拿掉
+    excluded = [prefix for prefix in excluded
+                if not any(path == prefix.rstrip("/") or path.startswith(prefix if prefix.endswith("/") else prefix + "/") for path in mentioned)]
+    return positives + sorted(set(mentioned)) + [f":(exclude){prefix}" for prefix in excluded]
+
+
+def stage_input_paths(root, stage_rows):
+    """这一道（或这一格）登记的路径，加上 closure=<包>:<bin> 现算出来的 crate 目录；没有 closure= 的行，结果与各行 input_paths 逐个相同。"""
+    paths = [input_path for row in stage_rows for input_path in row.input_paths]
+    for _token, _kind, parts in gate_conditions_of(stage_rows, ("closure",)):
+        paths += cargo_closure_input_paths(root, parts["package"], parts["binary"])
+    return paths
+
+
+def cell_registration_lines(root, tree_ish, key):
+    """某棵树里登记表中这个键的行（去掉末尾的注释列，保留键、路径、第三列），按出现的次序；表读不出来返回 None（两边比的时候当不同）。"""
+    return_code, text = git_output(root, "show", f"{tree_ish}:{REGISTRATION_TABLE}")
+    if return_code != 0:
+        return None
+    lines = []
+    for line in text.split("\n"):
+        columns = line.split("\t")
+        if columns[0] != key:
+            continue
+        kept = []
+        for position, column in enumerate(columns):
+            if position >= 2 and column.lstrip().startswith("#"):
+                break
+            kept.append(column)
+        lines.append("\t".join(kept))
+    return lines
+
+
+def registered_paths_text(stage_rows):
+    """依据句里写的路径：登记的路径加 closure= 的原文（现算出来的几十条 crate 目录与减去项不逐个打）。"""
+    parts = [input_path for row in stage_rows for input_path in row.input_paths]
+    parts += [token for row in stage_rows for token in row.conditions if token.startswith("closure=")]
+    return " ".join(parts)
+
+
 # ── 门禁的复用判定（原 stage-must-run.sh，判法与消息逐字相同）─────────────────
 
 def git_output(root, *git_arguments):
@@ -1125,7 +1433,8 @@ def gate_reuse(root, stage):
         return EXIT_GATE_MUST_RUN, f"判不出来：{root} 不是 git 工作树，按要跑处理"
     # 先看这一道在被判那棵树上的全绿标记（checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification
     # 判绿时自己写，按登记输入的指纹分格——登记了 environment= 的连同此刻的环境——住 git common-dir）：
-    # 在且没过复用上限就可跳过——主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑一遍。指纹算不出、没登记这一行的照旧往下按暂存树判。
+    # 在就可跳过——主 agent 提交前在工作区单跑过的那一趟，整轮门禁不用再跑一遍。指纹算不出、没登记这一行的照旧往下按暂存树判。
+    marker_note = ""   # 按格的键：没有标记时把这一句接在后面，看得出重跑是因为这批输入没有判绿过的标记
     if not break_is_set("stage-marker-ignored"):
         try:
             fingerprint, file_count, _paths = stage_fingerprint(root, stage)
@@ -1135,9 +1444,11 @@ def gate_reuse(root, stage):
             valid, lines = check_stage_marker(root, stage, fingerprint)
             if valid:
                 return EXIT_GATE_MAY_SKIP, f"这一道这批输入（指纹 {fingerprint[:16]}…，{file_count} 个文件）有全绿标记：{lines[0]}"
+            if STAGE_CELL_KEY_FORM.match(stage):
+                marker_note = f"；{lines[0]}"
     staged_tree = os.environ.get("SINGLEFS_STAGED_TREE", "")
     if not staged_tree:
-        return EXIT_GATE_MUST_RUN, "这一趟不是 gate-staged.sh 起的（没有 SINGLEFS_STAGED_TREE），被判的可能是工作区，不许复用"
+        return EXIT_GATE_MUST_RUN, f"这一趟不是 gate-staged.sh 起的（没有 SINGLEFS_STAGED_TREE），被判的可能是工作区，不许复用{marker_note}"
     return_code, _output = git_output(root, "rev-parse", "-q", "--verify", f"{staged_tree}^{{tree}}")
     if return_code != 0:
         return EXIT_GATE_MUST_RUN, f"判不出来：SINGLEFS_STAGED_TREE={staged_tree} 不是这个仓里的树对象"
@@ -1152,26 +1463,21 @@ def gate_reuse(root, stage):
         return EXIT_GATE_MUST_RUN, f"{REGISTRATION_TABLE} 里没有 {stage} 这一行，按要跑处理"
     # 清单里这道阶段的每一行都进比对；清单自己进比对（少写一条输入，那条输入就永远不会让这道阶段重跑）；
     # 阶段脚本自己进比对（判据本身变了，上一次的判定就不再作数）。
-    input_paths = [input_path for row in stage_rows for input_path in row.input_paths]
-    input_paths += [REGISTRATION_TABLE, f".claude/gate.d/{stage}"]
-    hours_text = os.environ.get("SINGLEFS_REUSE_HOURS", "") or "24"
     try:
-        reuse_limit_hours = int(hours_text)
-    except ValueError:
-        reuse_limit_hours = 0
-    # 时刻读那个提交对象自己的：ref 指的是「包着那棵暂存树的提交」而不是裸树，git update-ref 对 refs/heads/ 之外的 ref 默认不写 reflog。
-    return_code, epoch_output = git_output(root, "log", "-1", "--format=%ct", green)
-    green_epoch_text = epoch_output.strip() if return_code == 0 else ""
-    if not re.fullmatch(r"[0-9]+", green_epoch_text):
-        return EXIT_GATE_MUST_RUN, f"取不到 {GATE_REUSE_REFERENCE} 的时刻（它不是包着暂存树的提交？），判不出复用上限，按要跑处理"
-    elapsed_seconds = int(time.time()) - int(green_epoch_text)
-    age_hours = elapsed_seconds // 3600 if elapsed_seconds >= 0 else -((-elapsed_seconds) // 3600)
-    if age_hours >= reuse_limit_hours:
-        return EXIT_GATE_MUST_RUN, (f"上次整轮全绿在 {age_hours} 小时前，到了复用上限 {hours_text} 小时：内容没变不代表环境没变"
-                                    "（工具链升级这一格比对看不见），强制跑一趟")
+        input_paths = stage_input_paths(root, stage_rows)
+    except RegistrationError as error:
+        return EXIT_GATE_MUST_RUN, f"判不出来：{REGISTRATION_TABLE} 里 {stage} 的输入算不出来（{error}），按要跑处理"
+    # 整道阶段：登记表整份进比对（少写一条输入，那条输入就永远不会让这道阶段重跑）；按格的键：整张表不进（别的行加减不该让这一格重跑），
+    # 这一格自己的登记行（键、路径、第三列）单独比，见 cell_registration_lines
+    input_paths += ([] if STAGE_CELL_KEY_FORM.match(stage) else [REGISTRATION_TABLE]) + [f".claude/gate.d/{stage_script_name(stage)}"]
+    is_cell = bool(STAGE_CELL_KEY_FORM.match(stage))
+    if is_cell and cell_registration_lines(root, green, stage) != cell_registration_lines(root, staged_tree, stage):
+        return EXIT_GATE_MUST_RUN, f"{REGISTRATION_TABLE} 里 {stage} 这一格的登记行（键、路径、第三列）与上次整轮全绿那棵树不同，或读不出来"
     return_code, _output = git_output(root, "diff", "--quiet", green, staged_tree, "--", *input_paths)
     if return_code == 0:
-        reason = f"与上次整轮全绿那棵树（{green[:12]}）在这几条路径上逐字相同：{' '.join(input_paths)}"
+        table_text = "" if is_cell else REGISTRATION_TABLE + " "
+        reason = (f"与上次整轮全绿那棵树（{green[:12]}）在这几条路径上逐字相同：{registered_paths_text(stage_rows)} "
+                  f"{table_text}.claude/gate.d/{stage_script_name(stage)}")
         try:
             has_environment = bool(gate_conditions_of(stage_rows, ("environment",)))
         except RegistrationError as error:
@@ -1204,8 +1510,10 @@ def gate_reuse(root, stage):
 
 class CrashCase:
     def __init__(self, row, package, target, function, count_lines, exhaustive_lines, thread_lines, is_shardable_across_machines,
-                 thread_variable=None):
+                 thread_variable=None, features=()):
         self.row = row
+        # 登记行的 features=：用例要编进的 cargo 特性（没登记是空）；crash-case-command 在 -p <包> 之后带 --features
+        self.features = tuple(features)
         # 用例读线程数的环境变量（登记行的 threads-variable=，没登记是 SINGLEFS_LAYER0_THREADS）：crash-case-command 设它、标记里记它
         self.thread_variable = thread_variable or LAYER0_THREADS_VARIABLE
         self.is_shardable_across_machines = is_shardable_across_machines
@@ -1224,13 +1532,13 @@ class CrashCase:
 
 def parse_crash_case(row):
     """崩溃枚举用例行的第三列：写法认不出、test= 不是恰好一条、exhaustive= / threads= 点名的前缀没登记成 count-line=、
-    shard= 不是 across-machines 或多于一条、threads-variable= 不是环境变量名或多于一条，都抛 RegistrationError。"""
-    tests, count_lines, exhaustive_lines, thread_lines, shard_values, thread_variables = [], [], [], [], [], []
+    shard= 不是 across-machines 或多于一条、threads-variable= 不是环境变量名或多于一条、features= 写法不对或多于一条或与 shard= 并存，都抛 RegistrationError。"""
+    tests, count_lines, exhaustive_lines, thread_lines, shard_values, thread_variables, feature_values = [], [], [], [], [], [], []
     for token in row.conditions:
         match = CRASH_CASE_CONDITION_FORM.match(token)
         if not match:
             raise RegistrationError(f"崩溃枚举用例 {row.key} 的第三列认不出 {token}（只认 test=<包>:<测试目标>:<用例函数>、"
-                                    f"count-line=<前缀>、exhaustive=<前缀>、threads=<前缀>、threads-variable=<环境变量名>、"
+                                    f"count-line=<前缀>、exhaustive=<前缀>、threads=<前缀>、threads-variable=<环境变量名>、features=<特性,特性…>、"
                                     f"shard={CRASH_CASE_SHARD_ACROSS_MACHINES}）")
         kind, value = match.group("kind"), match.group("value")
         if kind == "test":
@@ -1243,6 +1551,11 @@ def parse_crash_case(row):
             if value != CRASH_CASE_SHARD_ACROSS_MACHINES:
                 raise RegistrationError(f"崩溃枚举用例 {row.key} 的 {token}：shard= 只认 {CRASH_CASE_SHARD_ACROSS_MACHINES}")
             shard_values.append(value)
+            continue
+        if kind == "features":
+            if not CRASH_CASE_FEATURES_FORM.match(value) or len(set(value.split(","))) != len(value.split(",")):
+                raise RegistrationError(f"崩溃枚举用例 {row.key} 的 {token}：features= 要写逗号隔开的 cargo 特性名（小写字母、数字、_、-，不重复）")
+            feature_values.append(value)
             continue
         if kind == "threads-variable":
             if not THREADS_VARIABLE_FORM.match(value):
@@ -1258,6 +1571,10 @@ def parse_crash_case(row):
         raise RegistrationError(f"崩溃枚举用例 {row.key} 的 shard= 至多一条，实际 {len(shard_values)} 条")
     if len(thread_variables) > 1:
         raise RegistrationError(f"崩溃枚举用例 {row.key} 的 threads-variable= 至多一条，实际 {len(thread_variables)} 条")
+    if len(feature_values) > 1:
+        raise RegistrationError(f"崩溃枚举用例 {row.key} 的 features= 至多一条，实际 {len(feature_values)} 条")
+    if feature_values and shard_values:
+        raise RegistrationError(f"崩溃枚举用例 {row.key} 的 features= 与 shard={CRASH_CASE_SHARD_ACROSS_MACHINES} 不并存：分片的驱动脚本自己拼 cargo、不带特性，分片那一趟会漏掉特性")
     if len(set(count_lines)) != len(count_lines):
         raise RegistrationError(f"崩溃枚举用例 {row.key} 的 count-line= 有重复的前缀")
     unregistered = [prefix for prefix in exhaustive_lines + thread_lines if prefix not in count_lines]
@@ -1266,7 +1583,8 @@ def parse_crash_case(row):
     test = tests[0]
     thread_variable = None if break_is_set("thread-variable-ignored") else (thread_variables[0] if thread_variables else None)
     return CrashCase(row, test.group("package"), test.group("target"), test.group("function"),
-                     count_lines, exhaustive_lines, thread_lines, bool(shard_values), thread_variable)
+                     count_lines, exhaustive_lines, thread_lines, bool(shard_values), thread_variable,
+                     feature_values[0].split(",") if feature_values else ())
 
 
 def crash_cases_of(rows):
@@ -2059,7 +2377,9 @@ def crash_case_launch(root, case, fingerprint, start_over, environment):
     SINGLEFS_LAYER0_START_OVER=1，不然从调用方的环境里清掉它；调用方环境里的分片开关 SINGLEFS_LAYER0_SHARD 一律清掉（这一趟单机跑整条流，
     分片只由 research/scripts/layer0-shard-run.sh 自己设）；线程数设进 SINGLEFS_LAYER0_THREADS，这条用例读的线程变量（登记行的 threads-variable=）
     不是它时另设成同一个数，盖掉调用方环境里的（弄坏开关 thread-variable-ignored 下只设 SINGLEFS_LAYER0_THREADS）。
-    取不到 common-dir、线程数取不到抛 InputManifestError。"""
+    登记行有 features= 的：cargo test 在 -p <包> 之后带 --features <特性>，env 里另设 BINDGEN_EXTRA_CLANG_ARGS；多机配置写了 ENABLE_GPU=1 的，特性里有 verdict-store 就加 gpu，
+    特性里有 gpu 的整条前面接 bash research/scripts/gpu-quiesce-run.sh --（清场、不复原），环境里交清场之后的显卡先后（crash_case_cargo_features）。
+    取不到 common-dir、线程数取不到、多机配置在而读不了抛 InputManifestError。"""
     common_directory = git_common_directory(root)
     if common_directory is None:
         raise InputManifestError(f"{root} 不是 git 工作树（取不到 git common-dir），续跑的进度文件没处放")
@@ -2071,11 +2391,86 @@ def crash_case_launch(root, case, fingerprint, start_over, environment):
     start_over_setting = [f"{LAYER0_START_OVER_VARIABLE}=1"] if start_over else ["-u", LAYER0_START_OVER_VARIABLE]
     # env 的 -u 要写在第一个 NAME=VALUE 之前（之后的 -u 被当成要起的命令）
     shard_setting = [] if break_is_set("keep-caller-shard-switch") else ["-u", LAYER0_SHARD_VARIABLE]
-    command = ["env", *shard_setting, *start_over_setting, f"SINGLEFS_LAYER0_PROGRESS_DIRECTORY={progress_directory}",
-               f"SINGLEFS_LAYER0_INPUT_FINGERPRINT={fingerprint}", *thread_settings,
-               "cargo", "test", "--release", "-p", case.package, "--test", case.target,
+    features, quiesced, configuration_file = crash_case_cargo_features(root, case, environment)
+    feature_words = ["--features", ",".join(features)] if features else []
+    bindgen_setting = bindgen_include_setting(root) if features else []
+    quiesce_unsets, quiesce_settings = [], []
+    if quiesced:
+        cards = (configuration_value(configuration_file, "GPU_CARDS_BY_PRIORITY_WHEN_QUIESCED")
+                 or configuration_value(configuration_file, "GPU_CARDS_BY_PRIORITY"))
+        quiesce_unsets = ["-u", "GPU_COMPUTATION_CLASSES", "-u", "SINGLEFS_GPU_CARDS_CONFIG"] + ([] if cards else ["-u", "GPU_CARDS_BY_PRIORITY"])
+        quiesce_settings = ([f"GPU_CARDS_BY_PRIORITY={cards}"] if cards else [])
+        if os.path.isfile(configuration_file):
+            quiesce_settings.append(f"{MULTI_HOST_CONFIGURATION_VARIABLE}={os.path.abspath(configuration_file)}")
+    command = ["env", *quiesce_unsets, *shard_setting, *start_over_setting, f"SINGLEFS_LAYER0_PROGRESS_DIRECTORY={progress_directory}",
+               f"SINGLEFS_LAYER0_INPUT_FINGERPRINT={fingerprint}", *thread_settings, *bindgen_setting, *quiesce_settings,
+               "cargo", "test", "--release", "-p", case.package, *feature_words, "--test", case.target,
                "--", "--include-ignored", "--exact", case.function, "--nocapture"]
+    if quiesced:
+        command = ["bash", os.path.join(root, GPU_QUIESCE_SCRIPT), "--", *command]
     return machine_cores, threads, threads_origin, progress_directory, command
+
+
+def multi_host_configuration_file(root, environment):
+    """多机配置在哪（同 research/scripts/crash-amplification-lib.sh 的 crash_amplification_multi_host_configuration_file）：
+    调用方环境里 SINGLEFS_MULTI_HOST_CONFIG 设了照它；没设取 <root> 的 git common-dir 的上一层（主工作树的根）下的 multi-host.env，取不到 common-dir 退回 <root>/multi-host.env。
+    文件在不在不判。"""
+    configured = environment.get(MULTI_HOST_CONFIGURATION_VARIABLE)
+    if configured:
+        return configured
+    common_directory = git_common_directory(root)
+    if common_directory is not None:
+        return os.path.join(os.path.dirname(common_directory), MULTI_HOST_CONFIGURATION_NAME)
+    return os.path.join(root, MULTI_HOST_CONFIGURATION_NAME)
+
+
+def configuration_value(path, key):
+    """配置文件里 <键>= 开头的第一行的值（去掉两头成对的一层引号，同 crash_amplification_configuration_value）；文件不在、键没写是空串，在而读不了抛 InputManifestError。"""
+    if not os.path.isfile(path):
+        return ""
+    try:
+        with open(path, encoding="utf-8") as handle:
+            lines = handle.read().splitlines()
+    except (OSError, UnicodeDecodeError) as error:
+        raise InputManifestError(f"多机配置 {path} 读不了（{error}），判不出 {key}")
+    for line in lines:
+        line = line.strip()
+        if not line.startswith(key + "="):
+            continue
+        value = line[len(key) + 1:].strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "'\"":
+            value = value[1:-1]
+        return value
+    return ""
+
+
+def crash_case_cargo_features(root, case, environment):
+    """这条用例的 cargo 特性：返回 (特性列表, 是否整条经清场包装起, 多机配置文件的路径)。
+    没登记 features= 的是空列表、不经包装；登记了的照登记，多机配置里 ENABLE_GPU 等于 1 而特性里有 verdict-store 的另加 gpu，特性里有 gpu 的（ENABLE_GPU 等于 1）经包装起。
+    弄坏开关 features-not-passed：登记的 features= 不认；features-passed-to-every-case：没登记的也当 verdict-store；gpu-case-not-quiesced：不经包装。"""
+    features = list(case.features)
+    if break_is_set("features-not-passed"):
+        features = []
+    elif break_is_set("features-passed-to-every-case") and not features:
+        features = [VERDICT_STORE_FEATURE]
+    configuration_file = multi_host_configuration_file(root, environment)
+    if not features:
+        return [], False, configuration_file
+    gpu_enabled = configuration_value(configuration_file, "ENABLE_GPU") == "1"
+    if gpu_enabled and VERDICT_STORE_FEATURE in features and GPU_FEATURE not in features:
+        features.append(GPU_FEATURE)
+    quiesced = gpu_enabled and GPU_FEATURE in features and not break_is_set("gpu-case-not-quiesced")
+    return features, quiesced, configuration_file
+
+
+def bindgen_include_setting(root):
+    """librocksdb-sys 的 bindgen 找头文件的目录：崩溃放量那份库（BINDGEN_LIBRARY_SCRIPT）里 CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS 的值，打成 env 的一个词；库不在、读不到是空（照调用方环境）。"""
+    try:
+        with open(os.path.join(root, BINDGEN_LIBRARY_SCRIPT), encoding="utf-8") as handle:
+            found = BINDGEN_ASSIGNMENT_FORM.search(handle.read())
+    except (OSError, UnicodeDecodeError):
+        return []
+    return [f"{BINDGEN_VARIABLE}={found.group(1)}"] if found else []
 
 
 def top_level_definitions(tree):
@@ -2210,14 +2605,16 @@ def crash_case_judging_digest_line():
 
 def stage_fingerprint(root, stage):
     """一道门禁阶段的输入指纹：登记路径下逐文件清单 + 登记表 + 阶段脚本自己 + 登记行 + 工具链 + 构建环境，登记了 environment= 的再加此刻环境的 sha256。
-    返回 (sha256, 文件数, 路径)。
+    判法版本在这里不单列一列（判定库 research/scripts/lib_verdict_library.py 文件头「键分两列」）：阶段脚本与登记的判法脚本照登记路径按内容进这一个指纹，
+    改了判法与改了输入一样让旧标记对不上。返回 (sha256, 文件数, 路径)。
     与 gate_reuse 比对的路径同一份（少一条输入就永远不重跑的那个理由同样成立）。"""
     stage_rows = rows_of_key(read_registration_rows(root), stage)
     if not any(row.input_paths for row in stage_rows):
         raise RegistrationError(f"{REGISTRATION_TABLE} 里没有 {stage} 这一行")
-    input_paths = [input_path for row in stage_rows for input_path in row.input_paths]
-    input_paths += [REGISTRATION_TABLE, f".claude/gate.d/{stage}"]
-    registration_text = "".join(row.fingerprint_text() for row in stage_rows).encode("utf-8", "surrogateescape")
+    input_paths = stage_input_paths(root, stage_rows)
+    is_cell = bool(STAGE_CELL_KEY_FORM.match(stage))
+    input_paths += ([] if is_cell else [REGISTRATION_TABLE]) + [f".claude/gate.d/{stage_script_name(stage)}"]
+    registration_text = "".join(row.text_with_conditions() if is_cell else row.fingerprint_text() for row in stage_rows).encode("utf-8", "surrogateescape")
     named_lines = [(f"<登记行：{stage}>", registration_text), toolchain_line(root)] + build_environment_lines(root)
     if not break_is_set("environment-outside-stage-marker"):
         # 登记了 environment= 的：此刻的环境（逐条现跑，与 judge_gate_environment 同一份）进指纹，环境换了旧标记就对不上；取不出来抛 InputManifestError
@@ -2237,8 +2634,7 @@ def stage_marker_path(root, stage, fingerprint):
 
 
 def check_stage_marker(root, stage, fingerprint):
-    """这一道这批输入的全绿标记作不作数：返回 (作数?, 说明行)。作数时第一行是「ok <路径> <跑完的时刻>」；
-    过了复用上限（SINGLEFS_REUSE_HOURS，默认 24 小时；内容没变不代表环境没变）不作数。"""
+    """这一道这批输入的全绿标记作不作数：返回 (作数?, 说明行)。作数时第一行是「ok <路径> <跑完的时刻>」；标记在、读得出就作数，不看它多久以前写的。"""
     marker_path = stage_marker_path(root, stage, fingerprint)
     if marker_path is None:
         return False, [f"{root} 不是 git 工作树（取不到 git common-dir），全绿标记没处读"]
@@ -2246,21 +2642,10 @@ def check_stage_marker(root, stage, fingerprint):
     if marker is None:
         return False, [f"这批输入（指纹 {fingerprint[:16]}…）没有全绿标记：{marker_path}"]
     finished_text = marker["fields"].get("finished_utc", "")
-    try:
-        finished_epoch = int(time.mktime(time.strptime(finished_text, "%Y-%m-%dT%H:%M:%SZ"))) - (time.mktime(time.localtime(0)) - time.mktime(time.gmtime(0)))
-    except (ValueError, OverflowError):
-        return False, [f"全绿标记 {marker_path} 的 finished_utc 读不出（{finished_text!r}），不作数"]
-    hours_text = os.environ.get("SINGLEFS_REUSE_HOURS", "") or "24"
-    try:
-        reuse_limit_hours = int(hours_text)
-    except ValueError:
-        reuse_limit_hours = 0
-    age_hours = max(0, int(time.time()) - int(finished_epoch)) // 3600
-    if age_hours >= reuse_limit_hours:
-        return False, [f"全绿标记 {marker_path} 跑完于 {finished_text}、{age_hours} 小时前，到了复用上限 {hours_text} 小时，不作数"]
     return True, [f"ok {marker_path} {finished_text}"]
 
 
+# gate-overlap:copy-kept lib_verdict_library.py 全绿标记是判定库的整道阶段那一份：一道阶段或一格一个标记文件，在就复用、不按项分条，键是登记路径的输入指纹（判法脚本按登记路径进同一个指纹），读法是 read_crash_case_marker 的 key=value 文本、与崩溃枚举用例的标记共用；判定库按项名与两列键存 JSON，形态不同。原子写这一段也不改调判定库：这个模块的自证把它单份拷进临时仓起（shutil.copy(module, …) 那几处），多 import 一份就要多拷一份
 def write_stage_marker(root, stage, fingerprint, file_count):
     """判绿之后写这一道这批输入的全绿标记：同目录排他建临时文件、写完改名换上。返回标记路径；取不到 common-dir、写不了抛 InputManifestError。"""
     marker_path = stage_marker_path(root, stage, fingerprint)
@@ -2489,6 +2874,45 @@ def command_keys(arguments):
     return 0
 
 
+def replay_row_key_problems(root):
+    """复跑表每一行的准入键，连同 replay-row-keys 判红的三类：返回 ([ReplayRow], 登记了准入的键集合, 写法与登记的说明, 被几行共用的 [(键, 行数)])。"""
+    rows, problems = replay_rows_with_keys(root)
+    registered = {row.key for row in read_registration_rows(root) if EXPERIMENT_KEY_FORM.match(row.key)}
+    for row in rows:
+        if row.explicit and row.key not in registered:
+            problems.append(f"复跑表「{row.identity}」那一行指明的准入键 {row.key} 没在 {REGISTRATION_TABLE} 登记")
+    counts = {}
+    for row in rows:
+        if row.key in registered:
+            counts[row.key] = counts.get(row.key, 0) + 1
+    shared = [(key, count) for key, count in counts.items() if count > 1]
+    return rows, registered, problems, shared
+
+
+def command_replay_row_keys(arguments):
+    """replay.sh 开跑前调：复跑表每一行打「<前三列><制表符><准入键><制表符><产物头谁写><制表符><登记了准入：yes|no>」；判错退 2，✗ 与出路打在 stdout。"""
+    if len(arguments) != 1:
+        print("  ✗ 用法：admission.py replay-row-keys <项目根>")
+        print("     → 怎么办：只给项目根一个参数")
+        return EXIT_REGISTRATION_ERROR
+    rows, registered, problems, shared = replay_row_key_problems(arguments[0])
+    if problems:
+        print(f"  ✗ 复跑表按行的准入键有 {len(problems)} 处不对：")  # gate-lint:summary
+        for problem in problems:
+            print(f"       {problem}")  # gate-lint:detail
+        print(f"     → 怎么办：照上面每一条改 {REPLAY_SCRIPT} 里 ADMISSION_ROW_KEYS 那一段（键、复跑表那一行的前三列原样抄、产物头谁写 device 或 replay），"
+              f"指明的键在 {REGISTRATION_TABLE} 各登记一行它那一行读的输入；写法见 {os.path.join('research', 'scripts', 'admission.py')} 文件头「复跑表按行的准入键」")
+    for key, count in shared:
+        print(f"  ✗ {key} 登记了准入，而这张复跑表里它有 {count} 行：准入只按实验号比产物，分不清哪一行对哪一份")
+        print("     → 怎么办：给每一行起一个带方式的准入键（照 .claude/gate.d/stage-inputs.tsv 的 E142/layer0 写），在准入模块里按行认键之后再登记："
+              f"写进 {REPLAY_SCRIPT} 的 ADMISSION_ROW_KEYS（一行一条：键、那一行的前三列、产物头谁写），每个键在 {REGISTRATION_TABLE} 各登记一行")
+    if problems or shared:
+        return EXIT_REGISTRATION_ERROR
+    for row in rows:
+        print(f"{row.identity}\t{row.key}\t{row.header_writer}\t{'yes' if row.key in registered else 'no'}")
+    return 0
+
+
 def command_crash_cases(arguments):
     """核登记的崩溃枚举用例，逐条打「键、包、测试目标、用例函数」；登记有错退 2，原因不带 ✗（阶段自己打 ✗ 与出路）。"""
     if len(arguments) != 1:
@@ -2713,7 +3137,7 @@ class Selftest:
 def run_quietly(command, environment_changes=None, working_directory=None):
     """外面设的 ADMISSION_BREAK 照样传给子进程：`ADMISSION_BREAK=skip-unchanged admission.py --selftest` 要看到「输入没变」那几格红。"""
     environment = dict(os.environ)
-    for variable in (FORCE_RERUN_VARIABLE, "SINGLEFS_GATE_FULL", "SINGLEFS_STAGED_TREE", "SINGLEFS_REUSE_HOURS"):
+    for variable in (FORCE_RERUN_VARIABLE, "SINGLEFS_GATE_FULL", "SINGLEFS_STAGED_TREE"):
         environment.pop(variable, None)
     environment.update(environment_changes or {})
     completed = subprocess.run(command, capture_output=True, text=True, errors="replace", env=environment, cwd=working_directory)
@@ -2760,7 +3184,7 @@ def point_replay_row_at(work, product_name):
 
 
 def run_stage_marker_cells(selftest, module):
-    """checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification 的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、过上限不作数、输入改了就没有它的格。"""
+    """checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification 的全绿标记：没有时判不了、写了之后 gate-reuse 不看暂存树也可跳过、弄坏开关下转红、输入改了就没有它的格。"""
     work = tempfile.mkdtemp(prefix="admission-stage-marker-")
     try:
         build_selftest_repository(work)
@@ -2783,11 +3207,15 @@ def run_stage_marker_cells(selftest, module):
         exit_code, output, _messages = call("gate-reuse", work, "59-demo.sh")
         selftest.expect("有全绿标记时 gate-reuse 不看暂存树也判可跳过（退 10）", exit_code == EXIT_GATE_MAY_SKIP and "全绿标记" in output,
                         f"退 {exit_code}，stdout「{output.strip()}」")
+        with open(marker_path, encoding="utf-8") as handle:
+            marker_text = handle.read()
+        write_text(marker_path, re.sub(r"finished_utc=\S+", "finished_utc=2020-01-01T00:00:00Z", marker_text))
+        exit_code, output, _messages = call("gate-reuse", work, "59-demo.sh")
+        selftest.expect("全绿标记是很久以前写的（finished_utc 拨到 2020 年）照样作数、判可跳过：复用只看输入与标记在不在，不看时刻",
+                        exit_code == EXIT_GATE_MAY_SKIP, f"退 {exit_code}，stdout「{output.strip()}」")
         exit_code, output, _messages = call("gate-reuse", work, "59-demo.sh", environment_changes={BREAK_VARIABLE: "stage-marker-ignored"})
         selftest.expect("弄坏开关 stage-marker-ignored 下「有标记可跳过」那一格转红（判要跑）", exit_code == EXIT_GATE_MUST_RUN,
                         f"弄坏之后仍退 {exit_code}：这一格分不出标记看没看")
-        exit_code, output, _messages = call("gate-reuse", work, "59-demo.sh", environment_changes={"SINGLEFS_REUSE_HOURS": "0"})
-        selftest.expect("复用上限 0 小时：标记再新也不作数、判要跑", exit_code == EXIT_GATE_MUST_RUN, f"退 {exit_code}，stdout「{output.strip()}」")
         write_text(os.path.join(work, "crates/demo/src/lib.rs"), "pub fn one() -> u32 { 2 }\n")
         exit_code, output, _messages = call("gate-reuse", work, "59-demo.sh")
         selftest.expect("登记的输入改了一个字节就没有它那一格标记、判要跑", exit_code == EXIT_GATE_MUST_RUN, f"退 {exit_code}，stdout「{output.strip()}」")
@@ -2795,6 +3223,495 @@ def run_stage_marker_cells(selftest, module):
         selftest.expect("没登记的阶段 stage-marker-check 退 2", exit_code == EXIT_REGISTRATION_ERROR, f"退 {exit_code}，stdout「{output.strip()}」")
     finally:
         shutil.rmtree(work, ignore_errors=True)
+
+
+# ── 门禁 checker-tier-formal-verification 按格复用（records/2026-09-16-subagent拆分提案.md 第六十三节）──────────────────────────────
+# 临时仓里放真仓这一道的阶段脚本、格共用库、登记表里这一道的六行与真仓各 crate 的 Cargo.toml（依赖图与真仓相同，源码是空桩），
+# 两份判法脚本换成只往跟踪文件记一行的假驱动：不起 Verus、不起 cargo。阶段在这个临时仓里是「阶段所在的仓」，走真仓那一支（复用判定、写标记）。
+
+FORMAL_STAGE_FILE = "checker-tier-formal-verification.sh"
+FORMAL_CELL_NAMES = ("verus-toolchain-pinned", "verus-proof", "verus-vacuity", "verus-must-red-worlds", "pinned-red-examples-complete", "pinned-red-examples-replay")
+FORMAL_VERUS_CELLS = list(FORMAL_CELL_NAMES[:4])
+FORMAL_RED_CELLS = list(FORMAL_CELL_NAMES[4:])
+FORMAL_TRACE_NAMES = {"toolchain": "verus-toolchain-pinned", "proof": "verus-proof", "vacuity": "verus-vacuity", "must-red-worlds": "verus-must-red-worlds",
+                      "--check": "pinned-red-examples-complete", "--replay": "pinned-red-examples-replay"}
+FORMAL_FAKE_VERUS_DRIVER = '''#!/usr/bin/env python3
+import os, sys
+mode = sys.argv[1] if len(sys.argv) > 1 else ""
+if mode == "tool-versions":
+    print("Verus 假安装 0.0.0-selftest")
+    sys.exit(0)
+if mode == "list-items":
+    print("toolchain\\tverus-toolchain-pinned\\nproof\\tverus-proof\\nvacuity:k.rs:5\\tverus-vacuity\\tfn a\\nvacuity:k.rs:9\\tverus-vacuity\\tfn b\\n"
+          "must-red:改坏 A\\tverus-must-red-worlds\\t第 2 行")
+    sys.exit(0)
+with open(os.environ["FORMAL_SELFTEST_TRACE"], "a", encoding="utf-8") as handle:
+    handle.write("\\t".join(sys.argv[1:]) + "\\n")
+if mode != "toolchain" and os.environ.get("FORMAL_ITEM_TALLY_FILE"):
+    with open(os.environ["FORMAL_ITEM_TALLY_FILE"], "a", encoding="utf-8") as handle:
+        handle.write({"proof": "verus-proof", "vacuity": "verus-vacuity", "must-red-worlds": "verus-must-red-worlds"}[mode] + "\\t1\\t2\\t无记录 1\\n")
+print("  ✓ 假 Verus 判了 " + mode)
+'''
+FORMAL_FAKE_PIN_DRIVER = '''#!/usr/bin/env python3
+import os, sys
+mode = sys.argv[1] if len(sys.argv) > 1 else ""
+if mode == "--list-items":
+    print("complete\\tpinned-red-examples-complete\\npinned:12\\tpinned-red-examples-replay\\ta.tsv:2 crates/mutations.tsv#x")
+    sys.exit(0)
+with open(os.environ["FORMAL_SELFTEST_TRACE"], "a", encoding="utf-8") as handle:
+    handle.write("\\t".join(sys.argv[1:]) + "\\n")
+if mode == "--replay" and os.environ.get("FORMAL_ITEM_TALLY_FILE"):
+    with open(os.environ["FORMAL_ITEM_TALLY_FILE"], "a", encoding="utf-8") as handle:
+        handle.write("pinned-red-examples-replay\\t0\\t1\\t\\n")
+print("  ✓ 假红例判了 " + mode)
+'''
+# 登记表里 verus-proof 那格的键拿掉 crates/singlefs-replay-prefix/ 的弄坏开关（登记数据上的弄坏，在 FormalWorld 造表时认）
+FORMAL_PROOF_KEY_BREAK = "proof-key-without-replay-prefix"
+
+
+class FormalWorld:
+    """门禁 checker-tier-formal-verification 的临时仓。run() 在里面跑一趟阶段，返回 (退出码, 输出, 跑了哪几格)；edit() 往一个文件末尾追加一行。"""
+    def __init__(self, module, drop_replay_prefix_from_proof_key=False, extra_environment=None):
+        repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
+        self.work = work = tempfile.mkdtemp(prefix="admission-selftest-formal-")
+        self.extra_environment = dict(extra_environment or {})
+        self.edits = 0
+        self.tools = os.path.join(work, ".formal-selftest")
+        run_quietly(["git", "init", "-q", "-b", "master", work], GIT_IDENTITY)
+        write_text(os.path.join(work, ".gitignore"), ".formal-selftest/\n")
+        link_sop_copy(work)
+        with open(os.path.join(repository_root, "Cargo.toml"), encoding="utf-8") as handle:
+            root_manifest = handle.read()
+        anchor = '"crates/singlefs-format",'
+        if anchor not in root_manifest:
+            raise InputManifestError("真仓根 Cargo.toml 里找不到 \"crates/singlefs-format\", 这一行，造不出自证用的工作区")
+        write_text(os.path.join(work, "Cargo.toml"), root_manifest.replace(anchor, anchor + '\n    "crates/singlefs-unrelated",', 1))
+        for directory in sorted(workspace_package_directories(repository_root).values()):
+            shutil.copy(os.path.join(repository_root, directory, "Cargo.toml"), self._prepared(os.path.join(work, directory, "Cargo.toml")))
+            write_text(os.path.join(work, directory, "src/lib.rs"), "pub fn stub() {}\n")
+            write_text(os.path.join(work, directory, "tests/stub.rs"), "// 测试桩\n")
+        write_text(os.path.join(work, "crates/singlefs-unrelated/Cargo.toml"), '[package]\nname = "singlefs-unrelated"\nversion = "0.0.0"\n')
+        write_text(os.path.join(work, "crates/singlefs-unrelated/src/lib.rs"), "pub fn stub() {}\n")
+        write_text(os.path.join(work, "crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs"), "fn main() {}\n")
+        write_text(os.path.join(work, "crates/singlefs-checker-tier/src/bin/other_tool.rs"), "fn main() {}\n")
+        write_text(os.path.join(work, "crates/singlefs-checker-tier/tests/crash.rs"), "// 别的测试目标\n")
+        for shared in ("crates/singlefs-replay-prefix/verus-must-red-worlds.tsv", "crates/mutations.tsv", "research/mutations/e165_replay_bounded_enumeration_custom.tsv",
+                       ".claude/gate.d/e165-pinned-red-examples.tsv", ".claude/gate.d/e165-void-red-example-ledgers.tsv", ".claude/gate.d/verus-pins.tsv",
+                       "research/results/e165-selftest-red-examples.tsv",
+                       "research/results/e165-selftest-kill-bounds.out", "Cargo.lock", "research/scripts/run-with-memory-cap.sh", "research/scripts/capped.sh",
+                       "research/scripts/lib_atomic_replace.py", "research/scripts/lib_verdict_library.py"):
+            write_text(os.path.join(work, shared), "# 样本\n")
+        shutil.copy(module, os.path.join(work, "research/scripts/admission.py"))
+        shutil.copy(os.path.join(SELFTEST_HERE, "stage-must-run.sh"), os.path.join(work, "research/scripts/stage-must-run.sh"))
+        write_text(os.path.join(work, "research/scripts/verus-proof-check.py"), FORMAL_FAKE_VERUS_DRIVER)
+        write_text(os.path.join(work, "research/scripts/e165-pin-red-examples.py"), FORMAL_FAKE_PIN_DRIVER)
+        self.gate = os.path.join(work, ".claude/gate.d", FORMAL_STAGE_FILE)
+        shutil.copy(os.path.join(repository_root, ".claude/gate.d", FORMAL_STAGE_FILE), self._prepared(self.gate))
+        shutil.copy(os.path.join(repository_root, ".claude/gate.d/lib/stage-cells.sh"), self._prepared(os.path.join(work, ".claude/gate.d/lib/stage-cells.sh")))
+        formal_rows = [row for row in read_registration_rows(repository_root) if row.key.startswith(FORMAL_STAGE_FILE + ":")]
+        lines = []
+        for row in formal_rows:
+            paths = list(row.input_paths)
+            if drop_replay_prefix_from_proof_key and row.key == f"{FORMAL_STAGE_FILE}:verus-proof":
+                paths.remove("crates/singlefs-replay-prefix/")
+            lines.append(f"{row.key}\t{' '.join(paths)}\t{' '.join(row.conditions)}\t# 样本\n")
+        write_text(os.path.join(work, REGISTRATION_TABLE), "".join(lines))
+        for toolchain_program, program_text in FAKE_TOOLCHAIN_SCRIPTS.items():
+            write_executable(os.path.join(self.tools, toolchain_program), program_text)
+        run_quietly(["git", "-C", work, "add", "-A"], GIT_IDENTITY)
+        run_quietly(["git", "-C", work, "commit", "-q", "-m", "base"], GIT_IDENTITY)
+        self.row_count = len(formal_rows)
+
+    @staticmethod
+    def _prepared(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        return path
+
+    def run(self, *arguments, extra_environment=None):
+        trace_path = os.path.join(self.tools, "trace")
+        write_text(trace_path, "")
+        changes = {"PATH": self.tools + os.pathsep + os.environ.get("PATH", ""), "CARGO_HOME": os.path.join(self.tools, "cargo-home"),
+                   "FORMAL_SELFTEST_TRACE": trace_path}
+        changes.update(self.extra_environment)
+        changes.update(extra_environment or {})
+        environment = environment_without_build_settings(changes)
+        for variable in ("GATE_NOT_RUN_FILE", "GATE_STAGED_FROM", "STAGE_CELLS_BREAK"):
+            environment.pop(variable, None)
+        exit_code, output, messages = run_in_environment(["bash", self.gate, *arguments], environment, working_directory=self.work)
+        with open(trace_path, encoding="utf-8") as handle:
+            self.trace = [line.split("\t") for line in handle.read().split("\n") if line]
+        ran = [FORMAL_TRACE_NAMES.get(fields[0], fields[0]) for fields in self.trace]
+        return exit_code, output + messages, ran
+
+    def arguments_of(self, cell):
+        """上一趟里起这一格的判法时带的参数（模式之后的），没起交 None。"""
+        return next((fields[1:] for fields in self.trace if FORMAL_TRACE_NAMES.get(fields[0]) == cell), None)
+
+    def edit(self, relative_path):
+        self.edits += 1
+        with open(os.path.join(self.work, relative_path), "a", encoding="utf-8") as handle:
+            handle.write(f"// 自证改动 {self.edits}\n")
+
+    def append_table_line(self, line):
+        with open(os.path.join(self.work, REGISTRATION_TABLE), "a", encoding="utf-8") as handle:
+            handle.write(line)
+
+    def add_path_to_row(self, key, path):
+        table_path = os.path.join(self.work, REGISTRATION_TABLE)
+        with open(table_path, encoding="utf-8") as handle:
+            lines = handle.read().split("\n")
+        for position, line in enumerate(lines):
+            columns = line.split("\t")
+            if columns[0] == key:
+                columns[1] += " " + path
+                lines[position] = "\t".join(columns)
+        write_text(table_path, "\n".join(lines))
+
+    def markers(self):
+        return sorted(name for name in os.listdir(os.path.join(self.work, ".git"))
+                      if name.startswith(f"{STAGE_MARKER_PREFIX}{FORMAL_STAGE_FILE}:") and ".partial." not in name)
+
+    def cleanup(self):
+        shutil.rmtree(self.work, ignore_errors=True)
+
+
+def run_formal_cell_reuse_cells(selftest, module):
+    """门禁 checker-tier-formal-verification 的复用判定按格算：每格登记自己读的输入（键 <阶段>:<格名>），输入没变、上次判绿作数就复用，汇总写「复用」，变了只重跑那几格；
+    Verus 四格的输入只有 crates/singlefs-replay-prefix/ 与判法这一类，红例两格的输入是 singlefs-checker-tier 编那个 bin 的 cargo 依赖闭包（closure= 现算）。
+    ① 只改一个 core 文件 ⇒ Verus 四格复用、红例两格重跑；② 只改 replay-prefix 的 src/lib.rs ⇒ 六格全重跑；③ 只改 verus-pins.tsv ⇒ Verus 四格重跑；
+    弄坏开关 proof-key-without-replay-prefix（verus-proof 那格的键拿掉 crates/singlefs-replay-prefix/）⇒ ② 红；弄坏开关 closure-only-replay-prefix（红例两格的闭包退回只算 replay-prefix）⇒ ① 红。"""
+    all_cells = list(FORMAL_CELL_NAMES)
+    core_file, prefix_file = "crates/singlefs-core/src/lib.rs", "crates/singlefs-replay-prefix/src/lib.rs"
+
+    def step_core_ok(exit_code, ran):
+        return exit_code == 0 and ran == FORMAL_RED_CELLS
+
+    def step_prefix_ok(exit_code, ran):
+        return exit_code == 0 and ran == all_cells
+    world = FormalWorld(module, drop_replay_prefix_from_proof_key=break_is_set(FORMAL_PROOF_KEY_BREAK))
+    try:
+        selftest.expect(f"按格复用：临时仓的登记表带真表这一道的 {len(FORMAL_CELL_NAMES)} 行（<阶段>:<格名>）", world.row_count == len(FORMAL_CELL_NAMES), f"读到 {world.row_count} 行")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：头一趟（没有标记）六格都跑、跑绿各写一份全绿标记（键 <阶段>:<格名>）",
+                        exit_code == 0 and ran == all_cells and len(world.markers()) == len(all_cells), f"退 {exit_code}，跑了 {ran}，标记 {world.markers()}，输出尾部：{output.strip()[-500:]}")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：什么都没改，第二趟六格都复用、一格不跑、整道退 77，汇总每格写「复用」",
+                        exit_code == 77 and ran == [] and all(f"{cell}：复用" in output for cell in all_cells), f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        world.edit(core_file)
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用 ①：只改一个 core 文件 ⇒ Verus 四格复用、红例两格重跑",
+                        step_core_ok(exit_code, ran) and all(f"{cell}：复用" in output for cell in FORMAL_VERUS_CELLS)
+                        and all(f"{cell}：重跑" in output for cell in FORMAL_RED_CELLS), f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：红例两格重跑绿了之后各写了自己的新标记，再跑一趟六格都复用（退 77）", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}")
+        world.edit(prefix_file)
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用 ②：只改 crates/singlefs-replay-prefix/src/lib.rs ⇒ 六格全重跑", step_prefix_ok(exit_code, ran), f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit(".claude/gate.d/verus-pins.tsv")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用 ③：只改 verus-pins.tsv ⇒ Verus 四格重跑、红例两格复用", exit_code == 0 and ran == FORMAL_VERUS_CELLS, f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("crates/singlefs-replay-prefix/verus-must-red-worlds.tsv")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv（Verus 的必红世界表，crate 根下 cargo 不读）⇒ Verus 四格重跑、红例两格复用",
+                        exit_code == 0 and ran == FORMAL_VERUS_CELLS, f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit(".claude/gate.d/e165-void-red-example-ledgers.tsv")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改作废红例账登记表 e165-void-red-example-ledgers.tsv ⇒ 只有 pinned-red-examples-complete 重跑",
+                        exit_code == 0 and ran == ["pinned-red-examples-complete"], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("Cargo.lock")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改仓根 Cargo.lock ⇒ 读它的 verus-toolchain-pinned 与红例两格重跑，verus-proof、verus-vacuity、verus-must-red-worlds 复用",
+                        exit_code == 0 and ran == ["verus-toolchain-pinned", *FORMAL_RED_CELLS], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("crates/singlefs-checker-tier/tests/crash.rs")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改 singlefs-checker-tier 的 tests/（cargo 编那个 bin 读不到）⇒ 六格全复用、整道退 77", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("crates/singlefs-checker-tier/src/bin/other_tool.rs")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改 singlefs-checker-tier 里别的 bin 的源码 ⇒ 六格全复用、整道退 77", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("crates/singlefs-unrelated/src/lib.rs")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：只改闭包之外的 crate（不是 e165 装置的依赖）⇒ 六格全复用、整道退 77", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：改装置 e165_replay_bounded_enumeration 自己的源码 ⇒ 红例两格重跑、Verus 四格复用", exit_code == 0 and ran == FORMAL_RED_CELLS, f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-900:]}")
+        world.edit("research/results/e165-selftest-red-examples.tsv")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：红例账改了 ⇒ 红例两格重跑", exit_code == 0 and ran == FORMAL_RED_CELLS, f"退 {exit_code}，跑了 {ran}")
+        write_text(os.path.join(world.work, "research/results/e165-selftest-r2-red-examples.tsv"), "# 新一趟的账\n")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：research/results/ 里落一份新的 e165-*-red-examples.tsv ⇒ 红例两格重跑", exit_code == 0 and ran == FORMAL_RED_CELLS, f"退 {exit_code}，跑了 {ran}")
+        write_text(os.path.join(world.work, "research/results/e171-unrelated.out"), "别的实验的产物\n")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：research/results/ 里别的实验的产物 ⇒ 六格全复用（只登记 e165 的账与产物，不再整个目录）", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}")
+        # 登记表里别的行加了一行：整张表不进按格的比对，六格全复用；一格自己的登记行变了（多登记一条路径），只有那一格重跑
+        world.append_table_line("other-stage.sh\tcrates/singlefs-unrelated/\t# 别的阶段的一行\n")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：stage-inputs.tsv 里别的键加了一行 ⇒ 六格全复用、整道退 77（整张登记表不进按格的比对）", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        world.add_path_to_row(f"{FORMAL_STAGE_FILE}:verus-vacuity", "research/scripts/extra-input.sh")
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：verus-vacuity 那一行多登记了一条路径 ⇒ 只有 verus-vacuity 重跑", exit_code == 0 and ran == ["verus-vacuity"], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        # 单跑、--check、--list 不变：不问复用、不写标记
+        marker_count = len(world.markers())
+        exit_code, output, ran = world.run("--check", "verus-proof")
+        selftest.expect("--check 点名一格：照样只跑那一格（标记都有效也跑）、输出里没有按格复用判定、不写标记",
+                        exit_code == 0 and ran == ["verus-proof"] and "按格复用判定" not in output and len(world.markers()) == marker_count, f"退 {exit_code}，跑了 {ran}，标记 {world.markers()}")
+        exit_code, output, ran = world.run("--list")
+        selftest.expect("--list：逐行打六个格名、一格不跑、退 0", exit_code == 0 and ran == [] and [line.split("\t")[0] for line in output.strip().split("\n")] == all_cells, f"退 {exit_code}，输出 {output.strip()[:300]}")
+        exit_code, output, ran = world.run(extra_environment={"SINGLEFS_GATE_FULL": "1"})
+        selftest.expect("SINGLEFS_GATE_FULL=1：六格全跑（强制）", exit_code == 0 and ran == all_cells, f"退 {exit_code}，跑了 {ran}")
+        # 判定脚本自己坏了（退 2）：这一道判红、一格不跑，不能当成可跳过
+        judge_path = os.path.join(world.work, "research/scripts/stage-must-run.sh")
+        with open(judge_path, encoding="utf-8") as handle:
+            judge_text = handle.read()
+        write_executable(judge_path + ".new", "#!/usr/bin/env bash\necho 判定坏了\nexit 2\n")
+        os.replace(judge_path + ".new", judge_path)
+        exit_code, output, ran = world.run()
+        selftest.expect("按格复用：判定脚本退 2（不是 0 也不是 1）⇒ 整道判红退 1、一格不跑，✗ 后面有出路", exit_code == 1 and ran == [] and "→ 怎么办" in output, f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-400:]}")
+        write_executable(judge_path + ".new", judge_text)
+        os.replace(judge_path + ".new", judge_path)
+    finally:
+        world.cleanup()
+    # 另一条路：不看全绿标记（stage-marker-ignored），按 gate-staged.sh 的 refs/sop/staged-green 那棵树逐格比；Verus 四格还要它们各自的环境记录（键 <阶段>:<格名>）
+    world = FormalWorld(module)
+    try:
+        staged_environment = {BREAK_VARIABLE: "stage-marker-ignored"}
+        base_tree = staged_tree_of(world.work)
+        mark_tree_green(world.work, base_tree)
+        exit_code, output, ran = world.run(extra_environment=dict(staged_environment, SINGLEFS_STAGED_TREE=base_tree))
+        record_paths = [os.path.join(world.work, ".git", GATE_ENVIRONMENT_RECORD_PREFIX + f"{FORMAL_STAGE_FILE}:{cell}") for cell in FORMAL_VERUS_CELLS]
+        selftest.expect("按格复用（暂存树那条路）：红例两格输入与上次整轮全绿那棵树相同就复用，Verus 四格还没有各自的环境记录所以跑；跑绿后每格各记一份环境记录",
+                        exit_code == 0 and ran == FORMAL_VERUS_CELLS and all(os.path.isfile(path) for path in record_paths), f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        exit_code, output, ran = world.run(extra_environment=dict(staged_environment, SINGLEFS_STAGED_TREE=base_tree))
+        selftest.expect("按格复用（暂存树那条路）：输入与环境记录都没变，六格全复用、整道退 77", exit_code == 77 and ran == [], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        world.edit(core_file)
+        edited_tree = staged_tree_of(world.work)
+        exit_code, output, ran = world.run(extra_environment=dict(staged_environment, SINGLEFS_STAGED_TREE=edited_tree))
+        selftest.expect("按格复用（暂存树那条路）①：暂存树里只改了一个 core 文件 ⇒ Verus 四格复用、红例两格重跑", exit_code == 0 and ran == FORMAL_RED_CELLS, f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        world.append_table_line("other-stage.sh\tcrates/singlefs-unrelated/\t# 别的阶段的一行\n")
+        exit_code, output, ran = world.run(extra_environment=dict(staged_environment, SINGLEFS_STAGED_TREE=staged_tree_of(world.work)))
+        selftest.expect("按格复用（暂存树那条路）：别的键加了一行 ⇒ Verus 四格照样复用（整张登记表不进比对），红例两格因 core 还和绿树不同照样重跑", exit_code == 0 and ran == FORMAL_RED_CELLS, f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+        world.add_path_to_row(f"{FORMAL_STAGE_FILE}:verus-vacuity", "research/scripts/extra-input.sh")
+        exit_code, output, ran = world.run(extra_environment=dict(staged_environment, SINGLEFS_STAGED_TREE=staged_tree_of(world.work)))
+        selftest.expect("按格复用（暂存树那条路）：verus-vacuity 那一行的登记变了 ⇒ 它重跑（与绿树比这一格自己的登记行）", exit_code == 0 and ran == ["verus-vacuity", *FORMAL_RED_CELLS], f"退 {exit_code}，跑了 {ran}，输出尾部：{output.strip()[-700:]}")
+    finally:
+        world.cleanup()
+    # 弄坏开关 proof-key-without-replay-prefix：verus-proof 那格的键里没有 crates/singlefs-replay-prefix/，② 那条必须红（verus-proof 没跟着重跑）
+    world = FormalWorld(module, drop_replay_prefix_from_proof_key=True)
+    try:
+        world.run()
+        world.edit(prefix_file)
+        exit_code, output, ran = world.run()
+        selftest.expect(f"弄坏开关 {FORMAL_PROOF_KEY_BREAK} 下 ② 那一条红（只改 replay-prefix，verus-proof 没重跑）", not step_prefix_ok(exit_code, ran) and "verus-proof" not in ran,
+                        f"弄坏之后 ② 仍判对：退 {exit_code}，跑了 {ran}")
+    finally:
+        world.cleanup()
+    # 弄坏开关 closure-only-replay-prefix：红例两格的闭包退回只算 replay-prefix，① 那条必须红（core 改了红例两格没重跑）
+    world = FormalWorld(module, extra_environment={BREAK_VARIABLE: "closure-only-replay-prefix"})
+    try:
+        world.run()
+        world.edit(core_file)
+        exit_code, output, ran = world.run()
+        selftest.expect("弄坏开关 closure-only-replay-prefix 下 ① 那一条红（只改 core，红例两格没重跑）", not step_core_ok(exit_code, ran) and "pinned-red-examples-replay" not in ran,
+                        f"弄坏之后 ① 仍判对：退 {exit_code}，跑了 {ran}")
+    finally:
+        world.cleanup()
+
+
+def run_formal_item_cells(selftest, module):
+    """门禁 checker-tier-formal-verification 的逐项点名与按条复用那一半（两份判法换成记参数的假驱动）：--list-items 列项不跑格；--item 只跑点了项的格、
+    把项转给判法；写错退 2；与 --check 一起退 2；整道跑转 --verdict-library <git common-dir>/singlefs-formal-verdicts、读；--item 与 SINGLEFS_GATE_FULL=1 只记不读；
+    判法往 FORMAL_ITEM_TALLY_FILE 写的行整道相加。弄坏开关 FORMAL_VERIFICATION_BREAK=items-unchecked、reuse-on-named-run、library-in-tmpdir 下各自那一格转红。"""
+    def list_items_ok(exit_code, output, ran):
+        lines = [line.split("\t")[:2] for line in output.strip().split("\n") if "\t" in line]
+        return (exit_code == 0 and ran == [] and ["vacuity:k.rs:5", "verus-vacuity"] in lines and ["pinned:12", "pinned-red-examples-replay"] in lines
+                and ["complete", "pinned-red-examples-complete"] in lines and len(lines) == 7)
+
+    def item_run_ok(world, exit_code, ran):
+        vacuity = world.arguments_of("verus-vacuity") or []
+        replay = world.arguments_of("pinned-red-examples-replay") or []
+        return (exit_code == 0 and ran == ["verus-proof", "verus-vacuity", "pinned-red-examples-replay"]
+                and vacuity[-2:] == ["--item", "vacuity:k.rs:9"] and replay[-2:] == ["--item", "pinned:12"]
+                and "--no-reuse" in vacuity and "--verdict-library" in vacuity)
+
+    def unknown_ok(exit_code, output, ran):
+        return exit_code == 2 and ran == [] and "vacuity:k.rs:5" in output and "→ 怎么办" in output
+
+    def library_ok(world, exit_code, ran):
+        proof = world.arguments_of("verus-proof") or []
+        expected = os.path.join(world.work, ".git", "singlefs-formal-verdicts")
+        return (exit_code == 0 and len(ran) == len(FORMAL_CELL_NAMES) and "--no-reuse" not in proof
+                and proof[proof.index("--verdict-library") + 1:proof.index("--verdict-library") + 2] == [expected] if "--verdict-library" in proof else False)
+
+    def full_ok(world, exit_code, ran):
+        must_red = world.arguments_of("verus-must-red-worlds") or []
+        return exit_code == 0 and len(ran) == len(FORMAL_CELL_NAMES) and "--no-reuse" in must_red
+
+    world = FormalWorld(module)
+    try:
+        exit_code, output, ran = world.run("--list-items")
+        selftest.expect("逐项点名：--list-items 逐行打「项<TAB>格」（两份判法各列自己的、加起来 7 项），一格不跑、退 0", list_items_ok(exit_code, output, ran),
+                        f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-500:]}")
+        exit_code, output, ran = world.run("--item", "vacuity:k.rs:9", "--item", "proof", "--item", "pinned:12")
+        selftest.expect("逐项点名：--item 只跑点了项的那几格（按登记次序），空真与红例重放各收到点名的 --item，只记不读（--verdict-library 加 --no-reuse）",
+                        item_run_ok(world, exit_code, ran), f"退 {exit_code}，跑了 {ran}，参数 {world.trace}")
+        exit_code, output, ran = world.run("--item", "vacuity:k.rs:7")
+        selftest.expect("逐项点名：--item 写错退 2、一格不跑、列出可点名的项", unknown_ok(exit_code, output, ran), f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-400:]}")
+        exit_code, output, ran = world.run("--item", "proof", "--check", "verus-proof")
+        selftest.expect("逐项点名：--item 与 --check 一起退 2", exit_code == 2 and ran == [], f"退 {exit_code}，跑了 {ran}")
+        exit_code, output, ran = world.run("--item")
+        selftest.expect("逐项点名：--item 后面缺项名退 2", exit_code == 2 and ran == [], f"退 {exit_code}，跑了 {ran}")
+        exit_code, output, ran = world.run()
+        selftest.expect("按条复用：整道跑转 --verdict-library <git common-dir>/singlefs-formal-verdicts、不带 --no-reuse（读判定库）", library_ok(world, exit_code, ran),
+                        f"退 {exit_code}，跑了 {ran}，参数 {world.trace}")
+        selftest.expect("按条复用：判法写的按条行整道相加（假驱动三格各现判 1 复用 2、红例重放复用 1）", "── 按条（4 格有逐项判定" in output and "现判 3、复用 7" in output,
+                        f"输出尾部：{output.strip()[-500:]}")
+        exit_code, output, ran = world.run(extra_environment={"SINGLEFS_GATE_FULL": "1"})
+        selftest.expect("按条复用：SINGLEFS_GATE_FULL=1 只记不读（带 --no-reuse）", full_ok(world, exit_code, ran), f"退 {exit_code}，跑了 {ran}，参数 {world.trace}")
+    finally:
+        world.cleanup()
+    broken = {"items-unchecked": lambda world: unknown_ok(*world.run("--item", "vacuity:k.rs:7")),
+              "library-in-tmpdir": lambda world: library_ok(world, *[value for index, value in enumerate(world.run()) if index != 1]),
+              "reuse-on-named-run": lambda world: item_run_ok(world, *[value for index, value in enumerate(world.run("--item", "vacuity:k.rs:9", "--item", "proof", "--item", "pinned:12")) if index != 1])}
+    for switch, judged in broken.items():
+        world = FormalWorld(module, extra_environment={"FORMAL_VERIFICATION_BREAK": switch})
+        try:
+            selftest.expect(f"弄坏开关 FORMAL_VERIFICATION_BREAK={switch} 下它那一格转红", not judged(world), f"弄坏之后那一格仍判对：参数 {getattr(world, 'trace', None)}")
+        finally:
+            world.cleanup()
+
+
+def run_closure_input_cells(selftest):
+    """closure=<包>:<bin>（cargo_closure_input_paths）：path 依赖的传递闭包、减去读不到的、include! / #[path] 点名到的拿回来、认不出的整个目录留着。"""
+    work = tempfile.mkdtemp(prefix="admission-selftest-closure-")
+    try:
+        def manifest(name, dependencies="", extra=""):
+            return f'[package]\nname = "{name}"\nversion = "0.0.0"\n{extra}\n[dependencies]\n{dependencies}'
+        write_text(os.path.join(work, "Cargo.toml"),
+                   '[workspace]\nmembers = ["crates/app", "crates/lib-b", "crates/lib-c", "crates/lib-d", "crates/lib-e", "crates/lib-f", "crates/lib-w"]\n'
+                   '[workspace.dependencies]\nlib-w = { path = "crates/lib-w" }\n')
+        write_text(os.path.join(work, "crates/app/Cargo.toml"),
+                   manifest("app", 'lib-b = { path = "../lib-b" }\nlib-c = { path = "../lib-c", optional = true }\nlib-w = { workspace = true }\nserde = "1"\n')
+                   + '[dev-dependencies]\nlib-e = { path = "../lib-e" }\n')
+        write_text(os.path.join(work, "crates/app/src/lib.rs"), "pub fn app() {}\n")
+        write_text(os.path.join(work, "crates/app/src/bin/tool.rs"), "fn main() {}\n")
+        write_text(os.path.join(work, "crates/app/src/bin/other.rs"), "fn main() {}\n")
+        write_text(os.path.join(work, "crates/app/tests/t.rs"), "// t\n")
+        write_text(os.path.join(work, "crates/lib-b/Cargo.toml"), manifest("lib-b"))
+        write_text(os.path.join(work, "crates/lib-b/src/lib.rs"), 'pub const DATA: &str = include_str!("../tests/data.txt");\n')
+        write_text(os.path.join(work, "crates/lib-b/tests/data.txt"), "数据\n")
+        write_text(os.path.join(work, "crates/lib-b/tests/other.rs"), "// 别的\n")
+        write_text(os.path.join(work, "crates/lib-c/Cargo.toml"), manifest("lib-c", 'lib-d = { path = "../lib-d" }\n'))
+        write_text(os.path.join(work, "crates/lib-c/build.rs"), "fn main() {}\n")
+        write_text(os.path.join(work, "crates/lib-c/src/lib.rs"), "")
+        write_text(os.path.join(work, "crates/lib-c/tests/t.rs"), "// t\n")
+        write_text(os.path.join(work, "crates/lib-d/Cargo.toml"), manifest("lib-d"))
+        write_text(os.path.join(work, "crates/lib-d/src/lib.rs"), '// include_str!("../tests/commented.txt") 只在注释里\n#[path = "../../lib-f/shared.rs"]\nmod shared;\n')
+        write_text(os.path.join(work, "crates/lib-d/tests/commented.txt"), "x\n")
+        write_text(os.path.join(work, "crates/lib-e/Cargo.toml"), manifest("lib-e"))
+        write_text(os.path.join(work, "crates/lib-e/src/lib.rs"), "")
+        write_text(os.path.join(work, "crates/lib-f/Cargo.toml"), manifest("lib-f"))
+        write_text(os.path.join(work, "crates/lib-f/src/lib.rs"), "")
+        write_text(os.path.join(work, "crates/lib-f/shared.rs"), "")
+        write_text(os.path.join(work, "crates/lib-w/Cargo.toml"), manifest("lib-w"))
+        write_text(os.path.join(work, "crates/lib-w/src/lib.rs"), "")
+        write_text(os.path.join(work, "crates/lib-w/tests/t.rs"), "// t\n")
+        # crate 根下 cargo 不读的：lib-b 的表（只在注释里提到）、lib-w 根下的目录；lib-w 的 README 被 include_str! 点名；lib-c 有 build.rs（整个目录留）；
+        # lib-d 的源码出现 CARGO_MANIFEST_DIR（运行期可能按 crate 目录读根下的文件，根下的一份都不减）
+        write_text(os.path.join(work, "crates/lib-b/src/lib.rs"), '//! 表在同目录的 notes.tsv（只在注释里提到）\npub const DATA: &str = include_str!("../tests/data.txt");\n')
+        write_text(os.path.join(work, "crates/lib-b/notes.tsv"), "表\t第一行\n")
+        write_text(os.path.join(work, "crates/lib-w/docs/guide.md"), "说明\n")
+        write_text(os.path.join(work, "crates/lib-w/README.md"), "读我\n")
+        write_text(os.path.join(work, "crates/lib-w/src/lib.rs"), '#![doc = include_str!("../README.md")]\n')
+        write_text(os.path.join(work, "crates/lib-c/extra.tsv"), "有 build.rs 的 crate 根下的表\n")
+        write_text(os.path.join(work, "crates/lib-d/table.tsv"), "运行期按 crate 目录读的表\n")
+        write_text(os.path.join(work, "crates/lib-d/src/lib.rs"), '// include_str!("../tests/commented.txt") 只在注释里\n#[path = "../../lib-f/shared.rs"]\nmod shared;\n'
+                   'pub fn table() -> std::path::PathBuf { std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("table.tsv") }\n')
+        run_quietly(["git", "init", "-q", "-b", "master", work], GIT_IDENTITY)
+        paths = cargo_closure_input_paths(work, "app", "tool")
+        positives = [path for path in paths if not path.startswith(":(exclude)")]
+        excluded = [path[len(":(exclude)"):] for path in paths if path.startswith(":(exclude)")]
+        selftest.expect("closure：app 的 path 依赖顺着传递闭包（lib-b、可选的 lib-c 及其依赖 lib-d、workspace = true 的 lib-w）都算，dev-dependencies 的 lib-e 与没人依赖的 lib-f 不算",
+                        [path for path in positives if path.endswith("/")] == ["crates/app/", "crates/lib-b/", "crates/lib-c/", "crates/lib-w/", "crates/lib-d/"], f"得到 {positives}")
+        selftest.expect("closure：编 tool 这个 bin 时 app 的 tests/ 与别的 bin（other.rs）不读，tool.rs 自己留着",
+                        "crates/app/tests/" in excluded and "crates/app/src/bin/other.rs" in excluded and "crates/app/src/bin/tool.rs" not in excluded, f"减去 {excluded}")
+        selftest.expect("closure：lib-b 的源码 include_str! 点名了 ../tests/data.txt ⇒ lib-b/tests/ 不减", "crates/lib-b/tests/" not in excluded, f"减去 {excluded}")
+        selftest.expect("closure：lib-c 有 build.rs ⇒ 整个目录留着，一条也不减", not any(path.startswith("crates/lib-c/") for path in excluded), f"减去 {excluded}")
+        selftest.expect("closure：lib-d 注释里的 include_str! 不算点名（tests/ 照减），#[path] 指到仓内别的 crate 的文件 ⇒ 那个文件进输入",
+                        "crates/lib-d/tests/" in excluded and "crates/lib-f/shared.rs" in positives, f"减去 {excluded}，输入 {positives}")
+        selftest.expect("closure：别的 crate 的 tests/ 都减（lib-w/tests/）", "crates/lib-w/tests/" in excluded, f"减去 {excluded}")
+        selftest.expect("closure：crate 根下 cargo 不读的文件与目录减掉（lib-b/notes.tsv、lib-w/docs/），Cargo.toml、src/ 不减",
+                        "crates/lib-b/notes.tsv" in excluded and "crates/lib-w/docs/" in excluded
+                        and not any(path.endswith("/Cargo.toml") or path.endswith("/src/") for path in excluded), f"减去 {excluded}")
+        selftest.expect("closure：crate 根下的文件被 include_str! 点名（lib-w/README.md）⇒ 拿回来不减", "crates/lib-w/README.md" not in excluded, f"减去 {excluded}")
+        selftest.expect("closure：有 build.rs 的 crate 根下 cargo 不读的文件照旧全留（lib-c/extra.tsv）", "crates/lib-c/extra.tsv" not in excluded, f"减去 {excluded}")
+        selftest.expect("closure：源码出现 CARGO_MANIFEST_DIR 的 crate 根下一份都不减（lib-d/table.tsv），tests/ 照减",
+                        "crates/lib-d/table.tsv" not in excluded and "crates/lib-d/tests/" in excluded, f"减去 {excluded}")
+        manifest_before = input_manifest(work, paths, [])[1]
+        write_text(os.path.join(work, "crates/lib-b/notes.tsv"), "表\t第一行改了 \n")
+        manifest_after_root_file = input_manifest(work, cargo_closure_input_paths(work, "app", "tool"), [])[1]
+        listed = listed_input_files(work, paths)
+        selftest.expect("closure：改 crate 根下 cargo 不读的文件（lib-b/notes.tsv）⇒ 闭包的逐文件清单指纹不变；有 build.rs 的 lib-c 整个目录照旧在清单里",
+                        manifest_before == manifest_after_root_file and b"crates/lib-c/extra.tsv" in listed and b"crates/lib-c/build.rs" in listed,
+                        f"改前 {manifest_before[:12]}、改后 {manifest_after_root_file[:12]}，清单里 lib-c 的 {[name for name in listed if name.startswith(b'crates/lib-c/')]}")
+        write_text(os.path.join(work, "crates/lib-b/src/lib.rs"), '//! 表在同目录的 notes.tsv（只在注释里提到）\npub const DATA: &str = include_str!("../tests/data.txt");\n// 源码改了\n')
+        selftest.expect("closure：改 crate 的 src/（lib-b/src/lib.rs）⇒ 闭包的逐文件清单指纹变",
+                        input_manifest(work, cargo_closure_input_paths(work, "app", "tool"), [])[1] != manifest_after_root_file, "指纹没变")
+        with BreakSwitch("closure-keeps-crate-root-files"):
+            broken = cargo_closure_input_paths(work, "app", "tool")
+        selftest.expect("弄坏开关 closure-keeps-crate-root-files：crate 根下 cargo 不读的文件（lib-b/notes.tsv）留在闭包里",
+                        ":(exclude)crates/lib-b/notes.tsv" not in broken, f"得到 {broken}")
+        write_text(os.path.join(work, "crates/app/src/lib.rs"), 'pub const X: &str = include_str!(concat!(env!("OUT_DIR"), "/x.rs"));\n')
+        paths = cargo_closure_input_paths(work, "app", "tool")
+        selftest.expect("closure：app 的源码里有参数是算出来的 include! ⇒ app 整个目录留着，别的 crate 照减",
+                        not any(path.startswith(":(exclude)crates/app/") for path in paths) and ":(exclude)crates/lib-w/tests/" in paths, f"得到 {paths}")
+        for package, binary, why in (("nope", "tool", "包不在工作区里"), ("app", "nope", "包里没有这个 bin")):
+            try:
+                cargo_closure_input_paths(work, package, binary)
+                raised = False
+            except RegistrationError:
+                raised = True
+            selftest.expect(f"closure：{why} ⇒ RegistrationError", raised, "没抛")
+        with BreakSwitch("closure-only-replay-prefix"):
+            broken = cargo_closure_input_paths(work, "app", "tool")
+        selftest.expect("弄坏开关 closure-only-replay-prefix：闭包只剩 crates/singlefs-replay-prefix/", broken == [CLOSURE_REPLAY_PREFIX_DIRECTORY + "/"], f"得到 {broken}")
+        rows = [RegistrationRow("x.sh:verus-proof", ["crates/a/"], [], 1, ""), RegistrationRow("x.sh:Bad Cell", ["crates/a/"], [], 2, ""),
+                RegistrationRow("x.sh:red", ["crates/a/"], ["closure=app:tool"], 3, ""), RegistrationRow("x.sh:red2", ["crates/a/"], ["closure=app"], 4, "")]
+        problems = lint_registration_rows(rows, work)
+        selftest.expect("登记表自查：<阶段>.sh:<格名> 的键认，格名里带空白不认；closure=<包>:<bin> 认、少了 :<bin> 报错",
+                        len(problems) == 2 and "第 2 行" in problems[0] and "第 4 行" in problems[1], "；".join(problems))
+        rows[2] = RegistrationRow("x.sh:red", ["crates/a/"], ["closure=app:nope"], 3, "")
+        problems = lint_registration_rows(rows[2:3], work)
+        selftest.expect("登记表自查：closure= 指的包里没有那个 bin 报错", len(problems) == 1 and "没有名叫 nope 的 bin" in problems[0], "；".join(problems))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def run_real_formal_rows_cells(selftest, repository_root, rows):
+    """真仓登记表里这一道的六行：键、Verus 四格不含别的 crate、红例两格登记 closure= 且现算出来的闭包在真仓上成立。"""
+    formal_rows = {row.key.split(":", 1)[1]: row for row in rows if row.key.startswith(FORMAL_STAGE_FILE + ":")}
+    selftest.expect("真仓登记表：checker-tier-formal-verification.sh 按格登记，六格各一行、没有整道的那一行",
+                    sorted(formal_rows) == sorted(FORMAL_CELL_NAMES) and not any(row.key == FORMAL_STAGE_FILE for row in rows), f"读到 {sorted(formal_rows)}")
+    verus_paths = [path for cell in FORMAL_VERUS_CELLS if cell in formal_rows for path in formal_rows[cell].input_paths]
+    selftest.expect("真仓登记表：Verus 四格登记的 crates/ 路径只有 crates/singlefs-replay-prefix/（不含整个 crates/、别的 crate）",
+                    bool(verus_paths) and all(path == "crates/singlefs-replay-prefix/" for path in verus_paths if path.startswith("crates/")), f"读到 {verus_paths}")
+    selftest.expect("真仓登记表：Verus 四格都登记了 environment=（工具版本进复用判定）",
+                    all(any(token.startswith("environment=") for token in formal_rows[cell].conditions) for cell in FORMAL_VERUS_CELLS if cell in formal_rows), "有一格没登记")
+    selftest.expect("真仓登记表：红例两格登记了 closure=singlefs-checker-tier:e165_replay_bounded_enumeration、没手列 crate、不含 Verus 的判法与登记表",
+                    all(formal_rows[cell].conditions == ["closure=singlefs-checker-tier:e165_replay_bounded_enumeration"]
+                        and not any(path.startswith("crates/") and path != "crates/mutations.tsv" for path in formal_rows[cell].input_paths)
+                        and "research/scripts/verus-proof-check.py" not in formal_rows[cell].input_paths
+                        and ".claude/gate.d/verus-pins.tsv" not in formal_rows[cell].input_paths for cell in FORMAL_RED_CELLS if cell in formal_rows), "红例两格的登记不对")
+    selftest.expect("真仓登记表：pinned-red-examples-complete 登记了作废红例账登记表 .claude/gate.d/e165-void-red-example-ledgers.tsv（--check 读它）",
+                    ".claude/gate.d/e165-void-red-example-ledgers.tsv" in getattr(formal_rows.get("pinned-red-examples-complete"), "input_paths", []), "没登记")
+    try:
+        closure = cargo_closure_input_paths(repository_root, "singlefs-checker-tier", "e165_replay_bounded_enumeration")
+    except RegistrationError as error:
+        closure = [f"算不出：{error}"]
+    selftest.expect("真仓：e165_replay_bounded_enumeration 的 cargo 依赖闭包含 core、replay-prefix、format、harness、checker、reference-filesystem 与 checker-tier 自己，不含整个 crates/",
+                    all(f"crates/singlefs-{name}/" in closure for name in ("checker-tier", "core", "replay-prefix", "format", "harness", "checker", "reference-filesystem"))
+                    and "crates/" not in closure, f"得到 {closure[:12]}")
+    selftest.expect("真仓：e165_replay_bounded_enumeration 的 cargo 依赖闭包减掉 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv（Verus 的必红世界表，cargo 不读）",
+                    ":(exclude)crates/singlefs-replay-prefix/verus-must-red-worlds.tsv" in closure, f"减去的 {[path for path in closure if path.startswith(':(exclude)')]}")
 
 
 def run_selftest():
@@ -2934,6 +3851,7 @@ def run_selftest():
         run_gate_environment_cells(selftest, module)
         # ⑫ replay.sh 接准入的那几处：输入没变不跑、前提没齐拒、比对前删产物头、装置没打指纹行
         run_replay_cells(selftest, module)
+        run_replay_row_key_cells(selftest, module)
         # ⑭ 构建环境与指向目录的符号链接进指纹（层 0 规模第三轮判决 U4）：每一样改了，指纹必须变
         run_build_environment_cells(selftest, module)
         # ⑮ 崩溃枚举用例：去注释找点名、减去别的测试目标独占的文件、登记行自查、日志怎么判、全绿标记读写
@@ -2942,14 +3860,25 @@ def run_selftest():
         run_crash_case_log_cells(selftest)
         run_judging_digest_cells(selftest, module)
         run_thread_source_cells(selftest, module)
+        run_crash_case_features_cells(selftest)
         # ⑯ 门禁 checker-tier-layer0-replay 这一份的流程：拷进临时仓（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑
         run_layer0_stage_cells(selftest, module)
+        # ⑰ 门禁 checker-tier-formal-verification 的复用判定按格算（records/2026-09-16-subagent拆分提案.md 第六十三节）：假驱动、不起 Verus、不起 cargo
+        run_closure_input_cells(selftest)
+        run_formal_cell_reuse_cells(selftest, module)
+        run_formal_item_cells(selftest, module)
 
         # ⑬ 真仓的登记表自己写对没有（语法：实验键、条件的种类分门禁与实验、@ 引用、probe= / environment= 指的脚本在不在）
         repository_root = os.path.dirname(os.path.dirname(SELFTEST_HERE))
         real_problems = lint_registration_rows(read_registration_rows(repository_root), repository_root)
         selftest.expect(f"真仓的登记表 {REGISTRATION_TABLE} 自查没有问题", not real_problems, "；".join(real_problems))
         run_real_crash_case_row_cells(selftest, read_registration_rows(repository_root))
+        run_real_crash_case_features_cells(selftest, read_registration_rows(repository_root))
+        run_real_formal_rows_cells(selftest, repository_root, read_registration_rows(repository_root))
+        _real_rows, _registered, real_row_key_problems, real_shared_keys = replay_row_key_problems(repository_root)
+        selftest.expect("真仓 replay.sh 复跑表每一行定得下准入键：按行的准入键那一段写得对、指明的键都登记了、没有登记了准入的键被两行共用",
+                        not real_row_key_problems and not real_shared_keys,
+                        "；".join(real_row_key_problems + [f"{key} 被 {count} 行共用" for key, count in real_shared_keys]))
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
@@ -2963,8 +3892,10 @@ def run_selftest():
           "whole-module-in-judging-digest、judging-digest-without-dispatch、single-worker-threads-field、threads-ignore-shards、"
           "shardable-outside-judging-digest、shard-driver-outside-manifest、keep-caller-shard-switch、target-own-files-only、include-alias-subtracts、"
           "runner-arguments-from-configuration-directory-only、digest-skips-other-statements、digest-allows-non-name-dispatch、digest-allows-imported-names、"
-          "judge-takes-forwarded-threads、cores-from-nproc、thread-variable-ignored、threads-skip-self-contained-finish-line、stage-marker-ignored "
-          "下各自那一格转红，弄坏 replay.sh 比对前删产物头那一步判对不上）")
+          "judge-takes-forwarded-threads、cores-from-nproc、thread-variable-ignored、threads-skip-self-contained-finish-line、stage-marker-ignored、"
+          "features-not-passed、features-passed-to-every-case、gpu-case-not-quiesced、"
+          "closure-only-replay-prefix、closure-keeps-crate-root-files、proof-key-without-replay-prefix、ignore-row-keys "
+          "下各自那一格转红，FORMAL_VERIFICATION_BREAK=items-unchecked、reuse-on-named-run、library-in-tmpdir 下逐项点名与按条复用各自那一格转红，REPLAY_BREAK=row-key-by-experiment 下「复跑表按行的准入键」那两格转红，弄坏 replay.sh 比对前删产物头那一步判对不上）")
     return 0
 
 
@@ -3170,6 +4101,15 @@ driver_e902() {
   : >"$OUT_DIR/driver-ran-E902"
   printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
 }
+driver_e903() {
+  : >"$OUT_DIR/driver-ran-E903"
+  python3 scripts/admission.py experiment .. E903 || return $?
+  printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
+}
+driver_e903_second() {
+  : >"$OUT_DIR/driver-ran-E903-second"
+  printf 'E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n'
+}
 '''
 REPLAY_TABLE_START = "TABLE=$(cat <<'TSV'\n"
 REPLAY_TABLE_END = "\nTSV\n)\n"
@@ -3192,17 +4132,22 @@ def link_sop_copy(work):
             handle.write(relative_path + "\n")
 
 
-def replay_copy_text(table_rows, break_header_strip):
-    """真仓 replay.sh 的副本：只换掉复跑表、在表后面拼上桩驱动；break_header_strip 时把比对前删产物头那一步换成 cat。
-    replay.sh 的形状变了（表的起止、删头那一句不是恰好一处）抛 RegistrationError，那一格判错。"""
+def replay_copy_text(table_rows, break_header_strip, row_keys=()):
+    """真仓 replay.sh 的副本：只换掉复跑表与按行的准入键那一段（row_keys，一行一条、制表符分隔；不给就是空的，真仓 E142 那几条不带进来）、
+    在表后面拼上桩驱动；break_header_strip 时把比对前删产物头那一步换成 cat。
+    replay.sh 的形状变了（表的起止、删头那一句、按行的准入键那一段不是恰好一处）抛 RegistrationError，那一格判错。"""
     with open(os.path.join(SELFTEST_HERE, "replay.sh"), encoding="utf-8") as handle:
         text = handle.read()
-    if text.count(REPLAY_TABLE_START) != 1 or text.count(REPLAY_STRIP_HEADER_COMMAND) != 1:
-        raise RegistrationError("replay.sh 里复跑表的开头或比对前删产物头那一句不是恰好一处，自证拼不出副本")
+    if (text.count(REPLAY_TABLE_START) != 1 or text.count(REPLAY_STRIP_HEADER_COMMAND) != 1
+            or text.count(REPLAY_ROW_KEYS_START) != 1):
+        raise RegistrationError("replay.sh 里复跑表的开头、比对前删产物头那一句或按行的准入键那一段不是恰好一处，自证拼不出副本")
     start = text.index(REPLAY_TABLE_START) + len(REPLAY_TABLE_START)
     end = text.index(REPLAY_TABLE_END, start)
     copy = (text[:start] + "\n".join(table_rows) + REPLAY_TABLE_END + REPLAY_SELFTEST_DRIVERS
             + text[end + len(REPLAY_TABLE_END):])
+    keys_start = copy.index(REPLAY_ROW_KEYS_START) + len(REPLAY_ROW_KEYS_START)
+    keys_end = copy.index("\n" + REPLAY_ROW_KEYS_END_LINE + "\n", keys_start - 1) + 1
+    copy = copy[:keys_start] + "".join(line + "\n" for line in row_keys) + copy[keys_end:]
     if break_header_strip:
         copy = copy.replace(REPLAY_STRIP_HEADER_COMMAND, "cat")
     return copy
@@ -3272,7 +4217,7 @@ def environment_without_build_settings(changes=None):
     environment = {name: value for name, value in os.environ.items()
                    if not (name in BUILD_ENVIRONMENT_EXACT_VARIABLES or name in ("RUSTC", "CARGO_HOME")
                            or any(form.match(name) for form in BUILD_ENVIRONMENT_VARIABLE_FORMS))}
-    for variable in (FORCE_RERUN_VARIABLE, "SINGLEFS_GATE_FULL", "SINGLEFS_STAGED_TREE", "SINGLEFS_REUSE_HOURS"):
+    for variable in (FORCE_RERUN_VARIABLE, "SINGLEFS_GATE_FULL", "SINGLEFS_STAGED_TREE"):
         environment.pop(variable, None)
     environment.update(changes or {})
     return environment
@@ -3281,6 +4226,84 @@ def environment_without_build_settings(changes=None):
 def run_in_environment(command, environment, working_directory=None):
     completed = subprocess.run(command, capture_output=True, text=True, errors="replace", env=environment, cwd=working_directory)
     return completed.returncode, completed.stdout, completed.stderr
+
+
+def run_replay_row_key_cells(selftest, module):
+    """复跑表按行的准入键（records/2026-09-16-subagent拆分提案.md 第六十七节）：临时仓里一个实验 E903 在复跑表里两行，拿真仓 replay.sh 的副本跑。
+    外面设 ADMISSION_BREAK=ignore-row-keys 或 REPLAY_BREAK=row-key-by-experiment 时，「两行各给键」那几格转红。"""
+    work = tempfile.mkdtemp(prefix="admission-selftest-row-keys-")
+    tools = tempfile.mkdtemp(prefix="admission-selftest-tools-")
+    try:
+        run_quietly(["git", "init", "-q", "-b", "master", work], GIT_IDENTITY)
+        for name, script in FAKE_TOOLCHAIN_SCRIPTS.items():
+            write_executable(os.path.join(tools, name), script)
+        os.makedirs(os.path.join(work, "research/scripts"), exist_ok=True)
+        shutil.copy(module, os.path.join(work, "research/scripts/admission.py"))
+        write_text(os.path.join(work, REGISTRATION_TABLE),
+                   "E903\tresearch/src/e903.txt\t# 样本：E903 两行里默认那一种（装置自己打产物头）\n"
+                   "E903/second\tresearch/src/e903-second.txt\t# 样本：E903 第二行（跑的东西不接准入，产物头由 replay.sh 写）\n"
+                   "E903/third\t@E903\tproduct-field=E903:verdict:control_ok=true\t# 样本：按实验号点名产物，复跑表里键是 E903 的只一行\n")
+        stored_body = "E7RESULT name=verdict control_ok=true\nE7RESULT name=done emitted=2\n"
+        for name in ("e903", "e903-second"):
+            write_text(os.path.join(work, f"research/src/{name}.txt"), f"输入 {name}\n")
+            write_text(os.path.join(work, RESULTS_DIRECTORY, f"{name}-2026-09-01.out"), stored_body)
+        link_sop_copy(work)
+        run_quietly(["git", "-C", work, "add", "-A"], GIT_IDENTITY)
+        run_quietly(["git", "-C", work, "commit", "-qm", "base"], GIT_IDENTITY)
+        table_rows = ["E903|@driver_e903||e903-2026-09-01.out|exact", "E903|@driver_e903_second||e903-second-2026-09-01.out|exact"]
+        row_keys = ["E903\tE903|@driver_e903|\tdevice", "E903/second\tE903|@driver_e903_second|\treplay"]
+
+        def replay(arguments, keys):
+            write_text(os.path.join(work, REPLAY_SCRIPT), replay_copy_text(table_rows, False, keys))
+            output_directory = tempfile.mkdtemp(prefix="out-", dir=work)
+            exit_code, output, messages = run_quietly(
+                ["bash", os.path.join(work, REPLAY_SCRIPT), *arguments],
+                {"PATH": tools + os.pathsep + os.environ.get("PATH", ""), "REPLAY_OUT": output_directory, "REPLAY_JOBS": "1"})
+            ran = sorted(name for name in os.listdir(output_directory) if name.startswith("driver-ran-"))
+            return exit_code, output + messages, output_directory, ran
+
+        def head_of(path):
+            if not os.path.isfile(path):
+                return ""
+            with open(path, encoding="utf-8", errors="replace") as handle:
+                return handle.read()[:400]
+
+        exit_code, output, _run, ran = replay(["E903"], ())
+        selftest.expect("复跑表按行的准入键：同一实验两行、只按实验号登记时 replay.sh 整份退 2，红在「准入只按实验号比产物」那一句，一行都没跑",
+                        exit_code == 2 and "E903 登记了准入，而这张复跑表里它有 2 行：准入只按实验号比产物，分不清哪一行对哪一份" in output and not ran,
+                        f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-600:]}")
+        exit_code, output, keyed_run, ran = replay(["E903"], row_keys)
+        first_head, second_head = head_of(os.path.join(keyed_run, "E903.1.out")), head_of(os.path.join(keyed_run, "E903.2.out"))
+        selftest.expect("复跑表按行的准入键：两行各给键、各自登记时两行都跑、都判字节一致；第一行产物头是装置打的 key=E903，第二行是 replay.sh 接上的 key=E903/second",
+                        exit_code == 0 and len(re.findall(r"^E903 .*字节一致", output, re.M)) == 2
+                        and "E7INPUT name=input_fingerprint key=E903 " in first_head
+                        and first_head.startswith("E7INPUT name=input_fingerprint key=E903 ")
+                        and second_head.startswith("E7INPUT name=input_fingerprint key=E903/second "),
+                        f"退 {exit_code}，跑了 {ran}，第一行产物头「{first_head[:120]}」，第二行「{second_head[:120]}」，输出：{output.strip()[-600:]}")
+        exit_code, output, _run, ran = replay(["--admission-only", "E903"], row_keys)
+        selftest.expect("复跑表按行的准入键：--admission-only 逐行列出各自的键与判定，一行都没跑",
+                        exit_code == 0 and re.search(r"^E903 +@driver_e903 +放行 +准入键 E903，", output, re.M) is not None
+                        and re.search(r"^E903 +@driver_e903_second +放行 +准入键 E903/second，", output, re.M) is not None and not ran,
+                        f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-600:]}")
+        unregistered_keys = [row_keys[0], "E903/fourth\tE903|@driver_e903_second|\treplay"]
+        exit_code, output, _run, ran = replay(["E903"], unregistered_keys)
+        selftest.expect("复跑表按行的准入键：两行各给键而其中一个没在登记表登记时整份退 2，点名那个键，一行都没跑",
+                        exit_code == 2 and f"指明的准入键 E903/fourth 没在 {REGISTRATION_TABLE} 登记" in output and not ran,
+                        f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-600:]}")
+        dangling_keys = [row_keys[0], "E903/second\tE903|@driver_e903_missing|\treplay"]
+        exit_code, output, _run, ran = replay(["E903"], dangling_keys)
+        selftest.expect("复跑表按行的准入键：指到复跑表里没有的行时整份退 2，点名那一条",
+                        exit_code == 2 and "「E903|@driver_e903_missing|」在复跑表里有 0 行，要恰好一行" in output and not ran,
+                        f"退 {exit_code}，跑了 {ran}，输出：{output.strip()[-600:]}")
+        write_text(os.path.join(work, REPLAY_SCRIPT), replay_copy_text(table_rows, False, row_keys))
+        exit_code, _output, messages = run_quietly(["python3", os.path.join(work, "research/scripts/admission.py"), "experiment", work, "E903/third"])
+        selftest.expect("复跑表按行的准入键：product-field=E903 只认键是 E903 的那一行产物（复跑表里 E903 两行），前提判得出、放行",
+                        exit_code == 0 and "e903-2026-09-01.out 的 name=verdict control_ok=true" in messages, f"退 {exit_code}，stderr：{messages.strip()[-600:]}")
+    except RegistrationError as error:
+        selftest.expect("复跑表按行的准入键：replay.sh 的副本拼得出来", False, str(error))
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+        shutil.rmtree(tools, ignore_errors=True)
 
 
 class BreakSwitch:
@@ -3959,6 +4982,101 @@ def edit_inside_definition(source, name, old, new):
     return head + "\n" + body.replace(old, new) + "\n" + tail
 
 
+def run_crash_case_features_cells(selftest):
+    """登记行 features= 带进 crash-case-command：带特性的行拼出 -p <包> 之后带 --features、env 里设 bindgen 头文件目录的命令（多机配置 ENABLE_GPU=1 的另加 gpu、整条经 gpu-quiesce-run.sh 起），
+    不带的行命令照旧（不带 --features、不设 bindgen、不经包装）；登记行写错（小写以外、写两条、与 shard=across-machines 并存）拒。
+    弄坏开关：features-not-passed（带特性那一格红）、features-passed-to-every-case（不带特性那一格红）、gpu-case-not-quiesced（开 GPU 那一格红）。"""
+    work = tempfile.mkdtemp(prefix="admission-selftest-features-")
+    try:
+        plain_row = "crash-case:plain\tcrates/ Cargo.toml\ttest=pkg:own_case:the_case count-line=LAYER0\t# 样本"
+        engine_row = "crash-case:engine\tcrates/ Cargo.toml\ttest=pkg:own_case:the_case count-line=LAYER0 features=verdict-store\t# 样本"
+        build_crash_case_repository(work, [plain_row, engine_row])
+        write_text(os.path.join(work, BINDGEN_LIBRARY_SCRIPT), 'CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS="-I/sample/gcc/13/include -I/sample/gcc/14/include"\n')
+        gpu_off = os.path.join(work, "multi-host-gpu-off.env")
+        gpu_on = os.path.join(work, "multi-host-gpu-on.env")
+        write_text(gpu_off, "ENABLE_GPU=0\n")
+        write_text(gpu_on, 'ENABLE_GPU=1\nGPU_CARDS_BY_PRIORITY="local:0:8G"\nGPU_CARDS_BY_PRIORITY_WHEN_QUIESCED="local:0:24G"\n')
+        rows = read_registration_rows(work)
+        quiesce_script = os.path.join(work, GPU_QUIESCE_SCRIPT)
+        cargo_head = ["cargo", "test", "--release", "-p", "pkg"]
+        cargo_tail = ["--test", "own_case", "--", "--include-ignored", "--exact", "the_case", "--nocapture"]
+
+        def launched(key, configuration):
+            caller = dict(os.environ, **{MULTI_HOST_CONFIGURATION_VARIABLE: configuration})
+            caller.pop(LAYER0_THREADS_VARIABLE, None)
+            return crash_case_launch(work, crash_case_of_key(rows, key), "0" * 64, False, caller)[4]
+
+        def has_bindgen(command):
+            return f"{BINDGEN_VARIABLE}=-I/sample/gcc/13/include -I/sample/gcc/14/include" in command
+
+        plain = launched("crash-case:plain", gpu_on)
+        plain_is_old = (plain[0] == "env" and plain[plain.index("cargo"):] == cargo_head + cargo_tail
+                        and not has_bindgen(plain) and not any(word.startswith("GPU_") for word in plain))
+        selftest.expect("crash-case-command：没登记 features= 的行（多机配置开着 GPU 也一样）命令照旧：不带 --features、不设 bindgen、不经 gpu-quiesce-run.sh",
+                        plain_is_old, f"命令是 {plain}")
+        with BreakSwitch("features-passed-to-every-case"):
+            broken_plain = launched("crash-case:plain", gpu_off)
+        selftest.expect("弄坏开关 features-passed-to-every-case 下「不带特性的行命令照旧」那一格红（带上了 --features）", "--features" in broken_plain,
+                        f"弄坏之后命令是 {broken_plain}")
+
+        engine = launched("crash-case:engine", gpu_off)
+        engine_ok = (engine[0] == "env" and engine[engine.index("cargo"):] == cargo_head + ["--features", "verdict-store"] + cargo_tail and has_bindgen(engine))
+        selftest.expect("crash-case-command：登记了 features=verdict-store 的行（GPU 关）：-p pkg 之后带 --features verdict-store、env 里设 bindgen 头文件目录、不经包装",
+                        engine_ok, f"命令是 {engine}")
+        with BreakSwitch("features-not-passed"):
+            broken_engine = launched("crash-case:engine", gpu_off)
+        selftest.expect("弄坏开关 features-not-passed 下「带特性的行带 --features」那一格红（没带）", "--features" not in broken_engine, f"弄坏之后命令是 {broken_engine}")
+
+        gpu = launched("crash-case:engine", gpu_on)
+        gpu_ok = (gpu[:3] == ["bash", quiesce_script, "--"] and gpu[3] == "env" and "--features" in gpu
+                  and gpu[gpu.index("--features") + 1] == "verdict-store,gpu" and "GPU_CARDS_BY_PRIORITY=local:0:24G" in gpu
+                  and f"{MULTI_HOST_CONFIGURATION_VARIABLE}={gpu_on}" in gpu and gpu[gpu.index("-u") + 1] == "GPU_COMPUTATION_CLASSES")
+        selftest.expect("crash-case-command：登记了 features=verdict-store 的行、多机配置 ENABLE_GPU=1：特性加 gpu，整条经 gpu-quiesce-run.sh 起，交清场之后那一份显卡先后",
+                        gpu_ok, f"命令是 {gpu}")
+        with BreakSwitch("gpu-case-not-quiesced"):
+            broken_gpu = launched("crash-case:engine", gpu_on)
+        selftest.expect("弄坏开关 gpu-case-not-quiesced 下「开 GPU 的带特性行经清场包装」那一格红（直接起 env）", broken_gpu[0] == "env" and "gpu" in broken_gpu[broken_gpu.index("--features") + 1],
+                        f"弄坏之后命令是 {broken_gpu}")
+        # 多机配置在而读不了：判不出开没开 GPU，抛错，不当成关
+        unreadable = os.path.join(work, "multi-host-unreadable.env")
+        with open(unreadable, "wb") as handle:
+            handle.write(b"ENABLE_GPU=\xff\xfe\n")
+        try:
+            launched("crash-case:engine", unreadable)
+            outcome = "没抛错"
+        except InputManifestError as error:
+            outcome = f"拒：{error}"
+        selftest.expect("crash-case-command：多机配置在而读不了 ⇒ 抛 InputManifestError（不当成 GPU 关）", outcome.startswith("拒"), outcome)
+
+        written = [("features= 写成大写", ["features=Verdict_Store"]), ("features= 写了两条", ["features=verdict-store", "features=gpu"]),
+                   ("features= 里有空项", ["features=verdict-store,,gpu"]), ("features= 里有重复项", ["features=gpu,gpu"]),
+                   ("features= 与 shard=across-machines 并存", ["features=verdict-store", "shard=across-machines"])]
+        for label, conditions in written:
+            try:
+                parse_crash_case(RegistrationRow("crash-case:demo", ["crates/"], ["test=pkg:target:function", *conditions], 1, ""))
+                outcome = "读得出"
+            except RegistrationError as error:
+                outcome = f"拒：{error}"
+            selftest.expect(f"崩溃枚举用例登记行：{label} ⇒ 拒", outcome.startswith("拒") and "features=" in outcome, outcome)
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def run_real_crash_case_features_cells(selftest, rows):
+    """真仓登记表里经引擎的两条随机历史用例（crash-injection-fast-tier、read-faulted-states-never-hold-the-witness-criterion）登记着 features=verdict-store，
+    其余的崩溃枚举用例不登记（它们的用例函数不经引擎，带特性只多编 RocksDB）；登记了 features= 的没有一条同时登记 shard=across-machines。"""
+    engine_keys = ("crash-case:crash-injection-fast-tier", "crash-case:read-faulted-states-never-hold-the-witness-criterion")
+    cases = crash_cases_of(rows)
+    for key in engine_keys:
+        found = [case for case in cases if case.key == key]
+        selftest.expect(f"真仓登记的 {key} 登记着 features=verdict-store", len(found) == 1 and found[0].features == (VERDICT_STORE_FEATURE,),
+                        f"登记的特性是 {[case.features for case in found]}")
+    others = [case.key for case in cases if case.features and case.key not in engine_keys]
+    selftest.expect("真仓登记表里登记了 features= 的只有经引擎的那两条随机历史用例", not others, f"另外还有 {others}")
+    both = [case.key for case in cases if case.features and case.is_shardable_across_machines]
+    selftest.expect("真仓登记表里 features= 与 shard=across-machines 没有并存的", not both, f"并存的有 {both}")
+
+
 def run_thread_source_cells(selftest, module):
     """门禁批第三轮 FM 与 FD3：线程从哪来、判法自己现取。
     FM：登记行的 threads-variable= 由 crash-case-command 设成配的线程数（调用方设着的不认，弄坏开关 thread-variable-ignored 下漏进来）、
@@ -4042,7 +5160,7 @@ SHARDABLE_ANSWER_UNREGISTERED = '：单机跑")\n    return 1'
 JUDGING_DIGEST_VARIANTS = [
     ("实验准入：admit_experiment 里加一行注释", "admit_experiment", "def admit_experiment(root, key):\n", "def admit_experiment(root, key):\n    # 样本\n",
      False),
-    ("门禁复用：gate_reuse 的一句说明改字", "gate_reuse", "强制跑一趟", "强制跑一次", False),
+    ("门禁复用：gate_reuse 的一句说明改字", "gate_reuse", "还没有过整轮全绿的暂存树", "还没有整轮全绿过的暂存树", False),
     ("自证：run_selftest 里加一行注释", "run_selftest", "def run_selftest():\n", "def run_selftest():\n    # 样本\n", False),
     ("排除规则：files_crash_cases_do_not_read 里加一行注释（它的结果变了，清单自己会变）", "files_crash_cases_do_not_read",
      "    listed_set = set(listed_names)\n", "    # 样本\n    listed_set = set(listed_names)\n", False),
@@ -4628,6 +5746,7 @@ COMMANDS = {
     "paths": command_paths,
     "manifest": command_manifest,
     "keys": command_keys,
+    "replay-row-keys": command_replay_row_keys,
     "gate-preconditions": command_gate_preconditions,
     "gate-record-environment": command_gate_record_environment,
     "crash-cases": command_crash_cases,

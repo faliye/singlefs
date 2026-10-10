@@ -10,9 +10,13 @@
 用法：
   insert-row.py 文件 --after 正则 --line 文本 [--absent 正则] [--dry-run]
   insert-row.py 文件 --before 正则 --line 文本 …
+  insert-row.py 文件 --after-literal 文本 --line 文本 …    # 锚点按字面认（括号、竖线、点都不当正则）
   insert-row.py --selftest
 
   --after / --before  锚点正则，必须在文件里**恰好命中一次**（命中 0 次或多次都拒绝，与 replace-once 同规矩）
+  --after-literal / --before-literal  同上，锚点按字面找（等于把它 re.escape 之后当正则）
+  锚点命中 0 次：说明按正则认、点出锚点里的正则元字符，给 --<…>-literal 与转义好的写法，列出按字面找得到的行号；
+  命中多次：列出每一处的行号与那一行。
   --absent            插之前先确认这个正则一处都没有，用来挡重复插入（例如已经有同编号的行）
 写之前复核：读文件时记下 sha256，写之前再算一次，变了就拒绝并让人重跑——
 别人在这中间写过，读到的内容已经不是要改的那一份。
@@ -22,11 +26,21 @@
 
 退出码：0 插好了（或干跑）；1 用法不对或自检没过；2 --absent 已有命中；3 锚点不是恰好命中一次；
 4 读到写之间文件被改过；5 没换上（有多个硬链接、建不了临时文件、写或改名失败）。2–5 都是原文件没动、临时文件已删。
+
+弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（括号里是那条「✗ 自检失败：」的开头）：
+  INSERT_ROW_BREAK=vague-anchor-hint  anchor_hints() 走回改前的说法（「把正则写得更具体些」，不点元字符、不列行号）
+      锚点命中多次（「✗ 自检失败：锚点命中两次时没列出每一处的行号」；自证停在第一处失败，排在它后面的
+      「✗ 自检失败：锚点带括号命中 0 次」那一格同样判这一支，只在前一格过了时才走到）
+  INSERT_ROW_BREAK=literal-as-regex  insert() 把 --<…>-literal 照旧按正则认
+      按字面插（「✗ 自检失败：--after-literal 带括号的锚点没插成」）
 """
 import argparse
+import contextlib
 import hashlib
+import io
 import os
 import re
+import shlex
 import sys
 
 from lib_atomic_replace import ReplaceRefused, leftover_temporary_files, problems_with_replacement_by_rename, \
@@ -50,7 +64,48 @@ def digest(path):
     return hashlib.sha256(open(path, "rb").read()).hexdigest()
 
 
-def insert(path, anchor, where, line, absent, dry_run):
+BROKEN = os.environ.get("INSERT_ROW_BREAK", "")
+REGEX_METACHARACTERS = "()[]{}|.*+?^$\\"
+
+
+def anchor_hints(lines, anchor, where, literal, matched):
+    """锚点不是恰好命中一次时的说明与下一步：→ [行]（已带缩进）。多次：列出每一处的行号；0 次：说明按正则认、点出锚点里的元字符，
+    给转义好的写法与按字面匹配的 --<where>-literal，并列出按字面找得到的行号。"""
+    if BROKEN == "vague-anchor-hint":   # 弄坏开关：改前的说法
+        return ["     → 怎么办：把 --%s 的正则写得更具体些，让它只命中要插的那个位置。" % where]
+    hints = []
+    metacharacters = [] if literal else sorted({character for character in anchor if character in REGEX_METACHARACTERS}, key=anchor.index)
+    if matched:
+        hints.append("     命中的每一处（行号: 那一行）：")
+        hints += ["       %d: %s" % (index + 1, lines[index][:120]) for index in matched[:20]]   # gate-lint:detail
+        if len(matched) > 20:
+            hints.append("       ……另有 %d 处" % (len(matched) - 20))
+        if metacharacters:
+            hints.append("     --%s 按正则认，锚点里的 %s 不按字面匹配（竖线是「或」、点是任意一个字……）；要按字面找就改用 --%s-literal %s"
+                         % (where, " ".join("「%s」" % character for character in metacharacters), where, shlex.quote(anchor)))
+        hints.append("     → 怎么办：锚点往要插的那一行前后多带几个字（或在开头加 ^ 钉住行首），直到只命中那一处")
+        return hints
+    literal_hits = [index for index, value in enumerate(lines) if anchor in value]
+    if literal:
+        hints.append("     → 怎么办：--%s-literal 按字面一处都没找到：先 grep -nF 找到那一行，把锚点按文件里的原样（含空格与标点、全半角）抄进来" % where)
+        return hints
+    if metacharacters:
+        hints.append("     --%s 按正则认，锚点里有正则元字符 %s：它们不按字面匹配（括号是分组、方括号是字符集、竖线是「或」、点是任意一个字、"
+                     "* + ? { } 是重复、^ $ 是行首行尾、反斜杠是转义）" % (where, " ".join("「%s」" % character for character in metacharacters)))
+    else:
+        hints.append("     --%s 按正则认；锚点里没有正则元字符，文件里就是没有这一段" % where)
+    if literal_hits:
+        hints.append("     按字面找，命中 %d 处：%s" % (len(literal_hits), "、".join("第 %d 行" % (index + 1) for index in literal_hits[:10])))
+    hints.append("     → 怎么办：要按字面匹配，改用 --%s-literal %s；或者用转义好的正则 --%s %s"
+                 % (where, shlex.quote(anchor), where, shlex.quote(re.escape(anchor))))
+    if not literal_hits:
+        hints.append("       按字面也一处都没有：先 grep -nF 找到那一行，把锚点按文件里的原样（含空格与标点、全半角）抄进来")
+    return hints
+
+
+def insert(path, anchor, where, line, absent, dry_run, literal=False):
+    if BROKEN == "literal-as-regex":   # 弄坏开关：--<where>-literal 照旧按正则认
+        literal = False
     before = digest(path)
     text = open(path, encoding="utf-8").read()
     if absent:
@@ -60,10 +115,16 @@ def insert(path, anchor, where, line, absent, dry_run):
             print("     → 怎么办：先看那几处是不是你要插的这一行；确实要再插一行就换一个 --absent，或者去掉它。")
             return 2
     lines = text.split("\n")
-    matched = [index for index, value in enumerate(lines) if re.search(anchor, value)]
+    try:
+        matched = [index for index, value in enumerate(lines) if (anchor in value if literal else re.search(anchor, value))]
+    except re.error as error:
+        print("  ✗ --%s 的锚点不是一条合法的正则（%s）：%s" % (where, error, anchor))
+        print("     → 怎么办：--%s 按正则认；要按字面找就改用 --%s-literal %s" % (where, where, shlex.quote(anchor)))
+        return 3
     if len(matched) != 1:
-        print("  ✗ 锚点在 %s 里命中 %d 次，只认恰好一次" % (path, len(matched)))
-        print("     → 怎么办：把 --%s 的正则写得更具体些，让它只命中要插的那个位置。" % where)
+        print("  ✗ 锚点在 %s 里命中 %d 次，只认恰好一次（--%s%s）" % (path, len(matched), where, "-literal 按字面认" if literal else " 按正则认"))
+        for line in anchor_hints(lines, anchor, where, literal, matched):
+            print(line)
         return 3
     at = matched[0] + (1 if where == "after" else 0)
     lines.insert(at, line)
@@ -114,10 +175,35 @@ def selftest():
             print("     → 这个工具自己坏了，别再拿它改公共表：挡不住重复插入意味着同一行会被插两遍。"
                   "查 absent 那条正则是不是拿去逐行匹配了，以及命中时有没有真的 return 2。")
             return 1
-        if insert(path, r"^\| [AB] \|", "after", "| D | 四 |", None, False) != 3:
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = insert(path, r"^\| [AB] \|", "after", "| D | 四 |", None, False)
+        if code != 3:
             print("  ✗ 自检失败：锚点命中两次时没拒绝")
             print("     → 这个工具自己坏了，别再拿它改公共表：锚点不唯一还照插，等于插在了没人指定的位置。"
                   "查数命中那一段是不是只找了第一处就停（应当数完全部行再判）。")
+            return 1
+        if "       1: | A | 一 |" not in captured.getvalue() or "       2: | B | 二 |" not in captured.getvalue():
+            print("  ✗ 自检失败：锚点命中两次时没列出每一处的行号：\n" + captured.getvalue())
+            print("     → 查 anchor_hints() 命中多次那一支；INSERT_ROW_BREAK=vague-anchor-hint 设着的话这里本来就该红。")
+            return 1
+        # 锚点带 ASCII 括号：按正则认时括号是分组，命中 0 次；说明要点出元字符、给 --before-literal 与转义好的写法、列出按字面找得到的行
+        open(path, "a", encoding="utf-8").write("| 派发闸(派发提示) | 九 |\n")
+        captured = io.StringIO()
+        with contextlib.redirect_stdout(captured):
+            code = insert(path, "派发闸(派发提示)", "before", "| F | 六 |", None, False)
+        said = captured.getvalue()
+        wanted = ["命中 0 次", "按正则认", "「(」 「)」", "--before-literal '派发闸(派发提示)'", "--before '派发闸\\(派发提示\\)'", "按字面找，命中 1 处：第 6 行"]
+        if code != 3 or any(piece not in said for piece in wanted):
+            print("  ✗ 自检失败：锚点带括号命中 0 次时，说明应当点出元字符、给 --before-literal 与转义好的写法、列出按字面找到的行号，实际退 %d：\n%s" % (code, said))
+            print("     → 查 anchor_hints() 命中 0 次那一支；INSERT_ROW_BREAK=vague-anchor-hint 设着的话这里本来就该红。")
+            return 1
+        with contextlib.redirect_stdout(io.StringIO()):
+            code = insert(path, "派发闸(派发提示)", "before", "| F | 六 |", None, False, literal=True)
+        body = open(path, encoding="utf-8").read()
+        if code != 0 or "| F | 六 |\n| 派发闸(派发提示) | 九 |" not in body:
+            print("  ✗ 自检失败：--after-literal 带括号的锚点没插成（--before-literal 同一支），退 %d：\n%s" % (code, body))
+            print("     → 查 insert() 里 literal 那一支是不是按字面（in）比；INSERT_ROW_BREAK=literal-as-regex 设着的话这里本来就该红。")
             return 1
         # 写前复核：让 digest 在读之后返回不同的值，模拟别的会话在这中间写过
         global digest
@@ -158,7 +244,8 @@ def selftest():
         print("     → 这个工具自己坏了，别再拿它改脚本：就地写会让正在边跑边读那份脚本的进程读到别的内容。"
               "按方括号里那一格查 lib_atomic_replace.py 的 replace_file_contents_by_rename。")
         return 1
-    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝、读到写之间被改过拒绝且不写也不留临时文件；"
+    print("  ✓ 自检：正常插入判绿、重复插入被 --absent 挡、锚点不唯一拒绝并列出每一处的行号、"
+          "锚点带括号命中 0 次时点出元字符并给 --before-literal 与转义好的写法、--before-literal 按字面插成、读到写之间被改过拒绝且不写也不留临时文件；"
           "换上的是新 inode、权限位不变、改之前打开文件的读者接着读到旧内容、fsync 在改名之前、"
           "经符号链接改的是它指向的文件、有两个硬链接或当前用户只读都拒绝、fsync 或改名失败都不动原文件也不留临时文件")
     return 0
@@ -169,6 +256,8 @@ def main(argv):
     parser.add_argument("file", nargs="?")
     parser.add_argument("--after")
     parser.add_argument("--before")
+    parser.add_argument("--after-literal")
+    parser.add_argument("--before-literal")
     parser.add_argument("--line")
     parser.add_argument("--absent")
     parser.add_argument("--dry-run", action="store_true")
@@ -176,13 +265,19 @@ def main(argv):
     arguments = parser.parse_args(argv)
     if arguments.selftest:
         return selftest()
-    if not arguments.file or not arguments.line or bool(arguments.after) == bool(arguments.before):
-        print("  ✗ 用法：insert-row.py 文件 --after 正则 --line 文本（--after 与 --before 二选一）")
+    anchors = [(where, literal, value) for where, literal, value in
+               (("after", False, arguments.after), ("before", False, arguments.before),
+                ("after", True, arguments.after_literal), ("before", True, arguments.before_literal)) if value]
+    if not arguments.file or not arguments.line or len(anchors) != 1:
+        print("  ✗ 用法：insert-row.py 文件 --after 正则 --line 文本（--after、--before、--after-literal、--before-literal 四选一）")
         print("     → 怎么办：看文件头的用法一节；自检跑 insert-row.py --selftest。")
         return 1
-    where = "after" if arguments.after else "before"
-    return insert(arguments.file, arguments.after or arguments.before, where,
-                  arguments.line, arguments.absent, arguments.dry_run)
+    if not os.path.isfile(arguments.file):
+        print("  ✗ 找不到文件 %s" % arguments.file)
+        print("     → 怎么办：检查路径（相对路径相对当前工作目录），文件是不是已经被别的进程删掉或改名")
+        return 1
+    where, literal, anchor = anchors[0]
+    return insert(arguments.file, anchor, where, arguments.line, arguments.absent, arguments.dry_run, literal=literal)
 
 
 if __name__ == "__main__":

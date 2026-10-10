@@ -3,7 +3,8 @@
 # 长跑脚本脱离会话跑：挂到用户级 systemd 的一个临时服务单元下，不在调用方的进程树里，调用方被停、会话的后台时限到点、会话关掉都不影响它；
 # 会话里只上报（list / watch），不停它（records/2026-09-16-subagent拆分提案.md 第四十二节，用户 2026-10-01 定）。
 #
-#   detached-run.sh start --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>
+#   detached-run.sh start --wall-clock <within-2h|over-2h> --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>
+#   detached-run.sh long-run-check -- <命令与参数…>
 #   detached-run.sh list
 #   detached-run.sh watch [--every <秒>]
 #   detached-run.sh stop <名>
@@ -48,6 +49,16 @@
 #   起之前读 loginctl show-user <用户> -p Linger：为 no、或读不到时，stderr 打一行警告，照起（不拒）。
 #   起完回读：单元的 ActiveState 与 MainPID、登记里命令的进程号（至多等 10 秒），两样都读不到就判没起成、退 1；登记里有退出码而没有命令的进程号，
 #   是命令没跑起来（单元里写不进登记或日志，退出码是单元里那个 bash 的），判没起成、退 1。
+# start 的 --wall-clock（必填，也可写成 --wall-clock=<值>）：这一次的预计挂钟在 2 小时内写 within-2h，超过写 over-2h。没写、写了别的值，用法错退 2、什么都不起。
+#   over-2h 的：从 -- 之后的词里认出被起的那份脚本，读它文件头注释块里的长活声明——# long-run-shards:（分片单元）、# long-run-resume:（续跑入口：
+#   同一条命令重起只补没做完的）、# long-run-hosts:（台数从 layer0-shard-configuration-check.sh --emit-hosts 读、额度从 host-resources.py --json 现算，不写死），
+#   分不了的写 # long-run-unshardable: 点名缺的那几段与为什么（至少 8 个字）。判据 .claude/singlefs-ai-sop/rules/test-script-discipline.md
+#   「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；认被起的脚本、读声明与判法都在 .claude/hooks/lib_long_run.py（写法以它的文件头为准）。
+#   声明不齐、多机一行写死额度、判不出被起的是哪份脚本（bash -c '…' 一长串、直接起 cargo 或编出来的二进制）、判法起不来，都拒、退 5，
+#   什么都不起、旧登记不动（判在拿锁之前）；出路：把命令写进一份脚本、文件头补声明、改成 -- bash <那份脚本> 起。齐了在 stderr 打一行「长活声明齐了」。
+#   within-2h 的不读声明。挂钟估得对不对这里判不了。
+# long-run-check：照 over-2h 判 -- 之后那条命令的长活声明，不起单元、不碰登记；齐了退 0（stdout 一行），不齐退 5，用法错退 2。
+#   谁都能跑（子 agent 交回长跑法之前自查；.claude/hooks/bash-command-detector.sh 只拒子 agent 的 start 与 stop）。
 # list：逐条列登记——还在跑的：名、单元名、主进程号、命令的进程号、起跑日期、已跑时长、日志大小；已结束的：退出码（stop 停的另注一句；没有命令进程号的
 #   注「命令没跑起来」）、结束日期、用时；单元已不在又没留退出码的单列（stop 停时到点被 KILL 的另注一句），其中旁路文件在的单列成「登记写不进」；
 #   systemctl --user show 查不到状态的单列成「查不到」（不知道还在不在跑，不算结束）；记了 start-failed 的先按单元名查状态，单元在跑的列成还在跑，
@@ -95,6 +106,7 @@
 #
 # 退出码：0 成功（watch：观察的全部结束）；1 systemd 起不来、起了回读不到、登记目录建不了、查不到单元状态；2 用法错（什么都没起）；
 #   3 拒绝（同名还在跑、stop 的名没有登记）；4 弄坏开关 DETACHED_RUN_BREAK 设在 --selftest 之外（什么都没做；出路：去掉它再跑）；
+#   5 长活声明不齐（start --wall-clock over-2h 与 long-run-check；什么都没起）；
 #   78 准入或运行条件不满足（preflight）；watch 被停退 143 / 130 / 129。
 #
 # 自证（--selftest）：在临时登记目录里起名为 selftest-<进程号>-<格> 的单元，只跑 sleep、true 与几行 bash；收尾逐个按单元名停、
@@ -203,6 +215,26 @@
 #       Ⓩ watch 开跑之后起了又跑完的短命令：一轮清单都没见它在跑，watch 退 0 时照报 selftest-<进程号>-z2 退出码 6
 #   DETACHED_RUN_BREAK=scopes-left-running  单元里那个 bash 命令退出之后不找、不停命令留在别的 scope 里的进程
 #       Ⓤ 命令留在别的 scope 里的进程：stop 停单元之后，那个 scope 也停了、sleep 不在了，日志里记了一行
+#   DETACHED_RUN_BREAK=wall-clock-optional  start 没写 --wall-clock 时当 within-2h 照起
+#       长活① 没写 --wall-clock、写了认不出的值：用法错退 2、带出路、没建登记
+#   DETACHED_RUN_BREAK=long-run-unchecked  start --wall-clock over-2h 不判长活声明、照起
+#       长活② over-2h、被起的脚本一样声明都没有（不分片的长跑法）：拒、退 5、带出路、没建登记
+#       长活③ over-2h、只写了分片一样（半截声明）：拒、退 5、点名缺续跑与多机、没建登记
+#       长活④ over-2h、多机一行写死线程与内存：拒、退 5、点名写死的额度、没建登记
+#       长活⑤ over-2h、bash -c 一长串判不出被起的脚本：拒、退 5、出路写进一份脚本、没建登记
+#       长活⑧ over-2h 三样齐了照起、命令跑了；within-2h 不读声明照起
+#   长活声明判法那一半的开关在 .claude/hooks/lib_long_run.py（LIB_LONG_RUN_BREAK；只在自证起的进程里认，别处设了 start 与 long-run-check 调判法前摘掉它）：
+#   LIB_LONG_RUN_BREAK=partial-accepted  三样写了一样就当齐了
+#       长活③ over-2h、只写了分片一样（半截声明）：拒、退 5、点名缺续跑与多机、没建登记
+#       长活⑥ long-run-check：分不了一行不到 8 个字、没点名缺的多机都拒（退 5），点名了的放（退 0）
+#   LIB_LONG_RUN_BREAK=hosts-unchecked  多机一行不看内容
+#       长活④ over-2h、多机一行写死线程与内存：拒、退 5、点名写死的额度、没建登记
+#   LIB_LONG_RUN_BREAK=script-unresolved-accepted  判不出被起的脚本时当成齐了
+#       长活⑤ over-2h、bash -c 一长串判不出被起的脚本：拒、退 5、出路写进一份脚本、没建登记
+#   LIB_LONG_RUN_BREAK=unshardable-unchecked  分不了一行不看字数、不看点没点名缺的那几样
+#       长活⑥ long-run-check：分不了一行不到 8 个字、没点名缺的多机都拒（退 5），点名了的放（退 0）
+#   LIB_LONG_RUN_BREAK=wrappers-not-skipped  不跳过包装，第一份脚本就算被起的那份
+#       长活⑦ long-run-check 跳过包装：run-with-memory-cap.sh 与 capped.sh 包着的三样齐的脚本退 0；包着没声明的脚本退 5、点名的是那份脚本
 #   两道闸切参数那一半的开关在 .claude/hooks/lib_shell_words.py（不经令牌，自证把它带给自己起的 python3）：
 #   LIB_SHELL_WORDS_BREAK=detached-run-force-kept  切 start 的参数时 -- 之后的 --force 不照 preflight 摘
 #       Ⓟ -- 之后的 --force 照 preflight 摘：命令收到 a b，闸切出的词与登记里的命令逐字相同
@@ -211,7 +243,7 @@
 # gate-similar: run-with-memory-cap.sh 它也用用户级 systemd（scope 加 singlefs-heavy.slice），scope 里的命令仍是调用方的子进程、跟着调用方的进程树走；这里要的正是不跟着调用方走的 service
 #
 # admission: always 每次调都是对此刻的用户级 systemd 与登记目录做一件事，上一次的结论不替这一次作保
-# run-condition: command bash systemd-run systemctl flock timeout
+# run-condition: command bash systemd-run systemctl flock timeout python3
 # run-condition: check systemctl --user show-environment >/dev/null 2>&1 :: 用户级 systemd 连不上（没有 XDG_RUNTIME_DIR 或 D-Bus）：在登录会话里跑，或请用户开 linger
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../../.claude/scripts/preflight.sh"
@@ -296,7 +328,7 @@ detached_run_inside_selftest() { # 这个进程是不是 --selftest 起的：登
 
 detached_run_usage_error() { # <原因>：用法错，什么都没起，退 2
   echo "  ✗ detached-run.sh 用法错：$1" >&2
-  echo "     → 怎么办：detached-run.sh start --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>、list、watch [--every <秒>]、stop <名>，或 --selftest；名只用字母、数字、点、减号与下划线，字母或数字起头，至多 64 个字" >&2
+  echo "     → 怎么办：detached-run.sh start --wall-clock <within-2h|over-2h> --label <名> [--log <文件>] [--stop-timeout <秒>] -- <命令与参数…>、long-run-check -- <命令与参数…>、list、watch [--every <秒>]、stop <名>，或 --selftest；名只用字母、数字、点、减号与下划线，字母或数字起头，至多 64 个字" >&2
   exit 2
 }
 
@@ -497,9 +529,21 @@ detached_run_list() { # 逐条列登记；DETACHED_RUN_RUNNING_COUNT / _RECORDS 
   echo "  ✓ detached-run.sh list：还在跑、没结束的 $DETACHED_RUN_RUNNING_COUNT 条，已结束 $ended_count 条，没留退出码 $vanished_count 条，登记写不进 $write_failed_count 条，查不到 $DETACHED_RUN_UNKNOWN_COUNT 条，没起成 $start_failed_count 条；登记里没有的单元 $unregistered_count 个（登记 $total 条，登记目录 $detached_run_state）"
 }
 
+detached_run_long_run_check() { # <命令与参数…>：照 over-2h 判被起脚本的长活声明（判法 .claude/hooks/lib_long_run.py，它的 ✓ 打 stdout、✗ 与出路打 stderr）；
+  # 齐了返回 0；不齐、判不出、判法起不来返回 5。LIB_LONG_RUN_BREAK 只在自证起的进程里带给判法，别处摘掉
+  local lib="${detached_run_script%/*}/../../.claude/hooks/lib_long_run.py" rc unset_break=(-u LIB_LONG_RUN_BREAK)
+  if detached_run_inside_selftest; then unset_break=(); fi
+  if env ${unset_break[@]+"${unset_break[@]}"} python3 "$lib" script "$PWD" -- "$@"; then return 0; else rc=$?; fi
+  if ((rc != 1)); then
+    echo "  ✗ 长活声明判不了：$lib 退 $rc（判法起不来，或 LIB_LONG_RUN_BREAK 写错），这一次什么都没起" >&2
+    echo "     → 怎么办：看它上面打的那几行，修好 .claude/hooks/lib_long_run.py（或去掉写错的 LIB_LONG_RUN_BREAK）再起" >&2
+  fi
+  return 5
+}
+
 detached_run_start() { # start 的参数
   local label="" log="" separator_seen=0 record unit state archive="" started name runner main_pid pid tries=0 carried=() setenv=() properties=() rc waited=0
-  local stop_timeout="$DETACHED_RUN_DEFAULT_STOP_TIMEOUT_SECONDS" stop_timeout_given="" unwritable="" side query_deferred="" bad_assignment
+  local stop_timeout="$DETACHED_RUN_DEFAULT_STOP_TIMEOUT_SECONDS" stop_timeout_given="" unwritable="" side query_deferred="" bad_assignment wall_clock=""
   while (($#)); do
     case "$1" in
       --label) (($# >= 2)) || detached_run_usage_error "--label 后面要一个名"; label="$2"; shift 2 ;;
@@ -508,6 +552,8 @@ detached_run_start() { # start 的参数
       --log=*) log="${1#--log=}"; shift ;;
       --stop-timeout) (($# >= 2)) || detached_run_usage_error "--stop-timeout 后面要秒数"; stop_timeout_given=1; stop_timeout="$2"; shift 2 ;;
       --stop-timeout=*) stop_timeout_given=1; stop_timeout="${1#--stop-timeout=}"; shift ;;
+      --wall-clock) (($# >= 2)) || detached_run_usage_error "--wall-clock 后面要 within-2h 或 over-2h"; wall_clock="$2"; shift 2 ;;
+      --wall-clock=*) wall_clock="${1#--wall-clock=}"; shift ;;
       --) separator_seen=1; shift; break ;;
       *) detached_run_usage_error "start 认不出 $1（命令要写在 -- 之后）" ;;
     esac
@@ -523,6 +569,14 @@ detached_run_start() { # start 的参数
   [[ -n "$label" ]] || detached_run_usage_error "start 没给 --label"
   [[ "$label" =~ $DETACHED_RUN_LABEL_PATTERN ]] || detached_run_usage_error "名「$label」不合写法"
   [[ "$stop_timeout" =~ ^[1-9][0-9]*$ ]] || detached_run_usage_error "--stop-timeout 要正整数秒，给的是 $stop_timeout"
+  # 预计挂钟与长活声明（文件头 start 的 --wall-clock 一段）：判在拿锁、挪旧登记之前
+  if [[ -z "$wall_clock" ]] && detached_run_break_is wall-clock-optional; then wall_clock=within-2h; fi
+  case "$wall_clock" in
+    within-2h) ;;
+    over-2h) if ! detached_run_break_is long-run-unchecked; then detached_run_long_run_check "$@" >&2 || exit 5; fi ;;
+    "") detached_run_usage_error "start 没写 --wall-clock：预计挂钟 2 小时内写 --wall-clock within-2h；超过的写 --wall-clock over-2h，被起的脚本文件头要写长活声明（detached-run.sh 文件头 start 的 --wall-clock 一段）" ;;
+    *) detached_run_usage_error "--wall-clock 只认 within-2h 或 over-2h，给的是「$wall_clock」" ;;
+  esac
   record="$detached_run_state/$label"
   unit="${DETACHED_RUN_UNIT_PREFIX}${label}.service"
   detached_run_linger_warning
@@ -1095,7 +1149,7 @@ detached_run_selftest_watch_signal() { # <信号> <期望的退出码> <格的�
   #   退期望的码、最后一次清单里有它、它的单元与 sleep 都还在。work、prefix、state_directory 用 detached_run_selftest 里的
   local signal="$1" wanted_rc="$2" letter="$3" label="${prefix}$3" unit pid watch_pid rc tries=0 state
   unit="${DETACHED_RUN_UNIT_PREFIX}${label}.service"
-  bash "$detached_run_script" start --label "$label" -- sleep 300 > "$work/$letter.out" 2>&1
+  bash "$detached_run_script" start --wall-clock within-2h --label "$label" -- sleep 300 > "$work/$letter.out" 2>&1
   detached_run_selftest_wait_for_file "$state_directory/$label/pid" 100
   pid="$(detached_run_field "$state_directory/$label" pid)"
   # 后台作业的 INT 默认被忽略（nohup 下 HUP 也是），忽略着进来的信号 trap 不上：用 env --default-signal 把三种都放回默认，watch 才接得到
@@ -1135,8 +1189,8 @@ if [[ \" \$* \" == *' show '* && \" \$* \" == *$(printf '%q' " $unit ")* && ! -e
 fi
 exec $(printf '%q' "$real_systemctl") \"\$@\""
   # 先起一条 e1（名字排在 e2 前面）：别的格的单元被弄坏开关停了也保证这一轮在 e2 之前至少调两次 show
-  bash "$detached_run_script" start --label "${prefix}e1" -- sleep 300 > "$work/e1.out" 2>&1
-  bash "$detached_run_script" start --label "$label" -- sleep 300 > "$work/e2.out" 2>&1
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}e1" -- sleep 300 > "$work/e1.out" 2>&1
+  bash "$detached_run_script" start --wall-clock within-2h --label "$label" -- sleep 300 > "$work/e2.out" 2>&1
   detached_run_selftest_wait_for_file "$state_directory/$label/pid" 100
   pid="$(detached_run_field "$state_directory/$label" pid)"
   PATH="$shim:$PATH" env --default-signal=INT,HUP,TERM bash "$detached_run_script" watch --every 1 > "$work/e2-watch.out" 2>&1 &
@@ -1182,15 +1236,15 @@ detached_run_selftest() {
   local unit_t="${DETACHED_RUN_UNIT_PREFIX}${prefix}t.service" unit_x="${DETACHED_RUN_UNIT_PREFIX}${prefix}x.service" letter
   caller_unit="${DETACHED_RUN_UNIT_PREFIX}${prefix}caller.service"
   detached_run_selftest_units=("$unit_b" "$unit_d" "$unit_f" "$unit_c" "$unit_a" "$unit_e" "$caller_unit" "$unit_t" "$unit_x")
-  for letter in e1 e2 u i k l l2 q2 r s n w w2 v1 v2 v3 p q m0 m1 m2 m3 m4 m5 m6 y z1 z2 us; do detached_run_selftest_units+=("${DETACHED_RUN_UNIT_PREFIX}${prefix}${letter}.service"); done
+  for letter in e1 e2 u i k l l2 q2 r s n w w2 v1 v2 v3 p q m0 m1 m2 m3 m4 m5 m6 y z1 z2 us lw lw2 lr1 lr2 lr3 lr4 lr-ok lr-within; do detached_run_selftest_units+=("${DETACHED_RUN_UNIT_PREFIX}${prefix}${letter}.service"); done
   detached_run_selftest_units+=("${DETACHED_RUN_UNIT_PREFIX}${prefix}us-inner.scope")   # Ⓤ 那一格照内存包装起的 scope
   # 单元里写登记失败时的旁路文件落进临时目录，不进真的 $XDG_RUNTIME_DIR
   export DETACHED_RUN_SIDE_DIRECTORY="$work/side"
 
   # Ⓗ 用法错与拒绝：名不合写法、没有 --、stop 没登记的名
-  bash "$detached_run_script" start --label 'a/b' -- true > "$work/h1.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label 'a/b' -- true > "$work/h1.out" 2>&1; rc=$?
   detached_run_expect "Ⓗ 名里带斜杠 ⇒ 用法错退 2" "$((rc == 2 ? 0 : 1))" "$work/h1.out"
-  bash "$detached_run_script" start --label "${prefix}h" true > "$work/h2.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}h" true > "$work/h2.out" 2>&1; rc=$?
   detached_run_expect "Ⓗ 命令前面没写 -- ⇒ 用法错退 2，什么都没起" \
     "$( { ((rc == 2)) && [[ ! -d "$state_directory/${prefix}h" ]]; } && echo 0 || echo 1)" "$work/h2.out"
   bash "$detached_run_script" stop "${prefix}nowhere" > "$work/h3.out" 2>&1; rc=$?
@@ -1198,7 +1252,7 @@ detached_run_selftest() {
 
   # Ⓚ 弄坏开关设在自证之外（不带 DETACHED_RUN_SELFTEST_TOKEN，登记目录里的令牌对不上）：start 与 list 都拒、退 4，什么都没起
   env -u DETACHED_RUN_SELFTEST_TOKEN DETACHED_RUN_BREAK="${DETACHED_RUN_BREAK:+$DETACHED_RUN_BREAK,}exit-dropped" \
-    bash "$detached_run_script" start --label "${prefix}k" -- true > "$work/k.out" 2>&1; rc=$?
+    bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}k" -- true > "$work/k.out" 2>&1; rc=$?
   env -u DETACHED_RUN_SELFTEST_TOKEN DETACHED_RUN_BREAK="${DETACHED_RUN_BREAK:+$DETACHED_RUN_BREAK,}exit-dropped" \
     bash "$detached_run_script" list >> "$work/k.out" 2>&1; got=$?
   detached_run_expect "Ⓚ DETACHED_RUN_BREAK 设在 --selftest 之外：start 与 list 都拒、退 4，没建登记" \
@@ -1212,11 +1266,11 @@ detached_run_selftest() {
   for m_sample in 'a-b=1' '--force=1' '1=1' 'a.b=1' 'FOO=1 a-b=1' '--force a-b=1'; do
     m_index=$((m_index + 1))
     read -r -a m_words <<< "$m_sample"
-    bash "$detached_run_script" start --label "${prefix}m$m_index" -- "${m_words[@]}" touch "$work/m$m_index.marker" >> "$work/m.out" 2>&1; rc=$?
+    bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}m$m_index" -- "${m_words[@]}" touch "$work/m$m_index.marker" >> "$work/m.out" 2>&1; rc=$?
     echo "样本「$m_sample」：start 退 $rc；登记 $([[ -d "$state_directory/${prefix}m$m_index" ]] && echo 在 || echo 不在)；marker $([[ -e "$work/m$m_index.marker" ]] && echo 在 || echo 不在)" >> "$work/m.out"
     { ((rc == 2)) && [[ ! -d "$state_directory/${prefix}m$m_index" && ! -e "$work/m$m_index.marker" ]]; } || m_failed=$((m_failed + 1))
   done
-  bash "$detached_run_script" start --label "${prefix}m0" -- FOO=selftest-m0 bash -c 'printf "%s\n" "$FOO" > "$0"' "$work/m0.env" >> "$work/m.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}m0" -- FOO=selftest-m0 bash -c 'printf "%s\n" "$FOO" > "$0"' "$work/m0.env" >> "$work/m.out" 2>&1; rc=$?
   detached_run_selftest_wait_for_file "$state_directory/${prefix}m0/exit" 100
   echo "对照「FOO=selftest-m0」：start 退 $rc；命令读到 FOO=$(cat "$work/m0.env" 2>/dev/null)；拒的样本里带出路的 $(grep -c '要设环境变量写成 -- env 名=值' "$work/m.out") 条" >> "$work/m.out"
   detached_run_expect "Ⓜ -- 之后开头的赋值名不合写法（a-b=1、--force=1、1=1、a.b=1、FOO=1 a-b=1、--force a-b=1）：start 拒、退 2、带出路、没建登记、命令没跑；合法的 FOO=… 照起、设进命令" \
@@ -1251,8 +1305,8 @@ for argument in \"\$@\"; do
   [[ \"\$argument\" == -- ]] && seen=1
 done
 exec $(printf '%q' "$real_mv") \"\$@\""
-  PATH="$shim_o:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_o" bash "$detached_run_script" start --label "${prefix}o" -- true > "$work/o1.out" 2>&1; rc=$?
-  PATH="$shim_o2:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_o" bash "$detached_run_script" start --label "${prefix}o2" -- true > "$work/o2.out" 2>&1; got=$?
+  PATH="$shim_o:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_o" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}o" -- true > "$work/o1.out" 2>&1; rc=$?
+  PATH="$shim_o2:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_o" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}o2" -- true > "$work/o2.out" 2>&1; got=$?
   { echo "建不了登记、挪回成：start 退 $rc"; cat "$work/o1.out"; echo "建不了登记、挪回也失败：start 退 $got"; cat "$work/o2.out"; ls -a "$state_o"; } > "$work/o.out" 2>&1
   detached_run_expect "Ⓞ 建不了这一次的登记：start 退 1、挪走的同名旧登记挪回原处；挪回也失败时退 1、打一行「没挪回」带出路、旧登记留在 <名>@<秒数>" \
     "$( { ((rc == 1)) && [[ "$(detached_run_field "$state_o/${prefix}o" started)" == "$started_o" ]] && ! compgen -G "$state_o/${prefix}o@*" > /dev/null \
@@ -1261,7 +1315,7 @@ exec $(printf '%q' "$real_mv") \"\$@\""
           && grep -qF "没挪回 $state_o/${prefix}o2" "$work/o2.out" && grep -qF "→ 怎么办：看登记目录 $state_o 的权限" "$work/o2.out"; } && echo 0 || echo 1)" "$work/o.out"
 
   # Ⓑ 退出码在单元结束之后读得到：命令退 7，单元收掉（--collect）之后登记里与 list 里都是 7，list 带日志最后一行
-  bash "$detached_run_script" start --label "${prefix}b" -- bash -c 'echo last-line-b; exit 7' > "$work/b.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}b" -- bash -c 'echo last-line-b; exit 7' > "$work/b.out" 2>&1; rc=$?
   detached_run_selftest_wait_for_file "$state_directory/${prefix}b/exit" 200
   tries=0
   while [[ "$(systemctl --user show -p LoadState --value "$unit_b" 2>/dev/null)" == loaded ]] && ((tries < 50)); do
@@ -1282,7 +1336,7 @@ exec $(printf '%q' "$real_mv") \"\$@\""
   mkdir -p "$work/cwd-d" "$work/path-d" "$work/home-d"
   ( cd "$work/cwd-d" && SINGLEFS_HEAVY_TESTS=selftest-carried CARGO_HOME="$work/cargo-home" RUSTUP_HOME="$work/rustup-home" \
       PATH="$work/path-d:$PATH" HOME="$work/home-d" \
-      bash "$detached_run_script" start --label "${prefix}d" -- \
+      bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}d" -- \
       bash -c 'printf "%s|%s|%s|%s|%s|%s|%s\n" "${SINGLEFS_HEAVY_TESTS-unset}" "${CARGO_HOME-unset}" "${RUSTUP_HOME-unset}" "${PATH%%:*}" "${HOME-unset}" "$(pwd -P)" "$1" > "$0"' \
       "$work/d.env" 'pct%n-dollar$HOME' ) > "$work/d.out" 2>&1; rc=$?
   detached_run_selftest_wait_for_file "$state_directory/${prefix}d/exit" 200
@@ -1293,17 +1347,17 @@ exec $(printf '%q' "$real_mv") \"\$@\""
     "$( { ((rc == 0)) && [[ "$got" == "$wanted" ]]; } && echo 0 || echo 1)" "$work/d.out"
 
   # Ⓕ watch 在观察的全部结束时自己退 0，报各自的退出码
-  bash "$detached_run_script" start --label "${prefix}f" -- bash -c 'sleep 2; exit 5' > "$work/f.out" 2>&1
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}f" -- bash -c 'sleep 2; exit 5' > "$work/f.out" 2>&1
   timeout 60 bash "$detached_run_script" watch --every 1 > "$work/f-watch.out" 2>&1; rc=$?
   cat "$work/f.out" >> "$work/f-watch.out"
   detached_run_expect "Ⓕ watch 在观察的全部结束时自己退 0、报 ${prefix}f 退出码 5" \
     "$( { ((rc == 0)) && grep -q "^  · ${prefix}f 退出码 5\$" "$work/f-watch.out"; } && echo 0 || echo 1)" "$work/f-watch.out"
 
   # Ⓒ 同名还在跑就拒、退 3，原登记与命令不动；list 数到还在跑 1 条
-  bash "$detached_run_script" start --label "${prefix}c" -- sleep 300 > "$work/c.out" 2>&1
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}c" -- sleep 300 > "$work/c.out" 2>&1
   detached_run_selftest_wait_for_file "$state_directory/${prefix}c/pid" 100
   pid_before="$(detached_run_field "$state_directory/${prefix}c" pid)"
-  bash "$detached_run_script" start --label "${prefix}c" -- sleep 301 > "$work/c2.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}c" -- sleep 301 > "$work/c2.out" 2>&1; rc=$?
   pid="$(detached_run_field "$state_directory/${prefix}c" pid)"
   bash "$detached_run_script" list > "$work/c-list.out" 2>&1
   cat "$work/c.out" "$work/c2.out" >> "$work/c-list.out"
@@ -1331,7 +1385,7 @@ exec $(printf '%q' "$real_mv") \"\$@\""
 
   # Ⓝ stop 等命令收尾完：命令收到 TERM 之后 7 秒才退 9（比 stop 回读退出码的 5 秒长、比停机时限 30 秒短）；stop 退 0、报退出码 9、
   #   回来时单元已停下、没记 stop-killed
-  bash "$detached_run_script" start --label "${prefix}n" --stop-timeout 30 -- bash -c 'trap "sleep 7; exit 9" TERM; : > "$0"; sleep 30 & wait' "$work/n.ready" \
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}n" --stop-timeout 30 -- bash -c 'trap "sleep 7; exit 9" TERM; : > "$0"; sleep 30 & wait' "$work/n.ready" \
     > "$work/n.out" 2>&1
   detached_run_selftest_wait_for_file "$work/n.ready" 100
   bash "$detached_run_script" stop "${prefix}n" >> "$work/n.out" 2>&1; rc=$?
@@ -1347,7 +1401,7 @@ exec $(printf '%q' "$real_mv") \"\$@\""
     --working-directory="$work" --setenv=PATH="$PATH" --setenv=HOME="$HOME" --setenv=DETACHED_RUN_STATE_DIRECTORY="$state_directory" \
     --setenv=DETACHED_RUN_SELFTEST_TOKEN="$DETACHED_RUN_SELFTEST_TOKEN" ${DETACHED_RUN_BREAK:+"--setenv=DETACHED_RUN_BREAK=$DETACHED_RUN_BREAK"} \
     --setenv=DETACHED_RUN_SIDE_DIRECTORY="$DETACHED_RUN_SIDE_DIRECTORY" \
-    -- "$BASH" -c '"$BASH" "$0" start --label "$1" -- sleep 300 > "$2" 2>&1; exec sleep 300' "$detached_run_script" "${prefix}a" "$work/a.out" \
+    -- "$BASH" -c '"$BASH" "$0" start --wall-clock within-2h --label "$1" -- sleep 300 > "$2" 2>&1; exec sleep 300' "$detached_run_script" "${prefix}a" "$work/a.out" \
     > "$work/a-caller.out" 2>&1
   detached_run_selftest_wait_for_file "$state_directory/${prefix}a/pid" 150
   pid="$(detached_run_field "$state_directory/${prefix}a" pid)"
@@ -1400,14 +1454,14 @@ exit 1"
   detached_run_expect "Ⓠ 连续 $DETACHED_RUN_UNKNOWN_ALARM_ROUNDS 次查不到：watch 报警一行「报警  ${prefix}q」、带出路，仍不退出（退 124）" \
     "$( { grep -q "报警  ${prefix}q .*连续 [0-9]* 次查不到" "$work/q-watch.out" && grep -q "→ 怎么办：systemctl --user show-environment" "$work/q-watch.out" \
           && ((rc == 124)); } && echo 0 || echo 1)" "$work/q-list.out"
-  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" start --label "${prefix}q2" -- true > "$work/q2.out" 2>&1; rc=$?
+  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}q2" -- true > "$work/q2.out" 2>&1; rc=$?
   PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" stop "${prefix}q" >> "$work/q2.out" 2>&1; got=$?
   detached_run_expect "Ⓠ 查不到单元状态：start 拒、退 1、没建登记；stop 拒、退 1、没记 stop-requested" \
     "$( { ((rc == 1)) && [[ ! -d "$state_q/${prefix}q2" ]] && [[ "$got" == 1 ]] && [[ ! -f "$state_q/${prefix}q/stop-requested" ]] \
           && grep -q "查不到单元" "$work/q2.out"; } && echo 0 || echo 1)" "$work/q2.out"
   # 同名的旧登记在（q 没有退出码、不知道还在不在跑）：start 同名照拒、退 1，旧登记留在原处、没挪成 <名>@<秒数>
   wanted="$(detached_run_field "$state_q/${prefix}q" started)"
-  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" start --label "${prefix}q" -- true > "$work/q3.out" 2>&1; rc=$?
+  PATH="$shim_bus:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_q" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}q" -- true > "$work/q3.out" 2>&1; rc=$?
   ls -a "$state_q" >> "$work/q3.out" 2>&1
   detached_run_expect "Ⓠ 查不到单元状态时 start 同名：拒、退 1，旧登记留在原处（没挪走）" \
     "$( { ((rc == 1)) && [[ "$(detached_run_field "$state_q/${prefix}q" started)" == "$wanted" ]] \
@@ -1445,7 +1499,7 @@ exec $(printf '%q' "$real_systemctl") \"\$@\""
   detached_run_selftest_shim "$shim_run" systemd-run "echo 'Failed to start transient service unit（自证的替身）' >&2
 exit 1"
   detached_run_selftest_state_directory "$state_s"
-  PATH="$shim_run:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_s" bash "$detached_run_script" start --label "${prefix}s" -- true > "$work/s.out" 2>&1; rc=$?
+  PATH="$shim_run:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_s" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}s" -- true > "$work/s.out" 2>&1; rc=$?
   DETACHED_RUN_STATE_DIRECTORY="$state_s" bash "$detached_run_script" list >> "$work/s.out" 2>&1
   detached_run_expect "Ⓢ systemd-run 没起成：start 退 1、登记里有 start-failed、list 列成「没起成」" \
     "$( { ((rc == 1)) && [[ -f "$state_s/${prefix}s/start-failed" ]] && grep -q "没起成  ${prefix}s" "$work/s.out" \
@@ -1454,7 +1508,7 @@ exit 1"
   # Ⓡ 同名重起：watch 观察到 r 在跑；r 被 stop（143）之后隔一秒同名又起一次（退 6）；watch 结束时照报观察到的那一次的 143
   local state_r="$work/state-r" watch_pid
   detached_run_selftest_state_directory "$state_r"
-  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --label "${prefix}r" -- sleep 300 > "$work/r.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}r" -- sleep 300 > "$work/r.out" 2>&1
   detached_run_selftest_wait_for_file "$state_r/${prefix}r/pid" 100
   DETACHED_RUN_STATE_DIRECTORY="$state_r" timeout 90 bash "$detached_run_script" watch --every 8 > "$work/r-watch.out" 2>&1 &
   watch_pid=$!
@@ -1462,7 +1516,7 @@ exit 1"
   DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" stop "${prefix}r" >> "$work/r.out" 2>&1
   detached_run_selftest_r_archive="$state_r/${prefix}r@$(detached_run_field "$state_r/${prefix}r" started)"
   sleep 1.1   # 起跑秒数要与上一次不同，旧登记才挪得到 <名>@<上一次的秒数>
-  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --label "${prefix}r" -- bash -c 'sleep 1; exit 6' >> "$work/r.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_r" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}r" -- bash -c 'sleep 1; exit 6' >> "$work/r.out" 2>&1
   wait "$watch_pid"; rc=$?
   { echo "watch 退出码 $rc"; cat "$work/r.out"; } >> "$work/r-watch.out"
   detached_run_expect "Ⓡ 同名重起：watch 退 0，照报观察到的那一次的退出码 143（stop 停的，登记已挪走）" \
@@ -1472,7 +1526,7 @@ exit 1"
   # Ⓧ 登记被挪走、单元还在跑：list 列成「登记里没有」
   local state_x="$work/state-x"
   detached_run_selftest_state_directory "$state_x"
-  DETACHED_RUN_STATE_DIRECTORY="$state_x" bash "$detached_run_script" start --label "${prefix}x" -- sleep 300 > "$work/x.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_x" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}x" -- sleep 300 > "$work/x.out" 2>&1
   detached_run_selftest_wait_for_file "$state_x/${prefix}x/pid" 100
   mv -- "$state_x/${prefix}x" "$work/moved-x"
   DETACHED_RUN_STATE_DIRECTORY="$state_x" bash "$detached_run_script" list >> "$work/x.out" 2>&1
@@ -1483,7 +1537,7 @@ exit 1"
   #   不报「都结束了」（之后又列完一轮仍不退出，自证给 timeout 发 ALRM 让它当场到点、退 124）
   local state_w="$work/state-w" watch_pid_w
   detached_run_selftest_state_directory "$state_w"
-  DETACHED_RUN_STATE_DIRECTORY="$state_w" bash "$detached_run_script" start --label "${prefix}w" -- sleep 300 > "$work/w.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_w" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}w" -- sleep 300 > "$work/w.out" 2>&1
   detached_run_selftest_wait_for_file "$state_w/${prefix}w/pid" 100
   # 「观察到之后」挪走，挪在最容易出岔子的那一下：替身 head 数 watch 读 w 的单元名的次数（每一轮清单一次、记观察一次），第 4 次（第二轮记观察，
   #   起跑秒数刚读完）先把登记挪走再读——单元名读不到，watch 要用第一轮记下的那一个去查
@@ -1519,7 +1573,7 @@ exec $(printf '%q' "$real_head") \"\$@\""
 echo \"自证的替身：真的 systemd-run 退 \$?，这里报 1\" >&2
 exit 1"
   detached_run_selftest_state_directory "$state_w2"
-  PATH="$shim_run_w2:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_w2" bash "$detached_run_script" start --label "${prefix}w2" -- sleep 300 > "$work/w2.out" 2>&1; rc=$?
+  PATH="$shim_run_w2:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_w2" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}w2" -- sleep 300 > "$work/w2.out" 2>&1; rc=$?
   DETACHED_RUN_STATE_DIRECTORY="$state_w2" bash "$detached_run_script" list >> "$work/w2.out" 2>&1
   detached_run_expect "Ⓦ systemd-run 退 1 而单元照起：start 退 0、登记里有 systemd-run-failed 没有 start-failed、list 列成还在跑" \
     "$( { ((rc == 0)) && [[ -f "$state_w2/${prefix}w2/systemd-run-failed" && ! -f "$state_w2/${prefix}w2/start-failed" ]] \
@@ -1534,7 +1588,7 @@ exit 1"
   detached_run_selftest_state_directory "$state_v"
   mkdir -p "$work/ro"
   chmod 555 "$work/ro"
-  DETACHED_RUN_STATE_DIRECTORY="$state_v" bash "$detached_run_script" start --label "${prefix}v1" --log "$work/ro/run.log" -- touch "$work/v1.marker" \
+  DETACHED_RUN_STATE_DIRECTORY="$state_v" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}v1" --log "$work/ro/run.log" -- touch "$work/v1.marker" \
     > "$work/v1.out" 2>&1; rc=$?
   sleep 0.5
   echo "start 退 $rc；单元 $(detached_run_unit_state "${DETACHED_RUN_UNIT_PREFIX}${prefix}v1.service")；marker $([[ -e "$work/v1.marker" ]] && echo 在 || echo 不在)" >> "$work/v1.out"
@@ -1543,7 +1597,7 @@ exit 1"
           && grep -q "写不进" "$work/v1.out"; } && echo 0 || echo 1)" "$work/v1.out"
   # 起单元之前的核关掉（这一格自己带弄坏开关 log-unchecked）：单元起了而命令没跑起来，起完回读照样认得出、退 1，list 注明没跑起来
   DETACHED_RUN_BREAK="${DETACHED_RUN_BREAK:+$DETACHED_RUN_BREAK,}log-unchecked" DETACHED_RUN_STATE_DIRECTORY="$state_v" \
-    bash "$detached_run_script" start --label "${prefix}v2" --log "$work/ro/run.log" -- touch "$work/v2.marker" > "$work/v2.out" 2>&1; rc=$?
+    bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}v2" --log "$work/ro/run.log" -- touch "$work/v2.marker" > "$work/v2.out" 2>&1; rc=$?
   detached_run_selftest_wait_for_file "$state_v/${prefix}v2/exit" 100
   DETACHED_RUN_STATE_DIRECTORY="$state_v" bash "$detached_run_script" list >> "$work/v2.out" 2>&1
   detached_run_expect "Ⓥ 起单元之前没核日志时：起完回读认得出命令没跑起来（有退出码没有命令进程号）、退 1，list 注明没跑起来" \
@@ -1553,7 +1607,7 @@ exit 1"
   local state_v3="$work/state-v3" side_v3
   detached_run_selftest_state_directory "$state_v3"
   mkdir -p "$work/v3-log"
-  DETACHED_RUN_STATE_DIRECTORY="$state_v3" bash "$detached_run_script" start --label "${prefix}v3" --log "$work/v3-log/run.log" -- \
+  DETACHED_RUN_STATE_DIRECTORY="$state_v3" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}v3" --log "$work/v3-log/run.log" -- \
     bash -c 'chmod a-w "$0"; exit 3' "$state_v3/${prefix}v3" > "$work/v3.out" 2>&1
   side_v3="$(detached_run_field "$state_v3/${prefix}v3" write-failure-file)"
   tries=0
@@ -1572,14 +1626,14 @@ exit 1"
   local hooks_directory code_p hook_view=() hook_text recorded_text
   hooks_directory="$(cd "$(dirname "$detached_run_script")/../../.claude/hooks" 2>/dev/null && pwd)"
   code_p='printf "%s\n" "$@" > "$0"'
-  bash "$detached_run_script" start --label "${prefix}p" -- --force bash -c "$code_p" "$work/p.args" a --force b > "$work/p.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}p" -- --force bash -c "$code_p" "$work/p.args" a --force b > "$work/p.out" 2>&1; rc=$?
   detached_run_selftest_wait_for_file "$state_directory/${prefix}p/exit" 100
   if [[ -n "$hooks_directory" ]]; then
     mapfile -d '' -t hook_view < <(python3 -B -c 'import sys
 sys.path.insert(0, sys.argv[1])
 import lib_shell_words
 words = lib_shell_words.detached_run_start_command(sys.argv[2:]) or []
-sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" start --label "${prefix}p" -- --force bash -c "$code_p" "$work/p.args" a --force b)
+sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" start --wall-clock within-2h --label "${prefix}p" -- --force bash -c "$code_p" "$work/p.args" a --force b)
   fi
   hook_text="$(printf '%q ' ${hook_view[@]+"${hook_view[@]}"})"
   recorded_text="$(detached_run_field "$state_directory/${prefix}p" command)"
@@ -1591,7 +1645,7 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   # Ⓣ 停机时限：--stop-timeout 2 设进单元（TimeoutStopUSec=2s）；命令不理 TERM，stop 到点被 KILL：退 0、没留退出码、登记里有 stop-killed、list 注明
   local state_t="$work/state-t" timeout_property
   detached_run_selftest_state_directory "$state_t"
-  DETACHED_RUN_STATE_DIRECTORY="$state_t" bash "$detached_run_script" start --label "${prefix}t" --stop-timeout 2 -- bash -c 'trap "" TERM; exec sleep 300' \
+  DETACHED_RUN_STATE_DIRECTORY="$state_t" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}t" --stop-timeout 2 -- bash -c 'trap "" TERM; exec sleep 300' \
     > "$work/t.out" 2>&1
   detached_run_selftest_wait_for_file "$state_t/${prefix}t/pid" 100
   timeout_property="$(systemctl --user show -p TimeoutStopUSec --value "$unit_t" 2>&1)"
@@ -1612,9 +1666,9 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   detached_run_selftest_state_directory "$state_l"
   detached_run_selftest_shim "$work/shim-linger-no" loginctl "echo no"
   detached_run_selftest_shim "$work/shim-linger-yes" loginctl "echo yes"
-  PATH="$work/shim-linger-no:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --label "${prefix}l" -- true \
+  PATH="$work/shim-linger-no:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}l" -- true \
     > "$work/l-no.out" 2>&1; rc=$?
-  PATH="$work/shim-linger-yes:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --label "${prefix}l2" -- true \
+  PATH="$work/shim-linger-yes:$PATH" DETACHED_RUN_STATE_DIRECTORY="$state_l" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}l2" -- true \
     > "$work/l-yes.out" 2>&1; got=$?
   cat "$work/l-no.out" "$work/l-yes.out" > "$work/l.out"
   detached_run_expect "Ⓛ Linger=no 时 start 警告一行、照起（退 0）；Linger=yes 时不警告" \
@@ -1630,7 +1684,7 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   printf '%s\n' "${DETACHED_RUN_UNIT_PREFIX}${prefix}y.service" > "$state_y/${prefix}y/unit"
   printf '%s\n' "$old_started_y" > "$state_y/${prefix}y/started"
   printf '0\n' > "$state_y/${prefix}y/exit"
-  DETACHED_RUN_STATE_DIRECTORY="$state_y" bash "$detached_run_script" start --label "${prefix}y" -- true > "$work/y.out" 2>&1; rc=$?
+  DETACHED_RUN_STATE_DIRECTORY="$state_y" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}y" -- true > "$work/y.out" 2>&1; rc=$?
   new_started_y="$(detached_run_field "$state_y/${prefix}y" started)"
   echo "旧登记的起跑秒数 $old_started_y，新登记的 ${new_started_y:-（没有）}；挪走的：$(cd "$state_y" && ls -d "${prefix}y@"* 2>/dev/null | tr '\n' ' ')" >> "$work/y.out"
   detached_run_expect "Ⓨ 同名旧登记的起跑秒数不早于此刻：start 等到它之后再起、退 0，新登记的起跑秒数比旧的大，旧登记挪到 <名>@<旧秒数>" \
@@ -1641,12 +1695,12 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   #   等 z2 留下退出码再停 z1；watch 退 0、报 z2 的退出码 6（一轮清单都没见 z2 在跑，照报）
   local state_z="$work/state-z" watch_pid_z
   detached_run_selftest_state_directory "$state_z"
-  DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" start --label "${prefix}z1" -- sleep 300 > "$work/z.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}z1" -- sleep 300 > "$work/z.out" 2>&1
   detached_run_selftest_wait_for_file "$state_z/${prefix}z1/pid" 100
   DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" watch --every 2 > "$work/z-watch.out" 2>&1 &
   watch_pid_z=$!
   detached_run_selftest_wait_for_output "$work/z-watch.out" "还在跑  ${prefix}z1" 1200 "$watch_pid_z"
-  DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" start --label "${prefix}z2" -- bash -c 'exit 6' >> "$work/z.out" 2>&1
+  DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}z2" -- bash -c 'exit 6' >> "$work/z.out" 2>&1
   detached_run_selftest_wait_for_file "$state_z/${prefix}z2/exit" 100
   DETACHED_RUN_STATE_DIRECTORY="$state_z" bash "$detached_run_script" stop "${prefix}z1" >> "$work/z.out" 2>&1
   # watch 每 2 秒一轮，负载高时一轮清单要好几秒：至多等 60 秒，到点还没退就停它（只停这一格自己起的那个进程号）
@@ -1664,7 +1718,7 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   #   stop 停单元之后，那个 scope 也停了、sleep 不在了，日志里记了一行
   local state_us="$work/state-us" scope_us="${DETACHED_RUN_UNIT_PREFIX}${prefix}us-inner.scope" sleep_us="" scope_state_us=""
   detached_run_selftest_state_directory "$state_us"
-  DETACHED_RUN_STATE_DIRECTORY="$state_us" bash "$detached_run_script" start --label "${prefix}us" -- \
+  DETACHED_RUN_STATE_DIRECTORY="$state_us" bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}us" -- \
     bash -c 'systemd-run --user --scope --quiet --unit="$1" bash -c "echo \$\$ > \"\$0\"; exec sleep 300" "$2"; exit "$?"' wrapper-like "$scope_us" "$work/us.sleep" \
     > "$work/us.out" 2>&1
   detached_run_selftest_wait_for_file "$work/us.sleep" 100
@@ -1680,6 +1734,119 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
   detached_run_expect "Ⓤ 命令留在别的 scope 里的进程：stop 停单元之后，那个 scope 也停了、sleep 不在了，日志里记了一行" \
     "$( { [[ -n "$sleep_us" ]] && ! detached_run_is_active_state "$scope_state_us" && [[ "$(cat "/proc/$sleep_us/comm" 2>/dev/null)" != sleep ]] \
           && grep -qF "留在 $scope_us 里" "$state_us/${prefix}us/log"; } && echo 0 || echo 1)" "$work/us.out"
+
+  # 长活①–⑧ --wall-clock 与长活声明（判法 .claude/hooks/lib_long_run.py）：样本脚本放 $work/long-run/，被起时只 touch 第一个参数给的标记；
+  #   拒的几格核退出码、没建登记、标记不在、stderr 点名与出路；放的几格起真单元（lr-ok、lr-within）或只跑 long-run-check
+  local long_run="$work/long-run" scripts_directory="${detached_run_script%/*}" lr_rc=() lr_index
+  mkdir -p "$long_run"
+  cat > "$long_run/bare.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# 样本：一样长活声明都没有（不分片的长跑法）
+touch "$1"
+SAMPLE
+  cat > "$long_run/half.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+touch "$1"
+SAMPLE
+  cat > "$long_run/hard.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+# long-run-resume: 结果表里已有的行跳过，重起同一条命令只补没做完的
+# long-run-hosts: 本机 31 线程 30G、第二台 31 线程 50G（--emit-hosts 与 host-resources.py 只当参考）
+touch "$1"
+SAMPLE
+  cat > "$long_run/full.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+# long-run-resume: 结果表里已有的行跳过，重起同一条命令只补没做完的
+# long-run-hosts: 台数取 layer0-shard-configuration-check.sh --emit-hosts，每台的线程与内存取 host-resources.py --json 现算
+touch "$1"
+SAMPLE
+  cat > "$long_run/short.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+# long-run-resume: 结果表里已有的行跳过
+# long-run-unshardable: 多机不行
+touch "$1"
+SAMPLE
+  cat > "$long_run/unnamed.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+# long-run-resume: 结果表里已有的行跳过
+# long-run-unshardable: 装置只认本机那块盘，第二台上没有这块盘
+touch "$1"
+SAMPLE
+  cat > "$long_run/named.sh" <<'SAMPLE'
+#!/usr/bin/env bash
+# long-run-shards: 按行号 mod 片数切
+# long-run-resume: 结果表里已有的行跳过
+# long-run-unshardable: 多机这一段缺：装置只认本机那块盘，第二台上没有这块盘
+touch "$1"
+SAMPLE
+
+  # 长活① 没写 --wall-clock、写了认不出的值：用法错退 2、带出路、没建登记（DETACHED_RUN_BREAK=wall-clock-optional 下没写的那一次照起，这一格红）
+  bash "$detached_run_script" start --label "${prefix}lw" -- bash "$long_run/full.sh" "$long_run/lw.marker" > "$work/lw.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock 3h --label "${prefix}lw2" -- bash "$long_run/full.sh" "$long_run/lw2.marker" >> "$work/lw.out" 2>&1; got=$?
+  echo "没写：start 退 $rc；写 3h：start 退 $got" >> "$work/lw.out"
+  detached_run_expect "长活① 没写 --wall-clock、写了认不出的值：用法错退 2、带出路、没建登记" \
+    "$( { ((rc == 2)) && [[ "$got" == 2 ]] && [[ ! -d "$state_directory/${prefix}lw" && ! -d "$state_directory/${prefix}lw2" ]] \
+          && grep -q "没写 --wall-clock" "$work/lw.out" && grep -q "只认 within-2h 或 over-2h" "$work/lw.out" && grep -q "→ 怎么办" "$work/lw.out"; } && echo 0 || echo 1)" \
+    "$work/lw.out"
+
+  # 长活②–⑤ --wall-clock over-2h 的四种该拒的：没声明（nice 包一层，照样认出 bare.sh）、半截、写死额度、bash -c 一长串
+  local lr_samples=("lr1|nice -n 19 bash $long_run/bare.sh $long_run/lr1.marker" "lr2|bash $long_run/half.sh $long_run/lr2.marker"
+                    "lr3|bash $long_run/hard.sh $long_run/lr3.marker")
+  local lr_words=()
+  for lr_index in "${!lr_samples[@]}"; do
+    read -r -a lr_words <<< "${lr_samples[$lr_index]#*|}"
+    bash "$detached_run_script" start --wall-clock over-2h --label "${prefix}${lr_samples[$lr_index]%%|*}" -- "${lr_words[@]}" \
+      > "$work/${lr_samples[$lr_index]%%|*}.out" 2>&1
+    lr_rc[lr_index]=$?
+  done
+  bash "$detached_run_script" start --wall-clock=over-2h --label "${prefix}lr4" -- bash -c "touch $(printf '%q' "$long_run/lr4.marker"); true" > "$work/lr4.out" 2>&1
+  lr_rc[3]=$?
+  for lr_index in 1 2 3 4; do echo "lr$lr_index：start 退 ${lr_rc[lr_index - 1]}" >> "$work/lr$lr_index.out"; done
+  detached_run_expect "长活② over-2h、被起的脚本一样声明都没有（不分片的长跑法）：拒、退 5、带出路、没建登记" \
+    "$( { [[ "${lr_rc[0]}" == 5 ]] && [[ ! -d "$state_directory/${prefix}lr1" && ! -e "$long_run/lr1.marker" ]] && grep -q "缺 分片" "$work/lr1.out" \
+          && grep -qF "$long_run/bare.sh" "$work/lr1.out" && grep -q "→ 怎么办" "$work/lr1.out"; } && echo 0 || echo 1)" "$work/lr1.out"
+  detached_run_expect "长活③ over-2h、只写了分片一样（半截声明）：拒、退 5、点名缺续跑与多机、没建登记" \
+    "$( { [[ "${lr_rc[1]}" == 5 ]] && [[ ! -d "$state_directory/${prefix}lr2" && ! -e "$long_run/lr2.marker" ]] && grep -q "缺 续跑.*多机" "$work/lr2.out" \
+          && ! grep -q "缺 分片" "$work/lr2.out"; } && echo 0 || echo 1)" "$work/lr2.out"
+  detached_run_expect "长活④ over-2h、多机一行写死线程与内存：拒、退 5、点名写死的额度、没建登记" \
+    "$( { [[ "${lr_rc[2]}" == 5 ]] && [[ ! -d "$state_directory/${prefix}lr3" && ! -e "$long_run/lr3.marker" ]] \
+          && grep -q "写死了额度：31 线程、30G" "$work/lr3.out"; } && echo 0 || echo 1)" "$work/lr3.out"
+  detached_run_expect "长活⑤ over-2h、bash -c 一长串判不出被起的脚本：拒、退 5、出路写进一份脚本、没建登记" \
+    "$( { [[ "${lr_rc[3]}" == 5 ]] && [[ ! -d "$state_directory/${prefix}lr4" && ! -e "$long_run/lr4.marker" ]] \
+          && grep -q "判不出被起的是哪份脚本" "$work/lr4.out" && grep -q "把这条命令写进一份脚本" "$work/lr4.out"; } && echo 0 || echo 1)" "$work/lr4.out"
+
+  # 长活⑥ long-run-check：分不了一行不到 8 个字、没点名缺的多机都拒（退 5），点名了的放（退 0）
+  bash "$detached_run_script" long-run-check -- bash "$long_run/short.sh" x > "$work/lr6.out" 2>&1; rc=$?
+  bash "$detached_run_script" long-run-check -- bash "$long_run/unnamed.sh" x >> "$work/lr6.out" 2>&1; got=$?
+  bash "$detached_run_script" long-run-check -- bash "$long_run/named.sh" x >> "$work/lr6.out" 2>&1; lr_index=$?
+  echo "short.sh 退 $rc；unnamed.sh 退 $got；named.sh 退 $lr_index" >> "$work/lr6.out"
+  detached_run_expect "长活⑥ long-run-check：分不了一行不到 8 个字、没点名缺的多机都拒（退 5），点名了的放（退 0）" \
+    "$( { ((rc == 5)) && [[ "$got" == 5 && "$lr_index" == 0 ]] && grep -q "只有 4 个字" "$work/lr6.out" && grep -q "没点名缺的 多机" "$work/lr6.out"; } && echo 0 || echo 1)" \
+    "$work/lr6.out"
+
+  # 长活⑦ long-run-check 跳过包装：run-with-memory-cap.sh 与 capped.sh 包着的 full.sh 退 0；包着 bare.sh 的退 5、点名的是 bare.sh（只判、不起包装）
+  bash "$detached_run_script" long-run-check -- bash "$scripts_directory/run-with-memory-cap.sh" 1G bash "$scripts_directory/capped.sh" 1 \
+    bash "$long_run/full.sh" x > "$work/lr7.out" 2>&1; rc=$?
+  bash "$detached_run_script" long-run-check -- bash "$scripts_directory/run-with-memory-cap.sh" 1G bash "$long_run/bare.sh" x >> "$work/lr7.out" 2>&1; got=$?
+  echo "包着 full.sh 退 $rc；包着 bare.sh 退 $got" >> "$work/lr7.out"
+  detached_run_expect "长活⑦ long-run-check 跳过包装：run-with-memory-cap.sh 与 capped.sh 包着的三样齐的脚本退 0；包着没声明的脚本退 5、点名的是那份脚本" \
+    "$( { ((rc == 0)) && [[ "$got" == 5 ]] && grep -qF "长活声明齐了（$long_run/full.sh" "$work/lr7.out" && grep -qF "长活声明（$long_run/bare.sh）" "$work/lr7.out"; } && echo 0 || echo 1)" \
+    "$work/lr7.out"
+
+  # 长活⑧ over-2h 三样齐了照起、命令跑了、stderr 有「长活声明齐了」；within-2h 不读声明（bare.sh）照起（对照）
+  bash "$detached_run_script" start --wall-clock over-2h --label "${prefix}lr-ok" -- bash "$long_run/full.sh" "$long_run/lr-ok.marker" > "$work/lr8.out" 2>&1; rc=$?
+  bash "$detached_run_script" start --wall-clock within-2h --label "${prefix}lr-within" -- bash "$long_run/bare.sh" "$long_run/lr-within.marker" >> "$work/lr8.out" 2>&1; got=$?
+  detached_run_selftest_wait_for_file "$long_run/lr-ok.marker" 100
+  detached_run_selftest_wait_for_file "$long_run/lr-within.marker" 100
+  echo "over-2h 齐了：start 退 $rc；within-2h：start 退 $got" >> "$work/lr8.out"
+  detached_run_expect "长活⑧ over-2h 三样齐了照起、命令跑了；within-2h 不读声明照起" \
+    "$( { ((rc == 0)) && [[ "$got" == 0 ]] && [[ -e "$long_run/lr-ok.marker" && -e "$long_run/lr-within.marker" ]] && grep -q "长活声明齐了" "$work/lr8.out"; } && echo 0 || echo 1)" \
+    "$work/lr8.out"
 
   # 收尾：a、e、i、u 用 stop 停（stop 那一格的第二遍），再逐个按单元名停剩下的，最后核这个前缀的单元一条不剩
   bash "$detached_run_script" stop "${prefix}a" > "$work/stop-a.out" 2>&1
@@ -1697,7 +1864,7 @@ sys.stdout.write("".join(word + "\0" for word in words))' "$hooks_directory" sta
     echo "     → 怎么办：按不对的那一格修 detached-run.sh 再跑 --selftest；DETACHED_RUN_BREAK 设着的话本来就该红"
     exit 1
   fi
-  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、收尾不剩单元）"
+  echo "  ✓ detached-run.sh 自证 $detached_run_selftest_checked 格都对（用法错与拒绝、弄坏开关设在自证之外就拒、-- 之后开头的赋值名不合写法就拒、建不了登记时挪回同名旧登记且挪不回出声、退出码在单元收掉之后读得到、环境（连 PATH、HOME）与工作目录带进单元、watch 全部结束自己退、同名在跑就拒、默认停机时限设进单元、stop 只停登记的那一个、stop 等命令收尾完、调用方被停命令照跑、watch 被 TERM / INT / HUP 都不停单元、查不到单元状态时 list 单列 watch 不退且连续 3 次报警 start 与 stop 拒 start 同名不挪旧登记、查不到之后又查得到照报退出码、没起成的单列、同名重起照报旧一次的退出码、登记被挪走的单元照列、观察到的登记被挪走而单元在跑 watch 不算结束、systemd-run 报错而单元照起记成在跑、日志写不进不起单元、命令没跑起来认得出、单元里写登记失败单列、--force 摘法与闸一致、停机时限设进单元且到点 KILL 记进登记、Linger=no 时警告、同一秒里同名重起等到下一秒、watch 开跑之后起了又跑完的短命令照报、命令留在别的 scope 里的进程随单元停、--wall-clock 必填且 over-2h 判长活声明（没声明、半截、写死额度、判不出脚本、分不了没点名都拒，包装跳过，齐了照起）、收尾不剩单元）"
 }
 
 if [[ -n "${DETACHED_RUN_BREAK:-}" && "${1:-}" != --selftest ]] && ! detached_run_break_is break-honored-anywhere && ! detached_run_inside_selftest; then
@@ -1707,6 +1874,12 @@ if [[ -n "${DETACHED_RUN_BREAK:-}" && "${1:-}" != --selftest ]] && ! detached_ru
 fi
 case "${1:-}" in
   start) shift; detached_run_start "$@" ;;
+  long-run-check)
+    shift
+    [[ "${1:-}" == -- ]] || detached_run_usage_error "long-run-check 要写成 long-run-check -- <命令与参数…>"
+    shift
+    (($#)) || detached_run_usage_error "long-run-check 的 -- 之后没有命令"
+    detached_run_long_run_check "$@" || exit 5 ;;
   list) shift; (($# == 0)) || detached_run_usage_error "list 不带参数"; detached_run_list ;;
   watch) shift; detached_run_watch "$@" ;;
   stop) shift; detached_run_stop "$@" ;;

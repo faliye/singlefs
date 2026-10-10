@@ -1,0 +1,27 @@
+# E171 第 1 次重跑第一段·修订 8 那一趟的装置（第 0 步判法、占位核对、单元编排、逐行编排外层、两趟对照）的变异表。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经本目录 mutation_driver.py 带 --unit-test-module test_revision_8 跑。
+R8-1 S16 ① 逐文件表同路径就算相同、不比 sha256	else left.get(path) == right.get(path)	else (path in left and path in right)
+R8-2 打块容模糊	"--fuzz=2" if broken("s16-3-fuzz") else "--fuzz=0"	"--fuzz=2" if broken("s16-3-fuzz") else "--fuzz=2"
+R8-3 fixture 头带修改时刻也收	and not broken("fixture-timestamps-allowed"):	and False:
+R8-4 宣布行行号从 0 数	enumerate(records_text.splitlines(), start=1)	enumerate(records_text.splitlines(), start=0)
+R8-5 几份 after.sha256 取先合的	                    chosen[parts[1]] = parts[0]	                    chosen.setdefault(parts[1], parts[0])
+R8-6 甲类 holds=false 不记	        if any(fields.get("holds") != "true" for fields in found):	        if False:
+R8-7 A12「≥ 1」那几项 0 次也算过	hits >= 1 if at_least_one else hits == 0	hits >= 0 if at_least_one else hits == 0
+R8-8 S16 ② 撤得掉就算过、不核撤完等于树里那份	    holds = removed == tree_sha	    holds = removed is not None
+R8-9 S16 ③ 打得上就算等于	    identical = applied == target_sha	    identical = applied is not None
+R8-10 第 0 步不看拍树那份记录里 S16 ① 触发没有	    if not copied or any("triggered=true" in body for body in copied):	    if not copied:
+R8-11 P1-F 底态摘要取错列	            return int(row_id), columns[2].lower()	            return int(row_id), columns[3].lower()
+R8-12 H14 主取样点少乘一个 2	    formula = (h14["main_states"] == key_choices * 2 ** writes	    formula = (h14["main_states"] == key_choices * 2 ** (writes - 1)
+R8-13 H18 与修订 6 同名也收	else [name for name in names if name in REVISION_6_PEER_NAMES]	else []
+R8-14 H20 写分到别的台也收	    supported = h20["steps_3_and_9_on_other_hosts"] is False or broken("h20-true-accepted")	    supported = h20["steps_3_and_9_on_other_hosts"] is not None or broken("h20-true-accepted")
+R8-15 干跑配置在 start 阶段也算过	    if dry and phase == "start" and not broken("dry-run-accepted"):	    if False:
+R8-16 第 7 步不排队首	(unit.name != "step-7", -unit.estimated_seconds, unit.name)	(unit.name == "step-7", -unit.estimated_seconds, unit.name)
+R8-17 下游要每个依赖都在才算	if unit.name not in found and any(dep in found for dep in unit.deps):	if unit.name not in found and all(dep in found for dep in unit.deps):
+R8-18 放得下只看线程	    return threads <= budget.threads and memory <= budget.memory_bytes	    return threads <= budget.threads
+R8-19 第二次的 TAG 记成 -attempt1	    return "" if attempt == 1 else f"-attempt{attempt}"	    return "" if attempt == 1 else f"-attempt{attempt - 1}"
+R8-20 续跑不核产物行数	        elif line_count(path) != lines:	        elif False:
+R8-21 同时在跑只认第 7 步之前起的	other_start < end and (other_end is None or other_end > start)	other_start < start and (other_end is None or other_end > start)
+R8-22 停派文件不拦	    if stop_file and os.path.exists(stop_file) and not broken("stop-file-ignored"):	    if False:
+R8-23 树里 crates/mutations.tsv 变了不停	    if actual != STATE["mutations_sha256"]:	    if False:
+R8-24 对照按出现次序配行	            identity = (kind,) + tuple((name, values.pop(name, "absent")) for name in identity_fields)	            identity = (kind, ("occurrence", str(sum(1 for key in keyed if key[0] == kind) + 1)))
+R8-25 s15 的 triggered 不改名	        if name == RENAMED_S15_KEY[0] and not broken("s15-triggered-kept"):	        if False:
+R8-26 行耗时一律记本机	else ledger.get((step, values.get("row_number", "?")), "1")	else "1"

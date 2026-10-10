@@ -66,9 +66,11 @@ printf '# 清单\ndemo-stage.sh\tcrates/\t# 少写了 Cargo.toml 与 Cargo.lock\
 git -C "$work" add -A
 expect 0 "清单自己变了就判要跑" SINGLEFS_STAGED_TREE="$(tree_now)"
 printf "# 清单\\ndemo-stage.sh\\tcrates/ Cargo.toml Cargo.lock\\t# 跑 crates 里的东西\\n" > "$work/.claude/gate.d/stage-inputs.tsv" && git -C "$work" add -A
-# ⑦ 复用上限到点 ⇒ 要跑；把上限调回去必须又变可跳过（同一棵树，只换上限）
-expect 0 "到了复用上限就强制跑" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_REUSE_HOURS=0
-expect 1 "上限没到时照旧可跳过" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_REUSE_HOURS=9999
+# ⑦ 不看判绿那一次是多久以前：绿树是 30 天前那一次也照样可跳过（同一棵树，只把绿提交的时刻往前拨）
+set_green_dated() { git -C "$work" update-ref refs/sop/staged-green "$(GIT_COMMITTER_DATE="$2" GIT_AUTHOR_DATE="$2" git -C "$work" commit-tree "$1" -m green)"; }
+set_green_dated "$base_tree" "$(( $(date +%s) - 30 * 86400 )) +0000"
+expect 1 "判绿那一次是 30 天前也照样可跳过（复用不看时刻）" SINGLEFS_STAGED_TREE="$base_tree"
+set_green "$base_tree"
 # ⑧ 强制全跑
 expect 0 "SINGLEFS_GATE_FULL=1 强制跑" SINGLEFS_STAGED_TREE="$base_tree" SINGLEFS_GATE_FULL=1
 # ⑨ 只改阶段脚本自己 ⇒ 要跑（判据本身变了，上一次的判定不再作数；清单里没登记它也一样）
@@ -89,4 +91,4 @@ if ((failures > 0)); then
   echo "     → 怎么办：照上面每一格的「要 X 实际 Y」改被测脚本；判据与为什么这么定见它的文件头。"
   exit 1
 fi
-echo "  ✓ stage-must-run.sh 自证通过：$checked 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、上限到点与没到、强制全跑、阶段脚本自己变了、清单里同一道阶段写两行）"
+echo "  ✓ stage-must-run.sh 自证通过：$checked 格都对（没有绿树、不是 gate-staged.sh 起的、输入相同、crates 改了、清单外改了、清单自己变了、判绿那一次很久以前、强制全跑、阶段脚本自己变了、清单里同一道阶段写两行）"

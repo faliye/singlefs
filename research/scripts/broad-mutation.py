@@ -2,6 +2,10 @@
 # admission: always 每次调都判此刻库目录里那棵树与它这一版的结果表；哪些条要跑由结果表定，上一次的结论不替这一次作保
 # run-condition: command git python3
 # broad-mutation-driver-signature: singlefs 广谱变异逐条驱动（重型测试闸 .claude/hooks/lib_heavy_tests.py 按这一行认改名或拷走的一份，别删）
+# 长活声明（判法 .claude/hooks/lib_long_run.py：research/scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check、research/scripts/host-dispatch.py 文件头 ⓪ 都读这几行）：
+# long-run-shards: 按清单序号切：--shard <k>/<n> 只跑「序号 mod n == k」的条（n 由调用方给，两台各起一趟 --shard k/2），跑完在一台上 --import-results <另一台那一版的目录> 并成一份
+# long-run-resume: 重起同一条命令就是续跑：结果表里已有定论的条跳过，超时、内存撞顶、驱动错与被打断的那一条照样再选中重跑（被打断的先照在途记录拷回原件）
+# long-run-unshardable: 多机：--shard 的片数、在哪几台起、每台的 --threads 与 --memory-cap 都由调用方手给（--threads 默认 SINGLEFS_THREAD_CAP 或核数减一，--memory-cap 默认 24G），驱动不读 layer0-shard-configuration-check.sh --emit-hosts 的清单、也不按 host-resources.py --json 现算
 """广谱变异的逐条驱动（.claude/kb/checks-owed.md 的 C489；用户 2026-09-30 定：一直跑、中断要续接不从头来、一条一条可点名）。
 
   broad-mutation.py --sync-tree [--commit <提交>]   把主仓某个提交（默认 HEAD）的源码导出成库目录里的专用树（git archive，不动主仓），
@@ -63,7 +67,7 @@
     判法版本进指纹之前建的版本目录（名字是源码指纹、或 sha256(源码指纹、换行、工具链)，例 versions/19c45e02…）与全局键进指纹之前建的（tree.source 里没有 global_key）
     不再认：真跑退 7、提交门禁判红，同一个提交重做 --sync-tree 是另一版；全局键全文的写法没变，结论表里键相同的结论照沿用。
     提交流程（.claude/skills/crash-test/commit-stages.md 第 2b 步）② 先 --sync-tree：这样的旧版本在 ② 就换成新的一版（新版本目录、整版现判），③ 不落在旧版上退 7。
-  导出范围取门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（research/scripts/crates-mutation-rows.py 的 copied_paths，去掉 research/ 下的）加 .cargo/。
+  导出范围取门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（research/scripts/crates-mutation-rows.py 的 copied_paths，去掉 research/ 下的）加 .cargo/（拷贝范围里已登记了它就不重复加）。
 
 一条一条跑：每条变异一次独立的判定，判完立刻往 results.tsv 追加一行并 fsync（驱动自己不经 eatmydata，只有测试命令经它）。一行十二段，制表符分隔：
   序号、包、变异名、结局、哪一段判的（one / two）、抓到它的第一条测试名、编译秒数、测试秒数、时刻、这一版的指纹、备注、校验列
@@ -175,7 +179,10 @@
     另存结局、抓到它的测试与那条测试 fn 项的指纹（E3）、fn 项与函数外部分的词法单元指纹（E2）、宏与 include 依赖的指纹、全局键（E4：工具链、
     Cargo.toml、Cargo.lock、.cargo/、构建环境、nextest / cargo-mutants / llvm-tools 版本、排除表、限时参数、升档常量、判法版本 JUDGE_RULES_VERSION；全文在这一版的 global-key.txt，
     sha256 进这一版的指纹，见上「指纹」）。
-    判法版本此刻是 prune-r3-e1-e6-fresh-build（换树后编译目录不留过时的工作区产物）：它之前落的结论（结论表里记着旧全局键的、旧版目录里的结果行）一条都不沿用，全部重判。
+  判定库（research/scripts/lib_verdict_library.py 文件头「键分两列」；广谱变异这一份是结论表与这一版的结果表，形态不同、不调那份共用部分）：
+    判法版本 = JUDGE_RULES_VERSION（全局键第一行 rules，进这一版的指纹）；输入指纹 = 源码指纹、rustc -Vv 与全局键里判法版本之外的几类
+    （Cargo 清单与锁、.cargo/、构建环境、工具版本、排除表、限时参数、升档常量），每条另加 fn 项、函数外部分与依赖的指纹（E2、E3）。两列有一样变了就现判。
+    判法版本此刻是 prune-r3-e1-e6-fresh-build-mac（fresh-build：换树后编译目录不留过时的工作区产物；mac：结果行带密钥校验、基线按线程数分开记）：它之前落的结论（结论表里记着旧全局键的、旧版目录里的结果行）一条都不沿用，全部重判。
   旧表：加剪枝之前的版本目录（例 versions/19c45e02…，十一段的 results.tsv）照旧留着，但那时没存函数键与测试指纹，结论表里没有它们的行，
     判法版本又进了指纹（换树之后版本指针指不回它），一条都不沿用，只作参考。
   第二段基线红报成退 6 的拒绝，列红的测试与出路（修好的提交再 --sync-tree；在那之前只要第一段的结论就加 --skip-stage-two）。
@@ -190,7 +197,7 @@
 退出码：0 选中的条都判完；1 --summary 栏数对不上或结果表有对不上的行（含没有校验列、校验列对不上、没有密钥校验不了的行）、续跑开跑前核出结果行与清单对不上、
   --import-results 有冲突的条、忽略用例登记对不上（含排除表写坏）、--selftest 有格判错；
   2 用法错（项写错、库目录不合、没带前缀、缺工具、只供自证的变量出现在自证之外、要写结果行而密钥用不了）；
-  3 内存包装自己的结局（251 起不来、252 排不上、254 被总上限挤掉）：那一条不落行，修好重跑同一条命令；
+  3 内存包装自己的结局（251 起不来、252 排不上、254 被总上限挤掉、245 显存不够）：那一条不落行，修好重跑同一条命令；
   4 锁被占着；5 树脏了恢复不了、树里多出文件、上一次 --sync-tree 没做完、编译目录里可能留着换树之前编的工作区产物；6 基线不绿、或疑似环境坏了；
   7 工具链与这一版记下的不同、或这一趟的全局键与这一版记下的不同（含全局键进指纹之前建的版本）；
   8 --summary 判提交门禁红（这一版有没结论的条、或有没红的条；BROAD_MUTATION_GATE 行写 verdict=red）；
@@ -198,6 +205,10 @@
 弄坏开关 BROAD_MUTATION_BREAK=<项>（逗号分隔，只给 --selftest 证红用，只在 --selftest 自己起的子进程里生效）。
 逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 run_selftest_cells 里那几组格的函数名，括号里是那几条「✗ 自证：」的开头；
 每一项红时都另有汇总行「✗ --selftest：<格数> 格里 N 格判错」，退 1）：
+  BROAD_MUTATION_BREAK=list-items-pipe-unhandled  --list-items 不照 SIGPIPE 惯例退（接 | head 时打 BrokenPipeError、退 120）
+      selftest_basic_cells（「✗ 自证：--list-items 接 | head 时没照 SIGPIPE 惯例安静退」）
+  BROAD_MUTATION_BREAK=own-libtest-failure-line  libtest 结果行回到驱动自己那条正则取红的测试名（名字带上「 - should panic」），不经 lib_libtest_result_lines.py
+      selftest_basic_cells（「✗ 自证：两段式的结局不对（第 5 条记的第一条失败的测试名 …」）
   BROAD_MUTATION_BREAK=rerun-done  重起时已有定论的条照样重跑
       selftest_basic_cells（「✗ 自证：--stage-two-only 不对」、「✗ 自证：重起之后已有结果的条或基线被重跑了」、「✗ 自证：--shard 0/2 跑的不是还没结果的偶数序号」）、
       selftest_state_cells（「✗ 自证：点名已有定论的条没跳过」、「✗ 自证：点名加 --rerun 没有重跑并追加新行」、「✗ 自证：第二段的定论被后来的 stage-one-only 行降级了」、「✗ 自证：抓到的条被后来的超时行盖掉了」、「✗ 自证：--stage-two-only 点到没过过第一段的条没拒」）、
@@ -236,6 +247,8 @@
       selftest_table_cells（「✗ 自证：认不出的退出码没处理对」）
   BROAD_MUTATION_BREAK=unknown-exit-stops  一步退认不出的码照旧整趟停
       selftest_table_cells（「✗ 自证：认不出的退出码没处理对」）
+  BROAD_MUTATION_BREAK=gpu-memory-as-driver-error  一步退 245（内存包装认出的显存不够）照认不出的码落一行 driver-error、不停
+      selftest_gpu_memory_cells（「✗ 自证：一步退 245（显存不够）没当包装自己的结局停下」）
   BROAD_MUTATION_BREAK=stage-two-without-stage-one  点名加 --stage-two-only 不看过没过第一段
       selftest_state_cells（「✗ 自证：--stage-two-only 点到没过过第一段的条没拒」）、selftest_test_variable_cells（「✗ 自证：父进程不是 --selftest 的进程带着假一步的变量时没拒」）
   BROAD_MUTATION_BREAK=stage-two-full-cargo-test  第二段照旧是整遍 cargo test 加快档
@@ -379,10 +392,10 @@
   BROAD_MUTATION_RESULT_KEY=<文件> 结果行的密钥换成这一份（自证起的每个子进程都带：自证不读写真的密钥）、
   BROAD_MUTATION_RUSTC=<脚本> 工具链换成起这个假 rustc 的 -Vv（--unit-environment 比工具链那一格用）。
 
-gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 逐条改坏、点名的测试必须红，行是人写的、判的是「这条测试抓不抓得到」；这里的清单由 cargo-mutants 生成、判每条变异有没有任何测试抓到，按条记录的形态照它，导出范围取它登记的那一份
+gate-similar: checker-tier-crates-mutation-replay.sh 它按 crates/mutations.tsv 逐条改坏、点名的测试必须红，行是人写的、判的是「这条测试抓不抓得到」；这里的清单由 cargo-mutants 生成、判每条变异有没有任何测试抓到，判定库记录的形态照它，导出范围取它登记的那一份
 gate-similar: mutate.sh 它跑一张手写变异表对一个实验二进制，每条 cargo test 经内存包装；这里同样逐步经内存包装，但清单是生成的、结果按源码与工具链的指纹分版本落在库目录里续接
 gate-similar: crash-amplification.sh 它是崩溃放量的分项驱动，--list-items / --item 与「重跑同一条命令就是续跑」的形态照它；判的对象不同（崩溃点状态对变异）
-gate-similar: mutation-shard-run.sh 它把 crates/mutations.tsv 的行分给两台、第二台的按条记录经 crates-mutation-rows.py import 核过底座指纹与行键再导入；这里两台各起一趟 --shard k/2、结果表是一张只追加的 TSV，导入（--import-results）核的是这一版的指纹、清单与逐行的变异名，两边的记录形态不同，导入不共用
+gate-similar: mutation-shard-run.sh 它把 crates/mutations.tsv 的行分给两台、第二台的判定库记录经 crates-mutation-rows.py import 核过判法版本与行键再导入；这里两台各起一趟 --shard k/2、结果表是一张只追加的 TSV，导入（--import-results）核的是这一版的指纹、清单与逐行的变异名，两边的记录形态不同，导入不共用
 """
 import argparse
 import difflib
@@ -411,6 +424,11 @@ sys.path.insert(0, os.path.join(REPOSITORY, ".claude", "scripts"))
 from project_preflight import preflight  # noqa: E402
 
 SELF_PATH = os.path.join(SCRIPT_DIRECTORY, os.path.basename(__file__))
+# libtest 的结果行（`test <全名>[ - should panic] ... <结局>`）全仓只在 lib_libtest_result_lines.py 解析一份：should panic 那一段不进名字
+_LIBTEST_RESULT_LINES_SPECIFICATION = importlib.util.spec_from_file_location("lib_libtest_result_lines_for_broad_mutation",
+                                                                             os.path.join(SCRIPT_DIRECTORY, "lib_libtest_result_lines.py"))
+libtest_result_lines = importlib.util.module_from_spec(_LIBTEST_RESULT_LINES_SPECIFICATION)
+_LIBTEST_RESULT_LINES_SPECIFICATION.loader.exec_module(libtest_result_lines)
 REAL_SELF_PATH = os.path.realpath(__file__)
 MEMORY_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "run-with-memory-cap.sh")
 THREAD_CAP_RUNNER = os.path.join(SCRIPT_DIRECTORY, "capped.sh")
@@ -436,6 +454,7 @@ HEAVY_PREFIX_VALUES = ("commit", "user-request")
 VOLATILE_PREFIXES = ("/tmp", "/run", "/dev/shm", "/var/run")
 VOLATILE_FILESYSTEMS = ("tmpfs", "ramfs")
 IGNORED_DIRECTORY_NAMES = ("target", "mutants.out", "mutants.out.old")
+# gate-overlap:copy-kept lib_verdict_library.py 广谱变异的判定库是只追加的 TSV（结果表按序号、结论表按函数键取最后一行，每行带密钥校验列、两台导入按行核），判定库共用部分按项名与两列键存 JSON、一项一个文件；形态不同，存放、按键读、原子写都不抽，现判与沿用分开报在 --summary 的八栏里
 RESULT_COLUMNS = ("sequence", "package", "name", "outcome", "stage", "first_failing_test", "build_seconds", "test_seconds",
                   "finished_at", "fingerprint", "note", "mac")
 RESULT_SIGNED_COLUMNS = len(RESULT_COLUMNS) - 1    # mac 一段签的是它前面那十一段（文件头「结果行的校验列」）
@@ -493,17 +512,17 @@ MEMORY_CAP_UNAVAILABLE_EXIT = 251
 MEMORY_ADMISSION_REFUSED_EXIT = 252
 TIME_LIMIT_HIT_EXIT = 253
 SLICE_TOTAL_HIT_EXIT = 254
+GPU_MEMORY_HIT_EXIT = 245            # 显存不够：命令退了非 0、起止之间内核报了 NV_ERR_NO_MEMORY，结果不算数
 WRAPPER_INFRASTRUCTURE_EXITS = {MEMORY_CAP_UNAVAILABLE_EXIT: "带上限的 scope 起不来", MEMORY_ADMISSION_REFUSED_EXIT: "内存排不上",
-                                SLICE_TOTAL_HIT_EXIT: "被 slice 的总上限挤掉"}
+                                SLICE_TOTAL_HIT_EXIT: "被 slice 的总上限挤掉",
+                                GPU_MEMORY_HIT_EXIT: "显存不够：起止之间内核报了 NV_ERR_NO_MEMORY，输出里的失败是被它弄红的"}
 NEXTEST_TEST_FAILED_EXIT = 100       # cargo nextest run：有测试没过
 CARGO_FAILED_EXIT = 101              # cargo：编不过、或 cargo test 有测试没过
 EXIT_INCONSISTENT, EXIT_USAGE, EXIT_INFRASTRUCTURE, EXIT_LOCKED, EXIT_DIRTY_TREE, EXIT_BASELINE_RED, EXIT_TOOLCHAIN, EXIT_STOPPED = 1, 2, 3, 4, 5, 6, 7, 143
 NEXTEST_FAILURE_LINE = re.compile(r"^\s*(?:FAIL|TIMEOUT|ABORT|LEAK-FAIL|SIG[A-Z0-9]+)\s+\[[^\]]*\]\s+(?:\([^)]*\)\s+)?(\S.*?)\s*$")
-LIBTEST_FAILURE_LINE = re.compile(r"^test (\S.*?) \.\.\. FAILED\s*$")
 # 进度行里数的几种日志行：编了一个 crate、nextest 过了一条、libtest 过了一条
 COMPILING_LINE = re.compile(r"^\s*Compiling \S")
 NEXTEST_PASS_LINE = re.compile(r"^\s*PASS \[")
-LIBTEST_PASS_LINE = re.compile(r"^test \S.* \.\.\. ok\s*$")
 # 编译那一步的失败才算无效：日志里有一条带源码位置的 rustc 错误（error 行后面两行之内有 `--> 文件:行:列`），又有 cargo 的「could not compile」
 COMPILE_ERROR_LINE = re.compile(r"^error(?:\[E\d+\])?: ")
 COMPILE_ERROR_LOCATION = re.compile(r"^\s*--> \S+:\d+:\d+")
@@ -945,7 +964,8 @@ def acquire_lock(home, wait_seconds):
 # ── 树：导出、指纹、在途记录 ───────────────────────────────────────────────────────────────────────────────
 
 def export_paths():
-    """导出哪些路径：门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（去掉 research/ 下的：那是那道门禁自己的脚本）加 .cargo。"""
+    """导出哪些路径：门禁 checker-tier-crates-mutation-replay 登记的拷贝范围（去掉 research/ 下的：那是那道门禁自己的脚本）加 .cargo。
+    拷贝范围已登记了 .cargo 就不再加：重复的一项让提交门禁 checker-tier-broad-mutation 比导出范围时与库目录记的那一份对不上。"""
     specification = importlib.util.spec_from_file_location("crates_mutation_rows_for_broad_mutation",
                                                            os.path.join(SCRIPT_DIRECTORY, "crates-mutation-rows.py"))
     module = importlib.util.module_from_spec(specification)
@@ -955,7 +975,9 @@ def export_paths():
     except Exception as error:  # 登记表读不了、没有那一行
         refuse(f"读不出导出范围（research/scripts/crates-mutation-rows.py 的 copied_paths）：{error}",
                "看 .claude/gate.d/stage-inputs.tsv 里 checker-tier-crates-mutation-replay.sh 那一行还在不在、成不成形")
-    paths = [path for path in copied if not path.startswith("research/")] + [".cargo"]
+    paths = [path for path in copied if not path.startswith("research/")]
+    if ".cargo" not in paths:
+        paths.append(".cargo")
     if "crates" not in paths:
         refuse(f"导出范围里没有 crates（读到的是 {copied}）", "看 .claude/gate.d/stage-inputs.tsv 里 checker-tier-crates-mutation-replay.sh 那一行登记的路径")
     return paths
@@ -1861,9 +1883,9 @@ def progress_line(sequence, step_name, elapsed, log_path):
                 line = line.rstrip("\n")
                 if COMPILING_LINE.match(line):
                     compiled += 1
-                elif NEXTEST_PASS_LINE.match(line) or LIBTEST_PASS_LINE.match(line):
+                elif NEXTEST_PASS_LINE.match(line) or libtest_outcome(line) == "ok":
                     passed += 1
-                elif NEXTEST_FAILURE_LINE.match(line) or LIBTEST_FAILURE_LINE.match(line):
+                elif NEXTEST_FAILURE_LINE.match(line) or libtest_outcome(line) == "FAILED":
                     failed += 1
     except OSError:
         pass
@@ -2222,8 +2244,9 @@ class Runner:
                                                      f"证据登记在 {ESCALATION_REGISTRY}", "")
 
     def stop_for_infrastructure(self, step_name, sequence, exit_code):
+        who = "nvidia-smi 看谁在用卡" if exit_code == GPU_MEMORY_HIT_EXIT else "bash research/scripts/run-with-memory-cap.sh --status 看谁占着"
         refuse(f"第 {sequence} 条的 {step_name} 退 {exit_code}（{WRAPPER_INFRASTRUCTURE_EXITS[exit_code]}）：这是内存包装自己的结局，不是这条变异的结局，不落行",
-               f"看日志 {self.log_path(sequence, step_name)}（bash research/scripts/run-with-memory-cap.sh --status 看谁占着），"
+               f"看日志 {self.log_path(sequence, step_name)}（{who}），"
                "修好或等别的重活退了，重跑同一条命令接着跑", EXIT_INFRASTRUCTURE)
 
     def ensure_baseline(self, stage):
@@ -2261,9 +2284,9 @@ class Runner:
                 try:
                     with open(log_path, encoding="utf-8", errors="replace") as handle:
                         for line in handle:
-                            found = LIBTEST_FAILURE_LINE.match(line.rstrip("\n")) or NEXTEST_FAILURE_LINE.match(line.rstrip("\n"))
-                            if found and found.group(1) not in failing:
-                                failing.append(found.group(1))
+                            name = libtest_failed_name(line.rstrip("\n")) or nextest_failed_name(line.rstrip("\n"))
+                            if name and name not in failing:
+                                failing.append(name)
                 except OSError:
                     pass
                 refuse(f"第二段基线 {step_name} 在没改过的树上退 {exit_code}，红的测试：{'、'.join(failing[:8]) or UNRECOGNISED_TEST}；第二段一条结论都给不出",
@@ -2308,14 +2331,34 @@ class Runner:
             say(f"  · 重起先验编译：{'、'.join(step_names)} 在没改过的树上照过")
 
 
+def libtest_outcome(line):
+    """libtest 结果行的结局（ok / FAILED / ignored），不是结果行交 None（解析在 lib_libtest_result_lines.py）。"""
+    found = libtest_result_lines.result_line(line)
+    return found.outcome if found else None
+
+
+def libtest_failed_name(line):
+    """libtest 结果行结局是 FAILED 的全名（` - should panic` 那一段不进名字），别的交 None。弄坏开关 own-libtest-failure-line 下回到改前那条正则（名字带上 ` - should panic`）。"""
+    if break_is("own-libtest-failure-line"):
+        found = re.match(r"^test (\S.*?) \.\.\. FAILED\s*$", line)
+        return found.group(1) if found else None
+    found = libtest_result_lines.result_line(line)
+    return found.full_name if found and found.outcome == "FAILED" else None
+
+
+def nextest_failed_name(line):
+    found = NEXTEST_FAILURE_LINE.match(line)
+    return found.group(1) if found else None
+
+
 def first_failing_test(log_path, test_failed_exit):
-    pattern = NEXTEST_FAILURE_LINE if test_failed_exit == NEXTEST_TEST_FAILED_EXIT else LIBTEST_FAILURE_LINE
+    failed_name = nextest_failed_name if test_failed_exit == NEXTEST_TEST_FAILED_EXIT else libtest_failed_name
     try:
         with open(log_path, encoding="utf-8", errors="replace") as handle:
             for line in handle:
-                found = pattern.match(line.rstrip("\n"))
-                if found:
-                    return found.group(1)
+                name = failed_name(line.rstrip("\n"))
+                if name:
+                    return name
     except OSError:
         pass
     return UNRECOGNISED_TEST
@@ -2436,6 +2479,9 @@ def process_item(library, runner, item, with_stage_one, with_stage_two):
             if kind == "test" and exit_code == test_failed_exit:
                 return record("caught", stage, first_failing_test(log_path, test_failed_exit), note_text=step_name + limit_note(log_path), step_name=step_name,
                               step_seconds=seconds)
+            if exit_code == GPU_MEMORY_HIT_EXIT and break_is("gpu-memory-as-driver-error"):
+                return record(DRIVER_ERROR, stage, note_text=f"{step_name} 退 {exit_code}（认不出的退出码，不是这条变异的结局；日志 {os.path.basename(log_path)}）",
+                              step_name=step_name, step_seconds=seconds)
             if exit_code in WRAPPER_INFRASTRUCTURE_EXITS or break_is("unknown-exit-stops"):
                 if exit_code not in WRAPPER_INFRASTRUCTURE_EXITS:
                     refuse(f"第 {sequence} 条的 {step_name} 退 {exit_code}（认不出的退出码）：不落行", f"看日志 {log_path}", EXIT_INFRASTRUCTURE)
@@ -3397,6 +3443,9 @@ def main(argv):
                 shutil.rmtree(scratch, ignore_errors=True)
             return 0
         if arguments.list_items:
+            if not break_is("list-items-pipe-unhandled"):
+                # 接 | head 时读的一头先关了：照 SIGPIPE 的惯例安静退出（被 SIGPIPE 停，shell 里退 141），不打 BrokenPipeError 的回溯
+                signal.signal(signal.SIGPIPE, signal.SIG_DFL)
             list_items(library)
             return 0
         if arguments.check_ignored:
@@ -3492,6 +3541,10 @@ if action == "exit:253":
 if action == "exit:250":
     print(f"run-with-memory-cap: 撞了内存上限 {os.environ.get('BROAD_MUTATION_STEP_MEMORY_CAP')}（自证的假一步）", flush=True)
     sys.exit(250)
+if action == "exit:245":
+    print("        FAIL [   0.010s] (3/9) fake-package::fake_target the_case_that_catches_it")
+    print("run-with-memory-cap: 显存不够（自证的假一步）", flush=True)
+    sys.exit(245)
 if action == "fail-nextest":
     print("        FAIL [   0.010s] (3/9) fake-package::fake_target the_case_that_catches_it")
     sys.exit(100)
@@ -3499,7 +3552,9 @@ if action.startswith("fail-nextest:"):
     print("        FAIL [   0.010s] (3/9) " + action.split(":", 1)[1])
     sys.exit(100)
 if action == "fail-cargo":
-    print("test tests::the_stage_two_case ... FAILED")
+    # 头一条红的是 #[should_panic] 的用例：结果行在名字与「 ... 」之间多一段「 - should panic」，记下的名字不该带它
+    print("test tests::the_stage_two_case - should panic ... FAILED")
+    print("test tests::another_stage_two_case ... FAILED")
     sys.exit(101)
 if action == "fail-compile":
     print("error[E0277]: the trait bound `Fake: Default` is not satisfied")
@@ -3750,6 +3805,15 @@ def selftest_basic_cells(selftest):
                    and [fields[0] for fields in listed_lines] == [str(index + 1) for index in range(len(selftest.mutants))] and not selftest.calls(),
                    f"--sync-tree / --list-items 不对（退 {synced.returncode} / {listed.returncode}，{len(listed_lines)} 行，调了 {len(selftest.calls())} 步）：{synced.stderr}{listed.stderr}",
                    "看 sync_tree、generate_list 与 list_items：清单每条一行「序号、包、变异名、状态」，列项不许起任何一步")
+    # --list-items 接 | head（读的一头先关了）：被 SIGPIPE 安静停掉，stderr 一个字都没有
+    read_end, write_end = os.pipe()
+    os.close(read_end)
+    closed_pipe = subprocess.run(selftest.command("first", "--list-items"), stdout=write_end, stderr=subprocess.PIPE, text=True,
+                                 stdin=subprocess.DEVNULL, env=selftest.environment)
+    os.close(write_end)
+    selftest.check(closed_pipe.returncode == -signal.SIGPIPE and closed_pipe.stderr == "",
+                   f"--list-items 接 | head 时没照 SIGPIPE 惯例安静退（退 {closed_pipe.returncode}）：{closed_pipe.stderr.strip()[-300:]}",
+                   "看 main 里 --list-items 那一支：开头要把 SIGPIPE 设回默认")
     # 项写错退 2、一步都不跑
     unknown = selftest.run("first", "--item", "no-such-mutant", "--skip-stage-two")
     selftest.check(unknown.returncode == EXIT_USAGE and not selftest.calls(), f"不认得的项没拒（退 {unknown.returncode}，调了 {len(selftest.calls())} 步）",
@@ -3810,7 +3874,8 @@ def selftest_basic_cells(selftest):
     # 两段式的结局：抓到（第一段、文档测试、慢档用例各一）、没红、无效、超时（两段各一）、内存撞顶，逐条对
     final = {row[0]: (row[3], row[4]) for row in rows if row[3] != STAGE_ONE_ONLY}
     selftest.check(final == SELFTEST_EXPECTED and [row[5] for row in rows if row[0] == "5" and row[3] == "caught"] == ["tests::the_stage_two_case"],
-                   f"两段式的结局不对：{sorted(final.items())}", "看 process_item 的 run_stage：第二段全绿才记 missed，抓到要带第一条失败的测试名")
+                   f"两段式的结局不对（第 5 条记的第一条失败的测试名 {[row[5] for row in rows if row[0] == '5']}）：{sorted(final.items())}",
+                   "看 process_item 的 run_stage：第二段全绿才记 missed，抓到要带第一条失败的测试名（libtest 结果行经 lib_libtest_result_lines.py，should panic 那一段不进名字）")
     # 汇总八栏加起来等于清单条数，没红的逐条列名
     summary = selftest.run("second", "--summary")
     selftest.check(summary.returncode == EXIT_GATE_RED and SELFTEST_EXPECTED_SUMMARY in summary.stdout and "verdict=red" in summary.stdout
@@ -4453,6 +4518,24 @@ def selftest_environmental_cells(selftest):
                    "看 select_items：给了 plans（--changed-since）时，要现判的条这一版里是 timeout / memory-cap 的也选上重跑（过过第一段的只补第二段）")
 
 
+def selftest_gpu_memory_cells(selftest):
+    """一步退 245（内存包装认出的显存不够，输出里照样有失败行）：是包装自己的结局，那一条不落行，整趟退 EXIT_INFRASTRUCTURE、报显存不够；
+    显存空出来之后重跑同一条命令，那一条照常判。"""
+    selftest.write_plan([("1", "one-test", "exit:245")])
+    selftest.run("gpu-memory", "--sync-tree")
+    stopped = selftest.run("gpu-memory", "--item", "1", "--skip-stage-two")
+    rows_after_stop = [row for row in selftest.rows("gpu-memory") if row[0] == "1"]
+    selftest.write_plan(SELFTEST_PLAN)
+    resumed = selftest.run("gpu-memory", "--item", "1", "--skip-stage-two")
+    states = selftest.states("gpu-memory")
+    selftest.clear_calls()
+    selftest.check(stopped.returncode == EXIT_INFRASTRUCTURE and not rows_after_stop and "显存不够" in stopped.stderr
+                   and resumed.returncode == 0 and states.get("1") == "caught",
+                   f"一步退 245（显存不够）没当包装自己的结局停下（头一趟退 {stopped.returncode}、第 1 条落了 {len(rows_after_stop)} 行；"
+                   f"重跑退 {resumed.returncode}、第 1 条 {states.get('1')}）：{stopped.stderr[-300:]}",
+                   "看 WRAPPER_INFRASTRUCTURE_EXITS 与 stop_for_infrastructure：245 是内存包装认出的显存不够，输出里的失败不算这条变异的结局")
+
+
 def selftest_limits(selftest):
     """假一步记的 [(序号, 步名, 哪一趟, 整步时限, 内存上限)]。"""
     path = os.path.join(selftest.work, "limits.log")
@@ -4950,6 +5033,7 @@ def run_selftest_cells(selftest):
     selftest_fresh_build_cells(selftest)   # 放最前：弄坏换树那几项时后面各组的库都换不好树，跑在后面会被前面的异常截掉
     selftest_prune_cells(selftest)
     selftest_environmental_cells(selftest)
+    selftest_gpu_memory_cells(selftest)
     listed_lines = selftest_basic_cells(selftest)
     selftest_state_cells(selftest)
     selftest_table_cells(selftest, listed_lines)
@@ -4986,7 +5070,8 @@ def run_selftest():
         print(f"     → 怎么办：照上面每一格给的出路改，再跑 python3 {SELF_PATH} --selftest", file=sys.stderr)
         return 1
     say("  ✓ --selftest：临时库目录拒、导出与列项、项写错拒、点名与两段、杀掉再起只补没做完的、各种结局与汇总八栏、第二段只补第一段没跑到的、--from 与 --shard、脏树拒、"
-        "点名跳过已有定论的条与 --rerun、定论不被降级、--stage-two-only 要过过第一段、变异名对清单、末行没写完、认不出的退出码、重起验编译与连着无效或秒红、"
+        "点名跳过已有定论的条与 --rerun、定论不被降级、--stage-two-only 要过过第一段、变异名对清单、末行没写完、认不出的退出码、一步退 245（显存不够）停下不落行、"
+        "重起验编译与连着无效或秒红、"
         "核树看多出来的文件、换树的次序、工具链进指纹、全局键进指纹与真跑核全局键、全局键逐类进键（工具链、工具版本、限时参数、构建环境另七类，源码指纹算路径）、"
         "加大限时与上限再点名重跑判出结论、超时与撞顶自动升档（证据齐的判抓到并登记、升档那趟跑完照它往后判、证据不齐的没结论、--summary 逐条列、"
         "升档那趟按自己的上限排队、变异步撞总上限时先挨杀）、升档证据五支各一格、基线按线程数分开记且登记行指的那一行对得上、结果行带密钥校验列（手追加的不算）、"

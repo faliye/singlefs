@@ -7,6 +7,9 @@
     checklist-specs.py 清单.md                                  # 只打印取法，一行一条
     checklist-specs.py 清单.md --cited 正文.md --out 出口.md [--extra 取法 …]   # 生成取法并调用 quote-kb.py
     checklist-specs.py --selftest
+    checklist-specs.py --help                                   # 打这一段用法（-h 同），退 0
+退出码：0 打出取法或 quote-kb.py 抄成；1 清单本身判红（「随」行父节没取到、标了抄却认不出）；2 不认的选项、选项缺值、清单或正文读不了；
+  带 --out 时其余退出码是 quote-kb.py 的（3–6，见它的文件头）。
 
 为什么要有它：`.claude/rules/three-way-inference.md` 要求取法「从清单里标『抄』的行自动生成，别手写第二份」，
 而仓里一直没有这个脚本，D16（发布语义） 未定项 1 的三轮材料都是靠 scratchpad 里一份临时脚本生成的。
@@ -24,6 +27,8 @@ quote-kb.py 报「标题『###』命中 9 次」。这里用参数列表直接�
       带空格的标题（「✗ 自检：取法 」…「≠ 期望」）
   CHECKLIST_SPECS_BREAK=trust-follow  specs_from_checklist() 不判父节没被取到的「随」行
       父节没取到的「随」行（「✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 0」）
+  CHECKLIST_SPECS_BREAK=raw-arguments  main() 不先判 --help、不认的选项、选项缺值与读不了的文件（改前的样子）
+      命令行那一格（「✗ 自检：命令行 ['--help'] 应当退 0」）
 """
 import os
 import re
@@ -142,29 +147,65 @@ def selftest():
             print(f'  ✗ 自检：父节标「不抄」、子节标「抄 / 随」的清单应当判红，实际退出码 {child.returncode}：{child.stderr[-200:]}')
             print('    → 看 uncarried_follow_rows()；CHECKLIST_SPECS_BREAK=trust-follow 设着的话这里本来就该红')
             return 1
-    print('  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法，父节没取到的「随」行判红（查了 3 条）')
+        # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；清单或正文读不了报文件名与出路、不抛 traceback
+        cli_cases = [(['--help'], 0, '用法：'), (['-h'], 0, '用法：'), (['--bogus'], 2, '不认的选项：--bogus'),
+                     ([checklist, '--bogus'], 2, '不认的选项：--bogus'),
+                     ([os.path.join(directory, 'nothere.md')], 2, f'读不了 {os.path.join(directory, "nothere.md")}'),
+                     ([checklist, '--cited', os.path.join(directory, 'nobody.md'), '--out', os.path.join(directory, 'out.md')], 2,
+                      f'读不了 {os.path.join(directory, "nobody.md")}')]
+        for arguments, want_code, want_text in cli_cases:
+            child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
+            said = child.stdout + child.stderr
+            if child.returncode != want_code or want_text not in said or 'Traceback' in said or (want_code and '→ 怎么办' not in said):
+                print(f'  ✗ 自检：命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），'
+                      f'实际退 {child.returncode}：{said[-300:]}')
+                print('    → 看 main() 开头那几道判；CHECKLIST_SPECS_BREAK=raw-arguments 设着的话这里本来就该红')
+                return 1
+    print(f'  ✓ 自检通过：顶部标题与引言合成一个行区间，带空格的标题是一整条取法，父节没取到的「随」行判红（查了 3 条）；'
+          f'命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的清单与正文退 2 带出路')
     return 0
+
+
+def refuse(reason, howto):
+    """用法错与读不了的文件：stderr 写原因与下一步，退 2。"""
+    print(f'✗ {reason}\n  → 怎么办：{howto}', file=sys.stderr)
+    return 2
 
 
 def main():
     arguments = sys.argv[1:]
     if arguments == ['--selftest']:
         return selftest()
+    usage = 'checklist-specs.py 清单.md [--cited 正文.md --out 出口.md] [--extra 取法 …]'
     if not arguments:
-        sys.exit('✗ 缺清单路径\n  → checklist-specs.py 清单.md [--cited 正文.md --out 出口.md] [--extra 取法 …]')
+        sys.exit(f'✗ 缺清单路径\n  → {usage}')
+    guarded = os.environ.get('CHECKLIST_SPECS_BREAK') != 'raw-arguments'   # 弄坏开关：--help、不认的选项、读不了的文件都不先判
+    if guarded and arguments[0] in ('--help', '-h'):
+        print(__doc__)
+        return 0
+    if guarded and arguments[0].startswith('-'):
+        return refuse(f'不认的选项：{arguments[0]}（第一个参数要是清单路径）', f'{usage}；看用法跑 checklist-specs.py --help')
     checklist = arguments.pop(0)
     cited = out = None
     extras = []
     while arguments:
         flag = arguments.pop(0)
+        if flag in ('--cited', '--out', '--extra') and not arguments and guarded:
+            return refuse(f'{flag} 后面没给值', usage)
         if flag == '--cited':
             cited = arguments.pop(0)
         elif flag == '--out':
             out = arguments.pop(0)
         elif flag == '--extra':
             extras.append(arguments.pop(0))
+        elif guarded and flag.startswith('-'):
+            return refuse(f'不认的选项：{flag}', f'只认 --cited、--out、--extra（{usage}）')
         else:
             sys.exit(f'✗ 不认识的参数 {flag}\n  → 只认 --cited、--out、--extra')
+    unreadable = [path for path in (checklist, cited) if guarded and path is not None and not os.path.isfile(path)]
+    if unreadable:
+        return refuse(f'读不了 {"、".join(unreadable)}（文件不在，或不是普通文件）',
+                      '核对路径（相对路径相对当前工作目录，三方材料在 research/prompts/_<轮>-checklist.md、_<轮>-body.md）')
     specs = specs_from_checklist(checklist, extras) + extras
     if out is None:
         print('\n'.join(specs))

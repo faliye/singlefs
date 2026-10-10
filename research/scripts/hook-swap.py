@@ -388,7 +388,7 @@ def swap(spec, hook, scratch, root, feeds=None, dry_run=False, after_draft=None,
     root = os.path.realpath(root)
     scratch = os.path.abspath(scratch)
     if os.path.realpath(scratch) == root or is_inside(scratch, root):
-        raise BadInput(f"草稿目录 {scratch} 在主工作区里\n→ 怎么办：放进派发提示给的草稿目录（/tmp/claude-1000/<轮>/ 这类仓外位置）")
+        raise BadInput(f"草稿目录 {scratch} 在主工作区里\n→ 怎么办：放进派发提示给的草稿目录（工作根 ~/.local/share/singlefs/work/<轮>/ 这类仓外位置）")
     edits = resolve_edits(spec, root)
     hook_path = os.path.realpath(hook if os.path.isabs(hook) else os.path.join(root, hook))
     if os.path.dirname(hook_path) != os.path.realpath(os.path.join(root, HOOKS_DIRECTORY)) or not hook_path.endswith(".sh") or not os.path.isfile(hook_path):

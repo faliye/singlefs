@@ -16,34 +16,41 @@
 # .claude/singlefs-ai-sop/ 另拷进那棵树（它在 .gitignore 里，HEAD + 暂存区的 worktree 里没有；本机的准入模块经 git common-dir 回退到主仓找得到，
 # 第二台那棵树 git init 过、没有主仓可回退）：树里有就拷树里的，没有就拷驱动所在主仓那一份（先驱动这棵树里的，再驱动这棵树的 git common-dir
 # 所在的那份仓，与 .claude/scripts/preflight.sh 找它的次序相同），拷完回读 scripts/preflight.py 在不在；
-# ③ 两台各算这条用例的输入指纹（admission.py crash-case-manifest，参数与 checker-tier-layer0-replay 相同），不同就拒；清场（配置里写了的话，回读验证，
-# 复原挂在 EXIT 上，跑红了也复原）；④ 两片同时跑，各记 pid、各 wait 取退出码、各写自己的日志，LAYER0_PROGRESS 边跑边转出来；
+# ③ 两台各算这条用例的输入指纹（admission.py crash-case-manifest，参数与 checker-tier-layer0-replay 相同），不同就拒；清场（配置里写了的话，回读验证；
+# 跑完、跑红、被打断都不复原，EXIT 上报一句「清了场、没复原」，要复原由用户手动跑私有复原脚本）；④ 两片同时跑，各记 pid、各 wait 取退出码、各写自己的日志，LAYER0_PROGRESS 边跑边转出来；
 # ⑤ 第二台的账本拷回本机进度目录；⑥ 本机 merge；⑦ 删掉第二台上这一趟的树与编译目录（两片的进度目录留着：被杀之后下一趟接着跑）。
 # 第二台上这一趟的目录建好之后在哪一步失败退出，⑦ 都挂在 EXIT 上照做（删树与第二台上那一片的发现日志，进度目录留着）。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停两片——本机那一片从它的进程起、第二台那一片从它在第二台上记下的进程号起（第二台上
 # runs/<这一趟>.shard-1-of-2.pid，核它的工作目录是这一趟的树），都按父子关系逐层冻住（STOP）、从最底层起 TERM、放开，等至多 30 秒，
-# 还在的 KILL，回读一个不剩，第二台那一片再等它的外层写完退出码文件（至多 30 秒）——再照 EXIT 上那一套复原、回读、删第二台这一趟的树，全部做完才退；收尾时不再理会这三个信号与 SIGPIPE
+# 还在的 KILL，回读一个不剩，第二台那一片再等它的外层写完退出码文件（至多 30 秒）——再照 EXIT 上那一套删第二台这一趟的树（不复原），全部做完才退；收尾时不再理会这三个信号与 SIGPIPE
 # （读输出的一方先没了，写不出去也照样往下做）。两片的进度目录留着，下一趟接着跑。前台那几步（rsync、算指纹、merge）里收到的，
 # 等那一步跑完再照这一套收尾；KILL 接不住，那时第二台上这一趟的树留着，手动删。
+# 第二台那一片跑完没有：它在第二台上脱离 ssh 起，外层（写退出码文件的那个 bash）开头先把自己的进程号写进 runs/<这一趟>.shard-1-of-2.outer.pid，
+# 内层（测试二进制）把自己的写进 .shard-1-of-2.pid（收到 TERM 时凭它停那一片）。驱动每 5 秒看一次：退出码文件在就照它收；不在而外层还在
+# （核命令行里有这一趟的退出码文件名）就接着等——内层退了之后外层要等内存包装收尾才写退出码文件，收尾多久没有上界；外层也没了、退出码文件
+# 仍不在，连续 3 次才定为 vanished。没读到退出码就收了的（vanished、连不上），删第二台这一趟的东西之前先等外层退出（至多 30 秒）。
 # 进度目录：本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>（与 checker-tier-layer0-replay 相同），第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>。
 # 线程：本机那一片取 SINGLEFS_LAYER0_THREADS（没设取本机 nproc），第二台那一片取第二台的 nproc；两台的 nproc 都清掉 OMP_NUM_THREADS、
 # OMP_THREAD_LIMIT 再跑（nproc 认这两个变量，漏进来就把核数压成它们的值）。SINGLEFS_LAYER0_START_OVER=1 交给两片，
 # merge 那一趟不带。只接登记了 shard=across-machines 的用例（它的枚举经 Layer0Resume::from_environment 认分片开关）。
 # 内存：第二台那一片在第二台上经那棵树副本里的 research/scripts/run-with-memory-cap.sh 起，上限取配置的 PEER_MEMORY_CAP（第二台不在本机的进程树里，
 # 本机包在外面的那一层罩不到它）；本机那一片与 merge 照旧，由起 checker-tier-layer0-replay / 这个驱动的那一层包装管。第二台那一片退 250–254 是包装自己的结局
-# （含义见 run-with-memory-cap.sh 文件头「退出码」），那一片的输出不算结果，判红。
+# （含义见 run-with-memory-cap.sh 文件头「退出码」），那一片的输出不算结果，判红；退 245 是那边的包装认出显存不够（起止之间内核报了 NV_ERR_NO_MEMORY），
+# 单报「显存不够」，同样不算结果、判红。
 # PEER_MEMORY_CAP 只罩第二台跑测试二进制那一趟；第二台编测试二进制（cargo test --release --no-run）另经同一个包装、上限
 # SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP（写法同 PEER_MEMORY_CAP，默认 16G：本机 60 GiB 减去常驻约 12 GiB、同时至多 3 件重活，每件 16 GiB，
 # 与 research/scripts/mutate.sh 的 MUTATE_MEMORY_MAX 同一个算法；峰值表里 singlefs-checker-tier release --no-run 量到的最大一条是 4.29 GiB；
-# 第二台的内存与本机不同时要重算）。两台对称：本机编测试二进制也不在那一片的上限里。编译撞了这个上限（包装退 250）报明「编译上限太小」。
+# 第二台的内存与本机不同时要重算）。两台对称：本机编测试二进制也不在那一片的上限里。编译撞了这个上限（包装退 250）报明「编译上限太小」；
+# 编译那一趟包装退 245 报明「第二台编测试二进制那一趟显存不够」（出路句不提编译上限：两支的判别串各只在自己那一支里出现，--selftest 的 ⑰ ⑲ 凭它们分）。
 # 环境变量 SINGLEFS_LAYER0_PEER_MEMORY_CAP 设了就覆盖配置的 PEER_MEMORY_CAP（写法同它：正整数加 K / M / G / T），没设照配置。
 # 本机环境里设了 RUN_WITH_MEMORY_CAP_RESERVE（包装的余量），同一个值带给第二台那一条 run-with-memory-cap.sh；没设就不带，第二台照包装的默认余量。
 # 「第二台」是本机（只供测试）时，这两个变量不从本机环境漏给那一片（真的第二台经 ssh 也拿不到本机环境），只认驱动带过去的。
 # 判与写标记：merge 那一趟的日志交 admission.py crash-case-judge 判，判绿交 crash-case-record 写；核数与线程数由它们自己现取，这里不转。
 # 登记的崩溃枚举用例都标了 #[ignore]，三趟 cargo test 都带 --include-ignored --exact <用例函数>；只供测试的开关
 # SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0 时不带 --include-ignored（--selftest 那条小流用例不标 ignore，不必把别的 ignore 用例放进过滤范围）。
-# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=<秒>：第二台那一片的外层（跑完写退出码文件的那个 bash）写之前先停这么多秒，
-# 只给 --selftest 的 ⑬ 把「收到 TERM 删完第二台这一趟的东西之后，外层才写出退出码文件」的竞态撑开。
+# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE=<文件>：第二台那一片的外层（跑完写退出码文件的那个 bash）写之前，这个文件在就一直等
+# （每 0.1 秒看一次，至多 120 秒）。只给 --selftest 的 ⑬：外层什么时候写出退出码文件由自证放，「收到 TERM 不等外层就往下删」判得出来，
+# 不看删第二台这一趟的东西快不快（改前停固定 5 秒，负载高时删一趟要 4–12 秒，删得比外层写得晚，退出码文件随着一起删掉，这个开关就判不红）。
 #
 # 配置（本地、git 忽略）：${SINGLEFS_MULTI_HOST_CONFIG:-<主工作树的根>/multi-host.env}，键与写法见仓根 multi-host.env.example；
 # 在不在、齐不齐、第二台连不连得上由 research/scripts/layer0-shard-configuration-check.sh 判（门禁 checker-tier-layer0-replay 拿同一份判走不走分片）。
@@ -59,21 +66,38 @@
 # 弄坏开关（只给证红用）LAYER0_SHARD_RUN_BREAK=<项>：no-merge-findings 不给 merge 那一趟设发现日志，打开时 --selftest 的 ⑦ 那一格判错。
 # peer-build-under-shard-cap 第二台编测试二进制照改前放进那一片的上限 PEER_MEMORY_CAP 里，打开时 --selftest 的 ⑯、⑰ 两格判错（⑰ 设的小编译上限不起作用，照编成、退 0）；
 # peer-build-cap-unexplained 编译撞了编译上限也只报「第二台编测试二进制失败」、不说上限太小（改前的报法），打开时 --selftest 的 ⑰ 那一格判错。
-# no-peer-cleanup-on-failure 失败退出时不删第二台上这一趟的树，打开时 --selftest 的 ⑩、⑬、⑰ 三格判错（都看第二台 runs/ 下这一趟的东西删没删）。
+# no-peer-cleanup-on-failure 失败退出时不删第二台上这一趟的树，打开时 --selftest 的 ⑩、⑬、⑰ 与 ⑲ 两格共五格判错（都看第二台 runs/ 下这一趟的东西删没删；
+#   ⑲ 两格比的都是 ⑲ 开跑之前那一份 runs/，第一格编译那一趟失败退出留下的树，第二格也看得见）。
 # 下面四项照 research/scripts/mutate.sh 的写法：开关一行写弄坏哪一处，下一行起写打开后 --selftest 判错的格（「格名开头」，括号里写失败行格名之后的句首）：
 #   LAYER0_SHARD_RUN_BREAK=peer-without-memory-cap  第二台那一片不经 run-with-memory-cap.sh 起
 #       「⑧ 第二台那一片经 research/scripts/run-with-memory-cap.sh 起」（驱动的输出里 ④ 那一行没写第二台那一片经 run-with-memory-cap.sh）
 #       「⑪ 本机设了 RUN_WITH_MEMORY_CAP_RESERVE=10G」（设了余量那一趟，驱动 ④ 那一行没写第二台经 RUN_WITH_MEMORY_CAP_RESERVE=10G 起包装）
 #       「⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G」（设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=12G 那一趟，驱动 ④ 那一行上限不是 12G）
-#       以上取自真 cargo（带 SINGLEFS_HEAVY_TESTS）模式；假 cargo 模式判错的也是这三格，⑫ 的格名与句首里的 12G 换成 2G，其余同上
+#       「⑲ 第二台那一片内存包装退 245」（退 1；输出尾部：…第二台那一片退 3…：那一片不经包装，没人认显存不够）
+#       以上取自真 cargo（带 SINGLEFS_HEAVY_TESTS）模式；假 cargo 模式判错的也是这四格，⑫ 的格名与句首里的 12G 换成 2G，其余同上
+#       「⑳ 第二台那一片的内存包装收尾拉长」（没报「第二台那一片退 245：显存不够」；那一片不经包装，收尾没拉长、也没人认显存不够）：这一格只在假 cargo 模式下跑过
 #   LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy  两片跑完不拷回第二台那一片的发现日志
 #       「⑦ 发现日志」（第二台那一片没拷回到）
 #   LAYER0_SHARD_RUN_BREAK=no-sop-copy  照改前只把树拷到第二台（树里有规范副本就随树走），不另拷规范副本：树里没有它的那一趟第二台算不出输入指纹
 #       「⑨ 树里没有规范副本」（退 1；）
 #   LAYER0_SHARD_RUN_BREAK=peer-exit-not-awaited  收到 TERM 停了第二台那一片的测试二进制就往下删，不等那一片的外层写完退出码文件（改前的写法）
-#       「⑬ 两片跑到一半给驱动发 TERM」（第二台 runs/ 下多了：）
+#       「⑬ 两片跑到一半给驱动发 TERM」（驱动没等第二台那一片的外层写完退出码文件就往下收尾：；同一行后面还有「第二台 runs/ 下多了：」）
+#   LAYER0_SHARD_RUN_BREAK=restore-after-run  退出时照改前跑配置的 QUIESCE_START_COMMAND 复原
+#       「⑱ 跑完不调复原命令」（配置的复原命令记了 …）
+#   LAYER0_SHARD_RUN_BREAK=gpu-memory-unexplained  第二台编测试二进制那一趟、那一片退 245 时不报显存不够，照别的退出码报
+#       「⑲ 第二台编测试二进制那一趟内存包装退 245」（没报「第二台编测试二进制那一趟显存不够」；输出尾部：…第二台编测试二进制失败…）
+#       「⑲ 第二台那一片内存包装退 245」（退 1；输出尾部：…第二台那一片退 245…）
+#       「⑳ 第二台那一片的内存包装收尾拉长」（没报「第二台那一片退 245：显存不够」）：这一格只在假 cargo 模式下跑过
+#   LAYER0_SHARD_RUN_BREAK=liveness-by-inner-pid  判第二台那一片还在不在跑照改前只看内层（测试二进制）的进程号，不看写退出码文件的外层
+#       「⑳ 第二台那一片的内存包装收尾拉长」（驱动判成了 vanished：）
+#   LAYER0_SHARD_RUN_BREAK=outer-liveness-unchecked  第二台那一片外层的进程号文件在就算那一片在跑，不看那个进程还在不在
+#       「㉑ 第二台那一片的外层没留退出码文件就没了」（外层没了 90 秒驱动还没退）
 #
 # 配置在不在、判不判得过不写成运行条件（--selftest 不要配置）：开跑之后第一件事调配置判法，判不过照它的原因与出路退 1。
+# 长活声明（判法 .claude/hooks/lib_long_run.py：research/scripts/detached-run.sh start --wall-clock over-2h 与 long-run-check、research/scripts/host-dispatch.py 文件头 ⓪ 都读这几行）：
+# long-run-shards: 按 SINGLEFS_LAYER0_SHARD 切两片（切法与账本在 crates/singlefs-checker-tier/src/layer0_progress.rs）：本机跑第 0/2 片、多机配置的 PEER_SSH_HOST 跑第 1/2 片，本机 merge/2 按切片序号并
+# long-run-resume: 两片的进度目录（本机 <git common-dir>/singlefs-layer0-progress/<输入指纹>、第二台 <PEER_REPOSITORY_DIRECTORY>/progress/<输入指纹>）跑完、跑红、被停都留着，重起同一条命令接着跑没做完的切片；SINGLEFS_LAYER0_START_OVER=1 才从头
+# long-run-unshardable: 多机：台数固定两台（本机与多机配置的 PEER_SSH_HOST，经 layer0-shard-configuration-check.sh --emit-assignments 判，不读 --emit-hosts 的清单）；本机那一片线程取 SINGLEFS_LAYER0_THREADS 或本机 nproc、第二台那一片取它的 nproc，第二台内存上限取配置的 PEER_MEMORY_CAP，都不按 host-resources.py --json 现算
 #
 # admission: always 每次调都跑这一刻这棵树上的一条崩溃枚举用例；复用判定在门禁 checker-tier-layer0-replay 的全绿标记里，不在这里
 # run-condition: command cargo rustc python3 rsync ssh nproc git
@@ -133,10 +157,10 @@ peer_build_memory_cap="${SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP:-16G}"
 [[ "$peer_build_memory_cap" =~ ^[1-9][0-9]*[KMGT]$ ]] \
   || fail "SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 要写第二台编测试二进制的内存上限（正整数加 K / M / G / T，单位必写），读到「${peer_build_memory_cap}」" \
     "写成例 16G；不设它取默认 16G"
-# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=<秒>：第二台那一片的外层写退出码文件之前先停这么多秒（文件头「只供测试的开关」）
-peer_exit_pause="${SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE:-}"
-[[ -z "$peer_exit_pause" || "$peer_exit_pause" =~ ^[1-9][0-9]*$ ]] \
-  || fail "SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE 只许写正整数秒，读到「${peer_exit_pause}」" "不设它；只有 --selftest 的 ⑬ 设它"
+# 只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE=<文件>：这个文件在，第二台那一片的外层就不写退出码文件（文件头「只供测试的开关」）
+peer_exit_hold_file="${SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE:-}"
+[[ -z "$peer_exit_hold_file" || "$peer_exit_hold_file" == /* ]] \
+  || fail "SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE 只许写绝对路径，读到「${peer_exit_hold_file}」" "不设它；只有 --selftest 的 ⑬ 设它"
 
 # 这条用例登记的包、测试目标、用例函数（第三列的 test=）；要登记了 shard=across-machines
 registration_row="$(awk -F'\t' -v key="$case_key" '$1 == key' "$tree_root/.claude/gate.d/stage-inputs.tsv")"
@@ -155,6 +179,7 @@ peer_run_directory="$PEER_REPOSITORY_DIRECTORY/runs/$run_label"
 peer_findings_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.findings.tsv"
 peer_pid_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.pid"  # 第二台那一片的进程号（收到 TERM 时凭它停那一片）
 peer_exit_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.exit"  # 第二台那一片跑完写它的退出码（驱动凭它判那一片跑完没有、怎么收的）
+peer_outer_pid_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.outer.pid"  # 第二台那一片的外层（写退出码文件的那个 bash）的进程号：驱动凭它判那一片还在不在跑
 peer_output_file="$PEER_REPOSITORY_DIRECTORY/runs/$run_label.shard-1-of-2.log"  # 第二台那一片的输出：写在第二台的文件里，不经 ssh 的管道
 layer0_shard_break="${LAYER0_SHARD_RUN_BREAK:-}"
 # 三趟的日志放哪（跑完不删）：--merged-log 时在给的日志文件旁边，单独跑时在 common-dir 下这一趟的目录里
@@ -171,16 +196,14 @@ quiesced=0
 peer_run_directory_pending=0
 local_shard_process=""
 peer_shard_started=0
-restore_on_exit() {
+finish_on_exit() { # 退出时：清过场就报一句「清了场、没复原」（不复原）；删第二台这一趟的树与本机的临时目录
   trap '' TERM INT HUP PIPE
   if (( quiesced )); then
-    echo "  · 复原：$QUIESCE_START_COMMAND"
-    bash -c "$QUIESCE_START_COMMAND"
-    if bash -c "$QUIESCE_STARTED_CHECK_COMMAND"; then
-      echo "  · 复原之后回读过了（$QUIESCE_STARTED_CHECK_COMMAND 退 0）"
+    if [[ "$layer0_shard_break" == restore-after-run ]]; then
+      echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=restore-after-run：照配置跑复原命令"
+      bash -c "$QUIESCE_START_COMMAND"
     else
-      echo "  ✗ 复原之后回读没过：$QUIESCE_STARTED_CHECK_COMMAND 退非 0"
-      echo "     → 怎么办：手动复原（$QUIESCE_START_COMMAND），回读到它退 0 为止"
+      echo "  · 清了场、没复原：清场停下的服务一直停着；要复原手动跑私有复原脚本（配置的 QUIESCE_START_COMMAND），再跑 QUIESCE_STARTED_CHECK_COMMAND 回读到它退 0"
     fi
   fi
   # 第二台上这一趟的目录建好之后失败退出：照 ⑦ 删掉（进度目录留着）；弄坏开关 no-peer-cleanup-on-failure 下不删
@@ -193,7 +216,7 @@ restore_on_exit() {
   fi
   rm -rf -- "${scratch_directory:?}"
 }
-trap restore_on_exit EXIT
+trap finish_on_exit EXIT
 
 process_is_alive() { # process_is_alive <进程号>：还在、且不是僵尸（僵尸算停了）
   [[ -d "/proc/$1" ]] && [[ "$(awk '{print $3}' "/proc/$1/stat" 2>/dev/null)" != Z ]]
@@ -210,10 +233,16 @@ stop_one_process_by_pid() { # stop_one_process_by_pid <进程号>：只停这一
   if process_is_alive "$1"; then echo "进程 $1 发了 TERM、KILL 还在"; return 1; fi
   echo "进程 $1 停了"
 }
-stop_shards_and_exit() { # stop_shards_and_exit <信号名> <退出码>：先停两片，再 exit（EXIT 上复原、回读、删第二台这一趟的树）
+peer_outer_is_alive() { # peer_outer_is_alive <外层进程号文件> <退出码文件名>：第二台那一片的外层（写退出码文件的那个 bash）还在、不是僵尸，
+  # 命令行里有这一趟的退出码文件名（进程号没被别的进程重用）。在第二台上跑（declare -f 带过去）
+  local outer
+  outer="$(cat "$1" 2>/dev/null)"
+  [[ "$outer" =~ ^[0-9]+$ ]] && process_is_alive "$outer" && grep -qaF -- "$2" "/proc/$outer/cmdline" 2>/dev/null
+}
+stop_shards_and_exit() { # stop_shards_and_exit <信号名> <退出码>：先停两片，再 exit（EXIT 上删第二台这一趟的树，不复原）
   local stop_output peer_exit_wait_command
   trap '' TERM INT HUP PIPE
-  echo "  ! 收到 $1：先停两片，再复原、回读、删第二台这一趟的树（两片的进度目录留着），做完再退"
+  echo "  ! 收到 $1：先停两片，再删第二台这一趟的树（不复原；两片的进度目录留着），做完再退"
   if [[ -n "$local_shard_process" ]]; then
     if stop_output="$(stop_one_process_by_pid "$local_shard_process")"; then
       echo "  · 本机那一片（测试二进制）：$stop_output"
@@ -279,7 +308,7 @@ remove_peer_run_directory() { # ⑦ 删掉第二台上这一趟的树与编译�
   local peer_run_size
   peer_run_directory_pending=0
   peer_run_size="$(run_on_peer / "du -sh $(printf '%q' "$peer_run_directory") | cut -f1")"
-  if run_on_peer / "rm -rf -- $(printf '%q' "${peer_run_directory:?}") $(printf '%q' "${peer_findings_file:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}")"; then
+  if run_on_peer / "rm -rf -- $(printf '%q' "${peer_run_directory:?}") $(printf '%q' "${peer_findings_file:?}") $(printf '%q' "${peer_pid_file:?}") $(printf '%q' "${peer_exit_file:?}") $(printf '%q' "${peer_output_file:?}") $(printf '%q' "${peer_outer_pid_file:?}")"; then
     echo "  · ⑦ 删掉第二台上这一趟的树与编译目录 $peer_run_directory（${peer_run_size:-大小没读到}）；两片的进度目录留着"
   else
     echo "  ! 第二台上的 $peer_run_directory 没删掉：下一趟另起一个目录，不碍事；手动删它"
@@ -365,12 +394,12 @@ peer_progress_directory="$PEER_REPOSITORY_DIRECTORY/progress/$local_fingerprint"
 mkdir -p "$local_progress_directory"
 run_on_peer / "mkdir -p $(printf '%q' "$peer_progress_directory")" || fail "第二台建不了进度目录 $peer_progress_directory" "看 PEER_REPOSITORY_DIRECTORY 可不可写"
 
-# 清场（配置里写了才做）：跑完回读，复原挂在 EXIT 上
+# 清场（配置里写了才做）：跑完回读；不复原（EXIT 上报一句「清了场、没复原」）
 if [[ -n "$QUIESCE_STOP_COMMAND" ]]; then
   echo "  · 清场：$QUIESCE_STOP_COMMAND"
   quiesced=1
   bash -c "$QUIESCE_STOP_COMMAND"
-  bash -c "$QUIESCE_STOPPED_CHECK_COMMAND" || fail "清场之后回读没过：$QUIESCE_STOPPED_CHECK_COMMAND 退非 0" "手动清场，回读到它退 0 为止；复原命令在退出时照跑"
+  bash -c "$QUIESCE_STOPPED_CHECK_COMMAND" || fail "清场之后回读没过：$QUIESCE_STOPPED_CHECK_COMMAND 退非 0" "手动清场，回读到它退 0 为止"
   echo "  · 清场之后回读过了（$QUIESCE_STOPPED_CHECK_COMMAND 退 0）"
 fi
 
@@ -410,7 +439,7 @@ echo "  · 发现日志：本机 0/2 $local_findings_file；第二台 1/2 写在
 # 每一片先编出测试二进制（cargo test --no-run），再直接执行它：一片只有测试二进制这一个进程，收到 TERM 时凭进程号停它一个。
 # 输出直接写进文件、不经管道：读输出的一方（显示用的 tail、第二台的 ssh）断了，测试进程照样写文件，不会因写断掉的管道 panic——
 # panic 展开时进度文件的守卫会把进度文件删掉，续跑就读回 0 片（2026-09-28 预演：第二台那一片 ssh 一断就这样丢了 1920 片）。
-# 第二台那一片在第二台上脱离 ssh 会话起（setsid nohup），进程号、退出码、输出各写一个文件，驱动每 5 秒经 ssh 看一次。
+# 第二台那一片在第二台上脱离 ssh 会话起（setsid nohup），外层与内层的进程号、退出码、输出各写一个文件，驱动每 5 秒经 ssh 看一次（文件头「第二台那一片跑完没有」）。
 # 每一片起跑前在自己的进度目录拿一把 flock（锁跟着 exec 留在测试进程手里）：上一趟那一片还活着就拿不到，这一片当场退 75。
 # 直接执行测试二进制时补上 cargo test 会给的两样：工作目录是包的目录；环境变量 CARGO（账本头记工具链要它）取工具链里真正的 cargo。
 test_binary_from_cargo_messages() { # 读 cargo --message-format=json 的标准输出，打两行：<测试目标> 那一个测试可执行文件、它的包目录
@@ -449,7 +478,11 @@ if [[ "$peer_build_exit" != 0 ]]; then
     fail "第二台编测试二进制撞了编译的内存上限 ${peer_build_memory_cap}（cargo test --no-run 那一趟，包装退 250）：编译上限太小" \
       "调大 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 再跑（写法同 PEER_MEMORY_CAP，默认 16G 的依据在 research/scripts/layer0-shard-run.sh 文件头「内存」一段）"
   fi
-  fail "第二台编测试二进制失败（cargo test --no-run 那一趟退 $peer_build_exit）" "看上面那几行标准错误；退 250–254 是内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」）"
+  if [[ "$peer_build_exit" == 245 && "$layer0_shard_break" != gpu-memory-unexplained ]]; then
+    fail "第二台编测试二进制那一趟显存不够（cargo test --no-run 那一趟退了非 0，第二台的内存包装认出它起止之间内核报了 NV_ERR_NO_MEMORY，退 245）：这一趟不算结果" \
+      "到第二台 nvidia-smi 看谁在用卡，等它跑完再起这一趟；卡空出来之前调大 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 没有用"
+  fi
+  fail "第二台编测试二进制失败（cargo test --no-run 那一趟退 $peer_build_exit）" "看上面那几行标准错误；退 245、250–254 是内存包装自己的结局（run-with-memory-cap.sh 文件头「退出码」）"
 fi
 mapfile -t peer_test_binary_lines < <(test_binary_from_cargo_messages "$case_target" <<< "$peer_build_messages")
 (( ${#peer_test_binary_lines[@]} == 2 )) || fail "第二台从 cargo 的输出里取不到测试可执行文件" "ssh 到第二台看 $peer_run_directory/.layer0-shard-build.log"
@@ -466,9 +499,9 @@ tail -n +1 -F --pid="$local_shard_process" "$local_log" 2>/dev/null | { grep --l
 peer_shard_command="exec 9>$(printf '%q' "$peer_progress_directory/.layer0-shard-run.lock") && { flock -n 9 || { echo '✗ 第二台进度目录的锁被占着：上一趟第二台那一片还在跑'; echo '     → 怎么办：等第二台上一趟那一片跑完再起（进度留着，这一趟接着续跑）；它该停，就按进程号停它，别删锁文件'; exit 75; }; } && echo \$\$ > $(printf '%q' "$peer_pid_file") && cd $(printf '%q' "$peer_package_directory") && exec env SINGLEFS_HEAVY_TESTS=${SINGLEFS_HEAVY_TESTS:-} ${start_over_text}CARGO=\"$cargo_executable_text\" SINGLEFS_LAYER0_SHARD=1/2 SINGLEFS_LAYER0_PROGRESS_DIRECTORY=$(printf '%q' "$peer_progress_directory") SINGLEFS_LAYER0_INPUT_FINGERPRINT=$local_fingerprint SINGLEFS_LAYER0_THREADS=$peer_cores SINGLEFS_LAYER0_FINDINGS_FILE=$(printf '%q' "$peer_findings_file") $(printf '%q ' "$peer_test_binary" "${libtest_arguments[@]}")"
 # 只让 setsid nohup 那一条进后台（它的输入输出都重定向了）：写成 `A && B && setsid … &` 的话，`&` 把整串放进后台子进程，
 # 那个子进程握着 ssh 的输出通道、等第二台那一片跑完才退，ssh 就一直不返回（2026-09-28 预演第二条流卡在这里）
-peer_exit_pause_text=""
-if [[ -n "$peer_exit_pause" ]]; then peer_exit_pause_text="sleep $peer_exit_pause; "; fi
-run_on_peer "$peer_run_directory" "mkdir -p $(printf '%q' "$peer_progress_directory") && rm -f -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_exit_file") $(printf '%q' "$peer_output_file") || exit 1; setsid nohup bash -c $(printf '%q' "${peer_memory_cap_text}bash -c $(printf '%q' "$peer_shard_command") > $(printf '%q' "$peer_output_file") 2>&1; peer_shard_exit=\$?; ${peer_exit_pause_text}echo \$peer_shard_exit > $(printf '%q' "$peer_exit_file")") < /dev/null > /dev/null 2>&1 &" \
+peer_exit_hold_text=""
+if [[ -n "$peer_exit_hold_file" ]]; then peer_exit_hold_text="hold_rounds=0; while [[ -e $(printf '%q' "$peer_exit_hold_file") ]] && (( hold_rounds++ < 1200 )); do sleep 0.1; done; "; fi
+run_on_peer "$peer_run_directory" "mkdir -p $(printf '%q' "$peer_progress_directory") && rm -f -- $(printf '%q' "$peer_pid_file") $(printf '%q' "$peer_exit_file") $(printf '%q' "$peer_output_file") $(printf '%q' "$peer_outer_pid_file") || exit 1; setsid nohup bash -c $(printf '%q' "echo \$\$ > $(printf '%q' "$peer_outer_pid_file"); ${peer_memory_cap_text}bash -c $(printf '%q' "$peer_shard_command") > $(printf '%q' "$peer_output_file") 2>&1; peer_shard_exit=\$?; ${peer_exit_hold_text}echo \$peer_shard_exit > $(printf '%q' "$peer_exit_file")") < /dev/null > /dev/null 2>&1 &" \
   || fail "第二台那一片起不来" "ssh 到第二台看 $peer_output_file"
 peer_shard_started=1
 {
@@ -481,21 +514,52 @@ peer_shard_started=1
 } &
 echo "  · ④ 两片开跑：本机 ${start_over_text}SINGLEFS_LAYER0_SHARD=0/2 直接执行测试二进制（pid $local_shard_process），第二台 SINGLEFS_LAYER0_SHARD=1/2 同一条、经 ${peer_memory_cap_text:-（不经内存包装）}起（进程号在第二台 $peer_pid_file）"
 if wait "$local_shard_process"; then local_exit=0; else local_exit=$?; fi
+local_shard_process=""  # 收过了：之后收到 TERM 不再照这个进程号发信号（进程号可能已经被别的进程重用）
+# 判第二台那一片还在不在跑看外层（文件头「第二台那一片跑完没有」一段）：外层还在（核命令行里有这一趟的退出码文件名，进程号没被重用）、
+# 或内层还在，都算在跑；外层与内层都没了、退出码文件仍不在，才数一次 vanished。
+#   弄坏开关 liveness-by-inner-pid 下照改前只看内层；outer-liveness-unchecked 下外层的进程号文件在就算在跑，不看那个进程还在不在
+peer_outer_running_test="peer_outer_is_alive $(printf '%q' "$peer_outer_pid_file") $(printf '%q' "${peer_exit_file##*/}")"
+if [[ "$layer0_shard_break" == outer-liveness-unchecked ]]; then
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=outer-liveness-unchecked：第二台那一片外层的进程号文件在就算在跑，不看那个进程还在不在"
+  peer_outer_running_test="[[ -s $(printf '%q' "$peer_outer_pid_file") ]]"
+fi
+peer_poll_text="$(declare -f process_is_alive peer_outer_is_alive)
+if [[ -s $(printf '%q' "$peer_exit_file") ]]; then echo \"exit \$(cat $(printf '%q' "$peer_exit_file"))\"
+elif $peer_outer_running_test; then echo running
+elif [[ -s $(printf '%q' "$peer_pid_file") ]] && process_is_alive \"\$(cat $(printf '%q' "$peer_pid_file"))\"; then echo running
+elif [[ -s $(printf '%q' "$peer_outer_pid_file") || -s $(printf '%q' "$peer_pid_file") ]]; then echo vanished
+else echo starting; fi"
+if [[ "$layer0_shard_break" == liveness-by-inner-pid ]]; then
+  echo "  ! 弄坏开关 LAYER0_SHARD_RUN_BREAK=liveness-by-inner-pid：判第二台那一片还在不在跑照改前只看内层（测试二进制）的进程号"
+  peer_poll_text="if [[ -s $(printf '%q' "$peer_exit_file") ]]; then echo \"exit \$(cat $(printf '%q' "$peer_exit_file"))\"; elif [[ -s $(printf '%q' "$peer_pid_file") && -d /proc/\$(cat $(printf '%q' "$peer_pid_file")) ]]; then echo running; elif [[ -s $(printf '%q' "$peer_pid_file") ]]; then echo vanished; else echo starting; fi"
+fi
 peer_exit=""; peer_unreachable_rounds=0; peer_vanished_rounds=0
 while [[ -z "$peer_exit" ]]; do
-  if peer_poll="$(run_on_peer / "if [[ -s $(printf '%q' "$peer_exit_file") ]]; then echo \"exit \$(cat $(printf '%q' "$peer_exit_file"))\"; elif [[ -s $(printf '%q' "$peer_pid_file") && -d /proc/\$(cat $(printf '%q' "$peer_pid_file")) ]]; then echo running; elif [[ -s $(printf '%q' "$peer_pid_file") ]]; then echo vanished; else echo starting; fi" 2>/dev/null)"; then
+  if peer_poll="$(run_on_peer / "$peer_poll_text" 2>/dev/null)"; then
     peer_unreachable_rounds=0
   else
     peer_poll=unreachable; peer_unreachable_rounds=$((peer_unreachable_rounds + 1))
   fi
   case "$peer_poll" in
     "exit "*) peer_exit="${peer_poll#exit }" ;;
-    vanished) peer_vanished_rounds=$((peer_vanished_rounds + 1)); (( peer_vanished_rounds < 3 )) || peer_exit="vanished（进程没了、没留退出码）" ;;
+    vanished) peer_vanished_rounds=$((peer_vanished_rounds + 1)); (( peer_vanished_rounds < 3 )) || peer_exit="vanished（外层进程没了、没留退出码）" ;;
     unreachable) (( peer_unreachable_rounds < 60 )) || peer_exit="unreachable（连续 5 分钟 ssh 不通）" ;;
     *) peer_vanished_rounds=0 ;;
   esac
   [[ -n "$peer_exit" ]] || sleep 5
 done
+# 没读到退出码就收了（vanished、unreachable）：删第二台这一趟的东西之前先等那一片的外层退出（至多 30 秒），不然它之后照样写出一份退出码文件
+# 留在第二台 runs/ 下。判还在跑看外层之后，定为 vanished 时外层已经没了；这里兜的是 ssh 一时不通、外层的进程号文件没写成（等不了，照样提醒）
+if [[ "$peer_exit" == vanished* || "$peer_exit" == unreachable* ]]; then
+  peer_outer_wait_output="$(run_on_peer / "$(declare -f process_is_alive peer_outer_is_alive)
+if [[ ! -s $(printf '%q' "$peer_outer_pid_file") ]]; then echo '外层没记下进程号'; exit 0; fi
+for ((outer_rounds = 0; outer_rounds < 300; outer_rounds++)); do $peer_outer_running_test || break; sleep 0.1; done
+if $peer_outer_running_test; then echo '外层 30 秒内没退'; else echo '外层退了'; fi" 2>/dev/null)"
+  if [[ "$peer_outer_wait_output" != '外层退了' ]]; then
+    echo "  ! 第二台那一片没留退出码，没等到它的外层退出（${peer_outer_wait_output:-连不上第二台}）：下面删了这一趟的东西之后，它还可能再写出 $peer_exit_file"
+    echo "     → 怎么办：过几分钟到第二台看那个文件在不在，在就手动删（只删这一个文件）"
+  fi
+fi
 copy_to_peer "$(peer_path "$peer_output_file")" "$peer_log" 2>/dev/null || echo "  ! 第二台那一片的输出 $peer_output_file 没拷回来"
 shard_problems=()
 case "$local_exit" in
@@ -505,6 +569,13 @@ case "$local_exit" in
 esac
 case "$peer_exit" in
   0) ;;
+  245)
+    if [[ "$layer0_shard_break" == gpu-memory-unexplained ]]; then
+      shard_problems+=("第二台那一片退 $peer_exit")
+    else
+      shard_problems+=("第二台那一片退 245：显存不够（那一片退了非 0，第二台的内存包装认出它起止之间内核报了 NV_ERR_NO_MEMORY），那一片的输出不算结果；到第二台 nvidia-smi 看谁在用卡，等它跑完再重跑")
+    fi
+    ;;
   25[0-4]) shard_problems+=("第二台那一片退 $peer_exit：内存包装 run-with-memory-cap.sh 自己的结局（250 撞了 PEER_MEMORY_CAP、251 起不了带上限的 scope、252 排不上、253 超时、254 被总上限挤掉），那一片的输出不算结果") ;;
   75) shard_problems+=("第二台那一片退 75：第二台进度目录的锁被占着，上一趟第二台那一片还在跑（先停它）") ;;
   *) shard_problems+=("第二台那一片退 $peer_exit") ;;

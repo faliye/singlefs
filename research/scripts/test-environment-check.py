@@ -7,6 +7,8 @@
     test-environment-check.py [check] [--temporary-directory 目录]... [--report 路径]
                               [--minimum-free-percent 10] [--minimum-free-gibibytes 50]
                               [--recent-minutes 10] [--kernel-log-since 时间] [--smart]
+                              [--produced-after 时刻] [--gate-run-temporary-directory 目录]...
+                              [--cross-run-temporary-directory 目录]...
     test-environment-check.py clean [--temporary-directory 目录]... [--yes]
     test-environment-check.py --selftest
 
@@ -14,7 +16,12 @@ check 逐类判，每类一行 ✓ / ✗ / !（没查成）/ -（没要求跑）
     残留测试设备   loop 设备背后的文件在临时目录下；device-mapper 目标名以 sfs_ / singlefs_ 开头，
                    或它压在这样的 loop 上；/proc/mounts 里源是这些设备、源或挂载点在临时目录的 singlefs-* 下；
                    命令行里带 singlefs 的 qemu-system* 进程
-    临时目录残留   临时目录下的 singlefs-*，不在白名单、创建者已经不在、没有进程开着它下面的文件
+    临时目录残留   临时目录下的 singlefs-*，不在白名单、创建者已经不在、没有进程开着它下面的文件；
+                   --gate-run-temporary-directory 点名的目录（gate.sh 发给这一轮各阶段的 TMPDIR）这一类不扫：
+                   上游 gate.sh 的「跑完没留下临时文件」在全部阶段跑完之后判它下面的每一项、名字不限 singlefs-*，
+                   这里再扫判的是它的一个子集；残留测试设备与宿主盘两类照旧把它算进临时目录（上游不看设备）；
+                   --cross-run-temporary-directory 点名的目录（gate.sh 开跑前的 TMPDIR，GATE_CROSS_RUN_TMPDIR：有意跨轮复用的缓存放那里）
+                   这一类另扫它（不是 /tmp 也不是这一轮的 TMPDIR 时，不点名就从来不扫），判法与别的临时目录相同；设备与宿主盘不算它
     宿主盘         /、/home、/tmp 与临时目录所在的文件系统变成只读；剩余空间低于阈值；
                    ext4 的 errors_count 不为 0；本次开机以来内核日志里宿主盘栈上的块设备错误；
                    给了 --smart 时再用 sudo 跑 smartctl -H 或 nvme smart-log
@@ -27,7 +34,10 @@ qemu 进程不自动杀，列出 pid 交人判。白名单与在用的一律不�
 
 退出码：0 干净；1 有残留或异常（clean --yes 时：有一步没做成）；2 用法错；3 有一类没查成（与 1 同时成立时取 1）。
 破坏开关（只给 --selftest 用，证明自检会红）：环境变量 TEST_ENVIRONMENT_CHECK_BREAK 取
-aliveowner / allowlist / openfile / pidreuse / recent / readonly / freespace / kernellog / loopbacking / deleteguard 之一。
+aliveowner / allowlist / openfile / pidreuse / recent / readonly / freespace / kernellog / loopbacking / deleteguard /
+gaterunscanned / crossrununscanned 之一（gaterunscanned：临时目录残留这一类照扫 --gate-run-temporary-directory 点名的目录，
+自检「这一轮门禁的临时目录不进临时目录残留」那一条不中；crossrununscanned：临时目录残留这一类不扫 --cross-run-temporary-directory 点名的目录，
+自检「gate.sh 开跑前的 TMPDIR 也扫」那一条不中）。
 """
 import argparse
 import contextlib
@@ -52,7 +62,7 @@ REPOSITORY_ROOT = os.path.realpath(os.path.join(os.path.dirname(os.path.abspath(
 SCRIPT_RELATIVE_PATH = 'research/scripts/test-environment-check.py'
 BREAK_SWITCH_VARIABLE = 'TEST_ENVIRONMENT_CHECK_BREAK'
 BREAK_SWITCH_NAMES = ('aliveowner', 'allowlist', 'openfile', 'pidreuse', 'recent',
-                      'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard')
+                      'readonly', 'freespace', 'kernellog', 'loopbacking', 'deleteguard', 'gaterunscanned', 'crossrununscanned')
 TOKYO_TIMEZONE = datetime.timezone(datetime.timedelta(hours=9))
 GIBIBYTE = 1 << 30
 ENTRY_PREFIX = 'singlefs-'
@@ -383,6 +393,10 @@ class Environment:
     smart_requested: bool = False
     # 这个时刻之后才出现的临时条目单列成「这一次跑自己产生的」、不判红（C448）；0 表示不分界、照旧全判
     produced_after: float = 0.0
+    # gate.sh 发给这一轮各阶段的 TMPDIR：临时目录残留这一类不扫它（见 entry_scan_directories），设备与宿主盘照旧算它
+    gate_run_temporary_directories: list = dataclasses.field(default_factory=list)
+    # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR）：临时目录残留这一类另扫它（见 entry_scan_directories），设备与宿主盘不算它
+    cross_run_temporary_directories: list = dataclasses.field(default_factory=list)
     # 可注入的读取器；None 表示用真系统
     kernel_log_reader: object = None       # () -> (行列表 | None, 说明)
     host_device_resolver: object = None    # (mounts 行) -> (设备名集合, 主次设备号集合)
@@ -1036,14 +1050,44 @@ def write_report(report_path, environment, results, entries, summary, exit_code)
         handle.write('\n'.join(lines) + '\n')
 
 
+def entry_scan_directories(environment):
+    """临时目录残留这一类扫的目录：临时目录减掉 --gate-run-temporary-directory 点名的（按真实路径比）。
+    点名的是 gate.sh 发给这一轮各阶段的 TMPDIR，上游「跑完没留下临时文件」在全部阶段跑完之后判它下面的每一项；设备与宿主盘不走这里。"""
+    if break_switch_is('gaterunscanned'):
+        scanned = list(environment.temporary_directories)
+    else:
+        covered = {os.path.realpath(directory) for directory in environment.gate_run_temporary_directories}
+        scanned = [directory for directory in environment.temporary_directories if os.path.realpath(directory) not in covered]
+    # --cross-run-temporary-directory 点名的（gate.sh 开跑前的 TMPDIR）另扫：已经在扫的、或正是这一轮门禁的临时目录的不重复加
+    if not break_switch_is('crossrununscanned'):
+        seen = {os.path.realpath(directory) for directory in environment.temporary_directories}
+        for directory in environment.cross_run_temporary_directories:
+            if os.path.realpath(directory) not in seen and os.path.isdir(directory):
+                scanned.append(directory)
+                seen.add(os.path.realpath(directory))
+    return scanned
+
+
 def run_check(environment, report_path=''):
     print(f'test-environment-check：check（临时目录 {"、".join(environment.temporary_directories)}）')
+    scanned_directories = entry_scan_directories(environment)
+    skipped_directories = [directory for directory in environment.temporary_directories if directory not in scanned_directories]
+    added_directories = [directory for directory in scanned_directories if directory not in environment.temporary_directories]
+    if added_directories:
+        print(f'  临时目录残留这一类另扫 {"、".join(added_directories)}：它是 gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR），'
+              f'那里的残留用 clean --temporary-directory <那个目录> 清')
+    if skipped_directories:
+        print(f'  临时目录残留这一类不扫 {"、".join(skipped_directories)}：它是 gate.sh 发给这一轮各阶段的 TMPDIR，'
+              '由上游「跑完没留下临时文件」在全部阶段跑完之后判；残留测试设备与宿主盘两类照旧算它')
     device_scan = scan_devices(environment)
     entries, open_path_scan, unreadable_directories = scan_temporary_directories(
-        environment.temporary_directories, environment.recent_seconds, environment.produced_after)
+        scanned_directories, environment.recent_seconds, environment.produced_after)
     results = judge_devices(device_scan)
-    results.append(judge_temporary_entries(entries, open_path_scan, unreadable_directories,
-                                           environment.temporary_directories))
+    if scanned_directories:
+        results.append(judge_temporary_entries(entries, open_path_scan, unreadable_directories, scanned_directories))
+    else:
+        results.append(CategoryResult('临时目录残留', 'skipped',
+                                      f'临时目录 {"、".join(skipped_directories)} 都由 gate.sh「跑完没留下临时文件」判', []))
     results += collect_host_results(environment)
     for result in results:
         print_category_result(result)
@@ -1557,6 +1601,60 @@ def check_host_disk(recorder, workspace):
     recorder.expect(second_exit == 2, f'--report 指向已有文件时应拒绝、不盖掉，退出码应是 2，实际 {second_exit}')
 
 
+def check_gate_run_directory(recorder, workspace):
+    """--gate-run-temporary-directory 点名的目录：临时目录残留这一类不扫它，loop 设备那一类照旧把它算进临时目录。"""
+    case_directory = os.path.join(workspace, 'gate-run-case')
+    plain_temporary = os.path.join(case_directory, 'tmp')
+    gate_run = os.path.join(plain_temporary, 'gate-run.Sample1')
+    os.makedirs(gate_run)
+    old_epoch = time.time() - 3600
+    for directory, name in ((plain_temporary, 'singlefs-before-gate.Old111'), (gate_run, 'singlefs-in-gate-run.Old222')):
+        write_text(os.path.join(directory, name, 'left'), 'stale\n')
+        set_tree_modification_time(os.path.join(directory, name), old_epoch)
+    system_block_root = os.path.join(case_directory, 'sys-block')
+    write_text(os.path.join(system_block_root, 'loop0', 'loop', 'backing_file'),
+               f'{os.path.realpath(gate_run)}/singlefs-in-gate-run.Old222/left\n')
+    environment = Environment(temporary_directories=[plain_temporary, gate_run], system_block_root=system_block_root,
+                              gate_run_temporary_directories=[gate_run])
+    entries, _, _ = scan_temporary_directories(entry_scan_directories(environment), environment.recent_seconds)
+    residual_names = sorted(os.path.basename(entry.path) for entry in entries if entry.verdict == 'residual')
+    recorder.expect(residual_names == ['singlefs-before-gate.Old111'],
+                    f'这一轮门禁的临时目录不进临时目录残留：只该判 singlefs-before-gate.Old111，实际 {residual_names}')
+    _, _, residual_loops = scan_loop_devices(environment)
+    recorder.expect([device_name for device_name, backing in residual_loops] == ['loop0'],
+                    f'背后文件在这一轮门禁的临时目录下的 loop0 照旧判残留设备，实际 {residual_loops}')
+    parsed = build_argument_parser().parse_args(['check', '--gate-run-temporary-directory', gate_run])
+    recorder.expect(parsed.gate_run_temporary_directory == [gate_run],
+                    f'--gate-run-temporary-directory 应当收成一张表，实际 {parsed.gate_run_temporary_directory!r}')
+
+
+def check_cross_run_directory(recorder, workspace):
+    """--cross-run-temporary-directory 点名的目录（gate.sh 开跑前的 TMPDIR，不是 /tmp 也不是这一轮的 TMPDIR）：临时目录残留这一类另扫它，
+    判法与别的临时目录相同（白名单里的缓存不判）；与已在扫的目录是同一处时不重复扫。"""
+    case_directory = os.path.join(workspace, 'cross-run-case')
+    plain_temporary = os.path.join(case_directory, 'tmp')
+    gate_run = os.path.join(plain_temporary, 'gate-run.Sample3')
+    cross_run = os.path.join(case_directory, 'session-tmp')
+    os.makedirs(gate_run)
+    old_epoch = time.time() - 3600
+    for directory, name in ((plain_temporary, 'singlefs-in-tmp.Old333'), (cross_run, 'singlefs-in-cross-run.Old444'),
+                            (cross_run, 'singlefs-crates-mutation-target')):
+        write_text(os.path.join(directory, name, 'left'), 'stale\n')
+        set_tree_modification_time(os.path.join(directory, name), old_epoch)
+    environment = Environment(temporary_directories=[plain_temporary, gate_run], gate_run_temporary_directories=[gate_run],
+                              cross_run_temporary_directories=[cross_run, plain_temporary])
+    scanned = entry_scan_directories(environment)
+    entries, _, _ = scan_temporary_directories(scanned, environment.recent_seconds)
+    residual_names = sorted(os.path.basename(entry.path) for entry in entries if entry.verdict == 'residual')
+    recorder.expect(residual_names == ['singlefs-in-cross-run.Old444', 'singlefs-in-tmp.Old333'],
+                    f'gate.sh 开跑前的 TMPDIR 也扫：该判 singlefs-in-cross-run.Old444 与 singlefs-in-tmp.Old333（白名单的缓存不判），实际 {residual_names}')
+    recorder.expect(scanned.count(plain_temporary) == 1,
+                    f'点名的目录与已在扫的是同一处时只扫一次，实际扫的 {scanned}')
+    parsed = build_argument_parser().parse_args(['check', '--cross-run-temporary-directory', cross_run])
+    recorder.expect(parsed.cross_run_temporary_directory == [cross_run],
+                    f'--cross-run-temporary-directory 应当收成一张表，实际 {parsed.cross_run_temporary_directory!r}')
+
+
 def run_selftest():
     break_switch = os.environ.get(BREAK_SWITCH_VARIABLE, '')
     if break_switch and break_switch not in BREAK_SWITCH_NAMES:
@@ -1579,6 +1677,8 @@ def run_selftest():
                                   mounts_path=mounts_path, ext4_system_root=ext4_system_root)
         check_devices_and_clean(recorder, environment, holders, fake_temporary, outside_directory, expectations)
         check_host_disk(recorder, workspace)
+        check_gate_run_directory(recorder, workspace)
+        check_cross_run_directory(recorder, workspace)
     finally:
         for holder in holders:
             if holder.poll() is None:
@@ -1596,7 +1696,8 @@ def run_selftest():
         return 1
     print(f'  ✓ --selftest 通过{switch_note}：{recorder.assertion_count} 条断言都中（临时条目分类、'
           '删除护栏、稀疏文件按实际占用、loop / dm / 挂载 / qemu、clean 预演与动手及次序、'
-          '宿主盘只读 / 剩余空间 / ext4 计数 / 内核日志 / 退出码 / 报告不覆盖）')
+          '宿主盘只读 / 剩余空间 / ext4 计数 / 内核日志 / 退出码 / 报告不覆盖、'
+          '这一轮门禁的临时目录不进临时目录残留而 loop 照旧算它、gate.sh 开跑前的 TMPDIR 也扫）')
     return 0
 
 
@@ -1614,6 +1715,12 @@ def build_argument_parser():
     parser.add_argument('--produced-after', type=float, default=0.0,
                         help='这个时刻（epoch 秒）之后才出现的临时条目，单列成「这一次跑自己产生的」、不判红；'
                              '门禁 harness-test-environment 把本次门禁的开跑时刻传进来（C448）')
+    parser.add_argument('--gate-run-temporary-directory', action='append', default=[],
+                        help='gate.sh 发给这一轮各阶段的 TMPDIR，可给多次；只给 check：临时目录残留这一类不扫它'
+                             '（上游「跑完没留下临时文件」判它），设备与宿主盘照旧算它；门禁 harness-test-environment 在 gate.sh 里时传进来')
+    parser.add_argument('--cross-run-temporary-directory', action='append', default=[],
+                        help='gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR），可给多次；只给 check：临时目录残留这一类另扫它，'
+                             '设备与宿主盘不算它；门禁 harness-test-environment 在 gate.sh 里时传进来')
     parser.add_argument('--minimum-free-gibibytes', type=float, default=50.0, help='剩余空间下限（GiB），默认 50；两条取严')
     parser.add_argument('--recent-minutes', type=float, default=10.0,
                         help='名字里没有 pid 的条目这么多分钟内还在改就当可能正在跑，默认 10')
@@ -1640,8 +1747,18 @@ def main(argument_list):
         print('  ✗ --yes 只对 clean 有意义')
         print(f'     → 怎么办：要清就跑 python3 {SCRIPT_RELATIVE_PATH} clean --yes')
         return 2
+    if arguments.gate_run_temporary_directory and arguments.action != 'check':
+        print('  ✗ --gate-run-temporary-directory 只给 check')
+        print(f'     → 怎么办：clean 不认它，去掉再跑：python3 {SCRIPT_RELATIVE_PATH} clean')
+        return 2
+    if arguments.cross_run_temporary_directory and arguments.action != 'check':
+        print('  ✗ --cross-run-temporary-directory 只给 check')
+        print(f'     → 怎么办：clean 那个目录用 --temporary-directory 点名：python3 {SCRIPT_RELATIVE_PATH} clean --temporary-directory <那个目录>')
+        return 2
     temporary_directories = arguments.temporary_directory or default_temporary_directories()
     environment = Environment(temporary_directories=temporary_directories,
+                              gate_run_temporary_directories=arguments.gate_run_temporary_directory,
+                              cross_run_temporary_directories=arguments.cross_run_temporary_directory,
                               recent_seconds=int(arguments.recent_minutes * 60),
                               minimum_free_percent=arguments.minimum_free_percent,
                               minimum_free_gibibytes=arguments.minimum_free_gibibytes,

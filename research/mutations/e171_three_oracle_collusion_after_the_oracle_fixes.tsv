@@ -1,0 +1,38 @@
+# E171 第 1 次重跑第一段：比对器一侧的变异表（登记第九节 V13–V16 与比对器的几处门槛）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经本目录 mutation_driver.py 跑。
+V13 比对器 Q1 的 O1 漏掉 RefFS 子列	O1_SUBCOLUMNS = (SUBCOLUMN_COMPARISON, SUBCOLUMN_CRASH_JUDGE, SUBCOLUMN_REFERENCE_FILESYSTEM)	O1_SUBCOLUMNS = (SUBCOLUMN_COMPARISON, SUBCOLUMN_CRASH_JUDGE)
+V14 比对器 Q2 只看内存对象、不看交回值	            difference = ReturnValueDifference(name, value.index, fields, objects, base.observation != value.observation)	            difference = ReturnValueDifference(name, value.index, (), objects, base.observation != value.observation)
+V15 比对器 Q3 可判的调用把 not_modelled 也数进去	        judged += sum(call.was_judged_by_the_comparison() for call in calls[:panic_at])	        judged += sum(call.model_word != "implementation_crashed_not_compared" for call in calls[:panic_at])
+V16 比对器 Q4 只看（ii）有没有、不看第二截判没判合法	    return "bing" if counter_branch_judged_legal > 0 else "yi"	    return "bing"
+R1 RefFS 弃权算红	        return state.reference_filesystem == REFERENCE_FILESYSTEM_RED	        return state.reference_filesystem in (REFERENCE_FILESYSTEM_RED, "abstained")
+R2 基线两次不稳的内存对象不拿掉	                                   if key not in unstable_objects and base.memory_objects.get(key) != value.memory_objects.get(key)))	                                   if base.memory_objects.get(key) != value.memory_objects.get(key)))
+R3 单点红的判法挪成「至少一个态」	        single_point_segments=tuple(segment for segment, count in ordered if count == red_states_that_make_a_single_point),	        single_point_segments=tuple(segment for segment, count in ordered if count >= red_states_that_make_a_single_point),
+R4 Q5 全弃权不走 F8	    if reference_filesystem_abstained == lost:\n        return "not_enough_f8"\n	
+R5 比对器重切段时 FUA 不关段	        if kind == "write_fua":\n            writes_in_the_segment += 1	        if kind == "write_fua":\n            writes_in_the_segment += 1\n            continue
+R6 Q5 没跑的那一形也照判	    if not found or "not_run" in found[0]:	    if not found:
+R7 实现自崩的门槛把等于也算进去	    return judged is not None and judged < minimum	    return judged is not None and judged <= minimum
+R8 Q4-对账把判不出那一支的见证拒也数进去	                                                   and not probe.counter_branch_holds() and not probe.undecidable_branch for probe in probes),	                                                   and not probe.counter_branch_holds() for probe in probes),
+R9 逐行限时的倍数 3 写成 2（修订 2 第 2.5 节）	BASELINE_MULTIPLIER = 3	BASELINE_MULTIPLIER = 2
+R10 逐行限时不设 1800 秒的下限（修订 2 第 2.5 节）	    limit = max(ROW_TIME_LIMIT_FLOOR_SECONDS, math.ceil(BASELINE_MULTIPLIER * baseline_seconds))	    limit = math.ceil(BASELINE_MULTIPLIER * baseline_seconds)
+R11 逐行限时向下取整（修订 2 第 2.5 节）	math.ceil(BASELINE_MULTIPLIER * baseline_seconds)	math.floor(BASELINE_MULTIPLIER * baseline_seconds)
+R12 超时的点名行重跑不再乘 3（修订 2 第 2.5 节）	TIMED_OUT_ROW_RERUN_MULTIPLIER = 3	TIMED_OUT_ROW_RERUN_MULTIPLIER = 1
+R13 基线的进程挂钟不核包不包住各流之和（修订 2 第 2.5 节）	                and self.process_wall_seconds * NANOSECONDS_PER_SECOND >= self.stream_time_sum_nanoseconds)	                )
+R14 A11 现算取第一个落了的写而不是最后一个（修订 6 那一趟比对器提速）	    last_landed = len(landing.rstrip("0")) - 1	    last_landed = len(landing) - len(landing.lstrip("0"))
+R15 A11 写所在调用不取前缀最大、取最后排进来的那次调用	            highest_call = max(highest_call, calls_by_first_operation[next_call][0])	            highest_call = calls_by_first_operation[next_call][0]
+R16 oracle-verdicts.tsv 退回修订 5 之前的 24 列	ORACLE_VERDICT_COLUMNS = 25	ORACLE_VERDICT_COLUMNS = 24
+R17 流三覆盖（O3）把批 3 的态也算进去	    sampled = [state for state in baseline.streams[stream].states if state.batch in (matrix.FIRST_BATCH, matrix.SECOND_BATCH)]	    sampled = [state for state in baseline.streams[stream].states]
+R18 比对器不核产物名属不属于这一趟（修订 8 第 8.5 节第 1 条）	                if path is not None and not (os.path.basename(path).startswith(product_prefix) and os.path.basename(path).endswith(product_suffix))]	                if False]
+R19 空变异那一行不判触达（第七节 A1「空变异判未触达」）	    touched = matrix.touch_report(baseline, run).touched()\n    lines.result(f"name=a1_empty_mutation_touch	    touched = False\n    lines.result(f"name=a1_empty_mutation_touch
+R20 Q5 没有一态红也没有一态两者都绿时退回 not_enough（修订 5 第 5.1 节第 7 条写 F8）	        return "yi"\n    return "not_enough_f8"	        return "yi"\n    return "not_enough"
+R21 Q4-（ii）逐态清单把（i）判不出那一支也列进来	        if probe.batch != batch or not probe.counter_branch_holds():	        if probe.batch != batch or not (probe.counter_branch_holds() or probe.undecidable_branch):
+R22 第二截判定在最后一个冒号处拆（没满足的条件里还带冒号）	    verdict, separator, condition = second_crop.partition(":")	    verdict, separator, condition = second_crop.rpartition(":")
+R23 落地向量摘要取成镜像摘要	                    landing_sha256 = hashlib.sha256(state.landing.encode("utf-8")).hexdigest()	                    landing_sha256 = state.digest
+R24 轨迹的期末值取最后一个为正的格（第八节「期末值」是末格）	last_cell_value=values[-1] if values else 0)	last_cell_value=next((count for count in reversed(values) if count > 0), 0))
+R25 轨迹的为正格数把 0 格也数进去	positive_cells=sum(count > 0 for count in values)	positive_cells=sum(count >= 0 for count in values)
+R26 Q4 轨迹判合法的数把（ii）全数进去	            legal[segment] += probe.second_crop == SECOND_CROP_LEGAL	            legal[segment] += 1
+R27 一段的调用取段里第一个写所在的调用	        call_of_segment.append(call_of_write[writes_of_segment[-1]])	        call_of_segment.append(call_of_write[writes_of_segment[0]])
+R28 第几次建 inode 从 0 数	            creation_ordinal_of_call[index] = len(creation_ordinal_of_call) + 1	            creation_ordinal_of_call[index] = len(creation_ordinal_of_call)
+R29 Q5 轨迹的格只到装置报的最大格（末格不是末段全落）	    filled = tuple((landed, cells.get(landed, (0, 0, 0))) for landed in range(last_segment_writes + 1))	    filled = tuple((landed, cells.get(landed, (0, 0, 0))) for landed in range(max(cells, default=-1) + 1))
+R30 Q5 轨迹各格之和与 name=q5 行的核对恒真	    adds_up = sums == (int(q5["lost_the_confirmed_version"]), int(q5["reference_filesystem_red"]), int(q5["model_crash_judge_red"]))	    adds_up = True
+R31 轨迹的峰值格取最后一次出现	peak_at=next((cell for cell, count in ordered if count == peak and count > 0), None)	peak_at=next((cell for cell, count in reversed(ordered) if count == peak and count > 0), None)
+R32 流三全持久态那一段并进不在建 inode 调用里的那一格	                cell = after_every_call if call is None else	                cell = outside if call is None else
+R33 Q5 轨迹不按取样点挑格	        if cell["sampling_point"] != q5["sampling_point"]:	        if False:

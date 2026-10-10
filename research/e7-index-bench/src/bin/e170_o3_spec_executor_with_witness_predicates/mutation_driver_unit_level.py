@@ -5,6 +5,8 @@
 再在副本里跑 python3 -m unittest test_executor_on_synthetic_pool，结局照 .claude/rules/mutation-sampling.md 记：
 ✅ 抓到（单测有红：失败、出错，含载入时断言红）；⏭ 无效（替换之后编不过）；❌ 没红；⏱ 超时。原目录一个字节不动，
 收尾核原目录逐文件 sha256 与开跑前相同、再在新副本上跑一遍基线，都过才打「已还原，基线仍全绿」。
+每一行都以 name= 起头、不带耗时与绝对路径（目录与表只写末一段名字，副本路径写成 .），
+`research/scripts/replay.sh` 的 E170 几行经 run_replay_result_lines.py wrap 把它改写成 E7RESULT 结果行逐字节比。
 
 用法：python3 mutation_driver_unit_level.py --executor-directory <目录> --table <变异表> --scratch <草稿目录> --output <新文件>
 """
@@ -19,7 +21,6 @@ import re
 import shutil
 import subprocess
 import sys
-import time
 
 TEST_MODULE = "test_executor_on_synthetic_pool"
 PER_RUN_TIMEOUT_SECONDS = 180
@@ -84,6 +85,11 @@ def red_test_names(output: str) -> list[str]:
     return sorted(set(re.findall(r"^(?:FAIL|ERROR): (\S+)", output, flags=re.MULTILINE)))
 
 
+def without_whitespace(text: str) -> str:
+    """结果行按空格分字段：说明文字里的空白换成 _。"""
+    return "".join("_" if character.isspace() else character for character in text) or "-"
+
+
 def main(argument_list: list[str]) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--executor-directory", required=True)
@@ -102,7 +108,7 @@ def main(argument_list: list[str]) -> int:
             output.write(line + "\n")
             print(line)
 
-        emit(f"name=mutation_config executor_directory={directory} table={arguments.table} rows={len(rows)} "
+        emit(f"name=mutation_config executor_directory={os.path.basename(directory)} table={os.path.basename(arguments.table)} rows={len(rows)} "
              f"python={sys.version.split()[0]} per_run_timeout_seconds={PER_RUN_TIMEOUT_SECONDS}")
         bad_anchors = [(name, anchor_hits(directory, anchor)) for name, anchor, _replacement in rows]
         bad_anchors = [(name, hits) for name, hits in bad_anchors if sum(count for _file, count in hits) != 1]
@@ -120,7 +126,6 @@ def main(argument_list: list[str]) -> int:
             return 4
         counts = {"✅": 0, "⏭": 0, "❌": 0, "⏱": 0}
         for name, anchor, replacement in rows:
-            started = time.perf_counter_ns()
             copy = fresh_copy(directory, arguments.scratch, "mutated")
             file_name = anchor_hits(copy, anchor)[0][0]
             path = os.path.join(copy, file_name)
@@ -133,31 +138,33 @@ def main(argument_list: list[str]) -> int:
                     py_compile.compile(path, cfile=os.path.join(arguments.scratch, "compile-check.pyc"), doraise=True)
                 except py_compile.PyCompileError as error:
                     counts["⏭"] += 1
-                    emit(f"⏭ [{name}] 无效：{file_name} 替换之后编不过（{str(error).splitlines()[-1][:160]}）")
+                    reason = without_whitespace(str(error).splitlines()[-1][:160].replace(copy, "."))
+                    emit(f"name=mutation mutation={name} result=invalid symbol=⏭ file={file_name} reason={reason}")
                     continue
             state, code, test_output = run_unit_tests(copy, arguments.scratch)
-            elapsed_seconds = (time.perf_counter_ns() - started) / 1e9
             if state == "timeout":
                 counts["⏱"] += 1
-                emit(f"⏱ [{name}] 超时（{PER_RUN_TIMEOUT_SECONDS} 秒）：{file_name}")
+                emit(f"name=mutation mutation={name} result=timeout symbol=⏱ file={file_name} timeout_seconds={PER_RUN_TIMEOUT_SECONDS}")
             elif code == 0:
                 counts["❌"] += 1
                 ran = re.findall(r"^Ran (\d+) tests?", test_output, flags=re.MULTILINE)
-                emit(f"❌ [{name}] 没红：{file_name}，单测 {ran[-1] if ran else '?'} 条全过（{elapsed_seconds:.1f} 秒）")
+                emit(f"name=mutation mutation={name} result=not_red symbol=❌ file={file_name} ran={ran[-1] if ran else '?'}")
             else:
                 counts["✅"] += 1
                 red_names = red_test_names(test_output)
                 # 一个单测名都没有：载入时就红了（例：on_disk_layout 的载入断言），记下输出里最后一行带 Error 的，证明不是别的原因退出
-                load_time_reason = "" if red_names else "，载入时红：" + next(
-                    (line.strip()[:200] for line in reversed(test_output.splitlines()) if "Error" in line), "输出里没有带 Error 的行")
-                emit(f"✅ [{name}] 抓到：{file_name}，红的单测 {red_names}{load_time_reason}（{elapsed_seconds:.1f} 秒）")
+                load_time_reason = "-" if red_names else without_whitespace(next(
+                    (line.strip()[:200] for line in reversed(test_output.splitlines()) if "Error" in line), "输出里没有带 Error 的行").replace(copy, "."))
+                emit(f"name=mutation mutation={name} result=caught symbol=✅ file={file_name} "
+                     f"red_tests={','.join(red_names) or '-'} load_time_red={load_time_reason}")
         after = digests_of(directory)
         final_state, final_code, _final_output = run_unit_tests(fresh_copy(directory, arguments.scratch, "baseline"), arguments.scratch)
         if after == before and final_state == "finished" and final_code == 0:
-            emit("已还原，基线仍全绿")
+            emit("name=restore result=已还原，基线仍全绿")
         else:
             emit(f"name=restore_problem source_unchanged={after == before} final_baseline_state={final_state} exit={final_code}")
-        emit(f"计数：抓到 {counts['✅']}、无效 {counts['⏭']}、没红 {counts['❌']}、超时 {counts['⏱']}，合计 {sum(counts.values())} / 表 {len(rows)} 条")
+        emit(f"name=mutation_counts caught={counts['✅']} invalid={counts['⏭']} not_red={counts['❌']} timeout={counts['⏱']} "
+             f"total={sum(counts.values())} table_rows={len(rows)}")
         emit("name=complete")
     return 0
 

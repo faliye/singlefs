@@ -1,0 +1,29 @@
+# E171 第 1 次重跑第二段：比对器 segment_two_comparator.py 的变异表（登记第六节 Q2、Q3-分母，第八节两批的 D，作废 Z6）。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经本目录 mutation_driver.py 带 --unit-test-module test_segment_two 跑。
+W1 批 2 的触达不按批挑态（两批都拿全部态比）	for state in stream.states if state.batch == batch])	for state in stream.states])
+W2 换批的触达拿基线比基线	with_only_the_batch_as_the_first(baseline, batch), with_only_the_batch_as_the_first(row, batch))	with_only_the_batch_as_the_first(baseline, batch), with_only_the_batch_as_the_first(baseline, batch))
+W3 恢复 panic 态数反着数	state.recovery_panic != NO_RECOVERY_PANIC for name	state.recovery_panic == NO_RECOVERY_PANIC for name
+W4 原登记读法 5 不看态上的恢复 panic	return call_panicked or recovery_panic_states(run) > 0	return call_panicked
+W5 原登记读法 5 不看调用 panic	call_panicked = any(call.panicked() for name	call_panicked = any(False for name
+W6 定位失败当成跑成了	    if status != STATUS_OK:\n        return status	    if status != STATUS_OK:\n        return None
+W7 超时并进包装的别的结局	if exit_code == TIMEOUT_EXIT_CODE:	if False:
+W8 装置停机不单列	if exit_code == DEVICE_STOP_EXIT_CODE:	if False:
+W9 触达排在自崩之前判	    if self_crash:\n        return CATEGORY_SELF_CRASH\n    if touch.touched():\n        return CATEGORY_COUNTED	    if touch.touched():\n        return CATEGORY_COUNTED\n    if self_crash:\n        return CATEGORY_SELF_CRASH
+W10 只在不看 journal 那一遍不同并进未触达	return CATEGORY_ONLY_IN_THE_IGNORED_PASS if touch.ignored_pass_differs else CATEGORY_UNTOUCHED	return CATEGORY_UNTOUCHED
+W11 Q2 的未触达按批 2 定	return self.fixed_category is None and not self.touch_by_batch[matrix.FIRST_BATCH].touched()	return self.fixed_category is None and not self.touch_by_batch[matrix.SECOND_BATCH].touched()
+W12 mkfs 那一步 panic 不看发没发调用	 and by_stream[name].get("calls") == "0"	 and True
+W13 mkfs 那一步 panic 只认实现 panic 的前缀	startswith(PIPELINE_PANIC_PREFIXES)	startswith(("implementation_crashed",))
+W14 没导出的一律记 dump_missing	CATEGORY_SELF_CRASH if panicked_before_the_first_call(stream_lines or []) else "dump_missing"	"dump_missing"
+W15 分母把未触达也算进	return sum(row.category(reading, batch) == CATEGORY_COUNTED for row in rows)	return sum(row.category(reading, batch) in (CATEGORY_COUNTED, CATEGORY_UNTOUCHED) for row in rows)
+W16 Q2 集合收进触达的行	        if not row.untouched():\n            continue\n        q2_row = q2_row_of	        if False:\n            continue\n        q2_row = q2_row_of
+W17 Q2 判甲的门槛写成有一行红	if red_rows == set_rows:	if red_rows > 0:
+W18 Q2 集合空不走 F4	if set_rows == 0:	if False:
+W19 Q2 只比流一	matrix.return_value_differences(baseline, row.run, unstable, TOUCH_STREAM_NAMES))	matrix.return_value_differences(baseline, row.run, unstable, TOUCH_STREAM_NAMES[:1]))
+W20 Q2 红的行按观测不同数	red_rows = [q2_row.number for q2_row in found if q2_row.comparison_red_calls > 0]	red_rows = [q2_row.number for q2_row in found if q2_row.observation_differs_calls() > 0]
+W21 基线两次不稳的对象不拿掉	unstable |= matrix.unstable_memory_objects(baseline, other)	unstable |= frozenset()
+W22 Z6 反着数	REBUILD_CHECK_FIELD not in row.driver_fields	REBUILD_CHECK_FIELD in row.driver_fields
+W23 合成产物对账不比退出码	product_rows.get(row.number, {}).get("device_exit"))	row.driver_fields.get("device_exit"))
+W24 导出目录要在每一个导出根之下	if all(segment_one.inputs_outside_this_run(root	if any(segment_one.inputs_outside_this_run(root
+W25 自崩落点的调用号差一	call_{panic_at}:judged_	call_{panic_at + 1}:judged_
+W26 稳定性基线不同的文件不计	differing_files += same.count(False)	differing_files += 0
+W27 定位失败判反	return self.driver_fields.get("status", "missing") != STATUS_OK	return self.driver_fields.get("status", "missing") == STATUS_OK
+W28 未触达而有一列红的行不记	        if any(reds.values()):	        if False:

@@ -6,6 +6,7 @@
 用法：
     cite-check.py <报告.md> [<报告.md> …] [--root 目录 …] [--background 背景材料.md …] [--unchanged-since <epoch 秒>]
     cite-check.py --selftest          # CITE_CHECK_BREAK=<项> 时必须判红
+    cite-check.py --help              # 打这一段用法（-h 同），退 0
 
 认的两种写法（同一行里）：
     「原文」（`路径:行号`）  或  「原文」(`路径:行号`)        引号紧挨着括号里的位置
@@ -14,7 +15,7 @@
 标题命中不是恰好一次判红）——引规则与 kb 的条款优先这样写，不用为一个行号再读一遍文件。路径带目录的按 --root（默认仓根）逐个找；只写文件名的在仓里 `git ls-files` 按文件名找，恰好一个才判。
 原文里的「…」与「……」是省略：切开的每一段要按次序出现在那一行（或区间）里。比对前两边都去掉 ** 与反引号、把连续空白并成一个空格。
 判不了的不判、单列：路径认不出（不在、文件名不唯一）、行号超出文件、给了 --unchanged-since 而被引文件在那之后改过。
-退出码：0 全部对上（或没有可判的）；1 有对不上的；2 用法错。
+退出码：0 全部对上（或没有可判的）；1 有对不上的；2 用法错（不认的选项、选项缺值、报告或背景材料读不了）。
 
 弄坏开关（只给 --selftest 证红用）。逐项写开关名、弄坏哪一处、打开后自证哪几项红（项名是 selftest() 里那一例的标签，括号里是那条「✗ 自检：」的开头）：
   CITE_CHECK_BREAK=always-ok  judge() 与 judge_section() 不比原文，每处引文都判对上
@@ -28,6 +29,8 @@
       指到标题行（「✗ 自检：指到标题行：应当判红」）
   CITE_CHECK_BREAK=title-any-section  judge_section() 不要求标题恰好命中一次，原文在整份文件里找
       小节写法：标题不在（「✗ 自检：小节写法：标题不在：应当判红」）
+  CITE_CHECK_BREAK=raw-arguments  run() 不先判 --help、不认的选项、读不了的文件与写错的 --unchanged-since（改前的样子）
+      命令行那几格（「✗ 自检：命令行 ['--help'] 应当退 0」起的六条）
 """
 import os
 import re
@@ -180,6 +183,10 @@ def check_reports(report_paths, roots, background_paths, unchanged_since):
 
 def run(arguments):
     reports, roots, backgrounds, unchanged_since = [], [], [], None
+    guarded = BROKEN != "raw-arguments"   # 弄坏开关：--help、不认的选项、读不了的文件都不先判
+    if guarded and arguments[:1] in (["--help"], ["-h"]):
+        print(__doc__)
+        return 0
     index = 0
     while index < len(arguments):
         argument = arguments[index]
@@ -193,13 +200,26 @@ def run(arguments):
             elif argument == "--background":
                 backgrounds.append(value)
             else:
-                unchanged_since = float(value)
+                try:
+                    unchanged_since = float(value)
+                except ValueError:
+                    if not guarded:
+                        raise
+                    print(f"✗ --unchanged-since 要一个 epoch 秒数，给的是「{value}」\n→ 怎么办：写开工时刻的秒数，例如 $(date +%s) 当时记下的那个数")
+                    return 2
             index += 2
             continue
+        if guarded and argument.startswith("-"):
+            print(f"✗ 不认的选项：{argument}\n→ 怎么办：只认 --root、--background、--unchanged-since（用法跑 cite-check.py --help）")
+            return 2
         reports.append(argument)
         index += 1
     if not reports:
         print("✗ 没给要核的报告\n→ 怎么办：cite-check.py <报告.md> [--root 目录] [--background 背景材料.md]")
+        return 2
+    unreadable = [path for path in reports + backgrounds if guarded and not os.path.isfile(path)]
+    if unreadable:
+        print(f"✗ 读不了 {'、'.join(unreadable)}（文件不在，或不是普通文件）\n→ 怎么办：核对路径（相对路径相对当前工作目录）；报告与背景材料都要给文件，不给目录")
         return 2
     total, bad, skipped = check_reports(reports, roots or [REPOSITORY_ROOT], backgrounds, unchanged_since)
     for line in bad:
@@ -261,12 +281,23 @@ def selftest():
         _, bad, skipped = check_reports([changed_report], [work], [], unchanged_since=0.0)
         if bad or not skipped:
             failures.append(f"被引文件在开工之后改过：应当只列进没判，实际对不上 {bad}、没判 {skipped}")
+        # 命令行：--help / -h 打文件头的用法退 0；不认的选项退 2；报告读不了报文件名与出路、不抛 traceback
+        cli_cases = [(["--help"], 0, "用法："), (["-h"], 0, "用法："), (["--bogus", changed_report], 2, "不认的选项：--bogus"),
+                     ([os.path.join(work, "nothere.md")], 2, f"读不了 {os.path.join(work, 'nothere.md')}"),
+                     ([changed_report, "--background", work], 2, f"读不了 {work}"),
+                     ([changed_report, "--unchanged-since", "昨天"], 2, "--unchanged-since 要一个 epoch 秒数")]
+        for arguments, want_code, want_text in cli_cases:
+            child = subprocess.run([sys.executable, os.path.abspath(__file__), *arguments], capture_output=True, text=True)
+            said = child.stdout + child.stderr
+            if child.returncode != want_code or want_text not in said or "Traceback" in said or (want_code and "→ 怎么办" not in said):
+                failures.append(f"命令行 {arguments} 应当退 {want_code}、说「{want_text}」（拒绝时带「→ 怎么办」、不抛 traceback），实际退 {child.returncode}：{said[-300:]}")
         for failure in failures:
             print(f"  ✗ 自检：{failure}")  # gate-lint:detail
         if failures:
             print("  → 看 citations_in() / judge() / judge_section() 的判法；CITE_CHECK_BREAK（always-ok、no-heading-check、no-background-check、ignore-changed、title-any-section）设着的话这里本来就该红")
             return 1
-        print(f"  ✓ cite-check 自检通过：对上的、位置在前、省略号、只写文件名、区间放行，错行、标题行、背景材料行号、超出文件判红，认不出的与开工后改过的只列不判（{len(cases) + 1} 种）")
+        print(f"  ✓ cite-check 自检通过：对上的、位置在前、省略号、只写文件名、区间放行，错行、标题行、背景材料行号、超出文件判红，认不出的与开工后改过的只列不判（{len(cases) + 1} 种）；"
+              f"命令行 {len(cli_cases)} 种：--help、-h 退 0，不认的选项、读不了的报告与背景材料、写错的 --unchanged-since 退 2 带出路")
         return 0
     finally:
         subprocess.run(["rm", "-rf", "--", work], check=False)

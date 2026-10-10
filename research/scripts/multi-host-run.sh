@@ -24,19 +24,21 @@
 #      经 ssh 看一次（peer_host_wait_detached）；跑完输出拷回、经 peer_host_redact 打到标准输出。
 #      带到第二台的环境：RUN_WITH_MEMORY_CAP_RESERVE 设了就带；本机别的环境变量不带（真的第二台经 ssh 也拿不到），要设写成 -- env 变量=值 <命令>。
 #   ⑥ --fetch 点名的路径（文件或目录，相对树根，不许绝对路径与 ..）取回本机取回目录；不带 --peer 时从本机仓根拷过去，两种一样放。
-#      取回目录：${MULTI_HOST_RUN_FETCH_DIRECTORY:-${TMPDIR:-/tmp}/singlefs-multi-host-run/<标签>}，路径在里面照原样；已有东西就拒（退 2）。
+#      取回目录：${MULTI_HOST_RUN_FETCH_DIRECTORY:-<工作根>/multi-host-run/<标签>}，路径在里面照原样；已有东西就拒（退 2）。
+#      工作根只在 .claude/hooks/lib_work_root.py 里定义（SINGLEFS_WORK_ROOT，默认 ~/.local/share/singlefs/work，开机不清）；
+#      没设 MULTI_HOST_RUN_FETCH_DIRECTORY、又给了 --fetch 而那份库跑不起来，命令不跑、退 255。
 #   ⑦ 删第二台这一趟的树与 .pid / .exit / .log；④ 之后在哪一步失败退出，这一步都挂在 EXIT 上照做。
 # 收到 TERM / INT / HUP（退 143 / 130 / 129）：先停那条命令——本机的从它的进程号起、第二台的从它在第二台上记下的进程号起（peer_host_stop_detached），
 #   第二台的停下之后先取回 --fetch 点名的路径（写到一半的产物不随树一起丢），
 #   连同全部后代冻住、从最底层起 TERM、放开，至多等 30 秒，还在的 KILL——再删第二台这一趟的树，做完才退。
-# 退出码：那条命令的退出码（250–254 是内存包装自己的结局，含义见 run-with-memory-cap.sh 文件头「退出码」，那一次的输出不算结果）；
+# 退出码：那条命令的退出码（245 与 250–254 是内存包装自己的结局，含义见 run-with-memory-cap.sh 文件头「退出码」，那一次的输出不算结果）；
 #   2 用法错，或弄坏开关 MULTI_HOST_RUN_BREAK 设在 --selftest 之外（命令一行都没跑）；255 这个脚本自己没跑成（配置、工具链、拷树、起不来、等不到结局，或命令退 0 而点名取回的路径不在）。
 #   命令退非 0 时点名的路径不在，只提一句，退出码照旧是命令的。
 # 驱动打的每一行都不写配置里第二台的主机、别名与目录：第二台的输出与错误输出经 peer_host_redact 换成「第二台」「第二台的目录」再打。
 # 共用库 research/scripts/peer-host-lib.sh 只调它的对外函数，不改它。
 #
 # gate-similar: layer0-shard-run.sh 它把一条登记了分片的崩溃枚举用例切成两片、两台各跑一片再 merge 并写 checker-tier-layer0-replay 的全绿标记，步骤与输入指纹都绑在那一类用例上；它按内容进三条用例的输入指纹（admission.py 的 SHARD_DRIVER_FILES），并进来改一行就废三格标记
-# gate-similar: mutation-shard-run.sh 它是 checker-tier-crates-mutation-replay 专用的变异表分行驱动：按用时分两堆、两台各跑一份 checker-tier-crates-mutation-replay、拷回按条记录核过再导入，判定归 checker-tier-crates-mutation-replay；这里只挪一条任意命令，不分行、不导记录，两份共用的第二台那几段已经抽在 peer-host-lib.sh
+# gate-similar: mutation-shard-run.sh 它是 checker-tier-crates-mutation-replay 专用的变异表分行驱动：按用时分两堆、两台各跑一份 checker-tier-crates-mutation-replay、拷回判定库记录核过再导入，判定归 checker-tier-crates-mutation-replay；这里只挪一条任意命令，不分行、不导记录，两份共用的第二台那几段已经抽在 peer-host-lib.sh
 #
 # 弄坏开关 MULTI_HOST_RUN_BREAK=<项>（只给证红用，逗号分隔可给几个；打开时自证退 1）。只在 --selftest 起的驱动里生效：自证在它的临时目录里放一份标记文件，
 #   路径经 MULTI_HOST_RUN_SELFTEST_MARK 带给它起的驱动，文件在、内容是 MULTI_HOST_SELFTEST_MARK_CONTENT 那一行才认开关（驱动读完就 unset，不带给命令）；
@@ -68,7 +70,8 @@
 #       Ⓖ 输出里没有配置里的主机名与第二台的目录，命令打的那两样换成了「第二台」「第二台的目录」（「有的：peer/run.out」）
 #   MULTI_HOST_RUN_BREAK=switch-off-falls-back-to-local  配置里双机没开时退回本机跑
 #       Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，出路写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑、第二台没建目录（「退 0，命令跑了」）
-#   MULTI_HOST_RUN_BREAK=selftest-keeps-session  自证起驱动时不清调用方的会话号 CLAUDE_CODE_SESSION_ID（改前的跑法；只有自证读这一项）
+#   内存包装的弄坏开关 RUN_WITH_MEMORY_CAP_BREAK=sessiononejob（装回 2026-10-06 撤了的「同一个会话同时只许一条」）也带进这份自证：
+#     Ⓐ 在占着一条的同一个会话里起，被装回的那道拒绝挡下（退 252）
 #       Ⓐ 默认本机跑：配置是坏的、调用方的会话里已有一条日常的在跑也照跑、退 0、在本机仓根跑、第二台一个目录都没建（「退 252，在「」跑」）
 #       Ⓐ 默认本机跑经 run-with-memory-cap.sh（cgroup 在 singlefs-memory-cap- 的 scope 里）（「命令记下的 cgroup：」后面是空的）
 #       Ⓐ 默认本机跑 --fetch：取回的与仓根那一份逐字相同（「cmp: …/local/repo/out/local.txt: No such file or directory」）
@@ -76,6 +79,11 @@
 #       Ⓑ --peer 跑成：退 0，在第二台 runs/<标签>/ 那棵副本里跑（有规范副本、提交过一次），被 git 忽略的 .env 没拷过去（「退 0，在「…/runs/peer-ok」跑，提交 …，.env 拷过去了」）
 #   MULTI_HOST_RUN_BREAK=break-honored-anywhere  弄坏开关在 --selftest 之外也认
 #       Ⓘ MULTI_HOST_RUN_BREAK 设在 --selftest 之外（不带自证的标记）⇒ 拒（退 2，说设在 --selftest 之外），命令没跑（「退 0，命令跑了」）
+#   MULTI_HOST_RUN_BREAK=fetch-under-tmp  没设 MULTI_HOST_RUN_FETCH_DIRECTORY 时取回目录退回 ${TMPDIR:-/tmp}/singlefs-multi-host-run/<标签>（改前的默认）
+#       Ⓙ 没设 MULTI_HOST_RUN_FETCH_DIRECTORY ⇒ 取回到工作根下 multi-host-run/<标签>/，不落进 $TMPDIR；设了它 ⇒ 取回到它点名的目录、工作根下没有这一趟
+#         （「默认那一趟退 0，工作根下没有取回的文件；$TMPDIR 下有」）
+#   MULTI_HOST_RUN_BREAK=gpu-memory-unexplained  那条命令退 245（内存包装认出的显存不够）时不报「显存不够」
+#       Ⓚ 本机跑、内存包装认出显存不够（假 journalctl 打 NVRM … NV_ERR_NO_MEMORY）⇒ 原样退 245、报「显存不够」、说那一次的输出不算结果（「退 245，stderr 尾部：…」）
 # 判法的开关 MULTI_HOST_CONFIGURATION_BREAK 也带进这份自证，打开后红哪几格写在 research/scripts/layer0-shard-configuration-check.sh 文件头；
 # 共用库的开关 PEER_HOST_LIB_BREAK 同样带进来，打开后红哪几格写在 research/scripts/peer-host-lib.sh 文件头。
 # 只供测试的开关：SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1（照层 0 分片）：「第二台」是本机上的另一个目录，命令在本机跑、环境照 ssh 那样只给最少几样。
@@ -176,7 +184,7 @@ multi_host_fetch() { # ⑥ 取回 --fetch 点名的路径：本机模式从仓�
   (( ${#fetch_paths[@]} > 0 )) || return 0
   for relative_path in "${fetch_paths[@]}"; do
     destination="$fetch_directory/$relative_path"
-    mkdir -p -- "$(dirname "$destination")" || multi_host_fail "建不了取回目录 $(dirname "$destination")" "看 ${TMPDIR:-/tmp} 可不可写、盘满没满"
+    mkdir -p -- "$(dirname "$destination")" || multi_host_fail "建不了取回目录 $(dirname "$destination")" "看取回目录 $fetch_directory 的上一级可不可写、盘满没满，或把 MULTI_HOST_RUN_FETCH_DIRECTORY 指到可写的空目录"
     if (( ! peer_mode )); then
       if [[ -d "$tree_root/$relative_path" ]]; then
         { mkdir -p -- "$destination" && cp -a -- "$tree_root/$relative_path/." "$destination/"; } || fetch_missing+=("$relative_path")
@@ -203,6 +211,11 @@ multi_host_fetch() { # ⑥ 取回 --fetch 点名的路径：本机模式从仓�
 multi_host_finish() { # <命令的退出码>：缺了取回的路径、包装自己的结局各提一句，按文件头「退出码」那一段退
   local command_exit="$1"
   case "$command_exit" in
+    245)
+      if ! multi_host_break_is gpu-memory-unexplained; then
+        echo "  ! 那条命令退 245：显存不够（内存包装认出它起止之间内核报了 NV_ERR_NO_MEMORY），那一次的输出不算结果；nvidia-smi 看谁在用卡，等它跑完再重跑" >&2
+      fi
+      ;;
     25[0-4]) echo "  ! 那条命令退 $command_exit：内存包装 run-with-memory-cap.sh 自己的结局（文件头「退出码」），那一次的输出不算结果" >&2 ;;
   esac
   if (( ${#fetch_missing[@]} > 0 )); then
@@ -375,7 +388,19 @@ multi_host_main() {
       multi_host_usage_error "--send 的落点读到「$send_relative」：要写树里的相对路径，不许绝对路径与 .."
     fi
   done
-  fetch_directory="${MULTI_HOST_RUN_FETCH_DIRECTORY:-${TMPDIR:-/tmp}/singlefs-multi-host-run/$run_label}"
+  # 取回目录（文件头 ⑥）：没设 MULTI_HOST_RUN_FETCH_DIRECTORY 就落在工作根下
+  fetch_directory=""
+  if [[ -n "${MULTI_HOST_RUN_FETCH_DIRECTORY:-}" ]]; then
+    fetch_directory="$MULTI_HOST_RUN_FETCH_DIRECTORY"
+  elif multi_host_break_is fetch-under-tmp; then
+    echo "  ! 弄坏开关 MULTI_HOST_RUN_BREAK=fetch-under-tmp：默认取回目录退回 \${TMPDIR:-/tmp} 下" >&2
+    fetch_directory="${TMPDIR:-/tmp}/singlefs-multi-host-run/$run_label"
+  elif multi_host_work_root="$(python3 "$multi_host_script_directory/../../.claude/hooks/lib_work_root.py")" && [[ -n "$multi_host_work_root" ]]; then
+    fetch_directory="$multi_host_work_root/multi-host-run/$run_label"
+  elif (( ${#fetch_paths[@]} > 0 )); then
+    multi_host_fail "取不到工作根（.claude/hooks/lib_work_root.py 跑不起来），--fetch 的取回目录没处放：命令没跑" \
+      "恢复那份库，或设 MULTI_HOST_RUN_FETCH_DIRECTORY 指到开机不清的可写空目录"
+  fi
   if (( ${#fetch_paths[@]} > 0 )) && [[ -e "$fetch_directory" ]] && [[ -n "$(ls -A -- "$fetch_directory" 2>/dev/null)" ]]; then
     multi_host_usage_error "取回目录 $fetch_directory 里已经有东西（换一个 --label，或删掉它、或把 MULTI_HOST_RUN_FETCH_DIRECTORY 指到空目录）"
   fi
@@ -412,11 +437,15 @@ multi_host_main() {
 #   Ⓔ Ⓑ Ⓓ 那几趟跑完（含退 7 那一趟）第二台 runs/ 下什么都不剩
 #   Ⓕ 第二台那条命令在跑时给驱动（只给它自己，kill "$!"）发 TERM ⇒ 120 秒内退 143，第二台那条命令不在了，runs/ 下什么都不剩；
 #      第二台那条命令只握 0、1、2（不握驱动那一头的管道：握着的话，起它那一步要等它跑完才回来）
-# 场景里起驱动一律清掉 CLAUDE_CODE_SESSION_ID 与 SINGLEFS_HEAVY_TESTS（照 run-with-memory-cap.sh 自证 in_context 的写法）：自证起的命令不算进
-#   调用方会话的「日常一条」（调用方的会话里常有一条日常的在跑，经真包装起的 Ⓐ 就会被拒、退 252）
+# 场景里起驱动一律清掉 SINGLEFS_HEAVY_TESTS；会话号 CLAUDE_CODE_SESSION_ID 照调用方给的带下去：内存包装 2026-10-06 撤了「同一个会话同时只许一条」，
+#   Ⓐ 在占着一条的同一个会话里照跑，就是核那道拒绝没再出现
 #   Ⓖ 输出（驱动的标准输出与标准错误）里没有配置里的主机名与第二台的目录，而命令打的那两样换成了「第二台」「第二台的目录」
 #   Ⓗ 配置里没写 ENABLE_ACROSS_MACHINES ⇒ --peer 拒（退 255，说在配置里写 ENABLE_ACROSS_MACHINES=1），命令哪台都没跑
 #   Ⓘ 弄坏开关设在自证之外（起驱动时去掉自证的标记）⇒ 拒（退 2），命令没跑
+#   Ⓙ 本机跑 --fetch，起驱动时去掉 MULTI_HOST_RUN_FETCH_DIRECTORY、SINGLEFS_WORK_ROOT 与 TMPDIR 各指进场景目录 ⇒ 取回到工作根下 multi-host-run/<标签>/、
+#      $TMPDIR 下没有；再设 MULTI_HOST_RUN_FETCH_DIRECTORY 跑一趟 ⇒ 取回到它点名的目录，工作根下没有那一趟（小仓里另拷了 .claude/hooks/lib_work_root.py）
+#   Ⓚ 本机跑 bash -c 'exit 3'，内存包装的 journalctl 换成假的（RUN_WITH_MEMORY_CAP_JOURNALCTL，打一行 NVRM … NV_ERR_NO_MEMORY）⇒ 包装退 245，
+#      驱动原样退 245、标准错误里报「显存不够」与「不算结果」
 # 自证在临时目录里放标记文件、export MULTI_HOST_RUN_SELFTEST_MARK 指向它：场景里起的驱动认得出是自证起的，调用方设的弄坏开关才生效
 
 multi_host_selftest() {
@@ -444,8 +473,9 @@ multi_host_selftest() {
 
   # 小仓的模板
   template="$work/template"
-  mkdir -p "$template/.claude" "$template/research" "$template/payload"
+  mkdir -p "$template/.claude/hooks" "$template/research" "$template/payload"
   rsync -a --exclude __pycache__ "$repository_root/.claude/scripts/" "$template/.claude/scripts/"
+  cp -- "$repository_root/.claude/hooks/lib_work_root.py" "$template/.claude/hooks/lib_work_root.py"   # 取回目录的默认值要它（Ⓙ）
   rsync -a --exclude __pycache__ --exclude memory-peaks.tsv "$repository_root/research/scripts/" "$template/research/scripts/"
   ln -s "$sop_source" "$template/.claude/singlefs-ai-sop"
   printf '/.claude/singlefs-ai-sop\n__pycache__/\n/multi-host.env\n/.env\n/research/scripts/memory-peaks.tsv\ntarget/\n' > "$template/.gitignore"
@@ -469,10 +499,9 @@ multi_host_selftest() {
       echo "QUIESCE_STARTED_CHECK_COMMAND="
     } > "$scene/multi-host.env"
   }
-  scene_command_for() { # <场景名>：scene_command 设成在这个场景里起驱动的前缀（弄坏开关从调用方的环境里留着；会话号与 SINGLEFS_HEAVY_TESTS 清掉，见上面的说明）
-    local scene="$work/$1" session_settings=(-u CLAUDE_CODE_SESSION_ID)
-    if multi_host_break_is selftest-keeps-session; then session_settings=(); fi
-    scene_command=(env "${session_settings[@]}" -u SINGLEFS_HEAVY_TESTS -u RUN_WITH_MEMORY_CAP_RESERVE -u RUN_WITH_MEMORY_CAP_KEY SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
+  scene_command_for() { # <场景名>：scene_command 设成在这个场景里起驱动的前缀（弄坏开关从调用方的环境里留着；SINGLEFS_HEAVY_TESTS 清掉，见上面的说明）
+    local scene="$work/$1"
+    scene_command=(env -u SINGLEFS_HEAVY_TESTS -u RUN_WITH_MEMORY_CAP_RESERVE -u RUN_WITH_MEMORY_CAP_KEY SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
       MULTI_HOST_RUN_POLL_SECONDS=1 MULTI_HOST_RUN_FETCH_DIRECTORY="$scene/fetch" RUN_WITH_MEMORY_CAP_PEAKS="$scene/peaks.tsv"
       bash "$scene/repo/research/scripts/multi-host-run.sh")
   }
@@ -490,7 +519,7 @@ multi_host_selftest() {
   }
 
   # Ⓐ 默认本机跑：配置是坏的（判法一读就拒），不带 --peer 照跑。调用方的会话里已有一条日常的在跑：自证用假会话号经真包装占一条
-  #   （16M 的 sleep，明写等待上限，slice 一时放不下就排队），Ⓐ 带同一个会话号起；场景清掉会话号，Ⓐ 就不算进那个会话的「日常一条」
+  #   （16M 的 sleep，明写等待上限，slice 一时放不下就排队），Ⓐ 带同一个会话号起，照跑（内存包装的弄坏开关 sessiononejob 装回那道拒绝时 Ⓐ 退 252）
   local scene holder_pid holder_sleep="" holder_rounds fake_session="multi-host-run-selftest-$$"
   prepare_scene local
   scene="$work/local"
@@ -635,12 +664,51 @@ pwd; echo selftest-multi-host-peer-name"
     "$([[ "$outside_exit" == 2 && ! -e "$scene/ran" ]] && grep -q '设在 --selftest 之外' "$scene/run.err"; echo $?)" \
     "退 $outside_exit，命令$([[ -e "$scene/ran" ]] && echo 跑了 || echo 没跑)；stderr 尾部：$(tail -n 3 "$scene/run.err" 2>/dev/null | tr '\n' '|')"
 
+  # Ⓙ 没设 MULTI_HOST_RUN_FETCH_DIRECTORY：取回到工作根下（SINGLEFS_WORK_ROOT 指进场景目录，TMPDIR 也指进来看有没有落进去）；设了它照它
+  prepare_scene work-root-fetch
+  scene="$work/work-root-fetch"
+  mkdir -p "$scene/tmp"
+  local default_fetch_exit override_fetch_exit
+  local -a fetch_scene_command=(env -u SINGLEFS_HEAVY_TESTS -u RUN_WITH_MEMORY_CAP_RESERVE -u RUN_WITH_MEMORY_CAP_KEY -u MULTI_HOST_RUN_FETCH_DIRECTORY
+    SINGLEFS_MULTI_HOST_CONFIG="$scene/multi-host.env" SINGLEFS_WORK_ROOT="$scene/work-root" TMPDIR="$scene/tmp" RUN_WITH_MEMORY_CAP_PEAKS="$scene/peaks.tsv")
+  if "${fetch_scene_command[@]}" bash "$scene/repo/research/scripts/multi-host-run.sh" --memory-cap 256M --label default-fetch --fetch out/default.txt -- \
+       bash -c "mkdir -p out && printf '默认取回目录\n' > out/default.txt" > "$scene/default.out" 2> "$scene/default.err" < /dev/null; then
+    default_fetch_exit=0
+  else
+    default_fetch_exit=$?
+  fi
+  expect "Ⓙ 没设 MULTI_HOST_RUN_FETCH_DIRECTORY ⇒ 取回到工作根下 multi-host-run/<标签>/，不落进 \$TMPDIR" \
+    "$([[ "$default_fetch_exit" == 0 && ! -e "$scene/tmp/singlefs-multi-host-run" ]] && cmp -s "$scene/repo/out/default.txt" "$scene/work-root/multi-host-run/default-fetch/out/default.txt"; echo $?)" \
+    "默认那一趟退 $default_fetch_exit，工作根下$([[ -e "$scene/work-root/multi-host-run/default-fetch/out/default.txt" ]] && echo 有 || echo 没有)取回的文件；\$TMPDIR 下$([[ -e "$scene/tmp/singlefs-multi-host-run" ]] && echo 有 || echo 没有)；stderr 尾部：$(tail -n 3 "$scene/default.err" 2>/dev/null | tr '\n' '|')"
+  if "${fetch_scene_command[@]}" MULTI_HOST_RUN_FETCH_DIRECTORY="$scene/override" bash "$scene/repo/research/scripts/multi-host-run.sh" --memory-cap 256M --label override-fetch \
+       --fetch out/override.txt -- bash -c "mkdir -p out && printf '点名的取回目录\n' > out/override.txt" > "$scene/override.out" 2> "$scene/override.err" < /dev/null; then
+    override_fetch_exit=0
+  else
+    override_fetch_exit=$?
+  fi
+  expect "Ⓙ 设了 MULTI_HOST_RUN_FETCH_DIRECTORY ⇒ 取回到它点名的目录，工作根下没有这一趟" \
+    "$([[ "$override_fetch_exit" == 0 && ! -e "$scene/work-root/multi-host-run/override-fetch" ]] && cmp -s "$scene/repo/out/override.txt" "$scene/override/out/override.txt"; echo $?)" \
+    "设了变量那一趟退 $override_fetch_exit，点名的目录下$([[ -e "$scene/override/out/override.txt" ]] && echo 有 || echo 没有)取回的文件，工作根下$([[ -e "$scene/work-root/multi-host-run/override-fetch" ]] && echo 有 || echo 没有)这一趟；stderr 尾部：$(tail -n 3 "$scene/override.err" 2>/dev/null | tr '\n' '|')"
+
+  # Ⓚ 内存包装认出显存不够（假 journalctl：-n 1 那一问打一行，查窗口那一问打 NVRM … NV_ERR_NO_MEMORY）
+  prepare_scene gpu-memory
+  scene="$work/gpu-memory"
+  mkdir -p "$scene/fake-journal"
+  printf '%s\n' '#!/usr/bin/env bash' '# 自证用的假 journalctl：问最近一条打一行，问起止之间打一行显卡驱动报的显存不够' \
+    'case " $* " in *" -n 1 "*) echo "host kernel: probe" ;; *) echo "host kernel: NVRM: GPU0 nvAssertOkFailedNoLog: Out of memory [NV_ERR_NO_MEMORY] (0x00000051)" ;; esac' \
+    > "$scene/fake-journal/journalctl"
+  chmod +x "$scene/fake-journal/journalctl"
+  RUN_WITH_MEMORY_CAP_JOURNALCTL="$scene/fake-journal/journalctl" run_in gpu-memory run --memory-cap 256M -- bash -c 'exit 3'
+  expect "Ⓚ 本机跑、内存包装认出显存不够 ⇒ 原样退 245、报「显存不够」、说那一次的输出不算结果" \
+    "$([[ "$(exit_of gpu-memory run)" == 245 ]] && grep -q '退 245：显存不够' "$scene/run.err" && grep -q '不算结果' "$scene/run.err"; echo $?)" \
+    "退 $(exit_of gpu-memory run)，stderr 尾部：$(tail_of gpu-memory run)"
+
   if (( failures > 0 )); then
     echo "  ✗ multi-host-run.sh 自证有 $failures 格判错（共 $checked 格）"
     echo "     → 怎么办：设了 MULTI_HOST_RUN_BREAK 或 MULTI_HOST_CONFIGURATION_BREAK 的，这就是要的结果（那个开关把对应的一步弄坏了）；没设的，照上面那几格去看 research/scripts/multi-host-run.sh 与 peer-host-lib.sh"
     return 1
   fi
-  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒）"
+  echo "  ✓ multi-host-run.sh 自证 $checked 格都对（默认本机跑不读配置、--peer 跑成且退出码带回、上限不超过 PEER_MEMORY_CAP、工具链不同就拒、取回逐字相同、跑完删第二台的目录、收到 TERM 先停第二台、输出不露主机与目录、双机没开就拒、弄坏开关设在自证之外就拒、取回目录默认在工作根下而设了变量照变量、包装认出显存不够时原样退 245 并报显存不够）"
 }
 
 if [[ "${1:-}" == --selftest ]]; then

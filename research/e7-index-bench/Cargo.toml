@@ -466,6 +466,8 @@ optional = true
 e162-block-stores = ["dep:redb", "dep:rocksdb"]
 # E163（GPU 多卡算单元校验和）：只这一个 bin 用，见下方 [dependencies.wgpu] 旁的注释。
 e163-gpu = ["dep:wgpu", "dep:pollster"]
+# E174（借据丢掉时等待与显存回还）：同一份 wgpu、pollster，只这个 bin 用，写法照 e163-gpu。
+e174-gpu = ["dep:wgpu", "dep:pollster"]
 
 [[bin]]
 name = "e162-crash-verdict-block-store"
@@ -532,3 +534,36 @@ path = "src/bin/e169_parallel_commit_append_and_prefix_recovery.rs"
 [[bin]]
 name = "e166-parallel-commit-shared-state-partition"
 path = "src/bin/e166_parallel_commit_shared_state_partition.rs"
+
+# E172（删除写出的字节的干跑）：跑前登记 research/prompts/e172-preregistration.md。独立解码器，不与 crates/ 共用代码，读 crates/ 侧导出 deletion_write_dump 的输出。
+[[bin]]
+name = "e172-deletion-write-dry-run"
+path = "src/bin/e172_deletion_write_dry_run.rs"
+
+# E173（上限卡在读坏槽的三种处置）：跑前登记 research/prompts/e173-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e173-admission-ceiling-bad-ring-slot-dispositions"
+path = "src/bin/e173_admission_ceiling_bad_ring_slot_dispositions.rs"
+
+# E174（借据丢掉时等待与显存回还）：跑前登记 research/prompts/e174-preregistration.md。独立手写装置，不与 crates/ 共用代码；
+# 依赖沿用上面 [dependencies.wgpu]、[dependencies.pollster]，挂在不默认打开的特性 e174-gpu 上。
+# 编这个 bin：cargo build --release -p e7-index-bench --features e174-gpu --bin e174-lease-drop-wait-memory-return
+[[bin]]
+name = "e174-lease-drop-wait-memory-return"
+path = "src/bin/e174_lease_drop_wait_memory_return.rs"
+required-features = ["e174-gpu"]
+
+# E176（inode 树叶合并三候选的容量与写代价）：跑前登记 research/prompts/e176-preregistration.md。独立手写模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e176-inode-leaf-merge-capacity-and-rewrites"
+path = "src/bin/e176_inode_leaf_merge_capacity_and_rewrites.rs"
+
+# E177（逐树不写墓碑的复活数）：跑前登记 research/prompts/e177-preregistration.md（含修订 1 与执行员修订 2）。独立手写模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e177-per-tree-resurrection-without-tombstones"
+path = "src/bin/e177_per_tree_resurrection_without_tombstones.rs"
+
+# E178（叶容器与记录死亡的计数）：跑前登记 research/prompts/e178-preregistration.md。独立手写计数模型，不与 crates/ 共用代码。
+[[bin]]
+name = "e178-leaf-and-record-death-counts"
+path = "src/bin/e178_leaf_and_record_death_counts.rs"

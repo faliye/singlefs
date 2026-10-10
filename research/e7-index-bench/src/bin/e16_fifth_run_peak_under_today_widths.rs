@@ -47,13 +47,13 @@ const EXTENT_TREE_INTERNAL_FANOUT: u64 = 147;
 const EXTENT_TREE_LOWER_LEAF_DATA_UNITS: u64 = 144;
 /// journal 一条记录的定长字节数。lib.rs:191 `JOURNAL_RECORD_BYTES`。
 const JOURNAL_RECORD_BYTES: u64 = 4096;
-/// journal 记录头部字节数。lib.rs:200 `JOURNAL_HEADER_BYTES`。
-const JOURNAL_HEADER_BYTES: u64 = 311;
+/// journal 记录头部字节数。lib.rs:223 `JOURNAL_HEADER_BYTES`。
+const JOURNAL_HEADER_BYTES: u64 = 487;
 /// journal 一个点名项的字节数。lib.rs:203 `JOURNAL_NAMED_ENTRY_BYTES`。
 const JOURNAL_NAMED_ENTRY_BYTES: u64 = 56;
-/// 一条记录最多装的点名项数 = (4096 − 311) ÷ 56 = 67。lib.rs:206
-/// `JOURNAL_NAMED_ENTRIES_PER_RECORD`。M4 的锚点：换成 72 就是旧记录宽。
-const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 67;
+/// 一条记录最多装的点名项数 = (4096 − 487) ÷ 56 = 64。lib.rs:229
+/// `JOURNAL_NAMED_ENTRIES_PER_RECORD`。两条记录宽变异的锚点：换成 72 是原装置的记录宽，换成 67 是上一代（头 311）的记录宽。
+const JOURNAL_NAMED_ENTRIES_PER_RECORD: u64 = 64;
 
 /// 数据单元载荷字节数 = 总字节 − 头偏移。M3 的锚点：换成不扣头就是「载荷用 32768」。
 const DATA_UNIT_PAYLOAD_BYTES: u64 = DATA_UNIT_BYTES - DATA_UNIT_PAYLOAD_OFFSET;
@@ -75,7 +75,7 @@ const LEGACY_RECORD_HEADER_BYTES: u64 = 48;
 
 // ── 两条臂共用的块数常量：甲的记录与根槽恒为 1 块，两种记录宽下都成立 ────────────────
 
-/// 甲每次 fsync 写的那条游标记录的块数：今天 311 字节头、原装置 48 字节头，都 ≤ 一个块。
+/// 甲每次 fsync 写的那条游标记录的块数：今天 487 字节头、原装置 48 字节头，都 ≤ 一个块。
 /// M5 的锚点：换成 0 就是「游标记录不计块」。
 const INTENT_RECORD_BLOCKS: u64 = 1;
 /// 甲每次 fsync 覆写的根槽块数（D22：发根 = 覆写一个槽，不是追加）。
@@ -192,7 +192,7 @@ const LARGE_FANOUT_ONE_TEBIBYTE_FILE_GEOMETRY: Geometry =
 
 /// 记录宽旋钮的两个取样点（跑前登记第八节 8.2 R1、R∞）：树形与 ONE_TEBIBYTE_FILE_GEOMETRY 完全
 /// 相同（leaf_units、fanout、units 一个字不改），只挂个不同的名字，方便在 second_segment 模式的
-/// 产物里跟今天的记录宽（67 项一条）区分——记录宽旋钮只经 RecordFormat 起作用，不改树形。
+/// 产物里跟今天的记录宽（64 项一条）区分——记录宽旋钮只经 RecordFormat 起作用，不改树形。
 const RECORD_WIDTH_KNOB_MINIMUM_GEOMETRY: Geometry = Geometry {
     name: "record_width_knob_minimum_one_entry_per_record",
     leaf_units: EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
@@ -419,8 +419,8 @@ fn emit_cell_line(emitter: &mut Emitter, output: &mut String, mode: &str, geomet
 const STREAM_AXIS_BASE: [u64; 17] = [2, 3, 4, 6, 7, 8, 11, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256];
 /// Q2 端点扩展点（跑前登记第六节 Q2）：直接并入第一段，省一轮「触发了再加」的重跑。
 const STREAM_AXIS_ENDPOINT_EXTENSION: [u64; 4] = [384, 512, 768, 1024];
-const BATCH_AXIS_BASE: [u64; 49] = [
-    1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 14, 16, 20, 24, 28, 32, 40, 48, 50, 56, 64, 67, 68, 70, 72, 73, 80, 96, 100,
+const BATCH_AXIS_BASE: [u64; 51] = [
+    1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 14, 16, 20, 24, 28, 32, 40, 48, 50, 56, 63, 64, 65, 67, 68, 70, 72, 73, 80, 96, 100,
     112, 128, 160, 192, 200, 224, 256, 320, 384, 448, 512, 640, 768, 1024, 1280, 1536, 2048, 3072, 4096,
 ];
 /// F3 端点扩展点（跑前登记第六节 Q1）：同样直接并入。
@@ -962,7 +962,7 @@ mod tests {
     #[test]
     fn entries_per_record_today_and_legacy() {
         assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, (JOURNAL_RECORD_BYTES - JOURNAL_HEADER_BYTES) / JOURNAL_NAMED_ENTRY_BYTES);
-        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67);
+        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64);
         let legacy_entries_per_block = (LEGACY_BLOCK_BYTES - LEGACY_RECORD_HEADER_BYTES) / (LEGACY_ENTRY_BYTES + LEGACY_CHECKSUM_BYTES);
         assert_eq!(legacy_entries_per_block, 72);
     }
@@ -1011,8 +1011,18 @@ mod tests {
 
     #[test]
     fn write_ahead_log_leaf_record_blocks_today_vs_legacy_at_boundary_batches() {
-        // 跑前登记第七节 7.2：乙在 B=67/68/70/72/73 的块数（今天 / 原装置记录宽）。
-        for (batch, today_blocks, legacy_blocks) in [(67u64, 68u64, 68u64), (68, 70, 69), (70, 72, 71), (72, 74, 73), (73, 75, 75)] {
+        // 第 6 次跑前登记第七节 B2：乙在 B=63/64/65/66/67/68/70/72/73 的块数（今天 64 项一条 / 原装置记录宽 72 项一块）。
+        for (batch, today_blocks, legacy_blocks) in [
+            (63u64, 64u64, 64u64),
+            (64, 65, 65),
+            (65, 67, 66),
+            (66, 68, 67),
+            (67, 69, 68),
+            (68, 70, 69),
+            (70, 72, 71),
+            (72, 74, 73),
+            (73, 75, 75),
+        ] {
             assert_eq!(batch + write_ahead_log_leaf_record_blocks(batch, RecordFormat::Today), today_blocks, "batch={batch} 今天");
             assert_eq!(batch + write_ahead_log_leaf_record_blocks(batch, RecordFormat::LegacyOriginal), legacy_blocks, "batch={batch} 原装置");
         }
@@ -1052,12 +1062,12 @@ mod tests {
         assert_eq!(EXTENT_TREE_INTERNAL_FANOUT, 147);
         assert_eq!(EXTENT_TREE_LOWER_LEAF_DATA_UNITS, 144);
         assert_eq!(JOURNAL_RECORD_BYTES, 4096);
-        assert_eq!(JOURNAL_HEADER_BYTES, 311);
+        assert_eq!(JOURNAL_HEADER_BYTES, 487);
         assert_eq!(JOURNAL_NAMED_ENTRY_BYTES, 56);
-        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 67);
+        assert_eq!(JOURNAL_NAMED_ENTRIES_PER_RECORD, 64);
     }
 
-    // ── PC4（跑前登记 5.3）：每个几何点 B=1 时甲−乙=祖先层数+1；B<=67 时比值>1 ─────
+    // ── PC4（跑前登记 5.3）：每个几何点 B=1 时甲−乙=祖先层数+1；B ≤ 64 与 B = 65 / 67 时比值>1 ─────
 
     #[test]
     fn positive_control_four_batch_one_difference_equals_node_levels_plus_one() {
@@ -1078,7 +1088,7 @@ mod tests {
     fn positive_control_four_ratio_above_one_for_small_batches() {
         for geometry in FIRST_SEGMENT_GEOMETRIES {
             for &streams in &[2u64, 16, 128] {
-                for &batch in &[1u64, 2, 5, 10, 20, 50, 67] {
+                for &batch in &[1u64, 2, 5, 10, 20, 50, 64, 65, 67] {
                     let cell = compute_cell(&geometry, streams, batch, RecordFormat::Today);
                     assert!(cell.ratio > 1.0, "{} streams={streams} batch={batch} ratio={}", geometry.name, cell.ratio);
                 }

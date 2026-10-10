@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # research/scripts/layer0-shard-run.sh --selftest 的本体：不碰第二台。拷一份仓进临时目录、git init，登记一条 shard=across-machines 的用例，
 # 「第二台」是本机上的另一个目录（只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1），本机两个进程各跑一片，走驱动脚本同一条路：
-# 工具链与输入指纹两边比、清场与复原（回读）、两片、拷账本、merge、判、写 checker-tier-layer0-replay 那一格全绿标记。
+# 工具链与输入指纹两边比、清场（回读；跑完不复原）、两片、拷账本、merge、判、写 checker-tier-layer0-replay 那一格全绿标记。
 # 默认用假 cargo（不编译、不跑用例）：登记的是临时仓里新写的一条标了 #[ignore] 的替身用例，三趟都不带 --include-ignored，不算重型；
 # 假 cargo 分片跑时往进度目录写账本、merge 时核两份账本在不在、记的输入指纹对不对，打与层 0 同形的计数行与带 shards= 的线程行。
 # 带 SINGLEFS_HEAVY_TESTS（commit 或 user-request）时换真 cargo：登记 crates/singlefs-checker-tier/tests/crash_enumeration_sharded_across_processes.rs
 # 里不标 ignore 的小流用例（第一条流按甲二展开 29 个状态），release 下真编真跑；不带时成功行写明真 cargo 那一趟本次未跑。逐格核：
-#   ① 不分片跑那条用例打的计数行，与双机分片 merge 之后记进全绿标记的那一行逐字相同；标记作数；清场复原了；第二台这一趟的目录删了
+#   ① 不分片跑那条用例打的计数行，与双机分片 merge 之后记进全绿标记的那一行逐字相同；标记作数；清了场；第二台这一趟的目录删了
 #   ② --merged-log（门禁 checker-tier-layer0-replay 调的那一条）：merge 那一趟的日志写进给的文件，带 LAYER0_SHARD mode=merge shards=2 与同一行计数
 #   ③ 「第二台」的 rustc -Vv 第一行不同 ⇒ 拒（工具链不同），标记不动
 #   ④ 「第二台」那一片没写账本 ⇒ 判红，删这批输入那一格标记
@@ -25,14 +25,30 @@
 #      设成不带单位的数 ⇒ 拒（退 1）
 #   ⑧ ⑫ 的配置值 / 覆盖值按模式取：假 cargo 1G / 2G；真 cargo 8G / 12G（取值时第二台还在这个上限里编测试二进制；编译挪出去之后测试那一趟要多少没量过，
 #      没往回改）。scope 的 memory.max 只在假 cargo 模式核
-#   ⑬ 两片跑到一半给驱动（只给它自己，kill "$!"）发 TERM ⇒ 驱动先停两片（两片的测试进程里记下的进程号都不在了），再复原、回读、
-#      删「第二台」这一趟的树，退 143；两片的进度目录还在。等两片都停住的上限：假 cargo 60 秒，真 cargo 1 小时（第二台那棵树每一趟从头编），驱动先退了就不等。
-#      这一趟设只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=5（第二台那一片的外层晚 5 秒写退出码文件）：驱动要等外层写完再删，
-#      不然删完它又写出一份 runs/<这一趟>.shard-1-of-2.exit；第 1/2 片记下外层的进程号，自证等它退了（至多 120 秒）再看 runs/
+#   ⑬ 两片跑到一半给驱动（只给它自己，kill "$!"）发 TERM ⇒ 驱动先停两片（两片的测试进程里记下的进程号都不在了），再删「第二台」这一趟的树
+#      （不复原），退 143；两片的进度目录还在。发 TERM 之前轮询到两片的进程号都记下了才发；等的上限 hold_wait_seconds：
+#      假 cargo 600 秒，真 cargo 3600 秒（第二台那棵树每一趟从头编）；设了 LAYER0_SHARD_SELFTEST_HOLD_SECONDS=<秒> 就用它（只供证「没跑成」那一支）。
+#      到上限还没都记下：照样发 TERM 收尾，这一格判「没跑成」（✗ 那一行写「没跑成」，不算通过，自证退 1）；驱动先退了判这一格错。
+#      两片记下进程号之后停住等驱动来停，至多停「上限 + 120 秒」。
+#      这一趟设只供测试的开关 SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE（自证按住第二台那一片的外层，放走之前它写不出退出码文件）：发 TERM 之后
+#      按住 15 秒（驱动等外层的上限是 30 秒），驱动这期间报了第二台那一片停没停（「第二台那一片（测试二进制）：」「第二台那一片没停下」那一行）或者退了，
+#      就是没等外层就往下收尾，判这一格错；驱动退了再放（至多按住 15 秒），没等的驱动删完之后外层又写出一份 runs/<这一趟>.shard-1-of-2.exit。
+#      驱动退了之后要报过第二台那一片停没停。第 1/2 片记下外层的进程号，自证等它退了（至多 120 秒）再看 runs/
 #   ⑯ 第二台编测试二进制经 run-with-memory-cap.sh、在编译的上限 SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP 里（自证设：假 cargo 3G，真 cargo 16G），
 #      不在那一片的 PEER_MEMORY_CAP 里：编译那一趟记下的 cgroup 是 singlefs-memory-cap- 的 scope、memory.max 是编译的上限；驱动 ④ 那一行写着它
 #   ⑰ 编译的上限太小（假 cargo 64M、编译那一趟先占 256 MiB；真 cargo 128M、真编）⇒ 驱动退 1、报「编译上限太小」，第二台这一趟的树删了
-# 两片的测试进程里的自证记录（⑭ 标准输出指向、⑧ ⑪ ⑫ cgroup、⑬ 停住等驱动来停）与编译那一趟的记录（⑯ cgroup、⑰ 先占内存）在临时目录的
+#   ⑱ 跑完不调复原命令：配置的 QUIESCE_START_COMMAND 只往临时目录的 restore-calls 记一笔，① 到 ⑬ 的各趟（跑完、跑红、被 TERM 打断）一笔都没记；
+#      ① 与 ⑬ 那两趟驱动报了「清了场、没复原」（⑬ 没跑成时只看 ①）；配置里复原那一对写成空串（清场那一对照写），配置判法照样判得过（退 0）
+#   ⑲ 第二台那一边的内存包装认出显存不够：驱动的环境里设 RUN_WITH_MEMORY_CAP_JOURNALCTL 指到假 journalctl（打一行 NVRM … NV_ERR_NO_MEMORY），
+#      编测试二进制那一趟（LAYER0_SHARD_SELFTEST_PEER_BUILD_FAIL，只在第二台那棵树里）或第 1/2 片（LAYER0_SHARD_SELFTEST_PEER_SHARD_FAIL）一起就退 3，
+#      第二台的包装退 245 ⇒ 驱动退 1、报「显存不够」（编译那一趟判驱动那一支独有的「第二台编测试二进制那一趟显存不够」在、
+#      包装退 250 那一支的「第二台编测试二进制撞了编译的内存上限」与「编译上限太小」都不在；不拿「显存不够」单字判，包装自己也打它），第二台这一趟的树删了
+#   ⑳ 第二台那一片的内存包装收尾拉长：同 ⑲ 第二格，只是假 journalctl 每次先睡 12 秒（包装退非 0 时调两次，内层退了之后外层约 24 秒才写退出码文件）
+#      ⇒ 驱动看外层还在、接着等，不判 vanished，报「第二台那一片退 245：显存不够」、不算结果；第 1/2 片记下外层，自证等它退了（至多 120 秒）再看 runs/，与这一格开跑之前相同
+#   ㉑ 第二台那一片的外层没留退出码文件就没了：第 1/2 片把退出码文件换成指向不存在的目录里的符号链接，外层写不进去就退了 ⇒ 驱动退 1、
+#      报「第二台那一片退 vanished（外层进程没了、没留退出码）」，runs/ 与这一格开跑之前相同。驱动放后台跑，外层没了 90 秒还不退就只给它发 TERM、判这一格错；
+#      外层到 hold_wait_seconds（同 ⑬）还没记下或没退，发 TERM 收尾，这一格判「没跑成」
+# 两片的测试进程里的自证记录（⑭ 标准输出指向、⑧ ⑪ ⑫ cgroup、⑬ 记下进程号、停住等驱动来停）与编译那一趟的记录（⑯ cgroup、⑰ 先占内存）在临时目录的
 #   shard-hooks.sh、build-hooks.sh 里：假 cargo 自己调；真 cargo 模式 PATH 最前面放一层 cargo，别的照转给真的，cargo test … --no-run --message-format=json
 #   时先调编译那一趟的记录，再把它交出的测试可执行文件换成临时目录里的替身（先调两片的记录，再 exec 真的测试二进制），所以真 cargo 下这几格也判得到。
 # 自证起的命令不算进调用方会话的「日常一条」：开头清掉 CLAUDE_CODE_SESSION_ID（照 run-with-memory-cap.sh 自证 in_context 的写法；本机当第二台时
@@ -43,9 +59,11 @@
 #      --emit-assignments 同样退 3、不打赋值
 #   ⑮ 开关写了 0、1 之外的值（ENABLE_ACROSS_MACHINES=yes、ENABLE_GPU=2）⇒ 判不过（退 1），说出是哪个键
 # 弄坏开关（配置判法的）MULTI_HOST_CONFIGURATION_BREAK=switch-off-is-on 打开时 ⑭ 判错，switch-value-unchecked 打开时 ⑮ 判错。
-# 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ ⑪ ⑫ 判错（真 cargo、假 cargo 两种模式都是这三格，写法以驱动文件头那一项为准），
-# no-sop-copy 打开时 ⑨ 判错，no-peer-cleanup-on-failure 打开时 ⑩ ⑬ ⑰ 判错，peer-build-under-shard-cap 打开时 ⑯ ⑰ 判错，peer-build-cap-unexplained 打开时 ⑰ 判错，
-# peer-exit-not-awaited 打开时 ⑬ 判错（no-peer-findings-copy、no-sop-copy、peer-exit-not-awaited 三项的失败句首写在驱动文件头）。
+# 弄坏开关（驱动脚本的）LAYER0_SHARD_RUN_BREAK=no-peer-findings-copy、no-merge-findings 各自打开时 ⑦ 判错，peer-without-memory-cap 打开时 ⑧ ⑪ ⑫ 与 ⑲ 第二格判错（真 cargo、假 cargo 两种模式都是这四格，写法以驱动文件头那一项为准）、⑳ 也判错，
+# no-sop-copy 打开时 ⑨ 判错，no-peer-cleanup-on-failure 打开时 ⑩ ⑬ ⑰ 与 ⑲ 两格判错（⑳ ㉑ 不红：它们走的那一支失败前自己调 ⑦ 删，不经 EXIT 上那一处），peer-build-under-shard-cap 打开时 ⑯ ⑰ 判错，peer-build-cap-unexplained 打开时 ⑰ 判错，
+# peer-exit-not-awaited 打开时 ⑬ 判错，restore-after-run 打开时 ⑱ 判错，gpu-memory-unexplained 打开时 ⑲ 两格与 ⑳ 判错，
+# liveness-by-inner-pid 打开时 ⑳ 判错，outer-liveness-unchecked 打开时 ㉑ 判错
+# （no-peer-findings-copy、no-sop-copy、peer-exit-not-awaited、restore-after-run、gpu-memory-unexplained、liveness-by-inner-pid、outer-liveness-unchecked 七项的失败句首写在驱动文件头）。
 # 弄坏开关（本自证的，开关一行，下一行起是打开后判错的格）：
 #   LAYER0_SHARD_SELFTEST_BREAK=package-mismatch  登记与不分片那一趟的 -p 写成用例不在的那个包（真 cargo 模式写成 singlefs-harness，即用例搬进
 #     singlefs-checker-tier 之后还写死的旧包名；假 cargo 模式写成 singlefs-checker-tier，假 cargo 照真 cargo 报 no test target、退 101）
@@ -76,6 +94,7 @@ remove_work() {
 trap remove_work EXIT
 checked=0
 failures=0
+not_run=0
 expect() { # expect <名> <判据的退出码：0 为过> <不过时的细节>
   checked=$((checked + 1))
   if [[ "$2" == 0 ]]; then
@@ -90,6 +109,26 @@ selftest_case_key="crash-case:sharded-selftest"
 copy="$work/repository"
 # 两片（0/2、1/2）的测试进程开头 source 的自证记录：⑭ 标准输出指向哪里，⑧ ⑪ ⑫ 第二台那一片的 cgroup，⑬ 记下进程号、停住等驱动来停
 cat > "$work/shard-hooks.sh" <<'SHARD_HOOKS'
+find_peer_outer() { # 第二台那一片的外层（写退出码文件的那个 bash：祖先里命令行带 .shard-1-of-2.exit 的第一个），找不到打 0
+  local outer="$PPID"
+  while (( outer > 1 )) && ! grep -qaF '.shard-1-of-2.exit' "/proc/$outer/cmdline" 2>/dev/null; do
+    outer="$(sed 's/.*) //' "/proc/$outer/stat" 2>/dev/null | cut -d' ' -f2)"
+    [[ "$outer" =~ ^[0-9]+$ ]] || outer=0
+  done
+  (( outer > 1 )) || outer=0
+  echo "$outer"
+}
+if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE:-}" ]]; then
+  # ⑳ ㉑：记下第二台那一片的外层（先写临时文件再改名，自证读不到半个进程号），自证等它退了再看 runs/
+  find_peer_outer > "$LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE.partial" && mv -- "$LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE.partial" "$LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE" || exit 101
+fi
+if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_EXIT_FILE_TARGET:-}" ]]; then
+  # ㉑：第二台那一片的退出码文件换成指向不存在的目录里的符号链接：外层照常收尾，写退出码写不进去就退了（演外层没留退出码就没了）
+  ln -sfn -- "$LAYER0_SHARD_SELFTEST_PEER_EXIT_FILE_TARGET" "${SINGLEFS_LAYER0_FINDINGS_FILE%.findings.tsv}.exit" || exit 101
+fi
+if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_SHARD_FAIL:-}" ]]; then
+  exit 3   # ⑲：第 1/2 片一起就退 3，第二台的内存包装照假 journalctl 认成显存不够
+fi
 if [[ -n "${LAYER0_SHARD_SELFTEST_STDOUT_KINDS:-}" ]]; then
   # ⑭：记下这一片的标准输出指向哪里（普通文件的路径，还是 pipe:[…]）
   echo "shard=$SINGLEFS_LAYER0_SHARD stdout=$(readlink "/proc/$$/fd/1")" >> "$LAYER0_SHARD_SELFTEST_STDOUT_KINDS"
@@ -99,19 +138,14 @@ if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 && -n "${LAYER0_SHARD_SELFTEST_PEER_CGROUP
   { cat /proc/self/cgroup; printf 'memory.max=%s\nreserve=%s\n' "$(cat "/sys/fs/cgroup$own_cgroup/memory.max" 2>/dev/null)" "${RUN_WITH_MEMORY_CAP_RESERVE-unset}"; } >> "$LAYER0_SHARD_SELFTEST_PEER_CGROUP"
 fi
 if [[ -n "${LAYER0_SHARD_SELFTEST_HOLD_FILE:-}" ]]; then
-  # ⑬：记下自己的进程号，停在这里等驱动收到 TERM 来停；至多 60 秒，hold 文件被删（自证放走）就退 101。
+  # ⑬：记下自己的进程号，停在这里等驱动收到 TERM 来停；至多停「⑬ 等两片的上限 + 120 秒」，hold 文件被删（自证放走）就退 101。
   #   第 1/2 片先记下第二台那一片的外层（写退出码文件的那个 bash：祖先里命令行带 .shard-1-of-2.exit 的第一个，找不到记 0），自证等它退了再看 runs/
   if [[ "$SINGLEFS_LAYER0_SHARD" == 1/2 ]]; then
-    peer_outer="$PPID"
-    while (( peer_outer > 1 )) && ! grep -qaF '.shard-1-of-2.exit' "/proc/$peer_outer/cmdline" 2>/dev/null; do
-      peer_outer="$(sed 's/.*) //' "/proc/$peer_outer/stat" 2>/dev/null | cut -d' ' -f2)"
-      [[ "$peer_outer" =~ ^[0-9]+$ ]] || peer_outer=0
-    done
-    (( peer_outer > 1 )) || peer_outer=0
-    echo "peer_outer=$peer_outer" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
+    echo "peer_outer=$(find_peer_outer)" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
   fi
   echo "shard=$SINGLEFS_LAYER0_SHARD pid=$$" >> "$LAYER0_SHARD_SELFTEST_HOLD_FILE"
-  for ((held_rounds = 0; held_rounds < 600; held_rounds++)); do
+  held_rounds_limit=$(( (${LAYER0_SHARD_SELFTEST_HOLD_SECONDS:-60} + 120) * 10 ))
+  for ((held_rounds = 0; held_rounds < held_rounds_limit; held_rounds++)); do
     [[ -e "$LAYER0_SHARD_SELFTEST_HOLD_FILE" ]] || exit 101
     sleep 0.1
   done
@@ -120,6 +154,9 @@ fi
 SHARD_HOOKS
 # 编测试二进制那一趟（cargo test … --no-run）开头 source 的自证记录：⑯ 这一次编译所在的 cgroup 与 memory.max（连同工作目录），⑰ 先占一块内存
 cat > "$work/build-hooks.sh" <<'BUILD_HOOKS'
+if [[ -n "${LAYER0_SHARD_SELFTEST_PEER_BUILD_FAIL:-}" && "$PWD" == */peer/runs/* ]]; then
+  exit 3   # ⑲：第二台那棵树里编测试二进制一起就退 3，第二台的内存包装照假 journalctl 认成显存不够；本机那一趟照常编
+fi
 if [[ -n "${LAYER0_SHARD_SELFTEST_BUILD_CGROUP:-}" ]]; then
   build_cgroup="$(sed -n 's/^0:://p' /proc/self/cgroup)"
   printf 'cwd=%s cgroup=%s memory.max=%s\n' "$PWD" "$build_cgroup" "$(cat "/sys/fs/cgroup$build_cgroup/memory.max" 2>/dev/null)" >> "$LAYER0_SHARD_SELFTEST_BUILD_CGROUP"
@@ -290,8 +327,8 @@ PEER_MEMORY_CAP=$peer_memory_cap
 ENABLE_ACROSS_MACHINES=1
 QUIESCE_STOP_COMMAND=touch $work/quiesced
 QUIESCE_STOPPED_CHECK_COMMAND=test -e $work/quiesced
-QUIESCE_START_COMMAND=rm -f $work/quiesced
-QUIESCE_STARTED_CHECK_COMMAND=test ! -e $work/quiesced
+QUIESCE_START_COMMAND=echo restore >> $work/restore-calls
+QUIESCE_STARTED_CHECK_COMMAND=test -e $work/restore-calls
 CONFIGURATION
 }
 write_configuration "$work/multi-host.env" "$selftest_bin_directory"
@@ -302,7 +339,7 @@ export SINGLEFS_LAYER0_SHARD_PEER_IS_THIS_MACHINE=1
 export SINGLEFS_LAYER0_SHARD_INCLUDE_IGNORED=0
 unset SINGLEFS_LAYER0_SHARD SINGLEFS_LAYER0_PROGRESS_DIRECTORY SINGLEFS_LAYER0_INPUT_FINGERPRINT SINGLEFS_LAYER0_START_OVER
 # ⑪ ⑫ 之外的各格都是「没设」：余量与第二台上限的覆盖开关不从调用方漏进来；编译的上限由自证设（⑯）
-unset RUN_WITH_MEMORY_CAP_RESERVE SINGLEFS_LAYER0_PEER_MEMORY_CAP LAYER0_SHARD_SELFTEST_BUILD_CGROUP LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE
+unset RUN_WITH_MEMORY_CAP_RESERVE SINGLEFS_LAYER0_PEER_MEMORY_CAP LAYER0_SHARD_SELFTEST_BUILD_CGROUP LAYER0_SHARD_SELFTEST_BUILD_ALLOCATE_MIB SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE
 export SINGLEFS_LAYER0_PEER_BUILD_MEMORY_CAP="$peer_build_memory_cap"
 # 自证起的命令不算进调用方会话的「日常一条」（文件头）；假 cargo 模式下自证用假会话号占一条日常的，① 那一趟带着同一个会话号起
 fake_session="layer0-shard-run-selftest-$$"
@@ -369,10 +406,10 @@ expect "① 不分片的计数行与双机分片 merge 之后记进标记的那�
   "不分片「$unsharded_count_line」，标记里「$marker_count_line」"
 expect "① merge 那一行按片报线程（shards=2、shard_worker_threads=），记进了标记" "$(grep -q '^parallel_finished=LAYER0_PARALLEL_FINISHED .*shards=2 shard_worker_threads=' "$marker_path"; echo $?)" \
   "标记 $marker_path 里：$(grep 'parallel_finished=' "$marker_path" 2>/dev/null)"
-expect "① 清了场、跑完复原了（回读过），第二台这一趟的目录删了" \
-  "$([[ ! -e "$work/quiesced" ]] && grep -q '清场之后回读过了' "$work/standalone.log" && grep -q '复原之后回读过了' "$work/standalone.log" \
+expect "① 清了场（回读过），第二台这一趟的目录删了" \
+  "$([[ -e "$work/quiesced" ]] && grep -q '清场之后回读过了' "$work/standalone.log" \
      && [[ -z "$(ls -A "$work/peer/runs" 2>/dev/null)" ]]; echo $?)" \
-  "清场标记还在：$([[ -e "$work/quiesced" ]] && echo 是 || echo 否)；第二台 runs/ 下：$(ls -A "$work/peer/runs" 2>/dev/null | tr '\n' ' ')"
+  "清场标记在不在：$([[ -e "$work/quiesced" ]] && echo 在 || echo 不在)；第二台 runs/ 下：$(ls -A "$work/peer/runs" 2>/dev/null | tr '\n' ' ')"
 
 # ⑧ 第二台那一片经内存包装起
 peer_cap_problems=()
@@ -600,22 +637,43 @@ expect "⑫ 设了 SINGLEFS_LAYER0_PEER_MEMORY_CAP=$peer_memory_cap_override ⇒
 hold_file="$work/shards-held"
 : > "$hold_file"
 peer_runs_before_interrupt="$(ls -A "$work/peer/runs" 2>/dev/null)"
-export LAYER0_SHARD_SELFTEST_HOLD_FILE="$hold_file"
-# 第二台那一片的外层晚 5 秒写退出码文件（只供测试的开关）：驱动要等它写完再删第二台这一趟的东西，不然删完它又写出一份
-SINGLEFS_LAYER0_SHARD_PEER_EXIT_PAUSE=5 bash "$driver" "$selftest_case_key" "$copy" > "$work/interrupted.log" 2>&1 &
+# 等两片的进程号都记下的上限（文件头 ⑬）：假 cargo 600 秒、真 cargo 3600 秒；LAYER0_SHARD_SELFTEST_HOLD_SECONDS 设了就用它
+hold_wait_seconds=600
+if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then hold_wait_seconds=3600; fi
+hold_wait_seconds="${LAYER0_SHARD_SELFTEST_HOLD_SECONDS:-$hold_wait_seconds}"
+[[ "$hold_wait_seconds" =~ ^[1-9][0-9]*$ ]] || hold_wait_seconds=600
+export LAYER0_SHARD_SELFTEST_HOLD_FILE="$hold_file" LAYER0_SHARD_SELFTEST_HOLD_SECONDS="$hold_wait_seconds"
+# 第二台那一片的外层由自证按住（驱动的只供测试的开关）：这个文件在，外层就不写退出码文件；驱动要等它写完再删第二台这一趟的东西
+peer_exit_hold_file="$work/peer-exit-hold"
+: > "$peer_exit_hold_file"
+SINGLEFS_LAYER0_SHARD_PEER_EXIT_HOLD_FILE="$peer_exit_hold_file" bash "$driver" "$selftest_case_key" "$copy" > "$work/interrupted.log" 2>&1 &
 interrupted_driver=$!
-unset LAYER0_SHARD_SELFTEST_HOLD_FILE
-# 等两片都停住：上限假 cargo 60 秒、真 cargo 1 小时（第二台那棵树每一趟从头编测试二进制）；驱动先退了就不等
-hold_wait_rounds=600
-if [[ -n "${SINGLEFS_HEAVY_TESTS:-}" ]]; then hold_wait_rounds=36000; fi
-for ((waited_rounds = 0; waited_rounds < hold_wait_rounds; waited_rounds++)); do
-  [[ "$(grep -c '^shard=' "$hold_file")" == 2 ]] && break
-  kill -0 "$interrupted_driver" 2>/dev/null || break
-  sleep 0.1
+unset LAYER0_SHARD_SELFTEST_HOLD_FILE LAYER0_SHARD_SELFTEST_HOLD_SECONDS
+# 发 TERM 之前轮询：两片的进程号都记下了才发（held）；驱动先退了（driver-exited）、到上限还没都记下（timed-out）也发，用来收尾
+hold_deadline=$((SECONDS + hold_wait_seconds))
+hold_outcome=""
+while [[ -z "$hold_outcome" ]]; do
+  if [[ "$(grep -c '^shard=' "$hold_file")" == 2 ]]; then hold_outcome=held
+  elif ! kill -0 "$interrupted_driver" 2>/dev/null; then hold_outcome=driver-exited
+  elif (( SECONDS >= hold_deadline )); then hold_outcome=timed-out
+  else sleep 0.1; fi
 done
+hold_waited_seconds=$((SECONDS + hold_wait_seconds - hold_deadline))
 mapfile -t held_processes < <(sed -n 's/^shard=.* pid=//p' "$hold_file")
 peer_outer="$(sed -n 's/^peer_outer=//p' "$hold_file" | head -1)"
 kill -TERM "$interrupted_driver"
+# 外层按住的时候（放走之前它写不出退出码文件），驱动该停在等外层那一步：至多按住 15 秒（驱动等外层的上限是 30 秒）。这期间驱动报了第二台那一片
+# 停没停、或者退了，都是没等外层就往下收尾；驱动退了就放（没等的驱动删完之后，外层才写出退出码文件）。驱动退没退看 ps -o stat=（僵尸算退了）
+peer_exit_release_deadline=$((SECONDS + 15))
+reported_before_release="" exited_before_release=""
+while [[ "$hold_outcome" == held ]]; do
+  if [[ -z "$reported_before_release" ]] && grep -qE '第二台那一片（测试二进制）：|第二台那一片没停下' "$work/interrupted.log"; then reported_before_release=1; fi
+  interrupted_driver_state="$(ps -o stat= -p "$interrupted_driver" 2>/dev/null)"
+  if [[ -z "$interrupted_driver_state" || "$interrupted_driver_state" == Z* ]]; then exited_before_release=1; break; fi
+  (( SECONDS < peer_exit_release_deadline )) || break
+  sleep 0.1
+done
+rm -f -- "$peer_exit_hold_file"
 wait "$interrupted_driver"
 interrupted_exit=$?
 # 等第二台那一片的外层退了再看 runs/（它退之前还可能写出退出码文件）：至多 120 秒；核命令行还是它（进程号没被重用）
@@ -637,18 +695,145 @@ done
 rm -f -- "$hold_file"  # 没停掉的两片看到它不在就自己退
 interrupt_problems=()
 [[ $interrupted_exit == 143 ]] || interrupt_problems+=("驱动退 $interrupted_exit，不是 143")
-[[ ${#held_processes[@]} == 2 ]] || interrupt_problems+=("发 TERM 之前两片没都停在那里（记下 ${#held_processes[@]} 个进程号）")
+[[ ${#held_processes[@]} == 2 ]] || interrupt_problems+=("发 TERM 之前两片没都停在那里（记下 ${#held_processes[@]} 个进程号，等了 ${hold_waited_seconds} 秒：$hold_outcome）")
 [[ -z "$peer_outer_problem" ]] || interrupt_problems+=("$peer_outer_problem")
 (( ${#still_running[@]} == 0 )) || interrupt_problems+=("TERM 之后两片还在跑：${still_running[*]}")
-grep -q '复原之后回读过了' "$work/interrupted.log" || interrupt_problems+=("没复原回读")
-[[ ! -e "$work/quiesced" ]] || interrupt_problems+=("清场标记还在（没复原）")
+if [[ -n "$reported_before_release$exited_before_release" ]]; then
+  interrupt_problems+=("驱动没等第二台那一片的外层写完退出码文件就往下收尾：外层按住的那几秒里驱动$([[ -n "$reported_before_release" ]] && echo 报了第二台那一片停没停)$([[ -n "$reported_before_release" && -n "$exited_before_release" ]] && echo 、)$([[ -n "$exited_before_release" ]] && echo 退了)")
+fi
+[[ "$hold_outcome" != held ]] || grep -qE '第二台那一片（测试二进制）：|第二台那一片没停下' "$work/interrupted.log" || interrupt_problems+=("驱动没报第二台那一片停没停")
 [[ "$(ls -A "$work/peer/runs" 2>/dev/null)" == "$peer_runs_before_interrupt" ]] || interrupt_problems+=("第二台 runs/ 下多了：$(ls -A "$work/peer/runs" | tr '\n' ' ')")
 [[ -d "$work/peer/progress/$fingerprint" && -d "$git_common_directory/singlefs-layer0-progress/$fingerprint" ]] || interrupt_problems+=("两片的进度目录不在了")
-expect "⑬ 两片跑到一半给驱动发 TERM（第二台那一片的外层晚 5 秒写退出码文件）⇒ 先停两片、等那一片的外层写完退出码文件，再复原、回读、删第二台这一趟的树，退 143，进度目录还在" "${#interrupt_problems[@]}" \
-  "$(IFS='；'; echo "${interrupt_problems[*]}")；驱动输出尾部：$(tail -8 "$work/interrupted.log" | tr '\n' '|')"
+interrupt_cell="⑬ 两片跑到一半给驱动发 TERM（第二台那一片的外层由自证按住，15 秒后才放它写退出码文件）⇒ 先停两片、等那一片的外层写完退出码文件，再删第二台这一趟的树（不复原），退 143，进度目录还在"
+if [[ "$hold_outcome" == timed-out ]]; then
+  # 到上限两片的进程号还没都记下：这一格没跑成，不判通过（文件头 ⑬）
+  checked=$((checked + 1)); not_run=$((not_run + 1))
+  echo "  ✗ ${interrupt_cell}：没跑成（等了 ${hold_wait_seconds} 秒，两片的进程号只记下 ${#held_processes[@]} 个；发 TERM 收了尾，这一格没判）；驱动输出尾部：$(tail -8 "$work/interrupted.log" | tr '\n' '|')"  # gate-lint:detail
+else
+  expect "$interrupt_cell" "${#interrupt_problems[@]}" \
+    "$(IFS='；'; echo "${interrupt_problems[*]}")；驱动输出尾部：$(tail -8 "$work/interrupted.log" | tr '\n' '|')"
+fi
 
-if (( failures > 0 )); then
-  echo "  ✗ layer0-shard-run.sh 自证没过：${failures} 格判错（共 ${checked} 格）"
+# ⑱ 跑完不调复原命令：① 到 ⑬ 各趟一笔复原都没记；① 与 ⑬ 那两趟报了「清了场、没复原」；复原那一对写成空串的配置照样判得过
+sed -e 's/^QUIESCE_START_COMMAND=.*/QUIESCE_START_COMMAND=/' -e 's/^QUIESCE_STARTED_CHECK_COMMAND=.*/QUIESCE_STARTED_CHECK_COMMAND=/' "$work/multi-host.env" > "$work/without-restore.env"
+SINGLEFS_MULTI_HOST_CONFIG="$work/without-restore.env" bash "$configuration_check" "$copy" > "$work/without-restore.log" 2>&1
+without_restore_exit=$?
+no_restore_problems=()
+[[ ! -e "$work/restore-calls" ]] || no_restore_problems+=("配置的复原命令记了 $(grep -c . "$work/restore-calls") 笔")
+grep -q '清了场、没复原' "$work/standalone.log" || no_restore_problems+=("① 那一趟没报「清了场、没复原」")
+if [[ "$hold_outcome" == held ]] && ! grep -q '清了场、没复原' "$work/interrupted.log"; then no_restore_problems+=("⑬ 那一趟没报「清了场、没复原」"); fi
+[[ $without_restore_exit == 0 ]] || no_restore_problems+=("复原那一对写成空串的配置判不过：退 $without_restore_exit（$(tail -2 "$work/without-restore.log" | tr '\n' '|')）")
+expect "⑱ 跑完不调复原命令：① 到 ⑬ 各趟（跑完、跑红、被 TERM 打断）配置的复原命令一笔都没记，① 与 ⑬ 报了「清了场、没复原」；复原那一对写成空串的配置照样判得过" \
+  "${#no_restore_problems[@]}" "$(IFS='；'; echo "${no_restore_problems[*]}")"
+
+# ⑲ 第二台那一边的内存包装认出显存不够（退 245）：假 journalctl 问最近一条打一行、问起止之间打显卡驱动报的显存不够；
+#    编测试二进制那一趟、第 1/2 片各起一趟驱动（文件头 ⑲），与 ⑳ ㉑ 一起放在最后：几趟都判红，不留给后面的格
+cat > "$work/fake-journalctl" <<'FAKE_JOURNAL'
+#!/usr/bin/env bash
+# 自证用的假 journalctl（RUN_WITH_MEMORY_CAP_JOURNALCTL）：问最近一条打一行，问起止之间打一行显卡驱动报的显存不够
+case " $* " in
+  *" -n 1 "*) echo "host kernel: probe" ;;
+  *) echo "host kernel: NVRM: GPU0 nvAssertOkFailedNoLog: Out of memory [NV_ERR_NO_MEMORY] (0x00000051)" ;;
+esac
+FAKE_JOURNAL
+chmod +x "$work/fake-journalctl"
+peer_runs_before_gpu_cells="$(ls -A "$work/peer/runs" 2>/dev/null)"
+RUN_WITH_MEMORY_CAP_JOURNALCTL="$work/fake-journalctl" LAYER0_SHARD_SELFTEST_PEER_BUILD_FAIL=1 bash "$driver" "$selftest_case_key" "$copy" > "$work/peer-build-gpu.log" 2>&1
+peer_build_gpu_exit=$?
+peer_runs_after_build_gpu="$(ls -A "$work/peer/runs" 2>/dev/null)"
+# 判两支各自独有的句子：「显存不够」那一支的 fail 第一句在、「撞了编译的内存上限」那一支（包装退 250）的 fail 第一句不在。
+# 不拿「显存不够」单字判：第二台的内存包装自己也打「run-with-memory-cap: 显存不够」，驱动不解释时照样命中
+peer_build_gpu_problems=()
+[[ $peer_build_gpu_exit == 1 ]] || peer_build_gpu_problems+=("退 $peer_build_gpu_exit，不是 1")
+[[ "$peer_runs_after_build_gpu" == "$peer_runs_before_gpu_cells" ]] || peer_build_gpu_problems+=("第二台 runs/ 下多了：$(tr '\n' ' ' <<< "$peer_runs_after_build_gpu")")
+grep -qF '第二台编测试二进制那一趟显存不够' "$work/peer-build-gpu.log" || peer_build_gpu_problems+=("没报「第二台编测试二进制那一趟显存不够」")
+! grep -qF '第二台编测试二进制撞了编译的内存上限' "$work/peer-build-gpu.log" || peer_build_gpu_problems+=("报了包装退 250 那一支的「第二台编测试二进制撞了编译的内存上限」")
+! grep -qF '编译上限太小' "$work/peer-build-gpu.log" || peer_build_gpu_problems+=("说了「编译上限太小」")
+expect "⑲ 第二台编测试二进制那一趟内存包装退 245 ⇒ 驱动退 1、报「第二台编测试二进制那一趟显存不够」、不报撞了编译的内存上限、不说编译上限太小，第二台这一趟的树删了" \
+  "${#peer_build_gpu_problems[@]}" "$(IFS='；'; echo "${peer_build_gpu_problems[*]}")；输出尾部：$(tail -6 "$work/peer-build-gpu.log" | tr '\n' '|')"
+RUN_WITH_MEMORY_CAP_JOURNALCTL="$work/fake-journalctl" LAYER0_SHARD_SELFTEST_PEER_SHARD_FAIL=1 bash "$driver" "$selftest_case_key" "$copy" > "$work/peer-shard-gpu.log" 2>&1
+peer_shard_gpu_exit=$?
+peer_runs_after_shard_gpu="$(ls -A "$work/peer/runs" 2>/dev/null)"
+expect "⑲ 第二台那一片内存包装退 245 ⇒ 驱动退 1、报「第二台那一片退 245：显存不够」、不算结果，第二台这一趟的树删了" \
+  "$([[ $peer_shard_gpu_exit == 1 && "$peer_runs_after_shard_gpu" == "$peer_runs_before_gpu_cells" ]] && grep -q '第二台那一片退 245：显存不够' "$work/peer-shard-gpu.log" \
+     && grep -q '不算结果' "$work/peer-shard-gpu.log"; echo $?)" \
+  "退 $peer_shard_gpu_exit；第二台 runs/ 下「$(tr '\n' ' ' <<< "$peer_runs_after_shard_gpu")」；输出尾部：$(tail -6 "$work/peer-shard-gpu.log" | tr '\n' '|')"
+
+# ⑳ ㉑ 判第二台那一片还在不在跑看外层（驱动文件头「第二台那一片跑完没有」）：两格的第 1/2 片都记下那一片的外层，自证等它退了（至多 120 秒）再看 runs/
+await_recorded_peer_outer() { # await_recorded_peer_outer <记外层进程号的文件>：等那一片的外层退了（核命令行还是它）；没记下、120 秒还在就打一句问题
+  local outer outer_rounds
+  outer="$(cat "$1" 2>/dev/null)"
+  if [[ ! "$outer" =~ ^[1-9][0-9]*$ ]]; then echo "第 1/2 片没记下第二台那一片的外层（记下的：${outer:-无}）"; return 0; fi
+  for ((outer_rounds = 0; outer_rounds < 1200; outer_rounds++)); do
+    grep -qaF '.shard-1-of-2.exit' "/proc/$outer/cmdline" 2>/dev/null || return 0
+    sleep 0.1
+  done
+  echo "第二台那一片的外层（进程 $outer）驱动退了 120 秒之后还在"
+}
+# ⑳ 第二台那一片的内存包装收尾拉长：假 journalctl 每次先睡 12 秒（第 1/2 片退 3，包装退非 0 时调它两次，收尾拉长约 24 秒，
+#    改前的驱动连续 3 次、每次隔 5 秒看到内层没了就判 vanished）⇒ 驱动看外层还在、接着等，读到退出码 245
+cat > "$work/slow-fake-journalctl" <<SLOW_FAKE_JOURNAL
+#!/usr/bin/env bash
+# ⑳ 用的慢假 journalctl：每次先睡 12 秒，再照 ⑲ 那一份打
+sleep 12
+exec $(printf '%q' "$work/fake-journalctl") "\$@"
+SLOW_FAKE_JOURNAL
+chmod +x "$work/slow-fake-journalctl"
+peer_runs_before_slow_finish="$(ls -A "$work/peer/runs" 2>/dev/null)"
+RUN_WITH_MEMORY_CAP_JOURNALCTL="$work/slow-fake-journalctl" LAYER0_SHARD_SELFTEST_PEER_SHARD_FAIL=1 LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE="$work/peer-outer-slow-finish" \
+  bash "$driver" "$selftest_case_key" "$copy" > "$work/peer-slow-finish.log" 2>&1
+slow_finish_exit=$?
+slow_finish_problems=()
+slow_finish_outer_problem="$(await_recorded_peer_outer "$work/peer-outer-slow-finish")"
+[[ $slow_finish_exit == 1 ]] || slow_finish_problems+=("退 $slow_finish_exit，不是 1")
+if grep -q '第二台那一片退 vanished' "$work/peer-slow-finish.log"; then slow_finish_problems+=("驱动判成了 vanished：$(grep -o '第二台那一片退 vanished[^；]*' "$work/peer-slow-finish.log" | head -1)"); fi
+grep -qF '第二台那一片退 245：显存不够' "$work/peer-slow-finish.log" || slow_finish_problems+=("没报「第二台那一片退 245：显存不够」")
+grep -qF '不算结果' "$work/peer-slow-finish.log" || slow_finish_problems+=("没说「不算结果」")
+[[ -z "$slow_finish_outer_problem" ]] || slow_finish_problems+=("$slow_finish_outer_problem")
+[[ "$(ls -A "$work/peer/runs" 2>/dev/null)" == "$peer_runs_before_slow_finish" ]] || slow_finish_problems+=("第二台 runs/ 下多了：$(ls -A "$work/peer/runs" | tr '\n' ' ')")
+expect "⑳ 第二台那一片的内存包装收尾拉长到 24 秒左右（内层退了、外层还没写退出码文件）⇒ 驱动看外层还在、接着等，不判 vanished，报「第二台那一片退 245：显存不够」、不算结果，第二台这一趟的树删了" \
+  "${#slow_finish_problems[@]}" "$(IFS='；'; echo "${slow_finish_problems[*]}")；输出尾部：$(tail -6 "$work/peer-slow-finish.log" | tr '\n' '|')"
+
+# ㉑ 第二台那一片的外层没留退出码文件就没了：第 1/2 片把退出码文件换成指向不存在的目录里的符号链接，外层写不进去就退了 ⇒ 驱动判 vanished。
+#    驱动放后台跑：外层没了之后等它至多 90 秒（判 vanished 要连续 3 次、每次隔 5 秒），还不退就只给它自己发 TERM（kill "$!" 记下的那个）收尾、判这一格错；
+#    外层一直没记下、没退，至多等 hold_wait_seconds（同 ⑬），到了照样发 TERM 收尾，这一格判「没跑成」
+peer_runs_before_outer_lost="$(ls -A "$work/peer/runs" 2>/dev/null)"
+LAYER0_SHARD_SELFTEST_PEER_OUTER_FILE="$work/peer-outer-lost" LAYER0_SHARD_SELFTEST_PEER_EXIT_FILE_TARGET="$work/no-such-directory/exit" \
+  bash "$driver" "$selftest_case_key" "$copy" > "$work/peer-outer-lost.log" 2>&1 &
+outer_lost_driver=$!
+outer_lost_deadline=$((SECONDS + hold_wait_seconds))
+outer_lost_outcome="" outer_gone_at=""
+while [[ -z "$outer_lost_outcome" ]]; do
+  outer_lost_driver_state="$(ps -o stat= -p "$outer_lost_driver" 2>/dev/null)"
+  recorded_lost_outer="$(cat "$work/peer-outer-lost" 2>/dev/null)"
+  if [[ -z "$outer_gone_at" && "$recorded_lost_outer" =~ ^[1-9][0-9]*$ ]] && ! grep -qaF '.shard-1-of-2.exit' "/proc/$recorded_lost_outer/cmdline" 2>/dev/null; then
+    outer_gone_at=$SECONDS
+  fi
+  if [[ -z "$outer_lost_driver_state" || "$outer_lost_driver_state" == Z* ]]; then outer_lost_outcome=exited
+  elif [[ -n "$outer_gone_at" ]] && (( SECONDS - outer_gone_at >= 90 )); then outer_lost_outcome=hung
+  elif (( SECONDS >= outer_lost_deadline )); then outer_lost_outcome=timed-out
+  else sleep 0.2; fi
+done
+if [[ "$outer_lost_outcome" != exited ]]; then kill -TERM "$outer_lost_driver"; fi
+wait "$outer_lost_driver"
+outer_lost_exit=$?
+outer_lost_problems=()
+outer_lost_outer_problem="$(await_recorded_peer_outer "$work/peer-outer-lost")"
+[[ "$outer_lost_outcome" != hung ]] || outer_lost_problems+=("外层没了 90 秒驱动还没退（还当第二台那一片在跑），发了 TERM 收尾")
+[[ $outer_lost_exit == 1 ]] || outer_lost_problems+=("驱动退 $outer_lost_exit，不是 1")
+grep -qF '第二台那一片退 vanished（外层进程没了、没留退出码）' "$work/peer-outer-lost.log" || outer_lost_problems+=("没报「第二台那一片退 vanished（外层进程没了、没留退出码）」")
+[[ -z "$outer_lost_outer_problem" ]] || outer_lost_problems+=("$outer_lost_outer_problem")
+[[ "$(ls -A "$work/peer/runs" 2>/dev/null)" == "$peer_runs_before_outer_lost" ]] || outer_lost_problems+=("第二台 runs/ 下多了：$(ls -A "$work/peer/runs" | tr '\n' ' ')")
+outer_lost_cell="㉑ 第二台那一片的外层没留退出码文件就没了 ⇒ 驱动判 vanished（退 1，报「第二台那一片退 vanished（外层进程没了、没留退出码）」），第二台这一趟的树删了"
+if [[ "$outer_lost_outcome" == timed-out ]]; then
+  checked=$((checked + 1)); not_run=$((not_run + 1))
+  echo "  ✗ ${outer_lost_cell}：没跑成（等了 ${hold_wait_seconds} 秒，第二台那一片的外层没记下或一直没退；发 TERM 收了尾，这一格没判）；驱动输出尾部：$(tail -6 "$work/peer-outer-lost.log" | tr '\n' '|')"  # gate-lint:detail
+else
+  expect "$outer_lost_cell" "${#outer_lost_problems[@]}" "$(IFS='；'; echo "${outer_lost_problems[*]}")；输出尾部：$(tail -6 "$work/peer-outer-lost.log" | tr '\n' '|')"
+fi
+
+if (( failures > 0 || not_run > 0 )); then
+  echo "  ✗ layer0-shard-run.sh 自证没过：${failures} 格判错、${not_run} 格没跑成（共 ${checked} 格；没跑成的不算通过，照那一行写的原因重跑）"
   echo "     → 怎么办：照上面每一格的说明改驱动脚本（research/scripts/layer0-shard-run.sh）或分片那一段（crates/singlefs-checker-tier/src/layer0_progress.rs、crash.rs）"
   exit 1
 fi

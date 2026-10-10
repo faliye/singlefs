@@ -1,0 +1,30 @@
+# E171 第 1 次重跑·修订 10（修订 8 那一趟第二段整表）的装置（占位核对与修订 8 日志的读法、第二段·修订 8 编排层、两趟第二段对照）的变异表。三列：变异名 <TAB> 原文 <TAB> 替换文（\n 还原成换行）。经本目录 mutation_driver.py 带 --unit-test-module test_revision_10 跑。
+R10-1 逐行编排的起与退在同一处也当在跑	    return last_start > last_end	    return last_start >= last_end
+R10-2 研究一侧变异表的闸取反	return not os.path.isfile(path) or judge.verdict_fields(path).get("research_side_differs", "true") != "false"	return not os.path.isfile(path) or judge.verdict_fields(path).get("research_side_differs", "true") == "false"
+R10-3 起跑闸不核绿行点名产物的行数	        elif units.line_count(path) != lines and not broken("gate-ignores-line-counts"):	        elif False and not broken("gate-ignores-line-counts"):
+R10-4 T₂ 不接第 1 步绿的那一次的 TAG	    relative = segment_one.timing(f"{STEP_1_STEM}{tag}")	    relative = segment_one.timing(STEP_1_STEM)
+R10-5 逐行限时按超时重跑那一档算	device_timing.row_time_limit_seconds(timing.process_wall_seconds, False))	device_timing.row_time_limit_seconds(timing.process_wall_seconds, True))
+R10-6 本机闸第 7 步绿与逐行编排起过只要一样	    is_open = step_7_green and (rows_started or broken("local-gate-without-rows-start"))	    is_open = step_7_green or (rows_started or broken("local-gate-without-rows-start"))
+R10-7 比对器的基线导出不接 TAG	os.path.join(segment_one.dumps, f"{stem}{records[unit][1]}")	os.path.join(segment_one.dumps, stem)
+R10-8 H23 只认修订 6 第二段导出根的原名	if segment_two.dumps.startswith(REVISION_6_SEGMENT_TWO_DUMPS) or overlapping(	if segment_two.dumps == REVISION_6_SEGMENT_TWO_DUMPS or overlapping(
+R10-9 目录重叠只看一个方向	first.startswith(second + os.sep) or second.startswith(first + os.sep)	first.startswith(second + os.sep)
+R10-10 标签前缀相撞只看一个方向	if f"{label}-".startswith(other) or other.startswith(label)]	if f"{label}-".startswith(other)]
+R10-11 H25 该登没登的不数	    missing = [path for path in H25_REQUIRED_FILES if path not in files]	    missing = []
+R10-12 比对器那一条命令的后缀少 .out	f"--product-suffix={segment_two.suffix}.out",	f"--product-suffix={segment_two.suffix}",
+R10-13 每行前后不核树里的变异表等于 H8	    if found != STATE["tree_table_sha256_h8"]:	    if False:
+R10-14 本机闸把第二台的槽记 0	if allocation.number == 1 else allocation for allocation in allocations]	if allocation.number == 2 else allocation for allocation in allocations]
+R10-15 让路取第一段逐行最早那一趟	if re.fullmatch(r"attempt-[0-9]+", name)), reverse=True)	if re.fullmatch(r"attempt-[0-9]+", name)), reverse=False)
+R10-16 写了 exit 的分片也当在跑	if not os.path.isfile(record_path) or os.path.exists(os.path.join(latest, entry, "exit")):	if not os.path.isfile(record_path):
+R10-17 重报的 carry 分片也当在跑	if record.get("kind") in ("local", "peer"):	if record.get("kind") in ("local", "peer", "carry"):
+R10-18 做完的行也当排着	if not os.path.exists(os.path.join(root, f"row-{row}", "row-result.tsv")) and (step, row) not in running:	if (step, row) not in running:
+R10-19 X 读第 12 步的行目录	        root = rows_root + one.STEPS[step].root_suffix	        root = rows_root
+R10-20 输入清单不比 sha256	                     if judge.sha256_or_missing(judge.resolve(repo, path)) != digest]	                     if False]
+R10-21 run-values 不比	for key, value in values if recorded_values.get(key) != value]	for key, value in values if False]
+R10-22 停派文件看不见	    if os.path.exists(segment_one.stop_file) and not broken("stop-file-ignored"):	    if False and not broken("stop-file-ignored"):
+R10-23 没跑成的行也算触达	    if values.get("ran") != "true":	    if values.get("ran") == "absent":
+R10-24 批 2 的触达读批 1 那一遍恢复的报告	    recovery_batch = "1" if broken("touch-batch-1-only") else batch	    recovery_batch = "1"
+R10-25 Q2 的集合只取 O1-对拍红的行	for column in ("rows_o1_red", "rows_o1_not_red")	for column in ("rows_o1_red",)
+R10-26 类变了的行取反	.get(column, "absent") != new_rows.get(row, {}).get(column, "absent")]	.get(column, "absent") == new_rows.get(row, {}).get(column, "absent")]
+R10-27 账里跨机对照那一步也收	if len(parts) >= 3 and parts[0] == "rows" and parts[1].isdigit():	if len(parts) >= 3 and parts[1].isdigit():
+R10-28 只有一边补位就不报	        if all(side.get("substituted_from", "-") in ("-", "absent", "") for side in sides):	        if any(side.get("substituted_from", "-") in ("-", "absent", "") for side in sides):
+R10-29 第一段那一处 S17 取反	    if identical == "false" and not broken("s17-ignored"):	    if identical == "true" and not broken("s17-ignored"):

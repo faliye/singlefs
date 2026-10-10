@@ -1,0 +1,23 @@
+M1_并读坏槽的过滤大于等于F改成大于F	.filter(|highest_txg| *highest_txg >= self.floor_in_the_current_version)	.filter(|highest_txg| *highest_txg > self.floor_in_the_current_version)
+M2_全零不并时也把读回全零的槽并进去	Some(Occupant::AllZeroAtMount { highest_txg_it_can_hold, .. }) if merge_all_zero_slots => Some(*highest_txg_it_can_hold),	Some(Occupant::AllZeroAtMount { highest_txg_it_can_hold, .. }) if merge_all_zero_slots || true => Some(*highest_txg_it_can_hold),
+M3_第4新改成第3新	distinct_non_empty_txgs.get(NEWEST_DISTINCT_STATES_THE_CEILING_KEEPS - 1)	distinct_non_empty_txgs.get(NEWEST_DISTINCT_STATES_THE_CEILING_KEEPS - 2)
+M4_抬F那一串少推一次	txgs.len() < usize::try_from(REGIONS_IN_THE_ROOT_RING).expect("R") {\n        let txg = txgs.last().map_or(current_txg, |previous| *previous) + 1;	txgs.len() + 1 < usize::try_from(REGIONS_IN_THE_ROOT_RING).expect("R") {\n        let txg = txgs.last().map_or(current_txg, |previous| *previous) + 1;
+M5_B等于8改9	const PUBLISHES_PER_ADMISSION_AT_MOST: usize = 4 + 2 * TOLERATED_ROOT_SLOT_WRITE_FAILURES;	const PUBLISHES_PER_ADMISSION_AT_MOST: usize = 5 + 2 * TOLERATED_ROOT_SLOT_WRITE_FAILURES;
+M6a_推空卡住的分流边界把C并等于F算成不卡	if reading.merged > floor {	if reading.merged >= floor {
+M6b_推空W推到卡住解开的循环边界把C并等于F算成已解开	if !(reading.merged <= floor && reading.unmerged > floor) {	if !(reading.merged < floor && reading.unmerged > floor) {
+M7_推空的空发布也判空间准入式子	if self.pool.space.free_blocks < self.pool.metadata_blocks {	if self.pool.free_blocks_above_the_reserve() < self.pool.metadata_blocks {
+M8_进程内重读读出有效根时不换照旧钉着	self.table.occupants.insert(slot, Occupant::ValidRootReadWhenRereading { checkpoint_txg: txg_read });	let _ = txg_read;
+M9_真值非空对最旧的一条不拿没有文件比	let is_non_empty_in_the_truth = root.state_number != state_of_the_previous_root;	let is_non_empty_in_the_truth = root.state_number != state_of_the_previous_root && position > 0;
+M10_抬F报自己的错记成读坏当没有根	return Err(SlotKnownToHoldARootStillBadAfterOneReread { slot });	bad_slots_taken_as_holding_no_root.insert(slot);
+M11_抬F回收出来的块不扣到生效当场可用	self.pool.space.reclaim_up_to(reclaim_floor(new_floor, oldest_valid_root), ReclaimedReuse::HeldUntilTheFloorTakesEffect);	self.pool.space.reclaim_up_to(reclaim_floor(new_floor, oldest_valid_root), ReclaimedReuse::Immediately);
+M12_能住的最大txg与最旧txg互换	(slot, (oldest_txg, highest_txg))	(slot, (highest_txg, oldest_txg))
+M13_回收门槛取F与最旧有效根的大者改成小者	oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.max(oldest))	oldest_valid_root.map_or(effective_floor, |oldest| effective_floor.min(oldest))
+M14_上限等于F时也去抬F	if ceiling <= self.pool.floor_in_the_current_version {	if ceiling < self.pool.floor_in_the_current_version {
+M15_抬F那一串的发布数不算进已推次数	tally.pushed_within_the_budget += publishes;	tally.pushed_within_the_budget += 0 * publishes;
+Mm1_一次挂载全ENOSPC的多拒门槛一改成大于一	let all_enospc = extra_rejected >= 1 && first_extra_step.is_some() && accepted_after_the_first_extra == 0;	let all_enospc = extra_rejected > 1 && first_extra_step.is_some() && accepted_after_the_first_extra == 0;
+Mm2_不并比并多的越过位置数用大于等于	pair.not_merged_crossed_more += usize::from(metrics_not_merged.crossed > metrics_merged.crossed);	pair.not_merged_crossed_more += usize::from(metrics_not_merged.crossed >= metrics_merged.crossed);
+Mm3_越过数的上沿把F新也算进去	root.checkpoint_txg >= truth_ceiling && root.checkpoint_txg < new_floor	root.checkpoint_txg >= truth_ceiling && root.checkpoint_txg <= new_floor
+Mm4_少掉的状态数不按4封顶	let states_lost = candidates_before.min(NEWEST_DISTINCT_STATES_THE_CEILING_KEEPS).saturating_sub(candidates_after);	let states_lost = candidates_before.saturating_sub(candidates_after);
+Mm5_聚合里量大于0的位置数把零也算进去	        if value > 0 {\n            self.positive_positions += 1;	        if value >= 0 {\n            self.positive_positions += 1;
+Mm6_判定打中的门槛从一改成二	let hit = totals.observed_maximum.is_some_and(|value| value >= 1);	let hit = totals.observed_maximum.is_some_and(|value| value > 1);
+Mm7_轨迹峰值从第一次不够之后一步起取	peak_after_the_first_short: first_short_step.and_then(|step| series[step..].iter().copied().max()),	peak_after_the_first_short: first_short_step.and_then(|step| series[step + 1..].iter().copied().max()),
