@@ -3,7 +3,7 @@
 //! 三件事：
 //! ① 一次写请求按切分纪律切成若干一单元事务（D16（发布语义） 已定项 5 末段、D23（journal 的角色与格式） 已定项 7、
 //!    C310（事务切分纪律与记录数口径打架） 的定案），切出一个事务的那一档与覆盖写走同一条发布路径、写出的字节一个不变；
-//! ② 切出不止一个事务时一次发布写出一个事务一条记录，跨过 67 那个点名项上限照样走得通，一片 extent 叶装满的 144 也走得通，
+//! ② 切出不止一个事务时一次发布写出一个事务一条记录，跨过 64 那个点名项上限照样走得通，一片 extent 叶装满的 144 也走得通，
 //!    多于 144 个单元时 extent 树下段长成两层（D8（核心索引结构） 已定项 14 的 K2），同样走得通。
 
 mod common;
@@ -18,6 +18,7 @@ use singlefs_core::unit::data_unit_payload_capacity;
 use singlefs_core::write_request_split::{
     data_unit_count_of_a_sequential_write, split_sequential_write_into_one_unit_transactions,
 };
+use singlefs_format::JOURNAL_NAMED_ENTRIES_PER_RECORD;
 use singlefs_harness::RetainedOperation;
 
 /// 一份可复现的内容：长度由调用点给，字节只随下标走。
@@ -116,8 +117,8 @@ fn sequential_write_of_one_data_unit_writes_the_same_bytes_as_an_overwrite_of_th
     );
 }
 
-/// 单元数跨过 67（一条 journal 记录的点名项上限）走得通：一次发布的记录条数 = 数据单元数
-/// （C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），67 那个点名项上限够不着——每条记录只点名一个数据单元，
+/// 单元数跨过 64（一条 journal 记录的点名项上限）走得通：一次发布的记录条数 = 数据单元数
+/// （C310（事务切分纪律与记录数口径打架） 2026-09-16 用户定案），64 那个点名项上限够不着——每条记录只点名一个数据单元，
 /// 末条再加共享的提交内生块。144（一片 extent 叶装满）也走得通；145 起 extent 树下段长成两层（D8（核心索引结构） 已定项 14），
 /// 同样走得通（下段的形状钉在 `multi_unit_file_write_and_read.rs`）。
 /// 一种单元数的顺序写：切分算出的事务数 = 单元数；一次发布写出与单元数相同条数的记录、末条之前每条只点名一个数据单元。
@@ -162,15 +163,26 @@ fn sequential_write_of_2_data_units_publishes_2_records() {
     sequential_write_publishes_one_record_per_data_unit(2);
 }
 
-/// 67 是一条 journal 记录的点名项上限。
+/// 64 是一条 journal 记录的点名项上限 ⌊(4096 − 487) ÷ 56⌋。
 #[test]
-fn sequential_write_of_67_data_units_at_the_named_item_limit_publishes_67_records() {
-    sequential_write_publishes_one_record_per_data_unit(67);
+fn sequential_write_of_64_data_units_at_the_named_item_limit_publishes_64_records() {
+    // 写路径不读这个上限，单元数写成字面量；先钉住上限今天的值，上限一变这里先红，单元数才会跟着挪，不会贴着旧上限照样绿下去。
+    assert_eq!(
+        JOURNAL_NAMED_ENTRIES_PER_RECORD, 64,
+        "这条用例的单元数压在一条 journal 记录的点名项上限上；上限变了要跟着挪单元数"
+    );
+    sequential_write_publishes_one_record_per_data_unit(64);
 }
 
 #[test]
-fn sequential_write_of_68_data_units_past_the_named_item_limit_publishes_68_records() {
-    sequential_write_publishes_one_record_per_data_unit(68);
+fn sequential_write_of_65_data_units_past_the_named_item_limit_publishes_65_records() {
+    // 同上一条：单元数是上限加一，先钉住上限今天的值。
+    assert_eq!(
+        JOURNAL_NAMED_ENTRIES_PER_RECORD + 1,
+        65,
+        "这条用例的单元数是一条 journal 记录的点名项上限加一；上限变了要跟着挪单元数"
+    );
+    sequential_write_publishes_one_record_per_data_unit(65);
 }
 
 /// 144 装满一片 extent 叶。

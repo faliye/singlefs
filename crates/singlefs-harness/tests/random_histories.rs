@@ -194,6 +194,25 @@ fn assert_every_path_was_exercised(tally: &HistoryTally) {
             HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
                 assert!(operation.refused >= 1, "{kind:?} 一次都没被拒过");
             }
+            // 快档那组比重不抽它（种子钉着的取样点照旧）：它只在留孤儿那一组比重里抽，跑到与留下孤儿由 `singlefs_harness::history`
+            // 的单元测试钉（`the_orphan_sampling_draws_the_overwrite_losing_power_and_the_broad_sampling_never_does` 与
+            // `an_overwrite_losing_power_before_its_journal_record_leaves_orphans_the_sweep_erases_once_its_instance_left_the_ring`）。
+            HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => {
+                assert_eq!(
+                    operation,
+                    singlefs_harness::history::OperationTally::default(),
+                    "{kind:?} 不在快档那组比重里，却跑到了"
+                );
+            }
+            // 只进它自己那一组比重（`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`，C696），快档那一组不抽它；
+            // 跑到了没有在那一组的取样点那条用例里核（`newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms`）。
+            HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                assert_eq!(
+                    (operation.applied, operation.refused, operation.not_applicable),
+                    (0, 0, 0),
+                    "快档那一组比重不抽 {kind:?}"
+                );
+            }
             HistoryOperationKind::PublishFirstFile
             | HistoryOperationKind::PublishOverwrite
             | HistoryOperationKind::PublishWithoutUnits
@@ -420,6 +439,56 @@ fn rollback_heavy_random_histories_reach_the_floor_root_and_end_only_in_known_re
             .rollbacks_accepted_at_the_effective_floor
             >= 1,
         "回退到 txg = F_生效 > 0 的根一次都没做成（B2 那一格没跑到）"
+    );
+}
+
+/// 崩溃注入读故障那一支的取样点（C696（崩溃注入的读故障一支在随机历史里从没触发），用户定设计调查的候选「丁」）：比重取
+/// `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`（快档那一组、崩溃恢复抛弃根那几格换成「每块盘最新那一槽
+/// 系统配置读回全 0 时的可写挂载」），种子从这个测试周期的种子基起 48 段、每段 24 步，两块 384 槽单元区的窄盘（设计调查量的那一档），
+/// 每一步之后跑池级 checker、模型照判。先判清单外的失败（checker 判红、模型对不上都在其内），再核这一步真的跑到了、可写挂载做成过——
+/// 做成就是取号、写行、暖机都在读故障下发了写（D22（单元原子性怎么合成） 已定项 8：单故障在承诺里，挂载照常往下走）。
+/// 判别力：这一步藏成每块盘两槽都读回全 0（`crates/mutations.tsv` 一行：那块盘一份自证过的系统配置都不剩，双故障）时可写挂载被拒、
+/// 一次都做不成，这一条红。
+#[test]
+#[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
+fn newest_system_configuration_slot_zeros_sampling_mounts_writable_and_ends_only_in_known_red_forms(
+) {
+    let started = std::time::Instant::now();
+    let report = run_history_campaign(
+        SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE,
+        48,
+        24,
+        &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Run,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        },
+        worker_threads_by_default(),
+        FindingShrinking::ReportSeedsOnly,
+    );
+    let rendered = report.render();
+    print_uncaptured(&format!(
+        "── 随机历史：每块盘最新那一槽系统配置读回全 0 的取样点 ──\n{rendered}用时 {:.1} 秒\n",
+        started.elapsed().as_secs_f64()
+    ));
+    assert!(
+        report.new_findings.is_empty(),
+        "「已知红」清单外的失败：\n{rendered}"
+    );
+    let step = report
+        .tally
+        .operations_by_kind
+        .get(&HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros)
+        .copied()
+        .unwrap_or_default();
+    assert!(
+        step.applied >= 1,
+        "每块盘最新那一槽系统配置读回全 0 的可写挂载一次都没做成：{step:?}\n{rendered}"
+    );
+    assert_eq!(
+        step.refused, 0,
+        "单故障在承诺里，这一步不许被拒：{step:?}\n{rendered}"
     );
 }
 
@@ -1116,8 +1185,8 @@ fn turning_the_root_ring_with_overwrites_in_the_make_filesystem_process_runs_to_
 /// 覆盖写（10）、可写挂载（实例 3，txg 11、12）、覆盖写三次（13–15）、抬 F（选择子 8）。旧形态下两次回退各开一个实例、抛弃前一段，
 /// F = 8 落进回退留下的空档，I-3.1 记账多算 12 槽；向前回退不抛弃任何根，这一段没有空档，每一步之后 checker 判绿、跑完。
 /// 清单那一条的形态今天只剩崩溃恢复抛弃的时间线造得出（实四乙第 7 件）；C554 乙之后只剩系统配置没见证到被抛弃那条根的那一形，
-/// 那一形的时间线由 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form`
-/// 造，抬 F 之前已经 I-7.4 红（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知）。
+/// 那一形的时间线由 `crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units`
+/// 造（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出））：可写挂载时的预隔离护住被抛弃那条根的单元，抬 F 之前池级 checker 不红。
 #[test]
 fn the_history_that_raised_the_floor_into_a_rollback_gap_completes_under_the_forward_rollback() {
     let empty = ContentChoice {
@@ -1241,21 +1310,24 @@ fn violations_on_the_image(image: &MemoryPool) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
 
-/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知，留里程碑三）：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），
-/// 崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11）。那次崩溃恢复看不见 C、把 C 引用的单元又发出去，
-/// 抬 F 之前池级 checker 就恰好红一条 I-7.4（近 K 代块未被复用），说明文字点名实例 1、txg 5 那条被抛弃的根——乙罩不到的那一格
-/// （`research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），不是乙的拒。被抛弃的 C 由
-/// [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造（系统配置没见证到 C 的那一形；生成器的那一步 C554 乙之后造不出）。
-/// 原来这一条接着抬 F 到 5、拿观察按「已知红」清单归到第 0 条（收口表第 43 行）；第 0 条要「只有 I-3.1 红」，抬 F 之前已经 I-7.4 红，
-/// 抬 F 与归类那一段归不进第 0 条，删掉（`reuse_after_raising_the_floor.rs` 那一条同形、同样改钉）。
+/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出））：第一个文件 A（txg 3）之后覆盖写 B（4）、C（5），
+/// 崩溃恢复抛弃 C——择根落到 B，实例 2 写行 6、暖机 7；再覆盖写四次（8–11）。那次挂载时 C 的根槽读不出、系统配置没见证 C（乙罩不到的那一格，
+/// `research/prompts/m2-impl-c554-yi-implementer-report.md` 第六节 Q1），影子账看不见 C；可写挂载时的预隔离（D23（journal 的角色与格式） 已定项 14
+/// 「可写挂载时的预隔离」）把水位之上没施加的 C 的记录点名的落点与 C 的账里的落点隔离到这个进程写掉 txg 5 那一槽为止，四次覆盖写发不出 C 的单元，
+/// 抬 F 之前池级 checker 一条都不红。被抛弃的 C 由 [`pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version`] 造
+/// （系统配置没见证到 C 的那一形；生成器的那一步 C554 乙之后造不出）。
+/// 判别力：挂载时不隔离那一份（变异「第37批 可写挂载时的预隔离不隔离水位之上没施加的记录点名的落点」）时 C 引用的单元又被发出去，
+/// I-7.4（近 K 代块未被复用）红、点名实例 1、txg 5 那条被抛弃的根，这一条红。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_is_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form(
+fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnessed_leaves_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(
 ) {
     let (mut pool, abandoned) =
         pool_after_a_crash_recovery_abandoned_an_unwitnessed_third_version("random-history-row-43");
@@ -1273,19 +1345,9 @@ fn crash_recovery_abandoning_a_newest_root_the_system_configuration_never_witnes
         "被抛弃的是 C：实例 1、txg 5"
     );
     let violations = violations_on_the_image(&pool.memory_pool());
-    assert_eq!(
-        violations
-            .iter()
-            .map(|(invariant, _)| *invariant)
-            .collect::<Vec<_>>(),
-        vec!["I-7.4"],
-        "抬 F 之前恰好 I-7.4 红：{violations:?}"
-    );
     assert!(
-        violations[0]
-            .1
-            .starts_with("被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头"),
-        "I-7.4 的说明文字点名实例 1、txg 5 那条被抛弃的根：{violations:?}"
+        violations.is_empty(),
+        "抬 F 之前池级 checker 一条都不红（C 的单元被预隔离护着）：{violations:?}"
     );
 }
 

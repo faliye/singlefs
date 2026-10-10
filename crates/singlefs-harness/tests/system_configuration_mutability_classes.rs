@@ -86,10 +86,13 @@ fn system_configuration_after_the_new_pool_file_creation() -> SystemConfiguratio
 /// （字段表末尾加回退下界 F 8 字节、incompat 布局身份从位 0 换到位 1，D22 已定项 9、D15 已定项 4）之后按新代码重打，
 /// 与旧字节逐字节比过只差 6 个字节：偏移 6（incompat 位图第一个字节 0x01 → 0x02）与 [155, 159)（整槽校验和的 CRC-32C 那 4 字节）；
 /// F 在这两份样本里是 0，落在原来就是补齐 0 的 [481, 489)，一个字节都没变。
+/// 2026-10-05 T_time 的盘上单位从秒改成毫秒（用户定案，判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2）：
+/// 偏移 [433, 437) 从 5 换成 5000，连带整槽校验和；两份摘要从 `a065c124…`、`c67464f9…` 换成下面这两个（第 30 批 30-3 实现员副本上
+/// 这条断言红出来的 left 值；换之前同一份副本只把 core 那一处退回秒，这一条绿，差异只来自这一改）。
 const SLOT_DIGEST_AT_MKFS: &str =
-    "a065c12485a9ff72117d549852461f5cb4529d664ac2384271f6e0f22d0f167f";
+    "e5cc28abb94e3e1739b85dc7abc2191a1b120908b72a5ab3cb03588feb01c28f";
 const SLOT_DIGEST_AFTER_THE_NEW_POOL_FILE_CREATION: &str =
-    "c67464f93c9021cf354d649f37044041e4b5eec252f23d103a7e8c1328796260";
+    "144c1785dd57555c8539963909817a597c5a32d2d4b8fc3e61f7a8f6233f299e";
 
 #[test]
 fn splitting_the_system_configuration_into_four_mutability_classes_changes_no_byte_on_disk() {

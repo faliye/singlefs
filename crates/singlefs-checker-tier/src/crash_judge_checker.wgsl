@@ -1,6 +1,7 @@
 // GPU 判器的池级 checker 走读内核（接在 crash_judge_common.wgsl 与 crash_judge_checker_common.wgsl 之后）：按 singlefs-checker 自己的读法
 // 判第一批（系统配置、根环、journal）与第二批（走读那 29 条），连同里程碑三二·1 那一批里不在扫描内核的十五条（I-1.12、I-8.10、I-8.11、
-// I-4.9、I-9.25、I-3.13、I-9.26、I-7.16、I-7.17、I-8.12、I-7.15、I-4.1、I-8.1、I-7.5、I-8.5），违例位写进每个状态结论的违例位那几个字
+// I-4.9、I-9.25、I-3.13、I-9.26、I-7.16、I-7.17、I-8.12、I-7.15、I-4.1、I-8.1、I-7.5、I-8.5）与里程碑三·3 墓碑树、谱系树条目身份那两条
+// （I-9.23、I-9.17），违例位写进每个状态结论的违例位那几个字
 // （IMPLEMENTED_INVARIANTS 次序），之后一字是走到的批次、再一字是判不了的原因；走完把扫描内核要的计数与几何写进草稿区的交接段
 // （第三批与 I-3.12 在 crash_judge_checker_scan.wgsl）。
 
@@ -375,7 +376,7 @@ fn judge_journal_back_chain_of_device() {
         let r = checker_record_at(i);
         var expected = 0u;
         if (is_zero64(r.counter)) {
-            violate(INVARIANT_I_8_6);
+            judge(INVARIANT_I_8_6, false);
             continue;
         }
         if (eq64(r.counter, u64_of(1u))) {
@@ -392,9 +393,7 @@ fn judge_journal_back_chain_of_device() {
                 expected = 0u;
             }
         }
-        if (r.back_chain != expected) {
-            violate(INVARIANT_I_8_6);
-        }
+        judge(INVARIANT_I_8_6, r.back_chain == expected);
     }
 }
 
@@ -421,17 +420,17 @@ fn judge_transaction_numbers_of_device() {
         }
         let previous = checker_record_at(previous_index);
         if (eq64(r.transaction, previous.transaction)) {
+            var separated = false;
             for (var k = previous_index + 1u; k < i; k = k + 1u) {
                 if (checker_record_at(k).instance == r.instance) {
-                    violate(INVARIANT_I_8_7);
+                    separated = true;
                     break;
                 }
             }
+            judge(INVARIANT_I_8_7, !separated);
             continue;
         }
-        if (!lt64(previous.transaction, r.transaction)) {
-            violate(INVARIANT_I_8_7);
-        }
+        judge(INVARIANT_I_8_7, lt64(previous.transaction, r.transaction));
     }
 }
 
@@ -476,6 +475,17 @@ fn judge_commit_markers_of_device() {
         if (marked >= 2u || (marked == 1u && !marked_at_last)) {
             violate(INVARIANT_I_8_8);
         }
+        // image::judge_commit_markers_per_transaction 的 judged_transactions：两条以上的组、一条提交标记都不带的组各算判过一组
+        var group_members = 0u;
+        for (var j = i; j <= last_index; j = j + 1u) {
+            let member = checker_record_at(j);
+            if (member.instance == r.instance && eq64(member.transaction, r.transaction)) {
+                group_members = group_members + 1u;
+            }
+        }
+        if (group_members >= 2u || marked == 0u) {
+            judge(INVARIANT_I_8_8, true);
+        }
         if (marked == 0u) {
             for (var j = last_index + 1u; j < record_count; j = j + 1u) {
                 if (checker_record_at(j).instance == r.instance) {
@@ -491,9 +501,8 @@ fn judge_commit_markers_of_device() {
 fn judge_publish_ordinals_of_device() {
     for (var i = 0u; i < record_count; i = i + 1u) {
         let r = checker_record_at(i);
-        if ((r.flags & 0xFEu) != 0u) {
-            violate(INVARIANT_I_8_9);
-        }
+        // image::judge_publish_ordinals_and_last_record_flags：盘上有一条记录就算判过（judged_records）
+        judge(INVARIANT_I_8_9, (r.flags & 0xFEu) == 0u);
         if (r.ordinal == 0u) {
             violate(INVARIANT_I_8_9);
         }
@@ -568,9 +577,7 @@ fn judge_named_entry_location_order_of_device() {
         let r = checker_record_at(i);
         for (var n = 0u; n < r.named_count; n = n + 1u) {
             let o = JOURNAL_HEADER_BYTES + n * JOURNAL_NAMED_ENTRY_BYTES;
-            if (!(rd32(r.base, o) < rd32(r.base, o + 14u))) {
-                violate(INVARIANT_I_2_5);
-            }
+            judge(INVARIANT_I_2_5, rd32(r.base, o) < rd32(r.base, o + 14u));
         }
     }
 }
@@ -584,9 +591,7 @@ fn judge_journal_record_txg_per_instance_of_device() {
             j = j - 1u;
             let previous = checker_record_at(j);
             if (previous.instance == r.instance) {
-                if (lt64(r.txg, previous.txg)) {
-                    violate(INVARIANT_I_8_12);
-                }
+                judge(INVARIANT_I_8_12, !lt64(r.txg, previous.txg));
                 break;
             }
         }
@@ -615,9 +620,7 @@ fn judge_records_of_one_publish_within_the_in_flight_record_limit_of_device(decl
                 records_of_this_publish = records_of_this_publish + 1u;
             }
         }
-        if (records_of_this_publish > declared_in_flight_record_limit) {
-            violate(INVARIANT_I_8_1);
-        }
+        judge(INVARIANT_I_8_1, records_of_this_publish <= declared_in_flight_record_limit);
     }
 }
 
@@ -663,9 +666,7 @@ fn judge_named_entries_against_the_unit_headers_of_device() {
                         && eq64(vec2<u32>(rd32(s.base, 103u), 0u), named_tail);
                     birth_tree_matches = eq64(rd64(s.base, 43u), named_birth_tree);
                 }
-                if (!(header_class == named_class && identity_matches && birth_tree_matches)) {
-                    violate(INVARIANT_I_8_11);
-                }
+                judge(INVARIANT_I_8_11, header_class == named_class && identity_matches && birth_tree_matches);
             }
         }
     }
@@ -707,9 +708,7 @@ fn judge_new_root_segment_of_the_last_record_against_the_roots_of_device() {
                 && bytes_equal(r.base, segment + 188u, root.base, 170u, 86u)
                 && bytes_equal(r.base, segment + 274u, root.base, 342u, 86u)
                 && bytes_equal(r.base, segment + 360u, root.base, 20u, 4u);
-            if (!same) {
-                violate(INVARIANT_I_8_10);
-            }
+            judge(INVARIANT_I_8_10, same);
         }
     }
 }
@@ -746,6 +745,22 @@ fn unit_write_order_instance(s: Slice, fsid_low: vec2<u32>) -> u32 {
     return rd32(s.base, instance_offset);
 }
 
+// walk::slots_claimed_by_a_unit_header（D18（块里携带什么信息） 已定项 7 认领规则）：起点槽上解得出单元头——magic 对、类标签 1 / 2 / 3、
+// 头校验和按自述的类过（检查字 c2 位 0）——就认领它：码 1、码 3 两槽，码 2 一槽；解不出 ⇒ 0，这一槽不认领。不看 fsid
+fn slots_claimed_by_a_unit_header(s: Slice) -> u32 {
+    if (s.version == NONE || s.length < NODE_BYTES || rd32(s.base, 0u) != MAGIC_SFSU || (s.c2 & 1u) == 0u) {
+        return 0u;
+    }
+    let unit_class = rd8(s.base, 6u);
+    if (unit_class == 1u || unit_class == 3u) {
+        return DATA_UNIT_BYTES >> SLOT_SHIFT;
+    }
+    if (unit_class == 2u) {
+        return NODE_BYTES >> SLOT_SHIFT;
+    }
+    return 0u;
+}
+
 // 是不是有载体的实例代号高于 threshold（根、每块盘的 journal 记录、每块盘的单元头写序）
 fn some_instance_carrier_exceeds(threshold: u32, g: CheckerSlot) -> bool {
     for (var i = 0u; i < root_count; i = i + 1u) {
@@ -772,9 +787,17 @@ fn some_instance_carrier_exceeds(threshold: u32, g: CheckerSlot) -> bool {
     return false;
 }
 
+// walk.rs 走读里 `self.judgements.judge(…)` 的对应：只在判的那一趟（w_judging）记评估过与违例
 fn w_judge(invariant: u32, holds: bool) {
-    if (w_judging && !holds) {
-        violate(invariant);
+    if (w_judging) {
+        judge(invariant, holds);
+    }
+}
+
+// walk.rs 走读里 `self.judgements.part_of_the_range_not_judged(…)` 的对应：同只在判的那一趟记
+fn w_mark_part_of_the_range_not_judged(invariant: u32) {
+    if (w_judging) {
+        mark_part_of_the_range_not_judged(invariant);
     }
 }
 
@@ -789,6 +812,207 @@ fn w_judge_unit_birth_against_an_older_candidate_root(birth_txg: vec2<u32>) {
     if (w_version_is_an_older_candidate_root) {
         w_judge(INVARIANT_I_4_9, le64(birth_txg, w_version_txg));
     }
+}
+
+// ───────────────────────── I-3.5（引用区间的精确性）的出现规则：走读时记下的东西 ─────────────────────────
+// 四张表在 crash_judge_checker_common.wgsl 的 C_APPEARANCE_*，只记主走读（上下文 0）走的那几版；这几个数是各表记到第几行，w_start(0) 清零。
+var<private> appearance_placement_count: u32;
+
+var<private> appearance_version_count: u32;
+
+var<private> appearance_version_placement_count: u32;
+
+var<private> appearance_walked_tree_table_count: u32;
+
+// 正在走的这一版树表里用户可见树的根记了几棵：记在版本表第 appearance_version_count 行（这一版走完才算进那一行）
+var<private> appearance_root_count_of_this_version: u32;
+
+// 走读此刻在哪棵用户可见树里往下走（walk.rs 的 user_visible_tree_being_walked）：在不在、种类、树 ID
+var<private> appearance_user_visible_tree_is_being_walked: bool;
+
+var<private> appearance_user_visible_tree_kind: u32;
+
+var<private> appearance_user_visible_tree: vec2<u32>;
+
+// 用户可见树的种类（walk.rs 的 USER_VISIBLE_TREE_KINDS：extent、inode、deleted_inodes）
+fn appearance_tree_kind_is_user_visible(kind: u32) -> bool {
+    return kind == TREE_KIND_EXTENT || kind == TREE_KIND_INODE || kind == TREE_KIND_DELETED_INODES;
+}
+
+// 落点表里 (盘, 槽) 那一行的下标，不在就是 NONE
+fn appearance_placement_index(device: u32, slot: vec2<u32>) -> u32 {
+    for (var i = 0u; i < appearance_placement_count; i = i + 1u) {
+        let row = C_APPEARANCE_PLACEMENTS + i * C_APPEARANCE_PLACEMENT_WORDS;
+        if (sw(row) == device && sw(row + 1u) == slot.x && sw(row + 2u) == slot.y) {
+            return i;
+        }
+    }
+    return NONE;
+}
+
+// walk.rs note_references_of_a_pointer_followed_by_the_walk 里记 I-3.5 那两张表的两句：落点第一次记下时记它是哪个单元
+// （unit_of_each_placement.entry(..).or_insert），走读此刻在一棵用户可见树里、这个落点还没打标签时打上那棵树（or_insert）
+fn appearance_note_placement(device: u32, slot: vec2<u32>, unit_device: u32, unit_slot: vec2<u32>) {
+    var index = appearance_placement_index(device, slot);
+    if (index == NONE) {
+        if (appearance_placement_count >= C_APPEARANCE_MAX_PLACEMENTS) {
+            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (40u << 8u);
+            return;
+        }
+        index = appearance_placement_count;
+        let new_row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+        sws(new_row, device);
+        sws(new_row + 1u, slot.x);
+        sws(new_row + 2u, slot.y);
+        sws(new_row + 3u, unit_device);
+        sws(new_row + 4u, unit_slot.x);
+        sws(new_row + 5u, unit_slot.y);
+        sws(new_row + 6u, 0u);
+        sws(new_row + 7u, 0u);
+        sws(new_row + 8u, 0u);
+        sws(new_row + 9u, 0u);
+        appearance_placement_count = appearance_placement_count + 1u;
+    }
+    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+    if (appearance_user_visible_tree_is_being_walked && sw(row + 6u) == 0u) {
+        sws(row + 6u, 1u);
+        sws(row + 7u, appearance_user_visible_tree_kind);
+        sws(row + 8u, appearance_user_visible_tree.x);
+        sws(row + 9u, appearance_user_visible_tree.y);
+    }
+}
+
+// 实例表一片的诞生代号（walk.rs 的 birth_txg_of_walked_instance_table_pages）：记进走过的单元那一行，标记写 2——
+// I-4.9 只认标记 1（实例表单元按 I-1.2 那一行的例外不进 I-4.9），I-3.5 两种都认
+fn appearance_note_the_birth_txg_of_an_instance_table_page(device: u32, slot: vec2<u32>, birth_txg: vec2<u32>) {
+    let visited_index = w_visited_index_in_the_main_walk(device, slot);
+    if (visited_index == NONE || sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS) != 0u) {
+        return;
+    }
+    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS, 2u);
+    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 1u, birth_txg.x);
+    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 2u, birth_txg.y);
+}
+
+// 正在走的这一版树表里一棵用户可见树的根记进版本表的待定那一行（版本表满了不记：这一版走完记它时判不了）
+fn appearance_note_a_user_visible_root_of_this_version(kind: u32, tree: vec2<u32>, root_pointer_birth_txg: vec2<u32>) {
+    if (appearance_version_count >= C_APPEARANCE_MAX_VERSIONS) {
+        return;
+    }
+    if (appearance_root_count_of_this_version >= C_APPEARANCE_MAX_USER_VISIBLE_ROOTS) {
+        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (41u << 8u);
+        return;
+    }
+    let row = C_APPEARANCE_VERSIONS + appearance_version_count * C_APPEARANCE_VERSION_WORDS
+        + C_APPEARANCE_VERSION_ROOTS_OFFSET + appearance_root_count_of_this_version * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
+    sws(row, kind);
+    sws(row + 1u, tree.x);
+    sws(row + 2u, tree.y);
+    sws(row + 3u, root_pointer_birth_txg.x);
+    sws(row + 4u, root_pointer_birth_txg.y);
+    appearance_root_count_of_this_version = appearance_root_count_of_this_version + 1u;
+}
+
+// 这一版第一个读得出的树表（walk_the_entries_of_a_tree_table_walked_first_by_this_version）：树表里每棵根指针非全零的用户可见树
+// （条目窄于 200 字节的不算，tree_table_entry_of_the_walk 交 None）记成这一版的根，连同树表落点记进走过的树表那张表
+fn appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt: Node, tree_table_device: u32, tree_table_slot: vec2<u32>) {
+    if (appearance_walked_tree_table_count >= C_APPEARANCE_MAX_WALKED_TREE_TABLES) {
+        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (42u << 8u);
+        return;
+    }
+    let table_row = C_APPEARANCE_WALKED_TREE_TABLES + appearance_walked_tree_table_count * C_APPEARANCE_WALKED_TREE_TABLE_WORDS;
+    sws(table_row, tree_table_device);
+    sws(table_row + 1u, tree_table_slot.x);
+    sws(table_row + 2u, tree_table_slot.y);
+    var roots = 0u;
+    if (tt.entry_width >= 200u) {
+        for (var e = 0u; e < tt.entry_count; e = e + 1u) {
+            let o = entry_offset(tt, e);
+            let kind = rd16(tt.base, o + 10u);
+            let root_pointer = parse_node_pointer(tt.base, o + 14u);
+            if (!appearance_tree_kind_is_user_visible(kind) || root_pointer.all_zero) {
+                continue;
+            }
+            if (roots >= C_APPEARANCE_MAX_USER_VISIBLE_ROOTS) {
+                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (46u << 8u);
+                return;
+            }
+            let root_row = table_row + C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET + roots * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
+            let tree = rd64(tt.base, o);
+            sws(root_row, kind);
+            sws(root_row + 1u, tree.x);
+            sws(root_row + 2u, tree.y);
+            sws(root_row + 3u, root_pointer.birth_txg.x);
+            sws(root_row + 4u, root_pointer.birth_txg.y);
+            roots = roots + 1u;
+            appearance_note_a_user_visible_root_of_this_version(kind, tree, root_pointer.birth_txg);
+        }
+    }
+    sws(table_row + 3u, roots);
+    appearance_walked_tree_table_count = appearance_walked_tree_table_count + 1u;
+}
+
+// 这一版的树表别的版本先走过（judge_the_tree_table_entries_an_earlier_version_walked）：这一版的用户可见树的根照先走那一版记下的取；
+// 先走那一版头用不了、没记下的，这里没有对象
+fn appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(tree_table_device: u32, tree_table_slot: vec2<u32>) {
+    for (var t = 0u; t < appearance_walked_tree_table_count; t = t + 1u) {
+        let table_row = C_APPEARANCE_WALKED_TREE_TABLES + t * C_APPEARANCE_WALKED_TREE_TABLE_WORDS;
+        if (sw(table_row) != tree_table_device || sw(table_row + 1u) != tree_table_slot.x || sw(table_row + 2u) != tree_table_slot.y) {
+            continue;
+        }
+        let roots = sw(table_row + 3u);
+        for (var r = 0u; r < roots; r = r + 1u) {
+            let root_row = table_row + C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET + r * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
+            appearance_note_a_user_visible_root_of_this_version(sw(root_row), vec2<u32>(sw(root_row + 1u), sw(root_row + 2u)), vec2<u32>(sw(root_row + 3u), sw(root_row + 4u)));
+        }
+        return;
+    }
+}
+
+// 走树表的第 e 条之前（walk_the_entries_of_a_tree_table_walked_first_by_this_version 的循环）：条目是一棵根指针非全零的用户可见树时，
+// 之后跟着指针记下的落点打上那棵树；不是就不打
+fn appearance_begin_tree_table_entry(tt: Node, e: u32) {
+    appearance_user_visible_tree_is_being_walked = false;
+    if (tt.entry_width < 200u) {
+        return;
+    }
+    let o = entry_offset(tt, e);
+    let kind = rd16(tt.base, o + 10u);
+    if (!appearance_tree_kind_is_user_visible(kind) || parse_node_pointer(tt.base, o + 14u).all_zero) {
+        return;
+    }
+    appearance_user_visible_tree_is_being_walked = true;
+    appearance_user_visible_tree_kind = kind;
+    appearance_user_visible_tree = rd64(tt.base, o);
+}
+
+// note_the_version_just_walked_for_the_appearance_rule：一版走完，把它此刻引用过的落点（这一版的集合，w_judge_placement_in_version 记的）
+// 换成落点表的下标记进版本表，连同实例、txg、走读这一版有没有记失败
+fn appearance_note_the_version_just_walked(instance: u32, txg: vec2<u32>, references_are_complete: bool) {
+    if (appearance_version_count >= C_APPEARANCE_MAX_VERSIONS) {
+        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (43u << 8u);
+        return;
+    }
+    let row = C_APPEARANCE_VERSIONS + appearance_version_count * C_APPEARANCE_VERSION_WORDS;
+    sws(row, instance);
+    sws(row + 1u, txg.x);
+    sws(row + 2u, txg.y);
+    sws(row + 3u, select(0u, 1u, references_are_complete));
+    sws(row + 4u, appearance_version_placement_count);
+    let count = w_in_version_count[0];
+    for (var i = 0u; i < count; i = i + 1u) {
+        let placement = appearance_placement_index(sw(C_IN_VERSION0 + i * 3u), vec2<u32>(sw(C_IN_VERSION0 + i * 3u + 1u), sw(C_IN_VERSION0 + i * 3u + 2u)));
+        // 这一版引用过的每个落点都经 w_note_pointer_references 记过（这一版或先走的那一版）：不在说明落点表与这一版的集合脱节了
+        if (placement == NONE || appearance_version_placement_count >= C_APPEARANCE_MAX_VERSION_PLACEMENTS) {
+            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (44u << 8u);
+            return;
+        }
+        sws(C_APPEARANCE_VERSION_PLACEMENTS + appearance_version_placement_count, placement);
+        appearance_version_placement_count = appearance_version_placement_count + 1u;
+    }
+    sws(row + 5u, count);
+    sws(row + 6u, appearance_root_count_of_this_version);
+    appearance_version_count = appearance_version_count + 1u;
 }
 
 // 主走读里 (盘, 槽) 在走过的单元表里的下标，不在就是 NONE
@@ -833,6 +1057,11 @@ fn w_start(context: u32, judging: bool) {
     w_mismatches = 0u;
     w_parent_valid = false;
     if (context == 0u) {
+        appearance_placement_count = 0u;
+        appearance_version_count = 0u;
+        appearance_version_placement_count = 0u;
+        appearance_walked_tree_table_count = 0u;
+        appearance_root_count_of_this_version = 0u;
         w_leaf_count = 0u;
         w_checksum_count = 0u;
         w_tree_id_count = 0u;
@@ -850,6 +1079,10 @@ fn w_start(context: u32, judging: bool) {
 fn w_begin_version() {
     w_in_version_count[w_context] = 0u;
     w_parent_valid = false;
+    appearance_user_visible_tree_is_being_walked = false;
+    if (w_context == 0u) {
+        appearance_root_count_of_this_version = 0u;
+    }
 }
 
 // 引用集合：(盘, 起点槽, 跨度) 去重记进；位置项校验和记进主走读的表或收割表
@@ -1022,6 +1255,10 @@ fn w_merge_below(device: u32, slot: vec2<u32>) {
 
 // 走读跟着一条指针往下：两条位置条目记进引用集合，判同一版第二次引用，记到父单元下面
 fn w_note_pointer_references(p: Ptr, span: u32) {
+    if (w_context == 0u) {
+        appearance_note_placement(p.device0, p.slot0, p.device0, p.slot0);
+        appearance_note_placement(p.device1, p.slot1, p.device0, p.slot0);
+    }
     w_note_reference(p.device0, p.slot0, p.sum0, span);
     w_judge_placement_in_version(p.device0, p.slot0);
     w_record_below(p.device0, p.slot0);
@@ -1051,9 +1288,20 @@ fn w_record_below(device: u32, slot: vec2<u32>) {
     w_below_count[w_context] = count + 1u;
 }
 
+// w_read_referenced_unit 最近一次交回的是第二条位置条目那一份（第一条那一份对不上、第二条对得上）：「走过」按读回那一份的落点认的几处读它
+// （w_visit_the_copy_read_back）
+var<private> w_read_back_from_the_second_location: bool;
+
+// w_read_unit_to_walk 最近一次读回、自证过的那一份的落点：这个单元在走读里的身份（walk.rs read_a_unit_to_walk_and_the_placement_it_was_read_from
+// 交回的落点；判决 `research/prompts/m3-batch32-code-r1-main-verification.md` 第三节第 1 条，攻方 allrbmap）。走过、诞生代号、并进前一版、
+// 父单元、叶序与 I-3.5 的折叠表都按它认。两份都读不出时是第一条位置条目的落点（调用方不用它）
+var<private> w_unit_device_read_back: u32;
+var<private> w_unit_slot_read_back: vec2<u32>;
+
 // image::read_referenced_unit：两条位置条目都读、都判 I-2.1，交回第一份对得上的
 fn w_read_referenced_unit(p: Ptr, unit_bytes: u32) -> Slice {
     var first = no_slice();
+    w_read_back_from_the_second_location = false;
     let s0 = read_at(p.device0, slot_to_bytes(p.slot0), unit_bytes);
     let matches0 = s0.version != NONE && slice_crc_matches(s0, unit_bytes, p.sum0);
     if (!matches0) {
@@ -1071,8 +1319,40 @@ fn w_read_referenced_unit(p: Ptr, unit_bytes: u32) -> Slice {
     w_judge(INVARIANT_I_2_1, matches1);
     if (matches1 && first.version == NONE) {
         first = s1;
+        w_read_back_from_the_second_location = true;
     }
     return first;
+}
+
+// walk.rs read_a_unit_to_walk_and_the_placement_it_was_read_from：按位置条目读一个走读要往下走的单元（同 w_read_referenced_unit），读回、自证过的那一份的
+// 落点记进 w_unit_device_read_back / w_unit_slot_read_back；读回的是第二条那一份、I-3.5 的落点表此刻把那个落点折在第一条落点那个单元上时，
+// 改记成它自己（appearance_note_placement 记的是第一条位置条目的落点）。调用方先 w_note_pointer_references 再调它
+fn w_read_unit_to_walk(p: Ptr, unit_bytes: u32) -> Slice {
+    let s = w_read_referenced_unit(p, unit_bytes);
+    w_unit_device_read_back = p.device0;
+    w_unit_slot_read_back = p.slot0;
+    if (s.version != NONE && w_read_back_from_the_second_location) {
+        w_unit_device_read_back = p.device1;
+        w_unit_slot_read_back = p.slot1;
+        if (w_context == 0u && !(p.device1 == p.device0 && eq64(p.slot1, p.slot0))) {
+            let index = appearance_placement_index(p.device1, p.slot1);
+            if (index != NONE) {
+                let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+                if (sw(row + 3u) == p.device0 && sw(row + 4u) == p.slot0.x && sw(row + 5u) == p.slot0.y) {
+                    sws(row + 3u, p.device1);
+                    sws(row + 4u, p.slot1.x);
+                    sws(row + 5u, p.slot1.y);
+                }
+            }
+        }
+    }
+    return s;
+}
+
+// 「走过」按 w_read_unit_to_walk 刚读回、自证过的那一份的落点认（攻方 F-KEY，判决 `research/prompts/m3-batch31-code-r1-main-verification.md` 第三节第 2 条）：
+// 第一条位置条目指着这一遍先走过的别的单元、第二条那一份完好时，按第一条认会把读回来的这一份当成走过、它的头与格式一个字节都不判
+fn w_visit_the_copy_read_back() -> bool {
+    return w_visit(w_unit_device_read_back, w_unit_slot_read_back);
 }
 
 // I-2.5：位置条目按设备身份严格升序；整条全零的指针豁免
@@ -1083,9 +1363,17 @@ fn w_judge_location_order(p: Ptr) {
     w_judge(INVARIANT_I_2_5, p.device0 < p.device1);
 }
 
-// I-2.4 的指针那一半：头部 MAC / nonce 全 0
+// I-2.4 的指针那一半：头部 MAC / nonce 全 0（image::judge_pointer_mac_and_nonce_are_zero），以及算法类型、压缩算法码、压后长度
+// 是第一版的取值 0（image::judge_pointer_encryption_and_compression_fields_take_the_first_version_values；head_ok 是
+// crash_judge_common.wgsl 的 pointer_encryption_and_compression_fields_are_the_first_version，连 MAC / nonce 一并判）
 fn w_judge_pointer_head(p: Ptr) {
     w_judge(INVARIANT_I_2_4, p.mac_nonce_zero);
+    w_judge(INVARIANT_I_2_4, p.head_ok);
+}
+
+// I-2.4 的指针那一半另一格：头部 extent 偏移为 0（image::judge_pointer_extent_offset_is_zero；第一版指针指整个单元，与加密开不开无关）
+fn w_judge_pointer_extent_offset(p: Ptr) {
+    w_judge(INVARIANT_I_2_4, p.extent_offset_zero);
 }
 
 // walk.rs judge_unit_header：按期望的类的字段表判 I-1.6、I-2.4（三格）、I-2.3、I-1.4；交回头能不能用
@@ -1134,8 +1422,8 @@ fn w_judge_unit_header(s: Slice, expected_class: u32, fsid_low: vec2<u32>) -> bo
     return true;
 }
 
-// I-1.2 / I-4.2：头里的出生身份与引用它的指针记的相同；按已发布谓词判成已发布
-fn w_judge_birth_identity(s: Slice, p: Ptr) {
+// I-1.2 / I-4.2：头里的出生身份与引用它的指针记的相同；按已发布谓词判成已发布。诞生代号记在 (unit_device, unit_slot)：读回那一份的落点
+fn w_judge_birth_identity(s: Slice, p: Ptr, unit_device: u32, unit_slot: vec2<u32>) {
     let unit_class = rd8(s.base, 6u);
     var birth_txg = vec2<u32>(0u, 0u);
     var instance = 0u;
@@ -1158,9 +1446,9 @@ fn w_judge_birth_identity(s: Slice, p: Ptr) {
     } else {
         return;
     }
-    // 记下这个单元的诞生代号（按位置条目第 0 条的落点认，与走过的单元表同一个键），再判 I-4.9
+    // 记下这个单元的诞生代号（按读回那一份的落点认，与走过的单元表同一个键），再判 I-4.9
     if (w_context == 0u) {
-        let visited_index = w_visited_index_in_the_main_walk(p.device0, p.slot0);
+        let visited_index = w_visited_index_in_the_main_walk(unit_device, unit_slot);
         if (visited_index != NONE) {
             sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS, 1u);
             sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 1u, birth_txg.x);
@@ -1230,35 +1518,45 @@ struct ReadNode {
     ok: bool,
     already_walked: bool,
     n: Node,
+    // 读回那一份的落点（这个节点在走读里的身份；往下走时记成父单元）。读不出时是第一条位置条目的落点
+    unit_device: u32,
+    unit_slot: vec2<u32>,
 };
 
 // walk.rs read_index_node：读一个码 2 节点并判头、出生身份、树 ID（I-1.3）与 key（I-1.1）
-// key_range_reading：0 贴紧首末条目、1 多层树的子树覆盖（叶贴紧、内部只判分隔 key）、2 按位置（只判分隔 key）
+// key_range_reading：0 贴紧首末条目、1 多层树的子树覆盖（叶贴紧、内部只判分隔 key）、2 按位置（只判分隔 key）、
+// 3 按位置读 extent 树上段的根（层级 0 的零条目根只判 key 宽，其余同 2；walk.rs 的 PrescribedByThePositionOfTheExtentUpperRootJudgedByTheCaller）
 fn w_read_index_node(p: Ptr, expected_tree: vec2<u32>, schema: u32, key_range_reading: u32, registered: bool, fsid_low: vec2<u32>) -> ReadNode {
     var out: ReadNode;
     out.ok = false;
     out.already_walked = false;
     out.n = bad_node();
+    out.unit_device = p.device0;
+    out.unit_slot = p.slot0;
     if (p.all_zero) {
         return out;
     }
     w_judge_location_order(p);
     w_judge_pointer_head(p);
+    w_judge_pointer_extent_offset(p);
     w_note_pointer_references(p, 1u);
-    let s = w_read_referenced_unit(p, NODE_BYTES);
+    let s = w_read_unit_to_walk(p, NODE_BYTES);
     if (s.version == NONE) {
         w_failures = w_failures + 1u;
         return out;
     }
-    if (!w_visit(p.device0, p.slot0)) {
+    // 「走过」、并进前一版、诞生代号按读回那一份的落点认，「先走过」交回调用方看（walk.rs IndexNodeReading）
+    out.unit_device = w_unit_device_read_back;
+    out.unit_slot = w_unit_slot_read_back;
+    if (!w_visit(out.unit_device, out.unit_slot)) {
         out.already_walked = true;
-        w_merge_below(p.device0, p.slot0);
+        w_merge_below(out.unit_device, out.unit_slot);
         return out;
     }
     if (!w_judge_unit_header(s, 2u, fsid_low)) {
         return out;
     }
-    w_judge_birth_identity(s, p);
+    w_judge_birth_identity(s, p, out.unit_device, out.unit_slot);
     let n = parse_index_node(s);
     if (!n.ok) {
         if (registered && entry_width_zero_with_entries(s)) {
@@ -1271,6 +1569,9 @@ fn w_read_index_node(p: Ptr, expected_tree: vec2<u32>, schema: u32, key_range_re
     var keys_hold = false;
     if (key_range_reading == 0u || (key_range_reading == 1u && n.level == 0u)) {
         keys_hold = w_check_index_node_keys(n, schema);
+    } else if (key_range_reading == 3u && n.level == 0u && n.entry_count == 0u) {
+        // extent 树上段的根兼叶删完第一个文件之后可以一条条目都没有（D8 已定项 16 第 5 条）：只判 key 宽，不判节点不空
+        keys_hold = schema_key_width(schema) == n.key_width;
     } else {
         keys_hold = w_check_internal_node_separators(n, schema);
     }
@@ -1302,6 +1603,12 @@ fn w_judge_packed_container(s: Slice, expected_type: u32, fsid_low: vec2<u32>) -
         registered_width = 140u;
     } else if (record_type == 4u) {
         registered_width = 88u;
+    } else if (record_type == PACKED_TYPE_TOMBSTONE) {
+        registered_width = 40u;
+    } else if (record_type == PACKED_TYPE_LINEAGE) {
+        registered_width = 24u;
+    } else if (record_type == PACKED_TYPE_RETIREMENT) {
+        registered_width = 34u;
     }
     let legal = record_type == expected_type && registered_width == width && count * width <= declared && declared <= DATA_UNIT_BYTES - 136u;
     w_judge(INVARIANT_I_1_7, legal);
@@ -1327,7 +1634,21 @@ fn w_judge_packed_container(s: Slice, expected_type: u32, fsid_low: vec2<u32>) -
     return out;
 }
 
-// walk.rs walk_instance_table_chain（挂载根那一张另判行：I-3.8 的行那一半，行记进 C_INSTANCE_ROWS）
+// 主走读沿最新根的实例表链走没走到末片（链指针记录说「没有下一片」）：walk.rs 的 Walk::abandoned_roots_filtering。走到了，C_INSTANCE_ROWS
+// 就是整张表的行、候选集按它滤掉了被崩溃恢复抛弃的根；没走到就滤不全。经交接段交给扫描内核，I-9.29 跨版本那张表比不比读它（判决
+// `research/prompts/m3-batch23-code-r1-main-verification.md` 第三节第 1 条：门与候选集的滤法用同一遍走读，不另读一遍）。择根之后、走最新根之前清掉
+var<private> w_newest_instance_table_chain_reached_its_last_page: bool;
+
+// 实例表链走读循环最多走几片（walk.rs 的链不设片数上限，走过的单元不再走）
+const INSTANCE_TABLE_CHAIN_MOST_PAGES_WALKED: u32 = 256u;
+
+// 走满 INSTANCE_TABLE_CHAIN_MOST_PAGES_WALKED 片、最后那一片的链指针记录还说有下一片：这一张表 GPU 走不完，记判不了交 CPU
+// （判决 `research/prompts/m3-batch25-code-r1-main-verification.md` 第二节 H-c 那一行与第三节第 1 条：不当「没走到末片」，
+// 否则门关、I-9.29 那张表不比，CPU 走到末片照比，两边分叉）。「条目太多」一类，站点号与别处不撞
+const UNDECIDABLE_INSTANCE_TABLE_CHAIN_LONGER_THAN_THE_PAGES_WALKED: u32 = UNDECIDABLE_TOO_MANY_ENTRIES | (61u << 8u);
+
+// walk.rs walk_instance_table_chain（每一片判 I-3.14 四格，不成立的一片解不开：行不收、链不往下走；挂载根那一张另判行：
+// I-3.8 的行那一半，行记进 C_INSTANCE_ROWS；走到末片记进 w_newest_instance_table_chain_reached_its_last_page）
 fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>) {
     var pointer = first;
     var page_index = vec2<u32>(0u, 0u);
@@ -1336,31 +1657,46 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
     let parent_slot = w_parent_slot;
     var rows_unique = true;
     var rows_below = true;
-    var chain_last = true;
     var pages = 0u;
-    for (var page = 0u; page < 256u; page = page + 1u) {
+    // 循环里每个提前出口都在 page 加一之前 break：走满上限才落到 page == INSTANCE_TABLE_CHAIN_MOST_PAGES_WALKED
+    var page = 0u;
+    for (; page < INSTANCE_TABLE_CHAIN_MOST_PAGES_WALKED; page = page + 1u) {
         w_judge_location_order(pointer);
         w_judge_pointer_head(pointer);
+        w_judge_pointer_extent_offset(pointer);
         w_note_pointer_references(pointer, 2u);
-        let s = w_read_referenced_unit(pointer, DATA_UNIT_BYTES);
+        let s = w_read_unit_to_walk(pointer, DATA_UNIT_BYTES);
         if (s.version == NONE) {
             w_failures = w_failures + 1u;
             break;
         }
-        if (!w_visit(pointer.device0, pointer.slot0)) {
-            w_merge_below(pointer.device0, pointer.slot0);
+        // 「走过」按读回、自证过的那一份的落点认（walk.rs placement_it_was_read_from，攻方 H-b）；并进前一版、父单元、这一片的诞生代号同一个落点
+        // （攻方 allrbmap）
+        let device_read_from = w_unit_device_read_back;
+        let slot_read_from = w_unit_slot_read_back;
+        if (!w_visit(device_read_from, slot_read_from)) {
+            w_merge_below(device_read_from, slot_read_from);
             break;
         }
         w_parent_valid = true;
-        w_parent_device = pointer.device0;
-        w_parent_slot = pointer.slot0;
+        w_parent_device = device_read_from;
+        w_parent_slot = slot_read_from;
         let packed = w_judge_packed_container(s, 4u, fsid_low);
         if (!packed.ok) {
             break;
         }
+        if (w_context == 0u) {
+            appearance_note_the_birth_txg_of_an_instance_table_page(device_read_from, slot_read_from, rd64(s.base, 73u));
+        }
         let p = packed.p;
         // I-1.12：指针的出生树等于被指单元头偏移 43 的出生树（码 3）
         w_judge(INVARIANT_I_1_12, eq64(pointer.birth_tree, p.birth_tree));
+        // I-1.2 遍历方向那一半（walk.rs walk_instance_table_chain 每一片都调 judge_birth_identity_against_the_pointer）：头里的诞生代号（码 3 偏移 73）、
+        // 写序实例（93）与出生序号（103）与指着这一片的指针记的相同，偏移同 w_judge_birth_identity 码 3 那一支。只判 I-1.2、不判 I-4.2：
+        // 打包记录类型 4 的实例表单元按 I-1.2 那一行的例外只免谓词那一半（判决 `research/prompts/m3-batch28-code-r1-main-verification.md`
+        // 第二节「实例表链上的 I-1.2」那一行、第三节第 2 条，攻方改法 F-IT）
+        w_judge(INVARIANT_I_1_2, eq64(rd64(s.base, 73u), pointer.birth_txg) && rd32(s.base, 93u) == pointer.instance
+            && eq64(vec2<u32>(rd32(s.base, 103u), 0u), pointer.tail));
         let identity_holds = is_zero64(p.birth_tree) && p.record_type == 4u && eq64(p.container, page_index) && is_zero64(p.container_birth);
         w_judge(INVARIANT_I_1_1, identity_holds);
         if (!identity_holds) {
@@ -1371,10 +1707,40 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
         if (p.record_count > 0u) {
             chain = w_chain_record_kind(p.base, packed_record_offset(p, p.record_count - 1u), p.record_width);
         }
-        w_judge(INVARIANT_I_3_8, chain != 2u);
+        // I-3.14 四格（walk.rs judge_instance_table_page_record_forms 三格，加最后一条是合法的链指针记录）：kind 只有 0 或 1、
+        // kind 1 不在最后一条之前、kind 0 行偏移 21 的 flags 为 0；走到的每一片都判（不只挂载根那一张）
+        var kinds_are_registered = true;
+        var chain_records_only_last = true;
+        var row_flags_are_zero = true;
+        for (var r = 0u; r < p.record_count; r = r + 1u) {
+            let o = packed_record_offset(p, r);
+            let kind = rd8(p.base, o);
+            if (kind == 0u) {
+                if (rd8(p.base, o + 21u) != 0u) {
+                    row_flags_are_zero = false;
+                }
+            } else if (kind == 1u) {
+                if (r + 1u < p.record_count) {
+                    chain_records_only_last = false;
+                }
+            } else {
+                kinds_are_registered = false;
+            }
+        }
+        w_judge(INVARIANT_I_3_14, kinds_are_registered);
+        w_judge(INVARIANT_I_3_14, chain_records_only_last);
+        w_judge(INVARIANT_I_3_14, row_flags_are_zero);
+        // 最后一条是合法的链指针记录那一格：有下一片而位置指针头部不是第一版的取值（第五形，第 10u 批）同样 chain == 2u（w_chain_record_kind）
+        w_judge(INVARIANT_I_3_14, chain != 2u);
+        // I-3.14 不成立的一片解不开（用户 2026-10-06 给 D18 已定项 11 补的那一句）：行不收、链不往下走、不记走读失败、没走到末片
+        if (!(kinds_are_registered && chain_records_only_last && row_flags_are_zero)) {
+            break;
+        }
+        if (chain == 2u) {
+            break;
+        }
         // 行那一半的账
         if (judge_rows) {
-            var chain_last_in_this_page = false;
             for (var r = 0u; r < p.record_count; r = r + 1u) {
                 let o = packed_record_offset(p, r);
                 let kind = rd8(p.base, o);
@@ -1400,15 +1766,12 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
                     if (instance >= w_mount_instance) {
                         rows_below = false;
                     }
-                    chain_last_in_this_page = false;
-                } else if (kind == 1u) {
-                    chain_last_in_this_page = r + 1u == p.record_count;
-                } else {
-                    chain_last_in_this_page = false;
                 }
             }
-            chain_last = chain_last && chain_last_in_this_page;
             pages = pages + 1u;
+            if (chain == 0u) {
+                w_newest_instance_table_chain_reached_its_last_page = true;
+            }
         }
         if (chain != 1u) {
             break;
@@ -1416,15 +1779,19 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
         pointer = parse_node_pointer(p.base, packed_record_offset(p, p.record_count - 1u) + 2u);
         page_index = add64(page_index, u64_of(1u));
     }
+    if (page == INSTANCE_TABLE_CHAIN_MOST_PAGES_WALKED) {
+        undecidable = UNDECIDABLE_INSTANCE_TABLE_CHAIN_LONGER_THAN_THE_PAGES_WALKED;
+    }
     w_parent_valid = parent_valid;
     w_parent_device = parent_device;
     w_parent_slot = parent_slot;
     if (judge_rows && pages > 0u) {
-        w_judge(INVARIANT_I_3_8, rows_unique && rows_below && chain_last);
+        w_judge(INVARIANT_I_3_8, rows_unique && rows_below);
     }
 }
 
-// 树表条目里 I-9.16 两道（walk.rs judge_tree_table_entries_ordering）
+// 树表条目里 I-9.16 四道（walk.rs judge_tree_table_entries_ordering）：① 盘上相邻两条树 ID 严格升序；条目宽读得出种类时
+// ③ ④（walk.rs judge_tree_table_entry_kind_counts）与 ② 发号次序。只有违例位，几道的先后不影响结论
 fn w_judge_tree_table_entries_ordering(n: Node) {
     for (var e = 1u; e < n.entry_count; e = e + 1u) {
         if (!lt64(rd64(n.base, entry_offset(n, e - 1u)), rd64(n.base, entry_offset(n, e)))) {
@@ -1433,16 +1800,46 @@ fn w_judge_tree_table_entries_ordering(n: Node) {
         }
     }
     if (n.entry_width < 12u) {
+        // 条目短到读不出种类：② ③ ④ 判不了，CPU 记射程里有一部分没判、再判一次成立（judge_tree_table_entries_ordering）；0 条的表 all() 为真、不记
+        if (n.entry_count > 0u) {
+            w_mark_part_of_the_range_not_judged(INVARIANT_I_9_16);
+        }
         w_judge(INVARIANT_I_9_16, true);
         return;
     }
+    // ③ ④：0 条的表不判
+    if (n.entry_count > 0u) {
+        // ③：每一种种类码（登记过的与没登记的都算）至多一条
+        for (var later_entry = 1u; later_entry < n.entry_count; later_entry = later_entry + 1u) {
+            let later_kind = rd16(n.base, entry_offset(n, later_entry) + 10u);
+            for (var earlier_entry = 0u; earlier_entry < later_entry; earlier_entry = earlier_entry + 1u) {
+                if (rd16(n.base, entry_offset(n, earlier_entry) + 10u) == later_kind) {
+                    w_judge(INVARIANT_I_9_16, false);
+                    return;
+                }
+            }
+        }
+        // ④：树表非空时进树表的十二种（发号次序 1,2,3,4,6,7,8,9,10,11,12,13）各至少一条，与 ③ 合起来各恰好一条
+        // （判决 m3-formal-code-b26-r1 第二节 J1 C1：core 重建一版时十二种各要一条）
+        for (var position = 0u; position < TREE_KINDS_OF_THE_TREE_TABLE; position = position + 1u) {
+            let required_kind = tree_kind_in_the_issuing_order(position);
+            var required_kind_is_present = false;
+            for (var entry_index = 0u; entry_index < n.entry_count; entry_index = entry_index + 1u) {
+                if (rd16(n.base, entry_offset(n, entry_index) + 10u) == required_kind) {
+                    required_kind_is_present = true;
+                }
+            }
+            if (!required_kind_is_present) {
+                w_judge(INVARIANT_I_9_16, false);
+                return;
+            }
+        }
+    }
+    // ②：按发号次序 1,2,3,4,6,7,8,9,10,11,12,13（walk.rs 的 TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER）
     var previous_tree = vec2<u32>(0u, 0u);
     var have_previous = false;
-    for (var k = 0u; k < 7u; k = k + 1u) {
-        var kind = k + 1u;
-        if (k >= 4u) {
-            kind = k + 2u;
-        }
+    for (var k = 0u; k < TREE_KINDS_OF_THE_TREE_TABLE; k = k + 1u) {
+        let kind = tree_kind_in_the_issuing_order(k);
         for (var e = 0u; e < n.entry_count; e = e + 1u) {
             let o = entry_offset(n, e);
             if (rd16(n.base, o + 10u) == kind) {
@@ -1460,10 +1857,13 @@ fn w_judge_tree_table_entries_ordering(n: Node) {
     w_judge(INVARIANT_I_9_16, true);
 }
 
-// 树表条目的头 ID（walk.rs judge_tree_table_entry_head_identifiers，I-9.27）：inode 树等于自己的树 ID；extent 树、deleted_inodes、墓碑树
+// 树表条目的头 ID（walk.rs judge_tree_table_entry_head_identifiers，I-9.27）：inode 树等于自己的树 ID；extent 树、deleted_inodes、墓碑树、退役树
 // 等于同一张表里某一条 inode 树条目的树 ID（一条都没有就红）；3、4、6、7、8、11、12 等于 0；别的种类不判。条目宽不到头 ID 那 8 字节时整张表不判
 fn w_judge_tree_table_entry_head_identifiers(n: Node) {
     if (n.entry_width < TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET + 8u) {
+        if (n.entry_count > 0u) {
+            w_mark_part_of_the_range_not_judged(INVARIANT_I_9_27);
+        }
         return;
     }
     for (var entry_index = 0u; entry_index < n.entry_count; entry_index = entry_index + 1u) {
@@ -1473,7 +1873,8 @@ fn w_judge_tree_table_entry_head_identifiers(n: Node) {
         let head = rd64(n.base, entry + TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET);
         if (kind == TREE_KIND_INODE) {
             w_judge(INVARIANT_I_9_27, eq64(head, tree));
-        } else if (kind == TREE_KIND_EXTENT || kind == TREE_KIND_DELETED_INODES || kind == TREE_KIND_TOMBSTONE) {
+        } else if (kind == TREE_KIND_EXTENT || kind == TREE_KIND_DELETED_INODES || kind == TREE_KIND_TOMBSTONE
+            || kind == TREE_KIND_RETIREMENT) {
             var names_an_inode_tree_of_this_table = false;
             for (var other_index = 0u; other_index < n.entry_count; other_index = other_index + 1u) {
                 let other = entry_offset(n, other_index);
@@ -1495,20 +1896,23 @@ fn w_walk_extent_data_pointer(base: u32, o: u32, inode: vec2<u32>, offset: vec2<
     let p = parse_data_pointer(base, o);
     w_judge_location_order(p);
     w_judge_pointer_head(p);
+    w_judge_pointer_extent_offset(p);
     w_note_pointer_references(p, 2u);
-    let s = w_read_referenced_unit(p, DATA_UNIT_BYTES);
+    let s = w_read_unit_to_walk(p, DATA_UNIT_BYTES);
     if (s.version == NONE) {
         w_failures = w_failures + 1u;
         return;
     }
-    if (!w_visit(p.device0, p.slot0)) {
-        w_merge_below(p.device0, p.slot0);
+    let unit_device = w_unit_device_read_back;
+    let unit_slot = w_unit_slot_read_back;
+    if (!w_visit_the_copy_read_back()) {
+        w_merge_below(unit_device, unit_slot);
         return;
     }
     if (!w_judge_unit_header(s, 1u, fsid_low)) {
         return;
     }
-    w_judge_birth_identity(s, p);
+    w_judge_birth_identity(s, p, unit_device, unit_slot);
     // I-1.12：指针的出生树等于被指单元头偏移 43 的出生树（码 1 五元组里的树）
     w_judge(INVARIANT_I_1_12, eq64(p.birth_tree, rd64(s.base, 43u)));
     w_judge(INVARIANT_I_1_3, eq64(rd64(s.base, 43u), tree));
@@ -1631,8 +2035,8 @@ fn w_walk_allocation_record_tree(root_pointer: Ptr, tree: vec2<u32>, fsid_low: v
             allocation_walk_frames[depth].parent_device = w_parent_device;
             allocation_walk_frames[depth].parent_slot = w_parent_slot;
             w_parent_valid = true;
-            w_parent_device = pending_pointer.device0;
-            w_parent_slot = pending_pointer.slot0;
+            w_parent_device = read.unit_device;
+            w_parent_slot = read.unit_slot;
             depth = depth + 1u;
             enter = false;
             continue;
@@ -1756,8 +2160,8 @@ fn w_walk_extent_lower(root_pointer: Ptr, inode: vec2<u32>, tree: vec2<u32>, fsi
                 let parent_device = w_parent_device;
                 let parent_slot = w_parent_slot;
                 w_parent_valid = true;
-                w_parent_device = pending_pointer.device0;
-                w_parent_slot = pending_pointer.slot0;
+                w_parent_device = read.unit_device;
+                w_parent_slot = read.unit_slot;
                 for (var e = 0u; e < n.entry_count; e = e + 1u) {
                     let o = entry_offset(n, e);
                     let record_inode = extent_key_inode(n.base, o);
@@ -1789,8 +2193,8 @@ fn w_walk_extent_lower(root_pointer: Ptr, inode: vec2<u32>, tree: vec2<u32>, fsi
             extent_lower_frames[depth].parent_device = w_parent_device;
             extent_lower_frames[depth].parent_slot = w_parent_slot;
             w_parent_valid = true;
-            w_parent_device = pending_pointer.device0;
-            w_parent_slot = pending_pointer.slot0;
+            w_parent_device = read.unit_device;
+            w_parent_slot = read.unit_slot;
             depth = depth + 1u;
             enter = false;
             continue;
@@ -1846,7 +2250,12 @@ fn w_walk_extent_tree(root_pointer: Ptr, tree: vec2<u32>, fsid_low: vec2<u32>) {
     var enter = true;
     loop {
         if (enter) {
-            let read = w_read_index_node(pending_pointer, tree, 3u, 2u, true, fsid_low);
+            // 读根（pending_level 还是 NONE）照 walk.rs walk_extent_upper_node 读根那一种读法（key_range_reading 3），读孩子照按位置（2）
+            var key_range_reading_of_this_node = 2u;
+            if (pending_level == NONE) {
+                key_range_reading_of_this_node = 3u;
+            }
+            let read = w_read_index_node(pending_pointer, tree, 3u, key_range_reading_of_this_node, true, fsid_low);
             if (!read.ok) {
                 if (depth == 0u) { break; }
                 extent_upper_frames[depth - 1u].child_index = extent_upper_frames[depth - 1u].child_index + 1u;
@@ -1877,8 +2286,8 @@ fn w_walk_extent_tree(root_pointer: Ptr, tree: vec2<u32>, fsid_low: vec2<u32>) {
                 let parent_device = w_parent_device;
                 let parent_slot = w_parent_slot;
                 w_parent_valid = true;
-                w_parent_device = pending_pointer.device0;
-                w_parent_slot = pending_pointer.slot0;
+                w_parent_device = read.unit_device;
+                w_parent_slot = read.unit_slot;
                 for (var e = 0u; e < n.entry_count; e = e + 1u) {
                     let o = entry_offset(n, e);
                     let entry_inode = extent_key_inode(n.base, o);
@@ -1898,8 +2307,8 @@ fn w_walk_extent_tree(root_pointer: Ptr, tree: vec2<u32>, fsid_low: vec2<u32>) {
                         w_walk_extent_lower(lower_root, entry_inode, tree, fsid_low);
                         // 下段走完把父单元换回这片叶
                         w_parent_valid = true;
-                        w_parent_device = pending_pointer.device0;
-                        w_parent_slot = pending_pointer.slot0;
+                        w_parent_device = read.unit_device;
+                        w_parent_slot = read.unit_slot;
                     } else if (well_formed && tag == 2u) {
                         w_walk_extent_data_pointer(n.base, o + 25u, entry_inode, vec2<u32>(0u, 0u), tree, fsid_low);
                     }
@@ -1925,8 +2334,8 @@ fn w_walk_extent_tree(root_pointer: Ptr, tree: vec2<u32>, fsid_low: vec2<u32>) {
             extent_upper_frames[depth].parent_device = w_parent_device;
             extent_upper_frames[depth].parent_slot = w_parent_slot;
             w_parent_valid = true;
-            w_parent_device = pending_pointer.device0;
-            w_parent_slot = pending_pointer.slot0;
+            w_parent_device = read.unit_device;
+            w_parent_slot = read.unit_slot;
             depth = depth + 1u;
             enter = false;
             continue;
@@ -2051,10 +2460,9 @@ fn w_walk_code_two_tree(root_pointer: Ptr, tree: vec2<u32>, schema: u32, fsid_lo
             if (pending_pointer.all_zero && pending_expected_level != NONE) {
                 w_failures = w_failures + 1u;
             } else {
-                let already = w_visited_contains(pending_pointer.device0, pending_pointer.slot0);
                 let read = w_read_index_node(pending_pointer, tree, schema, 1u, registered, fsid_low);
                 if (!read.ok) {
-                    if (already) {
+                    if (read.already_walked) {
                         result_kind = 1u;
                     }
                 } else {
@@ -2117,8 +2525,8 @@ fn w_walk_code_two_tree(root_pointer: Ptr, tree: vec2<u32>, schema: u32, fsid_lo
                             code2_walk_frames[depth].parent_device = w_parent_device;
                             code2_walk_frames[depth].parent_slot = w_parent_slot;
                             w_parent_valid = true;
-                            w_parent_device = pending_pointer.device0;
-                            w_parent_slot = pending_pointer.slot0;
+                            w_parent_device = read.unit_device;
+                            w_parent_slot = read.unit_slot;
                             depth = depth + 1u;
                             descended = true;
                         }
@@ -2269,7 +2677,7 @@ fn w_walk_central_mapping_entries(entries: u32, fsid_low: vec2<u32>) {
     }
 }
 
-// ── inode 树（walk_inode_root / walk_inode_internal_node / walk_inode_leaf_container）：根层级 1，孩子只接叶容器；类型段 0 的孩子这一版判不了
+// ── inode 树（walk_inode_root / walk_inode_internal_node / walk_inode_leaf_container）：根层级 1，孩子只接叶容器；类型段 0 而孩子不是别的一类（w_child_unit_class_other_than_the_entry_type_names）的这一版判不了
 fn w_cached_leaves_below(device: u32, slot: vec2<u32>, into_from: u32) -> u32 {
     // 把父单元 (device, slot) 下面缓存的叶容器接进叶序（从 into_from 起追加），交回追加了几条
     var appended = 0u;
@@ -2320,15 +2728,62 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
         let child = parse_node_pointer(root.base, o + 34u);
         w_judge_location_order(child);
         w_judge_pointer_head(child);
+        w_judge_pointer_extent_offset(child);
         var length = NODE_BYTES;
         var span = 1u;
         if (record_type == 2u) {
             length = DATA_UNIT_BYTES;
             span = 2u;
         }
+        // I-9.2 判孩子的类按孩子头里的类标签认、不按类型段定读多长（同墓碑树、谱系树那两条，walk.rs walk_inode_internal_node；判决
+        // `research/prompts/m3-batch22-code-r1-main-verification.md` 第二节 N4 那一行「inode 树 I-9.2 同形」）：孩子自证过的类与类型段说的不符
+        // （类型段 2 ⇒ 码 3、类型段 0 ⇒ 码 2；类型段不认得的，孩子读得出就算），判 I-9.2 红，按它自己那一类占的槽登记引用，不往下走、不记走读失败
+        var class_the_inode_entry_type_names = NONE;
+        if (record_type == 2u) {
+            class_the_inode_entry_type_names = 3u;
+        } else if (record_type == 0u) {
+            class_the_inode_entry_type_names = 2u;
+        }
+        var class_of_the_inode_child = w_child_unit_class_other_than_the_entry_type_names(child, class_the_inode_entry_type_names);
+        // 认出另一类、另有一份头里就是类型段那一类且按那一类的长度自证得过（walk.rs walk_inode_internal_node 的 F-W，判决
+        // `research/prompts/m3-batch28-code-r1-main-verification.md` 第三节第 1 条）：I-9.2 照判红，再照类型段那一支往下走那一份（槽数按类型段那一类登记）
+        if (class_of_the_inode_child != NONE && class_the_inode_entry_type_names != NONE
+            && w_some_copy_of_the_child_verifies_as_the_class_the_entry_type_names(child, class_the_inode_entry_type_names)) {
+            // 身份成立要孩子没有一份自证成别类：这里恒不成立
+            w_judge(INVARIANT_I_9_2, class_of_the_inode_child == NONE);
+            class_of_the_inode_child = NONE;
+        }
+        if (class_of_the_inode_child != NONE) {
+            w_note_pointer_references(child, w_slots_of_a_unit_of_class(class_of_the_inode_child));
+            w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+            w_judge(INVARIANT_I_9_2, class_of_the_inode_child == class_the_inode_entry_type_names);
+            continue;
+        }
+        // 类型段不认得、上面也没认出孩子自证过的类：不按哪一种长度去读孩子（walk.rs walk_inode_internal_node 的 Unregistered 那一支，
+        // 与墓碑树、谱系树类型段不认得那一支同判；第 27 批）——孩子按这一层定的形状登记引用（层级 1 下面是叶容器两槽，层级 ≥ 2 下面是码 2 节点一槽），
+        // 判 I-9.2 红；每一份副本照判 I-2.1、两份都对不上记走读失败（第 29 批，H-J3a）
+        if (class_the_inode_entry_type_names == NONE) {
+            var child_span_by_the_level = 2u;
+            if (root.level >= 2u) {
+                child_span_by_the_level = 1u;
+            }
+            w_note_pointer_references(child, child_span_by_the_level);
+            w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+            w_judge(INVARIANT_I_9_2, false);
+            continue;
+        }
         w_note_pointer_references(child, span);
-        let s = w_read_referenced_unit(child, length);
+        let s = w_read_unit_to_walk(child, length);
         if (s.version == NONE) {
+            // 孩子两份都读不出：I-9.2 里不看孩子就判得了的那几小句照判（walk.rs judge_an_inode_entry_whose_child_does_not_read_back，
+            // 与墓碑树、谱系树读不出孩子时同判）——类型段 0 判身份引用三段为 0，类型段 2 判子指针头部的出生树 == 身份引用的出生树
+            // （判决 `research/prompts/m3-batch26-code-r1-main-verification.md` 第三节第 1 条），比孩子头的那几小句不判（类型段不认得的上面已经判完）
+            if (record_type == 0u) {
+                w_judge(INVARIANT_I_9_2, is_zero64(identity_birth_tree) && is_zero64(identity_container) && is_zero64(identity_birth));
+            }
+            if (record_type == 2u) {
+                w_judge(INVARIANT_I_9_2, eq64(child.birth_tree, identity_birth_tree));
+            }
             w_failures = w_failures + 1u;
             continue;
         }
@@ -2336,16 +2791,18 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
             let header_identity_holds = rd8(s.base, 6u) == 3u && eq64(rd64(s.base, 43u), identity_birth_tree) && rd16(s.base, 51u) == 2u
                 && eq64(rd64(s.base, 53u), identity_container) && eq64(rd64(s.base, 61u), identity_birth) && eq64(child.birth_tree, identity_birth_tree);
             w_judge(INVARIANT_I_9_2, header_identity_holds);
-            // 叶容器
-            if (!w_visit(child.device0, child.slot0)) {
-                w_merge_below(child.device0, child.slot0);
+            // 叶容器（走过、并进前一版、叶序、诞生代号都按读回那一份的落点认，F-KEY 与攻方 allrbmap）
+            let leaf_device = w_unit_device_read_back;
+            let leaf_slot = w_unit_slot_read_back;
+            if (!w_visit_the_copy_read_back()) {
+                w_merge_below(leaf_device, leaf_slot);
                 if (w_context == 0u) {
-                    w_cached_leaves_below(child.device0, child.slot0, leaves_before);
+                    w_cached_leaves_below(leaf_device, leaf_slot, leaves_before);
                 }
                 continue;
             }
             w_judge(INVARIANT_I_1_3, eq64(rd64(s.base, 43u), tree));
-            w_judge_birth_identity(s, child);
+            w_judge_birth_identity(s, child, leaf_device, leaf_slot);
             let packed = w_judge_packed_container(s, 2u, fsid_low);
             if (!packed.ok) {
                 continue;
@@ -2358,18 +2815,23 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
             for (var r = 0u; r < p.record_count; r = r + 1u) {
                 let ro = packed_record_offset(p, r);
                 let inode = rd64(p.base, ro);
+                // I-9.4 第四句：同一片打包记录类型 2 容器里记录号沿记录序严格递增（判决 `research/prompts/m3-delete-checker-r2-main-verification.md`
+                // 第二节 T11 取甲；walk.rs walk_inode_leaf_container 逐对判）
+                if (r > 0u) {
+                    w_judge(INVARIANT_I_9_4, lt64(rd64(p.base, packed_record_offset(p, r - 1u)), inode));
+                }
                 w_judge(INVARIANT_I_9_7, all_zero(p.base, ro + 108u, 32u));
                 w_judge(INVARIANT_I_9_4, le64(p.container, inode));
-                let size = rd64(p.base, ro + 40u);
+                let size = rd64(p.base, ro + INODE_RECORD_SIZE_OFFSET);
                 let blocks = rd64(p.base, ro + 48u);
                 let logical_blocks = shr64(add64_saturating(size, u64_of(511u)), 9u);
                 w_judge(INVARIANT_I_9_15, eq64(blocks, logical_blocks));
-                // I-9.26：对象出生代（记录偏移 8）≤ 改动计数（偏移 88）≤ 这片容器头的诞生代号（偏移 73）
+                // I-9.26：对象出生代（记录偏移 INODE_RECORD_OBJECT_BIRTH_OFFSET）≤ 改动计数（偏移 88）≤ 这片容器头的诞生代号（偏移 73）
                 let change_count = rd64(p.base, ro + 88u);
-                w_judge(INVARIANT_I_9_26, le64(rd64(p.base, ro + 8u), change_count) && le64(change_count, p.birth_txg));
+                w_judge(INVARIANT_I_9_26, le64(rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET), change_count) && le64(change_count, p.birth_txg));
                 if (w_context == 0u) {
                     // inode → 对象出生代（后写的覆盖先写的）
-                    let birth = rd64(p.base, ro + 8u);
+                    let birth = rd64(p.base, ro + INODE_RECORD_OBJECT_BIRTH_OFFSET);
                     var found = false;
                     for (var i = 0u; i < w_inode_birth_count; i = i + 1u) {
                         if (sw(C_INODE_BIRTHS + i * 4u) == inode.x && sw(C_INODE_BIRTHS + i * 4u + 1u) == inode.y) {
@@ -2409,9 +2871,9 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
                 } else {
                     // 叶序里的一格，父 = 这片叶自己（别的版本再引用它时按父找）；这一趟的叶序按写入次序读
                     let row = C_LEAVES + w_leaf_count * C_LEAF_WORDS;
-                    sws(row, child.device0);
-                    sws(row + 1u, child.slot0.x);
-                    sws(row + 2u, child.slot0.y);
+                    sws(row, leaf_device);
+                    sws(row + 1u, leaf_slot.x);
+                    sws(row + 2u, leaf_slot.y);
                     sws(row + 3u, p.container.x);
                     sws(row + 4u, p.container.y);
                     sws(row + 5u, smallest.x);
@@ -2435,12 +2897,10 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
                     w_separator_count = w_separator_count + 1u;
                 }
             }
-        } else if (record_type == 0u) {
-            // 类型段 0 的内部节点：这一版没有这种形状（inode_tree_root_level_is_one），GPU 判不了
+        } else {
+            // 类型段 0 的内部节点（类型段不认得的上面已经判完）：这一版没有这种形状（inode_tree_root_level_is_one），GPU 判不了
             undecidable = UNDECIDABLE_TOO_DEEP;
             return;
-        } else {
-            w_judge(INVARIANT_I_9_2, false);
         }
     }
     w_parent_valid = parent_valid;
@@ -2463,15 +2923,14 @@ fn w_walk_inode_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: v
             w_judge(INVARIANT_I_9_12, lt64(previous_largest, separator));
         }
     }
-    // I-9.4 第二、三句：沿叶序相邻两片
+    // I-9.4 第二句：沿叶序相邻两片容器号严格递增（第三句「左容器的最大 key < 右容器号」随 N1 删掉：用户 2026-10-08 定案 X4，
+    // 左从右借之后右片保留身份，它的容器号可以不大于左片的最大 key；walk.rs judge_container_numbers_along_the_leaf_order 同改）
     for (var i = leaves_before + 1u; i < w_leaf_count; i = i + 1u) {
         let left = C_LEAVES + (i - 1u) * C_LEAF_WORDS;
         let right = C_LEAVES + i * C_LEAF_WORDS;
         let left_container = vec2<u32>(sw(left + 3u), sw(left + 4u));
-        let left_largest = vec2<u32>(sw(left + 7u), sw(left + 8u));
         let right_container = vec2<u32>(sw(right + 3u), sw(right + 4u));
         w_judge(INVARIANT_I_9_4, lt64(left_container, right_container));
-        w_judge(INVARIANT_I_9_4, lt64(left_largest, right_container));
     }
 }
 
@@ -2509,7 +2968,8 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
             }
         }
     }
-    // key 形态：1 extent、2 inode、3 分配记录、4 记账、5 映射；别的种类不走
+    // key 形态（lib.rs 的 key_schema_for_tree_kind）：1 extent、2 inode 与 deleted_inodes、3 分配记录、4 记账、5 映射、墓碑树与谱系树的容器号 [8]
+    // 与 inode 同形（形态 2）；条目字段表宽（walk.rs 的 field_table_width_of_tree_kind）：deleted_inodes 8，墓碑树、谱系树 120；别的种类不走
     var schema = NONE;
     var registered = false;
     var field_table_width = 0u;
@@ -2518,6 +2978,8 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
     else if (kind == TREE_KIND_ALLOCATION) { schema = 4u; registered = true; field_table_width = 20u; }
     else if (kind == TREE_KIND_ACCOUNTING) { schema = 0u; registered = true; field_table_width = 34u; }
     else if (kind == 5u) { schema = 1u; }
+    else if (kind == TREE_KIND_DELETED_INODES) { schema = 2u; registered = true; field_table_width = DELETED_INODES_ENTRY_BYTES; }
+    else if (kind == TREE_KIND_TOMBSTONE || kind == TREE_KIND_LINEAGE || kind == TREE_KIND_RETIREMENT) { schema = 2u; registered = true; field_table_width = CONTAINER_TREE_ENTRY_BYTES; }
     if (schema == NONE) {
         return;
     }
@@ -2530,10 +2992,20 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
     }
     if (kind == TREE_KIND_ACCOUNTING) {
         let walked = w_walk_code_two_tree(pointer, tree, 0u, fsid_low);
-        // I-3.13：走全了的记账树里每一行的代段（key 偏移 14）等于这一版的 txg
+        // I-3.13：走全了的记账树里每一行的代段（key 偏移 14）等于这一版的 txg；inode 号水位那一统计量（标签 12）、不带设备维、
+        // 代段早于这一版 txg 的行是台阶行，跳过（walk.rs walk_tree_table_entry 同改，D5（快照 / 空间记账机制） 已定项 2 射程）
         if (walked.kind == 0u && walked.is_complete) {
             for (var i = 0u; i < walked.entries; i = i + 1u) {
-                w_judge(INVARIANT_I_3_13, eq64(rd64(sw(R_ACCOUNTING + i * 3u), sw(R_ACCOUNTING + i * 3u + 1u) + 14u), w_version_txg));
+                let row_base = sw(R_ACCOUNTING + i * 3u);
+                let row_offset = sw(R_ACCOUNTING + i * 3u + 1u);
+                let row_generation = rd64(row_base, row_offset + 14u);
+                let is_an_inode_number_watermark_step = rd16(row_base, row_offset) == 12u
+                    && rd32(row_base, row_offset + 10u) == NONE
+                    && lt64(row_generation, w_version_txg);
+                if (is_an_inode_number_watermark_step) {
+                    continue;
+                }
+                w_judge(INVARIANT_I_3_13, eq64(row_generation, w_version_txg));
             }
         }
         // 记账行只取最新根那一遍的（check_pool_image 在走最新根之后就把 accounting 拷走了，候选根的账不覆盖它）
@@ -2591,38 +3063,350 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
         }
     }
     if (kind == TREE_KIND_INODE) {
-        w_walk_inode_root(read.n, tree, pointer.device0, pointer.slot0, fsid_low);
+        w_walk_inode_root(read.n, tree, read.unit_device, read.unit_slot, fsid_low);
+    }
+    // 墓碑树、谱系树、退役树：码 2 根之下是码 3 容器（类型段墓碑 {0, 1}、谱系 {0, 5}、退役 {0, 3}）；走到每片容器、判它的头与容器格式
+    if (kind == TREE_KIND_TOMBSTONE || kind == TREE_KIND_LINEAGE || kind == TREE_KIND_RETIREMENT) {
+        var container_record_type = PACKED_TYPE_TOMBSTONE;
+        if (kind == TREE_KIND_LINEAGE) {
+            container_record_type = PACKED_TYPE_LINEAGE;
+        } else if (kind == TREE_KIND_RETIREMENT) {
+            container_record_type = PACKED_TYPE_RETIREMENT;
+        }
+        w_walk_container_tree_root(read.n, tree, read.unit_device, read.unit_slot, container_record_type, fsid_low);
     }
 }
 
-// ── 一版的树表与中央映射树根（walk_tree_table_and_central_mapping_root）
-fn w_walk_tree_table_and_mapping(tree_table_pointer: Ptr, mapping_root_pointer: Ptr, fsid_low: vec2<u32>) {
-    let read = w_read_index_node(tree_table_pointer, vec2<u32>(0u, 0u), 2u, 0u, false, fsid_low);
-    if (!read.ok) {
-        return;
+// ── 墓碑树或谱系树的码 2 根往下走（walk.rs 的 walk_container_tree_root 与 walk_the_entries_of_a_container_tree_node）
+// 条目 120 字节（分隔 key 8 + 身份引用 26 + 子指针 86）：类型段 = record_type 的走到码 3 容器（判容器头、出生树、身份、出生身份、容器格式，
+// 单元记进这一版走到的落点），类型段 0 的走进下一层码 2 节点（层级 = 父层级 − 1、条目宽 120 才往下走；层级 ≤ 1 的节点里出现类型段 0 记走读失败），
+// 别的类型段先登记引用（层级 1 的节点按码 3 容器两槽、层级 ≥ 2 的按码 2 节点一槽）再判该条目损坏、不往下走。每条条目的身份单独判定
+// （墓碑树 I-9.23、谱系树 I-9.17），身份不符不记走读失败（判决 `research/prompts/m3-delete-checker-r2-main-verification.md` 第二节 T7 取 a）：
+// 类型段 0 判身份引用三段为 0 且孩子（读得出时）是码 2；类型段 = record_type 判容器头四段与身份引用逐字相等、子指针出生树相等、类标签 3。
+// 孩子是哪一类按它头里的类标签认、不按类型段定读多长（w_child_unit_class_other_than_the_entry_type_names，判决
+// `research/prompts/m3-batch22-code-r1-main-verification.md` 第二节 N4 那一行：类型段 0 指着码 3 容器、类型段 = record_type 指着码 2 节点时，
+// 按类型段的长度读回的整单元校验和对不上，身份那一判跑不到、却记了 I-2.1 与走读失败）：头里是另一类、按那一类的长度自证得过的，
+// 判身份红、按它自己那一类占的槽登记引用（码 2 一槽、码 1 / 码 3 两槽）、不往下走、不记走读失败；另有一份按类型段那一类自证得过的，
+// 判身份红之后照类型段走那一份（F-W，w_some_copy_of_the_child_verifies_as_the_class_the_entry_type_names）；别的照旧按类型段走。
+// 往下记的落点都记在正在走的那个码 2 节点下面（w_parent_*）。walk.rs 是递归，这里是同一个先序的显式栈，
+// 深度超过 w_container_tree_frames 的 12 层判不了；两个种类只经这一处调用点
+struct WalkContainerTreeFrame {
+    n: Node,
+    next_entry: u32,
+    device: u32,
+    slot: vec2<u32>,
+};
+
+var<private> w_container_tree_frames: array<WalkContainerTreeFrame, 12>;
+
+// 一份落点上读回的单元按 unit_class 那一类的长度（码 2 16 KiB，码 1 / 码 3 32 KiB）算的整单元校验和对得上 checksum；别的类没有长度，恒不成立
+fn w_unit_verifies_at_the_length_of_its_class(s: Slice, unit_class: u32, checksum: u32) -> bool {
+    if (unit_class == 2u) {
+        return slice_crc_matches(s, NODE_BYTES, checksum);
     }
-    let tt = read.n;
-    w_judge_tree_table_entries_ordering(tt);
-    w_judge_tree_table_entry_head_identifiers(tt);
+    if (unit_class == 1u || unit_class == 3u) {
+        return slice_crc_matches(s, DATA_UNIT_BYTES, checksum);
+    }
+    return false;
+}
+
+// 树里一条内部条目的孩子是不是条目类型段说的那一类（walk.rs 的 child_unit_class_other_than_the_entry_type_names）：只读孩子的单元头取类标签，
+// 不按类型段定读多长。两条位置条目都看：头按最短的单元（码 2，16 KiB）那么长读，头里的类标签是登记过的码、且按那一类的长度读回的
+// 整单元校验和对得上，这一份才算自证过的孩子；有一份自证过的是 class_the_entry_type_names 之外的一类，交回那一类（两份各自证成两个另一类时
+// 交回第一份的）；自证过的都是类型段那一类、或哪一份都自证不过（读不出、类标签不在登记表里、校验和对不上：陈旧副本、坏副本），交回 NONE
+// （照类型段那一支走，读不出照旧归 I-2.1）。不在第一份自证过的副本处停（判决 `research/prompts/m3-batch26-code-r1-main-verification.md`
+// 第二节 K2 H1 H-V 那一行、第三节第 2 条：两份都自证得过、却是两类时，只看第一份的话结论随那一份在哪块盘翻面，walk.rs 同改）。
+// class_the_entry_type_names 是 NONE（类型段不认得）时交回孩子自证过的那一类
+fn w_child_unit_class_other_than_the_entry_type_names(child: Ptr, class_the_entry_type_names: u32) -> u32 {
+    var class_other_than_the_entry_type_names = NONE;
+    let first_copy = read_at(child.device0, slot_to_bytes(child.slot0), NODE_BYTES);
+    if (first_copy.version != NONE) {
+        let class_in_the_first_header = rd8(first_copy.base, 6u);
+        if (w_unit_verifies_at_the_length_of_its_class(first_copy, class_in_the_first_header, child.sum0)) {
+            if (class_in_the_first_header != class_the_entry_type_names) {
+                class_other_than_the_entry_type_names = class_in_the_first_header;
+            }
+        }
+    }
+    let second_copy = read_at(child.device1, slot_to_bytes(child.slot1), NODE_BYTES);
+    if (second_copy.version != NONE) {
+        let class_in_the_second_header = rd8(second_copy.base, 6u);
+        if (w_unit_verifies_at_the_length_of_its_class(second_copy, class_in_the_second_header, child.sum1)) {
+            if (class_in_the_second_header != class_the_entry_type_names && class_other_than_the_entry_type_names == NONE) {
+                class_other_than_the_entry_type_names = class_in_the_second_header;
+            }
+        }
+    }
+    return class_other_than_the_entry_type_names;
+}
+
+// 两条位置条目里第一份按它自己那一类的长度整份自证过的副本头里的类标签（walk.rs 的 class_of_the_first_copy_verifying_at_the_length_of_its_class）：
+// 头里的类标签是登记过的码、按那一类的长度读回的整单元校验和对得上；哪一份都没自证过交 NONE
+fn w_class_of_the_first_copy_verifying_at_the_length_of_its_class(child: Ptr) -> u32 {
+    let first_copy = read_at(child.device0, slot_to_bytes(child.slot0), NODE_BYTES);
+    if (first_copy.version != NONE && w_unit_verifies_at_the_length_of_its_class(first_copy, rd8(first_copy.base, 6u), child.sum0)) {
+        return rd8(first_copy.base, 6u);
+    }
+    let second_copy = read_at(child.device1, slot_to_bytes(child.slot1), NODE_BYTES);
+    if (second_copy.version != NONE && w_unit_verifies_at_the_length_of_its_class(second_copy, rd8(second_copy.base, 6u), child.sum1)) {
+        return rd8(second_copy.base, 6u);
+    }
+    return NONE;
+}
+
+// w_child_unit_class_other_than_the_entry_type_names 认出另一类之后再问一句（walk.rs 的 some_copy_of_the_child_verifies_as_the_class_the_entry_type_names，
+// 判决 `research/prompts/m3-batch28-code-r1-main-verification.md` 第三节第 1 条，攻方改法 F-W）：有没有一份副本头里的类标签就是 class_the_entry_type_names、
+// 按那一类的长度读回的整单元校验和对得上。有的话读者用的就是这一份，走读照类型段那一支走它的子树。只在认出另一类之后调
+fn w_some_copy_of_the_child_verifies_as_the_class_the_entry_type_names(child: Ptr, class_the_entry_type_names: u32) -> bool {
+    let first_copy = read_at(child.device0, slot_to_bytes(child.slot0), NODE_BYTES);
+    if (first_copy.version != NONE && rd8(first_copy.base, 6u) == class_the_entry_type_names
+        && w_unit_verifies_at_the_length_of_its_class(first_copy, class_the_entry_type_names, child.sum0)) {
+        return true;
+    }
+    let second_copy = read_at(child.device1, slot_to_bytes(child.slot1), NODE_BYTES);
+    return second_copy.version != NONE && rd8(second_copy.base, 6u) == class_the_entry_type_names
+        && w_unit_verifies_at_the_length_of_its_class(second_copy, class_the_entry_type_names, child.sum1);
+}
+
+// 走读不往下读的孩子的一份副本（盘 device、槽 slot）与位置条目里的整单元校验和对不对得上（walk.rs 的 copy_matches_its_location_checksum_at_the_length_its_header_names）：
+// 头按最短的单元（码 2，16 KiB）那么长读，头里的类标签是登记过的码就只按那一类的长度比；没登记的码、或头读不出，16 KiB 与 32 KiB 两种长度都对不上
+// 才算对不上（判决 `research/prompts/m3-batch27-code-r1-main-verification.md` 第二节 H-J3a 那一行的改法 F-α）。比 32 KiB 时另按 32 KiB 读一次
+// （CPU 那一边按每种长度各读一次）：没写过的槽 read_at 按 16 KiB 交回的全零单元只按它自己那一槽的长度用，下一槽有落点时不拿它的 32 KiB 检查字去比
+// （判决 `research/prompts/m3-batch32-code-r1-main-verification.md` 第二节 K1 / K2 P4 F-零槽那一行、第三节第 2 条，攻方改法 Z3）。
+// 空段最后一槽那一读是拼读（read_at）：这里只比整段 CRC、不往下读字节，拼出的 CRC 照比（slice_whole_read_crc_matches，不记判不了；
+// 判决 `research/prompts/m3-batch33s-code-r1-main-verification.md` 第三节第 1 条，正推说的「空槽加下一已写槽前 16 KiB」那一形）
+fn w_copy_matches_its_location_checksum_at_the_length_its_header_names(device: u32, slot: vec2<u32>, checksum: u32) -> bool {
+    let copy = read_at(device, slot_to_bytes(slot), NODE_BYTES);
+    if (copy.version == NONE) {
+        return false;
+    }
+    let class_in_the_header = rd8(copy.base, 6u);
+    if (class_in_the_header >= 1u && class_in_the_header <= 3u) {
+        return w_unit_verifies_at_the_length_of_its_class(copy, class_in_the_header, checksum);
+    }
+    return slice_crc_matches(copy, NODE_BYTES, checksum)
+        || slice_whole_read_crc_matches(read_at(device, slot_to_bytes(slot), DATA_UNIT_BYTES), checksum);
+}
+
+// 走读不往下读的孩子（墓碑树、谱系树、inode 树内部条目里类型段不认得的，与孩子自证成类型段之外另一类的）：每一份副本照判 I-2.1，
+// 两份都对不上记走读失败（walk.rs 的 Walk::judge_every_copy_of_a_child_the_walk_does_not_go_into，第 29 批 H-J3a、H-J3b）。不往下走，引用由调用方先登记
+fn w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child: Ptr) {
+    let first_matches = w_copy_matches_its_location_checksum_at_the_length_its_header_names(child.device0, child.slot0, child.sum0);
+    if (!first_matches) {
+        w_mismatches = w_mismatches + 1u;
+    }
+    w_judge(INVARIANT_I_2_1, first_matches);
+    let second_matches = w_copy_matches_its_location_checksum_at_the_length_its_header_names(child.device1, child.slot1, child.sum1);
+    if (!second_matches) {
+        w_mismatches = w_mismatches + 1u;
+    }
+    w_judge(INVARIANT_I_2_1, second_matches);
+    if (!first_matches && !second_matches) {
+        w_failures = w_failures + 1u;
+    }
+}
+
+// 一个单元按它的类占几槽：码 2 节点一槽，码 1 数据单元与码 3 打包记录单元两槽
+fn w_slots_of_a_unit_of_class(unit_class: u32) -> u32 {
+    if (unit_class == 2u) {
+        return 1u;
+    }
+    return 2u;
+}
+
+fn w_walk_container_tree_root(root: Node, tree: vec2<u32>, root_device: u32, root_slot: vec2<u32>, record_type: u32, fsid_low: vec2<u32>) {
+    var identity_invariant = INVARIANT_I_9_23;
+    if (record_type == PACKED_TYPE_LINEAGE) {
+        identity_invariant = INVARIANT_I_9_17;
+    } else if (record_type == PACKED_TYPE_RETIREMENT) {
+        identity_invariant = INVARIANT_I_9_31;
+    }
     let parent_valid = w_parent_valid;
     let parent_device = w_parent_device;
     let parent_slot = w_parent_slot;
+    w_container_tree_frames[0].n = root;
+    w_container_tree_frames[0].next_entry = 0u;
+    w_container_tree_frames[0].device = root_device;
+    w_container_tree_frames[0].slot = root_slot;
+    var depth = 1u;
     w_parent_valid = true;
-    w_parent_device = tree_table_pointer.device0;
-    w_parent_slot = tree_table_pointer.slot0;
-    for (var e = 0u; e < tt.entry_count; e = e + 1u) {
-        w_walk_tree_table_entry(tt, e, fsid_low);
+    w_parent_device = root_device;
+    w_parent_slot = root_slot;
+    loop {
+        if (depth == 0u) {
+            break;
+        }
+        let top = depth - 1u;
+        let n = w_container_tree_frames[top].n;
+        let e = w_container_tree_frames[top].next_entry;
+        if (e >= n.entry_count) {
+            depth = depth - 1u;
+            if (depth > 0u) {
+                w_parent_device = w_container_tree_frames[depth - 1u].device;
+                w_parent_slot = w_container_tree_frames[depth - 1u].slot;
+            }
+            continue;
+        }
+        w_container_tree_frames[top].next_entry = e + 1u;
+        let o = entry_offset(n, e);
+        let entry_type = rd16(n.base, o + 16u);
+        let child = parse_node_pointer(n.base, o + CONTAINER_TREE_ENTRY_CHILD_POINTER_OFFSET);
+        w_judge_location_order(child);
+        w_judge_pointer_head(child);
+        w_judge_pointer_extent_offset(child);
+        if (entry_type == 0u) {
+            // 孩子头里是码 2 之外的一类、按那一类的长度自证得过：身份不符，按它自己那一类占的槽登记引用，不往下走、不记走读失败
+            var class_of_the_child_of_an_internal_entry = w_child_unit_class_other_than_the_entry_type_names(child, 2u);
+            // 另有一份码 2、按 16 KiB 自证得过（walk.rs walk_the_entries_of_a_container_tree_node 的 F-W）：身份照判红，再照类型段 0 那一支往下走那一份
+            if (class_of_the_child_of_an_internal_entry != NONE && w_some_copy_of_the_child_verifies_as_the_class_the_entry_type_names(child, 2u)) {
+                w_judge(identity_invariant, class_of_the_child_of_an_internal_entry == NONE);
+                class_of_the_child_of_an_internal_entry = NONE;
+            }
+            if (class_of_the_child_of_an_internal_entry != NONE) {
+                w_note_pointer_references(child, w_slots_of_a_unit_of_class(class_of_the_child_of_an_internal_entry));
+                w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+                w_judge(identity_invariant, class_of_the_child_of_an_internal_entry == 2u);
+                continue;
+            }
+            // 类型段 0：身份引用的出生树、容器号、出生代三段为 0；「子单元是码 2」与 I-1.6 重合、照 I-9.2 的先例留作合取，读不出的孩子这一小句不判。
+            // 孩子的类只认按它自己那一类的长度整份自证过的副本（walk.rs 的 class_of_the_first_copy_verifying_at_the_length_of_its_class，
+            // F-ID-b，用户 2026-10-07 定）；两份都没自证过的当读不出、这一小句不判（用户 2026-10-07 定）
+            let class_of_the_child_of_a_type_zero_entry = w_class_of_the_first_copy_verifying_at_the_length_of_its_class(child);
+            let child_is_a_code_two_node_or_unreadable = class_of_the_child_of_a_type_zero_entry == NONE || class_of_the_child_of_a_type_zero_entry == 2u;
+            w_judge(identity_invariant, is_zero64(rd64(n.base, o + 8u)) && is_zero64(rd64(n.base, o + 18u)) && is_zero64(rd64(n.base, o + 26u))
+                && child_is_a_code_two_node_or_unreadable);
+            if (n.level <= 1u) {
+                // 孩子不往下走、记走读失败；每一份副本照判 I-2.1（walk.rs walk_the_internal_node_below_a_container_tree_entry 的 F-L0，
+                // 判决 `research/prompts/m3-batch29-code-r1-main-verification.md` 第三节第 1 条），引用照旧不登记
+                w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+                w_failures = w_failures + 1u;
+                continue;
+            }
+            let read = w_read_index_node(child, tree, 2u, 0u, true, fsid_low);
+            if (!read.ok) {
+                continue;
+            }
+            w_judge(INVARIANT_I_1_1, read.n.level + 1u == n.level);
+            if (read.n.level + 1u == n.level && read.n.entry_width == CONTAINER_TREE_ENTRY_BYTES) {
+                if (depth >= MAX_FRAMES) {
+                    undecidable = UNDECIDABLE_TOO_DEEP;
+                    break;
+                }
+                w_container_tree_frames[depth].n = read.n;
+                w_container_tree_frames[depth].next_entry = 0u;
+                w_container_tree_frames[depth].device = read.unit_device;
+                w_container_tree_frames[depth].slot = read.unit_slot;
+                depth = depth + 1u;
+                w_parent_device = read.unit_device;
+                w_parent_slot = read.unit_slot;
+            }
+            continue;
+        }
+        if (entry_type != record_type) {
+            // 类型段不在 {0, record_type} 里：先登记引用（不登记的话这个孩子占的槽不进引用并集，I-3.1 连带红），孩子的形状由这一层定
+            var span_of_the_unregistered_child = 2u;
+            if (n.level >= 2u) {
+                span_of_the_unregistered_child = 1u;
+            }
+            w_note_pointer_references(child, span_of_the_unregistered_child);
+            w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+            w_judge(identity_invariant, false);
+            continue;
+        }
+        // 类型段 = record_type：孩子头里是码 3 之外的一类、按那一类的长度自证得过，身份不符（「类标签 3」那一小句），不按数据单元长度去读、不往下走
+        var class_of_the_child_of_a_container_entry = w_child_unit_class_other_than_the_entry_type_names(child, 3u);
+        // 另有一份码 3、按 32 KiB 自证得过（walk.rs walk_the_entries_of_a_container_tree_node 的 F-W）：身份照判红，再照这一支往下走那一份（两槽登记）
+        if (class_of_the_child_of_a_container_entry != NONE && w_some_copy_of_the_child_verifies_as_the_class_the_entry_type_names(child, 3u)) {
+            w_judge(identity_invariant, class_of_the_child_of_a_container_entry == NONE);
+            class_of_the_child_of_a_container_entry = NONE;
+        }
+        if (class_of_the_child_of_a_container_entry != NONE) {
+            w_note_pointer_references(child, w_slots_of_a_unit_of_class(class_of_the_child_of_a_container_entry));
+            w_judge_every_copy_of_a_child_the_walk_does_not_go_into(child);
+            w_judge(identity_invariant, class_of_the_child_of_a_container_entry == 3u);
+            continue;
+        }
+        w_note_pointer_references(child, 2u);
+        let s = w_read_unit_to_walk(child, DATA_UNIT_BYTES);
+        if (s.version == NONE) {
+            // 容器两份都读不出：子指针头部出生树 == 身份引用出生树只比父条目里的两段，照判（walk.rs walk_the_container_below_a_container_tree_entry，
+            // 判决 `research/prompts/m3-batch26-code-r1-main-verification.md` 第三节第 1 条）；比容器头的那几小句不判
+            w_judge(identity_invariant, eq64(child.birth_tree, rd64(n.base, o + 8u)));
+            w_failures = w_failures + 1u;
+            continue;
+        }
+        // 条目里的身份引用（出生树、类型段、容器号、容器出生代）与容器头逐段相同、子指针出生树相同、类标签 3，在查这一遍走没走过之前判
+        // （别的版本共享这片容器时也按这一版的条目判）
+        let identity_holds = rd8(s.base, 6u) == 3u && eq64(rd64(s.base, 43u), rd64(n.base, o + 8u)) && rd16(s.base, 51u) == entry_type
+            && eq64(rd64(s.base, 53u), rd64(n.base, o + 18u)) && eq64(rd64(s.base, 61u), rd64(n.base, o + 26u))
+            && eq64(child.birth_tree, rd64(n.base, o + 8u));
+        w_judge(identity_invariant, identity_holds);
+        // 走过、并进前一版、诞生代号都按读回那一份的落点认（F-KEY 与攻方 allrbmap）
+        let container_device = w_unit_device_read_back;
+        let container_slot = w_unit_slot_read_back;
+        if (!w_visit_the_copy_read_back()) {
+            w_merge_below(container_device, container_slot);
+            continue;
+        }
+        w_judge(INVARIANT_I_1_3, eq64(rd64(s.base, 43u), tree));
+        w_judge_birth_identity(s, child, container_device, container_slot);
+        // 容器格式（类标签、记录类型、记录宽与声明长度）按 I-1.7 判；记录本身的不变量归 I-9.17 起那几条，走读不判
+        _ = w_judge_packed_container(s, record_type, fsid_low);
     }
     w_parent_valid = parent_valid;
     w_parent_device = parent_device;
     w_parent_slot = parent_slot;
+}
+
+// ── 一版的树表与中央映射树根（walk_tree_table_and_central_mapping_root）
+// 树表别的版本先走过（零单元发布、卸载与抬 F 的空发布照抄上一版的树表与映射根）：条目不重走，这一版的用户可见树的根照先走那一版记下的取，
+// 映射根照样往下走（共享的就并进这一版，I-3.5 比相邻两版的引用集合要它）；树表读不出、头用不了时映射根也不走
+fn w_walk_tree_table_and_mapping(tree_table_pointer: Ptr, mapping_root_pointer: Ptr, fsid_low: vec2<u32>) {
+    // 树表指针整条全零（walk.rs 的 follow_an_all_zero_tree_table_pointer_like_the_root_record_reader_of_the_core）：core 的根记录读者照两条位置条目
+    // 读盘 0 槽 0、读不出。照 CPU 跟过去：两条位置条目照 I-2.1 判、这一版记一次走读失败，映射根不走；不判 I-2.5（整条全零的指针豁免）、
+    // 不记引用。根环里的根、由记录施加出来的那几版、重放施加出来的那一版都经这里（用户 2026-10-06 定 Q1、Q3「甲」）
+    if (tree_table_pointer.all_zero) {
+        _ = w_read_referenced_unit(tree_table_pointer, NODE_BYTES);
+        w_failures = w_failures + 1u;
+        return;
+    }
+    let read = w_read_index_node(tree_table_pointer, vec2<u32>(0u, 0u), 2u, 0u, false, fsid_low);
+    if (read.ok) {
+        let tt = read.n;
+        w_judge_tree_table_entries_ordering(tt);
+        w_judge_tree_table_entry_head_identifiers(tt);
+        if (w_context == 0u) {
+            appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt, read.unit_device, read.unit_slot);
+        }
+        let parent_valid = w_parent_valid;
+        let parent_device = w_parent_device;
+        let parent_slot = w_parent_slot;
+        w_parent_valid = true;
+        w_parent_device = read.unit_device;
+        w_parent_slot = read.unit_slot;
+        for (var e = 0u; e < tt.entry_count; e = e + 1u) {
+            appearance_begin_tree_table_entry(tt, e);
+            w_walk_tree_table_entry(tt, e, fsid_low);
+            appearance_user_visible_tree_is_being_walked = false;
+        }
+        w_parent_valid = parent_valid;
+        w_parent_device = parent_device;
+        w_parent_slot = parent_slot;
+    } else if (read.already_walked) {
+        if (w_context == 0u) {
+            appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(read.unit_device, read.unit_slot);
+        }
+    } else {
+        return;
+    }
     let mapping = w_walk_code_two_tree(mapping_root_pointer, mapping_root_pointer.birth_tree, 1u, fsid_low);
     w_walk_central_mapping_entries(mapping.entries, fsid_low);
 }
 
 // ── 一条根（walk_root）
 // 走一遍：一条根（WALK_KIND_ROOT：实例表与分配记录树、树表与映射都取自这条根记录），或一版由记录施加出来、根槽从没落盘的版本
-// （WALK_KIND_VERSION：树表与映射取自那条记录，实例表与分配记录树取自它施加在其上的那条根；没有那条根就不走这两样）。
+// （WALK_KIND_VERSION：四条指针都取自那条记录的新根段——施加一条记录 = 把所选根的七个字段换成记录里的，D23（journal 的角色与格式）
+// 已定项 15，用户 2026-10-02「回到甲」；walk.rs 的 walk_version_applied_only_by_records 同一个取法）。
 // 全内核只许有一处调它（walk_and_hand_off 的循环里）：显卡上的程序没有真的函数调用，驱动的编译器把每个调用点各展开一份，
 // 这一整棵展开之后三十多万记号。原来五处走根、一处走版本各展开一份时，走读内核展开后 242 万记号，本机（驱动 595 版）冷编 523 秒、
 // 常驻 4.1 GiB，第二台（驱动 580 版）在 48G 里编不完；只留一处之后本机 18 秒、0.8 GiB。
@@ -2630,25 +3414,271 @@ fn w_walk_tree_table_and_mapping(tree_table_pointer: Ptr, mapping_root_pointer: 
 const WALK_KIND_ROOT: u32 = 0u;
 const WALK_KIND_VERSION: u32 = 1u;
 
-fn w_walk_one(kind: u32, record_base: u32, applied_on_base: u32, is_newest: bool, fsid_low: vec2<u32>) {
+fn w_walk_one(kind: u32, record_base: u32, is_newest: bool, fsid_low: vec2<u32>) {
     w_begin_version();
     w_accounting_recording = is_newest;
-    var carrier_base = record_base;
     var tree_table_pointer_offset = 36u;
     var mapping_root_pointer_offset = 256u;
+    var instance_table_pointer_offset = 170u;
+    var allocation_root_pointer_offset = 342u;
     if (kind == WALK_KIND_VERSION) {
-        carrier_base = applied_on_base;
-        tree_table_pointer_offset = 99u;
-        mapping_root_pointer_offset = 185u;
+        tree_table_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET;
+        mapping_root_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86u;
+        instance_table_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER;
+        allocation_root_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER;
     }
-    if (carrier_base != NONE) {
-        w_walk_instance_table_chain(parse_node_pointer(carrier_base, 170u), is_newest, fsid_low);
-        let allocation_root = parse_node_pointer(carrier_base, 342u);
-        if (!allocation_root.all_zero) {
-            w_walk_allocation_record_tree(allocation_root, vec2<u32>(0u, 0u), fsid_low);
-        }
+    w_walk_instance_table_chain(parse_node_pointer(record_base, instance_table_pointer_offset), is_newest, fsid_low);
+    let allocation_root = parse_node_pointer(record_base, allocation_root_pointer_offset);
+    if (!allocation_root.all_zero) {
+        w_walk_allocation_record_tree(allocation_root, vec2<u32>(0u, 0u), fsid_low);
     }
     w_walk_tree_table_and_mapping(parse_node_pointer(record_base, tree_table_pointer_offset), parse_node_pointer(record_base, mapping_root_pointer_offset), fsid_low);
+}
+
+// ───────────────────────── I-3.5（引用区间的精确性）的出现规则：版本都走完之后逐对判 ─────────────────────────
+// walk.rs 的 HoleInTheCandidateSet
+const APPEARANCE_NO_HOLE: u32 = 0u;
+const APPEARANCE_HOLE_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS: u32 = 1u;
+const APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS: u32 = 2u;
+// 判一版时它去重之后的单元（版本表一行里的落点折成单元）摊在这里：每个单元 2 个字（落点表下标、走过的单元表下标或 NONE）。
+// 借 w_merge_below 的两块（C_PENDING 与紧跟其后的 C_EXPANDED），判的时候主走读那几版已经走完、不再并入
+const APPEARANCE_UNIT_WORDS: u32 = 2u;
+const APPEARANCE_UNITS: u32 = C_PENDING;
+const APPEARANCE_MAX_UNITS: u32 = (C_SCRATCH_END - C_PENDING) / APPEARANCE_UNIT_WORDS;
+
+fn appearance_version_row(version_index: u32) -> u32 {
+    return C_APPEARANCE_VERSIONS + version_index * C_APPEARANCE_VERSION_WORDS;
+}
+
+fn appearance_version_txg(version_index: u32) -> vec2<u32> {
+    let row = appearance_version_row(version_index);
+    return vec2<u32>(sw(row + 1u), sw(row + 2u));
+}
+
+// 落点表一行的 (盘, 槽) 比另一行的大（BTreeMap 的键序：先盘、后槽）
+fn appearance_placement_is_greater(index: u32, other: u32) -> bool {
+    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+    let other_row = C_APPEARANCE_PLACEMENTS + other * C_APPEARANCE_PLACEMENT_WORDS;
+    if (sw(row) != sw(other_row)) {
+        return sw(row) > sw(other_row);
+    }
+    return lt64(vec2<u32>(sw(other_row + 1u), sw(other_row + 2u)), vec2<u32>(sw(row + 1u), sw(row + 2u)));
+}
+
+// 两行落点折成的是同一个单元
+fn appearance_same_unit(index: u32, other: u32) -> bool {
+    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+    let other_row = C_APPEARANCE_PLACEMENTS + other * C_APPEARANCE_PLACEMENT_WORDS;
+    return sw(row + 3u) == sw(other_row + 3u) && sw(row + 4u) == sw(other_row + 4u) && sw(row + 5u) == sw(other_row + 5u);
+}
+
+// 落点表一行打的用户可见树标签是不是 (kind, tree)
+fn appearance_placement_is_in_tree(index: u32, kind: u32, tree: vec2<u32>) -> bool {
+    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
+    return sw(row + 6u) == 1u && sw(row + 7u) == kind && sw(row + 8u) == tree.x && sw(row + 9u) == tree.y;
+}
+
+// 一版去重之后的单元摊进 APPEARANCE_UNITS，交回几个（判不了交回 NONE）。note_the_version_just_walked_for_the_appearance_rule 把这一版的落点
+// 按 (盘, 槽) 升序折成单元收进 BTreeMap，同一个单元后收的标签盖掉先收的：这里每个单元留它 (盘, 槽) 最大的那个落点（标签取那一个的）
+fn appearance_spread_the_units_of_a_version(version_index: u32) -> u32 {
+    let row = appearance_version_row(version_index);
+    let first = sw(row + 4u);
+    let count = sw(row + 5u);
+    var units = 0u;
+    for (var k = 0u; k < count; k = k + 1u) {
+        let placement = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k);
+        var a_greater_placement_of_the_same_unit = false;
+        for (var j = 0u; j < count; j = j + 1u) {
+            let other = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + j);
+            if (j != k && appearance_same_unit(placement, other) && appearance_placement_is_greater(other, placement)) {
+                a_greater_placement_of_the_same_unit = true;
+                break;
+            }
+        }
+        if (a_greater_placement_of_the_same_unit) {
+            continue;
+        }
+        if (units >= APPEARANCE_MAX_UNITS) {
+            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (45u << 8u);
+            return NONE;
+        }
+        let placement_row = C_APPEARANCE_PLACEMENTS + placement * C_APPEARANCE_PLACEMENT_WORDS;
+        sws(APPEARANCE_UNITS + units * APPEARANCE_UNIT_WORDS, placement);
+        sws(APPEARANCE_UNITS + units * APPEARANCE_UNIT_WORDS + 1u,
+            w_visited_index_in_the_main_walk(sw(placement_row + 3u), vec2<u32>(sw(placement_row + 4u), sw(placement_row + 5u))));
+        units = units + 1u;
+    }
+    return units;
+}
+
+// 摊开的第 u 个单元有没有记下诞生代号（被引用单元那一支标记 1、实例表一片标记 2；头读不出的没有）
+fn appearance_unit_birth_is_known(u: u32) -> bool {
+    let visited_index = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS + 1u);
+    return visited_index != NONE && sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS) != 0u;
+}
+
+fn appearance_unit_birth_txg(u: u32) -> vec2<u32> {
+    let visited_index = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS + 1u);
+    return vec2<u32>(sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 1u), sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 2u));
+}
+
+// txg 为 previous_txg 的那几版（R⁻ 那一组）里有没有一版引用了与落点表第 placement 行同一个单元
+fn appearance_previous_group_references_the_unit_of(previous_txg: vec2<u32>, placement: u32) -> bool {
+    for (var other = 0u; other < appearance_version_count; other = other + 1u) {
+        if (!eq64(appearance_version_txg(other), previous_txg)) {
+            continue;
+        }
+        let row = appearance_version_row(other);
+        let first = sw(row + 4u);
+        let count = sw(row + 5u);
+        for (var k = 0u; k < count; k = k + 1u) {
+            if (appearance_same_unit(sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k), placement)) {
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+// walk.rs hole_in_the_candidate_set_between：R⁻ 那一组（txg previous_txg 的那几版）与这一版 (version_instance, version_txg) 之间的洞；
+// 接得上 ⟺ R⁻ 的某个实例 i：最新根的实例表里有一行 (i, T = R⁻.txg)，这一版的实例 v > i，i 与 v 之间每个实例都有一行、每一行都是 (j, 0, 0)
+fn appearance_hole_between(previous_txg: vec2<u32>, version_txg: vec2<u32>, version_instance: u32) -> u32 {
+    let previous_txg_has_a_successor = !(previous_txg.x == NONE && previous_txg.y == NONE);
+    if (previous_txg_has_a_successor && eq64(add64(previous_txg, u64_of(1u)), version_txg)) {
+        return APPEARANCE_NO_HOLE;
+    }
+    for (var other = 0u; other < appearance_version_count; other = other + 1u) {
+        if (!eq64(appearance_version_txg(other), previous_txg)) {
+            continue;
+        }
+        let previous_instance = sw(appearance_version_row(other));
+        if (version_instance <= previous_instance) {
+            continue;
+        }
+        var row_of_the_previous_version = false;
+        var instances_between = 0u;
+        var every_row_between_published_nothing = true;
+        for (var k = 0u; k < w_instance_row_count; k = k + 1u) {
+            let row = C_INSTANCE_ROWS + k * C_ROW_WORDS;
+            let instance = sw(row);
+            let row_txg = vec2<u32>(sw(row + 1u), sw(row + 2u));
+            let row_high_water = vec2<u32>(sw(row + 3u), sw(row + 4u));
+            if (instance == previous_instance && eq64(row_txg, previous_txg)) {
+                row_of_the_previous_version = true;
+            }
+            if (instance <= previous_instance || instance >= version_instance) {
+                continue;
+            }
+            if (!is_zero64(row_txg) || !is_zero64(row_high_water)) {
+                every_row_between_published_nothing = false;
+            }
+            // 中间的实例按不同的代号数（同一个实例有两行只算一个）
+            var counted_before = false;
+            for (var j = 0u; j < k; j = j + 1u) {
+                if (sw(C_INSTANCE_ROWS + j * C_ROW_WORDS) == instance) {
+                    counted_before = true;
+                    break;
+                }
+            }
+            if (!counted_before) {
+                instances_between = instances_between + 1u;
+            }
+        }
+        if (row_of_the_previous_version && instances_between == version_instance - previous_instance - 1u && every_row_between_published_nothing) {
+            return APPEARANCE_HOLE_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS;
+        }
+    }
+    return APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS;
+}
+
+// 这一版（摊开在 APPEARANCE_UNITS 里，units 个）树表里第 root_index 棵用户可见树是不是整棵继承下来的：根指针出生 txg 严格小于 R⁻.txg，
+// 且这一版里那棵树下读得出的诞生代号都不大于它
+fn appearance_tree_is_inherited_whole(version_index: u32, root_index: u32, units: u32, previous_txg: vec2<u32>) -> bool {
+    let root_row = appearance_version_row(version_index) + C_APPEARANCE_VERSION_ROOTS_OFFSET + root_index * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
+    let kind = sw(root_row);
+    let tree = vec2<u32>(sw(root_row + 1u), sw(root_row + 2u));
+    let root_pointer_birth_txg = vec2<u32>(sw(root_row + 3u), sw(root_row + 4u));
+    if (!lt64(root_pointer_birth_txg, previous_txg)) {
+        return false;
+    }
+    for (var u = 0u; u < units; u = u + 1u) {
+        if (!appearance_placement_is_in_tree(sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS), kind, tree) || !appearance_unit_birth_is_known(u)) {
+            continue;
+        }
+        if (!le64(appearance_unit_birth_txg(u), root_pointer_birth_txg)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+// walk.rs judge_the_appearance_rule_of_adjacent_candidate_versions：回退候选集（走过的每一版）按 txg 升序、同 txg 并成一组，
+// 每一版 R 与 txg 比它小的那几版里 txg 最大的那一组 R⁻ 比：R 引用而 R⁻ 不引用、诞生代号读得出的每个单元 b 满足
+// (a) birth(b) > R⁻.txg，或 (b) b 打着一棵整棵继承下来的用户可见树的标签。有洞而实例表行接不上时打着用户可见树标签的不判（N3）；
+// R 或 R⁻ 那一组有一版走读记过失败的那一对不判。一个单元都没判到时 CPU 报不适用，违例位上与成立一样是 0
+fn judge_the_appearance_rule_of_adjacent_candidate_versions() {
+    for (var version_index = 0u; version_index < appearance_version_count; version_index = version_index + 1u) {
+        let row = appearance_version_row(version_index);
+        let version_txg = appearance_version_txg(version_index);
+        var has_previous = false;
+        var previous_txg = vec2<u32>(0u, 0u);
+        for (var other = 0u; other < appearance_version_count; other = other + 1u) {
+            let other_txg = appearance_version_txg(other);
+            if (lt64(other_txg, version_txg) && (!has_previous || lt64(previous_txg, other_txg))) {
+                previous_txg = other_txg;
+                has_previous = true;
+            }
+        }
+        if (!has_previous || sw(row + 3u) != 1u) {
+            continue;
+        }
+        var previous_references_are_complete = true;
+        for (var other = 0u; other < appearance_version_count; other = other + 1u) {
+            if (eq64(appearance_version_txg(other), previous_txg) && sw(appearance_version_row(other) + 3u) != 1u) {
+                previous_references_are_complete = false;
+            }
+        }
+        if (!previous_references_are_complete) {
+            continue;
+        }
+        let hole = appearance_hole_between(previous_txg, version_txg, sw(row));
+        let units = appearance_spread_the_units_of_a_version(version_index);
+        if (units == NONE) {
+            return;
+        }
+        // 这一版里整棵继承下来的用户可见树（第 r 棵是就置位 r）
+        var trees_inherited_whole = 0u;
+        let roots = sw(row + 6u);
+        for (var r = 0u; r < roots; r = r + 1u) {
+            if (appearance_tree_is_inherited_whole(version_index, r, units, previous_txg)) {
+                trees_inherited_whole = trees_inherited_whole | (1u << r);
+            }
+        }
+        for (var u = 0u; u < units; u = u + 1u) {
+            let placement = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS);
+            if (appearance_previous_group_references_the_unit_of(previous_txg, placement)) {
+                continue;
+            }
+            let placement_row = C_APPEARANCE_PLACEMENTS + placement * C_APPEARANCE_PLACEMENT_WORDS;
+            let in_a_user_visible_tree = sw(placement_row + 6u) == 1u;
+            if (hole == APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS && in_a_user_visible_tree) {
+                continue;
+            }
+            if (!appearance_unit_birth_is_known(u)) {
+                continue;
+            }
+            let born_after_the_previous_version = lt64(previous_txg, appearance_unit_birth_txg(u));
+            var in_a_tree_inherited_whole = false;
+            for (var r = 0u; r < roots; r = r + 1u) {
+                let root_row = row + C_APPEARANCE_VERSION_ROOTS_OFFSET + r * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
+                if ((trees_inherited_whole & (1u << r)) != 0u
+                    && appearance_placement_is_in_tree(placement, sw(root_row), vec2<u32>(sw(root_row + 1u), sw(root_row + 2u)))) {
+                    in_a_tree_inherited_whole = true;
+                }
+            }
+            judge(INVARIANT_I_3_5, born_after_the_previous_version || in_a_tree_inherited_whole);
+        }
+    }
 }
 
 // ───────────────────────── 第二批：走读与走读之后（check_pool_image 择根之后那一段）─────────────────────────
@@ -2676,10 +3706,7 @@ fn checker_scan_journal_as_the_recovery_reads(fsid_low: vec2<u32>) {
 }
 
 // ───────────────────────── I-4.1：checker 自己复刻的只读重放（walk.rs 的 replay_the_next_mount_would_do）─────────────────────────
-
-fn replay_record_at(index: u32) -> CheckerRecord {
-    return checker_record_of_row(C_REPLAY_RECORDS + index * C_REPLAY_RECORD_WORDS);
-}
+// 扫描内核认下一次挂载先施加的那一版（I-3.10、I-5.4）读同一份重放的结局：第一次施加的发布的末条经交接段交过去，不另造一份重放。
 
 // 重放前缀读的那一份环（records_the_replay_reads）：每块盘上自证过、恢复读者读得出的记录（提交标记 0 / 1、记录标志位 0 之外全 0、
 // 本次发布内序号不是 0），按 (实例代号, 计数器) 建键、按盘的次序先到先得，升序排在 C_REPLAY_RECORDS。
@@ -2797,14 +3824,25 @@ fn named_units_of_the_record_verify_on_both_copies(r: CheckerRecord) -> bool {
     return true;
 }
 
-// 照 D23（journal 的角色与格式） 已定项 14 的全部规则复刻下一次挂载在所选根（chosen）之上施加哪一段记录，交回最后一次施加的发布的末条
-// 在重放读的那一份环里的下标；施加出来的那一版 = 所选根换上它的新根段。一次发布都不施加、锚点认不定（所选根那次发布带末条标志的多于一条）、
-// 所选根 txg 是 u64 的最大值、前缀停在点名单元两份没都验过的记录上，交回 NONE（I-4.1 报不适用）。
+// 下一次挂载在所选根之上施加的那一段记录的结局（walk.rs 的 ReplayTheNextMountWouldDo），两个都是重放读的那一份环里的下标：
+// last_record_of_the_last_publish_applied —— 最后一次施加的发布的末条，施加出来的那一版 = 所选根换上它的新根段（I-4.1 走它）；
+//   一次发布都不施加、锚点认不定（所选根那次发布带末条标志的多于一条）、所选根 txg 是 u64 的最大值、前缀停在点名单元两份没都验过的记录上，
+//   是 NONE（I-4.1 报不适用）。
+// last_record_of_the_first_publish_applied —— 第一次施加的发布的末条，下一次挂载先施加的那一版照它的新根段（walk.rs 的
+//   version_the_next_mount_applies_first，改法 R1）。前缀停在后面某次发布的点名单元上时，停之前已整次收下的发布 core 照施加
+//   （crates/singlefs-core/src/recovery.rs 的 replay_journal），这一个照交回；一次都没收下、锚点认不定、所选根 txg 没有后继时是 NONE。
+struct ReplayTheNextMountWouldDo {
+    last_record_of_the_last_publish_applied: u32,
+    last_record_of_the_first_publish_applied: u32,
+};
+
+// 照 D23（journal 的角色与格式） 已定项 14 的全部规则复刻下一次挂载在所选根（chosen）之上施加哪一段记录。
 // 在飞上限按环长与格式常量 F（3）现算：⌊环长 ÷ 4096 ÷ 3⌋。
-fn replayed_version_the_next_mount_would_apply(chosen: CheckerRoot, ring_bytes: vec2<u32>, fsid_low: vec2<u32>) -> u32 {
+fn replay_the_next_mount_would_do(chosen: CheckerRoot, ring_bytes: vec2<u32>, fsid_low: vec2<u32>) -> ReplayTheNextMountWouldDo {
+    let nothing_applied = ReplayTheNextMountWouldDo(NONE, NONE);
     let count = collect_the_records_the_replay_reads(fsid_low);
     if (undecidable != 0u) {
-        return NONE;
+        return nothing_applied;
     }
     var anchors = 0u;
     var anchor_counter = vec2<u32>(0u, 0u);
@@ -2816,12 +3854,12 @@ fn replayed_version_the_next_mount_would_apply(chosen: CheckerRoot, ring_bytes: 
         }
     }
     if (anchors >= 2u) {
-        return NONE;
+        return nothing_applied;
     }
     var have_expected_next_counter = anchors == 1u;
     var expected_next_counter = add64(anchor_counter, u64_of(1u));
     if (chosen.txg.x == NONE && chosen.txg.y == NONE) {
-        return NONE;
+        return nothing_applied;
     }
     let chain_start_txg_without_anchor = add64(chosen.txg, u64_of(1u));
     let in_flight_record_limit = divmod64(shr64(ring_bytes, 12u), u64_of(3u)).quotient;
@@ -2830,6 +3868,7 @@ fn replayed_version_the_next_mount_would_apply(chosen: CheckerRoot, ring_bytes: 
     // 开着的那次发布的上一条（open_publish_records 为 0 时不读它）
     var previous: CheckerRecord;
     var last_applied = NONE;
+    var last_record_of_the_first_publish_applied = NONE;
     for (var i = 0u; i < count; i = i + 1u) {
         let r = replay_record_at(i);
         if (r.instance != chosen.instance || !lt64(chosen.txg, r.txg)) {
@@ -2871,18 +3910,22 @@ fn replayed_version_the_next_mount_would_apply(chosen: CheckerRoot, ring_bytes: 
             break;
         }
         if (!named_units_of_the_record_verify_on_both_copies(r)) {
-            return NONE;
+            return ReplayTheNextMountWouldDo(NONE, last_record_of_the_first_publish_applied);
         }
         expected_next_counter = add64(r.counter, u64_of(1u));
         have_expected_next_counter = true;
         open_publish_records = open_publish_records + 1u;
         previous = r;
         if (ends_its_publish) {
+            // 第一次发布的那一版同取它的末条（已定项 15：core 施加末条那一份新根段，改法 FL 的那一取法）
+            if (last_record_of_the_first_publish_applied == NONE) {
+                last_record_of_the_first_publish_applied = i;
+            }
             open_publish_records = 0u;
             last_applied = i;
         }
     }
-    return last_applied;
+    return ReplayTheNextMountWouldDo(last_applied, last_record_of_the_first_publish_applied);
 }
 
 // 走读的七个阶段，按次序；每个阶段里要走的每一处都经 walk_and_hand_off 循环里那一个调用点走
@@ -2901,7 +3944,8 @@ const WALK_REACHED_THE_HAND_OFF: u32 = 4u;
 // 走读那一批连同收尾：择最新根、候选根、由记录施加出来的版本、被抛弃根，判走读之后那几条；
 // 收尾是候选集之外的根整遍走一次收位置项校验和（第三批判隔离的记录要），F 之下、没被抛弃的根各走一遍，
 // 它们引用的、候选版本没走到的槽记进交接段（第三批算 defer 那一格要），再把计数与几何写进交接段；
-// 最后照下一次挂载的重放施加出那一版、另起一份走读走一遍（I-4.1），它只动上下文 1 的集合，不碰交接段与扫描内核读的表。
+// 最后照下一次挂载的重放施加出那一版、另起一份走读走一遍（I-4.1），它只动上下文 1 的集合；同一份重放第一次施加的发布的末条写进交接段
+// （H_REPLAY_INDEX_OF_THE_LAST_RECORD_OF_THE_FIRST_PUBLISH_APPLIED），扫描内核照它读重放读的那一份环里那一行（I-3.10、I-5.4）。
 // 写成按阶段推进的一个循环：每一圈先找这一阶段下一处要走的（找不到就做完这一阶段收尾的事、转下一阶段），走，再做走完之后的事。
 fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
     let device_count = hdr(3u);
@@ -2922,6 +3966,7 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
     c_newest_index = newest;
     w_mount_instance = newest_root.instance;
     w_mount_txg = newest_root.txg;
+    w_newest_instance_table_chain_reached_its_last_page = false;
     w_start(0u, true);
     var phase = WALK_PHASE_NEWEST_ROOT;
     var cursor = 0u;
@@ -2937,7 +3982,6 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
         var found = false;
         var walk_kind = WALK_KIND_ROOT;
         var walk_base = NONE;
-        var walk_applied_on = NONE;
         var walk_is_newest = false;
         if (phase == WALK_PHASE_NEWEST_ROOT) {
             walk_base = newest_root.base;
@@ -3010,7 +4054,8 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                         if (root_slot_is_readable || lt64(r.txg, effective_floor) || !lt64(oldest_valid_txg, r.txg)) {
                             continue;
                         }
-                        // 按 (实例, txg) 去重、升序插入；同键取计数器小的那一条（先到的）
+                        // 按 (实例, txg) 去重、升序插入；同键取带末条标志的那一条（改法 FL：core 施加末条那一份新根段），
+                        // 一条带标志的都还没遇到时先占着计数器小的那一条（先到的），之后遇到带标志的换上它（walk.rs 的 SegmentTakenForTheVersion）
                         var position = 0u;
                         var duplicate = false;
                         while (position < version_count) {
@@ -3025,6 +4070,10 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                             position = position + 1u;
                         }
                         if (duplicate) {
+                            let existing = checker_record_at(sw(R_DATA + position));
+                            if ((existing.flags & 1u) == 0u && (r.flags & 1u) != 0u) {
+                                sws(R_DATA + position, i);
+                            }
                             continue;
                         }
                         if (version_count >= MAX_DATA_POINTERS * 2u) {
@@ -3048,23 +4097,14 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             if (cursor < version_count) {
                 let r = checker_record_at(sw(R_DATA + cursor));
                 cursor = cursor + 1u;
-                // 它施加在其上那一版的根：同实例、txg 比它小、txg 最大的那一条
-                var applied_on = NONE;
-                var applied_on_txg = vec2<u32>(0u, 0u);
-                for (var k = 0u; k < root_count; k = k + 1u) {
-                    let root = checker_root_of(k);
-                    if (root.instance == r.instance && lt64(root.txg, r.txg)) {
-                        if (applied_on == NONE || lt64(applied_on_txg, root.txg)) {
-                            applied_on = root.base;
-                            applied_on_txg = root.txg;
-                        }
-                    }
-                }
                 walk_kind = WALK_KIND_VERSION;
                 walk_base = r.base;
-                walk_applied_on = applied_on;
                 found = true;
             } else {
+                // I-3.5：回退候选集的每一版（最新根、候选根、由记录施加出来的版本）都走完了，逐对判（check_pool_image 走完它们之后那一处）
+                if (undecidable == 0u) {
+                    judge_the_appearance_rule_of_adjacent_candidate_versions();
+                }
                 phase = WALK_PHASE_ABANDONED_ROOTS;
                 cursor = 0u;
             }
@@ -3087,17 +4127,13 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             }
             if (!found) {
                 // I-7.2
-                if (newest_failures > 0u) {
-                    violate(INVARIANT_I_7_2);
-                }
+                judge(INVARIANT_I_7_2, newest_failures == 0u);
                 // I-9.6：记账里的 inode 号水位 > inode 树内最大 key
                 if (w_have_largest_inode) {
                     for (var k = 0u; k < w_accounting_row_count; k = k + 1u) {
                         if (sw(C_ACCOUNTING_ROWS + k * 4u) == 12u && sw(C_ACCOUNTING_ROWS + k * 4u + 1u) == NONE) {
                             let watermark = vec2<u32>(sw(C_ACCOUNTING_ROWS + k * 4u + 2u), sw(C_ACCOUNTING_ROWS + k * 4u + 3u));
-                            if (!lt64(w_largest_inode, watermark)) {
-                                violate(INVARIANT_I_9_6);
-                            }
+                            judge(INVARIANT_I_9_6, lt64(w_largest_inode, watermark));
                         }
                     }
                 }
@@ -3108,14 +4144,14 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                     for (var k = 0u; k < w_inode_birth_count; k = k + 1u) {
                         if (sw(C_INODE_BIRTHS + k * 4u) == inode.x && sw(C_INODE_BIRTHS + k * 4u + 1u) == inode.y) {
                             let record_birth = vec2<u32>(sw(C_INODE_BIRTHS + k * 4u + 2u), sw(C_INODE_BIRTHS + k * 4u + 3u));
-                            if (!eq64(record_birth, unit_birth)) {
-                                violate(INVARIANT_I_9_10);
-                            }
+                            judge(INVARIANT_I_9_10, eq64(record_birth, unit_birth));
                         }
                     }
                 }
                 // I-5.1：同一块盘上不同的引用不许占重叠的槽（按 (槽, 跨度) 排序后相邻两条比 ⟺ 任两条比）
                 let reference_count = w_reference_count[0];
+                // walk.rs 每块盘按 (槽, 跨度) 排好之后相邻两条各判一次：有一块盘上有两条以上的引用就算判过
+                var some_device_has_two_references = false;
                 for (var i = 0u; i < reference_count; i = i + 1u) {
                     let device = sw(C_REFERENCES0 + i * C_REFERENCE_WORDS);
                     let slot = vec2<u32>(sw(C_REFERENCES0 + i * C_REFERENCE_WORDS + 1u), sw(C_REFERENCES0 + i * C_REFERENCE_WORDS + 2u));
@@ -3125,6 +4161,7 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                         if (j == i || sw(C_REFERENCES0 + j * C_REFERENCE_WORDS) != device) {
                             continue;
                         }
+                        some_device_has_two_references = true;
                         let other_slot = vec2<u32>(sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 1u), sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 2u));
                         let other_span = sw(C_REFERENCES0 + j * C_REFERENCE_WORDS + 3u);
                         // i 排在 j 前面：(slot, span) 字典序小
@@ -3133,6 +4170,9 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                             violate(INVARIANT_I_5_1);
                         }
                     }
+                }
+                if (some_device_has_two_references) {
+                    judge(INVARIANT_I_5_1, true);
                 }
                 // I-7.8：根环全部根的水位取 max > 盘上出现过的最大树 ID（码 2 单元头 ∪ 走过的树表条目）
                 var watermark = vec2<u32>(0u, 0u);
@@ -3153,16 +4193,31 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                         highest_seen = tree;
                     }
                 }
+                // 扫描方向照认领规则按整单元跳（walk.rs 的 scanned_tree_identifiers）：落点表按 (盘, 偏移) 升序，每块盘跨轮带
+                // 「下一个没被认领的槽」、只增不减；起点槽解得出单元头就认领它占的几槽，被认领的后几槽是它的载荷，不再读头
+                var claiming_device = NONE;
+                var first_slot_not_claimed = vec2<u32>(0u, 0u);
                 let location_count = hdr(6u);
                 for (var l = 0u; l < location_count; l = l + 1u) {
                     if (location_word(l, 4u) != LOCATION_UNIT_SLOT) {
                         continue;
                     }
-                    let s = read_location(l);
-                    if (s.version == NONE || s.length < NODE_BYTES || rd32(s.base, 0u) != MAGIC_SFSU || rd8(s.base, 6u) != 2u) {
+                    let device = location_word(l, 0u);
+                    let slot = shr64(vec2<u32>(location_word(l, 1u), location_word(l, 2u)), SLOT_SHIFT);
+                    if (device != claiming_device) {
+                        claiming_device = device;
+                        first_slot_not_claimed = vec2<u32>(0u, 0u);
+                    }
+                    if (lt64(slot, first_slot_not_claimed)) {
                         continue;
                     }
-                    if (((s.c3 >> 4u) & 1u) == 0u) {
+                    let s = read_location(l);
+                    let claimed_slots = slots_claimed_by_a_unit_header(s);
+                    if (claimed_slots == 0u) {
+                        continue;
+                    }
+                    first_slot_not_claimed = add64(slot, u64_of(claimed_slots));
+                    if (rd8(s.base, 6u) != 2u) {
                         continue;
                     }
                     let key_span = 2u * rd8(s.base, 51u);
@@ -3190,15 +4245,11 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                         highest_seen = tree;
                     }
                 }
-                if (!lt64(highest_seen, watermark)) {
-                    violate(INVARIANT_I_7_8);
-                }
+                judge(INVARIANT_I_7_8, lt64(highest_seen, watermark));
                 // I-7.8 第二格：最新那条根自己的水位 > 盘上出现过的最大树 ID，与 CPU 的池级 checker 同判
                 // （`crates/singlefs-checker/src/walk.rs` 的 `check_pool_image` 末尾取 max 那一格之后那一格，C674）：
                 // 只把最新那条根的水位压低时取 max 那一格被更早的根盖住，而恢复按所选根的水位往下发号
-                if (!lt64(highest_seen, newest_root.watermark)) {
-                    violate(INVARIANT_I_7_8);
-                }
+                judge(INVARIANT_I_7_8, lt64(highest_seen, newest_root.watermark));
                 if (undecidable != 0u) {
                     return WALK_REACHED_THE_ROOT_RING;
                 }
@@ -3253,9 +4304,11 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                 sws(H_BASE + H_MOUNT_TXG_LO, w_mount_txg.x);
                 sws(H_BASE + H_MOUNT_TXG_HI, w_mount_txg.y);
                 sws(H_BASE + H_ROOT_COUNT, root_count);
+                sws(H_BASE + H_NEWEST_INSTANCE_TABLE_CHAIN_REACHED_ITS_LAST_PAGE, select(0u, 1u, w_newest_instance_table_chain_reached_its_last_page));
                 sws(H_BASE + H_UNIT_AREA_START_LO, g.unit_area_start_slot.x);
                 sws(H_BASE + H_UNIT_AREA_START_HI, g.unit_area_start_slot.y);
                 sws(H_BASE + H_REGIONS, g.regions);
+                sws(H_BASE + H_SLOTS_PER_REGION, g.slots_per_region);
                 sws(H_BASE + H_REGION0, g.region0);
                 sws(H_BASE + H_REGION1, g.region1);
                 sws(H_BASE + H_REGION2, g.region2);
@@ -3267,7 +4320,10 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             }
         } else if (phase == WALK_PHASE_REPLAYED_VERSION) {
             // I-4.1：一条都不施加、锚点认不定、所选根 txg 没有后继、前缀停在点名单元验不过，都报不适用（不走）
-            let last_applied = replayed_version_the_next_mount_would_apply(newest_root, g.ring_bytes, fsid_low);
+            let replay = replay_the_next_mount_would_do(newest_root, g.ring_bytes, fsid_low);
+            // 下一次挂载先施加的那一版（I-3.10、I-5.4）交给扫描内核：H_VALID 只在走过这一阶段之后才置 1
+            sws(H_BASE + H_REPLAY_INDEX_OF_THE_LAST_RECORD_OF_THE_FIRST_PUBLISH_APPLIED, replay.last_record_of_the_first_publish_applied);
+            let last_applied = replay.last_record_of_the_last_publish_applied;
             if (last_applied == NONE || undecidable != 0u) {
                 phase = WALK_PHASE_DONE;
             } else {
@@ -3275,7 +4331,6 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
                 w_harvesting = false;
                 walk_kind = WALK_KIND_VERSION;
                 walk_base = checker_record_of_row(C_REPLAY_RECORDS + last_applied * C_REPLAY_RECORD_WORDS).base;
-                walk_applied_on = newest_root.base;
                 found = true;
             }
         }
@@ -3291,8 +4346,16 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
         }
         let mismatches_before = w_mismatches;
         let failures_before = w_failures;
-        w_walk_one(walk_kind, walk_base, walk_applied_on, walk_is_newest, fsid_low);
+        w_walk_one(walk_kind, walk_base, walk_is_newest, fsid_low);
         w_version_is_an_older_candidate_root = false;
+        // I-3.5：主走读走的那几版（最新根、候选根、由记录施加出来的版本）各记一份它引用了哪些单元；这一版的实例与 txg：根记录偏移 24 / 28，记录偏移 16 / 26
+        if (phase == WALK_PHASE_NEWEST_ROOT || phase == WALK_PHASE_CANDIDATE_ROOTS || phase == WALK_PHASE_VERSIONS_APPLIED_ONLY_BY_RECORDS) {
+            var walked_instance = rd32(walk_base, 24u);
+            if (walk_kind == WALK_KIND_VERSION) {
+                walked_instance = rd32(walk_base, 16u);
+            }
+            appearance_note_the_version_just_walked(walked_instance, w_version_txg, w_failures == failures_before);
+        }
         // ③ 走完之后这一阶段要做的
         if (phase == WALK_PHASE_NEWEST_ROOT) {
             c_newest_reference_count = w_reference_count[0];
@@ -3345,14 +4408,10 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
             w_judge(INVARIANT_I_7_4, !walked_into);
             w_judge(INVARIANT_I_4_8, !walked_into);
         } else if (phase == WALK_PHASE_ABANDONED_ROOTS) {
-            if (w_failures > 0u || w_mismatches > 0u) {
-                violate(INVARIANT_I_7_4);
-            }
+            judge(INVARIANT_I_7_4, !(w_failures > 0u || w_mismatches > 0u));
         } else if (phase == WALK_PHASE_REPLAYED_VERSION) {
             // I-4.1：施加出来的那一版走不完（任一单元两份都读不对、头用不了、条目解不开）
-            if (w_failures > 0u) {
-                violate(INVARIANT_I_4_1);
-            }
+            judge(INVARIANT_I_4_1, w_failures == 0u);
             phase = WALK_PHASE_DONE;
         } else if (phase == WALK_PHASE_ROOTS_BELOW_THE_FLOOR) {
             for (var r = 0u; r < w_reference_count[1]; r = r + 1u) {
@@ -3398,11 +4457,11 @@ fn judge_system_configuration_slot_generations_follow_the_rotation(device_count:
     for (var d = 0u; d < device_count; d = d + 1u) {
         let zero = slot_readings[d * 2u];
         let one = slot_readings[d * 2u + 1u];
-        if (zero.reading == SLOT_USABLE && lt64(u64_of(1u), zero.generation) && (zero.generation.x & 1u) != 0u) {
-            violate(INVARIANT_I_7_16);
+        if (zero.reading == SLOT_USABLE && lt64(u64_of(1u), zero.generation)) {
+            judge(INVARIANT_I_7_16, (zero.generation.x & 1u) == 0u);
         }
-        if (one.reading == SLOT_USABLE && lt64(u64_of(1u), one.generation) && (one.generation.x & 1u) != 1u) {
-            violate(INVARIANT_I_7_16);
+        if (one.reading == SLOT_USABLE && lt64(u64_of(1u), one.generation)) {
+            judge(INVARIANT_I_7_16, (one.generation.x & 1u) == 1u);
         }
         if (zero.reading == SLOT_USABLE && one.reading == SLOT_USABLE) {
             let both_written_by_mkfs = eq64(zero.generation, u64_of(1u)) && eq64(one.generation, u64_of(1u));
@@ -3412,9 +4471,7 @@ fn judge_system_configuration_slot_generations_follow_the_rotation(device_count:
             } else {
                 one_apart = eq64(sub64(zero.generation, one.generation), u64_of(1u));
             }
-            if (!(both_written_by_mkfs || one_apart)) {
-                violate(INVARIANT_I_7_16);
-            }
+            judge(INVARIANT_I_7_16, both_written_by_mkfs || one_apart);
         }
     }
 }
@@ -3428,9 +4485,7 @@ fn judge_root_slots_aligned_to_the_decision_width(g: CheckerSlot, decision_width
         let region_bytes = mul64_32(mul32x32(region, g.prime_step), g.chunk_bytes).value;
         for (var slot = 0u; slot < g.slots_per_region; slot = slot + 1u) {
             let offset = add64(add64(root_ring_base_bytes, region_bytes), mul32x32(slot, g.spacing));
-            if (decision_width == 0u || !is_zero64(divmod64(offset, u64_of(decision_width)).remainder)) {
-                violate(INVARIANT_I_7_5);
-            }
+            judge(INVARIANT_I_7_5, decision_width != 0u && is_zero64(divmod64(offset, u64_of(decision_width)).remainder));
         }
     }
 }
@@ -3443,37 +4498,63 @@ fn judge_root_records_live_in_the_slot_their_txg_names(g: CheckerSlot) {
         let region = checker_root_region(i);
         let slot = checker_root_slot_in_its_region(i);
         if (is_zero64(txg)) {
-            if (slot != 0u) {
-                violate(INVARIANT_I_7_17);
-            }
+            judge(INVARIANT_I_7_17, slot == 0u);
             continue;
         }
         let by_region = divmod64(txg, u64_of(g.regions));
         let slot_of_the_txg = divmod64(by_region.quotient, u64_of(g.slots_per_region)).remainder;
-        if (!(by_region.remainder.x == region && slot_of_the_txg.x == slot)) {
-            violate(INVARIANT_I_7_17);
-        }
+        judge(INVARIANT_I_7_17, by_region.remainder.x == region && slot_of_the_txg.x == slot);
+    }
+}
+
+// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节的起点与字节数（D22（单元原子性怎么合成） 已定项 7 的字段表：偏移 428、429、441，
+// 合计到 457；image::ROOT_RECORD_ALGORITHM_NONCE_AND_MAC 是 428..457）
+const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC_OFFSET: u32 = 428u;
+const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC_BYTES: u32 = 29u;
+
+// I-2.4 根记录那一处：根环里每一条自证过的根（checker_collect_roots，不按候选集滤），根槽 428..457 全 0
+// （image::judge_root_record_algorithm_nonce_and_mac_are_zero；这一版 checker 只收加密类型 0 的系统配置，加密关着时恒 0）。只判不断
+fn judge_root_record_algorithm_nonce_and_mac_are_zero() {
+    for (var root_index = 0u; root_index < root_count; root_index = root_index + 1u) {
+        judge(INVARIANT_I_2_4, all_zero(checker_root_of(root_index).base, ROOT_RECORD_ALGORITHM_NONCE_AND_MAC_OFFSET, ROOT_RECORD_ALGORITHM_NONCE_AND_MAC_BYTES));
     }
 }
 
 // check_pool_image 从读系统配置槽到走读那一段，交回结论里「走到了第几步」。整池不作保的两支先判：任一盘任一槽带这一版读者不收的值
 // （I-7.13）、任一盘任一可择槽 I-8.1 的三个字段有一格不等（两支都中时走 I-7.13 那一支，image 与 walk 的次序）——中了就只报那一条、
 // 别的不判；再 I-8.5（全池没有一个自证过的槽）、择系统配置、系统配置与根环那几条、逐盘 journal，根环里有根才进走读。
+// 判到位跟 CPU 的三支走：带越界值那一支只交 I-7.13 那一份判定；I-8.1 三个字段不等那一支 CPU 另起一份判定、只交它（这里清掉之前记的评估过）；
+// 一块盘都择不到时 I-8.5 只有判红才算判到（那一支 CPU 判过而成立报不适用）
 fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 {
+    var any_slot_carries_a_refused_value = false;
     for (var d = 0u; d < device_count; d = d + 1u) {
         for (var k = 0u; k < 2u; k = k + 1u) {
-            if (slot_readings[d * 2u + k].reading == SLOT_CARRIES_A_REFUSED_VALUE) {
-                violate(INVARIANT_I_7_13);
+            let reading = slot_readings[d * 2u + k].reading;
+            if (reading == SLOT_USABLE) {
+                judge(INVARIANT_I_7_13, true);
+            } else if (reading == SLOT_CARRIES_A_REFUSED_VALUE) {
+                judge(INVARIANT_I_7_13, false);
+                any_slot_carries_a_refused_value = true;
+            }
+        }
+    }
+    if (any_slot_carries_a_refused_value) {
+        return 1u;
+    }
+    for (var d = 0u; d < device_count; d = d + 1u) {
+        for (var k = 0u; k < 2u; k = k + 1u) {
+            let slot = slot_readings[d * 2u + k];
+            if (slot.reading == SLOT_USABLE && !journal_ring_geometry_fields_agree(slot)) {
+                clear_judged();
+                judge(INVARIANT_I_8_1, false);
                 return 1u;
             }
         }
     }
     for (var d = 0u; d < device_count; d = d + 1u) {
         for (var k = 0u; k < 2u; k = k + 1u) {
-            let slot = slot_readings[d * 2u + k];
-            if (slot.reading == SLOT_USABLE && !journal_ring_geometry_fields_agree(slot)) {
-                violate(INVARIANT_I_8_1);
-                return 1u;
+            if (slot_readings[d * 2u + k].reading == SLOT_USABLE) {
+                judge(INVARIANT_I_8_1, true);
             }
         }
     }
@@ -3515,19 +4596,15 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
         if (!chosen_valid) {
             g = chosen;
             chosen_valid = true;
-        } else {
-            if (!same_fsid(chosen.fsid, g.fsid)) {
-                violate(INVARIANT_I_1_4);
-            }
-            // I-7.15：各盘所选的系统配置槽设备数相同（不要求等于盘表）
-            if (chosen.device_count != g.device_count) {
-                violate(INVARIANT_I_7_15);
-            }
         }
+        // 每块择到的盘（第一块也算）各判一次 I-1.4 与 I-7.15（各盘所选的系统配置槽设备数相同，不要求等于盘表）
+        judge(INVARIANT_I_1_4, same_fsid(chosen.fsid, g.fsid));
+        judge(INVARIANT_I_7_15, chosen.device_count == g.device_count);
     }
     if (!chosen_valid) {
         return 0u;
     }
+    judge(INVARIANT_I_8_5, some_slot_verifies_itself);
     judge_system_configuration_slot_generations_follow_the_rotation(device_count);
     judge_root_slots_aligned_to_the_decision_width(g, decision_width);
     // I-7.6：根环区域的设备
@@ -3560,11 +4637,10 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
         heaviest = max(heaviest, load);
     }
     let pigeonhole = (g.regions + device_count - 1u) / device_count;
-    if (!(distinct == min(g.regions, device_count) && heaviest <= pigeonhole && all_in_pool)) {
-        violate(INVARIANT_I_7_6);
-    }
+    judge(INVARIANT_I_7_6, distinct == min(g.regions, device_count) && heaviest <= pigeonhole && all_in_pool);
     let fsid_low = vec2<u32>(g.fsid.x, g.fsid.y);
     checker_collect_roots(g);
+    judge_root_record_algorithm_nonce_and_mac_are_zero();
     judge_root_records_live_in_the_slot_their_txg_names(g);
     // 自证过、属于本池的槽：I-7.14 本盘设备号；I-7.12 每盘的 F
     for (var d = 0u; d < device_count; d = d + 1u) {
@@ -3576,9 +4652,7 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
             if (slot.reading != SLOT_USABLE || !same_fsid(slot.fsid, g.fsid)) {
                 continue;
             }
-            if (slot.this_device != device) {
-                violate(INVARIANT_I_7_14);
-            }
+            judge(INVARIANT_I_7_14, slot.this_device == device);
             if (!have_slot || lt64(highest_floor, slot.floor)) {
                 highest_floor = slot.floor;
             }
@@ -3587,14 +4661,17 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
         if (!have_slot) {
             continue;
         }
+        // image::judge_system_configuration_floor_against_the_roots_on_each_device：有本池的槽的盘各判一次（这块盘上 F 最大的那条根不超过槽里的 F）
+        var floors_hold = true;
         for (var i = 0u; i < root_count; i = i + 1u) {
             if (checker_region_device(g, checker_root_region(i)) != device) {
                 continue;
             }
             if (lt64(highest_floor, checker_root_of(i).floor)) {
-                violate(INVARIANT_I_7_12);
+                floors_hold = false;
             }
         }
+        judge(INVARIANT_I_7_12, floors_hold);
     }
     // I-7.7：每盘两槽里本池的槽中 journal 实例代号的最大者；有一块盘没有本池的槽就不判
     var every_device_has_a_slot = true;
@@ -3617,13 +4694,10 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
             pool_lowest = min(pool_lowest, highest);
         }
     }
+    // image::judge_instance_carriers：GPU 的表里每个落点都读得出（没有 some_slot_is_unreadable 那一支），两句各判一次
     if (every_device_has_a_slot) {
-        if (some_instance_carrier_exceeds(pool_highest, g)) {
-            violate(INVARIANT_I_7_7);
-        }
-        if (pool_lowest < pool_highest && some_instance_carrier_exceeds(pool_lowest, g)) {
-            violate(INVARIANT_I_7_7);
-        }
+        judge(INVARIANT_I_7_7, !some_instance_carrier_exceeds(pool_highest, g));
+        judge(INVARIANT_I_7_7, !(pool_lowest < pool_highest && some_instance_carrier_exceeds(pool_lowest, g)));
     }
     // journal 那几条与点名项的位置条目次序，逐盘
     for (var d = 0u; d < device_count; d = d + 1u) {
@@ -3639,8 +4713,8 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
         judge_new_root_segment_of_the_last_record_against_the_roots_of_device();
     }
     // I-7.1 / I-7.3
+    judge(INVARIANT_I_7_1, root_count != 0u);
     if (root_count == 0u) {
-        violate(INVARIANT_I_7_1);
         return 2u;
     }
     var newest = vec2<u32>(0u, 0u);
@@ -3661,9 +4735,7 @@ fn judge_the_pool_from_its_system_configuration_slots(device_count: u32) -> u32 
             every_genesis = false;
         }
     }
-    if (!(earlier_exists || every_genesis)) {
-        violate(INVARIANT_I_7_3);
-    }
+    judge(INVARIANT_I_7_3, earlier_exists || every_genesis);
     let reached = walk_and_hand_off(g, fsid_low);
     if (reached == WALK_REACHED_THE_HAND_OFF && undecidable == 0u) {
         sws(H_BASE + H_VALID, 1u);
@@ -3681,6 +4753,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
     }
     begin_state(local);
     clear_violated();
+    clear_judged();
     let out = local * VERDICT_WORDS;
     sws(H_BASE + H_VALID, 0u);
     let device_count = hdr(3u);
@@ -3692,6 +4765,7 @@ fn main(@builtin(global_invocation_id) id: vec3<u32>) {
         reached = judge_the_pool_from_its_system_configuration_slots(device_count);
     }
     store_violated(out);
+    store_judged(out);
     verdicts[out + POOL_CHECKER_REACHED_WORD] = reached;
     verdicts[out + POOL_CHECKER_UNDECIDABLE_WORD] = undecidable;
 }

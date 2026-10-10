@@ -4,7 +4,8 @@
 //! 坏镜像照攻方那一份造（`research/prompts/m3-inv-a-r1-opus-output.md` 五、A6）：两块内存盘上 mkfs、取号、暖机、第一个文件（txg 3），
 //! 把根环里每一条自证过的根的实例表指针 extent 偏移改成 1、整槽自证校验和重封。改之前 `recover` 读出文件、`mount_writable` 挂上
 //! （读者 `reader.skip(2)`）；改之后两个入口都择不到根、拒，盘上逐字节不变。
-//! 另一条在指针一级钉住判的那两个读法（多层码 2 树内部条目、journal 新根段指针用的、根记录用的）报的是 extent 偏移。
+//! 另一条在指针一级钉住判头部的那两个读法（多层码 2 树内部条目、journal 新根段与根记录四条指针用的；走读的读者经判不判由读者定的那个入口用的）
+//! 报的是 extent 偏移。
 
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber, TreeIdentifier,
@@ -19,7 +20,7 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::pointer::{
     BirthSequence, LocationEntry, NodePointer, PointerHead, PointerHeadExtentOffsetNotZero,
-    PointerHeadFieldOutsideTheFirstVersion,
+    PointerHeadFieldOutsideTheFirstVersion, PointerHeadFieldsJudgement,
 };
 use singlefs_core::recovery::{
     choose_system_configuration, every_root_ring_slot, read_root_ring_slot, recover, JournalPolicy,
@@ -233,36 +234,40 @@ fn node_pointer_bytes_with_extent_offset(extent_offset: u16) -> (NodePointer, Ve
 }
 
 /// 场景：一条节点指针头部 extent 偏移写成 7，MAC、nonce、算法类型、压缩那几段都是第一版的取值。
-/// 预期：判头部的两个读法都报 extent 偏移非 0、带着读到的 7——多层码 2 树内部条目与 journal 新根段指针用的
-/// `read_judging_the_encryption_compression_and_extent_offset_fields_from`，根记录用的 `read_judging_the_extent_offset_from`；
-/// extent 偏移是 0 的同一条指针两个读法都照常读出。改之前两个读法都跳过这 2 字节、照常读出。
+/// 预期：判头部的两个读法都报 extent 偏移非 0、带着读到的 7——多层码 2 树内部条目、journal 新根段与根记录四条指针用的
+/// `read_judging_the_encryption_compression_and_extent_offset_fields_from`，走读的读者用的 `read_with_head_fields_judgement_from`
+/// 取判的那一种；extent 偏移是 0 的同一条指针两个读法都照常读出。改之前两个读法都跳过这 2 字节、照常读出。
 #[test]
 fn a_node_pointer_head_with_a_non_zero_extent_offset_is_refused_by_both_judging_readers() {
+    let judged = PointerHeadFieldsJudgement::JudgedAsTheStructureIsCorruptOutsideTheFirstVersion;
     let (pointer, clean) = node_pointer_bytes_with_extent_offset(0);
     assert_eq!(
         (
             NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
                 &mut ByteReader::at(&clean, 0)
             ),
-            NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(&clean, 0)),
+            NodePointer::read_with_head_fields_judgement_from(
+                &mut ByteReader::at(&clean, 0),
+                judged
+            ),
         ),
         (Ok(pointer), Ok(pointer)),
         "extent 偏移 0：两个读法都照常读出"
     );
     let (_, damaged) = node_pointer_bytes_with_extent_offset(7);
-    let not_zero = PointerHeadExtentOffsetNotZero { extent_offset: 7 };
+    let not_zero = PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(
+        PointerHeadExtentOffsetNotZero { extent_offset: 7 },
+    );
     assert_eq!(
         NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
             &mut ByteReader::at(&damaged, 0)
         ),
-        Err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(
-            not_zero
-        )),
+        Err(not_zero),
         "判加密与压缩那几段的读法也判 extent 偏移"
     );
     assert_eq!(
-        NodePointer::read_judging_the_extent_offset_from(&mut ByteReader::at(&damaged, 0)),
+        NodePointer::read_with_head_fields_judgement_from(&mut ByteReader::at(&damaged, 0), judged),
         Err(not_zero),
-        "根记录用的读法报 extent 偏移"
+        "走读的读者取判的那一种：报 extent 偏移"
     );
 }

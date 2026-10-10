@@ -7,7 +7,8 @@
 //! 那一槽（槽 1）：见证读与取号只看每块盘的槽 1 的错实现在那几条上全过（攻方变异 slot1-only-both）。这里写坏的是最新的世代 8 那一槽（槽 0）：
 //! - 两块盘槽 0 都报读错：有槽报读错、没有一块盘两槽都自证过 ⇒ 判不出，可写挂载重读一次仍判不出、取号之前拒，取号那一刻也拒；
 //! - 盘 0 槽 0 读回全零（撕裂的轮换）、盘 1 槽 0 报读错：报读错的是第二块盘，同样判不出、拒可写；
-//! - 读阶段两槽都读得出、到取号之前的逐盘核那一遍盘 1 两槽才读不出（两次读之间的瞬时读错）：逐盘核交 `Err(盘 1)`，照见证读的拒因报。
+//! - 读阶段两槽都读得出、到取号之前的逐盘核那一遍盘 1 两槽才读不出（两次读之间的瞬时读错）：逐盘核交 `Err(盘 1)`，以「读阶段判完之后
+//!   系统配置又读不出」拒（C664（挂载拒绝合法复算把两种拒因报成一个）之后与见证读的拒因分开报）。
 mod common;
 
 use std::cell::RefCell;
@@ -23,7 +24,8 @@ use singlefs_core::block_device::{
     BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes, WriteDurability,
 };
 use singlefs_core::mount::{
-    mount_writable, MountError, Mounted, StillUnreadableAfterOneReread, WitnessedCounterComparison,
+    mount_writable, MountError, Mounted, StillUnreadableAfterOneReread,
+    SystemConfigurationUnreadableWhen, WitnessedCounterComparison,
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::recovery::PoolReader;
@@ -382,7 +384,7 @@ const SLOT_READS_OF_THE_ACQUISITION_BEFORE_ITS_BARRIER: u64 = 3;
 /// 场景：新池新建文件之后重开、可写挂载；读阶段与之前几遍读盘 1 两槽都读得出，到取号之前的逐盘核那一遍（取号写之前那道屏障那一刻
 /// 两槽各被读的次数减去取号自己的三次）两槽读坏，之后碰到别处的第一次读起读故障撤掉（两次读之间的瞬时读错）。
 /// 次数取另一份逐字节相同的池上照常挂载时数到的。
-/// 预期：逐盘核交 `Err(盘 1)`，照见证读的拒因报 `NewerStateStillUnreadableAfterOneReread`（后一遍判「有一块盘一份自证过的系统配置都没有」）；
+/// 预期：逐盘核交 `Err(盘 1)`，拒成 `SystemConfigurationUnreadableAfterTheReadStage`（逐盘核点名盘 1；C664 之后不再报成见证读的拒因）；
 /// 只读坏了逐盘核那两次；系统配置槽、根环、录制流步数都不变。
 /// 判别力：逐盘核读不出就跳过这块盘时，取号那几遍读得出，挂载做成。
 #[test]
@@ -425,19 +427,15 @@ fn a_writable_mount_is_refused_when_the_slots_of_the_second_device_turn_unreadab
     );
     let refused_by_the_check_of_every_device = matches!(
         &outcome,
-        Err(MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable))
-            if matches!(
-                still_unreadable.as_ref(),
-                StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
-                    reread,
-                    ..
-                } if reread.witness.comparison
-                    == WitnessedCounterComparison::SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot
-            )
+        Err(MountError::SystemConfigurationUnreadableAfterTheReadStage(unreadable))
+            if unreadable.unreadable
+                == SystemConfigurationUnreadableWhen::CheckingEachDeviceBeforeTheAcquisition {
+                    device: DeviceIdentity(1),
+                }
     );
     assert!(
         refused_by_the_check_of_every_device,
-        "逐盘核那一遍盘 1 两槽读不出：拒可写，后一遍判「有一块盘一份自证过的系统配置都没有」；得到 {}",
+        "逐盘核那一遍盘 1 两槽读不出：以读阶段判完之后系统配置又读不出拒、点名盘 1；得到 {}",
         describe(&outcome)
     );
     assert_eq!(

@@ -11,7 +11,7 @@ use std::collections::BTreeMap;
 use std::io::Write as _;
 
 use singlefs_checker::walk::InstanceTableOfRootRecord;
-use singlefs_checker_tier::crash::check_records;
+use singlefs_checker_tier::crash::{check_records, check_records_against};
 use singlefs_checker_tier::crash_injection::{
     crash_injection_campaign_from_environment, inject_crashes_into_history,
     run_crash_injection_campaign, CrashInjectionAssertions, CrashInjectionCampaign,
@@ -33,7 +33,7 @@ use singlefs_harness::history::{
 };
 use singlefs_harness::memory_pool::{
     root_identity_written_by, writes_and_segments, CrashImage, MemoryPool, RecordCheck,
-    RetainedWrite,
+    RecordStreamContinuity, RetainedWrite,
 };
 use singlefs_harness::numeric_environment_variable::process_environment_variable;
 use singlefs_harness::segments::StepKind;
@@ -1598,6 +1598,125 @@ fn a_crash_state_landing_after_a_publish_whose_data_unit_never_landed_is_a_findi
     assert!(
         finding.observation.model_disagreement.is_none(),
         "恢复落到 (1, 4) 并读回它的内容，模型认：{finding:#?}"
+    );
+}
+
+/// 崩溃注入第一截交给记录核对器的写表取整条历史录制流（`crash_injection.rs` 第一截那一次 `check_records_against`），
+/// 与只取到崩溃点所在段为止的前缀，判出来不同只在两种崩溃状态上（推的：前缀之后的写一个都没持久，缺席判定与回收谓词只用得到
+/// 持久的后写与更早的写；整条流多出来的只有根槽写在前缀之后的那几次发布，与恢复落到的那一版的根槽写）：
+/// - 恢复落到由记录重建的一版、它的实例表抛弃了某次单元已被复用的发布：前缀里没有那一版的根槽写，实例表读不出，豁免落空。
+///   C554 乙之后这一形摆不出来（[`crash_state_landing_on_a_version_rebuilt_from_records_exempts_the_publishes_its_instance_table_abandons`]、
+///   [`units_of_a_publish_the_landed_version_abandons_are_not_required_while_a_kept_publish_missing_a_unit_is_still_red`] 钉着）。
+/// - 恢复落到由记录重建的一版、那一版自己的某个单元两份都不在：前缀里没有它的根槽写，那次发布归不出来，第二条判据罩不到它。
+///   这一条造的就是它：第二次覆盖写 (1, 5) 的第一个数据单元两份（第 20 段头两个写）扣下，第 20 段别的单元写与第 21 段两份 journal 记录都持久，
+///   第 22 段 (1, 5) 的根槽写在窗口之后、没落。验点名单元的恢复（`JournalPolicy::Consult`，崩溃注入用的就是它）不施加那条记录、落回 (1, 4)，
+///   两种交法同判；只有不验点名单元的恢复（只供测试强制进入的 `JournalPolicy::ConsultWithoutNamedVerification`）落到 (1, 5)，整条流判红、前缀不判。
+///
+/// 所以把第一截的写表退回前缀那一条变异不是等价变异：这一条自己就造出了两种交法不同值的输入（不验点名单元的恢复落到 (1, 5)，整条流判红、前缀不判）。
+/// 它是第三类「取样点不敏感」（`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」）：崩溃注入的取值域里摆不出能分辨两种交法的盘面——
+/// 崩溃注入恢复只用验点名单元的那一种（`JournalPolicy::Consult`），C554 乙那一判又让另一形摆不出来；补不上敏感的取样点，是因为要给崩溃注入
+/// 加换恢复策略的开关（改被测代码，判决 `research/prompts/m3-batch10-code-r1-main-verification.md` 第五节「崩溃注入换恢复策略的开关」那一行），
+/// 不是因为两种交法在所有输入上同值。这一条钉住取值域外那一支的两种交法确实分开、取值域里那一形两种交法同判；C554 乙那一判或点名验证哪天不在了，
+/// 崩溃注入里两种交法也会分开。
+/// 第二条判据不罩恰好是恢复落到的那一版的那次发布（`crates/mutations.tsv`），整条流那一判不红，这一条红。
+#[test]
+fn a_version_rebuilt_from_records_missing_a_unit_is_judged_only_on_the_whole_stream_and_the_verifying_recovery_never_lands_on_it(
+) {
+    let history = history_of_a_first_file_and_two_overwrites();
+    let (writes, segments) = writes_and_segments_of(&history);
+    let root_of_the_second_overwrite = segments[22][0];
+    assert_eq!(
+        root_identity_of_a_root_slot_write(&writes[root_of_the_second_overwrite]),
+        Some((InstanceGeneration(1), CheckpointTxg(5))),
+        "第 22 段的头一个写是第二次覆盖写 (1, 5) 的根槽写"
+    );
+    assert_eq!(
+        segments[21]
+            .iter()
+            .map(|index| writes[*index].kind)
+            .collect::<Vec<_>>(),
+        vec![StepKind::JournalRecord, StepKind::JournalRecord],
+        "第 21 段是 (1, 5) 的两份 journal 记录"
+    );
+    let first_write = segments[20][0];
+    let withheld_copies = &writes[first_write..first_write + 2];
+    assert!(
+        withheld_copies
+            .iter()
+            .all(|write| write.kind == StepKind::UnitWrite
+                && write.length_in_bytes() == DATA_UNIT_BYTES
+                && write.offset == withheld_copies[0].offset)
+            && withheld_copies[0].device != withheld_copies[1].device,
+        "第 20 段的头两个写是 (1, 5) 一个数据单元在两块盘上的两份：{withheld_copies:?}"
+    );
+    let end_of_the_window = segments[21][0] + segments[21].len();
+    assert_eq!(
+        end_of_the_window, root_of_the_second_overwrite,
+        "窗口（第 20、21 段）截在 (1, 5) 的根槽写之前"
+    );
+
+    let persisted_within_the_window: Vec<bool> = (first_write..end_of_the_window)
+        .map(|index| index >= first_write + 2)
+        .collect();
+    let persisted =
+        persisted_over_the_whole_stream(writes.len(), first_write, &persisted_within_the_window);
+    let base = pool_of_the_persisted_writes_before_the_segment(
+        &writes[..first_write],
+        &persisted,
+        UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES
+            .device_width
+            .device_bytes(),
+    );
+    let image = CrashImage {
+        base: &base,
+        writes: &writes[first_write..end_of_the_window],
+        persisted: persisted_within_the_window,
+    };
+    // 第一截的交法：两份镜像同一份、一条录制流（这段历史没掉过电），写表与持久集合取到 `end_of_table` 为止。
+    let record_check_on_the_table_up_to =
+        |end_of_table: usize, effective_root: Option<(InstanceGeneration, CheckpointTxg)>| {
+            check_records_against(
+                &image,
+                &image,
+                &writes[..end_of_table],
+                &persisted[..end_of_table],
+                RecordStreamContinuity::OneRecording,
+                effective_root,
+            )
+        };
+
+    let verifying = recover(&image, JournalPolicy::Consult).effective_root;
+    assert_eq!(
+        verifying,
+        Some((InstanceGeneration(1), CheckpointTxg(4))),
+        "验点名单元的恢复不施加 (1, 5) 的记录（它点名的数据单元两份都不在），落回 (1, 4)"
+    );
+    assert_eq!(
+        record_check_on_the_table_up_to(writes.len(), verifying),
+        RecordCheck::default(),
+        "落回 (1, 4)：整条流上记录核对器一条都不判"
+    );
+    assert_eq!(
+        record_check_on_the_table_up_to(end_of_the_window, verifying),
+        RecordCheck::default(),
+        "落回 (1, 4)：前缀上也一条都不判，两种交法同值"
+    );
+
+    let unverifying =
+        recover(&image, JournalPolicy::ConsultWithoutNamedVerification).effective_root;
+    assert_eq!(
+        unverifying,
+        Some((InstanceGeneration(1), CheckpointTxg(5))),
+        "不验点名单元的恢复施加 (1, 5) 的记录，落到由记录重建的 (1, 5)"
+    );
+    assert!(
+        record_check_on_the_table_up_to(writes.len(), unverifying).claimed_state_missing_unit,
+        "整条流里有 (1, 5) 的根槽写，那次发布归得出来，它的数据单元两份都不在：判「恢复自称新态而单元缺席」"
+    );
+    assert_eq!(
+        record_check_on_the_table_up_to(end_of_the_window, unverifying),
+        RecordCheck::default(),
+        "前缀里没有 (1, 5) 的根槽写，那次发布归不出来，第二条判据罩不到它"
     );
 }
 

@@ -9,6 +9,11 @@
 //!   改之前上限要读它们的树表、读到被复用的槽，准入抬 F 被拒 `RollbackFloorCeilingNeedsUnreadableValidRootTreeTable`（攻方 `rf-14-none.out`）。
 //! - 回收门槛把挂载时读不出的那一槽并进窗口里最旧有效根（RR4，攻方 B1）：X 那一槽第四次挂载起一直读不出，根环表按它能住的最大 txg 记着；
 //!   改之前抬 F 那一遍只在读得出的根上取门槛，门槛越过 X、回收了 X 引用的槽，记账比遍历少（攻方 `rfo3-17-persist.out`：抬完 I-3.1 红）。
+//!
+//! 用户 2026-10-04 定 RGall 之后（上限与回收门槛都取整个环）：洞那几槽里的旧根是有效根，上限与门槛都由它们定，
+//! 分不出上面两样改之前的做法（B2、RR4 两行变异挪走或拿掉，实现员报告）。同日又定读坏的槽在回收门槛里钉在它可能住过的最旧 txg
+//! （条文还没写回，定案在 `records/2026-09-30-里程碑三开工第一轮.md`）：X 那一槽一直读不出时钉在 9（它在 12 槽环上可能住过的最旧 txg），
+//! 比盘上环里最旧的有效根旧，池级 checker 读盘上完好的 X、按它算门槛，I-3.1 在记账多的一边红，直到这个进程写掉那一槽（第二条用例钉这个代价）。
 mod common;
 mod common_root_ring_holes;
 
@@ -24,12 +29,13 @@ use common_root_ring_holes::{
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::PoolAllocator;
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, raise_rollback_floor_to_the_admission_ceiling,
     MountError, RaiseToTheAdmissionCeiling, ShadowLedger,
 };
+use singlefs_core::recovery::allocation_records_under_root;
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};
@@ -76,7 +82,9 @@ fn violations_of(image: &MemoryPool, invariants_judged: &[&str]) -> Vec<String> 
         .filter(|(invariant, _)| invariants_judged.contains(invariant))
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}：{detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -195,12 +203,31 @@ fn admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes
     );
 }
 
+/// I-3.1 那一条红在记账比遍历多的一边：说明里「记账的已分配 Some(a)，遍历全部有效根得到 b」a 大于 b。
+fn allocated_statistic_counts_more_than_the_walk(violation: &str) -> bool {
+    let after = |marker: &str| {
+        violation.split(marker).nth(1).and_then(|rest| {
+            rest.chars()
+                .take_while(char::is_ascii_digit)
+                .collect::<String>()
+                .parse::<u64>()
+                .ok()
+        })
+    };
+    matches!(
+        (after("记账的已分配 Some("), after("遍历全部有效根得到 ")),
+        (Some(counted), Some(walked)) if counted > walked
+    )
+}
+
 /// 场景：实例 1 覆盖写到 txg 17，三次挂载崩在写行根槽之前（洞 18、19、20），X = 21；第四次挂载起 X 那一槽一直读不出，推到锚 29，
-/// 准入抬 F 到 [`FLOOR_RAISED_BELOW_X`]，再覆盖写三次。
-/// 预期：抬 F 做成，抬完与之后每次覆盖写之后盘上那几条不变量不红：X 那一槽按根环表记的最大 txg 并进回收门槛，门槛不越过 X。
-/// 改之前抬完 I-3.1 红（攻方 `rfo3-17-persist.out`：记账的已分配比遍历全部有效根少）。
+/// 准入抬 F 到 [`FLOOR_RAISED_BELOW_X`]，再覆盖写三次（txg 32、33、34；33 写掉 X 那一槽）。
+/// 预期：抬 F 做成；X 那一槽钉在它可能住过的最旧 txg 9（用户 2026-10-04 定），抬 F 那一遍与之后的进程内回收都不越过它：
+/// X 那一版引用的单元在这个进程写掉那一槽之前一个都不空闲，被引用单元那几条一直不红。
+/// 定案的代价：那一槽钉着的 9 比盘上环里最旧的有效根旧，池级 checker 读盘上完好的 X 按它算门槛，那几版 I-3.1 只许红在记账多的一边（安全方向）；
+/// 33 写掉那一槽之后不再钉，那几条全绿。改 RR4 之前抬完 I-3.1 红在记账少的一边（攻方 `rfo3-17-persist.out`）。
 #[test]
-fn admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold(
+fn admission_raising_the_floor_keeps_the_root_ring_slot_unreadable_since_the_mount_pinned_at_the_oldest_txg_it_can_have_held(
 ) {
     let mut pool = pool_just_before_the_admission_raise(17, 3, FailingReadsOfARange::Every);
     assert_eq!(
@@ -209,6 +236,72 @@ fn admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mo
         "三个洞紧跟着 X"
     );
     let parameters = parameters_of_the_ring_hole_pools();
+    let x_slot = target_for_publish(
+        CheckpointTxg(pool.x_txg),
+        parameters.geometry.root_ring_slots_per_region,
+    );
+    let txg_that_overwrites_the_x_slot = pool.x_txg + 3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS;
+    let x_root = readable_root_at_txg(&pool.image_now(), pool.x_txg).expect("盘上 X 那一槽完好");
+    let slots_x_references: Vec<(DeviceIdentity, SlotNumber)> =
+        allocation_records_under_root(&pool.image_now(), &x_root)
+            .expect("X 那一版的账读得出")
+            .iter()
+            .filter(|record| !record.is_released)
+            .flat_map(|record| {
+                (record.slot.0..record.slot.0 + u64::from(record.span_slots))
+                    .map(move |slot| (record.device, SlotNumber(slot)))
+            })
+            .collect();
+    let slots_of_x_left_free = |allocator: &PoolAllocator| -> Vec<(DeviceIdentity, SlotNumber)> {
+        slots_x_references
+            .iter()
+            .copied()
+            .filter(|(device, slot)| {
+                allocator
+                    .devices
+                    .iter()
+                    .find(|device_map| device_map.device == *device)
+                    .expect("账里的盘在分配器里")
+                    .is_free(*slot)
+            })
+            .collect()
+    };
+    let judge = |pool_being_judged: &PoolJustBeforeTheAdmissionRaise, when: &str| {
+        let txg = pool_being_judged.current.root.checkpoint_txg.0;
+        let violations = violations_of(
+            &pool_being_judged.image_now(),
+            &INVARIANTS_THE_RAISE_KEEPS_GREEN,
+        );
+        if txg < txg_that_overwrites_the_x_slot {
+            assert_eq!(
+                slots_of_x_left_free(&pool_being_judged.allocator),
+                Vec::new(),
+                "{when}（txg {txg}）：X 那一槽钉在 9，X 引用的单元一个都不空闲"
+            );
+            assert!(
+                violations
+                    .iter()
+                    .all(|violation| violation.starts_with("I-3.1：")
+                        && allocated_statistic_counts_more_than_the_walk(violation)),
+                "{when}（txg {txg}）：只许 I-3.1 红在记账多的一边：{violations:?}"
+            );
+        } else {
+            assert_eq!(
+                violations,
+                Vec::<String>::new(),
+                "{when}（txg {txg}）：X 那一槽写掉了，不再钉"
+            );
+        }
+    };
+    assert_eq!(
+        pool.allocator
+            .root_ring_occupancy()
+            .expect("可写挂载装了根环表")
+            .ring_slots_bad_at_mount_pinned_at_the_oldest_txg_they_can_have_held()
+            .get(&x_slot),
+        Some(&CheckpointTxg(9)),
+        "前提：X 那一槽钉在它可能住过的最旧 txg 9"
+    );
     let raised = raise_rollback_floor(
         &parameters,
         &mut pool.devices,
@@ -218,11 +311,7 @@ fn admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mo
         ShadowLedger::On,
     );
     assert!(raised.is_ok(), "准入抬 F 做成：{raised:?}");
-    assert_eq!(
-        violations_of(&pool.image_now(), &INVARIANTS_THE_RAISE_KEEPS_GREEN),
-        Vec::<String>::new(),
-        "抬完之后：门槛不越过 X 那一槽"
-    );
+    judge(&pool, "抬完之后");
     // 迭代上界：三次覆盖写；跨轮携带的是现行那一版。
     for step in 0..3u64 {
         let salt = 5000 + step;
@@ -240,11 +329,10 @@ fn admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mo
             )
             .expect("覆盖写")
         };
-        assert_eq!(
-            violations_of(&pool.image_now(), &INVARIANTS_THE_RAISE_KEEPS_GREEN),
-            Vec::<String>::new(),
-            "抬完之后第 {step} 次覆盖写（txg {}）",
-            pool.current.root.checkpoint_txg.0
-        );
+        judge(&pool, &format!("抬完之后第 {step} 次覆盖写"));
     }
+    assert!(
+        pool.current.root.checkpoint_txg.0 >= txg_that_overwrites_the_x_slot,
+        "前提：覆盖写走到了写掉 X 那一槽的那一版"
+    );
 }

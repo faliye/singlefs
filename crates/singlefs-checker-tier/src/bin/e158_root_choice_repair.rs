@@ -31,7 +31,7 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemParameters,
 };
 use singlefs_core::mount::{
-    mount_writable, raise_rollback_floor, ring_slots_known_to_hold_a_root_by,
+    mount_writable, raise_rollback_floor, ring_slots_whose_reread_still_bad_refuses_the_ceiling_by,
     roll_back_by_a_forward_publish, rollback_floor_ceiling, Mounted, RollbackTarget, ShadowLedger,
 };
 
@@ -1962,7 +1962,8 @@ fn floor_targets_between(
 /// op1 第三种变体的目标 floor 枚举：先不注入地做一次 `mount_writable`（试探性，用完即弃，只为量出
 /// 这一步的 F 与上限——它本身不是受注入的一步），从它交回的 `current.root.rollback_floor` 起算 F，
 /// 再用 `crates/` 已有的 `rollback_floor_ceiling`（与 `raise_rollback_floor` 内部用的是同一个函数）
-/// 算出上限。交回空 `Vec`：探测步骤失败（挂载不成功、没有文件、系统配置或实例表读不出、
+/// 算出上限（读坏、重读仍坏就拒的槽与抬 F 那一串同一个口径，`ring_slots_whose_reread_still_bad_refuses_the_ceiling_by`：
+/// 被抛弃根的槽读坏不拒、不进上限）。交回空 `Vec`：探测步骤失败（挂载不成功、没有文件、系统配置或实例表读不出、
 /// `rollback_floor_ceiling` 报错），或 F 已经等于上限（没有余量可抬）——两种都不是「该测到却漏了」，
 /// 是这条历史在这一格没有 op1 第三种变体可跑，调用方按 `raise_floor_history_nodes_without_room`
 /// 单独计一次，不归进任何触发计数。
@@ -1989,7 +1990,7 @@ fn raise_floor_targets_for(
         &system_configuration,
         current_floor,
         &table.records,
-        &ring_slots_known_to_hold_a_root_by(&mounted.allocator),
+        &ring_slots_whose_reread_still_bad_refuses_the_ceiling_by(&mounted.allocator),
     ) else {
         return Vec::new();
     };
@@ -17913,7 +17914,11 @@ mod fourth_run_segment_two {
                 | HistoryOperation::RollBackWhileMounted(_)
                 | HistoryOperation::ColdStartRecover
                 | HistoryOperation::Unlink
-                | HistoryOperation::CreateInode => format!("{operation:?}"),
+                | HistoryOperation::CreateInode
+                | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
+                | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                    format!("{operation:?}")
+                }
             });
         }
         let source_lines: Vec<&str> = body
@@ -18627,7 +18632,9 @@ mod fourth_run_segment_two {
                         }
                     }
                 }
-                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => {}
+                InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_) => {}
             }
         }
         reading
@@ -19000,6 +19007,17 @@ mod fourth_run_segment_two {
                 // 建 inode 只接在 unlink 删完之后（三·2 后续把它加进随机历史的生成），这个装置不发 unlink，同样照前提不满足记。
                 HistoryOperation::CreateInode => {
                     not_applicable("CreateInodeIsNotDrivenByThisExperiment")
+                }
+                // 掉电在 journal 记录之前的那次覆盖写只在留孤儿那一组比重里抽（实例表清扫抹头那一段的取样点），这个装置的格子不用那组比重：
+                // 照前提不满足记。
+                HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(
+                    _,
+                ) => not_applicable("OverwriteLosingPowerIsNotDrivenByThisExperiment"),
+                // 每块盘最新那一槽系统配置读回全 0 的可写挂载（C696）只进它自己那一组比重，这个装置用的几组比重不抽它：照前提不满足记。
+                HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                    not_applicable(
+                        "WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZerosIsNotDrivenByThisExperiment",
+                    )
                 }
             }
         }
@@ -22831,8 +22849,14 @@ mod tests {
 
     /// op1 第三种变体：探测出的 floor 目标落在 [F+1, 上限] 内时，不注入任何故障应当成功
     /// （`error_member` 为 `None`）；换成对着某条被抛弃可读根的分配记录树节点注入故障（两份都读失败），
-    /// `raise_rollback_floor` 必须做成、且它交回的 `RaisedFloor::abandoned_roots_unreadable` > 0——证明抬 F 那一步的影子账真的读到了
-    /// 这组故障（不是被前面那一步「先不注入的 mount_writable」悄悄吸收掉，也不是抬 F 算上限那一步先拒了）。
+    /// `raise_rollback_floor` 必须做成。那条被抛弃根在先不注入的 `mount_writable` 那一刻读得出，根环表把它记成被抛弃根、带着它引用的落点；
+    /// 抬 F 那一串照记着的落点算影子账、不再从盘上读它的账（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，根环线第 10z 批），
+    /// 所以交回的 `RaisedFloor::abandoned_roots_unreadable` 是 0（注入时与不注入时都是），抬 F 之后它记着的落点一槽都不空闲
+    /// （隔离着，或现行账里还分配着）——照记着的落点隔离，没被注入的读故障挡住，也没漏掉。
+    /// 根环表里没记着、账读不出时照读盘那一支（计数 1、从映射现算）由 harness 档
+    /// `an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs` 的
+    /// `an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account_is_unreadable_recomputes_it_from_the_mapping`
+    /// 与 `reuse_after_raising_the_floor.rs` 的慢档 `raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable` 钉。
     /// 被抛弃根取自第 2 次跑那一节 H1c 的抛弃步（`abandonment_step_nodes`；跑前登记 `research/prompts/e158-r2-prereg.md`
     /// 第一节处理表：故障改打 H1c 里一条被抛弃根的分配记录树节点、删掉「或者报了错也算」那一半）。
     #[test]
@@ -22890,13 +22914,94 @@ mod tests {
                 "被抛弃根的分配记录树节点两份都读失败时抬 F 照样做成（账读不出只计数），得到 {:?}",
                 with_fault.error_member
             );
+            assert_eq!(
+                (
+                    with_fault.abandoned_roots_unreadable,
+                    without_fault.abandoned_roots_unreadable
+                ),
+                (Some(0), Some(0)),
+                "这条被抛弃根挂载那一刻记在根环表里：抬 F 照记着的落点算、不读它的账，注入与不注入都不计（注入时、不注入时）"
+            );
+            let mut devices_of_the_mount = devices_from_pool(&pool, IMAGE_BYTES);
+            let mounted = mount_writable(&parameters, &mut devices_of_the_mount)
+                .expect("先不注入的可写挂载做得成（上面那一次就做成了）");
+            let recorded_placements = mounted
+                .allocator
+                .root_ring_occupancy()
+                .expect("挂载建的分配器装着根环表")
+                .placements_recorded_for_the_abandoned_root(record.instance, record.checkpoint_txg)
+                .filter(|placements| !placements.is_empty())
+                .expect("挂载那一刻这条被抛弃根读得出：根环表把它记成被抛弃根、带着它引用的落点");
+            let PoolVersion::WithFile(mut current) = mounted.current else {
+                panic!("先不注入的可写挂载交回的现行那一版带文件（上面那一次抬 F 做成了）");
+            };
+            let mut allocator = mounted.allocator;
+            let mut faulted_devices: Vec<(
+                DeviceIdentity,
+                FaultInjectingBlockDevice<SparseBlockDevice>,
+            )> = Vec::new();
+            for (identity, device) in devices_of_the_mount {
+                let plan = SharedFaultPlan::unarmed(fixed_geometry);
+                if let Some((_, offset)) = fault_targets
+                    .iter()
+                    .find(|(target_device, _)| *target_device == identity)
+                {
+                    plan.arm(FaultSchedule {
+                        fault: InjectedFault::ReadFails,
+                        device: FaultDeviceSelector::OnlyDevice(identity),
+                        placement: FaultPlacement::OffsetExactly(*offset),
+                        counting: FaultCounting::AcrossThePool,
+                        occurrence: FaultOccurrence::EVERY_MATCHING_CALL,
+                    });
+                }
+                faulted_devices.push((
+                    identity,
+                    FaultInjectingBlockDevice::new(identity, device, plan),
+                ));
+            }
+            // 注入确实打在抬 F 那一遍要读的地方（正推 `research/prompts/m3-batch10z-d-code-r1-sonnet-output.md` K1-3）：抬 F 之前，
+            // 经同一组带故障的盘读这条被抛弃根的分配记录树节点的每一份（落点照 `locate_allocation_record_tree` 从盘上现找，不取 `fault_targets`），
+            // 都读不出——抬 F 那一遍要是读它的账，就撞上注入。注入落空（偏移不对、故障没装上、严重度给成空集）时这里读得出，这一条红。
+            for location in &allocation_locations {
+                let (_, faulted_device) = faulted_devices
+                    .iter()
+                    .find(|(identity, _)| *identity == location.device)
+                    .expect("池里有这块盘");
+                let mut node_bytes = vec![
+                    0u8;
+                    usize::try_from(singlefs_format::SLOT_BYTES)
+                        .expect("槽宽装得进 usize")
+                ];
+                assert!(
+                    faulted_device
+                        .read_at(location.slot.to_device_offset(), &mut node_bytes)
+                        .is_err(),
+                    "注入打在这条被抛弃根的分配记录树节点 {location:?} 上：抬 F 那一遍去读它就读不出"
+                );
+            }
+            raise_rollback_floor(
+                &parameters,
+                &mut faulted_devices,
+                &mut allocator,
+                &mut current,
+                floor,
+                ShadowLedger::On,
+            )
+            .expect("注入同一组故障再抬一次：照样做成");
+            let free_recorded_placements: Vec<_> = recorded_placements
+                .iter()
+                .filter(|placement| {
+                    allocator
+                        .devices
+                        .iter()
+                        .find(|device_map| device_map.device == placement.device)
+                        .expect("池里有这块盘")
+                        .is_free(placement.slot)
+                })
+                .collect();
             assert!(
-                with_fault
-                    .abandoned_roots_unreadable
-                    .is_some_and(|count| count > 0),
-                "抬 F 重算影子账要数到这条读不出账的被抛弃根，得到 {:?}（不注入时 {:?}）",
-                with_fault.abandoned_roots_unreadable,
-                without_fault.abandoned_roots_unreadable
+                free_recorded_placements.is_empty(),
+                "抬 F 之后这条被抛弃根记着的落点一槽都不空闲（照记着的落点隔离）：空闲的 {free_recorded_placements:?}"
             );
             tested = true;
             break;
@@ -24217,10 +24322,11 @@ mod tests {
         );
     }
 
-    /// 第 2 次跑修订第 1 条的依据：重放验点名单元要全部份都验过，第一份读错就停，第二份一次都没读——b = unit 的第二份落点拦不到（V2 作废），
-    /// 只坏第一份就断得了链（b = unit_first_copy）。
+    /// 第 2 次跑修订第 1 条的依据（重放第一份读错就停，第二份一次都没读）在 C694 的 F1_ANY 之后不再整句成立：可写挂载的 F1
+    /// （D23（journal 的角色与格式） 已定项 14，点名单元两份副本都验不过才拒）第一份读坏会去读第二份，那一份被拦到恰好一次
+    /// （删除线第 35 批 W 合入后二分坐实，`~/.local/share/singlefs/work/e158-bisect/`）。只坏第一份照样断得了链（b = unit_first_copy）。
     #[test]
-    fn replay_stops_at_the_first_copy_of_a_named_unit_so_the_second_copy_is_never_read() {
+    fn a_named_unit_whose_first_copy_reads_bad_has_its_second_copy_read_once_by_the_f1_check() {
         let history = closed_history(1);
         let geometry = independent_geometry(&history.pool).expect("几何");
         let parameters = parameters_for(&GEOMETRY_PRIMARY);
@@ -24239,7 +24345,10 @@ mod tests {
         let run = run_instrumented_mount_writable(&history.pool, &parameters, &both, None, None);
         assert!(run.intercepted_reads[0] > 0, "根槽拦到了");
         assert!(run.intercepted_reads[1] > 0, "第一份拦到了");
-        assert_eq!(run.intercepted_reads[2], 0, "第二份一次都没读");
+        assert_eq!(
+            run.intercepted_reads[2], 1,
+            "F1 判两份都验不过才拒：第二份恰好读一次"
+        );
         let first = with_the_witness_unreadable(
             &history.pool,
             unreadable_ranges_of_the_abandonment(
@@ -24270,10 +24379,12 @@ mod tests {
         history.tip()
     }
 
-    /// 第 2 次跑修订第 2 条的依据（H1d 的 n1 从 0 起）：写行那次发布在它的根落盘之前写的单元，n1 = 0 时盖到被藏的首个文件那条根引用的单元，
-    /// n1 = 1 时一处都不盖（开的是更高的新段）。
+    /// 第 2 次跑修订第 2 条的依据（H1d 的 n1 = 0 时写行那次发布盖到被藏的首个文件那条根引用的单元）在 C694 的 C 预隔离之后不再成立：
+    /// 可写挂载把水位之上没施加的记录点名的落点与那次发布的账隔离到写掉那条记录的根环槽（D23（journal 的角色与格式） 已定项 14
+    /// 「可写挂载时的预隔离」），写行那次发布在它的根落盘之前写的单元，n1 = 0、1 都一处不盖（删除线第 33 批 T 合入后二分坐实，
+    /// `~/.local/share/singlefs/work/e158-bisect/`）。
     #[test]
-    fn the_row_publish_before_its_root_overwrites_the_hidden_newest_root_only_when_it_is_the_first_file(
+    fn the_row_publish_before_its_root_overwrites_none_of_the_hidden_newest_root_since_the_writable_mount_isolates_its_units(
     ) {
         let parameters = parameters_for(&GEOMETRY_PRIMARY);
         let mut overwritten_by_overwrites = Vec::new();
@@ -24316,8 +24427,8 @@ mod tests {
                 "根没落盘，恢复仍落到被藏的那条"
             );
         }
-        assert!(
-            overwritten_by_overwrites[0] > 0,
+        assert_eq!(
+            overwritten_by_overwrites[0], 0,
             "n1 = 0：{overwritten_by_overwrites:?}"
         );
         assert_eq!(

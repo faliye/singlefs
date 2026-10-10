@@ -12,7 +12,9 @@ mod common_corrupted_allocation_record;
 
 use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, disk_snapshot,
-    file_content, geometry, parameters, BuiltPool, Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    file_content, geometry, parameters,
+    rollback_after_a_recovery_abandoned_a_root_that_created_inodes, BuiltPool, Recorded,
+    RollbackAfterARecoveryAbandonedARootThatCreatedInodes, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
 use common_corrupted_allocation_record::move_the_first_allocation_record_past_the_end_of_the_unit_area_and_reseal_the_chain;
 use singlefs_checker::image::InvariantVerdict;
@@ -167,6 +169,103 @@ fn verdicts_without_any_violation(
         "{step}：池级 checker 一条违例都没有：{violated:?}"
     );
     verdicts
+}
+
+/// 挂载那一刻读坏（撕裂）或读回全零的那个根槽钉在它可能住过的最旧 txg，回收门槛停在那里（用户 2026-10-05 认下的代价：「钉最旧 txg 让 I-3.1
+/// 在合法盘面上红在记账多的一边……用例钉『只许红在记账多的一边』，池级 checker 不放宽」，`records/2026-09-30-里程碑三开工第一轮.md` 第 624 行；
+/// 读回全零照自证不过钉住，同一处第 628 行附近，第 10c 批）：池级 checker 只判 I-3.1 红，而且红在记账多的一边（记账的已分配比遍历全部有效根多）。
+/// 交回多出来的字节数；只核方向，不核大小（用户认的口径是方向加时长，判决 `research/prompts/m3-batch10-code-r3-main-verification.md` 第三节第一行）。
+fn bytes_the_allocated_statistic_counts_more_than_the_walk_when_only_it_is_red(
+    image: &MemoryPool,
+    step: &str,
+) -> u64 {
+    let violations: Vec<(&'static str, String)> = check_pool_image(image)
+        .into_iter()
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some((invariant, detail)),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect();
+    assert_eq!(
+        violations
+            .iter()
+            .map(|(invariant, _)| *invariant)
+            .collect::<Vec<_>>(),
+        vec!["I-3.1"],
+        "{step}：只许 I-3.1 红：{violations:?}"
+    );
+    let (allocated, walked) =
+        singlefs_harness::history::allocated_and_walked_bytes(&violations[0].1)
+            .expect("I-3.1 的说明里带着已分配与遍历两个数");
+    assert!(
+        allocated > walked,
+        "{step}：I-3.1 红在记账多的一边：{}",
+        violations[0].1
+    );
+    allocated - walked
+}
+
+/// 同 [`bytes_the_allocated_statistic_counts_more_than_the_walk_when_only_it_is_red`]，再钉多出来的字节数
+/// `expected_bytes_counted_more_than_the_walk`（挂载那一刻：慢档 4 条调查报告第 3.1 节，判决 `research/prompts/m3-batch10-code-r2-main-verification.md`
+/// 第三节最后一行：多出来的是盘 0 上释放代在 (钉住的 txg, checker 取的环里最旧的自证根] 里的已释放字节）。
+fn verdicts_red_only_by_the_allocated_statistic_counting_more_than_the_walk(
+    image: &MemoryPool,
+    step: &str,
+    expected_bytes_counted_more_than_the_walk: u64,
+) {
+    assert_eq!(
+        bytes_the_allocated_statistic_counts_more_than_the_walk_when_only_it_is_red(image, step),
+        expected_bytes_counted_more_than_the_walk,
+        "{step}：记账比遍历多的字节数"
+    );
+}
+
+/// 恢复之后重开的那个进程接着覆盖写（实例 3），一直写到 txg `txg_writing_the_pinned_slot`（它的根槽就是挂载时钉住的那一槽，28 + 一圈）：
+/// 写到它前一次为止，每一次覆盖写之后 I-3.1 都只红在记账多的一边（逐步核方向、不钉大小：多记的字节随覆盖写涨，第三轮两腿量过），
+/// 写掉那一槽那一次之后池级 checker 一条违例都没有（钉住只到这个进程把那个槽写掉为止，
+/// `allocator.rs` 的 `RootRingOccupant::AllZeroAtMount` / `BadAtMount`）。
+fn overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+    pool: &mut BuiltPool,
+    txg_writing_the_pinned_slot: u64,
+    step: &str,
+) {
+    assert_eq!(
+        root_slot_position_of(txg_writing_the_pinned_slot),
+        root_slot_position_of(28),
+        "txg {txg_writing_the_pinned_slot} 的根槽就是挂载时钉住的那一槽"
+    );
+    let mut overwrite = 0usize;
+    // 迭代上界：从挂载交回的那一版写到钉住那一槽的前一次（不到一圈）；没有提前出口（方向不对就断言失败）。
+    while pool.output.root.checkpoint_txg.0 + 1 < txg_writing_the_pinned_slot {
+        overwrite_in_process(
+            pool,
+            &content_of(1800 + overwrite, 61 + overwrite),
+            InstanceGeneration(3),
+        );
+        overwrite += 1;
+        bytes_the_allocated_statistic_counts_more_than_the_walk_when_only_it_is_red(
+            &pool.memory_pool(),
+            &format!(
+                "{step}：第 {overwrite} 次覆盖写之后（txg {}），那一槽还没被写掉",
+                pool.output.root.checkpoint_txg.0
+            ),
+        );
+    }
+    assert!(
+        overwrite > 0,
+        "{step}：挂载交回的那一版到钉住那一槽之间至少有一次覆盖写"
+    );
+    overwrite_in_process(pool, &content_of(1900, 97), InstanceGeneration(3));
+    assert_eq!(
+        pool.output.root.checkpoint_txg,
+        CheckpointTxg(txg_writing_the_pinned_slot)
+    );
+    verdicts_without_any_violation(
+        &pool.memory_pool(),
+        &format!("{step}：写掉钉住的那一槽（txg {txg_writing_the_pinned_slot}）之后"),
+    );
 }
 
 fn assert_judged_and_holding(
@@ -1023,8 +1122,9 @@ fn walk_to_the_file_under_the_abandoned_third_version_root(
 }
 
 /// C314（崩溃恢复落到旧根后可以复用被抛弃的根引用的单元） 那一格的必红，影子账开关强制进入；被抛弃的根由崩溃恢复造出
-/// （`abandon_the_third_version_by_a_recovery_that_lands_on_the_second_warm_up`，第一轮判决 H6 那一形）：抛弃 C 的那次挂载看不见 C，
-/// 下一次重开才看得见——影子账关着，重开之后下一版的数据单元落回 C 的数据槽，沿被抛弃的根 C 走到文件读不回第三次的内容；
+/// （`abandon_the_third_version_by_a_recovery_that_lands_on_the_second_warm_up`，第一轮判决 H6 那一形）：抛弃 C 的那次挂载照 C694 的
+/// `C_NEWER_ROOTS` 把 C 读得出的账里的 14 个槽在那一次挂载里隔离，这份隔离只住那一次挂载的内存——影子账关着，下一次重开不再隔离，
+/// 之后下一版的数据单元落回 C 的数据槽，沿被抛弃的根 C 走到文件读不回第三次的内容；
 /// 开着，只被 C 引用的 14 个槽隔离，第三次的内容原样读回。两臂报的分支名不同。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
@@ -1051,8 +1151,8 @@ fn publish_after_a_recovery_that_abandoned_the_third_version(shadow_ledger: Shad
         abandon_the_third_version_by_a_recovery_that_lands_on_the_second_warm_up(&mut pool, &third);
     assert_eq!(
         abandoning.output.isolated_slots_per_device,
-        vec![(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)],
-        "抛弃 C 的那次挂载看不见 C"
+        vec![(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)],
+        "抛弃 C 的那次挂载照 C_NEWER_ROOTS 隔离 C 那一次发布写的 14 个槽"
     );
     let remounted = remount_with_the_shadow_ledger(&mut pool, shadow_ledger);
     assert_eq!(
@@ -1332,8 +1432,8 @@ fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_fro
     assert!(
         records
             .values()
-            .any(|record| record.new_tree_identifier_watermark == 65548),
-        "(1, 3) 那次发布的记录还在环里，新根段带 65548（十二棵树 65536..65547 之后）"
+            .any(|record| record.new_tree_identifier_watermark == 65549),
+        "(1, 3) 那次发布的记录还在环里，新根段带 65549（十三棵树 65536..65548 之后）"
     );
     assert_eq!(
         highest_tree_identifier_watermark_in_the_ring(
@@ -1343,8 +1443,8 @@ fn with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_fro
             &immutable.filesystem_identifier,
             &records,
         ),
-        Some(65548),
-        "根读不出、记录还在：水位按记录带的 65548 算，不退回读得出的根带的 65536"
+        Some(65549),
+        "根读不出、记录还在：水位按记录带的 65549 算，不退回读得出的根带的 65536"
     );
 }
 
@@ -1528,8 +1628,10 @@ fn roll_back_to_the_oldest_ring_root_with_its_root_slot_write_failing(
 /// - 进程在重发之前崩了：D 的记录在根槽写之前已持久（D16（发布语义） 已定项 7 的持久顺序），恢复由记录重建 D 的根（已定项 15），
 ///   读回 B 的内容；B 的根槽哪怕被撕坏，回退也已经生效，不用再做一次。
 ///
-/// 两条路上回退都没有丢，C558 说的「退不回去」这两条路上走不到。checker 在重发之后与崩溃之后重开时全绿；崩在重发之前、
-/// B 的根槽被写坏的两格，恢复之前的镜像上 I-3.1（已分配统计对得上） 红，与普通发布同形（见用例里那一段）。
+/// 两条路上回退都没有丢，C558 说的「退不回去」这两条路上走不到。checker 在重发之后全绿；崩在重发之前、
+/// B 的根槽被写坏的两格，恢复之前的镜像上 I-3.1（已分配统计对得上） 红，与普通发布同形（见用例里那一段）；崩溃之后重开时一字节不写那一格全绿，
+/// 撕裂、写成 0 那两格挂载把那一槽钉在它可能住过的最旧 txg（用户 2026-10-05 认下的代价），只许 I-3.1 红在记账多的一边、差 819200，
+/// 这个进程写掉那一槽（txg 52）之后全绿。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
 fn the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash(
@@ -1656,7 +1758,31 @@ fn failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_is_resent_in_pro
         "{mode:?}：新实例接在 D 后面"
     );
     crashed.devices = Some(devices);
-    verdicts_without_any_violation(&crashed.memory_pool(), &format!("{mode:?}：崩溃之后重开"));
+    let step = format!("{mode:?}：崩溃之后重开");
+    match mode {
+        RootSlotWriteFailure::RefusedBeforeWriting => {
+            verdicts_without_any_violation(&crashed.memory_pool(), &step);
+        }
+        // B 的根槽（D 那一次写坏的那一槽）挂载时撕裂读坏、或读回全零：钉在它可能住过的最旧 txg 4，回收门槛停在 4，checker 取环里最旧的自证根 8；
+        // 多记账的是盘 0 上释放代 5–8 的已释放字节（慢档调查报告第 3.1 节：Torn、Zeroes 两种都是 819200 = 6406144 − 5586944）。
+        RootSlotWriteFailure::TornAfterTheFirstHalf | RootSlotWriteFailure::ZeroesWritten => {
+            verdicts_red_only_by_the_allocated_statistic_counting_more_than_the_walk(
+                &crashed.memory_pool(),
+                &step,
+                819_200,
+            );
+            crashed.allocator = remounted.allocator;
+            crashed.output = remounted
+                .current
+                .into_file_version()
+                .expect("崩溃之后重开，现行那一版带文件");
+            overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+                &mut crashed,
+                52,
+                &step,
+            );
+        }
+    }
 }
 
 /// C542 剩下的普通可写挂载那一支（`checks-owed.md` C542 行「所选根是最新根时，这次挂载的写行与暖机能不能把环里比它旧的有效根全盖掉」，
@@ -1829,7 +1955,9 @@ fn writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_
 /// 每块盘「记账的已分配 − 遍历全部有效根」= 只被 B 引用的那几个单元的字节数（229 376 = 14 槽）；这几个单元在 C 的账里是已释放、释放代 5
 /// （txg 5 那次换下的），回收要环里最旧的有效根 ≥ 5——B 还在环里时回收不了，C 的账照算它们；B 的根槽被 D 那一次写坏之后遍历里没有 B，
 /// 而 checker 只把「已被某次恢复施加」的记录并进遍历（`walk.rs` 的 `versions_applied_only_by_records`），D 不在其内，用的仍是 C 的账。
-/// D 那一版的账（D 盖掉 B 的槽之后环里最旧的有效根是 5，释放代 5 的已回收）与这个环对得上。恢复（由 D 的记录重建 D）之后重开，全绿。
+/// D 那一版的账（D 盖掉 B 的槽之后环里最旧的有效根是 5，释放代 5 的已回收）与这个环对得上。恢复（由 D 的记录重建 D）之后重开：
+/// 挂载时 B 那一槽读回全零，钉在它可能住过的最旧 txg 4（用户 2026-10-05 认下的代价），只许 I-3.1 红在记账多的一边、差 917504；
+/// 这个进程写掉那一槽（txg 52）之后全绿。
 /// checker 在这一格上该不该判红、要不要把「根槽写坏、记录已持久没施加」那一版并进来，是 checker 判法的事，交主 agent。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
@@ -1941,7 +2069,9 @@ fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_
         .iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((*invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert_eq!(
@@ -1978,7 +2108,208 @@ fn plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_
     );
     drop(cold);
     let mut reopened_devices = pool.reopen_recorded();
-    mount_writable(&parameters(), &mut reopened_devices).expect("恢复之后可写挂载");
+    let remounted = mount_writable(&parameters(), &mut reopened_devices).expect("恢复之后可写挂载");
     pool.devices = Some(reopened_devices);
-    verdicts_without_any_violation(&pool.memory_pool(), "恢复之后重开");
+    // B 的根槽读回全零：钉在它可能住过的最旧 txg 4（用户 2026-10-05 认下的代价，第 10c 批读回全零照自证不过钉住），多记账的是盘 0 上
+    // 释放代 5–8 的已释放字节（慢档调查报告第 3.1 节：917504 = 6455296 − 5537792）；写掉那一槽（txg 52）之后转绿。
+    verdicts_red_only_by_the_allocated_statistic_counting_more_than_the_walk(
+        &pool.memory_pool(),
+        "恢复之后重开",
+        917_504,
+    );
+    pool.allocator = remounted.allocator;
+    pool.output = remounted
+        .current
+        .into_file_version()
+        .expect("恢复之后重开，现行那一版带文件");
+    overwrite_until_the_pinned_root_slot_is_written_and_the_allocated_statistic_holds(
+        &mut pool,
+        52,
+        "恢复之后重开",
+    );
+}
+
+/// 一版记账里 inode 号水位那一统计量的每一行 (代段, 值)，按 key 升序（与盘上那棵记账树同序）。
+fn inode_number_watermark_rows_of(version: &TransactionOutput) -> Vec<(u64, u64)> {
+    version
+        .accounting_entries
+        .iter()
+        .filter(|entry| entry.statistic == singlefs_core::records::STATISTIC_INODE_WATERMARK)
+        .map(|entry| (entry.generation.0, entry.value))
+        .collect()
+}
+
+/// 一版的台阶行 (g, H)（`TransactionOutput::inode_number_watermark_steps`）。
+fn inode_number_watermark_steps_of(version: &TransactionOutput) -> Vec<(u64, u64)> {
+    version
+        .inode_number_watermark_steps()
+        .iter()
+        .map(|step| (step.generation.0, step.value))
+        .collect()
+}
+
+/// 管理员回退取 inode 号水位只取按 cur 的实例表没被崩溃恢复抛弃的根（D23（journal 的角色与格式） 已定项 14「水位」一格的 Opt2，用户 2026-10-08 Y1）：
+/// `common::rollback_after_a_recovery_abandoned_a_root_that_created_inodes` 那段历史——建过三个 inode、水位 5 的那一版被崩溃恢复抛弃、根读得出、
+/// 从盘上重建得出水位 5（搭建里自证），实例 2 再建一个（2 号重发，水位 3），再回退到 A：回退那次发布的水位是
+/// max(cur 那一版内存里的 3, 没被抛弃的根的) = 3，不跳到被抛弃那一版的 5。环里读得出的根全都算时（改之前的取法，
+/// `crates/mutations.tsv` 里「W3 Y1 Opt2」那一行）是 5，这一条红。台阶行照抄 cur 的：(A, 2)、(重发那次, 3)，回退那次水位没变、不留新台阶；
+/// 谱系记录带 H_cur = 3。池级 checker 一条违例都没有，I-9.30（台阶行与水位、记录、谱系对得上） 与 I-3.13 真被判过且成立。
+#[test]
+fn a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root(
+) {
+    let RollbackAfterARecoveryAbandonedARootThatCreatedInodes {
+        pool,
+        first_file_version,
+        abandoned,
+        created_again,
+        rollback,
+    } = rollback_after_a_recovery_abandoned_a_root_that_created_inodes(
+        "rollback-watermark-skips-a-root-abandoned-by-a-recovery",
+    );
+    assert_eq!(
+        (
+            abandoned.inode_number_watermark(),
+            created_again.inode_number_watermark()
+        ),
+        (5, 3),
+        "被抛弃那一版水位 5；崩溃恢复落到 A 之后再建一个，2 号重发、水位 3"
+    );
+    assert_eq!(
+        rollback.inode_number_watermark(),
+        3,
+        "回退那次发布的 inode 号水位 = max(cur 内存里的 3, 没被抛弃的根的)：不取被抛弃那一版的 5"
+    );
+    assert_eq!(
+        inode_number_watermark_steps_of(&rollback),
+        vec![
+            (first_file_version.root.checkpoint_txg.0, 2),
+            (created_again.root.checkpoint_txg.0, 3)
+        ],
+        "台阶行照抄 cur 的；回退那次水位没变，不留新台阶"
+    );
+    assert_eq!(
+        rollback
+            .lineage_containers
+            .iter()
+            .flat_map(|container| container.contents.records.iter())
+            .map(|record| record.inode_number_watermark_of_the_version_rolled_back_from)
+            .collect::<Vec<u64>>(),
+        vec![3],
+        "谱系记录带 H_cur = cur 的水位 3"
+    );
+    let verdicts =
+        verdicts_without_any_violation(&pool.memory_pool(), "崩溃恢复抛弃、再建、再回退之后");
+    assert_judged_and_holding(
+        &verdicts,
+        &["I-9.30", "I-3.13"],
+        "崩溃恢复抛弃、再建、再回退之后",
+    );
+}
+
+/// inode 号水位的台阶行（D5（快照 / 空间记账机制） 已定项 2 射程，W3 的 C2aL 形态，用户 2026-10-08 Y2）：A（第一个文件，txg 3，水位 2）、
+/// B（建两个空 inode，txg 4，水位 4）、C（覆盖写，txg 5）、D（建一个，txg 6，水位 5）、挂着的时候回退到 B（E，txg 7）。
+/// 建 inode 的发布留一级台阶 (那次的 txg, 那次之后的水位)，就是它写的那一行；别的发布照抄、自己那一行不是台阶，下一次发布不带它；
+/// 回退那次照抄 cur（D）的，不取 B 的。逐版钉 inode 号水位那一统计量的每一行 (代段, 值)、台阶与记账行数（15 + 早于这一版的台阶数），
+/// 从盘上重建读回的与写出的相同（`recovery::rebuild_version` 认得台阶行：记账行数那一判不把它们算进 3 + 6 × 盘数）。
+#[test]
+fn inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback(
+) {
+    let mut pool = build_pool("inode-number-watermark-steps");
+    let first = pool.output.clone();
+    let publish_new_inodes_in_process = |pool_to_publish_on: &mut BuiltPool, count: u64| {
+        let publish_parameters = parameters();
+        let previous = pool_to_publish_on.output.clone();
+        let devices = pool_to_publish_on.devices.as_mut().expect("镜像还开着");
+        let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+        let output = publish_new_inodes(
+            &mut writer,
+            &mut pool_to_publish_on.allocator,
+            &previous,
+            count,
+            FIXED_WRITE_TIME_SECONDS + 120,
+            InstanceGeneration(1),
+        )
+        .expect("建空 inode");
+        pool_to_publish_on.output = output.clone();
+        output
+    };
+    let second = publish_new_inodes_in_process(&mut pool, 2);
+    let third = overwrite_in_process(&mut pool, &second_content(), InstanceGeneration(1));
+    let fourth = publish_new_inodes_in_process(&mut pool, 1);
+    roll_back(
+        &mut pool,
+        RollbackTarget {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: second.root.checkpoint_txg,
+        },
+    )
+    .expect("挂着的时候回退到 B");
+    let rollback = pool.output.clone();
+    assert_eq!(
+        [&first, &second, &third, &fourth, &rollback].map(|version| version.root.checkpoint_txg.0),
+        [3, 4, 5, 6, 7],
+        "A、B、C、D、E 的 txg"
+    );
+    assert_eq!(
+        [&first, &second, &third, &fourth, &rollback].map(inode_number_watermark_rows_of),
+        [
+            vec![(3, 2)],
+            vec![(3, 2), (4, 4)],
+            vec![(3, 2), (4, 4), (5, 4)],
+            vec![(3, 2), (4, 4), (6, 5)],
+            vec![(3, 2), (4, 4), (6, 5), (7, 5)],
+        ],
+        "inode 号水位那一统计量的行 (代段, 值)：每一版自己那一行加照抄来的台阶"
+    );
+    assert_eq!(
+        [&first, &second, &third, &fourth, &rollback].map(inode_number_watermark_steps_of),
+        [
+            vec![(3, 2)],
+            vec![(3, 2), (4, 4)],
+            vec![(3, 2), (4, 4)],
+            vec![(3, 2), (4, 4), (6, 5)],
+            vec![(3, 2), (4, 4), (6, 5)],
+        ],
+        "台阶：建 inode 的发布各留一级（第一个文件那一版从没有水位到 2 也算一级），覆盖写与回退不留"
+    );
+    assert_eq!(
+        [&first, &second, &third, &fourth, &rollback]
+            .map(|version| version.accounting_entries.len()),
+        [15, 16, 17, 17, 18],
+        "记账行数 = 每一版自己的 15 行 + 早于这一版 txg 的台阶数"
+    );
+    assert_eq!(
+        (
+            rollback.inode_number_watermark(),
+            rollback
+                .lineage_containers
+                .iter()
+                .flat_map(|container| container.contents.records.iter())
+                .map(|record| record.inode_number_watermark_of_the_version_rolled_back_from)
+                .collect::<Vec<u64>>(),
+        ),
+        (5, vec![5]),
+        "回退到 B（水位 4）那一版的水位与谱系记录的 H_cur 都是 cur（D）的 5"
+    );
+    let rebuilt = match singlefs_core::recovery::rebuild_version(
+        &pool.memory_pool(),
+        &rollback.root,
+        Some(rollback.record.clone()),
+    ) {
+        Ok(
+            singlefs_core::recovery::RebuiltVersion::WithFile(version)
+            | singlefs_core::recovery::RebuiltVersion::WithTreesAndNoFile(version),
+        ) => version,
+        other => panic!("回退那一版从盘上重建：{other:?}"),
+    };
+    assert_eq!(
+        (
+            inode_number_watermark_rows_of(&rebuilt),
+            rebuilt.inode_number_watermark()
+        ),
+        (vec![(3, 2), (4, 4), (6, 5), (7, 5)], 5),
+        "从盘上重建读回的台阶行与现行值与写出的相同"
+    );
+    let verdicts = verdicts_without_any_violation(&pool.memory_pool(), "回退到 B 之后");
+    assert_judged_and_holding(&verdicts, &["I-9.30", "I-3.13"], "回退到 B 之后");
 }

@@ -5,7 +5,8 @@
 //! 重封，在流尾另起一段写进发布的根的下一个根槽（读根环次序在它后面）。两条根都落了的状态上择到哪一条，池级 checker 的判定不同
 //! （前提在取卡之前用 CPU 判：两条根换位的镜像判出的违例不同），GPU 与 CPU 逐状态的违例位要相同。
 //! 要本机一张空闲显存够的 NVIDIA 独显：一张独显适配器都没有时打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功
-//! （`gpu_unit_checks::gpu_test_start`）。要 `gpu` 特性。
+//! （`gpu_unit_checks::gpu_test_start`）。卡经这个进程的卡池取，建好表之后按判器要的显存借
+//! （`crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool`），等满了借不到报「本次未跑」。要 `gpu` 特性。
 #![cfg(feature = "gpu")]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -19,12 +20,12 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
     judge_layer0_state_range, layer0_plan_state_count, Layer0SegmentExpansion, Layer0StateJudgement,
 };
-use singlefs_checker_tier::crash_judge_dispatch::GpuCrashJudge;
+use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
 use singlefs_checker_tier::crash_judge_gpu::{
     pool_checker_violated_bits, verdict_bits, POOL_CHECKER_UNDECIDABLE_WORD, VERDICT_WORDS,
 };
 use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
 use singlefs_core::address::{CheckpointTxg, DeviceOffsetInBytes, InstanceGeneration};
 use singlefs_core::recovery::PoolReader;
 use singlefs_harness::memory_pool::{
@@ -170,7 +171,9 @@ fn invariants_violated_with_every_write_landed(flow: &RecordedFlow) -> BTreeSet<
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(_) => Some(invariant),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -187,7 +190,9 @@ fn pool_checker_bits_on_the_cpu(judgement: &Layer0StateJudgement) -> u128 {
                     .position(|candidate| candidate == invariant)
                     .expect("池级 checker 报的不变量在清单里"),
             ),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .fold(0u128, |bits, index| bits | (1u128 << index))
 }
@@ -219,9 +224,9 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
         violated_with_the_publish_root_first, violated_with_the_warm_up_trees_first,
         "两条同键的根换位之后池级 checker 判出的违例要不同，这条流才分得出择根平局"
     );
-    let Some(card) = first_usable_card_or_report_not_run(
-        "gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_checker",
-    ) else {
+    const TEST_NAME: &str =
+        "gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_checker";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
         return;
     };
     let expansion = |_segment_index: usize, segment: &[usize]| {
@@ -242,8 +247,11 @@ fn gpu_judge_takes_the_earlier_of_two_roots_with_the_same_key_like_the_cpu_check
     .expect("建得出表");
     let state_count = layer0_plan_state_count(&flow.base, &flow.writes, &flow.segments, &expansion);
     assert_eq!(tables.state_count, state_count);
-    let gpu: Vec<[u32; VERDICT_WORDS]> =
-        GpuCrashJudge::new(&card, &tables).judge_states(0..state_count);
+    let Some(gpu): Option<Vec<[u32; VERDICT_WORDS]>> =
+        judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
+    else {
+        return;
+    };
     let mut cpu: Vec<u128> = Vec::new();
     let judged_on_the_cpu = judge_layer0_state_range(
         &flow.base,

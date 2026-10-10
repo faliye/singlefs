@@ -17,6 +17,7 @@ use std::cell::{Cell, RefCell};
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::panic::{catch_unwind, AssertUnwindSafe};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, Once};
 
@@ -35,7 +36,7 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::mount::{
     mount_writable_with_space_admission, raise_rollback_floor, roll_back_by_a_forward_publish,
     MountError, ParametersAndDeviceTableOfTheMount, RollbackError, RollbackTarget, ShadowLedger,
-    StillUnreadableAfterOneReread,
+    StillUnreadableAfterOneReread, SystemConfigurationUnreadableWhen,
 };
 use singlefs_core::mounted_session::{
     MountedSession, UserChange, UserChangePublished, UserChangeRefused,
@@ -51,7 +52,10 @@ use singlefs_core::transaction::{
     PoolWriter, PublishError, TransactionOutput, ZeroUnitPublishPlan,
 };
 use singlefs_core::unit::data_unit_payload_capacity;
-use singlefs_format::{DATA_UNIT_BYTES, EXTENT_TREE_LOWER_LEAF_DATA_UNITS, SLOT_BYTES};
+use singlefs_format::{
+    DATA_UNIT_BYTES, EXTENT_TREE_LOWER_LEAF_DATA_UNITS, JOURNAL_RING_START_SLOT, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE, SYSTEM_CONFIGURATION_SLOT_BYTES,
+};
 
 use crate::fault_injection::{FaultInjectingBlockDevice, SharedFaultPlan};
 use crate::memory_pool::{MemoryPool, RecordCheck, SparseBlockDevice};
@@ -139,19 +143,23 @@ const SMALLER_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE: u64 = 256
 const NARROWEST_DEVICE_UNIT_AREA_SLOTS_BEYOND_THE_RING_WINDOW_ALLOWANCE: u64 = 240;
 
 /// 384 槽那一档小盘为环窗口补足的单元区槽数（D28（挂载期承诺量） 已定项 1 末项环窗口每块盘常驻扣；用户 2026-10-02 定「甲」：小盘放大到扣得起）。
-/// 放大之后单元区 [1408, 2607) 每块盘罩分配记录树叶 3 片（812 槽一片：⌊2606 ÷ 812⌋ − ⌊1408 ÷ 812⌋ + 1）⇒ N_0 = 6、W = 24 + 6 = 30、
-/// 环窗口 (3 × 8 + 1) × 30 = 750 槽。同一次补足还罩着 ckpt_cost 多出来的 5 块：叶多罩一片，分配记录树那一项 1 + 2 × 2 = 5 → 1 + 2 × 3 = 7
-/// （多 2 块），谱系那一项 3 块（同日定「乙」）；保留池每块盘多 5 槽、切换预留里暖机那一半多 (3 + 1) × 3 × 5 = 60 槽。
-/// 750 + 5 + 60 = 815：准入算出的可用(d) 与放大之前、ckpt_cost 加谱系那一项之前逐盘一样多（推的；每次发布改哪几片叶跟着盘宽变，实测见用例）。
-const SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 815;
+/// 放大之后单元区 [1408, 2799) 每块盘罩分配记录树叶 3 片（812 槽一片：⌊2798 ÷ 812⌋ − ⌊1408 ÷ 812⌋ + 1）⇒ N_0 = 6、
+/// W = 24 + (6 + 0) + 6 = 36（退役树那一项 6 + H_退役，H_退役 = 0）、环窗口 (3 × 8 + 1) × 36 = 900 槽。同一次补足还罩着 ckpt_cost 多出来的 8 块：
+/// 叶多罩一片，分配记录树那一项 1 + 2 × 2 = 5 → 1 + 2 × 3 = 7（多 2 块），谱系那一项 3 块（同日定「乙」），退役那一项 3 块
+/// （判决 `research/prompts/m3-retire-r1-main-verification.md` 第六节 R2）；保留池每块盘多 8 槽、切换预留里暖机那一半多 (3 + 1) × 3 × 8 = 96 槽；
+/// 标签 6 退役那一份摊到每块盘 (2 + 0 + 1) × 16384 + 35 × n_记录 字节：补整的 3 槽，35 × n_记录 字节那一截不补（同墓碑那 41 × n_live 字节当初也没补）。
+/// 900 + 8 + 96 + 3 = 1007：准入算出的可用(d) 与放大之前、ckpt_cost 加谱系与退役两项之前逐盘一样多、只少 35 × n_记录 字节（推的；每次发布改哪几片叶
+/// 跟着盘宽变，实测见用例）。第 49 批之前是 815（没有退役那几项：750 + 5 + 60）。
+const SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 1007;
 
-/// 256 槽、240 槽那两档小盘为环窗口补足的单元区槽数：放大之后单元区 [1408, 2403) 与 [1408, 2387) 每块盘仍只罩分配记录树叶 2 片
-/// （⌊2402 ÷ 812⌋ = ⌊2386 ÷ 812⌋ = 2）⇒ N_0 = 4、W = 28、环窗口 25 × 28 = 700 槽；ckpt_cost 只多谱系那一项 3 块：
-/// 保留池每块盘多 3 槽、切换预留多 12 × 3 = 36 槽。700 + 3 + 36 = 739。
-const SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 739;
+/// 256 槽、240 槽那两档小盘为环窗口补足的单元区槽数：放大之后单元区 [1408, 2671) 与 [1408, 2655) 每块盘罩分配记录树叶 3 片
+/// （⌊2670 ÷ 812⌋ = ⌊2654 ÷ 812⌋ = 3）⇒ N_0 = 6、W = 24 + (6 + 0) + 6 = 36、环窗口 25 × 36 = 900 槽；ckpt_cost 多 8 块（同上：叶多罩一片 2、
+/// 谱系 3、退役 3）：保留池每块盘多 8 槽、切换预留多 12 × 8 = 96 槽；标签 6 退役那一份补整的 3 槽。900 + 8 + 96 + 3 = 1007，两档与 384 槽那一档
+/// 补足一样多。第 49 批之前是 739（叶只罩 2 片：700 + 3 + 36），退役那几项把单元区推过第 3 片叶的起点 2436。
+const SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS: u64 = 1007;
 
 /// 小盘上的 journal 环字节数：6 MiB。单元区从环末尾的下一个槽 1024 + 384 = 1408（= 22 × 64，落在聚簇段边界上）起，
-/// 三档小盘的盘宽 = 1408 + 环窗口补足 + 单元区槽数，最窄那档（240 槽）是 1408 + 739 + 240 = 2387 槽，环 6 MiB 不超过它的四分之一；
+/// 三档小盘的盘宽 = 1408 + 环窗口补足 + 单元区槽数，最窄那档（240 槽）是 1408 + 1007 + 240 = 2655 槽，环 6 MiB 不超过它的四分之一；
 /// 放大之前（1648 槽），7 MiB 的环在 256 槽、240 槽那两档就超了。在飞上限 = 6 MiB ÷ 4096 ÷ 3 = 512 条。
 /// 改之前是 128 MiB、单元区从编译期常量 50176 起（盘约 790 MiB）；单元区起点改成随环长走之后，128 MiB 的环把起点拉到 9216，
 /// 同样宽的盘上单元区有四万多槽、走不到单元区墙，四分之一那一关又不许环更长。
@@ -496,6 +504,19 @@ pub enum HistoryOperation {
     /// 删完之后只许建 inode、写行与空发布）。只在第一个文件已删完的一版上调（有树而文件集合为空的一版、或在它上面建过 inode 的一版）：
     /// 模型只罩 inode 1 一个文件，建在第一个文件旁边的 inode 会让之后那次最后一批留下别的 inode，模型的删除那一臂罩不到。
     CreateInode,
+    /// 经挂着的会话整份重写文件内容（入口分法同 [`HistoryOperation::PublishOverwrite`]），两块盘在那次改动的第一个 journal 记录写
+    /// 到达时掉电：之前发出的写与屏障都落了盘，从那个写起一个都不落、都报 I/O 错（这一份里的 `DeviceLosingPowerAtTheFirstJournalRecordWrite`），
+    /// 这个进程随之崩掉；之后照 [`HistoryOperation::CloseAndMountWritable`] 可写挂载一次。那次改动写下的单元是这个会话那个实例的孤儿：
+    /// 下一个实例写行时给它写的那一行按所选根判它们未发布，根环里这个实例的根全被轮出去之后，挂载末尾的实例表清扫抹它们的头、
+    /// 再发清扫发布删那一行（D18（块里携带什么信息） 已定项 11「回收」一条：抹头那一段只有这样的孤儿走得到）。
+    /// 掉电截在第一条 journal 记录之前，那次改动没有任何一样能让恢复读到它的内容：交给模型与 RefFS 时与可写挂载相同。
+    OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(ContentChoice),
+    /// 关掉这个进程的可写会话，可写挂载期间每块盘自证过、世代号最大的那一槽系统配置读回全 0（单故障：D22（单元原子性怎么合成）
+    /// 已定项 8「容错承诺是单故障：每盘一槽系统配置坏在承诺里」；`DeviceReadingZerosOverHiddenRanges`，挂载自己写到那一槽之后照常读得出）。
+    /// 读回全 0 的槽自证不过、设备不报错，可写挂载照「一槽撕裂、另一槽自证过」往下走（同条 S-辨），取号那一写落到被藏的那一槽上：
+    /// 崩溃注入里唯一一种在读故障下真的往盘上发写的步（C696（崩溃注入的读故障一支在随机历史里从没触发））。
+    /// 只进它自己那一组比重（[`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]），已有各组生成的历史不变。
+    WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
 }
 
 /// 操作的种类：统计与比重用。
@@ -511,10 +532,12 @@ pub enum HistoryOperationKind {
     CrashRecoveryAbandoningTheNewestRoot,
     Unlink,
     CreateInode,
+    OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
+    WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
 }
 
 impl HistoryOperationKind {
-    pub const ALL: [HistoryOperationKind; 10] = [
+    pub const ALL: [HistoryOperationKind; 12] = [
         HistoryOperationKind::PublishFirstFile,
         HistoryOperationKind::PublishOverwrite,
         HistoryOperationKind::PublishWithoutUnits,
@@ -525,6 +548,8 @@ impl HistoryOperationKind {
         HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot,
         HistoryOperationKind::Unlink,
         HistoryOperationKind::CreateInode,
+        HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
     ];
 }
 
@@ -544,6 +569,12 @@ impl HistoryOperation {
             }
             HistoryOperation::Unlink => HistoryOperationKind::Unlink,
             HistoryOperation::CreateInode => HistoryOperationKind::CreateInode,
+            HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_) => {
+                HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
+            }
+            HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            }
         }
     }
 }
@@ -583,6 +614,10 @@ pub enum NamedGenerationWeights {
     TowardTheUnitAreaWall,
     /// [`GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES`]。
     DeletingFilesOfSeveralLowerLeaves,
+    /// [`GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP`]。
+    LeavingOrphansForTheInstanceTableSweep,
+    /// [`GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`]。
+    NewestSystemConfigurationSlotOfEachDeviceReadingZeros,
 }
 }
 
@@ -607,6 +642,12 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves => {
                 GenerationWeights::DELETING_FILES_OF_SEVERAL_LOWER_LEAVES
             }
+            NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep => {
+                GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP
+            }
+            NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS
+            }
         }
     }
 
@@ -620,6 +661,10 @@ impl NamedGenerationWeights {
             NamedGenerationWeights::TowardTheAllocationRecordWall => "wall",
             NamedGenerationWeights::TowardTheUnitAreaWall => "unit-area-wall",
             NamedGenerationWeights::DeletingFilesOfSeveralLowerLeaves => "several-leaves",
+            NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep => "orphans",
+            NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                "newest-system-configuration-slot-zeros"
+            }
         }
     }
 }
@@ -900,6 +945,94 @@ impl GenerationWeights {
         overwrite_contents: OverwriteContentDraw::AlsoSpanningSeveralDataUnits,
     };
 
+    /// 实例表清扫抹头那一段（D18（块里携带什么信息） 已定项 11「回收」一条）的取样点：一律从第一个文件起，带文件的版本上
+    /// 偶尔一次覆盖写掉电在第一个 journal 记录写之前、进程崩掉再挂（[`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`]，
+    /// 留下那个实例的孤儿），其余绝大多数是覆盖写（每次一条根，把孤儿那个实例的根从 24 槽的根环里轮出去），夹着少量可写挂载；
+    /// 不抽回退、抬 F、冷启动与 unlink。别的几组比重不抽这一步：它们的种子钉着的取样点照旧。
+    pub const LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP: GenerationWeights = GenerationWeights {
+        name: "偏向留下孤儿实例（清扫抹头那一段的取样点）",
+        named: NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep,
+        starting_points: &[(HistoryStartingPoint::AfterFirstFile, 1)],
+        with_session_closed: &[(HistoryOperationKind::CloseAndMountWritable, 100)],
+        with_session_open_without_file: &[
+            (HistoryOperationKind::PublishFirstFile, 90),
+            (HistoryOperationKind::CloseAndMountWritable, 10),
+        ],
+        with_session_open_with_file: &[
+            (HistoryOperationKind::PublishOverwrite, 88),
+            (
+                HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable,
+                8,
+            ),
+            (HistoryOperationKind::CloseAndMountWritable, 4),
+        ],
+        with_session_open_after_the_file_was_deleted: None,
+        rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+        overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
+    };
+
+    /// 崩溃注入读故障那一支的取样点（C696（崩溃注入的读故障一支在随机历史里从没触发），用户定设计调查的候选「丁」）：与
+    /// [`GenerationWeights::BROAD`] 逐格相同，只把崩溃恢复抛弃根那几格（份数照旧）换成「每块盘最新那一槽系统配置读回全 0 时的可写挂载」
+    /// （[`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`]）。两种步都不抽随机数、生成时对会话的
+    /// 估计都与可写挂载相同，所以同一个种子在这组比重下生成的历史与快档那一组逐步相同、只有那几步换了种类。已有各组的份数表里没有新步，
+    /// 它们生成的历史不变（`tests/random_history_generation_keeps_the_existing_weights_step_for_step.rs` 钉）。
+    pub const NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS: GenerationWeights =
+        GenerationWeights {
+            name: "每块盘最新那一槽系统配置读回全 0 的可写挂载（崩溃注入读故障那一支的取样点）",
+            named: NamedGenerationWeights::NewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+            starting_points: &[
+                (HistoryStartingPoint::AfterMakeFilesystem, 1),
+                (HistoryStartingPoint::AfterFirstFile, 1),
+            ],
+            with_session_closed: &[
+                (HistoryOperationKind::CloseAndMountWritable, 92),
+                (HistoryOperationKind::ColdStartRecover, 8),
+            ],
+            with_session_open_without_file: &[
+                (HistoryOperationKind::PublishFirstFile, 60),
+                (HistoryOperationKind::PublishWithoutUnits, 20),
+                (HistoryOperationKind::CloseAndMountWritable, 4),
+                (
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                    2,
+                ),
+                (HistoryOperationKind::RollBackWhileMounted, 4),
+                (HistoryOperationKind::ColdStartRecover, 4),
+                (HistoryOperationKind::PublishOverwrite, 3),
+                (HistoryOperationKind::RaiseRollbackFloor, 3),
+            ],
+            with_session_open_with_file: &[
+                (HistoryOperationKind::PublishOverwrite, 52),
+                (HistoryOperationKind::RaiseRollbackFloor, 16),
+                (HistoryOperationKind::CloseAndMountWritable, 6),
+                (HistoryOperationKind::Unlink, 3),
+                (
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                    3,
+                ),
+                (HistoryOperationKind::RollBackWhileMounted, 10),
+                (HistoryOperationKind::ColdStartRecover, 4),
+                (HistoryOperationKind::PublishFirstFile, 4),
+                (HistoryOperationKind::PublishWithoutUnits, 2),
+            ],
+            with_session_open_after_the_file_was_deleted: Some(&[
+                (HistoryOperationKind::CreateInode, 40),
+                (HistoryOperationKind::RaiseRollbackFloor, 15),
+                (HistoryOperationKind::RollBackWhileMounted, 15),
+                (HistoryOperationKind::CloseAndMountWritable, 10),
+                (
+                    HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                    3,
+                ),
+                (HistoryOperationKind::ColdStartRecover, 5),
+                (HistoryOperationKind::PublishOverwrite, 4),
+                (HistoryOperationKind::PublishFirstFile, 4),
+                (HistoryOperationKind::PublishWithoutUnits, 4),
+            ]),
+            rollback_targets: RollbackTargetDraw::RecentUniformOrBeyond,
+            overwrite_contents: OverwriteContentDraw::WithinOneDataUnitOrJustBeyond,
+        };
+
     /// 复现入口认得的每一组比重：按 `environment_value` 找回（[`HistorySampling::from_environment`]）。
     /// 照 [`NamedGenerationWeights::ALL`] 逐个经 [`NamedGenerationWeights::weights`] 生成，不手抄常量名：
     /// 新加一组比重要一个新成员，成员不在 `weights` 的穷举 `match` 里补一臂就编不过（代码三方 test-script-align-code-r1 判决 K4）。
@@ -1069,6 +1202,19 @@ fn draw_operation(
         }
         HistoryOperationKind::Unlink => HistoryOperation::Unlink,
         HistoryOperationKind::CreateInode => HistoryOperation::CreateInode,
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+        }
+        HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => {
+            HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(
+                match overwrite_contents {
+                    OverwriteContentDraw::WithinOneDataUnitOrJustBeyond => draw_content(source),
+                    OverwriteContentDraw::AlsoSpanningSeveralDataUnits => {
+                        draw_content_spanning_several_data_units(source)
+                    }
+                },
+            )
+        }
     }
 }
 
@@ -1087,15 +1233,21 @@ fn expected_session_after(
     kind: HistoryOperationKind,
 ) -> ExpectedSession {
     match kind {
-        // 崩溃恢复抛弃根也是一次可写挂载：落到的前一条根带不带文件，生成时照「这段历史发过文件没有」估，与可写挂载同一个估法。
+        // 崩溃恢复抛弃根也是一次可写挂载：落到的前一条根带不带文件，生成时照「这段历史发过文件没有」估，与可写挂载同一个估法；
+        // 掉电在 journal 记录之前的那次覆盖写之后也是一次可写挂载，落到的是那次改动之前的一版；
+        // 每块盘最新那一槽系统配置读回全 0 的那一次也是可写挂载，同一个估法。
         HistoryOperationKind::CloseAndMountWritable
-        | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => match first_file {
-            ExpectedFirstFile::Written => ExpectedSession::OpenWithFile,
-            ExpectedFirstFile::NotWrittenYet => ExpectedSession::OpenWithoutFile,
-            ExpectedFirstFile::DeletedAndFollowedByItsOwnTable => {
-                ExpectedSession::OpenAfterTheFileWasDeleted
+        | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
+        | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
+        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            match first_file {
+                ExpectedFirstFile::Written => ExpectedSession::OpenWithFile,
+                ExpectedFirstFile::NotWrittenYet => ExpectedSession::OpenWithoutFile,
+                ExpectedFirstFile::DeletedAndFollowedByItsOwnTable => {
+                    ExpectedSession::OpenAfterTheFileWasDeleted
+                }
             }
-        },
+        }
         HistoryOperationKind::ColdStartRecover => ExpectedSession::Closed,
         HistoryOperationKind::PublishFirstFile => match expected {
             ExpectedSession::OpenWithoutFile => ExpectedSession::OpenWithFile,
@@ -1210,6 +1362,44 @@ pub fn generate_history_with_weights(
     }
 }
 
+/// [`history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring`] 里掉电之后的那次可写挂载（实例 2）之后覆盖写几次。
+/// 根环 24 槽（`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM` 每区 8 槽、三区）里实例 1 的根要全被轮出去：实例 2 的写行、两次暖机与
+/// 之后 24 次覆盖写一共 27 条根；第 25 次是崩溃注入摆崩溃状态的那一步。
+pub const OVERWRITES_AFTER_THE_ORPHANS_OF_THE_FIRST_INSTANCE: u64 = 25;
+
+/// 留下实例 1 的孤儿、再把实例 1 的根全轮出根环的一段写死的历史：从第一个文件起（实例 1 的会话开着），一次覆盖写掉电在它的第一个
+/// journal 记录写之前、进程崩掉再可写挂载成实例 2（[`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`]：
+/// 写行把实例 1 那一行写进表，那次覆盖写写下的单元按这一行判未发布），再覆盖写 [`OVERWRITES_AFTER_THE_ORPHANS_OF_THE_FIRST_INSTANCE`] 次。
+/// 跑完之后（或崩在最后一次覆盖写之前）的盘面上，有一行就扫的可写挂载末尾清扫删实例 1 那一行、先抹它的孤儿的头
+/// （D18（块里携带什么信息） 已定项 11「回收」一条）：抹头那一段从这里走得到。
+#[must_use]
+pub fn history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring(
+) -> GeneratedHistory {
+    let mut operations = vec![
+        HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(
+            ContentChoice {
+                length: ContentLength::InsideOneDataUnit { selector: 0 },
+                fill_seed: 0,
+            },
+        ),
+    ];
+    operations.extend(
+        (1..=OVERWRITES_AFTER_THE_ORPHANS_OF_THE_FIRST_INSTANCE).map(|overwrite| {
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::InsideOneDataUnit {
+                    selector: overwrite,
+                },
+                fill_seed: overwrite,
+            })
+        }),
+    );
+    GeneratedHistory {
+        seed: HistorySeed(3),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations,
+    }
+}
+
 /// 这个进程里开着的可写会话：分配器、现行版本、实例代号，都是挂载（或起点那个进程）交回的。
 struct WritableSession {
     allocator: PoolAllocator,
@@ -1242,6 +1432,8 @@ struct HistoryPool {
     stream: SharedStream,
     /// mkfs 写完时录制流里有几步（崩溃注入的基线从这里起）。
     operations_written_by_make_filesystem: usize,
+    /// 每次掉电之后录制流里第一步的下标，按次序（交回 [`HistoryRun::first_stream_index_after_each_power_loss`]）。
+    first_stream_index_after_each_power_loss: Vec<usize>,
 }
 
 /// 模型对一步的判定：对不上的那一格（没有就是 None）与这一步比了多少格。
@@ -1484,6 +1676,7 @@ impl HistoryPool {
                 model,
                 stream: stream.clone(),
                 operations_written_by_make_filesystem,
+                first_stream_index_after_each_power_loss: Vec::new(),
             },
             verdict,
         ))
@@ -1502,7 +1695,7 @@ pub enum MissingPrecondition {
     NoWritableSession,
     /// 现行版本树表 0 条：覆盖写与抬 F 都要一个带文件的上一版（`TransactionOutput`）。
     CurrentVersionWithoutFile,
-    /// 现行版本带文件：零单元发布只给树表 0 条的一版；带文件的一版上的空发布要重写四个固定点单元，那是挂载内部的 `publish_version`，
+    /// 现行版本带文件：零单元发布只给树表 0 条的一版；带文件的一版上的空发布要重写固定点单元（分配记录树要改的那几个节点 + 记账 + 映射 + 树表），那是挂载内部的 `publish_version`，
     /// 不是这个入口。生成器的前提，没有条款明写调用约定，按入口的文档注释取的读法——`crates/singlefs-core/src/transaction.rs` 第 506 行
     /// 「零单元发布（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）」，已定项 9 在 `.claude/kb/decisions/16-发布语义.md` 第 192 行。
     /// 以后要测：前提之外调它应当返回 `Err`，不许 panic（增补 3 记着，2026-09-18 主 agent 定）。
@@ -1523,6 +1716,9 @@ pub enum MissingPrecondition {
     /// 现行版本里第一个文件还活着：建 inode 只接在第一个文件已删完的一版上（`HistoryOperation::CreateInode` 的文档）；
     /// 删除中的那一版照调，会话先走空、把它走成删完的一版（代码轮 U11）。
     CurrentVersionStillHasTheFirstFile,
+    /// 每块盘最新那一槽系统配置读回全 0 的可写挂载：有一块盘两槽里本池自证过的不到两份（mkfs 之后还没取过号的盘只写过一槽）——
+    /// 再藏它自证过的那一槽，这块盘一份自证过的系统配置都不剩，那是那块盘两槽都坏，不是单故障（D22（单元原子性怎么合成） 已定项 8）。
+    SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots,
 }
 
 impl MissingPrecondition {
@@ -1540,6 +1736,9 @@ impl MissingPrecondition {
             MissingPrecondition::NewestPublishNamesNoUnit => "最新那次发布一个单元都没点名",
             MissingPrecondition::CurrentVersionWithoutTheFirstFile => "现行版本里第一个文件已删完",
             MissingPrecondition::CurrentVersionStillHasTheFirstFile => "现行版本里第一个文件还在",
+            MissingPrecondition::SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots => {
+                "有盘两槽系统配置不是都自证过"
+            }
         }
     }
 }
@@ -2189,6 +2388,8 @@ pub struct HistoryTally {
     pub checker_runs_skipped_because_nothing_was_written: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
+    /// 判成「部分没判」（[`InvariantVerdict::PartiallyJudged`]）的次数：不红，也不算判绿。
+    pub invariant_partially_judged: BTreeMap<&'static str, u64>,
     /// 理想模型判过的步数（起点那次第一个文件也算一步；前提不满足、入口没调的不算）与各格计数。
     pub model_judged_steps: u64,
     pub model_counts: ModelJudgementCounts,
@@ -2275,6 +2476,12 @@ impl HistoryTally {
         }
         for (invariant, count) in &other.invariant_not_applicable {
             *self.invariant_not_applicable.entry(invariant).or_insert(0) += count;
+        }
+        for (invariant, count) in &other.invariant_partially_judged {
+            *self
+                .invariant_partially_judged
+                .entry(invariant)
+                .or_insert(0) += count;
         }
         self.model_judged_steps += other.model_judged_steps;
         self.model_counts.add(&other.model_counts);
@@ -2385,7 +2592,12 @@ impl HistoryTally {
             | HistoryOperation::ColdStartRecover
             | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
             | HistoryOperation::Unlink
-            | HistoryOperation::CreateInode => None,
+            | HistoryOperation::CreateInode
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros
+            // 那次改动掉电在 journal 记录之前、一次都没发布成：内容长度不记进「进过入口」「发布过」（结局是那之后可写挂载的结局）。
+            | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_) => {
+                None
+            }
         };
         let entrance_was_called = match outcome {
             StepOutcome::Applied(_) | StepOutcome::Refused { .. } => true,
@@ -2534,9 +2746,13 @@ impl HistoryTally {
         for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
             let _ = writeln!(
                 text,
-                "  {invariant}：判绿 {} 次、不适用 {} 次",
+                "  {invariant}：判绿 {} 次、不适用 {} 次、部分没判 {} 次",
                 self.invariant_holds.get(invariant).copied().unwrap_or(0),
                 self.invariant_not_applicable
+                    .get(invariant)
+                    .copied()
+                    .unwrap_or(0),
+                self.invariant_partially_judged
                     .get(invariant)
                     .copied()
                     .unwrap_or(0)
@@ -2562,6 +2778,11 @@ pub struct HistoryRun {
     /// 观察者那一路看不到这一份：判出失败的那一步不调观察者，而失败常常出在模型已经认下那一版之后（checker 在那一步判红）。
     /// 内容拷成 `Vec<u8>` 不留 `Rc`：`HistoryRun` 要跨线程送（`run_history_campaign` 的那张表），`Rc` 不是 `Send`。
     pub committed_versions_at_the_end: Vec<(ModelRootKey, Option<Vec<u8>>)>,
+    /// 每次掉电（[`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`]）之后录制流里第一步的下标，按次序：
+    /// 掉电之前那一截与之后可写挂载另起的实例写的流在这里断开。崩溃注入把它交给记录核对器
+    /// （`crate::memory_pool::RecordStreamSeam::AfterAPowerLoss`）：那次改动掉电之前落了盘的单元写没有根，
+    /// 不归掉电之后的第一次发布。
+    pub first_stream_index_after_each_power_loss: Vec<usize>,
 }
 
 /// 每一步之后交给观察者的东西：第几步、这一步是什么、结局、此刻的整份镜像、跟到这一步的理想模型。
@@ -2728,6 +2949,9 @@ fn mount_error_member(error: &MountError) -> String {
         MountError::Recovery(failure) => {
             return format!("MountError::Recovery({})", recovery_failure_member(failure))
         }
+        MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => {
+            "NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread"
+        }
         MountError::FileVersionWithoutAnyJournalRecord => "FileVersionWithoutAnyJournalRecord",
         MountError::InstanceTableMalformed => "InstanceTableMalformed",
         MountError::Acquisition(acquisition) => {
@@ -2846,6 +3070,22 @@ fn mount_error_member(error: &MountError) -> String {
                 still_unreadable_after_one_reread_member(still_unreadable)
             )
         }
+        MountError::SystemConfigurationUnreadableAfterTheReadStage(unreadable) => {
+            return format!(
+                "MountError::SystemConfigurationUnreadableAfterTheReadStage({})",
+                match unreadable.unreadable {
+                    SystemConfigurationUnreadableWhen::CheckingEachDeviceBeforeTheAcquisition {
+                        ..
+                    } => "CheckingEachDeviceBeforeTheAcquisition",
+                    SystemConfigurationUnreadableWhen::AcquisitionReadsAnUndecidableWitness {
+                        ..
+                    } => "AcquisitionReadsAnUndecidableWitness",
+                    SystemConfigurationUnreadableWhen::AcquisitionFindsADeviceWithoutAnySelfVerifiedSlot {
+                        ..
+                    } => "AcquisitionFindsADeviceWithoutAnySelfVerifiedSlot",
+                }
+            )
+        }
     };
     format!("MountError::{member}")
 }
@@ -2867,6 +3107,12 @@ fn still_unreadable_after_one_reread_member(
             "RootRingSlotKnownToHoldARoot"
         }
         StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => "AccountOfAnAbandonedRoot",
+        StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            ..
+        } => "AccountOfAnUnappliedPublishWithIncompleteReadableRecords",
+        StillUnreadableAfterOneReread::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify { .. } => {
+            "PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify"
+        }
     }
 }
 
@@ -4372,6 +4618,279 @@ fn apply_crash_recovery_abandoning_the_newest_root(
     )
 }
 
+/// 几块盘此刻通没通电（[`DeviceLosingPowerAtTheFirstJournalRecordWrite`] 的几块盘共用一份）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PowerOfTheDevices {
+    On,
+    /// 某块盘上第一个落在 journal 环里的写到达时掉的电：那个写与之后每一个写、写零、屏障都不落盘。
+    LostAtTheFirstJournalRecordWrite,
+}
+
+/// 第一个 journal 记录写到达时整池掉电的一块盘（[`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`] 的造法）：
+/// 之前的写与屏障原样交给里面那块盘（录制流照常记下、落盘）；落在 journal 环里的第一个写把几块盘共用的那份电源状态翻成掉电，
+/// 从它起每一个写、写零与屏障都不交下去、报 I/O 错——录制流里因此只有落了盘的那一串，与崩溃注入截在那个写之前的盘面相同。
+/// 读照样交下去：掉电之后读到的就是落了盘的字节。
+struct DeviceLosingPowerAtTheFirstJournalRecordWrite<
+    Device: singlefs_core::block_device::BlockDevice,
+> {
+    inner: Device,
+    /// journal 环在每块盘上的字节区间（`singlefs_format::JOURNAL_RING_START_SLOT` 起、`journal_ring_bytes` 长；与
+    /// `crate::segments::FixedGeometry::classify` 认 journal 记录写的那一臂同一个区间）。
+    journal_ring_offsets_in_bytes: std::ops::Range<u64>,
+    power: Rc<Cell<PowerOfTheDevices>>,
+}
+
+impl<Device: singlefs_core::block_device::BlockDevice>
+    DeviceLosingPowerAtTheFirstJournalRecordWrite<Device>
+{
+    fn error_after_the_power_loss() -> BlockDeviceError {
+        BlockDeviceError::InputOutput(std::io::Error::other(
+            "掉电：第一个 journal 记录写到达时整池断电，这个写与之后的写、屏障都没落盘",
+        ))
+    }
+
+    fn refuse_once_the_power_is_lost(&self) -> Result<(), BlockDeviceError> {
+        match self.power.get() {
+            PowerOfTheDevices::On => Ok(()),
+            PowerOfTheDevices::LostAtTheFirstJournalRecordWrite => {
+                Err(Self::error_after_the_power_loss())
+            }
+        }
+    }
+}
+
+impl<Device: singlefs_core::block_device::BlockDevice> singlefs_core::block_device::BlockDevice
+    for DeviceLosingPowerAtTheFirstJournalRecordWrite<Device>
+{
+    fn read_at(
+        &self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        self.inner.read_at(offset, buffer)
+    }
+
+    fn write_at(
+        &mut self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        bytes: &[u8],
+        durability: singlefs_core::block_device::WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        self.refuse_once_the_power_is_lost()?;
+        if self.journal_ring_offsets_in_bytes.contains(&offset.0) {
+            self.power
+                .set(PowerOfTheDevices::LostAtTheFirstJournalRecordWrite);
+            return Err(Self::error_after_the_power_loss());
+        }
+        self.inner.write_at(offset, bytes, durability)
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: singlefs_core::address::DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.refuse_once_the_power_is_lost()?;
+        self.inner.write_zeroes_at(offset, length)
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        self.refuse_once_the_power_is_lost()?;
+        self.inner.barrier()
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.inner.probe_physical_block_size()
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.inner.size_in_bytes()
+    }
+}
+
+/// [`HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable`]：前提同覆盖写（[`apply_publish_overwrite`]），
+/// 经挂着的会话发那次整份重写，盘在它的第一个 journal 记录写到达时掉电（[`DeviceLosingPowerAtTheFirstJournalRecordWrite`]）。
+/// 会话的结局不判：进程已经在这次改动里崩掉，没有人收这个结局（掉电之前做完的那几步落了盘、录制流里有它们）。会话连同模型那一侧的会话
+/// 一起丢掉，之后照可写挂载那一步（[`apply_mount_writable`]）挂一次、交模型判：模型看不见这次掉电——那次改动一样都没发布，
+/// 挂载恢复落到的就是改动之前那一版，与这个进程正常退出之后的可写挂载同一个答案。
+fn apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
+    pool: &mut HistoryPool,
+    parameters: &MakeFilesystemParameters,
+    content_choice: &ContentChoice,
+    write_time_seconds: u64,
+) -> AppliedStep {
+    let Some(open_session) = pool.session.as_ref() else {
+        return AppliedStep::not_applicable(MissingPrecondition::NoWritableSession);
+    };
+    let Some(current_file_version) = open_session.current.file_version() else {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutFile);
+    };
+    if current_file_version.inode_record.is_none() {
+        return AppliedStep::not_applicable(MissingPrecondition::CurrentVersionWithoutTheFirstFile);
+    }
+    let WritableSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+        ..
+    } = pool.session.take().expect("上面判过这个进程的会话开着");
+    let mut session_that_loses_power = MountedSession {
+        allocator,
+        current,
+        instance,
+        shadow_ledger,
+        parameters_and_device_table,
+    };
+    let content = content_choice.bytes();
+    let file = FirstFile {
+        content: &content,
+        write_time_seconds,
+    };
+    let power = Rc::new(Cell::new(PowerOfTheDevices::On));
+    let journal_ring_start = JOURNAL_RING_START_SLOT * SLOT_BYTES;
+    let journal_ring_offsets_in_bytes =
+        journal_ring_start..journal_ring_start + parameters.geometry.journal_ring_bytes;
+    let mut devices_losing_power: Vec<(
+        DeviceIdentity,
+        DeviceLosingPowerAtTheFirstJournalRecordWrite<HistoryDevice>,
+    )> = std::mem::take(&mut pool.devices)
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                DeviceLosingPowerAtTheFirstJournalRecordWrite {
+                    inner: device,
+                    journal_ring_offsets_in_bytes: journal_ring_offsets_in_bytes.clone(),
+                    power: Rc::clone(&power),
+                },
+            )
+        })
+        .collect();
+    let _outcome_nobody_receives_after_the_crash = session_that_loses_power.publish_user_change(
+        &mut devices_losing_power,
+        match content_choice.length.whole_file_write_entry() {
+            WholeFileWriteEntry::Overwrite => UserChange::Overwrite(file),
+            WholeFileWriteEntry::SequentialWrite => UserChange::SequentialWrite(file),
+        },
+    );
+    pool.devices = devices_losing_power
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect();
+    // 这个进程到这里就没了（掉电截在第一个 journal 记录写上；那次改动在那之前就被拒的，进程同样不再往下写），
+    // 之后录下的是可写挂载另起的实例写的流。
+    pool.first_stream_index_after_each_power_loss
+        .push(pool.stream.operation_count());
+    pool.model.close_session();
+    apply_mount_writable(pool, parameters)
+}
+
+/// 每块盘本池自证过（整槽校验和过、fsid 与本池相同）、世代号最大的那一槽系统配置在盘上的那一段：槽号是世代号对每盘槽数取余，
+/// 与发布末尾的轮换、取号那一写取槽同一个取法（`crates/singlefs-core/src/transaction.rs` 取号写系统配置那一处）。交回 (盘, 那一段)，
+/// 按 `devices` 的次序；有一块盘自证过的不到两份时交回 None（[`MissingPrecondition::SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots`]）。
+fn newest_self_verified_system_configuration_slot_of_each_device(
+    parameters: &MakeFilesystemParameters,
+    image_before_mount: &MemoryPool,
+    devices: &[DeviceIdentity],
+) -> Option<Vec<(DeviceIdentity, HiddenDeviceRange)>> {
+    let slot_spacing_in_bytes = u64::from(parameters.geometry.fixed_structure_slot_spacing);
+    devices
+        .iter()
+        .map(|device| {
+            let self_verified = singlefs_core::recovery::verified_system_configuration_slots(
+                image_before_mount,
+                *device,
+                slot_spacing_in_bytes,
+                &parameters.filesystem_identifier,
+            );
+            if u64::try_from(self_verified.len()).expect("一块盘的系统配置槽数装得进 u64")
+                < SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+            {
+                return None;
+            }
+            let newest_slot_generation = self_verified
+                .iter()
+                .map(|system_configuration| system_configuration.quantities.slot_generation)
+                .max()
+                .expect("上面判过这块盘自证过的系统配置有两份");
+            Some((
+                *device,
+                HiddenDeviceRange {
+                    offset_in_bytes: (newest_slot_generation
+                        % SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE)
+                        * slot_spacing_in_bytes,
+                    length_in_bytes: SYSTEM_CONFIGURATION_SLOT_BYTES,
+                },
+            ))
+        })
+        .collect()
+}
+
+/// 每块盘最新那一槽系统配置读回全 0 时的可写挂载
+/// （`HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros`）：关掉这个进程的会话，每块盘本池自证过、
+/// 世代号最大的那一槽（[`newest_self_verified_system_configuration_slot_of_each_device`]）整次挂载读回全 0
+/// （[`DeviceReadingZerosOverHiddenRanges`]：取号那一写落到它上面之后照常读得出）。读回全 0 的槽自证不过、设备不报读错：读阶段的见证取另一槽，
+/// R2 判不出不成立，逐盘核与取号照「一槽撕裂、另一槽自证过」往下走（D22（单元原子性怎么合成） 已定项 8 的 S-辨）。模型照一次普通可写挂载答
+/// （`IdealModel::answer_mount_writable`：模型不比系统配置落在哪一槽、带的见证值）；结局交给与可写挂载共用的 [`settle_mount`]。
+fn apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros(
+    pool: &mut HistoryPool,
+    parameters: &MakeFilesystemParameters,
+) -> AppliedStep {
+    let image_before_mount = pool.image();
+    let devices: Vec<DeviceIdentity> = pool.devices.iter().map(|(identity, _)| *identity).collect();
+    let Some(hidden) = newest_self_verified_system_configuration_slot_of_each_device(
+        parameters,
+        &image_before_mount,
+        &devices,
+    ) else {
+        return AppliedStep::not_applicable(
+            MissingPrecondition::SomeDeviceWithoutTwoSelfVerifiedSystemConfigurationSlots,
+        );
+    };
+    pool.session = None;
+    pool.model.close_session();
+    pool.mount_attempts += 1;
+    let answer = pool.model.answer_mount_writable();
+    let stream_length_before = pool.stream.operation_count();
+    let mut devices_with_hidden_ranges: Vec<(
+        DeviceIdentity,
+        DeviceReadingZerosOverHiddenRanges<HistoryDevice>,
+    )> = std::mem::take(&mut pool.devices)
+        .into_iter()
+        .map(|(identity, device)| {
+            (
+                identity,
+                DeviceReadingZerosOverHiddenRanges {
+                    inner: device,
+                    hidden_ranges: hidden
+                        .iter()
+                        .filter(|(device_of_the_range, _)| *device_of_the_range == identity)
+                        .map(|(_, range)| *range)
+                        .collect(),
+                },
+            )
+        })
+        .collect();
+    let mounted = mount_writable_with_space_admission(
+        parameters,
+        &mut devices_with_hidden_ranges,
+        pool.space_admission,
+    );
+    pool.devices = devices_with_hidden_ranges
+        .into_iter()
+        .map(|(identity, device)| (identity, device.inner))
+        .collect();
+    settle_mount(
+        pool,
+        mounted,
+        &image_before_mount,
+        answer,
+        stream_length_before,
+    )
+}
+
 fn apply_rollback_while_mounted(
     pool: &mut HistoryPool,
     parameters: &MakeFilesystemParameters,
@@ -4685,6 +5204,20 @@ fn apply_operation(
         }
         HistoryOperation::Unlink => apply_unlink(pool, write_time_seconds),
         HistoryOperation::CreateInode => apply_create_inode(pool, write_time_seconds),
+        HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(content) => {
+            apply_overwrite_losing_power_before_its_journal_record_then_mount_writable(
+                pool,
+                &parameters,
+                content,
+                write_time_seconds,
+            )
+        }
+        HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            apply_writable_mount_with_the_newest_system_configuration_slot_of_each_device_reading_zeros(
+                pool,
+                &parameters,
+            )
+        }
     }
 }
 
@@ -4712,6 +5245,12 @@ fn violations_on(image: &MemoryPool, tally: &mut HistoryTally) -> Vec<(&'static 
             InvariantVerdict::Holds => *tally.invariant_holds.entry(invariant).or_insert(0) += 1,
             InvariantVerdict::NotApplicable(_) => {
                 *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
+            }
+            InvariantVerdict::PartiallyJudged(_) => {
+                *tally
+                    .invariant_partially_judged
+                    .entry(invariant)
+                    .or_insert(0) += 1;
             }
             InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
         }
@@ -5476,6 +6015,11 @@ pub fn execute_history_with_faults(
                 .map(|(key, content)| (key, content.map(|content| content.to_vec())))
                 .collect()
         }),
+        first_stream_index_after_each_power_loss: pool_slot
+            .as_ref()
+            .map_or_else(Vec::new, |pool| {
+                pool.first_stream_index_after_each_power_loss.clone()
+            }),
     }
 }
 
@@ -5596,6 +6140,11 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
         HistoryOperation::PublishOverwrite(content) => simpler_contents(content)
             .map(HistoryOperation::PublishOverwrite)
             .collect(),
+        HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(content) => {
+            simpler_contents(content)
+                .map(HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable)
+                .collect()
+        }
         HistoryOperation::RollBackWhileMounted(RollbackTargetChoice::RingRoot {
             index_from_newest,
         }) => smaller_selectors(index_from_newest)
@@ -5630,7 +6179,10 @@ fn simpler_variants(operation: HistoryOperation) -> Vec<HistoryOperation> {
         | HistoryOperation::ColdStartRecover
         | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
         | HistoryOperation::Unlink
-        | HistoryOperation::CreateInode => Vec::new(),
+        | HistoryOperation::CreateInode
+        | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+            Vec::new()
+        }
     }
 }
 
@@ -6043,6 +6595,129 @@ fn campaign_report_of_finished_histories(
 mod tests {
     use super::*;
 
+    /// 留孤儿那一组比重抽得到「覆盖写掉电在 journal 记录之前再挂」，别的每一组比重一次都抽不到（它们的种子钉着的取样点照旧）：
+    /// 32 个种子、每段 40 步。判别力：留孤儿那一组里这一步的份数是 0 时第一条红。
+    #[test]
+    fn the_orphan_sampling_draws_the_overwrite_losing_power_and_the_broad_sampling_never_does() {
+        let kind =
+            HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable;
+        let steps_drawn_with = |weights: &GenerationWeights| {
+            (0..32u64)
+                .map(|seed_offset| {
+                    generate_history_with_weights(
+                        HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + seed_offset),
+                        40,
+                        weights,
+                    )
+                    .operations
+                    .iter()
+                    .filter(|operation| operation.kind() == kind)
+                    .count()
+                })
+                .sum::<usize>()
+        };
+        assert!(
+            steps_drawn_with(&GenerationWeights::LEAVING_ORPHANS_FOR_THE_INSTANCE_TABLE_SWEEP) >= 1,
+            "留孤儿那一组比重 32 段里一次都没抽到 {kind:?}"
+        );
+        for weights in GenerationWeights::NAMED {
+            if weights.named == NamedGenerationWeights::LeavingOrphansForTheInstanceTableSweep {
+                continue;
+            }
+            assert_eq!(
+                steps_drawn_with(&weights),
+                0,
+                "{} 那一组比重抽到了 {kind:?}",
+                weights.name
+            );
+        }
+    }
+
+    /// 掉电在 journal 记录之前的那次覆盖写留下实例 1 的孤儿（D18（块里携带什么信息） 已定项 11「回收」一条）：这段写死的历史
+    /// （[`history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring`]）每一步都做成，每一步之后池级 checker 与模型都不红，
+    /// 掉电之后那次可写挂载取到实例 2；之后在跑完的盘面上起一次有一行就扫的可写挂载，清扫删掉实例 1 那一行、抹了孤儿的头。
+    /// 判别力：掉电那一截不截写（那次覆盖写整次发布成）时模型那一判先红（挂载落到的不是它答的那一版），盘上也没有孤儿、清扫一个头都不抹。
+    #[test]
+    fn an_overwrite_losing_power_before_its_journal_record_leaves_orphans_the_sweep_erases_once_its_instance_left_the_ring(
+    ) {
+        use singlefs_core::instance_table_sweep::{
+            InstanceTableRowCountThreshold, InstanceTableSweepAtTheEndOfTheMount,
+            InstanceTableSweepConfiguration, InstanceTableSweepOutcome, InstanceTableSweepSwitch,
+            SweepPublishPlacements,
+        };
+        let history =
+            history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring();
+        let execution = HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES;
+        let stream = SharedStream::retaining_contents();
+        let mut image_after_the_last_step = None;
+        let run = execute_history_with(&history, execution, &stream, &mut |observation| {
+            image_after_the_last_step = Some(observation.image.clone());
+        });
+        assert_eq!(
+            run.ending,
+            HistoryEnding::Completed,
+            "这段历史每一步都做成、checker 与模型都不红：{:?}",
+            run.outcomes
+        );
+        assert!(
+            matches!(
+                run.outcomes.first(),
+                Some(StepOutcome::Applied(AppliedEffect::Mounted {
+                    instance: InstanceGeneration(2),
+                    ..
+                }))
+            ),
+            "掉电之后那次可写挂载做成、取到实例 2：{:?}",
+            run.outcomes.first()
+        );
+        let image = image_after_the_last_step.expect("历史跑完，观察者至少被调过一次");
+        let parameters = execution.device_width.parameters();
+        let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = image
+            .devices
+            .iter()
+            .map(|(identity, sectors)| {
+                let mut device = SparseBlockDevice::new(
+                    image.device_size_in_bytes,
+                    PhysicalBlockSizeInBytes(parameters.geometry.physical_block_size),
+                );
+                device.image = sectors.clone();
+                (*identity, device)
+            })
+            .collect();
+        let mounted = singlefs_core::mount::mount_writable_with_instance_table_sweep_configuration(
+            &parameters,
+            &mut devices,
+            SpaceAdmission::JudgedByTheFormula,
+            ShadowLedger::On,
+            InstanceTableSweepConfiguration {
+                switch: InstanceTableSweepSwitch::SweptAtTheEndOfTheMountAboveTheThreshold,
+                row_count_threshold: InstanceTableRowCountThreshold::ANY_ROW,
+                sweep_publish_placements: SweepPublishPlacements::TakenFromTheAllocatorOfTheMount,
+            },
+        )
+        .expect("跑完的盘面上可写挂载做得成");
+        let InstanceTableSweepAtTheEndOfTheMount::Swept(InstanceTableSweepOutcome::RowsDeleted {
+            rows_deleted,
+            heads_erased,
+        }) = &mounted.output.instance_table_sweep
+        else {
+            panic!("清扫删了行：{:?}", mounted.output.instance_table_sweep);
+        };
+        assert_eq!(
+            rows_deleted
+                .iter()
+                .map(|row| row.instance)
+                .collect::<Vec<_>>(),
+            vec![InstanceGeneration(1)],
+            "清扫删的是实例 1 那一行"
+        );
+        assert!(
+            !heads_erased.is_empty(),
+            "清扫抹了实例 1 的孤儿的头：{:?}",
+            mounted.output.instance_table_sweep
+        );
+    }
+
     /// SplitMix64 的参考输出（Vigna 的 splitmix64.c，种子 0）：手写的实现逐位对得上，换一个混合常数这里就红。
     #[test]
     fn seeded_random_source_reproduces_the_splitmix64_reference_sequence() {
@@ -6205,6 +6880,7 @@ mod tests {
             tally: HistoryTally::default(),
             operations_written_by_make_filesystem: 0,
             committed_versions_at_the_end: Vec::new(),
+            first_stream_index_after_each_power_loss: Vec::new(),
         };
         let finished = vec![
             (

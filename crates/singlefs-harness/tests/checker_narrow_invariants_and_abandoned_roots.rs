@@ -14,9 +14,10 @@ mod common;
 mod common_tree_split;
 
 use common::{
-    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool,
-    crash_state_devices, memory_pool_of_sparse_devices, parameters, publish_overwrite_in_process,
-    BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before,
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger,
+    build_pool, crash_state_devices, memory_pool_of_sparse_devices, parameters,
+    publish_overwrite_in_process, BuiltPool, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
 use common_tree_split::{
     capacities, propagate_the_new_checksum, read_unit_on_device, reseal_unit_by_its_class,
@@ -32,7 +33,7 @@ use singlefs_core::block_device::PhysicalBlockSizeInBytes;
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::make_filesystem::{make_filesystem, INSTANCE_TABLE_SLOT};
-use singlefs_core::mount::mount_writable;
+use singlefs_core::mount::{mount_writable, ShadowLedger};
 use singlefs_core::pointer::BirthSequence;
 use singlefs_core::transaction::{TransactionOutput, TransactionUnit};
 use singlefs_core::unit::{build_index_node, parse_index_node, IndexNodeHeader};
@@ -165,7 +166,9 @@ fn violations(image: &dyn ImageReader) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -185,7 +188,9 @@ fn verdict_of(image: &dyn ImageReader, invariant: &str) -> InvariantVerdict {
 fn detail_of_the_violation(image: &dyn ImageReader, invariant: &str) -> String {
     match verdict_of(image, invariant) {
         InvariantVerdict::Violated(detail) => detail,
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("{invariant} 该判违例，实际 {other:?}")
         }
     }
@@ -415,8 +420,10 @@ fn account_for_units_placed_by_hand(
             adjust_accounting_row(rows, STATISTIC_FREE_BYTES, device, -bytes);
         }
         if let Some(watermark) = inode_watermark {
+            // 台阶行与每次发布写的那一行同统计量、同设备段，代段更早、排在前面：改的是排在最后（代段最大）的那一行。
             let row = rows
                 .iter_mut()
+                .rev()
                 .find(|row| {
                     row[ACCOUNTING_ROW_STATISTIC_OFFSET..ACCOUNTING_ROW_STATISTIC_OFFSET + 2]
                         == STATISTIC_INODE_WATERMARK.to_le_bytes()
@@ -511,8 +518,13 @@ fn image_after_the_blind_mount_handed_out_a_unit_of_the_abandoned_root(
     tag: &str,
 ) -> (MemoryPool, TransactionOutput, Vec<u64>) {
     let (mut pool, third) = pool_through_the_third_version(tag);
+    // 那次挂载关着影子账（连 C694 的 C 一起关）：C 之后 C 的记录读得出时产品路径看得见 C、隔离它写出的单元，造不出这一形。
     let blind_mount =
-        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &third);
+        abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger(
+            &mut pool,
+            &third,
+            ShadowLedger::Off,
+        );
     let instance = blind_mount.output.instance;
     for round in 0..OVERWRITES_IN_THE_BLIND_MOUNT_AT_MOST {
         let round_index = usize::try_from(round).expect("轮次");
@@ -617,7 +629,9 @@ fn an_unreadable_root_ring_slot_leaves_the_abandoned_half_of_the_reuse_invariant
             reason.contains("读不出"),
             "理由要说是根环有读不出的槽：{reason}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::Violated(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::Violated(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("被抛弃根那一半判不了，I-7.4 不许报成立：{other:?}")
         }
     }
@@ -929,20 +943,21 @@ fn two_leaf_containers_in_key_order_hold_every_invariant() {
     assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
 }
 
-/// 第二片的容器号 8：它装的 20、30 都 ≥ 8（第一句成立），容器号 1 < 8（第二句成立），而左边容器的最大 key 10 不小于右边的容器号 8
-/// （第三句不成立）——这正是审阅那一例：I-9.12 的两条不等式都过，只有 I-9.4 第三句说话。改之前 checker 只判第一句，全绿。
+/// 第二片的容器号 8：它装的 20、30 都 ≥ 8（第一句成立），容器号 1 < 8（第二句成立），左边容器的最大 key 10 不小于右边的容器号 8，
+/// 分隔 key 落在左片最大 key 之后（I-9.12 的两条不等式都过）——这正是左从右借之后右片保留身份、分隔 key 改成它这一版最小 key 的形状（N1）。
+/// 原来的第三句（左容器的最大 key < 右容器号）随 N1 删掉（用户 2026-10-08 定案 X4，判决 `research/prompts/m3-leaf-death-r3-main-verification.md`
+/// 第五节）：这张镜像一条都不红，I-9.4 照样真被评估过、成立。
 #[test]
-fn a_right_container_number_not_above_the_largest_key_on_its_left_reddens_only_the_container_number_invariant(
-) {
+fn a_borrowed_right_container_numbered_below_the_largest_key_on_its_left_holds_every_invariant() {
     let pool = product_capacity_pool();
     let image = image_with_two_leaf_containers(&pool, 8);
     let red = violations(&image);
-    assert_eq!(violated_names(&red), ["I-9.4"], "只该红 I-9.4：{red:?}");
-    assert!(
-        red[0].1.contains("最大 key"),
-        "红在「左容器的最大 key < 右容器号」那一句：{}",
-        red[0].1
+    assert_eq!(
+        red,
+        Vec::new(),
+        "借之后的两片叶是合法形状，一条都不许红：{red:?}"
     );
+    assert_eq!(verdict_of(&image, "I-9.4"), InvariantVerdict::Holds);
 }
 
 /// 第二片的容器号 0：沿叶序容器号 1 → 0 往回走（第二句不成立；第三句跟着不成立）。违例说明取第一处，要是第二句那一格。

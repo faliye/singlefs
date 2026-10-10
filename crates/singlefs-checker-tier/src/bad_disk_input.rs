@@ -178,8 +178,9 @@ pub enum DamageKind {
     NarrowedEntryWidthOfTheAllocationRecordsTreeRoot,
     /// 条目宽度那一族（普查 R4、R13）：改记账树根（key 宽 22，条目该有 34），条目宽缩到 key 宽，**每条条目只留它的 key、
     /// 条目数不变**，节点头的 key 区间照旧与首末两条对得上。只缩成 1 条（extent、inode、分配记录树根那三种的缩法）过不了判全那一道：可写挂载重建与冷走读
-    /// 都照冷走读判全（代码审阅第 24 / 33 条），先红在「根 key 区间与条目不符」与「记账条目数不是 3 + 6 × 盘数」上，
-    /// 走不到解记账条目那一步；那一种原来的样子留在 [`DamageRefusedAtTheHeaderJudgement`]。
+    /// 都照冷走读判全（代码审阅第 24 / 33 条），先红在「根 key 区间与条目不符」上；重建不判节点头时（变异「实审 A3d」那一形），
+    /// 第 52 批起重建数条目之前先核条目宽，可写挂载红在「记账条目宽不到字段表」上，不再是「记账条目数不是 3 + 6 × 盘数」；
+    /// 都走不到逐条解记账条目那一步；那一种原来的样子留在 [`DamageRefusedAtTheHeaderJudgement`]。
     NarrowedEntryWidthOfTheAccountingTreeRoot,
     /// 条目宽度那一族（普查 R2、R13）：同上，改中央映射树根（key 宽 27，条目该有 55），每条只留 key、条目数不变
     /// （映射条目数同样要对得上进映射的单元数）。映射树的根住根记录、不经树表
@@ -1312,13 +1313,12 @@ pub fn feed_a_damaged_image(
                 .iter()
                 .filter_map(|(invariant, verdict)| match verdict {
                     InvariantVerdict::Violated(_) => Some(*invariant),
-                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                    InvariantVerdict::Holds
+                    | InvariantVerdict::NotApplicable(_)
+                    | InvariantVerdict::PartiallyJudged(_) => None,
                 })
                 .collect();
-            let judged_nothing = report.iter().all(|(_, verdict)| match verdict {
-                InvariantVerdict::NotApplicable(_) => true,
-                InvariantVerdict::Holds | InvariantVerdict::Violated(_) => false,
-            });
+            let judged_nothing = checker_judged_no_invariant(&report);
             (
                 ReaderOutcome::Finished {
                     how: format!("判红 {} 条", violated.len()),
@@ -1339,6 +1339,16 @@ pub fn feed_a_damaged_image(
         invariants_violated,
         checker_judged_nothing,
     }
+}
+
+/// 池级 checker 一条都没判出来：每一条都报不适用或部分没判（[`BadDiskObservation::checker_judged_nothing`]）。
+/// 部分没判不算判过（`InvariantVerdict::PartiallyJudged`：判到的那一部分对得上、射程里另有一部分这张镜像上判不了，它不是成立，
+/// 代码轮第三轮判决 `research/prompts/m3-root-ring-code-r3-main-verification.md` 第三节）。
+fn checker_judged_no_invariant(report: &[(&'static str, InvariantVerdict)]) -> bool {
+    report.iter().all(|(_, verdict)| match verdict {
+        InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => true,
+        InvariantVerdict::Holds | InvariantVerdict::Violated(_) => false,
+    })
 }
 
 fn describe_read_back(read_back: &ObservedReadBack) -> String {
@@ -2621,7 +2631,8 @@ fn relabel_the_inode_watermark_row(
         return None;
     }
     let layout = IndexNodeEntryLayout::of(&chain.tree_root_node);
-    let watermark_row = (0..layout.entry_count).find(|index| {
+    // 台阶行（D5（快照 / 空间记账机制） 已定项 2 射程）与每次发布写的那一行同标签、代段更早、排在前面：改的是最后那一条（现行值那一行）。
+    let watermark_row = (0..layout.entry_count).rev().find(|index| {
         read_u16_at(
             &chain.tree_root_node,
             layout.offset_of_entry(*index) + ACCOUNTING_ENTRY_STATISTIC_OFFSET,
@@ -2925,5 +2936,36 @@ mod tests {
         );
         let kinds: BTreeSet<DamageKind> = EVERY_DAMAGE_KIND.into_iter().collect();
         assert_eq!(kinds.len(), EVERY_DAMAGE_KIND.len(), "清单里没有重复");
+    }
+
+    /// 池级 checker 判出来的只有不适用与部分没判：算「一条都没判」（读者拒收整份镜像那一格），部分没判不算判过；
+    /// 有一条成立或违例就不算。
+    #[test]
+    fn a_checker_report_of_only_not_applicable_and_partially_judged_verdicts_counts_as_judging_nothing(
+    ) {
+        let not_applicable_and_partially_judged = [
+            ("I-1.1", InvariantVerdict::NotApplicable("读不出几何")),
+            (
+                "I-9.28",
+                InvariantVerdict::PartiallyJudged(
+                    "盘 0 上的根（实例 1、txg 4）：树表读不出".to_string(),
+                ),
+            ),
+        ];
+        assert!(
+            checker_judged_no_invariant(&not_applicable_and_partially_judged),
+            "只有不适用与部分没判：一条都没判"
+        );
+        for judged in [
+            InvariantVerdict::Holds,
+            InvariantVerdict::Violated("对不上".to_string()),
+        ] {
+            let mut report = not_applicable_and_partially_judged.to_vec();
+            report.push(("I-3.1", judged.clone()));
+            assert!(
+                !checker_judged_no_invariant(&report),
+                "有一条 {judged:?}：判过"
+            );
+        }
     }
 }

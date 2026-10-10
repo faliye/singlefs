@@ -102,6 +102,164 @@ pub struct SegmentFact {
     pub states: Range<u64>,
 }
 
+/// 一段的段内序号怎么拆成每次写的落地：`crate::crash::Layer0SegmentExpansion` 的三种，甲二那一种带上拆的时候要的两组写
+/// （判决 `research/prompts/m3-crash-enumeration-merge-r2-main-verification.md` 第二节 L6-2：判表加一列段的展开方式、两个内核照它拆）。
+/// 与 `crate::crash::Layer0StatePlan::persisted_writes_of_state` 同一套数字次序：全量时段内序号 r 按混合进制拆到段里全部的写上
+/// （第一次写是最低位）；甲二时单元写一个都没有就同全量（只拆到原地写上），有单元写时 r / 2 拆到原地写上、r 除以 2 的余数是「单元写全落」。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SegmentExpansionFact {
+    /// 不展开：段内一个状态都没有，只以整段持久进入后面的状态。
+    NotExpanded,
+    /// 段内每次写各取它的几态、任意组合，去掉整段全持久那一个。
+    EveryProperSubset,
+    /// 甲二：原地写（单元写之外的写）各取它的几态、任意组合 × 单元写只取全不落或全落，去掉整段全落那一个。两组写各按段内次序。
+    InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+        in_place_writes: Vec<u32>,
+        copy_on_write_writes: Vec<u32>,
+    },
+}
+
+/// GPU 表里段的展开方式码（判器内核与第 ② 段核对内核的段表第 6 字，[`segment_expansion_code_wgsl_constants`] 生成进内核）。
+pub const SEGMENT_EXPANSION_CODE_NOT_EXPANDED: u32 = 0;
+pub const SEGMENT_EXPANSION_CODE_EVERY_PROPER_SUBSET: u32 = 1;
+pub const SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL: u32 = 2;
+
+impl SegmentExpansionFact {
+    /// 一段按 `expansion` 展开时的拆法：甲二那一种按 [`in_place_and_copy_on_write_writes_of_the_segment`] 分两组。
+    #[must_use]
+    pub fn of(
+        expansion: Layer0SegmentExpansion,
+        writes: &[RetainedWrite],
+        segment: &[usize],
+    ) -> Self {
+        match expansion {
+            Layer0SegmentExpansion::NotExpanded => Self::NotExpanded,
+            Layer0SegmentExpansion::EveryProperSubset => Self::EveryProperSubset,
+            Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll => {
+                let (in_place_writes, copy_on_write_writes) =
+                    in_place_and_copy_on_write_writes_of_the_segment(writes, segment);
+                Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+                    in_place_writes,
+                    copy_on_write_writes,
+                }
+            }
+        }
+    }
+
+    /// GPU 表里的码。
+    #[must_use]
+    pub fn code(&self) -> u32 {
+        match self {
+            Self::NotExpanded => SEGMENT_EXPANSION_CODE_NOT_EXPANDED,
+            Self::EveryProperSubset => SEGMENT_EXPANSION_CODE_EVERY_PROPER_SUBSET,
+            Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll { .. } => {
+                SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL
+            }
+        }
+    }
+
+    /// 段内序号逐位拆到哪几次写上（次序就是数位次序，第一次写是最低位），与这一段之外还要整组一起落的单元写：
+    /// 全量与不展开时是段里全部的写、没有整组；甲二时是原地写、整组是单元写（单元写为空时同全量）。
+    #[must_use]
+    pub fn digit_writes_and_the_copy_on_write_group<'segment>(
+        &'segment self,
+        segment: &'segment SegmentFact,
+    ) -> (&'segment [u32], &'segment [u32]) {
+        match self {
+            Self::NotExpanded | Self::EveryProperSubset => (&segment.writes, &[]),
+            Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+                in_place_writes,
+                copy_on_write_writes,
+            } => (in_place_writes, copy_on_write_writes),
+        }
+    }
+
+    /// 这一段按这种拆法展开出几个状态（`is_tearable` 里为真的写取三态，其余取两态）；装不进 u64 交 `None`。
+    #[must_use]
+    pub fn state_count(&self, segment: &SegmentFact, is_tearable: &[bool]) -> Option<u64> {
+        let combinations_of = |write_indexes: &[u32]| {
+            write_indexes.iter().try_fold(1u64, |combinations, write| {
+                let choices = if is_tearable[usize::try_from(*write).expect("下标装得进 usize")]
+                {
+                    3
+                } else {
+                    2
+                };
+                combinations.checked_mul(choices)
+            })
+        };
+        match self {
+            Self::NotExpanded => Some(0),
+            Self::EveryProperSubset => combinations_of(&segment.writes)?.checked_sub(1),
+            Self::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+                in_place_writes,
+                copy_on_write_writes,
+            } => {
+                let copy_on_write_choices = if copy_on_write_writes.is_empty() {
+                    1
+                } else {
+                    2
+                };
+                combinations_of(in_place_writes)?
+                    .checked_mul(copy_on_write_choices)?
+                    .checked_sub(1)
+            }
+        }
+    }
+}
+
+/// 一段里的原地写与单元写（COW），各按段内次序：单元写落在新分出来的槽上，其余（系统配置槽、journal 记录、根槽、清零、屏障）都是原地覆盖。
+/// 与 `crate::crash` 里甲二拆段的那一份同一条分法（那一份是 `crash.rs` 的私有函数 `in_place_and_copy_on_write_writes_of`，崩溃点重放引擎那一路
+/// 合并时改成调这一份）。
+#[must_use]
+pub fn in_place_and_copy_on_write_writes_of_the_segment(
+    writes: &[RetainedWrite],
+    segment: &[usize],
+) -> (Vec<u32>, Vec<u32>) {
+    let write_index = |index: usize| u32::try_from(index).expect("写表下标装得进 u32");
+    let (in_place_writes, copy_on_write_writes): (Vec<usize>, Vec<usize>) = segment
+        .iter()
+        .copied()
+        .partition(|index| match writes[*index].kind {
+            StepKind::UnitWrite => false,
+            StepKind::ZeroFill
+            | StepKind::SystemConfigurationSlot
+            | StepKind::JournalRecord
+            | StepKind::RootRecordFua
+            | StepKind::Barrier => true,
+        });
+    (
+        in_place_writes.into_iter().map(write_index).collect(),
+        copy_on_write_writes.into_iter().map(write_index).collect(),
+    )
+}
+
+/// 每一段按 `expansion` 的拆法（与 `segments` 同序）。`expansion` 与枚举、抽事实时给的同一个。
+#[must_use]
+pub fn segment_expansion_facts(
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+) -> Vec<SegmentExpansionFact> {
+    segments
+        .iter()
+        .enumerate()
+        .map(|(segment_index, segment)| {
+            SegmentExpansionFact::of(expansion(segment_index, segment), writes, segment)
+        })
+        .collect()
+}
+
+/// 段的展开方式码在内核里的常量（WGSL 源码）：判器的三个内核与第 ② 段核对内核都接在源码最前面，不在 WGSL 里另写一份。
+#[must_use]
+pub fn segment_expansion_code_wgsl_constants() -> String {
+    format!(
+        "const SEGMENT_EXPANSION_CODE_NOT_EXPANDED: u32 = {SEGMENT_EXPANSION_CODE_NOT_EXPANDED}u;\n\
+         const SEGMENT_EXPANSION_CODE_EVERY_PROPER_SUBSET: u32 = {SEGMENT_EXPANSION_CODE_EVERY_PROPER_SUBSET}u;\n\
+         const SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL: u32 = {SEGMENT_EXPANSION_CODE_IN_PLACE_SUBSETS_WITH_COPY_ON_WRITE_NONE_OR_ALL}u;\n"
+    )
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TornImageFact {
     pub write_index: u32,
@@ -342,6 +500,28 @@ impl FlowFacts {
         )
     }
 
+    /// 同 [`Self::persisted_writes_of_state`]，每一段照 `segment_expansions` 那一段的拆法（有甲二段的流）。
+    ///
+    /// # Panics
+    /// 同 [`persisted_writes_of_state_by_the_segment_expansions`]。
+    #[must_use]
+    pub fn persisted_writes_of_state_by_the_segment_expansions(
+        &self,
+        segment_expansions: &[SegmentExpansionFact],
+        ordinal: u64,
+    ) -> Vec<bool> {
+        persisted_writes_of_state_by_the_segment_expansions(
+            usize::try_from(self.recorded_write_count).expect("装得进 usize"),
+            usize::try_from(self.enumerated_write_count).expect("装得进 usize"),
+            &self.is_tearable,
+            &self.torn_images,
+            &self.segments,
+            segment_expansions,
+            self.state_count,
+            ordinal,
+        )
+    }
+
     /// 序列化：全部小端定宽，字段次序就是 [`Self::from_bytes`] 读的次序。
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -524,12 +704,12 @@ impl FlowFacts {
     }
 }
 
-/// 序号 → 持久掩码，按枚举写表给（事实表与 GPU 判器的输入表共用这一份；层 0 的 `Layer0StatePlan::persisted_writes_of_state`
-/// 是同一套数字次序：两态的写数字 0 / 1 = 没持久 / 持久，三态的写 0 / 1 / 2 = 没持久 / 撕裂 / 持久；撕裂那一态记成原写没持久、
-/// 撕裂镜像持久，撕裂镜像之后的重放跟着被重放的那次写落不落）。
+/// 序号 → 持久掩码，按枚举写表给，每一段都按全量（[`SegmentExpansionFact::EveryProperSubset`]）拆：不展开的段序号区间是空的、
+/// 拆不到它，所以「每段要么全量展开、要么不展开」的流（崩溃放量按展开上限切的那一种）照用这一份；有甲二段的流用
+/// [`persisted_writes_of_state_by_the_segment_expansions`]。数字次序见那一份。
 ///
 /// # Panics
-/// 序号越过状态总数。
+/// 序号越过状态总数；同 [`persisted_writes_of_state_by_the_segment_expansions`]。
 #[must_use]
 pub fn persisted_writes_of_state(
     recorded_write_count: usize,
@@ -540,22 +720,75 @@ pub fn persisted_writes_of_state(
     state_count: u64,
     ordinal: u64,
 ) -> Vec<bool> {
+    persisted_writes_of_state_by_the_segment_expansions(
+        recorded_write_count,
+        enumerated_write_count,
+        is_tearable,
+        torn_images,
+        segments,
+        &vec![SegmentExpansionFact::EveryProperSubset; segments.len()],
+        state_count,
+        ordinal,
+    )
+}
+
+/// 序号 → 持久掩码，按枚举写表给，每一段照 `segment_expansions` 那一段的拆法（事实表与 GPU 判器的输入表共用这一份；层 0 的
+/// `Layer0StatePlan::persisted_writes_of_state` 是同一套数字次序：两态的写数字 0 / 1 = 没持久 / 持久，三态的写 0 / 1 / 2 = 没持久 / 撕裂 / 持久；
+/// 甲二段有单元写时段内序号的最低一位（除以 2 的余数）是「单元写全落」、其余拆到原地写上；撕裂那一态记成原写没持久、撕裂镜像持久，
+/// 撕裂镜像之后的重放跟着被重放的那次写落不落）。
+///
+/// # Panics
+/// 序号越过状态总数；`segment_expansions` 与 `segments` 不一样长；序号所在那一段的拆法展开出的状态数与它的序号区间对不上（拆法给错了）。
+#[must_use]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "拆一个序号要的几样各自独立：两张写表的长度、哪几次写取三态、撕裂镜像与重放、段、段的拆法、状态总数、序号"
+)]
+pub fn persisted_writes_of_state_by_the_segment_expansions(
+    recorded_write_count: usize,
+    enumerated_write_count: usize,
+    is_tearable: &[bool],
+    torn_images: &[TornImageFact],
+    segments: &[SegmentFact],
+    segment_expansions: &[SegmentExpansionFact],
+    state_count: u64,
+    ordinal: u64,
+) -> Vec<bool> {
     assert!(
         ordinal < state_count,
         "序号 {ordinal} 越过状态总数 {state_count}"
     );
+    assert_eq!(segment_expansions.len(), segments.len(), "每一段一个拆法");
+    let index_of = |write: &u32| usize::try_from(*write).expect("下标装得进 usize");
     // 0 没持久、1 撕裂、2 持久
     let mut landings = vec![0u8; recorded_write_count];
     let segment_of_state = segments.partition_point(|segment| segment.states.end <= ordinal);
     for segment in &segments[..segment_of_state] {
         for write in &segment.writes {
-            landings[*write as usize] = 2;
+            landings[index_of(write)] = 2;
         }
     }
     if let Some(segment) = segments.get(segment_of_state) {
+        let expansion = &segment_expansions[segment_of_state];
+        assert_eq!(
+            expansion.state_count(segment, is_tearable),
+            Some(segment.states.end - segment.states.start),
+            "段 {segment_of_state} 的拆法（{expansion:?}）展开出的状态数与它的序号区间 {:?} 对不上",
+            segment.states
+        );
         let mut remaining = ordinal - segment.states.start;
-        for write in &segment.writes {
-            let index = *write as usize;
+        let (digit_writes, copy_on_write_group) =
+            expansion.digit_writes_and_the_copy_on_write_group(segment);
+        if !copy_on_write_group.is_empty() {
+            if remaining % 2 == 1 {
+                for write in copy_on_write_group {
+                    landings[index_of(write)] = 2;
+                }
+            }
+            remaining /= 2;
+        }
+        for write in digit_writes {
+            let index = index_of(write);
             let choices = if is_tearable[index] { 3 } else { 2 };
             let digit = remaining % choices;
             remaining /= choices;
@@ -693,6 +926,30 @@ pub fn verify_persisted_set_from_facts(facts: &FlowFacts, persisted: &[bool]) ->
 pub fn verify_states_from_facts(facts: &FlowFacts, ordinals: Range<u64>) -> Vec<u32> {
     ordinals
         .map(|ordinal| verify_state_from_facts(facts, ordinal))
+        .collect()
+}
+
+/// 同 [`verify_states_from_facts`]，每一段照 `segment_expansions` 那一段的拆法拆序号（有甲二段的流；GPU 那一份是
+/// `crate::crash_verify_gpu::GpuFactsVerifier::new_by_the_segment_expansions`）。
+///
+/// # Panics
+/// 同 [`persisted_writes_of_state_by_the_segment_expansions`]。
+#[must_use]
+pub fn verify_states_from_facts_by_the_segment_expansions(
+    facts: &FlowFacts,
+    segment_expansions: &[SegmentExpansionFact],
+    ordinals: Range<u64>,
+) -> Vec<u32> {
+    ordinals
+        .map(|ordinal| {
+            verify_persisted_set_from_facts(
+                facts,
+                &facts.persisted_writes_of_state_by_the_segment_expansions(
+                    segment_expansions,
+                    ordinal,
+                ),
+            )
+        })
         .collect()
 }
 
@@ -835,6 +1092,165 @@ mod tests {
             facts.persisted_writes_of_state(6),
             vec![true, true, true, false],
             "最后全部持久"
+        );
+    }
+
+    /// 一段 5 次写（两次原地写 0、1，三次单元写 2、3、4；判决 m3-crash-enumeration-merge-r2 第二节 L6-2 攻方模型那两种段序）按甲二拆：
+    /// 序号 r 的最低一位是「单元写全落」，r / 2 按原地写的段内次序拆成两位，整段全落那一个取不到——7 个状态逐个照这个次序写出来比。
+    fn facts_of_one_segment_in_the_order(segment_writes: Vec<u32>, states: u64) -> FlowFacts {
+        FlowFacts {
+            recorded_write_count: 5,
+            enumerated_write_count: 5,
+            is_tearable: vec![false; 5],
+            torn_images: vec![],
+            segments: vec![SegmentFact {
+                writes: segment_writes,
+                states: 0..states,
+            }],
+            state_count: states + 1,
+            units: vec![],
+            roots: vec![],
+            newest_base_root: None,
+        }
+    }
+
+    fn in_place_subsets_with_copy_on_write_none_or_all_of_the_model() -> Vec<SegmentExpansionFact> {
+        vec![
+            SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+                in_place_writes: vec![0, 1],
+                copy_on_write_writes: vec![2, 3, 4],
+            },
+        ]
+    }
+
+    fn masks_of_the_in_place_subsets_with_copy_on_write_none_or_all_of_the_model() -> Vec<Vec<bool>>
+    {
+        // (原地写 0, 原地写 1, 单元写全落)，r = 2 × (写0 + 2 × 写1) + 单元写全落，r 从 0 数到 6
+        (0..7u64)
+            .map(|ordinal| {
+                let copy_on_write = ordinal % 2 == 1;
+                let in_place = ordinal / 2;
+                vec![
+                    in_place % 2 == 1,
+                    (in_place / 2) % 2 == 1,
+                    copy_on_write,
+                    copy_on_write,
+                    copy_on_write,
+                ]
+            })
+            .collect()
+    }
+
+    #[test]
+    fn in_place_subsets_with_copy_on_write_none_or_all_decode_with_the_in_place_writes_first_in_the_segment(
+    ) {
+        let facts = facts_of_one_segment_in_the_order(vec![0, 1, 2, 3, 4], 7);
+        let expansions = in_place_subsets_with_copy_on_write_none_or_all_of_the_model();
+        let decoded: Vec<Vec<bool>> = (0..7)
+            .map(|ordinal| {
+                facts.persisted_writes_of_state_by_the_segment_expansions(&expansions, ordinal)
+            })
+            .collect();
+        assert_eq!(
+            decoded,
+            masks_of_the_in_place_subsets_with_copy_on_write_none_or_all_of_the_model()
+        );
+        assert_eq!(
+            facts.persisted_writes_of_state_by_the_segment_expansions(&expansions, 7),
+            vec![true; 5],
+            "最后全部持久那一个"
+        );
+    }
+
+    #[test]
+    fn in_place_subsets_with_copy_on_write_none_or_all_decode_the_same_with_the_copy_on_write_writes_first_in_the_segment(
+    ) {
+        let facts = facts_of_one_segment_in_the_order(vec![2, 3, 4, 0, 1], 7);
+        let expansions = in_place_subsets_with_copy_on_write_none_or_all_of_the_model();
+        let decoded: Vec<Vec<bool>> = (0..7)
+            .map(|ordinal| {
+                facts.persisted_writes_of_state_by_the_segment_expansions(&expansions, ordinal)
+            })
+            .collect();
+        assert_eq!(
+            decoded,
+            masks_of_the_in_place_subsets_with_copy_on_write_none_or_all_of_the_model(),
+            "单元写排在段首也照原地写的段内次序拆，单元写只取全不落或全落"
+        );
+    }
+
+    /// 段的拆法展开出的状态数与段的序号区间对不上（拆法给错了）就 panic，不悄悄拆成别的状态。
+    #[test]
+    #[should_panic(expected = "展开出的状态数与它的序号区间")]
+    fn an_expansion_that_disagrees_with_the_state_range_of_its_segment_panics() {
+        let facts = facts_of_one_segment_in_the_order(vec![0, 1, 2, 3, 4], 7);
+        let _decoded = facts.persisted_writes_of_state_by_the_segment_expansions(
+            &[SegmentExpansionFact::EveryProperSubset],
+            3,
+        );
+    }
+
+    /// 33 次两态写的一段（判决 m3-crash-enumeration-merge-r2 第二节 L1-7，攻方 decode_alias.py 那一形）：第 2³² + 5 个状态拆出写 0、写 2、写 32 持久，
+    /// 不被截成低 32 位的 5。
+    #[test]
+    fn the_ordinal_within_a_thirty_three_write_segment_decodes_past_thirty_two_bits() {
+        let writes = 33u32;
+        let states = (1u64 << writes) - 1;
+        let facts = FlowFacts {
+            recorded_write_count: writes,
+            enumerated_write_count: writes,
+            is_tearable: vec![false; 33],
+            torn_images: vec![],
+            segments: vec![SegmentFact {
+                writes: (0..writes).collect(),
+                states: 0..states,
+            }],
+            state_count: states + 1,
+            units: vec![],
+            roots: vec![],
+            newest_base_root: None,
+        };
+        let persisted = facts.persisted_writes_of_state((1u64 << 32) + 5);
+        let persisted_writes: Vec<usize> = persisted
+            .iter()
+            .enumerate()
+            .filter(|(_, is_persisted)| **is_persisted)
+            .map(|(write_index, _)| write_index)
+            .collect();
+        assert_eq!(persisted_writes, vec![0, 2, 32]);
+    }
+
+    /// 段的拆法从写的种类分组：单元写是 COW 那一组，别的都是原地写；按段内次序，与 crash.rs 甲二那一份分法相同。
+    #[test]
+    fn the_segment_expansion_fact_of_in_place_subsets_groups_the_unit_writes_as_copy_on_write() {
+        use singlefs_harness::memory_pool::WrittenContents;
+        let write_of = |kind: StepKind| RetainedWrite {
+            device: singlefs_core::address::DeviceIdentity(0),
+            kind,
+            is_force_unit_access: false,
+            offset: DeviceOffsetInBytes(0),
+            contents: WrittenContents::Bytes(vec![0u8; 512]),
+        };
+        let writes = vec![
+            write_of(StepKind::UnitWrite),
+            write_of(StepKind::JournalRecord),
+            write_of(StepKind::UnitWrite),
+            write_of(StepKind::RootRecordFua),
+        ];
+        assert_eq!(
+            SegmentExpansionFact::of(
+                Layer0SegmentExpansion::InPlaceSubsetsWithCopyOnWriteNoneOrAll,
+                &writes,
+                &[0, 1, 2, 3]
+            ),
+            SegmentExpansionFact::InPlaceSubsetsWithCopyOnWriteNoneOrAll {
+                in_place_writes: vec![1, 3],
+                copy_on_write_writes: vec![0, 2],
+            }
+        );
+        assert_eq!(
+            SegmentExpansionFact::of(Layer0SegmentExpansion::NotExpanded, &writes, &[0, 1]),
+            SegmentExpansionFact::NotExpanded
         );
     }
 

@@ -41,7 +41,9 @@ use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
 use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
-use singlefs_core::make_filesystem::{INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
+use singlefs_core::make_filesystem::{
+    root_ring_occupancy_after_make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+};
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, RollbackTarget,
     ShadowLedger, UnmountRaisedTheFloor, Unmounted,
@@ -110,25 +112,32 @@ const LOCAL_FIRST_STREAM_QUICK_TIER_STATES: u64 = 46;
 /// 流一每次写只取两态时的全量闭式：同一份文件第 442 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
 const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_240;
 
-/// 流二的段长（78 段）：`tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行。
+/// 流二的段长（78 段）：取今天 crates 现算的那一份，即这个装置 `baseline` 的 S1 `fixed_script_through_e_then_unmount_segment_lengths`
+/// 的 `crates=`（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 第 438 行，step=z5）。与
+/// `tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行只差第 33 段（回退 D 那次向前发布）：20 → 24，
+/// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
 const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
     16, // 取号到写行之后的暖机
-    2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
+    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
     28, // C、回退 D、覆盖写
     2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1,
     2, // 抬 F、E、卸载
     16, 2, 1, 2, // 卸载第二次空发布与 txg 19 的轮换
 ];
-/// 流二的写数：同一份文件第 448 行 `191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21)`。
-const LOCAL_SECOND_STREAM_WRITES: usize = 477;
+/// 流二的写数：S1 `fixed_script_through_e_then_unmount_writes` 的 `crates=481`（同一份产物第 439 行）；测试文件第 448 行
+/// `191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21)` = 477 不含回退 D 那次的 4 次谱系记录写。
+const LOCAL_SECOND_STREAM_WRITES: usize = 481;
 /// 流二的根槽写数：同一份文件第 482 行（`=> 19`）。
 const LOCAL_SECOND_STREAM_ROOT_WRITES: usize = 19;
-/// 流二全量与快档的状态数：同一份文件第 100 行 `FULL_STATES_THROUGH_THE_UNMOUNT`、第 114 行 `QUICK_TIER_STATES_THROUGH_THE_UNMOUNT`。
-const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_662_648_564;
+/// 流二全量的状态数：S1 `fixed_script_through_e_then_unmount_full_states` 的 `crates=1678377204`（同一份产物第 443 行；
+/// 测试文件第 100 行 `FULL_STATES_THROUGH_THE_UNMOUNT` 还是 1_662_648_564，差 2^24 − 2^20）。快档：测试文件第 114 行
+/// `QUICK_TIER_STATES_THROUGH_THE_UNMOUNT`，与 S1 `crates=278` 相同。
+const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_678_377_204;
 const LOCAL_SECOND_STREAM_QUICK_TIER_STATES: u64 = 278;
-/// 流二每次写只取两态时的全量闭式：同一份文件第 96 行（单测拿段长表回算它）。
-const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_662_648_449;
+/// 流二每次写只取两态时的全量闭式：S1 `fixed_script_through_e_then_unmount_two_state_closed_form` 的 `crates=1678377089`
+/// （同一份产物第 445 行；测试文件第 96 行还是 1_662_648_449）。单测拿段长表回算它。
+const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_089;
 /// E 的数据单元落点：同一份文件第 318 行（`50176`）。
 const LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT: u64 = 50_176;
 /// 抬 F 推的空发布数：同一份文件第 306 行（`raised.publishes.len(), 2`）。
@@ -623,6 +632,10 @@ impl LiveStream {
                 span: 1,
             },
         );
+        allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
+            &common::parameters(),
+            &formatted.genesis,
+        ));
         let driver = StreamDriver::new(
             name,
             formatted.stream.clone(),
@@ -1746,7 +1759,9 @@ impl ImplementationVerdict {
                 .iter()
                 .filter(|(_, verdict)| match verdict {
                     InvariantVerdict::Violated(_) => true,
-                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => false,
+                    InvariantVerdict::Holds
+                    | InvariantVerdict::NotApplicable(_)
+                    | InvariantVerdict::PartiallyJudged(_) => false,
                 })
                 .map(|(invariant, _)| (*invariant).to_string())
                 .collect(),
@@ -1818,7 +1833,9 @@ fn violated_invariant_names(verdicts: &[(&'static str, InvariantVerdict)]) -> Ve
         .iter()
         .filter(|(_, verdict)| match verdict {
             InvariantVerdict::Violated(_) => true,
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => false,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => false,
         })
         .map(|(invariant, _)| (*invariant).to_string())
         .collect()
@@ -2797,9 +2814,11 @@ fn timing_summary(mut nanoseconds: Vec<u128>) -> (u128, u128, u128, u128) {
 
 // ───────────────────────────── 已知坏镜像族（登记 5.5 第三族）：照抄 `checker_known_bad_images.rs` ─────────────────────────────
 //
-// 那份用例是 O2 自己的回归语料：每一份都照 O2 的判据造来让 O2 红。下面这个模块逐行照抄它的导入（第 7–68 行）、常量与辅助函数（第 70–745 行）、
-// `known_bad_images`（第 747–1294 行），再抄 `known_bad_images` 用到而散在第 1295 行之后的几个常量与辅助函数（行号在模块末尾的注释里）。
-// 文件 sha256 e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820；它的 `#[test]` 没有抄。照抄、不 `#[path]` 引：
+// 那份用例是 O2 自己的回归语料：每一份都照 O2 的判据造来让 O2 红。`known_bad_images` 与它新用到的辅助函数
+// `move_the_data_unit_of_the_first_file_two_slots_further` 照抄 sha256 e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736
+// 那一份（第 755–1326 行、第 1328–1375 行；E170 第 2 次重跑登记修订 2 读法 18）。其余导入、常量与辅助函数照抄自更早的
+// sha256 e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820 那一份，与 e426cdff… 里同名条目去空白、去收尾逗号之后逐个相同
+// （`use` 两行不比）；散在 `known_bad_images` 之后的那几个在 e426cdff… 里的行号写在模块末尾的注释里。它的 `#[test]` 没有抄。照抄、不 `#[path]` 引：
 // 那个文件有自己的 `mod common;` 与全部测试，私有的 `known_bad_images` 也引不到。条目名与条数在 `known-bad-images` 模式里与原文件逐条比（停机 S4、断言 A8）。
 #[allow(
     dead_code,
@@ -2819,12 +2838,13 @@ mod known_bad_images_copied_from_the_harness_test {
     use singlefs_checker::image::{
         InvariantVerdict, ACCOUNTING_ROWS_CARRY_THE_GENERATION_OF_THEIR_VERSION,
         DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE,
+        FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
         INODE_CHANGE_COUNT_BETWEEN_OBJECT_BIRTH_AND_CONTAINER_BIRTH,
         INSTANCE_TABLE_ROWS_PUBLISHED_BEFORE_THE_ROOT_REFERENCING_THEM,
         JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE, JOURNAL_RING_GEOMETRY_FIELDS_AGREE,
         LAST_RECORD_OF_A_PUBLISH_CARRIES_THE_ROOT_OF_THAT_PUBLISH,
         NAMED_ENTRY_MATCHES_THE_UNIT_HEADER, POINTER_BIRTH_TREE_MATCHES_THE_UNIT_HEADER,
-        PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES,
+        PREVIOUS_SNAPSHOT_TXG_OF_THE_TREE_TABLE_ENTRIES, REFERENCE_INTERVALS_ARE_EXACT,
         ROOT_RECORDS_LIVE_IN_THE_SLOT_THEIR_TXG_NAMES, ROOT_SLOTS_ALIGNED_TO_THE_DECISION_WIDTH,
         SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION,
         SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS,
@@ -3923,7 +3943,7 @@ mod known_bad_images_copied_from_the_harness_test {
                 }),
             ),
             // 盘 0 环内偏移 4096 那条记录（w4，暖机第二条空发布）的反向链字段改成 0，头校验和重封：
-            // 它不是本实例第一条（本实例第一条是 w1、计数器 1），链值必须等于 CRC32C(w1 的 311 字节头)。
+            // 它不是本实例第一条（本实例第一条是 w1、计数器 1），链值必须等于 CRC32C(w1 的 487 字节头)。
             (
                 "I-8.6",
                 Box::new(|image: &mut MemoryPool| {
@@ -4100,7 +4120,85 @@ mod known_bad_images_copied_from_the_harness_test {
                     );
                 }),
             ),
+            // I-3.5：A 的数据单元（50180）头里的诞生代号 3 → 2，重封、补到根：A 引用、暖机那一版（txg 2）不引用的单元诞生代号不大于 2，
+            // 也不在整棵继承下来的用户可见树里（extent 树根指针出生 txg 3）。指针、映射 key 与分配代还记 3，I-1.2、I-1.11、I-3.10 跟着红，
+            // 所以放在这一张表里（只判「它红」，不判「只红它」）；按各个组成部分的几份在
+            // `checker_judges_reference_intervals_and_every_new_root_segment_field.rs`。
+            (
+                REFERENCE_INTERVALS_ARE_EXACT,
+                Box::new(|image: &mut MemoryPool| {
+                    mutate_unit(
+                        image,
+                        DATA_UNIT,
+                        |bytes| {
+                            assert_eq!(
+                                get_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET),
+                                3,
+                                "A 的数据单元生在 txg 3"
+                            );
+                            set_u64(bytes, DATA_UNIT_BIRTH_TXG_OFFSET, 2);
+                        },
+                        true,
+                    );
+                }),
+            ),
+            // I-5.5（判决 `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K2）：A 那一版是从 mkfs 水位第一次建树的那一版，
+            // 它唯一的数据单元（50180 = 单元区起始槽号 50176 + 4）搬到再往后两槽，每块盘上落点最小的数据单元就不在 U + 4。
+            // 分配记录与记账照旧记着 50180，这份镜像上不只红 I-5.5；这一格只要它判违例。
+            (
+                FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+                Box::new(move_the_data_unit_of_the_first_file_two_slots_further),
+            ),
         ]
+    }
+
+    /// 新池新建文件写出的那个数据单元（`DATA_UNIT`，32 KiB）原样搬到往后两槽（写完新池新建文件那份镜像上空着，下一个 32 KiB 对齐的槽对）：
+    /// 两盘各写一份；`UNITS` 里引用它的单元（extent 树根里的数据指针、中央映射叶）把位置条目的槽号改成新的、重封，
+    /// 新的整单元校验和沿引用链补到根槽。50180 那两份原样留着：journal 记录的点名项仍指着它。
+    fn move_the_data_unit_of_the_first_file_two_slots_further(image: &mut MemoryPool) {
+        const DATA_UNIT_BYTES: usize = 32768;
+        let moved_to = DATA_UNIT + 2;
+        assert!(
+            UNITS.iter().all(|(start, _)| *start != moved_to),
+            "槽 {moved_to} 在写完新池新建文件的镜像上空着"
+        );
+        let data_unit = read(image, 0, DATA_UNIT * SLOT, DATA_UNIT_BYTES);
+        for device in DEVICES {
+            write(image, device, moved_to * SLOT, &data_unit);
+        }
+        let checksum = crc32_castagnoli(&data_unit);
+        let mut parents_changed = Vec::new();
+        for (container, length) in UNITS.iter().copied() {
+            if container == DATA_UNIT {
+                continue;
+            }
+            let before = read(image, 0, container * SLOT, length);
+            let mut bytes = before.clone();
+            let mut touched = false;
+            for device in DEVICES {
+                touched |= replace_all(
+                    &mut bytes,
+                    &location_pattern(device, DATA_UNIT, checksum),
+                    &location_pattern(device, moved_to, checksum),
+                );
+            }
+            if touched {
+                reseal_unit(&mut bytes);
+                for device in DEVICES {
+                    write(image, device, container * SLOT, &bytes);
+                }
+                parents_changed.push((
+                    container,
+                    crc32_castagnoli(&before),
+                    crc32_castagnoli(&bytes),
+                ));
+            }
+        }
+        assert!(
+            !parents_changed.is_empty(),
+            "写完新池新建文件的镜像上有单元指着那个数据单元"
+        );
+        propagate(image, &UNITS, parents_changed);
     }
 
     /// 发布 B（txg 4）之后的干净镜像：A 的十二个单元（十四个槽）在这次发布里改写成已释放、释放代 4，树表是 B 写的那一版，
@@ -4108,7 +4206,7 @@ mod known_bad_images_copied_from_the_harness_test {
     /// 要的跨根比较到这里才有内容：写完新池新建文件的那份镜像上只有 A 的根有树表条目（mkfs 种的第 0 版树表是空的、
     /// 两次暖机空发布不写树表），I-9.14 在那份镜像上报「不适用」。
 
-    // 以下是散在原文件第 1295 行之后、被上面用到的常量与辅助函数，原文件行号：3071 1543 3179 3261 3246 3119 3573 3113 3115 3116 3114 3111
+    // 以下是散在原文件 `known_bad_images` 之后、被上面用到的常量与辅助函数，在 e426cdff… 那一份里的行号：3191 1629 3299 3381 3366 3239 3736 3233 3235 3236 3234 3231
 
     /// inode 记录里 `blocks` 的偏移（D8（核心索引结构） 已定项 6 的偏移表：size 在 40，blocks 在 48）。
     const INODE_RECORD_BLOCKS_OFFSET: usize = 48;
@@ -4214,7 +4312,7 @@ mod known_bad_images_copied_from_the_harness_test {
     /// 树表条目里种类那 2 字节的偏移（树 ID 8 + 条目长度 2 之后，D8（核心索引结构） 已定项 8）。
     const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
 
-    /// 对外的口子：第 747 行的 `known_bad_images` 是私有的，这里转一手（类型就是第 745 行的 `Mutation`）。
+    /// 对外的口子：第 755 行的 `known_bad_images` 是私有的，这里转一手（类型就是第 753 行的 `Mutation`）。
     pub(super) fn entries_of_the_known_bad_images(
         clean: &MemoryPool,
     ) -> Vec<(&'static str, Box<dyn Fn(&mut MemoryPool)>)> {
@@ -4255,7 +4353,7 @@ fn pool_checker_on_the_first_known_bad_image(
         known_bad_images_copied_from_the_harness_test::entries_of_the_known_bad_images(&clean);
     let (_, apply_the_first_entry) = entries
         .first()
-        .expect("已知坏镜像族至少一条（S4：装置数出的条数要是 41）");
+        .expect("已知坏镜像族至少一条（S4：装置数出的条数要是 43）");
     let mut bad = clean.clone();
     apply_the_first_entry(&mut bad);
     check_pool_image(&bad)
@@ -4399,13 +4497,14 @@ fn sector_difference_as_patches(clean: &MemoryPool, bad: &MemoryPool) -> Vec<Byt
     patches
 }
 
-// ───────────────────────────── `known-bad-images` 模式：41 条已知坏镜像与 E170 的 P 行、盲测族上的 O2（登记 5.5） ─────────────────────────────
+// ───────────────────────────── `known-bad-images` 模式：43 条已知坏镜像与 E170 的 P 行、盲测族上的 O2（登记 5.5） ─────────────────────────────
 
 /// 原用例文件的 sha256（登记第三节、A8）：变了先重数条目再比，不照抄的那一份当作没变。
 const KNOWN_BAD_TEST_FILE_SHA256: &str =
-    "e8543908a3cb08024037773ffc62997a23e0b1d87742e9ea897fa9c8145be820";
-/// `known_bad_images(clean)` 的条目数（登记第七节 A8：第 747–1294 行里 `Box::new(` 41 处，字面名 38 条、常量名 3 条）。
-const KNOWN_BAD_ENTRY_COUNT: usize = 41;
+    "e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736";
+/// `known_bad_images(clean)` 的条目数（登记第七节 A8；E170 第 2 次重跑登记修订 2 读法 18 照今天那份重数：
+/// 第 755–1326 行里 `Box::new(` 43 处，字面名 38 条、常量名 5 条）。
+const KNOWN_BAD_ENTRY_COUNT: usize = 43;
 
 /// 原用例文件里 `known_bad_images` 一函数里每条的目标不变量名，按文件次序：十二格缩进的一行写字面名（`"I-x.y",`）或常量名。
 fn entry_names_in_the_original_test_file(text: &str) -> Vec<String> {
@@ -4446,6 +4545,12 @@ fn entry_names_in_the_original_test_file(text: &str) -> Vec<String> {
                 }
                 "MAPPING_KEY_INVARIANT" => {
                     singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER.to_string()
+                }
+                // 下面两支写本地字面量，值抄自 `crates/singlefs-checker/src/image.rs` 第 197、206 行（E170 第 2 次重跑登记 12.15）：
+                // 照抄的条目带的是 crates 常量的值，`known_bad_entry_names_equal_the_original_file_in_order` 那一格两边不等就不过。
+                "REFERENCE_INTERVALS_ARE_EXACT" => "I-3.5".to_string(),
+                "FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK" => {
+                    "I-5.5".to_string()
                 }
                 unresolved => format!("unresolved_constant:{unresolved}"),
             });
@@ -4495,7 +4600,7 @@ fn patches_of_a_patch_list_text(list: &str, patches_file: &[u8]) -> Vec<BytePatc
         .collect()
 }
 
-/// 41 条已知坏镜像在流一全持久态上的 O2：每一条施加在干净镜像的拷贝上，一边直接判（`MemoryPool`），一边取补丁（逐扇区的差）再叠回干净镜像判，
+/// 43 条已知坏镜像在流一全持久态上的 O2：每一条施加在干净镜像的拷贝上，一边直接判（`MemoryPool`），一边取补丁（逐扇区的差）再叠回干净镜像判，
 /// 两边判红的不变量集合要相等（S4）、目标不变量要在里面（S4）。交回（停机条款没过的条数）。
 fn known_bad_images_on_the_first_stream(
     dump_directory: &Path,
@@ -5401,7 +5506,7 @@ mod tests {
             LOCAL_SECOND_STREAM_SEGMENT_LENGTHS.iter().sum::<usize>(),
             LOCAL_SECOND_STREAM_WRITES
         );
-        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_662_648_449);
+        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_678_377_089);
         assert_eq!(LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM, 16_777_240);
     }
 
@@ -6137,12 +6242,14 @@ mod tests {
     /// 原用例文件里一个函数的条目名按文件次序取：字面名与常量名都认，更深缩进的行不认。
     #[test]
     fn entry_names_are_read_in_file_order_from_the_twelve_space_indented_lines_of_the_function() {
-        let text = "fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {\n    vec![\n        (\n            \"I-7.4\",\n            Box::new(|image| {\n                let x = 1;\n                \"I-9.9\";\n            }),\n        ),\n        (\n            MAPPING_KEY_INVARIANT,\n            Box::new(|image| {}),\n        ),\n    ]\n}\nfn other() {\n            \"I-0.0\",\n}\n";
+        let text = "fn known_bad_images(clean: &MemoryPool) -> Vec<(&'static str, Mutation)> {\n    vec![\n        (\n            \"I-7.4\",\n            Box::new(|image| {\n                let x = 1;\n                \"I-9.9\";\n            }),\n        ),\n        (\n            MAPPING_KEY_INVARIANT,\n            Box::new(|image| {}),\n        ),\n        (\n            REFERENCE_INTERVALS_ARE_EXACT,\n            Box::new(|image| {}),\n        ),\n        (\n            FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,\n            Box::new(move_the_data_unit_of_the_first_file_two_slots_further),\n        ),\n    ]\n}\nfn other() {\n            \"I-0.0\",\n}\n";
         assert_eq!(
             entry_names_in_the_original_test_file(text),
             vec![
                 "I-7.4".to_string(),
-                singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER.to_string()
+                singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER.to_string(),
+                "I-3.5".to_string(),
+                "I-5.5".to_string()
             ]
         );
     }

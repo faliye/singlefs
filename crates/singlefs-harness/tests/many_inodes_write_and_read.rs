@@ -154,7 +154,7 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
         "右半出生树 = 执行这次分裂的那棵树"
     );
 
-    // ③ 这次重写了哪些角色：两片叶容器 + inode 根 + 四个固定点单元，加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）
+    // ③ 这次重写了哪些角色：两片叶容器 + inode 根 + 四个固定点角色的根（分配记录树、记账、映射、树表），加分配记录树按位置寻址（D8（核心索引结构） 已定项 14）
     // 重写的根之下那几个节点（4 GiB 两块盘上根在第 2 层，改的记录都在两块盘各自的叶 61 里，先叶后根）；数据单元与 extent 树根照抄。
     assert_eq!(
         after.rewritten,
@@ -313,7 +313,7 @@ fn creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_e
     }
 }
 
-/// 一次只建一个 inode、离 233 还远：树里仍只有一片叶容器，重写的也只有它与根 + 四个固定点单元（加分配记录树根之下那几个节点）。
+/// 一次只建一个 inode、离 233 还远：树里仍只有一片叶容器，重写的也只有它与根 + 四个固定点角色的根（分配记录树、记账、映射、树表；加分配记录树根之下那几个节点）。
 /// 这一档钉住「没跨过门槛就不分裂」——分裂条件写成「≥ 233」或「> 0」时这条红。
 #[test]
 fn creating_one_inode_below_the_threshold_keeps_one_container_and_bumps_the_watermark_by_one() {

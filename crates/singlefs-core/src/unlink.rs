@@ -12,6 +12,7 @@ use crate::container_tree::{ContainerTreeCapacities, ContainerTreeNodeEntries};
 use crate::extent_tree::{lower_segment_nodes_of_a_file_without_holes, upper_path_of_inode};
 use crate::extent_tree::{ExtentLowerNodePosition, ExtentTreeVersion};
 use crate::lineage_tree::LineageContainerCapacity;
+use crate::retirement_tree::RetirementContainerCapacity;
 use crate::tombstone_tree::TombstoneContainerCapacity;
 use crate::transaction::{
     role_of_extent_upper_node, ExtentTreeNodeOrigin, ExtentTreePlan, TransactionUnit,
@@ -19,7 +20,7 @@ use crate::transaction::{
 use crate::unit::data_unit_payload_capacity;
 
 /// 删除与回退那几次发布的只供测试的开关（`.claude/rules/fs-design.md` 五条硬要求第 2 条）：每批几个数据单元、一片墓碑容器装满几条、
-/// 一片谱系容器装满几条（管理员回退那次追加）、容器树一个码 2 节点装满几条（墓碑树、谱系树根满长高）。
+/// 一片谱系容器装满几条（管理员回退那次追加）、一片退役容器装满几条（最后一批追加）、容器树一个码 2 节点装满几条（墓碑树、谱系树、退役树根满长高）。
 /// 产品路径是 [`DeletionSwitches::PRODUCT`]；都只住内存、不落盘（D18（块里携带什么信息） 已定项 24 第 3 条）。
 /// 经可写挂载的只供测试的开关链装在分配器上（`mount::mount_writable_with_test_only_switches_and_deletion_switches`，与空间准入开关同一个做法），
 /// 挂载续做与这次挂载之后的会话都照它。
@@ -28,6 +29,7 @@ pub struct DeletionSwitches {
     pub batch_size: UnlinkBatchSize,
     pub tombstone_container_capacity: TombstoneContainerCapacity,
     pub lineage_container_capacity: LineageContainerCapacity,
+    pub retirement_container_capacity: RetirementContainerCapacity,
     pub container_tree_node_entries: ContainerTreeNodeEntries,
 }
 
@@ -36,15 +38,17 @@ impl DeletionSwitches {
         batch_size: UnlinkBatchSize::OneExtentLowerLeaf,
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity: RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     };
 
-    /// 墓碑树与谱系树那三个容量开关，装上写入口用（`transaction::PoolWriter::set_container_tree_capacities`）。
+    /// 墓碑树、谱系树与退役树那四个容量开关，装上写入口用（`transaction::PoolWriter::set_container_tree_capacities`）。
     #[must_use]
     pub const fn container_tree_capacities(self) -> ContainerTreeCapacities {
         ContainerTreeCapacities {
             tombstone_container: self.tombstone_container_capacity,
             lineage_container: self.lineage_container_capacity,
+            retirement_container: self.retirement_container_capacity,
             node_entries: self.container_tree_node_entries,
         }
     }

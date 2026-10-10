@@ -12,8 +12,28 @@ use common::{
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before, build_pool, parameters,
     BuiltPool, FIXED_WRITE_TIME_SECONDS,
 };
-use singlefs_checker::image::InvariantVerdict;
-use singlefs_checker::walk::check_pool_image;
+use singlefs_checker::image::{
+    InvariantVerdict, EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
+    INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION,
+    LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
+    NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE, RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
+    RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
+    RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
+    TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
+    TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT, TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+};
+use singlefs_checker::walk::{
+    check_pool_image, NO_LINEAGE_OR_RETIREMENT_CONTAINER_CAPACITY_KNOB,
+    NO_NON_RIGHTMOST_LINEAGE_OR_RETIREMENT_CONTAINER, NO_NON_RIGHTMOST_TOMBSTONE_CONTAINER,
+    NO_QUEUED_INODE_IN_ANY_WALKED_VERSION, NO_RETIREMENT_RECORD_IN_ANY_WALKED_VERSION,
+    NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
+    NO_RETIREMENT_TREE_ENTRY_IN_ANY_WALKED_VERSION,
+    NO_TOMBSTONE_CONTAINER_CAPACITY_KNOB_ON_THE_OLD_ENTRY, NO_TOMBSTONE_IN_ANY_WALKED_VERSION,
+    NO_TOMBSTONE_ON_THE_LINEAGE_NAMING_A_RECORD, NO_TOMBSTONE_TREE_ENTRY_IN_ANY_WALKED_VERSION,
+};
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
@@ -33,6 +53,63 @@ use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::transaction::{publish_overwrite, FirstFile, PoolWriter, TransactionOutput};
 use singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES;
+
+/// 没有删除的会话上，删除线那几条各自报的不适用理由（池级 checker `walk` 里为每条写的那一句）：不变量 → 只认的那一句。
+/// 前六行是墓碑与删除队列那几条（I-9.18–I-9.23）；后六行是退役树与谱系、退役容器容量那几条（I-9.31–I-9.34、I-9.36、I-9.37），
+/// 逐条照池级 checker 在 E 之后的镜像上实际报的登记：这条会话没有 unlink，退役树每一版都是零根，I-9.31 没有内部条目、I-9.32 没有退役记录、
+/// I-9.33 与 I-9.34 没有谱系上的退役记录；回退 D 只写了一条谱系记录，谱系树只一片容器、退役树零根，I-9.36 没有非最右的容器；
+/// `check_pool_image` 是旧入口、没给谱系与退役旋钮，I-9.37 不判。I-9.35（退役完备）不登记：候选集里相邻两版的父版读得出、叶身份集没少，
+/// 真被判过、要成立。
+const DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION: &[(&str, &str)] = &[
+    (
+        QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
+        NO_QUEUED_INODE_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
+        NO_TOMBSTONE_ON_THE_LINEAGE_NAMING_A_RECORD,
+    ),
+    (
+        TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
+        NO_TOMBSTONE_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+        NO_NON_RIGHTMOST_TOMBSTONE_CONTAINER,
+    ),
+    (
+        TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
+        NO_TOMBSTONE_CONTAINER_CAPACITY_KNOB_ON_THE_OLD_ENTRY,
+    ),
+    (
+        TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+        NO_TOMBSTONE_TREE_ENTRY_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+        NO_RETIREMENT_TREE_ENTRY_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
+        NO_RETIREMENT_RECORD_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
+        NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
+        NO_RETIREMENT_RECORD_ON_THE_LINEAGE_IN_ANY_WALKED_VERSION,
+    ),
+    (
+        NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+        NO_NON_RIGHTMOST_LINEAGE_OR_RETIREMENT_CONTAINER,
+    ),
+    (
+        LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
+        NO_LINEAGE_OR_RETIREMENT_CONTAINER_CAPACITY_KNOB,
+    ),
+];
 
 fn content_of(length: usize, seed: usize) -> Vec<u8> {
     (0..length)
@@ -270,6 +347,78 @@ fn raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slo
                     InvariantVerdict::NotApplicable(reason) if reason.contains("所选根之上一次发布都不施加")
                 ),
                 "{invariant} 在 E 之后的镜像上报「所选根之上一次发布都不施加」的不适用：{verdict:?}"
+            );
+            continue;
+        }
+        if *invariant == "I-5.5" {
+            // E 之后的候选集（F_生效 = 11）是 txg 11–17 七条根，树表条目的诞生 txg 都是 3、不等于各自的 txg，认法 ② 不成立：
+            // 候选集里没有从 mkfs 水位第一次建树的那一版，I-5.5（从 mkfs 水位建树那一版的 t1 落点） 一版都不判、报不适用；
+            // 满足 ①② 的只有 txg 3 那一版，它在 F 之下。只认池级 checker 给这一形写的专门理由，不认 `Judgements::into_report` 的缺省理由
+            // （那一句与「I-5.5 的判法一次都没跑」分不开，判决 `research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P3
+            // 「四支豁免」那一行）；别的不适用照红（同一机理的先例与判别力在
+            // `pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs`）。
+            assert!(
+                matches!(
+                    verdict,
+                    InvariantVerdict::NotApplicable(reason)
+                        if *reason == singlefs_checker::walk::NO_VERSION_BUILDS_TREES_FROM_THE_MKFS_WATERMARK
+                ),
+                "{invariant} 在 E 之后的镜像上报「候选集里没有从 mkfs 水位第一次建树的那一版」的专门不适用理由：{verdict:?}"
+            );
+            continue;
+        }
+        if *invariant == "I-4.7" {
+            // 这条会话没有删除：走读到的每一版里都没有 nlink = 0 的记录，也没有有数据单元而没有 nlink ≥ 1 记录的号，
+            // I-4.7（删除中 inode 有账） 没有对象、报不适用；只认这一种理由，别的不适用照红（判别力在 `checker_known_bad_images.rs`
+            // 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
+            assert!(
+                matches!(
+                    verdict,
+                    InvariantVerdict::NotApplicable(reason)
+                        if reason.contains("走读到的每一版里都没有处于删除中的 inode")
+                ),
+                "{invariant} 在 E 之后的镜像上报「走读到的每一版里都没有处于删除中的 inode」的不适用：{verdict:?}"
+            );
+            continue;
+        }
+        if *invariant == "I-4.6" {
+            // 同上，没有删除：I-4.6（中间态其余不变量成立） 自己判的那一格（nlink = 0 的记录单元数对 size）没有对象、报不适用；
+            // 只认这一种理由，别的不适用照红（判别力在 `checker_known_bad_images.rs` 与
+            // `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
+            assert!(
+                matches!(
+                    verdict,
+                    InvariantVerdict::NotApplicable(reason)
+                        if reason.contains("走读到的每一版 inode 树里都没有 nlink = 0 的记录")
+                ),
+                "{invariant} 在 E 之后的镜像上报「走读到的每一版 inode 树里都没有 nlink = 0 的记录」的不适用：{verdict:?}"
+            );
+            continue;
+        }
+        if *invariant == "I-4.4" {
+            // I-4.4（意图只描述目标态） 第一版恒报不适用（用户 2026-10-05 定）；只认池级 checker 写的那一句理由，别的不适用照红
+            // （判别力在 `checker_known_bad_images.rs` 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
+            assert_eq!(
+                *verdict,
+                InvariantVerdict::NotApplicable(INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION),
+                "{invariant} 在 E 之后的镜像上报第一版不适用"
+            );
+            continue;
+        }
+        if let Some((_, reason)) =
+            DELETION_INVARIANTS_WITHOUT_AN_OBJECT_ON_A_SESSION_WITHOUT_DELETION
+                .iter()
+                .find(|(exempted, _)| exempted == invariant)
+        {
+            // 删除线那几条（I-9.18–I-9.23、I-9.31–I-9.34、I-9.36、I-9.37）在这条没有删除的会话上没有对象：每一版的队列都空、
+            // 墓碑树与退役树都是零根、谱系树只一片容器、旧入口没给谱系与退役旋钮，报不适用；
+            // 每条只认池级 checker 为它写的那一句理由，别的不适用（含缺省理由「这个镜像上没有它判的对象」）照红
+            // （判别力在 `checker_known_bad_images.rs` 与 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）。
+            // 回退 D 写出了谱系树，I-9.17 在 E 之后的镜像上真被评估过、要成立；I-9.24（空队列报成立）、I-9.29 与 I-9.35 同样要成立。
+            assert_eq!(
+                *verdict,
+                InvariantVerdict::NotApplicable(reason),
+                "{invariant} 在 E 之后的镜像上报「{reason}」的不适用"
             );
             continue;
         }
@@ -1043,15 +1192,15 @@ fn pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites(tag: &s
     pool
 }
 
-/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出），已知，留里程碑三）：崩溃恢复抛弃 C（实例 1、txg 5）之后实例 2 覆盖写四次，
-/// 那次恢复看不见 C、把 C 引用的单元又发出去，抬 F 之前池级 checker 就恰好红一条 I-7.4（近 K 代块未被复用），说明文字点名实例 1、
-/// txg 5 那条被抛弃的根——C554 乙罩不到的那一格，不是乙的拒。
-/// 原来这一条接着把 F 抬到 5（C 那个 txg）、钉「只有 I-3.1 红、归到『已知红』清单第 0 条（收口表第 43 行）」，另有 F 抬到 6、7 两个对照全绿；
-/// 抬 F 之前已经 I-7.4 红，抬 F、归类与两个对照那一段都立不住，删掉（`random_histories.rs` 那一条同形、同样改钉）。
-/// 清单第 0 条的归类由 `crates/singlefs-harness/src/history.rs` 的库单测钉着。
+/// 双故障形（C583（双故障形：每盘一槽系统配置坏加最新根一时读不出））：崩溃恢复抛弃 C（实例 1、txg 5）之后实例 2 覆盖写四次。
+/// 那次挂载时 C 的根槽读不出、系统配置没见证 C（C554 乙罩不到的那一格），影子账看不见 C；可写挂载时的预隔离（D23（journal 的角色与格式）
+/// 已定项 14「可写挂载时的预隔离」）把水位之上没施加的 C 的记录点名的落点与 C 的账里的落点隔离到这个进程写掉 txg 5 那一槽为止，
+/// 四次覆盖写发不出 C 的单元，抬 F 之前池级 checker 一条都不红（`random_histories.rs` 那一条同形、同样改钉）。
+/// 判别力：挂载时不隔离那一份（变异「删除线第38批 可写挂载时的预隔离不隔离水位之上没施加的记录点名的落点（reuse_after_raising_the_floor 双故障形）」）
+/// 时 C 引用的单元又被发出去，I-7.4（近 K 代块未被复用）红、点名实例 1、txg 5 那条被抛弃的根，这一条红。
 #[test]
 #[ignore = "harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装"]
-fn four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form(
+fn four_overwrites_after_crash_recovery_abandoned_the_third_version_leave_the_pool_checker_green_before_any_floor_raise_since_the_writable_mount_isolates_its_units(
 ) {
     let pool =
         pool_after_a_recovery_abandoned_the_third_version_and_four_overwrites("step-five-gap-5");
@@ -1059,22 +1208,14 @@ fn four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
-    assert_eq!(
-        violations
-            .iter()
-            .map(|(invariant, _)| *invariant)
-            .collect::<Vec<_>>(),
-        vec!["I-7.4"],
-        "抬 F 之前恰好 I-7.4 红：{violations:?}"
-    );
     assert!(
-        violations[0]
-            .1
-            .starts_with("被抛弃的根（实例 1、txg 5）引用的单元已被重新分配或抹头"),
-        "I-7.4 的说明文字点名实例 1、txg 5 那条被抛弃的根：{violations:?}"
+        violations.is_empty(),
+        "抬 F 之前池级 checker 一条都不红（C 的单元被预隔离护着）：{violations:?}"
     );
 }
 

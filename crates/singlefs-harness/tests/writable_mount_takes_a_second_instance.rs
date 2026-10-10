@@ -133,7 +133,7 @@ fn accounting_value(output: &TransactionOutput, statistic: u16, device: DeviceId
         .expect("带设备维的行每盘一行")
 }
 
-/// 验收第一、二条：取号 2；行 (1, 4, 0)；写行发布 txg 5 重写实例表 + 四个固定点单元、事务号 0、反向链 0；暖机两次落到两块盘；
+/// 验收第一、二条：取号 2；行 (1, 4, 0)；写行发布 txg 5 重写实例表 + 固定点 8 个单元（分配记录树 5 个节点 + 记账 + 映射 + 树表）、事务号 0、反向链 0；暖机两次落到两块盘；
 /// 发布 C 接在后面（txg 8、事务号 1、反向链接 txg 7 那条）；冷启动择 (2, 8) 读回第三次的内容；记账与分配器对得上；checker 全绿。
 #[test]
 fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes_the_third_version()
@@ -197,7 +197,7 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
                 TransactionUnit::TreeTable,
             ])
             .collect::<Vec<_>>(),
-        "写行发布重写实例表 + 四个固定点单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9）+ 分配记录树根之下那四个节点"
+        "写行发布重写实例表 + 固定点 8 个单元（记账树已存在 ⇒ 空发布也重写，D16 已定项 9）：分配记录树根之下那四个节点、四个固定点角色的根（分配记录树、记账、映射、树表）"
     );
     assert_eq!(row.record.named.len(), 9, "点名的只有重写的九个");
     assert_eq!(
@@ -228,7 +228,7 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     assert_eq!(
         row.released.len(),
         9,
-        "写行发布释放 mkfs 的实例表单元 + B 的四个固定点单元与分配记录树根之下那四个节点"
+        "写行发布释放 mkfs 的实例表单元 + B 的固定点 8 个单元（四个固定点角色的根与分配记录树根之下那四个节点）"
     );
 
     assert_eq!(
@@ -264,7 +264,7 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
         assert_eq!(
             publish.released.len(),
             8,
-            "每次暖机释放上一次的四个固定点单元与分配记录树根之下那四个节点"
+            "每次暖机释放上一次的固定点 8 个单元（四个固定点角色的根与分配记录树根之下那四个节点）"
         );
     }
     let current = mounted
@@ -324,7 +324,7 @@ fn remount_takes_instance_two_writes_the_row_warms_up_both_devices_and_publishes
     assert_eq!(
         third_publish.released.len(),
         12,
-        "释放 B 的四个文件单元 + txg 7 的四个固定点单元与分配记录树根之下那四个节点"
+        "释放 B 的四个文件单元 + txg 7 的固定点 8 个单元（四个固定点角色的根与分配记录树根之下那四个节点）"
     );
     assert_eq!(
         third_publish

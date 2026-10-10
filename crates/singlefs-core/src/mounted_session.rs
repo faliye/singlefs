@@ -17,24 +17,37 @@
 //! 缺根那一半是 C585（会话发布放进发布途中取下的旧快照） 用户定的改法 C）。
 //! 发布路径与抬 F 各自开写入口的做法不变。
 
-use crate::address::{DeviceIdentity, InodeNumber, InstanceGeneration};
-use crate::allocator::PoolAllocator;
-use crate::block_device::BlockDevice;
+use std::collections::BTreeMap;
+
+use crate::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InodeNumber, InstanceGeneration,
+};
+use crate::allocator::{PlacementOnDevice, PoolAllocator};
+use crate::block_device::{
+    check_aligned_and_in_range, BlockDevice, BlockDeviceError, PhysicalBlockSizeInBytes,
+    WriteDurability,
+};
 use crate::make_filesystem::MakeFilesystemParameters;
 use crate::mount::{
     devices_behind_the_current_version, devices_without_a_self_verified_system_configuration,
+    empty_publish_plan_after_file_version,
     own_device_numbers_on_disk_differing_from_the_identities_handed_in,
+    parameters_of_the_pool_agreeing_with_the_caller_inputs,
     push_one_floor_raise_within_the_admission_budget, DeviceBehindTheCurrentVersion,
     FloorRaisePushedWithinTheAdmissionBudget, FloorRaiseStop, MountError, MountOutput, Mounted,
     OwnDeviceNumberOnDiskDifferingFromTheIdentityHandedIn, ParametersAndDeviceTableOfTheMount,
     RaisedFloor, ShadowLedger,
 };
+use crate::root_record::UnmountMarker;
+use crate::root_ring::{target_for_publish, RootRingSlot};
 use crate::transaction::{
-    publish_new_inodes, publish_overwrite, publish_sequential_write, publish_unlink_intent,
-    walk_the_deletion_queue_until_it_is_empty, DeletionQueueWalk, FirstFile, PoolVersion,
-    PoolWriter, PublishError, TransactionOutput,
+    prepare_the_version_publish, publish_new_inodes, publish_overwrite, publish_sequential_write,
+    publish_unlink_intent, publish_version, walk_the_deletion_queue_until_it_is_empty,
+    DeletionAndLineageOfThePublish, DeletionQueueWalk, FirstFile, PoolVersion, PoolWriter,
+    PublishError, ReleaseChecksumCheck, TransactionOutput,
 };
 use crate::unlink::DeletionSwitches;
+use singlefs_format::ROOT_RING_REGIONS;
 
 /// 一次可写挂载之后的会话：接下来的发布接在 `current` 后面、用这个分配器与实例代号。
 #[derive(Debug)]
@@ -88,7 +101,8 @@ pub type VersionsPublishedInThisChange = Vec<TransactionOutput>;
 pub enum UserChangeRefused {
     /// 交进来的盘表的设备身份（按次序）与这次挂载核过的那一份不同（多一块、少一块、换了次序、同一个身份交两次）：
     /// 写入口按盘表逐项写系统配置与单元，拿别的盘表发，多出来的盘收到本池的写、设备数与本盘设备号被改写（实审 A1b Q3）。
-    /// 在任何读写之前返回，盘上逐字节不变、会话不动。
+    /// 在任何读写之前返回，盘上逐字节不变、会话不动。推环入口与要出路先核同一判（[`RootRingPushRefused::DeviceTableOtherThanTheOneOfTheMount`]、
+    /// [`WaysOutOfTheWideProtectionRefused::DeviceTableOtherThanTheOneOfTheMount`]）：三个入口收盘表同一判。
     DeviceTableOtherThanTheOneOfTheMount {
         device_table_of_the_mount: Vec<DeviceIdentity>,
         device_table_handed_in: Vec<DeviceIdentity>,
@@ -160,6 +174,720 @@ pub struct NoSpaceAfterRaisingTheFloor {
     pub stop: FloorRaiseStop,
     /// 被拒之前发成的那几版（[`VersionsPublishedInThisChange`]）。
     pub versions_published: VersionsPublishedInThisChange,
+    /// 这一次是不是被宽护卡住（[`WideProtectionAtTheCeiling`]）：F 已在上限、C 那一圈还隔离着槽时点名这一形、带上算出路要的东西
+    /// （出路在调用方要的时候算，[`MountedSession::ways_out_of_the_wide_protection`]：推环那一条预演过放得下才列），
+    /// 别的形是 [`WideProtectionAtTheCeiling::NotWhatStopsTheAdmission`]，照旧只是空间不够。
+    pub wide_protection_at_the_ceiling: WideProtectionAtTheCeiling,
+}
+
+/// 推满仍不够时，挡着准入的是不是「这个进程写掉那一槽才放」的那一份隔离（用户 2026-10-08 弹窗定「显式推环命令加带出路的错」：
+/// 不自动推环，准入因宽护卡住时报一个点名「被宽护卡住」的错、带上出路；用户 2026-10-09 弹窗定「甲：预演推环与准入，推不通就不列」：
+/// 推环那一条出路预演过、推完这次改动放得下才列；同日弹窗定「改：预演延到要出路时才做」：报的时候不预演，调用方要出路时另调
+/// [`MountedSession::ways_out_of_the_wide_protection`] 算，只要错误码、不看出路的调用方不付这一笔）。
+///
+/// 为什么不另开一个 [`UserChangeRefused`] 成员：checker 档的装置（`e158_root_choice_repair`、`e168_delete_ring_window_borrow`）对
+/// `UserChangeRefused` 与 `FloorRaiseStop` 写的是穷举 `match`，多一个成员它们就编不过，而 checker 档这一批不改（第 10z 批第十六块派发）。
+/// 点名这一形的成员住在这里，外层照旧是 `NoSpaceAfterRaisingTheFloor`，交回的已落盘的东西不变。
+#[derive(Debug)]
+pub enum WideProtectionAtTheCeiling {
+    /// 不是这一形：不再推的原因不是「F 已在上限」（预算用完、抬 F 那一串自己被拒），或 C 那一圈这一刻一个槽都没隔离。
+    NotWhatStopsTheAdmission,
+    /// 被宽护卡住（[`StuckBehindTheWideProtection`]）。装箱同 `NoSpaceAfterRaisingTheFloor`。
+    StuckBehindTheWideProtection(Box<StuckBehindTheWideProtection>),
+}
+
+/// 被宽护卡住：准入被拒、会话推抬 F 停在上限（`FloorRaiseStop::FloorAlreadyAtTheCeiling`），而 C 那一圈（水位之上没施加的记录点名的落点、
+/// 那几次发布的账、比所选那一版新的可读根的账；认不出回退时并进 R 那一槽的「现行账里全部已释放的落点」就是宽护，它是这一圈里最大的一份）
+/// 还隔离着槽。这一圈只在这个进程写掉那一槽时解开（`allocator::PoolAllocator::record_root_written_by_this_process`），写被拒就不发布、
+/// 那一槽写不掉，不管它就隔离到进程结束（第 10z 批第十四块实现员报告第六节，384 槽盘 22 形写全被拒）。
+///
+/// 这里分不出 C 那一圈里哪一份是宽护、哪一份是窄的那几份：分得出要在根环表里另记一样（`PoolAllocator` 的 `{:?}` 随之变，checker 档 E171
+/// 记它），这一份不记；出路对整圈算。
+///
+/// **宽护是挡着准入的之一，不是唯一**：同一刻没有 C 那一圈，准入照样可以被拒（第 10z 批代码轮第一轮攻方
+/// `research/prompts/m3-batch10z-pqrs-code-r1-opus-output.md` 第一节：同一个池停在 R 之前、C 一槽都没有的对照臂，同一个长度也被拒的 27 格，
+/// 这里照样报这一形）。所以报这一形不说明写掉 R 那一槽之后放得下：推完放不放得下由调用方要出路时那一份预演说
+/// （[`MountedSession::ways_out_of_the_wide_protection`]），放不下（推完上限退到环里最旧的根、推环自己换下的那几份要等环再转一圈才回收，
+/// 同一节「读法」）就不列推环。
+///
+/// 报这一形只读分配器（内存）：不拷分配器、不预演、一个盘都不读。预演要的「被拒在哪一版上」「这次改动还剩什么」记在这里（私有，
+/// 只有会话造得出这一份），这次改动的内容拷一份进来（错误不借调用方的内容）。
+#[derive(Debug)]
+pub struct StuckBehindTheWideProtection {
+    /// 推环要写到的那一槽：C 那一圈还没解开、记着落点的槽里，从现行那一版起按 txg 往后最后一个轮到的（R 那一槽）。
+    pub ring_slot_of_r: RootRingSlot,
+    /// R 的 txg：根环表里那一槽记着的有效根（挂载那一刻按最新那条根的实例表有效、记成有效根，写行之后才被抛弃的那一条）；
+    /// 那一槽记的不是有效根（读坏、读回全零、没有根的记录）时 `None`。
+    pub checkpoint_txg_of_r: Option<CheckpointTxg>,
+    /// 从现行那一版起要发几次 F 不变的空发布才写掉 R 那一槽（不超过环长 3S）。
+    pub empty_publishes_until_the_ring_slot_of_r_is_written: u64,
+    /// C 那一圈每块盘上这一刻隔离着的槽数（按分配器里盘的次序，同一个槽只数一次）：宽护挡着的槽数。只数 C 那一圈罩着的，
+    /// 被抛弃根罩着、C 不罩的不在其内。
+    pub isolated_slots_on_each_device: Vec<(DeviceIdentity, u64)>,
+    /// 被拒的那一次要接在后面的那一版（报这一形那一刻会话的现行那一版）的实例代号与 txg：要出路时会话不在这一版上就不预演
+    /// （[`WaysOutOfTheWideProtectionRefused::SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion`]）。报里不记是哪个会话报的：
+    /// 别的会话的报这两个数恰好相同时不拦（同一成员的文档）。
+    instance_of_the_version_refused_on: InstanceGeneration,
+    checkpoint_txg_of_the_version_refused_on: CheckpointTxg,
+    /// 被拒的那一次之后这次用户改动还剩什么要发（内容拷一份）：要出路时推完环照它再预演一次。
+    remainder_of_the_change: RemainderOfTheUserChangeKeptByTheRefusal,
+}
+
+/// 调用方要出路时预演推环与推完之后这次改动的准入（用户 2026-10-09 弹窗定「甲：预演推环与准入，推不通就不列」「改：预演延到要出路时才做」）：
+/// 在分配器的一份拷贝上、对只进内存的盘走一遍推环入口与推完之后这次改动剩下的发布（`rehearse_the_push_then_the_remainder_of_the_change`），
+/// 一个写都没发到盘上，会话不动。
+#[derive(Debug)]
+pub enum RootRingPushRehearsal {
+    /// 推环做成，推完之后报里剩下的那一段放得下（还剩这次改动时是走空再发它；只剩走空时是那一段走空，unlink 的意图已发成）：出路列推环。
+    /// `isolated_slots_released_by_the_push_on_each_device` 是推完之后每块盘隔离的槽数
+    /// 比推之前少了几个（按分配器里盘的次序；推完反而多的那块盘记 0）：C 那一圈与被抛弃根罩着同一个槽时，被抛弃根还在环里那一槽就不放，
+    /// 推环途中写掉被抛弃根那一槽时它独占的也放出来——与 `isolated_slots_on_each_device` 不是同一个数。
+    ChangeAdmittedAfterThePush {
+        isolated_slots_released_by_the_push_on_each_device: Vec<(DeviceIdentity, u64)>,
+    },
+    /// 推环做成，推完之后这次改动照旧被拒（`refusal` 是预演里交回的那一种，例如推完上限退到环里最旧的根、推满仍不够）：出路不列推环。
+    ChangeStillRefusedAfterThePush {
+        isolated_slots_released_by_the_push_on_each_device: Vec<(DeviceIdentity, u64)>,
+        refusal: Box<UserChangeRefused>,
+    },
+    /// 推环自己在预演里被拒（`RootRingPushRefused` 的哪一种原样）：出路不列推环。
+    PushRefused(Box<RootRingPushRefused>),
+}
+
+/// 调用方要出路时算出来的（[`MountedSession::ways_out_of_the_wide_protection`]）：那一刻的预演结局与照它列的出路。
+#[derive(Debug)]
+pub struct WaysOutOfTheWideProtection {
+    /// 在分配器的拷贝与只进内存的盘上预演推环、推完再预演这次改动（连同它会推的抬 F）的结局：推环这条出路列不列按它定。
+    pub pushing_the_root_ring: RootRingPushRehearsal,
+    /// 出路，调用方照抄就能报给用户：卸载重挂一定列；推环（会丢掉最近可退到的状态，调用即确认）只在预演过推完这次改动放得下时列
+    /// （[`RootRingPushRehearsal::ChangeAdmittedAfterThePush`]）。按这个次序。
+    pub ways_out: Vec<String>,
+}
+
+/// 要出路时没预演。成员按调用方要做的决定分：再发一次这次改动拿新的报、换回挂载时那一份盘表。
+/// 两种都在预演之前返回：一个盘都没读、一个写都没发，会话不动。
+#[derive(Debug)]
+pub enum WaysOutOfTheWideProtectionRefused {
+    /// 会话的现行那一版已不是报「被宽护卡住」时被拒的那一次要接在后面的那一版（之后又发过：推过环、别的改动发成、走空走了几步）：
+    /// 报里的 R 那一槽、要推的次数与挡着的槽数说的是那一刻，照这一刻预演会与它们对不上，按哪一刻算条款没写，第一版不支持。
+    /// 调用方要做的是再发一次这次改动、拿新的那一份报再要出路。这一道在盘表那一道之前：会话已不在那一版上、交进来的盘表又与挂载时的不同，
+    /// 报的是这一种。同一个池卸载或崩了之后再挂取新实例，现行那一版的实例代号随之变，再挂之前的报在这一道拒成这一种
+    /// （`instance_of_the_current_version` 是新实例的）。
+    ///
+    /// 这一道只比实例代号与 txg，报里不记是哪个会话报的。别的会话（同一份 mkfs 起的另一个池、读盘造的另一条会话）
+    /// 的报若这两个数恰好与这个会话的现行那一版相同，这里不拦：照这个会话的状态（分配器、盘、现行那一版）预演，预演发的是报里拷下的那一份改动
+    /// （不是这个会话自己要发的），出路一的文字仍是报里的数
+    /// （R 的 txg 或 R 那一槽），列出路二时其中的 R 那一槽与要推的次数也是报里的（第 10z 批代码轮攻方「打中一」；用户 2026-10-09 定撤掉会话身份、照实写）。
+    /// 调用方要拿报去问报它的那个会话。
+    SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion {
+        instance_refused_on: InstanceGeneration,
+        checkpoint_txg_refused_on: CheckpointTxg,
+        instance_of_the_current_version: InstanceGeneration,
+        checkpoint_txg_of_the_current_version: CheckpointTxg,
+    },
+    /// 会话还在被拒的那一版上（实例代号与 txg 与报里记的相同），交进来的盘表的设备身份（按次序）却与这次挂载核过的那一份不同（多一块、少一块、换了次序、
+    /// 同一个身份交两次；与 [`UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount`] 同一判，`mount::ParametersAndDeviceTableOfTheMount::is_the_device_table_of_the_mount`）。
+    /// 预演经推环的本体走（`MountedSession::push_the_root_ring_on`，交的是包过的盘），本体里核盘表那一套不看次序：不先核这一判时，
+    /// 次序对调的盘表预演放得下、列推环，照出路二推完再发这次改动却拒成 `DeviceTableOtherThanTheOneOfTheMount`（第 10z 批代码轮攻方「打中二」）。
+    /// 推环公开入口与 [`MountedSession::publish_user_change`] 先核同一判（[`RootRingPushRefused::DeviceTableOtherThanTheOneOfTheMount`]）：
+    /// 三个入口收盘表同一判。调用方要做的是换回挂载时那一份盘表再要出路。
+    DeviceTableOtherThanTheOneOfTheMount {
+        device_table_of_the_mount: Vec<DeviceIdentity>,
+        device_table_handed_in: Vec<DeviceIdentity>,
+    },
+}
+
+impl StuckBehindTheWideProtection {
+    /// 照这一份报与要出路时那一份预演列出路：卸载重挂一定列；推环只在预演过推完这次改动放得下时列。按这个次序。
+    /// 出路二末句按报里剩下什么分：还剩这次改动时说推完之后这次改动放得下（调用方推完再发它）；只剩走空时说意图已发成、
+    /// 剩下的走空在下一次改动开头走、放得下，不再发这次改动。
+    fn ways_out_after(&self, pushing_the_root_ring: &RootRingPushRehearsal) -> Vec<String> {
+        let way_one = match self.checkpoint_txg_of_r {
+            Some(txg_of_r) => format!(
+                "出路一：正常卸载（mount::unmount）之后再可写挂载一次。再挂时 R（txg {}）按新实例的实例表判成被抛弃，影子账只护它自己账里引用的落点，宽护不再出现。R 的账读不出若是盘上永久坏，卸载之后再挂会被拒（C694 的 B），而会话在卸载时已断开。",
+                txg_of_r.0
+            ),
+            None => format!(
+                "出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 {}.{}）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。",
+                self.ring_slot_of_r.region, self.ring_slot_of_r.slot
+            ),
+        };
+        let mut ways_out = vec![way_one];
+        match pushing_the_root_ring {
+            RootRingPushRehearsal::ChangeAdmittedAfterThePush {
+                isolated_slots_released_by_the_push_on_each_device,
+            } => {
+                // 报里只剩走空时这次 unlink 的意图已发成：照「再发这次改动」再发，开头的走空走完、要 unlink 的文件已不在，被拒
+                // （第 10z 批代码轮攻方 H 形，判决 `research/prompts/m3-batch10z-xy-code-r1-main-verification.md` 第三节甲）。
+                let what_the_rehearsal_found_after_the_push = match &self.remainder_of_the_change {
+                    RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueueThenPublishTheChange(_) => {
+                        "预演过：推完之后这次改动放得下。"
+                    }
+                    RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueue => {
+                        "这次 unlink 的意图已发成，报里只剩它之后的走空：预演过，推完之后剩下的走空在下一次改动开头走、放得下；不再发这次改动。"
+                    }
+                };
+                let released_on_each_device: Vec<String> =
+                    isolated_slots_released_by_the_push_on_each_device
+                        .iter()
+                        .map(|(device, released)| format!("盘 {} 上 {released} 个", device.0))
+                        .collect();
+                ways_out.push(format!(
+                    "出路二：调 MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states（推环到 R 那一槽，根环槽 {}.{}）：从现行那一版起发 {} 次 F 不变的空发布，写掉根环里接下来轮到的 {} 槽，R 那一槽是最后一槽；宽护随之解开，隔离的槽放出来 {} 个（{}）。这几槽里原来的根换成同一个用户状态的空发布根，回退候选集可以掉到少于 4 个不同状态（D16（发布语义） 已定项 1），调用即确认。{}",
+                    self.ring_slot_of_r.region,
+                    self.ring_slot_of_r.slot,
+                    self.empty_publishes_until_the_ring_slot_of_r_is_written,
+                    self.empty_publishes_until_the_ring_slot_of_r_is_written,
+                    isolated_slots_released_by_the_push_on_each_device
+                        .iter()
+                        .map(|(_, released)| *released)
+                        .sum::<u64>(),
+                    released_on_each_device.join("，"),
+                    what_the_rehearsal_found_after_the_push,
+                ));
+            }
+            RootRingPushRehearsal::ChangeStillRefusedAfterThePush { .. }
+            | RootRingPushRehearsal::PushRefused(_) => {}
+        }
+        ways_out
+    }
+}
+
+/// 预演用的盘：读穿到底下那块盘（这一刻盘上的字节），写与写零只记进内存、盖在之后的读上，屏障什么都不做——一个写都不发到底下那块盘。
+/// 要出路时预演推环与推完之后这次改动的准入用（[`rehearse_the_push_then_the_remainder_of_the_change`]）。
+/// 底下那块盘只读借成 `&dyn BlockDevice`：改盘的三个动作要 `&mut`，类型上调不到。请求先过两个后端那一份判据
+/// （`block_device::check_aligned_and_in_range`），真盘会拒的这里照样拒。
+struct DeviceKeepingWritesInMemory<'disk> {
+    disk: &'disk dyn BlockDevice,
+    physical_block_size: PhysicalBlockSizeInBytes,
+    /// 写过的物理块：块号（按 `physical_block_size`）→ 那一块现在的字节。写零也逐块记成全 0（发布路径不写零，只有 mkfs 写零）。
+    written_blocks: BTreeMap<u64, Vec<u8>>,
+}
+
+impl<'disk> DeviceKeepingWritesInMemory<'disk> {
+    fn over_the_disk(disk: &'disk dyn BlockDevice) -> Self {
+        DeviceKeepingWritesInMemory {
+            disk,
+            physical_block_size: disk.probe_physical_block_size(),
+            written_blocks: BTreeMap::new(),
+        }
+    }
+
+    fn block_bytes(&self) -> u64 {
+        u64::from(self.physical_block_size.0)
+    }
+
+    /// 两个后端那一份判据（`block_device::check_aligned_and_in_range`），设备大小取底下那块盘的。
+    fn check_request(
+        &self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        check_aligned_and_in_range(
+            offset,
+            length,
+            self.physical_block_size,
+            self.disk.size_in_bytes(),
+        )
+    }
+
+    /// 块号 `first_unwritten_block` 起、到 `end_block` 之前那一段没写过的块从底下那块盘读进 `buffer` 里对应的那一截
+    /// （`buffer` 从块号 `first_block_of_the_buffer` 起）。
+    fn read_unwritten_blocks_from_the_disk(
+        &self,
+        first_unwritten_block: u64,
+        end_block: u64,
+        first_block_of_the_buffer: u64,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        let block_bytes = self.block_bytes();
+        let start_in_buffer =
+            usize::try_from((first_unwritten_block - first_block_of_the_buffer) * block_bytes)
+                .expect("一次读的长度装得进 usize：它就是调用方给的缓冲区长度以内");
+        let end_in_buffer = usize::try_from((end_block - first_block_of_the_buffer) * block_bytes)
+            .expect("一次读的长度装得进 usize：它就是调用方给的缓冲区长度以内");
+        self.disk.read_at(
+            DeviceOffsetInBytes(first_unwritten_block * block_bytes),
+            &mut buffer[start_in_buffer..end_in_buffer],
+        )
+    }
+
+    fn keep_in_memory(&mut self, offset: DeviceOffsetInBytes, bytes: &[u8]) {
+        let block_bytes = self.block_bytes();
+        let block_length = usize::try_from(block_bytes).expect("物理块装得进 usize");
+        let first_block = offset.0 / block_bytes;
+        // 迭代上界是这次写的块数；不跨轮带状态；没有提前出口。
+        for (block_offset, block) in (0u64..).zip(bytes.chunks(block_length)) {
+            self.written_blocks
+                .insert(first_block + block_offset, block.to_vec());
+        }
+    }
+}
+
+impl BlockDevice for DeviceKeepingWritesInMemory<'_> {
+    fn read_at(
+        &self,
+        offset: DeviceOffsetInBytes,
+        buffer: &mut [u8],
+    ) -> Result<(), BlockDeviceError> {
+        let length = u64::try_from(buffer.len()).expect("读长装得进 u64");
+        self.check_request(offset, length)?;
+        let block_bytes = self.block_bytes();
+        let block_length = usize::try_from(block_bytes).expect("物理块装得进 usize");
+        let first_block = offset.0 / block_bytes;
+        let end_block = first_block + length / block_bytes;
+        // 迭代上界是这次读的块数；跨轮带着还没读的那一段没写过的块从哪一块起；出口只有底下那块盘读错（原样交回）。
+        let mut unwritten_run_start: Option<u64> = None;
+        for block_index in first_block..end_block {
+            match self.written_blocks.get(&block_index) {
+                None => {
+                    unwritten_run_start.get_or_insert(block_index);
+                }
+                Some(written) => {
+                    if let Some(run_start) = unwritten_run_start.take() {
+                        self.read_unwritten_blocks_from_the_disk(
+                            run_start,
+                            block_index,
+                            first_block,
+                            buffer,
+                        )?;
+                    }
+                    let start_in_buffer = usize::try_from(block_index - first_block)
+                        .expect("块数装得进 usize")
+                        * block_length;
+                    buffer[start_in_buffer..start_in_buffer + block_length]
+                        .copy_from_slice(written);
+                }
+            }
+        }
+        if let Some(run_start) = unwritten_run_start {
+            self.read_unwritten_blocks_from_the_disk(run_start, end_block, first_block, buffer)?;
+        }
+        Ok(())
+    }
+
+    fn write_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        bytes: &[u8],
+        _durability: WriteDurability,
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, u64::try_from(bytes.len()).expect("写长装得进 u64"))?;
+        self.keep_in_memory(offset, bytes);
+        Ok(())
+    }
+
+    fn write_zeroes_at(
+        &mut self,
+        offset: DeviceOffsetInBytes,
+        length: u64,
+    ) -> Result<(), BlockDeviceError> {
+        self.check_request(offset, length)?;
+        let zeros = vec![0u8; usize::try_from(length).expect("写零的长度装得进 usize")];
+        self.keep_in_memory(offset, &zeros);
+        Ok(())
+    }
+
+    fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+        Ok(())
+    }
+
+    fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+        self.physical_block_size
+    }
+
+    fn size_in_bytes(&self) -> u64 {
+        self.disk.size_in_bytes()
+    }
+}
+
+/// 被拒的那一次发布之后，这次用户改动还剩什么要发（「被宽护卡住」那一报记一份拷贝，要出路时推完环之后照它再预演一次，
+/// [`rehearse_the_push_then_the_remainder_of_the_change`]）。
+#[derive(Clone, Copy, Debug)]
+enum RemainderOfTheUserChange<'content> {
+    /// 先把现行那一版的 `deleted_inodes` 走空、再发这次改动（unlink 连同它之后的走空）：被拒的是走空的一步或这次改动本身。
+    WalkTheQueueThenPublishTheChange(UserChange<'content>),
+    /// 只剩走空：unlink 的意图已发成，被拒的是它之后走空的一步（别的改动之后队列本来就空）。
+    WalkTheQueue,
+}
+
+/// [`RemainderOfTheUserChange`] 记进「被宽护卡住」那一份报里的拷贝：错误活得比调用方借给发布的内容长，内容拷一份。
+#[derive(Debug)]
+enum RemainderOfTheUserChangeKeptByTheRefusal {
+    WalkTheQueueThenPublishTheChange(UserChangeKeptByTheRefusal),
+    WalkTheQueue,
+}
+
+/// [`UserChange`] 的一份拷贝，内容自有。
+#[derive(Debug)]
+enum UserChangeKeptByTheRefusal {
+    Overwrite {
+        content: Vec<u8>,
+        write_time_seconds: u64,
+    },
+    SequentialWrite {
+        content: Vec<u8>,
+        write_time_seconds: u64,
+    },
+    NewInodes {
+        count: u64,
+        write_time_seconds: u64,
+    },
+    Unlink {
+        inode: InodeNumber,
+        write_time_seconds: u64,
+    },
+}
+
+impl UserChangeKeptByTheRefusal {
+    fn kept_from(change: UserChange<'_>) -> Self {
+        match change {
+            UserChange::Overwrite(file) => UserChangeKeptByTheRefusal::Overwrite {
+                content: file.content.to_vec(),
+                write_time_seconds: file.write_time_seconds,
+            },
+            UserChange::SequentialWrite(file) => UserChangeKeptByTheRefusal::SequentialWrite {
+                content: file.content.to_vec(),
+                write_time_seconds: file.write_time_seconds,
+            },
+            UserChange::NewInodes {
+                count,
+                write_time_seconds,
+            } => UserChangeKeptByTheRefusal::NewInodes {
+                count,
+                write_time_seconds,
+            },
+            UserChange::Unlink {
+                inode,
+                write_time_seconds,
+            } => UserChangeKeptByTheRefusal::Unlink {
+                inode,
+                write_time_seconds,
+            },
+        }
+    }
+
+    fn as_user_change(&self) -> UserChange<'_> {
+        match self {
+            UserChangeKeptByTheRefusal::Overwrite {
+                content,
+                write_time_seconds,
+            } => UserChange::Overwrite(FirstFile {
+                content,
+                write_time_seconds: *write_time_seconds,
+            }),
+            UserChangeKeptByTheRefusal::SequentialWrite {
+                content,
+                write_time_seconds,
+            } => UserChange::SequentialWrite(FirstFile {
+                content,
+                write_time_seconds: *write_time_seconds,
+            }),
+            UserChangeKeptByTheRefusal::NewInodes {
+                count,
+                write_time_seconds,
+            } => UserChange::NewInodes {
+                count: *count,
+                write_time_seconds: *write_time_seconds,
+            },
+            UserChangeKeptByTheRefusal::Unlink {
+                inode,
+                write_time_seconds,
+            } => UserChange::Unlink {
+                inode: *inode,
+                write_time_seconds: *write_time_seconds,
+            },
+        }
+    }
+}
+
+impl RemainderOfTheUserChangeKeptByTheRefusal {
+    fn kept_from(remainder: RemainderOfTheUserChange<'_>) -> Self {
+        match remainder {
+            RemainderOfTheUserChange::WalkTheQueueThenPublishTheChange(change) => {
+                RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueueThenPublishTheChange(
+                    UserChangeKeptByTheRefusal::kept_from(change),
+                )
+            }
+            RemainderOfTheUserChange::WalkTheQueue => {
+                RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueue
+            }
+        }
+    }
+
+    fn as_remainder(&self) -> RemainderOfTheUserChange<'_> {
+        match self {
+            RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueueThenPublishTheChange(change) => {
+                RemainderOfTheUserChange::WalkTheQueueThenPublishTheChange(change.as_user_change())
+            }
+            RemainderOfTheUserChangeKeptByTheRefusal::WalkTheQueue => {
+                RemainderOfTheUserChange::WalkTheQueue
+            }
+        }
+    }
+}
+
+/// 每块盘上这一刻隔离的槽数（D28（挂载期承诺量） 已定项 1 第九项那一项），按分配器里盘的次序。只读内存。
+fn isolated_slots_of_each_device(allocator: &PoolAllocator) -> Vec<(DeviceIdentity, u64)> {
+    allocator
+        .devices
+        .iter()
+        .map(|device_map| (device_map.device, device_map.isolated_slots()))
+        .collect()
+}
+
+/// 要出路时的预演（用户 2026-10-09 弹窗定「甲：预演推环与准入，推不通就不列」「改：预演延到要出路时才做」，
+/// [`MountedSession::ways_out_of_the_wide_protection`]）：在分配器的一份拷贝上、对只进内存的盘
+/// （[`DeviceKeepingWritesInMemory`]）先走一遍推环入口（与真调推环入口同一段，[`MountedSession::push_the_root_ring_on`]：它自己的整串预演、
+/// 真发与末尾的断言都在），推完再把这次改动剩下的照会话发布那一段走一遍（`remainder`：准入被拒照样推抬 F，抬 F 的上限按推完的根环算——
+/// 读的是盖着推环那几次写的盘）。读盘照读底下那几块盘；写一个都不发到底下那几块盘；会话的分配器与现行那一版不动。
+///
+/// 预演里的准入再被拒时报不报「被宽护卡住」只读内存（[`wide_protection_at_the_ceiling`] 不预演）；推环做成之后 C 那一圈一槽都不记着
+/// （推环入口末尾那条断言），报的是 `NotWhatStopsTheAdmission`。推环在预演里被拒就不往下走。
+fn rehearse_the_push_then_the_remainder_of_the_change<Device: BlockDevice>(
+    parameters: &MakeFilesystemParameters,
+    devices: &[(DeviceIdentity, Device)],
+    allocator: &PoolAllocator,
+    current: &TransactionOutput,
+    instance: InstanceGeneration,
+    shadow_ledger: ShadowLedger,
+    remainder: RemainderOfTheUserChange<'_>,
+) -> RootRingPushRehearsal {
+    let mut devices_keeping_writes_in_memory: Vec<(
+        DeviceIdentity,
+        DeviceKeepingWritesInMemory<'_>,
+    )> = devices
+        .iter()
+        .map(|(identity, device)| {
+            let disk: &dyn BlockDevice = device;
+            (*identity, DeviceKeepingWritesInMemory::over_the_disk(disk))
+        })
+        .collect();
+    let mut rehearsed_allocator = allocator.clone();
+    let mut rehearsed_version = PoolVersion::of_a_version_of_trees(current.clone());
+    let isolated_before_the_push = isolated_slots_of_each_device(&rehearsed_allocator);
+    if let Err(refusal) = MountedSession::push_the_root_ring_on(
+        parameters,
+        &mut devices_keeping_writes_in_memory,
+        &mut rehearsed_allocator,
+        &mut rehearsed_version,
+        instance,
+    ) {
+        return RootRingPushRehearsal::PushRefused(Box::new(refusal));
+    }
+    let isolated_slots_released_by_the_push_on_each_device: Vec<(DeviceIdentity, u64)> =
+        isolated_before_the_push
+            .iter()
+            .zip(isolated_slots_of_each_device(&rehearsed_allocator))
+            .map(|((device, before), (device_after, after))| {
+                assert_eq!(
+                    *device, device_after,
+                    "推环前后数的是同一个分配器的拷贝：盘的次序不变"
+                );
+                (*device, before.saturating_sub(after))
+            })
+            .collect();
+    let remainder_after_the_push = match remainder {
+        RemainderOfTheUserChange::WalkTheQueueThenPublishTheChange(change) => {
+            MountedSession::publish_the_change_raising_the_floor_for_space(
+                parameters,
+                &mut devices_keeping_writes_in_memory,
+                &mut rehearsed_allocator,
+                &mut rehearsed_version,
+                instance,
+                shadow_ledger,
+                change,
+            )
+            .map(|_published| ())
+        }
+        RemainderOfTheUserChange::WalkTheQueue => {
+            let mut version_to_walk = rehearsed_version.into_version_of_trees().expect(
+                "推环接在有树的一版后面、发的是带文件那一版的空发布（树表 0 条那一版推环入口先拒了），推完还是有树的一版",
+            );
+            publish_the_queue_until_it_is_empty_raising_the_floor_for_space(
+                parameters,
+                &mut devices_keeping_writes_in_memory,
+                &mut rehearsed_allocator,
+                &mut version_to_walk,
+                instance,
+                shadow_ledger,
+                RemainderOfTheUserChange::WalkTheQueue,
+                PublishedInThisChange {
+                    floor_raises: Vec::new(),
+                    refusals_that_pushed_the_floor_raises: Vec::new(),
+                    versions_published: Vec::new(),
+                },
+            )
+            .map(|_published_in_this_change| ())
+        }
+    };
+    match remainder_after_the_push {
+        Ok(()) => RootRingPushRehearsal::ChangeAdmittedAfterThePush {
+            isolated_slots_released_by_the_push_on_each_device,
+        },
+        Err(refusal) => RootRingPushRehearsal::ChangeStillRefusedAfterThePush {
+            isolated_slots_released_by_the_push_on_each_device,
+            refusal: Box::new(refusal),
+        },
+    }
+}
+
+/// C 那一圈还没解开、记着落点的那几槽，与从 `current_txg` 起推环要推到哪儿：推环入口（[`MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states`]）
+/// 与「被宽护卡住」那一报（[`wide_protection_at_the_ceiling`]）读同一份。
+struct RootRingPushTarget {
+    /// 这几槽，按槽的次序。
+    ring_slots: Vec<RootRingSlot>,
+    /// 这几槽记着的全部落点。
+    placements: Vec<PlacementOnDevice>,
+    /// 最后一个轮到的那一槽（R 那一槽）与写掉它要发几次空发布。
+    ring_slot_of_r: RootRingSlot,
+    publishes_until_the_ring_slot_of_r_is_written: u64,
+}
+
+/// [`RootRingPushTarget`]：分配器没装根环表、或 C 那一圈这一刻没有记着落点的槽时 `None`。只读内存。
+///
+/// 每一槽要几次发布：txg 逐个加一、每次发布写 `target_for_publish(txg)` 那一槽（`root_ring::target_for_publish`），环长 3S 个连续的 txg
+/// 里每一槽恰好轮到一次，所以从 `current_txg + 1` 起数到 3S 之内必找到；txg 加上去越过 u64 的那几个当找不到，取满一环 3S
+/// （真发时那一次发布自己就按 txg 到顶拒，`PublishError::NextCheckpointTxgPastTheTopOfItsRange`，在推环的预演里先报出来）。
+fn root_ring_push_target(
+    allocator: &PoolAllocator,
+    current_txg: CheckpointTxg,
+) -> Option<RootRingPushTarget> {
+    let occupancy = allocator.root_ring_occupancy()?;
+    let holding = occupancy.ring_slots_holding_placements_named_by_unapplied_journal_records();
+    let slots_per_region = occupancy.slots_per_region();
+    let ring_length_in_txgs = ROOT_RING_REGIONS * slots_per_region.count();
+    let publishes_until_written = |ring_slot: RootRingSlot| -> u64 {
+        (1..=ring_length_in_txgs)
+            .find(|publishes_ahead| {
+                current_txg
+                    .0
+                    .checked_add(*publishes_ahead)
+                    .is_some_and(|txg| {
+                        target_for_publish(CheckpointTxg(txg), slots_per_region) == ring_slot
+                    })
+            })
+            .unwrap_or(ring_length_in_txgs)
+    };
+    let (publishes_until_the_ring_slot_of_r_is_written, ring_slot_of_r) = holding
+        .keys()
+        .map(|ring_slot| (publishes_until_written(*ring_slot), *ring_slot))
+        .max()?;
+    Some(RootRingPushTarget {
+        ring_slots: holding.keys().copied().collect(),
+        placements: holding.into_values().flatten().collect(),
+        ring_slot_of_r,
+        publishes_until_the_ring_slot_of_r_is_written,
+    })
+}
+
+/// 推满仍不够时报不报「被宽护卡住」（[`WideProtectionAtTheCeiling`]）：`stop` 是 F 已在上限、C 那一圈还有记着落点的槽、它们这一刻至少隔离着一个槽，
+/// 才报；别的都照旧。判这三样与报的那几个数只读分配器（内存）。报的时候不预演（用户 2026-10-09 弹窗定「改：预演延到要出路时才做」）：
+/// 只记下被拒在哪一版上（`current`）与这次改动还剩什么（`remainder`，内容拷一份），调用方要出路时
+/// [`MountedSession::ways_out_of_the_wide_protection`] 照它们预演。
+fn wide_protection_at_the_ceiling(
+    allocator: &PoolAllocator,
+    current: &TransactionOutput,
+    remainder: RemainderOfTheUserChange<'_>,
+    stop: &FloorRaiseStop,
+) -> WideProtectionAtTheCeiling {
+    match stop {
+        FloorRaiseStop::FloorAlreadyAtTheCeiling { .. } => {}
+        FloorRaiseStop::PublishesPerAdmissionWouldBeExceeded { .. }
+        | FloorRaiseStop::FloorRaiseRefusedForSpace { .. } => {
+            return WideProtectionAtTheCeiling::NotWhatStopsTheAdmission;
+        }
+    }
+    let Some(target) = root_ring_push_target(allocator, current.root.checkpoint_txg) else {
+        return WideProtectionAtTheCeiling::NotWhatStopsTheAdmission;
+    };
+    let isolated_slots_on_each_device = allocator.isolated_slots_covered_by(&target.placements);
+    if isolated_slots_on_each_device
+        .iter()
+        .all(|(_, isolated)| *isolated == 0)
+    {
+        return WideProtectionAtTheCeiling::NotWhatStopsTheAdmission;
+    }
+    let checkpoint_txg_of_r = allocator.root_ring_occupancy().and_then(|occupancy| {
+        occupancy.checkpoint_txg_of_the_valid_root_recorded_on(target.ring_slot_of_r)
+    });
+    WideProtectionAtTheCeiling::StuckBehindTheWideProtection(Box::new(
+        StuckBehindTheWideProtection {
+            ring_slot_of_r: target.ring_slot_of_r,
+            checkpoint_txg_of_r,
+            empty_publishes_until_the_ring_slot_of_r_is_written: target
+                .publishes_until_the_ring_slot_of_r_is_written,
+            isolated_slots_on_each_device,
+            instance_of_the_version_refused_on: current.root.instance,
+            checkpoint_txg_of_the_version_refused_on: current.root.checkpoint_txg,
+            remainder_of_the_change: RemainderOfTheUserChangeKeptByTheRefusal::kept_from(remainder),
+        },
+    ))
+}
+
+/// 推环入口（[`MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states`]）做成了：
+/// 发成的每一版按先后（最后一版是会话的 `current`），与写掉的那几槽（C 那一圈在这几槽记着的落点都已解开）。
+#[derive(Debug)]
+pub struct RootRingPushed {
+    pub versions_published: Vec<TransactionOutput>,
+    pub ring_slots_written: Vec<RootRingSlot>,
+}
+
+/// 推环入口没做成。成员按调用方要做的决定分：换回挂载时那一份盘表、等冻结着的那次发布重发、换盘表或换回这个池的盘、这一形第一版不支持、不必推、
+/// 空间不够推不过去、发布路径的错。
+#[derive(Debug)]
+pub enum RootRingPushRefused {
+    /// 交进来的盘表的设备身份（按次序）与这次挂载核过的那一份不同（多一块、少一块、换了次序、同一个身份交两次）：入口第一道，
+    /// 与 [`UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount`]、[`WaysOutOfTheWideProtectionRefused::DeviceTableOtherThanTheOneOfTheMount`]
+    /// 同一判（`mount::ParametersAndDeviceTableOfTheMount::is_the_device_table_of_the_mount`，只比身份），三个入口收盘表同一判
+    /// （用户 2026-10-10 弹窗定「也先比次序」）。不核这一判时次序对调的盘表照样推成（写的先后跟着盘表次序变），推完照它再发被拒成盘表那一种，
+    /// 三个入口收不收同一份盘表不一致（判决 `research/prompts/m3-batch10z-xy-code-r1-main-verification.md` 第二节 K1-2）。
+    /// 在任何读写之前返回：物理块大小没探、一个盘都没读、一个写都没发，盘上逐字节不变、分配器与会话不动。调用方要做的是换回挂载时那一份盘表再推。
+    DeviceTableOtherThanTheOneOfTheMount {
+        device_table_of_the_mount: Vec<DeviceIdentity>,
+        device_table_handed_in: Vec<DeviceIdentity>,
+    },
+    /// 分配器上冻结着一次落盘途中失败、还没原样重发的发布（D23（journal 的角色与格式） 已定项 14「这一版的失败处置」；它的 txg 与实例代号）：
+    /// 推环的第一次空发布本来就会被拒（`PublishError::PublishFrozenAfterAWriteFailureIsNotResentYet`），而整串预演走的是发布路径落盘之前那一段、
+    /// 不判冻结，会在冻结着的分配器拷贝上照样过。比过盘表次序（只比身份、不读盘）之后就拒，在核盘表那一套、预演与任何读写之前：
+    /// 盘上逐字节不变、分配器与会话不动。调用方要做的是先让那次发布原样重发（会话这一层没有重发的入口，等进程重开）。
+    PublishFrozenAfterAWriteFailureIsNotResentYet {
+        checkpoint_txg: CheckpointTxg,
+        instance: InstanceGeneration,
+    },
+    /// 交进来的盘表没过挂着之后收盘表的那一套核（与抬 F 那一串的空发布同一套：身份交了不止一次、参数或盘表与盘上择到的系统配置不一致、
+    /// 有盘不「可见」、有盘落后于现行那一版又缺它的单元或它的根；系统配置择不出来），原样带着那一种 `MountError`。
+    /// 身份与次序已由入口第一道比过（`DeviceTableOtherThanTheOneOfTheMount`；要出路时的预演由要出路那一道比过），到这里的盘表身份与挂载时那一份
+    /// 逐项相同，身份交了不止一次那一支走不到；
+    /// 盘体对调（身份照旧、盘上的本盘设备号对不上）这类读盘才看得出的落在这里。一个写都没发，盘上逐字节不变、会话不动。
+    DevicesHandedIn(Box<MountError>),
+    /// 现行那一版树表 0 条：推环的空发布在这一版上是零单元发布（D16（发布语义） 已定项 9），会话层的推环在这一形上条款没写，第一版不支持。
+    /// 会话在这一版上也不会被宽护卡住（用户改动在这一版上一律 `NoFileVersionToChange`）。在任何读写之前返回，盘上逐字节不变、会话不动。
+    VersionWithoutFileNotSupportedInTheFirstVersion,
+    /// C 那一圈这一刻没有记着落点的槽，或记着落点而它们罩着的槽这一刻一个都没隔离（全在现行账里仍分配、或已释放还在 defer 窗口里）：
+    /// 这个进程写掉哪一槽都放不出东西，不推。一个写都没发，盘上逐字节不变、会话不动。
+    NothingHeldUntilThisProcessWritesARingSlot,
+    /// 整串空发布在任何写之前的预演里（分配器的一份拷贝上走发布路径落盘之前那一段）第 `refused_publish_in_the_push` 次（从 1 数）被拒：
+    /// 推到半路空发布取不到落点（`PublishError::PlacementRefused`）就是这里。一个写都没发，盘上逐字节不变、分配器与会话不动。
+    RefusedByTheRehearsalBeforeAnyWrite {
+        refused_publish_in_the_push: usize,
+        publishes_in_the_push: usize,
+        cause: PublishError,
+    },
+    /// 预演过了、真发时有一次发不出去（块设备错这一类：落盘途中失败的那一次冻结在分配器上，之后再调入口拒成
+    /// `PublishFrozenAfterAWriteFailureIsNotResentYet`；冻结着时入口在预演之前就拒，不进预演，所以不在这里。空间上预演与真发只在
+    /// 读盘核换下的那一份对不上时分叉）：[`RootRingPushFailedAfterTheRehearsal`]。
+    PublishFailedAfterTheRehearsal(Box<RootRingPushFailedAfterTheRehearsal>),
+}
+
+/// 推环真发时第 `failed_publish_in_the_push` 次（从 1 数）发不出去：那一次没成立（分配器换回它之前，发布路径的做法），
+/// 前面那几次已落盘、在 `versions_published` 里，会话的 `current` 停在最后一次落盘的那一版上。
+#[derive(Debug)]
+pub struct RootRingPushFailedAfterTheRehearsal {
+    pub failed_publish_in_the_push: usize,
+    pub publishes_in_the_push: usize,
+    pub cause: PublishError,
+    pub versions_published: Vec<TransactionOutput>,
 }
 
 /// 为空间不够推抬 F 时抬 F 自己报了错：`cause` 是抬 F 的错原样（`mount::push_one_floor_raise_within_the_admission_budget` 的 `Err`），
@@ -383,6 +1111,40 @@ impl MountedSession {
                 },
             );
         }
+        Self::publish_the_change_raising_the_floor_for_space(
+            parameters,
+            devices,
+            allocator,
+            current,
+            *instance,
+            *shadow_ledger,
+            change,
+        )
+    }
+
+    /// [`Self::publish_user_change`] 核过盘表之后那一半：先走空、再发这次改动（unlink 连同它之后的走空），被拒是空间不够就推抬 F 再判。
+    /// 要出路时的预演在只进内存的盘与分配器的拷贝上走同一段（[`rehearse_the_push_then_the_remainder_of_the_change`]），
+    /// 所以拆成不收 `self` 的一段。
+    fn publish_the_change_raising_the_floor_for_space<Device: BlockDevice>(
+        parameters: &MakeFilesystemParameters,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        allocator: &mut PoolAllocator,
+        current: &mut PoolVersion,
+        instance: InstanceGeneration,
+        shadow_ledger: ShadowLedger,
+        change: UserChange<'_>,
+    ) -> Result<UserChangePublished, UserChangeRefused> {
+        let current_version_of_trees = match &*current {
+            PoolVersion::WithFile(version_of_trees)
+            | PoolVersion::WithTreesAndNoFile(version_of_trees) => version_of_trees,
+            PoolVersion::WithoutFile(_) => {
+                return Err(no_file_version_to_change(PublishedInThisChange {
+                    floor_raises: Vec::new(),
+                    refusals_that_pushed_the_floor_raises: Vec::new(),
+                    versions_published: Vec::new(),
+                }))
+            }
+        };
         let mut published_in_this_change = PublishedInThisChange {
             floor_raises: Vec::new(),
             refusals_that_pushed_the_floor_raises: Vec::new(),
@@ -396,8 +1158,9 @@ impl MountedSession {
                 devices,
                 allocator,
                 &mut walked,
-                *instance,
-                *shadow_ledger,
+                instance,
+                shadow_ledger,
+                RemainderOfTheUserChange::WalkTheQueueThenPublishTheChange(change),
                 published_in_this_change,
             );
             *current = PoolVersion::of_a_version_of_trees(walked);
@@ -427,7 +1190,7 @@ impl MountedSession {
                 allocator,
                 version_to_change,
                 change,
-                *instance,
+                instance,
             ) {
                 Ok(published) => {
                     // unlink：意图发成之后接着把全部批走完（一次调用 = 走空 + 意图 + 全部批）；别的改动之后队列本来就空，一个写都不发。
@@ -440,8 +1203,9 @@ impl MountedSession {
                         devices,
                         allocator,
                         &mut published,
-                        *instance,
-                        *shadow_ledger,
+                        instance,
+                        shadow_ledger,
+                        RemainderOfTheUserChange::WalkTheQueue,
                         published_in_this_change,
                     );
                     *current = PoolVersion::of_a_version_of_trees(published);
@@ -465,13 +1229,274 @@ impl MountedSession {
                     devices,
                     allocator,
                     version_to_change,
-                    *shadow_ledger,
+                    shadow_ledger,
+                    RemainderOfTheUserChange::WalkTheQueueThenPublishTheChange(change),
                     publishes_pushed,
                     published_in_this_change,
                     refusal,
                 )?;
             publishes_pushed += publishes_of_this_raise;
         }
+    }
+
+    /// 推环到 R 那一槽（用户 2026-10-08 弹窗定「显式推环命令加带出路的错」那一个管理入口）：在现行那一版后面接连发 F 不变的空发布
+    /// （与可写挂载暖机同一张计划，`mount::empty_publish_plan_after_file_version`：重写固定点单元，不碰用户树、实例表照抄），
+    /// 直到这个进程写掉 C 那一圈还没解开、记着落点的每一槽（R 那一槽最后轮到），宽护随之解开（`allocator::PoolAllocator::record_root_written_by_this_process`
+    /// 摘下那一槽记着的落点、清掉别处不再护着的隔离位）。要几次见 [`StuckBehindTheWideProtection::empty_publishes_until_the_ring_slot_of_r_is_written`]，至多环长 3S。
+    ///
+    /// **调用即确认丢掉最近可退到的状态**：R 那一槽是 C 那一圈里最后轮到的一槽，推到它要写掉根环里从现行那一版起接下来轮到的那几槽（次数就是槽数，
+    /// 不超过一环），那几槽里原来的根（回退候选）换成同一个用户状态的空发布根；推完之后回退候选集可以掉到少于 4 个不同状态，
+    /// D16（发布语义） 已定项 1「回退候选集保留最近 4 个可退到的不同状态」只在调这个入口时破
+    /// （第 10z 批调查报告 10z-p 第六节第 1 条：384 槽盘那一形推完只剩 2 个）。不自动调：准入被宽护卡住时只报 [`StuckBehindTheWideProtection`]，
+    /// 调用方要出路时（[`Self::ways_out_of_the_wide_protection`]）预演过推完之后那次改动放得下才写明这一条出路。
+    ///
+    /// 第一道照 [`Self::publish_user_change`] 与 [`Self::ways_out_of_the_wide_protection`] 那样，把交进来的盘表与挂载时核过的那一份逐项比
+    /// （次序也比，`mount::ParametersAndDeviceTableOfTheMount::is_the_device_table_of_the_mount`，只比身份、不读盘），不符就拒
+    /// （`DeviceTableOtherThanTheOneOfTheMount`，带两份盘表），在任何读写之前：三个入口收盘表同一判（用户 2026-10-10 弹窗定「也先比次序」）。
+    /// 这一判在这个公开入口里、不在本体（`push_the_root_ring_on`）里：要出路时的预演经本体走、交的是包过的盘，要出路那一边先核过同一判。
+    /// 第二道看分配器上冻结着没重发的发布，冻结着就拒（`PublishFrozenAfterAWriteFailureIsNotResentYet`），在核盘表那一套与预演之前。
+    /// C 那一圈记着落点、而它们罩着的槽这一刻一个都没隔离时不推（写掉那几槽放不出东西，`NothingHeldUntilThisProcessWritesARingSlot`），在任何写之前。
+    /// 整串先在分配器的一份拷贝上预演（发布路径落盘之前那一段，与抬 F 那一串的预演同一个做法）：推到半路空发布取不到落点（没挡的槽不够这一串）
+    /// 时一个写都不发，盘上逐字节不变、分配器与会话不动。预演过了才真发；真发时有一次发不出去，前面那几次已落盘、`current` 停在最后一次落盘的那一版上。
+    /// 这些空发布不过准入两判（没有普通分配，D28（挂载期承诺量） 已定项 1），只受「取得到落点」约束。交进来的盘表照抬 F 那一串的
+    /// 空发布同一套核（`mount::parameters_of_the_pool_agreeing_with_the_caller_inputs`），在任何写之前；写入口只按盘上那一份参数建。
+    ///
+    /// # Errors
+    /// [`RootRingPushRefused`] 的七种。
+    pub fn push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states<
+        Device: BlockDevice,
+    >(
+        &mut self,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+    ) -> Result<RootRingPushed, RootRingPushRefused> {
+        let MountedSession {
+            allocator,
+            current,
+            instance,
+            shadow_ledger: _,
+            parameters_and_device_table,
+        } = self;
+        let is_the_device_table_handed_in_the_one_of_the_mount =
+            parameters_and_device_table.is_the_device_table_of_the_mount(devices);
+        if !is_the_device_table_handed_in_the_one_of_the_mount {
+            return Err(RootRingPushRefused::DeviceTableOtherThanTheOneOfTheMount {
+                device_table_of_the_mount: parameters_and_device_table
+                    .device_identities_in_table_order()
+                    .to_vec(),
+                device_table_handed_in: devices.iter().map(|(identity, _)| *identity).collect(),
+            });
+        }
+        Self::push_the_root_ring_on(
+            parameters_and_device_table.parameters_on_disk(),
+            devices,
+            allocator,
+            current,
+            *instance,
+        )
+    }
+
+    /// 被宽护卡住之后调用方要出路时调（用户 2026-10-09 弹窗定「改：预演延到要出路时才做」）：照 `stuck` 那一份报记着的「这次改动还剩什么」，
+    /// 在分配器的一份拷贝上、对只进内存的盘预演推环与推完之后这次改动剩下的发布（[`rehearse_the_push_then_the_remainder_of_the_change`]：
+    /// 与真调推环入口、之后走报里剩下的那一段走同一段：报里还剩这次改动时是再发同一个改动；只剩走空时 unlink 的意图已发成，
+    /// 是下一次改动开头的走空，不再发这次改动），照结局列出路（推完放得下才列推环）。报 `stuck` 的那一次不付这一笔。
+    ///
+    /// 收 `&self`：预演只读交进来的盘、在分配器的拷贝上走，会话的分配器、现行那一版一样都不动——类型上就动不了（`PoolAllocator` 里没有内部可变），
+    /// 调用方不必为了要出路把会话交出去。盘表只读借：只进内存的盘只读借底下那块盘，写一个都发不到它上面。
+    /// 交进来的盘表先照 [`Self::publish_user_change`] 与推环入口那样与挂载时核过的那一份逐项比（次序也比，三个入口同一判），
+    /// 再照推环本体那一套核（在预演的推环里，核不过就是推环被拒、出路只列卸载再挂），与照出路二真推、再走报里剩下的那一段时同一个结局
+    /// （报里还剩这次改动时是再发这次改动）。
+    ///
+    /// 第一道看会话还在不在被拒的那一版上（实例代号与 txg 都与报里记的相同），再比盘表：哪一道不过都不预演，一个盘都不读。
+    /// 第一道只比这两个数，认不出 `stuck` 是不是这个会话报的：别的会话的报若这两个数恰好与这个会话的现行那一版相同，照样过，
+    /// 照这个会话的状态预演（[`WaysOutOfTheWideProtectionRefused::SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion`]）。
+    /// 调用方要拿报去问报它的那个会话。
+    ///
+    /// # Errors
+    /// [`WaysOutOfTheWideProtectionRefused`] 的两种。
+    pub fn ways_out_of_the_wide_protection<Device: BlockDevice>(
+        &self,
+        devices: &[(DeviceIdentity, Device)],
+        stuck: &StuckBehindTheWideProtection,
+    ) -> Result<WaysOutOfTheWideProtection, WaysOutOfTheWideProtectionRefused> {
+        let is_the_version_refused_on = |version_of_trees: &TransactionOutput| {
+            version_of_trees.root.instance == stuck.instance_of_the_version_refused_on
+                && version_of_trees.root.checkpoint_txg
+                    == stuck.checkpoint_txg_of_the_version_refused_on
+        };
+        let version_refused_on = match &self.current {
+            PoolVersion::WithFile(version_of_trees)
+            | PoolVersion::WithTreesAndNoFile(version_of_trees)
+                if is_the_version_refused_on(version_of_trees) =>
+            {
+                version_of_trees
+            }
+            PoolVersion::WithFile(_)
+            | PoolVersion::WithTreesAndNoFile(_)
+            | PoolVersion::WithoutFile(_) => {
+                let current_root = self.current.root();
+                return Err(
+                    WaysOutOfTheWideProtectionRefused::SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion {
+                        instance_refused_on: stuck.instance_of_the_version_refused_on,
+                        checkpoint_txg_refused_on: stuck.checkpoint_txg_of_the_version_refused_on,
+                        instance_of_the_current_version: current_root.instance,
+                        checkpoint_txg_of_the_current_version: current_root.checkpoint_txg,
+                    },
+                );
+            }
+        };
+        if !self
+            .parameters_and_device_table
+            .is_the_device_table_of_the_mount(devices)
+        {
+            return Err(
+                WaysOutOfTheWideProtectionRefused::DeviceTableOtherThanTheOneOfTheMount {
+                    device_table_of_the_mount: self
+                        .parameters_and_device_table
+                        .device_identities_in_table_order()
+                        .to_vec(),
+                    device_table_handed_in: devices.iter().map(|(identity, _)| *identity).collect(),
+                },
+            );
+        }
+        let pushing_the_root_ring = rehearse_the_push_then_the_remainder_of_the_change(
+            self.parameters_and_device_table.parameters_on_disk(),
+            devices,
+            &self.allocator,
+            version_refused_on,
+            self.instance,
+            self.shadow_ledger,
+            stuck.remainder_of_the_change.as_remainder(),
+        );
+        let ways_out = stuck.ways_out_after(&pushing_the_root_ring);
+        Ok(WaysOutOfTheWideProtection {
+            pushing_the_root_ring,
+            ways_out,
+        })
+    }
+
+    /// [`Self::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states`] 的本体，盘上择到的参数由调用方给：
+    /// 要出路时的预演在只进内存的盘与分配器的拷贝上走同一段（[`rehearse_the_push_then_the_remainder_of_the_change`]）。
+    ///
+    /// # Errors
+    /// 同那个入口。
+    fn push_the_root_ring_on<Device: BlockDevice>(
+        parameters_on_disk: &MakeFilesystemParameters,
+        devices: &mut Vec<(DeviceIdentity, Device)>,
+        allocator: &mut PoolAllocator,
+        current: &mut PoolVersion,
+        instance: InstanceGeneration,
+    ) -> Result<RootRingPushed, RootRingPushRefused> {
+        // D23（journal 的角色与格式） 已定项 14「这一版的失败处置」：冻结着的那次发布等原样重发。下面的整串预演走的是发布路径落盘之前那一段、
+        // 不判冻结，在冻结着的分配器拷贝上照样过，真发第一次才被拒（第 10z 批代码轮第一轮攻方第二节「一处报法不准」）。
+        if let Some(frozen) = allocator.frozen_publish() {
+            return Err(
+                RootRingPushRefused::PublishFrozenAfterAWriteFailureIsNotResentYet {
+                    checkpoint_txg: frozen.checkpoint_txg(),
+                    instance: frozen.instance(),
+                },
+            );
+        }
+        let start = match &*current {
+            PoolVersion::WithFile(version_of_trees)
+            | PoolVersion::WithTreesAndNoFile(version_of_trees) => version_of_trees.clone(),
+            PoolVersion::WithoutFile(_) => {
+                return Err(RootRingPushRefused::VersionWithoutFileNotSupportedInTheFirstVersion);
+            }
+        };
+        let parameters_of_the_pool = parameters_of_the_pool_agreeing_with_the_caller_inputs(
+            parameters_on_disk,
+            devices,
+            &start,
+        )
+        .map_err(|refusal| RootRingPushRefused::DevicesHandedIn(Box::new(refusal)))?;
+        let parameters = &parameters_of_the_pool;
+        let Some(target) = root_ring_push_target(allocator, start.root.checkpoint_txg) else {
+            return Err(RootRingPushRefused::NothingHeldUntilThisProcessWritesARingSlot);
+        };
+        // C 那一圈记着落点、它们罩着的槽却一个都没隔离（全在现行账里仍分配、或已释放还在 defer 窗口里）：写掉那几槽放不出东西，
+        // 与没有记着落点的槽同一个结局（判决 `research/prompts/m3-batch10z-pqrs-code-r1-main-verification.md` 第二节「K1-1 三个量」那一行，正推注入级那一形）。
+        let slots_the_push_would_release_isolation_of =
+            allocator.isolated_slots_covered_by(&target.placements);
+        if slots_the_push_would_release_isolation_of
+            .iter()
+            .all(|(_, isolated)| *isolated == 0)
+        {
+            return Err(RootRingPushRefused::NothingHeldUntilThisProcessWritesARingSlot);
+        }
+        let publishes_in_the_push =
+            usize::try_from(target.publishes_until_the_ring_slot_of_r_is_written)
+                .expect("至多环长 3S ≤ 48 次");
+        // 预演：迭代上界是这一串的次数；跨轮携带的是预演出来的现行那一版（下一次的计划接着它）与分配器的拷贝。
+        {
+            let rehearsal_writer = PoolWriter::new(parameters, devices.as_mut_slice());
+            let mut copy = allocator.clone();
+            let mut rehearsed = start.clone();
+            for publish_index in 0..publishes_in_the_push {
+                let (_, next) = prepare_the_version_publish(
+                    &rehearsal_writer,
+                    &mut copy,
+                    &empty_publish_plan_after_file_version(&rehearsed, instance),
+                    Some(&rehearsed),
+                    rehearsed.tree_identifiers,
+                    ReleaseChecksumCheck::SkippedByTheDryRunBeforeAcquisition,
+                    UnmountMarker::NotWrittenByTheUnmountSequence,
+                    &DeletionAndLineageOfThePublish::NEITHER_A_DELETION_NOR_A_ROLLBACK,
+                )
+                .map_err(|cause| {
+                    RootRingPushRefused::RefusedByTheRehearsalBeforeAnyWrite {
+                        refused_publish_in_the_push: publish_index + 1,
+                        publishes_in_the_push,
+                        cause,
+                    }
+                })?;
+                rehearsed = next;
+            }
+        }
+        // 真发：迭代上界同上；跨轮携带的是落盘了的现行那一版与发成的每一版；出口只有发不出去那一次。
+        let mut last_published = start;
+        let mut versions_published = Vec::with_capacity(publishes_in_the_push);
+        for publish_index in 0..publishes_in_the_push {
+            let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
+            match publish_version(
+                &mut writer,
+                allocator,
+                empty_publish_plan_after_file_version(&last_published, instance),
+                Some(&last_published),
+            ) {
+                Ok(next) => {
+                    versions_published.push(next.clone());
+                    last_published = next;
+                }
+                Err(cause) => {
+                    *current = PoolVersion::of_a_version_of_trees(last_published);
+                    return Err(RootRingPushRefused::PublishFailedAfterTheRehearsal(
+                        Box::new(RootRingPushFailedAfterTheRehearsal {
+                            failed_publish_in_the_push: publish_index + 1,
+                            publishes_in_the_push,
+                            cause,
+                            versions_published,
+                        }),
+                    ));
+                }
+            }
+        }
+        *current = PoolVersion::of_a_version_of_trees(last_published);
+        let still_holding = allocator
+            .root_ring_occupancy()
+            .expect("推环之前读到了 C 那一圈，装着根环表")
+            .ring_slots_holding_placements_named_by_unapplied_journal_records();
+        assert!(
+            target
+                .ring_slots
+                .iter()
+                .all(|ring_slot| !still_holding.contains_key(ring_slot)),
+            "推环写到了 R 那一槽：每次发布 txg 加一、写 target_for_publish(txg) 那一槽并在取完落点之后摘下 C 在那一槽记着的落点，\
+             R 那一槽是这几槽里最后轮到的；还记着说明有一次发布没经分配器记根"
+        );
+        Ok(RootRingPushed {
+            versions_published,
+            ring_slots_written: target.ring_slots,
+        })
     }
 }
 
@@ -499,11 +1524,12 @@ struct PublishedInThisChange {
 /// 一次发布被拒之后会话怎么接（D16（发布语义） 已定项 1「准入」那一行）：不是空间不够的那两种（[`refusal_is_short_of_space`]）原样交回 `Publish`；
 /// 是就为被拒的那一次发布推一串抬 F 的空发布（这次准入已推 `publishes_pushed_in_this_admission` 次，预算照
 /// `mount::push_one_floor_raise_within_the_admission_budget`），推成交回记上这一串之后的 `published_in_this_change` 与这一串推了几次空发布，
-/// 不再推交回 `NoSpaceAfterRaisingTheFloor`，抬 F 自己报错交回 `FloorRaiseFailedWhilePushingForSpace`。
+/// 不再推交回 `NoSpaceAfterRaisingTheFloor`（报不报「被宽护卡住」，报的话记下这次改动剩下的 `remainder`，要出路时照它预演，
+/// [`wide_protection_at_the_ceiling`]），抬 F 自己报错交回 `FloorRaiseFailedWhilePushingForSpace`。
 /// 推的那一串就地推进 `current`（被拒的那一次要接在它后面的那一版）。
 #[allow(
     clippy::too_many_arguments,
-    reason = "参数各有名字与类型：写入口要的参数与盘表、分配器、现行那一版、影子账那一臂、预算已用的数、已落盘的、这一次被拒，不成一个概念"
+    reason = "参数各有名字与类型：写入口要的参数与盘表、分配器、现行那一版、影子账那一臂、这次改动还剩什么、预算已用的数、已落盘的、这一次被拒，不成一个概念"
 )]
 fn push_one_floor_raise_for_a_refusal_for_space<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
@@ -511,6 +1537,7 @@ fn push_one_floor_raise_for_a_refusal_for_space<Device: BlockDevice>(
     allocator: &mut PoolAllocator,
     current: &mut TransactionOutput,
     shadow_ledger: ShadowLedger,
+    remainder: RemainderOfTheUserChange<'_>,
     publishes_pushed_in_this_admission: usize,
     published_in_this_change: PublishedInThisChange,
     refusal: PublishError,
@@ -553,6 +1580,10 @@ fn push_one_floor_raise_for_a_refusal_for_space<Device: BlockDevice>(
                 last_refusal: refusal,
                 floor_raises,
                 refusals_that_pushed_the_floor_raises,
+                // 先借 `stop` 判这一形，再把它挪进下一个字段（字段按写的次序求值）。
+                wide_protection_at_the_ceiling: wide_protection_at_the_ceiling(
+                    allocator, current, remainder, &stop,
+                ),
                 stop,
                 versions_published,
             })),
@@ -574,7 +1605,12 @@ fn push_one_floor_raise_for_a_refusal_for_space<Device: BlockDevice>(
 /// 被它以空间拒时推抬 F 腾得出槽）；推满仍放不下、抬 F 自己报错、被拒不是空间不够，交回会话要报的那一种拒绝。
 /// 每一次被拒的删除类发布各算一次准入（与 unlink 意图那次、别的用户改动那次一样，预算数的是为被判的那一次发布推了几次空发布）：
 /// 这一趟走空有一步落了盘，下一次被拒的就是后面那一次发布，这次准入已推的数从 0 数起。`current` 停在最后一次落盘的那一版上
-/// （删除那一步或推的空发布）；发成的每一步记进 `versions_published`。
+/// （删除那一步或推的空发布）；发成的每一步记进 `versions_published`。`remainder` 是走空之后这次改动还剩什么（推满仍不够、被宽护卡住时
+/// 记进报里，要出路时预演推环之后照它再发一次，[`wide_protection_at_the_ceiling`]）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各有名字与类型：写入口要的参数与盘表、分配器、现行那一版、实例代号、影子账那一臂、这次改动还剩什么、已落盘的，不成一个概念"
+)]
 fn publish_the_queue_until_it_is_empty_raising_the_floor_for_space<Device: BlockDevice>(
     parameters: &MakeFilesystemParameters,
     devices: &mut Vec<(DeviceIdentity, Device)>,
@@ -582,6 +1618,7 @@ fn publish_the_queue_until_it_is_empty_raising_the_floor_for_space<Device: Block
     current: &mut TransactionOutput,
     instance: InstanceGeneration,
     shadow_ledger: ShadowLedger,
+    remainder: RemainderOfTheUserChange<'_>,
     published_in_this_change: PublishedInThisChange,
 ) -> Result<PublishedInThisChange, UserChangeRefused> {
     let mut published_in_this_change = published_in_this_change;
@@ -617,10 +1654,671 @@ fn publish_the_queue_until_it_is_empty_raising_the_floor_for_space<Device: Block
                 allocator,
                 current,
                 shadow_ledger,
+                remainder,
                 publishes_pushed_in_this_admission,
                 published_in_this_change,
                 refusal,
             )?;
         publishes_pushed_in_this_admission += publishes_of_this_raise;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    //! 只进内存的盘（[`DeviceKeepingWritesInMemory`]）：写与写零只进内存、盖在之后的读上，读没写过的块穿到底下那块盘，底下那块盘一字不动；
+    //! 请求判据与两个后端是同一份（`block_device::check_aligned_and_in_range`）。差分对拍照正推腿的做法
+    //! （`research/prompts/m3-batch10z-tu-code-r1-sonnet-model/src/core-mounted-session-debug.diff` 的 `sonnet_k5_differential`），
+    //! 参照换成一块把每个写直接写进去的字节盘（同一份请求判据）。
+    use super::*;
+
+    /// 物理块 512 字节、16 块的盘。
+    const PHYSICAL_BLOCK_BYTES: u32 = 512;
+    const BLOCKS_OF_THE_DISK: u64 = 16;
+
+    /// 底下那块盘（也是差分对拍的参照）：整块字节放内存，请求判据照两个后端那一份。
+    struct DeviceOfBytes {
+        bytes: Vec<u8>,
+        physical_block_size: PhysicalBlockSizeInBytes,
+    }
+
+    impl DeviceOfBytes {
+        /// 物理块 [`PHYSICAL_BLOCK_BYTES`]、[`BLOCKS_OF_THE_DISK`] 块的盘，每个字节按位置与 `seed` 填一个图样：读回哪一块看得出来。
+        fn filled_with_a_pattern(seed: u8) -> Self {
+            Self::filled_with_a_pattern_on_blocks_of(
+                PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_BYTES),
+                BLOCKS_OF_THE_DISK,
+                seed,
+            )
+        }
+
+        /// 物理块 `physical_block_size`、`blocks_of_the_disk` 块的盘，图样同 [`Self::filled_with_a_pattern`]。
+        fn filled_with_a_pattern_on_blocks_of(
+            physical_block_size: PhysicalBlockSizeInBytes,
+            blocks_of_the_disk: u64,
+            seed: u8,
+        ) -> Self {
+            let device_bytes =
+                usize::try_from(u64::from(physical_block_size.0) * blocks_of_the_disk)
+                    .expect("盘长装得进 usize");
+            DeviceOfBytes {
+                bytes: (0..device_bytes)
+                    .map(|position| {
+                        u8::try_from(position % 251)
+                            .expect("小于 256")
+                            .wrapping_add(seed)
+                    })
+                    .collect(),
+                physical_block_size,
+            }
+        }
+
+        fn range_of(
+            &self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<std::ops::Range<usize>, BlockDeviceError> {
+            check_aligned_and_in_range(
+                offset,
+                length,
+                self.physical_block_size,
+                self.size_in_bytes(),
+            )?;
+            let start = usize::try_from(offset.0).expect("判过不越过盘尾");
+            let end = start + usize::try_from(length).expect("判过不越过盘尾");
+            Ok(start..end)
+        }
+    }
+
+    impl BlockDevice for DeviceOfBytes {
+        fn read_at(
+            &self,
+            offset: DeviceOffsetInBytes,
+            buffer: &mut [u8],
+        ) -> Result<(), BlockDeviceError> {
+            let range = self.range_of(offset, u64::try_from(buffer.len()).expect("读长"))?;
+            buffer.copy_from_slice(&self.bytes[range]);
+            Ok(())
+        }
+
+        fn write_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            bytes: &[u8],
+            _durability: WriteDurability,
+        ) -> Result<(), BlockDeviceError> {
+            let range = self.range_of(offset, u64::try_from(bytes.len()).expect("写长"))?;
+            self.bytes[range].copy_from_slice(bytes);
+            Ok(())
+        }
+
+        fn write_zeroes_at(
+            &mut self,
+            offset: DeviceOffsetInBytes,
+            length: u64,
+        ) -> Result<(), BlockDeviceError> {
+            let range = self.range_of(offset, length)?;
+            self.bytes[range].fill(0);
+            Ok(())
+        }
+
+        fn barrier(&mut self) -> Result<(), BlockDeviceError> {
+            Ok(())
+        }
+
+        fn probe_physical_block_size(&self) -> PhysicalBlockSizeInBytes {
+            self.physical_block_size
+        }
+
+        fn size_in_bytes(&self) -> u64 {
+            u64::try_from(self.bytes.len()).expect("盘长装得进 u64")
+        }
+    }
+
+    fn offset_of_block(block: u64) -> DeviceOffsetInBytes {
+        DeviceOffsetInBytes(block * u64::from(PHYSICAL_BLOCK_BYTES))
+    }
+
+    fn bytes_of_blocks(blocks: u64) -> usize {
+        usize::try_from(blocks * u64::from(PHYSICAL_BLOCK_BYTES)).expect("块数装得进 usize")
+    }
+
+    /// 从 `first_block` 起读 `blocks` 块；读缓冲先填 0xAA，没读到的那一截露得出来。
+    fn read_blocks(device: &dyn BlockDevice, first_block: u64, blocks: u64) -> Vec<u8> {
+        let mut buffer = vec![0xAA_u8; bytes_of_blocks(blocks)];
+        device
+            .read_at(offset_of_block(first_block), &mut buffer)
+            .expect("对齐、没越过盘尾的读做得成");
+        buffer
+    }
+
+    fn bytes_of_the_disk_blocks(disk: &DeviceOfBytes, first_block: u64, blocks: u64) -> Vec<u8> {
+        let start = bytes_of_blocks(first_block);
+        disk.bytes[start..start + bytes_of_blocks(blocks)].to_vec()
+    }
+
+    #[test]
+    fn a_write_kept_in_memory_reads_back_and_leaves_the_disk_below_unchanged() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(0);
+        let bytes_before = disk.bytes.clone();
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let written = vec![0x5A_u8; bytes_of_blocks(1)];
+        kept.write_at(
+            offset_of_block(3),
+            &written,
+            WriteDurability::ForceUnitAccess,
+        )
+        .expect("对齐、没越过盘尾的写做得成");
+        assert_eq!(
+            read_blocks(&kept, 3, 1),
+            written,
+            "写过的块读回写进去的字节"
+        );
+        assert!(
+            disk.bytes == bytes_before,
+            "写只进内存：底下那块盘一个字节都没变"
+        );
+    }
+
+    #[test]
+    fn a_read_of_blocks_never_written_passes_through_to_the_disk_below() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(7);
+        let kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        assert_eq!(
+            read_blocks(&kept, 5, 3),
+            bytes_of_the_disk_blocks(&disk, 5, 3),
+            "没写过的块读穿到底下那块盘"
+        );
+    }
+
+    #[test]
+    fn a_read_across_written_and_unwritten_blocks_stitches_the_kept_blocks_with_the_disk_below() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(11);
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let block_two = vec![0x22_u8; bytes_of_blocks(1)];
+        let block_four = vec![0x44_u8; bytes_of_blocks(1)];
+        let blocks_seven_and_eight: Vec<u8> = (0..bytes_of_blocks(2))
+            .map(|position| u8::try_from(position % 199).expect("小于 256"))
+            .collect();
+        for (first_block, bytes) in [
+            (2, &block_two),
+            (4, &block_four),
+            (7, &blocks_seven_and_eight),
+        ] {
+            kept.write_at(offset_of_block(first_block), bytes, WriteDurability::Plain)
+                .expect("对齐、没越过盘尾的写做得成");
+        }
+        let mut expected = bytes_of_the_disk_blocks(&disk, 1, 9);
+        for (first_block, bytes) in [
+            (2, &block_two),
+            (4, &block_four),
+            (7, &blocks_seven_and_eight),
+        ] {
+            let start = bytes_of_blocks(first_block - 1);
+            expected[start..start + bytes.len()].copy_from_slice(bytes);
+        }
+        assert!(
+            read_blocks(&kept, 1, 9) == expected,
+            "块 1 到 9 一次读：写过的块（2、4、7、8）读回写进去的字节，没写过的（1、3、5、6、9，含末尾那一段）读穿到底下那块盘"
+        );
+    }
+
+    #[test]
+    fn zeroes_written_in_memory_read_back_as_zero_over_the_disk_below() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(13);
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        kept.write_zeroes_at(offset_of_block(3), u64::from(PHYSICAL_BLOCK_BYTES) * 3)
+            .expect("对齐、没越过盘尾的写零做得成");
+        let mut expected = bytes_of_the_disk_blocks(&disk, 2, 5);
+        expected[bytes_of_blocks(1)..bytes_of_blocks(4)].fill(0);
+        assert!(
+            read_blocks(&kept, 2, 5) == expected,
+            "写零的块 3 到 5 读回全 0，两头的块 2、6 读穿到底下那块盘"
+        );
+        assert!(
+            bytes_of_the_disk_blocks(&disk, 3, 3)
+                .iter()
+                .any(|byte| *byte != 0),
+            "底下那块盘那一段不是全 0（阳性对照：读回的 0 是写零记下的）"
+        );
+    }
+
+    #[test]
+    fn a_request_off_the_physical_block_boundaries_is_refused_before_anything_is_kept() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(17);
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let unaligned_offset = DeviceOffsetInBytes(u64::from(PHYSICAL_BLOCK_BYTES) + 100);
+        let one_block = vec![0x33_u8; bytes_of_blocks(1)];
+        let short_of_a_block = vec![0x33_u8; 100];
+        let refusals = [
+            (
+                "偏移不在物理块边界上的写",
+                kept.write_at(unaligned_offset, &one_block, WriteDurability::Plain),
+                unaligned_offset,
+                u64::from(PHYSICAL_BLOCK_BYTES),
+            ),
+            (
+                "长度不是物理块整数倍的写",
+                kept.write_at(
+                    offset_of_block(2),
+                    &short_of_a_block,
+                    WriteDurability::Plain,
+                ),
+                offset_of_block(2),
+                100,
+            ),
+            (
+                "长度不是物理块整数倍的写零",
+                kept.write_zeroes_at(offset_of_block(4), 100),
+                offset_of_block(4),
+                100,
+            ),
+            (
+                "偏移不在物理块边界上的读",
+                kept.read_at(unaligned_offset, &mut vec![0_u8; bytes_of_blocks(1)]),
+                unaligned_offset,
+                u64::from(PHYSICAL_BLOCK_BYTES),
+            ),
+        ];
+        for (request, outcome, offset, length) in refusals {
+            assert!(
+                matches!(
+                    outcome,
+                    Err(BlockDeviceError::Unaligned {
+                        offset: refused_offset,
+                        length: refused_length,
+                        physical_block_size: PHYSICAL_BLOCK_BYTES,
+                    }) if refused_offset == offset && refused_length == length
+                ),
+                "{request}：拒成 Unaligned，带偏移 {} 与长度 {length}，而交回 {outcome:?}",
+                offset.0
+            );
+        }
+        assert!(
+            read_blocks(&kept, 0, BLOCKS_OF_THE_DISK) == disk.bytes,
+            "被拒的写一个块都没记：整盘读回底下那块盘的字节"
+        );
+    }
+
+    #[test]
+    fn a_request_past_the_end_of_the_disk_below_is_refused_and_one_ending_at_the_end_is_kept() {
+        let disk = DeviceOfBytes::filled_with_a_pattern(19);
+        let device_size = disk.size_in_bytes();
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let last_block = vec![0x77_u8; bytes_of_blocks(1)];
+        kept.write_at(
+            offset_of_block(BLOCKS_OF_THE_DISK - 1),
+            &last_block,
+            WriteDurability::Plain,
+        )
+        .expect("最后一块正好写到盘尾：放行");
+        assert_eq!(
+            read_blocks(&kept, BLOCKS_OF_THE_DISK - 1, 1),
+            last_block,
+            "最后一块读回写进去的字节"
+        );
+        let two_blocks = vec![0x66_u8; bytes_of_blocks(2)];
+        let offset_near_the_top =
+            DeviceOffsetInBytes(u64::MAX - u64::from(PHYSICAL_BLOCK_BYTES) + 1);
+        let refusals = [
+            (
+                "从最后一块起写两块（越过盘尾一块）",
+                kept.write_at(
+                    offset_of_block(BLOCKS_OF_THE_DISK - 1),
+                    &two_blocks,
+                    WriteDurability::Plain,
+                ),
+                offset_of_block(BLOCKS_OF_THE_DISK - 1),
+                u64::from(PHYSICAL_BLOCK_BYTES) * 2,
+            ),
+            (
+                "从盘尾起写零一块",
+                kept.write_zeroes_at(
+                    offset_of_block(BLOCKS_OF_THE_DISK),
+                    u64::from(PHYSICAL_BLOCK_BYTES),
+                ),
+                offset_of_block(BLOCKS_OF_THE_DISK),
+                u64::from(PHYSICAL_BLOCK_BYTES),
+            ),
+            (
+                "偏移加长度越过 u64 的读",
+                kept.read_at(offset_near_the_top, &mut vec![0_u8; bytes_of_blocks(2)]),
+                offset_near_the_top,
+                u64::from(PHYSICAL_BLOCK_BYTES) * 2,
+            ),
+        ];
+        for (request, outcome, offset, length) in refusals {
+            assert!(
+                matches!(
+                    outcome,
+                    Err(BlockDeviceError::OutOfRange {
+                        offset: refused_offset,
+                        length: refused_length,
+                        device_size: refused_device_size,
+                    }) if refused_offset == offset && refused_length == length && refused_device_size == device_size
+                ),
+                "{request}：拒成 OutOfRange，带偏移 {}、长度 {length} 与盘长 {device_size}，而交回 {outcome:?}",
+                offset.0
+            );
+        }
+        let mut expected = disk.bytes.clone();
+        expected[bytes_of_blocks(BLOCKS_OF_THE_DISK - 1)..].copy_from_slice(&last_block);
+        assert!(
+            read_blocks(&kept, 0, BLOCKS_OF_THE_DISK) == expected,
+            "被拒的写一个块都没记：整盘读回只有最后一块是写进去的"
+        );
+    }
+
+    /// 差分对拍那一串请求的个数。
+    const REQUESTS_OF_THE_RANDOM_STREAM: u64 = 20_000;
+
+    /// 线性同余，取高 33 位（只要确定、够散）。
+    fn next_random(state: &mut u64) -> u64 {
+        *state = state
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
+        *state >> 33
+    }
+
+    /// 偏移：多半落在物理块边界上、盘以内，少数不对齐、正好在盘尾、越过盘尾、贴着 u64 的顶。
+    fn random_offset(state: &mut u64, device_size: u64, block_bytes: u64) -> u64 {
+        match next_random(state) % 8 {
+            0 => next_random(state) % (device_size + 2 * block_bytes),
+            1 => u64::MAX - next_random(state) % 1024,
+            2 => device_size,
+            _ => (next_random(state) % (device_size / block_bytes)) * block_bytes,
+        }
+    }
+
+    /// 长度：多半是一到几个物理块，少数是 0、不对齐、跨过盘尾。
+    fn random_length(state: &mut u64, device_size: u64, block_bytes: u64) -> u64 {
+        match next_random(state) % 8 {
+            0 => 0,
+            1 => next_random(state) % (2 * device_size),
+            _ => (1 + next_random(state) % 4) * block_bytes,
+        }
+    }
+
+    /// 一串随机请求（读、写、写零，偶尔一道屏障）同时交给盖在底下那块盘上的只进内存的盘与一块把写直接写进去的同样的盘之后看到的。
+    struct RandomRequestStreamAgainstADeviceWrittenThrough {
+        /// 两边对不上的请求，逐条写明第几个、什么请求、哪一样不同（读回的字节、交回值）。
+        disagreements: Vec<String>,
+        refused_requests: u64,
+        kept_writes: u64,
+        /// 一串请求之后整盘读回的字节与写穿的那块盘相同。
+        whole_disk_reads_back_as_written_through: bool,
+        /// 一串请求之后底下那块盘一个字节都没变。
+        disk_below_is_unchanged: bool,
+    }
+
+    /// 物理块 `physical_block_size`、`blocks_of_the_disk` 块、图样种子 `seed` 的盘上跑 [`REQUESTS_OF_THE_RANDOM_STREAM`] 个随机请求。
+    fn random_request_stream_against_a_device_written_through(
+        physical_block_size: PhysicalBlockSizeInBytes,
+        blocks_of_the_disk: u64,
+        seed: u8,
+    ) -> RandomRequestStreamAgainstADeviceWrittenThrough {
+        let disk = DeviceOfBytes::filled_with_a_pattern_on_blocks_of(
+            physical_block_size,
+            blocks_of_the_disk,
+            seed,
+        );
+        let bytes_before = disk.bytes.clone();
+        let device_size = disk.size_in_bytes();
+        let block_bytes = u64::from(physical_block_size.0);
+        let mut written_through = DeviceOfBytes::filled_with_a_pattern_on_blocks_of(
+            physical_block_size,
+            blocks_of_the_disk,
+            seed,
+        );
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let mut state = 1_u64;
+        let mut disagreements: Vec<String> = Vec::new();
+        let mut refused_requests = 0_u64;
+        let mut kept_writes = 0_u64;
+        // 迭代上界是请求个数；跨轮带着两块盘、随机数的状态与两个计数；没有提前出口。
+        for request_number in 1..=REQUESTS_OF_THE_RANDOM_STREAM {
+            let offset = DeviceOffsetInBytes(random_offset(&mut state, device_size, block_bytes));
+            let length = random_length(&mut state, device_size, block_bytes);
+            let length_in_memory = usize::try_from(length).expect("长度不过两倍盘长");
+            let (request, through, in_memory) = match next_random(&mut state) % 3 {
+                0 => {
+                    let mut through_buffer = vec![0xAA_u8; length_in_memory];
+                    let mut in_memory_buffer = vec![0xAA_u8; length_in_memory];
+                    let through = written_through.read_at(offset, &mut through_buffer);
+                    let in_memory = kept.read_at(offset, &mut in_memory_buffer);
+                    if through_buffer != in_memory_buffer {
+                        disagreements.push(format!(
+                            "第 {request_number} 个请求（读 {} 起 {length} 字节）：读回的字节不同",
+                            offset.0
+                        ));
+                    }
+                    ("读", through, in_memory)
+                }
+                1 => {
+                    let bytes: Vec<u8> = (0..length_in_memory)
+                        .map(|_| u8::try_from(next_random(&mut state) % 256).expect("小于 256"))
+                        .collect();
+                    (
+                        "写",
+                        written_through.write_at(offset, &bytes, WriteDurability::Plain),
+                        kept.write_at(offset, &bytes, WriteDurability::ForceUnitAccess),
+                    )
+                }
+                _ => (
+                    "写零",
+                    written_through.write_zeroes_at(offset, length),
+                    kept.write_zeroes_at(offset, length),
+                ),
+            };
+            let (through_returned, in_memory_returned) =
+                (format!("{through:?}"), format!("{in_memory:?}"));
+            if through_returned != in_memory_returned {
+                disagreements.push(format!(
+                    "第 {request_number} 个请求（{request} {} 起 {length} 字节）：写穿的盘交回 {through_returned}，只进内存的盘交回 {in_memory_returned}",
+                    offset.0
+                ));
+            }
+            match through {
+                Ok(()) => kept_writes += u64::from(request != "读"),
+                Err(_) => refused_requests += 1,
+            }
+            if next_random(&mut state).is_multiple_of(50) {
+                kept.barrier().expect("屏障什么都不做");
+            }
+        }
+        let mut whole_disk =
+            vec![0xAA_u8; usize::try_from(device_size).expect("盘长装得进 usize")];
+        kept.read_at(DeviceOffsetInBytes(0), &mut whole_disk)
+            .expect("整盘一次读：对齐、没越过盘尾");
+        RandomRequestStreamAgainstADeviceWrittenThrough {
+            disagreements,
+            refused_requests,
+            kept_writes,
+            whole_disk_reads_back_as_written_through: whole_disk == written_through.bytes,
+            disk_below_is_unchanged: disk.bytes == bytes_before,
+        }
+    }
+
+    /// 物理块 512 字节的盘上：只进内存的盘与写穿的盘逐个请求交回值、读回的字节相同，整盘读回相同，底下那块盘一字不动。
+    #[test]
+    fn the_device_keeping_writes_in_memory_agrees_with_a_device_written_through_on_a_random_request_stream(
+    ) {
+        let stream = random_request_stream_against_a_device_written_through(
+            PhysicalBlockSizeInBytes(PHYSICAL_BLOCK_BYTES),
+            BLOCKS_OF_THE_DISK,
+            23,
+        );
+        assert!(
+            stream.disagreements.is_empty(),
+            "每个请求两边交回值与读回的字节相同，而 {} 个对不上，头几个：{:?}",
+            stream.disagreements.len(),
+            stream.disagreements.iter().take(5).collect::<Vec<_>>()
+        );
+        assert!(
+            stream.refused_requests > 0 && stream.kept_writes > 0,
+            "这一串里既有被拒的请求，也有做成的写与写零（阳性对照）：拒 {} 个、写 {} 个",
+            stream.refused_requests,
+            stream.kept_writes
+        );
+        assert!(
+            stream.whole_disk_reads_back_as_written_through,
+            "整盘读回与写穿的那块盘相同"
+        );
+        assert!(
+            stream.disk_below_is_unchanged,
+            "一串写之后底下那块盘一个字节都没变"
+        );
+    }
+
+    /// 物理块 4096 字节的盘（正推 `research/prompts/m3-batch10z-vw-code-r1-sonnet-output.md` K2：入库用例原来只在 512 的盘上，
+    /// 判据里把物理块写死 512 照绿）：同一串随机请求按 4096 的块取偏移与长度，两边逐个请求相同、整盘读回相同、底下那块盘一字不动。
+    #[test]
+    fn the_device_keeping_writes_in_memory_on_4096_byte_physical_blocks_agrees_with_a_device_written_through_on_a_random_request_stream(
+    ) {
+        let stream = random_request_stream_against_a_device_written_through(
+            PhysicalBlockSizeInBytes(FOUR_KIBIBYTE_PHYSICAL_BLOCK_BYTES),
+            BLOCKS_OF_THE_DISK,
+            29,
+        );
+        assert!(
+            stream.disagreements.is_empty(),
+            "每个请求两边交回值与读回的字节相同，而 {} 个对不上，头几个：{:?}",
+            stream.disagreements.len(),
+            stream.disagreements.iter().take(5).collect::<Vec<_>>()
+        );
+        assert!(
+            stream.refused_requests > 0 && stream.kept_writes > 0,
+            "这一串里既有被拒的请求，也有做成的写与写零（阳性对照）：拒 {} 个、写 {} 个",
+            stream.refused_requests,
+            stream.kept_writes
+        );
+        assert!(
+            stream.whole_disk_reads_back_as_written_through,
+            "整盘读回与写穿的那块盘相同"
+        );
+        assert!(
+            stream.disk_below_is_unchanged,
+            "一串写之后底下那块盘一个字节都没变"
+        );
+    }
+
+    /// 4096 字节的物理块。
+    const FOUR_KIBIBYTE_PHYSICAL_BLOCK_BYTES: u32 = 4096;
+
+    /// 物理块 4096 字节的盘上，落在 512 字节边界上、不在 4096 边界上的请求（偏移或长度）照两个后端那一份判据拒成 `Unaligned`、
+    /// 带 4096 这个物理块，一个块都不记；同一块盘上按 4096 对齐的写读得回来。判据里物理块写死 512 时这几个请求都放行。
+    #[test]
+    fn requests_on_512_byte_boundaries_off_the_4096_byte_physical_blocks_are_refused_before_anything_is_kept(
+    ) {
+        let block = PhysicalBlockSizeInBytes(FOUR_KIBIBYTE_PHYSICAL_BLOCK_BYTES);
+        let block_bytes = u64::from(FOUR_KIBIBYTE_PHYSICAL_BLOCK_BYTES);
+        let disk = DeviceOfBytes::filled_with_a_pattern_on_blocks_of(block, BLOCKS_OF_THE_DISK, 31);
+        let mut kept = DeviceKeepingWritesInMemory::over_the_disk(&disk);
+        let one_block = vec![0x3C_u8; usize::try_from(block_bytes).expect("一块装得进 usize")];
+        let one_sector = vec![0x3C_u8; 512];
+        let offset_on_a_sector_inside_block_one = DeviceOffsetInBytes(block_bytes + 512);
+        let refusals = [
+            (
+                "偏移在 512 边界上、不在 4096 边界上的写",
+                kept.write_at(
+                    offset_on_a_sector_inside_block_one,
+                    &one_block,
+                    WriteDurability::Plain,
+                ),
+                offset_on_a_sector_inside_block_one,
+                block_bytes,
+            ),
+            (
+                "长度 512 的写",
+                kept.write_at(
+                    DeviceOffsetInBytes(2 * block_bytes),
+                    &one_sector,
+                    WriteDurability::Plain,
+                ),
+                DeviceOffsetInBytes(2 * block_bytes),
+                512,
+            ),
+            (
+                "长度 512 的写零",
+                kept.write_zeroes_at(DeviceOffsetInBytes(3 * block_bytes), 512),
+                DeviceOffsetInBytes(3 * block_bytes),
+                512,
+            ),
+            (
+                "偏移在 512 边界上、不在 4096 边界上的读",
+                kept.read_at(offset_on_a_sector_inside_block_one, &mut vec![0_u8; 512]),
+                offset_on_a_sector_inside_block_one,
+                512,
+            ),
+        ];
+        for (request, outcome, offset, length) in refusals {
+            assert!(
+                matches!(
+                    outcome,
+                    Err(BlockDeviceError::Unaligned {
+                        offset: refused_offset,
+                        length: refused_length,
+                        physical_block_size: FOUR_KIBIBYTE_PHYSICAL_BLOCK_BYTES,
+                    }) if refused_offset == offset && refused_length == length
+                ),
+                "{request}：拒成 Unaligned，带偏移 {}、长度 {length} 与物理块 4096，而交回 {outcome:?}",
+                offset.0
+            );
+        }
+        kept.write_at(
+            DeviceOffsetInBytes(5 * block_bytes),
+            &one_block,
+            WriteDurability::Plain,
+        )
+        .expect("按 4096 对齐的一块写做得成（阳性对照）");
+        let mut expected = disk.bytes.clone();
+        let start_of_block_five = usize::try_from(5 * block_bytes).expect("偏移装得进 usize");
+        expected[start_of_block_five..start_of_block_five + one_block.len()]
+            .copy_from_slice(&one_block);
+        let mut whole_disk = vec![0xAA_u8; disk.bytes.len()];
+        kept.read_at(DeviceOffsetInBytes(0), &mut whole_disk)
+            .expect("整盘一次读：对齐、没越过盘尾");
+        assert!(
+            whole_disk == expected,
+            "被拒的请求一个块都没记：整盘读回只有按 4096 对齐写的那一块是写进去的"
+        );
+    }
+
+    /// 「被宽护卡住」那一份报拷下的这次改动（[`UserChangeKeptByTheRefusal`]），要出路时读回成交给预演的改动，与被拒那一次交进来的改动
+    /// 逐项相同：种类、内容全长、写入时间、inode、个数（正推 `research/prompts/m3-batch10z-vw-code-r1-sonnet-output.md` K3-3：
+    /// 记错这几项的 8 种改坏原来照绿，其中读回时把覆盖写当顺序写那一种只在读回这一步，报的 `{:?}` 看不出来）。
+    #[test]
+    fn each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in() {
+        let overwrite_content: Vec<u8> = (0..2999_u32)
+            .map(|position| u8::try_from(position % 241).expect("小于 256"))
+            .collect();
+        let sequential_write_content: Vec<u8> = (0..5003_u32)
+            .map(|position| u8::try_from((position * 7) % 239).expect("小于 256"))
+            .collect();
+        let changes_handed_in = [
+            UserChange::Overwrite(FirstFile {
+                content: &overwrite_content,
+                write_time_seconds: 1_000_003,
+            }),
+            UserChange::SequentialWrite(FirstFile {
+                content: &sequential_write_content,
+                write_time_seconds: 1_000_007,
+            }),
+            UserChange::NewInodes {
+                count: 37,
+                write_time_seconds: 1_000_011,
+            },
+            UserChange::Unlink {
+                inode: InodeNumber(4_099),
+                write_time_seconds: 1_000_013,
+            },
+        ];
+        for change_handed_in in changes_handed_in {
+            let kept = UserChangeKeptByTheRefusal::kept_from(change_handed_in);
+            assert_eq!(
+                format!("{:?}", kept.as_user_change()),
+                format!("{change_handed_in:?}"),
+                "拷下的改动读回成被拒那一次交进来的改动（种类、内容全长、写入时间、inode、个数逐项相同）"
+            );
+        }
     }
 }

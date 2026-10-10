@@ -2,7 +2,7 @@
 //! 崩溃放量流水线在里程碑「覆盖写、释放、回退与复用」的整条固定脚本上（步 0 到步 5：取号加暖机 → 新池新建文件 A → 覆盖写 B →
 //! 重开可写挂载（取号、写行、暖机两次）→ 覆盖写 C → 挂着回退到 A（D）→ 五次覆盖写（txg 10–14）→ 抬 F 到 11（两次空发布 txg 15、16）→
 //! 复用 E（txg 17，数据单元落回 50176）→ 正常卸载（先写 F、两次带卸载记号的空发布 txg 18、19））：与层 0 全量跑的那条流同一条
-//! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，78 段、477 次写、19 条根槽写）。
+//! （`crash_enumeration_fixed_script_stream.rs` 的 `ReuseAfterRaisingFloorThenNormalUnmount`，78 段、481 次写、19 条根槽写）。
 //! 入口都由 `common_crash_points` 设点，前 36 个点与到 D 那条测试共享。展开上限 `SINGLEFS_CRASH_AMPLIFICATION_EXPAND_UP_TO`（默认 6），
 //! 28 及以上就是全域（`exhaustive=true`）。要 `verdict-store` 特性。
 #![cfg(feature = "verdict-store")]
@@ -180,15 +180,15 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         sizes,
         vec![
             2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
-            2, 24, 2, 1, 2, 20, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2,
+            2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2,
             1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2
         ],
         "固定脚本到 E 再正常卸载的段序列（与 crash_enumeration_fixed_script_stream 登记的相同）"
     );
     assert_eq!(
         writes.len(),
-        191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
-        "到 D 191 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
+        195 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
+        "到 D 195 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
     );
     let crash_points = recorder.into_crash_points(&writes, &segments, &stream_indexes);
     assert_eq!(crash_points.len(), segments.len(), "每个屏障段一个崩溃点");
@@ -209,7 +209,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
             ("publish_overwrite", 29),
             ("mount_writable", 67),
             ("publish_overwrite", 29),
-            ("roll_back_by_a_forward_publish", 25),
+            ("roll_back_by_a_forward_publish", 29),
             ("publish_overwrite", 33 * 5),
             ("raise_rollback_floor", 44),
             ("publish_overwrite", 33),
@@ -257,7 +257,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
             "publish_overwrite.journal_record.1",
             "publish_overwrite.root_record_fua.1",
             "publish_overwrite.system_configuration_slot.1",
-            "roll_back_by_a_forward_publish.index_node.1",
+            "roll_back_by_a_forward_publish.index_node+packed_records.1",
             "roll_back_by_a_forward_publish.journal_record.1",
             "roll_back_by_a_forward_publish.root_record_fua.1",
             "roll_back_by_a_forward_publish.system_configuration_slot.1",
@@ -333,6 +333,7 @@ fn the_whole_fixed_script_through_the_unmount_is_recorded_checked_in_parallel_an
         segments: &segments,
         judged_root_index,
         versions: &versions,
+        versions_without_a_file: &[],
         expansion: &expansion,
         crash_points,
     };

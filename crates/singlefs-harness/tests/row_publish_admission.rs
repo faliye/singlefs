@@ -172,7 +172,9 @@ fn writable_mount_on_a_pool_past_the_former_allocation_record_wall_succeeds(
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert_eq!(violated, Vec::new(), "挂载之后池级 checker 全绿");

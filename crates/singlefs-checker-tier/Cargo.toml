@@ -10,6 +10,8 @@ singlefs-checker = { path = "../singlefs-checker" }
 singlefs-core = { path = "../singlefs-core" }
 singlefs-format = { path = "../singlefs-format" }
 singlefs-harness = { path = "../singlefs-harness" }
+# RefFS（D13（验证路线） 已定项 3，E171 第 1 次重跑登记修订 2 第 2.3 节）：checker 档的装置只读它、只调它判允许集合，不改它的源码，它的依赖闭包与单测归它自己（harness 档）。
+singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }
 # 崩溃放量的判定存储（src/verdict_store.rs，里程碑三第十一项；用户 2026-09-28 选 RocksDB）。版本钉成与 research/Cargo.lock 相同，
 # E162（崩溃放量判定块存储选型） K 臂杀进程量的就是这一版，默认特性也照那边不动（K 臂用的 LZ4 压缩在默认特性里）。
 # 只进 checker 档：harness 档、池级 checker、core 都不依赖它（.claude/rules/verification.md「定义与名字」，门禁 94 号）。

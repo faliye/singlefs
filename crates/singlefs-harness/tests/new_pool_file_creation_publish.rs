@@ -177,6 +177,13 @@ fn build_pool(tag: &str) -> BuiltPool {
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &parameters,
+            &genesis,
+        ),
+    );
     let content = file_content();
     // 暖机两次发布之后录制流有几步：新池新建文件的写从这之后起（量出来，不按新池新建文件写几步倒推）。
     let warm_up_operation_count;
@@ -266,6 +273,7 @@ fn unit_length(identity: TransactionUnit) -> usize {
         | TransactionUnit::InodeLeafContainer(_)
         | TransactionUnit::TombstoneLeafContainer(_)
         | TransactionUnit::LineageLeafContainer(_)
+        | TransactionUnit::RetirementLeafContainer(_)
         | TransactionUnit::InstanceTable
         | TransactionUnit::InstanceTablePageAfterTheFirst(_) => 32768,
         TransactionUnit::ExtentRoot
@@ -283,6 +291,8 @@ fn unit_length(identity: TransactionUnit) -> usize {
         | TransactionUnit::TombstoneNodeBelowTheRoot(_)
         | TransactionUnit::LineageRoot
         | TransactionUnit::LineageNodeBelowTheRoot(_)
+        | TransactionUnit::RetirementRoot
+        | TransactionUnit::RetirementNodeBelowTheRoot(_)
         | TransactionUnit::TreeTable => 16384,
     }
 }
@@ -449,8 +459,8 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
         (3, 1, TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, 0)
     );
     assert_eq!(
-        newest.tree_identifier_watermark, 65548,
-        "D8 已定项 11：第一个文件版本那次之后树 ID 水位是 65548"
+        newest.tree_identifier_watermark, 65549,
+        "D8 已定项 11：第一个文件版本那次之后树 ID 水位是 65549（十三棵树 65536..65548，退役树是第 50 批加的）"
     );
     assert_eq!(newest.record_bytes, pool.output.root.to_slot(512)[..457]);
     for (region, expected_txg) in [(1u64, 1u64), (2, 2)] {
@@ -559,8 +569,8 @@ fn root_slots_system_configurations_and_journal_ring_hold_the_published_state() 
             );
             assert_eq!(
                 (view.new_tree_identifier_watermark, view.new_rollback_floor),
-                (65548, 0),
-                "新根段带的水位：十二棵树 65536..65547 之后是 65548（D8 已定项 11）"
+                (65549, 0),
+                "新根段带的水位：十三棵树 65536..65548 之后是 65549（D8 已定项 11）"
             );
             assert_eq!(
                 view.back_chain, E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION,
@@ -688,8 +698,11 @@ fn every_index_node_self_checks_with_tight_ascending_keys_and_merkle_checksums_h
             | TransactionUnit::TombstoneNodeBelowTheRoot(_)
             | TransactionUnit::LineageLeafContainer(_)
             | TransactionUnit::LineageRoot
-            | TransactionUnit::LineageNodeBelowTheRoot(_) => {
-                unreachable!("新池新建文件不删除、不回退：删除那两棵树与谱系树零根")
+            | TransactionUnit::LineageNodeBelowTheRoot(_)
+            | TransactionUnit::RetirementLeafContainer(_)
+            | TransactionUnit::RetirementRoot
+            | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
+                unreachable!("新池新建文件不删除、不回退：删除那两棵树、谱系树与退役树零根")
             }
         };
         match declared_key_range {
@@ -1189,8 +1202,8 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
     }
     assert_eq!(
         value_of(STATISTIC_COMMITTED_RESERVATION_BYTES),
-        2 * ((2 + 1) * 16384 + 41),
-        "已承诺预留（标签 6）按这一版现算：两份副本 × (3 槽常驻 + 41 字节 × 一个活对象)（D3 已定项 2，layout/03「记账标签 6 的值」）"
+        2 * ((2 + 1 + 2 + 1) * 16384 + 41 + 35),
+        "已承诺预留（标签 6）按这一版现算：两份副本 × (墓碑 3 槽 + 退役 3 槽常驻 + 41 字节 × 一个活对象 + 35 字节 × 一条 inode 记录)（D3 已定项 2，layout/03「记账标签 6 的值」；退役那一份是判决 m3-retire-r1 第三节第 6 条）"
     );
     assert_eq!(
         value_of(STATISTIC_DEFER_QUEUE_BYTES),
@@ -1231,36 +1244,148 @@ fn allocation_and_accounting_trees_carry_the_byte_table_numbers() {
     assert_eq!(pool.output.key_order_mismatches, 0);
 }
 
-/// 树表 11 条（D18（块里携带什么信息） 已定项 24 第 6 条：7 → 11，`deleted_inodes`、墓碑树、谱系树、logged_ops 零根注册），
+/// D3（空间分配） 已定项 10 ⑤ 那张落点表给分配记录树五个节点（t5–t9）写的出生序号 0..4（C686）：按位置先叶后根、同层按 key 升序 bump，
+/// 出生序号按同一个次序发（D19（块指针的结构与宽度预算） 已定项 9）。每个节点两块盘上的两份逐字节相同，头里的树 ID、层级、出生序号与表里那一行相同；
+/// 树表条目与父节点条目里指向它的指针，落点与出生序号也与表里那一行相同；两片叶里的记录各是表里写的那块盘的。
+#[test]
+fn allocation_record_tree_nodes_carry_birth_sequences_zero_to_four_as_the_bump_order_table_lists() {
+    let pool = build_pool("allocation-birth-sequences");
+    // (表里那一行, 落点, 层级, 出生序号, 罩哪块盘)：照 D3 已定项 10 ⑤ 的表逐行抄；根罩两块盘，记 `None`。
+    let bump_order_table: [(&str, u64, u8, u32, Option<DeviceIdentity>); 5] = [
+        (
+            "t5 分配记录树叶，设备 0",
+            50245,
+            0,
+            0,
+            Some(DeviceIdentity(0)),
+        ),
+        (
+            "t6 分配记录树叶，设备 1",
+            50246,
+            0,
+            1,
+            Some(DeviceIdentity(1)),
+        ),
+        (
+            "t7 分配记录树层级 1 节点，设备 0",
+            50247,
+            1,
+            2,
+            Some(DeviceIdentity(0)),
+        ),
+        (
+            "t8 分配记录树层级 1 节点，设备 1",
+            50248,
+            1,
+            3,
+            Some(DeviceIdentity(1)),
+        ),
+        ("t9 分配记录树根，层级 2", 50249, 2, 4, None),
+    ];
+    for (row, slot, level, birth_sequence, covered_device) in bump_order_table {
+        let copy_on_device_zero = read_unit_from(&pool, DeviceIdentity(0), SlotNumber(slot), 16384);
+        let copy_on_device_one = read_unit_from(&pool, DeviceIdentity(1), SlotNumber(slot), 16384);
+        assert_eq!(
+            copy_on_device_zero, copy_on_device_one,
+            "{row}：两块盘上的两份逐字节相同"
+        );
+        let view = index_node_view(&copy_on_device_zero).expect("分配记录树节点");
+        assert_eq!(
+            (view.tree_identifier, view.level, view.birth_sequence),
+            (
+                singlefs_format::TREE_IDENTIFIER_ALLOCATION_RECORDS,
+                level,
+                birth_sequence
+            ),
+            "{row}：头里的树 ID、层级、出生序号与 D3 已定项 10 ⑤ 的落点表相同"
+        );
+        if level == 0 {
+            let devices_of_the_records: BTreeSet<DeviceIdentity> = view
+                .entries
+                .iter()
+                .map(|bytes| {
+                    AllocationRecord::parse(bytes)
+                        .expect("分配记录树叶的条目是 20 字节的分配记录（同文件分配记录树那条用例钉过条目宽）")
+                        .device
+                })
+                .collect();
+            assert_eq!(
+                devices_of_the_records.into_iter().collect::<Vec<_>>(),
+                covered_device.into_iter().collect::<Vec<_>>(),
+                "{row}：叶里的记录全是表里写的那块盘的"
+            );
+            continue;
+        }
+        let children: Vec<(u64, u32)> = view
+            .entries
+            .iter()
+            .map(|entry| {
+                let child = NodePointer::read_from(&mut ByteReader::at(entry, 10));
+                (child.locations[0].slot.0, child.birth_sequence.0)
+            })
+            .collect();
+        let children_in_the_table: Vec<(u64, u32)> = bump_order_table
+            .iter()
+            .filter(|(_, _, child_level, _, child_device)| {
+                *child_level + 1 == level
+                    && covered_device.is_none_or(|device| *child_device == Some(device))
+            })
+            .map(|(_, child_slot, _, child_birth_sequence, _)| (*child_slot, *child_birth_sequence))
+            .collect();
+        assert_eq!(
+            children, children_in_the_table,
+            "{row}：条目里孩子指针的落点与出生序号是表里低一层、同一块盘那几行的"
+        );
+    }
+    let allocation_entry = tree_table_entries_from_disk(&pool)
+        .into_iter()
+        .find(|entry| entry.tree.0 == singlefs_format::TREE_IDENTIFIER_ALLOCATION_RECORDS)
+        .expect("分配记录树");
+    assert_eq!(
+        (
+            allocation_entry.root.locations[0].slot.0,
+            allocation_entry.root.birth_sequence.0
+        ),
+        (50249, 4),
+        "树表条目里分配记录树的根指针指着表里 t9 那一行"
+    );
+}
+
+/// 树表 12 条（D18（块里携带什么信息） 已定项 24 第 6 条：7 → 11，`deleted_inodes`、墓碑树、谱系树、logged_ops 零根注册；
+/// 退役树 11 → 12，判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条），
 /// 树 ID、种类码、头 ID 三列逐条钉条款登记的值：树 ID 从 65536 起（D8（核心索引结构） 已定项 11），种类码 9..12 接在 8 之后（已定项 9），
 /// 头 ID 照已定项 8 / D5（快照 / 空间记账机制） 已定项 9（inode 树、extent 树、`deleted_inodes`、墓碑树写 inode 树的树 ID 65537，其余 0）；后四条根指针全零。
 #[test]
-fn tree_table_holds_eleven_entries_keyed_by_tree_identifier() {
+fn tree_table_holds_twelve_entries_keyed_by_tree_identifier() {
     let pool = build_pool("treetable");
     let entries = tree_table_entries_from_disk(&pool);
-    assert_eq!(entries.len(), 11, "D18 已定项 24 第 6 条：树表 7 → 11 条");
+    assert_eq!(
+        entries.len(),
+        12,
+        "D18 已定项 24 第 6 条树表 7 → 11 条，退役树（判决 m3-retire-r1 第三节第 1 条）11 → 12 条"
+    );
     assert_eq!(
         entries.iter().map(|entry| entry.tree.0).collect::<Vec<_>>(),
-        vec![65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547],
-        "D8 已定项 11：树 ID 从 65536 起，中央映射树 65540 不进树表"
+        vec![65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547, 65548],
+        "D8 已定项 11：树 ID 从 65536 起，中央映射树 65540 不进树表，退役树 65548 排最后"
     );
     assert_eq!(
         entries.iter().map(|entry| entry.kind).collect::<Vec<_>>(),
-        vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12]
+        vec![1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13]
     );
     assert_eq!(
         entries
             .iter()
             .map(|entry| entry.head_identifier)
             .collect::<Vec<_>>(),
-        vec![65537, 65537, 0, 0, 0, 0, 0, 65537, 65537, 0, 0],
-        "D8 已定项 8 头 ID：inode 树、extent 树、deleted_inodes、墓碑树写 inode 树的树 ID，谱系树、logged_ops 与其余写 0"
+        vec![65537, 65537, 0, 0, 0, 0, 0, 65537, 65537, 0, 0, 65537],
+        "D8 已定项 8 头 ID：inode 树、extent 树、deleted_inodes、墓碑树、退役树写 inode 树的树 ID，谱系树、logged_ops 与其余写 0"
     );
     assert!(
         entries[7..]
             .iter()
             .all(|entry| entry.root == NodePointer::empty_root()),
-        "四棵新树零根注册：根指针全零"
+        "五棵新树零根注册：根指针全零"
     );
     assert!(entries
         .iter()
@@ -1269,8 +1394,8 @@ fn tree_table_holds_eleven_entries_keyed_by_tree_identifier() {
     let tree_table_unit = &pool.output.unit(TransactionUnit::TreeTable).bytes;
     assert_eq!(
         u16::from_le_bytes([tree_table_unit[8], tree_table_unit[9]]),
-        2200,
-        "声明长度 11 × 200"
+        2400,
+        "声明长度 12 × 200"
     );
     let view = index_node_view(tree_table_unit).expect("树表单元");
     assert_eq!(
@@ -1278,7 +1403,7 @@ fn tree_table_holds_eleven_entries_keyed_by_tree_identifier() {
         (0, 0, 0)
     );
     assert_eq!(view.smallest_key, 65536u64.to_le_bytes());
-    assert_eq!(view.largest_key, 65547u64.to_le_bytes());
+    assert_eq!(view.largest_key, 65548u64.to_le_bytes());
     // mkfs 的第 0 版树表还在原槽、0 条：COW 出新版本，不改旧的。
     let genesis_unit = read_unit_from(&pool, DeviceIdentity(0), TREE_TABLE_GENESIS_SLOT, 16384);
     assert_eq!(genesis_unit, pool.genesis.tree_table_genesis_unit);

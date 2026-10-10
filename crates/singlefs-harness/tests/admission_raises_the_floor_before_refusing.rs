@@ -274,13 +274,18 @@ fn an_unlink_whose_last_batch_and_the_floor_raise_pushed_for_it_both_find_no_unb
 }
 
 /// 挂载续做那两条的窄盘：不为环窗口补足（准入关着造盘面，`start_on_narrow_devices_without_the_ring_window_allowance_with_the_space_admission_switched_off`）、
-/// 单元区 256 槽；第一个文件之后覆盖写 [`OVERWRITES_BEFORE_THE_CONTINUATION`] 次，再顺序写把它长到 [`DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION`] 个数据单元。
-/// 第十位实现员副本上的草稿探针（单元区 192 / 256 / 320 / 384 槽 × 覆盖写 0–12 次 × 长到 1–14 个单元 × 崩在意图之后或第一批之后，逐格现跑）：
-/// 256 槽、覆盖写 2 次、14 个单元那一格崩在意图之后是「取号之前那一判放行、续做里一批被落得下那一判拒、推一串之后做成」，
-/// 崩在第一批之后是「续做推不出空间、挂载交回错」。
-const UNIT_AREA_SLOTS_OF_THE_NARROW_DEVICES_FOR_THE_CONTINUATION: u64 = 256;
-const OVERWRITES_BEFORE_THE_CONTINUATION: usize = 2;
-const DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION: usize = 14;
+/// 单元区 292 槽；第一个文件之后覆盖写 [`OVERWRITES_BEFORE_THE_CONTINUATION`] 次，再顺序写把它长到 [`DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION`] 个数据单元。
+/// 第十位实现员副本上的草稿探针（单元区 192 / 256 / 320 / 384 槽 × 覆盖写 0–12 次 × 长到 1–14 个单元 × 崩在意图之后或第一批之后，逐格现跑）定的是
+/// 256 槽、覆盖写 2 次、14 个单元；第 50 批退役树进准入之后挂载那一判每块盘多扣约 42 槽（标签 6 退役 3 槽、ckpt_cost 退役 3 块进保留池、切换预留跟着涨），
+/// 那一格崩在意图之后变成「取号之前就不够、先推一串」。第 50 批补做重扫（单元区 256–304 槽每 4 槽 × 覆盖写 0–4 次 × 长到 10–24 个单元 ×
+/// 崩在意图之后、第一批之后、第二批之后，逐格现跑）：292 槽、覆盖写 1 次、16 个单元那一格崩在意图之后是「取号之前那一判放行、续做里一批被落得下那一判拒、
+/// 推一串两次空发布之后走完」，崩在第一批之后是「取号之前放行、续做推不出空间、挂载照样做成可写」，不先覆盖写、崩在第二批之后是「续做走到空、一串都没推」——
+/// 三种场景同在一格的，256–304 槽里只有这一格。
+const UNIT_AREA_SLOTS_OF_THE_NARROW_DEVICES_FOR_THE_CONTINUATION: u64 = 292;
+const OVERWRITES_BEFORE_THE_CONTINUATION: usize = 1;
+const DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION: usize = 16;
+/// 单元区 192 槽那几条（准入与续做都推过抬 F）的文件单元数：它们的造形没随第 50 批改，仍是 14 个单元。
+const DATA_UNITS_OF_THE_FILE_ON_THE_192_SLOT_DEVICES: usize = 14;
 
 /// 删除批大小 1 个数据单元（只供测试的开关，挂载的开关链装上去，续做照它）。
 fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
@@ -290,6 +295,8 @@ fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
         ),
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity:
+            singlefs_core::retirement_tree::RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     }
 }
@@ -386,9 +393,9 @@ fn mount_after_the_crash_with_batches_of_one(
 }
 
 /// 挂载续做里删除的一批被落得下那一判拒、推一串抬 F、回收之后接着走（用户 2026-10-03 定案「挂载续做被空间拒：同样推抬 F 再试」，
-/// 与会话那一处同一个做法）：窄盘上 14 个单元的文件发完意图就崩（队列一条、单元都在），重开、准入判着、删除批大小 1。
+/// 与会话那一处同一个做法）：窄盘上 16 个单元的文件发完意图就崩（队列一条、单元都在），重开、准入判着、删除批大小 1。
 /// 取号之前那一判放行；写行与暖机之后续做，走到一半一批被落得下那一判拒（`SpaceAdmissionRefused`；删除类发布不判式子那一判），
-/// 推一串两次空发布的抬 F（插在续做的两步之间）、回收之后接着走，14 步走完：挂载交回的现行那一版有树而文件集合为空、队列空，F 抬上去了，
+/// 推一串两次空发布的抬 F（插在续做的两步之间）、回收之后接着走，16 步走完：挂载交回的现行那一版有树而文件集合为空、队列空，F 抬上去了，
 /// 池级 checker 全绿。
 /// 判别力：续做里不推（这一条定案之前的做法）时挂载交回 `MountError::Publish { cause: SpaceAdmissionRefused }`。
 #[test]
@@ -420,8 +427,8 @@ fn a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_
                 .collect::<Vec<_>>(),
             output.deletion_queue_continuation.len(),
         ),
-        (vec!["SpaceAdmissionRefused"], vec![2], 14),
-        "续做里推过一串（两次空发布），推它的是一批的落得下那一判；续做走了 14 步"
+        (vec!["SpaceAdmissionRefused"], vec![2], 16),
+        "续做里推过一串（两次空发布），推它的是一批的落得下那一判；续做走了 16 步"
     );
     let first_raise_txg = output.floor_raises_pushed_by_the_continuation[0].publishes[0]
         .root
@@ -461,11 +468,11 @@ fn a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_
 /// 推满仍放不下（用户 2026-10-03 定「照 D16 做成可写」：挂载照样做成可写、队列留着）：同一份窄盘造法，发完意图与第一批才崩，重开、准入判着、
 /// 删除批大小 1。续做里一批被落得下那一判拒，为它推的那一串推不出空间（一串都没推成，F 没动）：挂载照样交回可写，
 /// 续做停在 `StillShortAfterTheFloorRaises`、最后那一次被拒是落得下那一判，现行那一版的队列还留着第一个文件；
-/// 挂着时一次用户改动先走空、走不动报空间不够（一版都没发成、盘不动）。挂载写下的 13 次发布（写行、暖机与续做发成的几步）留在盘上：
+/// 挂着时一次用户改动先走空、走不动报空间不够（一版都没发成、盘不动）。挂载写下的 17 次发布（写行、暖机与续做发成的几步）留在盘上：
 /// 只读挂载走的是挂载最后落盘的那一版，第一个文件仍在删除中（打开它答「没有文件」）。
 /// 正常卸载照常做成（用户 2026-10-03 定甲 GA，`m3-unlink-code-r3-forks`）：槽被续做吃光了，卸载那一串的预演算上新 F 回收出来、当场放开的那一截
 /// （释放代不高于每块盘上最新有效根的那几个槽），
-/// 抬 F 到现行那一版、两次空发布；之后池级 checker 全绿，再挂可写、续做接着走到空（两步）。
+/// 抬 F 到现行那一版、两次空发布；之后池级 checker 全绿，再挂可写、续做接着走到空（一步）。
 /// 判别力：推满仍放不下照旧交回 `MountError::Publish`（这一条定案之前的做法）、或结局报成 `WalkedToEmpty`，挂载那一步就红；
 /// 卸载回收的槽照旧整截扣到生效（`ReuseOfTheSlotsReclaimedByTheSequence::HeldUntilFloorTakesEffect`）时卸载在预演里取不到落点，卸载那一步红。
 #[test]
@@ -532,8 +539,8 @@ fn a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_ma
             read_only.effective_root.checkpoint_txg.0 - root_at_the_crash.checkpoint_txg.0,
             read_only.effective_root.rollback_floor.0 - root_at_the_crash.rollback_floor.0,
         ),
-        (13, 0),
-        "挂载写下的 13 次发布（写行、暖机与续做发成的几步）留在盘上；为那一批推的抬 F 一串都没推成，F 没动"
+        (17, 0),
+        "挂载写下的 17 次发布（写行、暖机与续做发成的几步）留在盘上；为那一批推的抬 F 一串都没推成，F 没动"
     );
     assert!(
         matches!(
@@ -587,8 +594,8 @@ fn a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_ma
             remounted.output.deletion_queue_continuation.len(),
             member_name_of(&remounted.current)
         ),
-        (2, "WithTreesAndNoFile"),
-        "再挂之后续做走了两步、走到有树而文件集合为空的一版"
+        (1, "WithTreesAndNoFile"),
+        "再挂之后续做走了一步、走到有树而文件集合为空的一版"
     );
     drop(remounted);
     assert_eq!(
@@ -682,8 +689,8 @@ fn after_a_mount_whose_continuation_stays_short_the_next_mount_is_refused_by_the
 }
 
 /// 续做走到空、F 一次都没抬、可删的单元都还在 defer 里的盘面上卸载（攻方 `m3-unmount-after-short-continuation-r1` 表 A 那 9 格的形：
-/// 卸载被拒不绑队列）：单元区 256 槽、不先覆盖写、14 个单元，崩在意图与两批之后。重开、准入判着、删除批大小 1：取号之前那一判放行、
-/// 没推抬 F，续做 12 步走到空。挂载之后每块盘只剩 9 个没挡的空槽，卸载那一串三次空发布要 18 个——扣着回收出来的槽就在预演里取不到落点；
+/// 卸载被拒不绑队列）：单元区 292 槽、不先覆盖写、16 个单元，崩在意图与两批之后。重开、准入判着、删除批大小 1：取号之前那一判放行、
+/// 没推抬 F，续做 14 步走到空。挂载之后每块盘只剩 10 个没挡的空槽，卸载那一串两次空发布要 14 个——扣着回收出来的槽就在预演里取不到落点；
 /// 甲 GA 之下预演算上新 F 回收出来、当场放开的那一截，卸载做成、F 抬到现行那一版，池级 checker 全绿，再挂可写做成。
 /// 判别力：卸载回收的槽照旧扣到生效时卸载在预演里被拒，卸载那一步红。
 #[test]
@@ -713,8 +720,8 @@ fn a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmoun
             mounted.output.deletion_queue_continuation.len(),
             mounted.current.root().rollback_floor,
         ),
-        (0, 0, 12, root_at_the_crash.rollback_floor),
-        "准入与续做都没推抬 F、F 没动，续做 12 步走到空"
+        (0, 0, 14, root_at_the_crash.rollback_floor),
+        "准入与续做都没推抬 F、F 没动，续做 14 步走到空"
     );
     let free_slots_before_the_unmount: Vec<u64> = mounted
         .allocator
@@ -759,8 +766,8 @@ fn a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmoun
             slots_taken_by_the_unmount_sequence.len(),
             raised.rollback_floor,
         ),
-        (vec![9, 9], 18, current_txg),
-        "卸载之前每块盘 9 个空槽，那一串要 18 个；F 抬到现行那一版"
+        (vec![10, 10], 14, current_txg),
+        "卸载之前每块盘 10 个空槽，那一串要 14 个；F 抬到现行那一版"
     );
     assert!(
         slots_taken_by_the_unmount_sequence
@@ -1034,8 +1041,8 @@ fn assert_the_continuation_publish_error_accounts_for_every_landed_write(
     );
 }
 
-/// 准入推过抬 F 的起点（代码轮 V3 第一形）：单元区 256 槽、覆盖写 2 次、14 个单元、崩在第 7 批之后；取号之前不够、写行与暖机之后推了一串
-/// （三次空发布），续做 7 步、没再推。续做第二步的第一个写报块设备错：错里 6 份（写行、暖机、推的三次、续做第一步）= 落下的 6 个根槽写，
+/// 准入推过抬 F 的起点（代码轮 V3 第一形）：单元区 292 槽、覆盖写 1 次、16 个单元、崩在第 7 批之后；取号之前不够、写行与暖机之后推了一串
+/// （三次空发布），续做 9 步、没再推。续做第二步的第一个写报块设备错：错里 7 份（写行、暖机两次、推的三次、续做第一步）= 落下的 7 个根槽写，
 /// 写账合计 = 落下的写 − 取号两次（推的那一串先写系统配置那 2 个写在内）。
 /// 判别力：续做之前的写账去掉准入推的那几次空发布（攻方 MU1）时份数少 3；先写系统配置那一步不进错（改之前）时合计少 2。
 #[test]
@@ -1062,14 +1069,14 @@ fn a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_e
             output.floor_raises_pushed_by_the_continuation.len(),
             output.deletion_queue_continuation.len(),
         ),
-        (vec![3], 0, 7),
-        "起点：准入推了一串三次空发布，续做 7 步、没推"
+        (vec![3], 0, 9),
+        "起点：准入推了一串三次空发布，续做 9 步、没推"
     );
     let (_, publishes_before_the_failing_step) =
         writes_and_publishes_of_the_mount_before(&output, failing_step);
     assert_eq!(
-        publishes_before_the_failing_step, 6,
-        "写行、暖机、推的三次、续做第一步"
+        publishes_before_the_failing_step, 7,
+        "写行、暖机两次、推的三次、续做第一步"
     );
     assert_the_continuation_publish_error_accounts_for_every_landed_write(
         &refusal,
@@ -1079,8 +1086,8 @@ fn a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_e
     );
 }
 
-/// 续做里推过抬 F 的起点（代码轮 V3 第二形）：同一种盘崩在第 0 批之后（只发了意图）；续做 14 步，第 11 步之后被落得下那一判拒、推一串两次空发布、
-/// 回收之后接着走。推的那一串之后的第一步的第一个写报块设备错：错里 16 份（写行、暖机两次、续做 11 步、推的两次）= 落下的 16 个根槽写，
+/// 续做里推过抬 F 的起点（代码轮 V3 第二形）：同一种盘崩在第 0 批之后（只发了意图）；续做 16 步，第 14 步之后被落得下那一判拒、推一串两次空发布、
+/// 回收之后接着走。推的那一串之后的第一步的第一个写报块设备错：错里 19 份（写行、暖机两次、续做 14 步、推的两次）= 落下的 16 个根槽写，
 /// 写账合计 = 落下的写 − 取号两次。
 /// 判别力：续做的写账去掉续做推的那几次空发布（攻方 MU2）时份数少 2；先写系统配置那一步不进错时合计少 2。
 #[test]
@@ -1106,14 +1113,14 @@ fn a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_bac
                 .collect::<Vec<_>>(),
             output.deletion_queue_continuation.len(),
         ),
-        (0, vec![2], 14),
-        "起点：准入没推，续做 14 步、中间推了一串两次空发布"
+        (0, vec![2], 16),
+        "起点：准入没推，续做 16 步、中间推了一串两次空发布"
     );
     let (_, publishes_before_the_failing_step) =
         writes_and_publishes_of_the_mount_before(&output, failing_step);
     assert_eq!(
-        publishes_before_the_failing_step, 16,
-        "写行、暖机两次、续做 11 步、推的两次"
+        publishes_before_the_failing_step, 19,
+        "写行、暖机两次、续做 14 步、推的两次"
     );
     assert_the_continuation_publish_error_accounts_for_every_landed_write(
         &refusal,
@@ -1135,7 +1142,7 @@ fn a_continuation_step_failing_after_both_the_admission_and_the_continuation_rai
             NarrowPoolCrashedBetweenDeletionBatches {
                 unit_area_slots: 192,
                 overwrites_before_the_unlink: 0,
-                data_units_of_the_file: DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION,
+                data_units_of_the_file: DATA_UNITS_OF_THE_FILE_ON_THE_192_SLOT_DEVICES,
                 batches_published_after_the_intent: 1,
             },
             first_continuation_step_after_the_continuation_raised_the_floor,
@@ -1202,7 +1209,7 @@ fn a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_wr
     let shape = NarrowPoolCrashedBetweenDeletionBatches {
         unit_area_slots: 192,
         overwrites_before_the_unlink: 0,
-        data_units_of_the_file: DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION,
+        data_units_of_the_file: DATA_UNITS_OF_THE_FILE_ON_THE_192_SLOT_DEVICES,
         batches_published_after_the_intent: 1,
     };
     let (output, failing_publish, refusal, (landed_writes, landed_root_slot_writes)) =
@@ -1293,8 +1300,8 @@ fn unit_record_and_root_slot_writes_of_the_continuation_step(
 }
 
 /// 注错点在续做推的那一串之后的第一步、它第一个写之后的某一个写上（代码轮第三轮判决第三节第 6 条 N2：之前的用例只摆在发布的第一个写上）的那一形：
-/// 起点同 [`a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_back_every_landed_write`]（窄盘崩在第 0 批之后，续做 14 步、
-/// 第 11 步之后推一串两次空发布）。交回那一步之前落盘的发布数（16 份）、注错那一步写了几个单元、注错的错与真落下的写和根槽写。
+/// 起点同 [`a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_back_every_landed_write`]（窄盘崩在第 0 批之后，续做 16 步、
+/// 第 14 步之后推一串两次空发布）。交回那一步之前落盘的发布数（19 份）、注错那一步写了几个单元、注错的错与真落下的写和根槽写。
 fn mount_failing_after_the_first_write_of_the_step_after_the_continuation_raised_the_floor(
     ordinal_within_the_step: impl Fn(u64, u64) -> u64,
 ) -> (usize, u64, MountError, (u64, u64)) {
@@ -1326,7 +1333,7 @@ fn mount_failing_after_the_first_write_of_the_step_after_the_continuation_raised
 }
 
 /// 续做那一步的第二个单元写报块设备错（N2，注错点在发布第一个写之后）：第一个单元写已落盘、属于失败的那一次发布。
-/// 错是 `Publish`、块设备错；已落盘份数 16 = 落下的根槽写数；写账合计（含失败那一次已记的那 1 个单元写）= 落下的写 − 取号两次。
+/// 错是 `Publish`、块设备错；已落盘份数 19 = 落下的根槽写数；写账合计（含失败那一次已记的那 1 个单元写）= 落下的写 − 取号两次。
 /// 判别力：续做那一格交回的失败账照旧是空的（不带失败那一次已落下的写）时合计少 1，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_write() {
@@ -1340,8 +1347,8 @@ fn a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_
     );
     assert!(unit_writes >= 2, "那一步至少写两个单元：{unit_writes}");
     assert_eq!(
-        publishes_before_the_failing_step, 16,
-        "写行、暖机两次、续做 11 步、推的两次"
+        publishes_before_the_failing_step, 19,
+        "写行、暖机两次、续做 14 步、推的两次"
     );
     assert_the_continuation_publish_error_accounts_for_every_landed_write(
         &refusal,
@@ -1352,7 +1359,7 @@ fn a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_
 }
 
 /// 续做那一步的 journal 记录写报块设备错（N2）：那一步的单元写全落盘、属于失败的那一次发布，记录与根都没落。
-/// 判法同上一条：份数 16 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
+/// 判法同上一条：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
 /// 判别力：失败账照旧是空的时合计少那一步的单元写数，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_journal_record_write_hands_back_every_landed_write() {
@@ -1370,7 +1377,7 @@ fn a_continuation_step_failing_on_its_journal_record_write_hands_back_every_land
 
 /// 续做那一步的根槽写报块设备错（N2）：那一步的单元写与 journal 记录写落盘，根没落（只读恢复会靠那条记录多走一次，见
 /// `unlink_mount_continuation_and_the_emptied_version.rs` 设备错那一条的说明；这里只比根槽写，不比只读挂载走到的版）。
-/// 判法同上：份数 16 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
+/// 判法同上：份数 19 = 落下的根槽写数，写账合计 = 落下的写 − 取号两次。
 /// 判别力：失败账照旧是空的时合计少那一步的单元写与记录写，那一项红。
 #[test]
 fn a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_write() {
@@ -1400,7 +1407,7 @@ fn a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_h
             NarrowPoolCrashedBetweenDeletionBatches {
                 unit_area_slots: 192,
                 overwrites_before_the_unlink: 0,
-                data_units_of_the_file: DATA_UNITS_OF_THE_FILE_DELETED_BY_THE_CONTINUATION,
+                data_units_of_the_file: DATA_UNITS_OF_THE_FILE_ON_THE_192_SLOT_DEVICES,
                 batches_published_after_the_intent: 1,
             },
             |output| {
@@ -1465,13 +1472,13 @@ fn a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_h
 /// （[`a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue`]
 /// 的造法），先在一份拷贝上不注错地卸载一次，数清那一串第一次空发布写几个单元、其中落在这一串回收出来的槽上的那几个各是什么释放代；
 /// 再在另一份上从「先写系统配置那 2 个写 + 第一次空发布的单元写」之后的第一个写起每一个写都报错——单元已写进当场放开的槽，journal 记录与根都没落。
-/// GA 的结局（现行那一版 txg 21，第一版区域归属 0 / 1 / 0：盘 0 上最新的根 21、盘 1 上 19，取小 19）：第一次空发布落在回收槽上的单元，
-/// 那几个槽的释放代都不高于 19；回收出来的槽里释放代 20、21 的那几个（txg 19 那条根还引用着）扣到生效，第一次空发布一个都没落上去。
+/// GA 的结局（现行那一版 txg 24，第一版区域归属 0 / 1 / 0：盘 0 上最新的根 24、盘 1 上 22，取小 22）：第一次空发布落在回收槽上的单元，
+/// 那几个槽的释放代都不高于 22；回收出来的槽里释放代 23、24 的那几个（txg 22 那条根还引用着）扣到生效，第一次空发布一个都没落上去。
 /// 改钉这一句的理由：原来钉的「有单元落在回收出来的槽上」是丙 1 的说法（回收的槽整截当场能发）；GA 下当场能发的只有释放代不高于每块盘上最新根的那一截
 /// （判决 `research/prompts/m3-unlink-code-r3-main-verification.md` 第三节第 1 条，用户 2026-10-03 定甲 GA），钉的就改成落上去的那几个槽的释放代。
 /// 掉电之后：池级 checker 全绿；只读挂载走的是卸载之前现行那一版（根上带旧 F），而系统配置里已是新 F；再挂可写做成、续做接着走到空，池级 checker 全绿。
 /// 判别力：卸载回收的槽照旧整截扣到生效时拷贝上那一次卸载就在预演里被拒，第一步红。整截当场放开（丙 1）时这一形照样绿：这块盘面上那一串的单元
-/// 本来就没落到释放代 20、21 的槽上（判决第二节 N1「X 第 1404 行那一份盘面的交集」坐实为空；本批证红时量过，`crates/mutations.tsv` 不留这一行），
+/// 本来就没落到释放代 23、24 的槽上（判决第二节 N1「X 第 1404 行那一份盘面的交集」坐实为空；本批证红时量过，`crates/mutations.tsv` 不留这一行），
 /// 释放代那一项只钉 GA 的结局、不分辨丙 1；分辨丙 1 的是 `a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs` 那两形。
 #[test]
 fn an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version(
@@ -1603,11 +1610,11 @@ fn an_unmount_losing_power_after_its_system_configuration_write_before_any_root_
     );
 }
 
-/// 续做推满仍放不下的那块窄盘上，卸载之前现行那一版的 txg，与那时每块盘上最新的根的 txg 取小（第一版区域归属 0 / 1 / 0：txg 21 的根在盘 0，
-/// 盘 1 上最新的是 txg 19；这块盘的根从写行起连号写下来、没有回退，没有被抛弃的根）。
-const CURRENT_TXG_BEFORE_THE_UNMOUNT_OF_THE_SHORT_CONTINUATION: CheckpointTxg = CheckpointTxg(21);
+/// 续做推满仍放不下的那块窄盘上，卸载之前现行那一版的 txg，与那时每块盘上最新的根的 txg 取小（第一版区域归属 0 / 1 / 0：txg 24 的根在盘 0，
+/// 盘 1 上最新的是 txg 22；这块盘的根从写行起连号写下来、没有回退，没有被抛弃的根）。
+const CURRENT_TXG_BEFORE_THE_UNMOUNT_OF_THE_SHORT_CONTINUATION: CheckpointTxg = CheckpointTxg(24);
 const NEWEST_ROOT_ON_EVERY_DEVICE_BEFORE_THE_UNMOUNT_OF_THE_SHORT_CONTINUATION: CheckpointTxg =
-    CheckpointTxg(19);
+    CheckpointTxg(22);
 
 /// 甲 GA 在续做推满仍放不下的那块窄盘上的结局（用户 2026-10-03 定，`mount::RaiseFloorEntry::reuse_of_the_reclaimed_slots`）：卸载那一串
 /// 第一次空发布落在这一串回收出来的槽上的单元至少一个（槽被续做吃光，卸载靠当场放开的那一截做成），那几个槽在卸载之前的分配记录里的释放代都不高于
@@ -1650,27 +1657,27 @@ fn assert_the_first_unmount_publish_lands_only_on_slots_released_no_later_than_t
         .collect();
     assert_eq!(
         current_root.checkpoint_txg, CURRENT_TXG_BEFORE_THE_UNMOUNT_OF_THE_SHORT_CONTINUATION,
-        "卸载之前现行那一版 txg 21（盘 0 上），盘 1 上最新的根 txg 19"
+        "卸载之前现行那一版 txg 24（盘 0 上），盘 1 上最新的根 txg 22"
     );
     assert!(
         !release_generations_under_the_first_publish.is_empty()
             && release_generations_under_the_first_publish.iter().all(|generation| {
                 *generation <= NEWEST_ROOT_ON_EVERY_DEVICE_BEFORE_THE_UNMOUNT_OF_THE_SHORT_CONTINUATION
             }),
-        "第一次空发布落在回收槽上的单元有，那几个槽的释放代都不高于 19：{release_generations_under_the_first_publish:?}"
+        "第一次空发布落在回收槽上的单元有，那几个槽的释放代都不高于 22：{release_generations_under_the_first_publish:?}"
     );
     assert!(
         !reclaimed_released_after_the_newest_root_of_every_device.is_empty(),
-        "回收出来的槽里有释放代高于 19 的（txg 19 那条根还引用着，GA 下扣到生效）"
+        "回收出来的槽里有释放代高于 22 的（txg 22 那条根还引用着，GA 下扣到生效）"
     );
 }
 
 /// 同一刀（卸载那一串先写系统配置之后、第一次空发布的单元写完、journal 记录与根都没落）之后一块盘丢掉、只剩一块（攻方丙 1 那一节自列没判的第二件）：
-/// 丢掉的是住着现行那一版的根的盘 0（现行那一版 txg 21，21 mod 3 = 0，第一版区域归属 0 / 1 / 0），剩下的盘 1 上最新的根是 txg 19，
-/// 早于它系统配置里的新 F（21）。择根与重放：恢复择到盘 1 上最新的那条根、journal 没往后施加，只读挂载走 txg 19 那一版、根上带旧 F；
+/// 丢掉的是住着现行那一版的根的盘 0（现行那一版 txg 24，24 mod 3 = 0，第一版区域归属 0 / 1 / 0），剩下的盘 1 上最新的根是 txg 22，
+/// 早于它系统配置里的新 F（24）。择根与重放：恢复择到盘 1 上最新的那条根、journal 没往后施加，只读挂载走 txg 22 那一版、根上带旧 F；
 /// 可写挂载在读任何盘之前就被 w 的下限拒。
-/// GA 的结局（用户 2026-10-03 定甲 GA）：第一次空发布写下去、落在回收槽上的那几个单元，槽的释放代都不高于 19——txg 19 那条根不引用它们；
-/// 释放代 20、21 的那几个（txg 19 那条根还引用着）扣到生效、没被写。改钉这一句的理由：原来钉的「写进回收出来的槽的那几个单元没让池级 checker
+/// GA 的结局（用户 2026-10-03 定甲 GA）：第一次空发布写下去、落在回收槽上的那几个单元，槽的释放代都不高于 22——txg 22 那条根不引用它们；
+/// 释放代 23、24 的那几个（txg 22 那条根还引用着）扣到生效、没被写。改钉这一句的理由：原来钉的「写进回收出来的槽的那几个单元没让池级 checker
 /// 多判出一条」分不出 GA 与丙 1——单盘镜像上卸载之前 checker 就红六七条，条名已饱和（判决 `research/prompts/m3-unlink-code-r3-main-verification.md`
 /// 第二节 N1「第五节跑前判据的字面」那一行）；分得出的是被写的槽的释放代，与剩下那块盘的读回（`a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs`）。
 /// checker 那一项照旧判（与「只写了系统配置、单元一个都没写」那一刀逐条相同），只记饱和、不靠它分辨。
@@ -1766,11 +1773,11 @@ fn after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_survi
             recover(&survivor, JournalPolicy::Consult).effective_root,
         ),
         (
-            CheckpointTxg(21),
-            CheckpointTxg(21),
-            Some((current_root.instance, CheckpointTxg(19)))
+            CheckpointTxg(24),
+            CheckpointTxg(24),
+            Some((current_root.instance, CheckpointTxg(22)))
         ),
-        "剩下的盘 1 系统配置里是新 F 21，恢复择到它上面最新的根 txg 19、journal 没往后施加"
+        "剩下的盘 1 系统配置里是新 F 24，恢复择到它上面最新的根 txg 22、journal 没往后施加"
     );
     let read_only = mount_read_only(&survivor).expect("剩下那块盘只读挂载");
     assert_eq!(
@@ -1778,8 +1785,8 @@ fn after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_survi
             read_only.effective_root.checkpoint_txg,
             read_only.effective_root.rollback_floor,
         ),
-        (CheckpointTxg(19), current_root.rollback_floor),
-        "只读挂载走 txg 19 那一版，根上带旧 F，低于系统配置里的新 F"
+        (CheckpointTxg(22), current_root.rollback_floor),
+        "只读挂载走 txg 22 那一版，根上带旧 F，低于系统配置里的新 F"
     );
     let mut survivor_devices = plain_devices_on(&survivor);
     assert!(
@@ -2352,12 +2359,17 @@ fn known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any
     assert!(*current == current_before, "现行那一版不动");
 }
 
-/// 挂载那一刻就坏的槽照旧当没有根、不挡抬 F（C562 那一行的前半句）：同一个池进程退出，(区域 0, 槽 0) 从这时起每一次读都报错，
-/// 再可写挂载——挂载读根环时它就读不出，这个进程的根环表里没有它。之后抬 F 到上限：算上限时它读不出、当没有根，最旧的有效根是暖机那条 txg 1，
-/// 上限 1，F 抬到 1（`RaiseToTheAdmissionCeiling::Raised`），不因为这一槽被拒。
-/// 判别力：读坏的槽不分挂载时读不读得出、一律重读仍坏就拒时，这次抬 F 被拒。
+/// 挂载那一刻就读不出、这个进程之后没写过的槽，算准入抬 F 的上限时当作可能是一条非空有效根、F 不越过它
+/// （D16（发布语义） 已定项 1「抬 F 的上限」那一行，用户 2026-10-04 定 RS3；同日 Q3 重定成读不出与自证不过两类都并，这一条是读不出那一类）：
+/// 同一个池进程退出，(区域 0, 槽 0)
+/// 从这时起每一次读都报错，再可写挂载——挂载读根环时它就读不出，这个进程知道住着根的槽里没有它，根环表把它记成窗口里读不出的槽、
+/// 按它能住的最大 txg 记：那一槽在一圈窗口里只能住 txg 0（mkfs 那条根；下一次轮到它是 txg 3S，还没写到）。之后抬 F 到上限：
+/// 读得出的根算出的上限是 1（最旧的有效根是暖机那条 txg 1），并进那一槽的 0 之后上限是 0、不高于现行的 F 0——
+/// 报 `FloorAlreadyAtTheCeiling { floor: 0, ceiling: 0 }`，一个字节都不写；也不因为这一槽重读仍坏就拒（它不是这个进程知道住着根的槽）。
+/// 判别力：不并这一槽时上限 1、F 抬到 1；挂载那一刻读不出的槽也重读、仍坏就拒时报 `RollbackFloorCeilingRootRingSlotStillBadAfterOneReread`。
 #[test]
-fn root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise() {
+fn root_slot_already_unreadable_at_mount_is_taken_as_a_possible_root_and_holds_the_admission_ceiling_at_its_txg(
+) {
     let (mut pool, plan) = pool_for_the_ceiling_reading();
     plan.arm(schedule_on_the_genesis_root_slot(
         &pool.parameters,
@@ -2368,8 +2380,9 @@ fn root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_th
     assert!(
         !ring_slots_known_to_hold_a_root_by(&pool.session().allocator)
             .contains(&RootRingSlot { region: 0, slot: 0 }),
-        "挂载那一刻读不出的槽不在这个进程的根环表里"
+        "挂载那一刻读不出的槽不在这个进程知道住着根的槽里"
     );
+    let image_before = pool.image();
     let mut session = pool.session.take().expect("挂载的会话");
     let PoolVersion::WithFile(current) = &mut session.current else {
         panic!("挂载之后现行那一版带文件");
@@ -2382,21 +2395,15 @@ fn root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_th
         ShadowLedger::On,
     );
     plan.disarm();
-    let Ok(RaiseToTheAdmissionCeiling::Raised(raised)) = raised else {
-        panic!("挂载时就坏的槽不挡抬 F：{raised:?}");
+    let Ok(RaiseToTheAdmissionCeiling::FloorAlreadyAtTheCeiling { floor, ceiling }) = raised else {
+        panic!("挂载时就读不出的槽按它能住的 txg 0 封顶上限、F 不越过它：{raised:?}");
     };
     assert_eq!(
-        raised.ceiling,
-        CheckpointTxg(1),
-        "最旧的有效根是暖机那条 txg 1"
+        (floor, ceiling),
+        (CheckpointTxg(0), CheckpointTxg(0)),
+        "上限取读得出的根算出的 1 与那一槽能住的 0 里小的那个"
     );
-    assert!(
-        raised
-            .publishes
-            .iter()
-            .all(|publish| publish.root.rollback_floor == CheckpointTxg(1)),
-        "这一串的根都带新 F = 1"
-    );
+    assert!(pool.image() == image_before, "没有可抬的：两块盘逐字节不变");
 }
 
 /// 实四丙的构造做成用例（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实四丙交回」那一行）：故障注入的种子基 + 339 那段历史

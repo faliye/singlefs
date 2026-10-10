@@ -15,6 +15,7 @@ use singlefs_core::block_device::{
 };
 
 pub mod fault_injection;
+pub mod gpu_memory_ledger;
 pub mod hexadecimal;
 pub mod history;
 pub mod memory_pool;
@@ -40,6 +41,22 @@ pub enum RecordedOperationKind {
     Barrier,
 }
 
+impl RecordedOperationKind {
+    /// 流文本（[`RecordedOperation::to_stream_line`] 的 `kind=`）与各导出装置结果行（`kind=`）里的种类名。新写的地方都调它，不再抄一份；
+    /// checker 档里还有四份装置各自手抄着同样四个名字（`src/bin/` 下 `e170_o3_spec_executor_export.rs`、`e171_three_oracle_collusion.rs`、
+    /// `e171_three_oracle_collusion_after_the_oracle_fixes.rs`、`e142_new_pool_file_creation_write_dump_one_device.rs`；前三份另有一份
+    /// 按名字反查种类的），没挪过来，改名时那四份要跟着改。
+    #[must_use]
+    pub const fn name(self) -> &'static str {
+        match self {
+            RecordedOperationKind::Write => "write",
+            RecordedOperationKind::WriteForceUnitAccess => "write_fua",
+            RecordedOperationKind::WriteZeroes => "write_zeroes",
+            RecordedOperationKind::Barrier => "barrier",
+        }
+    }
+}
+
 /// 录制流的一条。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecordedOperation {
@@ -56,12 +73,7 @@ impl RecordedOperation {
     /// 一行一条，机器能重新解析；字段顺序固定。
     #[must_use]
     pub fn to_stream_line(&self) -> String {
-        let kind = match self.kind {
-            RecordedOperationKind::Write => "write",
-            RecordedOperationKind::WriteForceUnitAccess => "write_fua",
-            RecordedOperationKind::WriteZeroes => "write_zeroes",
-            RecordedOperationKind::Barrier => "barrier",
-        };
+        let kind = self.kind.name();
         format!(
             "device={} kind={kind} offset={} length={} hash={:016x}",
             self.device.0, self.offset.0, self.length, self.content_hash
@@ -108,6 +120,31 @@ pub fn fnv1a_64_of_zeros(length: u64) -> u64 {
 pub struct RetainedOperation {
     pub operation: RecordedOperation,
     pub contents: Option<Vec<u8>>,
+}
+
+impl RetainedOperation {
+    /// 这一步写到盘上的字节：普通写与 FUA 写是留下的内容（没开内容保留的流里是 `None`）；写清零按长度现铺 0
+    /// （录制器不为它留内容，整段全 0 由偏移与长度全定，见 [`RecordingBlockDevice`] 的 `write_zeroes_at`）；屏障没有字节，`None`。
+    /// 写清零真的摆进内存：mkfs 那一次清 768 MiB，调用方只对窗口里的写调它。
+    ///
+    /// # Panics
+    /// 写清零的长度装不进 `usize`（只在 32 位目标上可能）。
+    #[must_use]
+    pub fn written_bytes_rebuilding_zero_fills(&self) -> Option<Vec<u8>> {
+        match self.operation.kind {
+            RecordedOperationKind::Write | RecordedOperationKind::WriteForceUnitAccess => {
+                self.contents.clone()
+            }
+            RecordedOperationKind::WriteZeroes => Some(vec![
+                0u8;
+                usize::try_from(self.operation.length)
+                    .expect(
+                        "写清零的长度装得进 usize：64 位目标上恒成立"
+                    )
+            ]),
+            RecordedOperationKind::Barrier => None,
+        }
+    }
 }
 
 /// 录制流里一段操作是从哪个入口发出来的（C557（卸载记号只由卸载入口打没有检查）：录制流要记每次发布的入口）。
@@ -617,6 +654,64 @@ mod tests {
             .read_at(DeviceOffsetInBytes(0), &mut before)
             .expect("读清零段之前");
         assert_eq!(before, [1u8; 512], "清零段之外一个字节不动");
+    }
+
+    /// 种类名是流文本与各导出结果行里的 `kind=`：每一种一个名字，四个互不相同（E142、E172 的比对侧按这几个字面认种类）。
+    #[test]
+    fn recorded_operation_kind_names_are_the_four_literals_the_dumps_print() {
+        assert_eq!(RecordedOperationKind::Write.name(), "write");
+        assert_eq!(
+            RecordedOperationKind::WriteForceUnitAccess.name(),
+            "write_fua"
+        );
+        assert_eq!(
+            RecordedOperationKind::WriteZeroes.name(),
+            "write_zeroes",
+            "写清零打成 write 的话，比对侧会去流里找它没留的内容"
+        );
+        assert_eq!(RecordedOperationKind::Barrier.name(), "barrier");
+    }
+
+    /// 普通写与 FUA 写交回留下的内容；写清零没留内容也按长度铺 0；屏障没有字节。
+    #[test]
+    fn written_bytes_are_the_retained_content_the_zero_fill_by_length_and_none_for_a_barrier() {
+        let retained = |kind, length, contents| RetainedOperation {
+            operation: RecordedOperation {
+                device: DeviceIdentity(0),
+                kind,
+                offset: DeviceOffsetInBytes(0),
+                length,
+                content_hash: 0,
+            },
+            contents,
+        };
+        assert_eq!(
+            retained(RecordedOperationKind::Write, 3, Some(vec![1, 2, 3]))
+                .written_bytes_rebuilding_zero_fills(),
+            Some(vec![1, 2, 3]),
+            "普通写是留下的内容"
+        );
+        assert_eq!(
+            retained(
+                RecordedOperationKind::WriteForceUnitAccess,
+                2,
+                Some(vec![9, 9])
+            )
+            .written_bytes_rebuilding_zero_fills(),
+            Some(vec![9, 9]),
+            "FUA 写是留下的内容"
+        );
+        assert_eq!(
+            retained(RecordedOperationKind::WriteZeroes, 4, None)
+                .written_bytes_rebuilding_zero_fills(),
+            Some(vec![0, 0, 0, 0]),
+            "写清零没留内容，按长度铺 4 个 0"
+        );
+        assert_eq!(
+            retained(RecordedOperationKind::Barrier, 0, None).written_bytes_rebuilding_zero_fills(),
+            None,
+            "屏障没有字节（不算一次写）"
+        );
     }
 
     /// 全 0 串的哈希走的是平方乘的捷径，必须与真的把那一串 0 喂给 [`fnv1a_64`] 逐位相同。

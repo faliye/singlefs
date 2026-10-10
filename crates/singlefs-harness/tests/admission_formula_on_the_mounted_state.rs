@@ -139,9 +139,11 @@ fn slots_of(output: &TransactionOutput, device: DeviceIdentity) -> BTreeSet<u64>
         .collect()
 }
 
-/// 记账标签 6（墓碑预付，D3（空间分配） 已定项 2）摊到每块盘扣的字节：一个活对象、墓碑树零根时
-/// 两份副本 × ((2 + 0 + 1) × 16384 + 41 × 1) = 98386，÷ 2 = 49193。准入读数从发布路径接上它起每块盘多扣这么多。
-const TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES: i128 = (3 * 16384 + 41) * 2 / 2;
+/// 记账标签 6（墓碑与退役预付，D3（空间分配） 已定项 2；退役那一份是判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）
+/// 摊到每块盘扣的字节：一个活对象、一条记录、墓碑树与退役树零根时两份副本 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × 1 + 35 × 1) = 196760，
+/// ÷ 2 = 98380（第 50 批之前 49193）。准入读数从发布路径接上它起每块盘多扣这么多。小盘的环窗口补足为退役那一份多补了 3 槽
+/// （`crates/singlefs-harness/src/history.rs` 的 `SMALLER_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`），下面两格「可用 X 槽」各比第 50 批之前多 3。
+const TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES: i128 = (6 * 16384 + 41 + 35) * 2 / 2;
 
 /// 条款没给、由用例给的两个量（C363）。
 #[derive(Clone, Copy, Debug)]
@@ -182,7 +184,7 @@ fn admission_reading(
 }
 
 /// 同一份读数，只把第九项「被抛弃根独占量」逐盘置 0（C318 判别力自证要的那一刀）。
-fn reading_with_the_abandoned_root_exclusive_term_zeroed(
+fn reading_with_the_isolated_for_abandoned_roots_and_unapplied_journal_records_term_zeroed(
     reading: &AdmissionReading,
 ) -> AdmissionReading {
     AdmissionReading::new(
@@ -195,7 +197,7 @@ fn reading_with_the_abandoned_root_exclusive_term_zeroed(
                 allocated: terms.allocated,
                 unreclaimable: terms.unreclaimable,
                 mount_time_commitment: terms.mount_time_commitment,
-                abandoned_root_exclusive: BytesOnOneDevice::ZERO,
+                isolated_for_abandoned_roots_and_unapplied_journal_records: BytesOnOneDevice::ZERO,
                 ring_window: terms.ring_window,
             })
             .collect(),
@@ -295,12 +297,12 @@ fn after_a_recovery_abandoned_a_root_the_admission_reading_with_the_shadow_ledge
                 (*device, *device)
             );
             assert_eq!(
-                terms_with.abandoned_root_exclusive,
+                terms_with.isolated_for_abandoned_roots_and_unapplied_journal_records,
                 BytesOnOneDevice::of_slots(*abandoned_slots),
                 "{supplied:?} 盘 {device:?}：影子账开着，第九项是只被被抛弃根引用的那几个槽"
             );
             assert_eq!(
-                terms_without.abandoned_root_exclusive,
+                terms_without.isolated_for_abandoned_roots_and_unapplied_journal_records,
                 BytesOnOneDevice::ZERO,
                 "{supplied:?} 盘 {device:?}：影子账关着，第九项是 0"
             );
@@ -341,7 +343,10 @@ fn after_a_recovery_abandoned_a_root_the_admission_reading_with_the_shadow_ledge
             );
         }
 
-        let zeroed = reading_with_the_abandoned_root_exclusive_term_zeroed(&reading_with);
+        let zeroed =
+            reading_with_the_isolated_for_abandoned_roots_and_unapplied_journal_records_term_zeroed(
+                &reading_with,
+            );
         for (((device, with), (_, zeroed_available)), (_, abandoned_slots)) in available_with
             .iter()
             .zip(&zeroed.available_on_each_device())
@@ -472,7 +477,7 @@ fn image_of_the_devices(
 /// 可写挂载那一处（C363 (b) 判决第四节第 2 条接进来；D16（发布语义） 已定项 1「准入」那一行定了不够时怎么办，用户 2026-09-26 定）：
 /// 两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 12 次的盘面上再可写挂载——取号之前按这次挂载的 rows0 算
 /// （D28（挂载期承诺量） 已定项 3），扣掉实例切换预留、checkpoint 保留池（已定项 4，按最坏情况计，用户 2026-09-27 定）与已分配之后，
-/// 两块盘的可用(d) 都是 −39 槽 < 0（A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是 −47 槽）：
+/// 两块盘的可用(d) 都是 −36 槽 < 0（第 50 批之前 −39；A3b 把小盘改成 6 MiB 环、单元区从 1408 起之前是 −47 槽）：
 /// 实例切换的预留拿不到。写行那次发布照走切换预留、写完行与暖机之后推抬 F 的空发布、再判：这里推一串（F 抬到上限 14，3 次空发布），
 /// 再判就够了，挂载做成（取号 3），交回 `MountSpaceAdmission::AdmittedAfterTheFloorRaises`，带着取号之前那一判的拒绝原样。
 /// 推的那一串的根都带新 F = 14、接在暖机后面，现行那一版就是最后一次；挂载之后的镜像池级 checker 0 违例；按可写挂载的读数再判，每块盘可用 ≥ 0。
@@ -510,13 +515,13 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
                 .map(|device| DeviceShortOfDemand {
                     device,
                     available: AvailableBytesOnOneDevice(
-                        -39 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
+                        -36 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
                     ),
                     demand: BytesOnOneDevice::ZERO,
                 })
                 .collect(),
         },
-        "取号之前两块盘都短：可用 −39 槽再减标签 6 每盘那一份，挂载这一刻不另要需求"
+        "取号之前两块盘都短：可用 −36 槽再减标签 6 每盘那一份，挂载这一刻不另要需求"
     );
     assert_eq!(floor_raises.len(), 1, "推一串就够");
     let raised = &floor_raises[0];
@@ -564,7 +569,9 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert!(
@@ -590,7 +597,7 @@ fn writable_mount_short_of_its_instance_switch_reserve_raises_the_floor_after_th
 
 /// 发布路径那一处（C363 (b) 判决第四节第 2 条）：两块单元区 256 槽的小盘，第一个文件之后可写挂载、覆盖写 4 次的盘面上，进程重开、
 /// 可写挂载（取号之前就够），在这次挂载里直接调发布路径接连覆盖写三次（都放行），第四次：需求 = 这次发布新写的全部槽（D28（挂载期承诺量） 已定项 1 接线，
-/// 普通分配加固定点、不加换下的，用户 2026-09-25 定），每块盘 14 槽（普通分配 6、固定点 8），而两块盘的可用(d) 都只剩 11 槽
+/// 普通分配加固定点、不加换下的，用户 2026-09-25 定），每块盘 14 槽（普通分配 6、固定点 8），而两块盘的可用(d) 都只剩 14 槽再减标签 6 每盘那一份（第 50 批之前 11 槽，小盘补足多补了退役那 3 槽）
 /// （实例切换的预留按下一次挂载的 rows0，已定项 3；checkpoint 保留池与 c_max 按最坏情况计，已定项 4，用户 2026-09-27 定）——
 /// 在读盘核与动分配器之前返回 `PublishError::SpaceAdmissionRefused`：录制流一步没多、两块盘逐字节不变、`DiskSnapshot` 不变、
 /// 分配器与发布之前逐项相同。这一格只有把固定点算进需求才拒：普通分配只有 6 槽 ≤ 11。需求那 14 槽从同一次覆盖写真发出去的角色现数
@@ -713,12 +720,12 @@ fn an_overwrite_whose_new_slots_exceed_the_available_bytes_is_refused_by_the_spa
                 .map(|device| DeviceShortOfDemand {
                     device,
                     available: AvailableBytesOnOneDevice(
-                        11 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
+                        14 * i128::from(SLOT_BYTES) - TAG_SIX_SHARE_OF_ONE_DEVICE_IN_BYTES,
                     ),
                     demand: BytesOnOneDevice::of_slots(slots_written_by_the_overwrite),
                 })
                 .collect(),
         },
-        "两块盘都短：可用 11 槽再减标签 6 每盘那一份 < 需求 14 槽（普通分配的 6 槽装得下，固定点那 8 槽装不下）"
+        "两块盘都短：可用 14 槽再减标签 6 每盘那一份 < 需求 14 槽（普通分配的 6 槽装得下，固定点那 8 槽装不下）"
     );
 }

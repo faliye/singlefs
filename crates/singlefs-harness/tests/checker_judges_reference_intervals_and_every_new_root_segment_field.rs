@@ -107,7 +107,9 @@ fn assert_violated_mentioning(image: &MemoryPool, invariant: &str, expected_in_t
             detail.contains(expected_in_the_detail),
             "{invariant} 判违例，说明里该有「{expected_in_the_detail}」：{detail}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("{invariant} 应当判违例（说明里有「{expected_in_the_detail}」），实际 {other:?}")
         }
     }

@@ -598,7 +598,8 @@ pub fn key_schema_for_tree_kind(kind: u16) -> Option<KeySchema> {
         3 => Some(KEY_SCHEMA_ALLOCATION),
         4 => Some(KEY_SCHEMA_ACCOUNTING),
         5 => Some(KEY_SCHEMA_MAPPING),
-        10 | 11 => Some(KEY_SCHEMA_CONTAINER_NUMBER),
+        // 墓碑树 10、谱系树 11、退役树 13：码 2 节点的 key 是容器号 8 字节。
+        10 | 11 | 13 => Some(KEY_SCHEMA_CONTAINER_NUMBER),
         _ => None,
     }
 }

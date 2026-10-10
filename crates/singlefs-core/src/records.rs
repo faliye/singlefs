@@ -4,7 +4,7 @@
 use singlefs_format::{
     ACCOUNTING_ENTRY_BYTES, EXTENT_LEAF_RECORD_BYTES, INODE_INTERNAL_ENTRY, INODE_RECORD_BYTES,
     LINEAGE_RECORD_BYTES, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_POINTER_BYTES,
-    TOMBSTONE_RECORD_BYTES, TREE_TABLE_ENTRY_BYTES,
+    RETIREMENT_RECORD_BYTES, TOMBSTONE_RECORD_BYTES, TREE_TABLE_ENTRY_BYTES,
 };
 
 use crate::address::{
@@ -177,35 +177,80 @@ impl TombstoneRecord {
     }
 }
 
-/// 谱系记录 16（D18（块里携带什么信息） 已定项 24 第 5 条；字段表在 `.claude/kb/layout/03-third-txn.md`「三、谱系记录」）：
-/// T_rb 8 + T_old 8，小端，读作「T_rb 的父是 T_old」。管理员回退那次发布追加一条：T_rb 是回退那次发布的 checkpoint_txg，
-/// T_old 是回退目标 R_old 的 txg。
+/// 谱系记录 24（D18（块里携带什么信息） 已定项 24 第 5 条；字段表在 `.claude/kb/layout/03-third-txn.md`「三、谱系记录」）：
+/// T_rb 8 + T_old 8 + H_cur 8，小端，读作「T_rb 的父是 T_old」。管理员回退那次发布追加一条：T_rb 是回退那次发布的 checkpoint_txg，
+/// T_old 是回退目标 R_old 的 txg，H_cur 是 cur（回退之前的现行那一版）的 inode 号水位，从 cur 那一版读、不从发布路径交来的「上一版」现算。
+/// 三段的逐字节次序条款没定，这里取 T_rb | T_old | H_cur（新加的一段接在已有两段之后，已有两段的偏移不动）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LineageRecord {
     pub rollback_txg: CheckpointTxg,
     pub rollback_target_txg: CheckpointTxg,
+    pub inode_number_watermark_of_the_version_rolled_back_from: u64,
 }
 
 impl LineageRecord {
     #[must_use]
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut writer = ByteWriter::new(usize::try_from(LINEAGE_RECORD_BYTES).expect("16"));
+        let mut writer = ByteWriter::new(usize::try_from(LINEAGE_RECORD_BYTES).expect("24"));
         writer.put_u64(self.rollback_txg.0);
         writer.put_u64(self.rollback_target_txg.0);
+        writer.put_u64(self.inode_number_watermark_of_the_version_rolled_back_from);
         writer.assert_position(LINEAGE_RECORD_BYTES, "谱系记录");
         writer.into_bytes()
     }
 
-    /// 谱系记录的读者：长度不是 16 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 16 再切）。
+    /// 谱系记录的读者：长度不是 24 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 24 再切）。
     #[must_use]
     pub fn parse(bytes: &[u8]) -> Option<Self> {
-        if bytes.len() != usize::try_from(LINEAGE_RECORD_BYTES).expect("16") {
+        if bytes.len() != usize::try_from(LINEAGE_RECORD_BYTES).expect("24") {
             return None;
         }
         let mut reader = ByteReader::at(bytes, 0);
         Some(Self {
             rollback_txg: CheckpointTxg(reader.get_u64()),
             rollback_target_txg: CheckpointTxg(reader.get_u64()),
+            inode_number_watermark_of_the_version_rolled_back_from: reader.get_u64(),
+        })
+    }
+}
+
+/// 退役记录 34（D18（块里携带什么信息） 已定项 11 打包记录类型 3；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 2、3 条）：
+/// 被退役身份的出生树 8 | 打包记录类型 2 | 容器号 8 | 容器出生代 8 | 死亡 txg 8，小端，无填充无预留。身份四段与 inode 内部条目里的
+/// 身份引用（[`build_inode_internal_entry`]）同序同宽。死亡 txg = 身份消失那次发布的 checkpoint_txg（删空摘掉、被左邻吸收那次）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RetirementRecord {
+    pub retired: PackedIdentity,
+    pub death_txg: CheckpointTxg,
+}
+
+impl RetirementRecord {
+    #[must_use]
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut writer = ByteWriter::new(usize::try_from(RETIREMENT_RECORD_BYTES).expect("34"));
+        writer.put_u64(self.retired.birth_tree.0);
+        writer.put_u16(self.retired.record_type);
+        writer.put_u64(self.retired.container);
+        writer.put_u64(self.retired.container_birth.0);
+        writer.put_u64(self.death_txg.0);
+        writer.assert_position(RETIREMENT_RECORD_BYTES, "退役记录");
+        writer.into_bytes()
+    }
+
+    /// 退役记录的读者：长度不是 34 交回 `None`（记录宽是容器头里的盘上字段，读者先核它等于 34 再切）。
+    #[must_use]
+    pub fn parse(bytes: &[u8]) -> Option<Self> {
+        if bytes.len() != usize::try_from(RETIREMENT_RECORD_BYTES).expect("34") {
+            return None;
+        }
+        let mut reader = ByteReader::at(bytes, 0);
+        Some(Self {
+            retired: PackedIdentity {
+                birth_tree: TreeIdentifier(reader.get_u64()),
+                record_type: reader.get_u16(),
+                container: reader.get_u64(),
+                container_birth: CheckpointTxg(reader.get_u64()),
+            },
+            death_txg: CheckpointTxg(reader.get_u64()),
         })
     }
 }
@@ -383,6 +428,8 @@ pub const TREE_KIND_DELETED_INODES: u16 = 9;
 pub const TREE_KIND_TOMBSTONE: u16 = 10;
 pub const TREE_KIND_LINEAGE: u16 = 11;
 pub const TREE_KIND_LOGGED_OPERATIONS: u16 = 12;
+/// 退役树：码 13，接在 logged_ops 之后追加（D8（核心索引结构） 已定项 9；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
+pub const TREE_KIND_RETIREMENT: u16 = 13;
 
 /// 树表条目里根指针的起点：树 ID 8 + 条目长度 2 + 树的种类 2 + flags 2（`singlefs_format::TREE_TABLE_ENTRY_BYTES` 的字段表）。
 const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET_IN_BYTES: usize = 8 + 2 + 2 + 2;
@@ -558,7 +605,7 @@ mod tests {
         TREE_IDENTIFIER_ACCOUNTING, TREE_IDENTIFIER_ALLOCATION_RECORDS,
         TREE_IDENTIFIER_CENTRAL_MAPPING, TREE_IDENTIFIER_DEADLIST, TREE_IDENTIFIER_DELETED_INODES,
         TREE_IDENTIFIER_EXTENT, TREE_IDENTIFIER_INODE, TREE_IDENTIFIER_LINEAGE,
-        TREE_IDENTIFIER_LIVELIST, TREE_IDENTIFIER_LOGGED_OPERATIONS,
+        TREE_IDENTIFIER_LIVELIST, TREE_IDENTIFIER_LOGGED_OPERATIONS, TREE_IDENTIFIER_RETIREMENT,
         TREE_IDENTIFIER_SPARSE_SIDE_TABLE, TREE_IDENTIFIER_TOMBSTONE,
         TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH, TREE_IDENTIFIER_WATERMARK_AT_MKFS,
     };
@@ -580,6 +627,7 @@ mod tests {
             TREE_KIND_TOMBSTONE,
             TREE_KIND_LINEAGE,
             TREE_KIND_LOGGED_OPERATIONS,
+            TREE_KIND_RETIREMENT,
         ] {
             assert!(
                 u64::from(kind) < first_value_the_kind_field_cannot_hold,
@@ -599,6 +647,7 @@ mod tests {
             TREE_IDENTIFIER_TOMBSTONE,
             TREE_IDENTIFIER_LINEAGE,
             TREE_IDENTIFIER_LOGGED_OPERATIONS,
+            TREE_IDENTIFIER_RETIREMENT,
             TREE_IDENTIFIER_WATERMARK_AT_MKFS,
             TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
         ] {
@@ -747,6 +796,46 @@ mod tests {
             TombstoneRecord::parse(&bytes[..39]),
             None,
             "窄于 40 字节不解"
+        );
+    }
+
+    /// 退役记录 34 字节：出生树 0、打包记录类型 8、容器号 10、容器出生代 18、死亡 txg 26，小端、无填充；读回逐字段相等，
+    /// 长度不是 34 读不出（短一字节、长一字节都不收）。身份四段与 inode 内部条目里身份引用那 26 字节逐字节相同。
+    #[test]
+    fn a_retirement_record_is_thirty_four_bytes_identity_in_entry_order_then_the_death_txg() {
+        let record = RetirementRecord {
+            retired: PackedIdentity {
+                birth_tree: TreeIdentifier(0x0102),
+                record_type: 2,
+                container: 0x0304,
+                container_birth: CheckpointTxg(0x0506),
+            },
+            death_txg: CheckpointTxg(0x0708),
+        };
+        let bytes = record.to_bytes();
+        assert_eq!(
+            bytes,
+            [
+                vec![0x02, 0x01, 0, 0, 0, 0, 0, 0],
+                vec![2, 0],
+                vec![0x04, 0x03, 0, 0, 0, 0, 0, 0],
+                vec![0x06, 0x05, 0, 0, 0, 0, 0, 0],
+                vec![0x08, 0x07, 0, 0, 0, 0, 0, 0],
+            ]
+            .concat(),
+            "出生树 0、类型 8、容器号 10、出生代 18、死亡 txg 26，小端"
+        );
+        let entry = build_inode_internal_entry(9, record.retired, NodePointer::empty_root());
+        assert_eq!(
+            &bytes[..26],
+            &entry[8..34],
+            "身份四段与 inode 内部条目里的身份引用同序同宽"
+        );
+        assert_eq!(RetirementRecord::parse(&bytes), Some(record));
+        assert_eq!(RetirementRecord::parse(&bytes[..33]), None);
+        assert_eq!(
+            RetirementRecord::parse(&[bytes.as_slice(), &[0]].concat()),
+            None
         );
     }
 

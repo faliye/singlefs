@@ -268,6 +268,13 @@ impl TreeSplitPool {
                 span: 1,
             },
         );
+        // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+        allocator.install_root_ring_occupancy(
+            singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+                &publish_parameters,
+                &genesis,
+            ),
+        );
         let content = file_content();
         let (output, operations_before_the_first_file_version) = {
             let mut writer = PoolWriter::new(&publish_parameters, &mut devices);

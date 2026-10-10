@@ -1,7 +1,7 @@
 //! checker 档模块：无（自己逐个造崩溃状态，只用 harness 档的内存池与池级 checker）
 //! I-7.8（根记录树 ID 水位不低于全池最大树 ID） 扫描方向的改法 D（`research/prompts/m2-wave3-code-r1-main-verification.md`
 //! 第三节 Y1、第四节第 1 条，被攻过零轮）：第一个文件版本那次发布崩在录制流的每一个前缀上 → 可写挂载 → 挂载之后六种动作，
-//! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 65536 发十二棵树）。
+//! 池级 checker 一条违例都没有。流：mkfs → 取号 → 暖机 → 第一个文件版本（从水位 65536 发十三棵树，D8（核心索引结构） 已定项 11：退役树 65548、水位 65549）。
 //! 原先的流 ②（回退到暖机根 (1, 2) 之后在回退那个会话里再发第一个文件版本）随管理员回退改成挂着时的向前发布删掉：
 //! 向前回退的候选要带文件，退不到树表 0 条的暖机根（D23（journal 的角色与格式） 已定项 14）。
 //!
@@ -81,6 +81,13 @@ fn first_file_publish_after_mkfs() -> (
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &publish_parameters,
+            &genesis,
+        ),
+    );
     let (start, end) = {
         let mut writer = PoolWriter::new(&publish_parameters, &mut devices);
         let instance = acquire_instance(&mut writer).expect("取号");
@@ -103,8 +110,8 @@ fn first_file_publish_after_mkfs() -> (
                 first_file.root.checkpoint_txg,
                 first_file.root.tree_identifier_watermark
             ),
-            (CheckpointTxg(3), 65548),
-            "流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 65536 发 65536..65547、新水位 65548"
+            (CheckpointTxg(3), 65549),
+            "流 ①：第一个文件版本 (1, 3) 从 mkfs 的水位 65536 发 65536..65548（十三棵，最后一棵是退役树 65548）、新水位 65549"
         );
         (start, stream.operation_count())
     };
@@ -277,7 +284,9 @@ fn sweep_every_crash_inside_the_publish(
                 .into_iter()
                 .filter_map(|(invariant, verdict)| match verdict {
                     InvariantVerdict::Violated(detail) => Some(format!("{invariant}：{detail}")),
-                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                    InvariantVerdict::Holds
+                    | InvariantVerdict::NotApplicable(_)
+                    | InvariantVerdict::PartiallyJudged(_) => None,
                 })
                 .collect();
             if !violated.is_empty() {

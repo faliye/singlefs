@@ -140,6 +140,7 @@ fn expected_by_kind(
         WrittenStructureKind::DeletedInodesTreeNode,
         WrittenStructureKind::TombstoneTreeNode,
         WrittenStructureKind::LineageTreeNode,
+        WrittenStructureKind::RetirementTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
         WrittenStructureKind::InstanceTableUnit,
@@ -163,6 +164,7 @@ fn expected_by_kind(
                         | WrittenStructureKind::DeletedInodesTreeNode
                         | WrittenStructureKind::TombstoneTreeNode
                         | WrittenStructureKind::LineageTreeNode
+                        | WrittenStructureKind::RetirementTreeNode
                         | WrittenStructureKind::CentralMappingTreeNode
                         | WrittenStructureKind::TreeTableUnit
                         | WrittenStructureKind::InstanceTableUnit
@@ -199,8 +201,8 @@ fn zero_unit_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)
     expected_by_kind(&[])
 }
 
-/// 后续可写挂载写行那次发布：实例表单元 32768 + 分配记录、记账、映射、树表四个固定点单元各 16384（字节表八「第一次之后的可写挂载（写行）」），
-/// 分配记录树是五个节点。
+/// 后续可写挂载写行那次发布：实例表单元 32768 + 固定点 8 个单元各 16384——分配记录树 5 个节点 + 记账 + 映射 + 树表
+/// （字节表八「第一次之后的可写挂载（写行）」，每盘 9 个单元）。
 fn row_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
         (WrittenStructureKind::AllocationRecordTreeNode, 16384),
@@ -211,8 +213,8 @@ fn row_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     ])
 }
 
-/// 后续可写挂载的暖机空发布：四个固定点单元各 16384（字节表八「空发布（暖机，后续可写挂载的实例，写 c_max 个固定点单元）」），
-/// 分配记录树是五个节点。
+/// 后续可写挂载的暖机空发布：固定点 8 个单元各 16384——分配记录树 5 个节点 + 记账 + 映射 + 树表
+/// （字节表八「空发布（暖机，后续可写挂载的实例，写 c_max 个固定点单元）」）。
 fn later_warm_up_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBytes)> {
     expected_by_kind(&[
         (WrittenStructureKind::AllocationRecordTreeNode, 16384),
@@ -284,6 +286,13 @@ fn publish_through_overwrite() -> PublishedThroughOverwrite {
             slot: TREE_TABLE_GENESIS_SLOT,
             span: 1,
         },
+    );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &parameters,
+            &genesis,
+        ),
     );
     let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
     let instance = acquire_instance(&mut writer).expect("取号");
@@ -446,13 +455,13 @@ fn writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_
     assert_eq!(
         row_publish.writes.total(),
         calls_and_bytes(23, 344_576),
-        "写行：实例表单元 + 四个固定点单元（分配记录树五个节点）× 2 盘 = 18 次 327 680 字节 + 记录、根槽、系统配置槽 5 次 16 896"
+        "写行：（实例表单元 + 固定点 8 个单元：分配记录树 5 个节点 + 记账 + 映射 + 树表）× 2 盘 = 18 次 327 680 字节 + 记录、根槽、系统配置槽 5 次 16 896"
     );
     for (warm_up_index, warm_up_publish) in warm_up_publishes.iter().enumerate() {
         assert_eq!(
             warm_up_publish.writes.total(),
             calls_and_bytes(21, 279_040),
-            "第 {} 次暖机：四个固定点单元（分配记录树五个节点）× 2 盘 = 16 次 262 144 字节 + 5 次 16 896",
+            "第 {} 次暖机：固定点 8 个单元（分配记录树 5 个节点 + 记账 + 映射 + 树表）× 2 盘 = 16 次 262 144 字节 + 5 次 16 896",
             warm_up_index + 1
         );
     }
@@ -504,6 +513,10 @@ fn failed_midway_publish_by_kind() -> Vec<(WrittenStructureKind, WriteCallsAndBy
         ),
         (
             WrittenStructureKind::LineageTreeNode,
+            WriteCallsAndBytes::NONE,
+        ),
+        (
+            WrittenStructureKind::RetirementTreeNode,
             WriteCallsAndBytes::NONE,
         ),
         (

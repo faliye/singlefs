@@ -29,9 +29,10 @@
 use std::path::Path;
 
 use singlefs_checker_tier::on_device_modes::{
-    allocator_rebuilt_from_the_records_of, publish_the_fourth_version, publish_the_second_version,
-    publish_the_third_version, raise_the_rollback_floor_to_its_ceiling, FailedPublish,
-    OnDeviceRunMode, PublishesAfterTheNewPoolFileCreation,
+    allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process,
+    publish_the_fourth_version, publish_the_second_version, publish_the_third_version,
+    raise_the_rollback_floor_to_its_ceiling, FailedPublish, OnDeviceRunMode,
+    PublishesAfterTheNewPoolFileCreation,
 };
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::allocator::PoolAllocator;
@@ -54,7 +55,7 @@ use singlefs_harness::fault_injection::{
 };
 use singlefs_harness::scenario::{
     e142_parameters, run_new_pool_file_creation, NewPoolFileCreationPathFailure,
-    NewPoolFileCreationPathStep, ScenarioPoint,
+    NewPoolFileCreationPathStep, NewPoolFileCreationRun, ScenarioPoint,
 };
 use singlefs_harness::segments::{
     closed_form_state_count, segment_kinds_text, segment_sizes_text, split_into_segments,
@@ -594,7 +595,8 @@ struct FileOverwriteRun {
     window_matches_device: bool,
 }
 
-/// 发布 B：同一个进程里再覆盖写一次，分配器从新池新建文件的分配记录重建（与可写挂载同一条路）；两次快照之差就是这一次发布
+/// 发布 B：同一个进程里再覆盖写一次，分配器从新池新建文件的分配记录重建（与可写挂载同一条路）、装上这个进程的根环
+/// （`allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process`，只在内存里拼、不读盘）；两次快照之差就是这一次发布
 /// 交给设备的调用数，挂钟只计发布本身。
 ///
 /// # Errors
@@ -605,11 +607,14 @@ fn publish_the_second_version_and_describe<Inner: BlockDevice>(
     plan: &SharedFaultPlan,
     stream: &SharedStream,
     geometry: &FixedGeometry,
-    first_version: &TransactionOutput,
+    first_run: &NewPoolFileCreationRun,
 ) -> Result<FileOverwriteRun, FailedRun> {
+    let first_version = &first_run.output;
     let before = device_call_counts(devices, plan);
     let operations_before = stream.operations().len();
-    let mut allocator = allocator_rebuilt_from_the_records_of(devices, first_version);
+    let mut allocator = allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+        parameters, devices, first_run,
+    );
     let started = Instant::now();
     let published = publish_the_second_version(parameters, devices, &mut allocator, first_version);
     let nanoseconds = started.elapsed().as_nanos();
@@ -842,7 +847,11 @@ where
                 // 走到了也只报原样的错，窗口的账不比（推的，没在真设备上造过这一格）。
                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
                 // 读到更新的东西读不出、重读一次仍读不出（C554 乙）：取号之前拒，一个写都没发。
-                | MountError::NewerStateStillUnreadableAfterOneReread(_) => {
+                | MountError::NewerStateStillUnreadableAfterOneReread(_)
+                // 读阶段之后逐盘核或取号那一刻系统配置又读不出（C664）：第一个取号写之前拒，一个写都没发。
+                | MountError::SystemConfigurationUnreadableAfterTheReadStage(_)
+                // 重建分配器读根环重读那一遍仍一条有效根都没有（Q3）：取号之前拒，一个写都没发。
+                | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => {
                     vec![describe_run_failure("reopen_and_writable_mount", &cause)]
                 }
             };
@@ -1257,8 +1266,10 @@ fn raise_the_rollback_floor_and_describe<Inner: BlockDevice>(
                 // 现行那一版 txg 到顶：算这一串的 txg 时拒，一个写都没发；可写挂载那一处的抬 F 报错成员抬 F 自己报不出来。
                 | MountError::SequenceNumberPastTheTopOfItsRange(_)
                 | MountError::FloorRaiseFailedAfterTheMountsPublishes(_)
-                // 重读一次仍读不出只由可写挂载交回，抬 F 报不出来。
-                | MountError::NewerStateStillUnreadableAfterOneReread(_) => {
+                // 重读一次仍读不出、读阶段之后系统配置又读不出、重建分配器读根环重读仍一条有效根都没有只由可写挂载交回，抬 F 报不出来。
+                | MountError::NewerStateStillUnreadableAfterOneReread(_)
+                | MountError::SystemConfigurationUnreadableAfterTheReadStage(_)
+                | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => {
                     vec![describe_run_failure("raise_rollback_floor", &cause)]
                 }
             };
@@ -1446,7 +1457,7 @@ fn main() {
     let mut counts_after_acquisition: Option<Vec<DeviceCallCounts>> = None;
     let mut counts_before_new_pool_file_creation: Option<Vec<DeviceCallCounts>> = None;
     // 暖机 warm_up() 已调完、publish_first_file() 还没调的那一处：与 new_pool_file_creation_publish.rs 的
-    // warm_up_operation_count（该文件第 187–188 行）量的是同一个边界，不是从流尾往回数几步
+    // warm_up_operation_count（该文件第 189、201 行）量的是同一个边界，不是从流尾往回数几步
     // （里程碑「覆盖写、释放、回退与复用」收尾批「55 号装置步数」）。
     let mut operation_count_before_new_pool_file_creation: Option<usize> = None;
     // 分段挂钟在这里起表：往下每一段末尾取一次，行先攒着、跑完一起打——
@@ -1598,7 +1609,7 @@ fn main() {
                 &plan,
                 &stream,
                 &geometry,
-                &run.output,
+                &run,
             )
             .unwrap_or_else(|failed| exit_after_a_failed_run(&mut emitter, &failed));
             for line in &second.lines {
@@ -1754,8 +1765,8 @@ mod tests {
         DeviceCallCounts, SegmentClock,
     };
     use singlefs_checker_tier::on_device_modes::{
-        allocator_rebuilt_from_the_records_of, fourth_file_content, publish_the_second_version,
-        third_file_content, OnDeviceRunMode,
+        allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process, fourth_file_content,
+        publish_the_second_version, third_file_content, OnDeviceRunMode,
     };
     use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
     use singlefs_core::block_device::PhysicalBlockSizeInBytes;
@@ -1815,7 +1826,11 @@ mod tests {
         let run =
             run_new_pool_file_creation(&parameters, &mut devices, &stream, |_point, _devices| {})
                 .expect("新池新建文件");
-        let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+        let mut allocator = allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+            &parameters,
+            &devices,
+            &run,
+        );
         let second =
             publish_the_second_version(&parameters, &mut devices, &mut allocator, &run.output)
                 .expect("发布 B");
@@ -1962,6 +1977,10 @@ mod tests {
              inode_tree_root_write_calls=0 inode_tree_root_written_bytes=0 \
              allocation_record_tree_node_write_calls=0 allocation_record_tree_node_written_bytes=0 \
              accounting_tree_node_write_calls=0 accounting_tree_node_written_bytes=0 \
+             deleted_inodes_tree_node_write_calls=0 deleted_inodes_tree_node_written_bytes=0 \
+             tombstone_tree_node_write_calls=0 tombstone_tree_node_written_bytes=0 \
+             lineage_tree_node_write_calls=0 lineage_tree_node_written_bytes=0 \
+             retirement_tree_node_write_calls=0 retirement_tree_node_written_bytes=0 \
              central_mapping_tree_node_write_calls=0 central_mapping_tree_node_written_bytes=0 \
              tree_table_unit_write_calls=0 tree_table_unit_written_bytes=0 \
              instance_table_unit_write_calls=0 instance_table_unit_written_bytes=0 \
@@ -2351,7 +2370,7 @@ mod tests {
                 &plan,
                 &stream,
                 &geometry,
-                &run.output,
+                &run,
             ),
             "发布 B",
         );
@@ -2375,7 +2394,11 @@ mod tests {
         let run =
             run_new_pool_file_creation(&parameters, &mut devices, &stream, |_point, _devices| {})
                 .expect("新池新建文件");
-        let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+        let mut allocator = allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+            &parameters,
+            &devices,
+            &run,
+        );
         publish_the_second_version(&parameters, &mut devices, &mut allocator, &run.output)
             .expect("发布 B");
         let mut clock = SegmentClock::start();
@@ -2419,9 +2442,9 @@ mod tests {
     }
 
     /// 暖机与新池新建文件的分界不是从流尾往回数几步：`ScenarioPoint::BeforeNewPoolFileCreation` 处量到的流长度，
-    /// 与 `new_pool_file_creation_publish.rs` 的 `warm_up_operation_count`（该文件第 187–188 行）量的是同一处
+    /// 与 `new_pool_file_creation_publish.rs` 的 `warm_up_operation_count`（该文件第 189、201 行）量的是同一处
     /// ——暖机 `warm_up()` 已调完、`publish_first_file()` 还没调。这里在内存盘上走同一条路径，用它切出五段，
-    /// 钉住该文件那五处断言的操作数：23、2、20、35、57（C577 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
+    /// 钉住该文件那五处断言的操作数：25、2、20、35、57（mkfs 清 [0, 根环基址)（C651）之后每块盘多一步整段清零：mkfs 23 → 25；C577 之后每次发布末尾轮换之后多一道池屏障、两块盘各记一步：暖机两次发布
     /// 18 → 20——第一次末尾那一道顶替了第二次开头那道没有写在前的屏障、只多第二次末尾那 2 步——、新池新建文件 33 → 35，
     /// mkfs 之后整条 2 + 20 + 35 = 57）。
     #[test]
@@ -2451,7 +2474,7 @@ mod tests {
         let lengths: Vec<usize> = paths.into_iter().map(|(_, slice)| slice.len()).collect();
         assert_eq!(
             lengths,
-            vec![23, 2, 20, 35, 57],
+            vec![25, 2, 20, 35, 57],
             "mkfs / instance_acquisition / warm_up / transaction / post_mkfs_stream 五段的操作数：\
              与 new_pool_file_creation_publish.rs 断言的五个数逐字相同"
         );
@@ -2569,7 +2592,12 @@ mod tests {
                 |_point, _devices| {},
             )
             .expect("新池新建文件");
-            let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+            let mut allocator =
+                allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+                    &parameters,
+                    &devices,
+                    &run,
+                );
             publish_the_second_version(&parameters, &mut devices, &mut allocator, &run.output)
                 .expect("发布 B");
             let mut clock = SegmentClock::start();
@@ -2614,7 +2642,9 @@ mod tests {
         let run =
             run_new_pool_file_creation(parameters, &mut devices, stream, |_point, _devices| {})
                 .expect("新池新建文件");
-        let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+        let mut allocator = allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+            parameters, &devices, &run,
+        );
         publish_the_second_version(parameters, &mut devices, &mut allocator, &run.output)
             .expect("发布 B");
         let switched = match switch_instance_and_publish_third_version(
@@ -3052,7 +3082,7 @@ mod tests {
             &plan,
             &stream,
             &geometry,
-            &run.output,
+            &run,
         );
         assert!(second.is_ok_and(|second| second.window_matches_device));
         let operations_after_the_file_overwrite = stream.operation_count();

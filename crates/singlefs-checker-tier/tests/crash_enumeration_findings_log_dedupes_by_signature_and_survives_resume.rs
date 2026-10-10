@@ -260,7 +260,9 @@ fn rejudge_state(
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(_detail) => Some(invariant),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     if !violated_invariants.is_empty() {
@@ -504,6 +506,8 @@ fn begin_line(stream: &str) -> String {
 /// 先红后改的那一条：两类违例、两遍恢复、好几段里都红，今天的计数只留一条 `first_violation`；发现表按签名去重，每个签名的状态数、
 /// 最先 3 个状态与逐状态重判的相同，发现日志跑完是定稿（一个签名一行、汇总行的数对得上）；跑的过程中每并进一片，这一片带来的
 /// 新签名、跨过 10 的签名已经落在文件里（观察者在下一片并进来之前读得到），同一签名只报一次「新」。
+/// C577 那道屏障之后（46 个状态）这份版本表下最多的签名只有 8 个状态，没有签名跨过 10：跨台阶那一报在这里只核「没跨就不报」，
+/// 「跨过就报一次」这一面这条流上没有对象。
 #[test]
 fn red_states_are_deduplicated_by_signature_and_the_findings_log_is_readable_while_running() {
     let stream = first_stream("findings-dedupe");
@@ -577,15 +581,30 @@ fn red_states_are_deduplicated_by_signature_and_the_findings_log_is_readable_whi
         .map(Vec::len)
         .max()
         .expect("有签名");
+    // 钉值出处：2026-10-04 主工作区 checker 档日志 `LAYER0_FINDINGS signatures=15 red_states=25 states=46`，断言报「15 个签名，最多的 8 个状态」
+    // （C577 屏障让暖机末尾两次系统配置槽写自成一段，54 个状态那时写的门槛 10 跟着落空）。
     assert!(
-        rejudged.red_states_by_signature.len() >= 4 && largest_signature_states >= 10,
-        "至少四个签名、至少一个签名跨过 10 个状态：{} 个签名，最多的 {largest_signature_states} 个状态",
+        rejudged.red_states_by_signature.len() >= 4 && largest_signature_states >= 8,
+        "至少四个签名、至少一个签名跨过 8 个状态：{} 个签名，最多的 {largest_signature_states} 个状态",
         rejudged.red_states_by_signature.len()
     );
     assert_findings_match_the_rejudged(&tally.findings, &rejudged);
 
     let log_text = std::fs::read_to_string(&findings_log_path).expect("读发现日志");
     assert_final_section_matches_the_rejudged(&log_text, &rejudged, &begin_line("unnamed"));
+    let signatures_crossing_ten = rejudged
+        .red_states_by_signature
+        .values()
+        .filter(|red_states| red_states.len() >= 10)
+        .count();
+    assert_eq!(
+        log_text
+            .lines()
+            .filter(|line| line.starts_with("layer0_finding_threshold\t"))
+            .count(),
+        signatures_crossing_ten,
+        "跨台阶那一报恰好每个跨过 10 的签名一行（46 个状态的流上没有签名跨过 100），没跨的不报"
+    );
 
     // 跑的过程中：观察者在第 k 个状态那一片并进来之前读的文件，恰好有序号小于 k 的状态带来的新签名与跨台阶。
     for (position, (signature, red_states)) in rejudged

@@ -555,10 +555,12 @@ fn region_device(txg: u64) -> DeviceIdentity {
     parameters().region_devices[usize::try_from(target.region).expect("区域号")]
 }
 
-/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 21 条；
-/// 其余 25 条要真被评估过且成立。映射 key 与单元头相符（`MAPPING_KEY_MATCHES_THE_UNIT_HEADER`）报不适用是因为中央映射树的根指针全零，
+/// 最新的根下面还没有记账树、inode 树与分配记录树时（mkfs 之后、零单元发布之后）checker 报不适用的那 45 条；
+/// 其余 39 条要真被评估过且成立（条数按今天的 `IMPLEMENTED_INVARIANTS` 85 条数）。映射 key 与单元头相符（`MAPPING_KEY_MATCHES_THE_UNIT_HEADER`）报不适用是因为中央映射树的根指针全零，
 /// 一条映射条目都没有。I-3.11（已分配减 defer 等于最新根走读） 与 I-3.1（已分配统计对得上） 同一个理由：最新根下面没有记账树。I-9.14（树表条目的诞生 txg 跨根不变） 在这里报不适用是因为 mkfs 种的第 0 版树表是空的：
 /// 一棵树的条目都没有，跨根比不出来（有了文件版本之后也只有一条根有条目，见 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION`）；
+/// I-9.28（全部可读根里同一树 ID 的诞生 txg 相同） 同一个理由，比的是根环里全部读得出的根（不按实例表判有效）：根环里每条根的树表都是
+/// mkfs 种的那一版或零单元发布照抄的，一条条目都没有——这个文件里每一步 I-9.28 与 I-9.14 同报不适用（下面五张表都同时有这两条）；
 /// I-5.4（分配记录罩住的槽互不相交） 同一个理由：第 0 版树表里没有分配记录树，候选集里一条根的记录都走不到；
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 也是这个理由。
 /// I-1.10（码 2 条目宽等于字段表宽） 也是这个理由：一条树表条目都没有，就没有哪个码 2 节点的条目宽可比。
@@ -573,7 +575,16 @@ fn region_device(txg: u64) -> DeviceIdentity {
 /// 出现规则一个单元都判不到（mkfs 之后那一格的理由不同，见 `NOT_APPLICABLE_RIGHT_AFTER_MKFS`）。
 /// I-9.27（树表条目的头 ID 取值） 与 I-5.5（从 mkfs 水位建树那一版的 t1 落点） 三张没有文件的表都有：每条根的树表都是 0 条，
 /// 头 ID 一格都没有，也没有哪一版是从 mkfs 水位第一次建树的那一版（第一个文件版本之后两条都真被评估过且成立）。
-const NOT_APPLICABLE_WITHOUT_FILE: [&str; 30] = [
+/// 删除线那五条（里程碑三·3）五张没有文件的表都有：I-9.5（删除队列里的号仍在树里） 与 I-3.4（可用空间扣待删占用） 要树表里的
+/// `deleted_inodes`、inode 树与记账树，每一版树表都是 0 条（第一个文件版本之后两条都真被评估过且成立）；I-4.7（删除中 inode 有账） 与
+/// I-4.6（中间态其余不变量成立） 没有处于删除中的号；I-4.4（意图只描述目标态） 第一版恒报不适用（下面每一张表都有它）。
+/// 墓碑与谱系那九条（里程碑三·3，第 22 批）五张没有文件的表都有：I-9.17–I-9.23 要墓碑树、谱系树（每一版树表都是 0 条，有了文件版本也是零根，
+/// 下面两张有文件的表照样有这七条），I-9.24（删除队列至多一条 key） 要 `deleted_inodes` 条目、I-9.29（同号只许一个出生代） 要 inode 记录
+/// （第一个文件版本之后两条都真被评估过且成立）。I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上） 要最新根下面的记账树
+/// （第一个文件版本之后真被评估过且成立：那一版自己写的那一行就是第一级台阶）。退役树那五条（I-9.31–I-9.35，第 50 批）同样没有对象：
+/// 每一版树表都是 0 条，没有退役树、没有 inode 树。谱系树与退役树的容器容量那两条（I-9.36、I-9.37，第 53 批）同理没有对象
+/// （有了文件版本两棵也是零根，下面两张有文件的表照样有它们；旧入口没有谱系与退役的旋钮值，I-9.37 一格都不判）。
+const NOT_APPLICABLE_WITHOUT_FILE: [&str; 53] = [
     "I-9.27",
     "I-5.5",
     "I-1.10",
@@ -604,14 +615,38 @@ const NOT_APPLICABLE_WITHOUT_FILE: [&str; 30] = [
     "I-3.12",
     "I-4.1",
     "I-3.5",
+    "I-9.28",
+    "I-9.5",
+    "I-3.4",
+    "I-4.7",
+    "I-4.6",
+    "I-4.4",
+    "I-9.17",
+    "I-9.18",
+    "I-9.19",
+    "I-9.20",
+    "I-9.21",
+    "I-9.22",
+    "I-9.23",
+    "I-9.24",
+    "I-9.29",
+    "I-9.30",
+    "I-9.31",
+    "I-9.32",
+    "I-9.33",
+    "I-9.34",
+    "I-9.35",
+    "I-9.36",
+    "I-9.37",
 ];
 
-/// mkfs 刚写完那一份要多报两条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法） 与
-/// I-8.9（一次发布的记录序号连续且只有末条带标志） 都没有判的对象。
-/// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这两条只在 mkfs 之后那一格。
+/// mkfs 刚写完那一份比 `NOT_APPLICABLE_WITHOUT_FILE` 多报四条不适用：journal 环整段是 0，一条自证过的记录都没有 ⇒ I-8.6（反向链算法）、
+/// I-8.9（一次发布的记录序号连续且只有末条带标志）、I-8.10（记录新根段与同代根相同） 与 I-8.12（同实例记录的 txg 不减） 都没有判的对象。
+/// 可写挂载之后环里有记录（写行 / 暖机的空发布），它们就真被评估过了——所以这四条只在 mkfs 之后那一格。
 /// I-3.5（引用区间的精确性） 两张表都有，这一格的理由是回退候选集只剩 mkfs 的第 0 代根一版（环里没有记录、根环里只有它），
 /// 凑不出相邻的一对。
-const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 34] = [
+/// 删除线那五条与墓碑与谱系那九条的理由同 `NOT_APPLICABLE_WITHOUT_FILE`。
+const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 57] = [
     "I-9.27",
     "I-5.5",
     "I-1.10",
@@ -646,35 +681,73 @@ const NOT_APPLICABLE_RIGHT_AFTER_MKFS: [&str; 34] = [
     "I-8.12",
     "I-4.1",
     "I-3.5",
+    "I-9.28",
+    "I-9.5",
+    "I-3.4",
+    "I-4.7",
+    "I-4.6",
+    "I-4.4",
+    "I-9.17",
+    "I-9.18",
+    "I-9.19",
+    "I-9.20",
+    "I-9.21",
+    "I-9.22",
+    "I-9.23",
+    "I-9.24",
+    "I-9.29",
+    "I-9.30",
+    "I-9.31",
+    "I-9.32",
+    "I-9.33",
+    "I-9.34",
+    "I-9.35",
+    "I-9.36",
+    "I-9.37",
 ];
 
-/// 写完第一个文件版本之后仍报不适用的那五条（I-4.1 的理由见 `NOT_APPLICABLE_WITHOUT_FILE`）：
+/// 写完第一个文件版本之后仍报不适用的那六条（I-4.1 的理由见 `NOT_APPLICABLE_WITHOUT_FILE`）：
 /// I-7.9（回退下界 F 不高于抬 F 的上限）——没抬过 F，没有抬 F 的根可判（坏镜像与阳性对照在 `checker_known_bad_images.rs` 步 5 那段历史上）；
 /// I-9.14——树表条目只出现在这一条根的树表里（mkfs 种的第 0 版树表是空的、两次暖机空发布不写树表），
-/// 它要同一棵树的条目出现在两个树表单元里才比得出来；
+/// 它要同一棵树的条目出现在两个树表单元里才比得出来；I-9.28（全部可读根里同一树 ID 的诞生 txg 相同） 同一个理由（根环里别的根
+/// 都指着空树表）；
 /// I-8.7——这个实例只发过一个承载事务的版本（事务号 1），环里其余记录都是事务号 0 的空发布，
 /// 同一实例凑不出两条非 0 的号来比；
 /// I-8.8（前缀里的事务不被切开）——第一版一事务一条、每条都带提交标记，③ ④ 没有对象。
 /// 三条比得出来的镜像都在 `checker_known_bad_images.rs`（再覆盖写一次：树表两版、事务号 1 与 2；
 /// B 之后再接一事务两条记录的阳性对照与坏镜像）。
-const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 5] =
-    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1"];
+/// I-4.7（删除中 inode 有账） 与 I-4.6（中间态其余不变量成立）——没有删除，没有处于删除中的号、没有 nlink = 0 的记录
+/// （阳性对照与坏镜像在 `pool_checker_judges_the_deletion_state_of_every_walked_version.rs`）；I-4.4（意图只描述目标态） 第一版恒报不适用；
+/// I-9.17–I-9.23——没有删除、没有回退，墓碑树与谱系树都是零根；I-9.31–I-9.34——没有叶容器身份消失，退役树零根
+/// （I-9.35 在第一个文件版本那一版上真被评估过且成立：父版树表 0 条、叶身份集是空集）。
+const NOT_APPLICABLE_WITH_ONE_FILE_VERSION: [&str; 22] = [
+    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-4.1", "I-9.28", "I-4.7", "I-4.6", "I-4.4", "I-9.17",
+    "I-9.18", "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32", "I-9.33",
+    "I-9.34", "I-9.36", "I-9.37",
+];
 
 /// 只有实例 1 的池上第一个文件版本之后：比 `NOT_APPLICABLE_WITH_ONE_FILE_VERSION` 多 I-3.12（实例表行 T 低于引用它的根的 txg）——
 /// 实例表一行都没有（写过行的那一份上它真被评估过且成立）。
-const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 6] =
-    ["I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1"];
+const NOT_APPLICABLE_WITH_ONE_FILE_VERSION_OF_THE_ONLY_INSTANCE: [&str; 23] = [
+    "I-7.9", "I-8.7", "I-8.8", "I-9.14", "I-3.12", "I-4.1", "I-9.28", "I-4.7", "I-4.6", "I-4.4",
+    "I-9.17", "I-9.18", "I-9.19", "I-9.20", "I-9.21", "I-9.22", "I-9.23", "I-9.31", "I-9.32",
+    "I-9.33", "I-9.34", "I-9.36", "I-9.37",
+];
 
-/// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
-/// I-1.10（码 2 条目宽等于字段表宽）、I-3.9（释放代落在停止引用它的那一格区间里） 与 I-5.4（分配记录罩住的槽互不相交） 四条。
+/// 树表 0 条的一版上写行那次发布之后：比 `NOT_APPLICABLE_WITHOUT_FILE` 少七条——I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）、
+/// I-1.10（码 2 条目宽等于字段表宽）、I-3.9（释放代落在停止引用它的那一格区间里）、I-5.4（分配记录罩住的槽互不相交）、
+/// I-8.11（点名项与被指单元头相同）、I-3.12（实例表行 T 低于引用它的根的 txg） 与 I-3.5（引用区间的精确性）。
 /// 写行那次发布写了一棵分配记录树、根指针住根记录（C512（树表 0 条的一版上被换下的单元记在哪），
 /// D16（发布语义） 已定项 9），里面未释放的那几条记录起点槽上都读得出单元头，
 /// I-3.10 在这一格真被评估过；这棵树按位置寻址（D8（核心索引结构） 已定项 14），checker 从根记录那一项按位置走下去、每个节点判条目宽，
 /// I-1.10 也真被评估过。checker 把根记录直接持有的那一棵并进候选根的分配记录（实审 B2）：被换下的 mkfs 那片实例表带释放标志，
 /// I-3.9 判它的释放代；I-5.4 判这棵树里的记录两两不相交——两条都真被评估过且成立。
+/// I-3.12：实例表里有了实例 1 那一行，判它的 T 低于引用它的根的 txg；I-8.11：写行那次发布的记录点名它写的实例表单元与分配记录树节点，
+/// 判点名项与单元头逐字段相同——两条都真被评估过且成立。
 /// I-3.5（引用区间的精确性） 也不在这张表里：写行那次发布（实例 2、txg 3）把实例表 COW 到新落点、写了自己那棵分配记录树，
 /// 这几个单元前一版（实例 1 的暖机根，txg 2）不引用、诞生代号 3 大于 2，出现规则真判到了它们且成立。
-const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 23] = [
+/// 删除线那五条与墓碑与谱系那九条的理由同 `NOT_APPLICABLE_WITHOUT_FILE`。
+const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 46] = [
     "I-9.27",
     "I-5.5",
     "I-3.1",
@@ -698,6 +771,29 @@ const NOT_APPLICABLE_AFTER_THE_ROW_PUBLISH_WITHOUT_FILE: [&str; 23] = [
     "I-3.13",
     "I-9.26",
     "I-4.1",
+    "I-9.28",
+    "I-9.5",
+    "I-3.4",
+    "I-4.7",
+    "I-4.6",
+    "I-4.4",
+    "I-9.17",
+    "I-9.18",
+    "I-9.19",
+    "I-9.20",
+    "I-9.21",
+    "I-9.22",
+    "I-9.23",
+    "I-9.24",
+    "I-9.29",
+    "I-9.30",
+    "I-9.31",
+    "I-9.32",
+    "I-9.33",
+    "I-9.34",
+    "I-9.35",
+    "I-9.36",
+    "I-9.37",
 ];
 
 /// 这一步的镜像上 checker 的每一条判决逐条核：`not_applicable` 里的报不适用，其余每一条都真被评估过且成立（一条违例都没有）。
@@ -1081,10 +1177,11 @@ fn plant_a_root_without_its_allocation_record_tree(
 
 /// 验收：取号 1、不写行；写行那次发布 (1, 1)、jsn 1、事务号 0、反向链 0、零单元、落盘 1；暖机一次 (1, 2)、jsn 2、反向链接 jsn 1、落盘 0；
 /// 分配器只有 mkfs 的两个单元（每盘 3 槽）；第一个文件版本 (1, 3)、jsn 3、事务号 1，数据单元落 50180、换下 mkfs 那片树表；
-/// mkfs 之后的录制流与新池新建文件那条逐字节相同、写出的那一版也相同；冷启动读回文件；checker 一条违例都没有——mkfs 之后
-/// 23 条成立（环是空的，I-8.6 也报不适用）、挂载之后 25 条成立，没有记账树 / inode 树 / 分配记录树 / 映射条目的那几条报不适用，
-/// 第一个文件版本之后 42 条成立、I-7.9、I-9.14、I-8.7 与 I-8.8 仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；
-/// 没有哪个事务号落了两条记录、每条都带提交标记）。
+/// mkfs 之后的录制流与新池新建文件那条逐字节相同、写出的那一版也相同；冷启动读回文件；checker 一条违例都没有（条数按今天的
+/// `IMPLEMENTED_INVARIANTS` 85 条数）——mkfs 之后 35 条成立（环是空的，I-8.6、I-8.9、I-8.10、I-8.12 也报不适用）、挂载之后 39 条成立，
+/// 没有记账树 / inode 树 / 分配记录树 / 映射条目的那几条报不适用，第一个文件版本之后 68 条成立、I-7.9、I-9.14、I-9.28、I-8.7、I-8.8、
+/// I-3.12、I-4.1、I-4.7、I-4.6、I-4.4 与墓碑树、谱系树那七条（I-9.17–I-9.23）仍报不适用（树表条目只出现在这一条根的树表里；同一实例只有一条非 0 事务号的记录；没有哪个事务号落了两条记录、
+/// 每条都带提交标记；只有实例 1，实例表一行都没有；最新根之上没有记录；没有删除；I-4.4 第一版恒报不适用）。
 #[test]
 fn writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold(
 ) {
@@ -1464,14 +1561,14 @@ fn a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_i
 
 /// D8（核心索引结构） 已定项 8 ②「号永不重发」在崩溃恢复那一形上（原先由回退到暖机根之后再发第一个文件版本那几条用例护，
 /// 回退改成挂着时的向前发布之后那一形没有了，D23（journal 的角色与格式） 已定项 14）：只做过 mkfs 的池可写挂载（实例 1，暖机），
-/// 再挂一次（实例 2，写行 txg 3、暖机 txg 4）发第一个文件版本（txg 5，十二棵树 65536..65547），崩在 txg 5 的根槽 FUA 之后、系统配置轮换之前
+/// 再挂一次（实例 2，写行 txg 3、暖机 txg 4）发第一个文件版本（txg 5，十三棵树 65536..65548），崩在 txg 5 的根槽 FUA 之后、系统配置轮换之前
 /// （录制流切到那一写为止：系统配置只见证到 txg 4）。可写挂载一次，txg 5 的根槽与它那条记录点名的一个单元（数据单元盘 0 那一份）读不出——
 /// 择根落到实例 2 的暖机根 (2, 4)（树表 0 条、根上水位 65536），txg 5 那条记录施加前验点名单元验不过、不施加；系统配置见证到的就是 (2, 4)
 /// 那次，C554 乙不重读、照常挂载（见证过的根暂时读不出会被拒，`a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs`）。
-/// 新实例 3 的水位按根环与环里记录取 max = 65548。实例 3 接着发第一个文件版本：
-/// - 十二棵树从 65548 发 65548..65559、新水位 65560，不从那一版根上的 65536 重发（照 mkfs 水位发就与盘上实例 2 的节点撞号）；
-/// - 「树建没建」按树表条数判（0 条），不按水位是不是 65536（水位 65548、树表 0 条照样发得出第一个文件版本）；
-/// - 只读挂载沿新根读回这一版的内容：中央映射树是 65552，按根记录里映射根指针的出生树认，不写死 65540。
+/// 新实例 3 的水位按根环与环里记录取 max = 65549。实例 3 接着发第一个文件版本：
+/// - 十三棵树从 65549 发 65549..65561、新水位 65562，不从那一版根上的 65536 重发（照 mkfs 水位发就与盘上实例 2 的节点撞号）；
+/// - 「树建没建」按树表条数判（0 条），不按水位是不是 65536（水位 65549、树表 0 条照样发得出第一个文件版本）；
+/// - 只读挂载沿新根读回这一版的内容：中央映射树是 65553，按根记录里映射根指针的出生树认，不写死 65540。
 #[test]
 fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_trees_above_the_ring_watermark_and_reads_back(
 ) {
@@ -1504,8 +1601,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
     };
     assert_eq!(
         dropped_first_file.tree_identifiers.highest().0,
-        65547,
-        "实例 2 从 mkfs 的水位 65536 发 65536..65547"
+        65548,
+        "实例 2 从 mkfs 的水位 65536 发 65536..65548"
     );
     assert_eq!(
         dropped_first_file.root.checkpoint_txg,
@@ -1571,8 +1668,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
         panic!("落到实例 2 的暖机根：现行那一版树表 0 条")
     };
     assert_eq!(
-        version_of_the_third_instance.root.tree_identifier_watermark, 65548,
-        "实例 3 那一版带根环与环里记录的水位 max：实例 2 的记录带的 65548"
+        version_of_the_third_instance.root.tree_identifier_watermark, 65549,
+        "实例 3 那一版带根环与环里记录的水位 max：实例 2 的记录带的 65549"
     );
     let mut allocator_of_the_third_instance = third_instance.allocator.clone();
     let content = (0..3300usize)
@@ -1592,7 +1689,7 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
             third_instance.output.instance,
             &version_of_the_third_instance.record_bytes,
         )
-        .expect("水位 65548、树表 0 条：照样发得出第一个文件版本")
+        .expect("水位 65549、树表 0 条：照样发得出第一个文件版本")
     };
     assert_eq!(
         (
@@ -1610,8 +1707,8 @@ fn the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_tre
                 .birth_tree
                 .0
         ),
-        (65559, 65560, 65552),
-        "实例 3 从 65548 发 65548..65559、新水位 65560，中央映射树是 65552"
+        (65561, 65562, 65553),
+        "实例 3 从 65549 发 65549..65561、新水位 65562，中央映射树是 65553"
     );
     let image = memory_pool_of_sparse_devices(&reopened);
     let mounted = singlefs_core::mounted_read::mount_read_only(&image).expect("只读挂载");
@@ -1949,8 +2046,16 @@ fn crash_recovery_abandoning_the_unwitnessed_row_publish_of_the_version_without_
         UnreadableRangeReadBack::DeviceError,
     );
     let mut third_with_the_fault = with_unreadable_ranges(crashed, &unreadable);
-    let third_mount = mount_writable(&publish_parameters, &mut third_with_the_fault)
-        .expect("M3：写行那条根读不出、系统配置只见证到 (1, 2)，择根落到 (1, 2)，照常可写挂载");
+    // M3 关着影子账（只供测试的开关，连 C694 的 C 一起关，删除线第 33 批 T）：(2, 3) 的记录读得出、在水位之上没施加，产品路径的 C
+    // 会把它点名的落点隔离、M3 不再是看不见它的那次挂载；这条用例要的是看不见它、把它的槽发出去之后，之后的挂载与抬 F 怎么护。
+    let third_mount = mount_writable_with_test_only_switches_and_a_hook_before_the_one_reread(
+        &publish_parameters,
+        &mut third_with_the_fault,
+        SpaceAdmission::JudgedByTheFormula,
+        ShadowLedger::Off,
+        BeforeTheOneReread::RereadImmediately,
+    )
+    .expect("M3：写行那条根读不出、系统配置只见证到 (1, 2)，择根落到 (1, 2)，照常可写挂载");
     let mut third = without_unreadable_ranges(third_with_the_fault);
     assert_eq!(
         third_mount.output.rereads.read_stage,
@@ -2137,7 +2242,9 @@ fn assert_only_the_abandoned_root_the_blind_mount_reused_reddens_the_reuse_invar
         .iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((*invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert_eq!(

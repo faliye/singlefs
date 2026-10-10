@@ -38,8 +38,9 @@ const FIRST_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
 /// 进程内那几次发布都在新池新建文件那个实例里发。
 const INSTANCE_OF_THE_PROCESS: InstanceGeneration = InstanceGeneration(1);
 
-/// 产品批大小 144、S = 8、两块 4 GiB 盘：W = 24 + min(524, 340) + min(4, 340) = 368，环窗口 = 25 × 368 槽。
-const RING_WINDOW_SLOTS_OF_THE_PRODUCT_BATCH: u64 = 25 * 368;
+/// 产品批大小 144、S = 8、两块 4 GiB 盘、退役树至多只有根：W = 24 + (6 + 0) + min(524, 340) + min(4, 340) = 374，环窗口 = 25 × 374 槽
+/// （退役树那 6 + H_退役 是判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条加的，此前 368）。
+const RING_WINDOW_SLOTS_OF_THE_PRODUCT_BATCH: u64 = 25 * 374;
 
 fn slots_per_region() -> RootRingSlotsPerRegion {
     parameters().geometry.root_ring_slots_per_region
@@ -75,7 +76,8 @@ fn available_bytes_the_ring_window_takes_on_each_device(reading: &AdmissionReadi
                 allocated: terms.allocated,
                 unreclaimable: terms.unreclaimable,
                 mount_time_commitment: terms.mount_time_commitment,
-                abandoned_root_exclusive: terms.abandoned_root_exclusive,
+                isolated_for_abandoned_roots_and_unapplied_journal_records: terms
+                    .isolated_for_abandoned_roots_and_unapplied_journal_records,
                 ring_window: BytesOnOneDevice::ZERO,
             })
             .collect(),
@@ -165,11 +167,11 @@ fn publish_the_next_step_in_process(pool: &mut BuiltPool) -> TransactionOutput {
     output
 }
 
-/// 新池新建文件那一版 inode 树只有第一个文件（n_live = 1）、墓碑树零根（H = 0）：
-/// 标签 6 = 2 × ((2 + 0 + 1) × 16384 + 41 × 1) = 98386；再建两个 inode（n_live = 3）：2 × (49152 + 123) = 98550。
+/// 新池新建文件那一版 inode 树只有第一个文件（n_live = n_记录 = 1）、墓碑树与退役树零根（H_墓碑 = H_退役 = 0）：
+/// 标签 6 = 2 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × 1 + 35 × 1) = 196760；再建两个 inode（n_live = n_记录 = 3）：
+/// 2 × (98304 + 123 + 105) = 197064（退役那一份是判决 m3-retire-r1 第三节第 6 条）。
 #[test]
-fn tag_six_of_the_first_file_version_is_three_slots_and_one_live_object_and_two_new_inodes_add_two_more(
-) {
+fn tag_six_of_the_first_file_version_is_six_slots_and_one_record_and_two_new_inodes_add_two_more() {
     let mut pool = build_pool("tag-six-first-file-and-new-inodes");
     let first_file_version = pool.output.clone();
     let with_two_new_inodes = publish_new_inodes_in_process(&mut pool, 2);
@@ -178,12 +180,12 @@ fn tag_six_of_the_first_file_version_is_three_slots_and_one_live_object_and_two_
             tag_six_of(&first_file_version),
             tag_six_of(&with_two_new_inodes)
         ),
-        (98_386, 98_550),
-        "标签 6 按每一版现算：两份副本 × (3 槽常驻 + 41 字节 × n_live)"
+        (196_760, 197_064),
+        "标签 6 按每一版现算：两份副本 × (墓碑 3 槽 + 退役 3 槽常驻 + 41 字节 × n_live + 35 字节 × n_记录)"
     );
 }
 
-/// 发布之前的读数：环窗口每块盘各扣 9200 槽，已承诺预留取那一版记账行里的标签 6。
+/// 发布之前的读数：环窗口每块盘各扣 9350 槽，已承诺预留取那一版记账行里的标签 6。
 #[test]
 fn the_publish_reading_deducts_the_ring_window_of_the_product_batch_on_each_device() {
     let pool = build_pool("ring-window-in-the-publish-reading");
@@ -199,7 +201,7 @@ fn the_publish_reading_deducts_the_ring_window_of_the_product_batch_on_each_devi
             ring_window_slots_on_each_device(&reading),
             reading.pool_wide().committed_reservation.0,
         ),
-        (vec![RING_WINDOW_SLOTS_OF_THE_PRODUCT_BATCH; 2], 98_386),
+        (vec![RING_WINDOW_SLOTS_OF_THE_PRODUCT_BATCH; 2], 196_760),
         "每块盘扣 (3S + 1) × W 槽；全池那一项读到标签 6"
     );
     assert_eq!(
@@ -209,10 +211,10 @@ fn the_publish_reading_deducts_the_ring_window_of_the_product_batch_on_each_devi
     );
 }
 
-/// 第二个几何：随机历史单元区 384 槽那一档小盘（环窗口补足 815 槽之后单元区 [1408, 2607)、分配记录树根层级 1），
-/// 每块盘罩叶 ⌊2606 ÷ 812⌋ − ⌊1408 ÷ 812⌋ + 1 = 3 片 ⇒ N_0 = 6、W = 24 + 6 = 30，环窗口 = 25 × 30 = 750 槽；可用(d) 正好少这么多字节。
+/// 第二个几何：随机历史单元区 384 槽那一档小盘（环窗口补足 1007 槽之后单元区 [1408, 2799)、分配记录树根层级 1），
+/// 每块盘罩叶 ⌊2798 ÷ 812⌋ − ⌊1408 ÷ 812⌋ + 1 = 3 片 ⇒ N_0 = 6、W = 24 + (6 + 0) + 6 = 36，环窗口 = 25 × 36 = 900 槽；可用(d) 正好少这么多字节。
 #[test]
-fn the_publish_reading_on_the_384_slot_small_devices_deducts_twenty_five_times_thirty_slots() {
+fn the_publish_reading_on_the_384_slot_small_devices_deducts_twenty_five_times_thirty_six_slots() {
     let pool = PoolUnderTest::start_after_the_first_file(
         HistoryDeviceWidth::UnitAreaOf384Slots,
         plain_device,
@@ -230,12 +232,12 @@ fn the_publish_reading_on_the_384_slot_small_devices_deducts_twenty_five_times_t
             ring_window_slots_on_each_device(&reading),
             available_bytes_the_ring_window_takes_on_each_device(&reading),
         ),
-        (vec![25 * 30; 2], vec![i128::from(25 * 30 * 16384_u64); 2]),
-        "每块盘扣 (3 × 8 + 1) × 30 槽，可用(d) 正好少这么多字节"
+        (vec![25 * 36; 2], vec![i128::from(25 * 36 * 16384_u64); 2]),
+        "每块盘扣 (3 × 8 + 1) × 36 槽，可用(d) 正好少这么多字节"
     );
 }
 
-/// 批大小 K 取分配器上装的删除开关：K = 1 时 W = 24 + min(524, 54) + min(4, 54) = 82，环窗口 = 25 × 82 = 2050 槽。
+/// 批大小 K 取分配器上装的删除开关：K = 1 时 W = 24 + (6 + 0) + min(524, 54) + min(4, 54) = 88，环窗口 = 25 × 88 = 2200 槽。
 #[test]
 fn the_ring_window_follows_the_batch_size_switch_installed_on_the_allocator() {
     let mut pool = build_pool("ring-window-follows-the-batch-switch");
@@ -243,14 +245,17 @@ fn the_ring_window_follows_the_batch_size_switch_installed_on_the_allocator() {
         batch_size: batches_of_one_data_unit(),
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity:
+            singlefs_core::retirement_tree::RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     });
     assert_eq!(
         RingWindowOfTheReading::DeductedOnEachDevice {
-            slots_per_region: slots_per_region()
+            slots_per_region: slots_per_region(),
+            retirement_tree_internal_levels: 0,
         }
         .on_each_device(&pool.allocator),
-        BytesOnOneDevice::of_slots(25 * 82)
+        BytesOnOneDevice::of_slots(25 * 88)
     );
 }
 
@@ -284,6 +289,6 @@ fn the_writable_mount_reading_counts_the_ring_window_as_usable_only_while_the_de
             vec![RING_WINDOW_SLOTS_OF_THE_PRODUCT_BATCH; 2],
             vec![0, 0],
         ),
-        "队列非空：可动用；队列空：扣 9200 槽；没有第一个文件版本：不起计"
+        "队列非空：可动用；队列空：扣 9350 槽（退役树这时只有根，H_退役 = 0）；没有第一个文件版本：不起计"
     );
 }

@@ -131,7 +131,9 @@ fn core_and_checker_refuse_the_cell(
                     detail.contains(checker_names_member),
                     "{tag}：I-7.13 的违例说明里要点名 {checker_names_member}：{detail}"
                 ),
-                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+                other @ (InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_)) => {
                     panic!("{tag}：四槽都带这一版读者不收的值，I-7.13 要判违例，得到 {other:?}")
                 }
             }

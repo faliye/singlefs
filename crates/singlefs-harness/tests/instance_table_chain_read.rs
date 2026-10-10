@@ -12,7 +12,7 @@
 mod common;
 
 use common::{disk_snapshot, memory_pool_of_sparse_devices, parameters, DiskSnapshot, IMAGE_BYTES};
-use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::image::{InvariantVerdict, INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
@@ -530,14 +530,21 @@ fn abandonment_by_the_instance_table_reads_the_row_that_lives_on_the_second_page
     );
 }
 
-/// 合法的两片链上池级 checker 一条都不红：第二片的身份、校验和、位置条目次序、链指针记录都判过（I-1.1、I-2.1、I-2.5、I-3.8
+/// 合法的两片链上池级 checker 一条都不红：第二片的身份、校验和、位置条目次序、记录形态与链指针记录都判过（I-1.1、I-2.1、I-2.5、I-3.14
 /// 判成成立，不是「不适用」），两片的行接起来判 I-3.8。
 #[test]
 fn the_pool_checker_walks_both_pages_of_a_valid_chain_and_every_invariant_holds() {
     let (devices, _stream, _rows, _chain) = pool_with_a_valid_two_page_chain();
     let verdicts = verdicts(&devices);
     assert_eq!(violated(&verdicts), Vec::<&str>::new(), "{verdicts:?}");
-    for invariant in ["I-1.1", "I-2.1", "I-2.5", "I-3.8", "I-1.7"] {
+    for invariant in [
+        "I-1.1",
+        "I-2.1",
+        "I-2.5",
+        "I-3.8",
+        "I-1.7",
+        INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED,
+    ] {
         assert_eq!(
             verdict_of(&verdicts, invariant),
             InvariantVerdict::Holds,
@@ -583,7 +590,9 @@ fn chain_pointer_to_another_instance_table_unit_reddens_the_identity_invariant()
             detail.contains("实例表第 1 片"),
             "I-1.2 红在链上第 1 片的出生身份：{detail}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("链指针记的出生身份与 mkfs 那一片头里的不等，I-1.2 该红：{other:?}")
         }
     }
@@ -592,7 +601,9 @@ fn chain_pointer_to_another_instance_table_unit_reddens_the_identity_invariant()
             detail.contains(&format!("槽 {}", INSTANCE_TABLE_SLOT.0)),
             "I-3.9 红在 mkfs 那一片（已释放、又被链指针引用）：{detail}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("被换下的 mkfs 那一片又被每一条候选根引用，I-3.9 该红：{other:?}")
         }
     }
@@ -649,7 +660,7 @@ fn the_same_instance_on_both_pages_reddens_only_the_instance_table_invariant() {
 }
 
 /// 链指针记录自相矛盾（坏镜像）：「有无下一片」写 0 而位置指针没清零（条款：无下一片时清零占位），
-/// 与「有无下一片」写 2（字段表里只有有、无两个值）。两样都是 I-3.8 那条链指针记录的判定红；
+/// 与「有无下一片」写 2（字段表里只有有、无两个值）。两样都是 I-3.14（实例表每片记录形态合法） 那条链指针记录的判定红；
 /// 链在第 0 片就停了，第二片没人引用，别的不红。
 #[test]
 fn contradictory_chain_record_reddens_only_the_instance_table_invariant() {
@@ -664,7 +675,11 @@ fn contradictory_chain_record_reddens_only_the_instance_table_invariant() {
             &rows[2..],
         );
         let verdicts = verdicts(&devices);
-        assert_eq!(violated(&verdicts), vec!["I-3.8"], "{what}：{verdicts:?}");
+        assert_eq!(
+            violated(&verdicts),
+            vec![INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED],
+            "{what}：{verdicts:?}"
+        );
         assert_eq!(
             instance_table_of_root(&devices, &newest_root(&devices)),
             None,

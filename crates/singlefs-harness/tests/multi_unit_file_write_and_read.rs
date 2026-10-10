@@ -7,7 +7,7 @@
 //! 的定案（N 个数据单元 = N 个事务 = N 条记录）；D4（校验和位置） 已定项 5（净荷 32634，文件偏移到单元做除法）。
 //!
 //! 七条用例：
-//! 1. 写 68 个单元（跨过 67）再写 144 个单元（一片 extent 叶装满），冷启动顺序读回逐字节相同；一次发布的记录条数 = 数据单元数；
+//! 1. 写 65 个单元（跨过 64）再写 144 个单元（一片 extent 叶装满），冷启动顺序读回逐字节相同；一次发布的记录条数 = 数据单元数；
 //!    extent 树节点只在打开文件时按需读、读取次数 ≤ 树高 + 叶数（顺序读期间块层一次 16 KiB 节点读都没有）；池级 checker 一条违例都没有。
 //!    多于 144 个单元时 extent 树下段长成两层（D8（核心索引结构） 已定项 14），下段几种变形走一遍的是
 //!    `the_lower_extent_segment_grows_to_two_levels_past_one_leaf_and_shrinks_back_to_inline`。
@@ -47,7 +47,9 @@ use singlefs_core::transaction::{
     FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{data_unit_payload_capacity, unit_filesystem_identifier};
-use singlefs_format::{JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES};
+use singlefs_format::{
+    JOURNAL_NAMED_ENTRIES_PER_RECORD, JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES,
+};
 use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::read_tally::{JournalRingRegion, ReadCountingPoolReader};
 use singlefs_harness::{RecordedOperationKind, RetainedOperation};
@@ -115,7 +117,9 @@ fn assert_the_pool_checker_finds_no_violation(image: &MemoryPool, what: &str) {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert!(
@@ -196,33 +200,39 @@ fn cold_sequential_read_matches(
     );
 }
 
-/// 验收第 1、2 条：68 个单元（跨过一条记录 67 个点名项那个门槛）再 144 个单元（一片 extent 叶装满），
+/// 验收第 1、2 条：65 个单元（跨过一条记录 64 个点名项那个门槛）再 144 个单元（一片 extent 叶装满），
 /// 每次冷启动读回逐字节相同，一次发布的记录条数 = 数据单元数，extent 节点读取次数 ≤ 树高 + 叶数，池级 checker 没有违例。
 #[test]
-fn units_written_across_the_sixty_seven_threshold_and_up_to_a_full_extent_leaf_read_back_cold_byte_for_byte(
+fn units_written_across_the_sixty_four_threshold_and_up_to_a_full_extent_leaf_read_back_cold_byte_for_byte(
 ) {
+    // 写路径不读这个上限，单元数写成字面量；先钉住上限今天的值，上限一变这里先红，单元数才会跟着挪，不会贴着旧上限照样绿下去。
+    assert_eq!(
+        JOURNAL_NAMED_ENTRIES_PER_RECORD + 1,
+        65,
+        "第一次写的单元数是一条 journal 记录的点名项上限 ⌊(4096 − 487) ÷ 56⌋ = 64 加一；上限变了要跟着挪单元数"
+    );
     let mut pool = build_pool("parallel-line-one-large-file");
-    let sixty_eight_units = content_needing(68, 1);
-    let first = sequential_write(&mut pool, &sixty_eight_units, InstanceGeneration(1));
-    assert_eq!(first.data_pointers.len(), 68);
+    let sixty_five_units = content_needing(65, 1);
+    let first = sequential_write(&mut pool, &sixty_five_units, InstanceGeneration(1));
+    assert_eq!(first.data_pointers.len(), 65);
     let image_after_the_first = pool.memory_pool();
     assert_eq!(
         records_on_disk_with_txg(&image_after_the_first, first.root.checkpoint_txg),
-        68,
-        "一次发布的记录条数 = 数据单元数 68（C310 用户定案的口径），67 那个点名项上限够不着"
+        65,
+        "一次发布的记录条数 = 数据单元数 65（C310 用户定案的口径），64 那个点名项上限够不着"
     );
     // 144 个单元之内（D8（核心索引结构） 已定项 14）：上段一片根兼叶，下段一片根兼叶。
-    cold_sequential_read_matches(&image_after_the_first, &sixty_eight_units, 68, (2, 2));
+    cold_sequential_read_matches(&image_after_the_first, &sixty_five_units, 65, (2, 2));
     let (content, effective_root) = recovered(&image_after_the_first);
     assert!(
-        content == sixty_eight_units,
-        "冷走读（recover）读回 68 个单元"
+        content == sixty_five_units,
+        "冷走读（recover）读回 65 个单元"
     );
     assert_eq!(
         effective_root,
         (first.root.instance, first.root.checkpoint_txg)
     );
-    assert_the_pool_checker_finds_no_violation(&image_after_the_first, "68 个单元之后");
+    assert_the_pool_checker_finds_no_violation(&image_after_the_first, "65 个单元之后");
 
     let one_hundred_forty_four_units = content_needing(144, 2);
     let second = sequential_write(
@@ -231,7 +241,7 @@ fn units_written_across_the_sixty_seven_threshold_and_up_to_a_full_extent_leaf_r
         InstanceGeneration(1),
     );
     assert_eq!(second.data_pointers.len(), 144);
-    for position in 0..68u64 {
+    for position in 0..65u64 {
         let replaced_slot = first
             .unit(TransactionUnit::Data(DataUnitIndexInFile(position)))
             .slot;

@@ -1,6 +1,6 @@
 //! 代码审阅第 27、36、37 条与实审 A2a 交来的「journal 环短于三条记录」（实审 A2b）的会红用例：
 //! 树表里同一种树出现两条时，读树表的五个读者一律判损坏（不取首条也不取末条）；
-//! 所选根的 checkpoint_txg 加一溢出时恢复报损坏、不 panic；
+//! 所选根的 checkpoint_txg 加一溢出时恢复报损坏、不 panic；从盘上重建一版只剩 inode 号水位的台阶行、没有它自己那一行水位时判坏，可写挂载在任何写之前拒；
 //! 全池槽 0 都自证不过时，在格式允许的每一档槽距上找槽 1，只收自己记的槽距等于所在偏移的那一槽，几档都收得到时取世代号最大的
 //! （D22（单元原子性怎么合成） 已定项 16、D2（RAID 条带策略） 已定项 19）；
 //! journal 环装不下 F 条记录时 mkfs 在任何写之前拒掉（I-8.1（环几何够大）、D23（journal 的角色与格式） 已定项 18 / 已定项 19）。
@@ -20,11 +20,15 @@ use singlefs_core::make_filesystem::{
     allocator_after_make_filesystem, make_filesystem, MakeFilesystemError, MakeFilesystemOutput,
     MakeFilesystemParameters,
 };
+use singlefs_core::mount::{mount_writable, MountError};
 use singlefs_core::mounted_read::{
     mount_read_only, open_pool_for_read, MountReadOnlyFailure, OpenPoolForReadFailure,
 };
 use singlefs_core::pointer::NodePointer;
-use singlefs_core::records::{TreeTableEntry, TREE_KIND_ALLOCATION, TREE_KIND_INODE};
+use singlefs_core::records::{
+    AccountingEntry, TreeTableEntry, STATISTIC_INODE_WATERMARK, TREE_KIND_ACCOUNTING,
+    TREE_KIND_ALLOCATION, TREE_KIND_INODE,
+};
 use singlefs_core::recovery::{
     allocation_records_under_root, choose_system_configuration, rebuild_version, recover,
     user_visible_tree_root_pointers, walk_to_file, JournalPolicy, PoolReader,
@@ -32,20 +36,23 @@ use singlefs_core::recovery::{
     CHOSEN_ROOT_CHECKPOINT_TXG_HAS_NO_SUCCESSOR, TREE_TABLE_CARRIES_ONE_KIND_OF_TREE_TWICE,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::root_ring::{slot_offset, RootRingSlot, RootRingSlotsPerRegion};
+use singlefs_core::root_ring::{
+    slot_offset, target_for_publish, RootRingSlot, RootRingSlotsPerRegion,
+};
 use singlefs_core::system_configuration::{
     SystemConfiguration, SystemImmutableSizes,
     INCOMPAT_RETIRED_FIRST_SSD_LINE_WITH_ROLLBACK_WITNESS_BIT,
     SYSTEM_CONFIGURATION_CHECKSUM_OFFSET,
 };
 use singlefs_core::transaction::{
-    acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
+    acquire_instance, publish_first_file, publish_overwrite, warm_up, FirstFile, PoolWriter,
+    TransactionOutput,
 };
 use singlefs_core::unit::{build_index_node, parse_index_node};
 use singlefs_format::{
     JOURNAL_RECORD_BYTES, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
-    JOURNAL_SAFETY_FACTOR, NODE_BYTES, SLOT_BYTES, SYSTEM_CONFIGURATION_SLOT_BYTES,
-    UNIT_AREA_START_SLOT,
+    JOURNAL_SAFETY_FACTOR, NODE_BYTES, ROOT_RING_REGION_DEVICES, SLOT_BYTES,
+    SYSTEM_CONFIGURATION_SLOT_BYTES, UNIT_AREA_START_SLOT,
 };
 use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice, SparseDevice};
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -135,13 +142,21 @@ struct PoolAfterTheFirstFile {
 }
 
 fn pool_after_the_first_file() -> PoolAfterTheFirstFile {
+    pool_after_the_first_file_and_the_overwrites(&[]).0
+}
+
+/// 同 [`pool_after_the_first_file`]，第一个文件之后再按次序把 `overwrite_contents` 一份一份覆盖写（txg 4 起），交回池与每次覆盖写的输出；
+/// 池里的镜像是最后一次覆盖写之后的。
+fn pool_after_the_first_file_and_the_overwrites(
+    overwrite_contents: &[Vec<u8>],
+) -> (PoolAfterTheFirstFile, Vec<TransactionOutput>) {
     let parameters = parameters_with(geometry_with_minimum_input_output_bytes(512));
     let mut devices = two_sparse_devices();
     let genesis = make_filesystem(&parameters, &mut devices).expect("默认几何上 mkfs");
     let mut allocator: PoolAllocator =
         allocator_after_make_filesystem(&parameters, &devices, &genesis);
     let first_content = content_of(3000, 0);
-    let (instance, first) = {
+    let (instance, first, overwrites) = {
         let mut writer = PoolWriter::new(&parameters, devices.as_mut_slice());
         let instance = acquire_instance(&mut writer).expect("取号 1");
         let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
@@ -157,15 +172,35 @@ fn pool_after_the_first_file() -> PoolAfterTheFirstFile {
             &warmed.last_record_bytes,
         )
         .expect("第一个文件");
-        (instance, first)
+        let mut overwrites: Vec<TransactionOutput> = Vec::new();
+        for content in overwrite_contents {
+            let previous = overwrites.last().unwrap_or(&first).clone();
+            overwrites.push(
+                publish_overwrite(
+                    &mut writer,
+                    &mut allocator,
+                    &previous,
+                    FirstFile {
+                        content,
+                        write_time_seconds: WRITE_TIME_SECONDS,
+                    },
+                    instance,
+                )
+                .expect("覆盖写"),
+            );
+        }
+        (instance, first, overwrites)
     };
-    PoolAfterTheFirstFile {
-        image: image_of(&devices),
-        instance,
-        first_content,
-        first,
-        geometry: parameters.geometry,
-    }
+    (
+        PoolAfterTheFirstFile {
+            image: image_of(&devices),
+            instance,
+            first_content,
+            first,
+            geometry: parameters.geometry,
+        },
+        overwrites,
+    )
 }
 
 // ── 第 27 条：树表里同一种树出现两条 ──
@@ -343,14 +378,102 @@ fn a_tree_table_carrying_one_kind_of_tree_twice_is_refused_as_damaged_by_every_r
 
 // ── 第 36 条：所选根的 checkpoint_txg 加一溢出 ──
 
-/// 在根环区域 0 的槽 7（txg 3 之前的发布都没用到它）写一条 `root` 的根记录、checkpoint_txg 换成 `checkpoint_txg`：
-/// 它的 txg 最大，择根择中它。
+/// 一条根指着的记账树（只有根兼叶一个节点）的行交给 `rewrite_rows` 改过（改完仍按 key 升序），照原叶的头重建（key 区间取首行、末行的 key），
+/// 写回它两条位置条目指的槽；树表里记账树那一条指针的两条校验和跟着换，树表照 [`root_whose_tree_table_carries`] 重建写回，
+/// 交回一条除树表指针之外与 `root` 相同的根。原地写：别的根若指着同一片叶与同一个树表单元，它们的校验和就对不上了。
+fn root_whose_accounting_rows_are_rewritten(
+    image: &mut MemoryPool,
+    root: &RootRecord,
+    rewrite_rows: impl Fn(&mut Vec<AccountingEntry>),
+) -> RootRecord {
+    let tree_table_entries = parse_index_node(&tree_table_unit_of(image, root))
+        .expect("树表单元解得开")
+        .entries;
+    let mut rewritten_tree_table_entries = Vec::with_capacity(tree_table_entries.len());
+    for entry_bytes in &tree_table_entries {
+        let mut entry = TreeTableEntry::parse(entry_bytes).expect("写者写的条目解得开");
+        if entry.kind == TREE_KIND_ACCOUNTING {
+            let first_location = entry.root.locations[0];
+            let leaf = PoolReader::read(
+                image,
+                first_location.device,
+                first_location.slot.to_device_offset(),
+                node_bytes(),
+            )
+            .expect("记账树叶读得到");
+            let header = parse_index_node(&leaf).expect("记账树叶解得开");
+            let mut rows: Vec<AccountingEntry> = header
+                .entries
+                .iter()
+                .map(|row_bytes| AccountingEntry::parse(row_bytes).expect("写者写的记账行解得开"))
+                .collect();
+            let key_range_of = |rows_in_key_order: &[AccountingEntry]| {
+                (
+                    rows_in_key_order
+                        .first()
+                        .expect("记账树恒有池级 3 行")
+                        .key_bytes(),
+                    rows_in_key_order
+                        .last()
+                        .expect("记账树恒有池级 3 行")
+                        .key_bytes(),
+                )
+            };
+            assert_eq!(
+                (
+                    header.level,
+                    (header.smallest_key.clone(), header.largest_key.clone())
+                ),
+                (0, key_range_of(&rows)),
+                "记账树只有根兼叶一个节点，叶头的 key 区间是首行与末行的 key"
+            );
+            rewrite_rows(&mut rows);
+            let (smallest_key, largest_key) = key_range_of(&rows);
+            let rebuilt = build_index_node(
+                header.tree,
+                header.level,
+                header.key_width,
+                &smallest_key,
+                &largest_key,
+                header.birth_txg,
+                &FILESYSTEM_IDENTIFIER,
+                header.instance,
+                header.birth_sequence,
+                u16::try_from(header.entry_width).expect("条目宽 34"),
+                &rows
+                    .iter()
+                    .map(AccountingEntry::to_bytes)
+                    .collect::<Vec<_>>(),
+            );
+            let checksum = crc32_castagnoli(&rebuilt);
+            for location in &mut entry.root.locations {
+                image
+                    .devices
+                    .get_mut(&location.device)
+                    .expect("池里有这块盘")
+                    .write(location.slot.to_device_offset(), &rebuilt);
+                location.unit_checksum = checksum;
+            }
+        }
+        rewritten_tree_table_entries.push(entry.to_bytes());
+    }
+    root_whose_tree_table_carries(image, root, &rewritten_tree_table_entries)
+}
+
+/// 在根环区域 0 的槽 7（txg 3 之前的发布都没用到它）写一条 `root` 的根记录、checkpoint_txg 换成 `checkpoint_txg`，
+/// 记账行的代段跟着换成 `checkpoint_txg`（I-3.13：记账行代段等于这一版的 txg；恢复要代段 = 根 txg 的那一行 inode 号水位）：
+/// 它的 txg 最大，择根择中它。记账叶与树表原地改写，txg 3 那条根的两条校验和就对不上了，种的这条用不到它。
 fn image_whose_chosen_root_has_the_checkpoint_txg(
     pool: &PoolAfterTheFirstFile,
     checkpoint_txg: CheckpointTxg,
 ) -> MemoryPool {
     let mut image = pool.image.clone();
-    let mut planted = pool.first.root;
+    let mut planted =
+        root_whose_accounting_rows_are_rewritten(&mut image, &pool.first.root, |rows| {
+            for row in rows {
+                row.generation = checkpoint_txg;
+            }
+        });
     planted.checkpoint_txg = checkpoint_txg;
     let ring_slot = RootRingSlot { region: 0, slot: 7 };
     image
@@ -364,9 +487,9 @@ fn image_whose_chosen_root_has_the_checkpoint_txg(
     image
 }
 
-/// 所选根的 checkpoint_txg 是 u64 最大值（自证校验和对得上、别的字段都是第一个文件那一版的）：锚点读不出时链首那条的 txg 要取它加一，
-/// 改前在这一步溢出、只读挂载与恢复 panic；改后在施加任何一条记录之前报损坏。
-/// 边界：最大值减一加一不溢出，恢复照常读回第一个文件。
+/// 所选根的 checkpoint_txg 是 u64 最大值（自证校验和对得上、记账行代段跟着换成它，别的字段都是第一个文件那一版的）：锚点读不出时链首那条的 txg
+/// 要取它加一，改前在这一步溢出、只读挂载与恢复 panic；改后在施加任何一条记录之前报损坏。
+/// 边界：最大值减一加一不溢出，恢复照常读回第一个文件（读的是种的那条根：它自己的 inode 号水位那一行代段等于它的 txg）。
 #[test]
 fn a_chosen_root_whose_checkpoint_txg_is_the_largest_value_is_refused_as_damaged_instead_of_panicking(
 ) {
@@ -409,6 +532,106 @@ fn a_chosen_root_whose_checkpoint_txg_is_the_largest_value_is_refused_as_damaged
     assert!(
         mount_read_only(&image_one_below).is_ok(),
         "最大值减一：只读挂载挂得上"
+    );
+}
+
+/// 从盘上重建一版要它自己那一行 inode 号水位（统计量 12、代段 = 根的 txg），不认台阶顶替（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」；
+/// I-3.13 记账行代段等于这一版的 txg）：第一个文件（txg 3，它那一行是第 1 级台阶）之后覆盖写一版（txg 4：池级与每盘的行换成代段 4，
+/// 照抄台阶 (12, 3)，加自己那一行 (12, 4)，16 行）。把 txg 4 那一版自己那一行的统计量标签改成 13（仍排在末尾；不算台阶的行仍是 3 + 6 × 2），
+/// 那一版的根槽原地换成指着改过的树表的那一条：这一版只剩台阶 (12, 3) 那一行水位。
+/// 从盘上重建 txg 4 那一版（`rebuild_version`，可写挂载与回退建上一版走的那一份）判它坏：记账树里没有这一版的水位行；
+/// 可写挂载建不出所选那一版，这个池系统配置里见证的 journal 计数器是 mkfs 写的 0，F2 乙不退
+/// （D23（journal 的角色与格式） 已定项 14「c_见证 = 0 … 都不退」），在任何写之前拒、报同一个失败。冷读文件内容的走读不读水位，不在这条用例里。
+/// 判别力：重建退回只判「水位那一统计量有一行」，台阶 (12, 3) 顶上，txg 4 那一版照建、可写挂载照挂。
+#[test]
+fn a_version_whose_own_inode_number_watermark_row_is_damaged_leaving_only_a_step_is_judged_damaged_by_the_rebuild_and_refused_by_the_writable_mount(
+) {
+    let (mut pool, overwrites) =
+        pool_after_the_first_file_and_the_overwrites(&[content_of(2000, 1)]);
+    let overwrite = &overwrites[0];
+    let overwrite_txg = overwrite.root.checkpoint_txg;
+    let rows_of = |output: &TransactionOutput| {
+        output
+            .accounting_entries
+            .iter()
+            .filter(|row| row.statistic == STATISTIC_INODE_WATERMARK)
+            .map(|row| row.generation)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(
+        (
+            pool.first.root.checkpoint_txg,
+            overwrite_txg,
+            overwrite.accounting_entries.len(),
+            rows_of(overwrite)
+        ),
+        (
+            CheckpointTxg(3),
+            CheckpointTxg(4),
+            16,
+            vec![CheckpointTxg(3), CheckpointTxg(4)]
+        ),
+        "覆盖写那一版：16 行，水位那一统计量是台阶 (12, 3) 与它自己那一行 (12, 4)"
+    );
+    let damaged_root =
+        root_whose_accounting_rows_are_rewritten(&mut pool.image, &overwrite.root, |rows| {
+            let own_row = rows.last_mut().expect("记账树恒有池级 3 行");
+            assert_eq!(
+                (own_row.statistic, own_row.generation),
+                (STATISTIC_INODE_WATERMARK, overwrite_txg),
+                "末行是这一版自己那一行水位"
+            );
+            own_row.statistic = STATISTIC_INODE_WATERMARK + 1;
+        });
+    let ring_slot = target_for_publish(overwrite_txg, pool.geometry.root_ring_slots_per_region);
+    let device_holding_the_root = DeviceIdentity(
+        ROOT_RING_REGION_DEVICES[usize::try_from(ring_slot.region).expect("区域号小于 3")],
+    );
+    pool.image
+        .devices
+        .get_mut(&device_holding_the_root)
+        .expect("区域落在池里的盘上")
+        .write(
+            slot_offset(ring_slot, pool.geometry.fixed_structure_slot_spacing),
+            &damaged_root
+                .to_slot(usize::try_from(pool.geometry.physical_block_size).expect("根槽宽")),
+        );
+    assert_eq!(
+        rebuild_version(&pool.image, &damaged_root, Some(overwrite.record.clone())).err(),
+        Some(RebuildVersionFailure::Walk(
+            RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree
+        )),
+        "从盘上重建 txg 4 那一版：只剩台阶那一行水位，判记账树里没有这一版的水位行"
+    );
+    let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = pool
+        .image
+        .devices
+        .iter()
+        .map(|(identity, image)| {
+            let mut device = SparseBlockDevice::new(DEVICE_BYTES, SECTOR_PHYSICAL_BLOCK_SIZE);
+            device.image = image.clone();
+            (*identity, device)
+        })
+        .collect();
+    let refused = mount_writable(
+        &parameters_with(geometry_with_minimum_input_output_bytes(512)),
+        &mut devices,
+    )
+    .err();
+    assert!(
+        matches!(
+            refused,
+            Some(MountError::Recovery(
+                RecoveryFailure::InodeNumberWatermarkRowMissingFromTheAccountingTree
+            ))
+        ),
+        "可写挂载建上一版判 txg 4 那一版坏：系统配置见证的计数器是 0、不退（D23 已定项 14），拒的是记账树里没有这一版的水位行：{refused:?}"
+    );
+    assert!(
+        devices
+            .iter()
+            .all(|(identity, device)| pool.image.devices.get(identity) == Some(&device.image)),
+        "可写挂载在任何写之前拒：两块盘逐字节不变"
     );
 }
 

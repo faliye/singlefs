@@ -20,7 +20,7 @@
 //! 另两个纯函数核也在这里：择根（`choose_root_slot`，`recovery::choose_root` 取 `(checkpoint_txg, 实例代号)` 最大的那一截）与
 //! 扫环建表（`first_copy_of_each_record_key`，`recovery::scan_journal` 同一 (实例代号, 计数器) 先到先得的那一截）；
 //! 择根与取前缀的合判（C650 的 Verus 一半）写成推论 `corollary_recovery_replays_from_the_newest_self_verified_root`。
-//! Verus 的必红世界登记在同目录的 `verus-mutations.tsv`。
+//! Verus 的必红世界登记在同目录的 `verus-must-red-worlds.tsv`。
 #![forbid(unsafe_code)]
 
 use std::collections::BTreeMap;

@@ -27,7 +27,7 @@ use singlefs_checker_tier::crash_amplification::{
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
 #[cfg(feature = "gpu")]
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_checker_tier::verdict_store::{JudgeVersion, VerdictStore};
 use singlefs_harness::memory_pool::{
@@ -76,6 +76,7 @@ impl RecordedFlow {
             segments: &self.segments,
             judged_root_index: self.judged_root_index,
             versions: &self.versions,
+            versions_without_a_file: &[],
             expansion: &expansion,
             crash_points: self.crash_points.clone(),
         }
@@ -847,6 +848,7 @@ fn a_driver_line_reports_reuse_exhaustiveness_and_depth_and_its_reuse_equals_the
         segments: &recorded.segments,
         judged_root_index: recorded.judged_root_index,
         versions: &recorded.versions,
+        versions_without_a_file: &[],
         expansion: &expansion_of_the_run,
         crash_points: recorded.crash_points.clone(),
     };
@@ -954,16 +956,20 @@ fn a_run_importing_another_library_reports_the_states_judged_before_the_import_a
 
 /// L1：只排派活计划的那一趟照实报录入时库里已判的态数，不写 0。同一份库上第一趟（单机 CPU）把整条流判完；第二趟配置开 GPU、
 /// 登记 `crash_judge_gpu`、只排计划：一块都不判，复用数等于整条流的态数。要本机一张 NVIDIA 独显：一张适配器都没有时报「本次未跑」
-/// （`gpu_unit_checks::gpu_test_start`），有适配器而一张卡都起不来判红。要 `verdict-store,gpu` 两个特性。
+/// （经这个进程的卡池判有没有卡，`gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run`），有适配器而点名的卡找不到判红。
+/// 只排计划的那一趟一个状态都不上卡判，这条用例不向卡池借显存；那一趟的卡照这个进程的卡池用（第 10t 批 K4-4：每张卡这个进程只起一个设备；
+/// 第 10x 批：借到哪张卡才在哪张上起，驱动那一份记在这个进程的显存账上），不经产品路径另起一套不记账的设备。要 `verdict-store,gpu` 两个特性。
 #[cfg(feature = "gpu")]
 #[test]
 fn a_placement_only_run_reports_the_states_judged_at_recording_as_reused() {
-    let Some(card) = first_usable_card_or_report_not_run(
+    use singlefs_checker_tier::crash_amplification::GpuCardsSource;
+    if gpu_card_pool_or_report_not_run(
         "a_placement_only_run_reports_the_states_judged_at_recording_as_reused",
-    ) else {
+    )
+    .is_none()
+    {
         return;
-    };
-    drop(card);
+    }
     let recorded =
         record_new_pool_file_creation("crash-amplification-placement-reuse", false, file_content());
     let directory = EnvironmentRunDirectory::new("placement-reuse");
@@ -989,6 +995,11 @@ fn a_placement_only_run_reports_the_states_judged_at_recording_as_reused() {
     assert_eq!(
         placement_run.states_reused, state_count,
         "只排计划的那一趟录入时库里整条流都判过"
+    );
+    assert_eq!(
+        placement_run.gpu_cards_taken_from,
+        GpuCardsSource::TheCardPoolOfThisProcess,
+        "这个进程起过卡池：只排计划的那一趟照池里的卡用，不另起不记账的设备"
     );
     drop(directory);
 }

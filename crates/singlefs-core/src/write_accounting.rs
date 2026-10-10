@@ -24,6 +24,8 @@ pub enum WrittenStructureKind {
     TombstoneTreeNode,
     /// 谱系树的容器与根（D18（块里携带什么信息） 已定项 24 第 5 条）：另立一种、不并进墓碑树那一种（用户 2026-10-02 定「另立一种」），按树数。
     LineageTreeNode,
+    /// 退役树的容器与根（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条）：照谱系树另立一种，按树数。
+    RetirementTreeNode,
     CentralMappingTreeNode,
     TreeTableUnit,
     InstanceTableUnit,
@@ -35,7 +37,7 @@ pub enum WrittenStructureKind {
 impl WrittenStructureKind {
     /// 报数的次序：单元按 bump 次序（实例表单元在末尾，同 `TransactionOutput::units`），固定结构按持久顺序（D16（发布语义） 已定项 7）。
     /// 合计不经过这张清单（`WritesByStructureKind::total` 只从记过的账里加）：清单漏一种，报出的各种之和就对不上合计。
-    pub const IN_REPORT_ORDER: [WrittenStructureKind; 15] = [
+    pub const IN_REPORT_ORDER: [WrittenStructureKind; 16] = [
         WrittenStructureKind::DataUnit,
         WrittenStructureKind::ExtentTreeNode,
         WrittenStructureKind::InodeTreeLeafContainer,
@@ -45,6 +47,7 @@ impl WrittenStructureKind {
         WrittenStructureKind::DeletedInodesTreeNode,
         WrittenStructureKind::TombstoneTreeNode,
         WrittenStructureKind::LineageTreeNode,
+        WrittenStructureKind::RetirementTreeNode,
         WrittenStructureKind::CentralMappingTreeNode,
         WrittenStructureKind::TreeTableUnit,
         WrittenStructureKind::InstanceTableUnit,
@@ -81,6 +84,11 @@ impl WrittenStructureKind {
                 WrittenStructureKind::TombstoneTreeNode
             }
             TransactionUnit::LineageNodeBelowTheRoot(_) => WrittenStructureKind::LineageTreeNode,
+            TransactionUnit::RetirementLeafContainer(_)
+            | TransactionUnit::RetirementRoot
+            | TransactionUnit::RetirementNodeBelowTheRoot(_) => {
+                WrittenStructureKind::RetirementTreeNode
+            }
             TransactionUnit::MappingTreeNodeBelowTheRoot(_) | TransactionUnit::MappingTree => {
                 WrittenStructureKind::CentralMappingTreeNode
             }
@@ -104,6 +112,7 @@ impl WrittenStructureKind {
             WrittenStructureKind::DeletedInodesTreeNode => "deleted_inodes_tree_node",
             WrittenStructureKind::TombstoneTreeNode => "tombstone_tree_node",
             WrittenStructureKind::LineageTreeNode => "lineage_tree_node",
+            WrittenStructureKind::RetirementTreeNode => "retirement_tree_node",
             WrittenStructureKind::CentralMappingTreeNode => "central_mapping_tree_node",
             WrittenStructureKind::TreeTableUnit => "tree_table_unit",
             WrittenStructureKind::InstanceTableUnit => "instance_table_unit",
@@ -280,6 +289,7 @@ mod tests {
             TransactionUnit::DeletedInodesRoot,
             TransactionUnit::TombstoneRoot,
             TransactionUnit::LineageRoot,
+            TransactionUnit::RetirementRoot,
             TransactionUnit::MappingTree,
             TransactionUnit::TreeTable,
             TransactionUnit::InstanceTable,
@@ -302,7 +312,7 @@ mod tests {
             assert_eq!(
                 every_kind_once.of(kind).write_calls,
                 1,
-                "{kind:?}：十二个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
+                "{kind:?}：十三个单元角色各归一种、三种固定结构各一种，每种恰好一笔"
             );
         }
         let reported = WrittenStructureKind::IN_REPORT_ORDER
@@ -318,10 +328,10 @@ mod tests {
         assert_eq!(
             every_kind_once.total(),
             WriteCallsAndBytes {
-                write_calls: 15,
-                written_bytes: 32767
+                write_calls: 16,
+                written_bytes: 65535
             },
-            "十五笔，长度 1 到 16384 各一次"
+            "十六笔，长度 1 到 32768 各一次"
         );
         let mut names: Vec<&str> = WrittenStructureKind::IN_REPORT_ORDER
             .iter()
@@ -329,6 +339,6 @@ mod tests {
             .collect();
         names.sort_unstable();
         names.dedup();
-        assert_eq!(names.len(), 15, "结果行的字段名前缀互不相同");
+        assert_eq!(names.len(), 16, "结果行的字段名前缀互不相同");
     }
 }

@@ -124,7 +124,8 @@ fn capped(
 /// 产品路径的节点容量（按节点格式算），盘宽四档：分配记录树高 2（1 GiB）、3（4 GiB、64 GiB）、4（1 TiB），文件一个数据单元、中央映射树 1 层；
 /// 再加一格 4 GiB 两盘、文件顺序写到 300 个数据单元，中央映射树 2 层。
 /// ckpt_cost 加了谱系那一项（一次谱系容器 COW 连祖先：容器 2 + 根 1，谱系树零根，用户 2026-10-02 定「乙」）之后，这里与下一张表每格多扣的块数都多 3
-/// （空发布不写谱系树，实写的固定点不变）。
+/// （空发布不写谱系树，实写的固定点不变）。第 50 批 ckpt_cost 再加退役那一项（退役容器 2 + 根 1 + 退役树内部层数 0，判决
+/// `research/prompts/m3-retire-r1-main-verification.md` 第六节 R2），空发布不写退役树，每格再多 3。
 fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
     let one_data_unit = |name,
                          device_bytes,
@@ -147,28 +148,28 @@ fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
             GIBIBYTE,
             JOURNAL_RING_BYTES_OF_THE_ONE_GIBIBYTE_DEVICES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(135, 137),
+            over_reserved(138, 140),
         ),
         one_data_unit(
             "two-4GiB",
             4 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(530, 532),
+            over_reserved(533, 535),
         ),
         one_data_unit(
             "two-64GiB",
             64 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_PER_CELL,
-            over_reserved(10340, 10342),
+            over_reserved(10343, 10345),
         ),
         one_data_unit(
             "two-1TiB",
             1024 * GIBIBYTE,
             JOURNAL_RING_DEFAULT_BYTES,
             EMPTY_PUBLISHES_OF_THE_ONE_TEBIBYTE_CELL,
-            over_reserved(167_301, 167_303),
+            over_reserved(167_304, 167_306),
         ),
         PoolGeometryCell {
             name: "two-4GiB-file-300-units-mapping-two-levels",
@@ -179,7 +180,7 @@ fn cells_with_the_node_format_capacities() -> Vec<PoolGeometryCell> {
                 DATA_UNITS_OF_THE_TWO_LEVEL_CENTRAL_MAPPING_CELL,
             ),
             empty_publishes: EMPTY_PUBLISHES_PER_CELL,
-            over_reserved_slots_of_the_empty_publishes: over_reserved(531, 533),
+            over_reserved_slots_of_the_empty_publishes: over_reserved(534, 536),
         },
     ]
 }
@@ -199,21 +200,23 @@ fn cells_with_capped_code_two_trees() -> Vec<PoolGeometryCell> {
         };
     // ckpt_cost 中央映射树那一项的删插数连谱系容器与谱系树根那 2 把一起算（用户 2026-10-02 定 Q-U「乙」）之后，压小的映射树上
     // 那一项多切几次：三格各多扣 1 / 3 / 1077 块左右（三·2 第 8 位实现员副本上现跑；之前是 880–885、1060–1070、144964–145506）。
+    // 第 50 批退役那一项（容器 2 + 根 1 + 内部层数，中央映射树删插数再加退役容器与根各一把）之后三格各多扣 4–5 / 4 / 1084–1086 块
+    // （第 50 批实现员副本上现跑；之前是 881–886、1063–1072、146041–146585）。
     vec![
         capped_cell(
             "two-4GiB-mapping-4-8",
             capped((477, 150), (4, 8)),
-            over_reserved(881, 886),
+            over_reserved(885, 891),
         ),
         capped_cell(
             "two-4GiB-mapping-3-3",
             capped((477, 150), (3, 3)),
-            over_reserved(1063, 1072),
+            over_reserved(1067, 1076),
         ),
         capped_cell(
             "two-4GiB-mapping-2-2-accounting-8-3",
             capped((8, 3), (2, 2)),
-            over_reserved(146_041, 146_585),
+            over_reserved(147_125, 147_671),
         ),
     ]
 }
@@ -446,6 +449,9 @@ fn measure(
             | TransactionUnit::TombstoneLeafContainer(_)
             | TransactionUnit::TombstoneRoot
             | TransactionUnit::TombstoneNodeBelowTheRoot(_)
+            | TransactionUnit::RetirementLeafContainer(_)
+            | TransactionUnit::RetirementRoot
+            | TransactionUnit::RetirementNodeBelowTheRoot(_)
             | TransactionUnit::InstanceTable
             | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
                 measured.ordinary_allocation_slots += role.span_slots();

@@ -826,8 +826,7 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 /// `LAYER0_PARALLEL_START` + 46 行 `LAYER0_PROGRESS` + `LAYER0_FINDINGS` + `LAYER0_PARALLEL_FINISHED` + `GOLDEN_TALLY` 共 51 行。
 /// C577（系统配置没见证到的最新根，乙罩不到）那道发布返回之前的屏障加上之后甲二那一段 54 → 46 个状态（`crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs` 文件头），
 /// 行数与进度文件行数照这个数静态改（合入后验证二，改法 B 报告第四节第 5 条推的，没跑）；池级 checker 多一条 I-7.14 之后
-/// 打印的计数行与进度文件内容也跟着变。**两个 SHA-256 与进度文件名里的计划哈希留原值，待第五步 checker-tier-layer0-replay 跑出来重录**
-/// （checker 档，子 agent 不跑）。
+/// 打印的计数行与进度文件内容也跟着变。打的行与进度文件内容此后又重取过几次，经过与今天这组钉值取自哪一版见下。
 ///
 /// 钉值的来历：头一版取自加分片之前的代码（`crash.rs` 与 `layer0_progress.rs` 加分片之前那一版：38 行、SHA-256 `6deeb48f…`，
 /// 进度文件计划哈希 `a1d502a7…`、内容 `798bef3c…`），证的是加分片没改不分片那条路。实审 B3a-2 按设备记屏障、原地覆写补第三态之后
@@ -837,13 +836,35 @@ fn print_the_unsharded_enumerations_for_the_golden_comparison() {
 /// `LAYER0_FINDINGS signatures=0 red_states=0 states=54`、进度文件格式号 1 → 2 且每行片行多一个 `findings=none`，在那一版上重取
 /// （同一棵树上加发现日志之前是 65 行 `8e1ca03b…`、进度文件 `6ec51601…`，→ 下面的值）：重取之前逐行对过，打的行只多出那两行
 /// `LAYER0_FINDINGS`，进度文件去掉每行的校验和、`findings=none` 与格式号之后逐字节相同，进度文件名（计划哈希）不变。
+/// 2026-10-04 打的行与进度文件名重取自主工作区 checker 档日志（这条用例判红时把 58 行原样打在断言消息里，整段 58 行带换行的 SHA-256
+/// 与断言 `left` 里的 `7e64a883…` 逐字相同）：比 `15867e36…` 那一版不同的只有两趟的 `GOLDEN_TALLY`（池级 checker 多出的不变量各一项，
+/// I-1.12 … I-9.28）与 `LAYER0_RESUME` 里进度文件名的计划哈希（fcc4d340 那一版的 `6118958c…` → `0370ad26…`；HEAD 31e47115 的日志里
+/// 计划哈希也是 `0370ad26…`、打的行只比主工作区少 `I-9.28=0/0/46` 那两项）。
+/// 2026-10-09 第 50 批合入（加 I-9.31–I-9.35，连同第 49 批 W3 加的 I-9.30，已实现的不变量 84 → 90 条）之后在合后副本重取：
+/// 打的行取那一趟断言 `left` 的 `4d42c7ca…`（行数仍 58）；把两趟 `GOLDEN_TALLY` 各删掉 ` I-9.30=9/0/37 I-9.31=0/0/46 I-9.32=0/0/46
+/// I-9.33=0/0/46 I-9.34=0/0/46 I-9.35=9/0/37` 六项、`LAYER0_RESUME` 里的计划哈希换回 `49878830…` 之后，整段 SHA-256 正好是上一版 `4b8b1e84…`，
+/// 别的字节不差。计划哈希 `49878830…` → `555baf1b…`：新池新建文件那次发布写下的字节变了（树表多一条退役树条目、根记录里树 ID 水位
+/// 65548 → 65549，`crash_points_tree_identifier_watermark_orphans.rs` 钉着），写表跟着变；单元写、段与状态数不变（仍 46 个状态）。
+/// 2026-10-09 第 53 批合入（加 I-9.36、I-9.37，已实现的不变量 90 → 92 条）之后重取：打的行取主 agent 合后副本那一趟 checker 档快档
+/// 断言 `left` 的 `a4643c92…`（行数仍 58）；把两趟 `GOLDEN_TALLY` 各删掉 ` I-9.36=0/0/46 I-9.37=0/0/46` 两项之后，整段 SHA-256 正好是
+/// 上一版 `4d42c7ca…`，别的字节不差（`LAYER0_RESUME` 的计划哈希仍是 `555baf1b…`）。
 const GOLDEN_PRINTED_LINE_COUNT: usize = 58;
 const GOLDEN_PRINTED_LINES_SHA256: &str =
-    "15867e366db44d88e7de85fafe40ab6940310fc9cfe1a75787846c39b1024212";
-/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（47 行：文件头 + 46 行片行；两个值都待第五步 checker-tier-layer0-replay 重录，见上）。
-const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-5026593803c5654d562ab1858215ddd4a5be477116564e882947660016a1eb5e.txt";
+    "a4643c92e6836ef465aba245ee096127bebc0b65f7342a090fd1570d9c48bea6";
+/// 同一趟留下的进度文件：名字（带计划哈希）与整份内容的 SHA-256（47 行：文件头 + 46 行片行）。名字取自上面那一趟日志的 `LAYER0_RESUME` 行；
+/// 打的行与内容的 SHA-256 取自 2026-10-05 主工作区（形式化线第 34 批派出时那一版，含删除线第 22 批）：与根环线在「10g + 32-1」那棵树上重取的 58 行逐行比，只差 GOLDEN_TALLY 两行多出 I-9.17–I-9.24、I-9.29 九条新不变量的计数（删除线第 22 批把已实现的不变量从 74 条加到 83 条），已有各条计数不变；那一次比上一版只差 `LAYER0_RESUME` 那一行的计划哈希（T_time 改毫秒带来）：
+/// 打的行是那一趟断言 `left` 的 `50615e47…`。2026-10-06 删除线第 24 批合入之后（新九条各写专门的不适用理由、I-9.17 / I-9.23 改读孩子的方式）在主工作区重取：打的行取那一趟断言 `left` 的 `4fc9cde7…`；
+/// 内容是在只换了打的行钉值的副本里再跑一次、「不分片时的进度文件与钉值不同」那条断言 `left` 的第二项（2026-10-06 那一次是 `11977571…`，进度文件名不变）。2026-10-06 根环线第 10o 批合入（加 I-3.14，已实现的不变量 83 → 84 条）之后在主工作区（含删除线第 30 批）重取：打的行取断言 `left` 的 `4b8b1e84…`，把两趟 `GOLDEN_TALLY` 各一项 ` I-3.14=46/0/0` 删掉之后整段 SHA-256 正好是上一版 `4fc9cde7…`，别的字节不差；内容在只换了打的行钉值的副本里再跑一次取断言 `left` 第二项 `1d92a7ad…`，进度文件名不变。池级 checker 的判定集合再变，两个值跟着重取。
+/// 2026-10-09 第 50 批合后重取：名字里的计划哈希取那一趟 `LAYER0_RESUME` 行的 `555baf1b…`（来历见 [`GOLDEN_PRINTED_LINE_COUNT`]）；
+/// 内容取那一趟判红之后留在临时目录里的进度文件（打的行那条断言先红，进度文件那条没跑到、目录没删），SHA-256 `1553ba8e…`。
+/// 与上一版 `1d92a7ad…` 那一份逐行比：去掉每行的校验和、每行逐条不变量的表里 I-9.30–I-9.35 那几项、计划哈希换回之后 47 行逐字相同；
+/// 那一份每行的 CRC-32C 校验和都对得上正文。
+/// 2026-10-09 第 53 批合后重取：名字不变；内容取打的行判红那一趟（断言 `left` 为 `a4643c92…` 的那一趟）留在临时目录里的进度文件，
+/// SHA-256 `92ff4595…`。与上一版 `1553ba8e…` 那一份逐行比：去掉每行的校验和、每行逐条不变量的表里 I-9.36、I-9.37 那两项之后 47 行逐字相同；
+/// 那一份每行的 CRC-32C 校验和都对得上正文。
+const GOLDEN_PROGRESS_FILE_NAME: &str = "layer0-progress-golden_new_pool_file_creation_stream-fingerprint0-555baf1b8e6301e8874a473d44d0ce43260f946b695dfc0fbb3b0c5024bbbba6.txt";
 const GOLDEN_PROGRESS_FILE_SHA256: &str =
-    "6a153e1e268f829997ed67198ce0d125a450d0b12c4cdfbf5e6c1024ad8d5cd8";
+    "92ff4595a87332b8a915defde97ee09f05db4066dbcd4e58ece5f9214eb4481d";
 
 /// 一行打印里会随机器与时刻变的两样换掉：进度目录、`elapsed_seconds=` 的值。
 fn masked_printed_line(line: &str, directory: &Path) -> String {

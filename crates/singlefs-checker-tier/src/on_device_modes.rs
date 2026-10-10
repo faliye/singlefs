@@ -5,21 +5,25 @@
 //! 抬 F 抬到多少，两边不各抄一份，宿主重跑的才是同参数同字节的那条写路（里程碑「覆盖写、释放、回退与复用」增补 2 收口表第 30 行：宿主那一侧要接着重跑发布 B、
 //! 可写挂载与发布 C，把程序录制流与设备侧日志逐项比；第 58 行：抬 F 那一串发布同样要在真设备上跑、同样逐项比）。设备侧日志与这里不共享一行代码。
 
-use singlefs_core::address::{DeviceIdentity, InstanceGeneration};
-use singlefs_core::allocator::{DeviceFreeMap, PoolAllocator};
+use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration};
+use singlefs_core::allocator::{DeviceFreeMap, PoolAllocator, RootRingOccupancy, RootRingOccupant};
 use singlefs_core::block_device::BlockDevice;
-use singlefs_core::make_filesystem::MakeFilesystemParameters;
+use singlefs_core::make_filesystem::{MakeFilesystemParameters, ROLLBACK_FLOOR_AT_MKFS};
 use singlefs_core::mount::{
-    raise_rollback_floor, ring_slots_known_to_hold_a_root_by, rollback_floor_ceiling, MountError,
-    RaisedFloor, ShadowLedger,
+    raise_rollback_floor, ring_slots_whose_reread_still_bad_refuses_the_ceiling_by,
+    rollback_floor_ceiling, MountError, RaisedFloor, ShadowLedger,
 };
 use singlefs_core::recovery::{choose_system_configuration, instance_table_chain_of_root};
+use singlefs_core::root_ring::RootRingSlot;
 use singlefs_core::transaction::{
     publish_overwrite, FirstFile, PoolWriter, PublishError, TransactionOutput,
 };
 use singlefs_core::write_accounting::WritesByStructureKind;
+use singlefs_format::ROOT_RING_REGIONS;
 
-use singlefs_harness::scenario::{first_file_content, FIXED_WRITE_TIME_SECONDS};
+use singlefs_harness::scenario::{
+    first_file_content, NewPoolFileCreationRun, FIXED_WRITE_TIME_SECONDS,
+};
 
 /// 虚机档的六个模式（命令行最后一个参数）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -167,19 +171,67 @@ pub struct FailedPublish {
     pub writes_of_failed_publishes: Vec<WritesByStructureKind>,
 }
 
-/// 发布 B 的分配器：从新池新建文件的分配记录重建（与可写挂载同一条路）。
+/// 发布 B 的分配器：从新池新建文件的分配记录重建（与可写挂载同一条路），装上这个进程此刻眼里的根环。
+///
+/// 发布 B 与新池新建文件在同一个进程里，根环表与 `run_new_pool_file_creation` 里那个分配器记到的是同一张：从 mkfs 同进程会话那一张起
+/// （`make_filesystem::root_ring_occupancy_after_make_filesystem`：三个区域的槽 0 各一条第 0 代根，F 取 mkfs 写的，记到第 0 代根），
+/// 再按次序记上这个进程写过的根——暖机那几条（`run.warm_up.roots`）与新池新建文件那一条（`run.output.root`）。
+/// 不装根环表，发布 B 记根时断言（C551）；只装 mkfs 那一张、不补记，记 txg 4 时撞跳号断言。
+/// `run_new_pool_file_creation` 不交回 mkfs 的输出（`MakeFilesystemOutput`），这里调不了 core 那个函数，照它的两样现拼：
+/// 第 0 代根的 txg 取暖机第一条根的减一（暖机接在第 0 代根上、txg 逐个加一），F 取 `ROLLBACK_FLOOR_AT_MKFS`。
+///
+/// # Panics
+/// `run` 里暖机一条根都没有，或第一条根的 txg 是 0（`run_new_pool_file_creation` 做成时暖机两条、txg 1 与 2）；
+/// 补记的根 txg 不逐个加一（core 记根的跳号断言）。
 #[must_use]
-pub fn allocator_rebuilt_from_the_records_of<Device: BlockDevice>(
+pub fn allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process<
+    Device: BlockDevice,
+>(
+    parameters: &MakeFilesystemParameters,
     devices: &[(DeviceIdentity, Device)],
-    version: &TransactionOutput,
+    run: &NewPoolFileCreationRun,
 ) -> PoolAllocator {
-    PoolAllocator::rebuild_from_records(
+    let mut allocator = PoolAllocator::rebuild_from_records(
         devices
             .iter()
             .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
             .collect(),
-        version.allocation_records.clone(),
-    )
+        run.output.allocation_records.clone(),
+    );
+    let genesis_txg = CheckpointTxg(
+        run.warm_up
+            .roots
+            .first()
+            .expect("run_new_pool_file_creation 做成时暖机写了两条根")
+            .checkpoint_txg
+            .0
+            .checked_sub(1)
+            .expect("暖机第一条根接在第 0 代根上，txg 不是 0"),
+    );
+    allocator.install_root_ring_occupancy(RootRingOccupancy::read_from_the_ring(
+        parameters.geometry.root_ring_slots_per_region,
+        (0..ROOT_RING_REGIONS)
+            .map(|region| {
+                (
+                    RootRingSlot { region, slot: 0 },
+                    RootRingOccupant::ValidRoot {
+                        checkpoint_txg: genesis_txg,
+                    },
+                )
+            })
+            .collect(),
+        ROLLBACK_FLOOR_AT_MKFS,
+        genesis_txg,
+    ));
+    for root in run
+        .warm_up
+        .roots
+        .iter()
+        .chain(std::iter::once(&run.output.root))
+    {
+        allocator.record_root_written_by_this_process(root.checkpoint_txg);
+    }
+    allocator
 }
 
 /// 发布 B：接在新池新建文件那一版上覆盖写第二版，同一个实例。
@@ -258,7 +310,8 @@ pub fn publish_the_fourth_version<Device: BlockDevice>(
 /// `current_version` 随之换成最后落盘的那一次空发布（失败时是最后落盘的那一次，见 [`MountError::RaiseFloorSequencePublishFailed`]）。
 ///
 /// 上限照 D16（发布语义） 已定项 1「抬 F 的上限」由 core 的 [`rollback_floor_ceiling`] 现算（min(每块盘上最新的持久有效根,
-/// 第 4 新的非空持久有效根)），入参与 [`raise_rollback_floor`] 自己算上限时的一样：现行那一版的根指着的实例表、现行的 F、盘上读得到的根。
+/// 第 4 新的非空持久有效根)），入参与 [`raise_rollback_floor`] 自己算上限时的一样：现行那一版的根指着的实例表、现行的 F、盘上读得到的根；
+/// 读坏、重读仍坏就拒的槽与抬 F 那一串同一个口径（[`ring_slots_whose_reread_still_bad_refuses_the_ceiling_by`]：被抛弃根的槽读坏不拒、不进上限）。
 /// 这里算完到 `raise_rollback_floor` 再算一次之间没有写，两次读的是同一份盘上状态；对不上时 `raise_rollback_floor`
 /// 在任何写之前拒绝（`RollbackFloorAboveCeiling`）。
 ///
@@ -281,7 +334,7 @@ pub fn raise_the_rollback_floor_to_its_ceiling<Device: BlockDevice>(
         &system_configuration,
         current_version.root.rollback_floor,
         &instance_table,
-        &ring_slots_known_to_hold_a_root_by(allocator),
+        &ring_slots_whose_reread_still_bad_refuses_the_ceiling_by(allocator),
     )?;
     raise_rollback_floor(
         parameters,

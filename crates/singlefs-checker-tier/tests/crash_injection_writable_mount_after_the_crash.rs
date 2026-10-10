@@ -3,9 +3,13 @@
 //! 在同一份崩溃后镜像上真的起一次可写挂载（取号、写行、暖机）、再发一次布、跑池级 checker；挂载途中再崩一次（二次崩溃），
 //! 取号、写行、暖机、续做各段各摆一个，每个二次崩溃状态上只读恢复、问模型、池级 checker、记录核对器。
 //! 实现在 `singlefs_checker_tier::crash_injection`；随机崩溃注入的快档与大档（`crash_injection_campaign.rs`）
-//! 走的是同一个入口，这里用两段短历史与一段 unlink 的历史钉「每一截都跑到了、四段都摆到了、一条新发现都没有」。
+//! 走的是同一个入口，这里用两段短历史与一段 unlink 的历史钉「每一截都跑到了、四段都摆到了、一条新发现都没有」，
+//! 再加一段崩溃后那次可写挂载删得了实例表行的历史（有一行就扫）：清扫发布那一段的二次崩溃从它来；
+//! 再加一段开头那次覆盖写掉电在 journal 记录之前、留下实例 1 的孤儿的历史（同一种摆法）：抹头那一段的二次崩溃从它来。
 
 use singlefs_checker_tier::crash_injection::{
+    inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row,
+    inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans,
     inject_crashes_into_history, CrashInjectionTally, CrashPointDraw, WritableMountPhase,
 };
 use singlefs_core::admission::SpaceAdmission;
@@ -25,7 +29,9 @@ const UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES: HistoryExecution = HistoryExecution {
 /// 崩溃状态有落在意图那一版上的，那一版上的可写挂载续做，U4，`research/prompts/m3-unlink-code-r1-main-verification.md` 第三节）：
 /// 每个崩溃状态之后都起了可写挂载、发了一次布（删完那一版上建 inode）、跑了 checker，
 /// 挂载途中的二次崩溃取号、写行、暖机、续做四段都摆到了，二次崩溃状态上恢复、问模型、checker、记录核对器各跑了一次；
-/// 两截上一条新发现都没有，挂载与那次发布一次都没被拒。
+/// 两截上一条新发现都没有，挂载与那次发布一次都没被拒。第四段在一段覆盖写到根环里只剩实例 2 的根的历史最后一步开头崩一次，
+/// 那次可写挂载与二次崩溃之后的再挂有一行就扫（实例 1 那一行删得掉）：清扫发布那一段摆到二次崩溃。第五段同一种摆法，那段历史开头那次
+/// 覆盖写掉电在 journal 记录之前、留下实例 1 的孤儿：清扫先抹它们的头，抹头那一段摆到二次崩溃。
 #[test]
 fn every_crash_state_is_followed_by_a_writable_mount_one_publish_the_checker_and_second_crashes_in_each_phase(
 ) {
@@ -58,11 +64,31 @@ fn every_crash_state_is_followed_by_a_writable_mount_one_publish_the_checker_and
     );
     tally.absorb(&unlinking_the_first_file.tally);
     new_findings.extend(unlinking_the_first_file.new_findings);
+    let deleting_an_instance_table_row =
+        inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
+            UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        );
+    tally.absorb(&deleting_an_instance_table_row.tally);
+    new_findings.extend(deleting_an_instance_table_row.new_findings);
+    let erasing_heads_of_orphans =
+        inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans(
+            UNCHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+        );
+    tally.absorb(&erasing_heads_of_orphans.tally);
+    new_findings.extend(erasing_heads_of_orphans.new_findings);
     let rendered = tally.render();
     println!("{rendered}");
     assert!(
         tally.crash_points >= 2,
-        "三段历史里摆出了崩溃状态：{rendered}"
+        "五段历史里摆出了崩溃状态：{rendered}"
+    );
+    assert!(
+        tally.writable_mounts_after_the_crash_deleting_instance_table_rows >= 1,
+        "前提：有一次崩溃后的可写挂载末尾的清扫发布删了行：{rendered}"
+    );
+    assert!(
+        tally.heads_erased_by_the_instance_table_sweep_after_the_crash >= 1,
+        "前提：有一次崩溃后的可写挂载末尾的清扫抹了孤儿的头：{rendered}"
     );
     assert_eq!(
         tally.writable_mounts_after_the_crash, tally.crash_points,

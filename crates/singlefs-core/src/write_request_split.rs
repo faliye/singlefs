@@ -198,14 +198,26 @@ mod tests {
         assert_eq!(transactions[1].payload_length_in_bytes(), 1);
     }
 
-    /// 跨过 67（journal 记录点名项上限那一档）与 144（一片 extent 叶装得下的记录数）两个门槛：
-    /// 单元数、区间的连续性、事务号的连号与升序都不因门槛变。整份内容被恰好一次地盖住——
+    /// 跨过 64（journal 记录点名项上限 ⌊(4096 − 487) ÷ 56⌋ 那一档）与 144（一片 extent 下段叶罩的单元数
+    /// ⌊(16384 − 163) ÷ 112⌋）两个门槛：单元数、区间的连续性、事务号的连号与升序都不因门槛变。整份内容被恰好一次地盖住——
     /// 相邻两个事务首尾相接、不重不漏。
     #[test]
-    fn the_split_covers_every_file_byte_exactly_once_across_the_sixty_seven_and_one_hundred_forty_four_unit_thresholds(
+    fn the_split_covers_every_file_byte_exactly_once_across_the_sixty_four_and_one_hundred_forty_four_unit_thresholds(
     ) {
+        // 切分本身不读这两个常量，取样点写成字面量；先钉住两个门槛今天的值，门槛一变这里先红，
+        // 取样点才会跟着挪，不会贴着旧门槛照样绿下去。
+        assert_eq!(
+            singlefs_format::JOURNAL_NAMED_ENTRIES_PER_RECORD,
+            64,
+            "取样点 63 / 64 / 65 压的是一条 journal 记录的点名项上限；上限变了要跟着挪取样点"
+        );
+        assert_eq!(
+            singlefs_format::EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+            144,
+            "取样点 143 / 144 / 145 压的是一片 extent 下段叶罩的单元数；它变了要跟着挪取样点"
+        );
         let payload_capacity = payload_capacity_in_bytes();
-        for expected_unit_count in [66u64, 67, 68, 143, 144, 145] {
+        for expected_unit_count in [63u64, 64, 65, 143, 144, 145] {
             for last_unit_payload in [1u64, payload_capacity] {
                 let content_length_in_bytes =
                     (expected_unit_count - 1) * payload_capacity + last_unit_payload;

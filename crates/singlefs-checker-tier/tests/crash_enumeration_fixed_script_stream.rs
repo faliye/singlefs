@@ -38,7 +38,7 @@ use singlefs_core::transaction::{
     publish_overwrite, FirstFile, PoolVersion, PoolWriter, TransactionOutput,
 };
 use singlefs_core::unit::{UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED};
-use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES};
+use singlefs_format::{DATA_UNIT_BYTES, NODE_BYTES, SLOT_BYTES};
 use singlefs_harness::memory_pool::{
     closed_form_state_count, writes_and_segments,
     writes_and_segments_with_stream_indexes_and_entries, CrashImage, MemoryPool, PublishedVersion,
@@ -88,23 +88,27 @@ enum Script {
 
 /// 全量那条流在进度文件名里的名字（断点续跑按「输入指纹 + 流名 + 计划哈希」分格）。
 const FULL_ENUMERATION_STREAM_NAME: &str = "file_overwrite_fixed_script_through_e_then_unmount";
-/// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（78 段；六个 28 写段各 2^28 − 1 占 97%）。代码审阅第 19 条之后
+/// 到 E 再正常卸载那条流：每次写只取两态时的全量闭式 1 + Σ(2^|段| − 1)（78 段；六个 28 写段各 2^28 − 1 占 96%）。代码审阅第 19 条之后
 /// 取号、抬 F、卸载先写系统配置之前各多一道屏障，把上一次轮换那 2 写与它们的 2 写拆成两段：三处各 15 → 3 + 3，比改之前的 6649413746 少 27。
 /// C577（发布返回之前、系统配置轮换之后加一道屏障）之后每次轮换那 2 写都自成一段，不再与下一次发布的单元写同段：十四处 2 + n 写段
 /// 各拆成 2 与 n，每处 (2^(n+2) − 1) → 3 + (2^n − 1)、少 3 · 2^n − 3（n = 24 三处、16 四处、20 一处、28 六处——A、B、C、写行之后的两次暖机、
 /// 回退 D、五次覆盖写、抬 F 与卸载各第二次空发布、E），64 段 6649413719 → 78 段 1662648449。
-const FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT: u64 = 1_662_648_449;
+/// 回退那次发布追加一条谱系记录之后（D18（块里携带什么信息） 已定项 24 第 5 条：零根的谱系树上第一次追加，写谱系容器与谱系树根，两块盘各一份），
+/// D 的单元写 20 → 24，那一段 2^20 − 1 → 2^24 − 1、多 15728640：1662648449 → 1678377089，段数不变。
+const FULL_STATES_WITH_TWO_STATES_PER_WRITE_THROUGH_THE_UNMOUNT: u64 = 1_678_377_089;
 /// 全量枚举的状态数（代码审阅第 4 条，用户 2026-09-27 定「原地覆写补第三态、全量也跑」）：这条流上取三态的只有 46 次系统配置槽写，
 /// 每段 3^m · 2^(n−m) − 1（m 是段里系统配置槽写的个数），再加全部持久那一个。C577 之后 46 次系统配置槽写两两自成 23 个 2 写段，
-/// 每段 3² − 1 比两态时的 2² − 1 多 5：1662648449 + 23 × 5 = 1662648564（C577 之前轮换并进 30 写段、3² · 2²⁸ − 1，14960689284）。
-const FULL_STATES_THROUGH_THE_UNMOUNT: u64 = 1_662_648_564;
+/// 每段 3² − 1 比两态时的 2² − 1 多 5：1678377089 + 23 × 5 = 1678377204（D 加谱系记录之前 1662648449 + 23 × 5 = 1662648564；
+/// C577 之前轮换并进 30 写段、3² · 2²⁸ − 1，14960689284）。
+const FULL_STATES_THROUGH_THE_UNMOUNT: u64 = 1_678_377_204;
 /// 全量的状态按发布分：每段的状态归它后面最近的那次根槽写，再加全部持久那一个。
 /// C577 之后一次带单元的普通发布：上一次轮换段 3² − 1 = 8 + 单元段 2^n − 1 + 记录段 3 + 根槽段 1 = 2^n + 11
-/// （n = 24：16777227，n = 16：65547，n = 20：1048587，n = 28：268435467；C577 之前轮换与单元同段、3² · 2^n − 1 + 4 = 9 · 2^n + 3）；
+/// （n = 24：16777227，n = 16：65547，n = 28：268435467；回退 D（txg 9）加谱系记录之后 n = 24、16777227，之前 n = 20、1048587；
+/// C577 之前轮换与单元同段、3² · 2^n − 1 + 4 = 9 · 2^n + 3）；
 /// 写行 txg 5 与抬 F、卸载各第一次空发布（txg 15、18）前面是屏障，没有变。
 const FULL_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=12 instance1_txg2=12 \
      instance1_txg3=16777227 instance1_txg4=16777227 instance2_txg5=262163 instance2_txg6=65547 \
-     instance2_txg7=65547 instance2_txg8=16777227 instance2_txg9=1048587 instance2_txg10=268435467 \
+     instance2_txg7=65547 instance2_txg8=16777227 instance2_txg9=16777227 instance2_txg10=268435467 \
      instance2_txg11=268435467 instance2_txg12=268435467 instance2_txg13=268435467 \
      instance2_txg14=268435467 instance2_txg15=65555 instance2_txg16=65547 instance2_txg17=268435467 \
      instance2_txg18=65555 instance2_txg19=65547 after_the_last_root=8 every_write_persisted=1";
@@ -122,6 +126,38 @@ const QUICK_TIER_STATES_BY_PUBLISH_THROUGH_THE_UNMOUNT: &str = "instance1_txg1=1
      instance2_txg8=13 instance2_txg9=13 instance2_txg10=13 instance2_txg11=13 instance2_txg12=13 \
      instance2_txg13=13 instance2_txg14=13 instance2_txg15=21 instance2_txg16=13 instance2_txg17=13 \
      instance2_txg18=21 instance2_txg19=13 after_the_last_root=8 every_write_persisted=1";
+
+/// 回退 D（txg 9）那次发布在零根的谱系树上第一次追加谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条），多写的两个单元的落点：
+/// 谱系容器（码 3 打包记录单元，32768 字节）与谱系树根（码 2 索引节点，16384 字节），两块盘同槽各一份
+/// （根环线第 9 批 9-8 的探针在这条流上量到的槽号）。
+const LINEAGE_CONTAINER_SLOT_OF_THE_ROLLBACK_PUBLISH: u64 = 50352;
+const LINEAGE_TREE_ROOT_SLOT_OF_THE_ROLLBACK_PUBLISH: u64 = 50354;
+
+/// 回退 D 是这条脚本的第几条根（从 0 数：实例 1 的 txg 1–4，实例 2 的 txg 5–8，D 是 txg 9）。
+const ROOT_INDEX_OF_THE_ROLLBACK_PUBLISH: usize = 8;
+
+/// 回退 D 那次发布的单元写里落在 `slot` 起、单元类 `unit_class`、整单元 `unit_bytes` 字节的有几个（每块盘一份就是 2）。
+fn units_of_the_rollback_publish_at(
+    writes: &[RetainedWrite],
+    root_indexes: &[usize],
+    slot: u64,
+    unit_class: u8,
+    unit_bytes: u64,
+) -> usize {
+    let after_the_root_before_it = root_indexes[ROOT_INDEX_OF_THE_ROLLBACK_PUBLISH - 1] + 1;
+    let its_root = root_indexes[ROOT_INDEX_OF_THE_ROLLBACK_PUBLISH];
+    writes[after_the_root_before_it..its_root]
+        .iter()
+        .filter(|write| write.kind == StepKind::UnitWrite)
+        .filter(|write| write.offset.0 == slot * SLOT_BYTES)
+        .filter(|write| {
+            write.bytes().is_some_and(|bytes| {
+                u64::try_from(bytes.len()).expect("一个单元的字节数装得进 u64") == unit_bytes
+                    && bytes[6] == unit_class
+            })
+        })
+        .count()
+}
 
 /// 到 E 之后再覆盖写一次（txg 18）那一版的数据单元落点。
 const TXG_18_DATA_UNIT_SLOT: u64 = 50178;
@@ -384,11 +420,47 @@ fn prepare(tag: &str, script: Script) -> Prepared {
     }
     let base = pool.memory_pool_after_mkfs();
     let (writes, segments) = writes_and_segments_after_mkfs(&pool);
+    let root_indexes: Vec<usize> = writes
+        .iter()
+        .enumerate()
+        .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
+        .map(|(index, _)| index)
+        .collect();
+    // 谱系那两个单元的槽号先于段序列钉：回退不追加谱系记录时 D 那一段从 24 退回 20，段序列那一条也红，这一条先说清缺的是谱系那两个单元。
+    match script {
+        Script::SecondVersionOnly | Script::ThirdVersion => {}
+        Script::RollbackToFirstVersion
+        | Script::ReuseAfterRaisingFloorThenNormalUnmount
+        | Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
+            assert_eq!(
+                (
+                    units_of_the_rollback_publish_at(
+                        &writes,
+                        &root_indexes,
+                        LINEAGE_CONTAINER_SLOT_OF_THE_ROLLBACK_PUBLISH,
+                        UNIT_CLASS_PACKED,
+                        DATA_UNIT_BYTES
+                    ),
+                    units_of_the_rollback_publish_at(
+                        &writes,
+                        &root_indexes,
+                        LINEAGE_TREE_ROOT_SLOT_OF_THE_ROLLBACK_PUBLISH,
+                        UNIT_CLASS_INDEX_NODE,
+                        NODE_BYTES
+                    )
+                ),
+                (2, 2),
+                "回退 D 那次发布写出谱系容器（码 3，槽 {LINEAGE_CONTAINER_SLOT_OF_THE_ROLLBACK_PUBLISH}）与谱系树根（码 2，槽 {LINEAGE_TREE_ROOT_SLOT_OF_THE_ROLLBACK_PUBLISH}），两块盘各一份"
+            );
+        }
+    }
     let sizes: Vec<usize> = segments.iter().map(Vec::len).collect();
     // 每次发布：它的单元写、两份 journal 记录、一条根槽写、之后两块盘各一次系统配置槽轮换，共「单元写数 + 5」次写；
     // C577 之后轮换之后、发布返回之前有一道屏障，上一次发布的系统配置槽轮换自成一段，不再与这一次的单元写并成一段
     // （登记表八末尾那条 ⚠️ 说的并段不再有）。单元写数：暖机 0、A 与 B 与 C 各 24、
-    // 写行发布 18、写行之后的暖机各 16、回退 D 20、覆盖写与 E 各 28、抬 F 与卸载推的空发布各 16。取号、抬 F 与卸载那一串开头各多
+    // 写行发布 18、写行之后的暖机各 16、回退 D 24（分配记录树 7 个节点 + 记账 + 映射 + 树表 = 10 个固定点单元，加谱系容器与谱系树根
+    // 2 个——D18（块里携带什么信息） 已定项 24 第 5 条，回退那次追加一条谱系记录；加谱系记录之前 20）、覆盖写与 E 各 28、
+    // 抬 F 与卸载推的空发布各 16。取号、抬 F 与卸载那一串开头各多
     // 两块盘一次系统配置写（取号写实例代号，抬 F 与卸载先写新 F，D16（发布语义） 已定项 1「抬 F 那一串」），它们之前各一道屏障
     // （代码审阅第 19 条：覆写较旧那一槽之前，上一次轮换写的那一槽先持久），与上一次的轮换各自成段（2、2；改之前并成 4 写一段）。
     match script {
@@ -418,16 +490,17 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
         }
         Script::RollbackToFirstVersion => {
-            // 挂着时的向前回退 D：20 个单元写自成一段、C 的两个系统配置槽写在它前面自成一段（C577 之前并成 22），不取号、不写行、不暖机。
+            // 挂着时的向前回退 D：24 个单元写自成一段（10 个固定点单元加谱系容器与谱系树根，各两块盘；加谱系记录之前 20）、
+            // C 的两个系统配置槽写在它前面自成一段（C577 之前并成 22），不取号、不写行、不暖机。
             assert_eq!(
                 sizes,
                 vec![
                     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2
+                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2
                 ],
                 "固定脚本到 D 为止的段序列"
             );
-            assert_eq!(writes.len(), 166 + 25, "到 C 166 + D 25");
+            assert_eq!(writes.len(), 166 + 29, "到 C 166 + D 29");
         }
         Script::ReuseAfterRaisingFloorThenNormalUnmount => {
             // 五次覆盖写各 28 个单元写自成一段、上一次的两个系统配置槽写在它前面自成一段（C577 之前并成 30）；txg 14 的轮换自成一段、
@@ -437,7 +510,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
                 sizes,
                 vec![
                     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
+                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
                     2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2,
                     16, 2, 1, 2
                 ],
@@ -445,8 +518,8 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
             assert_eq!(
                 writes.len(),
-                191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
-                "到 D 191 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
+                195 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21),
+                "到 D 195 + 五次覆盖写 165 + 抬 F 44 + E 33 + 卸载 44"
             );
         }
         Script::ReuseOfTheFirstDataUnitSlotAfterFloorRaisingPublish => {
@@ -455,7 +528,7 @@ fn prepare(tag: &str, script: Script) -> Prepared {
                 sizes,
                 vec![
                     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16,
-                    2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
+                    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28,
                     2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
                     28, 2, 1, 2
                 ],
@@ -463,17 +536,11 @@ fn prepare(tag: &str, script: Script) -> Prepared {
             );
             assert_eq!(
                 writes.len(),
-                191 + 5 * 33 + 44 + 33 + 2 * 33,
-                "到 E 433 + txg 18、19 的覆盖写各 33"
+                195 + 5 * 33 + 44 + 33 + 2 * 33,
+                "到 E 437 + txg 18、19 的覆盖写各 33"
             );
         }
     }
-    let root_indexes: Vec<usize> = writes
-        .iter()
-        .enumerate()
-        .filter(|(_, write)| write.kind == StepKind::RootRecordFua)
-        .map(|(index, _)| index)
-        .collect();
     let expected_roots = match script {
         Script::SecondVersionOnly => 4,
         Script::ThirdVersion => 8,
@@ -624,14 +691,16 @@ fn the_fixed_script_through_the_third_publish_keeps_its_registered_segment_seque
     );
 }
 
-/// 到 D 为止的固定脚本：同上，36 段、每次写只取两态时闭式 51773503、甲二 77；补第三态之后全量 51773558、甲二 132。
-/// C577 之前 30 段、206307373、95、463863878、180（到 C 那五处之外 D 的 20 个单元写也与 C 的轮换同段、22）；
+/// 到 D 为止的固定脚本：同上，36 段、每次写只取两态时闭式 67502143、甲二 77；补第三态之后全量 67502198、甲二 132。
+/// 回退那次追加谱系记录之后 D 的单元写 20 → 24（谱系容器与谱系树根各两块盘，D18（块里携带什么信息） 已定项 24 第 5 条）：
+/// 两态闭式与全量各多 2^24 − 2^20 = 15728640（之前 51773503、51773558）；只有单元写的那一段甲二只取全不落一态，77、132 不变。
+/// C577 之前 30 段、206307373、95、463863878、180（到 C 那五处之外 D 当时的 20 个单元写也与 C 的轮换同段、22）；
 /// 代码审阅第 19 条之前 29 段、206307382、104。
 #[test]
 fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_sequence() {
     let prepared = prepare("layer0-d-registered", Script::RollbackToFirstVersion);
     assert_eq!(prepared.segments.len(), 36);
-    assert_eq!(closed_form_state_count(&prepared.segments), 51_773_503);
+    assert_eq!(closed_form_state_count(&prepared.segments), 67_502_143);
     assert_eq!(
         layer0_state_count(&prepared.writes, &prepared.segments, &quick_tier_expansion),
         77
@@ -651,7 +720,7 @@ fn the_fixed_script_through_the_rollback_publish_keeps_its_registered_segment_se
                 &quick_tier_expansion
             )
         ),
-        (51_773_558, 132)
+        (67_502_198, 132)
     );
 }
 
@@ -1290,9 +1359,9 @@ fn residual_record_seeded_into_the_base_image_is_applied_in_every_crash_state_wh
         tally.first_ignored_violation
     );
     assert_eq!(tally.failed_states, 0);
-    // 实例 2 的根为最新的那 12 个状态：残留记录那一版（(1, 5)，根槽从没落盘、只由记录施加出来）自己的四个固定点单元
-    // 50261–50264 被写行发布 txg 6 释放进 defer、仍算已分配，环里没有一条根引用它们。2026-09-17 写这条用例时它们在
-    // I-3.1（已分配统计对得上） 上判红、差 65536 字节；2026-09-23 用户定候选 b（增补 2 收口表第 54 行）：checker 的候选集
+    // 实例 2 的根为最新的那 12 个状态：残留记录那一版（(1, 5)，根槽从没落盘、只由记录施加出来）自己的固定点单元
+    // （分配记录树 5 个节点 + 记账 + 映射 + 树表，每盘 8 槽）被写行发布 txg 6 释放进 defer、仍算已分配，环里没有一条根引用它们。
+    // 2026-09-17 写这条用例时那一版的固定点是四个单元（50261–50264），它们在 I-3.1（已分配统计对得上） 上判红、差 65536 字节；2026-09-23 用户定候选 b（增补 2 收口表第 54 行）：checker 的候选集
     // 补上「由记录施加出来、根槽从没落盘的那一版」（`singlefs_checker::walk` 的 `versions_applied_only_by_records`），
     // 那 12 个状态从此一条都不红。把那一版从候选集里拿掉，这一行在 I-3.1 上当场红回 12。
     assert_checker_and_record_checker_counts(&tally, &[]);

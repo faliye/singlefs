@@ -17,7 +17,8 @@
 //!
 //! 条款给的量：checkpoint 保留池的 ckpt_cost 按一次空发布至多写出的固定点计，一律按最坏情况（D28（挂载期承诺量） 已定项 4，用户 2026-09-27 定：
 //! 分配记录树取几何上整棵树（每块盘单元区在根之下每一层罩到的位置数之和加根，用户同日再定取 K1），中央映射树逐层按可能改的路径数与可能切出来的节点数，
-//! 记账树按每发布的节点数，树表一项，实例表链不进；[`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
+//! 记账树按每发布的节点数（这次发布写完之后那棵树的，inode 号水位台阶行跨过一片叶那次多出的节点算上），树表一项，实例表链不进；
+//! [`checkpoint_cost_of_the_version_to_build_on`]）；挂载期承诺量暖机那一半的 c_max
 //! 与保留池「按同一个现算的 c_max 取」（D28（挂载期承诺量） 已定项 4 末条）；需求 = 这次发布新写的全部槽（普通分配加这次写出的固定点，
 //! 不加这次换下的槽），没有普通分配的发布（空发布、写行、暖机、抬 F）不判（D28（挂载期承诺量） 已定项 1 接线，用户 2026-09-25 定）。
 //!
@@ -36,16 +37,21 @@ use std::collections::BTreeSet;
 use std::num::NonZeroU64;
 
 use singlefs_format::{
-    DATA_UNIT_BYTES, INSTANCE_TABLE_PAGE_RECORDS, ROOT_RING_REGIONS, SLOT_BYTES,
-    TOMBSTONE_CONTAINER_RECORDS,
+    DATA_UNIT_BYTES, INSTANCE_TABLE_PAGE_RECORDS, RETIREMENT_CONTAINER_RECORDS, ROOT_RING_REGIONS,
+    SLOT_BYTES, TOMBSTONE_CONTAINER_RECORDS,
 };
 
-use crate::address::{DataUnitIndexInFile, DeviceIdentity};
+use crate::address::{CheckpointTxg, DataUnitIndexInFile, DeviceIdentity};
 use crate::allocation_record_tree::{span_in_slots_at_level, AllocationRecordTreeGeometry};
 use crate::allocator::PoolAllocator;
-use crate::code_two_tree::{CodeTwoTreeNodeCapacity, CodeTwoTreeShape};
+use crate::code_two_tree::{
+    plan_the_tree_after_this_publish, CodeTwoKeyFieldWidths, CodeTwoTreeKey,
+    CodeTwoTreeNodeCapacity, CodeTwoTreeShape,
+};
 use crate::inode_tree::InodeLeafContainer;
-use crate::records::{NLINK_OF_AN_INODE_BEING_DELETED, STATISTIC_COMMITTED_RESERVATION_BYTES};
+use crate::records::{
+    AccountingEntry, NLINK_OF_AN_INODE_BEING_DELETED, STATISTIC_COMMITTED_RESERVATION_BYTES,
+};
 use crate::root_ring::RootRingSlotsPerRegion;
 use crate::transaction::{
     CodeTwoTreeNodeCapacities, MultiLevelCodeTwoTree, TransactionOutput, TransactionUnit,
@@ -187,6 +193,44 @@ pub fn central_mapping_entries_of_one_lineage_container_cow(
         .expect("谱系那几把装得进 u64")
 }
 
+/// ckpt_cost 里退役容器那一项的固定部分（判决 `research/prompts/m3-retire-r1-main-verification.md` 第六节 R2「两样都做」：
+/// 照谱系在 ckpt_cost 里单列一项）：一个退役容器（32 KiB 码 3，2 块）加退役树根（1 块）；退役树的内部层数另加
+/// （[`checkpoint_cost_of_one_retirement_container_cow`]）。
+pub const RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
+pub const RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW: u64 = 1;
+
+/// ckpt_cost 里退役容器那一项：一次退役容器 COW 连路径 = 容器 2 + 退役树根 1 + 退役树内部层数（根节点码 2 头里现读的层级减一，
+/// 零根与只有根时 0），同谱系那一项（[`checkpoint_cost_of_one_lineage_container_cow`]）的算法。
+///
+/// # Panics
+/// 加出来装不进 u64：内部层数至多十来层。
+#[must_use]
+pub fn checkpoint_cost_of_one_retirement_container_cow(
+    retirement_tree_internal_levels: u64,
+) -> MetadataBlocks {
+    MetadataBlocks(
+        (RETIREMENT_CONTAINER_BLOCKS_OF_ONE_COW + RETIREMENT_TREE_ROOT_BLOCKS_OF_ONE_COW)
+            .checked_add(retirement_tree_internal_levels)
+            .expect("退役那一项装得进 u64"),
+    )
+}
+
+/// 一次退役容器 COW 连祖先在中央映射树里改的条目数：退役容器、退役树根与每层内部节点各一把 key，= 1 + 1 + 内部层数
+/// （判决第六节 R2「中央映射树删插数加退役容器、退役树根各一把和内部层每层一把」，同谱系那几把）。
+///
+/// # Panics
+/// 加出来装不进 u64：内部层数至多十来层。
+#[must_use]
+pub fn central_mapping_entries_of_one_retirement_container_cow(
+    retirement_tree_internal_levels: u64,
+) -> u64 {
+    const MAPPED_UNITS_OF_THE_RETIREMENT_CONTAINER: u64 = 1;
+    const MAPPED_UNITS_OF_THE_RETIREMENT_TREE_ROOT: u64 = 1;
+    (MAPPED_UNITS_OF_THE_RETIREMENT_CONTAINER + MAPPED_UNITS_OF_THE_RETIREMENT_TREE_ROOT)
+        .checked_add(retirement_tree_internal_levels)
+        .expect("退役那几把装得进 u64")
+}
+
 /// 式子里的「不可回收」：只在 zoned 上非零（活快照钉住的是 zone 粒度、引用按块计，`invariants.md` 逐字要求另立的量）；
 /// 第一版不跑 zoned ⇒ 恒 0。记账树每块盘那一行「不可回收字节」写的就是它（`transaction` 装记账行那一段）。
 pub const UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED: BytesOnOneDevice = BytesOnOneDevice::ZERO;
@@ -231,6 +275,17 @@ pub fn live_objects_of_the_inode_tree(inode_leaf_containers: &[InodeLeafContaine
     u64::try_from(live_records).expect("一棵 inode 树的记录数装得进 u64")
 }
 
+/// n_记录（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）：一版 inode 树里全部记录数，含 nlink = 0 的
+/// （退役记录写在最后一批，意图到最后一批之间那个对象 n_live 已不含它，退役那一份预付挂 n_live 就在用到之前释放了）。
+#[must_use]
+pub fn inode_records_of_the_inode_tree(inode_leaf_containers: &[InodeLeafContainer]) -> u64 {
+    let records: usize = inode_leaf_containers
+        .iter()
+        .map(|container| container.records.len())
+        .sum();
+    u64::try_from(records).expect("一棵 inode 树的记录数装得进 u64")
+}
+
 /// 墓碑预付里每个活对象、每份副本摊的字节：⌈一个 32 KiB 墓碑容器 ÷ 一容器装的墓碑条数 815⌉ = ⌈32768 ÷ 815⌉ = 41
 /// （`.claude/kb/layout/03-third-txn.md`「记账标签 6 的值」那一行：「41 = ⌈2 × 16384 ÷ 815⌉ 每份副本、每对象先取整再乘 n_live」）。
 pub const TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA: u64 =
@@ -241,41 +296,65 @@ pub const TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA: u64 =
 pub const TOMBSTONE_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
 pub const TOMBSTONE_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA: u64 = 1;
 
-/// 算墓碑预付要读的那一版的两个量。
+/// 退役记录预付里每条 inode 记录、每份副本摊的字节：⌈一个 32 KiB 退役容器 ÷ 一容器装的退役记录条数 959⌉ = ⌈32768 ÷ 959⌉ = 35
+/// （判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）。
+pub const RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA: u64 =
+    DATA_UNIT_BYTES.div_ceil(RETIREMENT_CONTAINER_RECORDS);
+
+/// 退役记录预付里全池常驻那一份的固定部分（每份副本、以 16 KiB 槽计）：一个开放退役容器（2 槽）加退役树根（1 槽），H_退役另算。
+pub const RETIREMENT_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA: u64 = DATA_UNIT_BYTES / SLOT_BYTES;
+pub const RETIREMENT_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA: u64 = 1;
+
+/// 算墓碑与退役记录预付要读的那一版的四个量。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TombstonePrepayBasis {
+pub enum TombstoneAndRetirementPrepayBasis {
     /// 树表里没有 `deleted_inodes` 条目的版本（第一个文件版本之前、树表 0 条）：标签 6 取 0。
     VersionWithoutADeletedInodesTreeTableEntry,
-    /// 树表里有 `deleted_inodes` 条目的版本：`tombstone_tree_internal_levels` 是现行那一版墓碑树的内部层数 H（从墓碑树根节点码 2 头现读，
-    /// 零根与只有根时 0），`live_objects` 是这一版 inode 树里 nlink ≥ 1 的记录数 n_live。
+    /// 树表里有 `deleted_inodes` 条目的版本：`tombstone_tree_internal_levels`、`retirement_tree_internal_levels` 是现行那一版墓碑树、
+    /// 退役树的内部层数（从各自根节点码 2 头现读，零根与只有根时 0），`live_objects` 是这一版 inode 树里 nlink ≥ 1 的记录数 n_live，
+    /// `inode_records` 是这一版 inode 树里全部记录数 n_记录（含 nlink = 0 的）。
     VersionWithADeletedInodesTreeTableEntry {
         tombstone_tree_internal_levels: u64,
         live_objects: u64,
+        retirement_tree_internal_levels: u64,
+        inode_records: u64,
     },
 }
 
-/// 记账标签 6「已承诺预留」里墓碑那一份（D3（空间分配） 已定项 2，用户定案 F2）：
-/// 副本数 × ((2 + H + 1) × 16384 + 41 × n_live) 字节，按全部副本之和记（C375（待删占用与已承诺预留按份还是按和记没有条款）），
-/// 41 每对象先取整再乘 n_live（[`TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA`]）；树表里没有 `deleted_inodes` 条目的版本取 0。
+/// 记账标签 6「已承诺预留」（D3（空间分配） 已定项 2，用户定案 F2；退役那一项是判决 `research/prompts/m3-retire-r1-main-verification.md`
+/// 第六节 R2「两样都做」的墓碑式预付）：
+/// 副本数 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录) 字节，按全部副本之和记（C375），
+/// 41、35 每对象先取整再乘（[`TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA`]、
+/// [`RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA`]）；树表里没有 `deleted_inodes` 条目的版本取 0。
 ///
 /// # Panics
-/// 乘出来装不进 u64：H 至多十来层、n_live 至多 2^63，单份副本的量远小于 2^64 ÷ 副本数——装不下说明调用方读错了那一版。
+/// 乘出来装不进 u64：H 至多十来层、记录数至多 2^63，单份副本的量远小于 2^64 ÷ 副本数——装不下说明调用方读错了那一版。
 #[must_use]
-pub fn committed_reservation_for_tombstones(
-    basis: TombstonePrepayBasis,
+pub fn committed_reservation_for_tombstones_and_retirement_records(
+    basis: TombstoneAndRetirementPrepayBasis,
     replicas: ReplicaCount,
 ) -> BytesSummedOverAllReplicas {
     match basis {
-        TombstonePrepayBasis::VersionWithoutADeletedInodesTreeTableEntry => {
+        TombstoneAndRetirementPrepayBasis::VersionWithoutADeletedInodesTreeTableEntry => {
             BytesSummedOverAllReplicas::ZERO
         }
-        TombstonePrepayBasis::VersionWithADeletedInodesTreeTableEntry {
+        TombstoneAndRetirementPrepayBasis::VersionWithADeletedInodesTreeTableEntry {
             tombstone_tree_internal_levels,
             live_objects,
+            retirement_tree_internal_levels,
+            inode_records,
         } => {
-            let resident_slots = TOMBSTONE_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA
-                + tombstone_tree_internal_levels
-                + TOMBSTONE_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA;
+            let resident_slots = [
+                TOMBSTONE_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA,
+                tombstone_tree_internal_levels,
+                TOMBSTONE_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA,
+                RETIREMENT_PREPAY_OPEN_CONTAINER_SLOTS_ON_ONE_REPLICA,
+                retirement_tree_internal_levels,
+                RETIREMENT_PREPAY_ROOT_SLOTS_ON_ONE_REPLICA,
+            ]
+            .into_iter()
+            .try_fold(0_u64, u64::checked_add)
+            .expect("常驻槽数装得进 u64");
             let bytes_of_one_replica = resident_slots
                 .checked_mul(SLOT_BYTES)
                 .and_then(|resident_bytes| {
@@ -283,7 +362,14 @@ pub fn committed_reservation_for_tombstones(
                         .checked_mul(live_objects)
                         .and_then(|per_object_bytes| resident_bytes.checked_add(per_object_bytes))
                 })
-                .expect("一份副本的墓碑预付装得进 u64");
+                .and_then(|bytes_with_tombstones| {
+                    RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA
+                        .checked_mul(inode_records)
+                        .and_then(|per_record_bytes| {
+                            bytes_with_tombstones.checked_add(per_record_bytes)
+                        })
+                })
+                .expect("一份副本的墓碑与退役记录预付装得进 u64");
             BytesSummedOverAllReplicas(
                 bytes_of_one_replica
                     .checked_mul(replicas.replicas())
@@ -297,13 +383,20 @@ pub fn committed_reservation_for_tombstones(
 /// 普通分配 16 + 固定点根 4 + 映射树根以下 4 = 24（辩方 `research/prompts/m3-delete-r3-sonnet-output.md` 3.1 节式子那一行的拆法）。
 pub const DELETION_PUBLISH_SLOTS_OUTSIDE_THE_ALLOCATION_RECORD_TREE_AT_MOST: u64 = 24;
 
+/// W 式子里退役树那一项除内部层数之外的部分：一次删除类发布至多跨两片退役容器（一次发布的退役记录 ≤ 134 条 < 959）⇒
+/// 新写的退役单元 ≤ 2 × 2 + 1 + H_退役 + 1 = 6 + H_退役 槽（判决 `research/prompts/m3-retire-r1-main-verification.md` 第二节 K4
+/// 「一次发布至多几条退役记录」那一行与第三节第 6 条，不论 M3 连不连锁；主 agent 由两次抽样的数推的，没量）。
+pub const DELETION_PUBLISH_RETIREMENT_TREE_SLOTS_BEYOND_ITS_INTERNAL_LEVELS_AT_MOST: u64 = 6;
+
 /// W 式子里分配记录树每一层的上界 2·(K + 26)：K 是删除批大小（数据单元个数），这两个常量是式子里的 2 与 26。
 pub const DELETION_PUBLISH_ALLOCATION_RECORD_TREE_LEVEL_BOUND_FACTOR: u64 = 2;
 pub const DELETION_PUBLISH_ALLOCATION_RECORD_TREE_LEVEL_BOUND_UNITS_BEYOND_THE_BATCH: u64 = 26;
 
-/// W：一次删除类发布每盘新占槽数的上界（D28（挂载期承诺量） 已定项 1），W = 24 + Σ_ℓ min(N_ℓ, 2·(K + 26))。
+/// W：一次删除类发布每盘新占槽数的上界（D28（挂载期承诺量） 已定项 1），W = 24 + (6 + H_退役) + Σ_ℓ min(N_ℓ, 2·(K + 26))。
 /// `positions_at_each_level` 是分配记录树根之下每一层全部盘合计罩到的位置数 N_ℓ（层级 0 到根层级 − 1），
-/// `batch_data_units` 是删除批大小 K（产品取 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`，D8（核心索引结构） 已定项 16 第 2 条）。
+/// `batch_data_units` 是删除批大小 K（产品取 `EXTENT_TREE_LOWER_LEAF_DATA_UNITS`，D8（核心索引结构） 已定项 16 第 2 条），
+/// `retirement_tree_internal_levels` 是要接着发布的那一版退役树的内部层数 H_退役（判决 `research/prompts/m3-retire-r1-main-verification.md`
+/// 第三节第 6 条「W 加 6 + H_退役」）。
 ///
 /// # Panics
 /// 加出来装不进 u64：N_ℓ 由槽号（至多 2^48）算出、K 至多 144，远装得下。
@@ -311,6 +404,7 @@ pub const DELETION_PUBLISH_ALLOCATION_RECORD_TREE_LEVEL_BOUND_UNITS_BEYOND_THE_B
 pub fn slots_one_deletion_publish_newly_takes_on_one_device_at_most(
     positions_at_each_level: &[u64],
     batch_data_units: u64,
+    retirement_tree_internal_levels: u64,
 ) -> u64 {
     let bound_of_one_level = DELETION_PUBLISH_ALLOCATION_RECORD_TREE_LEVEL_BOUND_FACTOR
         * (batch_data_units
@@ -319,9 +413,11 @@ pub fn slots_one_deletion_publish_newly_takes_on_one_device_at_most(
         .iter()
         .map(|positions| (*positions).min(bound_of_one_level))
         .try_fold(
-            DELETION_PUBLISH_SLOTS_OUTSIDE_THE_ALLOCATION_RECORD_TREE_AT_MOST,
+            DELETION_PUBLISH_SLOTS_OUTSIDE_THE_ALLOCATION_RECORD_TREE_AT_MOST
+                + DELETION_PUBLISH_RETIREMENT_TREE_SLOTS_BEYOND_ITS_INTERNAL_LEVELS_AT_MOST,
             u64::checked_add,
         )
+        .and_then(|slots| slots.checked_add(retirement_tree_internal_levels))
         .expect("W 装得进 u64")
 }
 
@@ -329,8 +425,10 @@ pub fn slots_one_deletion_publish_newly_takes_on_one_device_at_most(
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RingWindowOfTheReading {
     /// 每块盘扣 [`ring_window_on_one_device`]：带树的一版上的发布（第一个文件版本那次起）与可写挂载。
+    /// `retirement_tree_internal_levels` 是要接着的那一版退役树的内部层数（W 里那一项，[`slots_one_deletion_publish_newly_takes_on_one_device_at_most`]）。
     DeductedOnEachDevice {
         slots_per_region: RootRingSlotsPerRegion,
+        retirement_tree_internal_levels: u64,
     },
     /// 不扣：树表 0 条的一版（还没有第一个文件版本）上的可写挂载——环窗口还没起计。
     NotCountedBeforeTheFirstFileVersion,
@@ -350,7 +448,10 @@ impl RingWindowOfTheReading {
             Some(version) if !version.deleted_inodes.is_empty() => {
                 RingWindowOfTheReading::UsableByTheWritableMountWhileTheDeletionQueueIsNotEmpty
             }
-            Some(_) => RingWindowOfTheReading::DeductedOnEachDevice { slots_per_region },
+            Some(version) => RingWindowOfTheReading::DeductedOnEachDevice {
+                slots_per_region,
+                retirement_tree_internal_levels: version.retirement_tree_internal_levels(),
+            },
         }
     }
 
@@ -358,16 +459,18 @@ impl RingWindowOfTheReading {
     #[must_use]
     pub fn on_each_device(self, allocator: &PoolAllocator) -> BytesOnOneDevice {
         match self {
-            RingWindowOfTheReading::DeductedOnEachDevice { slots_per_region } => {
-                ring_window_on_one_device(
-                    allocator,
-                    slots_per_region,
-                    allocator
-                        .deletion_switches()
-                        .batch_size
-                        .data_units_per_batch(),
-                )
-            }
+            RingWindowOfTheReading::DeductedOnEachDevice {
+                slots_per_region,
+                retirement_tree_internal_levels,
+            } => ring_window_on_one_device(
+                allocator,
+                slots_per_region,
+                allocator
+                    .deletion_switches()
+                    .batch_size
+                    .data_units_per_batch(),
+                retirement_tree_internal_levels,
+            ),
             RingWindowOfTheReading::NotCountedBeforeTheFirstFileVersion
             | RingWindowOfTheReading::UsableByTheWritableMountWhileTheDeletionQueueIsNotEmpty => {
                 BytesOnOneDevice::ZERO
@@ -384,12 +487,14 @@ pub fn ring_window_on_one_device(
     allocator: &PoolAllocator,
     slots_per_region: RootRingSlotsPerRegion,
     batch_data_units: u64,
+    retirement_tree_internal_levels: u64,
 ) -> BytesOnOneDevice {
     let root_level = AllocationRecordTreeGeometry::of_allocator(allocator).root_level();
     let slots_one_deletion_publish_takes =
         slots_one_deletion_publish_newly_takes_on_one_device_at_most(
             &allocation_record_tree_positions_at_each_level_below_the_root(root_level, allocator),
             batch_data_units,
+            retirement_tree_internal_levels,
         );
     let roots_in_the_ring_plus_one = ROOT_RING_REGIONS * slots_per_region.count() + 1;
     BytesOnOneDevice::of_slots(
@@ -480,9 +585,11 @@ pub struct DeviceAdmissionTerms {
     /// 式子里的「挂载期承诺量」按设备摊的成员：实例切换的预留（D28（挂载期承诺量） 已定项 3，
     /// `instance_switch_reserve_on_one_device`）。它的池级成员 checkpoint 保留池在式子里单列，这里不重复扣。
     pub mount_time_commitment: BytesOnOneDevice,
-    /// 式子里的「被抛弃根独占量」（D28（挂载期承诺量） 已定项 1 第九项，C318（影子账隔离的单元没进准入不等式））：
-    /// 只被被抛弃根引用的槽，与分配器实际隔离的是同一个集合。
-    pub abandoned_root_exclusive: BytesOnOneDevice,
+    /// 式子第九项（D28（挂载期承诺量） 已定项 1，C318（影子账隔离的单元没进准入不等式））：分配器实际隔离的槽，是同一个集合——
+    /// 只被被抛弃根引用的槽，加可写挂载那一刻水位之上没施加的 journal 记录点名、不被回退候选集里的根（与现行账）引用、还没解开的槽
+    /// （C694 的 C，判决 `research/prompts/m3-c694-r2-main-verification.md` 第三节第 3 条：第九项的定义随 C 扩成分配器实际隔离的集合）。
+    /// 读法不变：取 `DeviceFreeMap::isolated_slots`。
+    pub isolated_for_abandoned_roots_and_unapplied_journal_records: BytesOnOneDevice,
     /// 式子里的「环窗口」（D28（挂载期承诺量） 已定项 1 末项）：删除各批新写的兜底，常驻扣项、只住内存、每块盘各扣这一份
     /// （[`RingWindowOfTheReading`]）。
     pub ring_window: BytesOnOneDevice,
@@ -556,7 +663,7 @@ impl AdmissionReading {
     }
 
     /// 从分配器此刻的计数取逐盘各项：容量 = 单元区槽数、已分配 = 占着的槽数（含已释放还在窗口里的）、
-    /// 被抛弃根独占量 = 影子账隔离的槽数，不可回收取 [`UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED`]；副本数按
+    /// 第九项 = 分配器隔离的槽数（影子账与水位之上没施加的记录点名的两部分），不可回收取 [`UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED`]；副本数按
     /// [`ReplicaCount::of_every_device_in_the_pool`]。挂载期承诺量与环窗口（每块盘同一个数）、全池三项由调用方给。
     ///
     /// D28（挂载期承诺量） 已定项 2 要的是「已发布统计量 − 在飞已批准」。这几个计数就是每次发布写进记账行的那几个数
@@ -580,7 +687,8 @@ impl AdmissionReading {
                 allocated: BytesOnOneDevice::of_slots(device_map.allocated_slots()),
                 unreclaimable: UNRECLAIMABLE_ON_A_DEVICE_OUTSIDE_ZONED,
                 mount_time_commitment: mount_time_commitment_on_each_device,
-                abandoned_root_exclusive: BytesOnOneDevice::of_slots(device_map.isolated_slots()),
+                isolated_for_abandoned_roots_and_unapplied_journal_records:
+                    BytesOnOneDevice::of_slots(device_map.isolated_slots()),
                 ring_window: ring_window_on_each_device,
             })
             .collect();
@@ -624,7 +732,7 @@ impl AdmissionReading {
                     terms.allocated,
                     terms.unreclaimable,
                     terms.mount_time_commitment,
-                    terms.abandoned_root_exclusive,
+                    terms.isolated_for_abandoned_roots_and_unapplied_journal_records,
                     terms.ring_window,
                 ]
                 .map(|term| i128::from(term.0));
@@ -904,10 +1012,13 @@ impl SpaceAdmission {
 /// - 分配记录树：几何上整棵树（用户同日再定取 K1），1 + Σ_盘 Σ_{层级 L = 0 … 根层级 − 1} 这块盘单元区在层级 L 上罩到的位置数
 ///   （[`allocation_record_tree_positions_over_the_unit_areas`]）；
 /// - 中央映射树：逐层按这次可能改的路径数与可能切出来的节点数计（[`central_mapping_tree_nodes_an_empty_publish_rewrites_at_most`]）；
-/// - 记账树每次发布整批重写（`transaction` 装记账行那一段，条目数每次发布相同、整棵按同一个形状重建）：这一版记账树的节点数；
+/// - 记账树：这次发布写完之后那棵记账树的节点数（[`accounting_tree_nodes_after_the_publish_built_on`]：行数至多是这一版的行数加
+///   这次新留的 1 级 inode 号水位台阶，按写路径同一个规划器、按 `node_capacities` 的记账树容量现算）；
 /// - 树表 1（每次发布重写一个单元，D16（发布语义） 已定项 9）；实例表链不进（它的开销归已定项 3 的切换预留）；
 /// - 谱系容器单列一项，按一次谱系容器 COW 连路径算（[`checkpoint_cost_of_one_lineage_container_cow`]，只算带文件的一版：
-///   树表 0 条的一版没有谱系树，也走不到管理员回退）。
+///   树表 0 条的一版没有谱系树，也走不到管理员回退）；
+/// - 退役容器照谱系单列一项（[`checkpoint_cost_of_one_retirement_container_cow`]，判决 `research/prompts/m3-retire-r1-main-verification.md`
+///   第六节 R2「两样都做」，只算带文件的一版），它在中央映射树里的删插同样算上。
 ///
 /// 「当前」= 这次发布要接在后面的那一版：
 /// - 带文件的一版：分配记录树与中央映射树的高从各自根节点的码 2 头里现读（层级 + 1，不用内存里另存一份，已定项 4）——分配记录树那一项
@@ -936,7 +1047,7 @@ pub fn checkpoint_cost_of_the_version_to_build_on(
     )
 }
 
-/// 同 [`checkpoint_cost_of_the_version_to_build_on`]，中央映射树的节点容量按 `node_capacities` 取：写入口装着只供测试的压小容量时，
+/// 同 [`checkpoint_cost_of_the_version_to_build_on`]，中央映射树与记账树的节点容量按 `node_capacities` 取：写入口装着只供测试的压小容量时，
 /// 它的空发布按压小的容量切分，量它的上界要按同一个容量算。产品路径（发布与可写挂载的准入）按节点格式调上面那一个。
 #[must_use]
 pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
@@ -959,20 +1070,34 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                 root_level_read_from_the_root_node_header,
                 allocator,
             );
-            let accounting_tree_nodes = u64::try_from(file_version.accounting_tree.node_count())
-                .expect("记账树的节点数装得进 u64");
+            let accounting_tree_nodes_of_this_version =
+                u64::try_from(file_version.accounting_tree.node_count())
+                    .expect("记账树的节点数装得进 u64");
+            let accounting_tree_nodes = accounting_tree_nodes_after_the_publish_built_on(
+                file_version,
+                node_capacities.of_tree(MultiLevelCodeTwoTree::Accounting),
+            );
             let lineage_tree_internal_levels = file_version.lineage_tree_internal_levels();
+            let retirement_tree_internal_levels = file_version.retirement_tree_internal_levels();
             // 一次空发布在中央映射树里改的条目是这两棵树的节点（别的进映射的单元照抄上一版、key 不变）：重写的每个节点删一把旧 key
             // （上一版有它时）、插一把这次的 key。再加回退那次谱系容器 COW 连祖先改的那几把：谱系那一项按一次 COW 连祖先算
             // （D28（挂载期承诺量） 已定项 4），它在中央映射树里的删插一并算上（用户 2026-10-02 定「乙 一并算上」）。
-            let changed_nodes_that_are_mapped = allocation_record_tree_nodes
-                .checked_add(accounting_tree_nodes)
-                .and_then(|nodes| {
-                    nodes.checked_add(central_mapping_entries_of_one_lineage_container_cow(
-                        lineage_tree_internal_levels,
-                    ))
-                })
-                .expect("两棵树重写的节点数与谱系那几把装得进 u64");
+            // 记账树的删至多是这一版的节点数、插至多是这次之后的节点数：两者在台阶行跨过一片叶的那次不同。
+            let mapped_changes_with_accounting_nodes = |accounting_nodes: u64| {
+                allocation_record_tree_nodes
+                    .checked_add(accounting_nodes)
+                    .and_then(|nodes| {
+                        nodes.checked_add(central_mapping_entries_of_one_lineage_container_cow(
+                            lineage_tree_internal_levels,
+                        ))
+                    })
+                    .and_then(|nodes| {
+                        nodes.checked_add(central_mapping_entries_of_one_retirement_container_cow(
+                            retirement_tree_internal_levels,
+                        ))
+                    })
+                    .expect("两棵树重写的节点数与谱系、退役那几把装得进 u64")
+            };
             let central_mapping_tree_nodes =
                 central_mapping_tree_nodes_an_empty_publish_rewrites_at_most(
                     &central_mapping_tree_nodes_at_each_level(
@@ -984,22 +1109,29 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
                     u64::try_from(file_version.mapped_units.len())
                         .expect("进映射的单元数装得进 u64"),
                     CentralMappingEntryChangesOfAnEmptyPublish {
-                        deleted_at_most: changed_nodes_that_are_mapped,
-                        inserted_at_most: changed_nodes_that_are_mapped,
+                        deleted_at_most: mapped_changes_with_accounting_nodes(
+                            accounting_tree_nodes_of_this_version,
+                        ),
+                        inserted_at_most: mapped_changes_with_accounting_nodes(
+                            accounting_tree_nodes,
+                        ),
                     },
                     node_capacities.of_tree(MultiLevelCodeTwoTree::CentralMapping),
                 );
             let lineage_container_cow =
                 checkpoint_cost_of_one_lineage_container_cow(lineage_tree_internal_levels).0;
+            let retirement_container_cow =
+                checkpoint_cost_of_one_retirement_container_cow(retirement_tree_internal_levels).0;
             [
                 allocation_record_tree_nodes,
                 central_mapping_tree_nodes,
                 accounting_tree_nodes,
                 lineage_container_cow,
+                retirement_container_cow,
             ]
             .into_iter()
             .try_fold(0u64, u64::checked_add)
-            .expect("三棵树的节点数与谱系那一项加起来装得进 u64")
+            .expect("三棵树的节点数与谱系、退役那两项加起来装得进 u64")
         }
         None => match allocator.allocation_record_tree_of_the_version_without_file() {
             Some(_) => allocation_record_tree_positions_over_the_unit_areas(
@@ -1010,6 +1142,66 @@ pub fn checkpoint_cost_of_the_version_to_build_on_with_node_capacities(
         },
     };
     MetadataBlocks(record_trees_and_accounting_nodes + TREE_TABLE_UNITS_PER_PUBLISH)
+}
+
+/// ckpt_cost 里记账树那一项（D28（挂载期承诺量） 已定项 4「记账树每发布的节点数」）：接在 `version_to_build_on` 后面的那次发布写完之后
+/// 那棵记账树的节点数，记账树节点容量取 `capacity`。
+///
+/// 那次发布的记账行与它做什么无关（空发布、覆盖写、建 inode、管理员回退都一样，`transaction` 装记账行那一段）：池级三行加每块盘六行，
+/// 代段换成那次的 txg，加照抄的 inode 号水位台阶行（[`TransactionOutput::inode_number_watermark_steps`]）。行数因此至多是这一版的行数加 1：
+/// 这一版自己那一行是一级台阶时，下一次照抄它、再写自己那一行（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」）。
+/// 形状按写路径同一个规划器从这一版的形状现算（`code_two_tree::plan_the_tree_after_this_publish`）：台阶行正好跨过一片叶的容量那次，
+/// 那次的树比这一版多节点（产品容量两块盘时第 463 级台阶起 +2，同一条射程），只拿这一版的节点数会少算。
+/// 那次的代段只要大于这一版的 txg 就排在同一处，取这一版的 txg + 1（D16（发布语义） 已定项 6）。
+///
+/// 规划器拒（树要长到 257 层，或这一版的形状按分隔 key 走不到它自己叶里的 key）时，接在这一版后面的发布拿同一个形状、同一组 key 规划，
+/// 同样在任何落盘之前拒、一个记账树节点都不写：这一项取这一版的节点数。
+///
+/// # Panics
+/// 这一版的 txg 加 1 装不进 u64；或算出来的行数多于这一版的行数加 1（照抄的台阶行代段都小于这一版的 txg，与这一版那一组行不重 key）。
+#[must_use]
+pub fn accounting_tree_nodes_after_the_publish_built_on(
+    version_to_build_on: &TransactionOutput,
+    capacity: CodeTwoTreeNodeCapacity,
+) -> u64 {
+    let version_txg = version_to_build_on.root.checkpoint_txg;
+    let txg_of_the_publish_built_on_it = CheckpointTxg(
+        version_txg
+            .0
+            .checked_add(1)
+            .expect("checkpoint 号加 1 装得进 u64"),
+    );
+    let rows_written_by_that_publish = version_to_build_on
+        .accounting_entries
+        .iter()
+        .filter(|entry| entry.generation == version_txg)
+        .map(|entry| AccountingEntry {
+            statistic: entry.statistic,
+            tree: entry.tree,
+            device: entry.device,
+            generation: txg_of_the_publish_built_on_it,
+            value: entry.value,
+            sequence: entry.sequence,
+        });
+    let keys_after_that_publish: BTreeSet<CodeTwoTreeKey> = rows_written_by_that_publish
+        .chain(version_to_build_on.inode_number_watermark_steps())
+        .map(|entry| CodeTwoTreeKey::new(&entry.key_bytes(), CodeTwoKeyFieldWidths::ACCOUNTING))
+        .collect();
+    assert!(
+        keys_after_that_publish.len() <= version_to_build_on.accounting_entries.len() + 1,
+        "接在这一版后面的发布至多比这一版多 1 行记账（新留的那一级台阶）：算出 {} 行，这一版 {} 行",
+        keys_after_that_publish.len(),
+        version_to_build_on.accounting_entries.len()
+    );
+    let nodes = match plan_the_tree_after_this_publish(
+        &version_to_build_on.accounting_tree.shape,
+        &keys_after_that_publish,
+        capacity,
+    ) {
+        Ok(plan) => plan.shape.nodes().len(),
+        Err(_refused_before_any_write) => version_to_build_on.accounting_tree.node_count(),
+    };
+    u64::try_from(nodes).expect("记账树的节点数装得进 u64")
 }
 
 /// 分配记录树一次空发布至多重写的节点数，取几何上整棵树（K1，用户 2026-09-27 定；D8（核心索引结构） 已定项 14：按位置寻址、根里按盘分路、
@@ -1238,6 +1430,11 @@ pub const fn space_budget_of_role(role: TransactionUnit) -> SpaceBudgetOfARole {
         | TransactionUnit::TombstoneLeafContainer(_)
         | TransactionUnit::TombstoneRoot
         | TransactionUnit::TombstoneNodeBelowTheRoot(_) => SpaceBudgetOfARole::OrdinaryAllocation,
+        // 退役树三个角色同墓碑（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）：只在最后一批（身份消失那次）重写，
+        // 落点那一判照判，式子那一判删除类发布整次不判；它们的空间罩在标签 6 的退役那一份与环窗口 W 的 6 + H_退役 里。
+        TransactionUnit::RetirementLeafContainer(_)
+        | TransactionUnit::RetirementRoot
+        | TransactionUnit::RetirementNodeBelowTheRoot(_) => SpaceBudgetOfARole::OrdinaryAllocation,
         // 谱系容器与谱系树根归固定点、进 ckpt_cost 的 Σ 名单（D28（挂载期承诺量） 已定项 1 接线），只在管理员回退那次重写：
         // 回退不判式子，空间从 checkpoint 保留池里出（[`checkpoint_cost_of_one_lineage_container_cow`]）。
         TransactionUnit::LineageLeafContainer(_)
@@ -1366,7 +1563,11 @@ pub fn admission_reading_before_a_publish_on_a_ring_of(
         InstanceRowsOfTheSwitchReserve::OfTheNextWritableMount,
         CodeTwoTreeNodeCapacities::FromTheNodeFormat,
         committed_reservation_after_this_publish,
-        RingWindowOfTheReading::DeductedOnEachDevice { slots_per_region },
+        RingWindowOfTheReading::DeductedOnEachDevice {
+            slots_per_region,
+            retirement_tree_internal_levels: version_to_build_on
+                .map_or(0, TransactionOutput::retirement_tree_internal_levels),
+        },
     )
 }
 
@@ -1459,7 +1660,7 @@ mod tests {
             allocated: BytesOnOneDevice::ZERO,
             unreclaimable: BytesOnOneDevice::ZERO,
             mount_time_commitment: BytesOnOneDevice::ZERO,
-            abandoned_root_exclusive: BytesOnOneDevice::ZERO,
+            isolated_for_abandoned_roots_and_unapplied_journal_records: BytesOnOneDevice::ZERO,
             ring_window: BytesOnOneDevice::ZERO,
         }
     }
@@ -1489,7 +1690,7 @@ mod tests {
                     allocated: slots(100),
                     unreclaimable: slots(1),
                     mount_time_commitment: slots(7),
-                    abandoned_root_exclusive: slots(3),
+                    isolated_for_abandoned_roots_and_unapplied_journal_records: slots(3),
                     ring_window: slots(13),
                 },
                 DeviceAdmissionTerms {
@@ -1498,7 +1699,8 @@ mod tests {
                     allocated: slots(90),
                     unreclaimable: BytesOnOneDevice::ZERO,
                     mount_time_commitment: slots(7),
-                    abandoned_root_exclusive: BytesOnOneDevice::ZERO,
+                    isolated_for_abandoned_roots_and_unapplied_journal_records:
+                        BytesOnOneDevice::ZERO,
                     ring_window: slots(13),
                 },
             ],
@@ -1676,10 +1878,11 @@ mod tests {
     }
 
     /// 两块 4 GiB 盘（单元区 [50176, 262144)、根层级 2）：N_0 = 2 × (322 − 61 + 1) = 524、N_1 = 2 × 2 = 4，
-    /// 产品批大小 K = 144 ⇒ W = 24 + min(524, 340) + min(4, 340) = 368；S = 8 ⇒ 环窗口 = (3 × 8 + 1) × 368 = 9200 槽 / 盘
-    /// （辩方 `research/prompts/m3-delete-r3-sonnet-output.md` 第三节表里 4 GiB 那一行）。
+    /// 产品批大小 K = 144、退役树只有根（H_退役 = 0）⇒ W = 24 + (6 + 0) + min(524, 340) + min(4, 340) = 374；
+    /// S = 8 ⇒ 环窗口 = (3 × 8 + 1) × 374 = 9350 槽 / 盘（辩方 `research/prompts/m3-delete-r3-sonnet-output.md` 第三节表里 4 GiB 那一行的 368，
+    /// 加判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条的 6 + H_退役）。
     #[test]
-    fn ring_window_on_two_four_gibibyte_devices_is_twenty_five_times_three_hundred_sixty_eight_slots(
+    fn ring_window_on_two_four_gibibyte_devices_is_twenty_five_times_three_hundred_seventy_four_slots(
     ) {
         let allocator = allocator_of_two_devices_of(4 << 30);
         assert_eq!(
@@ -1698,68 +1901,107 @@ mod tests {
         assert_eq!(
             slots_one_deletion_publish_newly_takes_on_one_device_at_most(
                 &[524, 4],
-                EXTENT_TREE_LOWER_LEAF_DATA_UNITS
+                EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+                0
             ),
-            368,
-            "W = 24 + min(524, 340) + min(4, 340)"
+            374,
+            "W = 24 + 6 + min(524, 340) + min(4, 340)"
+        );
+        assert_eq!(
+            slots_one_deletion_publish_newly_takes_on_one_device_at_most(
+                &[524, 4],
+                EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+                2
+            ),
+            376,
+            "退役树长到内部两层：W 多 2"
         );
         assert_eq!(
             ring_window_on_one_device(
                 &allocator,
                 RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
-                EXTENT_TREE_LOWER_LEAF_DATA_UNITS
+                EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+                0
             ),
-            slots(9200),
-            "(3 × 8 + 1) × 368"
+            slots(9350),
+            "(3 × 8 + 1) × 374"
         );
     }
 
-    /// 两块 16 GiB 盘（根层级 2）：N_1 = 2 × 8 = 16，层 0 远超 340 ⇒ W = 24 + 340 + 16 = 380；环窗口 = 25 × 380 = 9500 槽 / 盘
-    /// （辩方第三节表里 16 GiB 那一行）。
+    /// 两块 16 GiB 盘（根层级 2）：N_1 = 2 × 8 = 16，层 0 远超 340 ⇒ W = 24 + 6 + 340 + 16 = 386；环窗口 = 25 × 386 = 9650 槽 / 盘
+    /// （辩方第三节表里 16 GiB 那一行的 380 加退役树那 6 + 0）。
     #[test]
-    fn ring_window_on_two_sixteen_gibibyte_devices_is_twenty_five_times_three_hundred_eighty_slots()
-    {
+    fn ring_window_on_two_sixteen_gibibyte_devices_is_twenty_five_times_three_hundred_eighty_six_slots(
+    ) {
         assert_eq!(
             ring_window_on_one_device(
                 &allocator_of_two_devices_of(16 << 30),
                 RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM,
-                EXTENT_TREE_LOWER_LEAF_DATA_UNITS
+                EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
+                0
             ),
-            slots(25 * 380)
+            slots(25 * 386)
         );
     }
 
-    /// 墓碑预付（标签 6）在只有根的墓碑树上（H = 0）：两份副本 × ((2 + 0 + 1) × 16384 + 41 × n_live)。
-    /// n_live = 1 ⇒ 2 × (49152 + 41) = 98386；n_live = 3 ⇒ 2 × (49152 + 123) = 98550。
+    /// 标签 6 在只有根的墓碑树与退役树上（H_墓碑 = H_退役 = 0）、记录都是活的（n_记录 = n_live）：
+    /// 两份副本 × ((2 + 0 + 1 + 2 + 0 + 1) × 16384 + 41 × n_live + 35 × n_记录)。
+    /// n = 1 ⇒ 2 × (98304 + 41 + 35) = 196760；n = 3 ⇒ 2 × (98304 + 123 + 105) = 197064。
     #[test]
-    fn tombstone_prepay_on_a_root_only_tombstone_tree_is_three_slots_plus_forty_one_bytes_per_live_object(
+    fn tag_six_on_root_only_tombstone_and_retirement_trees_is_six_slots_plus_forty_one_and_thirty_five_bytes_per_record(
     ) {
-        let prepay_of = |live_objects: u64| {
-            committed_reservation_for_tombstones(
-                TombstonePrepayBasis::VersionWithADeletedInodesTreeTableEntry {
+        let prepay_of = |records: u64| {
+            committed_reservation_for_tombstones_and_retirement_records(
+                TombstoneAndRetirementPrepayBasis::VersionWithADeletedInodesTreeTableEntry {
                     tombstone_tree_internal_levels: 0,
-                    live_objects,
+                    live_objects: records,
+                    retirement_tree_internal_levels: 0,
+                    inode_records: records,
                 },
                 replicas_of_two_devices(),
             )
         };
         assert_eq!(TOMBSTONE_PREPAY_BYTES_PER_LIVE_OBJECT_ON_ONE_REPLICA, 41);
-        assert_eq!(prepay_of(1), BytesSummedOverAllReplicas(98_386));
-        assert_eq!(prepay_of(3), BytesSummedOverAllReplicas(98_550));
+        assert_eq!(
+            RETIREMENT_PREPAY_BYTES_PER_INODE_RECORD_ON_ONE_REPLICA, 35,
+            "⌈32768 ÷ 959⌉"
+        );
+        assert_eq!(prepay_of(1), BytesSummedOverAllReplicas(196_760));
+        assert_eq!(prepay_of(3), BytesSummedOverAllReplicas(197_064));
     }
 
-    /// 墓碑树长高一层之后（H = 1）常驻那一份多一槽：n_live = 1 ⇒ 2 × ((2 + 1 + 1) × 16384 + 41) = 131154。
+    /// 墓碑树长高一层之后（H_墓碑 = 1）常驻那一份多一槽：n = 1 ⇒ 2 × (7 × 16384 + 41 + 35) = 229528。
     #[test]
-    fn tombstone_prepay_after_the_tombstone_tree_grows_one_level_counts_one_more_slot() {
+    fn tag_six_after_the_tombstone_tree_grows_one_level_counts_one_more_slot() {
         assert_eq!(
-            committed_reservation_for_tombstones(
-                TombstonePrepayBasis::VersionWithADeletedInodesTreeTableEntry {
+            committed_reservation_for_tombstones_and_retirement_records(
+                TombstoneAndRetirementPrepayBasis::VersionWithADeletedInodesTreeTableEntry {
                     tombstone_tree_internal_levels: 1,
                     live_objects: 1,
+                    retirement_tree_internal_levels: 0,
+                    inode_records: 1,
                 },
                 replicas_of_two_devices(),
             ),
-            BytesSummedOverAllReplicas(131_154)
+            BytesSummedOverAllReplicas(229_528)
+        );
+    }
+
+    /// 退役那一项数 inode 树里全部记录（含 nlink = 0 的）、跟着退役树的内部层数：意图之后那一版 n_live = 0、n_记录 = 1、
+    /// 退役树长高一层（H_退役 = 1）⇒ 2 × ((2 + 0 + 1 + 2 + 1 + 1) × 16384 + 0 + 35) = 229446。
+    #[test]
+    fn the_retirement_share_of_tag_six_counts_every_inode_record_and_the_retirement_tree_levels() {
+        assert_eq!(
+            committed_reservation_for_tombstones_and_retirement_records(
+                TombstoneAndRetirementPrepayBasis::VersionWithADeletedInodesTreeTableEntry {
+                    tombstone_tree_internal_levels: 0,
+                    live_objects: 0,
+                    retirement_tree_internal_levels: 1,
+                    inode_records: 1,
+                },
+                replicas_of_two_devices(),
+            ),
+            BytesSummedOverAllReplicas(229_446)
         );
     }
 
@@ -1773,12 +2015,26 @@ mod tests {
         );
     }
 
+    /// ckpt_cost 退役那一项（判决 m3-retire-r1 第六节 R2「两样都做」，照谱系）：容器 2 + 根 1 + 内部层数块，零根与只有根 3 块、
+    /// 长高一层 4 块、两层 5 块；它在中央映射树里改的条目 = 容器 1 + 根 1 + 内部层数把。
+    #[test]
+    fn the_retirement_term_of_the_checkpoint_cost_is_a_container_a_root_and_every_internal_level() {
+        assert_eq!(
+            [0, 1, 2].map(checkpoint_cost_of_one_retirement_container_cow),
+            [MetadataBlocks(3), MetadataBlocks(4), MetadataBlocks(5)]
+        );
+        assert_eq!(
+            [0, 1, 2].map(central_mapping_entries_of_one_retirement_container_cow),
+            [2, 3, 4]
+        );
+    }
+
     /// 树表里没有 `deleted_inodes` 条目的版本：标签 6 取 0。
     #[test]
     fn tombstone_prepay_of_a_version_without_a_deleted_inodes_entry_is_zero() {
         assert_eq!(
-            committed_reservation_for_tombstones(
-                TombstonePrepayBasis::VersionWithoutADeletedInodesTreeTableEntry,
+            committed_reservation_for_tombstones_and_retirement_records(
+                TombstoneAndRetirementPrepayBasis::VersionWithoutADeletedInodesTreeTableEntry,
                 replicas_of_two_devices(),
             ),
             BytesSummedOverAllReplicas::ZERO
@@ -1913,7 +2169,7 @@ mod tests {
             allocated: slots(3),
             unreclaimable: BytesOnOneDevice::ZERO,
             mount_time_commitment,
-            abandoned_root_exclusive: slots(isolated_slots),
+            isolated_for_abandoned_roots_and_unapplied_journal_records: slots(isolated_slots),
             ring_window: BytesOnOneDevice::ZERO,
         };
         assert_eq!(

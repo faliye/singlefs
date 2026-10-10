@@ -174,9 +174,8 @@ pub struct PointerHeadExtentOffsetNotZero {
     pub extent_offset: u16,
 }
 
-/// 指针头部按字段表读出来的样子，加密与压缩那几段与 extent 偏移还没判：[`PointerHead::read_from`]、
-/// [`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`] 与 [`PointerHead::read_judging_the_extent_offset_from`]
-/// 共用这一份读法，字段表的偏移只写一处。
+/// 指针头部按字段表读出来的样子，加密与压缩那几段与 extent 偏移还没判：[`PointerHead::read_from`] 与
+/// [`PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`] 共用这一份读法，字段表的偏移只写一处。
 struct PointerHeadAsRead {
     is_every_mac_and_nonce_byte_zero: bool,
     algorithm_type: u8,
@@ -232,18 +231,12 @@ impl PointerHeadAsRead {
                 },
             );
         }
-        self.judged_extent_offset()
-            .map_err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero)
-    }
-
-    /// 只判 extent 偏移（C581）：今天只剩根记录（`root_record.rs`）走这一判，加密与压缩那几段在它上面还没换成判；树表条目、inode 内部条目、
-    /// extent 树的上段叶条目、内部条目与叶记录、分配记录树内部条目、实例表链指针已换成 [`Self::judged`]（判决
-    /// `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 5 行、`records/2026-09-30-里程碑三开工第一轮.md` 第 8 批 core 簇第 9 条）。
-    fn judged_extent_offset(self) -> Result<PointerHead, PointerHeadExtentOffsetNotZero> {
         if self.extent_offset != 0 {
-            return Err(PointerHeadExtentOffsetNotZero {
-                extent_offset: self.extent_offset,
-            });
+            return Err(PointerHeadFieldOutsideTheFirstVersion::ExtentOffsetNotZero(
+                PointerHeadExtentOffsetNotZero {
+                    extent_offset: self.extent_offset,
+                },
+            ));
         }
         Ok(self.head)
     }
@@ -266,8 +259,8 @@ impl PointerHead {
         );
     }
     /// 读头部，加密与压缩那几段与 extent 偏移都不判。core 读盘上指针的读者一律不用它（走
-    /// [`Self::read_judging_the_extent_offset_from`] 或 [`Self::read_judging_the_encryption_compression_and_extent_offset_fields_from`]）；
-    /// 留给测试与造坏盘的装置读自己刚写出、要改的那几个字节。
+    /// [`Self::read_judging_the_encryption_compression_and_extent_offset_fields_from`]；影子账的读者经
+    /// [`NodePointer::read_with_head_fields_judgement_from`] 不判）；留给测试与造坏盘的装置读自己刚写出、要改的那几个字节。
     pub fn read_from(reader: &mut ByteReader<'_>) -> Self {
         PointerHeadAsRead::read_from(reader).head
     }
@@ -280,16 +273,6 @@ impl PointerHead {
         reader: &mut ByteReader<'_>,
     ) -> Result<Self, PointerHeadFieldOutsideTheFirstVersion> {
         PointerHeadAsRead::read_from(reader).judged()
-    }
-
-    /// 读头部，只判 extent 偏移（加密与压缩那几段不判）。
-    ///
-    /// # Errors
-    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
-    pub fn read_judging_the_extent_offset_from(
-        reader: &mut ByteReader<'_>,
-    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
-        PointerHeadAsRead::read_from(reader).judged_extent_offset()
     }
 }
 
@@ -370,17 +353,6 @@ impl NodePointer {
         Ok(Self::read_after_the_head(head, reader))
     }
 
-    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
-    ///
-    /// # Errors
-    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
-    pub fn read_judging_the_extent_offset_from(
-        reader: &mut ByteReader<'_>,
-    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
-        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
-        Ok(Self::read_after_the_head(head, reader))
-    }
-
     /// 读一条子指针，判不判头部第一版之外的取值由读者定（[`PointerHeadFieldsJudgement`]）：走读的读者判，影子账的读者不判。
     ///
     /// # Errors
@@ -453,17 +425,6 @@ impl DataPointer {
             PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from(
                 reader,
             )?;
-        Ok(Self::read_after_the_head(head, reader))
-    }
-
-    /// 同 [`Self::read_from`]，头部里只判 extent 偏移（[`PointerHead::read_judging_the_extent_offset_from`]）。
-    ///
-    /// # Errors
-    /// extent 偏移非 0 ⇒ [`PointerHeadExtentOffsetNotZero`]。
-    pub fn read_judging_the_extent_offset_from(
-        reader: &mut ByteReader<'_>,
-    ) -> Result<Self, PointerHeadExtentOffsetNotZero> {
-        let head = PointerHead::read_judging_the_extent_offset_from(reader)?;
         Ok(Self::read_after_the_head(head, reader))
     }
 

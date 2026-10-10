@@ -48,10 +48,19 @@ fn many_device_pool(device_count: u32) -> ManyDevicePool {
             )
         })
         .collect();
-    let allocator = PoolAllocator::new(
+    let mut allocator = PoolAllocator::new(
         (0..device_count)
             .map(|device_number| DeviceFreeMap::new(DeviceIdentity(device_number), IMAGE_BYTES))
             .collect(),
+    );
+    // 记根要分配器装着根环表（没装就断言，C551）：盘是全新的，根环上一条根都没有，这个进程写的第一条根是第一个文件版本形态那一次（txg 3）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::allocator::RootRingOccupancy::read_from_the_ring(
+            parameters().geometry.root_ring_slots_per_region,
+            Vec::new(),
+            CheckpointTxg(0),
+            CheckpointTxg(NEW_POOL_FILE_CREATION_TXG - 1),
+        ),
     );
     ManyDevicePool { devices, allocator }
 }

@@ -30,8 +30,8 @@ use singlefs_core::mount::{
     mount_writable, mount_writable_with_test_only_switches_and_a_hook_before_the_one_reread,
     BeforeTheOneReread, InstanceRow, InstanceTableOfTheNewestRootRead, MountError,
     NewerPublishWitness, ReadStageSettled, RereadsOfThisMount, RollbackTarget,
-    SelectedVersionAgainstTheWitness, ShadowLedger, StillUnreadableAfterOneReread,
-    WitnessedCounterComparison,
+    RootRingOfTheRebuiltAllocatorRead, SelectedVersionAgainstTheWitness, ShadowLedger,
+    StillUnreadableAfterOneReread, WitnessedCounterComparison,
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::pointer::NodePointer;
@@ -166,7 +166,9 @@ fn violated_invariants(pool: &BuiltPool) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -292,6 +294,7 @@ fn mount_with_the_newest_root_unreadable_until_the_one_reread(
                 reread: selected_against_its_last_record(&newest, newest.record.counter),
             },
             instance_table_of_the_newest_root: InstanceTableOfTheNewestRootRead::OnTheFirstRead,
+            root_ring_of_the_rebuilt_allocator: RootRingOfTheRebuiltAllocatorRead::OnTheFirstRead,
         },
         "{read_back:?}：第一遍落到 B、判据为真；重读落到 C、判据为假，往下走用重读那一遍"
     );
@@ -487,7 +490,13 @@ fn without_the_last_record_of_the_selected_version_the_record_at_the_witnessed_c
     }
 }
 
-/// 判据的第一支：只做过 mkfs 的池两块盘的系统配置 tail 都是 0 ⇒ 没有见证，判假、不重读。
+/// 判据的第一支：只做过 mkfs 的池两块盘的系统配置 tail 都是 0 ⇒ 没有见证，判假、读阶段不重读。
+/// 重建分配器读根环那一遍也不重读：mkfs 在三个区域的槽 0 各写一份第 0 代根（区域 0、2 在盘 0，区域 1 在盘 1），一条根按读出它的那个槽
+/// 所在的区域归盘，两块盘各读出一条有效根，Q4 rr2（用户 2026-10-05 定，岔路单 `research/prompts/m3-batch10-code-r1-forks.md` 第 4 行）
+/// 「任一块盘没读出」不成立。
+/// 判别力：归盘改回按 txg 的落点公式（`crates/mutations.tsv`「第10h批 rr2 改回按 txg 的落点公式归盘」）时三份第 0 代根都归到盘 0，
+/// 盘 1 算成一条都没有、整环重读一次，最后一项报 `OnTheOneReread`、这一条红（判决
+/// `research/prompts/m3-batch10-code-r2-main-verification.md` 第二节 K2）。
 #[test]
 fn the_first_writable_mount_of_a_formatted_pool_has_nothing_witnessed_and_does_not_reread() {
     let mut formatted = format_pool("c554-yi-formatted-pool-nothing-witnessed");
@@ -510,6 +519,7 @@ fn the_first_writable_mount_of_a_formatted_pool_has_nothing_witnessed_and_does_n
                 },
             },
             instance_table_of_the_newest_root: InstanceTableOfTheNewestRootRead::OnTheFirstRead,
+            root_ring_of_the_rebuilt_allocator: RootRingOfTheRebuiltAllocatorRead::OnTheFirstRead,
         }
     );
 }

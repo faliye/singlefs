@@ -49,10 +49,10 @@ pub const OVERWRITE_BYTES: usize = 2999;
 /// 核这里三样（参数、盘宽、几何）与 history.rs 那一档逐项相同，两边改了一边就红。
 const UNIT_AREA_SLOTS_OF_THE_384_SLOT_SMALL_DEVICES: u64 = 384;
 
-/// 单元区 384 槽那一档小盘为环窗口补足的槽数：815（D28（挂载期承诺量） 已定项 1 末项环窗口每块盘常驻扣，用户 2026-10-02 定「甲」：小盘放大到扣得起）。
-/// 抄自 `crates/singlefs-harness/src/history.rs` 的 `SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`（式子 750 + 5 + 60 的来历写在那边），为什么各留一份见上一条；
-/// 名字里的 384 槽是补足之外的那一段。
-const RING_WINDOW_ALLOWANCE_SLOTS_OF_THE_384_SLOT_SMALL_DEVICES: u64 = 815;
+/// 单元区 384 槽那一档小盘为环窗口补足的槽数：1007（D28（挂载期承诺量） 已定项 1 末项环窗口每块盘常驻扣，用户 2026-10-02 定「甲」：小盘放大到扣得起；
+/// 第 50 批退役树那几项再补 192）。抄自 `crates/singlefs-harness/src/history.rs` 的 `SMALL_DEVICE_RING_WINDOW_ALLOWANCE_SLOTS`（式子的来历写在那边），
+/// 为什么各留一份见上一条；名字里的 384 槽是补足之外的那一段。
+const RING_WINDOW_ALLOWANCE_SLOTS_OF_THE_384_SLOT_SMALL_DEVICES: u64 = 1007;
 
 /// 单元区 384 槽那一档小盘的 journal 环字节数：6 MiB。
 /// 抄自 `crates/singlefs-harness/src/history.rs` 的 `SMALL_DEVICE_JOURNAL_RING_BYTES`，为什么各留一份见上一条。
@@ -66,7 +66,7 @@ pub fn parameters_of_the_384_slot_small_devices() -> MakeFilesystemParameters {
     parameters
 }
 
-/// 单元区 384 槽那一档小盘每块盘的字节数：单元区起点（6 MiB 的环末尾的下一个槽）加环窗口补足的 815 槽、再加 384 槽。
+/// 单元区 384 槽那一档小盘每块盘的字节数：单元区起点（6 MiB 的环末尾的下一个槽）加环窗口补足的 1007 槽、再加 384 槽。
 #[must_use]
 pub fn device_bytes_of_the_384_slot_small_devices() -> u64 {
     let unit_area_start_slot =
@@ -375,7 +375,9 @@ pub fn checker_violations_on(image: &MemoryPool) -> Vec<String> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }

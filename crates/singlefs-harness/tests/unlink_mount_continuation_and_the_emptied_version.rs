@@ -55,6 +55,8 @@ fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
         batch_size: batches_of_one_data_unit(),
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity:
+            singlefs_core::retirement_tree::RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     }
 }
@@ -162,7 +164,9 @@ fn violations(image: &MemoryPool) -> Vec<String> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -499,12 +503,21 @@ fn the_intent_and_a_middle_batch_each_set_the_change_count_to_the_txg_of_their_o
     );
 }
 
-/// 第一个文件那条记录在 `version` 这一版里、两块盘上各读出来的三个时间秒（偏移 64 起 atime、mtime、ctime 各 8 字节，D8（核心索引结构）
-/// 已定项 6 字段表）：按盘读这一版每片 inode 叶容器的单元字节，在码 3 记录区（`PACKED_UNIT_RECORDS_OFFSET` 起、每条 `INODE_RECORD_BYTES`）里
-/// 找 inode 号是第一个文件的那一条。读的是盘，不是内存里那份记录。
+/// 第一个文件那条记录在 `version` 这一版里、两块盘上各读出来的三个时间秒（[`time_seconds_of_an_inode_on_each_device`]）。
 fn time_seconds_of_the_first_file_on_each_device(
     image: &MemoryPool,
     version: &TransactionOutput,
+) -> Vec<[u64; 3]> {
+    time_seconds_of_an_inode_on_each_device(image, version, FIRST_FILE)
+}
+
+/// `inode` 那条记录在 `version` 这一版里、两块盘上各读出来的三个时间秒（偏移 64 起 atime、mtime、ctime 各 8 字节，D8（核心索引结构）
+/// 已定项 6 字段表）：按盘读这一版每片 inode 叶容器的单元字节，在码 3 记录区（`PACKED_UNIT_RECORDS_OFFSET` 起、每条 `INODE_RECORD_BYTES`）里
+/// 找 inode 号是它的那一条。读的是盘，不是内存里那份记录。
+fn time_seconds_of_an_inode_on_each_device(
+    image: &MemoryPool,
+    version: &TransactionOutput,
+    inode: InodeNumber,
 ) -> Vec<[u64; 3]> {
     let record_bytes = usize::try_from(INODE_RECORD_BYTES).expect("140");
     let records_offset = usize::try_from(PACKED_UNIT_RECORDS_OFFSET).expect("136");
@@ -531,7 +544,7 @@ fn time_seconds_of_the_first_file_on_each_device(
                     );
                     unit_bytes[records_offset..]
                         .chunks_exact(record_bytes)
-                        .find(|record| field_at(record, 0) == FIRST_FILE.0)
+                        .find(|record| field_at(record, 0) == inode.0)
                         .map(|record| {
                             [
                                 field_at(record, 64),
@@ -540,7 +553,9 @@ fn time_seconds_of_the_first_file_on_each_device(
                             ]
                         })
                 })
-                .expect("这一版的 inode 叶容器里有第一个文件那条记录（意图与中间各批之后 nlink = 0、还在树里）")
+                .unwrap_or_else(|| {
+                    panic!("这一版的 inode 叶容器里有 inode {} 那条记录（意图与中间各批之后 nlink = 0、还在树里）", inode.0)
+                })
         })
         .collect()
 }
@@ -550,24 +565,445 @@ fn time_seconds_of_the_first_file_on_each_device(
 /// 判别力：意图照旧带上一版的时间时第一项红；那一批不照抄上一版这条记录的时间（另取一个）时第二项红。
 #[test]
 fn the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it() {
-    let mut pool = pool_with_a_three_unit_file("write-time-of-the-deletion-steps");
-    let time_before_the_unlink = write_time_seconds_of_the_first_file(&pool);
-    let time_of_the_intent = time_before_the_unlink + 600;
-    let intent = publish_the_intent_in_process_at(&mut pool, time_of_the_intent);
+    let observed = time_fields_on_disk_after_an_intent_and_a_middle_batch_in_process(
+        "write-time-of-the-deletion-steps",
+        GivenTimeAgainstThePreviousVersion::Later,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record[0],
+        vec![[observed.given_time; 3]; 2],
+        "意图那一版两块盘上那条记录的 atime、mtime、ctime 秒都是给的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record[1],
+        vec![[observed.given_time; 3]; 2],
+        "中间那一批照抄意图那次写进去的时间"
+    );
+}
+
+/// 进程内发意图（给一个与这条记录上一版不同的时间，在上一版哪一边由 `given_time_against_the_previous_version` 定），再发一批（留 2）；
+/// 读意图那一版与那一批各自两块盘上第一个文件那条记录的三个时间秒（按先后，一版一项）。
+fn time_fields_on_disk_after_an_intent_and_a_middle_batch_in_process(
+    pool_tag: &str,
+    given_time_against_the_previous_version: GivenTimeAgainstThePreviousVersion,
+) -> TimeFieldsOnDiskAfterAnUnlink {
+    let mut pool = pool_with_a_three_unit_file(pool_tag);
+    let time_of_the_previous_version = write_time_seconds_of_the_first_file(&pool);
+    let given_time =
+        given_time_against_the_previous_version.given_time(time_of_the_previous_version);
+    let intent = publish_the_intent_in_process_at(&mut pool, given_time);
     let on_disk_after_the_intent =
         time_seconds_of_the_first_file_on_each_device(&pool.memory_pool(), &intent);
     let middle_batch = publish_the_next_step_in_process(&mut pool);
     let on_disk_after_the_middle_batch =
         time_seconds_of_the_first_file_on_each_device(&pool.memory_pool(), &middle_batch);
-    assert_eq!(
-        on_disk_after_the_intent,
-        vec![[time_of_the_intent; 3]; 2],
-        "意图那一版两块盘上那条记录的 atime、mtime、ctime 秒都是给的时间（上一版是 {time_before_the_unlink}）"
+    TimeFieldsOnDiskAfterAnUnlink {
+        time_of_the_previous_version,
+        given_time,
+        on_disk_in_every_version_with_the_record: vec![
+            on_disk_after_the_intent,
+            on_disk_after_the_middle_batch,
+        ],
+    }
+}
+
+/// 进程内发意图给的时间早于这条记录上一版（上一版减 600 秒）：意图那一版与中间那一批两块盘上那条记录的三个时间秒都等于给的那个较早的时间。
+/// 上面那一条只有晚于上一版一形，判不出「意图取给的时间与上一版里较大的那个」；会话与续做两条早于上一版的用例不经直接调
+/// `publish_unlink_intent` 这一路。
+/// 判别力：意图取 `write_time_seconds.max(record.write_time_seconds)`（`research/prompts/m3-batch16-code-r1-main-verification.md`
+/// 第二节 N7 攻方那一刀）时意图写下的是上一版的时间，这一条红、晚于上一版那一条照旧绿。
+#[test]
+fn the_intent_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_and_a_middle_batch_copies_it(
+) {
+    let observed = time_fields_on_disk_after_an_intent_and_a_middle_batch_in_process(
+        "earlier-write-time-of-the-deletion-steps",
+        GivenTimeAgainstThePreviousVersion::Earlier,
     );
     assert_eq!(
-        on_disk_after_the_middle_batch,
-        vec![[time_of_the_intent; 3]; 2],
-        "中间那一批照抄意图那次写进去的时间"
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 2],
+        "意图那一版与中间那一批，两块盘上那条记录的 atime、mtime、ctime 秒都是给的那个较早的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 调用方给 unlink 的时间与这条记录上一版的写入时间差几秒。
+const SECONDS_BETWEEN_THE_GIVEN_TIME_AND_THE_PREVIOUS_VERSION: u64 = 600;
+
+/// 给 unlink 的时间比这条记录上一版晚几秒、不是 60 的倍数（上一版是测试池写的固定时间，是 60 的倍数）：取整到分钟的实现写下的不是它。
+const SECONDS_AFTER_THE_PREVIOUS_VERSION_THAT_ARE_NOT_A_WHOLE_MINUTE: u64 = 7;
+
+/// 给 unlink 的时间超过 32 位（2^32 + 7 秒，晚于测试池写的固定时间）：按 32 位存的实现写下的是 7。
+const GIVEN_TIME_PAST_THIRTY_TWO_BITS_IN_SECONDS: u64 = (1 << 32) + 7;
+
+/// 会话里 unlink 之前先建的那个 inode 的时间比这条记录上一版晚几秒：晚于 unlink 给的时间（上一版加 600 秒）。
+const SECONDS_AFTER_THE_PREVIOUS_VERSION_OF_THE_NEW_INODE_BEFORE_THE_UNLINK: u64 = 1000;
+
+/// 调用方给 unlink 的时间怎么取：落在这条记录上一版写入时间的哪一边、取哪个值。Q-F 乙只说意图写调用方给的时间、各批照抄，
+/// 没说时间只进不退、没说存几位、没说精度到哪；每一形判一种错实现（`research/prompts/m3-batch17-code-r1-opus-output.md` 第三节）：
+/// 早于上一版那一形判得出「意图取给的时间与上一版里较大的那个」（`research/prompts/m3-batch16-code-r1-main-verification.md` 第二节 N7），
+/// 超过 32 位那一形判得出「按 32 位存」，不是 60 的倍数那一形判得出「取整到分钟」；晚于上一版 600 秒那一形这三种都判不出。
+#[derive(Clone, Copy)]
+enum GivenTimeAgainstThePreviousVersion {
+    Later,
+    Earlier,
+    LaterBySecondsThatAreNotAWholeMinute,
+    PastThirtyTwoBits,
+}
+
+impl GivenTimeAgainstThePreviousVersion {
+    fn given_time(self, time_of_the_previous_version: u64) -> u64 {
+        match self {
+            Self::Later => time_of_the_previous_version
+                .checked_add(SECONDS_BETWEEN_THE_GIVEN_TIME_AND_THE_PREVIOUS_VERSION)
+                .expect("上一版的时间是测试池写的固定时间，加 600 秒不溢出"),
+            Self::Earlier => time_of_the_previous_version
+                .checked_sub(SECONDS_BETWEEN_THE_GIVEN_TIME_AND_THE_PREVIOUS_VERSION)
+                .expect("上一版的时间是测试池写的固定时间，大于 600 秒"),
+            Self::LaterBySecondsThatAreNotAWholeMinute => time_of_the_previous_version
+                .checked_add(SECONDS_AFTER_THE_PREVIOUS_VERSION_THAT_ARE_NOT_A_WHOLE_MINUTE)
+                .expect("上一版的时间是测试池写的固定时间，加 7 秒不溢出"),
+            Self::PastThirtyTwoBits => GIVEN_TIME_PAST_THIRTY_TWO_BITS_IN_SECONDS,
+        }
+    }
+}
+
+/// 会话里 unlink 之前这次挂载还发不发别的改动。
+#[derive(Clone, Copy)]
+enum ChangeBeforeTheUnlinkInTheSession {
+    NoOtherChange,
+    /// 先建一个 inode，时间是上一版加 1000 秒（晚于 unlink 给的时间）：会话里时间只进不退的实现把 unlink 的时间抬到它。
+    ANewInodeLaterThanTheGivenTime,
+}
+
+/// 一次 unlink 给的时间、这条记录上一版的写入时间，与之后还带这条记录的几版两块盘上读回的三个时间秒（一版一项、一块盘一组）。
+struct TimeFieldsOnDiskAfterAnUnlink {
+    time_of_the_previous_version: u64,
+    given_time: u64,
+    on_disk_in_every_version_with_the_record: Vec<Vec<[u64; 3]>>,
+}
+
+/// 经会话发 unlink（`UserChange::Unlink`，会话把调用方给的时间交给意图那次）：给一个与这条记录上一版不同的时间（在上一版哪一边由
+/// `given_time_against_the_previous_version` 定），会话发成意图与三步；读意图那一版与还带这条记录的两批（留 2、留 1）各自两块盘上
+/// 第一个文件那条记录的三个时间秒。`change_before_the_unlink` 说这次挂载在 unlink 之前还发不发别的改动。
+fn time_fields_on_disk_after_a_session_unlink(
+    pool_tag: &str,
+    given_time_against_the_previous_version: GivenTimeAgainstThePreviousVersion,
+    change_before_the_unlink: ChangeBeforeTheUnlinkInTheSession,
+) -> TimeFieldsOnDiskAfterAnUnlink {
+    let mut pool = pool_with_a_three_unit_file(pool_tag);
+    let time_of_the_previous_version = write_time_seconds_of_the_first_file(&pool);
+    let given_time =
+        given_time_against_the_previous_version.given_time(time_of_the_previous_version);
+    let (mounted, mut devices) = remount_with_batches_of_one(&mut pool);
+    let (_, mut session) = MountedSession::of_the_mount(mounted);
+    match change_before_the_unlink {
+        ChangeBeforeTheUnlinkInTheSession::NoOtherChange => {}
+        ChangeBeforeTheUnlinkInTheSession::ANewInodeLaterThanTheGivenTime => {
+            let time_of_the_new_inode = time_of_the_previous_version
+                .checked_add(SECONDS_AFTER_THE_PREVIOUS_VERSION_OF_THE_NEW_INODE_BEFORE_THE_UNLINK)
+                .expect("上一版的时间是测试池写的固定时间，加 1000 秒不溢出");
+            assert!(
+                time_of_the_new_inode > given_time,
+                "先建的那个 inode 的时间 {time_of_the_new_inode} 晚于 unlink 给的时间 {given_time}"
+            );
+            session
+                .publish_user_change(
+                    &mut devices,
+                    UserChange::NewInodes {
+                        count: 1,
+                        write_time_seconds: time_of_the_new_inode,
+                    },
+                )
+                .expect("同一次挂载里 unlink 之前先建一个 inode");
+        }
+    }
+    let published = session
+        .publish_user_change(
+            &mut devices,
+            UserChange::Unlink {
+                inode: FIRST_FILE,
+                write_time_seconds: given_time,
+            },
+        )
+        .expect("会话 unlink");
+    drop(devices);
+    let image = pool.memory_pool();
+    let on_disk_in_every_version_with_the_record = published
+        .versions_published
+        .iter()
+        .filter(|version| version.inode_record.is_some())
+        .map(|version| time_seconds_of_the_first_file_on_each_device(&image, version))
+        .collect();
+    TimeFieldsOnDiskAfterAnUnlink {
+        time_of_the_previous_version,
+        given_time,
+        on_disk_in_every_version_with_the_record,
+    }
+}
+
+/// 给的时间晚于这条记录上一版：意图那一版与还带这条记录的两批（留 2、留 1）各自两块盘上第一个文件那条记录的三个时间秒都等于给的时间。
+/// 上面那一条直接调 `publish_unlink_intent`，判不出会话这一层（`research/prompts/m3-batch14-code-r1-main-verification.md` 第二节 N3）。
+/// 判别力：会话那一层丢掉调用方的时间、意图写 0 时（攻方那一刀 MQ1）这一条红。
+#[test]
+fn a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk(
+) {
+    let observed = time_fields_on_disk_after_a_session_unlink(
+        "write-time-of-a-session-unlink",
+        GivenTimeAgainstThePreviousVersion::Later,
+        ChangeBeforeTheUnlinkInTheSession::NoOtherChange,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 3],
+        "意图那一版与留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都是调用方给会话的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 给的时间早于这条记录上一版（上一版减 600 秒）：意图那一版与留 2、留 1 两批各自两块盘上那条记录的三个时间秒都等于给的那个较早的时间，
+/// 不取两者里较大的那个。
+/// 判别力：意图取 `write_time_seconds.max(record.write_time_seconds)`（`research/prompts/m3-batch16-code-r1-main-verification.md`
+/// 第二节 N7 攻方那一刀）时这一条红、晚于上一版那一条照旧绿。
+#[test]
+fn a_session_unlink_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk(
+) {
+    let observed = time_fields_on_disk_after_a_session_unlink(
+        "earlier-write-time-of-a-session-unlink",
+        GivenTimeAgainstThePreviousVersion::Earlier,
+        ChangeBeforeTheUnlinkInTheSession::NoOtherChange,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 3],
+        "意图那一版与留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都是调用方给会话的那个较早的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 同一次挂载里先建一个 inode（时间是上一版加 1000 秒），再 unlink 第一个文件、给上一版加 600 秒（晚于上一版、早于会话里上一次给的）：
+/// 意图那一版与留 2、留 1 两批两块盘上那条记录的三个时间秒都等于这次给的时间。上面几条的 unlink 都是这次挂载的第一次改动。
+/// 判别力：会话那一层 unlink 的时间取给的与会话里给过的更晚时间里较大的那个（时间只进不退，攻方 `research/prompts/m3-batch17-code-r1-opus-output.md`
+/// 第三节 qfm）时写下的是上一版加 1000 秒，这一条红；会话里只有 unlink 那几条照旧绿。
+#[test]
+fn a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk(
+) {
+    let observed = time_fields_on_disk_after_a_session_unlink(
+        "write-time-of-a-session-unlink-after-a-later-new-inode",
+        GivenTimeAgainstThePreviousVersion::Later,
+        ChangeBeforeTheUnlinkInTheSession::ANewInodeLaterThanTheGivenTime,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 3],
+        "意图那一版与留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都是这次给的时间，不是之前那个 inode 的更晚时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 同一次挂载里后一次 unlink 给的时间比这条记录上一版晚几秒：早于前一次给的（上一版加 600 秒）、不早于中间建的那个 inode 的时间（上一版）。
+const SECONDS_AFTER_THE_PREVIOUS_VERSION_OF_THE_SECOND_UNLINK_IN_THE_SAME_MOUNT: u64 = 300;
+
+/// `version` 这一版的 inode 树里有没有 `inode` 那条记录。
+fn version_holds_the_record_of(version: &TransactionOutput, inode: InodeNumber) -> bool {
+    version
+        .inode_leaf_container_contents()
+        .iter()
+        .flat_map(|container| container.records.iter())
+        .any(|record| record.inode == inode.0)
+}
+
+/// 同一次挂载里 unlink 两次、后一次给的时间更早（判决 `research/prompts/m3-batch19-code-r1-main-verification.md` 第二节「K2 N1 错实现漏红」那一行，
+/// 攻方 `research/prompts/m3-batch19-code-r1-opus-output.md`「N1」一节）：先 unlink 第一个文件、给上一版加 600 秒（会话走完意图与三步，这一版删空），
+/// 再建一个 inode（时间就是上一版的，不晚于后一次给的），再 unlink 它、给上一版加 300 秒。后一次那个 inode 那条记录只在意图那一版里
+/// （它没有数据单元，意图之后一批就删完），意图那一版两块盘上那条记录的三个时间秒都等于后一次给的时间。上面几条每次挂载只 unlink 一次。
+/// 判别力：会话那一层只对 unlink 只进不退（unlink 的时间取给的与这次挂载里上一次 unlink 用过的时间里较大的那个，攻方那一刀 q-unlink-mono）时
+/// 写下的是前一次的上一版加 600 秒，这一条红；只看这条记录上一版的时间、只看上一版各条记录最晚的时间、只记建 inode 给过的时间的几种写法
+/// 写下的都是后一次给的时间，照旧绿。
+#[test]
+fn two_session_unlinks_in_the_same_mount_the_second_given_an_earlier_time_write_the_second_given_time_into_the_three_time_fields_of_its_intent_on_disk(
+) {
+    let mut pool =
+        pool_with_a_three_unit_file("write-time-of-a-second-session-unlink-earlier-than-the-first");
+    let time_of_the_previous_version = write_time_seconds_of_the_first_file(&pool);
+    let time_given_to_the_first_unlink =
+        GivenTimeAgainstThePreviousVersion::Later.given_time(time_of_the_previous_version);
+    let time_given_to_the_second_unlink = time_of_the_previous_version
+        .checked_add(SECONDS_AFTER_THE_PREVIOUS_VERSION_OF_THE_SECOND_UNLINK_IN_THE_SAME_MOUNT)
+        .expect("上一版的时间是测试池写的固定时间，加 300 秒不溢出");
+    let time_of_the_new_inode = time_of_the_previous_version;
+    assert!(
+        time_of_the_new_inode <= time_given_to_the_second_unlink
+            && time_given_to_the_second_unlink < time_given_to_the_first_unlink,
+        "建的那个 inode 的时间 {time_of_the_new_inode} 不晚于后一次给的 {time_given_to_the_second_unlink}，后一次早于前一次给的 {time_given_to_the_first_unlink}"
+    );
+    let (mounted, mut devices) = remount_with_batches_of_one(&mut pool);
+    let (_, mut session) = MountedSession::of_the_mount(mounted);
+    session
+        .publish_user_change(
+            &mut devices,
+            UserChange::Unlink {
+                inode: FIRST_FILE,
+                write_time_seconds: time_given_to_the_first_unlink,
+            },
+        )
+        .expect("同一次挂载里前一次 unlink 第一个文件");
+    let created = session
+        .publish_user_change(
+            &mut devices,
+            UserChange::NewInodes {
+                count: 1,
+                write_time_seconds: time_of_the_new_inode,
+            },
+        )
+        .expect("删空的那一版上建一个 inode");
+    let new_inodes: Vec<InodeNumber> = created
+        .versions_published
+        .last()
+        .expect("建 inode 发成一版")
+        .inode_leaf_container_contents()
+        .iter()
+        .flat_map(|container| container.records.iter())
+        .map(|record| InodeNumber(record.inode))
+        .collect();
+    let [new_inode] = new_inodes[..] else {
+        panic!("删空的那一版上建一个之后树里只有新建的那一条记录：{new_inodes:?}");
+    };
+    let published = session
+        .publish_user_change(
+            &mut devices,
+            UserChange::Unlink {
+                inode: new_inode,
+                write_time_seconds: time_given_to_the_second_unlink,
+            },
+        )
+        .expect("同一次挂载里后一次 unlink 新建的那个 inode");
+    drop(devices);
+    let image = pool.memory_pool();
+    let on_disk_in_every_version_with_the_record: Vec<Vec<[u64; 3]>> = published
+        .versions_published
+        .iter()
+        .filter(|version| version_holds_the_record_of(version, new_inode))
+        .map(|version| time_seconds_of_an_inode_on_each_device(&image, version, new_inode))
+        .collect();
+    assert_eq!(
+        on_disk_in_every_version_with_the_record,
+        vec![vec![[time_given_to_the_second_unlink; 3]; 2]],
+        "后一次 unlink 的意图那一版（还带那条记录的只有这一版），两块盘上 inode {} 那条记录的 atime、mtime、ctime 秒都是后一次给的时间，\
+         不是前一次给的 {time_given_to_the_first_unlink}",
+        new_inode.0
+    );
+}
+
+/// 给 unlink 的时间超过 32 位（2^32 + 7 秒）：意图那一版与留 2、留 1 两批两块盘上那条记录的三个时间秒都是整个 64 位值。
+/// 判别力：意图写时间时按 32 位存（攻方第三节 qfu）时写下的是 7，这一条红；给的时间小于 2^32 的几条照旧绿。
+#[test]
+fn a_session_unlink_given_a_time_past_thirty_two_bits_writes_it_whole_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk(
+) {
+    let observed = time_fields_on_disk_after_a_session_unlink(
+        "write-time-of-a-session-unlink-past-thirty-two-bits",
+        GivenTimeAgainstThePreviousVersion::PastThirtyTwoBits,
+        ChangeBeforeTheUnlinkInTheSession::NoOtherChange,
+    );
+    assert!(
+        observed.given_time > u64::from(u32::MAX)
+            && observed.given_time > observed.time_of_the_previous_version,
+        "给的时间 {} 超过 32 位、晚于上一版 {}",
+        observed.given_time,
+        observed.time_of_the_previous_version
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 3],
+        "意图那一版与留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都是给的整个 64 位时间"
+    );
+}
+
+/// 给 unlink 的时间不是 60 的倍数（上一版加 7 秒）：意图那一版与留 2、留 1 两批两块盘上那条记录的三个时间秒精确到秒、等于给的时间。
+/// 判别力：意图写时间时取整到分钟（攻方第三节 qfr）时写下的是上一版的时间，这一条红；给的时间是 60 的倍数的几条照旧绿。
+#[test]
+fn a_session_unlink_given_a_time_that_is_not_a_whole_minute_writes_it_to_the_second_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk(
+) {
+    let observed = time_fields_on_disk_after_a_session_unlink(
+        "write-time-of-a-session-unlink-not-a-whole-minute",
+        GivenTimeAgainstThePreviousVersion::LaterBySecondsThatAreNotAWholeMinute,
+        ChangeBeforeTheUnlinkInTheSession::NoOtherChange,
+    );
+    assert_ne!(
+        observed.given_time % 60,
+        0,
+        "给的时间 {} 不是 60 的倍数",
+        observed.given_time
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 3],
+        "意图那一版与留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都是给的时间、精确到秒（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 进程内发意图（给一个与这条记录上一版不同的时间，在上一版哪一边由 `given_time_against_the_previous_version` 定），一批没发就重开镜像
+/// （意图落盘之后崩溃），可写挂载续做；读续做里还带这条记录的那两批（留 2、留 1）各自两块盘上第一个文件那条记录的三个时间秒。
+fn time_fields_on_disk_in_the_continuation_batches_after_an_intent(
+    pool_tag: &str,
+    given_time_against_the_previous_version: GivenTimeAgainstThePreviousVersion,
+) -> TimeFieldsOnDiskAfterAnUnlink {
+    let mut pool = pool_with_a_three_unit_file(pool_tag);
+    let time_of_the_previous_version = write_time_seconds_of_the_first_file(&pool);
+    let given_time =
+        given_time_against_the_previous_version.given_time(time_of_the_previous_version);
+    publish_the_intent_in_process_at(&mut pool, given_time);
+    let (mounted, devices) = remount_with_batches_of_one(&mut pool);
+    drop(devices);
+    let image = pool.memory_pool();
+    let on_disk_in_every_version_with_the_record = mounted
+        .output
+        .deletion_queue_continuation
+        .iter()
+        .filter(|step| step.inode_record.is_some())
+        .map(|step| time_seconds_of_the_first_file_on_each_device(&image, step))
+        .collect();
+    TimeFieldsOnDiskAfterAnUnlink {
+        time_of_the_previous_version,
+        given_time,
+        on_disk_in_every_version_with_the_record,
+    }
+}
+
+/// 意图给的时间晚于这条记录上一版：续做里还带这条记录的那两批（留 2、留 1）各自两块盘上第一个文件那条记录的三个时间秒都等于意图那次给的时间。
+/// 续做的几批没有调用方给时间，照抄从盘上读回的上一版这条记录的值（用户 2026-10-03 定 Q-F 乙「各批照抄」；D8（核心索引结构） 已定项 16 第 7 条 ①b）。
+/// 判别力：续做那几批另取时间（取 0、取一个固定时间），或挂载从盘上读回这条记录时丢了时间，这一条红。
+#[test]
+fn the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk() {
+    let observed = time_fields_on_disk_in_the_continuation_batches_after_an_intent(
+        "write-time-of-the-continuation-batches",
+        GivenTimeAgainstThePreviousVersion::Later,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 2],
+        "续做的留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都照抄意图那次给的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
+    );
+}
+
+/// 意图给的时间早于这条记录上一版（上一版减 600 秒）：续做的留 2、留 1 两批各自两块盘上那条记录的三个时间秒都照抄意图写下的那个较早的时间。
+/// 判别力：意图取 `write_time_seconds.max(record.write_time_seconds)`（`research/prompts/m3-batch16-code-r1-main-verification.md`
+/// 第二节 N7 攻方那一刀）时意图写下的是上一版的时间、续做照抄它，这一条红、晚于上一版那一条照旧绿。
+#[test]
+fn the_batches_of_a_mount_continuation_after_an_intent_given_a_time_earlier_than_the_previous_version_copy_that_earlier_time_on_disk(
+) {
+    let observed = time_fields_on_disk_in_the_continuation_batches_after_an_intent(
+        "earlier-write-time-of-the-continuation-batches",
+        GivenTimeAgainstThePreviousVersion::Earlier,
+    );
+    assert_eq!(
+        observed.on_disk_in_every_version_with_the_record,
+        vec![vec![[observed.given_time; 3]; 2]; 2],
+        "续做的留 2、留 1 两批，两块盘上那条记录的 atime、mtime、ctime 秒都照抄意图写下的那个较早的时间（上一版是 {}）",
+        observed.time_of_the_previous_version
     );
 }
 

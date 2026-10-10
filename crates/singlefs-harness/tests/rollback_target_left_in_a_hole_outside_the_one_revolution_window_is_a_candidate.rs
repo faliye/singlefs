@@ -1,9 +1,11 @@
-//! 回退候选集只收 txg 落在一圈窗口里的根（D16（发布语义） 已定项 1「回退候选集」：按现行那一版的实例表判仍然有效 ∧ txg ≥ F_生效 ∧ txg 落在一圈窗口里；
-//! D23（journal 的角色与格式） 已定项 14 的挂着时回退取同一个集合；用户 2026-10-03 定照 7-2 报告第四节做）。
+//! 回退候选集取环里全部按现行那一版的实例表判仍然有效、txg ≥ F_生效、带文件的根（D16（发布语义） 已定项 1「回退候选集」；D23（journal 的角色与格式）
+//! 已定项 14 的挂着时回退取同一个集合）。原来另有「txg 落在一圈窗口里」一格（用户 2026-10-03 定照 7-2 报告第四节做），用户 2026-10-04 定 RGall
+//! 与回收门槛一起退回整个环（`research/prompts/m3-reclaim-window-r1-main-verification.md` 第六节 Q1）：回收门槛不再越过窗口外的有效根，
+//! 它引用的单元都还在，它就是候选。
 //!
 //! 盘面同 `one_revolution_window_after_a_hole_in_the_root_ring.rs`：实例 1 在 24 槽的根环上发到 txg 30，txg 31 那次发布崩在「记录已持久、根槽没持久」，
 //! 那一槽里留着上一圈的 txg 7 的根；可写挂载（实例 2）恢复由记录施加出 txg 31，写行 32、暖机 33、34。txg 7 的根读得出、按实例表有效、
-//! txg ≥ F_生效（F 没抬过，是 0）、带文件，只有一样不满足：现行那一版 txg 34 的窗口是 txg > 10，txg 7 在窗口外——窗口已许可它引用的单元被复用。
+//! txg ≥ F_生效（F 没抬过，是 0）、带文件；现行那一版 txg 34 的一圈窗口是 txg > 10，txg 7 在窗口外。
 mod common;
 
 use common::{
@@ -11,12 +13,12 @@ use common::{
     overwrite_in_process_as_instance_one_and_advance_the_pool, parameters,
     system_configuration_slots_of_every_device, write_back_system_configuration_slots,
 };
+use singlefs_checker::image::InvariantVerdict;
+use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::block_device::BlockDevice;
-use singlefs_core::mount::{
-    mount_writable, roll_back_by_a_forward_publish, RollbackCandidateExclusion, RollbackError,
-    RollbackTarget,
-};
+use singlefs_core::mount::{mount_writable, roll_back_by_a_forward_publish, RollbackTarget};
+use singlefs_core::recovery::{recover, JournalPolicy, RecoveryOutcome};
 use singlefs_core::root_ring::{slot_offset, target_for_publish};
 use singlefs_core::transaction::PoolVersion;
 use singlefs_harness::SharedStream;
@@ -27,17 +29,20 @@ const TXG_WHOSE_ROOT_SLOT_DID_NOT_PERSIST: u64 = 31;
 const TXG_OF_THE_STALE_ROOT_IN_THE_HOLE: u64 = 7;
 /// 一次覆盖写的内容长度：一个数据单元装得下。
 const OVERWRITE_BYTES: usize = 3000;
+/// 判的几条：记账与遍历（I-3.1、I-3.11）、被引用单元读回来对不对（I-2.1、I-7.4、I-4.8）。
+const INVARIANTS_THE_ROLLBACK_KEEPS_GREEN: [&str; 5] =
+    ["I-3.1", "I-3.11", "I-2.1", "I-7.4", "I-4.8"];
 
 fn content_of_txg(checkpoint_txg: u64) -> Vec<u8> {
     vec![u8::try_from(checkpoint_txg % 251).expect("小于 256"); OVERWRITE_BYTES]
 }
 
 /// 场景：上面那份盘面上挂着时回退到环里那条 txg 7 的根（实例 1）。
-/// 预期：在任何写之前拒，报 `TargetNotACandidate { exclusion: OutsideTheOneRevolutionWindow }`；盘上逐字节不变（系统配置槽、根环里自证过的根、录制流步数）。
-/// 改之前候选集不看窗口，txg 7 那条根被当成候选往下走。
+/// 预期：回退做成，向前发一条 txg 35 的根；冷启动择到它、读回 txg 7 那一版的内容；回退之后盘上那几条不变量不红。
+/// 改之前候选集判一圈窗口，在任何写之前拒（`TargetNotACandidate { exclusion: OutsideTheOneRevolutionWindow }`）。
 #[test]
-fn rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_is_refused_before_any_write(
-) {
+fn rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_reads_back_that_version()
+{
     let mut pool = build_pool("rollback-target-outside-the-one-revolution-window");
     let slots_per_region = parameters().geometry.root_ring_slots_per_region;
     // 迭代上界：txg 4 到 30，27 次覆盖写。
@@ -108,9 +113,9 @@ fn rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_is_re
                     CheckpointTxg(TXG_OF_THE_STALE_ROOT_IN_THE_HOLE),
                 )
         }),
-        "txg 7 的根还在环里、读得出"
+        "前提：txg 7 的根还在环里、读得出"
     );
-    let refusal = roll_back_by_a_forward_publish(
+    let rolled_back = roll_back_by_a_forward_publish(
         &parameters(),
         &mut devices,
         &mut mounted.allocator,
@@ -119,21 +124,34 @@ fn rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_is_re
             instance: InstanceGeneration(1),
             checkpoint_txg: CheckpointTxg(TXG_OF_THE_STALE_ROOT_IN_THE_HOLE),
         },
-    )
-    .expect_err("txg 7 在现行那一版的一圈窗口外，不是候选");
+    );
     assert!(
-        matches!(
-            refusal,
-            RollbackError::TargetNotACandidate {
-                exclusion: RollbackCandidateExclusion::OutsideTheOneRevolutionWindow,
-                ..
-            }
-        ),
-        "报落在一圈窗口外：{refusal:?}"
+        rolled_back.is_ok(),
+        "txg 7 在环里、有效、带文件：是候选，回退做成：{rolled_back:?}"
     );
     assert_eq!(
-        disk_snapshot(&memory_pool_of_sparse_devices(&devices), &stream),
-        before,
-        "在任何写之前拒：盘上逐字节不变"
+        current.root.checkpoint_txg,
+        CheckpointTxg(35),
+        "回退向前发一条 txg 35 的根"
+    );
+    let image = memory_pool_of_sparse_devices(&devices);
+    let violations: Vec<String> = check_pool_image(&image)
+        .into_iter()
+        .filter(|(invariant, _)| INVARIANTS_THE_ROLLBACK_KEEPS_GREEN.contains(invariant))
+        .filter_map(|(invariant, verdict)| match verdict {
+            InvariantVerdict::Violated(detail) => Some(format!("{invariant}：{detail}")),
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
+        })
+        .collect();
+    assert_eq!(violations, Vec::<String>::new(), "回退之后");
+    assert_eq!(
+        recover(&image, JournalPolicy::Consult).outcome,
+        RecoveryOutcome::FileRead {
+            root: (InstanceGeneration(2), CheckpointTxg(35)),
+            content: content_of_txg(TXG_OF_THE_STALE_ROOT_IN_THE_HOLE),
+        },
+        "冷启动择 txg 35 那条根、读回 txg 7 那一版的内容"
     );
 }

@@ -188,26 +188,30 @@ impl TreeSplitStream {
                 shape_after: "L10",
                 units_written: 10,
             },
-            // 记账树 15 行根兼叶；空发布整批换代，叶容量 14：第 15 行插进去时从中间切（8 + 7），长出新根。
-            // 写：分配记录树五个节点、记账树两片叶与根、映射树一个节点、树表 = 10 个单元。
+            // 记账树 15 行根兼叶（第一个文件那一版自己那一行 inode 号水位就是第一级台阶，代段 3）；空发布整批换代，叶容量 14：
+            // 那一级台阶行照抄（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」，key 不变、不删不插），另 14 行先删，
+            // 叶只剩它；这次的 15 行按 key 升序插，统计量 12 排最后，前 14 行都插在台阶行之前：第 14 行插进去时 15 条从中间切（8 + 7，
+            // 台阶行在右叶），长出新根；最后插这次的水位行进右叶，8 + 8。写：分配记录树五个节点、记账树两片叶与根、映射树一个节点、树表 = 10 个单元。
             TreeSplitStream::AccountingRootSplit => StreamPlan {
                 first_file_capacities: capacities(BIG_ACCOUNTING, BIG_CENTRAL_MAPPING),
                 target_capacities: capacities((14, 3), BIG_CENTRAL_MAPPING),
                 target: TargetPublish::Empty,
                 tree: MultiLevelCodeTwoTree::Accounting,
                 shape_before: "L15",
-                shape_after: "L8 L7 I2",
+                shape_after: "L8 L8 I2",
                 units_written: 10,
             },
-            // 记账树按叶容量 14 两片叶加根；空发布叶容量压到 8：15 行插到第 9 行切一次、第 14 行再切一次，三片叶（5 + 5 + 5），
-            // 树高不变。写：分配记录树五个节点、记账树三片叶与根、映射树一个节点、树表 = 11 个单元。
+            // 记账树按叶容量 14 两片叶加根（8 + 7，第一级台阶行在右叶末尾）；空发布叶容量压到 8：台阶行照抄，另 14 行先删——
+            // 左叶删空摘掉、根只剩一个孩子降成右叶，右叶删到只剩台阶行；这次的 15 行按 key 升序插，前 14 行都在台阶行之前：
+            // 插到第 8 行时 9 条切一次（5 + 4），插到第 13 行右叶又到 9 条再切一次（5 + 4），第 14 行与这次的水位行落进最右那片，
+            // 三片叶（5 + 5 + 6），树高不变。写：分配记录树五个节点、记账树三片叶与根、映射树一个节点、树表 = 11 个单元。
             TreeSplitStream::AccountingLeafSplit => StreamPlan {
                 first_file_capacities: capacities((14, 3), BIG_CENTRAL_MAPPING),
                 target_capacities: capacities((8, 3), BIG_CENTRAL_MAPPING),
                 target: TargetPublish::Empty,
                 tree: MultiLevelCodeTwoTree::Accounting,
                 shape_before: "L8 L7 I2",
-                shape_after: "L5 L5 L5 I3",
+                shape_after: "L5 L5 L6 I3",
                 units_written: 11,
             },
         }

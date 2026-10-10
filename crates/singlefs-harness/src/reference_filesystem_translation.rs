@@ -404,9 +404,15 @@ impl ReferenceFileSystemTranslation {
             // 可写挂载与抬 F 不改内容：不进 RefFS 的操作序列（H1 只让发布调用、fsync、回退抬 lo），它们写的根映到现行版本。
             // 建 inode 只接在第一个文件删完之后（`HistoryOperation::CreateInode`），翻译到 unlink 写了盘那一步就已经停了；
             // 它也不改第一个文件的内容（新建的 inode 长度 0），照可写挂载与抬 F 那样不进操作序列。
+            // 掉电在第一个 journal 记录写之前的那次覆盖写一样都没发布成（盘上没有能让恢复读到它的记录与根），之后那次可写挂载照可写挂载。
+            // 每块盘最新那一槽系统配置读回全 0 的可写挂载：根与单元照常读得出、落到的就是现行那一版，与可写挂载同样不进操作序列。
             HistoryOperation::CloseAndMountWritable
             | HistoryOperation::RaiseRollbackFloor(_)
-            | HistoryOperation::CreateInode => EventsOfAStep::nothing(),
+            | HistoryOperation::CreateInode
+            | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                EventsOfAStep::nothing()
+            }
             HistoryOperation::ColdStartRecover => match &seen.ending {
                 StepEndingSeenByTheTranslation::ReturnedOk {
                     read_out_of_the_recovery_in_the_step: Some(read_out),

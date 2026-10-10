@@ -191,6 +191,36 @@ pub fn amplify_prepared_flow(
     .0
 }
 
+/// 同 [`amplify_prepared_flow`]，版本表另带文件从那一版起没有了的那几版（删除流的意图那一版，`CrashFlow::versions_without_a_file`）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一条流的八样各自独立，收成一个结构体只是把八个字段挪个地方"
+)]
+pub fn amplify_prepared_flow_against_the_version_table(
+    flow_name: &str,
+    base: &singlefs_harness::memory_pool::MemoryPool,
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[singlefs_harness::memory_pool::PublishedVersion],
+    versions_without_a_file: &[singlefs_harness::memory_pool::PublishedVersionWithoutAFile],
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    default_expand_up_to: usize,
+) -> singlefs_checker_tier::crash_amplification::EnvironmentRun {
+    amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
+        flow_name,
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        versions_without_a_file,
+        crash_points,
+        default_expand_up_to,
+    )
+    .0
+}
+
 /// 同 [`amplify_prepared_flow`]，另交回打出去的那一行 `CRASH_AMPLIFICATION flow=<名> …`（只排派活计划的那一趟不打，是 `None`）。
 /// 行末接 `reuse_and_scale_fields_of_the_line` 的几个字段（复用数、全域与否、展开上限、ignore 的跳过数），被叫停的那一行也接。
 #[allow(
@@ -210,6 +240,38 @@ pub fn amplify_prepared_flow_and_hand_back_its_line(
     singlefs_checker_tier::crash_amplification::EnvironmentRun,
     Option<String>,
 ) {
+    amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
+        flow_name,
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        &[],
+        crash_points,
+        default_expand_up_to,
+    )
+}
+
+/// 同 [`amplify_prepared_flow_and_hand_back_its_line`]，版本表另带「没有文件的那几版」。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "一条流的八样各自独立，收成一个结构体只是把八个字段挪个地方"
+)]
+fn amplify_prepared_flow_against_the_version_table_and_hand_back_its_line(
+    flow_name: &str,
+    base: &singlefs_harness::memory_pool::MemoryPool,
+    writes: &[singlefs_harness::memory_pool::RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: &[singlefs_harness::memory_pool::PublishedVersion],
+    versions_without_a_file: &[singlefs_harness::memory_pool::PublishedVersionWithoutAFile],
+    crash_points: Vec<singlefs_checker_tier::crash_amplification::CrashPointSpan>,
+    default_expand_up_to: usize,
+) -> (
+    singlefs_checker_tier::crash_amplification::EnvironmentRun,
+    Option<String>,
+) {
     use singlefs_checker_tier::crash_amplification::{
         reuse_and_scale_fields_of_the_line, run_from_environment, CrashFlow,
         ExpandUpToWritesPerSegment, PipelineJudgingCode,
@@ -223,6 +285,7 @@ pub fn amplify_prepared_flow_and_hand_back_its_line(
         segments,
         judged_root_index,
         versions,
+        versions_without_a_file,
         expansion: &expansion,
         crash_points,
     };

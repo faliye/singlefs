@@ -46,7 +46,9 @@ use singlefs_core::journal::{
     back_chain_of, record_offset, JournalRecord, JournalRecordOrdinalWithinPublish,
     JournalRecordPlaceInPublish, JOURNAL_ORDINAL_WITHIN_PUBLISH_OFFSET,
 };
-use singlefs_core::make_filesystem::{INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT};
+use singlefs_core::make_filesystem::{
+    root_ring_occupancy_after_make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+};
 use singlefs_core::mount::{
     mount_writable, raise_rollback_floor, roll_back_by_a_forward_publish, unmount, RollbackTarget,
     ShadowLedger, UnmountRaisedTheFloor, Unmounted,
@@ -105,25 +107,32 @@ const LOCAL_FIRST_STREAM_QUICK_TIER_STATES: u64 = 46;
 /// 流一每次写只取两态时的全量闭式：同一份文件第 442 行 `FULL_STATES_WITH_TWO_STATES_PER_WRITE`（单测拿段长表回算它）。
 const LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM: u64 = 16_777_240;
 
-/// 流二的段长（78 段）：`tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行。
+/// 流二的段长（78 段）：取今天 crates 现算的那一份，即 S1 `fixed_script_through_e_then_unmount_segment_lengths` 的 `crates=`
+/// （`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out` 第 306 行）。与
+/// `tests/crash_enumeration_fixed_script_stream.rs` 第 438–441 行只差第 33 段（回退 D 那次向前发布）：20 → 24，
+/// 多出的 4 次写是那次发布追加的谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条）。
 const LOCAL_SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
     2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2,
     16, // 取号到写行之后的暖机
-    2, 1, 2, 24, 2, 1, 2, 20, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
+    2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2,
     28, // C、回退 D、覆盖写
     2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1,
     2, // 抬 F、E、卸载
     16, 2, 1, 2, // 卸载第二次空发布与 txg 19 的轮换
 ];
-/// 流二的写数：同一份文件第 448 行 `191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21)`。
-const LOCAL_SECOND_STREAM_WRITES: usize = 477;
+/// 流二的写数：S1 `fixed_script_through_e_then_unmount_writes` 的 `crates=481`（同一份产物第 307 行）；测试文件第 448 行
+/// `191 + 5 * 33 + (2 + 2 * 21) + 33 + (2 + 2 * 21)` = 477 不含回退 D 那次的 4 次谱系记录写。
+const LOCAL_SECOND_STREAM_WRITES: usize = 481;
 /// 流二的根槽写数：同一份文件第 482 行（`=> 19`）。
 const LOCAL_SECOND_STREAM_ROOT_WRITES: usize = 19;
-/// 流二全量与快档的状态数：同一份文件第 100 行 `FULL_STATES_THROUGH_THE_UNMOUNT`、第 114 行 `QUICK_TIER_STATES_THROUGH_THE_UNMOUNT`。
-const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_662_648_564;
+/// 流二全量的状态数：S1 `fixed_script_through_e_then_unmount_full_states` 的 `crates=1678377204`（同一份产物第 311 行；
+/// 测试文件第 100 行 `FULL_STATES_THROUGH_THE_UNMOUNT` 还是 1_662_648_564，差 2^24 − 2^20）。快档：测试文件第 114 行
+/// `QUICK_TIER_STATES_THROUGH_THE_UNMOUNT`，与 S1 `crates=278` 相同。
+const LOCAL_SECOND_STREAM_FULL_STATES: u64 = 1_678_377_204;
 const LOCAL_SECOND_STREAM_QUICK_TIER_STATES: u64 = 278;
-/// 流二每次写只取两态时的全量闭式：同一份文件第 96 行（单测拿段长表回算它）。
-const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_662_648_449;
+/// 流二每次写只取两态时的全量闭式：S1 `fixed_script_through_e_then_unmount_two_state_closed_form` 的 `crates=1678377089`
+/// （同一份产物第 313 行；测试文件第 96 行还是 1_662_648_449）。单测拿段长表回算它。
+const LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM: u64 = 1_678_377_089;
 /// E 的数据单元落点：同一份文件第 318 行（`50176`）。
 const LOCAL_SECOND_STREAM_E_DATA_UNIT_SLOT: u64 = 50_176;
 /// 抬 F 推的空发布数：同一份文件第 306 行（`raised.publishes.len(), 2`）。
@@ -280,6 +289,12 @@ fn drive_through_the_new_pool_file_creation(
             span: 1,
         },
     );
+    // 照 `build_pool` 装上 mkfs 刚写下的根环（C551：没装的分配器记根就断言）。流一、流二在这个分配器上只记到 txg 4，
+    // 环转不过一格，一个落点都不回收，写流与不装时相同。
+    allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
+        &parameters,
+        &genesis,
+    ));
     let content = local_first_file_content();
     let (warmed, output, warm_up_operation_count) = {
         let mut pool = PoolWriter::new(&parameters, &mut devices);
@@ -1086,7 +1101,9 @@ impl ImplementationVerdict {
                 .iter()
                 .filter(|(_, verdict)| match verdict {
                     InvariantVerdict::Violated(_) => true,
-                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => false,
+                    InvariantVerdict::Holds
+                    | InvariantVerdict::NotApplicable(_)
+                    | InvariantVerdict::PartiallyJudged(_) => false,
                 })
                 .map(|(invariant, _)| (*invariant).to_string())
                 .collect(),
@@ -3681,7 +3698,7 @@ mod tests {
             LOCAL_SECOND_STREAM_SEGMENT_LENGTHS.iter().sum::<usize>(),
             LOCAL_SECOND_STREAM_WRITES
         );
-        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_662_648_449);
+        assert_eq!(LOCAL_SECOND_STREAM_TWO_STATE_CLOSED_FORM, 1_678_377_089);
         assert_eq!(LOCAL_FIRST_STREAM_TWO_STATE_CLOSED_FORM, 16_777_240);
     }
 

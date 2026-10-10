@@ -16,15 +16,13 @@ use singlefs_format::{
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::address::{CheckpointTxg, DeviceIdentity, SlotNumber};
+use crate::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
 use crate::admission::SpaceAdmission;
 use crate::bytes::ByteWriter;
 use crate::instance_table::InstanceTableRecords;
 use crate::journal::slot_after_the_journal_ring;
-use crate::root_ring::{
-    target_for_publish, txg_is_inside_the_one_revolution_window, RootRingSlot,
-    RootRingSlotsPerRegion,
-};
+use crate::root_record::RootRecord;
+use crate::root_ring::{target_for_publish, RootRingSlot, RootRingSlotsPerRegion};
 use crate::transaction::FrozenPublish;
 use crate::unlink::DeletionSwitches;
 
@@ -264,8 +262,11 @@ pub struct DeviceFreeMap {
     /// 空闲槽数，独立维护：分配时减、回收放回时加，不由「容量 − 已分配」现算（D5（快照 / 空间记账机制） 已定项 4 的 ⚠️：
     /// 那样 I-5.2（空闲统计对得上） 是恒真式；三方代码第一轮攻方腿打中）。已释放而还在 defer 窗口里的不算空闲。
     free_slots: u64,
-    /// 影子账（D23（journal 的角色与格式） 已定项 14 回退段；D28（挂载期承诺量） 已定项 1 第九项「被抛弃根独占量」）：
-    /// 只被被抛弃根引用的槽，当前账里既不是已分配也不是 defer，分配器却不许发出去，直到被抛弃的根离开根环。只住内存、不进记账行。
+    /// 影子账（D23（journal 的角色与格式） 已定项 14 回退段与「可写挂载时的预隔离」；D28（挂载期承诺量） 已定项 1 第九项）隔离的槽，两部分置同一位：
+    /// 只被被抛弃根引用的槽，隔离到那条被抛弃的根离开根环；可写挂载那一刻水位之上没施加的 journal 记录点名的落点与那几次发布的账里的落点
+    /// （C694 的 C，分配位置着的槽除外：现行账里仍分配的与已释放、还在 defer 窗口里的，它们在「已分配」里；回收时补隔离），
+    /// 隔离到这个进程写掉那条记录的 txg 对应的根环槽（`RootRingOccupancy` 里记着的那一份）。
+    /// 隔离位独立于分配位（[`Self::isolate`]）。只住内存、不进记账行。
     isolated: Vec<bool>,
     isolated_per_segment: Vec<u64>,
     isolated_slots: u64,
@@ -586,19 +587,66 @@ impl DeviceFreeMap {
             "跨度越过单元区末尾：隔离的落点来自被抛弃根，它的槽与跨度在 recovery::placement_lies_in_the_unit_area_of_its_device / allocation_records_fit_the_pool_geometry 判过"
         );
         for index in start..end {
-            if !self.isolated[index] {
-                self.set_blocking_bit(index, SlotBlockingBit::IsolatedByTheShadowLedger, true);
-                let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
-                self.isolated_per_segment[segment] += 1;
-                self.isolated_slots += 1;
+            self.isolate_slot_at_index(index);
+        }
+    }
+
+    /// 同 [`Self::isolate`]，只隔离落点里分配位没置着的槽：分配位置着的（现行账里仍分配的，或已释放、还在 defer 窗口里的）算在
+    /// 「已分配」里，D28（挂载期承诺量） 已定项 1 第九项「不在这里再算一次」；它们回收的那一刻由分配器照还没解开的那一份补隔离
+    /// （`PoolAllocator::record_root_written_by_this_process`、`PoolAllocator::reclaim_released_up_to_isolating_what_the_isolation_still_protects`）。
+    /// 给水位之上没施加的记录点名的落点（C694 的 C 那一圈）用。
+    pub fn isolate_the_slots_not_allocated(&mut self, slot: SlotNumber, span: u64) {
+        let start = self.index(slot);
+        let end = start + usize::try_from(span).expect("跨度");
+        assert!(
+            end <= self.allocated.len(),
+            "跨度越过单元区末尾：C 那一圈的落点是盘上读来的记录点名的与账里的（mount::placements_named_by_unapplied_journal_records、placements_referenced_by_root 逐条经 recovery::placement_lies_in_the_unit_area_of_its_device 判过落在这块盘的单元区里），或现行账里的记录"
+        );
+        for index in start..end {
+            if !self.allocated[index] {
+                self.isolate_slot_at_index(index);
             }
         }
     }
 
-    /// 影子账隔离的槽数（D28（挂载期承诺量） 已定项 1 第九项「被抛弃根独占量」的这块盘那一项）。
+    /// 置一槽的隔离位并维护两个隔离计数；已置着就什么都不动（同一个槽隔离两次不重复计数）。
+    fn isolate_slot_at_index(&mut self, index: usize) {
+        if !self.isolated[index] {
+            self.set_blocking_bit(index, SlotBlockingBit::IsolatedByTheShadowLedger, true);
+            let segment = index / usize::try_from(CLUSTER_SEGMENT_SLOTS).expect("64");
+            self.isolated_per_segment[segment] += 1;
+            self.isolated_slots += 1;
+        }
+    }
+
+    /// 分配位与隔离位同时置着的槽数：D28（挂载期承诺量） 已定项 1 第九项与「已分配」各扣一次的那几个。逐槽扫一遍单元区，
+    /// 只给核对与用例读，运行时的判定不读它（`.claude/rules/fs-design.md`「记账是事务的副产品，不是事后的遍历」）。
+    #[must_use]
+    pub fn slots_counted_both_as_allocated_and_as_isolated(&self) -> u64 {
+        u64::try_from(
+            self.allocated
+                .iter()
+                .zip(&self.isolated)
+                .filter(|(is_allocated, is_isolated)| **is_allocated && **is_isolated)
+                .count(),
+        )
+        .expect("单元区槽数装得进 u64")
+    }
+
+    /// 这块盘上隔离的槽数（D28（挂载期承诺量） 已定项 1 第九项的这块盘那一项）：只被被抛弃根引用的，加水位之上没施加的 journal 记录点名、
+    /// 还没解开的（C694 的 C）；两部分置的是同一个隔离位，同一个槽只数一次。
     #[must_use]
     pub fn isolated_slots(&self) -> u64 {
         self.isolated_slots
+    }
+
+    /// 这一槽的影子账隔离位（[`Self::isolate`] 那一套）置着；单元区之外的槽交 `false`。只给会话数「C 那一圈这一刻隔离着几个槽」读
+    /// （`PoolAllocator::isolated_slots_covered_by`，推满仍不够时报不报「被宽护卡住」），分配与准入的判定不读它。
+    #[must_use]
+    pub fn is_isolated(&self, slot: SlotNumber) -> bool {
+        let lies_in_the_unit_area =
+            (self.unit_area_start.slot().0..self.unit_area_end_slot()).contains(&slot.0);
+        lies_in_the_unit_area && self.isolated[self.index(slot)]
     }
 
     /// 清掉一个槽的影子账隔离位（`isolate` 置的那一套，D28（挂载期承诺量） 已定项 1 第九项「被抛弃的根被轮转覆写时清零」）：
@@ -943,28 +991,104 @@ impl PlacementOnDevice {
     }
 }
 
-/// 根环一个槽上这会儿住着哪条根。自证不过的槽、读不出而落在一圈窗口之外的槽不在 `RootRingOccupancy` 里：D16（发布语义） 已定项 1 的
-/// 「一圈窗口里最旧有效根」只看自证合法的根与窗口里读不出的槽，读不出的被抛弃根影子账本来就罩不到（`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
+/// 挂载那一刻读坏（设备报读错，或读得出、不是全零而自证不过）的一个根环槽能住的 txg（D16（发布语义） 已定项 1 的「挂载时读不出的槽」，
+/// 用户 2026-10-04 定：读不出、自证不过的根槽在回收门槛里钉在它可能住过的最旧 txg，重读读出有效根或确认为空之前门槛不越过它；
+/// 准入抬 F 的上限照 Q3 按它在 (N − 3S, 新实例第一次发布的 txg − 1] 里能住的最大 txg 并）。读回全零的槽不在这里：它不并进上限
+/// （用户 2026-10-04 定），回收门槛里照「自证不过」那一类钉住（用户 2026-10-05 定乙），记成 [`RootRingOccupant::AllZeroAtMount`]。
+/// 不变量：最旧的不高于最大的（构造时断言）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TxgsARingSlotBadAtMountCanHold {
+    oldest_txg_it_can_have_held: CheckpointTxg,
+    highest_txg_it_can_hold: CheckpointTxg,
+}
+
+impl TxgsARingSlotBadAtMountCanHold {
+    /// # Panics
+    /// `oldest_txg_it_can_have_held` 高于 `highest_txg_it_can_hold`：两个数是从同一个槽、同一个 txg 上界算出来的，倒过来说明算错了。
+    #[must_use]
+    pub fn new(
+        oldest_txg_it_can_have_held: CheckpointTxg,
+        highest_txg_it_can_hold: CheckpointTxg,
+    ) -> Self {
+        assert!(
+            oldest_txg_it_can_have_held <= highest_txg_it_can_hold,
+            "一个槽可能住过的最旧 txg {oldest_txg_it_can_have_held:?} 不高于它能住的最大 txg {highest_txg_it_can_hold:?}"
+        );
+        Self {
+            oldest_txg_it_can_have_held,
+            highest_txg_it_can_hold,
+        }
+    }
+
+    /// 落到这个槽上、不晚于新实例第一次发布之前那个 txg 的最小 txg：回收门槛钉在这里（窗口之外留在洞里的旧根也罩得住）。
+    #[must_use]
+    pub fn oldest_txg_it_can_have_held(self) -> CheckpointTxg {
+        self.oldest_txg_it_can_have_held
+    }
+
+    /// 它在 (N − 3S, 新实例第一次发布的 txg − 1] 里能住的最大 txg：准入抬 F 的上限按它并（Q3）。
+    #[must_use]
+    pub fn highest_txg_it_can_hold(self) -> CheckpointTxg {
+        self.highest_txg_it_can_hold
+    }
+}
+
+/// 根环一个槽上这会儿住着哪条根。一个 txg 都住不了的槽（年轻的环里还没轮到的）不在 `RootRingOccupancy` 里：
+/// 回收门槛取「环里最旧有效根」（D16（发布语义） 已定项 1，用户 2026-10-04 定 RGall，`research/prompts/m3-reclaim-window-r1-main-verification.md`
+/// 第六节 Q1），看自证合法的根与挂载时读坏、读回全零的槽；读不出的被抛弃根影子账本来就罩不到（`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RootRingOccupant {
-    /// 挂载那一刻设备报读错的槽，落在挂载时的一圈窗口里（D16（发布语义） 已定项 1「挂载时读不出的槽在窗口里只对应一两个 txg：
-    /// 门槛按最小的算，根环表记最大的」，`research/prompts/m3-ring-r3-main-verification.md` 第二节第 4 行，零轮）：按「那里住着一条 txg 为
-    /// `highest_txg_it_can_hold` 的有效根」进这个进程的回收门槛，直到这个进程把那个槽写掉。它不算「这个进程知道住着根的槽」
-    /// （[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]）：D16 已定项 1「根槽这一次读坏」那一行，挂载那一刻就读不出、之后没写过的槽
-    /// 算上限、判回退候选时当没有根，不因为这里记了它就改成「读坏就拒」。
-    UnreadableAtMountInsideTheWindow {
-        highest_txg_it_can_hold: CheckpointTxg,
+    /// 挂载那一刻读回全零的槽：回收门槛照「自证不过」那一类钉在它可能住过的最旧 txg（盘上那一槽可能住着一条有效根、只是这一次读回了全零），
+    /// 准入抬 F 的上限不并它（用户 2026-10-04 定全零不并进上限，2026-10-05 定乙：回收门槛里照旧钉住；条文还没写回，定案在
+    /// `records/2026-09-30-里程碑三开工第一轮.md`）。直到这个进程把那个槽写掉，或进程内记根时重读读出有效根、读出被抛弃的根才解开；
+    /// 重读读回全零不算确认为空，照旧钉着。它不算「这个进程知道住着根的槽」。
+    AllZeroAtMount {
+        oldest_txg_it_can_have_held: CheckpointTxg,
     },
-    /// 挂载那一刻读不出的槽，这个进程在它成了窗口里最小的那个时重读、读出了一条自证过而按实例表仍然有效的根
+    /// 挂载那一刻读坏的槽（设备报读错，或读得出、不是全零而自证不过）：回收门槛钉在它可能住过的最旧 txg、准入抬 F 的上限按它能住的最大 txg
+    /// 并（[`TxgsARingSlotBadAtMountCanHold`]），直到这个进程把那个槽写掉，或进程内记根时重读读出有效根、读出被抛弃的根
+    /// （用户 2026-10-04 定；重读读回全零照旧钉着，2026-10-05 定乙）。它不算「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]）：
+    /// D16 已定项 1「根槽这一次读坏」那一行，挂载那一刻就读坏、之后没写过的槽算上限时并进来、判回退候选时当没有根，不因为这里记了它就改成「读坏就拒」。
+    BadAtMount(TxgsARingSlotBadAtMountCanHold),
+    /// 挂载那一刻读坏的槽，这个进程在它成了环里最小的那个时重读、读出了一条自证过而按实例表仍然有效的根
     /// （D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定，`research/prompts/m3-root-ring-code-r1-main-verification.md` 第三节表二之后那一段）：
-    /// 照读出来的 txg 进窗口。与 [`RootRingOccupant::UnreadableAtMountInsideTheWindow`] 一样不算「这个进程知道住着根的槽」：D16 已定项 1
-    /// 「根槽这一次读坏」那一行列的是挂载那一刻读得出的与这个进程写过的两种，进程内重读读出来的不在其内。
-    ValidRootReadWhenTheSlotUnreadableAtMountWasReread { checkpoint_txg: CheckpointTxg },
+    /// 照读出来的 txg 进环里最旧有效根。它算「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]；D16 已定项 1
+    /// 「根槽这一次读坏」那一行，用户 2026-10-04 定，`research/prompts/m3-root-ring-code-r2-main-verification.md` 第六节 RS1）：
+    /// 之后那一槽再读坏，算上限、判回退候选时重读一次、仍坏就拒，不按没有根往下走。
+    ValidRootReadWhenTheSlotBadAtMountWasReread { checkpoint_txg: CheckpointTxg },
+    /// 重建分配器读根环有一块盘没读出有效根、整环重读了一遍，两遍按槽并起来是一条自证过的根，而另一遍那一槽没自证过（读不出、读得出而
+    /// 自证不过或读回全零）：并出来的照读出来的那条根算（有效的进环里最旧有效根，被抛弃的带着它引用的落点，离开根环时按它清），
+    /// 另记读出来的那整条根记录 `root_record_self_verified_on_one_rebuild_pass`。抬 F 那一串（准入与卸载）读它读坏、重读一次仍坏时拿这条记录顶上，
+    /// 照它本身算、不拒这一次抬（用户 2026-10-06 定 T1 甲，判决 `research/prompts/m3-batch10i-code-r1-main-verification.md` 第六节）：
+    /// 有效的照它本身进准入上限与候选集，被抛弃的照它记着的落点进影子账、不进上限；有效还是被抛弃照那一遍判抛弃的实例表判。
+    /// 之前（S1，`research/prompts/m3-batch10-code-r3-main-verification.md` 第六节）照挂载那一刻读坏钉在能住的 txg：被抛弃的那一半掉出影子账（I-7.4 红），
+    /// 准入上限卡在它能住的最大 txg（同一份第 10i 批判决第二节 K1）。管理员回退判候选与算 F_生效 那一遍照旧把它算进
+    /// 「这个进程知道住着根的槽」（[`RootRingOccupancy::ring_slots_known_to_hold_a_root`]），读坏重读仍坏就拒（同一份判决第六节 T2：照今天拒）。
+    RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+        root: RootReadOnOneRebuildPass,
+        root_record_self_verified_on_one_rebuild_pass: Box<RootRecord>,
+    },
     /// 按实例表判仍然有效的根，txg 在不在 F 之下都算（可再分配谓词取 max(F_生效, 环里最旧有效根)，F 那一半另记）。
     ValidRoot { checkpoint_txg: CheckpointTxg },
-    /// 按实例表判被抛弃的根（D23（journal 的角色与格式） 已定项 14），带着它引用的每个落点——挂载那一刻仍被候选根或现行账引用、
+    /// 按实例表判被抛弃的根（D23（journal 的角色与格式） 已定项 14），带着它的 (实例代号, txg) 与它引用的每个落点——挂载那一刻仍被候选根或现行账引用、
     /// 因而没隔离的也在内：它们之后在这次挂载里被回收时要补隔离，这条根离开根环时按它清。
-    /// 账读不出的、影子账关着（只供测试）的，这一串是空的：它什么都没隔离，离开根环时也什么都不清。
+    /// 账读不出（凭据放行）的、影子账关着（只供测试）的，这一串是空的：它什么都没隔离，离开根环时也什么都不清。
+    /// 抬 F 那一串（准入与卸载）重算影子账时，这一槽这一遍读出的被抛弃根与这里记着的是同一条（实例代号与 txg 都对上）就照这一串算、
+    /// 不再从盘上读它的账（[`RootRingOccupancy::placements_recorded_for_the_abandoned_root`]，D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，用户 2026-10-07 定）。
+    AbandonedRoot {
+        instance: InstanceGeneration,
+        checkpoint_txg: CheckpointTxg,
+        referenced_placements: Vec<PlacementOnDevice>,
+    },
+}
+
+/// [`RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses`] 那一槽里读出来的根按最新那条根的实例表是哪一类：
+/// 与 [`RootRingOccupant::ValidRoot`]、[`RootRingOccupant::AbandonedRoot`] 两类同一个分法、同样带着的东西。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum RootReadOnOneRebuildPass {
+    ValidRoot {
+        checkpoint_txg: CheckpointTxg,
+    },
     AbandonedRoot {
         referenced_placements: Vec<PlacementOnDevice>,
     },
@@ -985,10 +1109,16 @@ pub struct RootRingOccupancy {
     latest_recorded_txg: CheckpointTxg,
     /// 见 [`RootRingOccupancy::instance_table_judging_the_rereads`]。
     instance_table_judging_the_rereads: InstanceTableRecords,
+    /// 可写挂载那一刻水位之上、没被施加的 journal 记录点名的落点（C694 的 C，判决 `research/prompts/m3-c694-r2-main-verification.md`
+    /// 第三节第 1 条：选法取水位之上全部记录），按那条记录的 txg 在根环里对应的槽归组：那条记录所属的发布若落过根，根就住在那一槽，
+    /// 这个进程写掉那一槽之前那条根还可能被下一次恢复择到。挂载那一刻仍被候选根或现行账引用、因而没隔离的落点也在内：
+    /// 它们之后在这次挂载里被回收时要补隔离。只在 [`PoolAllocator::record_root_written_by_this_process`] 写掉那一槽、那次发布取完落点之后
+    /// 解开（判决同一条的 `ring`）；进程内重读那一槽（D16（发布语义） 已定项 1 读回全零的槽）读出什么都不解开它。
+    placements_named_by_unapplied_journal_records: BTreeMap<RootRingSlot, Vec<PlacementOnDevice>>,
 }
 
 impl RootRingOccupancy {
-    /// 从盘上读出来的那一刻：`occupants` 是每个读得出的根环槽上的根，`effective_floor` 是恢复后生效的 F，
+    /// 从盘上读出来的那一刻：`occupants` 是每个读得出的根环槽上的根与挂载时读坏的槽，`effective_floor` 是恢复后生效的 F，
     /// `latest_txg_before_the_next_publish` 是这个进程下一条根的 txg 减一（挂载时 = 新实例第一次发布的 txg − 1：
     /// 环里只有记录、没有根的那几个 txg 这时已经跳过，它们的槽上照旧是读出来的内容）。
     #[must_use]
@@ -1004,7 +1134,179 @@ impl RootRingOccupancy {
             effective_floor,
             latest_recorded_txg: latest_txg_before_the_next_publish,
             instance_table_judging_the_rereads: InstanceTableRecords { rows: Vec::new() },
+            placements_named_by_unapplied_journal_records: BTreeMap::new(),
         }
+    }
+
+    /// 还没解开的、水位之上没施加的 journal 记录点名的全部落点（[`RootRingOccupancy`] 那一项的注释），按根环槽的次序摊平：
+    /// 抬 F 按新候选集重算隔离时拿它（`mount::raise_rollback_floor` 一族）。
+    #[must_use]
+    pub fn placements_named_by_unapplied_journal_records(&self) -> Vec<PlacementOnDevice> {
+        self.placements_named_by_unapplied_journal_records
+            .values()
+            .flatten()
+            .copied()
+            .collect()
+    }
+
+    /// 抬 F 那一串（准入与卸载）重算影子账时一条被抛弃根的落点（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句「抬 F 那一串（准入与卸载）里的被抛弃根」，
+    /// 用户 2026-10-07 定）：这条根（`instance`、`checkpoint_txg`）的 txg 在根环里对应的那一槽上，表里记着的是挂载那一刻读出的被抛弃根
+    /// （[`RootRingOccupant::AbandonedRoot`]，或两遍里只有一遍自证过的槽里被抛弃的那一半，按那一遍读出的整条根记录认），而且就是这一条——
+    /// 实例代号与 txg 都对上，不只按槽号对——就交回挂载时算出、记着的那一串落点；记着的是别的根、有效根、挂载时读坏或读回全零的槽，
+    /// 或这个进程已写掉那一槽（换成有效根），交 `None`。只读内存里的表，不读盘。
+    #[must_use]
+    pub fn placements_recorded_for_the_abandoned_root(
+        &self,
+        instance: InstanceGeneration,
+        checkpoint_txg: CheckpointTxg,
+    ) -> Option<Vec<PlacementOnDevice>> {
+        let ring_slot = target_for_publish(checkpoint_txg, self.slots_per_region);
+        match self.occupants.get(&ring_slot)? {
+            RootRingOccupant::AbandonedRoot {
+                instance: recorded_instance,
+                checkpoint_txg: recorded_checkpoint_txg,
+                referenced_placements,
+            } => ((*recorded_instance, *recorded_checkpoint_txg) == (instance, checkpoint_txg))
+                .then(|| referenced_placements.clone()),
+            RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root:
+                    RootReadOnOneRebuildPass::AbandonedRoot {
+                        referenced_placements,
+                    },
+                root_record_self_verified_on_one_rebuild_pass,
+            } => ((
+                root_record_self_verified_on_one_rebuild_pass.instance,
+                root_record_self_verified_on_one_rebuild_pass.checkpoint_txg,
+            ) == (instance, checkpoint_txg))
+                .then(|| referenced_placements.clone()),
+            RootRingOccupant::ValidRoot { .. }
+            | RootRingOccupant::BadAtMount(_)
+            | RootRingOccupant::AllZeroAtMount { .. }
+            | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+            | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root: RootReadOnOneRebuildPass::ValidRoot { .. },
+                ..
+            } => None,
+        }
+    }
+
+    /// 抬 F 那一串（准入与卸载）重算影子账时，一条根环表里没记着落点的被抛弃根借 C 那一圈记着的落点（D16（发布语义） 已定项 1「根槽这一次读坏」
+    /// 那一行，用户 2026-10-08 定 H2「用 C 那一圈记着的落点」，判决 `research/prompts/m3-batch10z-b-code-r1-main-verification.md` 第三节）：
+    /// 可写挂载自己写行之后才按现行那一版的实例表判成被抛弃的根，挂载那一刻按最新那条根的表判有效、记成有效根，不带落点。
+    /// 这条根（`instance`、`checkpoint_txg`）的 txg 在根环里对应的那一槽上，表里记着的是一条有效根、txg 与它相同（实例代号记着的就也比：
+    /// 两遍里只有一遍自证过的有效那一半带整条根记录），而 C 那一圈（水位之上没施加的记录点名的落点、那几次发布的账、比所选那一版新的可读根的账，
+    /// [`RootRingOccupancy`] 那一项）在那一槽还记着、没解开，就交回那一槽记着的落点；那一槽记的是被抛弃根、挂载时读坏或读回全零的槽、
+    /// 有效根而 txg 不同（同一槽差一整圈的另一次发布），或 C 在那一槽什么都没记（这个进程写掉那一槽时解开了，或挂载时就没记），交 `None`，
+    /// 调用方照今天读盘。C 在那一槽有条目而落点是空的（凭据放行那一形）交 `Some(空)`：条目在就是记着了，调用方照空串算、不读账。
+    /// 只读内存里的表，不读盘。
+    #[must_use]
+    pub fn placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+        &self,
+        instance: InstanceGeneration,
+        checkpoint_txg: CheckpointTxg,
+    ) -> Option<Vec<PlacementOnDevice>> {
+        let ring_slot = target_for_publish(checkpoint_txg, self.slots_per_region);
+        let is_the_same_root_recorded_valid = match self.occupants.get(&ring_slot)? {
+            RootRingOccupant::ValidRoot {
+                checkpoint_txg: recorded_checkpoint_txg,
+            }
+            | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread {
+                checkpoint_txg: recorded_checkpoint_txg,
+            } => *recorded_checkpoint_txg == checkpoint_txg,
+            RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root: RootReadOnOneRebuildPass::ValidRoot { .. },
+                root_record_self_verified_on_one_rebuild_pass,
+            } => {
+                (
+                    root_record_self_verified_on_one_rebuild_pass.instance,
+                    root_record_self_verified_on_one_rebuild_pass.checkpoint_txg,
+                ) == (instance, checkpoint_txg)
+            }
+            RootRingOccupant::AbandonedRoot { .. }
+            | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
+                ..
+            }
+            | RootRingOccupant::BadAtMount(_)
+            | RootRingOccupant::AllZeroAtMount { .. } => false,
+        };
+        if !is_the_same_root_recorded_valid {
+            return None;
+        }
+        self.placements_named_by_unapplied_journal_records
+            .get(&ring_slot)
+            .cloned()
+    }
+
+    /// 根环表里记成被抛弃根的槽（[`RootRingOccupant::AbandonedRoot`]）与那条根挂载时记着的落点，按槽的次序：抬 F 那一串读根环时这几槽读坏、
+    /// 重读仍坏不拒，照这里记着的落点进影子账、不进上限（D16（发布语义） 已定项 1「根槽这一次读坏」那一行，用户 2026-10-08 定 H1
+    /// 「被抛弃根的槽不拒」）。两遍里只有一遍自证过的槽不在其内：抬 F 那一遍拿它记着的整条根记录顶上（用户 2026-10-06 定 T1 甲）。
+    /// 这个进程写掉那一槽之后就不在其内。
+    #[must_use]
+    pub fn ring_slots_recorded_as_holding_an_abandoned_root(
+        &self,
+    ) -> BTreeMap<RootRingSlot, Vec<PlacementOnDevice>> {
+        self.occupants
+            .iter()
+            .filter_map(|(ring_slot, occupant)| match occupant {
+                RootRingOccupant::AbandonedRoot {
+                    referenced_placements,
+                    ..
+                } => Some((*ring_slot, referenced_placements.clone())),
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::BadAtMount(_)
+                | RootRingOccupant::AllZeroAtMount { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses { .. } => None,
+            })
+            .collect()
+    }
+
+    /// C 那一圈（水位之上没施加的记录点名的落点、那几次发布的账、比所选那一版新的可读根的账，认不出回退时的宽护在其中，[`RootRingOccupancy`]
+    /// 那一项的注释）还没解开、记着落点的槽，各带记着的落点，按槽的次序：这个进程写掉那一槽之前它们一直罩着（回收出来的照补隔离）。
+    /// 会话推环推到哪一槽、推满仍不够时报不报「被宽护卡住」读它（`mounted_session`，用户 2026-10-08 弹窗定「显式推环命令加带出路的错」）。
+    /// 记着空串的槽（凭据放行那一形）不在其内：它什么都不罩。只读内存里的表。
+    #[must_use]
+    pub fn ring_slots_holding_placements_named_by_unapplied_journal_records(
+        &self,
+    ) -> BTreeMap<RootRingSlot, Vec<PlacementOnDevice>> {
+        self.placements_named_by_unapplied_journal_records
+            .iter()
+            .filter(|(_, placements)| !placements.is_empty())
+            .map(|(ring_slot, placements)| (*ring_slot, placements.clone()))
+            .collect()
+    }
+
+    /// 这一槽上表里记着的有效根的 txg（挂载那一刻读出、按最新那条根的实例表有效的，进程内重读读出的，两遍里只有一遍自证过而有效的，
+    /// 或这个进程写的）；记的是被抛弃根、挂载那一刻读坏或读回全零的槽，或表里没记这一槽，交 `None`。只读内存里的表。
+    #[must_use]
+    pub fn checkpoint_txg_of_the_valid_root_recorded_on(
+        &self,
+        ring_slot: RootRingSlot,
+    ) -> Option<CheckpointTxg> {
+        match self.occupants.get(&ring_slot)? {
+            RootRingOccupant::ValidRoot { checkpoint_txg }
+            | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { checkpoint_txg }
+            | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root: RootReadOnOneRebuildPass::ValidRoot { checkpoint_txg },
+                ..
+            } => Some(*checkpoint_txg),
+            RootRingOccupant::AbandonedRoot { .. }
+            | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
+                ..
+            }
+            | RootRingOccupant::BadAtMount(_)
+            | RootRingOccupant::AllZeroAtMount { .. } => None,
+        }
+    }
+
+    /// 环里还在的被抛弃根引用着的全部落点，加还没解开的、水位之上没施加的记录点名的全部落点：清隔离位之前要看的那一份
+    /// （一个槽两边任一边还罩着就不清），回收出来的槽里它们罩着的补隔离。
+    fn placements_the_isolation_still_protects(&self) -> Vec<PlacementOnDevice> {
+        let mut protected = self.placements_referenced_by_abandoned_roots();
+        protected.extend(self.placements_named_by_unapplied_journal_records());
+        protected
     }
 
     /// 根环每区槽数 S（系统配置偏移 362）：准入式子里环窗口按它算（`admission::ring_window_on_one_device`）。
@@ -1014,46 +1316,78 @@ impl RootRingOccupancy {
     }
 
     /// 这个进程知道住着一条根的根环槽（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）：挂载那一刻读得出、自证过的槽
-    /// （有效的与被抛弃的都算），与这个进程之后写过、FUA 返回过的槽——发布在落盘之前或落盘途中失败时分配器整个换回发布之前那一份，
-    /// 这张表随之退回，记着的只剩根落盘做成的那几次。挂载那一刻读不出或自证不过、之后又没写过的槽不在其内
-    /// （[`RootRingOccupant::UnreadableAtMountInsideTheWindow`] 记着的槽也不在）。
+    /// （有效的与被抛弃的都算），这个进程之后写过、FUA 返回过的槽——发布在落盘之前或落盘途中失败时分配器整个换回发布之前那一份，
+    /// 这张表随之退回，记着的只剩根落盘做成的那几次——，与进程内记根时重读读出了有效根的槽
+    /// （[`RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread`]，用户 2026-10-04 定）。挂载那一刻读坏、
+    /// 之后又没写过也没重读出有效根的槽不在其内（[`RootRingOccupant::BadAtMount`] 与 [`RootRingOccupant::AllZeroAtMount`] 记着的槽也不在）。
+    /// 重建分配器两遍里只有一遍自证过的槽（[`RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses`]）在其内：管理员回退判候选、
+    /// 算 F_生效 读到它仍坏照旧拒；抬 F 那一遍另按 [`Self::ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes`] 处置
+    /// （`mount::raise_rollback_floor` 一族把它们从这一份里拿掉）。
     #[must_use]
     pub fn ring_slots_known_to_hold_a_root(&self) -> BTreeSet<RootRingSlot> {
         self.occupants
             .iter()
             .filter(|(_, occupant)| match occupant {
-                RootRingOccupant::ValidRoot { .. } | RootRingOccupant::AbandonedRoot { .. } => true,
-                RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
-                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. } => {
-                    false
-                }
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::AbandonedRoot { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses { .. } => true,
+                RootRingOccupant::BadAtMount(_) | RootRingOccupant::AllZeroAtMount { .. } => false,
             })
             .map(|(ring_slot, _)| *ring_slot)
             .collect()
     }
 
-    /// 一圈窗口里最旧有效根的 txg（D16（发布语义） 已定项 1）：N = 这个进程记到的最新根的 txg（`latest_recorded_txg`：进程内每记一条根
-    /// 就是这条根），窗口 = txg > N − 3S（3S 是环长）；窗口里的有效根与挂载时窗口里读不出的槽（按它能住的最大 txg）取最小。一条都没有时 `None`。
-    /// 挂载那一刻的门槛不走这里（`mount::rebuilt_allocator` 锚在环里读得出的最新有效根、读不出的槽按最小 txg 算）。
-    fn oldest_valid_root_in_the_window(&self) -> Option<CheckpointTxg> {
+    /// 重建分配器两遍里只有一遍自证过、还记在表里的槽（[`RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses`]），
+    /// 各带重建那一遍自证过的那整条根记录，按槽的次序：抬 F 那一串读它读坏、重读一次仍坏时拿这条记录顶上（用户 2026-10-06 定 T1 甲）。
+    /// 这个进程写掉那一槽之后就不在其内。
+    #[must_use]
+    pub fn ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes(
+        &self,
+    ) -> BTreeMap<RootRingSlot, RootRecord> {
+        self.occupants
+            .iter()
+            .filter_map(|(ring_slot, occupant)| match occupant {
+                RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root_record_self_verified_on_one_rebuild_pass,
+                    ..
+                } => Some((*ring_slot, **root_record_self_verified_on_one_rebuild_pass)),
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::BadAtMount(_)
+                | RootRingOccupant::AllZeroAtMount { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::AbandonedRoot { .. } => None,
+            })
+            .collect()
+    }
+
+    /// 环里最旧有效根的 txg（D16（发布语义） 已定项 1「环里最旧有效根」，用户 2026-10-04 定 RGall：回收门槛从一圈窗口退回整个环）：
+    /// 这张表里全部有效根与挂载时读坏、读回全零的槽（钉在它可能住过的最旧 txg，用户 2026-10-04 定；读回全零的 2026-10-05 定乙）取最小，
+    /// 不按 txg 离这个进程记到的最新根多远滤。
+    /// 一条都没有时 `None`。
+    fn oldest_valid_root_in_the_ring(&self) -> Option<CheckpointTxg> {
         self.occupants
             .values()
             .filter_map(|occupant| match occupant {
                 RootRingOccupant::ValidRoot { checkpoint_txg, .. }
-                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread {
                     checkpoint_txg,
+                }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root: RootReadOnOneRebuildPass::ValidRoot { checkpoint_txg },
+                    ..
                 } => Some(*checkpoint_txg),
-                RootRingOccupant::UnreadableAtMountInsideTheWindow {
-                    highest_txg_it_can_hold,
-                } => Some(*highest_txg_it_can_hold),
-                RootRingOccupant::AbandonedRoot { .. } => None,
-            })
-            .filter(|checkpoint_txg| {
-                txg_is_inside_the_one_revolution_window(
-                    *checkpoint_txg,
-                    self.latest_recorded_txg,
-                    self.slots_per_region,
-                )
+                RootRingOccupant::BadAtMount(txgs_it_can_hold) => {
+                    Some(txgs_it_can_hold.oldest_txg_it_can_have_held())
+                }
+                RootRingOccupant::AllZeroAtMount {
+                    oldest_txg_it_can_have_held,
+                } => Some(*oldest_txg_it_can_have_held),
+                RootRingOccupant::AbandonedRoot { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
+                    ..
+                } => None,
             })
             .min()
     }
@@ -1065,104 +1399,164 @@ impl RootRingOccupancy {
             .flat_map(|occupant| match occupant {
                 RootRingOccupant::AbandonedRoot {
                     referenced_placements,
+                    ..
+                }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root:
+                        RootReadOnOneRebuildPass::AbandonedRoot {
+                            referenced_placements,
+                        },
+                    ..
                 } => referenced_placements.as_slice(),
                 RootRingOccupant::ValidRoot { .. }
-                | RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
-                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. } => {
-                    &[]
-                }
+                | RootRingOccupant::BadAtMount(_)
+                | RootRingOccupant::AllZeroAtMount { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root: RootReadOnOneRebuildPass::ValidRoot { .. },
+                    ..
+                } => &[],
             })
             .copied()
             .collect()
     }
 
-    /// 挂载那一刻读不出、还记在表里的槽，各按它能住的最大 txg（[`RootRingOccupant::UnreadableAtMountInsideTheWindow`]），按槽的次序。
+    /// 挂载那一刻读坏、还记在表里的槽（[`RootRingOccupant::BadAtMount`]），各带它能住的 txg，按槽的次序。回收门槛与 E2 重读按其中
+    /// 可能住过的最旧 txg 取，准入抬 F 的上限按其中能住的最大 txg 并（`mount::ring_slots_bad_at_mount_by`）。
     #[must_use]
-    pub fn ring_slots_unreadable_at_mount(&self) -> BTreeMap<RootRingSlot, CheckpointTxg> {
+    pub fn ring_slots_bad_at_mount(
+        &self,
+    ) -> BTreeMap<RootRingSlot, TxgsARingSlotBadAtMountCanHold> {
         self.occupants
             .iter()
             .filter_map(|(ring_slot, occupant)| match occupant {
-                RootRingOccupant::UnreadableAtMountInsideTheWindow {
-                    highest_txg_it_can_hold,
-                } => Some((*ring_slot, *highest_txg_it_can_hold)),
+                RootRingOccupant::BadAtMount(txgs_it_can_hold) => {
+                    Some((*ring_slot, *txgs_it_can_hold))
+                }
                 RootRingOccupant::ValidRoot { .. }
-                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. }
-                | RootRingOccupant::AbandonedRoot { .. } => None,
+                | RootRingOccupant::AllZeroAtMount { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::AbandonedRoot { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses { .. } => None,
             })
             .collect()
     }
 
-    /// 进程内重读那几个槽时判「按实例表仍然有效」用的那张表（D16（发布语义） 已定项 1「一圈窗口里最旧有效根」：按实例表判仍然有效）。
-    /// 挂载时装的是最新那条根的那一张（`mount::rebuilt_allocator`），写行那次发布的表一定下来就换成它（`mount::establish_instance`）——
-    /// 池级 checker 按镜像里最新那条根的实例表判，写行之后最新那条根带的就是写行那一张。mkfs 同一个进程里装的是空表（表里没有挂载时读不出的槽，用不到它）。
+    /// 挂载那一刻读坏、还记在表里的槽，各钉在它可能住过的最旧 txg：回收门槛与 E2 重读按它取。
+    #[must_use]
+    pub fn ring_slots_bad_at_mount_pinned_at_the_oldest_txg_they_can_have_held(
+        &self,
+    ) -> BTreeMap<RootRingSlot, CheckpointTxg> {
+        self.ring_slots_bad_at_mount()
+            .into_iter()
+            .map(|(ring_slot, txgs_it_can_hold)| {
+                (ring_slot, txgs_it_can_hold.oldest_txg_it_can_have_held())
+            })
+            .collect()
+    }
+
+    /// 挂载那一刻读回全零、还记在表里的槽（[`RootRingOccupant::AllZeroAtMount`]），各钉在它可能住过的最旧 txg，按槽的次序。
+    /// 准入抬 F 的上限不并它们（[`Self::ring_slots_bad_at_mount`] 里没有它们，用户 2026-10-04 定）。
+    #[must_use]
+    pub fn ring_slots_reading_back_all_zero_at_mount_pinned_at_the_oldest_txg_they_can_have_held(
+        &self,
+    ) -> BTreeMap<RootRingSlot, CheckpointTxg> {
+        self.occupants
+            .iter()
+            .filter_map(|(ring_slot, occupant)| match occupant {
+                RootRingOccupant::AllZeroAtMount {
+                    oldest_txg_it_can_have_held,
+                } => Some((*ring_slot, *oldest_txg_it_can_have_held)),
+                RootRingOccupant::ValidRoot { .. }
+                | RootRingOccupant::BadAtMount(_)
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::AbandonedRoot { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses { .. } => None,
+            })
+            .collect()
+    }
+
+    /// 回收门槛与 E2 重读看的那几个槽：挂载那一刻读坏的与读回全零的，各钉在它可能住过的最旧 txg（读回全零的照「自证不过」那一类钉住，
+    /// 用户 2026-10-05 定乙）。一个槽在表里只有一项，两类不会同时有它。
+    #[must_use]
+    pub fn ring_slots_pinned_since_the_mount_at_the_oldest_txg_they_can_have_held(
+        &self,
+    ) -> BTreeMap<RootRingSlot, CheckpointTxg> {
+        let mut pinned = self.ring_slots_bad_at_mount_pinned_at_the_oldest_txg_they_can_have_held();
+        pinned.extend(
+            self.ring_slots_reading_back_all_zero_at_mount_pinned_at_the_oldest_txg_they_can_have_held(),
+        );
+        pinned
+    }
+
+    /// 进程内重读那几个槽时判「按实例表仍然有效」用的那张表（D16（发布语义） 已定项 1「环里最旧有效根」：按实例表判仍然有效）。
+    /// 装上根环表时是空表；可写挂载在写行那次发布的表一定下来、第一次记根之前换成它（`mount::establish_instance`）——
+    /// 池级 checker 按镜像里最新那条根的实例表判，写行之后最新那条根带的就是写行那一张。挂载装上根环表到换表之间不记根，空表没人读；
+    /// mkfs 同一个进程里一直是空表（表里没有挂载时读坏的槽，用不到它）。
     #[must_use]
     pub fn instance_table_judging_the_rereads(&self) -> &InstanceTableRecords {
         &self.instance_table_judging_the_rereads
     }
 }
 
-/// 进程内重读一个挂载那一刻读不出的根环槽读到了什么（D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定）。封闭集合，`match` 不写通配臂。
+/// 进程内重读一个挂载那一刻读坏或读回全零的根环槽读到了什么（D16（发布语义） 已定项 1 的 E2，用户 2026-10-03 定；用户 2026-10-04 定：
+/// 重读读出有效根之前回收门槛不越过它；2026-10-05 定乙：读回全零不算确认为空，照「自证不过」那一类钉着）。封闭集合，`match` 不写通配臂。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RereadOfARootRingSlotUnreadableAtMount {
-    /// 读得出、自证过，按实例表仍然有效：照读出来的 txg 算（窗口里的进窗口，窗口外的不算）。
+pub enum RereadOfARootRingSlotBadAtMount {
+    /// 读得出、自证过，按实例表仍然有效：照读出来的 txg 算（回收门槛取整个环，RGall，读出来多旧都算）；那一槽从此算「这个进程知道住着根的槽」。
     ValidRoot { checkpoint_txg: CheckpointTxg },
-    /// 读得出而自证不过，或读出来的根按实例表被抛弃：当没有根（与挂载那一刻读得出而自证不过的槽同一个处置）。
-    NoValidRoot,
-    /// 仍读不出：照旧按它能住的最大 txg 算。
-    StillUnreadable,
+    /// 读得出、自证过，读出来的根按实例表被抛弃：当没有根。
+    AbandonedByTheInstanceTable,
+    /// 读回全零：不算确认为空（盘上那一槽可能住着一条有效根、这一次又读回了全零），照旧钉在它可能住过的最旧 txg（用户 2026-10-05 定乙）。
+    AllZero,
+    /// 仍读不出，或读得出、不是全零而自证不过：照旧钉在它可能住过的最旧 txg。
+    StillUnreadableOrNotSelfVerified,
 }
 
-/// 一圈窗口里最旧有效根，挂载那一刻读不出的槽按 E2 并进来（D16（发布语义） 已定项 1，用户 2026-10-03 定）：`valid_root_txgs` 是已知
-/// 住着有效根的 txg，`unreadable_at_mount` 是挂载那一刻读不出、各按能住的最大 txg 记的槽；两者里窗口（锚 `window_anchor`）里最小的那个
-/// 若是一个读不出的槽，先重读那一槽（`reread`）：读出有效根就照它的 txg 换进去、当没有根就拿掉，再取最小；仍读不出才按最大 txg 算。
+/// 环里最旧有效根，挂载那一刻读坏的槽按 E2 并进来（D16（发布语义） 已定项 1，用户 2026-10-03 定；回收门槛取整个环，用户 2026-10-04 定
+/// RGall；读坏的槽钉在它可能住过的最旧 txg，用户 2026-10-04 定；读回全零的槽同样钉着，用户 2026-10-05 定乙）：`valid_root_txgs` 是已知
+/// 住着有效根的 txg，`bad_at_mount` 是挂载那一刻读坏或读回全零、各按它可能住过的最旧 txg 钉着的槽；两者里最小的那个若是一个钉着的槽，
+/// 先重读那一槽（`reread`）：读出有效根就照它的 txg 换进去、读出被抛弃的根就拿掉，再取最小；仍读不出、读得出而自证不过或读回全零
+/// 才按钉着的 txg 算。
 /// 交回最小的 txg（一条都没有时 `None`）与每个重读过的槽读到了什么（按重读的次序）。
 ///
-/// 循环：每轮要么换掉或拿掉一个读不出的槽（`unreadable_at_mount` 少一个），要么在最小的是一个仍读不出的槽、或最小的不是读不出的槽时返回；
-/// 轮数至多 `unreadable_at_mount` 的条数加一。跨轮携带两张表与重读结局。
-pub fn oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+/// 循环：每轮要么换掉或拿掉一个读坏的槽（`bad_at_mount` 少一个），要么在最小的是一个仍读坏的槽、或最小的不是读坏的槽时返回；
+/// 轮数至多 `bad_at_mount` 的条数加一。跨轮携带两张表与重读结局。
+pub fn oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
     valid_root_txgs: &[CheckpointTxg],
-    mut unreadable_at_mount: BTreeMap<RootRingSlot, CheckpointTxg>,
-    window_anchor: CheckpointTxg,
-    slots_per_region: RootRingSlotsPerRegion,
-    reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotUnreadableAtMount,
+    mut bad_at_mount: BTreeMap<RootRingSlot, CheckpointTxg>,
+    reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotBadAtMount,
 ) -> (
     Option<CheckpointTxg>,
-    Vec<(RootRingSlot, RereadOfARootRingSlotUnreadableAtMount)>,
+    Vec<(RootRingSlot, RereadOfARootRingSlotBadAtMount)>,
 ) {
-    let is_inside_the_window = |checkpoint_txg: CheckpointTxg| {
-        txg_is_inside_the_one_revolution_window(checkpoint_txg, window_anchor, slots_per_region)
-    };
     let mut valid_root_txgs: Vec<CheckpointTxg> = valid_root_txgs.to_vec();
     let mut rereads = Vec::new();
     loop {
-        let oldest_valid_root = valid_root_txgs
+        let oldest_valid_root = valid_root_txgs.iter().copied().min();
+        let oldest_bad_slot = bad_at_mount
             .iter()
-            .copied()
-            .filter(|checkpoint_txg| is_inside_the_window(*checkpoint_txg))
-            .min();
-        let oldest_unreadable_slot = unreadable_at_mount
-            .iter()
-            .filter(|(_, highest_txg_it_can_hold)| is_inside_the_window(**highest_txg_it_can_hold))
-            .min_by_key(|(_, highest_txg_it_can_hold)| **highest_txg_it_can_hold)
-            .map(|(ring_slot, highest_txg_it_can_hold)| (*ring_slot, *highest_txg_it_can_hold));
-        let Some((ring_slot, highest_txg_it_can_hold)) = oldest_unreadable_slot else {
+            .min_by_key(|(_, pinned_txg)| **pinned_txg)
+            .map(|(ring_slot, pinned_txg)| (*ring_slot, *pinned_txg));
+        let Some((ring_slot, pinned_txg)) = oldest_bad_slot else {
             return (oldest_valid_root, rereads);
         };
-        if oldest_valid_root.is_some_and(|oldest| oldest < highest_txg_it_can_hold) {
+        if oldest_valid_root.is_some_and(|oldest| oldest < pinned_txg) {
             return (oldest_valid_root, rereads);
         }
         let reread_of_the_slot = reread(ring_slot);
         rereads.push((ring_slot, reread_of_the_slot));
         match reread_of_the_slot {
-            RereadOfARootRingSlotUnreadableAtMount::ValidRoot { checkpoint_txg } => {
-                unreadable_at_mount.remove(&ring_slot);
+            RereadOfARootRingSlotBadAtMount::ValidRoot { checkpoint_txg } => {
+                bad_at_mount.remove(&ring_slot);
                 valid_root_txgs.push(checkpoint_txg);
             }
-            RereadOfARootRingSlotUnreadableAtMount::NoValidRoot => {
-                unreadable_at_mount.remove(&ring_slot);
+            RereadOfARootRingSlotBadAtMount::AbandonedByTheInstanceTable => {
+                bad_at_mount.remove(&ring_slot);
             }
-            RereadOfARootRingSlotUnreadableAtMount::StillUnreadable => {
-                return (Some(highest_txg_it_can_hold), rereads);
+            RereadOfARootRingSlotBadAtMount::StillUnreadableOrNotSelfVerified
+            | RereadOfARootRingSlotBadAtMount::AllZero => {
+                return (Some(pinned_txg), rereads);
             }
         }
     }
@@ -1197,9 +1591,17 @@ pub struct PoolAllocator {
     /// 复用窗口置 0 时在 `release` 里当场回收掉的落点数（逐盘各算一条，与 `reclaim_released_up_to` 的返回值口径不同）：
     /// 开关走没走到，读这个数就看得出（`.claude/rules/fs-design.md` 五条硬要求第 4 条）。
     placements_reclaimed_on_release_by_the_forced_zero_reuse_window: u64,
+    /// 这个分配器实例上提交内生块走回落（`CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot`，D3（空间分配） 已定项 8 ②）的次数，
+    /// 只增、只住内存、`new` 与 `rebuild_from_records` 起步是 0。只读，产品路径不按它分支：它是回落那一支的观测
+    /// （`.claude/rules/fs-design.md` 五条硬要求第 4 条「分支必须可观测」）。harness 的看门用例在「mkfs 之后连续可写挂载、再写第一个文件」
+    /// 那一族上断言它是 0：I-5.5 的开放段认法（池级 checker 拿树表单元所在的段当开放段）假定这一族不走回落，哪天走进回落，用例红、
+    /// 回来重看那一格（判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y3「开放段回落误排」那一行）。
+    commit_generated_placements_that_fell_back_to_the_lowest_free_slot: u64,
     /// 分配器眼里的根环（`RootRingOccupancy`）：挂载时装（`mount::rebuilt_allocator`），mkfs 同一个进程里由建分配器的一方装
     /// （`make_filesystem::root_ring_occupancy_after_make_filesystem`）。`None`：建分配器的一方没装（`new` 与 `rebuild_from_records`
-    /// 都不装），挂载内回收与轮转清隔离位都不做，与只在挂载和抬 F 时回收的样子相同。
+    /// 都不装）。没装的分配器不许记根：`record_root_written_by_this_process` 断言（C551，用户 2026-10-05 定），只做不发布的事：分配，
+    /// 以及调用方自己给根环每区槽数的准入读数 `admission::admission_reading_before_a_publish_on_a_ring_of`——
+    /// `admission::admission_reading_before_a_publish` 从这张表取每区槽数，没装就断言。
     root_ring: Option<RootRingOccupancy>,
     /// 落盘中途失败、冻结着等原样重发的那一次发布（`transaction::FrozenPublish`，D23（journal 的角色与格式） 已定项 14
     /// 「这一版的失败处置」）。住在分配器上是因为每一次发布都要交分配器进来：冻结着的时候发布路径在任何读写之前拒绝，
@@ -1232,6 +1634,7 @@ impl PoolAllocator {
             allocation_record_tree_of_the_version_without_file: None,
             reuse_window: ReuseWindow::GatedByTheRollbackFloor,
             placements_reclaimed_on_release_by_the_forced_zero_reuse_window: 0,
+            commit_generated_placements_that_fell_back_to_the_lowest_free_slot: 0,
             root_ring: None,
             frozen_publish: None,
             instance_rows_after_this_mounts_row_publish: 0,
@@ -1311,6 +1714,13 @@ impl PoolAllocator {
     #[must_use]
     pub fn placements_reclaimed_on_release_by_the_forced_zero_reuse_window(&self) -> u64 {
         self.placements_reclaimed_on_release_by_the_forced_zero_reuse_window
+    }
+
+    /// 这个分配器实例上提交内生块走回落（`CommitGeneratedDeviceAnswer::FallBackToLowestFreeSlot`）的次数：每取一个回落的落点加一。
+    /// 可写挂载交回的分配器（`mount::Mounted::allocator`）带着挂载里写行、暖机、抬 F 与续做那几次发布数下的；重开之后从 0 数起。
+    #[must_use]
+    pub fn commit_generated_placements_that_fell_back_to_the_lowest_free_slot(&self) -> u64 {
+        self.commit_generated_placements_that_fell_back_to_the_lowest_free_slot
     }
 
     /// 重开时从盘上那棵分配记录树重建分配器（D23（journal 的角色与格式） 已定项 14：defer 队列、分配器游标、记账的现行值从所选根那棵账重新载入）：
@@ -1643,6 +2053,7 @@ impl PoolAllocator {
                 // 回落之后没有段可 bump 了，但刚才那一段仍是聚簇段、仍装着这次提交的内生块：它留在 `cluster_segments` 里，
                 // 用户数据照旧不许落进去（D3（空间分配） 已定项 8 第 2 条；增补 2 第 20c 行）。
                 self.open_segment = None;
+                self.commit_generated_placements_that_fell_back_to_the_lowest_free_slot += 1;
                 let placement = Placement {
                     slot,
                     span: footprint.slots(),
@@ -1717,6 +2128,36 @@ impl PoolAllocator {
             .collect()
     }
 
+    /// 同 [`Self::reclaim_released_up_to`]，回收出来的槽里隔离还护着的（环里还在的被抛弃根引用的、还没解开的水位之上没施加的记录点名的，
+    /// [`RootRingOccupancy::placements_the_isolation_still_protects`]）当场补隔离，与 [`Self::record_root_written_by_this_process`] 里回收之后那一步
+    /// 同一件事：C 那一圈的落点挂载那一刻分配位置着的不隔离（[`DeviceFreeMap::isolate_the_slots_not_allocated`]，D28（挂载期承诺量） 已定项 1
+    /// 第九项），抬 F 那一串回收它们时在这里补上。没装根环表时没有要护的，只回收。
+    pub fn reclaim_released_up_to_isolating_what_the_isolation_still_protects(
+        &mut self,
+        floor: CheckpointTxg,
+        reuse: ReclaimedReuse,
+    ) -> Vec<Placement> {
+        let first_device = self.devices[0].device;
+        let reclaimed = self.reclaim_released_records_up_to(floor, reuse);
+        let still_protected_by_the_isolation = self
+            .root_ring
+            .as_ref()
+            .map(RootRingOccupancy::placements_the_isolation_still_protects)
+            .unwrap_or_default();
+        self.isolate_reclaimed_slots_the_isolation_still_protects(
+            &reclaimed,
+            &still_protected_by_the_isolation,
+        );
+        reclaimed
+            .into_iter()
+            .filter(|record| record.device == first_device)
+            .map(|record| Placement {
+                slot: record.slot,
+                span: u64::from(record.span_slots),
+            })
+            .collect()
+    }
+
     /// `reclaim_released_up_to` 的本体，交回这次回收的每一条记录（逐盘各一条）：挂载内回收要按盘判哪几个槽还被被抛弃的根引用着。
     fn reclaim_released_records_up_to(
         &mut self,
@@ -1760,7 +2201,24 @@ impl PoolAllocator {
         }
     }
 
-    /// 回退的影子账：把一个只被被抛弃根引用的落点在它那块盘上隔离。
+    /// 水位之上没施加的 journal 记录点名、不被现行账引用的落点（C694 的 C 那一圈）在它那块盘上隔离，只隔离分配位没置着的槽
+    /// （[`DeviceFreeMap::isolate_the_slots_not_allocated`]，D28（挂载期承诺量） 已定项 1 第九项「只除去现行账里仍分配着的槽」）。
+    pub fn isolate_the_slots_not_allocated_of_a_placement_named_by_unapplied_journal_records(
+        &mut self,
+        device: DeviceIdentity,
+        slot: SlotNumber,
+        span: u64,
+    ) {
+        let device_map = self
+            .devices
+            .iter_mut()
+            .find(|device_map| device_map.device == device)
+            .expect("C 那一圈的落点的盘在池里：盘上读来的那几份逐条经 recovery::placement_lies_in_the_unit_area_of_its_device 判过这块盘在池里，现行账里的记录在 recovery::allocation_records_fit_the_pool_geometry 比过");
+        device_map.isolate_the_slots_not_allocated(slot, span);
+    }
+
+    /// 回退的影子账：把一个只被被抛弃根引用的落点，或水位之上没施加的 journal 记录点名、不被候选根与现行账引用的落点（C694 的 C），
+    /// 在它那块盘上隔离。
     pub fn isolate_abandoned(&mut self, device: DeviceIdentity, slot: SlotNumber, span: u64) {
         let device_map = self
             .devices
@@ -1768,6 +2226,50 @@ impl PoolAllocator {
             .find(|device_map| device_map.device == device)
             .expect("被抛弃根的分配记录的盘在池里：盘上读来的记录在 recovery::allocation_records_fit_the_pool_geometry 逐条比过 PoolReader::device_identities");
         device_map.isolate(slot, span);
+    }
+
+    /// 同 [`Self::isolate_abandoned`]，只隔离落点里分配位没置着的槽（[`DeviceFreeMap::isolate_the_slots_not_allocated`]）：被抛弃根引用、
+    /// 现行账里已释放而还在 defer 窗口里的槽分配位置着，算在「已分配」里，D28（挂载期承诺量） 已定项 1 第九项不在这里再算一次
+    /// （第 10z 批第十四块实现员报告第七节第 2 条，与 C 那一圈同一个做法）。它们回收的那一刻由根环表照这条根记着的落点补隔离
+    /// （[`RootRingOccupancy::placements_the_isolation_still_protects`] 里被抛弃根那一份，挂载内记根与抬 F 那一串回收两条路都走它）。
+    /// 只给落点记在根环表里的被抛弃根用：可写挂载那一遍读出的（落点随后记进表里）、抬 F 那一串取表里记着的或借 C 那一圈的；
+    /// 抬 F 那一串读盘得来、表里没记着的那几条照旧 [`Self::isolate_abandoned`]（回收时没有一份补得上它们，`mount::isolate_slots_referenced_only_by_abandoned_roots`）。
+    pub fn isolate_the_slots_not_allocated_of_a_placement_referenced_by_an_abandoned_root(
+        &mut self,
+        device: DeviceIdentity,
+        slot: SlotNumber,
+        span: u64,
+    ) {
+        let device_map = self
+            .devices
+            .iter_mut()
+            .find(|device_map| device_map.device == device)
+            .expect("被抛弃根的分配记录的盘在池里：盘上读来的记录在 recovery::allocation_records_fit_the_pool_geometry 逐条比过 PoolReader::device_identities，根环表里记着的是同一份");
+        device_map.isolate_the_slots_not_allocated(slot, span);
+    }
+
+    /// `placements` 罩着的槽里这一刻隔离着的槽数，每块盘一个数、按分配器里盘的次序；同一个槽被几个落点罩着只数一次。
+    /// 只给会话报「被宽护卡住」时数 C 那一圈挡着几个槽读（`mounted_session`），分配与准入的判定不读它。
+    #[must_use]
+    pub fn isolated_slots_covered_by(
+        &self,
+        placements: &[PlacementOnDevice],
+    ) -> Vec<(DeviceIdentity, u64)> {
+        self.devices
+            .iter()
+            .map(|device_map| {
+                let isolated_covered: BTreeSet<u64> = placements
+                    .iter()
+                    .filter(|placement| placement.device == device_map.device)
+                    .flat_map(|placement| placement.slot.0..placement.slot.0 + placement.span)
+                    .filter(|slot| device_map.is_isolated(SlotNumber(*slot)))
+                    .collect();
+                (
+                    device_map.device,
+                    u64::try_from(isolated_covered.len()).expect("单元区槽数装得进 u64"),
+                )
+            })
+            .collect()
     }
 
     /// 装上根环表（`RootRingOccupancy`：挂载时从盘上读出来的，或 mkfs 刚写下的），替掉原来那一张。
@@ -1784,6 +2286,22 @@ impl PoolAllocator {
         if let Some(occupancy) = self.root_ring.as_mut() {
             occupancy.instance_table_judging_the_rereads = table;
         }
+    }
+
+    /// 记下可写挂载那一刻水位之上没施加的 journal 记录点名的落点（按记录的 txg 对应的根环槽归组，C694 的 C）：
+    /// 隔离位由调用方在同一次影子账里置好（`mount::isolate_slots_referenced_only_by_abandoned_roots`），这里只记着什么时候解开
+    /// （[`Self::record_root_written_by_this_process`] 写掉那一槽时）、回收出来的槽要不要补隔离。挂载装上根环表之后、第一次记根之前调一次。
+    ///
+    /// # Panics
+    /// 没装根环表：可写挂载在重建分配器那一步先装上根环表再调它（`mount::rebuilt_allocator`），不装就没有解开的时机。
+    pub fn note_placements_named_by_unapplied_journal_records(
+        &mut self,
+        named_by_ring_slot: BTreeMap<RootRingSlot, Vec<PlacementOnDevice>>,
+    ) {
+        self.root_ring
+            .as_mut()
+            .expect("记水位之上没施加的记录点名的落点之前装了根环表：mount::rebuilt_allocator 先装根环表再记它")
+            .placements_named_by_unapplied_journal_records = named_by_ring_slot;
     }
 
     /// 这会儿装着的根环；`None` 见 `root_ring` 字段的注释。
@@ -1804,14 +2322,20 @@ impl PoolAllocator {
     /// **调用时机是调用方的前置条件**：这次发布的落点全部取完、之后不再分配（带单元的发布在装记账行之前调，记账行因此已经按回收之后的数写；
     /// 零单元发布在根落盘之后调）；这次发布失败时调用方把分配器整个换回发布之前（`transaction::publish_version` 与
     /// `transaction::publish_instance_table_on_version_without_file` 都这么做），这张表随之退回，盘上那个槽照旧按旧内容算
-    /// （D16（发布语义） 已定项 1「写失败的槽按旧内容算」）。没装根环时什么都不做。
+    /// （D16（发布语义） 已定项 1「写失败的槽按旧内容算」）。
     ///
     /// # Panics
-    /// 这条根的 txg 不是上一条记到的加一：有一条根没经分配器写出去，这张表说的环已经不是盘上的环，再按它回收会把还被环里的根引用的槽发出去。
+    /// - 分配器没装根环表（`install_root_ring_occupancy`）：不装就一次不回收，转过根环之后已分配统计越积越多、I-3.1（已分配统计对得上）红
+    ///   （C551（`build_pool` 的分配器没有根环表），用户 2026-10-05 定：core 在这里断言，漏装的装置当场 panic，不再静默不回收）。
+    ///   出路是建分配器的一方装上根环表：mkfs 同一个进程里用 `make_filesystem::allocator_after_make_filesystem`，或
+    ///   `install_root_ring_occupancy(make_filesystem::root_ring_occupancy_after_make_filesystem(..))`；挂载建的分配器（`mount::rebuilt_allocator`）装着。
+    /// - 这条根的 txg 不是上一条记到的加一：有一条根没经分配器写出去，这张表说的环已经不是盘上的环，再按它回收会把还被环里的根引用的槽发出去。
     pub fn record_root_written_by_this_process(&mut self, checkpoint_txg: CheckpointTxg) {
-        let Some(occupancy) = self.root_ring.as_mut() else {
-            return;
-        };
+        let occupancy = self.root_ring.as_mut().expect(
+            "分配器没装根环表却记了一条根：写根的分配器都由建它的一方装上根环表（挂载在 mount::rebuilt_allocator 装，\
+             mkfs 同一个进程里用 make_filesystem::allocator_after_make_filesystem，或 install_root_ring_occupancy(\
+             make_filesystem::root_ring_occupancy_after_make_filesystem(..))）；没装就一次不回收，转过根环之后 I-3.1 红（C551）",
+        );
         let expected_txg = CheckpointTxg(occupancy.latest_recorded_txg.0 + 1);
         assert_eq!(
             checkpoint_txg, expected_txg,
@@ -1824,43 +2348,72 @@ impl PoolAllocator {
         let displaced = occupancy
             .occupants
             .insert(ring_slot, RootRingOccupant::ValidRoot { checkpoint_txg });
-        // 与挂载时同一个谓词（一处定义）：max(F_生效, 一圈窗口里最旧有效根)。
+        // 与挂载时同一个谓词（一处定义）：max(F_生效, 环里最旧有效根)（RGall）。
         let reclaim_floor = crate::mount::reclaim_floor(
             occupancy.effective_floor,
-            occupancy.oldest_valid_root_in_the_window(),
+            occupancy.oldest_valid_root_in_the_ring(),
         );
-        let still_referenced_by_abandoned_roots =
-            occupancy.placements_referenced_by_abandoned_roots();
+        // C694 的 C 只在这里解开（判决 `research/prompts/m3-c694-r2-main-verification.md` 第三节第 1 条 `ring`）：这个进程写掉那条记录的 txg
+        // 对应的根环槽，这次发布的落点已经取完（调用时机是调用方的前置条件，见上）。
+        let released_named_by_unapplied_journal_records = occupancy
+            .placements_named_by_unapplied_journal_records
+            .remove(&ring_slot)
+            .unwrap_or_default();
+        let still_protected_by_the_isolation = occupancy.placements_the_isolation_still_protects();
         match displaced {
-            Some(RootRingOccupant::AbandonedRoot {
-                referenced_placements,
-            }) => self.clear_isolation_no_abandoned_root_in_the_ring_backs(
+            Some(
+                RootRingOccupant::AbandonedRoot {
+                    referenced_placements,
+                    ..
+                }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root:
+                        RootReadOnOneRebuildPass::AbandonedRoot {
+                            referenced_placements,
+                        },
+                    ..
+                },
+            ) => self.clear_isolation_nothing_still_protected_backs(
                 &referenced_placements,
-                &still_referenced_by_abandoned_roots,
+                &still_protected_by_the_isolation,
             ),
             Some(
                 RootRingOccupant::ValidRoot { .. }
-                | RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
-                | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread { .. },
+                | RootRingOccupant::BadAtMount(_)
+                | RootRingOccupant::AllZeroAtMount { .. }
+                | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread { .. }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root: RootReadOnOneRebuildPass::ValidRoot { .. },
+                    ..
+                },
             )
             | None => {}
         }
+        self.clear_isolation_nothing_still_protected_backs(
+            &released_named_by_unapplied_journal_records,
+            &still_protected_by_the_isolation,
+        );
         let reclaimed =
             self.reclaim_released_records_up_to(reclaim_floor, ReclaimedReuse::Immediately);
-        self.isolate_reclaimed_slots_an_abandoned_root_still_references(
+        self.isolate_reclaimed_slots_the_isolation_still_protects(
             &reclaimed,
-            &still_referenced_by_abandoned_roots,
+            &still_protected_by_the_isolation,
         );
     }
 
-    /// 同 [`Self::record_root_written_by_this_process`]，记之前先照 E2 重读挂载那一刻读不出、记了这条根之后会是窗口里最小的那个槽
-    /// （D16（发布语义） 已定项 1，用户 2026-10-03 定：读得出且自证过就照读出来的根算——窗口里、按实例表有效的照它的 txg，别的当没有；
-    /// 仍读不出才按它能住的最大 txg 算）。`reread` 读盘、判自证与实例表（`mount::reread_of_a_root_ring_slot_unreadable_at_mount`）；
-    /// 这里只定重读哪一槽、按读到的改表。读不出的槽一个都不在窗口里最小的位置上时一个都不读。没装根环时只记根（什么都不做）。
-    pub fn record_root_written_by_this_process_rereading_slots_unreadable_at_mount(
+    /// 同 [`Self::record_root_written_by_this_process`]，记之前先照 E2 重读挂载那一刻读坏或读回全零、记了这条根之后会是环里最小的那个槽
+    /// （D16（发布语义） 已定项 1，用户 2026-10-03 定；用户 2026-10-04 定：读坏的槽钉在它可能住过的最旧 txg，重读读出有效根之前
+    /// 回收门槛不越过它——读得出且自证过就照读出来的根算，按实例表有效的照它的 txg（回收门槛取整个环，RGall，多旧都算），被抛弃的当没有；
+    /// 仍读不出、读得出而自证不过或读回全零照旧钉着：读回全零不算确认为空，用户 2026-10-05 定乙）。
+    /// `reread` 读盘、判全零、自证与实例表（`mount::reread_of_a_root_ring_slot_bad_at_mount`）；
+    /// 这里只定重读哪一槽、按读到的改表。钉着的槽一个都不在最小的位置上时一个都不读。
+    ///
+    /// # Panics
+    /// 同 [`Self::record_root_written_by_this_process`]：没装根环表、或这条根的 txg 不是上一条记到的加一。
+    pub fn record_root_written_by_this_process_rereading_slots_bad_at_mount(
         &mut self,
         checkpoint_txg: CheckpointTxg,
-        reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotUnreadableAtMount,
+        reread: &mut dyn FnMut(RootRingSlot) -> RereadOfARootRingSlotBadAtMount,
     ) {
         if let Some(occupancy) = self.root_ring.as_mut() {
             let ring_slot_of_this_root =
@@ -1874,39 +2427,51 @@ impl PoolAllocator {
                     RootRingOccupant::ValidRoot {
                         checkpoint_txg: txg_of_the_occupant,
                     }
-                    | RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                    | RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread {
                         checkpoint_txg: txg_of_the_occupant,
+                    }
+                    | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                        root:
+                            RootReadOnOneRebuildPass::ValidRoot {
+                                checkpoint_txg: txg_of_the_occupant,
+                            },
+                        ..
                     } => Some(*txg_of_the_occupant),
-                    RootRingOccupant::UnreadableAtMountInsideTheWindow { .. }
-                    | RootRingOccupant::AbandonedRoot { .. } => None,
+                    RootRingOccupant::BadAtMount(_)
+                    | RootRingOccupant::AllZeroAtMount { .. }
+                    | RootRingOccupant::AbandonedRoot { .. }
+                    | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                        root: RootReadOnOneRebuildPass::AbandonedRoot { .. },
+                        ..
+                    } => None,
                 })
                 .chain(std::iter::once(checkpoint_txg))
                 .collect();
-            let mut unreadable_at_mount = occupancy.ring_slots_unreadable_at_mount();
-            unreadable_at_mount.remove(&ring_slot_of_this_root);
-            let (_oldest, rereads) = oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+            let mut bad_at_mount =
+                occupancy.ring_slots_pinned_since_the_mount_at_the_oldest_txg_they_can_have_held();
+            bad_at_mount.remove(&ring_slot_of_this_root);
+            let (_oldest, rereads) = oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
                 &valid_root_txgs,
-                unreadable_at_mount,
-                checkpoint_txg,
-                occupancy.slots_per_region,
+                bad_at_mount,
                 reread,
             );
             for (ring_slot, reread_of_the_slot) in rereads {
                 match reread_of_the_slot {
-                    RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                    RereadOfARootRingSlotBadAtMount::ValidRoot {
                         checkpoint_txg: txg_read_on_the_reread,
                     } => {
                         occupancy.occupants.insert(
                             ring_slot,
-                            RootRingOccupant::ValidRootReadWhenTheSlotUnreadableAtMountWasReread {
+                            RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread {
                                 checkpoint_txg: txg_read_on_the_reread,
                             },
                         );
                     }
-                    RereadOfARootRingSlotUnreadableAtMount::NoValidRoot => {
+                    RereadOfARootRingSlotBadAtMount::AbandonedByTheInstanceTable => {
                         occupancy.occupants.remove(&ring_slot);
                     }
-                    RereadOfARootRingSlotUnreadableAtMount::StillUnreadable => {}
+                    RereadOfARootRingSlotBadAtMount::StillUnreadableOrNotSelfVerified
+                    | RereadOfARootRingSlotBadAtMount::AllZero => {}
                 }
             }
         }
@@ -1931,8 +2496,9 @@ impl PoolAllocator {
         }
     }
 
-    /// 一条被抛弃根离开根环：它引用的槽里，`still_referenced` 不罩着的清掉隔离位。
-    fn clear_isolation_no_abandoned_root_in_the_ring_backs(
+    /// 一条被抛弃根离开根环，或水位之上没施加的记录点名的一组落点解开：`left_the_ring` 罩的槽里，`still_referenced`
+    /// （环里还在的被抛弃根引用的、还没解开的记录点名的，[`RootRingOccupancy::placements_the_isolation_still_protects`]）不罩着的清掉隔离位。
+    fn clear_isolation_nothing_still_protected_backs(
         &mut self,
         left_the_ring: &[PlacementOnDevice],
         still_referenced: &[PlacementOnDevice],
@@ -1956,8 +2522,9 @@ impl PoolAllocator {
         }
     }
 
-    /// 挂载内回收出来的槽里，环里还在的被抛弃根引用着的补隔离（同一个槽隔离两次不重复计数，`DeviceFreeMap::isolate`）。
-    fn isolate_reclaimed_slots_an_abandoned_root_still_references(
+    /// 挂载内回收出来的槽里，环里还在的被抛弃根引用着的、还没解开的水位之上没施加的记录点名的补隔离
+    /// （同一个槽隔离两次不重复计数，`DeviceFreeMap::isolate`）。
+    fn isolate_reclaimed_slots_the_isolation_still_protects(
         &mut self,
         reclaimed: &[AllocationRecord],
         still_referenced: &[PlacementOnDevice],
@@ -2051,6 +2618,43 @@ mod tests {
         assert_eq!(map.unit_area_slots(), 211_968);
         assert_eq!(map.empty_segments(), 3312);
         assert_eq!(map.free_runs(), 1);
+    }
+
+    /// [`DeviceFreeMap::slots_counted_both_as_allocated_and_as_isolated`] 的阳性对照（判决 `research/prompts/m3-batch10z-no-code-r1-main-verification.md`
+    /// 第二节 K2 ②：harness 档用例里它全是比 0，它恒交 0 时那些用例照绿）。一块盘上分配三段（起点槽起两槽、第 4 槽起一槽、第 8 槽起两槽），
+    /// 再用不看分配位的整段 [`DeviceFreeMap::isolate`] 罩住第 0 到第 5 槽：第 0、1、4 槽同时置着分配位与隔离位，第 2、3、5 槽只置隔离位，
+    /// 第 8、9 槽只置分配位。访问器交 3，隔离数 6、已分配数 5 各自对得上。
+    #[test]
+    fn isolating_a_whole_span_over_allocated_slots_counts_each_overlapping_slot_both_as_allocated_and_as_isolated(
+    ) {
+        let device_bytes = (UNIT_AREA_START_SLOT + 385) * SLOT_BYTES;
+        let mut map = DeviceFreeMap::new(DeviceIdentity(0), device_bytes);
+        let first_slot = map.unit_area_start().slot();
+        let slot_at = |offset_in_slots: u64| SlotNumber(first_slot.0 + offset_in_slots);
+        map.mark_allocated(slot_at(0), 2);
+        map.mark_allocated(slot_at(4), 1);
+        map.mark_allocated(slot_at(8), 2);
+        assert_eq!(
+            map.slots_counted_both_as_allocated_and_as_isolated(),
+            0,
+            "隔离之前没有一个槽置着隔离位"
+        );
+        map.isolate(slot_at(0), 6);
+        assert_eq!(
+            map.slots_counted_both_as_allocated_and_as_isolated(),
+            3,
+            "整段隔离罩住的第 0、1、4 槽同时置着分配位与隔离位"
+        );
+        assert_eq!(
+            map.isolated_slots(),
+            3 + 3,
+            "隔离着的槽：同时置两位的 3 个加只置隔离位的第 2、3、5 槽"
+        );
+        assert_eq!(
+            map.allocated_slots(),
+            3 + 2,
+            "已分配的槽：同时置两位的 3 个加没被罩住的第 8、9 槽"
+        );
     }
 
     #[test]
@@ -2715,48 +3319,418 @@ mod tests {
         }
     }
 
-    /// E2 那一判的取法（D16（发布语义） 已定项 1，用户 2026-10-03 定）：12 槽的环（S = 4），锚 txg 23，窗口 txg > 11；txg 13–23 住着有效根，
-    /// 区域 0 槽 0 挂载那一刻读不出、按它能住的最大 txg 12 记着，是窗口里最小的那个 ⇒ 重读那一槽一次。
-    fn oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
-        reread_of_the_slot: RereadOfARootRingSlotUnreadableAtMount,
+    /// 抬 F 那一串取的被抛弃根落点按根认、不只按槽认（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，用户 2026-10-07 定）：
+    /// 24 槽的环里 txg 8 那一槽记着实例 2 的被抛弃根（读出那一遍记成 `AbandonedRoot`），txg 9 那一槽是两遍里只有一遍自证过、被抛弃的
+    /// 实例 2 的根。同一条根交回记着的落点；同一槽上 txg 差一整圈的根、或实例代号不同的根交 `None`；有效根那一槽交 `None`。
+    #[test]
+    fn placements_recorded_for_an_abandoned_root_answer_only_for_the_same_root_not_for_another_root_on_its_ring_slot(
+    ) {
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let ring_length = 3 * slots_per_region.count();
+        let recorded_on_txg_8 = vec![PlacementOnDevice {
+            device: DeviceIdentity(0),
+            slot: SlotNumber(50180),
+            span: 2,
+        }];
+        let recorded_on_txg_9 = vec![PlacementOnDevice {
+            device: DeviceIdentity(1),
+            slot: SlotNumber(50190),
+            span: 1,
+        }];
+        let root_on_txg_9 = RootRecord {
+            filesystem_identifier: [5u8; 16],
+            unmount_marker: crate::root_record::UnmountMarker::NotWrittenByTheUnmountSequence,
+            instance: InstanceGeneration(2),
+            checkpoint_txg: CheckpointTxg(9),
+            tree_table: crate::pointer::NodePointer::empty_root(),
+            tree_identifier_watermark: singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+            rollback_floor: CheckpointTxg(0),
+            instance_table: crate::pointer::NodePointer::empty_root(),
+            mapping_root: crate::pointer::NodePointer::empty_root(),
+            allocation_record_tree_root: crate::pointer::NodePointer::empty_root(),
+        };
+        let occupancy = RootRingOccupancy::read_from_the_ring(
+            slots_per_region,
+            vec![
+                (
+                    target_for_publish(CheckpointTxg(8), slots_per_region),
+                    RootRingOccupant::AbandonedRoot {
+                        instance: InstanceGeneration(2),
+                        checkpoint_txg: CheckpointTxg(8),
+                        referenced_placements: recorded_on_txg_8.clone(),
+                    },
+                ),
+                (
+                    target_for_publish(CheckpointTxg(9), slots_per_region),
+                    RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                        root: RootReadOnOneRebuildPass::AbandonedRoot {
+                            referenced_placements: recorded_on_txg_9.clone(),
+                        },
+                        root_record_self_verified_on_one_rebuild_pass: Box::new(root_on_txg_9),
+                    },
+                ),
+                (
+                    target_for_publish(CheckpointTxg(10), slots_per_region),
+                    RootRingOccupant::ValidRoot {
+                        checkpoint_txg: CheckpointTxg(10),
+                    },
+                ),
+            ],
+            CheckpointTxg(0),
+            CheckpointTxg(10),
+        );
+        assert_eq!(
+            occupancy.placements_recorded_for_the_abandoned_root(
+                InstanceGeneration(2),
+                CheckpointTxg(8)
+            ),
+            Some(recorded_on_txg_8),
+            "记成被抛弃根的那一条：交回挂载时记着的落点"
+        );
+        assert_eq!(
+            occupancy.placements_recorded_for_the_abandoned_root(
+                InstanceGeneration(2),
+                CheckpointTxg(9)
+            ),
+            Some(recorded_on_txg_9),
+            "两遍里只有一遍自证过、被抛弃的那一条：按那一遍读出的整条根记录认，交回记着的落点"
+        );
+        for (instance, checkpoint_txg) in [
+            (InstanceGeneration(2), CheckpointTxg(8 + ring_length)),
+            (InstanceGeneration(3), CheckpointTxg(8)),
+            (InstanceGeneration(2), CheckpointTxg(9 + ring_length)),
+            (InstanceGeneration(3), CheckpointTxg(9)),
+            (InstanceGeneration(2), CheckpointTxg(10)),
+        ] {
+            assert_eq!(
+                occupancy.placements_recorded_for_the_abandoned_root(instance, checkpoint_txg),
+                None,
+                "({instance:?}, {checkpoint_txg:?}) 不是那一槽记着的那条被抛弃根（同槽差一整圈、实例代号不同，或那一槽是有效根）：不交落点"
+            );
+        }
+    }
+
+    /// 实例 2、txg `checkpoint_txg` 的一条根记录（只有 (实例, txg) 有用，指针都是空的）：两遍里只有一遍自证过的槽记着的那整条根。
+    fn root_record_of_instance_2_at(checkpoint_txg: CheckpointTxg) -> RootRecord {
+        RootRecord {
+            filesystem_identifier: [5u8; 16],
+            unmount_marker: crate::root_record::UnmountMarker::NotWrittenByTheUnmountSequence,
+            instance: InstanceGeneration(2),
+            checkpoint_txg,
+            tree_table: crate::pointer::NodePointer::empty_root(),
+            tree_identifier_watermark: singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS,
+            rollback_floor: CheckpointTxg(0),
+            instance_table: crate::pointer::NodePointer::empty_root(),
+            mapping_root: crate::pointer::NodePointer::empty_root(),
+            allocation_record_tree_root: crate::pointer::NodePointer::empty_root(),
+        }
+    }
+
+    /// 24 槽的环：txg 11 那一槽挂载时读坏，12 读回全零，13 挂载时读坏、进程内重读读出有效根，14 两遍里只有一遍自证过、那一遍读出的是有效根
+    /// （实例 2），15 是有效根，16 是实例 2 的被抛弃根；C 那一圈在 11 到 16 每一槽都记着一个落点（槽号 50200 + txg）。
+    fn occupancy_with_every_kind_of_slot_from_txg_11_through_16_and_unapplied_records_on_each(
+    ) -> RootRingOccupancy {
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let ring_slot_of = |txg: u64| target_for_publish(CheckpointTxg(txg), slots_per_region);
+        let mut occupancy = RootRingOccupancy::read_from_the_ring(
+            slots_per_region,
+            vec![
+                (
+                    ring_slot_of(11),
+                    RootRingOccupant::BadAtMount(TxgsARingSlotBadAtMountCanHold::new(
+                        CheckpointTxg(11),
+                        CheckpointTxg(11),
+                    )),
+                ),
+                (
+                    ring_slot_of(12),
+                    RootRingOccupant::AllZeroAtMount {
+                        oldest_txg_it_can_have_held: CheckpointTxg(12),
+                    },
+                ),
+                (
+                    ring_slot_of(13),
+                    RootRingOccupant::ValidRootReadWhenTheSlotBadAtMountWasReread {
+                        checkpoint_txg: CheckpointTxg(13),
+                    },
+                ),
+                (
+                    ring_slot_of(14),
+                    RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                        root: RootReadOnOneRebuildPass::ValidRoot {
+                            checkpoint_txg: CheckpointTxg(14),
+                        },
+                        root_record_self_verified_on_one_rebuild_pass: Box::new(
+                            root_record_of_instance_2_at(CheckpointTxg(14)),
+                        ),
+                    },
+                ),
+                (
+                    ring_slot_of(15),
+                    RootRingOccupant::ValidRoot {
+                        checkpoint_txg: CheckpointTxg(15),
+                    },
+                ),
+                (
+                    ring_slot_of(16),
+                    RootRingOccupant::AbandonedRoot {
+                        instance: InstanceGeneration(2),
+                        checkpoint_txg: CheckpointTxg(16),
+                        referenced_placements: Vec::new(),
+                    },
+                ),
+            ],
+            CheckpointTxg(0),
+            CheckpointTxg(16),
+        );
+        occupancy.placements_named_by_unapplied_journal_records = (11..=16)
+            .map(|txg| {
+                (
+                    ring_slot_of(txg),
+                    vec![PlacementOnDevice {
+                        device: DeviceIdentity(0),
+                        slot: SlotNumber(50200 + txg),
+                        span: 1,
+                    }],
+                )
+            })
+            .collect();
+        occupancy
+    }
+
+    /// 抬 F 那一串取被抛弃根记着的落点（[`RootRingOccupancy::placements_recorded_for_the_abandoned_root`]）只认记成被抛弃根的槽：
+    /// 挂载时读坏、读回全零、读坏后进程内重读读出有效根、两遍里只有一遍自证过而那一遍是有效根这四类槽，这一遍读出一条被抛弃根时交 `None`
+    /// （照今天读盘），不交一串空落点——交空落点就是「这条根什么都不引用」，不隔离也不读盘，它的单元掉出影子账（正推 m5、m6、m8、m20）。
+    #[test]
+    fn placements_recorded_for_an_abandoned_root_answer_none_on_slots_recorded_bad_all_zero_or_valid_at_mount(
+    ) {
+        let occupancy =
+            occupancy_with_every_kind_of_slot_from_txg_11_through_16_and_unapplied_records_on_each(
+            );
+        for (txg, kind_of_slot) in [
+            (11, "挂载时读坏"),
+            (12, "挂载时读回全零"),
+            (13, "挂载时读坏、进程内重读读出有效根"),
+            (14, "两遍里只有一遍自证过、那一遍是有效根"),
+            (15, "有效根"),
+        ] {
+            assert_eq!(
+                occupancy.placements_recorded_for_the_abandoned_root(
+                    InstanceGeneration(2),
+                    CheckpointTxg(txg)
+                ),
+                None,
+                "txg {txg} 那一槽记的是「{kind_of_slot}」：没记着这条被抛弃根的落点，交 None 照今天读盘，不交空落点"
+            );
+        }
+    }
+
+    /// 根环表里没记着落点的被抛弃根借 C 那一圈记着的落点（用户 2026-10-08 定 H2）：认同条件不只按槽号——那一槽记的是有效根且 txg 相同
+    /// （两遍里只有一遍自证过的那一类还比实例代号）。同一条根交回 C 在那一槽记着的落点；同一槽上 txg 差一整圈的另一次发布、实例代号不同、
+    /// 那一槽记的是被抛弃根或挂载时读坏、读回全零的槽，交 `None`；C 在那一槽解开之后（这个进程写掉了那一槽）也交 `None`。
+    #[test]
+    fn placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot(
+    ) {
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let ring_length = 3 * slots_per_region.count();
+        let mut occupancy =
+            occupancy_with_every_kind_of_slot_from_txg_11_through_16_and_unapplied_records_on_each(
+            );
+        for txg in [13, 14, 15] {
+            assert_eq!(
+                occupancy.placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+                    InstanceGeneration(2),
+                    CheckpointTxg(txg)
+                ),
+                Some(vec![PlacementOnDevice {
+                    device: DeviceIdentity(0),
+                    slot: SlotNumber(50200 + txg),
+                    span: 1,
+                }]),
+                "txg {txg} 那一槽记的是同一条有效根：交回 C 在那一槽记着的落点"
+            );
+        }
+        for (instance, checkpoint_txg, why) in [
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(15 + ring_length),
+                "同一槽差一整圈的另一次发布",
+            ),
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(13 + ring_length),
+                "同一槽差一整圈的另一次发布（进程内重读读出的有效根那一槽）",
+            ),
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(14 + ring_length),
+                "同一槽差一整圈的另一次发布（两遍里只有一遍自证过那一槽）",
+            ),
+            (
+                InstanceGeneration(3),
+                CheckpointTxg(14),
+                "实例代号与那一遍读出的整条根记录不同",
+            ),
+            (InstanceGeneration(2), CheckpointTxg(11), "那一槽挂载时读坏"),
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(12),
+                "那一槽挂载时读回全零",
+            ),
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(16),
+                "那一槽记的是被抛弃根（它记着的落点归另一个方法）",
+            ),
+            (
+                InstanceGeneration(2),
+                CheckpointTxg(17),
+                "那一槽表里什么都没记",
+            ),
+        ] {
+            assert_eq!(
+                occupancy.placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+                    instance,
+                    checkpoint_txg
+                ),
+                None,
+                "({instance:?}, {checkpoint_txg:?})：{why}，不借 C 的落点"
+            );
+        }
+        occupancy
+            .placements_named_by_unapplied_journal_records
+            .remove(&target_for_publish(CheckpointTxg(15), slots_per_region));
+        assert_eq!(
+            occupancy.placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+                InstanceGeneration(2),
+                CheckpointTxg(15)
+            ),
+            None,
+            "C 在那一槽解开之后没有可借的落点：交 None，调用方照今天读盘"
+        );
+    }
+
+    /// C 那一圈在那一槽有条目、落点是空的（正推 `research/prompts/m3-batch10z-d-code-r1-sonnet-output.md` K1-2：较新可读根或没施加的发布的账
+    /// 读不出、记录不齐、映射也现算不成，而现行账里有 C694 的 B 那道凭据时，`mount::placements_of_an_unapplied_publish_whose_account_is_unreadable`
+    /// 交空串、照样记进 C 那一槽）：借到的是 `Some(空)`，不是 `None`。D16（发布语义） 已定项 1「根槽这一次读坏」那一行：C 那一圈在那一槽记着
+    /// 同一条根时「照 C 那一圈记着的落点算、不读账、读不出不拒」，「C 也没记着的照今天读盘」——条目在就是记着了，空串照空串算，
+    /// 与根环表里记着空串（挂载时凭据放行，攻方 M7）同一处置；凭据说的是那条根引用的单元已经没有要护的。
+    #[test]
+    fn placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_lend_an_empty_entry_as_some_empty(
+    ) {
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let mut occupancy =
+            occupancy_with_every_kind_of_slot_from_txg_11_through_16_and_unapplied_records_on_each(
+            );
+        occupancy
+            .placements_named_by_unapplied_journal_records
+            .insert(
+                target_for_publish(CheckpointTxg(15), slots_per_region),
+                Vec::new(),
+            );
+        assert_eq!(
+            occupancy.placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+                InstanceGeneration(2),
+                CheckpointTxg(15)
+            ),
+            Some(Vec::new()),
+            "那一槽记的是同一条有效根、C 在那一槽有条目而落点是空的：借到空串（照它算、不读账），不交 None（照今天读盘）"
+        );
+    }
+
+    /// 环上有洞留下的旧根压住进程内的回收门槛（D16（发布语义） 已定项 1「环里最旧有效根」，用户 2026-10-04 定 RGall）：24 槽的环里
+    /// txg 1 那一槽留着 txg 1 的根（txg 25、49 那两次的根槽都没落），其余 23 槽住着 txg 26–48；这个进程记到 txg 49（没有根的那一个）
+    /// 之后再记 txg 50，盖掉的是 txg 26。txg 1 离最新根已过两圈，仍是环里最旧的有效根：释放代 2 的落点不回收、仍在 defer 里。
+    /// 照一圈窗口取（锚 50，窗口 txg > 26）时 txg 1 被滤掉、门槛跳到 27，那两槽当场回收。
+    #[test]
+    fn root_ring_occupancy_keeps_the_reclaim_floor_at_the_oldest_valid_root_however_far_below_the_newest_it_is(
+    ) {
+        let mut pool = rebuilt_pool(records_on_both_devices(&[(50180, 2, 2, true)]));
+        let slots_per_region = RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM;
+        let ring_length = 3 * slots_per_region.count();
+        let occupants: Vec<(RootRingSlot, RootRingOccupant)> = std::iter::once(1)
+            .chain(ring_length + 2..=2 * ring_length)
+            .map(|txg| {
+                (
+                    target_for_publish(CheckpointTxg(txg), slots_per_region),
+                    RootRingOccupant::ValidRoot {
+                        checkpoint_txg: CheckpointTxg(txg),
+                    },
+                )
+            })
+            .collect();
+        assert_eq!(
+            occupants.len(),
+            usize::try_from(ring_length).expect("环长"),
+            "每个槽上一条根"
+        );
+        pool.install_root_ring_occupancy(RootRingOccupancy::read_from_the_ring(
+            slots_per_region,
+            occupants,
+            CheckpointTxg(0),
+            CheckpointTxg(2 * ring_length + 1),
+        ));
+        pool.record_root_written_by_this_process(CheckpointTxg(2 * ring_length + 2));
+        for device_map in &pool.devices {
+            assert!(
+                !device_map.is_free(SlotNumber(50180)) && !device_map.is_free(SlotNumber(50181)),
+                "盘 {:?}：txg 1 的根离最新根 txg {} 已过两圈，仍是环里最旧的有效根，释放代 2 的落点不回收",
+                device_map.device,
+                2 * ring_length + 2
+            );
+            assert_eq!(
+                device_map.deferred_slots(),
+                2,
+                "释放代 2 的那两槽仍在 defer 里"
+            );
+        }
+    }
+
+    /// E2 那一判的取法（D16（发布语义） 已定项 1，用户 2026-10-03 定；读坏的槽钉在它可能住过的最旧 txg，用户 2026-10-04 定）：
+    /// 12 槽的环（S = 4）；txg 13–23 住着有效根，区域 0 槽 0 挂载那一刻读坏、钉在它可能住过的最旧 txg 0（它能住的最大 txg 是 12），
+    /// 是环里最小的那个 ⇒ 重读那一槽一次。
+    fn oldest_in_the_ring_when_the_slot_bad_at_mount_rereads_as(
+        reread_of_the_slot: RereadOfARootRingSlotBadAtMount,
     ) -> (
         Option<CheckpointTxg>,
-        Vec<(RootRingSlot, RereadOfARootRingSlotUnreadableAtMount)>,
+        Vec<(RootRingSlot, RereadOfARootRingSlotBadAtMount)>,
     ) {
         let slots_per_region =
             RootRingSlotsPerRegion::from_system_configuration_field(4).expect("4 在区间里");
         let hidden_slot = RootRingSlot { region: 0, slot: 0 };
         assert_eq!(
-            target_for_publish(CheckpointTxg(12), slots_per_region),
-            hidden_slot
+            (
+                target_for_publish(CheckpointTxg(0), slots_per_region),
+                target_for_publish(CheckpointTxg(12), slots_per_region)
+            ),
+            (hidden_slot, hidden_slot)
         );
         let valid_root_txgs: Vec<CheckpointTxg> = (13..=23).map(CheckpointTxg).collect();
-        oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+        oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
             &valid_root_txgs,
-            BTreeMap::from([(hidden_slot, CheckpointTxg(12))]),
-            CheckpointTxg(23),
-            slots_per_region,
+            BTreeMap::from([(hidden_slot, CheckpointTxg(0))]),
             &mut |ring_slot| {
-                assert_eq!(ring_slot, hidden_slot, "只重读窗口里最小的那一槽");
+                assert_eq!(ring_slot, hidden_slot, "只重读环里最小的那一槽");
                 reread_of_the_slot
             },
         )
     }
 
-    /// 重读读出的是上一圈的 txg 0（窗口外）：照读出来的根算、那一槽不在窗口里，最旧有效根是 13。
+    /// 重读读出的是上一圈的 txg 0（离锚 23 已过一圈）：回收门槛取整个环（RGall），照读出来的根算，最旧有效根是 0。
     #[test]
-    fn the_slot_unreadable_at_mount_rereading_as_a_root_outside_the_window_leaves_the_window() {
+    fn the_slot_bad_at_mount_rereading_as_a_root_of_the_previous_revolution_counts_by_the_txg_read()
+    {
         assert_eq!(
-            oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
-                RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+            oldest_in_the_ring_when_the_slot_bad_at_mount_rereads_as(
+                RereadOfARootRingSlotBadAtMount::ValidRoot {
                     checkpoint_txg: CheckpointTxg(0),
                 }
             ),
             (
-                Some(CheckpointTxg(13)),
+                Some(CheckpointTxg(0)),
                 vec![(
                     RootRingSlot { region: 0, slot: 0 },
-                    RereadOfARootRingSlotUnreadableAtMount::ValidRoot {
+                    RereadOfARootRingSlotBadAtMount::ValidRoot {
                         checkpoint_txg: CheckpointTxg(0),
                     }
                 )]
@@ -2764,42 +3738,57 @@ mod tests {
         );
     }
 
-    /// 重读仍读不出：照旧按它能住的最大 txg 12 算。
+    /// 重读仍读不出：照旧钉在它可能住过的最旧 txg 0，不按它能住的最大 txg 12 算。
     #[test]
-    fn the_slot_unreadable_at_mount_still_unreadable_on_the_reread_counts_by_its_highest_txg() {
+    fn the_slot_bad_at_mount_still_unreadable_on_the_reread_stays_pinned_at_the_oldest_txg_it_can_have_held(
+    ) {
         assert_eq!(
-            oldest_in_the_window_when_the_slot_unreadable_at_mount_rereads_as(
-                RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+            oldest_in_the_ring_when_the_slot_bad_at_mount_rereads_as(
+                RereadOfARootRingSlotBadAtMount::StillUnreadableOrNotSelfVerified
             ),
             (
-                Some(CheckpointTxg(12)),
+                Some(CheckpointTxg(0)),
                 vec![(
                     RootRingSlot { region: 0, slot: 0 },
-                    RereadOfARootRingSlotUnreadableAtMount::StillUnreadable
+                    RereadOfARootRingSlotBadAtMount::StillUnreadableOrNotSelfVerified
                 )]
             )
         );
     }
 
-    /// 窗口里还有比那一槽能住的最大 txg 更旧的有效根：不重读（重读的口子被调到就断言失败）。
+    /// 重读读回全零：不算确认为空，照旧钉在它可能住过的最旧 txg 0（用户 2026-10-05 定乙；照「从没写过」拿掉时最旧有效根是 13）。
     #[test]
-    fn the_slot_unreadable_at_mount_is_not_reread_while_an_older_valid_root_is_in_the_window() {
-        let slots_per_region =
-            RootRingSlotsPerRegion::from_system_configuration_field(4).expect("4 在区间里");
-        // txg 12 与那一槽同槽，不在有效根里。
-        let valid_root_txgs: Vec<CheckpointTxg> = std::iter::once(11)
-            .chain(13..=22)
+    fn the_slot_bad_at_mount_reading_back_all_zero_on_the_reread_stays_pinned_at_the_oldest_txg_it_can_have_held(
+    ) {
+        assert_eq!(
+            oldest_in_the_ring_when_the_slot_bad_at_mount_rereads_as(
+                RereadOfARootRingSlotBadAtMount::AllZero
+            ),
+            (
+                Some(CheckpointTxg(0)),
+                vec![(
+                    RootRingSlot { region: 0, slot: 0 },
+                    RereadOfARootRingSlotBadAtMount::AllZero
+                )]
+            )
+        );
+    }
+
+    /// 环里还有比那一槽钉着的 txg 更旧的有效根：不重读（重读的口子被调到就断言失败）。
+    #[test]
+    fn the_slot_bad_at_mount_is_not_reread_while_an_older_valid_root_is_in_the_ring() {
+        // 区域 0 槽 1 可能住过的最旧 txg 是 3，环里还有 txg 2 的有效根。
+        let valid_root_txgs: Vec<CheckpointTxg> = std::iter::once(2)
+            .chain(4..=13)
             .map(CheckpointTxg)
             .collect();
         assert_eq!(
-            oldest_txg_in_the_window_rereading_slots_unreadable_at_mount(
+            oldest_txg_in_the_ring_rereading_slots_bad_at_mount(
                 &valid_root_txgs,
-                BTreeMap::from([(RootRingSlot { region: 0, slot: 0 }, CheckpointTxg(12))]),
-                CheckpointTxg(22),
-                slots_per_region,
-                &mut |ring_slot| panic!("窗口里 txg 11 比那一槽的 12 旧，不该重读 {ring_slot:?}"),
+                BTreeMap::from([(RootRingSlot { region: 0, slot: 1 }, CheckpointTxg(3))]),
+                &mut |ring_slot| panic!("环里 txg 2 比那一槽钉着的 3 旧，不该重读 {ring_slot:?}"),
             ),
-            (Some(CheckpointTxg(11)), Vec::new())
+            (Some(CheckpointTxg(2)), Vec::new())
         );
     }
 
@@ -2809,5 +3798,19 @@ mod tests {
     fn root_ring_occupancy_that_missed_the_root_panics_instead_of_reclaiming_by_the_guessed_ring() {
         let mut stopped = pool_whose_root_ring_holds_txg_0_through_23();
         stopped.record_root_written_by_this_process(CheckpointTxg(25));
+    }
+
+    /// 分配器没装根环表（只 `new` 加 mkfs 那两个单元，C551 那一形）而记了一条根：断言失败，不静默跳过回收
+    /// （用户 2026-10-05 定）。
+    #[test]
+    #[should_panic(expected = "分配器没装根环表却记了一条根")]
+    fn recording_a_root_on_an_allocator_without_a_root_ring_occupancy_panics_instead_of_never_reclaiming(
+    ) {
+        let mut without_a_root_ring = pool_after_mkfs();
+        assert!(
+            without_a_root_ring.root_ring_occupancy().is_none(),
+            "前提：new 不装根环表"
+        );
+        without_a_root_ring.record_root_written_by_this_process(CheckpointTxg(1));
     }
 }

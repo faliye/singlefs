@@ -3,6 +3,7 @@
 //! 翻载荷里一个字节报载荷 CRC 不对、翻头里一个字节报头校验和不对；整条流水线开着 GPU 核一遍 0 红、0 对不上。
 //! 要 `gpu` 与 `verdict-store` 两个特性（配置 `ENABLE_GPU=1` 的跑法才开）；开了 `gpu` 而本机一张 NVIDIA 独显适配器都没有时打一行
 //! `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，有卡而用不上（一张都没起来，或 PCI 上有卡而 Vulkan 枚举不出）判红（`gpu_unit_checks::gpu_test_start`）。
+//! 卡经这个进程的卡池取，知道要核几个单元之后按 `gpu_unit_checks::mebibytes_crc32c_of_ranges_needs` 借，等满了借不到报「本次未跑」。
 #![cfg(all(feature = "gpu", feature = "verdict-store"))]
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -13,15 +14,17 @@ use std::sync::Arc;
 
 use common::{build_pool, file_content, geometry};
 use singlefs_checker::crc32_castagnoli_table;
-use singlefs_checker_tier::crash::Layer0SegmentExpansion;
+use singlefs_checker_tier::crash::{layer0_plan_state_count, Layer0SegmentExpansion};
 use singlefs_checker_tier::crash_amplification::{
-    check_recorded_blocks, plan_crash_points, record_crash_points, CrashFlow, CrashPointSpan,
-    PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
+    check_recorded_blocks, checking_threads, plan_crash_points, record_crash_points, CrashFlow,
+    CrashPointSpan, PipelineJudgingCode, UnitChecksumsOn, WeightedShares,
 };
 use singlefs_checker_tier::crash_identity::CoverageReport;
-use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::{
+    gpu_card_pool_or_report_not_run, not_run_line, GpuCardLease, GpuCardPool,
+};
 use singlefs_checker_tier::gpu_unit_checks::{
-    check_unit_checksums_on_gpu, GpuCard, UnitChecksumVerdict,
+    check_unit_checksums_on_gpu, mebibytes_crc32c_of_ranges_needs, UnitChecksumVerdict,
 };
 use singlefs_checker_tier::layer0_progress::Layer0ToolchainIdentity;
 use singlefs_checker_tier::verdict_store::VerdictStore;
@@ -33,14 +36,27 @@ use singlefs_harness::segments::StepKind;
 
 const THIS_FILE: &str = "crates/singlefs-checker-tier/tests/gpu_unit_checks_agree_with_the_cpu_and_catch_a_flipped_byte.rs";
 
-/// 取空闲显存最大的那张卡；本机没有 NVIDIA 卡时打「本次未跑」那一行、交回 `None`，用例当场返回。
-fn one_usable_card_or_report_not_run(test_name: &str) -> Option<GpuCard> {
-    let card = first_usable_card_or_report_not_run(test_name)?;
+/// 在卡池里借一张卡，够 `checks_at_once` 批各核 `units_per_check` 个单元的两道校验和同时在卡上（每个单元两段字节）；
+/// 借到打一行借的是哪张卡，等满了借不到时借卡那一层打「本次未跑」那一行、这里交 `None`（用例当场返回）。
+fn lease_for_unit_checks_or_report_not_run(
+    cards: &'static GpuCardPool,
+    test_name: &str,
+    units_per_check: usize,
+    checks_at_once: u64,
+) -> Option<GpuCardLease> {
+    let lease = cards.lease_card_or_report_not_run(
+        test_name,
+        checks_at_once * mebibytes_crc32c_of_ranges_needs(2 * units_per_check),
+    )?;
+    let card = lease.card();
     println!(
-        "GPU_CARD name={:?} pci={} free_mebibytes={}",
-        card.name, card.pci_bus_identifier, card.free_memory_mebibytes
+        "GPU_CARD name={:?} pci={} free_mebibytes={} lent_mebibytes={}",
+        card.name,
+        card.pci_bus_identifier,
+        card.free_memory_mebibytes,
+        lease.mebibytes()
     );
-    Some(card)
+    Some(lease)
 }
 
 struct Recorded {
@@ -105,13 +121,18 @@ fn every_unit(recorded: &Recorded) -> Vec<Vec<u8>> {
 
 #[test]
 fn gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_unit_hold() {
-    let Some(card) = one_usable_card_or_report_not_run(
-        "gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_unit_hold",
-    ) else {
+    const TEST_NAME: &str =
+        "gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_unit_hold";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
         return;
     };
     let recorded = record("gpu-unit-checks-healthy");
     let units = every_unit(&recorded);
+    let Some(lease) = lease_for_unit_checks_or_report_not_run(cards, TEST_NAME, units.len(), 1)
+    else {
+        return;
+    };
+    let card = lease.card();
     assert!(
         units.len() >= 20,
         "新池新建文件至少写 20 个单元，实际 {}",
@@ -126,7 +147,7 @@ fn gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_
             "GPU 与 CPU 的 CRC-32C 逐个相同"
         );
     }
-    let verdicts = check_unit_checksums_on_gpu(&card, &borrowed);
+    let verdicts = check_unit_checksums_on_gpu(card, &borrowed);
     assert!(
         verdicts
             .iter()
@@ -138,19 +159,23 @@ fn gpu_crc32c_matches_the_cpu_on_every_unit_and_both_checksums_of_every_healthy_
 
 #[test]
 fn a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu() {
-    let Some(card) = one_usable_card_or_report_not_run(
-        "a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu",
-    ) else {
+    const TEST_NAME: &str =
+        "a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
         return;
     };
     let recorded = record("gpu-unit-checks-flipped");
     let mut units = every_unit(&recorded);
+    let Some(lease) = lease_for_unit_checks_or_report_not_run(cards, TEST_NAME, units.len(), 1)
+    else {
+        return;
+    };
     let last = units.len() - 1;
     let last_byte_of_first_unit = units[0].len() - 1;
     units[0][last_byte_of_first_unit] ^= 0x01;
     units[last][8] ^= 0x01;
     let borrowed: Vec<&[u8]> = units.iter().map(Vec::as_slice).collect();
-    let verdicts = check_unit_checksums_on_gpu(&card, &borrowed);
+    let verdicts = check_unit_checksums_on_gpu(lease.card(), &borrowed);
     assert_eq!(
         verdicts[0],
         UnitChecksumVerdict::PayloadCrcMismatch,
@@ -168,13 +193,25 @@ fn a_flipped_payload_byte_and_a_flipped_header_byte_are_each_caught_on_the_gpu()
 
 #[test]
 fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_healthy_flow() {
-    let Some(card) = one_usable_card_or_report_not_run(
-        "the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_healthy_flow",
-    ) else {
+    const TEST_NAME: &str =
+        "the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_healthy_flow";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
         return;
     };
-    let card = Arc::new(card);
     let recorded = record("gpu-pipeline");
+    // 流水线按核对线程并行判块，每条线程判一个状态时把这个状态里落了的单元写交卡核一批：一批最多是这条流的全部单元写
+    let unit_writes = recorded
+        .writes
+        .iter()
+        .filter(|write| write.kind == StepKind::UnitWrite)
+        .count();
+    let threads = u64::try_from(checking_threads()).expect("线程数装得进 u64");
+    let Some(lease) =
+        lease_for_unit_checks_or_report_not_run(cards, TEST_NAME, unit_writes, threads)
+    else {
+        return;
+    };
+    let card = Arc::new(lease.card().clone());
     let expansion = |_segment_index: usize, segment: &[usize]| {
         if segment.len() <= 6 {
             Layer0SegmentExpansion::EveryProperSubset
@@ -188,6 +225,7 @@ fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_h
         segments: &recorded.segments,
         judged_root_index: recorded.judged_root_index,
         versions: &recorded.versions,
+        versions_without_a_file: &[],
         expansion: &expansion,
         crash_points: vec![
             CrashPointSpan {
@@ -240,7 +278,21 @@ fn the_pipeline_with_gpu_unit_checks_reports_no_red_and_no_disagreement_on_the_h
     .expect("核得完");
     drop(store);
     std::fs::remove_dir_all(&directory).expect("删得掉库");
-    assert!(tally.states_checked > 0);
+    // 单元校验和对拍时卡上报了 Out of Memory（第 10z 批代码轮判决 K1-3 正推）：那一块与之后的没判，不判绿也不判红，报本次未跑
+    if let Some(reason) = &tally.stopped_because_the_gpu_memory_was_short {
+        println!("{}", not_run_line(TEST_NAME, reason));
+        return;
+    }
+    assert_eq!(
+        tally.states_checked,
+        layer0_plan_state_count(
+            &recorded.base,
+            &recorded.writes,
+            &recorded.segments,
+            &expansion
+        ),
+        "没报显存不够：这条流的每个状态都判了"
+    );
     assert_eq!(
         tally.gpu_cpu_disagreements, 0,
         "GPU 与 CPU 一处都不许对不上"

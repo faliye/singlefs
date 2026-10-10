@@ -17,9 +17,11 @@ pub const FORMAT_VERSION: u16 = 1;
 pub const UNIT_CLASS_DATA: u8 = 1;
 pub const UNIT_CLASS_INDEX_NODE: u8 = 2;
 pub const UNIT_CLASS_PACKED: u8 = 3;
-/// 打包记录类型（第二级登记表）：1 = 墓碑（D18（块里携带什么信息） 已定项 24），2 = inode 记录，4 = 实例表。
+/// 打包记录类型（第二级登记表）：1 = 墓碑（D18（块里携带什么信息） 已定项 24），2 = inode 记录，3 = 退役记录，4 = 实例表。
 pub const PACKED_TYPE_TOMBSTONE: u16 = 1;
 pub const PACKED_TYPE_INODE: u16 = 2;
+/// 退役记录（D18（块里携带什么信息） 已定项 11 登记的类型 3；记录宽 34，判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 2 条）。
+pub const PACKED_TYPE_RETIREMENT: u16 = 3;
 pub const PACKED_TYPE_INSTANCE_TABLE: u16 = 4;
 /// 谱系记录（D18（块里携带什么信息） 已定项 24 第 5 条：不复用登记过的类型 3）。
 pub const PACKED_TYPE_LINEAGE: u16 = 5;

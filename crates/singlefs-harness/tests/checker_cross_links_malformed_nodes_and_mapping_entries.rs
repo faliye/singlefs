@@ -70,7 +70,9 @@ fn violations(image: &MemoryPool) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -164,8 +166,10 @@ fn assert_the_rebuild_reproduces(unit_bytes: &[u8], header: &IndexNodeHeader) {
 
 /// 第一个文件版本的 extent 根兼叶里，把那条内联数据指针抄一份给下一个 inode 号：同一个根里两个 inode 的 extent 指向同一个数据单元。
 /// 改之前的 checker 在第二次遇到这个单元时直接跳过（整个走读共用一份「走过的单元」），五元组、出生身份、I-5.1 全不判，全绿。
+/// 抄出来的下一个 inode 号在 inode 树里没有记录，extent 树里却有数据单元、号也不在 `deleted_inodes` 里：照 I-4.7 的对象（取丙）
+/// 它处于删除中而没有账，I-4.7 跟着红；判红的恰好是 I-5.1 与 I-4.7 两条。
 #[test]
-fn two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_only_the_disjoint_ranges_invariant(
+fn two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_the_disjoint_ranges_and_the_deletion_accounting_invariants(
 ) {
     let pool = product_capacity_pool();
     let clean = pool.memory_pool();
@@ -218,13 +222,29 @@ fn two_inodes_whose_extents_name_one_data_unit_in_one_root_redden_only_the_disjo
     let red = violations(&image);
     assert_eq!(
         violated_names(&red),
-        ["I-5.1"],
-        "判红的该只有 I-5.1：{red:?}"
+        ["I-5.1", "I-4.7"],
+        "判红的该恰好是 I-5.1 与 I-4.7：{red:?}"
     );
+    let disjoint_ranges_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-5.1")
+        .expect("上一条断言钉了 I-5.1 判红")
+        .1;
     assert!(
-        red[0].1.contains("被同一版引用了两次"),
-        "说明要点出同一版里的第二次引用：{}",
-        red[0].1
+        disjoint_ranges_detail.contains("被同一版引用了两次"),
+        "说明要点出同一版里的第二次引用：{disjoint_ranges_detail}"
+    );
+    let inode_without_a_record = inode + 1;
+    let deletion_accounting_detail = &red
+        .iter()
+        .find(|(name, _)| *name == "I-4.7")
+        .expect("上一条断言钉了 I-4.7 判红")
+        .1;
+    assert!(
+        deletion_accounting_detail.contains(&format!(
+            "inode {inode_without_a_record} 处于删除中（inode 树里没有它的记录）"
+        )),
+        "I-4.7 的说明要点出没有记录的 inode {inode_without_a_record}：{deletion_accounting_detail}"
     );
 }
 
@@ -469,7 +489,9 @@ fn a_journal_record_whose_counter_is_zero_is_judged_without_a_panic() {
             detail.contains("计数器 0"),
             "I-8.6 的说明要点出是计数器 0 那一条：{detail}"
         ),
-        other_verdict @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other_verdict @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("计数器 0 那一条没有本实例内逻辑前一条，I-8.6 该判违例，实际 {other_verdict:?}")
         }
     }
@@ -588,7 +610,9 @@ fn a_device_reporting_an_end_before_the_unit_area_start_is_judged_without_a_pani
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert!(

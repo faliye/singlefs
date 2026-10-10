@@ -1,10 +1,10 @@
-//! 谱系树的叶容器（D18（块里携带什么信息） 已定项 24 第 5 条）：码 3 打包记录类型 5，一容器装 2039 条 16 字节谱系记录；
+//! 谱系树的叶容器（D18（块里携带什么信息） 已定项 24 第 5 条）：码 3 打包记录类型 5，一容器装 1359 条 24 字节谱系记录；
 //! 根恒为码 2，条目同墓碑树（`crate::container_tree`）。随现行那一版、只增不删；管理员回退那次发布追加一条
 //! （D23（journal 的角色与格式） 已定项 14）；容器号从 1 起，下一个号 = 树里最大号 + 1，零根时 1（规则同墓碑容器）。
 //!
 //! **根满长高**：根装满之后同样长一层（第 5 条「谱系树根满同样长高」），共用的那一半在 `crate::container_tree`。
 //! 只供测试的两个旋钮（一片装几条 [`LineageContainerCapacity`]、一个码 2 节点装几条 `ContainerTreeNodeEntries`）只住内存、不落盘，
-//! 「开下一片」与「长高」这两支按产品容量要 2039 次与 2039 × 135 次回退才走得到（`.claude/rules/fs-design.md` 五条硬要求第 2 条）。
+//! 「开下一片」与「长高」这两支按产品容量要 1359 次与 1359 × 135 次回退才走得到（`.claude/rules/fs-design.md` 五条硬要求第 2 条）。
 
 use singlefs_format::LINEAGE_CONTAINER_RECORDS;
 
@@ -41,12 +41,12 @@ impl LineageContainerIndexInTree {
 /// 一片谱系容器这一版装的东西：身份四段（出生树 = 谱系树、打包记录类型 5、容器号、容器出生代）与它的记录，按追加的先后。
 pub type LineageContainer = RecordContainer<LineageRecord>;
 
-/// 只供测试压小的每片谱系容器条数：至少 1、至多产品容量 2039；只住内存，不落盘（同墓碑容器的旋钮，D18（块里携带什么信息） 已定项 24 第 3 条）。
+/// 只供测试压小的每片谱系容器条数：至少 1、至多产品容量 1359；只住内存，不落盘（同墓碑容器的旋钮，D18（块里携带什么信息） 已定项 24 第 3 条）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LineageRecordsPerContainerCappedForTests(u64);
 
 impl LineageRecordsPerContainerCappedForTests {
-    /// 0 条或多于产品容量 2039 交回 `None`。
+    /// 0 条或多于产品容量 1359 交回 `None`。
     #[must_use]
     pub fn new(records: u64) -> Option<Self> {
         (1..=LINEAGE_CONTAINER_RECORDS)
@@ -60,7 +60,7 @@ impl LineageRecordsPerContainerCappedForTests {
     }
 }
 
-/// 一片谱系容器装满几条就关：产品路径按容器格式算（2039），只供测试的开关把它压小。
+/// 一片谱系容器装满几条就关：产品路径按容器格式算（1359），只供测试的开关把它压小。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum LineageContainerCapacity {
     FromTheContainerFormat,
@@ -113,7 +113,7 @@ pub fn append_lineage_record_to_the_open_container(
         checkpoint_txg,
         lineage_tree,
         PACKED_TYPE_LINEAGE,
-        usize::try_from(capacity.records_per_container()).expect("至多 2039 条"),
+        usize::try_from(capacity.records_per_container()).expect("至多 1359 条"),
         node_entries,
     )
 }
@@ -127,12 +127,13 @@ mod tests {
     const LINEAGE_TREE: TreeIdentifier = TreeIdentifier(TREE_IDENTIFIER_LINEAGE);
 
     /// 零根时第一条谱系记录开第一片容器：容器号 1、出生代 = 这次回退的 txg、打包记录类型 5、出生树 = 谱系树；
-    /// 第二次回退追加进同一片（一片装 2039 条），只重写它、身份不变。
+    /// 第二次回退追加进同一片（一片装 1359 条），只重写它、身份不变。
     #[test]
     fn the_first_lineage_record_opens_container_number_one_and_the_second_is_appended_to_it() {
         let first_record = LineageRecord {
             rollback_txg: CheckpointTxg(12),
             rollback_target_txg: CheckpointTxg(9),
+            inode_number_watermark_of_the_version_rolled_back_from: 4,
         };
         let first = append_lineage_record_to_the_open_container(
             &[],
@@ -163,6 +164,7 @@ mod tests {
         let second_record = LineageRecord {
             rollback_txg: CheckpointTxg(15),
             rollback_target_txg: CheckpointTxg(12),
+            inode_number_watermark_of_the_version_rolled_back_from: 4,
         };
         let second = append_lineage_record_to_the_open_container(
             &first.containers,
@@ -184,23 +186,31 @@ mod tests {
         assert_eq!(second.rewritten_containers, vec![0]);
     }
 
-    /// 谱系记录 16 字节：T_rb 在前、T_old 在后，小端；读回逐字段相等，长度不是 16 读不出。
+    /// 谱系记录 24 字节：T_rb、T_old、H_cur 依次各 8 字节，小端；读回逐字段相等，长度不是 24 读不出（短一字节、长一字节都不收）。
     #[test]
-    fn a_lineage_record_is_sixteen_bytes_rollback_txg_then_target_txg() {
+    fn a_lineage_record_is_twenty_four_bytes_rollback_txg_then_target_txg_then_the_watermark_rolled_back_from(
+    ) {
         let record = LineageRecord {
             rollback_txg: CheckpointTxg(0x0102),
             rollback_target_txg: CheckpointTxg(0x0304),
+            inode_number_watermark_of_the_version_rolled_back_from: 0x0506,
         };
         let bytes = record.to_bytes();
         assert_eq!(
             bytes,
             [
                 [0x02, 0x01, 0, 0, 0, 0, 0, 0],
-                [0x04, 0x03, 0, 0, 0, 0, 0, 0]
+                [0x04, 0x03, 0, 0, 0, 0, 0, 0],
+                [0x06, 0x05, 0, 0, 0, 0, 0, 0]
             ]
-            .concat()
+            .concat(),
+            "T_rb 0、T_old 8、H_cur 16，各 8 字节小端"
         );
         assert_eq!(LineageRecord::parse(&bytes), Some(record));
-        assert_eq!(LineageRecord::parse(&bytes[..15]), None);
+        assert_eq!(LineageRecord::parse(&bytes[..23]), None);
+        assert_eq!(
+            LineageRecord::parse(&[bytes.as_slice(), &[0]].concat()),
+            None
+        );
     }
 }

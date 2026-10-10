@@ -1,4 +1,4 @@
-//! 池级 checker 的输入与第一层判定：读盘的口子、每条不变量的三态、系统配置与根环（I-7 类）、指针与位置条目。
+//! 池级 checker 的输入与第一层判定：读盘的口子、每条不变量的四种判定、系统配置与根环（I-7 类）、指针与位置条目。
 //! 与实现只共享 `singlefs-format` 这一个常量模块（D13（验证路线） 已定项 5）：偏移在这里按字段表各写一份。
 
 use std::collections::BTreeMap;
@@ -11,8 +11,8 @@ use singlefs_format::{
 };
 
 use crate::{
-    check_root_slot, check_system_configuration_slot, read_six_byte_unsigned, read_u32, read_u64,
-    RootView, SystemConfigurationView,
+    check_root_slot, check_system_configuration_slot, read_six_byte_unsigned, read_u16, read_u32,
+    read_u64, RootView, SystemConfigurationView,
 };
 
 /// checker 读镜像的口子。它不依赖实现的块设备抽象：harness 的崩溃镜像、宿主上的盘镜像各自接一份。
@@ -33,6 +33,11 @@ pub enum InvariantVerdict {
     Holds,
     Violated(String),
     NotApplicable(&'static str),
+    /// 部分没判（用户 2026-10-04 定，第四种判定）：判到的那一部分都对得上，射程里另有一部分这张镜像上判不了，说明逐条列出没判到的
+    /// 是什么（例如 I-9.28 那几条根：盘号、txg、为什么没判）。**它不是红，也不是成立**：计红、计违例的地方算不红（层 0 与崩溃放量
+    /// 把它算成不红），计「成立」的地方不算成立。今天 I-9.28 报它（树表读不出、条目比字段表短的根），I-5.5 报它（某一版树表读不出、
+    /// 条目窄、extent 树或分配记录树读不全、种类 1 / 3 条数不对，`research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y3）。
+    PartiallyJudged(String),
 }
 
 /// 「中央映射条目的 key 与它指的单元头相符」那一条（用户 2026-09-27 定新立，实审 B2），
@@ -73,7 +78,38 @@ pub const SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY: &str = 
 ///
 /// 第 67、68 条（下标 66、67）是 C673（三 oracle 合谋测试的补 oracle 改法没做） ⑤ ⑥ 那两条：I-9.27（树表条目的头 ID 取值）与
 /// I-5.5（从 mkfs 水位建树那一版的 t1 落点），同样只往末尾追加；GPU 判器内核两条都判。
-pub const IMPLEMENTED_INVARIANTS: [&str; 68] = [
+///
+/// 第 69 条（下标 68）是 I-9.28（全部可读根里同一树 ID 的诞生 txg 相同，用户 2026-10-04 定新立，里程碑三第 9 批），同样只往末尾追加；
+/// GPU 判器内核还没判它（`crash_judge_gpu` 那一侧要补，归 GPU 那一簇）。
+///
+/// 第 70–74 条（下标 69–73）是里程碑三·3 删除线那五条（判决 `research/prompts/m3-delete-checker-r1-main-verification.md` 第二节，
+/// 用户 2026-10-05 定 I-4.4、I-4.6 取乙）：I-9.5、I-3.4、I-4.7、I-4.6、I-4.4，同样只往末尾追加；GPU 判器的扫描内核判前四条
+/// （下标 69–72，删除态扫描，第 18 批 P2），下标 73 的 I-4.4 第一版恒报不适用、内核不置位（`crash_judge_gpu` 的覆盖表）。
+///
+/// 第 75–83 条（下标 74–82）是里程碑三·3 墓碑与谱系那九条（判决 `research/prompts/m3-delete-checker-r2-main-verification.md` 第二节与
+/// 第四节用户定案，次序照第二节 T13 那一格）：I-9.17、I-9.18、I-9.19、I-9.20、I-9.21、I-9.22、I-9.23、I-9.24、I-9.29，同样只往末尾追加。
+/// I-9.17、I-9.23 在主走读里判（墓碑树、谱系树的内部条目），其余在删除态扫描里每一版各判（I-9.29 跨版本比）；
+/// I-9.21、I-9.22 的旋钮值从镜像外给（`walk::check_pool_image_given_the_tombstone_container_capacity_knob`）。
+/// GPU 判器的内核这一批不置这九位（`crash_judge_gpu` 的覆盖表照登记，内核第 23 批补）。
+///
+/// 第 84 条（下标 83）是 I-3.14（实例表每片记录形态合法，用户 2026-10-06 定另立，根环线第 10j 批），同样只往末尾追加；
+/// 主走读沿实例表链每一片判（`walk` 的 `judge_instance_table_page_record_forms` 与链指针记录那一格）。
+/// 不成立的那一片解不开：行不收、链不往下走（第 10k 批）。GPU 判器的走读内核同判（`crash_judge_gpu` 的覆盖表补了下标 83，第 10k 批）。
+///
+/// 第 85 条（下标 84）是 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上，W3 的 C2aL 形态，第 49 批），同样只往末尾追加；
+/// 在最新的根上判（`walk` 的 `judge_inode_number_watermark_steps_of_the_newest_root`，挨着 I-9.6）。GPU 判器的扫描内核同判（`crash_judge_gpu` 的覆盖表补了下标 84）。
+///
+/// 第 86–90 条（下标 85–89）是退役树那五条（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 8 条，正推
+/// `research/prompts/m3-retire-r1-sonnet-output.md` K5.1，第 50 批）：I-9.31、I-9.32、I-9.33、I-9.34、I-9.35，同样只往末尾追加。
+/// I-9.31 在主走读里判（退役树的内部条目，与 I-9.17、I-9.23 同一个走法），其余在墓碑与谱系那一遍里每一版各判（I-9.35 跨相邻两版比）。
+/// GPU 判器同判 I-9.31，其余四条在有退役记录的状态上判不了（`crash_judge_gpu` 的覆盖表与它的文档）。
+///
+/// 第 91、92 条（下标 90、91）是谱系树与退役树的容器容量那两条（判决 `research/prompts/m3-batch50-code-r1-main-verification.md` 第三节 F2，
+/// 第 53 批，与 I-9.21、I-9.22 同形）：I-9.36、I-9.37，同样只往末尾追加。在墓碑与谱系那一遍里每一版各判；I-9.37 的旋钮值从镜像外给
+/// （`walk::check_pool_image_given_the_container_capacity_knobs`）。GPU 判器的扫描内核同判 I-9.36；第 56 批 G6 起旋钮值经扫描内核源码前面的常量
+/// 传进 GPU（`crash_judge_gpu` 的 `JudgeKernelSources::of_the_judge_given_the_container_capacity_knobs`），装了旋钮的那一棵 GPU 同判 I-9.37
+/// （墓碑旋钮同判 I-9.22）；层 0 与放量走产品那一份（三棵都没装），I-9.22、I-9.37 在那里照旧不置位。
+pub const IMPLEMENTED_INVARIANTS: [&str; 92] = [
     "I-1.1",
     "I-1.2",
     "I-1.3",
@@ -142,6 +178,30 @@ pub const IMPLEMENTED_INVARIANTS: [&str; 68] = [
     REFERENCE_INTERVALS_ARE_EXACT,
     HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES,
     FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK,
+    TREE_IDENTIFIER_BIRTH_TXG_AGREES_ACROSS_EVERY_READABLE_ROOT,
+    DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES,
+    PENDING_DELETION_OCCUPANCY_STATISTIC_IS_ZERO,
+    INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT,
+    DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE,
+    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+    LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
+    TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
+    TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
+    NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
+    TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY,
+    ONE_OBJECT_BIRTH_PER_INODE_NUMBER,
+    INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED,
+    INODE_NUMBER_WATERMARK_STEPS_AGREE_WITH_THE_WATERMARK_THE_RECORDS_AND_THE_LINEAGE,
+    RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
+    RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
+    RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
+    RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSION,
+    NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
 ];
 
 /// I-1.12：走读跟随的一条指针，偏移 34 的出生树等于被指单元头里的出生树——码 1、码 3 取头偏移 43；码 2 取哪个字段随 C289 定，
@@ -171,7 +231,7 @@ pub const JOURNAL_RECORD_TXG_NOT_DECREASING_WITHIN_AN_INSTANCE: &str = "I-8.12";
 /// I-7.15：各盘所选的系统配置槽里的设备数相同（形态抄 I-1.4 的 fsid 那一判）。
 pub const DEVICE_COUNTS_OF_THE_CHOSEN_SYSTEM_CONFIGURATIONS_AGREE: &str = "I-7.15";
 /// I-4.1：所选根（重放之后那一版）指向的树全可遍历；checker 自己按 D23（journal 的角色与格式） 已定项 14 的规则只读重放（`walk` 的
-/// `version_the_next_mount_applies`），一条记录都不施加时报不适用，前缀停在点名单元验证不过（起点含介质损坏）时报不适用。
+/// `replay_the_next_mount_would_do`），一条记录都不施加、锚点认不定、所选根 txg 没有后继、前缀停在点名单元验证不过（起点含介质损坏）时报不适用。
 pub const TREES_OF_THE_REPLAYED_VERSION_ARE_TRAVERSABLE: &str = "I-4.1";
 /// I-8.1：自证过的系统配置槽里在飞上限 = ⌊环长 ÷ 4096 ÷ F⌋、最坏占用 = 在飞上限 × 4096、F = 格式常量 `JOURNAL_SAFETY_FACTOR`
 /// （三格任一不等，整池不作保，同 I-7.13）；同一块盘环里同 (实例代号, checkpoint_txg) 的记录不多于在飞上限条。
@@ -192,8 +252,93 @@ pub const REFERENCE_INTERVALS_ARE_EXACT: &str = "I-3.5";
 /// 不拿字面 65537 比（D8（核心索引结构） 已定项 8「头 ID 8 字节的取值」句末的关系判据，判决 `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K1）。
 pub const HEAD_IDENTIFIERS_OF_THE_TREE_TABLE_ENTRIES: &str = "I-9.27";
 /// I-5.5：从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条诞生 txg 都等于这一版的 `checkpoint_txg`）引用的数据单元里，
-/// 每块盘上落点槽号最小的那一个等于单元区起始槽号 U + 4（D3（空间分配） 已定项 8 射程，判决 `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K2）。
+/// 每块盘上落点槽号最小的那一个等于这一版分配记录照 D3（空间分配） 已定项 8 第 1 条那条政策算出的那一对的起点槽号（起点最小、32768 对齐、
+/// 两槽都空、不在开放段里；新池新建文件那一次是单元区起始槽号 U + 4，回收之后不再是）（D3（空间分配） 已定项 8 射程，判决
+/// `research/prompts/c673-clauses-r1-main-verification.md` 第二节 K2；按分配记录现算：判决 `research/prompts/m3-formal-code-b17-r1-main-verification.md` 第二节 K2）。
 pub const FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK: &str = "I-5.5";
+/// I-9.28：根环里全部读得出且自证合法的根（不按实例表判有效与否，含被崩溃恢复抛弃的旧线上的根），任两条根各自的树表里同一树 ID
+/// （条目偏移 0）的条目，诞生 txg 相同。与 I-9.14 的分工：I-9.14 只比同一条时间线上的根，这一条不分时间线（树 ID 被重发时
+/// 新线与老线上同一个 ID 的树诞生 txg 不同，C342（树 ID 水位在根读不出时退回去重发））。
+pub const TREE_IDENTIFIER_BIRTH_TXG_AGREES_ACROSS_EVERY_READABLE_ROOT: &str = "I-9.28";
+/// I-9.5（删除队列里的号仍在树里），两个方向：① `deleted_inodes` 里的每个号在同一版的 inode 树里有记录且 nlink = 0；
+/// ② inode 树里 nlink = 0 的每条记录，号都在同一版的 `deleted_inodes` 里（队列 = inode 树里 nlink = 0 的号集合，
+/// D8（核心索引结构） 已定项 16 第 3 条；C708）。判法（判哪几版、经头 ID 配对、读不全报射程里判不了）是下面四条的共用判法。
+pub const DELETION_QUEUE_AND_THE_NLINK_ZERO_RECORDS_NAME_THE_SAME_INODES: &str = "I-9.5";
+/// I-3.4（可用空间扣待删占用） 只落「记账标签 4 恒 0」那一句：判的每一版里走全了的记账树都有 (4, 0, 0xFFFF_FFFF) 那一行、值为 0，缺行判红
+/// （判决 `research/prompts/m3-delete-checker-r1-main-verification.md` 第二节 F5 三格）。
+pub const PENDING_DELETION_OCCUPANCY_STATISTIC_IS_ZERO: &str = "I-3.4";
+/// I-4.7（删除中 inode 有账），对象取丙：inode 树里 nlink = 0 的记录的号，与 extent 树里有数据单元、而 inode 树里没有 nlink ≥ 1 记录的号；
+/// 这些号要么在 `deleted_inodes` 里，要么一个数据单元都不剩（同一判决第二节 F1）。
+pub const INODE_BEING_DELETED_IS_QUEUED_OR_HAS_NO_DATA_UNIT_LEFT: &str = "I-4.7";
+/// I-4.6（中间态其余不变量成立） 取乙：每条 nlink = 0 的记录，extent 树里它的数据单元数与 size 对得上——size 为 0 时 0 或 1 个，
+/// size > 0 时 ⌈size ÷ 数据单元净荷容量⌉（用户 2026-10-05 定，岔路单 `research/prompts/m3-delete-checker-r1-forks.md`）。
+pub const DATA_UNIT_COUNT_OF_AN_INODE_BEING_DELETED_MATCHES_ITS_SIZE: &str = "I-4.6";
+/// I-4.4（意图只描述目标态）：第一版报不适用（用户 2026-10-05 定，岔路单同上），理由见 [`INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION`]。
+pub const INTENT_DESCRIBES_ONLY_THE_TARGET_STATE: &str = "I-4.4";
+/// I-4.4 在第一版报不适用的理由，照 `.claude/kb/invariants.md` I-4.4 那一行的状态列。
+pub const INTENT_IS_NOT_APPLICABLE_IN_THE_FIRST_VERSION: &str = "第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现";
+/// I-9.17（谱系树条目身份与子头相符）：谱系树每条内部条目的类型段 ∈ {0, 5}；0 ⇒ 子单元是码 2、身份引用三段为 0；5 ⇒ 子容器头四段与身份引用逐字相等、
+/// 子指针头部出生树相等、子容器打包记录类型 5。身份不符单独判红，不记走读失败（判决第二节 T7 取 a）。
+pub const LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER: &str = "I-9.17";
+/// I-9.18（删除队列里的号有谱系上的墓碑）：每一版 `deleted_inodes` 里的号 N，这一版墓碑树里有 (N, N 的记录的对象出生代, 整对象) 且死亡 txg
+/// 在这一版的父链上（每版从自己的 txg 与自己树表里的谱系树起算，判决第二节 T3 取 a）；N 在 inode 树里没有记录的那一形报射程里判不了。
+pub const QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE: &str = "I-9.18";
+/// I-9.19（谱系上的墓碑不指活对象）：每一版墓碑树里在谱系上的墓碑，这一版 inode 树里有号与对象出生代都相同的记录时，那条记录 nlink = 0。
+pub const TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT: &str = "I-9.19";
+/// I-9.20（谱系上的墓碑不重号且记录合法）：在谱系上的墓碑按 (号, 对象出生代) 不重复；全部墓碑每条整对象 [0, 2⁶⁴ − 1]、
+/// 对象出生代 ≤ 死亡 txg ≤ 这一版的 txg；每片墓碑容器记录数 ≤ 815（判决第二节 T14 与第四节用户定案「补」）。
+pub const TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED: &str =
+    "I-9.20";
+/// I-9.21（产品镜像里非最右墓碑容器装满）：没装只供测试的容量旋钮时，每一版墓碑树里沿叶序第一片容器号是 1、相邻两片容器号加一、
+/// 每片（含最右那片）至少一条（第 56 批 G2）、最右那片之外每片记录数 == 815；零根或只一片容器没有对象。
+pub const NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE: &str = "I-9.21";
+/// I-9.22（测试镜像里墓碑容器不超旋钮值）：装了旋钮（新入口给了旋钮值）时，每一版墓碑树里沿叶序第一片容器号是 1、相邻两片容器号加一、
+/// 每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值；零根没有对象。
+pub const TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE: &str = "I-9.22";
+/// I-9.23（墓碑树条目身份与子头相符）：与 I-9.17 同形，类型段 ∈ {0, 1}、子容器打包记录类型 1。
+pub const TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER: &str = "I-9.23";
+/// I-9.24（删除队列至多一条 key）：每一版树表里每一条 `deleted_inodes` 条目都判，不管头 ID 配不配得上；空队列的一版报成立（判决第二节 T8 取 a）。
+pub const DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY: &str = "I-9.24";
+/// I-9.29（同号只许一个出生代）：回退候选集里各版的 inode 记录与各版自己谱系上的墓碑合起来，同一棵 inode 树里同一个号只许一个对象出生代
+/// （判决第二节 T10 乙、第四节 T15「写」：D8（核心索引结构） 已定项 6「同一条时间线上 inode 号不复用」）。
+pub const ONE_OBJECT_BIRTH_PER_INODE_NUMBER: &str = "I-9.29";
+/// I-3.14（实例表每片记录形态合法，用户 2026-10-06 定另立）：走读到的实例表每一片里，每条记录的 `kind` 只有 0（行）或 1（链指针记录）；
+/// 链指针记录恰好是这一片的最后一条（合法：有无下一片 0 或 1、无下一片时位置指针全零、有下一片时不全零且位置指针头部 MAC / nonce、算法类型、压缩算法码与压后长度、extent 偏移都是第一版的取值），片中间不出现；
+/// `kind` 0 行的 flags 字节为 0（D18（块里携带什么信息） 已定项 11：flags「第一版恒 0、非 0 拒收」）。行唯一与低于挂载根归 I-3.8。
+/// 不成立的一片解不开（用户 2026-10-06 给 D18 已定项 11 补「kind 不是 0 或 1 ⇒ 这一片解不开（表不可读）」）：主走读与只读不判的读法都不收它的行。
+pub const INSTANCE_TABLE_PAGE_RECORDS_ARE_WELL_FORMED: &str = "I-3.14";
+/// I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上，拟定编号；W3 的 C2aL 形态，D5（快照 / 空间记账机制） 已定项 2 射程、
+/// D18（块里携带什么信息） 已定项 24 第 5 条）：最新根记账里 inode 号水位那一统计量的台阶行 (g, H)——①水位不小于每一级的 H；
+/// ② 最新根 inode 树里的记录与谱系上的墓碑 (号 n, 对象出生代 b) 没有一级 H > n 且 b > g；④ 每条谱系记录上，代段 ≤ T_rb − 1 的台阶里最大的 H
+/// 等于记录带的 H_cur，H_cur 为 0 也判红（正推草案 `research/prompts/m3-w3-r1-sonnet-output.md` 3.1 节，加第二轮攻方 C2aL 最强形的那一判）。
+pub const INODE_NUMBER_WATERMARK_STEPS_AGREE_WITH_THE_WATERMARK_THE_RECORDS_AND_THE_LINEAGE: &str =
+    "I-9.30";
+
+/// I-9.31（退役树条目身份与子头相符）：与 I-9.17 同形，类型段 ∈ {0, 3}、子容器打包记录类型 3（判决
+/// `research/prompts/m3-retire-r1-main-verification.md` 第三节第 8 条，逐字照 I-9.17、I-9.23）。
+pub const RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER: &str = "I-9.31";
+/// I-9.32（退役记录合法）：退役树里每条记录（不论在不在谱系上）被退役身份的打包记录类型 == 2、出生树 ≠ 0，容器出生代 < 死亡 txg ≤ 这一版的 txg；
+/// 每片退役容器的记录数 ≤ 959（正推 K5.1；记录宽 34 由 I-1.7 判）。
+pub const EVERY_RETIREMENT_RECORD_IS_WELL_FORMED: &str = "I-9.32";
+/// I-9.33（谱系上的退役记录按身份不重复）：死亡 txg 落在这一版父链上的退役记录，按（出生树、打包记录类型、容器号、容器出生代）不重复；
+/// 只判在谱系上的（不滤谱系会在「删 → 回退 → 再删」的合法历史上误报，判决第二节 K5 那一行两次抽样坐实）。
+pub const RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT: &str = "I-9.33";
+/// I-9.34（谱系上的退役记录不指本版活叶）：在谱系上的退役记录指认的身份，不出现在同一版、头 ID 配得上的那棵 inode 树的叶容器身份集合里
+/// （读内部条目的身份引用，不开叶）。
+pub const RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF: &str = "I-9.34";
+/// I-9.35（退役完备）：相邻两版（这一版的 txg 恰是这一版谱系树里某条记录的 T_rb 时父版是那条记录的 T_old，否则父版是 txg − 1；父版在回退候选集里
+/// 读得出才判）：父版叶身份集 − 本版叶身份集 = 本版谱系上、死亡 txg == 本版 txg 的退役记录的身份集，两个方向各报。最新根的实例表读不出、
+/// 滤不掉被崩溃恢复抛弃的根时报部分没判（照 I-9.29 的门）。被攻过零轮（判决第四节）。
+pub const RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSION: &str = "I-9.35";
+/// I-9.36（产品镜像里非最右谱系与退役容器装满，与 I-9.21 同形）：那一棵没装只供测试的容量旋钮时，每一版谱系树与退役树里沿叶序第一片容器号是 1、
+/// 相邻两片容器号加一、每片（含最右那片）至少一条（第 56 批 G2）、最右那片之外每片记录数 == 产品容量（谱系 1359、退役 959；开放容器满了才关，
+/// D18（块里携带什么信息） 已定项 24）；零根或只一片容器没有对象。
+pub const NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE: &str =
+    "I-9.36";
+/// I-9.37（测试镜像里谱系与退役容器不超旋钮值，与 I-9.22 同形）：那一棵装了旋钮（新入口给了旋钮值）时，每一版那棵树里沿叶序第一片容器号是 1、
+/// 相邻两片容器号加一、每片至少一条（第 56 批 G2）、每片记录数 ≤ 旋钮值；零根没有对象。
+pub const LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE: &str =
+    "I-9.37";
 
 /// 判定累加器：每条不变量记评估了几次、第一处违例、整条不适用的理由，以及射程里有一部分判不了的理由。
 #[derive(Default)]
@@ -203,6 +348,7 @@ pub struct Judgements {
     first_violation: BTreeMap<&'static str, String>,
     not_applicable: BTreeMap<&'static str, &'static str>,
     part_of_the_range_not_judged: BTreeMap<&'static str, &'static str>,
+    partially_judged: BTreeMap<&'static str, String>,
 }
 
 impl Judgements {
@@ -243,6 +389,15 @@ impl Judgements {
             .entry(invariant)
             .or_insert(reason);
     }
+    /// 这条不变量射程里有一部分在这个镜像上判不了、要报「部分没判」（[`InvariantVerdict::PartiallyJudged`]）：`unjudged` 逐条列出没判到的是什么。
+    /// 判出了违例照报违例；没有违例时报部分没判，压过「成立」与「不适用」。只记第一次给的说明。
+    pub fn partially_judged(&mut self, invariant: &'static str, unjudged: String) {
+        assert!(
+            IMPLEMENTED_INVARIANTS.contains(&invariant),
+            "{invariant} 不在第一版 checker 的清单里"
+        );
+        self.partially_judged.entry(invariant).or_insert(unjudged);
+    }
     /// 这条不变量到此为止的第一处违例说明：一次走读前后各看一眼，走读里第一处对不上的是什么（I-7.4 被抛弃根那一半报它）。
     #[must_use]
     pub fn first_violation_of(&self, invariant: &'static str) -> Option<&str> {
@@ -255,6 +410,8 @@ impl Judgements {
             .map(|invariant| {
                 let verdict = if let Some(detail) = self.first_violation.get(invariant) {
                     InvariantVerdict::Violated(detail.clone())
+                } else if let Some(unjudged) = self.partially_judged.get(invariant) {
+                    InvariantVerdict::PartiallyJudged(unjudged.clone())
                 } else if let Some(reason) = self.part_of_the_range_not_judged.get(invariant) {
                     InvariantVerdict::NotApplicable(reason)
                 } else if self.evaluated.get(invariant).copied().unwrap_or(0) > 0 {
@@ -1198,6 +1355,9 @@ pub struct PointerView {
     /// 加密关着时它们恒 0，读者遇到非 0 判该指针所在的结构损坏（已定项 3 射程）；池级走读在每条跟随的指针上按 I-2.4 判
     /// （[`judge_pointer_mac_and_nonce_are_zero`]）。
     pub is_mac_and_nonce_all_zero: bool,
+    /// 头部 MAC / nonce 之后、extent 偏移之前的加密与压缩那几段（偏移 28..32）读到的原值。第一版的取值都是 0，池级走读在每条跟随的指针上
+    /// 按 I-2.4 判（[`judge_pointer_encryption_and_compression_fields_take_the_first_version_values`]）。
+    pub encryption_and_compression_fields: PointerHeadEncryptionAndCompressionFields,
     /// 头部 extent 偏移那 2 字节（偏移 32，D19（块指针的结构与宽度预算） 已定项 11 的偏移表）是 0：第一版指针指整个单元，恒 0，
     /// 读者遇到非 0 判该指针所在的结构损坏，与 MAC / nonce 同一处置、与加密开不开无关（已定项 3；`m3-inv-a-r1` 判决第二节第 11 行）。
     pub is_extent_offset_zero: bool,
@@ -1205,6 +1365,33 @@ pub struct PointerView {
 
 /// 指针头部 MAC 16 + nonce 12：从偏移 0 起连着的 28 字节（D19（块指针的结构与宽度预算） 已定项 11）。
 const POINTER_MAC_AND_NONCE_BYTES: usize = 16 + 12;
+
+/// 指针头部里 MAC / nonce 之后的加密与压缩那几段（D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11 的字段表：算法类型 1 在偏移 28、
+/// 压缩算法码 1 在 29、压后长度 2 在 30），读到的原值。与 core `PointerHead::read_judging_the_encryption_compression_and_extent_offset_fields_from`
+/// 判的是同一组字段，checker 自己按偏移表读一份。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PointerHeadEncryptionAndCompressionFields {
+    pub algorithm_type: u8,
+    pub compression_algorithm_code: u8,
+    pub compressed_length: u16,
+}
+
+/// 指针头部算法类型 1 字节的位置（MAC 16 + nonce 12 之后）。
+const POINTER_ALGORITHM_TYPE_OFFSET: usize = 28;
+/// 指针头部压缩算法码 1 字节的位置（算法类型之后）。
+const POINTER_COMPRESSION_ALGORITHM_CODE_OFFSET: usize = 29;
+/// 指针头部压后长度 2 字节的位置（压缩算法码之后）。
+const POINTER_COMPRESSED_LENGTH_OFFSET: usize = 30;
+
+fn encryption_and_compression_fields_of(
+    pointer_bytes: &[u8],
+) -> PointerHeadEncryptionAndCompressionFields {
+    PointerHeadEncryptionAndCompressionFields {
+        algorithm_type: pointer_bytes[POINTER_ALGORITHM_TYPE_OFFSET],
+        compression_algorithm_code: pointer_bytes[POINTER_COMPRESSION_ALGORITHM_CODE_OFFSET],
+        compressed_length: read_u16(pointer_bytes, POINTER_COMPRESSED_LENGTH_OFFSET),
+    }
+}
 
 /// 指针头部 extent 偏移 2 字节的位置：MAC 16 + nonce 12 + 算法类型等 4 之后（D19（块指针的结构与宽度预算） 已定项 11）。
 const POINTER_EXTENT_OFFSET_FIELD: std::ops::Range<usize> = 32..34;
@@ -1232,6 +1419,7 @@ pub fn parse_node_pointer(bytes: &[u8]) -> PointerView {
         tail: u64::from(read_u32(bytes, 82)),
         all_zero: bytes[..86].iter().all(|byte| *byte == 0),
         is_mac_and_nonce_all_zero: mac_and_nonce_are_all_zero(bytes),
+        encryption_and_compression_fields: encryption_and_compression_fields_of(bytes),
         is_extent_offset_zero: extent_offset_is_zero(bytes),
     }
 }
@@ -1247,6 +1435,7 @@ pub fn parse_data_pointer(bytes: &[u8]) -> PointerView {
         tail: read_six_byte_unsigned(bytes, 82),
         all_zero: bytes[..88].iter().all(|byte| *byte == 0),
         is_mac_and_nonce_all_zero: mac_and_nonce_are_all_zero(bytes),
+        encryption_and_compression_fields: encryption_and_compression_fields_of(bytes),
         is_extent_offset_zero: extent_offset_is_zero(bytes),
     }
 }
@@ -1263,6 +1452,68 @@ pub fn judge_pointer_mac_and_nonce_are_zero(
     judgements.judge("I-2.4", pointer.is_mac_and_nonce_all_zero, || {
         format!("{what}：指针头部 MAC 16 / nonce 12 有非 0 字节，加密关着时它们恒 0")
     });
+}
+
+/// I-2.4（头校验和覆盖范围） 射程里指针那一半的加密与压缩那几段：走读跟随的一条指针，头部算法类型是 0（不加密）、压缩算法码是 0（不压缩）、
+/// 压后长度是 0（码 0 时恒 0）。第一版不支持加密（D9（加密） 已定项 10），压缩算法码登记表第一版只有码 0（D9（加密） 已定项 14），
+/// 读者遇到别的取值判该指针所在的结构损坏，与 MAC / nonce 同一处置（D19（块指针的结构与宽度预算） 已定项 3；实现那一侧是
+/// `crates/singlefs-core/src/pointer.rs` 的 `PointerHeadFieldOutsideTheFirstVersion` 的算法类型、压缩算法码、压后长度三个成员；
+/// 判决 `research/prompts/m3-formal-code-b30-r1-main-verification.md` 第二节 M2 那一行的改法 F2）。三段各判一格，违例那一句写清是哪一段。只判不断。
+pub fn judge_pointer_encryption_and_compression_fields_take_the_first_version_values(
+    judgements: &mut Judgements,
+    pointer: &PointerView,
+    what: &str,
+) {
+    let fields = pointer.encryption_and_compression_fields;
+    judgements.judge("I-2.4", fields.algorithm_type == 0, || {
+        format!(
+            "{what}：指针头部算法类型是 {}，第一版不加密、这 1 字节恒 0",
+            fields.algorithm_type
+        )
+    });
+    judgements.judge("I-2.4", fields.compression_algorithm_code == 0, || {
+        format!(
+            "{what}：指针头部压缩算法码是 {}，第一版登记表只有码 0（不压缩）",
+            fields.compression_algorithm_code
+        )
+    });
+    judgements.judge("I-2.4", fields.compressed_length == 0, || {
+        format!(
+            "{what}：指针头部压后长度是 {}，压缩算法码 0 时这 2 字节恒 0",
+            fields.compressed_length
+        )
+    });
+}
+
+/// 根记录里算法类型 1 + nonce 12 + MAC 16 那 29 字节（D22（单元原子性怎么合成） 已定项 7 的字段表：偏移 428、429、441，合计到 457）。
+const ROOT_RECORD_ALGORITHM_NONCE_AND_MAC: std::ops::Range<usize> = 428..457;
+
+/// I-2.4（头校验和覆盖范围） 射程里根记录那一处：根环里每一条读得出、自证过的根（`valid_roots`，不按候选集滤），根槽偏移 428..457
+/// （算法类型、nonce、MAC）全是 0。这一版 checker 只收加密类型 0 的系统配置，加密关着时它们恒 0、读者遇到非 0 判该结构损坏——
+/// 与单元头那 29 字节、指针头部 MAC / nonce 由同一条规则守（`.claude/kb/invariants.md` I-2.4 那一行；判决
+/// `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1「算法、nonce、MAC」那一行：单镜像性质，归池级 checker，
+/// 挂载透明不比）。实现今天不判这 29 字节（`crates/singlefs-core/src/root_record.rs` 的 `parse_slot` 跳过它们），checker 自己判一份。
+/// 只判不断：这条根照样进候选集、照样走。
+pub fn judge_root_record_algorithm_nonce_and_mac_are_zero(
+    judgements: &mut Judgements,
+    roots: &[(u64, u64, RootView)],
+) {
+    for (region, slot, root) in roots {
+        let reserved = &root.record_bytes[ROOT_RECORD_ALGORITHM_NONCE_AND_MAC];
+        judgements.judge("I-2.4", reserved.iter().all(|byte| *byte == 0), || {
+            let first_non_zero = reserved
+                .iter()
+                .position(|byte| *byte != 0)
+                .expect("判红时这 29 字节里有非 0 的");
+            format!(
+                "区域 {region} 槽 {slot} 的根（实例 {}、txg {}）：根槽偏移 {} 的字节是 {:#04x}，算法类型 / nonce / MAC 那 29 字节（428..457）加密关着时恒 0",
+                root.instance,
+                root.checkpoint_txg,
+                ROOT_RECORD_ALGORITHM_NONCE_AND_MAC.start + first_non_zero,
+                reserved[first_non_zero]
+            )
+        });
+    }
 }
 
 /// I-2.4（头校验和覆盖范围） 射程里指针那一半的另一格：走读跟随的一条指针，头部 extent 偏移（偏移 32 的 2 字节）为 0。
@@ -1310,6 +1561,22 @@ pub fn read_referenced_unit(
     unit_bytes: usize,
     what: &str,
 ) -> Option<Vec<u8>> {
+    read_referenced_unit_with_the_location_it_was_read_from(
+        reader, judgements, locations, unit_bytes, what,
+    )
+    .map(|(bytes, _location_it_was_read_from)| bytes)
+}
+
+/// 同 [`read_referenced_unit`]，另交回读回的那一份（第一份对得上的）是哪一条位置条目：认「走过」要按读回、自证过的那一份的落点
+/// （实例表链上第 k 片的指针，盘 0 那条位置条目指错、盘 1 那条完好时，按盘 0 那条认会把它认成别的片，攻方 H-b，
+/// `research/prompts/m3-batch25-code-r1-opus-output.md` 第 1.3 节）。
+pub fn read_referenced_unit_with_the_location_it_was_read_from(
+    reader: &dyn ImageReader,
+    judgements: &mut Judgements,
+    locations: &[PointerLocation; 2],
+    unit_bytes: usize,
+    what: &str,
+) -> Option<(Vec<u8>, PointerLocation)> {
     let mut first_good = None;
     for location in locations {
         let bytes = reader.read(location.device, location.slot * SLOT_BYTES, unit_bytes);
@@ -1323,7 +1590,7 @@ pub fn read_referenced_unit(
             )
         });
         if matches && first_good.is_none() {
-            first_good = bytes;
+            first_good = bytes.map(|content| (content, *location));
         }
     }
     first_good

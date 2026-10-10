@@ -248,7 +248,9 @@ fn row_publishes_on_a_version_without_file_with_a_sixty_six_page_instance_table_
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     assert_eq!(violated, Vec::new(), "十二次挂载之后池级 checker 全绿");

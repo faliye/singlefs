@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use singlefs_core::address::{CheckpointTxg, DataUnitIndexInFile, InstanceGeneration, SlotNumber};
 use singlefs_core::allocator::{AllocationRecord, PlacementRefusal};
 use singlefs_core::block_device::BlockDeviceError;
-use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::instance_table::{
     InstanceTableChainRecord, InstanceTablePage, InstanceTablePageIndex,
 };
@@ -22,6 +21,7 @@ use singlefs_core::mount::{
 use singlefs_core::pointer::LocationEntry;
 use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
 use singlefs_core::recovery::{RecoveryOutcome, RecoveryReport};
+use singlefs_core::retirement_tree::RetirementContainerIndexInTree;
 use singlefs_core::root_record::RootRecord;
 use singlefs_core::root_ring::RootRingSlot;
 use singlefs_core::tombstone_tree::TombstoneContainerIndexInTree;
@@ -74,25 +74,20 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         TransactionUnit::ExtentUpperNodeBelowTheRoot(position) => {
             panic!("模型今天只罩 inode 1 一个文件（上段只有根兼叶）：{position:?}")
         }
-        // 模型罩的发布里 inode 树恒只有最左那一片叶容器：随机历史只在删完第一个文件之后建 inode、一次一个
-        // （`history.rs` 的 `HistoryOperation::CreateInode`），一片叶容器装 233 条，几百步的历史建不满；
-        // 第二片只会从一次建很多个、或第一个文件旁边建 inode 那几条路径出来，随机历史与层 0 的固定脚本都不走。
+        // inode 树的每片叶容器按它在树里左起的位置各是一个角色（最左那片是 `InodeLeaf`，之后每片各一个）：删完第一个文件之后
+        // 一次建一个 inode（`history.rs` 的 `HistoryOperation::CreateInode`），满 233 条在末尾分裂、左半不动（D8（核心索引结构） 已定项 6），
+        // 各片的分配代不同，模型逐片记、逐片比。位置是实现发布路径里的角色序号（`inode_tree::InodeLeafContainerIndexInTree`）。
         TransactionUnit::InodeLeafContainer(index) => {
-            assert_eq!(
-                index,
-                InodeLeafContainerIndexInTree::LEFTMOST,
-                "模型今天只罩一片叶容器的那几种发布"
-            );
-            ModelUnitRole::InodeLeaf
+            ModelUnitRole::inode_leaf_container_at(u64::from(index.0))
         }
         TransactionUnit::InodeRoot => ModelUnitRole::InodeRoot,
         TransactionUnit::AllocationTree => ModelUnitRole::AllocationTree,
         TransactionUnit::AllocationTreeNodeBelowTheRoot(_) => return None,
-        // 模型罩的池两块盘、15 行记账：记账树恒只有一个节点（根兼叶），根之下的节点只在压小容量的
-        // 只供测试的开关下、或记账行装不下一个节点的池（80 块盘起）上出现，随机历史与层 0 的固定脚本都不装那个开关。
-        TransactionUnit::AccountingTreeNodeBelowTheRoot(position) => {
-            panic!("模型今天只罩记账树一个节点的池：{position:?}")
-        }
+        // 记账树根之下的节点不对应角色（同中央映射树根之下的节点）：inode 号水位的台阶行多到一片叶装不下时（两块盘第 463 级台阶起，
+        // D5（快照 / 空间记账机制） 已定项 2 射程）记账树从中间切开、长出根之下的节点（D8（核心索引结构） 已定项 11）；哪几片这次重写由
+        // 这次删插了哪些 key 定，模型不记 key、不记是哪几片。它们的分配代、位置与记录归池级 checker 判，占槽与映射条目模型沿来路带
+        // 节点数的上界（`model::accounting_tree_nodes_upper_bound`）。
+        TransactionUnit::AccountingTreeNodeBelowTheRoot(_) => return None,
         TransactionUnit::AccountingTree => ModelUnitRole::AccountingTree,
         // 中央映射树根之下的节点不对应角色（同分配记录树根之下的节点）：每个数据单元一条映射条目，数据单元加别的进映射的单元
         // 多于一片叶装的 294 条时（随机历史里是跨三片下段叶的那一档），映射树从中间切开、长出根之下的节点（D8（核心索引结构） 已定项 11）；
@@ -121,6 +116,20 @@ pub fn model_unit_role(unit: TransactionUnit) -> Option<ModelUnitRole> {
         TransactionUnit::LineageLeafContainer(_)
         | TransactionUnit::LineageRoot
         | TransactionUnit::LineageNodeBelowTheRoot(_) => return None,
+        // 退役树（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条，照墓碑树）：模型罩的历史里只有删第一个文件那次最后一批
+        // 让唯一那片叶容器身份消失，退役树恒只有容器 1 那一片与根（回退之后再删一次追加进同一片）。
+        TransactionUnit::RetirementLeafContainer(index) => {
+            assert_eq!(
+                index,
+                RetirementContainerIndexInTree(0),
+                "模型今天只罩退役树一片容器"
+            );
+            ModelUnitRole::RetirementLeaf
+        }
+        TransactionUnit::RetirementRoot => ModelUnitRole::RetirementRoot,
+        TransactionUnit::RetirementNodeBelowTheRoot(position) => {
+            panic!("模型今天只罩退役树一片容器（根之下没有节点）：{position:?}")
+        }
         // 模型把实例表链当一个角色：各片的落点与分配记录按这次之后的行数现算片数（`model::instance_table_pages_for_rows`）。
         TransactionUnit::InstanceTable | TransactionUnit::InstanceTablePageAfterTheFirst(_) => {
             ModelUnitRole::InstanceTable
@@ -236,6 +245,9 @@ fn instance_table_page_of_role(identity: TransactionUnit) -> Option<InstanceTabl
         | TransactionUnit::LineageLeafContainer(_)
         | TransactionUnit::LineageRoot
         | TransactionUnit::LineageNodeBelowTheRoot(_)
+        | TransactionUnit::RetirementLeafContainer(_)
+        | TransactionUnit::RetirementRoot
+        | TransactionUnit::RetirementNodeBelowTheRoot(_)
         | TransactionUnit::TreeTable => None,
     }
 }
@@ -683,9 +695,10 @@ pub fn refusal_reason_of_publish_error(error: &PublishError) -> ObservedRefusalR
         // 释放判定路径的五种：上一版的映射或分配记录与上一版对不上、盘上那条指针的两条位置条目不同槽，健康的历史里不该出现。
         // 分配记录树重写集合迭代不收敛那一条同理：只有强制复用窗口为 0 的只供测试的开关下才可能走到，随机历史不装那个开关。
         // inode 树写入被拒那一条同样：随机历史只在删完第一个文件之后建 inode、一次一个（`HistoryOperation::CreateInode`），
-        // inode 树恒只有一片叶容器、新记录追加在末尾，它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
+        // 新记录恒追加在最右那片叶、满 233 条在末尾分裂；叶容器数到一个根装得下的 135 片之前（三万多次建 inode）不拒，
+        // 它跑的那几种发布每次最多改一片叶容器、重写的角色最多九个。
         // 多层码 2 树算不出形状那一条同理：两棵树装不下一个节点时分裂、不拒，只有长到 257 层或上一版的形状按分隔 key 走不通才拒，
-        // 随机历史里两棵树恒只有一个节点；它出现就是模型与实现对不上。
+        // 随机历史里两棵树至多长一两层（记账树在建几百个 inode 之后、映射树在跨三片下段叶的文件上）；它出现就是模型与实现对不上。
         PublishError::MultiLevelCodeTwoTreeRefused { .. }
         | PublishError::InodeTreeWriteRefused(_)
         | PublishError::AllocationRecordTreeRewriteSetDidNotSettle { .. }
@@ -735,8 +748,8 @@ pub fn refusal_reason_of_placement_refusal(refusal: &PlacementRefusal) -> Observ
 }
 
 /// 回退目标不在候选集里的那一条说的是哪条理由：按字段一对一映射，不看给人看的文字（增补 3 第 2 件代码三方第一轮判决第三节第 2 条）。
-/// 候选集五条（D23（journal 的角色与格式） 已定项 14：根环里、txg ≥ F_生效、按现行那一版的实例表判仍然有效、带文件；D16（发布语义） 已定项 1
-/// 「回退候选集」：txg 落在一圈窗口里），各映射到自己那一条。
+/// 候选集四条（D23（journal 的角色与格式） 已定项 14：根环里、txg ≥ F_生效、按现行那一版的实例表判仍然有效、带文件；D16（发布语义） 已定项 1
+/// 「回退候选集」原来另有「txg 落在一圈窗口里」一条，用户 2026-10-04 定 RGall 拿掉），各映射到自己那一条。
 #[must_use]
 pub fn refusal_reason_of_rollback_candidate_exclusion(
     exclusion: RollbackCandidateExclusion,
@@ -748,9 +761,6 @@ pub fn refusal_reason_of_rollback_candidate_exclusion(
         }
         RollbackCandidateExclusion::OnAbandonedTimeline => {
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-        }
-        RollbackCandidateExclusion::OutsideTheOneRevolutionWindow => {
-            ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
         }
         RollbackCandidateExclusion::VersionWithoutFile => {
             ModelRefusalReason::RollbackTargetWithoutFile
@@ -845,7 +855,11 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
                 // 改之前经 `MountError::Recovery` 交出、同样记成没理由）：只在读路径上注入故障才有，模型没有这一条。
                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
                 | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
-                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => {
+                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. }
+                // 没施加的发布的账读不出、读得出的记录不齐、映射也现算不成（C_MAPPING）：随机历史不藏 journal 记录，模型没有这一条。
+                | StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords { .. }
+                // 水位之上一次缺记录、读得出的记录点名的单元又验不过的发布（F1 乙）：随机历史不藏 journal 记录，模型没有这一条。
+                | StillUnreadableAfterOneReread::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify { .. } => {
                     ObservedRefusalReason::Unexplained
                 }
             }
@@ -872,7 +886,15 @@ pub fn refusal_reason_of_mount_error(error: &MountError) -> ObservedRefusalReaso
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
         | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         // 盘上的实例代号或 txg 已到顶：坏镜像才有。
-        | MountError::SequenceNumberPastTheTopOfItsRange(_) => ObservedRefusalReason::Unexplained,
+        | MountError::SequenceNumberPastTheTopOfItsRange(_)
+        // 重建分配器读根环有一块盘没读出有效根、整环重读一遍，两遍逐槽并起来整个环仍一条不被抛弃的自证有效根都没有（Q3 另起的拒因；
+        // R1 按槽并两遍之后，第一遍读出过一条的不拒）：读阶段择得到根，只在读路径上注入故障才有，模型没有这一条。
+        | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread
+        // 读阶段判完之后（判据 N-配置 为假）逐盘核或取号那一刻系统配置又读不出（C664（挂载拒绝合法复算把两种拒因报成一个）之前并在 N-配置 里、
+        // 映射成模型那一条理由）：两遍读之间的瞬时读错或一块盘两槽都坏才有，模型没有这一条，不映射成「见证过比所选那一版新的发布」。
+        | MountError::SystemConfigurationUnreadableAfterTheReadStage(_) => {
+            ObservedRefusalReason::Unexplained
+        }
     }
 }
 
@@ -923,7 +945,9 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_mount_error(
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
         | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
-        | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+        | MountError::NewerStateStillUnreadableAfterOneReread(_)
+        | MountError::SystemConfigurationUnreadableAfterTheReadStage(_)
+        | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => None,
     }
 }
 
@@ -942,7 +966,9 @@ pub fn root_ring_slot_still_bad_after_one_reread_of_rollback_error(
                 StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { .. }
                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. }
                 | StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
-                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => None,
+                | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. }
+                | StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords { .. }
+                | StillUnreadableAfterOneReread::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify { .. } => None,
             }
         }
         RollbackError::PublishFrozenAfterAWriteFailureIsNotResentYet { .. }
@@ -997,7 +1023,9 @@ pub fn reported_ceiling_of_mount_error(error: &MountError) -> Option<ModelCheckp
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
         | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
-        | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+        | MountError::NewerStateStillUnreadableAfterOneReread(_)
+        | MountError::SystemConfigurationUnreadableAfterTheReadStage(_)
+        | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => None,
     }
 }
 
@@ -1294,9 +1322,58 @@ mod tests {
         );
     }
 
-    /// 回退候选集的五条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
-    /// 「目标那一版树表 0 条」是第五条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根），「落在一圈窗口外」是第四条
-    /// （D16（发布语义） 已定项 1「回退候选集」）。
+    /// C664（挂载拒绝合法复算把两种拒因报成一个）：读阶段判完之后逐盘核或取号那一刻系统配置又读不出
+    /// （`MountError::SystemConfigurationUnreadableAfterTheReadStage`，三处各一个）映射成 Unexplained，不映射成读阶段判据 N-配置 那一条模型理由——
+    /// 两种拒因分开报之后，模型那一侧也不许再把它们混成一条。
+    /// 判别力：这一成员映射成「见证过比所选那一版新的发布、重读仍判真」（`crates/mutations.tsv` 一行）时这一条红。
+    #[test]
+    fn a_system_configuration_unreadable_after_the_read_stage_does_not_map_to_the_witnessed_newer_publish(
+    ) {
+        use singlefs_core::mount::{
+            NewerPublishWitness, SelectedVersionAgainstTheWitness,
+            SystemConfigurationUnreadableAfterTheReadStage, SystemConfigurationUnreadableWhen,
+            WitnessedCounterComparison,
+        };
+        let read_stage = SelectedVersionAgainstTheWitness {
+            selected_version: RollbackTarget {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(4),
+            },
+            witness: NewerPublishWitness {
+                witnessed_journal_counter: 4,
+                comparison: WitnessedCounterComparison::AgainstTheSelectedVersionsLastRecord {
+                    selected_version_last_record_counter: 4,
+                },
+            },
+        };
+        for unreadable in [
+            SystemConfigurationUnreadableWhen::CheckingEachDeviceBeforeTheAcquisition {
+                device: DeviceIdentity(1),
+            },
+            SystemConfigurationUnreadableWhen::AcquisitionReadsAnUndecidableWitness {
+                first_device_reporting_a_read_error: DeviceIdentity(0),
+            },
+            SystemConfigurationUnreadableWhen::AcquisitionFindsADeviceWithoutAnySelfVerifiedSlot {
+                device: DeviceIdentity(1),
+            },
+        ] {
+            let refusal = MountError::SystemConfigurationUnreadableAfterTheReadStage(Box::new(
+                SystemConfigurationUnreadableAfterTheReadStage {
+                    read_stage,
+                    unreadable,
+                },
+            ));
+            assert_eq!(
+                refusal_reason_of_mount_error(&refusal),
+                ObservedRefusalReason::Unexplained,
+                "读阶段之后系统配置又读不出（{unreadable:?}）模型没有这一条理由，不并进判据 N-配置 那一条"
+            );
+        }
+    }
+
+    /// 回退候选集的四条排除各映射到自己那一条理由、互不相同（此前「不在候选集里」映射成「低于 F、被抛弃」两条之一）；
+    /// 「目标那一版树表 0 条」是第四条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。原来的「落在一圈窗口外」那一条
+    /// 用户 2026-10-04 定 RGall 拿掉（D16（发布语义） 已定项 1「回退候选集」）。
     #[test]
     fn each_rollback_candidate_exclusion_maps_to_its_own_reason() {
         let target = RollbackTarget {
@@ -1307,7 +1384,6 @@ mod tests {
             RollbackCandidateExclusion::NotInRing,
             RollbackCandidateExclusion::BelowEffectiveFloor,
             RollbackCandidateExclusion::OnAbandonedTimeline,
-            RollbackCandidateExclusion::OutsideTheOneRevolutionWindow,
             RollbackCandidateExclusion::VersionWithoutFile,
         ]
         .into_iter()
@@ -1323,9 +1399,6 @@ mod tests {
                 ),
                 ObservedRefusalReason::Explained(
                     ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-                ),
-                ObservedRefusalReason::Explained(
-                    ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
                 ),
                 ObservedRefusalReason::Explained(ModelRefusalReason::RollbackTargetWithoutFile),
             ]
@@ -1366,6 +1439,74 @@ mod tests {
         assert!(counts.instance_tables_compared >= 1, "{counts:?}");
         assert!(counts.rewritten_role_sets_compared >= 1, "{counts:?}");
         assert!(counts.allocation_records_compared >= 1, "{counts:?}");
+    }
+
+    /// 胶水把实现交回的 inode 叶容器序号映到模型角色那一句，逐片单测（第 30 批判决 `research/prompts/m3-formal-code-b30-r1-main-verification.md`
+    /// 第二节 M1「第 k 片都对」那一行的改法 B3）：一个码 2 根装得下的 135 片（D8（核心索引结构） 已定项 6；实现的
+    /// `leaf_containers_one_root_node_holds`，再多一片实现就拒）逐片映到这一片自己的角色——第 0 片是最左那片，第 k 片是左起第 k 片——
+    /// 而且 135 片映到 135 个互不相同的角色。按取样点逐片往外加历史用例追不完（胶水封顶在第 k 片，只有建到第 k + 1 片的历史抓得到），
+    /// 这一条不跑历史，封顶在任何一片都红。
+    #[test]
+    fn every_inode_leaf_container_one_root_holds_maps_to_its_own_model_role_and_no_two_share_one() {
+        const LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS: usize = 135;
+        assert_eq!(
+            singlefs_core::inode_tree::leaf_containers_one_root_node_holds(),
+            LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS,
+            "实现的码 2 根扇出是 135（D8（核心索引结构） 已定项 6）"
+        );
+        let mut roles_seen = BTreeSet::new();
+        for position_from_the_leftmost in 0..LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS {
+            let role = model_unit_role(TransactionUnit::InodeLeafContainer(
+                singlefs_core::inode_tree::InodeLeafContainerIndexInTree::of_position(
+                    position_from_the_leftmost,
+                ),
+            ))
+            .expect("inode 叶容器每一片都对应一个角色");
+            let position_the_role_names = match role {
+                ModelUnitRole::InodeLeaf => 0,
+                ModelUnitRole::InodeLeafRightOfTheLeftmost(leaf_container) => {
+                    usize::try_from(leaf_container.position_from_the_leftmost())
+                        .expect("位置小于 135")
+                }
+                ModelUnitRole::Data
+                | ModelUnitRole::ExtentRoot
+                | ModelUnitRole::InodeRoot
+                | ModelUnitRole::AllocationTree
+                | ModelUnitRole::AccountingTree
+                | ModelUnitRole::MappingTree
+                | ModelUnitRole::TreeTable
+                | ModelUnitRole::InstanceTable
+                | ModelUnitRole::DeletedInodesRoot
+                | ModelUnitRole::TombstoneLeaf
+                | ModelUnitRole::TombstoneRoot
+                | ModelUnitRole::RetirementLeaf
+                | ModelUnitRole::RetirementRoot => {
+                    panic!(
+                        "第 {position_from_the_leftmost} 片 inode 叶容器映到了别的角色：{role:?}"
+                    )
+                }
+            };
+            assert_eq!(
+                position_the_role_names, position_from_the_leftmost,
+                "第 {position_from_the_leftmost} 片映到的角色说的是第 {position_the_role_names} 片"
+            );
+            assert_eq!(
+                role,
+                ModelUnitRole::inode_leaf_container_at(
+                    u64::try_from(position_from_the_leftmost).expect("位置小于 135")
+                ),
+                "第 {position_from_the_leftmost} 片映到模型落点函数的第 {position_from_the_leftmost} 片"
+            );
+            assert!(
+                roles_seen.insert(role),
+                "第 {position_from_the_leftmost} 片与前面某一片映到同一个角色：{role:?}"
+            );
+        }
+        assert_eq!(
+            roles_seen.len(),
+            LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS,
+            "135 片映到 135 个互不相同的角色"
+        );
     }
 
     /// 模型模块只用格式常量那一个 crate（D13（验证路线） 已定项 5）：`model.rs` 里注释之外的每一行都不提 `singlefs_core`、`singlefs_checker`，

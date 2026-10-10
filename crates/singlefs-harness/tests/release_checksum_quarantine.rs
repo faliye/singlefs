@@ -823,7 +823,7 @@ fn quarantined_copy_counts_as_allocated_in_the_admission_reading_and_adds_no_ter
             quarantined_terms.device
         );
         assert_eq!(
-            quarantined_terms.abandoned_root_exclusive,
+            quarantined_terms.isolated_for_abandoned_roots_and_unapplied_journal_records,
             BytesOnOneDevice::ZERO,
             "不另进式子：被抛弃根独占量那一项是 0"
         );

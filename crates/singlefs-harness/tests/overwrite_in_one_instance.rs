@@ -5,7 +5,7 @@
 
 mod common;
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use common::{
     build_pool, file_content, geometry, parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS,
@@ -20,7 +20,7 @@ use singlefs_core::admission::{AvailableBytesOnOneDevice, BytesOnOneDevice, Devi
 use singlefs_core::allocation_record_tree::{
     AllocationRecordTreeNode, AllocationRecordTreeNodePosition,
 };
-use singlefs_core::allocator::UnitFootprint;
+use singlefs_core::allocator::{AllocationRecord, UnitFootprint};
 use singlefs_core::inode_tree::InodeLeafContainerIndexInTree;
 use singlefs_core::journal::{back_chain_of, record_offset};
 use singlefs_core::mounted_read::mount_read_only;
@@ -34,7 +34,7 @@ use singlefs_core::recovery::{
     RecoveryFailure, RecoveryOutcome,
 };
 use singlefs_core::root_record::RootRecord;
-use singlefs_core::root_ring::{slot_offset, target_for_publish};
+use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlot};
 use singlefs_core::transaction::{
     mapping_locations_for_key, placements_to_release_via_mapping, publish_overwrite, FirstFile,
     MappingLookup, PoolWriter, PublishError, TransactionOutput, TransactionUnit,
@@ -43,7 +43,9 @@ use singlefs_core::transaction::{
 use singlefs_core::unit::{
     build_index_node, data_unit_payload_capacity, index_node_entry_capacity, parse_index_node,
 };
-use singlefs_format::{JOURNAL_RING_DEFAULT_BYTES, SLOT_BYTES, UNIT_AREA_START_SLOT};
+use singlefs_format::{
+    JOURNAL_RING_DEFAULT_BYTES, ROOT_RING_REGIONS, SLOT_BYTES, UNIT_AREA_START_SLOT,
+};
 use singlefs_harness::memory_pool::MemoryPool;
 use singlefs_harness::segments::{segment_kinds_text, segment_sizes_text, split_into_segments};
 
@@ -105,8 +107,8 @@ fn overwrite_publishes_the_second_version_through_the_same_commit_shape() {
     assert_eq!(second.root.checkpoint_txg, CheckpointTxg(4));
     assert_eq!(second.root.instance, InstanceGeneration(1));
     assert_eq!(
-        second.root.tree_identifier_watermark, 65548,
-        "没有建新树，水位不动（第一个文件版本发 65536..65547 之后是 65548，D8 已定项 11）"
+        second.root.tree_identifier_watermark, 65549,
+        "没有建新树，水位不动（第一个文件版本发 65536..65548 之后是 65549，D8 已定项 11）"
     );
     assert_eq!(second.root.rollback_floor, CheckpointTxg(0));
     assert_eq!(
@@ -315,10 +317,15 @@ fn release_rewrites_the_first_versions_records_and_accounting_moves_them_into_th
     let watermark = second
         .accounting_entries
         .iter()
-        .find(|entry| entry.statistic == STATISTIC_INODE_WATERMARK)
+        .filter(|entry| entry.statistic == STATISTIC_INODE_WATERMARK)
+        .max_by_key(|entry| entry.generation)
         .expect("inode 号水位");
     assert_eq!(watermark.value, 2, "没有建新 inode");
-    assert_eq!(second.accounting_entries.len(), 15);
+    assert_eq!(
+        second.accounting_entries.len(),
+        16,
+        "这一版自己的 15 行，加 A 那次留的一级 inode 号水位台阶 (A 的 txg, 2)（D5 已定项 2 射程）"
+    );
 
     assert_eq!(
         second.mapping_keys.len(),
@@ -331,7 +338,7 @@ fn release_rewrites_the_first_versions_records_and_accounting_moves_them_into_th
             "A 的映射条目一条都不留：释放走映射、条目删掉"
         );
     }
-    assert_eq!(second.tree_table_entries.len(), 11);
+    assert_eq!(second.tree_table_entries.len(), 12);
     for (entry, previous) in second
         .tree_table_entries
         .iter()
@@ -601,21 +608,21 @@ fn release_goes_through_the_previous_mapping_and_a_missing_entry_is_reported_not
     );
 }
 
-/// 同一个进程同一个实例里连着覆盖写、一个落点都不回收，分配记录只增不减：攒到多于 812 条（一片叶的条目容量，
-/// 原先「分配记录树只有一个节点」那道墙）之后照样做成——分配记录树按绝对槽号按位置寻址（D8（核心索引结构） 已定项 14，
-/// 用户 2026-09-24 定 K1），每块盘上装着记录的叶不止一片，墙拆了。越过 812 条的那一版之后池级 checker 管按位置寻址的那几条
-/// （I-1.1 节点位置、I-3.10 每个节点都有分配记录）都判过且成立，冷启动读回最后写的内容。
-/// I-3.1 在这里不判：`build_pool` 的分配器没装根环表、同一个进程里不回收（`released_placements_are_not_handed_out_again_before_reclaim_exists`），
-/// 根环转过之后被换下的落点还在 defer 里，而引用过它们的根已经被盖掉——那是这个装置的形状，不是这一轮要钉的；
-/// 装着根环表、会回收的那条会话上越过 812 条每一步都跑全部 checker，钉在随机历史
-/// `overwrites_raising_the_floor_and_rolling_back_past_812_allocation_records_all_succeed`。
+/// 同一个进程同一个实例里连着覆盖写，分配记录攒到多于 812 条（一片叶的条目容量，原先「分配记录树只有一个节点」那道墙）之后照样做成——
+/// 分配记录树按绝对槽号按位置寻址（D8（核心索引结构） 已定项 14，用户 2026-09-24 定 K1），每块盘上装着记录的叶不止一片，墙拆了。
+/// `build_pool` 的分配器装着 mkfs 的根环（C551），根环转过一格之后照可再分配谓词回收（D16（发布语义） 已定项 1；这一形会话第一次回收
+/// 在 txg 26，第 31 批代码轮判决第二节 N2）；回收的落点被重新分配时改写原来那条记录、不追加（D3（空间分配） 已定项 7），
+/// 所以记录数只增不减，只是转环之后涨得慢。越过 812 条的那一版上池级 checker 判全部不变量（I-3.1 在内）、0 违例（C551 推翻条件
+/// 「`build_pool` 装上根环表之后，同一条用例判全部不变量」），其中管按位置寻址的那两条（I-1.1 节点位置、I-3.10 每个节点都有分配记录）
+/// 还要判过且成立、不是没判；冷启动读回最后写的内容。这条只在末尾那一版跑一次 checker，每一版都跑的是
+/// `allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records`。
 #[test]
 fn repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves_of_the_allocation_record_tree(
 ) {
     assert_eq!(index_node_entry_capacity(10, 20), 812);
     let mut pool = build_pool("overwrites-past-one-allocation-leaf");
     let mut overwrites = 0;
-    // 迭代上界 200 次（每次至少加 16 条，远在这之前就越过 812）；跨轮携带的是现行那一版。
+    // 迭代上界 200 次（回收开始之前每次至少加 16 条，之后有的落点改写原来的记录）；跨轮携带的是现行那一版。
     while pool.output.allocation_records.len() <= 812 && overwrites < 200 {
         let previous = pool.output.clone();
         pool.output = try_overwrite(&mut pool, &previous)
@@ -649,6 +656,16 @@ fn repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves
     }
     let image = pool.memory_pool();
     let verdicts = check_pool_image(&image);
+    let violated_invariants: Vec<&(&str, InvariantVerdict)> = verdicts
+        .iter()
+        .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+        .collect();
+    assert!(
+        violated_invariants.is_empty(),
+        "{overwrites} 次覆盖写（txg {}，{} 条分配记录）之后池级 checker 判红：{violated_invariants:?}",
+        pool.output.root.checkpoint_txg.0,
+        pool.output.allocation_records.len()
+    );
     for invariant in ["I-1.1", "I-3.10"] {
         assert_eq!(
             verdicts
@@ -666,27 +683,96 @@ fn repeated_overwrites_go_past_the_812_records_of_one_leaf_across_several_leaves
     assert_eq!(content, second_content(), "冷启动读回最后一次覆盖写的内容");
 }
 
-/// 分配记录过 600 条时记账的「已分配」照样等于分配记录的跨度之和（增补 3 第 2 件代码三方第二轮判决第三节第 3 条：攻方变异 m4b——
+/// 这个进程从第 0 代根起每个 txg 写一条根、写到 `newest_txg` 之后，根环里最旧的那条根的 txg：mkfs 在三个区域的槽 0 各写一条第 0 代根
+/// （`make_filesystem` 写的那三条），之后第 n 条根落在 `target_for_publish` 给的槽上、盖掉那槽原来的，环里每槽留最后写到它的那一条。
+/// 一个实例、没有被抛弃的根，环里每一条都有效，所以它就是可再分配谓词里的「环里最旧有效根」（D16（发布语义） 已定项 1）。
+/// 这里从 txg 现算，不读分配器的根环表。
+fn oldest_root_in_the_ring_after_this_process_wrote_every_txg_up_to(
+    newest_txg: CheckpointTxg,
+    genesis_txg: CheckpointTxg,
+) -> CheckpointTxg {
+    let slots_per_region = parameters().geometry.root_ring_slots_per_region;
+    let mut txg_of_each_ring_slot: BTreeMap<RootRingSlot, CheckpointTxg> = (0..ROOT_RING_REGIONS)
+        .map(|region| (RootRingSlot { region, slot: 0 }, genesis_txg))
+        .collect();
+    // 迭代上界：newest_txg − genesis_txg 次（这条用例里不过两百多）；不带提前出口。
+    for written_txg in genesis_txg.0 + 1..=newest_txg.0 {
+        txg_of_each_ring_slot.insert(
+            target_for_publish(CheckpointTxg(written_txg), slots_per_region),
+            CheckpointTxg(written_txg),
+        );
+    }
+    *txg_of_each_ring_slot
+        .values()
+        .min()
+        .expect("环里至少有 mkfs 写的那几槽")
+}
+
+/// 分配记录过 600 条时记账的「已分配」照样等于还没回收的分配记录的跨度之和（增补 3 第 2 件代码三方第二轮判决第三节第 3 条：攻方变异 m4b——
 /// 分配记录过 600 条之后「已分配」少记一槽——整个 workspace 没有一条测试会红）。同一个进程同一个实例里从第一个文件起连着覆盖写，
-/// 直到越过 900 条（分配记录树按位置寻址之后没有 812 条那道墙，D8（核心索引结构） 已定项 14）：没有挂载、没有抬 F，一个落点都不回收，
-/// 已释放的都还在 defer 窗口里、仍算已分配（I-3.1 读法甲），所以每一版每盘的「已分配」= 这一版交回的分配记录里那块盘的跨度之和 × 16 KiB
-/// ——拿分配记录现算，不看分配器的计数。逐版核，过 600 条的版本至少 5 个。每一次覆盖写接着上一版，次序本身就是被测对象，不切片并行。
+/// 直到越过 812 条（一片叶的条目容量；分配记录树按位置寻址之后那道墙拆了，D8（核心索引结构） 已定项 14）。停在 812 而不再往上取：
+/// 回收开始之后复用的落点改写原来那条记录、不再追加，记录涨得慢，200 次覆盖写之后是 882 条（2026-10-05 在装了根环表的 `build_pool` 上跑的）。
+/// 没有挂载、没有抬 F（F 恒 0）；
+/// `build_pool` 的分配器装着 mkfs 的根环（C551），根环转过一格之后照可再分配谓词回收（D16（发布语义） 已定项 1：已释放 ∧ 释放代 ≤
+/// max(F, 环里最旧有效根)）。回收的落点那条记录不删、照旧写着已释放，留到它被重新分配时改写（D3（空间分配） 已定项 7「条目留到该落点
+/// 被重新分配时覆盖」），回收的槽不再算已分配；还在 defer 窗口里的已释放落点仍算已分配（I-3.1 读法甲）。所以每一版每盘的「已分配」=
+/// 这一版交回的分配记录里那块盘上不是已回收的记录的跨度之和 × 16 KiB，「已回收」= 已释放且释放代 ≤ max(这一版的 F, 写到这一版时环里最旧的根)
+/// ——拿分配记录与根的 txg 现算，不看分配器的计数。逐版核，过 600 条的版本至少 5 个，其中带已回收记录的至少 1 个（判法里减掉已回收那一半真走到）。
+/// 这个判法的释放代读的是实现交回的分配记录，根环的槽位走的是实现的 `target_for_publish`：释放代记错、根环公式少一槽时它跟着实现一起偏，
+/// 照绿（第 31 批代码轮判决第二节 N3）。所以每一版另在盘上镜像上跑一遍池级 checker（全部不变量）、要求 0 违例——它自己从盘上读根环与
+/// 分配记录树、自己算谓词，不借实现的这两样（C551 推翻条件「同一条用例判全部不变量」）。镜像接着上一版只补施加这一次覆盖写发出的那一截。
+/// 每一次覆盖写接着上一版，次序本身就是被测对象，不切片并行。
 #[test]
-fn allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hundred_records() {
+fn allocated_statistic_equals_the_span_sum_of_the_unreclaimed_allocation_records_past_six_hundred_records(
+) {
     let mut pool = build_pool("allocated-statistic-past-six-hundred-records");
+    let genesis_txg = pool.genesis.root.checkpoint_txg;
+    let mut image = pool.memory_pool();
+    let mut operations_applied_to_the_image = pool.stream.operation_count();
     let mut versions_past_six_hundred_records = 0;
+    let mut versions_carrying_reclaimed_records = 0;
     let mut overwrites = 0;
-    // 迭代上界 200 次（每次至少加 16 条）；跨轮携带的是现行那一版。
-    while pool.output.allocation_records.len() <= 900 && overwrites < 200 {
+    // 迭代上界 200 次（回收开始之前每次至少加 16 条，之后有的落点改写原来的记录）；跨轮携带的是现行那一版、
+    // 与它对应的盘上镜像和镜像已经施加到录制流第几步（不变量：等于流的长度，每一轮补施加之后重新对齐）。
+    while pool.output.allocation_records.len() <= 812 && overwrites < 200 {
         let previous = pool.output.clone();
         let output = try_overwrite(&mut pool, &previous)
             .unwrap_or_else(|error| panic!("第 {} 次覆盖写：{error:?}", overwrites + 1));
         overwrites += 1;
+        let operations = pool.retained_operations();
+        image.apply(&operations[operations_applied_to_the_image..]);
+        operations_applied_to_the_image = operations.len();
+        let violated_invariants: Vec<(&str, InvariantVerdict)> = check_pool_image(&image)
+            .into_iter()
+            .filter(|(_, verdict)| matches!(verdict, InvariantVerdict::Violated(_)))
+            .collect();
+        assert!(
+            violated_invariants.is_empty(),
+            "第 {overwrites} 次覆盖写（txg {}，{} 条分配记录）之后池级 checker 判红：{violated_invariants:?}",
+            output.root.checkpoint_txg.0,
+            output.allocation_records.len()
+        );
+        let reclaim_floor = output.root.rollback_floor.max(
+            oldest_root_in_the_ring_after_this_process_wrote_every_txg_up_to(
+                output.root.checkpoint_txg,
+                genesis_txg,
+            ),
+        );
+        let is_reclaimed =
+            |record: &&AllocationRecord| record.is_released && record.generation <= reclaim_floor;
+        if output
+            .allocation_records
+            .iter()
+            .any(|record| is_reclaimed(&record))
+        {
+            versions_carrying_reclaimed_records += 1;
+        }
         for device in [DeviceIdentity(0), DeviceIdentity(1)] {
             let span_sum_in_slots: u64 = output
                 .allocation_records
                 .iter()
                 .filter(|record| record.device == device)
+                .filter(|record| !is_reclaimed(record))
                 .map(|record| u64::from(record.span_slots))
                 .sum();
             let allocated_bytes = output
@@ -700,8 +786,9 @@ fn allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hu
             assert_eq!(
                 allocated_bytes,
                 span_sum_in_slots * SLOT_BYTES,
-                "第 {overwrites} 次覆盖写（{} 条分配记录）盘 {}：「已分配」要等于这一版分配记录的跨度之和",
+                "第 {overwrites} 次覆盖写（{} 条分配记录，回收门槛 txg {}）盘 {}：「已分配」要等于这一版不是已回收的分配记录的跨度之和",
                 output.allocation_records.len(),
+                reclaim_floor.0,
                 device.0
             );
         }
@@ -711,13 +798,17 @@ fn allocated_statistic_equals_the_span_sum_of_the_allocation_records_past_six_hu
         pool.output = output;
     }
     assert!(
-        pool.output.allocation_records.len() > 900,
+        pool.output.allocation_records.len() > 812,
         "{overwrites} 次覆盖写之后 {} 条",
         pool.output.allocation_records.len()
     );
     assert!(
         versions_past_six_hundred_records >= 5,
         "过 600 条的版本 {versions_past_six_hundred_records} 个"
+    );
+    assert!(
+        versions_carrying_reclaimed_records >= 1,
+        "带已回收记录的版本 {versions_carrying_reclaimed_records} 个：根环一次都没转过，判法里减掉已回收那一半没走到"
     );
 }
 
@@ -969,10 +1060,10 @@ fn publish_running_out_of_space_midway_leaves_the_allocator_as_it_was() {
             .map(|device| DeviceShortOfDemand {
                 device,
                 available: AvailableBytesOnOneDevice(0),
-                demand: BytesOnOneDevice(8_912_896),
+                demand: BytesOnOneDevice(8_962_048),
             })
             .to_vec(),
-        "每块盘两个数据槽被数据单元取走之后没挡的槽剩 0（0 字节）< 第一个提交内生块要的 544 槽（8 912 896 字节；ckpt_cost 含谱系那一项 3 块）"
+        "每块盘两个数据槽被数据单元取走之后没挡的槽剩 0（0 字节）< 第一个提交内生块要的 547 槽（8 962 048 字节；ckpt_cost 含谱系、退役那两项各 3 块）"
     );
     assert_eq!(
         pool.allocator.records(),

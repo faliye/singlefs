@@ -1516,6 +1516,8 @@ pub struct FaultInjectionTally {
     pub checker_runs_on_the_image_after_the_fault: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
+    /// 判成「部分没判」（[`InvariantVerdict::PartiallyJudged`]）的条次：不红，也不算判绿。
+    pub invariant_partially_judged: BTreeMap<&'static str, u64>,
     pub faults_ending_known_red: BTreeMap<KnownRedFormAtAFault, u64>,
     pub faults_ending_new_finding: u64,
 }
@@ -1589,6 +1591,9 @@ impl FaultInjectionTally {
         }
         for (key, count) in &other.invariant_not_applicable {
             *self.invariant_not_applicable.entry(key).or_insert(0) += count;
+        }
+        for (key, count) in &other.invariant_partially_judged {
+            *self.invariant_partially_judged.entry(key).or_insert(0) += count;
         }
         for (form, count) in &other.faults_ending_known_red {
             *self.faults_ending_known_red.entry(*form).or_insert(0) += count;
@@ -1720,10 +1725,11 @@ impl FaultInjectionTally {
         );
         let _ = writeln!(
             text,
-            "注入之后的镜像上跑池级 checker {} 次：判绿 {} 条次、不适用 {} 条次",
+            "注入之后的镜像上跑池级 checker {} 次：判绿 {} 条次、不适用 {} 条次、部分没判 {} 条次",
             self.checker_runs_on_the_image_after_the_fault,
             self.invariant_holds.values().sum::<u64>(),
-            self.invariant_not_applicable.values().sum::<u64>()
+            self.invariant_not_applicable.values().sum::<u64>(),
+            self.invariant_partially_judged.values().sum::<u64>()
         );
         let _ = writeln!(
             text,
@@ -1804,9 +1810,12 @@ fn system_configuration_instance_before_a_mount_step(
     match segment {
         FaultedSegment::TheStartingPoint => Some(MKFS_INSTANCE_GENERATION),
         FaultedSegment::Operation { operation_kind, .. } => match operation_kind {
-            // 崩溃恢复抛弃根也是一次可写挂载：取号、写行、暖机。
+            // 崩溃恢复抛弃根、每块盘最新那一槽系统配置读回全 0 的那一次也是可写挂载：取号、写行、暖机；
+            // 掉电在 journal 记录之前的那次覆盖写之后也挂一次（掉电那一截不写系统配置）。
             HistoryOperationKind::CloseAndMountWritable
-            | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => {
+            | HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
+            | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable
+            | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
                 let index = marks
                     .iter()
                     .position(|mark| mark.position == segment.position())?;
@@ -1879,6 +1888,12 @@ fn checker_violations_on(
             InvariantVerdict::Holds => *tally.invariant_holds.entry(invariant).or_insert(0) += 1,
             InvariantVerdict::NotApplicable(_) => {
                 *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
+            }
+            InvariantVerdict::PartiallyJudged(_) => {
+                *tally
+                    .invariant_partially_judged
+                    .entry(invariant)
+                    .or_insert(0) += 1;
             }
             InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
         }
@@ -2497,7 +2512,11 @@ fn inject_one_fault(
             | HistoryOperation::ColdStartRecover
             | HistoryOperation::CrashRecoveryAbandoningTheNewestRoot
             | HistoryOperation::Unlink
-            | HistoryOperation::CreateInode => None,
+            | HistoryOperation::CreateInode
+            | HistoryOperation::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable(_)
+            | HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => {
+                None
+            }
         });
     let (read_back_root, read_back_content): (Option<ModelRootKey>, Option<&[u8]>) =
         match &read_back {
@@ -2618,7 +2637,9 @@ fn inject_one_fault(
                 .into_iter()
                 .filter_map(|(invariant, verdict)| match verdict {
                     InvariantVerdict::Violated(_) => Some(invariant),
-                    InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                    InvariantVerdict::Holds
+                    | InvariantVerdict::NotApplicable(_)
+                    | InvariantVerdict::PartiallyJudged(_) => None,
                 })
                 .collect();
         let swallowed_root_slot_writes: Vec<&SwallowedWrite> = swallowed_writes

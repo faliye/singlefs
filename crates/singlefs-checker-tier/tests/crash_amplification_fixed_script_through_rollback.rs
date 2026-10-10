@@ -125,11 +125,11 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         sizes,
         vec![
             2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1,
-            2, 24, 2, 1, 2, 20, 2, 1, 2
+            2, 24, 2, 1, 2, 24, 2, 1, 2
         ],
         "固定脚本到 D 为止的段序列（与 crash_enumeration_fixed_script_stream 登记的相同）"
     );
-    assert_eq!(writes.len(), 191, "到 C 166 + D 25");
+    assert_eq!(writes.len(), 195, "到 C 166 + D 29");
     let crash_points = recorder.into_crash_points(&writes, &segments, &stream_indexes);
     assert_eq!(crash_points.len(), segments.len(), "每个屏障段一个崩溃点");
     // 按入口归拢：名字 `<入口>.<周期>.<步>` 的第一段是入口
@@ -150,9 +150,9 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             ("publish_overwrite", 29),
             ("mount_writable", 67),
             ("publish_overwrite", 29),
-            ("roll_back_by_a_forward_publish", 25)
+            ("roll_back_by_a_forward_publish", 29)
         ],
-        "六个入口各管的写数：取号 2 + 暖机 5 × 2；A 29；B 29；重开取号 2 + 写行 23 + 暖机 21 × 2；C 29；D 25"
+        "六个入口各管的写数：取号 2 + 暖机 5 × 2；A 29；B 29；重开取号 2 + 写行 23 + 暖机 21 × 2；C 29；D 29（单元写 24：10 个固定点单元加谱系容器与谱系树根，各两块盘）"
     );
     let names: Vec<&str> = crash_points
         .iter()
@@ -194,12 +194,12 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
             "publish_overwrite.journal_record.1",
             "publish_overwrite.root_record_fua.1",
             "publish_overwrite.system_configuration_slot.1",
-            "roll_back_by_a_forward_publish.index_node.1",
+            "roll_back_by_a_forward_publish.index_node+packed_records.1",
             "roll_back_by_a_forward_publish.journal_record.1",
             "roll_back_by_a_forward_publish.root_record_fua.1",
             "roll_back_by_a_forward_publish.system_configuration_slot.1"
         ],
-        "36 个点的名字 <入口>.<周期：写的种类，单元写按类标签分 data_unit / index_node / packed_records>.<这个入口里这一种的第几段>：取号加暖机 7 段、A 4 段、B 4 段、重开 13 段（写行那一段是打包记录加索引节点、暖机两段只有索引节点）、C 4 段、D 4 段（回退只写索引节点）"
+        "36 个点的名字 <入口>.<周期：写的种类，单元写按类标签分 data_unit / index_node / packed_records>.<这个入口里这一种的第几段>：取号加暖机 7 段、A 4 段、B 4 段、重开 13 段（写行那一段是打包记录加索引节点、暖机两段只有索引节点）、C 4 段、D 4 段（回退那一段先写固定点的索引节点、再写谱系容器这个打包记录单元，D18（块里携带什么信息） 已定项 24 第 5 条）"
     );
     assert!(
         crash_points
@@ -220,6 +220,7 @@ fn the_fixed_script_through_the_rollback_is_recorded_checked_in_parallel_and_reu
         segments: &segments,
         judged_root_index,
         versions: &versions,
+        versions_without_a_file: &[],
         expansion: &expansion,
         crash_points,
     };

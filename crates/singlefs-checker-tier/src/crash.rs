@@ -33,8 +33,8 @@ use crate::layer0_progress::{
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_harness::memory_pool::{
     newest_persisted_root, publishes_in, root_identity_of_write, root_identity_written_by,
-    CrashImage, MemoryPool, PublishWrites, PublishedVersion, RecordCheck, RecordStreamContinuity,
-    RetainedWrite, WrittenContents, SECTOR_BYTES,
+    CrashImage, MemoryPool, PublishWrites, PublishedVersion, PublishedVersionWithoutAFile,
+    RecordCheck, RecordStreamContinuity, RetainedWrite, WrittenContents, SECTOR_BYTES,
 };
 use singlefs_harness::numeric_environment_variable::{
     number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
@@ -63,7 +63,7 @@ pub fn check_records(
 }
 
 /// 同一条判据，两份崩溃后镜像、被核的记录流与它的持久集合分开给（`persisted` 与 `writes` 逐条对应；`continuity` 说这张写表是
-/// 一条录制流，还是崩溃截断的流接上崩溃之后写出的流，[`publishes_in`] 按它分发布）。
+/// 一条录制流，还是在掉电、崩溃那几道接缝处断开的几截录制流，[`publishes_in`] 按它分发布）。
 ///
 /// 崩溃后镜像是两份（D13（验证路线） 已定项 7）：`crash_state_image` 是崩溃态镜像，判择根与前缀——第一条判据里根槽写与记录写
 /// 「在盘上」看它；`recovered_image` 是实现恢复后的镜像，判在不在——第二条判据里单元副本缺不缺席、恢复落到的那一版的实例表
@@ -74,10 +74,11 @@ pub fn check_records(
 /// - 层 0（[`check_records`]）：两份镜像同一份；写表是枚举用的那一张（录制流里的写在前，原地覆写的撕裂镜像与重放接在后面，
 ///   见 [`CrashImage`]），一条录制流。
 /// - 崩溃注入第一截（增补 3 第 3 件，`crash_injection.rs`）：两份镜像都是「更早的段整段持久 + 当前段一个子集」那份崩溃镜像；
-///   写表是这段历史的整条录制流，一条录制流——`persisted` 里更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久；
-///   恢复落到由记录重建的一版时，那一版的根槽写在更晚的段里，也在这张表里。
+///   写表是这段历史的整条录制流——`persisted` 里更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久；
+///   恢复落到由记录重建的一版时，那一版的根槽写在更晚的段里，也在这张表里。这个崩溃状态之前掉过电的，在每道掉电接缝处断开
+///   （`RecordStreamSeam::AfterAPowerLoss`：掉电之前那次改动落了盘、没有根的单元写不归掉电之后的第一次发布），没掉过电的是一条录制流。
 /// - 崩溃注入第二截（崩溃后镜像上可写挂载、再发一次布之后的池）：崩溃态镜像是第一截那份崩溃镜像，恢复后的镜像是挂载与那次发布
-///   之后的池；写表是整条历史录制流接上挂载那一段录制流、再接上那次发布的录制流，在历史与挂载的接缝处断开——历史那一段的持久集合
+///   之后的池；写表是整条历史录制流接上挂载那一段录制流、再接上那次发布的录制流，在历史与挂载的接缝处断开（第一截那几道掉电接缝照给）——历史那一段的持久集合
 ///   同第一截，挂载与那次发布全落了；`effective_root` 取挂载与那次发布写出的最新那条根（一条根都没写出时取第一次崩溃之后
 ///   恢复落到的那一版）。
 /// - 崩溃注入第三截（挂载途中的二次崩溃）：两份镜像都是二次崩溃镜像；写表同第二截，挂载那一段的持久集合按二次崩溃——
@@ -113,7 +114,7 @@ pub fn check_records_against<
     recovered_image: &RecoveredImage,
     writes: &[RetainedWrite],
     persisted: &[bool],
-    continuity: RecordStreamContinuity,
+    continuity: RecordStreamContinuity<'_>,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
 ) -> RecordCheck {
     assert_eq!(
@@ -287,7 +288,7 @@ fn rollback_floor_written_by(bytes: &[u8]) -> CheckpointTxg {
 ///   （下界过得了它）、要么比它新而它自己的根还在环里（本来就不许复用）。
 ///
 /// 按这三个界判，合法的复用不会被判成过不了；漏的是释放代比 `earlier_publish_txg + 1` 晚得多、又晚过门槛的那一类。
-/// 崩溃注入第二、三截的写表（崩溃截断的历史流接上崩溃之后写出的流，[`RecordStreamContinuity::ResumedAfterACrash`]）里，
+/// 崩溃注入第二、三截的写表（崩溃截断的历史流接上崩溃之后写出的流，`RecordStreamSeam::AfterACrash`）里，
 /// 截断处之后那一截历史写没发生过，接缝之后的写取「这次写之前」时照样把它们算进去：那一截的根比截断处之前的 txg 都大、
 /// 带的 F 不比之前的小，算进去只会把两个界往「过得了」那边推，不会把合法的复用判成过不了（推的，没造状态量过松了多少）。
 /// 前提有两条，写表的来路都满足：基镜像里的根带的 F 为 0（层 0 的基是 mkfs 之后，崩溃注入的基是空池），
@@ -966,13 +967,137 @@ pub fn oracle_violation_for_versions(
     .map(|violation| violation.reason)
 }
 
+/// 层 0 一条流的版本表：带文件的那几版（[`PublishedVersion`]）与文件从那一版起没有了的那几版（[`PublishedVersionWithoutAFile`]，
+/// D8（核心索引结构） 已定项 16 第 4 条：删除意图那次发布起冷走读答没有文件）。表按根（实例，txg）认；落到的根不在表里时，
+/// 照比它旧的最新那一项判（按 (txg, 实例) 字典序，同 D22（单元原子性怎么合成） 已定项 7 的择根序）。
+#[derive(Clone, Copy, Debug)]
+pub struct Layer0VersionTable<'table> {
+    versions_with_a_file: &'table [PublishedVersion],
+    versions_without_a_file: &'table [PublishedVersionWithoutAFile],
+}
+
+/// 恢复落到的根在版本表里是哪一项。
+#[derive(Clone, Copy, Debug)]
+enum Layer0VersionAtTheRoot<'table> {
+    /// 这一版有文件，读回的要是它的内容。
+    WithAFile(&'table PublishedVersion),
+    /// 文件从这一版起没有了。
+    WithoutAFile,
+    /// 表里没有这个根。
+    NotInTheTable,
+}
+
+impl<'table> Layer0VersionTable<'table> {
+    /// 没有一版是「文件从这一版起没有了」：文件一旦写出就不消失的流（删除之前的每一条流）。
+    #[must_use]
+    pub fn with_a_file_only(versions_with_a_file: &'table [PublishedVersion]) -> Self {
+        Self {
+            versions_with_a_file,
+            versions_without_a_file: &[],
+        }
+    }
+
+    /// # Panics
+    /// 同一个根（实例，txg）既在带文件的那几版里、又在没有文件的那几版里：版本表自相矛盾，是用例写错了。
+    #[must_use]
+    pub fn new(
+        versions_with_a_file: &'table [PublishedVersion],
+        versions_without_a_file: &'table [PublishedVersionWithoutAFile],
+    ) -> Self {
+        for without_a_file in versions_without_a_file {
+            assert!(
+                !versions_with_a_file.iter().any(|with_a_file| {
+                    (with_a_file.instance, with_a_file.checkpoint_txg)
+                        == (without_a_file.instance, without_a_file.checkpoint_txg)
+                }),
+                "实例 {} 第 {} 代既写成有文件、又写成文件从这一版起没有了",
+                without_a_file.instance.0,
+                without_a_file.checkpoint_txg.0
+            );
+        }
+        Self {
+            versions_with_a_file,
+            versions_without_a_file,
+        }
+    }
+
+    fn version_at_the_root(
+        &self,
+        instance: InstanceGeneration,
+        checkpoint_txg: CheckpointTxg,
+    ) -> Layer0VersionAtTheRoot<'table> {
+        if let Some(with_a_file) = self.versions_with_a_file.iter().find(|version| {
+            version.checkpoint_txg == checkpoint_txg && version.instance == instance
+        }) {
+            return Layer0VersionAtTheRoot::WithAFile(with_a_file);
+        }
+        if self
+            .versions_without_a_file
+            .iter()
+            .any(|version| version.checkpoint_txg == checkpoint_txg && version.instance == instance)
+        {
+            return Layer0VersionAtTheRoot::WithoutAFile;
+        }
+        Layer0VersionAtTheRoot::NotInTheTable
+    }
+
+    /// 不在表里的根照比它旧的最新那一项：那一项有文件就交回它（报没有文件是违例），那一项是没有文件、或没有更旧的项就交回 `None`。
+    /// 文件从不消失的表里（[`Self::with_a_file_only`]）这与「任一更旧版有文件」相同。
+    fn newest_older_version_if_it_has_a_file(
+        &self,
+        instance: InstanceGeneration,
+        checkpoint_txg: CheckpointTxg,
+    ) -> Option<&'table PublishedVersion> {
+        let newest_older_with_a_file = self
+            .versions_with_a_file
+            .iter()
+            .filter(|version| {
+                (version.checkpoint_txg, version.instance) < (checkpoint_txg, instance)
+            })
+            .max_by_key(|version| (version.checkpoint_txg, version.instance));
+        let newest_older_without_a_file = self
+            .versions_without_a_file
+            .iter()
+            .map(|version| (version.checkpoint_txg, version.instance))
+            .filter(|root| *root < (checkpoint_txg, instance))
+            .max();
+        match (newest_older_with_a_file, newest_older_without_a_file) {
+            (Some(with_a_file), Some(without_a_file)) => {
+                ((with_a_file.checkpoint_txg, with_a_file.instance) > without_a_file)
+                    .then_some(with_a_file)
+            }
+            (Some(with_a_file), None) => Some(with_a_file),
+            (None, Some(_) | None) => None,
+        }
+    }
+}
+
 /// 同 [`oracle_violation_for_versions`]，另交回违例是哪一类（[`Layer0OracleViolationKind`]，层 0 发现表按它分签名）。
+/// 文件从不消失的流：版本表是 [`Layer0VersionTable::with_a_file_only`]。
 #[must_use]
 pub fn classified_oracle_violation_for_versions(
     outcome: &RecoveryOutcome,
     effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
     newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
     versions: &[PublishedVersion],
+) -> Option<Layer0OracleViolation> {
+    classified_oracle_violation_for_the_version_table(
+        outcome,
+        effective_root,
+        newest_persisted_root,
+        Layer0VersionTable::with_a_file_only(versions),
+    )
+}
+
+/// 层 0 的 oracle 对一张版本表（[`Layer0VersionTable`]）判：落到的根是带文件的一版，读回的得是它的内容；是「文件从这一版起没有了」
+/// 的一版，只许报没有文件；不在表里，报没有文件时看比它旧的最新那一项——那一项有文件就是违例（文件从不消失的流上与「任一更旧版有文件」
+/// 相同），不在表里却读出了内容一律是违例。根槽已持久而恢复到旧态、走读失败、没择到根同 [`oracle_violation_for_versions`]。
+#[must_use]
+pub fn classified_oracle_violation_for_the_version_table(
+    outcome: &RecoveryOutcome,
+    effective_root: Option<(InstanceGeneration, CheckpointTxg)>,
+    newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
+    versions: Layer0VersionTable<'_>,
 ) -> Option<Layer0OracleViolation> {
     let violation =
         |kind: Layer0OracleViolationKind, reason: String| Layer0OracleViolation { kind, reason };
@@ -993,21 +1118,18 @@ pub fn classified_oracle_violation_for_versions(
             ));
         }
     }
-    let version = versions.iter().find(|version| {
-        version.checkpoint_txg == effective_txg && version.instance == effective_instance
-    });
-    match (outcome, version) {
+    match (
+        outcome,
+        versions.version_at_the_root(effective_instance, effective_txg),
+    ) {
         (RecoveryOutcome::Failed { failure, .. }, _) => Some(violation(
             Layer0OracleViolationKind::ReadFailed,
             format!("走读失败：{failure:?}"),
         )),
-        // 落在一个没发布过的更新的根上报「没有文件」：更旧的根下面有文件时是违例（第二轮攻方腿：此前一律放过）。
-        (RecoveryOutcome::NoFile { .. }, None) => versions
-            .iter()
-            .find(|candidate_version| {
-                (candidate_version.checkpoint_txg, candidate_version.instance)
-                    < (effective_txg, effective_instance)
-            })
+        // 落在一个表里没有的更新的根上报「没有文件」：比它旧的最新一项下面有文件时是违例（第二轮攻方腿：此前一律放过）；
+        // 那一项是「文件从这一版起没有了」（删除那几批落在意图之后）时不是。
+        (RecoveryOutcome::NoFile { .. }, Layer0VersionAtTheRoot::NotInTheTable) => versions
+            .newest_older_version_if_it_has_a_file(effective_instance, effective_txg)
             .map(|older_version| {
                 violation(
                     Layer0OracleViolationKind::NoFileWhereAnOlderRootHasOne,
@@ -1020,15 +1142,19 @@ pub fn classified_oracle_violation_for_versions(
                 ),
                 )
             }),
-        (RecoveryOutcome::NoFile { .. }, Some(_)) => Some(violation(
+        (RecoveryOutcome::NoFile { .. }, Layer0VersionAtTheRoot::WithoutAFile) => None,
+        (RecoveryOutcome::NoFile { .. }, Layer0VersionAtTheRoot::WithAFile(_)) => Some(violation(
             Layer0OracleViolationKind::NoFileWhereThisRootHasOne,
             format!("第 {} 代根下面有文件却报没有", effective_txg.0),
         )),
-        (RecoveryOutcome::FileRead { .. }, None) => Some(violation(
+        (
+            RecoveryOutcome::FileRead { .. },
+            Layer0VersionAtTheRoot::NotInTheTable | Layer0VersionAtTheRoot::WithoutAFile,
+        ) => Some(violation(
             Layer0OracleViolationKind::FileReadWhereThisRootHasNone,
             format!("第 {} 代根下面没有文件却读出了内容", effective_txg.0),
         )),
-        (RecoveryOutcome::FileRead { content, .. }, Some(version)) => {
+        (RecoveryOutcome::FileRead { content, .. }, Layer0VersionAtTheRoot::WithAFile(version)) => {
             (*content != version.content).then(|| {
                 violation(
                     Layer0OracleViolationKind::WrongContent,
@@ -1072,7 +1198,7 @@ pub fn evaluate_state_for_versions(
         writes,
         persisted,
         judged_root_index,
-        versions,
+        Layer0VersionTable::with_a_file_only(versions),
         None,
         tally,
     )
@@ -1166,7 +1292,9 @@ impl Layer0StateJudgement {
                 InvariantVerdict::Violated(_) => {
                     items.push(format!("{LAYER0_RED_PASS_POOL_CHECKER}:{invariant}"))
                 }
-                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => {}
+                InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_) => {}
             }
         }
         if self.records.root_without_record {
@@ -1202,7 +1330,9 @@ impl Layer0StateJudgement {
             .iter()
             .filter_map(|(invariant, verdict)| match verdict {
                 InvariantVerdict::Violated(detail) => Some((*invariant, detail.clone())),
-                InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_) => None,
             })
             .collect();
         if !violated.is_empty() {
@@ -1218,23 +1348,38 @@ impl Layer0StateJudgement {
 }
 
 /// 判一个崩溃镜像（写表是枚举用的那一张，撕裂镜像与重放接在后面）；`judged_root_index` 是被判的那次根槽 FUA 写。
+/// 文件从不消失的流：版本表是 [`Layer0VersionTable::with_a_file_only`]。
 #[must_use]
 pub fn judge_crash_image(
     image: &CrashImage<'_>,
     judged_root_index: usize,
     versions: &[PublishedVersion],
 ) -> Layer0StateJudgement {
+    judge_crash_image_against_the_version_table(
+        image,
+        judged_root_index,
+        Layer0VersionTable::with_a_file_only(versions),
+    )
+}
+
+/// 同 [`judge_crash_image`]，oracle 对一张版本表判（[`classified_oracle_violation_for_the_version_table`]）。
+#[must_use]
+fn judge_crash_image_against_the_version_table(
+    image: &CrashImage<'_>,
+    judged_root_index: usize,
+    versions: Layer0VersionTable<'_>,
+) -> Layer0StateJudgement {
     let root_persisted = image.persisted[judged_root_index];
     let newest_persisted = newest_persisted_root(image.writes, &image.persisted);
     let consulted = recover(image, JournalPolicy::Consult);
     let ignored = recover(image, JournalPolicy::Ignore);
-    let consulted_oracle = classified_oracle_violation_for_versions(
+    let consulted_oracle = classified_oracle_violation_for_the_version_table(
         &consulted.outcome,
         consulted.effective_root,
         newest_persisted,
         versions,
     );
-    let ignored_oracle = classified_oracle_violation_for_versions(
+    let ignored_oracle = classified_oracle_violation_for_the_version_table(
         &ignored.outcome,
         ignored.effective_root,
         newest_persisted,
@@ -1274,6 +1419,38 @@ pub fn judge_layer0_state_range(
     ordinals: Range<u64>,
     judge_state: &mut dyn FnMut(u64, &CrashImage<'_>, &Layer0StateJudgement),
 ) -> u64 {
+    judge_layer0_state_range_against_the_version_table(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        Layer0VersionTable::with_a_file_only(versions),
+        expansion,
+        ordinals,
+        judge_state,
+    )
+}
+
+/// 同 [`judge_layer0_state_range`]，oracle 对一张版本表判（[`classified_oracle_violation_for_the_version_table`]）：文件会消失的流
+/// （删除流：意图那一版起没有文件）经崩溃放量判的时候走这里（`crash_amplification::CrashFlow` 带「没有文件的那几版」）。
+///
+/// # Panics
+/// `ordinals` 越过整条流的状态数。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "与 judge_layer0_state_range 同一组参数，版本表换成带「没有文件的那几版」的那一张"
+)]
+#[must_use]
+pub fn judge_layer0_state_range_against_the_version_table(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: Layer0VersionTable<'_>,
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    ordinals: Range<u64>,
+    judge_state: &mut dyn FnMut(u64, &CrashImage<'_>, &Layer0StateJudgement),
+) -> u64 {
     let tearable = TearableInPlaceOverwrites::of(base, writes);
     let writes_with_torn_images = WritesWithTornImages::of(base, writes, segments, &tearable);
     let plan = Layer0StatePlan::new(
@@ -1295,7 +1472,8 @@ pub fn judge_layer0_state_range(
             writes: enumerated_writes,
             persisted: plan.persisted_writes_of_state(ordinal),
         };
-        let judgement = judge_crash_image(&image, judged_root_index, versions);
+        let judgement =
+            judge_crash_image_against_the_version_table(&image, judged_root_index, versions);
         judge_state(ordinal, &image, &judgement);
     }
     plan.state_count
@@ -1400,7 +1578,7 @@ fn evaluate_state_recording_findings(
     writes: &[RetainedWrite],
     persisted: Vec<bool>,
     judged_root_index: usize,
-    versions: &[PublishedVersion],
+    versions: Layer0VersionTable<'_>,
     position: Option<Layer0StatePosition>,
     tally: &mut Layer0Tally,
 ) -> RecoveryReport {
@@ -1409,7 +1587,8 @@ fn evaluate_state_recording_findings(
         writes,
         persisted,
     };
-    let judgement = judge_crash_image(&image, judged_root_index, versions);
+    let judgement =
+        judge_crash_image_against_the_version_table(&image, judged_root_index, versions);
     let Layer0StateJudgement {
         consulted,
         ignored,
@@ -1484,7 +1663,9 @@ fn evaluate_state_recording_findings(
                     .or_insert_with(|| detail.clone());
                 violated_invariants.push((invariant, detail));
             }
-            InvariantVerdict::NotApplicable(_) => {
+            // 部分没判（`InvariantVerdict::PartiallyJudged`）不红、也不算评估过（判到的那一部分成立不等于整条成立）：计进不适用这一格，
+            // 「评估过 + 不适用 = 状态数」照旧成立，进度文件的格式也不多一格。
+            InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => {
                 *tally
                     .checker_not_applicable_states
                     .entry(invariant)
@@ -2356,6 +2537,34 @@ enum SlicingRule {
 pub type Layer0StateObserver<'observer> =
     &'observer mut dyn FnMut(&CrashImage<'_>, &RecoveryReport, &mut Layer0ObserverCounts);
 
+/// 在工作线程上跑的逐状态观察者：同 [`Layer0StateObserver`] 拿到的三样，各工作线程共用一份、并发调用，所以只读、能跨线程。
+/// 每个状态评完就在评它的那个工作线程上调，计数记进那一片自己的观察者计数，并片时按片号次序相加（与在调用线程上看的计数相同）。
+/// 每个状态上要做重活（可写挂载）的观察者用它：调用线程上逐个看撑不住全量。
+pub type Layer0StateObserverOnTheWorkerThreads<'observer> =
+    &'observer (dyn Fn(&CrashImage<'_>, &RecoveryReport, &mut Layer0ObserverCounts) + Sync);
+
+/// 层 0 枚举逐状态看不看、在哪个线程上看。
+pub enum Layer0StateObserving<'observer> {
+    /// 不看。
+    NoObserver,
+    /// 在调用线程上、按状态序号从小到大看（[`Layer0StateObserver`]）。
+    OnTheCallingThread(Layer0StateObserver<'observer>),
+    /// 在评那个状态的工作线程上看（[`Layer0StateObserverOnTheWorkerThreads`]）。
+    OnTheWorkerThreads(Layer0StateObserverOnTheWorkerThreads<'observer>),
+}
+
+impl<'observer> Layer0StateObserving<'observer> {
+    /// 旧入口的写法：`None` 不看，`Some` 在调用线程上看。
+    fn on_the_calling_thread_if_given(
+        observe_state: Option<Layer0StateObserver<'observer>>,
+    ) -> Self {
+        match observe_state {
+            Some(observe) => Self::OnTheCallingThread(observe),
+            None => Self::NoObserver,
+        }
+    }
+}
+
 /// 工作线程评状态时 panic，就把旗子立起来：别的工作线程看到旗子不再领新片，调用线程不必等整条流跑完才知道红了。
 struct RaiseFlagWhenPanicking<'flag>(&'flag AtomicBool);
 
@@ -2368,10 +2577,12 @@ impl Drop for RaiseFlagWhenPanicking<'_> {
 }
 
 /// 工作线程要不要把每个状态的持久集合与看 journal 那一遍恢复的报告带回调用线程。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum StateReportRetention {
-    /// 有观察者：带回去，由调用线程按序号交给它。
+#[derive(Clone, Copy)]
+enum StateReportRetention<'observer> {
+    /// 在调用线程上看的观察者：带回去，由调用线程按序号交给它。
     HandEachStateToObserver,
+    /// 在工作线程上看的观察者：评完一个状态就地交给它，只带计数回去。
+    ObserveOnTheWorkerThread(Layer0StateObserverOnTheWorkerThreads<'observer>),
     /// 没有观察者：只带计数回去（全量流上两百多万个报告不必留）。
     CountOnly,
 }
@@ -2397,8 +2608,8 @@ fn evaluate_state_slice(
     slice_index: usize,
     slice: Range<u64>,
     judged_root_index: usize,
-    versions: &[PublishedVersion],
-    retention: StateReportRetention,
+    versions: Layer0VersionTable<'_>,
+    retention: StateReportRetention<'_>,
 ) -> FinishedSlice {
     let mut tally = Layer0Tally::default();
     let mut observed_states = Vec::new();
@@ -2422,6 +2633,27 @@ fn evaluate_state_slice(
                     &mut tally,
                 );
                 observed_states.push((persisted, consulted_report));
+            }
+            StateReportRetention::ObserveOnTheWorkerThread(observe) => {
+                let consulted_report = evaluate_state_recording_findings(
+                    base,
+                    writes,
+                    persisted.clone(),
+                    judged_root_index,
+                    versions,
+                    Some(position),
+                    &mut tally,
+                );
+                observe(
+                    &CrashImage {
+                        base,
+                        writes,
+                        persisted,
+                    },
+                    &consulted_report,
+                    &mut tally.observer_counts,
+                );
+                tally.observed_states += 1;
             }
             StateReportRetention::CountOnly => {
                 evaluate_state_recording_findings(
@@ -2566,7 +2798,7 @@ fn layer0_plan_hash(
     writes: &[RetainedWrite],
     plan: &Layer0StatePlan<'_>,
     judged_root_index: usize,
-    versions: &[PublishedVersion],
+    versions: Layer0VersionTable<'_>,
     slices: &[Range<u64>],
     has_observer: bool,
     shard: Option<Layer0ShardOfShards>,
@@ -2614,10 +2846,23 @@ fn layer0_plan_hash(
             .expect("下标")
             .to_le_bytes(),
     );
-    for version in versions {
+    for version in versions.versions_with_a_file {
         message.extend_from_slice(&version.instance.0.to_le_bytes());
         message.extend_from_slice(&version.checkpoint_txg.0.to_le_bytes());
         append_length_prefixed(&mut message, &version.content);
+    }
+    // 没有文件的那几版只在有的时候拼：文件从不消失的流，计划哈希与加这一项之前的相同，旧进度文件照样相认。
+    if !versions.versions_without_a_file.is_empty() {
+        append_length_prefixed(&mut message, b"versions without a file");
+        message.extend_from_slice(
+            &u64::try_from(versions.versions_without_a_file.len())
+                .expect("版本数装得进 u64")
+                .to_le_bytes(),
+        );
+        for version in versions.versions_without_a_file {
+            message.extend_from_slice(&version.instance.0.to_le_bytes());
+            message.extend_from_slice(&version.checkpoint_txg.0.to_le_bytes());
+        }
     }
     message.extend_from_slice(&plan.state_count.to_le_bytes());
     for slice in slices {
@@ -3032,8 +3277,7 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard(
 /// 同 [`enumerate_layer0_in_state_slices_or_one_shard`]；另有发现日志建、写、落盘失败。
 #[allow(
     clippy::too_many_arguments,
-    clippy::too_many_lines,
-    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者、续跑与发现日志；续跑的读回、并片、落盘、收尾是同一件事的几步，拆开要把可变状态来回传"
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者、续跑与发现日志"
 )]
 #[must_use]
 pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
@@ -3044,7 +3288,77 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
     versions: &[PublishedVersion],
     expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
     parallelism: Layer0Parallelism,
-    mut observe_state: Option<Layer0StateObserver<'_>>,
+    observe_state: Option<Layer0StateObserver<'_>>,
+    resume: &Layer0Resume,
+    findings_log: &Layer0FindingsLog,
+) -> Layer0EnumerationOutcome {
+    enumerate_layer0_against_the_version_table_with_findings_log(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        Layer0VersionTable::with_a_file_only(versions),
+        expansion,
+        parallelism,
+        Layer0StateObserving::on_the_calling_thread_if_given(observe_state),
+        resume,
+        findings_log,
+    )
+}
+
+/// 同 [`enumerate_layer0_in_state_slices_or_one_shard`]，oracle 对一张版本表判（[`Layer0VersionTable`]：带「文件从这一版起没有了」的流，
+/// 删除那几次发布），观察者可以放到工作线程上看（[`Layer0StateObserving::OnTheWorkerThreads`]：每个状态上可写挂载这种重活）。
+/// 进度文件的计划哈希另拼没有文件的那几版（没有时与 [`enumerate_layer0_in_state_slices_or_one_shard`] 的相同）；观察者在哪个线程上看不进哈希，
+/// 两种看法的观察者计数相同。
+///
+/// # Panics
+/// 同 [`enumerate_layer0_in_state_slices_or_one_shard`]。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "前六个与单线程时的枚举相同（版本表多了没有文件的那几版），多出来的是切法、观察者与续跑"
+)]
+#[must_use]
+pub fn enumerate_layer0_against_the_version_table_or_one_shard(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: Layer0VersionTable<'_>,
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    parallelism: Layer0Parallelism,
+    observing: Layer0StateObserving<'_>,
+    resume: &Layer0Resume,
+) -> Layer0EnumerationOutcome {
+    enumerate_layer0_against_the_version_table_with_findings_log(
+        base,
+        writes,
+        segments,
+        judged_root_index,
+        versions,
+        expansion,
+        parallelism,
+        observing,
+        resume,
+        &Layer0FindingsLog::from_environment(),
+    )
+}
+
+/// 层 0 枚举的本体（几个公开入口都落到这里），写法见 [`enumerate_layer0_in_state_slices`] 与
+/// [`enumerate_layer0_in_state_slices_or_one_shard_with_findings_log`]。
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    reason = "前六个与单线程时的枚举相同，多出来的是切法、观察者、续跑与发现日志；续跑的读回、并片、落盘、收尾是同一件事的几步，拆开要把可变状态来回传"
+)]
+fn enumerate_layer0_against_the_version_table_with_findings_log(
+    base: &MemoryPool,
+    writes: &[RetainedWrite],
+    segments: &[Vec<usize>],
+    judged_root_index: usize,
+    versions: Layer0VersionTable<'_>,
+    expansion: &dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion,
+    parallelism: Layer0Parallelism,
+    observing: Layer0StateObserving<'_>,
     resume: &Layer0Resume,
     findings_log: &Layer0FindingsLog,
 ) -> Layer0EnumerationOutcome {
@@ -3063,7 +3377,21 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
         plan.state_count,
         &slicing_of_the_run(&parallelism, resume, plan.state_count),
     );
-    let has_observer = observe_state.is_some();
+    let (retention, mut observe_state) = match observing {
+        Layer0StateObserving::NoObserver => (StateReportRetention::CountOnly, None),
+        Layer0StateObserving::OnTheCallingThread(observe) => {
+            (StateReportRetention::HandEachStateToObserver, Some(observe))
+        }
+        Layer0StateObserving::OnTheWorkerThreads(observe) => (
+            StateReportRetention::ObserveOnTheWorkerThread(observe),
+            None,
+        ),
+    };
+    let has_observer = match retention {
+        StateReportRetention::HandEachStateToObserver
+        | StateReportRetention::ObserveOnTheWorkerThread(_) => true,
+        StateReportRetention::CountOnly => false,
+    };
     let (progress_settings, shard_run) = match resume {
         Layer0Resume::NoProgressFile => (None, None),
         Layer0Resume::KeepProgressFile(settings) => (Some(settings), None),
@@ -3158,10 +3486,6 @@ pub fn enumerate_layer0_in_state_slices_or_one_shard_with_findings_log(
         .collect();
     let restored_slice_count = restored_slices.len();
     let spawned_worker_threads = parallelism.worker_threads.get().min(slices_to_run.len());
-    let retention = match observe_state {
-        Some(_) => StateReportRetention::HandEachStateToObserver,
-        None => StateReportRetention::CountOnly,
-    };
     // 分片跑一片时两行 LAYER0_PARALLEL_* 的 states= / slices= 是这一片的，另带整条流的数；不分片时什么都不加，与分片之前逐字相同。
     let shard_fields = shard.map_or_else(String::new, |shard| {
         format!(
@@ -3716,6 +4040,68 @@ mod tests {
                 contents: WrittenContents::Bytes(vec![0u8; 512]),
             })
             .collect()
+    }
+
+    /// 计划哈希里「没有文件的那几版」只在有的时候拼（第 33 批 R，判决 `research/prompts/m3-batch33r-code-r1-main-verification.md`
+    /// 第三节第 2 条补的变异行）：版本表里没有那几版时，哈希与加这一支之前那一版 `layer0_plan_hash` 逐字相同，旧进度文件照样相认——
+    /// 钉值是照加这一支之前的拼法另算的（三次 512 字节全零的单元写、一段不展开、被判的根下标 2、带文件的一版是实例 1 第 3 代内容 `A`、
+    /// 一片 0..1、没有观察者、不分片）；有那几版时，两组不同的那几版算出不同的计划，也与没有那几版的不同。
+    #[test]
+    fn the_plan_hash_takes_the_versions_without_a_file_only_when_the_table_has_some() {
+        const PLAN_HASH_BEFORE_THE_VERSIONS_WITHOUT_A_FILE_WERE_HASHED: &str =
+            "3729ab0a41c79064becbabde10841d6f933118e1ff7b0ecd171f3eb21751cb88";
+        let writes = writes_of_kinds(&[StepKind::UnitWrite; 3]);
+        let segments = vec![vec![0, 1, 2]];
+        let tearable = TearableInPlaceOverwrites::none(writes.len());
+        let writes_with_torn_images =
+            WritesWithTornImages::of(&MemoryPool::default(), &writes, &segments, &tearable);
+        let plan = Layer0StatePlan::new(
+            &writes,
+            &segments,
+            &|_segment_index, _segment| Layer0SegmentExpansion::NotExpanded,
+            &tearable,
+            &writes_with_torn_images,
+        );
+        assert_eq!(plan.state_count, 1, "一段不展开，只有全部持久那一个状态");
+        let versions_with_a_file = vec![PublishedVersion {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(3),
+            content: b"A".to_vec(),
+        }];
+        let one_slice_of_every_state = 0..plan.state_count;
+        let plan_hash_with = |versions_without_a_file: &[PublishedVersionWithoutAFile]| {
+            layer0_plan_hash(
+                &MemoryPool::default(),
+                &writes,
+                &plan,
+                2,
+                Layer0VersionTable::new(&versions_with_a_file, versions_without_a_file),
+                std::slice::from_ref(&one_slice_of_every_state),
+                false,
+                None,
+            )
+        };
+        let without_any = plan_hash_with(&[]);
+        assert_eq!(
+            without_any, PLAN_HASH_BEFORE_THE_VERSIONS_WITHOUT_A_FILE_WERE_HASHED,
+            "版本表里没有「没有文件的那几版」时，计划哈希与加这一支之前的相同"
+        );
+        let from_txg_six = plan_hash_with(&[PublishedVersionWithoutAFile {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(6),
+        }]);
+        let from_txg_seven = plan_hash_with(&[PublishedVersionWithoutAFile {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(7),
+        }]);
+        assert_ne!(
+            from_txg_six, from_txg_seven,
+            "两组不同的「没有文件的那几版」是两份计划"
+        );
+        assert_ne!(
+            from_txg_six, without_any,
+            "有「没有文件的那几版」与没有的是两份计划"
+        );
     }
 
     /// 甲二那一串持久集合的参照走法（与计划分开写）：逐段，段内先按原地写的子集掩码从 0 数到 2^k − 1，每个掩码先「单元写全不落」、
@@ -4622,7 +5008,12 @@ mod tests {
 
 #[cfg(test)]
 mod oracle_instance_tests {
-    use super::{oracle_violation_for_versions, PublishedVersion};
+    use super::{
+        classified_oracle_violation_for_the_version_table,
+        classified_oracle_violation_for_versions, oracle_violation_for_versions,
+        Layer0OracleViolationKind, Layer0VersionTable, PublishedVersion,
+        PublishedVersionWithoutAFile,
+    };
     use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
     use singlefs_core::recovery::RecoveryOutcome;
 
@@ -4687,6 +5078,234 @@ mod oracle_instance_tests {
             ),
             None
         );
+    }
+
+    /// 多记录流（`crates/singlefs-checker-tier/tests/crash_enumeration_multi_record_publish_stream.rs`）的版本表：实例 1 的
+    /// A、B、C 三次带文件的发布落在第 3、4、5 代（第 1、2 代是两次暖机，根下面没有文件）。
+    fn the_multi_record_publish_stream_versions() -> Vec<PublishedVersion> {
+        [
+            (3, b"A".as_slice()),
+            (4, b"B".as_slice()),
+            (5, b"C".as_slice()),
+        ]
+        .into_iter()
+        .map(|(checkpoint_txg, content)| PublishedVersion {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(checkpoint_txg),
+            content: content.to_vec(),
+        })
+        .collect()
+    }
+
+    /// 改「根不在表里只看比它旧的最新一版」之前的判法（逐字照那一版的分支写）：报没有文件、根不在表里，任一更旧版有文件就是违例。
+    fn kind_judged_by_any_older_version_with_a_file(
+        outcome: &RecoveryOutcome,
+        effective_root: (InstanceGeneration, CheckpointTxg),
+        newest_persisted_root: Option<(CheckpointTxg, InstanceGeneration)>,
+        versions: &[PublishedVersion],
+    ) -> Option<Layer0OracleViolationKind> {
+        let (effective_instance, effective_txg) = effective_root;
+        if newest_persisted_root.is_some_and(|newest| (effective_txg, effective_instance) < newest)
+        {
+            return Some(Layer0OracleViolationKind::RecoveredToAnOlderRoot);
+        }
+        let version = versions.iter().find(|version| {
+            version.checkpoint_txg == effective_txg && version.instance == effective_instance
+        });
+        match (outcome, version) {
+            (RecoveryOutcome::Failed { .. }, _) => Some(Layer0OracleViolationKind::ReadFailed),
+            (RecoveryOutcome::NoFile { .. }, None) => versions
+                .iter()
+                .any(|candidate_version| {
+                    (candidate_version.checkpoint_txg, candidate_version.instance)
+                        < (effective_txg, effective_instance)
+                })
+                .then_some(Layer0OracleViolationKind::NoFileWhereAnOlderRootHasOne),
+            (RecoveryOutcome::NoFile { .. }, Some(_)) => {
+                Some(Layer0OracleViolationKind::NoFileWhereThisRootHasOne)
+            }
+            (RecoveryOutcome::FileRead { .. }, None) => {
+                Some(Layer0OracleViolationKind::FileReadWhereThisRootHasNone)
+            }
+            (RecoveryOutcome::FileRead { content, .. }, Some(version)) => {
+                (*content != version.content).then_some(Layer0OracleViolationKind::WrongContent)
+            }
+        }
+    }
+
+    /// 文件从不消失的流上，「根不在表里只看比它旧的最新一版」与「任一更旧版有文件」判得逐项相同：多记录流与两实例同 txg 两张版本表，
+    /// 实例 0–2、第 0–8 代的每个根，报没有文件、读出表里每一版的内容、读出表里没有的内容，盘上最新根槽没有或就是这个根，两种判法交回的违例类相同。
+    #[test]
+    fn a_table_where_the_file_never_vanishes_judges_a_root_not_in_it_like_any_older_version_with_a_file(
+    ) {
+        for versions in [
+            the_multi_record_publish_stream_versions(),
+            two_instances_at_txg_seven(),
+        ] {
+            let mut judged_pairs = 0usize;
+            for instance in 0..=2 {
+                for checkpoint_txg in 0..=8 {
+                    let root = (InstanceGeneration(instance), CheckpointTxg(checkpoint_txg));
+                    let mut outcomes = vec![RecoveryOutcome::NoFile { root }];
+                    outcomes.extend(
+                        versions
+                            .iter()
+                            .map(|version| version.content.clone())
+                            .chain([b"not written by any version".to_vec()])
+                            .map(|content| RecoveryOutcome::FileRead { root, content }),
+                    );
+                    for outcome in &outcomes {
+                        for newest_persisted_root in [None, Some((root.1, root.0))] {
+                            assert_eq!(
+                                classified_oracle_violation_for_versions(
+                                    outcome,
+                                    Some(root),
+                                    newest_persisted_root,
+                                    &versions,
+                                )
+                                .map(|violation| violation.kind),
+                                kind_judged_by_any_older_version_with_a_file(
+                                    outcome,
+                                    root,
+                                    newest_persisted_root,
+                                    &versions,
+                                ),
+                                "根 {root:?}、{outcome:?}、盘上最新根槽 {newest_persisted_root:?}：两种判法应当相同"
+                            );
+                            judged_pairs += 1;
+                        }
+                    }
+                }
+            }
+            assert_eq!(
+                judged_pairs,
+                3 * 9 * (versions.len() + 2) * 2,
+                "每个根、每种结局、两种最新根槽都判到了"
+            );
+        }
+    }
+
+    /// 多记录流之后 unlink 的版本表（`crates/singlefs-checker-tier/tests/crash_enumeration_unlink_after_the_multi_record_publish_stream.rs`）：
+    /// A、B、C 有文件，第 6 代（删除意图那次）起没有文件，之后两批与最后一批（第 7–9 代）不进表。
+    fn versions_without_a_file_from_txg_six() -> Vec<PublishedVersionWithoutAFile> {
+        vec![PublishedVersionWithoutAFile {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(6),
+        }]
+    }
+
+    fn kind_judged_against_the_table(
+        outcome: &RecoveryOutcome,
+        effective_root: (InstanceGeneration, CheckpointTxg),
+        versions: Layer0VersionTable<'_>,
+    ) -> Option<Layer0OracleViolationKind> {
+        classified_oracle_violation_for_the_version_table(
+            outcome,
+            Some(effective_root),
+            Some((effective_root.1, effective_root.0)),
+            versions,
+        )
+        .map(|violation| violation.kind)
+    }
+
+    /// D8（核心索引结构） 已定项 16 第 4 条：意图那次起冷走读答没有文件。落在意图那一版、或落在它之后不在表里的根（各批）上报没有文件不是违例；
+    /// 在那几个根上读出内容、落在 C 上报没有文件照旧是违例。
+    #[test]
+    fn no_file_from_the_version_without_a_file_on_is_not_a_violation_and_a_file_read_there_is() {
+        let with_a_file = the_multi_record_publish_stream_versions();
+        let without_a_file = versions_without_a_file_from_txg_six();
+        let table = Layer0VersionTable::new(&with_a_file, &without_a_file);
+        for checkpoint_txg in 6..=9 {
+            let root = (InstanceGeneration(1), CheckpointTxg(checkpoint_txg));
+            assert_eq!(
+                kind_judged_against_the_table(&RecoveryOutcome::NoFile { root }, root, table),
+                None,
+                "第 {checkpoint_txg} 代（意图那次或之后的一批）报没有文件不是违例"
+            );
+            assert_eq!(
+                kind_judged_against_the_table(
+                    &RecoveryOutcome::FileRead {
+                        root,
+                        content: b"C".to_vec(),
+                    },
+                    root,
+                    table
+                ),
+                Some(Layer0OracleViolationKind::FileReadWhereThisRootHasNone),
+                "第 {checkpoint_txg} 代起没有文件，读出 C 的内容是违例"
+            );
+        }
+        let root_of_c = (InstanceGeneration(1), CheckpointTxg(5));
+        assert_eq!(
+            kind_judged_against_the_table(
+                &RecoveryOutcome::NoFile { root: root_of_c },
+                root_of_c,
+                table
+            ),
+            Some(Layer0OracleViolationKind::NoFileWhereThisRootHasOne),
+            "C 那一版有文件，报没有是违例"
+        );
+    }
+
+    /// 根不在表里只看比它旧的最新那一项：文件没了之后又有一版带文件的（第 8 代），落在它后面的第 9 代报没有文件是违例、点名第 8 代；
+    /// 落在没有文件那一版与第 8 代之间的第 7 代报没有文件不是违例。
+    #[test]
+    fn a_root_not_in_the_table_is_judged_by_the_newest_older_entry_only() {
+        let with_a_file = vec![
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(3),
+                content: b"A".to_vec(),
+            },
+            PublishedVersion {
+                instance: InstanceGeneration(1),
+                checkpoint_txg: CheckpointTxg(8),
+                content: b"written after the file vanished".to_vec(),
+            },
+        ];
+        let without_a_file = versions_without_a_file_from_txg_six();
+        let table = Layer0VersionTable::new(&with_a_file, &without_a_file);
+        let root_after_the_newer_file = (InstanceGeneration(1), CheckpointTxg(9));
+        let violation = classified_oracle_violation_for_the_version_table(
+            &RecoveryOutcome::NoFile {
+                root: root_after_the_newer_file,
+            },
+            Some(root_after_the_newer_file),
+            None,
+            table,
+        )
+        .expect("比第 9 代旧的最新一项是第 8 代、有文件：报没有文件是违例");
+        assert_eq!(
+            violation.kind,
+            Layer0OracleViolationKind::NoFileWhereAnOlderRootHasOne
+        );
+        assert!(
+            violation.reason.contains("实例 1 第 8 代下面有文件"),
+            "违例点名比它旧的最新那一版：{}",
+            violation.reason
+        );
+        let root_between = (InstanceGeneration(1), CheckpointTxg(7));
+        assert_eq!(
+            kind_judged_against_the_table(
+                &RecoveryOutcome::NoFile { root: root_between },
+                root_between,
+                table
+            ),
+            None,
+            "比第 7 代旧的最新一项是第 6 代、没有文件"
+        );
+    }
+
+    /// 同一个根既写成有文件、又写成没有文件：版本表自相矛盾，构造时停下。
+    #[test]
+    #[should_panic(expected = "既写成有文件、又写成文件从这一版起没有了")]
+    fn a_root_both_with_and_without_a_file_is_refused_when_the_table_is_built() {
+        let with_a_file = the_multi_record_publish_stream_versions();
+        let without_a_file = vec![PublishedVersionWithoutAFile {
+            instance: InstanceGeneration(1),
+            checkpoint_txg: CheckpointTxg(5),
+        }];
+        let _table = Layer0VersionTable::new(&with_a_file, &without_a_file);
     }
 
     /// 同 txg 的两条版本是两条版本：落在实例 2 上读出实例 2 的内容不是违例。

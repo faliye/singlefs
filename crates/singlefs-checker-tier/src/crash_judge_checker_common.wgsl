@@ -137,28 +137,90 @@ const INVARIANT_I_7_5: u32 = 63u;
 
 const INVARIANT_I_8_5: u32 = 64u;
 
-// 第 67、68 条：C673 ⑤ ⑥ 那两条（只往末尾追加；下标 65 的 I-3.5 内核还没判，这里没有它的常量）
+// 第 66 条：I-3.5（引用区间的精确性）的出现规则，走读内核在回退候选集的版本都走完之后逐对判
+const INVARIANT_I_3_5: u32 = 65u;
+
+// 第 67、68 条：C673 ⑤ ⑥ 那两条（只往末尾追加）
 const INVARIANT_I_9_27: u32 = 66u;
 
 const INVARIANT_I_5_5: u32 = 67u;
 
-// I-9.27 读的另外四个种类码（walk.rs 的 TREE_KIND_*；1..8 在 crash_judge_common.wgsl）
-const TREE_KIND_DELETED_INODES: u32 = 9u;
+// 第 69 条：I-9.28（全部可读根里同一树 ID 的诞生 txg 相同），扫描内核挨着 I-9.14 判
+const INVARIANT_I_9_28: u32 = 68u;
 
-const TREE_KIND_TOMBSTONE: u32 = 10u;
+// 第 70–74 条：里程碑三·3 删除线那五条（只往末尾追加），扫描内核的删除态扫描判前四条；I-4.4 第一版报不适用，内核不置它那一位
+const INVARIANT_I_9_5: u32 = 69u;
 
-const TREE_KIND_LINEAGE: u32 = 11u;
+const INVARIANT_I_3_4: u32 = 70u;
 
-const TREE_KIND_LOGGED_OPERATIONS: u32 = 12u;
+const INVARIANT_I_4_7: u32 = 71u;
+
+const INVARIANT_I_4_6: u32 = 72u;
+
+const INVARIANT_I_4_4: u32 = 73u;
+
+// 第 75–83 条：里程碑三·3 墓碑与谱系那九条（只往末尾追加）。走读内核判 I-9.17、I-9.23（墓碑树、谱系树每条内部条目的身份）；
+// 扫描内核在删除态扫描那一份版本清单上判 I-9.18–I-9.21、I-9.24、I-9.29。I-9.22 恒不置位：它只在池级 checker 带旋钮值的入口上判，
+// 层 0 与放量都走旧入口（`check_pool_image`，当没装旋钮、恒报不适用），GPU 手里也没有旋钮值——照 I-4.4 的先例登记、内核不置它那一位
+const INVARIANT_I_9_17: u32 = 74u;
+
+const INVARIANT_I_9_18: u32 = 75u;
+
+const INVARIANT_I_9_19: u32 = 76u;
+
+const INVARIANT_I_9_20: u32 = 77u;
+
+const INVARIANT_I_9_21: u32 = 78u;
+
+const INVARIANT_I_9_22: u32 = 79u;
+
+const INVARIANT_I_9_23: u32 = 80u;
+
+const INVARIANT_I_9_24: u32 = 81u;
+
+const INVARIANT_I_9_29: u32 = 82u;
+
+// 第 84 条：根环线第 10j 批新立的 I-3.14（实例表每片记录形态合法），走读内核在 w_walk_instance_table_chain 走到的每一片上判四格（第 10k 批）
+const INVARIANT_I_3_14: u32 = 83u;
+
+// 第 85 条：第 49 批新立的 I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上），扫描内核在最新根上判（walk.rs judge_inode_number_watermark_steps_of_the_newest_root）
+const INVARIANT_I_9_30: u32 = 84u;
+
+// 第 86–90 条：第 50 批退役树那五条（walk.rs 的 RETIREMENT_*）。走读内核在退役树的每条内部条目上判 I-9.31；扫描内核在墓碑与谱系那一遍的每一版上判
+// I-9.32、I-9.33、I-9.34，扫完各版再跨相邻两版判 I-9.35（用户 2026-09-29「配了 GPU 就一定要 GPU 判，不退回 CPU」，不记判不了）
+const INVARIANT_I_9_31: u32 = 85u;
+
+const INVARIANT_I_9_32: u32 = 86u;
+
+const INVARIANT_I_9_33: u32 = 87u;
+
+const INVARIANT_I_9_34: u32 = 88u;
+
+const INVARIANT_I_9_35: u32 = 89u;
+
+// 第 91、92 条：第 53 批谱系树与退役树的容器容量那两条（walk.rs 的 NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE、
+// LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE）。扫描内核在墓碑与谱系那一遍判 I-9.36；I-9.37 照 I-9.22 恒不置位
+// （层 0 与放量走池级 checker 的旧入口，GPU 也没有旋钮值）
+const INVARIANT_I_9_36: u32 = 90u;
+
+const INVARIANT_I_9_37: u32 = 91u;
+
+// 墓碑树、谱系树叶容器的打包记录类型（walk.rs 的 PACKED_TYPE_TOMBSTONE / PACKED_TYPE_LINEAGE；登记的记录宽墓碑 40、谱系 24）
+const PACKED_TYPE_TOMBSTONE: u32 = 1u;
+
+const PACKED_TYPE_LINEAGE: u32 = 5u;
+
+// 退役树叶容器的打包记录类型（walk.rs 的 PACKED_TYPE_RETIREMENT；登记的记录宽 34）
+const PACKED_TYPE_RETIREMENT: u32 = 3u;
+
+// deleted_inodes 根的条目：key = inode 号 8 字节、无 value（walk.rs 的 DELETED_INODES_ENTRY_BYTES）
+const DELETED_INODES_ENTRY_BYTES: u32 = 8u;
 
 // 树表条目里头 ID 8 字节的偏移（walk.rs 的 TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET）
 const TREE_TABLE_ENTRY_HEAD_IDENTIFIER_OFFSET: u32 = 116u;
 
 // mkfs 种下的树 ID 水位（singlefs_format::TREE_IDENTIFIER_WATERMARK_AT_MKFS），I-5.5 认法 ① 拿 extent 树条目的树 ID 比它
 const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u32 = 65536u;
-
-// 从 mkfs 水位第一次建树那一版，每块盘上落点最小的数据单元比单元区起始槽号多几槽（walk.rs 的 FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START）
-const FIRST_DATA_UNIT_SLOTS_PAST_THE_UNIT_AREA_START: u32 = 4u;
 
 // 违例位：位 i 在第 i / 32 字的第 i % 32 位（位 i ↔ IMPLEMENTED_INVARIANTS[i]），存进结论的第 POOL_CHECKER_VIOLATED_FIRST_WORD 字起。
 var<private> violated: array<u32, POOL_CHECKER_VIOLATED_WORDS>;
@@ -183,6 +245,56 @@ fn load_violated(out: u32) {
 fn store_violated(out: u32) {
     for (var word_index = 0u; word_index < POOL_CHECKER_VIOLATED_WORDS; word_index = word_index + 1u) {
         verdicts[out + POOL_CHECKER_VIOLATED_FIRST_WORD + word_index] = violated[word_index];
+    }
+}
+
+// 判到位（与违例位同一个下标）：这一条在这个状态上「评估过」——CPU 池级 checker 的 `Judgements::judge` 调到过它（成立或违例都算），
+// 而射程里没有一部分判不了（`part_of_the_range_not_judged`、`partially_judged` 那两种把整条降成不适用或部分没判）。存进结论的第
+// POOL_CHECKER_JUDGED_FIRST_WORD 字起之前与违例位合起来：违例的一定判到（CPU `into_report` 违例压过别的三种）。
+var<private> evaluated: array<u32, POOL_CHECKER_JUDGED_WORDS>;
+var<private> part_not_judged: array<u32, POOL_CHECKER_JUDGED_WORDS>;
+
+// CPU `Judgements::judge(invariant, holds, …)` 的对应：评估一次，不成立就置违例位
+fn judge(invariant: u32, holds: bool) {
+    let word_index = invariant / 32u;
+    evaluated[word_index] = evaluated[word_index] | (1u << (invariant % 32u));
+    if (!holds) {
+        violate(invariant);
+    }
+}
+
+// CPU `Judgements::part_of_the_range_not_judged` 与 `Judgements::partially_judged` 的对应：没有违例时这一条不算判到
+fn mark_part_of_the_range_not_judged(invariant: u32) {
+    let word_index = invariant / 32u;
+    part_not_judged[word_index] = part_not_judged[word_index] | (1u << (invariant % 32u));
+}
+
+// 一次记同一个字里的几条（mask 是第 word_index 字里的位；墓碑、谱系、退役那几条都在下标 64..95 那一个字里）
+fn mark_parts_of_the_range_not_judged(word_index: u32, mask: u32) {
+    part_not_judged[word_index] = part_not_judged[word_index] | mask;
+}
+
+fn clear_judged() {
+    for (var word_index = 0u; word_index < POOL_CHECKER_JUDGED_WORDS; word_index = word_index + 1u) {
+        evaluated[word_index] = 0u;
+        part_not_judged[word_index] = 0u;
+    }
+}
+
+// 扫描内核接着走读内核记：评估过与部分判不了两张表随交接段存在草稿区里（结论字里只存合起来的判到位）
+fn load_judged() {
+    for (var word_index = 0u; word_index < POOL_CHECKER_JUDGED_WORDS; word_index = word_index + 1u) {
+        evaluated[word_index] = sw(H_BASE + H_EVALUATED + word_index);
+        part_not_judged[word_index] = sw(H_BASE + H_PART_NOT_JUDGED + word_index);
+    }
+}
+
+fn store_judged(out: u32) {
+    for (var word_index = 0u; word_index < POOL_CHECKER_JUDGED_WORDS; word_index = word_index + 1u) {
+        sws(H_BASE + H_EVALUATED + word_index, evaluated[word_index]);
+        sws(H_BASE + H_PART_NOT_JUDGED + word_index, part_not_judged[word_index]);
+        verdicts[out + POOL_CHECKER_JUDGED_FIRST_WORD + word_index] =
+            violated[word_index] | (evaluated[word_index] & ~part_not_judged[word_index]);
     }
 }
 
@@ -362,71 +474,76 @@ const C_MAX_CANDIDATES: u32 = 48u;
 
 const C_CANDIDATES: u32 = 166368u;            // 候选根在根表里的下标
 
-const C_CANDIDATE_WORDS: u32 = 40u;          // 0 走全了、1 有树表落点、2 盘、3 槽 lo、4 槽 hi、5 树数、6.. 每树 4 字（树 lo/hi、诞生 lo/hi）
+const C_CANDIDATE_WORDS: u32 = 54u;          // 0 走全了、1 有树表落点、2 盘、3 槽 lo、4 槽 hi、5 树数、6.. 每树 4 字（树 lo/hi、诞生 lo/hi）：6 + 4 × C_MAX_TREES_PER_TABLE
 
-const C_MAX_TREES_PER_TABLE: u32 = 8u;
+// 一张树表最多记几棵不同的树：进树表的种类有 12 个（recovery.rs 与 walk.rs 的 TREE_KINDS_OF_THE_TREE_TABLE_IN_THE_ISSUING_ORDER，
+// 第一个文件版本那次就写满 12 条，退役树是第 50 批加的）；合法镜像上一张树表每种至多一条，更多的只出现在坏镜像上，第 13 棵起判不了、交 CPU。
+// 从 11 加到 12 时 C_CANDIDATE_INFO 那 48 行每行多 4 字，其后的草稿区偏移各后移 48 × 4 = 192 字
+const C_MAX_TREES_PER_TABLE: u32 = 12u;
 
+// I-9.28 在 I-3.9 与 I-9.14 判完之后借这几行，根表里第 k 条根记进第 k 行（只用 1..5 与每树那几字）：根表最多 MAX_ROOTS 条，
+// 不多于 C_MAX_CANDIDATES 行（judge_tree_identifier_birth_txg_across_every_readable_root 开头判，越过就判不了）
 const C_CANDIDATE_INFO: u32 = 166416u;
 
 const C_ALLOC_RECORD_WORDS: u32 = 8u;        // 盘、槽 lo/hi、跨度、代 lo/hi、已释放、0
 
 const C_MAX_ALLOC_RECORDS: u32 = 2048u;
 
-const C_ALLOC_RECORDS: u32 = 168336u;
+const C_ALLOC_RECORDS: u32 = 169008u;
 
 const C_R_MAX_SEEN: u32 = 512u;
 
-const C_R_SEEN: u32 = 184720u;                // 盘、槽 lo/hi
+const C_R_SEEN: u32 = 185392u;                // 盘、槽 lo/hi
 
 const C_R_PENDING_WORDS: u32 = 10u;
 
 const C_R_MAX_PENDING: u32 = 512u;
 
-const C_R_PENDING: u32 = 186256u;
+const C_R_PENDING: u32 = 186928u;
 
 const C_MAX_SEEN_NODES: u32 = 256u;
 
-const C_SEEN_NODES: u32 = 191376u;           // 盘、槽 lo/hi、校验和
+const C_SEEN_NODES: u32 = 192048u;           // 盘、槽 lo/hi、校验和
 
 const C_MAX_EXAMINED: u32 = 2048u;
 
-const C_EXAMINED: u32 = 192400u;             // 盘、槽 lo/hi、代 lo/hi
+const C_EXAMINED: u32 = 193072u;             // 盘、槽 lo/hi、代 lo/hi
 
 const C_MAX_SCANNED: u32 = 2048u;
 
-const C_SCANNED: u32 = 202640u;              // 落点下标
+const C_SCANNED: u32 = 203312u;              // 落点下标
 
 const C_R_MAX_ROWS: u32 = 256u;
 
-const C_R_ROWS: u32 = 204688u;               // 实例、txg lo/hi
+const C_R_ROWS: u32 = 205360u;               // 实例、txg lo/hi
 
 const C_VALID_BEFORE_WORDS: u32 = 6u;        // 根下标、有指针、inode 基、inode 偏移、extent 基、extent 偏移
 
-const C_VALID_BEFORE: u32 = 205456u;
+const C_VALID_BEFORE: u32 = 206128u;
 
-const C_NON_EMPTY: u32 = 205744u;            // txg lo/hi、实例、valid_before 下标
+const C_NON_EMPTY: u32 = 206416u;            // txg lo/hi、实例、valid_before 下标
 
-const C_UNDETERMINABLE: u32 = 205936u;       // txg lo/hi、实例
+const C_UNDETERMINABLE: u32 = 206608u;       // txg lo/hi、实例
 
-const C_COUNTED: u32 = 206080u;              // txg lo/hi
+const C_COUNTED: u32 = 206752u;              // txg lo/hi
 
-const C_COUNTED_STATES: u32 = 206176u;       // valid_before 下标
+const C_COUNTED_STATES: u32 = 206848u;       // valid_before 下标
 
-const C_PICKED: u32 = 206224u;               // 选过的标记（非空 48 + 判不了 48）
+const C_PICKED: u32 = 206896u;               // 选过的标记（非空 48 + 判不了 48）
 
 const C_MAX_RELEASED_ABOVE: u32 = 2048u;
 
-const C_RELEASED_ABOVE: u32 = 206320u;       // 盘、槽 lo/hi、跨度
+const C_RELEASED_ABOVE: u32 = 206992u;       // 盘、槽 lo/hi、跨度
 
 const C_MAX_DEFERRED: u32 = 4096u;
 
-const C_DEFERRED: u32 = 214512u;             // 盘、槽 lo/hi
+const C_DEFERRED: u32 = 215184u;             // 盘、槽 lo/hi
 
 const C_MAX_GROUPS: u32 = 2048u;
 
-const C_GROUPS: u32 = 226800u;               // 槽 lo/hi、跨度、盘位掩码
+const C_GROUPS: u32 = 227472u;               // 槽 lo/hi、跨度、盘位掩码
 
-const C_SCRATCH_END_SCAN: u32 = 234992u;
+const C_SCRATCH_END_SCAN: u32 = 235664u;
 
 var<private> w_context: u32;
 
@@ -561,7 +678,9 @@ fn schema_compare(schema: u32, base_a: u32, oa: u32, base_b: u32, ob: u32) -> u3
     return 1u;
 }
 
-// 链指针记录：0 最后一片、1 有下一片、2 坏
+// 链指针记录：0 最后一片、1 有下一片、2 坏（walk.rs chain_record_view）。有下一片还要位置指针头部 extent 偏移及之前那几段都是第一版的取值
+// （MAC / nonce、算法类型、压缩算法码、压后长度经 crash_judge_common.wgsl 的 pointer_encryption_and_compression_fields_are_the_first_version，
+// extent 偏移经 pointer_extent_offset_is_zero）：有一段不过是 I-3.14 第五形，这一片解不开（用户 2026-10-06 定 K2-1 甲，第 10u 批）
 fn w_chain_record_kind(base: u32, o: u32, width: u32) -> u32 {
     if (width != 88u || rd8(base, o) != 1u) {
         return 2u;
@@ -571,7 +690,8 @@ fn w_chain_record_kind(base: u32, o: u32, width: u32) -> u32 {
     if (flag == 0u && pointer_zero) {
         return 0u;
     }
-    if (flag == 1u && !pointer_zero) {
+    if (flag == 1u && !pointer_zero && pointer_encryption_and_compression_fields_are_the_first_version(base, o + 2u)
+        && pointer_extent_offset_is_zero(base, o + 2u)) {
         return 1u;
     }
     return 2u;
@@ -654,7 +774,7 @@ var<private> w_accounting_recording: bool;
 // ───────────────────────── 走读内核交给扫描内核的东西（草稿区里的交接段）─────────────────────────
 // 两个内核各自编（驱动编一个 4900 行的内核要 41 分钟、13 GiB；拆开各编各的、并行）；草稿区在同一次派活里两趟共用，
 // 集合都留在草稿区里，只把私有变量里的计数与几何写进这一段。
-const H_BASE: u32 = 234992u;
+const H_BASE: u32 = 235664u;
 const H_VALID: u32 = 0u;                 // 1 = 走读那一批判完、判得了；0 = 扫描内核什么都不做
 const H_ROW_COUNT: u32 = 1u;
 const H_REFERENCE_COUNT: u32 = 2u;
@@ -684,24 +804,140 @@ const H_FSID1: u32 = 25u;
 const H_FSID2: u32 = 26u;
 const H_FSID3: u32 = 27u;
 const H_BELOW_FLOOR_SLOT_COUNT: u32 = 28u;
+const H_SLOTS_PER_REGION: u32 = 29u;     // 根环每区槽数 S：I-7.9 的一圈窗口宽 3S = H_REGIONS × 它
+// 1 = 主走读沿最新根的实例表链走到了末片（走读内核的 w_newest_instance_table_chain_reached_its_last_page）：扫描内核 I-9.29 跨版本那张表比不比读它。
+// 第 30、31 两个字原来空着（H_BELOW_FLOOR_SLOTS 从 H_BASE + 32 起），占第 30 个，交接段不变长
+const H_NEWEST_INSTANCE_TABLE_CHAIN_REACHED_ITS_LAST_PAGE: u32 = 30u;
+// 走读内核照 I-4.1 那一份重放（replay_the_next_mount_would_do）施加的第一次发布的末条，在重放读的那一份环（C_REPLAY_RECORDS）里的下标，
+// 没有是 NONE：扫描内核认下一次挂载先施加的那一版（I-3.10、I-5.4）读它。占原来空着的第 31 个字，交接段不变长
+const H_REPLAY_INDEX_OF_THE_LAST_RECORD_OF_THE_FIRST_PUBLISH_APPLIED: u32 = 31u;
 const H_MAX_BELOW_FLOOR_SLOTS: u32 = 4096u;
-const H_BELOW_FLOOR_SLOTS: u32 = 235024u;   // 盘、槽 lo/hi
-const H_END: u32 = 247312u;
+const H_BELOW_FLOOR_SLOTS: u32 = 235696u;   // 盘、槽 lo/hi
+const H_END: u32 = 247984u;
 
-// ───────────────────────── 交接段之后：走读内核自己用、扫描内核不读的两张表 ─────────────────────────
+// ───────────────────────── 交接段之后：走读内核写的两张表（扫描内核只读重放那一张）─────────────────────────
 // 主走读（上下文 0）每个走过的单元一行：有没有记下诞生代号、诞生代号 lo/hi（walk.rs 的 birth_txg_of_walked_units，与 C_VISITED0 同下标）。
 // 别的版本再引用它时按这张表判 I-4.9（非最新候选根引用的单元不晚于它）。
 const C_VISITED_BIRTH_WORDS: u32 = 3u;
 
-const C_VISITED_BIRTHS0: u32 = 247312u;
+const C_VISITED_BIRTHS0: u32 = 247984u;
 
-// I-4.1 重放读的那一份环（walk.rs 的 records_the_replay_reads）：版本、计数器 lo/hi、实例，按 (实例, 计数器) 升序
+// I-4.1 重放读的那一份环（walk.rs 的 records_the_replay_reads）：版本、计数器 lo/hi、实例，按 (实例, 计数器) 升序。
+// 走读内核在 I-4.1 那一阶段填；扫描内核照交接段的 H_REPLAY_INDEX_OF_THE_LAST_RECORD_OF_THE_FIRST_PUBLISH_APPLIED 读其中一行、不写
 const C_REPLAY_RECORD_WORDS: u32 = 4u;
 
-const C_REPLAY_RECORDS: u32 = 253456u;
+const C_REPLAY_RECORDS: u32 = 254128u;
+
+fn replay_record_at(index: u32) -> CheckerRecord {
+    return checker_record_of_row(C_REPLAY_RECORDS + index * C_REPLAY_RECORD_WORDS);
+}
+
+// I-3.5（引用区间的精确性）的出现规则读的四张表，只记主走读（上下文 0）走的那几版（最新根、回退候选根、由记录施加出来的版本）。
+// ① 落点表（walk.rs 的 unit_of_each_placement 与 user_visible_tree_of_each_placement）：跟着指针记下的每个落点一行——
+//    落点盘、槽 lo/hi，它是哪个单元（第一次记下它的那条指针第 0 条位置条目的盘、槽 lo/hi），记下它那一刻走读在不在一棵用户可见树里
+//    （第一次在树里记下它时打上，之后不换）、那棵树的种类、树 ID lo/hi。
+const C_APPEARANCE_PLACEMENT_WORDS: u32 = 10u;
+
+const C_APPEARANCE_MAX_PLACEMENTS: u32 = 2048u;
+
+const C_APPEARANCE_PLACEMENTS: u32 = 256176u;
+
+// ② 版本表（walk.rs 的 versions_walked_for_the_appearance_rule）：走完的每一版一行——实例、txg lo/hi、走读一条失败都没记（1 / 0）、
+//    这一版引用的落点在 ③ 里的起点与条数、树表里用户可见树的根几棵，之后每棵 5 个字（种类、树 ID lo/hi、根指针出生 txg lo/hi）。
+const C_APPEARANCE_VERSION_WORDS: u32 = 48u;
+
+const C_APPEARANCE_MAX_USER_VISIBLE_ROOTS: u32 = 8u;
+
+const C_APPEARANCE_USER_VISIBLE_ROOT_WORDS: u32 = 5u;
+
+const C_APPEARANCE_VERSION_ROOTS_OFFSET: u32 = 7u;
+
+const C_APPEARANCE_MAX_VERSIONS: u32 = 64u;
+
+const C_APPEARANCE_VERSIONS: u32 = 276656u;
+
+// ③ 每一版引用的落点（walk.rs 的 placements_referenced_in_this_version 在这一版走完那一刻的样子）：每个落点一个字，是它在 ① 里的下标。
+const C_APPEARANCE_MAX_VERSION_PLACEMENTS: u32 = 8192u;
+
+const C_APPEARANCE_VERSION_PLACEMENTS: u32 = 279728u;
+
+// ④ 走过的树表（walk.rs 的 tree_table_entries_of_a_walked_tree_table 里 I-3.5 读的那一样）：第一个读得出它的那一版记下树表单元的盘、槽 lo/hi
+//    与它里面用户可见树的根几棵、每棵 5 个字（同 ②）；别的版本共享这片树表时照它取这一版的根。
+const C_APPEARANCE_WALKED_TREE_TABLE_WORDS: u32 = 44u;
+
+const C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET: u32 = 4u;
+
+const C_APPEARANCE_MAX_WALKED_TREE_TABLES: u32 = 64u;
+
+const C_APPEARANCE_WALKED_TREE_TABLES: u32 = 287920u;
+
+// ───────────────────────── 走读内核那几张表之后：扫描内核的删除态扫描（walk.rs judge_deletion_state_of_the_versions）与墓碑、谱系那一遍
+// （walk.rs judge_tombstones_and_the_lineage_of_the_versions）用的表 ─────────────────────────
+// ① 这一版一棵 inode 树的记录（walk.rs inode_records_without_judging）：号 lo/hi、nlink、size lo/hi、对象出生代 lo/hi；同一个号再读到时
+//    后读到的盖掉先读到的。一版一棵树地重填
+const D_INODE_RECORD_WORDS: u32 = 7u;
+
+const D_MAX_INODE_RECORDS: u32 = 1024u;
+
+const D_INODE_RECORDS: u32 = 290736u;
+
+// ② 这一版 extent 树里每个号的数据单元数（walk.rs data_unit_count_of_each_inode_without_judging，全零数据指针不数）：号 lo/hi、单元数
+const D_DATA_UNIT_COUNT_WORDS: u32 = 3u;
+
+const D_MAX_DATA_UNIT_INODES: u32 = 1024u;
+
+const D_DATA_UNIT_COUNTS: u32 = 297904u;
+
+// ③ 一棵墓碑树或谱系树按叶序读出的容器（walk.rs containers_of_a_container_tree_without_judging）：容器在打包表里的字节基、记录数、
+//    第一条记录的偏移、头里的容器号 lo/hi。一棵树地重填；多于 D_MAX_CONTAINERS_OF_A_CONTAINER_TREE 片判不了（交 CPU）
+const D_CONTAINER_OF_A_CONTAINER_TREE_WORDS: u32 = 5u;
+
+const D_MAX_CONTAINERS_OF_A_CONTAINER_TREE: u32 = 256u;
+
+const D_CONTAINERS_OF_A_CONTAINER_TREE: u32 = 300976u;
+
+// ④ 这一版谱系树里的谱系记录（walk.rs lineage_records_without_judging），按 T_rb 从大到小排好：T_rb lo/hi、T_old lo/hi、H_cur lo/hi。
+//    多于 D_MAX_LINEAGE_RECORDS 条判不了
+const D_LINEAGE_RECORD_WORDS: u32 = 6u;
+
+const D_MAX_LINEAGE_RECORDS: u32 = 256u;
+
+const D_LINEAGE_RECORDS: u32 = 302256u;
+
+// ⑤ I-9.29 跨版本那张表（walk.rs ObjectBirthsOfEachInodeNumber）：inode 树的树 ID lo/hi、inode 号 lo/hi、第一次见到的对象出生代 lo/hi。
+//    回退候选集里各版读完一起判，不一版一版重填；多于 D_MAX_OBJECT_BIRTHS 个 (树, 号) 判不了
+const D_OBJECT_BIRTH_WORDS: u32 = 6u;
+
+const D_MAX_OBJECT_BIRTHS: u32 = 2048u;
+
+const D_OBJECT_BIRTHS: u32 = 303792u;
+
+// ⑥ I-9.30 那一判读的最新根记账里 inode 号水位那一统计量（不带设备维）的每一行（walk.rs Walk::inode_number_watermark_rows）：代段 lo/hi、值 lo/hi。
+//    最新根一棵记账树一棵树地收（读不全的那棵退回去不收）；多于 D_MAX_INODE_NUMBER_WATERMARK_ROWS 行判不了
+const D_INODE_NUMBER_WATERMARK_ROW_WORDS: u32 = 4u;
+
+const D_MAX_INODE_NUMBER_WATERMARK_ROWS: u32 = 256u;
+
+const D_INODE_NUMBER_WATERMARK_ROWS: u32 = 316080u;
+
+// ⑦ 退役那几条读的两张叶身份表（walk.rs inode_leaf_identities_without_judging）：一版一棵 inode 树里每片叶容器的身份（出生树 lo/hi、打包记录类型、
+//    容器号 lo/hi、容器出生代 lo/hi），集合、一棵树地重填。前一张装被判的那一版（I-9.34、I-9.35），后一张装 I-9.35 的父版；
+//    一棵树多于 D_MAX_LEAF_IDENTITIES 片判不了（一个码 2 根装 135 条 inode 内部条目，合法树至多 135 片）
+const D_LEAF_IDENTITY_WORDS: u32 = 7u;
+
+const D_MAX_LEAF_IDENTITIES: u32 = 256u;
+
+const D_LEAF_IDENTITIES_OF_THE_VERSION: u32 = 317104u;
+
+const D_LEAF_IDENTITIES_OF_THE_PARENT_VERSION: u32 = 318896u;
+
+// ⑧ 判到位的两张表（走读内核记、扫描内核接着记；判决 m3-crash-enumeration-merge-r2 第二节 L1-4）：评估过、射程里有一部分判不了，
+//    各 POOL_CHECKER_JUDGED_WORDS 个字。交接段 32 个字都占满了，接在草稿区末尾（H_BASE 起数的偏移）
+const H_EVALUATED: u32 = 320688u - 235664u;
+const H_PART_NOT_JUDGED: u32 = H_EVALUATED + POOL_CHECKER_JUDGED_WORDS;
 
 // 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
-const SCRATCH_END: u32 = 255504u;
+const SCRATCH_END: u32 = 320696u;
 
 fn handoff_region_device(region: u32) -> u32 {
     if (region == 0u) {

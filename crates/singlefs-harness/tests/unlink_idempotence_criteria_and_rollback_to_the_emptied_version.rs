@@ -55,6 +55,8 @@ fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
         batch_size: batches_of_one_data_unit(),
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity:
+            singlefs_core::retirement_tree::RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     }
 }
@@ -138,16 +140,20 @@ fn violations(image: &MemoryPool) -> Vec<String> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
 
+/// 这一版那一统计量的现行值：代段最大的那一行（inode 号水位那一统计量还有台阶行，D8（核心索引结构） 已定项 6「读现行值」）。
 fn accounting_value(version: &TransactionOutput, statistic: u16) -> u64 {
     version
         .accounting_entries
         .iter()
-        .find(|entry| entry.statistic == statistic)
+        .filter(|entry| entry.statistic == statistic)
+        .max_by_key(|entry| entry.generation)
         .expect("池级三行每一版都写")
         .value
 }
@@ -312,8 +318,10 @@ fn a_crash_halfway_through_the_writes_of_the_first_batch_continues_on_remount_to
 }
 
 /// ④：删除前、意图、两批、最后一批每一版记账行里的标签 4 与 6，等于从这一版镜像现算的值：
-/// 标签 4 恒 0；标签 6 = 2 × ((2 + H + 1) × 16384 + 41 × n_live)，n_live 数重建出来的 inode 树里 nlink ≥ 1 的记录，
-/// H 从墓碑树根单元的码 2 头现读（零根时 0）。删除前 n_live = 1（98386），意图起 n_live = 0（98304）。
+/// 标签 4 恒 0；标签 6 = 2 × ((2 + H_墓碑 + 1 + 2 + H_退役 + 1) × 16384 + 41 × n_live + 35 × n_记录)，n_live 数重建出来的 inode 树里
+/// nlink ≥ 1 的记录、n_记录 数它的全部记录（含 nlink = 0 的，判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条），
+/// H_墓碑、H_退役 从墓碑树、退役树根单元的码 2 头现读（零根时 0）。删除前 n_live = n_记录 = 1（196760），意图起到最后一批之前 n_live = 0、
+/// n_记录 = 1（196678），最后一批之后 n_记录 = 0（196608）。
 #[test]
 fn tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_its_image() {
     let mut pool = pool_with_a_three_unit_file("idempotence-tags-four-and-six");
@@ -338,13 +346,32 @@ fn tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_
                     .count(),
             )
             .expect("记录数");
-            let tombstone_tree_internal_levels = rebuilt
-                .units
-                .iter()
-                .find(|unit| unit.identity == TransactionUnit::TombstoneRoot)
-                .map_or(0, |root| {
-                    u64::from(parse_index_node(&root.bytes).expect("墓碑树根解得开").level) - 1
-                });
+            // n_记录 数 inode 树里全部记录、含 nlink = 0 的（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）。
+            let records = u64::try_from(
+                rebuilt
+                    .inode_leaf_containers
+                    .iter()
+                    .map(|container| container.contents.records.len())
+                    .sum::<usize>(),
+            )
+            .expect("记录数");
+            let internal_levels_below_the_root = |root_role: TransactionUnit, what: &str| {
+                rebuilt
+                    .units
+                    .iter()
+                    .find(|unit| unit.identity == root_role)
+                    .map_or(0, |root| {
+                        u64::from(
+                            parse_index_node(&root.bytes)
+                                .unwrap_or_else(|_| panic!("{what}根解得开"))
+                                .level,
+                        ) - 1
+                    })
+            };
+            let tombstone_tree_internal_levels =
+                internal_levels_below_the_root(TransactionUnit::TombstoneRoot, "墓碑树");
+            let retirement_tree_internal_levels =
+                internal_levels_below_the_root(TransactionUnit::RetirementRoot, "退役树");
             (
                 (
                     accounting_value(version, STATISTIC_PENDING_DELETE_BYTES),
@@ -352,7 +379,15 @@ fn tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_
                 ),
                 (
                     0,
-                    2 * ((2 + tombstone_tree_internal_levels + 1) * 16384 + 41 * live_objects),
+                    2 * ((2
+                        + tombstone_tree_internal_levels
+                        + 1
+                        + 2
+                        + retirement_tree_internal_levels
+                        + 1)
+                        * 16384
+                        + 41 * live_objects
+                        + 35 * records),
                 ),
             )
         })
@@ -373,8 +408,9 @@ fn tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_
             .iter()
             .map(|((_, recorded_tag_six), _)| *recorded_tag_six)
             .collect::<Vec<u64>>(),
-        vec![98_386, 98_304, 98_304, 98_304, 98_304],
-        "删除前一个活对象；从意图那次起第一个文件 nlink = 0、不再算活对象"
+        vec![196_760, 196_678, 196_678, 196_678, 196_608],
+        "删除前一个活对象、一条记录；从意图那次起第一个文件 nlink = 0、不再算活对象，记录还在（n_记录 含 nlink = 0 的）；最后一批记录删掉。\
+         墓碑 3 槽与退役 3 槽常驻：2 × 6 × 16384 = 196608，活对象每个 2 × 41、记录每条 2 × 35"
     );
 }
 
@@ -436,8 +472,10 @@ fn rolling_back_to_the_emptied_version_is_accepted_and_publishes_a_version_with_
 }
 
 /// 回退那次发布的标签 6 按新根现算（D23（journal 的角色与格式） 已定项 14「准入与记账」那一行）：新根的 inode 树与 `deleted_inodes`
-/// 取 R_old 的，n_live = R_old 那一版 inode 树的记录数减 `deleted_inodes` 的 key 数。删完唯一的文件（标签 6 = 98304，n_live = 0）之后
-/// 回退到意图之前那一版（第一个文件活着）：新根的标签 6 = 2 × (49152 + 41 × 1) = 98386，被带回来的对象的墓碑份额照抬。
+/// 取 R_old 的，n_live = R_old 那一版 inode 树的记录数减 `deleted_inodes` 的 key 数，n_记录 = R_old 那一版 inode 树的全部记录数。
+/// 删完唯一的文件（标签 6 = 2 × (6 × 16384) = 196608，n_live = n_记录 = 0；墓碑 3 槽与退役 3 槽常驻，判决
+/// `research/prompts/m3-retire-r1-main-verification.md` 第三节第 6 条）之后回退到意图之前那一版（第一个文件活着）：
+/// 新根的标签 6 = 2 × (98304 + 41 × 1 + 35 × 1) = 196760，被带回来的对象的墓碑与退役份额照抬。
 #[test]
 fn rolling_back_to_the_version_before_the_intent_recomputes_tag_six_from_the_rollback_targets_inode_tree(
 ) {
@@ -467,7 +505,7 @@ fn rolling_back_to_the_version_before_the_intent_recomputes_tag_six_from_the_rol
             tag_six_before_the_rollback,
             accounting_value(&pool.output, STATISTIC_COMMITTED_RESERVATION_BYTES),
         ),
-        (98_304, 98_386),
-        "删完时没有活对象；回退新根按 R_old 的 inode 树现算，第一个文件又是一个活对象"
+        (196_608, 196_760),
+        "删完时没有活对象也没有记录；回退新根按 R_old 的 inode 树现算，第一个文件又是一个活对象、一条记录"
     );
 }

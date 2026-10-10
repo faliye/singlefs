@@ -243,7 +243,9 @@ fn an_inode_tree_root_with_a_non_zero_encryption_reserved_byte_breaks_the_walk_o
             detail.contains("头用不了"),
             "最新根走不完，断在 inode 树根头用不了那一步：{detail}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+        other @ (InvariantVerdict::Holds
+        | InvariantVerdict::NotApplicable(_)
+        | InvariantVerdict::PartiallyJudged(_)) => {
             panic!("inode 树根的预留位非 0，最新根不该算走得完：{other:?}")
         }
     }
@@ -672,7 +674,9 @@ fn every_unit_class_with_an_unrecognized_format_version_or_a_non_zero_reserved_b
                     detail.contains(expected_in_the_detail),
                     "{identity:?}：I-2.4 的说明要点名{expected_in_the_detail}：{detail}"
                 ),
-                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+                other @ (InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_)) => {
                     panic!("{identity:?} 的{expected_in_the_detail}改坏、两道校验和都对：池级走读要报 I-2.4，得到 {other:?}")
                 }
             }
@@ -681,7 +685,9 @@ fn every_unit_class_with_an_unrecognized_format_version_or_a_non_zero_reserved_b
                     detail.contains("头用不了"),
                     "{identity:?}：最新根走不完，断在头用不了那一步：{detail}"
                 ),
-                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => {
+                other @ (InvariantVerdict::Holds
+                | InvariantVerdict::NotApplicable(_)
+                | InvariantVerdict::PartiallyJudged(_)) => {
                     panic!("{identity:?} 的头用不了，最新根不该算走得完：{other:?}")
                 }
             }
@@ -826,7 +832,7 @@ fn a_followed_pointer_whose_mac_or_nonce_is_not_zero_reddens_the_header_invarian
                     detail.contains(expected_in_the_detail) && detail.contains("MAC 16 / nonce 12"),
                     "{followed_pointer:?} 头部第 {byte_in_pointer_head} 字节是 1：I-2.4 的说明要点名{expected_in_the_detail}：{detail}"
                 ),
-                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => panic!(
+                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_)) => panic!(
                     "{followed_pointer:?} 头部第 {byte_in_pointer_head} 字节是 1（加密关着时恒 0）：池级走读要报 I-2.4，得到 {other:?}"
                 ),
             }
@@ -867,7 +873,7 @@ fn a_node_of_a_registered_tree_whose_entry_width_is_zero_while_its_entry_count_i
             detail.contains("条目宽 0 而条目数不是 0"),
             "inode 树（登记了条目字段表 120）的根条目宽 0、条目数 3：I-1.10 的说明要点名宽 0：{detail}"
         ),
-        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => panic!(
+        other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_)) => panic!(
             "登记树的节点条目宽 0 而条目数非 0：0 不是任何登记宽，要报 I-1.10，得到 {other:?}"
         ),
     }
@@ -940,7 +946,7 @@ fn a_pool_where_one_system_configuration_slot_carries_a_refused_value_is_reporte
                     detail.contains(&format!("盘 1 偏移 {offset}")),
                     "只有盘 1 偏移 {offset} 那一槽是「{what}」：违例要点名那一槽：{detail}"
                 ),
-                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_)) => panic!(
+                other @ (InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_)) => panic!(
                     "只有盘 1 偏移 {offset} 那一槽是「{what}」：实现整池拒绝挂载，checker 要报违例，得到 {other:?}"
                 ),
             }

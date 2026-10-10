@@ -11,8 +11,8 @@ use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};
 use singlefs_core::block_device::{FileBackedBlockDevice, PhysicalBlockSizeInBytes};
 use singlefs_core::journal::{back_chain_of, record_offset, JournalRecord};
 use singlefs_core::make_filesystem::{
-    make_filesystem, MakeFilesystemOutput, MakeFilesystemParameters, INSTANCE_TABLE_SLOT,
-    TREE_TABLE_GENESIS_SLOT,
+    make_filesystem, root_ring_occupancy_after_make_filesystem, MakeFilesystemOutput,
+    MakeFilesystemParameters, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
 };
 use singlefs_core::recovery::{choose_system_configuration, readable_roots, PoolReader};
 use singlefs_core::root_ring::{slot_offset, target_for_publish, RootRingSlotsPerRegion};
@@ -696,6 +696,11 @@ pub fn build_pool(tag: &str) -> BuiltPool {
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话：装上 mkfs 刚写下的根环，转过根环之后照可再分配谓词回收（C551；不装的话记根就断言）。
+    allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
+        &parameters,
+        &genesis,
+    ));
     let content = file_content();
     let warm_up_operation_count;
     let (warm_up, output) = {
@@ -743,6 +748,186 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
     pool: &mut BuiltPool,
     newest: &TransactionOutput,
 ) -> singlefs_core::mount::Mounted {
+    abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger(
+        pool,
+        newest,
+        singlefs_core::mount::ShadowLedger::On,
+    )
+}
+
+/// 同 [`abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`]，那次挂载的影子账那一臂由调用方给（只供测试的开关）。
+/// `ShadowLedger::Off` 连 C694 的 C（水位之上没施加的记录点名的落点隔离，删除线第 33 批 T）一起关：那次挂载真看不见 `newest`，
+/// 它的分配器把 `newest` 写出的单元当空闲槽——C 之后产品路径上 `newest` 的记录读得出时造不出这一形，checker 那几条要这一形的坏镜像用它造。
+pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before_with_the_shadow_ledger(
+    pool: &mut BuiltPool,
+    newest: &TransactionOutput,
+    shadow_ledger: singlefs_core::mount::ShadowLedger,
+) -> singlefs_core::mount::Mounted {
+    let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
+    let data_units_of_the_newest = newest
+        .data_pointers
+        .iter()
+        .flat_map(|pointer| pointer.locations)
+        .map(|location| {
+            (
+                location.device,
+                location.slot.to_device_offset(),
+                data_unit_bytes,
+            )
+        })
+        .collect();
+    abandon_the_newest_root_by_a_recovery_hiding_its_root_slot_and(
+        pool,
+        newest,
+        data_units_of_the_newest,
+        shadow_ledger,
+    )
+}
+
+/// 同 [`abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`]，暂时读不出的是 `newest` 的根槽与它那条末条记录点名的打包记录单元
+/// （码 3，两份）：没写数据单元的发布（建空 inode 那一种）也被抛弃得了——它那条记录点名的 inode 叶容器两份都读不出，施加前验点名单元失败、不施加
+/// （D23（journal 的角色与格式） 已定项 14 前缀第四条）。影子账开着；交回那次挂载。
+pub fn abandon_the_newest_root_by_a_recovery_hiding_the_packed_units_its_record_names(
+    pool: &mut BuiltPool,
+    newest: &TransactionOutput,
+) -> singlefs_core::mount::Mounted {
+    let packed_units_named_by_the_newest = newest
+        .record
+        .named
+        .iter()
+        .filter(|named| named.unit_class == UNIT_CLASS_PACKED)
+        .flat_map(|named| {
+            named.locations.iter().map(|location| {
+                (
+                    location.device,
+                    location.slot.to_device_offset(),
+                    named_unit_bytes(named.unit_class),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
+    assert!(
+        !packed_units_named_by_the_newest.is_empty(),
+        "`newest` 那条记录点名了至少一片打包记录单元（建 inode 的发布重写 inode 叶容器）"
+    );
+    abandon_the_newest_root_by_a_recovery_hiding_its_root_slot_and(
+        pool,
+        newest,
+        packed_units_named_by_the_newest,
+        singlefs_core::mount::ShadowLedger::On,
+    )
+}
+
+/// W3 那一段历史（D23（journal 的角色与格式） 已定项 14「水位」一格的 Opt2、D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」）：
+/// 第一个文件那一版 A（实例 1，inode 号水位 2）之后建三个空 inode 的那一版 `abandoned`（号 2、3、4，水位 5）；崩溃恢复抛弃它
+/// （[`abandon_the_newest_root_by_a_recovery_hiding_the_packed_units_its_record_names`]：恢复落到 A，实例 2 写行、暖机，再把它的根槽与
+/// inode 叶容器写回——它的根读得出、从盘上重建得出水位 5，按实例 2 的实例表判是被抛弃的）；实例 2 再建一个空 inode 的那一版 `created_again`
+/// （号 2 又发一次：被抛弃那段里发过的号，D8（核心索引结构） 已定项 6 射程允许重发；水位 3）；挂着的时候管理员回退到 A 的那一版 `rollback`。
+pub struct RollbackAfterARecoveryAbandonedARootThatCreatedInodes {
+    pub pool: BuiltPool,
+    pub first_file_version: TransactionOutput,
+    pub abandoned: TransactionOutput,
+    pub created_again: TransactionOutput,
+    pub rollback: TransactionOutput,
+}
+
+/// 搭 [`RollbackAfterARecoveryAbandonedARootThatCreatedInodes`] 那一段历史。搭建自证：回退之前被抛弃那一版的根在根环里读得出、
+/// 从盘上重建得出水位 5（不然「回退只取没被抛弃的根」那一判在这段历史上量不出什么）。
+pub fn rollback_after_a_recovery_abandoned_a_root_that_created_inodes(
+    tag: &str,
+) -> RollbackAfterARecoveryAbandonedARootThatCreatedInodes {
+    const NEW_INODES_OF_THE_ABANDONED_PUBLISH: u64 = 3;
+    let mut pool = build_pool(tag);
+    let first_file_version = pool.output.clone();
+    let publish_new_inodes_in_process =
+        |pool_to_publish_on: &mut BuiltPool, count: u64, instance: InstanceGeneration| {
+            let publish_parameters = parameters();
+            let previous = pool_to_publish_on.output.clone();
+            let devices = pool_to_publish_on.devices.as_mut().expect("镜像还开着");
+            let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+            let output = singlefs_core::transaction::publish_new_inodes(
+                &mut writer,
+                &mut pool_to_publish_on.allocator,
+                &previous,
+                count,
+                FIXED_WRITE_TIME_SECONDS + 60,
+                instance,
+            )
+            .expect("建空 inode");
+            pool_to_publish_on.output = output.clone();
+            output
+        };
+    let abandoned = publish_new_inodes_in_process(
+        &mut pool,
+        NEW_INODES_OF_THE_ABANDONED_PUBLISH,
+        InstanceGeneration(1),
+    );
+    assert_eq!(
+        abandoned.inode_number_watermark(),
+        2 + NEW_INODES_OF_THE_ABANDONED_PUBLISH,
+        "建三个空 inode（号 2、3、4）之后水位 5"
+    );
+    let mounted = abandon_the_newest_root_by_a_recovery_hiding_the_packed_units_its_record_names(
+        &mut pool, &abandoned,
+    );
+    assert_eq!(
+        (
+            mounted.output.effective_root.instance,
+            mounted.output.effective_root.checkpoint_txg
+        ),
+        (
+            first_file_version.root.instance,
+            first_file_version.root.checkpoint_txg
+        ),
+        "崩溃恢复落到 A，建 inode 那一版的记录不施加"
+    );
+    match singlefs_core::recovery::rebuild_version(
+        &pool.memory_pool(),
+        &abandoned.root,
+        Some(abandoned.record.clone()),
+    ) {
+        Ok(
+            singlefs_core::recovery::RebuiltVersion::WithFile(version)
+            | singlefs_core::recovery::RebuiltVersion::WithTreesAndNoFile(version),
+        ) => assert_eq!(
+            version.inode_number_watermark(),
+            2 + NEW_INODES_OF_THE_ABANDONED_PUBLISH,
+            "被抛弃那一版从盘上重建得出水位 5"
+        ),
+        other => panic!("被抛弃那一版从盘上重建得出：{other:?}"),
+    }
+    let created_again = publish_new_inodes_in_process(&mut pool, 1, mounted.output.instance);
+    let publish_parameters = parameters();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    singlefs_core::mount::roll_back_by_a_forward_publish(
+        &publish_parameters,
+        devices,
+        &mut pool.allocator,
+        &mut pool.output,
+        singlefs_core::mount::RollbackTarget {
+            instance: first_file_version.root.instance,
+            checkpoint_txg: first_file_version.root.checkpoint_txg,
+        },
+    )
+    .expect("挂着的时候回退到 A");
+    let rollback = pool.output.clone();
+    RollbackAfterARecoveryAbandonedARootThatCreatedInodes {
+        pool,
+        first_file_version,
+        abandoned,
+        created_again,
+        rollback,
+    }
+}
+
+/// 崩溃恢复抛弃 `newest` 的本体：根槽与 `units_hidden_besides_the_root_slot`（盘、字节偏移、长度）暂时读不出，其余见
+/// [`abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before`]。
+fn abandon_the_newest_root_by_a_recovery_hiding_its_root_slot_and(
+    pool: &mut BuiltPool,
+    newest: &TransactionOutput,
+    units_hidden_besides_the_root_slot: Vec<(DeviceIdentity, DeviceOffsetInBytes, usize)>,
+    shadow_ledger: singlefs_core::mount::ShadowLedger,
+) -> singlefs_core::mount::Mounted {
     use singlefs_core::block_device::{BlockDevice, WriteDurability};
     let publish_parameters = parameters();
     let target = singlefs_core::root_ring::target_for_publish(
@@ -757,7 +942,6 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
     );
     let root_slot_bytes =
         usize::try_from(publish_parameters.geometry.physical_block_size).expect("根槽宽");
-    let data_unit_bytes = usize::try_from(singlefs_format::DATA_UNIT_BYTES).expect("32768");
     fn index_of_device(devices: &[(DeviceIdentity, Recorded)], identity: DeviceIdentity) -> usize {
         devices
             .iter()
@@ -766,19 +950,7 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
     }
     let mut devices = pool.reopen_recorded();
     let places_to_hide = std::iter::once((root_slot_device, root_slot_offset, root_slot_bytes))
-        .chain(
-            newest
-                .data_pointers
-                .iter()
-                .flat_map(|pointer| pointer.locations)
-                .map(|location| {
-                    (
-                        location.device,
-                        location.slot.to_device_offset(),
-                        data_unit_bytes,
-                    )
-                }),
-        );
+        .chain(units_hidden_besides_the_root_slot);
     let mut saved: Vec<(
         DeviceIdentity,
         singlefs_core::address::DeviceOffsetInBytes,
@@ -837,8 +1009,13 @@ pub fn abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(
             .write_at(newest_slot, &rotation_not_written, WriteDurability::Plain)
             .expect("见证 newest 的系统配置槽写回成轮换之前的那一代");
     }
-    let mounted = singlefs_core::mount::mount_writable(&publish_parameters, &mut devices)
-        .expect("最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载");
+    let mounted = singlefs_core::mount::mount_writable_with_test_only_switches(
+        &publish_parameters,
+        &mut devices,
+        singlefs_core::admission::SpaceAdmission::JudgedByTheFormula,
+        shadow_ledger,
+    )
+    .expect("最新那条根与它的数据单元读不出：择根落到前一条根，照常可写挂载");
     for (identity, offset, bytes) in &saved {
         let index = index_of_device(&devices, *identity);
         devices[index]

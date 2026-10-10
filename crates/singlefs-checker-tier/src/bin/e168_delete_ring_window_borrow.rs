@@ -112,6 +112,11 @@ const JOURNAL_RING_ENLARGEMENTS_AT_MOST: usize = 4;
 const NARROW_JOURNAL_RING_BYTES: u64 = 6 << 20;
 /// 登记 5.7 P2 的单元区槽数。
 const NARROW_UNIT_AREA_SLOTS: u64 = 384;
+/// 装置单测用的 P2 宽盘：S = 4 时环窗口真扣（每盘 364 槽）之后，384 槽连第一个文件都写不进；
+/// 照「准入可用与放大前一样」的先例放大到 790 槽，重挂载后的可用与 384 槽在没有环窗口时只差墓碑每对象那 41 字节。
+/// 登记 5.7 的 P2 取样点不随它变。
+#[cfg(test)]
+const NARROW_UNIT_AREA_SLOTS_WITH_THE_RING_WINDOW_RESERVED: u64 = 790;
 /// 登记 5.7 P4：4 GiB。
 const PRODUCT_DEVICE_BYTES: u64 = 4 << 30;
 /// 盘的物理块大小：harness 的内存稀疏盘都按 512 建。
@@ -1257,7 +1262,9 @@ fn checker_violations(image: &MemoryPool) -> Vec<String> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}:{detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -2622,6 +2629,19 @@ fn narrow_geometry(slots_per_region: u64) -> Geometry {
         device_bytes: device_bytes_with_unit_area(
             NARROW_JOURNAL_RING_BYTES,
             NARROW_UNIT_AREA_SLOTS,
+        ),
+        journal_ring_bytes: NARROW_JOURNAL_RING_BYTES,
+        slots_per_region,
+    }
+}
+
+#[cfg(test)]
+fn narrow_geometry_with_the_ring_window_reserved(slots_per_region: u64) -> Geometry {
+    Geometry {
+        point: DeviceSizePoint::Narrow,
+        device_bytes: device_bytes_with_unit_area(
+            NARROW_JOURNAL_RING_BYTES,
+            NARROW_UNIT_AREA_SLOTS_WITH_THE_RING_WINDOW_RESERVED,
         ),
         journal_ring_bytes: NARROW_JOURNAL_RING_BYTES,
         slots_per_region,
@@ -4237,17 +4257,18 @@ mod tests {
 
     #[test]
     fn a_publish_after_the_filled_slots_are_unmarked_leaves_a_pool_the_checker_holds() {
-        let PoolWithAFile::Written(mut pool) =
-            pool_with_a_file(narrow_geometry(ROOT_RING_SLOTS_PER_REGION_MINIMUM), 1)
-        else {
-            panic!("P2、S = 4 上写得进一个单元的文件（2026-10-01 第一段在 P2-S4-K1-Lseq-Fend-N-A-N1 上删过）");
+        let PoolWithAFile::Written(mut pool) = pool_with_a_file(
+            narrow_geometry_with_the_ring_window_reserved(ROOT_RING_SLOTS_PER_REGION_MINIMUM),
+            1,
+        ) else {
+            panic!("单元区 790 槽、S = 4 上写得进一个单元的文件");
         };
         let FillOutcome::WithinOneSlotAtOrBelowZero {
             filled_slots_of_each_device,
             ..
         } = fill_from_the_unit_area_end(&mut pool)
         else {
-            panic!("P2、S = 4、一个单元的池压得满（那一格 free_after_fill = 112）");
+            panic!("单元区 790 槽、S = 4、一个单元的池压得满");
         };
         assert!(
             filled_slots_of_each_device
@@ -4361,10 +4382,11 @@ mod tests {
     #[test]
     fn the_s7_ledger_rewrite_is_published_with_the_formula_judgement_skipped_like_every_delete_publish(
     ) {
-        let PoolWithAFile::Written(mut pool) =
-            pool_with_a_file(narrow_geometry(ROOT_RING_SLOTS_PER_REGION_MINIMUM), 1)
-        else {
-            panic!("P2、S = 4 上写得进一个单元的文件");
+        let PoolWithAFile::Written(mut pool) = pool_with_a_file(
+            narrow_geometry_with_the_ring_window_reserved(ROOT_RING_SLOTS_PER_REGION_MINIMUM),
+            1,
+        ) else {
+            panic!("单元区 790 槽、S = 4 上写得进一个单元的文件");
         };
         let hooks = fake_delete_path_hooks();
         let (ledger_rewrite, formula_judgements) =

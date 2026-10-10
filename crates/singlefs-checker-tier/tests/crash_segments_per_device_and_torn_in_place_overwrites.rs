@@ -467,6 +467,13 @@ fn new_pool_file_creation_stream(
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &parameters,
+            &genesis,
+        ),
+    );
     let content = file_content();
     {
         let mut pool = PoolWriter::new(&parameters, &mut devices);

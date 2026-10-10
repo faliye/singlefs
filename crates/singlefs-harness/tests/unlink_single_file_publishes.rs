@@ -2,14 +2,17 @@
 //! 意图那次、不是最后一批的一批、最后一批。三个单元的文件按只供测试的批大小 1 删：意图 → 留 2 → 留 1 → 最后一批。
 
 mod common;
+mod common_deletion_in_progress;
+mod common_pointer_head_corruption;
 
-use common::{
-    build_pool, parameters, sequential_write_in_process_as_instance_one_and_advance_the_pool,
-    BuiltPool, FIXED_WRITE_TIME_SECONDS,
+use common::{parameters, BuiltPool, FIXED_WRITE_TIME_SECONDS};
+use common_deletion_in_progress::{
+    batches_of_one_data_unit, pool_with_a_three_unit_file, publish_the_next_step_in_batches_of_one,
+    FIRST_FILE, INSTANCE_OF_THE_PUBLISHES,
 };
 use singlefs_checker::image::InvariantVerdict;
 use singlefs_checker::walk::check_pool_image;
-use singlefs_core::address::{CheckpointTxg, InodeNumber, InstanceGeneration};
+use singlefs_core::address::CheckpointTxg;
 use singlefs_core::allocator::Placement;
 use singlefs_core::mounted_read::{mount_read_only, OpenFileFailure};
 use singlefs_core::pointer::NodePointer;
@@ -20,44 +23,13 @@ use singlefs_core::recovery::{
     rebuild_version, recover, JournalPolicy, RebuiltVersion, RecoveryOutcome,
 };
 use singlefs_core::transaction::{
-    publish_overwrite, publish_unlink_intent, publish_unlink_step,
-    publish_unlink_steps_until_the_queue_is_empty, FirstFile, PoolWriter, PublishError,
-    TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
+    publish_overwrite, publish_unlink_intent, publish_unlink_steps_until_the_queue_is_empty,
+    FirstFile, PoolWriter, PublishError, TransactionOutput, TransactionUnit, FIRST_INODE_NUMBER,
 };
 use singlefs_core::unit::{data_unit_payload_capacity, PACKED_TYPE_TOMBSTONE};
-use singlefs_core::unlink::{UnlinkBatchDataUnitsCappedForTests, UnlinkBatchSize};
 use singlefs_harness::memory_pool::MemoryPool;
 
-const FIRST_FILE: InodeNumber = InodeNumber(FIRST_INODE_NUMBER);
-
-/// 删除的那一路都在新池新建文件那个实例里发。
-const INSTANCE_OF_THE_PUBLISHES: InstanceGeneration = InstanceGeneration(1);
-
-fn batches_of_one_data_unit() -> UnlinkBatchSize {
-    UnlinkBatchSize::CappedForTests(
-        UnlinkBatchDataUnitsCappedForTests::new(1).expect("1 在 1..=144 里"),
-    )
-}
-
-/// 三个数据单元的内容：最后一个单元装半个净荷。
-fn content_of_three_data_units() -> Vec<u8> {
-    let payload_capacity = data_unit_payload_capacity();
-    (0..2 * payload_capacity + payload_capacity / 2)
-        .map(|index| u8::try_from((index * 13 + 5) % 251).expect("小于 256"))
-        .collect()
-}
-
-/// 新池新建文件之后把第一个文件顺序写成三个数据单元。
-fn pool_with_a_three_unit_file(tag: &str) -> BuiltPool {
-    let mut pool = build_pool(tag);
-    let grown = sequential_write_in_process_as_instance_one_and_advance_the_pool(
-        &mut pool,
-        &content_of_three_data_units(),
-    );
-    assert_eq!(grown.data_pointers.len(), 3, "第一个文件三个数据单元");
-    pool
-}
-
+/// 意图那次被拒要交回错（已经删完的那一格），`common_deletion_in_progress::publish_the_intent` 被拒就 panic：这一份照旧留在这里。
 fn publish_the_intent(pool: &mut BuiltPool) -> Result<TransactionOutput, PublishError> {
     let publish_parameters = parameters();
     let previous = pool.output.clone();
@@ -79,24 +51,6 @@ fn publish_the_intent(pool: &mut BuiltPool) -> Result<TransactionOutput, Publish
     Ok(output)
 }
 
-fn publish_the_next_step_in_batches_of_one(pool: &mut BuiltPool) -> TransactionOutput {
-    let publish_parameters = parameters();
-    let previous = pool.output.clone();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
-    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
-    let output = publish_unlink_step(
-        &mut writer,
-        &mut pool.allocator,
-        &previous,
-        FIRST_FILE,
-        batches_of_one_data_unit(),
-        INSTANCE_OF_THE_PUBLISHES,
-    )
-    .expect("删除的下一步");
-    pool.output = output.clone();
-    output
-}
-
 fn tags_of(roles: &[TransactionUnit]) -> Vec<String> {
     roles.iter().map(|role| role.tag()).collect()
 }
@@ -106,7 +60,9 @@ fn violations(image: &MemoryPool) -> Vec<String> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some(format!("{invariant}: {detail}")),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -260,9 +216,21 @@ fn the_final_batch_removes_the_record_the_queue_key_and_every_remaining_unit_in_
     assert_eq!(
         tags_of(&final_batch.rewritten),
         [
-            "t2", "t4", "t5@0.0.61", "t5@0.1.61", "t5@1.0.0", "t5@1.1.0", "t5", "t6", "t7", "t8"
+            "t2",
+            "t4",
+            "t5@0.0.61",
+            "t5@0.1.61",
+            "t5@1.0.0",
+            "t5@1.1.0",
+            "t5",
+            "t6",
+            "tr@0",
+            "tr",
+            "t7",
+            "t8"
         ],
-        "最后一批重写 extent 零条目根、inode 零条目根与固定点单元；deleted_inodes 删空取根指针置零、不写它的节点"
+        "最后一批重写 extent 零条目根、inode 零条目根与固定点单元；deleted_inodes 删空取根指针置零、不写它的节点；唯一那片叶容器身份消失，\
+         退役树开第一片容器、写根（判决 m3-retire-r1 第三节第 3 条）"
     );
     assert_eq!(final_batch.inode_record, None, "记录删掉");
     assert!(final_batch.deleted_inodes.is_empty(), "key 删掉");

@@ -116,7 +116,7 @@ struct Remount {
 
 fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Remount {
     let (mut pool, abandoned) = pool_after_a_recovery_abandoned_c(tag);
-    let unit = abandoned.unit(account.unit());
+    let account_unit = abandoned.unit(account.unit());
     let failing = match unreadability {
         Unreadability::Readable => FailingReadsOfARange::Never,
         Unreadability::EveryRead | Unreadability::EveryReadUntilTheRereadHook => {
@@ -128,8 +128,8 @@ fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Remount
         .into_iter()
         .map(|device| UnreadableRange {
             device,
-            offset_in_bytes: unit.slot.0 * SLOT_BYTES,
-            length_in_bytes: u64::try_from(unit.bytes.len()).expect("长度"),
+            offset_in_bytes: account_unit.slot.0 * SLOT_BYTES,
+            length_in_bytes: u64::try_from(account_unit.bytes.len()).expect("长度"),
             failing_reads: failing,
         })
         .collect();
@@ -156,7 +156,7 @@ fn remount(tag: &str, account: Account, unreadability: Unreadability) -> Remount
     let mut remount = Remount {
         pool,
         abandoned: abandoned.clone(),
-        account_slot: unit.slot.0,
+        account_slot: account_unit.slot.0,
         result: Ok(()),
         isolated: Vec::new(),
         abandoned_roots_unreadable: 0,
@@ -579,12 +579,82 @@ fn zero_the_tree_table_and_the_mapping_root_of(
     pool.devices = Some(devices);
 }
 
+/// 一条根的根槽在池里的位置与原字节：(盘, 偏移, 原来那一槽的字节)。
+struct HiddenRootSlot {
+    device: DeviceIdentity,
+    offset: DeviceOffsetInBytes,
+    original_bytes: Vec<u8>,
+}
+
+/// 把一条根的根槽抹成全零（之后可写挂载那一刻读回全零），交回原字节，挂载之后由 [`restore_the_root_slot`] 写回。
+fn hide_the_root_slot_of(
+    pool: &mut BuiltPool,
+    root: &singlefs_core::root_record::RootRecord,
+) -> HiddenRootSlot {
+    use singlefs_core::block_device::{BlockDevice, WriteDurability};
+    let pool_parameters = parameters();
+    let ring_slot = singlefs_core::root_ring::target_for_publish(
+        root.checkpoint_txg,
+        pool_parameters.geometry.root_ring_slots_per_region,
+    );
+    let device = pool_parameters.region_devices
+        [usize::try_from(ring_slot.region).expect("区域号装得进 usize")];
+    let offset = singlefs_core::root_ring::slot_offset(
+        ring_slot,
+        pool_parameters.geometry.fixed_structure_slot_spacing,
+    );
+    let root_slot_bytes =
+        usize::try_from(pool_parameters.geometry.physical_block_size).expect("物理块装得进 usize");
+    let mut devices = pool.reopen_recorded();
+    let index = devices
+        .iter()
+        .position(|(identity, _)| *identity == device)
+        .expect("根槽所在的盘");
+    let mut original_bytes = vec![0u8; root_slot_bytes];
+    devices[index]
+        .1
+        .read_at(offset, &mut original_bytes)
+        .expect("读根槽");
+    devices[index]
+        .1
+        .write_at(offset, &vec![0u8; root_slot_bytes], WriteDurability::Plain)
+        .expect("抹零根槽");
+    pool.devices = Some(devices);
+    HiddenRootSlot {
+        device,
+        offset,
+        original_bytes,
+    }
+}
+
+fn restore_the_root_slot(pool: &mut BuiltPool, hidden: &HiddenRootSlot) {
+    use singlefs_core::block_device::{BlockDevice, WriteDurability};
+    let mut devices = pool.reopen_recorded();
+    let index = devices
+        .iter()
+        .position(|(identity, _)| *identity == hidden.device)
+        .expect("根槽所在的盘");
+    devices[index]
+        .1
+        .write_at(
+            hidden.offset,
+            &hidden.original_bytes,
+            WriteDurability::Plain,
+        )
+        .expect("写回根槽");
+    pool.devices = Some(devices);
+}
+
 /// 抬 F 那一串在影子账上被拒（代码轮 LR3，攻方 `m3-leftover-code-r1` Z2 ③：此前没有用例走到这一支）：
 /// 崩溃恢复先后抛弃 C (2, 8) 与 E（实例 3 覆盖写 D 之后的那一版），再可写挂载一次、覆盖写 [`OVERWRITES_BEFORE_THE_RAISE`] 次，然后把两条被抛弃根里影子账排在后面的那一条的
 /// 树表与中央映射树根两份都抹零。抬 F 到上限：新 F 越过两条被抛弃根的前一版，排在前面那条被抛弃根引用的槽（前一版那张实例表这类）
 /// 此刻只被它引用，影子账先给它补上隔离；算到后面那条，账与从映射现算都不成、重读一次仍不成，`isolate_slots_referenced_only_by_abandoned_roots`
 /// 交 `Err`——抬 F 拒成 `NewerStateStillUnreadableAfterOneReread(AccountOfAnAbandonedRoot)`、点名那条根，一个写都不发，
 /// 分配器整个换回抬 F 之前那一份（补上的隔离撤掉）。
+/// 抬 F 那一串里根环表记着的被抛弃根照记着的落点算、读不出也不拒（D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，用户 2026-10-07 定，
+/// 根环线第 10z 批）：要走到影子账的拒，排在后面的那一条得是根环表里没记着的——再可写挂载那一刻它的根槽读回全零（挂载之后写回），
+/// 根环表把那一槽记成「挂载时读回全零」，抬 F 那一遍读出它、照盘上读它的账（那一槽记的不是有效根，C 那一圈也不借：两样都没记着的照今天读盘，
+/// D16（发布语义） 已定项 1「根槽这一次读坏」那一行，用户 2026-10-08 定）。
 /// 判别力：影子账交 `Err` 时不换回分配器，前一条补上的隔离留在分配器上，「与抬 F 之前逐项相同」那一项红。
 #[test]
 fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator(
@@ -610,13 +680,44 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
     )
     .expect("E");
     abandon_the_newest_root_by_a_recovery_that_lands_on_the_root_before(&mut pool, &abandoned_e);
+    let keys = [
+        (abandoned_c.root.instance, abandoned_c.root.checkpoint_txg),
+        (abandoned_e.root.instance, abandoned_e.root.checkpoint_txg),
+    ];
+    let positions = positions_in_the_ring_order(&mut pool, &keys);
+    let (earlier, later) = if positions[0] > positions[1] {
+        (&abandoned_e, &abandoned_c)
+    } else {
+        (&abandoned_c, &abandoned_e)
+    };
+    let hidden_root_slot = hide_the_root_slot_of(&mut pool, &later.root);
     let mut devices_of_the_mount = pool.reopen_recorded();
     let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_mount)
-        .expect("两条被抛弃根都读得出：照常可写挂载");
+        .expect("排在后面那条被抛弃根的根槽读回全零、前面那条读得出：照常可写挂载");
     let instance = mounted.output.instance;
     pool.devices = Some(devices_of_the_mount);
     pool.allocator = mounted.allocator;
     pool.output = mounted.current.into_file_version().expect("带文件");
+    restore_the_root_slot(&mut pool, &hidden_root_slot);
+    let root_ring_table = pool
+        .allocator
+        .root_ring_occupancy()
+        .expect("挂载建的分配器装着根环表");
+    assert!(
+        root_ring_table
+            .placements_recorded_for_the_abandoned_root(
+                earlier.root.instance,
+                earlier.root.checkpoint_txg
+            )
+            .is_some()
+            && root_ring_table
+                .placements_recorded_for_the_abandoned_root(
+                    later.root.instance,
+                    later.root.checkpoint_txg
+                )
+                .is_none(),
+        "根环表记着排在前面的那条被抛弃根、没记着排在后面的那一条"
+    );
     for overwrite_index in 0..OVERWRITES_BEFORE_THE_RAISE {
         let previous = pool.output.clone();
         pool.output = publish_overwrite_in_process(
@@ -628,16 +729,6 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
         )
         .expect("这次挂载里覆盖写");
     }
-    let keys = [
-        (abandoned_c.root.instance, abandoned_c.root.checkpoint_txg),
-        (abandoned_e.root.instance, abandoned_e.root.checkpoint_txg),
-    ];
-    let positions = positions_in_the_ring_order(&mut pool, &keys);
-    let later = if positions[0] > positions[1] {
-        &abandoned_c
-    } else {
-        &abandoned_e
-    };
     zero_the_tree_table_and_the_mapping_root_of(&mut pool, &later.root);
     let allocator_before_the_raise = format!("{:?}", pool.allocator);
     let image_before_the_raise = pool.memory_pool();
@@ -678,9 +769,12 @@ fn a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_accou
 /// 被抛弃根的实例表有两片时，账读不出、从中央映射现算的那一臂把两片都算进它引用的落点（代码轮 LR2，攻方 `m3-leftover-code-r1` Z4 ①
 /// 「现算只认实例表第 0 片」放过：用例的池都只有一片实例表）。
 /// 造法：A、B（实例 1）之后连取 370 次号再可写挂载（实例 372），写行把 1 到 371 的 371 行写进两片实例表；覆盖写 C、崩溃恢复抛弃 C
-/// （实例 373 写行，换下两片）；C 的树表两份抹零（账读不出）再可写挂载（实例 374）、覆盖写 [`OVERWRITES_BEFORE_THE_RAISE`] 次、抬 F 到上限：新 F 越过 C 的前一版，
-/// C 那两片实例表此刻只被 C 引用、在现行那一版的账里已释放，抬 F 的影子账从映射现算、两片都隔离，回收之后照样不空闲。
-/// 判别力：现算只认实例表第 0 片时第 1 片不隔离、回收之后空闲，那一项红。
+/// （实例 373 写行，换下两片）；C 的树表两份抹零（账读不出）再可写挂载（实例 374）：挂载那一遍读不出 C 的账、从映射现算出它引用的落点（两片都在内），
+/// 根环表把 C 记成被抛弃根、记着这一份。覆盖写 [`OVERWRITES_BEFORE_THE_RAISE`] 次、抬 F 到上限：新 F 越过 C 的前一版，C 那两片实例表此刻只被 C 引用、
+/// 在现行那一版的账里已释放；抬 F 那一串照根环表里记着的那一份算（不再从盘上读 C 的账、也不再现算，D16（发布语义） 已定项 1「根槽这一次读坏」那一行末句，
+/// 根环线第 10z 批），两片都隔离，回收之后照样不空闲。
+/// 判别力：现算只认实例表第 0 片时挂载那一遍就只记下第 0 片，抬 F 照它算，第 1 片不隔离、回收之后空闲，那一项红；
+/// 抬 F 那一串记着的落点被削（只交一部分或交空）时同样红。
 #[test]
 fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_isolates_both_pages_from_the_mapping(
 ) {
@@ -814,5 +908,105 @@ fn an_abandoned_root_with_a_two_page_instance_table_and_an_unreadable_account_is
         free_page_slots,
         Vec::<(u32, u64)>::new(),
         "C 那两片实例表的落点抬 F 回收之后一槽都不空闲（从映射现算两片都隔离）"
+    );
+}
+
+/// 抬 F 那一串里根环表没记着落点的被抛弃根照今天读盘，账读不出就从中央映射现算、照样隔离、计进 `abandoned_roots_unreadable`
+/// （C393 取 (b)-从映射现算；攻方 M11、正推 m19，判决 `research/prompts/m3-batch10z-b-code-r1-main-verification.md` 第二节 K3：
+/// 这一批之前默认档里没有一条用例走到抬 F 那一遍现算做成的这一支，只有一条慢档用例）。
+/// 造法：崩溃恢复抛弃 C (2, 8) 之后再可写挂载（实例 4）那一刻 C 的根槽读回全零（挂载之后写回）：根环表把那一槽记成「挂载时读回全零」，
+/// 没记着 C 的落点，C 那一圈在那一槽也不借（那一槽记的不是有效根）。挂上之后 C 的树表两份抹零（账读不出、中央映射读得出），正常卸载：
+/// 抬 F 那一遍读出 C、按现行那一版的表被抛弃，读它的账读不出，从映射现算——卸载做成、计数 1，C 写出的单元一个都不空闲。
+/// 判别力：抬 F 那一遍不从映射现算（直接重读、看凭据）时，C 的树表槽没被后来的写占、没有凭据，卸载拒成 `AccountOfAnAbandonedRoot`，这一条红。
+#[test]
+fn an_unmount_meeting_an_abandoned_root_not_in_the_root_ring_table_whose_account_is_unreadable_recomputes_it_from_the_mapping(
+) {
+    let (mut pool, abandoned_c) =
+        pool_after_a_recovery_abandoned_c("m11-unmount-recomputes-from-the-mapping");
+    let hidden_root_slot = hide_the_root_slot_of(&mut pool, &abandoned_c.root);
+    let mut devices_of_the_mount = pool.reopen_recorded();
+    let mounted = singlefs_core::mount::mount_writable(&parameters(), &mut devices_of_the_mount)
+        .expect("C 的根槽读回全零：照常可写挂载");
+    pool.devices = Some(devices_of_the_mount);
+    pool.allocator = mounted.allocator;
+    pool.output = mounted.current.into_file_version().expect("带文件");
+    restore_the_root_slot(&mut pool, &hidden_root_slot);
+    let root_ring_table = pool
+        .allocator
+        .root_ring_occupancy()
+        .expect("挂载建的分配器装着根环表");
+    assert_eq!(
+        root_ring_table.placements_recorded_for_the_abandoned_root(
+            abandoned_c.root.instance,
+            abandoned_c.root.checkpoint_txg
+        ),
+        None,
+        "挂载那一刻 C 的根槽读回全零：根环表里没记着 C 的落点"
+    );
+    assert_eq!(
+        root_ring_table
+            .placements_named_by_unapplied_journal_records_for_the_root_recorded_valid_on_its_ring_slot(
+                abandoned_c.root.instance,
+                abandoned_c.root.checkpoint_txg
+            ),
+        None,
+        "C 那一槽记的不是有效根：不借 C 那一圈的落点"
+    );
+    {
+        use singlefs_core::block_device::{BlockDevice, WriteDurability};
+        let mut devices_to_zero_the_tree_table = pool.reopen_recorded();
+        let tree_table_of_c = abandoned_c.unit(TransactionUnit::TreeTable);
+        for (_, device) in &mut devices_to_zero_the_tree_table {
+            device
+                .write_at(
+                    DeviceOffsetInBytes(tree_table_of_c.slot.0 * SLOT_BYTES),
+                    &vec![0u8; tree_table_of_c.bytes.len()],
+                    WriteDurability::Plain,
+                )
+                .expect("C 的树表两份抹零");
+        }
+        pool.devices = Some(devices_to_zero_the_tree_table);
+    }
+    let mut version_to_unmount =
+        singlefs_core::transaction::PoolVersion::WithFile(pool.output.clone());
+    let mut devices_of_the_unmount = pool.reopen_recorded();
+    let unmounted = singlefs_core::mount::unmount(
+        &parameters(),
+        &mut devices_of_the_unmount,
+        &mut pool.allocator,
+        &mut version_to_unmount,
+        ShadowLedger::On,
+    );
+    pool.devices = Some(devices_of_the_unmount);
+    match unmounted {
+        Ok(singlefs_core::mount::Unmounted::FloorRaisedToTheCurrentVersion(raised)) => {
+            assert_eq!(
+                raised.abandoned_roots_unreadable, 1,
+                "抬 F 那一遍读不出 C 的账：从映射现算，照样计数往上报"
+            );
+        }
+        Ok(singlefs_core::mount::Unmounted::NothingWrittenOnAVersionWithoutFile { current }) => {
+            panic!("现行那一版带文件，卸载要推一串抬 F：{current:?}")
+        }
+        Err(refusal) => {
+            panic!("C 的账读不出、映射读得出：卸载从映射现算做成，而被拒：{refusal:?}")
+        }
+    }
+    let free_units_of_c: Vec<(u32, u64)> = abandoned_c
+        .units
+        .iter()
+        .flat_map(|unit| {
+            pool.allocator
+                .devices
+                .iter()
+                .filter(|device_map| device_map.is_free(unit.slot))
+                .map(|device_map| (device_map.device.0, unit.slot.0))
+                .collect::<Vec<(u32, u64)>>()
+        })
+        .collect();
+    assert_eq!(
+        free_units_of_c,
+        Vec::<(u32, u64)>::new(),
+        "卸载之后 C 写出的单元一个都不空闲（从映射现算的落点都隔离着）"
     );
 }

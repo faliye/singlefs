@@ -79,6 +79,7 @@ impl RecordedFlow {
             segments: &self.segments,
             judged_root_index: self.judged_root_index,
             versions: &self.versions,
+            versions_without_a_file: &[],
             expansion: &expansion,
             crash_points: self.crash_points.clone(),
         }
@@ -989,6 +990,7 @@ fn root_slot_writes_whose_txgs_do_not_strictly_increase_put_every_later_write_in
             segments: &recorded.segments,
             judged_root_index: recorded.judged_root_index,
             versions: &recorded.versions,
+            versions_without_a_file: &[],
             expansion: &expansion,
             crash_points: recorded.crash_points.clone(),
         })
@@ -1111,6 +1113,7 @@ fn a_flow_whose_base_image_is_a_crash_state_with_a_journal_record_past_its_newes
         segments: &segments,
         judged_root_index,
         versions: &versions,
+        versions_without_a_file: &[],
         expansion: &expansion,
         crash_points,
     });

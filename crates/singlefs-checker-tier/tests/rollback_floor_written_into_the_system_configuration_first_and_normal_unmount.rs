@@ -363,23 +363,54 @@ fn the_floor_takes_effect_from_the_system_configuration_when_every_root_carrying
     );
 }
 
-/// 回退候选集的下界取 F 生效值（D16（发布语义） 已定项 1「回退候选集」「生效」），不是最新根自己带的 F：同上抬到 3、两条带新 F 的根都读不出，
-/// 最新读得出的根是 txg 6（带 F 0）；挂着的时候回退到暖机那条 txg 2 的根，在任何写之前拒成 `BelowEffectiveFloor`，盘上逐字节不变、
-/// 分配器与现行版本不动。按最新根自己的 F（0）判，它过得了下界这一道，报的是「树表 0 条」（`VersionWithoutFile`）。
+/// 回退候选集的下界取 F 生效值（D16（发布语义） 已定项 1「回退候选集」「生效」），不是最新根自己带的 F、也不是目标根自己带的 F。
+/// 头几步照下面那条「先写系统配置那一步失败」：覆盖写三次到 txg 6，抬 F 到 3，第二次写（盘 1 的系统配置槽）报块设备错——
+/// 只有盘 0 的系统配置带新 F 3，一条带新 F 的根都没发；最新读得出的根仍是 txg 6（带 F 0），F 生效值是 3。
+/// 同一个进程里回退到暖机那条 txg 2 的根（实例 1，根槽 (1, 2)，带 F 0），在任何写之前拒成 `BelowEffectiveFloor`：录制流不多一步、
+/// 分配器与现行版本不动。按最新根或目标根自己的 F（都是 0）判，它过得了下界这一道，报的是「树表 0 条」（`VersionWithoutFile`）。
+///
+/// 为什么不用原来的造法（抬到 3 做成、再把 txg 7、8 那两条带新 F 的根改坏）：31-1 之后 `build_pool` 的分配器装了根环表，那两槽是
+/// 这个进程写过的、「这个进程知道住着根的槽」，判候选与算 F_生效 读根环时重读一次仍坏，就先拒成 `CandidateJudgementStillUnreadableAfterOneReread`、
+/// 到不了下界这一判（D16（发布语义） 已定项 1「根槽这一次读坏」那一行）；那一形由 `reuse_after_raising_the_floor.rs` 的
+/// `rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write` 钉成先拒。
+/// 这一造法一个根槽都不碰，下界只能从盘 0 的系统配置里来。
 #[test]
 fn rolling_back_below_a_floor_only_the_system_configuration_carries_is_refused_before_any_write() {
-    let mut pool = build_pool("rbf2-rollback-below-the-system-configuration-floor");
-    overwrite_times(&mut pool, 3);
-    raise_floor(&mut pool, CheckpointTxg(3)).expect("抬到上限 3");
-    make_the_root_unreadable(&mut pool, CheckpointTxg(7));
-    make_the_root_unreadable(&mut pool, CheckpointTxg(8));
-    let newest_readable_root = {
-        let devices = pool.devices.as_ref().expect("镜像还开着");
-        readable_roots_of(devices.as_slice())
-            .into_iter()
-            .max_by_key(|root| (root.checkpoint_txg, root.instance))
-            .expect("根环里有根")
-    };
+    let mut pool = three_overwrites_on_fault_injected_devices();
+    let roots_before_the_raise = readable_roots_of(pool.devices.as_slice());
+    pool.fault_plan
+        .arm(FaultSchedule::the_nth_call_across_the_pool(
+            InjectedFault::WriteFails,
+            2,
+        ));
+    let mut current_for_the_raise = pool.output.clone();
+    let refused_raise = raise_rollback_floor(
+        &parameters(),
+        &mut pool.devices,
+        &mut pool.allocator,
+        &mut current_for_the_raise,
+        CheckpointTxg(3),
+        ShadowLedger::On,
+    );
+    pool.fault_plan.disarm();
+    assert!(
+        matches!(
+            &refused_raise,
+            Err(MountError::RaiseFloorSystemConfigurationWriteFailedBeforeAnyRoot(failed))
+                if failed.devices_carrying_the_raised_floor == vec![DeviceIdentity(0)]
+        ),
+        "盘 1 的系统配置写报错：先写系统配置那一步失败、只有盘 0 带新 F：{:?}",
+        refused_raise.as_ref().err()
+    );
+    let roots_after_the_raise = readable_roots_of(pool.devices.as_slice());
+    assert_eq!(
+        roots_after_the_raise, roots_before_the_raise,
+        "抬 F 这一串一条根都没发：根环逐条不变"
+    );
+    let newest_readable_root = roots_after_the_raise
+        .iter()
+        .max_by_key(|root| (root.checkpoint_txg, root.instance))
+        .expect("根环里有根");
     assert_eq!(
         (
             newest_readable_root.checkpoint_txg,
@@ -388,14 +419,37 @@ fn rolling_back_below_a_floor_only_the_system_configuration_carries_is_refused_b
         (CheckpointTxg(6), CheckpointTxg(0)),
         "最新读得出的根是 txg 6、带 F 0"
     );
-    let before = disk_snapshot(&pool.memory_pool(), &pool.stream);
+    let target_root = roots_after_the_raise
+        .iter()
+        .find(|root| {
+            root.instance == InstanceGeneration(1) && root.checkpoint_txg == CheckpointTxg(2)
+        })
+        .expect("暖机那条 txg 2 的根读得出");
+    assert_eq!(
+        target_root.rollback_floor,
+        CheckpointTxg(0),
+        "目标根自己带 F 0"
+    );
+    assert_eq!(
+        (
+            system_configuration_floors_on(pool.devices.as_slice(), DeviceIdentity(0))
+                .into_iter()
+                .max(),
+            system_configuration_floors_on(pool.devices.as_slice(), DeviceIdentity(1))
+                .into_iter()
+                .max()
+        ),
+        (Some(CheckpointTxg(3)), Some(CheckpointTxg(0))),
+        "只有盘 0 的系统配置带新 F 3，盘 1 没写进"
+    );
+    // F 生效值是 3 这里不另断言：同一盘面在下面那条「先写系统配置那一步失败」里断言过；F_生效 不取系统配置的变异要红在回退判候选这一判上，
+    // 不在前面的搭建核对上。
+    let operations_before_the_rollback = pool.stream.operation_count();
     let current_before = pool.output.clone();
     let records_before = pool.allocator.records().to_vec();
-    let rollback_parameters = parameters();
-    let devices = pool.devices.as_mut().expect("镜像还开着");
     let refused = roll_back_by_a_forward_publish(
-        &rollback_parameters,
-        devices,
+        &parameters(),
+        &mut pool.devices,
         &mut pool.allocator,
         &mut pool.output,
         RollbackTarget {
@@ -407,17 +461,20 @@ fn rolling_back_below_a_floor_only_the_system_configuration_carries_is_refused_b
         matches!(
             &refused,
             Err(RollbackError::TargetNotACandidate {
+                target: RollbackTarget {
+                    instance: InstanceGeneration(1),
+                    checkpoint_txg: CheckpointTxg(2),
+                },
                 exclusion: RollbackCandidateExclusion::BelowEffectiveFloor,
-                ..
             })
         ),
         "txg 2 低于 F 生效值 3：不是候选：{:?}",
         refused.as_ref().err()
     );
     assert_eq!(
-        disk_snapshot(&pool.memory_pool(), &pool.stream),
-        before,
-        "拒在任何写之前"
+        pool.stream.operation_count(),
+        operations_before_the_rollback,
+        "拒在任何写之前：录制流不多一步"
     );
     assert_eq!(pool.output, current_before, "现行版本不动");
     assert_eq!(

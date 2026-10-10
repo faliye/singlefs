@@ -69,7 +69,7 @@ use singlefs_harness::sha256::sha256_hexadecimal;
 // ── 本地常量：值抄自 kb，不从 `crates/` 引；[`cross_check_local_constants_against_the_implementation`] 逐个回比（登记第三节、停机条款 H2）。
 
 /// journal 记录字节数。抄自 `.claude/kb/layout/01-first-txn.md:45`（「journal 环……记录 4096」）与
-/// `.claude/kb/decisions/23-journal的角色与格式.md:311`（已定项 12：记录尺寸取 4 KiB）。
+/// `.claude/kb/decisions/23-journal的角色与格式.md:313`（已定项 12：记录尺寸取 4 KiB）。
 const LOCAL_JOURNAL_RECORD_BYTES: u64 = 4096;
 /// 在飞上限的安全系数 F。抄自 `.claude/kb/decisions/23-journal的角色与格式.md:492`（已定项 18：「在飞记录数上限 = 环槽数 ÷ F」，默认环下 196608 ÷ 3）。
 const LOCAL_JOURNAL_SAFETY_FACTOR: u64 = 3;
@@ -197,6 +197,9 @@ enum CriteriaSet {
     WithJ6QnAndJ7,
     /// r3 档（登记 `research/prompts/e165-r3-prereg.md` 5.1、5.6）：r2 档全部判据原样，对抗一族的 J6Qn 再按 I-8.12 拆行。
     WithJ6QnAndJ7SplitByI812,
+    /// r5 档（登记 `research/prompts/e165-r5-prereg.md` 5.1、5.3）：r3 档的判据原样，只把 J7 五行换成 J8 五行与「无出处」一行；
+    /// 这一档生成的记录带它那次发布的根的后三项（D23（journal 的角色与格式） 已定项 15 今天的原句）。
+    WithJ6QnAndJ8SplitByI812,
 }
 
 /// 判据一侧拿哪张记录表去判（登记 r2 5.4 T-表、T-行；`--table direct|scan|both`，不给取 `direct`，只在 r2 档有）。
@@ -289,6 +292,24 @@ impl RunProfile {
         }
     }
 
+    /// r5 档（登记 r5 5.1）：时间线根的投影之外四个字段同 r2 / r3 档，生成的记录带它那次发布的根的后三项，判 J8 不判 J7。
+    const fn r5(marker_parity: MarkerParity) -> Self {
+        Self {
+            generator: FieldsBeyondTheProjectionGenerator::VaryWithTheVersion(marker_parity),
+            criteria: CriteriaSet::WithJ6QnAndJ8SplitByI812,
+            table_source: RecordTableSource::Direct,
+            reported_disk_order: ReportedDiskOrder::FirstDeviceBeforeSecond,
+        }
+    }
+
+    /// 只给 J8 的阳性对照用（登记 r5 5.4 末列「r1 档那种生成器」）：生成器照 r1 档（时间线根与记录的后三项恒为 r1 常量），判据照 r5 档。
+    const R1_GENERATOR_WITH_R5_CRITERIA: Self = Self {
+        generator: FieldsBeyondTheProjectionGenerator::SameForEveryVersion,
+        criteria: CriteriaSet::WithJ6QnAndJ8SplitByI812,
+        table_source: RecordTableSource::Direct,
+        reported_disk_order: ReportedDiskOrder::FirstDeviceBeforeSecond,
+    };
+
     /// 只给 J7 的阳性对照用：生成器照 r1 档，判据照 r2 档。
     const R1_GENERATOR_WITH_R2_CRITERIA: Self = Self {
         generator: FieldsBeyondTheProjectionGenerator::SameForEveryVersion,
@@ -315,17 +336,48 @@ impl RunProfile {
         }
     }
 
-    const fn judges_j6qn_and_j7(self) -> bool {
+    /// J6Qn 两行与多盘一族：r2、r3、r5 档判。
+    const fn judges_j6qn(self) -> bool {
         match self.criteria {
             CriteriaSet::RegisteredBeforeR2 => false,
+            CriteriaSet::WithJ6QnAndJ7
+            | CriteriaSet::WithJ6QnAndJ7SplitByI812
+            | CriteriaSet::WithJ6QnAndJ8SplitByI812 => true,
+        }
+    }
+
+    /// J7 五行（照「投影之外抄所选根」登记的旧规则）：只在 r2、r3 档判（r5 登记 5.1：旧档一个字不改）。
+    const fn judges_j7(self) -> bool {
+        match self.criteria {
+            CriteriaSet::RegisteredBeforeR2 | CriteriaSet::WithJ6QnAndJ8SplitByI812 => false,
             CriteriaSet::WithJ6QnAndJ7 | CriteriaSet::WithJ6QnAndJ7SplitByI812 => true,
         }
     }
 
-    /// 对抗一族的 J6Qn 按 I-8.12 再拆（登记 r3 5.6）：只有 r3 档。
+    /// J8 五行与「无出处」一行（登记 r5 5.3）：只在 r5 档判；这一档生成的记录同时带它那次发布的根的后三项。
+    const fn judges_j8(self) -> bool {
+        match self.criteria {
+            CriteriaSet::RegisteredBeforeR2
+            | CriteriaSet::WithJ6QnAndJ7
+            | CriteriaSet::WithJ6QnAndJ7SplitByI812 => false,
+            CriteriaSet::WithJ6QnAndJ8SplitByI812 => true,
+        }
+    }
+
+    /// 对抗一族的 J6Qn 按 I-8.12 再拆（登记 r3 5.6）：r3 档与 r5 档（r5 档 = r3 档原样，只换 J7 → J8）。
     const fn splits_j6qn_by_i812(self) -> bool {
         match self.criteria {
             CriteriaSet::RegisteredBeforeR2 | CriteriaSet::WithJ6QnAndJ7 => false,
+            CriteriaSet::WithJ6QnAndJ7SplitByI812 | CriteriaSet::WithJ6QnAndJ8SplitByI812 => true,
+        }
+    }
+
+    /// `--family root_choice` 认不认这一档：只认 r3 档（`--profile r3`、`--profile r4` 都解成它）；r5 档报用法错（登记 r5 5.1）。
+    const fn admits_the_root_choice_family(self) -> bool {
+        match self.criteria {
+            CriteriaSet::RegisteredBeforeR2
+            | CriteriaSet::WithJ6QnAndJ7
+            | CriteriaSet::WithJ6QnAndJ8SplitByI812 => false,
             CriteriaSet::WithJ6QnAndJ7SplitByI812 => true,
         }
     }
@@ -377,10 +429,124 @@ impl RunProfile {
     }
 }
 
+/// r5 档时间线之外那条记录（对抗一族字母表里的、R 域的残留）的实例表指针住的槽：这个数加区分号 d（登记 r5 5.3 第 2 条 (i)：
+/// 对 d 单射，与时间线第 0..12 版的槽 69 000 + j 两两不同）。
+const OFF_TIMELINE_RECORD_INSTANCE_TABLE_SLOT_BASE: u64 = 200_000;
+/// 同上，分配记录树根住的槽：这个数加 d（与时间线第 0..12 版的槽 68 000 + j 两两不同）。
+const OFF_TIMELINE_RECORD_ALLOCATION_RECORD_TREE_ROOT_SLOT_BASE: u64 = 300_000;
+
+/// 一条记录新根段的后三项（D23（journal 的角色与格式） 已定项 15：实例表指针、分配记录树根、卸载记号；fsid 不在新根段里）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct RecordFieldsBeyondTheProjection {
+    instance_table: NodePointer,
+    allocation_record_tree_root: NodePointer,
+    unmount_marker: UnmountMarker,
+}
+
+impl RecordFieldsBeyondTheProjection {
+    fn of_root_fields(fields: FieldsBeyondTheProjection) -> Self {
+        Self {
+            instance_table: fields.instance_table,
+            allocation_record_tree_root: fields.allocation_record_tree_root,
+            unmount_marker: fields.unmount_marker,
+        }
+    }
+
+    fn of_record(record: &JournalRecord) -> Self {
+        Self {
+            instance_table: record.new_instance_table,
+            allocation_record_tree_root: record.new_allocation_record_tree_root,
+            unmount_marker: record.new_unmount_marker,
+        }
+    }
+
+    fn of_root(root: &RootRecord) -> Self {
+        Self {
+            instance_table: root.instance_table,
+            allocation_record_tree_root: root.allocation_record_tree_root,
+            unmount_marker: root.unmount_marker,
+        }
+    }
+
+    /// 见证里的写法：卸载记号、实例表与分配记录树根住的槽（空根是槽 0）。
+    fn describe(self) -> String {
+        format!(
+            "marker_{}:instance_table_slot{}:allocation_record_tree_root_slot{}",
+            match self.unmount_marker {
+                UnmountMarker::WrittenByTheUnmountSequence => "written",
+                UnmountMarker::NotWrittenByTheUnmountSequence => "not_written",
+            },
+            self.instance_table.locations[0].slot.0,
+            self.allocation_record_tree_root.locations[0].slot.0
+        )
+    }
+}
+
+/// 卸载记号的另一个值（登记 r5 5.3 第 2 条 (ii)：时间线之外的记录取与所选根 R_0 相反的那一值）。
+const fn the_other_unmount_marker(marker: UnmountMarker) -> UnmountMarker {
+    match marker {
+        UnmountMarker::WrittenByTheUnmountSequence => UnmountMarker::NotWrittenByTheUnmountSequence,
+        UnmountMarker::NotWrittenByTheUnmountSequence => UnmountMarker::WrittenByTheUnmountSequence,
+    }
+}
+
+impl RunProfile {
+    /// 时间线上第 `publish_ordinal` 次发布（`NewRootSegment::of_timeline_publish` 那一个序号）的每条记录带的后三项（登记 r5 5.3 第 1 条）：
+    /// r5 档是时间线第 j 版 R_j 的那三项；别的档一律是 r1 档时间线那一份常量（r1–r4 档一个字不改）。
+    fn record_fields_of_the_timeline_publish(
+        self,
+        publish_ordinal: usize,
+    ) -> RecordFieldsBeyondTheProjection {
+        if self.judges_j8() {
+            RecordFieldsBeyondTheProjection::of_root_fields(
+                self.fields_beyond_the_projection_of_version(publish_ordinal),
+            )
+        } else {
+            RecordFieldsBeyondTheProjection::of_root_fields(
+                fields_beyond_the_projection_carried_by_every_generated_record(),
+            )
+        }
+    }
+
+    /// 时间线之外区分号为 `distinguishing_number` 的那条记录带的后三项 h(d)（登记 r5 5.3 第 2 条）：r5 档且生成器随版本变时，
+    /// 实例表指针、分配记录树根各住 d 的单射槽，卸载记号取与 R_0 相反的那一值；别的档与 r1 档那种生成器上是 r1 常量。
+    fn record_fields_off_the_timeline(
+        self,
+        distinguishing_number: u64,
+    ) -> RecordFieldsBeyondTheProjection {
+        let r1_constant = RecordFieldsBeyondTheProjection::of_root_fields(
+            fields_beyond_the_projection_carried_by_every_generated_record(),
+        );
+        if !self.judges_j8() {
+            return r1_constant;
+        }
+        match self.generator {
+            FieldsBeyondTheProjectionGenerator::SameForEveryVersion => r1_constant,
+            FieldsBeyondTheProjectionGenerator::VaryWithTheVersion(_marker_parity) => {
+                let marker_of_the_first_version = self
+                    .fields_beyond_the_projection_of_version(0)
+                    .unmount_marker;
+                RecordFieldsBeyondTheProjection {
+                    instance_table: node_pointer_at_slot(
+                        OFF_TIMELINE_RECORD_INSTANCE_TABLE_SLOT_BASE + distinguishing_number,
+                        1,
+                    ),
+                    allocation_record_tree_root: node_pointer_at_slot(
+                        OFF_TIMELINE_RECORD_ALLOCATION_RECORD_TREE_ROOT_SLOT_BASE
+                            + distinguishing_number,
+                        1,
+                    ),
+                    unmount_marker: the_other_unmount_marker(marker_of_the_first_version),
+                }
+            }
+        }
+    }
+}
+
 /// 装置生成的每条记录的新根段后三项（实例表指针、分配记录树根、卸载记号；D23（journal 的角色与格式） 已定项 15，2026-10-02 用户定
-/// 「回到甲」之后施加一条记录时这三项取记录里的，不再抄所选根）：一律带 r1 档时间线那一份常量。r1 档的所选根投影之外的字段就是这几个常量，
-/// 施加结果与改之前逐态相同；r2 / r3 档的投影之外字段随版本变，J7 那几行判据照「投影之外抄所选根」登记，与新的施加规则对不上，
-/// 要重新登记（实现员 2026-10-03 只为让装置照新的记录格式编得过，登记与判据一个字没改）。
+/// 「回到甲」之后施加一条记录时这三项取记录里的，不再抄所选根）：r1–r4 档一律带 r1 档时间线那一份常量。r1 档的所选根投影之外的字段就是这几个常量，
+/// 施加结果与改之前逐态相同；r2 / r3 档的投影之外字段随版本变，J7 那几行判据照「投影之外抄所选根」登记，与新的施加规则对不上
+/// （旧档一个字不改，r5 登记 5.1）。照今天原句重新登记的是 r5 档：记录带它那次发布的根的后三项（[`RunProfile::record_fields_of_the_timeline_publish`]），判 J8。
 fn fields_beyond_the_projection_carried_by_every_generated_record() -> FieldsBeyondTheProjection {
     RunProfile::R1.fields_beyond_the_projection_of_version(0)
 }
@@ -602,6 +768,21 @@ impl VersionFields {
             allocation_record_tree_root: chosen_root.allocation_record_tree_root,
         })
     }
+
+    /// 照 D23（journal 的角色与格式） 已定项 15 今天的原句由记录重建的根（登记 r5 5.3 J8a、J8b）：投影取这六个字段，实例表指针、
+    /// 分配记录树根、卸载记号取施加末条那一份记录新根段里的 `record_fields`，fsid 抄 `chosen_root`。r5 档的理想恢复用它。
+    fn to_root_rebuilt_from_the_record_over(
+        self,
+        record_fields: RecordFieldsBeyondTheProjection,
+        chosen_root: &RootRecord,
+    ) -> RootRecord {
+        self.to_root_with(FieldsBeyondTheProjection {
+            filesystem_identifier: chosen_root.filesystem_identifier,
+            unmount_marker: record_fields.unmount_marker,
+            instance_table: record_fields.instance_table,
+            allocation_record_tree_root: record_fields.allocation_record_tree_root,
+        })
+    }
 }
 
 // ── 生成一条记录槽
@@ -616,7 +797,7 @@ enum ParseExpectation {
     OrdinalZeroMustBeRejected,
 }
 
-/// 内存盘上一个记录槽里的一条记录：字节、`parse` 的结果、它的 311 字节头算出的链值（下一条记录的反向链真值）。
+/// 内存盘上一个记录槽里的一条记录：字节、`parse` 的结果、它的 487 字节头算出的链值（下一条记录的反向链真值）。
 #[derive(Clone, Debug)]
 struct GeneratedSlot {
     device: u32,
@@ -817,6 +998,65 @@ struct PublishTruth {
     fields: VersionFields,
 }
 
+/// 生成器记下的真相（登记 r5 5.3 第 3 条）：每条生成的记录的新根段投影（实例代号、txg、树表、映射根、水位、F）对到它的后三项。
+/// 合法写路径里同一投影只对一份后三项；记进来时同一投影出现两份不同的后三项就停（停机条款 PH6）。键是投影里的树 ID 水位，
+/// 同一个水位下逐份比整个投影。
+#[derive(Clone, Debug)]
+struct GeneratedRecordTruth {
+    by_tree_identifier_watermark:
+        BTreeMap<u64, Vec<(VersionFields, RecordFieldsBeyondTheProjection)>>,
+}
+
+impl GeneratedRecordTruth {
+    fn new() -> Self {
+        Self {
+            by_tree_identifier_watermark: BTreeMap::new(),
+        }
+    }
+
+    /// 记下一条生成的记录：它的投影与后三项。
+    fn note(&mut self, projection: VersionFields, fields: RecordFieldsBeyondTheProjection) {
+        let entries = self
+            .by_tree_identifier_watermark
+            .entry(projection.segment.tree_identifier_watermark)
+            .or_default();
+        match entries
+            .iter()
+            .find(|(noted_projection, _noted_fields)| *noted_projection == projection)
+        {
+            Some((_noted_projection, noted_fields)) => assert!(
+                *noted_fields == fields,
+                "停机条款 PH6（登记 r5 5.3 第 3 条）：生成器真相里同一投影（实例 {}、txg {}、水位 {}）对到两份不同的后三项：{} 与 {}",
+                projection.instance,
+                projection.checkpoint_txg,
+                projection.segment.tree_identifier_watermark,
+                noted_fields.describe(),
+                fields.describe()
+            ),
+            None => entries.push((projection, fields)),
+        }
+    }
+
+    fn note_the_record(&mut self, record: &JournalRecord) {
+        self.note(
+            VersionFields::of_record(record),
+            RecordFieldsBeyondTheProjection::of_record(record),
+        );
+    }
+
+    /// 新根段投影等于 `projection` 的那条生成记录的后三项；生成器一条都没造过这个投影是 `None`（J8「无出处」）。
+    fn fields_of(&self, projection: VersionFields) -> Option<RecordFieldsBeyondTheProjection> {
+        self.by_tree_identifier_watermark
+            .get(&projection.segment.tree_identifier_watermark)
+            .and_then(|entries| {
+                entries
+                    .iter()
+                    .find(|(noted_projection, _noted_fields)| *noted_projection == projection)
+                    .map(|(_noted_projection, noted_fields)| *noted_fields)
+            })
+    }
+}
+
 /// 一段生成出来的历史：每条记录的槽（都在 0 号盘）、哪条属于哪次发布、每次发布的六个字段、点名单元。
 #[derive(Clone, Debug)]
 struct History {
@@ -828,6 +1068,8 @@ struct History {
     units: Vec<Option<GeneratedUnit>>,
     shape_description: String,
     run_profile: RunProfile,
+    /// 每条生成记录的投影对到它的后三项（登记 r5 5.3 第 3 条）；R 域的残留在 [`tally_of_a_legal_history`] 里补记进来。
+    record_truth: GeneratedRecordTruth,
 }
 
 fn describe_publish_sequence(publishes: &[PublishShape]) -> String {
@@ -842,6 +1084,7 @@ fn generate_history(plan: &HistoryPlan) -> History {
     let mut slots: Vec<GeneratedSlot> = Vec::new();
     let mut publishes: Vec<PublishTruth> = Vec::new();
     let mut units: Vec<Option<GeneratedUnit>> = Vec::new();
+    let mut record_truth = GeneratedRecordTruth::new();
     let mut counter = plan.ring.first_history_counter();
     let mut publish_ordinal: u64 = 0;
     let instance_segments = [
@@ -859,6 +1102,11 @@ fn generate_history(plan: &HistoryPlan) -> History {
                 .expect("E 域的发布数照登记 5.2 取，txg 不越过 u64");
             let segment_of_this_publish =
                 NewRootSegment::of_timeline_publish(publish_ordinal, checkpoint_txg);
+            // 新根段后三项：r5 档是这次发布的根 R_j 的那三项，别的档是 r1 常量（登记 r5 5.3 第 1 条）。
+            let record_fields_of_this_publish =
+                plan.run_profile.record_fields_of_the_timeline_publish(
+                    usize::try_from(publish_ordinal).expect("发布序号很小"),
+                );
             let first_record_index = slots.len();
             for record_position in 0..shape.record_count {
                 let is_last_record_of_the_publish = record_position + 1 == shape.record_count;
@@ -900,20 +1148,16 @@ fn generate_history(plan: &HistoryPlan) -> History {
                     new_mapping_root: segment.mapping_root,
                     new_tree_identifier_watermark: segment.tree_identifier_watermark,
                     new_rollback_floor: CheckpointTxg(segment.rollback_floor),
-                    new_instance_table:
-                        fields_beyond_the_projection_carried_by_every_generated_record()
-                            .instance_table,
-                    new_allocation_record_tree_root:
-                        fields_beyond_the_projection_carried_by_every_generated_record()
-                            .allocation_record_tree_root,
-                    new_unmount_marker:
-                        fields_beyond_the_projection_carried_by_every_generated_record()
-                            .unmount_marker,
+                    new_instance_table: record_fields_of_this_publish.instance_table,
+                    new_allocation_record_tree_root: record_fields_of_this_publish
+                        .allocation_record_tree_root,
+                    new_unmount_marker: record_fields_of_this_publish.unmount_marker,
                     named: unit
                         .as_ref()
                         .map(|generated_unit| vec![generated_unit.named])
                         .unwrap_or_default(),
                 };
+                record_truth.note_the_record(&record);
                 slots.push(generate_slot(
                     0,
                     plan.ring,
@@ -955,6 +1199,7 @@ fn generate_history(plan: &HistoryPlan) -> History {
         units,
         shape_description,
         run_profile: plan.run_profile,
+        record_truth,
     }
 }
 
@@ -989,6 +1234,8 @@ impl History {
 struct Residue {
     record_index: usize,
     slot: GeneratedSlot,
+    /// 生成器这一侧的那条残留记录（进生成器真相，登记 r5 5.3 第 3 条）。
+    record: JournalRecord,
 }
 
 fn generate_residue(history: &History, record_index: usize) -> Residue {
@@ -1004,9 +1251,17 @@ fn generate_residue(history: &History, record_index: usize) -> Residue {
     record.new_mapping_root = off_timeline_segment.mapping_root;
     record.new_tree_identifier_watermark = off_timeline_segment.tree_identifier_watermark;
     record.new_rollback_floor = CheckpointTxg(off_timeline_segment.rollback_floor);
+    // 后三项：r5 档是区分号 d = 记录下标的 h(d)，别的档仍是 r1 常量（登记 r5 5.3 第 2 条）。
+    let record_fields = history
+        .run_profile
+        .record_fields_off_the_timeline(u64::try_from(record_index).expect("记录下标装得进 u64"));
+    record.new_instance_table = record_fields.instance_table;
+    record.new_allocation_record_tree_root = record_fields.allocation_record_tree_root;
+    record.new_unmount_marker = record_fields.unmount_marker;
     Residue {
         record_index,
         slot: generate_slot(1, history.ring, &record, ParseExpectation::MustRoundTrip),
+        record,
     }
 }
 
@@ -1978,6 +2233,15 @@ labelled_enumeration! {
         J6QnPremiseFailsI812HoldsViolations => "J6Qn_premise_fails_i812_holds",
         J6QnPremiseFailsI812FailsJudged => "j6qn_premise_fails_i812_fails_judged",
         J6QnPremiseFailsI812FailsViolations => "J6Qn_premise_fails_i812_fails",
+        J8Judged => "j8_judged",
+        J8aJudged => "j8a_judged",
+        J8aInstanceTableViolations => "J8a_instance_table",
+        J8aAllocationRecordTreeRootViolations => "J8a_allocation_record_tree_root",
+        J8aUnmountMarkerViolations => "J8a_unmount_marker",
+        J8bViolations => "J8b",
+        J8cJudged => "j8c_judged",
+        J8cViolations => "J8c",
+        J8WithoutASource => "J8_without_a_source",
     }
 }
 
@@ -2018,7 +2282,8 @@ labelled_enumeration! {
 }
 
 /// 落后类别各自数的量（登记 r2 SQ9、SQ17：状态数与 J1、J2、J4、J6、J6Qn、J7 的违例数，各行照原样分开）。
-const LAGGING_CLASS_COLUMNS: [Counter; 13] = [
+/// r5 档另记 J8 五格（登记 r5 5.3：J7 五行换成 J8 五行）；产物只打这一档判的那几列（[`lagging_class_columns_shown_under`]）。
+const LAGGING_CLASS_COLUMNS: [Counter; 18] = [
     Counter::States,
     Counter::J1Violations,
     Counter::J2Violations,
@@ -2032,7 +2297,41 @@ const LAGGING_CLASS_COLUMNS: [Counter; 13] = [
     Counter::J7aFilesystemIdentifierViolations,
     Counter::J7bViolations,
     Counter::J7cViolations,
+    Counter::J8aInstanceTableViolations,
+    Counter::J8aAllocationRecordTreeRootViolations,
+    Counter::J8aUnmountMarkerViolations,
+    Counter::J8bViolations,
+    Counter::J8cViolations,
 ];
+
+/// 落后类别的行里打哪几列：J7 五列只在判 J7 的档（r2、r3）打，J8 五列只在 r5 档打，其余列各档都打
+/// （r2 档的落后类别行因此与加 J8 之前逐字节相同）。
+fn lagging_class_columns_shown_under(run_profile: RunProfile) -> Vec<Counter> {
+    LAGGING_CLASS_COLUMNS
+        .iter()
+        .copied()
+        .filter(|counter| {
+            let is_a_j7_column = matches!(
+                counter,
+                Counter::J7aInstanceTableViolations
+                    | Counter::J7aAllocationRecordTreeRootViolations
+                    | Counter::J7aFilesystemIdentifierViolations
+                    | Counter::J7bViolations
+                    | Counter::J7cViolations
+            );
+            let is_a_j8_column = matches!(
+                counter,
+                Counter::J8aInstanceTableViolations
+                    | Counter::J8aAllocationRecordTreeRootViolations
+                    | Counter::J8aUnmountMarkerViolations
+                    | Counter::J8bViolations
+                    | Counter::J8cViolations
+            );
+            (!is_a_j7_column || run_profile.judges_j7())
+                && (!is_a_j8_column || run_profile.judges_j8())
+        })
+        .collect()
+}
 
 /// 两块盘的落盘集合（按记录下标置位）：相等；0 号盘的真包含于 1 号盘的是 0 号盘落后；反过来是 1 号盘落后；其余互不包含。
 fn lagging_class_of(first_device_mask: u32, second_device_mask: u32) -> LaggingClass {
@@ -2784,8 +3083,12 @@ enum ControlKind {
     IdealWithAFieldOfTheLandedVersion(FieldOfTheRebuiltRoot),
     /// J7b：理想恢复，施加过时卸载记号抄所选根的。
     IdealCopyingTheChosenUnmountMarkerWhenApplied,
-    /// J7c：理想恢复，一条没施加时卸载记号写成 `NotWritten…`。
+    /// J7c：理想恢复，一条没施加时卸载记号写成 `NotWritten…`；r5 档的 C8d 也是它（登记 r5 5.4）。
     IdealWritingNotWrittenWhenNothingIsApplied,
+    /// C8a（登记 r5 5.4）：理想恢复，施加过时把实例表指针、分配记录树根、卸载记号三项都抄所选根的。
+    IdealCopyingTheChosenRecordFieldsWhenApplied,
+    /// C8b（登记 r5 5.4）：理想恢复，施加过时卸载记号一律写 [`UNMOUNT_MARKER_THE_C8B_CONTROL_WRITES_WHEN_APPLIED`]。
+    IdealWritingOneUnmountMarkerWhenApplied,
     /// 多盘「任一份在即在」（登记 r2 5.5）：理想恢复，但 j\* 只数 0 号盘那一份。
     IdealCountingOnlyTheFirstDeviceCopies,
     /// T-表（登记 r2 5.5）：扫盘建表之后删掉表里键最大的那条记录，直接建的表不动。
@@ -2846,6 +3149,10 @@ enum Implementation {
     Control(ControlKind),
 }
 
+/// C8b 的假结局施加过时写的卸载记号（登记 r5 5.4：旧规则的第三项「由记录施加的一律不是卸载写的」）。
+const UNMOUNT_MARKER_THE_C8B_CONTROL_WRITES_WHEN_APPLIED: UnmountMarker =
+    UnmountMarker::NotWrittenByTheUnmountSequence;
+
 /// 一次重放施加的发布集合 (low, high]，high 同时是落到的版本。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct AppliedInterval {
@@ -2898,10 +3205,7 @@ fn returned_at_version(
         root: if version == state.chosen_version {
             *chosen_root
         } else {
-            state
-                .history
-                .version_fields(version)
-                .to_root_rebuilt_over(chosen_root)
+            rebuilt_root_of_the_ideal_recovery(state.history, version, chosen_root)
         },
         prefix_applied,
         verification_passed: if state.verify_named_units {
@@ -2909,6 +3213,26 @@ fn returned_at_version(
         } else {
             0
         },
+    }
+}
+
+/// 理想恢复落到时间线第 `version` 版时由记录重建的根：r5 档照 D23（journal 的角色与格式） 已定项 15 今天的原句（后三项取那次发布的
+/// 记录里的、fsid 抄所选根，登记 r5 5.3），别的档照各自登记时的「投影之外抄所选根」（r1–r4 档一个字不改）。
+fn rebuilt_root_of_the_ideal_recovery(
+    history: &History,
+    version: usize,
+    chosen_root: &RootRecord,
+) -> RootRecord {
+    let landed_fields = history.version_fields(version);
+    if history.run_profile.judges_j8() {
+        landed_fields.to_root_rebuilt_from_the_record_over(
+            history
+                .run_profile
+                .record_fields_of_the_timeline_publish(version),
+            chosen_root,
+        )
+    } else {
+        landed_fields.to_root_rebuilt_over(chosen_root)
     }
 }
 
@@ -3036,6 +3360,22 @@ fn first_outcome_on_a_legal_state(
             }
             ReplayOutcome::Returned(returned)
         }
+        ControlKind::IdealCopyingTheChosenRecordFieldsWhenApplied => {
+            let mut returned = ideal();
+            if truth.farthest_version > state.chosen_version {
+                returned.root.instance_table = chosen_root.instance_table;
+                returned.root.allocation_record_tree_root = chosen_root.allocation_record_tree_root;
+                returned.root.unmount_marker = chosen_root.unmount_marker;
+            }
+            ReplayOutcome::Returned(returned)
+        }
+        ControlKind::IdealWritingOneUnmountMarkerWhenApplied => {
+            let mut returned = ideal();
+            if truth.farthest_version > state.chosen_version {
+                returned.root.unmount_marker = UNMOUNT_MARKER_THE_C8B_CONTROL_WRITES_WHEN_APPLIED;
+            }
+            ReplayOutcome::Returned(returned)
+        }
         ControlKind::IdealCountingOnlyTheFirstDeviceCopies => {
             let first_device_view = LegalState {
                 history: state.history,
@@ -3127,7 +3467,7 @@ fn judge_the_fixed_point(
     } else {
         Counter::J6PremiseFailsJudged
     });
-    if run_profile.judges_j6qn_and_j7() {
+    if run_profile.judges_j6qn() {
         if first.root.checkpoint_txg.0 == u64::MAX {
             tally.add(Counter::FirstReturnedRootTxgIsTheLargest);
         }
@@ -3329,6 +3669,80 @@ fn judge_the_fields_beyond_the_projection(
     tally.add(judged_counter);
     if returned_root.unmount_marker != expected_unmount_marker {
         tally.add_violation(violations_counter, &describe_with_both_roots);
+    }
+}
+
+/// J8（登记 r5 5.3，照 D23（journal 的角色与格式） 已定项 15 今天的原句重新登记）：凡第一次调用返回根 ρ 的态都判。
+/// J8b：ρ 的 fsid 等于所选根的。投影等于所选根的（一条没施加）J8c：fsid、实例表指针、分配记录树根、卸载记号四项都等于所选根的。
+/// 投影不等于所选根的（由记录重建过）J8a 三格：实例表指针、分配记录树根、卸载记号各等于生成器真相里新根段投影等于 ρ 的投影的那条记录的；
+/// 生成器真相里没有这样一条记录的不判 J8a，记「无出处」（只报）。「重建过没有」由判据比投影定，不读报告的 `prefix_applied`。
+/// `landed_version_root` 是 ρ 落到的那一版时间线根（对抗一族与落点不在时间线上的给 `None`），只进见证。
+fn judge_the_fields_beyond_the_projection_against_the_generated_records(
+    chosen_root: &RootRecord,
+    returned_root: &RootRecord,
+    record_truth: &GeneratedRecordTruth,
+    landed_version_root: Option<RootRecord>,
+    describe_witness: &dyn Fn() -> String,
+    tally: &mut Tally,
+) {
+    let returned_projection = VersionFields::of_root(returned_root);
+    let projection_equals_the_chosen_one =
+        returned_projection == VersionFields::of_root(chosen_root);
+    let source_of_the_returned_projection = record_truth.fields_of(returned_projection);
+    let describe_with_both_roots = || {
+        format!(
+            "{};chosen_root={};returned_root={};record_of_the_returned_projection={};landed_version_root={};projection_equals_the_chosen_one={projection_equals_the_chosen_one}",
+            describe_witness(),
+            FieldsBeyondTheProjection::of_root(chosen_root).describe(),
+            FieldsBeyondTheProjection::of_root(returned_root).describe(),
+            source_of_the_returned_projection
+                .map_or_else(|| "none".to_string(), RecordFieldsBeyondTheProjection::describe),
+            landed_version_root.map_or_else(
+                || "none".to_string(),
+                |landed_root| FieldsBeyondTheProjection::of_root(&landed_root).describe()
+            )
+        )
+    };
+    tally.add(Counter::J8Judged);
+    let expected_filesystem_identifier = chosen_root.filesystem_identifier;
+    if returned_root.filesystem_identifier != expected_filesystem_identifier {
+        tally.add_violation(Counter::J8bViolations, &describe_with_both_roots);
+    }
+    if projection_equals_the_chosen_one {
+        tally.add(Counter::J8cJudged);
+        let returned_equals_the_chosen_root_beyond_the_projection =
+            FieldsBeyondTheProjection::of_root(returned_root)
+                == FieldsBeyondTheProjection::of_root(chosen_root);
+        if !returned_equals_the_chosen_root_beyond_the_projection {
+            tally.add_violation(Counter::J8cViolations, &describe_with_both_roots);
+        }
+        return;
+    }
+    let Some(fields_from_the_new_root_segment) = source_of_the_returned_projection else {
+        tally.add_violation(Counter::J8WithoutASource, &describe_with_both_roots);
+        return;
+    };
+    tally.add(Counter::J8aJudged);
+    let expected_fields_of_the_rebuilt_root = fields_from_the_new_root_segment;
+    let returned_fields = RecordFieldsBeyondTheProjection::of_root(returned_root);
+    for (field_differs, violations_counter) in [
+        (
+            returned_fields.instance_table != expected_fields_of_the_rebuilt_root.instance_table,
+            Counter::J8aInstanceTableViolations,
+        ),
+        (
+            returned_fields.allocation_record_tree_root
+                != expected_fields_of_the_rebuilt_root.allocation_record_tree_root,
+            Counter::J8aAllocationRecordTreeRootViolations,
+        ),
+        (
+            returned_fields.unmount_marker != expected_fields_of_the_rebuilt_root.unmount_marker,
+            Counter::J8aUnmountMarkerViolations,
+        ),
+    ] {
+        if field_differs {
+            tally.add_violation(violations_counter, &describe_with_both_roots);
+        }
     }
 }
 
@@ -3665,10 +4079,20 @@ fn judge_a_legal_state_on_a_table(
                 &describe_witness,
                 tally,
             );
-            if history.run_profile.judges_j6qn_and_j7() {
+            if history.run_profile.judges_j7() {
                 judge_the_fields_beyond_the_projection(
                     &chosen_root,
                     &returned.root,
+                    &describe_witness,
+                    tally,
+                );
+            }
+            if history.run_profile.judges_j8() {
+                judge_the_fields_beyond_the_projection_against_the_generated_records(
+                    &chosen_root,
+                    &returned.root,
+                    &history.record_truth,
+                    landing.map(|version| history.timeline_root(version)),
                     &describe_witness,
                     tally,
                 );
@@ -4271,10 +4695,15 @@ fn tally_of_a_legal_history(
     unit_index: usize,
     implementation: Implementation,
 ) -> Tally {
-    let history = generate_history(&unit.plan);
+    let mut history = generate_history(&unit.plan);
     let residue = unit
         .residue_record_index
         .map(|record_index| generate_residue(&history, record_index));
+    if let Some(generated_residue) = &residue {
+        history
+            .record_truth
+            .note_the_record(&generated_residue.record);
+    }
     let record_count = history.slots.len();
     let verify_named_units = domain != Domain::NamedUnitsNotVerified;
     let mut tally = Tally::new();
@@ -4769,6 +5198,55 @@ fn adversarial_chosen_root(run_profile: RunProfile) -> RootRecord {
     .to_root_with(run_profile.fields_beyond_the_projection_of_version(0))
 }
 
+/// 对抗一族锚点之后第 `position` 个槽上字母表第 `alphabet_index` 种记录的新根段投影与后三项：区分号 d = 槽位 × 1000 + 字母表下标，
+/// 新根段取时间线之外的值，后三项取 h(d)（登记 r5 5.3 第 2 条；r1–r4 档是 r1 常量）。生成器与生成器真相都从这里取。
+fn adversarial_record_projection_and_fields(
+    chosen_root: &RootRecord,
+    alphabet_fields: AdversarialRecordFields,
+    position: usize,
+    alphabet_index: usize,
+    run_profile: RunProfile,
+) -> (VersionFields, RecordFieldsBeyondTheProjection) {
+    let checkpoint_txg = chosen_root.checkpoint_txg.0 + alphabet_fields.txg_above_the_chosen_root;
+    let distinguishing_number =
+        u64::try_from(position * 1000 + alphabet_index).expect("槽位与字母表下标都很小");
+    (
+        VersionFields {
+            instance: CHOSEN_INSTANCE,
+            checkpoint_txg,
+            segment: NewRootSegment::off_timeline(distinguishing_number, checkpoint_txg),
+        },
+        run_profile.record_fields_off_the_timeline(distinguishing_number),
+    )
+}
+
+/// 对抗一族一个域在 `slot_count` 个槽上能造出的每条记录（锚点与每个槽位上字母表的每一种）的投影对到后三项（登记 r5 5.3 第 3 条）。
+fn adversarial_record_truth(
+    slot_count: usize,
+    alphabet: &[AdversarialRecordFields],
+    chosen_root: &RootRecord,
+    run_profile: RunProfile,
+) -> GeneratedRecordTruth {
+    let mut truth = GeneratedRecordTruth::new();
+    truth.note(
+        VersionFields::of_root(chosen_root),
+        run_profile.record_fields_of_the_timeline_publish(0),
+    );
+    for position in 1..=slot_count {
+        for (alphabet_index, alphabet_fields) in alphabet.iter().enumerate() {
+            let (projection, record_fields) = adversarial_record_projection_and_fields(
+                chosen_root,
+                *alphabet_fields,
+                position,
+                alphabet_index,
+                run_profile,
+            );
+            truth.note(projection, record_fields);
+        }
+    }
+    truth
+}
+
 /// 对抗域枚举到一半的状态：锚点槽与其后各槽上放着什么、由它们建出来的表。
 struct AdversarialEnumeration<'run> {
     domain: Domain,
@@ -4778,6 +5256,8 @@ struct AdversarialEnumeration<'run> {
     chosen_root: RootRecord,
     implementation: Implementation,
     run_profile: RunProfile,
+    /// 这个域这一档字母表能造出的每条记录（与锚点）的投影对到后三项（登记 r5 5.3 第 3 条），J8a 拿它定期望。
+    record_truth: &'run GeneratedRecordTruth,
     /// 下标 0 是锚点槽，之后是第 1..n 个槽；`None` 是不在。
     slots: Vec<Option<GeneratedSlot>>,
     choice_trail: Vec<AdversarialSlotChoice>,
@@ -4792,6 +5272,8 @@ impl AdversarialEnumeration<'_> {
     /// 锚点：计数器 a，txg = 所选根的 txg、序号 1、带末条标志与提交标记（登记 5.2）。
     fn generate_the_anchor_slot(&self) -> GeneratedSlot {
         let chosen_fields = VersionFields::of_root(&self.chosen_root);
+        // 锚点是所选根 R_0 那次发布的记录：r5 档带 R_0 的后三项（登记 r5 5.3 第 1 条），别的档 r1 常量。
+        let anchor_record_fields = self.run_profile.record_fields_of_the_timeline_publish(0);
         let record = JournalRecord {
             instance: InstanceGeneration(CHOSEN_INSTANCE),
             counter: self.anchor_counter(),
@@ -4806,13 +5288,9 @@ impl AdversarialEnumeration<'_> {
             new_mapping_root: chosen_fields.segment.mapping_root,
             new_tree_identifier_watermark: chosen_fields.segment.tree_identifier_watermark,
             new_rollback_floor: CheckpointTxg(chosen_fields.segment.rollback_floor),
-            new_instance_table: fields_beyond_the_projection_carried_by_every_generated_record()
-                .instance_table,
-            new_allocation_record_tree_root:
-                fields_beyond_the_projection_carried_by_every_generated_record()
-                    .allocation_record_tree_root,
-            new_unmount_marker: fields_beyond_the_projection_carried_by_every_generated_record()
-                .unmount_marker,
+            new_instance_table: anchor_record_fields.instance_table,
+            new_allocation_record_tree_root: anchor_record_fields.allocation_record_tree_root,
+            new_unmount_marker: anchor_record_fields.unmount_marker,
             named: Vec::new(),
         };
         generate_slot(
@@ -4832,15 +5310,19 @@ impl AdversarialEnumeration<'_> {
         back_chain_is_wrong: bool,
     ) -> GeneratedSlot {
         let fields = self.alphabet[alphabet_index];
-        let checkpoint_txg = self.chosen_root.checkpoint_txg.0 + fields.txg_above_the_chosen_root;
         let true_back_chain = match self.slots[position - 1].as_ref() {
             Some(slot_before) => slot_before.chain_value_of_header,
             None => BACK_CHAIN_WHEN_THE_PREVIOUS_SLOT_HOLDS_NOTHING,
         };
-        let segment = NewRootSegment::off_timeline(
-            u64::try_from(position * 1000 + alphabet_index).expect("槽位与字母表下标都很小"),
-            checkpoint_txg,
+        let (projection, record_fields) = adversarial_record_projection_and_fields(
+            &self.chosen_root,
+            fields,
+            position,
+            alphabet_index,
+            self.run_profile,
         );
+        let checkpoint_txg = projection.checkpoint_txg;
+        let segment = projection.segment;
         let record = JournalRecord {
             instance: InstanceGeneration(CHOSEN_INSTANCE),
             counter: self.anchor_counter() + u64::try_from(position).expect("槽位不超过 4"),
@@ -4865,13 +5347,9 @@ impl AdversarialEnumeration<'_> {
             new_mapping_root: segment.mapping_root,
             new_tree_identifier_watermark: segment.tree_identifier_watermark,
             new_rollback_floor: CheckpointTxg(segment.rollback_floor),
-            new_instance_table: fields_beyond_the_projection_carried_by_every_generated_record()
-                .instance_table,
-            new_allocation_record_tree_root:
-                fields_beyond_the_projection_carried_by_every_generated_record()
-                    .allocation_record_tree_root,
-            new_unmount_marker: fields_beyond_the_projection_carried_by_every_generated_record()
-                .unmount_marker,
+            new_instance_table: record_fields.instance_table,
+            new_allocation_record_tree_root: record_fields.allocation_record_tree_root,
+            new_unmount_marker: record_fields.unmount_marker,
             named: Vec::new(),
         };
         generate_slot(
@@ -5192,6 +5670,8 @@ impl AdversarialEnumeration<'_> {
                 | ControlKind::IdealWithAFieldOfTheLandedVersion(_)
                 | ControlKind::IdealCopyingTheChosenUnmountMarkerWhenApplied
                 | ControlKind::IdealWritingNotWrittenWhenNothingIsApplied
+                | ControlKind::IdealCopyingTheChosenRecordFieldsWhenApplied
+                | ControlKind::IdealWritingOneUnmountMarkerWhenApplied
                 | ControlKind::IdealCountingOnlyTheFirstDeviceCopies
                 | ControlKind::ScanTableLosesItsLargestKeyRecord
                 | ControlKind::ScanPassOutcomeBecomesAPanic => today(),
@@ -5300,10 +5780,20 @@ impl AdversarialEnumeration<'_> {
                     &describe_witness,
                     tally,
                 );
-                if self.run_profile.judges_j6qn_and_j7() {
+                if self.run_profile.judges_j7() {
                     judge_the_fields_beyond_the_projection(
                         &self.chosen_root,
                         &returned.root,
+                        &describe_witness,
+                        tally,
+                    );
+                }
+                if self.run_profile.judges_j8() {
+                    judge_the_fields_beyond_the_projection_against_the_generated_records(
+                        &self.chosen_root,
+                        &returned.root,
+                        self.record_truth,
+                        None,
                         &describe_witness,
                         tally,
                     );
@@ -5340,14 +5830,17 @@ fn tally_of_an_adversarial_work_unit(
 ) -> Tally {
     let alphabet = adversarial_record_alphabet();
     let choices = adversarial_slot_choices(domain, alphabet.len());
+    let chosen_root = adversarial_chosen_root(run_profile);
+    let record_truth = adversarial_record_truth(slot_count, &alphabet, &chosen_root, run_profile);
     let mut enumeration = AdversarialEnumeration {
         domain,
         slot_count,
         alphabet: &alphabet,
         choices: &choices,
-        chosen_root: adversarial_chosen_root(run_profile),
+        chosen_root,
         implementation,
         run_profile,
+        record_truth: &record_truth,
         slots: Vec::new(),
         choice_trail: Vec::new(),
         is_the_designated_state: unit_index == 0 && slot_count == 1,
@@ -5650,6 +6143,10 @@ labelled_enumeration! {
         J7aFilesystemIdentifier => "J7a_filesystem_identifier",
         J7bUnmountMarkerOfARebuiltRoot => "J7b",
         J7cUnmountMarkerWhenNothingIsApplied => "J7c",
+        J8aFieldsFromTheNewRootSegment => "J8a",
+        J8aUnmountMarkerFromTheNewRootSegment => "J8a_unmount_marker",
+        J8bFilesystemIdentifierOfTheChosenRoot => "J8b",
+        J8cNothingAppliedReturnsTheChosenRoot => "J8c",
         MultiDiskAnyCopyIsOnDisk => "multi_disk_any_copy",
         MultiDiskReturnedRoot => "J1_multi_disk",
         MultiDiskFarthestVersion => "J4_multi_disk",
@@ -5680,6 +6177,10 @@ impl Criterion {
             | Self::J7aFilesystemIdentifier
             | Self::J7bUnmountMarkerOfARebuiltRoot
             | Self::J7cUnmountMarkerWhenNothingIsApplied
+            | Self::J8aFieldsFromTheNewRootSegment
+            | Self::J8aUnmountMarkerFromTheNewRootSegment
+            | Self::J8bFilesystemIdentifierOfTheChosenRoot
+            | Self::J8cNothingAppliedReturnsTheChosenRoot
             | Self::TableComparisonSeesADifferentTable
             | Self::TableComparisonSeesADifferentRow => Family::LegalHistory,
             Self::A0Defined
@@ -5705,24 +6206,28 @@ impl Criterion {
         )
     }
 
-    /// 这一档判不判这条判据：J6Qn 与 J7 只在 r2、r3 档判（登记 r2 5.4），J6Qn 的 I-8.12 拆行只在 r3 档判（登记 r3 5.6），
-    /// T-表与 T-行只在 `--table both` 时判，别的两档都判。
+    /// 这一档判不判这条判据：J6Qn 与多盘四条在 r2、r3、r5 档判，J7 只在 r2、r3 档判（登记 r2 5.4），J8 只在 r5 档判（登记 r5 5.3），
+    /// J6Qn 的 I-8.12 拆行在 r3、r5 档判（登记 r3 5.6），T-表与 T-行只在 `--table both` 时判，别的各档都判。
     const fn is_judged_under(self, run_profile: RunProfile) -> bool {
         match self {
             Self::J6QnSplitByI812 => run_profile.splits_j6qn_by_i812(),
             Self::TableComparisonSeesADifferentTable | Self::TableComparisonSeesADifferentRow => {
                 run_profile.compares_the_two_record_tables()
             }
-            Self::J6QnFixedPoint
-            | Self::J7aInstanceTable
+            Self::J7aInstanceTable
             | Self::J7aAllocationRecordTreeRoot
             | Self::J7aFilesystemIdentifier
             | Self::J7bUnmountMarkerOfARebuiltRoot
-            | Self::J7cUnmountMarkerWhenNothingIsApplied
+            | Self::J7cUnmountMarkerWhenNothingIsApplied => run_profile.judges_j7(),
+            Self::J8aFieldsFromTheNewRootSegment
+            | Self::J8aUnmountMarkerFromTheNewRootSegment
+            | Self::J8bFilesystemIdentifierOfTheChosenRoot
+            | Self::J8cNothingAppliedReturnsTheChosenRoot => run_profile.judges_j8(),
+            Self::J6QnFixedPoint
             | Self::MultiDiskAnyCopyIsOnDisk
             | Self::MultiDiskReturnedRoot
             | Self::MultiDiskFarthestVersion
-            | Self::MultiDiskAppliedSetAndLandedVersion => run_profile.judges_j6qn_and_j7(),
+            | Self::MultiDiskAppliedSetAndLandedVersion => run_profile.judges_j6qn(),
             Self::J0Defined
             | Self::J1ReturnedRoot
             | Self::J2RootPlusDisk
@@ -5768,6 +6273,10 @@ const FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND: u64 = 762;
 const STATES_WITHIN_THE_CONTROL_BOUND_OF_THE_BIG_RING_LEGAL_DOMAIN: u64 = 3_110;
 /// 对照界里 L 域 j\* = 0 的态数：登记 r2 第七节乙类「j\* = 0 2 348」。
 const FARTHEST_IS_THE_CHOSEN_VERSION_STATES_WITHIN_THE_CONTROL_BOUND: u64 = 2_348;
+/// 对照界里 L 域 j\* 为奇数的态数：登记 r5 第七节乙类「j\* 为奇数 620」（逐 N 0 + 2 + 14 + 86 + 518，`anchors_r5.py`）。
+const FARTHEST_IS_ODD_STATES_WITHIN_THE_CONTROL_BOUND: u64 = 620;
+/// 对照界里 L 域 j\* 为偶数且 ≥ 2 的态数：登记 r5 第七节乙类「j\* 为偶数且 ≥ 2 的 142」（620 + 142 = 762）。
+const FARTHEST_IS_EVEN_AND_AT_LEAST_TWO_STATES_WITHIN_THE_CONTROL_BOUND: u64 = 142;
 /// E1 全界（N ≤ 4）上 j\* = 1 的态数：登记 r2 第七节乙类「E1 上 j\* = 1 的态数 0、2、12、56，合 70」。
 const E1_STATES_WHOSE_FARTHEST_VERSION_TXG_IS_THE_LARGEST: u64 = 70;
 /// 多盘对照的界（登记 r2 5.5 末段）：M 到 N = 3，M6 到 N = 4，MC 到 Nc = 2。
@@ -6274,6 +6783,18 @@ fn control_readings_of(
             run_profile,
             thread_count,
         ),
+        Criterion::J8aFieldsFromTheNewRootSegment => {
+            c8a_control_readings(run_profile, thread_count)
+        }
+        Criterion::J8aUnmountMarkerFromTheNewRootSegment => {
+            c8b_control_readings(run_profile, thread_count)
+        }
+        Criterion::J8bFilesystemIdentifierOfTheChosenRoot => {
+            c8c_control_readings(run_profile, thread_count)
+        }
+        Criterion::J8cNothingAppliedReturnsTheChosenRoot => {
+            c8d_control_readings(run_profile, thread_count)
+        }
         Criterion::MultiDiskAnyCopyIsOnDisk => any_copy_control_readings(run_profile, thread_count),
         Criterion::MultiDiskReturnedRoot => {
             mirrored_returned_root_control_readings(run_profile, thread_count)
@@ -6943,6 +7464,208 @@ fn j7a_control_readings(
     readings
 }
 
+/// r5 档跑的是哪一种卸载记号奇偶（J8 的对照只在 r5 档跑，r5 档的生成器随版本变）。
+fn marker_parity_of_the_r5_profile(run_profile: RunProfile) -> MarkerParity {
+    match run_profile.generator {
+        FieldsBeyondTheProjectionGenerator::VaryWithTheVersion(marker_parity) => marker_parity,
+        FieldsBeyondTheProjectionGenerator::SameForEveryVersion => {
+            unreachable!(
+                "J8 的对照只在 r5 档跑（Criterion::is_judged_under），r5 档的生成器随版本变"
+            )
+        }
+    }
+}
+
+/// 一条 J8 对照（登记 r5 5.4）在 L 域 N ≤ 5 上逐格钉值、在 r1 档那种生成器上逐格必须是 0、反奇偶另在 C 域 Nc ≤ 3 上逐格必须大于 0。
+/// `pinned_cells` 是 (量, r5 生成器上的钉值)；`cells_that_must_be_zero_on_the_r1_generator` 与 `cells_above_zero_on_the_monotone_domain_under_odd`
+/// 各列一组量。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "每个参数都是这一条对照要用的一样东西，凑不成一个带不变量的概念"
+)]
+fn c8_control_readings(
+    criterion: Criterion,
+    control_label: &str,
+    control: ControlKind,
+    pinned_cells: &[(Counter, u64)],
+    cells_that_must_be_zero_on_the_r1_generator: &[Counter],
+    cells_above_zero_on_the_monotone_domain_under_odd: &[Counter],
+    run_profile: RunProfile,
+    thread_count: usize,
+) -> Vec<ControlReading> {
+    let marker_parity = marker_parity_of_the_r5_profile(run_profile);
+    let place = format!(
+        "domain=L,max_n={CONTROL_LARGEST_SIZE_OF_THE_BIG_RING_LEGAL_DOMAIN},implementation={control_label}"
+    );
+    let big_ring_tally = control_tally(
+        Domain::LegalBigRing,
+        CONTROL_LARGEST_SIZE_OF_THE_BIG_RING_LEGAL_DOMAIN,
+        control,
+        run_profile,
+        thread_count,
+    );
+    let mut readings: Vec<ControlReading> = pinned_cells
+        .iter()
+        .map(|(counter, pinned_value)| {
+            reading_that_must_equal(
+                criterion,
+                format!(
+                    "{place},counter={},marker_parity={}",
+                    counter.label(),
+                    marker_parity.label()
+                ),
+                big_ring_tally.get(*counter),
+                *pinned_value,
+            )
+        })
+        .collect();
+    let r1_generator_tally = control_tally(
+        Domain::LegalBigRing,
+        CONTROL_LARGEST_SIZE_OF_THE_BIG_RING_LEGAL_DOMAIN,
+        control,
+        RunProfile::R1_GENERATOR_WITH_R5_CRITERIA,
+        thread_count,
+    );
+    for counter in cells_that_must_be_zero_on_the_r1_generator {
+        readings.push(reading_that_must_equal(
+            criterion,
+            format!("{place},generator=r1,counter={}", counter.label()),
+            r1_generator_tally.get(*counter),
+            0,
+        ));
+    }
+    match marker_parity {
+        MarkerParity::EvenVersionsWrittenByTheUnmountSequence => {}
+        MarkerParity::OddVersionsWrittenByTheUnmountSequence => {
+            let monotone_tally = control_tally(
+                Domain::MonotoneBigRing,
+                CONTROL_LARGEST_SIZE_OF_THE_MONOTONE_BIG_RING_DOMAIN,
+                control,
+                run_profile,
+                thread_count,
+            );
+            for counter in cells_above_zero_on_the_monotone_domain_under_odd {
+                readings.push(reading_that_must_be_positive(
+                    criterion,
+                    format!(
+                        "domain=C,max_n={CONTROL_LARGEST_SIZE_OF_THE_MONOTONE_BIG_RING_DOMAIN},implementation={control_label},counter={},marker_parity=odd",
+                        counter.label()
+                    ),
+                    monotone_tally.get(*counter),
+                ));
+            }
+        }
+    }
+    readings
+}
+
+/// C8a（登记 r5 5.4、第七节乙类）：理想恢复、施加过时三项都抄所选根的。L 域 N ≤ 5 上 J8a 实例表指针 762、分配记录树根 762
+/// （第 j 版的两个槽与第 0 版的不同 ⟺ j ≥ 1）、卸载记号 620（第 j 版与第 0 版的记号不同 ⟺ j 为奇数，两种奇偶都如此），J8b、J8c 0。
+fn c8a_control_readings(run_profile: RunProfile, thread_count: usize) -> Vec<ControlReading> {
+    c8_control_readings(
+        Criterion::J8aFieldsFromTheNewRootSegment,
+        "C8a",
+        ControlKind::IdealCopyingTheChosenRecordFieldsWhenApplied,
+        &[
+            (
+                Counter::J8aInstanceTableViolations,
+                FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
+            ),
+            (
+                Counter::J8aAllocationRecordTreeRootViolations,
+                FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
+            ),
+            (
+                Counter::J8aUnmountMarkerViolations,
+                FARTHEST_IS_ODD_STATES_WITHIN_THE_CONTROL_BOUND,
+            ),
+            (Counter::J8bViolations, 0),
+            (Counter::J8cViolations, 0),
+        ],
+        &[
+            Counter::J8aInstanceTableViolations,
+            Counter::J8aAllocationRecordTreeRootViolations,
+            Counter::J8aUnmountMarkerViolations,
+        ],
+        &[
+            Counter::J8aInstanceTableViolations,
+            Counter::J8aAllocationRecordTreeRootViolations,
+        ],
+        run_profile,
+        thread_count,
+    )
+}
+
+/// C8b（登记 r5 5.4、第七节乙类）：理想恢复、施加过时卸载记号一律写 `NotWritten…`。落到的那一版是 `Written…` ⟺ `even` 下 j 为偶数、
+/// `odd` 下 j 为奇数，施加过的态里 j ≥ 1：L 域 N ≤ 5 上 `even` 142、`odd` 620。
+fn c8b_control_readings(run_profile: RunProfile, thread_count: usize) -> Vec<ControlReading> {
+    let pinned_unmount_marker_violations = match marker_parity_of_the_r5_profile(run_profile) {
+        MarkerParity::EvenVersionsWrittenByTheUnmountSequence => {
+            FARTHEST_IS_EVEN_AND_AT_LEAST_TWO_STATES_WITHIN_THE_CONTROL_BOUND
+        }
+        MarkerParity::OddVersionsWrittenByTheUnmountSequence => {
+            FARTHEST_IS_ODD_STATES_WITHIN_THE_CONTROL_BOUND
+        }
+    };
+    c8_control_readings(
+        Criterion::J8aUnmountMarkerFromTheNewRootSegment,
+        "C8b",
+        ControlKind::IdealWritingOneUnmountMarkerWhenApplied,
+        &[(
+            Counter::J8aUnmountMarkerViolations,
+            pinned_unmount_marker_violations,
+        )],
+        &[Counter::J8aUnmountMarkerViolations],
+        &[],
+        run_profile,
+        thread_count,
+    )
+}
+
+/// C8c（登记 r5 5.4、第七节乙类）：理想恢复、施加过时 fsid 取落到的那一版 R_j 的。fsid 末字节取 j，第 j 版与第 0 版不同 ⟺ j ≥ 1：
+/// L 域 N ≤ 5 上 J8b 762，J8a 三格 0。
+fn c8c_control_readings(run_profile: RunProfile, thread_count: usize) -> Vec<ControlReading> {
+    c8_control_readings(
+        Criterion::J8bFilesystemIdentifierOfTheChosenRoot,
+        "C8c",
+        ControlKind::IdealWithAFieldOfTheLandedVersion(FieldOfTheRebuiltRoot::FilesystemIdentifier),
+        &[
+            (
+                Counter::J8bViolations,
+                FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
+            ),
+            (Counter::J8aInstanceTableViolations, 0),
+            (Counter::J8aAllocationRecordTreeRootViolations, 0),
+            (Counter::J8aUnmountMarkerViolations, 0),
+        ],
+        &[Counter::J8bViolations],
+        &[Counter::J8bViolations],
+        run_profile,
+        thread_count,
+    )
+}
+
+/// C8d（登记 r5 5.4、第七节乙类）：理想恢复、一条没施加时卸载记号写成 `NotWritten…`。一条没施加 ⟺ j* = 0；R_0 的记号 `even` 下
+/// `Written…`、`odd` 下 `NotWritten…`：L 域 N ≤ 5 上 `even` 2 348、`odd` 0（`odd` 另在 C 域 Nc ≤ 3 上大于 0）。
+fn c8d_control_readings(run_profile: RunProfile, thread_count: usize) -> Vec<ControlReading> {
+    let pinned_nothing_applied_violations = match marker_parity_of_the_r5_profile(run_profile) {
+        MarkerParity::EvenVersionsWrittenByTheUnmountSequence => {
+            FARTHEST_IS_THE_CHOSEN_VERSION_STATES_WITHIN_THE_CONTROL_BOUND
+        }
+        MarkerParity::OddVersionsWrittenByTheUnmountSequence => 0,
+    };
+    c8_control_readings(
+        Criterion::J8cNothingAppliedReturnsTheChosenRoot,
+        "C8d",
+        ControlKind::IdealWritingNotWrittenWhenNothingIsApplied,
+        &[(Counter::J8cViolations, pinned_nothing_applied_violations)],
+        &[Counter::J8cViolations],
+        &[Counter::J8cViolations],
+        run_profile,
+        thread_count,
+    )
+}
+
 /// J7b、J7c 的对照（登记 r2 5.5、第七节、第八节奇偶的判别力自证）。偶数版带记号（R_0 是 `Written…`）：L 域 N ≤ 5 上
 /// 等于 `count_when_the_first_version_is_written`，r1 档生成器上 0。奇数版带记号（R_0 是 `NotWritten…`）：L 域 0（假结局与期望同值），
 /// C 域 Nc ≤ 3 大于 0（所选根是第几版取决于哪些根槽落了，两种记号的所选根都有）。
@@ -7075,7 +7798,13 @@ fn witness_field(tally: &Tally, counter: Counter) -> String {
 
 /// 落后类别的五行（登记 r2 SQ9、SQ17）：相等、落后（两个方向之和）、互不包含、0 号盘落后、1 号盘落后；每行列出
 /// [`LAGGING_CLASS_COLUMNS`] 各量。`row_name` 是 `lagging_class`（每个 (域, N)）或 `verdict`（域的合计）。
-fn lagging_class_rows(row_name: &str, place: &str, tally: &Tally) -> Vec<String> {
+fn lagging_class_rows(
+    row_name: &str,
+    place: &str,
+    tally: &Tally,
+    run_profile: RunProfile,
+) -> Vec<String> {
+    let shown_columns = lagging_class_columns_shown_under(run_profile);
     let groups: [(&str, &[LaggingClass]); 5] = [
         (LaggingClass::Equal.label(), &[LaggingClass::Equal]),
         (
@@ -7098,7 +7827,7 @@ fn lagging_class_rows(row_name: &str, place: &str, tally: &Tally) -> Vec<String>
     groups
         .iter()
         .map(|(group_label, classes)| {
-            let columns: Vec<String> = LAGGING_CLASS_COLUMNS
+            let columns: Vec<String> = shown_columns
                 .iter()
                 .map(|counter| {
                     let count: u64 = classes
@@ -7197,7 +7926,7 @@ fn emit_the_rows_of_a_domain_size(
         Counter::J6PremiseFailsViolations,
         tally.get(Counter::J6PremiseFailsJudged),
     );
-    if run_profile.judges_j6qn_and_j7() {
+    if run_profile.judges_j6qn() {
         violations_row(
             "J6Qn_premise_holds",
             Counter::J6QnPremiseHoldsViolations,
@@ -7208,6 +7937,8 @@ fn emit_the_rows_of_a_domain_size(
             Counter::J6QnPremiseFailsViolations,
             tally.get(Counter::J6QnPremiseFailsJudged),
         );
+    }
+    if run_profile.judges_j7() {
         for field in FieldOfTheRebuiltRoot::ALL {
             violations_row(
                 field.violations_counter().label(),
@@ -7217,6 +7948,23 @@ fn emit_the_rows_of_a_domain_size(
         }
         violations_row("J7b", Counter::J7bViolations, tally.get(Counter::J7bJudged));
         violations_row("J7c", Counter::J7cViolations, tally.get(Counter::J7cJudged));
+    }
+    // r5 档（登记 r5 5.3）：J7 五行换成 J8 五行与「无出处」一行；「无出处」只报，它的 judged 是投影不等于所选根的态数。
+    if run_profile.judges_j8() {
+        for counter in [
+            Counter::J8aInstanceTableViolations,
+            Counter::J8aAllocationRecordTreeRootViolations,
+            Counter::J8aUnmountMarkerViolations,
+        ] {
+            violations_row(counter.label(), counter, tally.get(Counter::J8aJudged));
+        }
+        violations_row("J8b", Counter::J8bViolations, tally.get(Counter::J8Judged));
+        violations_row("J8c", Counter::J8cViolations, tally.get(Counter::J8cJudged));
+        violations_row(
+            "J8_without_a_source",
+            Counter::J8WithoutASource,
+            tally.get(Counter::J8aJudged) + tally.get(Counter::J8WithoutASource),
+        );
     }
     if tally.get(Counter::Ia1Judged) > 0 {
         violations_row("IA1", Counter::Ia1Violations, tally.get(Counter::Ia1Judged));
@@ -7230,7 +7978,7 @@ fn emit_the_rows_of_a_domain_size(
         tally.get(Counter::J6ThirdCallEqualsSecond),
         tally.get(Counter::J6ThirdCallDiffersOrIsMissing),
     ));
-    if run_profile.judges_j6qn_and_j7() {
+    if run_profile.judges_j6qn() {
         emitter.result(&format!(
             "name=first_returned_root_txg {place} first_returned_root_txg_is_the_largest={}",
             tally.get(Counter::FirstReturnedRootTxgIsTheLargest),
@@ -7270,7 +8018,7 @@ fn emit_the_rows_of_a_domain_size(
         }
     }
     if !pinned_mirrored_counts(domain).is_empty() {
-        for row in lagging_class_rows("lagging_class", &place, tally) {
+        for row in lagging_class_rows("lagging_class", &place, tally, run_profile) {
             emitter.result(&row);
         }
     }
@@ -7418,7 +8166,7 @@ fn emit_the_verdict_of_a_domain(
                 }
             }
             if !pinned_mirrored_counts(domain).is_empty() {
-                for row in lagging_class_rows("verdict", &place, total) {
+                for row in lagging_class_rows("verdict", &place, total, run_profile) {
                     emitter.result(&row);
                 }
             }
@@ -7456,7 +8204,7 @@ fn emit_the_verdict_of_a_domain(
             ));
         }
     }
-    if run_profile.judges_j6qn_and_j7() {
+    if run_profile.judges_j6qn() {
         let first_returned_root_txg_is_the_largest =
             total.get(Counter::FirstReturnedRootTxgIsTheLargest);
         // 登记 r2 作废条款 SV4：E1 上 ρ_1 的 txg 是 u64 最大值的态数为 0，J6Qn 在 E1 上的 0 不算「Qn 管住了顶格」。
@@ -7466,6 +8214,10 @@ fn emit_the_verdict_of_a_domain(
                     .to_string(),
             );
         }
+    }
+    if run_profile.judges_j7() {
+        let first_returned_root_txg_is_the_largest =
+            total.get(Counter::FirstReturnedRootTxgIsTheLargest);
         emitter.result(&format!(
             "name=verdict {place} criteria=r2 j6qn_premise_holds_violations={} j6qn_premise_holds_judged={} j6qn_premise_fails_violations={} j6qn_premise_fails_judged={} j7_judged={} j7a_instance_table_violations={} j7a_allocation_record_tree_root_violations={} j7a_filesystem_identifier_violations={} j7b_violations={} j7b_judged={} j7c_violations={} j7c_judged={} first_returned_root_txg_is_the_largest={first_returned_root_txg_is_the_largest}",
             total.get(Counter::J6QnPremiseHoldsViolations),
@@ -7480,6 +8232,26 @@ fn emit_the_verdict_of_a_domain(
             total.get(Counter::J7bJudged),
             total.get(Counter::J7cViolations),
             total.get(Counter::J7cJudged),
+        ));
+    }
+    if run_profile.judges_j8() {
+        emitter.result(&format!(
+            "name=verdict {place} criteria=r5 j6qn_premise_holds_violations={} j6qn_premise_holds_judged={} j6qn_premise_fails_violations={} j6qn_premise_fails_judged={} j8_judged={} j8a_judged={} j8a_instance_table_violations={} j8a_allocation_record_tree_root_violations={} j8a_unmount_marker_violations={} j8b_violations={} j8b_judged={} j8c_violations={} j8c_judged={} j8_without_a_source={} first_returned_root_txg_is_the_largest={}",
+            total.get(Counter::J6QnPremiseHoldsViolations),
+            total.get(Counter::J6QnPremiseHoldsJudged),
+            total.get(Counter::J6QnPremiseFailsViolations),
+            total.get(Counter::J6QnPremiseFailsJudged),
+            total.get(Counter::J8Judged),
+            total.get(Counter::J8aJudged),
+            total.get(Counter::J8aInstanceTableViolations),
+            total.get(Counter::J8aAllocationRecordTreeRootViolations),
+            total.get(Counter::J8aUnmountMarkerViolations),
+            total.get(Counter::J8bViolations),
+            total.get(Counter::J8Judged),
+            total.get(Counter::J8cViolations),
+            total.get(Counter::J8cJudged),
+            total.get(Counter::J8WithoutASource),
+            total.get(Counter::FirstReturnedRootTxgIsTheLargest),
         ));
     }
     if run_profile.splits_j6qn_by_i812() && domain.family() == Family::Adversarial {
@@ -8196,7 +8968,37 @@ fn check_the_profile_options() {
         RunProfile::r2(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
         "r3 档与 r2 档是两个档"
     );
-    assert!(split(&["--profile", "r5"]).is_err());
+    assert_eq!(
+        split(&[
+            "--profile",
+            "r5",
+            "--marker-parity",
+            "odd",
+            "--bounds",
+            "segment1"
+        ]),
+        Ok((
+            RunProfile::r5(MarkerParity::OddVersionsWrittenByTheUnmountSequence),
+            owned(&["--bounds", "segment1"])
+        )),
+        "r5 档认得（登记 r5 5.1），奇偶照 r2 档的意思认，参数原样留下"
+    );
+    let (r5_profile, _remaining_arguments) =
+        split(&["--profile", "r5"]).expect("r5 档认得（登记 r5 5.1）");
+    assert!(
+        r5_profile.judges_j8() && !r5_profile.judges_j7() && r5_profile.judges_j6qn(),
+        "r5 档判 J8、J6Qn，不判 J7（登记 r5 5.1、5.3）"
+    );
+    assert!(
+        !r5_profile.admits_the_root_choice_family(),
+        "r5 档不认根环择根一族（登记 r5 5.1）"
+    );
+    assert_ne!(
+        RunProfile::r5(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
+        RunProfile::r3(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
+        "r5 档与 r3 档是两个档"
+    );
+    assert!(split(&["--profile", "r6"]).is_err());
     assert!(split(&["--profile"]).is_err());
     assert!(split(&["--profile", "r2", "--profile", "r1"]).is_err());
 }
@@ -9088,7 +9890,7 @@ struct RootChoicePublishPlan {
     first_transaction: u64,
     record_count: usize,
     commit_marker_bits: u32,
-    /// 本实例写的上一条记录的 311 字节头算出的链值；本实例第一条记录没有，取 0（I-8.6）。
+    /// 本实例写的上一条记录的 487 字节头算出的链值；本实例第一条记录没有，取 0（I-8.6）。
     previous_chain_value: Option<u32>,
     is_user_publish: bool,
 }
@@ -12167,7 +12969,8 @@ fn run_the_root_choice_family(arguments: &[String], run_profile: RunProfile) {
 //
 // 被测对象与 r3 的择根合判一族相同：`recover` 的 `Consult` 支里串起来的三步（`choose_root`、`scan_journal`、`replay_journal(…, true)`）。
 // 这一族多出来的东西全在生成器一侧（可信件，按登记 5.3 与 D16 已定项 7、8，D22 已定项 7、8、16，D23 已定项 14、18 的字面写，不调 `mount.rs`、`transaction.rs`）：
-// 每块盘两个系统配置槽、挂载开头的读故障（根槽、系统配置槽的一时读不出）、可写挂载读到的更新状态读不出那道闸（实现的取甲，登记修订 1）、取号那一写与发布末尾的系统配置轮换。
+// 每块盘两个系统配置槽、挂载开头的读故障（根槽、系统配置槽的一时读不出）、可写挂载读到的更新状态读不出那道闸（不给 `--gate` 是 r4 登记修订 1 的取甲；
+// `--gate r2` 是 r5 登记修订 1 的 R2）、取号那一写与发布末尾的系统配置轮换。
 // 被判的那一次恢复另有 5 种读故障（无、RN、RI、D0、D1）；故障只落在读者一侧，盘上的字节不变。
 
 const FAULT_FAMILY_LABEL: &str = "root_choice_faults";
@@ -12484,6 +13287,117 @@ fn readable_system_slots_of(slots: &SystemSlots, locations: FaultLocations) -> (
     (count, largest_tail)
 }
 
+/// 可写挂载读到的更新状态读不出那道闸、与取号那一刻的「判不出」取法（登记 r5 修订 1：`--gate r2` 只在 `--profile r4 --family root_choice_faults`
+/// 时认；不给是取甲，r4 档输出逐字节不变）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum WitnessGateRule {
+    /// 取甲（r4 登记修订 1，2026-09-28 那一版实现）：读得出且没撕裂的系统配置槽不足整池槽数就判不出；取号那一刻同判。
+    OneUnreadableOrTornSlotMeansUndecidable,
+    /// R2（D22（单元原子性怎么合成） 已定项 8 射程，今天的 `recovery.rs` 的 `system_configuration_witness_is_undecidable`）：判不出 ⟺ 有槽设备报读错，
+    /// 且没有一块盘两槽都自证过；取号那一刻判不出、或某块盘两槽里一份自证过的都没有，就拒。撕裂（读得出、自证不过）不报读错（S-辨）。
+    SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots,
+}
+
+impl WitnessGateRule {
+    /// config 行与收尾判决行里闸那一段。取甲那一份与 r4 档的 config 行逐字相同。
+    const fn label(self) -> &'static str {
+        match self {
+            Self::OneUnreadableOrTornSlotMeansUndecidable => {
+                "the_implementation_choice_one_unreadable_or_torn_slot_means_undecidable"
+            }
+            Self::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+                "r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots"
+            }
+        }
+    }
+}
+
+labelled_enumeration! {
+    /// 一次挂载被拒在哪一步（登记 r5 修订 1 修1.五第 4 条「拒因分计」：闸那一栏 = 重读那一遍仍为真；取号那一刻的拒按 R2 的两道分；
+    /// 取甲下取号那一刻只有一种拒，另记一栏，不进 R2 的三栏）。走了第二遍又在取号那一刻被拒的挂载记取号那一栏。
+    enum MountRefusalReason {
+        TheGateAfterTheOneReread => "gate",
+        AcquisitionDeviceWithoutASelfVerifiedSlot => "acquisition_device_without_a_self_verified_slot",
+        AcquisitionWitnessUndecidable => "acquisition_witness_undecidable",
+        AcquisitionUnderTheImplementationChoice => "acquisition_under_the_implementation_choice",
+    }
+}
+
+/// R2 读法：这个系统配置槽是不是「设备报读错」——读故障落点与不在的盘报读错；撕裂的槽读得出、自证不过，设备不报错
+/// （D22 已定项 8 射程 S-辨；`recovery.rs` 的 `system_configuration_slots_of_one_device_read_once` 只在读不出时记读错）。
+fn system_slot_reports_a_read_error(
+    content: SystemSlotContent,
+    is_unreadable_in_the_view: bool,
+) -> bool {
+    match content {
+        SystemSlotContent::Torn => is_unreadable_in_the_view,
+        SystemSlotContent::Verified { .. } => is_unreadable_in_the_view,
+    }
+}
+
+/// R2 的判不出（D22 已定项 8 射程「判不出 ⟺ 有槽设备报读错，且没有一块盘两槽都自证过」）：在 `locations` 那一遍读视图里判。
+fn system_configuration_witness_is_undecidable_under_r2(
+    slots: &SystemSlots,
+    locations: FaultLocations,
+) -> bool {
+    let some_slot_reports_a_read_error = slots.iter().enumerate().any(|(device, device_slots)| {
+        device_slots.iter().enumerate().any(|(slot, content)| {
+            system_slot_reports_a_read_error(
+                *content,
+                locations.system_slot_is_unreadable(device, slot),
+            )
+        })
+    });
+    let some_device_self_verified_both_slots =
+        slots.iter().enumerate().any(|(device, device_slots)| {
+            device_slots.iter().enumerate().all(|(slot, content)| {
+                *content != SystemSlotContent::Torn
+                    && !locations.system_slot_is_unreadable(device, slot)
+            })
+        });
+    some_slot_reports_a_read_error && !some_device_self_verified_both_slots
+}
+
+/// 某块盘两槽里一份读得出且没撕裂的都没有（D22 已定项 8 射程「某块盘一份自证过的系统配置都没有时，取号那一步也拒」；
+/// 与 `mount.rs` 逐盘核第一支同一判、同一视图）。
+fn some_device_has_no_self_verified_system_slot(
+    slots: &SystemSlots,
+    locations: FaultLocations,
+) -> bool {
+    slots.iter().enumerate().any(|(device, device_slots)| {
+        !device_slots.iter().enumerate().any(|(slot, content)| {
+            matches!(content, SystemSlotContent::Verified { .. })
+                && !locations.system_slot_is_unreadable(device, slot)
+        })
+    })
+}
+
+/// 取号那一刻（读视图 = 盘减去 TP 的落点，登记 r4 5.3 第 6 条、r5 修订 1 修1.五第 3 条）拒不拒、拒在哪一道：取甲下四槽有一槽读不出或撕裂就拒；
+/// R2 下 (a) 判不出拒，(b) 某块盘一份自证过的都没有拒。
+fn acquisition_refusal_of(
+    world: &FaultWorld,
+    locations: FaultLocations,
+) -> Option<MountRefusalReason> {
+    match world.witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {
+            let (readable_slot_count, _largest_tail) =
+                readable_system_slots_of(&world.system_slots, locations);
+            (readable_slot_count < FAULT_SYSTEM_SLOT_COUNT_OF_THE_POOL)
+                .then_some(MountRefusalReason::AcquisitionUnderTheImplementationChoice)
+        }
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            if system_configuration_witness_is_undecidable_under_r2(&world.system_slots, locations)
+            {
+                return Some(MountRefusalReason::AcquisitionWitnessUndecidable);
+            }
+            if some_device_has_no_self_verified_system_slot(&world.system_slots, locations) {
+                return Some(MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot);
+            }
+            None
+        }
+    }
+}
+
 /// 挂载开头故障菜单的一项（登记 5.3 第 5 条）：时机 T1 = 这次挂载里对那个落点的第一次读读不出、之后每一次读都读得出（D23 已定项 14「重读一次」的 R = 1）；
 /// TP = 这次挂载里对那个落点的每一次读都读不出；两种都在下一次挂载开头恢复。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12675,7 +13589,14 @@ struct FaultWorld {
     refused_mounts: u64,
     reread_mounts: u64,
     final_crash: Option<FaultCrashLabel>,
+    /// 闸与取号那一刻的判不出取法（登记 r5 修订 1）；mkfs 之后取甲，`--gate r2` 时换成 R2。
+    witness_gate_rule: WitnessGateRule,
+    /// 被拒的挂载按拒因分（下标是 [`MountRefusalReason`] 的次序；各栏之和等于 `refused_mounts`）。
+    refusals_by_reason: [u64; MOUNT_REFUSAL_REASON_COUNT],
 }
+
+/// [`MountRefusalReason`] 的成员数。
+const MOUNT_REFUSAL_REASON_COUNT: usize = MountRefusalReason::ALL.len();
 
 impl FaultWorld {
     /// mkfs 之后、一次挂载都还没有：第 0 代根在三个区域的槽 0，别处全 0，journal 环空，每块盘两个系统配置槽都是 (世代号 1, tail 0, 实例 0)。
@@ -12704,7 +13625,19 @@ impl FaultWorld {
             refused_mounts: 0,
             reread_mounts: 0,
             final_crash: None,
+            witness_gate_rule: WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable,
+            refusals_by_reason: [0; MOUNT_REFUSAL_REASON_COUNT],
         }
+    }
+
+    /// mkfs 之后、闸取 `witness_gate_rule` 的那一份（登记 r5 修订 1：`--gate r2`）。
+    fn right_after_mkfs_under_the_gate(
+        geometry: RootChoiceDomain,
+        witness_gate_rule: WitnessGateRule,
+    ) -> Self {
+        let mut world = Self::right_after_mkfs(geometry);
+        world.witness_gate_rule = witness_gate_rule;
+        world
     }
 
     fn slots_per_region(&self) -> u64 {
@@ -12985,8 +13918,9 @@ fn ideal_landed_version_of_a_view(
     })
 }
 
-/// 可写挂载读到的更新状态读不出那道闸（D23 已定项 14，实现的取甲，登记修订 1）：`landed` 是读阶段落到的那一版，`locations` 是这一遍读视图里读不出的落点。
-/// 为真 = 判不出或见证到比所选那一版更新的发布。写法照 `mount.rs` 的 `newer_publish_witness` 那一段条款文字，不调它。
+/// 可写挂载读到的更新状态读不出那道闸（D23 已定项 14）：`landed` 是读阶段落到的那一版，`locations` 是这一遍读视图里读不出的落点。
+/// 为真 = 判不出或见证到比所选那一版更新的发布。判不出的取法跟 `world.witness_gate_rule`：取甲（r4 登记修订 1）或 R2（r5 登记修订 1）。
+/// 写法照 `mount.rs` 的 `newer_publish_witness` 那一段条款文字，不调它。
 fn newer_publish_is_witnessed(
     world: &FaultWorld,
     locations: FaultLocations,
@@ -12994,12 +13928,47 @@ fn newer_publish_is_witnessed(
 ) -> bool {
     let (readable_slot_count, largest_tail) =
         readable_system_slots_of(&world.system_slots, locations);
+    match world.witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {}
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            return newer_publish_is_witnessed_under_r2(world, locations, landed, largest_tail);
+        }
+    }
     if readable_slot_count < FAULT_SYSTEM_SLOT_COUNT_OF_THE_POOL {
         return true;
     }
     if largest_tail == 0 {
         return false;
     }
+    newer_publish_is_witnessed_against_the_witnessed_tail(world, locations, landed, largest_tail)
+}
+
+/// 闸的 R2 支（登记 r5 修订 1 修1.五第 2 条；D22（单元原子性怎么合成） 已定项 8 射程）：判不出 ⟺ 这一遍读视图里有系统配置槽报读错，
+/// 且没有一块盘两槽都读得出且没撕裂 ⇒ 真；c_见证（读得出且没撕裂的槽 tail 的最大值）= 0 ⇒ 假；其余与取甲同一段比法。
+fn newer_publish_is_witnessed_under_r2(
+    world: &FaultWorld,
+    locations: FaultLocations,
+    landed: RootVersion,
+    largest_tail: u64,
+) -> bool {
+    if system_configuration_witness_is_undecidable_under_r2(&world.system_slots, locations) {
+        return true;
+    }
+    let nothing_is_witnessed = largest_tail == 0;
+    if nothing_is_witnessed {
+        return false;
+    }
+    newer_publish_is_witnessed_against_the_witnessed_tail(world, locations, landed, largest_tail)
+}
+
+/// 闸判得出、c_见证 > 0 之后的比法（`mount.rs` 的 `newer_publish_witness` 那三支的条款文字）：所选那一版末条读得出 ⇒ c_见证 > 它的计数器；
+/// 否则计数器等于 c_见证 的记录读得出 ⇒ 键最大那条的 (实例代号, txg) > 所选那一版；都读不出 ⇒ 真。
+fn newer_publish_is_witnessed_against_the_witnessed_tail(
+    world: &FaultWorld,
+    locations: FaultLocations,
+    landed: RootVersion,
+    largest_tail: u64,
+) -> bool {
     let view = fault_landing_of_a_view(world, locations);
     let last_record_counter_of_the_landed_publish = view
         .records
@@ -13148,7 +14117,8 @@ impl FaultEnumeration {
     }
 
     /// 读阶段：第一遍读视图 = 盘减去故障落点，在它上面做条款的理想恢复；闸为真就用第二遍读视图（盘减去 TP 的落点）重做，仍为真拒；
-    /// 往下走之前再判取号那一刻（两块盘的四个系统配置槽在 TP 视图里有一槽读不出或撕裂就拒）。KG 关掉闸与取号那一刻（登记 5.3 第 6 条）。
+    /// 往下走之前再判取号那一刻（取甲：两块盘的四个系统配置槽在 TP 视图里有一槽读不出或撕裂就拒；R2：判不出、或某块盘一份自证过的都没有就拒，
+    /// 登记 r5 修订 1）。KG 关掉闸与取号那一刻（登记 5.3 第 6 条）。
     fn enumerate_a_mount_under_a_fault(
         &self,
         world: &FaultWorld,
@@ -13163,29 +14133,28 @@ impl FaultEnumeration {
             .expect("停机条款 TH9：读阶段第一遍的读视图里一条根都没有");
         let mut settled_unreadable = entry.first_read_unreadable;
         let mut outcome = MountOutcome::WentDownOnTheFirstRead;
-        let mut is_refused = false;
+        let mut refusal: Option<MountRefusalReason> = None;
         if self.domain.gate_is_on() {
             if newer_publish_is_witnessed(world, entry.first_read_unreadable, landed) {
                 let second_view = fault_landing_of_a_view(world, entry.every_read_unreadable);
                 let second_landed = ideal_landed_version_of_a_view(&second_view, limit)
                     .expect("停机条款 TH9：读阶段第二遍的读视图里一条根都没有");
                 if newer_publish_is_witnessed(world, entry.every_read_unreadable, second_landed) {
-                    is_refused = true;
+                    refusal = Some(MountRefusalReason::TheGateAfterTheOneReread);
                 } else {
                     settled_unreadable = entry.every_read_unreadable;
                     landed = second_landed;
                     outcome = MountOutcome::WentDownOnTheSecondRead;
                 }
             }
-            let (readable_slot_count, _largest_tail) =
-                readable_system_slots_of(&world.system_slots, entry.every_read_unreadable);
-            if readable_slot_count < FAULT_SYSTEM_SLOT_COUNT_OF_THE_POOL {
-                is_refused = true;
+            if refusal.is_none() {
+                refusal = acquisition_refusal_of(world, entry.every_read_unreadable);
             }
         }
-        if is_refused {
+        if let Some(reason) = refusal {
             let mut refused_world = world.clone();
             refused_world.refused_mounts += 1;
+            refused_world.refusals_by_reason[reason.index()] += 1;
             refused_world.mount_log.push(MountLogEntry {
                 fault: entry,
                 outcome: MountOutcome::Refused,
@@ -13482,6 +14451,8 @@ struct FaultTally {
     judged_states: u64,
     confirmed_states: u64,
     refused_mounts: u64,
+    /// 被拒的挂载按拒因分（登记 r5 修订 1 修1.五第 4 条；只在 `--gate r2` 时打进产物）。
+    refusals_by_reason: [u64; MOUNT_REFUSAL_REASON_COUNT],
     reread_mounts: u64,
     states_with_a_torn_system_slot: u64,
     states_with_same_txg_different_instance_roots: u64,
@@ -13530,6 +14501,7 @@ impl FaultTally {
             judged_states: 0,
             confirmed_states: 0,
             refused_mounts: 0,
+            refusals_by_reason: [0; MOUNT_REFUSAL_REASON_COUNT],
             reread_mounts: 0,
             states_with_a_torn_system_slot: 0,
             states_with_same_txg_different_instance_roots: 0,
@@ -13624,6 +14596,13 @@ impl FaultTally {
         self.judged_states += later.judged_states;
         self.confirmed_states += later.confirmed_states;
         self.refused_mounts += later.refused_mounts;
+        for (count, later_count) in self
+            .refusals_by_reason
+            .iter_mut()
+            .zip(&later.refusals_by_reason)
+        {
+            *count += later_count;
+        }
         self.reread_mounts += later.reread_mounts;
         self.states_with_a_torn_system_slot += later.states_with_a_torn_system_slot;
         self.states_with_same_txg_different_instance_roots +=
@@ -14178,6 +15157,13 @@ impl FaultJudgement {
         let history = facts_of_a_fault_history(world, self.domain.geometry().ring().ring_slots);
         tally.histories += 1;
         tally.refused_mounts += world.refused_mounts;
+        for (count, world_count) in tally
+            .refusals_by_reason
+            .iter_mut()
+            .zip(&world.refusals_by_reason)
+        {
+            *count += world_count;
+        }
         tally.reread_mounts += world.reread_mounts;
         tally.largest_counter = tally.largest_counter.max(
             world
@@ -14628,10 +15614,28 @@ impl FaultVisitor for FaultStateJudge<'_> {
     }
 }
 
-/// 一个 (域, M, U) 格上全部历史的计数。合法历史与 KG 按工作单元分给几条线程；KA 不走这里。
+/// 一个 (域, M, U) 格上全部历史的计数，闸取甲（r4 档；只给单测用，跑法里一律带闸的取法）。
+#[cfg(test)]
 fn fault_tally_of_a_cell(
     domain: FaultDomain,
     cell: RootChoiceCell,
+    run_the_three_steps: bool,
+    thread_count: usize,
+) -> FaultTally {
+    fault_tally_of_a_cell_under_the_gate(
+        domain,
+        cell,
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable,
+        run_the_three_steps,
+        thread_count,
+    )
+}
+
+/// 一个 (域, M, U) 格上全部历史的计数，闸取 `witness_gate_rule`。合法历史与 KG 按工作单元分给几条线程；KA 不走这里。
+fn fault_tally_of_a_cell_under_the_gate(
+    domain: FaultDomain,
+    cell: RootChoiceCell,
+    witness_gate_rule: WitnessGateRule,
     run_the_three_steps: bool,
     thread_count: usize,
 ) -> FaultTally {
@@ -14642,7 +15646,7 @@ fn fault_tally_of_a_cell(
     };
     let mut collector = FaultUnitCollector { units: Vec::new() };
     collecting.enumerate_a_mount(
-        &FaultWorld::right_after_mkfs(domain.geometry()),
+        &FaultWorld::right_after_mkfs_under_the_gate(domain.geometry(), witness_gate_rule),
         1,
         cell.user_publishes,
         None,
@@ -14785,6 +15789,174 @@ KG RNSB-T1 40271 0 0\n\
 KG RNSB-TP 40271 0 0\n\
 ";
 
+/// 登记 r5 修订 1 修1.七乙类（闸取 R2；出自设计员的独立生成器 `anchors_s5.py`，sha256 133e56358b88a284e9a5afcbb19197be3e6d2b6ce571c2f87549809144b83af7，
+/// 输出 `anchors_s5.out` sha256 4578b08579af7e0198e23326b61ea4fe4711464533c72da930bfdfe8a42230c1，由第三段执行员的 `to_pinned_text.py cells` 只换形摊成这一张；
+/// 同一份脚本对 `E165_S5_GATE=A` 那一遍的输出摊出来与 [`PINNED_FAULT_CELLS_TEXT`] 逐行相同）：列同 [`PINNED_FAULT_CELLS_TEXT`]。
+/// 与取甲那一张不同的 15 行是 KF、KF3、KF9 的 M ≥ 2 各格，其余 34 行逐行相同。
+const PINNED_FAULT_CELLS_TEXT_UNDER_R2: &str = "\
+KF 1 0 10 0 50 0 0 0 0 0 0 0 1 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0\n\
+KF 1 1 39 0 195 0 0 0 0 0 0 0 3 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0\n\
+KF 1 2 117 0 585 585 0 0 0 0 0 0 5 0 0 117 468 468 351 585 585 252 585 585 585 117 117 0 117 117 0 468 468 351 117 117 0 117 117 0 117 117 0\n\
+KF 1 3 351 0 1755 1755 0 0 0 0 0 0 4 0 0 351 1404 1404 1053 1755 1755 756 1755 1755 1755 351 351 0 351 351 0 1404 1404 1053 351 351 0 351 351 0 351 351 0\n\
+KF 2 0 3094 351 15470 0 99 1130 245 0 0 0 2 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0\n\
+KF 2 1 15639 1733 78195 0 318 5619 620 0 0 0 3 0 0 0 0 0 70332 0 0 0 0 0 0 0 0 0 0 0 0 0 0 70332 0 0 0 0 0 0 0 0 0\n\
+KF 2 2 78888 8567 394440 275850 975 27900 1745 0 0 0 5 0 0 35820 247356 247356 354423 275850 275850 167166 275850 275850 275850 35820 35820 0 35820 35820 0 247356 247356 354423 35820 35820 0 35820 35820 0 35820 35820 0\n\
+KF 2 3 282585 30518 1412925 1411335 2946 99414 5120 0 0 0 6 0 0 178317 1279296 1279296 1316046 1411335 1411335 919764 1411335 1411335 1411335 178317 178317 0 178317 178317 0 1279296 1279296 1316046 178317 178317 0 178317 178317 0 178317 178317 0\n\
+KF3 1 0 10 0 50 0 0 0 0 0 0 0 1 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0\n\
+KF3 1 1 5 0 25 0 0 0 0 0 0 0 2 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0\n\
+KF3 1 2 5 0 25 25 0 0 0 0 0 0 3 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KF3 1 3 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KF3 2 0 3094 351 15470 0 99 1130 245 0 0 0 2 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0\n\
+KF3 2 1 2543 299 12715 0 148 905 370 0 0 0 2 0 0 0 0 0 11002 0 0 0 0 0 0 0 0 0 0 0 0 0 0 11002 0 0 0 0 0 0 0 0 0\n\
+KF3 2 2 3742 437 18710 14970 197 1340 495 0 0 0 3 0 0 1724 13116 13116 15849 14970 14970 10462 14970 14970 14970 1724 1724 0 1724 1724 0 13116 13116 15849 1724 1724 0 1724 1724 0 1724 1724 0\n\
+KF3 2 3 3891 460 19455 18715 246 1370 620 0 0 0 3 0 0 2373 16712 16712 16946 18715 18715 13092 18715 18715 18715 2373 2373 0 2373 2373 0 16712 16712 16946 2373 2373 0 2373 2373 0 2373 2373 0\n\
+KF3 3 0 885618 188613 4428090 0 42196 668541 74905 0 0 0 2 0 0 0 0 0 3783158 0 0 0 0 0 0 0 0 0 0 0 0 0 0 3783158 0 0 0 0 0 0 0 0 0\n\
+KF3 3 1 1068016 228892 5340080 0 64571 796720 134805 0 0 0 2 0 0 0 0 0 5173977 0 0 0 0 0 0 0 0 0 0 0 0 0 0 5173977 0 0 0 0 0 0 0 0 0\n\
+KF3 3 2 1665004 357011 8325020 5864165 104556 1233377 223455 0 0 0 3 0 0 507003 5333364 5333364 7951618 5864165 5864165 4481658 5864165 5864165 5864165 507003 507003 0 507003 507003 0 5333364 5333364 7951618 507003 507003 0 507003 507003 0 507003 507003 0\n\
+KF3 3 3 2326572 498392 11632860 10967505 141571 1726053 314605 0 0 0 3 0 0 870431 10186388 10186388 11363419 10967505 10967505 8745782 10967505 10967505 10967505 870431 870431 0 870431 870431 0 10186388 10186388 11363419 870431 870431 0 870431 870431 0 870431 870431 0\n\
+KF9 1 0 10 0 50 0 0 0 0 0 0 0 1 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0\n\
+KF9 1 1 39 0 195 0 0 0 0 0 0 0 3 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0\n\
+KF9 1 2 117 0 585 585 0 0 0 0 0 0 5 0 0 117 468 468 359 585 585 252 585 585 585 117 117 0 117 117 0 468 468 359 117 117 0 117 117 0 117 117 0\n\
+KF9 2 0 3094 351 15470 0 99 1130 245 0 0 0 2 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0 0 0 0 0 0 9265 0 0 0 0 0 0 0 0 0\n\
+KF9 2 1 15639 1733 78195 0 318 5619 620 0 0 0 3 0 0 0 0 0 70332 0 0 0 0 0 0 0 0 0 0 0 0 0 0 70332 0 0 0 0 0 0 0 0 0\n\
+KF9 2 2 78888 8567 394440 275850 975 27900 1745 0 0 0 5 0 0 35820 247356 247356 363767 275850 275850 167166 275850 275850 275850 35820 35820 0 35820 35820 0 247356 247356 363767 35820 35820 0 35820 35820 0 35820 35820 0\n\
+KFW 1 0 10 0 50 0 0 0 0 0 0 0 1 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0\n\
+KFW 1 1 5 0 25 0 0 0 0 0 0 0 2 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0 0 0 0 0 0 15 0 0 0 0 0 0 0 0 0\n\
+KFW 1 2 5 0 25 25 0 0 0 0 0 0 3 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 3 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 4 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 11 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 5 5 0 25 25 0 0 0 0 0 0 3 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 6 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 7 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 11 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 8 5 0 25 25 0 0 0 0 0 0 3 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 9 5 0 25 25 0 0 0 0 0 0 2 0 0 5 20 20 15 25 25 12 25 25 25 5 5 0 5 5 0 20 20 15 5 5 0 5 5 0 5 5 0\n\
+KFW 1 10 5 0 25 25 0 0 0 0 0 1 2 0 0 4 16 16 12 25 25 11 25 25 25 4 4 0 4 4 0 16 16 12 4 4 0 4 4 0 4 4 0\n\
+KFW 1 11 5 0 25 25 0 0 0 0 0 5 3 0 0 0 0 0 0 25 25 12 25 25 25 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n\
+KFW 1 12 5 0 25 25 0 0 0 0 0 5 2 0 0 0 0 0 0 25 25 12 25 25 25 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n\
+KFW 1 13 5 0 25 25 0 0 0 0 0 5 2 0 0 0 0 0 0 25 25 11 25 25 25 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n\
+KFW 1 14 5 0 25 25 0 0 0 0 0 5 3 0 0 0 0 0 0 25 25 12 25 25 25 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0\n\
+KG 1 0 10 0 50 0 0 0 0 0 0 0 1 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0 0 0 0 0 0 8 0 0 0 0 0 0 0 0 0\n\
+KG 1 1 39 0 195 0 0 0 0 0 0 0 3 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0 0 0 0 0 0 117 0 0 0 0 0 0 0 0 0\n\
+KG 1 2 117 0 585 585 0 0 0 0 0 0 5 0 0 117 468 468 351 585 585 252 585 585 585 117 117 0 117 117 0 468 468 351 117 117 0 117 117 0 117 117 0\n\
+KG 1 3 351 0 1755 1755 0 0 0 0 0 0 4 0 0 351 1404 1404 1053 1755 1755 756 1755 1755 1755 351 351 0 351 351 0 1404 1404 1053 351 351 0 351 351 0 351 351 0\n\
+KG 2 0 4015 610 20075 0 0 0 925 0 450 0 2 0 0 0 0 0 10824 0 0 0 0 0 0 0 0 0 0 0 0 0 0 10824 0 0 0 0 0 36 0 0 0\n\
+KG 2 1 22092 3648 110460 0 0 0 3120 0 3420 0 3 0 0 0 0 0 88296 0 0 0 0 0 0 0 0 0 0 0 0 0 0 88296 0 0 0 0 0 630 0 0 0\n\
+KG 2 2 98892 14778 494460 334755 0 0 19035 0 21060 0 5 0 1512 51642 292302 292302 423162 334755 334755 188253 334755 334755 334755 53154 53154 0 53154 53154 0 292302 292302 423162 53154 53154 0 58824 58824 7236 53154 53154 0\n\
+KG 2 3 400194 61506 2000970 2000970 0 0 56160 0 104490 0 6 0 19116 265491 1765179 1770093 1756485 2000970 2000970 1261629 2000970 1995300 2000970 265923 284607 0 265923 284607 0 1765179 1770093 1756485 265923 284607 0 309609 346005 49680 265923 284607 0\n\
+";
+
+/// 登记 r5 修订 1 修1.七乙类「M = 2 的格按挂载 2 开头那一项故障合起来」（闸取 R2；同一份 `anchors_s5.out`，`to_pinned_text.py mount_two` 摊成）：
+/// 列同 [`PINNED_MOUNT_TWO_FAULT_TEXT`]。
+const PINNED_MOUNT_TWO_FAULT_TEXT_UNDER_R2: &str = "\
+KF none 39931 0 0\n\
+KF RN-T1 39931 0 4683\n\
+KF RN-TP 35284 36 0\n\
+KF SN0-T1 39931 0 6879\n\
+KF SN0-TP 28776 310 0\n\
+KF SN1-T1 39931 0 6879\n\
+KF SN1-TP 28776 310 0\n\
+KF SB-T1 39931 0 39931\n\
+KF SB-TP 1238 1238 0\n\
+KF RI-T1 39931 0 35760\n\
+KF RI-TP 5377 1206 0\n\
+KF RNSB-T1 39931 0 39931\n\
+KF RNSB-TP 1238 1238 0\n\
+KF3 none 1365 0 0\n\
+KF3 RN-T1 1365 0 255\n\
+KF3 RN-TP 1146 36 0\n\
+KF3 SN0-T1 1365 0 315\n\
+KF3 SN0-TP 910 70 0\n\
+KF3 SN1-T1 1365 0 315\n\
+KF3 SN1-TP 910 70 0\n\
+KF3 SB-T1 1365 0 1365\n\
+KF3 SB-TP 182 182 0\n\
+KF3 RI-T1 1365 0 1130\n\
+KF3 RI-TP 385 150 0\n\
+KF3 RNSB-T1 1365 0 1365\n\
+KF3 RNSB-TP 182 182 0\n\
+KF9 none 10258 0 0\n\
+KF9 RN-T1 10258 0 1524\n\
+KF9 RN-TP 8761 27 0\n\
+KF9 SN0-T1 10258 0 1857\n\
+KF9 SN0-TP 7268 105 0\n\
+KF9 SN1-T1 10258 0 1857\n\
+KF9 SN1-TP 7268 105 0\n\
+KF9 SB-T1 10258 0 10258\n\
+KF9 SB-TP 393 393 0\n\
+KF9 RI-T1 10258 0 8895\n\
+KF9 RI-TP 1732 369 0\n\
+KF9 RNSB-T1 10258 0 10258\n\
+KF9 RNSB-TP 393 393 0\n\
+KG none 40921 0 0\n\
+KG RN-T1 40271 0 0\n\
+KG RN-TP 40271 0 0\n\
+KG SN0-T1 40921 0 0\n\
+KG SN0-TP 40921 0 0\n\
+KG SN1-T1 40921 0 0\n\
+KG SN1-TP 40921 0 0\n\
+KG SB-T1 40921 0 0\n\
+KG SB-TP 40921 0 0\n\
+KG RI-T1 38831 0 0\n\
+KG RI-TP 38831 0 0\n\
+KG RNSB-T1 40271 0 0\n\
+KG RNSB-TP 40271 0 0\n\
+";
+
+/// 登记 r5 修订 1 修1.七乙类「拒因分计」（闸取 R2；同一份 `anchors_s5.out` 的 `refused_gate`、`refused_acq_device_without_self_verified`、
+/// `refused_acq_undecidable` 三个键，`to_pinned_text.py refusals` 摊成）：每行 = 域 M U，然后是闸拒（重读那一遍仍真）、取号那一刻拒（某块盘一份自证过的都没有）、
+/// 取号那一刻拒（判不出）。
+const PINNED_REFUSALS_BY_REASON_TEXT_UNDER_R2: &str = "\
+KF 1 0 0 0 0\n\
+KF 1 1 0 0 0\n\
+KF 1 2 0 0 0\n\
+KF 1 3 0 0 0\n\
+KF 2 0 91 8 0\n\
+KF 2 1 298 20 0\n\
+KF 2 2 919 56 0\n\
+KF 2 3 2782 164 0\n\
+KF3 1 0 0 0 0\n\
+KF3 1 1 0 0 0\n\
+KF3 1 2 0 0 0\n\
+KF3 1 3 0 0 0\n\
+KF3 2 0 91 8 0\n\
+KF3 2 1 136 12 0\n\
+KF3 2 2 181 16 0\n\
+KF3 2 3 226 20 0\n\
+KF3 3 0 38920 3276 0\n\
+KF3 3 1 59499 5072 0\n\
+KF3 3 2 96288 8268 0\n\
+KF3 3 3 130347 11224 0\n\
+KF9 1 0 0 0 0\n\
+KF9 1 1 0 0 0\n\
+KF9 1 2 0 0 0\n\
+KF9 2 0 91 8 0\n\
+KF9 2 1 298 20 0\n\
+KF9 2 2 919 56 0\n\
+KFW 1 0 0 0 0\n\
+KFW 1 1 0 0 0\n\
+KFW 1 2 0 0 0\n\
+KFW 1 3 0 0 0\n\
+KFW 1 4 0 0 0\n\
+KFW 1 5 0 0 0\n\
+KFW 1 6 0 0 0\n\
+KFW 1 7 0 0 0\n\
+KFW 1 8 0 0 0\n\
+KFW 1 9 0 0 0\n\
+KFW 1 10 0 0 0\n\
+KFW 1 11 0 0 0\n\
+KFW 1 12 0 0 0\n\
+KFW 1 13 0 0 0\n\
+KFW 1 14 0 0 0\n\
+KG 1 0 0 0 0\n\
+KG 1 1 0 0 0\n\
+KG 1 2 0 0 0\n\
+KG 1 3 0 0 0\n\
+KG 2 0 0 0 0\n\
+KG 2 1 0 0 0\n\
+KG 2 2 0 0 0\n\
+KG 2 3 0 0 0\n\
+";
+
 /// 一行钉值（`PINNED_FAULT_CELLS_TEXT` 里的一行）：一个 (域, M, U) 格上生成器一侧的计数与假结局、本地择根序的读数。
 #[derive(Clone, Debug)]
 struct PinnedFaultCell {
@@ -14859,15 +16031,56 @@ fn pinned_fault_cells() -> &'static Vec<PinnedFaultCell> {
     PINNED.get_or_init(|| parse_the_pinned_fault_cells(PINNED_FAULT_CELLS_TEXT))
 }
 
-fn pinned_fault_cell(
+/// 闸取 `witness_gate_rule` 时那一张钉值表：取甲是 [`PINNED_FAULT_CELLS_TEXT`]，R2 是 [`PINNED_FAULT_CELLS_TEXT_UNDER_R2`]。
+fn pinned_fault_cells_under_the_gate(
+    witness_gate_rule: WitnessGateRule,
+) -> &'static Vec<PinnedFaultCell> {
+    match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => pinned_fault_cells(),
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            static PINNED_UNDER_R2: std::sync::OnceLock<Vec<PinnedFaultCell>> =
+                std::sync::OnceLock::new();
+            PINNED_UNDER_R2
+                .get_or_init(|| parse_the_pinned_fault_cells(PINNED_FAULT_CELLS_TEXT_UNDER_R2))
+        }
+    }
+}
+
+fn pinned_fault_cell_under_the_gate(
+    witness_gate_rule: WitnessGateRule,
     domain: FaultDomain,
     cell: RootChoiceCell,
 ) -> Option<&'static PinnedFaultCell> {
-    pinned_fault_cells().iter().find(|pinned| {
-        pinned.domain == domain
-            && pinned.mounts == cell.mounts
-            && pinned.user_publishes == cell.user_publishes
-    })
+    pinned_fault_cells_under_the_gate(witness_gate_rule)
+        .iter()
+        .find(|pinned| {
+            pinned.domain == domain
+                && pinned.mounts == cell.mounts
+                && pinned.user_publishes == cell.user_publishes
+        })
+}
+
+/// R2 那一张拒因钉值表里 (域, M, U) 那一格的三栏：闸拒、取号那一刻拒（某块盘一份自证过的都没有）、取号那一刻拒（判不出）。
+fn pinned_refusals_by_reason_under_r2(
+    domain: FaultDomain,
+    cell: RootChoiceCell,
+) -> Option<[u64; 3]> {
+    PINNED_REFUSALS_BY_REASON_TEXT_UNDER_R2
+        .lines()
+        .map(|line| line.split_whitespace().collect::<Vec<&str>>())
+        .find(|fields| {
+            fields[0] == domain.label()
+                && fields[1].parse::<usize>().ok() == Some(cell.mounts)
+                && fields[2].parse::<usize>().ok() == Some(cell.user_publishes)
+        })
+        .map(|fields| {
+            let numbers: Vec<u64> = fields[3..]
+                .iter()
+                .map(|field| field.parse::<u64>().expect("拒因钉值表里的数是非负整数"))
+                .collect();
+            assert_eq!(numbers.len(), 3, "拒因钉值表每行三栏：{fields:?}");
+            [numbers[0], numbers[1], numbers[2]]
+        })
 }
 
 /// 本地择根序 today 在 KG 上、被判时无故障的态里的 KJ1T 合计（登记 5.6「C331 的判别力自证」：本地理想恢复算出的数是 648）。
@@ -14875,12 +16088,59 @@ const PINNED_KG_TODAY_KJ1T_WITHOUT_A_JUDGED_FAULT: u64 = 648;
 
 /// 每个跑到的格，装置数出的生成器一侧的计数与本地择根序的读数等于独立生成器的数；不符走作废条款 TV4（这些量只看生成器与真相，与被测实现无关）。
 /// 条款的理想恢复在合法域里丢了的被判态（因在飞上限、罩着的其余）不是 0 时不当 TV4 停，交回登记的 TF9（条款或实现可能错）。
+/// 闸取甲（只给单测用，跑法里一律带闸的取法）。
+#[cfg(test)]
 fn assert_the_pinned_fault_cell(
     domain: FaultDomain,
     cell: RootChoiceCell,
     tally: &FaultTally,
 ) -> Vec<String> {
-    let pinned = pinned_fault_cell(domain, cell).expect("每个跑到的格都在登记第七节乙类的表里");
+    assert_the_pinned_fault_cell_under_the_gate(
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable,
+        domain,
+        cell,
+        tally,
+    )
+}
+
+/// 每个跑到的格的钉值比对（同上一个函数的说法），按闸的取法选表：取甲照 r4 登记第七节乙类，R2 照 r5 登记修订 1 修1.七乙类，另核拒因三栏（各栏之和等于被拒的挂载数）。
+fn assert_the_pinned_fault_cell_under_the_gate(
+    witness_gate_rule: WitnessGateRule,
+    domain: FaultDomain,
+    cell: RootChoiceCell,
+    tally: &FaultTally,
+) -> Vec<String> {
+    assert_eq!(
+        tally.refusals_by_reason.iter().sum::<u64>(),
+        tally.refused_mounts,
+        "拒因各栏之和等于被拒的挂载数（{} M = {} U = {}）",
+        domain.label(),
+        cell.mounts,
+        cell.user_publishes
+    );
+    match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {}
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            let pinned_refusals = pinned_refusals_by_reason_under_r2(domain, cell)
+                .expect("每个跑到的格都在登记 r5 修订 1 修1.七乙类的拒因表里");
+            assert_eq!(
+                [
+                    tally.refusals_by_reason[MountRefusalReason::TheGateAfterTheOneReread.index()],
+                    tally.refusals_by_reason
+                        [MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot.index()],
+                    tally.refusals_by_reason
+                        [MountRefusalReason::AcquisitionWitnessUndecidable.index()],
+                ],
+                pinned_refusals,
+                "PV12：{} M = {} U = {} 拒因三栏（闸、取号那一刻 (b)、取号那一刻 (a)）",
+                domain.label(),
+                cell.mounts,
+                cell.user_publishes
+            );
+        }
+    }
+    let pinned = pinned_fault_cell_under_the_gate(witness_gate_rule, domain, cell)
+        .expect("每个跑到的格都在登记第七节乙类的表里");
     let place = format!(
         "域 {} M = {} U = {}",
         domain.label(),
@@ -14965,13 +16225,21 @@ fn assert_the_pinned_fault_cell(
     findings
 }
 
-/// M = 2 的格合起来、按挂载 2 开头那项故障报的历史数、被拒数、重读数等于登记第七节那张表（TV4）。
-fn assert_the_pinned_mount_two_table(
+/// M = 2 的格合起来、按挂载 2 开头那项故障报的历史数、被拒数、重读数等于登记第七节那张表（TV4）；按闸的取法选表：取甲照 r4 登记第七节，
+/// R2 照 r5 登记修订 1 修1.七乙类。
+fn assert_the_pinned_mount_two_table_under_the_gate(
+    witness_gate_rule: WitnessGateRule,
     domain: FaultDomain,
     merged_over_the_mount_two_cells: &FaultTally,
 ) {
+    let pinned_text = match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => PINNED_MOUNT_TWO_FAULT_TEXT,
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            PINNED_MOUNT_TWO_FAULT_TEXT_UNDER_R2
+        }
+    };
     let mut checked_rows = 0;
-    for line in PINNED_MOUNT_TWO_FAULT_TEXT.lines() {
+    for line in pinned_text.lines() {
         let fields: Vec<&str> = line.split_whitespace().collect();
         if fields[0] != domain.label() {
             continue;
@@ -15026,6 +16294,35 @@ fn fault_reading_that_must_equal(
     }
 }
 
+/// R2 的拒因行（登记 r5 修订 1 修1.五第 4 条、修1.七乙类「拒因分计」）：被拒的挂载按闸（重读那一遍仍真）、取号那一刻 (b)（某块盘一份自证过的都没有）、
+/// 取号那一刻 (a)（判不出）三栏分；三栏之和等于被拒的挂载数（[`assert_the_pinned_fault_cell_under_the_gate`] 断言）。
+fn refusal_row_of_a_fault_cell(
+    domain: FaultDomain,
+    cell: RootChoiceCell,
+    tally: &FaultTally,
+) -> String {
+    let columns: Vec<String> = [
+        MountRefusalReason::TheGateAfterTheOneReread,
+        MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot,
+        MountRefusalReason::AcquisitionWitnessUndecidable,
+    ]
+    .iter()
+    .map(|reason| {
+        format!(
+            "refused_{}={}",
+            reason.label(),
+            tally.refusals_by_reason[reason.index()]
+        )
+    })
+    .collect();
+    format!(
+        "name=root_choice_fault_refusals {} refused_mounts={} {}",
+        fault_place_of(domain, cell),
+        tally.refused_mounts,
+        columns.join(" ")
+    )
+}
+
 fn fault_place_of(domain: FaultDomain, cell: RootChoiceCell) -> String {
     format!(
         "domain={} ring_slots={} slots_per_region={} mounts={} user_publishes={}",
@@ -15039,13 +16336,31 @@ fn fault_place_of(domain: FaultDomain, cell: RootChoiceCell) -> String {
 
 /// 一个合法历史或 KG 格上每条判据的对照读数（登记 5.6 表）：KJ0 在 KF M = 1、U = 0 指定一态上 panic（违例数 1）；KJ1、KJ1T、KJ2 在 KF1 下等于第七节 KF1 三列；
 /// KJ1、KJ1T、KJ3 在 KF2 下各等于「有已确认的被判态数」，KJ2 等于第七节 KF2 KJ2 一列；KJ1、KJ1T 在 KF4 下等于第七节 KF4 两列。
+/// 闸取甲（只给单测用，跑法里一律带闸的取法）。
+#[cfg(test)]
 fn fault_control_readings_of_a_cell(
     domain: FaultDomain,
     cell: RootChoiceCell,
     tally: &FaultTally,
 ) -> Vec<FaultControlReading> {
+    fault_control_readings_of_a_cell_under_the_gate(
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable,
+        domain,
+        cell,
+        tally,
+    )
+}
+
+/// 一个合法历史或 KG 格上每条判据的对照读数，按闸的取法取钉值：取甲照 r4 登记第七节，R2 照 r5 登记修订 1 修1.七乙类（判据那一套同 r4 登记 5.6）。
+fn fault_control_readings_of_a_cell_under_the_gate(
+    witness_gate_rule: WitnessGateRule,
+    domain: FaultDomain,
+    cell: RootChoiceCell,
+    tally: &FaultTally,
+) -> Vec<FaultControlReading> {
     let place = fault_place_of(domain, cell);
-    let pinned = pinned_fault_cell(domain, cell).expect("每个跑到的格都在登记第七节乙类的表里");
+    let pinned = pinned_fault_cell_under_the_gate(witness_gate_rule, domain, cell)
+        .expect("每个跑到的格都在登记第七节乙类的表里");
     let mut readings = Vec::new();
     if domain == FaultDomain::GateOn && cell.mounts == 1 && cell.user_publishes == 0 {
         readings.push(fault_reading_that_must_equal(
@@ -15450,6 +16765,8 @@ struct FaultSelection {
     bounds: BoundsTier,
     only: Option<Vec<String>>,
     largest_user_publishes_cap: Option<usize>,
+    /// `--gate r2` 时 R2，不给时取甲（登记 r5 修订 1）。
+    witness_gate_rule: WitnessGateRule,
 }
 
 fn arguments_name_the_root_choice_faults_family(arguments: &[String]) -> bool {
@@ -15466,6 +16783,7 @@ fn parse_the_root_choice_faults_command_line(
     let mut bounds: Option<BoundsTier> = None;
     let mut only: Option<Vec<String>> = None;
     let mut largest_user_publishes_cap: Option<usize> = None;
+    let mut witness_gate_rule = WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable;
     let mut position = 0;
     while position < arguments.len() {
         let option = arguments[position].as_str();
@@ -15481,6 +16799,18 @@ fn parse_the_root_choice_faults_command_line(
                     "light" => BoundsTier::Light,
                     unknown_tier => return Err(format!("不认识的界：{unknown_tier}")),
                 });
+            }
+            "--gate" => {
+                witness_gate_rule = match value {
+                    "r2" => {
+                        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots
+                    }
+                    unknown_gate => {
+                        return Err(format!(
+                        "不认识的闸：{unknown_gate}（只认 r2；不给 --gate 是取甲，登记 r5 修订 1）"
+                    ))
+                    }
+                };
             }
             "--family" => {
                 if value != FAULT_FAMILY_LABEL {
@@ -15513,6 +16843,7 @@ fn parse_the_root_choice_faults_command_line(
         bounds: bounds.ok_or_else(|| "缺 --bounds".to_string())?,
         only,
         largest_user_publishes_cap,
+        witness_gate_rule,
     })
 }
 
@@ -15520,6 +16851,8 @@ fn parse_the_root_choice_faults_command_line(
 #[derive(Default)]
 struct FaultRunWitnesses {
     mount_two_by_domain: Vec<(FaultDomain, FaultTally)>,
+    /// KF 的 M = 2 每一格（U, 取号那一刻因「某块盘一份自证过的都没有」被拒的挂载数），R2 的判别力自证第 3 条用。
+    acquisition_refusals_without_a_self_verified_slot_on_kf_two_mounts: Vec<(usize, u64)>,
     torn_states_of_the_gate_on_domain_at_two_mounts_without_user_publishes: Option<u64>,
     kg_kf4_at_two_mounts_and_three_user_publishes: Option<[u64; 2]>,
     kg_local_today_kj1t_without_a_judged_fault: u64,
@@ -15555,10 +16888,146 @@ fn emit_the_control_rows(
 }
 
 /// 登记第八节「判别力自证」四条与 C331 的判别力自证（5.6）：读数都来自这一次跑出的格，不另跑。
+/// 挂载 2 开头那项故障在菜单里的下标。
+fn mount_fault_menu_index_of(label: &str) -> usize {
+    MOUNT_FAULT_MENU_LABELS
+        .iter()
+        .position(|candidate| *candidate == label)
+        .expect("故障名在菜单之内")
+}
+
+/// 取甲的判别力自证第 1 条（r4 登记 5.6）：KF 的 M = 2 各格合起来，SN0-TP、SN1-TP、SB-TP、RNSB-TP 四项每一项的历史全被拒，KG 同四项一个不拒。
+fn gate_refusal_proof_under_the_implementation_choice(
+    gate_on: &FaultTally,
+    gate_off: &FaultTally,
+) -> (String, bool, String) {
+    let mut gate_refusal_proof_passed = true;
+    let mut gate_refusal_proof_detail = Vec::new();
+    for label in ["SN0-TP", "SN1-TP", "SB-TP", "RNSB-TP"] {
+        let with_the_gate = gate_on.mount_two[mount_fault_menu_index_of(label)];
+        let without_the_gate = gate_off.mount_two[mount_fault_menu_index_of(label)];
+        gate_refusal_proof_passed &= with_the_gate.histories > 0
+            && with_the_gate.refused == with_the_gate.histories
+            && without_the_gate.refused == 0;
+        gate_refusal_proof_detail.push(format!(
+            "{label}:KF_histories={}_KF_refused={}_KG_refused={}",
+            with_the_gate.histories, with_the_gate.refused, without_the_gate.refused
+        ));
+    }
+    (
+        "gate_refuses_every_history_of_the_four_tp_faults_and_the_gate_off_domain_refuses_none"
+            .to_string(),
+        gate_refusal_proof_passed,
+        gate_refusal_proof_detail.join(","),
+    )
+}
+
+/// R2 的判别力自证第 1 条（r5 登记修订 1 修1.八）：KF 的 M = 2 各格合起来，SN0-TP、SN1-TP 两项有历史、有被拒、而不是全拒（取甲下全拒）；
+/// SB-TP、RNSB-TP 两项历史全被拒；KG 同四项一个不拒。把门槛挪到两点之间（「SN0-TP 的历史全被拒」）：取甲那一点为真、R2 这一点为假。
+fn gate_refusal_proof_under_r2(
+    gate_on: &FaultTally,
+    gate_off: &FaultTally,
+) -> (String, bool, String) {
+    let mut gate_refusal_proof_passed = true;
+    let mut gate_refusal_proof_detail = Vec::new();
+    for (label, every_history_is_refused) in [
+        ("SN0-TP", false),
+        ("SN1-TP", false),
+        ("SB-TP", true),
+        ("RNSB-TP", true),
+    ] {
+        let with_the_gate = gate_on.mount_two[mount_fault_menu_index_of(label)];
+        let without_the_gate = gate_off.mount_two[mount_fault_menu_index_of(label)];
+        let refusal_matches_the_rule = if every_history_is_refused {
+            with_the_gate.refused == with_the_gate.histories
+        } else {
+            with_the_gate.refused > 0 && with_the_gate.refused < with_the_gate.histories
+        };
+        gate_refusal_proof_passed &= with_the_gate.histories > 0
+            && refusal_matches_the_rule
+            && without_the_gate.refused == 0;
+        gate_refusal_proof_detail.push(format!(
+            "{label}:KF_histories={}_KF_refused={}_KG_refused={}",
+            with_the_gate.histories, with_the_gate.refused, without_the_gate.refused
+        ));
+    }
+    (
+        "r2_gate_lets_part_of_the_sn_tp_histories_through_refuses_every_sb_and_rnsb_tp_history_and_the_gate_off_domain_refuses_none"
+            .to_string(),
+        gate_refusal_proof_passed,
+        gate_refusal_proof_detail.join(","),
+    )
+}
+
+/// 判别力自证第 1 条照闸的取法选（取甲那一条与 R2 那一条判的是相反的两点）。
+fn gate_refusal_proof_of(
+    witness_gate_rule: WitnessGateRule,
+    gate_on: &FaultTally,
+    gate_off: &FaultTally,
+) -> (String, bool, String) {
+    match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {
+            gate_refusal_proof_under_the_implementation_choice(gate_on, gate_off)
+        }
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            gate_refusal_proof_under_r2(gate_on, gate_off)
+        }
+    }
+}
+
+/// 判别力自证第 2 条（T1 生效）：取甲照 r4 登记 5.6（SN0-T1、SN1-T1、SB-T1 走第二遍的挂载数都不是 0）；R2 照 r5 登记修订 1 修1.八
+/// （SB-T1、RNSB-T1 走第二遍的挂载数等于那一项的历史数，SN0-T1、SN1-T1 不是 0）。
+fn second_read_proof_of(
+    witness_gate_rule: WitnessGateRule,
+    gate_on: &FaultTally,
+) -> (String, bool, String) {
+    let mut second_read_proof_passed = true;
+    let mut second_read_proof_detail = Vec::new();
+    match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {
+            for label in ["SN0-T1", "SN1-T1", "SB-T1"] {
+                let with_the_gate = gate_on.mount_two[mount_fault_menu_index_of(label)];
+                second_read_proof_passed &= with_the_gate.reread > 0;
+                second_read_proof_detail
+                    .push(format!("{label}:KF_reread={}", with_the_gate.reread));
+            }
+            (
+                "t1_takes_the_second_read_in_the_gate_on_domain".to_string(),
+                second_read_proof_passed,
+                second_read_proof_detail.join(","),
+            )
+        }
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            for (label, every_history_takes_the_second_read) in [
+                ("SN0-T1", false),
+                ("SN1-T1", false),
+                ("SB-T1", true),
+                ("RNSB-T1", true),
+            ] {
+                let with_the_gate = gate_on.mount_two[mount_fault_menu_index_of(label)];
+                second_read_proof_passed &= with_the_gate.reread > 0
+                    && (!every_history_takes_the_second_read
+                        || with_the_gate.reread == with_the_gate.histories);
+                second_read_proof_detail.push(format!(
+                    "{label}:KF_histories={}_KF_reread={}",
+                    with_the_gate.histories, with_the_gate.reread
+                ));
+            }
+            (
+                "r2_t1_takes_the_second_read_on_every_sb_and_rnsb_t1_history_and_on_some_sn_t1_histories"
+                    .to_string(),
+                second_read_proof_passed,
+                second_read_proof_detail.join(","),
+            )
+        }
+    }
+}
+
 fn emit_the_self_proofs(
     emitter: &mut Emitter,
     findings: &mut RunFindings,
     witnesses: &FaultRunWitnesses,
+    witness_gate_rule: WitnessGateRule,
 ) {
     let mount_two_of = |domain: FaultDomain| {
         witnesses
@@ -15567,48 +17036,33 @@ fn emit_the_self_proofs(
             .find(|(candidate, _tally)| *candidate == domain)
             .map(|(_domain, tally)| tally)
     };
-    let label_index = |label: &str| {
-        MOUNT_FAULT_MENU_LABELS
-            .iter()
-            .position(|candidate| *candidate == label)
-            .expect("故障名在菜单之内")
-    };
     let mut proofs: Vec<(String, bool, String)> = Vec::new();
     if let (Some(gate_on), Some(gate_off)) = (
         mount_two_of(FaultDomain::GateOn),
         mount_two_of(FaultDomain::GateOff),
     ) {
-        let mut gate_refusal_proof_passed = true;
-        let mut gate_refusal_proof_detail = Vec::new();
-        for label in ["SN0-TP", "SN1-TP", "SB-TP", "RNSB-TP"] {
-            let with_the_gate = gate_on.mount_two[label_index(label)];
-            let without_the_gate = gate_off.mount_two[label_index(label)];
-            gate_refusal_proof_passed &= with_the_gate.histories > 0
-                && with_the_gate.refused == with_the_gate.histories
-                && without_the_gate.refused == 0;
-            gate_refusal_proof_detail.push(format!(
-                "{label}:KF_histories={}_KF_refused={}_KG_refused={}",
-                with_the_gate.histories, with_the_gate.refused, without_the_gate.refused
-            ));
+        proofs.push(gate_refusal_proof_of(witness_gate_rule, gate_on, gate_off));
+        proofs.push(second_read_proof_of(witness_gate_rule, gate_on));
+    }
+    // R2 的判别力自证第 3 条（r5 登记修订 1 修1.八）：取号那一刻第二道拒（某块盘一份自证过的都没有）在 KF 的 M = 2 每一格都拒过挂载。
+    match witness_gate_rule {
+        WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {}
+        WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+            let cells =
+                &witnesses.acquisition_refusals_without_a_self_verified_slot_on_kf_two_mounts;
+            if !cells.is_empty() {
+                proofs.push((
+                    "r2_acquisition_refuses_a_device_without_a_self_verified_slot_on_every_kf_two_mount_cell"
+                        .to_string(),
+                    cells.iter().all(|(_user_publishes, refused)| *refused > 0),
+                    cells
+                        .iter()
+                        .map(|(user_publishes, refused)| format!("KF_M2_U{user_publishes}:refused={refused}"))
+                        .collect::<Vec<String>>()
+                        .join(","),
+                ));
+            }
         }
-        proofs.push((
-            "gate_refuses_every_history_of_the_four_tp_faults_and_the_gate_off_domain_refuses_none"
-                .to_string(),
-            gate_refusal_proof_passed,
-            gate_refusal_proof_detail.join(","),
-        ));
-        let mut second_read_proof_passed = true;
-        let mut second_read_proof_detail = Vec::new();
-        for label in ["SN0-T1", "SN1-T1", "SB-T1"] {
-            let with_the_gate = gate_on.mount_two[label_index(label)];
-            second_read_proof_passed &= with_the_gate.reread > 0;
-            second_read_proof_detail.push(format!("{label}:KF_reread={}", with_the_gate.reread));
-        }
-        proofs.push((
-            "t1_takes_the_second_read_in_the_gate_on_domain".to_string(),
-            second_read_proof_passed,
-            second_read_proof_detail.join(","),
-        ));
     }
     if let Some([kj1, kj1t]) = witnesses.kg_kf4_at_two_mounts_and_three_user_publishes {
         proofs.push((
@@ -15722,7 +17176,7 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
         })
         .collect();
     emitter.result(&format!(
-        "name=config experiment=E165 bounds={} family={FAULT_FAMILY_LABEL} only={} max_u={} root_slot_bytes={ROOT_CHOICE_ROOT_SLOT_BYTES} region_devices=0,1,0 system_slots_per_device={FAULT_SYSTEM_SLOTS_PER_DEVICE} witness_gate=the_implementation_choice_one_unreadable_or_torn_slot_means_undecidable profile=r4",
+        "name=config experiment=E165 bounds={} family={FAULT_FAMILY_LABEL} only={} max_u={} root_slot_bytes={ROOT_CHOICE_ROOT_SLOT_BYTES} region_devices=0,1,0 system_slots_per_device={FAULT_SYSTEM_SLOTS_PER_DEVICE} witness_gate={} profile=r4",
         selection.bounds.label(),
         selection
             .only
@@ -15731,6 +17185,7 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
         selection
             .largest_user_publishes_cap
             .map_or_else(|| "none".to_string(), |cap| cap.to_string()),
+        selection.witness_gate_rule.label(),
     ));
     // ① 常量回比断言（不过当场 panic，进程以非 0 退出，一行结果都不算）。
     cross_check_root_choice_fault_local_constants_against_the_implementation();
@@ -15767,20 +17222,51 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
         let mut mount_two_merged = FaultTally::new();
         for cell in cells {
             let cell_started = Instant::now();
-            let tally = fault_tally_of_a_cell(*domain, *cell, true, thread_count);
+            let tally = fault_tally_of_a_cell_under_the_gate(
+                *domain,
+                *cell,
+                selection.witness_gate_rule,
+                true,
+                thread_count,
+            );
             findings
                 .halt_conditions
-                .extend(assert_the_pinned_fault_cell(*domain, *cell, &tally));
+                .extend(assert_the_pinned_fault_cell_under_the_gate(
+                    selection.witness_gate_rule,
+                    *domain,
+                    *cell,
+                    &tally,
+                ));
             assert_eq!(
                 tally.chose_nothing_without_a_readable_root,
-                pinned_fault_cell(*domain, *cell)
+                pinned_fault_cell_under_the_gate(selection.witness_gate_rule, *domain, *cell)
                     .expect("每个跑到的格都在登记第七节乙类的表里")
                     .states_without_a_readable_root,
                 "TV4：{} 读视图里一条根都没有的被判态里 choose_root 交回空的态数",
                 fault_place_of(*domain, *cell)
             );
             emit_the_rows_of_a_fault_cell(&mut emitter, *domain, *cell, &tally);
-            let readings = fault_control_readings_of_a_cell(*domain, *cell, &tally);
+            match selection.witness_gate_rule {
+                WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {}
+                WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+                    emitter.result(&refusal_row_of_a_fault_cell(*domain, *cell, &tally));
+                }
+            }
+            if *domain == FaultDomain::GateOn && cell.mounts == 2 {
+                witnesses
+                    .acquisition_refusals_without_a_self_verified_slot_on_kf_two_mounts
+                    .push((
+                        cell.user_publishes,
+                        tally.refusals_by_reason
+                            [MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot.index()],
+                    ));
+            }
+            let readings = fault_control_readings_of_a_cell_under_the_gate(
+                selection.witness_gate_rule,
+                *domain,
+                *cell,
+                &tally,
+            );
             emit_the_control_rows(&mut emitter, &mut findings, &readings);
             control_readings.extend(readings);
             println!(
@@ -15817,7 +17303,11 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
             }
         }
         if the_whole_registered_bound_is_run && domain.largest_mounts(selection.bounds) >= 2 {
-            assert_the_pinned_mount_two_table(*domain, &mount_two_merged);
+            assert_the_pinned_mount_two_table_under_the_gate(
+                selection.witness_gate_rule,
+                *domain,
+                &mount_two_merged,
+            );
         }
         if cells.iter().any(|cell| cell.mounts == 2) {
             witnesses
@@ -15834,7 +17324,12 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
             selection.bounds,
         );
     }
-    emit_the_self_proofs(&mut emitter, &mut findings, &witnesses);
+    emit_the_self_proofs(
+        &mut emitter,
+        &mut findings,
+        &witnesses,
+        selection.witness_gate_rule,
+    );
     for condition in &findings.void_conditions {
         emitter.result(&format!(
             "name=void condition={}",
@@ -15848,7 +17343,7 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
         ));
     }
     emitter.result(&format!(
-        "name=verdict scope=run bounds={} family={FAULT_FAMILY_LABEL} states={total_states} self_checks_passed={self_checks_passed} control_readings={} controls_not_red={} void_conditions={} halt_conditions={} profile=r4",
+        "name=verdict scope=run bounds={} family={FAULT_FAMILY_LABEL} states={total_states} self_checks_passed={self_checks_passed} control_readings={} controls_not_red={} void_conditions={} halt_conditions={} profile=r4{}",
         selection.bounds.label(),
         control_readings.len(),
         control_readings
@@ -15857,6 +17352,12 @@ fn run_the_root_choice_faults_family(arguments: &[String]) {
             .count(),
         findings.void_conditions.len(),
         findings.halt_conditions.len(),
+        match selection.witness_gate_rule {
+            WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => String::new(),
+            WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+                format!(" witness_gate={}", selection.witness_gate_rule.label())
+            }
+        },
     ));
     println!(
         "E7TIMING name=elapsed scope=run states={total_states} elapsed_seconds={:.3} threads={thread_count}",
@@ -15878,7 +17379,7 @@ struct RunSelection {
     family_label: &'static str,
 }
 
-const USAGE: &str = "用法：e165_replay_bounded_enumeration --bounds segment1|segment2|light [--family legal|adversarial|all|multi_disk|root_choice|root_choice_faults] [--only <域>[,<域>…]] [--max-n <N>] [--profile r1|r2|r3|r4] [--marker-parity even|odd] [--table direct|scan|both] [--disk-order normal|reversed]（档不给取 r1；奇偶、建表法、盘次序只在 r2、r3 档有，不给分别取 even、direct、normal；这几个参数写在哪都行，单状态重放、逐态判定行、钉住的红例逐行重放同样认）；域名：L L6 L9 U C C6 A A6 AC X E1 E2 R M M6 MC（多盘三个域只在 --family multi_disk 时跑、要 --profile r2；all 只含合法历史与对抗两族；--family root_choice 只在 --profile r3 时跑，域 K K9 KW KA，认 --bounds、--only、--max-u；--family root_choice_faults 只在 --profile r4 时跑，域 KF KF3 KF9 KFW KG KA，认 --bounds、--only、--max-u；--profile r4 其余族与 r3 档相同）。单状态重放：--replay-state <域>:<N>:<序号>；逐态判定行：--list-states <域>:<N>（这两种的域名用产物里 domain= 的写法，U 域是 U_verify_on、U_verify_off）；钉住的红例逐行重放：--pinned-cases <表>（格式见 .claude/gate.d/e165-pinned-red-examples.tsv 文件头）";
+const USAGE: &str = "用法：e165_replay_bounded_enumeration --bounds segment1|segment2|light [--family legal|adversarial|all|multi_disk|root_choice|root_choice_faults] [--only <域>[,<域>…]] [--max-n <N>] [--profile r1|r2|r3|r4|r5] [--marker-parity even|odd] [--table direct|scan|both] [--disk-order normal|reversed]（档不给取 r1；奇偶、建表法、盘次序只在 r2、r3、r5 档有，不给分别取 even、direct、normal；这几个参数写在哪都行，单状态重放、逐态判定行、钉住的红例逐行重放同样认）；域名：L L6 L9 U C C6 A A6 AC X E1 E2 R M M6 MC（多盘三个域只在 --family multi_disk 时跑、要 --profile r2；all 只含合法历史与对抗两族；--family root_choice 只在 --profile r3 时跑，域 K K9 KW KA，认 --bounds、--only、--max-u；--family root_choice_faults 只在 --profile r4 时跑，域 KF KF3 KF9 KFW KG KA，认 --bounds、--only、--max-u、--gate r2（不给是取甲，r5 登记修订 1）；--profile r4 其余族与 r3 档相同；--profile r5 认 legal、adversarial、all、multi_disk，不认 root_choice、root_choice_faults，其余同 r3 档、只把 J7 换成 J8）。单状态重放：--replay-state <域>:<N>:<序号>；逐态判定行：--list-states <域>:<N>（这两种的域名用产物里 domain= 的写法，U 域是 U_verify_on、U_verify_off）；钉住的红例逐行重放：--pinned-cases <表>（格式见 .claude/gate.d/e165-pinned-red-examples.tsv 文件头）";
 
 fn parse_the_command_line(arguments: &[String]) -> Result<RunSelection, String> {
     let mut bounds: Option<BoundsTier> = None;
@@ -16013,10 +17514,10 @@ fn split_off_the_profile_options(
     };
     match profile_label.as_deref().unwrap_or(DEFAULT_PROFILE_LABEL) {
         "r1" if marker_parity_label.is_some() => {
-            Err("--marker-parity 只在 --profile r2 或 r3 时有".to_string())
+            Err("--marker-parity 只在 --profile r2、r3 或 r5 时有".to_string())
         }
         "r1" if table_source_label.is_some() || disk_order_label.is_some() => {
-            Err("--table 与 --disk-order 只在 --profile r2 或 r3 时有".to_string())
+            Err("--table 与 --disk-order 只在 --profile r2、r3 或 r5 时有".to_string())
         }
         "r1" => Ok((RunProfile::R1, remaining_arguments)),
         "r2" => Ok((
@@ -16031,8 +17532,14 @@ fn split_off_the_profile_options(
                 .with_reported_disk_order(reported_disk_order),
             remaining_arguments,
         )),
+        "r5" => Ok((
+            RunProfile::r5(marker_parity)
+                .with_table_source(table_source)
+                .with_reported_disk_order(reported_disk_order),
+            remaining_arguments,
+        )),
         unknown_profile => Err(format!(
-            "不认识的档：{unknown_profile}（只认 r1、r2、r3、r4）"
+            "不认识的档：{unknown_profile}（只认 r1、r2、r3、r4、r5）"
         )),
     }
 }
@@ -16087,6 +17594,14 @@ fn generator_and_criteria_fields_of_the_run_rows(run_profile: RunProfile) -> Str
             " profile=r2_generator_with_r1_criteria marker_parity={}",
             marker_parity.label()
         ),
+        (
+            FieldsBeyondTheProjectionGenerator::VaryWithTheVersion(marker_parity),
+            CriteriaSet::WithJ6QnAndJ8SplitByI812,
+        ) => format!(" profile=r5 marker_parity={}", marker_parity.label()),
+        (
+            FieldsBeyondTheProjectionGenerator::SameForEveryVersion,
+            CriteriaSet::WithJ6QnAndJ8SplitByI812,
+        ) => " profile=r1_generator_with_r5_criteria".to_string(),
     }
 }
 
@@ -16138,9 +17653,9 @@ fn main() {
         return;
     }
     if arguments_name_the_root_choice_family(&arguments) {
-        if !run_profile.splits_j6qn_by_i812() {
+        if !run_profile.admits_the_root_choice_family() {
             eprintln!(
-                "  ✗ --family root_choice 只在 --profile r3 时有（登记 r3 5.1：这一族只在 r3 档）"
+                "  ✗ --family root_choice 只在 --profile r3（或 r4）时有（登记 r3 5.1：这一族只在 r3 档；登记 r5 5.1：r5 档不认它）"
             );
             eprintln!("  → 怎么办：{USAGE}");
             std::process::exit(2);
@@ -16150,9 +17665,12 @@ fn main() {
     }
     match parse_the_state_probe(&arguments) {
         Ok(Some((domain, _size, _probe)))
-            if domain.family() == Family::MultiDisk && !run_profile.judges_j6qn_and_j7() =>
+            if domain.family() == Family::MultiDisk && !run_profile.judges_j6qn() =>
         {
-            eprintln!("  ✗ 多盘域 {} 只在 --profile r2 时有", domain.label());
+            eprintln!(
+                "  ✗ 多盘域 {} 只在 --profile r2、r3、r5 时有",
+                domain.label()
+            );
             eprintln!("  → 怎么办：{USAGE}");
             std::process::exit(2);
         }
@@ -16175,9 +17693,9 @@ fn main() {
             std::process::exit(2);
         }
     };
-    if selection.families.contains(&Family::MultiDisk) && !run_profile.judges_j6qn_and_j7() {
+    if selection.families.contains(&Family::MultiDisk) && !run_profile.judges_j6qn() {
         eprintln!(
-            "  ✗ --family multi_disk 只在 --profile r2 时有（登记 r2 5.1：多盘域只在 r2 档）"
+            "  ✗ --family multi_disk 只在 --profile r2、r3、r5 时有（登记 r2 5.1：多盘域不在 r1 档；登记 r5 5.1：r5 档认它）"
         );
         eprintln!("  → 怎么办：{USAGE}");
         std::process::exit(2);
@@ -16202,7 +17720,7 @@ fn main() {
     ));
 
     // ① 常量回比断言与装置自检（断言不过当场 panic，进程以非 0 退出，一行结果都不算）；r2 档另跑 r2 那几项。
-    let self_checks_of_the_profile: &[(&str, fn())] = if run_profile.judges_j6qn_and_j7() {
+    let self_checks_of_the_profile: &[(&str, fn())] = if run_profile.judges_j6qn() {
         R2_SELF_CHECKS
     } else {
         &[]
@@ -16749,44 +18267,412 @@ mod tests {
         assert!(parse_the_state_probe(&arguments("--replay-state", "X:1:0")).is_err());
     }
 
-    /// 判据表每一行都有一条对照且都红（登记 5.4、作废条款 V2；r2 档加的 J6Qn、J7 五行同样，登记 r2 5.5）。r1 档只判 r1 时的那几行、
-    /// 也都红；r2 档判全表。对抗一族那几行要扫到 n = 3，用上全部核。
+    /// 判据表每一行都有一条对照且都红（登记 5.4、作废条款 V2；r2 档加的 J6Qn、J7 五行同样，登记 r2 5.5；r5 档加的 J8 五行，登记 r5 5.4；
+    /// T_table、T_row，登记 r2 5.5）。逐个核正式跑的单元：`research/scripts/replay.sh` 起这个装置的那几条驱动，加上第 5 次重跑登记
+    /// 比对对象表里没有复跑行的四条（r2 直接建表，两族、两种标记奇偶），每条一族、一档、
+    /// 一种建表法、一种盘次序、一种标记奇偶；每个单元跑出对照的判据恰好是那条驱动产物里 `name=control` 的那一份（写死成字面，
+    /// 不从 `is_judged_under`、`Criterion::family` 现算，那是被核的东西），且读数全红；全部单元并起来罩全表。不把几档、几族并起来判：
+    /// 并起来时一个单元少跑的对照会被别的单元的读数补上（判决 `research/prompts/m3-formal-code-b37-r1-main-verification.md` B1-甲、
+    /// `research/prompts/m3-formal-code-b37-r2-main-verification.md` C3-甲）。对抗一族那几行要扫到 n = 3，用上全部核。
     #[test]
     fn every_criterion_has_a_positive_control_and_every_control_is_red() {
         let thread_count = std::thread::available_parallelism().map_or(1, std::num::NonZero::get);
-        let families = [Family::LegalHistory, Family::Adversarial];
-        let r1_readings = positive_control_readings(&families, RunProfile::R1, thread_count);
-        for reading in &r1_readings {
-            assert!(reading.is_red_as_required, "r1 档对照没红：{reading:?}");
+        let even = MarkerParity::EvenVersionsWrittenByTheUnmountSequence;
+        let odd = MarkerParity::OddVersionsWrittenByTheUnmountSequence;
+        let labels: std::collections::BTreeSet<&str> = Criterion::ALL
+            .iter()
+            .map(|criterion| criterion.label())
+            .collect();
+        assert_eq!(labels.len(), Criterion::ALL.len(), "判据的标签互不相同");
+        let formal_run_units: [(&str, Family, RunProfile, &[Criterion]); 19] = [
+            // `research/scripts/replay.sh` 的 `driver_e165`、`driver_e165_light`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out`，11 条
+            (
+                "r1 合法",
+                Family::LegalHistory,
+                RunProfile::R1,
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out`，7 条
+            (
+                "r1 对抗",
+                Family::Adversarial,
+                RunProfile::R1,
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out`，4 条
+            (
+                "r2 多盘",
+                Family::MultiDisk,
+                RunProfile::r2(even),
+                &[
+                    Criterion::MultiDiskAnyCopyIsOnDisk,
+                    Criterion::MultiDiskReturnedRoot,
+                    Criterion::MultiDiskFarthestVersion,
+                    Criterion::MultiDiskAppliedSetAndLandedVersion,
+                ],
+            ),
+            // `research/prompts/e165-r5-prereg.md` 比对对象表第 4 行（`replay.sh` 里没有复跑行）；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family.out`，17 条
+            (
+                "r2 合法",
+                Family::LegalHistory,
+                RunProfile::r2(even),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J7aInstanceTable,
+                    Criterion::J7aAllocationRecordTreeRoot,
+                    Criterion::J7aFilesystemIdentifier,
+                    Criterion::J7bUnmountMarkerOfARebuiltRoot,
+                    Criterion::J7cUnmountMarkerWhenNothingIsApplied,
+                ],
+            ),
+            // `research/prompts/e165-r5-prereg.md` 比对对象表第 5 行（`replay.sh` 里没有复跑行）；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-adversarial-family.out`，7 条
+            (
+                "r2 对抗",
+                Family::Adversarial,
+                RunProfile::r2(even),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                ],
+            ),
+            // `research/prompts/e165-r5-prereg.md` 比对对象表第 6 行（`replay.sh` 里没有复跑行）；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-legal-family.out`，17 条
+            (
+                "奇数版本的 r2 合法",
+                Family::LegalHistory,
+                RunProfile::r2(odd),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J7aInstanceTable,
+                    Criterion::J7aAllocationRecordTreeRoot,
+                    Criterion::J7aFilesystemIdentifier,
+                    Criterion::J7bUnmountMarkerOfARebuiltRoot,
+                    Criterion::J7cUnmountMarkerWhenNothingIsApplied,
+                ],
+            ),
+            // `research/prompts/e165-r5-prereg.md` 比对对象表第 7 行（`replay.sh` 里没有复跑行）；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-adversarial-family.out`，7 条
+            (
+                "奇数版本的 r2 对抗",
+                Family::Adversarial,
+                RunProfile::r2(odd),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out`，19 条
+            (
+                "两份表都取的 r2 合法",
+                Family::LegalHistory,
+                RunProfile::r2(even).with_table_source(RecordTableSource::Both),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J7aInstanceTable,
+                    Criterion::J7aAllocationRecordTreeRoot,
+                    Criterion::J7aFilesystemIdentifier,
+                    Criterion::J7bUnmountMarkerOfARebuiltRoot,
+                    Criterion::J7cUnmountMarkerWhenNothingIsApplied,
+                    Criterion::TableComparisonSeesADifferentTable,
+                    Criterion::TableComparisonSeesADifferentRow,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out`，9 条
+            (
+                "两份表都取的 r2 对抗",
+                Family::Adversarial,
+                RunProfile::r2(even).with_table_source(RecordTableSource::Both),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                    Criterion::TableComparisonSeesADifferentTable,
+                    Criterion::TableComparisonSeesADifferentRow,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_table_both_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out`，6 条
+            (
+                "两份表都取的 r2 多盘",
+                Family::MultiDisk,
+                RunProfile::r2(even).with_table_source(RecordTableSource::Both),
+                &[
+                    Criterion::MultiDiskAnyCopyIsOnDisk,
+                    Criterion::MultiDiskReturnedRoot,
+                    Criterion::MultiDiskFarthestVersion,
+                    Criterion::MultiDiskAppliedSetAndLandedVersion,
+                    Criterion::TableComparisonSeesADifferentTable,
+                    Criterion::TableComparisonSeesADifferentRow,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out`，19 条
+            (
+                "两份表都取、盘次序反报的 r2 合法",
+                Family::LegalHistory,
+                RunProfile::r2(even)
+                    .with_table_source(RecordTableSource::Both)
+                    .with_reported_disk_order(ReportedDiskOrder::SecondDeviceBeforeFirst),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J7aInstanceTable,
+                    Criterion::J7aAllocationRecordTreeRoot,
+                    Criterion::J7aFilesystemIdentifier,
+                    Criterion::J7bUnmountMarkerOfARebuiltRoot,
+                    Criterion::J7cUnmountMarkerWhenNothingIsApplied,
+                    Criterion::TableComparisonSeesADifferentTable,
+                    Criterion::TableComparisonSeesADifferentRow,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r2_segment4_reversed_disk_order_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out`，6 条
+            (
+                "两份表都取、盘次序反报的 r2 多盘",
+                Family::MultiDisk,
+                RunProfile::r2(even)
+                    .with_table_source(RecordTableSource::Both)
+                    .with_reported_disk_order(ReportedDiskOrder::SecondDeviceBeforeFirst),
+                &[
+                    Criterion::MultiDiskAnyCopyIsOnDisk,
+                    Criterion::MultiDiskReturnedRoot,
+                    Criterion::MultiDiskFarthestVersion,
+                    Criterion::MultiDiskAppliedSetAndLandedVersion,
+                    Criterion::TableComparisonSeesADifferentTable,
+                    Criterion::TableComparisonSeesADifferentRow,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r3_segment1_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out`，8 条
+            (
+                "r3 对抗",
+                Family::Adversarial,
+                RunProfile::r3(even),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                    Criterion::J6QnSplitByI812,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r6_r3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`，17 条
+            (
+                "r3 合法",
+                Family::LegalHistory,
+                RunProfile::r3(even),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J7aInstanceTable,
+                    Criterion::J7aAllocationRecordTreeRoot,
+                    Criterion::J7aFilesystemIdentifier,
+                    Criterion::J7bUnmountMarkerOfARebuiltRoot,
+                    Criterion::J7cUnmountMarkerWhenNothingIsApplied,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-legal-family.out`，16 条
+            (
+                "r5 合法",
+                Family::LegalHistory,
+                RunProfile::r5(even),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J8aFieldsFromTheNewRootSegment,
+                    Criterion::J8aUnmountMarkerFromTheNewRootSegment,
+                    Criterion::J8bFilesystemIdentifierOfTheChosenRoot,
+                    Criterion::J8cNothingAppliedReturnsTheChosenRoot,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-adversarial-family.out`，8 条
+            (
+                "r5 对抗",
+                Family::Adversarial,
+                RunProfile::r5(even),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                    Criterion::J6QnSplitByI812,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_multi_disk`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-multi-disk.out`，4 条
+            (
+                "r5 多盘",
+                Family::MultiDisk,
+                RunProfile::r5(even),
+                &[
+                    Criterion::MultiDiskAnyCopyIsOnDisk,
+                    Criterion::MultiDiskReturnedRoot,
+                    Criterion::MultiDiskFarthestVersion,
+                    Criterion::MultiDiskAppliedSetAndLandedVersion,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_legal`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-legal-family.out`，16 条
+            (
+                "奇数版本的 r5 合法",
+                Family::LegalHistory,
+                RunProfile::r5(odd),
+                &[
+                    Criterion::J0Defined,
+                    Criterion::J1ReturnedRoot,
+                    Criterion::J2RootPlusDisk,
+                    Criterion::J3WithinTheInFlightLimit,
+                    Criterion::J4FarthestVersion,
+                    Criterion::J5aAppliedSet,
+                    Criterion::J5bLandedVersion,
+                    Criterion::J5aAndJ5bAreSeparable,
+                    Criterion::J6FixedPoint,
+                    Criterion::Ia1LargestTxgFails,
+                    Criterion::Ia2NoVerificationCounted,
+                    Criterion::J6QnFixedPoint,
+                    Criterion::J8aFieldsFromTheNewRootSegment,
+                    Criterion::J8aUnmountMarkerFromTheNewRootSegment,
+                    Criterion::J8bFilesystemIdentifierOfTheChosenRoot,
+                    Criterion::J8cNothingAppliedReturnsTheChosenRoot,
+                ],
+            ),
+            // `research/scripts/replay.sh` 的 `driver_e165_r5_segment3_odd_marker_adversarial`；产物 `e165-replay-bounded-enumeration-2026-10-04-r5-segment3-r5-odd-marker-adversarial-family.out`，8 条
+            (
+                "奇数版本的 r5 对抗",
+                Family::Adversarial,
+                RunProfile::r5(odd),
+                &[
+                    Criterion::A0Defined,
+                    Criterion::AsWholeTable,
+                    Criterion::AsGapContinues,
+                    Criterion::AsGapStops,
+                    Criterion::AMutual,
+                    Criterion::AStructure,
+                    Criterion::ALimit,
+                    Criterion::J6QnSplitByI812,
+                ],
+            ),
+        ];
+        let mut controlled_in_some_unit = std::collections::BTreeSet::new();
+        for (unit_name, family, run_profile, registered_criteria) in formal_run_units {
+            let readings = positive_control_readings(&[family], run_profile, thread_count);
+            let controlled: std::collections::BTreeSet<Criterion> =
+                readings.iter().map(|reading| reading.criterion).collect();
+            let registered: std::collections::BTreeSet<Criterion> =
+                registered_criteria.iter().copied().collect();
+            assert_eq!(
+                controlled, registered,
+                "{unit_name} 那个单元跑出对照的判据与那条正式跑产物里的那一份不同"
+            );
+            for reading in &readings {
+                assert!(
+                    reading.is_red_as_required,
+                    "{unit_name} 那个单元对照没红：{reading:?}"
+                );
+            }
+            controlled_in_some_unit.extend(controlled);
         }
-        // r3 档判全表（r2 档的每一行再加 J6Qn 的 I-8.12 拆行）；r2 档那一份另核：r2 档不判拆行那一条判据。
-        let r2_readings = positive_control_readings(
-            &[Family::LegalHistory, Family::Adversarial, Family::MultiDisk],
-            RunProfile::r2(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
-            thread_count,
-        );
-        assert!(
-            r2_readings
-                .iter()
-                .all(|reading| reading.criterion != Criterion::J6QnSplitByI812),
-            "r2 档不判 J6Qn 的 I-8.12 拆行"
-        );
-        let readings = positive_control_readings(
-            &[Family::LegalHistory, Family::Adversarial, Family::MultiDisk],
-            RunProfile::r3(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
-            thread_count,
-        );
         for criterion in Criterion::ALL.iter() {
             assert!(
-                readings
-                    .iter()
-                    .any(|reading| reading.criterion == *criterion),
-                "判据 {} 没有对照的读数",
+                controlled_in_some_unit.contains(criterion),
+                "判据 {} 在正式跑的单元里都没有对照的读数",
                 criterion.label()
             );
-        }
-        for reading in &readings {
-            assert!(reading.is_red_as_required, "对照没红：{reading:?}");
         }
     }
 
@@ -17672,6 +19558,718 @@ mod root_choice_fault_tests {
             readings_of(FaultCriterion::Kj3LandsOnTheIdealRecovery),
             cells.len(),
             "KJ3 在每个格上 KF2 一条对照"
+        );
+    }
+
+    // ── r5 档（登记 `research/prompts/e165-r5-prereg.md` 5.3、5.4、第七节乙类、第八节、9.2）
+
+    /// 登记 r5 5.3 第 1 条：第 j 次发布的每条记录带时间线第 j 版 R_j 的后三项，生成器真相里那条记录的投影对到同一份；
+    /// r1 档那种生成器上记录的后三项仍是 r1 常量。9.2「r5 档时间线记录的后三项写回 r1 常量」点名这一条。
+    #[test]
+    fn the_r5_generator_puts_the_three_fields_of_each_publishs_root_into_every_record_of_that_publish(
+    ) {
+        let shapes = || {
+            vec![
+                PublishShape {
+                    record_count: 1,
+                    commit_marker_bits: 0,
+                },
+                PublishShape {
+                    record_count: 2,
+                    commit_marker_bits: 0,
+                },
+                PublishShape {
+                    record_count: 1,
+                    commit_marker_bits: 0,
+                },
+            ]
+        };
+        for marker_parity in [
+            MarkerParity::EvenVersionsWrittenByTheUnmountSequence,
+            MarkerParity::OddVersionsWrittenByTheUnmountSequence,
+        ] {
+            let r5_profile = RunProfile::r5(marker_parity);
+            let history = generate_history(&history_plan(
+                Domain::LegalBigRing,
+                ORDINARY_FIRST_TXG,
+                shapes(),
+                Vec::new(),
+                r5_profile,
+            ));
+            for publish_index in 0..history.publishes.len() {
+                let fields_of_the_version =
+                    RecordFieldsBeyondTheProjection::of_root(&history.timeline_root(publish_index));
+                for record_index in history.record_indexes_of_publish(publish_index) {
+                    let parsed = history.slots[record_index]
+                        .parsed
+                        .as_ref()
+                        .expect("合法历史的每条记录都解得出");
+                    assert_eq!(
+                        RecordFieldsBeyondTheProjection::of_record(parsed),
+                        fields_of_the_version,
+                        "r5 档（{}）第 {publish_index} 次发布的第 {record_index} 条记录带 R_{publish_index} 的后三项",
+                        marker_parity.label()
+                    );
+                    assert_eq!(
+                        history
+                            .record_truth
+                            .fields_of(VersionFields::of_record(parsed)),
+                        Some(fields_of_the_version),
+                        "生成器真相里这条记录的投影对到同一份后三项"
+                    );
+                }
+            }
+            let first = RecordFieldsBeyondTheProjection::of_root(&history.timeline_root(0));
+            let second = RecordFieldsBeyondTheProjection::of_root(&history.timeline_root(1));
+            assert!(
+                first.instance_table != second.instance_table
+                    && first.allocation_record_tree_root != second.allocation_record_tree_root
+                    && first.unmount_marker != second.unmount_marker,
+                "R_0 与 R_1 的后三项逐项不同（C8a 的钉值靠这一条）"
+            );
+        }
+        let r1_constant = RecordFieldsBeyondTheProjection::of_root_fields(
+            fields_beyond_the_projection_carried_by_every_generated_record(),
+        );
+        let r1_generator_history = generate_history(&history_plan(
+            Domain::LegalBigRing,
+            ORDINARY_FIRST_TXG,
+            shapes(),
+            Vec::new(),
+            RunProfile::R1_GENERATOR_WITH_R5_CRITERIA,
+        ));
+        for slot in &r1_generator_history.slots {
+            let parsed = slot.parsed.as_ref().expect("合法历史的每条记录都解得出");
+            assert_eq!(
+                RecordFieldsBeyondTheProjection::of_record(parsed),
+                r1_constant,
+                "r1 档那种生成器上记录的后三项恒为 r1 常量"
+            );
+        }
+    }
+
+    /// 登记 r5 5.3 第 2 条：时间线之外的记录（对抗一族字母表里的、R 域的残留）后三项 h(d) 的 (i) 实例表指针与分配记录树根各是 d 的单射、
+    /// 与时间线第 0..12 版的同一字段两两不同；(ii) 卸载记号取与 R_0 相反的那一值（A 域 n = 1 第一个字母那条记录也如此）；(iii) 过 H4 往返
+    /// （A 域 n = 1、R 域 n = 2 整格生成一遍，生成时断言往返）。9.2「h(d) 的卸载记号取与 R_0 相同的值」点名这一条。
+    #[test]
+    fn the_records_off_the_timeline_carry_tails_distinct_from_every_version_and_the_unmount_marker_opposite_to_the_first_version(
+    ) {
+        let alphabet = adversarial_record_alphabet();
+        let mut distinguishing_numbers: Vec<u64> = (0..12).collect();
+        for position in 1..=4usize {
+            for alphabet_index in 0..alphabet.len() {
+                distinguishing_numbers
+                    .push(u64::try_from(position * 1000 + alphabet_index).expect("很小"));
+            }
+        }
+        for marker_parity in [
+            MarkerParity::EvenVersionsWrittenByTheUnmountSequence,
+            MarkerParity::OddVersionsWrittenByTheUnmountSequence,
+        ] {
+            let r5_profile = RunProfile::r5(marker_parity);
+            let first_version_marker = r5_profile
+                .fields_beyond_the_projection_of_version(0)
+                .unmount_marker;
+            let mut instance_table_slots = std::collections::BTreeSet::new();
+            let mut allocation_record_tree_root_slots = std::collections::BTreeSet::new();
+            for distinguishing_number in &distinguishing_numbers {
+                let tail = r5_profile.record_fields_off_the_timeline(*distinguishing_number);
+                assert_ne!(
+                    tail.unmount_marker,
+                    first_version_marker,
+                    "（{}）d = {distinguishing_number} 的卸载记号与 R_0 相反",
+                    marker_parity.label()
+                );
+                for version in 0..=12usize {
+                    let fields_of_the_version =
+                        r5_profile.fields_beyond_the_projection_of_version(version);
+                    assert!(
+                        tail.instance_table != fields_of_the_version.instance_table
+                            && tail.allocation_record_tree_root
+                                != fields_of_the_version.allocation_record_tree_root,
+                        "d = {distinguishing_number} 的两条指针与时间线第 {version} 版的同一字段不同"
+                    );
+                }
+                instance_table_slots.insert(tail.instance_table.locations[0].slot.0);
+                allocation_record_tree_root_slots
+                    .insert(tail.allocation_record_tree_root.locations[0].slot.0);
+            }
+            assert_eq!(
+                instance_table_slots.len(),
+                distinguishing_numbers.len(),
+                "实例表指针对 d 单射"
+            );
+            assert_eq!(
+                allocation_record_tree_root_slots.len(),
+                distinguishing_numbers.len(),
+                "分配记录树根对 d 单射"
+            );
+            let chosen_root = adversarial_chosen_root(r5_profile);
+            let (_projection, first_letter_tail) = adversarial_record_projection_and_fields(
+                &chosen_root,
+                alphabet[0],
+                1,
+                0,
+                r5_profile,
+            );
+            assert_ne!(
+                first_letter_tail.unmount_marker, chosen_root.unmount_marker,
+                "A 域 n = 1 第一个字母那条记录的卸载记号与所选根 R_0 相反"
+            );
+            for (domain, size) in [(Domain::AdversarialBigRing, 1), (Domain::Residue, 2)] {
+                let tally = tally_of_a_domain_size(
+                    domain,
+                    size,
+                    Implementation::TodayReplayJournal,
+                    r5_profile,
+                    1,
+                );
+                assert!(
+                    tally.get(Counter::States) > 0,
+                    "{} 域 n = {size} 生成过",
+                    domain.label()
+                );
+            }
+        }
+        let r1_constant = RecordFieldsBeyondTheProjection::of_root_fields(
+            fields_beyond_the_projection_carried_by_every_generated_record(),
+        );
+        assert_eq!(
+            RunProfile::R1_GENERATOR_WITH_R5_CRITERIA.record_fields_off_the_timeline(1000),
+            r1_constant,
+            "r1 档那种生成器上时间线之外的记录也带 r1 常量"
+        );
+        assert_eq!(
+            RunProfile::r3(MarkerParity::EvenVersionsWrittenByTheUnmountSequence)
+                .record_fields_off_the_timeline(1000),
+            r1_constant,
+            "r1–r4 档一个字不改：时间线之外的记录带 r1 常量"
+        );
+    }
+
+    /// C8a 的钉值（登记 r5 5.4、第七节乙类）：`even` 下 L 域 N ≤ 5 上 J8a 三格 762、762、620，J8b、J8c 0，r1 档那种生成器上三格 0；
+    /// `odd` 下 L 域同值（第 j 版与第 0 版的记号不同 ⟺ j 为奇数，两种奇偶都如此），C 域 Nc ≤ 3 两条指针那两格大于 0。
+    /// 9.2「r5 档时间线记录的后三项写回 r1 常量」点名这一条。
+    #[test]
+    fn the_c8a_control_reads_762_762_620_on_the_r5_generator_and_0_on_the_r1_generator() {
+        assert_eq!(
+            FARTHEST_AT_LEAST_ONE_STATES_WITHIN_THE_CONTROL_BOUND,
+            FARTHEST_IS_ODD_STATES_WITHIN_THE_CONTROL_BOUND
+                + FARTHEST_IS_EVEN_AND_AT_LEAST_TWO_STATES_WITHIN_THE_CONTROL_BOUND,
+            "登记 r5 第七节乙类：620 + 142 = 762"
+        );
+        for marker_parity in [
+            MarkerParity::EvenVersionsWrittenByTheUnmountSequence,
+            MarkerParity::OddVersionsWrittenByTheUnmountSequence,
+        ] {
+            let readings = control_readings_of(
+                Criterion::J8aFieldsFromTheNewRootSegment,
+                RunProfile::r5(marker_parity),
+                1,
+            );
+            assert_eq!(
+                readings
+                    .iter()
+                    .take(8)
+                    .map(|reading| reading.value)
+                    .collect::<Vec<u64>>(),
+                vec![762, 762, 620, 0, 0, 0, 0, 0],
+                "C8a（{}）的对照读数：{readings:?}",
+                marker_parity.label()
+            );
+            assert!(
+                readings.iter().all(|reading| reading.is_red_as_required),
+                "C8a（{}）的对照都照登记红：{readings:?}",
+                marker_parity.label()
+            );
+        }
+    }
+
+    /// C8b 的钉值与第八节奇偶的判别力自证（登记 r5 5.4、第七节乙类、第八节）：`even` 142、`odd` 620，r1 档那种生成器上 0；把门槛挪到
+    /// 142 与 620 之间（判「卸载记号那一格 ≥ 400」），`even` 那一点由绿转红、`odd` 那一点不动。9.2「C8b 的卸载记号写 Written（写反）」点名这一条。
+    #[test]
+    fn the_c8b_control_reads_142_on_even_and_620_on_odd_and_a_threshold_of_400_parts_the_two_parities(
+    ) {
+        let readings_on = |marker_parity: MarkerParity| {
+            control_readings_of(
+                Criterion::J8aUnmountMarkerFromTheNewRootSegment,
+                RunProfile::r5(marker_parity),
+                1,
+            )
+        };
+        let even = readings_on(MarkerParity::EvenVersionsWrittenByTheUnmountSequence);
+        let odd = readings_on(MarkerParity::OddVersionsWrittenByTheUnmountSequence);
+        assert_eq!(
+            even.iter()
+                .map(|reading| reading.value)
+                .collect::<Vec<u64>>(),
+            vec![142, 0],
+            "C8b even：{even:?}"
+        );
+        assert_eq!(
+            odd.iter()
+                .map(|reading| reading.value)
+                .collect::<Vec<u64>>(),
+            vec![620, 0],
+            "C8b odd：{odd:?}"
+        );
+        assert!(
+            even.iter()
+                .chain(&odd)
+                .all(|reading| reading.is_red_as_required),
+            "C8b 两种奇偶都照登记红"
+        );
+        let threshold_between_the_two_points = 400;
+        assert!(
+            even[0].value < threshold_between_the_two_points
+                && odd[0].value >= threshold_between_the_two_points,
+            "判别力自证：门槛 400 上 even 那一点红、odd 那一点不动（{} 与 {}）",
+            even[0].value,
+            odd[0].value
+        );
+    }
+
+    /// C8c 的钉值（登记 r5 5.4、第七节乙类）：L 域 N ≤ 5 上 J8b 762、J8a 三格 0，r1 档那种生成器上 J8b 0；`odd` 下 C 域 Nc ≤ 3 上 J8b 大于 0。
+    /// 9.2「J8b 拿落到的那一版的 fsid 当期望」点名这一条。
+    #[test]
+    fn the_c8c_control_reads_762_on_j8b_and_0_on_the_three_j8a_cells_and_on_the_r1_generator() {
+        for marker_parity in [
+            MarkerParity::EvenVersionsWrittenByTheUnmountSequence,
+            MarkerParity::OddVersionsWrittenByTheUnmountSequence,
+        ] {
+            let readings = control_readings_of(
+                Criterion::J8bFilesystemIdentifierOfTheChosenRoot,
+                RunProfile::r5(marker_parity),
+                1,
+            );
+            assert_eq!(
+                readings
+                    .iter()
+                    .take(5)
+                    .map(|reading| reading.value)
+                    .collect::<Vec<u64>>(),
+                vec![762, 0, 0, 0, 0],
+                "C8c（{}）：{readings:?}",
+                marker_parity.label()
+            );
+            assert!(
+                readings.iter().all(|reading| reading.is_red_as_required),
+                "C8c（{}）都照登记红：{readings:?}",
+                marker_parity.label()
+            );
+        }
+    }
+
+    /// C8d 的钉值（登记 r5 5.4、第七节乙类）：`even` 下 L 域 N ≤ 5 上 J8c 2 348、`odd` 下 0，r1 档那种生成器上 0；`odd` 下 C 域 Nc ≤ 3 上大于 0。
+    #[test]
+    fn the_c8d_control_reads_2348_on_even_0_on_odd_and_above_0_on_the_monotone_domain_under_odd() {
+        let even = control_readings_of(
+            Criterion::J8cNothingAppliedReturnsTheChosenRoot,
+            RunProfile::r5(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
+            1,
+        );
+        let odd = control_readings_of(
+            Criterion::J8cNothingAppliedReturnsTheChosenRoot,
+            RunProfile::r5(MarkerParity::OddVersionsWrittenByTheUnmountSequence),
+            1,
+        );
+        assert_eq!(
+            even.iter()
+                .map(|reading| reading.value)
+                .collect::<Vec<u64>>(),
+            vec![2_348, 0],
+            "C8d even：{even:?}"
+        );
+        assert_eq!(
+            odd.iter()
+                .take(2)
+                .map(|reading| reading.value)
+                .collect::<Vec<u64>>(),
+            vec![0, 0],
+            "C8d odd：{odd:?}"
+        );
+        assert_eq!(odd.len(), 3, "odd 另有 C 域那一条：{odd:?}");
+        assert!(
+            even.iter()
+                .chain(&odd)
+                .all(|reading| reading.is_red_as_required),
+            "C8d 两种奇偶都照登记红"
+        );
+    }
+
+    /// 今天的 `replay_journal` 在 r5 档 L 域 N ≤ 2 上 J8 每格 0、施加过的态有判到、「无出处」0（调真实现，同 r2 登记修订 4 挪进单测）。
+    /// 9.2「J8a 拿所选根当期望（回到旧规则）」点名这一条：那一变异在 N = 2、P_1 落了那一态上 J8a 两格各 1。
+    #[test]
+    fn todays_replay_journal_breaks_no_j8_cell_on_the_big_ring_up_to_two_records() {
+        let mut judged_rebuilt_states = 0;
+        for size in 1..=2 {
+            let tally = tally_of_a_domain_size(
+                Domain::LegalBigRing,
+                size,
+                Implementation::TodayReplayJournal,
+                RunProfile::r5(MarkerParity::EvenVersionsWrittenByTheUnmountSequence),
+                1,
+            );
+            for counter in [
+                Counter::J8aInstanceTableViolations,
+                Counter::J8aAllocationRecordTreeRootViolations,
+                Counter::J8aUnmountMarkerViolations,
+                Counter::J8bViolations,
+                Counter::J8cViolations,
+                Counter::J8WithoutASource,
+            ] {
+                assert_eq!(
+                    tally.get(counter),
+                    0,
+                    "L 域 N = {size} 上 {} 是 0：{:?}",
+                    counter.label(),
+                    tally.witness(counter)
+                );
+            }
+            judged_rebuilt_states += tally.get(Counter::J8aJudged);
+        }
+        assert!(
+            judged_rebuilt_states > 0,
+            "L 域 N ≤ 2 里有施加过、判到 J8a 的态"
+        );
+    }
+
+    /// J8c 手造（登记 r5 9.2「J8c 只比卸载记号」那一行的取样点）：一条没施加、返回根的实例表指针被改过，J8c 记一条违例；原样交回的不记。
+    /// 另一格：投影不在生成器真相里的返回根记「无出处」、不判 J8a。
+    #[test]
+    fn j8c_counts_a_returned_root_that_kept_the_projection_but_changed_the_instance_table() {
+        let r5_profile = RunProfile::r5(MarkerParity::EvenVersionsWrittenByTheUnmountSequence);
+        let chosen_root = adversarial_chosen_root(r5_profile);
+        let truth =
+            adversarial_record_truth(1, &adversarial_record_alphabet(), &chosen_root, r5_profile);
+        let judge = |returned_root: &RootRecord| {
+            let mut tally = Tally::new();
+            judge_the_fields_beyond_the_projection_against_the_generated_records(
+                &chosen_root,
+                returned_root,
+                &truth,
+                None,
+                &|| "hand_made".to_string(),
+                &mut tally,
+            );
+            tally
+        };
+        let untouched = judge(&chosen_root);
+        assert_eq!(
+            (
+                untouched.get(Counter::J8cJudged),
+                untouched.get(Counter::J8cViolations),
+                untouched.get(Counter::J8bViolations)
+            ),
+            (1, 0, 0),
+            "原样交回所选根：J8c 判到、不违例"
+        );
+        let mut changed_instance_table = chosen_root;
+        changed_instance_table.instance_table =
+            node_pointer_at_slot(INSTANCE_TABLE_SLOT_OF_THE_FIRST_VERSION + 5, 1);
+        let changed = judge(&changed_instance_table);
+        assert_eq!(
+            (
+                changed.get(Counter::J8cJudged),
+                changed.get(Counter::J8cViolations),
+                changed.get(Counter::J8aJudged)
+            ),
+            (1, 1, 0),
+            "一条没施加而实例表指针变了：J8c 记一条"
+        );
+        let mut without_a_source = chosen_root;
+        without_a_source.tree_identifier_watermark = OFF_TIMELINE_WATERMARK_BASE + 999_999;
+        let unsourced = judge(&without_a_source);
+        assert_eq!(
+            (
+                unsourced.get(Counter::J8WithoutASource),
+                unsourced.get(Counter::J8aJudged),
+                unsourced.get(Counter::J8cJudged)
+            ),
+            (1, 0, 0),
+            "投影不在生成器真相里：记无出处，J8a、J8c 都不判"
+        );
+    }
+
+    /// C8e（登记 r5 5.4、停机条款 PH6）：手造一份真相，同一投影两份不同的后三项，必须停在 PH6。
+    /// 9.2「真相表同一投影两份后三项时不停、取先到的那一份」点名这一条。
+    #[test]
+    #[should_panic(expected = "停机条款 PH6")]
+    fn a_generated_record_truth_given_two_tails_for_one_projection_halts_on_ph6() {
+        let r5_profile = RunProfile::r5(MarkerParity::EvenVersionsWrittenByTheUnmountSequence);
+        let projection = VersionFields::of_root(&adversarial_chosen_root(r5_profile));
+        let mut truth = GeneratedRecordTruth::new();
+        truth.note(
+            projection,
+            r5_profile.record_fields_of_the_timeline_publish(0),
+        );
+        truth.note(
+            projection,
+            r5_profile.record_fields_of_the_timeline_publish(1),
+        );
+    }
+
+    // ── r5 修订 1 第五段（`--gate r2`；登记 `research/prompts/e165-r5-prereg.md` 修1.七甲类、修1.八、修1.九甲表）
+
+    /// 一份手造的系统配置槽：`torn` 里列的 (盘, 槽) 撕裂，其余是 mkfs 那一份自证过的。
+    fn system_slots_with_torn(torn: &[(usize, usize)]) -> SystemSlots {
+        let mut slots = system_slots_right_after_mkfs();
+        for (device, slot) in torn {
+            slots[*device][*slot] = SystemSlotContent::Torn;
+        }
+        slots
+    }
+
+    /// 读视图里报读错的 (盘, 槽)。
+    fn locations_with_read_errors(read_errors: &[(usize, usize)]) -> FaultLocations {
+        read_errors
+            .iter()
+            .fold(FaultLocations::NOWHERE, |locations, (device, slot)| {
+                locations.with_system_slot(*device, *slot)
+            })
+    }
+
+    /// 修1.七甲类「判不出的真值」（D22（单元原子性怎么合成） 已定项 8 射程 R2 原句与 S-辨那一句）：一槽撕裂而没有槽报读错 ⇒ 判得出；
+    /// 一块盘报读错而另一块盘两槽都自证过 ⇒ 判得出；两块盘各有一槽报读错 ⇒ 判不出；一块盘报读错、另一块盘一槽撕裂 ⇒ 判不出。
+    /// 9.2「撕裂也算报读错」「R2 后一半拿掉」「两槽都自证过不看撕裂」点名这一条。
+    #[test]
+    fn the_r2_undecidability_holds_only_when_a_slot_reports_a_read_error_and_no_device_self_verified_both(
+    ) {
+        for (torn, read_errors, undecidable, case) in [
+            (
+                vec![(0, 0), (1, 0)],
+                vec![],
+                false,
+                "两块盘各一槽撕裂、没有槽报读错",
+            ),
+            (
+                vec![],
+                vec![(0, 0)],
+                false,
+                "0 号盘一槽报读错、1 号盘两槽都自证过",
+            ),
+            (vec![], vec![(0, 0), (1, 1)], true, "两块盘各一槽报读错"),
+            (
+                vec![(1, 0)],
+                vec![(0, 0)],
+                true,
+                "0 号盘一槽报读错、1 号盘一槽撕裂",
+            ),
+            (vec![], vec![], false, "全都自证过"),
+        ] {
+            assert_eq!(
+                system_configuration_witness_is_undecidable_under_r2(
+                    &system_slots_with_torn(&torn),
+                    locations_with_read_errors(&read_errors)
+                ),
+                undecidable,
+                "{case}"
+            );
+        }
+    }
+
+    /// 修1.七甲类「取号那一刻：某块盘两槽一份自证过的都没有 ⇒ 拒（即使判得出）」：0 号盘一槽报读错、另一槽撕裂，1 号盘两槽都自证过。
+    /// 9.2「取号那一刻不判 (b)」点名这一条。
+    #[test]
+    fn acquisition_refuses_a_device_without_a_self_verified_slot_even_when_the_witness_is_decidable(
+    ) {
+        let mut world = FaultWorld::right_after_mkfs_under_the_gate(
+            RootChoiceDomain::BigRing,
+            WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots,
+        );
+        world.system_slots = system_slots_with_torn(&[(0, 1)]);
+        let locations = locations_with_read_errors(&[(0, 0)]);
+        assert!(!system_configuration_witness_is_undecidable_under_r2(
+            &world.system_slots,
+            locations
+        ));
+        assert_eq!(
+            acquisition_refusal_of(&world, locations),
+            Some(MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot)
+        );
+    }
+
+    /// 修1.九甲表「取号那一刻不判 (a)」的手造单测（界内没有取样点）：跳过闸，直接对「两块盘各一槽报读错」的读视图判取号那一刻，必须拒在判不出那一道。
+    #[test]
+    fn acquisition_refuses_an_undecidable_witness_when_each_device_reports_a_read_error_on_one_slot(
+    ) {
+        let world = FaultWorld::right_after_mkfs_under_the_gate(
+            RootChoiceDomain::BigRing,
+            WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots,
+        );
+        assert_eq!(
+            acquisition_refusal_of(&world, locations_with_read_errors(&[(0, 0), (1, 0)])),
+            Some(MountRefusalReason::AcquisitionWitnessUndecidable)
+        );
+        assert_eq!(
+            acquisition_refusal_of(&world, FaultLocations::NOWHERE),
+            None,
+            "四槽都自证过时取号那一刻不拒"
+        );
+    }
+
+    /// `--gate r2` 解析出的闸（登记 r5 修订 1）上，KF M = 2、U = 0 那一格的生成器计数与拒因三栏等于修1.七乙类（历史 3 094、被拒 99、
+    /// 走了重读 1 130、带撕裂 245；拒因 91、8、0）。9.2「R2 后一半拿掉」「两槽都自证过不看撕裂」「取号那一刻不判 (b)」「c_见证 = 0 判真」
+    /// 「--gate r2 认了但闸照取甲」点名这一条。
+    #[test]
+    fn the_r2_generator_counts_of_the_kf_two_mount_cell_equal_the_r2_pinned_values() {
+        let selection = parse_the_root_choice_faults_command_line(
+            &[
+                "--bounds",
+                "segment1",
+                "--family",
+                "root_choice_faults",
+                "--gate",
+                "r2",
+            ]
+            .iter()
+            .map(|word| (*word).to_string())
+            .collect::<Vec<String>>(),
+        )
+        .expect("登记的命令行");
+        let cell = cell_of(2, 0);
+        let tally = fault_tally_of_a_cell_under_the_gate(
+            FaultDomain::GateOn,
+            cell,
+            selection.witness_gate_rule,
+            false,
+            1,
+        );
+        assert_eq!(
+            (tally.histories, tally.refused_mounts, tally.reread_mounts),
+            (3_094, 99, 1_130),
+            "KF M = 2、U = 0 在 R2 下的历史数、被拒数、走了重读的数"
+        );
+        let findings = assert_the_pinned_fault_cell_under_the_gate(
+            selection.witness_gate_rule,
+            FaultDomain::GateOn,
+            cell,
+            &tally,
+        );
+        assert!(findings.is_empty(), "{findings:?}");
+    }
+
+    /// 修1.七乙类「拒因分计」KF M = 2、U = 0 那一格：闸拒 91、取号那一刻 (b) 8、取号那一刻 (a) 0，三栏之和等于被拒的 99。
+    /// 9.2「拒因记错：取号那一刻 (b) 的拒记进闸那一栏」点名这一条。
+    #[test]
+    fn the_r2_refusals_of_the_kf_two_mount_cell_split_into_91_at_the_gate_8_without_a_self_verified_slot_and_0_undecidable(
+    ) {
+        let tally = fault_tally_of_a_cell_under_the_gate(
+            FaultDomain::GateOn,
+            cell_of(2, 0),
+            WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots,
+            false,
+            1,
+        );
+        assert_eq!(
+            [
+                tally.refusals_by_reason[MountRefusalReason::TheGateAfterTheOneReread.index()],
+                tally.refusals_by_reason
+                    [MountRefusalReason::AcquisitionDeviceWithoutASelfVerifiedSlot.index()],
+                tally.refusals_by_reason[MountRefusalReason::AcquisitionWitnessUndecidable.index()],
+                tally.refusals_by_reason
+                    [MountRefusalReason::AcquisitionUnderTheImplementationChoice.index()],
+            ],
+            [91, 8, 0, 0]
+        );
+        assert_eq!(tally.refused_mounts, 91 + 8);
+    }
+
+    /// 修1.八判别力自证第 1 条（门槛挪到两点之间：「SN0-TP 的历史全被拒」）：KF、KG 的 M = 2、U = 0 一格上，R2 的闸下 R2 那一条为真、取甲那一条为假；
+    /// 取甲的闸下反过来。9.2「R2 档的判别力自证仍用取甲那四条」点名这一条。
+    #[test]
+    fn the_r2_gate_refusal_proof_holds_under_r2_and_the_implementation_choice_proof_holds_only_under_the_implementation_choice(
+    ) {
+        for (witness_gate_rule, rule_label) in [
+            (
+                WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots,
+                "R2",
+            ),
+            (
+                WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable,
+                "取甲",
+            ),
+        ] {
+            let gate_on = fault_tally_of_a_cell_under_the_gate(
+                FaultDomain::GateOn,
+                cell_of(2, 0),
+                witness_gate_rule,
+                false,
+                1,
+            );
+            let gate_off = fault_tally_of_a_cell_under_the_gate(
+                FaultDomain::GateOff,
+                cell_of(2, 0),
+                witness_gate_rule,
+                false,
+                1,
+            );
+            let (_item, own_proof_holds, own_detail) =
+                gate_refusal_proof_of(witness_gate_rule, &gate_on, &gate_off);
+            assert!(
+                own_proof_holds,
+                "{rule_label} 的闸下它自己那一条为真：{own_detail}"
+            );
+            let other_proof_holds = match witness_gate_rule {
+                WitnessGateRule::SomeSlotReportsAReadErrorAndNoDeviceSelfVerifiedBothSlots => {
+                    gate_refusal_proof_under_the_implementation_choice(&gate_on, &gate_off).1
+                }
+                WitnessGateRule::OneUnreadableOrTornSlotMeansUndecidable => {
+                    gate_refusal_proof_under_r2(&gate_on, &gate_off).1
+                }
+            };
+            assert!(
+                !other_proof_holds,
+                "{rule_label} 的闸下另一种取法那一条为假"
+            );
+        }
+    }
+
+    /// `--gate r2` 只在 `--family root_choice_faults` 那一支认（别的族的参数解析报用法错），解出 R2；不给是取甲，config 行的闸字段与 r4 档逐字相同；
+    /// 别的值报错。9.2「--gate r2 认了但闸照取甲」点名这一条（config 行带 R2 的闸字段）。
+    #[test]
+    fn the_gate_option_names_the_r2_gate_in_the_config_row_only_on_the_faults_family() {
+        let words = |list: &[&str]| {
+            list.iter()
+                .map(|word| (*word).to_string())
+                .collect::<Vec<String>>()
+        };
+        let with_r2 = parse_the_root_choice_faults_command_line(&words(&[
+            "--bounds",
+            "segment1",
+            "--family",
+            "root_choice_faults",
+            "--gate",
+            "r2",
+        ]))
+        .expect("登记的命令行");
+        assert_eq!(
+            with_r2.witness_gate_rule.label(),
+            "r2_some_slot_reports_a_read_error_and_no_device_self_verified_both_slots",
+            "--gate r2 的 config 行带 R2 的闸字段"
+        );
+        let without = parse_the_root_choice_faults_command_line(&words(&[
+            "--bounds",
+            "segment1",
+            "--family",
+            "root_choice_faults",
+        ]))
+        .expect("登记的命令行");
+        assert_eq!(
+            without.witness_gate_rule.label(),
+            "the_implementation_choice_one_unreadable_or_torn_slot_means_undecidable",
+            "不给 --gate 是取甲，config 行与 r4 档逐字相同"
+        );
+        assert!(parse_the_root_choice_faults_command_line(&words(&[
+            "--bounds", "segment1", "--gate", "a"
+        ]))
+        .is_err());
+        assert!(
+            parse_the_command_line(&words(&[
+                "--bounds", "segment1", "--family", "legal", "--gate", "r2"
+            ]))
+            .is_err(),
+            "合法历史一族不认 --gate"
         );
     }
 }

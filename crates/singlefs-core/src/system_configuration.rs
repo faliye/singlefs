@@ -81,8 +81,9 @@ pub const ROOT_RING_BASE_SLOT_OF_THE_FIRST_VERSION: SlotNumber = SlotNumber(ROOT
 /// D2（RAID 条带策略） 已定项 18：第一版 w_max 与 g 都写 4。
 const MAXIMUM_STRIPE_WIDTH: u8 = 4;
 const GROUP_SIZE: u8 = 4;
-/// D16（发布语义） 已定项 5 的两个可调值。
-const TIME_THRESHOLD_SECONDS: u32 = 5;
+/// D16（发布语义） 已定项 5 的两个可调值。T_time 盘上那 4 字节的单位是毫秒（用户 2026-10-05 定：已定项 5 的可设区间
+/// [200 ms, 5 s] 下端在「秒」里写不出；判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2），默认 5 s 写 5000。
+const TIME_THRESHOLD_MILLISECONDS: u32 = 5000;
 const DIRTY_THRESHOLD_BYTES: u64 = 2 << 30;
 /// 整理低水位 / 高水位 / 停止线三条（D26（后台整理与放置回收） 已定项 1）。
 const COMPACTION_WATERMARK_COUNT: usize = 3;
@@ -285,10 +286,10 @@ impl SystemRuntimeConfiguration {
     /// 这一档在字段表里占的字节数：4 + 8 + 24。
     pub const FIELD_TABLE_BYTES: u64 = 36;
 
-    /// T_time（D16（发布语义） 已定项 5）。
+    /// T_time（D16（发布语义） 已定项 5），单位毫秒：盘上偏移 433 那 4 字节照这个单位写。
     #[must_use]
-    pub fn time_threshold_seconds(self) -> u32 {
-        TIME_THRESHOLD_SECONDS
+    pub fn time_threshold_milliseconds(self) -> u32 {
+        TIME_THRESHOLD_MILLISECONDS
     }
 
     /// T_dirty（D16（发布语义） 已定项 5）；挂载时的有效值另按环长夹取，那不改盘上这 8 字节。
@@ -519,7 +520,7 @@ impl SystemConfiguration {
             writer.put_u32(self.immutable.sizes.fixed_structure_slot_spacing);
         });
         slot.write(SlotFieldMutability::RuntimeConfiguration, |writer| {
-            writer.put_u32(self.runtime.time_threshold_seconds());
+            writer.put_u32(self.runtime.time_threshold_milliseconds());
             writer.put_u64(self.runtime.dirty_threshold_bytes());
             for watermark in self.runtime.compaction_watermarks() {
                 writer.put_u64(watermark);

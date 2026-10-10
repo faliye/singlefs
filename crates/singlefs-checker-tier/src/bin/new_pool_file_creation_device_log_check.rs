@@ -18,9 +18,9 @@ use singlefs_checker_tier::device_log::{
     fold_declared_zero_fills, parse_device_log, DeviceEvent, DeviceLog,
 };
 use singlefs_checker_tier::on_device_modes::{
-    allocator_rebuilt_from_the_records_of, publish_the_fourth_version, publish_the_second_version,
-    publish_the_third_version, raise_the_rollback_floor_to_its_ceiling, OnDeviceRunMode,
-    PublishesAfterTheNewPoolFileCreation,
+    allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process,
+    publish_the_fourth_version, publish_the_second_version, publish_the_third_version,
+    raise_the_rollback_floor_to_its_ceiling, OnDeviceRunMode, PublishesAfterTheNewPoolFileCreation,
 };
 use singlefs_core::address::DeviceIdentity;
 use singlefs_core::allocator::PoolAllocator;
@@ -152,7 +152,11 @@ fn rerun_the_program_on_the_host(
         PublishesAfterTheNewPoolFileCreation::SecondVersion
         | PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstance
         | PublishesAfterTheNewPoolFileCreation::SecondVersionThenSecondInstanceThenFourthVersionThenRaiseOfTheRollbackFloor => {
-            let mut allocator = allocator_rebuilt_from_the_records_of(&devices, &run.output);
+            let mut allocator = allocator_rebuilt_from_the_records_with_the_root_ring_of_this_process(
+                parameters,
+                &devices,
+                &run,
+            );
             publish_the_second_version(parameters, &mut devices, &mut allocator, &run.output)
                 .map_err(|failed| format!("发布 B：{:?}", failed.cause))?;
             window_ends.push((ProgramWindow::FileOverwrite, stream.operation_count()));

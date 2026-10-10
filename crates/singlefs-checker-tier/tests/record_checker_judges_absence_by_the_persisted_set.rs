@@ -1022,7 +1022,7 @@ fn an_illegal_reuse_does_not_explain_the_overwritten_unit_in_any_of_the_three_st
 }
 
 /// σ 那次发布的写区间：单元写段起、到它根槽写所在的段末为止；紧跟的一段若只有系统配置槽轮换（没有单元写、没有根槽写），也归它。
-#[cfg(any(feature = "verdict-store", feature = "gpu"))]
+#[cfg(feature = "verdict-store")]
 fn sigma_publish_writes(recorded: &RecordedHistory) -> std::ops::Range<usize> {
     let chain = misaligned_reuse_chain(recorded);
     let sigma_first_write = *recorded.segments[chain.sigma]
@@ -1057,7 +1057,9 @@ fn sigma_publish_writes(recorded: &RecordedHistory) -> std::ops::Range<usize> {
 /// （它是今天唯一一条一个落点超过 32 次写的流）。只展开 σ 那次发布的段，其余段不展开；每个状态 GPU 的红项与 CPU 判器的
 /// `red_items` 逐项同名、同序，GPU 一个状态都不许判不了。要一张空闲显存够的 NVIDIA 独显：本机没有 NVIDIA 卡时打一行
 /// `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、返回成功，有卡而用不上判红（`gpu_unit_checks::gpu_test_start`）。
-#[cfg(feature = "gpu")]
+/// 卡经这个进程的卡池取，建好表之后按判器要的显存借（`crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool`），
+/// 等满了借不到也报「本次未跑」。
+#[cfg(all(feature = "gpu", feature = "verdict-store"))]
 #[test]
 fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times(
 ) {
@@ -1065,9 +1067,9 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
     use singlefs_checker_tier::crash_amplification::{
         gpu_recovery_words, gpu_verdict_items, recovery_words_of,
     };
-    use singlefs_checker_tier::crash_judge_dispatch::GpuCrashJudge;
+    use singlefs_checker_tier::crash_judge_dispatch::judge_every_state_on_a_card_leased_from_the_pool;
     use singlefs_checker_tier::crash_judge_tables::{build_judge_tables, JudgeFlow};
-    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::first_usable_card_or_report_not_run;
+    use singlefs_checker_tier::gpu_unit_checks::gpu_test_start::gpu_card_pool_or_report_not_run;
     let recorded = record_history("gpu-judge-sigma", &HISTORY_UOOUOMSU);
     let sigma_publish = sigma_publish_writes(&recorded);
     let expansion = |_segment_index: usize, segment: &[usize]| {
@@ -1123,13 +1125,14 @@ fn the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_
         versions_told_apart_only_by_the_high_bits > 0,
         "这条对拍要有两个版本低 32 位相同、只差高位，不然只比低 32 位的内核也判得对"
     );
-    let Some(card) = first_usable_card_or_report_not_run(
-        "the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times",
-    ) else {
+    const TEST_NAME: &str = "the_gpu_judge_agrees_with_the_cpu_judge_on_sigma_whose_configuration_slot_is_written_more_than_thirty_two_times";
+    let Some(cards) = gpu_card_pool_or_report_not_run(TEST_NAME) else {
         return;
     };
-    let judge = GpuCrashJudge::new(&card, &tables);
-    let gpu = judge.judge_states(0..tables.state_count);
+    let Some(gpu) = judge_every_state_on_a_card_leased_from_the_pool(cards, TEST_NAME, &tables)
+    else {
+        return;
+    };
     // CPU 判器按区间切片并行判（每个状态十几到几十毫秒，单线程判 6.5 万态要一个多小时）：线程数从
     // SINGLEFS_CRASH_JUDGE_CPU_THREADS 取，没设取本机可用并行度；每线程 8 片，按片序拼回，与单线程逐状态相同
     let threads = cpu_threads_from_the_value_of_the_variable(

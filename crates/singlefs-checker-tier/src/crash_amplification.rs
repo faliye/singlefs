@@ -14,6 +14,55 @@
 //!    领块只在内存里，库里不记谁领了，不会有块被一张死卡占着。
 //! 4. **分工与跑法**：块按权重分给几方（一方一台机器的 CPU，或一张卡，权重取空闲显存），各写各的库，最后
 //!    [`crate::verdict_store::VerdictStore::import_from`] 并成一个；跑法由配置的两个开关定：`ENABLE_ACROSS_MACHINES`、`ENABLE_GPU`。
+//! 5. **显存账**（`singlefs_harness::gpu_memory_ledger`，只防这台机器的显存 OOM、不压并发：用户 2026-10-06 定；只记这个进程借的、
+//!    每次借现读卡上此刻的显存：用户 2026-10-07 定第 10t 批代码轮判决岔路 G1「二」，口径在那份文件头）：这个进程起过 GPU 用例共用的卡池
+//!    （[`GpuCardsSource::TheCardPoolOfThisProcess`]）时，取卡照池里的卡、不登记也不起设备，借到哪张卡才在哪张上起（第 10t 批代码轮判决 K2-3）；
+//!    第 ① 段判器的草稿区按派活装到每张卡上的状态数借（照 state_count 封顶，`singlefs_harness::gpu_memory_ledger::scratch_states_to_book_on_each_card`，
+//!    显存按与 GPU 对拍用例同一份的 `crate::crash_judge_dispatch::mebibytes_a_judge_needs` 算，只记在那张卡上），每张卡装几个状态照这一刻
+//!    这张卡能借给这个进程的量压（不照起池那一刻的空闲，第 10t 批代码轮攻方 S5）。几张卡按卡的先后每张当场试一次，借不到的卡这一趟
+//!    不用（不装状态，它那一份留给后面的卡），一张都借不到就照对拍用例那一路打「本次未跑」那一行（同一个记号，原因写显存不够），
+//!    这一趟照叫停的样子交回（`stopped_early`，判过的块在库里，分项驱动把这一项记成本次未跑；派出的项全没判完时整趟退 77）。不等。
+//!    每张卡此刻都带不了一个状态而至少一张空着时带得了，同样是借不到、报本次未跑，不去借也不判红；空着时也带不了才判红
+//!    （`singlefs_harness::gpu_memory_ledger::decide_scratch_before_booking`，第 10x 批代码轮判决 K2-2）。
+//!    只排派活计划那一趟试判前同样借。
+//!    第 ② 段核对（`crash_verify_gpu`）与第 ① 段由 CPU 判时的单元校验和对拍（`gpu_unit_checks`）在卡上建的缓冲同样进账：照卡的先后借第一张
+//!    此刻放得下的，用借来的那张卡算，借不到报本次未跑（判过的块在库里）。量照
+//!    `singlefs_harness::gpu_memory_ledger::mebibytes_of_buffers_held_at_once`，下面的字节数是照两份代码建的缓冲推的，没上卡量过。
+//!    第 ② 段（`facts_verifier_buffer_footprint`）：上卡一次的六张事实表（`crate::crash_verify_gpu::GpuFactsVerifier::new`：
+//!    录制流每次写 4 个字、每对重放 2 个、每段 6 个、段里每次写 1 个、每个单元 6 个、每条根 38 个，空表也建一个字），
+//!    加一块一趟的头（12 个字）、结论与回读（每个状态各 1 个字），一块按 [`STATES_PER_BLOCK`] 个状态算；核对一块接一块，同时还活着的
+//!    照 `PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD` 算。几个字照 `crash_verify_gpu.rs` 里那几个常数抄的，那边改了布局这里要跟着改。
+//!    单元校验和（`unit_checksum_buffer_footprint`）：一个状态一趟，这条流里每次单元写各两段
+//!    （`crate::gpu_unit_checks::bytes_crc32c_of_ranges_needs`），核对线程数（[`checking_threads`]）条线程同时派活，
+//!    每条同时还活着的照 `PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD` 算。
+//!    驱动的上下文与编好的管线算在每张卡第一次借时的驱动那一份里，不另记。
+//!    账只记这个进程借的：两个进程同一刻读到同一份空闲、一起借超了，由运行时兜底：第 ① 段卡上建判器、判一块时 wgpu 报 Out of Memory，
+//!    这张卡停下、这一块交回给别的卡，判不完才报本次未跑（原因写显存不够，`singlefs_harness::gpu_memory_ledger::reason_for_running_out_of_gpu_memory`）；
+//!    第 ② 段在卡上核时、只排派活计划那一趟试判时、卡池在借到的卡上起设备与编单元校验和管线时同样（第 10x 批代码轮判决 K1-3）。
+//!    判器内核在另起的线程上编，那里的 Out of Memory 不进卡线程的错误范围：每个设备上装了接 wgpu 没接住的错误的回调，Out of Memory
+//!    记在设备上（`crate::gpu_unit_checks::DeviceConditionOfACard`），卡线程上的活 panic 了就照它认是不是显存不够
+//!    （`decide_the_work_on_the_card`），按这段活认、不按整台设备认（第 10z 批：别的线程一次 Out of Memory 不把这条线程上真正的 panic
+//!    说成显存不够）；设备因为 Out of Memory 丢了，卡池下一次借这张卡时重起设备（驱动那一份在账上重新登记，放不下就报本次未跑）。
+//!    第 ① 段由 CPU 判时单元校验和对拍几条线程一起派活，每条线程那一段各自包进接 Out of Memory 的那一层（第 10z 批）：有一段报了，
+//!    这一块不入库、不再领下一块，这一趟报本次未跑（`CheckingTally::stopped_because_the_gpu_memory_was_short`，之前判完的块在库里）。
+//!    第 ① 段在几张卡上判时，一张卡建判器或判一块时报了 Out of Memory，只停那一张：它手里那一块交回队里，别的卡照判
+//!    （第 10z 批，第 10y 批代码轮判决 K2-2 P2）；剩下的块别的卡判完了这一趟照常交回。别的卡都已收工、还有交回的块没判时，收尾那一步
+//!    再起一轮，只用没报过的卡（照这一刻能借的重新装状态、借草稿区）判剩下的块，判完的块照块序都入库（第 10z 批第三块，第 10z 批代码轮判决
+//!    K2-1 第 5 条：状态全装在第一张卡时也起第二张）；报过的卡之外没有卡能判才报本次未跑。被叫停时卡照样领判完的块在等的那几块（交回的），
+//!    判完的块照块序都入库再照叫停收尾，没判的留给下一趟（第 10z 批第五块，第 10z 批第三块代码轮判决 K1-5）；照叫停收尾而这一趟有卡报过
+//!    Out of Memory，头一句照「本次未跑」那一行的形态打出来（第 10z 批第六块，第 10z 批第五块代码轮判决 K1-3）。叫停是叫停文件在不在，
+//!    一趟里见过一次就记住（`singlefs_harness::gpu_memory_ledger::StopRequestRememberedInThisRun`，第 10z 批第五块代码轮判决 K2-2：
+//!    外层循环、卡线程、一轮收尾、整趟收尾都问它，文件中途被删也不各读各的）。卡线程那一圈、起下一张卡、活交回那一刻记设备与按块序写库、
+//!    几轮之间带着的与怎么走在 harness 档（`singlefs_harness::gpu_memory_ledger::judge_blocks_on_one_card`、`next_card_to_start`、
+//!    `work_caught_noting_the_device_when_it_returned`、`BlocksStoredInOrder`、`RoundsOfTheCards`），不要卡就测得到。
+//!    单元校验和对拍时一块的几段在同一个设备上并发，认一段是不是显存不够之前等同块的几段都收完（第 10z 批第三块，攻方：一段因设备丢了先失败，
+//!    同块另一段范围里接到的 Out of Memory 还没记进设备时不判红）。
+//!    没起过卡池的进程照旧不进账（[`GpuCardsSource::DevicesStartedForThisRun`]：这一趟自己在点名的卡上起设备），调用方是这几种：
+//!    崩溃放量分项驱动（`research/scripts/crash-amplification-item.sh`）起的、只有经 [`run_from_environment`] 跑的用例而没有一条取卡池的测试二进制
+//!    （`tests/crash_amplification_fixed_script_through_rollback.rs`、`…_through_unmount.rs`、`crash_amplification_two_flows_share_their_prefix.rs`、
+//!    经 `tests/common_crash_points` 跑的 `crash_enumeration_*` 那几份）；同一个测试二进制里有取卡池的 GPU 用例、而经 [`run_from_environment`]
+//!    的用例跑在它们起池之前的（`crash_amplification_pipeline_records_checks_and_reuses.rs`、`record_checker_judges_absence_by_the_persisted_set.rs`）。
+//!    直接调 `judge_my_blocks_on_gpu_cards` 的对拍用例不走这一条，卡由用例自己给、不进账。
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Range;
@@ -24,10 +73,28 @@ use std::time::Instant;
 use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
 use singlefs_core::recovery::{recover, JournalPolicy};
 use singlefs_core::root_record::ROOT_MAGIC;
+#[cfg(feature = "gpu")]
+use singlefs_harness::gpu_memory_ledger::{
+    decide_scratch_before_booking, gpu_not_run_line, mebibytes_of_buffers_held_at_once,
+    most_states_whose_need_fits_the_capacity, reason_for_a_booking_without_room_now,
+    reason_for_running_out_of_gpu_memory, scratch_booking_refusal_outcome,
+    scratch_states_to_book_on_each_card, BookingRefusal, NeedLargerThanEveryCard,
+    ScratchBeforeBooking, ScratchBookingRefusalOutcome, ScratchStatesToBook,
+    PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD,
+};
+#[cfg(feature = "gpu")]
+use singlefs_harness::gpu_memory_ledger::{
+    judge_blocks_on_one_card, next_card_to_start, work_caught_noting_the_device_when_it_returned,
+    AfterARoundOfTheCards, BlockHandedToTheStore, BlockJudgedOnACard, BlocksForTheCards,
+    BlocksStoredInOrder, CardLeftTheBlocks, RoundsOfTheCards, StopOfTheCards,
+};
+use singlefs_harness::gpu_memory_ledger::{
+    StopRequestRememberedInThisRun, WorkEndingTogether, WorksEndingTogetherOnADevice,
+};
 use singlefs_harness::hexadecimal::hexadecimal_text;
 use singlefs_harness::memory_pool::{
     root_identity_of_write, root_identity_written_by, CrashImage, MemoryPool, PublishedVersion,
-    RetainedWrite, WrittenContents,
+    PublishedVersionWithoutAFile, RetainedWrite, WrittenContents,
 };
 use singlefs_harness::numeric_environment_variable::{
     number_from_the_variable_value_panicking_when_unreadable, process_environment_variable,
@@ -36,12 +103,15 @@ use singlefs_harness::segments::StepKind;
 use singlefs_harness::sha256::{sha256_digest, DIGEST_BYTES};
 
 use crate::crash::{
-    judge_layer0_state_range, layer0_state_ranges_by_segment,
+    judge_layer0_state_range_against_the_version_table, layer0_state_ranges_by_segment,
     receive_until_the_senders_are_gone_with_wall_clock_lines, Layer0SegmentExpansion,
-    ReceivedOrWallClockLineDue, WallClockProgressLines, LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE,
-    LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE, LAYER0_RED_PASS_POOL_CHECKER,
-    LAYER0_RED_PASS_RECORD_CHECKER, RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT,
-    RECORD_CHECKER_ROOT_WITHOUT_RECORD,
+    Layer0VersionTable, ReceivedOrWallClockLineDue, WallClockProgressLines,
+};
+#[cfg(feature = "gpu")]
+use crate::crash::{
+    LAYER0_RED_PASS_JOURNAL_CONSULTED_ORACLE, LAYER0_RED_PASS_JOURNAL_IGNORED_ORACLE,
+    LAYER0_RED_PASS_POOL_CHECKER, LAYER0_RED_PASS_RECORD_CHECKER,
+    RECORD_CHECKER_CLAIMED_STATE_MISSING_UNIT, RECORD_CHECKER_ROOT_WITHOUT_RECORD,
 };
 use crate::crash_facts::{extract_flow_facts, verify_states_from_facts, FlowFacts};
 use crate::crash_identity::{
@@ -125,14 +195,26 @@ pub struct CrashPointSpan {
 }
 
 /// 一条录好的测试流程：崩溃枚举要的五样，加上各点（名字、设它的文件、写区间；按流程次序、首尾相接）。
+/// 版本表是两样：带文件的那几版（`versions`）与文件从那一版起没有了的那几版（`versions_without_a_file`，删除流的意图那一版，
+/// D8（核心索引结构） 已定项 16 第 4 条；文件从不消失的流是空的），两个判器都按 [`Layer0VersionTable`] 认（第 33 批 R 报告「停下交主 agent」第一项）。
+/// 同一个根两边都有是用例写错了：判的时候 [`Layer0VersionTable::new`] 停下。
 pub struct CrashFlow<'flow> {
     pub base: &'flow MemoryPool,
     pub writes: &'flow [RetainedWrite],
     pub segments: &'flow [Vec<usize>],
     pub judged_root_index: usize,
     pub versions: &'flow [PublishedVersion],
+    pub versions_without_a_file: &'flow [PublishedVersionWithoutAFile],
     pub expansion: &'flow (dyn Fn(usize, &[usize]) -> Layer0SegmentExpansion + Sync),
     pub crash_points: Vec<CrashPointSpan>,
+}
+
+impl CrashFlow<'_> {
+    /// 判器读的版本表（[`Layer0VersionTable::new`]）。
+    #[must_use]
+    pub fn version_table(&self) -> Layer0VersionTable<'_> {
+        Layer0VersionTable::new(self.versions, self.versions_without_a_file)
+    }
 }
 
 /// 一个崩溃点在这一趟里的计划：它管哪几段、这几段的状态在整条流里的序号区间、它的复用键与路径编号、分成几块。
@@ -395,7 +477,9 @@ enum WritesAfterThePoint {
 /// - 这个点之前的写表（不只是扇区终值）：记录核对器按写表分发布、按写的种类找根槽写与系统配置槽写
 ///   （`crash::check_records_against`、`crash::reuse_is_not_proven_illegal_by_the_reclaim_predicate`），种类、次序变了而扇区终值相同时判定会变。
 ///   按（写、整条流里的段号）逐行链起来取摘要。
-/// - 版本表：oracle 只按恢复落到的根（实例，txg）找那一版、找比它旧的版本（`crash::classified_oracle_violation_for_versions`）。
+/// - 版本表：oracle 只按恢复落到的根（实例，txg）找那一版、找比它旧的版本（`crash::classified_oracle_violation_for_the_version_table`）；
+///   「没有文件的那几版」（`CrashFlow::versions_without_a_file`）与带文件的那几版按同一个上界进键，一行都没有时一个字都不加
+///   （文件从不消失的流键不变）。
 ///   落到的根要么是基镜像里本来就有的根（基镜像里带根 magic 的扇区；基镜像自己的 journal 不越过其中最新那条，排计划时断言：
 ///   `assert_journal_recovery_of_the_base_image_lands_on_its_newest_root`），要么是写表里到这个点为止写过的根槽写，要么是 journal 重放出来的
 ///   那一版——没做完的那次发布，它的根槽写在这个点之后、是下一条。够得着的版本是（txg，实例）不超过这几样根里最大那一条的行：
@@ -613,6 +697,16 @@ impl JudgeInputsOfTheFlow {
                 hexadecimal_text(&sha256_digest(&version.content))
             ));
         }
+        for version in flow.versions_without_a_file.iter().filter(|version| {
+            highest_reachable_root.is_none_or(|highest_root| {
+                (version.checkpoint_txg, version.instance) <= highest_root
+            })
+        }) {
+            text.push_str(&format!(
+                "version_without_a_file instance={} txg={}\n",
+                version.instance.0, version.checkpoint_txg.0
+            ));
+        }
         let judged_root_slot_write = if flow.judged_root_index < first_write {
             "persisted_in_every_state".to_string()
         } else if flow.judged_root_index < last_write {
@@ -827,139 +921,11 @@ impl WeightedShares {
     }
 }
 
-/// 配置里的一张卡在哪台机器上。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CardHost {
-    Local,
-    Peer,
-}
-
-impl CardHost {
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Local => "local",
-            Self::Peer => "peer",
-        }
-    }
-
-    /// 这个进程在哪台机器上：环境变量 `SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE`，没设是本机。
-    ///
-    /// # Errors
-    /// 写的不是 `local` 也不是 `peer`。
-    pub fn of_this_process() -> Result<Self, String> {
-        match std::env::var("SINGLEFS_CRASH_AMPLIFICATION_HOST_ROLE") {
-            Err(_) => Ok(Self::Local),
-            Ok(text) => Self::parse(&text),
-        }
-    }
-
-    fn parse(text: &str) -> Result<Self, String> {
-        match text.trim() {
-            "local" => Ok(Self::Local),
-            "peer" => Ok(Self::Peer),
-            other => Err(format!("机器要写 local 或 peer，实际「{other}」")),
-        }
-    }
-}
-
-/// 配置点名的一张卡（`GPU_CARDS_BY_PRIORITY` 里的一项）：在哪台机器、`nvidia-smi` 的序号、给崩溃放量的显存额度。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct CardByPriority {
-    pub host: CardHost,
-    pub index: u32,
-    pub memory_quota_mebibytes: u64,
-}
-
-/// 读 `GPU_CARDS_BY_PRIORITY` 的值：空白隔开的若干项，每项 `<local|peer>:<nvidia-smi 序号>:<显存额度>`，
-/// 额度是正整数加 `G` 或 `M`（1024 进制）；写在前面的优先级高，任务先装它、装满了才给后面的。
-///
-/// # Errors
-/// 一项不是三段、机器或序号或额度写法不对、同一张卡点名两次、一项都没有。
-pub fn parse_cards_by_priority(text: &str) -> Result<Vec<CardByPriority>, String> {
-    let mut cards: Vec<CardByPriority> = Vec::new();
-    for entry in text.split_whitespace() {
-        let fields: Vec<&str> = entry.split(':').collect();
-        let [host, index, quota] = fields.as_slice() else {
-            return Err(format!(
-                "显卡优先级的一项要写 <local|peer>:<序号>:<显存额度>，实际「{entry}」"
-            ));
-        };
-        let host = CardHost::parse(host)?;
-        let index: u32 = index
-            .parse()
-            .map_err(|_| format!("显卡序号不是数：「{entry}」"))?;
-        let (number, unit_mebibytes) = match quota.as_bytes().last() {
-            Some(b'G') => (&quota[..quota.len() - 1], 1024u64),
-            Some(b'M') => (&quota[..quota.len() - 1], 1u64),
-            _ => {
-                return Err(format!(
-                    "显存额度要带单位 G 或 M（1024 进制），实际「{entry}」"
-                ))
-            }
-        };
-        let number: u64 = number
-            .parse()
-            .ok()
-            .filter(|number| *number > 0)
-            .ok_or_else(|| format!("显存额度不是正整数：「{entry}」"))?;
-        if cards
-            .iter()
-            .any(|card| card.host == host && card.index == index)
-        {
-            return Err(format!("同一张卡点名了两次：「{entry}」"));
-        }
-        cards.push(CardByPriority {
-            host,
-            index,
-            memory_quota_mebibytes: number * unit_mebibytes,
-        });
-    }
-    if cards.is_empty() {
-        return Err("显卡优先级一项都没写".to_string());
-    }
-    Ok(cards)
-}
-
-/// `键=值` 配置文件里一个键的值（去掉两头的空白与一层引号）；文件不在、键没写是 `None`。
-#[must_use]
-pub fn configuration_value(path: &Path, key: &str) -> Option<String> {
-    let text = std::fs::read_to_string(path).ok()?;
-    text.lines().find_map(|line| {
-        let value = line.trim().strip_prefix(key)?.strip_prefix('=')?.trim();
-        let value = value
-            .strip_prefix('\'')
-            .and_then(|rest| rest.strip_suffix('\''))
-            .or_else(|| {
-                value
-                    .strip_prefix('"')
-                    .and_then(|rest| rest.strip_suffix('"'))
-            })
-            .unwrap_or(value);
-        Some(value.to_string())
-    })
-}
-
-/// 配置的显卡优先级：环境变量 `GPU_CARDS_BY_PRIORITY` 设了就照它（驱动脚本按清没清场从显卡配置里挑一份送过来，第二台的树副本也靠它），
-/// 没设读显卡配置文件（`SINGLEFS_GPU_CARDS_CONFIG` 指的那一份，模板是仓根的 `gpu-cards.env.example`）里的同名键；
-/// 都没有是 `None`（本机能用的卡按空闲显存从大到小用，不设额度）。
-///
-/// # Errors
-/// 写了而写法不对（[`parse_cards_by_priority`]）。
-pub fn cards_by_priority_from_configuration_or_environment(
-    configuration_file: Option<&Path>,
-) -> Result<Option<Vec<CardByPriority>>, String> {
-    let text = match std::env::var("GPU_CARDS_BY_PRIORITY") {
-        Ok(text) => Some(text),
-        Err(_) => {
-            configuration_file.and_then(|path| configuration_value(path, "GPU_CARDS_BY_PRIORITY"))
-        }
-    };
-    match text {
-        Some(text) if !text.trim().is_empty() => parse_cards_by_priority(&text).map(Some),
-        _ => Ok(None),
-    }
-}
+/// 显卡配置的读法住在 [`crate::gpu_card_configuration`]（只开 `gpu` 的卡池也照它挑卡），这里转出来，调用方与单测照旧经这一份引。
+pub use crate::gpu_card_configuration::{
+    cards_by_priority_from_configuration_or_environment, configuration_value,
+    configured_cards_not_usable, parse_cards_by_priority, CardByPriority, CardHost,
+};
 
 /// 显卡配置里登记哪几类计算走 GPU 的键（上游 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用上现有的硬件加速」；
 /// 模板是仓根的 `gpu-cards.env.example`）。环境变量同名，设了就照它。
@@ -1213,6 +1179,9 @@ pub struct CheckingTally {
     pub gpu_cpu_disagreements: u64,
     /// 每个红状态的违例正文（点名、块内序号、正文），给门禁与人看；只收前 [`RED_TEXTS_KEPT`] 条。
     pub red_texts: Vec<(String, u64, String)>,
+    /// 单元校验和交卡对拍时卡上 wgpu 报了 Out of Memory（第 10z 批）：那一块不入库、之后的块不领，这一趟报本次未跑；
+    /// 是「本次未跑」那一行的原因（以「显存不够：」起头）。没报是 `None`。
+    pub stopped_because_the_gpu_memory_was_short: Option<String>,
 }
 
 pub const RED_TEXTS_KEPT: usize = 64;
@@ -1246,12 +1215,52 @@ pub fn checking_threads_from_the_variable_value(value: Option<&str>) -> usize {
     .get()
 }
 
-/// 一块判完的结果（还没写库）：每个状态判红的各项、红状态的正文、GPU 与 CPU 对不上的状态数。
+/// 一块判完的结果（还没写库）：每个状态判红的各项、红状态的正文、GPU 与 CPU 对不上的状态数；单元校验和交卡对拍时卡上报了
+/// Out of Memory 的，`gpu_memory_was_short` 是「本次未跑」那一行的原因，前几样都是空的（这一段不作数）。
 struct JudgedBlock {
     local: Range<u64>,
     items_of_each_state: Vec<Vec<String>>,
     red_texts: Vec<(u64, String)>,
     gpu_cpu_disagreements: u64,
+    gpu_memory_was_short: Option<String>,
+}
+
+/// 判一块的一段（[`judge_one_block`]）：单元校验和交卡对拍的，这一段包进接 Out of Memory 的那一层（[`on_the_card_catching_out_of_memory`]，
+/// 每条核对线程各认各的），报了就交一段不作数、带着原因的（第 10z 批，第 10y 批代码轮判决 K1-3）；`ending` 是这一段在同一块几段里的报到，
+/// 认是不是显存不够之前等同一块的几段都收完（第 10z 批第三块，第 10z 批代码轮判决 K1-3 攻方：一段因设备丢了先失败，同块另一段范围里接到的
+/// Out of Memory 还没记进设备）。只在 CPU 上判的不用它（丢掉就是报到）。
+fn judge_one_piece_catching_out_of_memory_on_the_card(
+    flow: &CrashFlow<'_>,
+    plan: &CrashPlan,
+    point_index: usize,
+    local: Range<u64>,
+    unit_checksums: &UnitChecksumsOn,
+    ending: WorkEndingTogether<'_>,
+) -> JudgedBlock {
+    match unit_checksums {
+        UnitChecksumsOn::CpuOnly => {
+            drop(ending);
+            judge_one_block(flow, plan, point_index, local, unit_checksums)
+        }
+        #[cfg(feature = "gpu")]
+        UnitChecksumsOn::Gpu(card) => {
+            match on_the_card_catching_out_of_memory_ending_together(
+                card,
+                "单元校验和对拍时",
+                ending,
+                || judge_one_block(flow, plan, point_index, local.clone(), unit_checksums),
+            ) {
+                Ok(judged) => judged,
+                Err(reason) => JudgedBlock {
+                    local,
+                    items_of_each_state: Vec::new(),
+                    red_texts: Vec::new(),
+                    gpu_cpu_disagreements: 0,
+                    gpu_memory_was_short: Some(reason),
+                },
+            }
+        }
+    }
 }
 
 fn judge_one_block(
@@ -1270,12 +1279,12 @@ fn judge_one_block(
     let mut red_texts = Vec::new();
     let mut gpu_cpu_disagreements = 0u64;
     let ordinals = point.ordinals.start + local.start..point.ordinals.start + local.end;
-    let stream_state_count = judge_layer0_state_range(
+    let stream_state_count = judge_layer0_state_range_against_the_version_table(
         flow.base,
         flow.writes,
         flow.segments,
         flow.judged_root_index,
-        flow.versions,
+        flow.version_table(),
         &expansion,
         ordinals,
         &mut |ordinal, image, judgement| {
@@ -1323,13 +1332,15 @@ fn judge_one_block(
         items_of_each_state,
         red_texts,
         gpu_cpu_disagreements,
+        gpu_memory_was_short: None,
     }
 }
 
 /// 核对录入表里还没有判定的块：按分工只核 `owner` 那一方分到的；一块切成几段多线程判（[`checking_threads`]），
 /// 每块在 CPU 上逐状态判（`unit_checksums` 给了卡就把每个状态镜像里被写过的单元两道校验和交 GPU 算、与 CPU 逐个对拍），
 /// 判完一块就按块的次序单线程写回判定块与违例——判定向量的编号按块序登记，与线程数无关，输出与单线程逐字相同。
-/// 同一块两方不会同时领：块的归属由权重表与块序号定死。
+/// 同一块两方不会同时领：块的归属由权重表与块序号定死。单元校验和对拍时卡上报了 Out of Memory（每条核对线程各自接），那一块不写、
+/// 不再领下一块，交回的账带着原因（[`CheckingTally::stopped_because_the_gpu_memory_was_short`]，调用方报本次未跑）。
 ///
 /// # Errors
 /// 库读写失败；判定向量超过 256 种。
@@ -1394,9 +1405,81 @@ pub fn check_blocks_where_until(
     stop_is_requested: &(dyn Fn() -> bool + Sync),
 ) -> Result<CheckingTally, VerdictStoreError> {
     let pending = pending_blocks(store, plan, version, is_mine)?;
+    let points: Vec<NamesOfACrashPoint> = plan
+        .points
+        .iter()
+        .map(|point| NamesOfACrashPoint {
+            name: point.name.clone(),
+            path_number: point.path_number.clone(),
+        })
+        .collect();
+    check_pending_blocks_in_pieces(
+        &pending,
+        &points,
+        checking_threads(),
+        stop_is_requested,
+        &|point_index, local, ending| {
+            judge_one_piece_catching_out_of_memory_on_the_card(
+                flow,
+                plan,
+                point_index,
+                local,
+                unit_checksums,
+                ending,
+            )
+        },
+        &mut |point_index, local, items_of_each_state, violating| {
+            let mut numbers = Vec::with_capacity(items_of_each_state.len());
+            for items in items_of_each_state {
+                numbers.push(store.register_verdict_vector(&encoded_verdict(items))?);
+            }
+            let verdict_block = VerdictBlock::new(numbers).expect("一块至少一个状态");
+            store.store_verdict_block(
+                &plan.points[point_index].block_key(local),
+                version,
+                &verdict_block,
+                violating,
+            )?;
+            Ok(())
+        },
+    )
+}
+
+/// [`check_pending_blocks_in_pieces`] 写一块的那一份：点在 `points` 里的次序、块内序号、逐状态红项、红状态的块内序号。
+type StoreACheckedBlock<'store> = dyn FnMut(
+        usize,
+        &Range<u64>,
+        &[Vec<String>],
+        &[StateOffsetInBlock],
+    ) -> Result<(), VerdictStoreError>
+    + 'store;
+
+/// 一个崩溃点的名字与路径编号（核对时打进度行、记红状态的正文用）。
+struct NamesOfACrashPoint {
+    name: String,
+    path_number: String,
+}
+
+/// [`check_blocks_where_until`] 的那一圈（不碰库与卡：判一段交 `judge_a_piece`，写一块交 `store_a_block`，单测用假的）：`pending` 里的块按次序，
+/// 每领一块之前先问 `stop_is_requested`；一块的序号切成 `threads` 那么多段、一段一个线程交 `judge_a_piece`（带这一段在同一块几段里的报到），
+/// 收齐按段序拼回一块、当场交 `store_a_block`（点在 `points` 里的次序、块内序号、逐状态红项、红状态的块内序号）。有一段报了显存不够，
+/// 这一块不写、不再领下一块，交回的账带着原因。
+///
+/// # Errors
+/// `store_a_block` 的错。
+///
+/// # Panics
+/// 判一段的线程 panic。
+fn check_pending_blocks_in_pieces(
+    pending: &[(usize, Range<u64>)],
+    points: &[NamesOfACrashPoint],
+    threads: usize,
+    stop_is_requested: &(dyn Fn() -> bool + Sync),
+    judge_a_piece: &(dyn Fn(usize, Range<u64>, WorkEndingTogether<'_>) -> JudgedBlock + Sync),
+    store_a_block: &mut StoreACheckedBlock<'_>,
+) -> Result<CheckingTally, VerdictStoreError> {
     // 块是库与 GPU 批的粒度，不改小；一块的序号切成线程数那么多段、一段一个线程（一块 65536 个状态、32 线程时一段 2048 个），
     // 判完按段序拼回一块、当场写库：中途被停，写进库的块下一次不再判。
-    let threads = checking_threads();
     let mut tally = CheckingTally::default();
     // 每一段判完打一行 `CRASH_AMPLIFICATION_BLOCK`；一段判得比进度间隔久时，等着收的这条线程隔一个间隔另打一行按挂钟的
     let started = std::time::Instant::now();
@@ -1406,7 +1489,7 @@ pub fn check_blocks_where_until(
         if stop_is_requested() {
             break;
         }
-        let point = &plan.points[*point_index];
+        let point = &points[*point_index];
         let piece_length = (local.end - local.start)
             .div_ceil(u64::try_from(threads).expect("段数装得进 u64"))
             .max(1);
@@ -1418,13 +1501,16 @@ pub fn check_blocks_where_until(
             start = end;
         }
         let piece_count = pieces.len();
+        // 每一段的报到在起线程之前都领出来：先收完的那一段等的是这一块全部的段
+        let ending_together = WorksEndingTogetherOnADevice::new();
+        let endings: Vec<WorkEndingTogether<'_>> =
+            pieces.iter().map(|_| ending_together.join()).collect();
         let mut judged: Vec<JudgedBlock> = std::thread::scope(|scope| {
             let (judged_sender, judged_receiver) = std::sync::mpsc::channel::<JudgedBlock>();
-            for range in &pieces {
-                let range = range.clone();
+            for (range, ending) in pieces.iter().cloned().zip(endings) {
                 let judged_sender = judged_sender.clone();
                 scope.spawn(move || {
-                    let piece = judge_one_block(flow, plan, *point_index, range, unit_checksums);
+                    let piece = judge_a_piece(*point_index, range, ending);
                     // 发不出去说明收的这条线程已经走了（它 panic 了），这一段的结果没人要
                     let _ = judged_sender.send(piece);
                 });
@@ -1452,6 +1538,11 @@ pub fn check_blocks_where_until(
             "块 {pending_index} 的每一段都判完交回了（核对线程 panic 时上面的 scope 已经往外传）"
         );
         judged.sort_by_key(|piece| piece.local.start);
+        // 单元校验和对拍时有一段报了 Out of Memory：这一块不入库、不再领下一块，判过的块在库里（文件头第 5 条）
+        if let Some(reason) = reason_the_gpu_memory_was_short_in_one_of_the_pieces(&judged) {
+            tally.stopped_because_the_gpu_memory_was_short = Some(reason);
+            break;
+        }
         let mut items_of_each_state: Vec<Vec<String>> =
             Vec::with_capacity(usize::try_from(local.end - local.start).expect("一块装得进 usize"));
         let mut next_expected = local.start;
@@ -1472,7 +1563,6 @@ pub fn check_blocks_where_until(
             }
         }
         assert_eq!(next_expected, local.end, "块 {pending_index} 的段没有拼满");
-        let mut numbers = Vec::with_capacity(items_of_each_state.len());
         let mut violating = Vec::new();
         for (offset, items) in items_of_each_state.iter().enumerate() {
             if !items.is_empty() {
@@ -1481,14 +1571,19 @@ pub fn check_blocks_where_until(
                     u64::try_from(offset).expect("块内序号装得进 u64"),
                 ));
             }
-            numbers.push(store.register_verdict_vector(&encoded_verdict(items))?);
         }
-        let verdict_block = VerdictBlock::new(numbers).expect("一块至少一个状态");
-        store.store_verdict_block(&point.block_key(local), version, &verdict_block, &violating)?;
+        store_a_block(*point_index, local, &items_of_each_state, &violating)?;
         tally.blocks_checked += 1;
         tally.states_checked += local.end - local.start;
     }
     Ok(tally)
+}
+
+/// 一块按段序排好的几段里，单元校验和对拍时卡上报了 Out of Memory 的第一段的原因；都没报是 `None`。
+fn reason_the_gpu_memory_was_short_in_one_of_the_pieces(pieces: &[JudgedBlock]) -> Option<String> {
+    pieces
+        .iter()
+        .find_map(|piece| piece.gpu_memory_was_short.clone())
 }
 
 /// 一块正在判的时候按挂钟那一行要报的：哪个点、块从点内第几个状态起、切成几段，这一趟已经判完几块（共几块）与几个状态。
@@ -1549,6 +1644,99 @@ pub fn gpu_judge_wall_clock_line(
         "CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu blocks_stored={blocks_stored}/{pending_blocks} blocks_waiting_for_an_earlier_block={blocks_waiting_for_an_earlier_block} cards_finished={cards_finished} elapsed_seconds={:.1}",
         elapsed.as_secs_f64()
     )
+}
+
+/// 一段在卡上建的缓冲合起来的字节数（文件头第 5 条），折成 MiB 照 `singlefs_harness::gpu_memory_ledger::mebibytes_of_buffers_held_at_once`。
+#[cfg(feature = "gpu")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct GpuBufferFootprint {
+    bytes_uploaded_once: u64,
+    bytes_of_one_pass: u64,
+    passes_alive_at_once: u64,
+}
+
+#[cfg(feature = "gpu")]
+impl GpuBufferFootprint {
+    fn mebibytes(self) -> u64 {
+        mebibytes_of_buffers_held_at_once(
+            self.bytes_uploaded_once,
+            self.bytes_of_one_pass,
+            self.passes_alive_at_once,
+        )
+    }
+}
+
+/// `crate::crash_verify_gpu::GpuFactsVerifier` 建的几张缓冲里每一项占几个 u32：照 `crash_verify_gpu.rs` 的 `RECORDED_WORDS`、
+/// 每对重放两个字、`SEGMENT_WORDS`、`UNIT_WORDS`、`ROOT_WORDS`、`HEADER_WORDS` 抄（那几个常数那边是私有的，这一批碰不到那份文件），
+/// 那边改了布局这里跟着改。
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_WORDS_PER_RECORDED_WRITE: u64 = 4;
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_WORDS_PER_REPLAY: u64 = 2;
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_WORDS_PER_SEGMENT: u64 = 6;
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_WORDS_PER_UNIT: u64 = 6;
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_WORDS_PER_ROOT: u64 = 2 + 4 * (1 + 2 * 4);
+#[cfg(feature = "gpu")]
+const FACTS_VERIFIER_HEADER_WORDS: u64 = 12;
+#[cfg(feature = "gpu")]
+const BYTES_PER_GPU_WORD: u64 = 4;
+
+/// 第 ② 段在卡上核一条流（`crate::crash_verify_gpu::GpuFactsVerifier`）建的缓冲（文件头第 5 条）：六张事实表上卡一次（空表也建一个字），
+/// 核一块一趟建头、结论与回读（每个状态各一个字），一块按 `states_in_the_largest_block` 个状态算；一块接一块核，
+/// 同时还活着的照一条线程算。
+#[cfg(feature = "gpu")]
+fn facts_verifier_buffer_footprint(
+    facts: &FlowFacts,
+    states_in_the_largest_block: u64,
+) -> GpuBufferFootprint {
+    let count = |length: usize| u64::try_from(length).expect("表长装得进 u64");
+    let replays: u64 = facts
+        .torn_images
+        .iter()
+        .map(|torn| count(torn.replays.len()))
+        .sum();
+    let writes_of_the_segments: u64 = facts
+        .segments
+        .iter()
+        .map(|segment| count(segment.writes.len()))
+        .sum();
+    let words_of_each_table = [
+        count(facts.is_tearable.len()) * FACTS_VERIFIER_WORDS_PER_RECORDED_WRITE,
+        replays * FACTS_VERIFIER_WORDS_PER_REPLAY,
+        count(facts.segments.len()) * FACTS_VERIFIER_WORDS_PER_SEGMENT,
+        writes_of_the_segments,
+        count(facts.units.len()) * FACTS_VERIFIER_WORDS_PER_UNIT,
+        count(facts.roots.len()) * FACTS_VERIFIER_WORDS_PER_ROOT,
+    ];
+    GpuBufferFootprint {
+        bytes_uploaded_once: words_of_each_table
+            .iter()
+            .map(|words| (*words).max(1) * BYTES_PER_GPU_WORD)
+            .sum(),
+        bytes_of_one_pass: (FACTS_VERIFIER_HEADER_WORDS + 2 * states_in_the_largest_block)
+            * BYTES_PER_GPU_WORD,
+        passes_alive_at_once: PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD,
+    }
+}
+
+/// 第 ① 段由 CPU 判、单元两道校验和交卡对拍（[`gpu_unit_checksum_items`]）建的缓冲（文件头第 5 条）：一个状态一趟，
+/// 这条流里每次单元写各两段（`crate::gpu_unit_checks::bytes_crc32c_of_ranges_needs`），`checking_threads` 条线程同时派活。
+#[cfg(feature = "gpu")]
+fn unit_checksum_buffer_footprint(
+    unit_writes_in_the_flow: usize,
+    checking_threads: usize,
+) -> GpuBufferFootprint {
+    GpuBufferFootprint {
+        bytes_uploaded_once: 0,
+        bytes_of_one_pass: crate::gpu_unit_checks::bytes_crc32c_of_ranges_needs(
+            2 * unit_writes_in_the_flow,
+        ),
+        passes_alive_at_once: u64::try_from(checking_threads).expect("线程数装得进 u64")
+            * PASSES_ALIVE_AT_ONCE_ON_EACH_THREAD,
+    }
 }
 
 /// 一个崩溃镜像里被写表写过的每个单元（数据单元、节点、打包单元）两道校验和在 GPU 上算、与 CPU 对拍，
@@ -1642,16 +1830,6 @@ pub fn first_state_the_gpu_could_not_judge(
     })
 }
 
-/// 配置点名的卡里哪几张（序号）不在用得上的卡里，按配置的次序。
-#[must_use]
-pub fn configured_cards_not_usable(configured: &[(u32, u64)], usable: &[u32]) -> Vec<u32> {
-    configured
-        .iter()
-        .map(|(index, _)| *index)
-        .filter(|index| !usable.contains(index))
-        .collect()
-}
-
 /// 一个状态的 GPU 结论字换成与 CPU `Layer0StateJudgement::red_items` 逐项同名、同序的红项；判不了的状态交回 `None`（回落到 CPU）。
 #[cfg(feature = "gpu")]
 #[must_use]
@@ -1729,6 +1907,13 @@ pub struct GpuCardOutcome {
     /// 带得最多的一次派活几个状态、卡算得最久的一次派活多久（一次派活带几个按用时调，不一定到 `states_per_dispatch`）。
     pub states_in_the_widest_dispatch: u64,
     pub seconds_of_the_longest_dispatch: f64,
+    /// 起过卡池的进程在显存账上给这张卡的判器借的草稿区（MiB，文件头第 5 条）；不进账（卡是这一趟自己起的、或调用方给的）是 `None`。
+    pub scratch_booked_mebibytes: Option<u64>,
+    /// 起过卡池的进程，这张卡的判器建好那一刻核账：草稿区那一笔借据还在账上没有（第 10t 批代码轮判决 K4-1：借了又在判之前还掉要红）；
+    /// 不进账是 `None`。
+    pub scratch_lease_on_the_books_when_the_judge_was_built: Option<bool>,
+    /// 同上，这张卡领的最后一块判完那一刻再核一次（第 10x 批代码轮判决 K3-1：建好之后、判完之前还掉也要红）；不进账是 `None`。
+    pub scratch_lease_on_the_books_when_the_judging_finished: Option<bool>,
 }
 
 impl GpuCardOutcome {
@@ -1755,7 +1940,7 @@ pub struct GpuJudgeOutcome {
     pub judge_seconds: f64,
     /// 写库的挂钟（CPU，单线程，按块序）。
     pub seconds_storing: f64,
-    /// 用到的每张卡一行，按优先级。
+    /// 用到的卡每收工一次一行，按优先级（一张卡在收尾再起的那一轮里又收工一次就有两行；用到几张卡看 `cards_used`）。
     pub cards: Vec<GpuCardOutcome>,
 }
 
@@ -1847,20 +2032,26 @@ enum CardMessage {
     Finished(GpuCardOutcome),
     /// 这张卡判不了领到的块里的某个状态（表越过了内核的容量）：整趟停下、报错，不退回 CPU 判器。
     Refused(String),
+    /// 这张卡（`index` 是 `nvidia-smi` 给它的序号）建判器或判一块时 wgpu 报了 Out of Memory（文件头第 5 条）：只停这一张，判一块时报的那一块已经交回队里；
+    /// 带那一句为什么。
+    OutOfMemory {
+        index: u32,
+        reason: String,
+    },
 }
 
-/// 写库那条线程收完卡上的线程发来的话之后手里的：按块序写进库几块、收工的卡各自的账（按收到的次序）、写库的错、卡拒判的理由。
+/// 写库那条线程收完一轮卡上的线程发来的话之后手里的：收工的卡各自的账（按收到的次序）、卡拒判的理由、报了 Out of Memory 的卡（序号与那一句，
+/// 按收到的次序）。判完的块按块序写进库几块、写库的错在几轮共用的那一份里（[`BlocksStoredInOrder`]）。
 #[cfg(feature = "gpu")]
 struct CardsMessagesReceived {
-    blocks_stored: usize,
     finished_cards: Vec<GpuCardOutcome>,
-    storing_error: Option<String>,
     refusal: Option<String>,
+    cards_out_of_memory: Vec<(u32, String)>,
 }
 
-/// 写库那条线程收卡上的线程发来的话，到发送端全丢掉为止：判完的块按块序交 `store_block` 写库（后面的块先到就等前面那一块，
-/// 到了一起写；写库失败之后到的块不再写），收工的卡记下它的账，拒判的留第一条理由；上一次收到之后 `clock` 走过整个进度间隔还没有新的话，
-/// 就交 `write_progress_line` 一行 `CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu …`（C611：卡上判一块、编内核比进度间隔久时
+/// 写库那条线程收卡上的线程发来的话，到发送端全丢掉为止：判完的块交 `stored_in_order` 按块序写库（`store_block` 写一块；后面的块先到就等前面那一块，
+/// 到了一起写；写库失败之后到的块不再写），收工的卡记下它的账，拒判的留第一条理由，报了 Out of Memory 的卡都记下；上一次收到之后 `clock` 走过整个进度间隔
+/// 还没有新的话，就交 `write_progress_line` 一行 `CRASH_AMPLIFICATION_BLOCK by=wall_clock judge=gpu …`（C611：卡上判一块、编内核比进度间隔久时
 /// 照样隔一个间隔报一行，[`gpu_judge_wall_clock_line`]）。`pending_blocks` 是这一趟要判的块数，只进那一行。
 #[cfg(feature = "gpu")]
 fn receive_the_cards_messages_and_store_the_blocks_in_order(
@@ -1868,17 +2059,15 @@ fn receive_the_cards_messages_and_store_the_blocks_in_order(
     wall_clock_lines: &mut WallClockProgressLines,
     clock: &dyn Fn() -> std::time::Duration,
     pending_blocks: usize,
+    stored_in_order: &mut BlocksStoredInOrder<GpuJudgedBlock>,
     store_block: &mut dyn FnMut(GpuJudgedBlock) -> Result<(), String>,
     write_progress_line: &mut dyn FnMut(String),
 ) -> CardsMessagesReceived {
     let mut received = CardsMessagesReceived {
-        blocks_stored: 0,
         finished_cards: Vec::new(),
-        storing_error: None,
         refusal: None,
+        cards_out_of_memory: Vec::new(),
     };
-    // 写库：按块序。后面的块先判完就在这里等，前面那一块到了一起写
-    let mut waiting: BTreeMap<usize, GpuJudgedBlock> = BTreeMap::new();
     receive_until_the_senders_are_gone_with_wall_clock_lines(
         receiver,
         wall_clock_lines,
@@ -1886,9 +2075,9 @@ fn receive_the_cards_messages_and_store_the_blocks_in_order(
         &mut |event| match event {
             ReceivedOrWallClockLineDue::WallClockLineDue { elapsed } => {
                 write_progress_line(gpu_judge_wall_clock_line(
-                    received.blocks_stored,
+                    stored_in_order.blocks_stored(),
                     pending_blocks,
-                    waiting.len(),
+                    stored_in_order.blocks_waiting(),
                     received.finished_cards.len(),
                     elapsed,
                 ));
@@ -1899,17 +2088,11 @@ fn receive_the_cards_messages_and_store_the_blocks_in_order(
             ReceivedOrWallClockLineDue::Received(CardMessage::Refused(reason)) => {
                 received.refusal.get_or_insert(reason);
             }
+            ReceivedOrWallClockLineDue::Received(CardMessage::OutOfMemory { index, reason }) => {
+                received.cards_out_of_memory.push((index, reason));
+            }
             ReceivedOrWallClockLineDue::Received(CardMessage::Block(arrived_block)) => {
-                waiting.insert(arrived_block.pending_index, arrived_block);
-                while let Some(block) = waiting.remove(&received.blocks_stored) {
-                    if received.storing_error.is_some() {
-                        continue;
-                    }
-                    match store_block(block) {
-                        Ok(()) => received.blocks_stored += 1,
-                        Err(error) => received.storing_error = Some(error),
-                    }
-                }
+                stored_in_order.arrive(arrived_block.pending_index, arrived_block, store_block);
             }
         },
     );
@@ -1925,23 +2108,136 @@ struct CardsAtWork<'work> {
     cards: &'work [std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
     /// 每张卡按优先级装到的状态数（一次派活带几个）；0 的这一趟不用。
     states_placed: &'work [u64],
-    next_pending: std::sync::atomic::AtomicUsize,
-    /// 写库失败之后置上：卡上的线程判完手里那一块就停。
+    /// 每张卡的判器在显存账上借的草稿区（MiB）；不进账的是 `None`。
+    scratch_booked_mebibytes: &'work [Option<u64>],
+    /// 每张卡草稿区那一笔借据的借据号（判器建好那一刻核账用）；不进账的是 `None`。
+    scratch_lease_identifiers: &'work [Option<u64>],
+    blocks: BlocksForTheCards,
+    /// 写库失败、有卡拒判之后置上：卡上的线程判完手里那一块就停、一块都不再领。一张卡报 Out of Memory 不置（只停那一张，第 10z 批）。
     stop: std::sync::atomic::AtomicBool,
-    /// 调用方要停（每领一块之前问一次）：不再领新的块，手里那一块判完照旧交去写库。
-    stop_is_requested: &'work (dyn Fn() -> bool + Sync),
+    /// 调用方要停（每领一块之前问一次）：不再领新的块，只领判完的块在等的那几块（第 10z 批第五块），手里那一块判完照旧交去写库。
+    /// 一趟里见过一次就记住（第 10z 批第六块，第 10z 批第五块代码轮判决 K2-2），与一轮收尾问的是同一个。
+    stop_request: &'work StopRequestRememberedInThisRun<'work>,
 }
 
 #[cfg(feature = "gpu")]
 impl CardsAtWork<'_> {
-    fn must_stop(&self) -> bool {
-        self.stop.load(std::sync::atomic::Ordering::SeqCst) || (self.stop_is_requested)()
+    /// 卡上的线程这一刻照什么停（[`judge_blocks_on_one_card`]、[`start_the_next_card_with_states`] 问）：判红了一块都不再领，
+    /// 调用方叫停了只领判完的块在等的，都没有照常领。
+    fn stop_of_the_cards(&self) -> StopOfTheCards {
+        if self.stop.load(std::sync::atomic::Ordering::SeqCst) {
+            StopOfTheCards::TheRunFailed
+        } else if self.stop_request.is_requested() {
+            StopOfTheCards::RequestedByTheCaller
+        } else {
+            StopOfTheCards::NotRequested
+        }
+    }
+}
+
+/// 卡上一段活做完之后的结局（[`decide_the_work_on_the_card`]）。
+#[cfg(feature = "gpu")]
+enum WorkOnTheCard<Outcome> {
+    Done(Outcome),
+    /// 显存不够：`detail` 说 wgpu 报的那一句（这条线程上的错误范围接住的，或别的线程上没接住、记在设备上的）。
+    OutOfMemory {
+        detail: String,
+    },
+    /// 活 panic 了，又说不成显存不够：照样往外抛。
+    Panicked(Box<dyn std::any::Any + Send>),
+}
+
+/// 卡上一段活（`outcome`，panic 了是 `Err`）怎么收：这条线程上的 Out of Memory 范围接到了（`out_of_memory_in_the_scope`）就是显存不够，
+/// 活成没成都一样；没接到而活 panic 了，看设备上从活开始起记的（`out_of_memory_on_the_device_since_the_work_began`，别的线程上没接住的
+/// Out of Memory、或因它丢了设备）：有就是显存不够，没有照样抛（第 10x 批代码轮判决 K1-3：判器内核在另起的线程上编，那条线程上的
+/// Out of Memory 让卡线程在 `join` 那里 panic，范围接不到）。活没 panic 就交它的结果。
+#[cfg(feature = "gpu")]
+fn decide_the_work_on_the_card<Outcome>(
+    outcome: std::thread::Result<Outcome>,
+    out_of_memory_in_the_scope: Option<String>,
+    out_of_memory_on_the_device_since_the_work_began: Option<String>,
+) -> WorkOnTheCard<Outcome> {
+    match (
+        outcome,
+        out_of_memory_in_the_scope,
+        out_of_memory_on_the_device_since_the_work_began,
+    ) {
+        (Ok(_) | Err(_), Some(detail), _) => WorkOnTheCard::OutOfMemory { detail },
+        (Ok(outcome), None, _) => WorkOnTheCard::Done(outcome),
+        (Err(_), None, Some(detail)) => WorkOnTheCard::OutOfMemory { detail },
+        (Err(panic), None, None) => WorkOnTheCard::Panicked(panic),
+    }
+}
+
+/// 在 `card` 上做 `work`，同时接住 wgpu 报的 Out of Memory（文件头第 5 条）：没报就交 `work` 的结果；报了交 `Err(那一句)`
+/// （`what_ran_out` 说是哪一段，`work` 里因为缓冲没建成而 panic 的一并接住、不再往外抛）；没报而 `work` panic 了照样往外抛。
+/// wgpu 的错误范围按线程分：这条线程上的接在范围里；`work` 另起的线程上没接住的记在设备上（`crate::gpu_unit_checks::DeviceConditionOfACard`），
+/// 照 [`decide_the_work_on_the_card`] 一并认。设备上记的按这段活认（`singlefs_harness::gpu_memory_ledger::WorkOnTheCardOfThisThread`，
+/// 第 10z 批：同一个设备上别的线程那段活的 Out of Memory 说不成这段活的显存不够，这段活真正的 panic 照样往外抛）。
+#[cfg(feature = "gpu")]
+fn on_the_card_catching_out_of_memory<Outcome>(
+    card: &crate::gpu_unit_checks::GpuCard,
+    what_ran_out: &str,
+    work: impl FnOnce() -> Outcome,
+) -> Result<Outcome, String> {
+    let alone = WorksEndingTogetherOnADevice::new();
+    on_the_card_catching_out_of_memory_ending_together(card, what_ran_out, alone.join(), work)
+}
+
+/// 同 [`on_the_card_catching_out_of_memory`]，这段活与同一个设备上别的几段一起开（`ending` 是它的报到，单元校验和对拍时一块切成的几段）：
+/// 活交回那一刻记下设备丢没丢，这条线程上的错误范围接到的 Out of Memory 记进设备之后报到，等那几段都报到了再认设备上记的
+/// （`singlefs_harness::gpu_memory_ledger::DeviceConditionOfACard::end_the_work_and_explain_its_failure`，第 10z 批第三块：一段因设备丢了先失败、
+/// 同块另一段范围里接到的还没记进设备时，先认就认不出、判红；第 10z 批第五块：设备因显存不够丢的，不在同一组也认得出；
+/// 交回那一刻设备还没丢的，之后别的段丢了设备不把它说成显存不够）。
+#[cfg(feature = "gpu")]
+fn on_the_card_catching_out_of_memory_ending_together<Outcome>(
+    card: &crate::gpu_unit_checks::GpuCard,
+    what_ran_out: &str,
+    ending: WorkEndingTogether<'_>,
+    work: impl FnOnce() -> Outcome,
+) -> Result<Outcome, String> {
+    let work_on_the_card = singlefs_harness::gpu_memory_ledger::WorkOnTheCardOfThisThread::begin();
+    let out_of_memory_reports_before = card.device_condition().out_of_memory_reports();
+    let out_of_memory_scope = card
+        .device()
+        .push_error_scope(wgpu::ErrorFilter::OutOfMemory);
+    // 活交回的这一刻设备丢没丢：之后等同组几段时别的段丢了设备，不把这段活真正的 panic 说成显存不够（第 10z 批第五块；
+    // 接住与记设备抽在 harness 档，第 10z 批第六块）
+    let (outcome, device_when_the_work_returned) =
+        work_caught_noting_the_device_when_it_returned(card.device_condition(), work);
+    let out_of_memory_in_the_scope =
+        pollster::block_on(out_of_memory_scope.pop()).map(|error| error.to_string());
+    let out_of_memory_on_the_device = card
+        .device_condition()
+        .end_the_work_and_explain_its_failure(
+            &work_on_the_card,
+            out_of_memory_reports_before,
+            device_when_the_work_returned,
+            out_of_memory_in_the_scope
+                .as_ref()
+                .map(|caught| format!("序号 {} 的卡{what_ran_out}报了 {caught}", card.index)),
+            ending,
+        );
+    match decide_the_work_on_the_card(
+        outcome,
+        out_of_memory_in_the_scope,
+        out_of_memory_on_the_device,
+    ) {
+        WorkOnTheCard::Done(outcome) => Ok(outcome),
+        WorkOnTheCard::OutOfMemory { detail } => Err(reason_for_running_out_of_gpu_memory(
+            &format!("序号 {} 的卡{what_ran_out}（{detail}）", card.index),
+        )),
+        WorkOnTheCard::Panicked(panic) => std::panic::resume_unwind(panic),
     }
 }
 
 /// 一张卡的线程：表上卡、编内核；备好之后，队里还有活、下一张卡也装了状态，就起下一张卡的线程（卡一张一张备，不同时编内核）；
 /// 然后从队头一块一块领、判、把结论字拆成红项、交给写库的线程。有一个状态判不了（结论字带「判不了」），
 /// 就叫所有卡停下、发一条 [`CardMessage::Refused`]，不退回 CPU 判器（用户 2026-09-29 定：配了 GPU 就一定要 GPU 判，做不到就报错）。
+/// 建判器或判一块时 wgpu 报 Out of Memory（[`on_the_card_catching_out_of_memory`]），只停这一张卡、发一条 [`CardMessage::OutOfMemory`]：
+/// 判一块时报的，那一块交回队里给别的卡（[`BlocksForTheCards::give_back`]），不交去写库；建判器时报的，下一张卡照起
+/// （第 10z 批，第 10y 批代码轮判决 K2-2 P2：一张卡 Out of Memory 不停整趟）。起过卡池的进程，判器建好那一刻与这张卡判完那一刻
+/// 各核一次账：草稿区那一笔借据还在不在（第 10t 批代码轮判决 K4-1、第 10x 批代码轮判决 K3-1）。
 #[cfg(feature = "gpu")]
 fn judge_on_one_card_and_start_the_next<'scope, 'work>(
     scope: &'scope std::thread::Scope<'scope, 'work>,
@@ -1953,11 +2249,33 @@ fn judge_on_one_card_and_start_the_next<'scope, 'work>(
     use std::sync::atomic::Ordering;
     let card: &crate::gpu_unit_checks::GpuCard = &work.cards[position];
     let build_started = Instant::now();
-    let judge = GpuCrashJudge::on_card_with_packed_tables(
-        card,
-        work.tables,
-        usize::try_from(work.states_placed[position]).expect("一次派活的状态数装得进 usize"),
-    );
+    let judge =
+        match on_the_card_catching_out_of_memory(card, "建判器（表与草稿区）时", || {
+            GpuCrashJudge::on_card_with_packed_tables(
+                card,
+                work.tables,
+                usize::try_from(work.states_placed[position])
+                    .expect("一次派活的状态数装得进 usize"),
+            )
+        }) {
+            Ok(judge) => judge,
+            Err(reason) => {
+                // 写库的线程已经走了（写库失败）就没人收，那一边的错先报
+                let _ = sender.send(CardMessage::OutOfMemory {
+                    index: card.index,
+                    reason,
+                });
+                start_the_next_card_with_states(scope, work, position, &sender);
+                return;
+            }
+        };
+    let scratch_lease_is_on_the_books_now = || {
+        work.scratch_lease_identifiers[position].map(|lease_identifier| {
+            the_card_pool_this_run_takes_its_cards_from()
+                .is_the_lease_on_the_books(card.index, lease_identifier)
+        })
+    };
+    let scratch_lease_on_the_books_when_the_judge_was_built = scratch_lease_is_on_the_books_now();
     let build_seconds = build_started.elapsed().as_secs_f64();
     eprintln!(
         "CRASH_AMPLIFICATION_GPU_JUDGE card={:?} index={} memory_budget_mebibytes={} states_per_dispatch={} scratch_mebibytes={} build_seconds={build_seconds:.1}",
@@ -1967,16 +2285,7 @@ fn judge_on_one_card_and_start_the_next<'scope, 'work>(
         judge.states_per_dispatch(),
         judge.scratch_mebibytes()
     );
-    let next_position =
-        (position + 1..work.cards.len()).find(|candidate| work.states_placed[*candidate] > 0);
-    if let Some(next_position) = next_position {
-        if work.next_pending.load(Ordering::SeqCst) < work.pending.len() && !work.must_stop() {
-            let sender = sender.clone();
-            scope.spawn(move || {
-                judge_on_one_card_and_start_the_next(scope, work, next_position, sender);
-            });
-        }
-    }
+    start_the_next_card_with_states(scope, work, position, &sender);
     let judging_started = Instant::now();
     let mut outcome = GpuCardOutcome {
         name: card.name.clone(),
@@ -1985,63 +2294,92 @@ fn judge_on_one_card_and_start_the_next<'scope, 'work>(
         states_per_dispatch: u64::try_from(judge.states_per_dispatch()).expect("装得进 u64"),
         scratch_mebibytes: u64::try_from(judge.scratch_mebibytes()).expect("装得进 u64"),
         build_seconds,
+        scratch_booked_mebibytes: work.scratch_booked_mebibytes[position],
+        scratch_lease_on_the_books_when_the_judge_was_built,
         ..GpuCardOutcome::default()
     };
-    while !work.must_stop() {
-        let pending_index = work.next_pending.fetch_add(1, Ordering::SeqCst);
-        if pending_index >= work.pending.len() {
-            break;
-        }
-        let (point_index, local) = &work.pending[pending_index];
-        let point = &work.plan.points[*point_index];
-        let ordinals = point.ordinals.start + local.start..point.ordinals.start + local.end;
-        let words = judge.judge_states(ordinals.clone());
-        let decoding_started = Instant::now();
-        if let Some(offset) = first_state_the_gpu_could_not_judge(&words) {
-            let state_words = &words[offset];
-            work.stop.store(true, Ordering::SeqCst);
-            // 写库的线程已经走了（写库失败）就没人收，那一边的错先报
-            let _ = sender.send(CardMessage::Refused(format!(
-                "卡 {} 判不了点 {} 块内第 {} 个状态（恢复内核第 1 字 {}、checker 内核第 {} 字 {}：表越过了内核的容量）。\
-                 配置开了 GPU，不退回 CPU 判器：照这两个字查是哪张表满了、改内核的容量再跑",
-                card.index,
-                point.name,
-                local.start + u64::try_from(offset).expect("块内序号"),
-                state_words[1],
-                crate::crash_judge_gpu::POOL_CHECKER_UNDECIDABLE_WORD,
-                state_words[crate::crash_judge_gpu::POOL_CHECKER_UNDECIDABLE_WORD]
-            )));
-            return;
-        }
-        let items_of_each_state: Vec<Vec<String>> = words
-            .iter()
-            .map(|state_words| gpu_verdict_items(state_words).expect("判不了的状态上面已经拒过"))
-            .collect();
-        outcome.seconds_decoding += decoding_started.elapsed().as_secs_f64();
-        eprintln!(
-            "CRASH_AMPLIFICATION_BLOCK point={} block_start={} states={} red={} judge=gpu card={}",
-            point.name,
-            local.start,
-            local.end - local.start,
-            items_of_each_state
+    let card_left = judge_blocks_on_one_card(
+        &work.blocks,
+        &|| work.stop_of_the_cards(),
+        &mut |pending_index| {
+            let (point_index, local) = &work.pending[pending_index];
+            let point = &work.plan.points[*point_index];
+            let ordinals = point.ordinals.start + local.start..point.ordinals.start + local.end;
+            let words = match on_the_card_catching_out_of_memory(card, "判一块时", || {
+                judge.judge_states(ordinals.clone())
+            }) {
+                Ok(words) => words,
+                // 只停这一张卡：这一块交回给别的卡（第 10z 批）
+                Err(reason) => return BlockJudgedOnACard::OutOfMemory { reason },
+            };
+            let decoding_started = Instant::now();
+            if let Some(offset) = first_state_the_gpu_could_not_judge(&words) {
+                let state_words = &words[offset];
+                return BlockJudgedOnACard::Refused {
+                    reason: format!(
+                        "卡 {} 判不了点 {} 块内第 {} 个状态（恢复内核第 1 字 {}、checker 内核第 {} 字 {}：表越过了内核的容量）。\
+                         配置开了 GPU，不退回 CPU 判器：照这两个字查是哪张表满了、改内核的容量再跑",
+                        card.index,
+                        point.name,
+                        local.start + u64::try_from(offset).expect("块内序号"),
+                        state_words[1],
+                        crate::crash_judge_gpu::POOL_CHECKER_UNDECIDABLE_WORD,
+                        state_words[crate::crash_judge_gpu::POOL_CHECKER_UNDECIDABLE_WORD]
+                    ),
+                };
+            }
+            let items_of_each_state: Vec<Vec<String>> = words
                 .iter()
-                .filter(|items| !items.is_empty())
-                .count(),
-            card.index
-        );
-        outcome.blocks_judged += 1;
-        outcome.states_judged += local.end - local.start;
-        if sender
-            .send(CardMessage::Block(GpuJudgedBlock {
+                .map(|state_words| {
+                    gpu_verdict_items(state_words).expect("判不了的状态上面已经拒过")
+                })
+                .collect();
+            outcome.seconds_decoding += decoding_started.elapsed().as_secs_f64();
+            eprintln!(
+                "CRASH_AMPLIFICATION_BLOCK point={} block_start={} states={} red={} judge=gpu card={}",
+                point.name,
+                local.start,
+                local.end - local.start,
+                items_of_each_state
+                    .iter()
+                    .filter(|items| !items.is_empty())
+                    .count(),
+                card.index
+            );
+            outcome.blocks_judged += 1;
+            outcome.states_judged += local.end - local.start;
+            BlockJudgedOnACard::Judged(items_of_each_state)
+        },
+        &mut |pending_index, items_of_each_state| match sender.send(CardMessage::Block(
+            GpuJudgedBlock {
                 pending_index,
                 items_of_each_state,
-            }))
-            .is_err()
-        {
-            break;
+            },
+        )) {
+            Ok(()) => BlockHandedToTheStore::Handed,
+            Err(_) => BlockHandedToTheStore::TheStoreIsGone,
+        },
+    );
+    match card_left {
+        CardLeftTheBlocks::NothingLeftOrStopped | CardLeftTheBlocks::TheStoreIsGone => {}
+        CardLeftTheBlocks::OutOfMemory { reason } => {
+            // 写库的线程已经走了（写库失败）就没人收，那一边的错先报
+            let _ = sender.send(CardMessage::OutOfMemory {
+                index: card.index,
+                reason,
+            });
+            return;
+        }
+        CardLeftTheBlocks::Refused { reason } => {
+            work.stop.store(true, Ordering::SeqCst);
+            // 写库的线程已经走了（写库失败）就没人收，那一边的错先报
+            let _ = sender.send(CardMessage::Refused(reason));
+            return;
         }
     }
     outcome.judge_seconds = judging_started.elapsed().as_secs_f64();
+    outcome.scratch_lease_on_the_books_when_the_judging_finished =
+        scratch_lease_is_on_the_books_now();
     let spent = judge.time_spent();
     outcome.dispatches = spent.dispatches;
     outcome.seconds_preparing = spent.seconds_preparing;
@@ -2073,7 +2411,99 @@ fn judge_on_one_card_and_start_the_next<'scope, 'work>(
     let _ = sender.send(CardMessage::Finished(outcome));
 }
 
-/// 每张卡按它的显存额度一次派活带得了几个状态（表上卡之后剩下的显存装草稿区），按 `cards` 的次序。
+/// 第 ① 段借草稿区之前这一步怎么走（[`scratch_step_before_booking`]）。
+#[cfg(feature = "gpu")]
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ScratchStepBeforeBooking {
+    /// 至少一张卡此刻带得了一个状态：去借。
+    BookOnTheCards,
+    /// 每张卡此刻都带不了一个状态、至少一张空着时带得了：打这一行，报本次未跑（不借、不判红）。
+    NotRunNoCardHoldsAStateNow { not_run_line: String },
+    /// 空着时也带不了：往下走到没有一张卡装得下那一句，判红。
+    RedNoCardHoldsAStateEvenWhenEmpty,
+}
+
+/// 照借之前的判定（[`decide_scratch_before_booking`]）定这一步：此刻借不到的那一行照对拍用例那一路写（同一个记号、原因写显存不够），
+/// 带每张卡此刻能借的（额度减驱动那一份）与一个状态要借的 `need_of_one_state_mebibytes`。
+#[cfg(feature = "gpu")]
+fn scratch_step_before_booking(
+    decision: ScratchBeforeBooking,
+    run_cards: &[CardCapacityOfThisRun],
+    need_of_one_state_mebibytes: u64,
+) -> ScratchStepBeforeBooking {
+    match decision {
+        ScratchBeforeBooking::BookOnTheCardsThatHoldAStateNow => {
+            ScratchStepBeforeBooking::BookOnTheCards
+        }
+        ScratchBeforeBooking::NoCardHoldsAStateNow => {
+            let card_rooms_mebibytes: Vec<u64> = run_cards
+                .iter()
+                .map(|card| {
+                    card.memory_budget_mebibytes
+                        .saturating_sub(crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER)
+                })
+                .collect();
+            ScratchStepBeforeBooking::NotRunNoCardHoldsAStateNow {
+                not_run_line: gpu_not_run_line(
+                    PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                    &reason_for_a_booking_without_room_now(
+                        need_of_one_state_mebibytes,
+                        &card_rooms_mebibytes,
+                    ),
+                ),
+            }
+        }
+        ScratchBeforeBooking::NoCardHoldsAStateEvenWhenEmpty => {
+            ScratchStepBeforeBooking::RedNoCardHoldsAStateEvenWhenEmpty
+        }
+    }
+}
+
+/// 第 `position` 张卡备好了（或建判器时报了 Out of Memory、不判）：后面还有装了状态的卡、队里照此刻的叫停还有领得的块
+/// （[`CardsAtWork::stop_of_the_cards`]，只在后面有装了状态的卡时问一次），就起下一张的线程（卡一张一张备，不同时编内核）。
+#[cfg(feature = "gpu")]
+fn start_the_next_card_with_states<'scope, 'work>(
+    scope: &'scope std::thread::Scope<'scope, 'work>,
+    work: &'work CardsAtWork<'work>,
+    position: usize,
+    sender: &std::sync::mpsc::Sender<CardMessage>,
+) {
+    // 起哪一张、看不看叫停抽在 harness 档（第 10z 批第六块，第 10z 批第五块代码轮判决 K3）；叫停交成闭包，没有下一张卡不问（第 10z 批第七块）
+    if let Some(next_position) =
+        next_card_to_start(work.states_placed, position, &work.blocks, || {
+            work.stop_of_the_cards()
+        })
+    {
+        let sender = sender.clone();
+        scope.spawn(move || {
+            judge_on_one_card_and_start_the_next(scope, work, next_position, sender);
+        });
+    }
+}
+
+/// 一张卡照额度 `memory_budget_mebibytes`（MiB）一次派活带得了几个状态（表上卡之后剩下的显存装草稿区）：表比存储缓冲绑定上限
+/// `max_storage_buffer_binding_size` 大、或额度装不下表与驱动那一份，是 0。
+#[cfg(feature = "gpu")]
+fn states_in_flight_within_the_budget(
+    max_storage_buffer_binding_size: u64,
+    memory_budget_mebibytes: u64,
+    tables: &crate::crash_judge_dispatch::PackedJudgeTables,
+) -> u64 {
+    if tables.mebibytes() * 1024 * 1024 > max_storage_buffer_binding_size
+        || memory_budget_mebibytes
+            < tables.mebibytes() + crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER
+    {
+        return 0;
+    }
+    u64::try_from(crate::crash_judge_dispatch::states_in_flight_within(
+        max_storage_buffer_binding_size,
+        memory_budget_mebibytes,
+        tables,
+    ))
+    .expect("装得进 u64")
+}
+
+/// 每张卡按它的显存额度一次派活带得了几个状态（[`states_in_flight_within_the_budget`]），按 `cards` 的次序。
 #[cfg(feature = "gpu")]
 fn states_in_flight_of_each_card(
     cards: &[std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
@@ -2082,22 +2512,128 @@ fn states_in_flight_of_each_card(
     cards
         .iter()
         .map(|card| {
-            let limit = card.device().limits().max_storage_buffer_binding_size;
-            if tables.mebibytes() * 1024 * 1024 > limit
-                || card.memory_budget_mebibytes()
-                    < tables.mebibytes()
-                        + crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER
-            {
-                return 0;
-            }
-            u64::try_from(crate::crash_judge_dispatch::states_in_flight_within(
-                limit,
+            states_in_flight_within_the_budget(
+                card.device().limits().max_storage_buffer_binding_size,
                 card.memory_budget_mebibytes(),
                 tables,
-            ))
-            .expect("装得进 u64")
+            )
         })
         .collect()
+}
+
+/// 这一趟本机的一张卡（按优先级）：序号、名字、存储缓冲绑定上限、给判器的额度（MiB），与照额度一次派活带得了几个状态。
+/// 起过卡池的，额度是这一刻这张卡能借给这个进程的加驱动那一份（借来的卡就是这个额度），卡上还没起设备
+/// （[`cards_of_the_pool_with_what_each_lends_now`]）；这一趟自己起的卡照卡的额度。
+#[cfg(feature = "gpu")]
+struct CardCapacityOfThisRun {
+    index: u32,
+    name: String,
+    max_storage_buffer_binding_size: u64,
+    memory_budget_mebibytes: u64,
+    states_in_flight_capacity: u64,
+    /// 这张卡空着时一次派活带得了几个状态（起过卡池的照这张卡空着时能借给这个进程的算；这一趟自己起的卡没有「此刻」与「空着时」之分，
+    /// 同 `states_in_flight_capacity`）：每张卡此刻都带不了一个状态时照它分借不到与放不下（第 10x 批代码轮判决 K2-2）。
+    states_in_flight_capacity_when_the_card_is_empty: u64,
+}
+
+/// 起过卡池的这一趟本机每张卡（池里每张，按池的优先级，不起设备）：额度是这一刻这张卡能借给这个进程的加驱动那一份，照它算一次派活
+/// 带得了几个状态，再按判器按状态数借的量（`crate::crash_judge_dispatch::mebibytes_a_judge_needs`）压到能借的之内（装上的状态才借得到）。
+/// 不照起池那一刻的空闲（第 10t 批代码轮攻方 S5）。
+///
+/// # Errors
+/// 卡上的显存读不出。
+#[cfg(feature = "gpu")]
+fn cards_of_the_pool_with_what_each_lends_now(
+    pool: &crate::gpu_unit_checks::gpu_test_start::GpuCardPool,
+    tables: &crate::crash_judge_dispatch::PackedJudgeTables,
+) -> Result<Vec<CardCapacityOfThisRun>, String> {
+    let cards = pool.cards_for_the_product_path();
+    let card_indices: Vec<u32> = cards.iter().map(|card| card.index).collect();
+    let rooms = pool.card_rooms_now_and_when_empty_of(&card_indices)?;
+    // 照能借的（MiB）算一次派活带得了几个状态：额度是能借的加驱动那一份，再按判器按状态数借的量压到能借的之内
+    let states_in_flight_for_a_room = |max_storage_buffer_binding_size: u64,
+                                       room_mebibytes: u64| {
+        let states_by_the_budget = states_in_flight_within_the_budget(
+            max_storage_buffer_binding_size,
+            room_mebibytes + crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER,
+            tables,
+        );
+        u64::try_from(most_states_whose_need_fits_the_capacity(
+            usize::try_from(states_by_the_budget).unwrap_or(usize::MAX),
+            room_mebibytes,
+            &|states| crate::crash_judge_dispatch::mebibytes_a_judge_needs(tables, states),
+        ))
+        .expect("装得进 u64")
+    };
+    Ok(cards
+        .into_iter()
+        .zip(rooms)
+        .map(|(card, room)| {
+            let (states_in_flight_capacity, states_in_flight_capacity_when_the_card_is_empty) =
+                states_in_flight_now_and_when_the_card_is_empty(room, &|room_mebibytes| {
+                    states_in_flight_for_a_room(
+                        card.max_storage_buffer_binding_size,
+                        room_mebibytes,
+                    )
+                });
+            CardCapacityOfThisRun {
+                index: card.index,
+                memory_budget_mebibytes: room.room_now_mebibytes
+                    + crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER,
+                states_in_flight_capacity,
+                states_in_flight_capacity_when_the_card_is_empty,
+                name: card.name,
+                max_storage_buffer_binding_size: card.max_storage_buffer_binding_size,
+            }
+        })
+        .collect())
+}
+
+/// 一张池里的卡此刻与空着时一次派活各带得了几个状态（`states_in_flight_for_a_room` 照能借的 MiB 算）：此刻照这一刻能借的，
+/// 空着时照空着时能借的（[`singlefs_harness::gpu_memory_ledger::CardRoomForThisProcess::ceiling_mebibytes`]，第 10x 批代码轮判决 K2-2）。
+#[cfg(feature = "gpu")]
+fn states_in_flight_now_and_when_the_card_is_empty(
+    room: singlefs_harness::gpu_memory_ledger::CardRoomForThisProcess,
+    states_in_flight_for_a_room: &dyn Fn(u64) -> u64,
+) -> (u64, u64) {
+    (
+        states_in_flight_for_a_room(room.room_now_mebibytes),
+        states_in_flight_for_a_room(room.ceiling_mebibytes),
+    )
+}
+
+/// 这一趟本机每张卡（按优先级）：起过卡池的照池（[`cards_of_the_pool_with_what_each_lends_now`]，`cards` 是空的），
+/// 这一趟自己起的照 `cards`（[`states_in_flight_of_each_card`]）。
+///
+/// # Errors
+/// 起过卡池的进程读不出卡上的显存。
+#[cfg(feature = "gpu")]
+fn card_capacities_of_this_run(
+    cards_taken_from: GpuCardsSource,
+    cards: &[std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
+    tables: &crate::crash_judge_dispatch::PackedJudgeTables,
+) -> Result<Vec<CardCapacityOfThisRun>, String> {
+    match cards_taken_from {
+        GpuCardsSource::TheCardPoolOfThisProcess => cards_of_the_pool_with_what_each_lends_now(
+            the_card_pool_this_run_takes_its_cards_from(),
+            tables,
+        ),
+        GpuCardsSource::NoCardNeeded | GpuCardsSource::DevicesStartedForThisRun => Ok(cards
+            .iter()
+            .zip(states_in_flight_of_each_card(cards, tables))
+            .map(|(card, states_in_flight_capacity)| CardCapacityOfThisRun {
+                index: card.index,
+                name: card.name.clone(),
+                max_storage_buffer_binding_size: card
+                    .device()
+                    .limits()
+                    .max_storage_buffer_binding_size,
+                memory_budget_mebibytes: card.memory_budget_mebibytes(),
+                states_in_flight_capacity,
+                states_in_flight_capacity_when_the_card_is_empty: states_in_flight_capacity,
+            })
+            .collect()),
+    }
 }
 
 /// 第 ① 段在卡上。卡按 `cards` 的次序（优先级）用：要判的状态先装第一张卡，装到它的显存额度带得了的状态数为止，
@@ -2105,10 +2641,13 @@ fn states_in_flight_of_each_card(
 /// 判完的块按块序一块一块写库（后判完的先到就等前面的）：中途被停，写进库的块下一次不再判；
 /// 判定向量的编号按块序登记，与用了几张卡无关。配置开了 GPU 就一定由 GPU 判（用户 2026-09-29 定，不接受默认降级）：
 /// 建不出表（有清零写、写与落点对不上）、有状态判不了（表越过内核容量），都报错，不退回 CPU 判器；报错之前判完的块照旧在库里。
-/// 每领一块之前先问 `stop_is_requested`：要停就不再领，已经领的块判完、写进库再收尾（领的块按块序连着，库里不留空洞）。
+/// 每领一块之前先问 `stop_is_requested`：要停就不再领新的，已经领的块判完、写进库再收尾（库里不留空洞）；有卡报了 Out of Memory 交回的块、
+/// 判完的块在等它的，叫停了也照领照判（交回的块落到收尾再起的那一轮里也一样），判完的块照块序都入库、没判的留给下一趟（第 10z 批第五块，
+/// 第 10z 批第三块代码轮判决 K1-5）。
 ///
 /// # Errors
-/// 库读写失败；建不出表；没有一张卡装得下这条流的表与一个状态的草稿区；有状态 GPU 判不了。
+/// 库读写失败；建不出表；没有一张卡装得下这条流的表与一个状态的草稿区；有状态 GPU 判不了；卡上 wgpu 报了 Out of Memory
+/// 而别的卡没把剩下的块判完（「本次未跑」那一行已经打了，报错之前判完的块在库里；只停报了的那一张卡，第 10z 批）。
 ///
 /// # Panics
 /// 卡上的线程 panic（内核没把状态判完、编内核之前量得内核超了预算）。
@@ -2122,7 +2661,267 @@ pub fn judge_my_blocks_on_gpu_cards(
     cards: &[std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
     stop_is_requested: &(dyn Fn() -> bool + Sync),
 ) -> Result<(CheckingTally, GpuJudgeOutcome), String> {
-    use crate::crash_judge_tables::{build_judge_tables, JudgeFlow};
+    match judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(
+        store,
+        flow,
+        plan,
+        is_mine,
+        version,
+        cards,
+        GpuCardsSource::DevicesStartedForThisRun,
+        stop_is_requested,
+    )? {
+        GpuJudgingOfMyBlocks::Judged { tally, outcome } => Ok((tally, outcome)),
+        // 卡判成调用方自己起的就不借草稿区，走到这里只能是卡上 wgpu 报了 Out of Memory
+        GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort { reason, .. } => Err(reason),
+    }
+}
+
+/// 第 ① 段在卡上判的结局。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "没编进 gpu 特性时第 ① 段在卡上的那一份只报错，两种结局只在编进来时造"
+    )
+)]
+enum GpuJudgingOfMyBlocks {
+    Judged {
+        tally: CheckingTally,
+        outcome: GpuJudgeOutcome,
+    },
+    /// 显存不够：起过卡池的进程此刻在账上借不到草稿区（一块都没判），或卡上 wgpu 报了 Out of Memory（之前判完的块在库里，
+    /// `tally` 是它们）。「本次未跑」那一行已经打了（`reason` 是它的原因），调用方照叫停的样子交回。
+    NotRunTheGpuMemoryWasShort {
+        tally: CheckingTally,
+        reason: String,
+    },
+}
+
+/// 「本次未跑」那一行里产品路径的名字（GPU 用例写用例名的那一格）。
+const PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE: &str = "crash_amplification::run_from_environment";
+
+/// 这一趟的卡判成照这个进程的卡池用（[`gpu_cards_in_use`] 交 [`GpuCardsSource::TheCardPoolOfThisProcess`]）时的那个池。
+///
+/// # Panics
+/// 这个进程没起过卡池（调用方把卡的来路判错了）。
+#[cfg(feature = "gpu")]
+fn the_card_pool_this_run_takes_its_cards_from(
+) -> &'static crate::gpu_unit_checks::gpu_test_start::GpuCardPool {
+    crate::gpu_unit_checks::gpu_test_start::card_pool_started_in_this_process().expect(
+        "这一趟的卡判成照这个进程的卡池用时池已经起好（gpu_cards_in_use 看过），起好的池在进程里不会再变回没起",
+    )
+}
+
+/// 起过卡池的产品路径向卡池借不到时怎么报（`what_was_booked` 说借的是什么）：此刻借不到、借到的卡上起设备时显存不够，
+/// 照对拍用例那一路打「本次未跑」那一行（同一个记号、原因写显存不够）、交 `Ok(那一行)`，调用方照叫停的样子交回；
+/// 要的比每张卡空着时能借的都大、卡上的显存读不出判红。那一行怎么造、哪几种判红在 [`not_run_line_or_refusal_of_a_lease`]，
+/// 这里只多打印那一行。
+///
+/// # Errors
+/// 同 [`not_run_line_or_refusal_of_a_lease`]。
+#[cfg(feature = "gpu")]
+fn print_the_not_run_line_or_refuse(
+    what_was_booked: &str,
+    refusal: &crate::gpu_unit_checks::gpu_test_start::CardPoolLeaseRefusal,
+) -> Result<String, String> {
+    let not_run_line = not_run_line_or_refusal_of_a_lease(what_was_booked, refusal)?;
+    println!("{not_run_line}");
+    Ok(not_run_line)
+}
+
+/// 起过卡池的产品路径向卡池借不到时那一行「本次未跑」或判红的那一句，不打印（第 10z 批第七块：造那一行与打印分开，不要卡的用例只调这一半，
+/// 测试段的标准输出里不出现门禁会收成本次未跑的那一行）：此刻借不到、借到的卡上起设备时显存不够交 `Ok(那一行)`。
+///
+/// # Errors
+/// 要的比每张卡空着时能借的都大（说法与没有一张卡装得下这条流的表那一句同一类，分项驱动照它认成设备用不上）、卡上的显存读不出。
+#[cfg(feature = "gpu")]
+fn not_run_line_or_refusal_of_a_lease(
+    what_was_booked: &str,
+    refusal: &crate::gpu_unit_checks::gpu_test_start::CardPoolLeaseRefusal,
+) -> Result<String, String> {
+    use crate::gpu_unit_checks::gpu_test_start::CardPoolLeaseRefusal;
+    let refusal = match refusal {
+        CardPoolLeaseRefusal::Booking(refusal) => refusal,
+        CardPoolLeaseRefusal::OutOfGpuMemoryStartingTheDevice { reason } => {
+            return Ok(gpu_not_run_line(
+                PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                reason,
+            ));
+        }
+    };
+    if let BookingRefusal::NeedLargerThanEveryCard(NeedLargerThanEveryCard {
+        need_mebibytes,
+        largest_ceiling_mebibytes,
+    }) = refusal
+    {
+        return Err(format!(
+            "没有一张卡装得下这条流的表与{what_was_booked}：要借 {need_mebibytes} MiB，池里最大的一张卡空着时也只借得出 {largest_ceiling_mebibytes} MiB。\
+             看配置里每张卡的显存额度与卡上此刻的空闲显存"
+        ));
+    }
+    match scratch_booking_refusal_outcome(PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE, 0, refusal) {
+        ScratchBookingRefusalOutcome::NotRun { not_run_line } => Ok(not_run_line),
+        ScratchBookingRefusalOutcome::Red { reason } => Err(format!("{what_was_booked}：{reason}")),
+    }
+}
+
+/// 第 ① 段每张卡上的判器用什么（只列装了状态的卡，按这一趟卡的次序）：借了草稿区的是借来的卡（额度是借的量加驱动那一份，
+/// 判器照它开出来的草稿区正好是借的状态数），每张卡装几个状态（一次派活带几个，都大于 0），借了多少、借据号；
+/// 连同这一趟本机每张卡（与 [`CardCapacityOfThisRun`] 的表逐张对上）各装了几个。
+#[cfg(feature = "gpu")]
+struct ScratchOfTheCards {
+    cards_for_the_judges: Vec<std::sync::Arc<crate::gpu_unit_checks::GpuCard>>,
+    states_placed: Vec<u64>,
+    scratch_booked_mebibytes: Vec<Option<u64>>,
+    scratch_lease_identifiers: Vec<Option<u64>>,
+    states_placed_on_each_card_of_this_run: Vec<u64>,
+    /// 借据（不进账时是空的），判器都丢掉之后才还。
+    leases: Vec<crate::gpu_unit_checks::gpu_test_start::GpuCardLease>,
+}
+
+/// 第 ① 段借草稿区的结局。
+#[cfg(feature = "gpu")]
+enum ScratchOfEachCard {
+    Ready(ScratchOfTheCards),
+    /// 一张卡都借不到：「本次未跑」那一行已经打了（`not_run_line`），什么都没借着。
+    NotRunTheGpuMemoryWasShort {
+        not_run_line: String,
+    },
+}
+
+/// 照卡的来路给第 ① 段装状态、借草稿区（[`scratch_states_to_book_on_each_card`]）。`run_cards` 是这一趟本机每张卡
+/// （[`card_capacities_of_this_run`]），`states_each_card_holds` 是每张卡最多装几个（起过卡池的已照这一刻能借的压过）。
+/// 起过卡池的：按卡的先后把 `pending_states` 个状态装到此刻借得到的卡上，每张在账的锁里现读、照此刻能借的再压一次再借
+/// （显存按 `crate::crash_judge_dispatch::mebibytes_a_judge_needs`，与 GPU 对拍用例借卡同一份），借不到的卡不装；
+/// 一张都借不到就打「本次未跑」那一行（[`print_the_not_run_line_or_refuse`]）。没起过卡池的不借、卡照原样（`cards`，与 `run_cards` 逐张对上），
+/// 照 [`place_states_on_cards_by_priority`] 装。
+///
+/// # Errors
+/// 每张卡空着时连一个状态都放不下、卡上的显存读不出（判红）。
+#[cfg(feature = "gpu")]
+fn scratch_of_each_card_booked_by_where_the_cards_came_from(
+    cards_taken_from: GpuCardsSource,
+    cards: &[std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
+    run_cards: &[CardCapacityOfThisRun],
+    tables: &crate::crash_judge_dispatch::PackedJudgeTables,
+    state_count: u64,
+    pending_states: u64,
+    states_each_card_holds: &[u64],
+) -> Result<ScratchOfEachCard, String> {
+    match scratch_states_to_book_on_each_card(cards_taken_from, states_each_card_holds, state_count)
+    {
+        ScratchStatesToBook::NotBooked => {
+            let states_placed_on_each_card_of_this_run =
+                place_states_on_cards_by_priority(pending_states, states_each_card_holds);
+            let placed: Vec<(&std::sync::Arc<crate::gpu_unit_checks::GpuCard>, u64)> = cards
+                .iter()
+                .zip(&states_placed_on_each_card_of_this_run)
+                .filter(|(_, states_placed)| **states_placed > 0)
+                .map(|(card, states_placed)| (card, *states_placed))
+                .collect();
+            Ok(ScratchOfEachCard::Ready(ScratchOfTheCards {
+                cards_for_the_judges: placed.iter().map(|(card, _)| (*card).clone()).collect(),
+                states_placed: placed
+                    .iter()
+                    .map(|(_, states_placed)| *states_placed)
+                    .collect(),
+                scratch_booked_mebibytes: vec![None; placed.len()],
+                scratch_lease_identifiers: vec![None; placed.len()],
+                states_placed_on_each_card_of_this_run,
+                leases: Vec::new(),
+            }))
+        }
+        ScratchStatesToBook::OnEachCard(states_each_card_lends) => {
+            let card_indices: Vec<u32> = run_cards.iter().map(|card| card.index).collect();
+            let states_each_card_lends: Vec<u64> = states_each_card_lends
+                .into_iter()
+                .map(|states| u64::try_from(states).expect("状态数装得进 u64"))
+                .collect();
+            let booked = match the_card_pool_this_run_takes_its_cards_from()
+                .book_the_scratch_of_the_cards_with_room_now(
+                    PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                    &card_indices,
+                    pending_states,
+                    &states_each_card_lends,
+                    &|states| {
+                        crate::crash_judge_dispatch::mebibytes_a_judge_needs(
+                            tables,
+                            usize::try_from(states).unwrap_or(usize::MAX),
+                        )
+                    },
+                ) {
+                Ok(booked) => booked,
+                Err(refusal) => {
+                    let not_run_line =
+                        print_the_not_run_line_or_refuse("第 ① 段判器的草稿区", &refusal)?;
+                    return Ok(ScratchOfEachCard::NotRunTheGpuMemoryWasShort { not_run_line });
+                }
+            };
+            let mut scratch = ScratchOfTheCards {
+                cards_for_the_judges: Vec::new(),
+                states_placed: Vec::new(),
+                scratch_booked_mebibytes: Vec::new(),
+                scratch_lease_identifiers: Vec::new(),
+                states_placed_on_each_card_of_this_run: vec![0; run_cards.len()],
+                leases: Vec::new(),
+            };
+            for (card_slot, booked_on_the_card) in booked.into_iter().enumerate() {
+                if let Some(crate::gpu_unit_checks::gpu_test_start::ScratchLeaseOnACard {
+                    lease,
+                    states,
+                }) = booked_on_the_card
+                {
+                    scratch
+                        .cards_for_the_judges
+                        .push(std::sync::Arc::new(lease.card().clone()));
+                    scratch.states_placed.push(states);
+                    scratch
+                        .scratch_booked_mebibytes
+                        .push(Some(lease.mebibytes()));
+                    scratch
+                        .scratch_lease_identifiers
+                        .push(Some(lease.lease_identifier()));
+                    scratch.states_placed_on_each_card_of_this_run[card_slot] = states;
+                    scratch.leases.push(lease);
+                }
+            }
+            Ok(ScratchOfEachCard::Ready(scratch))
+        }
+    }
+}
+
+/// 同 [`judge_my_blocks_on_gpu_cards`]，卡的来路另给：起过卡池的（[`GpuCardsSource::TheCardPoolOfThisProcess`]，`cards` 是空的），
+/// 本机每张卡装几个状态照这一刻能借的量压（[`cards_of_the_pool_with_what_each_lends_now`]），判之前把要判的状态装到此刻借得到草稿区的卡上
+/// （[`scratch_of_each_card_booked_by_where_the_cards_came_from`]：借不到的卡这一趟不用，一张都借不到交
+/// [`GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort`]、一块都不判）；判完先丢判器、再还借据。卡上 wgpu 报了 Out of Memory
+/// 同样交 [`GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort`]（打「本次未跑」那一行，之前判完的块在库里）。
+///
+/// # Errors
+/// 同 [`judge_my_blocks_on_gpu_cards`]（Out of Memory 那一形除外）；借草稿区时每张卡空着时连一个状态都放不下、卡上的显存读不出。
+///
+/// # Panics
+/// 同 [`judge_my_blocks_on_gpu_cards`]。
+#[cfg(feature = "gpu")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "库、流、计划、分工、判法版本、卡、卡的来路、叫停，各是各的东西，凑成结构体只为让签名变短"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "备表、装卡、借草稿区、几张卡一起判、按块序写库、收尾，是第 ① 段的全部步骤，拆开要把十几个量来回传"
+)]
+fn judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(
+    store: &mut VerdictStore,
+    flow: &CrashFlow<'_>,
+    plan: &CrashPlan,
+    is_mine: &dyn Fn(u64) -> bool,
+    version: &JudgeVersion,
+    cards: &[std::sync::Arc<crate::gpu_unit_checks::GpuCard>],
+    cards_taken_from: GpuCardsSource,
+    stop_is_requested: &(dyn Fn() -> bool + Sync),
+) -> Result<GpuJudgingOfMyBlocks, String> {
+    use crate::crash_judge_tables::{build_judge_tables_against_the_version_table, JudgeFlow};
     let pending = pending_blocks(store, plan, version, is_mine)
         .map_err(|error| format!("读判定块失败：{error:?}"))?;
     let expansion = |segment_index: usize, segment: &[usize]| {
@@ -2136,7 +2935,10 @@ pub fn judge_my_blocks_on_gpu_cards(
         versions: flow.versions,
         expansion: &expansion,
     };
-    let tables = match build_judge_tables(&judge_flow) {
+    let tables = match build_judge_tables_against_the_version_table(
+        &judge_flow,
+        flow.versions_without_a_file,
+    ) {
         Ok(tables) => tables,
         Err(refusal) => {
             return Err(format!(
@@ -2147,113 +2949,250 @@ pub fn judge_my_blocks_on_gpu_cards(
     let mut tally = CheckingTally::default();
     let mut outcome = GpuJudgeOutcome::default();
     if pending.is_empty() {
-        return Ok((tally, outcome));
+        return Ok(GpuJudgingOfMyBlocks::Judged { tally, outcome });
     }
+    let state_count = tables.state_count;
     let tables = crate::crash_judge_dispatch::PackedJudgeTables::of(&tables);
-    let pending_states: u64 = pending
-        .iter()
-        .map(|(_, local)| local.end - local.start)
-        .sum();
-    let capacities = states_in_flight_of_each_card(cards, &tables);
-    let states_placed = place_states_on_cards_by_priority(pending_states, &capacities);
-    for ((card, capacity), placed) in cards.iter().zip(&capacities).zip(&states_placed) {
-        eprintln!(
-            "CRASH_AMPLIFICATION_GPU_PLACEMENT card={:?} index={} memory_budget_mebibytes={} states_in_flight_capacity={capacity} states_placed={placed} pending_states={pending_states} tables_mebibytes={}",
-            card.name,
-            card.index,
-            card.memory_budget_mebibytes(),
-            tables.mebibytes()
-        );
-    }
-    let Some(first_position) = states_placed.iter().position(|placed| *placed > 0) else {
-        return Err(format!(
-            "没有一张卡装得下这条流的表（{} MiB）与一个状态的草稿区：看配置里每张卡的显存额度与卡上此刻的空闲显存",
-            tables.mebibytes()
-        ));
-    };
-    let work = CardsAtWork {
-        plan,
-        pending: &pending,
-        tables: &tables,
-        cards,
-        states_placed: &states_placed,
-        next_pending: std::sync::atomic::AtomicUsize::new(0),
-        stop: std::sync::atomic::AtomicBool::new(false),
-        stop_is_requested,
-    };
+    // 几轮之间带着的（harness 档，不要卡就测得到）：按块序写库的那一份（上一轮判完、等着前面那一块的，下一轮那一块判完照块序一起写）、
+    // 下一轮的那一队块、报过 Out of Memory 的卡与头一句、收过工的卡
+    let mut rounds: RoundsOfTheCards<GpuJudgedBlock> = RoundsOfTheCards::new(pending.len());
+    // 卡线程与一轮收尾问的是同一个叫停，见过一次就记住（第 10z 批第六块；调用方 `run_from_environment` 交的已经是记住的那一个）
+    let stop_request = StopRequestRememberedInThisRun::new(stop_is_requested);
+    // 这一趟本机每张卡的优先级（头一轮那一份，后面几轮只少不多）：收尾时每张卡的账照它排
+    let mut card_indices_by_priority: Vec<u32> = Vec::new();
     let started = Instant::now();
-    let received = std::thread::scope(|scope| {
-        let (sender, receiver) = std::sync::mpsc::channel::<CardMessage>();
-        let work = &work;
-        scope.spawn(move || {
-            judge_on_one_card_and_start_the_next(scope, work, first_position, sender);
-        });
-        // 卡上判一块、编内核都可能比进度间隔久：等着收的这条线程隔一个间隔打一行按挂钟的
-        let clock = || started.elapsed();
-        let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
-        let received = receive_the_cards_messages_and_store_the_blocks_in_order(
-            &receiver,
-            &mut wall_clock_lines,
-            &clock,
-            pending.len(),
-            &mut |block| {
-                let storing_started = Instant::now();
-                let (point_index, local) = &pending[block.pending_index];
-                let stored = store_judged_block(
-                    store,
-                    &plan.points[*point_index],
-                    local,
-                    version,
-                    &block.items_of_each_state,
-                    &mut tally,
-                );
-                outcome.seconds_storing += storing_started.elapsed().as_secs_f64();
-                match stored {
-                    Ok(()) => {
-                        outcome.blocks_judged += 1;
-                        outcome.states_judged += local.end - local.start;
-                        Ok(())
-                    }
-                    Err(error) => {
-                        work.stop.store(true, std::sync::atomic::Ordering::SeqCst);
-                        Err(format!("写判定块失败：{error:?}"))
+    // 每再起一轮至少少一张卡（报过 Out of Memory 的不再用），轮数不超过卡数
+    loop {
+        let pending_states: u64 = rounds
+            .blocks_of_the_next_round()
+            .iter()
+            .map(|pending_index| {
+                let (_, local) = &pending[*pending_index];
+                local.end - local.start
+            })
+            .sum();
+        let cards_of_the_round: Vec<std::sync::Arc<crate::gpu_unit_checks::GpuCard>> = cards
+            .iter()
+            .filter(|card| !rounds.is_short_of_memory(card.index))
+            .cloned()
+            .collect();
+        let run_cards: Vec<CardCapacityOfThisRun> =
+            card_capacities_of_this_run(cards_taken_from, &cards_of_the_round, &tables)?
+                .into_iter()
+                .filter(|card| !rounds.is_short_of_memory(card.index))
+                .collect();
+        if card_indices_by_priority.is_empty() {
+            card_indices_by_priority = run_cards.iter().map(|card| card.index).collect();
+        }
+        let capacities: Vec<u64> = run_cards
+            .iter()
+            .map(|card| card.states_in_flight_capacity)
+            .collect();
+        let capacities_when_the_cards_are_empty: Vec<u64> = run_cards
+            .iter()
+            .map(|card| card.states_in_flight_capacity_when_the_card_is_empty)
+            .collect();
+        // 借据活到这一轮收尾：几张卡上的判器在下面的线程里判完就丢，丢完才还
+        let scratch = match scratch_step_before_booking(
+            decide_scratch_before_booking(&capacities, &capacities_when_the_cards_are_empty),
+            &run_cards,
+            crate::crash_judge_dispatch::mebibytes_a_judge_needs(&tables, 1),
+        ) {
+            ScratchStepBeforeBooking::BookOnTheCards => {
+                match scratch_of_each_card_booked_by_where_the_cards_came_from(
+                    cards_taken_from,
+                    &cards_of_the_round,
+                    &run_cards,
+                    &tables,
+                    state_count,
+                    pending_states,
+                    &capacities,
+                )? {
+                    ScratchOfEachCard::Ready(scratch) => Some(scratch),
+                    ScratchOfEachCard::NotRunTheGpuMemoryWasShort { not_run_line } => {
+                        return Ok(GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort {
+                            tally,
+                            reason: not_run_line,
+                        });
                     }
                 }
-            },
-            &mut |line| eprintln!("{line}"),
+            }
+            ScratchStepBeforeBooking::NotRunNoCardHoldsAStateNow { not_run_line } => {
+                println!("{not_run_line}");
+                return Ok(GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort {
+                    tally,
+                    reason: not_run_line,
+                });
+            }
+            ScratchStepBeforeBooking::RedNoCardHoldsAStateEvenWhenEmpty => None,
+        };
+        let states_placed_on_each_card_of_this_run = scratch.as_ref().map_or_else(
+            || vec![0; run_cards.len()],
+            |scratch| scratch.states_placed_on_each_card_of_this_run.clone(),
         );
-        if received.storing_error.is_none() && received.refusal.is_none() {
-            // 领走的块（序号连着、从 0 起）每一块都写进了库；没被叫停时领走的就是全部
-            let taken = work
-                .next_pending
-                .load(std::sync::atomic::Ordering::SeqCst)
-                .min(pending.len());
-            assert_eq!(received.blocks_stored, taken, "领走的块每一块都写进了库");
-            assert!(
-                received.blocks_stored == pending.len() || stop_is_requested(),
-                "没人叫停，却有 {} 块没判",
-                pending.len() - received.blocks_stored
+        for ((card, capacity), placed) in run_cards
+            .iter()
+            .zip(&capacities)
+            .zip(&states_placed_on_each_card_of_this_run)
+        {
+            eprintln!(
+                "CRASH_AMPLIFICATION_GPU_PLACEMENT card={:?} index={} memory_budget_mebibytes={} states_in_flight_capacity={capacity} states_placed={placed} pending_states={pending_states} tables_mebibytes={}",
+                card.name,
+                card.index,
+                card.memory_budget_mebibytes,
+                tables.mebibytes()
             );
         }
-        received
-    });
-    outcome.cards = received.finished_cards;
-    if let Some(error) = received.storing_error {
-        return Err(error);
-    }
-    if let Some(reason) = received.refusal {
-        return Err(reason);
+        let Some(scratch) = scratch.filter(|scratch| !scratch.cards_for_the_judges.is_empty())
+        else {
+            if let Some(reason) = rounds.first_out_of_memory().map(str::to_string) {
+                // 报过 Out of Memory 的卡之外没有一张装得下：没有卡能判剩下的块了
+                println!(
+                    "{}",
+                    gpu_not_run_line(PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE, &reason)
+                );
+                return Ok(GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort { tally, reason });
+            }
+            return Err(format!(
+                "没有一张卡装得下这条流的表（{} MiB）与一个状态的草稿区：看配置里每张卡的显存额度与卡上此刻的空闲显存",
+                tables.mebibytes()
+            ));
+        };
+        let work = CardsAtWork {
+            plan,
+            pending: &pending,
+            tables: &tables,
+            cards: &scratch.cards_for_the_judges,
+            states_placed: &scratch.states_placed,
+            scratch_booked_mebibytes: &scratch.scratch_booked_mebibytes,
+            scratch_lease_identifiers: &scratch.scratch_lease_identifiers,
+            blocks: rounds.take_the_blocks_of_the_round(),
+            stop: std::sync::atomic::AtomicBool::new(false),
+            stop_request: &stop_request,
+        };
+        let received = std::thread::scope(|scope| {
+            let (sender, receiver) = std::sync::mpsc::channel::<CardMessage>();
+            let work = &work;
+            scope.spawn(move || {
+                judge_on_one_card_and_start_the_next(scope, work, 0, sender);
+            });
+            // 卡上判一块、编内核都可能比进度间隔久：等着收的这条线程隔一个间隔打一行按挂钟的
+            let clock = || started.elapsed();
+            let mut wall_clock_lines =
+                WallClockProgressLines::every_progress_line_interval(clock());
+            let received = receive_the_cards_messages_and_store_the_blocks_in_order(
+                &receiver,
+                &mut wall_clock_lines,
+                &clock,
+                pending.len(),
+                rounds.stored_in_order(),
+                &mut |block| {
+                    let storing_started = Instant::now();
+                    let (point_index, local) = &pending[block.pending_index];
+                    let stored = store_judged_block(
+                        store,
+                        &plan.points[*point_index],
+                        local,
+                        version,
+                        &block.items_of_each_state,
+                        &mut tally,
+                    );
+                    outcome.seconds_storing += storing_started.elapsed().as_secs_f64();
+                    match stored {
+                        Ok(()) => {
+                            outcome.blocks_judged += 1;
+                            outcome.states_judged += local.end - local.start;
+                            Ok(())
+                        }
+                        Err(error) => {
+                            work.stop.store(true, std::sync::atomic::Ordering::SeqCst);
+                            Err(format!("写判定块失败：{error:?}"))
+                        }
+                    }
+                },
+                &mut |line| eprintln!("{line}"),
+            );
+            received
+        });
+        if let Some(error) = rounds.stored_in_order().storing_error() {
+            return Err(error.to_string());
+        }
+        if let Some(reason) = received.refusal {
+            return Err(reason);
+        }
+        let finished_card_indices: Vec<u32> = received
+            .finished_cards
+            .iter()
+            .map(|card| card.index)
+            .collect();
+        outcome.cards.extend(received.finished_cards);
+        let stop = stop_request.stop_of_the_run();
+        let run_card_indices: Vec<u32> = run_cards.iter().map(|card| card.index).collect();
+        // 收工之后的不变量（没有卡报 Out of Memory 时判完的块都写进了库、没叫停时块都领走了）也在这一步里判
+        match rounds.after_the_round(
+            &work.blocks,
+            &run_card_indices,
+            finished_card_indices,
+            &received.cards_out_of_memory,
+            stop,
+        ) {
+            AfterARoundOfTheCards::EveryBlockStored => {
+                if rounds.first_out_of_memory().is_some() {
+                    eprintln!(
+                        "CRASH_AMPLIFICATION_GPU_OUT_OF_MEMORY_ON_A_CARD 有卡报了 Out of Memory、只停那一张，别的卡判完了全部 {} 块",
+                        pending.len()
+                    );
+                }
+                break;
+            }
+            AfterARoundOfTheCards::StoppedOnRequest => {
+                // 叫停加有卡报过 Out of Memory：显存不够的缘由照本次未跑那一行打出来（第 10z 批第五块代码轮判决 K1-3）
+                if let Some(not_run_line) = rounds.not_run_line_of_a_stop_after_an_out_of_memory(
+                    PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                ) {
+                    println!("{not_run_line}");
+                }
+                break;
+            }
+            AfterARoundOfTheCards::AnotherRoundWithoutTheCardsShortOfMemory => {
+                eprintln!(
+                    "CRASH_AMPLIFICATION_GPU_ANOTHER_ROUND 报了 Out of Memory 的卡 {:?} 收工之后还有 {} 块没写进库，收尾再起一轮、用别的卡判剩下的 {} 块",
+                    rounds.cards_short_of_memory(),
+                    pending.len() - rounds.blocks_stored(),
+                    rounds.blocks_of_the_next_round().len()
+                );
+            }
+            AfterARoundOfTheCards::AnotherRoundOnlyForTheBlocksTheJudgedBlocksWaitFor => {
+                eprintln!(
+                    "CRASH_AMPLIFICATION_GPU_ANOTHER_ROUND_AFTER_THE_STOP 叫停了；报了 Out of Memory 的卡 {:?} 交回的块前面判完的 {} 块在等，再起一轮、用别的卡只判它们在等的那几块，判完照叫停收尾",
+                    rounds.cards_short_of_memory(),
+                    rounds.blocks_waiting()
+                );
+            }
+            AfterARoundOfTheCards::NotRunTheGpuMemoryWasShort => {
+                let reason = rounds
+                    .first_out_of_memory()
+                    .expect("这一轮有卡报了 Out of Memory 才会走到本次未跑这一支")
+                    .to_string();
+                println!(
+                    "{}",
+                    gpu_not_run_line(PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE, &reason)
+                );
+                return Ok(GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort { tally, reason });
+            }
+        }
     }
     outcome.cards.sort_by_key(|card| {
-        cards
+        card_indices_by_priority
             .iter()
-            .position(|candidate| candidate.index == card.index)
+            .position(|index| *index == card.index)
     });
-    outcome.cards_used = outcome.cards.len();
+    // 一张卡在收尾再起的那一轮里又收工一次，`outcome.cards` 里有它两行，用到的卡只算一张（第 10z 批第五块）
+    outcome.cards_used = rounds.cards_used();
     outcome.compile_seconds = outcome.cards.iter().map(|card| card.build_seconds).sum();
     outcome.judge_seconds = (started.elapsed().as_secs_f64() - outcome.compile_seconds).max(0.0);
     outcome.red_states = tally.red_states;
-    Ok((tally, outcome))
+    Ok(GpuJudgingOfMyBlocks::Judged { tally, outcome })
 }
 
 /// GPU 判完这一趟打的那一行：判了多少、多快，连这一趟的展开上限与全域与否（[`run_from_environment`] 打，展开上限只有它知道）。
@@ -2338,12 +3277,26 @@ pub fn verify_blocks_from_facts(
     on: &FactsVerifierOn,
 ) -> Result<VerificationTally, String> {
     let facts = extract_flow_facts(flow.base, flow.writes, flow.segments, flow.expansion);
+    verify_blocks_from_these_facts(store, plan, &facts, is_mine, on)
+}
+
+/// 同 [`verify_blocks_from_facts`]，事实表由调用方抽好（起过卡池的进程按事实表的大小借第 ② 段的缓冲，抽一次、借、再核）。
+///
+/// # Errors
+/// 同 [`verify_blocks_from_facts`]。
+fn verify_blocks_from_these_facts(
+    store: &mut VerdictStore,
+    plan: &CrashPlan,
+    facts: &FlowFacts,
+    is_mine: &dyn Fn(u64) -> bool,
+    on: &FactsVerifierOn,
+) -> Result<VerificationTally, String> {
     let facts_digest = facts.digest();
     store
         .store_flow_facts(&facts_digest, &facts.to_bytes())
         .map_err(|error| format!("事实表写不进库：{error:?}"))?;
     let verifier_digest = on.verifier_digest();
-    let verifier = BlockVerifier::new(on, &facts);
+    let verifier = BlockVerifier::new(on, facts);
     let mut tally = VerificationTally::default();
     let mut block_sequence = 0u64;
     for point in &plan.points {
@@ -2363,7 +3316,7 @@ pub fn verify_blocks_from_facts(
                 continue;
             }
             let ordinals = point.ordinals.start + local.start..point.ordinals.start + local.end;
-            let bits = verifier.verify(&facts, ordinals);
+            let bits = verifier.verify(facts, ordinals);
             tally.verifier_red_states += bits.iter().filter(|value| **value != 0).count() as u64;
             tally.states_verified += bits.len() as u64;
             tally.blocks_verified += 1;
@@ -2381,6 +3334,7 @@ enum BlockVerifier<'card> {
     #[cfg(feature = "gpu")]
     Gpu(Box<crate::crash_verify_gpu::GpuFactsVerifier<'card>>),
     #[cfg(not(feature = "gpu"))]
+    #[expect(dead_code, reason = "没编进 gpu 时只替生命周期参数占位，从不建出")]
     Never(std::marker::PhantomData<&'card ()>),
 }
 
@@ -2621,6 +3575,13 @@ pub fn read_violations(
 mod tests {
     use super::*;
 
+    // 扫源码的用例里，串里的花括号一律写成 \u 转义：门禁 code-source-discipline 的 mutation-tables 格配花括号时不跳字符串，
+    // 串里落单的半边括号会让它把后面的用例算到别的模块下（第 10z 批第八块）。
+    /// 这份文件测试模块的头两行（扫源码的用例从这里切掉测试模块）。
+    const TESTS_MODULE_OPENING: &str = "#[cfg(test)]\nmod tests \u{7b}";
+    /// 顶格的右括号自成一行（测试模块在这里收尾）。
+    const TOP_LEVEL_CLOSING_BRACE_LINE: &str = "\n\u{7d}\n";
+
     /// 配置点名的卡少了哪几张：按配置的次序列出用不上的序号；都在就是空。
     #[test]
     fn configured_cards_that_are_not_usable_are_named_in_the_configured_order() {
@@ -2631,6 +3592,309 @@ mod tests {
         assert_eq!(
             configured_cards_not_usable(&[(0, 32), (1, 16)], &[1, 0, 3]),
             Vec::<u32>::new()
+        );
+    }
+
+    /// 第 10z 批（第 10y 批代码轮判决 K1-3）：一块的几段里，单元校验和对拍时卡上报了 Out of Memory 的，按段序取第一段的原因
+    /// （那一块不入库、这一趟报本次未跑）；都没报是 `None`。不要卡：几段照核对线程交回的造。
+    #[test]
+    fn the_first_piece_short_of_gpu_memory_stops_the_checking_with_its_reason() {
+        let piece = |start: u64, gpu_memory_was_short: Option<&str>| JudgedBlock {
+            local: start..start + 2,
+            items_of_each_state: Vec::new(),
+            red_texts: Vec::new(),
+            gpu_cpu_disagreements: 0,
+            gpu_memory_was_short: gpu_memory_was_short.map(str::to_string),
+        };
+        assert_eq!(
+            reason_the_gpu_memory_was_short_in_one_of_the_pieces(&[
+                piece(0, None),
+                piece(2, Some("显存不够：第二段")),
+                piece(4, Some("显存不够：第三段")),
+            ]),
+            Some("显存不够：第二段".to_string())
+        );
+        assert_eq!(
+            reason_the_gpu_memory_was_short_in_one_of_the_pieces(&[piece(0, None), piece(2, None)]),
+            None
+        );
+    }
+
+    /// 第 10z 批第三块（第 10z 批代码轮判决 K3 攻方第三节第 1445–1447 行）：一块的几段里有一段报了显存不够，这一块不写、不再领下一块，
+    /// 之前判完的块写了，交回的账带着那一段的原因。不要卡、不碰库：判一段与写一块都用假的。
+    #[test]
+    fn a_block_with_a_piece_short_of_gpu_memory_is_not_stored_and_no_later_block_is_taken() {
+        let pending: Vec<(usize, Range<u64>)> = vec![(0, 0..2), (0, 2..4), (0, 4..6), (0, 6..8)];
+        let points = vec![NamesOfACrashPoint {
+            name: "一个点".to_string(),
+            path_number: "0".to_string(),
+        }];
+        let mut stored_block_starts = Vec::new();
+        let tally = check_pending_blocks_in_pieces(
+            &pending,
+            &points,
+            2,
+            &|| false,
+            &|_point_index, local, ending| {
+                drop(ending);
+                let is_short = local.start == 5;
+                JudgedBlock {
+                    items_of_each_state: if is_short {
+                        Vec::new()
+                    } else {
+                        vec![
+                            Vec::new();
+                            usize::try_from(local.end - local.start).expect("一段装得进")
+                        ]
+                    },
+                    local,
+                    red_texts: Vec::new(),
+                    gpu_cpu_disagreements: 0,
+                    gpu_memory_was_short: is_short
+                        .then(|| "显存不够：块 4..6 的第二段".to_string()),
+                }
+            },
+            &mut |_point_index, local, items_of_each_state, _violating| {
+                assert_eq!(
+                    items_of_each_state.len(),
+                    usize::try_from(local.end - local.start).expect("一块装得进"),
+                    "写进库的块每个状态都有判定"
+                );
+                stored_block_starts.push(local.start);
+                Ok(())
+            },
+        )
+        .expect("假的写库不失败");
+        assert_eq!(
+            stored_block_starts,
+            vec![0, 2],
+            "报了的那一块与之后的都不写"
+        );
+        assert_eq!(tally.blocks_checked, 2);
+        assert_eq!(tally.states_checked, 4);
+        assert_eq!(
+            tally.stopped_because_the_gpu_memory_was_short,
+            Some("显存不够：块 4..6 的第二段".to_string())
+        );
+    }
+
+    /// 第 10z 批第五块（第 10z 批第三块代码轮正推 K3 补充 2 第 2 条：第 D 条的接线）：一块切成的几段领的是同一组报到，先收完的那一段等到
+    /// 同一块别的段都报到了才交回（认它是不是显存不够之前，同块别的段范围里接到的都记进了设备）。不要卡、不碰库：判一段与写一块都用假的；
+    /// 段 0 一来就报到、等，别的段等段 0 报到之后过 100 毫秒再报到。每段各领一组时段 0 一报到就交回，那一刻别的段都还没报到。
+    #[test]
+    fn the_pieces_of_one_block_report_their_endings_in_one_group() {
+        let pending: Vec<(usize, Range<u64>)> = vec![(0, 0..3)];
+        let points = vec![NamesOfACrashPoint {
+            name: "一个点".to_string(),
+            path_number: "0".to_string(),
+        }];
+        let pieces_ended = std::sync::atomic::AtomicUsize::new(0);
+        let pieces_ended_when_the_first_piece_returned = std::sync::Mutex::new(None);
+        check_pending_blocks_in_pieces(
+            &pending,
+            &points,
+            3,
+            &|| false,
+            &|_point_index, local, ending| {
+                if local.start == 0 {
+                    pieces_ended.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    ending.end_and_wait_for_the_others();
+                    *pieces_ended_when_the_first_piece_returned
+                        .lock()
+                        .expect("段 0 只有一条线程写") =
+                        Some(pieces_ended.load(std::sync::atomic::Ordering::SeqCst));
+                } else {
+                    let waiting_since = std::time::Instant::now();
+                    while pieces_ended.load(std::sync::atomic::Ordering::SeqCst) == 0 {
+                        assert!(
+                            waiting_since.elapsed() < std::time::Duration::from_secs(60),
+                            "段 0 一分钟都没报到"
+                        );
+                        std::thread::yield_now();
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    pieces_ended.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    ending.end_and_wait_for_the_others();
+                }
+                JudgedBlock {
+                    items_of_each_state: vec![
+                        Vec::new();
+                        usize::try_from(local.end - local.start)
+                            .expect("一段装得进")
+                    ],
+                    local,
+                    red_texts: Vec::new(),
+                    gpu_cpu_disagreements: 0,
+                    gpu_memory_was_short: None,
+                }
+            },
+            &mut |_point_index, _local, _items_of_each_state, _violating| Ok(()),
+        )
+        .expect("假的写库不失败");
+        assert_eq!(
+            pieces_ended_when_the_first_piece_returned
+                .into_inner()
+                .expect("段 0 的线程不 panic"),
+            Some(3),
+            "段 0 等到同一块的三段都报到才交回"
+        );
+    }
+
+    /// 第 10z 批（第 10y 批代码轮正推 K3 列的第 7 处）：池里一张卡此刻照这一刻能借的算带得了几个状态，空着时照空着时能借的算。不要卡。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_pool_card_holds_states_now_by_its_room_now_and_when_empty_by_its_ceiling() {
+        assert_eq!(
+            states_in_flight_now_and_when_the_card_is_empty(
+                singlefs_harness::gpu_memory_ledger::CardRoomForThisProcess {
+                    room_now_mebibytes: 100,
+                    ceiling_mebibytes: 1_000,
+                },
+                &|room_mebibytes| room_mebibytes / 10
+            ),
+            (10, 100)
+        );
+    }
+
+    /// 第 10z 批（第 10y 批代码轮正推 K3 列的第 6 处）：借草稿区之前每张卡此刻都带不了一个状态、至少一张空着时带得了，这一步是报本次未跑
+    /// （GPU 用例的记号、原因写显存不够、带每张卡此刻能借的）；空着时也带不了才判红；有一张此刻带得了就去借。不要卡。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn with_no_card_holding_a_state_now_the_step_before_booking_is_a_not_run_line_not_red() {
+        let run_cards = [CardCapacityOfThisRun {
+            index: 0,
+            name: "造的一张卡".to_string(),
+            max_storage_buffer_binding_size: 1 << 30,
+            memory_budget_mebibytes: crate::crash_judge_dispatch::MEBIBYTES_LEFT_FOR_THE_DRIVER
+                + 700,
+            states_in_flight_capacity: 0,
+            states_in_flight_capacity_when_the_card_is_empty: 3,
+        }];
+        match scratch_step_before_booking(ScratchBeforeBooking::NoCardHoldsAStateNow, &run_cards, 900)
+        {
+            ScratchStepBeforeBooking::NotRunNoCardHoldsAStateNow { not_run_line } => assert!(
+                not_run_line.starts_with(
+                    "NOT_RUN_NO_GPU_ADAPTER test=crash_amplification::run_from_environment reason=显存不够："
+                ) && not_run_line.contains("900 MiB")
+                    && not_run_line.contains("[700]"),
+                "{not_run_line}"
+            ),
+            other @ (ScratchStepBeforeBooking::BookOnTheCards
+            | ScratchStepBeforeBooking::RedNoCardHoldsAStateEvenWhenEmpty) => {
+                panic!("此刻借不到：要报本次未跑，判成了 {other:?}")
+            }
+        }
+        assert_eq!(
+            scratch_step_before_booking(
+                ScratchBeforeBooking::NoCardHoldsAStateEvenWhenEmpty,
+                &run_cards,
+                900
+            ),
+            ScratchStepBeforeBooking::RedNoCardHoldsAStateEvenWhenEmpty
+        );
+        assert_eq!(
+            scratch_step_before_booking(
+                ScratchBeforeBooking::BookOnTheCardsThatHoldAStateNow,
+                &run_cards,
+                900
+            ),
+            ScratchStepBeforeBooking::BookOnTheCards
+        );
+    }
+
+    /// 第 10z 批（第 10y 批代码轮正推 K3 列的第 5 处）：产品路径向卡池借不到时，借到的卡上起设备显存不够与此刻借不到都打本次未跑那一行、
+    /// 交 `Ok`；要的比每张卡空着时都大、卡上的显存读不出判红。不要卡：结局照卡池交回的造；只调不打印的那一半
+    /// （第 10z 批第七块：打印那一半会把造出来的那一行打进测试段的标准输出，门禁收成本次未跑）。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_device_short_of_gpu_memory_on_the_card_lent_is_reported_not_run_like_no_room_now() {
+        use crate::gpu_unit_checks::gpu_test_start::CardPoolLeaseRefusal;
+        assert!(
+            not_run_line_or_refusal_of_a_lease(
+                "单元校验和对拍的缓冲",
+                &CardPoolLeaseRefusal::OutOfGpuMemoryStartingTheDevice {
+                    reason: "显存不够：起设备时".to_string()
+                }
+            )
+            .is_ok_and(|line| line.starts_with("NOT_RUN_NO_GPU_ADAPTER ")
+                && line.ends_with("reason=显存不够：起设备时")),
+            "起设备时显存不够：本次未跑"
+        );
+        assert!(
+            not_run_line_or_refusal_of_a_lease(
+                "单元校验和对拍的缓冲",
+                &CardPoolLeaseRefusal::Booking(BookingRefusal::NoCardHasRoomNow {
+                    need_mebibytes: 900,
+                    card_rooms_mebibytes: vec![700],
+                })
+            )
+            .is_ok_and(|line| line.starts_with("NOT_RUN_NO_GPU_ADAPTER ")),
+            "此刻借不到：本次未跑"
+        );
+        assert!(
+            not_run_line_or_refusal_of_a_lease(
+                "单元校验和对拍的缓冲",
+                &CardPoolLeaseRefusal::Booking(BookingRefusal::NeedLargerThanEveryCard(
+                    NeedLargerThanEveryCard {
+                        need_mebibytes: 40_000,
+                        largest_ceiling_mebibytes: 29_550,
+                    }
+                ))
+            )
+            .is_err(),
+            "比每张卡空着时都大：判红"
+        );
+        assert!(
+            not_run_line_or_refusal_of_a_lease(
+                "单元校验和对拍的缓冲",
+                &CardPoolLeaseRefusal::Booking(BookingRefusal::CardMemoryUnreadable {
+                    reason: "nvidia-smi 起不来".to_string()
+                })
+            )
+            .is_err(),
+            "读不出：判红"
+        );
+    }
+
+    /// 第 10z 批第七块：产品路径借不到时那一行照旧打进标准输出（造那一行与打印分开之后，打印那一半交 `Ok` 之前打它；
+    /// 不要卡的用例调的是不打印的那一半，钉不住这一句）。扫这份源码，不要卡。
+    #[test]
+    fn the_product_path_prints_the_not_run_line_of_a_lease_it_could_not_get() {
+        let lines = code_lines_outside_the_tests();
+        let start = lines
+            .iter()
+            .position(|line| line.trim() == "fn print_the_not_run_line_or_refuse(")
+            .expect("产品路径有打印借不到那一行的那一半");
+        let body = lines[start..]
+            .iter()
+            .take_while(|line| line.as_str() != "\u{7d}")
+            .map(|line| line.trim().to_string())
+            .collect::<Vec<String>>();
+        let line_made = body
+            .iter()
+            .position(|line| {
+                line == "let not_run_line = not_run_line_or_refusal_of_a_lease(what_was_booked, refusal)?;"
+            })
+            .unwrap_or_else(|| panic!("打印那一半先照不打印的那一半造那一行：{body:?}"));
+        let line_printed = body
+            .iter()
+            .position(|line| line == "println!(\"{not_run_line}\");")
+            .unwrap_or_else(|| panic!("打印那一半要把造出来的那一行打进标准输出：{body:?}"));
+        let line_handed_back = body
+            .iter()
+            .position(|line| line == "Ok(not_run_line)")
+            .unwrap_or_else(|| panic!("打印那一半交回造出来的那一行：{body:?}"));
+        assert!(
+            line_made < line_printed && line_printed < line_handed_back,
+            "先造、再打、再交回：{body:?}"
+        );
+        assert_eq!(
+            lines
+                .iter()
+                .filter(|line| line.contains("print_the_not_run_line_or_refuse("))
+                .count(),
+            4,
+            "产品路径的三处借不到都经打印的那一半（加上它自己的定义一处）"
         );
     }
 
@@ -2653,6 +3917,68 @@ mod tests {
             first_state_the_gpu_could_not_judge(&[judged, judged, checker_gave_up]),
             Some(2)
         );
+    }
+
+    /// 第 10w 批：第 ② 段核对在卡上建的缓冲进账的量（文件头第 5 条）。录制流 3 次写（12 个字）、一张撕裂镜像带 2 对重放（4 个字）、
+    /// 2 段（12 个字）、段里共 3 次写（3 个字），单元与根都没有（空表各建一个字）：上卡一次 33 个字 132 字节；一块 65 536 个状态一趟
+    /// 建头 12 个字、结论与回读各 65 536 个字，同时两趟活着：合起来 1 048 804 字节，向上取整 2 MiB。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn the_facts_verifier_books_its_tables_once_and_two_blocks_of_header_verdicts_and_readback() {
+        let facts = FlowFacts {
+            recorded_write_count: 3,
+            enumerated_write_count: 3,
+            is_tearable: vec![true, false, false],
+            torn_images: vec![crate::crash_facts::TornImageFact {
+                write_index: 0,
+                torn_image_index: 0,
+                replays: vec![(0, 1), (1, 2)],
+            }],
+            segments: vec![
+                crate::crash_facts::SegmentFact {
+                    writes: vec![0, 1],
+                    states: 0..4,
+                },
+                crate::crash_facts::SegmentFact {
+                    writes: vec![2],
+                    states: 4..6,
+                },
+            ],
+            state_count: 6,
+            units: Vec::new(),
+            roots: Vec::new(),
+            newest_base_root: None,
+        };
+        let footprint = facts_verifier_buffer_footprint(&facts, STATES_PER_BLOCK);
+        assert_eq!(
+            footprint,
+            GpuBufferFootprint {
+                bytes_uploaded_once: 132,
+                bytes_of_one_pass: (12 + 2 * 65_536) * 4,
+                passes_alive_at_once: 2,
+            },
+            "六张表上卡一次（空表各一个字），一块一趟建头、结论与回读"
+        );
+        assert_eq!(footprint.mebibytes(), 2);
+    }
+
+    /// 第 10w 批：单元校验和对拍在卡上建的缓冲进账的量（文件头第 5 条）。这条流 10 次单元写、32 条核对线程：一个状态一趟 20 段，
+    /// 每段一个 32 KiB 的槽、一个长度字、一条结果与回读，加 16 字节派活参数，共 655 776 字节；每条线程同时两趟活着：64 趟，
+    /// 合起来 41 969 664 字节，向上取整 41 MiB。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn unit_checksums_book_two_ranges_per_unit_write_for_two_passes_on_every_checking_thread() {
+        let footprint = unit_checksum_buffer_footprint(10, 32);
+        assert_eq!(
+            footprint,
+            GpuBufferFootprint {
+                bytes_uploaded_once: 0,
+                bytes_of_one_pass: 20 * (32_768 + 4 + 16) + 16,
+                passes_alive_at_once: 64,
+            },
+            "每次单元写两段、每条线程两趟"
+        );
+        assert_eq!(footprint.mebibytes(), 41);
     }
 
     /// 显卡优先级照写的次序读：写在前面的先装；额度带单位（G、M，1024 进制）。写法不对的每一种都拒。
@@ -3049,6 +4375,7 @@ mod tests {
                         items_of_each_state: vec![Vec::new(), Vec::new()],
                         red_texts: Vec::new(),
                         gpu_cpu_disagreements: 0,
+                        gpu_memory_was_short: None,
                     })
                     .expect("收的那一头还在等");
             });
@@ -3119,6 +4446,7 @@ mod tests {
         let mut wall_clock_lines = WallClockProgressLines::every_progress_line_interval(clock());
         let mut printed: Vec<String> = Vec::new();
         let mut blocks_handed_to_the_store = 0usize;
+        let mut stored_in_order: BlocksStoredInOrder<GpuJudgedBlock> = BlocksStoredInOrder::new();
         let received = std::thread::scope(|scope| {
             scope.spawn(move || {
                 release_receiver.recv().expect("时钟读到第 4 次就放行");
@@ -3139,6 +4467,9 @@ mod tests {
                     seconds_decoding: 0.0,
                     states_in_the_widest_dispatch: 0,
                     seconds_of_the_longest_dispatch: 0.0,
+                    scratch_booked_mebibytes: None,
+                    scratch_lease_on_the_books_when_the_judge_was_built: None,
+                    scratch_lease_on_the_books_when_the_judging_finished: None,
                 };
                 card_sender
                     .send(CardMessage::Finished(finished_card))
@@ -3149,6 +4480,7 @@ mod tests {
                 &mut wall_clock_lines,
                 &clock,
                 3,
+                &mut stored_in_order,
                 &mut |_block| {
                     blocks_handed_to_the_store += 1;
                     Ok(())
@@ -3173,38 +4505,129 @@ mod tests {
             "收工的那张卡照样记下"
         );
         assert_eq!(
-            (received.blocks_stored, blocks_handed_to_the_store),
+            (stored_in_order.blocks_stored(), blocks_handed_to_the_store),
             (0, 0),
             "块 1 在等块 0，一块都不写"
         );
-        assert_eq!(received.storing_error, None);
+        assert_eq!(stored_in_order.storing_error(), None);
         assert_eq!(received.refusal, None);
+    }
+
+    /// 第 10x 批代码轮判决 K1-3（攻方 R2）：卡线程上的错误范围接到 Out of Memory 就是显存不够（活成没成都一样）；没接到而活 panic 了，
+    /// 设备上从活开始起记了 Out of Memory（另起的线程上编内核时没接住的）也是显存不够；都没有照样抛；活没 panic 交结果。
+    /// 不要卡：几样输入照 [`on_the_card_catching_out_of_memory`] 收到的造。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn a_panic_on_the_card_after_an_out_of_memory_on_another_thread_is_put_down_to_gpu_memory() {
+        let panicked = || -> std::thread::Result<u32> {
+            Err(Box::new("恢复内核的编译线程不 panic"))
+        };
+        assert!(
+            matches!(
+                decide_the_work_on_the_card(
+                    panicked(),
+                    None,
+                    Some("另起的线程上没接住的 Out of Memory".to_string())
+                ),
+                WorkOnTheCard::OutOfMemory { ref detail } if detail == "另起的线程上没接住的 Out of Memory"
+            ),
+            "范围没接到、设备上记了：显存不够，不往外抛"
+        );
+        assert!(
+            matches!(
+                decide_the_work_on_the_card(panicked(), Some("Out of Memory".to_string()), None),
+                WorkOnTheCard::OutOfMemory { .. }
+            ),
+            "范围接到了：显存不够"
+        );
+        assert!(
+            matches!(
+                decide_the_work_on_the_card(Ok(7u32), Some("Out of Memory".to_string()), None),
+                WorkOnTheCard::OutOfMemory { .. }
+            ),
+            "活成了而范围接到 Out of Memory：缓冲没建成，判的不作数"
+        );
+        assert!(
+            matches!(
+                decide_the_work_on_the_card(panicked(), None, None),
+                WorkOnTheCard::Panicked(_)
+            ),
+            "都没有：照样往外抛"
+        );
+        assert!(
+            matches!(
+                decide_the_work_on_the_card(Ok(7u32), None, None),
+                WorkOnTheCard::Done(7)
+            ),
+            "活成了：交结果"
+        );
+    }
+
+    /// 第 10x 批：卡上 wgpu 报了 Out of Memory（[`CardMessage::OutOfMemory`]，文件头第 5 条）记成显存不够、按卡记下，不记成拒判
+    /// （拒判整趟判红，显存不够这一趟报本次未跑）；之前判完的块照写进库。不要卡：卡上的线程换成直接发这几句话。
+    #[cfg(feature = "gpu")]
+    #[test]
+    fn an_out_of_memory_on_a_card_is_kept_apart_from_a_refusal_and_the_blocks_judged_before_it_are_stored(
+    ) {
+        let (card_sender, card_receiver) = std::sync::mpsc::channel::<CardMessage>();
+        card_sender
+            .send(CardMessage::Block(GpuJudgedBlock {
+                pending_index: 0,
+                items_of_each_state: vec![Vec::new()],
+            }))
+            .expect("收的那一头还在");
+        for (index, reason) in [(0, "第一张卡报的那一句"), (1, "第二张卡报的那一句")]
+        {
+            card_sender
+                .send(CardMessage::OutOfMemory {
+                    index,
+                    reason: reason.to_string(),
+                })
+                .expect("收的那一头还在");
+        }
+        drop(card_sender);
+        let mut wall_clock_lines =
+            WallClockProgressLines::every_progress_line_interval(std::time::Duration::ZERO);
+        let mut blocks_handed_to_the_store = 0usize;
+        let mut stored_in_order: BlocksStoredInOrder<GpuJudgedBlock> = BlocksStoredInOrder::new();
+        let received = receive_the_cards_messages_and_store_the_blocks_in_order(
+            &card_receiver,
+            &mut wall_clock_lines,
+            &|| std::time::Duration::ZERO,
+            2,
+            &mut stored_in_order,
+            &mut |_block| {
+                blocks_handed_to_the_store += 1;
+                Ok(())
+            },
+            &mut |_line| {},
+        );
+        assert_eq!(
+            received.cards_out_of_memory,
+            vec![
+                (0, "第一张卡报的那一句".to_string()),
+                (1, "第二张卡报的那一句".to_string())
+            ],
+            "报了 Out of Memory 的卡按收到的次序都记下"
+        );
+        assert_eq!(
+            received.refusal, None,
+            "Out of Memory 不记成拒判：拒判整趟判红，显存不够报本次未跑"
+        );
+        assert_eq!(
+            (stored_in_order.blocks_stored(), blocks_handed_to_the_store),
+            (1, 1),
+            "Out of Memory 之前判完的块 0 照写进库"
+        );
     }
 
     /// K5：这份文件里每一处按名字读环境变量（`env::var("…")`、`env::var_os("…")`，测试模块之外），名字都在
     /// [`ENVIRONMENT_VARIABLES_READ_BY_A_RUN`] 里：用例的环境守卫照这张表清、还原，漏一个就会读到调用方留下的值。
     #[test]
     fn every_environment_variable_this_file_reads_by_name_is_in_the_list_a_run_reads() {
-        let source = std::fs::read_to_string(
-            Path::new(env!("CARGO_MANIFEST_DIR")).join("src/crash_amplification.rs"),
-        )
-        .expect("读得了这份源文件");
-        let tests_start = source
-            .find("#[cfg(test)]\nmod tests {")
-            .expect("这份文件有测试模块");
-        let tests_end = tests_start
-            + source[tests_start..]
-                .find("\n}\n")
-                .expect("测试模块在顶格的右括号处收尾");
-        let outside_the_tests = format!("{}{}", &source[..tests_start], &source[tests_end..]);
-        let mut names_read = Vec::new();
-        for opening in ["env::var(\"", "env::var_os(\""] {
-            for (position, _) in outside_the_tests.match_indices(opening) {
-                let rest = &outside_the_tests[position + opening.len()..];
-                let name = &rest[..rest.find('"').expect("变量名的串收得了尾")];
-                names_read.push(name.to_string());
-            }
-        }
+        let names_read = environment_variables_read_by_name_outside_the_tests(include_str!(
+            "crash_amplification.rs"
+        ));
         assert!(
             names_read.len() >= 10,
             "按名字读的环境变量少得不对，扫法坏了：{names_read:?}"
@@ -3213,6 +4636,1584 @@ mod tests {
             assert!(
                 ENVIRONMENT_VARIABLES_READ_BY_A_RUN.contains(&name.as_str()),
                 "{name} 在这份文件里按名字读，却不在 ENVIRONMENT_VARIABLES_READ_BY_A_RUN 里"
+            );
+        }
+    }
+
+    /// `source`（这份源文件，或用例在它上面改过的一份）测试模块之外按名字读的环境变量（`env::var("…")`、`env::var_os("…")`），照源码次序。
+    fn environment_variables_read_by_name_outside_the_tests(source: &str) -> Vec<String> {
+        let outside_the_tests = text_outside_the_tests_module(source);
+        let mut names_read = Vec::new();
+        for opening in ["env::var(\"", "env::var_os(\""] {
+            for (position, _) in outside_the_tests.match_indices(opening) {
+                let rest = &outside_the_tests[position + opening.len()..];
+                let name = &rest[..rest.find('"').expect("变量名的串收得了尾")];
+                names_read.push(name.to_string());
+            }
+        }
+        names_read
+    }
+
+    /// `source`（这份源文件，或用例在它上面改过的一份）去掉测试模块之后的文本：从测试模块的头两行起，到与它配对的顶格右括号那一行止，
+    /// 连同这两处一起去掉。头两行只认这一种，与卡池扫源码那一份（`gpu_unit_checks.rs` 的 `code_before_the_tests_module`）同一口径、
+    /// 按行逐字：
+    /// - 相邻两整行逐字是 [`TESTS_MODULE_OPENING`] 那两行（`#[cfg(test)]`，与 `mod tests`、一个空格、一个左花括号；行首起、行尾止，不带别的空白与注释，换行是 `\n`），在代码里（注释与字面量之外）；
+    /// - 在花括号的第 0 层，也在圆括号、方括号的第 0 层；
+    /// - 前一个词（空白、注释、字面量都跳过）是分号、右花括号、右方括号或文件开头。
+    ///
+    /// 照原文找第一处时，块注释里写一份就把切口挪到注释那里，注释与真测试模块之间的代码被当成测试切掉（第 10z 批第二十三块）；
+    /// 拿一个吃掉 `#[cfg(test)]` 的宏把测试模块包进一次宏调用的圆括号里，那个「测试模块」在非测试构建里照编、里面藏的层照样可调用，
+    /// 头两行却仍在花括号第 0 层（第 10z 批第二十五块，正推 K4-1 S14），宏调用的括号里头两行前一个词是 `(`，前面先放一条以分号收尾的
+    /// 条目也还在圆括号里。这一份原先每行去掉行尾空白再比，第二十五块对齐成逐字：这两份文件是 rustfmt 出的，头两行就是这一种写法，
+    /// 别的写法（`mod tests` 后面不空格就接左花括号、写在一行、`#[ cfg ( test ) ]`、多空格、缩进、行尾带空白或注释、CRLF 换行）一律判红，是故意拒。
+    ///
+    /// # Panics
+    /// 照上面那样认的头两行不是恰好一处，或它之后没有收尾的顶格右括号行。
+    fn text_outside_the_tests_module(source: &str) -> String {
+        let lines: Vec<&str> = source.split('\n').collect();
+        let read_lines = lines_read_past_comments_and_literals(&lines);
+        let (attribute_line, module_line) = TESTS_MODULE_OPENING
+            .split_once('\n')
+            .expect("测试模块的头两行是两行");
+        let code_before_the_line = |line_index: usize| -> String {
+            read_lines[..line_index]
+                .iter()
+                .map(|read_line| read_line.without_comments_and_literals.as_str())
+                .collect::<Vec<&str>>()
+                .join("\n")
+        };
+        let openings: Vec<usize> = read_lines
+            .windows(2)
+            .enumerate()
+            .filter(|(line_index, pair)| {
+                pair[0].without_comments_and_literals == attribute_line
+                    && pair[1].without_comments_and_literals == module_line
+                    && pair[0].brace_depth_at_the_start == 0
+                    && parenthesis_and_bracket_depth_at_the_end_of(&code_before_the_line(
+                        *line_index,
+                    )) == 0
+                    && {
+                        let code_before_the_attribute_line = code_before_the_line(*line_index);
+                        let last_code = code_before_the_attribute_line.trim_end();
+                        last_code.is_empty() || last_code.ends_with([';', '\u{7d}', ']'])
+                    }
+            })
+            .map(|(line_index, _pair)| line_index)
+            .collect();
+        assert_eq!(
+            openings.len(),
+            1,
+            "代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的行号（从 0 数）：{openings:?}"
+        );
+        let opening = openings[0];
+        let closing = opening
+            + 1
+            + read_lines[opening + 1..]
+                .iter()
+                .position(|read_line| {
+                    read_line.brace_depth_at_the_start == 1
+                        && read_line.without_comments_and_literals.trim_end()
+                            == TOP_LEVEL_CLOSING_BRACE_LINE.trim()
+                })
+                .expect("测试模块在顶格的右括号行收尾");
+        lines[..opening]
+            .iter()
+            .chain(&lines[closing + 1..])
+            .copied()
+            .collect::<Vec<&str>>()
+            .join("\n")
+    }
+
+    /// `code`（注释与字面量已换成空格）读到结尾时还没收尾的圆括号与方括号有几层。
+    ///
+    /// # Panics
+    /// 右圆括号、右方括号多于左的。
+    fn parenthesis_and_bracket_depth_at_the_end_of(code: &str) -> usize {
+        code.chars().fold(0_usize, |depth, character| {
+            if matches!(character, '(' | '[') {
+                depth + 1
+            } else if matches!(character, ')' | ']') {
+                depth.checked_sub(1).expect("右圆括号、右方括号不多于左的")
+            } else {
+                depth
+            }
+        })
+    }
+
+    /// 这份源文件测试模块之外的代码行（注释行不算）。
+    fn code_lines_outside_the_tests() -> Vec<String> {
+        text_outside_the_tests_module(include_str!("crash_amplification.rs"))
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .map(str::to_string)
+            .collect()
+    }
+
+    /// 第 10z 批第六块（第 10z 批第五块代码轮判决 K2-2，攻方 F2）：叫停文件只在一处读进这一趟记住的那一个叫停
+    /// （`StopRequestRememberedInThisRun::new`），外层循环、卡线程、一轮收尾与整趟收尾不再各自现读文件。扫这份源码，不要卡。
+    #[test]
+    fn the_run_reads_the_stop_file_only_into_the_stop_request_it_remembers() {
+        let lines_naming_the_stop_file_reader: Vec<String> = code_lines_outside_the_tests()
+            .into_iter()
+            .filter(|line| line.contains(concat!("stop_is_requested_", "by_the_environment")))
+            .map(|line| line.trim().to_string())
+            .collect();
+        assert_eq!(
+            lines_naming_the_stop_file_reader,
+            vec![
+                concat!(
+                    "pub fn stop_is_requested_",
+                    "by_the_environment() -> bool \u{7b}"
+                )
+                .to_string(),
+                concat!(
+                    "let stop_request = StopRequestRememberedInThisRun::new(&stop_is_requested_",
+                    "by_the_environment);"
+                )
+                .to_string(),
+            ],
+            "读叫停文件的只有定义它的那一处与这一趟记住叫停的那一处"
+        );
+    }
+
+    /// 第 10z 批第六块（第 10z 批第五块代码轮判决 K1-3）：第 ① 段在卡上判、照叫停收尾的那一支打头一句 Out of Memory 那一行
+    /// （`RoundsOfTheCards::not_run_line_of_a_stop_after_an_out_of_memory`，harness 档钉它的形态）。扫这份源码，不要卡。
+    #[test]
+    fn the_gpu_rounds_stopped_on_request_print_the_first_out_of_memory_in_the_not_run_line() {
+        let lines = code_lines_outside_the_tests();
+        let arm = lines
+            .iter()
+            .position(|line| line.trim() == "AfterARoundOfTheCards::StoppedOnRequest => \u{7b}")
+            .expect("第 ① 段几轮卡的收尾里有照叫停收尾那一支");
+        let arm_body = lines[arm..]
+            .iter()
+            .take_while(|line| line.trim() != "break;")
+            .cloned()
+            .collect::<Vec<String>>()
+            .join("\n");
+        assert!(
+            arm_body.contains(".not_run_line_of_a_stop_after_an_out_of_memory(")
+                && arm_body.contains("PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE")
+                && arm_body
+                    .lines()
+                    .any(|line| line.trim() == "println!(\"{not_run_line}\");"),
+            "照叫停收尾那一支要把头一句 Out of Memory 那一行打进标准输出（整行比，`eprintln!` 不算）：{arm_body}"
+        );
+    }
+
+    /// 第 10z 批第八块（第 10z 批第六块代码轮判决 K4，正推第 3 点：checker 档接线五种改回去，两条扫源码用例照绿）：这一趟记住的那一个叫停
+    /// 一路交到一轮收尾（A）、起下一张卡（B）、卡线程判块那一圈（C）与整趟收尾（D）；E（照叫停收尾那一支打进标准输出）在上一条。扫这份源码，不要卡。
+    #[test]
+    fn the_stop_request_remembered_in_this_run_reaches_the_rounds_the_next_card_the_card_threads_and_the_run(
+    ) {
+        let lines: Vec<String> = code_lines_outside_the_tests()
+            .iter()
+            .map(|line| line.trim().to_string())
+            .collect();
+        let count = |expected: &str| {
+            lines
+                .iter()
+                .filter(|line| line.as_str() == expected)
+                .count()
+        };
+        for (expected, what) in [
+            (
+                concat!("let stop = stop_request.", "stop_of_the_run();"),
+                "一轮收尾问这一趟记住的叫停（A）",
+            ),
+            (
+                concat!("&|| work.", "stop_of_the_cards(),"),
+                "卡线程判块那一圈问卡上的叫停（C）",
+            ),
+            (
+                concat!(
+                    "let stop_is_requested = || stop_",
+                    "request.is_requested();"
+                ),
+                "整趟收尾问的是记住的那一个（D）",
+            ),
+            (
+                concat!(
+                    "let stop_was_requested = gpu_memory_was_short || stop_",
+                    "is_requested();"
+                ),
+                "整趟收尾照它判提早收尾（D）",
+            ),
+        ] {
+            assert_eq!(count(expected), 1, "{what}：要有一行 {expected}");
+        }
+        let start = lines
+            .iter()
+            .position(|line| line.starts_with("fn start_the_next_card_with_states<"))
+            .expect("有起下一张卡的那一个函数");
+        let next_card_body: Vec<&String> = lines[start..]
+            .iter()
+            .take_while(|line| line.as_str() != "\u{7d}")
+            .collect();
+        assert!(
+            next_card_body
+                .iter()
+                .any(|line| line.as_str() == concat!("work.", "stop_of_the_cards()")),
+            "起下一张卡照卡上的叫停问（B）：{next_card_body:?}"
+        );
+    }
+
+    /// 第 10z 批第十一块（第 10z 批第七八九块代码轮判决 K5，正推六·二：交给第 ① 段在卡上判与 CPU 判器的叫停那一行换成永不叫停，
+    /// 上一条照绿）：这一趟记住的那一个叫停（`stop_is_requested`）就是交给 `judge_my_blocks_on_gpu` 与 `check_selected_blocks` 的那一个
+    /// （两处调用的最后一个参数整行比）。下游各层把收到的叫停原样往下交，换掉就是那一层的参数没用上、编译器报没用的变量。扫这份源码，不要卡。
+    #[test]
+    fn the_stop_request_remembered_in_this_run_is_the_one_handed_to_the_gpu_judge_and_the_cpu_checker(
+    ) {
+        let lines: Vec<String> = code_lines_outside_the_tests()
+            .iter()
+            .map(|line| line.trim().to_string())
+            .collect();
+        for (call_opening, what) in [
+            (
+                concat!(
+                    "(ComputedOn::Gpu, Some(cards)) => match judge_my_blocks_on_gpu",
+                    "("
+                ),
+                "第 ① 段在卡上判",
+            ),
+            (
+                concat!("let checking = check_selected_blocks", "("),
+                "第 ① 段 CPU 判器",
+            ),
+        ] {
+            let openings: Vec<usize> = lines
+                .iter()
+                .enumerate()
+                .filter(|(_line_index, line)| line.as_str() == call_opening)
+                .map(|(line_index, _line)| line_index)
+                .collect();
+            assert_eq!(openings.len(), 1, "{what}：这份源码里有一处 {call_opening}");
+            let arguments: Vec<&String> = lines[openings[0] + 1..]
+                .iter()
+                .take_while(|line| !line.starts_with(')'))
+                .collect();
+            assert_eq!(
+                arguments.last().map(|argument| argument.as_str()),
+                Some(concat!("&stop_is_", "requested,")),
+                "{what}收到的叫停是这一趟记住的那一个：{arguments:?}"
+            );
+        }
+    }
+
+    /// `line` 里 `stop_is_requested` 作为整个名字出现了几次（前后不连着字母、数字、下划线：`stop_is_requested_by_the_environment`、
+    /// `_stop_is_requested` 不算）。
+    fn whole_name_uses_of_the_stop_request(line: &str) -> usize {
+        whole_word_positions(line, STOP_REQUEST_PARAMETER_NAME).len()
+    }
+
+    /// 收叫停的那几层给叫停参数起的名字。
+    const STOP_REQUEST_PARAMETER_NAME: &str = concat!("stop_is_", "requested");
+
+    /// `text` 里 `word` 作为整个名字出现的每一处起点（前后不连着字母、数字、下划线）。
+    fn whole_word_positions(text: &str, word: &str) -> Vec<usize> {
+        let is_part_of_a_name = |neighbour: Option<char>| {
+            neighbour.is_some_and(|neighbour_character| {
+                neighbour_character.is_alphanumeric() || neighbour_character == '_'
+            })
+        };
+        text.match_indices(word)
+            .filter(|(position, _word)| {
+                !is_part_of_a_name(text[..*position].chars().next_back())
+                    && !is_part_of_a_name(text[position + word.len()..].chars().next())
+            })
+            .map(|(position, _word)| position)
+            .collect()
+    }
+
+    /// 叫停参数的类型，去掉空白。
+    const STOP_REQUEST_TYPE_WITHOUT_SPACES: &str = "&(dynFn()->bool+Sync)";
+
+    /// `text` 跳过空白读下去恰以 `pattern_without_spaces` 起头时，那一截（连同中间的空白）收尾之后的位置；不是就交 `None`。
+    fn end_of_a_prefix_ignoring_whitespace(
+        text: &str,
+        pattern_without_spaces: &str,
+    ) -> Option<usize> {
+        let mut pattern_characters = pattern_without_spaces.chars().peekable();
+        for (offset, character) in text.char_indices() {
+            let Some(expected_character) = pattern_characters.peek() else {
+                return Some(offset);
+            };
+            if character.is_whitespace() {
+                continue;
+            }
+            if character != *expected_character {
+                return None;
+            }
+            pattern_characters.next();
+        }
+        pattern_characters.peek().is_none().then_some(text.len())
+    }
+
+    /// 源码里写着叫停类型的一处（参数、`let` 的类型标注、字段都算）。
+    struct PlaceTakingTheStopRequest<'code> {
+        /// 往前最近的 `fn` 后面那个名字（往前没有 `fn` 的交空串）。
+        layer: &'code str,
+        /// 类型前面 `名字:` 的那个名字（前面不是 `名字:` 的交空串）。
+        parameter: &'code str,
+        /// 参数名前面紧挨着的是不是属性的右方括号（`#[cfg(any())] stop_is_requested: …`）。
+        is_the_parameter_under_an_attribute: bool,
+        /// 类型起头（`&`）的位置。
+        start_of_the_type: usize,
+        /// 类型收尾之后的位置。
+        end_of_the_type: usize,
+    }
+
+    /// `code`（注释与字面量已换成空格）里每一处叫停类型，照源码次序：类型里的空白随意、可以跨行，参数与别的参数挤在签名那一行、
+    /// 参数换了名字的都找得到。
+    fn places_taking_the_stop_request(code: &str) -> Vec<PlaceTakingTheStopRequest<'_>> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let identifier_at_the_end_of = |text: &str| -> usize {
+            text.char_indices()
+                .rev()
+                .take_while(|(_index, character)| is_identifier_character(*character))
+                .last()
+                .map_or(text.len(), |(index, _character)| index)
+        };
+        code.match_indices('&')
+            .filter_map(|(ampersand, _ampersand)| {
+                let end_of_the_type = ampersand
+                    + end_of_a_prefix_ignoring_whitespace(
+                        &code[ampersand..],
+                        STOP_REQUEST_TYPE_WITHOUT_SPACES,
+                    )?;
+                let before_the_type = code[..ampersand].trim_end();
+                let before_the_colon = before_the_type
+                    .strip_suffix(':')
+                    .filter(|before_the_colon| !before_the_colon.ends_with(':'))
+                    .map(str::trim_end);
+                let parameter = before_the_colon.map_or("", |before_the_name| {
+                    &before_the_name[identifier_at_the_end_of(before_the_name)..]
+                });
+                let is_the_parameter_under_an_attribute =
+                    before_the_colon.is_some_and(|before_the_name| {
+                        before_the_name[..identifier_at_the_end_of(before_the_name)]
+                            .trim_end()
+                            .ends_with(']')
+                    });
+                let layer = whole_word_positions(&code[..ampersand], "fn")
+                    .last()
+                    .map_or("", |fn_keyword| {
+                        let after_the_keyword = code[fn_keyword + 2..ampersand].trim_start();
+                        let name_length = after_the_keyword
+                            .find(|character: char| !is_identifier_character(character))
+                            .unwrap_or(after_the_keyword.len());
+                        &after_the_keyword[..name_length]
+                    });
+                Some(PlaceTakingTheStopRequest {
+                    layer,
+                    parameter,
+                    is_the_parameter_under_an_attribute,
+                    start_of_the_type: ampersand,
+                    end_of_the_type,
+                })
+            })
+            .collect()
+    }
+
+    /// 叫停那种闭包的形（不问参数）到返回类型之前那一截，去掉空白；`FnMut`、`FnOnce` 与函数指针 `fn() -> …` 也算。返回类型交 `bool`
+    /// 的才算叫停（[`end_of_a_bool_return_type`]）。
+    const STOP_REQUEST_SHAPES_UP_TO_THE_RETURN_TYPE_WITHOUT_SPACES: [&str; 4] =
+        ["Fn()->", "FnMut()->", "FnOnce()->", "fn()->"];
+
+    /// 叫停那种闭包交的 `bool` 的写法，去掉空白：按路径写到 `core`、`std` 里那个原始类型的也算（第 10z 批第二十五块，正推 K4-1 N01）。
+    const WAYS_TO_WRITE_BOOL_WITHOUT_SPACES: [&str; 5] = [
+        "bool",
+        "::core::primitive::bool",
+        "core::primitive::bool",
+        "::std::primitive::bool",
+        "std::primitive::bool",
+    ];
+
+    /// `text`（叫停那种闭包的形 `->` 之后那一截）以交 `bool` 的返回类型起头时，那个 `bool` 收尾之后的位置；不是就交 `None`。
+    /// 空白随意，外面套几层括号的（`(bool)`，第 10z 批第二十五块，正推 K4-1 N02）、按路径写的（[`WAYS_TO_WRITE_BOOL_WITHOUT_SPACES`]）都算，
+    /// 后面紧跟标识符的字（`boolean`）不算。
+    fn end_of_a_bool_return_type(text: &str) -> Option<usize> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let after_the_parentheses = text
+            .trim_start_matches(|character: char| character == '(' || character.is_whitespace());
+        let parentheses_length = text.len() - after_the_parentheses.len();
+        WAYS_TO_WRITE_BOOL_WITHOUT_SPACES
+            .iter()
+            .find_map(|way_to_write_bool| {
+                let bool_length =
+                    end_of_a_prefix_ignoring_whitespace(after_the_parentheses, way_to_write_bool)?;
+                (!after_the_parentheses[bool_length..]
+                    .chars()
+                    .next()
+                    .is_some_and(is_identifier_character))
+                .then_some(parentheses_length + bool_length)
+            })
+    }
+
+    /// `code`（注释与字面量已换成空格）里写着叫停那种闭包的形、却不在 `places` 哪一处钉住的类型里的地方，一处一句（往前最近的 `fn`
+    /// 后面那个名字连同那一行）：叫停写成 `&(dyn Fn() -> bool + Sync)` 之外的类型（多加 `Send`、`'static`，`&mut`、`&'static`，
+    /// `Box<dyn …>`，`dyn Sync + Fn() -> bool`，`&dyn Fn() -> bool`，`impl`、泛型、这份源文件里的类型别名）收叫停的层，按钉住的类型找不到，
+    /// 照这个形找得到。
+    fn stop_request_shapes_outside_the_pinned_type(
+        code: &str,
+        places: &[PlaceTakingTheStopRequest<'_>],
+    ) -> Vec<String> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut found = Vec::new();
+        for shape in STOP_REQUEST_SHAPES_UP_TO_THE_RETURN_TYPE_WITHOUT_SPACES {
+            let first_word = &shape[..shape.find('(').expect("形里有左括号")];
+            for position in whole_word_positions(code, first_word) {
+                let Some(shape_length) =
+                    end_of_a_prefix_ignoring_whitespace(&code[position..], shape)
+                else {
+                    continue;
+                };
+                if end_of_a_bool_return_type(&code[position + shape_length..]).is_none() {
+                    continue;
+                }
+                if places.iter().any(|place| {
+                    (place.start_of_the_type..place.end_of_the_type).contains(&position)
+                }) {
+                    continue;
+                }
+                let layer =
+                    whole_word_positions(&code[..position], "fn")
+                        .last()
+                        .map_or("", |fn_keyword| {
+                            let after_the_keyword = code[fn_keyword + 2..position].trim_start();
+                            let name_length = after_the_keyword
+                                .find(|character: char| !is_identifier_character(character))
+                                .unwrap_or(after_the_keyword.len());
+                            &after_the_keyword[..name_length]
+                        });
+                let line_start = code[..position]
+                    .rfind('\n')
+                    .map_or(0, |newline| newline + 1);
+                let line_end = code[position..]
+                    .find('\n')
+                    .map_or(code.len(), |newline| position + newline);
+                found.push(format!(
+                    "{layer} 往后有一处叫停写成钉住的 &(dyn Fn() -> bool + Sync) 之外的类型，按钉住的类型找不到这一层：{}",
+                    code[line_start..line_end].trim()
+                ));
+            }
+        }
+        found
+    }
+
+    /// 没有行为用例的那几层，扫源码钉住它们怎么用收到的叫停（`every_layer_handed_the_stop_request_hands_it_on_or_asks_it`）。
+    enum StopRequestUseThatIsPinned {
+        /// 函数体短：参数行之后到函数收尾（返回类型与函数体，去掉注释行与空白）整个等于这一句。
+        WholeBodyAfterTheParameter(&'static str),
+        /// 函数体太长、整句比不了：用到叫停整名的只有 `line` 这一行（去掉首尾空白），它是函数体顶层的一句；
+        /// `binding` 在这一层只由它 `let` 绑一次，`type_name` 在这一层只出现在它里面。
+        TopLevelStatementOfALongBody {
+            line: &'static str,
+            binding: &'static str,
+            type_name: &'static str,
+        },
+    }
+
+    /// 数花括号时，读到的这个字在源码的哪一种地方（跨行时带到下一行）。
+    #[derive(Clone, Copy)]
+    enum PlaceInTheSource {
+        Code,
+        InsideAString,
+        /// 原始字符串（`r"…"`、`r#"…"#`、`br"…"`、`cr"…"`）：收尾是一个 `"` 后面跟这么多个 `#`。
+        InsideARawString {
+            closing_hashes: usize,
+        },
+        /// 块注释，可以嵌套：`nesting` 是还没收尾的 `/*` 有几层。
+        InsideABlockComment {
+            nesting: usize,
+        },
+    }
+
+    /// 读过的一个字算源码里的哪一类（`lines_read_past_comments_and_literals`）。
+    #[derive(Clone, Copy)]
+    enum KindOfACharacterInTheSource {
+        Code,
+        /// 行注释、块注释里的字，连同 `//`、`/*`、`*/`。
+        Comment,
+        /// 字符串（普通的、原始的）与字符字面量里的字，连同引号与原始字符串的 `r`、`br`、`cr` 和 `#`。
+        Literal,
+    }
+
+    /// 一行读过注释与字面量之后的样子（`lines_read_past_comments_and_literals`）。
+    struct LineReadPastCommentsAndLiterals {
+        /// 这一行起头处在第几层花括号里。
+        brace_depth_at_the_start: usize,
+        /// 注释里的字换成空格（一个字换成与它的 UTF-8 字节数一样多的空格，字节位置不变），字面量照原样。
+        without_comments: String,
+        /// 注释与字面量里的字都换成空格，字节位置不变：扫源码的用例照它找名字、数 `let`、数花括号，注释与字符串里写的不算。
+        without_comments_and_literals: String,
+    }
+
+    /// `lines` 每一行起头处在第几层花括号里（第一行起头算第 0 层）：字符串（普通的、原始的）、字符字面量、行注释与块注释（可以嵌套）里的
+    /// 花括号不算，字符串、块注释跨行时照跨着数。
+    ///
+    /// # Panics
+    /// 右花括号多于左花括号。
+    fn brace_depth_at_the_start_of_each_line(lines: &[&str]) -> Vec<usize> {
+        lines_read_past_comments_and_literals(lines)
+            .iter()
+            .map(|read_line| read_line.brace_depth_at_the_start)
+            .collect()
+    }
+
+    /// `lines` 逐行读过注释与字面量：每一行起头处的花括号层数，连同去掉注释、去掉注释与字面量的两份（字节位置与原行相同）。
+    /// 字符串（普通的、原始的 `r"…"`、`r#"…"#`、`br`、`cr`）、字符字面量、行注释与块注释（可以嵌套）里的花括号不算，
+    /// 字符串、块注释跨行时照跨着读。与卡池扫源码那一份分词（`gpu_unit_checks.rs` 的 `rust_tokens_without_comments_and_literals`）
+    /// 认原始字符串的写法相同：`r`、`br`、`cr` 后面紧跟若干个 `#` 与一个 `"`。
+    ///
+    /// # Panics
+    /// 右花括号多于左花括号。
+    fn lines_read_past_comments_and_literals(
+        lines: &[&str],
+    ) -> Vec<LineReadPastCommentsAndLiterals> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut depth = 0_usize;
+        let mut place = PlaceInTheSource::Code;
+        let mut read_lines = Vec::with_capacity(lines.len());
+        for line in lines {
+            let brace_depth_at_the_start = depth;
+            let characters: Vec<char> = line.chars().collect();
+            let mut kinds = vec![KindOfACharacterInTheSource::Code; characters.len()];
+            let mut index = 0;
+            while index < characters.len() {
+                let character = characters[index];
+                let next_character = characters.get(index + 1).copied();
+                let read_from = index;
+                let place_before = place;
+                match place {
+                    PlaceInTheSource::InsideAString => {
+                        if character == '\\' {
+                            index += 1;
+                        } else if character == '"' {
+                            place = PlaceInTheSource::Code;
+                        }
+                    }
+                    PlaceInTheSource::InsideARawString { closing_hashes } => {
+                        let closing_hashes_follow = characters
+                            .get(index + 1..index + 1 + closing_hashes)
+                            .is_some_and(|after_the_quote| {
+                                after_the_quote.iter().all(|after| *after == '#')
+                            });
+                        if character == '"' && closing_hashes_follow {
+                            index += closing_hashes;
+                            place = PlaceInTheSource::Code;
+                        }
+                    }
+                    PlaceInTheSource::InsideABlockComment { nesting } => {
+                        if character == '/' && next_character == Some('*') {
+                            index += 1;
+                            place = PlaceInTheSource::InsideABlockComment {
+                                nesting: nesting + 1,
+                            };
+                        } else if character == '*' && next_character == Some('/') {
+                            index += 1;
+                            place = match nesting.checked_sub(1) {
+                                Some(0) | None => PlaceInTheSource::Code,
+                                Some(nesting_left) => PlaceInTheSource::InsideABlockComment {
+                                    nesting: nesting_left,
+                                },
+                            };
+                        }
+                    }
+                    PlaceInTheSource::Code => {
+                        if character == '"' {
+                            place = PlaceInTheSource::InsideAString;
+                        } else if character == '\'' {
+                            // 字符字面量（`'x'`、`'\''`、`'\u{7b}'`）整个跳过；生命周期（`'static`）只跳这个引号
+                            if next_character == Some('\\') {
+                                index += 2;
+                                while characters.get(index + 1).is_some_and(|next| *next != '\'') {
+                                    index += 1;
+                                }
+                                index += 1;
+                            } else if characters.get(index + 2) == Some(&'\'') {
+                                index += 2;
+                            }
+                        } else if character == '/' && next_character == Some('/') {
+                            kinds[index..].fill(KindOfACharacterInTheSource::Comment);
+                            break;
+                        } else if character == '/' && next_character == Some('*') {
+                            index += 1;
+                            place = PlaceInTheSource::InsideABlockComment { nesting: 1 };
+                        } else if is_identifier_character(character) {
+                            // 一整个词跳过；词是 r、br、cr 而后面紧跟若干个 # 与一个 " 的，是原始字符串的开头
+                            let word_end = characters[index..]
+                                .iter()
+                                .position(|after| !is_identifier_character(*after))
+                                .map_or(characters.len(), |word_length| index + word_length);
+                            let word: String = characters[index..word_end].iter().collect();
+                            let opening_hashes = characters[word_end..]
+                                .iter()
+                                .take_while(|after| **after == '#')
+                                .count();
+                            if matches!(word.as_str(), "r" | "br" | "cr")
+                                && characters.get(word_end + opening_hashes) == Some(&'"')
+                            {
+                                index = word_end + opening_hashes;
+                                place = PlaceInTheSource::InsideARawString {
+                                    closing_hashes: opening_hashes,
+                                };
+                            } else {
+                                index = word_end - 1;
+                            }
+                        } else if character == '\u{7b}' {
+                            depth += 1;
+                        } else if character == '\u{7d}' {
+                            depth = depth.checked_sub(1).expect("右花括号不多于左花括号");
+                        }
+                    }
+                }
+                index += 1;
+                let kind_read = match place_before {
+                    PlaceInTheSource::InsideAString | PlaceInTheSource::InsideARawString { .. } => {
+                        KindOfACharacterInTheSource::Literal
+                    }
+                    PlaceInTheSource::InsideABlockComment { .. } => {
+                        KindOfACharacterInTheSource::Comment
+                    }
+                    PlaceInTheSource::Code => match place {
+                        PlaceInTheSource::InsideAString
+                        | PlaceInTheSource::InsideARawString { .. } => {
+                            KindOfACharacterInTheSource::Literal
+                        }
+                        PlaceInTheSource::InsideABlockComment { .. } => {
+                            KindOfACharacterInTheSource::Comment
+                        }
+                        // 一次读过不止一个字的引号是整个字符字面量；生命周期只读过那一个引号
+                        PlaceInTheSource::Code if character == '\'' && index > read_from + 1 => {
+                            KindOfACharacterInTheSource::Literal
+                        }
+                        PlaceInTheSource::Code => KindOfACharacterInTheSource::Code,
+                    },
+                };
+                kinds[read_from..index.min(characters.len())].fill(kind_read);
+            }
+            let mut without_comments = String::with_capacity(line.len());
+            let mut without_comments_and_literals = String::with_capacity(line.len());
+            for (character, kind) in characters.iter().zip(&kinds) {
+                let spaces = " ".repeat(character.len_utf8());
+                match kind {
+                    KindOfACharacterInTheSource::Code => {
+                        without_comments.push(*character);
+                        without_comments_and_literals.push(*character);
+                    }
+                    KindOfACharacterInTheSource::Comment => {
+                        without_comments.push_str(&spaces);
+                        without_comments_and_literals.push_str(&spaces);
+                    }
+                    KindOfACharacterInTheSource::Literal => {
+                        without_comments.push(*character);
+                        without_comments_and_literals.push_str(&spaces);
+                    }
+                }
+            }
+            read_lines.push(LineReadPastCommentsAndLiterals {
+                brace_depth_at_the_start,
+                without_comments,
+                without_comments_and_literals,
+            });
+        }
+        read_lines
+    }
+
+    /// 第 10z 批第十五块（第 10z 批第十二、十三块代码轮判决 K4：扫源码的用例被领块之前那一问写成 `if false && stop_is_requested()` 骗过，
+    /// 攻方 crash-3）：四块要判，叫停在第三次被问时交真：领每一块之前各问一次、问到真就不再领，叫停之前领的两块判完写了，之后的不领，
+    /// 叫停一共被问三次。不要卡、不碰库：判一段与写一块都用假的。
+    #[test]
+    fn the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken()
+    {
+        const ASK_THAT_FINDS_THE_STOP: usize = 3;
+        let pending: Vec<(usize, Range<u64>)> = vec![(0, 0..2), (0, 2..4), (0, 4..6), (0, 6..8)];
+        let points = vec![NamesOfACrashPoint {
+            name: "一个点".to_string(),
+            path_number: "0".to_string(),
+        }];
+        let asks = std::sync::atomic::AtomicUsize::new(0);
+        let mut stored_block_starts = Vec::new();
+        let tally = check_pending_blocks_in_pieces(
+            &pending,
+            &points,
+            2,
+            &|| {
+                asks.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1
+                    >= ASK_THAT_FINDS_THE_STOP
+            },
+            &|_point_index, local, ending| {
+                drop(ending);
+                JudgedBlock {
+                    items_of_each_state: vec![
+                        Vec::new();
+                        usize::try_from(local.end - local.start)
+                            .expect("一段装得进")
+                    ],
+                    local,
+                    red_texts: Vec::new(),
+                    gpu_cpu_disagreements: 0,
+                    gpu_memory_was_short: None,
+                }
+            },
+            &mut |_point_index, local, _items_of_each_state, _violating| {
+                stored_block_starts.push(local.start);
+                Ok(())
+            },
+        )
+        .expect("假的写库不失败");
+        assert_eq!(
+            asks.load(std::sync::atomic::Ordering::SeqCst),
+            ASK_THAT_FINDS_THE_STOP,
+            "领第一、二块之前各问一次（不停），领第三块之前问到停、不再问"
+        );
+        assert_eq!(
+            stored_block_starts,
+            vec![0, 2],
+            "叫停之前领的两块判完写了，之后的不领"
+        );
+        assert_eq!(tally.blocks_checked, 2);
+    }
+
+    /// 第 10z 批第十三块（第 10z 批第十、十一块代码轮判决 K5，正推：下游各层把收到的叫停换成永不叫停，`cargo check` 只报没用的变量、
+    /// 变异跑道不带 `-D warnings`，照绿）：这份源码里收叫停参数（`stop_is_requested: &(dyn Fn() -> bool + Sync),`，测试那一段之外）的函数
+    /// 照源码次序是这六层（多一层少一层都要回来看罩没罩到）。
+    /// 第 10z 批第十五块（第 10z 批第十二、十三块代码轮判决 K4：「参数行之后整名用上至少一次」被只提一次名字而永不叫停的写法骗过，
+    /// 正推 A7 `let _ = stop_is_requested`、攻方 crash-2 `&|| { let _ = stop_is_requested; false }`、crash-3 `if false && stop_is_requested()`）：
+    /// 不要卡的两层改由行为用例数叫停被问了几次——`check_pending_blocks_in_pieces` 由本模块
+    /// `the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken`，`check_blocks_where_until` 由
+    /// `tests/crash_amplification_pipeline_records_checks_and_reuses.rs` 的 `a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest`
+    /// （叫停在第二次被问时交真，只判了一块）。另四层换不成不要卡的行为用例：第 ① 段在卡上判那三层要卡，`check_selected_blocks` 要录好的流与库
+    /// （只有 `run_from_environment` 调它，经环境跑的那几条用例里叫停文件放上时块都判过了，问不到这一层），这里扫源码：参数行之后到函数收尾的
+    /// 顶格右括号，用到叫停整名的行（去掉首尾空白）逐行等于钉住的那几行，往下交的那一行之后紧跟右括号（是调下一层的最后一个实参）。
+    /// 整行比拦得住上面三种写法（多一行、或那一行不是原样）。
+    /// 第 10z 批第十八块（第 10z 批第十四、十五块代码轮判决 K4，正推 N1：`check_selected_blocks` 里真调用的叫停换成 `&|| false`，钉住的那一行
+    /// 连同它后面的右括号原样留在 `if false { … }` 死分支里的另一次调用里，编得过、整行比照绿）：函数体短的三层
+    /// （`judge_my_blocks_on_gpu_cards`、`check_selected_blocks`、`judge_my_blocks_on_gpu`）改成整句比——参数行之后到函数收尾
+    /// （返回类型与函数体，去掉注释行与空白）整个等于钉住的那一句，死分支、多一次调用、换实参、换被调的函数都红；函数体太长、整句比不了的
+    /// `judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from` 照旧整行比那一行，另要它是函数体顶层的一句
+    /// （不在任何块里：`if false { … }`、`if false && … { … }` 包着的红）、`stop_request` 在这一层只由它 `let` 绑一次
+    /// （后面再 `let` 一次就换掉了记住的叫停）、`StopRequestRememberedInThisRun` 在这一层只出现在它里面（块里 `use` 或另起同名类型会遮住它）。
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K4，正推 K4-3：名单外三种写法拦不住）：
+    /// 收叫停的层改成按叫停类型找（`&(dyn Fn() -> bool + Sync)`，空白随意、可以跨行），名单记层名连同参数名——参数与别的参数挤在签名那一行
+    /// （`the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_shares_the_signature_line`）、参数换了名字
+    /// （`the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_is_renamed`）的新层都在名单外、红；没编进 `gpu` 特性时那一份
+    /// `judge_my_blocks_on_gpu`（参数 `_stop_is_requested`）因此也进了名单，整句钉成只交错；长的那一层数 `stop_request` 被 `let` 绑了几次
+    /// 改成看每个 `let`（`if let`、`while let` 也算）到 `=` 或 `;` 之前那一截里有没有整个名字 `stop_request`——解构
+    /// `let (stop_request, …) = …`、`let` 后面多几个空格都数得到
+    /// （`the_stop_request_scan_finds_the_remembered_stop_request_rebound_by_a_tuple_pattern_or_a_let_with_extra_spaces`）；
+    /// 数花括号的层数认得原始字符串与块注释（`brace_depth_reads_past_raw_strings_block_comments_and_strings_spanning_lines`），
+    /// 长的那一层里写原始字符串不再让这条用例当场红，`if false { /* } */` 也骗不过层数。
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4）：测试模块只从代码里那一处头两行切（块注释里写一份头两行、藏住它与真测试模块
+    /// 之间的新层，攻方 K4-2 v2，`the_tests_module_is_cut_at_its_opening_in_code_not_at_a_copy_in_a_comment_or_a_string`）；
+    /// 找层、数 `let`、数用到叫停的行都在注释与字面量换成空格之后的代码上做，整句、整行比在去掉注释的代码上做——签名行尾注释里的 `fn`
+    /// 不再被当成层名（攻方 v4），行尾注释、字符串里的 `let stop_request` 与钉住那一行、短层函数体上的行尾注释不再判红
+    /// （`the_stop_request_scan_reads_layer_names_rebindings_and_pinned_lines_past_comments_and_strings`）；钉住那一行与叫停参数上挂属性
+    /// （`#[cfg(any())]` 编译时去掉那一句、那个参数，正推 K4-1 A01）判红（`the_stop_request_scan_finds_an_attribute_on_the_pinned_line_or_on_a_stop_parameter`）；
+    /// 叫停写成钉住之外的类型（多加 `Send`、`'static`，`&mut`、`&'static`，类型里夹注释，`Box<dyn …>`，`dyn Sync + Fn() -> bool`，
+    /// `&dyn Fn() -> bool`，`impl`、泛型、这份源文件里的类型别名，函数指针）的新层照 `Fn() -> bool` 这个形找到、判红
+    /// （`the_stop_request_scan_finds_new_layers_whose_stop_type_is_written_another_way`，正推 K4-2 C02–C12）。
+    /// 第 10z 批第二十五块（第 10z 批第二十二、二十三块代码轮判决 K3、K4）：测试模块的头两行只认按行逐字、括号第 0 层、前一个词是条目收尾的那一处，
+    /// 拿一个吃掉 `#[cfg(test)]` 的宏把测试模块包进宏调用的圆括号里（正推 K4-1 S14）、包着的假测试模块里藏一层（S19）都红，
+    /// 恰好一处的上界与第 0 层两道各有用例钉（正推 K3-5 W8、W9、X6、X7，`the_tests_module_is_cut_only_at_one_opening_of_two_whole_lines_at_the_top_level_after_an_item`）；
+    /// 叫停闭包的返回类型写成 `::core::primitive::bool`、`std::primitive::bool`、套括号的 `(bool)` 的新层照形找到、红
+    /// （正推 K4-1 N01、N02，`the_stop_request_scan_finds_new_layers_whose_stop_returns_bool_by_a_path_or_in_parentheses`）。
+    ///
+    /// 拦不住的写法，一种一条：
+    /// - 同一行原样交下去而下一层的函数体里不用（下一层由它自己那一条管；第 ① 段在卡上判那一层里 `stop_request` 往下怎么用由
+    ///   `the_stop_request_remembered_in_this_run_reaches_the_rounds_the_next_card_the_card_threads_and_the_run` 管，也只看文本）；
+    /// - 长的那一层：钉住那一行之前提早返回，或让它之后的路走不到；`stop_request` 经 `let` 之外的绑定（`match` 的臂、闭包参数、`for`）
+    ///   在块里换成别的；
+    /// - 被调的那一层自己改了（短的几层整句比钉的是调谁、怎么交，不是被调的函数里做什么）；harness 档的 `StopRequestRememberedInThisRun::new` 改了；
+    /// - 叫停的类型写成别的源文件、别的 crate 里定义的别名或 trait（`&crate::某处::叫停类型`），或换成不带 `Fn() -> bool` 字样的类型
+    ///   （`&StopRequestRememberedInThisRun`、自己的 trait）的新层：只扫这一份源文件、只认这个形；
+    /// - 叫停闭包的返回类型写成别名（`type 别名 = bool;` 之后 `Fn() -> 别名`，正推 K4-1 N03）或类型宏（`Fn() -> 某宏!()`，N15）的新层：
+    ///   只认 `bool`、按路径写到 `core`、`std` 里的那个原始类型与外面套的括号，别名与宏展开出来的是什么，扫这一份源文件看不出；
+    /// - 在函数上面加 `#[cfg]`，让照上一条另写类型的同名函数编进来（同样写成钉住的类型或这份源文件里看得见的形的，读到的名单多一层、红）；
+    /// - 长的那一层里宏展开出来的调用与绑定；
+    /// - 过程宏（属性宏）挂在测试模块上、或把它包住，把测试模块编进非测试构建：切口只认头两行的写法与所在的层，宏做了什么扫源码看不见。
+    ///
+    /// 合法写法判红、是故意拒的，一种一条：
+    /// - 测试模块头两行换写法（`mod tests` 后面不空格就接左花括号、写在一行、`#[ cfg ( test ) ]`、多空格、缩进、行尾带空白或注释）
+    ///   与 CRLF 换行（[`text_outside_the_tests_module`]，两份文件是 rustfmt 出的，头两行就是一种写法）；
+    /// - 叫停闭包参数之外、不带参数而返回以 `bool` 开头的元组的闭包（`Fn() -> (bool, u8)`；第 10z 批第二十六块写明，第 10z 批第二十四、
+    ///   二十五块代码轮判决第二节 K3，正推 `N16`）：[`end_of_a_bool_return_type`] 跳过开头的左括号读到 `bool` 就算，不往后找与它配对的
+    ///   右括号，分不出 `(bool)` 与以 `bool` 开头的元组；要分就得把返回类型照类型的语法读到收尾（元组里还能套泛型、路径、括号），这一扫
+    ///   只认形，方向是不过就红、不会放过一层。这份文件里没有这样的闭包，要写就把返回类型写成具名的结构体。
+    #[test]
+    fn every_layer_handed_the_stop_request_hands_it_on_or_asks_it() {
+        assert_eq!(
+            ways_a_layer_handed_the_stop_request_could_drop_it(include_str!(
+                "crash_amplification.rs"
+            )),
+            Vec::<String>::new(),
+            "收叫停的每一层照钉住的那样往下交或问"
+        );
+    }
+
+    /// `source`（这份源文件，或用例在它上面改过的一份）测试模块之外，收叫停的层没照钉住的那样往下交或问的地方，一处一句；一处没有交空。
+    /// 判法与名单在 `every_layer_handed_the_stop_request_hands_it_on_or_asks_it`。
+    fn ways_a_layer_handed_the_stop_request_could_drop_it(source: &str) -> Vec<String> {
+        let pinned_layers_without_a_behaviour_test: [(&str, &str, StopRequestUseThatIsPinned); 5] = [
+            (
+                "judge_my_blocks_on_gpu_cards",
+                STOP_REQUEST_PARAMETER_NAME,
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<(CheckingTally,GpuJudgeOutcome),String>\u{7b}",
+                    "matchjudge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(",
+                    "store,flow,plan,is_mine,version,cards,GpuCardsSource::DevicesStartedForThisRun,stop_is_",
+                    "requested,)?\u{7b}",
+                    "GpuJudgingOfMyBlocks::Judged\u{7b}tally,outcome\u{7d}=>Ok((tally,outcome)),",
+                    "GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort\u{7b}reason,..\u{7d}=>Err(reason),",
+                    "\u{7d}"
+                )),
+            ),
+            (
+                "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from",
+                STOP_REQUEST_PARAMETER_NAME,
+                StopRequestUseThatIsPinned::TopLevelStatementOfALongBody {
+                    line: concat!(
+                        "let stop_request = StopRequestRememberedInThisRun::new(stop_is_",
+                        "requested);"
+                    ),
+                    binding: "stop_request",
+                    type_name: "StopRequestRememberedInThisRun",
+                },
+            ),
+            (
+                "check_selected_blocks",
+                STOP_REQUEST_PARAMETER_NAME,
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<CheckingTally,VerdictStoreError>\u{7b}",
+                    "check_blocks_where_until(store,flow,plan,",
+                    "&|block_sequence|selected_block_sequences.contains(&block_sequence),",
+                    "unit_checksums,version,stop_is_",
+                    "requested,)"
+                )),
+            ),
+            (
+                "judge_my_blocks_on_gpu",
+                STOP_REQUEST_PARAMETER_NAME,
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<GpuJudgingOfMyBlocks,String>\u{7b}",
+                    "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(",
+                    "store,flow,plan,is_mine,version,cards,cards_taken_from,stop_is_",
+                    "requested,)"
+                )),
+            ),
+            (
+                "judge_my_blocks_on_gpu",
+                concat!("_stop_is_", "requested"),
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<GpuJudgingOfMyBlocks,String>\u{7b}",
+                    "Err(\"配置写了ENABLE_GPU=1，这份二进制没有编进gpu特性（cargo…--featuresverdict-store,gpu）\".to_string())"
+                )),
+            ),
+        ];
+        let outside_the_tests = text_outside_the_tests_module(source) + "\n";
+        let outside_the_tests_lines: Vec<&str> = outside_the_tests.split('\n').collect();
+        let read_lines = lines_read_past_comments_and_literals(&outside_the_tests_lines);
+        // 两份与 outside_the_tests 逐字节同位：找名字、数 let 与花括号照 code（注释与字面量都不算），整句、整行比照 without_comments
+        let without_comments = read_lines
+            .iter()
+            .map(|read_line| read_line.without_comments.as_str())
+            .collect::<Vec<&str>>()
+            .join("\n");
+        let code = read_lines
+            .iter()
+            .map(|read_line| read_line.without_comments_and_literals.as_str())
+            .collect::<Vec<&str>>()
+            .join("\n");
+        let mut found = Vec::new();
+        let mut layers_handed_the_stop_request = Vec::new();
+        let places = places_taking_the_stop_request(&code);
+        for place in &places {
+            let PlaceTakingTheStopRequest {
+                layer,
+                parameter,
+                is_the_parameter_under_an_attribute,
+                start_of_the_type: _,
+                end_of_the_type,
+            } = *place;
+            if is_the_parameter_under_an_attribute {
+                found.push(format!(
+                    "{layer} 的叫停参数 {parameter} 前面挂着属性（#[cfg(any())] 让参数编译时去掉，函数体里的名字就落到别处同名的条目上）"
+                ));
+            }
+            let layer_length = code[end_of_the_type..]
+                .find(TOP_LEVEL_CLOSING_BRACE_LINE)
+                .unwrap_or(code.len() - end_of_the_type);
+            let rest_of_the_layer: Vec<&str> = without_comments
+                [end_of_the_type..end_of_the_type + layer_length]
+                .lines()
+                .collect();
+            let rest_of_the_layer_code: Vec<&str> = code
+                [end_of_the_type..end_of_the_type + layer_length]
+                .lines()
+                .collect();
+            match pinned_layers_without_a_behaviour_test
+                .iter()
+                .find(|(pinned_layer, pinned_parameter, _pinned)| {
+                    *pinned_layer == layer && *pinned_parameter == parameter
+                })
+                .map(|(_layer, _parameter, pinned)| pinned)
+            {
+                Some(StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(expected_body)) => {
+                    let body_without_spaces: String = rest_of_the_layer
+                        .iter()
+                        .flat_map(|line| line.chars())
+                        .filter(|character| !character.is_whitespace())
+                        .collect();
+                    // 参数后面的逗号（参数单独占一行时有）不算函数体
+                    let body_after_the_parameter = body_without_spaces
+                        .strip_prefix(',')
+                        .unwrap_or(&body_without_spaces);
+                    if body_after_the_parameter != *expected_body {
+                        found.push(format!(
+                            "{layer} 参数之后整句等于钉住的那一句（死分支里留一份原样的调用、真调用换实参，都多出或换掉一截）：{rest_of_the_layer:#?}"
+                        ));
+                    }
+                }
+                Some(StopRequestUseThatIsPinned::TopLevelStatementOfALongBody {
+                    line: pinned_line,
+                    binding,
+                    type_name,
+                }) => {
+                    let lines_using_it: Vec<(usize, &str)> = rest_of_the_layer_code
+                        .iter()
+                        .enumerate()
+                        .filter(|(_offset, line)| whole_name_uses_of_the_stop_request(line) > 0)
+                        .map(|(offset, _line)| (offset, rest_of_the_layer[offset].trim()))
+                        .collect();
+                    if lines_using_it
+                        .iter()
+                        .map(|(_offset, line)| *line)
+                        .collect::<Vec<&str>>()
+                        != [*pinned_line]
+                    {
+                        found.push(format!(
+                            "{layer} 用到叫停的只有钉住的那一行、原样（只提一次名字而永不叫停的写法多一行或那一行变了）：{rest_of_the_layer:#?}"
+                        ));
+                    }
+                    let depths = brace_depth_at_the_start_of_each_line(&rest_of_the_layer_code);
+                    for (pinned_offset, _line) in &lines_using_it {
+                        if depths[*pinned_offset] != 1 {
+                            found.push(format!(
+                                "{layer} 的 {pinned_line} 是函数体顶层的一句，不在 `if false` 一类的块里（参数之后那一行开函数体，算第 1 层），读到的是第 {} 层",
+                                depths[*pinned_offset]
+                            ));
+                        }
+                        let code_before_the_pinned_line =
+                            rest_of_the_layer_code[..*pinned_offset].join("\n");
+                        if !code_before_the_pinned_line
+                            .trim_end()
+                            .ends_with([';', '\u{7b}', '\u{7d}'])
+                        {
+                            found.push(format!(
+                                "{layer} 的 {pinned_line} 前面紧挨着的是上一句的收尾（分号、左右花括号），不是属性：#[cfg(any())] 挂在它上面编译时整句去掉，下面用的 {binding} 就落到别处同名的条目上"
+                            ));
+                        }
+                    }
+                    let rest_of_the_layer_text = rest_of_the_layer_code.join("\n");
+                    let let_bindings = whole_word_positions(&rest_of_the_layer_text, "let")
+                        .into_iter()
+                        .filter(|let_keyword| {
+                            let after_the_keyword = &rest_of_the_layer_text[let_keyword + 3..];
+                            let pattern_end = after_the_keyword
+                                .find(['=', ';'])
+                                .unwrap_or(after_the_keyword.len());
+                            !whole_word_positions(&after_the_keyword[..pattern_end], binding)
+                                .is_empty()
+                        })
+                        .count();
+                    if let_bindings != 1 {
+                        found.push(format!(
+                            "{layer} 里 {binding} 只由钉住的那一行 let 绑一次（后面再 let 一次、解构、if let 就换掉了记住的叫停），读到 {let_bindings} 次"
+                        ));
+                    }
+                    let lines_naming_the_type = rest_of_the_layer_code
+                        .iter()
+                        .filter(|line| line.contains(type_name))
+                        .count();
+                    if lines_naming_the_type != 1 {
+                        found.push(format!(
+                            "{layer} 里只有钉住的那一行提到 {type_name}（块里 use 或另起同名的类型会遮住它），读到 {lines_naming_the_type} 行"
+                        ));
+                    }
+                }
+                None => {}
+            }
+            layers_handed_the_stop_request.push((layer, parameter));
+        }
+        found.extend(stop_request_shapes_outside_the_pinned_type(&code, &places));
+        let expected_layers = [
+            ("check_blocks_where_until", STOP_REQUEST_PARAMETER_NAME),
+            (
+                "check_pending_blocks_in_pieces",
+                STOP_REQUEST_PARAMETER_NAME,
+            ),
+            ("judge_my_blocks_on_gpu_cards", STOP_REQUEST_PARAMETER_NAME),
+            (
+                "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from",
+                STOP_REQUEST_PARAMETER_NAME,
+            ),
+            ("check_selected_blocks", STOP_REQUEST_PARAMETER_NAME),
+            ("judge_my_blocks_on_gpu", STOP_REQUEST_PARAMETER_NAME),
+            ("judge_my_blocks_on_gpu", concat!("_stop_is_", "requested")),
+        ];
+        if layers_handed_the_stop_request != expected_layers {
+            found.push(format!(
+                "收叫停的是这六层，连同没编进 gpu 特性时那一份 judge_my_blocks_on_gpu（多一层少一层、参数换了名字都要回来看这条用例罩没罩到），读到的是 {layers_handed_the_stop_request:?}"
+            ));
+        }
+        found
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K4，正推 K4-3 第 1 种 `bypass_extra_layer_one_line`）：新加一层收叫停、
+    /// 叫停参数与别的参数挤在签名那一行里，照样找得到这一层，它不在名单里就红。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_shares_the_signature_line() {
+        let new_layer = concat!(
+            "fn an_extra_layer_never_asking(first_input: u8, stop_is_",
+            "requested: &(dyn Fn() -> bool + Sync)) -> bool \u{7b} first_input == 0 \u{7d}"
+        );
+        let source_with_the_new_layer =
+            format!("{}\n{new_layer}\n", include_str!("crash_amplification.rs"));
+        let found = ways_a_layer_handed_the_stop_request_could_drop_it(&source_with_the_new_layer);
+        assert!(
+            found
+                .iter()
+                .any(|finding| finding.contains("(\"an_extra_layer_never_asking\", ")),
+            "签名一行里收叫停的新层进了读到的名单、与钉住的名单对不上：{found:#?}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K4，正推 K4-3 第 2 种 `bypass_extra_layer_other_name`）：新加一层收叫停、
+    /// 叫停参数换了名字，照样找得到这一层，它不在名单里就红。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_a_new_layer_whose_stop_parameter_is_renamed() {
+        let new_layer = concat!(
+            "fn an_extra_layer_with_a_renamed_stop(\n",
+            "    first_input: u8,\n",
+            "    stop: &(dyn Fn() -> bool + Sync),\n",
+            ") -> bool \u{7b}\n",
+            "    first_input == 0\n",
+            "\u{7d}"
+        );
+        let source_with_the_new_layer =
+            format!("{}\n{new_layer}\n", include_str!("crash_amplification.rs"));
+        let found = ways_a_layer_handed_the_stop_request_could_drop_it(&source_with_the_new_layer);
+        assert!(
+            found
+                .iter()
+                .any(|finding| finding
+                    .contains("(\"an_extra_layer_with_a_renamed_stop\", \"stop\")")),
+            "参数换了名字的新层进了读到的名单、与钉住的名单对不上：{found:#?}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K4，正推 K4-3 第 3 种 `bypass_tuple_let_rebind`、`bypass_let_extra_spaces`）：
+    /// 长的那一层钉住那一行之后解构重绑 `stop_request`、或 `let` 与名字之间多几个空格重绑，都数成又 `let` 了一次。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_the_remembered_stop_request_rebound_by_a_tuple_pattern_or_a_let_with_extra_spaces(
+    ) {
+        let source = include_str!("crash_amplification.rs");
+        let pinned_line = concat!(
+            "    let stop_request = StopRequestRememberedInThisRun::new(stop_is_",
+            "requested);\n"
+        );
+        assert_eq!(
+            source.matches(pinned_line).count(),
+            1,
+            "长的那一层钉住的那一行在这份源码里恰好一处"
+        );
+        for (form, rebinding) in [
+            (
+                "解构",
+                "    let (stop_request, _unused) = (the_never_stopping_request(), 0);\n",
+            ),
+            (
+                "多几个空格",
+                "    let   stop_request  =  the_never_stopping_request();\n",
+            ),
+        ] {
+            let rebound = source.replacen(pinned_line, &format!("{pinned_line}{rebinding}"), 1);
+            let found = ways_a_layer_handed_the_stop_request_could_drop_it(&rebound);
+            assert!(
+                found.iter().any(|finding| finding.contains(
+                    "里 stop_request 只由钉住的那一行 let 绑一次（后面再 let 一次、解构、if let 就换掉了记住的叫停），读到 2 次"
+                )),
+                "{form}重绑数成第二次 let：{found:#?}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮正推 K5：数花括号遇到原始字符串当场 `assert!`）：原始字符串（里面的 `"`、
+    /// 收尾的反斜杠、跨行）、块注释（嵌套、里面的右花括号）、跨行的普通字符串里的花括号都不算层数。不要卡。
+    #[test]
+    fn brace_depth_reads_past_raw_strings_block_comments_and_strings_spanning_lines() {
+        let lines = [
+            "let path = r\"C:\\\";",
+            "if path.is_empty() \u{7b}",
+            "    let quoted = r#\"say \"\u{7b}\" here\"#;",
+            "    let bytes = br##\"\u{7d}\"#\u{7d}\"##;",
+            "    let spanning = r#\"",
+            "\u{7b}\u{7b}",
+            "\"#;",
+            "    /* a \u{7d} in a comment */",
+            "    let nested = /* outer /* inner \u{7d} */ still \u{7d} */ 0;",
+            "    let plain = \"",
+            "\u{7b}\";",
+            "\u{7d}",
+            "after",
+        ];
+        assert_eq!(
+            brace_depth_at_the_start_of_each_line(&lines),
+            vec![0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0],
+            "只有 if 那一行的左花括号与倒数第二行的右花括号算层数：{lines:#?}"
+        );
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，攻方 K4-2 v2）：真测试模块头两行之前写一份在块注释里（或跨行的字符串里），
+    /// 中间放一层收叫停而不问的新层、一个按名字读名单外环境变量的函数：测试模块只从代码里那一处切，两样都照样扫得到。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_tests_module_is_cut_at_its_opening_in_code_not_at_a_copy_in_a_comment_or_a_string() {
+        let source = include_str!("crash_amplification.rs");
+        assert_eq!(
+            source.matches(TESTS_MODULE_OPENING).count(),
+            1,
+            "这份源码里测试模块的头两行原文只有代码里那一处"
+        );
+        let new_layer = concat!(
+            "pub fn an_extra_layer_never_asking(first_input: u8, stop_is_",
+            "requested: &(dyn Fn() -> bool + Sync)) -> bool \u{7b} let _ = stop_is_",
+            "requested; first_input == 0 \u{7d}\n"
+        );
+        let reading_a_variable_left_out = concat!(
+            "pub fn reads_a_variable_left_out_of_the_list() -> bool \u{7b} ",
+            "std::env::var(\"SINGLEFS_A_VARIABLE_LEFT_OUT_OF_THE_LIST\").is_ok() \u{7d}\n"
+        );
+        for (form, copy_of_the_opening) in [
+            ("块注释", format!("/*\n{TESTS_MODULE_OPENING}\n*/\n")),
+            (
+                "跨行的字符串",
+                format!(
+                    "pub const A_COPY_OF_THE_OPENING: &str = \"\n{TESTS_MODULE_OPENING}\n\";\n"
+                ),
+            ),
+        ] {
+            let hiding = source.replacen(
+                TESTS_MODULE_OPENING,
+                &format!(
+                    "{copy_of_the_opening}{new_layer}{reading_a_variable_left_out}{TESTS_MODULE_OPENING}"
+                ),
+                1,
+            );
+            let found = ways_a_layer_handed_the_stop_request_could_drop_it(&hiding);
+            assert!(
+                found
+                    .iter()
+                    .any(|finding| finding.contains("(\"an_extra_layer_never_asking\", ")),
+                "{form}里写一份测试模块的头两行，藏不住它与真测试模块之间收叫停的新层：{found:#?}"
+            );
+            let names_read = environment_variables_read_by_name_outside_the_tests(&hiding);
+            assert!(
+                names_read
+                    .iter()
+                    .any(|name| name == "SINGLEFS_A_VARIABLE_LEFT_OUT_OF_THE_LIST"),
+                "{form}里写一份测试模块的头两行，藏不住它与真测试模块之间按名字读的环境变量：{names_read:?}"
+            );
+        }
+    }
+
+    /// 跑 `check`，它 panic 时交 panic 的消息，不 panic 交 `None`：扫源码的用例看判法在改过的源码上红没红、红在哪一句。
+    fn panic_message_of(check: impl FnOnce() + std::panic::UnwindSafe) -> Option<String> {
+        std::panic::catch_unwind(check).err().map(|payload| {
+            payload
+                .downcast_ref::<String>()
+                .cloned()
+                .or_else(|| {
+                    payload
+                        .downcast_ref::<&str>()
+                        .map(|message| (*message).to_string())
+                })
+                .unwrap_or_default()
+        })
+    }
+
+    /// 第 10z 批第二十五块（第 10z 批第二十二、二十三块代码轮判决 K3、K4，正推 K3-5 `X6`、`X7`，K4-1 `S14`、`S19`）：真测试模块头两行之前
+    /// 写一份头两行，认不认照 [`text_outside_the_tests_module`] 那几条。宏调用圆括号里的（前一个词是左括号；里面藏一层收叫停的层，`S19`，
+    /// 那一层留在测试模块之外、照样找得到；前面先放一条以分号收尾的条目）、花括号里的（前面先放一条以分号收尾的条目）、前一个词不是条目收尾的，
+    /// 都不认，切口照旧在真测试模块；代码里两处都认的（恰好一处的上界）、真测试模块包进宏调用的圆括号（`S14`）、头两行换写法与 CRLF 换行
+    /// （按行逐字的口径，故意拒），都红在「恰好一处」那一句。扫这份源码改过的一份，不要卡。
+    /// 第 10z 批第二十六块（第 10z 批第二十四、二十五块代码轮判决第二节 K2，攻方 B2：括号那一道只数圆括号照绿）：真测试模块包进方括号的
+    /// 宏调用（`keep_hidden![` 起、前面先放一条以分号收尾的条目、`];` 收尾，攻方 `c09`；rustc 编得过、非测试构建里照编），也红在「恰好一处」。
+    #[test]
+    fn the_tests_module_is_cut_only_at_one_opening_of_two_whole_lines_at_the_top_level_after_an_item(
+    ) {
+        let source = include_str!("crash_amplification.rs");
+        let outside_the_tests = text_outside_the_tests_module(source);
+        let hidden_layer = concat!(
+            "    pub fn a_layer_hidden_in_a_wrapped_copy_of_the_tests_module(stop: &(dyn Fn() -> bool + Sync)) -> bool ",
+            "\u{7b} stop() \u{7d}\n"
+        );
+        let wrapped_copy_hiding_a_layer =
+            format!("keep_hidden!(\n{TESTS_MODULE_OPENING}\n{hidden_layer}") + "\u{7d}\n);\n";
+        for (form, copy_of_the_opening) in [
+            (
+                "宏调用圆括号里的一份，里面藏一层收叫停的层（S19）",
+                wrapped_copy_hiding_a_layer.as_str(),
+            ),
+            (
+                "宏调用圆括号里、前面先放一条以分号收尾的条目的一份",
+                "keep_hidden!(\nconst BEFORE_THE_COPY: u8 = 0;\n#[cfg(test)]\nmod tests \u{7b}\n\u{7d}\n);\n",
+            ),
+            (
+                "花括号里、前面先放一条以分号收尾的条目的一份",
+                "mod a_module_holding_a_copy \u{7b}\nconst BEFORE_THE_COPY: u8 = 0;\n#[cfg(test)]\nmod tests \u{7b}\n\u{7d}\n\u{7d}\n",
+            ),
+            (
+                "前一个词不是条目收尾的一份",
+                "static NOT_ENDED_BY_A_SEMICOLON: u8 = 0\n#[cfg(test)]\nmod tests \u{7b}\n\u{7d}\n",
+            ),
+        ] {
+            let with_a_copy = source.replacen(
+                TESTS_MODULE_OPENING,
+                &format!("{copy_of_the_opening}{TESTS_MODULE_OPENING}"),
+                1,
+            );
+            assert_eq!(
+                text_outside_the_tests_module(&with_a_copy).len(),
+                outside_the_tests.len() + copy_of_the_opening.len(),
+                "{form}不认，切口照旧在真测试模块"
+            );
+        }
+        let with_a_wrapped_copy_hiding_a_layer = source.replacen(
+            TESTS_MODULE_OPENING,
+            &format!("{wrapped_copy_hiding_a_layer}{TESTS_MODULE_OPENING}"),
+            1,
+        );
+        let found =
+            ways_a_layer_handed_the_stop_request_could_drop_it(&with_a_wrapped_copy_hiding_a_layer);
+        assert!(
+            found
+                .iter()
+                .any(|finding| finding
+                    .contains("a_layer_hidden_in_a_wrapped_copy_of_the_tests_module")),
+            "宏包着的假测试模块里藏的那一层找得到、红（S19）：{found:#?}"
+        );
+        let opening_offset = source
+            .find(TESTS_MODULE_OPENING)
+            .expect("这份源文件里有测试模块的头两行");
+        let end_of_the_tests_module = opening_offset
+            + source[opening_offset..]
+                .find(TOP_LEVEL_CLOSING_BRACE_LINE)
+                .expect("测试模块在顶格的右括号行收尾")
+            + TOP_LEVEL_CLOSING_BRACE_LINE.len();
+        let tests_wrapped_in_square_brackets_after_an_item =
+            String::from(&source[..opening_offset])
+                + "keep_hidden![\nconst BEFORE_THE_TESTS: u8 = 0;\n"
+                + &source[opening_offset..end_of_the_tests_module]
+                + "];\n"
+                + &source[end_of_the_tests_module..];
+        let mut refused_sources: Vec<(&str, String)> = vec![
+            (
+                "代码里两处都认的头两行",
+                source.replacen(
+                    TESTS_MODULE_OPENING,
+                    &format!(
+                        "{TESTS_MODULE_OPENING}{TOP_LEVEL_CLOSING_BRACE_LINE}{TESTS_MODULE_OPENING}"
+                    ),
+                    1,
+                ),
+            ),
+            (
+                "真测试模块包进宏调用的圆括号（S14）",
+                source.replacen(
+                    TESTS_MODULE_OPENING,
+                    &format!("keep_hidden!(\n{TESTS_MODULE_OPENING}"),
+                    1,
+                ),
+            ),
+            (
+                "真测试模块包进宏调用的圆括号、前面先放一条以分号收尾的条目",
+                source.replacen(
+                    TESTS_MODULE_OPENING,
+                    &(String::from("keep_hidden!(\nconst BEFORE_THE_TESTS: u8 = 0;\n")
+                        + TESTS_MODULE_OPENING),
+                    1,
+                ),
+            ),
+            (
+                "真测试模块包进宏调用的花括号、前面先放一条以分号收尾的条目",
+                source.replacen(
+                    TESTS_MODULE_OPENING,
+                    &(String::from("keep_hidden! \u{7b}\nconst BEFORE_THE_TESTS: u8 = 0;\n")
+                        + TESTS_MODULE_OPENING),
+                    1,
+                ),
+            ),
+            (
+                "真测试模块包进宏调用的方括号、前面先放一条以分号收尾的条目（攻方 c09）",
+                tests_wrapped_in_square_brackets_after_an_item,
+            ),
+            ("CRLF 换行", source.replace('\n', "\r\n")),
+        ];
+        for (form, other_writing) in [
+            ("mod 行少一个空格", "#[cfg(test)]\nmod tests\u{7b}"),
+            ("写在一行", "#[cfg(test)] mod tests \u{7b}"),
+            ("属性里多空格", "#[ cfg ( test ) ]\nmod tests \u{7b}"),
+            ("mod 行多空格", "#[cfg(test)]\nmod  tests  \u{7b}"),
+            ("头一行缩进", "    #[cfg(test)]\nmod tests \u{7b}"),
+            ("头一行行尾带空白", "#[cfg(test)]  \nmod tests \u{7b}"),
+            ("头一行行尾带注释", "#[cfg(test)] // 单测\nmod tests \u{7b}"),
+            ("第二行行尾带注释", "#[cfg(test)]\nmod tests \u{7b} // 单测"),
+        ] {
+            refused_sources.push((
+                form,
+                source.replacen(TESTS_MODULE_OPENING, other_writing, 1),
+            ));
+        }
+        for (form, refused_source) in &refused_sources {
+            let message = panic_message_of(|| {
+                drop(text_outside_the_tests_module(refused_source));
+            });
+            assert!(
+                message
+                    .as_deref()
+                    .is_some_and(|message| message.contains("测试模块的头两行恰好一处")),
+                "{form}：切口红在「恰好一处」那一句，读到 {message:?}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十五块（第 10z 批第二十二、二十三块代码轮判决 K4，正推 K4-1 N01、N02：叫停闭包的返回类型写成 `::core::primitive::bool`、
+    /// `(bool)` 的新层，叫停原样可用，按形找不到、判绿）：返回类型按路径写到 `core`、`std` 里那个原始类型的、外面套括号的，
+    /// 照 [`end_of_a_bool_return_type`] 认成 `bool`，新层找得到、红。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_new_layers_whose_stop_returns_bool_by_a_path_or_in_parentheses()
+    {
+        let source = include_str!("crash_amplification.rs");
+        for (marker, new_layer) in [
+            (
+                "an_extra_layer_whose_stop_returns_bool_by_the_core_path",
+                "fn an_extra_layer_whose_stop_returns_bool_by_the_core_path(stop: &(dyn Fn() -> ::core::primitive::bool + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_returns_bool_by_a_relative_core_path",
+                "fn an_extra_layer_whose_stop_returns_bool_by_a_relative_core_path(stop: &(dyn Fn() -> core::primitive::bool + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_returns_bool_by_the_std_path",
+                "fn an_extra_layer_whose_stop_returns_bool_by_the_std_path(stop: &(dyn Fn() -> std :: primitive :: bool + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_returns_bool_in_parentheses",
+                "fn an_extra_layer_whose_stop_returns_bool_in_parentheses(stop: &(dyn Fn() -> (bool) + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_returns_bool_by_a_path_in_two_parentheses",
+                "fn an_extra_layer_whose_stop_returns_bool_by_a_path_in_two_parentheses(stop: &(dyn Fn() -> ( ( ::std::primitive::bool ) ) + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_a_function_pointer_returning_bool_in_parentheses",
+                "fn an_extra_layer_whose_stop_is_a_function_pointer_returning_bool_in_parentheses(stop: fn() -> (bool)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_fn_mut_returning_bool_by_a_path",
+                "fn an_extra_layer_whose_stop_is_fn_mut_returning_bool_by_a_path(stop: &mut dyn FnMut() -> core::primitive::bool) -> bool \u{7b} false \u{7d}",
+            ),
+        ] {
+            let source_with_the_new_layer = format!("{source}\n{new_layer}\n");
+            let found =
+                ways_a_layer_handed_the_stop_request_could_drop_it(&source_with_the_new_layer);
+            assert!(
+                found.iter().any(|finding| finding.contains(marker)),
+                "叫停闭包的返回类型换了写法的新层 {marker} 找得到、红：{found:#?}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，正推 K4-1 A01：长的那一层钉住那一行上面挂 `#[cfg(any())]`，模块里另放一个
+    /// 叫 `stop_request` 的静态量，编译时那一行去掉、下面用的是静态量，整行比、层数、`let` 次数照绿）：钉住那一行前面紧挨着的（跳过注释）
+    /// 要是上一句的收尾，挂着属性（一行的、跨行的、属性与那一行之间夹注释行的）都红；叫停参数前面挂属性同样红。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_an_attribute_on_the_pinned_line_or_on_a_stop_parameter() {
+        let source = include_str!("crash_amplification.rs");
+        let pinned_line = concat!(
+            "    let stop_request = StopRequestRememberedInThisRun::new(stop_is_",
+            "requested);\n"
+        );
+        assert_eq!(
+            source.matches(pinned_line).count(),
+            1,
+            "长的那一层钉住的那一行在这份源码里恰好一处"
+        );
+        for (form, attribute) in [
+            ("一行的属性", "    #[cfg(any())]\n"),
+            ("跨行的属性", "    #[cfg(\n        any()\n    )]\n"),
+            (
+                "属性与那一行之间夹注释行",
+                "    #[cfg(any())]\n    // 编译时这一句去掉\n",
+            ),
+        ] {
+            let under_an_attribute =
+                source.replacen(pinned_line, &format!("{attribute}{pinned_line}"), 1);
+            let found = ways_a_layer_handed_the_stop_request_could_drop_it(&under_an_attribute);
+            assert!(
+                found
+                    .iter()
+                    .any(|finding| finding.contains("前面紧挨着的是上一句的收尾")),
+                "钉住那一行上面挂{form}，红：{found:#?}"
+            );
+        }
+        let stop_parameter = concat!("\n    stop_is_", "requested: &(dyn Fn() -> bool + Sync),\n");
+        let parameter_under_an_attribute = source.replacen(
+            stop_parameter,
+            &format!("\n    #[cfg(any())]{stop_parameter}"),
+            1,
+        );
+        assert_ne!(
+            parameter_under_an_attribute, source,
+            "造的源码在叫停参数上挂了属性"
+        );
+        let found =
+            ways_a_layer_handed_the_stop_request_could_drop_it(&parameter_under_an_attribute);
+        assert!(
+            found.iter().any(|finding| finding
+                .contains(concat!("的叫停参数 stop_is_", "requested 前面挂着属性"))),
+            "叫停参数上面挂属性，红：{found:#?}"
+        );
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，正推 K4-2 C02–C12）：新加一层收叫停、叫停写成钉住的
+    /// `&(dyn Fn() -> bool + Sync)` 之外的类型，照 `Fn() -> bool` 这个形（`FnMut`、`FnOnce`、函数指针也算）找到、红；类型里夹注释的，
+    /// 注释不算，照钉住的类型找到这一层、它不在名单里红。扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_finds_new_layers_whose_stop_type_is_written_another_way() {
+        let source = include_str!("crash_amplification.rs");
+        for (marker, new_layer) in [
+            (
+                "an_extra_layer_whose_stop_is_also_send",
+                "fn an_extra_layer_whose_stop_is_also_send(stop: &(dyn Fn() -> bool + Send + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_static",
+                "fn an_extra_layer_whose_stop_is_static(stop: &(dyn Fn() -> bool + Sync + 'static)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_borrowed_mutably",
+                "fn an_extra_layer_whose_stop_is_borrowed_mutably(stop: &mut (dyn Fn() -> bool + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_lives_for_the_whole_run",
+                "fn an_extra_layer_whose_stop_lives_for_the_whole_run(stop: &'static (dyn Fn() -> bool + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_type_holds_a_comment",
+                "fn an_extra_layer_whose_stop_type_holds_a_comment(stop: &(dyn Fn() -> bool /* 叫停 */ + Sync)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_boxed",
+                "fn an_extra_layer_whose_stop_is_boxed(stop: Box<dyn Fn() -> bool + Sync>) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_names_sync_first",
+                "fn an_extra_layer_whose_stop_names_sync_first(stop: &(dyn Sync + Fn() -> bool)) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_a_bare_trait_object",
+                "fn an_extra_layer_whose_stop_is_a_bare_trait_object(stop: &dyn Fn() -> bool) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_an_impl",
+                "fn an_extra_layer_whose_stop_is_an_impl(stop: impl Fn() -> bool) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_generic",
+                "fn an_extra_layer_whose_stop_is_generic<Stop: Fn() -> bool + Sync>(stop: &Stop) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "StopRequestOfAnExtraLayer",
+                "type StopRequestOfAnExtraLayer = dyn Fn() -> bool + Sync;\nfn an_extra_layer_whose_stop_is_an_alias(stop: &StopRequestOfAnExtraLayer) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_fn_mut",
+                "fn an_extra_layer_whose_stop_is_fn_mut(stop: &mut dyn FnMut() -> bool) -> bool \u{7b} false \u{7d}",
+            ),
+            (
+                "an_extra_layer_whose_stop_is_a_function_pointer",
+                "fn an_extra_layer_whose_stop_is_a_function_pointer(stop: fn() -> bool) -> bool \u{7b} false \u{7d}",
+            ),
+        ] {
+            let source_with_the_new_layer = format!("{source}\n{new_layer}\n");
+            let found =
+                ways_a_layer_handed_the_stop_request_could_drop_it(&source_with_the_new_layer);
+            assert!(
+                found.iter().any(|finding| finding.contains(marker)),
+                "叫停写成别的类型的新层 {marker} 找得到、红：{found:#?}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，攻方 v4、正推 K4-2 A11、A12、B02）：注释与字符串里写的不算——签名行尾注释里的
+    /// `fn` 不被当成层名，字符串、行尾注释里的 `let stop_request` 不算又绑一次，钉住那一行、短层函数体上的行尾注释不算改了那一句，都判绿。
+    /// 扫这份源码改过的一份，不要卡。
+    #[test]
+    fn the_stop_request_scan_reads_layer_names_rebindings_and_pinned_lines_past_comments_and_strings(
+    ) {
+        let source = include_str!("crash_amplification.rs");
+        let pinned_line = concat!(
+            "    let stop_request = StopRequestRememberedInThisRun::new(stop_is_",
+            "requested);\n"
+        );
+        let signature_lines = concat!(
+            "    cards_taken_from: GpuCardsSource,\n    stop_is_",
+            "requested: &(dyn"
+        );
+        let call_line_of_a_short_layer =
+            "        &|block_sequence| selected_block_sequences.contains(&block_sequence),\n";
+        for (anchor, replacement, form) in [
+            (
+                signature_lines,
+                signature_lines.replacen(",\n", ", // 判法版本，fn 外面定\n", 1),
+                "签名行尾注释里写 fn",
+            ),
+            (
+                pinned_line,
+                format!("{pinned_line}    let _quoted = \"let stop_request = the_never_stopping_request();\";\n"),
+                "字符串里写 let stop_request",
+            ),
+            (
+                pinned_line,
+                format!("{pinned_line}    let _counted_once = 0; // let stop_request = 换掉记住的叫停\n"),
+                "行尾注释里写 let stop_request",
+            ),
+            (
+                pinned_line,
+                pinned_line.replacen(";\n", "; // 记住的叫停\n", 1),
+                "钉住那一行带行尾注释",
+            ),
+            (
+                call_line_of_a_short_layer,
+                call_line_of_a_short_layer.replacen(",\n", ", // 只判点了名的块\n", 1),
+                "短层函数体上带行尾注释",
+            ),
+        ] {
+            assert!(
+                source.contains(anchor),
+                "{form}：这份源码里有要改的那一处 {anchor}"
+            );
+            let with_comments_and_strings = source.replacen(anchor, &replacement, 1);
+            assert_eq!(
+                ways_a_layer_handed_the_stop_request_could_drop_it(&with_comments_and_strings),
+                Vec::<String>::new(),
+                "{form}，判绿"
             );
         }
     }
@@ -3634,7 +6635,10 @@ pub struct EnvironmentRun {
     pub gpu_judge: Option<GpuJudgeOutcome>,
     /// 这一趟只排了派活计划（`SINGLEFS_CRASH_AMPLIFICATION_PLACEMENT_ONLY=1`）：录入与导入照做，一块都没判。
     pub placement_only: bool,
-    /// 这一趟被叫停了（[`stop_is_requested_by_the_environment`]）：判过的块在库里，第 ②③ 段没做，对账不为空是正常的。
+    /// 这一趟被叫停了（[`stop_is_requested_by_the_environment`]），或显存不够（起过卡池的进程在显存账上此刻借不到、卡上 wgpu 报了
+    /// Out of Memory）、打了「本次未跑」那一行（文件头第 5 条）：判过的块在库里，没做完的段留给下一趟，对账不为空是正常的；
+    /// 分项驱动照它把这一项记成本次未跑。只排派活计划的那一趟借不到试判的草稿区也置上（`placement_only` 同时为真，那一趟没打
+    /// `CRASH_AMPLIFICATION_PLACEMENT` 行）。
     pub stopped_early: bool,
     /// 这一趟判定行上的判法版本。
     pub judge_version: JudgeVersion,
@@ -3649,7 +6653,21 @@ pub struct EnvironmentRun {
     /// 测试代码里预设 ignore 的点（按登记整批不判的一类，不算剪枝）与因此没展开的态数。
     pub ignored_points: usize,
     pub states_skipped_by_ignore: u64,
+    /// 这一趟用的卡从哪来（[`GpuCardsSource`]）。
+    pub gpu_cards_taken_from: GpuCardsSource,
+    /// 起过卡池的进程第 ① 段由 CPU 判、单元校验和交卡对拍时，在显存账上为对拍的缓冲借的（MiB，文件头第 5 条）；没借是 `None`。
+    pub unit_checksum_buffers_booked_mebibytes: Option<u64>,
+    /// 起过卡池的进程第 ② 段在卡上核时，在显存账上为核对的缓冲借的（MiB，文件头第 5 条）；没借是 `None`。
+    pub facts_verifier_buffers_booked_mebibytes: Option<u64>,
+    /// 起过卡池的进程单元校验和对拍完那一刻核账：对拍的缓冲那一笔借据还在账上没有（第 10t 批代码轮判决 K4-1）；没借是 `None`。
+    pub unit_checksum_buffers_lease_on_the_books_after_checking: Option<bool>,
+    /// 起过卡池的进程第 ② 段核完那一刻核账：核对的缓冲那一笔借据还在账上没有（同上）；没借是 `None`。
+    pub facts_verifier_buffers_lease_on_the_books_after_verifying: Option<bool>,
 }
+
+/// 一趟用的卡从哪来（定义在 harness 档，草稿区记不记账的判法 `singlefs_harness::gpu_memory_ledger::scratch_states_to_book_on_each_card`
+/// 照它分，单测在 harness 档随时跑得到）。
+pub use singlefs_harness::gpu_memory_ledger::GpuCardsSource;
 
 /// 每一行 `CRASH_AMPLIFICATION ` 末尾都接的几个字段（汇总行、被叫停的行、`flow=` 行、两台跑的分份行与导入行，打法都在
 /// `crates/singlefs-checker-tier/tests/` 里调 [`run_from_environment`] 的用例）：
@@ -4056,29 +7074,35 @@ pub fn run_from_environment(
         }
     }
     let seconds_planning_and_recording = planning_started.elapsed().as_secs_f64();
-    let cards = if routes.need_a_card() {
-        Some(gpu_cards_in_use(cards_by_priority.as_deref(), host)?)
+    // 起过卡池的进程取卡不登记、不起设备，借到哪张卡才在哪张上起（文件头第 5 条）
+    let (cards, gpu_cards_taken_from) = if routes.need_a_card() {
+        let GpuCardsOfThisRun { cards, taken_from } =
+            gpu_cards_in_use(cards_by_priority.as_deref(), host)?;
+        (Some(cards), taken_from)
     } else {
-        None
+        (None, GpuCardsSource::NoCardNeeded)
     };
     if placement_only {
-        let (ComputedOn::Gpu, Some(cards)) = (routes.crash_judge, &cards) else {
-            return Err(format!(
-                "只排派活计划排的是 GPU 判器的活：要配置开着 GPU（ENABLE_GPU=1）、{GPU_COMPUTATION_CLASSES_KEY} 里登记 {}",
-                GpuComputationClass::CrashJudgeGpu.name()
-            ));
+        let placement = match (routes.crash_judge, &cards) {
+            (ComputedOn::Gpu, Some(cards)) => print_the_placement(
+                &store,
+                flow,
+                &plan,
+                &|block| selected.contains(&block),
+                &version,
+                cards,
+                gpu_cards_taken_from,
+                cards_by_priority.as_deref(),
+                host,
+                states_reused_at_recording,
+            )?,
+            (ComputedOn::Gpu, None) | (ComputedOn::Cpu, _) => {
+                return Err(format!(
+                    "只排派活计划排的是 GPU 判器的活：要配置开着 GPU（ENABLE_GPU=1）、{GPU_COMPUTATION_CLASSES_KEY} 里登记 {}",
+                    GpuComputationClass::CrashJudgeGpu.name()
+                ));
+            }
         };
-        print_the_placement(
-            &store,
-            flow,
-            &plan,
-            &|block| selected.contains(&block),
-            &version,
-            cards,
-            cards_by_priority.as_deref(),
-            host,
-            states_reused_at_recording,
-        )?;
         let unjudged = unjudged_blocks_of_the_flow(&store, &plan, &version)
             .map_err(|error| format!("对账失败：{error:?}"))?
             .len();
@@ -4101,7 +7125,8 @@ pub fn run_from_environment(
             comparison: None,
             gpu_judge: None,
             placement_only: true,
-            stopped_early: false,
+            // 起过卡池的进程借不到试判的草稿区：「本次未跑」那一行已经打了，没打 PLACEMENT 行（第 10v 批）
+            stopped_early: placement == PlacementOfThisRun::NotRunTheGpuMemoryWasShort,
             judge_version: version,
             computation_routes: routes,
             expand_up_to,
@@ -4110,47 +7135,174 @@ pub fn run_from_environment(
             states_reused: states_reused_at_recording,
             ignored_points,
             states_skipped_by_ignore,
+            gpu_cards_taken_from,
+            unit_checksum_buffers_booked_mebibytes: None,
+            facts_verifier_buffers_booked_mebibytes: None,
+            unit_checksum_buffers_lease_on_the_books_after_checking: None,
+            facts_verifier_buffers_lease_on_the_books_after_verifying: None,
         });
     }
     // 第 ① 段：登记了 crash_judge_gpu 就由 GPU 判器判这台机器领的块（判不了就报错，不退回 CPU）；没登记由 CPU 判器判，
-    // 那时登记了 gpu_unit_checks 就把单元两道校验和另交一张卡对拍
+    // 那时登记了 gpu_unit_checks 就把单元两道校验和另交一张卡对拍。显存不够（起过卡池的进程此刻借不到、卡上 wgpu 报了 Out of Memory）：
+    // 「本次未跑」那一行已经打了，判过的块在库里，下面照叫停的样子交回（文件头第 5 条）
     let judging_started = std::time::Instant::now();
-    let (checking, gpu_judge) = match (routes.crash_judge, &cards) {
-        (ComputedOn::Gpu, Some(cards)) => {
-            let (checking, outcome) = judge_my_blocks_on_gpu(
-                &mut store,
-                flow,
-                &plan,
-                &|block| selected.contains(&block),
-                &version,
-                cards,
-                &stop_is_requested_by_the_environment,
-            )?;
-            eprintln!("{}", gpu_total_line(&outcome, expand_up_to, exhaustive));
-            (checking, Some(outcome))
-        }
+    // 这一趟的叫停：第 ① 段的外层循环、卡线程、一轮收尾与下面整趟收尾都问这一个，见过一次就记住（第 10z 批第六块，
+    // 第 10z 批第五块代码轮判决 K2-2 攻方 F2：叫停文件中途被删时各自现读，轮末断言 panic、或整趟没记成提早收尾）
+    let stop_request = StopRequestRememberedInThisRun::new(&stop_is_requested_by_the_environment);
+    let stop_is_requested = || stop_request.is_requested();
+    let (
+        checking,
+        gpu_judge,
+        unit_checksum_buffers_booked_mebibytes,
+        unit_checksum_buffers_lease_on_the_books_after_checking,
+        gpu_memory_was_short,
+    ) = match (routes.crash_judge, &cards) {
+        (ComputedOn::Gpu, Some(cards)) => match judge_my_blocks_on_gpu(
+            &mut store,
+            flow,
+            &plan,
+            &|block| selected.contains(&block),
+            &version,
+            cards,
+            gpu_cards_taken_from,
+            &stop_is_requested,
+        )? {
+            GpuJudgingOfMyBlocks::Judged { tally, outcome } => {
+                eprintln!("{}", gpu_total_line(&outcome, expand_up_to, exhaustive));
+                (tally, Some(outcome), None, None, false)
+            }
+            GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort { tally, reason: _ } => {
+                (tally, None, None, None, true)
+            }
+        },
         (ComputedOn::Gpu, None) => {
             return Err(format!(
                 "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回 CPU 判器",
                 GpuComputationClass::CrashJudgeGpu.name()
             ));
         }
-        (ComputedOn::Cpu, _) => (
-            check_selected_blocks(
+        (ComputedOn::Cpu, _) => match unit_checksums_on(
+            routes.unit_checksums,
+            cards.as_ref(),
+            gpu_cards_taken_from,
+            flow,
+        )? {
+            // 借来的缓冲活到这一段判完；判完那一刻核账（第 10t 批代码轮判决 K4-1）
+            UnitChecksumsOfThisRun::Ready {
+                on,
+                lease: buffers_held_until_checked,
+                buffers_booked_mebibytes,
+            } => {
+                let checking = check_selected_blocks(
+                    &mut store,
+                    flow,
+                    &plan,
+                    &selected,
+                    &on,
+                    &version,
+                    &stop_is_requested,
+                )
+                .map_err(|error| format!("核对失败：{error:?}"))?;
+                // 对拍时卡上报了 Out of Memory：打「本次未跑」那一行，照叫停的样子交回（第 10z 批，文件头第 5 条）
+                let gpu_memory_was_short = match &checking.stopped_because_the_gpu_memory_was_short
+                {
+                    Some(reason) => {
+                        println!(
+                            "{}",
+                            singlefs_harness::gpu_memory_ledger::gpu_not_run_line(
+                                PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                                reason
+                            )
+                        );
+                        true
+                    }
+                    None => false,
+                };
+                (
+                    checking,
+                    None,
+                    buffers_booked_mebibytes,
+                    lease_on_the_books_after_its_work(&buffers_held_until_checked),
+                    gpu_memory_was_short,
+                )
+            }
+            UnitChecksumsOfThisRun::NotRunTheGpuMemoryWasShort => {
+                (CheckingTally::default(), None, None, None, true)
+            }
+        },
+    };
+    let stop_was_requested = gpu_memory_was_short || stop_is_requested();
+    let seconds_judging = judging_started.elapsed().as_secs_f64();
+    // 第 ② 段：配置开了 GPU 就核，登记了 crash_verify_gpu 在一张卡上核（起过卡池的照账借第一张放得下的，第 ① 段的草稿区已经放掉）、
+    // 没登记用 CPU 参照核；没开 GPU 而 SINGLEFS_CRASH_AMPLIFICATION_VERIFY=cpu 也用 CPU 参照核；被叫停的不核
+    let verifying_started = std::time::Instant::now();
+    let facts_verifier_route = if stop_was_requested {
+        None
+    } else if mode.uses_gpu()
+        || std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").is_ok_and(|value| value == "cpu")
+    {
+        Some(routes.facts_verifier)
+    } else {
+        None
+    };
+    let (
+        verification,
+        verifying_cards_used,
+        facts_verifier_buffers_booked_mebibytes,
+        facts_verifier_buffers_lease_on_the_books_after_verifying,
+        facts_were_not_verified_for_short_gpu_memory,
+    ) = match (facts_verifier_route, &cards) {
+        (Some(ComputedOn::Gpu), Some(cards)) => match verify_my_blocks_on_the_first_card(
+            &mut store,
+            flow,
+            &plan,
+            &my_blocks,
+            cards,
+            gpu_cards_taken_from,
+        )? {
+            FactsVerifiedOnACard::Verified {
+                outcome,
+                buffers_booked_mebibytes,
+                lease_on_the_books_after_verifying,
+            } => (
+                Some(outcome),
+                1,
+                buffers_booked_mebibytes,
+                lease_on_the_books_after_verifying,
+                false,
+            ),
+            FactsVerifiedOnACard::NotRunTheGpuMemoryWasShort => (None, 0, None, None, true),
+        },
+        (Some(ComputedOn::Gpu), None) => {
+            return Err(format!(
+                "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回 CPU 参照核",
+                GpuComputationClass::CrashVerifyGpu.name()
+            ));
+        }
+        (None, _) => (None, 0, None, None, false),
+        (Some(ComputedOn::Cpu), _) => {
+            let on = FactsVerifierOn::Cpu;
+            let tally = verify_blocks_from_facts(
                 &mut store,
                 flow,
                 &plan,
-                &selected,
-                &unit_checksums_on(routes.unit_checksums, cards.as_ref())?,
-                &version,
-                &stop_is_requested_by_the_environment,
+                &|block| selected.contains(&block),
+                &on,
+            )?;
+            (
+                Some(VerificationOutcome {
+                    verifier: on.name(),
+                    tally,
+                }),
+                0,
+                None,
+                None,
+                false,
             )
-            .map_err(|error| format!("核对失败：{error:?}"))?,
-            None,
-        ),
+        }
     };
-    if stop_is_requested_by_the_environment() {
-        // 被叫停：判过的块已经在库里，第 ②③ 段留给接着判的那一趟
+    if stop_was_requested || facts_were_not_verified_for_short_gpu_memory {
+        // 被叫停，或显存不够（本次未跑）：判过的块已经在库里，没做的段留给接着判的那一趟
         let unjudged = unjudged_blocks_of_the_flow(&store, &plan, &version)
             .map_err(|error| format!("对账失败：{error:?}"))?
             .len();
@@ -4186,48 +7338,13 @@ pub fn run_from_environment(
             states_reused: states_reused_at_recording,
             ignored_points,
             states_skipped_by_ignore,
+            gpu_cards_taken_from,
+            unit_checksum_buffers_booked_mebibytes,
+            facts_verifier_buffers_booked_mebibytes,
+            unit_checksum_buffers_lease_on_the_books_after_checking,
+            facts_verifier_buffers_lease_on_the_books_after_verifying,
         });
     }
-    let seconds_judging = judging_started.elapsed().as_secs_f64();
-    // 第 ② 段：配置开了 GPU 就核，登记了 crash_verify_gpu 在优先级最高的那张卡上核（第 ① 段的草稿区已经放掉）、没登记用 CPU 参照核；
-    // 没开 GPU 而 SINGLEFS_CRASH_AMPLIFICATION_VERIFY=cpu 也用 CPU 参照核
-    let verifying_started = std::time::Instant::now();
-    let facts_verifier_route = if mode.uses_gpu()
-        || std::env::var("SINGLEFS_CRASH_AMPLIFICATION_VERIFY").is_ok_and(|value| value == "cpu")
-    {
-        Some(routes.facts_verifier)
-    } else {
-        None
-    };
-    let (verification, verifying_cards_used) = match (facts_verifier_route, &cards) {
-        (Some(ComputedOn::Gpu), Some(cards)) => {
-            verify_my_blocks_on_the_first_card(&mut store, flow, &plan, &my_blocks, cards)?
-        }
-        (Some(ComputedOn::Gpu), None) => {
-            return Err(format!(
-                "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回 CPU 参照核",
-                GpuComputationClass::CrashVerifyGpu.name()
-            ));
-        }
-        (None, _) => (None, 0),
-        (Some(ComputedOn::Cpu), _) => {
-            let on = FactsVerifierOn::Cpu;
-            let tally = verify_blocks_from_facts(
-                &mut store,
-                flow,
-                &plan,
-                &|block| selected.contains(&block),
-                &on,
-            )?;
-            (
-                Some(VerificationOutcome {
-                    verifier: on.name(),
-                    tally,
-                }),
-                0,
-            )
-        }
-    };
     // 用了几张卡：第 ① 段在卡上判的按它用的，第 ② 段在卡上核、单元校验和在卡上对拍的各一张
     let cards_used = [
         gpu_judge.as_ref().map_or(0, |outcome| outcome.cards_used),
@@ -4299,6 +7416,11 @@ pub fn run_from_environment(
         states_reused: states_reused_at_recording,
         ignored_points,
         states_skipped_by_ignore,
+        gpu_cards_taken_from,
+        unit_checksum_buffers_booked_mebibytes,
+        facts_verifier_buffers_booked_mebibytes,
+        unit_checksum_buffers_lease_on_the_books_after_checking,
+        facts_verifier_buffers_lease_on_the_books_after_verifying,
     })
 }
 
@@ -4345,12 +7467,62 @@ type CardsInUse = Vec<std::sync::Arc<crate::gpu_unit_checks::GpuCard>>;
 #[cfg(not(feature = "gpu"))]
 type CardsInUse = ();
 
+/// 起过卡池的进程为第 ② 段或单元校验和对拍在显存账上借的那一笔：活到那一段算完；卡不是从池里来的不借（`None`）。
+/// 没编进 `gpu` 特性时没有这个东西。
+#[cfg(feature = "gpu")]
+type BufferLeaseOnTheCardPool = Option<crate::gpu_unit_checks::gpu_test_start::GpuCardLease>;
+#[cfg(not(feature = "gpu"))]
+type BufferLeaseOnTheCardPool = ();
+
+/// 一段算完那一刻核账：那一段的缓冲借的那一笔还在这个进程的账上没有（第 10t 批代码轮判决 K4-1：借了又在用完之前还掉要红）；没借是 `None`。
+#[cfg(feature = "gpu")]
+fn lease_on_the_books_after_its_work(lease: &BufferLeaseOnTheCardPool) -> Option<bool> {
+    lease
+        .as_ref()
+        .map(crate::gpu_unit_checks::gpu_test_start::GpuCardLease::is_on_the_books)
+}
+
+/// 没编进 `gpu` 特性时不借，没有可核的。
+#[cfg(not(feature = "gpu"))]
+fn lease_on_the_books_after_its_work(_lease: &BufferLeaseOnTheCardPool) -> Option<bool> {
+    None
+}
+
+/// 这一趟的卡（[`gpu_cards_in_use`]）：这一趟自己起的那几张（起过卡池的是空的：池里的卡借到哪张才在哪张上起设备，
+/// 用的时候照池取，文件头第 5 条），与卡从哪来。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "没编进 gpu 特性时取卡那一份只报错，这个结局只在编进来时造"
+    )
+)]
+struct GpuCardsOfThisRun {
+    cards: CardsInUse,
+    taken_from: GpuCardsSource,
+}
+
 /// 这个进程用哪几张卡：配置点了名的只用这台机器那几张、照配置的次序与额度；没配就是本机能用的卡按空闲显存从大到小。
+/// 这个进程起过 GPU 用例共用的卡池（[`crate::gpu_unit_checks::gpu_test_start::card_pool_started_in_this_process`]）就照池里的卡用
+/// （池里的卡要与配置对得上，[`the_card_pool_matches_the_configured_cards`]），不另起一套设备，此刻也不登记、不起设备：
+/// 借到哪张卡才在哪张上起（第 10t 批代码轮判决 K2-3）。没起过池才自己起。
 #[cfg(feature = "gpu")]
 fn gpu_cards_in_use(
     configured: Option<&[CardByPriority]>,
     host: CardHost,
-) -> Result<CardsInUse, String> {
+) -> Result<GpuCardsOfThisRun, String> {
+    if let Some(pool) = crate::gpu_unit_checks::gpu_test_start::card_pool_started_in_this_process()
+    {
+        the_card_pool_matches_the_configured_cards(
+            &pool.cards_in_priority_order_as_configured(),
+            configured,
+            host,
+        )?;
+        return Ok(GpuCardsOfThisRun {
+            cards: Vec::new(),
+            taken_from: GpuCardsSource::TheCardPoolOfThisProcess,
+        });
+    }
     let cards = match configured {
         Some(configured) => {
             let mine: Vec<(u32, u64)> = configured
@@ -4384,29 +7556,124 @@ fn gpu_cards_in_use(
                 .to_string(),
         );
     }
-    Ok(cards.into_iter().map(std::sync::Arc::new).collect())
+    Ok(GpuCardsOfThisRun {
+        cards: cards.into_iter().map(std::sync::Arc::new).collect(),
+        taken_from: GpuCardsSource::DevicesStartedForThisRun,
+    })
 }
 
-/// 第 ① 段由 CPU 判时，单元两道校验和在哪对拍：登记了 `gpu_unit_checks` 交优先级最高的那张卡，没登记只在 CPU 上。
+/// 池里的卡（`pool_cards`：按池的优先级，每张的序号与配置给它的额度）对不对得上这一趟读到的显卡配置：配置点了名的（`configured` 里
+/// 这台机器那几项），池里的卡要与它逐张同序号、同额度，对不上就报错（池与这一趟读到的显卡配置不同，不悄悄换卡）；没配就照池里的卡用。
 ///
 /// # Errors
-/// 登记了却没有起好的卡（不退回只在 CPU 上算）。
+/// 两份显卡配置对不上。
+#[cfg(feature = "gpu")]
+fn the_card_pool_matches_the_configured_cards(
+    pool_cards: &[(u32, Option<u64>)],
+    configured: Option<&[CardByPriority]>,
+    host: CardHost,
+) -> Result<(), String> {
+    if let Some(configured) = configured {
+        let mine: Vec<(u32, Option<u64>)> = configured
+            .iter()
+            .filter(|card| card.host == host)
+            .map(|card| (card.index, Some(card.memory_quota_mebibytes)))
+            .collect();
+        if mine != pool_cards {
+            return Err(format!(
+                "这个进程的卡池里是 {pool_cards:?}（序号，额度 MiB），这一趟的显卡配置给 {} 这台机器点的是 {mine:?}：两份显卡配置对不上，\
+                 不另起一套设备、也不悄悄换卡",
+                host.name()
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// 第 ① 段由 CPU 判时，单元两道校验和在哪对拍（[`unit_checksums_on`]）。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "没编进 gpu 特性时单元校验和只在 CPU 上，借不到缓冲那一形只在编进来时造"
+    )
+)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "一趟只造一个、交给调用方就拆开，不进集合：卡池的借据多带一份账上的设备（第 10z 批第八块）之后过了门槛，装箱省不下什么"
+)]
+enum UnitChecksumsOfThisRun {
+    /// `on` 是在哪对拍；`lease` 是起过卡池的进程为对拍的缓冲借的那一笔（活到这一段判完），`buffers_booked_mebibytes` 是借的量。
+    Ready {
+        on: UnitChecksumsOn,
+        lease: BufferLeaseOnTheCardPool,
+        buffers_booked_mebibytes: Option<u64>,
+    },
+    /// 起过卡池的进程此刻借不到对拍的缓冲：「本次未跑」那一行已经打了。
+    NotRunTheGpuMemoryWasShort,
+}
+
+/// 第 ① 段由 CPU 判时，单元两道校验和在哪对拍：登记了 `gpu_unit_checks` 交一张卡，没登记只在 CPU 上。
+/// 卡是这一趟自己起的交优先级最高的那张；起过卡池的照对拍的缓冲（`unit_checksum_buffer_footprint`，这条流的单元写数、核对线程数）
+/// 在账上借第一张此刻放得下的，用借来的那张算；借不到打「本次未跑」那一行（文件头第 5 条）。
+///
+/// # Errors
+/// 登记了却没有起好的卡（不退回只在 CPU 上算）；起过卡池的进程借缓冲时要的比每张卡空着时能借的都大、卡上的显存读不出。
 #[cfg(feature = "gpu")]
 fn unit_checksums_on(
     route: ComputedOn,
     cards: Option<&CardsInUse>,
-) -> Result<UnitChecksumsOn, String> {
+    cards_taken_from: GpuCardsSource,
+    flow: &CrashFlow<'_>,
+) -> Result<UnitChecksumsOfThisRun, String> {
+    let ready_without_a_lease = |on: UnitChecksumsOn| UnitChecksumsOfThisRun::Ready {
+        on,
+        lease: None,
+        buffers_booked_mebibytes: None,
+    };
     match route {
-        ComputedOn::Cpu => Ok(UnitChecksumsOn::CpuOnly),
-        ComputedOn::Gpu => cards
-            .and_then(|cards| cards.first())
-            .map(|card| UnitChecksumsOn::Gpu(card.clone()))
-            .ok_or_else(|| {
+        ComputedOn::Cpu => Ok(ready_without_a_lease(UnitChecksumsOn::CpuOnly)),
+        ComputedOn::Gpu => {
+            let no_card = || {
                 format!(
                     "登记了 {} 走 GPU，这一趟却没有起好的卡：不退回只在 CPU 上算",
                     GpuComputationClass::GpuUnitChecks.name()
                 )
-            }),
+            };
+            let cards = cards.ok_or_else(no_card)?;
+            match cards_taken_from {
+                GpuCardsSource::NoCardNeeded | GpuCardsSource::DevicesStartedForThisRun => {
+                    let first_card = cards.first().ok_or_else(no_card)?;
+                    Ok(ready_without_a_lease(UnitChecksumsOn::Gpu(
+                        first_card.clone(),
+                    )))
+                }
+                GpuCardsSource::TheCardPoolOfThisProcess => {
+                    let unit_writes = flow
+                        .writes
+                        .iter()
+                        .filter(|write| write.kind == StepKind::UnitWrite)
+                        .count();
+                    let need_mebibytes =
+                        unit_checksum_buffer_footprint(unit_writes, checking_threads()).mebibytes();
+                    match the_card_pool_this_run_takes_its_cards_from()
+                        .lease_the_first_card_with_room_now(
+                            PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                            need_mebibytes,
+                        ) {
+                        Ok(lease) => Ok(UnitChecksumsOfThisRun::Ready {
+                            on: UnitChecksumsOn::Gpu(std::sync::Arc::new(lease.card().clone())),
+                            buffers_booked_mebibytes: Some(lease.mebibytes()),
+                            lease: Some(lease),
+                        }),
+                        Err(refusal) => {
+                            print_the_not_run_line_or_refuse("单元校验和对拍的缓冲", &refusal)?;
+                            Ok(UnitChecksumsOfThisRun::NotRunTheGpuMemoryWasShort)
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -4418,9 +7685,15 @@ fn unit_checksums_on(
 fn unit_checksums_on(
     route: ComputedOn,
     _cards: Option<&CardsInUse>,
-) -> Result<UnitChecksumsOn, String> {
+    _cards_taken_from: GpuCardsSource,
+    _flow: &CrashFlow<'_>,
+) -> Result<UnitChecksumsOfThisRun, String> {
     match route {
-        ComputedOn::Cpu => Ok(UnitChecksumsOn::CpuOnly),
+        ComputedOn::Cpu => Ok(UnitChecksumsOfThisRun::Ready {
+            on: UnitChecksumsOn::CpuOnly,
+            lease: (),
+            buffers_booked_mebibytes: None,
+        }),
         ComputedOn::Gpu => Err(format!(
             "登记了 {} 走 GPU，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）",
             GpuComputationClass::GpuUnitChecks.name()
@@ -4433,12 +7706,17 @@ fn unit_checksums_on(
 fn gpu_cards_in_use(
     _configured: Option<&[CardByPriority]>,
     _host: CardHost,
-) -> Result<CardsInUse, String> {
+) -> Result<GpuCardsOfThisRun, String> {
     Err("配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）".to_string())
 }
 
-/// 第 ① 段在卡上的入口（`gpu` 特性编进来时调 [`judge_my_blocks_on_gpu_cards`]）。
+/// 第 ① 段在卡上的入口（`gpu` 特性编进来时调 [`judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from`]：
+/// 起过卡池的这一趟草稿区进账，显存不够交 [`GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort`]）。
 #[cfg(feature = "gpu")]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "库、流、计划、分工、判法版本、卡、卡的来路、叫停，各是各的东西，凑成结构体只为让签名变短"
+)]
 fn judge_my_blocks_on_gpu(
     store: &mut VerdictStore,
     flow: &CrashFlow<'_>,
@@ -4446,21 +7724,27 @@ fn judge_my_blocks_on_gpu(
     is_mine: &dyn Fn(u64) -> bool,
     version: &JudgeVersion,
     cards: &CardsInUse,
+    cards_taken_from: GpuCardsSource,
     stop_is_requested: &(dyn Fn() -> bool + Sync),
-) -> Result<(CheckingTally, GpuJudgeOutcome), String> {
-    judge_my_blocks_on_gpu_cards(
+) -> Result<GpuJudgingOfMyBlocks, String> {
+    judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(
         store,
         flow,
         plan,
         is_mine,
         version,
         cards,
+        cards_taken_from,
         stop_is_requested,
     )
 }
 
 /// 没编进 `gpu` 特性走不到这里（[`gpu_cards_in_use`] 先报错）。
 #[cfg(not(feature = "gpu"))]
+#[allow(
+    clippy::too_many_arguments,
+    reason = "与编进 gpu 特性的那一份同一个签名"
+)]
 fn judge_my_blocks_on_gpu(
     _store: &mut VerdictStore,
     _flow: &CrashFlow<'_>,
@@ -4468,13 +7752,39 @@ fn judge_my_blocks_on_gpu(
     _is_mine: &dyn Fn(u64) -> bool,
     _version: &JudgeVersion,
     _cards: &CardsInUse,
+    _cards_taken_from: GpuCardsSource,
     _stop_is_requested: &(dyn Fn() -> bool + Sync),
-) -> Result<(CheckingTally, GpuJudgeOutcome), String> {
+) -> Result<GpuJudgingOfMyBlocks, String> {
     Err("配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）".to_string())
 }
 
-/// 第 ② 段在卡上：这台机器领到的块都在优先级最高的那张卡上核（第 ① 段的草稿区那时已经放掉，这一段一块一次派活、不占草稿区）。
-/// 交回合计与用了几张卡。
+/// 第 ② 段在卡上核的结局（[`verify_my_blocks_on_the_first_card`]）。
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "没编进 gpu 特性时第 ② 段在卡上的那一份只报错，两种结局只在编进来时造"
+    )
+)]
+enum FactsVerifiedOnACard {
+    /// 核完了：`buffers_booked_mebibytes` 是起过卡池的进程为核对的缓冲借的（不借是 `None`），`lease_on_the_books_after_verifying`
+    /// 是核完那一刻核账、那一笔还在不在（不借是 `None`）。
+    Verified {
+        outcome: VerificationOutcome,
+        buffers_booked_mebibytes: Option<u64>,
+        lease_on_the_books_after_verifying: Option<bool>,
+    },
+    /// 显存不够（起过卡池的进程此刻借不到核对的缓冲，或卡上 wgpu 报了 Out of Memory）：「本次未跑」那一行已经打了，
+    /// 核过的块在库里。
+    NotRunTheGpuMemoryWasShort,
+}
+
+/// 第 ② 段在卡上：这台机器领到的块都在一张卡上核（第 ① 段的草稿区那时已经放掉，这一段一块一次派活、不占草稿区）。
+/// 卡是这一趟自己起的用优先级最高的那张；起过卡池的照这条流的事实表与一块的缓冲（`facts_verifier_buffer_footprint`）在账上借
+/// 第一张此刻放得下的，用借来的那张核，借不到打「本次未跑」那一行（文件头第 5 条）。核的时候 wgpu 报 Out of Memory 同样报本次未跑。
+///
+/// # Errors
+/// 库读写失败；起过卡池的进程借缓冲时要的比每张卡空着时能借的都大、卡上的显存读不出。
 #[cfg(feature = "gpu")]
 fn verify_my_blocks_on_the_first_card(
     store: &mut VerdictStore,
@@ -4482,11 +7792,33 @@ fn verify_my_blocks_on_the_first_card(
     plan: &CrashPlan,
     my_blocks: &[u64],
     cards: &CardsInUse,
-) -> Result<(Option<VerificationOutcome>, usize), String> {
-    let card = cards
-        .first()
-        .expect("用的卡至少一张（gpu_cards_in_use 判过）")
-        .clone();
+    cards_taken_from: GpuCardsSource,
+) -> Result<FactsVerifiedOnACard, String> {
+    let facts = extract_flow_facts(flow.base, flow.writes, flow.segments, flow.expansion);
+    // 借据活到这一段核完（核对的缓冲在下面那一次调用里建、丢）
+    let (card, lease): (_, BufferLeaseOnTheCardPool) = match cards_taken_from {
+        GpuCardsSource::NoCardNeeded | GpuCardsSource::DevicesStartedForThisRun => (
+            cards
+                .first()
+                .expect("用的卡至少一张（gpu_cards_in_use 判过）")
+                .clone(),
+            None,
+        ),
+        GpuCardsSource::TheCardPoolOfThisProcess => {
+            let need_mebibytes =
+                facts_verifier_buffer_footprint(&facts, STATES_PER_BLOCK).mebibytes();
+            match the_card_pool_this_run_takes_its_cards_from().lease_the_first_card_with_room_now(
+                PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE,
+                need_mebibytes,
+            ) {
+                Ok(lease) => (std::sync::Arc::new(lease.card().clone()), Some(lease)),
+                Err(refusal) => {
+                    print_the_not_run_line_or_refuse("第 ② 段核对的缓冲", &refusal)?;
+                    return Ok(FactsVerifiedOnACard::NotRunTheGpuMemoryWasShort);
+                }
+            }
+        }
+    };
     let selected: std::collections::HashSet<u64> = my_blocks.iter().copied().collect();
     eprintln!(
         "CRASH_AMPLIFICATION_CARD name={:?} index={} memory_budget_mebibytes={} blocks={}",
@@ -4495,16 +7827,30 @@ fn verify_my_blocks_on_the_first_card(
         card.memory_budget_mebibytes(),
         selected.len()
     );
-    let on = FactsVerifierOn::Gpu(card);
-    let tally =
-        verify_blocks_from_facts(store, flow, plan, &|block| selected.contains(&block), &on)?;
-    Ok((
-        Some(VerificationOutcome {
+    let on = FactsVerifierOn::Gpu(card.clone());
+    // 核对在这条线程上一块接一块派活（verify_blocks_from_these_facts），wgpu 的错误范围接得住
+    let tally = match on_the_card_catching_out_of_memory(&card, "第 ② 段核对时", || {
+        verify_blocks_from_these_facts(store, plan, &facts, &|block| selected.contains(&block), &on)
+    }) {
+        Ok(tally) => tally?,
+        Err(reason) => {
+            println!(
+                "{}",
+                gpu_not_run_line(PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE, &reason)
+            );
+            return Ok(FactsVerifiedOnACard::NotRunTheGpuMemoryWasShort);
+        }
+    };
+    Ok(FactsVerifiedOnACard::Verified {
+        outcome: VerificationOutcome {
             verifier: "gpu",
             tally,
-        }),
-        1,
-    ))
+        },
+        buffers_booked_mebibytes: lease
+            .as_ref()
+            .map(crate::gpu_unit_checks::gpu_test_start::GpuCardLease::mebibytes),
+        lease_on_the_books_after_verifying: lease_on_the_books_after_its_work(&lease),
+    })
 }
 
 /// 没编进 `gpu` 特性走不到这里（[`gpu_cards_in_use`] 先报错）。
@@ -4515,17 +7861,40 @@ fn verify_my_blocks_on_the_first_card(
     _plan: &CrashPlan,
     _my_blocks: &[u64],
     _cards: &CardsInUse,
-) -> Result<(Option<VerificationOutcome>, usize), String> {
+    _cards_taken_from: GpuCardsSource,
+) -> Result<FactsVerifiedOnACard, String> {
     Err("配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）".to_string())
+}
+
+/// 只排派活计划那一趟的结局。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    not(feature = "gpu"),
+    allow(
+        dead_code,
+        reason = "没编进 gpu 特性时只排计划的那一份只报错，打了那一行的结局只在编进来时造"
+    )
+)]
+enum PlacementOfThisRun {
+    /// 打了 `CRASH_AMPLIFICATION_PLACEMENT` 那一行。
+    Printed,
+    /// 起过卡池的进程此刻借不到试判的草稿区、或试判时卡上报了 Out of Memory：「本次未跑」那一行已经打了，没打 PLACEMENT 行。
+    NotRunTheGpuMemoryWasShort,
 }
 
 /// 只排派活计划：这一趟要判多少、配置的每张卡按额度带得了多少、按优先级各装多少；这台机器装了状态的卡各试判几次派活量速度。
 /// 打一行 `CRASH_AMPLIFICATION_PLACEMENT`（带这一趟录入时库里已判、因此不排的态数 `states_reused`）。别的机器上的卡带得了多少按它的额度算
-/// （绑定上限按本机第一张卡估）。
+/// （绑定上限按本机第一张卡估）。起过卡池的这一趟（`cards_taken_from`），本机的卡照池里的卡、每张装几个状态照这一刻能借的量压，
+/// 试判之前按装的状态数借草稿区（同第 ① 段，[`scratch_of_each_card_booked_by_where_the_cards_came_from`]），借不到交
+/// [`PlacementOfThisRun::NotRunTheGpuMemoryWasShort`]。
 #[cfg(feature = "gpu")]
 #[allow(
     clippy::too_many_arguments,
-    reason = "库、流、计划、分工、判法版本、卡、配置、机器、复用数，各是各的东西，凑成结构体只为让签名变短"
+    reason = "库、流、计划、分工、判法版本、卡、卡的来路、配置、机器、复用数，各是各的东西，凑成结构体只为让签名变短"
+)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "备表、按配置排每张卡、借草稿区、试判量速度、打行，是只排计划那一趟的全部步骤，拆开要把十几个量来回传"
 )]
 fn print_the_placement(
     store: &VerdictStore,
@@ -4534,12 +7903,13 @@ fn print_the_placement(
     is_mine: &dyn Fn(u64) -> bool,
     version: &JudgeVersion,
     cards: &CardsInUse,
+    cards_taken_from: GpuCardsSource,
     configured: Option<&[CardByPriority]>,
     host: CardHost,
     states_reused: u64,
-) -> Result<(), String> {
+) -> Result<PlacementOfThisRun, String> {
     use crate::crash_judge_dispatch::{states_in_flight_within, GpuCrashJudge, PackedJudgeTables};
-    use crate::crash_judge_tables::{build_judge_tables, JudgeFlow};
+    use crate::crash_judge_tables::{build_judge_tables_against_the_version_table, JudgeFlow};
     /// 量完宽度之后计时判几次派活那么多的状态。
     const CALIBRATION_DISPATCHES: u64 = 8;
     let pending = pending_blocks(store, plan, version, is_mine)
@@ -4559,8 +7929,11 @@ fn print_the_placement(
         versions: flow.versions,
         expansion: &expansion,
     };
-    let tables = match build_judge_tables(&judge_flow) {
-        Ok(tables) => PackedJudgeTables::of(&tables),
+    let (states_of_the_flow, tables) = match build_judge_tables_against_the_version_table(
+        &judge_flow,
+        flow.versions_without_a_file,
+    ) {
+        Ok(tables) => (tables.state_count, PackedJudgeTables::of(&tables)),
         Err(refusal) => {
             return Err(format!(
                 "GPU 判器建不出这条流的表（{refusal:?}；{} 块、{pending_states} 个状态要判）。配置开了 GPU，不退回 CPU 判器：让判器的表认得这种写再跑",
@@ -4568,12 +7941,14 @@ fn print_the_placement(
             ));
         }
     };
-    let local_capacities = states_in_flight_of_each_card(cards, &tables);
-    let limit = cards
+    let local_cards = card_capacities_of_this_run(cards_taken_from, cards, &tables)?;
+    let local_capacities: Vec<u64> = local_cards
+        .iter()
+        .map(|card| card.states_in_flight_capacity)
+        .collect();
+    let limit = local_cards
         .first()
-        .expect("用的卡至少一张（gpu_cards_in_use 判过）")
-        .device()
-        .limits()
+        .expect("用的卡至少一张（gpu_cards_in_use 判过、起过卡池的池里至少一张）")
         .max_storage_buffer_binding_size;
     // 配置的每张卡一行，按优先级：这台机器的取实际起好的那张（点了名而用不了的带得了 0 个），别的机器的按额度算
     let rows: Vec<(CardHost, u32, u64)> = match configured {
@@ -4581,7 +7956,7 @@ fn print_the_placement(
             .iter()
             .map(|entry| {
                 let capacity = if entry.host == host {
-                    cards
+                    local_cards
                         .iter()
                         .position(|card| card.index == entry.index)
                         .map_or(0, |position| local_capacities[position])
@@ -4598,7 +7973,7 @@ fn print_the_placement(
                 (entry.host, entry.index, capacity)
             })
             .collect(),
-        None => cards
+        None => local_cards
             .iter()
             .zip(&local_capacities)
             .map(|(card, capacity)| (host, card.index, *capacity))
@@ -4613,36 +7988,84 @@ fn print_the_placement(
         .max_by_key(|(_, local)| local.end - local.start)
     {
         let point = &plan.points[*point_index];
-        for ((row_host, index, _), states_placed) in rows.iter().zip(&placed) {
-            if *row_host != host || *states_placed == 0 {
+        // 本机每张卡装的状态数（按这一趟卡的次序）：试判的草稿区照它借，借据活到试判完
+        let states_placed_on_local_cards: Vec<u64> = local_cards
+            .iter()
+            .map(|card| {
+                rows.iter()
+                    .zip(&placed)
+                    .find(|((row_host, index, _), _)| *row_host == host && *index == card.index)
+                    .map_or(0, |(_, states_placed)| *states_placed)
+            })
+            .collect();
+        // 借据活到试判完（这一段收尾）；本机的卡照装的状态数借，此刻借不到的卡不试判、不等它；本机一张卡都没装状态就不借
+        let states_placed_on_this_host: u64 = states_placed_on_local_cards.iter().sum();
+        let scratch = if states_placed_on_this_host == 0 {
+            None
+        } else {
+            match scratch_of_each_card_booked_by_where_the_cards_came_from(
+                cards_taken_from,
+                cards,
+                &local_cards,
+                &tables,
+                states_of_the_flow,
+                states_placed_on_this_host,
+                &states_placed_on_local_cards,
+            )? {
+                ScratchOfEachCard::Ready(scratch) => Some(scratch),
+                ScratchOfEachCard::NotRunTheGpuMemoryWasShort { not_run_line: _ } => {
+                    return Ok(PlacementOfThisRun::NotRunTheGpuMemoryWasShort);
+                }
+            }
+        };
+        for (card, states_placed) in scratch.iter().flat_map(|scratch| {
+            scratch
+                .cards_for_the_judges
+                .iter()
+                .zip(&scratch.states_placed)
+        }) {
+            if *states_placed == 0 {
                 continue;
             }
-            let card = cards
-                .iter()
-                .find(|card| card.index == *index)
-                .expect("装了状态的本机卡是起好的");
-            let judge = GpuCrashJudge::on_card_with_packed_tables(
+            // 建判器、试判都在这一层里：卡上报 Out of Memory（判器内核另起的线程上的也算）报本次未跑，不判红（第 10x 批代码轮判决 K1-3）
+            let trial = on_the_card_catching_out_of_memory(
                 card,
-                &tables,
-                usize::try_from(*states_placed).expect("装得进 usize"),
+                "只排派活计划那一趟试判时",
+                || {
+                    let judge = GpuCrashJudge::on_card_with_packed_tables(
+                        card,
+                        &tables,
+                        usize::try_from(*states_placed).expect("装得进 usize"),
+                    );
+                    // 先判一小段让卡量出派活宽度（量宽度那几次派活不算速度），再计时判几次派活那么多
+                    let first = point.ordinals.start + local.start;
+                    let state_count = judge.state_count();
+                    // 量宽度最宽试到这张卡一次带得了的上限，先判的这一段要比它长
+                    let warm_end = (first
+                        + 2 * u64::try_from(judge.states_per_dispatch()).expect("装得进 u64"))
+                    .min(state_count);
+                    let _warm = judge.judge_states(first..warm_end);
+                    let timed_end = (warm_end
+                        + u64::try_from(judge.dispatch_width()).expect("装得进 u64")
+                            * CALIBRATION_DISPATCHES)
+                        .min(state_count);
+                    let started = Instant::now();
+                    let words = judge.judge_states(warm_end..timed_end);
+                    (words.len(), started.elapsed().as_secs_f64())
+                },
             );
-            // 先判一小段让卡量出派活宽度（量宽度那几次派活不算速度），再计时判几次派活那么多
-            let first = point.ordinals.start + local.start;
-            let state_count = judge.state_count();
-            // 量宽度最宽试到这张卡一次带得了的上限，先判的这一段要比它长
-            let warm_end = (first
-                + 2 * u64::try_from(judge.states_per_dispatch()).expect("装得进 u64"))
-            .min(state_count);
-            let _warm = judge.judge_states(first..warm_end);
-            let timed_end = (warm_end
-                + u64::try_from(judge.dispatch_width()).expect("装得进 u64")
-                    * CALIBRATION_DISPATCHES)
-                .min(state_count);
-            let started = Instant::now();
-            let words = judge.judge_states(warm_end..timed_end);
-            let seconds = started.elapsed().as_secs_f64();
+            let (states_timed, seconds) = match trial {
+                Ok(timed) => timed,
+                Err(reason) => {
+                    println!(
+                        "{}",
+                        gpu_not_run_line(PRODUCT_PATH_NAME_IN_THE_NOT_RUN_LINE, &reason)
+                    );
+                    return Ok(PlacementOfThisRun::NotRunTheGpuMemoryWasShort);
+                }
+            };
             if seconds > 0.0 {
-                states_per_second_on_this_host += words.len() as f64 / seconds;
+                states_per_second_on_this_host += states_timed as f64 / seconds;
             }
         }
     }
@@ -4674,7 +8097,7 @@ fn print_the_placement(
             0.0
         }
     );
-    Ok(())
+    Ok(PlacementOfThisRun::Printed)
 }
 
 /// 没编进 `gpu` 特性走不到这里（[`gpu_cards_in_use`] 先报错）。
@@ -4690,9 +8113,10 @@ fn print_the_placement(
     _is_mine: &dyn Fn(u64) -> bool,
     _version: &JudgeVersion,
     _cards: &CardsInUse,
+    _cards_taken_from: GpuCardsSource,
     _configured: Option<&[CardByPriority]>,
     _host: CardHost,
     _states_reused: u64,
-) -> Result<(), String> {
+) -> Result<PlacementOfThisRun, String> {
     Err("配置写了 ENABLE_GPU=1，这份二进制没有编进 gpu 特性（cargo … --features verdict-store,gpu）".to_string())
 }

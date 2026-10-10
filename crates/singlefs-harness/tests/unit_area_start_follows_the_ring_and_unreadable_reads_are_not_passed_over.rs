@@ -171,7 +171,9 @@ fn checker_violations(image: &MemoryPool) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -306,7 +308,13 @@ fn crc32_of_the_images(devices: &[(DeviceIdentity, SparseBlockDevice)], device_b
 /// （暖机两条、第一个文件一条）的字节：新根段补上实例表指针、分配记录树根指针、卸载记号，fsid 挪到 [463, 471)，点名项整体后挪 176 字节，
 /// 连带 header_csum 与反向链；系统配置槽、根环、单元区逐字节不变（7-2 之前与之后两份副本上同一段流程逐扇区比过，差异只落在 journal 环
 /// 第 0–2 个记录槽里）。钉值随之换成 4048568891（7-2 合入之后的副本上同一段流程现算，与合入验证里这条断言红出来的 left 值相同）。
-const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 4_048_568_891;
+/// 2026-10-05 T_time 的盘上单位从秒改成毫秒（用户定案，判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2）：
+/// 两块盘每个系统配置槽偏移 [433, 437) 从 5 换成 5000，连带整槽校验和；钉值随之换成 1329175690（第 30 批 30-3 实现员副本上这条断言
+/// 红出来的 left 值；同一份副本只把 core 那一处退回秒时这一条绿，差异只来自这一改）。
+/// 第 50 批退役树 day-1 零根注册（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）：树表 11 → 12 条（声明长度 2400、
+/// 末条是退役树、key 区间末端 65548）、根记录与新根段里的树 ID 水位 65548 → 65549、记账标签 6 加退役那一份，连带各处校验和；
+/// 钉值随之换成 3497143766（第 50 批实现员副本上这条断言红出来的 left 值）。
+const DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32: u32 = 3_497_143_766;
 
 /// 默认环 768 MiB：mkfs 按环长现算的单元区起点就是 50176（`INSTANCE_TABLE_SLOT`），树表第 0 版在 50178（`TREE_TABLE_GENESIS_SLOT`），
 /// 系统配置偏移 417 的 8 字节写 50176；mkfs 到第一个文件写出的两块盘与钉值那一版（钉值说明里最后一次换钉的那一版）逐字节相同（整盘 CRC-32C 钉值）。
@@ -341,7 +349,7 @@ fn the_default_journal_ring_keeps_the_unit_area_at_slot_50176_and_the_new_pool_f
     assert_eq!(
         crc32_of_the_images(&pool.devices, pool.device_bytes),
         DEFAULT_RING_NEW_POOL_FILE_CREATION_IMAGES_CRC32,
-        "默认环下 mkfs 到第一个文件写出的两块盘与钉值那一版（7-2 合入之后）逐字节相同"
+        "默认环下 mkfs 到第一个文件写出的两块盘与钉值那一版（T_time 改毫秒之后）逐字节相同"
     );
 }
 
@@ -1596,10 +1604,10 @@ fn the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_mem
 
 /// 管理员回退算水位的树 ID 那一半（D23（journal 的角色与格式） 已定项 14「水位」、D8（核心索引结构） 已定项 8 ②「号永不重发」；
 /// C586（回退取树 ID 水位的那一半没有用例），攻方 `research/prompts/m2-closeout-code-r3-opus-output.md`「X1-e」）：
-/// 第一个文件（txg 3）十二棵树发 65536..65547、水位 65548，覆盖写一次（txg 4）照带 65548；环里别的根（mkfs 与暖机）都带 mkfs 种下的 65536。
+/// 第一个文件（txg 3）十三棵树发 65536..65549、水位 65549，覆盖写一次（txg 4）照带 65549；环里别的根（mkfs 与暖机）都带 mkfs 种下的 65536。
 /// 回退到 txg 3 时这两条根的槽判候选那两遍（各自第 1、2 次读）读得出，算水位那一遍（第 3 次，`readable_roots`，不重读）都瞬时读不出：
-/// 环里读得出的根都是 65536，只有内存里的现行那一版带 65548。回退那次发布的树 ID 水位仍是 65548——树表里 65536..65547 那几棵树都在水位之下（I-7.8 不红），
-/// 之后再发树 ID 从 65548 起、不重发 65536..65547。只取环里读得出的根时是 65536——`crates/mutations.tsv` 里 C586 那一行证这条断言红。
+/// 环里读得出的根都是 65536，只有内存里的现行那一版带 65549。回退那次发布的树 ID 水位仍是 65549——树表里 65536..65549 那几棵树都在水位之下（I-7.8 不红），
+/// 之后再发树 ID 从 65549 起、不重发 65536..65549。只取环里读得出的根时是 65536——`crates/mutations.tsv` 里 C586 那一行证这条断言红。
 #[test]
 fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_every_root_carrying_it(
 ) {
@@ -1621,7 +1629,7 @@ fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_
         .expect("覆盖写")
     };
     assert_eq!(overwritten.root.checkpoint_txg, CheckpointTxg(4));
-    assert_eq!(overwritten.root.tree_identifier_watermark, 65548);
+    assert_eq!(overwritten.root.tree_identifier_watermark, 65549);
     let roots_in_the_ring = readable_roots_with_ring_slots(
         &pool.devices,
         &pool.parameters.region_devices,
@@ -1631,22 +1639,22 @@ fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_
     let slots_of_the_roots_carrying_the_first_file_version_watermark: Vec<RootRingSlot> =
         roots_in_the_ring
             .iter()
-            .filter(|(_, root)| root.tree_identifier_watermark == 65548)
+            .filter(|(_, root)| root.tree_identifier_watermark == 65549)
             .map(|(ring_slot, _)| *ring_slot)
             .collect();
     assert_eq!(
         roots_in_the_ring
             .iter()
-            .filter(|(_, root)| root.tree_identifier_watermark == 65548)
+            .filter(|(_, root)| root.tree_identifier_watermark == 65549)
             .map(|(_, root)| root.checkpoint_txg)
             .collect::<BTreeSet<_>>(),
         BTreeSet::from([CheckpointTxg(3), CheckpointTxg(4)]),
-        "带 65548 的只有第一个文件与覆盖写那两条根"
+        "带 65549 的只有第一个文件与覆盖写那两条根"
     );
     assert!(
         roots_in_the_ring
             .iter()
-            .all(|(_, root)| root.tree_identifier_watermark == 65548
+            .all(|(_, root)| root.tree_identifier_watermark == 65549
                 || root.tree_identifier_watermark == 65536),
         "环里别的根都带 mkfs 种下的 65536"
     );
@@ -1684,8 +1692,8 @@ fn the_rollback_takes_the_tree_identifier_watermark_from_the_current_version_in_
         "回退那次发布"
     );
     assert_eq!(
-        current.root.tree_identifier_watermark, 65548,
-        "回退那次发布的树 ID 水位 = max(现行那一版内存里的 65548, 环里读得出的根的 65536)"
+        current.root.tree_identifier_watermark, 65549,
+        "回退那次发布的树 ID 水位 = max(现行那一版内存里的 65549, 环里读得出的根的 65536)"
     );
     assert_eq!(
         checker_violations(&memory_pool_of(&pool.devices, pool.device_bytes)),

@@ -44,6 +44,7 @@ use crate::records::{
 };
 use crate::recovery::{
     choose_root, choose_system_configuration_naming_devices_without_a_mountable_slot,
+    newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to,
     read_mapped_tree_node_via_hint_then_central_mapping, read_mapped_tree_root,
     read_unit_via_locations, replay_journal, scan_journal,
     tree_table_entries_each_kind_at_most_once, JournalScanReport, MappedTreeNodeClass, PoolReader,
@@ -367,6 +368,23 @@ pub fn open_pool_for_read(
     let filesystem_identifier_in_unit_headers =
         unit_filesystem_identifier(&root.filesystem_identifier);
 
+    // 映射根是空指针（mkfs 的第 0 代、暖机根与写行根这几条树表 0 条的根）时先判树表 0 条（C695 甲，用户 2026-10-07 定「先修次序」，
+    // 判决 `research/prompts/m3-c694-r1-main-verification.md` 第二节 K3 那一行）：先读空映射根会把一个两盘都在、树表 0 条的版本报成
+    // 槽 0 读不出。树表有条目而映射根是空指针的，照下面的次序往下走（读映射那一步判红）。
+    if root.mapping_root == NodePointer::empty_root() {
+        let tree_table_bytes =
+            read_unit_via_locations(reader, &root.tree_table.locations, node_bytes)?;
+        let tree_table = parse_index_node(&tree_table_bytes).map_err(|error| {
+            OpenPoolForReadFailure::UnitMalformed {
+                what: "树表单元",
+                error,
+            }
+        })?;
+        if tree_table.entries.is_empty() {
+            return Err(OpenPoolForReadFailure::TreeTableHasNoEntries);
+        }
+    }
+
     // 中央映射树的根住根记录（D19（块指针的结构与宽度预算） 已定项 11）；它的节点都不进映射（自举豁免），只按父指针里的位置条目读。
     // 它不进树表，是哪棵树由根记录里它那条根指针的出生树说（第一个文件版本那次从水位发的号）。
     // 多层时整棵读进挂载态（D19（块指针的结构与宽度预算） 已定项 5「挂载态怎么读映射」）：之后解引用查的是这份内存里的条目，
@@ -567,7 +585,9 @@ pub struct MountedReadOnly {
 }
 
 /// 只读挂载：择系统配置 → 择根 → 全环扫描 journal → 按前缀口径施加 → 沿施加之后的根打开挂载态。
-/// 一个字节都不写（并行线二「这条线不写盘」）。
+/// 一个字节都不写（并行线二「这条线不写盘」）。施加之后那一版打不开（树表 0 条除外）、系统配置没见证它时，退到 [见证到的那一版, 所选根) 里最新的那条根打开
+/// （F2 乙，[`newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`]）：`chosen_root` 与 `effective_root` 都是退到的那一条，
+/// `journal` 仍是对原来所选根扫环、施加那一趟的报告。
 ///
 /// **扫环只在这一步发生一次**：之后每一次 [`OpenFileForRead::read_at`] 都不碰 journal 环。
 /// 层 0 的每个恢复结果上也能跑这一条——`reader` 换成那个崩溃镜像即可（并行线二验收第 3 条；
@@ -591,8 +611,38 @@ pub fn mount_read_only(reader: &dyn PoolReader) -> Result<MountedReadOnly, Mount
         true,
     )
     .map_err(MountReadOnlyFailure::Recovery)?;
-    let mounted =
-        open_pool_for_read(reader, &effective_root).map_err(MountReadOnlyFailure::Open)?;
+    let (mounted, chosen_root, effective_root) = match open_pool_for_read(reader, &effective_root) {
+        Ok(mounted) => (mounted, chosen_root, effective_root),
+        // 树表 0 条不是走读失败（这一版还没发布过文件版本），不退。
+        Err(OpenPoolForReadFailure::TreeTableHasNoEntries) => {
+            return Err(MountReadOnlyFailure::Open(
+                OpenPoolForReadFailure::TreeTableHasNoEntries,
+            ));
+        }
+        // 所选那一版走读失败、系统配置没见证它：退到 [见证到的那一版, 所选根) 里最新的那条根（F2 乙，与恢复、可写挂载同一份判法，
+        // `recovery::newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`），不重放、直接打开；打不开照报所选那一版的失败。
+        Err(failure_of_the_selected_version) => {
+            let version_fallen_back_to_opened =
+                newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
+                    reader,
+                    &system_configuration,
+                    &chosen_root,
+                    &effective_root,
+                    &records,
+                )
+                .and_then(|version_fallen_back_to| {
+                    open_pool_for_read(reader, &version_fallen_back_to)
+                        .ok()
+                        .map(|mounted| (mounted, version_fallen_back_to))
+                });
+            match version_fallen_back_to_opened {
+                Some((mounted, version_fallen_back_to)) => {
+                    (mounted, version_fallen_back_to, version_fallen_back_to)
+                }
+                None => return Err(MountReadOnlyFailure::Open(failure_of_the_selected_version)),
+            }
+        }
+    };
     Ok(MountedReadOnly {
         mounted,
         chosen_root,

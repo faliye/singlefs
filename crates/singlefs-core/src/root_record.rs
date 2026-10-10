@@ -19,11 +19,14 @@ pub const ROOT_RECORD_FLAG_UNMOUNT_MARKER: u32 = 1 << 0;
 /// 根记录 flags 位 0 的卸载记号（D22（单元原子性怎么合成） 已定项 7）：这条根是不是正常卸载那一串空发布写的
 /// （D16（发布语义） 已定项 1「正常卸载」）。池级 checker 按它给 I-7.9（回退下界 F 不高于抬 F 的上限） 分两支判；
 /// 「记号只由卸载入口打」盘上没有别的东西核它，归层 0 录制流（C557（卸载记号只由卸载入口打没有检查））。
+/// 由记录施加出来的那一版不归下面哪一个成员固定：它取那条记录新根段里的记号（D23（journal 的角色与格式） 已定项 15，`recovery` 施加处），
+/// 记录的新根段照抄那次发布写的根上的记号——卸载那一串发布的记录带 1、施加出来是 [`UnmountMarker::WrittenByTheUnmountSequence`]，
+/// 别的发布的记录带 0。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum UnmountMarker {
     /// flags 位 0 = 1：正常卸载那一串写的根（`mount::unmount`）。
     WrittenByTheUnmountSequence,
-    /// flags 位 0 = 0：别的每一条根——mkfs 的第 0 代、暖机、写行、发布、准入抬 F、回退，以及由记录施加出来的那一版。
+    /// flags 位 0 = 0：别的每一条根——mkfs 的第 0 代、暖机、写行、发布、准入抬 F、回退。
     NotWrittenByTheUnmountSequence,
 }
 
@@ -114,10 +117,13 @@ impl RootRecord {
         bytes
     }
 
-    /// 读者：magic、整槽校验和、fsid、flags、四条指针的 extent 偏移五关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
+    /// 读者：magic、整槽校验和、fsid、flags、四条指针头部五关。flags 只收卸载记号那一位（[`ROOT_RECORD_FLAG_UNMOUNT_MARKER`]），
     /// 别的位非 0 拒收；记号照实读进 [`RootRecord::unmount_marker`]（挂载与恢复不按它分支，按它分支的是池级 checker 的 I-7.9）。
-    /// 树表、实例表、中央映射树、分配记录树四条指针头部的 extent 偏移第一版恒 0，任一非 0 判这条根记录损坏、拒收
-    /// （C581（extent 偏移非 0 没有判据），`pointer::PointerHeadExtentOffsetNotZero`）：拒收的根与自证不过的根同一个处置，择根时不可择。
+    /// 树表、实例表、中央映射树、分配记录树四条指针头部里加密、压缩与 extent 偏移那几段按第一版的取值判，与 journal 新根段那四条指针
+    /// 同一判法（`NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from`）：MAC / nonce 非 0、算法类型不是未加密、
+    /// 压缩算法码不是 0、码 0 而压后长度非 0、extent 偏移非 0，任一条判这条根记录损坏、拒收（I-2.4（头校验和覆盖范围）「加密关着时恒 0、
+    /// 读者遇到非 0 一律判该结构损坏」，D19（块指针的结构与宽度预算） 已定项 3，C581（extent 偏移非 0 没有判据），
+    /// `pointer::PointerHeadFieldOutsideTheFirstVersion`）：拒收的根与自证不过的根同一个处置，择根时不可择。
     #[must_use]
     pub fn parse_slot(bytes: &[u8], expected_filesystem_identifier: &[u8; 16]) -> Option<Self> {
         if bytes.len() < usize::try_from(ROOT_RECORD_BYTES).expect("457")
@@ -140,14 +146,29 @@ impl RootRecord {
         let unmount_marker = UnmountMarker::of_flags_bits_carrying_only_the_marker(flags);
         let instance = InstanceGeneration(reader.get_u32());
         let checkpoint_txg = CheckpointTxg(reader.get_u64());
-        let tree_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+        let tree_table =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         let tree_identifier_watermark = reader.get_u64();
         let rollback_floor = CheckpointTxg(reader.get_u64());
         reader.skip(usize::try_from(WIDE_CHECKSUM_BYTES).expect("32"));
-        let instance_table = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
-        let mapping_root = NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+        let instance_table =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
+        let mapping_root =
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         let allocation_record_tree_root =
-            NodePointer::read_judging_the_extent_offset_from(&mut reader).ok()?;
+            NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from(
+                &mut reader,
+            )
+            .ok()?;
         assert_eq!(
             reader.position(),
             ROOT_CHECKSUM_OFFSET + 32 + 3 * usize::try_from(NODE_POINTER_BYTES).expect("86")

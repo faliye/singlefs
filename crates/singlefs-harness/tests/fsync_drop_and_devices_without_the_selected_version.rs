@@ -44,7 +44,8 @@ use singlefs_core::make_filesystem::{
 use singlefs_core::mount::{
     mount_writable, DeviceCount, DeviceWithoutTheSelectedVersion, MountError, NewerPublishWitness,
     RollbackTarget, SelectedVersionAgainstTheWitness, SelectedVersionLackingOnDevice,
-    StillUnreadableAfterOneReread, WitnessedCounterComparison, STRIPE_WIDTH_LOWER_BOUND,
+    StillUnreadableAfterOneReread, SystemConfigurationUnreadableAfterTheReadStage,
+    SystemConfigurationUnreadableWhen, WitnessedCounterComparison, STRIPE_WIDTH_LOWER_BOUND,
 };
 use singlefs_core::mounted_read::mount_read_only;
 use singlefs_core::records::STATISTIC_ALLOCATED_BYTES;
@@ -141,8 +142,8 @@ fn content_of(version: u64) -> Vec<u8> {
         .collect()
 }
 
-/// 两块录制着的内存盘上做完 mkfs：交回装置与创世根。
-fn rig_after_make_filesystem() -> (Rig, singlefs_core::root_record::RootRecord) {
+/// 两块录制着的内存盘上做完 mkfs：交回装置与 mkfs 的输出。
+fn rig_after_make_filesystem() -> (Rig, singlefs_core::make_filesystem::MakeFilesystemOutput) {
     let parameters = e142_parameters(512, 512);
     let geometry = FixedGeometry {
         fixed_structure_slot_spacing: parameters.geometry.fixed_structure_slot_spacing,
@@ -183,13 +184,13 @@ fn rig_after_make_filesystem() -> (Rig, singlefs_core::root_record::RootRecord) 
             failures,
             devices,
         },
-        genesis.root,
+        genesis,
     )
 }
 
 /// mkfs → 取号 1 → 暖机 → 第一个文件（txg 3）。
 fn build_rig() -> (Rig, PoolAllocator, TransactionOutput, InstanceGeneration) {
-    let (mut rig, genesis_root) = rig_after_make_filesystem();
+    let (mut rig, genesis) = rig_after_make_filesystem();
     let mut allocator = PoolAllocator::new(vec![
         DeviceFreeMap::new(DEVICE_ZERO, IMAGE_BYTES),
         DeviceFreeMap::new(DEVICE_ONE, IMAGE_BYTES),
@@ -204,10 +205,17 @@ fn build_rig() -> (Rig, PoolAllocator, TransactionOutput, InstanceGeneration) {
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &rig.parameters,
+            &genesis,
+        ),
+    );
     let (first, instance) = {
         let mut writer = PoolWriter::new(&rig.parameters, rig.devices.as_mut_slice());
         let instance = acquire_instance(&mut writer).expect("取号");
-        let warmed = warm_up(&mut writer, &genesis_root, instance).expect("暖机");
+        let warmed = warm_up(&mut writer, &genesis.root, instance).expect("暖机");
         let first = publish_first_file(
             &mut writer,
             &mut allocator,
@@ -501,7 +509,9 @@ fn describe(
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(_) => Some(invariant),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect();
     let _ = writeln!(text, "    池级 checker 判红：{violated:?}");
@@ -1168,7 +1178,9 @@ fn mount_and_write_on(
                     .into_iter()
                     .filter_map(|(invariant, verdict)| match verdict {
                         InvariantVerdict::Violated(_) => Some(invariant),
-                        InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+                        InvariantVerdict::Holds
+                        | InvariantVerdict::NotApplicable(_)
+                        | InvariantVerdict::PartiallyJudged(_) => None,
                     })
                     .collect();
                 (
@@ -1703,8 +1715,8 @@ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
         "盘 0 是空盘：拒在取号之前，两块盘逐字节不变"
     );
     // 盘 1 是空盘：没有槽报读错，R2 判得出；见证值取盘 0 读得出的最大 tail 5，所选那一版 (1, 5) 末条 5，判据 N-配置 为假。
-    // 往下逐盘核：盘 1 一份自证过的系统配置都没有（C554 乙-配置续 Q1，不「可见」），照见证读的拒因报，后一遍判
-    // 「有一块盘一份自证过的系统配置都没有」（用户 2026-09-28 定并进见证读的拒因）。
+    // 往下逐盘核：盘 1 一份自证过的系统配置都没有（C554 乙-配置续 Q1，不「可见」），以「读阶段判完之后系统配置又读不出」拒，
+    // 带读阶段往下走用的那一遍读数（C664（挂载拒绝合法复算把两种拒因报成一个）之后不再并进见证读的拒因）。
     let mut devices_with_device_one_blank = vec![
         (DEVICE_ZERO, sparse_from(&pool.full, DEVICE_ZERO)),
         (DEVICE_ONE, blank_device()),
@@ -1723,22 +1735,16 @@ fn blank_device_refuses_the_writable_mount_by_name_before_any_write() {
             },
         },
     };
-    let reread = SelectedVersionAgainstTheWitness {
-        selected_version: version_key(1, 5),
-        witness: NewerPublishWitness {
-            witnessed_journal_counter: 5,
-            comparison:
-                WitnessedCounterComparison::SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot,
-        },
-    };
     assert!(
         matches!(
             &refusal_with_device_one_blank,
-            MountError::NewerStateStillUnreadableAfterOneReread(still_unreadable)
-                if **still_unreadable
-                    == StillUnreadableAfterOneReread::PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion {
-                        first_read,
-                        reread,
+            MountError::SystemConfigurationUnreadableAfterTheReadStage(unreadable)
+                if **unreadable
+                    == SystemConfigurationUnreadableAfterTheReadStage {
+                        read_stage: first_read,
+                        unreadable: SystemConfigurationUnreadableWhen::CheckingEachDeviceBeforeTheAcquisition {
+                            device: DEVICE_ONE,
+                        },
                     }
         ),
         "盘 1 是空盘：读阶段判得出、为假，逐盘核点名盘 1 一份自证过的系统配置都没有：{refusal_with_device_one_blank:?}"
@@ -2064,7 +2070,7 @@ fn device_one_behind_by_the_rotation_with_the_data_unit_unreadable_everywhere_st
 #[test]
 fn device_one_stale_on_the_version_without_file_refuses_the_writable_mount_naming_what_the_row_publish_rewrote(
 ) {
-    let (mut rig, _genesis_root) = rig_after_make_filesystem();
+    let (mut rig, _genesis) = rig_after_make_filesystem();
     mount_writable(&rig.parameters, &mut rig.devices).expect("第一次可写挂载");
     let stale_point = rig.stream.operation_count();
     let second_mount = mount_writable(&rig.parameters, &mut rig.devices).expect("第二次可写挂载");

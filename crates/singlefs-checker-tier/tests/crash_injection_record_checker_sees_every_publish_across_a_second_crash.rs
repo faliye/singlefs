@@ -2,7 +2,7 @@
 //! 崩溃注入第二、三截交给记录核对器的记录流（代码审阅第 2 条「崩溃注入层补可写挂载」的收尾）。
 //!
 //! 第二截（崩溃后镜像上可写挂载、再发一次布之后的池）与第三截（挂载途中的二次崩溃）交的都是整条历史录制流接上挂载那一段录制流，
-//! 在接缝处断开（`crash::RecordStreamContinuity::ResumedAfterACrash`，`crash_injection::HistoryThenWritableMountRecords`）；
+//! 在接缝处断开（`memory_pool::RecordStreamSeam::AfterACrash`，`crash_injection::HistoryThenWritableMountRecords`）；
 //! 崩溃后镜像是两份：崩溃态镜像判择根与前缀，实现恢复后的镜像判在不在（D13（验证路线） 已定项 7）。
 //! 此前第三截只交挂载那一段到当前段为止的前缀，历史那几次发布在二次崩溃镜像上还在不在没人核（B3c-1 报告第六节第 2 条）；
 //! 第二截只跑 checker，没接记录核对器（B3b 报告第二节第 5 条）；直接把历史写表接在挂载前面会假红（B3b 报告第二节第 4 条）。
@@ -34,7 +34,7 @@ use singlefs_harness::history::{
 use singlefs_harness::memory_pool::{
     root_identity_written_by, some_publish_persisted_without_its_root, writes_and_segments,
     writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, RecordCheck,
-    RecordStreamContinuity, RetainedWrite, WrittenContents,
+    RecordStreamContinuity, RecordStreamSeam, RetainedWrite, WrittenContents,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::SharedStream;
@@ -172,10 +172,10 @@ fn publishes_cut_off_by_the_crash_are_on_the_resumed_timeline_only_if_their_root
                 pool,
                 &writes,
                 persisted_set,
-                RecordStreamContinuity::ResumedAfterACrash {
+                RecordStreamContinuity::BrokenAtSeams(&[RecordStreamSeam::AfterACrash {
                     first_write_after_the_crash,
                     version_landed_on_after_the_crash: Some(landed),
-                },
+                }]),
                 Some(root_identity(2, 2)),
             )
         };
@@ -229,10 +229,10 @@ fn writes_left_without_a_root_at_the_end_of_the_cut_recording_do_not_join_the_fi
             &image,
             &writes,
             &persisted,
-            RecordStreamContinuity::ResumedAfterACrash {
+            RecordStreamContinuity::BrokenAtSeams(&[RecordStreamSeam::AfterACrash {
                 first_write_after_the_crash: 3,
                 version_landed_on_after_the_crash: Some(root_identity(1, 1)),
-            },
+            }]),
             Some(root_identity(2, 2)),
         ),
         RecordCheck::default(),
@@ -387,6 +387,8 @@ fn crash_then_mount(
     let records = HistoryThenWritableMountRecords::new(
         &recorded.writes,
         &persisted,
+        // 这几段历史里没有掉电步：第一次崩溃之前一道掉电接缝都没有。
+        &[],
         landed_version,
         &mount_writes,
         &publish_writes,
@@ -490,7 +492,9 @@ fn checker_is_silent_on(image: &dyn singlefs_checker::image::ImageReader) -> boo
         .into_iter()
         .all(|(_, verdict)| match verdict {
             InvariantVerdict::Violated(_) => false,
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => true,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => true,
         })
 }
 
@@ -941,10 +945,10 @@ fn the_pool_after_the_mount_exempts_what_the_newest_mount_version_abandons_by_it
         &crash_image,
         &writes,
         &persisted,
-        RecordStreamContinuity::ResumedAfterACrash {
+        RecordStreamContinuity::BrokenAtSeams(&[RecordStreamSeam::AfterACrash {
             first_write_after_the_crash: recorded.writes.len(),
             version_landed_on_after_the_crash: state.landed_version,
-        },
+        }]),
         newest_mount_root,
     );
     println!(

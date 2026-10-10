@@ -24,6 +24,7 @@
 //! 挂载做成的每个崩溃状态上，崩溃镜像的只读恢复（R1）与只挂载之后、挂载加一次发布之后的只读恢复（R2，后者比发布之前那一版）逐字段比，
 //! 挂载途中每个二次崩溃镜像的只读恢复也与 R1 比；可写挂载被拒的，理由在 D23（journal 的角色与格式） 已定项 14 那张单子上的判拒绝本身合不合法。
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
@@ -39,31 +40,49 @@ use singlefs_core::address::{
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::instance_table::InstanceRow;
+use singlefs_core::instance_table_sweep::{
+    InstanceTableRowCountThreshold, InstanceTableSweepAtTheEndOfTheMount,
+    InstanceTableSweepConfiguration, InstanceTableSweepOutcome, InstanceTableSweepSwitch,
+    SweepPublishPlacements,
+};
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
-use singlefs_core::mount::{mount_writable_with_space_admission, MountError};
+use singlefs_core::mount::{
+    mount_writable_with_instance_table_sweep_configuration, MountError, Mounted, ShadowLedger,
+};
+use singlefs_core::records::NLINK_OF_AN_INODE_BEING_DELETED;
 use singlefs_core::recovery::{
     choose_root, choose_system_configuration, recover, JournalPolicy, PoolReader, RecoveryOutcome,
     RecoveryReport,
 };
 use singlefs_core::transaction::{
     publish_first_file, publish_new_inodes, publish_overwrite, FirstFile, PoolVersion, PoolWriter,
+    TransactionOutput,
 };
 use singlefs_core::write_accounting::{WritesByStructureKind, WrittenStructureKind};
 
 use crate::crash::check_records_against;
+use crate::writable_mount_phases::writable_mount_phase_of_each_write;
+/// 可写挂载的分段与崩溃镜像落池住在 `crate::writable_mount_phases`（不拿随机历史当输入的用例经那一份引）；崩溃注入的用例照旧从这里引。
+pub use crate::writable_mount_phases::{
+    materialized_crash_image, publishes_before_the_instance_table_sweep_of_the_mount_output,
+    writes_of_the_instance_table_sweep_phases, WritableMountPhase,
+};
 use singlefs_harness::history::{
     choice_from_reproduction_environment, classify_failure, execute_history_with,
-    generate_history_with_weights, newest_ring_root_and_slot_count_of,
-    raised_floor_lands_only_on_abandoned_roots, record_check_aspects,
-    render_environment_assignments, FailureObservation, FailureSignature, GeneratedHistory,
-    GenerationWeights, HistoryEnding, HistoryExecution, HistoryOperation, HistoryOperationKind,
-    HistorySampling, HistorySeed, ReproductionVariablePrefix, SeededRandomSource, StepPosition,
+    generate_history_with_weights,
+    history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring,
+    newest_ring_root_and_slot_count_of, raised_floor_lands_only_on_abandoned_roots,
+    record_check_aspects, render_environment_assignments, ContentChoice, ContentLength,
+    FailureObservation, FailureSignature, GeneratedHistory, GenerationWeights, HistoryEnding,
+    HistoryExecution, HistoryOperation, HistoryOperationKind, HistorySampling, HistorySeed,
+    HistoryStartingPoint, ReproductionVariablePrefix, SeededRandomSource, StepPosition,
     KNOWN_RED_FORMS,
 };
 use singlefs_harness::memory_pool::{
     newest_persisted_root, root_identity_written_by, some_publish_persisted_without_its_root,
     writes_and_segments_with_stream_indexes, CrashImage, MemoryPool, RecordCheck,
-    RecordStreamContinuity, RetainedWrite, SparseBlockDevice, SECTOR_BYTES,
+    RecordStreamContinuity, RecordStreamSeam, RetainedWrite, SparseBlockDevice, SECTOR_BYTES,
 };
 use singlefs_harness::model::{
     crash_recovery_disagreement, ModelDisagreement, ModelDisagreementAspect, ModelRefusalReason,
@@ -74,11 +93,12 @@ use singlefs_harness::model_comparison::{
     refusal_reason_of_publish_error,
 };
 use singlefs_harness::mount_transparency::{
-    judge_mount_transparency, judge_writable_mount_refusal_of_a_crash_state, read_recovery_fields,
-    ComparedVersion, DiskAfterTheRefusal, FieldOutcome, FloorRaisedByTheMount,
-    FloorRaisesInTheMountWrites, MountTransparency, MountTransparencyAction,
-    ReadFaultsInTheCrashState, ReadOnlyReadBackOfTheCrashImage, RecoveryFieldsRead,
-    RefusalConditionNotMet, RefusalReasonOnTheD23List,
+    judge_mount_transparency,
+    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount,
+    read_recovery_fields, ComparedVersion, DiskAfterTheRefusal, FieldOutcome,
+    FloorRaisedByTheMount, FloorRaisesInTheMountWrites, MountTransparency, MountTransparencyAction,
+    ReadFaultsInTheCrashState, ReadFaultsUnderTheRefusedMount, ReadOnlyReadBackOfTheCrashImage,
+    RecoveryFieldsRead, RefusalConditionNotMet, RefusalReasonOnTheD23List,
     UserVisibleTreeRootPointersOfTheContinuation, WritableMountRefusalVerdict,
 };
 use singlefs_harness::numeric_environment_variable::{
@@ -99,8 +119,15 @@ pub const CRASH_INJECTION_WORKER_THREADS_ENVIRONMENT_VARIABLE: &str =
 /// 摆崩溃状态的随机源与生成历史那一路岔开：同一个种子，历史怎么生成不受它影响，反过来也一样。
 const CRASH_POINT_SEED_SALT: u64 = 0x63_72_61_73_68_70_74_00;
 
-/// 摆挂载途中的二次崩溃的随机源，与上面两路再岔开（再按第一次崩溃的段号岔开：同一段历史上各个崩溃状态抽的不是同一串）。
+/// 摆挂载途中的二次崩溃的随机源，与上面两路再岔开（再按第一次崩溃的段号与段内子集岔开：同一段历史上各个崩溃状态抽的不是同一串，
+/// [`draw_second_crash_points`]）。
 const SECOND_CRASH_POINT_SEED_SALT: u64 = 0x73_65_63_6f_6e_64_63_72;
+
+/// 第一次崩溃那个段内子集的指纹（[`fingerprint_of_the_persisted_subset`]）取 64 位 FNV-1a：起始值。
+const PERSISTED_SUBSET_FINGERPRINT_OFFSET_BASIS: u64 = 0xcbf2_9ce4_8422_2325;
+
+/// 64 位 FNV-1a 的乘数。
+const PERSISTED_SUBSET_FINGERPRINT_PRIME: u64 = 0x0000_0100_0000_01b3;
 
 /// 每个工作线程摊到的片数：各段历史的长短差得远（一步就被拒的与连发四十次的），片切得比线程多，先跑完的线程接着领下一片。
 const SLICES_PER_WORKER_THREAD: usize = 4;
@@ -287,40 +314,6 @@ impl CrashPoint {
     }
 }
 
-/// 可写挂载的四段（D23（journal 的角色与格式） 已定项 16 取号、D18（块里携带什么信息） 已定项 11 写行、D16（发布语义） 已定项 8 暖机、
-/// D8（核心索引结构） 已定项 16 第 6 条挂载续做）：挂载那一段录制流里的一次写落在哪一段。
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum WritableMountPhase {
-    /// 取号：写行那次发布的第一个单元写或 journal 记录写之前的那几次系统配置槽写。
-    Acquisition,
-    /// 写行那次发布：到它的根槽写、连同紧跟着的系统配置槽轮换为止。
-    RowPublish,
-    /// 写行那次之后的暖机空发布（与挂载在暖机之后推的抬 F：摆二次崩溃时两者算一段，F 那一样按抬 F 的写有没有持久分开判，
-    /// [`FloorRaisesInTheMountWrites::at_a_second_crash`]）。
-    WarmUp,
-    /// 挂载续做：暖机与推的抬 F 之后、交回之前把所选那一版的 `deleted_inodes` 走空的那几步删除发布（所选那一版有删除中的文件时才有）。
-    Continuation,
-}
-
-impl WritableMountPhase {
-    pub const ALL: [WritableMountPhase; 4] = [
-        WritableMountPhase::Acquisition,
-        WritableMountPhase::RowPublish,
-        WritableMountPhase::WarmUp,
-        WritableMountPhase::Continuation,
-    ];
-
-    #[must_use]
-    pub fn name(self) -> &'static str {
-        match self {
-            WritableMountPhase::Acquisition => "acquisition",
-            WritableMountPhase::RowPublish => "row_publish",
-            WritableMountPhase::WarmUp => "warm_up",
-            WritableMountPhase::Continuation => "continuation",
-        }
-    }
-}
-
 /// 第一次崩溃镜像上挂载透明比的是哪个动作之后的池（`singlefs_harness::mount_transparency::MountTransparencyAction` 的前两种）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MountTransparencyComparison {
@@ -486,6 +479,8 @@ pub struct CrashInjectionTally {
     pub checker_runs: u64,
     pub invariant_holds: BTreeMap<&'static str, u64>,
     pub invariant_not_applicable: BTreeMap<&'static str, u64>,
+    /// 判成「部分没判」（`InvariantVerdict::PartiallyJudged`）的次数：不红，也不算判绿。
+    pub invariant_partially_judged: BTreeMap<&'static str, u64>,
     /// 记录核对器跑过几次、两类各判红几次（与层 0 那一路同一份判据，`crash::check_records_against`）。
     pub record_checks: u64,
     pub record_root_without_record: u64,
@@ -503,13 +498,17 @@ pub struct CrashInjectionTally {
     pub writable_mounts_after_the_crash_succeeded: u64,
     pub writable_mounts_after_the_crash_refused_at_the_unit_area_wall: u64,
     pub writable_mounts_after_the_crash_refused: u64,
-    /// 挂载做成之后的那一次发布（带文件的一版上覆盖写、树表 0 条的一版上发第一个文件）：做成的、单元区墙、别的理由（判红）。
+    /// 挂载做成之后的那一次发布（第一个文件还活着的一版上覆盖写、树表 0 条的一版上发第一个文件、第一个文件已删完或正在删的一版上建一个 inode）：
+    /// 做成的、单元区墙、别的理由（判红）。
     pub publishes_after_the_writable_mount: u64,
     pub publishes_after_the_writable_mount_refused_at_the_unit_area_wall: u64,
     pub publishes_after_the_writable_mount_refused: u64,
     /// 挂载与那次发布之后的池上跑的池级 checker 与记录核对器。
     pub checker_runs_after_the_writable_mount: u64,
     pub record_checks_after_the_writable_mount: u64,
+    /// 崩溃后镜像上那次可写挂载末尾的清扫发布删了行的次数，与那几次删行之前一共抹了几个头（清扫那两段摆没摆得到二次崩溃按它们看）。
+    pub writable_mounts_after_the_crash_deleting_instance_table_rows: u64,
+    pub heads_erased_by_the_instance_table_sweep_after_the_crash: u64,
     /// 挂载途中的二次崩溃：摆了几个、按崩在挂载的哪一段分。
     pub second_crash_points: u64,
     pub second_crash_points_by_phase: BTreeMap<WritableMountPhase, u64>,
@@ -531,6 +530,24 @@ pub struct CrashInjectionTally {
     /// 崩溃态没注入读故障而判据在二次崩溃镜像上复算仍为真、拒得不合法的（判红）。
     pub remount_refusals_for_a_newer_publish_witnessed_by_system_configuration: u64,
     pub remount_refusals_with_the_witness_criterion_true_without_read_faults: u64,
+    /// 二次崩溃之后再挂被拒、拒因是「读阶段判完之后系统配置又读不出」的（第三截判改法 G4 那一条，与 C670 同形）：判过的、
+    /// 崩溃态没注入读故障而那一拒的判据在二次崩溃镜像上复算为真、拒得不合法的（判红）。
+    pub remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage: u64,
+    pub remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults:
+        u64,
+    /// 二次崩溃之后再挂被拒、拒因是「重建分配器读根环整环重读一次仍一条不被抛弃的自证有效根都没有」的（第三截判 Q3 那一条，与 G4 同形）：
+    /// 判过的、崩溃态没注入读故障而那一拒的判据在二次崩溃镜像上复算为真、拒得不合法的（判红）。
+    pub remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator: u64,
+    pub remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults:
+        u64,
+    /// 二次崩溃之后再挂被拒、拒因是「记录有缺口时拒可写」的（D23（journal 的角色与格式） 已定项 14，F1 乙）：判过的次数。这一拒没有 C670 同形的那一条
+    /// （判官不列「没注入读故障时判据复算为真」那一类条件），只差 U6 那几条的照别的拒因不报红。
+    pub remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify:
+        u64,
+    /// 二次崩溃之后再挂被拒、拒因是 C 读一次没施加的发布的账读不出、读得出的记录不齐、映射也现算不成的（`C_MAPPING` 收窄）：判过的次数。
+    /// 与 F1 乙同样没有 C670 同形的那一条，只差 U6 那几条的照别的拒因不报红。
+    pub remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records:
+        u64,
     /// 每一截（崩溃镜像本身、挂载与一次发布之后、二次崩溃）判到已知红与新发现的状态数之和。
     pub crash_states_ending_known_red: BTreeMap<usize, u64>,
     pub crash_states_ending_new_finding: u64,
@@ -541,10 +558,13 @@ pub struct CrashInjectionTally {
     pub mount_transparency_not_judged: BTreeMap<&'static str, u64>,
     pub mount_transparency_violations_by_field: BTreeMap<&'static str, u64>,
     pub mount_transparency_fields_not_judged: BTreeMap<&'static str, u64>,
+    /// 挂载透明判的时候 R2 那一版是清扫发布那一版、把清扫删的行放回去再比的次数（C704（挂载透明不认清扫发布）的处置真走到了）。
+    pub mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back: u64,
     /// 崩溃后镜像上的可写挂载被拒、理由在 D23（journal 的角色与格式） 已定项 14 那张单子上的：拒得合法的、不合法的（判红）。
     pub writable_mount_refusals_on_the_d23_list_legal: u64,
     pub writable_mount_refusals_on_the_d23_list_illegal: u64,
-    /// 崩溃窗口末尾之前历史里有一步在注入的读故障下发过东西的崩溃状态：第二截判拒可写时不判 C670（无读故障的崩溃态上可写挂载见证判据为真没有判官）那一条。
+    /// 崩溃窗口末尾之前历史里有一步在注入的读故障下发过东西的崩溃状态：第二截判拒可写时不判 C670（无读故障的崩溃态上可写挂载见证判据为真没有判官）
+    /// 与改法 G4 那两条。
     pub crash_points_after_a_step_reading_under_injected_faults: u64,
     /// 第一截与二次崩溃那一截上 RefFS 与 O1 判官两票合起来（G1 用户定案：任一红即红），按哪一边红分开计；
     /// RefFS 弃权的按理由另计（两截并在一起）。
@@ -578,6 +598,7 @@ impl CrashInjectionTally {
             checker_runs,
             invariant_holds,
             invariant_not_applicable,
+            invariant_partially_judged,
             record_checks,
             record_root_without_record,
             record_claimed_state_missing_unit,
@@ -594,6 +615,8 @@ impl CrashInjectionTally {
             publishes_after_the_writable_mount_refused,
             checker_runs_after_the_writable_mount,
             record_checks_after_the_writable_mount,
+            writable_mounts_after_the_crash_deleting_instance_table_rows,
+            heads_erased_by_the_instance_table_sweep_after_the_crash,
             second_crash_points,
             second_crash_points_by_phase,
             second_crash_recoveries_reading_a_file,
@@ -609,6 +632,12 @@ impl CrashInjectionTally {
             remount_idempotence_not_judged,
             remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
             remount_refusals_with_the_witness_criterion_true_without_read_faults,
+            remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage,
+            remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults,
+            remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator,
+            remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults,
+            remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify,
+            remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records,
             crash_states_ending_known_red,
             crash_states_ending_new_finding,
             mount_transparency_judged,
@@ -616,6 +645,7 @@ impl CrashInjectionTally {
             mount_transparency_not_judged,
             mount_transparency_violations_by_field,
             mount_transparency_fields_not_judged,
+            mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back,
             writable_mount_refusals_on_the_d23_list_legal,
             writable_mount_refusals_on_the_d23_list_illegal,
             crash_points_after_a_step_reading_under_injected_faults,
@@ -660,6 +690,12 @@ impl CrashInjectionTally {
         for (invariant, count) in invariant_not_applicable {
             *self.invariant_not_applicable.entry(invariant).or_insert(0) += count;
         }
+        for (invariant, count) in invariant_partially_judged {
+            *self
+                .invariant_partially_judged
+                .entry(invariant)
+                .or_insert(0) += count;
+        }
         self.record_checks += record_checks;
         self.record_root_without_record += record_root_without_record;
         self.record_claimed_state_missing_unit += record_claimed_state_missing_unit;
@@ -681,6 +717,10 @@ impl CrashInjectionTally {
             publishes_after_the_writable_mount_refused;
         self.checker_runs_after_the_writable_mount += checker_runs_after_the_writable_mount;
         self.record_checks_after_the_writable_mount += record_checks_after_the_writable_mount;
+        self.writable_mounts_after_the_crash_deleting_instance_table_rows +=
+            writable_mounts_after_the_crash_deleting_instance_table_rows;
+        self.heads_erased_by_the_instance_table_sweep_after_the_crash +=
+            heads_erased_by_the_instance_table_sweep_after_the_crash;
         self.second_crash_points += second_crash_points;
         for (phase, count) in second_crash_points_by_phase {
             *self.second_crash_points_by_phase.entry(*phase).or_insert(0) += count;
@@ -712,6 +752,18 @@ impl CrashInjectionTally {
             remount_refusals_for_a_newer_publish_witnessed_by_system_configuration;
         self.remount_refusals_with_the_witness_criterion_true_without_read_faults +=
             remount_refusals_with_the_witness_criterion_true_without_read_faults;
+        self.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage +=
+            remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage;
+        self.remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults +=
+            remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults;
+        self.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator +=
+            remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator;
+        self.remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults +=
+            remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults;
+        self.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify +=
+            remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify;
+        self.remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records +=
+            remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records;
         for (form, count) in crash_states_ending_known_red {
             *self.crash_states_ending_known_red.entry(*form).or_insert(0) += count;
         }
@@ -746,6 +798,8 @@ impl CrashInjectionTally {
                 .entry(reason)
                 .or_insert(0) += count;
         }
+        self.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back +=
+            mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back;
         self.writable_mount_refusals_on_the_d23_list_legal +=
             writable_mount_refusals_on_the_d23_list_legal;
         self.writable_mount_refusals_on_the_d23_list_illegal +=
@@ -871,6 +925,12 @@ impl CrashInjectionTally {
         );
         let _ = writeln!(
             text,
+            "崩溃后那次可写挂载末尾的清扫发布删了行 {} 次，删行之前一共抹了 {} 个头",
+            self.writable_mounts_after_the_crash_deleting_instance_table_rows,
+            self.heads_erased_by_the_instance_table_sweep_after_the_crash
+        );
+        let _ = writeln!(
+            text,
             "挂载途中的二次崩溃 {} 个：恢复读回文件 {} 次、没有文件 {} 次、失败 {} 次；问模型 {} 次、checker {} 次、记录核对器 {} 次",
             self.second_crash_points,
             self.second_crash_recoveries_reading_a_file,
@@ -911,7 +971,29 @@ impl CrashInjectionTally {
         );
         let _ = writeln!(
             text,
-            "挂载透明：第一次崩溃镜像上判了 {:?}，二次崩溃镜像上按段判了 {:?}；没判的 {:?}；判红的字段 {:?}；某一样没判的 {:?}",
+            "二次崩溃之后再挂被拒、拒因是读阶段判完之后系统配置又读不出的（第三截判 G4 那一条）：{} 次，崩溃态没注入读故障而判据复算为真、拒得不合法 {}",
+            self.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage,
+            self.remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults
+        );
+        let _ = writeln!(
+            text,
+            "二次崩溃之后再挂被拒、拒因是重建分配器读根环整环重读一次仍一条有效根都没有的（第三截判 Q3 那一条）：{} 次，崩溃态没注入读故障而判据复算为真、拒得不合法 {}",
+            self.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator,
+            self.remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults
+        );
+        let _ = writeln!(
+            text,
+            "二次崩溃之后再挂被拒、拒因是记录有缺口时拒可写的（F1 乙）：{} 次",
+            self.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify
+        );
+        let _ = writeln!(
+            text,
+            "二次崩溃之后再挂被拒、拒因是没施加的发布的账读不出而读得出的记录不齐的（C_MAPPING）：{} 次",
+            self.remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records
+        );
+        let _ = writeln!(
+            text,
+            "挂载透明：第一次崩溃镜像上判了 {:?}，二次崩溃镜像上按段判了 {:?}；没判的 {:?}；判红的字段 {:?}；某一样没判的 {:?}；把清扫删的行放回去再比的 {} 次",
             self.mount_transparency_judged
                 .iter()
                 .map(|(comparison, count)| (comparison.name(), *count))
@@ -922,7 +1004,8 @@ impl CrashInjectionTally {
                 .collect::<Vec<_>>(),
             self.mount_transparency_not_judged,
             self.mount_transparency_violations_by_field,
-            self.mount_transparency_fields_not_judged
+            self.mount_transparency_fields_not_judged,
+            self.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back
         );
         let _ = writeln!(
             text,
@@ -952,9 +1035,13 @@ impl CrashInjectionTally {
         for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
             let _ = writeln!(
                 text,
-                "  {invariant}：判绿 {} 次、不适用 {} 次",
+                "  {invariant}：判绿 {} 次、不适用 {} 次、部分没判 {} 次",
                 self.invariant_holds.get(invariant).copied().unwrap_or(0),
                 self.invariant_not_applicable
+                    .get(invariant)
+                    .copied()
+                    .unwrap_or(0),
+                self.invariant_partially_judged
                     .get(invariant)
                     .copied()
                     .unwrap_or(0)
@@ -1026,11 +1113,61 @@ impl StreamMarks {
     }
 }
 
-/// 这一类历史步在注入的读故障下读盘：崩溃恢复抛弃根（那次可写挂载期间最新那条根的根槽与它点名的单元读回全 0，
-/// `singlefs_harness::history` 的 `DeviceReadingZerosOverHiddenRanges`）。别的步读的就是盘上的字节。
+/// 每次掉电之后第一个写在写表里的下标，按次序：录制流下标（[`singlefs_harness::history::HistoryRun::first_stream_index_after_each_power_loss`]）
+/// 换成写表下标，取录制流下标不小于它的第一个写（写表不算屏障，`stream_indexes` 与写表逐条对应）；掉电之后一个写都没录下的取写表长度。
+fn first_write_after_each_power_loss_in_the_write_table(
+    first_stream_index_after_each_power_loss: &[usize],
+    stream_indexes: &[usize],
+) -> Vec<usize> {
+    first_stream_index_after_each_power_loss
+        .iter()
+        .map(|first_stream_index_after_the_power_loss| {
+            stream_indexes
+                .iter()
+                .position(|stream_index| *stream_index >= *first_stream_index_after_the_power_loss)
+                .unwrap_or(stream_indexes.len())
+        })
+        .collect()
+}
+
+/// 写表下标上的几道掉电接缝（[`RecordStreamSeam::AfterAPowerLoss`]），次序照给的。
+fn power_loss_seams(first_write_after_each_power_loss: &[usize]) -> Vec<RecordStreamSeam> {
+    first_write_after_each_power_loss
+        .iter()
+        .map(
+            |first_write_after_the_power_loss| RecordStreamSeam::AfterAPowerLoss {
+                first_write_after_the_power_loss: *first_write_after_the_power_loss,
+            },
+        )
+        .collect()
+}
+
+/// 崩溃窗口末尾那个写在录制流里的下标：窗口从写表第 `first_write_of_the_segment` 个写起数 `writes_from_the_segment_on` 个
+/// （靶向用例的窗口可以越过段尾），末尾是写表第 `first_write_of_the_segment + writes_from_the_segment_on - 1` 个写。
+/// 读故障的认定（[`StreamMarks::read_faults_in_a_crash_state`]）按录制流下标与每一步跑完时流里的步数比；写表下标不算屏障，
+/// 流里每过一道屏障两者就差一，拿写表下标去比会把窗口末尾认早（攻方 K2-c，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节）。
+///
+/// # Panics
+/// `writes_from_the_segment_on` 是 0（崩溃窗口里至少有一个写：段内真子集的长度是段的写数，靶向用例的写数由 [`draw_crash_points`] 拒 0），
+/// 或窗口末尾越过写表（`stream_indexes` 与写表逐条对应）。
+fn stream_index_of_the_last_write_of_the_crash_window(
+    stream_indexes: &[usize],
+    first_write_of_the_segment: usize,
+    writes_from_the_segment_on: usize,
+) -> usize {
+    let last_write_within_the_crash_window = writes_from_the_segment_on
+        .checked_sub(1)
+        .expect("崩溃窗口里至少有一个写：段内真子集的长度是段的写数，靶向用例的写数在摆的时候拒 0");
+    stream_indexes[first_write_of_the_segment + last_write_within_the_crash_window]
+}
+
+/// 这一类历史步在注入的读故障下读盘（`singlefs_harness::history` 的 `DeviceReadingZerosOverHiddenRanges`）：崩溃恢复抛弃根（那次可写挂载期间
+/// 最新那条根的根槽与它点名的单元读回全 0），每块盘最新那一槽系统配置读回全 0 的可写挂载（C696（崩溃注入的读故障一支在随机历史里从没触发）：
+/// 随机历史里唯一真的在读故障下往盘上发写的一种步）。别的步读的就是盘上的字节。
 fn operation_reads_under_injected_faults(kind: HistoryOperationKind) -> bool {
     match kind {
-        HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot => true,
+        HistoryOperationKind::CrashRecoveryAbandoningTheNewestRoot
+        | HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros => true,
         HistoryOperationKind::PublishFirstFile
         | HistoryOperationKind::PublishOverwrite
         | HistoryOperationKind::PublishWithoutUnits
@@ -1039,7 +1176,10 @@ fn operation_reads_under_injected_faults(kind: HistoryOperationKind) -> bool {
         | HistoryOperationKind::RaiseRollbackFloor
         | HistoryOperationKind::ColdStartRecover
         | HistoryOperationKind::Unlink
-        | HistoryOperationKind::CreateInode => false,
+        | HistoryOperationKind::CreateInode
+        | HistoryOperationKind::OverwriteLosingPowerBeforeItsJournalRecordThenMountWritable => {
+            false
+        }
     }
 }
 
@@ -1055,6 +1195,180 @@ pub fn inject_crashes_into_history(
     history: &GeneratedHistory,
     execution: HistoryExecution,
     draw: CrashPointDraw,
+    image_directory: Option<&Path>,
+) -> HistoryCrashInjection {
+    inject_crashes_into_history_drawing_second_crashes(
+        history,
+        execution,
+        draw,
+        SecondCrashPointDraw::OneInEachMountPhaseBySeed,
+        image_directory,
+    )
+}
+
+/// [`inject_crashes_into_history`]，挂载途中的二次崩溃按 `second_crash_draw` 摆（靶向用例经它摆写死的那一个二次崩溃）。
+///
+/// # Panics
+/// 同 [`inject_crashes_into_history`]；`second_crash_draw` 是 [`SecondCrashPointDraw::ExactlyOneSecondCrashState`] 而写死的段号、
+/// 写数或扣下的下标在某一次挂载写出的写表上不成立（见那一支）。
+#[must_use]
+pub fn inject_crashes_into_history_drawing_second_crashes(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    draw: CrashPointDraw,
+    second_crash_draw: SecondCrashPointDraw,
+    image_directory: Option<&Path>,
+) -> HistoryCrashInjection {
+    inject_crashes_into_history_with_every_switch(
+        history,
+        execution,
+        draw,
+        second_crash_draw,
+        InstanceTableSweepConfiguration::PRODUCT,
+        image_directory,
+    )
+}
+
+/// [`inject_crashes_into_history`]，崩溃后镜像上那次可写挂载与每个二次崩溃镜像上的再挂末尾那一判实例表清扫按 `instance_table_sweep`
+/// （[`INSTANCE_TABLE_SWEPT_ON_ANY_ROW`] 这一份让短历史摆得到清扫那两段；别的入口取产品路径 `InstanceTableSweepConfiguration::PRODUCT`）。
+///
+/// # Panics
+/// 同 [`inject_crashes_into_history`]。
+#[must_use]
+pub fn inject_crashes_into_history_with_the_instance_table_sweep_configuration(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    draw: CrashPointDraw,
+    instance_table_sweep: InstanceTableSweepConfiguration,
+    image_directory: Option<&Path>,
+) -> HistoryCrashInjection {
+    inject_crashes_into_history_with_every_switch(
+        history,
+        execution,
+        draw,
+        SecondCrashPointDraw::OneInEachMountPhaseBySeed,
+        instance_table_sweep,
+        image_directory,
+    )
+}
+
+/// [`history_whose_writable_mount_after_the_crash_deletes_an_instance_table_row`] 里实例 2 覆盖写几次。根环 24 槽
+/// （`RootRingSlotsPerRegion::AT_MAKE_FILESYSTEM` 每区 8 槽、三区）里实例 1 的根要全被轮出去：实例 2 的写行、两次暖机与崩溃之前的 24 次
+/// 覆盖写一共 27 条根；最后一次是摆崩溃状态的那一步。
+const OVERWRITES_OF_THE_HISTORY_WHOSE_MOUNT_DELETES_AN_INSTANCE_TABLE_ROW: u64 = 25;
+
+/// 崩溃后那次可写挂载（有一行就扫，[`INSTANCE_TABLE_SWEPT_ON_ANY_ROW`]）删得了行的一段历史：第一个文件之后关掉会话、可写挂载成实例 2
+/// （写行把实例 1 那一行写进表），再覆盖写 [`OVERWRITES_OF_THE_HISTORY_WHOSE_MOUNT_DELETES_AN_INSTANCE_TABLE_ROW`] 次——根环里实例 1 的根
+/// 全被轮出去，根环每一槽都是自证过的根，实例 1 那一行是候选行（D18（块里携带什么信息） 已定项 11「回收」一条）。每次发布都做完了，
+/// 盘上没有按实例 1 那一行判未发布的单元：清扫删行、一个头都不抹。
+#[must_use]
+pub fn history_whose_writable_mount_after_the_crash_deletes_an_instance_table_row(
+) -> GeneratedHistory {
+    let mut operations = vec![HistoryOperation::CloseAndMountWritable];
+    operations.extend(
+        (0..OVERWRITES_OF_THE_HISTORY_WHOSE_MOUNT_DELETES_AN_INSTANCE_TABLE_ROW).map(|overwrite| {
+            HistoryOperation::PublishOverwrite(ContentChoice {
+                length: ContentLength::InsideOneDataUnit {
+                    selector: overwrite,
+                },
+                fill_seed: overwrite,
+            })
+        }),
+    );
+    GeneratedHistory {
+        seed: HistorySeed(3),
+        starting_point: HistoryStartingPoint::AfterFirstFile,
+        operations,
+    }
+}
+
+/// 在 [`history_whose_writable_mount_after_the_crash_deletes_an_instance_table_row`] 最后一步的开头摆一个崩溃状态（更早的写全落、
+/// 最后一步一个写都没落），崩溃后那次可写挂载与每个二次崩溃镜像上的再挂有一行就扫（[`INSTANCE_TABLE_SWEPT_ON_ANY_ROW`]）。
+/// 最后一步的第一个写落在第几段随历史的写数变：先把这段历史跑一遍、按同一条切段规则取出来，不写死段号。
+///
+/// # Panics
+/// 历史没跑到最后一步；最后一步的第一个写不是一段的段首（上一步发布返回之前那道屏障把它与上一步隔开：不是段首说明切段变了，
+/// 「最后一步一个写都没落」那个状态摆不准）。
+#[must_use]
+pub fn inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
+    execution: HistoryExecution,
+) -> HistoryCrashInjection {
+    inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
+        &history_whose_writable_mount_after_the_crash_deletes_an_instance_table_row(),
+        execution,
+    )
+}
+
+/// 在 [`history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring`] 最后一步的开头摆一个崩溃状态（摆法同
+/// [`inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row`]）：那段历史开头那次覆盖写掉电在
+/// journal 记录之前、留下实例 1 的孤儿，之后实例 2 把实例 1 的根全轮出根环；崩溃后那次可写挂载（有一行就扫）末尾的清扫先抹孤儿的头、
+/// 再发清扫发布删实例 1 那一行，抹头那一段（D18（块里携带什么信息） 已定项 11「回收」一条）的二次崩溃从它来。
+///
+/// # Panics
+/// 同 [`inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row`]。
+#[must_use]
+pub fn inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans(
+    execution: HistoryExecution,
+) -> HistoryCrashInjection {
+    inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
+        &history_leaving_orphans_of_the_first_instance_whose_roots_then_leave_the_ring(),
+        execution,
+    )
+}
+
+/// 在 `history` 最后一步的开头摆一个崩溃状态（更早的写全落、最后一步一个写都没落），崩溃后那次可写挂载与每个二次崩溃镜像上的再挂
+/// 有一行就扫（[`INSTANCE_TABLE_SWEPT_ON_ANY_ROW`]）。最后一步的第一个写落在第几段随历史的写数变：先把这段历史跑一遍、
+/// 按同一条切段规则取出来，不写死段号。
+///
+/// # Panics
+/// 历史没跑到最后一步；最后一步的第一个写不是一段的段首。
+fn inject_a_crash_at_the_start_of_the_last_step_sweeping_on_any_row(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+) -> HistoryCrashInjection {
+    let step_before_the_last = StepPosition::Operation(history.operations.len() - 2);
+    let stream = SharedStream::retaining_contents();
+    let mut operations_before_the_last_step = None;
+    let _run = execute_history_with(history, execution, &stream, &mut |observation| {
+        if observation.position == step_before_the_last {
+            operations_before_the_last_step = Some(stream.operation_count());
+        }
+    });
+    let operations_before_the_last_step = operations_before_the_last_step.expect(
+        "这段历史的每一步都做得成（覆盖写落在 4 GiB 的盘上），倒数第二步之后观察者一定被调过",
+    );
+    let (_writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+        &stream.retained_operations(),
+        &execution.device_width.fixed_geometry(),
+    );
+    let first_write_of_the_last_step = stream_indexes
+        .iter()
+        .position(|stream_index| *stream_index >= operations_before_the_last_step)
+        .expect("最后一步（覆盖写）写过东西");
+    let segment_index = segments
+        .iter()
+        .position(|segment| segment.first() == Some(&first_write_of_the_last_step))
+        .expect("最后一步的第一个写是一段的段首：上一步发布返回之前那道屏障把它与上一步隔开");
+    inject_crashes_into_history_with_the_instance_table_sweep_configuration(
+        history,
+        execution,
+        CrashPointDraw::ExactlyOneCrashState {
+            segment_index,
+            writes_from_the_segment_on: 1,
+            withheld_among_them: &[0],
+        },
+        INSTANCE_TABLE_SWEPT_ON_ANY_ROW,
+        None,
+    )
+}
+
+/// 崩溃注入的全部开关一处收：第一次崩溃怎么摆、二次崩溃怎么摆、挂载末尾的实例表清扫用哪一份配置。
+fn inject_crashes_into_history_with_every_switch(
+    history: &GeneratedHistory,
+    execution: HistoryExecution,
+    draw: CrashPointDraw,
+    second_crash_draw: SecondCrashPointDraw,
+    instance_table_sweep: InstanceTableSweepConfiguration,
     image_directory: Option<&Path>,
 ) -> HistoryCrashInjection {
     let stream = SharedStream::retaining_contents();
@@ -1102,6 +1416,10 @@ pub fn inject_crashes_into_history(
     };
     let (writes, segments, stream_indexes) =
         writes_and_segments_with_stream_indexes(&operations, &geometry);
+    let first_write_after_each_power_loss = first_write_after_each_power_loss_in_the_write_table(
+        &run.first_stream_index_after_each_power_loss,
+        &stream_indexes,
+    );
     // 崩溃状态摆在最后一个跑完的操作之前，停下那一步不进 RefFS（与 O1 那一路同一个范围）。
     let reference_filesystem_history =
         reference_filesystem_translation.translate(&operations, &geometry);
@@ -1231,12 +1549,27 @@ pub fn inject_crashes_into_history(
         // 更早的段里发出的单元写与 journal 记录写要算进一次发布里；恢复落到由 journal 记录重建的一版时，那一版的根槽写在更晚的段里，
         // 只给到这一段为止的前缀就找不到它、读不出它的实例表，被它抛弃的发布的豁免整条落空（D23（journal 的角色与格式） 已定项 15）。
         // 持久集合与整条流逐条对应：更早的段整段持久、当前段按这个崩溃点的子集、更晚的段一个都没持久（D13（验证路线） 已定项 7 的第四样入参）。
+        // 这个崩溃状态之前掉过电的，在每道掉电接缝处断开（[`RecordStreamSeam::AfterAPowerLoss`]）。
+        let first_write_after_each_power_loss_before_the_crash: Vec<usize> =
+            first_write_after_each_power_loss
+                .iter()
+                .copied()
+                .filter(|first_write_after_the_power_loss| {
+                    *first_write_after_the_power_loss <= first_write_of_the_segment
+                })
+                .collect();
+        let power_loss_seams_before_the_crash =
+            power_loss_seams(&first_write_after_each_power_loss_before_the_crash);
         let record_check = check_records_against(
             &image,
             &image,
             &writes,
             &persisted,
-            RecordStreamContinuity::OneRecording,
+            if power_loss_seams_before_the_crash.is_empty() {
+                RecordStreamContinuity::OneRecording
+            } else {
+                RecordStreamContinuity::BrokenAtSeams(&power_loss_seams_before_the_crash)
+            },
             report.effective_root,
         );
         tally.record_checks += 1;
@@ -1278,7 +1611,11 @@ pub fn inject_crashes_into_history(
         let crash_image_materialized = materialized_crash_image(&image);
         let read_faults_in_the_crash_state = marks.read_faults_in_a_crash_state(
             &step_kinds,
-            stream_indexes[first_write_of_the_segment + writes_in_the_segment - 1],
+            stream_index_of_the_last_write_of_the_crash_window(
+                &stream_indexes,
+                first_write_of_the_segment,
+                writes_in_the_segment,
+            ),
         );
         match read_faults_in_the_crash_state {
             ReadFaultsInTheCrashState::NoneInjected => {}
@@ -1291,13 +1628,20 @@ pub fn inject_crashes_into_history(
             ObservedReadBack::NoFile { .. } => Some(None),
             ObservedReadBack::Failed { .. } => None,
         };
-        let mount_run = mount_and_publish_once_on_the_crash_image(
-            &crash_image_materialized,
-            &parameters,
-            execution,
-            history.seed,
-            crash_point,
-        );
+        let mount_run =
+            mount_and_publish_once_with_the_instance_table_sweep_configuration_on_the_crash_image(
+                &crash_image_materialized,
+                &parameters,
+                execution,
+                history.seed,
+                crash_point,
+                instance_table_sweep,
+            );
+        if let Some(rows_deleted) = &mount_run.rows_deleted_by_the_instance_table_sweep {
+            tally.writable_mounts_after_the_crash_deleting_instance_table_rows += 1;
+            tally.heads_erased_by_the_instance_table_sweep_after_the_crash +=
+                u64::try_from(rows_deleted.heads_erased).expect("抹的头数装得进 u64");
+        }
         let (mount_writes, mount_segments, _mount_stream_indexes) =
             writes_and_segments_with_stream_indexes(&mount_run.mount_operations, &geometry);
         let (writes_of_the_publish_after_the_mount, _publish_segments, _publish_stream_indexes) =
@@ -1305,6 +1649,7 @@ pub fn inject_crashes_into_history(
         let records_across_the_crash = HistoryThenWritableMountRecords::new(
             &writes,
             &persisted,
+            &first_write_after_each_power_loss_before_the_crash,
             report.effective_root,
             &mount_writes,
             &writes_of_the_publish_after_the_mount,
@@ -1345,18 +1690,27 @@ pub fn inject_crashes_into_history(
             None => Err(RemountIdempotenceNotJudged::TheUninterruptedMountWasRefused),
             Some((_pool, fields)) => Ok(content_read_by_the_recovery_report(&fields.report)),
         };
-        judge_mount_transparency_on_the_crash_image(
-            &mut tally,
-            &mut findings,
-            &fields_read_after_the_crash,
-            &mount_run,
-            fields_after_the_uninterrupted_mount
-                .as_ref()
-                .map(|(pool, fields)| (pool, fields)),
-            history.seed,
-            crash_point,
-            image_directory,
-        );
+        // 挂载透明的射程只管不带故障的状态（D13（验证路线） 已定项 1）：注入过读故障的崩溃态不判，按理由记一次没判。
+        match read_faults_in_the_crash_state {
+            ReadFaultsInTheCrashState::NoneInjected => judge_mount_transparency_on_the_crash_image(
+                &mut tally,
+                &mut findings,
+                &fields_read_after_the_crash,
+                &mount_run,
+                fields_after_the_uninterrupted_mount
+                    .as_ref()
+                    .map(|(pool, fields)| (pool, fields)),
+                history.seed,
+                crash_point,
+                image_directory,
+            ),
+            ReadFaultsInTheCrashState::Injected => {
+                *tally
+                    .mount_transparency_not_judged
+                    .entry(MOUNT_TRANSPARENCY_NOT_JUDGED_ON_A_READ_FAULTED_CRASH_STATE)
+                    .or_insert(0) += 1;
+            }
+        }
         judge_second_crashes_inside_the_writable_mount(
             &mut tally,
             &mut findings,
@@ -1376,10 +1730,17 @@ pub fn inject_crashes_into_history(
                     .as_ref(),
                 publishes_before_the_deletion_queue_continuation: mount_run
                     .publishes_before_the_deletion_queue_continuation,
+                publishes_before_the_instance_table_sweep: mount_run
+                    .publishes_before_the_instance_table_sweep,
                 parameters: &parameters,
                 space_admission: execution.space_admission,
+                instance_table_sweep,
+                rows_deleted_by_the_sweep_of_the_uninterrupted_mount: mount_run
+                    .rows_deleted_by_the_instance_table_sweep
+                    .as_ref(),
                 reference_filesystem_at_the_first_crash: &reference_filesystem_judgement,
                 read_faults_in_the_first_crash_state: read_faults_in_the_crash_state,
+                second_crash_draw,
             },
             history.seed,
             crash_point,
@@ -1464,18 +1825,6 @@ impl FindingsOfOneHistory {
             }
         }
     }
-}
-
-/// 把一份崩溃镜像（基线 + 这一段里持久了的写）落成一个池：之后的可写挂载在它的副本上写。
-#[must_use]
-pub fn materialized_crash_image(image: &CrashImage<'_>) -> MemoryPool {
-    let mut pool = image.base.clone();
-    for (write, is_persisted) in image.writes.iter().zip(&image.persisted) {
-        if *is_persisted {
-            pool.apply_writes(std::slice::from_ref(write));
-        }
-    }
-    pool
 }
 
 /// I-8.4（重放幂等）在这里判的那一条的编号：R-换（用户 2026-10-01 定，`research/prompts/m3-inv-a-r1-main-verification.md` 第四节）——
@@ -1585,11 +1934,29 @@ pub enum WritableMountAlone {
 }
 
 /// 在 `pool` 的副本上只起一次可写挂载（建池那一份参数、给定的空间准入开关），不接发布；交回挂载之后的池，或拒的理由、错误与拒之后的池。
+/// 挂载末尾的实例表清扫取产品路径的配置（`InstanceTableSweepConfiguration::PRODUCT`）。
 #[must_use]
 pub fn writable_mount_alone_on(
     pool: &MemoryPool,
     parameters: &MakeFilesystemParameters,
     space_admission: SpaceAdmission,
+) -> WritableMountAlone {
+    writable_mount_alone_with_the_instance_table_sweep_configuration_on(
+        pool,
+        parameters,
+        space_admission,
+        InstanceTableSweepConfiguration::PRODUCT,
+    )
+}
+
+/// 同 [`writable_mount_alone_on`]，挂载末尾那一判实例表清扫的开关与阈值由调用方给（`mount::mount_writable_with_instance_table_sweep_configuration`；
+/// 影子账开着，与产品路径同一臂）。
+#[must_use]
+pub fn writable_mount_alone_with_the_instance_table_sweep_configuration_on(
+    pool: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    space_admission: SpaceAdmission,
+    instance_table_sweep: InstanceTableSweepConfiguration,
 ) -> WritableMountAlone {
     let mut devices: Vec<(DeviceIdentity, SparseBlockDevice)> = pool
         .devices
@@ -1603,11 +1970,16 @@ pub fn writable_mount_alone_on(
             (*identity, device)
         })
         .collect();
-    let mounted_instance =
-        match mount_writable_with_space_admission(parameters, &mut devices, space_admission) {
-            Err(error) => Err(error),
-            Ok(mounted) => Ok(mounted.output.instance),
-        };
+    let mounted_instance = match mount_writable_with_instance_table_sweep_configuration(
+        parameters,
+        &mut devices,
+        space_admission,
+        ShadowLedger::On,
+        instance_table_sweep,
+    ) {
+        Err(error) => Err(error),
+        Ok(mounted) => Ok(mounted.output.instance),
+    };
     let pool_after = MemoryPool {
         devices: devices
             .into_iter()
@@ -1678,13 +2050,69 @@ pub struct WritableMountOnTheCrashImage {
     /// 挂载交回 `MountError::Publish` 或 `MountError::FloorRaiseFailedAfterTheMountsPublishes` 时按错里交回的已落盘发布写账划
     /// （[`publishes_before_the_continuation_of_a_mount_that_failed`]；划不出续做、别的错都是 None：写行之后都算暖机）。
     pub publishes_before_the_deletion_queue_continuation: Option<usize>,
+    /// 挂载末尾清扫写了东西（抹了头或发了清扫发布）时，清扫之前这次挂载发了几次（写行、暖机、推的抬 F、续做每一步与续做里推的抬 F）：
+    /// 挂载那一段录制流里第几个根槽写之后起是清扫抹头；没清扫、或清扫一个字节都没写、或挂载被拒时 None。
+    pub publishes_before_the_instance_table_sweep: Option<usize>,
     /// 挂载推的抬 F 从挂载那一段写表（`mount_operations` 按同一份几何切出来的写表）的哪个写起（二次崩溃上 F 判不判按它分；
     /// 挂载准入推的与续做里推的都认，界按它们在写表里的位置取，取不出的是 [`FloorRaisesInTheMountWrites::NotLocatedInTheMountWrites`]）；挂载被拒时 None。
     pub floor_raises_in_the_mount_writes: Option<FloorRaisesInTheMountWrites>,
     /// 挂载续做每一步那一版的两棵用户可见树的根指针（挂载透明那一样按它比，用户 2026-10-03 定「续做算挂载的一部分」）；挂载被拒时 None。
     pub user_visible_tree_root_pointers_of_the_continuation:
         Option<UserVisibleTreeRootPointersOfTheContinuation>,
+    /// 挂载末尾的清扫发布删了行时：清扫发布那一版是哪条根、删了哪几行、抹了几个头（挂载透明的实例表行那一样按它放回被删的行再比，
+    /// C704（挂载透明不认清扫发布））；没清扫、清扫没删行、或挂载被拒时 None。
+    pub rows_deleted_by_the_instance_table_sweep: Option<RowsDeletedByTheInstanceTableSweepPublish>,
 }
+
+/// 崩溃后镜像上那次可写挂载末尾的清扫发布删了行（`InstanceTableSweepOutcome::RowsDeleted`）：清扫发布那一版的根身份、删掉的行、
+/// 删行之前抹了几个头。清扫是挂载交回之前最后一件事（`mount::mount_writable` 文档「可写挂载末尾」），清扫发布那一版就是挂载交回的现行版本。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RowsDeletedByTheInstanceTableSweepPublish {
+    pub sweep_publish: (InstanceGeneration, CheckpointTxg),
+    pub rows_deleted: Vec<InstanceRow>,
+    pub heads_erased: usize,
+}
+
+impl RowsDeletedByTheInstanceTableSweepPublish {
+    /// 挂载交回值里清扫删了行时交回删了什么；没删行（没扫、扫了没删、清扫发布没发成）时 None。
+    #[must_use]
+    pub fn of_the_mount(mounted: &Mounted) -> Option<Self> {
+        match &mounted.output.instance_table_sweep {
+            InstanceTableSweepAtTheEndOfTheMount::Swept(
+                InstanceTableSweepOutcome::RowsDeleted {
+                    rows_deleted,
+                    heads_erased,
+                },
+            ) => Some(Self {
+                sweep_publish: (
+                    mounted.current.root().instance,
+                    mounted.current.root().checkpoint_txg,
+                ),
+                rows_deleted: rows_deleted.clone(),
+                heads_erased: heads_erased.len(),
+            }),
+            InstanceTableSweepAtTheEndOfTheMount::NotSweptAtOrBelowTheThreshold { .. }
+            | InstanceTableSweepAtTheEndOfTheMount::HandedToTheBackgroundSweepWhileMounted
+            | InstanceTableSweepAtTheEndOfTheMount::Swept(
+                InstanceTableSweepOutcome::NoRowDeleted(_)
+                | InstanceTableSweepOutcome::SweepPublishRefusedForSpace { .. }
+                | InstanceTableSweepOutcome::SweepPublishFailed { .. }
+                | InstanceTableSweepOutcome::StoppedByABlockDeviceErrorWhileErasing { .. },
+            ) => None,
+        }
+    }
+}
+
+/// 崩溃注入里那次可写挂载（与每个二次崩溃镜像上的再挂）末尾的实例表清扫：有一行就扫（开关关着、阈值
+/// [`InstanceTableRowCountThreshold::ANY_ROW`]、清扫发布照挂载的分配器取落点）。产品路径的阈值占位 369 行（C690（清扫触发阈值的默认值没定）），
+/// 短历史到不了；要摆到清扫那两段（[`WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep`]、[`WritableMountPhase::InstanceTableSweepPublish`]）
+/// 的用例用这一份（`.claude/rules/fs-design.md` 五条硬要求第 2 条：每条分支都能被测试强制进入）。
+pub const INSTANCE_TABLE_SWEPT_ON_ANY_ROW: InstanceTableSweepConfiguration =
+    InstanceTableSweepConfiguration {
+        switch: InstanceTableSweepSwitch::SweptAtTheEndOfTheMountAboveTheThreshold,
+        row_count_threshold: InstanceTableRowCountThreshold::ANY_ROW,
+        sweep_publish_placements: SweepPublishPlacements::TakenFromTheAllocatorOfTheMount,
+    };
 
 /// 挂载之后那一次发布写的内容：随种子与崩溃状态变，装得进一个数据单元（模型只罩一个数据单元的文件）。
 fn content_of_the_publish_after_the_crash(seed: HistorySeed, crash_point: &CrashPoint) -> Vec<u8> {
@@ -1696,8 +2124,10 @@ fn content_of_the_publish_after_the_crash(seed: HistorySeed, crash_point: &Crash
 }
 
 /// 在 `crash_image_materialized` 的副本上起可写挂载（建池那一份参数、那一段历史的空间准入开关），做成了就接着发一次布：
-/// 挂载交回的现行版本带文件时覆盖写，树表 0 条时发第一个文件（与随机历史里这两个入口同一种调法），有树而文件集合为空（删完那一版）时
-/// 建一个 size 0 的 inode（D8（核心索引结构） 已定项 16 第 5 条）。
+/// 挂载交回的现行版本带文件、第一个文件那条记录还活着时覆盖写，树表 0 条时发第一个文件（与随机历史里这两个入口同一种调法），
+/// 有树而文件集合为空（删完那一版）时、或带文件而第一个文件已删完或正在删（unlink 之后再建过 inode）时建一个 size 0 的 inode
+/// （D8（核心索引结构） 已定项 16 第 4、5 条：写入口拒不在树里与正在删的 inode）。挂载末尾的实例表清扫取产品路径的配置
+/// （`InstanceTableSweepConfiguration::PRODUCT`）。
 #[must_use]
 pub fn mount_and_publish_once_on_the_crash_image(
     crash_image_materialized: &MemoryPool,
@@ -1705,6 +2135,27 @@ pub fn mount_and_publish_once_on_the_crash_image(
     execution: HistoryExecution,
     seed: HistorySeed,
     crash_point: &CrashPoint,
+) -> WritableMountOnTheCrashImage {
+    mount_and_publish_once_with_the_instance_table_sweep_configuration_on_the_crash_image(
+        crash_image_materialized,
+        parameters,
+        execution,
+        seed,
+        crash_point,
+        InstanceTableSweepConfiguration::PRODUCT,
+    )
+}
+
+/// 同 [`mount_and_publish_once_on_the_crash_image`]，挂载末尾那一判实例表清扫的开关与阈值由调用方给
+/// （`mount::mount_writable_with_instance_table_sweep_configuration`，影子账开着、与产品路径同一臂）。
+#[must_use]
+pub fn mount_and_publish_once_with_the_instance_table_sweep_configuration_on_the_crash_image(
+    crash_image_materialized: &MemoryPool,
+    parameters: &MakeFilesystemParameters,
+    execution: HistoryExecution,
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+    instance_table_sweep: InstanceTableSweepConfiguration,
 ) -> WritableMountOnTheCrashImage {
     let stream = SharedStream::retaining_contents();
     let mut devices: Vec<(DeviceIdentity, RecordingBlockDevice<SparseBlockDevice>)> =
@@ -1723,9 +2174,18 @@ pub fn mount_and_publish_once_on_the_crash_image(
                 )
             })
             .collect();
-    let mounted =
-        mount_writable_with_space_admission(parameters, &mut devices, execution.space_admission);
+    let mounted = mount_writable_with_instance_table_sweep_configuration(
+        parameters,
+        &mut devices,
+        execution.space_admission,
+        ShadowLedger::On,
+        instance_table_sweep,
+    );
     let mount_operation_count = stream.operation_count();
+    let rows_deleted_by_the_instance_table_sweep = mounted
+        .as_ref()
+        .ok()
+        .and_then(RowsDeletedByTheInstanceTableSweepPublish::of_the_mount);
     let floor_raised_by_the_mount = mounted
         .as_ref()
         .ok()
@@ -1743,6 +2203,9 @@ pub fn mount_and_publish_once_on_the_crash_image(
         ),
         Err(error) => publishes_before_the_continuation_of_a_mount_that_failed(error),
     };
+    let publishes_before_the_instance_table_sweep = mounted.as_ref().ok().and_then(|mounted| {
+        publishes_before_the_instance_table_sweep_of_the_mount_output(&mounted.output)
+    });
     let user_visible_tree_root_pointers_of_the_continuation =
         mounted.as_ref().ok().map(|mounted| {
             UserVisibleTreeRootPointersOfTheContinuation::of_the_mount_output(&mounted.output)
@@ -1775,11 +2238,24 @@ pub fn mount_and_publish_once_on_the_crash_image(
             let mut allocator = mounted.allocator;
             let mut writer = PoolWriter::new(parameters, devices.as_mut_slice());
             let published = match &mounted.current {
-                PoolVersion::WithFile(current) => publish_overwrite(
+                PoolVersion::WithFile(current) if first_file_is_a_live_record(current) => {
+                    publish_overwrite(
+                        &mut writer,
+                        &mut allocator,
+                        current,
+                        file,
+                        mounted.output.instance,
+                    )
+                    .map(|_| ())
+                }
+                // 带文件的一版而第一个文件已删完（unlink 之后再建过 inode：树里只剩别的 inode）或正在删（nlink = 0）：覆盖写只写第一个文件，
+                // 在这一版上被拒成写一个不在树里、或正在删的 inode（D8（核心索引结构） 已定项 16 第 4 条）；与删完那一版一样建一个 size 0 的 inode。
+                PoolVersion::WithFile(current) => publish_new_inodes(
                     &mut writer,
                     &mut allocator,
                     current,
-                    file,
+                    1,
+                    FIXED_WRITE_TIME_SECONDS,
                     mounted.output.instance,
                 )
                 .map(|_| ()),
@@ -1829,14 +2305,27 @@ pub fn mount_and_publish_once_on_the_crash_image(
         pool_after,
         floor_raised_by_the_mount,
         publishes_before_the_deletion_queue_continuation,
+        publishes_before_the_instance_table_sweep,
         floor_raises_in_the_mount_writes,
         user_visible_tree_root_pointers_of_the_continuation,
+        rows_deleted_by_the_instance_table_sweep,
     }
+}
+
+/// 带文件的一版里第一个文件那条记录还活着（在树里、nlink 不是 0）：覆盖写只写第一个文件，写入口拒删完与正在删的
+/// （`transaction::live_record_of_the_first_file`，D8（核心索引结构） 已定项 16 第 4 条）。unlink 之后再建过 inode 的一版仍归带文件的一版
+/// （`TransactionOutput::is_a_version_with_trees_and_no_file` 为假），它的 `inode_record` 是 None。
+fn first_file_is_a_live_record(version: &TransactionOutput) -> bool {
+    version
+        .inode_record
+        .as_ref()
+        .is_some_and(|record| record.nlink != NLINK_OF_AN_INODE_BEING_DELETED)
 }
 
 /// 一次发布写没写只有续做的删除步才写的那几种结构：文件的 extent 树、inode 树与 `deleted_inodes` 树（数据单元也算，挂载里没有别的发布写它）。
 /// 写行、暖机与抬 F 的空发布只重写分配记录树、记账树、中央映射树、树表、实例表与固定结构（2026-10-03 在副本上量的：崩在意图之后重挂，
 /// 写行与两次暖机写的是这几种，续做那一步写了 extent 树与 inode 树根）。
+/// 退役树（第 50 批）只在身份消失的那次最后一批写，挂载里只可能是续做那一步写的，同样认。
 /// 五种里 `DataUnit` 与 `DeletedInodesTreeNode` 在那次探针上空转（续做那一步没写它们）、仍留着（代码轮第二轮判决 V6）：这一判认的是
 /// 「写行、暖机与抬 F 的空发布都不写的结构」，不是「今天的续做那一步写了的结构」，两种都属于前者——那几种发布不碰文件数据，也不碰
 /// `deleted_inodes`（队列只由删除类发布改），所以认它们不会把写行或暖机认成续做；去掉它们，划段就随续做那一步今天的写法变：
@@ -1850,7 +2339,8 @@ fn writes_a_structure_only_the_continuation_changes(writes: &WritesByStructureKi
             | WrittenStructureKind::ExtentTreeNode
             | WrittenStructureKind::InodeTreeLeafContainer
             | WrittenStructureKind::InodeTreeRoot
-            | WrittenStructureKind::DeletedInodesTreeNode => true,
+            | WrittenStructureKind::DeletedInodesTreeNode
+            | WrittenStructureKind::RetirementTreeNode => true,
             WrittenStructureKind::AllocationRecordTreeNode
             | WrittenStructureKind::AccountingTreeNode
             | WrittenStructureKind::TombstoneTreeNode
@@ -1910,7 +2400,9 @@ fn publishes_before_the_continuation_of_a_mount_that_failed(error: &MountError) 
         | MountError::CallerParametersDisagreeWithTheSelectedSystemConfiguration { .. }
         | MountError::DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot { .. }
         | MountError::SequenceNumberPastTheTopOfItsRange(_)
-        | MountError::NewerStateStillUnreadableAfterOneReread(_) => None,
+        | MountError::NewerStateStillUnreadableAfterOneReread(_)
+        | MountError::SystemConfigurationUnreadableAfterTheReadStage(_)
+        | MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => None,
     }
 }
 
@@ -1944,7 +2436,8 @@ fn publishes_before_the_continuation_of_a_mount_that_handed_back_an_error(
 }
 
 /// 第二、三截交给记录核对器的记录流：整条历史录制流接上那份崩溃后镜像上可写挂载那一段录制流、再接上挂载之后那一次发布的录制流，
-/// 在历史与挂载的接缝处断开（[`RecordStreamContinuity::ResumedAfterACrash`]：历史那一段只留第一次崩溃之后那条时间线上的发布）。
+/// 在历史与挂载的接缝处断开（[`RecordStreamSeam::AfterACrash`]：历史那一段只留第一次崩溃之后那条时间线上的发布）；
+/// 历史在第一次崩溃之前掉过电的，也在每道掉电接缝处断开（[`RecordStreamSeam::AfterAPowerLoss`]）。
 /// 历史那一段的持久集合是第一次崩溃那个状态的，与第一截交的同一张。只交挂载那一段时，历史那几次发布在挂载之后的池与二次崩溃镜像上
 /// 还在不在没人核，二次崩溃落到由记录重建的写行那一版时它的根槽写也不在表里（B3c-1 报告第六节第 2 条、B3b 报告第二节第 4、5 条）。
 /// 挂载之后那一次发布的写也要在表里：它会复用历史发布换下、已可回收的槽，第二截的池上那些单元被它合法盖掉，表里没有它就解释不了。
@@ -1957,15 +2450,21 @@ pub struct HistoryThenWritableMountRecords {
     writes_of_the_mount: usize,
     /// 第一次崩溃之后只读恢复落到的那一版（恢复失败是 None）。
     version_landed_on_after_the_first_crash: Option<(InstanceGeneration, CheckpointTxg)>,
+    /// 交给记录核对器的接缝：第一次崩溃之前的几道掉电接缝，再加历史与挂载之间那一道崩溃接缝。
+    seams: Vec<RecordStreamSeam>,
 }
 
 impl HistoryThenWritableMountRecords {
+    /// `first_write_after_each_power_loss_before_the_crash` 是第一次崩溃之前每次掉电之后第一个写在历史写表里的下标，从小到大
+    /// （历史在那次崩溃之前没掉过电的给空表）。
+    ///
     /// # Panics
-    /// `persisted_in_the_history` 与 `history_writes` 不一样长。
+    /// `persisted_in_the_history` 与 `history_writes` 不一样长；有一道掉电接缝越过历史写表。
     #[must_use]
     pub fn new(
         history_writes: &[RetainedWrite],
         persisted_in_the_history: &[bool],
+        first_write_after_each_power_loss_before_the_crash: &[usize],
         version_landed_on_after_the_first_crash: Option<(InstanceGeneration, CheckpointTxg)>,
         mount_writes: &[RetainedWrite],
         writes_of_the_publish_after_the_mount: &[RetainedWrite],
@@ -1975,6 +2474,20 @@ impl HistoryThenWritableMountRecords {
             history_writes.len(),
             "历史那一段的持久集合与历史录制流逐条对应"
         );
+        assert!(
+            first_write_after_each_power_loss_before_the_crash
+                .iter()
+                .all(|first_write_after_the_power_loss| {
+                    *first_write_after_the_power_loss <= history_writes.len()
+                }),
+            "掉电接缝落在历史写表里：{first_write_after_each_power_loss_before_the_crash:?}，历史写表 {} 项",
+            history_writes.len()
+        );
+        let mut seams = power_loss_seams(first_write_after_each_power_loss_before_the_crash);
+        seams.push(RecordStreamSeam::AfterACrash {
+            first_write_after_the_crash: history_writes.len(),
+            version_landed_on_after_the_crash: version_landed_on_after_the_first_crash,
+        });
         Self {
             writes: history_writes
                 .iter()
@@ -1985,6 +2498,7 @@ impl HistoryThenWritableMountRecords {
             persisted_in_the_history: persisted_in_the_history.to_vec(),
             writes_of_the_mount: mount_writes.len(),
             version_landed_on_after_the_first_crash,
+            seams,
         }
     }
 
@@ -1995,11 +2509,8 @@ impl HistoryThenWritableMountRecords {
         &self.writes[first_write_of_the_mount..first_write_of_the_mount + self.writes_of_the_mount]
     }
 
-    fn continuity(&self) -> RecordStreamContinuity {
-        RecordStreamContinuity::ResumedAfterACrash {
-            first_write_after_the_crash: self.persisted_in_the_history.len(),
-            version_landed_on_after_the_crash: self.version_landed_on_after_the_first_crash,
-        }
+    fn continuity(&self) -> RecordStreamContinuity<'_> {
+        RecordStreamContinuity::BrokenAtSeams(&self.seams)
     }
 
     /// 历史那一段的持久集合，接上挂载那一段的（`persisted_in_the_mount`，与挂载那一段逐条对应），
@@ -2093,6 +2604,12 @@ enum PublishAfterTheMountInTheState {
     NotWrittenYet,
 }
 
+/// 第二截、第三截被拒的那次挂载都起在崩溃镜像（第一次崩溃的、二次崩溃的）上，盘是不带故障层的内存盘：读到的就是镜像上的字节，
+/// 瞬时读错不会发生——崩溃态注入过读故障也一样（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2
+/// C3 / J2-a 那一行，改法 G3：判官恒交「否」）。
+const READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE: ReadFaultsUnderTheRefusedMount =
+    ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults;
+
 /// 判可写挂载被拒合不合法要的：崩溃后镜像（拒的判据在它上面复算，拒之后的池要与它逐字节相同）、它上面只读恢复落到的那一版、
 /// 那一次只读读出在不在模型的允许集合里（问模型的结论）。第二截交第一次崩溃的镜像与第一截的结论；第三截交二次崩溃镜像与那一个二次崩溃上的结论，
 /// 读故障的认定沿用第一次崩溃那个态的（第二截那次挂载起在第一次崩溃的镜像上，不注入读故障）。
@@ -2100,16 +2617,18 @@ struct RefusalOnTheCrashImage<'crash> {
     crash_image_materialized: &'crash MemoryPool,
     version_landed_on_after_the_crash: Option<(InstanceGeneration, CheckpointTxg)>,
     read_only_read_back: ReadOnlyReadBackOfTheCrashImage,
-    /// 这个崩溃态注没注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：没注入的，判据 N-配置 复算为真即拒得不合法（C670）。
+    /// 这个崩溃态注没注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：没注入的，判据 N-配置 复算为真即拒得不合法（C670），
+    /// 「读阶段判完之后系统配置又读不出」那一拒的判据复算为真也拒得不合法（改法 G4）。
     read_faults: ReadFaultsInTheCrashState,
 }
 
 /// 第二截：挂载或那次发布被拒（单元区墙只计数，模型在单元区墙上只答允许拒绝的区间、而这里没有崩溃点上的模型状态可判区间），
 /// 做没做成都在之后的池上跑池级 checker；`record_check` 是同一个池上记录核对器的结论
 /// （[`HistoryThenWritableMountRecords::record_check_after_the_writable_mount`]）。挂载被拒而理由在 D23（journal 的角色与格式） 已定项 14
-/// 那张单子上的，判拒绝本身（`singlefs_harness::mount_transparency::judge_writable_mount_refusal_of_a_crash_state`：判据在崩溃镜像上复算为真、
-/// 盘上逐字节不变、只读读出在允许集合里；崩溃态没注入读故障而判据 N-配置 复算为真的另判不合法，C670），合法的只计数，不合法的报红。别的理由被拒按「模型说该成、实现拒了」报：
-/// 模型对可写挂载与覆盖写、第一个文件从不要求拒，容量墙之外也不许拒（`IdealModel::answer_mount_writable`）。
+/// 那张单子上的，判拒绝本身（`singlefs_harness::mount_transparency::judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount`，被拒的那次挂载恒交不带故障层：判据在崩溃镜像上复算为真、
+/// 盘上逐字节不变、只读读出在允许集合里；崩溃态没注入读故障而判据 N-配置 复算为真的另判不合法，C670，「读阶段判完之后系统配置又读不出」
+/// 那一拒的判据复算为真的同样另判不合法，改法 G4），合法的只计数，不合法的报红。别的理由被拒按「模型说该成、实现拒了」报：
+/// 模型对可写挂载与之后那一次发布（覆盖写活着的第一个文件、第一个文件、建 inode）从不要求拒，容量墙之外也不许拒（`IdealModel::answer_mount_writable`）。
 #[allow(
     clippy::too_many_arguments,
     reason = "每个参数各是一样东西：计数与发现、挂载那一趟与它之后的记录核对、判拒绝要的崩溃镜像那一份、这一个崩溃状态落在哪"
@@ -2137,13 +2656,14 @@ fn judge_the_writable_mount_on_the_crash_image(
                 } else {
                     DiskAfterTheRefusal::Changed
                 };
-            match judge_writable_mount_refusal_of_a_crash_state(
+            match judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
                 refusal_on_the_crash_image.crash_image_materialized,
                 refusal_on_the_crash_image.version_landed_on_after_the_crash,
                 refusal_error,
                 disk,
                 refusal_on_the_crash_image.read_only_read_back,
                 refusal_on_the_crash_image.read_faults,
+                READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE,
             ) {
                 WritableMountRefusalVerdict::Legal(_) => {
                     tally.writable_mount_refusals_on_the_d23_list_legal += 1;
@@ -2194,7 +2714,7 @@ fn judge_the_writable_mount_on_the_crash_image(
     let model_disagreement = refusal.map(|implementation_answer| {
         ModelDisagreement::new(
             ModelDisagreementAspect::RefusedWhenModelRequiresSuccess,
-            "崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）与之后的覆盖写或第一个文件都该成（单元区墙之外模型不许拒）"
+            "崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）与之后那一次发布（第一个文件还活着时覆盖写、树表 0 条时第一个文件、第一个文件已删完或正在删时建一个 inode）都该成（单元区墙之外模型不许拒）"
                 .to_string(),
             implementation_answer,
         )
@@ -2233,6 +2753,10 @@ const MOUNT_TRANSPARENCY_NOT_JUDGED_THE_PUBLISH_AFTER_THE_MOUNT_WAS_REFUSED: &st
 /// 二次崩溃镜像上：没崩过的那一次可写挂载被拒，没有挂载交回值（推没推抬 F）。
 const MOUNT_TRANSPARENCY_NOT_JUDGED_THE_UNINTERRUPTED_MOUNT_WAS_REFUSED: &str =
     "没崩过的那一次可写挂载被拒";
+/// 第一次崩溃那个态注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：挂载透明的射程只管不带故障的状态
+/// （D13（验证路线） 已定项 1），崩溃镜像上那一次挂载整个不判，它途中的每个二次崩溃也不判（各记一次）。
+const MOUNT_TRANSPARENCY_NOT_JUDGED_ON_A_READ_FAULTED_CRASH_STATE: &str =
+    "崩溃态注入过读故障（挂载透明只管不带故障的状态）";
 
 /// 挂载透明的一判记进计数：整个动作没判的按理由、某一样没判的按理由、判红的按字段（名字里带量过或推的）；交回判红的那几样，
 /// 一样一条违例（名字是 [`singlefs_harness::mount_transparency::MountTransparencyField::violation_name`]）。
@@ -2273,11 +2797,112 @@ fn violations_of_the_mount_transparency(
     violations
 }
 
-/// 第一次崩溃镜像上一个动作的挂载透明：R1（`before_the_mount`）与动作之后的池（`pool_after_the_action`）上的只读恢复（`after_the_action`）逐字段比；
+/// 挂载透明判红时记进违例的名字：R2 那一版是清扫发布那一版，它的实例表里却仍有清扫说删掉了的行（C704（挂载透明不认清扫发布））。
+pub const MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH: &str =
+    "挂载透明·实例表行（清扫发布那一版里仍有它删掉的行）";
+
+/// R2 那一版的实例表行对清扫发布删的行是什么样（C704（挂载透明不认清扫发布）的处置：判法先跟上，再让战役带清扫配置）。
+#[derive(Debug)]
+enum InstanceTableRowsAgainstTheSweepPublish {
+    /// 挂载没删行、R2 那一版不是清扫发布那一版，或它的实例表读不出（读不出照原样交给逐字段判，实例表行那一样照判红）：照原样比。
+    ComparedAsRead,
+    /// R2 那一版是清扫发布那一版、被删的行一条都不在：把它们放回去之后的 R2（其余的行照 D18 已定项 11「恢复写的行」判）。
+    DeletedRowsPutBack(Box<RecoveryFieldsRead>),
+    /// R2 那一版是清扫发布那一版，被删的行还在：判红。
+    DeletedRowsStillPresent(Vec<InstanceRow>),
+}
+
+/// 按清扫发布那一版的根身份认 R2（只挂载与二次崩溃比恢复落到的那一版、挂载加一次发布比发布之前那一版——清扫是挂载交回之前最后一件事，
+/// 两种比法拿到的都可能是它），判被删的行在不在。
+fn instance_table_rows_against_the_sweep_publish(
+    after_the_action: &RecoveryFieldsRead,
+    rows_deleted_by_the_sweep: Option<&RowsDeletedByTheInstanceTableSweepPublish>,
+) -> InstanceTableRowsAgainstTheSweepPublish {
+    let Some(rows_deleted_by_the_sweep) = rows_deleted_by_the_sweep else {
+        return InstanceTableRowsAgainstTheSweepPublish::ComparedAsRead;
+    };
+    let Some(compared) = &after_the_action.compared_version else {
+        return InstanceTableRowsAgainstTheSweepPublish::ComparedAsRead;
+    };
+    if (compared.root.instance, compared.root.checkpoint_txg)
+        != rows_deleted_by_the_sweep.sweep_publish
+    {
+        return InstanceTableRowsAgainstTheSweepPublish::ComparedAsRead;
+    }
+    let Some(rows_read) = &compared.instance_table_rows else {
+        return InstanceTableRowsAgainstTheSweepPublish::ComparedAsRead;
+    };
+    let deleted_instances: BTreeSet<InstanceGeneration> = rows_deleted_by_the_sweep
+        .rows_deleted
+        .iter()
+        .map(|row| row.instance)
+        .collect();
+    let still_present: Vec<InstanceRow> = rows_read
+        .iter()
+        .filter(|row| deleted_instances.contains(&row.instance))
+        .copied()
+        .collect();
+    if !still_present.is_empty() {
+        return InstanceTableRowsAgainstTheSweepPublish::DeletedRowsStillPresent(still_present);
+    }
+    let rows_with_the_deleted_put_back: Vec<InstanceRow> = rows_read
+        .iter()
+        .chain(&rows_deleted_by_the_sweep.rows_deleted)
+        .copied()
+        .collect();
+    let mut put_back = after_the_action.clone();
+    put_back
+        .compared_version
+        .as_mut()
+        .expect("上面判过 R2 那一版在")
+        .instance_table_rows = Some(rows_with_the_deleted_put_back);
+    InstanceTableRowsAgainstTheSweepPublish::DeletedRowsPutBack(Box::new(put_back))
+}
+
+/// 挂载透明逐字段判（`mount_transparency::judge_mount_transparency`）之前，挂载末尾的清扫发布删了行时按 C704（挂载透明不认清扫发布）先处置 R2：
+/// 那里的逐字段判法按「恢复写的行」比实例表行，不认清扫发布删行。R2 那一版是清扫发布那一版而被删的行一条都不在 ⇒ 交回放回之后的 R2；
+/// 被删的行还在 ⇒ R2 照原样交回、另交一条违例（[`MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH`]，
+/// 计进按字段分的判红计数）；别的照原样交回。被删的是哪几行取挂载交回值（与 F 取挂载交回的抬 F、续做取挂载交回的根指针同一个做法），
+/// 判法不另算哪几行该删。
+fn after_the_action_with_the_rows_deleted_by_the_sweep_put_back<'read>(
+    tally: &mut CrashInjectionTally,
+    after_the_action: &'read RecoveryFieldsRead,
+    rows_deleted_by_the_sweep: Option<&RowsDeletedByTheInstanceTableSweepPublish>,
+) -> (Cow<'read, RecoveryFieldsRead>, Vec<(&'static str, String)>) {
+    match instance_table_rows_against_the_sweep_publish(after_the_action, rows_deleted_by_the_sweep)
+    {
+        InstanceTableRowsAgainstTheSweepPublish::ComparedAsRead => {
+            (Cow::Borrowed(after_the_action), Vec::new())
+        }
+        InstanceTableRowsAgainstTheSweepPublish::DeletedRowsPutBack(put_back) => {
+            tally.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back += 1;
+            (Cow::Owned(*put_back), Vec::new())
+        }
+        InstanceTableRowsAgainstTheSweepPublish::DeletedRowsStillPresent(still_present) => {
+            *tally
+                .mount_transparency_violations_by_field
+                .entry(MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH)
+                .or_insert(0) += 1;
+            (
+                Cow::Borrowed(after_the_action),
+                vec![(
+                    MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH,
+                    format!(
+                        "清扫发布 {:?} 删了 {:?}；那一版的实例表里仍有 {still_present:?}",
+                        rows_deleted_by_the_sweep.map(|deleted| deleted.sweep_publish),
+                        rows_deleted_by_the_sweep.map(|deleted| &deleted.rows_deleted)
+                    ),
+                )],
+            )
+        }
+    }
+}
+
+/// 第一次崩溃镜像上一个动作的挂载透明：R1（`before_the_mount`）与动作之后的池（`pool_after_the_action`）上的只读恢复（`after_the_action_as_read`；挂载末尾的清扫发布删了行时先按 C704 处置）逐字段比；
 /// 判红的落成这一截（[`CrashStateStage::MountTransparencyAfterTheCrash`]）的新发现，镜像留的是动作之后的池。
 #[allow(
     clippy::too_many_arguments,
-    reason = "每个参数各是一样东西：计数与发现、哪个动作、两次恢复与动作之后的池、动作与挂载续做那几步的交回值、这一个崩溃状态落在哪"
+    reason = "每个参数各是一样东西：计数与发现、哪个动作、两次恢复与动作之后的池、动作与挂载续做那几步的交回值、清扫发布删的行、这一个崩溃状态落在哪"
 )]
 fn judge_mount_transparency_of_one_comparison(
     tally: &mut CrashInjectionTally,
@@ -2285,13 +2910,21 @@ fn judge_mount_transparency_of_one_comparison(
     comparison: MountTransparencyComparison,
     before_the_mount: &RecoveryFieldsRead,
     pool_after_the_action: &MemoryPool,
-    after_the_action: &RecoveryFieldsRead,
+    after_the_action_as_read: &RecoveryFieldsRead,
     action: MountTransparencyAction,
     continuation: &UserVisibleTreeRootPointersOfTheContinuation,
+    rows_deleted_by_the_sweep: Option<&RowsDeletedByTheInstanceTableSweepPublish>,
     seed: HistorySeed,
     crash_point: &CrashPoint,
     image_directory: Option<&Path>,
 ) {
+    let (compared_after_the_action, rows_deleted_by_the_sweep_still_present) =
+        after_the_action_with_the_rows_deleted_by_the_sweep_put_back(
+            tally,
+            after_the_action_as_read,
+            rows_deleted_by_the_sweep,
+        );
+    let after_the_action: &RecoveryFieldsRead = &compared_after_the_action;
     let transparency =
         judge_mount_transparency(before_the_mount, after_the_action, action, continuation);
     match &transparency {
@@ -2303,7 +2936,8 @@ fn judge_mount_transparency_of_one_comparison(
         }
         MountTransparency::NotJudged(_) => {}
     }
-    let violations = violations_of_the_mount_transparency(tally, &transparency);
+    let mut violations = violations_of_the_mount_transparency(tally, &transparency);
+    violations.extend(rows_deleted_by_the_sweep_still_present);
     if violations.is_empty() {
         return;
     }
@@ -2377,6 +3011,7 @@ fn judge_mount_transparency_on_the_crash_image(
             after_the_mount,
             MountTransparencyAction::MountAlone(floor),
             continuation_of_a_mount_that_was_made(mount_run),
+            mount_run.rows_deleted_by_the_instance_table_sweep.as_ref(),
             seed,
             crash_point,
             image_directory,
@@ -2403,6 +3038,7 @@ fn judge_mount_transparency_on_the_crash_image(
                 &after_the_publish,
                 MountTransparencyAction::MountAndOnePublish(floor),
                 continuation_of_a_mount_that_was_made(mount_run),
+                mount_run.rows_deleted_by_the_instance_table_sweep.as_ref(),
                 seed,
                 crash_point,
                 image_directory,
@@ -2427,12 +3063,21 @@ fn judge_mount_transparency_on_the_crash_image(
 /// 抬 F 的写有持久的（从第一串把新 F 写进系统配置的那个写起，`persisted_in_the_mount` 与挂载那一段写表逐条对应）时，F 那一样不判
 /// （条款没写落在哪一处）；暖机那一次发布的写崩出来的态照 r5 判决 U5 前半句判 F 不变（代码轮第二轮判决 K2-1）。抬 F 的界在挂载写表里取不出的
 /// （代码轮第三轮判决第三节第 3 条），这一次挂载的二次崩溃整段 F 不判、计数。没崩过的那一次挂载被拒的不判。
+/// 没崩过的那一次挂载末尾的清扫发布删了行时，实例表行那一样照 C704（挂载透明不认清扫发布）的处置判
+/// （[`after_the_action_with_the_rows_deleted_by_the_sweep_put_back`]）。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "每个参数各是一样东西：计数、R1 与二次崩溃镜像上的恢复、没崩过的那一次挂载的抬 F 界与续做根指针与清扫删的行、二次崩溃的持久集合与段"
+)]
 fn mount_transparency_violations_of_a_second_crash(
     tally: &mut CrashInjectionTally,
     fields_read_after_the_first_crash: &RecoveryFieldsRead,
     fields_read_after_the_second_crash: &RecoveryFieldsRead,
     floor_raises_in_the_uninterrupted_mount_writes: Option<FloorRaisesInTheMountWrites>,
     continuation_of_the_uninterrupted_mount: Option<&UserVisibleTreeRootPointersOfTheContinuation>,
+    rows_deleted_by_the_sweep_of_the_uninterrupted_mount: Option<
+        &RowsDeletedByTheInstanceTableSweepPublish,
+    >,
     persisted_in_the_mount: &[bool],
     phase: WritableMountPhase,
 ) -> Vec<(&'static str, String)> {
@@ -2448,9 +3093,15 @@ fn mount_transparency_violations_of_a_second_crash(
         "没崩过的那一次挂载做成时抬 F 的界与续做那几步的根指针一起交回（mount_and_publish_once_on_the_crash_image 里同一个 Ok 取的两样）",
     );
     let floor_raises = floor_raises_in_the_mount_writes.at_a_second_crash(persisted_in_the_mount);
+    let (fields_read_after_the_second_crash, rows_deleted_by_the_sweep_still_present) =
+        after_the_action_with_the_rows_deleted_by_the_sweep_put_back(
+            tally,
+            fields_read_after_the_second_crash,
+            rows_deleted_by_the_sweep_of_the_uninterrupted_mount,
+        );
     let transparency = judge_mount_transparency(
         fields_read_after_the_first_crash,
-        fields_read_after_the_second_crash,
+        &fields_read_after_the_second_crash,
         MountTransparencyAction::SecondCrashInsideTheMount(floor_raises),
         continuation,
     );
@@ -2463,66 +3114,12 @@ fn mount_transparency_violations_of_a_second_crash(
         }
         MountTransparency::NotJudged(_) => {}
     }
-    violations_of_the_mount_transparency(tally, &transparency)
+    let mut violations = violations_of_the_mount_transparency(tally, &transparency);
+    violations.extend(rows_deleted_by_the_sweep_still_present);
+    violations
 }
 
-/// 挂载那一段录制流里每一次写落在挂载的哪一段：先是取号的系统配置槽写，第一个别的写起是写行那次发布；
-/// 一次发布的根槽写与紧跟着的系统配置槽写（轮换、抬 F 那一串先写的新 F）之后的第一个别的写起是下一次发布：
-/// 写行之后、第 `publishes_before_the_deletion_queue_continuation` 个根槽写之前的那几次是暖机（连同挂载推的抬 F），
-/// 从它起是续做（没崩过的那一次挂载被拒、交不出这个数时 None：写行之后都算暖机）。
-fn writable_mount_phase_of_each_write(
-    writes: &[RetainedWrite],
-    publishes_before_the_deletion_queue_continuation: Option<usize>,
-) -> Vec<WritableMountPhase> {
-    let phase_of_the_publish_after = |root_records_written: usize| match (
-        root_records_written,
-        publishes_before_the_deletion_queue_continuation,
-    ) {
-        (0, _) => WritableMountPhase::RowPublish,
-        (publishes_landed, Some(publishes_before_the_continuation))
-            if publishes_landed >= publishes_before_the_continuation =>
-        {
-            WritableMountPhase::Continuation
-        }
-        (_, Some(_) | None) => WritableMountPhase::WarmUp,
-    };
-    let mut phase = WritableMountPhase::Acquisition;
-    let mut root_records_written = 0;
-    // 迭代上界是挂载那一段的写数；跨轮带的是这一次写落在哪一段与已写的根槽数；没有提前出口。
-    writes
-        .iter()
-        .map(|write| {
-            phase = match (phase, write.kind) {
-                (WritableMountPhase::Acquisition, StepKind::SystemConfigurationSlot) => {
-                    WritableMountPhase::Acquisition
-                }
-                (
-                    WritableMountPhase::RowPublish
-                    | WritableMountPhase::WarmUp
-                    | WritableMountPhase::Continuation,
-                    StepKind::SystemConfigurationSlot,
-                ) => phase,
-                (
-                    WritableMountPhase::Acquisition
-                    | WritableMountPhase::RowPublish
-                    | WritableMountPhase::WarmUp
-                    | WritableMountPhase::Continuation,
-                    StepKind::UnitWrite
-                    | StepKind::JournalRecord
-                    | StepKind::RootRecordFua
-                    | StepKind::ZeroFill
-                    | StepKind::Barrier,
-                ) => phase_of_the_publish_after(root_records_written),
-            };
-            if write.kind == StepKind::RootRecordFua {
-                root_records_written += 1;
-            }
-            phase
-        })
-        .collect()
-}
-
-/// 挂载途中的一次二次崩溃：挂载那一段的第几段、段内哪几个写持久了、崩在挂载的哪一段。
+/// 挂载途中的一次二次崩溃：挂载那一段的第几段、段内哪几个写持久了（靶向用例摆的那一个从这一段的第一个写起数，可以越过段尾）、崩在挂载的哪一段。
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct SecondCrashPoint {
     segment_index: usize,
@@ -2530,19 +3127,118 @@ struct SecondCrashPoint {
     phase: WritableMountPhase,
 }
 
+/// 挂载途中的二次崩溃怎么摆（[`judge_second_crashes_inside_the_writable_mount`]）。
+#[derive(Clone, Copy)]
+pub enum SecondCrashPointDraw {
+    /// 挂载的每一段各按种子摆一个（[`draw_second_crash_points`]）：[`inject_crashes_into_history`] 与战役都走这一支。
+    OneInEachMountPhaseBySeed,
+    /// 每个第一次崩溃态上都只摆这一个二次崩溃（靶向用例用，攻方改法 F2，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节 K2）：
+    /// 从挂载那一段写表切出的第 `segment_index` 段的第一个写起数 `writes_from_the_segment_on` 个写，其中下标（从这一段的第一个写数起）
+    /// 在 `withheld_among_them` 里的扣下、别的持久；更早的段整段持久，这几个写之后的一个都没持久。这几个写可以越过这一段的末尾，
+    /// 越过的那几道屏障当设备没守（同 [`CrashPointDraw::ExactlyOneCrashState`]：今天的持久顺序下根槽 FUA 先于轮换、各成一段，
+    /// 「轮换落了、根没落」在段内真子集里摆不出来）。崩在挂载的哪一段按第一个被扣下的写取。
+    /// 段号不在挂载写出的段里、这几个写越过挂载写表末尾、`writes_from_the_segment_on` 是 0、扣下的下标越界或一个都没有时 panic——
+    /// 写死的输入写错了，不悄悄摆别的状态（[`exactly_one_second_crash_point`]）。
+    ExactlyOneSecondCrashState {
+        segment_index: usize,
+        writes_from_the_segment_on: usize,
+        withheld_among_them: &'static [usize],
+    },
+}
+
+/// 靶向用例那一个二次崩溃（[`SecondCrashPointDraw::ExactlyOneSecondCrashState`]）：持久集合从挂载第 `segment_index` 段的第一个写起数，
+/// 可以越过段尾；崩在挂载的哪一段取第一个被扣下的写的（`phase_of_each_write` 与挂载写表逐条对应）。
+///
+/// # Panics
+/// 段号不在 `mount_segments` 里、`writes_from_the_segment_on` 是 0 或越过挂载写表末尾、扣下的下标一个都没有或越界。
+fn exactly_one_second_crash_point(
+    mount_segments: &[Vec<usize>],
+    phase_of_each_write: &[WritableMountPhase],
+    segment_index: usize,
+    writes_from_the_segment_on: usize,
+    withheld_among_them: &[usize],
+) -> SecondCrashPoint {
+    let first_write_of_the_segment = mount_segments
+        .get(segment_index)
+        .and_then(|segment| segment.first().copied())
+        .unwrap_or_else(|| {
+            panic!(
+                "靶向用例写死的挂载第 {segment_index} 段不在挂载写出的 {} 段里",
+                mount_segments.len()
+            )
+        });
+    assert!(
+        writes_from_the_segment_on > 0
+            && first_write_of_the_segment + writes_from_the_segment_on
+                <= phase_of_each_write.len(),
+        "靶向用例从挂载第 {segment_index} 段起数 {writes_from_the_segment_on} 个写：要至少一个、不越过挂载写表末尾（{} 个写）",
+        phase_of_each_write.len()
+    );
+    let first_withheld = withheld_among_them
+        .iter()
+        .min()
+        .copied()
+        .filter(|_| {
+            withheld_among_them
+                .iter()
+                .all(|withheld| *withheld < writes_from_the_segment_on)
+        })
+        .unwrap_or_else(|| {
+            panic!(
+                "靶向用例扣下的写 {withheld_among_them:?} 要至少一个、都落在从挂载第 {segment_index} 段起数的 {writes_from_the_segment_on} 个写里"
+            )
+        });
+    SecondCrashPoint {
+        segment_index,
+        persisted_within_the_segment: (0..writes_from_the_segment_on)
+            .map(|within_the_state| !withheld_among_them.contains(&within_the_state))
+            .collect(),
+        phase: phase_of_each_write[first_write_of_the_segment + first_withheld],
+    }
+}
+
+/// 第一次崩溃那个段内子集的指纹：段内第 k 个写持久了折 1、没持久折 0，逐个按 64 位 FNV-1a 折进去。只用来岔开二次崩溃的随机源，
+/// 不进任何判定。
+fn fingerprint_of_the_persisted_subset(persisted_within_the_segment: &[bool]) -> u64 {
+    persisted_within_the_segment.iter().fold(
+        PERSISTED_SUBSET_FINGERPRINT_OFFSET_BASIS,
+        |fingerprint, is_persisted| {
+            (fingerprint ^ u64::from(*is_persisted))
+                .wrapping_mul(PERSISTED_SUBSET_FINGERPRINT_PRIME)
+        },
+    )
+}
+
+/// 一个第一次崩溃态上按种子摆二次崩溃（[`draw_second_crash_points`]）用的随机源种子。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+struct SecondCrashPointSeed(u64);
+
+/// 历史种子、盐、第一次崩溃的段号与它段内子集的指纹（[`fingerprint_of_the_persisted_subset`]）四样异或。
+fn seed_of_the_second_crash_points(
+    seed: HistorySeed,
+    crash_point: &CrashPoint,
+) -> SecondCrashPointSeed {
+    SecondCrashPointSeed(
+        seed.0
+            ^ SECOND_CRASH_POINT_SEED_SALT
+            ^ u64::try_from(crash_point.segment_index).expect("段号装得进 u64")
+            ^ fingerprint_of_the_persisted_subset(&crash_point.persisted_within_the_segment),
+    )
+}
+
 /// 挂载的每一段各摆一个二次崩溃：在那一段的写里按种子挑一个 w，崩在 w 上——w 所在那一段里 w 之前的写都落了、w 没落、
 /// w 之后的写各按种子抽；更早的段整段持久，更晚的段一个都没持久（与第一次崩溃同一个枚举域）。挂载没写出某一段的写就不摆那一段。
+/// 种子是历史种子、盐、第一次崩溃的段号与它段内子集的指纹四样异或（[`seed_of_the_second_crash_points`]）：同一段里不同子集的
+/// 第一次崩溃态各抽各的（攻方改法 F3，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第五节第 1 行；
+/// 只混段号时同一段里的各个第一次崩溃态用同一串随机数，挂载写表相同就摆到同一组二次崩溃）。
 fn draw_second_crash_points(
     seed: HistorySeed,
     crash_point: &CrashPoint,
     segments: &[Vec<usize>],
     phase_of_each_write: &[WritableMountPhase],
 ) -> Vec<SecondCrashPoint> {
-    let mut source = SeededRandomSource::from_seed(
-        seed.0
-            ^ SECOND_CRASH_POINT_SEED_SALT
-            ^ u64::try_from(crash_point.segment_index).expect("段号装得进 u64"),
-    );
+    let mut source =
+        SeededRandomSource::from_seed(seed_of_the_second_crash_points(seed, crash_point).0);
     let mut chosen: BTreeSet<SecondCrashPoint> = BTreeSet::new();
     for phase in WritableMountPhase::ALL {
         let writes_of_the_phase: Vec<(usize, usize)> = segments
@@ -2596,6 +3292,8 @@ struct SecondCrashInputs<'history> {
         Result<ContentReadByRecovery, RemountIdempotenceNotJudged>,
     /// 没崩过的那一次挂载在续做之前发了几次（[`WritableMountOnTheCrashImage::publishes_before_the_deletion_queue_continuation`]）。
     publishes_before_the_deletion_queue_continuation: Option<usize>,
+    /// 没崩过的那一次挂载在清扫之前发了几次（[`WritableMountOnTheCrashImage::publishes_before_the_instance_table_sweep`]）。
+    publishes_before_the_instance_table_sweep: Option<usize>,
     /// 第一次崩溃镜像上的只读恢复与挂载透明要比的字段（R1）。
     fields_read_after_the_first_crash: &'history RecoveryFieldsRead,
     /// 没崩过的那一次挂载推的抬 F 从挂载那一段写表的哪个写起（没推是 [`FloorRaisesInTheMountWrites::NotPushed`]）；挂载被拒时 None。
@@ -2603,13 +3301,20 @@ struct SecondCrashInputs<'history> {
     /// 没崩过的那一次挂载续做每一步那一版的两根指针（二次崩溃落到挂载写的那一版时挂载透明按它比）；挂载被拒时 None。
     continuation_of_the_uninterrupted_mount:
         Option<&'history UserVisibleTreeRootPointersOfTheContinuation>,
-    /// 二次崩溃之后再挂用的建池参数与空间准入开关（与没崩过的那一次挂载同一份）。
+    /// 二次崩溃之后再挂用的建池参数、空间准入开关与实例表清扫的配置（与没崩过的那一次挂载同一份）。
     parameters: &'history MakeFilesystemParameters,
     space_admission: SpaceAdmission,
+    instance_table_sweep: InstanceTableSweepConfiguration,
+    /// 没崩过的那一次挂载末尾的清扫发布删了哪几行（二次崩溃落到清扫发布那一版时挂载透明按它放回再比，C704）；没删行时 None。
+    rows_deleted_by_the_sweep_of_the_uninterrupted_mount:
+        Option<&'history RowsDeletedByTheInstanceTableSweepPublish>,
     /// RefFS 在第一次崩溃上的判定：判绿时带着以读出的内容重新起头的 RefFS，二次崩溃接着它判。
     reference_filesystem_at_the_first_crash: &'history ReferenceFileSystemJudgementOfACrash,
-    /// 第一次崩溃那个态注没注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：二次崩溃之后再挂被拒时判 C670 那一条沿用它。
+    /// 第一次崩溃那个态注没注入过读故障（[`StreamMarks::read_faults_in_a_crash_state`]）：二次崩溃之后再挂被拒时判 C670 那一条沿用它；
+    /// 注入过的，二次崩溃镜像上的挂载透明照第二截跳过（改法 G5）。
     read_faults_in_the_first_crash_state: ReadFaultsInTheCrashState,
+    /// 二次崩溃怎么摆：挂载每一段按种子各摆一个，或靶向用例写死的那一个。
+    second_crash_draw: SecondCrashPointDraw,
 }
 
 /// 第三截：挂载途中的二次崩溃。每个二次崩溃状态上：只读恢复（看 journal）、问模型——允许的版本是模型提交过的每一版，加上这次挂载写出的根
@@ -2634,21 +3339,40 @@ fn judge_second_crashes_inside_the_writable_mount(
         newest_persisted_before_the_mount,
         content_after_the_uninterrupted_mount,
         publishes_before_the_deletion_queue_continuation,
+        publishes_before_the_instance_table_sweep,
         fields_read_after_the_first_crash,
         floor_raises_in_the_uninterrupted_mount_writes,
         continuation_of_the_uninterrupted_mount,
         parameters,
         space_admission,
+        instance_table_sweep,
+        rows_deleted_by_the_sweep_of_the_uninterrupted_mount,
         reference_filesystem_at_the_first_crash,
         read_faults_in_the_first_crash_state,
+        second_crash_draw,
     } = inputs;
     let mount_writes = records_across_the_crash.mount_writes();
     let phase_of_each_write = writable_mount_phase_of_each_write(
         mount_writes,
         publishes_before_the_deletion_queue_continuation,
+        publishes_before_the_instance_table_sweep,
     );
-    let second_crash_points =
-        draw_second_crash_points(seed, crash_point, mount_segments, &phase_of_each_write);
+    let second_crash_points = match second_crash_draw {
+        SecondCrashPointDraw::OneInEachMountPhaseBySeed => {
+            draw_second_crash_points(seed, crash_point, mount_segments, &phase_of_each_write)
+        }
+        SecondCrashPointDraw::ExactlyOneSecondCrashState {
+            segment_index,
+            writes_from_the_segment_on,
+            withheld_among_them,
+        } => vec![exactly_one_second_crash_point(
+            mount_segments,
+            &phase_of_each_write,
+            segment_index,
+            writes_from_the_segment_on,
+            withheld_among_them,
+        )],
+    };
     let mut versions_allowed = committed_versions.clone();
     if let Some(content) = &content_read_back_after_the_crash {
         for write in mount_writes {
@@ -2740,6 +3464,7 @@ fn judge_second_crashes_inside_the_writable_mount(
             },
             parameters,
             space_admission,
+            instance_table_sweep,
             second.phase,
             seed,
             crash_point,
@@ -2748,15 +3473,30 @@ fn judge_second_crashes_inside_the_writable_mount(
         tally.second_crash_checker_runs += 1;
         let mut violations = checker_violations_of(&image);
         violations.extend(reference_filesystem_vote.violation());
-        violations.extend(mount_transparency_violations_of_a_second_crash(
-            tally,
-            fields_read_after_the_first_crash,
-            &fields_read_after_the_second_crash,
-            floor_raises_in_the_uninterrupted_mount_writes,
-            continuation_of_the_uninterrupted_mount,
-            &persisted_in_the_mount,
-            second.phase,
-        ));
+        // 挂载透明的射程只管不带故障的状态（D13（验证路线） 已定项 1）：第一次崩溃那个态注入过读故障的，它上面那次挂载途中的二次崩溃
+        // 也不判，与第二截同一个理由记一次没判（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2
+        // 「二次崩溃镜像在注入态下照判（J2-d）」那一行，改法 G5）。
+        violations.extend(match read_faults_in_the_first_crash_state {
+            ReadFaultsInTheCrashState::NoneInjected => {
+                mount_transparency_violations_of_a_second_crash(
+                    tally,
+                    fields_read_after_the_first_crash,
+                    &fields_read_after_the_second_crash,
+                    floor_raises_in_the_uninterrupted_mount_writes,
+                    continuation_of_the_uninterrupted_mount,
+                    rows_deleted_by_the_sweep_of_the_uninterrupted_mount,
+                    &persisted_in_the_mount,
+                    second.phase,
+                )
+            }
+            ReadFaultsInTheCrashState::Injected => {
+                *tally
+                    .mount_transparency_not_judged
+                    .entry(MOUNT_TRANSPARENCY_NOT_JUDGED_ON_A_READ_FAULTED_CRASH_STATE)
+                    .or_insert(0) += 1;
+                Vec::new()
+            }
+        });
         if violations.is_empty() && disagreement.is_none() && record_check == RecordCheck::default()
         {
             continue;
@@ -2780,11 +3520,11 @@ fn judge_second_crashes_inside_the_writable_mount(
 
 /// I-8.4 的 R-换：二次崩溃镜像（`second_crash_image.crash_image_materialized`）上再起一次可写挂载，「恢复加写行那一整段」于是做了两次；
 /// 再挂之后只读恢复读出的内容要与没崩过的那一次挂载之后读出的（`once`）相同。不同判红（违例记在 [`REPLAY_IDEMPOTENCE_INVARIANT`] 名下）；
-/// 条款没写的情形（[`RemountIdempotenceNotJudged`]）只计数。再挂被拒时 I-8.4 照旧不判，另判 C670 那一条
-/// （[`judge_the_remount_refusal_after_a_second_crash_against_the_witness_criterion`]）；没崩过的那一次挂载被拒（`once` 是没判的理由）时不再挂，两样都不判。
+/// 条款没写的情形（[`RemountIdempotenceNotJudged`]）只计数。再挂被拒时 I-8.4 照旧不判，另判 C670 与改法 G4 那两条
+/// （[`judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_without_read_faults`]）；没崩过的那一次挂载被拒（`once` 是没判的理由）时不再挂，两样都不判。
 #[allow(
     clippy::too_many_arguments,
-    reason = "每个参数各是一样东西：两次挂载的输入、计数与发现、这一个二次崩溃落在哪"
+    reason = "每个参数各是一样东西：两次挂载的输入（连同清扫的配置）、计数与发现、这一个二次崩溃落在哪"
 )]
 fn judge_the_remount_after_a_second_crash(
     tally: &mut CrashInjectionTally,
@@ -2793,6 +3533,7 @@ fn judge_the_remount_after_a_second_crash(
     second_crash_image: &RefusalOnTheCrashImage<'_>,
     parameters: &MakeFilesystemParameters,
     space_admission: SpaceAdmission,
+    instance_table_sweep: InstanceTableSweepConfiguration,
     phase: WritableMountPhase,
     seed: HistorySeed,
     crash_point: &CrashPoint,
@@ -2809,10 +3550,11 @@ fn judge_the_remount_after_a_second_crash(
         }
         Ok(content) => content,
     };
-    let remount = writable_mount_alone_on(
+    let remount = writable_mount_alone_with_the_instance_table_sweep_configuration_on(
         second_crash_image.crash_image_materialized,
         parameters,
         space_admission,
+        instance_table_sweep,
     );
     let pool_after_the_remount = match &remount {
         WritableMountAlone::Refused {
@@ -2825,7 +3567,7 @@ fn judge_the_remount_after_a_second_crash(
                 .remount_idempotence_not_judged
                 .entry(RemountIdempotenceNotJudged::TheRemountWasRefused)
                 .or_insert(0) += 1;
-            judge_the_remount_refusal_after_a_second_crash_against_the_witness_criterion(
+            judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_without_read_faults(
                 tally,
                 findings,
                 RemountRefusedAfterASecondCrash {
@@ -2918,8 +3660,14 @@ struct RemountRefusedAfterASecondCrash<'remount> {
 /// 第二节 K2-b）：二次崩溃镜像同样是一个崩溃态，再挂的拒因是判据 N-配置、崩溃态没注入读故障、判据在二次崩溃镜像上（撕裂的系统配置槽跳过）
 /// 复算仍为真 ⇒ 拒得不合法，报红（记在 [`CrashStateStage::RemountAfterASecondCrashInsideTheWritableMount`] 那一截）。判官一并判的 U6 那四条
 /// （r5 判决第二节 U6）条款只管第二截，这一截不拿它们定红绿：只差那几条的不报红、不计不合法，判官列出的没满足的条件只随 C670 那一条的红带出来。
-/// 拒因不是判据 N-配置 的不判。
-fn judge_the_remount_refusal_after_a_second_crash_against_the_witness_criterion(
+/// 改法 G4（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2「新拒因少一条 C670 同形的判法（J2-b）」那一行）同一个接法：
+/// 再挂的拒因是「读阶段判完之后系统配置又读不出」、崩溃态没注入读故障、那一拒的判据在二次崩溃镜像上复算为真 ⇒ 拒得不合法，报红
+/// （判官的 [`RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults`]）。
+/// Q3（用户 2026-10-05 定，判决 `research/prompts/m3-batch10-code-r1-main-verification.md` 第六节）同一个接法：再挂的拒因是「重建分配器读根环
+/// 整环重读一次仍一条不被抛弃的自证有效根都没有」、崩溃态没注入读故障、那一拒的判据在二次崩溃镜像上复算为真 ⇒ 拒得不合法，报红
+/// （判官的 [`RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults`]）。
+/// 拒因是实例表读不出的不判。
+fn judge_the_remount_refusal_after_a_second_crash_against_the_criteria_true_without_read_faults(
     tally: &mut CrashInjectionTally,
     findings: &mut FindingsOfOneHistory,
     remount: RemountRefusedAfterASecondCrash<'_>,
@@ -2939,27 +3687,30 @@ fn judge_the_remount_refusal_after_a_second_crash_against_the_witness_criterion(
     } else {
         DiskAfterTheRefusal::Changed
     };
-    let verdict = judge_writable_mount_refusal_of_a_crash_state(
-        second_crash_image.crash_image_materialized,
-        second_crash_image.version_landed_on_after_the_crash,
-        refusal,
-        disk,
-        second_crash_image.read_only_read_back,
-        second_crash_image.read_faults,
-    );
-    let Some(conditions_not_met) =
-        conditions_not_met_by_a_remount_refusal_with_the_witness_criterion_true(tally, verdict)
+    let verdict =
+        judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+            second_crash_image.crash_image_materialized,
+            second_crash_image.version_landed_on_after_the_crash,
+            refusal,
+            disk,
+            second_crash_image.read_only_read_back,
+            second_crash_image.read_faults,
+            READ_FAULTS_UNDER_A_MOUNT_ON_A_CRASH_IMAGE,
+        );
+    let Some((reason, conditions_not_met)) =
+        reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
+            tally, verdict,
+        )
     else {
         return;
     };
     let detail = format!(
-        "崩在挂载的 {} 里、二次崩溃镜像上再挂被拒，理由 {:?}；崩溃态没注入读故障，判据在二次崩溃镜像上复算仍为真，拒得不合法（C670；判官列出的没满足的条件 {conditions_not_met:?}）：{member}",
-        phase.name(),
-        RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration
+        "崩在挂载的 {} 里、二次崩溃镜像上再挂被拒，理由 {reason:?}；崩溃态没注入读故障，判据在二次崩溃镜像上复算仍为真，拒得不合法（C670 / G4；判官列出的没满足的条件 {conditions_not_met:?}）：{member}",
+        phase.name()
     );
     let model_disagreement = ModelDisagreement::new(
         ModelDisagreementAspect::RefusedWhenModelRequiresSuccess,
-        "没注入读故障的崩溃态上，见证判据不许为真：二次崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）都该成"
+        "没注入读故障的崩溃态上，见证判据与「读阶段判完之后系统配置又读不出」那一拒的判据都不许为真：二次崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）都该成"
             .to_string(),
         detail.clone(),
     );
@@ -2989,14 +3740,19 @@ fn judge_the_remount_refusal_after_a_second_crash_against_the_witness_criterion(
     );
 }
 
-/// 第三截那一判的计数与取舍：拒因是判据 N-配置 的记一次判过；判官列出的没满足的条件里有 C670 那一条
-/// （[`RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults`]）时再记一次不合法，交回全部没满足的条件（报红用）。
-/// 拒因不是它、C670 那一条不成立（注入过读故障、判据复算为假）、只差 U6 那几条的，交回 None。
-fn conditions_not_met_by_a_remount_refusal_with_the_witness_criterion_true(
+/// 第三截那一判的计数与取舍：拒因是判据 N-配置、「读阶段判完之后系统配置又读不出」或「重建分配器读根环整环重读一次仍一条有效根都没有」的，
+/// 各记一次判过；判官列出的没满足的条件里有
+/// 没注入读故障时判据复算为真的那一条（N-配置 的 C670：[`RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults`]；
+/// 另一拒的改法 G4：[`RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults`]；
+/// Q3：[`RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults`]）时
+/// 再各记一次不合法，交回拒因与全部没满足的条件（报红用）。拒因是「记录有缺口时拒可写」（F1 乙）或 C 读一次没施加的发布的账读不出而记录不齐
+/// （`C_MAPPING`）的只记一次判过：判官对它们不列那一类条件。
+/// 拒因是实例表读不出的、那一条不成立（注入过读故障、判据复算为假）、只差 U6 那几条的，交回 None。
+fn reason_and_conditions_not_met_by_a_remount_refusal_with_a_criterion_true_without_read_faults(
     tally: &mut CrashInjectionTally,
     verdict: WritableMountRefusalVerdict,
-) -> Option<Vec<RefusalConditionNotMet>> {
-    let conditions_not_met = match verdict {
+) -> Option<(RefusalReasonOnTheD23List, Vec<RefusalConditionNotMet>)> {
+    let (reason, conditions_not_met) = match verdict {
         WritableMountRefusalVerdict::ReasonNotOnTheD23List
         | WritableMountRefusalVerdict::Legal(
             RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable,
@@ -3016,20 +3772,101 @@ fn conditions_not_met_by_a_remount_refusal_with_the_witness_criterion_true(
             conditions_not_met,
         } => {
             tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration += 1;
-            conditions_not_met
+            (
+                RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+                conditions_not_met,
+            )
+        }
+        WritableMountRefusalVerdict::Legal(
+            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+        ) => {
+            tally.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage += 1;
+            return None;
+        }
+        WritableMountRefusalVerdict::Illegal {
+            reason: RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            conditions_not_met,
+        } => {
+            tally.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage += 1;
+            (
+                RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+                conditions_not_met,
+            )
+        }
+        WritableMountRefusalVerdict::Legal(
+            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+        ) => {
+            tally.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator += 1;
+            return None;
+        }
+        WritableMountRefusalVerdict::Illegal {
+            reason: RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            conditions_not_met,
+        } => {
+            tally.remount_refusals_for_no_valid_root_in_the_root_ring_of_the_rebuilt_allocator += 1;
+            (
+                RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+                conditions_not_met,
+            )
+        }
+        WritableMountRefusalVerdict::Legal(
+            RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+        ) => {
+            tally.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify += 1;
+            return None;
+        }
+        WritableMountRefusalVerdict::Illegal {
+            reason:
+                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+            conditions_not_met,
+        } => {
+            tally.remount_refusals_for_a_publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify += 1;
+            (
+                RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+                conditions_not_met,
+            )
+        }
+        WritableMountRefusalVerdict::Legal(
+            RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                ..
+            },
+        ) => {
+            tally.remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records += 1;
+            return None;
+        }
+        WritableMountRefusalVerdict::Illegal {
+            reason:
+                reason @ RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                    ..
+                },
+            conditions_not_met,
+        } => {
+            tally.remount_refusals_for_an_account_of_an_unapplied_publish_with_incomplete_readable_records += 1;
+            (reason, conditions_not_met)
         }
     };
-    let witness_criterion_true_without_read_faults = conditions_not_met.iter().any(|condition| {
-        matches!(
-            condition,
-            RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults(_)
-        )
-    });
-    if !witness_criterion_true_without_read_faults {
-        return None;
+    let mut criterion_true_without_read_faults = false;
+    // 迭代上界是判官列出的条件数（至多五条）；跨轮携带的只有上面那一个布尔；没有提前出口。
+    for condition in &conditions_not_met {
+        match condition {
+            RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults(_) => {
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults += 1;
+                criterion_true_without_read_faults = true;
+            }
+            RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults => {
+                tally.remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults += 1;
+                criterion_true_without_read_faults = true;
+            }
+            RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults => {
+                tally.remount_refusals_with_the_no_valid_root_in_the_root_ring_criterion_true_without_read_faults += 1;
+                criterion_true_without_read_faults = true;
+            }
+            RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
+            | RefusalConditionNotMet::DiskChangedByTheRefusedMount
+            | RefusalConditionNotMet::ReadOnlyReadBackOutsideTheAllowedSet => {}
+        }
     }
-    tally.remount_refusals_with_the_witness_criterion_true_without_read_faults += 1;
-    Some(conditions_not_met)
+    criterion_true_without_read_faults.then_some((reason, conditions_not_met))
 }
 
 /// 这个崩溃状态在段内扣下的写各是什么种类（同一种只记一次）。段是写表里连续的一截
@@ -3220,6 +4057,12 @@ fn checker_violations_on(
             InvariantVerdict::NotApplicable(_) => {
                 *tally.invariant_not_applicable.entry(invariant).or_insert(0) += 1;
             }
+            InvariantVerdict::PartiallyJudged(_) => {
+                *tally
+                    .invariant_partially_judged
+                    .entry(invariant)
+                    .or_insert(0) += 1;
+            }
             InvariantVerdict::Violated(detail) => violations.push((invariant, detail)),
         }
     }
@@ -3233,7 +4076,9 @@ fn checker_violations_of(image: &dyn ImageReader) -> Vec<(&'static str, String)>
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -3886,7 +4731,8 @@ pub fn seed_slices(seed_count: u64, worker_threads: usize) -> Vec<std::ops::Rang
 mod tests {
     use super::*;
     use singlefs_core::mount::FloorRaiseFailedAfterTheMountsPublishes;
-    use singlefs_harness::history::{generate_history, HistoryStartingPoint};
+    use singlefs_harness::history::generate_history;
+    use singlefs_harness::mount_transparency::WitnessedCounterBranchThatHolds;
 
     const FOUR_CRASH_POINTS: CrashPointDraw = CrashPointDraw::Sampled {
         crash_points_per_history: 4,
@@ -3968,7 +4814,7 @@ mod tests {
             StepKind::SystemConfigurationSlot,
         ];
         let writes: Vec<RetainedWrite> = kinds.iter().map(|kind| write_of(*kind)).collect();
-        let phases = writable_mount_phase_of_each_write(&writes, Some(2));
+        let phases = writable_mount_phase_of_each_write(&writes, Some(2), None);
         assert_eq!(
             phases,
             [
@@ -4008,6 +4854,517 @@ mod tests {
                 .count(),
             1,
             "续做那一段摆一个二次崩溃：{second_crash_points:?}"
+        );
+    }
+
+    /// 二次崩溃的种子混进第一次崩溃那个段内子集（攻方改法 F3，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第五节第 1 行）：
+    /// 同一历史种子（7）、同一段号（5）、同一份挂载写表，段内子集不同（第 0 个写落了 / 第 1 个写落了，各三个写）的两个第一次崩溃态，
+    /// 摆出的二次崩溃不同。挂载写表造成两段：写行 4 个写、暖机 8 个写。怎么挑的：在 harness 档草稿探针里照
+    /// [`draw_second_crash_points`] 原样抄一份算这组输入，混子集时两份摆法在写行与暖机两段的持久集合都不同，不混时逐个相同。
+    /// 判别力：种子不混子集（`crates/mutations.tsv` 一行，指纹换成空子集的）时两份摆法逐个相同，这一条红。
+    #[test]
+    fn two_first_crash_states_differing_only_in_the_persisted_subset_draw_different_second_crashes()
+    {
+        let phase_of_each_write: Vec<WritableMountPhase> = (0..12)
+            .map(|write_index| {
+                if write_index < 4 {
+                    WritableMountPhase::RowPublish
+                } else {
+                    WritableMountPhase::WarmUp
+                }
+            })
+            .collect();
+        let segments: Vec<Vec<usize>> = vec![(0..4).collect(), (4..12).collect()];
+        let first_crash_with = |persisted_within_the_segment: Vec<bool>| CrashPoint {
+            segment_index: 5,
+            persisted_within_the_segment,
+            step: StepPosition::Operation(0),
+            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+        };
+        let first_write_landed = first_crash_with(vec![true, false, false]);
+        let second_write_landed = first_crash_with(vec![false, true, false]);
+        let drawn_after_the_first_write_landed = draw_second_crash_points(
+            HistorySeed(7),
+            &first_write_landed,
+            &segments,
+            &phase_of_each_write,
+        );
+        let drawn_after_the_second_write_landed = draw_second_crash_points(
+            HistorySeed(7),
+            &second_write_landed,
+            &segments,
+            &phase_of_each_write,
+        );
+        assert_eq!(
+            drawn_after_the_first_write_landed,
+            draw_second_crash_points(
+                HistorySeed(7),
+                &first_write_landed,
+                &segments,
+                &phase_of_each_write
+            ),
+            "前提：同一个第一次崩溃态摆两次，摆法相同"
+        );
+        assert_ne!(
+            drawn_after_the_first_write_landed, drawn_after_the_second_write_landed,
+            "同一历史种子、同一段号、段内子集不同的两个第一次崩溃态要摆出不同的二次崩溃"
+        );
+    }
+
+    /// 二次崩溃的种子把段内子集整个折进去（攻方改法 F3-c，判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节
+    /// 「K2 F3 内联用例判别力」与第三节第 2 条）：同一历史种子（0）、同一段号（16）、长 12 的段，段内扣下集合非空的全部 4095 个第一次崩溃态
+    /// （12 个写的 4096 个持久子集去掉全持久的那一个：全持久不是崩在这一段里的态）各算一次种子，两两不同。上一条只比两个子集，
+    /// 两个子集的第一个写一个落了一个没落，只折第一个写的弱指纹也分得开。攻方在副本上量过：入库指纹 4095 个种子各不相同，
+    /// 只折第一个写落没落时剩 2 个，只取第一个被扣下的写的下标时剩 12 个（`research/prompts/m3-formal-code-b21-r1-opus-model/out/f3.txt`）。
+    /// 判别力：指纹只折段内第一个写落没落（`crates/mutations.tsv` 一行）时种子只剩 2 个，这一条红。
+    #[test]
+    fn all_first_crash_states_of_a_segment_of_twelve_writes_seed_their_second_crashes_differently()
+    {
+        const WRITES_OF_THE_SEGMENT: usize = 12;
+        let all_persisted_mask = (1_u32 << WRITES_OF_THE_SEGMENT) - 1;
+        let seeds: BTreeSet<SecondCrashPointSeed> = (0..all_persisted_mask)
+            .map(|persisted_mask| {
+                seed_of_the_second_crash_points(
+                    HistorySeed(0),
+                    &CrashPoint {
+                        segment_index: 16,
+                        persisted_within_the_segment: (0..WRITES_OF_THE_SEGMENT)
+                            .map(|write_within_the_segment| {
+                                (persisted_mask >> write_within_the_segment) & 1 == 1
+                            })
+                            .collect(),
+                        step: StepPosition::Operation(0),
+                        operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+                    },
+                )
+            })
+            .collect();
+        assert_eq!(
+            seeds.len(),
+            4095,
+            "长 12 的段上 4095 个第一次崩溃态（扣下集合非空）算出的二次崩溃种子两两不同"
+        );
+    }
+
+    /// F3-d 三条用例变的是段末这么多个写的持久子集。
+    const WRITES_VARIED_AT_THE_END_OF_THE_SEGMENT: usize = 12;
+
+    /// 段末 [`WRITES_VARIED_AT_THE_END_OF_THE_SEGMENT`] 个写的持久子集里扣下集合非空的那几种（全持久不是崩在这一段里的态）：4095 种。
+    const FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT: usize =
+        (1 << WRITES_VARIED_AT_THE_END_OF_THE_SEGMENT) - 1;
+
+    /// 一个段上的第一次崩溃态逐个算二次崩溃的种子：段号 `segment_index`，段内前 `writes_landed_before_the_varied_end` 个写都落了，
+    /// 段末 [`WRITES_VARIED_AT_THE_END_OF_THE_SEGMENT`] 个写取扣下集合非空的全部 4095 种（段末第 k 个写落没落取掩码第 k 位），
+    /// 次序照掩码从 0 起。F3-d 三条用例共用这一份搭建，各自数种子、各自断言。
+    fn seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+        seed: HistorySeed,
+        segment_index: usize,
+        writes_landed_before_the_varied_end: usize,
+    ) -> Vec<SecondCrashPointSeed> {
+        (0..FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT)
+            .map(|persisted_mask_of_the_varied_end| {
+                seed_of_the_second_crash_points(
+                    seed,
+                    &CrashPoint {
+                        segment_index,
+                        persisted_within_the_segment: std::iter::repeat_n(
+                            true,
+                            writes_landed_before_the_varied_end,
+                        )
+                        .chain((0..WRITES_VARIED_AT_THE_END_OF_THE_SEGMENT).map(
+                            |write_within_the_varied_end| {
+                                (persisted_mask_of_the_varied_end >> write_within_the_varied_end)
+                                    & 1
+                                    == 1
+                            },
+                        ))
+                        .collect(),
+                        step: StepPosition::Operation(0),
+                        operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+                    },
+                )
+            })
+            .collect()
+    }
+
+    /// 二次崩溃的种子跨段号也两两不同（攻方改法 F3-d，判决 `research/prompts/m3-formal-code-b23-r1-main-verification.md` 第二节
+    /// 「K1 F3-c 4095 断言的判别力」与第三节第 2 条）：历史种子 0，段号 0..=63 各取长 12 的段上扣下集合非空的 4095 个第一次崩溃态，
+    /// 64 × 4095 = 262080 个种子合成一个集合数，两两不同——不只是同一段号里各自不同，段号 a 上的一个子集与段号 b 上的另一个子集也不撞
+    /// （攻方 `f3_fix` 的 A 那一格就是这样数的：`research/prompts/m3-formal-code-b23-r1-opus-model/probe/opus_probe.rs`）。
+    /// 上一条固定段号 16，种子里去掉段号、或四样改成或，它照绿。
+    /// 判别力：种子不异或段号、指纹改成按位拼接（段号与子集掩码在低位撞）、四样改成或（`crates/mutations.tsv` 各一行）时这一条红；
+    /// 攻方在模型上量过三种各剩 4095、4096、13254 个（`research/prompts/m3-formal-code-b23-r1-opus-model/out/f3-fix.txt` 的 A 那一列）。
+    #[test]
+    fn first_crash_states_of_segments_zero_to_sixty_three_seed_their_second_crashes_differently_across_segments(
+    ) {
+        const SEGMENT_INDEXES: std::ops::RangeInclusive<usize> = 0..=63;
+        let seeds: Vec<SecondCrashPointSeed> = SEGMENT_INDEXES
+            .flat_map(|segment_index| {
+                seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+                    HistorySeed(0),
+                    segment_index,
+                    0,
+                )
+            })
+            .collect();
+        assert_eq!(
+            seeds.len(),
+            SEGMENT_INDEXES.count() * FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "前提：段号 0..=63 各 4095 个第一次崩溃态，共 262080 个"
+        );
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            seeds.len(),
+            "历史种子 0、段号 0..=63、长 12 的段上 262080 个第一次崩溃态算出的二次崩溃种子跨段号也两两不同"
+        );
+    }
+
+    /// 长于 12 的段末 12 个写也折进种子（F3-d，同上判决）：历史种子 0、段号 16、长 28 的段，前 16 个写都落了、末 12 个写取扣下集合非空的
+    /// 4095 种，4095 个种子两两不同。真历史里的候选段长到 26（384 槽）/ 30（4 GiB）个写（攻方 `research/prompts/m3-formal-code-b23-r1-opus-model/out/f3-segments.txt`），
+    /// 长 12 的段只看得见前 12 个写：只折前 12 / 16 个写的指纹在上一条照绿，在这里末 12 个写全被丢掉。
+    /// 判别力：指纹只折段内前 12 个写、只折前 16 个写（`crates/mutations.tsv` 各一行）时 4095 个第一次崩溃态只剩 1 个种子，这一条红
+    /// （攻方量过，`research/prompts/m3-formal-code-b23-r1-opus-model/out/f3-fix.txt` 的 B 那一列）。
+    #[test]
+    fn first_crash_states_of_a_segment_of_twenty_eight_writes_differing_only_in_the_last_twelve_seed_their_second_crashes_differently(
+    ) {
+        const WRITES_LANDED_BEFORE_THE_VARIED_END: usize = 16;
+        let seeds = seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+            HistorySeed(0),
+            16,
+            WRITES_LANDED_BEFORE_THE_VARIED_END,
+        );
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "长 28 的段、前 16 个写都落了、末 12 个写取 4095 种：二次崩溃种子两两不同"
+        );
+    }
+
+    /// 二次崩溃的种子随历史种子变（F3-d，同上判决）：段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0 与 1 上各算一遍，
+    /// 8190 个种子合成一个集合数，两两不同。
+    /// 判别力：种子不异或历史种子（`crates/mutations.tsv` 一行）时两个历史种子上同一子集撞成一个，这一条红；
+    /// 攻方在模型上量过它剩 4095 个，按位拼接剩 4096 个、四样改成或剩 5998 个（`research/prompts/m3-formal-code-b23-r1-opus-model/out/f3-fix.txt` 的 C 那一列）。
+    #[test]
+    fn first_crash_states_under_history_seeds_zero_and_one_seed_their_second_crashes_differently() {
+        const HISTORY_SEEDS: [HistorySeed; 2] = [HistorySeed(0), HistorySeed(1)];
+        let seeds: Vec<SecondCrashPointSeed> = HISTORY_SEEDS
+            .into_iter()
+            .flat_map(|seed| {
+                seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+                    seed, 16, 0,
+                )
+            })
+            .collect();
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            HISTORY_SEEDS.len() * FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0 与 1 上算出的 8190 个二次崩溃种子两两不同"
+        );
+    }
+
+    /// 二次崩溃的种子在段号过 63 之后也两两不同（攻方改法 F3-e 的 A2，判决 `research/prompts/m3-formal-code-b24-r1-main-verification.md`
+    /// 第二节「K1 改法 F3-e」与第三节第 2 条；原型 `research/prompts/m3-formal-code-b24-r1-opus-model/probe/opus-b24-probe/src/main.rs` 的
+    /// `f3_proposed`）：历史种子 0，段号 0..=63 再加 2^k、2^k + 1（k = 6..=20）共 94 个段号，各取长 12 的段上扣下集合非空的 4095 个第一次崩溃态，
+    /// 384930 个种子合成一个集合数，两两不同。真历史里的段号到 210（战役大档），段号 0..=63 那一条看不见只取段号低 6 位的种子。
+    /// 被攻过零轮：这一组取样（段号 2^k、2^k + 1）对更长的历史、别的种子基罩不罩得住没人攻过。
+    /// 判别力：段号只取低 6 位（`crates/mutations.tsv` 一行，攻方 M7d）时段号 64 与 0 撞，这一条红。
+    #[test]
+    fn first_crash_states_of_segments_past_sixty_three_seed_their_second_crashes_differently_across_segments(
+    ) {
+        let segment_indexes: Vec<usize> = (0..=63)
+            .chain((6..=20).flat_map(|exponent| [1_usize << exponent, (1_usize << exponent) + 1]))
+            .collect();
+        let seeds: Vec<SecondCrashPointSeed> = segment_indexes
+            .iter()
+            .flat_map(|segment_index| {
+                seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+                    HistorySeed(0),
+                    *segment_index,
+                    0,
+                )
+            })
+            .collect();
+        assert_eq!(
+            seeds.len(),
+            94 * FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "前提：94 个段号各 4095 个第一次崩溃态，共 384930 个"
+        );
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            seeds.len(),
+            "历史种子 0、段号 0..=63 与 2^k、2^k + 1（k = 6..=20）、长 12 的段上 384930 个第一次崩溃态算出的二次崩溃种子两两不同"
+        );
+    }
+
+    /// 长 32 的段里扣下的写落在任何位置都折进种子（攻方改法 F3-e 的 B3，同上判决与原型）：历史种子 0、段号 16、长 32 的段，扣下其中一个写
+    /// （32 种）或两个写（496 种），528 个第一次崩溃态的种子两两不同。上面长 28 的那一条只变段末 12 个写，只折段末 12 个写的指纹在它上面照绿。
+    /// 被攻过零轮：段长 32、只扣一两个写的取样对更长的段、扣得更多的子集罩不罩得住没人攻过。
+    /// 判别力：指纹只折段内末 12 个写（`crates/mutations.tsv` 一行，攻方 M7a）时扣下前 20 个写里哪一个都撞成一个种子，这一条红。
+    #[test]
+    fn first_crash_states_of_a_segment_of_thirty_two_writes_withholding_one_or_two_writes_anywhere_seed_their_second_crashes_differently(
+    ) {
+        const WRITES_OF_THE_SEGMENT: usize = 32;
+        let first_crash_with_withheld = |withheld: &[usize]| CrashPoint {
+            segment_index: 16,
+            persisted_within_the_segment: (0..WRITES_OF_THE_SEGMENT)
+                .map(|write_within_the_segment| !withheld.contains(&write_within_the_segment))
+                .collect(),
+            step: StepPosition::Operation(0),
+            operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+        };
+        let seeds: Vec<SecondCrashPointSeed> = (0..WRITES_OF_THE_SEGMENT)
+            .flat_map(|first_withheld| {
+                std::iter::once(vec![first_withheld]).chain(
+                    (first_withheld + 1..WRITES_OF_THE_SEGMENT)
+                        .map(move |second_withheld| vec![first_withheld, second_withheld]),
+                )
+            })
+            .map(|withheld| {
+                seed_of_the_second_crash_points(
+                    HistorySeed(0),
+                    &first_crash_with_withheld(&withheld),
+                )
+            })
+            .collect();
+        assert_eq!(
+            seeds.len(),
+            528,
+            "前提：长 32 的段扣下一个写 32 种、两个写 496 种"
+        );
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            seeds.len(),
+            "历史种子 0、段号 16、长 32 的段上扣下一两个写的 528 个第一次崩溃态算出的二次崩溃种子两两不同"
+        );
+    }
+
+    /// 二次崩溃的种子随历史种子的高位也变（攻方改法 F3-e 的 C2，同上判决与原型）：段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0、1、2^63
+    /// 上各算一遍，12285 个种子两两不同。上面历史种子 0 与 1 那一条只差最低位，只取历史种子最低位的种子在它上面照绿。
+    /// 被攻过零轮：历史种子 0、1、2^63 这三个取样对别的种子基罩不罩得住没人攻过。
+    /// 判别力：历史种子只取最低位（`crates/mutations.tsv` 一行，攻方 M7f）时 0 与 2^63 撞，这一条红。
+    #[test]
+    fn first_crash_states_under_history_seeds_zero_one_and_two_to_the_sixty_third_seed_their_second_crashes_differently(
+    ) {
+        const HISTORY_SEEDS: [HistorySeed; 3] =
+            [HistorySeed(0), HistorySeed(1), HistorySeed(1 << 63)];
+        let seeds: Vec<SecondCrashPointSeed> = HISTORY_SEEDS
+            .into_iter()
+            .flat_map(|seed| {
+                seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+                    seed, 16, 0,
+                )
+            })
+            .collect();
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            HISTORY_SEEDS.len() * FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0、1、2^63 上算出的 12285 个二次崩溃种子两两不同"
+        );
+    }
+
+    /// 二次崩溃的种子随历史种子的每一位都变（攻方取样 C3，判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2
+    /// 「F3-e 取样（C4 / J2-f）」那一行与第三节第 1 条、改法 G6；原型 `research/prompts/m3-formal-code-b26-r1-opus-model/probe/src/f3.rs` 的
+    /// `F3PROPOSED`）：段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0 与 2^k（k = 0..=63）共 65 个种子上各算一遍，266175 个种子两两不同。
+    /// 上面 0、1、2^63 那一条只看得见最低位与最高位，历史种子对 3 取余、只留低 8 位与最高位的种子在它上面照绿（攻方量过，`research/prompts/m3-formal-code-b26-r1-opus-model/out/f3.txt`）。
+    /// b24 已是最后一轮，只加宽取样：这一组取样对别的种子形状罩不罩得住没人攻过，剩下的漏形记在 b24 那笔欠账里。
+    /// 判别力：历史种子对 3 取余（`crates/mutations.tsv` 一行）时 2^k 与 0、1、2 撞，这一条红。
+    #[test]
+    fn first_crash_states_under_history_seeds_zero_and_every_power_of_two_seed_their_second_crashes_differently(
+    ) {
+        let history_seeds: Vec<HistorySeed> = std::iter::once(HistorySeed(0))
+            .chain((0..64).map(|bit| HistorySeed(1_u64 << bit)))
+            .collect();
+        let seeds: Vec<SecondCrashPointSeed> = history_seeds
+            .iter()
+            .flat_map(|seed| {
+                seeds_of_the_second_crashes_over_every_withheld_subset_of_the_end_of_a_segment(
+                    *seed, 16, 0,
+                )
+            })
+            .collect();
+        assert_eq!(
+            seeds.len(),
+            65 * FIRST_CRASH_STATES_OVER_THE_VARIED_END_OF_A_SEGMENT,
+            "前提：历史种子 0 与 2^0..=2^63 共 65 个，各 4095 个第一次崩溃态"
+        );
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            seeds.len(),
+            "段号 16、长 12 的段上 4095 个第一次崩溃态在历史种子 0 与 2^k（k = 0..=63）上算出的 266175 个二次崩溃种子两两不同"
+        );
+    }
+
+    /// 长 1024 的段里扣下的那一个写落在任何位置都折进种子（攻方取样 B4，同上判决、改法 G6 与原型）：历史种子 0、段号 16、长 1024 的段，
+    /// 扣下其中一个写（1024 种），1024 个第一次崩溃态的种子两两不同。上面长 32 的那一条看不见第 32 个写之后：指纹只折段内前 32 个或末 32 个写的
+    /// 在它上面照绿（攻方量过，`research/prompts/m3-formal-code-b26-r1-opus-model/out/f3.txt`）。
+    /// b24 已是最后一轮，只加宽取样：段长 1024、只扣一个写的取样对更长的段、扣得更多的子集罩不罩得住没人攻过，剩下的漏形记在 b24 那笔欠账里。
+    /// 判别力：指纹只折段内前 32 个写（`crates/mutations.tsv` 一行）时扣下第 32 个写之后哪一个都撞成一个种子，这一条红。
+    #[test]
+    fn first_crash_states_of_a_segment_of_one_thousand_twenty_four_writes_withholding_one_write_anywhere_seed_their_second_crashes_differently(
+    ) {
+        const WRITES_OF_THE_SEGMENT: usize = 1024;
+        let seeds: Vec<SecondCrashPointSeed> = (0..WRITES_OF_THE_SEGMENT)
+            .map(|withheld| {
+                seed_of_the_second_crash_points(
+                    HistorySeed(0),
+                    &CrashPoint {
+                        segment_index: 16,
+                        persisted_within_the_segment: (0..WRITES_OF_THE_SEGMENT)
+                            .map(|write_within_the_segment| write_within_the_segment != withheld)
+                            .collect(),
+                        step: StepPosition::Operation(0),
+                        operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+                    },
+                )
+            })
+            .collect();
+        let distinct_seeds: BTreeSet<SecondCrashPointSeed> = seeds.iter().copied().collect();
+        assert_eq!(
+            distinct_seeds.len(),
+            WRITES_OF_THE_SEGMENT,
+            "历史种子 0、段号 16、长 1024 的段上扣下一个写的 1024 个第一次崩溃态算出的二次崩溃种子两两不同"
+        );
+    }
+
+    /// 实例表清扫两段（D18（块里携带什么信息） 已定项 11「回收」一条）：挂载那一段的写里，第「清扫之前发了几次」个根槽写之后起是清扫抹头
+    /// （FUA 写零的单元头、每块盘一道屏障），之后第一个不带 FUA 的单元写起是清扫发布（单元、屏障、记录、根槽、轮换），两段摆二次崩溃时各摆到一个。
+    /// 造的写表：取号；写行那次（单元、记录、根槽、轮换）；一次暖机（单元、根槽）；抹两个头、两道屏障；清扫发布——清扫之前发了 2 次。
+    /// 判别力：`WritableMountPhase::ALL` 里没有这两段时一个二次崩溃都摆不到；不按 FUA 分开时清扫发布的写归抹头。
+    #[test]
+    fn the_writes_of_the_instance_table_sweep_split_into_erasing_heads_and_the_sweep_publish_and_each_gets_a_second_crash_point(
+    ) {
+        let write_of = |kind: StepKind, is_force_unit_access: bool| RetainedWrite {
+            device: DeviceIdentity(0),
+            kind,
+            is_force_unit_access,
+            offset: DeviceOffsetInBytes(0),
+            contents: singlefs_harness::memory_pool::WrittenContents::Bytes(vec![0; 512]),
+        };
+        let writes = vec![
+            write_of(StepKind::SystemConfigurationSlot, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::JournalRecord, false),
+            write_of(StepKind::RootRecordFua, true),
+            write_of(StepKind::SystemConfigurationSlot, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::RootRecordFua, true),
+            write_of(StepKind::UnitWrite, true),
+            write_of(StepKind::UnitWrite, true),
+            write_of(StepKind::Barrier, false),
+            write_of(StepKind::Barrier, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::Barrier, false),
+            write_of(StepKind::JournalRecord, false),
+            write_of(StepKind::RootRecordFua, true),
+            write_of(StepKind::SystemConfigurationSlot, false),
+        ];
+        let phases = writable_mount_phase_of_each_write(&writes, None, Some(2));
+        assert_eq!(
+            phases[7..],
+            [
+                WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep,
+                WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep,
+                WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep,
+                WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+            ],
+            "抹两个头与两道屏障归抹头，清扫发布从它第一个不带 FUA 的单元写起"
+        );
+        assert_eq!(
+            phases[..7],
+            [
+                WritableMountPhase::Acquisition,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::WarmUp,
+                WritableMountPhase::WarmUp,
+            ],
+            "清扫之前那几段照旧"
+        );
+        let crash_point = CrashPoint {
+            segment_index: 0,
+            persisted_within_the_segment: vec![false],
+            step: StepPosition::StartingPoint,
+            operation_kind: None,
+        };
+        let one_write_per_segment: Vec<Vec<usize>> = (0..writes.len())
+            .map(|write_index| vec![write_index])
+            .collect();
+        let second_crash_points = draw_second_crash_points(
+            HistorySeed(7),
+            &crash_point,
+            &one_write_per_segment,
+            &phases,
+        );
+        for phase in [
+            WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep,
+            WritableMountPhase::InstanceTableSweepPublish,
+        ] {
+            assert_eq!(
+                second_crash_points
+                    .iter()
+                    .filter(|point| point.phase == phase)
+                    .count(),
+                1,
+                "{} 那一段摆一个二次崩溃：{second_crash_points:?}",
+                phase.name()
+            );
+        }
+    }
+
+    /// 清扫一个头都没抹（只删行）：清扫之前最后一次发布的轮换之后，第一个写就是清扫发布的单元写，抹头那一段一个写都没有。
+    /// 把清扫发布的第一个写记进抹头那一段的，二次崩溃会说崩在了没写过一个字节的抹头里（假绿）。
+    #[test]
+    fn a_sweep_that_erased_no_head_puts_every_write_after_the_last_publish_before_it_into_the_sweep_publish(
+    ) {
+        let write_of = |kind: StepKind, is_force_unit_access: bool| RetainedWrite {
+            device: DeviceIdentity(0),
+            kind,
+            is_force_unit_access,
+            offset: DeviceOffsetInBytes(0),
+            contents: singlefs_harness::memory_pool::WrittenContents::Bytes(vec![0; 512]),
+        };
+        let writes = vec![
+            write_of(StepKind::SystemConfigurationSlot, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::JournalRecord, false),
+            write_of(StepKind::RootRecordFua, true),
+            write_of(StepKind::SystemConfigurationSlot, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::UnitWrite, false),
+            write_of(StepKind::JournalRecord, false),
+            write_of(StepKind::RootRecordFua, true),
+            write_of(StepKind::SystemConfigurationSlot, false),
+        ];
+        let phases = writable_mount_phase_of_each_write(&writes, None, Some(1));
+        assert_eq!(
+            phases,
+            [
+                WritableMountPhase::Acquisition,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::RowPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+                WritableMountPhase::InstanceTableSweepPublish,
+            ],
+            "写行那次的轮换之后没有 FUA 写零：清扫发布从它第一个单元写起，抹头那一段是空的"
         );
     }
 
@@ -4120,6 +5477,7 @@ mod tests {
                     &[row_publish, warm_up, continuation_step.clone()],
                     std::slice::from_ref(&continuation_step),
                 ),
+                None,
             );
         assert_eq!(
             phases_of_a_mount_that_failed_in_the_second_continuation_step[5..],
@@ -4247,10 +5605,186 @@ mod tests {
         );
     }
 
+    /// unlink 之后再建过 inode 的一版归带文件的一版、第一个文件那条记录不在（删除与并发那条线读码诊断；攻方随机历史种子 32768、245760 两段那一形，
+    /// 判决 `research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节「越出攻击面」那一行）：第一个文件之后 unlink 它、再建一个 inode，
+    /// 崩在建 inode 那次发布里——根槽落了、紧跟着的系统配置轮换没落，只读恢复落在建 inode 那一版（这段历史最后提交的一版）。
+    /// 崩溃后镜像上的可写挂载做成，之后那一次发布建一个 inode、做成，第二截没有新发现；发布之后那份盘只读挂载读回的 inode 记录是崩溃那一版的
+    /// 每一条原样加新建的那一条，新建那一条整条等于第二截那一支的调法该写出的（改法 a，`research/prompts/m3-formal-code-b20-r1-main-verification.md`
+    /// 第二节 K2 H1；比整条是改法 A1，`research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节「K2 改法 a 判别力」与第三节第 2 条）。
+    /// 判别力：带文件那一臂改回「一律覆盖写」（`crates/mutations.tsv` 一行），覆盖写被拒成写一个不在树里的 inode 1，计一次发布被拒、
+    /// 记一条第二截的新发现，这一条红；那一臂建 0 个 inode、新建那一条 nlink = 0、出生代取上一版、size 4096、写入时间 0
+    /// （`crates/mutations.tsv` 各一行；攻方量过后四种池级 checker 照样绿，`research/prompts/m3-formal-code-b21-r1-opus-model/out/k2a.txt`），
+    /// 红在比整条记录那一条。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个崩溃态（ExactlyOneCrashState），不枚举
+    #[test]
+    fn the_publish_after_a_writable_mount_on_a_version_created_after_the_first_file_was_unlinked_creates_an_inode_and_is_published(
+    ) {
+        use singlefs_core::records::{InodeRecord, NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES};
+        use singlefs_core::transaction::FIRST_INODE_NUMBER;
+        use singlefs_harness::history::{HistoryDeviceWidth, PerStepChecker};
+        let execution = HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        };
+        let history = GeneratedHistory {
+            seed: HistorySeed(0),
+            starting_point: HistoryStartingPoint::AfterFirstFile,
+            operations: vec![HistoryOperation::Unlink, HistoryOperation::CreateInode],
+        };
+        let stream = SharedStream::retaining_contents();
+        let mut operations_after_the_unlink = None;
+        let run = execute_history_with(&history, execution, &stream, &mut |observation| {
+            if observation.position == StepPosition::Operation(0) {
+                operations_after_the_unlink = Some(stream.operation_count());
+            }
+        });
+        assert_eq!(
+            run.ending,
+            HistoryEnding::Completed,
+            "前提：unlink 与建 inode 都跑完"
+        );
+        let operations_after_the_unlink =
+            operations_after_the_unlink.expect("unlink 那一步跑完时登记过一次");
+        let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+            &stream.retained_operations(),
+            &execution.device_width.fixed_geometry(),
+        );
+        let root_of_the_inode_creation = (0..writes.len())
+            .rev()
+            .find(|write| {
+                stream_indexes[*write] >= operations_after_the_unlink
+                    && writes[*write].kind == StepKind::RootRecordFua
+            })
+            .expect("前提：建 inode 那次发布写了根槽");
+        assert_eq!(
+            writes
+                .get(root_of_the_inode_creation + 1)
+                .map(|write| write.kind),
+            Some(StepKind::SystemConfigurationSlot),
+            "前提：建 inode 那次发布的根槽 FUA 之后紧跟着轮换系统配置"
+        );
+        let segment_of_the_root =
+            segment_containing_the_write(&segments, root_of_the_inode_creation);
+        let first_write_of_the_segment = segments[segment_of_the_root][0];
+        let injection = inject_crashes_into_history(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: segment_of_the_root,
+                writes_from_the_segment_on: root_of_the_inode_creation + 2
+                    - first_write_of_the_segment,
+                withheld_among_them: vec![
+                    root_of_the_inode_creation + 1 - first_write_of_the_segment,
+                ]
+                .leak(),
+            },
+            None,
+        );
+        let tally = &injection.tally;
+        assert_eq!(
+            injection
+                .crash_points
+                .iter()
+                .map(|crash_point| crash_point.operation_kind)
+                .collect::<Vec<_>>(),
+            [Some(HistoryOperationKind::CreateInode)],
+            "前提：只摆写死的那一个崩溃态，崩在建 inode 那次发布里"
+        );
+        assert_eq!(
+            tally.crash_points_that_land_before_the_last_committed_version,
+            0,
+            "前提：建 inode 那次发布的根落了，崩溃态落在这段历史最后提交的那一版上：{}",
+            tally.render()
+        );
+        assert_eq!(
+            tally.writable_mounts_after_the_crash_succeeded,
+            1,
+            "前提：崩溃后镜像上的可写挂载做成：{}",
+            tally.render()
+        );
+        let findings_after_the_writable_mount: Vec<String> = injection
+            .new_findings
+            .iter()
+            .filter(|finding| finding.stage == CrashStateStage::AfterTheWritableMountAndOnePublish)
+            .map(CrashPointFinding::render)
+            .collect();
+        assert_eq!(
+            (
+                tally.publishes_after_the_writable_mount,
+                tally.publishes_after_the_writable_mount_refused
+            ),
+            (1, 0),
+            "第一个文件已删完的带文件一版上，挂载之后那一次发布建一个 inode、做成：{findings_after_the_writable_mount:?}"
+        );
+        assert!(
+            findings_after_the_writable_mount.is_empty(),
+            "第二截没有新发现：{findings_after_the_writable_mount:?}"
+        );
+        // 崩溃态是写表前缀到建 inode 那次的根槽为止（段内摆到 root + 1、扣下 root + 1，之后一个都没落），在同一份盘面上照第二截那一种调法
+        // 再挂一次加一次发布，比发布之后那份池与崩溃那一份上只读挂载读回的 inode 号。
+        let mut crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        crash_image.apply_writes(&writes[..=root_of_the_inode_creation]);
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &crash_image,
+            &execution.device_width.parameters(),
+            execution,
+            history.seed,
+            &injection.crash_points[0],
+        );
+        assert!(
+            matches!(mount_run.outcome, WritableMountOutcome::Published),
+            "前提：同一份盘面上再挂一次加一次发布，照样做成：{:?}",
+            mount_run.outcome
+        );
+        let read_only_mount = |pool: &MemoryPool| {
+            singlefs_core::mounted_read::mount_read_only(pool)
+                .expect("崩溃那一版与发布之后那一版都是整次落盘的版本，只读挂载做得成")
+        };
+        let crashed_version = read_only_mount(&crash_image);
+        let version_after_the_publish = read_only_mount(&mount_run.pool_after);
+        // 第一个文件取 1 号（已删完），unlink 之后历史里建的那一个取 2 号：崩溃那一版树里只剩 2 号，inode 号水位 3。
+        assert_eq!(
+            crashed_version
+                .mounted
+                .inode_records()
+                .iter()
+                .map(|record| record.inode)
+                .collect::<Vec<_>>(),
+            [FIRST_INODE_NUMBER + 1],
+            "前提：崩溃那一版树里只剩历史里建的那一个 inode"
+        );
+        // 照第二截那一支的调法 `publish_new_inodes(…, 1, FIXED_WRITE_TIME_SECONDS, 挂载的实例)` 该写出的那一条：号从水位 3 起发，
+        // 对象出生代与改动计数都是这次发布的 checkpoint_txg（发布之后那一版的根），活着（nlink = 1），长度 0（blocks 由 size 现算，跟着是 0）。
+        let txg_of_the_publish = version_after_the_publish.effective_root.checkpoint_txg;
+        let mut expected_records_after_the_publish =
+            crashed_version.mounted.inode_records().to_vec();
+        expected_records_after_the_publish.push(InodeRecord {
+            inode: FIRST_INODE_NUMBER + 2,
+            object_birth: txg_of_the_publish,
+            nlink: NLINK_OF_A_LIVE_INODE_WITHOUT_DIRECTORIES,
+            size: 0,
+            change_count: txg_of_the_publish.0,
+            write_time_seconds: FIXED_WRITE_TIME_SECONDS,
+        });
+        assert_eq!(
+            version_after_the_publish.mounted.inode_records(),
+            expected_records_after_the_publish.as_slice(),
+            "发布之后只读挂载读回的 inode 记录 = 崩溃那一版的每一条原样 + 新建的那一条（号、出生代、nlink、size、改动计数、写入时间逐个对上）"
+        );
+    }
+
     /// 挂载每一段都摆得到二次崩溃的两段历史（U4，`research/prompts/m3-unlink-code-r1-main-verification.md` 第三节）：从第一个文件起的
     /// 随机一段（起点就是攻方 `research/prompts/m3-inv-a-r1-opus-output.md` 一·2 的「新池新建文件做完的镜像」），与第一个文件之后经挂着的会话
     /// unlink 它的一段（意图那次 + 最后一批：崩溃状态有落在意图那一版上的，那一版上的可写挂载续做、写出续做那一段，
-    /// 之后那一次发布落在删完那一版上）。两段同一种摆法（短段整段枚举），计数并在一起。
+    /// 之后那一次发布落在删完那一版上）。两段同一种摆法（短段整段枚举），计数并在一起。再并上一段崩溃后那次可写挂载删得了行的历史
+    /// （[`inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row`]，有一行就扫）：
+    /// 清扫发布那一段从它来；那段历史上没有孤儿、一个头都不抹。最后并上一段留下实例 1 的孤儿再把实例 1 的根全轮出根环的历史
+    /// （[`inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans`]，同一种摆法）：
+    /// 抹头那一段从它来。
     fn crash_injections_into_histories_reaching_every_mount_phase(
     ) -> (CrashInjectionTally, Vec<HistoryCrashInjection>) {
         let histories = [
@@ -4265,7 +5799,7 @@ mod tests {
                 operations: vec![HistoryOperation::Unlink],
             },
         ];
-        let injections: Vec<HistoryCrashInjection> = histories
+        let mut injections: Vec<HistoryCrashInjection> = histories
             .iter()
             .map(|history| {
                 inject_crashes_into_history(
@@ -4279,11 +5813,169 @@ mod tests {
                 )
             })
             .collect();
+        injections.push(
+            inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
+                HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            ),
+        );
+        injections.push(
+            inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans(
+                HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            ),
+        );
         let mut tally = CrashInjectionTally::default();
         for injection in &injections {
             tally.absorb(&injection.tally);
         }
         (tally, injections)
+    }
+
+    /// 崩溃后那次可写挂载末尾的清扫发布删了行（C704（挂载透明不认清扫发布） 的验收）：挂载做成、删了实例 1 那一行、一个头都没抹；
+    /// 只挂载与挂载加一次发布两个比法拿到的 R2 都是清扫发布那一版，实例表行那一样把删的行放回去再比，挂载透明一样都没红；
+    /// 清扫发布那一段摆了二次崩溃，再挂判了 I-8.4、挂载透明判了；抹头那一段一个二次崩溃都没摆（没抹头时那一段一个写都没有）；
+    /// 一条新发现都没有。判别力：挂载透明不放回删的行时只挂载那一个比法判红（`crates/mutations.tsv` 里点名这条的行）。
+    #[test]
+    fn a_writable_mount_after_the_crash_whose_sweep_publish_deletes_a_row_is_judged_in_the_sweep_publish_phase_without_a_red_field(
+    ) {
+        let injection =
+            inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_deletes_an_instance_table_row(
+                HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            );
+        let tally = &injection.tally;
+        let rendered = tally.render();
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.publishes_after_the_writable_mount
+            ),
+            (1, 1, 1),
+            "前提：摆了一个崩溃状态，那次可写挂载与之后那一次发布都做成：{rendered}"
+        );
+        assert_eq!(
+            (
+                tally.writable_mounts_after_the_crash_deleting_instance_table_rows,
+                tally.heads_erased_by_the_instance_table_sweep_after_the_crash
+            ),
+            (1, 0),
+            "前提：那次挂载末尾的清扫发布删了行、一个头都没抹（这段历史每次发布都做完了，没有孤儿）：{rendered}"
+        );
+        assert_eq!(
+            tally.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back, 2,
+            "只挂载与挂载加一次发布两个比法拿到的 R2 都是清扫发布那一版，各放回一次删的行再比：{rendered}"
+        );
+        let phase_count = |counts: &BTreeMap<WritableMountPhase, u64>, phase| {
+            counts.get(&phase).copied().unwrap_or(0)
+        };
+        assert_eq!(
+            phase_count(
+                &tally.second_crash_points_by_phase,
+                WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep
+            ),
+            0,
+            "一个头都没抹时抹头那一段一个写都没有，不摆二次崩溃：{rendered}"
+        );
+        for (what, counts) in [
+            ("摆了二次崩溃", &tally.second_crash_points_by_phase),
+            ("再挂判了 I-8.4", &tally.remount_idempotence_judged_by_phase),
+            (
+                "判了挂载透明",
+                &tally.mount_transparency_judged_on_second_crashes_by_phase,
+            ),
+        ] {
+            assert!(
+                phase_count(counts, WritableMountPhase::InstanceTableSweepPublish) >= 1,
+                "清扫发布那一段{what}：{rendered}"
+            );
+        }
+        assert!(
+            tally.mount_transparency_violations_by_field.is_empty(),
+            "挂载透明判红的字段 {:?}：{}",
+            tally.mount_transparency_violations_by_field,
+            injection
+                .new_findings
+                .iter()
+                .map(CrashPointFinding::render)
+                .collect::<String>()
+        );
+        assert_eq!(
+            tally.remounts_after_a_second_crash_reading_different_content, 0,
+            "二次崩溃之后再挂读出的内容与没崩过的那一次不同：{rendered}"
+        );
+        assert!(
+            injection.new_findings.is_empty(),
+            "新发现：{}",
+            injection
+                .new_findings
+                .iter()
+                .map(CrashPointFinding::render)
+                .collect::<String>()
+        );
+    }
+
+    /// 崩溃后那次可写挂载末尾的清扫先抹孤儿的头、再发清扫发布删行（D18（块里携带什么信息） 已定项 11「回收」一条，抹头那一段）：
+    /// 挂载做成、删了行、抹了至少一个头；抹头那一段摆了二次崩溃、再挂判了 I-8.4、判了挂载透明；挂载透明一样都没红、二次崩溃之后再挂
+    /// 读出的内容与没崩过的那一次相同、一条新发现都没有。判别力：历史开头那次覆盖写掉电不截写（`singlefs_harness::history` 里
+    /// 掉电那一截的判法）时盘上没有孤儿，「抹了至少一个头」那条先红。
+    #[test]
+    fn a_writable_mount_after_the_crash_whose_sweep_erases_heads_of_orphans_is_judged_in_the_erasing_phase_without_a_red_field(
+    ) {
+        let injection =
+            inject_a_crash_at_the_start_of_the_last_step_of_the_history_whose_mount_erases_heads_of_orphans(
+                HistoryExecution::CHECKED_ON_FOUR_GIBIBYTE_DEVICES,
+            );
+        let tally = &injection.tally;
+        let rendered = tally.render();
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.writable_mounts_after_the_crash_deleting_instance_table_rows
+            ),
+            (1, 1, 1),
+            "前提：摆了一个崩溃状态，那次可写挂载做成、末尾的清扫发布删了行：{rendered}"
+        );
+        assert!(
+            tally.heads_erased_by_the_instance_table_sweep_after_the_crash >= 1,
+            "前提：那次挂载末尾的清扫抹了孤儿的头：{rendered}"
+        );
+        let phase_count = |counts: &BTreeMap<WritableMountPhase, u64>, phase| {
+            counts.get(&phase).copied().unwrap_or(0)
+        };
+        for (what, counts) in [
+            ("摆了二次崩溃", &tally.second_crash_points_by_phase),
+            ("再挂判了 I-8.4", &tally.remount_idempotence_judged_by_phase),
+            (
+                "判了挂载透明",
+                &tally.mount_transparency_judged_on_second_crashes_by_phase,
+            ),
+        ] {
+            assert!(
+                phase_count(
+                    counts,
+                    WritableMountPhase::ErasingHeadsOfTheInstanceTableSweep
+                ) >= 1,
+                "抹头那一段{what}：{rendered}"
+            );
+        }
+        assert!(
+            tally.mount_transparency_violations_by_field.is_empty(),
+            "挂载透明判红的字段 {:?}：{rendered}",
+            tally.mount_transparency_violations_by_field
+        );
+        assert_eq!(
+            tally.remounts_after_a_second_crash_reading_different_content, 0,
+            "二次崩溃之后再挂读出的内容与没崩过的那一次不同：{rendered}"
+        );
+        assert!(
+            injection.new_findings.is_empty(),
+            "新发现：{}",
+            injection
+                .new_findings
+                .iter()
+                .map(CrashPointFinding::render)
+                .collect::<String>()
+        );
     }
 
     /// I-8.4 的 R-换 在真的二次崩溃上不误红：两段历史（[`crash_injections_into_histories_reaching_every_mount_phase`]），
@@ -4409,9 +6101,7 @@ mod tests {
     /// 关掉空间准入跑第一个文件之后重挂与 12 次覆盖写，再判准入挂载一次。
     #[test]
     fn the_writable_mount_on_a_crash_image_names_the_first_floor_raise_write_after_the_warm_up() {
-        use singlefs_harness::history::{
-            ContentChoice, ContentLength, HistoryDeviceWidth, PerStepChecker,
-        };
+        use singlefs_harness::history::{HistoryDeviceWidth, PerStepChecker};
         let width = HistoryDeviceWidth::UnitAreaOf256Slots;
         let mut operations = vec![HistoryOperation::CloseAndMountWritable];
         operations.extend(std::iter::repeat_n(
@@ -5011,6 +6701,29 @@ mod tests {
         );
     }
 
+    /// 读故障认定拿的崩溃窗口末尾（攻方改法 F5，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节 K2）：
+    /// 写表 6 个写落在录制流第 0、1、3、4、6、9 步（第 2、5、7、8 步是屏障）。从写表第 2 个写起数 3 个，窗口末尾是写表第 4 个写、
+    /// 录制流第 6 步——交出去的是 6，不是写表下标 4；窗口越到写表末尾、只有一个写时同样按录制流下标交。
+    #[test]
+    fn the_end_of_a_crash_window_is_named_by_its_stream_index_and_not_by_its_write_index() {
+        let stream_indexes = [0, 1, 3, 4, 6, 9];
+        assert_eq!(
+            stream_index_of_the_last_write_of_the_crash_window(&stream_indexes, 2, 3),
+            6,
+            "写表第 2、3、4 个写，末尾那个在录制流第 6 步"
+        );
+        assert_eq!(
+            stream_index_of_the_last_write_of_the_crash_window(&stream_indexes, 4, 2),
+            9,
+            "窗口越到写表末尾：写表第 5 个写在录制流第 9 步"
+        );
+        assert_eq!(
+            stream_index_of_the_last_write_of_the_crash_window(&stream_indexes, 3, 1),
+            4,
+            "窗口只有写表第 3 个写：录制流第 4 步"
+        );
+    }
+
     /// C670：「崩溃恢复抛弃根」那一步一个都没往录制流里发（取号之前就拒了），盘面与没走这一步的历史一样：之后的崩溃态都不算注入过读故障。
     #[test]
     fn an_abandoning_recovery_that_sent_nothing_leaves_every_crash_state_without_read_faults() {
@@ -5106,11 +6819,407 @@ mod tests {
         );
     }
 
+    /// 每块盘最新那一槽系统配置读回全 0 时的可写挂载（C696（崩溃注入的读故障一支在随机历史里从没触发））。
+    const NEWEST_SYSTEM_CONFIGURATION_SLOT_ZEROS_MOUNT: HistoryOperationKind =
+        HistoryOperationKind::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros;
+
+    /// 单元区 384 槽的小盘、不逐步跑 checker（设计调查量读故障那一支用的那一档）。
+    fn execution_on_384_slot_devices_without_the_per_step_checker() -> HistoryExecution {
+        use singlefs_harness::history::{HistoryDeviceWidth, PerStepChecker};
+        HistoryExecution {
+            per_step_checker: PerStepChecker::Skipped,
+            device_width: HistoryDeviceWidth::UnitAreaOf384Slots,
+            space_admission: SpaceAdmission::JudgedByTheFormula,
+        }
+    }
+
+    /// C696 判别力（用户定「步表加一条靶向用例」之下的步表那一半；设计调查报告第三节：候选「丁」之下 2676 个注入段里 614 段按写表下标会被认成没注入）：
+    /// 比重取 `GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS`，从这个测试周期的种子基起取前 4 段「每块盘最新那一槽
+    /// 系统配置读回全 0 的可写挂载」往录制流里发过东西的历史（每段 24 步），每段按种子抽 16 个崩溃状态。用例自己再跑一遍同一段历史，照录制流下标
+    /// 独立数「崩溃窗口末尾那个写（录制流下标）之前那一步发过东西」的崩溃状态，崩溃注入的计数（`crash_points_after_a_step_reading_under_injected_faults`）
+    /// 要与它相等；另核这批崩溃状态里按录制流下标算注入过、按写表下标算没注入的至少一个（F5 那一种接错在这批上改得了计数），注入过的至少一个。
+    /// 判别力：读故障认定的崩溃窗口末尾交成写表下标（F5，`crates/mutations.tsv` 一行）时计数少了按写表下标认成没注入的那几个；认定函数恒交
+    /// NoneInjected（一行）时计数是 0——两种都与独立数的不等，这一条红。
+    #[test]
+    fn crash_states_after_a_newest_system_configuration_slot_zeros_mount_count_as_read_faulted_by_the_stream_index_of_the_crash_window(
+    ) {
+        use singlefs_harness::history::SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE;
+        const HISTORIES: usize = 4;
+        const OPERATIONS_PER_HISTORY: usize = 24;
+        const SEEDS_SEARCHED: u64 = 64;
+        let execution = execution_on_384_slot_devices_without_the_per_step_checker();
+        let mut histories_taken = 0usize;
+        let mut counted_by_the_injection = 0u64;
+        let mut read_faulted_by_the_stream_index = 0u64;
+        let mut read_faulted_by_the_stream_index_but_not_by_the_write_index = 0u64;
+        // 迭代上界是 SEEDS_SEARCHED 个种子；跨轮携带的是四样计数；取够 HISTORIES 段就停。
+        for seed_offset in 0..SEEDS_SEARCHED {
+            if histories_taken == HISTORIES {
+                break;
+            }
+            let history = generate_history_with_weights(
+                HistorySeed(SEED_BASE_DRAWN_FOR_THIS_TEST_CYCLE + seed_offset),
+                OPERATIONS_PER_HISTORY,
+                &GenerationWeights::NEWEST_SYSTEM_CONFIGURATION_SLOT_OF_EACH_DEVICE_READING_ZEROS,
+            );
+            let stream = SharedStream::retaining_contents();
+            let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
+            execute_history_with(&history, execution, &stream, &mut |observation| {
+                operations_after_each_step.push((observation.position, stream.operation_count()));
+            });
+            // 读故障下发过东西的那几步各自的第一个录制流下标。
+            let mut operations_before_the_step = 0usize;
+            let mut first_stream_index_of_each_read_faulted_step: Vec<usize> = Vec::new();
+            for (position, operations_after_the_step) in &operations_after_each_step {
+                if let StepPosition::Operation(step_index) = position {
+                    if history.operations[*step_index].kind()
+                        == NEWEST_SYSTEM_CONFIGURATION_SLOT_ZEROS_MOUNT
+                        && operations_before_the_step < *operations_after_the_step
+                    {
+                        first_stream_index_of_each_read_faulted_step
+                            .push(operations_before_the_step);
+                    }
+                }
+                operations_before_the_step = *operations_after_the_step;
+            }
+            if first_stream_index_of_each_read_faulted_step.is_empty() {
+                continue;
+            }
+            let (_writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+                &stream.retained_operations(),
+                &execution.device_width.fixed_geometry(),
+            );
+            let read_faulted_by_the_end_of_the_window = |last_index_of_the_window: usize| {
+                first_stream_index_of_each_read_faulted_step
+                    .iter()
+                    .any(|first_stream_index| *first_stream_index <= last_index_of_the_window)
+            };
+            let injection = inject_crashes_into_history(
+                &history,
+                execution,
+                CrashPointDraw::Sampled {
+                    crash_points_per_history: 16,
+                },
+                None,
+            );
+            for crash_point in &injection.crash_points {
+                let last_write_of_the_window = segments[crash_point.segment_index][0]
+                    + crash_point.persisted_within_the_segment.len()
+                    - 1;
+                if read_faulted_by_the_end_of_the_window(stream_indexes[last_write_of_the_window]) {
+                    read_faulted_by_the_stream_index += 1;
+                    if !read_faulted_by_the_end_of_the_window(last_write_of_the_window) {
+                        read_faulted_by_the_stream_index_but_not_by_the_write_index += 1;
+                    }
+                }
+            }
+            counted_by_the_injection += injection
+                .tally
+                .crash_points_after_a_step_reading_under_injected_faults;
+            histories_taken += 1;
+        }
+        assert_eq!(
+            histories_taken, HISTORIES,
+            "前提：种子基起 {SEEDS_SEARCHED} 段里有 {HISTORIES} 段的那一步往录制流里发过东西"
+        );
+        assert!(
+            read_faulted_by_the_stream_index >= 1,
+            "前提：抽到的崩溃状态里至少一个在那一步发过东西之后"
+        );
+        assert!(
+            read_faulted_by_the_stream_index_but_not_by_the_write_index >= 1,
+            "前提：至少一个崩溃状态按录制流下标算注入过、按写表下标算没注入（F5 那一种接错在这批上改得了计数）"
+        );
+        assert_eq!(
+            counted_by_the_injection, read_faulted_by_the_stream_index,
+            "崩溃注入认定的注入过读故障的崩溃状态数，与按录制流下标独立数的相等（其中 {read_faulted_by_the_stream_index_but_not_by_the_write_index} 个按写表下标会认成没注入）"
+        );
+    }
+
+    /// 起点（取号、暖机、第一个文件）之后：一次「每块盘最新那一槽系统配置读回全 0 的可写挂载」（读故障下发写，C696），再一次覆盖写。
+    fn history_of_a_newest_system_configuration_slot_zeros_mount_and_one_overwrite(
+    ) -> GeneratedHistory {
+        use singlefs_harness::history::{ContentChoice, ContentLength};
+        GeneratedHistory {
+            seed: HistorySeed(0),
+            starting_point: HistoryStartingPoint::AfterFirstFile,
+            operations: vec![
+                HistoryOperation::WritableMountWithTheNewestSystemConfigurationSlotOfEachDeviceReadingZeros,
+                HistoryOperation::PublishOverwrite(ContentChoice {
+                    length: ContentLength::InsideOneDataUnit { selector: 0 },
+                    fill_seed: 1,
+                }),
+            ],
+        }
+    }
+
+    /// 那段历史的写表与切段（与 [`inject_crashes_into_history`] 自己切的同一份），覆盖写那次发布的第一个写在写表里的下标；
+    /// 另核读回全 0 的那次可写挂载往录制流里发过东西、两步都做成。
+    fn writes_segments_and_first_write_of_the_overwrite_after_the_zeros_mount(
+        history: &GeneratedHistory,
+        execution: HistoryExecution,
+    ) -> (Vec<RetainedWrite>, Vec<Vec<usize>>, usize) {
+        let stream = SharedStream::retaining_contents();
+        let mut operations_after_each_step: Vec<(StepPosition, usize)> = Vec::new();
+        let run = execute_history_with(history, execution, &stream, &mut |observation| {
+            operations_after_each_step.push((observation.position, stream.operation_count()));
+        });
+        assert_eq!(run.ending, HistoryEnding::Completed, "前提：这段历史跑完");
+        let [(StepPosition::StartingPoint, after_the_starting_point), (StepPosition::Operation(0), after_the_zeros_mount), (StepPosition::Operation(1), _)] =
+            operations_after_each_step[..]
+        else {
+            panic!("前提：起点与两步各登记一次：{operations_after_each_step:?}");
+        };
+        assert!(
+            after_the_starting_point < after_the_zeros_mount,
+            "前提：读回全 0 的那次可写挂载往录制流里发过东西（取号、写行、暖机）"
+        );
+        let (writes, segments, stream_indexes) = writes_and_segments_with_stream_indexes(
+            &stream.retained_operations(),
+            &execution.device_width.fixed_geometry(),
+        );
+        let first_write_of_the_overwrite = stream_indexes
+            .iter()
+            .position(|stream_index| *stream_index >= after_the_zeros_mount)
+            .expect("覆盖写那次发布写过东西");
+        (writes, segments, first_write_of_the_overwrite)
+    }
+
+    /// C696 与 D13（验证路线） 已定项 1 挂载透明的射程（只管不带故障的状态）：第一次崩溃摆在覆盖写那次发布的第一个写上（它一个写都没落，
+    /// 盘面停在读回全 0 的那次可写挂载做成之后），这个态注入过读故障，崩溃镜像上那一次可写挂载做成，挂载透明整个不判，它途中按段摆的
+    /// 三个二次崩溃也不判（第 28 批 G5），同一理由共记四次没判。
+    /// 判别力（`crates/mutations.tsv` 各一行）：第一次崩溃镜像上照判挂载透明（「第26批 C696 射程」）时没判的那一条理由只剩二次崩溃那 3 次；
+    /// 二次崩溃那一截不看标记、照判（「第28批 G5」）时它是 1；二次崩溃那一截跳过却不记没判（「第33批 G5」）时它也是 1。三种这一条都红。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态（ExactlyOneCrashState），不枚举
+    #[test]
+    fn mount_transparency_is_not_judged_on_a_crash_state_after_a_newest_system_configuration_slot_zeros_mount(
+    ) {
+        let history = history_of_a_newest_system_configuration_slot_zeros_mount_and_one_overwrite();
+        let execution = execution_on_384_slot_devices_without_the_per_step_checker();
+        let (_writes, segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite_after_the_zeros_mount(
+                &history, execution,
+            );
+        let overwrite_segment_index = segments
+            .iter()
+            .position(|segment| segment[0] == first_write_of_the_overwrite)
+            .expect("覆盖写那次发布从一段的第一个写起（它前面是挂载最后那道屏障）");
+        let injection = inject_crashes_into_history(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: overwrite_segment_index,
+                writes_from_the_segment_on: 1,
+                withheld_among_them: &[0],
+            },
+            None,
+        );
+        let tally = &injection.tally;
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.crash_points_after_a_step_reading_under_injected_faults,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.second_crash_points
+            ),
+            (1, 1, 1, 3),
+            "前提：只摆写死的那一个第一次崩溃态，它注入过读故障，它上面的可写挂载做成，挂载途中按段摆了三个二次崩溃：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.mount_transparency_judged.clone(),
+                tally
+                    .mount_transparency_judged_on_second_crashes_by_phase
+                    .clone(),
+                tally
+                    .mount_transparency_not_judged
+                    .get(MOUNT_TRANSPARENCY_NOT_JUDGED_ON_A_READ_FAULTED_CRASH_STATE)
+                    .copied()
+            ),
+            (BTreeMap::new(), BTreeMap::new(), Some(1 + 3)),
+            "注入过读故障的崩溃态上挂载透明一个动作都不判：崩溃镜像上那次挂载记一次，它途中的三个二次崩溃各记一次：{}",
+            tally.render()
+        );
+    }
+
+    /// 「每块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上摆第一次崩溃（注入过读故障的态），第二截那次可写挂载的
+    /// 写行那次发布上摆一个二次崩溃——根槽 FUA 没落、紧跟着的两槽系统配置轮换落了；交回这一趟崩溃注入。两条靶向用例共用这份搭建，各自断言。
+    fn injection_with_a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount(
+    ) -> HistoryCrashInjection {
+        let history = history_of_a_newest_system_configuration_slot_zeros_mount_and_one_overwrite();
+        let execution = execution_on_384_slot_devices_without_the_per_step_checker();
+        let (writes, segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite_after_the_zeros_mount(
+                &history, execution,
+            );
+        let overwrite_segment_index = segments
+            .iter()
+            .position(|segment| segment[0] == first_write_of_the_overwrite)
+            .expect("覆盖写那次发布从一段的第一个写起（它前面是挂载最后那道屏障）");
+        let mut first_crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        first_crash_image.apply_writes(&writes[..first_write_of_the_overwrite]);
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &first_crash_image,
+            &execution.device_width.parameters(),
+            execution,
+            history.seed,
+            &CrashPoint {
+                segment_index: overwrite_segment_index,
+                persisted_within_the_segment: vec![false],
+                step: StepPosition::Operation(1),
+                operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            },
+        );
+        assert!(
+            matches!(mount_run.outcome, WritableMountOutcome::Published),
+            "前提：读回全 0 的那次挂载之后那一版上的可写挂载与之后那一次覆盖写都做成：{:?}",
+            mount_run.outcome
+        );
+        let (mount_writes, mount_segments, _mount_stream_indexes) =
+            writes_and_segments_with_stream_indexes(
+                &mount_run.mount_operations,
+                &execution.device_width.fixed_geometry(),
+            );
+        let phase_of_each_write = writable_mount_phase_of_each_write(
+            &mount_writes,
+            mount_run.publishes_before_the_deletion_queue_continuation,
+            mount_run.publishes_before_the_instance_table_sweep,
+        );
+        let root_of_the_row_publish = (0..mount_writes.len())
+            .find(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::RootRecordFua
+            })
+            .expect("前提：写行那次发布写了根槽");
+        let rotation_after_the_root: Vec<usize> = (root_of_the_row_publish + 1..mount_writes.len())
+            .take_while(|write| mount_writes[*write].kind == StepKind::SystemConfigurationSlot)
+            .collect();
+        assert_eq!(
+            rotation_after_the_root.len(),
+            2,
+            "前提：写行那次发布的根槽 FUA 之后紧跟着每块盘轮换一槽系统配置"
+        );
+        let segment_of_the_root =
+            segment_containing_the_write(&mount_segments, root_of_the_row_publish);
+        let first_write_of_the_segment_of_the_root = mount_segments[segment_of_the_root][0];
+        let last_rotation = rotation_after_the_root[rotation_after_the_root.len() - 1];
+        inject_crashes_into_history_drawing_second_crashes(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: overwrite_segment_index,
+                writes_from_the_segment_on: 1,
+                withheld_among_them: &[0],
+            },
+            SecondCrashPointDraw::ExactlyOneSecondCrashState {
+                segment_index: segment_of_the_root,
+                writes_from_the_segment_on: last_rotation + 1
+                    - first_write_of_the_segment_of_the_root,
+                withheld_among_them: vec![
+                    root_of_the_row_publish - first_write_of_the_segment_of_the_root,
+                ]
+                .leak(),
+            },
+            None,
+        )
+    }
+
+    /// C696「第三截调用点写死成 NoneInjected」那一种接错的靶向用例（用户定「步表加一条靶向用例」；W 为真的阳性对照，造法同
+    /// [`a_second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site`]）：第一次崩溃摆在
+    /// 「每块盘最新那一槽系统配置读回全 0 的可写挂载」之后那次覆盖写的第一个写上（注入过读故障的态），第二截那次可写挂载的写行那次发布上摆一个
+    /// 二次崩溃——根槽 FUA 没落、紧跟着的两槽系统配置轮换落了。二次崩溃镜像上再挂以判据 N-配置 拒、判据复算为真；崩溃态注入过读故障，
+    /// 第三截判过一次、不判 C670 那一条（不合法 0 次、没有新发现）。
+    /// 判别力：第三截调用点把读故障的认定写死成 NoneInjected（`crates/mutations.tsv` 一行）时不合法变 1、报一条新发现，这一条红。
+    /// 随机历史上那一种接错是等价变异（设计调查报告第三节：注入态与第三截二次崩溃态上判据从没为真），等价性留档在
+    /// `crates/singlefs-checker-tier/tests/crash_injection_read_faulted_states_never_hold_the_witness_criterion.rs`。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
+    #[test]
+    fn a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount_is_not_judged_by_c670(
+    ) {
+        let injection =
+            injection_with_a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount();
+        let tally = &injection.tally;
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.crash_points_after_a_step_reading_under_injected_faults,
+                tally.writable_mounts_after_the_crash_succeeded
+            ),
+            (1, 1, 1),
+            "前提：只摆写死的那一个第一次崩溃态，它注入过读故障，它上面的可写挂载做成：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.second_crash_points,
+                tally
+                    .second_crash_points_by_phase
+                    .get(&WritableMountPhase::RowPublish)
+                    .copied()
+            ),
+            (1, Some(1)),
+            "前提：只摆写死的那一个二次崩溃，崩在写行里：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults
+            ),
+            (1, 0),
+            "二次崩溃镜像上再挂以判据 N-配置 拒、判过一次；第一次崩溃那个态注入过读故障，不判 C670 那一条：{:?}",
+            injection
+                .new_findings
+                .iter()
+                .map(CrashPointFinding::render)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// 改法 G5（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2「二次崩溃镜像在注入态下照判（J2-d）」那一行，
+    /// D13（验证路线） 已定项 1「带故障的状态不在射程」）：同上那一份搭建——第一次崩溃那个态注入过读故障，它上面那次可写挂载做成，写行里摆一个
+    /// 二次崩溃。第二截那一次挂载透明不判；那个二次崩溃镜像上的挂载透明也不判，与第二截同一个理由再记一次（共 2 次），按段判过的一次都没有。
+    /// 判别力：二次崩溃那一截不看读故障标记、照判挂载透明（`crates/mutations.tsv` 一行）时按段判过的有写行 1 次、没判的只记 1 次，这一条红。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
+    #[test]
+    fn mount_transparency_is_not_judged_on_a_second_crash_inside_the_mount_on_a_crash_state_after_a_newest_system_configuration_slot_zeros_mount(
+    ) {
+        let injection =
+            injection_with_a_second_crash_where_only_the_rotation_landed_after_a_newest_system_configuration_slot_zeros_mount();
+        let tally = &injection.tally;
+        assert_eq!(
+            (
+                tally.crash_points_after_a_step_reading_under_injected_faults,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.second_crash_points
+            ),
+            (1, 1, 1),
+            "前提：只摆写死的那一个第一次崩溃态（注入过读故障，它上面的可写挂载做成）与那一个二次崩溃：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally
+                    .mount_transparency_judged_on_second_crashes_by_phase
+                    .clone(),
+                tally
+                    .mount_transparency_not_judged
+                    .get(MOUNT_TRANSPARENCY_NOT_JUDGED_ON_A_READ_FAULTED_CRASH_STATE)
+                    .copied()
+            ),
+            (BTreeMap::new(), Some(2)),
+            "注入过读故障的崩溃态上，那次挂载与它途中的二次崩溃都不判挂载透明，按理由各记一次：{}",
+            tally.render()
+        );
+    }
+
     /// 起点（取号、暖机、第一个文件）之后一次覆盖写、不重挂的历史，与跑它用的执行（单元区 384 槽的小盘，不逐步跑 checker）。
     fn history_of_the_first_file_and_one_overwrite() -> (GeneratedHistory, HistoryExecution) {
-        use singlefs_harness::history::{
-            ContentChoice, ContentLength, HistoryDeviceWidth, PerStepChecker,
-        };
+        use singlefs_harness::history::{HistoryDeviceWidth, PerStepChecker};
         (
             GeneratedHistory {
                 seed: HistorySeed(0),
@@ -5182,7 +7291,8 @@ mod tests {
     /// `writable_mount_refusal_on_a_crash_state_without_read_faults.rs` 的造法；越过了根槽 FUA 与轮换的先后，今天的持久顺序下段内真子集摆不出来）。
     /// 历史里没有带读故障的步；第二截的可写挂载以判据 N-配置 拒，盘没变、只读读出在允许集合里，U6 四条都满足，C670 那一条判不合法，计 1。
     /// 判别力：调用点把读故障的认定恒交 `Injected`、第二截换回不判 C670 的旧判官 `judge_writable_mount_refusal`（`crates/mutations.tsv` 两行），
-    /// 这一拒都判成合法，这一条红。harness 档不许依赖 checker 档，接线在 checker 档，用例只能写在这里。
+    /// 这一拒都判成合法，这一条红；调用点把所选那一版交成 None 时计数照样 (0, 1)，不合法改由「判据复算为假」给出，红在条件那两条断言上
+    /// （攻方改法 F1）。harness 档不许依赖 checker 档，接线在 checker 档，用例只能写在这里。
     // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个崩溃态（ExactlyOneCrashState），不枚举
     #[test]
     fn a_crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash(
@@ -5237,6 +7347,69 @@ mod tests {
             "第二截的可写挂载以判据 N-配置 拒、崩溃态没注入读故障而判据复算为真：拒得不合法，计 1：{}",
             tally.render()
         );
+        // 不合法是哪一条给的（攻方改法 F1，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节 K2）：调用点把所选那一版交成 None 时，
+        // C670 那一条不成立、U6「判据复算为假」那一条顶上来，计数照样是 (0, 1)；只有看判官列出的没满足的条件才分得开。
+        let conditions_not_met = conditions_not_met_named_by_the_one_illegal_writable_mount_refusal(
+            &injection.new_findings,
+        );
+        let witness_criterion_true_without_read_faults = format!(
+            "{:?}",
+            RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults(
+                WitnessedCounterBranchThatHolds::WitnessedCounterAboveTheLastRecordOfTheSelectedVersion
+            )
+        )
+        .split('(')
+        .next()
+        .expect("split 至少交回一段")
+        .to_string();
+        let criterion_false_when_recomputed = format!(
+            "{:?}",
+            RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
+        );
+        assert!(
+            conditions_not_met.contains(&witness_criterion_true_without_read_faults),
+            "拒得不合法要由 C670 那一条（{witness_criterion_true_without_read_faults}）给出：判官列出的没满足的条件 {conditions_not_met}"
+        );
+        assert!(
+            !conditions_not_met.contains(&criterion_false_when_recomputed),
+            "判据在崩溃镜像上复算为真（U6 那一条满足），不许列出 {criterion_false_when_recomputed}：判官列出的没满足的条件 {conditions_not_met}"
+        );
+    }
+
+    /// 第二截那一条拒得不合法的发现里，判官列出的没满足的条件（[`judge_the_writable_mount_on_the_crash_image`] 写进实现那一半的
+    /// 「拒得不合法（…）：」那一段，`Vec<RefusalConditionNotMet>` 的 Debug 文本）。
+    ///
+    /// # Panics
+    /// 第二截的新发现不是恰好一条、它没有模型对不上那一半、或那一半里没有「拒得不合法（…）：」那一段。
+    fn conditions_not_met_named_by_the_one_illegal_writable_mount_refusal(
+        new_findings: &[CrashPointFinding],
+    ) -> String {
+        let findings_after_the_writable_mount: Vec<&CrashPointFinding> = new_findings
+            .iter()
+            .filter(|finding| finding.stage == CrashStateStage::AfterTheWritableMountAndOnePublish)
+            .collect();
+        let [finding] = findings_after_the_writable_mount.as_slice() else {
+            panic!(
+                "第二截要恰好一条新发现（那一次拒得不合法）：{:?}",
+                findings_after_the_writable_mount
+                    .iter()
+                    .map(|finding| finding.render())
+                    .collect::<Vec<_>>()
+            );
+        };
+        let implementation_answer = &finding
+            .observation
+            .model_disagreement
+            .as_ref()
+            .unwrap_or_else(|| panic!("拒得不合法记成模型对不上：{}", finding.render()))
+            .implementation_answer;
+        implementation_answer
+            .split_once("拒得不合法（")
+            .and_then(|(_, after)| after.split_once("）："))
+            .map(|(conditions, _)| conditions.to_string())
+            .unwrap_or_else(|| {
+                panic!("实现那一半里没有「拒得不合法（…）：」那一段：{implementation_answer}")
+            })
     }
 
     /// C670 在第三截的判法（攻方改法 P1）：把「只落了覆盖写那次轮换」的盘面当成一个二次崩溃镜像交给第三截，没崩过的那一次挂载做成过（`once` 有内容）。
@@ -5288,6 +7461,7 @@ mod tests {
             },
             &execution.device_width.parameters(),
             execution.space_admission,
+            InstanceTableSweepConfiguration::PRODUCT,
             WritableMountPhase::RowPublish,
             history.seed,
             &crash_point,
@@ -5309,6 +7483,116 @@ mod tests {
             ),
             (1, 1),
             "拒因是判据 N-配置、崩溃态没注入读故障而判据复算为真：判过一次、不合法一次：{}",
+            tally.render()
+        );
+        assert_eq!(
+            findings.known_red_hits.len() + findings.new_findings.len(),
+            1,
+            "第三截记一条：已知红 {:?}，新发现 {:?}",
+            findings.known_red_hits,
+            findings
+                .new_findings
+                .iter()
+                .map(CrashPointFinding::render)
+                .collect::<Vec<_>>()
+        );
+    }
+
+    /// 改法 G4 在第三截的判法（与 C670 那一条同一个接法）：第一个文件之后的盘面上，盘 0 两个系统配置槽各改一个字节（读得出、自证不过，设备不报错），
+    /// 当成一个二次崩溃镜像交给第三截，没崩过的那一次挂载做成过（`once` 有内容）。再挂以「读阶段判完之后系统配置又读不出」拒；崩溃态没注入读故障、
+    /// 那一拒的判据在这份盘面上复算为真（盘 0 一份自证过的系统配置都没有）：I-8.4 照旧记「再挂被拒」不判，G4 那一条判过一次、不合法一次，
+    /// 记一条第三截的发现；判据 N-配置 那两样计数不动。判别力：第三截不认 G4 那一条（`crates/mutations.tsv` 一行），这一条红。
+    #[test]
+    fn a_remount_refused_on_a_second_crash_image_where_device_zero_has_both_system_configuration_slots_torn_is_an_illegal_refusal_after_the_read_stage(
+    ) {
+        /// 撕裂一个系统配置槽时改的那个字节在槽里的位置：槽中间，落在整槽校验和罩着的范围里。
+        const TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT: usize = 2048;
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, _segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite(&history, execution);
+        let mut second_crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        second_crash_image.apply_writes(&writes[..first_write_of_the_overwrite]);
+        let slot_spacing = u64::from(
+            execution
+                .device_width
+                .parameters()
+                .geometry
+                .fixed_structure_slot_spacing,
+        );
+        let slot_bytes = usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES)
+            .expect("系统配置槽 4096 字节装得进 usize");
+        // 迭代上界是一块盘的两个系统配置槽；不跨轮携带状态；没有提前出口。
+        for slot_index in 0..singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
+            let offset = DeviceOffsetInBytes(slot_index * slot_spacing);
+            let mut slot =
+                PoolReader::read(&second_crash_image, DeviceIdentity(0), offset, slot_bytes)
+                    .expect("内存盘上系统配置槽读得出");
+            slot[TORN_BYTE_INSIDE_THE_SYSTEM_CONFIGURATION_SLOT] ^= 0xFF;
+            second_crash_image
+                .devices
+                .get_mut(&DeviceIdentity(0))
+                .expect("池里有盘 0")
+                .write(offset, &slot);
+        }
+        let recovered =
+            read_recovery_fields(&second_crash_image, ComparedVersion::TheRecoveredVersion);
+        let crash_point = CrashPoint {
+            segment_index: 0,
+            persisted_within_the_segment: vec![false],
+            step: StepPosition::StartingPoint,
+            operation_kind: None,
+        };
+        let mut tally = CrashInjectionTally::default();
+        let mut findings = FindingsOfOneHistory {
+            known_red_hits: Vec::new(),
+            new_findings: Vec::new(),
+        };
+        judge_the_remount_after_a_second_crash(
+            &mut tally,
+            &mut findings,
+            &Ok(content_read_by_the_recovery_report(&recovered.report)),
+            &RefusalOnTheCrashImage {
+                crash_image_materialized: &second_crash_image,
+                version_landed_on_after_the_crash: recovered.report.effective_root,
+                read_only_read_back: ReadOnlyReadBackOfTheCrashImage::InsideTheAllowedSet,
+                read_faults: ReadFaultsInTheCrashState::NoneInjected,
+            },
+            &execution.device_width.parameters(),
+            execution.space_admission,
+            InstanceTableSweepConfiguration::PRODUCT,
+            WritableMountPhase::RowPublish,
+            history.seed,
+            &crash_point,
+            None,
+        );
+        assert_eq!(
+            tally
+                .remount_idempotence_not_judged
+                .get(&RemountIdempotenceNotJudged::TheRemountWasRefused)
+                .copied(),
+            Some(1),
+            "前提：再挂被拒，I-8.4 不判：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults
+            ),
+            (0, 0),
+            "前提：拒因不是判据 N-配置：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_system_configuration_unreadable_after_the_read_stage,
+                tally.remount_refusals_with_the_system_configuration_unreadable_criterion_true_without_read_faults
+            ),
+            (1, 1),
+            "拒因是读阶段判完之后系统配置又读不出、崩溃态没注入读故障而判据复算为真：判过一次、不合法一次：{}",
             tally.render()
         );
         assert_eq!(
@@ -5383,6 +7667,647 @@ mod tests {
                 ))
                 .map(CrashPointFinding::render)
                 .collect::<Vec<_>>()
+        );
+    }
+
+    /// C670 在第三截经调用点的判法（攻方改法 F2，`research/prompts/m3-formal-code-b18-r1-main-verification.md` 第二节 K2）：第一个文件之后一次覆盖写的历史，
+    /// 第一次崩溃摆在覆盖写那次发布的第一个写上（它一个写都没落，盘面就是起点那一版）；第二截那次可写挂载的写行那次发布上摆一个二次崩溃——
+    /// 根槽 FUA 没落、紧跟着的两槽系统配置轮换落了（越过根槽那一段的段尾：今天的持久顺序下根槽 FUA 先于轮换、各成一段，段内真子集摆不出来，
+    /// 与 [`a_crash_state_where_only_the_rotation_of_an_overwrite_landed_is_an_illegal_witness_refusal_of_the_writable_mount_after_the_crash`] 越过段尾同一个理由）。
+    /// 新实例的记录不跨实例边界施加，二次崩溃镜像上只读恢复落在起点那一版，见证值比它新：再挂以判据 N-配置 拒；崩溃态没注入读故障、判据复算为真，
+    /// 第三截判过一次、不合法一次。判别力：调用点（[`judge_second_crashes_inside_the_writable_mount`] 拼 [`RefusalOnTheCrashImage`] 那几行）
+    /// 把读故障恒交 `Injected`、再挂的盘换成第一次崩溃的镜像、换成没叠这一段的基线（`crates/mutations.tsv` 三行），不合法都变 0。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
+    #[test]
+    fn a_second_crash_where_only_the_rotation_of_the_row_publish_landed_is_an_illegal_witness_refusal_through_the_call_site(
+    ) {
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite(&history, execution);
+        let overwrite_segment_index = segments
+            .iter()
+            .position(|segment| segment[0] == first_write_of_the_overwrite)
+            .expect("覆盖写那次发布从一段的第一个写起（它前面是起点末尾那道屏障）");
+        // 第二截那次挂载写出的写表：与注入里那一次同一份盘面（覆盖写一个写都没落）、同一份参数；挂载之后那一次发布写的内容随崩溃点变，不在挂载写表里。
+        let mut first_crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        first_crash_image.apply_writes(&writes[..first_write_of_the_overwrite]);
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &first_crash_image,
+            &execution.device_width.parameters(),
+            execution,
+            history.seed,
+            &CrashPoint {
+                segment_index: overwrite_segment_index,
+                persisted_within_the_segment: vec![false],
+                step: StepPosition::Operation(0),
+                operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            },
+        );
+        assert!(
+            matches!(mount_run.outcome, WritableMountOutcome::Published),
+            "前提：起点那一版上的可写挂载与之后那一次覆盖写都做成：{:?}",
+            mount_run.outcome
+        );
+        let (mount_writes, mount_segments, _mount_stream_indexes) =
+            writes_and_segments_with_stream_indexes(
+                &mount_run.mount_operations,
+                &execution.device_width.fixed_geometry(),
+            );
+        let phase_of_each_write = writable_mount_phase_of_each_write(
+            &mount_writes,
+            mount_run.publishes_before_the_deletion_queue_continuation,
+            mount_run.publishes_before_the_instance_table_sweep,
+        );
+        let root_of_the_row_publish = (0..mount_writes.len())
+            .find(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::RootRecordFua
+            })
+            .expect("前提：写行那次发布写了根槽");
+        let rotation_after_the_root: Vec<usize> = (root_of_the_row_publish + 1..mount_writes.len())
+            .take_while(|write| mount_writes[*write].kind == StepKind::SystemConfigurationSlot)
+            .collect();
+        assert_eq!(
+            rotation_after_the_root.len(),
+            2,
+            "前提：写行那次发布的根槽 FUA 之后紧跟着每块盘轮换一槽系统配置"
+        );
+        let segment_of_the_root =
+            segment_containing_the_write(&mount_segments, root_of_the_row_publish);
+        let first_write_of_the_segment_of_the_root = mount_segments[segment_of_the_root][0];
+        let last_rotation = rotation_after_the_root[rotation_after_the_root.len() - 1];
+        let injection = inject_crashes_into_history_drawing_second_crashes(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: overwrite_segment_index,
+                writes_from_the_segment_on: 1,
+                withheld_among_them: &[0],
+            },
+            SecondCrashPointDraw::ExactlyOneSecondCrashState {
+                segment_index: segment_of_the_root,
+                writes_from_the_segment_on: last_rotation + 1
+                    - first_write_of_the_segment_of_the_root,
+                withheld_among_them: vec![
+                    root_of_the_row_publish - first_write_of_the_segment_of_the_root,
+                ]
+                .leak(),
+            },
+            None,
+        );
+        let tally = &injection.tally;
+        assert_eq!(
+            (tally.crash_points, tally.writable_mounts_after_the_crash_succeeded),
+            (1, 1),
+            "前提：只摆写死的那一个第一次崩溃态，它上面的可写挂载做成（没崩过的那一次读得出内容）：{}",
+            tally.render()
+        );
+        assert_eq!(
+            tally.crash_points_after_a_step_reading_under_injected_faults,
+            0,
+            "这段历史没有带读故障的步：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.second_crash_points,
+                tally
+                    .second_crash_points_by_phase
+                    .get(&WritableMountPhase::RowPublish)
+                    .copied()
+            ),
+            (1, Some(1)),
+            "前提：只摆写死的那一个二次崩溃，崩在写行里：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults
+            ),
+            (1, 1),
+            "二次崩溃镜像上再挂以判据 N-配置 拒、崩溃态没注入读故障而判据复算为真：判过一次、不合法一次：{}",
+            tally.render()
+        );
+    }
+
+    /// 第三截调用点交给判官的「所选那一版」是二次崩溃镜像上只读恢复落到的那一版（判决 `research/prompts/m3-formal-code-b20-r1-main-verification.md`
+    /// 第二节 K1「第四种接错」）：第一次崩溃与上一条同一个（覆盖写一个写都没落，只读恢复落在起点那一版）；第二截那次可写挂载的写行那次发布上
+    /// 摆一个二次崩溃——写行那次的记录（每块盘一份）没落，根槽 FUA 与紧跟着的两槽系统配置轮换落了（越过记录与根槽之间那道屏障，与上一条同一个理由）。
+    /// 二次崩溃镜像上只读恢复落在写行那一版（新实例的根），与第一次崩溃不同；它那次发布的末条记录读不出，计数器等于 c_见证 的记录也读不出：
+    /// 再挂以判据 N-配置 拒，C670 那一条成立在「两条都读不出」那一支。判别力：调用点把所选那一版交成第一次崩溃那一版（`crates/mutations.tsv` 一行）时
+    /// 计数照样 (1, 1)，判官列出的那一支换成「c_见证 大于所选那一版末条记录的计数器」，红在那一支的两条断言上。计数分不开：在 harness 档草稿探针里
+    /// 量过，三段短历史 131 个第一次崩溃态上挂载写表每个前缀与每个前缀扣一个写（177198 个二次崩溃态），以及这一个第一次崩溃态上每个前缀扣至多两个写，
+    /// 两种所选那一版的 (判过, 不合法) 没有一处不同；判官结论不同的只有扣下写行（或第一次暖机）那次记录、根槽落了的这一类，都只差这一支。
+    /// 那几处没量到的越屏障靶向态里计数分得开（攻方量过，判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md` 第二节 K3），
+    /// 钉在 [`a_second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal`]。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
+    #[test]
+    fn a_second_crash_landing_on_the_row_publish_whose_records_were_lost_names_the_selected_version_of_the_second_crash_image(
+    ) {
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite(&history, execution);
+        let overwrite_segment_index = segments
+            .iter()
+            .position(|segment| segment[0] == first_write_of_the_overwrite)
+            .expect("覆盖写那次发布从一段的第一个写起（它前面是起点末尾那道屏障）");
+        let mut first_crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        first_crash_image.apply_writes(&writes[..first_write_of_the_overwrite]);
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &first_crash_image,
+            &execution.device_width.parameters(),
+            execution,
+            history.seed,
+            &CrashPoint {
+                segment_index: overwrite_segment_index,
+                persisted_within_the_segment: vec![false],
+                step: StepPosition::Operation(0),
+                operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            },
+        );
+        assert!(
+            matches!(mount_run.outcome, WritableMountOutcome::Published),
+            "前提：起点那一版上的可写挂载与之后那一次覆盖写都做成：{:?}",
+            mount_run.outcome
+        );
+        let (mount_writes, mount_segments, _mount_stream_indexes) =
+            writes_and_segments_with_stream_indexes(
+                &mount_run.mount_operations,
+                &execution.device_width.fixed_geometry(),
+            );
+        let phase_of_each_write = writable_mount_phase_of_each_write(
+            &mount_writes,
+            mount_run.publishes_before_the_deletion_queue_continuation,
+            mount_run.publishes_before_the_instance_table_sweep,
+        );
+        let root_of_the_row_publish = (0..mount_writes.len())
+            .find(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::RootRecordFua
+            })
+            .expect("前提：写行那次发布写了根槽");
+        let records_of_the_row_publish: Vec<usize> = (0..root_of_the_row_publish)
+            .filter(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::JournalRecord
+            })
+            .collect();
+        let rotation_after_the_root: Vec<usize> = (root_of_the_row_publish + 1..mount_writes.len())
+            .take_while(|write| mount_writes[*write].kind == StepKind::SystemConfigurationSlot)
+            .collect();
+        assert_eq!(
+            (
+                records_of_the_row_publish.len(),
+                rotation_after_the_root.len()
+            ),
+            (2, 2),
+            "前提：写行那次发布在根槽之前每块盘写一份记录，根槽 FUA 之后紧跟着每块盘轮换一槽系统配置"
+        );
+        let segment_of_the_first_record =
+            segment_containing_the_write(&mount_segments, records_of_the_row_publish[0]);
+        let first_write_of_the_segment = mount_segments[segment_of_the_first_record][0];
+        let last_rotation = rotation_after_the_root[rotation_after_the_root.len() - 1];
+        let withheld_among_them: Vec<usize> = records_of_the_row_publish
+            .iter()
+            .map(|record| record - first_write_of_the_segment)
+            .collect();
+        // 前提：两次崩溃之后只读恢复落的版本不同（同一份盘面在这里照摆法叠一遍）。
+        let mut second_crash_image = first_crash_image.clone();
+        second_crash_image.apply_writes(&mount_writes[..first_write_of_the_segment]);
+        let persisted_writes_of_the_second_crash: Vec<RetainedWrite> = (first_write_of_the_segment
+            ..=last_rotation)
+            .filter(|write| !records_of_the_row_publish.contains(write))
+            .map(|write| mount_writes[write].clone())
+            .collect();
+        second_crash_image.apply_writes(&persisted_writes_of_the_second_crash);
+        let version_after_the_first_crash =
+            recover(&first_crash_image, JournalPolicy::Consult).effective_root;
+        let version_after_the_second_crash =
+            recover(&second_crash_image, JournalPolicy::Consult).effective_root;
+        assert_ne!(
+            version_after_the_first_crash, version_after_the_second_crash,
+            "前提：第一次崩溃落在起点那一版、二次崩溃落在写行那一版，两次只读恢复落的版本不同"
+        );
+        let injection = inject_crashes_into_history_drawing_second_crashes(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: overwrite_segment_index,
+                writes_from_the_segment_on: 1,
+                withheld_among_them: &[0],
+            },
+            SecondCrashPointDraw::ExactlyOneSecondCrashState {
+                segment_index: segment_of_the_first_record,
+                writes_from_the_segment_on: last_rotation + 1 - first_write_of_the_segment,
+                withheld_among_them: withheld_among_them.leak(),
+            },
+            None,
+        );
+        let tally = &injection.tally;
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.crash_points_after_a_step_reading_under_injected_faults
+            ),
+            (1, 1, 0),
+            "前提：只摆写死的那一个第一次崩溃态、它上面的可写挂载做成、这段历史没有带读故障的步：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.second_crash_points,
+                tally
+                    .second_crash_points_by_phase
+                    .get(&WritableMountPhase::RowPublish)
+                    .copied()
+            ),
+            (1, Some(1)),
+            "前提：只摆写死的那一个二次崩溃，崩在写行里：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults
+            ),
+            (1, 1),
+            "二次崩溃镜像上再挂以判据 N-配置 拒、崩溃态没注入读故障而判据复算为真：判过一次、不合法一次：{}",
+            tally.render()
+        );
+        let remount_findings: Vec<String> = injection
+            .new_findings
+            .iter()
+            .filter(|finding| {
+                matches!(
+                    finding.stage,
+                    CrashStateStage::RemountAfterASecondCrashInsideTheWritableMount(_)
+                )
+            })
+            .map(|finding| {
+                finding
+                    .observation
+                    .model_disagreement
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("拒得不合法记成模型对不上：{}", finding.render()))
+                    .implementation_answer
+                    .clone()
+            })
+            .collect();
+        let [remount_finding] = remount_findings.as_slice() else {
+            panic!("第三截再挂那一判要恰好一条新发现：{remount_findings:?}");
+        };
+        let branch_of_the_second_crash_version = format!(
+            "{:?}",
+            WitnessedCounterBranchThatHolds::NeitherTheLastRecordOfTheSelectedVersionNorTheRecordAtTheWitnessedCounterReadable
+        );
+        let branch_of_the_first_crash_version = format!(
+            "{:?}",
+            WitnessedCounterBranchThatHolds::WitnessedCounterAboveTheLastRecordOfTheSelectedVersion
+        );
+        assert!(
+            remount_finding.contains(&branch_of_the_second_crash_version),
+            "所选那一版是写行那一版：它的末条记录与计数器等于 c_见证 的记录都读不出，判官要列 {branch_of_the_second_crash_version}：{remount_finding}"
+        );
+        assert!(
+            !remount_finding.contains(&branch_of_the_first_crash_version),
+            "所选那一版不是第一次崩溃落的起点那一版（那一版的末条记录读得出），不许列 {branch_of_the_first_crash_version}：{remount_finding}"
+        );
+    }
+
+    /// 第三截「所选那一版」的接线在计数层分得开的靶向态（攻方改法 K3-a，判决 `research/prompts/m3-formal-code-b21-r1-main-verification.md`
+    /// 第二节 K3 与第三节第 2 条；攻方探针 `research/prompts/m3-formal-code-b21-r1-opus-model/probe/opus_probe.rs` 的 `k3_sweep`，
+    /// 产物 `…/out/k3-sweep.txt` 那一行 `first(last=80,withheld=[0, 1, 4]) second(last=19,withheld=[0, 1, 3])`）。与上两条同一段历史。
+    /// 第一次崩溃从第一个文件那次发布的第一份记录起，摆到覆盖写那次的根槽为止：第一个文件那次的两份记录与它根槽之后第二槽系统配置轮换扣下，
+    /// 别的（第一个文件那次的根槽、第一槽轮换，覆盖写那次的单元、记录与根槽）都落了——越过记录与根槽之间、根槽与轮换之间的屏障。
+    /// 第二截那次可写挂载的写行那次发布上摆一个二次崩溃：写行那次的两份记录与根槽之后第一槽轮换扣下，根槽落了，第二槽轮换没摆到。
+    /// 第三截再挂以判据 N-配置 拒；所选那一版取二次崩溃镜像上只读恢复落到的那一版（写行那一版），它的末条记录与计数器等于 c_见证 的记录都读不出，
+    /// 判据为真：判过一次、不合法一次。判别力：调用点把所选那一版交成第一次崩溃那一版（`crates/mutations.tsv` 一行，原文与上一条那一行相同）时
+    /// 判据复算为假、计数变 (1, 0)，红在最后一条断言（攻方在副本上量过，`research/prompts/m3-formal-code-b21-r1-opus-model/out/k3-sweep.txt`）。
+    /// 上一条那一态在计数层分不开这两种接线，只在判官列出的那一支上分得开；这一态在计数层就分得开。
+    // crash-case-check:not-a-crash-case 靶向用例只摆写死的一个第一次崩溃态与一个二次崩溃（ExactlyOneCrashState、ExactlyOneSecondCrashState），不枚举
+    #[test]
+    fn a_second_crash_losing_the_records_of_the_row_publish_after_a_first_crash_losing_the_records_of_the_first_file_counts_one_illegal_witness_refusal(
+    ) {
+        let (history, execution) = history_of_the_first_file_and_one_overwrite();
+        let (writes, segments, first_write_of_the_overwrite) =
+            writes_segments_and_first_write_of_the_overwrite(&history, execution);
+        let root_of_the_overwrite = (first_write_of_the_overwrite..writes.len())
+            .find(|write| writes[*write].kind == StepKind::RootRecordFua)
+            .expect("前提：覆盖写那次发布写了根槽");
+        let root_of_the_first_file = (0..first_write_of_the_overwrite)
+            .rev()
+            .find(|write| writes[*write].kind == StepKind::RootRecordFua)
+            .expect("前提：第一个文件那次发布写了根槽");
+        let root_before_the_first_file = (0..root_of_the_first_file)
+            .rev()
+            .find(|write| writes[*write].kind == StepKind::RootRecordFua)
+            .expect("前提：第一个文件之前那次发布写了根槽");
+        let records_of_the_first_file: Vec<usize> = (root_before_the_first_file + 1
+            ..root_of_the_first_file)
+            .filter(|write| writes[*write].kind == StepKind::JournalRecord)
+            .collect();
+        let rotation_after_the_first_file: Vec<usize> = (root_of_the_first_file + 1
+            ..first_write_of_the_overwrite)
+            .filter(|write| writes[*write].kind == StepKind::SystemConfigurationSlot)
+            .collect();
+        assert_eq!(
+            (
+                records_of_the_first_file.len(),
+                rotation_after_the_first_file.len()
+            ),
+            (2, 2),
+            "前提：第一个文件那次发布在根槽之前每块盘写一份记录，根槽之后每块盘轮换一槽系统配置"
+        );
+        let first_crash_segment_index =
+            segment_containing_the_write(&segments, records_of_the_first_file[0]);
+        let first_write_of_the_first_crash_segment = segments[first_crash_segment_index][0];
+        let withheld_in_the_first_crash: Vec<usize> = records_of_the_first_file
+            .iter()
+            .chain(std::iter::once(&rotation_after_the_first_file[1]))
+            .map(|write| write - first_write_of_the_first_crash_segment)
+            .collect();
+        let writes_of_the_first_crash =
+            root_of_the_overwrite + 1 - first_write_of_the_first_crash_segment;
+        let mut first_crash_image = MemoryPool::with_devices(
+            &[DeviceIdentity(0), DeviceIdentity(1)],
+            execution.device_width.device_bytes(),
+        );
+        first_crash_image.apply_writes(&writes[..first_write_of_the_first_crash_segment]);
+        let persisted_writes_of_the_first_crash: Vec<RetainedWrite> = (0
+            ..writes_of_the_first_crash)
+            .filter(|within_the_state| !withheld_in_the_first_crash.contains(within_the_state))
+            .map(|within_the_state| {
+                writes[first_write_of_the_first_crash_segment + within_the_state].clone()
+            })
+            .collect();
+        first_crash_image.apply_writes(&persisted_writes_of_the_first_crash);
+        // 第二截那次挂载写出的写表：与注入里那一次同一份盘面、同一份参数；挂载之后那一次发布写的内容随崩溃点变，不在挂载写表里。
+        let mount_run = mount_and_publish_once_on_the_crash_image(
+            &first_crash_image,
+            &execution.device_width.parameters(),
+            execution,
+            history.seed,
+            &CrashPoint {
+                segment_index: first_crash_segment_index,
+                persisted_within_the_segment: (0..writes_of_the_first_crash)
+                    .map(|within_the_state| {
+                        !withheld_in_the_first_crash.contains(&within_the_state)
+                    })
+                    .collect(),
+                step: StepPosition::Operation(0),
+                operation_kind: Some(HistoryOperationKind::PublishOverwrite),
+            },
+        );
+        assert!(
+            matches!(mount_run.outcome, WritableMountOutcome::Published),
+            "前提：第一次崩溃镜像上的可写挂载与之后那一次发布都做成：{:?}",
+            mount_run.outcome
+        );
+        let (mount_writes, mount_segments, _mount_stream_indexes) =
+            writes_and_segments_with_stream_indexes(
+                &mount_run.mount_operations,
+                &execution.device_width.fixed_geometry(),
+            );
+        let phase_of_each_write = writable_mount_phase_of_each_write(
+            &mount_writes,
+            mount_run.publishes_before_the_deletion_queue_continuation,
+            mount_run.publishes_before_the_instance_table_sweep,
+        );
+        let root_of_the_row_publish = (0..mount_writes.len())
+            .find(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::RootRecordFua
+            })
+            .expect("前提：写行那次发布写了根槽");
+        let records_of_the_row_publish: Vec<usize> = (0..root_of_the_row_publish)
+            .filter(|write| {
+                phase_of_each_write[*write] == WritableMountPhase::RowPublish
+                    && mount_writes[*write].kind == StepKind::JournalRecord
+            })
+            .collect();
+        let rotation_after_the_root: Vec<usize> = (root_of_the_row_publish + 1..mount_writes.len())
+            .take_while(|write| mount_writes[*write].kind == StepKind::SystemConfigurationSlot)
+            .collect();
+        assert_eq!(
+            (
+                records_of_the_row_publish.len(),
+                rotation_after_the_root.len()
+            ),
+            (2, 2),
+            "前提：写行那次发布在根槽之前每块盘写一份记录，根槽 FUA 之后紧跟着每块盘轮换一槽系统配置"
+        );
+        let second_crash_segment_index =
+            segment_containing_the_write(&mount_segments, records_of_the_row_publish[0]);
+        let first_write_of_the_second_crash_segment = mount_segments[second_crash_segment_index][0];
+        let withheld_in_the_second_crash: Vec<usize> = records_of_the_row_publish
+            .iter()
+            .chain(std::iter::once(&rotation_after_the_root[0]))
+            .map(|write| write - first_write_of_the_second_crash_segment)
+            .collect();
+        // 前提：两次崩溃之后只读恢复落的版本不同（同一份盘面在这里照摆法叠一遍）。
+        let mut second_crash_image = first_crash_image.clone();
+        second_crash_image.apply_writes(&mount_writes[..first_write_of_the_second_crash_segment]);
+        let persisted_writes_of_the_second_crash: Vec<RetainedWrite> =
+            (first_write_of_the_second_crash_segment..=rotation_after_the_root[0])
+                .filter(|write| {
+                    !withheld_in_the_second_crash
+                        .contains(&(write - first_write_of_the_second_crash_segment))
+                })
+                .map(|write| mount_writes[write].clone())
+                .collect();
+        second_crash_image.apply_writes(&persisted_writes_of_the_second_crash);
+        assert_ne!(
+            recover(&first_crash_image, JournalPolicy::Consult).effective_root,
+            recover(&second_crash_image, JournalPolicy::Consult).effective_root,
+            "前提：第一次崩溃落在覆盖写那一版、二次崩溃落在写行那一版，两次只读恢复落的版本不同"
+        );
+        let injection = inject_crashes_into_history_drawing_second_crashes(
+            &history,
+            execution,
+            CrashPointDraw::ExactlyOneCrashState {
+                segment_index: first_crash_segment_index,
+                writes_from_the_segment_on: writes_of_the_first_crash,
+                withheld_among_them: withheld_in_the_first_crash.leak(),
+            },
+            SecondCrashPointDraw::ExactlyOneSecondCrashState {
+                segment_index: second_crash_segment_index,
+                writes_from_the_segment_on: rotation_after_the_root[0] + 1
+                    - first_write_of_the_second_crash_segment,
+                withheld_among_them: withheld_in_the_second_crash.leak(),
+            },
+            None,
+        );
+        let tally = &injection.tally;
+        assert_eq!(
+            (
+                tally.crash_points,
+                tally.writable_mounts_after_the_crash_succeeded,
+                tally.crash_points_after_a_step_reading_under_injected_faults
+            ),
+            (1, 1, 0),
+            "前提：只摆写死的那一个第一次崩溃态、它上面的可写挂载做成、这段历史没有带读故障的步：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.second_crash_points,
+                tally
+                    .second_crash_points_by_phase
+                    .get(&WritableMountPhase::RowPublish)
+                    .copied()
+            ),
+            (1, Some(1)),
+            "前提：只摆写死的那一个二次崩溃，崩在写行里：{}",
+            tally.render()
+        );
+        assert_eq!(
+            (
+                tally.remount_refusals_for_a_newer_publish_witnessed_by_system_configuration,
+                tally.remount_refusals_with_the_witness_criterion_true_without_read_faults
+            ),
+            (1, 1),
+            "二次崩溃镜像上再挂以判据 N-配置 拒，对着二次崩溃镜像上只读恢复落到的那一版复算判据为真：判过一次、不合法一次：{}",
+            tally.render()
+        );
+    }
+
+    /// 清扫发布那一版的根身份（实例, checkpoint_txg），两条用例共用：R2 那一版就是它。
+    const SWEEP_PUBLISH_OF_THE_C704_CASES: (InstanceGeneration, CheckpointTxg) =
+        (InstanceGeneration(3), CheckpointTxg(9));
+    /// 清扫删掉的那一行与留下的那一行。
+    const ROW_DELETED_BY_THE_SWEEP: InstanceRow = InstanceRow {
+        instance: InstanceGeneration(1),
+        selected_root_txg: CheckpointTxg(4),
+        applied_transaction_high_water: 2,
+    };
+    const ROW_KEPT_BY_THE_SWEEP: InstanceRow = InstanceRow {
+        instance: InstanceGeneration(2),
+        selected_root_txg: CheckpointTxg(7),
+        applied_transaction_high_water: 5,
+    };
+
+    /// 一次只读恢复的字段，拿来比的那一版（R2）的根身份是 `root_identity`、实例表行是 `instance_table_rows`。恢复报告与其余字段取自一对空盘上的
+    /// 只读恢复（择不到系统配置，那几样都是 None）：C704 那一臂只看 R2 的根身份与实例表行。
+    fn recovery_fields_read_comparing_a_version_with_these_instance_table_rows(
+        root_identity: (InstanceGeneration, CheckpointTxg),
+        instance_table_rows: Vec<InstanceRow>,
+    ) -> RecoveryFieldsRead {
+        let blank_pool = MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], 4 << 30);
+        let mut read = read_recovery_fields(&blank_pool, ComparedVersion::TheRecoveredVersion);
+        let empty_pointer = singlefs_core::pointer::NodePointer::empty_root();
+        read.compared_version = Some(singlefs_harness::mount_transparency::VersionFieldsRead {
+            root: singlefs_core::root_record::RootRecord {
+                filesystem_identifier: [7u8; 16],
+                unmount_marker:
+                    singlefs_core::root_record::UnmountMarker::NotWrittenByTheUnmountSequence,
+                instance: root_identity.0,
+                checkpoint_txg: root_identity.1,
+                tree_table: empty_pointer,
+                tree_identifier_watermark: 0,
+                rollback_floor: CheckpointTxg(0),
+                instance_table: empty_pointer,
+                mapping_root: empty_pointer,
+                allocation_record_tree_root: empty_pointer,
+            },
+            root_record_bytes: Vec::new(),
+            content: singlefs_harness::mount_transparency::PosixContentRead::NoFile,
+            instance_table_rows: Some(instance_table_rows),
+            tree_table_entries: None,
+        });
+        read
+    }
+
+    fn rows_deleted_by_the_sweep_of_the_c704_cases() -> RowsDeletedByTheInstanceTableSweepPublish {
+        RowsDeletedByTheInstanceTableSweepPublish {
+            sweep_publish: SWEEP_PUBLISH_OF_THE_C704_CASES,
+            rows_deleted: vec![ROW_DELETED_BY_THE_SWEEP],
+            heads_erased: 0,
+        }
+    }
+
+    /// C704（挂载透明不认清扫发布）处置那一臂：R2 那一版是清扫发布那一版，它的实例表里却仍有清扫说删掉了的行 ⇒ 交回一条违例，
+    /// 名字是 [`MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH`]，按字段分的判红计数里它加 1；
+    /// R2 照原样交回、不记放回。判别力（`crates/mutations.tsv` 里点名这条的行）：被删的行还在也当成都不在、放回去再比时一条违例都没有；
+    /// 判红不进计数时那一格是 None。
+    #[test]
+    fn a_sweep_publish_still_holding_the_rows_it_deleted_is_a_mount_transparency_violation_counted_once(
+    ) {
+        let read = recovery_fields_read_comparing_a_version_with_these_instance_table_rows(
+            SWEEP_PUBLISH_OF_THE_C704_CASES,
+            vec![ROW_KEPT_BY_THE_SWEEP, ROW_DELETED_BY_THE_SWEEP],
+        );
+        let rows_deleted = rows_deleted_by_the_sweep_of_the_c704_cases();
+        let mut tally = CrashInjectionTally::default();
+        let (compared, violations) = after_the_action_with_the_rows_deleted_by_the_sweep_put_back(
+            &mut tally,
+            &read,
+            Some(&rows_deleted),
+        );
+        assert_eq!(
+            violations.iter().map(|(name, _)| *name).collect::<Vec<_>>(),
+            [MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH],
+            "清扫发布那一版里仍有它删掉的那一行：判红一条：{violations:?}"
+        );
+        assert_eq!(
+            tally
+                .mount_transparency_violations_by_field
+                .get(MOUNT_TRANSPARENCY_VIOLATION_ROWS_DELETED_BY_THE_SWEEP_STILL_IN_ITS_PUBLISH)
+                .copied(),
+            Some(1),
+            "按字段分的判红计数里这一样加 1：{}",
+            tally.render()
+        );
+        assert_eq!(
+            tally.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back, 0,
+            "被删的行还在：不放回"
+        );
+        assert_eq!(*compared, read, "R2 照原样交回给逐字段判");
+    }
+
+    /// 对照：R2 那一版是清扫发布那一版，被删的行一条都不在 ⇒ 不判红，把它们放回去之后的 R2 交给逐字段判，放回计数加 1。
+    /// 判别力（`crates/mutations.tsv` 里点名这条的行）：放回时不接上被删的行，交回的 R2 里只有留下的那一行。
+    #[test]
+    fn a_sweep_publish_without_the_rows_it_deleted_is_compared_with_them_put_back() {
+        let read = recovery_fields_read_comparing_a_version_with_these_instance_table_rows(
+            SWEEP_PUBLISH_OF_THE_C704_CASES,
+            vec![ROW_KEPT_BY_THE_SWEEP],
+        );
+        let rows_deleted = rows_deleted_by_the_sweep_of_the_c704_cases();
+        let mut tally = CrashInjectionTally::default();
+        let (compared, violations) = after_the_action_with_the_rows_deleted_by_the_sweep_put_back(
+            &mut tally,
+            &read,
+            Some(&rows_deleted),
+        );
+        assert!(
+            violations.is_empty(),
+            "被删的行都不在：不判红：{violations:?}"
+        );
+        assert!(
+            tally.mount_transparency_violations_by_field.is_empty(),
+            "按字段分的判红计数一样都没有：{}",
+            tally.render()
+        );
+        assert_eq!(
+            tally.mount_transparency_judged_with_the_rows_deleted_by_the_sweep_put_back, 1,
+            "放回一次"
+        );
+        assert_eq!(
+            compared
+                .compared_version
+                .as_ref()
+                .expect("R2 那一版在")
+                .instance_table_rows,
+            Some(vec![ROW_KEPT_BY_THE_SWEEP, ROW_DELETED_BY_THE_SWEEP]),
+            "放回之后的 R2：留下的那一行在前，被删的接在后面"
         );
     }
 }

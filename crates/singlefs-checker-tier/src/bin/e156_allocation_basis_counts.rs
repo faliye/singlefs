@@ -10,7 +10,12 @@
 //!
 //! 只读驱动 `singlefs-core` / `singlefs-checker` 的公开入口，不改这两个 crate 的生产代码；产物按 `E7RESULT` 行打印，复跑登记在
 //! `research/scripts/replay.sh`。洞的 txg、挂载做完的 txg、终点 txg 从本地 S 与装置里的锚点模型（[`anchor_model`]，登记第七节 7.2
-//! 命令四 `anchors_e156_r4.py` 的逐行移植）算，不从 `crates/` 算；装置跑的时候从盘上现量，两边比。
+//! 命令四 `anchors_e156_r4.py` 的逐行移植，门槛那一处照第 6 次重跑登记 `research/prompts/e156-r6-prereg.md` 第十三节命令四
+//! `anchors_e156_r6.py` 改）算，不从 `crates/` 算；装置跑的时候从盘上现量，两边比。
+//!
+//! 第 6 次重跑（登记 `research/prompts/e156-r6-prereg.md` 第一节 W15–W18、第五节 E7–E11）：回收门槛照用户 2026-10-05 定乙读——
+//! 挂载那一刻读回全零的根环槽钉在它可能住过的最旧 txg，直到这个进程写掉那一槽、或读出一条根（[`read_hh_state`] 的
+//! `all_zero_slots_still_pinned`）；K10 守门、「每」列的旁路门槛与锚点模型三处吃同一个读数。
 //!
 //! 判定写在装置里（[`judge_peak_against_threshold`] 那一组函数，单测 U18），不另写 Python 判定脚本：执行员的写范围不含
 //! `research/scripts/` 与门禁 47 号，理由与改动记在登记第十二节。
@@ -22,7 +27,7 @@ use singlefs_checker::walk::check_pool_image;
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration, SlotNumber,
 };
-use singlefs_core::allocator::{AllocationRecord, DeviceFreeMap, Placement, PoolAllocator};
+use singlefs_core::allocator::{AllocationRecord, PoolAllocator};
 use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
 use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};
 use singlefs_core::journal::back_chain_of;
@@ -694,6 +699,7 @@ fn verdict_label(verdict: &InvariantVerdict) -> &'static str {
         InvariantVerdict::Holds => "holds",
         InvariantVerdict::Violated(_) => "violated",
         InvariantVerdict::NotApplicable(_) => "not_applicable",
+        InvariantVerdict::PartiallyJudged(_) => "partially_judged",
     }
 }
 
@@ -1068,7 +1074,8 @@ fn record_release_generations(
 // 只用脚本头那几句条款：根环 txg u 落槽 u mod 3S；可再分配 = 已释放 ∧ 释放代 ≤ 环里最旧有效根（Hh 里 F_生效 = 0）；
 // 每一次发布（连空发布）都重写树表单元，mkfs 之后两次暖机是零单元发布；暖机直到两块盘上各有一条本实例的根；
 // c2 之后新实例第一个 txg = max(环里最高, 记录最高) + 1。产物里 `name=anchor_dump` 那几行去掉前缀之后与 Python 脚本
-// `--dump` 的 `DUMP` 行逐行比（报告里的命令）。
+// `--dump` 的 `DUMP` 行逐行比（报告里的命令）。第 6 次重跑登记第五节 E11：门槛那一处照第十三节命令四 `anchors_e156_r6.py` 改，
+// 并进这次挂载读回全零、还没被写掉的槽（槽号即落到它的最小 txg；定乙），`h_缺`、`h_洞` 与两条闭式照旧读环里最旧的根。
 // ============================================================================================
 mod anchor_model {
     use std::collections::{BTreeMap, BTreeSet};
@@ -1196,12 +1203,19 @@ mod anchor_model {
         let mut tree_tables: BTreeMap<u64, Option<u64>> = BTreeMap::from([(0, None)]);
         let mut live_tree_table = 0u64;
         let mut rows = Vec::new();
+        let mount_first_txgs: BTreeSet<u64> = holes.iter().map(|hole| hole + 1).collect();
+        let mut pins: BTreeSet<u64> = BTreeSet::new();
         for txg in 0..=end {
             let role = roles[&txg];
             if !ZERO_UNIT_WARM_UP_TXGS.contains(&txg) && txg > 0 {
                 tree_tables.insert(live_tree_table, Some(txg));
                 tree_tables.insert(txg, None);
                 live_tree_table = txg;
+            }
+            if mount_first_txgs.contains(&txg) {
+                pins = (0..ring_length.min(txg))
+                    .filter(|slot| !ring.contains_key(slot))
+                    .collect();
             }
             if role != AnchorPublishRole::Crash {
                 ring.insert(txg % ring_length, txg);
@@ -1210,7 +1224,11 @@ mod anchor_model {
                 continue;
             }
             let oldest = *ring.values().min().expect("环里至少有 mkfs 那一条根");
-            let floor = oldest;
+            let floor = pins
+                .iter()
+                .copied()
+                .filter(|slot| !ring.contains_key(slot))
+                .fold(oldest, u64::min);
             let roots: BTreeSet<u64> = ring.values().copied().collect();
             let is_referenced = |allocation: u64, release: Option<u64>| match release {
                 None => true,
@@ -1408,35 +1426,12 @@ impl WorkloadDensity {
     }
 }
 
-/// W7：分配器从哪来。产品路径（mkfs 同一个进程里装根环表，之后用每次可写挂载交回的）；PC-分配器换回不装根环表的那一种。
+/// W7：分配器从哪来。只有产品路径一种（mkfs 同一个进程里装根环表，之后用每次可写挂载交回的）。第 5 次重跑登记 5.5 E1 撤了
+/// 「不装根环表」那一种（C551：没装根环表的分配器在第一次记根就断言，到不了观测点），成员名不改：`name=q1_cell` 行打
+/// `allocator={:?}`，改名会让每一格多一处不同。
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum HhAllocatorSource {
     ProductPathWithRootRing,
-    WithoutRootRingPositiveControl,
-}
-
-/// 不装根环表的分配器（PC-分配器）：`PoolAllocator::new` 加 mkfs 那两个单元，与装置原有的做法相同。
-fn allocator_without_the_root_ring(
-    devices: &[(DeviceIdentity, SparseBlockDevice)],
-    genesis: &MakeFilesystemOutput,
-) -> PoolAllocator {
-    let mut allocator = PoolAllocator::new(
-        devices
-            .iter()
-            .map(|(identity, device)| DeviceFreeMap::new(*identity, device.size_in_bytes()))
-            .collect(),
-    );
-    allocator.mark_format_time_units(
-        Placement {
-            slot: genesis_slot_on_device_zero(&genesis.root.instance_table.locations),
-            span: INSTANCE_TABLE_SPAN_SLOTS,
-        },
-        Placement {
-            slot: genesis_slot_on_device_zero(&genesis.root.tree_table.locations),
-            span: TransactionUnit::TreeTable.span_slots(),
-        },
-    );
-    allocator
 }
 
 fn genesis_slot_on_device_zero(
@@ -1458,9 +1453,6 @@ fn allocator_for_hh(
     match source {
         HhAllocatorSource::ProductPathWithRootRing => {
             allocator_after_make_filesystem(parameters, devices, genesis)
-        }
-        HhAllocatorSource::WithoutRootRingPositiveControl => {
-            allocator_without_the_root_ring(devices, genesis)
         }
     }
 }
@@ -1786,6 +1778,16 @@ struct HhStateReading {
     isolated_slots: u64,
     not_free_beyond_allocated: u64,
     root_ring_installed: bool,
+    /// W18 (c)(d)：到这个观测点还钉着的全零槽数。
+    all_zero_slots_still_pinned: u64,
+    /// B 让门槛比只按 A（读得出的有效根）取更低（第五节 E10 的 `threshold_lowered_points`）。
+    threshold_lowered_by_all_zero_pins: bool,
+    /// W18 (a)：这个观测点看到这个进程写掉了的钉住槽。
+    all_zero_pins_released_by_write: Vec<RootRingSlot>,
+    /// W18 (b)：这个观测点看到读出了一条不是这个进程写的根的钉住槽（这一族推的是 0，不为 0 照 S18 停）。
+    all_zero_pins_released_by_reread_only: Vec<RootRingSlot>,
+    /// W18 (d)：还钉着而读坏的槽数（这一族不造读故障，不为 0 照 S17 停）。
+    bad_slots_still_pinned: u64,
 }
 
 struct HhStateInputs<'context> {
@@ -1795,6 +1797,10 @@ struct HhStateInputs<'context> {
     versions: &'context BTreeMap<u64, PublishedVersionFacts>,
     allocation_generations: &'context HashMap<u64, u64>,
     injected_holes: &'context [u64],
+    /// 第 6 次重跑登记 E7：这次挂载钉着的槽与它可能住过的最旧 txg；mkfs 那个进程为空。
+    all_zero_pins: &'context BTreeMap<RootRingSlot, u64>,
+    /// 这次挂载新实例的第一个 txg；mkfs 那个进程为 `None`。
+    first_txg_of_this_mount: Option<u64>,
 }
 
 fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
@@ -1839,14 +1845,47 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
     .0;
     let newest_root_txg = newest_root.checkpoint_txg.0;
     let slots_per_region = geometry.root_ring_slots_per_region;
-    let ring_threshold =
-        reclaim_threshold_read_from_the_ring_image(effective_floor, &valid_root_txgs);
-    let oldest_valid_root_txg = valid_root_txgs.iter().min().copied().unwrap_or(0);
-    let missing_txgs = missing_txg_count(oldest_valid_root_txg, newest_root_txg, &ring_root_txgs);
     let occupant_by_ring_slot: BTreeMap<RootRingSlot, u64> = ring
         .iter()
         .map(|(ring_slot, root)| (*ring_slot, root.checkpoint_txg.0))
         .collect();
+    // W18：钉着的每一槽读这一刻那一槽里自证合法的根；「写掉」「重读读出」两句都不成立的仍钉着。
+    let mut all_zero_slots_still_pinned: BTreeSet<u64> = BTreeSet::new();
+    let mut all_zero_slots_still_pinned_count = 0u64;
+    let mut all_zero_pins_released_by_write = Vec::new();
+    let mut all_zero_pins_released_by_reread_only = Vec::new();
+    let mut bad_slots_still_pinned = 0u64;
+    if let Some(first_txg) = inputs.first_txg_of_this_mount {
+        for (ring_slot, oldest_txg_it_can_have_held) in inputs.all_zero_pins {
+            let occupant = occupant_by_ring_slot.get(ring_slot).copied();
+            let released_by_write = occupant.is_some_and(|occupant_txg| occupant_txg >= first_txg);
+            let released_by_reread = occupant.is_some_and(|occupant_txg| occupant_txg < first_txg);
+            if released_by_write {
+                all_zero_pins_released_by_write.push(*ring_slot);
+            } else if released_by_reread {
+                all_zero_pins_released_by_reread_only.push(*ring_slot);
+            } else {
+                all_zero_slots_still_pinned.insert(*oldest_txg_it_can_have_held);
+                all_zero_slots_still_pinned_count += 1;
+                if read_root_ring_slot_content(inputs.devices, inputs.parameters, *ring_slot)
+                    != RootRingSlotContent::AllZero
+                {
+                    bad_slots_still_pinned += 1;
+                }
+            }
+        }
+    }
+    let ring_threshold = reclaim_threshold_read_from_the_ring_image(
+        effective_floor,
+        &valid_root_txgs
+            .union(&all_zero_slots_still_pinned)
+            .copied()
+            .collect(),
+    );
+    let threshold_lowered_by_all_zero_pins = ring_threshold
+        < reclaim_threshold_read_from_the_ring_image(effective_floor, &valid_root_txgs);
+    let oldest_valid_root_txg = valid_root_txgs.iter().min().copied().unwrap_or(0);
+    let missing_txgs = missing_txg_count(oldest_valid_root_txg, newest_root_txg, &ring_root_txgs);
     let live_holes = live_hole_count(
         inputs.injected_holes,
         oldest_valid_root_txg,
@@ -1919,6 +1958,11 @@ fn read_hh_state(inputs: &HhStateInputs<'_>) -> HhStateReading {
             .expect("落在 u64 内")
             .saturating_sub(free_map_zero.allocated_slots()),
         root_ring_installed: inputs.allocator.root_ring_occupancy().is_some(),
+        all_zero_slots_still_pinned: all_zero_slots_still_pinned_count,
+        threshold_lowered_by_all_zero_pins,
+        all_zero_pins_released_by_write,
+        all_zero_pins_released_by_reread_only,
+        bad_slots_still_pinned,
     }
 }
 
@@ -2039,6 +2083,11 @@ struct HhRunOutcome {
     tree_table_lags_every_publish: BTreeSet<u64>,
     checker_red_on_hole_states: u64,
     checker_judged_hole_states: u64,
+    /// 第 6 次重跑登记 E8：每次挂载那一刻的定乙钉住。
+    all_zero_pin_mounts: Vec<AllZeroPinsAtMount>,
+    /// W18 (a)、(b) 解开的钉住槽数（整格累加，每槽每次挂载最多一次）。
+    all_zero_pins_released_by_write: u64,
+    all_zero_pins_released_by_reread_only: u64,
 }
 
 /// 一格要怎么跑（第 4 次重跑登记第五节 5.3、5.4）。
@@ -2108,6 +2157,93 @@ fn describe_the_root_ring_slot_of_txg(
     }
 }
 
+/// 根环一个槽这一刻读到的样子（第 6 次重跑登记 W17）：读出自证过的根；读不出自证而原字节每个都是 0；
+/// 其余（读不出、读得出而不是全零又自证不过）都算读坏，这一族不造，出现了照 S17 停。
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum RootRingSlotContent {
+    SelfVerifiedRoot { checkpoint_txg: u64 },
+    AllZero,
+    Bad,
+}
+
+fn read_root_ring_slot_content(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    parameters: &MakeFilesystemParameters,
+    ring_slot: RootRingSlot,
+) -> RootRingSlotContent {
+    match read_root_ring_slot(
+        devices,
+        &parameters.region_devices,
+        &parameters.geometry,
+        &parameters.filesystem_identifier,
+        ring_slot,
+    ) {
+        RootRingSlotReading::SelfVerified(root) => RootRingSlotContent::SelfVerifiedRoot {
+            checkpoint_txg: root.checkpoint_txg.0,
+        },
+        RootRingSlotReading::Bad(_) => {
+            let device = parameters.region_devices
+                [usize::try_from(ring_slot.region).expect("区域号落在 3 以内")];
+            let offset = slot_offset(ring_slot, parameters.geometry.fixed_structure_slot_spacing);
+            let root_slot_bytes =
+                usize::try_from(parameters.geometry.physical_block_size).expect("根槽宽");
+            match PoolReader::read(devices, device, offset, root_slot_bytes) {
+                Some(bytes) if bytes.iter().all(|byte| *byte == 0) => RootRingSlotContent::AllZero,
+                Some(_) | None => RootRingSlotContent::Bad,
+            }
+        }
+    }
+}
+
+/// 一次挂载那一刻的定乙钉住（第 6 次重跑登记 W16、W17，第五节 E8）：交给 `mount_writable` 之前那份切段镜像里
+/// 读回全零的槽，各钉在它可能住过的最旧 txg。
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct AllZeroPinsAtMount {
+    hole_txg: u64,
+    first_txg_of_the_new_instance: u64,
+    pinned: BTreeMap<RootRingSlot, u64>,
+    bad_slots_at_mount: u64,
+}
+
+/// W17：3S 个槽逐个读，交回读回全零的槽与读坏的槽数。槽用 txg 0..3S 经 `target_for_publish` 走一遍（A2：txg 与 u mod 3S 一一对应）。
+fn root_ring_slots_reading_back_all_zero_at_mount(
+    devices: &[(DeviceIdentity, SparseBlockDevice)],
+    parameters: &MakeFilesystemParameters,
+    ring_length: u64,
+) -> (BTreeSet<RootRingSlot>, u64) {
+    let mut all_zero = BTreeSet::new();
+    let mut bad_slots = 0u64;
+    for txg in 0..ring_length {
+        let ring_slot = target_for_publish(
+            CheckpointTxg(txg),
+            parameters.geometry.root_ring_slots_per_region,
+        );
+        match read_root_ring_slot_content(devices, parameters, ring_slot) {
+            RootRingSlotContent::SelfVerifiedRoot { .. } => {}
+            RootRingSlotContent::AllZero => {
+                all_zero.insert(ring_slot);
+            }
+            RootRingSlotContent::Bad => bad_slots += 1,
+        }
+    }
+    (all_zero, bad_slots)
+}
+
+/// W16：落到这一槽、小于这次挂载新实例第一个 txg 的最小 txg，在 [0, min(3S, 第一个 txg)) 里找；一个都没有的槽不钉。
+fn oldest_txg_an_all_zero_slot_can_have_held(
+    ring_slot: RootRingSlot,
+    first_txg_of_the_new_instance: u64,
+    ring_length: u64,
+    parameters: &MakeFilesystemParameters,
+) -> Option<u64> {
+    (0..ring_length.min(first_txg_of_the_new_instance)).find(|txg| {
+        target_for_publish(
+            CheckpointTxg(*txg),
+            parameters.geometry.root_ring_slots_per_region,
+        ) == ring_slot
+    })
+}
+
 fn mount_admission_label(admission: &MountSpaceAdmission) -> &'static str {
     match admission {
         MountSpaceAdmission::AdmittedBeforeAcquisition => "admitted_before_acquisition",
@@ -2164,6 +2300,10 @@ struct HhRunState {
     workload_publishes: u64,
     tree_table_lag_seen_real: BTreeSet<(u64, u64)>,
     tree_table_lag_seen_every_publish: BTreeSet<(u64, u64)>,
+    /// 第 6 次重跑登记 E7：这次挂载钉着、还没解开的槽（值是 W16 的最旧 txg）；每次挂载整张换掉，mkfs 之后为空。
+    all_zero_pins: BTreeMap<RootRingSlot, u64>,
+    /// 这次挂载新实例的第一个 txg；mkfs 之后为 `None`。
+    first_txg_of_this_mount: Option<u64>,
 }
 
 impl HhRunState {
@@ -2183,7 +2323,22 @@ impl HhRunState {
             versions: &self.versions,
             allocation_generations: &self.allocation_generations,
             injected_holes: &self.injected_holes,
+            all_zero_pins: &self.all_zero_pins,
+            first_txg_of_this_mount: self.first_txg_of_this_mount,
         });
+        // W18 (a)(b)：解开的槽从这次挂载的钉住表里拿掉，各计一次。
+        for ring_slot in reading
+            .all_zero_pins_released_by_write
+            .iter()
+            .chain(&reading.all_zero_pins_released_by_reread_only)
+        {
+            self.all_zero_pins.remove(ring_slot);
+        }
+        outcome.all_zero_pins_released_by_write +=
+            u64::try_from(reading.all_zero_pins_released_by_write.len()).expect("落在 u64 内");
+        outcome.all_zero_pins_released_by_reread_only +=
+            u64::try_from(reading.all_zero_pins_released_by_reread_only.len())
+                .expect("落在 u64 内");
         let txg = self.current.root.checkpoint_txg.0;
         let free_map_zero = self
             .allocator
@@ -2398,7 +2553,11 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
         tree_table_lags_every_publish: BTreeSet::new(),
         checker_red_on_hole_states: 0,
         checker_judged_hole_states: 0,
+        all_zero_pin_mounts: Vec::new(),
+        all_zero_pins_released_by_write: 0,
+        all_zero_pins_released_by_reread_only: 0,
     };
+    let ring_length = E156_ROOT_RING_REGIONS * shape.slots_per_region;
     let mut devices = new_pool_devices();
     let genesis = make_filesystem(&parameters, &mut devices).expect("Hh mkfs");
     outcome.genesis_root_in_ring = readable_roots(
@@ -2476,6 +2635,8 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
         workload_publishes: 0,
         tree_table_lag_seen_real: BTreeSet::new(),
         tree_table_lag_seen_every_publish: BTreeSet::new(),
+        all_zero_pins: BTreeMap::new(),
+        first_txg_of_this_mount: None,
     };
     state.lineage.note_version(&mut state.versions, &first);
     state.observe(
@@ -2529,6 +2690,12 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
                 .note_version(&mut state.versions, &crashed.crashed_output);
             state.injected_holes.push(next_txg);
             let mut recovered_devices = devices_from_memory_pool(&crashed.cut_image);
+            let (slots_reading_back_all_zero_at_mount, bad_slots_at_mount) =
+                root_ring_slots_reading_back_all_zero_at_mount(
+                    &recovered_devices,
+                    &state.parameters,
+                    ring_length,
+                );
             let mounted = match mount_writable(&state.parameters, &mut recovered_devices) {
                 Ok(mounted) => mounted,
                 Err(error) => {
@@ -2570,6 +2737,27 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
                 state.lineage.note_version(&mut state.versions, version);
             }
             let first_txg_of_the_new_instance = mounted.output.row_publish.root().checkpoint_txg.0;
+            // 第 6 次重跑登记 E8：钉住表整张换成这次挂载读回全零的槽（W16、W17）。
+            let all_zero_pins: BTreeMap<RootRingSlot, u64> = slots_reading_back_all_zero_at_mount
+                .iter()
+                .filter_map(|ring_slot| {
+                    oldest_txg_an_all_zero_slot_can_have_held(
+                        *ring_slot,
+                        first_txg_of_the_new_instance,
+                        ring_length,
+                        &state.parameters,
+                    )
+                    .map(|oldest_txg| (*ring_slot, oldest_txg))
+                })
+                .collect();
+            state.all_zero_pins.clone_from(&all_zero_pins);
+            state.first_txg_of_this_mount = Some(first_txg_of_the_new_instance);
+            let all_zero_pins_at_mount = AllZeroPinsAtMount {
+                hole_txg: next_txg,
+                first_txg_of_the_new_instance,
+                pinned: all_zero_pins,
+                bad_slots_at_mount,
+            };
             let publishes_in_the_mount = 1
                 + u64::try_from(mounted.output.warm_up_publishes.len()).expect("落在 u64 内")
                 + floor_raise_sequences
@@ -2659,6 +2847,21 @@ fn run_hh_history(emitter: &mut Emitter, request: &HhRunRequest<'_>) -> HhRunOut
                 recovery.mount_admission,
                 recovery.mount_floor_raise_sequences,
             ));
+            emitter.emit(&format!(
+                "name=all_zero_pins_at_mount family={} {} hole_txg={} first_txg={} pinned=[{}] bad_slots_at_mount={}",
+                request.family,
+                shape.fields(),
+                all_zero_pins_at_mount.hole_txg,
+                all_zero_pins_at_mount.first_txg_of_the_new_instance,
+                all_zero_pins_at_mount
+                    .pinned
+                    .iter()
+                    .map(|(ring_slot, txg)| format!("({},{},{txg})", ring_slot.region, ring_slot.slot))
+                    .collect::<Vec<_>>()
+                    .join(","),
+                all_zero_pins_at_mount.bad_slots_at_mount,
+            ));
+            outcome.all_zero_pin_mounts.push(all_zero_pins_at_mount);
             outcome.recoveries.push(recovery);
             workload_index_in_segment = 0;
             state.cross_check_references_against_the_disk(&mut outcome);
@@ -4338,6 +4541,78 @@ fn emit_cell_checks(
     ));
 }
 
+/// 一格的定乙钉住簿记（第 6 次重跑登记第五节 E10、第六节 R1d）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct AllZeroPinCellTotals {
+    mounts: u64,
+    pins_installed: u64,
+    pinned_points: u64,
+    pinned_slots_peak: u64,
+    pinned_slots_end: u64,
+    threshold_lowered_points: u64,
+    released_by_write: u64,
+    released_by_reread_only: u64,
+    bad_slots_at_mount: u64,
+    bad_slots_still_pinned: u64,
+}
+
+fn all_zero_pin_cell_totals(outcome: &HhRunOutcome) -> AllZeroPinCellTotals {
+    let observations = &outcome.observations;
+    AllZeroPinCellTotals {
+        mounts: u64::try_from(outcome.all_zero_pin_mounts.len()).expect("落在 u64 内"),
+        pins_installed: outcome
+            .all_zero_pin_mounts
+            .iter()
+            .map(|mount| u64::try_from(mount.pinned.len()).expect("落在 u64 内"))
+            .sum(),
+        pinned_points: count_where(observations, |observation| {
+            observation.reading.all_zero_slots_still_pinned > 0
+        }),
+        pinned_slots_peak: observations
+            .iter()
+            .map(|observation| observation.reading.all_zero_slots_still_pinned)
+            .max()
+            .unwrap_or(0),
+        pinned_slots_end: observations.last().map_or(0, |observation| {
+            observation.reading.all_zero_slots_still_pinned
+        }),
+        threshold_lowered_points: count_where(observations, |observation| {
+            observation.reading.threshold_lowered_by_all_zero_pins
+        }),
+        released_by_write: outcome.all_zero_pins_released_by_write,
+        released_by_reread_only: outcome.all_zero_pins_released_by_reread_only,
+        bad_slots_at_mount: outcome
+            .all_zero_pin_mounts
+            .iter()
+            .map(|mount| mount.bad_slots_at_mount)
+            .sum(),
+        bad_slots_still_pinned: observations
+            .iter()
+            .map(|observation| observation.reading.bad_slots_still_pinned)
+            .sum(),
+    }
+}
+
+fn emit_all_zero_pin_cell(emitter: &mut Emitter, outcome: &HhRunOutcome) -> AllZeroPinCellTotals {
+    let totals = all_zero_pin_cell_totals(outcome);
+    emitter.emit(&format!(
+        "name=all_zero_pin_cell family={} {} mounts={} pins_installed={} pinned_points={} pinned_slots_peak={} pinned_slots_end={} threshold_lowered_points={} released_by_write={} released_by_reread_only={} bad_slots_at_mount={} bad_slots_still_pinned={}",
+        outcome.family,
+        outcome.shape.fields(),
+        totals.mounts,
+        totals.pins_installed,
+        totals.pinned_points,
+        totals.pinned_slots_peak,
+        totals.pinned_slots_end,
+        totals.threshold_lowered_points,
+        totals.released_by_write,
+        totals.released_by_reread_only,
+        totals.bad_slots_at_mount,
+        totals.bad_slots_still_pinned,
+    ));
+    totals
+}
+
 /// PQ1 一段历史里「造出了洞」的判定（登记第六节 6.1：② = t + 1 且 ③ 没有）。
 fn premise_one_reproduced(outcome: &HhRunOutcome) -> bool {
     !outcome.recoveries.is_empty()
@@ -4660,6 +4935,7 @@ fn main() {
     let mut grid_totals = HoleHistoryVerdictTotals::default();
     let mut every_publish_tree_table_lag_mismatch_cells = 0u64;
     let mut not_fitting = 0u64;
+    let mut all_zero_pin_cells: Vec<AllZeroPinCellTotals> = Vec::new();
     for slots_per_region in E156_SLOTS_PER_REGION_SAMPLING_POINTS {
         let expected_lags = anchor_model::tree_table_reclaim_lags(
             slots_per_region,
@@ -4722,38 +4998,53 @@ fn main() {
                 every_publish_tree_table_lag_mismatch_cells +=
                     totals.tree_table_lag_every_publish_mismatch;
                 emit_cell_checks(&mut emitter, &outcome, &totals);
+                all_zero_pin_cells.push(emit_all_zero_pin_cell(&mut emitter, &outcome));
                 grid_totals.add(totals);
                 outcomes.push(outcome);
             }
         }
     }
 
-    // PC-分配器：Hh(0, —, S = 4, ρ = 1) 换回不装根环表的分配器，环转过一圈之后 A10 应判红。
-    let positive_control_allocator = {
-        let shape = shape_of(4, WorkloadDensity::EveryPublishOverwrites, 0, None);
-        let mut request = hh_request("PC-allocator", shape, anchor_cell_for(&anchors, 4, 0, None));
-        request.allocator_source = HhAllocatorSource::WithoutRootRingPositiveControl;
-        request.emit_positive_control_no_reclaim = false;
-        run_hh_history(&mut emitter, &request)
-    };
-    let expected_lags_four =
-        anchor_model::tree_table_reclaim_lags(4, anchors[&4].without_holes.end);
-    let positive_control_allocator_seen = positive_control_allocator.tree_table_lags_real
-        != expected_lags_four
-        && positive_control_allocator
-            .observations
-            .iter()
-            .all(|observation| !observation.reading.root_ring_installed);
+    // PC-钉门槛（第 5 次重跑登记 5.3、5.4、5.5 E2；替 PC-分配器）：格表里本来就跑的 Hh(1, 后, S, ρ) 六格，洞让 txg t − 3S 的旧根
+    // 留在 t 的槽里，真实分配器的回收门槛钉在它上面直到 t + 3S（K15、L1），释放代 6 的树表滞后 = 6S − 1。把这一格交给同一个
+    // k = 0 的 A10 判定（期望 = 同一 S 的 {3S}）：判定判「不符」只证判定不是恒绿，「含 6S − 1」证量法读到了真实分配器的推迟，两句各报各的。
+    // 六格不进 grid_totals；6S − 1 用本地的 S 现算（2 × 区域数 × S − 1）。
+    let mut pinned_floor_cells = 0u64;
+    let mut pinned_floor_seen_real_cells = 0u64;
+    let mut pinned_floor_seen_every_cells = 0u64;
+    for outcome in outcomes.iter().filter(|outcome| {
+        outcome.shape.hole_count == 1 && outcome.shape.position == Some(HolePosition::Back)
+    }) {
+        let slots_per_region = outcome.shape.slots_per_region;
+        let expected_lags = anchor_model::tree_table_reclaim_lags(
+            slots_per_region,
+            anchors[&slots_per_region].without_holes.end,
+        );
+        let totals = judge_hole_history_outcome(outcome, Some(&expected_lags));
+        let bound = 2 * E156_ROOT_RING_REGIONS * slots_per_region - 1;
+        let contains_bound_real = outcome.tree_table_lags_real.contains(&bound);
+        let contains_bound_every = outcome.tree_table_lags_every_publish.contains(&bound);
+        let seen_real = totals.tree_table_lag_real_mismatch == 1 && contains_bound_real;
+        let seen_every = totals.tree_table_lag_every_publish_mismatch == 1 && contains_bound_every;
+        pinned_floor_cells += 1;
+        pinned_floor_seen_real_cells += u64::from(seen_real);
+        pinned_floor_seen_every_cells += u64::from(seen_every);
+        emitter.emit(&format!(
+            "name=pc_pinned_floor {} expected={} lags_real={} lags_every={} judge_real_mismatch={} judge_every_mismatch={} bound={bound} contains_bound_real={contains_bound_real} contains_bound_every={contains_bound_every} seen_real={seen_real} seen_every={seen_every}",
+            outcome.shape.fields(),
+            set_text(&expected_lags),
+            set_text(&outcome.tree_table_lags_real),
+            set_text(&outcome.tree_table_lags_every_publish),
+            totals.tree_table_lag_real_mismatch,
+            totals.tree_table_lag_every_publish_mismatch,
+        ));
+    }
     emitter.emit(&format!(
-        "name=pc_allocator a10_lags_real={} expected={} root_ring_installed_points={} seen={positive_control_allocator_seen}",
-        set_text(&positive_control_allocator.tree_table_lags_real),
-        set_text(&expected_lags_four),
-        positive_control_allocator
-            .observations
-            .iter()
-            .filter(|observation| observation.reading.root_ring_installed)
-            .count()
+        "name=pc_pinned_floor_summary cells={pinned_floor_cells} seen_real_cells={pinned_floor_seen_real_cells} seen_every_cells={pinned_floor_seen_every_cells}"
     ));
+    // 登记写死六格：S ∈ {4, 8, 16} × ρ ∈ {1, 1/4}，全都排得下。
+    let pinned_floor_seen =
+        pinned_floor_cells == 6 && pinned_floor_seen_every_cells == pinned_floor_cells;
 
     // PC-多扣：每个 (S, ρ) 的 Hh(0, —) 与 Hh(2, 后)，四个组合的期末值都要 > 0。
     let mut over_withheld_controls_void = 0u64;
@@ -4962,11 +5253,28 @@ fn main() {
         front_one_slot.join(","),
         not_on_holes.join(","),
     ));
+    // 第 6 次重跑登记 E10：定乙钉住的汇总（逐格的和）。
+    let sum_of = |pick: fn(&AllZeroPinCellTotals) -> u64| -> u64 {
+        all_zero_pin_cells.iter().map(pick).sum()
+    };
+    emitter.emit(&format!(
+        "name=all_zero_pin_summary cells={} cells_with_pins={} pins_installed={} threshold_lowered_points={} released_by_reread_only={} bad_slots_at_mount={} bad_slots_still_pinned={}",
+        all_zero_pin_cells.len(),
+        all_zero_pin_cells
+            .iter()
+            .filter(|cell| cell.pins_installed > 0)
+            .count(),
+        sum_of(|cell| cell.pins_installed),
+        sum_of(|cell| cell.threshold_lowered_points),
+        sum_of(|cell| cell.released_by_reread_only),
+        sum_of(|cell| cell.bad_slots_at_mount),
+        sum_of(|cell| cell.bad_slots_still_pinned),
+    ));
 
     // 作废与停机（第十一节）。
     let cells_run = outcomes.len();
     emitter.emit(&format!(
-        "name=verdict stage=second cells_run={cells_run} cells_not_fitting={not_fitting} truncated_cells={} v1_over_withheld_controls_void={over_withheld_controls_void} v2_a10_every_mismatch_cells={every_publish_tree_table_lag_mismatch_cells} v2_a12_every_nonzero_points={} v2_a14_mismatch_points={} v2_a15_every_below_points={} v2_pc_allocator_seen={positive_control_allocator_seen} v2_pc_c2_seen={positive_control_crash_seen} v6_a11_mismatch_points={} v6_devices_unequal_points={} v6_pc_hole_not_seen_cells={hole_controls_not_seen} v16_judge_cases_wrong={judge_wrong} v17_a13_every_nonzero_points={} s1_failures={} s1h_root_ring_missing_points={} s11_a10_real_mismatch_cells={} s11_a12_real_nonzero_points={} s11_a15_real_below_points={} s11_k10_violation_points={} s12_g_adm_nonzero={} k8_mismatches={} referenced_but_free_points={} abandoned_or_unknown_root_points={} anchor_rows_missing={}",
+        "name=verdict stage=second cells_run={cells_run} cells_not_fitting={not_fitting} truncated_cells={} v1_over_withheld_controls_void={over_withheld_controls_void} v2_a10_every_mismatch_cells={every_publish_tree_table_lag_mismatch_cells} v2_a12_every_nonzero_points={} v2_a14_mismatch_points={} v2_a15_every_below_points={} v2_pc_pinned_floor_seen={pinned_floor_seen} v2_pc_c2_seen={positive_control_crash_seen} v6_a11_mismatch_points={} v6_devices_unequal_points={} v6_pc_hole_not_seen_cells={hole_controls_not_seen} v16_judge_cases_wrong={judge_wrong} v17_a13_every_nonzero_points={} s1_failures={} s1h_root_ring_missing_points={} s11_a10_real_mismatch_cells={} s11_a12_real_nonzero_points={} s11_a15_real_below_points={} s11_k10_violation_points={} s12_g_adm_nonzero={} k8_mismatches={} referenced_but_free_points={} abandoned_or_unknown_root_points={} anchor_rows_missing={}",
         outcomes.iter().filter(|outcome| outcome.truncation.is_some()).count(),
         grid_totals.every_publish_nonzero_without_holes,
         grid_totals.threshold_anchor_mismatches,
@@ -5003,19 +5311,20 @@ fn main() {
 #[cfg(test)]
 mod tests {
     //! K1（新池新建文件之后的记账三项）、G27（`referenced_slots`）、R8（U7）、R3 的判别力（U8）、R-3 闭式（U10、U12）的最小单测，
-    //! 与第 4 次重跑登记第九节的 U11、U13–U18。
+    //! 与第 4 次重跑登记第九节的 U11、U13–U18、第 5 次重跑登记第九节的 U19。
     use super::{
         accounting_row_slots, allocated_minus_deferred_matches_referenced,
         allocated_minus_deferred_mismatches_referenced, anchor_cell_for, anchor_cells_of,
         corrupt_device_zero_accounting, e156_allocation_record_tree_new_node_count,
         e156_closed_form_expected, e156_existing_leaf_positions, e156_touched_leaf_positions,
         hh_request, judge_geometry_sensitivity, judge_growth_with_holes,
-        judge_peak_against_threshold, judge_positive_control_cases, memory_pool_snapshot,
-        parameters, q7c_self_test, referenced_slots, run_forward_rollback_scenario, run_hh_history,
-        run_rollback_to_the_oldest_candidate, self_release_slots_of_this_publish,
-        synthetic_base_with_zero_deferred, AnchorCellsOfOneSlotsPerRegion, Arm, Emitter,
-        GeometrySensitivity, GrowthWithHoles, HhCellShape, HhRunOutcome, HolePosition,
-        PeakJudgement, ReclaimTiming, WorkloadDensity, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
+        judge_hole_history_outcome, judge_peak_against_threshold, judge_positive_control_cases,
+        memory_pool_snapshot, parameters, q7c_self_test, referenced_slots,
+        run_forward_rollback_scenario, run_hh_history, run_rollback_to_the_oldest_candidate,
+        self_release_slots_of_this_publish, synthetic_base_with_zero_deferred,
+        AnchorCellsOfOneSlotsPerRegion, Arm, Emitter, GeometrySensitivity, GrowthWithHoles,
+        HhCellShape, HhRunOutcome, HolePosition, PeakJudgement, ReclaimTiming, WorkloadDensity,
+        FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
     };
     use singlefs_core::address::{CheckpointTxg, DeviceIdentity, InstanceGeneration, SlotNumber};
     use singlefs_core::allocator::{
@@ -5023,7 +5332,8 @@ mod tests {
     };
     use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};
     use singlefs_core::make_filesystem::{
-        make_filesystem, INSTANCE_TABLE_SLOT, TREE_TABLE_GENESIS_SLOT,
+        make_filesystem, root_ring_occupancy_after_make_filesystem, INSTANCE_TABLE_SLOT,
+        TREE_TABLE_GENESIS_SLOT,
     };
     use singlefs_core::transaction::{
         acquire_instance, publish_first_file, warm_up, FirstFile, PoolWriter, TransactionOutput,
@@ -5064,6 +5374,12 @@ mod tests {
                 span: 1,
             },
         );
+        // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（C551：没装的分配器记根就断言）。用它的单测最多记到 txg 15，
+        // 环转不过一格，一个落点都不回收，钉的数与不装时相同。
+        allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(
+            &parameters,
+            &genesis,
+        ));
         let instance = {
             let mut pool = PoolWriter::new(&parameters, devices.as_mut_slice());
             acquire_instance(&mut pool).expect("取号")
@@ -5557,7 +5873,7 @@ mod tests {
     }
 
     /// U14（第 4 次重跑登记第九节）：Hh(0, —, S = 4, ρ = 1) 跑到 txg 48：实与每两个时点 A10 的滞后全是 12、A12 每个观测点
-    /// Q1a = Q1b = 0、每个观测点分配器装着根环表。M35（分配器退回不装根环表）、M42（「每」的门槛晚一次）在这里红。
+    /// Q1a = Q1b = 0、每个观测点分配器装着根环表。M35（第 5 次重跑登记第九节改写：装着根环表而记根时不回收）、M42（「每」的门槛晚一次）在这里红。
     #[test]
     fn hh_without_holes_at_four_slots_per_region_reclaims_each_tree_table_one_ring_length_after_release(
     ) {
@@ -5716,6 +6032,120 @@ mod tests {
                 "txg 7 Q1b = 0"
             );
         }
+    }
+
+    /// U20（第 6 次重跑登记第九节；钉的值出自第七节 K16、L6）：Hh(1, 前, S = 4, ρ = 1)，与 U17 同一段历史。定乙：洞在 txg 5，
+    /// 那一槽挂载时读回全零、钉在 5；txg 16 环里最旧有效根是 6、门槛照钉住取 5；txg 17 这个进程写掉那一槽，门槛回到 6。
+    /// M45（门槛不并进全零槽）、M46（锚点模型不并进）、M47（写掉也不解开）在这里红。
+    #[test]
+    fn hh_front_hole_at_four_slots_per_region_pins_the_threshold_to_the_hole_txg_until_the_process_rewrites_its_slot(
+    ) {
+        let anchors = anchors_for_four_slots_per_region();
+        let outcome = run_the_hole_history_of_one_shape(&anchors, 1, Some(HolePosition::Front));
+        let recovery = outcome.recoveries.first().expect("造了一个洞");
+        assert_eq!(recovery.hole_txg, 5, "洞在 txg 5");
+        assert_eq!(
+            recovery.hole_slot_content, "never_written",
+            "txg 5 的槽从没写过"
+        );
+        assert_eq!(outcome.all_zero_pin_mounts.len(), 1, "一次挂载");
+        let txg_five_slot = super::RootRingSlot { region: 2, slot: 1 };
+        assert_eq!(
+            outcome.all_zero_pin_mounts[0].pinned,
+            BTreeMap::from([(txg_five_slot, 5)]),
+            "W16、W17：这次挂载恰好钉 txg 5 那一槽（区域 2、槽 1），钉在 5"
+        );
+        for (txg, expected_threshold) in [(15u64, 4u64), (16, 5), (17, 6)] {
+            assert_eq!(
+                observation_at(&outcome, txg).reading.ring_threshold,
+                expected_threshold,
+                "K16：txg {txg} 门槛 = {expected_threshold}"
+            );
+        }
+        let anchor = anchor_cell_for(&anchors, 4, 1, Some(HolePosition::Front));
+        assert_eq!(
+            anchor.observed_row(16).expect("锚点有 txg 16").floor,
+            5,
+            "L6：锚点模型 txg 16 门槛 = 5"
+        );
+        assert_eq!(
+            anchor.observed_row(17).expect("锚点有 txg 17").floor,
+            6,
+            "锚点模型 txg 17 门槛 = 6"
+        );
+        for observation in &outcome.observations {
+            assert_eq!(
+                observation.reading.device_zero.reclaim_rule_violations, 0,
+                "K10：txg {}",
+                observation.txg
+            );
+            assert_eq!(
+                observation.over_withheld(Arm::FloorRule, ReclaimTiming::Real),
+                observation.over_withheld(Arm::FloorRule, ReclaimTiming::EveryPublish),
+                "F24：实、每两列 Q1a 相等，txg {}",
+                observation.txg
+            );
+        }
+        assert_eq!(
+            outcome.all_zero_pins_released_by_write, 1,
+            "txg 17 写掉那一槽"
+        );
+        assert_eq!(
+            outcome.all_zero_pins_released_by_reread_only, 0,
+            "没有重读解开"
+        );
+        assert_eq!(
+            outcome.all_zero_pin_mounts[0].bad_slots_at_mount, 0,
+            "挂载那一刻没有读坏的槽"
+        );
+    }
+
+    /// U19（第 5 次重跑登记第九节）：Hh(1, 后, S = 4, ρ = 1)，与 U15 同一段历史。① 实、每两份滞后集合都含 6S − 1 = 23
+    /// （K15、L1：洞让 txg 4 的旧根压着门槛到 txg 28，释放代 6 的树表到那一次发布才可发，滞后 = 28 + 1 − 6）；
+    /// ② 交 k = 0 的 A10 判定、期望 {12} 时，实、每两项都判「不符」；③ 期望换成这一格自己量出来的两份集合时，两项各自判「符」
+    /// （判定不是恒红）。M44（「实」列不读真实分配器的空闲位图、按 3S 的时间表记）在 ① 红。
+    #[test]
+    fn hh_back_hole_at_four_slots_per_region_delays_the_tree_table_reclaim_to_six_ring_slots_minus_one_and_the_a10_judgement_sees_it(
+    ) {
+        let outcome = run_the_hole_history_of_one_shape(
+            &anchors_for_four_slots_per_region(),
+            1,
+            Some(HolePosition::Back),
+        );
+        assert!(
+            outcome.tree_table_lags_real.contains(&23),
+            "K15：实列滞后集合含 6S − 1 = 23，量到 {:?}",
+            outcome.tree_table_lags_real
+        );
+        assert!(
+            outcome.tree_table_lags_every_publish.contains(&23),
+            "K15：每列滞后集合含 6S − 1 = 23，量到 {:?}",
+            outcome.tree_table_lags_every_publish
+        );
+        let three_slots_per_ring_length = BTreeSet::from([12]);
+        let against_the_no_hole_expectation =
+            judge_hole_history_outcome(&outcome, Some(&three_slots_per_ring_length));
+        assert_eq!(
+            against_the_no_hole_expectation.tree_table_lag_real_mismatch, 1,
+            "期望 {{12}}：实列判不符"
+        );
+        assert_eq!(
+            against_the_no_hole_expectation.tree_table_lag_every_publish_mismatch, 1,
+            "期望 {{12}}：每列判不符"
+        );
+        let real_own = outcome.tree_table_lags_real.clone();
+        let every_own = outcome.tree_table_lags_every_publish.clone();
+        assert_eq!(
+            judge_hole_history_outcome(&outcome, Some(&real_own)).tree_table_lag_real_mismatch,
+            0,
+            "期望 = 实列自己量出来的集合：实列判符"
+        );
+        assert_eq!(
+            judge_hole_history_outcome(&outcome, Some(&every_own))
+                .tree_table_lag_every_publish_mismatch,
+            0,
+            "期望 = 每列自己量出来的集合：每列判符"
+        );
     }
 
     /// U18（第 4 次重跑登记第九节，PC-判定器）：判定函数在合成用例上逐条判对。M43（「> 2」写成「≥ 2」）在这里红。

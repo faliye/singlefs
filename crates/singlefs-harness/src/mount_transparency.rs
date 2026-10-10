@@ -6,8 +6,9 @@
 //! 或挂载加一次发布——之后再只读恢复一次（R2），逐字段比（[`judge_mount_transparency`]）；挂载途中各相位的二次崩溃镜像上，
 //! 只读恢复读出的与 R1 比（用户 2026-10-02 定 F6「加二次」）；抬 F 的写有持久的那几态 F 不判（[`FloorRaisesInTheMountWrites`]；
 //! 抬 F 的界在挂载写表里对不上位置的那一次挂载，二次崩溃整段 F 不判、按 [`FieldNotJudged`] 计数）。
-//! 可写挂载被拒的状态不判透明，判拒绝本身合不合法（[`judge_writable_mount_refusal`]；崩溃注入第二截再加 C670 那一条：
-//! 没注入读故障的崩溃态上判据 N-配置 复算为真，拒得不合法，[`judge_writable_mount_refusal_of_a_crash_state`]）。
+//! 可写挂载被拒的状态不判透明，判拒绝本身合不合法（[`judge_writable_mount_refusal`]；崩溃注入第二、三截再加两条：
+//! 没注入读故障的崩溃态上判据 N-配置 复算为真（C670），或「读阶段判完之后系统配置又读不出」那一拒的判据复算为真（改法 G4），
+//! 正确实现摆不出这份盘面，拒得不合法，[`judge_writable_mount_refusal_of_a_crash_state`]）。
 //!
 //! 读盘的只有 [`read_recovery_fields`] 与那两个判拒绝的函数里在崩溃镜像上复算拒的判据那一截；[`judge_mount_transparency`]
 //! 只吃读好的字段与挂载交回值。checker 档的崩溃注入调它，harness 档的轻用例也调它（harness 档不依赖 checker 档）。
@@ -16,22 +17,39 @@
 
 use std::collections::BTreeMap;
 
-use singlefs_core::address::{CheckpointTxg, InstanceGeneration};
+use singlefs_core::address::{
+    CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
+};
+use singlefs_core::bytes::ByteReader;
+use singlefs_core::checksum::crc32_castagnoli;
 use singlefs_core::instance_table::InstanceRow;
-use singlefs_core::journal::JournalRecordPlaceInPublish;
+use singlefs_core::journal::{JournalRecord, JournalRecordPlaceInPublish, NamedUnit};
 use singlefs_core::mount::{MountError, MountOutput, RaisedFloor, StillUnreadableAfterOneReread};
-use singlefs_core::records::{TreeTableEntry, TREE_KIND_EXTENT, TREE_KIND_INODE};
+use singlefs_core::pointer::NodePointer;
+use singlefs_core::records::{
+    TreeTableEntry, TREE_KIND_ALLOCATION, TREE_KIND_DEADLIST, TREE_KIND_DELETED_INODES,
+    TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_LINEAGE, TREE_KIND_LIVELIST,
+    TREE_KIND_LOGGED_OPERATIONS, TREE_KIND_RETIREMENT, TREE_KIND_SPARSE_SIDE_TABLE,
+    TREE_KIND_TOMBSTONE,
+};
 use singlefs_core::recovery::{
-    choose_root, choose_system_configuration, effective_rollback_floor, highest_root_instance,
-    highest_root_txg, instance_table_of_root, readable_roots, recover, replay_journal,
-    scan_journal, user_visible_tree_root_pointers, verified_system_configuration_slots,
-    walk_to_file, JournalPolicy, PoolReader, RecoveryOutcome, RecoveryReport,
-    UserVisibleTreeRootPointers,
+    choose_root, choose_system_configuration, chosen_system_configuration_slot_bytes,
+    effective_rollback_floor, highest_root_instance, highest_root_txg, instance_table_of_root,
+    newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to,
+    readable_roots, recover, replay_journal, root_record_bytes_of_the_version, scan_journal,
+    tree_table_entry_bytes_of_root, verified_system_configuration_slots, walk_to_file,
+    JournalPolicy, PoolReader, RecoveryOutcome, RecoveryReport,
 };
 use singlefs_core::root_record::{RootRecord, UnmountMarker};
 use singlefs_core::system_configuration::{SystemConfiguration, SystemImmutableConfiguration};
 use singlefs_core::transaction::TransactionOutput;
-use singlefs_format::SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE;
+use singlefs_core::unit::{
+    parse_index_node, UNIT_CLASS_DATA, UNIT_CLASS_INDEX_NODE, UNIT_CLASS_PACKED,
+};
+use singlefs_format::{
+    DATA_UNIT_BYTES, NODE_BYTES, SYSTEM_CONFIGURATION_BYTES, SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE,
+    SYSTEM_CONFIGURATION_SLOT_BYTES,
+};
 
 use crate::memory_pool::{root_identity_written_by, RetainedWrite};
 use crate::segments::StepKind;
@@ -74,15 +92,19 @@ pub enum ComparedVersion {
     TheVersionBeforeTheRecoveredOne,
 }
 
-/// 拿来比的那一版自己的字段：根记录、读出的内容、它指着的实例表的行、树表里两棵用户可见树的根指针。
+/// 拿来比的那一版自己的字段：根记录（解出来的与原字节）、读出的内容、它指着的实例表的行、树表条目的原字节。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VersionFieldsRead {
     pub root: RootRecord,
+    /// 根记录 [0, `ROOT_RECORD_BYTES`) 的原字节（`recovery::root_record_bytes_of_the_version`：根环里那一槽的，
+    /// 由记录施加出来、根槽没落盘的那一版是按字段表编出来的）。[`ROOT_RECORD_FIELD_BYTE_RANGES`] 按它逐段比。
+    pub root_record_bytes: Vec<u8>,
     pub content: PosixContentRead,
     /// 实例表沿链有一片读不出、解不开时 None。
     pub instance_table_rows: Option<Vec<InstanceRow>>,
-    /// 树表读不出、解不开时 None。
-    pub user_visible_tree_root_pointers: Option<UserVisibleTreeRootPointers>,
+    /// 树表单元里每一条条目的原字节，按盘上次序（`recovery::tree_table_entry_bytes_of_root`）；树表读不出、解不开时 None。
+    /// [`TREE_TABLE_ENTRY_FIELD_BYTE_RANGES`] 按它逐条逐段比，树表条目的根指针那一样也从这里取。
+    pub tree_table_entries: Option<Vec<Vec<u8>>>,
 }
 
 /// 一个池上的一次只读恢复（看 journal）连同挂载透明要比的字段（[`read_recovery_fields`] 读出来的）。
@@ -106,12 +128,22 @@ pub struct RecoveryFieldsRead {
     pub highest_root_txg_in_the_ring: Option<CheckpointTxg>,
     /// 环里全部自证通过的 journal 记录的 checkpoint_txg 的最大值（txg 下界另一半）。
     pub highest_record_checkpoint_txg_in_the_ring: Option<CheckpointTxg>,
+    /// 环里全部自证通过的 journal 记录的计数器的最大值（系统配置 journal_tail 那一样的上界）；环里一条都没有时 None。
+    pub highest_record_counter_in_the_ring: Option<u64>,
+    /// 择到的系统配置那一槽 [0, `SYSTEM_CONFIGURATION_BYTES`) 的原字节（`recovery::chosen_system_configuration_slot_bytes`）；择不到时 None。
+    /// [`SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES`] 按它逐段比，journal_tail、journal 实例代号、系统运行配置三样也从这里取。
+    pub chosen_system_configuration_bytes: Option<Vec<u8>>,
 }
 
 /// 对 `reader` 跑一次只读恢复（看 journal），再读挂载透明要比的字段。`compared` 定拿哪一版来比（[`ComparedVersion`]）。
 ///
+/// 拿来比的那一版（与恢复报告里的 `effective_root` 那一版）按恢复同一套读法再算一遍：择根、重放；重放出来的那一版走读失败时，
+/// 照恢复同一份 F2 判法（`recovery::newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to`）退到
+/// [系统配置见证到的那一版, 所选根) 里最新的那条根，
+/// 那一版走得通就是它（判决 `research/prompts/m3-batch33t-code-r1-main-verification.md` 第三节第 1 条：F2 退了就比退到的那一版）。
+///
 /// # Panics
-/// 同一份盘、同一套读法再择一次根、再重放一次，落到的那一版与恢复报告里的不同：两次读同一份内存盘，读法是同一组函数，走不到。
+/// 同一份盘、同一套读法再算一遍，落到的那一版与恢复报告里的不同：两次读同一份内存盘，读法是同一组函数，走不到。
 #[must_use]
 pub fn read_recovery_fields(
     reader: &dyn PoolReader,
@@ -128,10 +160,16 @@ pub fn read_recovery_fields(
         highest_root_instance_in_the_ring: None,
         highest_root_txg_in_the_ring: None,
         highest_record_checkpoint_txg_in_the_ring: None,
+        highest_record_counter_in_the_ring: None,
+        chosen_system_configuration_bytes: None,
     };
     let Ok(system_configuration) = choose_system_configuration(reader) else {
         return fields;
     };
+    let system_configuration_bytes =
+        usize::try_from(SYSTEM_CONFIGURATION_BYTES).expect("系统配置字段表 489 字节装得进 usize");
+    fields.chosen_system_configuration_bytes = chosen_system_configuration_slot_bytes(reader)
+        .map(|slot| slot[..system_configuration_bytes].to_vec());
     let immutable = system_configuration.immutable;
     let slot_spacing = u64::from(immutable.sizes.fixed_structure_slot_spacing);
     fields.immutable_configuration = Some(immutable);
@@ -169,10 +207,11 @@ pub fn read_recovery_fields(
     let records = scan_journal(reader, &system_configuration);
     fields.highest_record_checkpoint_txg_in_the_ring =
         records.values().map(|record| record.checkpoint_txg).max();
+    fields.highest_record_counter_in_the_ring = records.values().map(|record| record.counter).max();
     let Some(chosen) = choose_root(reader, &system_configuration) else {
         return fields;
     };
-    let Ok((_, recovered_root)) = replay_journal(
+    let Ok((_, replayed_root)) = replay_journal(
         reader,
         &chosen,
         immutable.sizes.journal_ring_bytes,
@@ -181,14 +220,32 @@ pub fn read_recovery_fields(
     ) else {
         return fields;
     };
+    let walks_to_a_file_or_no_file = |root: &RootRecord| {
+        let mut mapping_fallbacks = 0usize;
+        walk_to_file(reader, root, &mut mapping_fallbacks).is_ok()
+    };
+    let recovered_root = if walks_to_a_file_or_no_file(&replayed_root) {
+        replayed_root
+    } else {
+        newest_root_from_the_version_the_system_configuration_witnessed_up_to_the_chosen_root_to_fall_back_to(
+            reader,
+            &system_configuration,
+            &chosen,
+            &replayed_root,
+            &records,
+        )
+        .filter(walks_to_a_file_or_no_file)
+        .unwrap_or(replayed_root)
+    };
     assert_eq!(
         Some((recovered_root.instance, recovered_root.checkpoint_txg)),
         fields.report.effective_root,
-        "同一份盘上再择一次根、再重放一次，要落到恢复报告里那一版"
+        "同一份盘上再择一次根、再重放一次（走读失败时照 F2 退到 [见证到的那一版, 所选根) 里最新的那条根），要落到恢复报告里那一版"
     );
     fields.compared_version = match compared {
         ComparedVersion::TheRecoveredVersion => Some(version_fields(
             reader,
+            &immutable,
             recovered_root,
             PosixContentRead::of_the_recovery_report(&fields.report),
         )),
@@ -211,7 +268,7 @@ pub fn read_recovery_fields(
                 Ok(None) => PosixContentRead::NoFile,
                 Err(_failure) => PosixContentRead::NothingRead,
             };
-            version_fields(reader, before, content)
+            version_fields(reader, &immutable, before, content)
         }),
     };
     fields
@@ -219,14 +276,21 @@ pub fn read_recovery_fields(
 
 fn version_fields(
     reader: &dyn PoolReader,
+    immutable: &SystemImmutableConfiguration,
     root: RootRecord,
     content: PosixContentRead,
 ) -> VersionFieldsRead {
     VersionFieldsRead {
         root,
+        root_record_bytes: root_record_bytes_of_the_version(
+            reader,
+            &immutable.region_devices,
+            &immutable.sizes,
+            &root,
+        ),
         content,
         instance_table_rows: instance_table_of_root(reader, &root).map(|table| table.rows),
-        user_visible_tree_root_pointers: user_visible_tree_root_pointers(reader, &root).ok(),
+        tree_table_entries: tree_table_entry_bytes_of_root(reader, &root).ok(),
     }
 }
 
@@ -523,15 +587,71 @@ impl FloorRaisesInTheMountWrites {
     }
 }
 
-/// 挂载续做（D8（核心索引结构） 已定项 16 第 6 条）每一步那一版树表里两棵用户可见树的根指针（用户 2026-10-03 定「续做算挂载的一部分」）：
-/// 挂载写的版本里，续做之前的那几版（写行、暖机、准入推的抬 F）照抄 R1 那一版的两棵树；续做的每一步改了它们，之后挂载写的版本
+/// 树表里只由挂载续做改根的那六种树（判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1：墓碑、谱系、
+/// deleted_inodes 三根并进「树表里 inode 树、extent 树的根指针」那一行，同一条续做规则）：extent、inode、deleted_inodes、墓碑树、谱系树，
+/// 与退役树（续做的最后一批身份消失时追加，挂载本身不改它；判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条，
+/// 正推 K1.2 那一行）。
+pub const TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES: [u16; 6] = [
+    TREE_KIND_EXTENT,
+    TREE_KIND_INODE,
+    TREE_KIND_DELETED_INODES,
+    TREE_KIND_TOMBSTONE,
+    TREE_KIND_LINEAGE,
+    TREE_KIND_RETIREMENT,
+];
+
+/// 树表里根恒全零、挂载前后必须相同的那四种树（同上判决 Y1「树表种类 6、7、8、12 的根」那一行）：livelist、稀疏旁表、deadlist、logged_ops。
+/// 种类 3、4（分配记录树、记账树）的根每一版都重写，不比，归「分配记录」那一行（池级 checker 判 R2 的镜像）。
+pub const TREE_KINDS_WHOSE_ROOTS_THE_MOUNT_KEEPS: [u16; 4] = [
+    TREE_KIND_LIVELIST,
+    TREE_KIND_SPARSE_SIDE_TABLE,
+    TREE_KIND_DEADLIST,
+    TREE_KIND_LOGGED_OPERATIONS,
+];
+
+/// 一版树表里按种类取的条目根指针（条目偏移 14 起 86 字节的盘上原样）；同一种有几条时取盘上先出现的那条（同一种两条由池级 checker 的
+/// I-9.16 ③ 判，这里不另判）。只装调用方点名的那几种。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TreeTableEntryRootPointersByKind {
+    pub root_pointer_of_each_kind: BTreeMap<u16, Vec<u8>>,
+}
+
+impl TreeTableEntryRootPointersByKind {
+    /// 从树表条目的原字节取 `kinds` 那几种的根指针。条目宽不到种类那 2 字节或根指针那 86 字节的条目跳过（宽度由树表字段表那一段比）。
+    #[must_use]
+    pub fn of_the_entries(entries: &[Vec<u8>], kinds: &[u16]) -> Self {
+        let mut root_pointer_of_each_kind = BTreeMap::new();
+        for entry in entries {
+            let (Some(kind_bytes), Some(root_pointer)) = (
+                entry.get(TREE_TABLE_ENTRY_KIND.clone()),
+                entry.get(TREE_TABLE_ENTRY_ROOT_POINTER.clone()),
+            ) else {
+                continue;
+            };
+            let kind = u16::from_le_bytes(kind_bytes.try_into().expect("切的是种类那 2 字节"));
+            if kinds.contains(&kind) {
+                root_pointer_of_each_kind
+                    .entry(kind)
+                    .or_insert_with(|| root_pointer.to_vec());
+            }
+        }
+        TreeTableEntryRootPointersByKind {
+            root_pointer_of_each_kind,
+        }
+    }
+}
+
+/// 挂载续做（D8（核心索引结构） 已定项 16 第 6 条）每一步那一版树表里只由续做改根的那六种树
+/// （[`TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES`]）的根指针（用户 2026-10-03 定「续做算挂载的一部分」）：
+/// 挂载写的版本里，续做之前的那几版（写行、暖机、准入推的抬 F）照抄 R1 那一版的；续做的每一步改了它们，之后挂载写的版本
 /// （续做推的抬 F 的空发布）照抄最近一步的。挂载没续做时一步都没有，挂载写的每一版都比 R1 那一版。
+/// 名字里的「用户可见」是只装 inode 树、extent 树两种时起的：checker 档的崩溃注入（`crash_injection.rs`）照这个名字调它，改名随那一份。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UserVisibleTreeRootPointersOfTheContinuation {
-    /// (那一步的实例代号与 checkpoint_txg, 两根指针)，按 txg 升序（构造时排）。
+    /// (那一步的实例代号与 checkpoint_txg, 五种树的根指针)，按 txg 升序（构造时排）。
     steps: Vec<(
         (InstanceGeneration, CheckpointTxg),
-        UserVisibleTreeRootPointers,
+        TreeTableEntryRootPointersByKind,
     )>,
 }
 
@@ -539,20 +659,20 @@ impl UserVisibleTreeRootPointersOfTheContinuation {
     /// 挂载没续做（`MountOutput::deletion_queue_continuation` 空）。
     pub const NOT_CONTINUED: Self = Self { steps: Vec::new() };
 
-    /// 两根指针取续做每一步交回的树表条目（`TransactionOutput::tree_table_entries`）里那 86 字节，与只读恢复读盘上树表的取法
-    /// （`recovery::user_visible_tree_root_pointers`）同一段字节。
+    /// 根指针取续做每一步交回的树表条目（`TransactionOutput::tree_table_entries`）编成盘上字节之后那 86 字节，与只读恢复读盘上树表条目
+    /// 的取法（[`TreeTableEntryRootPointersByKind::of_the_entries`]）同一段字节。
     #[must_use]
     pub fn of_the_mount_output(output: &MountOutput) -> Self {
         let mut steps: Vec<(
             (InstanceGeneration, CheckpointTxg),
-            UserVisibleTreeRootPointers,
+            TreeTableEntryRootPointersByKind,
         )> = output
             .deletion_queue_continuation
             .iter()
             .map(|step| {
                 (
                     (step.root.instance, step.root.checkpoint_txg),
-                    user_visible_tree_root_pointers_of_a_published_version(step),
+                    root_pointers_the_continuation_rewrites_in_a_published_version(step),
                 )
             })
             .collect();
@@ -560,12 +680,12 @@ impl UserVisibleTreeRootPointersOfTheContinuation {
         UserVisibleTreeRootPointersOfTheContinuation { steps }
     }
 
-    /// 挂载写的 `version` 那一版该带的两根指针：同一个实例里 txg 不大于它的最近一步续做那一版的；它在续做之前（或挂载没续做）时 None，
+    /// 挂载写的 `version` 那一版该带的五种树的根指针：同一个实例里 txg 不大于它的最近一步续做那一版的；它在续做之前（或挂载没续做）时 None，
     /// 调用方比 R1 那一版。
     fn of_the_last_step_at_or_before(
         &self,
         version: (InstanceGeneration, CheckpointTxg),
-    ) -> Option<&UserVisibleTreeRootPointers> {
+    ) -> Option<&TreeTableEntryRootPointersByKind> {
         self.steps
             .iter()
             .filter(|(step, _)| step.0 == version.0 && step.1 <= version.1)
@@ -574,20 +694,19 @@ impl UserVisibleTreeRootPointersOfTheContinuation {
     }
 }
 
-/// 一次发布交回的树表条目里 inode 树、extent 树两条的根指针盘上字节；树表里没有那棵树的条目时 None。
-fn user_visible_tree_root_pointers_of_a_published_version(
+/// 一次发布交回的树表条目里只由续做改根的那五种树的根指针盘上字节；树表里没有那种树的条目时那一种不在表里。
+fn root_pointers_the_continuation_rewrites_in_a_published_version(
     version: &TransactionOutput,
-) -> UserVisibleTreeRootPointers {
-    let mut pointers = UserVisibleTreeRootPointers::ABSENT;
-    for entry in &version.tree_table_entries {
-        let root_pointer = Some(TreeTableEntry::root_pointer_bytes(&entry.to_bytes()).to_vec());
-        if entry.kind == TREE_KIND_INODE {
-            pointers.inode_tree = root_pointer;
-        } else if entry.kind == TREE_KIND_EXTENT {
-            pointers.extent_tree = root_pointer;
-        }
-    }
-    pointers
+) -> TreeTableEntryRootPointersByKind {
+    let entries: Vec<Vec<u8>> = version
+        .tree_table_entries
+        .iter()
+        .map(TreeTableEntry::to_bytes)
+        .collect();
+    TreeTableEntryRootPointersByKind::of_the_entries(
+        &entries,
+        &TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES,
+    )
 }
 
 /// 做的是哪个动作。
@@ -601,7 +720,8 @@ pub enum MountTransparencyAction {
     SecondCrashInsideTheMount(FloorRaisesAtTheSecondCrash),
 }
 
-/// 比的十样（r5 判决第二节 U5 那一行的逐字段表）。
+/// 比的十八样：r5 判决第二节 U5 那一行的逐字段表十样，加判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md`
+/// 第二节 Y1、Y2 补的五样关系与三张按字节区间的字段表。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum MountTransparencyField {
     /// POSIX 内容与存在性。
@@ -614,11 +734,29 @@ pub enum MountTransparencyField {
     InstanceGeneration,
     InstanceTableRows,
     TreeIdentifierWatermark,
-    /// 树表里 inode 树、extent 树两个根指针。
-    UserVisibleTreeRootPointers,
+    /// 树表条目的根指针：种类 1、2、9、10、11、13（[`TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES`]）照续做规则，
+    /// 种类 6、7、8、12（[`TREE_KINDS_WHOSE_ROOTS_THE_MOUNT_KEEPS`]）与 R1 相同，种类 3、4 不比。
+    TreeTableEntryRootPointers,
     CheckpointTxg,
     /// 扫描报告（施加了几条、水位之上几条）。
     JournalScanReport,
+    /// 根记录里中央映射树根指针（偏移 256 起 86 字节）：挂载写的那一版 R2 全零 ⇔ R1 全零；落回 v1 时逐字节相同。
+    MappingRootEmptiness,
+    /// 根记录里树表 0 条那一版的分配记录树根（偏移 342 起 86 字节）：挂载写的那一版 R1 带树 ⇒ R2 全零，R1 树表 0 条 ⇒
+    /// R2 非零 ⇔ 这次挂载取到的新实例号 ≥ 2；落回 v1 时逐字节相同。
+    AllocationRecordTreeRoot,
+    /// 系统配置 journal_tail（偏移 469）：R1 的 ≤ R2 的 ≤ R2 环里自证记录的最大计数器，挂载做完（只挂载、挂载加一次发布）取等。
+    SystemConfigurationJournalTail,
+    /// 系统配置的 journal 实例代号（偏移 477）：挂载做完 = R2 那一版根的实例代号；二次崩溃 ∈ {R1 的, 新实例}。
+    SystemConfigurationJournalInstance,
+    /// 系统运行配置 36 字节（偏移 433 起）：R2 = 内置默认（今天没有挂载选项通道，写槽总写默认）。
+    SystemRuntimeConfiguration,
+    /// 根记录按字节区间（[`ROOT_RECORD_FIELD_BYTE_RANGES`]）：「必须相同」「必须为 0」的那几段。
+    RootRecordBytes,
+    /// 系统配置按字节区间（[`SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES`]）：「必须相同」「必须为 0」的那几段。
+    SystemConfigurationBytes,
+    /// 树表条目按字节区间（[`TREE_TABLE_ENTRY_FIELD_BYTE_RANGES`]），逐条：「必须相同」「必须为 0」的那几段。
+    TreeTableEntryBytes,
 }
 
 /// 一样字段的关系是攻方在副本装置上量过（主 agent 复跑坐实）的，还是 r5 判决标「推的」。
@@ -629,7 +767,7 @@ pub enum FieldBasis {
 }
 
 impl MountTransparencyField {
-    pub const ALL: [MountTransparencyField; 10] = [
+    pub const ALL: [MountTransparencyField; 18] = [
         MountTransparencyField::PosixContent,
         MountTransparencyField::ImmutableConfigurationWithoutThisDevice,
         MountTransparencyField::UnmountMarker,
@@ -637,13 +775,22 @@ impl MountTransparencyField {
         MountTransparencyField::InstanceGeneration,
         MountTransparencyField::InstanceTableRows,
         MountTransparencyField::TreeIdentifierWatermark,
-        MountTransparencyField::UserVisibleTreeRootPointers,
+        MountTransparencyField::TreeTableEntryRootPointers,
         MountTransparencyField::CheckpointTxg,
         MountTransparencyField::JournalScanReport,
+        MountTransparencyField::MappingRootEmptiness,
+        MountTransparencyField::AllocationRecordTreeRoot,
+        MountTransparencyField::SystemConfigurationJournalTail,
+        MountTransparencyField::SystemConfigurationJournalInstance,
+        MountTransparencyField::SystemRuntimeConfiguration,
+        MountTransparencyField::RootRecordBytes,
+        MountTransparencyField::SystemConfigurationBytes,
+        MountTransparencyField::TreeTableEntryBytes,
     ];
 
     /// 这一样在这个动作下的关系是量过的还是推的。二次崩溃那一截的字段一半整截是推的（r5 判决第二节 U6、攻方 U6-1），
     /// F 在挂载推了抬 F 时那一半（「= 挂载交回的最后一串抬到的 F」）r5 判决写的是「后半没量」。
+    /// c655 那一轮补的八样（五样关系、三张字节表）一律记推的：攻方量的是副本装置，判决第五节列它们为零轮，入库代码上还没量过。
     #[must_use]
     pub fn basis(self, action: MountTransparencyAction) -> FieldBasis {
         match (action, self) {
@@ -657,9 +804,17 @@ impl MountTransparencyField {
                 MountTransparencyAction::MountAlone(_)
                 | MountTransparencyAction::MountAndOnePublish(_),
                 MountTransparencyField::TreeIdentifierWatermark
-                | MountTransparencyField::UserVisibleTreeRootPointers
+                | MountTransparencyField::TreeTableEntryRootPointers
                 | MountTransparencyField::CheckpointTxg
-                | MountTransparencyField::JournalScanReport,
+                | MountTransparencyField::JournalScanReport
+                | MountTransparencyField::MappingRootEmptiness
+                | MountTransparencyField::AllocationRecordTreeRoot
+                | MountTransparencyField::SystemConfigurationJournalTail
+                | MountTransparencyField::SystemConfigurationJournalInstance
+                | MountTransparencyField::SystemRuntimeConfiguration
+                | MountTransparencyField::RootRecordBytes
+                | MountTransparencyField::SystemConfigurationBytes
+                | MountTransparencyField::TreeTableEntryBytes,
             ) => FieldBasis::InferredNotMeasured,
             (
                 MountTransparencyAction::MountAlone(_)
@@ -726,13 +881,13 @@ impl MountTransparencyField {
                 "挂载透明：树 ID 水位（推的）"
             }
             (
-                MountTransparencyField::UserVisibleTreeRootPointers,
+                MountTransparencyField::TreeTableEntryRootPointers,
                 FieldBasis::MeasuredByTheSecondRoundAttack,
-            ) => "挂载透明：两棵树的根指针（量过）",
+            ) => "挂载透明：树表条目的根指针（量过）",
             (
-                MountTransparencyField::UserVisibleTreeRootPointers,
+                MountTransparencyField::TreeTableEntryRootPointers,
                 FieldBasis::InferredNotMeasured,
-            ) => "挂载透明：两棵树的根指针（推的）",
+            ) => "挂载透明：树表条目的根指针（推的）",
             (MountTransparencyField::CheckpointTxg, FieldBasis::MeasuredByTheSecondRoundAttack) => {
                 "挂载透明：txg（量过）"
             }
@@ -746,8 +901,534 @@ impl MountTransparencyField {
             (MountTransparencyField::JournalScanReport, FieldBasis::InferredNotMeasured) => {
                 "挂载透明：扫描报告（推的）"
             }
+            (
+                MountTransparencyField::MappingRootEmptiness,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：中央映射树根的空性（量过）",
+            (MountTransparencyField::MappingRootEmptiness, FieldBasis::InferredNotMeasured) => {
+                "挂载透明：中央映射树根的空性（推的）"
+            }
+            (
+                MountTransparencyField::AllocationRecordTreeRoot,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：根记录里的分配记录树根（量过）",
+            (MountTransparencyField::AllocationRecordTreeRoot, FieldBasis::InferredNotMeasured) => {
+                "挂载透明：根记录里的分配记录树根（推的）"
+            }
+            (
+                MountTransparencyField::SystemConfigurationJournalTail,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：系统配置 journal_tail（量过）",
+            (
+                MountTransparencyField::SystemConfigurationJournalTail,
+                FieldBasis::InferredNotMeasured,
+            ) => "挂载透明：系统配置 journal_tail（推的）",
+            (
+                MountTransparencyField::SystemConfigurationJournalInstance,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：系统配置的 journal 实例代号（量过）",
+            (
+                MountTransparencyField::SystemConfigurationJournalInstance,
+                FieldBasis::InferredNotMeasured,
+            ) => "挂载透明：系统配置的 journal 实例代号（推的）",
+            (
+                MountTransparencyField::SystemRuntimeConfiguration,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：系统运行配置（量过）",
+            (
+                MountTransparencyField::SystemRuntimeConfiguration,
+                FieldBasis::InferredNotMeasured,
+            ) => "挂载透明：系统运行配置（推的）",
+            (
+                MountTransparencyField::RootRecordBytes,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：根记录按字节区间（量过）",
+            (MountTransparencyField::RootRecordBytes, FieldBasis::InferredNotMeasured) => {
+                "挂载透明：根记录按字节区间（推的）"
+            }
+            (
+                MountTransparencyField::SystemConfigurationBytes,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：系统配置按字节区间（量过）",
+            (MountTransparencyField::SystemConfigurationBytes, FieldBasis::InferredNotMeasured) => {
+                "挂载透明：系统配置按字节区间（推的）"
+            }
+            (
+                MountTransparencyField::TreeTableEntryBytes,
+                FieldBasis::MeasuredByTheSecondRoundAttack,
+            ) => "挂载透明：树表条目按字节区间（量过）",
+            (MountTransparencyField::TreeTableEntryBytes, FieldBasis::InferredNotMeasured) => {
+                "挂载透明：树表条目按字节区间（推的）"
+            }
         }
     }
+}
+
+/// 一段字节区间挂载前后怎么比（判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y2「字段清单从哪取」那一行：
+/// 每段带归类，判官按表比原字节）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FieldByteRangeClass {
+    /// R2 的这几字节与 R1 的逐字节相同。
+    MustBeTheSame,
+    /// R2 的这几字节全是 0。
+    MustBeZero,
+    /// 不比：值随这次挂载合法地变，或读槽那一刻已经判过；`judged_instead_by` 写谁替它判。
+    NotCompared { judged_instead_by: &'static str },
+    /// 挂载前后有一条确定的关系，由 `judged_by` 那一样判（它从同一份原字节里取这几字节）。
+    DeterminedRelation { judged_by: MountTransparencyField },
+}
+
+/// 字段表里的一段：名字、字节区间、归类，与它引的 D13（验证路线） 已定项 1 挂载透明逐字段表那一行的行名
+/// （判决第三节第 3 条：那张表按 Y1、Y2 改行由写回批写；这里引的行名有几行是写回批才加的，见 [`D13_ROWS_ADDED_BY_THE_WRITE_BACK`]）。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct FieldByteRange {
+    pub name: &'static str,
+    pub bytes: std::ops::Range<usize>,
+    pub class: FieldByteRangeClass,
+    pub row_of_the_d13_field_table: &'static str,
+}
+
+/// 系统配置字段表的四档（D22（单元原子性怎么合成） 已定项 9 / 已定项 26：系统不可变配置 389、系统可变配置 4、系统运行配置 36、系统运行量 60）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SystemConfigurationTier {
+    ImmutableConfiguration,
+    MutableConfiguration,
+    RuntimeConfiguration,
+    RuntimeQuantities,
+}
+
+/// 系统配置字段表里的一段，连同它归哪一档。
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SystemConfigurationFieldByteRange {
+    pub range: FieldByteRange,
+    pub tier: SystemConfigurationTier,
+}
+
+/// D13（验证路线） 已定项 1 挂载透明逐字段表今天的行名（`.claude/kb/decisions/13-验证路线.md`）。
+const D13_IMMUTABLE_CONFIGURATION: &str = "池身份与系统配置的不可变配置（本盘设备号除外）";
+const D13_UNMOUNT_MARKER: &str = "卸载记号";
+const D13_ROLLBACK_FLOOR: &str = "F 与 F 生效值";
+const D13_INSTANCE_GENERATION: &str = "实例代号";
+const D13_INSTANCE_TABLE_ROWS: &str = "实例表行";
+const D13_CHECKPOINT_TXG: &str = "`checkpoint_txg`";
+const D13_TREE_IDENTIFIER_WATERMARK: &str = "树 ID 水位";
+const D13_TREE_ROOT_POINTERS: &str = "树表里 inode 树、extent 树的根指针";
+const D13_ALLOCATION_RECORDS: &str = "分配记录";
+/// 判决第二节 Y1、Y2 定下、写回批才加进 D13 逐字段表的几行。
+const D13_STRUCTURAL_FIELDS: &str = "magic、flags 其余位、自证校验和、整槽校验和";
+const D13_ROOT_SLOT_RESERVED_BYTES: &str = "算法、nonce、MAC（根槽偏移 428..457）";
+const D13_SYSTEM_CONFIGURATION_SLOT_GENERATION: &str = "系统配置槽世代号";
+const D13_SYSTEM_CONFIGURATION_JOURNAL_TAIL: &str = "journal_tail";
+const D13_SYSTEM_CONFIGURATION_JOURNAL_INSTANCE: &str = "系统配置的 journal 实例代号";
+const D13_MUTABLE_CONFIGURATION: &str = "系统可变配置（节点大小）";
+const D13_RUNTIME_CONFIGURATION: &str = "系统运行配置";
+const D13_TREE_TABLE_ENTRY_IDENTITY: &str = "树表条目的树 ID、种类、诞生 txg、头 ID";
+
+/// 这几张表引的 D13 行名里，今天的逐字段表有的那几行（[`D13_ROWS_ADDED_BY_THE_WRITE_BACK`] 之外的）。26-4 的对账门禁格按它与 kb 比。
+pub const D13_ROWS_OF_TODAY: [&str; 9] = [
+    D13_IMMUTABLE_CONFIGURATION,
+    D13_UNMOUNT_MARKER,
+    D13_ROLLBACK_FLOOR,
+    D13_INSTANCE_GENERATION,
+    D13_INSTANCE_TABLE_ROWS,
+    D13_CHECKPOINT_TXG,
+    D13_TREE_IDENTIFIER_WATERMARK,
+    D13_TREE_ROOT_POINTERS,
+    D13_ALLOCATION_RECORDS,
+];
+
+/// 这几张表引的 D13 行名里，写回批才加进逐字段表的那几行（判决第三节第 3 条）。
+pub const D13_ROWS_ADDED_BY_THE_WRITE_BACK: [&str; 8] = [
+    D13_STRUCTURAL_FIELDS,
+    D13_ROOT_SLOT_RESERVED_BYTES,
+    D13_SYSTEM_CONFIGURATION_SLOT_GENERATION,
+    D13_SYSTEM_CONFIGURATION_JOURNAL_TAIL,
+    D13_SYSTEM_CONFIGURATION_JOURNAL_INSTANCE,
+    D13_MUTABLE_CONFIGURATION,
+    D13_RUNTIME_CONFIGURATION,
+    D13_TREE_TABLE_ENTRY_IDENTITY,
+];
+
+/// 根记录里几样字段的字节区间（D22（单元原子性怎么合成） 已定项 7 的字段表：行序即盘上顺序，偏移按行累加）。
+const ROOT_RECORD_INSTANCE: std::ops::Range<usize> = 24..28;
+const ROOT_RECORD_MAPPING_ROOT: std::ops::Range<usize> = 256..342;
+const ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT: std::ops::Range<usize> = 342..428;
+
+/// 系统配置里几样字段的字节区间（`.claude/kb/layout/01-first-txn.md`「系统配置字段表的偏移」）。
+const SYSTEM_CONFIGURATION_RUNTIME_CONFIGURATION: std::ops::Range<usize> = 433..469;
+const SYSTEM_CONFIGURATION_JOURNAL_TAIL: std::ops::Range<usize> = 469..477;
+const SYSTEM_CONFIGURATION_JOURNAL_INSTANCE: std::ops::Range<usize> = 477..481;
+
+/// 树表条目里种类与根指针的字节区间（D8（核心索引结构） 已定项 8：树 ID 8 + 条目长度 2 + 种类 2 + flags 2 + 根指针 86）。
+const TREE_TABLE_ENTRY_KIND: std::ops::Range<usize> = 10..12;
+const TREE_TABLE_ENTRY_ROOT_POINTER: std::ops::Range<usize> = 14..100;
+
+const fn must_be_the_same(
+    name: &'static str,
+    bytes: std::ops::Range<usize>,
+    row_of_the_d13_field_table: &'static str,
+) -> FieldByteRange {
+    FieldByteRange {
+        name,
+        bytes,
+        class: FieldByteRangeClass::MustBeTheSame,
+        row_of_the_d13_field_table,
+    }
+}
+
+const fn not_compared(
+    name: &'static str,
+    bytes: std::ops::Range<usize>,
+    judged_instead_by: &'static str,
+    row_of_the_d13_field_table: &'static str,
+) -> FieldByteRange {
+    FieldByteRange {
+        name,
+        bytes,
+        class: FieldByteRangeClass::NotCompared { judged_instead_by },
+        row_of_the_d13_field_table,
+    }
+}
+
+const fn determined_relation(
+    name: &'static str,
+    bytes: std::ops::Range<usize>,
+    judged_by: MountTransparencyField,
+    row_of_the_d13_field_table: &'static str,
+) -> FieldByteRange {
+    FieldByteRange {
+        name,
+        bytes,
+        class: FieldByteRangeClass::DeterminedRelation { judged_by },
+        row_of_the_d13_field_table,
+    }
+}
+
+const READ_WHEN_THE_SLOT_IS_READ: &str = "读槽时判（不对这一槽不可择）";
+
+/// 根记录 [0, `ROOT_RECORD_BYTES`) 按字段逐段（D22（单元原子性怎么合成） 已定项 7 的字段表 15 行；算法、nonce、MAC 合一段）。
+pub const ROOT_RECORD_FIELD_BYTE_RANGES: &[FieldByteRange] = &[
+    not_compared(
+        "magic",
+        0..4,
+        READ_WHEN_THE_SLOT_IS_READ,
+        D13_STRUCTURAL_FIELDS,
+    ),
+    must_be_the_same("fsid", 4..20, D13_IMMUTABLE_CONFIGURATION),
+    determined_relation(
+        "flags（位 0 是卸载记号；其余位非 0 读槽时拒收）",
+        20..24,
+        MountTransparencyField::UnmountMarker,
+        D13_UNMOUNT_MARKER,
+    ),
+    determined_relation(
+        "实例代号",
+        ROOT_RECORD_INSTANCE,
+        MountTransparencyField::InstanceGeneration,
+        D13_INSTANCE_GENERATION,
+    ),
+    determined_relation(
+        "checkpoint_txg",
+        28..36,
+        MountTransparencyField::CheckpointTxg,
+        D13_CHECKPOINT_TXG,
+    ),
+    not_compared(
+        "树表单元指针",
+        36..122,
+        "树表单元自己的落点每次发布都变、不比；它的条目按树表条目那张表逐段比",
+        D13_TREE_ROOT_POINTERS,
+    ),
+    determined_relation(
+        "树 ID 水位",
+        122..130,
+        MountTransparencyField::TreeIdentifierWatermark,
+        D13_TREE_IDENTIFIER_WATERMARK,
+    ),
+    determined_relation(
+        "回退下界 F",
+        130..138,
+        MountTransparencyField::RollbackFloor,
+        D13_ROLLBACK_FLOOR,
+    ),
+    not_compared(
+        "自证校验和",
+        138..170,
+        READ_WHEN_THE_SLOT_IS_READ,
+        D13_STRUCTURAL_FIELDS,
+    ),
+    not_compared(
+        "实例表单元指针",
+        170..256,
+        "实例表单元的落点不比；表里的行由「实例表行」那一样比",
+        D13_INSTANCE_TABLE_ROWS,
+    ),
+    determined_relation(
+        "中央映射树根指针",
+        ROOT_RECORD_MAPPING_ROOT,
+        MountTransparencyField::MappingRootEmptiness,
+        D13_ALLOCATION_RECORDS,
+    ),
+    determined_relation(
+        "分配记录树根指针",
+        ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT,
+        MountTransparencyField::AllocationRecordTreeRoot,
+        D13_ALLOCATION_RECORDS,
+    ),
+    not_compared(
+        "算法类型、nonce、MAC",
+        428..457,
+        "池级 checker 的 I-2.4 判全 0（单镜像性质）",
+        D13_ROOT_SLOT_RESERVED_BYTES,
+    ),
+];
+
+const fn system_configuration_field(
+    range: FieldByteRange,
+    tier: SystemConfigurationTier,
+) -> SystemConfigurationFieldByteRange {
+    SystemConfigurationFieldByteRange { range, tier }
+}
+
+const fn immutable_and_the_same(
+    name: &'static str,
+    bytes: std::ops::Range<usize>,
+) -> SystemConfigurationFieldByteRange {
+    system_configuration_field(
+        must_be_the_same(name, bytes, D13_IMMUTABLE_CONFIGURATION),
+        SystemConfigurationTier::ImmutableConfiguration,
+    )
+}
+
+/// 系统配置 [0, `SYSTEM_CONFIGURATION_BYTES`) 按字段逐段（`.claude/kb/layout/01-first-txn.md`「系统配置字段表」46 行，一行一段）。
+pub const SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES: &[SystemConfigurationFieldByteRange] = &[
+    system_configuration_field(
+        not_compared(
+            "magic",
+            0..4,
+            READ_WHEN_THE_SLOT_IS_READ,
+            D13_STRUCTURAL_FIELDS,
+        ),
+        SystemConfigurationTier::ImmutableConfiguration,
+    ),
+    immutable_and_the_same("格式版本", 4..6),
+    immutable_and_the_same("feature bits", 6..102),
+    immutable_and_the_same("fsid", 102..118),
+    immutable_and_the_same("写入者身份", 118..138),
+    immutable_and_the_same("校验和算法标识", 138..139),
+    system_configuration_field(
+        not_compared(
+            "本盘设备号",
+            139..143,
+            "择到哪块盘的那一槽就是哪块盘的号；池级 checker 的 I-7.14 判它等于盘在池里的身份",
+            D13_IMMUTABLE_CONFIGURATION,
+        ),
+        SystemConfigurationTier::ImmutableConfiguration,
+    ),
+    immutable_and_the_same("设备数 devs", 143..147),
+    system_configuration_field(
+        not_compared(
+            "槽世代号",
+            147..155,
+            "池级 checker 的 I-7.16 在 R2 的镜像上判",
+            D13_SYSTEM_CONFIGURATION_SLOT_GENERATION,
+        ),
+        SystemConfigurationTier::RuntimeQuantities,
+    ),
+    system_configuration_field(
+        not_compared(
+            "整槽校验和",
+            155..187,
+            READ_WHEN_THE_SLOT_IS_READ,
+            D13_STRUCTURAL_FIELDS,
+        ),
+        SystemConfigurationTier::RuntimeQuantities,
+    ),
+    immutable_and_the_same("系统配置自身 MAC", 187..203),
+    immutable_and_the_same("nonce 水位", 203..215),
+    immutable_and_the_same("KDF 标识", 215..219),
+    immutable_and_the_same("加密类型", 219..220),
+    immutable_and_the_same("MAC 长度声明", 220..221),
+    immutable_and_the_same("主密钥槽", 221..301),
+    system_configuration_field(
+        must_be_the_same("节点大小", 301..305, D13_MUTABLE_CONFIGURATION),
+        SystemConfigurationTier::MutableConfiguration,
+    ),
+    immutable_and_the_same("单元大小", 305..309),
+    immutable_and_the_same("落点粒度", 309..313),
+    immutable_and_the_same("位置条目宽度", 313..317),
+    immutable_and_the_same("mkfs 时的 physical_block_size", 317..321),
+    immutable_and_the_same("扩展点声明值 N", 321..325),
+    immutable_and_the_same("journal 环起点", 325..333),
+    immutable_and_the_same("journal 环长度", 333..341),
+    immutable_and_the_same("journal 最大记录字节", 341..345),
+    immutable_and_the_same("journal 在飞记录数上限", 345..349),
+    immutable_and_the_same("journal 最坏占用", 349..357),
+    immutable_and_the_same("journal 安全系数 F", 357..361),
+    immutable_and_the_same("根环区域数 R", 361..362),
+    immutable_and_the_same("每区槽数 S", 362..363),
+    immutable_and_the_same("素数步长 P", 363..367),
+    immutable_and_the_same("根环 chunk", 367..371),
+    immutable_and_the_same("根环起点", 371..379),
+    immutable_and_the_same("根环逐区域设备身份", 379..391),
+    immutable_and_the_same("条带宽度上界 w_max", 391..392),
+    immutable_and_the_same("组大小 g", 392..393),
+    immutable_and_the_same("映射来源", 393..417),
+    immutable_and_the_same("单元区起始槽号", 417..425),
+    immutable_and_the_same("mkfs 时的 io_min", 425..429),
+    immutable_and_the_same("固定结构槽距", 429..433),
+    system_configuration_field(
+        determined_relation(
+            "T_time",
+            433..437,
+            MountTransparencyField::SystemRuntimeConfiguration,
+            D13_RUNTIME_CONFIGURATION,
+        ),
+        SystemConfigurationTier::RuntimeConfiguration,
+    ),
+    system_configuration_field(
+        determined_relation(
+            "T_dirty",
+            437..445,
+            MountTransparencyField::SystemRuntimeConfiguration,
+            D13_RUNTIME_CONFIGURATION,
+        ),
+        SystemConfigurationTier::RuntimeConfiguration,
+    ),
+    system_configuration_field(
+        determined_relation(
+            "整理低水位 / 高水位 / 停止线",
+            445..469,
+            MountTransparencyField::SystemRuntimeConfiguration,
+            D13_RUNTIME_CONFIGURATION,
+        ),
+        SystemConfigurationTier::RuntimeConfiguration,
+    ),
+    system_configuration_field(
+        determined_relation(
+            "journal tail",
+            SYSTEM_CONFIGURATION_JOURNAL_TAIL,
+            MountTransparencyField::SystemConfigurationJournalTail,
+            D13_SYSTEM_CONFIGURATION_JOURNAL_TAIL,
+        ),
+        SystemConfigurationTier::RuntimeQuantities,
+    ),
+    system_configuration_field(
+        determined_relation(
+            "journal 实例代号",
+            SYSTEM_CONFIGURATION_JOURNAL_INSTANCE,
+            MountTransparencyField::SystemConfigurationJournalInstance,
+            D13_SYSTEM_CONFIGURATION_JOURNAL_INSTANCE,
+        ),
+        SystemConfigurationTier::RuntimeQuantities,
+    ),
+    system_configuration_field(
+        not_compared(
+            "回退下界 F",
+            481..489,
+            "写低由池级 checker 的 I-7.12 判；F 生效值由「F 与 F 生效值」那一样比",
+            D13_ROLLBACK_FLOOR,
+        ),
+        SystemConfigurationTier::RuntimeQuantities,
+    ),
+];
+
+/// 树表条目 [0, 200) 按字段逐段（D8（核心索引结构） 已定项 8 的字段表：树 ID 8 + 条目长度 2 + 种类 2 + flags 2 + 根指针 86 +
+/// `previous_snapshot_txg` 8 + 诞生 txg 8 + 头 ID 8 + 预留 76）。条目按盘上下标一一对上比（两版条数不同判红）。
+pub const TREE_TABLE_ENTRY_FIELD_BYTE_RANGES: &[FieldByteRange] = &[
+    must_be_the_same("树 ID", 0..8, D13_TREE_TABLE_ENTRY_IDENTITY),
+    must_be_the_same("条目长度", 8..10, D13_TREE_TABLE_ENTRY_IDENTITY),
+    must_be_the_same("种类", TREE_TABLE_ENTRY_KIND, D13_TREE_TABLE_ENTRY_IDENTITY),
+    must_be_the_same("flags", 12..14, D13_TREE_TABLE_ENTRY_IDENTITY),
+    determined_relation(
+        "根指针",
+        TREE_TABLE_ENTRY_ROOT_POINTER,
+        MountTransparencyField::TreeTableEntryRootPointers,
+        D13_TREE_ROOT_POINTERS,
+    ),
+    must_be_the_same(
+        "previous_snapshot_txg",
+        100..108,
+        D13_TREE_TABLE_ENTRY_IDENTITY,
+    ),
+    must_be_the_same("诞生 txg", 108..116, D13_TREE_TABLE_ENTRY_IDENTITY),
+    must_be_the_same("头 ID", 116..124, D13_TREE_TABLE_ENTRY_IDENTITY),
+    FieldByteRange {
+        name: "预留",
+        bytes: 124..200,
+        class: FieldByteRangeClass::MustBeZero,
+        row_of_the_d13_field_table: D13_TREE_TABLE_ENTRY_IDENTITY,
+    },
+];
+
+/// 三张字节表按字节比的那几段（「必须相同」「必须为 0」）里，`after` 对不上的段名。`before` / `after` 短于那一段的末尾也算对不上。
+fn byte_ranges_that_do_not_hold<'table>(
+    table: impl IntoIterator<Item = &'table FieldByteRange>,
+    before: &[u8],
+    after: &[u8],
+) -> Vec<&'static str> {
+    table
+        .into_iter()
+        .filter(|range| match range.class {
+            FieldByteRangeClass::MustBeTheSame => {
+                before.get(range.bytes.clone()) != after.get(range.bytes.clone())
+                    || after.get(range.bytes.clone()).is_none()
+            }
+            FieldByteRangeClass::MustBeZero => !after
+                .get(range.bytes.clone())
+                .is_some_and(|bytes| bytes.iter().all(|byte| *byte == 0)),
+            FieldByteRangeClass::NotCompared { .. }
+            | FieldByteRangeClass::DeterminedRelation { .. } => false,
+        })
+        .map(|range| range.name)
+        .collect()
+}
+
+/// T_time 的内置默认值，单位毫秒：5 s 写 5000（D16（发布语义） 已定项 5「`T_time` 默认值 5 s」、可设区间 [200 ms, 5 s]；
+/// 盘上编码单位毫秒是用户 2026-10-05 定的，判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第二节 L2，
+/// `.claude/kb/layout/01-first-txn.md` 系统配置字段表「可调值 | T_time | 4」那一行由写回批写明单位毫秒、默认值 5000）。照条款写死，不取被测 core 的常量：
+/// 期望取自被测者时，core 把默认值或单位改错，挂载写槽写的与期望一起错，这一行判不出
+/// （判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J1「运行配置『R2 = 内置默认』」那一行，改法 G1）。
+const BUILT_IN_TIME_THRESHOLD_MILLISECONDS_OF_THE_CLAUSES: u32 = 5000;
+/// T_dirty 的内置默认值，单位字节：2 GiB（D16（发布语义） 已定项 5；字段表「可调值 | T_dirty | 8 | 2 GiB」那一行。挂载时的有效值另按环长夹取，
+/// 不改盘上这 8 字节）。
+const BUILT_IN_DIRTY_THRESHOLD_BYTES_OF_THE_CLAUSES: u64 = 2 * 1024 * 1024 * 1024;
+/// 整理低水位 / 高水位 / 停止线的内置默认值：0 = 内置默认（字段表「可调值 | 整理低水位 / 高水位 / 停止线 | 8 × 3 | 0 = 内置默认」那一行，
+/// D26（后台整理与放置回收） 已定项 1）。
+const BUILT_IN_COMPACTION_WATERMARKS_OF_THE_CLAUSES: [u64; 3] = [0, 0, 0];
+
+/// 系统运行配置那 36 字节的内置默认值：照字段表的次序（T_time 4、T_dirty 8、整理三水位 8 × 3，小端），值照条款写死
+/// （[`BUILT_IN_TIME_THRESHOLD_MILLISECONDS_OF_THE_CLAUSES`] 那三个常量；今天没有挂载选项通道，写槽总写内置默认）。
+#[must_use]
+pub fn built_in_runtime_configuration_bytes() -> Vec<u8> {
+    let mut bytes = Vec::with_capacity(SYSTEM_CONFIGURATION_RUNTIME_CONFIGURATION.len());
+    bytes.extend_from_slice(&BUILT_IN_TIME_THRESHOLD_MILLISECONDS_OF_THE_CLAUSES.to_le_bytes());
+    bytes.extend_from_slice(&BUILT_IN_DIRTY_THRESHOLD_BYTES_OF_THE_CLAUSES.to_le_bytes());
+    for watermark in BUILT_IN_COMPACTION_WATERMARKS_OF_THE_CLAUSES {
+        bytes.extend_from_slice(&watermark.to_le_bytes());
+    }
+    assert_eq!(
+        bytes.len(),
+        SYSTEM_CONFIGURATION_RUNTIME_CONFIGURATION.len(),
+        "系统运行配置一档 36 字节：T_time 4 + T_dirty 8 + 整理三水位 8 × 3"
+    );
+    bytes
+}
+
+fn read_u32_at(bytes: &[u8], range: std::ops::Range<usize>) -> Option<u32> {
+    bytes
+        .get(range)
+        .map(|field| u32::from_le_bytes(field.try_into().expect("切的是 4 字节")))
+}
+
+fn read_u64_at(bytes: &[u8], range: std::ops::Range<usize>) -> Option<u64> {
+    bytes
+        .get(range)
+        .map(|field| u64::from_le_bytes(field.try_into().expect("切的是 8 字节")))
+}
+
+fn is_all_zero(bytes: &[u8]) -> bool {
+    bytes.iter().all(|byte| *byte == 0)
 }
 
 /// 某一样为什么没判：条款没写这一格该是什么，不替它定红绿，只计数（交主 agent）。
@@ -960,11 +1641,17 @@ fn rows_sorted_by_instance(rows: &[InstanceRow]) -> Vec<InstanceRow> {
 /// 动作做成之后的那一版：POSIX 内容与存在性相同；不可变配置（除本盘设备号）相同；卸载记号恒为「不是卸载写的」、R1 的记号不进比较；
 /// 挂载没推抬 F 时 R2 的 F 生效值与 R2 根里的 F 都 = R1 的 F 生效值，推了时 R2 的 F 生效值 = 挂载交回的最后一串抬到的 F；
 /// 实例代号 = max(R1 镜像上各盘两槽自证系统配置的实例代号, 根环全部可读根的实例代号) + 1；实例表行照 D18 已定项 11「恢复写的行」；
-/// 树 ID 水位相同（挂载不发第一个文件）；两棵用户可见树的根指针相同——挂载续做过时（用户 2026-10-03 定「续做算挂载的一部分」）
-/// 比挂载交回的续做那几步里 txg 不大于 R2 那一版的最近一步的（`continuation`，[`UserVisibleTreeRootPointersOfTheContinuation`]）；
+/// 树 ID 水位相同（挂载不发第一个文件）；树表里 extent、inode、deleted_inodes、墓碑、谱系五种树的根指针相同——挂载续做过时
+/// （用户 2026-10-03 定「续做算挂载的一部分」）比挂载交回的续做那几步里 txg 不大于 R2 那一版的最近一步的
+/// （`continuation`，[`UserVisibleTreeRootPointersOfTheContinuation`]），livelist、稀疏旁表、deadlist、logged_ops 四种的根相同；
 /// txg ≥ max(根环全部根的 txg, 环里全部自证记录的 checkpoint_txg) + 1（只判下界：kb 允许跳号）；扫描报告施加 0 条、水位之上 0 条。
 /// 二次崩溃之后落回 v1 那一版自己（实例与 txg 都是 R1 那一版的）：各样与 R1 那一版相同（推的）；落到这次挂载写的某一版：照上一段，
 /// 扫描报告不判，崩在抬 F 开始之后的 F 不判。
+/// 判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1、Y2 补的几样（[`MountTransparencyField`] 的后八个成员）：
+/// 中央映射树根的空性、根记录里的分配记录树根、系统配置 journal_tail 与 journal 实例代号、系统运行配置 = 内置默认，
+/// 再加根记录、系统配置、树表条目三张按字节区间的字段表里「必须相同」「必须为 0」的那几段；这几样都从 [`read_recovery_fields`]
+/// 读进来的原字节里取（[`VersionFieldsRead::root_record_bytes`]、[`VersionFieldsRead::tree_table_entries`]、
+/// [`RecoveryFieldsRead::chosen_system_configuration_bytes`]），签名不变。
 ///
 /// # Panics
 /// 调用方交错了比的版本：R1 不是比恢复落到的那一版，或 R2 拿的那一版与动作对不上。
@@ -1197,23 +1884,8 @@ fn judge_one_field(
             first_recovery.root.tree_identifier_watermark.to_string(),
             compared.root.tree_identifier_watermark.to_string(),
         ),
-        MountTransparencyField::UserVisibleTreeRootPointers => {
-            let expected = match relation {
-                Relation::WrittenByTheMount(_) => continuation
-                    .of_the_last_step_at_or_before((
-                        compared.root.instance,
-                        compared.root.checkpoint_txg,
-                    ))
-                    .or(first_recovery.user_visible_tree_root_pointers.as_ref()),
-                Relation::TheVersionOfTheFirstRecovery(_) => {
-                    first_recovery.user_visible_tree_root_pointers.as_ref()
-                }
-            };
-            held_or_violated(
-                expected.is_some() && compared.user_visible_tree_root_pointers.as_ref() == expected,
-                format!("{expected:?}"),
-                format!("{:?}", compared.user_visible_tree_root_pointers),
-            )
+        MountTransparencyField::TreeTableEntryRootPointers => {
+            tree_table_entry_root_pointers_outcome(first_recovery, compared, relation, continuation)
         }
         MountTransparencyField::CheckpointTxg => match relation {
             Relation::WrittenByTheMount(_) => {
@@ -1255,16 +1927,352 @@ fn judge_one_field(
                 )
             }
         },
+        MountTransparencyField::MappingRootEmptiness => {
+            let before = &first_recovery.root_record_bytes[ROOT_RECORD_MAPPING_ROOT];
+            let after = &compared.root_record_bytes[ROOT_RECORD_MAPPING_ROOT];
+            match relation {
+                Relation::WrittenByTheMount(_) => held_or_violated(
+                    is_all_zero(after) == is_all_zero(before),
+                    format!("R2 全零 ⇔ R1 全零（R1 全零：{}）", is_all_zero(before)),
+                    format!("R2 全零：{}", is_all_zero(after)),
+                ),
+                Relation::TheVersionOfTheFirstRecovery(_) => held_or_violated(
+                    after == before,
+                    format!("与 R1 逐字节相同：{before:?}"),
+                    format!("{after:?}"),
+                ),
+            }
+        }
+        MountTransparencyField::AllocationRecordTreeRoot => {
+            allocation_record_tree_root_outcome(first_recovery, compared, relation, new_instance)
+        }
+        MountTransparencyField::SystemConfigurationJournalTail => {
+            system_configuration_journal_tail_outcome(before_the_mount, after_the_action, action)
+        }
+        MountTransparencyField::SystemConfigurationJournalInstance => {
+            system_configuration_journal_instance_outcome(
+                before_the_mount,
+                after_the_action,
+                compared,
+                new_instance,
+                action,
+            )
+        }
+        MountTransparencyField::SystemRuntimeConfiguration => {
+            let built_in = built_in_runtime_configuration_bytes();
+            let observed = after_the_action
+                .chosen_system_configuration_bytes
+                .as_deref()
+                .and_then(|bytes| bytes.get(SYSTEM_CONFIGURATION_RUNTIME_CONFIGURATION));
+            held_or_violated(
+                observed == Some(built_in.as_slice()),
+                format!("内置默认 {built_in:?}"),
+                format!("{observed:?}"),
+            )
+        }
+        MountTransparencyField::RootRecordBytes => {
+            let ranges_that_do_not_hold = byte_ranges_that_do_not_hold(
+                ROOT_RECORD_FIELD_BYTE_RANGES,
+                &first_recovery.root_record_bytes,
+                &compared.root_record_bytes,
+            );
+            held_or_violated(
+                ranges_that_do_not_hold.is_empty(),
+                "根记录里「必须相同」「必须为 0」的那几段都对得上".to_string(),
+                format!("这几段不符：{ranges_that_do_not_hold:?}"),
+            )
+        }
+        MountTransparencyField::SystemConfigurationBytes => match (
+            &before_the_mount.chosen_system_configuration_bytes,
+            &after_the_action.chosen_system_configuration_bytes,
+        ) {
+            (Some(before), Some(after)) => {
+                let ranges_that_do_not_hold = byte_ranges_that_do_not_hold(
+                    SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES
+                        .iter()
+                        .map(|system_configuration_field| &system_configuration_field.range),
+                    before,
+                    after,
+                );
+                held_or_violated(
+                    ranges_that_do_not_hold.is_empty(),
+                    "系统配置里「必须相同」「必须为 0」的那几段都对得上".to_string(),
+                    format!("这几段不符：{ranges_that_do_not_hold:?}"),
+                )
+            }
+            (before, after) => FieldOutcome::Violated {
+                expected: "R1、R2 都择得到系统配置".to_string(),
+                observed: format!(
+                    "R1 择到：{}；R2 择到：{}",
+                    before.is_some(),
+                    after.is_some()
+                ),
+            },
+        },
+        MountTransparencyField::TreeTableEntryBytes => {
+            tree_table_entry_bytes_outcome(first_recovery, compared)
+        }
     }
 }
 
-/// D23（journal 的角色与格式） 已定项 14 那张单子（C554 乙-配置续，用户 2026-09-27 定；C331 取甲，用户 2026-09-28 定）上的拒可写理由。
+/// 树表条目的根指针那一样（[`MountTransparencyField::TreeTableEntryRootPointers`]）：只由续做改根的五种照续做规则
+/// （挂载写的那一版比续做里 txg 不大于它的最近一步，没有那一步比 R1），根恒全零的四种与 R1 相同，种类 3、4 不比。
+/// 两版任一版树表读不出判红。
+fn tree_table_entry_root_pointers_outcome(
+    first_recovery: &VersionFieldsRead,
+    compared: &VersionFieldsRead,
+    relation: Relation,
+    continuation: &UserVisibleTreeRootPointersOfTheContinuation,
+) -> FieldOutcome {
+    let (Some(entries_before), Some(entries_after)) = (
+        &first_recovery.tree_table_entries,
+        &compared.tree_table_entries,
+    ) else {
+        return FieldOutcome::Violated {
+            expected: "R1、R2 两版的树表都读得出".to_string(),
+            observed: format!(
+                "R1 读得出：{}；R2 读得出：{}",
+                first_recovery.tree_table_entries.is_some(),
+                compared.tree_table_entries.is_some()
+            ),
+        };
+    };
+    let rewritten_only_by_the_continuation_before =
+        TreeTableEntryRootPointersByKind::of_the_entries(
+            entries_before,
+            &TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES,
+        );
+    let expected_rewritten_only_by_the_continuation = match relation {
+        Relation::WrittenByTheMount(_) => continuation
+            .of_the_last_step_at_or_before((compared.root.instance, compared.root.checkpoint_txg))
+            .unwrap_or(&rewritten_only_by_the_continuation_before),
+        Relation::TheVersionOfTheFirstRecovery(_) => &rewritten_only_by_the_continuation_before,
+    };
+    let observed_rewritten_only_by_the_continuation =
+        TreeTableEntryRootPointersByKind::of_the_entries(
+            entries_after,
+            &TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES,
+        );
+    let kept_before = TreeTableEntryRootPointersByKind::of_the_entries(
+        entries_before,
+        &TREE_KINDS_WHOSE_ROOTS_THE_MOUNT_KEEPS,
+    );
+    let kept_after = TreeTableEntryRootPointersByKind::of_the_entries(
+        entries_after,
+        &TREE_KINDS_WHOSE_ROOTS_THE_MOUNT_KEEPS,
+    );
+    held_or_violated(
+        observed_rewritten_only_by_the_continuation == *expected_rewritten_only_by_the_continuation
+            && kept_after == kept_before,
+        format!(
+            "续做改根的五种 {expected_rewritten_only_by_the_continuation:?}；根恒全零的四种 {kept_before:?}"
+        ),
+        format!(
+            "续做改根的五种 {observed_rewritten_only_by_the_continuation:?}；根恒全零的四种 {kept_after:?}"
+        ),
+    )
+}
+
+/// 根记录里的分配记录树根那一样（[`MountTransparencyField::AllocationRecordTreeRoot`]）。R1 树表读不出（认不出带不带树）、
+/// 或 R1 树表 0 条而新实例号算不出时判红。
+fn allocation_record_tree_root_outcome(
+    first_recovery: &VersionFieldsRead,
+    compared: &VersionFieldsRead,
+    relation: Relation,
+    new_instance: Option<InstanceGeneration>,
+) -> FieldOutcome {
+    let before = &first_recovery.root_record_bytes[ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT];
+    let after = &compared.root_record_bytes[ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT];
+    match relation {
+        Relation::TheVersionOfTheFirstRecovery(_) => held_or_violated(
+            after == before,
+            format!("与 R1 逐字节相同：{before:?}"),
+            format!("{after:?}"),
+        ),
+        Relation::WrittenByTheMount(_) => {
+            match (first_recovery.tree_table_entries.as_deref(), new_instance) {
+                (Some([_, ..]), _) => held_or_violated(
+                    is_all_zero(after),
+                    "R1 带树 ⇒ R2 全零".to_string(),
+                    format!("R2 全零：{}", is_all_zero(after)),
+                ),
+                (Some([]), Some(new_instance)) => {
+                    let expected_non_zero = new_instance.0 >= 2;
+                    held_or_violated(
+                        !is_all_zero(after) == expected_non_zero,
+                        format!(
+                            "R1 树表 0 条 ⇒ R2 非零 ⇔ 新实例号 {} ≥ 2（该非零：{expected_non_zero}）",
+                            new_instance.0
+                        ),
+                        format!("R2 非零：{}", !is_all_zero(after)),
+                    )
+                }
+                (Some([]), None) => FieldOutcome::Violated {
+                    expected: "R1 树表 0 条：要新实例号定 R2 该不该非零".to_string(),
+                    observed: "新实例号算不出".to_string(),
+                },
+                (None, _) => FieldOutcome::Violated {
+                    expected: "R1 那一版的树表读得出（认得出带不带树）".to_string(),
+                    observed: "R1 那一版的树表读不出".to_string(),
+                },
+            }
+        }
+    }
+}
+
+/// 系统配置 journal_tail 那一样（[`MountTransparencyField::SystemConfigurationJournalTail`]，判决第二节 Y1 journal_tail 那一行取攻方的式子）：
+/// R1 的 ≤ R2 的 ≤ R2 环里自证记录的最大计数器（环里一条都没有按 0），挂载做完（只挂载、挂载加一次发布）取等。
+/// 二次崩溃落回 v1 那一版时照这一行判，不按与 R1 相同判（判决表下那句：系统配置的运行量不是那一版自己的）。
+/// 两次恢复任一次择不到系统配置判红。
+fn system_configuration_journal_tail_outcome(
+    before_the_mount: &RecoveryFieldsRead,
+    after_the_action: &RecoveryFieldsRead,
+    action: MountTransparencyAction,
+) -> FieldOutcome {
+    let tail_of = |fields: &RecoveryFieldsRead| {
+        fields
+            .chosen_system_configuration_bytes
+            .as_deref()
+            .and_then(|bytes| read_u64_at(bytes, SYSTEM_CONFIGURATION_JOURNAL_TAIL))
+    };
+    let (Some(tail_before), Some(tail_after)) =
+        (tail_of(before_the_mount), tail_of(after_the_action))
+    else {
+        return FieldOutcome::Violated {
+            expected: "R1、R2 都择得到系统配置".to_string(),
+            observed: format!(
+                "R1 的 tail {:?}；R2 的 tail {:?}",
+                tail_of(before_the_mount),
+                tail_of(after_the_action)
+            ),
+        };
+    };
+    let highest_record_counter = after_the_action
+        .highest_record_counter_in_the_ring
+        .unwrap_or(0);
+    let mount_completed = match action {
+        MountTransparencyAction::MountAlone(_) | MountTransparencyAction::MountAndOnePublish(_) => {
+            true
+        }
+        MountTransparencyAction::SecondCrashInsideTheMount(_) => false,
+    };
+    held_or_violated(
+        tail_before <= tail_after
+            && tail_after <= highest_record_counter
+            && (!mount_completed || tail_after == highest_record_counter),
+        format!(
+            "R1 的 tail {tail_before} ≤ R2 的 tail ≤ R2 环里自证记录的最大计数器 {highest_record_counter}{}",
+            if mount_completed { "，挂载做完取等" } else { "" }
+        ),
+        format!("R2 的 tail {tail_after}"),
+    )
+}
+
+/// 系统配置的 journal 实例代号那一样（[`MountTransparencyField::SystemConfigurationJournalInstance`]，判决第二节 Y1 那一行取攻方的式子）：
+/// 挂载做完 = R2 那一版根的实例代号（从根记录原字节取）；二次崩溃 ∈ {R1 的, 新实例}。择不到系统配置判红。
+fn system_configuration_journal_instance_outcome(
+    before_the_mount: &RecoveryFieldsRead,
+    after_the_action: &RecoveryFieldsRead,
+    compared: &VersionFieldsRead,
+    new_instance: Option<InstanceGeneration>,
+    action: MountTransparencyAction,
+) -> FieldOutcome {
+    let instance_of = |fields: &RecoveryFieldsRead| {
+        fields
+            .chosen_system_configuration_bytes
+            .as_deref()
+            .and_then(|bytes| read_u32_at(bytes, SYSTEM_CONFIGURATION_JOURNAL_INSTANCE))
+    };
+    let observed = instance_of(after_the_action);
+    match action {
+        MountTransparencyAction::MountAlone(_) | MountTransparencyAction::MountAndOnePublish(_) => {
+            let root_instance = read_u32_at(&compared.root_record_bytes, ROOT_RECORD_INSTANCE);
+            held_or_violated(
+                observed.is_some() && observed == root_instance,
+                format!("R2 那一版根的实例代号 {root_instance:?}"),
+                format!("{observed:?}"),
+            )
+        }
+        MountTransparencyAction::SecondCrashInsideTheMount(_) => {
+            let before = instance_of(before_the_mount);
+            let new_instance = new_instance.map(|instance| instance.0);
+            held_or_violated(
+                observed.is_some() && (observed == before || observed == new_instance),
+                format!("R1 的 {before:?} 或新实例 {new_instance:?}"),
+                format!("{observed:?}"),
+            )
+        }
+    }
+}
+
+/// 树表条目按字节区间那一样（[`MountTransparencyField::TreeTableEntryBytes`]）：两版条目按盘上下标一一对上，逐条按
+/// [`TREE_TABLE_ENTRY_FIELD_BYTE_RANGES`] 比「必须相同」「必须为 0」那几段。条数不同、任一版树表读不出判红。
+fn tree_table_entry_bytes_outcome(
+    first_recovery: &VersionFieldsRead,
+    compared: &VersionFieldsRead,
+) -> FieldOutcome {
+    let (Some(entries_before), Some(entries_after)) = (
+        &first_recovery.tree_table_entries,
+        &compared.tree_table_entries,
+    ) else {
+        return FieldOutcome::Violated {
+            expected: "R1、R2 两版的树表都读得出".to_string(),
+            observed: format!(
+                "R1 读得出：{}；R2 读得出：{}",
+                first_recovery.tree_table_entries.is_some(),
+                compared.tree_table_entries.is_some()
+            ),
+        };
+    };
+    if entries_before.len() != entries_after.len() {
+        return FieldOutcome::Violated {
+            expected: format!("树表 {} 条", entries_before.len()),
+            observed: format!("树表 {} 条", entries_after.len()),
+        };
+    }
+    let entries_that_do_not_hold: Vec<String> = entries_before
+        .iter()
+        .zip(entries_after)
+        .enumerate()
+        .filter_map(|(index, (before, after))| {
+            let ranges =
+                byte_ranges_that_do_not_hold(TREE_TABLE_ENTRY_FIELD_BYTE_RANGES, before, after);
+            (!ranges.is_empty()).then(|| format!("第 {index} 条：{ranges:?}"))
+        })
+        .collect();
+    held_or_violated(
+        entries_that_do_not_hold.is_empty(),
+        "树表每一条里「必须相同」「必须为 0」的那几段都对得上".to_string(),
+        format!("这几条不符：{}", entries_that_do_not_hold.join("；")),
+    )
+}
+
+/// D23（journal 的角色与格式） 已定项 14 那张单子（C554 乙-配置续，用户 2026-09-27 定；C331 判不出改取 R2，用户 2026-10-03 定）上的拒可写理由。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RefusalReasonOnTheD23List {
-    /// 读阶段判据 N-配置 为真（有一槽读不出或本池自证不过按真；取号那一刻有一槽读不出也报成它），重读一次仍为真。
+    /// 读阶段判据 N-配置 为真（系统配置见证判不出按真：R2，有槽设备报读错而没有一块盘两槽都自证过），重读一次仍为真。
     NewerPublishWitnessedBySystemConfiguration,
     /// 重建分配器判抛弃用的最新那条根的实例表读不出，重读一次仍读不出。
     InstanceTableOfTheNewestRootUnreadable,
+    /// 读阶段判完、判据 N-配置 为假之后，取号之前的逐盘核或取号那一刻读系统配置判不出（R2）或某块盘一份自证过的都没有
+    /// （`MountError::SystemConfigurationUnreadableAfterTheReadStage`；C664（挂载拒绝合法复算把两种拒因报成一个）之前并在 N-配置 里报）。
+    SystemConfigurationUnreadableAfterTheReadStage,
+    /// 重建分配器读根环那一遍有一块盘一条不被抛弃的自证有效根都没读出、整环重读一次，两遍逐槽并起来整个环仍一条都没有
+    /// （`MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread`；用户 2026-10-05 定 Q3「另起拒因、单子加一行」，
+    /// 岔路单 `research/prompts/m3-batch10-code-r1-forks.md`；之前报 `Recovery(NoValidRoot)`、与读阶段择不到根同名，不在单子上；
+    /// 两遍按槽并照用户 2026-10-05 定 R1，判决 `research/prompts/m3-batch10-code-r2-main-verification.md` 第六节：第一遍读出过一条有效根的不拒）。
+    NoValidRootInTheRootRingOfTheRebuiltAllocator,
+    /// 「记录有缺口时拒可写」（F1 乙，用户 2026-10-07 定；判据照判决 `research/prompts/m3-batch33t-code-r1-main-verification.md` 第二节 T4 那一行，`F1_ANY`）：
+    /// 水位之上一次没施加的发布，读得出的那几条记录的本次发布内序号不是 1..N 连着或缺末条，而它们点名的单元里有一个两份副本都验不过，
+    /// 重读一次仍这样（`StillUnreadableAfterOneReread::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify`）。
+    PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify,
+    /// 可写挂载的 C 读一次没施加的发布（水位之上那几条记录拼的根，或比所选那一版新、按实例表有效、读得出的根）的账读不出、那次发布读得出的记录
+    /// 不齐、从中央映射也现算不成，重读一次仍这样（`C_MAPPING` 收窄，判决 `research/prompts/m3-batch35-36-code-r1-main-verification.md`
+    /// 第二节 K2 W1 / W2 H1、K2 W2 H3 两行；`StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords`，
+    /// 用户 2026-10-08 定「乙：core 另起错误成员」、列进单子）。`unapplied_publish` 是那一拒点名的 (实例代号, checkpoint_txg)，复算按它找那次发布。
+    AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+        unapplied_publish: (InstanceGeneration, CheckpointTxg),
+    },
 }
 
 /// 拒可写的理由在不在 D23 已定项 14 那张单子上。别的理由（单元区墙、坏盘上才有的那几种……）照崩溃注入第二截今天的写法判。
@@ -1279,12 +2287,32 @@ pub fn refusal_reason_on_the_d23_list(error: &MountError) -> Option<RefusalReaso
                 StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheShadowLedger { .. } => {
                     Some(RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable)
                 }
+                StillUnreadableAfterOneReread::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify { .. } => {
+                    Some(RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify)
+                }
+                StillUnreadableAfterOneReread::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                    unapplied_publish,
+                } => Some(
+                    RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                        unapplied_publish: (
+                            unapplied_publish.instance,
+                            unapplied_publish.checkpoint_txg,
+                        ),
+                    },
+                ),
                 // 挂着时抬 F、管理员回退那几处读坏，与影子账读一条被抛弃根的账读不出（C393）：不在 D23 已定项 14 那张单子上。
                 StillUnreadableAfterOneReread::InstanceTableOfTheNewestRootForTheEffectiveFloor { .. }
                 | StillUnreadableAfterOneReread::RootRingSlotKnownToHoldARoot { .. }
                 | StillUnreadableAfterOneReread::AccountOfAnAbandonedRoot { .. } => None,
             }
         }
+        MountError::SystemConfigurationUnreadableAfterTheReadStage(_) => {
+            Some(RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage)
+        }
+        MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread => {
+            Some(RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator)
+        }
+        // 恢复报的错（读阶段择不到根那一拒在内，只读挂载同样挂不上）：不在单子上。
         MountError::Recovery(_)
         | MountError::FileVersionWithoutAnyJournalRecord
         | MountError::InstanceTableMalformed
@@ -1314,9 +2342,106 @@ pub fn refusal_reason_on_the_d23_list(error: &MountError) -> Option<RefusalReaso
     }
 }
 
+/// 一块盘两个系统配置槽在崩溃镜像上各直接读一次：自证过、fsid 与本池相同的那几份，与设备报读错（`PoolReader::read` 交空）的槽数。
+/// 读得出而自证不过的槽（撕裂的轮换、没写过的槽）两边都不算。
+struct SystemConfigurationSlotsReadOnTheCrashImage {
+    self_verified: Vec<SystemConfiguration>,
+    slots_reporting_a_read_error: u64,
+}
+
+fn system_configuration_slots_read_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    device: DeviceIdentity,
+    slot_spacing_in_bytes: u64,
+    filesystem_identifier: &[u8; 16],
+) -> SystemConfigurationSlotsReadOnTheCrashImage {
+    let slot_bytes =
+        usize::try_from(SYSTEM_CONFIGURATION_SLOT_BYTES).expect("系统配置槽 4096 字节装得进 usize");
+    let mut slots = SystemConfigurationSlotsReadOnTheCrashImage {
+        self_verified: Vec::new(),
+        slots_reporting_a_read_error: 0,
+    };
+    // 迭代上界是一块盘的两个系统配置槽；跨轮携带的只有两样计数；没有提前出口。
+    for slot_index in 0..SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE {
+        let offset = DeviceOffsetInBytes(slot_index * slot_spacing_in_bytes);
+        match crash_image.read(device, offset, slot_bytes) {
+            None => slots.slots_reporting_a_read_error += 1,
+            Some(bytes) => {
+                if let Ok(system_configuration) = SystemConfiguration::parse_slot(&bytes) {
+                    if system_configuration.immutable.filesystem_identifier
+                        == *filesystem_identifier
+                    {
+                        slots.self_verified.push(system_configuration);
+                    }
+                }
+            }
+        }
+    }
+    slots
+}
+
+/// 系统配置见证判不出（R2，D22（单元原子性怎么合成） 已定项 8 射程，用户 2026-10-03 定「改取 R2」）在崩溃镜像上独立写的一份，
+/// 不调实现的 `recovery::system_configuration_witness_is_undecidable`：判不出 ⟺ 有槽设备报读错，且没有一块盘两槽都自证过。
+/// 撕裂的轮换（读得出、自证不过，设备没报错）不算判不出；一块盘报读错而另一块盘两槽都自证过也不算。
+fn system_configuration_witness_undecidable_on_the_crash_image(
+    slots_of_every_device: &[SystemConfigurationSlotsReadOnTheCrashImage],
+) -> bool {
+    let some_slot_reported_a_read_error = slots_of_every_device
+        .iter()
+        .any(|slots| slots.slots_reporting_a_read_error > 0);
+    let some_device_self_verified_both_slots = slots_of_every_device.iter().any(|slots| {
+        u64::try_from(slots.self_verified.len()).expect("一块盘的系统配置槽数装得进 u64")
+            == SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
+    });
+    some_slot_reported_a_read_error && !some_device_self_verified_both_slots
+}
+
+/// 某块盘两槽里一份本池自证过的系统配置都没有（C554 乙-配置续 Q1：这块盘不「可见」，D18（块里携带什么信息） 已定项 11）。
+/// R2 之下这一形不并进判不出（一块盘两槽都撕裂、另一块盘两槽都自证过时 R2 判得出）；实现在读阶段判完之后的逐盘核与取号里拒它
+/// （`MountError::SystemConfigurationUnreadableAfterTheReadStage`，与判据 N-配置 那一拒分开报，C664（挂载拒绝合法复算把两种拒因报成一个））。
+fn some_device_without_any_self_verified_system_configuration_slot_on_the_crash_image(
+    slots_of_every_device: &[SystemConfigurationSlotsReadOnTheCrashImage],
+) -> bool {
+    slots_of_every_device
+        .iter()
+        .any(|slots| slots.self_verified.is_empty())
+}
+
+/// 「读阶段判完之后系统配置又读不出」（D23（journal 的角色与格式） 已定项 14：取号那一刻按同一个判不出（R2）判，某块盘一份自证过的系统配置
+/// 都没有时也拒）在崩溃镜像上复算：每块盘两槽各直接读一次，判不出（[`system_configuration_witness_undecidable_on_the_crash_image`]）或某块盘
+/// 一份本池自证过的都没有（[`some_device_without_any_self_verified_system_configuration_slot_on_the_crash_image`]）⇒ 真；择不到系统配置也按真。
+/// 两遍读之间的瞬时读错在崩溃镜像上复算不出（C664（挂载拒绝合法复算把两种拒因报成一个）），那一形怎么判见
+/// [`judge_writable_mount_refusal_of_a_crash_state`]。
+fn system_configuration_unreadable_after_the_read_stage_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+) -> bool {
+    let Ok(system_configuration) = choose_system_configuration(crash_image) else {
+        return true;
+    };
+    let immutable = system_configuration.immutable;
+    let slot_spacing = u64::from(immutable.sizes.fixed_structure_slot_spacing);
+    let slots_of_every_device: Vec<SystemConfigurationSlotsReadOnTheCrashImage> = crash_image
+        .device_identities()
+        .into_iter()
+        .map(|device| {
+            system_configuration_slots_read_on_the_crash_image(
+                crash_image,
+                device,
+                slot_spacing,
+                &immutable.filesystem_identifier,
+            )
+        })
+        .collect();
+    system_configuration_witness_undecidable_on_the_crash_image(&slots_of_every_device)
+        || some_device_without_any_self_verified_system_configuration_slot_on_the_crash_image(
+            &slots_of_every_device,
+        )
+}
+
 /// 判据 N-配置（D23 已定项 14「可写挂载读到的更新状态读不出」那一段）在崩溃镜像上自己复算一遍，不经实现的 `mount::newer_publish_witness`：
-/// 每块盘两槽有一槽读不出或本池自证不过 ⇒ 判不出、按真；全部槽的 journal tail 取最大为 c_见证，0 ⇒ 假；所选那一版那次发布带末条标志的记录读得出 ⇒
-/// c_见证 > 它的计数器；读不出而计数器等于 c_见证 的记录读得出 ⇒ 它的 (实例代号, checkpoint_txg) > 所选那一版；两条都读不出按真。
+/// 系统配置见证判不出（[`system_configuration_witness_undecidable_on_the_crash_image`]，R2）⇒ 按真；否则全部自证过的槽的 journal tail
+/// 取最大为 c_见证（撕裂的槽跳过），0 ⇒ 假；所选那一版那次发布带末条标志的记录读得出 ⇒ c_见证 > 它的计数器；读不出而计数器等于 c_见证 的记录
+/// 读得出 ⇒ 它的 (实例代号, checkpoint_txg) > 所选那一版；两条都读不出按真。
 /// `selected_version` 是 R1 落到的那一版（与可写挂载读阶段同一份盘、同一套择根与重放）；没有时判据无从复算，交回假。
 fn newer_publish_witnessed_on_the_crash_image(
     crash_image: &dyn PoolReader,
@@ -1327,24 +2452,27 @@ fn newer_publish_witnessed_on_the_crash_image(
     };
     let immutable = system_configuration.immutable;
     let slot_spacing = u64::from(immutable.sizes.fixed_structure_slot_spacing);
-    let mut witnessed_journal_counter = 0u64;
-    for device in crash_image.device_identities() {
-        let slots = verified_system_configuration_slots(
-            crash_image,
-            device,
-            slot_spacing,
-            &immutable.filesystem_identifier,
-        );
-        if u64::try_from(slots.len()).expect("一块盘的系统配置槽数装得进 u64")
-            < SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
-        {
-            return true;
-        }
-        witnessed_journal_counter = slots
-            .iter()
-            .map(|slot| slot.quantities.journal_tail)
-            .fold(witnessed_journal_counter, u64::max);
+    let slots_of_every_device: Vec<SystemConfigurationSlotsReadOnTheCrashImage> = crash_image
+        .device_identities()
+        .into_iter()
+        .map(|device| {
+            system_configuration_slots_read_on_the_crash_image(
+                crash_image,
+                device,
+                slot_spacing,
+                &immutable.filesystem_identifier,
+            )
+        })
+        .collect();
+    if system_configuration_witness_undecidable_on_the_crash_image(&slots_of_every_device) {
+        return true;
     }
+    let witnessed_journal_counter = slots_of_every_device
+        .iter()
+        .flat_map(|slots| slots.self_verified.iter())
+        .map(|slot| slot.quantities.journal_tail)
+        .max()
+        .unwrap_or(0);
     witnessed_counter_holds_against_the_selected_version(
         crash_image,
         &system_configuration,
@@ -1408,9 +2536,9 @@ fn witnessed_counter_holds_against_the_selected_version(
 
 /// C670（无读故障的崩溃态上可写挂载见证判据为真没有判官）：判据 N-配置 在没注入读故障的崩溃镜像上复算，为真交回是哪一支。
 /// 没有读故障时设备不报读错，见证读判得出（R2，D22（单元原子性怎么合成） 已定项 8 射程：判不出 ⟺ 有槽设备报读错且没有一块盘两槽都自证过；
-/// 撕裂的系统配置轮换不算判不出）：c_见证 取全部自证过、fsid 与本池相同的槽 journal tail 的最大值，自证不过的槽（撕裂的、没写过的）跳过。
-/// 撕裂系统配置那一支因此不落在这里（C664（挂载拒绝合法复算把两种拒因报成一个）、C331（择根倒挂压过已确认的写））：
-/// [`newer_publish_witnessed_on_the_crash_image`] 照甲把它判成按真，那一支的拒照 U6 判。一份自证过的系统配置都择不到时 c_见证 为 0，交回 `None`。
+/// 撕裂的系统配置轮换不算判不出）：c_见证 取全部自证过、fsid 与本池相同的槽 journal tail 的最大值，自证不过的槽（撕裂的、没写过的）跳过——
+/// 与 [`newer_publish_witnessed_on_the_crash_image`] 改取 R2 之后在撕裂的轮换上同一个取法（某块盘两槽都撕裂、一份自证过的都没有的那一形
+/// 两边都照常比：实现拒它报的是另一个拒因，C664（挂载拒绝合法复算把两种拒因报成一个））。一份自证过的系统配置都择不到时 c_见证 为 0，交回 `None`。
 fn witnessed_counter_holds_on_a_crash_image_without_read_faults(
     crash_image: &dyn PoolReader,
     selected_version: Option<(InstanceGeneration, CheckpointTxg)>,
@@ -1457,6 +2585,302 @@ fn instance_table_of_the_newest_root_unreadable_on_the_crash_image(
         .is_none_or(|newest| instance_table_of_root(crash_image, &newest).is_none())
 }
 
+/// 「重建分配器读根环整环重读一次、两遍逐槽并起来仍一条不被抛弃的自证有效根都没有」（Q3，并两遍照用户 2026-10-05 定 R1）在崩溃镜像上复算：
+/// 按最新那条根（`choose_root`）指着的实例表，根环里一条不被抛弃的自证有效根都没有。并两遍之后判据照旧只读一遍：崩溃镜像上没有瞬时读错，
+/// 两遍读出的逐槽相同，并起来就是那一遍（任一遍自证过的根留着，两遍都没有才算没有）。被抛弃照 D23（journal 的角色与格式） 已定项 14 候选集那一格在这里另写一份：表里有那条根的实例的行
+/// (i, Ti, Wi) 且它的 txg > Ti（不调实现的 `recovery::root_is_abandoned_by_the_instance_table`）。择不到系统配置、择不到根都按真；
+/// 最新那条根的实例表读不出时没有「被抛弃」可判，不按表滤（读得出的根都算有效，与 F 生效值那一处的取法同向），择得到根就为假。
+/// 没有读故障时最新那条根按它自己指着的表恒不被抛弃（表里的行只记更早的实例：写行只给比要取的号小的实例写，`mount.rs` 的
+/// `instance_rows_to_write`），所以择得到根的崩溃镜像上这条判据为假；「按表判被抛弃」那半句在合法盘面上不改判据的值，等价性留档在
+/// `writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring.rs`
+/// 的 `a_refusal_for_no_valid_root_on_a_crash_image_holding_an_abandoned_root_is_illegal_because_the_newest_root_is_never_abandoned_by_its_own_table`。
+fn no_valid_root_in_the_root_ring_under_the_newest_roots_instance_table_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+) -> bool {
+    let Ok(system_configuration) = choose_system_configuration(crash_image) else {
+        return true;
+    };
+    let Some(newest) = choose_root(crash_image, &system_configuration) else {
+        return true;
+    };
+    let Some(table_of_the_newest_root) = instance_table_of_root(crash_image, &newest) else {
+        return false;
+    };
+    let immutable = &system_configuration.immutable;
+    !readable_roots(
+        crash_image,
+        &immutable.region_devices,
+        &immutable.sizes,
+        &immutable.filesystem_identifier,
+    )
+    .iter()
+    .any(|root| {
+        !table_of_the_newest_root
+            .rows
+            .iter()
+            .any(|row| row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg)
+    })
+}
+
+/// 「记录有缺口时拒可写」（D23（journal 的角色与格式） 已定项 14，F1 乙）在崩溃镜像上复算，不调实现的
+/// `mount::publishes_above_the_water_mark_missing_records_whose_named_units_do_not_verify`：水位（`selected_version`，R1 落到的那一版）之上
+/// 按 (实例代号, checkpoint_txg) 分组的每一次发布，读得出的记录的本次发布内序号排好之后不是从 1 起逐个加一、或其中没有一条带末条标志，
+/// 而它们点名的单元里有一个两份副本都验不过（[`named_unit_has_a_copy_that_verifies_on_the_crash_image`] 为假）——有这样一次发布即为真。
+/// 崩溃镜像上没有瞬时读错，重读一次读出的与这一遍相同，判据只算一遍。择不到系统配置按真（与这一族别的复算同向）；
+/// 没有所选那一版时水位无从取，交回假。
+fn publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    selected_version: Option<(InstanceGeneration, CheckpointTxg)>,
+) -> bool {
+    let Ok(system_configuration) = choose_system_configuration(crash_image) else {
+        return true;
+    };
+    let Some(selected_version) = selected_version else {
+        return false;
+    };
+    let mut records_of_each_publish: BTreeMap<
+        (InstanceGeneration, CheckpointTxg),
+        Vec<JournalRecord>,
+    > = BTreeMap::new();
+    for record in scan_journal(crash_image, &system_configuration).into_values() {
+        let publish = (record.instance, record.checkpoint_txg);
+        if publish > selected_version {
+            records_of_each_publish
+                .entry(publish)
+                .or_default()
+                .push(record);
+        }
+    }
+    records_of_each_publish
+        .values()
+        .any(|records_of_the_publish| {
+            let mut ordinals: Vec<u32> = records_of_the_publish
+                .iter()
+                .map(|record| record.ordinal_within_publish.0)
+                .collect();
+            ordinals.sort_unstable();
+            let ordinals_run_from_one_without_a_gap = ordinals
+                .iter()
+                .zip(1u32..)
+                .all(|(ordinal, expected_ordinal)| *ordinal == expected_ordinal);
+            let carries_the_last_record_of_the_publish =
+                records_of_the_publish.iter().any(|record| {
+                    record.place_in_publish == JournalRecordPlaceInPublish::LastRecordOfThePublish
+                });
+            let some_named_unit_fails_on_both_copies = records_of_the_publish
+                .iter()
+                .flat_map(|record| &record.named)
+                .any(|named| {
+                    !named_unit_has_a_copy_that_verifies_on_the_crash_image(crash_image, named)
+                });
+            !(ordinals_run_from_one_without_a_gap && carries_the_last_record_of_the_publish)
+                && some_named_unit_fails_on_both_copies
+        })
+}
+
+/// 一条记录点名的一个单元在崩溃镜像上至少有一份副本验得过：某一条位置条目指的那一份读得出，按单元种类的长度（数据单元、打包单元 32 KiB，
+/// 索引节点 16 KiB）读回的整单元 CRC-32C 等于条目里的。种类不认识的点名项（坏盘上的记录）哪一份都不算验得过。
+fn named_unit_has_a_copy_that_verifies_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    named: &NamedUnit,
+) -> bool {
+    let unit_length_in_bytes = if named.unit_class == UNIT_CLASS_INDEX_NODE {
+        NODE_BYTES
+    } else if named.unit_class == UNIT_CLASS_DATA || named.unit_class == UNIT_CLASS_PACKED {
+        DATA_UNIT_BYTES
+    } else {
+        return false;
+    };
+    let unit_bytes =
+        usize::try_from(unit_length_in_bytes).expect("单元字节数 16384 或 32768 装得进 usize");
+    named.locations.iter().any(|location| {
+        crash_image
+            .read(
+                location.device,
+                location.slot.to_device_offset(),
+                unit_bytes,
+            )
+            .is_some_and(|bytes| crc32_castagnoli(&bytes) == location.unit_checksum)
+    })
+}
+
+/// 「C 读一次没施加的发布的账读不出、读得出的记录不齐、从中央映射也现算不成」（`C_MAPPING` 收窄）那一拒在崩溃镜像上复算，不调实现的
+/// `mount::placements_in_the_accounts_of_unapplied_publishes` 与 `mount::placements_in_the_accounts_of_newer_readable_roots`。
+/// 判据由主 agent 定（2026-10-08，被攻过零轮），三样都成立即为真：
+/// 1. 那一拒点名的 `unapplied_publish` 是水位（`selected_version`，R1 落到的那一版，按实例代号为主比）之上没施加的发布——崩溃镜像上读得出它的记录；
+///    或是根环里比所选那一版新（txg 为主、实例代号破平局）、按最新那条根的实例表有效、读得出的根。被抛弃照 D23（journal 的角色与格式） 已定项 14
+///    候选集那一格另写一份（表里有那条根的实例的行 (i, Ti, Wi) 且它的 txg > Ti）；最新那条根的实例表读不出时不按表滤，与
+///    [`no_valid_root_in_the_root_ring_under_the_newest_roots_instance_table_on_the_crash_image`] 同一取法。
+/// 2. 那次发布在崩溃镜像上读得出的记录不齐：本次发布内序号排好之后不是从 1 起逐个加一，或没有一条带末条标志（一条都读不出也算没有末条）。
+/// 3. 它的账在崩溃镜像上读不出：按新根段里的树表指针找到的账根两份副本都验不过、或账根读不到（[`account_unreadable_on_the_crash_image`]）——
+///    读得出的每条记录的新根段，与第 1 条里那条较新的根的根记录，各找一次，每一份都读不出才算。
+///
+/// 这一格只判必要条件：实现拒之前还要「从中央映射现算不成」，那一半崩溃镜像上不复算——复算为真不说明实现非拒不可，只说拒的理由在镜像上站得住。
+/// 账只看到账根那一个节点：实现读账还读分配记录树根以下的节点，只有那几样读不出时实现照拒、这里复算为假（判不合法）。
+/// 崩溃镜像上没有瞬时读错，重读一次读出的与这一遍相同，判据只算一遍。择不到系统配置按真（与这一族别的复算同向）；没有所选那一版时水位无从取，交回假。
+fn account_of_an_unapplied_publish_with_incomplete_readable_records_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    selected_version: Option<(InstanceGeneration, CheckpointTxg)>,
+    unapplied_publish: (InstanceGeneration, CheckpointTxg),
+) -> bool {
+    let Ok(system_configuration) = choose_system_configuration(crash_image) else {
+        return true;
+    };
+    let Some(selected_version) = selected_version else {
+        return false;
+    };
+    let readable_records_of_the_publish: Vec<JournalRecord> =
+        scan_journal(crash_image, &system_configuration)
+            .into_values()
+            .filter(|record| (record.instance, record.checkpoint_txg) == unapplied_publish)
+            .collect();
+    let is_an_unapplied_publish_above_the_water_mark =
+        unapplied_publish > selected_version && !readable_records_of_the_publish.is_empty();
+    let newer_valid_readable_root = newer_valid_readable_root_on_the_crash_image(
+        crash_image,
+        &system_configuration,
+        selected_version,
+        unapplied_publish,
+    );
+    if !is_an_unapplied_publish_above_the_water_mark && newer_valid_readable_root.is_none() {
+        return false;
+    }
+    let mut ordinals: Vec<u32> = readable_records_of_the_publish
+        .iter()
+        .map(|record| record.ordinal_within_publish.0)
+        .collect();
+    ordinals.sort_unstable();
+    let ordinals_run_from_one_without_a_gap = ordinals
+        .iter()
+        .zip(1u32..)
+        .all(|(ordinal, expected_ordinal)| *ordinal == expected_ordinal);
+    let carries_the_last_record_of_the_publish =
+        readable_records_of_the_publish.iter().any(|record| {
+            record.place_in_publish == JournalRecordPlaceInPublish::LastRecordOfThePublish
+        });
+    if ordinals_run_from_one_without_a_gap && carries_the_last_record_of_the_publish {
+        return false;
+    }
+    readable_records_of_the_publish
+        .iter()
+        .map(|record| {
+            (
+                record.new_tree_table,
+                record.new_allocation_record_tree_root,
+            )
+        })
+        .chain(
+            newer_valid_readable_root
+                .iter()
+                .map(|root| (root.tree_table, root.allocation_record_tree_root)),
+        )
+        .all(
+            |(tree_table, allocation_record_tree_root_in_the_new_root_segment)| {
+                account_unreadable_on_the_crash_image(
+                    crash_image,
+                    &tree_table,
+                    &allocation_record_tree_root_in_the_new_root_segment,
+                )
+            },
+        )
+}
+
+/// 一版的账在崩溃镜像上读不出：账根两份副本都验不过（[`node_has_a_copy_that_verifies_on_the_crash_image`] 为假），或连账根在哪都读不到。
+/// 账根按那一版的树表找（`mount::placements_referenced_by_root` 读账的同一条路，这里另写一份、不调它）：树表两份都验不过、解不开 ⇒
+/// 读不到账根，算读不出；树表 0 条（没写过文件的一版）⇒ 账根是新根段里那条分配记录树根（空指针算读得出：mkfs 的第 0 代与照抄它的暖机根没有这棵树）；
+/// 树表有条目 ⇒ 账根是 `TREE_KIND_ALLOCATION` 那一条的根指针（没有那一条算读得出：账里一条记录都没有）。
+/// 主 agent 定的判据写的是「新根段里的分配记录树根」；带文件的一版，根记录与新根段里那一条恒是空指针（它的分配记录树住树表条目，
+/// D8（核心索引结构） 已定项 8；`transaction.rs` 发布带文件的一版时那一项写 `NodePointer::empty_root()`），不是它的账——
+/// 只看那一条，带文件的一版永远判不成读不出。这里按「新根段里的树表指针找到的账根」读，交主 agent 定（第 43 批报告）。
+/// 只看账根那一个节点：账根以下的节点读不出时实现照拒、这里判读得出。
+fn account_unreadable_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    tree_table: &NodePointer,
+    allocation_record_tree_root_in_the_new_root_segment: &NodePointer,
+) -> bool {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("节点字节数 16384 装得进 usize");
+    let Some(tree_table_bytes) = tree_table.locations.iter().find_map(|location| {
+        crash_image
+            .read(
+                location.device,
+                location.slot.to_device_offset(),
+                node_bytes,
+            )
+            .filter(|bytes| crc32_castagnoli(bytes) == location.unit_checksum)
+    }) else {
+        return true;
+    };
+    let Ok(tree_table_node) = parse_index_node(&tree_table_bytes) else {
+        return true;
+    };
+    let account_root = if tree_table_node.entries.is_empty() {
+        *allocation_record_tree_root_in_the_new_root_segment
+    } else {
+        match TreeTableEntryRootPointersByKind::of_the_entries(
+            &tree_table_node.entries,
+            &[TREE_KIND_ALLOCATION],
+        )
+        .root_pointer_of_each_kind
+        .get(&TREE_KIND_ALLOCATION)
+        {
+            Some(root_pointer_bytes) => {
+                NodePointer::read_from(&mut ByteReader::at(root_pointer_bytes, 0))
+            }
+            None => return false,
+        }
+    };
+    account_root != NodePointer::empty_root()
+        && !node_has_a_copy_that_verifies_on_the_crash_image(crash_image, &account_root)
+}
+
+/// 根环里那条 (实例代号, checkpoint_txg) 等于 `publish` 的根，它比所选那一版新（择根的序：txg 为主、实例代号破平局）、读得出、按最新那条根
+/// （`choose_root`）的实例表不被抛弃（表里有它的实例的行 (i, Ti, Wi) 且它的 txg > Ti 才算被抛弃，不调实现的
+/// `recovery::root_is_abandoned_by_the_instance_table`；那张表读不出时不按表滤）：交回那条根，没有交 `None`。
+fn newer_valid_readable_root_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    system_configuration: &SystemConfiguration,
+    selected_version: (InstanceGeneration, CheckpointTxg),
+    publish: (InstanceGeneration, CheckpointTxg),
+) -> Option<RootRecord> {
+    let table_of_the_newest_root = choose_root(crash_image, system_configuration)
+        .and_then(|newest| instance_table_of_root(crash_image, &newest));
+    let immutable = &system_configuration.immutable;
+    readable_roots(
+        crash_image,
+        &immutable.region_devices,
+        &immutable.sizes,
+        &immutable.filesystem_identifier,
+    )
+    .into_iter()
+    .find(|root| {
+        let is_abandoned = table_of_the_newest_root.as_ref().is_some_and(|table| {
+            table.rows.iter().any(|row| {
+                row.instance == root.instance && root.checkpoint_txg > row.selected_root_txg
+            })
+        });
+        (root.instance, root.checkpoint_txg) == publish
+            && (root.checkpoint_txg, root.instance) > (selected_version.1, selected_version.0)
+            && !is_abandoned
+    })
+}
+
+/// 一条码 2 / 码 3 指针指的节点在崩溃镜像上至少有一份副本验得过：某一条位置条目指的那一份读得出，16 KiB 读回的整单元 CRC-32C 等于条目里的。
+fn node_has_a_copy_that_verifies_on_the_crash_image(
+    crash_image: &dyn PoolReader,
+    pointer: &NodePointer,
+) -> bool {
+    let node_bytes = usize::try_from(NODE_BYTES).expect("节点字节数 16384 装得进 usize");
+    pointer.locations.iter().any(|location| {
+        crash_image
+            .read(
+                location.device,
+                location.slot.to_device_offset(),
+                node_bytes,
+            )
+            .is_some_and(|bytes| crc32_castagnoli(&bytes) == location.unit_checksum)
+    })
+}
+
 /// 拒之后盘上逐字节同不同（调用方比拒之前与拒之后的整份镜像）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiskAfterTheRefusal {
@@ -1479,6 +2903,31 @@ pub enum ReadFaultsInTheCrashState {
     Injected,
 }
 
+/// 被拒的这次可写挂载自己在不在读故障下跑（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2
+/// 「注入读故障的态上『新拒因复算为假不算不合法』（C3 / J2-a）」那一行，改法 G3）。与 [`ReadFaultsInTheCrashState`] 是两件事：
+/// 那一样说造出崩溃镜像的历史里有没有读故障步，这一样说被拒的那次挂载读盘时有没有故障层——崩溃注入第二、三截那次挂载起在崩溃镜像上、
+/// 盘是不带故障层的内存盘，历史里注入过读故障也不会在这次挂载里出瞬时读错。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ReadFaultsUnderTheRefusedMount {
+    /// 被拒的那次挂载读的就是崩溃镜像上的字节、不带故障层（崩溃注入第二、三截，E171 装置）：瞬时读错不会发生，
+    /// 拒的判据在崩溃镜像上复算为假就是拒错了。
+    TheRefusedMountReadTheCrashImageWithoutFaults,
+    /// 被拒的那次挂载的读经故障层、读错可以是瞬时的：两遍读之间的瞬时读错在崩溃镜像上复算不出
+    /// （C664（挂载拒绝合法复算把两种拒因报成一个）判别力自证里取号那一刻瞬时读错的态）。
+    TheRefusedMountReadThroughInjectedFaults,
+}
+
+impl ReadFaultsUnderTheRefusedMount {
+    /// 「读阶段判完之后系统配置又读不出」与「重建分配器读根环整环重读一次仍一条有效根都没有」（Q3）那两拒的判据在崩溃镜像上复算为假，
+    /// 能不能是被拒那次挂载里一次瞬时读错（复算不出）。
+    fn can_hide_a_transient_read_error_from_the_crash_image(self) -> bool {
+        match self {
+            Self::TheRefusedMountReadTheCrashImageWithoutFaults => false,
+            Self::TheRefusedMountReadThroughInjectedFaults => true,
+        }
+    }
+}
+
 /// 单子上的理由，合法还差哪一条。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RefusalConditionNotMet {
@@ -1489,6 +2938,15 @@ pub enum RefusalConditionNotMet {
     /// C670：崩溃态没注入读故障，判据 N-配置 在崩溃镜像上（撕裂的系统配置槽跳过）复算仍为真——正确实现的可写挂载在这份盘面上永远拒，
     /// 一次普通断电之后池只剩只读挂载；这样的崩溃态不许出现，拒是对的、造出这份盘面的那一段不对。带的是判据为真的那一支。
     WitnessCriterionTrueOnACrashImageWithoutReadFaults(WitnessedCounterBranchThatHolds),
+    /// 改法 G4（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J2「新拒因少一条 C670 同形的判法（J2-b）」那一行）：
+    /// 崩溃态没注入读故障，拒因是「读阶段判完之后系统配置又读不出」，那一拒的判据在崩溃镜像上复算为真（某块盘一份本池自证过的系统配置都没有、
+    /// 一份都择不到，或见证判不出）——没有读故障的历史留不下这份盘面，正确实现在它上面永远拒可写；与 C670 那一条同形，拒是对的、造出这份盘面的那一段不对。
+    SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults,
+    /// 与改法 G4 同形（用户 2026-10-05 定 Q3，判决 `research/prompts/m3-batch10-code-r1-main-verification.md` 第六节）：崩溃态没注入读故障，
+    /// 拒因是「重建分配器读根环整环重读一次、两遍并起来仍一条不被抛弃的自证有效根都没有」，那一拒的判据在崩溃镜像上复算为真（按最新那条根的实例表，
+    /// 环里一条不被抛弃的自证有效根都没有）——没有读故障的历史留不下这份盘面（读阶段择得到根、它按自己的实例表不被抛弃），正确实现在它上面
+    /// 永远拒可写；拒是对的、造出这份盘面的那一段不对。
+    NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults,
 }
 
 /// 可写挂载被拒，拒得合不合法（r5 判决第二节 U6：拒绝合法 ⇔ 理由在 D23 已定项 14 那张单子上、那一条判据在崩溃镜像上复算为真、
@@ -1504,7 +2962,7 @@ pub enum WritableMountRefusalVerdict {
     ReasonNotOnTheD23List,
 }
 
-/// 判一次拒可写合不合法，只判 r5 判决 U6 那四条，不判 C670 那一条（崩溃态知道注没注入读故障的调用方用
+/// 判一次拒可写合不合法，只判 r5 判决 U6 那四条，不判 C670 与改法 G4 那两条（崩溃态知道注没注入读故障的调用方用
 /// [`judge_writable_mount_refusal_of_a_crash_state`]）。拒的判据在崩溃镜像（`crash_image`）上自己复算（不经 O1 判官，也不经实现判拒的那一段）；
 /// `selected_version` 是崩溃镜像上只读恢复落到的那一版（R1 恢复报告里的 `effective_root`）。
 #[must_use]
@@ -1530,10 +2988,9 @@ pub fn judge_writable_mount_refusal(
     )
 }
 
-/// 判崩溃注入第二截的一次拒可写合不合法：U6 那四条（[`judge_writable_mount_refusal`]），再加 C670 那一条——崩溃态没注入读故障
-/// （`read_faults`）、理由是判据 N-配置，而判据在崩溃镜像上复算、撕裂的系统配置槽跳过之后仍为真（[`WitnessedCounterBranchThatHolds`]），
-/// 拒得不合法（[`RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults`]）。注入过读故障的崩溃态不判这一条
-/// （D13（验证路线） 已定项 1 挂载透明的射程只管不带故障的状态）。
+/// 同 [`judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount`]，被拒的那次挂载读的就是崩溃镜像、
+/// 不带故障层（[`ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults`]：在崩溃镜像上起一次挂载判它的调用方，
+/// 如 E171 装置）。
 #[must_use]
 pub fn judge_writable_mount_refusal_of_a_crash_state(
     crash_image: &dyn PoolReader,
@@ -1542,6 +2999,37 @@ pub fn judge_writable_mount_refusal_of_a_crash_state(
     disk: DiskAfterTheRefusal,
     read_only_read_back: ReadOnlyReadBackOfTheCrashImage,
     read_faults: ReadFaultsInTheCrashState,
+) -> WritableMountRefusalVerdict {
+    judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+        crash_image,
+        selected_version,
+        refusal,
+        disk,
+        read_only_read_back,
+        read_faults,
+        ReadFaultsUnderTheRefusedMount::TheRefusedMountReadTheCrashImageWithoutFaults,
+    )
+}
+
+/// 判崩溃注入第二、三截的一次拒可写合不合法：U6 那四条（[`judge_writable_mount_refusal`]），再加 C670 那一条——崩溃态没注入读故障
+/// （`read_faults`）、理由是判据 N-配置，而判据在崩溃镜像上复算、撕裂的系统配置槽跳过之后仍为真（[`WitnessedCounterBranchThatHolds`]），
+/// 拒得不合法（[`RefusalConditionNotMet::WitnessCriterionTrueOnACrashImageWithoutReadFaults`]）；与它同形的改法 G4——崩溃态没注入读故障、
+/// 理由是「读阶段判完之后系统配置又读不出」，而那一拒的判据在崩溃镜像上复算为真，拒得不合法
+/// （[`RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults`]）；与 G4 同形的 Q3——
+/// 崩溃态没注入读故障、理由是「重建分配器读根环整环重读一次、两遍并起来仍一条不被抛弃的自证有效根都没有」，而那一拒的判据在崩溃镜像上复算为真，拒得不合法
+/// （[`RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults`]）。注入过读故障的崩溃态
+/// 这三条都不判（D13（验证路线） 已定项 1 挂载透明的射程只管不带故障的状态）。理由是「读阶段判完之后系统配置又读不出」或 Q3 那一拒而被拒的那次挂载
+/// 自己在读故障下跑的（`read_faults_under_the_refused_mount`），判据在崩溃镜像上复算为假不算不合法（两遍读之间的瞬时读错复算不出，C664（挂载拒绝合法复算
+/// 把两种拒因报成一个））；被拒的那次挂载不带故障层的，崩溃态注没注入过读故障都照 U6 复算（判据为假即不合法，改法 G3）。
+#[must_use]
+pub fn judge_writable_mount_refusal_of_a_crash_state_knowing_the_read_faults_under_the_refused_mount(
+    crash_image: &dyn PoolReader,
+    selected_version: Option<(InstanceGeneration, CheckpointTxg)>,
+    refusal: &MountError,
+    disk: DiskAfterTheRefusal,
+    read_only_read_back: ReadOnlyReadBackOfTheCrashImage,
+    read_faults: ReadFaultsInTheCrashState,
+    read_faults_under_the_refused_mount: ReadFaultsUnderTheRefusedMount,
 ) -> WritableMountRefusalVerdict {
     let Some(reason) = refusal_reason_on_the_d23_list(refusal) else {
         return WritableMountRefusalVerdict::ReasonNotOnTheD23List;
@@ -1569,14 +3057,71 @@ pub fn judge_writable_mount_refusal_of_a_crash_state(
                 );
             }
         }
+        // 改法 G4：没有读故障时设备不报读错，某块盘两槽都自证不过只能是盘面本身如此——正确实现在没有读故障的历史里留不下它。
         (
-            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration,
+            RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage,
+            ReadFaultsInTheCrashState::NoneInjected,
+        ) => {
+            if system_configuration_unreadable_after_the_read_stage_on_the_crash_image(crash_image)
+            {
+                conditions_not_met.push(
+                    RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults,
+                );
+            }
+        }
+        // Q3 与 G4 同形：没有读故障时设备不报读错，读阶段择得到的根按它自己的实例表不被抛弃——这一拒的判据为真只能是盘面本身如此。
+        (
+            RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
+            ReadFaultsInTheCrashState::NoneInjected,
+        ) => {
+            if no_valid_root_in_the_root_ring_under_the_newest_roots_instance_table_on_the_crash_image(
+                crash_image,
+            ) {
+                conditions_not_met.push(
+                    RefusalConditionNotMet::NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults,
+                );
+            }
+        }
+        (
+            RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration
+            | RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+            | RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator,
             ReadFaultsInTheCrashState::Injected,
         )
         | (
-            RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable,
+            RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable
+            | RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify
+            | RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+                ..
+            },
             ReadFaultsInTheCrashState::NoneInjected | ReadFaultsInTheCrashState::Injected,
         ) => {}
+    }
+    // 读阶段之后系统配置又读不出、被拒的那次挂载自己在读故障下跑：两遍读之间的瞬时读错在崩溃镜像上复算不出，判据复算为假不算拒得不合法
+    // （C664（挂载拒绝合法复算把两种拒因报成一个）的还清条件：带读故障的档里取号那一刻瞬时读错的态，分开报之后判合法）；
+    // 盘上逐字节不变与只读读出照判。被拒的那次挂载不带故障层的照 U6 复算（判据为假即不合法）。
+    // 重建分配器读根环重读仍一条有效根都没有（Q3）同一个办法：重建那一遍与它的重读读坏是这次挂载里的瞬时读错，崩溃镜像上复算不出。
+    match reason {
+        RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage
+        | RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator => {
+            if read_faults_under_the_refused_mount
+                .can_hide_a_transient_read_error_from_the_crash_image()
+            {
+                conditions_not_met.retain(|condition| {
+                    *condition
+                        != RefusalConditionNotMet::CriterionFalseWhenRecomputedOnTheCrashImage
+                });
+            }
+        }
+        // 「记录有缺口时拒可写」那一拒没有这一条宽限：被拒的那次挂载在读故障下跑、判据在崩溃镜像上复算为假的照判不合法
+        // （D23 已定项 14 那一段只写判据、没写读故障下这一拒怎么判；取不放宽的一边：复算不出的报红，不藏）。
+        // `C_MAPPING` 那一拒同一个取法（主 agent 2026-10-08 定，被攻过零轮）。
+        RefusalReasonOnTheD23List::NewerPublishWitnessedBySystemConfiguration
+        | RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable
+        | RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify
+        | RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            ..
+        } => {}
     }
     verdict_of_a_refusal_on_the_d23_list(reason, conditions_not_met)
 }
@@ -1596,6 +3141,27 @@ fn conditions_not_met_by_a_refusal_on_the_d23_list(
         RefusalReasonOnTheD23List::InstanceTableOfTheNewestRootUnreadable => {
             instance_table_of_the_newest_root_unreadable_on_the_crash_image(crash_image)
         }
+        RefusalReasonOnTheD23List::SystemConfigurationUnreadableAfterTheReadStage => {
+            system_configuration_unreadable_after_the_read_stage_on_the_crash_image(crash_image)
+        }
+        RefusalReasonOnTheD23List::NoValidRootInTheRootRingOfTheRebuiltAllocator => {
+            no_valid_root_in_the_root_ring_under_the_newest_roots_instance_table_on_the_crash_image(
+                crash_image,
+            )
+        }
+        RefusalReasonOnTheD23List::PublishAboveTheWaterMarkMissingRecordsWhoseNamedUnitsDoNotVerify => {
+            publish_above_the_water_mark_missing_records_whose_named_units_do_not_verify_on_the_crash_image(
+                crash_image,
+                selected_version,
+            )
+        }
+        RefusalReasonOnTheD23List::AccountOfAnUnappliedPublishWithIncompleteReadableRecords {
+            unapplied_publish,
+        } => account_of_an_unapplied_publish_with_incomplete_readable_records_on_the_crash_image(
+            crash_image,
+            selected_version,
+            unapplied_publish,
+        ),
     };
     let mut conditions_not_met = Vec::new();
     if !criterion_holds_on_the_crash_image {

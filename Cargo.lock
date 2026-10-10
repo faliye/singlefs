@@ -805,6 +805,7 @@ dependencies = [
  "singlefs-core",
  "singlefs-format",
  "singlefs-harness",
+ "singlefs-reference-filesystem",
  "wgpu",
 ]
 

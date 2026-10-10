@@ -10,6 +10,9 @@
 //! 每个可达的崩溃状态里，池里两块盘两槽全部自证过的系统配置的 journal tail 取最大（见证值，与可写挂载判 N-配置、取号写的见证值同一取法）
 //! 都不小于这次发布末条记录的计数器。计数器全池接着走（D23（journal 的角色与格式） 已定项 14 第 3 条），后面换了实例也照比。
 //! 见证值只由落在系统配置两槽上的写定：崩溃状态只在「还没被屏障放行的那一段」里的系统配置槽写上取子集，别的写不改它。
+//! 唯一许落在系统配置两槽上的别的写是 mkfs 每块盘最先发的 [0, 根环基址) 整段清零（D22（单元原子性怎么合成） 已定项 8 第 3 条）：
+//! 它发在那块盘第一次系统配置槽写之前，那时这块盘上系统配置两槽还是空白镜像的全零，清零不改见证值；
+//! 同一块盘上已有系统配置槽写（不论放没放行）之后再清零到两槽上，判法就不成立，照旧停下。
 //! 撕开的原地覆写不另枚举：被撕的是较旧的那一槽（两槽轮换），撕坏自证不过，与那一写没持久对见证值是同一个数。
 
 #[path = "../../singlefs-harness/tests/common/mod.rs"]
@@ -19,6 +22,8 @@ use common::{
     build_pool, format_pool, geometry, parameters, publish_overwrite_in_process, BuiltPool,
     Recorded, FIXED_WRITE_TIME_SECONDS, IMAGE_BYTES,
 };
+use std::collections::BTreeSet;
+
 use singlefs_core::address::{
     CheckpointTxg, DeviceIdentity, DeviceOffsetInBytes, InstanceGeneration,
 };
@@ -125,8 +130,9 @@ fn lowest_witness_over_the_open_subsets(
 /// 录制流每个崩溃点（已发出前 p 步，p 从 0 到流长）上，全部可达崩溃状态里见证值的最小值；交回的第 p 项是第 p 个崩溃点的。
 /// 切段照 [`SegmentClosingRule`]（与层 0 同一条规则）：段关上时段里的写全持久，还开着的那一段里的写任取子集。
 ///
-/// 循环：按录制流逐步（轮数 = 步数），跨轮携带「已持久的系统配置槽写施加出的镜像」与「当前段里的系统配置槽写」，
-/// 段关上时把后者按次序施加进前者再清空；没有提前出口。
+/// 循环：按录制流逐步（轮数 = 步数），跨轮携带「已持久的系统配置槽写施加出的镜像」、「当前段里的系统配置槽写」与
+/// 「发过系统配置槽写的盘」（只增不减），段关上时把第二样按次序施加进第一样再清空；没有提前出口。
+/// 落在系统配置两槽上的整段清零只许发在那块盘第一次系统配置槽写之前（那时两槽在空白镜像上全零，清零不改见证值），否则停下。
 fn lowest_witness_at_every_crash_point(operations: &[RetainedOperation]) -> Vec<u64> {
     let classifying_geometry = geometry();
     let system_configuration_end_in_bytes = SYSTEM_CONFIGURATION_SLOTS_PER_DEVICE
@@ -135,13 +141,20 @@ fn lowest_witness_at_every_crash_point(operations: &[RetainedOperation]) -> Vec<
         MemoryPool::with_devices(&[DeviceIdentity(0), DeviceIdentity(1)], IMAGE_BYTES);
     let mut open_system_configuration_writes: Vec<&RetainedOperation> = Vec::new();
     let mut closing_rule = SegmentClosingRule::default();
+    let mut devices_with_a_system_configuration_slot_write: BTreeSet<DeviceIdentity> =
+        BTreeSet::new();
     let mut lowest_witnesses = vec![witness_on(&persisted_image)];
     for retained in operations {
         match classifying_geometry.classify(&retained.operation) {
-            StepKind::SystemConfigurationSlot => open_system_configuration_writes.push(retained),
+            StepKind::SystemConfigurationSlot => {
+                devices_with_a_system_configuration_slot_write.insert(retained.operation.device);
+                open_system_configuration_writes.push(retained);
+            }
             StepKind::ZeroFill => assert!(
-                retained.operation.offset.0 >= system_configuration_end_in_bytes,
-                "整段清零落在系统配置两槽上：见证值不再只由系统配置槽写定，这份判法不成立：{:?}",
+                retained.operation.offset.0 >= system_configuration_end_in_bytes
+                    || !devices_with_a_system_configuration_slot_write
+                        .contains(&retained.operation.device),
+                "整段清零落在一块已发过系统配置槽写的盘的系统配置两槽上：见证值不再只由系统配置槽写定，这份判法不成立：{:?}",
                 retained.operation
             ),
             StepKind::UnitWrite

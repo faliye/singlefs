@@ -898,6 +898,16 @@ pub const RANDOM_HISTORY_THROUGH_LIBRARY_MODULES_ALLOWED: &[RandomHistoryThrough
         library_module: "crates/singlefs-harness/src/model_comparison.rs",
         reason: "崩溃注入拿随机历史当输入：战役经 crash_injection.rs 用它把崩溃之后读回的结果对到理想模型；它只在自己的单元测试模块里引随机历史脚手架（词法闭包照收），判定随对拍的写法变",
     },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_injection_campaign",
+        library_module: "crates/singlefs-harness/src/reference_filesystem_translation.rs",
+        reason: "崩溃注入拿随机历史当输入：战役经 crash_injection.rs 用 RefFS 翻译层把历史操作、每步结局与崩溃时刻翻成 RefFS 操作再判恢复读出（形式化接入线 12-2），翻译层直接引随机历史脚手架的操作与观察类型，判定随历史怎么生成、怎么执行变",
+    },
+    RandomHistoryThroughALibraryModuleAllowed {
+        test_target: "crash_injection_campaign",
+        library_module: "crates/singlefs-harness/src/fault_injection.rs",
+        reason: "崩溃注入拿随机历史当输入：RefFS 翻译层把历史操作翻成 RefFS 操作时要认每步的故障结局（形式化接入线 12-2），经它引故障注入的结局类型，故障注入又引随机历史脚手架的执行器；判定随带故障执行历史的写法变",
+    },
 ];
 
 /// 随机历史脚手架的一个引入者判下来是什么。

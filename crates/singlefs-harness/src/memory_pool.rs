@@ -789,6 +789,15 @@ pub struct PublishedVersion {
     pub content: Vec<u8>,
 }
 
+/// 文件从这一版起没有了：哪次发布（实例代号 + checkpoint_txg）之后冷走读答「没有文件」（D8（核心索引结构） 已定项 16 第 4 条：
+/// 删除意图那次发布起）。与 [`PublishedVersion`] 一起排成一条流的版本表：落到的根两边都不在时，看比它旧的最新那一项
+/// （`singlefs_checker_tier::crash::Layer0VersionTable`）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PublishedVersionWithoutAFile {
+    pub instance: InstanceGeneration,
+    pub checkpoint_txg: CheckpointTxg,
+}
+
 /// 这个持久集合把一次发布截在了它的根落盘之前：那次发布的单元写或记录写至少有一次已持久，而它的根槽写没持久。
 #[must_use]
 pub fn some_publish_persisted_without_its_root(
@@ -933,58 +942,121 @@ pub struct PublishWrites {
     pub checkpoint_txg: u64,
 }
 
-/// 交给记录核对器的写表是怎么来的：一条录制流从头到尾，还是一条被崩溃截断的录制流后面接上崩溃之后在那份崩溃后镜像上写出的流
-/// （[`publishes_in`] 按它在接缝处断开）。
+/// 写表里的一道接缝：从这一项起是另一个进程写出的录制流，之前那一截到这里就断了（[`publishes_in`] 在这里断开，两截各分各的）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RecordStreamContinuity {
-    /// 一条录制流从头到尾（层 0 与崩溃注入第一截）。
-    OneRecording,
-    /// 写表前 `first_write_after_the_crash` 项是被一次崩溃截断的那条录制流（整条录下来的，截断处之后的写都记成没持久），
-    /// 从这一项起是崩溃之后在那份崩溃后镜像上写出的流（崩溃注入第二、三截：可写挂载那一段）。
-    ResumedAfterACrash {
+pub enum RecordStreamSeam {
+    /// 一段历史里的一次掉电（`crate::history` 里覆盖写掉电在第一个 journal 记录写之前、再可写挂载的那一步）：之前那一截是掉电之前录下的
+    /// （录制器只录交下去、落了盘的写；掉电那个写与之后的写一个都没交下去），从 `first_write_after_the_power_loss` 起是掉电之后
+    /// 那次可写挂载另起的实例写的流。交这道接缝的调用方保证之前那一截在持久集合里全落了（被判的崩溃状态落在掉电之后）。
+    AfterAPowerLoss {
+        first_write_after_the_power_loss: usize,
+    },
+    /// 之前那一截是被一次崩溃截断的录制流（整条录下来的，截断处之后的写都记成没持久），从 `first_write_after_the_crash` 起是
+    /// 崩溃之后在那份崩溃后镜像上写出的流（崩溃注入第二、三截：可写挂载那一段）。
+    AfterACrash {
         first_write_after_the_crash: usize,
         /// 那次崩溃之后只读恢复落到的那一版（恢复失败是 None）：截断处在飞的那次发布只在恢复落到它上（由它的记录重建）时算发生过。
         version_landed_on_after_the_crash: Option<(InstanceGeneration, CheckpointTxg)>,
     },
 }
 
+impl RecordStreamSeam {
+    /// 接缝之后第一个写在写表里的下标。
+    #[must_use]
+    pub fn first_write_after_the_seam(&self) -> usize {
+        match self {
+            Self::AfterAPowerLoss {
+                first_write_after_the_power_loss,
+            } => *first_write_after_the_power_loss,
+            Self::AfterACrash {
+                first_write_after_the_crash,
+                ..
+            } => *first_write_after_the_crash,
+        }
+    }
+}
+
+/// 交给记录核对器的写表是怎么来的：一条录制流从头到尾，还是在几道接缝处断开的几截录制流（[`publishes_in`] 按它分发布）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RecordStreamContinuity<'seams> {
+    /// 一条录制流从头到尾（层 0；崩溃注入第一截在崩溃之前没掉过电的历史上）。
+    OneRecording,
+    /// 写表在每道接缝处断开，接缝按写表下标从小到大；最后一道接缝之后那一截是一条录制流。崩溃注入第一截给崩溃之前那几道掉电接缝；
+    /// 第二、三截给那几道掉电接缝，再加历史与挂载之间那一道崩溃接缝。
+    BrokenAtSeams(&'seams [RecordStreamSeam]),
+}
+
 /// 写表里的每次发布。一条录制流里按根槽写分：一次根槽写之前、上一次根槽写之后的单元写与 journal 记录写都归它。
 ///
-/// 写表是崩溃截断的流接上崩溃之后写出的流（[`RecordStreamContinuity::ResumedAfterACrash`]）时，在接缝处断开，两条流各分各的：
-/// - 截断的那条流末尾没等到根槽写的单元写与记录写，不归接缝之后的第一次发布（那次发布是崩溃之后另起的实例写的）；
-/// - 截断的那条流里只留崩溃之后那条时间线上的发布：根槽写落了盘的（`persisted`），与那次崩溃之后恢复落到的那一版
-///   （由记录重建时它的根槽写在截断处之后、没落盘）。截断处之后才写根槽写、恢复又没落到的发布没发生过：崩溃之后的挂载另起实例、
-///   txg 从盘上最大的往上接，与它们的 (实例, txg) 撞得上，挂载写的实例表也不带挂载自己实例的行，留着就会被当成恢复自称的那一版该有的发布。
+/// 写表在接缝处断开（[`RecordStreamContinuity::BrokenAtSeams`]）时，每道接缝前后各分各的：
+/// - 接缝之前那一截末尾没等到根槽写的单元写与记录写，不归接缝之后的第一次发布（那次发布是另起的实例写的）。掉电那道接缝
+///   （[`RecordStreamSeam::AfterAPowerLoss`]）之前那一截就是这样：掉电截在第一个 journal 记录写上，那次改动的单元写落了盘、
+///   根与记录一个都没写，接成一条来分会把它们归进掉电之后可写挂载写行那次发布，那次发布之后复用了它们落点的写就被判成盖掉了一次发布的单元；
+/// - 崩溃那道接缝（[`RecordStreamSeam::AfterACrash`]）之前那一截里只留崩溃之后那条时间线上的发布：根槽写落了盘的（`persisted`），
+///   与那次崩溃之后恢复落到的那一版（由记录重建时它的根槽写在截断处之后、没落盘）。截断处之后才写根槽写、恢复又没落到的发布没发生过：
+///   崩溃之后的挂载另起实例、txg 从盘上最大的往上接，与它们的 (实例, txg) 撞得上，挂载写的实例表也不带挂载自己实例的行，
+///   留着就会被当成恢复自称的那一版该有的发布。掉电那道接缝之前那一截的根槽写都落了盘（调用方保证），不必剔。
 ///
 /// 两条流接成一条来分（B3b 报告第二节第 4 条）会假红：第一次崩溃截在一次发布中间时，只接到截断处为止，那次发布没落根的单元写与记录写
 /// 归进挂载写行那次发布；整条接上，截断处之后的历史发布与挂载的发布撞了身份。
+///
+/// # Panics
+/// 接缝不是按写表下标从小到大、或越过写表；掉电那道接缝之前那一截有一个写在持久集合里没落。
 pub fn publishes_in(
     writes: &[RetainedWrite],
     persisted: &[bool],
-    continuity: RecordStreamContinuity,
+    continuity: RecordStreamContinuity<'_>,
 ) -> Vec<PublishWrites> {
     match continuity {
         RecordStreamContinuity::OneRecording => publishes_of_one_recording(writes, 0),
-        RecordStreamContinuity::ResumedAfterACrash {
-            first_write_after_the_crash,
-            version_landed_on_after_the_crash,
-        } => {
-            let (cut_recording, resumed_recording) = writes.split_at(first_write_after_the_crash);
-            publishes_of_one_recording(cut_recording, 0)
-                .into_iter()
-                .filter(|publish| {
-                    persisted[publish.root]
-                        || version_landed_on_after_the_crash
-                            == Some((
-                                InstanceGeneration(publish.instance),
-                                CheckpointTxg(publish.checkpoint_txg),
-                            ))
-                })
-                .chain(publishes_of_one_recording(
-                    resumed_recording,
-                    first_write_after_the_crash,
-                ))
-                .collect()
+        RecordStreamContinuity::BrokenAtSeams(seams) => {
+            let mut publishes = Vec::new();
+            let mut first_write_of_the_recording = 0;
+            for seam in seams {
+                let first_write_after_the_seam = seam.first_write_after_the_seam();
+                assert!(
+                    first_write_of_the_recording <= first_write_after_the_seam
+                        && first_write_after_the_seam <= writes.len(),
+                    "接缝按写表下标从小到大、不越过写表：上一截起在 {first_write_of_the_recording}，这道接缝在 {first_write_after_the_seam}，写表 {} 项",
+                    writes.len()
+                );
+                let publishes_of_the_recording_before_the_seam = publishes_of_one_recording(
+                    &writes[first_write_of_the_recording..first_write_after_the_seam],
+                    first_write_of_the_recording,
+                );
+                match seam {
+                    RecordStreamSeam::AfterAPowerLoss { .. } => {
+                        assert!(
+                            persisted[first_write_of_the_recording..first_write_after_the_seam]
+                                .iter()
+                                .all(|is_persisted| *is_persisted),
+                            "掉电那道接缝（写表下标 {first_write_after_the_seam}）之前那一截在持久集合里全落了：被判的崩溃状态落在掉电之后"
+                        );
+                        publishes.extend(publishes_of_the_recording_before_the_seam);
+                    }
+                    RecordStreamSeam::AfterACrash {
+                        version_landed_on_after_the_crash,
+                        ..
+                    } => publishes.extend(
+                        publishes_of_the_recording_before_the_seam
+                            .into_iter()
+                            .filter(|publish| {
+                                persisted[publish.root]
+                                    || *version_landed_on_after_the_crash
+                                        == Some((
+                                            InstanceGeneration(publish.instance),
+                                            CheckpointTxg(publish.checkpoint_txg),
+                                        ))
+                            }),
+                    ),
+                }
+                first_write_of_the_recording = first_write_after_the_seam;
+            }
+            publishes.extend(publishes_of_one_recording(
+                &writes[first_write_of_the_recording..],
+                first_write_of_the_recording,
+            ));
+            publishes
         }
     }
 }

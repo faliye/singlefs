@@ -15,6 +15,7 @@ use singlefs_core::address::{
 };
 use singlefs_core::admission::SpaceAdmission;
 use singlefs_core::block_device::PhysicalBlockSizeInBytes;
+use singlefs_core::checksum::wide_checksum_with_field_zeroed;
 use singlefs_core::container_tree::ContainerTreeNodeEntries;
 use singlefs_core::lineage_tree::LineageContainerCapacity;
 use singlefs_core::make_filesystem::MakeFilesystemParameters;
@@ -24,7 +25,8 @@ use singlefs_core::mount::{
     ShadowLedger, Unmounted,
 };
 use singlefs_core::mounted_session::MountedSession;
-use singlefs_core::root_record::UnmountMarker;
+use singlefs_core::records::{TREE_KIND_DELETED_INODES, TREE_KIND_INODE};
+use singlefs_core::root_record::{RootRecord, UnmountMarker, ROOT_CHECKSUM_OFFSET};
 use singlefs_core::system_configuration::SystemConfiguration;
 use singlefs_core::tombstone_tree::TombstoneContainerCapacity;
 use singlefs_core::transaction::{
@@ -44,11 +46,15 @@ use singlefs_harness::memory_pool::{
     WrittenContents,
 };
 use singlefs_harness::mount_transparency::{
-    judge_mount_transparency, read_recovery_fields, ComparedVersion, FieldNotJudged, FieldOutcome,
-    FloorRaiseInTheMountWrites, FloorRaisedByTheMount, FloorRaisesAtTheSecondCrash,
-    FloorRaisesInTheMountWrites, FloorRaisesOfTheMount, MountTransparency, MountTransparencyAction,
-    MountTransparencyField, PosixContentRead, PublishInTheMountWrites, RecoveryFieldsRead,
-    UserVisibleTreeRootPointersOfTheContinuation, VersionFieldsRead,
+    judge_mount_transparency, read_recovery_fields, ComparedVersion, FieldByteRange,
+    FieldByteRangeClass, FieldNotJudged, FieldOutcome, FloorRaiseInTheMountWrites,
+    FloorRaisedByTheMount, FloorRaisesAtTheSecondCrash, FloorRaisesInTheMountWrites,
+    FloorRaisesOfTheMount, MountTransparency, MountTransparencyAction, MountTransparencyField,
+    PosixContentRead, PublishInTheMountWrites, RecoveryFieldsRead, SystemConfigurationTier,
+    TreeTableEntryRootPointersByKind, UserVisibleTreeRootPointersOfTheContinuation,
+    VersionFieldsRead, D13_ROWS_ADDED_BY_THE_WRITE_BACK, D13_ROWS_OF_TODAY,
+    ROOT_RECORD_FIELD_BYTE_RANGES, SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES,
+    TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES, TREE_TABLE_ENTRY_FIELD_BYTE_RANGES,
 };
 use singlefs_harness::segments::StepKind;
 use singlefs_harness::{RecordingBlockDevice, SharedStream};
@@ -178,7 +184,8 @@ fn publish_once_after_the_mount(
     .expect("挂载之后那一次发布该成");
 }
 
-/// 一次判下来要的四样：R1、R2、动作与挂载续做那几步的两根指针。
+/// 一次判下来要的四样：R1、R2、动作与挂载续做那几步的根指针。
+#[derive(Clone)]
 struct JudgedScenario {
     before_the_mount: RecoveryFieldsRead,
     after_the_action: RecoveryFieldsRead,
@@ -675,30 +682,65 @@ fn a_tree_identifier_watermark_that_moved_with_the_mount_is_red() {
 }
 
 #[test]
-fn the_two_user_visible_tree_root_pointers_before_the_publish_after_the_mount_are_those_of_the_crash_image(
+fn the_tree_table_entry_root_pointers_before_the_publish_after_the_mount_are_those_of_the_crash_image(
 ) {
     let scenario = mount_and_one_publish_on(SMALL, &pool_after_the_first_file());
     assert_holds(
         &scenario.judge(),
-        MountTransparencyField::UserVisibleTreeRootPointers,
+        MountTransparencyField::TreeTableEntryRootPointers,
     );
+}
+
+/// 树表条目里种类那 2 字节与根指针 86 字节的偏移（D8（核心索引结构） 已定项 8 的字段表）。
+const TREE_TABLE_ENTRY_KIND_OFFSET: usize = 10;
+const TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET: usize = 14;
+
+/// R2 那一版树表里种类 `kind` 那一条的根指针第一个字节翻一下（0 变 0xff、非 0 异或 0xff）：只改原字节里的那一处。
+fn flip_the_root_pointer_of_the_tree_table_entry_of_kind(
+    fields: &mut RecoveryFieldsRead,
+    kind: u16,
+) {
+    let entries = compared_version_mut(fields)
+        .tree_table_entries
+        .as_mut()
+        .expect("R2 那一版的树表读得出");
+    let entry = entries
+        .iter_mut()
+        .find(|entry| {
+            u16::from_le_bytes([
+                entry[TREE_TABLE_ENTRY_KIND_OFFSET],
+                entry[TREE_TABLE_ENTRY_KIND_OFFSET + 1],
+            ]) == kind
+        })
+        .unwrap_or_else(|| panic!("带文件的一版树表里有种类 {kind}"));
+    entry[TREE_TABLE_ENTRY_ROOT_POINTER_OFFSET] ^= 0xff;
 }
 
 #[test]
 fn an_inode_tree_root_pointer_that_moved_with_the_mount_is_red() {
     let mut scenario = mount_and_one_publish_on(SMALL, &pool_after_the_first_file());
-    let pointers = compared_version_mut(&mut scenario.after_the_action)
-        .user_visible_tree_root_pointers
-        .as_mut()
-        .expect("R2 那一版的树表读得出");
-    let inode_tree = pointers
-        .inode_tree
-        .as_mut()
-        .expect("带文件的一版树表里有 inode 树");
-    inode_tree[0] ^= 0xff;
+    flip_the_root_pointer_of_the_tree_table_entry_of_kind(
+        &mut scenario.after_the_action,
+        TREE_KIND_INODE,
+    );
     assert_only_this_field_is_violated(
         &scenario.judge(),
-        MountTransparencyField::UserVisibleTreeRootPointers,
+        MountTransparencyField::TreeTableEntryRootPointers,
+    );
+}
+
+/// 判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1：墓碑、谱系、deleted_inodes 三根并进根指针那一行
+/// （攻方 H3）。没续做的挂载上 R2 的 deleted_inodes 根被挪了：红在树表条目的根指针那一样。判别力：种类集合退回 {1, 2} 时这一格不比、判绿。
+#[test]
+fn a_deleted_inodes_root_pointer_that_moved_with_a_mount_that_did_not_continue_is_red() {
+    let mut scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    flip_the_root_pointer_of_the_tree_table_entry_of_kind(
+        &mut scenario.after_the_action,
+        TREE_KIND_DELETED_INODES,
+    );
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::TreeTableEntryRootPointers,
     );
 }
 
@@ -768,8 +810,16 @@ fn a_second_crash_right_after_the_acquisition_recovers_the_first_version_field_b
             | MountTransparencyField::InstanceGeneration
             | MountTransparencyField::InstanceTableRows
             | MountTransparencyField::TreeIdentifierWatermark
-            | MountTransparencyField::UserVisibleTreeRootPointers
-            | MountTransparencyField::CheckpointTxg => FieldOutcome::Holds,
+            | MountTransparencyField::TreeTableEntryRootPointers
+            | MountTransparencyField::CheckpointTxg
+            | MountTransparencyField::MappingRootEmptiness
+            | MountTransparencyField::AllocationRecordTreeRoot
+            | MountTransparencyField::SystemConfigurationJournalTail
+            | MountTransparencyField::SystemConfigurationJournalInstance
+            | MountTransparencyField::SystemRuntimeConfiguration
+            | MountTransparencyField::RootRecordBytes
+            | MountTransparencyField::SystemConfigurationBytes
+            | MountTransparencyField::TreeTableEntryBytes => FieldOutcome::Holds,
         };
         assert_eq!(
             verdict.outcome_of(field),
@@ -1059,26 +1109,26 @@ fn deletion_switches_with_batches_of_one() -> DeletionSwitches {
         ),
         tombstone_container_capacity: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container_capacity: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container_capacity:
+            singlefs_core::retirement_tree::RetirementContainerCapacity::FromTheContainerFormat,
         container_tree_node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     }
 }
 
-/// 窄盘上 unlink 一个 14 个数据单元的文件、发完意图就崩（单元区 256 槽、不为环窗口补足，第一个文件之后覆盖写 2 次再顺序写长到 14 个单元），
-/// 与 `admission_raises_the_floor_before_refusing.rs` 里「挂载续做里一批被落得下那一判拒、推一串抬 F 之后走完」那一条同一种造法（那边第十位实现员的
-/// 草稿探针定的 256 槽、2 次、14 个单元）。交回崩溃那一刻的盘面与建池那一份参数。
-fn pool_crashed_after_the_unlink_intent_of_fourteen_data_units_on_narrow_devices(
+/// 窄盘上 unlink 一个 16 个数据单元的文件、发完意图就崩（单元区 292 槽、不为环窗口补足，第一个文件之后覆盖写 1 次再顺序写长到 16 个单元），
+/// 与 `admission_raises_the_floor_before_refusing.rs` 里「挂载续做里一批被落得下那一判拒、推一串抬 F 之后走完」那一条同一种造法（那边第 50 批补做
+/// 重扫定的 292 槽、1 次、16 个单元；此前第十位实现员定的 256 槽、2 次、14 个单元在退役树进准入之后取号之前就不够）。交回崩溃那一刻的盘面与建池那一份参数。
+fn pool_crashed_after_the_unlink_intent_of_sixteen_data_units_on_narrow_devices(
 ) -> (MemoryPool, MakeFilesystemParameters) {
     let mut pool =
         start_on_narrow_devices_without_the_ring_window_allowance_with_the_space_admission_switched_off(
             HistoryDeviceWidth::UnitAreaOf384Slots,
-            256,
+            292,
         );
-    for overwrite_index in 1..=2 {
-        pool.overwrite(OVERWRITE_BYTES)
-            .unwrap_or_else(|refusal| panic!("第 {overwrite_index} 次覆盖写做成：{refusal:?}"));
-    }
-    pool.sequential_write(13 * data_unit_payload_capacity() + 100)
-        .unwrap_or_else(|refusal| panic!("顺序写把文件长到 14 个单元：{refusal:?}"));
+    pool.overwrite(OVERWRITE_BYTES)
+        .unwrap_or_else(|refusal| panic!("那一次覆盖写做成：{refusal:?}"));
+    pool.sequential_write(15 * data_unit_payload_capacity() + 100)
+        .unwrap_or_else(|refusal| panic!("顺序写把文件长到 16 个单元：{refusal:?}"));
     let PoolUnderTest {
         session,
         devices,
@@ -1128,24 +1178,29 @@ fn after_a_mount_that_continued_the_deletion_the_two_tree_root_pointers_are_thos
         PosixContentRead::NoFile,
         "前提：R1 落到意图那一版，第一个文件在删除中、读出「没有文件」"
     );
+    let deleted_inodes_root_pointer = |fields: &RecoveryFieldsRead| {
+        TreeTableEntryRootPointersByKind::of_the_entries(
+            fields
+                .compared_version
+                .as_ref()
+                .expect("落到一版")
+                .tree_table_entries
+                .as_ref()
+                .expect("那一版的树表读得出"),
+            &TREE_KINDS_WHOSE_ROOTS_ONLY_THE_CONTINUATION_REWRITES,
+        )
+        .root_pointer_of_each_kind
+        .get(&TREE_KIND_DELETED_INODES)
+        .cloned()
+    };
     assert_ne!(
-        scenario
-            .after_the_action
-            .compared_version
-            .as_ref()
-            .expect("R2 落到一版")
-            .user_visible_tree_root_pointers,
-        scenario
-            .before_the_mount
-            .compared_version
-            .as_ref()
-            .expect("R1 落到一版")
-            .user_visible_tree_root_pointers,
-        "前提：续做改了两棵树的根指针"
+        deleted_inodes_root_pointer(&scenario.after_the_action),
+        deleted_inodes_root_pointer(&scenario.before_the_mount),
+        "前提：续做改了 deleted_inodes 的根（攻方 H3 那一形：按「必须相同」比就红）"
     );
     assert_holds(
         &scenario.judge(),
-        MountTransparencyField::UserVisibleTreeRootPointers,
+        MountTransparencyField::TreeTableEntryRootPointers,
     );
 }
 
@@ -1156,7 +1211,7 @@ fn after_a_mount_that_continued_the_deletion_the_two_tree_root_pointers_are_thos
 fn a_mount_whose_continuation_raised_the_floor_leaves_the_effective_floor_at_the_last_one_the_continuation_raised_to(
 ) {
     let (crash_image, parameters) =
-        pool_crashed_after_the_unlink_intent_of_fourteen_data_units_on_narrow_devices();
+        pool_crashed_after_the_unlink_intent_of_sixteen_data_units_on_narrow_devices();
     let (scenario, output) = mount_alone_with(&parameters, &crash_image, |parameters, devices| {
         mount_writable_with_test_only_switches_and_deletion_switches(
             parameters,
@@ -1374,5 +1429,545 @@ fn floor_raises_pushed_by_both_the_admission_and_the_continuation_are_located_fr
         located.at_a_second_crash(&persisted_into_the_continuation_raise),
         FloorRaisesAtTheSecondCrash::SomeMayHaveLanded,
         "崩在续做推的那一串里：F 不照「没推」判"
+    );
+}
+
+// ───────── 判决 `research/prompts/m3-formal-c655-c687-r1-main-verification.md` 第二节 Y1、Y2 补的几样与按字节区间的字段表 ─────────
+
+/// mkfs 之后可写挂载一次（实例 1，不写行）再关掉的盘面：树表 0 条，下一次可写挂载取实例 2、在树表 0 条的一版上写行。
+fn pool_after_one_mount_without_file() -> MemoryPool {
+    pool_after_the_history(
+        SMALL,
+        HistoryStartingPoint::AfterMakeFilesystem,
+        vec![HistoryOperation::CloseAndMountWritable],
+        SpaceAdmission::JudgedByTheFormula,
+    )
+}
+
+/// 根记录里中央映射树根指针与分配记录树根指针的偏移（D22（单元原子性怎么合成） 已定项 7）。
+const ROOT_RECORD_MAPPING_ROOT_OFFSET: usize = 256;
+const ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_OFFSET: usize = 342;
+const NODE_POINTER_BYTES: usize = 86;
+/// 系统配置里 journal tail 与 journal 实例代号的偏移（`.claude/kb/layout/01-first-txn.md`「系统配置字段表的偏移」）。
+const SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET: usize = 469;
+const SYSTEM_CONFIGURATION_JOURNAL_INSTANCE_OFFSET: usize = 477;
+
+fn root_record_bytes(fields: &RecoveryFieldsRead) -> &[u8] {
+    &fields
+        .compared_version
+        .as_ref()
+        .expect("落到一版")
+        .root_record_bytes
+}
+
+fn chosen_system_configuration_bytes_mut(fields: &mut RecoveryFieldsRead) -> &mut Vec<u8> {
+    fields
+        .chosen_system_configuration_bytes
+        .as_mut()
+        .expect("择得到系统配置")
+}
+
+#[test]
+fn the_mapping_root_stays_all_zero_after_a_mount_alone_on_a_pool_without_file() {
+    let scenario = mount_alone_on(SMALL, &pool_after_make_filesystem());
+    for fields in [&scenario.before_the_mount, &scenario.after_the_action] {
+        assert!(
+            root_record_bytes(fields)[ROOT_RECORD_MAPPING_ROOT_OFFSET
+                ..ROOT_RECORD_MAPPING_ROOT_OFFSET + NODE_POINTER_BYTES]
+                .iter()
+                .all(|byte| *byte == 0),
+            "前提：树表 0 条的一版映射根全零"
+        );
+    }
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::MappingRootEmptiness,
+    );
+}
+
+#[test]
+fn a_mapping_root_written_non_zero_by_a_mount_on_a_pool_without_file_is_red() {
+    let mut scenario = mount_alone_on(SMALL, &pool_after_make_filesystem());
+    compared_version_mut(&mut scenario.after_the_action).root_record_bytes
+        [ROOT_RECORD_MAPPING_ROOT_OFFSET] = 1;
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::MappingRootEmptiness,
+    );
+}
+
+/// 树表 0 条、实例 1 写过的盘面上再挂一次：新实例号 2 ≥ 2，写行那次发布在树表 0 条的一版上写分配记录树、根记录那一项非零。
+#[test]
+fn a_mount_taking_instance_two_on_a_pool_without_file_writes_a_non_zero_allocation_record_tree_root(
+) {
+    let scenario = mount_alone_on(SMALL, &pool_after_one_mount_without_file());
+    assert_eq!(
+        scenario
+            .after_the_action
+            .compared_version
+            .as_ref()
+            .expect("R2 落到一版")
+            .root
+            .instance,
+        InstanceGeneration(2),
+        "前提：这次挂载取实例 2"
+    );
+    assert!(
+        root_record_bytes(&scenario.after_the_action)[ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_OFFSET
+            ..ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_OFFSET + NODE_POINTER_BYTES]
+            .iter()
+            .any(|byte| *byte != 0),
+        "前提：R2 根记录里的分配记录树根非零"
+    );
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::AllocationRecordTreeRoot,
+    );
+}
+
+#[test]
+fn a_non_zero_allocation_record_tree_root_after_a_mount_on_a_file_version_is_red() {
+    let mut scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::AllocationRecordTreeRoot,
+    );
+    compared_version_mut(&mut scenario.after_the_action).root_record_bytes
+        [ROOT_RECORD_ALLOCATION_RECORD_TREE_ROOT_OFFSET] = 1;
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::AllocationRecordTreeRoot,
+    );
+}
+
+#[test]
+fn the_journal_tail_after_a_mount_and_one_publish_is_the_highest_record_counter_in_the_ring() {
+    let scenario = mount_and_one_publish_on(SMALL, &pool_after_the_first_file());
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalTail,
+    );
+}
+
+/// 二次崩溃只判 R1 ≤ R2 ≤ 环里最大计数器（不取等）：tail 越过环里自证记录的最大计数器，红在上界那一半（攻方 q2「tail 多写 100」）。
+#[test]
+fn a_journal_tail_past_every_record_in_the_ring_of_a_second_crash_image_is_red() {
+    let mut scenario = second_crash_after_the_acquisition(&pool_after_the_first_file());
+    let highest_record_counter = scenario
+        .after_the_action
+        .highest_record_counter_in_the_ring
+        .expect("环里有记录");
+    chosen_system_configuration_bytes_mut(&mut scenario.after_the_action)
+        [SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET..SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET + 8]
+        .copy_from_slice(&(highest_record_counter + 100).to_le_bytes());
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalTail,
+    );
+}
+
+/// 那一份择到的系统配置里的 journal tail（择得到系统配置）。
+fn journal_tail_of(fields: &RecoveryFieldsRead) -> u64 {
+    let bytes = fields
+        .chosen_system_configuration_bytes
+        .as_ref()
+        .expect("择得到系统配置");
+    u64::from_le_bytes(
+        bytes[SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET
+            ..SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET + 8]
+            .try_into()
+            .expect("切的是 8 字节"),
+    )
+}
+
+fn set_journal_tail_of(fields: &mut RecoveryFieldsRead, journal_tail: u64) {
+    chosen_system_configuration_bytes_mut(fields)
+        [SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET..SYSTEM_CONFIGURATION_JOURNAL_TAIL_OFFSET + 8]
+        .copy_from_slice(&journal_tail.to_le_bytes());
+}
+
+/// journal_tail 那一行「R1 ≤ R2」那一半（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J1
+/// 「journal_tail、journal 实例代号两行」那一行：两半各补一条会红的用例）：取号之后的二次崩溃上（不判取等），R2 的 tail 比 R1 的小一，
+/// 仍不超过 R2 环里自证记录的最大计数器——只有下界那一半不成立。
+/// 判别力：去掉「R1 ≤ R2」那一半（`crates/mutations.tsv` 一行）时这一条红。
+#[test]
+fn a_journal_tail_below_the_one_on_the_crash_image_after_a_second_crash_is_red() {
+    let mut scenario = second_crash_after_the_acquisition(&pool_after_the_first_file());
+    let tail_on_the_crash_image = journal_tail_of(&scenario.before_the_mount);
+    assert!(
+        tail_on_the_crash_image >= 1,
+        "前提：第一个文件之后的崩溃镜像上 tail 至少 1（这一份是 {tail_on_the_crash_image}）"
+    );
+    assert!(
+        tail_on_the_crash_image - 1
+            <= scenario
+                .after_the_action
+                .highest_record_counter_in_the_ring
+                .unwrap_or(0),
+        "前提：R2 的 tail 改小之后仍不超过 R2 环里自证记录的最大计数器（上界那一半照旧成立）"
+    );
+    set_journal_tail_of(&mut scenario.after_the_action, tail_on_the_crash_image - 1);
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalTail,
+    );
+}
+
+/// journal_tail 那一行「挂载做完取等」那一半（同上判决）：挂载加一次发布之后，R2 的 tail 比 R2 环里自证记录的最大计数器小一，
+/// 仍不小于 R1 的——只有取等那一半不成立。
+/// 判别力：挂载做完时不判取等（`crates/mutations.tsv` 一行）时这一条红。
+#[test]
+fn a_journal_tail_below_the_highest_record_counter_in_the_ring_after_a_mount_and_one_publish_is_red(
+) {
+    let mut scenario = mount_and_one_publish_on(SMALL, &pool_after_the_first_file());
+    let highest_record_counter = scenario
+        .after_the_action
+        .highest_record_counter_in_the_ring
+        .expect("挂载加一次发布之后环里有记录");
+    assert!(
+        journal_tail_of(&scenario.before_the_mount) < highest_record_counter,
+        "前提：R1 的 tail {} 比 R2 环里自证记录的最大计数器 {highest_record_counter} 小（改小一之后下界那一半照旧成立）",
+        journal_tail_of(&scenario.before_the_mount)
+    );
+    set_journal_tail_of(&mut scenario.after_the_action, highest_record_counter - 1);
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalTail,
+    );
+}
+
+/// 系统运行配置那一行「R2 = 内置默认」（判决 `research/prompts/m3-formal-code-b26-r1-main-verification.md` 第二节 J1「运行配置『R2 = 内置默认』」
+/// 那一行，改法 G1）：带文件的一版上只挂载，判官拿 R2 择到的系统配置 433..469 那 36 字节比照条款写死的内置默认（T_time 5000 毫秒即 5 s、T_dirty 2 GiB、
+/// 整理三水位各 0，D16（发布语义） 已定项 5；`.claude/kb/layout/01-first-txn.md` 系统配置字段表「可调值」那三行），这一样判绿。
+/// 判别力：core 的 T_time 内置默认 5000 改成 4000（攻方 MUT-A，`crates/mutations.tsv` 一行）、或单位退回秒写成 5（第 30 批 30-3 那一行）时
+/// 这一条红——判官的期望取自被测 core 时，那一改坏下挂载透明 45 条全绿（同一判决同一行）。
+#[test]
+fn the_runtime_configuration_after_a_mount_alone_is_the_built_in_default_written_in_the_clauses() {
+    let scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::SystemRuntimeConfiguration,
+    );
+}
+
+#[test]
+fn the_journal_instance_of_the_system_configuration_after_a_mount_alone_is_the_instance_of_its_root(
+) {
+    let scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    assert_holds(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalInstance,
+    );
+}
+
+/// 攻方 q3「journal 实例代号写成 9」。
+#[test]
+fn a_journal_instance_of_the_system_configuration_other_than_the_instance_of_the_root_is_red() {
+    let mut scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    chosen_system_configuration_bytes_mut(&mut scenario.after_the_action)
+        [SYSTEM_CONFIGURATION_JOURNAL_INSTANCE_OFFSET
+            ..SYSTEM_CONFIGURATION_JOURNAL_INSTANCE_OFFSET + 4]
+        .copy_from_slice(&9u32.to_le_bytes());
+    assert_only_this_field_is_violated(
+        &scenario.judge(),
+        MountTransparencyField::SystemConfigurationJournalInstance,
+    );
+}
+
+/// 一张字节表从 0 起首尾相接、恰好盖满 `width` 字节（无洞、无重叠），每一段引的 D13 行名是登记过的那几行之一。
+fn assert_the_ranges_cover_the_width_end_to_end(
+    table_name: &str,
+    ranges: &[&FieldByteRange],
+    width: u64,
+) {
+    let mut next_byte = 0usize;
+    for range in ranges {
+        assert_eq!(
+            range.bytes.start, next_byte,
+            "{table_name}「{}」要接在上一段末尾 {next_byte}",
+            range.name
+        );
+        assert!(
+            range.bytes.end > range.bytes.start,
+            "{table_name}「{}」不是空段",
+            range.name
+        );
+        assert!(
+            D13_ROWS_OF_TODAY.contains(&range.row_of_the_d13_field_table)
+                || D13_ROWS_ADDED_BY_THE_WRITE_BACK.contains(&range.row_of_the_d13_field_table),
+            "{table_name}「{}」引的 D13 行名「{}」没登记",
+            range.name,
+            range.row_of_the_d13_field_table
+        );
+        next_byte = range.bytes.end;
+    }
+    assert_eq!(
+        u64::try_from(next_byte).expect("字节数装得进 u64"),
+        width,
+        "{table_name}要恰好盖满 {width} 字节"
+    );
+}
+
+#[test]
+fn the_three_field_byte_tables_cover_the_root_record_the_system_configuration_and_a_tree_table_entry_end_to_end(
+) {
+    assert_the_ranges_cover_the_width_end_to_end(
+        "根记录",
+        &ROOT_RECORD_FIELD_BYTE_RANGES.iter().collect::<Vec<_>>(),
+        singlefs_format::ROOT_RECORD_BYTES,
+    );
+    assert_the_ranges_cover_the_width_end_to_end(
+        "系统配置",
+        &SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES
+            .iter()
+            .map(|field| &field.range)
+            .collect::<Vec<_>>(),
+        singlefs_format::SYSTEM_CONFIGURATION_BYTES,
+    );
+    assert_the_ranges_cover_the_width_end_to_end(
+        "树表条目",
+        &TREE_TABLE_ENTRY_FIELD_BYTE_RANGES
+            .iter()
+            .collect::<Vec<_>>(),
+        singlefs_format::TREE_TABLE_ENTRY_BYTES,
+    );
+    let bytes_of_the_tier = |tier: SystemConfigurationTier| -> usize {
+        SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES
+            .iter()
+            .filter(|field| field.tier == tier)
+            .map(|field| field.range.bytes.len())
+            .sum()
+    };
+    assert_eq!(
+        [
+            bytes_of_the_tier(SystemConfigurationTier::ImmutableConfiguration),
+            bytes_of_the_tier(SystemConfigurationTier::MutableConfiguration),
+            bytes_of_the_tier(SystemConfigurationTier::RuntimeConfiguration),
+            bytes_of_the_tier(SystemConfigurationTier::RuntimeQuantities),
+        ],
+        [389, 4, 36, 60],
+        "系统配置四档之和（D22（单元原子性怎么合成） 已定项 9）"
+    );
+    assert_eq!(
+        SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES.len(),
+        46,
+        "系统配置字段表 46 行，一行一段"
+    );
+}
+
+/// 一段字节翻一个：这一段里第一个非 0 字节改成 0（数值字段这样只会变小，下界那几条才判得出），整段全 0 时第一个字节写 1。
+fn flip_one_byte_of(bytes: &mut [u8], range: std::ops::Range<usize>) {
+    match bytes[range.clone()].iter().position(|byte| *byte != 0) {
+        Some(first_non_zero) => bytes[range.start + first_non_zero] = 0,
+        None => bytes[range.start] = 1,
+    }
+}
+
+/// 指针头部里出生 txg 的第一个字节：MAC 16、nonce 12、算法类型 1、压缩算法码 1、压后长度 2、extent 偏移 2、出生树 8 之后
+/// （D19（块指针的结构与宽度预算） 已定项 7 / 已定项 11 的字段表）。
+const BIRTH_TXG_IN_THE_POINTER_HEAD: usize = 16 + 12 + 1 + 1 + 2 + 2 + 8;
+
+/// 根记录里一段翻一字节：同 [`flip_one_byte_of`]，只是整段全 0 的指针段（中央映射树根、分配记录树根在没有它们的那一版上）写在头部出生 txg 那一字节，
+/// 不写在段首：头部前 34 字节（MAC、nonce、算法类型、压缩那两段与 extent 偏移）非 0 时根记录读者判这条根损坏（I-2.4（头校验和覆盖范围），
+/// `RootRecord::parse_slot`），翻在段首这一槽重封之后自证不过、到不了判官。
+fn flip_one_byte_of_a_root_record_range(bytes: &mut [u8], range: std::ops::Range<usize>) {
+    let is_an_all_zero_pointer =
+        range.len() == NODE_POINTER_BYTES && bytes[range.clone()].iter().all(|byte| *byte == 0);
+    if is_an_all_zero_pointer {
+        bytes[range.start + BIRTH_TXG_IN_THE_POINTER_HEAD] = 1;
+    } else {
+        flip_one_byte_of(bytes, range);
+    }
+}
+
+/// R2 那一版的根记录翻一字节之后重封整槽自证校验和、照新字节重解一遍（解出来的那几样与原字节一起变）。
+fn flip_one_byte_of_the_root_record_and_reseal(
+    version: &mut VersionFieldsRead,
+    range: std::ops::Range<usize>,
+) {
+    let root_slot_bytes =
+        usize::try_from(SMALL.parameters().geometry.physical_block_size).expect("根槽宽");
+    let record_bytes = version.root_record_bytes.len();
+    let mut slot = version.root_record_bytes.clone();
+    slot.resize(root_slot_bytes, 0);
+    flip_one_byte_of_a_root_record_range(&mut slot, range);
+    let digest = wide_checksum_with_field_zeroed(&slot, root_slot_bytes, ROOT_CHECKSUM_OFFSET);
+    slot[ROOT_CHECKSUM_OFFSET..ROOT_CHECKSUM_OFFSET + 32].copy_from_slice(&digest);
+    let filesystem_identifier: [u8; 16] = slot[4..20].try_into().expect("fsid 16 字节");
+    version.root =
+        RootRecord::parse_slot(&slot, &filesystem_identifier).expect("重封之后这一槽自证得过");
+    version.root_record_bytes = slot[..record_bytes].to_vec();
+}
+
+/// R2 择到的系统配置翻一字节之后重封整槽校验和（罩整槽 4096，字段表之后是补齐的 0）。
+fn flip_one_byte_of_the_system_configuration_and_reseal(
+    fields: &mut RecoveryFieldsRead,
+    range: std::ops::Range<usize>,
+) {
+    let bytes = chosen_system_configuration_bytes_mut(fields);
+    let field_table_bytes = bytes.len();
+    let slot_bytes =
+        usize::try_from(singlefs_format::SYSTEM_CONFIGURATION_SLOT_BYTES).expect("4096");
+    let mut slot = bytes.clone();
+    slot.resize(slot_bytes, 0);
+    flip_one_byte_of(&mut slot, range);
+    let checksum_offset = singlefs_core::system_configuration::SYSTEM_CONFIGURATION_CHECKSUM_OFFSET;
+    let digest = wide_checksum_with_field_zeroed(&slot, slot_bytes, checksum_offset);
+    slot[checksum_offset..checksum_offset + 32].copy_from_slice(&digest);
+    *bytes = slot[..field_table_bytes].to_vec();
+}
+
+/// 字节表的一段翻一字节之后，判官红在它那一行：「必须相同」「必须为 0」的段红在那张表那一样、违例里点名这一段；
+/// 「确定关系」的段红在判它的那一样。
+fn assert_the_judge_reddens_the_row(
+    verdict: &MountTransparency,
+    table_field: MountTransparencyField,
+    range: &FieldByteRange,
+) {
+    let violated: Vec<MountTransparencyField> = verdict
+        .violated_fields()
+        .iter()
+        .map(|field_verdict| field_verdict.field)
+        .collect();
+    match range.class {
+        FieldByteRangeClass::MustBeTheSame | FieldByteRangeClass::MustBeZero => {
+            let Some(FieldOutcome::Violated { observed, .. }) = verdict.outcome_of(table_field)
+            else {
+                panic!(
+                    "「{}」翻了一字节：{table_field:?} 要红：{verdict:#?}",
+                    range.name
+                );
+            };
+            assert!(
+                observed.contains(&format!("\"{}\"", range.name)),
+                "「{}」翻了一字节：违例里点名这一段：{observed}",
+                range.name
+            );
+        }
+        FieldByteRangeClass::DeterminedRelation { judged_by } => assert!(
+            violated.contains(&judged_by),
+            "「{}」翻了一字节：判它的 {judged_by:?} 要红：{violated:?}",
+            range.name
+        ),
+        FieldByteRangeClass::NotCompared { .. } => {
+            panic!("「{}」不比，不翻", range.name)
+        }
+    }
+}
+
+fn is_compared(range: &FieldByteRange) -> bool {
+    match range.class {
+        FieldByteRangeClass::MustBeTheSame
+        | FieldByteRangeClass::MustBeZero
+        | FieldByteRangeClass::DeterminedRelation { .. } => true,
+        FieldByteRangeClass::NotCompared { .. } => false,
+    }
+}
+
+/// 中央映射树根那一段只判空性：带文件的一版上它非零，翻一字节仍非零、判不出，那一段放到树表 0 条的盘面上翻（下一条用例）。
+fn is_judged_by_the_mapping_root_emptiness(range: &FieldByteRange) -> bool {
+    range.class
+        == FieldByteRangeClass::DeterminedRelation {
+            judged_by: MountTransparencyField::MappingRootEmptiness,
+        }
+}
+
+/// 判决第二节 Y2「判别力自证」：带文件的一版上只挂载，三张字节表里每个「必须相同」「必须为 0」「确定关系」的区间各翻一字节、重封校验和，
+/// 判官红在那一行（树表条目翻的是第 0 条，extent 树那一条）。
+// harness-test-granularity:one-scenario 一份盘面上只挂载一次，逐段改的是 R2 读出来的那份原字节，每段从同一份干净的判前字段起改
+#[test]
+fn flipping_one_byte_of_each_compared_range_of_the_three_field_byte_tables_reddens_its_row() {
+    let scenario = mount_alone_on(SMALL, &pool_after_the_first_file());
+    assert!(
+        scenario.judge().violated_fields().is_empty(),
+        "前提：合法挂载上一样都不红"
+    );
+    let mut flipped_ranges = 0usize;
+    for range in ROOT_RECORD_FIELD_BYTE_RANGES
+        .iter()
+        .filter(|range| is_compared(range) && !is_judged_by_the_mapping_root_emptiness(range))
+    {
+        let mut flipped = scenario.clone();
+        flip_one_byte_of_the_root_record_and_reseal(
+            compared_version_mut(&mut flipped.after_the_action),
+            range.bytes.clone(),
+        );
+        assert_the_judge_reddens_the_row(
+            &flipped.judge(),
+            MountTransparencyField::RootRecordBytes,
+            range,
+        );
+        flipped_ranges += 1;
+    }
+    for range in SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES
+        .iter()
+        .map(|field| &field.range)
+        .filter(|range| is_compared(range))
+    {
+        let mut flipped = scenario.clone();
+        flip_one_byte_of_the_system_configuration_and_reseal(
+            &mut flipped.after_the_action,
+            range.bytes.clone(),
+        );
+        assert_the_judge_reddens_the_row(
+            &flipped.judge(),
+            MountTransparencyField::SystemConfigurationBytes,
+            range,
+        );
+        flipped_ranges += 1;
+    }
+    for range in TREE_TABLE_ENTRY_FIELD_BYTE_RANGES
+        .iter()
+        .filter(|range| is_compared(range))
+    {
+        let mut flipped = scenario.clone();
+        let entries = compared_version_mut(&mut flipped.after_the_action)
+            .tree_table_entries
+            .as_mut()
+            .expect("R2 那一版的树表读得出");
+        flip_one_byte_of(&mut entries[0], range.bytes.clone());
+        assert_the_judge_reddens_the_row(
+            &flipped.judge(),
+            MountTransparencyField::TreeTableEntryBytes,
+            range,
+        );
+        flipped_ranges += 1;
+    }
+    assert_eq!(
+        flipped_ranges,
+        ROOT_RECORD_FIELD_BYTE_RANGES
+            .iter()
+            .filter(|range| is_compared(range) && !is_judged_by_the_mapping_root_emptiness(range))
+            .count()
+            + SYSTEM_CONFIGURATION_FIELD_BYTE_RANGES
+                .iter()
+                .filter(|field| is_compared(&field.range))
+                .count()
+            + TREE_TABLE_ENTRY_FIELD_BYTE_RANGES
+                .iter()
+                .filter(|range| is_compared(range))
+                .count(),
+        "每个比的段都翻过"
+    );
+}
+
+/// 中央映射树根那一段放在树表 0 条的盘面上翻（R1、R2 都全零，翻一字节就非零）。
+#[test]
+fn flipping_one_byte_of_the_mapping_root_range_on_a_pool_without_file_reddens_its_row() {
+    let scenario = mount_alone_on(SMALL, &pool_after_make_filesystem());
+    let ranges: Vec<&FieldByteRange> = ROOT_RECORD_FIELD_BYTE_RANGES
+        .iter()
+        .filter(|range| is_judged_by_the_mapping_root_emptiness(range))
+        .collect();
+    assert_eq!(ranges.len(), 1, "根记录表里中央映射树根一段");
+    let mut flipped = scenario.clone();
+    flip_one_byte_of_the_root_record_and_reseal(
+        compared_version_mut(&mut flipped.after_the_action),
+        ranges[0].bytes.clone(),
+    );
+    assert_the_judge_reddens_the_row(
+        &flipped.judge(),
+        MountTransparencyField::RootRecordBytes,
+        ranges[0],
     );
 }

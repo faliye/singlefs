@@ -180,7 +180,9 @@ fn violated_invariants(image: &MemoryPool) -> Vec<(&'static str, String)> {
         .into_iter()
         .filter_map(|(invariant, verdict)| match verdict {
             InvariantVerdict::Violated(detail) => Some((invariant, detail)),
-            InvariantVerdict::Holds | InvariantVerdict::NotApplicable(_) => None,
+            InvariantVerdict::Holds
+            | InvariantVerdict::NotApplicable(_)
+            | InvariantVerdict::PartiallyJudged(_) => None,
         })
         .collect()
 }
@@ -489,7 +491,9 @@ fn a_slot_whose_in_flight_limit_is_off_by_one_and_whose_generation_is_lower_foun
 }
 
 /// 逐档读到的自证过的槽都不可择（4096 处本池的槽 1 也抹掉，8192 处放一份 incompat 位图不认识的槽）：恢复报 incompat 位图不认识、
-/// 点名盘 0；checker 两块盘都择不到，而那一槽自证过，I-8.5（tail 槽有效集非空） 照样成立。
+/// 点名盘 0；checker 两块盘都择不到：这不是一个挂得上的镜像，每一条不变量都报不适用、带理由。I-8.5（tail 槽有效集非空） 也报不适用
+/// （那一槽自证过，全池皆废那一格不成立，不判红；而一块盘都交不出可择的系统配置，也不判成立：`InvariantVerdict` 的「不适用必须带理由，
+/// 不许静默算成立」）。改之前 I-8.5 在早退之前判成成立，坏盘输入战役（checker 档 `bad_disk_input_campaign`）把这类镜像算成三个读者都没看见。
 #[test]
 fn only_self_verified_slots_that_are_not_choosable_found_while_reading_every_spacing_choose_nothing_in_both_the_checker_and_recovery(
 ) {
@@ -527,13 +531,28 @@ fn only_self_verified_slots_that_are_not_choosable_found_while_reading_every_spa
         vec![(0, None), (1, None)],
         "checker 两块盘都择不到"
     );
-    assert_eq!(
+    assert!(
+        matches!(
+            verdict_of(
+                &image,
+                SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION
+            ),
+            InvariantVerdict::NotApplicable(_)
+        ),
+        "8192 处那一槽自证过、而一块盘都择不到：I-8.5 报不适用：{:?}",
         verdict_of(
             &image,
             SOME_DEVICE_CARRIES_A_SELF_VERIFIED_SYSTEM_CONFIGURATION
-        ),
-        InvariantVerdict::Holds,
-        "8192 处那一槽自证过：I-8.5 成立"
+        )
+    );
+    let judged: Vec<(&str, InvariantVerdict)> = check_pool_image(&image)
+        .into_iter()
+        .filter(|(_, verdict)| !matches!(verdict, InvariantVerdict::NotApplicable(_)))
+        .collect();
+    assert_eq!(
+        judged,
+        Vec::new(),
+        "一块盘都择不到系统配置：每一条不变量都报不适用"
     );
 }
 

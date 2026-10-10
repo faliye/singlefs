@@ -134,6 +134,13 @@ fn build_unequal_pool(tag: &str) -> UnequalPool {
             span: 1,
         },
     );
+    // mkfs 同一个进程里接着写的会话装上 mkfs 刚写下的根环（没装的分配器记根就断言，C551）。
+    allocator.install_root_ring_occupancy(
+        singlefs_core::make_filesystem::root_ring_occupancy_after_make_filesystem(
+            &parameters(),
+            &genesis,
+        ),
+    );
     let content = file_content();
     let first = {
         let publish_parameters = parameters();
@@ -396,10 +403,10 @@ fn devices_answering_different_places_for_a_commit_generated_block_are_refused_b
             vec![DeviceShortOfDemand {
                 device: DeviceIdentity(1),
                 available: AvailableBytesOnOneDevice(16_384),
-                demand: BytesOnOneDevice(7_602_176),
+                demand: BytesOnOneDevice(7_651_328),
             }],
-            "准入先拒（C545）：小盘数据单元取走那一对之后没挡的槽剩 1（16 384 字节）< 第一个提交内生块要的 464 槽\
-             （extent 根 + inode 叶容器 + inode 根 + ckpt_cost（含谱系那一项 3 块），7 602 176 字节），只报盘 1"
+            "准入先拒（C545）：小盘数据单元取走那一对之后没挡的槽剩 1（16 384 字节）< 第一个提交内生块要的 467 槽\
+             （extent 根 + inode 叶容器 + inode 根 + ckpt_cost（含谱系、退役那两项各 3 块），7 651 328 字节），只报盘 1"
         ),
         other => panic!("extent 树根的落点该被拒（准入先拒）：{:?}", other.as_ref().err()),
     }

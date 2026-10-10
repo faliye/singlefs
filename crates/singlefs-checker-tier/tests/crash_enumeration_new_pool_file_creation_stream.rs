@@ -7,7 +7,22 @@
 mod common;
 
 use common::{build_pool, file_content, geometry};
-use singlefs_checker::image::MAPPING_KEY_MATCHES_THE_UNIT_HEADER;
+use singlefs_checker::image::{
+    DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY, EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
+    INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+    LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
+    LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER, MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+    NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+    ONE_OBJECT_BIRTH_PER_INODE_NUMBER, QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
+    RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSION,
+    RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
+    RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
+    RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+    TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
+    TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
+    TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT, TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+};
 use singlefs_checker::walk::check_pool_image;
 use singlefs_checker_tier::crash::{
     check_records, enumerate_layer0_in_state_slices_or_one_shard, enumerate_layer0_selecting,
@@ -87,8 +102,10 @@ fn checker_line(tally: &Layer0Tally) -> String {
 }
 
 /// checker 与记录核对器那一半的钉死值。只在根槽 txg 3 已持久的状态上才走得到记账树、inode 树、分配记录树与中央映射树的条目，
-/// 那 16 条只在这些状态上评估
-/// （I-5.4（分配记录罩住的槽互不相交） 在其中，
+/// 那 26 条只在这些状态上评估（删除态扫描那四条 I-9.5、I-3.4、I-9.24、I-9.29 的理由写在函数里那张表旁边）
+/// （I-9.25（树表条目的 previous_snapshot_txg）、I-9.27（树表条目的头 ID）、I-3.13（记账行的代段）、I-9.26（inode 记录的改动计数）、
+/// I-5.5（从 mkfs 水位建树那一版的第一个数据单元） 与 I-3.5（引用区间的精确性） 是这个理由：种子根与暖机根指着的第 0 版树表是空的，
+/// 只有 txg 3 那一版有树表条目、记账树、inode 记录与数据单元；记录施加出来的那一版由 I-4.1 另起一份走读去走、判定丢掉，不进这几条的计数，
 /// 映射 key 与单元头相符（`MAPPING_KEY_MATCHES_THE_UNIT_HEADER`，实审 B2 新立、编号待定）判的是中央映射树叶里的每一条条目：
 /// 种子根与暖机根的映射根指针全零（没有文件的一版），走不到条目；txg 3 的记录已落而根槽没落时，由记录施加出来的那一版
 /// 在这条流上不走（它要实例表里有一行记着某次恢复施加到过 txg 3，实例表的行是挂载写行时写的，而这条流上唯一一次挂载在 txg 3 之前），
@@ -100,10 +117,17 @@ fn checker_line(tally: &Layer0Tally) -> String {
 /// I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号） 单列一类：它除了回退候选集里那几版，还读下一次挂载会先施加的那一版
 /// （`.claude/kb/invariants.md` I-3.10 那一行射程 ④），txg 3 的记录至少一份已落、根槽没落的状态上也评估，
 /// 评估过的状态数由调用方按录制流逐状态现算（[`TransactionPublishInRecordedStream::allocation_generation_read_set_in`]），不写死；
-/// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到；
+/// I-5.4（分配记录罩住的槽互不相交） 在这一类里：按版本那一层也判下一次挂载先施加的那一版（第 34 批改法 RV，`.claude/kb/invariants.md`
+/// I-5.4 那一行），两条认这一版用的是池级 checker 里同一个函数，这条流上评估过的状态逐个相同，理由写在函数里那张表旁边；
+/// I-9.14（树表条目的诞生 txg 跨根不变）在这条流上一个状态都评估不到，I-9.28（全部读得出的根之间同一树 ID 的诞生 txg 相同） 同一个理由；
+/// I-3.12（实例表行 T 低于引用它的根的 txg） 也评估不到：这条流上没有哪次发布重写实例表（取号只写系统配置，暖机与 A 照抄
+/// mkfs 那张只有链记录、没有行的实例表）；
 /// I-8.6（反向链算法） 要环里至少有一条自证过的记录，环还空着的那几个状态上报「不适用」；
 /// I-8.7（实例内事务号不重号）、I-8.8（前缀里的事务不被切开） 与 I-7.9（回退下界 F 不高于抬 F 的上限） 在这条流上一个状态都评估不到；
-/// 其余 23 条每个状态都评估。
+/// I-8.10、I-8.11、I-8.12、I-4.1、I-7.16 各自一类，评估过的状态数逐条写在函数里那几张表旁边；
+/// 删除与回退那十条（I-4.7、I-4.6、I-4.4 与墓碑、谱系那七条 I-9.17–I-9.23）与退役那四条（I-9.31–I-9.34）在这条流上一个状态都评估不到，
+/// I-9.35（退役完备）只在根已落的状态上评估，理由同样写在表旁边；
+/// 其余 34 条每个状态都评估（第 50 批合后 checker 档快档那一行 `CHECKER`：90 条里 34 条是 46/0）。
 /// 违例只许出现在 I-7.7（系统配置实例代号不低于根环）：C322（取号那一步的屏障怎么放没有条款） 未还，
 /// 取号只落了一块盘的那 2 个状态里两份系统配置的实例代号不等。
 fn assert_checker_counts(
@@ -127,7 +151,6 @@ fn assert_checker_counts(
         "I-3.9",
         "I-3.11",
         "I-5.2",
-        "I-5.4",
         "I-9.1",
         "I-9.2",
         "I-9.4",
@@ -138,10 +161,40 @@ fn assert_checker_counts(
         "I-9.13",
         "I-9.15",
         MAPPING_KEY_MATCHES_THE_UNIT_HEADER,
+        "I-9.25",
+        "I-9.27",
+        "I-3.13",
+        "I-9.26",
+        "I-5.5",
+        "I-3.5",
+        // 删除态扫描（`walk::judge_deletion_state_of_the_versions` 与 `judge_tombstones_and_the_lineage_of_the_versions`）只扫树表有条目的那几版，
+        // 这条流上只有 txg 3 那一版：I-9.5（队列与 nlink 0 的记录同号）与 I-9.24（队列至多一条 key，空队列报成立）逐条判 `deleted_inodes` 条目，
+        // I-3.4（记账标签 4 恒 0）判记账树，I-9.29（同号只许一个出生代）比 inode 记录收出来的号——都要 txg 3 的根已落。
+        // 记录已落、根没落的那几个状态上由记录施加出来的那一版不进删除态扫描的版本清单（同 I-1.11 那一行的理由：实例表里没有行）。
+        // I-9.5、I-3.4 的 9 对得上 2026-10-05 主工作区 checker 档日志快档那一行的 `I-9.5=9/0`、`I-3.4=9/0`；I-9.24、I-9.29 是推的。
+        "I-9.5",
+        "I-3.4",
+        DELETION_QUEUE_HOLDS_AT_MOST_ONE_KEY,
+        ONE_OBJECT_BIRTH_PER_INODE_NUMBER,
+        // I-9.30（inode 号水位的台阶行与水位、记录、谱系对得上，第 49 批）只在最新根下面有走全了的记账树时判：txg 3 那一版自己写的那一行
+        // 就是第一级台阶 (3, 2)，① 判得到、成立；它的谱系树、墓碑树都是零根。种子根与暖机根没有记账树，报不适用。推的，没在 checker 档跑过。
+        "I-9.30",
+        // I-9.35（退役完备，第 50 批）比相邻两版：删除态扫描只扫到 txg 3 那一版有 inode 树（要它的根已落），它的父版取 txg − 1 = 2
+        // （谱系树零根，没有 T_rb = 3 的记录），暖机第二次那条根比它早一段落盘、根已落的状态上恒在回退候选集里，树表 0 条、当父版时叶身份集是空集；
+        // txg 3 那一版的 inode 树一片叶、退役树零根：父版少的叶 = 空集 = 死于 txg 3 的退役记录 ⇒ 判得到、成立。
+        // 根没落的状态上没有一版有 inode 树，报不适用。对得上第 50 批合后 checker 档快档那一行 `CHECKER` 的 `I-9.35=9/0`。
+        RETIREMENT_RECORDS_ACCOUNT_FOR_EVERY_LEAF_GONE_SINCE_THE_PARENT_VERSION,
     ];
     // I-3.10 除了回退候选集，还读下一次挂载会先施加的那一版（射程 ④）：新根没落而 txg 3 的记录已落时，
     // 恢复要由那条记录重建 txg 3 那一版，它的分配记录树在记录的新根段指着的树表下面。
-    let under_the_new_root_or_through_the_record_the_next_mount_applies_first = ["I-3.10"];
+    // I-5.4 按版本那一层同样判这一版（第 34 批改法 RV）。两条在这条流上逐状态评估同一批状态（推的，读码，没在 checker 档跑过）：
+    // ① 认这一版两条都经 `walk::version_the_next_mount_applies_first`（I-3.10 经 `tree_table_pointer_of_the_version_the_next_mount_applies_first`
+    // 取它的树表指针），候选根两条都取 `candidate_indexes`，由记录施加出来的那几版两条都取、这条流上一版都没有；
+    // ② 这条流上只有 txg 3 那一版有分配记录树，A 的 24 个单元写自成一段、排在记录段与根槽段之前（`prepare` 里钉的段长），
+    // txg 3 的记录或根落了的状态上它的单元全落了：树表、分配记录树读得出、走得到叶（I-5.4 判成立），记录罩住的单元头都可用（I-3.10 判得到记录）；
+    // ③ 种子根与暖机根指着的第 0 版树表在 mkfs 的基线里、读得出、0 条，根记录里树表 0 条那一版的分配记录树根全零：
+    // I-5.4 那几格「树表读不出」「树表指针全零」「根记录直接持有的树读不出」都不出现，不报部分没判；txg 3 那一版不在读集里的状态上两条都报不适用。
+    let under_the_new_root_or_through_the_record_the_next_mount_applies_first = ["I-3.10", "I-5.4"];
     // I-9.14 要同一棵树的条目出现在两个树表单元里才比得出来，而这条流上只有新池新建文件写树表：mkfs 种的第 0 版树表是空的、
     // 两次暖机空发布不写树表 ⇒ 每个状态都报「不适用」，一个状态都评估不到。跨根比得出来的流在
     // `crash_enumeration_fixed_script_stream.rs`（发布 B 起每次发布都重写树表），那里它真被评估过。
@@ -154,7 +207,46 @@ fn assert_checker_counts(
     // 违例数仍由下面那条断言钉 0）。它在哪一条流上都评估不到，判别力在 `checker_known_bad_images.rs` 的阳性对照与坏镜像上。
     // I-7.9（回退下界 F 不高于抬 F 的上限） 只判抬 F 的那一条根，这条流上没抬过 F（每条根带的 F 都是 0）⇒ 每个状态都报「不适用」。
     // 抬过 F 的流在 `crash_enumeration_fixed_script_stream.rs`（E 之前抬到 11），那里它真被评估过。
-    let never_comparable_on_this_stream = ["I-9.14", "I-8.7", "I-8.8", "I-7.9"];
+    // I-9.28 要两条根的树表里有同一个树 ID 的条目才比得出来，这条流上只有 txg 3 那条根的树表有条目 ⇒ 每个状态都没有对象。
+    // I-3.12 要根指着的实例表里有行，这条流上全部根都指着 mkfs 那张只有链记录的实例表（取号不写行、暖机与 A 照抄实例表指针）。
+    // 两条的 0 都对得上 2026-10-04 主工作区 checker 档日志快档那一行 `CHECKER` 的 `I-9.28=0/0`、`I-3.12=0/0`。
+    let never_comparable_on_this_stream = ["I-9.14", "I-8.7", "I-8.8", "I-7.9", "I-3.12", "I-9.28"];
+    // 这条流上没有删除（没有 nlink = 0 的记录、`deleted_inodes` 里没有号）：I-4.7（删除中 inode 有账） 与 I-4.6（删除中 inode 的数据单元数对得上 size）
+    // 没有对象；I-9.18（删除队列里的号有谱系上的墓碑） 队列空就不判。这三条的 0 对得上同一份日志的 `I-4.7=0/0`、`I-4.6=0/0`（I-9.18 是推的）。
+    let never_has_an_inode_being_deleted_on_this_stream = [
+        "I-4.7",
+        "I-4.6",
+        QUEUED_INODE_HAS_A_TOMBSTONE_ON_THE_LINEAGE,
+    ];
+    // 没有删除、没有回退：txg 3 那一版的墓碑树、谱系树都是零根（全部持久那个状态就是 `checker_known_bad_images.rs` 的干净镜像，
+    // 那里这几条报不适用），主走读走不到它们的内部条目（I-9.17、I-9.23），删除态扫描读出的墓碑容器是空的（I-9.19、I-9.20 没有墓碑可判，
+    // I-9.21 在旧入口上要至少两片容器）；I-9.22 只在新入口装了旋钮时判，层 0 走旧入口 `check_pool_image`。全是推的。
+    let never_has_a_tombstone_or_lineage_record_on_this_stream = [
+        LINEAGE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+        TOMBSTONE_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+        TOMBSTONE_ON_THE_LINEAGE_NAMES_NO_LIVE_OBJECT,
+        TOMBSTONES_ON_THE_LINEAGE_ARE_DISTINCT_AND_EVERY_TOMBSTONE_IS_WELL_FORMED,
+        NON_RIGHTMOST_TOMBSTONE_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+        TOMBSTONE_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOB_ON_A_TEST_IMAGE,
+    ];
+    // 没有删除：没有 inode 叶容器删空、被吸收，txg 3 那一版的退役树是零根（第 50 批，开池就建、零根注册）。主走读走不到退役树的内部条目
+    // （I-9.31 照 I-9.17、I-9.23 的形态：一条都没走到报不适用），删除态扫描读出的退役容器是空的（I-9.32 没有记录可判，
+    // I-9.33、I-9.34 没有死亡 txg 在谱系上的记录）。四条的 0 对得上第 50 批合后 checker 档快档那一行 `CHECKER` 的
+    // `I-9.31=0/0`、`I-9.32=0/0`、`I-9.33=0/0`、`I-9.34=0/0`。
+    let never_has_a_retirement_record_on_this_stream = [
+        RETIREMENT_TREE_ENTRY_MATCHES_ITS_CHILD_HEADER,
+        EVERY_RETIREMENT_RECORD_IS_WELL_FORMED,
+        RETIREMENT_RECORDS_ON_THE_LINEAGE_ARE_DISTINCT,
+        RETIREMENT_RECORD_ON_THE_LINEAGE_NAMES_NO_LIVE_LEAF,
+    ];
+    // 谱系树与退役树的容器容量那两条（第 53 批）：这条流上两棵都是零根，没有非最右的容器（I-9.36 没有对象）；层 0 走池级 checker 的旧入口，
+    // 没有谱系与退役的旋钮值（I-9.37 一格都不判）。推的：两条都是 0/0，没跑。
+    let never_has_two_lineage_or_retirement_containers_on_this_stream = [
+        NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE,
+        LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE,
+    ];
+    // I-4.4（意图只描述目标态） 第一版报不适用（用户 2026-10-05 定），哪一条流上都评估不到；对得上同一份日志的 `I-4.4=0/0`。
+    let not_applicable_in_the_first_version = [INTENT_DESCRIBES_ONLY_THE_TARGET_STATE];
     // I-8.6 判的是「本实例内逻辑前一条」与这一条的链值，环里一条自证过的记录都没有时判不了：
     // 取号那一段（两盘各一次系统配置写，原地覆写各三态）的 3² − 1 个状态，加上暖机第一次的记录段整段没落那一个，
     // 一共 9 个状态还没有记录落盘（补第三态之前 4 个）。
@@ -162,8 +254,26 @@ fn assert_checker_counts(
     // I-8.9（一次发布的记录序号连续且只有末条带标志） 同一个理由：环里有一条自证过的记录就判得了（记录标志其余位、序号 0 逐条判），
     // 没有就报不适用；这条流上 w1、w4、t9 各是一次只有一条记录的发布（序号 1、带末条标志）。
     let judged_once_a_record_is_on_disk = ["I-8.6", "I-8.9"];
+    // I-8.10 拿带末条标志的记录的新根段去比根环里同 (实例, txg) 的根：环里有记录还不够，还要它那次发布的根已落。
+    // 环空着的 [`STATES_WITH_AN_EMPTY_JOURNAL_RING`] 个之外，暖机第一次的记录落了而它的根没落的
+    // [`STATES_WITH_ONLY_RECORDS_OF_THE_FIRST_WARM_UP_BEFORE_ITS_ROOT`] 个也没有可比的根（mkfs 的种子根是实例 0、txg 0）。
+    let judged_once_a_record_and_the_root_of_its_publish_are_on_disk = ["I-8.10"];
+    // I-8.11 判点名项与被指单元的头：只有 A 的记录点名单元（暖机是零单元的空发布），A 的记录一份落了才有对象。
+    let judged_once_a_record_of_the_file_publish_is_on_disk = ["I-8.11"];
+    // I-8.12 比同一块盘上同一实例前后两条记录的 txg：一块盘上要有两条实例 1 的记录（暖机第二次的记录落了）才有对象。
+    let judged_once_a_device_holds_two_records_of_one_instance = ["I-8.12"];
+    // I-4.1 走重放之后那一版：所选根之上一条都不施加时报不适用。
+    let judged_only_when_the_replay_applies_a_record = ["I-4.1"];
+    // I-7.16 判可择的系统配置槽的世代号：每块盘都只剩一槽可择、而且是 mkfs 写下的世代号 1 时一格都不判。
+    let judged_unless_every_device_has_one_choosable_slot_written_by_mkfs = ["I-7.16"];
     for invariant in singlefs_checker::image::IMPLEMENTED_INVARIANTS {
-        let expected_evaluated = if never_comparable_on_this_stream.contains(&invariant) {
+        let expected_evaluated = if never_comparable_on_this_stream.contains(&invariant)
+            || never_has_an_inode_being_deleted_on_this_stream.contains(&invariant)
+            || never_has_a_tombstone_or_lineage_record_on_this_stream.contains(&invariant)
+            || never_has_a_retirement_record_on_this_stream.contains(&invariant)
+            || never_has_two_lineage_or_retirement_containers_on_this_stream.contains(&invariant)
+            || not_applicable_in_the_first_version.contains(&invariant)
+        {
             0
         } else if only_under_the_new_root.contains(&invariant) {
             root_persisted_states
@@ -173,6 +283,21 @@ fn assert_checker_counts(
             states_judging_allocation_generations
         } else if judged_once_a_record_is_on_disk.contains(&invariant) {
             every_state - states_with_an_empty_journal_ring
+        } else if judged_once_a_record_and_the_root_of_its_publish_are_on_disk.contains(&invariant)
+        {
+            every_state
+                - states_with_an_empty_journal_ring
+                - STATES_WITH_ONLY_RECORDS_OF_THE_FIRST_WARM_UP_BEFORE_ITS_ROOT
+        } else if judged_once_a_record_of_the_file_publish_is_on_disk.contains(&invariant) {
+            root_persisted_states + STATES_WITH_A_RECORD_OF_THE_FILE_PUBLISH_BUT_NOT_ITS_ROOT
+        } else if judged_once_a_device_holds_two_records_of_one_instance.contains(&invariant) {
+            every_state - STATES_BEFORE_A_DEVICE_HOLDS_TWO_RECORDS_OF_ONE_INSTANCE
+        } else if judged_only_when_the_replay_applies_a_record.contains(&invariant) {
+            STATES_WHERE_THE_REPLAY_APPLIES_A_RECORD
+        } else if judged_unless_every_device_has_one_choosable_slot_written_by_mkfs
+            .contains(&invariant)
+        {
+            every_state - STATES_WHERE_EVERY_DEVICE_HAS_ONE_CHOOSABLE_SLOT_WRITTEN_BY_MKFS
         } else {
             every_state
         };
@@ -454,6 +579,22 @@ const ROOT_PERSISTED_STATES: u64 = 9;
 const FILE_READ_STATES: u64 = 12;
 /// 环里一条记录都还没有的状态：取号那一段 3² − 1，加暖机第一次记录段整段没落那一个（补第三态之前 4）。
 const STATES_WITH_AN_EMPTY_JOURNAL_RING: u64 = 9;
+/// 环里只有暖机第一次（实例 1、txg 1）的记录、它的根还没落的状态：那一段两份记录只落一份的 2 个，加它的根槽段（根没落）那 1 个。
+/// 快档与全量相同（A 的单元段在它们之后）。快档 I-8.10 = 46 − 9 − 3 = 34，对得上 2026-10-04 主工作区 checker 档日志 `I-8.10=34/0`。
+const STATES_WITH_ONLY_RECORDS_OF_THE_FIRST_WARM_UP_BEFORE_ITS_ROOT: u64 = 3;
+/// A 的记录至少一份落了、A 的根没落的状态：记录段两份只落一份的 2 个，加根槽段（根没落）那 1 个。快档与全量相同（A 的单元段只在
+/// 记录之前展开，那里记录一份都没落）。I-8.11 = 9 + 3 = 12，对得上同一份日志的 `I-8.11=12/0`。
+const STATES_WITH_A_RECORD_OF_THE_FILE_PUBLISH_BUT_NOT_ITS_ROOT: u64 = 3;
+/// 哪块盘上都还没有两条实例 1 的记录的状态：取号段 8、暖机第一次的记录段 3、根槽段 1、轮换段 8，加暖机第二次记录段整段没落那 1 个。
+/// 快档与全量相同（A 的单元段在它们之后）。快档 I-8.12 = 46 − 21 = 25，对得上同一份日志的 `I-8.12=25/0`。
+const STATES_BEFORE_A_DEVICE_HOLDS_TWO_RECORDS_OF_ONE_INSTANCE: u64 = 21;
+/// 重放在所选根之上施加记录的状态：暖机第二次与 A 各 3 个（记录落了一份或两份、根没落）。暖机第一次那 3 个不算：记录是实例 1 的，
+/// 所选根是 mkfs 的实例 0 种子根，前缀只接同实例的记录，一条都不施加。快档与全量相同（全量多出来的 A 单元段状态上 A 的记录一份都没落）。
+/// 对得上同一份日志的 `I-4.1=6/0`，与 oracle 那一半的 `verification_ran_states` 6 是同一批状态（推的：恢复施加了记录才跑验证）。
+const STATES_WHERE_THE_REPLAY_APPLIES_A_RECORD: u64 = 6;
+/// 每块盘都只剩一槽可择、而且是 mkfs 写下的世代号 1 的状态：取号那一段两块盘的写都撕开的那 1 个（另一槽还是 mkfs 写的 1）。
+/// 之后每一段里每块盘都已有一槽世代号 ≥ 2。快档与全量相同。快档 I-7.16 = 46 − 1 = 45，对得上同一份日志的 `I-7.16=45/0`。
+const STATES_WHERE_EVERY_DEVICE_HAS_ONE_CHOOSABLE_SLOT_WRITTEN_BY_MKFS: u64 = 1;
 
 fn prepare(tag: &str) -> Prepared {
     let pool = build_pool(tag);
@@ -744,9 +885,10 @@ fn positive_control_root_persisted_without_each_unit_is_caught_by_the_oracle() {
 }
 
 /// 记录核对器的判别力（C6（块层语义假设写错） 那条「崩溃测试必须变红」在模型层的形态，与 E77（发布的持久顺序） b_ur 臂同形）：
-/// 摘掉新池新建文件里「journal 记录 → 根槽」那道池屏障（录制器按设备记屏障，两块盘各一步，两步都摘），两份记录与根槽同段；
+/// 摘掉新池新建文件里「journal 记录 → 根槽」那道池屏障（录制器按设备记屏障，两块盘各一步，两步都摘），两份记录、根槽与之后的
+/// 两次系统配置槽轮换写同段（段按设备记屏障：根槽 FUA 只放行它自己那块盘，另一块盘上的记录没放行，这一段开到轮换之后那道屏障才关）；
 /// 枚举里出现根在案而记录一份都不在的状态。oracle 在这里不红。只摘盘 1 那一步的判别力在
-/// `crash_segments_per_device_and_torn_in_place_overwrites.rs`。
+/// `crash_segments_per_device_and_torn_in_place_overwrites.rs`（那里同样是 `[…, 24, 5]`、同样按 `<= 5` 展开）。
 #[test]
 fn removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker() {
     let pool = build_pool("record-checker-barrier-two");
@@ -770,26 +912,29 @@ fn removing_the_barrier_before_the_root_slot_is_caught_by_the_record_checker() {
     let (writes, segments) = writes_and_segments(&operations, &geometry());
     assert_eq!(
         segments.iter().map(Vec::len).collect::<Vec<_>>(),
-        vec![2, 2, 1, 2, 2, 1, 2, 24, 3, 2],
-        "记录两份与根槽并成一段（C577 之后暖机第二次的轮换 2 写自成一段，不与 A 的 24 个单元写同段）"
+        vec![2, 2, 1, 2, 2, 1, 2, 24, 5],
+        "记录两份、根槽与 A 的两次系统配置槽轮换写并成一段（C577 之后暖机第二次的轮换 2 写自成一段，不与 A 的 24 个单元写同段）"
     );
     let root_index = writes
         .iter()
         .rposition(|write| write.kind == StepKind::RootRecordFua)
         .expect("根槽");
-    // A 的 24 个单元写那一段不展开（只以整段持久进入后面的状态），其余每段任意子集。
+    // A 的 24 个单元写那一段不展开（只以整段持久进入后面的状态），其余每段任意子集；最后那一段 5 个写，选择器放到 5 才展开得到它
+    // （留在 3 时这一段只以整段持久进来，根在案而记录不在的状态一个都摆不出来）。
     let tally = enumerate_layer0_selecting(
         &base,
         &writes,
         &segments,
         root_index,
         &file_content(),
-        &|_segment_index, segment| segment.len() <= 3,
+        &|_segment_index, segment| segment.len() <= 5,
     );
     assert_eq!(tally.violations, 0, "oracle 不红：根记录自己带着全部字段");
+    // 五个写那一段（记录 2、根槽 1、系统配置槽轮换 2）里根槽落了、两份记录都没落的状态：两次轮换写是原地覆写、各取三态（没落、落了、撕开），
+    // 3² = 9 个，都是真子集（记录没落）。记录核对器的「根在案而记录不在」只看盘上的根槽与记录写，不看系统配置槽（推的，checker 档没跑）。
     assert_eq!(
-        tally.record_root_without_record, 1,
-        "三个写那一段的真子集里只有「只有根槽」这一个是根在案而两份记录都不在"
+        tally.record_root_without_record, 9,
+        "五个写那一段的真子集里根槽在、两份记录都不在的是两次轮换写各三态的 3² 个"
     );
     assert_eq!(tally.record_claimed_state_missing_unit, 0);
 }

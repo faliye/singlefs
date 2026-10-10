@@ -115,11 +115,19 @@ pub const TOMBSTONE_RECORD_BYTES: u64 = 40;
 /// 一个 32 KiB 码 3 墓碑容器装几条：(32768 − 136) ÷ 40（D18（块里携带什么信息） 已定项 24 第 2 条）。
 pub const TOMBSTONE_CONTAINER_RECORDS: u64 = 815;
 
-/// 谱系记录定长 16：T_rb 8 + T_old 8（D18（块里携带什么信息） 已定项 24 第 5 条，打包记录类型 5）。
-pub const LINEAGE_RECORD_BYTES: u64 = 16;
+/// 谱系记录定长 24：T_rb 8 + T_old 8 + H_cur 8（D18（块里携带什么信息） 已定项 24 第 5 条，打包记录类型 5）。
+pub const LINEAGE_RECORD_BYTES: u64 = 24;
 
-/// 一个 32 KiB 码 3 谱系容器装几条：(32768 − 136) ÷ 16（D18（块里携带什么信息） 已定项 24 第 5 条）。
-pub const LINEAGE_CONTAINER_RECORDS: u64 = 2039;
+/// 一个 32 KiB 码 3 谱系容器装几条：(32768 − 136) ÷ 24（D18（块里携带什么信息） 已定项 24 第 5 条）。
+pub const LINEAGE_CONTAINER_RECORDS: u64 = 1359;
+
+/// 退役记录定长 34：被退役身份的出生树 8 + 打包记录类型 2 + 容器号 8 + 容器出生代 8 + 死亡 txg 8，小端，身份四段与 inode 内部条目里的
+/// 身份引用同序同宽、无填充无预留（D18（块里携带什么信息） 已定项 11 打包记录类型 3；判决 `research/prompts/m3-retire-r1-main-verification.md`
+/// 第三节第 2 条）。format-const: RETIREMENT_RECORD_BYTES
+pub const RETIREMENT_RECORD_BYTES: u64 = 34;
+
+/// 一个 32 KiB 码 3 退役容器装几条：(32768 − 136) ÷ 34（同一判决第三节第 2 条）。format-const: RETIREMENT_CONTAINER_RECORDS
+pub const RETIREMENT_CONTAINER_RECORDS: u64 = 959;
 
 /// `deleted_inodes` 树节点的条目：key = inode 号 8 字节、无 value、不带对象出生代（D8（核心索引结构） 已定项 16 第 1 条）。
 pub const DELETED_INODES_ENTRY_BYTES: u64 = 8;
@@ -184,8 +192,9 @@ pub const NEW_POOL_FILE_CREATION_ACCOUNTING_ROWS: u64 = 15;
 pub const TREE_TABLE_ENTRY_BYTES: u64 = 200;
 
 /// 新池新建文件写出的树表条目数（extent、inode、分配记录、记账、livelist、稀疏旁表、deadlist，
-/// 加 `deleted_inodes`、墓碑树、谱系树、logged_ops 四棵零根注册的树：D8（核心索引结构） 已定项 16 第 3 条、D18（块里携带什么信息） 已定项 24 第 6 条）。
-pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 11;
+/// 加 `deleted_inodes`、墓碑树、谱系树、logged_ops、退役树五棵零根注册的树：D8（核心索引结构） 已定项 9 / 已定项 16 第 3 条、
+/// D18（块里携带什么信息） 已定项 24 第 6 条；退役树见判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
+pub const NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES: u64 = 12;
 
 /// 树 ID 从 65536 起（树的种类那 2 字节取不到的最小值），与树的种类码值域不相交（D8（核心索引结构） 已定项 11，用户 2026-10-01 定案整体挪开）。
 pub const TREE_IDENTIFIER_EXTENT: u64 = 65536;
@@ -202,9 +211,12 @@ pub const TREE_IDENTIFIER_DELETED_INODES: u64 = 65544;
 pub const TREE_IDENTIFIER_TOMBSTONE: u64 = 65545;
 pub const TREE_IDENTIFIER_LINEAGE: u64 = 65546;
 pub const TREE_IDENTIFIER_LOGGED_OPERATIONS: u64 = 65547;
-/// 树 ID 水位：mkfs 写 65536，第一个文件版本那次之后写 65548（D8（核心索引结构） 已定项 8 ② / 已定项 11）。
+/// 退役树：同样在第一个文件版本那次零根注册，接在 logged_ops 之后（D8（核心索引结构） 已定项 11；判决
+/// `research/prompts/m3-retire-r1-main-verification.md` 第三节第 1 条）。
+pub const TREE_IDENTIFIER_RETIREMENT: u64 = 65548;
+/// 树 ID 水位：mkfs 写 65536，第一个文件版本那次之后写 65549（D8（核心索引结构） 已定项 8 ② / 已定项 11）。
 pub const TREE_IDENTIFIER_WATERMARK_AT_MKFS: u64 = 65536;
-pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 65548;
+pub const TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH: u64 = 65549;
 
 /// 根记录：magic 4 + fsid 16 + flags 4 + 实例代号 4 + checkpoint_txg 8 + 树表指针 86 + 树 ID 水位 8 + 回退下界 F 8 + 自证校验和 32 + 实例表指针 86 + 中央映射树根指针 86 + 分配记录树根指针 86 + 算法类型 1 + nonce 12 + MAC 16（D22（单元原子性怎么合成） 已定项 7；加密预留 2026-09-14 用户定案；分配记录树根指针 2026-09-23 用户定案随 C512（树表 0 条的一版上被换下的单元记在哪） 加）。format-const: ROOT_RECORD_BYTES
 pub const ROOT_RECORD_BYTES: u64 = 457;
@@ -457,15 +469,33 @@ mod tests {
             TOMBSTONE_CONTAINER_RECORDS, 815,
             "D18 已定项 24 第 2 条写的 815"
         );
-        assert_eq!(LINEAGE_RECORD_BYTES, 8 + 8, "谱系记录 = T_rb + T_old");
+        assert_eq!(
+            LINEAGE_RECORD_BYTES,
+            8 + 8 + 8,
+            "谱系记录 = T_rb + T_old + H_cur"
+        );
         assert_eq!(
             LINEAGE_CONTAINER_RECORDS,
             (DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / LINEAGE_RECORD_BYTES,
             "一个 32 KiB 谱系容器从记录区起点 136 装到单元末尾的条数"
         );
         assert_eq!(
-            LINEAGE_CONTAINER_RECORDS, 2039,
-            "D18 已定项 24 第 5 条写的 2039"
+            LINEAGE_CONTAINER_RECORDS, 1359,
+            "D18 已定项 24 第 5 条写的 1359"
+        );
+        assert_eq!(
+            RETIREMENT_RECORD_BYTES,
+            8 + 2 + 8 + 8 + 8,
+            "退役记录 = 出生树 + 打包记录类型 + 容器号 + 容器出生代 + 死亡 txg"
+        );
+        assert_eq!(
+            RETIREMENT_CONTAINER_RECORDS,
+            (DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / RETIREMENT_RECORD_BYTES,
+            "一个 32 KiB 退役容器从记录区起点 136 装到单元末尾的条数"
+        );
+        assert_eq!(
+            RETIREMENT_CONTAINER_RECORDS, 959,
+            "判决 m3-retire-r1 第三节第 2 条写的 959"
         );
         assert_eq!(
             DELETED_INODES_ENTRY_BYTES, 8,
@@ -626,7 +656,7 @@ mod tests {
         );
     }
 
-    /// 十二棵树（八棵加第一个文件版本那次零根注册的四棵）的树 ID 与两个水位逐个等于 D8（核心索引结构） 已定项 11 登记的值
+    /// 十三棵树（八棵加第一个文件版本那次零根注册的五棵）的树 ID 与两个水位逐个等于 D8（核心索引结构） 已定项 11 登记的值
     /// （用户 2026-10-01 定案「树 ID 整体挪开」）：从 65536 起连号，起点是树的种类那 2 字节取不到的最小值，水位在最后一个之后。
     #[test]
     fn tree_identifiers_are_the_registered_values_in_a_row_from_the_first_value_the_kind_field_cannot_hold(
@@ -644,10 +674,11 @@ mod tests {
             (TREE_IDENTIFIER_TOMBSTONE, 65545, "墓碑树"),
             (TREE_IDENTIFIER_LINEAGE, 65546, "谱系树"),
             (TREE_IDENTIFIER_LOGGED_OPERATIONS, 65547, "logged_ops 树"),
+            (TREE_IDENTIFIER_RETIREMENT, 65548, "退役树"),
             (TREE_IDENTIFIER_WATERMARK_AT_MKFS, 65536, "mkfs 时的水位"),
             (
                 TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
-                65548,
+                65549,
                 "第一个文件版本那次之后的水位",
             ),
         ] {
@@ -674,19 +705,20 @@ mod tests {
             TREE_IDENTIFIER_TOMBSTONE,
             TREE_IDENTIFIER_LINEAGE,
             TREE_IDENTIFIER_LOGGED_OPERATIONS,
+            TREE_IDENTIFIER_RETIREMENT,
         ];
         for (position, identifier) in identifiers.iter().enumerate() {
             let expected = TREE_IDENTIFIER_WATERMARK_AT_MKFS
-                + u64::try_from(position).expect("十二棵树的序号装得进 u64");
+                + u64::try_from(position).expect("十三棵树的序号装得进 u64");
             assert_eq!(*identifier, expected, "树 ID 连号");
         }
         assert_eq!(
             TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH,
-            TREE_IDENTIFIER_LOGGED_OPERATIONS + 1
+            TREE_IDENTIFIER_RETIREMENT + 1
         );
         assert_eq!(
-            NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES, 11,
-            "D18 已定项 24 第 6 条：树表 7 → 11 条"
+            NEW_POOL_FILE_CREATION_TREE_TABLE_ENTRIES, 12,
+            "D18 已定项 24 第 6 条树表 7 → 11 条，退役树（判决 m3-retire-r1 第三节第 1 条）11 → 12 条"
         );
         assert_eq!(
             u64::try_from(ROOT_RING_REGION_DEVICES.len()).expect("三个区域"),

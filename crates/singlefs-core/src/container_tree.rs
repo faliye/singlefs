@@ -1,6 +1,11 @@
-//! 墓碑树与谱系树共用的那一半（D18（块里携带什么信息） 已定项 24 第 1、5 条）：两棵树的根恒为码 2、条目照 inode 树内部节点的
+//! 墓碑树、谱系树与退役树共用的那一半（D18（块里携带什么信息） 已定项 24 第 1、5 条；退役树照墓碑树，判决
+//! `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条）：三棵树的根恒为码 2、条目照 inode 树内部节点的
 //! 120 字节形态（分隔 key 容器号 8 + 身份引用 26 + 子指针 86），孩子是码 3 打包记录容器；容器号从 1 起、下一个号 = 树里最大号 + 1、
-//! 零根时 1；容器只增不删。两棵树只差打包记录类型与一片装几条，各自的模块（`crate::tombstone_tree`、`crate::lineage_tree`）把这两样填进来。
+//! 零根时 1；容器只增不删。三棵树只差打包记录类型与一片装几条，各自的模块（`crate::tombstone_tree`、`crate::lineage_tree`、
+//! `crate::retirement_tree`）把这两样填进来。
+//!
+//! 一次发布可以往开放容器里追加不止一条（退役树：一次删除连着吸收几片，[`append_records_to_the_open_container`]）：开放容器装满就开下一片，
+//! 这次重写的码 2 节点是每片重写的容器的祖先的并（[`ContainerTreeShape::ancestors_of_containers`]），只追加一条时它就是最右那一条路径。
 //!
 //! 根满时长高（D18（块里携带什么信息） 已定项 24 第 1、5 条「根满时长高，照 D8（核心索引结构） 已定项 6」，用户定案 K-R3-3）：
 //! 码 2 节点装满时末尾分裂——左半保留全部原有条目、一个字节不动，右半从触发分裂的那条新条目起；根装满时长一层，新根 1 个码 2、
@@ -17,6 +22,7 @@ use singlefs_format::INODE_INTERNAL_ENTRY;
 
 use crate::address::{CheckpointTxg, TreeIdentifier};
 use crate::lineage_tree::LineageContainerCapacity;
+use crate::retirement_tree::RetirementContainerCapacity;
 use crate::tombstone_tree::TombstoneContainerCapacity;
 use crate::unit::{index_node_entry_capacity, PackedIdentity};
 
@@ -109,19 +115,22 @@ impl ContainerTreeNodeEntries {
     }
 }
 
-/// 写入口上墓碑树与谱系树的三个容量开关（都只供测试、只住内存、不落盘）：一片墓碑容器、一片谱系容器各装满几条，一个码 2 节点装满几条。
+/// 写入口上墓碑树、谱系树与退役树的四个容量开关（都只供测试、只住内存、不落盘）：一片墓碑容器、一片谱系容器、一片退役容器各装满几条，
+/// 一个码 2 节点装满几条。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ContainerTreeCapacities {
     pub tombstone_container: TombstoneContainerCapacity,
     pub lineage_container: LineageContainerCapacity,
+    pub retirement_container: RetirementContainerCapacity,
     pub node_entries: ContainerTreeNodeEntries,
 }
 
 impl ContainerTreeCapacities {
-    /// 产品路径：三样都按格式算。
+    /// 产品路径：四样都按格式算。
     pub const FROM_THE_FORMAT: ContainerTreeCapacities = ContainerTreeCapacities {
         tombstone_container: TombstoneContainerCapacity::FromTheContainerFormat,
         lineage_container: LineageContainerCapacity::FromTheContainerFormat,
+        retirement_container: RetirementContainerCapacity::FromTheContainerFormat,
         node_entries: ContainerTreeNodeEntries::FromTheNodeFormat,
     };
 }
@@ -262,6 +271,48 @@ impl ContainerTreeShape {
         first_child..first_child + nodes[index]
     }
 
+    /// 这几片容器（叶序）的祖先的并，按 bump 次序（层级升序、同层从左到右，根最末）：这几片被重写时 COW 的就是它们（叶 + 全部祖先）。
+    /// 只有最右那一片时就是 [`Self::rightmost_path`]。没有容器时空。
+    ///
+    /// # Panics
+    /// 某个下标不小于容器数：调用方只拿这一版里的容器问。
+    #[must_use]
+    pub fn ancestors_of_containers(&self, containers: &[usize]) -> Vec<ContainerTreeNodePosition> {
+        let mut ancestors: std::collections::BTreeSet<ContainerTreeNodePosition> =
+            std::collections::BTreeSet::new();
+        for container in containers {
+            assert!(
+                *container < self.containers(),
+                "问祖先的容器 {container} 在这一版里（{} 片）",
+                self.containers()
+            );
+            // 迭代上界是层数：每一轮从这一层的孩子下标找出它在这一层的父节点，再拿父节点当上一层的孩子。
+            let mut child = *container;
+            for (level_index, nodes) in self.children_of_each_node_at_each_level.iter().enumerate()
+            {
+                let mut first_child_of_the_node = 0;
+                let parent = nodes
+                    .iter()
+                    .position(|children| {
+                        let holds_it = child < first_child_of_the_node + children;
+                        if !holds_it {
+                            first_child_of_the_node += children;
+                        }
+                        holds_it
+                    })
+                    .expect(
+                        "每一层孩子数之和等于下一层的节点数（构造时判过），孩子下标落在某个节点里",
+                    );
+                ancestors.insert(ContainerTreeNodePosition {
+                    level: u8::try_from(level_index + 1).expect("层数在构造时判过装得进一字节"),
+                    index_in_level: u32::try_from(parent).expect("同层节点数装得进 u32"),
+                });
+                child = parent;
+            }
+        }
+        ancestors.into_iter().collect()
+    }
+
     /// 最右那一条路径上的节点（每一层最右那一个），按 bump 次序（层级 1 先、根最末）：最右那片容器被重写时 COW 的祖先就是它们。
     #[must_use]
     pub fn rightmost_path(&self) -> Vec<ContainerTreeNodePosition> {
@@ -373,14 +424,22 @@ impl<Record> ContainerTreeAfterThisPublish<Record> {
             && self.shape.root_level() > self.shape_before_this_publish.root_level()
     }
 
-    /// 这次重写的码 2 节点，按 bump 次序（层级升序，根最末）。
+    /// 这次长了一层、而上一版的根一个字节不动地留在原位置当根之下的节点（它下面没有容器重写）：那一次新根在上一版里没有落点，
+    /// 上一版的根不被这次换下。一次追加好几条、上一版的开放容器先装满再长层时，旧根下面有容器重写，它跟着重写、照样被换下。
+    #[must_use]
+    pub fn previous_root_is_carried_down_unchanged(&self) -> bool {
+        self.grew_a_level_this_publish()
+            && self
+                .shape_before_this_publish
+                .root_position()
+                .is_some_and(|previous_root| !self.rewritten_nodes().contains(&previous_root))
+    }
+
+    /// 这次重写的码 2 节点，按 bump 次序（层级升序，根最末）：重写的每片容器的全部祖先（COW 叶 + 祖先）。
     #[must_use]
     pub fn rewritten_nodes(&self) -> Vec<ContainerTreeNodePosition> {
-        if self.is_the_root_rewritten() {
-            self.shape.rightmost_path()
-        } else {
-            Vec::new()
-        }
+        self.shape
+            .ancestors_of_containers(&self.rewritten_containers)
     }
 
     /// 这一版每个码 2 节点从哪来，按 bump 次序。
@@ -408,13 +467,7 @@ impl<Record> ContainerTreeAfterThisPublish<Record> {
     }
 }
 
-/// 往容器树的开放容器（最右那一片）追加一条记录：最右那片还装得下（记录数小于 `records_per_container`）就追加进去、形状不变；装满了
-/// （或树是空的）就开一片新容器：容器号 = 树里最大号 + 1（零根时 1），出生代 = 这次发布的 checkpoint_txg，出生树 = `tree`，
-/// 打包记录类型 = `record_type`，形状照 [`ContainerTreeShape::after_a_container_is_opened_at_the_right_end`] 往上挂（根满长高）。
-/// 别的容器一个字节都不动。
-///
-/// # Panics
-/// `shape_before_this_publish` 里的容器数与 `containers_before_this_publish` 不等：两样出自同一版。
+/// 往容器树的开放容器（最右那一片）追加一条记录：[`append_records_to_the_open_container`] 只给一条的那一格。
 #[allow(
     clippy::too_many_arguments,
     reason = "参数各是一样东西：上一版的容器与形状、这条记录、txg、树、记录类型、一片装几条、一个节点装几条"
@@ -430,43 +483,94 @@ pub fn append_record_to_the_open_container<Record: Clone>(
     records_per_container: usize,
     node_entries: ContainerTreeNodeEntries,
 ) -> ContainerTreeAfterThisPublish<Record> {
+    append_records_to_the_open_container(
+        containers_before_this_publish,
+        shape_before_this_publish,
+        &[record],
+        checkpoint_txg,
+        tree,
+        record_type,
+        records_per_container,
+        node_entries,
+    )
+}
+
+/// 往容器树的开放容器（最右那一片）按给的次序逐条追加记录：最右那片还装得下（记录数小于 `records_per_container`）就追加进去；装满了
+/// （或树是空的）就开一片新容器：容器号 = 树里最大号 + 1（零根时 1），出生代 = 这次发布的 checkpoint_txg，出生树 = `tree`，
+/// 打包记录类型 = `record_type`，形状照 [`ContainerTreeShape::after_a_container_is_opened_at_the_right_end`] 往上挂（根满长高）。
+/// 这次追加过的每一片进重写清单（叶序升序、各一次）；别的容器一个字节都不动。`records` 为空时整棵照抄（[`ContainerTreeAfterThisPublish::carried`]）。
+///
+/// # Panics
+/// `shape_before_this_publish` 里的容器数与 `containers_before_this_publish` 不等：两样出自同一版。`records_per_container` 为 0：
+/// 三棵树的容量开关的构造函数都判过至少 1。
+#[allow(
+    clippy::too_many_arguments,
+    reason = "参数各是一样东西：上一版的容器与形状、这几条记录、txg、树、记录类型、一片装几条、一个节点装几条"
+)]
+#[must_use]
+pub fn append_records_to_the_open_container<Record: Clone>(
+    containers_before_this_publish: &[RecordContainer<Record>],
+    shape_before_this_publish: &ContainerTreeShape,
+    records: &[Record],
+    checkpoint_txg: CheckpointTxg,
+    tree: TreeIdentifier,
+    record_type: u16,
+    records_per_container: usize,
+    node_entries: ContainerTreeNodeEntries,
+) -> ContainerTreeAfterThisPublish<Record> {
     assert_eq!(
         shape_before_this_publish.containers(),
         containers_before_this_publish.len(),
         "上一版容器树的形状与它的容器出自同一版"
     );
+    assert!(
+        records_per_container >= 1,
+        "一片容器至少装一条：容量开关的构造函数判过"
+    );
     let mut containers = containers_before_this_publish.to_vec();
-    let open_container_has_room = containers
-        .last()
-        .is_some_and(|open| open.records.len() < records_per_container);
-    let shape = if open_container_has_room {
-        containers
-            .last_mut()
-            .expect("上一句判过最右那片在")
-            .records
-            .push(record);
-        shape_before_this_publish.clone()
-    } else {
-        // 容器号沿叶序严格递增、从 1 起（0 不用），下一个号 = 树里最大号 + 1：最右那片的号就是最大号。
-        let next_container_number = containers
+    let mut shape = shape_before_this_publish.clone();
+    let mut rewritten_containers: Vec<usize> = Vec::new();
+    // 迭代次数 = 这次追加的条数；跨轮携带的是容器与形状（形状里的容器数恒等于容器数）与升序不重复的重写清单。
+    for record in records {
+        let open_container_has_room = containers
             .last()
-            .map_or(1, |rightmost| rightmost.identity.container + 1);
-        containers.push(RecordContainer {
-            identity: PackedIdentity {
-                birth_tree: tree,
-                record_type,
-                container: next_container_number,
-                container_birth: checkpoint_txg,
-            },
-            records: vec![record],
-        });
-        shape_before_this_publish
-            .after_a_container_is_opened_at_the_right_end(node_entries.entries_per_node())
-    };
-    let rewritten_position = containers.len() - 1;
+            .is_some_and(|open| open.records.len() < records_per_container);
+        if open_container_has_room {
+            containers
+                .last_mut()
+                .expect("上一句判过最右那片在")
+                .records
+                .push(record.clone());
+        } else {
+            // 容器号沿叶序严格递增、从 1 起（0 不用），下一个号 = 树里最大号 + 1：最右那片的号就是最大号。
+            let next_container_number = containers
+                .last()
+                .map_or(1, |rightmost| rightmost.identity.container + 1);
+            containers.push(RecordContainer {
+                identity: PackedIdentity {
+                    birth_tree: tree,
+                    record_type,
+                    container: next_container_number,
+                    container_birth: checkpoint_txg,
+                },
+                records: vec![record.clone()],
+            });
+            shape =
+                shape.after_a_container_is_opened_at_the_right_end(node_entries.entries_per_node());
+        }
+        let rewritten_position = containers.len() - 1;
+        if rewritten_containers.last() != Some(&rewritten_position) {
+            rewritten_containers.push(rewritten_position);
+        }
+        assert_eq!(
+            shape.containers(),
+            containers.len(),
+            "形状里层级 1 的孩子数之和就是容器数"
+        );
+    }
     ContainerTreeAfterThisPublish {
         containers,
-        rewritten_containers: vec![rewritten_position],
+        rewritten_containers,
         shape,
         shape_before_this_publish: shape_before_this_publish.clone(),
     }
@@ -601,6 +705,83 @@ mod tests {
             ContainerTreeShape::from_children_of_each_node_at_each_level(vec![vec![2, 1], vec![1]]),
             None,
             "根的孩子数之和要等于下一层的节点数"
+        );
+    }
+
+    /// 一次追加三条、一片装两条、扇出压到 2：上一版两片（第二片装着一条、还开着）。第一条装满第二片，第二、三条开第三片（这时根满长一层）。
+    /// 这次重写的是第二、三片与它们的全部祖先：旧根 (1, 0) 下面的第二片被重写，旧根跟着重写、照样被这次换下。
+    #[test]
+    fn appending_several_records_rewrites_every_touched_container_and_all_their_ancestors() {
+        let before_shape = shape_after_opening(2, 2);
+        let identity = |number: u64| PackedIdentity {
+            birth_tree: TreeIdentifier(65548),
+            record_type: 3,
+            container: number,
+            container_birth: CheckpointTxg(5),
+        };
+        let before = vec![
+            RecordContainer {
+                identity: identity(1),
+                records: vec![10_u64, 11],
+            },
+            RecordContainer {
+                identity: identity(2),
+                records: vec![12_u64],
+            },
+        ];
+        let after = append_records_to_the_open_container(
+            &before,
+            &before_shape,
+            &[13_u64, 14, 15],
+            CheckpointTxg(9),
+            TreeIdentifier(65548),
+            3,
+            2,
+            capped(2),
+        );
+        assert_eq!(after.containers.len(), 3);
+        assert_eq!(after.containers[0], before[0], "装满了的第一片原样");
+        assert_eq!(after.containers[1].records, vec![12, 13], "第二片装满");
+        assert_eq!(
+            after.containers[2].identity,
+            PackedIdentity {
+                birth_tree: TreeIdentifier(65548),
+                record_type: 3,
+                container: 3,
+                container_birth: CheckpointTxg(9),
+            },
+            "第三片：容器号 = 最大号 + 1，出生代 = 这次的 txg"
+        );
+        assert_eq!(after.containers[2].records, vec![14, 15]);
+        assert_eq!(after.rewritten_containers, vec![1, 2]);
+        assert!(after.grew_a_level_this_publish());
+        assert!(
+            !after.previous_root_is_carried_down_unchanged(),
+            "旧根下面的第二片重写了：旧根跟着重写"
+        );
+        assert_eq!(
+            after.rewritten_nodes(),
+            vec![position(1, 0), position(1, 1), position(2, 0)]
+        );
+        assert_eq!(
+            after.shape.ancestors_of_containers(&[2]),
+            after.shape.rightmost_path(),
+            "只看最右那一片时祖先就是最右那一条路径"
+        );
+        let carried = append_records_to_the_open_container(
+            &after.containers,
+            &after.shape,
+            &[],
+            CheckpointTxg(10),
+            TreeIdentifier(65548),
+            3,
+            2,
+            capped(2),
+        );
+        assert!(carried.rewritten_containers.is_empty() && carried.rewritten_nodes().is_empty());
+        assert_eq!(
+            carried.containers, after.containers,
+            "一条都不追加时整棵照抄"
         );
     }
 

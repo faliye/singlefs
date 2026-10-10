@@ -17,6 +17,7 @@
 //! 按位置寻址之后（D8（核心索引结构） 已定项 14）没有「一个节点装不下」那道墙，模型也就没有那条拒绝理由。
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::num::NonZeroU64;
 use std::rc::Rc;
 
 use singlefs_format::{
@@ -24,10 +25,11 @@ use singlefs_format::{
     ALLOCATION_RECORD_TREE_LEAF_SLOTS, CLUSTER_SEGMENT_SLOTS, DATA_UNIT_BYTES,
     DATA_UNIT_PAYLOAD_OFFSET, EXTENT_TREE_INTERNAL_FANOUT, EXTENT_TREE_LOWER_LEAF_DATA_UNITS,
     INDEX_NODE_HEADER_BYTES_WITHOUT_KEY_RANGE, INDEX_NODE_HEADER_KEY_RANGE_KEY_COUNT,
-    INSTANCE_TABLE_PAGE_RECORDS, JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT,
-    LINEAGE_CONTAINER_RECORDS, MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_BYTES,
-    NODE_POINTER_BYTES, NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RING_REGIONS,
-    ROOT_RING_REGION_DEVICES, ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES,
+    INODE_INTERNAL_ENTRY, INODE_LEAF_RECORDS, INSTANCE_TABLE_PAGE_RECORDS,
+    JOURNAL_RING_DEFAULT_BYTES, JOURNAL_RING_START_SLOT, LINEAGE_CONTAINER_RECORDS,
+    MAPPING_ENTRY_BYTES, MAPPING_KEY_BYTES, NODE_BYTES, NODE_POINTER_BYTES,
+    NONCE_MAC_ALGORITHM_RESERVED_BYTES, ROOT_RING_REGIONS, ROOT_RING_REGION_DEVICES,
+    ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM, SLOT_BYTES,
 };
 
 /// 模型里的 checkpoint 号（D16（发布语义） 已定项 6：每次发布 + 1）。与实现的 `CheckpointTxg` 各自声明（D13（验证路线） 已定项 5）。
@@ -62,12 +64,31 @@ const MAKE_FILESYSTEM_TXG: ModelCheckpointTxg = ModelCheckpointTxg(0);
 const POOL_WIDE_ACCOUNTING_ROWS: u64 = 3;
 const ACCOUNTING_ROWS_PER_DEVICE: u64 = 6;
 
+/// inode 树里最左那片之外的一片叶容器：它在树里左起第几片（从 0 数，最左那片是 0，这里恒不小于 1）。
+/// 只经 [`ModelUnitRole::inode_leaf_container_at`] 造，第 0 片造不出这个类型（那一片是 [`ModelUnitRole::InodeLeaf`]）。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ModelInodeLeafContainerRightOfTheLeftmost {
+    position_from_the_leftmost: NonZeroU64,
+}
+
+impl ModelInodeLeafContainerRightOfTheLeftmost {
+    /// 它在树里左起第几片（从 0 数，恒不小于 1）。
+    #[must_use]
+    pub fn position_from_the_leftmost(self) -> u64 {
+        self.position_from_the_leftmost.get()
+    }
+}
+
 /// 一版里的一个角色：第一个文件版本的八个单元（D3（空间分配） 已定项 10 ⑤ 的次序）与实例表单元（D18（块里携带什么信息） 已定项 11）。
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ModelUnitRole {
     Data,
     ExtentRoot,
+    /// inode 树最左那片叶容器：第一个文件那条记录住它，删完之后建的 inode 前 233 条也住它。
     InodeLeaf,
+    /// inode 树最左那片之外的每一片叶容器各是一个角色（删完之后建满 233 条起才有，D8（核心索引结构） 已定项 6：插入落在最右那片、
+    /// 满了在末尾分裂、左半不动）：各片的分配代不同（只有新记录落的那一片这次重写），模型逐片记、逐片比。
+    InodeLeafRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost),
     InodeRoot,
     AllocationTree,
     AccountingTree,
@@ -80,9 +101,28 @@ pub enum ModelUnitRole {
     TombstoneLeaf,
     /// 墓碑树的根。
     TombstoneRoot,
+    /// 退役树的开放容器（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 5 条，照墓碑树）：模型罩的历史里只有删第一个文件
+    /// 那次最后一批让唯一那片叶容器身份消失、追加一条退役记录，退役树恒只有容器 1 那一片。随现行那一版：管理员回退不取回退目标的。
+    RetirementLeaf,
+    /// 退役树的根。
+    RetirementRoot,
 }
 
 impl ModelUnitRole {
+    /// inode 树左起第 `position_from_the_leftmost` 片叶容器（从 0 数）的角色：第 0 片是 [`ModelUnitRole::InodeLeaf`]，
+    /// 之后每一片是 [`ModelUnitRole::InodeLeafRightOfTheLeftmost`]。
+    #[must_use]
+    pub fn inode_leaf_container_at(position_from_the_leftmost: u64) -> ModelUnitRole {
+        match NonZeroU64::new(position_from_the_leftmost) {
+            None => ModelUnitRole::InodeLeaf,
+            Some(position_from_the_leftmost) => ModelUnitRole::InodeLeafRightOfTheLeftmost(
+                ModelInodeLeafContainerRightOfTheLeftmost {
+                    position_from_the_leftmost,
+                },
+            ),
+        }
+    }
+
     /// 占几个槽：数据单元与打包记录单元（inode 叶、实例表）恒 32 KiB（D4（校验和位置） 已定项 5），索引节点恒 16 KiB
     /// （D8（核心索引结构） 已定项 2），落点粒度 16 KiB（D3（空间分配） 已定项 7）。
     #[must_use]
@@ -90,8 +130,10 @@ impl ModelUnitRole {
         match self {
             ModelUnitRole::Data
             | ModelUnitRole::InodeLeaf
+            | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
             | ModelUnitRole::InstanceTable
-            | ModelUnitRole::TombstoneLeaf => DATA_UNIT_BYTES / SLOT_BYTES,
+            | ModelUnitRole::TombstoneLeaf
+            | ModelUnitRole::RetirementLeaf => DATA_UNIT_BYTES / SLOT_BYTES,
             ModelUnitRole::ExtentRoot
             | ModelUnitRole::InodeRoot
             | ModelUnitRole::AllocationTree
@@ -99,7 +141,8 @@ impl ModelUnitRole {
             | ModelUnitRole::MappingTree
             | ModelUnitRole::TreeTable
             | ModelUnitRole::DeletedInodesRoot
-            | ModelUnitRole::TombstoneRoot => NODE_BYTES / SLOT_BYTES,
+            | ModelUnitRole::TombstoneRoot
+            | ModelUnitRole::RetirementRoot => NODE_BYTES / SLOT_BYTES,
         }
     }
 }
@@ -107,17 +150,18 @@ impl ModelUnitRole {
 /// 一次发布重写哪些角色。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum ModelPublishKind {
-    /// 第一个文件版本：四个文件角色，加四个固定点单元（D16（发布语义） 已定项 9：记账行每发布重写，连带记账树节点、分配记录、
-    /// 映射条目与树表单元）。与覆盖写重写的角色相同，分开只为一件事——它走 `previous: None`，这一版的内存态从头建。
+    /// 第一个文件版本：四个文件角色，加固定点单元——四个固定点角色（分配记录树、记账树、映射树、树表），分配记录树按位置寻址
+    /// 一次重写根与根之下要改的那几个节点（D8（核心索引结构） 已定项 14；新池几何下 5 个，固定点合计 8 个单元，字节表八），
+    /// D16（发布语义） 已定项 9：记账行每发布重写，连带记账树节点、分配记录、映射条目与树表单元。与覆盖写重写的角色相同，分开只为一件事——它走 `previous: None`，这一版的内存态从头建。
     FirstFileVersion,
     /// 整份重写文件内容：覆盖写（一个数据单元以内）与顺序写（跨几个数据单元，`transaction::publish_sequential_write`）。
     /// 与第一个文件版本重写的角色相同，接在上一版的内存态后面；内容的每个数据单元都在这次写（同一个分配代），
     /// 多于一个单元时 extent 树下段的节点（叶罩 144 个单元、内部扇出 147，D8（核心索引结构） 已定项 14）也在这次写，
     /// 一个单元一个事务（D16（发布语义） 已定项 5 的切分纪律）。
     OverwriteFileVersion,
-    /// 写行：实例表单元（D18（块里携带什么信息） 已定项 11：每次可写挂载都写行）加四个固定点单元（D16（发布语义） 已定项 9）。
+    /// 写行：实例表单元（D18（块里携带什么信息） 已定项 11：每次可写挂载都写行）加固定点单元（同第一个文件版本那几族，D16（发布语义） 已定项 9）。
     RowsOnFileVersion,
-    /// 树表不是 0 条时的空发布（暖机、抬 F）：四个固定点单元（D16（发布语义） 已定项 9）。
+    /// 树表不是 0 条时的空发布（暖机、抬 F）：固定点单元（同第一个文件版本那几族，D16（发布语义） 已定项 9）。
     EmptyOnFileVersion,
     /// 树表 0 条的一版上写行：只重写实例表这一个单元（D18（块里携带什么信息） 已定项 11 要求每次可写挂载都写行；
     /// 这一版没有记账树，D16（发布语义） 已定项 9 的那五样——记账行、记账树节点、分配记录、映射条目、树表单元——一样都不写）。
@@ -125,21 +169,48 @@ enum ModelPublishKind {
     /// 树表 0 条上的空发布：零单元（D16（发布语义） 已定项 9「树表 0 条 ⇒ 零单元」）。
     ZeroUnit,
     /// unlink 的意图那次（D8（核心索引结构） 已定项 16 第 1 条）：inode 叶与根（nlink 写 0）、`deleted_inodes` 根（加 key）、
-    /// 墓碑树开放容器与根（追加一条墓碑），加四个固定点单元；数据单元与 extent 树照抄。
+    /// 墓碑树开放容器与根（追加一条墓碑），加固定点单元；数据单元与 extent 树照抄。
     UnlinkIntent,
     /// 不是最后一批的删除批（D8（核心索引结构） 已定项 16 第 2 条：剩下的单元多于产品批大小 144 时从尾部释放 144 个）：
     /// 留下的数据单元照抄（分配代不变）；重写被截掉那一片下段叶与它的祖先（下段节点不对应角色，占槽按下段层数取上界）、
-    /// extent 上段根、inode 叶与根（记录的 size 改成剩下单元数 × 净荷容量，nlink 仍 0），加四个固定点单元；
+    /// extent 上段根、inode 叶与根（记录的 size 改成剩下单元数 × 净荷容量，nlink 仍 0），加固定点单元；
     /// `deleted_inodes` 那条 key 与墓碑树不动。这一版仍是删除中的那一版。
     DeletionBatchKeepingDataUnits,
     /// 最后一批（D8（核心索引结构） 已定项 16 第 2 条）：剩下的单元不多于产品批大小 144 时意图之后（或上一批之后）的下一步——释放剩下的单元、
     /// 删 inode 记录（树里只有 inode 1，叶容器一片都不剩）、删 `deleted_inodes` 那条 key（删空取根指针置零、不写它的节点），
-    /// 同一次发布；重写 extent 零条目根与 inode 零条目根，加四个固定点单元。
+    /// 同一次发布；重写 extent 零条目根与 inode 零条目根，加固定点单元。唯一那片叶容器身份消失，退役树开放容器追加一条退役记录、
+    /// 连根重写（判决 `research/prompts/m3-retire-r1-main-verification.md` 第三节第 3 条）。
     FinalDeletionBatch,
     /// 建一个 size 0 的 inode（`transaction::publish_new_inodes`，count 1；D8（核心索引结构） 已定项 16 第 5 条：删完之后只许建 inode、
-    /// 写行与空发布）：inode 叶与根（新记录落在唯一那片叶容器里），加四个固定点单元；数据单元与 extent 树根照抄（新建的 inode 长度 0）。
+    /// 写行与空发布），新记录落在最左那片叶容器里（删完之后建的前 233 条，[`inode_leaf_container_position_of_a_new_record`]）：
+    /// inode 叶与根，加固定点单元；数据单元与 extent 树根照抄（新建的 inode 长度 0）。
     /// 执行器只在第一个文件已删完的一版上调（`history.rs` 的 `HistoryOperation::CreateInode`）。
     NewInode,
+    /// 同 [`ModelPublishKind::NewInode`]，新记录落在最左那片之外的那一片里（删完之后建的第 234 条起）：只重写那一片与 inode 根，
+    /// 左边那几片一个字节都不动、分配代不变（D8（核心索引结构） 已定项 6：分裂点取末尾，左半保留全部原有记录与身份；
+    /// 「更新一条记录 = COW 叶 + 全部祖先」）。
+    NewInodeInALeafContainerRightOfTheLeftmost(ModelInodeLeafContainerRightOfTheLeftmost),
+}
+
+/// inode 号的宽：内部节点条目里的分隔 key 8 字节（D8（核心索引结构） 已定项 6：条目 = 分隔 key 8 + 身份引用 26 + 子指针 86）。
+const INODE_TREE_KEY_BYTES: u64 = 8;
+
+/// 删完第一个文件之后建的第 `records_before` 条（从 0 数，也就是这次之前树里已有几条）落在 inode 树左起第几片叶容器（从 0 数）。
+/// D8（核心索引结构） 已定项 6：插入永远落在最右的叶，满 233 条（`INODE_LEAF_RECORDS`）就在末尾分裂、左半不动；模型罩的历史里
+/// 这棵树删完第一个文件之后是空的、之后只经建 inode 往右追加，所以左边每片都装满 233 条、第 k 条落在第 ⌊k ÷ 233⌋ 片。
+///
+/// # Panics
+/// 落点超出一个码 2 根装得下的叶容器数（扇出 135，D8（核心索引结构） 已定项 6）：根要长一层，实现今天在那里拒
+/// （`MoreLeafContainersThanOneRootNodeHolds`），模型罩的历史建不到三万多个 inode。
+fn inode_leaf_container_position_of_a_new_record(records_before: u64) -> u64 {
+    let position_from_the_leftmost = records_before / INODE_LEAF_RECORDS;
+    let leaf_containers_one_root_holds =
+        index_node_entry_capacity(INODE_TREE_KEY_BYTES, INODE_INTERNAL_ENTRY);
+    assert!(
+        position_from_the_leftmost < leaf_containers_one_root_holds,
+        "模型今天只罩 inode 树根之下直接挂叶容器的历史（一个根装 {leaf_containers_one_root_holds} 片）：第 {records_before} 条落在第 {position_from_the_leftmost} 片"
+    );
+    position_from_the_leftmost
 }
 
 /// 装得下 `rows` 行要几片（D18（块里携带什么信息） 已定项 11：一片 370 条记录，链指针记录恒为一片的最后一条、数据行 369；
@@ -154,6 +225,25 @@ pub fn instance_table_pages_for_rows(rows: usize) -> u64 {
 }
 
 impl ModelPublishKind {
+    /// 这次发布让 inode 号水位变了、给记账留一级台阶行（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」）：
+    /// 第一个文件那次（inode 1 落下，水位从没有记账树到 2）与建 inode 那两种（每次加 1）。别的发布不发号；管理员回退那次的水位
+    /// 取环里没被崩溃恢复抛弃的根的最大值，模型罩的历史里那就是现行那一版的（D23（journal 的角色与格式） 已定项 14「水位」那一格），不留新台阶。
+    fn leaves_an_inode_number_watermark_step(self) -> bool {
+        match self {
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => true,
+            ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent
+            | ModelPublishKind::DeletionBatchKeepingDataUnits
+            | ModelPublishKind::FinalDeletionBatch => false,
+        }
+    }
+
     /// 这次发布重写不重写实例表：写行那两种重写整条链，别的照抄。
     fn rewrites_the_instance_table(self) -> bool {
         match self {
@@ -167,7 +257,8 @@ impl ModelPublishKind {
             | ModelPublishKind::UnlinkIntent
             | ModelPublishKind::DeletionBatchKeepingDataUnits
             | ModelPublishKind::FinalDeletionBatch
-            | ModelPublishKind::NewInode => false,
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => false,
         }
     }
 
@@ -182,7 +273,8 @@ impl ModelPublishKind {
             ModelPublishKind::UnlinkIntent
             | ModelPublishKind::DeletionBatchKeepingDataUnits
             | ModelPublishKind::FinalDeletionBatch
-            | ModelPublishKind::NewInode => 1,
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => 1,
             ModelPublishKind::RowsOnFileVersion
             | ModelPublishKind::EmptyOnFileVersion
             | ModelPublishKind::RowsOnVersionWithoutFile
@@ -206,13 +298,37 @@ impl ModelPublishKind {
             | ModelPublishKind::ZeroUnit
             | ModelPublishKind::UnlinkIntent
             | ModelPublishKind::DeletionBatchKeepingDataUnits
-            | ModelPublishKind::NewInode => &[],
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => &[],
         }
     }
 
-    /// 这次发布重写的角色。分配记录树（`ModelUnitRole::AllocationTree`）在这里只记它的根：根之下重写几个节点按位置寻址现算上界
+    /// 这次发布重写的角色：种类定死的那几个（[`ModelPublishKind::rewritten_roles_fixed_by_the_kind`]），建 inode 落在最左那片之外时
+    /// 再加新记录落的那一片。
+    fn rewritten_roles(self) -> Vec<ModelUnitRole> {
+        let mut roles = self.rewritten_roles_fixed_by_the_kind().to_vec();
+        match self {
+            ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(leaf_container) => {
+                roles.push(ModelUnitRole::InodeLeafRightOfTheLeftmost(leaf_container));
+            }
+            ModelPublishKind::FirstFileVersion
+            | ModelPublishKind::OverwriteFileVersion
+            | ModelPublishKind::RowsOnFileVersion
+            | ModelPublishKind::EmptyOnFileVersion
+            | ModelPublishKind::RowsOnVersionWithoutFile
+            | ModelPublishKind::ZeroUnit
+            | ModelPublishKind::UnlinkIntent
+            | ModelPublishKind::DeletionBatchKeepingDataUnits
+            | ModelPublishKind::FinalDeletionBatch
+            | ModelPublishKind::NewInode => {}
+        }
+        roles
+    }
+
+    /// 这次发布重写的、由种类定死的角色（建 inode 落在最左那片之外时那一片不在这里，[`ModelPublishKind::rewritten_roles`] 另加）。
+    /// 分配记录树（`ModelUnitRole::AllocationTree`）在这里只记它的根：根之下重写几个节点按位置寻址现算上界
     /// （`IdealModel::allocation_record_tree_nodes_rewritten_upper_bound`），模型不记是哪几个。
-    fn rewritten_roles(self) -> &'static [ModelUnitRole] {
+    fn rewritten_roles_fixed_by_the_kind(self) -> &'static [ModelUnitRole] {
         match self {
             ModelPublishKind::FirstFileVersion | ModelPublishKind::OverwriteFileVersion => &[
                 ModelUnitRole::Data,
@@ -268,11 +384,21 @@ impl ModelPublishKind {
                 ModelUnitRole::InodeRoot,
                 ModelUnitRole::AllocationTree,
                 ModelUnitRole::AccountingTree,
+                ModelUnitRole::RetirementLeaf,
+                ModelUnitRole::RetirementRoot,
                 ModelUnitRole::MappingTree,
                 ModelUnitRole::TreeTable,
             ],
             ModelPublishKind::NewInode => &[
                 ModelUnitRole::InodeLeaf,
+                ModelUnitRole::InodeRoot,
+                ModelUnitRole::AllocationTree,
+                ModelUnitRole::AccountingTree,
+                ModelUnitRole::MappingTree,
+                ModelUnitRole::TreeTable,
+            ],
+            // 新记录落的那一片（最左那片之外）由 `rewritten_roles` 另加；最左那片不动。
+            ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => &[
                 ModelUnitRole::InodeRoot,
                 ModelUnitRole::AllocationTree,
                 ModelUnitRole::AccountingTree,
@@ -311,7 +437,12 @@ pub enum ModelVersionContents {
     /// 删完第一个文件之后建过 inode：inode 树里只有 size 0 的记录、没有 inode 1，没有数据单元、队列空，读回「没有文件」；
     /// 实现把它归带文件的一版（inode 树有条目，D8（核心索引结构） 已定项 16 第 5 条的判定不成立）。
     /// `trees_written_by`：最近一次建 inode 那次发布（回退到这一版的根照抄它）。
-    InodesWithoutTheFirstFile { trees_written_by: ModelRootKey },
+    /// `inode_records_in_the_tree`：这一版 inode 树里有几条记录（删完之后建了几个）：下一个建的落在哪一片叶容器由它定
+    /// （[`inode_leaf_container_position_of_a_new_record`]）。
+    InodesWithoutTheFirstFile {
+        trees_written_by: ModelRootKey,
+        inode_records_in_the_tree: u64,
+    },
 }
 
 impl ModelVersionContents {
@@ -349,9 +480,24 @@ impl ModelVersionContents {
                 trees_written_by, ..
             }
             | ModelVersionContents::TreesAndNoFile { trees_written_by }
-            | ModelVersionContents::InodesWithoutTheFirstFile { trees_written_by } => {
-                Some(*trees_written_by)
-            }
+            | ModelVersionContents::InodesWithoutTheFirstFile {
+                trees_written_by, ..
+            } => Some(*trees_written_by),
+        }
+    }
+
+    /// 删完第一个文件之后建的 inode 在这一版 inode 树里有几条：有树而文件集合为空的一版 0 条；
+    /// 别的几种不是第一个文件已删完的一版，None（建 inode 只接在这两种后面）。
+    fn inode_records_created_after_the_first_file_was_deleted(&self) -> Option<u64> {
+        match self {
+            ModelVersionContents::TreesAndNoFile { .. } => Some(0),
+            ModelVersionContents::InodesWithoutTheFirstFile {
+                inode_records_in_the_tree,
+                ..
+            } => Some(*inode_records_in_the_tree),
+            ModelVersionContents::WithoutTrees
+            | ModelVersionContents::LiveFile(_)
+            | ModelVersionContents::FileBeingDeleted { .. } => None,
         }
     }
 
@@ -394,6 +540,18 @@ pub struct ModelRoot {
     /// 这一版中央映射树节点数的上界（[`central_mapping_tree_nodes_upper_bound`] 沿来路带下来，每盘一个节点占一个槽）；
     /// 树表 0 条的一版没有这棵树，记 0。
     pub central_mapping_tree_nodes_upper_bound: u64,
+    /// 这一版记账里 inode 号水位那一统计量的台阶行有几行（D5（快照 / 空间记账机制） 已定项 2 射程「inode 号水位的台阶行」）：
+    /// 水位变了的每次发布留一级，之后每次写记账行的发布照抄（管理员回退那次照抄现行那一版的，不取回退目标的）。
+    /// 模型不记水位的值，按发布的种类认水位变没变（[`ModelPublishKind::leaves_an_inode_number_watermark_step`]）。
+    /// 没写过记账树的一版记 0。
+    pub inode_number_watermark_steps: u64,
+    /// 这一版记账树的行数：写它的那次发布写的池级三行、每块盘六行与照抄的台阶行（[`IdealModel::accounting_rows_of_a_publish_on`]）；
+    /// 没写过记账树的一版记 0。
+    pub accounting_rows: u64,
+    /// 这一版记账树节点数的上界（[`accounting_tree_nodes_upper_bound`] 沿来路带下来，每盘一个节点占一个槽）：台阶行多到一片叶装不下时
+    /// 记账树分裂、长出根之下的节点（D8（核心索引结构） 已定项 11）。根之下的节点不对应角色，模型不记 key、不记是哪几个（同中央映射树）；
+    /// 写记账树的发布按它带占槽、按它数进映射条目。没写过记账树的一版记 0。
+    pub accounting_tree_nodes_upper_bound: u64,
     /// 写出这条根的那次发布的记录里最大的事务号：写文件内容的发布（第一个文件、覆盖写、顺序写）一事务一单元（D16（发布语义） 已定项 5）
     /// ⇒ 内容切成几个数据单元就承载几个事务、接着实例内计数往下取，这里记最后那一个号；删除类发布与建 inode 各一个事务；
     /// 空发布、写行、暖机、抬 F、回退的记录事务号 0（D23（journal 的角色与格式） 已定项 19 ①），这里记 0。
@@ -432,16 +590,6 @@ pub struct ModelRingPosition {
 /// 写成「mkfs 写的那个值」而不是「每区槽数 S」，是为了让「模型假定 S 不变」这件事在名字里就看得见。
 const MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM: u64 =
     ROOT_RING_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM;
-
-/// 一圈窗口（D16（发布语义） 已定项 1）：txg 落不落在锚 `window_anchor` 之下一圈里，txg > N − 3S（写成 txg + 3S > N，N < 3S 时整个环都在窗口里）。
-/// 模型自己算一份，不引实现的那一份（D13（验证路线） 已定项 5）。
-fn is_inside_the_one_revolution_window_of(
-    checkpoint_txg: ModelCheckpointTxg,
-    window_anchor: ModelCheckpointTxg,
-) -> bool {
-    checkpoint_txg.0 + ROOT_RING_REGIONS * MODEL_SLOTS_PER_REGION_AT_MAKE_FILESYSTEM
-        > window_anchor.0
-}
 
 fn ring_position_of(checkpoint_txg: ModelCheckpointTxg) -> ModelRingPosition {
     ModelRingPosition {
@@ -581,18 +729,83 @@ pub fn central_mapping_tree_nodes_upper_bound(nodes_before: u64, entries: u64) -
     }
 }
 
-/// 一版的中央映射树里除分配记录树的节点之外装几条条目的上界（D19（块指针的结构与宽度预算） 已定项 8：进映射的是数据单元、extent 树每个节点、
-/// inode 叶容器与根、分配记录树每个节点、记账树每个节点、`deleted_inodes` 根、墓碑树与谱系树的容器与索引节点；
-/// 映射树自己的节点、树表、实例表豁免）。分配记录树的节点数由调用方按它的上界另加。
+/// 记账树一片叶装几行：(节点 − 头) ÷ 记账条目宽（D8（核心索引结构） 已定项 11；条目 34，D5（快照 / 空间记账机制） 已定项 5）。
+fn accounting_tree_leaf_entry_capacity() -> u64 {
+    index_node_entry_capacity(ACCOUNTING_KEY_BYTES, ACCOUNTING_ENTRY_BYTES)
+}
+
+/// 记账树一个内部节点装几个孩子：内部条目 = 本树 key + 子指针 86（D8（核心索引结构） 已定项 11）。
+fn accounting_tree_internal_child_capacity() -> u64 {
+    index_node_entry_capacity(
+        ACCOUNTING_KEY_BYTES,
+        ACCOUNTING_KEY_BYTES + NODE_POINTER_BYTES,
+    )
+}
+
+/// 记账树一次写记账行的发布之后至多几个节点（D8（核心索引结构） 已定项 11 ②③ 与「一次发布里先删后插」）。
 ///
-/// 谱系树模型不记（管理员回退往它上面追加一条，D18（块里携带什么信息） 已定项 24 第 5 条）：一条时间线上每次发布至多是一次回退，
-/// 回退至多 txg 次，一片容器装 2039 条，加根；没回退过的一版没有这棵树，多算的两条只让上界松一点。
+/// 节点数不是行数的函数（收缩只摘空节点、不合并，形状随来路变）；模型不记 key、不照抄实现的分裂（D13（验证路线） 已定项 5），
+/// 同中央映射树沿来路带一个上界（[`central_mapping_tree_nodes_upper_bound`]），这里多数一半：
+/// - 先删：只摘空节点、根只剩一个孩子时降高，节点数不增；
+/// - 后插：设叶切了 s 次、内部节点切了 t 次、根切了 r 次（切开的根上面再长一个新根）。每切一次多一个节点，根切再多一个：
+///   N ≤ N_前 + s + t + r。
+/// - 切开的两半各至少 ⌊(容量 + 1) ÷ 2⌋（叶 239 行、内部 75 个孩子，[`smallest_half_of_a_split`]），之后这一段只插不删，到这次结束仍至少这么多。
+///   每切一次，这次结束时「切出来的」叶至少多一片（切原有的叶多两片、切切出来的叶多一片），s ≥ 1 时至少 s + 1 片、彼此不相交：
+///   (s + 1) × 239 ≤ 这次之后的行数 R。内部节点同一条：(t + 1) × 75 ≤ N − 1（根之外每个节点恰是一个内部节点的孩子）。
+///   没有叶切就没有内部节点切（内部节点只在孩子切开时多一个孩子）：s = 0 ⇒ t = 0。
+/// - 根切：根兼叶切开那一次是叶切，之后的根都是内部节点、它切开算在 t 里：r ≤ min(s + t, 1 + t)。
+///
+/// ⇒ 从一个节点长到 R = 478 行（两块盘 463 级台阶，D5 已定项 2 射程）：s ≤ 1、t = 0、r ≤ 1，N ≤ 3，恰是实现长成的根加两片叶。
+/// 右边随 N 涨得比 N 慢，满足它的 N 有个最大值：从 2 (N_前 + 2 s + 1)（那里已不满足）往下迭代，每一步都仍是 N 的上界，停在不动点。
+///
+/// `nodes_before`：上一版这棵树节点数的上界；上一版没有记账树时取 1（实现的规划从一片空的根兼叶起插）。
 ///
 /// # Panics
-/// 谱系容器的上界多于一片：模型罩的历史一条时间线上发布不到 2039 次，谱系树根之下不长层。
+/// `nodes_before` 为 0：一棵有行的树至少一个节点，调用方给的是上一版的上界或 1。
+#[must_use]
+pub fn accounting_tree_nodes_upper_bound(nodes_before: u64, rows: u64) -> u64 {
+    assert!(
+        nodes_before >= 1,
+        "上一版的树至少一个节点（从空树建起也从一片空的根兼叶起插）"
+    );
+    let leaf_splits_bound =
+        (rows / smallest_half_of_a_split(accounting_tree_leaf_entry_capacity())).saturating_sub(1);
+    let nodes_after_the_splits_bound = |nodes: u64| {
+        let internal_splits_bound = if leaf_splits_bound == 0 {
+            0
+        } else {
+            ((nodes - 1) / smallest_half_of_a_split(accounting_tree_internal_child_capacity()))
+                .saturating_sub(1)
+        };
+        let root_splits_bound =
+            (leaf_splits_bound + internal_splits_bound).min(1 + internal_splits_bound);
+        nodes_before + leaf_splits_bound + internal_splits_bound + root_splits_bound
+    };
+    let mut bound = 2 * (nodes_before + 2 * leaf_splits_bound + 1);
+    // 迭代上界：bound 每一轮严格变小，不小于 nodes_before。跨轮带的是「这次之后的节点数不超过 bound」。
+    loop {
+        let next = nodes_after_the_splits_bound(bound);
+        if next >= bound {
+            return bound;
+        }
+        bound = next;
+    }
+}
+
+/// 一版的中央映射树里除分配记录树的节点之外装几条条目的上界（D19（块指针的结构与宽度预算） 已定项 8：进映射的是数据单元、extent 树每个节点、
+/// inode 叶容器与根、分配记录树每个节点、记账树每个节点、`deleted_inodes` 根、墓碑树与谱系树的容器与索引节点；
+/// 映射树自己的节点、树表、实例表豁免）。分配记录树的节点数由调用方按它的上界另加；记账树的节点按调用方给的这一版的上界
+/// （`accounting_tree_nodes`，[`accounting_tree_nodes_upper_bound`]）数。
+///
+/// 谱系树模型不记（管理员回退往它上面追加一条，D18（块里携带什么信息） 已定项 24 第 5 条）：一条时间线上每次发布至多是一次回退，
+/// 回退至多 txg 次，一片容器装 1359 条，加根；没回退过的一版没有这棵树，多算的两条只让上界松一点。
+///
+/// # Panics
+/// 谱系容器的上界多于一片：模型罩的历史一条时间线上发布不到 1359 次，谱系树根之下不长层。
 fn central_mapping_entries_other_than_the_allocation_record_tree(
     contents: &ModelVersionContents,
     role_written_at: &BTreeMap<ModelUnitRole, ModelCheckpointTxg>,
+    accounting_tree_nodes: u64,
     checkpoint_txg: ModelCheckpointTxg,
 ) -> u64 {
     let data_units = match contents {
@@ -610,14 +823,18 @@ fn central_mapping_entries_other_than_the_allocation_record_tree(
     let entries_of_one_node_roles: u64 = role_written_at
         .keys()
         .map(|role| match role {
-            // 模型罩的一版里这几个角色各一个单元（上段只有根兼叶、一片 inode 叶容器、记账树一个节点、墓碑树一片容器加根）。
+            // 记账树：根与根之下的每个节点各一条（台阶行多到一片叶装不下时长层），按这一版节点数的上界数。
+            ModelUnitRole::AccountingTree => accounting_tree_nodes,
+            // 模型罩的一版里这几个角色各一个单元（上段只有根兼叶、每片 inode 叶容器各是一个角色、墓碑树一片容器加根）。
             ModelUnitRole::ExtentRoot
             | ModelUnitRole::InodeLeaf
+            | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
             | ModelUnitRole::InodeRoot
-            | ModelUnitRole::AccountingTree
             | ModelUnitRole::DeletedInodesRoot
             | ModelUnitRole::TombstoneLeaf
-            | ModelUnitRole::TombstoneRoot => 1,
+            | ModelUnitRole::TombstoneRoot
+            | ModelUnitRole::RetirementLeaf
+            | ModelUnitRole::RetirementRoot => 1,
             // 数据单元按这一版的单元数另数，分配记录树的节点由调用方按上界另加。
             ModelUnitRole::Data | ModelUnitRole::AllocationTree => 0,
             // 豁免映射（D19（块指针的结构与宽度预算） 已定项 8 / 已定项 12）。
@@ -629,7 +846,7 @@ fn central_mapping_entries_other_than_the_allocation_record_tree(
     let lineage_containers = checkpoint_txg.0.div_ceil(LINEAGE_CONTAINER_RECORDS);
     assert!(
         lineage_containers <= 1,
-        "模型罩的历史一条时间线上发布不到 2039 次（谱系树至多一片容器）：txg {}",
+        "模型罩的历史一条时间线上发布不到 1359 次（谱系树至多一片容器）：txg {}",
         checkpoint_txg.0
     );
     let lineage_root = u64::from(lineage_containers > 0);
@@ -679,9 +896,6 @@ pub enum ModelRefusalReason {
     RollbackTargetBelowEffectiveFloor,
     /// 回退目标在被抛弃的时间线上（D23（journal 的角色与格式） 已定项 14：有行 (i, Ti, Wi) 且 T > Ti）。
     RollbackTargetOnAbandonedTimeline,
-    /// 回退目标的 txg 落在现行那一版的一圈窗口外（D16（发布语义） 已定项 1「回退候选集」：txg 落在一圈窗口里；窗口 = txg > N − 3S，
-    /// N 取现行那一版的 txg，3S 是环长）。
-    RollbackTargetOutsideTheOneRevolutionWindow,
     /// 回退目标那一版树表 0 条（D23（journal 的角色与格式） 已定项 14：候选集只收带文件的根）。
     RollbackTargetWithoutFile,
     /// 要建立新实例的那一版树表 0 条、而它的实例表已经不是 mkfs 那一片（上一次挂载在这一版上写过行）：
@@ -714,9 +928,6 @@ impl ModelRefusalReason {
             ModelRefusalReason::RollbackTargetNotInRing => "回退目标不在根环里",
             ModelRefusalReason::RollbackTargetBelowEffectiveFloor => "回退目标低于 F_生效",
             ModelRefusalReason::RollbackTargetOnAbandonedTimeline => "回退目标在被抛弃的时间线上",
-            ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow => {
-                "回退目标的 txg 落在现行那一版的一圈窗口外"
-            }
             ModelRefusalReason::RollbackTargetWithoutFile => "回退目标那一版没有文件",
             ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem => {
                 "树表 0 条、而实例表已经不是 mkfs 那一片（条款没写被换下的那一片记在哪）"
@@ -741,7 +952,6 @@ impl ModelRefusalReason {
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-            | ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
             | ModelRefusalReason::RollbackTargetWithoutFile
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling
@@ -1168,6 +1378,9 @@ impl IdealModel {
             occupied_slots_upper_bound_per_device: ModelUnitRole::InstanceTable.span_in_slots()
                 + ModelUnitRole::TreeTable.span_in_slots(),
             central_mapping_tree_nodes_upper_bound: 0,
+            inode_number_watermark_steps: 0,
+            accounting_rows: 0,
+            accounting_tree_nodes_upper_bound: 0,
             highest_transaction_number_of_its_publish: 0,
             highest_transaction_number_in_its_instance: 0,
         };
@@ -1283,7 +1496,7 @@ impl IdealModel {
     }
 
     /// 抬 F 的上限（D16（发布语义） 已定项 1）：min(每块盘上最新的有效根, 第 4 新的非空有效根)；非空有效根不足 4 个时取最旧的有效根。
-    /// 有效 = 按最新根的实例表不被抛弃 ∧ txg ≥ 现行的 F ∧ 落在一圈窗口里（「非空」从盘上怎么认，2026-09-17 用户定案；窗口那一项 B2）；现行的 F 取 F_生效（不建崩溃时与
+    /// 有效 = 按最新根的实例表不被抛弃 ∧ txg ≥ 现行的 F（「非空」从盘上怎么认，2026-09-17 用户定案；B2 的窗口那一项 2026-10-04 RGall 拿掉）；现行的 F 取 F_生效（不建崩溃时与
     /// 现行根带的相等）。非空 = inode 树、extent 树的根指针与前一条有效根（按 (txg, 实例) 排）的不同，最旧的有效根与「没有这两棵树」比。
     /// 一块盘上没有有效根时不算它（条款没写这一格；不建崩溃时抬 F 与暖机都推到每块盘都有，走不到）。预想，跟收口表第 ② 行
     /// （候选集下界用哪个 F、被抛弃根带的 F 算不算都在那一行里重议）。
@@ -1291,23 +1504,13 @@ impl IdealModel {
     pub fn rollback_floor_ceiling(&self) -> Option<ModelCheckpointTxg> {
         let current_floor = self.effective_rollback_floor();
         let newest_table = Rc::clone(&self.newest_root().instance_table_rows);
-        // 上限与「非空」只在一圈窗口里的有效根上取（B2，用户 2026-10-03 定，D16 已定项 1 同取这个窗口的第六处）：锚 = 环里最新的有效根。
-        let window_anchor = self
-            .ring
-            .values()
-            .filter(|root| !Self::is_abandoned_by(root, &newest_table))
-            .map(|root| root.key.checkpoint_txg)
-            .max()?;
+        // 上限与「非空」在环里全部有效根上取：B2（用户 2026-10-03 定）原来只取一圈窗口里的，用户 2026-10-04 定 RGall 与回收门槛一起退回整个环。
         let mut valid: Vec<&ModelRoot> = self
             .ring
             .values()
             .filter(|root| {
                 !Self::is_abandoned_by(root, &newest_table)
                     && root.key.checkpoint_txg >= current_floor
-                    && is_inside_the_one_revolution_window_of(
-                        root.key.checkpoint_txg,
-                        window_anchor,
-                    )
             })
             .collect();
         valid.sort_by_key(|root| root.key);
@@ -1459,11 +1662,28 @@ impl IdealModel {
         }
     }
 
-    /// 一次写记账行的发布要几行、一个节点装几行（D5（快照 / 空间记账机制） 已定项 8）。
-    fn accounting_rows_exceed_one_node(&self) -> bool {
+    /// 接在 `previous` 后面、写记账行的一次发布写几行：池级三行加每块盘六行（D5（快照 / 空间记账机制） 已定项 8），加照抄的
+    /// inode 号水位台阶行（D5 已定项 2 射程「inode 号水位的台阶行」）——这次自己那一行是不是新的一级台阶不改行数（它就是池级那一行）。
+    fn accounting_rows_of_a_publish_on(&self, previous: &ModelRoot) -> u64 {
         let device_count = u64::try_from(self.geometry.devices.len()).expect("盘数");
-        POOL_WIDE_ACCOUNTING_ROWS + ACCOUNTING_ROWS_PER_DEVICE * device_count
-            > index_node_entry_capacity(ACCOUNTING_KEY_BYTES, ACCOUNTING_ENTRY_BYTES)
+        POOL_WIDE_ACCOUNTING_ROWS
+            + ACCOUNTING_ROWS_PER_DEVICE * device_count
+            + previous.inode_number_watermark_steps
+    }
+
+    /// 接在可写会话的现行版本后面、写记账行的下一次发布写几行（[`IdealModel::accounting_rows_of_a_publish_on`]）；没有可写会话时 None。
+    #[must_use]
+    pub fn accounting_rows_of_the_next_publish_in_the_session(&self) -> Option<u64> {
+        self.session
+            .as_ref()
+            .map(|session| self.accounting_rows_of_a_publish_on(&session.current))
+    }
+
+    /// 可写会话的现行版本（接下来的发布要接在它后面的那一版）；没有可写会话时 None。对拍的用例拿它的记账行数与记账树节点数的上界
+    /// 看模型在哪一步判记账树长一层、那次占几个槽。
+    #[must_use]
+    pub fn current_version_in_the_session(&self) -> Option<&ModelRoot> {
+        self.session.as_ref().map(|session| &session.current)
     }
 
     /// 单元区每块盘的槽数。
@@ -1540,7 +1760,7 @@ impl IdealModel {
             | ModelVersionContents::InodesWithoutTheFirstFile { .. } => None,
         };
         let rewritten = kind.rewritten_roles();
-        for role in rewritten {
+        for role in &rewritten {
             role_written_at.insert(*role, checkpoint_txg);
         }
         let mut contents = match (kind, new_file_content) {
@@ -1569,8 +1789,17 @@ impl IdealModel {
             (ModelPublishKind::FinalDeletionBatch, None) => ModelVersionContents::TreesAndNoFile {
                 trees_written_by: key,
             },
-            (ModelPublishKind::NewInode, None) => ModelVersionContents::InodesWithoutTheFirstFile {
+            (
+                ModelPublishKind::NewInode
+                | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_),
+                None,
+            ) => ModelVersionContents::InodesWithoutTheFirstFile {
                 trees_written_by: key,
+                inode_records_in_the_tree: previous
+                    .contents
+                    .inode_records_created_after_the_first_file_was_deleted()
+                    .expect("建 inode 只接在第一个文件已删完的一版后面（`answer_create_inode` 判过）")
+                    + 1,
             },
             (
                 ModelPublishKind::RowsOnFileVersion
@@ -1588,7 +1817,8 @@ impl IdealModel {
                 | ModelPublishKind::UnlinkIntent
                 | ModelPublishKind::DeletionBatchKeepingDataUnits
                 | ModelPublishKind::FinalDeletionBatch
-                | ModelPublishKind::NewInode,
+                | ModelPublishKind::NewInode
+                | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_),
                 Some(_),
             ) => panic!("只有写文件内容的两种发布带内容，别的都不带：{kind:?}"),
         };
@@ -1598,7 +1828,7 @@ impl IdealModel {
                 contents.clone_from(&target_root.contents);
                 // 新根的 inode 树、extent 树与 `deleted_inodes` 取回退目标那一版的（D23（journal 的角色与格式） 已定项 14）：
                 // 目标那一版有的角色取它的分配代，没有的（删完的一版没有数据单元、叶容器与 `deleted_inodes` 根）这一版也没有；
-                // 墓碑树随现行那一版。
+                // 墓碑树与退役树随现行那一版。
                 for role in [
                     ModelUnitRole::Data,
                     ModelUnitRole::ExtentRoot,
@@ -1615,28 +1845,69 @@ impl IdealModel {
                         }
                     }
                 }
+                // 最左那片之外的叶容器同样整组取目标那一版的：现行那一版有、目标那一版没有的那几片这一版也没有。
+                role_written_at.retain(|role, _| {
+                    !matches!(role, ModelUnitRole::InodeLeafRightOfTheLeftmost(_))
+                });
+                role_written_at.extend(
+                    target_root
+                        .role_written_at
+                        .iter()
+                        .filter(|(role, _)| {
+                            matches!(role, ModelUnitRole::InodeLeafRightOfTheLeftmost(_))
+                        })
+                        .map(|(role, written_at)| (*role, *written_at)),
+                );
             }
         }
+        // 记账行：写记账树的发布照抄上一版的台阶行（回退那次的 `previous` 是现行那一版，台阶从它带），水位变了的再留一级；
+        // 不写记账树的发布（树表 0 条的一版上的零单元发布）这一版没有记账树。记账树节点数的上界按这次写的行数从上一版的上界往下带
+        // （回退那次实现从现行那一版的形状规划，`previous` 就是它）。
+        let (inode_number_watermark_steps, accounting_rows, accounting_tree_nodes) =
+            if rewritten.contains(&ModelUnitRole::AccountingTree) {
+                let accounting_rows = self.accounting_rows_of_a_publish_on(previous);
+                (
+                    previous.inode_number_watermark_steps
+                        + u64::from(kind.leaves_an_inode_number_watermark_step()),
+                    accounting_rows,
+                    accounting_tree_nodes_upper_bound(
+                        previous.accounting_tree_nodes_upper_bound.max(1),
+                        accounting_rows,
+                    ),
+                )
+            } else {
+                (
+                    previous.inode_number_watermark_steps,
+                    previous.accounting_rows,
+                    previous.accounting_tree_nodes_upper_bound,
+                )
+            };
         let mut slots_written = 0;
         let mut rewrites_the_allocation_record_tree = false;
-        for role in rewritten {
+        for role in &rewritten {
             match role {
                 ModelUnitRole::AllocationTree => rewrites_the_allocation_record_tree = true,
                 // 内容的每个数据单元都在这次写（模型把它们记成同一个角色、同一个分配代）。
                 ModelUnitRole::Data => {
                     slots_written += role.span_in_slots() * data_units_of_the_new_content;
                 }
+                // 记账树一次至多重写这一版的全部节点（根与根之下的，每个节点每盘占一个槽）：根之下的节点不对应角色，按上界算。
+                ModelUnitRole::AccountingTree => {
+                    slots_written += role.span_in_slots() * accounting_tree_nodes;
+                }
                 // 中央映射树在这里只记它的根：根之下的节点数按上界另算（下面）。
                 ModelUnitRole::ExtentRoot
                 | ModelUnitRole::InodeLeaf
+                | ModelUnitRole::InodeLeafRightOfTheLeftmost(_)
                 | ModelUnitRole::InodeRoot
-                | ModelUnitRole::AccountingTree
                 | ModelUnitRole::MappingTree
                 | ModelUnitRole::TreeTable
                 | ModelUnitRole::InstanceTable
                 | ModelUnitRole::DeletedInodesRoot
                 | ModelUnitRole::TombstoneLeaf
-                | ModelUnitRole::TombstoneRoot => slots_written += role.span_in_slots(),
+                | ModelUnitRole::TombstoneRoot
+                | ModelUnitRole::RetirementLeaf
+                | ModelUnitRole::RetirementRoot => slots_written += role.span_in_slots(),
             }
         }
         // extent 树下段的节点不对应角色（同分配记录树根之下的节点：分配代与位置归池级 checker 判），占槽按条款现算：
@@ -1656,7 +1927,8 @@ impl IdealModel {
             | ModelPublishKind::ZeroUnit
             | ModelPublishKind::UnlinkIntent
             | ModelPublishKind::FinalDeletionBatch
-            | ModelPublishKind::NewInode => 0,
+            | ModelPublishKind::NewInode
+            | ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(_) => 0,
         };
         slots_written += extent_lower_segment_nodes_written * (NODE_BYTES / SLOT_BYTES);
         // 实例表链多于一片时第 1 片起每一片也是一个重写的单元：`rewritten_roles` 里实例表只记一个角色，多出来的几片在这里补上。
@@ -1681,6 +1953,7 @@ impl IdealModel {
                     central_mapping_entries_other_than_the_allocation_record_tree(
                         &contents,
                         &role_written_at,
+                        accounting_tree_nodes,
                         checkpoint_txg,
                     ),
                     previous.occupied_slots_upper_bound_per_device + slots_written,
@@ -1721,6 +1994,9 @@ impl IdealModel {
             occupied_slots_upper_bound_per_device: previous.occupied_slots_upper_bound_per_device
                 + slots_written,
             central_mapping_tree_nodes_upper_bound,
+            inode_number_watermark_steps,
+            accounting_rows,
+            accounting_tree_nodes_upper_bound: accounting_tree_nodes,
             highest_transaction_number_of_its_publish,
             highest_transaction_number_in_its_instance:
                 highest_transaction_number_before_this_publish
@@ -2014,12 +2290,29 @@ impl IdealModel {
                 ));
             }
         }
+        let inode_records_before = current
+            .contents
+            .inode_records_created_after_the_first_file_was_deleted()
+            .expect("上面只放过第一个文件已删完的两种");
+        // 新记录落在哪一片叶容器定这次重写哪一片（D8（核心索引结构） 已定项 6）：最左那片之外的那几片各是一个角色。
+        let kind = match NonZeroU64::new(inode_leaf_container_position_of_a_new_record(
+            inode_records_before,
+        )) {
+            None => ModelPublishKind::NewInode,
+            Some(position_from_the_leftmost) => {
+                ModelPublishKind::NewInodeInALeafContainerRightOfTheLeftmost(
+                    ModelInodeLeafContainerRightOfTheLeftmost {
+                        position_from_the_leftmost,
+                    },
+                )
+            }
+        };
         let root = self.next_root(
             current,
             session.instance,
             ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
             ModelJournalCounter(self.highest_journal_counter.0 + 1),
-            ModelPublishKind::NewInode,
+            kind,
             current.rollback_floor,
             None,
             Rc::clone(&current.instance_table_rows),
@@ -2071,17 +2364,6 @@ impl IdealModel {
         permitted_refusals: BTreeSet<ModelRefusalReason>,
         roots: Vec<ModelRoot>,
     ) -> ModelAnswer {
-        // 这一步里有一次发布重写了记账树（零单元发布不写记账行，别的都写，D16（发布语义） 已定项 9）。
-        let writes_accounting_rows = roots.iter().any(|root| {
-            root.role_written_at.get(&ModelUnitRole::AccountingTree)
-                == Some(&root.key.checkpoint_txg)
-        });
-        // 记账行装不下一个节点时记账树分裂、不拒（D8（核心索引结构） 已定项 11），分裂多出来的节点每个各占一个槽；
-        // 模型的占槽上界按「记账树一个节点」数，只罩行数装得进一个节点的池（盘数不到 80）——超出就是模型没罩到，不是实现错。
-        assert!(
-            !(writes_accounting_rows && self.accounting_rows_exceed_one_node()),
-            "模型今天只罩记账树一个节点的池：分裂多出来的节点模型的占槽上界没算"
-        );
         ModelAnswer {
             operation,
             required_refusals,
@@ -2242,13 +2524,6 @@ impl IdealModel {
                 if Self::is_abandoned_by(target_root, &current.instance_table_rows) {
                     required_refusals.insert(ModelRefusalReason::RollbackTargetOnAbandonedTimeline);
                 }
-                if !is_inside_the_one_revolution_window_of(
-                    target.checkpoint_txg,
-                    current.key.checkpoint_txg,
-                ) {
-                    required_refusals
-                        .insert(ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow);
-                }
                 if !target_root.contents.has_trees() {
                     required_refusals.insert(ModelRefusalReason::RollbackTargetWithoutFile);
                 }
@@ -2400,7 +2675,7 @@ impl IdealModel {
     ) -> Result<ModelAnswer, ModelDisagreement> {
         let session = self.open_session()?;
         let current = &session.current;
-        // 抬 F 的空发布要重写四个固定点单元，接在有树的一版后面：执行器只在带文件（含删除中）的一版上调，
+        // 抬 F 的空发布要重写固定点单元，接在有树的一版后面：执行器只在带文件（含删除中）的一版上调，
         // 挂载与会话为空间推的那几串还会接在有树而文件集合为空的一版后面。
         if !current.contents.has_trees() {
             return Err(ModelDisagreement::new(
@@ -2449,7 +2724,7 @@ impl IdealModel {
     }
 
     /// 抬 F 那一串（D16（发布语义） 已定项 1「抬 F 那一串」：准入与卸载共用）接在会话现行那一版后面写出的根：带 `new_floor` 的空发布
-    /// （有树的一版上重写四个固定点单元），推到每块盘上都有一条为止（「生效」那一行），至多 R 次。
+    /// （有树的一版上重写固定点单元），推到每块盘上都有一条为止（「生效」那一行），至多 R 次。
     /// 先写系统配置那一步不属于任何一次发布（已定项 7），模型不建系统配置，这里只有根。
     fn empty_publishes_carrying_the_floor_to_every_device(
         &self,
@@ -2584,7 +2859,6 @@ impl IdealModel {
             | ModelRefusalReason::RollbackTargetNotInRing
             | ModelRefusalReason::RollbackTargetBelowEffectiveFloor
             | ModelRefusalReason::RollbackTargetOnAbandonedTimeline
-            | ModelRefusalReason::RollbackTargetOutsideTheOneRevolutionWindow
             | ModelRefusalReason::RollbackTargetWithoutFile
             | ModelRefusalReason::VersionWithoutFileNotWrittenByMakeFilesystem
             | ModelRefusalReason::FloorAboveCeiling
@@ -4127,6 +4401,222 @@ mod tests {
             ),
             (5, 123, slots_outside_the_two_trees + 4 + 123),
             "映射树至多 5 个节点（根之下 4 个），分配记录树至多 123 个节点：这次占槽上界 722"
+        );
+    }
+
+    /// 记账树节点数的上界（D8（核心索引结构） 已定项 11：叶装 477 行、内部节点装 150 个孩子，装不下从中间切，切开的两半各至少 239 行 / 75 个孩子；
+    /// 收缩只摘空节点）：不到 2 × 239 = 478 行一次都切不了，上界照上一版的；从一个节点长到 478 行至多切一片叶、根切一次，3 个节点；
+    /// 717 = 3 × 239 行至多切两片叶，4 个；76 × 239 行 76 片叶挂一个根，77 个；151 × 239 行 151 片叶一个根装不下，根切一次、长成两个内部节点加新根，154 个。
+    /// 上一版长过的节点不往回收（3 个节点、477 行仍是 3），长过之后每多切一片叶多两个（叶一个、根一个的上界）。
+    #[test]
+    fn accounting_tree_nodes_grow_to_three_at_478_rows_and_keep_the_previous_bound() {
+        assert_eq!(
+            (
+                accounting_tree_leaf_entry_capacity(),
+                accounting_tree_internal_child_capacity(),
+                smallest_half_of_a_split(accounting_tree_leaf_entry_capacity()),
+                smallest_half_of_a_split(accounting_tree_internal_child_capacity()),
+            ),
+            (477, 150, 239, 75)
+        );
+        assert_eq!(
+            [
+                (1, 15),
+                (1, 477),
+                (1, 478),
+                (1, 3 * 239),
+                (1, 76 * 239),
+                (1, 151 * 239),
+                (3, 477),
+                (3, 479),
+            ]
+            .map(|(nodes_before, rows)| accounting_tree_nodes_upper_bound(nodes_before, rows)),
+            [1, 1, 3, 4, 77, 154, 3, 5],
+            "478 行：叶切 1 次、根切 1 次；151 × 239 行：叶切 150 次、内部节点切 1 次（2 × 75 ≤ 153）、根切 2 次之内取 1 + t = 2"
+        );
+    }
+
+    /// 两块 4 GiB 盘：第一个文件、unlink、最后一批之后一次建一个 inode，第 462 个那一版写 477 行、记账树一个节点；第 463 个那次照抄 463 级台阶、
+    /// 写 478 行，记账树长成根加两片叶（上界 3）。这次占槽上界：分配记录树与映射树之外写 8 槽（新记录落的第 2 片 inode 叶容器 2、inode 根 1、
+    /// 记账树 3 个节点各 1、映射树的根 1、树表 1），加映射树根之下的节点与分配记录树按上界算的节点。
+    #[test]
+    fn the_inode_creation_whose_watermark_step_crosses_one_accounting_leaf_counts_the_nodes_below_the_root_in_the_occupied_slots(
+    ) {
+        let mut model = two_device_model();
+        model.acquire_and_warm_up_in_the_make_filesystem_process();
+        let first = model
+            .answer_publish_first_file(&[3])
+            .expect("会话开着、现行 txg 2");
+        succeed(&mut model, &first);
+        let intent = model
+            .answer_unlink_intent()
+            .expect("会话开着、现行版本带活文件");
+        succeed(&mut model, &intent);
+        let final_batch = model
+            .answer_deletion_step()
+            .expect("会话开着、现行版本删除中");
+        succeed(&mut model, &final_batch);
+        for _ in 0..462 {
+            let created = model
+                .answer_create_inode()
+                .expect("会话开着、第一个文件已删完");
+            succeed(&mut model, &created);
+        }
+        let before = model.newest_root().clone();
+        let created = model
+            .answer_create_inode()
+            .expect("会话开着、第一个文件已删完");
+        assert!(
+            created.required_refusals.is_empty(),
+            "{:?}",
+            created.required_refusals
+        );
+        let written = &created.expected_roots[0];
+        let slots_outside_the_two_trees = 2 + 1 + 3 + 1 + 1;
+        let mapping_nodes_below_the_root = written.central_mapping_tree_nodes_upper_bound - 1;
+        assert_eq!(
+            (
+                (before.accounting_rows, before.accounting_tree_nodes_upper_bound),
+                (written.accounting_rows, written.accounting_tree_nodes_upper_bound),
+                written.occupied_slots_upper_bound_per_device
+                    - before.occupied_slots_upper_bound_per_device,
+            ),
+            (
+                (477, 1),
+                (478, 3),
+                slots_outside_the_two_trees
+                    + mapping_nodes_below_the_root
+                    + model.allocation_record_tree_nodes_rewritten_upper_bound(
+                        before.occupied_slots_upper_bound_per_device
+                            + slots_outside_the_two_trees
+                            + mapping_nodes_below_the_root
+                    ),
+            ),
+            "第 462 个那一版 477 行一个节点；第 463 个那次 478 行、根加两片叶，三个节点各占一槽进这次的占槽上界"
+        );
+    }
+
+    /// 一个码 2 根装 135 片叶容器（D8（核心索引结构） 已定项 6）：删完之后建的第 233 × 135 − 1 条（从 0 数）落在最后那片（第 134 片），
+    /// 第 233 × 135 条要第 136 片、根要长一层，模型的落点式子在那里 panic（判决 `research/prompts/m3-formal-code-b25-r1-main-verification.md`
+    /// K1 第四行：保留 `assert!`、不答拒；core 在同一条拒，`MoreLeafContainersThanOneRootNodeHolds`）。
+    #[test]
+    fn the_inode_leaf_container_position_reaches_the_last_of_135_leaf_containers_and_panics_one_record_beyond(
+    ) {
+        const LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS: u64 = 135;
+        assert_eq!(
+            index_node_entry_capacity(INODE_TREE_KEY_BYTES, INODE_INTERNAL_ENTRY),
+            LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS,
+            "模型按条款算的码 2 根扇出是 135"
+        );
+        let records_one_root_holds = INODE_LEAF_RECORDS * LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS;
+        assert_eq!(
+            inode_leaf_container_position_of_a_new_record(records_one_root_holds - 1),
+            LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS - 1,
+            "第 233 × 135 − 1 条落在第 134 片"
+        );
+        let one_record_beyond = std::panic::catch_unwind(|| {
+            inode_leaf_container_position_of_a_new_record(records_one_root_holds)
+        });
+        let payload =
+            one_record_beyond.expect_err("第 233 × 135 条要第 136 片：模型的落点式子 panic");
+        let message = payload
+            .downcast_ref::<String>()
+            .expect("assert! 带格式参数，panic 的载荷是 String");
+        assert!(
+            message.contains(&format!(
+                "第 {records_one_root_holds} 条落在第 {LEAF_CONTAINERS_ONE_CODE_TWO_ROOT_HOLDS} 片"
+            )),
+            "panic 的是落点式子那一条 assert!：{message}"
+        );
+    }
+
+    /// 一版里最左那片之外的 inode 叶容器角色与各自的分配代。
+    fn inode_leaf_containers_right_of_the_leftmost(
+        root: &ModelRoot,
+    ) -> BTreeMap<ModelUnitRole, ModelCheckpointTxg> {
+        root.role_written_at
+            .iter()
+            .filter(|(role, _)| matches!(role, ModelUnitRole::InodeLeafRightOfTheLeftmost(_)))
+            .map(|(role, written_at)| (*role, *written_at))
+            .collect()
+    }
+
+    /// 只供测试的一版：照 `base` 抄，inode 树换成 `leaf_containers` 片叶容器（从 1 数，最左那片算 1），最左那片之外的第 k 片记成
+    /// txg `first_written_at + k` 写的（各片分配代互不相同，回退取错一片就看得出来）。
+    fn version_with_inode_leaf_containers(
+        base: &ModelRoot,
+        leaf_containers: u64,
+        first_written_at: ModelCheckpointTxg,
+    ) -> ModelRoot {
+        let mut version = base.clone();
+        version
+            .role_written_at
+            .retain(|role, _| !matches!(role, ModelUnitRole::InodeLeafRightOfTheLeftmost(_)));
+        for position_from_the_leftmost in 1..leaf_containers {
+            version.role_written_at.insert(
+                ModelUnitRole::inode_leaf_container_at(position_from_the_leftmost),
+                ModelCheckpointTxg(first_written_at.0 + position_from_the_leftmost),
+            );
+        }
+        version
+    }
+
+    /// 模型回退那次发布对最左那片之外的叶容器的处置（`next_root_with_the_user_visible_trees` 取回退目标那一支里丢现行那几片、取目标那几片的两句），
+    /// 结构单测（第 30 批判决 `research/prompts/m3-formal-code-b30-r1-main-verification.md` 第二节 M1「第 k 片都对」那一行的改法 B4）：
+    /// 现行与目标各取 1、2、3、4、5、30、100、120、135 片（135 是一个码 2 根装得下的上界，D8（核心索引结构） 已定项 6）的每一种组合，回退写出的那一版
+    /// 最左那片之外的叶容器（角色与分配代）恰好等于目标那一版的——现行有、目标没有的那几片这一版也没有，目标的每一片都取回、分配代取目标的。
+    /// 30、100、120 罩只按片数触发、不按位置触发的错（最左之外各 29、99、119 片）：1–5 与 135 之间没有取样点时，只在目标装 60–118 片才错的回退照绿
+    /// （第 32–33 批代码轮判决 `research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P1「B4」那一行，`.claude/rules/mutation-sampling.md` 第三类）；
+    /// 只有 100 时，最左之外的片数落在 6–58、5–98、100–133 里才错的回退照绿（第 34 批代码轮判决
+    /// `research/prompts/m3-formal-code-b34-r1-main-verification.md` 第二节 P5「B4」那一行），30 落进前两个窗口、120 落进第三个。
+    /// 按取样点逐片往外加历史用例追不完（回退只取回或只丢某几片，只有建到那几片之外的历史抓得到），这一条不跑历史。
+    #[test]
+    fn a_rollback_takes_exactly_the_inode_leaf_containers_right_of_the_leftmost_of_its_target_for_every_pair_of_container_counts(
+    ) {
+        const CONTAINER_COUNTS: [u64; 9] = [1, 2, 3, 4, 5, 30, 100, 120, 135];
+        let model = model_after_four_overwrites_in_a_second_instance();
+        let newest = model.newest_root().clone();
+        let mut pairs_judged = 0;
+        for current_leaf_containers in CONTAINER_COUNTS {
+            for target_leaf_containers in CONTAINER_COUNTS {
+                let target = version_with_inode_leaf_containers(
+                    &newest,
+                    target_leaf_containers,
+                    ModelCheckpointTxg(1000),
+                );
+                let current = version_with_inode_leaf_containers(
+                    &newest,
+                    current_leaf_containers,
+                    ModelCheckpointTxg(2000),
+                );
+                let after_the_rollback = model.next_root_with_the_user_visible_trees(
+                    &current,
+                    current.key.instance,
+                    ModelCheckpointTxg(current.key.checkpoint_txg.0 + 1),
+                    ModelJournalCounter(model.highest_journal_counter.0 + 1),
+                    ModelPublishKind::EmptyOnFileVersion,
+                    current.rollback_floor,
+                    None,
+                    Rc::clone(&current.instance_table_rows),
+                    UserVisibleTreesOfTheNewVersion::TakenFromTheRollbackTarget(&target),
+                );
+                assert_eq!(
+                    inode_leaf_containers_right_of_the_leftmost(&after_the_rollback),
+                    inode_leaf_containers_right_of_the_leftmost(&target),
+                    "现行 {current_leaf_containers} 片、目标 {target_leaf_containers} 片：回退写出的那一版最左那片之外的叶容器要恰好是目标那一版的"
+                );
+                assert_eq!(
+                    inode_leaf_containers_right_of_the_leftmost(&target).len(),
+                    usize::try_from(target_leaf_containers - 1).expect("片数小于 135"),
+                    "搭建：目标那一版最左那片之外有 {} 片",
+                    target_leaf_containers - 1
+                );
+                pairs_judged += 1;
+            }
+        }
+        assert_eq!(
+            pairs_judged,
+            CONTAINER_COUNTS.len() * CONTAINER_COUNTS.len()
         );
     }
 }

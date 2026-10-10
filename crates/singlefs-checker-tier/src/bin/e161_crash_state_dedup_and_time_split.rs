@@ -6,6 +6,8 @@
 //! 登记：`research/prompts/e161-preregistration.md`（5.5「第一段」：D1-small、D1-stride、D1-quick，停机条款 S1–S6、
 //! 锚点 A1–A7、5.3 全部阳性对照、第八节几何敏感性里 D1-quick 与线程数 1 那两格）。第二、三段（D2、D3 全量）是同一个装置换取样域，
 //! 本文件给了模式名但这一段不跑。
+//! 第 2 次重跑登记：`research/prompts/e161-r2-prereg.md`（C577 那道屏障之后的段形：第一条流 11 段、第二条流 78 段取段 11–26，
+//! 取样域照它 5.5 的读法甲重定，装置的改动照它 5.6 的 I-1 到 I-12）。
 //!
 //! 只读、只驱动、只观测：不改 `crates/singlefs-core`、`crates/singlefs-checker`、harness 已有的文件。
 //! 第一条流经 `#[path]` 引 `tests/common/mod.rs` 的 `build_pool`；第二条流的脚本照抄
@@ -83,7 +85,7 @@ const SHARE_MARGIN_FOR_ENOUGH: f64 = 0.1;
 const STRIDE_STEP: u64 = 2_311;
 /// 对照样本里大段各取序号最小的这么多个（5.5）。
 const CONTROL_SAMPLE_PER_LARGE_SEGMENT: usize = 4_096;
-/// PC3：第二条流段 14 里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3）。
+/// PC3：第二条流段 16（第 1 次登记的段 14，同一批写）里序号最小的 1000 个状态、每个计时区各加 2 ms 忙等（5.3；重跑登记 I-6）。
 const TIMING_CONTROL_STATES: usize = 1_000;
 const TIMING_CONTROL_BUSY_WAIT: Duration = Duration::from_millis(2);
 /// PC3 的判据：加忙等的那个区多出 ≥ 1.8 s，其余每个区变化 < 1 s。
@@ -95,11 +97,11 @@ const LARGEST_CARD_MEBIBYTES: u128 = 32_607;
 const SMALLEST_SIXTEEN_GIGABYTE_CARD_MEBIBYTES: u128 = 16_303;
 const FIVE_CARDS_MEBIBYTES: u128 = 97_843;
 const CARD_COUNT: u128 = 5;
-/// 外推点：问题单的 10¹⁰，另报第二条流整条流的全量状态数（第四节 4.2）。
+/// 外推点：问题单的 10¹⁰，另报第二条流整条流的全量状态数（第四节 4.2；重跑登记 A7：C577 之后 78 段）。
 const EXTRAPOLATED_STATES: u128 = 10_000_000_000;
-const SECOND_STREAM_FULL_STATES: u128 = 14_960_689_284;
-/// A7：第二条流整条流最大一段 3² · 2²⁸ − 1。
-const SECOND_STREAM_LARGEST_SEGMENT_STATES: u128 = 2_415_919_103;
+const SECOND_STREAM_FULL_STATES: u128 = 1_678_377_204;
+/// A7：第二条流整条流最大一段 2²⁸ − 1（重跑登记 A7：28 个单元写的段，C577 之前是 3² · 2²⁸ − 1 的 30 写段）。
+const SECOND_STREAM_LARGEST_SEGMENT_STATES: u128 = 268_435_455;
 /// 容量的 95% 到 100% 之间记「临界」（第六节 G5 表下）。
 const CRITICAL_BAND_PERCENT: u128 = 95;
 /// G5 的字节口径（第六节）：读集每次调用 21 字节，集合每个元素 20 字节，每状态三个键各 16 字节，每个不同键一条 20 字节。
@@ -289,7 +291,7 @@ fn fingerprint_of_debug_text(value: &dyn std::fmt::Debug) -> Digest128 {
 enum StreamName {
     /// 层 0 第一条流：mkfs → 取号 → 暖机两次 → 新池新建文件。
     First,
-    /// 层 0 第二条流：固定脚本到 E 再正常卸载，取段 9–22。
+    /// 层 0 第二条流：固定脚本到 E 再正常卸载，取段 11–26。
     Second,
 }
 
@@ -564,23 +566,24 @@ fn prepare_second_stream() -> PreparedStream {
     }
 }
 
-/// S2 的锚点：第一条流段长 `[2,2,1,2,2,1,26,2,1,2]`、41 次写（`crash_enumeration_new_pool_file_creation_stream.rs:464-471`）；
-/// 第二条流 64 段的段长表、477 次写、19 条根（`crash_enumeration_fixed_script_stream.rs:431-483`）。
-const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 10] = [2, 2, 1, 2, 2, 1, 26, 2, 1, 2];
+/// S2 的锚点（重跑登记 A8，C577 那道屏障之后的段形）：第一条流 11 段的段长、41 次写
+/// （`crash_enumeration_new_pool_file_creation_stream.rs:466`、`:470-472`）；
+/// 第二条流 78 段的段长表、481 次写、19 条根（`crash_enumeration_fixed_script_stream.rs:439-457`、`:489`，到 E 再正常卸载那一支）。
+const FIRST_STREAM_SEGMENT_LENGTHS: [usize; 11] = [2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2];
 const FIRST_STREAM_WRITES: usize = 41;
 /// 第一条流的根槽写：暖机两次各一条、新池新建文件一条（段表里三个 1 写段，收严：登记 S2 没列这一格）。
 const FIRST_STREAM_ROOTS: usize = 3;
-const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 64] = [
-    2, 2, 1, 2, 2, 1, 26, 2, 1, 26, 2, 1, 2, 2, 18, 2, 1, 18, 2, 1, 18, 2, 1, 26, 2, 1, 22, 2, 1,
-    30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 30, 2, 1, 2, 2, 16, 2, 1, 18, 2, 1, 30, 2, 1, 2, 2, 16,
-    2, 1, 18, 2, 1, 2,
+const SECOND_STREAM_SEGMENT_LENGTHS: [usize; 78] = [
+    2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 24, 2, 1, 2, 2, 18, 2, 1, 2, 16, 2, 1, 2, 16, 2, 1, 2, 24, 2,
+    1, 2, 24, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2,
+    1, 2, 16, 2, 1, 2, 28, 2, 1, 2, 2, 16, 2, 1, 2, 16, 2, 1, 2,
 ];
-const SECOND_STREAM_WRITES: usize = 477;
+const SECOND_STREAM_WRITES: usize = 481;
 const SECOND_STREAM_ROOTS: usize = 19;
-/// 第二条流取段 9–22（第一节「读法写死」）；段 0–8 与第一条流段 0–8 逐字节相同（S2）。
-const SECOND_STREAM_FIRST_SAMPLED_SEGMENT: usize = 9;
-const SECOND_STREAM_LAST_SAMPLED_SEGMENT: usize = 22;
-const SHARED_PREFIX_SEGMENTS: usize = 9;
+/// 第二条流取段 11–26（重跑登记 1.3「第二条流的取样段」）；段 0–10 与第一条流段 0–10 逐字节相同（S2），不枚举。
+const SECOND_STREAM_FIRST_SAMPLED_SEGMENT: usize = 11;
+const SECOND_STREAM_LAST_SAMPLED_SEGMENT: usize = 26;
+const SHARED_PREFIX_SEGMENTS: usize = 11;
 
 /// S2 的一行：每条判据各自一个布尔。
 struct StreamCheck {
@@ -605,7 +608,7 @@ fn check_stream_shape(stream: &PreparedStream) -> StreamCheck {
     }
 }
 
-/// S2：两条流的基镜像逐字节相同；第二条流段 0–8 的写与第一条流段 0–8 逐字节相同。
+/// S2：两条流的基镜像逐字节相同；第二条流段 0–10 的写与第一条流段 0–10 逐字节相同。
 fn shared_prefix_is_identical(first: &PreparedStream, second: &PreparedStream) -> (bool, bool) {
     let bases_identical = first.base == second.base;
     let prefix_of = |stream: &PreparedStream| -> Vec<RetainedWrite> {
@@ -2088,7 +2091,8 @@ fn evaluate_baseline(
                 *tally.checker_evaluated_states.entry(invariant).or_insert(0) += 1;
                 *tally.checker_violated_states.entry(invariant).or_insert(0) += 1;
             }
-            InvariantVerdict::NotApplicable(_) => {
+            // 部分没判不红、不算评估过：与层 0 那一路（`crash.rs`）同一个口径，计进不适用这一格。
+            InvariantVerdict::NotApplicable(_) | InvariantVerdict::PartiallyJudged(_) => {
                 *tally
                     .checker_not_applicable_states
                     .entry(invariant)
@@ -2732,7 +2736,7 @@ fn evaluate_stream_domain(run: &StreamDomainRun<'_>) -> StreamDomainTotals {
 
 // ───────────────────────────── 取样域（5.5） ─────────────────────────────
 
-/// 这条流的取样段（第一条流全部；第二条流段 9–22）。
+/// 这条流的取样段（第一条流全部；第二条流段 11–26）。
 fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     match stream {
         StreamName::First => true,
@@ -2742,7 +2746,7 @@ fn is_sampled_segment(stream: StreamName, segment_index: usize) -> bool {
     }
 }
 
-/// 全部持久那一个在不在域里：第一条流在（D2 = 150994980 含它），第二条流不在（段 23 起不取）。
+/// 全部持久那一个在不在域里：第一条流在（第一条流全量 16777260 含它），第二条流不在（段 27 起不取）。
 fn includes_every_write_persisted(stream: StreamName) -> bool {
     match stream {
         StreamName::First => true,
@@ -2762,12 +2766,13 @@ fn domain_expansions(stream: &PreparedStream, expansion: LocalExpansion) -> Vec<
         .collect()
 }
 
-/// 26 写段（D1-stride 取步长的那两段）。
-const STRIDED_SEGMENT_WRITES: usize = 26;
-/// 对照样本里「大段」的写数下限（18 写段与 26 写段，5.5）。
+/// 大段的写数：24 写段（D1-stride 取步长、可行性档取段头的那两段：第一条流段 7、第二条流段 11）。
+/// 重跑登记读法甲：第 1 次的 26 写段（3² · 2²⁴ − 1 个状态）在 C577 之后拆成轮换 2 写与单元 24 写，阈值照改成 24。
+const STRIDED_SEGMENT_WRITES: usize = 24;
+/// 对照样本里「大段」的写数下限（18 写段与 24 写段，5.5）。
 const CONTROL_SAMPLE_LARGE_SEGMENT_WRITES: usize = 18;
 
-/// D1-small：取样段里写数少于 26 的每一段的全部状态（第一条流再加全部持久那一个）；按全量计划的序号。
+/// D1-small：取样段里写数少于 24 的每一段的全部状态（第一条流再加全部持久那一个）；按全量计划的序号。
 fn small_domain_ordinals(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     let mut ordinals = Vec::new();
     for (segment_index, segment) in stream.segments.iter().enumerate() {
@@ -2783,7 +2788,7 @@ fn small_domain_ordinals(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u
     ordinals
 }
 
-/// D1-stride：26 写段里段内序号 ≡ 0 (mod 2311) 的状态。
+/// D1-stride：24 写段里段内序号 ≡ 0 (mod 2311) 的状态。
 fn stride_domain_ordinals(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     let mut ordinals = Vec::new();
     for (segment_index, segment) in stream.segments.iter().enumerate() {
@@ -2807,7 +2812,7 @@ fn every_ordinal(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     (0..last).collect()
 }
 
-/// 对照样本（5.5）：D1 里每一段，18 写段与 26 写段取序号最小的 4096 个，其余段取全部；第一条流的全部持久那一个也在。
+/// 对照样本（5.5）：D1 里每一段，18 写及以上的段取序号最小的 4096 个，其余段取全部；第一条流的全部持久那一个也在。
 fn control_ordinals(
     stream: &PreparedStream,
     plan: &LocalPlan<'_>,
@@ -2850,7 +2855,7 @@ struct SegmentCountCheck {
 }
 
 /// 逐个数：只展开 `segment_index` 那一段的计划里，每个序号的持久集合真生成出来，数不同的有几个。取样段里一律逐个数（段内这一段的写、
-/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（第二条流段 23 起，一段至多 3² · 2²⁸ − 1 个）按计划的组合数报。
+/// 它们的撕裂镜像与重放至多 32 个位置时用位图，否则用集合）；取样段之外（第二条流段 0–10 与段 27 起，一段至多 2²⁸ − 1 个）按计划的组合数报。
 /// 交回（数出来的个数，是不是逐个数的）。
 fn count_distinct_persisted_sets(
     stream: &PreparedStream,
@@ -3914,34 +3919,26 @@ fn discriminating_positions(
 
 // ───────────────────────────── 锚点 A2–A7 的值（第七节 7.2，登记第十三节 anchors.py / anchors2.py 的原样输出） ─────────────────────────────
 
-const ANCHOR_FIRST_STREAM_SEGMENT_STATES: [u64; 10] = [8, 3, 1, 8, 3, 1, 150_994_943, 3, 1, 8];
-const ANCHOR_FIRST_STREAM_STATES: u64 = 150_994_980;
-/// txg1、txg2、txg3、最后一条根之后（再加全部持久那一个）。
-const ANCHOR_FIRST_STREAM_BY_PUBLISH: [u64; 4] = [12, 12, 150_994_947, 8];
-const ANCHOR_SECOND_STREAM_SEGMENT_STATES: [u64; 14] = [
-    150_994_943,
-    3,
-    1,
-    8,
-    8,
-    262_143,
-    3,
-    1,
-    589_823,
-    3,
-    1,
-    589_823,
-    3,
-    1,
+// 重跑登记（`research/prompts/e161-r2-prereg.md`）第七节 A2、A3、A4 与第十三节 `anchors_r2.py` 的原样输出（C577 之后的段形）。
+const ANCHOR_FIRST_STREAM_SEGMENT_STATES: [u64; 11] = [8, 3, 1, 8, 3, 1, 8, 16_777_215, 3, 1, 8];
+const ANCHOR_FIRST_STREAM_STATES: u64 = 16_777_260;
+/// txg1、txg2、txg3、最后一条根之后。
+const ANCHOR_FIRST_STREAM_BY_PUBLISH: [u64; 4] = [12, 12, 16_777_227, 8];
+/// 第二条流取样段 11–26 逐段。
+const ANCHOR_SECOND_STREAM_SEGMENT_STATES: [u64; 16] = [
+    16_777_215, 3, 1, 8, 8, 262_143, 3, 1, 8, 65_535, 3, 1, 8, 65_535, 3, 1,
 ];
-const ANCHOR_SECOND_STREAM_STATES: u64 = 152_436_764;
-/// txg4、txg5、txg6、txg7。
-const ANCHOR_SECOND_STREAM_BY_PUBLISH: [u64; 4] = [150_994_947, 262_163, 589_827, 589_827];
-const ANCHOR_FIRST_STREAM_SMALL: u64 = 37;
-const ANCHOR_SECOND_STREAM_SMALL: u64 = 1_441_821;
-const ANCHOR_STRIDE_PER_SEGMENT: u64 = 65_338;
-const ANCHOR_FIRST_STREAM_QUICK: u64 = 54;
-const ANCHOR_SECOND_STREAM_QUICK: u64 = 84;
+const ANCHOR_SECOND_STREAM_STATES: u64 = 17_170_476;
+/// txg4（不含不取的段 10）、txg5、txg6、txg7。
+const ANCHOR_SECOND_STREAM_BY_PUBLISH: [u64; 4] = [16_777_219, 262_163, 65_547, 65_547];
+const ANCHOR_FIRST_STREAM_SMALL: u64 = 45;
+const ANCHOR_SECOND_STREAM_SMALL: u64 = 393_261;
+/// 每个 24 写段 ⌈(2²⁴ − 1) / 2311⌉；两条流取样段里各只有一个 24 写段。
+const ANCHOR_STRIDE_PER_SEGMENT: u64 = 7_260;
+const ANCHOR_FIRST_STREAM_QUICK: u64 = 46;
+const ANCHOR_SECOND_STREAM_QUICK: u64 = 52;
+/// 段头：每条流的大段（24 写段）各取段内序号 0–4095（重跑登记 I-4 新加的一格）。
+const ANCHOR_SEGMENT_HEADS_PER_STREAM: u64 = 4_096;
 /// A5：取三态的写数（第一条流 8 次系统配置槽写，第二条流 46 次）。
 const ANCHOR_FIRST_STREAM_IN_PLACE_OVERWRITES: usize = 8;
 const ANCHOR_SECOND_STREAM_IN_PLACE_OVERWRITES: usize = 46;
@@ -3976,12 +3973,47 @@ fn bool_text(value: bool) -> &'static str {
     }
 }
 
-/// 一条流的锚点 A1、A2 / A3、A5 与 A4 的域大小；交回全部都对上没有。
+/// 整条流每段按 A1 的公式算的状态数（只用公式，不枚举；重跑登记 I-5）：交回（全量 = 1 + Σ 各段，最大一段）。
+fn whole_stream_states_by_the_formula(
+    stream: &PreparedStream,
+    table: &TornWriteTable,
+) -> (u128, u128) {
+    let per_segment: Vec<u128> = stream
+        .segments
+        .iter()
+        .map(|segment| {
+            let in_place_overwrites = segment
+                .iter()
+                .filter(|write_index| table.is_in_place_overwrite[**write_index])
+                .count();
+            u128::from(formula_segment_state_count(
+                u64::try_from(segment.len()).expect("写数"),
+                u64::try_from(in_place_overwrites).expect("个数"),
+            ))
+        })
+        .collect();
+    let largest = per_segment
+        .iter()
+        .copied()
+        .max()
+        .expect("录制流至少有一段（S2 核过段长表）");
+    (1 + per_segment.iter().sum::<u128>(), largest)
+}
+
+/// 一条流的锚点核下来的两样。
+struct StreamAnchorOutcome {
+    /// A1、A2 / A3、A4、A5 与（第二条流）A7 全部对上。
+    every_anchor_holds: bool,
+    /// 可行性档要评的三个域（D1-small、D1-quick、段头）的大小都等于 A4（重跑登记 I-7 的域守卫只看这一样）。
+    evaluated_domain_sizes_hold: bool,
+}
+
+/// 一条流的锚点 A1、A2 / A3、A5 与 A4 的域大小（第二条流另核 A7 的整条流全量与最大一段）。
 fn report_stream_anchors(
     output: &mut ResultLines,
     stream: &PreparedStream,
     table: &TornWriteTable,
-) -> bool {
+) -> StreamAnchorOutcome {
     let checks = segment_count_checks(stream, table);
     let mut all_three_agree = true;
     for check in &checks {
@@ -4032,6 +4064,7 @@ fn report_stream_anchors(
     let small = u64::try_from(small_domain_ordinals(stream, &full).len()).expect("个数");
     let stride = u64::try_from(stride_domain_ordinals(stream, &full).len()).expect("个数");
     let quick_states = u64::try_from(every_ordinal(stream, &quick).len()).expect("个数");
+    let heads = u64::try_from(strided_segment_heads(stream, &full).len()).expect("个数");
     let (segments_ok, states_ok, publish_ok, small_ok, quick_ok, in_place_ok) = match stream.name {
         StreamName::First => (
             sampled_counts == ANCHOR_FIRST_STREAM_SEGMENT_STATES,
@@ -4056,10 +4089,28 @@ fn report_stream_anchors(
         ),
     };
     let stride_ok = stride == ANCHOR_STRIDE_PER_SEGMENT;
+    let heads_ok = heads == ANCHOR_SEGMENT_HEADS_PER_STREAM;
     let mask_width_formula_holds =
         table.mask_width() == stream.writes.len() + in_place + table.replay_count;
+    let (whole_stream_fields, whole_stream_ok) = match stream.name {
+        StreamName::First => (String::new(), true),
+        StreamName::Second => {
+            let (whole_stream_states, whole_stream_largest) =
+                whole_stream_states_by_the_formula(stream, table);
+            let states_match = whole_stream_states == SECOND_STREAM_FULL_STATES;
+            let largest_match = whole_stream_largest == SECOND_STREAM_LARGEST_SEGMENT_STATES;
+            (
+                format!(
+                    " whole_stream_states={whole_stream_states} whole_stream_largest_segment_states={whole_stream_largest} whole_stream_states_match={} whole_stream_largest_segment_match={}",
+                    bool_text(states_match),
+                    bool_text(largest_match),
+                ),
+                states_match && largest_match,
+            )
+        }
+    };
     output.line(format!(
-        "name=anchor_stream stream={} sampled_segment_states={sampled_counts:?} domain_states={domain_states} by_publish={by_publish:?} d1_small={small} d1_stride={stride} d1_quick={quick_states} recorded_writes={} in_place_overwrites={in_place} replays={} w={} segments_match={} domain_states_match={} by_publish_match={} d1_small_match={} d1_stride_match={} d1_quick_match={} in_place_overwrites_match={} w_formula_holds={}",
+        "name=anchor_stream stream={} sampled_segment_states={sampled_counts:?} domain_states={domain_states} by_publish={by_publish:?} d1_small={small} d1_stride={stride} d1_quick={quick_states} d1_heads={heads} recorded_writes={} in_place_overwrites={in_place} replays={} w={} segments_match={} domain_states_match={} by_publish_match={} d1_small_match={} d1_stride_match={} d1_quick_match={} d1_heads_match={} in_place_overwrites_match={} w_formula_holds={}{whole_stream_fields}",
         stream.name.label(),
         stream.writes.len(),
         table.replay_count,
@@ -4070,18 +4121,24 @@ fn report_stream_anchors(
         bool_text(small_ok),
         bool_text(stride_ok),
         bool_text(quick_ok),
+        bool_text(heads_ok),
         bool_text(in_place_ok),
         bool_text(mask_width_formula_holds),
     ));
-    all_three_agree
-        && segments_ok
-        && states_ok
-        && publish_ok
-        && small_ok
-        && stride_ok
-        && quick_ok
-        && in_place_ok
-        && mask_width_formula_holds
+    StreamAnchorOutcome {
+        every_anchor_holds: all_three_agree
+            && segments_ok
+            && states_ok
+            && publish_ok
+            && small_ok
+            && stride_ok
+            && quick_ok
+            && heads_ok
+            && in_place_ok
+            && mask_width_formula_holds
+            && whole_stream_ok,
+        evaluated_domain_sizes_hold: small_ok && quick_ok && heads_ok,
+    }
 }
 
 /// A6、A7：容量与最大一段的算术。
@@ -4089,7 +4146,7 @@ fn capacity_anchors_hold() -> bool {
     LARGEST_CARD_MEBIBYTES * MEBIBYTE == ANCHOR_LARGEST_CARD_BYTES
         && SMALLEST_SIXTEEN_GIGABYTE_CARD_MEBIBYTES * MEBIBYTE == ANCHOR_SIXTEEN_GIGABYTE_CARD_BYTES
         && FIVE_CARDS_MEBIBYTES * MEBIBYTE == ANCHOR_FIVE_CARDS_BYTES
-        && 3u128.pow(2) * 2u128.pow(28) == SECOND_STREAM_LARGEST_SEGMENT_STATES + 1
+        && 2u128.pow(28) == SECOND_STREAM_LARGEST_SEGMENT_STATES + 1
 }
 
 // ───────────────────────────── 模式 stop-clauses：S1–S6 与 A1–A7（跑产物之前） ─────────────────────────────
@@ -4264,7 +4321,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
         ));
     }
     output.line(format!(
-        "name=stop_clause_shared_prefix bases_identical={} first_nine_segments_identical={} clause_S2_holds={}",
+        "name=stop_clause_shared_prefix bases_identical={} shared_prefix_segments={SHARED_PREFIX_SEGMENTS} shared_prefix_segments_identical={} clause_S2_holds={}",
         bool_text(bases_identical),
         bool_text(prefix_identical),
         bool_text(streams_clause_holds)
@@ -4280,7 +4337,7 @@ fn run_stop_clauses(output: &mut ResultLines) -> i32 {
     let mut walk_subset_clause_holds = true;
     for stream in [&first, &second] {
         let table = TornWriteTable::of(stream);
-        anchors_hold &= report_stream_anchors(output, stream, &table);
+        anchors_hold &= report_stream_anchors(output, stream, &table).every_anchor_holds;
         let context = EvaluationContext::new(stream, &table);
         let full = LocalPlan::new(
             stream,
@@ -4854,7 +4911,41 @@ fn report_device_memory_control(
     holds
 }
 
-/// PC3：第二条流段 14 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
+/// PC3 那一段的样子：（写数，全量计划里的状态数，序号最小的 1000 个，这 1000 个是不是都落在那一段）。
+struct TimingControlSegmentShape {
+    writes: usize,
+    states: u64,
+    ordinals: Vec<u64>,
+    every_ordinal_in_the_segment: bool,
+}
+
+impl TimingControlSegmentShape {
+    fn of(stream: &PreparedStream, full: &LocalPlan<'_>) -> Self {
+        let segment = TIMING_CONTROL_SEGMENT;
+        let first = full.first_ordinal_by_segment[segment];
+        let ordinals: Vec<u64> =
+            (first..first + u64::try_from(TIMING_CONTROL_STATES).expect("1000")).collect();
+        let every_ordinal_in_the_segment = ordinals
+            .iter()
+            .all(|ordinal| full.segment_of(*ordinal) == segment);
+        Self {
+            writes: stream.segments[segment].len(),
+            states: full.count_by_segment[segment],
+            ordinals,
+            every_ordinal_in_the_segment,
+        }
+    }
+
+    /// 重跑登记 I-6：那一段写数是 18、状态数不少于 1000、取的 1000 个序号都落在那一段。
+    fn holds(&self) -> bool {
+        self.writes == TIMING_CONTROL_SEGMENT_WRITES
+            && self.states >= u64::try_from(TIMING_CONTROL_STATES).expect("1000")
+            && self.every_ordinal_in_the_segment
+    }
+}
+
+/// PC3：第二条流段 16 序号最小的 1000 个状态，先照常跑一遍，再六遍各在一个计时区里加 2 ms 忙等。交回全部六个区都过没过。
+/// 那一段不是写行那 18 个单元写、或不够 1000 个状态时，六个区一律判不过、一个状态都不评（`pc3_segment_holds=false`）。
 fn report_timing_control(
     output: &mut ResultLines,
     stream: &PreparedStream,
@@ -4867,10 +4958,19 @@ fn report_timing_control(
         &table,
         domain_expansions(stream, LocalExpansion::EveryCombination),
     );
-    let segment = TIMING_CONTROL_SEGMENT;
-    let first = full.first_ordinal_by_segment[segment];
-    let ordinals: Vec<u64> =
-        (first..first + u64::try_from(TIMING_CONTROL_STATES).expect("1000")).collect();
+    let shape = TimingControlSegmentShape::of(stream, &full);
+    if !shape.holds() {
+        for busy_zone in TIMING_ZONES {
+            output.line(format!(
+                "name=positive_control_timing busy_zone={} states=0 segment={TIMING_CONTROL_SEGMENT} segment_writes={} segment_states={} pc3_segment_holds=false pc3_zone_holds=false",
+                busy_zone.label(),
+                shape.writes,
+                shape.states,
+            ));
+        }
+        return false;
+    }
+    let ordinals = shape.ordinals;
     let zone_totals = |busy_zone: Option<TimingZone>| -> [u128; 6] {
         let totals = evaluate_stream_domain(&StreamDomainRun {
             label: format!("pc3-{}", busy_zone.map_or("none", TimingZone::label)),
@@ -4913,7 +5013,7 @@ fn report_timing_control(
             .map(|(zone, change)| format!("{}_delta_elapsed_ns={change}", zone.label()))
             .collect();
         output.line(format!(
-            "name=positive_control_timing busy_zone={} states={} {} busy_zone_added_at_least_1800ms={} other_zones_changed_under_1000ms={} pc3_zone_holds={}",
+            "name=positive_control_timing busy_zone={} states={} {} busy_zone_added_at_least_1800ms={} other_zones_changed_under_1000ms={} pc3_segment_holds=true pc3_zone_holds={}",
             busy_zone.label(),
             ordinals.len(),
             change_fields.join(" "),
@@ -4925,8 +5025,10 @@ fn report_timing_control(
     every_zone_holds
 }
 
-/// PC3 取的段（5.3：第二条流段 14）。
-const TIMING_CONTROL_SEGMENT: usize = 14;
+/// PC3 取的段（5.3：第 1 次第二条流段 14「写行发布 18 个单元写」那一段；C577 之后同一批写是段 16，重跑登记 I-6、A9）。
+const TIMING_CONTROL_SEGMENT: usize = 16;
+/// PC3 那一段的写数：写行发布的 18 个单元写（重跑登记 A9）。
+const TIMING_CONTROL_SEGMENT_WRITES: usize = 18;
 
 // ───────────────────────────── 几何敏感性与判别力自证（8.2） ─────────────────────────────
 
@@ -5235,10 +5337,10 @@ fn report_verdicts(
 
 // ───────────────────────────── 模式 feasibility：可行性档（用户 2026-09-27 定，登记 12.2） ─────────────────────────────
 
-/// 可行性档里 26 写段取段内序号最小的这么多个状态（用户 2026-09-27 定，登记 12.2）。
+/// 可行性档里大段（24 写段）取段内序号最小的这么多个状态（用户 2026-09-27 定，登记 12.2；重跑登记 1.3「段头」）。
 const FEASIBILITY_HEAD_STATES: u64 = 4_096;
 
-/// 取样段里 26 写段的段头：段内序号 0 到 4095（按全量计划的序号）。
+/// 取样段里大段（24 写段）的段头：段内序号 0 到 4095（按全量计划的序号）。
 fn strided_segment_heads(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u64> {
     let mut ordinals = Vec::new();
     for (segment_index, segment) in stream.segments.iter().enumerate() {
@@ -5252,7 +5354,7 @@ fn strided_segment_heads(stream: &PreparedStream, plan: &LocalPlan<'_>) -> Vec<u
     ordinals
 }
 
-/// S4 在 26 写段段头上的形态：crates 按段枚举要把整段 1.5 亿个跑完，这里改用 crates 的单状态入口
+/// S4 在大段段头上的形态：crates 按段枚举要把整段 1677 万个跑完，这里改用 crates 的单状态入口
 /// `evaluate_state_for_versions`，在装置给的同一批持久集合上逐个评，计数与装置照跑的逐项比。交回相不相同。
 fn report_per_state_crates_comparison(
     output: &mut ResultLines,
@@ -5311,8 +5413,9 @@ fn report_per_state_crates_comparison(
     holds
 }
 
-/// 可行性档（用户 2026-09-27 定）：第一条流 D1-small、两条流的 D1-quick、两个 26 写段各取段头 4096 个状态；
+/// 可行性档（用户 2026-09-27 定）：第一条流 D1-small、两条流的 D1-quick、两个大段（24 写段）各取段头 4096 个状态；
 /// 停机条款、阳性对照与 crates 的对拍都只在这个小域上做。G 行一律不判（只跑了可行性档）。
+/// 要评的三个域的大小先与 A4 比，对不上一个状态都不评、退 3（重跑登记 I-7 的域守卫）。
 #[allow(
     clippy::too_many_lines,
     reason = "可行性档的全部格按登记 12.2 的次序排下来：S1、S2、锚点、与 crates 对拍、两遍对照、各格结果行、阳性对照、判定行"
@@ -5320,7 +5423,7 @@ fn report_per_state_crates_comparison(
 fn run_feasibility(output: &mut ResultLines) -> i32 {
     let threads = threads_from_environment();
     output.line(format!(
-        "name=config experiment=E161 mode=feasibility threads={threads} registration=research/prompts/e161-preregistration.md domain=first_small_37+quick_54_84+strided_segment_heads_4096"
+        "name=config experiment=E161 mode=feasibility threads={threads} registration=research/prompts/e161-preregistration.md rerun_registration=research/prompts/e161-r2-prereg.md domain=first_small_45+quick_46_52+largest_segment_heads_4096"
     ));
     let constants = local_constants_against_the_crates();
     let constants_clause_holds = constants
@@ -5355,30 +5458,48 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
         ));
     }
     output.line(format!(
-        "name=stop_clause_shared_prefix bases_identical={} first_nine_segments_identical={} clause_S2_holds={}",
+        "name=stop_clause_shared_prefix bases_identical={} shared_prefix_segments={SHARED_PREFIX_SEGMENTS} shared_prefix_segments_identical={} clause_S2_holds={}",
         bool_text(bases_identical),
         bool_text(prefix_identical),
         bool_text(streams_clause_holds)
     ));
+    let first_table = TornWriteTable::of(&first);
+    let second_table = TornWriteTable::of(&second);
+    let streams_and_tables = [(&first, &first_table), (&second, &second_table)];
     let mut anchors_hold = capacity_anchors_hold();
+    let mut evaluated_domain_sizes_hold = true;
+    for (stream, table) in streams_and_tables {
+        let anchors = report_stream_anchors(output, stream, table);
+        anchors_hold &= anchors.every_anchor_holds;
+        evaluated_domain_sizes_hold &= anchors.evaluated_domain_sizes_hold;
+    }
+    // 域守卫（重跑登记 I-7）：要评的域与 A4 对不上时一个状态都不评。第 1 次的段形一变，「写数少于 26」把 1677 万个状态的段整段收进
+    // D1-small，装置照样往下评、撞内存上限才停；先核域大小，对不上就打判决行、退 3（停机条款 S9）。
+    if !evaluated_domain_sizes_hold {
+        output.line(format!(
+            "name=verdict scope=feasibility clause_S1_holds={} clause_S2_holds={} anchors_a1_to_a7_hold={} evaluated_domain_sizes_hold=false states_evaluated=false",
+            bool_text(constants_clause_holds),
+            bool_text(streams_clause_holds),
+            bool_text(anchors_hold),
+        ));
+        return 3;
+    }
     let mut enumeration_clause_holds = true;
     let mut tally_clause_holds = true;
     let mut determinism_clause_holds = true;
     let mut walk_subset_clause_holds = true;
     let mut positive_controls: Vec<(String, bool)> = Vec::new();
-    for stream in [&first, &second] {
+    for (stream, table) in streams_and_tables {
         let name = stream.name.label();
-        let table = TornWriteTable::of(stream);
-        anchors_hold &= report_stream_anchors(output, stream, &table);
-        let context = EvaluationContext::new(stream, &table);
+        let context = EvaluationContext::new(stream, table);
         let full = LocalPlan::new(
             stream,
-            &table,
+            table,
             domain_expansions(stream, LocalExpansion::EveryCombination),
         );
         let quick = LocalPlan::new(
             stream,
-            &table,
+            table,
             domain_expansions(
                 stream,
                 LocalExpansion::InPlaceCombinationsWithUnitWritesNoneOrAll,
@@ -5533,7 +5654,10 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
         }
     }
     let timing_control_holds = report_timing_control(output, &second, threads);
-    positive_controls.push(("second_segment_14_pc3".to_string(), timing_control_holds));
+    positive_controls.push((
+        format!("second_segment_{TIMING_CONTROL_SEGMENT}_pc3"),
+        timing_control_holds,
+    ));
     let control_fields: Vec<String> = positive_controls
         .iter()
         .map(|(name, holds)| format!("{name}={}", bool_text(*holds)))
@@ -5568,13 +5692,15 @@ fn run_feasibility(output: &mut ResultLines) -> i32 {
 mod tests {
     use super::*;
 
-    /// 第一条流的 D1-small（37 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
+    /// 第一条流的 D1-small（45 个状态）跑一遍 5.1 的四件事；各测试共用这一份搭建的写法。
+    /// 评之前先核 D1-small 的个数（重跑登记 I-7 的域守卫）：段形或阈值一变，D1-small 会把 1677 万个状态的段整段收进来，
+    /// 不先核就一路评到撞内存上限。
     fn evaluate_the_first_stream_small_domain(
         threads: usize,
         busy_zone: Option<TimingZone>,
     ) -> (PreparedStream, StreamDomainTotals, Vec<u64>) {
         let stream = prepare_first_stream();
-        let totals = {
+        let (totals, small) = {
             let table = TornWriteTable::of(&stream);
             let context = EvaluationContext::new(&stream, &table);
             let plan = LocalPlan::new(
@@ -5583,8 +5709,13 @@ mod tests {
                 domain_expansions(&stream, LocalExpansion::EveryCombination),
             );
             let small = small_domain_ordinals(&stream, &plan);
+            assert_eq!(
+                small.len(),
+                45,
+                "域守卫：第一条流 D1-small 是 45 个状态（重跑登记 A4），对不上就不评"
+            );
             let control: BTreeSet<u64> = small.iter().copied().collect();
-            evaluate_stream_domain(&StreamDomainRun {
+            let totals = evaluate_stream_domain(&StreamDomainRun {
                 label: "test-first-small".to_string(),
                 context: &context,
                 plan: &plan,
@@ -5593,16 +5724,8 @@ mod tests {
                 busy_zone,
                 threads,
                 depth: EvaluationDepth::FourSteps,
-            })
-        };
-        let small = {
-            let table = TornWriteTable::of(&stream);
-            let plan = LocalPlan::new(
-                &stream,
-                &table,
-                domain_expansions(&stream, LocalExpansion::EveryCombination),
-            );
-            small_domain_ordinals(&stream, &plan)
+            });
+            (totals, small)
         };
         (stream, totals, small)
     }
@@ -5626,14 +5749,7 @@ mod tests {
         let stream = prepare_first_stream();
         let table = TornWriteTable::of(&stream);
         let checks = segment_count_checks_up_to(&stream, &table, 1 << 20);
-        let counted: Vec<u64> = checks
-            .iter()
-            .map(|check| check.counted_by_the_plan)
-            .collect();
-        assert_eq!(
-            counted, ANCHOR_FIRST_STREAM_SEGMENT_STATES,
-            "A2：装置计划逐段数"
-        );
+        // 先 A1 两半、后 A2（重跑登记 I-8）：装置计划改坏时头一个断的是「装置对 crates」，crates 那一列因此被比到。
         for check in &checks {
             assert_eq!(
                 check.counted_by_the_plan, check.counted_by_the_crates,
@@ -5646,6 +5762,14 @@ mod tests {
                 check.segment_index
             );
         }
+        let counted: Vec<u64> = checks
+            .iter()
+            .map(|check| check.counted_by_the_plan)
+            .collect();
+        assert_eq!(
+            counted, ANCHOR_FIRST_STREAM_SEGMENT_STATES,
+            "A2：装置计划逐段数"
+        );
         assert_eq!(
             table.mask_width(),
             49,
@@ -5655,6 +5779,11 @@ mod tests {
             formula_segment_state_count(26, 2),
             150_994_943,
             "3² · 2²⁴ − 1"
+        );
+        assert_eq!(
+            formula_segment_state_count(24, 0),
+            16_777_215,
+            "2²⁴ − 1：C577 之后第一条流段 7 的 24 个单元写"
         );
     }
 
@@ -5677,25 +5806,118 @@ mod tests {
         );
         assert_eq!(
             small_domain_ordinals(&stream, &full).len(),
-            37,
+            45,
             "A4：D1-small 第一条流"
         );
         assert_eq!(
             stride_domain_ordinals(&stream, &full).len(),
-            65_338,
-            "A4：D1-stride 每个 26 写段"
+            7_260,
+            "A4：D1-stride 第一条流唯一的 24 写段（段 7）"
         );
         assert_eq!(
             every_ordinal(&stream, &quick).len(),
-            54,
+            46,
             "A4：D1-quick 第一条流"
+        );
+        assert_eq!(
+            strided_segment_heads(&stream, &full).len(),
+            4_096,
+            "A4：段头，第一条流段 7 序号最小的 4096 个"
+        );
+    }
+
+    /// 重跑登记 I-10：只搭第二条流、建计划，一个状态都不评。
+    #[test]
+    fn second_stream_shape_and_sampled_domains_have_the_registered_sizes() {
+        let first = prepare_first_stream();
+        let stream = prepare_second_stream();
+        assert_eq!(stream.segments.len(), 78, "A8：第二条流 78 段");
+        assert_eq!(stream.writes.len(), 481, "A8：第二条流 481 次写");
+        assert_eq!(stream.root_write_count, 19, "A8：第二条流 19 条根");
+        let shape = check_stream_shape(&stream);
+        assert!(shape.segment_lengths_match, "S2：段长表与本地常量逐段相同");
+        assert!(shape.writes_match, "S2：写数与本地常量相同");
+        assert!(shape.roots_match, "S2：根数与本地常量相同");
+        let (bases_identical, prefix_identical) = shared_prefix_is_identical(&first, &stream);
+        assert!(bases_identical, "S2：两条流的基镜像逐字节相同");
+        assert!(
+            prefix_identical,
+            "S2：第二条流前 11 段的写与第一条流 11 段逐字节相同"
+        );
+        let table = TornWriteTable::of(&stream);
+        let full = LocalPlan::new(
+            &stream,
+            &table,
+            domain_expansions(&stream, LocalExpansion::EveryCombination),
+        );
+        let quick = LocalPlan::new(
+            &stream,
+            &table,
+            domain_expansions(
+                &stream,
+                LocalExpansion::InPlaceCombinationsWithUnitWritesNoneOrAll,
+            ),
+        );
+        let sampled_counts: Vec<u64> = full
+            .count_by_segment
+            .iter()
+            .enumerate()
+            .filter(|(segment_index, _count)| is_sampled_segment(stream.name, *segment_index))
+            .map(|(_segment_index, count)| *count)
+            .collect();
+        assert_eq!(
+            sampled_counts, ANCHOR_SECOND_STREAM_SEGMENT_STATES,
+            "A3：取样段 11–26 逐段状态数"
+        );
+        assert_eq!(
+            small_domain_ordinals(&stream, &full).len(),
+            393_261,
+            "A4：D1-small 第二条流"
+        );
+        assert_eq!(
+            stride_domain_ordinals(&stream, &full).len(),
+            7_260,
+            "A4：D1-stride 第二条流唯一的 24 写段（段 11）"
+        );
+        assert_eq!(
+            every_ordinal(&stream, &quick).len(),
+            52,
+            "A4：D1-quick 第二条流"
+        );
+        assert_eq!(
+            strided_segment_heads(&stream, &full).len(),
+            4_096,
+            "A4：段头，第二条流段 11 序号最小的 4096 个"
+        );
+        let timing_control = TimingControlSegmentShape::of(&stream, &full);
+        assert_eq!(
+            timing_control.writes, 18,
+            "A9：PC3 那一段是写行发布的 18 个单元写"
+        );
+        assert_eq!(
+            timing_control.states, 262_143,
+            "A9：PC3 那一段 2¹⁸ − 1 个状态"
+        );
+        assert!(
+            timing_control.holds(),
+            "I-6：PC3 取的 1000 个序号都落在那一段"
+        );
+        let (whole_stream_states, whole_stream_largest) =
+            whole_stream_states_by_the_formula(&stream, &table);
+        assert_eq!(
+            whole_stream_states, 1_678_377_204,
+            "A7：第二条流整条流全量（公式，1 + Σ 各段）"
+        );
+        assert_eq!(
+            whole_stream_largest, 268_435_455,
+            "A7：第二条流整条流最大一段 2²⁸ − 1"
         );
     }
 
     #[test]
     fn recorded_recovery_answers_exactly_like_the_baseline_on_the_first_stream() {
         let (_stream, totals, _small) = evaluate_the_first_stream_small_domain(2, None);
-        assert_eq!(totals.states(), 37, "D1-small 第一条流 37 个状态");
+        assert_eq!(totals.states(), 45, "D1-small 第一条流 45 个状态");
         assert_eq!(
             totals.consult_report_differs, 0,
             "S5：记录跑看 journal 那一遍与照跑逐项相同"
@@ -5740,7 +5962,7 @@ mod tests {
         assert_eq!(
             summary.arm_inconsistent[Arm::RecoveryConsult.slot()],
             0,
-            "按读集复用在这 37 个状态上没有不一致"
+            "按读集复用在这 45 个状态上没有不一致"
         );
     }
 
@@ -5782,8 +6004,8 @@ mod tests {
         };
         let added = zone_total(&busy, 0).saturating_sub(zone_total(&quiet, 0));
         assert!(
-            added >= 37 * TIMING_CONTROL_BUSY_WAIT.as_nanos() * 9 / 10,
-            "PC3 的缩小版：看 journal 那一区多出 37 × 2 ms 的九成以上，实际 {added} ns"
+            added >= 45 * TIMING_CONTROL_BUSY_WAIT.as_nanos() * 9 / 10,
+            "PC3 的缩小版：看 journal 那一区多出 45 × 2 ms 的九成以上，实际 {added} ns"
         );
     }
 

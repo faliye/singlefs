@@ -310,8 +310,9 @@ impl FileBackedBlockDevice {
     }
 }
 
-/// 请求要按物理块对齐、不越过设备末尾；两个后端共用这一份判据。
-fn check_aligned_and_in_range(
+/// 请求要按物理块对齐、不越过设备末尾；两个后端与预演用的只进内存的盘（`mounted_session` 的 `DeviceKeepingWritesInMemory`：
+/// 写不交给底下那块盘，不判就收得下一个真盘会拒的写）共用这一份判据。
+pub(crate) fn check_aligned_and_in_range(
     offset: DeviceOffsetInBytes,
     length: u64,
     physical_block_size: PhysicalBlockSizeInBytes,

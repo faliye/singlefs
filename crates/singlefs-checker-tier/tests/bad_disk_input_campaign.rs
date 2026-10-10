@@ -517,7 +517,8 @@ fn observation_of(base: &BaseImageForOneHistory, damaged: &DamagedImage) -> BadD
 /// [`DamageKind::NarrowedEntryWidthOfTheAccountingTreeRoot`] 原来的样子。冷走读与可写挂载的重建调同一个叶判，
 /// 两个读者都在解记账条目之前红在「根 key 区间与条目不符」上（末条的 key 与头里的最大 key 对不上）。
 /// 判别力：重建读记账树时不判节点头（`recovery.rs` 的 `rebuild_version` 那一处改回 `OnlyWhatTheShapeNeeds`），
-/// 可写挂载改报「记账条目数不是 3 + 6 × 盘数」——`crates/mutations.tsv` 里以「实审 A3d：重建读记账树不判节点头（记账根只剩一条」开头的那一行。
+/// 可写挂载改报记账条目窄于字段表（`EntryNarrowerThanItsFieldTable`：重建先核条目宽、后数条目）——`crates/mutations.tsv` 里以
+/// 「实审 A3d：重建读记账树不判节点头（记账根只剩一条」开头的那一行。
 #[test]
 fn an_accounting_root_narrowed_to_its_first_entry_is_refused_at_the_header_judgement_by_both_readers(
 ) {
