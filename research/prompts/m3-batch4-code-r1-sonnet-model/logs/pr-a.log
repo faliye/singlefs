@@ -1,6 +1,0 @@
-二·1 I-8.10 判定恒真：带末条标志的记录新根段不与同代根比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
-二·1 I-9.25 判定恒真：树表条目 previous_snapshot_txg 不判	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
-二·1 I-9.26 判定恒真：inode 改动计数不判上下界	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
-二·1 I-7.15 判定恒真：各盘所选系统配置设备数不比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
-✓ 点名 4 条：跑了 4 条，跳过 0 条，跑的都抓到了
-exit=0

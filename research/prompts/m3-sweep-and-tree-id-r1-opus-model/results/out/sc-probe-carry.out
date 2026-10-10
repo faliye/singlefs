@@ -1,3 +1,0 @@
-PREFIX s=4 n=5 i1=1 i2=2 orphan_unit_writes=34 rows_after_mount2=[(1, 5, 0)] unpublished_of_i1_after_mount2=34 overwrites_until_no_i1_root=10 current=(2,17) every_ring_slot_self_verified=true candidate_rows=[(1, 5)] unpublished_targets=24
-STREAM arm=carry writes=45 segments=28 segment_lengths=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 16, 2, 1, 2] closed_form_states=65567 layer0_states=65572 swept_root=(2,18) rows_after=[(1, 5)]
-rc=0

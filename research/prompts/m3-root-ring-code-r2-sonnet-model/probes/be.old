@@ -1,1 +1,0 @@
-                row.instance == previous_instance && row.published_checkpoint_txg == previous_txg

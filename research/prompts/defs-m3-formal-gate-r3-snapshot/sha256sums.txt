@@ -1,9 +1,0 @@
-cbbf8abbbad1789d902f9130600d2285744ebe3a84593602b68e1b40411602f1  .claude/agents/crash-verifier.md
-114750d4d1c929b2c1667561801472d5be04532aff51c09109173fd59eb62b92  .claude/agents/gate-triage.md
-eff50a8f1e1902bdd23b85ff7eab194ee374cbb15352d194dd6f023bf238ee63  .claude/main-agent.md
-68f63ce98876a5cdf769921dfd540e27ab1b6711f810ae10ef4514a3b3670073  .claude/hooks/lib_heavy_tests.py
-c9e82af23b5595f3230cf48a11fcfdc76c593cc28d6dfefc69357cea08a5e6d9  .claude/hooks/heavy-test-guard.sh
-ee95b1759b183786cd142cbdd89dba20ec450fcda3d02013febcbb22029e6b8f  research/scripts/verus-proof-check.py
-9024abb1e0f43b80b878e67f9b7ddcb4299bac9351bfb21adf0f1603e9e18642  research/scripts/e165-pin-red-examples.py
-4aab0e4d6e9a0d1214c5aeb36eb7ebb97165c2dbb2a474d8a81ed9260b0bdf3d  research/scripts/admission.py
-c23737d7e7a228ba3f0a0fbc30ca2823efc8bca107509df5e18eb07d7a7946b5  .claude/gate.d/checker-tier-formal-verification.sh

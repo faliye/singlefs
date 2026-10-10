@@ -1,3 +1,0 @@
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：并行的几条三方腿各跑各的
-E-s8-back-zero-m1-single0 rc=0 PROTO name=direct_peak s=8 position=Back point=P1AfterAcquisition hole=28 row_crash_repeats=0 peak_over_withheld=10 peak_released_by_window_floor=0 red_steps=0
-E-s8-back-zero-m1-single1 rc=0 PROTO name=direct_peak s=8 position=Back point=P1AfterAcquisition hole=28 row_crash_repeats=0 peak_over_withheld=10 peak_released_by_window_floor=0 red_steps=7

@@ -1,6 +1,0 @@
-d1-control-same-exit	（对照）两趟结局不同不算证据不齐：自证第 4 条（253|250）应当红
-d2-no-baseline-ok	这一版没有这一步的基线也算证据齐
-d3-no-multiple	升档那趟不到基线的 K 倍也算证据齐
-d4-not-larger-ok	升档那趟没比原来的大也算证据齐
-d5-no-wrapper-first	原来那趟的日志里没有包装那一句也算证据齐
-d6-no-wrapper-escalated	升档那趟的日志里没有包装那一句也算证据齐

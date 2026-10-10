@@ -1,4 +1,0 @@
-base_s1	unlink	step=start	recover=1,3 o2_red=-
-base_s1	unlink	step=mount	ok instance=2 new_root=2,5 floor=0 chosen=1,3 effective=1,3	recover=2,5 o2_red=-
-base_s1	unlink	step=unlink_intent	ok	recover=2,6 o2_red=-
-base_s1	unlink	step=unlink_steps	Ok(1)	recover=2,7 o2_red=-

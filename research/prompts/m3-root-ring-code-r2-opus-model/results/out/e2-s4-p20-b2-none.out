@@ -1,5 +1,0 @@
-SETUP S=4 P=20 h=18 slot=(0,2) device=0 h_referenced_slots=28
-MOUNTED instance=2 current=22 hits=14 x_in_table=RootRingSlot { region: 0, slot: 2 }: ValidRoot { checkpoint_txg: CheckpointTxg(18) }, RootRingSlot { region: 0, slot: 3  red=[]
-ANCHOR txg=29 hits=28 x_in_table=RootRingSlot { region: 0, slot: 2 }: ValidRoot { checkpoint_txg: CheckpointTxg(18) }, RootRingSlot { region: 0, slot: 3  red=[]
-NEXT txg=30 unit_writes_over_h_refs=[] h_on_disk_at_crash=Some(18) crash_before_root_red=[]
-rc=0

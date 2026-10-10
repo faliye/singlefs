@@ -1,6 +1,0 @@
-run-with-memory-cap: 上限 3G 超过实测峰值 248M 的 2 倍，照理由放行：攻方原型逐段历史的峰值不同，表里那条是别的历史
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：m3-formal-code-r2 攻方腿自己的原型，与同会话别的 agent 各跑各的
-history fms12: ending Completed
-  window mount: instance=InstanceGeneration(2) floor_raises=1
-first_states_picked=18 per_segment=1
-history=fms12 mode=k2 second=true writes=74 segments=18 closed_form=28703 with_torn=28733 range=0..28733

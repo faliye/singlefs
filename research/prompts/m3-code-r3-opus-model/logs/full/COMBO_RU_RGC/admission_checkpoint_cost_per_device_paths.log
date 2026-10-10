@@ -1,9 +1,0 @@
-
-running 4 tests
-test empty_publishes_of_the_histories_where_one_device_rewrites_more_than_two_leaves_fit_in_the_whole_tree_checkpoint_cost ... ignored, harness 耗时用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
-test three_devices_rewrite_at_most_two_leaf_paths_on_each_device_and_the_shared_root ... ok
-test every_empty_publish_under_capped_code_two_tree_capacities_fits_in_the_worst_case_checkpoint_cost_counted_with_them ... ok
-test every_empty_publish_under_the_node_format_capacities_fits_in_the_worst_case_checkpoint_cost_before_it ... ok
-
-test result: ok. 3 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 19.29s
-

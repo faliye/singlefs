@@ -1,7 +1,0 @@
-[swap-between-cells] 第一格 library-version-is-staged-tree 退 0：✓ 广谱变异库目录那一版（724b584c37f0758e，导出自 0123456789ab）就是被判的暂存树：导出范围 crates Cargo.toml Cargo.lock litmus .cargo 里 6 个文件逐个相同，工具链相同
-[swap-between-cells] 两格之间别的会话 --sync-tree 换指针：tree.source 724b584c37f0758e → 7a2df53692c419d2（导出自 bbbbbbbbbbbb）
-[swap-between-cells] 第二格 gate-verdict 退 0：✓ 广谱变异提交门禁判绿：这一版（7a2df53692c419d2）6 条每一条都有结论（沿用 4、现判 2），没红 0 条；里程碑全量翻面 0 条（只报不判）
-[swap-between-cells] 整道：绿
-[no-swap-control] 第一格 library-version-is-staged-tree 退 0：✓ 广谱变异库目录那一版（724b584c37f0758e，导出自 0123456789ab）就是被判的暂存树：导出范围 crates Cargo.toml Cargo.lock litmus .cargo 里 6 个文件逐个相同，工具链相同
-[no-swap-control] 第二格 gate-verdict 退 1：✗ 汇总行的 fingerprint=7a2df53692c419d2 不是库目录 tree.source 那一版（724b584c37f0758e）：判的不是同一版
-[no-swap-control] 整道：红

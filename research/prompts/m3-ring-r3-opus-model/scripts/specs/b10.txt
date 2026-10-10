@@ -1,6 +1,0 @@
-s4-today-a - 1000 4 50 today
-s4-window-a - 1000 4 50 window
-s4-today-b - 1050 4 50 today
-s4-window-b - 1050 4 50 window
-s4-today-c - 1100 4 50 today
-s4-window-c - 1100 4 50 window

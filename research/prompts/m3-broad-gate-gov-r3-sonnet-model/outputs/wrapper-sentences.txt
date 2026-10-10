@@ -1,6 +1,0 @@
-$ RUN_WITH_MEMORY_CAP_TIME_LIMIT=2 bash research/scripts/run-with-memory-cap.sh 64M sleep 6
-run-with-memory-cap: 超过限时 2 秒（scope singlefs-memory-cap-3674699-2216210874 的 Result=timeout，systemd 停掉了 scope 里的进程；命令退出码 143）
-exit=253
-$ bash research/scripts/run-with-memory-cap.sh 1536M python3 (分配 2 GiB)
-run-with-memory-cap: 撞了内存上限 1536M（scope singlefs-memory-cap-3674795-47694149 的 Result=oom-kill，命令退出码 137）
-exit=250

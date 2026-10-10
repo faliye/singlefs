@@ -1,5 +1,0 @@
-1419c1419,1420
-<             if record.checkpoint_txg.0 != chain_start_txg_without_anchor.0 {
----
->             if record.checkpoint_txg.0 != chain_start_txg_without_anchor.0
->                 || record.ordinal_within_publish.0 != 1 {

@@ -1,7 +1,0 @@
-K2R1 name=sizes states_this_run=57 closed_form_state_count_fully_expanded=33554462 segments=15 writes=70
-K2R1 name=keys points=15 every_point_same_reuse_key_identity_plan_hash=true versions_differ=true
-K2R1 name=fresh healthy_red_states=0 miswritten_red_states=12
-K2R1 name=order_miswritten_then_healthy first_red_states=12 healthy_blocks_reused=13 healthy_states_checked=0 healthy_stored_red_states=12 healthy_fresh_red_states=0 states_differing_from_fresh=12 first_differing=Some(45)
-K2R1 name=order_healthy_then_miswritten first_red_states=0 miswritten_blocks_reused=13 miswritten_states_checked=0 miswritten_stored_red_states=0 miswritten_fresh_red_states=12 states_differing_from_fresh=12 first_differing=Some(45)
-K2R1 name=control_as_merged a_red_states=12 older_b_red_states=12 b_blocks_reused=13 states_differing_from_fresh=12
-K2R1 name=control_with_the_miswritten_b_under_the_same_version miswritten_b_red_states=12 b_blocks_reused=13 states_differing_from_fresh=12 first_differing=Some(45)

@@ -1,4 +1,0 @@
-5091 30
-no enclosing fn 170
-const fn enclosing 93
-mismatch (name in the mutant name vs the function my parser found) 0

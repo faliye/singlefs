@@ -1,5 +1,0 @@
-SETUP S=4 P=20 h=18 slot=(0,2) device=0 h_referenced_slots=28
-MOUNTED instance=2 current=22 hits=20 x_in_table=RootRingSlot { region: 0, slot: 2 }: UnreadableAtMountInsideTheWindow { highest_txg_it_can_hold: CheckpointTxg(18) }, Ro red=[]
-ANCHOR txg=29 hits=35 x_in_table=RootRingSlot { region: 0, slot: 2 }: ValidRootReadWhenTheSlotUnreadableAtMountWasReread { checkpoint_txg: CheckpointTxg( red=[]
-NEXT txg=30 unit_writes_over_h_refs=[] h_on_disk_at_crash=Some(18) crash_before_root_red=[]
-rc=0

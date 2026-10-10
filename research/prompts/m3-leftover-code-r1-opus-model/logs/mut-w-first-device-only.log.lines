@@ -1,2 +1,0 @@
-name=w-first-device-only cases=22 failed=1
-  FAILED a_writable_mount_refuses_when_a_system_configuration_slot_does_not_verify::a_writable_mount_refuses_before_acquisition_when_the_second_devices_newest_system_configuration_slot_does_not_verify rc=101

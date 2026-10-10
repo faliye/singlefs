@@ -1,1 +1,0 @@
-SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/checker-tier-layer0-replay.sh

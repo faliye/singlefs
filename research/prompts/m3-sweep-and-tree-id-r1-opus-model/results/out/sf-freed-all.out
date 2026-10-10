@@ -1,5 +1,0 @@
-SETUP place=freed reading=all rows=[(1, 5, 0)] fake_slots=[(0, 50177), (1, 50177)] fake_in_current_ledger=0 fake_referenced_by_ring_root=2 fake_claimed_away=2 targets=26 fake_targeted=2 candidate_rows=[(1, 5)]
-AFTER_SWEEP root=(2,20) rows=[] red=["I-2.1:数据单元 在盘 0 槽 50176 的那一份与位置条目里的校验和对不上", "I-4.8:候选根 txg 18 出发的遍历有单元对不上或读不出", "I-7.4:候选根 txg 18 引用的单元已被复用或抹头（校验和对不上或头用不了）"]
-REMOUNT ok effective=(2,20) red=["I-2.1:数据单元 在盘 0 槽 50176 的那一份与位置条目里的校验和对不上", "I-4.8:候选根 txg 18 出发的遍历有单元对不上或读不出", "I-7.4:候选根 txg 18 引用的单元已被复用或抹头（校验和对不上或头用不了）"]
-ROLLBACK to=(2,18) err=ResurrectedUnitCopyUnreadableOrMismatched { unit: Data(DataUnitIndexInFile(0)), device: DeviceIdentity(0), slot: SlotNumber(50176) }
-rc=0

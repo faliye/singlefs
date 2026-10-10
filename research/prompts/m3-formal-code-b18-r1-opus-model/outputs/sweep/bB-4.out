@@ -1,8 +1,0 @@
-t3 seed=118784 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=122880 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=126976 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=131072 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=135168 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=139264 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 seed=143360 crash_points=35 injected=0 overwrite_points=9 second_crash_points=105 row_publish_second=35 remounts=105 c670_judged=0 c670_illegal=0 stage3_new_findings=0 stage2_illegal=0 test3_red=false
-t3 summary seeds=7 seeds_with_a_hit=0

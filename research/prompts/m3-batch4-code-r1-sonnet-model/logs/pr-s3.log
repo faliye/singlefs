@@ -1,6 +1,0 @@
-二·1 I-8.5 旁路报告只报两槽全废的盘	抓到	a_device_short_of_self_verified_system_configuration_slots_is_reported_aside_while_the_tail_slot_invariant_holds 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
-二·1 I-1.2 收窄：实例表各片不再与指针比出生身份	抓到	an_instance_table_pointer_whose_birth_txg_differs_from_the_instance_table_header_reddens_only_the_birth_identity_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
-二·1 B7 守卫拿掉：比 L 晚的根走不完也照判	抓到	release_generations_hidden_behind_a_later_incomplete_root_are_skipped_and_the_release_generation_invariant_is_not_applicable 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
-二·1 B7 守卫退回整条：任一候选根走不完就跳过	抓到	a_wrong_release_generation_is_still_reddened_when_only_a_root_not_later_than_the_last_one_referencing_it_is_incomplete 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
-✓ 点名 4 条：跑了 4 条，跳过 0 条，跑的都抓到了
-exit=0

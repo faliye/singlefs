@@ -1,9 +1,0 @@
-TORN device=0 slot_offset=0 (写之前这一槽是另一份，之后只落了头 512 字节)
-DEVICE 0 self_verified=2 read_errors=0
-DEVICE 1 self_verified=1 read_errors=1
-R2_UNDECIDABLE false
-ATTEMPT 0 writable=Ok instance=3
-ATTEMPT 1 writable=Ok instance=4
-ATTEMPT 2 writable=Ok instance=5
-READ_ONLY Ok
-rc=0

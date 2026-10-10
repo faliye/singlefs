@@ -1,7 +1,0 @@
-  · 样本只跑 .gate-cells 点名的格：library-version-is-staged-tree（/tmp/claude-1000/m3-broad-gate-gov-r1-opus/rerun/run-fixed/library-version-is-staged-tree-green 是样本，不是这道阶段所在的仓）
-── library-version-is-staged-tree：广谱变异库目录此刻那一版的源码与被判的暂存树在导出范围上逐文件相同、导出范围与登记的相同、记下的工具链与此刻的 rustc -Vv 相同
-  ✓ 广谱变异库目录那一版（724b584c37f0758e，导出自 0123456789ab）就是被判的暂存树：导出范围 crates Cargo.toml Cargo.lock litmus .cargo 里 6 个文件逐个相同，工具链相同
-── 汇总：checker-tier-broad-mutation.sh 跑了 1 格（样本根的 .gate-cells 点名）
-  library-version-is-staged-tree：绿
-  ✓ checker-tier-broad-mutation.sh：1 格里 1 格绿（library-version-is-staged-tree），0 格本次未跑（无）
-exit=0

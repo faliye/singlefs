@@ -1,3 +1,0 @@
-m3-code-r2 J4：文件后端长度 0 的早退挪到请求判据之前（稀疏盘对拍：越过末尾的长度 0 清零文件后端交 Ok、稀疏盘拒）	抓到	a_sparse_block_device_accepts_and_refuses_every_request_exactly_like_the_file_backend 红了（日志 /tmp/claude-1000/m3-code-r3-opus/logs/prove-red/001.log）
-✓ 点名 1 条：跑了 1 条，跳过 0 条，跑的都抓到了
-rc=0

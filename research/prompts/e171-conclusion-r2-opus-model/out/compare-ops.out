@@ -1,5 +1,0 @@
-name=compare_ops label=s4base dump=baseline-run1/fixed_script_through_e_then_unmount probe_ops=595 dump_ops=595 compared=595 identical_prefix=595 differing_in_compared=0 first_difference=-
-name=compare_ops label=s4m34 dump=rows-s4/row-34/dump/fixed_script_through_e_then_unmount probe_ops=595 dump_ops=595 compared=595 identical_prefix=595 differing_in_compared=0 first_difference=-
-name=compare_ops label=s4m125 dump=baseline-run1/fixed_script_through_e_then_unmount probe_ops=537 dump_ops=595 compared=537 identical_prefix=108 differing_in_compared=117 first_difference=108:mine=0/write/824295424/16384:theirs=0/write/824295424/16384
-name=compare_ops label=s4m125 dump=rows-s4/row-34/dump/fixed_script_through_e_then_unmount probe_ops=537 dump_ops=595 compared=537 identical_prefix=108 differing_in_compared=131 first_difference=108:mine=0/write/824295424/16384:theirs=0/write/824295424/16384
-name=compare_ops label=base dump=baseline-run1/fixed_script_through_e_then_unmount probe_ops=599 dump_ops=595 compared=595 identical_prefix=40 differing_in_compared=405 first_difference=40:mine=0/write/823296000/16384:theirs=0/write/823296000/16384

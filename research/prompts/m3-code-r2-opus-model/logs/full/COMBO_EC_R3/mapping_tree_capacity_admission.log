@@ -1,7 +1,0 @@
-
-running 2 tests
-test two_hundred_ninety_five_mapping_keys_grow_the_tree_to_two_levels_instead_of_being_refused ... ok
-test the_central_mapping_node_holds_two_hundred_ninety_four_entries_and_an_internal_node_one_hundred_forty_three ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
-

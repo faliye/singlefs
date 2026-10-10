@@ -1,1 +1,0 @@
-git diff --quiet -- crates Cargo.toml Cargo.lock litmus research/scripts research/results

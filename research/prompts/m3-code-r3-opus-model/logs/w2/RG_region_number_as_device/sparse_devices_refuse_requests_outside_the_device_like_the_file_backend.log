@@ -1,9 +1,0 @@
-    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
-     Running tests/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend.rs (/tmp/claude-1000/m3-code-r3-opus/target/debug/deps/sparse_devices_refuse_requests_outside_the_device_like_the_file_backend-d0e4db460ddf5557)
-
-running 2 tests
-test a_sparse_block_device_accepts_and_refuses_every_request_exactly_like_the_file_backend ... ok
-test memory_pool_and_crash_image_readers_answer_none_outside_a_device_like_a_pool_of_real_devices ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
-

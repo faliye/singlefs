@@ -1,2 +1,0 @@
-C1 代码之后的词：tool-versions；桩看到的参数： proof .
-C3 代码之后的词：--check；桩看到的参数： --replay

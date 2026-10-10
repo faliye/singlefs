@@ -1,3 +1,0 @@
-        .iter()
-        .map(|device| {
-            roots_read_from_the_ring

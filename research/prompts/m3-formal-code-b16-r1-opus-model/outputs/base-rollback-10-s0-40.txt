@@ -1,6 +1,0 @@
-== random rollback steps=10 seeds=0..40
-histories=40 completed=40
-first_states=5568 with_torn_write=2470 mounts_succeeded=5568 n_config_refusals=0
-first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
-second_states=60254 second_n_config_refusals=0 second_c670=0
-elapsed_seconds=66.2

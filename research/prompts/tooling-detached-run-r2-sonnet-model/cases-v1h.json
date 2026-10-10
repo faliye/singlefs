@@ -1,7 +1,0 @@
-[
- ["主 直接 cargo test -p singlefs-checker-tier 无前缀", null, "cargo test -p singlefs-checker-tier"],
- ["主 start 起 cargo test -p singlefs-checker-tier 无前缀", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test -p singlefs-checker-tier"],
- ["子 start 被拒(detector) 与 heavy 对照: clerk cargo test -p singlefs-checker-tier", "clerk", "cargo test -p singlefs-checker-tier"],
- ["主 直接 cargo test --workspace 无前缀", null, "cargo test --workspace"],
- ["主 start 起 cargo test --workspace 无前缀", null, "bash /home/fy5090/code/singlefs/research/scripts/detached-run.sh start --label d -- cargo test --workspace"]
-]

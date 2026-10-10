@@ -1,1 +1,0 @@
-            (walk, pool.writes_of_failed_publishes().to_vec())

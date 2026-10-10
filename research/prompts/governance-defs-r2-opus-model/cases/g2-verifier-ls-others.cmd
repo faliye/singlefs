@@ -1,1 +1,0 @@
-git ls-files --others --exclude-standard -- crates Cargo.toml Cargo.lock litmus research/scripts research/results

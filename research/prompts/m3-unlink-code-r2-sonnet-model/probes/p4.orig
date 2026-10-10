@@ -1,9 +1,0 @@
-            .chain(
-                space_admission
-                    .floor_raises()
-                    .iter()
-                    .flat_map(|raised| raised.publishes.iter())
-                    .map(|publish| publish.writes.clone()),
-            )
-            .collect();
-    let DeletionQueueContinuation {

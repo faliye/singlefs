@@ -1,3 +1,0 @@
-# python3 crates-summarize.py crates-mutant-path-all.txt; python3 crates-summarize.py crates-mutant-path-harness.txt（只取第一行）
-rows=186 baseline-pass=186 mutant-fails-T=186 mutant-executes-a-file-outside-T-baseline-files=0 mutant-executes-a-function-outside-T-baseline-functions=11 branchy=59 branchy-new-file=0 branchy-new-function=7
-rows=50 baseline-pass=50 mutant-fails-T=50 mutant-executes-a-file-outside-T-baseline-files=0 mutant-executes-a-function-outside-T-baseline-functions=21 branchy=23 branchy-new-file=0 branchy-new-function=10

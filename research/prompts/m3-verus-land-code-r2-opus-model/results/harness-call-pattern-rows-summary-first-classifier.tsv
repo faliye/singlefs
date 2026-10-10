@@ -1,3 +1,0 @@
-2	GREEN	rc=0	passed=1	seconds=93	failed=
-4	GREEN	rc=0	passed=1	seconds=90	failed=
-5	BUILD_ERROR	rc=101	passed=0	seconds=60	failed=the_same_image_read_cold_and_read_through_the_mount_state_gives_the_same_bytes 

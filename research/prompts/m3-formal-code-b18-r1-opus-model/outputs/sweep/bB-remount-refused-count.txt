@@ -1,4 +1,0 @@
-$ grep -h "phase=" runs/bB-*.trace | wc -l
-4410
-$ grep -h "remount_refused=1" runs/bB-*.trace | wc -l
-0

@@ -1,3 +1,0 @@
-MUT A_only_device_zero	GREEN	rc=0	failed=[]	results=94
-MUT D_no_reread	GREEN	rc=0	failed=[]	results=94
-MUT E_any_self_verified_root	GREEN	rc=0	failed=[]	results=94

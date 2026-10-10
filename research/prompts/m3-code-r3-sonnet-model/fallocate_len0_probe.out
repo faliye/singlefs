@@ -1,6 +1,0 @@
-off=0 len=0 -> rc=-1 errno=22
-off=512 len=0 -> rc=-1 errno=22
-off=0 len=512 -> rc=0 errno=0
-off=65536 len=512 -> rc=0 errno=0
-off=0 len=131072 -> rc=0 errno=0
-straddle(off=65024,len=1024) rc 0 size 65536 in-file half zeroed True head untouched True

@@ -1,4 +1,0 @@
-652c652
-<                 .or(spacing_recorded_by_the_first_valid_slot_zero)
----
->                 .or(spacing_recorded_by_the_first_valid_slot_zero.filter(|_| false))

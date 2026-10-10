@@ -1,2 +1,0 @@
-11	RED	rc=101	passed=0	seconds=21	failed=last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag 
-12	RED	rc=101	passed=0	seconds=16	failed=last_record_flag_followed_only_by_the_very_next_record_of_the_same_publish_breaks_the_chain_at_the_flag 

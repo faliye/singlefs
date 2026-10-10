@@ -1,2 +1,0 @@
-        (row_of_the_previous_version || true)
-            && every_instance_between_has_a_row

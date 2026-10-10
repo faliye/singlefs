@@ -1,7 +1,0 @@
-二·1 I-7.17 判定恒真：根槽位置不与 txg 算出的比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
-二·1 I-2.4 判定恒真：指针 extent 偏移不判	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
-二·1 I-8.11 判定恒真：点名项不与被指单元头比	抓到	each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
-二·1 I-8.12 判定恒真：同实例记录 txg 不减不判	抓到	each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
-二·1 I-7.8 判定恒真：最新那条根的水位不判	抓到	each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/005.log）
-✓ 点名 5 条：跑了 5 条，跳过 0 条，跑的都抓到了
-exit=0

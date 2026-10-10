@@ -1,7 +1,0 @@
-
-running 2 tests
-test mount_after_crashes_right_after_acquisition_fills_the_page_and_one_more_row_opens_the_second_page ... ok
-test writable_mounts_fill_the_instance_table_page_and_the_three_hundred_seventy_first_opens_the_second_page ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 24.77s
-

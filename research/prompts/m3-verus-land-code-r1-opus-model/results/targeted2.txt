@@ -1,6 +1,0 @@
-G08a_rollback_floor_from_the_root targets=6 rc=0 seconds=83 result_lines=6 passed=23 failed: 
-T514 targets=1 rc=0 seconds=29 result_lines=1 passed=8 failed: 
-T515 targets=1 rc=0 seconds=45 result_lines=1 passed=8 failed: 
-T613 targets=1 rc=0 seconds=21 result_lines=1 passed=8 failed: 
-T614 targets=1 rc=101 seconds=24 result_lines=1 passed=7 failed: last_record_flag_followed_by_the_record_of_the_same_publish_breaks_the_chain_at_the_flag_and_the_checker_reddens 
-K20_c540_skips_the_very_next_record targets=1 rc=0 seconds=25 result_lines=1 passed=8 failed: 

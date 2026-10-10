@@ -1,9 +1,0 @@
-TORN device=0 slot_offset=0 (写之前这一槽是另一份，之后只落了头 512 字节)
-DEVICE 0 self_verified=2 read_errors=0
-DEVICE 1 self_verified=0 read_errors=2
-R2_UNDECIDABLE false
-ATTEMPT 0 writable=Err NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S reread_Some("comparison: SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot } } })") disk_unchanged=true
-ATTEMPT 1 writable=Err NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S reread_Some("comparison: SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot } } })") disk_unchanged=true
-ATTEMPT 2 writable=Err NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigurationNewerThanTheSelectedVersion { first_read: S reread_Some("comparison: SomeDeviceWithoutAnySelfVerifiedSystemConfigurationSlot } } })") disk_unchanged=true
-READ_ONLY Ok
-rc=0

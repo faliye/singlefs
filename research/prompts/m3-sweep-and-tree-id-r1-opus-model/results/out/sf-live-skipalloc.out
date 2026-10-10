@@ -1,4 +1,0 @@
-SETUP place=live reading=skipalloc rows=[(1, 5, 0)] fake_slots=[(0, 50177), (1, 50177)] fake_in_current_ledger=2 fake_referenced_by_ring_root=2 fake_claimed_away=2 targets=24 fake_targeted=0 candidate_rows=[(1, 5)]
-AFTER_SWEEP root=(2,19) rows=[] red=[]
-REMOUNT ok effective=(2,19) red=[]
-rc=0

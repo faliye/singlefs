@@ -1,8 +1,0 @@
-DEVICE 0 self_verified=1 read_errors=1
-DEVICE 1 self_verified=2 read_errors=0
-R2_UNDECIDABLE false
-ATTEMPT 0 writable=Ok instance=2
-ATTEMPT 1 writable=Ok instance=3
-ATTEMPT 2 writable=Ok instance=4
-READ_ONLY Ok
-rc=0

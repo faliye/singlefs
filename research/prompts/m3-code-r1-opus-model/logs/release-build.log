@@ -1,4 +1,0 @@
-   Compiling m3r1-opus-proto v0.1.0 (/tmp/claude-1000/m3-code-r1-opus/work2/crates/m3r1-opus-proto)
-    Finished `release` profile [optimized + debuginfo] target(s) in 18.73s
-  Executable tests/z2_every_crash_state_of_a_publish_then_a_writable_mount.rs (/tmp/claude-1000/m3-code-r1-opus/target2/release/deps/z2_every_crash_state_of_a_publish_then_a_writable_mount-47161cdcc348d59f)
-  Executable tests/z2_stale_snapshot_from_any_publish_of_a_history.rs (/tmp/claude-1000/m3-code-r1-opus/target2/release/deps/z2_stale_snapshot_from_any_publish_of_a_history-e9039527ecd7ac3c)

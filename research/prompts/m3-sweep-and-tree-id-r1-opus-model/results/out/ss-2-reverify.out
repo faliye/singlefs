@@ -1,5 +1,0 @@
-SETUP k=2 arm=reverify list_a=24 list_a_now_in_current_ledger=0 list_a_now_referenced_by_a_ring_root=0 targets=24
-AFTER_SWEEP root=(2,20) red=[]
-REMOUNT ok effective=(2,20) red=[]
-READ_ONLY_MOUNT ok=true
-rc=0

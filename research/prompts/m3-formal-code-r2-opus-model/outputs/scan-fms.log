@@ -1,9 +1,0 @@
-history fms8: ending Completed
-  window mount: instance=InstanceGeneration(2) floor_raises=0
-history=fms8 writes=38 segments=9 closed_form=20496 with_torn=20511 committed=14
-history fms12: ending Completed
-  window mount: instance=InstanceGeneration(2) floor_raises=1
-history=fms12 writes=74 segments=18 closed_form=28703 with_torn=28733 committed=20
-history fms16: ending Completed
-  window mount: instance=InstanceGeneration(2) floor_raises=1
-history=fms16 writes=116 segments=26 closed_form=344107 with_torn=344147 committed=26

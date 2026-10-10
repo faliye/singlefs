@@ -1,7 +1,0 @@
-E rule=max_plus_one start=0 seeds=2000 containers_written=34850 crash_events=13812 dup_4tuple=0 dup_3tuple_after_recovery=16664 reachable_tree_not_strictly_increasing=0
-E rule=max_plus_one start=1 seeds=2000 containers_written=34850 crash_events=13812 dup_4tuple=0 dup_3tuple_after_recovery=16664 reachable_tree_not_strictly_increasing=0
-E rule=counter start=0 seeds=2000 containers_written=34850 crash_events=13812 dup_4tuple=0 dup_3tuple_after_recovery=19199 reachable_tree_not_strictly_increasing=2826
-E rule=counter start=1 seeds=2000 containers_written=34850 crash_events=13812 dup_4tuple=0 dup_3tuple_after_recovery=19199 reachable_tree_not_strictly_increasing=2826
-E rule=max_plus_one start=1 no_crash_only_rollback dup_4tuple=0 dup_3tuple=0
-E empty_tree start=0 first_number=0
-E empty_tree start=1 first_number=1

@@ -1,4 +1,0 @@
-                let Some(birth_txg) = birth_txg_of(unit) else {
-                    continue;
-                };
-                units_judged += 1;

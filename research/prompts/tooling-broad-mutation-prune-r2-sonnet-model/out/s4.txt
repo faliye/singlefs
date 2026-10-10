@@ -1,3 +1,0 @@
-user traits declared in crates (core/checker/format/harness): 4 [('singlefs-checker', 'ImageReader'), ('singlefs-core', 'BlockDevice'), ('singlefs-core', 'PoolReader'), ('singlefs-harness', 'DeviceOverASparseImage')]
-(type,method) pairs that are both inherent and trait methods: 0
-... in different files: 0

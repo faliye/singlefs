@@ -1,4 +1,0 @@
-run-with-memory-cap: 这个会话已有 10 条日常的在跑，照理由并行：正推腿 m3-unlink-r2-forward 与别的派出去的 agent 各跑各的，只跑 harness 档单个测试二进制
-    Blocking waiting for file lock on build directory
-   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-core)
-   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-unlink-r2-forward/tree/crates/singlefs-harness)

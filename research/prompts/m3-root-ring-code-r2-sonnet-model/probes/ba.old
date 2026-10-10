@@ -1,4 +1,0 @@
-        if version_instance <= previous_instance {
-            return false;
-        }
-        let row_of_the_previous_version =

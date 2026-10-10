@@ -1,2 +1,0 @@
-FUZZ seed=2030 s=4 arm=today faults=true journal=805306368 lives=3 unit_writes=1006 candidate_hits=0 abandoned_hits=0 first_candidate_hit=None first_abandoned_hit=None outside_seen=0 checker_reds=[] refusals={"R:TargetNotACandidate { target: RollbackTa": 1} aborted="" log=start7 |m2@8Or2R8CbeforeLastRoot19/21 |m3@13EFR16OR14OFFOEOOOOOCbeforeLastRoot82/84 |hideSlot1:0=txgSome(25)/newestSome(31) |m4@33OOOOOOFER43R44OR40OFOOCanywhere65/91
-rc=0

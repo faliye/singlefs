@@ -1,6 +1,0 @@
-CONTROL[m1 去掉 take(limit)] diverged=1581 / 40000
-CONTROL[m2 点名失败不断] diverged=3821 / 40000
-CONTROL[m3 序号 FIRST 改 >2] diverged=545 / 40000
-CONTROL[m4 max 只看第一条] diverged=520 / 40000
-test recovery::zz_diff::random_family ... RESULT[random] Tally { total: 3000000, diverged: 0, panics_old: 0, panics_new: 0, errs: 327781, applied_some: 271293, verif_failed: 290134, anchor_err: 0, shown: 0 }
-test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 134 filtered out; finished in 46.49s

@@ -1,5 +1,0 @@
-trials=400 seed=20261003
-summary_exit=0 gate_exit=0 truth_green=True gate_says_inconsistent=False count=78
-summary_exit=0 gate_exit=1 truth_green=False gate_says_inconsistent=False count=11
-summary_exit=8 gate_exit=1 truth_green=False gate_says_inconsistent=False count=311
-mismatches=0

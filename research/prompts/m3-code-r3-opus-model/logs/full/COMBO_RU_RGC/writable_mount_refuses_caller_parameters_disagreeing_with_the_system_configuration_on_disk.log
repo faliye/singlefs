@@ -1,7 +1,0 @@
-
-running 2 tests
-test mount_with_a_different_minimum_input_output_size_is_refused_before_any_write_and_names_that_field ... ok
-test mount_with_another_filesystem_identifier_and_region_devices_is_refused_before_any_write_and_names_both_fields ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
-

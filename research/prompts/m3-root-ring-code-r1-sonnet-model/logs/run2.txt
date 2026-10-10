@@ -1,9 +1,0 @@
-test probe_first_file_after_a_row_record_only ... PROBE first-file-after-row WHOLE: core effective_root txg=5 instance=2 above_water=0 prefix_applied=0; checker verdicts=[]
-PROBE first-file-after-row ROOT-TORN: core effective_root txg=5 instance=2 above_water=1 prefix_applied=1; checker verdicts=[]
-test probe_unmount_marker_bits ... PROBE marker=1,tt-corrupt: core mount_read_only ERR Open(Walk(UnitUnreadable { slot: SlotNumber(50252) })); checker verdicts=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
-PROBE marker=2,tt-corrupt: core mount_read_only ERR Open(Walk(UnitUnreadable { slot: SlotNumber(0) })); checker verdicts=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
-PROBE marker=0x80000000,tt-corrupt: core mount_read_only ERR Open(Walk(UnitUnreadable { slot: SlotNumber(0) })); checker verdicts=["I-4.1: Violated(\"所选根（实例 1、txg 2）之上重放 1 次发布、1 条记录（末条计数器 3）施加出的那一版走不完：树表单元 两份都读不到对得上的\")"]
-PROBE marker=2,intact: core mount_read_only ERR Open(Walk(UnitUnreadable { slot: SlotNumber(0) })); checker verdicts=[]
-PROBE baseline-root3-torn: core effective_root txg=3 instance=1 above_water=1 prefix_applied=1; checker verdicts=[]
-PROBE baseline-untouched: core effective_root txg=3 instance=1 above_water=0 prefix_applied=0; checker verdicts=[]
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.10s

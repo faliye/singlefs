@@ -1,4 +1,0 @@
-2	主 agent	主 agent 直接打 herd7 版本（lkmm 的 environment= 那一条）
-2	crash-verifier	崩溃验证员不带前缀打 herd7 版本
-0	crash-verifier	崩溃验证员第 1 步问 lkmm 的标记（F1 之后它在里面现跑上一条）
-0	主 agent	对照：主 agent 打 Verus 版本（这一道的 environment= 那一条）

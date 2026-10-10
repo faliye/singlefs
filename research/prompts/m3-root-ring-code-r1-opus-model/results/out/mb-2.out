@@ -1,5 +1,0 @@
-ARM clean crashed_txg=9 core_parse_accepts=[true, true] checker_parse_accepts=[true, true] recovery_effective_root=Some((2, 9)) checker_red=[]
-ARM clean mount=Ok effective_root=(2, 9) row_txg=10 after_checker_red=[]
-ARM bit1 crashed_txg=9 core_parse_accepts=[false, false] checker_parse_accepts=[true, true] recovery_effective_root=Some((2, 8)) checker_red=[]
-ARM bit1 mount=Ok effective_root=(2, 8) row_txg=9 after_checker_red=[]
-rc=0

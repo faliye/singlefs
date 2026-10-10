@@ -1,1 +1,0 @@
-nice -n 19 bash .claude/gate.d/74-model-differential.sh

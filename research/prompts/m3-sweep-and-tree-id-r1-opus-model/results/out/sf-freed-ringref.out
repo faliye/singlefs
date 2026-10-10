@@ -1,5 +1,0 @@
-SETUP place=freed reading=ringref rows=[(1, 5, 0)] fake_slots=[(0, 50177), (1, 50177)] fake_in_current_ledger=0 fake_referenced_by_ring_root=2 fake_claimed_away=2 targets=24 fake_targeted=0 candidate_rows=[(1, 5)]
-AFTER_SWEEP root=(2,20) rows=[] red=[]
-REMOUNT ok effective=(2,20) red=[]
-ROLLBACK to=(2,18) ok resurrected=8 red=[]
-rc=0

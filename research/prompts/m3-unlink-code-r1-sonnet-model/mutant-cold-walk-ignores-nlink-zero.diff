@@ -1,3 +1,0 @@
---- crates/singlefs-core/src/recovery.rs   (冻结副本 4902 行)
--    if inode_record.nlink == NLINK_OF_AN_INODE_BEING_DELETED {
-+    if false && inode_record.nlink == NLINK_OF_AN_INODE_BEING_DELETED {

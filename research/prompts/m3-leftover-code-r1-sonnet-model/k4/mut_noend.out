@@ -1,8 +1,0 @@
-run-with-memory-cap: 上限 1G 超过实测峰值 1M 的 2 倍，照理由放行：新探针没有峰值表样本
-run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：主agent同时派出的正推腿与攻方腿各跑各的
-
-thread 'main' (4147361) panicked at mut_noend.rs:127:5:
-assertion `left == right` failed: 每一条都不越过段尾（接在末端的查了段尾、先到的查了所在那一块的块尾），已铺满的末端停在段尾
-  left: 2
- right: 1
-note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

@@ -1,8 +1,0 @@
-I-8.1 core 同判：不判最坏占用 = 在飞上限 × 4096	抓到	a_worst_case_occupancy_other_than_the_in_flight_limit_times_the_record_bytes_is_refused_by_both_mounts 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/001.log）
-C581 根记录的实例表指针不判 extent 偏移（攻方 A6 那份镜像两个入口照挂）	抓到	every_root_carrying_a_non_zero_instance_table_extent_offset_is_refused_by_recovery_and_the_writable_mount 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/002.log）
-C581 指针头部读者不判 extent 偏移	抓到	a_node_pointer_head_with_a_non_zero_extent_offset_is_refused_by_both_judging_readers 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/003.log）
-C462 空池择系统配置退回报 SystemConfigurationsDisagree	抓到	a_pool_without_any_device_is_refused_as_having_no_device 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/004.log）
-C463 择系统配置不记两槽都不可择的盘	抓到	a_device_whose_two_system_configuration_slots_are_both_lost_is_named_by_the_read_only_mount_and_recovery 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/005.log）
-C463 只读挂载不交出两槽都不可择的盘	抓到	a_device_whose_two_system_configuration_slots_are_both_lost_is_named_by_the_read_only_mount_and_recovery 红了（日志 /tmp/claude-1000/m3-batch4-code-r1-sonnet/prove-red-logs/006.log）
-✓ 点名 6 条：跑了 6 条，跳过 0 条，跑的都抓到了
-exit=0

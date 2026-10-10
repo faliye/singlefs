@@ -1,9 +1,0 @@
-run-with-memory-cap: 上限 2G 超过实测峰值 101M 的 2 倍，照理由放行：探针格越大用得越多，峰值表里的数只是一次短跑的数
-run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：正推腿是派出去的子 agent，与主 agent 的整包慢档各跑各的
-
-running 1 test
-CELL Narrow(192) O4 U40 B2 K1 rw=650 before=d0[free=38 unblocked=38 deferred=61 alloc=154]d1[free=38 unblocked=38 deferred=61 alloc=154] at-crash=d0[free=3 unblocked=3 deferred=96 alloc=189]d1[free=3 unblocked=3 deferred=96 alloc=189] => mount-err PlacementRefusedBeforeAcquisitionMountAdmissionUndecided { instance_to_acquire: InstanceGeneration(2), publish_index: 0, warm_up_publishes_planned: 1, unit: AllocationTreeNodeBelowTheRoot(AllocationRecordTreeNodePosition { level: 0, device: DeviceIdentity(1), index_in_device: 1 }), refusal: NoFreeSlotOnAnyDevice }
-test probe_grid ... ok
-
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.93s
-

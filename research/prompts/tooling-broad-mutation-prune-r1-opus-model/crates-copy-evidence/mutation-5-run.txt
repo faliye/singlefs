@@ -1,5 +1,0 @@
-# 变异 5 施加后 cargo test -p singlefs-core --lib -- address::tests（退出码 101）
-test address::tests::journal_sequence_numbers_order_by_instance_then_counter ... FAILED
-thread 'address::tests::journal_sequence_numbers_order_by_instance_then_counter' panicked at crates/singlefs-core/src/address.rs:122:9:
-  left: 0
- right: 281474976710656

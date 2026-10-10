@@ -1,6 +1,0 @@
-history=ow writes=25 segments=4 closed_form=1048583 with_torn=1048588 committed=5
-history=mnt writes=38 segments=9 closed_form=20496 with_torn=20511 committed=6
-history=mkmnt writes=12 segments=7 closed_form=18 with_torn=33 committed=3
-history=first writes=25 segments=4 closed_form=1048583 with_torn=1048588 committed=4
-history=rb writes=17 segments=4 closed_form=4103 with_torn=4108 committed=6
-history=rbm writes=17 segments=4 closed_form=4103 with_torn=4108 committed=9

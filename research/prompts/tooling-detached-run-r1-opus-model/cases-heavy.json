@@ -1,8 +1,0 @@
-[
- ["T3b ctrl: real detached-run start -- cargo --all, main no prefix (should heavy-refuse)", null, "bash research/scripts/detached-run.sh start --label m -- cargo test --all"],
- ["T3b renamed copy hides inner cargo --all, main no prefix", null, "bash research/scripts/dr2.sh start --label m -- cargo test --all"],
- ["T3b renamed copy, subagent inner cargo --all", "clerk", "bash research/scripts/dr2.sh start --label m -- cargo test --all"],
- ["T3b source hides inner cargo --all, main no prefix", null, "source research/scripts/detached-run.sh start --label m -- cargo test --all"],
- ["T3b inner checker-tier via memory-cap, main no prefix", null, "bash research/scripts/detached-run.sh start --label m -- bash research/scripts/run-with-memory-cap.sh 4G cargo test -p singlefs-checker-tier"],
- ["T3b label value is start then inner cargo", null, "bash research/scripts/detached-run.sh start --label start -- cargo test --all"]
-]

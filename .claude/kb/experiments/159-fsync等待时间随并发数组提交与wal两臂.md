@@ -7,7 +7,7 @@
 | J1 | 甲在某个 k 越过 M |
 | J4 | p99 在某个 k 越过 M |
 
-**问题**：跑前登记 `research/prompts/e159-preregistration.md`——岔路单 `research/prompts/m2-fsync-wait-forks.md` 第 1 行「甲（今天的做法：每次 fsync 写脏叶加全部祖先，按 D16（发布语义） 已定项 10 攒批、组提交）的等待时间可不可以接受」，量「一次 fsync 从发出到返回等了多久」在甲与两条 WAL 臂（wal_full-K10、乙-M-K10，两条都留、各判各的）上随并发数 k 的走法。装置写在 `research/e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs`（独立手写模型，不是入库装置——`crates/` 里没有组提交，第三节 2.3 现查零命中）。量延迟用真跑（真机、真 O_DIRECT 设备、真线程），不用计数模型换算，理由见跑前登记「五、5.1」。
+**问题**：跑前登记 `e159-preregistration.md`——岔路单 `m2-fsync-wait-forks.md` 第 1 行「甲（今天的做法：每次 fsync 写脏叶加全部祖先，按 D16（发布语义） 已定项 10 攒批、组提交）的等待时间可不可以接受」，量「一次 fsync 从发出到返回等了多久」在甲与两条 WAL 臂（wal_full-K10、乙-M-K10，两条都留、各判各的）上随并发数 k 的走法。装置写在 `research/e7-index-bench/src/bin/e159_fsync_wait_group_commit.rs`（独立手写模型，不是入库装置——`crates/` 里没有组提交，第三节 2.3 现查零命中）。量延迟用真跑（真机、真 O_DIRECT 设备、真线程），不用计数模型换算，理由见跑前登记「五、5.1」。
 
 **这一段（接续一个撞了会话限额而中断的执行员）只做到「装置与冒烟」**：正式计时（本机口径下的 5 轮主网格、PC1–PC3、AA、G8、G1、G6）没有跑——机器上这会儿有并发编译，计时会被污染（`.claude/kb/tooling.md`「仓里的性能数都只在本机成立」同一类顾虑），等机器空闲另派。
 
@@ -25,7 +25,7 @@
 
 ### 结果整行抄自产物
 
-`research/results/e159-fsync-wait-group-commit-2026-09-24-anchors.out`（纯算术、逐字节可复跑，见「复跑」）：
+`e159-fsync-wait-group-commit-2026-09-24-anchors.out`（纯算术、逐字节可复跑，见「复跑」）：
 
 ```text
 E7RESULT name=anchor label=jia_p1_f1_k1_single_device_bytes value=172544
@@ -36,7 +36,7 @@ E7RESULT name=anchor label=write_ahead_log_full_k10_f8a_p10000_k16_single_device
 E7RESULT name=done emitted=6
 ```
 
-`research/results/e159-fsync-wait-group-commit-2026-09-24-smoke.out`（真机冒烟存证，不参与 `replay.sh` 的逐字节比对——真延迟每次跑都不同——只证明装置真跑得通；完整上下文见该文件）：修复之后三条臂各一格的 `E159RESULT` 行，例如乙-M-K10 那一格：
+`e159-fsync-wait-group-commit-2026-09-24-smoke.out`（真机冒烟存证，不参与 `replay.sh` 的逐字节比对——真延迟每次跑都不同——只证明装置真跑得通；完整上下文见该文件）：修复之后三条臂各一格的 `E159RESULT` 行，例如乙-M-K10 那一格：
 
 ```text
 E7RESULT E159RESULT arm=yi-M-K10 k=2 group_commit=true samples=37 median_ns=193801295 p99_ns=854997334 containment_violations=0 checkpoint_count=1 checkpoint_bytes=434688 bytes_written_estimate=12751360
@@ -50,7 +50,7 @@ E7RESULT E159RESULT arm=yi-M-K10 k=2 group_commit=true samples=37 median_ns=1938
 bash research/scripts/replay.sh E159
 ```
 
-只登记了 `anchors` 子命令这一行（纯算术、不碰真设备、逐字节可复跑）：`research/scripts/replay.sh` 里 E159（fsync 等待时间随并发数：组提交与 WAL 两臂） 的 `anchors` 那一行，产物 `e159-fsync-wait-group-commit-2026-09-24-anchors.out`、判法 `exact`，本次交回前跑过、判定「字节一致」。真机冒烟（S3 探针与三条臂各一格）不登记进 `replay.sh`——延迟数每次跑都不同，没有能钉住的逐字节判据；复跑命令原样存进 `research/results/e159-fsync-wait-group-commit-2026-09-24-smoke.out` 文件头，需要重跑时手动执行，例如：
+只登记了 `anchors` 子命令这一行（纯算术、不碰真设备、逐字节可复跑）：`research/scripts/replay.sh` 里 E159（fsync 等待时间随并发数：组提交与 WAL 两臂） 的 `anchors` 那一行，产物 `e159-fsync-wait-group-commit-2026-09-24-anchors.out`、判法 `exact`，本次交回前跑过、判定「字节一致」。真机冒烟（S3 探针与三条臂各一格）不登记进 `replay.sh`——延迟数每次跑都不同，没有能钉住的逐字节判据；复跑命令原样存进 `e159-fsync-wait-group-commit-2026-09-24-smoke.out` 文件头，需要重跑时手动执行，例如：
 
 ```
 cargo build --release --target x86_64-unknown-linux-musl --bin e159-fsync-wait-group-commit -p e7-index-bench
@@ -76,22 +76,22 @@ VM_DISK_PREALLOCATE=1 bash research/scripts/vm-bench.sh <musl 二进制路径> c
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D23（journal 的角色与格式） 已定项 1 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 2 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 5 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；`T_time`=5s、有效 `T_dirty`=256MiB 两个常量在装置里对拍过（`checkpoint_time_threshold_constant_is_five_seconds`），没有产生新的代价数据；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；S1 核对了发布持久顺序与 fsync 返回条件，没有改变这条已定项；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 10 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；这是这个实验要量代价的那条政策本身（攒批组提交），量代价的正式计时还没跑，因此还谈不上支撑或推翻；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D16（发布语义） 已定项 11 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；装置的两条 WAL 臂与甲共用同一个 journal/checkpoint 节奏，没有另开一条日志格式，符合这条已定项的判据，未产生新代价数；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
-| D25（目标负载优先级） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 research/prompts/e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D23（journal 的角色与格式） 已定项 1 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D16（发布语义） 已定项 2 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D16（发布语义） 已定项 5 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；`T_time`=5s、有效 `T_dirty`=256MiB 两个常量在装置里对拍过（`checkpoint_time_threshold_constant_is_five_seconds`），没有产生新的代价数据；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D16（发布语义） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；S1 核对了发布持久顺序与 fsync 返回条件，没有改变这条已定项；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D16（发布语义） 已定项 10 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；这是这个实验要量代价的那条政策本身（攒批组提交），量代价的正式计时还没跑，因此还谈不上支撑或推翻；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D16（发布语义） 已定项 11 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；装置的两条 WAL 臂与甲共用同一个 journal/checkpoint 节奏，没有另开一条日志格式，符合这条已定项的判据，未产生新代价数；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
+| D25（目标负载优先级） 已定项 7 | 备料 | 2026-09-25 不受影响：记录头 307 → 311 重跑（登记 e157-r1-prereg.md / e159-r1-prereg.md），产物与 307 下逐字节相同，结论不变；2026-09-25 不受影响：只给本页的局部编号补登记与简称，结论、数与产物不变 |
 
 ## 历史版本
 
 ### 2026-09-24：记录头 307 → 311 重跑（锚点与冒烟，问题单第 5 行）
 
 - 改前：装置常量 `RECORD_HEADER_BYTES` 仍是 307，`crates/singlefs-format/src/lib.rs` 已是 311。`H` 进装置只有一条通道（`NAMED_ITEMS_PER_RECORD_MAIN`），且它只影响记录条数这一路；`anchors` 产物（写量锚点）与等待时间的计时结论完全无关——这一次不跑计时段。
-- 改后：`research/prompts/e159-r1-prereg.md` 写死判据后常量改成 311，新增一条钉余数 33 的单测（写成加法，理由同 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 第五次重跑登记）；`anchors` 产物逐字节相同（与既有的 `e159-fsync-wait-group-commit-2026-09-24-anchors.out` 也逐字节相同，未换新文件）。与 `e155_fourth_run_group_commit_concurrency.rs` 共享的四个写量函数（`solve_fixed_point_core`、`solve_jia_batch_publish`、`solve_write_ahead_log_batch_fsync`、`solve_write_ahead_log_batch_checkpoint`）逐字节 diff 为空，S2 未触发。真机冒烟重跑：S3 探针仍报 `logical_block_size=512`；甲/wal_full-K10/乙-M-K10 三条臂各跑一格，退出码全部 0、结果行齐、`emitted=` 对得上（`samples=0`——测量窗口内没有 fsync 落在 warmup 之后，与计时无关，不判这个数），新存证 `research/results/e159-fsync-wait-group-commit-2026-09-24-h311-smoke.out`。55 单测全绿（新增 1 条）、17 条变异全抓（新增 M15/M16/M17，改常量前后各跑一遍，0 无效、0 没红）。**问题单第 5 行这一次的范围（写量那一半与冒烟）记「不变」**；等待时间那一半仍未量，留给计时段（机器空闲时另派）。
-- 依据：`research/prompts/e159-r1-prereg.md`；`research/prompts/m2-header311-rerun-questions.md` 第 5 行；D23（journal 的角色与格式） 已定项 4。
+- 改后：`e159-r1-prereg.md` 写死判据后常量改成 311，新增一条钉余数 33 的单测（写成加法，理由同 E155（每次持久化的写量：三种 fsync 形态与反事实上界） 第五次重跑登记）；`anchors` 产物逐字节相同（与既有的 `e159-fsync-wait-group-commit-2026-09-24-anchors.out` 也逐字节相同，未换新文件）。与 `e155_fourth_run_group_commit_concurrency.rs` 共享的四个写量函数（`solve_fixed_point_core`、`solve_jia_batch_publish`、`solve_write_ahead_log_batch_fsync`、`solve_write_ahead_log_batch_checkpoint`）逐字节 diff 为空，S2 未触发。真机冒烟重跑：S3 探针仍报 `logical_block_size=512`；甲/wal_full-K10/乙-M-K10 三条臂各跑一格，退出码全部 0、结果行齐、`emitted=` 对得上（`samples=0`——测量窗口内没有 fsync 落在 warmup 之后，与计时无关，不判这个数），新存证 `e159-fsync-wait-group-commit-2026-09-24-h311-smoke.out`。55 单测全绿（新增 1 条）、17 条变异全抓（新增 M15/M16/M17，改常量前后各跑一遍，0 无效、0 没红）。**问题单第 5 行这一次的范围（写量那一半与冒烟）记「不变」**；等待时间那一半仍未量，留给计时段（机器空闲时另派）。
+- 依据：`e159-r1-prereg.md`；`m2-header311-rerun-questions.md` 第 5 行；D23（journal 的角色与格式） 已定项 4。
 
 ### 2026-09-25（为门禁 69 号补落产物）
 
-- 2026-09-25 为门禁 69 号补落产物，逐字节相同：上一条重跑的 `anchors` 产物判定「与既有产物逐字节相同」但没有另存新产物，`research/results/e159-fsync-wait-group-commit-2026-09-24-anchors.out` 的 mtime 早于装置源码改到 311 的时刻，门禁 69 号判红。今天用 `replay.sh` 里这个实验的登记行 重跑，与登记行当时指的产物逐字节一致，另存 `e159-fsync-wait-group-commit-2026-09-25-h311-replay.out`（与旧产物逐字节相同，旧产物留着不删），`replay.sh` 该行登记改指新文件；不改装置、不改结论。
+- 2026-09-25 为门禁 69 号补落产物，逐字节相同：上一条重跑的 `anchors` 产物判定「与既有产物逐字节相同」但没有另存新产物，`e159-fsync-wait-group-commit-2026-09-24-anchors.out` 的 mtime 早于装置源码改到 311 的时刻，门禁 69 号判红。今天用 `replay.sh` 里这个实验的登记行 重跑，与登记行当时指的产物逐字节一致，另存 `e159-fsync-wait-group-commit-2026-09-25-h311-replay.out`（与旧产物逐字节相同，旧产物留着不删），`replay.sh` 该行登记改指新文件；不改装置、不改结论。

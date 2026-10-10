@@ -1,9 +1,0 @@
-[
- ["G1 直接 env -- a-b=1 cargo test --all", null, "env -- a-b=1 cargo test --all"],
- ["G2 直接 env a-b=1 cargo test --all", null, "env a-b=1 cargo test --all"],
- ["G3 直接 env -- --force=1 cargo test --all", null, "env -- --force=1 cargo test --all"],
- ["G4 直接 $'cargo' test --all", null, "$'cargo' test --all"],
- ["G5 直接 {cargo,} test --all", null, "{cargo,} test --all"],
- ["G6 直接 cargo test $'--all'", null, "cargo test $'--all'"],
- ["G7 直接 env -- FOO=1 cargo test --all（对照）", null, "env -- FOO=1 cargo test --all"]
-]

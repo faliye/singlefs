@@ -1,6 +1,0 @@
-增补 2 收口表第 39 行那一族：发布取完落点之后不记根（不转环、不回收；取号之前的预演与真发走同一段，两边一起不回收）	抓到	rolling_back_while_mounted_to_the_oldest_ring_root_on_a_small_device_and_overwriting_again_all_succeed 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/001.log）
-二·1 I-8.10 判定恒真：带末条标志的记录新根段不与同代根比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/002.log）
-第 5 批池级 checker：I-8.10 新根段树表指针不比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/003.log）
-第 5 批池级 checker：I-8.10 新根段映射根指针不比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/004.log）
-第 5 批池级 checker：I-8.10 新根段树 ID 水位不比	抓到	each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/005.log）
-✓ 点名 5 条：跑了 5 条，跳过 0 条，跑的都抓到了

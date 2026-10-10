@@ -1,5 +1,0 @@
-scope files 32
-defs Counter({'const': 336, 'constfn': 51, 'static': 3}) files with defs 29
-const fn names 42 common-named (defined in >=2 files): 2
-mutated files where full item-level const closure has files beyond the one-hop set: 0 of 30 mutants 0 of 5091
-[]

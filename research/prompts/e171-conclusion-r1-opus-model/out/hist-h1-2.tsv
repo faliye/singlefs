@@ -1,3 +1,0 @@
-row42_s2	remount_rollback	step=start	recover=2,19 o2_red=-
-row42_s2	remount_rollback	step=mount	ok instance=3 new_root=3,22 floor=11 chosen=2,19 effective=2,19	recover=3,22 o2_red=-
-row42_s2	remount_rollback	step=rollback_sweep	tried=110 accepted=2,11;2,12;2,13;2,14;2,15;2,16;2,17;2,18;2,19;3,20;3,21;3,22

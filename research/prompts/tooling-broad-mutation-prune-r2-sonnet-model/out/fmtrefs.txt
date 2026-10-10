@@ -1,3 +1,0 @@
-format consts 89
-mutated files 30 directly referencing format consts 25 mutants in them 4940 of 5091
-not referencing: [('block_device.rs', 62), ('bytes.rs', 42), ('mounted_session.rs', 12), ('write_accounting.rs', 17), ('write_request_split.rs', 18)]

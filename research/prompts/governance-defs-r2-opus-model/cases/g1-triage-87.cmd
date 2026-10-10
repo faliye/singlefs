@@ -1,1 +1,0 @@
-SINGLEFS_HEAVY_TESTS=commit nice -n 19 bash .claude/gate.d/87-replay.sh

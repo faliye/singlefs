@@ -1,7 +1,0 @@
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿副本原型小批并行与别的腿各跑各的
-rand seed=32768 ops=ColdStartRecover,CloseAndMountWritable,PublishFirstFile,Unlink,CreateInode,PublishWithoutUnits,CrashRecoveryAbandoningTheNewestRoot,RollBackWhileMounted crash_points=15 injected=0 second=47 remounts=47 not_judged={} s2_legal=0 s2_illegal=0 s3_judged=0 s3_illegal=0 new_findings=1 known_red=0
-rand finding seed=32768 stage=AfterTheWritableMountAndOnePublish 崩溃状态上的新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }（after_the_writable_mount_and_one_publish）：种子 32768，第 25 段（2 个写，持久 1 个，扣下段内第 [0] 个），落在 Operation(4)／Some(CreateInode)
-崩溃状态上的新发现 ModelDisagreement { aspect: "模型说该成、实现拒了" }（after_the_writable_mount_and_one_publish）：种子 32768，第 25 段（2 个写，持久 1 个，扣下段内第 [0] 个），落在 Operation(4)／Some(CreateInode)
-  恢复读回：PublishRefused { member: "WriteToAnInodeThatIsNotInTheTree { inode: 1 }", reason: Unexplained }
-  模型对不上（模型说该成、实现拒了）：模型答 崩溃之后恢复到一版上，可写挂载（取号、写行、暖机）与之后的覆盖写或第一个文件都该成（单元区墙之外模型不许拒）；实现 崩溃后可写挂载之后的那一次发布拒了：WriteToAnInodeThatIsNotInTheTree { inode: 1 }
-

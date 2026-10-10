@@ -2,7 +2,7 @@
 
 <!-- doc-lint:not-numbers O1 O2 O3 Q1 Q2 Q3 Q4 Y1 Y3 P1 P2 P3 P4 P5 P8 P9 N1 N2 N3 N4 N5 S1 S2 S3 S4 S5 S6 S7 S8 Z1 Z2 Z3 Z4 F1 F2 F3 F4 F5 F6 F7 X1 X2 X3 X4 X5 X6 X7 X8 X9 X10 X11 X12 X13 X14 X15 X52 X53 X54 X55 X56 X57 X58 X59 X60 X61 X62 X63 X64 X65 X66 X67 X68 X69 X70 X71 X72 X73 A1 A2 A3 A4 A5 A6 A7 A8 A9 A10 A11 V1 V2 W1 K4 Q5 S15 S17 Z7 U1 U9 U13 U16 V17 V31 V33 V36 R14 R19 R20 R33 F8 -->
 
-跑前登记 `research/prompts/e171-preregistration.md`（含第十二节修订 1–5；Q4 的另一种读法由主 agent 在装置写之前删去，只留整表 ≤ 60 秒那一种）；问题单 `research/prompts/three-oracle-collusion-questions.md` 的 Q1（一张坏实现表在同一批历史与崩溃状态上，有没有一行三条 oracle 全放行）、Q2（手造坏镜像喂 O2、O3，有没有一张两条全放行）、Q3（拿已知被抓的坏实现逐条关掉一条 oracle，剩下的还红不红）、Q4（这道测试一次跑多久、怎么进门禁）。被测条款 D13（验证路线） 已定项 6：三个 oracle 的独立性要靠合谋测试验证，不许自称。
+跑前登记 `e171-preregistration.md`（含第十二节修订 1–5；Q4 的另一种读法由主 agent 在装置写之前删去，只留整表 ≤ 60 秒那一种）；问题单 `three-oracle-collusion-questions.md` 的 Q1（一张坏实现表在同一批历史与崩溃状态上，有没有一行三条 oracle 全放行）、Q2（手造坏镜像喂 O2、O3，有没有一张两条全放行）、Q3（拿已知被抓的坏实现逐条关掉一条 oracle，剩下的还红不红）、Q4（这道测试一次跑多久、怎么进门禁）。被测条款 D13（验证路线） 已定项 6：三个 oracle 的独立性要靠合谋测试验证，不许自称。
 
 **现状**：坏实现表 117 行用修过的逐行驱动在同一棵冻住的树上跑完一遍（s4，两条线道、每条 2 线程），连同 Q3-核三趟与比对器；s3 那一次整表因驱动把上一行的变异带进下一行而整表作废、留档（「s3 整表作废」一节）。O3 用 E170（O3规约执行器第一版） 第 1 次重跑冻结的执行器，开头与收尾两次冻结核对都是 0 处不同。s4 的分母 D = 19 < 30，登记 F4 触发，扩表 164 行（序号 118–281）在同一份冻住的树上跑完，比对器把两半并成 281 行：分母 D = 37 ≥ 30。两趟里编不过的 6 行（第 33、59、127、163、206、243 行）当时的驱动没按登记 5.2 补位；驱动改成编不过之后补位，补位那一趟在同一份冻住的树上跑完（六行换上的都是未触达的行），比对器把 117 + 164 + 补位并成 `…-s4-f4-substitutes-comparator.out`：分母仍 D = 37，Q1、Q3 名单与补位之前逐字同（「编不过的 6 行补位（已跑）」一节）。读数到齐之后开了三轮结论判决（`research/prompts/e171-conclusion-r1-main-verification.md`、`…-r2-main-verification.md`、`…-r3-main-verification.md`，第三轮是最终轮），判这批读数撑不撑 D13（验证路线） 已定项 6：真盲区候选收成第 15、23、42、242、269、270、271 行，别的全放行行与未触达行里交回值不同的行归另几类（「三轮判决之后的三分」一节）；三分与读数一样只属于 s4 那一棵冻住的树。
 
@@ -83,7 +83,7 @@ E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0
 
 | 行（变异） | 和基线不同在哪 | 落在哪种状态里 | O1 / O2 / O3 看不看得到 | 三分 |
 |---|---|---|---|---|
-| 15（用户数据落点不从这张图的单元区起点起扫） | 两条流第 22 条 op 起：用户数据单元两块盘各 32 KiB 落点 822149120 → 823132160，内容逐字节相同；指向它的 16 KiB 节点里指针与校验和随之变；同一次发布的十一个提交内生块（t2–t12）也整体后移 64 槽，开放段 [50240, 50304) 整段后移到 [50304, 50368)：设备 0 上 12 条写换了落点（第 22 条 op 50180 → 50240，第 24 条 50240 → 50304，第 26 条 50242 → 50306，……，第 44 条 50252 → 50316；两条流相同，`research/prompts/e171-conclusion-r3-opus-model/out/row15-offsets.out` 第 1、2 行 `name=row15_first_publish`）；流二第 4 次调用起返回点后移 4 条 op（`mount_writable` 92–179 → 92–183），共 555 条 op 不同；调用结局同；看 journal 那一遍恢复逐态同 | 镜像不同：流一批 1 20 态、批 2 7 态，流二批 1 364 态、批 2 119 态；择到新版：流一批 1 12 态，流二批 1 356 态、批 2 112 态 | O1：`ObservedRoot` 不带落点，读回同，看不到；O2：落点在单元区里、记账自洽，判绿；O3：投影不带落点，「在」 | **真盲区候选**：依据是 D3（空间分配） 已定项 10 ⑤ 的 t2–t12 落点：「⑤ 在新池新建文件上的落点（开放段 [50240, 50304)，bump 游标从 50240 起）」（`.claude/kb/decisions/03-空间分配.md` 第 208 行）、射程「改新池新建文件的字节：是」「十一个提交内生块（默认几何）的落点整体重排」（第 226 行）、字节表「t2 到 t12 依次 50240、50242–50243、50244、…」（`.claude/kb/layout/01-first-txn.md` 第 307 行）；变异下用户数据落到 50240、十一个提交内生块整体挪 64 槽，不在 ⑤ 钉的落点上，三条都放行。另一条依据（用户 2026-10-03 定案之后才有）：D3（空间分配） 已定项 8 射程「例外是**从 mkfs 水位第一次建树的那一版**」「新池新建文件是这一类」、t1@50180「登记在 [layout/01-first-txn.md](../layout/01-first-txn.md) 字节表里，算格式级，偏离它写出的这一类镜像不合法」（`.claude/kb/decisions/03-空间分配.md` 第 171 行），变异把 t1 从 50180 挪到 50240，本身就不合法；三轮判决定去留时还没有这一条，只靠 ⑤。会分开的历史（推的）：单元区刚好够用的池，跳过开头一段之后发布在模型说该成的地方报空间不够，O1-对拍会红 |
+| 15（用户数据落点不从这张图的单元区起点起扫） | 两条流第 22 条 op 起：用户数据单元两块盘各 32 KiB 落点 822149120 → 823132160，内容逐字节相同；指向它的 16 KiB 节点里指针与校验和随之变；同一次发布的十一个提交内生块（t2–t12）也整体后移 64 槽，开放段 [50240, 50304) 整段后移到 [50304, 50368)：设备 0 上 12 条写换了落点（第 22 条 op 50180 → 50240，第 24 条 50240 → 50304，第 26 条 50242 → 50306，……，第 44 条 50252 → 50316；两条流相同，`row15-offsets.out` 第 1、2 行 `name=row15_first_publish`）；流二第 4 次调用起返回点后移 4 条 op（`mount_writable` 92–179 → 92–183），共 555 条 op 不同；调用结局同；看 journal 那一遍恢复逐态同 | 镜像不同：流一批 1 20 态、批 2 7 态，流二批 1 364 态、批 2 119 态；择到新版：流一批 1 12 态，流二批 1 356 态、批 2 112 态 | O1：`ObservedRoot` 不带落点，读回同，看不到；O2：落点在单元区里、记账自洽，判绿；O3：投影不带落点，「在」 | **真盲区候选**：依据是 D3（空间分配） 已定项 10 ⑤ 的 t2–t12 落点：「⑤ 在新池新建文件上的落点（开放段 [50240, 50304)，bump 游标从 50240 起）」（`.claude/kb/decisions/03-空间分配.md` 第 208 行）、射程「改新池新建文件的字节：是」「十一个提交内生块（默认几何）的落点整体重排」（第 226 行）、字节表「t2 到 t12 依次 50240、50242–50243、50244、…」（`.claude/kb/layout/01-first-txn.md` 第 307 行）；变异下用户数据落到 50240、十一个提交内生块整体挪 64 槽，不在 ⑤ 钉的落点上，三条都放行。另一条依据（用户 2026-10-03 定案之后才有）：D3（空间分配） 已定项 8 射程「例外是**从 mkfs 水位第一次建树的那一版**」「新池新建文件是这一类」、t1@50180「登记在 [layout/01-first-txn.md](../layout/01-first-txn.md) 字节表里，算格式级，偏离它写出的这一类镜像不合法」（`.claude/kb/decisions/03-空间分配.md` 第 171 行），变异把 t1 从 50180 挪到 50240，本身就不合法；三轮判决定去留时还没有这一条，只靠 ⑤。会分开的历史（推的）：单元区刚好够用的池，跳过开头一段之后发布在模型说该成的地方报空间不够，O1-对拍会红 |
 | 23（分裂出来的右半容器号不是触发分裂那条新记录的 inode 号） | 两条流第 26 条 op 起：第一个文件那次发布写的 inode 叶（码 3，两块盘各 32 KiB）偏移 53 一字节 0x01 → 0x00（容器号 1 → 0），头校验和随之变；同一次发布第 28 条 op（16 KiB 节点）偏移 52、60、131、149 等处 0x01 → 0x00；之后重写 inode 树的每次发布都带着（流二 155 条 op 不同）；调用结局同；恢复逐态同 | 镜像不同：流一批 1 20 态、批 2 7 态，流二批 1 364 态、批 2 119 态；择到第一个文件那一版（txg 3）及之后：流一批 1 12 态，流二批 1 356 态、批 2 112 态 | O1：不读盘，`ObservedRoot` 里没有容器号，读回同；O2：I-9.4（容器号不超最小 key）只要「inode 号 ≥ 容器号、沿叶序严格递增」，一片叶时 1 ≥ 0 成立，判绿；O3：投影不进 inode 树，「在」 | **真盲区候选**：D8（核心索引结构） 已定项 6 定案写「**新池新建文件写**：一个码 2 根节点（头带 key 区间 [1, 1]；一条条目：key 1、类型 2、出生树、容器号 1、出生代 3、指针）；一个码 3 叶（类型 2、容器号 1、出生代 3、记录数 1、记录宽 140）」（`.claude/kb/decisions/08-核心索引结构.md` 第 203 行），射程写「每个容器号都是某条记录首次插入时的 inode 号」（第 205 行）；容器号 0 不是任何一条记录的 inode 号。择到新版的那些态不在条款写得出的镜像里，三条都放行。会让 O2 红的取样点（推的，没跑）：一片叶装满之后的分裂，右半容器号 0 小于左半，I-9.4 的「沿叶序严格递增」判红 |
 | 27（记录头读者把末条标志位 0 读反） | 写流与调用结局全同；只在看 journal 那一遍恢复上不同：流一批 1 6 态、流二批 1 51 态（批 2 0 态）里，基线施加 1 条记录、择到新的一版，变异把带末条标志的记录读成「后面还有」、施加 0 条、停在前一版；读回内容不同的 3 / 30 态（例：流一第 41 态基线 `1,3 file_read e8ca4bf8…`，变异 `1,2 no_file`） | 发布写到一半的态：被丢掉的那一版的调用没返回、它的根槽没落（`returned_check.py` 57 态全是 `call_returned=False its_root_slot_landed=False`） | O1-崩溃判官：前一版是模型提交过的、不比盘上已持久的最新根槽旧、读回与那一版相同，判绿是对的；O1-对拍：调用不经恢复；O2、O3：镜像与基线逐字节相同，各自不看实现的恢复 | **另一类：三条不判实现恢复里靠记录重建的那一段**。态本身合法（调用没返回，新旧两版都在允许集合里），错在实现的恢复少施加一条记录，违反 D13（验证路线） 已定项 1 的 M4「`Recover` 返回的根恰是 j\*」与 D23（journal 的角色与格式） 已定项 15「由记录重建那次发布的根」、已定项 14「恢复只施加 `(实例代号, checkpoint_txg)` 严格大于所选根的记录」；O1-崩溃判官的判据（模型提交过的某一版、不比盘上已持久的最新根旧）比 M4 弱，O2 判恢复之前的镜像，O3 不跑实现的恢复；M4 的落点是 E165 与 Verus，不是这三条。会分开的取样点（推的，没跑）：一次已经返回、提交点只在 journal 记录里（根槽还没写）的发布之后的态，变异会丢掉一次已返回的发布；两条流的发布都在返回之前写根槽，这样的态不存在。那时 O1-崩溃判官的「不许比盘上已持久的最新根槽旧」也挡不住（根槽没写），会不会三条都放行没量过 |
 | 34（抬 F 生效之后不放开扣住的槽） | 流一无不同；流二第 498 条 op 起（抬 F 之后那次 `publish`）：用户数据单元落点 822083584 → 822411264，内容相同；指向它的节点与分配记录随之变（51 条 op 不同）；调用结局同；恢复逐态同 | 镜像不同：流二批 1 68 态、批 2 21 态；择到 txg 17 及之后的根：批 1 60 态、批 2 14 态 | 同第 15 行：O1 不比落点，O2 判绿（记账自洽），O3「在」 | **另一类：分配政策，镜像合法**：抬 F 之后那次发布换了一个空闲槽、没复用回收的槽，每个态的分配记录与记账自洽；D3（空间分配） 已定项 8 射程「其余的写（覆盖写、之后的发布、重挂之后）上违反它的实现写出的镜像合法，拦它只能靠运行时读数」（`.claude/kb/decisions/03-空间分配.md` 第 171 行；新池新建文件那一格例外，这一行的改动在流二抬 F 之后那次发布上，不在其中），三条按设计都不判分配政策。会分开的历史（推的）：抬 F 之后空间只够复用扣住那几槽的池，发布报空间不够而模型说该成，O1-对拍会红；这一行在 `crates/mutations.tsv` 点名的测试 `raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it` 直接断言复用 |
@@ -180,7 +180,7 @@ E7RESULT name=q1_quiet_row reading=q1_gamma row=233 row_name=由记录重建的�
 
 | 类 | 行 | 一句话依据（各行条款原文在上面两节的行里） | 三轮里的翻动 |
 |---|---|---|---|
-| 真盲区候选 | 第 15 行 | D3（空间分配） 已定项 10 ⑤ 的 t2–t12 落点：变异下十一个提交内生块整体挪 64 槽（`research/prompts/e171-conclusion-r3-opus-model/out/row15-offsets.out`），⑤ 与 `layout/01-first-txn.md` 第 307 行钉的是这些落点 | 第一轮从「对这一批等价」挪进来（D3 已定项 10 ③）；第二轮维持，依据写 ⑤ 落点表与 `layout/01-first-txn.md` 第 309 行的 t1@50180；第三轮留名单、依据换成 ⑤ 的 t2–t12 落点（主 agent 现查 ⑤ 表 t2@50240 与第 220 行「改新池新建文件的字节：是」，复跑 `row15-offsets.out` 同） |
+| 真盲区候选 | 第 15 行 | D3（空间分配） 已定项 10 ⑤ 的 t2–t12 落点：变异下十一个提交内生块整体挪 64 槽（`row15-offsets.out`），⑤ 与 `layout/01-first-txn.md` 第 307 行钉的是这些落点 | 第一轮从「对这一批等价」挪进来（D3 已定项 10 ③）；第二轮维持，依据写 ⑤ 落点表与 `layout/01-first-txn.md` 第 309 行的 t1@50180；第三轮留名单、依据换成 ⑤ 的 t2–t12 落点（主 agent 现查 ⑤ 表 t2@50240 与第 220 行「改新池新建文件的字节：是」，复跑 `row15-offsets.out` 同） |
 | 真盲区候选 | 第 23、42、271 行 | 第 23 行 D8（核心索引结构） 已定项 6 的容器号；第 42 行 D16（发布语义） 已定项 1 卸载抬 F；第 271 行 D8（核心索引结构） 已定项 8 头 ID | 三轮都在名单 |
 | 真盲区候选 | 第 242、269、270 行 | 第 242、270 行 D16（发布语义） 已定项 7 的写序；第 269 行 D23（journal 的角色与格式） 已定项 14 的见证值 | 第一轮被改出名单（按已定项 12 合法、写序义务无人判），第二轮翻回，第三轮没被打中 |
 | 另一类 | 第 27、112、277 行 | 三条不判实现恢复里靠记录重建的那一段（D13（验证路线） 已定项 1 的 M4、D23（journal 的角色与格式） 已定项 14 注 1 与已定项 15）；第 112 行已在 `.claude/gate.d/e165-pinned-red-examples.tsv` 里 | 第一轮采正推改归这一类，第二轮站住、措辞收窄，第三轮没变 |
@@ -218,7 +218,7 @@ O3 在 F4 计入分母的 37 行上一行都没红（`name=q1_column_red_rows �
 
 - 不是装置、比对器或取样的缺陷：比对器的触达照登记第一节读法 4 字面算（「任一次调用的结局（成功 / 哪一种错误）」，`collusion_matrix.py` 的 `outcome_words` 只比调用名与结局列），这一次调用两边都是 `ok`；O1-对拍比的是成功的调用交回的值（这里是抬 F 的上限），写流不变是因为这一次请求的 F 不超过 11，上限放宽没起作用。O1-对拍按调用算，与取样点无关，两批都红。
 - 缺口在登记读法 4 的触达定义：它把「成功的调用交回的值」排在三样之外，却写「三样都相同的行……在这一批上与正常实现逐字节同行为，哪条 oracle 都不该红」；这两行交回值不同，那句前提不成立。装置的 `call-outcomes.tsv` 只在对拍判出不同时记两边的值，成功的调用交回什么没有单独记，入库装置没有这一列。触达定义没改（产物跑过之后不改登记），分母仍 37。
-- 别的未触达行有没有同类差异：攻方（第三轮）在 s4 树的副本上量了（副本探针，s4 树，入库装置没有这一列）。探针照流二的驱动在内存稀疏盘上跑一遍，记每次成功调用交回值的 `{:?}` 文本摘要、末了的分配器与现行那一版；基线与 E171 导出的 595 条 op 逐条相同；再把未触达的行逐行打进副本、重编重跑、还原。跑了 232 行（238 行去掉 `make_filesystem.rs` 的 6 行，mkfs 不是一次调用，探针不记它的交回值，第 149–154 行没跑），7 行不同：第 49、110、155、161、162、174、252 行。第 155、161 行就是上面那两行（这把尺子在同一次第 12 次调用 `raise_floor` 上抓到它们，上限 11 → 13，是现成的阳性对照）；另 5 行 O1-对拍不比那几个字段所以不红：第 49 行可写挂载交回的见证值 4 → 3，第 110 行写账的结构种类，第 162 行影子账分支名，第 174 行抬 F 交回的写账，第 252 行内存里的分配器少了根槽登记（第 49、252 行交回值或分配器不同，写流不变）。汇总行整行抄自攻方 `research/prompts/e171-conclusion-r3-opus-model/out/return-rows.out` 第 239 行：
+- 别的未触达行有没有同类差异：攻方（第三轮）在 s4 树的副本上量了（副本探针，s4 树，入库装置没有这一列）。探针照流二的驱动在内存稀疏盘上跑一遍，记每次成功调用交回值的 `{:?}` 文本摘要、末了的分配器与现行那一版；基线与 E171 导出的 595 条 op 逐条相同；再把未触达的行逐行打进副本、重编重跑、还原。跑了 232 行（238 行去掉 `make_filesystem.rs` 的 6 行，mkfs 不是一次调用，探针不记它的交回值，第 149–154 行没跑），7 行不同：第 49、110、155、161、162、174、252 行。第 155、161 行就是上面那两行（这把尺子在同一次第 12 次调用 `raise_floor` 上抓到它们，上限 11 → 13，是现成的阳性对照）；另 5 行 O1-对拍不比那几个字段所以不红：第 49 行可写挂载交回的见证值 4 → 3，第 110 行写账的结构种类，第 162 行影子账分支名，第 174 行抬 F 交回的写账，第 252 行内存里的分配器少了根槽登记（第 49、252 行交回值或分配器不同，写流不变）。汇总行整行抄自攻方 `return-rows.out` 第 239 行：
 
 ```
 name=return_summary hidden_difference=7 identical=225 no_output=6
@@ -298,7 +298,7 @@ E7RESULT name=batch stream=fixed_script_through_e_then_unmount batch=2 states=11
 E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o2_red_states=0
 ```
 
-`research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out`，基线与对照（Z1 两趟 26 个文件逐字节相同、S2 与 E170（O3规约执行器第一版） 导出装置 18 项逐字节相同、S5 两个数比对器自己现算、A3 基线 0 红）：
+`e171-three-oracle-collusion-2026-10-03-s1-comparator.out`，基线与对照（Z1 两趟 26 个文件逐字节相同、S2 与 E170（O3规约执行器第一版） 导出装置 18 项逐字节相同、S5 两个数比对器自己现算、A3 基线 0 红）：
 
 ```
 E7RESULT name=a4 table_rows=117 expected=117 per_file_matches_the_registration=true found_once_in_today_table=117 line_unchanged_since_the_registration=117
@@ -366,7 +366,7 @@ E7RESULT name=q2_all_quiet status=not_run why=o3_frozen_version_not_available_s7
 E7RESULT name=verdict a3_columns_with_red_on_the_baseline=0 z1_files_differing=0 s2_files_differing=0 s5_numbers_that_differ=0 positive_controls_run=6 positive_controls_not_red=0 disabled_runs_with_differences_outside_the_closed_column=0 rows_untouched_but_red=0 negative_bases_with_o2_red=0 known_bad_rows_with_o2_quiet=0 o3_columns=not_run q1_alpha=not_run q1_beta=not_run q2_all_quiet=not_run q3_alpha=not_run
 ```
 
-`research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out`（第一刀第 6 行：分配记录树按槽号找叶时叶宽算成两倍，实现在第一次 `publish` 里 panic，装置记「实现自崩」、这条流不导出）：
+`e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out`（第一刀第 6 行：分配记录树按槽号找叶时叶宽算成两倍，实现在第一次 `publish` 里 panic，装置记「实现自崩」、这条流不导出）：
 
 ```
 E7RESULT name=stream stream=new_pool_file_creation ending=implementation_crashed:call_2_publish:分配记录（盘DeviceIdentity(0)槽SlotNumber(50176)跨2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 exported=false not_exported_why=implementation_crashed_in_a_call:call_2_publish:分配记录（盘_DeviceIdentity(0)_槽_SlotNumber(50176)_跨_2）越过它所在叶的末槽：两槽单元起在偶数槽、叶宽取偶数，盘上读来的记录进来之前判过 operations=22 writes=12 segments=7 tearable_writes=0 calls=3 full_states=0 quick_tier_states=0 sampled_states=0 model_stopped_at_call=2
@@ -402,7 +402,7 @@ E7RESULT name=verdict known_bad_entries_failing_s4=0 e170_bad_rows_failing_s3_or
 
 ### 第 1 次重跑第一段·修订 6 那一趟（已跑：第一段的量跑完，Q5 告警自证已过、判甲；Q2 的集合与 Q3 的分母在第二段那一节）
 
-登记 `research/prompts/e171-r1-prereg.md`（修订 6、7 与其后各条「主 agent 认定」，最后一条是「`-resume2` 跨机一致对照 S17 停机的处置」）；问题单 `research/prompts/e171-r1-questions.md` 的 Q1–Q5。树是修订 6 树 `research/target/e171-r1-frozen-tree-revision-6/`（快照摘要 `7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4`，284 个文件；第一段新树只换装置，不带第 31 批的 core 断言），装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 在树里那一份 sha256 `67e7a549…`。第 0–10 步后缀 `-r6-r3`，第 11、12 步（16 行）多机跑、后缀 `-resume2`，第 13 步没起（超时 0 行）。O3 是 E170（O3规约执行器第一版） 第 2 次重跑的 v2-487（登记修订 1）。修订 6 那一趟的判定只属于修订 6 树；修订 8 那一趟（最终主线）还没跑，这里一个数都不推到它上面。比对器只读这一趟的产物前缀 `e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-`、后缀 `-r6-r3.out` 与导出根 `research/target/e171-r1-dumps/revision-6-2026-10-05-r3/`，给到别的前缀就退出（登记修订 8 第 8.5 节第 1 条）。
+登记 `research/prompts/e171-r1-prereg.md`（修订 6、7 与其后各条「主 agent 认定」，最后一条是「`-resume2` 跨机一致对照 S17 停机的处置」）；问题单 `e171-r1-questions.md` 的 Q1–Q5。树是修订 6 树 `research/target/e171-r1-frozen-tree-revision-6/`（快照摘要 `7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4`，284 个文件；第一段新树只换装置，不带第 31 批的 core 断言），装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 在树里那一份 sha256 `67e7a549…`。第 0–10 步后缀 `-r6-r3`，第 11、12 步（16 行）多机跑、后缀 `-resume2`，第 13 步没起（超时 0 行）。O3 是 E170（O3规约执行器第一版） 第 2 次重跑的 v2-487（登记修订 1）。修订 6 那一趟的判定只属于修订 6 树；修订 8 那一趟（最终主线）还没跑，这里一个数都不推到它上面。比对器只读这一趟的产物前缀 `e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-`、后缀 `-r6-r3.out` 与导出根 `research/target/e171-r1-dumps/revision-6-2026-10-05-r3/`，给到别的前缀就退出（登记修订 8 第 8.5 节第 1 条）。
 
 | 行 | 判定（修订 6 树） | 依据（产物） | 照字面之外要一起读的 |
 |---|---|---|---|
@@ -1011,22 +1011,22 @@ cd research/e7-index-bench/src/bin/e171_three_oracle_collusion && python3 mutati
 
 ```
 research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run1.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-run2.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-baseline-timing.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator-mutations.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-comparator.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-disable-o1.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-disable-o2.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-e170-bad-states-placeholder-seed.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-e170-pinned-dump.out
+e171-three-oracle-collusion-2026-10-03-s1-baseline-run2.out
+e171-three-oracle-collusion-2026-10-03-s1-baseline-timing.out
+e171-three-oracle-collusion-2026-10-03-s1-comparator-mutations.out
+e171-three-oracle-collusion-2026-10-03-s1-comparator.out
+e171-three-oracle-collusion-2026-10-03-s1-disable-o1.out
+e171-three-oracle-collusion-2026-10-03-s1-disable-o2.out
+e171-three-oracle-collusion-2026-10-03-s1-e170-bad-states-placeholder-seed.out
+e171-three-oracle-collusion-2026-10-03-s1-e170-pinned-dump.out
 research/results/e171-three-oracle-collusion-2026-10-03-s1-known-bad-images.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-comparison.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-crash-judge.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-positive-control-o2.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-row-0-device.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-row-1-device.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out
-research/results/e171-three-oracle-collusion-2026-10-03-s1-rows-timing.out
+e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-comparison.out
+e171-three-oracle-collusion-2026-10-03-s1-positive-control-o1-crash-judge.out
+e171-three-oracle-collusion-2026-10-03-s1-positive-control-o2.out
+e171-three-oracle-collusion-2026-10-03-s1-row-0-device.out
+e171-three-oracle-collusion-2026-10-03-s1-row-1-device.out
+e171-three-oracle-collusion-2026-10-03-s1-row-6-device.out
+e171-three-oracle-collusion-2026-10-03-s1-rows-timing.out
 ```
 
 第二段起的产物（`ls research/results | grep -E '^e171-three-oracle-collusion-2026-10-03-s[234]-'`，29 份，名字前缀 `e171-three-oracle-collusion-2026-10-03-` 之后接）：
@@ -1053,34 +1053,34 @@ research/results/e171-three-oracle-collusion-2026-10-03-s1-rows-timing.out
 
 ```
 research/results/e171-three-oracle-collusion-2026-10-03-s2-bad-states-export.out
-research/results/e171-three-oracle-collusion-2026-10-03-s2-comparator-mutations.out
+e171-three-oracle-collusion-2026-10-03-s2-comparator-mutations.out
 research/results/e171-three-oracle-collusion-2026-10-03-s2-comparator.out
 research/results/e171-three-oracle-collusion-2026-10-03-s2-images-o3.out
 research/results/e171-three-oracle-collusion-2026-10-03-s2-known-bad-images.out
-research/results/e171-three-oracle-collusion-2026-10-03-s2-o3-baseline.out
+e171-three-oracle-collusion-2026-10-03-s2-o3-baseline.out
 research/results/e171-three-oracle-collusion-2026-10-03-s2-o3-control-baseline.out
-research/results/e171-three-oracle-collusion-2026-10-03-s2-rows-timing.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-baseline-after-the-fix.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-clean-check-comparator.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r2.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r3.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r4.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r5.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r6.out
+e171-three-oracle-collusion-2026-10-03-s2-rows-timing.out
+e171-three-oracle-collusion-2026-10-03-s3-baseline-after-the-fix.out
+e171-three-oracle-collusion-2026-10-03-s3-clean-check-comparator.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r2.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r3.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r4.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r5.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r6.out
 research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations-2026-10-03-r7.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-comparator.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-k4c-attack-row-device.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-k4c-check-driver.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-row-0-device.out
-research/results/e171-three-oracle-collusion-2026-10-03-s3-rows-timing.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator-mutations.out
+e171-three-oracle-collusion-2026-10-03-s3-comparator.out
+e171-three-oracle-collusion-2026-10-03-s3-k4c-attack-row-device.out
+e171-three-oracle-collusion-2026-10-03-s3-k4c-check-driver.out
+e171-three-oracle-collusion-2026-10-03-s3-row-0-device.out
+e171-three-oracle-collusion-2026-10-03-s3-rows-timing.out
 research/results/e171-three-oracle-collusion-2026-10-03-s4-comparator.out
 research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-comparator.out
-research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-rows-timing.out
+e171-three-oracle-collusion-2026-10-03-s4-f4-rows-timing.out
 research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-comparator.out
 research/results/e171-three-oracle-collusion-2026-10-03-s4-f4-substitutes-rows-timing.out
-research/results/e171-three-oracle-collusion-2026-10-03-s4-rows-timing.out
+e171-three-oracle-collusion-2026-10-03-s4-rows-timing.out
 ```
 
 ### 它答不了的
@@ -1098,10 +1098,10 @@ research/results/e171-three-oracle-collusion-2026-10-03-s4-rows-timing.out
 - 逐行驱动与装置读跑那一刻的 `crates/`：s4 五趟驱动是同一份冻住的树，但 `crates/` 里别处在变，整表跑出来的数只说那一份树。
 - 坏镜像上实现的恢复读回什么（登记第一节读法 11，附带）、旧种子盲测族的回归都没跑。Q1-丁（三条全放行而记录核对器或层 0 手写版本表的 oracle 红的行）跑了：F4 的 12 行全放行（甲、乙）里一行都没有（`name=q1_delta … =none`）；比对器只按甲乙算这一格，丙多出的第 233 行上层 0 那份 oracle 与记录核对器红（`name=q1_quiet_row reading=q1_gamma row=233 … layer0_or_record_checker_red=true`）；层 0 那份 oracle 与记录核对器另在只靠 O1 的第 108、115 行上红。
 - 装置内联单测没跑（checker 档），装置一侧变异 15 行的三个数没有；Python 一侧的变异只证明比对器与驱动的谓词会红，不证明它们读的装置输出是对的（装置输出由两趟基线、S2、S5 与对照另行钉）。
-- E171 的 O1 一列是模型对拍加模型的崩溃判官，不接 RefFS（登记把崩溃判官算进 O1，另写本实验不用 RefFS），与 D13（验证路线） 已定项 6 表 O1 行把崩溃之后允许看到的集合归 RefFS 不同；两者的下界也不同（盘上已持久的最新根，对最后一次返回成功的发布）。「已确认而丢了」那一类在 E171 的四列里只有 O3 判，没有在 37 行上跑过 RefFS（读码读出来的）。RefFS 的数只在三轮的第二轮判决里（`research/prompts/e171-conclusion-r2-main-verification.md` 第二节 R6 一格，读数在 `research/prompts/e171-conclusion-r2-opus-model/out/judge-summary.out`，攻方副本探针，s4 树 core，RefFS 直调 crate、崩溃落点手给、没经翻译层）：暖机那一形 O3 判「不在」27 态，RefFS 判绿的也是这 27 态（27 / 27）；带内容的同形写流 O3 判「不在」的 27 态 RefFS 全红，RefFS 红的共 36 态，另 9 态 RefFS 红而 O3 判在（两边归属崩溃时刻的规矩不同，推的）。这几个数不是 E171 装置读数。
+- E171 的 O1 一列是模型对拍加模型的崩溃判官，不接 RefFS（登记把崩溃判官算进 O1，另写本实验不用 RefFS），与 D13（验证路线） 已定项 6 表 O1 行把崩溃之后允许看到的集合归 RefFS 不同；两者的下界也不同（盘上已持久的最新根，对最后一次返回成功的发布）。「已确认而丢了」那一类在 E171 的四列里只有 O3 判，没有在 37 行上跑过 RefFS（读码读出来的）。RefFS 的数只在三轮的第二轮判决里（`research/prompts/e171-conclusion-r2-main-verification.md` 第二节 R6 一格，读数在 `judge-summary.out`，攻方副本探针，s4 树 core，RefFS 直调 crate、崩溃落点手给、没经翻译层）：暖机那一形 O3 判「不在」27 态，RefFS 判绿的也是这 27 态（27 / 27）；带内容的同形写流 O3 判「不在」的 27 态 RefFS 全红，RefFS 红的共 36 态，另 9 态 RefFS 红而 O3 判在（两边归属崩溃时刻的规矩不同，推的）。这几个数不是 E171 装置读数。
 - Q2 里 O2 放行而 O3 判不在的 29 张（P 族 12、盲测 B 族 17，「Q2 里 O2 放行而 O3 判不在的坏镜像」一节）全是结构自洽的伪造根、伪造续接镜像，不是坏实现；补丁与期望同出 E170（O3规约执行器第一版） 的改法代码（E170 页「它答不了的」），源头独立在 Q2 只量过 O2、O3 一对，不当独立读数，O1 不在 Q2 里；流一 P2、P5 两种补丁的 O2 一列随底态翻面。这 29 张的复跑读今天的 `crates/`，不还原 s4 的读数：基线流与 s4 树不同，数不保证仍是 12 与 17。D13 依据段只指到本页的这个数。
 - 这一页的行级读数（全放行、只靠一条、未触达的名单与每行的态）只属于快照摘要那一棵冻住的树：它与今天的 `crates/` 不是同一份，页里的名单不能直接当今天实现的名单；`replay.sh` 的 E171 复跑行读今天的 `crates/`，复跑一次出的是今天那棵树的读数。入库装置上除 Q2 的 29 张之外，下面几个数都不能原样重做（装置没有挂载模式、没有 RefFS 列、panic 的流不导出）。
-- 第 125 行是自崩的 6 行之一：登记读法 5 把 panic 记自崩、不进分母，D = 37。它在 panic 之前有 13 次调用可判：副本探针在 s4 树上驱动、打第 125 行变异，第 4–13 次调用的全持久态 O2 判 I-3.11 红，第 14 次（`unmount`）panic（`research/prompts/e171-conclusion-r2-opus-model/out/drive-s4-m125.tsv`），装置对 panic 整条流不导出。把 panic 与报错同样截断照判，计入分母 D = 38（改口径的预演，不是装置读数，37 与 38 都写）；若触达也把成功调用的交回值算进去，含第 155、161 行，D = 40（37 加第 125、155、161 行）；7 行交回值不同的行都算进来、含第 125 行，D = 45（推的，算术）。
+- 第 125 行是自崩的 6 行之一：登记读法 5 把 panic 记自崩、不进分母，D = 37。它在 panic 之前有 13 次调用可判：副本探针在 s4 树上驱动、打第 125 行变异，第 4–13 次调用的全持久态 O2 判 I-3.11 红，第 14 次（`unmount`）panic（`drive-s4-m125.tsv`），装置对 panic 整条流不导出。把 panic 与报错同样截断照判，计入分母 D = 38（改口径的预演，不是装置读数，37 与 38 都写）；若触达也把成功调用的交回值算进去，含第 155、161 行，D = 40（37 加第 125、155、161 行）；7 行交回值不同的行都算进来、含第 125 行，D = 45（推的，算术）。
 - 谓词 W（正确实现的可写挂载会把这一态读成「见证过的更新一版读不出」）在第 242、269 行取到的崩溃态上为真的态各 15、63 个，基线 0 / 576；s4 树 core 上两次可写挂载的见证类拒 61 个（第 242 行 9、第 269 行 52）。这些数是攻方副本脚本（W）与副本探针（挂载）在 s4 树上量的，入库装置没有 W、也没有挂载模式。今天的 core 读 s4 写出的镜像大面积 `refused:Undecidable`（基线流一 44 / 60、流二 500 / 516）：格式变了（journal 头 311 → 487、新根段 188 → 364、点名项 67 → 64），旧记录在新解析器下读不出，不是回归；所以 W 的 15 / 63 与 61 个见证拒只对 s4 core 成立，在今天的 core 上没有对照意义。
 - 用户数据落点的取值算不算 layout 登记的字节，这一页不判；三轮判决交用户（`research/prompts/e171-conclusion-r3-main-verification.md` 第五节第 1 行，零轮），用户 2026-10-03 定「算」：D3（空间分配） 已定项 8 射程改成新池新建文件上的落点取值（t1@50180）算格式级，检查欠在 C673（三 oracle 合谋测试的补 oracle 改法没做） ⑥。它不改这一页的三分：第 15 行的依据是 ⑤ 的 t2–t12 落点；第 34 行的落点改动在流二抬 F 之后那次发布上，不是新池新建文件，仍归分配政策。
 - 新树重跑装置（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`，这一页没记它的读数）打的 `name=batch`、`name=verdict` 两种行里，`piece_panic_states=` 按件计、不按态：`<件>:<态数>` 逗号连起来，0 的件不写，全 0 写 `-`；同一次 panic 在 `layer0_oracles` 与 `crash_judge` 两列各记一次（第 27–29 批代码轮判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md` 第三节第 3 条，两腿同判，不改装置）。

@@ -1,2 +1,0 @@
-w2_count --mutate-ignore-device-cover exit=101
-w2_count --mutate-split-pays-no-fixed-point exit=101

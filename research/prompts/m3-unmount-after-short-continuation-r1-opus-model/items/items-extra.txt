@@ -1,4 +1,0 @@
-allowance 979 0,8 20,max 0,1,2,half,last jia
-allowance 1199 0,8 20,max 0,1,2,half,last jia
-narrow 979 0,8 max 0,1,2,half,last today
-narrow 1199 0,8 max 0,1,2,half,last today

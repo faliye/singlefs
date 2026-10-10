@@ -1,6 +1,0 @@
-== random unitwall steps=10 seeds=0..32
-histories=32 completed=32
-first_states=5000 with_torn_write=2170 mounts_succeeded=5000 n_config_refusals=0
-first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
-second_states=55033 second_n_config_refusals=0 second_c670=0
-elapsed_seconds=86.2

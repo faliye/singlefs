@@ -1,5 +1,0 @@
-ARM foreign template=(dev 0, slot 50178, class 2, tree 0) fake_at_content_offset=16250 header_end=102 root=(1,3) watermark=65548
-CHECKER red=["I-7.8:根环水位最大 65548，盘上出现过的最大树 ID 1099511627776"]
-READ_ONLY_MOUNT ok=true
-REMOUNT ok instance=2 red_after=["I-7.8:根环水位最大 65548，盘上出现过的最大树 ID 1099511627776"]
-rc=0

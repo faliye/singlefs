@@ -1,7 +1,0 @@
-
-running 2 tests
-test seventy_nine_devices_fill_the_accounting_node_exactly_and_still_publish ... ok
-test eightieth_device_splits_the_accounting_tree_into_two_leaves_under_a_root_instead_of_refusing ... ok
-
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.62s
-

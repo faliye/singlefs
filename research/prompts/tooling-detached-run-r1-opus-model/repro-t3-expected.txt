@@ -1,5 +1,0 @@
-两个单元的 ActiveState 都应为 active：
-  singlefs-detached-opusr1t3-rename.service  active
-  singlefs-detached-opusr1t3-source.service  active
-说明改名拷贝与 source 两种写法都绕过了子 agent 闸与重型闸，真能起脱离单元。
-（闸的裁决已由 t3-hook-probes.txt 证明：这两种写法 bash: rc=0。）

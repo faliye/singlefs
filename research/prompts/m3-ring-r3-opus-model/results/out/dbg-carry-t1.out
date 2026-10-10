@@ -1,6 +1,0 @@
-SWEEP s=4 arm=carry k=2 instance=3 txg=22 rows_before=[(1, 15), (2, 0)] rows_written=[(1, 15)] writes=25 segments=4 closed_form_states=1048583 layer0_states=1048588
-CRASH_STATE red=["I-3.1"]
-NEXT_MOUNT ok chosen=(3,21) effective=(3,22) effective_instance_table_eq_written=true effective_instance_table_eq_chosen=true red_crash_state=["I-3.1"] red_after_mount=[]
-AFTER_MOUNT newest=(4,25) rows=Ok([(1, 15), (2, 0), (3, 22)])
-REMOUNT ok effective=(4,25) red=[]
-rc=0

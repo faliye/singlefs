@@ -1,8 +1,0 @@
-CRATES-SELECT tests-covered=776 baseline-tests=776 covered-without-baseline-seconds=0 full-stage-one-seconds=7691.1
-CRATES-SELECT caught-in-stage-one=241 catcher-in-selected=238 catcher-not-in-selected=3
-CRATES-SELECT catcher-not-selected sequence=5 crates/singlefs-core/src/address.rs:90 selected=0 catcher=singlefs-core address::tests::journal_sequence_numbers_order_by_instance_then_counter
-CRATES-SELECT catcher-not-selected sequence=13 crates/singlefs-core/src/admission.rs:167 selected=0 catcher=singlefs-core admission::tests::publish_reading_reserves_the_switch_share_of_the_next_writable_mounts_rows_and_the_mount_reading_its_own
-CRATES-SELECT catcher-not-selected sequence=14 crates/singlefs-core/src/admission.rs:167 selected=0 catcher=singlefs-core admission::tests::publish_reading_reserves_the_switch_share_of_the_next_writable_mounts_rows_and_the_mount_reading_its_own
-CRATES-SELECT package=singlefs-core mutants=3326 zero-coverage=170 selected-median=271 selected-p90=519 selected-max=586 seconds-median=5607.1 seconds-p90=7672.2 seconds-max=7690.0 seconds-sum=15418003
-CRATES-SELECT package=singlefs-checker mutants=1765 zero-coverage=86 selected-median=174 selected-p90=182 selected-max=212 seconds-median=2452.4 seconds-p90=2517.0 seconds-max=2654.3 seconds-sum=3659428
-CRATES-SELECT package=all mutants=5091 zero-coverage=256 selected-median=182 selected-p90=499 selected-max=586 seconds-median=2517.0 seconds-p90=7582.0 seconds-max=7690.0 seconds-sum=19077430

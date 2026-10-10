@@ -1,2 +1,0 @@
-                let birth_txg = birth_txg_of(unit).unwrap_or(0);
-                units_judged += 1;

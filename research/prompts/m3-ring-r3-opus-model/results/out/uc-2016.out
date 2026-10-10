@@ -1,2 +1,0 @@
-FUZZ seed=2016 s=4 arm=window faults=true journal=805306368 lives=4 unit_writes=1544 candidate_hits=0 abandoned_hits=0 first_candidate_hit=None first_abandoned_hit=None outside_seen=1 checker_reds=[] refusals={} aborted="" log=start13 |hideSlot2:2=txgSome(8)/newestSome(13) |m2@14EOR8R17OOCbeforeLastRoot35/37 |hideSlot0:3=txgSome(21)/newestSome(21) |m3@23EOEOEOOOR32EEOFOOCafterLastRootBeforeRotation81/82 |m4@43OEEFFOOOEOOOR54OOOCanywhere4/87 |m5@44OEOEOOOOOOR50FOR58EOOCafterLastRootBeforeRotation85/86
-rc=0

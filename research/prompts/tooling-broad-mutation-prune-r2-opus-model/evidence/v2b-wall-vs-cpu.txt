@@ -1,7 +1,0 @@
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：派出去的攻方腿与别的腿各跑各的模型
-concurrent=1 cores=30,31 wall-min=4.29s wall-max=4.29s cpu-min=4.28s cpu-max=4.28s exit-codes=[0]
-concurrent=1 cores=30,31 wall-min=5.49s wall-max=5.49s cpu-min=5.43s cpu-max=5.43s exit-codes=[0]
-concurrent=1 cores=30,31 wall-min=5.67s wall-max=5.67s cpu-min=5.56s cpu-max=5.56s exit-codes=[0]
-concurrent=2 cores=30,31 wall-min=4.44s wall-max=4.48s cpu-min=4.38s cpu-max=4.39s exit-codes=[0]
-concurrent=6 cores=30,31 wall-min=9.59s wall-max=9.75s cpu-min=3.20s cpu-max=3.29s exit-codes=[0]
-concurrent=12 cores=30,31 wall-min=12.48s wall-max=18.73s cpu-min=3.09s cpu-max=3.20s exit-codes=[0]

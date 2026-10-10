@@ -1,6 +1,0 @@
-== random reuse steps=10 seeds=0..40
-histories=40 completed=40
-first_states=7804 with_torn_write=3480 mounts_succeeded=7804 n_config_refusals=0
-first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
-second_states=84582 second_n_config_refusals=0 second_c670=0
-elapsed_seconds=94.9

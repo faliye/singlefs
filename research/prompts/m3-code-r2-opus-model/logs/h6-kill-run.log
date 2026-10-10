@@ -1,3 +1,0 @@
-
-running 1 test
-test mkfs_on_two_image_files_hands_only_the_written_bytes_to_write_calls_and_punches_every_zeroed_range ... 

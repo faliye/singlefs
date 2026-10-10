@@ -1,6 +1,0 @@
-base	verification results:: 14 verified, 0 errors	exit=0
-code_smoke_expected_plus2	verification results:: 13 verified, 1 errors	exit=1
-spec_smoke_chain_plus2	verification results:: 12 verified, 2 errors	exit=1
-spec_smoke_head_plus2	verification results:: 13 verified, 1 errors	exit=1
-tsv36	verification results:: 13 verified, 1 errors	exit=1
-tsv448	verification results:: 13 verified, 1 errors	exit=1

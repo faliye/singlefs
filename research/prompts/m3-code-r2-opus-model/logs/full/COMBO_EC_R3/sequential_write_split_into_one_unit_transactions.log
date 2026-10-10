@@ -1,8 +1,0 @@
-
-running 3 tests
-test sequential_write_that_fits_one_data_unit_publishes_through_the_single_transaction_path ... ok
-test the_second_extent_leaf_record_key_is_the_file_byte_offset_of_the_second_data_unit ... ok
-test publish_of_two_data_units_names_the_shared_commit_generated_units_only_in_its_last_record ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
-

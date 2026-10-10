@@ -1,4 +1,0 @@
-        RootRingSlotReading::SelfVerified(_)
-        | RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified) => {
-            RereadOfARootRingSlotUnreadableAtMount::NoValidRoot
-        }

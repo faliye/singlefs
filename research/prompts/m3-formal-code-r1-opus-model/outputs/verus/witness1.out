@@ -1,7 +1,0 @@
-run-with-memory-cap: 上限 1500M 超过实测峰值 547M 的 2 倍，照理由放行：攻方腿改坏核或加探针，峰值随改动变
-run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：攻方腿 m3-formal-code-r1 在自己的拷贝上单文件验核
-run-with-memory-cap: 排队（已等 0 秒，至多 600 秒）：slice 已占 42.5 GiB，这一条要 547 MiB（按峰值表里上一次实测的峰值 547 MiB（2026-10-02T13:17:01Z 量的）算），总上限 40.1 GiB；账上在跑 6 条
-run-with-memory-cap: 排队（已等 60 秒，至多 600 秒）：slice 已占 40.4 GiB，这一条要 547 MiB（按峰值表里上一次实测的峰值 547 MiB（2026-10-02T13:17:01Z 量的）算），总上限 40.1 GiB；账上在跑 5 条
-run-with-memory-cap: 排队（已等 120 秒，至多 600 秒）：slice 已占 41.4 GiB，这一条要 547 MiB（按峰值表里上一次实测的峰值 547 MiB（2026-10-02T13:17:01Z 量的）算），总上限 40.1 GiB；账上在跑 7 条
-run-with-memory-cap: 排了 165 秒，起跑（singlefs-memory-cap-1245652-330727982）
-verification results:: 57 verified, 0 errors

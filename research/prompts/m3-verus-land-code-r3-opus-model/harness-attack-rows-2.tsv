@@ -1,2 +1,0 @@
-# 攻方第三轮 harness 补跑：H04 只跑新用例（第一张表里它先红在 mounted_read_by_offset，cargo 没往下跑新用例）。六段同 harness-attack-rows.tsv。
-H04b S06 主循环每条记录都先调一次反向链回调（只跑新用例）	crates/singlefs-replay-prefix/src/lib.rs	        let record = &records[index];\n        proof {\n            lemma_candidates_lie_below_their_end_in_ascending_order(	        let record = &records[index];\n        let _probed_back_chain_broken = back_chain_broken(index);\n        proof {\n            lemma_candidates_lie_below_their_end_in_ascending_order(	-p singlefs-harness --test mounted_recovery_reads_each_candidate_once_in_order	ANY

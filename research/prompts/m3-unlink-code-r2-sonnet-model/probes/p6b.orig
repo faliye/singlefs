@@ -1,3 +1,0 @@
-            ObservedRefusalReason::Explained(
-                ModelRefusalReason::OnlyNewInodesOnAVersionWithTreesAndNoFile,
-            ),

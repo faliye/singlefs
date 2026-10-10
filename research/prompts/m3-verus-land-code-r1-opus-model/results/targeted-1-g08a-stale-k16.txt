@@ -1,2 +1,0 @@
-G08a_rollback_floor_from_the_root targets=6 rc=0 seconds=238 result_lines=6 passed=23 failed: 
-K02_in_flight_off_by_one targets=3 rc=0 seconds=87 result_lines=3 passed=48 failed: 

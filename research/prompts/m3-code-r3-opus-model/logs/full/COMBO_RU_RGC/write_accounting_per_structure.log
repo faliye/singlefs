@@ -1,8 +1,0 @@
-
-running 3 tests
-test new_pool_file_creation_and_overwrite_writes_by_kind_add_up_to_the_recorded_writes_and_the_byte_table ... ok
-test publish_that_fails_midway_hands_out_what_it_already_wrote_so_the_retry_still_adds_up ... ok
-test writable_remount_row_publish_and_each_warm_up_publish_add_up_to_the_recorded_writes ... ok
-
-test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.58s
-

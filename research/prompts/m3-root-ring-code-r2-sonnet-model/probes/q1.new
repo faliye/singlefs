@@ -1,2 +1,0 @@
-            allocator.record_root_written_by_this_process(published.root.checkpoint_txg);
-            Ok(PoolVersion::WithoutFile(published))

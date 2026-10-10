@@ -1,4 +1,0 @@
-run-with-memory-cap: 上限 1500M 超过实测峰值 554M 的 2 倍，照理由放行：攻方腿改坏核或加探针，峰值随改动变
-run-with-memory-cap: 排队（已等 0 秒，至多 600 秒）：slice 已占 39.7 GiB，这一条要 554 MiB（按峰值表里上一次实测的峰值 554 MiB（2026-10-02T13:20:11Z 量的）算），总上限 40.1 GiB；账上在跑 6 条
-run-with-memory-cap: 排了 3 秒，起跑（singlefs-memory-cap-1250601-976024848）
-verification results:: 57 verified, 0 errors

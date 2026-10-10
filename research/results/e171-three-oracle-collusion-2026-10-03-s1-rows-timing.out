@@ -1,6 +1,0 @@
-E7TIMING name=row_time row=0 copy_ns=176238524 compile_ns=30376711839 compile_kind=cold device_ns=38354718873 o3_ns=-
-E7TIMING name=row_time row=1 copy_ns=169944992 compile_ns=23384924439 compile_kind=incremental device_ns=38111985808 o3_ns=-
-E7TIMING name=row_time row=6 copy_ns=169344165 compile_ns=23577944591 compile_kind=incremental device_ns=186156369 o3_ns=-
-E7TIMING name=row_time_summary column=compile_ns rows=3 min_ns=23384924439 median_ns=23577944591 max_ns=30376711839
-E7TIMING name=row_time_summary column=copy_ns rows=3 min_ns=169344165 median_ns=169944992 max_ns=176238524
-E7TIMING name=row_time_summary column=device_ns rows=3 min_ns=186156369 median_ns=38111985808 max_ns=38354718873

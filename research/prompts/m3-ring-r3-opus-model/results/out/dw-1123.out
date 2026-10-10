@@ -1,2 +1,0 @@
-FUZZ seed=1123 s=4 arm=window faults=false journal=805306368 lives=4 unit_writes=332 candidate_hits=0 abandoned_hits=0 first_candidate_hit=None first_abandoned_hit=None outside_seen=2 checker_reds=["life2:[\"I-7.9\"]", "life3:[\"I-7.9\"]"] refusals={"R:TargetNotACandidate { target: RollbackTa": 1} aborted="" log=start7 |m2@8R6Er2OCbeforeLastRoot23/25 |m3@14Canywhere1/13 |m4@14FOCbeforeLastRoot28/30 |m5@21CbeforeLastRoot7/9
-rc=0

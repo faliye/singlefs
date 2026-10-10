@@ -1,4 +1,0 @@
-name=pair input=I1-v2-batches-1-2 kind=states this_run=/home/fy5090/code/singlefs/research/results/e170-r2-o3-spec-executor-2026-10-04-s2-v2-i1.out stored=/home/fy5090/code/singlefs/research/results/e170-r2-o3-spec-executor-2026-10-04-s1-executor.out
-name=v1_against_stored input=I1-v2-batches-1-2 kind=states now_states=972 stored_states=576 compared=576 differing_states=0 only_in_this_run=396 only_in_the_stored_product=0 only_in_this_run_sources=- compared_fields=ack,ack_rotation_tail,allowed,anchor_unreadable,applied,batch,begun,chosen_below_largest,chosen_below_largest_self_verified,chosen_root,digest,failed_predicates,gaps,landed,last_counter,layer0,m,path,provisional,provisional_before_witness,refusal,segment,slot_one,state,stop,stream,strict,strict_before_witness,tail_check,torn,witness_branch,witness_compared,witness_counter,witness_true
-name=verdict q1d_differing_or_missing_states=0 v9_triggered=false
-name=done emitted=4

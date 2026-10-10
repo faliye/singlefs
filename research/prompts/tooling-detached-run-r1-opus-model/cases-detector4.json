@@ -1,5 +1,0 @@
-[
- ["T3a inline env flips allow-switch?", "clerk", "BASH_COMMAND_DETECTOR_ALLOW_SUBAGENT_DETACHED_RUN=1 bash research/scripts/detached-run.sh start --label m -- sleep 1"],
- ["T3a inline disable-check flips?", "clerk", "BASH_COMMAND_DETECTOR_DISABLE_CHECK=1 bash research/scripts/detached-run.sh start --label m -- sleep 1"],
- ["T3a export then start same command", "clerk", "export BASH_COMMAND_DETECTOR_ALLOW_SUBAGENT_DETACHED_RUN=1; bash research/scripts/detached-run.sh start --label m -- sleep 1"]
-]

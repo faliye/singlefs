@@ -1,4 +1,0 @@
-1089c1089
-<             .or(slot_spacing_recorded_by_the_first_mountable_slot_zero)
----
->             .or(slot_spacing_recorded_by_the_first_mountable_slot_zero.filter(|_| false))

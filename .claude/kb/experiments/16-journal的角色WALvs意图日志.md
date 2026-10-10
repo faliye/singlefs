@@ -93,9 +93,9 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 ### 第五次跑：今天的单元宽度下，峰值落点、预测式误差与适用范围句
 
 <!-- doc-lint:not-numbers G0（主几何点） G1 G2 G3 G4 G5 -->
-以下 G0（主几何点）–G5 是跑前登记 `research/prompts/e16-r5-prereg.md` 第五节给的几何点本地标号，不是 kb 编号。
+以下 G0（主几何点）–G5 是跑前登记 `e16-r5-prereg.md` 第五节给的几何点本地标号，不是 kb 编号。
 
-**独立装置**：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽——装置今天是 64 项/条，第五次跑当时是 67 项/条，第六次跑一节写这一次换值）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `research/results/e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
+**独立装置**：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽——装置今天是 64 项/条，第五次跑当时是 67 项/条，第六次跑一节写这一次换值）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
 
 **今天扇出 144/147 下，树高由文件大小定**（`.claude/kb/decisions/08-核心索引结构.md` 已定项 14）：G1=4 GiB（L=3）、G2=1 TiB（L=4，真实基线）、G4=16 TiB（L=5）。
 
@@ -111,14 +111,14 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 
 记录宽旋钮的三个点（第五次跑当时的今天 67 项/条（2026-10-04 起装置是 64 项/条）、`record_width_knob_minimum`=1 项/条、`record_width_knob_maximum`=100 万项/条）里，1 项/条那一点全部 21 行都已经是丙行（乙的记录开销被这个旋钮拉得很高，把甲相对乙的优势从批=1 就已经吃光）；100 万项/条那一点与当时的今天（67 项/条）的分类逐行相同（64 项/条的新产物里也逐行相同）——记录宽只要不是「小到几乎每个单元一条记录」，对峰值落点这件事影响不大。
 
-产物：`research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash research/scripts/replay.sh E16R5`。变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，第五次跑那一次 17 条全部抓到（2026-10-04 起表是 18 条，见第六次跑一节）（`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
+产物：`e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash research/scripts/replay.sh E16R5`。变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，第五次跑那一次 17 条全部抓到（2026-10-04 起表是 18 条，见第六次跑一节）（`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
 
 **它答不了的**：`crates/` 今天的发布点名每一个重写的单元（不只脏叶）、一次写还动别的几棵树（上段叶、树表、中央映射树、分配记录树、记账树）——这两处结构差异这次没建模，会改每次 fsync 的实际块数，但不是「宽度」，不在这一题的范围里；Q1 归类的「加密」重判步骤（批轴相邻取值间逐个整数加密，确认分类不是采样伪影）没做，只人工抽查了两处最可能踩边界的地方，没有系统性证明；根下孩子数这个变量在中间取值（比如 30、50）上是不是也线性影响丙行起点，没有扫描——只取了 2、11、17、147 四个点，够判「主导变量是谁」，不够判「具体是什么函数关系」。
 
 ### 第六次跑：点名项 67 → 64（2026-10-04，第五次跑的装置与几何不动）
 
 <!-- doc-lint:not-numbers PC1 PC2 PC3 PC4 F7 S1 V7 -->
-PC1–PC4、F7、S1、V7 是跑前登记 `research/prompts/e16-r5-prereg.md` 与 `research/prompts/e16-r6-prereg.md` 自己的对照 / 失败 / 停机 / 作废条款编号，G1–G5 是同一份登记的几何点标号，都不是 kb 编号。
+PC1–PC4、F7、S1、V7 是跑前登记 `e16-r5-prereg.md` 与 `research/prompts/e16-r6-prereg.md` 自己的对照 / 失败 / 停机 / 作废条款编号，G1–G5 是同一份登记的几何点标号，都不是 kb 编号。
 D23（journal 的角色与格式） 已定项 4 今天的记录头是 487（新根段 364），一条 4096 记录装 64 个点名项（已定项 12、17），装置里乙一次 fsync 点名 k 片叶写 ⌈k ÷ 64⌉ 条记录（第五次跑时是 ⌈k ÷ 67⌉）。几何点、两条臂的语义、判据、容差、带宽一字不改；重跑登记 `research/prompts/e16-r6-prereg.md`，复跑键仍是 `E16R5`，问题单 `research/prompts/m3-r1-batch9-reruns-questions.md` 第 4 行。
 改了的只有：`JOURNAL_HEADER_BYTES` 487 与 `JOURNAL_NAMED_ENTRIES_PER_RECORD` 64（连同三段注释）、批轴并上 63 与 65（批轴取值共 81 个，两个点在新门槛 64 / 65 两侧）、四条单测的钉值（点名项、乙在 B = 63 到 73 九个批上的块数、头宽、PC4 批集合 {1, 2, 5, 10, 20, 50, 64, 65, 67}）、变异表（删「67→72」，加「64→72」「64→67」两条，18 条）。单测 23 条全绿（`cargo test --release --bin e16-fifth-run-peak-under-today-widths` 输出 `test result: ok. 23 passed`）。
 

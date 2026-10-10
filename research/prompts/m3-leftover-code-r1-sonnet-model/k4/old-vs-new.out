@@ -1,3 +1,0 @@
-run-with-memory-cap: 上限 1G 超过实测峰值 2M 的 2 倍，照理由放行：新探针没有峰值表样本
-run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：主agent同时派出的正推腿与攻方腿各跑各的
-old-vs-new: sequences=40749960 old_folds=2116840 old_fold_but_new_differs=0 new_folds_where_old_did_not=69816 first_counterexample=None

@@ -1,3 +1,0 @@
-at_make_filesystem_checked_at_compile_time 1 ['crates/singlefs-core/src/root_ring.rs:44:AT_MAKE_FILESYSTEM']
-row_publish_rewriting_instance_table_pages 1 ['crates/singlefs-core/src/transaction.rs:3603:ROW_PUBLISH']
-to_device_offset 2 ['crates/singlefs-harness/src/new_pool_file_creation_regions.rs:125:NEW_POOL_FILE_CREATION_ROOT_SLOT_OFFSET', 'crates/singlefs-harness/src/new_pool_file_creation_regions.rs:130:NEW_POOL_FILE_CREATION_JOURNAL_RECORD_OFFSET']

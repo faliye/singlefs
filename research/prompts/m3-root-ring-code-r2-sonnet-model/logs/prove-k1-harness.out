@@ -1,7 +1,0 @@
-E2 进程内记根时挂载时读不出的槽成了窗口里最小的那个也不重读（仍按最大 txg 算，I-3.1 在 24 + 3S − 1 那一版红）	抓到	a_root_ring_slot_unreadable_only_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window_and_the_allocated_statistic_holds 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/001.log）
-E2 进程内重读了挂载时读不出的槽却不按读到的改根环表	抓到	a_root_ring_slot_unreadable_only_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window_and_the_allocated_statistic_holds 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/002.log）
-B2 抬 F 的上限与「非空」不只取一圈窗口里的有效根（洞里窗口外旧根的树表读不出，准入抬 F 被拒）	抓到	admission_raising_the_floor_above_holes_at_the_oldest_end_of_the_window_takes_its_ceiling_only_from_roots_inside_the_window 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/003.log）
-RR4 抬 F 那一遍的回收门槛不并进根环表里挂载时读不出的槽（门槛越过 X，I-3.1 红）	抓到	admission_raising_the_floor_counts_the_root_ring_slot_unreadable_since_the_mount_into_the_reclaim_threshold 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/004.log）
-回退候选集不判一圈窗口（洞里窗口外的旧根被当成候选）	抓到	rolling_back_to_a_root_left_in_a_hole_outside_the_one_revolution_window_is_refused_before_any_write 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/005.log）
-RR2 M-F：恢复由记录重建根时卸载记号照抄所选根	抓到	a_root_rebuilt_from_both_records_of_the_unmount_sequence_takes_the_unmount_marker_from_the_record 红了（日志 /tmp/claude-1000/m3-root-ring-code-r2-sonnet/prove-logs/006.log）
-✓ 点名 6 条：跑了 6 条，跳过 0 条，跑的都抓到了

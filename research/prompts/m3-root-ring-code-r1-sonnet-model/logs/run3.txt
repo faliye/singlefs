@@ -1,5 +1,0 @@
-test probe_marker_two_intact_details ... PROBE details chosen root txg=2 instance=1
-PROBE details scanned records keys=[(1, 1), (1, 2)]
-PROBE details replay ok prefix_applied=0 above_water=0 rebuilt txg=2
-PROBE control: root3 torn and record3 zeroed: core mount_read_only ERR Open(Walk(UnitUnreadable { slot: SlotNumber(0) })); checker verdicts=[]
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.04s

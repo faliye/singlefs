@@ -1,2 +1,0 @@
-                    !abandoned_by_table(root, table)
-                        && device_of_txg(root.checkpoint_txg) == *device

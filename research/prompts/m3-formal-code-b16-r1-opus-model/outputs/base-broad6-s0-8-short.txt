@@ -1,6 +1,0 @@
-== random broad steps=6 seeds=0..8
-histories=8 completed=8
-first_states=692 with_torn_write=305 mounts_succeeded=692 n_config_refusals=0
-first_c670=0 in_short_segments(<=4)=0 in_torn_states=0
-second_states=7545 second_n_config_refusals=0 second_c670=0
-elapsed_seconds=9.0

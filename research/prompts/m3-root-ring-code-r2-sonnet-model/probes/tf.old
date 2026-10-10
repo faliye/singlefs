@@ -1,2 +1,0 @@
-                let in_a_tree_inherited_whole =
-                    user_visible_tree.is_some_and(|tree| trees_inherited_whole.contains(&tree));

@@ -1,6 +1,0 @@
-CUT instance=1 row_txg=1 warm_up_txgs=[2]
-CRASHED newest=(实例 1, txg 1) rows=[]
-REMOUNT instance=2 row_txg=3
-REMOUNTED newest=(实例 2, txg 4) rows=[InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(2), applied_transaction_high_water: 0 }]
-REMOUNTED APPLIED_ONLY_BY_RECORDS (实例 1, 计数 2, txg 2) applied_on_txg=Some(1) record_instance_table_all_zero=false record_allocation_root_all_zero=true same_instance_table_as_applied_on=Some(true) same_allocation_root_as_applied_on=Some(true)
-rc=0

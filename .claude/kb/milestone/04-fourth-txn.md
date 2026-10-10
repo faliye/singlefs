@@ -119,7 +119,7 @@
 
 ## 六　并行提交（里程碑三项四转来）
 
-- **来历**：里程碑三四·1 的问题单（`research/prompts/_m3-conc-r1-body.md`）判决 `research/prompts/m3-conc-r1-main-verification.md` 把 Q1–Q10 全部转来；C58（串行提交撞天花板没人报警） 的报警用户 2026-10-02 定转来（岔路单 `research/prompts/m3-conc-r1-forks.md` F1 选丙）。
+- **来历**：里程碑三四·1 的问题单（`_m3-conc-r1-body.md`）判决 `research/prompts/m3-conc-r1-main-verification.md` 把 Q1–Q10 全部转来；C58（串行提交撞天花板没人报警） 的报警用户 2026-10-02 定转来（岔路单 `m3-conc-r1-forks.md` F1 选丙）。
 - **进不进出口**：未定，段 0 接手时交用户定。
 - **作业点**（每行带过去的条件出自判决「二、各格」那一行）：
 

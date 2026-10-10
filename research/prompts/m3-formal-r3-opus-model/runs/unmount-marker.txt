@@ -1,6 +1,0 @@
-ATTACK unmount_publishes=2 markers=[WrittenByTheUnmountSequence, WrittenByTheUnmountSequence] txgs=[4, 5] counters=[4, 5]
-ATTACK unmount_write_kinds=[SystemConfigurationSlot, SystemConfigurationSlot, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, JournalRecord, JournalRecord, RootRecordFua, SystemConfigurationSlot, SystemConfigurationSlot, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, UnitWrite, JournalRecord, JournalRecord, RootRecordFua, SystemConfigurationSlot, SystemConfigurationSlot]
-ATTACK chosen=(1,4) chosen_marker=WrittenByTheUnmountSequence rebuilt=(1,5) rebuilt_marker=NotWrittenByTheUnmountSequence prefix_applied=1 second_publish=(1,5) second_publish_marker=WrittenByTheUnmountSequence
-ATTACK rebuilt_equals_second_publish_root=false other_fields_equal_chosen=(true,false,true,true)
-test a_crash_between_the_second_unmount_publish_record_and_its_root_slot ... ok
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.16s

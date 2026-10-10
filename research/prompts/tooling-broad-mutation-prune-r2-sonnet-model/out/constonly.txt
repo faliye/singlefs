@@ -1,5 +1,0 @@
-const fns with mutants 51 mutants 93
-const fns: runtime-called 48 (mutants 90 ) const-context-only 2 (mutants 2 ) no direct call syntactically 1 (mutants 1 )
-('const-only', 'at_make_filesystem_checked_at_compile_time', 'root_ring.rs', 1)
-('nocall', 'data_unit_pointer', 1)
-('const-only', 'row_publish_rewriting_instance_table_pages', 'transaction.rs', 1)

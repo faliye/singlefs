@@ -1,5 +1,0 @@
-        if let Some(refused) = self.answer_refusing_a_change_on_a_version_with_trees_and_no_file(
-            ModelOperationKind::PublishUnlinkIntent,
-        ) {
-            return Ok(refused);
-        }

@@ -1,2 +1,0 @@
-        RootRingSlotReading::SelfVerified(root) if !abandoned_by_table(&root, table) => {
-            RereadOfARootRingSlotUnreadableAtMount::ValidRoot {

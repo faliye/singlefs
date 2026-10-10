@@ -1,9 +1,0 @@
-K2G1 name=synthetic case=vulkan_zero_adapters usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=vulkan_only_llvmpipe usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=nvidia_reported_as_virtual_gpu usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=nvidia_reported_as_other usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=nvidia_integrated usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=amd_discrete_only usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=intel_integrated_only usable=0 decision=NotRunNoGpuAdapter
-K2G1 name=synthetic case=nvidia_discrete_no_card_started usable=0 decision=AdapterPresentButNoCardStarted
-K2G1 name=live vk_icd_filenames=None vk_driver_files=None pci_nvidia_display_controllers=2 vulkan_adapters=[EnumeratedAdapter { vendor_identifier: 4318, device_kind: DiscreteGpu }, EnumeratedAdapter { vendor_identifier: 4318, device_kind: DiscreteGpu }, EnumeratedAdapter { vendor_identifier: 65541, device_kind: SoftwareRenderingOnTheCpu }] usable_cards=1 decision=RunOnTheFirstUsableCard

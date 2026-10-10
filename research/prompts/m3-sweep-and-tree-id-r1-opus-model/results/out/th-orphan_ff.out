@@ -1,9 +1,0 @@
-CRASHED ring=[(0, 0, 65536), (1, 1, 65536), (1, 2, 65536)]
-CRASHED T1_all=0 T1_same_line=0 T2_noexcl=0 T2_excl=0 T2_claim_excl=0 T3_monotone=0
-CRASHED checker_red=[]
-MOUNT2 rows=[(1, 2)] effective=(1,2)
-REISSUE first_file=(2,5) wm=65548
-AFTER ring=[(0, 0, 65536), (1, 1, 65536), (1, 2, 65536), (2, 3, 65536), (2, 4, 65536), (2, 5, 65548), (2, 6, 65548)]
-AFTER T1_all=0 T1_same_line=0 T2_noexcl=0 T2_excl=0 T2_claim_excl=0 T3_monotone=0
-AFTER checker_red=[]
-rc=0
