@@ -1,0 +1,16 @@
+S=4 L=15 alphabet=D U=2 mode=random:1:0 arm=G histories=1 states=30 fake=0 lone0=0 lone1=14 newest=0 states_with_valid_root_outside_window=27 max_held=22
+    lone1_sample=DDDDDDDDDDDDDDD@8D|crash-in-27
+S=4 L=15 alphabet=D U=2 mode=random:1:0 arm=RG histories=1 states=30 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=27 max_held=50
+S=4 L=15 alphabet=D U=2 mode=random:1:0 arm=WD histories=1 states=30 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=27 max_held=32
+S=4 L=30 alphabet=D U=2 mode=random:1:0 arm=G histories=1 states=60 fake=0 lone0=0 lone1=44 newest=0 states_with_valid_root_outside_window=57 max_held=22
+    lone1_sample=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDD@8D|crash-in-27
+S=4 L=30 alphabet=D U=2 mode=random:1:0 arm=RG histories=1 states=60 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=57 max_held=80
+S=4 L=30 alphabet=D U=2 mode=random:1:0 arm=WD histories=1 states=60 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=57 max_held=62
+S=4 L=60 alphabet=D U=2 mode=random:1:0 arm=G histories=1 states=120 fake=0 lone0=0 lone1=104 newest=0 states_with_valid_root_outside_window=117 max_held=22
+    lone1_sample=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD@8D|crash-in-27
+S=4 L=60 alphabet=D U=2 mode=random:1:0 arm=RG histories=1 states=120 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=117 max_held=140
+S=4 L=60 alphabet=D U=2 mode=random:1:0 arm=WD histories=1 states=120 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=117 max_held=122
+S=4 L=120 alphabet=D U=2 mode=random:1:0 arm=G histories=1 states=240 fake=0 lone0=0 lone1=224 newest=0 states_with_valid_root_outside_window=237 max_held=22
+    lone1_sample=DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD@8D|crash-in-27
+S=4 L=120 alphabet=D U=2 mode=random:1:0 arm=RG histories=1 states=240 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=237 max_held=260
+S=4 L=120 alphabet=D U=2 mode=random:1:0 arm=WD histories=1 states=240 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=237 max_held=242

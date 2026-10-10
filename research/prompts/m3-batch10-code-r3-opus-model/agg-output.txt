@@ -1,0 +1,84 @@
+TOT ('prod', 'green') 3658
+TOT ('prod', 'red_c554') 488
+TOT ('reread_only', 'green') 2833
+TOT ('reread_only', 'red_c554') 203
+TOT ('reread_only', 'red_not_c554') 310
+TOT ('zero_over_bad', 'green') 822
+TRANS reread_only->prod ('Err(FloorRaiseFailedAfterTheMountsPublishes)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)', 'persist') 42
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)', 'persist') 31
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'persist') 1
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)', 'persist') 75
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)', 'transient') 464
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)/c554', 'Ok(reread)/red/c554', 'persist') 27
+TRANS reread_only->prod ('Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)/c554', 'Ok(reread)/red/c554', 'transient') 112
+TRANS reread_only->prod ('Ok(first)', 'Ok(first)', 'transient') 10
+TRANS reread_only->prod ('Ok(reread)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)', 'persist') 31
+TRANS reread_only->prod ('Ok(reread)', 'Ok(reread)', 'persist') 397
+TRANS reread_only->prod ('Ok(reread)', 'Ok(reread)', 'transient') 1643
+TRANS reread_only->prod ('Ok(reread)/red', 'Ok(reread)', 'persist') 67
+TRANS reread_only->prod ('Ok(reread)/red', 'Ok(reread)', 'transient') 243
+TRANS reread_only->prod ('Ok(reread)/red/c554', 'Ok(reread)/red/c554', 'persist') 29
+TRANS reread_only->prod ('Ok(reread)/red/c554', 'Ok(reread)/red/c554', 'transient') 174
+---
+FRF ('narrow-264-6-4', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)') 16
+FRF ('narrow-264-6-4', 'Ok(reread)') 9
+FRF ('narrow-384-20-2', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)') 15
+FRF ('narrow-384-20-2', 'Ok(reread)') 22
+EX-prod OPUS3-RUN sp=narrow-384-20-2 arm="" plan=r7-387 c554=false desc=d=1 p1=0.15 p2=1 persist=true [V:-E*=5,V:-G=3,V:-Z=7,V:EE*=2,V:EZ=1,V:GE*=2,V:GG=1,V:ZE*=1,V:ZG=1,V:ZZ=1] abandoned=[] outcome=Err(FloorRaiseFailedAfterTheMountsPublishes) hooks=1 fired=175 red=false image_unchanged=false after_err_classes=[] findings=[]
+
+EX-ro OPUS3-RUN sp=narrow-384-20-2 arm="reread_only" plan=r7-387 c554=false desc=d=1 p1=0.15 p2=1 persist=true [V:-E*=5,V:-G=3,V:-Z=7,V:EE*=2,V:EZ=1,V:GE*=2,V:GG=1,V:ZE*=1,V:ZG=1,V:ZZ=1] abandoned=[] outcome=Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread) hooks=1 fired=33 red=false image_unchanged=true findings=[]
+
+REFUSED ('prod', 'ab-384-1-0', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 59
+REFUSED ('prod', 'ab-384-3-0', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 59
+REFUSED ('prod', 'ab-384-3-0', 'NoSpaceAfterRaisingTheFloor', 'persist') 2
+REFUSED ('prod', 'ab-384-3-5', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 54
+REFUSED ('prod', 'ab-384-3-5', 'NoSpaceAfterRaisingTheFloor', 'persist') 4
+REFUSED ('prod', 'mat-384-30-8', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 57
+REFUSED ('prod', 'mat-384-30-8', 'NoSpaceAfterRaisingTheFloor', 'persist') 1
+REFUSED ('prod', 'narrow-264-6-4', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 8
+REFUSED ('prod', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'persist') 28
+REFUSED ('prod', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'transient') 324
+REFUSED ('reread_only', 'ab-384-1-0', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 38
+REFUSED ('reread_only', 'ab-384-1-0', 'NoSpaceAfterRaisingTheFloor', 'persist') 3
+REFUSED ('reread_only', 'mat-384-30-8', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 38
+REFUSED ('reread_only', 'mat-384-30-8', 'NoSpaceAfterRaisingTheFloor', 'persist') 5
+REFUSED ('reread_only', 'narrow-264-6-4', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 12
+REFUSED ('reread_only', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'persist') 32
+REFUSED ('reread_only', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'transient') 247
+REFUSED ('reread_only', 'narrow-384-20-2', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 2
+REFUSED ('zero_over_bad', 'narrow-264-6-4', 'FloorRaiseFailedWhilePushingForSpace', 'persist') 7
+REFUSED ('zero_over_bad', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'persist') 28
+REFUSED ('zero_over_bad', 'narrow-264-6-4', 'NoSpaceAfterRaisingTheFloor', 'transient') 324
+--- refusal transitions for persist plans (reread_only -> prod)
+PT ('ab-384-1-0', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 18
+PT ('ab-384-1-0', 'Ok(reread)', 'Ok(reread)') 28
+PT ('ab-384-1-0', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 38
+PT ('ab-384-1-0', 'Ok(reread):NoSpaceAfterRaisingTheFloor', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 3
+PT ('ab-384-3-0', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 2
+PT ('ab-384-3-5', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 2
+PT ('ab-4g-1-0', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)') 18
+PT ('ab-4g-1-0', 'Ok(reread)', 'Ok(reread)') 69
+PT ('ab-4g-3-0', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)') 16
+PT ('ab-4g-3-0', 'Ok(reread)', 'Ok(reread)') 71
+PT ('ab-4g-3-5', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)') 1
+PT ('ab-4g-3-5', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)') 15
+PT ('ab-4g-3-5', 'Ok(reread)', 'Ok(reread)') 71
+PT ('mat-384-30-8', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 15
+PT ('mat-384-30-8', 'Ok(reread)', 'Ok(reread)') 29
+PT ('mat-384-30-8', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 38
+PT ('mat-384-30-8', 'Ok(reread):NoSpaceAfterRaisingTheFloor', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 4
+PT ('mat-384-30-8', 'Ok(reread):NoSpaceAfterRaisingTheFloor', 'Ok(reread):NoSpaceAfterRaisingTheFloor') 1
+PT ('mat-4g-30-8', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread)') 15
+PT ('mat-4g-30-8', 'Ok(reread)', 'Ok(reread)') 72
+PT ('narrow-264-6-4', 'Err(FloorRaiseFailedAfterTheMountsPublishes)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 26
+PT ('narrow-264-6-4', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 16
+PT ('narrow-264-6-4', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 1
+PT ('narrow-264-6-4', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 5
+PT ('narrow-264-6-4', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace') 7
+PT ('narrow-264-6-4', 'Ok(reread):NoSpaceAfterRaisingTheFloor', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 4
+PT ('narrow-264-6-4', 'Ok(reread):NoSpaceAfterRaisingTheFloor', 'Ok(reread):NoSpaceAfterRaisingTheFloor') 28
+PT ('narrow-384-20-2', 'Err(FloorRaiseFailedAfterTheMountsPublishes)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 16
+PT ('narrow-384-20-2', 'Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 15
+PT ('narrow-384-20-2', 'Ok(reread)', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 20
+PT ('narrow-384-20-2', 'Ok(reread)', 'Ok(reread)') 34
+PT ('narrow-384-20-2', 'Ok(reread):FloorRaiseFailedWhilePushingForSpace', 'Err(FloorRaiseFailedAfterTheMountsPublishes)') 2

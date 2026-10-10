@@ -1,0 +1,8 @@
+sweep_misses_evidence_cap6 today histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1023 sweep_evidence_missed=210
+sweep_misses_evidence_cap6 ret_a histories=24 crash_points=868 ret_in_flight=52 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1015 sweep_evidence_missed=260
+sweep_misses_evidence_cap6 persist histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=54 sweep_rows_deleted=1112 sweep_erased=1003 sweep_evidence_missed=267
+sweep_misses_evidence_cap6 tsz histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1023 sweep_evidence_missed=210
+sweep_perfect_cap6 today histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1233 sweep_evidence_missed=0
+sweep_perfect_cap6 ret_a histories=24 crash_points=868 ret_in_flight=52 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1275 sweep_evidence_missed=0
+sweep_perfect_cap6 persist histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=54 sweep_rows_deleted=1112 sweep_erased=1270 sweep_evidence_missed=0
+sweep_perfect_cap6 tsz histories=24 crash_points=868 ret_in_flight=0 tomb_in_flight=232 zero_entry_leaf_in_flight=0 sweep_rows_deleted=1112 sweep_erased=1233 sweep_evidence_missed=0

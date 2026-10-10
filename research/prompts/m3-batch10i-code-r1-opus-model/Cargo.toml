@@ -1,0 +1,13 @@
+[package]
+name = "opus-i1-attack"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "攻方原型（m3-batch10i-code-r1 云端攻方，只在冻结副本的拷贝上）：按槽并两遍的随机两遍读坏网格、层 0 崩溃态、按槽归盘扫描"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

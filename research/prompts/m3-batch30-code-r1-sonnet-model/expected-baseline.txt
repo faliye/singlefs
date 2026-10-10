@@ -1,0 +1,37 @@
+rc=0
+a_lineage_container_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ok
+a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device ok
+a_lineage_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device ok
+a_tombstone_container_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ok
+a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device ok
+a_tombstone_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device ok
+an_inode_leaf_whose_first_copy_carries_an_unregistered_class_tag_and_whose_second_copy_verifies_as_a_node_reddens_the_inode_entry_invariant ok
+an_inode_leaf_whose_first_copy_does_not_read_back_and_whose_second_copy_verifies_as_a_node_reddens_the_inode_entry_invariant ok
+an_inode_leaf_with_a_non_zero_reserved_byte_beside_a_copy_verifying_as_a_node_reddens_the_reserved_bytes_invariant_on_either_device ok
+an_inode_leaf_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ok
+an_inode_leaf_with_blocks_off_the_logical_length_beside_a_copy_verifying_as_a_node_reddens_the_blocks_invariant_on_either_device ok
+an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device ok
+an_inode_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_leaf_that_does_not_read_back_reddens_the_inode_entry_invariant ok
+an_inode_tree_entry_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device ok
+PROBE-FW kind=10 loc=0 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.23"}
+PROBE-FW kind=10 loc=1 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.23"}
+PROBE-FW kind=11 loc=0 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.17"}
+PROBE-FW kind=11 loc=1 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.17"}
+PROBE-FW kind=2 loc=0 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.2"}
+PROBE-FW kind=2 loc=0 only_violation={"I-9.15"} fw={"I-2.1", "I-4.8", "I-7.4", "I-9.15", "I-9.2"}
+PROBE-FW kind=2 loc=0 only_violation={"I-9.7"} fw={"I-2.1", "I-4.8", "I-7.4", "I-9.2", "I-9.7"}
+PROBE-FW kind=2 loc=1 only_violation={"I-1.7"} fw={"I-1.7", "I-2.1", "I-4.8", "I-7.4", "I-9.2"}
+PROBE-FW kind=2 loc=1 only_violation={"I-9.15"} fw={"I-2.1", "I-4.8", "I-7.4", "I-9.15", "I-9.2"}
+PROBE-FW kind=2 loc=1 only_violation={"I-9.7"} fw={"I-2.1", "I-4.8", "I-7.4", "I-9.2", "I-9.7"}
+PROBE-HV kind=10 loc=0 I-9.23 violated={"I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"}
+PROBE-HV kind=10 loc=0 I-9.23 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.23"}
+PROBE-HV kind=10 loc=1 I-9.23 violated={"I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"}
+PROBE-HV kind=10 loc=1 I-9.23 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.23"}
+PROBE-HV kind=11 loc=0 I-9.17 violated={"I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"}
+PROBE-HV kind=11 loc=0 I-9.17 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.17"}
+PROBE-HV kind=11 loc=1 I-9.17 violated={"I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"}
+PROBE-HV kind=11 loc=1 I-9.17 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.17"}
+PROBE-HV kind=2 loc=0 I-9.2 violated={"I-1.1", "I-1.2", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4", "I-9.2"}
+PROBE-HV kind=2 loc=0 I-9.2 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.2"}
+PROBE-HV kind=2 loc=1 I-9.2 violated={"I-1.1", "I-1.2", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4", "I-9.2"}
+PROBE-HV kind=2 loc=1 I-9.2 violated={"I-2.1", "I-4.8", "I-7.4", "I-9.2"}

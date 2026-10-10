@@ -1,0 +1,1 @@
+c88645bd94574acb052bd68312b764df546d94548423fcb3aeb7bfe0cdd076cd  .claude/kb/invariants.md

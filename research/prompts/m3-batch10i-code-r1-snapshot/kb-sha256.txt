@@ -1,0 +1,2 @@
+b2cd52de5ff66e3d0985c2a745fe4f6a87750f0101b9582766e5b6cb4de83f00  .claude/kb/decisions/16-发布语义.md
+b3280a004a8ed29e8048fe20eabdefbfb92dc2098b6d6a2754d0ea65ee462279  .claude/kb/checks-owed.md

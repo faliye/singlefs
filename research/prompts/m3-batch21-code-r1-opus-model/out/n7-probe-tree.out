@@ -1,0 +1,11 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/n7_probe_unlink_batch_points.rs (/tmp/claude-1000/m3-batch21-code-r1-opus/rerun2/target-tree/release/deps/n7_probe_unlink_batch_points-df4b4c7d351886bf)
+
+running 1 test
+N7_PROBE one_unit_largest=31 bound_add=748
+N7_PROBE size=4609 publishes=34 first_released=[0, 144, 144, 144] clause_first=[0, 144, 144, 144] released_equals_clause=true largest_write_calls=55 largest_written_bytes=868864
+N7_PROBE size=9216 publishes=65 first_released=[0, 144, 144, 144] clause_first=[0, 144, 144, 144] released_equals_clause=true largest_write_calls=73 largest_written_bytes=1163776
+test probe_points_outside_the_sampled_sizes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 12.95s
+

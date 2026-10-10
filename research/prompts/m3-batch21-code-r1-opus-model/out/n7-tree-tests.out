@@ -1,0 +1,10 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 1672M 的 2 倍，照理由放行：新编译目录从头编、探针用例与峰值表记的不是同一次
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/unlink_writes_per_transaction_do_not_grow_with_the_file.rs (/tmp/claude-1000/m3-batch21-code-r1-opus/rerun2/target-tree/release/deps/unlink_writes_per_transaction_do_not_grow_with_the_file-322f95b0cbd7252f)
+
+running 2 tests
+test unlink_of_files_of_one_to_four_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_does_not_grow_with_the_file ... ok
+test unlink_of_files_of_sixteen_and_thirty_two_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_stays_within_a_constant_of_a_one_unit_file ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.97s
+

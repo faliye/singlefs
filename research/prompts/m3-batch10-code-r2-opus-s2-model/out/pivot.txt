@@ -1,0 +1,15 @@
+no-fault | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:c-e (C554 control) | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=4 iso0=4 refused=0 | merge: n=4 red=4 iso0=4 refused=0
+pass1:dev1-all-e+c-e reread:- | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=4 iso0=4 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:all-e | rr2: n=4 red=4 iso0=0 refused=4 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:c-Error | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:c-Garbage | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:c-Zeros | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-and-c-Error | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-and-c-Garbage | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-and-c-Zeros | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-Error | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-Garbage | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev0-but-newest-Zeros | rr2: n=4 red=4 iso0=4 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e reread:dev1-all-e | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0
+pass1:dev1-all-e | rr2: n=4 red=0 iso0=0 refused=0 | before: n=4 red=0 iso0=0 refused=0 | merge: n=4 red=0 iso0=0 refused=0

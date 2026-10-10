@@ -1,0 +1,6 @@
+7d0ae12ed1a2d732f988bff3a81966df27506cac1e6b121bfb4e3cdb866854ea  .claude/kb/decisions/16-发布语义.md
+06561e1d40d7000bd26ef51aca7adb80e39a4e43a13f57a6c7fdef268cee1ea5  .claude/kb/decisions/18-块里携带什么信息.md
+46a30a5b99195dbe2661a2ed56e9ce1c099dd5f9137137c3b10f8797bb77c121  .claude/kb/invariants.md
+12d909782d74fac4fb97efa2efddce4e1086a5c71b6ed54b742770265e95daf5  .claude/kb/checks-owed.md
+7408ea2097e42d1d15d3a00394b5f58bf6570ed1072dd98215f9701c1b602361  .claude/kb/decisions/22-单元原子性怎么合成.md
+d2fd003ed9d7dbbecdb8a0d5701f2354653da4a9211410083f4ec6979e426617  .claude/kb/experiments/02-key布局对递归遍历的影响.md

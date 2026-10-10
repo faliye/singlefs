@@ -1,0 +1,128 @@
+BUILT newest_txg=14 bad_writer=Some("m4a")
+JUDGE clean skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="" I31_PROTO mode="" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="e1ws" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="e1ws" I31_PROTO_SLOTS walked_slots_without_a_record={}
+  NOTE clean skip=rows i31="e1ws" I31_PROTO mode="e1ws" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="e1ws" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="e1ws" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(2195456) 不在按记录算的 [2392064, 2392064] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、) I-3.5=Holds
+  NOTE clean skip=rows i31="rc" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="rc" I31_PROTO mode="rc" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="rc" I31_PROTO_RC counted_high={0: 146, 1: 146} counted_low={0: 146, 1: 146} walked_uncounted={}
+  NOTE clean skip=rows i31="rc" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+  NOTE clean skip=rows i31="rc" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+JUDGE clean skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(2195456) 不在按记录算的 [2392064, 2392064] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、) I-3.5=Holds
+  NOTE clean skip=rows i31="rcw" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="rcw" I31_PROTO mode="rcw" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="rcw" I31_PROTO_RC counted_high={0: 146, 1: 146} counted_low={0: 146, 1: 146} walked_uncounted={}
+  NOTE clean skip=rows i31="rcw" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+  NOTE clean skip=rows i31="rcw" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+JUDGE clean skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="na" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="na" I31_PROTO mode="na" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="na" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="na" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="e1" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="e1" I31_PROTO mode="e1" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="e1" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="e1" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="e1w" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="e1w" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=rows i31="e1wu" HOLE_TABLE evidence="rows" window=[3,14] non_present=[]
+  NOTE clean skip=rows i31="e1wu" I31_PROTO mode="e1wu" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=rows i31="e1wu" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=rows i31="e1wu" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=union i31="na" HOLE_TABLE evidence="union" window=[3,14] non_present=[]
+  NOTE clean skip=union i31="na" I31_PROTO mode="na" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=union i31="na" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=union i31="na" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=naive i31="na" HOLE_TABLE evidence="naive" window=[3,14] non_present=[]
+  NOTE clean skip=naive i31="na" I31_PROTO mode="na" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=naive i31="na" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=naive i31="na" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=counter i31="na" HOLE_TABLE evidence="counter" window=[3,14] non_present=[]
+  NOTE clean skip=counter i31="na" I31_PROTO mode="na" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=counter i31="na" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=counter i31="na" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE clean skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(2195456)，遍历全部有效根得到 2392064（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 12 个、最老的自证过的根 txg 3、遍历的候选根槽 12 个、并进遍历的由) I-3.5=Holds
+  NOTE clean skip=counter i31="e1wu" HOLE_TABLE evidence="counter" window=[3,14] non_present=[]
+  NOTE clean skip=counter i31="e1wu" I31_PROTO mode="e1wu" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE clean skip=counter i31="e1wu" I31 device=0 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+  NOTE clean skip=counter i31="e1wu" I31 device=1 allocated=Some(2195456) walked=2392064 deferred_high=0 proto=Exact
+JUDGE bad12 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=rows i31="" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="" I31_PROTO mode="" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Exact
+  NOTE bad12 skip=rows i31="" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Exact
+JUDGE bad12 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=rows i31="e1ws" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="e1ws" I31_PROTO_SLOTS walked_slots_without_a_record={}
+  NOTE bad12 skip=rows i31="e1ws" I31_PROTO mode="e1ws" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="e1ws" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+  NOTE bad12 skip=rows i31="e1ws" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+JUDGE bad12 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(2195456) 不在按记录算的 [2392064, 2392064] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、) I-3.5=Holds
+  NOTE bad12 skip=rows i31="rc" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="rc" I31_PROTO mode="rc" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="rc" I31_PROTO_RC counted_high={0: 146, 1: 146} counted_low={0: 146, 1: 146} walked_uncounted={}
+  NOTE bad12 skip=rows i31="rc" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+  NOTE bad12 skip=rows i31="rc" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+JUDGE bad12 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(2195456) 不在按记录算的 [2392064, 2392064] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、) I-3.5=Holds
+  NOTE bad12 skip=rows i31="rcw" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="rcw" I31_PROTO mode="rcw" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="rcw" I31_PROTO_RC counted_high={0: 146, 1: 146} counted_low={0: 146, 1: 146} walked_uncounted={}
+  NOTE bad12 skip=rows i31="rcw" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+  NOTE bad12 skip=rows i31="rcw" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Records { low: 2392064, high: 2392064, uncounted: 0 }
+JUDGE bad12 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+  NOTE bad12 skip=rows i31="na" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="na" I31_PROTO mode="na" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="na" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+  NOTE bad12 skip=rows i31="na" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+JUDGE bad12 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=rows i31="e1" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="e1" I31_PROTO mode="e1" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="e1" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2195456 }
+  NOTE bad12 skip=rows i31="e1" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2195456 }
+JUDGE bad12 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="e1w" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+  NOTE bad12 skip=rows i31="e1w" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+JUDGE bad12 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=rows i31="e1wu" HOLE_TABLE evidence="rows" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=rows i31="e1wu" I31_PROTO mode="e1wu" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=rows i31="e1wu" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+  NOTE bad12 skip=rows i31="e1wu" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+JUDGE bad12 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+  NOTE bad12 skip=union i31="na" HOLE_TABLE evidence="union" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=union i31="na" I31_PROTO mode="na" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=union i31="na" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+  NOTE bad12 skip=union i31="na" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+JUDGE bad12 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=naive i31="na" HOLE_TABLE evidence="naive" window=[3,14] non_present=["12:Skipped"]
+  NOTE bad12 skip=naive i31="na" I31_PROTO mode="na" unreachable=[] trigger=[] theta_high=3 theta_low=3
+  NOTE bad12 skip=naive i31="na" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Exact
+  NOTE bad12 skip=naive i31="na" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Exact
+JUDGE bad12 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+  NOTE bad12 skip=counter i31="na" HOLE_TABLE evidence="counter" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=counter i31="na" I31_PROTO mode="na" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=counter i31="na" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+  NOTE bad12 skip=counter i31="na" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=NotApplicable
+JUDGE bad12 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE bad12 skip=counter i31="e1wu" HOLE_TABLE evidence="counter" window=[3,14] non_present=["12:ExistedUnreachable"]
+  NOTE bad12 skip=counter i31="e1wu" I31_PROTO mode="e1wu" unreachable=[12] trigger=[12] theta_high=3 theta_low=3
+  NOTE bad12 skip=counter i31="e1wu" I31 device=0 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+  NOTE bad12 skip=counter i31="e1wu" I31 device=1 allocated=Some(2195456) walked=2195456 deferred_high=0 proto=Interval { upper: 2392064 }
+rc=0

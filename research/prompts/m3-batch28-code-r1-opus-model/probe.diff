@@ -1,0 +1,76 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -2380,6 +2380,10 @@
+             // 容器两份都读不出：「子指针头部出生树 == 身份引用出生树」只比父条目里的两段，照判（判决
+             // `research/prompts/m3-batch26-code-r1-main-verification.md` 第二节 K2 H3 H-B 那一行、第三节第 1 条）；比容器头的那几小句不判。
+             let identity_birth_tree = identity.0;
++            opus_probe(5);
++            if child.birth_tree != identity_birth_tree {
++                opus_probe(6);
++            }
+             self.judgements.judge(
+                 identity_invariant,
+                 child.birth_tree == identity_birth_tree,
+@@ -4158,12 +4162,27 @@
+ /// 它是陈旧副本时，第二份照样要看）。
+ /// 类型段不认得的条目（`class_the_entry_type_names` 是 None）没有「它说的那一类」，交回孩子自证过的那一类。
+ /// 只认按它自己的长度自证过的孩子：头里的类标签坏了的单元按那个长度对不上校验和，不会被当成「另一类」。只读、不判。
++/// 攻方探针（只计数、不改判定）：0 认孩子类的调用、1 交回别类、2 一份自证成类型段那一类、3 一份自证成别类、
++/// 4 inode 读不出孩子走到 H-B、5 墓碑 / 谱系读不出容器走到 H-B、6 H-B 判红、7 两条位置条目校验和不同、8 头读得到、类登记、按那一类长度自证不过的副本。
++pub static OPUS_PROBE: [std::sync::atomic::AtomicU64; 9] = [const { std::sync::atomic::AtomicU64::new(0) }; 9];
++fn opus_probe(index: usize) {
++    OPUS_PROBE[index].fetch_add(1, std::sync::atomic::Ordering::Relaxed);
++}
++#[must_use]
++pub fn opus_probe_counts() -> [u64; 9] {
++    std::array::from_fn(|index| OPUS_PROBE[index].load(std::sync::atomic::Ordering::Relaxed))
++}
++
+ fn child_unit_class_other_than_the_entry_type_names(
+     reader: &dyn ImageReader,
+     child: &PointerView,
+     class_the_entry_type_names: Option<MappingKeyUnitClass>,
+ ) -> Option<MappingKeyUnitClass> {
+     let mut class_other_than_the_entry_type_names = None;
++    opus_probe(0);
++    if child.locations[0].checksum != child.locations[1].checksum {
++        opus_probe(7);
++    }
+     for location in &child.locations {
+         let offset = location.slot * SLOT_BYTES;
+         // 头按最短的单元（码 2，16 KiB）那么长读：读者只认整块的读，32 KiB 的单元头也在这前 16 KiB 里。
+@@ -4178,14 +4197,23 @@
+             .read(location.device, offset, unit_bytes)
+             .is_some_and(|content| crc32_castagnoli_table(&content) == location.checksum);
+         if !verifies_at_the_length_of_its_class {
++            opus_probe(8);
+             continue;
+         }
++        if Some(class_in_the_header) == class_the_entry_type_names {
++            opus_probe(2);
++        } else {
++            opus_probe(3);
++        }
+         if Some(class_in_the_header) != class_the_entry_type_names
+             && class_other_than_the_entry_type_names.is_none()
+         {
+             class_other_than_the_entry_type_names = Some(class_in_the_header);
+         }
+     }
++    if class_other_than_the_entry_type_names.is_some() {
++        opus_probe(1);
++    }
+     class_other_than_the_entry_type_names
+ }
+ 
+@@ -4206,6 +4234,10 @@
+     match entry_type {
+         RegisteredInodeInternalEntryType::LeafContainer => {
+             let identity_birth_tree = identity.0;
++            opus_probe(4);
++            if birth_tree_in_the_child_pointer_head != identity_birth_tree {
++                opus_probe(6);
++            }
+             judgements.judge(
+                 "I-9.2",
+                 birth_tree_in_the_child_pointer_head == identity_birth_tree,

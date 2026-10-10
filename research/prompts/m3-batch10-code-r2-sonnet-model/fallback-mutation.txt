@@ -1,0 +1,24 @@
+自写变异（对立读法：重读那一遍整环一条都没有时退回第一遍的读数）。改在冻结副本拷贝的 crates/singlefs-core/src/mount.rs，
+把「重读之后的 let Some(window_anchor) = … else { return Err(…) }; ( readings_of_the_reread, window_anchor, OnTheOneReread )」整段换成下面这段（原文取自冻结副本 mount.rs 第 1970–1982 行）：
+
+                match newest_valid_root_txg_of_the_readings(&readings_of_the_reread) {
+                    Some(window_anchor) => (
+                        readings_of_the_reread,
+                        window_anchor,
+                        RootRingOfTheRebuiltAllocatorRead::OnTheOneReread,
+                    ),
+                    None => match newest_valid_root_txg_of_the_readings(&first_readings) {
+                        Some(window_anchor) => (
+                            first_readings,
+                            window_anchor,
+                            RootRingOfTheRebuiltAllocatorRead::OnTheOneReread,
+                        ),
+                        None => {
+                            return Err(
+                                MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
+                            );
+                        }
+                    },
+                }
+
+跑的三份用例文件见 logs/mut-fallback.log（8、6、8 条全绿）。

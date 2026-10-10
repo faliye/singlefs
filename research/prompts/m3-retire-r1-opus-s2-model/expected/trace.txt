@@ -1,0 +1,130 @@
+S2 name=trace reader=first allow_second_rollback=false rb1_index=9 ops=[] rb2_index=None
+  rollback to txg 9
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 1)] ret_records=1
+  publish txg 14 inst 1 seq 14 unlink last batch leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  current txg=14 lineage=[(13, 9)] chain=[1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=true
+  retirement record who=9/2 death=14 on_chain=true last_write=9 last_write_on_chain=true
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=true records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=true records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=true records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=true records=[(9, 0)]
+  reader=first first_hit=seq=14 txg=14 inst=1 r=1 m=0 r_peak=1 m_peak=0
+S2 name=trace reader=over allow_second_rollback=false found=none
+S2 name=trace reader=lastw allow_second_rollback=false rb1_index=9 ops=[] rb2_index=None
+  rollback to txg 9
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 1)] ret_records=1
+  publish txg 14 inst 1 seq 14 unlink last batch leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  current txg=14 lineage=[(13, 9)] chain=[1, 2, 3, 4, 5, 6, 7, 8, 9, 13, 14]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=true
+  retirement record who=9/2 death=14 on_chain=true last_write=9 last_write_on_chain=true
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=true records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=true records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=true records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=true records=[(9, 0)]
+  reader=lastw first_hit=seq=13 txg=13 inst=1 r=0 m=1 r_peak=0 m_peak=1
+S2 name=trace reader=nofilter allow_second_rollback=false rb1_index=2 ops=[] rb2_index=None
+  rollback to txg 2
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 4)] ret_records=1
+  current txg=13 lineage=[(13, 2)] chain=[1, 2, 13]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8]), (9, 2, [9, 10, 11, 12])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=false
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=false records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=false records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=false records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=false records=[(9, 0)]
+  reader=nofilter first_hit=seq=13 txg=13 inst=1 r=0 m=4 r_peak=0 m_peak=4
+S2 name=trace reader=both allow_second_rollback=false found=none
+S2 name=trace reader=first allow_second_rollback=true rb1_index=1 ops=[] rb2_index=Some(9)
+  rollback to txg 1
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 1)] ret_records=1
+  rollback to txg 9
+  publish txg 14 inst 1 seq 14 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 1)] ret_records=1
+  publish txg 15 inst 1 seq 15 unlink last batch leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  publish txg 16 inst 1 seq 16 idle leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  current txg=16 lineage=[(13, 1), (14, 9)] chain=[1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=true
+  retirement record who=9/2 death=15 on_chain=true last_write=9 last_write_on_chain=true
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=true records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=true records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=true records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=true records=[(9, 0)]
+  reader=first first_hit=seq=15 txg=15 inst=1 r=1 m=0 r_peak=1 m_peak=0
+S2 name=trace reader=over allow_second_rollback=true rb1_index=9 ops=[] rb2_index=Some(10)
+  rollback to txg 9
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 1)] ret_records=1
+  publish txg 14 inst 1 seq 14 unlink last batch leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  rollback to txg 10
+  publish txg 15 inst 1 seq 15 admin rollback leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  publish txg 16 inst 1 seq 16 idle leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  current txg=16 lineage=[(13, 9), (15, 10)] chain=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 16]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8])]
+  retirement record who=9/2 death=10 on_chain=true last_write=9 last_write_on_chain=true
+  retirement record who=9/2 death=14 on_chain=false last_write=9 last_write_on_chain=true
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=true records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=true records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=true records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=true records=[(9, 0)]
+  reader=over first_hit=seq=15 txg=15 inst=1 r=1 m=0 r_peak=1 m_peak=0
+S2 name=trace reader=lastw allow_second_rollback=true rb1_index=1 ops=[] rb2_index=Some(9)
+  rollback to txg 1
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 1)] ret_records=1
+  rollback to txg 9
+  publish txg 14 inst 1 seq 14 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 1)] ret_records=1
+  publish txg 15 inst 1 seq 15 unlink last batch leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  publish txg 16 inst 1 seq 16 idle leaves=[(1, 1, 4), (5, 2, 4)] ret_records=2
+  current txg=16 lineage=[(13, 1), (14, 9)] chain=[1, 2, 3, 4, 5, 6, 7, 8, 9, 14, 15, 16]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=true
+  retirement record who=9/2 death=15 on_chain=true last_write=9 last_write_on_chain=true
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=true records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=true records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=true records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=true records=[(9, 0)]
+  reader=lastw first_hit=seq=14 txg=14 inst=1 r=0 m=1 r_peak=0 m_peak=1
+S2 name=trace reader=nofilter allow_second_rollback=true rb1_index=1 ops=[] rb2_index=Some(2)
+  rollback to txg 1
+  publish txg 13 inst 1 seq 13 admin rollback leaves=[(1, 1, 1)] ret_records=1
+  rollback to txg 2
+  publish txg 14 inst 1 seq 14 admin rollback leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 4)] ret_records=1
+  publish txg 15 inst 1 seq 15 idle leaves=[(1, 1, 4), (5, 2, 4), (9, 2, 4)] ret_records=1
+  current txg=15 lineage=[(13, 1), (14, 2)] chain=[1, 2, 14, 15]
+  live leaves now: [(1, 1, [1, 2, 3, 4]), (5, 2, [5, 6, 7, 8]), (9, 2, [9, 10, 11, 12])]
+  retirement record who=9/2 death=10 on_chain=false last_write=9 last_write_on_chain=false
+  leaf C version slot=3 birth=2 inst=1 published=true on_chain=true records=[(9, 1), (10, 1), (11, 1), (12, 1)]
+  leaf C version slot=4 birth=3 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 1), (12, 0)]
+  leaf C version slot=5 birth=4 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 1)]
+  leaf C version slot=6 birth=5 inst=1 published=true on_chain=false records=[(9, 1), (10, 1), (11, 0)]
+  leaf C version slot=7 birth=6 inst=1 published=true on_chain=false records=[(9, 1), (10, 1)]
+  leaf C version slot=8 birth=7 inst=1 published=true on_chain=false records=[(9, 1), (10, 0)]
+  leaf C version slot=9 birth=8 inst=1 published=true on_chain=false records=[(9, 1)]
+  leaf C version slot=10 birth=9 inst=1 published=true on_chain=false records=[(9, 0)]
+  reader=nofilter first_hit=seq=14 txg=14 inst=1 r=0 m=4 r_peak=0 m_peak=4
+S2 name=trace reader=both allow_second_rollback=true found=none

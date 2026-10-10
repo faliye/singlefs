@@ -1,0 +1,1015 @@
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 3", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 3", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 3", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 3", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 3", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 3", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 3", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 3", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 3", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 3", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 3", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 3"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=1 k2=233 k3=233 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 234", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 234", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 234", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 234", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 234", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 234", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 234", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 234", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 234", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 234", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 234", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=1 k3=1 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 234", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 234", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 234", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 234", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 234", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 234", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 234", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 234", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 234", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 234", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 234", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 234"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=232 k2=2 k3=300 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 235", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 235", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 235", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 235", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 235", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 235", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 235", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 235", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 235", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 235", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 235", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 235"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=233 k2=233 k3=1 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 467", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 467", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 467", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 467", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 467", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 467", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 467", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 467", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 467", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 467", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 467", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 467"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=465 k2=233 k3=300 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 701", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 701", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 701", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 701", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 701", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 701", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 701", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 701", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 701", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 701", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 701", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 701"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=699 k2=1 k3=233 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback0 outcomes=["rb->8:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback1 outcomes=["rb->8:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback2 outcomes=["rb->8:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback3 outcomes=["rb->8:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback4 outcomes=["rb->8:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,rollback5 outcomes=["rb->8:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,unlink-reissued outcomes=["rb->8:ok", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,unlink-prefix outcomes=["rb->8:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,create1 outcomes=["rb->8:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,create233 outcomes=["rb->8:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,crash-mount outcomes=["rb->8:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback0,abandon outcomes=["rb->8:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback0 outcomes=["rb->7:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback1 outcomes=["rb->7:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback2 outcomes=["rb->7:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback3 outcomes=["rb->7:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback4 outcomes=["rb->7:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,rollback5 outcomes=["rb->7:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,unlink-reissued outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,unlink-prefix outcomes=["rb->7:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,create1 outcomes=["rb->7:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,create233 outcomes=["rb->7:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,crash-mount outcomes=["rb->7:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback1,abandon outcomes=["rb->7:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback0 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback3 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback4 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,rollback5 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,unlink-reissued outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,unlink-prefix outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,create1 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,create233 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,crash-mount outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback2,abandon outcomes=["rb->5:TargetNotACandidate { target: RollbackTa", "abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback0 outcomes=["rb->4:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback1 outcomes=["rb->4:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback2 outcomes=["rb->4:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback3 outcomes=["rb->4:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback4 outcomes=["rb->4:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,rollback5 outcomes=["rb->4:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,unlink-reissued outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,unlink-prefix outcomes=["rb->4:ok", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,create1 outcomes=["rb->4:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,create233 outcomes=["rb->4:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,crash-mount outcomes=["rb->4:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback3,abandon outcomes=["rb->4:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback0 outcomes=["rb->3:ok", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback1 outcomes=["rb->3:ok", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback2 outcomes=["rb->3:ok", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback3 outcomes=["rb->3:ok", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback4 outcomes=["rb->3:ok", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,rollback5 outcomes=["rb->3:ok", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,unlink-reissued outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,unlink-prefix outcomes=["rb->3:ok", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,create1 outcomes=["rb->3:ok", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,create233 outcomes=["rb->3:ok", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,crash-mount outcomes=["rb->3:ok", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback4,abandon outcomes=["rb->3:ok", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback0 outcomes=["rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback1 outcomes=["rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback2 outcomes=["rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback3 outcomes=["rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback4 outcomes=["rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,rollback5 outcomes=[] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,unlink-reissued outcomes=["unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,unlink-prefix outcomes=["unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,create1 outcomes=["create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,create233 outcomes=["create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,crash-mount outcomes=["crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=rollback5,abandon outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback0 outcomes=["unlink 242", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback1 outcomes=["unlink 242", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback2 outcomes=["unlink 242", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback3 outcomes=["unlink 242", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback4 outcomes=["unlink 242", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,rollback5 outcomes=["unlink 242", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-reissued outcomes=["unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,unlink-prefix outcomes=["unlink 242", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,create1 outcomes=["unlink 242", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,create233 outcomes=["unlink 242", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,crash-mount outcomes=["unlink 242", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-reissued,abandon outcomes=["unlink 242", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback0 outcomes=["unlink 2", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback1 outcomes=["unlink 2", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback2 outcomes=["unlink 2", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback3 outcomes=["unlink 2", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback4 outcomes=["unlink 2", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,rollback5 outcomes=["unlink 2", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-reissued outcomes=["unlink 2", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,unlink-prefix outcomes=["unlink 2", "unlink 2"] checker_red=0 oracle_red=1
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,create1 outcomes=["unlink 2", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,create233 outcomes=["unlink 2", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,crash-mount outcomes=["unlink 2", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=unlink-prefix,abandon outcomes=["unlink 2", "abandon Some((14, 10))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback0 outcomes=["create1", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback1 outcomes=["create1", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback2 outcomes=["create1", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback3 outcomes=["create1", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback4 outcomes=["create1", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,rollback5 outcomes=["create1", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,unlink-reissued outcomes=["create1", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,unlink-prefix outcomes=["create1", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,create1 outcomes=["create1", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,create233 outcomes=["create1", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,crash-mount outcomes=["create1", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create1,abandon outcomes=["create1", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback0 outcomes=["create233", "rb->9:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback1 outcomes=["create233", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback2 outcomes=["create233", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback3 outcomes=["create233", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback4 outcomes=["create233", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,rollback5 outcomes=["create233", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,unlink-reissued outcomes=["create233", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,unlink-prefix outcomes=["create233", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,create1 outcomes=["create233", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,create233 outcomes=["create233", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,crash-mount outcomes=["create233", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=create233,abandon outcomes=["create233", "abandon Some((11, 9))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback0 outcomes=["crash-mount", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback1 outcomes=["crash-mount", "rb->8:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback2 outcomes=["crash-mount", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback3 outcomes=["crash-mount", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback4 outcomes=["crash-mount", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,rollback5 outcomes=["crash-mount", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,unlink-reissued outcomes=["crash-mount", "unlink 242"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,unlink-prefix outcomes=["crash-mount", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,create1 outcomes=["crash-mount", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,create233 outcomes=["crash-mount", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,crash-mount outcomes=["crash-mount", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=crash-mount,abandon outcomes=["crash-mount", "abandon None"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback0 outcomes=["abandon Some((10, 8))", "rb->10:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback1 outcomes=["abandon Some((10, 8))", "rb->8:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback2 outcomes=["abandon Some((10, 8))", "rb->7:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback3 outcomes=["abandon Some((10, 8))", "rb->5:TargetNotACandidate { target: RollbackTa"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback4 outcomes=["abandon Some((10, 8))", "rb->4:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,rollback5 outcomes=["abandon Some((10, 8))", "rb->3:ok"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,unlink-reissued outcomes=["abandon Some((10, 8))"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,unlink-prefix outcomes=["abandon Some((10, 8))", "unlink 2"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,create1 outcomes=["abandon Some((10, 8))", "create1"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,create233 outcomes=["abandon Some((10, 8))", "create233"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,crash-mount outcomes=["abandon Some((10, 8))", "crash-mount"] checker_red=0 oracle_red=0
+name=scan k1=240 k2=5 k3=3 abandoned=Some((7, 5)) suffix=abandon,abandon outcomes=["abandon Some((10, 8))", "abandon None"] checker_red=0 oracle_red=0
+name=scan-total histories=144 checker_red=0

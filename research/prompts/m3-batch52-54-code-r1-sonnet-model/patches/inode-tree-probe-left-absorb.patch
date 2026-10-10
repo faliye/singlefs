@@ -1,0 +1,19 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-fixes-code-r1/repo/crates/singlefs-core/src/inode_tree.rs	2026-10-09 20:46:09.003044741 +0000
++++ /home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/pristine/inode_tree_with_probe.rs	2026-10-09 21:07:02.097932759 +0000
+@@ -1260,6 +1260,16 @@
+         );
+     }
+ 
++    #[test]
++    fn sonnet_probe_last_leaf_pair_fits_only_on_the_left() {
++        let mut before = full_containers(3);
++        for position in 0..3 {
++            keep_the_first_records(&mut before, position, 117);
++        }
++        let after = remove_record_from_leaf_containers(&before, InodeNumber(500)).expect("删 500");
++        eprintln!("PROBE counts={:?} numbers={:?} retired={}", record_counts(&after.containers), container_numbers(&after.containers), after.retired.len());
++    }
++
+     /// 删的是树里唯一一条（unlink 唯一的文件）：一片都不剩、没有要重写的片，那片身份消失，根照样重写成零条目根。
+     #[test]
+     fn removing_the_last_record_of_the_tree_leaves_no_container_and_rewrites_the_root() {

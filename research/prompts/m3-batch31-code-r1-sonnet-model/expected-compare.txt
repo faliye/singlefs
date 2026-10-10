@@ -1,0 +1,92 @@
+ANCHOR line=3054 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=5 per_filter=2,1,1,1
+ANCHOR line=3055 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=5 per_filter=2,1,1,1
+ANCHOR line=3056 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=5 per_filter=2,1,1,1
+ANCHOR line=3057 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=5 per_filter=2,1,1,1
+ANCHOR line=3058 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3059 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3060 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3061 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3062 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3063 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3064 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3065 file=crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+DBG level=0 dev=0 slot=50278 matches=false
+DBG level=0 dev=0 slot=50278 matches=false
+DBG level=0 dev=1 slot=50278 matches=false
+DBG level=0 dev=1 slot=50278 matches=false
+DBG level=1 dev=0 slot=50278 matches=false
+DBG level=1 dev=0 slot=50278 matches=false
+DBG level=1 dev=0 slot=50278 matches=true
+DBG level=1 dev=0 slot=50278 matches=true
+DBG level=1 dev=0 slot=50278 matches=true
+DBG level=1 dev=0 slot=50278 matches=true
+DBG level=1 dev=0 slot=50352 matches=true
+DBG level=1 dev=0 slot=50352 matches=true
+DBG level=1 dev=0 slot=50352 matches=true
+DBG level=1 dev=0 slot=50352 matches=true
+DBG level=1 dev=1 slot=50278 matches=false
+DBG level=1 dev=1 slot=50278 matches=false
+DBG level=1 dev=1 slot=50278 matches=true
+DBG level=1 dev=1 slot=50278 matches=true
+DBG level=1 dev=1 slot=50278 matches=true
+DBG level=1 dev=1 slot=50352 matches=true
+DBG level=1 dev=1 slot=50352 matches=true
+DBG level=1 dev=1 slot=50352 matches=true
+DBG level=1 dev=7 slot=50278 matches=false
+DBG level=1 dev=7 slot=50352 matches=false
+PROBE A-lineage-type0-fw-node-copy-at-location-0
+PROBE A-lineage-type0-fw-node-copy-at-location-0 red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 0 槽 5035 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：谱系树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE A-lineage-type0-fw-node-copy-at-location-1
+PROBE A-lineage-type0-fw-node-copy-at-location-1 red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 1 槽 5035 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：谱系树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE A-tomb-type0-fw-node-copy-at-location-0
+PROBE A-tomb-type0-fw-node-copy-at-location-0 red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 0 槽 5027 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE A-tomb-type0-fw-node-copy-at-location-1
+PROBE A-tomb-type0-fw-node-copy-at-location-1 red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 1 槽 5027 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE B-inode-type0-fw-node-copy-at-location-0
+PROBE B-inode-type0-fw-node-copy-at-location-0 red=["I-1.1", "I-1.2", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4", "I-9.2"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=inode 树的孩子 在盘 1 槽 50 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：inode 树的内部节点：层级不是父层级减一，这一支走不下去
+PROBE B-inode-type0-fw-node-copy-at-location-1
+PROBE B-inode-type0-fw-node-copy-at-location-1 red=["I-1.1", "I-1.2", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4", "I-9.2"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=inode 树的孩子 在盘 0 槽 50 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：inode 树的内部节点：层级不是父层级减一，这一支走不下去
+PROBE C-lineage-clean
+PROBE C-lineage-clean red=[] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=- i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=-
+PROBE C-tomb-clean
+PROBE C-tomb-clean red=[] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=- i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=-
+PROBE D-lineage-type0-both-copies-valid-node
+PROBE D-lineage-type0-both-copies-valid-node red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 0 槽 5035 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：谱系树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE D-tomb-type0-both-copies-valid-node
+PROBE D-tomb-type0-both-copies-valid-node red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=映射条目指的单元 在盘 0 槽 5027 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE E-lineage-type0-one-valid-node-one-unreadable
+PROBE E-lineage-type0-one-valid-node-one-unreadable red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=谱系树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：谱系树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE E-tomb-type0-one-valid-node-one-unreadable
+PROBE E-tomb-type0-one-valid-node-one-unreadable red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE G-level-one-detail-of-I-2.1
+PROBE G-level-one-detail-of-I-2.1 墓碑树内部条目的子指针（走读不往下读的孩子）在盘 0 槽 50278 的那一份按头里那一类的长度（没登记的 16 KiB、32 KiB 都试）与位置条目里的校验和对不上
+PROBE G-level-one-detail-of-I-4.8
+PROBE G-level-one-detail-of-I-4.8 最新根（txg 5）出发的遍历有单元对不上或读不出
+PROBE G-level-zero-detail-of-I-2.1
+PROBE G-level-zero-detail-of-I-2.1 墓碑树内部条目的子指针（走读不往下读的孩子）在盘 0 槽 50278 的那一份按头里那一类的长度（没登记的 16 KiB、32 KiB 都试）与位置条目里的校验和对不上
+PROBE G-level-zero-detail-of-I-4.8
+PROBE G-level-zero-detail-of-I-4.8 最新根（txg 5）出发的遍历有单元对不上或读不出
+PROBE G-tomb-root-level-one-type0-two-location-checksums-wrong
+PROBE G-tomb-root-level-one-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=1 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树内部条目的子指针（走读不往下读的孩子）两份都与位置条目里的校验和对不上
+PROBE G-tomb-root-level-zero-type0-two-location-checksums-wrong
+PROBE G-tomb-root-level-zero-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=1 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：墓碑树内部条目的子指针（走读不往下读的孩子）两份都与位置条目里的校验和对不上
+PROBE-UNDER-EXTRA-1 G-tomb-root-level-one-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=1 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树内部条目的子指针（走读不往下读的孩子）两份都与位置条目里的校验和对不上
+PROBE-UNDER-EXTRA-1 G-tomb-root-level-zero-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=1 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：墓碑树内部条目的子指针（走读不往下读的孩子）两份都与位置条目里的校验和对不上
+PROBE-UNDER-EXTRA-2 G-tomb-root-level-one-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树层级 1 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE-UNDER-EXTRA-2 G-tomb-root-level-zero-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：墓碑树层级 0 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+PROBE-UNDER-EXTRA-3 G-tomb-root-level-one-type0-two-location-checksums-wrong red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=1 i2_1_first_item=墓碑树内部条目的子指针（走读不往下读的孩 i7_2_items_both_copies_wrong=1 i7_2_items_level_one_type_zero=1 i7_2_first_item=最新的根走不完：墓碑树内部条目的子指针（走读不往下读的孩子）两份都与位置条目里的校验和对不上
+PROBE-UNDER-EXTRA-3 G-tomb-root-level-zero-type0-two-location-checksums-wrong red=["I-4.8", "I-7.2", "I-7.4"] i2_1_items_of_the_child_the_walk_does_not_go_into=0 i2_1_first_item=- i7_2_items_both_copies_wrong=0 i7_2_items_level_one_type_zero=0 i7_2_first_item=最新的根走不完：墓碑树层级 0 的节点有类型段 0 的条目：孩子会是层级 0 的码 2 节点，这两棵树里没有条款定的形状
+RESULT extra line=1 named_test=an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_of_an_unregistered_class_whose_first_location_checksum_matches_its_first_sixteen_kibibytes_leaves_the_checksum_invariant_holding verdict=RED cargo_rc=101 ran=5 failed=1 failed_tests=[ an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_of_an_unregistered_class_whose_first_location_checksum_matches_its_first_sixteen_kibibytes_leaves_the_checksum_invariant_holding ]
+RESULT extra line=2 named_test=a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants verdict=RED cargo_rc=101 ran=5 failed=2 failed_tests=[ a_lineage_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ]
+RESULT extra line=3 named_test=a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants verdict=SURVIVES cargo_rc=0 ran=5 failed=0 failed_tests=[ ]
+RESULT extra line=4 named_test=probe_of_the_sonnet_leg_for_batch31 verdict=SURVIVES cargo_rc=0 ran=1 failed=0 failed_tests=[ ]
+RESULT table line=3054 named_test=a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants verdict=RED cargo_rc=101 ran=5 failed=2 failed_tests=[ a_lineage_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ]
+RESULT table line=3055 named_test=an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_whose_first_location_checksum_matches_only_its_first_sixteen_kibibytes_reddens_the_checksum_invariant verdict=RED cargo_rc=101 ran=5 failed=1 failed_tests=[ an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_whose_first_location_checksum_matches_only_its_first_sixteen_kibibytes_reddens_the_checksum_invariant ]
+RESULT table line=3056 named_test=an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_of_an_unregistered_class_whose_first_location_checksum_matches_its_first_sixteen_kibibytes_leaves_the_checksum_invariant_holding verdict=RED cargo_rc=101 ran=5 failed=1 failed_tests=[ an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_of_an_unregistered_class_whose_first_location_checksum_matches_its_first_sixteen_kibibytes_leaves_the_checksum_invariant_holding ]
+RESULT table line=3057 named_test=an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_second_copy_does_not_read_back_reddens_the_checksum_invariant verdict=RED cargo_rc=101 ran=5 failed=1 failed_tests=[ an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_second_copy_does_not_read_back_reddens_the_checksum_invariant ]
+test a_lineage_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_second_copy_does_not_read_back_reddens_the_checksum_invariant ... ok
+test an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_of_an_unregistered_class_whose_first_location_checksum_matches_its_first_sixteen_kibibytes_leaves_the_checksum_invariant_holding ... ok
+test an_inode_tree_entry_with_an_unregistered_type_over_a_leaf_whose_first_location_checksum_matches_only_its_first_sixteen_kibibytes_reddens_the_checksum_invariant ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 170 filtered out

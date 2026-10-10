@@ -1,0 +1,96 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 12.13s
+     Running tests/pool_checker_judges_the_deletion_state_of_every_walked_version.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/pool_checker_judges_the_deletion_state_of_every_walked_version-e216f9aa004669de)
+
+running 45 tests
+test a_leaf_holding_two_inode_numbers_in_descending_order_reddens_only_the_container_number_invariant ... ok
+test a_new_inode_published_with_nlink_zero_as_in_the_formal_line_being_deleted_variant_reddens_the_deletion_queue_invariant ... ok
+test a_pending_deletion_occupancy_row_that_is_not_zero_reddens_only_the_pending_deletion_invariant ... ok
+test a_deletion_queue_holding_one_number_twice_reddens_only_the_key_order_invariant ... ok
+test a_deleted_inodes_root_that_does_not_read_back_leaves_the_deletion_queue_invariants_not_judged ... ok
+test a_deletion_queue_of_two_inodes_being_deleted_with_their_tombstones_reddens_only_the_at_most_one_key_invariant ... ok
+test a_deleted_inodes_entry_whose_head_identifier_names_no_inode_tree_leaves_the_deletion_queue_invariants_not_judged ... ok
+test a_queued_inode_whose_tombstone_does_not_cover_the_whole_object_reddens_the_queued_tombstone_invariant ... ok
+test a_queue_number_whose_inode_record_has_nlink_one_reddens_the_deletion_queue_invariant ... ok
+test a_size_ahead_of_the_data_units_on_a_version_without_a_deleted_inodes_entry_is_not_judged_with_the_reason_of_the_missing_entry ... ok
+test a_tombstone_container_that_does_not_read_back_leaves_the_watermark_invariant_not_judged ... ok
+test a_queue_number_without_an_inode_record_reddens_only_the_deletion_queue_invariant ... ok
+test a_queued_inode_whose_tombstone_names_another_object_birth_reddens_the_queued_tombstone_invariant ... ok
+test a_tombstone_container_outside_the_published_predicate_does_not_count_toward_the_watermark ... ok
+test a_queued_inode_whose_tombstone_died_on_a_branch_a_rollback_left_reddens_only_the_queued_tombstone_invariant ... ok
+test an_accounting_tree_that_does_not_read_back_leaves_the_pending_deletion_invariant_not_judged ... ok
+test an_accounting_tree_without_the_pending_deletion_occupancy_row_reddens_only_the_pending_deletion_invariant ... ok
+test an_empty_entry_standing_in_for_the_extent_tree_while_the_real_extent_tree_names_no_inode_tree_leaves_the_data_unit_invariants_not_judged ... ok
+test an_extent_tree_entry_whose_head_identifier_names_no_inode_tree_leaves_the_data_unit_invariants_not_judged ... ok
+test an_extent_tree_that_does_not_read_back_leaves_the_data_unit_invariants_of_the_deletion_not_judged ... ok
+test an_inode_being_deleted_whose_size_asks_for_more_data_units_than_it_has_reddens_only_the_intermediate_state_invariant ... ok
+test an_inode_being_deleted_with_size_zero_and_one_data_unit_holds_the_intermediate_state_invariant ... ok
+test an_inode_record_with_nlink_zero_outside_the_queue_reddens_only_the_deletion_queue_invariant ... ok
+test an_inode_tree_whose_deleted_inodes_entry_carries_an_unregistered_kind_leaves_the_deletion_queue_invariants_not_judged ... ok
+test an_inode_tree_without_a_deleted_inodes_entry_in_the_tree_table_leaves_the_deletion_queue_invariants_not_judged ... ok
+test an_intermediate_deletion_batch_whose_size_asks_for_more_data_units_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_deletion_batch_with_a_non_zero_pending_deletion_row_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_tree_table_that_does_not_read_back_leaves_the_deletion_invariants_not_judged ... ok
+test a_tombstone_whose_object_identifier_reaches_the_inode_number_watermark_reddens_only_the_watermark_invariant ... ok
+test a_tombstone_on_the_lineage_naming_a_live_inode_reddens_only_the_live_object_invariant ... ok
+test an_intermediate_tree_table_whose_entries_are_narrower_than_the_field_table_leaves_the_deletion_invariants_not_judged ... ok
+test a_tombstone_that_died_after_every_version_reddens_only_the_tombstone_record_invariant ... ok
+test an_intermediate_version_with_an_inode_record_of_nlink_zero_outside_the_queue_reddens_while_the_newest_root_is_clean ... ok
+test a_tombstone_on_the_lineage_carrying_another_object_birth_for_a_live_number_reddens_the_one_birth_per_number_invariant ... ok
+test an_intermediate_version_whose_inode_leaf_does_not_read_back_is_not_judged_rather_than_red ... ok
+test a_tombstone_that_does_not_cover_the_whole_object_reddens_only_the_tombstone_record_invariant ... ok
+test an_intermediate_version_with_data_units_of_an_inode_without_a_record_reddens_while_the_newest_root_is_clean ... ok
+test a_tombstone_off_the_lineage_whose_object_birth_differs_from_the_live_record_reddens_only_the_object_birth_invariant ... ok
+test a_tombstone_that_died_before_its_object_was_born_reddens_only_the_tombstone_record_invariant ... ok
+test data_units_of_an_inode_without_a_record_outside_the_queue_redden_only_the_inode_being_deleted_invariant ... ok
+test unlinking_then_rolling_back_before_the_intent_and_back_to_the_emptied_version_holds_every_lineage_invariant ... ok
+test unlinking_the_same_inode_again_after_a_rollback_before_its_intent_holds_the_tombstone_record_invariant ... ok
+test an_intermediate_version_without_a_deleted_inodes_entry_leaves_the_deletion_queue_invariants_not_judged_while_the_newest_root_is_clean ... ok
+test two_tombstones_of_one_object_on_the_lineage_redden_only_the_tombstone_record_invariant ... ok
+test every_published_step_of_unlinking_a_three_unit_file_holds_the_deletion_invariants ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 69.05s
+
+     Running tests/rollback_by_a_forward_publish.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+
+running 25 tests
+test after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback ... ok
+test rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration ... ok
+test a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root ... ok
+
+test result: ok. 3 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out; finished in 9.36s
+
+     Running tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/unlink_idempotence_criteria_and_rollback_to_the_emptied_version-e9df936c04fe3af8)
+
+running 5 tests
+test rolling_back_to_the_version_before_the_intent_recomputes_tag_six_from_the_rollback_targets_inode_tree ... ok
+test tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_its_image ... ok
+test rolling_back_to_the_emptied_version_is_accepted_and_publishes_a_version_with_trees_and_no_file ... ok
+test the_publishes_continued_by_a_remount_between_two_batches_equal_the_rest_of_the_uninterrupted_run ... ok
+test a_crash_halfway_through_the_writes_of_the_first_batch_continues_on_remount_to_the_uninterrupted_end_state ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.32s
+

@@ -1,0 +1,13 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.72s
+     Running tests/zz_probe_k1_diff.rs (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/target/debug/deps/zz_probe_k1_diff-3767b0fff8c5fc54)
+
+running 1 test
+test zz_probe_k1_member_listing has been running for over 60 seconds
+PROBE lines=33
+test zz_probe_k1_member_listing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 79.31s
+
+exit=0

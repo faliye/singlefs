@@ -1,0 +1,1336 @@
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+index 25d4f64..faf45d8 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+@@ -791,6 +791,207 @@ fn w_judge_unit_birth_against_an_older_candidate_root(birth_txg: vec2<u32>) {
+     }
+ }
+ 
++// ───────────────────────── I-3.5（引用区间的精确性）的出现规则：走读时记下的东西 ─────────────────────────
++// 四张表在 crash_judge_checker_common.wgsl 的 C_APPEARANCE_*，只记主走读（上下文 0）走的那几版；这几个数是各表记到第几行，w_start(0) 清零。
++var<private> appearance_placement_count: u32;
++
++var<private> appearance_version_count: u32;
++
++var<private> appearance_version_placement_count: u32;
++
++var<private> appearance_walked_tree_table_count: u32;
++
++// 正在走的这一版树表里用户可见树的根记了几棵：记在版本表第 appearance_version_count 行（这一版走完才算进那一行）
++var<private> appearance_root_count_of_this_version: u32;
++
++// 走读此刻在哪棵用户可见树里往下走（walk.rs 的 user_visible_tree_being_walked）：在不在、种类、树 ID
++var<private> appearance_user_visible_tree_is_being_walked: bool;
++
++var<private> appearance_user_visible_tree_kind: u32;
++
++var<private> appearance_user_visible_tree: vec2<u32>;
++
++// 用户可见树的种类（walk.rs 的 USER_VISIBLE_TREE_KINDS：extent、inode、deleted_inodes）
++fn appearance_tree_kind_is_user_visible(kind: u32) -> bool {
++    return kind == TREE_KIND_EXTENT || kind == TREE_KIND_INODE || kind == TREE_KIND_DELETED_INODES;
++}
++
++// 落点表里 (盘, 槽) 那一行的下标，不在就是 NONE
++fn appearance_placement_index(device: u32, slot: vec2<u32>) -> u32 {
++    for (var i = 0u; i < appearance_placement_count; i = i + 1u) {
++        let row = C_APPEARANCE_PLACEMENTS + i * C_APPEARANCE_PLACEMENT_WORDS;
++        if (sw(row) == device && sw(row + 1u) == slot.x && sw(row + 2u) == slot.y) {
++            return i;
++        }
++    }
++    return NONE;
++}
++
++// walk.rs note_references_of_a_pointer_followed_by_the_walk 里记 I-3.5 那两张表的两句：落点第一次记下时记它是哪个单元
++// （unit_of_each_placement.entry(..).or_insert），走读此刻在一棵用户可见树里、这个落点还没打标签时打上那棵树（or_insert）
++fn appearance_note_placement(device: u32, slot: vec2<u32>, unit_device: u32, unit_slot: vec2<u32>) {
++    var index = appearance_placement_index(device, slot);
++    if (index == NONE) {
++        if (appearance_placement_count >= C_APPEARANCE_MAX_PLACEMENTS) {
++            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (40u << 8u);
++            return;
++        }
++        index = appearance_placement_count;
++        let new_row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
++        sws(new_row, device);
++        sws(new_row + 1u, slot.x);
++        sws(new_row + 2u, slot.y);
++        sws(new_row + 3u, unit_device);
++        sws(new_row + 4u, unit_slot.x);
++        sws(new_row + 5u, unit_slot.y);
++        sws(new_row + 6u, 0u);
++        sws(new_row + 7u, 0u);
++        sws(new_row + 8u, 0u);
++        sws(new_row + 9u, 0u);
++        appearance_placement_count = appearance_placement_count + 1u;
++    }
++    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
++    if (appearance_user_visible_tree_is_being_walked && sw(row + 6u) == 0u) {
++        sws(row + 6u, 1u);
++        sws(row + 7u, appearance_user_visible_tree_kind);
++        sws(row + 8u, appearance_user_visible_tree.x);
++        sws(row + 9u, appearance_user_visible_tree.y);
++    }
++}
++
++// 实例表一片的诞生代号（walk.rs 的 birth_txg_of_walked_instance_table_pages）：记进走过的单元那一行，标记写 2——
++// I-4.9 只认标记 1（实例表单元按 I-1.2 那一行的例外不进 I-4.9），I-3.5 两种都认
++fn appearance_note_the_birth_txg_of_an_instance_table_page(device: u32, slot: vec2<u32>, birth_txg: vec2<u32>) {
++    let visited_index = w_visited_index_in_the_main_walk(device, slot);
++    if (visited_index == NONE || sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS) != 0u) {
++        return;
++    }
++    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS, 2u);
++    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 1u, birth_txg.x);
++    sws(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 2u, birth_txg.y);
++}
++
++// 正在走的这一版树表里一棵用户可见树的根记进版本表的待定那一行（版本表满了不记：这一版走完记它时判不了）
++fn appearance_note_a_user_visible_root_of_this_version(kind: u32, tree: vec2<u32>, root_pointer_birth_txg: vec2<u32>) {
++    if (appearance_version_count >= C_APPEARANCE_MAX_VERSIONS) {
++        return;
++    }
++    if (appearance_root_count_of_this_version >= C_APPEARANCE_MAX_USER_VISIBLE_ROOTS) {
++        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (41u << 8u);
++        return;
++    }
++    let row = C_APPEARANCE_VERSIONS + appearance_version_count * C_APPEARANCE_VERSION_WORDS
++        + C_APPEARANCE_VERSION_ROOTS_OFFSET + appearance_root_count_of_this_version * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
++    sws(row, kind);
++    sws(row + 1u, tree.x);
++    sws(row + 2u, tree.y);
++    sws(row + 3u, root_pointer_birth_txg.x);
++    sws(row + 4u, root_pointer_birth_txg.y);
++    appearance_root_count_of_this_version = appearance_root_count_of_this_version + 1u;
++}
++
++// 这一版第一个读得出的树表（walk_the_entries_of_a_tree_table_walked_first_by_this_version）：树表里每棵根指针非全零的用户可见树
++// （条目窄于 200 字节的不算，tree_table_entry_of_the_walk 交 None）记成这一版的根，连同树表落点记进走过的树表那张表
++fn appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt: Node, tree_table_pointer: Ptr) {
++    if (appearance_walked_tree_table_count >= C_APPEARANCE_MAX_WALKED_TREE_TABLES) {
++        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (42u << 8u);
++        return;
++    }
++    let table_row = C_APPEARANCE_WALKED_TREE_TABLES + appearance_walked_tree_table_count * C_APPEARANCE_WALKED_TREE_TABLE_WORDS;
++    sws(table_row, tree_table_pointer.device0);
++    sws(table_row + 1u, tree_table_pointer.slot0.x);
++    sws(table_row + 2u, tree_table_pointer.slot0.y);
++    var roots = 0u;
++    if (tt.entry_width >= 200u) {
++        for (var e = 0u; e < tt.entry_count; e = e + 1u) {
++            let o = entry_offset(tt, e);
++            let kind = rd16(tt.base, o + 10u);
++            let root_pointer = parse_node_pointer(tt.base, o + 14u);
++            if (!appearance_tree_kind_is_user_visible(kind) || root_pointer.all_zero) {
++                continue;
++            }
++            if (roots >= C_APPEARANCE_MAX_USER_VISIBLE_ROOTS) {
++                undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (46u << 8u);
++                return;
++            }
++            let root_row = table_row + C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET + roots * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
++            let tree = rd64(tt.base, o);
++            sws(root_row, kind);
++            sws(root_row + 1u, tree.x);
++            sws(root_row + 2u, tree.y);
++            sws(root_row + 3u, root_pointer.birth_txg.x);
++            sws(root_row + 4u, root_pointer.birth_txg.y);
++            roots = roots + 1u;
++            appearance_note_a_user_visible_root_of_this_version(kind, tree, root_pointer.birth_txg);
++        }
++    }
++    sws(table_row + 3u, roots);
++    appearance_walked_tree_table_count = appearance_walked_tree_table_count + 1u;
++}
++
++// 这一版的树表别的版本先走过（judge_the_tree_table_entries_an_earlier_version_walked）：这一版的用户可见树的根照先走那一版记下的取；
++// 先走那一版头用不了、没记下的，这里没有对象
++fn appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(tree_table_pointer: Ptr) {
++    for (var t = 0u; t < appearance_walked_tree_table_count; t = t + 1u) {
++        let table_row = C_APPEARANCE_WALKED_TREE_TABLES + t * C_APPEARANCE_WALKED_TREE_TABLE_WORDS;
++        if (sw(table_row) != tree_table_pointer.device0 || sw(table_row + 1u) != tree_table_pointer.slot0.x || sw(table_row + 2u) != tree_table_pointer.slot0.y) {
++            continue;
++        }
++        let roots = sw(table_row + 3u);
++        for (var r = 0u; r < roots; r = r + 1u) {
++            let root_row = table_row + C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET + r * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
++            appearance_note_a_user_visible_root_of_this_version(sw(root_row), vec2<u32>(sw(root_row + 1u), sw(root_row + 2u)), vec2<u32>(sw(root_row + 3u), sw(root_row + 4u)));
++        }
++        return;
++    }
++}
++
++// 走树表的第 e 条之前（walk_the_entries_of_a_tree_table_walked_first_by_this_version 的循环）：条目是一棵根指针非全零的用户可见树时，
++// 之后跟着指针记下的落点打上那棵树；不是就不打
++fn appearance_begin_tree_table_entry(tt: Node, e: u32) {
++    appearance_user_visible_tree_is_being_walked = false;
++    if (tt.entry_width < 200u) {
++        return;
++    }
++    let o = entry_offset(tt, e);
++    let kind = rd16(tt.base, o + 10u);
++    if (!appearance_tree_kind_is_user_visible(kind) || parse_node_pointer(tt.base, o + 14u).all_zero) {
++        return;
++    }
++    appearance_user_visible_tree_is_being_walked = true;
++    appearance_user_visible_tree_kind = kind;
++    appearance_user_visible_tree = rd64(tt.base, o);
++}
++
++// note_the_version_just_walked_for_the_appearance_rule：一版走完，把它此刻引用过的落点（这一版的集合，w_judge_placement_in_version 记的）
++// 换成落点表的下标记进版本表，连同实例、txg、走读这一版有没有记失败
++fn appearance_note_the_version_just_walked(instance: u32, txg: vec2<u32>, references_are_complete: bool) {
++    if (appearance_version_count >= C_APPEARANCE_MAX_VERSIONS) {
++        undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (43u << 8u);
++        return;
++    }
++    let row = C_APPEARANCE_VERSIONS + appearance_version_count * C_APPEARANCE_VERSION_WORDS;
++    sws(row, instance);
++    sws(row + 1u, txg.x);
++    sws(row + 2u, txg.y);
++    sws(row + 3u, select(0u, 1u, references_are_complete));
++    sws(row + 4u, appearance_version_placement_count);
++    let count = w_in_version_count[0];
++    for (var i = 0u; i < count; i = i + 1u) {
++        let placement = appearance_placement_index(sw(C_IN_VERSION0 + i * 3u), vec2<u32>(sw(C_IN_VERSION0 + i * 3u + 1u), sw(C_IN_VERSION0 + i * 3u + 2u)));
++        // 这一版引用过的每个落点都经 w_note_pointer_references 记过（这一版或先走的那一版）：不在说明落点表与这一版的集合脱节了
++        if (placement == NONE || appearance_version_placement_count >= C_APPEARANCE_MAX_VERSION_PLACEMENTS) {
++            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (44u << 8u);
++            return;
++        }
++        sws(C_APPEARANCE_VERSION_PLACEMENTS + appearance_version_placement_count, placement);
++        appearance_version_placement_count = appearance_version_placement_count + 1u;
++    }
++    sws(row + 5u, count);
++    sws(row + 6u, appearance_root_count_of_this_version);
++    appearance_version_count = appearance_version_count + 1u;
++}
++
+ // 主走读里 (盘, 槽) 在走过的单元表里的下标，不在就是 NONE
+ fn w_visited_index_in_the_main_walk(device: u32, slot: vec2<u32>) -> u32 {
+     for (var i = 0u; i < w_visited_count[0]; i = i + 1u) {
+@@ -833,6 +1034,11 @@ fn w_start(context: u32, judging: bool) {
+     w_mismatches = 0u;
+     w_parent_valid = false;
+     if (context == 0u) {
++        appearance_placement_count = 0u;
++        appearance_version_count = 0u;
++        appearance_version_placement_count = 0u;
++        appearance_walked_tree_table_count = 0u;
++        appearance_root_count_of_this_version = 0u;
+         w_leaf_count = 0u;
+         w_checksum_count = 0u;
+         w_tree_id_count = 0u;
+@@ -850,6 +1056,10 @@ fn w_start(context: u32, judging: bool) {
+ fn w_begin_version() {
+     w_in_version_count[w_context] = 0u;
+     w_parent_valid = false;
++    appearance_user_visible_tree_is_being_walked = false;
++    if (w_context == 0u) {
++        appearance_root_count_of_this_version = 0u;
++    }
+ }
+ 
+ // 引用集合：(盘, 起点槽, 跨度) 去重记进；位置项校验和记进主走读的表或收割表
+@@ -1022,6 +1232,10 @@ fn w_merge_below(device: u32, slot: vec2<u32>) {
+ 
+ // 走读跟着一条指针往下：两条位置条目记进引用集合，判同一版第二次引用，记到父单元下面
+ fn w_note_pointer_references(p: Ptr, span: u32) {
++    if (w_context == 0u) {
++        appearance_note_placement(p.device0, p.slot0, p.device0, p.slot0);
++        appearance_note_placement(p.device1, p.slot1, p.device0, p.slot0);
++    }
+     w_note_reference(p.device0, p.slot0, p.sum0, span);
+     w_judge_placement_in_version(p.device0, p.slot0);
+     w_record_below(p.device0, p.slot0);
+@@ -1358,6 +1572,9 @@ fn w_walk_instance_table_chain(first: Ptr, judge_rows: bool, fsid_low: vec2<u32>
+         if (!packed.ok) {
+             break;
+         }
++        if (w_context == 0u) {
++            appearance_note_the_birth_txg_of_an_instance_table_page(pointer.device0, pointer.slot0, rd64(s.base, 73u));
++        }
+         let p = packed.p;
+         // I-1.12：指针的出生树等于被指单元头偏移 43 的出生树（码 3）
+         w_judge(INVARIANT_I_1_12, eq64(pointer.birth_tree, p.birth_tree));
+@@ -2596,33 +2813,47 @@ fn w_walk_tree_table_entry(tt: Node, e: u32, fsid_low: vec2<u32>) {
+ }
+ 
+ // ── 一版的树表与中央映射树根（walk_tree_table_and_central_mapping_root）
++// 树表别的版本先走过（零单元发布、卸载与抬 F 的空发布照抄上一版的树表与映射根）：条目不重走，这一版的用户可见树的根照先走那一版记下的取，
++// 映射根照样往下走（共享的就并进这一版，I-3.5 比相邻两版的引用集合要它）；树表读不出、头用不了时映射根也不走
+ fn w_walk_tree_table_and_mapping(tree_table_pointer: Ptr, mapping_root_pointer: Ptr, fsid_low: vec2<u32>) {
++    let tree_table_walked_by_an_earlier_version = !tree_table_pointer.all_zero && w_visited_contains(tree_table_pointer.device0, tree_table_pointer.slot0);
+     let read = w_read_index_node(tree_table_pointer, vec2<u32>(0u, 0u), 2u, 0u, false, fsid_low);
+-    if (!read.ok) {
++    if (read.ok) {
++        let tt = read.n;
++        w_judge_tree_table_entries_ordering(tt);
++        w_judge_tree_table_entry_head_identifiers(tt);
++        if (w_context == 0u) {
++            appearance_note_the_user_visible_roots_of_a_tree_table_walked_first(tt, tree_table_pointer);
++        }
++        let parent_valid = w_parent_valid;
++        let parent_device = w_parent_device;
++        let parent_slot = w_parent_slot;
++        w_parent_valid = true;
++        w_parent_device = tree_table_pointer.device0;
++        w_parent_slot = tree_table_pointer.slot0;
++        for (var e = 0u; e < tt.entry_count; e = e + 1u) {
++            appearance_begin_tree_table_entry(tt, e);
++            w_walk_tree_table_entry(tt, e, fsid_low);
++            appearance_user_visible_tree_is_being_walked = false;
++        }
++        w_parent_valid = parent_valid;
++        w_parent_device = parent_device;
++        w_parent_slot = parent_slot;
++    } else if (tree_table_walked_by_an_earlier_version) {
++        if (w_context == 0u) {
++            appearance_take_the_user_visible_roots_of_a_tree_table_walked_earlier(tree_table_pointer);
++        }
++    } else {
+         return;
+     }
+-    let tt = read.n;
+-    w_judge_tree_table_entries_ordering(tt);
+-    w_judge_tree_table_entry_head_identifiers(tt);
+-    let parent_valid = w_parent_valid;
+-    let parent_device = w_parent_device;
+-    let parent_slot = w_parent_slot;
+-    w_parent_valid = true;
+-    w_parent_device = tree_table_pointer.device0;
+-    w_parent_slot = tree_table_pointer.slot0;
+-    for (var e = 0u; e < tt.entry_count; e = e + 1u) {
+-        w_walk_tree_table_entry(tt, e, fsid_low);
+-    }
+-    w_parent_valid = parent_valid;
+-    w_parent_device = parent_device;
+-    w_parent_slot = parent_slot;
+     let mapping = w_walk_code_two_tree(mapping_root_pointer, mapping_root_pointer.birth_tree, 1u, fsid_low);
+     w_walk_central_mapping_entries(mapping.entries, fsid_low);
+ }
+ 
+ // ── 一条根（walk_root）
+ // 走一遍：一条根（WALK_KIND_ROOT：实例表与分配记录树、树表与映射都取自这条根记录），或一版由记录施加出来、根槽从没落盘的版本
+-// （WALK_KIND_VERSION：树表与映射取自那条记录，实例表与分配记录树取自它施加在其上的那条根；没有那条根就不走这两样）。
++// （WALK_KIND_VERSION：四条指针都取自那条记录的新根段——施加一条记录 = 把所选根的七个字段换成记录里的，D23（journal 的角色与格式）
++// 已定项 15，用户 2026-10-02「回到甲」；walk.rs 的 walk_version_applied_only_by_records 同一个取法）。
+ // 全内核只许有一处调它（walk_and_hand_off 的循环里）：显卡上的程序没有真的函数调用，驱动的编译器把每个调用点各展开一份，
+ // 这一整棵展开之后三十多万记号。原来五处走根、一处走版本各展开一份时，走读内核展开后 242 万记号，本机（驱动 595 版）冷编 523 秒、
+ // 常驻 4.1 GiB，第二台（驱动 580 版）在 48G 里编不完；只留一处之后本机 18 秒、0.8 GiB。
+@@ -2630,27 +2861,275 @@ fn w_walk_tree_table_and_mapping(tree_table_pointer: Ptr, mapping_root_pointer:
+ const WALK_KIND_ROOT: u32 = 0u;
+ const WALK_KIND_VERSION: u32 = 1u;
+ 
+-fn w_walk_one(kind: u32, record_base: u32, applied_on_base: u32, is_newest: bool, fsid_low: vec2<u32>) {
++fn w_walk_one(kind: u32, record_base: u32, is_newest: bool, fsid_low: vec2<u32>) {
+     w_begin_version();
+     w_accounting_recording = is_newest;
+-    var carrier_base = record_base;
+     var tree_table_pointer_offset = 36u;
+     var mapping_root_pointer_offset = 256u;
++    var instance_table_pointer_offset = 170u;
++    var allocation_root_pointer_offset = 342u;
+     if (kind == WALK_KIND_VERSION) {
+-        carrier_base = applied_on_base;
+-        tree_table_pointer_offset = 99u;
+-        mapping_root_pointer_offset = 185u;
++        tree_table_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET;
++        mapping_root_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + 86u;
++        instance_table_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER;
++        allocation_root_pointer_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER;
+     }
+-    if (carrier_base != NONE) {
+-        w_walk_instance_table_chain(parse_node_pointer(carrier_base, 170u), is_newest, fsid_low);
+-        let allocation_root = parse_node_pointer(carrier_base, 342u);
+-        if (!allocation_root.all_zero) {
+-            w_walk_allocation_record_tree(allocation_root, vec2<u32>(0u, 0u), fsid_low);
+-        }
++    w_walk_instance_table_chain(parse_node_pointer(record_base, instance_table_pointer_offset), is_newest, fsid_low);
++    let allocation_root = parse_node_pointer(record_base, allocation_root_pointer_offset);
++    if (!allocation_root.all_zero) {
++        w_walk_allocation_record_tree(allocation_root, vec2<u32>(0u, 0u), fsid_low);
+     }
+     w_walk_tree_table_and_mapping(parse_node_pointer(record_base, tree_table_pointer_offset), parse_node_pointer(record_base, mapping_root_pointer_offset), fsid_low);
+ }
+ 
++// ───────────────────────── I-3.5（引用区间的精确性）的出现规则：版本都走完之后逐对判 ─────────────────────────
++// walk.rs 的 HoleInTheCandidateSet
++const APPEARANCE_NO_HOLE: u32 = 0u;
++const APPEARANCE_HOLE_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS: u32 = 1u;
++const APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS: u32 = 2u;
++// 判一版时它去重之后的单元（版本表一行里的落点折成单元）摊在这里：每个单元 2 个字（落点表下标、走过的单元表下标或 NONE）。
++// 借 w_merge_below 的两块（C_PENDING 与紧跟其后的 C_EXPANDED），判的时候主走读那几版已经走完、不再并入
++const APPEARANCE_UNIT_WORDS: u32 = 2u;
++const APPEARANCE_UNITS: u32 = C_PENDING;
++const APPEARANCE_MAX_UNITS: u32 = (C_SCRATCH_END - C_PENDING) / APPEARANCE_UNIT_WORDS;
++
++fn appearance_version_row(version_index: u32) -> u32 {
++    return C_APPEARANCE_VERSIONS + version_index * C_APPEARANCE_VERSION_WORDS;
++}
++
++fn appearance_version_txg(version_index: u32) -> vec2<u32> {
++    let row = appearance_version_row(version_index);
++    return vec2<u32>(sw(row + 1u), sw(row + 2u));
++}
++
++// 落点表一行的 (盘, 槽) 比另一行的大（BTreeMap 的键序：先盘、后槽）
++fn appearance_placement_is_greater(index: u32, other: u32) -> bool {
++    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
++    let other_row = C_APPEARANCE_PLACEMENTS + other * C_APPEARANCE_PLACEMENT_WORDS;
++    if (sw(row) != sw(other_row)) {
++        return sw(row) > sw(other_row);
++    }
++    return lt64(vec2<u32>(sw(other_row + 1u), sw(other_row + 2u)), vec2<u32>(sw(row + 1u), sw(row + 2u)));
++}
++
++// 两行落点折成的是同一个单元
++fn appearance_same_unit(index: u32, other: u32) -> bool {
++    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
++    let other_row = C_APPEARANCE_PLACEMENTS + other * C_APPEARANCE_PLACEMENT_WORDS;
++    return sw(row + 3u) == sw(other_row + 3u) && sw(row + 4u) == sw(other_row + 4u) && sw(row + 5u) == sw(other_row + 5u);
++}
++
++// 落点表一行打的用户可见树标签是不是 (kind, tree)
++fn appearance_placement_is_in_tree(index: u32, kind: u32, tree: vec2<u32>) -> bool {
++    let row = C_APPEARANCE_PLACEMENTS + index * C_APPEARANCE_PLACEMENT_WORDS;
++    return sw(row + 6u) == 1u && sw(row + 7u) == kind && sw(row + 8u) == tree.x && sw(row + 9u) == tree.y;
++}
++
++// 一版去重之后的单元摊进 APPEARANCE_UNITS，交回几个（判不了交回 NONE）。note_the_version_just_walked_for_the_appearance_rule 把这一版的落点
++// 按 (盘, 槽) 升序折成单元收进 BTreeMap，同一个单元后收的标签盖掉先收的：这里每个单元留它 (盘, 槽) 最大的那个落点（标签取那一个的）
++fn appearance_spread_the_units_of_a_version(version_index: u32) -> u32 {
++    let row = appearance_version_row(version_index);
++    let first = sw(row + 4u);
++    let count = sw(row + 5u);
++    var units = 0u;
++    for (var k = 0u; k < count; k = k + 1u) {
++        let placement = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k);
++        var a_greater_placement_of_the_same_unit = false;
++        for (var j = 0u; j < count; j = j + 1u) {
++            let other = sw(C_APPEARANCE_VERSION_PLACEMENTS + first + j);
++            if (j != k && appearance_same_unit(placement, other) && appearance_placement_is_greater(other, placement)) {
++                a_greater_placement_of_the_same_unit = true;
++                break;
++            }
++        }
++        if (a_greater_placement_of_the_same_unit) {
++            continue;
++        }
++        if (units >= APPEARANCE_MAX_UNITS) {
++            undecidable = UNDECIDABLE_TOO_MANY_ENTRIES | (45u << 8u);
++            return NONE;
++        }
++        let placement_row = C_APPEARANCE_PLACEMENTS + placement * C_APPEARANCE_PLACEMENT_WORDS;
++        sws(APPEARANCE_UNITS + units * APPEARANCE_UNIT_WORDS, placement);
++        sws(APPEARANCE_UNITS + units * APPEARANCE_UNIT_WORDS + 1u,
++            w_visited_index_in_the_main_walk(sw(placement_row + 3u), vec2<u32>(sw(placement_row + 4u), sw(placement_row + 5u))));
++        units = units + 1u;
++    }
++    return units;
++}
++
++// 摊开的第 u 个单元有没有记下诞生代号（被引用单元那一支标记 1、实例表一片标记 2；头读不出的没有）
++fn appearance_unit_birth_is_known(u: u32) -> bool {
++    let visited_index = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS + 1u);
++    return visited_index != NONE && sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS) != 0u;
++}
++
++fn appearance_unit_birth_txg(u: u32) -> vec2<u32> {
++    let visited_index = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS + 1u);
++    return vec2<u32>(sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 1u), sw(C_VISITED_BIRTHS0 + visited_index * C_VISITED_BIRTH_WORDS + 2u));
++}
++
++// txg 为 previous_txg 的那几版（R⁻ 那一组）里有没有一版引用了与落点表第 placement 行同一个单元
++fn appearance_previous_group_references_the_unit_of(previous_txg: vec2<u32>, placement: u32) -> bool {
++    for (var other = 0u; other < appearance_version_count; other = other + 1u) {
++        if (!eq64(appearance_version_txg(other), previous_txg)) {
++            continue;
++        }
++        let row = appearance_version_row(other);
++        let first = sw(row + 4u);
++        let count = sw(row + 5u);
++        for (var k = 0u; k < count; k = k + 1u) {
++            if (appearance_same_unit(sw(C_APPEARANCE_VERSION_PLACEMENTS + first + k), placement)) {
++                return true;
++            }
++        }
++    }
++    return false;
++}
++
++// walk.rs hole_in_the_candidate_set_between：R⁻ 那一组（txg previous_txg 的那几版）与这一版 (version_instance, version_txg) 之间的洞；
++// 接得上 ⟺ R⁻ 的某个实例 i：最新根的实例表里有一行 (i, T = R⁻.txg)，这一版的实例 v > i，i 与 v 之间每个实例都有一行、每一行都是 (j, 0, 0)
++fn appearance_hole_between(previous_txg: vec2<u32>, version_txg: vec2<u32>, version_instance: u32) -> u32 {
++    let previous_txg_has_a_successor = !(previous_txg.x == NONE && previous_txg.y == NONE);
++    if (previous_txg_has_a_successor && eq64(add64(previous_txg, u64_of(1u)), version_txg)) {
++        return APPEARANCE_NO_HOLE;
++    }
++    for (var other = 0u; other < appearance_version_count; other = other + 1u) {
++        if (!eq64(appearance_version_txg(other), previous_txg)) {
++            continue;
++        }
++        let previous_instance = sw(appearance_version_row(other));
++        if (version_instance <= previous_instance) {
++            continue;
++        }
++        var row_of_the_previous_version = false;
++        var instances_between = 0u;
++        var every_row_between_published_nothing = true;
++        for (var k = 0u; k < w_instance_row_count; k = k + 1u) {
++            let row = C_INSTANCE_ROWS + k * C_ROW_WORDS;
++            let instance = sw(row);
++            let row_txg = vec2<u32>(sw(row + 1u), sw(row + 2u));
++            let row_high_water = vec2<u32>(sw(row + 3u), sw(row + 4u));
++            if (instance == previous_instance && eq64(row_txg, previous_txg)) {
++                row_of_the_previous_version = true;
++            }
++            if (instance <= previous_instance || instance >= version_instance) {
++                continue;
++            }
++            if (!is_zero64(row_txg) || !is_zero64(row_high_water)) {
++                every_row_between_published_nothing = false;
++            }
++            // 中间的实例按不同的代号数（同一个实例有两行只算一个）
++            var counted_before = false;
++            for (var j = 0u; j < k; j = j + 1u) {
++                if (sw(C_INSTANCE_ROWS + j * C_ROW_WORDS) == instance) {
++                    counted_before = true;
++                    break;
++                }
++            }
++            if (!counted_before) {
++                instances_between = instances_between + 1u;
++            }
++        }
++        if (row_of_the_previous_version && instances_between == version_instance - previous_instance - 1u && every_row_between_published_nothing) {
++            return APPEARANCE_HOLE_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS;
++        }
++    }
++    return APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS;
++}
++
++// 这一版（摊开在 APPEARANCE_UNITS 里，units 个）树表里第 root_index 棵用户可见树是不是整棵继承下来的：根指针出生 txg 严格小于 R⁻.txg，
++// 且这一版里那棵树下读得出的诞生代号都不大于它
++fn appearance_tree_is_inherited_whole(version_index: u32, root_index: u32, units: u32, previous_txg: vec2<u32>) -> bool {
++    let root_row = appearance_version_row(version_index) + C_APPEARANCE_VERSION_ROOTS_OFFSET + root_index * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
++    let kind = sw(root_row);
++    let tree = vec2<u32>(sw(root_row + 1u), sw(root_row + 2u));
++    let root_pointer_birth_txg = vec2<u32>(sw(root_row + 3u), sw(root_row + 4u));
++    if (!lt64(root_pointer_birth_txg, previous_txg)) {
++        return false;
++    }
++    for (var u = 0u; u < units; u = u + 1u) {
++        if (!appearance_placement_is_in_tree(sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS), kind, tree) || !appearance_unit_birth_is_known(u)) {
++            continue;
++        }
++        if (!le64(appearance_unit_birth_txg(u), root_pointer_birth_txg)) {
++            return false;
++        }
++    }
++    return true;
++}
++
++// walk.rs judge_the_appearance_rule_of_adjacent_candidate_versions：回退候选集（走过的每一版）按 txg 升序、同 txg 并成一组，
++// 每一版 R 与 txg 比它小的那几版里 txg 最大的那一组 R⁻ 比：R 引用而 R⁻ 不引用、诞生代号读得出的每个单元 b 满足
++// (a) birth(b) > R⁻.txg，或 (b) b 打着一棵整棵继承下来的用户可见树的标签。有洞而实例表行接不上时打着用户可见树标签的不判（N3）；
++// R 或 R⁻ 那一组有一版走读记过失败的那一对不判。一个单元都没判到时 CPU 报不适用，违例位上与成立一样是 0
++fn judge_the_appearance_rule_of_adjacent_candidate_versions() {
++    for (var version_index = 0u; version_index < appearance_version_count; version_index = version_index + 1u) {
++        let row = appearance_version_row(version_index);
++        let version_txg = appearance_version_txg(version_index);
++        var has_previous = false;
++        var previous_txg = vec2<u32>(0u, 0u);
++        for (var other = 0u; other < appearance_version_count; other = other + 1u) {
++            let other_txg = appearance_version_txg(other);
++            if (lt64(other_txg, version_txg) && (!has_previous || lt64(previous_txg, other_txg))) {
++                previous_txg = other_txg;
++                has_previous = true;
++            }
++        }
++        if (!has_previous || sw(row + 3u) != 1u) {
++            continue;
++        }
++        var previous_references_are_complete = true;
++        for (var other = 0u; other < appearance_version_count; other = other + 1u) {
++            if (eq64(appearance_version_txg(other), previous_txg) && sw(appearance_version_row(other) + 3u) != 1u) {
++                previous_references_are_complete = false;
++            }
++        }
++        if (!previous_references_are_complete) {
++            continue;
++        }
++        let hole = appearance_hole_between(previous_txg, version_txg, sw(row));
++        let units = appearance_spread_the_units_of_a_version(version_index);
++        if (units == NONE) {
++            return;
++        }
++        // 这一版里整棵继承下来的用户可见树（第 r 棵是就置位 r）
++        var trees_inherited_whole = 0u;
++        let roots = sw(row + 6u);
++        for (var r = 0u; r < roots; r = r + 1u) {
++            if (appearance_tree_is_inherited_whole(version_index, r, units, previous_txg)) {
++                trees_inherited_whole = trees_inherited_whole | (1u << r);
++            }
++        }
++        for (var u = 0u; u < units; u = u + 1u) {
++            let placement = sw(APPEARANCE_UNITS + u * APPEARANCE_UNIT_WORDS);
++            if (appearance_previous_group_references_the_unit_of(previous_txg, placement)) {
++                continue;
++            }
++            let placement_row = C_APPEARANCE_PLACEMENTS + placement * C_APPEARANCE_PLACEMENT_WORDS;
++            let in_a_user_visible_tree = sw(placement_row + 6u) == 1u;
++            if (hole == APPEARANCE_HOLE_NOT_BRIDGED_BY_THE_INSTANCE_TABLE_ROWS && in_a_user_visible_tree) {
++                continue;
++            }
++            if (!appearance_unit_birth_is_known(u)) {
++                continue;
++            }
++            let born_after_the_previous_version = lt64(previous_txg, appearance_unit_birth_txg(u));
++            var in_a_tree_inherited_whole = false;
++            for (var r = 0u; r < roots; r = r + 1u) {
++                let root_row = row + C_APPEARANCE_VERSION_ROOTS_OFFSET + r * C_APPEARANCE_USER_VISIBLE_ROOT_WORDS;
++                if ((trees_inherited_whole & (1u << r)) != 0u
++                    && appearance_placement_is_in_tree(placement, sw(root_row), vec2<u32>(sw(root_row + 1u), sw(root_row + 2u)))) {
++                    in_a_tree_inherited_whole = true;
++                }
++            }
++            if (!(born_after_the_previous_version || in_a_tree_inherited_whole)) {
++                violate(INVARIANT_I_3_5);
++            }
++        }
++    }
++}
++
+ // ───────────────────────── 第二批：走读与走读之后（check_pool_image 择根之后那一段）─────────────────────────
+ 
+ // 恢复眼里的 journal 环：每个计数器取按盘次序第一块盘上自证过的那一份（records_as_the_recovery_reads_them）
+@@ -2937,7 +3416,6 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
+         var found = false;
+         var walk_kind = WALK_KIND_ROOT;
+         var walk_base = NONE;
+-        var walk_applied_on = NONE;
+         var walk_is_newest = false;
+         if (phase == WALK_PHASE_NEWEST_ROOT) {
+             walk_base = newest_root.base;
+@@ -3048,23 +3526,14 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
+             if (cursor < version_count) {
+                 let r = checker_record_at(sw(R_DATA + cursor));
+                 cursor = cursor + 1u;
+-                // 它施加在其上那一版的根：同实例、txg 比它小、txg 最大的那一条
+-                var applied_on = NONE;
+-                var applied_on_txg = vec2<u32>(0u, 0u);
+-                for (var k = 0u; k < root_count; k = k + 1u) {
+-                    let root = checker_root_of(k);
+-                    if (root.instance == r.instance && lt64(root.txg, r.txg)) {
+-                        if (applied_on == NONE || lt64(applied_on_txg, root.txg)) {
+-                            applied_on = root.base;
+-                            applied_on_txg = root.txg;
+-                        }
+-                    }
+-                }
+                 walk_kind = WALK_KIND_VERSION;
+                 walk_base = r.base;
+-                walk_applied_on = applied_on;
+                 found = true;
+             } else {
++                // I-3.5：回退候选集的每一版（最新根、候选根、由记录施加出来的版本）都走完了，逐对判（check_pool_image 走完它们之后那一处）
++                if (undecidable == 0u) {
++                    judge_the_appearance_rule_of_adjacent_candidate_versions();
++                }
+                 phase = WALK_PHASE_ABANDONED_ROOTS;
+                 cursor = 0u;
+             }
+@@ -3275,7 +3744,6 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
+                 w_harvesting = false;
+                 walk_kind = WALK_KIND_VERSION;
+                 walk_base = checker_record_of_row(C_REPLAY_RECORDS + last_applied * C_REPLAY_RECORD_WORDS).base;
+-                walk_applied_on = newest_root.base;
+                 found = true;
+             }
+         }
+@@ -3291,8 +3759,16 @@ fn walk_and_hand_off(g: CheckerSlot, fsid_low: vec2<u32>) -> u32 {
+         }
+         let mismatches_before = w_mismatches;
+         let failures_before = w_failures;
+-        w_walk_one(walk_kind, walk_base, walk_applied_on, walk_is_newest, fsid_low);
++        w_walk_one(walk_kind, walk_base, walk_is_newest, fsid_low);
+         w_version_is_an_older_candidate_root = false;
++        // I-3.5：主走读走的那几版（最新根、候选根、由记录施加出来的版本）各记一份它引用了哪些单元；这一版的实例与 txg：根记录偏移 24 / 28，记录偏移 16 / 26
++        if (phase == WALK_PHASE_NEWEST_ROOT || phase == WALK_PHASE_CANDIDATE_ROOTS || phase == WALK_PHASE_VERSIONS_APPLIED_ONLY_BY_RECORDS) {
++            var walked_instance = rd32(walk_base, 24u);
++            if (walk_kind == WALK_KIND_VERSION) {
++                walked_instance = rd32(walk_base, 16u);
++            }
++            appearance_note_the_version_just_walked(walked_instance, w_version_txg, w_failures == failures_before);
++        }
+         // ③ 走完之后这一阶段要做的
+         if (phase == WALK_PHASE_NEWEST_ROOT) {
+             c_newest_reference_count = w_reference_count[0];
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl b/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+index 9c741b7..8e612da 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+@@ -137,7 +137,10 @@ const INVARIANT_I_7_5: u32 = 63u;
+ 
+ const INVARIANT_I_8_5: u32 = 64u;
+ 
+-// 第 67、68 条：C673 ⑤ ⑥ 那两条（只往末尾追加；下标 65 的 I-3.5 内核还没判，这里没有它的常量）
++// 第 66 条：I-3.5（引用区间的精确性）的出现规则，走读内核在回退候选集的版本都走完之后逐对判
++const INVARIANT_I_3_5: u32 = 65u;
++
++// 第 67、68 条：C673 ⑤ ⑥ 那两条（只往末尾追加）
+ const INVARIANT_I_9_27: u32 = 66u;
+ 
+ const INVARIANT_I_5_5: u32 = 67u;
+@@ -700,8 +703,47 @@ const C_REPLAY_RECORD_WORDS: u32 = 4u;
+ 
+ const C_REPLAY_RECORDS: u32 = 253456u;
+ 
++// I-3.5（引用区间的精确性）的出现规则读的四张表，只记主走读（上下文 0）走的那几版（最新根、回退候选根、由记录施加出来的版本）。
++// ① 落点表（walk.rs 的 unit_of_each_placement 与 user_visible_tree_of_each_placement）：跟着指针记下的每个落点一行——
++//    落点盘、槽 lo/hi，它是哪个单元（第一次记下它的那条指针第 0 条位置条目的盘、槽 lo/hi），记下它那一刻走读在不在一棵用户可见树里
++//    （第一次在树里记下它时打上，之后不换）、那棵树的种类、树 ID lo/hi。
++const C_APPEARANCE_PLACEMENT_WORDS: u32 = 10u;
++
++const C_APPEARANCE_MAX_PLACEMENTS: u32 = 2048u;
++
++const C_APPEARANCE_PLACEMENTS: u32 = 255504u;
++
++// ② 版本表（walk.rs 的 versions_walked_for_the_appearance_rule）：走完的每一版一行——实例、txg lo/hi、走读一条失败都没记（1 / 0）、
++//    这一版引用的落点在 ③ 里的起点与条数、树表里用户可见树的根几棵，之后每棵 5 个字（种类、树 ID lo/hi、根指针出生 txg lo/hi）。
++const C_APPEARANCE_VERSION_WORDS: u32 = 48u;
++
++const C_APPEARANCE_MAX_USER_VISIBLE_ROOTS: u32 = 8u;
++
++const C_APPEARANCE_USER_VISIBLE_ROOT_WORDS: u32 = 5u;
++
++const C_APPEARANCE_VERSION_ROOTS_OFFSET: u32 = 7u;
++
++const C_APPEARANCE_MAX_VERSIONS: u32 = 64u;
++
++const C_APPEARANCE_VERSIONS: u32 = 275984u;
++
++// ③ 每一版引用的落点（walk.rs 的 placements_referenced_in_this_version 在这一版走完那一刻的样子）：每个落点一个字，是它在 ① 里的下标。
++const C_APPEARANCE_MAX_VERSION_PLACEMENTS: u32 = 8192u;
++
++const C_APPEARANCE_VERSION_PLACEMENTS: u32 = 279056u;
++
++// ④ 走过的树表（walk.rs 的 tree_table_entries_of_a_walked_tree_table 里 I-3.5 读的那一样）：第一个读得出它的那一版记下树表单元的盘、槽 lo/hi
++//    与它里面用户可见树的根几棵、每棵 5 个字（同 ②）；别的版本共享这片树表时照它取这一版的根。
++const C_APPEARANCE_WALKED_TREE_TABLE_WORDS: u32 = 44u;
++
++const C_APPEARANCE_WALKED_TREE_TABLE_ROOTS_OFFSET: u32 = 4u;
++
++const C_APPEARANCE_MAX_WALKED_TREE_TABLES: u32 = 64u;
++
++const C_APPEARANCE_WALKED_TREE_TABLES: u32 = 287248u;
++
+ // 每个状态的草稿区到这里为止：crash_judge_gpu.rs 的 SCRATCH_WORDS 与它相等（那一份的单测核）
+-const SCRATCH_END: u32 = 255504u;
++const SCRATCH_END: u32 = 290064u;
+ 
+ fn handoff_region_device(region: u32) -> u32 {
+     if (region == 0u) {
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_common.wgsl b/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+index 56c538d..37eb55a 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
++++ b/crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+@@ -94,6 +94,11 @@ const JOURNAL_NAMED_ENTRY_BYTES: u32 = 56u;
+ // 实例表指针 86、分配记录树根指针 86、卸载记号 4），fsid 8 紧跟新根段（偏移 463），头到 487 为止
+ const JOURNAL_NEW_ROOT_SEGMENT_OFFSET: u32 = 99u;
+ const JOURNAL_NEW_ROOT_SEGMENT_BYTES: u32 = 364u;
++// 新根段里后三段的段内偏移（walk.rs 的 NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER、NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER、
++// NEW_ROOT_SEGMENT_UNMOUNT_MARKER）：施加一条记录取这三段（已定项 15），卸载记号只有位 0（root_record.rs 的 ROOT_RECORD_FLAG_UNMOUNT_MARKER）
++const JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER: u32 = 188u;
++const JOURNAL_NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER: u32 = 274u;
++const JOURNAL_NEW_ROOT_SEGMENT_UNMOUNT_MARKER: u32 = 360u;
+ const JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET: u32 = 463u;
+ const JOURNAL_RING_START_BYTES: u32 = 16777216u;   // 1024 × 16384
+ const SYSTEM_CONFIGURATION_SLOT_BYTES: u32 = 4096u;
+@@ -952,7 +957,11 @@ fn invalid_record() -> Rec {
+     r.named_count = 0u;
+     return r;
+ }
+-// journal::JournalRecord::parse：magic、类型、整条校验和、标志、长度、提交标记、序号、新根段两条指针头部、fsid、载荷校验和
++// 记录新根段里一条指针的头（偏移 o 起 34 字节）是第一版的取值：head_ok 判的几段，加 extent 偏移（指针偏移 32 的 2 字节）为 0
++fn record_pointer_head_is_the_first_version(base: u32, o: u32) -> bool {
++    return parse_node_pointer(base, o).head_ok && rd16(base, o + 32u) == 0u;
++}
++// journal::JournalRecord::parse：magic、类型、整条校验和、标志、长度、提交标记、序号、新根段四条指针头部、卸载记号位 0 之外为 0、fsid、载荷校验和
+ fn parse_record(s: Slice, fsid_low: vec2<u32>) -> Rec {
+     if (s.version == NONE || s.length < JOURNAL_RECORD_BYTES) {
+         return invalid_record();
+@@ -976,9 +985,17 @@ fn parse_record(s: Slice, fsid_low: vec2<u32>) -> Rec {
+     if (ordinal == 0u) {
+         return invalid_record();
+     }
+-    let tree_table = parse_node_pointer(base, 99u);
+-    let mapping_root = parse_node_pointer(base, 185u);
+-    if (!tree_table.head_ok || !mapping_root.head_ok) {
++    // 新根段四条指针各按 NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from 判头：
++    // MAC / nonce、算法类型、压缩码、压缩长度、extent 偏移都是第一版的取值
++    if (!record_pointer_head_is_the_first_version(base, 99u) || !record_pointer_head_is_the_first_version(base, 185u)) {
++        return invalid_record();
++    }
++    if (!record_pointer_head_is_the_first_version(base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER)
++        || !record_pointer_head_is_the_first_version(base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER)) {
++        return invalid_record();
++    }
++    // UnmountMarker::of_unmount_marker_field_of_a_new_root_segment：位 0 之外有位为 1 当这条记录损坏
++    if ((rd32(base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_UNMOUNT_MARKER) & 0xFFFFFFFEu) != 0u) {
+         return invalid_record();
+     }
+     if (!eq64(rd64(base, JOURNAL_FILESYSTEM_IDENTIFIER_OFFSET), fsid_low)) {
+@@ -1281,15 +1298,18 @@ fn replay_journal(chosen: RootFields, ring_bytes: vec2<u32>) -> Replay {
+             continue;
+         }
+         open_count = 0u;
++        // 施加末条：所选根的七个字段换成记录新根段里的（recovery::replay_journal，已定项 15，用户 2026-10-02「回到甲」）；fsid 照所选根
+         var next = rebuilt;
+         next.valid = true;
+-        next.unmount = false;
++        next.unmount = (rd32(r.base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_UNMOUNT_MARKER) & 1u) != 0u;
+         next.instance = r.instance;
+         next.txg = r.txg;
+         next.tree_table = parse_node_pointer(r.base, 99u);
+         next.watermark = rd64(r.base, 271u);
+         next.floor = rd64(r.base, 279u);
++        next.instance_table = parse_node_pointer(r.base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER);
+         next.mapping_root = parse_node_pointer(r.base, 185u);
++        next.allocation_root = parse_node_pointer(r.base, JOURNAL_NEW_ROOT_SEGMENT_OFFSET + JOURNAL_NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER);
+         rebuilt = next;
+         replay_stop_reason = 12u;
+     }
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+index 4100ad3..44cb400 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
++++ b/crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+@@ -879,14 +879,14 @@ mod tests {
+     #[test]
+     fn states_in_one_dispatch_follow_the_scratch_memory_up_to_the_lane_limit() {
+         let bytes_per_state = u64::try_from(SCRATCH_WORDS * 4).expect("装得进 u64");
+-        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 2170);
++        assert_eq!(states_per_scratch_lane(BINDING_LIMIT), 1850);
+         assert_eq!(states_per_scratch_lane(1), 1, "再小的上限也带一个");
+-        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 989 248 = 13 024 个（向下取整）
++        // 12 GiB 的草稿区：12 × 1024 × 1024 × 1024 ÷ 1 160 256 = 11 105 个（向下取整）
+         assert_eq!(
+             states_per_dispatch(BINDING_LIMIT, 12 * 1024),
+             usize::try_from(12 * 1024 * 1024 * 1024 / bytes_per_state).expect("装得进 usize")
+         );
+-        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 13_024);
++        assert_eq!(states_per_dispatch(BINDING_LIMIT, 12 * 1024), 11_105);
+         assert_eq!(
+             states_per_dispatch(BINDING_LIMIT, 0),
+             1,
+@@ -894,7 +894,7 @@ mod tests {
+         );
+         assert_eq!(
+             states_per_dispatch(BINDING_LIMIT, 1024 * 1024),
+-            2170 * MAXIMUM_SCRATCH_LANES,
++            1850 * MAXIMUM_SCRATCH_LANES,
+             "显存再多也只到条数上限"
+         );
+     }
+@@ -1093,8 +1093,7 @@ mod tests {
+     /// 走读内核里「走一遍根」回到六个调用点（第二台 580 版驱动 48G 里编不完的那个形态），编之前就被拒。
+     #[test]
+     fn the_walk_kernel_with_the_root_walk_called_from_six_sites_is_refused() {
+-        const CALL: &str =
+-            "w_walk_one(walk_kind, walk_base, walk_applied_on, walk_is_newest, fsid_low);";
++        const CALL: &str = "w_walk_one(walk_kind, walk_base, walk_is_newest, fsid_low);";
+         let source = crate::crash_judge_gpu::checker_walk_kernel_source();
+         assert_eq!(
+             source.matches(CALL).count(),
+diff --git a/crates/singlefs-checker-tier/src/crash_judge_gpu.rs b/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+index 9d675b5..f267eee 100644
+--- a/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
++++ b/crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+@@ -3,7 +3,7 @@
+ //! 七类 oracle、记录核对器两条判据，判法与 CPU 判器（`crate::crash::judge_crash_image`）逐条相同；GPU 与 CPU 逐状态比是它的判别力自证。
+ //! 内核分五份源码：`crash_judge_common.wgsl`（各内核共用的解析与查表）、`crash_judge_recovery.wgsl`（恢复、oracle、记录核对器）、
+ //! `crash_judge_checker_common.wgsl`（池级 checker 两个内核共用的读法与交接段）、`crash_judge_checker.wgsl`（走读内核：第一、二批不变量，
+-//! 连同里程碑三二·1 那一批里的十五条与 I-9.27）、`crash_judge_checker_scan.wgsl`（扫描内核：第三批、I-3.12 与 I-5.5）；判不了的状态（表越过内核容量）置最高位、交 CPU 判。
++//! 连同里程碑三二·1 那一批里的十五条、I-9.27 与 I-3.5）、`crash_judge_checker_scan.wgsl`（扫描内核：第三批、I-3.12 与 I-5.5）；判不了的状态（表越过内核容量）置最高位、交 CPU 判。
+ //!
+ //! 一个状态的结论 [`VERDICT_WORDS`] 个 u32：第 0 字是红位（位 0..6 看 journal 那一遍 oracle 的七类、位 8..14 不看那一遍、
+ //! 位 16 根在而记录都不在、位 17 恢复自称的状态少单元、位 31 判不了）；第 1 字判不了的原因（判得了时低 16 位是看 journal 那一遍
+@@ -58,76 +58,32 @@ const _: () = assert!(
+     "违例位读成一个 u128"
+ );
+ 
+-/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：前 65 条——三批 49 条，加里程碑三二·1 那一批 16 条
+-/// （判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 11 行），再加 C673（三 oracle 合谋测试的补 oracle 改法没做）
+-/// ⑤ ⑥ 那两条（下标 66 是 I-9.27，走读内核挨着 I-9.16 按表判；下标 67 是 I-5.5，扫描内核每一版重读树表与 extent 树判），对拍逐位比、不屏蔽。
++/// 池级 checker 内核覆盖到的不变量（`IMPLEMENTED_INVARIANTS` 的下标）：全部 68 条——三批 49 条，加里程碑三二·1 那一批 16 条
++/// （判决 `research/prompts/m3-batch4-code-r1-main-verification.md` 第二节第 11 行），下标 65 的 I-3.5（引用区间的精确性，
++/// 走读内核在回退候选集的版本都走完之后逐对判），再加 C673（三 oracle 合谋测试的补 oracle 改法没做）⑤ ⑥ 那两条
++/// （下标 66 是 I-9.27，走读内核挨着 I-9.16 按表判；下标 67 是 I-5.5，扫描内核每一版重读树表与 extent 树判），对拍逐位比、不屏蔽。
++/// 用户 2026-10-04 定「改回要求全覆盖」：没有「内核还没判」那一张表。
+ pub const POOL_CHECKER_COVERED_INVARIANT_INDEXES: &[usize] = &[
+     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
+     26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+-    50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 66, 67,
++    50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67,
+ ];
+ 
+-/// 池级 checker 已经判、GPU 内核还没判的不变量：下标 65 是 I-3.5（引用区间的精确性，里程碑三第 8 批进池级 checker，
+-/// 派发没含 GPU 内核那一半，交主 agent 定）。内核那一位恒 0：对拍逐位比照旧不屏蔽，CPU 在哪个状态上判红它，对拍就在那个状态上报不同；
+-/// 崩溃放量由 GPU 判的那几趟判不到它（`crash_amplification` 按违例位取不变量）。
+-pub const POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET: &[usize] = &[65];
+-
+-// 覆盖表与「内核还没判」那张表合起来是池级 checker 的每一条：每个下标恰好在其中一张表里、两张表各按下标升序。
+-// 新立一条不变量而两张表都没跟上时这里编译不过，不悄悄让 GPU 那一位恒 0；还没判的那几条要在「内核还没判」那张表里点名。
+-// 「内核还没判」那几条不必在覆盖表的末尾：I-3.5（下标 65）之后立的 I-9.27、I-5.5 内核判了，排在它后面。
++// 覆盖表就是池级 checker 的每一条，按下标升序：第 k 项是 k。新立一条不变量而内核没跟上时这里编译不过，不悄悄让 GPU 那一位恒 0。
+ const _: () = {
+     assert!(
+         POOL_CHECKER_COVERED_INVARIANT_INDEXES.len()
+-            + POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET.len()
+             == singlefs_checker::image::IMPLEMENTED_INVARIANTS.len(),
+-        "池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表（暂不补内核的，点名进「内核还没判」那张表）"
++        "池级 checker 新立的不变量 GPU 内核还没判：补内核，再把下标补进覆盖表"
+     );
+-    let mut position = 1;
++    let mut position = 0;
+     while position < POOL_CHECKER_COVERED_INVARIANT_INDEXES.len() {
+         assert!(
+-            POOL_CHECKER_COVERED_INVARIANT_INDEXES[position - 1]
+-                < POOL_CHECKER_COVERED_INVARIANT_INDEXES[position],
+-            "覆盖表按下标升序"
++            POOL_CHECKER_COVERED_INVARIANT_INDEXES[position] == position,
++            "覆盖表按下标升序、一条不缺一条不重：第 k 项是 k"
+         );
+         position += 1;
+     }
+-    let mut position_not_judged = 1;
+-    while position_not_judged < POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET.len() {
+-        assert!(
+-            POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET[position_not_judged - 1]
+-                < POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET[position_not_judged],
+-            "「内核还没判」那张表按下标升序"
+-        );
+-        position_not_judged += 1;
+-    }
+-    // 每个下标恰好在一张表里：两张表都升序、合起来条数等于不变量条数，再要求每个下标至少在一张表里，就一条不缺、一条不重。
+-    let mut invariant_index = 0;
+-    while invariant_index < singlefs_checker::image::IMPLEMENTED_INVARIANTS.len() {
+-        let mut is_listed = false;
+-        let mut covered_position = 0;
+-        while covered_position < POOL_CHECKER_COVERED_INVARIANT_INDEXES.len() {
+-            if POOL_CHECKER_COVERED_INVARIANT_INDEXES[covered_position] == invariant_index {
+-                is_listed = true;
+-            }
+-            covered_position += 1;
+-        }
+-        let mut not_judged_position = 0;
+-        while not_judged_position
+-            < POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET.len()
+-        {
+-            if POOL_CHECKER_INVARIANT_INDEXES_THE_KERNEL_DOES_NOT_JUDGE_YET[not_judged_position]
+-                == invariant_index
+-            {
+-                is_listed = true;
+-            }
+-            not_judged_position += 1;
+-        }
+-        assert!(
+-            is_listed,
+-            "池级 checker 的每一条要么在覆盖表里、要么在「内核还没判」那张表里"
+-        );
+-        invariant_index += 1;
+-    }
+ };
+ 
+ /// 一个状态结论里池级 checker 的违例位（[`POOL_CHECKER_VIOLATED_BIT_CAPACITY`] 位，位 i ↔ `IMPLEMENTED_INVARIANTS[i]`）。
+@@ -154,8 +110,8 @@ pub fn verdict_layout_wgsl_constants() -> String {
+     )
+ }
+ /// 每个状态的草稿区几个 u32（checker 共用那一半里 `SCRATCH_END`：共用的 `SCRATCH_WORDS_REQUIRED`、走读与扫描的集合、两个内核的交接段、
+-/// 交接段之后走读内核自己用的两张表）。
+-pub const SCRATCH_WORDS: usize = 255_504;
++/// 交接段之后走读内核自己用的表：两张，加 I-3.5 的出现规则读的四张）。
++pub const SCRATCH_WORDS: usize = 290_064;
+ /// 内核的工作组大小（三个内核都是 `@workgroup_size(64)`）：派 n 个状态要 ⌈n ÷ 64⌉ 个工作组。
+ pub const WORKGROUP_SIZE: usize = 64;
+ /// 内核的四个绑定（`crash_judge_common.wgsl` 开头）：派活参数、打包的表、结论、草稿区。
+diff --git a/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs b/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+index 64622ad..8d8f189 100644
+--- a/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
++++ b/crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+@@ -4,7 +4,8 @@
+ //! 崩溃状态，GPU 判出的红位（两遍 oracle 各七类、记录核对器两条）要与 CPU `judge_crash_image` 的 `red_items` 逐位相同，池级 checker
+ //! 每一条不变量的违例位（`IMPLEMENTED_INVARIANTS` 全部，不屏蔽）要与 CPU 池级 checker 逐位相同，一个状态都不许判不了。
+ //! 改坏那条流上 CPU 有红，GPU 要红在同样的状态、同样的项上——这是 GPU 判器分得出差别的自证；里程碑三二·1 那一批的每一条不变量
+-//! 另有一条只改坏它管的那个字段的流（`the_gpu_judge_agrees_with_the_cpu_when_…` 那一组）。
++//! 另有一条只改坏它管的那个字段的流（`the_gpu_judge_agrees_with_the_cpu_when_…` 那一组）；I-3.5 的出现规则红与成立各一条，
++//! 恢复施加一条记录取新根段的那几段、施加出来的那一版从记录走实例表与分配记录树、I-8.10 后三段，各有一条同样形态的流。
+ //! 要本机一张空闲显存够的 NVIDIA 独显：本机一张 NVIDIA 独显适配器都没有时用卡的用例打一行 `NOT_RUN_NO_GPU_ADAPTER` 报「本次未跑」、
+ //! 返回成功；有卡而用不上（一张都没起来，或 PCI 上有卡而 Vulkan 枚举不出）判红（`gpu_unit_checks::gpu_test_start`）。要 `verdict-store,gpu` 特性；
+ //! 展开上限 `SINGLEFS_CRASH_JUDGE_EXPAND_UP_TO`（默认 8）、显存额度 `SINGLEFS_CRASH_JUDGE_CARD_QUOTA_MEBIBYTES`（没设不定额度）、
+@@ -1504,6 +1505,145 @@ fn record_rollback_with_a_journal_record_txg_going_back(tag: &str) -> RecordedFl
+     flow
+ }
+ 
++// ───────────── 第 9 批：I-3.5 的出现规则、恢复施加一条记录取新根段的七段、施加出来的那一版从记录走实例表与分配记录树、I-8.10 后三段 ─────────────
++
++/// journal 记录新根段里实例表指针的段内偏移（D23（journal 的角色与格式） 已定项 15：树表指针 86 + 映射根指针 86 + 水位 8 + F 8）。
++const NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER: usize = 188;
++/// 新根段里分配记录树根指针的段内偏移（实例表指针之后 86 字节）。
++const NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER: usize = 274;
++/// 新根段末尾卸载记号 4 字节的段内偏移（只有位 0，与根记录 flags 同一个编码）。
++const NEW_ROOT_SEGMENT_UNMOUNT_MARKER: usize = 360;
++/// 码 2 / 码 3 指针里两条位置条目各自的整单元校验和的偏移（位置条目 50 与 64 起，盘 4 + 槽 6 之后）。
++const POINTER_LOCATION_CHECKSUM_OFFSETS: [usize; 2] = [60, 74];
++/// 指针头里 extent 偏移 2 字节的偏移（MAC / nonce 28、算法类型 1、压缩码 1、压缩长度 2 之后）。
++const POINTER_EXTENT_OFFSET_OFFSET: usize = 32;
++/// 码 2 / 码 3 指针宽。
++const NODE_POINTER_BYTES: usize = 86;
++/// 数据单元头里诞生代号的偏移（码 1 写序五元组：树 43、inode 51、对象出生代 59、偏移 67、诞生代号 75）。
++const DATA_UNIT_BIRTH_TXG_OFFSET: usize = 75;
++
++/// I-3.5（引用区间的精确性）的出现规则：新池新建文件那条流上，发布那一版（txg 3）新写的数据单元头里的诞生代号 3 → 2、重封到根——
++/// 发布那一版引用、暖机最后一版（txg 2）不引用的这个单元诞生代号不大于 2，它在 extent 树里，而 extent 树的根指针生在 txg 3、不是整棵继承下来的。
++/// 指针、映射 key 与分配代还记 3，I-1.2、I-1.11、I-3.10 跟着红（与 `checker_known_bad_images.rs` 里 I-3.5 那一格同一个改法）。
++fn record_new_pool_with_a_data_unit_born_no_later_than_the_previous_version(
++    tag: &str,
++) -> RecordedFlow {
++    let data_unit = |bytes: &[u8]| unit_class(bytes) == 1;
++    record_new_pool_with_a_resealed_field(
++        tag,
++        "new-pool-data-unit-birth-txg-three-to-two",
++        &data_unit,
++        false,
++        &|bytes| {
++            let birth_txg = u64::from_le_bytes(
++                bytes[DATA_UNIT_BIRTH_TXG_OFFSET..DATA_UNIT_BIRTH_TXG_OFFSET + 8]
++                    .try_into()
++                    .expect("8"),
++            );
++            assert_eq!(birth_txg, 3, "新建的文件那个数据单元生在发布那一版 txg 3");
++            bytes[DATA_UNIT_BIRTH_TXG_OFFSET..DATA_UNIT_BIRTH_TXG_OFFSET + 8]
++                .copy_from_slice(&2u64.to_le_bytes());
++        },
++    )
++}
++
++/// 发布那几条 journal 记录新根段里的卸载记号写成 0b10（位 0 之外有位为 1）、重封：core 的读者当记录损坏（重放不施加它），
++/// CPU 池级 checker 照同一口径不收它（RR1）。
++fn record_new_pool_with_a_last_record_whose_unmount_marker_sets_another_bit(
++    tag: &str,
++) -> RecordedFlow {
++    let mut flow =
++        record_new_pool_file_creation(tag, "new-pool-last-record-unmount-marker-bit-one");
++    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
++        let marker = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_UNMOUNT_MARKER;
++        assert_eq!(
++            bytes[marker..marker + 4],
++            [0u8; 4],
++            "建文件那次发布不是卸载那一串，卸载记号是 0"
++        );
++        bytes[marker..marker + 4].copy_from_slice(&0b10u32.to_le_bytes());
++    });
++    flow
++}
++
++/// 发布那几条 journal 记录新根段里的卸载记号写成 1（只有位 0）、重封：记录照收、照施加，新根段与同代的根（flags 0）不逐字节相同，
++/// CPU 池级 checker 红 I-8.10（第七段，卸载记号）。
++fn record_new_pool_with_a_last_record_carrying_the_unmount_marker(tag: &str) -> RecordedFlow {
++    let mut flow = record_new_pool_file_creation(tag, "new-pool-last-record-unmount-marker-set");
++    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
++        let marker = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_UNMOUNT_MARKER;
++        bytes[marker..marker + 4].copy_from_slice(&1u32.to_le_bytes());
++    });
++    flow
++}
++
++/// 发布那几条 journal 记录新根段里实例表指针的两条位置条目校验和各取反、重封：记录照收、照施加，施加出来那一版的实例表指针
++/// 与所选根（暖机最后那条根）的不同、两份都读不对。core 的恢复从记录取实例表（已定项 15）走到文件之前就读不出；
++/// CPU 池级 checker 走施加出来的那一版时实例表读不出（I-4.1），根也落了的状态上新根段与同代的根不逐字节相同（I-8.10 第五段）。
++fn record_new_pool_with_a_last_record_whose_instance_table_pointer_reads_wrong(
++    tag: &str,
++) -> RecordedFlow {
++    let mut flow =
++        record_new_pool_file_creation(tag, "new-pool-last-record-instance-table-checksums-flipped");
++    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
++        let pointer = JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER;
++        for location_checksum in POINTER_LOCATION_CHECKSUM_OFFSETS {
++            for byte in &mut bytes[pointer + location_checksum..pointer + location_checksum + 4] {
++                *byte ^= 0xFF;
++            }
++        }
++    });
++    flow
++}
++
++/// 发布那几条 journal 记录新根段里实例表指针头的 extent 偏移写成 1、重封：core 的读者当记录损坏（指针头不是第一版的取值，
++/// `NodePointer::read_judging_the_encryption_compression_and_extent_offset_fields_from`），重放不施加它；CPU 池级 checker 不判记录里的指针头、
++/// 照收，根也落了的状态上红 I-8.10（第五段）。
++fn record_new_pool_with_a_last_record_whose_instance_table_pointer_carries_an_extent_offset(
++    tag: &str,
++) -> RecordedFlow {
++    let mut flow =
++        record_new_pool_file_creation(tag, "new-pool-last-record-instance-table-extent-offset-one");
++    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
++        let extent_offset = JOURNAL_NEW_ROOT_SEGMENT_OFFSET
++            + NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER
++            + POINTER_EXTENT_OFFSET_OFFSET;
++        bytes[extent_offset..extent_offset + 2].copy_from_slice(&1u16.to_le_bytes());
++    });
++    flow
++}
++
++/// 发布那几条 journal 记录新根段里分配记录树根指针（建文件那一版本来全零）换成外来的字节：同一条记录的实例表指针、
++/// 两条位置条目校验和各取反，重封。施加出来那一版的分配记录树根与它施加在其上的那条根（全零）不同：CPU 池级 checker 走那一版时
++/// 从记录取它、两份都读不对（I-4.1），根也落了的状态上新根段与同代的根不逐字节相同（I-8.10 第六段）。
++fn record_new_pool_with_a_last_record_whose_allocation_record_tree_root_is_foreign(
++    tag: &str,
++) -> RecordedFlow {
++    let mut flow =
++        record_new_pool_file_creation(tag, "new-pool-last-record-allocation-root-foreign-bytes");
++    rewrite_every_journal_record_of_the_publish(&mut flow, &|bytes| {
++        let instance_table =
++            JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_INSTANCE_TABLE_POINTER;
++        let allocation_root =
++            JOURNAL_NEW_ROOT_SEGMENT_OFFSET + NEW_ROOT_SEGMENT_ALLOCATION_RECORD_TREE_ROOT_POINTER;
++        assert_eq!(
++            bytes[allocation_root..allocation_root + NODE_POINTER_BYTES],
++            [0u8; NODE_POINTER_BYTES],
++            "带文件的一版分配记录树根恒全零"
++        );
++        let foreign = bytes[instance_table..instance_table + NODE_POINTER_BYTES].to_vec();
++        bytes[allocation_root..allocation_root + NODE_POINTER_BYTES].copy_from_slice(&foreign);
++        for location_checksum in POINTER_LOCATION_CHECKSUM_OFFSETS {
++            for byte in &mut bytes
++                [allocation_root + location_checksum..allocation_root + location_checksum + 4]
++            {
++                *byte ^= 0xFF;
++            }
++        }
++    });
++    flow
++}
++
+ /// GPU 判器与 CPU 判器在这条流的每个状态上红位与违例位逐位相同、落到同一条根，CPU 池级 checker 在这条流上红 `invariant`。
+ /// 本机没有 NVIDIA 独显适配器时报「本次未跑」返回。
+ fn assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
+@@ -1579,6 +1719,21 @@ fn expected_pool_checker_bits(judgement: &Layer0StateJudgement) -> u128 {
+     bits
+ }
+ 
++/// CPU 池级 checker 在这个状态上判过而成立的不变量（不是报不适用）：一位一条，与违例位同一个下标。
++fn expected_pool_checker_held_bits(judgement: &Layer0StateJudgement) -> u128 {
++    let mut bits = 0u128;
++    for (invariant, verdict) in &judgement.pool_checker {
++        if let InvariantVerdict::Holds = verdict {
++            let index = IMPLEMENTED_INVARIANTS
++                .iter()
++                .position(|candidate| candidate == invariant)
++                .expect("池级 checker 报的不变量在清单里");
++            bits |= 1u128 << index;
++        }
++    }
++    bits
++}
++
+ fn invariant_names(bits: u128) -> Vec<&'static str> {
+     IMPLEMENTED_INVARIANTS
+         .iter()
+@@ -1596,6 +1751,8 @@ struct Comparison {
+     gpu_checker_red: u64,
+     /// CPU 池级 checker 在这条流的哪几条不变量上红过。
+     cpu_checker_red_invariants: std::collections::BTreeSet<&'static str>,
++    /// CPU 池级 checker 在这条流的哪几条不变量上判过而成立过（至少一个状态上不是报不适用）。
++    cpu_checker_held_invariants: std::collections::BTreeSet<&'static str>,
+     /// 看 journal 那一遍落到的根或两遍的结局类别与 CPU 不同的状态数（算进不一致）。
+     recovery_mismatches: u64,
+     mismatches: Vec<String>,
+@@ -1647,7 +1804,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) ->
+     let slice = state_count.div_ceil(threads * 8).max(1);
+     let next_slice = std::sync::atomic::AtomicU64::new(0);
+     let slice_count = state_count.div_ceil(slice);
+-    type JudgedOnCpu = (u32, u128, String, String, [u32; 4]);
++    type JudgedOnCpu = (u32, u128, String, String, [u32; 4], u128);
+     let mut slices: Vec<(u64, Vec<JudgedOnCpu>)> = std::thread::scope(|scope| {
+         let handles: Vec<_> = (0..threads.min(slice_count))
+             .map(|_| {
+@@ -1689,6 +1846,7 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) ->
+                                         judgement.ignored.outcome
+                                     ),
+                                     recovery_words_of(judgement),
++                                    expected_pool_checker_held_bits(judgement),
+                                 ));
+                             },
+                         );
+@@ -1715,12 +1873,18 @@ fn compare_on_every_state(card: &GpuCard, flow: &RecordedFlow, limit: usize) ->
+         cpu_checker_red: 0,
+         gpu_checker_red: 0,
+         cpu_checker_red_invariants: std::collections::BTreeSet::new(),
++        cpu_checker_held_invariants: std::collections::BTreeSet::new(),
+         recovery_mismatches: 0,
+         mismatches: Vec::new(),
+     };
+-    for (ordinal, (cpu_bits, cpu_checker_bits, cpu_items, cpu_report, cpu_recovery)) in
+-        cpu.iter().enumerate()
++    for (
++        ordinal,
++        (cpu_bits, cpu_checker_bits, cpu_items, cpu_report, cpu_recovery, cpu_checker_held_bits),
++    ) in cpu.iter().enumerate()
+     {
++        comparison
++            .cpu_checker_held_invariants
++            .extend(invariant_names(*cpu_checker_held_bits));
+         let gpu_words: [u32; VERDICT_WORDS] = gpu[ordinal];
+         let gpu_bits = gpu_words[0] & !(1 << verdict_bits::UNDECIDABLE);
+         let undecidable = gpu_words[0] & (1 << verdict_bits::UNDECIDABLE) != 0
+@@ -2080,7 +2244,7 @@ fn verdicts_are_the_same_whether_one_dispatch_spans_one_scratch_lane_or_several(
+ /// 在扫描内核读回违例位之后种第 128 位（下标 127）：
+ /// 两份种过的内核判出的每个状态，违例位等于没种的那一份判出的再并上种的位（第 65 位每个状态都有，第 128 位只在扫描内核判完的状态上有），
+ /// 其余的字逐字相同。违例位的高 64 位在走读内核写出、扫描内核读回又写出、Rust 读出这三处任一处被截掉，这条红。
+-/// 池级 checker 今天 68 条（下标 0..=67；内核判下标 65 之外的每一条，下标 65 的 I-3.5 内核还没判，`crash_judge_gpu` 的「内核还没判」那张表），种的是第 69 位（下标 68）。
++/// 池级 checker 今天 68 条（下标 0..=67，内核每一条都判），种的是第 69 位（下标 68）。
+ #[test]
+ fn a_planted_violated_bit_past_the_sixty_fourth_reaches_the_verdict_through_both_checker_kernels() {
+     const FIRST_BIT_OF_THE_HIGH_HALF: usize = 64;
+@@ -2804,6 +2968,139 @@ fn the_gpu_judge_agrees_with_the_cpu_when_the_root_slots_are_not_aligned_to_the_
+     );
+ }
+ 
++/// 列出这条流上不一致的状态（前几个），没有就是空串。
++fn mismatch_listing(comparison: &Comparison) -> String {
++    comparison
++        .mismatches
++        .iter()
++        .filter(|line| !line.is_empty())
++        .cloned()
++        .collect::<Vec<_>>()
++        .join("\n")
++}
++
++/// I-3.5：一版引用、前一版不引用的单元诞生代号不大于前一版的 txg、也不在整棵继承下来的用户可见树里——CPU 红 I-3.5，GPU 在同样的状态上红。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_when_a_version_references_a_unit_born_no_later_than_the_previous_version(
++) {
++    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
++        "the_gpu_judge_agrees_with_the_cpu_when_a_version_references_a_unit_born_no_later_than_the_previous_version",
++        &record_new_pool_with_a_data_unit_born_no_later_than_the_previous_version(
++            "crash-judge-gpu-i35",
++        ),
++        "I-3.5",
++    );
++}
++
++/// I-3.5 判成立的那一支：固定脚本到回退 D 的流上，回退那次发布引用回退目标那一版（txg 3）的单元，诞生代号都不大于前一版的 txg，
++/// 它们落在根指针生在 txg 3 的 extent / inode 树里、整棵继承下来（(b)）。CPU 在至少一个状态上判过 I-3.5 而成立、一个状态都不红它，
++/// GPU 每个状态逐位相同。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_that_a_rollback_publish_inheriting_its_user_visible_trees_whole_keeps_the_appearance_rule(
++) {
++    let flow = record_fixed_script_through_rollback("crash-judge-gpu-i35-holds");
++    let Some(card) = one_usable_card_or_report_not_run(
++        "the_gpu_judge_agrees_with_the_cpu_that_a_rollback_publish_inheriting_its_user_visible_trees_whole_keeps_the_appearance_rule",
++    ) else {
++        return;
++    };
++    let comparison = compare_on_every_state(&card, &flow, expand_up_to());
++    assert!(
++        comparison.cpu_checker_held_invariants.contains("I-3.5")
++            && !comparison.cpu_checker_red_invariants.contains("I-3.5"),
++        "流 {} 上 CPU 池级 checker 判过 I-3.5 而成立、一个状态都不红它（成立过的：{:?}；红过的：{:?}）",
++        flow.name,
++        comparison.cpu_checker_held_invariants,
++        comparison.cpu_checker_red_invariants
++    );
++    assert!(
++        comparison.mismatches.is_empty(),
++        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
++        flow.name,
++        comparison.mismatches.len(),
++        mismatch_listing(&comparison)
++    );
++}
++
++/// 恢复内核与 core 同一口径读记录（D23（journal 的角色与格式） 已定项 15，`root_record.rs` 的 `of_unmount_marker_field_of_a_new_root_segment`）：
++/// 新根段卸载记号位 0 之外有位为 1 的记录当损坏、不施加。发布那条记录落了而根没落的状态上 CPU 恢复停在暖机那条根，
++/// GPU 收了这条记录就落到发布那一版、两遍恢复的结论对不上；池级 checker 那一边 GPU 也照 RR1 不收它。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_that_a_record_whose_unmount_marker_sets_another_bit_is_not_applied(
++) {
++    let flow = record_new_pool_with_a_last_record_whose_unmount_marker_sets_another_bit(
++        "crash-judge-gpu-rr1",
++    );
++    let Some(card) = one_usable_card_or_report_not_run(
++        "the_gpu_judge_agrees_with_the_cpu_that_a_record_whose_unmount_marker_sets_another_bit_is_not_applied",
++    ) else {
++        return;
++    };
++    let comparison = compare_on_every_state(&card, &flow, expand_up_to());
++    assert!(
++        comparison.mismatches.is_empty(),
++        "流 {}：{} 个状态 GPU 与 CPU 不一致（前几个）：\n{}",
++        flow.name,
++        comparison.mismatches.len(),
++        mismatch_listing(&comparison)
++    );
++}
++
++/// 恢复施加一条记录取它新根段里的实例表指针（已定项 15，`recovery.rs` 的 `replay_journal`），不照抄所选根的：记录里的实例表指针读不对时
++/// CPU 恢复走到文件之前就读不出，GPU 照抄所选根就读得出；池级 checker 走施加出来那一版也从记录取（I-4.1），根落了的状态上红 I-8.10 第五段。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_when_the_applied_record_names_an_instance_table_other_than_the_chosen_root(
++) {
++    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
++        "the_gpu_judge_agrees_with_the_cpu_when_the_applied_record_names_an_instance_table_other_than_the_chosen_root",
++        &record_new_pool_with_a_last_record_whose_instance_table_pointer_reads_wrong(
++            "crash-judge-gpu-applied-instance-table",
++        ),
++        "I-8.10",
++    );
++}
++
++/// 恢复内核判记录新根段四条指针的头与 core 同一口径：实例表指针头的 extent 偏移非 0 的记录当损坏、不施加；
++/// CPU 池级 checker 不判记录里的指针头、照收，根落了的状态上红 I-8.10 第五段。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_that_a_record_whose_instance_table_pointer_carries_an_extent_offset_is_not_applied(
++) {
++    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
++        "the_gpu_judge_agrees_with_the_cpu_that_a_record_whose_instance_table_pointer_carries_an_extent_offset_is_not_applied",
++        &record_new_pool_with_a_last_record_whose_instance_table_pointer_carries_an_extent_offset(
++            "crash-judge-gpu-record-pointer-head",
++        ),
++        "I-8.10",
++    );
++}
++
++/// 走读内核走由记录施加出来的那一版时，分配记录树根从记录新根段取（walk.rs 的 `walk_version_applied_only_by_records`），
++/// 不取它施加在其上的那条根的：记录里的分配记录树根是外来的、读不对时 CPU 判 I-4.1 红，GPU 取那条根（全零、不走）就不红。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_when_the_applied_version_names_an_allocation_record_tree_root_other_than_the_root_it_is_applied_on(
++) {
++    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
++        "the_gpu_judge_agrees_with_the_cpu_when_the_applied_version_names_an_allocation_record_tree_root_other_than_the_root_it_is_applied_on",
++        &record_new_pool_with_a_last_record_whose_allocation_record_tree_root_is_foreign(
++            "crash-judge-gpu-applied-allocation-root",
++        ),
++        "I-4.1",
++    );
++}
++
++/// I-8.10 第七段：发布那条记录的卸载记号与同代的根不同（记录 1、根 0）。
++#[test]
++fn the_gpu_judge_agrees_with_the_cpu_when_the_last_record_carries_another_unmount_marker_than_its_root(
++) {
++    assert_the_gpu_judge_agrees_with_the_cpu_on_a_flow_reddening(
++        "the_gpu_judge_agrees_with_the_cpu_when_the_last_record_carries_another_unmount_marker_than_its_root",
++        &record_new_pool_with_a_last_record_carrying_the_unmount_marker(
++            "crash-judge-gpu-i810-unmount",
++        ),
++        "I-8.10",
++    );
++}
++
+ /// 两个池级 checker 内核把违例位的每个字都写出来：结论缓冲派活前整个填全 1，没被写的字读出来是全 1。
+ /// 新池新建文件那条流的每个状态（不种假位）上，违例位在池级 checker 条数之外的那些位全是 0、判得了——高 64 位那两个字只要有一个没写，这条红。
+ #[test]

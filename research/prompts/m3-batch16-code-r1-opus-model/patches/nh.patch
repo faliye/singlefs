@@ -1,0 +1,11 @@
+--- crates/singlefs-core/src/mount.rs	2026-10-03 21:14:38.431434968 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-03 21:41:16.011154382 +0000
+@@ -1878,7 +1878,7 @@
+             effective_floor.min(newest_valid_root_on_every_device),
+             oldest_valid_root_in_the_window,
+         ),
+-        None => floor_of_the_reclaim,
++        None => reclaim_floor(effective_floor.min(oldest_valid_root_in_the_window.unwrap_or(CheckpointTxg(0))), oldest_valid_root_in_the_window), // NH 臂（攻方副本，零轮）：某块盘一条有效根都读不出时当场只放到窗口里最旧有效根
+     };
+     allocator.reclaim_released_up_to(floor_released_immediately, ReclaimedReuse::Immediately);
+     allocator.reclaim_released_up_to(

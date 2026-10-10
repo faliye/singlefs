@@ -1,0 +1,20 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -7745,10 +7745,16 @@
+         .iter()
+         .map(|root| root.tree_identifier_watermark)
+         .fold(current.root.tree_identifier_watermark, u64::max);
++    // Y1 第二种取法（m3-w3-r3 攻方腿副本）：inode 号水位只取按 cur 的实例表没被抛弃的根。
++    let ring_roots_kept: Vec<RootRecord> = ring_roots
++        .iter()
++        .filter(|root| !abandoned_by_table(root, &current_table))
++        .cloned()
++        .collect();
+     let inode_number_watermark = highest_inode_number_watermark_in_the_ring(
+         devices,
+         unit_area_start,
+-        &ring_roots,
++        &ring_roots_kept,
+         &current.record,
+     )
+     .map_or(current.inode_number_watermark(), |ring| {

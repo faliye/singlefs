@@ -1,0 +1,6 @@
+41ea6f543a2c88ae511f7ef7f073fb2cd4c993a24328a7f9f53cb71800ffc716  .claude/kb/experiments/177-逐树不写墓碑的复活数.md
+32ddf0f21c857168af23492b4e10a6359fa21984ccbfa6722c416aaa14298bc3  .claude/kb/checks-owed.md
+4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md
+6739e34a220703a5bbf4619ed72134b160731c6c47260899ad13c0f0996f704a  .claude/kb/decisions/18-块里携带什么信息.md
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
+f430d2bf23672e9e23c3ab362e987af6f598a84227a8a3729022e9d25466b41a  .claude/kb/experiments/176-inode树叶合并三候选的容量与写代价.md

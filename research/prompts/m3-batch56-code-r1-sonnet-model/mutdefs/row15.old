@@ -1,0 +1,4 @@
+        Err(gap) => judgements.part_of_the_range_not_judged(
+            lineage_or_retirement_capacity_invariant_of(lineage_capacity_knob),
+            gap.reason(),
+        ),

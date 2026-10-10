@@ -1,0 +1,3 @@
+PROBE build_and_publish_elapsed=18.631518ms publishes=6
+PROBE writes=192 segments=31 segment_lengths=[2, 2, 1, 2, 2, 1, 2, 24, 2, 1, 2, 30, 6, 1, 2, 26, 2, 1, 2, 24, 2, 1, 2, 22, 2, 1, 2, 20, 2, 1, 2] closed_form_states=1179648114
+PROBE check_pool_image_mean=30.477185ms

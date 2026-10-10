@@ -1,0 +1,12 @@
+diff -ru /tmp/claude-1000/m3-batch17-code-r1/tree/crates/singlefs-core/src/transaction.rs /tmp/claude-1000/m3-batch17-code-r1-opus/qf/qfu/crates/singlefs-core/src/transaction.rs
+--- crates/singlefs-core/src/transaction.rs
++++ crates/singlefs-core/src/transaction.rs
+@@ -5879,7 +5879,7 @@
+                 nlink: NLINK_OF_AN_INODE_BEING_DELETED,
+                 size: record.size,
+                 change_count: change_count_of_the_intent,
+-                write_time_seconds,
++                write_time_seconds: u64::from(write_time_seconds as u32), // QFU 错实现（攻方副本）：时间按 32 位存
+             },
+             tombstone: TombstoneRecord::of_the_whole_object(inode, record.object_birth, txg),
+         },

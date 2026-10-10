@@ -1,0 +1,39 @@
+KSTART plain W=384 k=12 m=2 k2=3 | current_txg=27 source=now
+KPASSES plain W=384 k=12 m=2 k2=3 n=now j=20 ring_reads=336 boundaries=[0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336] ring_newest=["dev0:[27, 26, 24, 23, 21]", "dev1:[25, 22, 19, 16, 13]"]
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=0 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=clean cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=0 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=0 pattern=oooooooooooooooooooo faulted_now=1 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/only1:g:p cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=0 pattern=oooooooooooooooooooo faulted_now=1 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/-:g:p cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=1 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=0 pattern=oooooooooooooooooooo faulted_now=7 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:-/but1:g:p cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=7 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=0 pattern=oooooooooooooooooooo faulted_now=16 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:all/-:g:p cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=16 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=0 pattern=oooooooooooooooooooo faulted_now=2 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=1 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=2 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=3 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=4 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KCYCLE plain W=384 k=12 m=2 k2=3 n=now j=20 plan=w:only1/only1:e:p cycle=5 pattern=oooooooooooooooooooo faulted_now=0 cleared_total=2 checker_end=[] first_refusal=overwrites_done=20 pattern=oooooooooooooooooooo
+KDONE plain W=384 k=12 m=2 k2=3

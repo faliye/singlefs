@@ -1,0 +1,14 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 626M 的 2 倍，照理由放行：改了探针之后要重编目标，编译比测试占内存
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.52s
+     Running tests/k1probe.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/k1probe-96b5f31712e7fb97)
+
+running 1 test
+PROBE raise result Err("RollbackFloorAboveCeiling { requested: CheckpointTxg(24), ceiling: CheckpointTxg(20) }")
+PROBE newest CheckpointTxg(40) valid [39, 18, 21, 25, 40, 19, 22, 38, 17, 20, 23]
+PROBE I-3.1 violations []
+test probe_k1_shape_raise_floor_to_24 ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 1.80s
+

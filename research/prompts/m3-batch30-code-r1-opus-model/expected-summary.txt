@@ -1,0 +1,12 @@
+b29 OPUSPROBE FW code2-copy-at-location 0: {"I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4", "I-9.2"}
+b29 OPUSPROBE FW code2-copy-at-location 1: {"I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4", "I-9.2"}
+b29 OPUSPROBE HVonly code2-copy-at-location 0: {"I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4", "I-9.2"}
+b29 OPUSPROBE HVonly code2-copy-at-location 1: {"I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4", "I-9.2"}
+b29 OPUSPROBE only-violation: {"I-9.15"}
+b29 test result: FAILED. 4 passed; 5 failed; 0 ignored; 0 measured; 161 filtered out; finished in 6.08s
+b30 OPUSPROBE FW code2-copy-at-location 0: {"I-2.1", "I-4.8", "I-7.4", "I-9.15", "I-9.2"}
+b30 OPUSPROBE FW code2-copy-at-location 1: {"I-2.1", "I-4.8", "I-7.4", "I-9.15", "I-9.2"}
+b30 OPUSPROBE HVonly code2-copy-at-location 0: {"I-2.1", "I-4.8", "I-7.4", "I-9.2"}
+b30 OPUSPROBE HVonly code2-copy-at-location 1: {"I-2.1", "I-4.8", "I-7.4", "I-9.2"}
+b30 OPUSPROBE only-violation: {"I-9.15"}
+b30 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 161 filtered out; finished in 22.24s

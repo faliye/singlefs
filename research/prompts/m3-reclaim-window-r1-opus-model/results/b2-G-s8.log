@@ -1,0 +1,102 @@
+START s=8 c=48 ring=24 build=0.2s
+s=8 c=48 k=0 j=0 mount instance=3 chosen=50 effective=50 row=51 warm_up=[52] current=52 alloc_after_mount=[dev0:alloc=270,free=6834,deferred=256,isolated=0 dev1:alloc=270,free=6834,deferred=256,isolated=0] skipped_row_txgs=[]
+s=8 c=48 k=0 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=0 j=1 mount instance=3 chosen=50 effective=50 row=51 warm_up=[52] current=52 alloc_after_mount=[dev0:alloc=270,free=6834,deferred=256,isolated=0 dev1:alloc=270,free=6834,deferred=256,isolated=0] skipped_row_txgs=[]
+s=8 c=48 k=0 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=0 j=3 mount instance=3 chosen=50 effective=50 row=51 warm_up=[52] current=52 alloc_after_mount=[dev0:alloc=270,free=6834,deferred=256,isolated=0 dev1:alloc=270,free=6834,deferred=256,isolated=0] skipped_row_txgs=[]
+s=8 c=48 k=0 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=0 j=8 mount instance=3 chosen=50 effective=50 row=51 warm_up=[52] current=52 alloc_after_mount=[dev0:alloc=270,free=6834,deferred=256,isolated=0 dev1:alloc=270,free=6834,deferred=256,isolated=0] skipped_row_txgs=[]
+s=8 c=48 k=0 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=0 j=26 mount instance=3 chosen=50 effective=50 row=51 warm_up=[52] current=52 alloc_after_mount=[dev0:alloc=270,free=6834,deferred=256,isolated=0 dev1:alloc=270,free=6834,deferred=256,isolated=0] skipped_row_txgs=[]
+s=8 c=48 k=0 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=1 j=0 mount instance=4 chosen=50 effective=50 row=52 warm_up=[53] current=53 alloc_after_mount=[dev0:alloc=258,free=6846,deferred=244,isolated=0 dev1:alloc=258,free=6846,deferred=244,isolated=0] skipped_row_txgs=[51]
+s=8 c=48 k=1 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=1 j=1 mount instance=4 chosen=50 effective=50 row=52 warm_up=[53] current=53 alloc_after_mount=[dev0:alloc=258,free=6846,deferred=244,isolated=0 dev1:alloc=258,free=6846,deferred=244,isolated=0] skipped_row_txgs=[51]
+s=8 c=48 k=1 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=1 j=3 mount instance=4 chosen=50 effective=50 row=52 warm_up=[53] current=53 alloc_after_mount=[dev0:alloc=258,free=6846,deferred=244,isolated=0 dev1:alloc=258,free=6846,deferred=244,isolated=0] skipped_row_txgs=[51]
+s=8 c=48 k=1 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=1 j=8 mount instance=4 chosen=50 effective=50 row=52 warm_up=[53] current=53 alloc_after_mount=[dev0:alloc=258,free=6846,deferred=244,isolated=0 dev1:alloc=258,free=6846,deferred=244,isolated=0] skipped_row_txgs=[51]
+s=8 c=48 k=1 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=1 j=26 mount instance=4 chosen=50 effective=50 row=52 warm_up=[53] current=53 alloc_after_mount=[dev0:alloc=258,free=6846,deferred=244,isolated=0 dev1:alloc=258,free=6846,deferred=244,isolated=0] skipped_row_txgs=[51]
+s=8 c=48 k=1 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=2 j=0 mount instance=5 chosen=50 effective=50 row=53 warm_up=[54, 55] current=55 alloc_after_mount=[dev0:alloc=240,free=6864,deferred=226,isolated=0 dev1:alloc=240,free=6864,deferred=226,isolated=0] skipped_row_txgs=[51, 52]
+s=8 c=48 k=2 j=0 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=2 j=1 mount instance=5 chosen=50 effective=50 row=53 warm_up=[54, 55] current=55 alloc_after_mount=[dev0:alloc=240,free=6864,deferred=226,isolated=0 dev1:alloc=240,free=6864,deferred=226,isolated=0] skipped_row_txgs=[51, 52]
+s=8 c=48 k=2 j=1 SNAPSHOTS roots=4 any_bad=false
+s=8 c=48 k=2 j=3 mount instance=5 chosen=50 effective=50 row=53 warm_up=[54, 55] current=55 alloc_after_mount=[dev0:alloc=240,free=6864,deferred=226,isolated=0 dev1:alloc=240,free=6864,deferred=226,isolated=0] skipped_row_txgs=[51, 52]
+s=8 c=48 k=2 j=3 SNAPSHOTS roots=6 any_bad=false
+s=8 c=48 k=2 j=8 mount instance=5 chosen=50 effective=50 row=53 warm_up=[54, 55] current=55 alloc_after_mount=[dev0:alloc=240,free=6864,deferred=226,isolated=0 dev1:alloc=240,free=6864,deferred=226,isolated=0] skipped_row_txgs=[51, 52]
+s=8 c=48 k=2 j=8 SNAPSHOTS roots=11 any_bad=false
+s=8 c=48 k=2 j=26 mount instance=5 chosen=50 effective=50 row=53 warm_up=[54, 55] current=55 alloc_after_mount=[dev0:alloc=240,free=6864,deferred=226,isolated=0 dev1:alloc=240,free=6864,deferred=226,isolated=0] skipped_row_txgs=[51, 52]
+s=8 c=48 k=2 j=26 SNAPSHOTS roots=29 any_bad=false
+s=8 c=48 k=8 j=0 mount instance=11 chosen=50 effective=50 row=59 warm_up=[60, 61] current=61 alloc_after_mount=[dev0:alloc=168,free=6936,deferred=154,isolated=0 dev1:alloc=168,free=6936,deferred=154,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58]
+s=8 c=48 k=8 j=0 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=8 j=1 mount instance=11 chosen=50 effective=50 row=59 warm_up=[60, 61] current=61 alloc_after_mount=[dev0:alloc=168,free=6936,deferred=154,isolated=0 dev1:alloc=168,free=6936,deferred=154,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58]
+s=8 c=48 k=8 j=1 SNAPSHOTS roots=4 any_bad=false
+s=8 c=48 k=8 j=3 mount instance=11 chosen=50 effective=50 row=59 warm_up=[60, 61] current=61 alloc_after_mount=[dev0:alloc=168,free=6936,deferred=154,isolated=0 dev1:alloc=168,free=6936,deferred=154,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58]
+s=8 c=48 k=8 j=3 SNAPSHOTS roots=6 any_bad=false
+s=8 c=48 k=8 j=8 mount instance=11 chosen=50 effective=50 row=59 warm_up=[60, 61] current=61 alloc_after_mount=[dev0:alloc=168,free=6936,deferred=154,isolated=0 dev1:alloc=168,free=6936,deferred=154,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58]
+s=8 c=48 k=8 j=8 SNAPSHOTS roots=11 any_bad=false
+s=8 c=48 k=8 j=26 mount instance=11 chosen=50 effective=50 row=59 warm_up=[60, 61] current=61 alloc_after_mount=[dev0:alloc=168,free=6936,deferred=154,isolated=0 dev1:alloc=168,free=6936,deferred=154,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58]
+s=8 c=48 k=8 j=26 SNAPSHOTS roots=29 any_bad=false
+s=8 c=48 k=16 j=0 mount instance=19 chosen=50 effective=50 row=67 warm_up=[68] current=68 alloc_after_mount=[dev0:alloc=78,free=7026,deferred=64,isolated=0 dev1:alloc=78,free=7026,deferred=64,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+s=8 c=48 k=16 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=16 j=1 mount instance=19 chosen=50 effective=50 row=67 warm_up=[68] current=68 alloc_after_mount=[dev0:alloc=78,free=7026,deferred=64,isolated=0 dev1:alloc=78,free=7026,deferred=64,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+s=8 c=48 k=16 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=16 j=3 mount instance=19 chosen=50 effective=50 row=67 warm_up=[68] current=68 alloc_after_mount=[dev0:alloc=78,free=7026,deferred=64,isolated=0 dev1:alloc=78,free=7026,deferred=64,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+s=8 c=48 k=16 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=16 j=8 mount instance=19 chosen=50 effective=50 row=67 warm_up=[68] current=68 alloc_after_mount=[dev0:alloc=78,free=7026,deferred=64,isolated=0 dev1:alloc=78,free=7026,deferred=64,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+s=8 c=48 k=16 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=16 j=26 mount instance=19 chosen=50 effective=50 row=67 warm_up=[68] current=68 alloc_after_mount=[dev0:alloc=78,free=7026,deferred=64,isolated=0 dev1:alloc=78,free=7026,deferred=64,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66]
+s=8 c=48 k=16 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=22 j=0 mount instance=25 chosen=50 effective=50 row=73 warm_up=[74] current=74 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+s=8 c=48 k=22 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=22 j=1 mount instance=25 chosen=50 effective=50 row=73 warm_up=[74] current=74 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+s=8 c=48 k=22 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=22 j=3 mount instance=25 chosen=50 effective=50 row=73 warm_up=[74] current=74 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+s=8 c=48 k=22 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=22 j=8 mount instance=25 chosen=50 effective=50 row=73 warm_up=[74] current=74 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+s=8 c=48 k=22 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=22 j=26 mount instance=25 chosen=50 effective=50 row=73 warm_up=[74] current=74 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72]
+s=8 c=48 k=22 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=23 j=0 mount instance=26 chosen=50 effective=50 row=74 warm_up=[75, 76] current=76 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+s=8 c=48 k=23 j=0 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=23 j=1 mount instance=26 chosen=50 effective=50 row=74 warm_up=[75, 76] current=76 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+s=8 c=48 k=23 j=1 SNAPSHOTS roots=4 any_bad=false
+s=8 c=48 k=23 j=3 mount instance=26 chosen=50 effective=50 row=74 warm_up=[75, 76] current=76 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+s=8 c=48 k=23 j=3 SNAPSHOTS roots=6 any_bad=false
+s=8 c=48 k=23 j=8 mount instance=26 chosen=50 effective=50 row=74 warm_up=[75, 76] current=76 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+s=8 c=48 k=23 j=8 SNAPSHOTS roots=11 any_bad=false
+s=8 c=48 k=23 j=26 mount instance=26 chosen=50 effective=50 row=74 warm_up=[75, 76] current=76 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73]
+s=8 c=48 k=23 j=26 SNAPSHOTS roots=29 any_bad=false
+s=8 c=48 k=24 j=0 mount instance=27 chosen=50 effective=50 row=75 warm_up=[76] current=76 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+s=8 c=48 k=24 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=24 j=1 mount instance=27 chosen=50 effective=50 row=75 warm_up=[76] current=76 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+s=8 c=48 k=24 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=24 j=3 mount instance=27 chosen=50 effective=50 row=75 warm_up=[76] current=76 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+s=8 c=48 k=24 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=24 j=8 mount instance=27 chosen=50 effective=50 row=75 warm_up=[76] current=76 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+s=8 c=48 k=24 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=24 j=26 mount instance=27 chosen=50 effective=50 row=75 warm_up=[76] current=76 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74]
+s=8 c=48 k=24 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=25 j=0 mount instance=28 chosen=50 effective=50 row=76 warm_up=[77] current=77 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+s=8 c=48 k=25 j=0 SNAPSHOTS roots=2 any_bad=false
+s=8 c=48 k=25 j=1 mount instance=28 chosen=50 effective=50 row=76 warm_up=[77] current=77 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+s=8 c=48 k=25 j=1 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=25 j=3 mount instance=28 chosen=50 effective=50 row=76 warm_up=[77] current=77 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+s=8 c=48 k=25 j=3 SNAPSHOTS roots=5 any_bad=false
+s=8 c=48 k=25 j=8 mount instance=28 chosen=50 effective=50 row=76 warm_up=[77] current=77 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+s=8 c=48 k=25 j=8 SNAPSHOTS roots=10 any_bad=false
+s=8 c=48 k=25 j=26 mount instance=28 chosen=50 effective=50 row=76 warm_up=[77] current=77 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75]
+s=8 c=48 k=25 j=26 SNAPSHOTS roots=28 any_bad=false
+s=8 c=48 k=26 j=0 mount instance=29 chosen=50 effective=50 row=77 warm_up=[78, 79] current=79 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+s=8 c=48 k=26 j=0 SNAPSHOTS roots=3 any_bad=false
+s=8 c=48 k=26 j=1 mount instance=29 chosen=50 effective=50 row=77 warm_up=[78, 79] current=79 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+s=8 c=48 k=26 j=1 SNAPSHOTS roots=4 any_bad=false
+s=8 c=48 k=26 j=3 mount instance=29 chosen=50 effective=50 row=77 warm_up=[78, 79] current=79 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+s=8 c=48 k=26 j=3 SNAPSHOTS roots=6 any_bad=false
+s=8 c=48 k=26 j=8 mount instance=29 chosen=50 effective=50 row=77 warm_up=[78, 79] current=79 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+s=8 c=48 k=26 j=8 SNAPSHOTS roots=11 any_bad=false
+s=8 c=48 k=26 j=26 mount instance=29 chosen=50 effective=50 row=77 warm_up=[78, 79] current=79 alloc_after_mount=[dev0:alloc=26,free=7078,deferred=12,isolated=0 dev1:alloc=26,free=7078,deferred=12,isolated=0] skipped_row_txgs=[51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76]
+s=8 c=48 k=26 j=26 SNAPSHOTS roots=29 any_bad=false
+DONE elapsed=143.0s

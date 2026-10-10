@@ -1,0 +1,21 @@
+W3COST real-bulk-462 leaf=477 internal=150 change_every=1 publish=462 rewritten=1 height=1 nodes=1 leaves=1 keys=476 (bulk)
+W3COST real-bulk-462 leaf=477 internal=150 change_every=1 publish=463 rewritten=1 height=1 nodes=1 leaves=1 keys=477
+W3COST real-bulk-462 leaf=477 internal=150 change_every=1 publish=464 rewritten=3 height=2 nodes=3 leaves=2 keys=478
+W3COST real-bulk-462 leaf=477 internal=150 change_every=1 publish=465 rewritten=3 height=2 nodes=3 leaves=2 keys=479
+W3COST real-bulk-462 leaf=477 internal=150 change_every=1 publish=466 rewritten=3 height=2 nodes=3 leaves=2 keys=480
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36071 rewritten=151 height=2 nodes=151 leaves=150 keys=36085 (bulk)
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36072 rewritten=3 height=2 nodes=151 leaves=150 keys=36086
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36073 rewritten=3 height=2 nodes=151 leaves=150 keys=36087
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36074 rewritten=3 height=2 nodes=151 leaves=150 keys=36088
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36075 rewritten=6 height=3 nodes=154 leaves=151 keys=36089
+W3COST real-bulk-36071 leaf=477 internal=150 change_every=1 publish=36076 rewritten=5 height=3 nodes=154 leaves=151 keys=36090
+W3COST real-bulk-100000 leaf=477 internal=150 change_every=1 publish=100000 rewritten=424 height=3 nodes=424 leaves=418 keys=100014 (bulk)
+W3COST real-bulk-100000 leaf=477 internal=150 change_every=1 publish=100001 rewritten=5 height=3 nodes=424 leaves=418 keys=100015
+W3COST real-bulk-100000 leaf=477 internal=150 change_every=1 publish=100002 rewritten=5 height=3 nodes=424 leaves=418 keys=100016
+W3COST real-bulk-100000 leaf=477 internal=150 change_every=1 publish=100003 rewritten=5 height=3 nodes=424 leaves=418 keys=100017
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742507 rewritten=11625 height=3 nodes=11625 leaves=11474 keys=2742521 (bulk)
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742508 rewritten=5 height=3 nodes=11625 leaves=11474 keys=2742522
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742509 rewritten=5 height=3 nodes=11625 leaves=11474 keys=2742523
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742510 rewritten=5 height=3 nodes=11625 leaves=11474 keys=2742524
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742511 rewritten=9 height=4 nodes=11629 leaves=11475 keys=2742525
+W3COST real-bulk-2742507 leaf=477 internal=150 change_every=1 publish=2742512 rewritten=7 height=4 nodes=11629 leaves=11475 keys=2742526

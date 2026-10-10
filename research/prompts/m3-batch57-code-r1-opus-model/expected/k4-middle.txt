@@ -1,0 +1,5 @@
+command args=-p opus-probe-b57 --test k4_middle_short_container rc=0
+OPUS_K4M tree=lineage tombstone=[] lineage=[(1, 2), (2, 1), (3, 1)] retirement=[] leaves=[3] judged_with=Knobs { tombstone: 0, lineage: 2, retirement: 0, node_entries: 0 } I-9.22=NotApplicable I-9.37=Violated violations=["I-9.37: 根（实例 1、txg 9）：谱系树（树 65546）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）"]
+OPUS_K4M tree=retirement tombstone=[(1, 4)] lineage=[] retirement=[(1, 2), (2, 1), (3, 1)] leaves=[233] judged_with=Knobs { tombstone: 0, lineage: 0, retirement: 2, node_entries: 0 } I-9.22=NotApplicable I-9.37=Violated violations=["I-9.37: 根（实例 1、txg 16）：退役树（树 65548）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）"]
+OPUS_K4M tree=tombstone tombstone=[(1, 2), (2, 1), (3, 1)] lineage=[] retirement=[] leaves=[5] judged_with=Knobs { tombstone: 2, lineage: 0, retirement: 0, node_entries: 0 } I-9.22=Violated I-9.37=NotApplicable violations=["I-9.22: 根（实例 1、txg 12）：墓碑树（树 65545）里不是最右的容器 2 装了 1 条，不是旋钮值 2（满了才关）"]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 

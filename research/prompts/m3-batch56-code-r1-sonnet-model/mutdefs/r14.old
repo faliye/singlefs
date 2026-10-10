@@ -1,0 +1,4 @@
+                if is_the_rightmost {
+                    continue;
+                }
+                let product_records = tree_kind

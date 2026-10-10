@@ -1,0 +1,10 @@
+KSTART narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty | current_txg=23 source=now
+KPASSES narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=26 ring_reads=648 boundaries=[0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336, 360, 384, 408, 432, 456, 480, 504, 528, 552, 576, 600, 624, 648] ring_newest=["dev0:[23, 21, 20, 18, 17]", "dev1:[22, 19, 16, 13, 10]"]
+KPLAN narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=26 plan=clean faulted_reads=0 ok chosen=23 effective=23 floor_in_row=13 row_txg=24 warm_up=1 floor_raises=1 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrite0_refused=NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdm overwrites_done=0 pattern=xxxxxxxxxxxxxxxxxxxxxxxxxx unmount=raised:3 writes2=144 mount_writes=91 closed_form_states=45114 unscreened
+KPLAN narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=26 plan=w:only1/-:g:p faulted_reads=27 ok chosen=22 effective=23 floor_in_row=13 row_txg=24 warm_up=1 floor_raises=1 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrite0_refused=NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdm overwrites_done=0 pattern=xxxxxxxxxxxxxxxxxxxxxxxxxx unmount=raised:3 writes2=144 mount_writes=91 closed_form_states=45114 unscreened
+LAYER0_FINDINGS signatures=14 red_states=20499 states=20499
+LAYER0_PARALLEL_FINISHED states=20499 slices=239 worker_threads=15 configured_worker_threads=15 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=239 progress_file_after_completion=none
+KENUM narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now plan=w:only1/-:g:p j=26 segments=0..6/35 closed_form_states=20489 states=20499 observed=20499 violations=20499 failed_states=0 checker_violated={} recheck={}
+KENUM_FIRST_VIOLATION narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now plan=w:only1/-:g:p j=26 走到实例 2 第 23 代根报没有文件，而没有这一代的版本、实例 1 第 3 代下面有文件（持久的写：）
+KTALLY narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty mounted j=26 count=2
+KDONE narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty

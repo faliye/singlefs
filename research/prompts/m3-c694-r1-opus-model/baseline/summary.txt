@@ -1,0 +1,233 @@
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=A root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=A root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=3 arm=A root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=A root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=A root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=A root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=B root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=B root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=3 arm=B root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=B root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=B root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=B root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=C root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=C root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=3 arm=C root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=C root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=C root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=C root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=3 arm=today root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=3 arm=today root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=3 arm=today root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=3 arm=today root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=today root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=3 arm=today root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=2 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:FAILED(MappingStillUnreadable { slot: SlotNumber(1420) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=A root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=A root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=5 arm=A root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=14 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=A root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(2) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=A root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(3) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=A root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=B root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=B root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=5 arm=B root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=14 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=B root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(2) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=B root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(3) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=B root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Ok(2) remount=Ok(unreadable=1)+unmount=Ok(3) probe=onR:FAILED(UnitUnreadable { slot: SlotNumber(1542) }) checker=[I-7.4] states=4
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=C root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=C root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=5 arm=C root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=5 arm=C root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=5 arm=C root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=5 arm=C root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=onR:read-ok checker=[] states=4
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=0 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=3
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=1 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(2) probe=- checker=[] states=1
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=2 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(2) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=3
+H1 W=384 k=5 arm=today root_landed=false r_in_ring_at_crash=false step=3 in_ring=false r_placements=0 damaged_before_unmount=0 unmount=Ok(3) remount=Ok(unreadable=0)+unmount=Ok(3) probe=- checker=[] states=1
+H1 W=384 k=5 arm=today root_landed=true r_in_ring_at_crash=true MOUNT_ERR abandoning-mount:NewerStateStillUnreadableAfterOneReread(PublishWitnessedBySystemConfigura states=5
+H1 W=384 k=5 arm=today root_landed=true r_in_ring_at_crash=true step=0 in_ring=true r_placements=22 damaged_before_unmount=14 unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot) remount=Err(StillUnreadable:AccountOfAnAbandonedRoot) probe=- checker=[I-7.4] states=4
+H1 W=384 k=5 arm=today root_landed=true r_in_ring_at_crash=true step=1 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot) remount=Err(StillUnreadable:AccountOfAnAbandonedRoot) probe=- checker=[I-7.4] states=4
+H1 W=384 k=5 arm=today root_landed=true r_in_ring_at_crash=true step=2 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot) remount=Err(StillUnreadable:AccountOfAnAbandonedRoot) probe=- checker=[I-7.4] states=4
+H1 W=384 k=5 arm=today root_landed=true r_in_ring_at_crash=true step=3 in_ring=true r_placements=22 damaged_before_unmount=16 unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot) remount=Err(StillUnreadable:AccountOfAnAbandonedRoot) probe=- checker=[I-7.4] states=4
+H2 W=240 k=3 arm=A MOUNT_ERR states=5
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=4 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=6 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=8 (w)faulty_overwrite=Ok(raises=1)[in_ring=false dmg=2 chk=] then=Ok(raises=0)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(3) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B MOUNT_ERR states=5
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today MOUNT_ERR states=5
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H5 W=384 k=5 arm=C m1_writes=38 m1_segments=9 segment_sizes=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 row_txg=10 warm_up=1
+H5 W=384 k=5 arm=C states_with_this_expansion=4113 full=
+H5 W=384 k=5 arm=today m1_writes=38 m1_segments=9 segment_sizes=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 row_txg=10 warm_up=1
+H5 W=384 k=5 arm=today states_with_this_expansion=4113 full=
+H5CLASS W=384 k=5 arm=C row_root_persisted=false onR:read-ok states=12
+H5CLASS W=384 k=5 arm=C row_root_persisted=true landed=Some((2, 10)):ok states=4104
+H5CLASS W=384 k=5 arm=C row_root_persisted=true landed=Some((2, 11)):ok states=12
+H5CLASS W=384 k=5 arm=today row_root_persisted=false onR:FAILED(UnitUnreadable) states=4
+H5CLASS W=384 k=5 arm=today row_root_persisted=false onR:read-ok states=8
+H5CLASS W=384 k=5 arm=today row_root_persisted=true landed=Some((2, 10)):ok states=4104
+H5CLASS W=384 k=5 arm=today row_root_persisted=true landed=Some((2, 11)):ok states=12
+K3 W=240 arm=R both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=240 arm=R both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=240 arm=R both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=240 arm=R both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=240 arm=R lost=dev0 effective=Some((1, 2)) read_only=Err(Open(TreeTableHasNoEntries)) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=240 arm=R lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=240 arm=today both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=240 arm=today both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=240 arm=today both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=240 arm=today both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=240 arm=today lost=dev0 effective=Some((1, 2)) read_only=Err(Open(Walk(UnitUnreadable { slot: SlotNumber(0) }))) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=240 arm=today lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=256 arm=R both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=256 arm=R both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=256 arm=R both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=256 arm=R both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=256 arm=R lost=dev0 effective=Some((1, 2)) read_only=Err(Open(TreeTableHasNoEntries)) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=256 arm=R lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=256 arm=today both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=256 arm=today both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=256 arm=today both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=256 arm=today both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=256 arm=today lost=dev0 effective=Some((1, 2)) read_only=Err(Open(Walk(UnitUnreadable { slot: SlotNumber(0) }))) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=256 arm=today lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=384 arm=R both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=384 arm=R both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=384 arm=R both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=384 arm=R both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=384 arm=R lost=dev0 effective=Some((1, 2)) read_only=Err(Open(TreeTableHasNoEntries)) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=384 arm=R lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=384 arm=today both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=384 arm=today both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=384 arm=today both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=384 arm=today both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=384 arm=today lost=dev0 effective=Some((1, 2)) read_only=Err(Open(Walk(UnitUnreadable { slot: SlotNumber(0) }))) recover=NoFile unapplied_records_above_effective=[(1,3):named=10:survivor_copy_ok=10] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=384 arm=today lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=4g arm=R both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=4g arm=R both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=4g arm=R both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(TreeTableHasNoEntries)
+K3 W=4g arm=R both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=4g arm=R lost=dev0 effective=Some((1, 2)) read_only=Err(Open(TreeTableHasNoEntries)) recover=NoFile unapplied_records_above_effective=[(1,3):named=12:survivor_copy_ok=12] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=4g arm=R lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+K3 W=4g arm=today both root=(0,0) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=4g arm=today both root=(1,1) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=4g arm=today both root=(1,2) mapping_root_empty=true alloc_tree_empty=true open=Err(Walk(UnitUnreadable { slot: SlotNumber(0) }))
+K3 W=4g arm=today both root=(1,3) mapping_root_empty=false alloc_tree_empty=true open=Ok(inodes=1)
+K3 W=4g arm=today lost=dev0 effective=Some((1, 2)) read_only=Err(Open(Walk(UnitUnreadable { slot: SlotNumber(0) }))) recover=NoFile unapplied_records_above_effective=[(1,3):named=12:survivor_copy_ok=12] checker=[I-2.1,I-4.8,I-7.3,I-7.4,I-7.6]
+K3 W=4g arm=today lost=dev1 effective=Some((1, 3)) read_only=Ok(inodes=1) recover=Failed(InvariantViolated { invariant: "I-1.1", detail: "分配记录树内部条目的 key 不是这个节点里一个孩子那一段的起点" }) unapplied_records_above_effective=[] checker=[I-1.1,I-2.1,I-4.8,I-7.2,I-7.4,I-7.6]
+L0TALLY m1 W=384 k=5 arm=C states=4128 root_persisted=4116 violations=0 failed=0 no_file=0 file_read=4128 checker_violated=[] first_violation=-
+L0TALLY m1 W=384 k=5 arm=today states=4128 root_persisted=4116 violations=4 failed=4 no_file=0 file_read=4124 checker_violated=[I-2.1=4,I-4.8=4,I-7.2=4,I-7.4=4120] first_violation=走读失败：UnitUnreadable { slot: SlotNumber(1542) }（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|u
+L0TALLY recorded W=240 k=3 arm=A (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=3 arm=B (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=3 arm=today (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=3 arm=A states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=3 arm=B states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=3 arm=C states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=3 arm=today states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=5 arm=A states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=5 arm=B states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=5 arm=C states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=384 k=5 arm=today states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-

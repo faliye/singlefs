@@ -1,0 +1,11 @@
+KSTART narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty | current_txg=23 source=now
+KPASSES narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=0 ring_reads=648 boundaries=[0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336, 360, 384, 408, 432, 456, 480, 504, 528, 552, 576, 600, 624, 648] ring_newest=["dev0:[23, 21, 20, 18, 17]", "dev1:[22, 19, 16, 13, 10]"]
+KPLAN narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=0 plan=clean faulted_reads=0 ok chosen=23 effective=23 floor_in_row=13 row_txg=24 warm_up=1 floor_raises=1 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrites_done=0 pattern= writes2=91 mount_writes=91 closed_form_states=32805 unscreened
+KPLAN narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now j=0 plan=w:but1/but1:z faulted_reads=558 ok chosen=23 effective=23 floor_in_row=13 row_txg=24 warm_up=1 floor_raises=1 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrites_done=0 pattern= writes2=91 mount_writes=91 closed_form_states=32805 unscreened
+LAYER0_FINDINGS signatures=44 red_states=12342 states=12342
+LAYER0_PARALLEL_FINISHED states=12342 slices=238 worker_threads=15 configured_worker_threads=15 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=238 progress_file_after_completion=none
+KENUM narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now plan=w:but1/but1:z j=0 segments=6..22/22 closed_form_states=12317 states=12342 observed=12342 violations=12342 failed_states=0 checker_violated={"I-7.9": 8223} recheck={}
+KENUM_CHECKER_FIRST narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now plan=w:but1/but1:z j=0 I-7.9 实例 3 txg 26 那条根把回退下界 F 从 13 抬到 22，高于它之前的根算出的抬 F 上限 14：每块盘上最新的有效根 {0: 24, 1: 25}，非空有效根 [13, 14, 15, 16, 23]，空不空判不了的有效根 []，最旧有效根 txg 13
+KENUM_FIRST_VIOLATION narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty n=now plan=w:but1/but1:z j=0 第 24 代根下面有文件却报没有（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|unit_write|journal_record|journal_record|root_record_fua|system_configuration_slot|
+KTALLY narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty mounted j=0 count=2
+KDONE narrow U=216 k=7 u=5 b=4 cont=WalkedToEmpty

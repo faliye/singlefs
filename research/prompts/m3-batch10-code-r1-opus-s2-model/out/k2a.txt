@@ -1,0 +1,8 @@
+KSTART plain W=4 k=30 m=1 k2=3 | current_txg=38 source=now
+KPASSES plain W=4 k=30 m=1 k2=3 n=now j=0 ring_reads=336 boundaries=[0, 24, 48, 72, 96, 120, 144, 168, 192, 216, 240, 264, 288, 312, 336] ring_newest=["dev0:[38, 36, 35, 33, 32]", "dev1:[37, 34, 31, 28, 25]"]
+KPLAN plain W=4 k=30 m=1 k2=3 n=now j=0 plan=clean faulted_reads=0 ok chosen=38 effective=38 floor_in_row=0 row_txg=39 warm_up=1 floor_raises=0 rereads=ring:OnTheFirstRead/table:OnTheFirstRead overwrites_done=0 pattern= writes2=46 mount_writes=46 closed_form_states=327696 unscreened
+KPLAN plain W=4 k=30 m=1 k2=3 n=now j=0 plan=r0-24:-/only1:e+P5:all/all:e faulted_reads=25 ok chosen=38 effective=38 floor_in_row=0 row_txg=39 warm_up=1 floor_raises=0 rereads=ring:OnTheOneReread/table:OnTheFirstRead overwrites_done=0 pattern= writes2=46 mount_writes=46 closed_form_states=327696 unscreened
+KREFUSED plain W=4 k=30 m=1 k2=3 n=now j=0 plan=r0-48:-/only1:e+r48-200:all/all:e faulted_reads=74 writes_before_err=0 NewerStateStillUnreadableAfterOneReread(InstanceTableOfTheNewestRootForTheShadowLedger { newest_root_on_the_reread: None })
+KTALLY plain W=4 k=30 m=1 k2=3 mounted j=0 count=2
+KTALLY plain W=4 k=30 m=1 k2=3 refused j=0 NewerStateStillUnreadableAfterOneReread after_writes=false count=1
+KDONE plain W=4 k=30 m=1 k2=3

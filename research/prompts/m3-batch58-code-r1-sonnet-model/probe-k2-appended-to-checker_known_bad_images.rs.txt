@@ -1,0 +1,160 @@
+// ───────────── Sonnet 探针（只在拷贝里，不进仓）：K2 新旧造法比对 ─────────────
+#[test]
+fn sonnet_probe_k2_old_and_new_flow_of_the_product_tombstone_branch() {
+    use singlefs_harness::memory_pool::writes_and_segments_with_stream_indexes;
+    let tombstones = singlefs_format::TOMBSTONE_CONTAINER_RECORDS;
+    let mut pool = common_deletion_in_progress::pool_with_new_inodes("sonnet-probe-k2", tombstones + 1);
+    for inode in common_deletion_in_progress::FIRST_FILE.0 + 1
+        ..=common_deletion_in_progress::FIRST_FILE.0 + tombstones
+    {
+        unlink_an_empty_inode_to_the_end_under_the_capacities(
+            &mut pool,
+            inode,
+            singlefs_core::container_tree::ContainerTreeCapacities::FROM_THE_FORMAT,
+        );
+    }
+    let before = pool.stream.operation_count();
+    unlink_an_empty_inode_to_the_end_under_the_capacities(
+        &mut pool,
+        common_deletion_in_progress::FIRST_FILE.0 + tombstones + 1,
+        singlefs_core::container_tree::ContainerTreeCapacities::FROM_THE_FORMAT,
+    );
+    let operations = pool.retained_operations();
+    let mkfs = pool.mkfs_operation_count;
+    println!("PROBE_K2 operations_total={} mkfs={} before_last_unlink={}", operations.len(), mkfs, before);
+    // 旧造法
+    let (old_writes, old_segments, old_indexes) =
+        writes_and_segments_with_stream_indexes(&operations[mkfs..], &geometry());
+    let relative_before = before - mkfs;
+    let first = old_indexes.iter().position(|index| *index >= relative_before).expect("有写");
+    println!(
+        "PROBE_K2 old_writes={} old_segments={} first_write_of_last_unlink={}",
+        old_writes.len(),
+        old_segments.len(),
+        first
+    );
+    // 新造法
+    let (new_writes, new_segments, _) =
+        writes_and_segments_with_stream_indexes(&operations[before..], &geometry());
+    println!(
+        "PROBE_K2 new_writes={} new_segments={} new_segment_sizes={:?}",
+        new_writes.len(),
+        new_segments.len(),
+        new_segments.iter().map(Vec::len).collect::<Vec<_>>()
+    );
+    // 1) 写逐条相同
+    assert_eq!(old_writes.len() - first, new_writes.len(), "写数");
+    let mut identical = 0usize;
+    for (offset_in_new, new_write) in new_writes.iter().enumerate() {
+        assert_eq!(&old_writes[first + offset_in_new], new_write, "第 {offset_in_new} 条写");
+        identical += 1;
+    }
+    println!("PROBE_K2 writes_identical={identical}");
+    // 2) 段：旧的尾部段（首写 >= first）没有跨界的，且减去 first 之后与新的逐段相同
+    let straddling = old_segments
+        .iter()
+        .filter(|segment| segment.iter().any(|w| *w < first) && segment.iter().any(|w| *w >= first))
+        .count();
+    let old_tail: Vec<Vec<usize>> = old_segments
+        .iter()
+        .filter(|segment| segment.first().is_some_and(|w| *w >= first))
+        .map(|segment| segment.iter().map(|w| w - first).collect())
+        .collect();
+    println!(
+        "PROBE_K2 straddling_segments={straddling} old_tail_segments={} tail_equals_new={}",
+        old_tail.len(),
+        old_tail == new_segments
+    );
+    assert_eq!(straddling, 0);
+    assert_eq!(old_tail, new_segments);
+    // 3) 旧段里首写 < first 的有多少段、多少写（新造法把它们并进起点镜像）
+    let earlier_segments = old_segments.iter().filter(|s| s.first().is_some_and(|w| *w < first)).count();
+    println!("PROBE_K2 earlier_segments_folded_into_base={earlier_segments} earlier_writes={first}");
+    // 4) 每个 16 KiB 槽被新写表盖几次（上限 64）、起点镜像碰过多少个 16 KiB 槽
+    let mut per_slot: std::collections::BTreeMap<(u32, u64), usize> = Default::default();
+    for write in &new_writes {
+        let start = write.offset.0 / 16384;
+        let end = (write.offset.0 + write.length_in_bytes() - 1) / 16384;
+        for slot in start..=end {
+            *per_slot.entry((write.device.0, slot)).or_default() += 1;
+        }
+    }
+    println!(
+        "PROBE_K2 new_slots_written={} max_writes_over_one_slot={}",
+        per_slot.len(),
+        per_slot.values().max().copied().unwrap_or(0)
+    );
+    let mut base = pool.memory_pool_after_mkfs();
+    base.apply(&operations[mkfs..before]);
+    let mut base_slots: std::collections::BTreeSet<(u32, u64)> = Default::default();
+    for (device, sparse) in &base.devices {
+        for sector in sparse.written_sectors().keys() {
+            base_slots.insert((device.0, sector * 512 / 16384));
+        }
+    }
+    println!("PROBE_K2 base_touched_16KiB_slots={}", base_slots.len());
+    let mut old_slots: std::collections::BTreeSet<(u32, u64)> = Default::default();
+    let base_after_mkfs = pool.memory_pool_after_mkfs();
+    for (device, sparse) in &base_after_mkfs.devices {
+        for sector in sparse.written_sectors().keys() {
+            old_slots.insert((device.0, sector * 512 / 16384));
+        }
+    }
+    for write in &old_writes {
+        let start = write.offset.0 / 16384;
+        let end = (write.offset.0 + write.length_in_bytes() - 1) / 16384;
+        for slot in start..=end {
+            old_slots.insert((write.device.0, slot));
+        }
+    }
+    println!("PROBE_K2 old_flow_touched_16KiB_slots={}", old_slots.len());
+    // 5) 原地覆写（撕裂第三态）的判据：旧造法（基 = mkfs 之后、写表 = 整条）与新造法（基 = 起点镜像、写表 = 尾部）逐次比
+    fn tearable(
+        base: &MemoryPool,
+        writes: &[singlefs_harness::memory_pool::RetainedWrite],
+        write_index: usize,
+    ) -> bool {
+        use singlefs_harness::memory_pool::WrittenContents;
+        use singlefs_harness::segments::StepKind;
+        let write = &writes[write_index];
+        let is_copy_on_write = matches!(write.kind, StepKind::UnitWrite);
+        if is_copy_on_write || write.length_in_bytes() <= 512 {
+            return false;
+        }
+        let write_end = write.offset.0 + write.length_in_bytes();
+        let base_nonzero = base.devices.get(&write.device).is_some_and(|device| {
+            device
+                .written_sectors()
+                .range(write.offset.0 / 512..write_end.div_ceil(512))
+                .any(|(_, bytes)| bytes.iter().any(|byte| *byte != 0))
+        });
+        let earlier = writes[..write_index].iter().any(|earlier| {
+            matches!(earlier.contents, WrittenContents::Bytes(_))
+                && earlier.device == write.device
+                && earlier.offset.0 < write_end
+                && write.offset.0 < earlier.offset.0 + earlier.length_in_bytes()
+        });
+        base_nonzero || earlier
+    }
+    let old_tearable: Vec<bool> = (first..old_writes.len()).map(|i| tearable(&base_after_mkfs, &old_writes, i)).collect();
+    let new_tearable: Vec<bool> = (0..new_writes.len()).map(|i| tearable(&base, &new_writes, i)).collect();
+    println!(
+        "PROBE_K2 tearable_old_equals_new={} tearable_count_old={} tearable_count_new={}",
+        old_tearable == new_tearable,
+        old_tearable.iter().filter(|x| **x).count(),
+        new_tearable.iter().filter(|x| **x).count()
+    );
+    let mut kinds: std::collections::BTreeMap<String, usize> = Default::default();
+    for write in &new_writes {
+        *kinds.entry(format!("{:?}/{}B", write.kind, write.length_in_bytes())).or_default() += 1;
+    }
+    println!("PROBE_K2 new_write_kinds={kinds:?}");
+    assert_eq!(old_tearable, new_tearable);
+    let new_slots_total: std::collections::BTreeSet<(u32, u64)> =
+        base_slots.iter().copied().chain(per_slot.keys().copied()).collect();
+    println!(
+        "PROBE_K2 new_flow_touched_16KiB_slots={} subset_of_old={}",
+        new_slots_total.len(),
+        new_slots_total.is_subset(&old_slots)
+    );
+}

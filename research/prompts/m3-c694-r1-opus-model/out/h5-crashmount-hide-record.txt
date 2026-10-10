@@ -1,0 +1,14 @@
+hide-record H5 W=384 k=5 arm=C m1_writes=38 m1_segments=9 segment_sizes=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 row_txg=9 warm_up=1
+hide-record H5 W=384 k=5 arm=C states_with_this_expansion=4113 full=
+hide-record H5 W=384 k=5 arm=today m1_writes=38 m1_segments=9 segment_sizes=[2, 14, 2, 1, 2, 12, 2, 1, 2] closed_form=20496 row_txg=9 warm_up=1
+hide-record H5 W=384 k=5 arm=today states_with_this_expansion=4113 full=
+hide-record H5CLASS W=384 k=5 arm=C row_root_persisted=false onR:FAILED(UnitUnreadable) states=9
+hide-record H5CLASS W=384 k=5 arm=C row_root_persisted=false onR:read-ok states=8
+hide-record H5CLASS W=384 k=5 arm=C row_root_persisted=true landed=Some((2, 10)):ok states=12
+hide-record H5CLASS W=384 k=5 arm=C row_root_persisted=true landed=Some((2, 9)):ok states=4104
+hide-record H5CLASS W=384 k=5 arm=today row_root_persisted=false onR:FAILED(UnitUnreadable) states=9
+hide-record H5CLASS W=384 k=5 arm=today row_root_persisted=false onR:read-ok states=8
+hide-record H5CLASS W=384 k=5 arm=today row_root_persisted=true landed=Some((2, 10)):ok states=12
+hide-record H5CLASS W=384 k=5 arm=today row_root_persisted=true landed=Some((2, 9)):ok states=4104
+hide-record L0TALLY m1 W=384 k=5 arm=C states=4133 root_persisted=4116 violations=9 failed=9 no_file=0 file_read=4124 checker_violated=[I-2.1=9,I-4.8=9,I-7.2=9,I-7.4=9] first_violation=走读失败：UnitUnreadable { slot: SlotNumber(1542) }（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|u
+hide-record L0TALLY m1 W=384 k=5 arm=today states=4133 root_persisted=4116 violations=9 failed=9 no_file=0 file_read=4124 checker_violated=[I-2.1=9,I-4.8=9,I-7.2=9,I-7.4=9] first_violation=走读失败：UnitUnreadable { slot: SlotNumber(1542) }（持久的写：system_configuration_slot|system_configuration_slot|unit_write|unit_write|unit_write|unit_write|unit_write|u

@@ -1,0 +1,88 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 54M 的 2 倍，照理由放行：派发提示写死编译 6G、跑 4G
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿模型复跑，在自己的工作目录里各跑各的
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/opus_b22_attack.rs (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/target/release/deps/opus_b22_attack-57d41c271b79e8af)
+
+running 1 test
+test n5_n9_random_legal_histories ... RESULT history seed=0 reds=[] reissued=[5] trace=intent1->t7 rollback(i1,t6)->t8 step:skip(队列空) remount->t10 create1->t11 abandon->t13 remount->t16 create1->t17 remount->t19 intent3->t20
+RESULT history seed=1 reds=[] reissued=[] trace=rollback(i1,t4)->t7 remount->t10 intent1->t11 step->t12 step->t13 intent-none:skip(没有活的号) intent-none:skip(没有活的号) drain->t14 step:skip(队列空) rollback(i2,t11)->t15
+RESULT history seed=2 reds=[] reissued=[] trace=create1->t7 drain:skip(队列空) step:skip(队列空) step:skip(队列空) intent3->t8 drain->t9 step:skip(队列空) intent2->t10 create2->t12 step:skip(队列空)
+RESULT history seed=3 reds=[] reissued=[] trace=drain:skip(队列空) rollback(i1,t5)->t7 step:skip(队列空) rollback(i1,t3)->t8 rollback(i1,t7)->t9 step:skip(队列空) intent1->t10 create1->t12 intent3->t13 rollback(i1,t4)->t14
+RESULT history seed=4 reds=[] reissued=[] trace=rollback(i1,t4)->t7 step:skip(队列空) remount->t10 step:skip(队列空) step:skip(队列空) create1->t11 remount->t13 intent1->t14 intent5->t16 drain->t17
+RESULT history seed=5 reds=[] reissued=[] trace=intent1->t7 rollback(i1,t5)->t8 rollback(i1,t6)->t9 create2->t10 rollback(i1,t3)->t11 rollback(i1,t6)->t12 intent2->t13 intent3->t15 remount->t18 intent4->t19
+RESULT history seed=6 reds=[] reissued=[] trace=abandon->t8 intent1->t9 create2->t11 rollback(i2,t9)->t12 create2->t14 intent3->t15 create1->t17 step:skip(队列空) step:skip(队列空) create2->t18
+RESULT history seed=7 reds=[] reissued=[] trace=remount->t8 create1->t9 create1->t10 create1->t11 remount->t13 remount->t16 intent7->t17 intent1->t19 step->t20 remount->t23
+RESULT history seed=8 reds=[] reissued=[6] trace=intent2->t7 create1->t9 create1->t10 abandon->t13 create2->t14 rollback(i1,t7)->t15 step->t16 create1->t17 intent1->t18 rollback(i1,t10):skip(TargetNotACandidate { target: RollbackTa)
+RESULT history seed=9 reds=[] reissued=[] trace=intent3->t7 step->t8 remount->t10 create1->t11 step:skip(队列空) rollback(i1,t8)->t12 remount->t14 create2->t15 step:skip(队列空) rollback(i1,t5)->t16
+RESULT history seed=10 reds=[] reissued=[] trace=rollback(i1,t3)->t7 abandon->t10 step:skip(队列空) abandon->t13 drain:skip(队列空) create2->t14 create2->t15 abandon->t17 rollback(i3,t15):skip(TargetNotACandidate { target: RollbackTa) remount->t19
+RESULT history seed=11 reds=[] reissued=[] trace=create2->t7 remount->t10 rollback(i1,t4)->t11 remount->t13 rollback(i1,t6)->t14 rollback(i2,t10)->t15 rollback(i3,t13)->t16 abandon->t19 create2->t20 step:skip(队列空)
+RESULT history seed=12 reds=[] reissued=[] trace=intent4->t7 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) step->t8 drain:skip(队列空) rollback(i1,t5)->t9 rollback(i1,t6)->t10 step:skip(队列空) intent1->t11 intent4->t13 intent3->t15
+RESULT history seed=13 reds=[] reissued=[] trace=abandon->t8 intent1->t9 intent3->t11 step->t12 create1->t13 drain:skip(队列空) rollback(i2,t11)->t14 step->t15 create2->t16 remount->t19
+RESULT history seed=14 reds=[] reissued=[] trace=step:skip(队列空) abandon->t8 rollback(i1,t4)->t9 step:skip(队列空) remount->t11 abandon->t13 step:skip(队列空) rollback(i1,t3)->t14 create1->t15 remount->t17
+RESULT history seed=15 reds=[] reissued=[] trace=step:skip(队列空) abandon->t8 intent3->t9 drain->t10 abandon->t14 step:skip(队列空) abandon->t17 create1->t18 step:skip(队列空) create1->t19
+RESULT history seed=16 reds=[] reissued=[] trace=abandon->t8 intent2->t9 rollback(i1,t6):skip(TargetNotACandidate { target: RollbackTa) intent3->t11 intent1->t13 step->t14 create2->t16 step:skip(队列空) remount->t19 rollback(i2,t11)->t20
+RESULT history seed=17 reds=[] reissued=[] trace=rollback(i1,t4)->t7 rollback(i1,t3)->t8 rollback(i1,t4)->t9 step:skip(队列空) rollback(i1,t8)->t10 step:skip(队列空) intent1->t11 abandon->t13 create2->t14 rollback(i1,t11):skip(TargetNotACandidate { target: RollbackTa)
+RESULT history seed=18 reds=[] reissued=[] trace=rollback(i1,t5)->t7 create1->t8 rollback(i1,t6)->t9 intent3->t10 rollback(i1,t8)->t11 rollback(i1,t10)->t12 remount->t15 intent2->t16 drain->t17 rollback(i1,t11)->t18
+RESULT history seed=19 reds=[] reissued=[] trace=step:skip(队列空) rollback(i1,t3)->t7 step:skip(队列空) create2->t8 step:skip(队列空) step:skip(队列空) remount->t10 create2->t11 create2->t12 drain:skip(队列空)
+RESULT history seed=20 reds=[] reissued=[] trace=step:skip(队列空) rollback(i1,t4)->t7 rollback(i1,t3)->t8 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) rollback(i1,t5)->t9 rollback(i1,t8)->t10 create1->t11 rollback(i1,t5)->t12 create2->t13
+RESULT history seed=21 reds=[] reissued=[] trace=step:skip(队列空) intent4->t7 rollback(i1,t5)->t8 create1->t9 rollback(i1,t8)->t10 step:skip(队列空) remount->t13 create2->t14 create2->t15 intent3->t16
+RESULT history seed=22 reds=[] reissued=[] trace=step:skip(队列空) remount->t8 remount->t10 remount->t13 drain:skip(队列空) rollback(i1,t6)->t14 intent2->t15 drain->t16 rollback(i1,t5)->t17 step:skip(队列空)
+RESULT history seed=23 reds=[] reissued=[] trace=rollback(i1,t4)->t7 create2->t8 rollback(i1,t3)->t9 intent1->t10 rollback(i1,t9)->t11 abandon->t14 create1->t15 rollback(i1,t10)->t16 abandon->t19 step:skip(队列空)
+RESULT history seed=24 reds=[] reissued=[] trace=create2->t7 intent6->t8 rollback(i1,t3)->t9 rollback(i1,t3)->t10 rollback(i1,t9)->t11 create1->t12 rollback(i1,t8)->t13 rollback(i1,t9)->t14 step:skip(队列空) rollback(i1,t4)->t15
+RESULT history seed=25 reds=[] reissued=[] trace=intent1->t7 rollback(i1,t5)->t8 step:skip(队列空) rollback(i1,t7)->t9 abandon->t11 intent1->t12 rollback(i1,t4)->t13 create2->t14 intent1->t15 step->t16
+RESULT history seed=26 reds=[] reissued=[] trace=create2->t7 create1->t8 intent2->t9 drain->t10 create2->t11 create1->t12 remount->t14 intent3->t15 intent1->t17 create2->t19
+RESULT history seed=27 reds=[] reissued=[] trace=rollback(i1,t4)->t7 intent1->t8 drain->t9 intent-none:skip(没有活的号) step:skip(队列空) step:skip(队列空) rollback(i1,t8)->t10 rollback(i1,t4)->t11 rollback(i1,t3)->t12 intent1->t13
+RESULT history seed=28 reds=[] reissued=[] trace=abandon->t8 remount->t10 rollback(i1,t3)->t11 remount->t13 rollback(i1,t6):skip(TargetNotACandidate { target: RollbackTa) rollback(i1,t3)->t14 intent1->t15 intent-none:skip(没有活的号) abandon->t17 intent1->t18
+RESULT history seed=29 reds=[] reissued=[] trace=create1->t7 drain:skip(队列空) create2->t8 remount->t10 drain:skip(队列空) intent1->t11 step->t12 create1->t14 rollback(i2,t10)->t15 abandon->t17
+RESULT history seed=30 reds=[] reissued=[] trace=create1->t7 abandon->t10 rollback(i1,t7):skip(TargetNotACandidate { target: RollbackTa) step:skip(队列空) intent4->t11 step->t12 rollback(i1,t6)->t13 rollback(i2,t10)->t14 rollback(i1,t7):skip(TargetNotACandidate { target: RollbackTa) create1->t15
+RESULT history seed=31 reds=[] reissued=[] trace=rollback(i1,t4)->t7 create2->t8 create2->t9 intent6->t10 drain->t11 rollback(i1,t8)->t12 remount->t14 remount->t16 rollback(i1,t3)->t17 step:skip(队列空)
+RESULT history seed=32 reds=[] reissued=[] trace=create1->t7 create2->t8 create2->t9 intent2->t10 rollback(i1,t5)->t11 rollback(i1,t5)->t12 rollback(i1,t9)->t13 remount->t16 rollback(i1,t11)->t17 intent3->t18
+RESULT history seed=33 reds=[] reissued=[] trace=step:skip(队列空) rollback(i1,t4)->t7 step:skip(队列空) intent1->t8 intent-none:skip(没有活的号) rollback(i1,t6)->t9 remount->t11 step:skip(队列空) rollback(i1,t6)->t12 step:skip(队列空)
+RESULT history seed=34 reds=[] reissued=[] trace=remount->t8 create2->t9 step:skip(队列空) abandon->t11 rollback(i1,t5)->t12 remount->t14 step:skip(队列空) abandon->t16 create2->t17 remount->t19
+RESULT history seed=35 reds=[] reissued=[] trace=abandon->t8 intent3->t9 create1->t11 drain:skip(队列空) rollback(i1,t3)->t12 rollback(i1,t5)->t13 intent1->t14 rollback(i2,t9)->t15 step->t16 create2->t17
+RESULT history seed=36 reds=[] reissued=[] trace=rollback(i1,t5)->t7 rollback(i1,t6)->t8 create2->t9 rollback(i1,t7)->t10 abandon->t13 intent6->t14 rollback(i2,t13)->t15 intent6->t16 remount->t20 drain:skip(队列空)
+RESULT history seed=37 reds=[] reissued=[] trace=remount->t8 rollback(i1,t4)->t9 rollback(i1,t5)->t10 create1->t11 intent1->t12 step->t13 rollback(i2,t12)->t14 rollback(i2,t11)->t15 rollback(i2,t14)->t16 drain->t17
+RESULT history seed=38 reds=[] reissued=[] trace=create1->t7 step:skip(队列空) intent1->t8 create2->t10 create1->t11 remount->t13 rollback(i1,t5)->t14 rollback(i2,t13)->t15 abandon->t17 rollback(i2,t15):skip(TargetNotACandidate { target: RollbackTa)
+RESULT history seed=39 reds=[] reissued=[] trace=step:skip(队列空) rollback(i1,t5)->t7 create1->t8 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) drain:skip(队列空) intent1->t9 rollback(i1,t7)->t10 intent1->t11 create2->t13
+RESULT history seed=40 reds=[] reissued=[] trace=abandon->t8 drain:skip(队列空) rollback(i1,t6):skip(TargetNotACandidate { target: RollbackTa) intent3->t9 remount->t12 intent1->t13 remount->t17 drain:skip(队列空) abandon->t20 intent2->t21
+RESULT history seed=41 reds=[] reissued=[] trace=create1->t7 step:skip(队列空) remount->t10 create1->t11 create1->t12 remount->t14 create1->t15 create2->t16 remount->t19 create1->t20
+RESULT history seed=42 reds=[] reissued=[] trace=create2->t7 rollback(i1,t6)->t8 drain:skip(队列空) rollback(i1,t7)->t9 create2->t10 rollback(i1,t4)->t11 step:skip(队列空) abandon->t13 abandon->t16 rollback(i2,t13):skip(TargetNotACandidate { target: RollbackTa)
+RESULT history seed=43 reds=[] reissued=[] trace=rollback(i1,t4)->t7 create2->t8 intent6->t9 rollback(i1,t8)->t10 abandon->t14 rollback(i1,t10):skip(TargetNotACandidate { target: RollbackTa) create1->t15 intent1->t16 abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888)
+RESULT history seed=44 reds=[] reissued=[] trace=intent3->t7 step->t8 intent2->t9 remount->t12 intent1->t13 intent4->t15 remount->t18 step:skip(队列空) rollback(i2,t13)->t19 rollback(i1,t9)->t20
+RESULT history seed=45 reds=[] reissued=[] trace=intent1->t7 intent4->t9 rollback(i1,t7)->t10 remount->t14 rollback(i1,t5)->t15 intent2->t16 rollback(i1,t9)->t17 rollback(i1,t10)->t18 rollback(i1,t10)->t19 rollback(i2,t17)->t20
+RESULT history seed=46 reds=[] reissued=[] trace=step:skip(队列空) rollback(i1,t3)->t7 step:skip(队列空) step:skip(队列空) remount->t10 intent1->t11 rollback(i1,t6)->t12 rollback(i2,t10)->t13 rollback(i1,t7)->t14 step:skip(队列空)
+RESULT history seed=47 reds=[] reissued=[] trace=rollback(i1,t3)->t7 remount->t10 drain:skip(队列空) rollback(i1,t5)->t11 intent3->t12 rollback(i2,t11)->t13 rollback(i1,t4)->t14 abandon->t16 abandon->t19 intent2->t20
+RESULT history seed=48 reds=[] reissued=[] trace=rollback(i1,t3)->t7 create2->t8 rollback(i1,t3)->t9 create2->t10 rollback(i1,t3)->t11 create2->t12 intent9->t13 rollback(i1,t9)->t14 intent1->t15 abandon->t17
+RESULT history seed=49 reds=[] reissued=[] trace=abandon->t8 create2->t9 intent1->t10 intent3->t12 rollback(i2,t8)->t13 rollback(i1,t6):skip(TargetNotACandidate { target: RollbackTa) intent2->t14 step->t15 rollback(i1,t5)->t16 intent1->t17
+TIMING histories=50 steps=10 checks=402 seconds=61.3
+RESULT sweep knob=None seeds=0..50 steps=10 checks=402 red_checks=0
+RESULT sweep histories_with_a_reissued_number=2
+RESULT sweep act=abandon done=36 skipped=7
+RESULT sweep act=create done=85 skipped=0
+RESULT sweep act=drain done=10 skipped=16
+RESULT sweep act=intent done=83 skipped=0
+RESULT sweep act=intent-none done=0 skipped=5
+RESULT sweep act=remount done=50 skipped=0
+RESULT sweep act=rollback done=122 skipped=12
+RESULT sweep act=step done=16 skipped=58
+RESULT sweep verdict I-9.10 成立 402
+RESULT sweep verdict I-9.17 不适用 135
+RESULT sweep verdict I-9.17 成立 267
+RESULT sweep verdict I-9.18 不适用 146
+RESULT sweep verdict I-9.18 成立 256
+RESULT sweep verdict I-9.19 不适用 146
+RESULT sweep verdict I-9.19 成立 256
+RESULT sweep verdict I-9.20 不适用 146
+RESULT sweep verdict I-9.20 成立 256
+RESULT sweep verdict I-9.21 不适用 402
+RESULT sweep verdict I-9.22 不适用 402
+RESULT sweep verdict I-9.23 不适用 146
+RESULT sweep verdict I-9.23 成立 256
+RESULT sweep verdict I-9.24 成立 402
+RESULT sweep verdict I-9.29 成立 402
+RESULT sweep verdict I-9.5 成立 402
+RESULT sweep verdict I-9.6 成立 402
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 61.35s
+

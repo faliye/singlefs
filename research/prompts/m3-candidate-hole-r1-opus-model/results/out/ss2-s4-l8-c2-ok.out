@@ -1,0 +1,211 @@
+CRASHED txg=9 writes=155 cut_before_root_fua=152
+INSTANCE_2 instance=2 row_txg=10 bad_writer=Some("")
+JUDGE k=0 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=0 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[0,11] non_present=["9:AppliedByRecords"]
+  NOTE k=0 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=0 theta_low=0
+  NOTE k=0 skip=rows i31="e1w" I31 device=0 allocated=Some(8077312) walked=8077312 deferred_high=0 proto=Interval { upper: 8077312 }
+  NOTE k=0 skip=rows i31="e1w" I31 device=1 allocated=Some(8077312) walked=8077312 deferred_high=0 proto=Interval { upper: 8077312 }
+JUDGE k=0 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=1 newest=12 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[1,12] non_present=["9:AppliedByRecords"]
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=1 theta_low=1
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31 device=0 allocated=Some(9371648) walked=9371648 deferred_high=0 proto=Interval { upper: 9371648 }
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31 device=1 allocated=Some(9371648) walked=9371648 deferred_high=0 proto=Interval { upper: 9371648 }
+JUDGE k=1 newest=12 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=2 newest=13 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[2,13] non_present=["9:AppliedByRecords"]
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=2 theta_low=2
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31 device=0 allocated=Some(10665984) walked=10665984 deferred_high=0 proto=Interval { upper: 10665984 }
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31 device=1 allocated=Some(10665984) walked=10665984 deferred_high=0 proto=Interval { upper: 10665984 }
+JUDGE k=2 newest=13 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=3 newest=14 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[3,14] non_present=["9:AppliedByRecords"]
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=3 theta_low=3
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31 device=0 allocated=Some(11911168) walked=11911168 deferred_high=0 proto=Interval { upper: 11911168 }
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31 device=1 allocated=Some(11911168) walked=11911168 deferred_high=0 proto=Interval { upper: 11911168 }
+JUDGE k=3 newest=14 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=3 newest=14 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=4 newest=15 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[4,15] non_present=["9:AppliedByRecords"]
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=4 theta_low=4
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31 device=0 allocated=Some(13008896) walked=13008896 deferred_high=0 proto=Interval { upper: 13008896 }
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31 device=1 allocated=Some(13008896) walked=13008896 deferred_high=0 proto=Interval { upper: 13008896 }
+JUDGE k=4 newest=15 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=4 newest=15 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=5 newest=16 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[5,16] non_present=["9:AppliedByRecords"]
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=5 theta_low=5
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31 device=0 allocated=Some(13041664) walked=13041664 deferred_high=0 proto=Interval { upper: 13041664 }
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31 device=1 allocated=Some(13041664) walked=13041664 deferred_high=0 proto=Interval { upper: 13041664 }
+JUDGE k=5 newest=16 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=5 newest=16 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=6 newest=17 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[6,17] non_present=["9:AppliedByRecords"]
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=6 theta_low=6
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31 device=0 allocated=Some(13074432) walked=13074432 deferred_high=0 proto=Interval { upper: 13074432 }
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31 device=1 allocated=Some(13074432) walked=13074432 deferred_high=0 proto=Interval { upper: 13074432 }
+JUDGE k=6 newest=17 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=6 newest=17 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=7 newest=18 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[7,18] non_present=["9:AppliedByRecords"]
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=7 theta_low=7
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31 device=0 allocated=Some(13107200) walked=13107200 deferred_high=0 proto=Interval { upper: 13107200 }
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31 device=1 allocated=Some(13107200) walked=13107200 deferred_high=0 proto=Interval { upper: 13107200 }
+JUDGE k=7 newest=18 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=7 newest=18 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(13139968)，遍历全部有效根得到 13041664（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(13139968) 不在 [13041664, 13041664] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=8 newest=19 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[8,19] non_present=["9:ExistedUnreachable"]
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=8 theta_low=8
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31 device=0 allocated=Some(13139968) walked=13041664 deferred_high=0 proto=Interval { upper: 13139968 }
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31 device=1 allocated=Some(13139968) walked=13041664 deferred_high=0 proto=Interval { upper: 13139968 }
+JUDGE k=8 newest=19 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=8 newest=19 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=9 newest=20 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[9,20] non_present=["9:ExistedUnreachable"]
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=10 theta_low=9
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31 device=0 allocated=Some(13041664) walked=13041664 deferred_high=0 proto=Interval { upper: 13172736 }
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31 device=1 allocated=Some(13041664) walked=13041664 deferred_high=0 proto=Interval { upper: 13172736 }
+JUDGE k=9 newest=20 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=9 newest=20 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=10 newest=21 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[10,21] non_present=[]
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=10 theta_low=10
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31 device=0 allocated=Some(14336000) walked=14336000 deferred_high=0 proto=Exact
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31 device=1 allocated=Some(14336000) walked=14336000 deferred_high=0 proto=Exact
+JUDGE k=10 newest=21 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=10 newest=21 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=11 newest=22 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[11,22] non_present=[]
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=11 theta_low=11
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31 device=0 allocated=Some(15532032) walked=15532032 deferred_high=0 proto=Exact
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31 device=1 allocated=Some(15532032) walked=15532032 deferred_high=0 proto=Exact
+JUDGE k=11 newest=22 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=11 newest=22 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=12 newest=23 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[12,23] non_present=[]
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=12 theta_low=12
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31 device=0 allocated=Some(15532032) walked=15532032 deferred_high=0 proto=Exact
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31 device=1 allocated=Some(15532032) walked=15532032 deferred_high=0 proto=Exact
+JUDGE k=12 newest=23 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=12 newest=23 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+rc=0

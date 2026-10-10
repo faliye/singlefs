@@ -1,0 +1,51 @@
+
+running 2 tests
+test k2_attack_grid ... name=k2-start arm="rr2" width=FourGibibytes overwrites_before=3 c=(2,9) c_slot=RootRingSlot { region: 0, slot: 3 } c_places=26
+name=k2-calibrate k=1 exact=false result=Err(Recovery(NoValidRoot)) fired=24 hooks=0
+name=k2-calibrate k=2 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=3 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=4 exact=true result=Ok fired=24 hooks=1 read_stage=First table=OnTheOneReread ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=5 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=6 exact=true result=Ok fired=24 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=7 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=8 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=9 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-calibrate k=10 exact=false result=Ok fired=24 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 no_reuse_after=0 floor_after=0 checker_red={}
+name=k2-k arm="rr2" k=6
+name=k2-cell arm="rr2" cell="no-fault" result=Ok fired=0 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e" result=Ok fired=8 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:c-e (C554 control)" result=Ok fired=1 hooks=0 read_stage=First table=OnTheFirstRead ring=OnTheFirstRead isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e+c-e reread:-" result=Ok fired=9 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:c-Error" result=Ok fired=9 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:c-Zeros" result=Ok fired=9 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:c-Garbage" result=Ok fired=9 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-and-c-Error" result=Ok fired=22 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-and-c-Zeros" result=Ok fired=22 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-and-c-Garbage" result=Ok fired=22 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-Error" result=Ok fired=23 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-Zeros" result=Ok fired=23 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev0-but-newest-Garbage" result=Ok fired=23 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 0), (DeviceIdentity(1), 0)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=24 reused_after_publishes=1 txg=14 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={"I-7.4"}
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:all-e" result=Err(NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread) fired=32 hooks=1
+name=k2-cell arm="rr2" cell="pass1:dev1-all-e reread:dev1-all-e" result=Ok fired=16 hooks=1 read_stage=First table=OnTheFirstRead ring=OnTheOneReread isolated=[(DeviceIdentity(0), 14), (DeviceIdentity(1), 14)] abandoned_roots_unreadable=0 c_places=26 free_c_places_after_mount=0 reused_after_publishes=21 txg=34 overwritten=[(0, 50188), (1, 50188)] floor_after=0 checker_red={}
+ok
+test k2_young_ring_rereads ... name=k2-young mount=M1-after-mkfs ring=OnTheOneReread hooks=1 reads_per_ring_slot={15} effective_root=(0,0)
+name=k2-young mount=M2-after-a-clean-M1 ring=OnTheFirstRead hooks=0 reads_per_ring_slot={14} effective_root=(1,2)
+name=k2-young mount=M3 ring=OnTheFirstRead hooks=0 reads_per_ring_slot={16} effective_root=(2,4)
+name=k2-young-sweep m1_crash_at_write=1 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=2 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=3 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=4 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=5 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=6 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=7 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=8 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=9 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=10 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=11 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=12 m2_ring=OnTheFirstRead
+name=k2-young-sweep M1 finished before write 13: stop
+name=k2-young-sweep-total crash_points=12 m2_rereading=5
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.54s
+

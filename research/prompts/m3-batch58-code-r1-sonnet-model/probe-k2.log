@@ -1,0 +1,18 @@
+
+running 1 test
+test sonnet_probe_k2_old_and_new_flow_of_the_product_tombstone_branch ... PROBE_K2 operations_total=55717 mkfs=25 before_last_unlink=55649
+PROBE_K2 old_writes=45878 old_segments=6543 first_write_of_last_unlink=45822
+PROBE_K2 new_writes=56 new_segments=8 new_segment_sizes=[26, 2, 1, 2, 20, 2, 1, 2]
+PROBE_K2 writes_identical=56
+PROBE_K2 straddling_segments=0 old_tail_segments=8 tail_equals_new=true
+PROBE_K2 earlier_segments_folded_into_base=6535 earlier_writes=45822
+PROBE_K2 new_slots_written=58 max_writes_over_one_slot=2
+PROBE_K2 base_touched_16KiB_slots=2230
+PROBE_K2 old_flow_touched_16KiB_slots=2230
+PROBE_K2 tearable_old_equals_new=true tearable_count_old=4 tearable_count_new=4
+PROBE_K2 new_write_kinds={"JournalRecord/4096B": 4, "RootRecordFua/512B": 2, "SystemConfigurationSlot/4096B": 4, "UnitWrite/16384B": 40, "UnitWrite/32768B": 6}
+PROBE_K2 new_flow_touched_16KiB_slots=2230 subset_of_old=true
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 264 filtered out; finished in 212.44s
+

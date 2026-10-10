@@ -1,0 +1,10 @@
+--- /tmp/claude-1000/m3-batch10-code-r2/tree/Cargo.toml	2026-10-02 14:44:08.496410410 +0000
++++ Cargo.toml	2026-10-05 14:56:38.068466799 +0000
+@@ -10,6 +10,7 @@
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
+     "crates/singlefs-reference-filesystem",
++    "crates/opus-r2-crash-states",
+ ]
+ exclude = ["research"]
+ 

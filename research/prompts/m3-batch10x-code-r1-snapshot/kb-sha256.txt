@@ -1,0 +1,1 @@
+e71e6f87bbfb7784b9dec9a32dc84fd99038a639bd2faec7de152950124bbee7  .claude/kb/decisions/24-后台重活能不能卸给GPU.md

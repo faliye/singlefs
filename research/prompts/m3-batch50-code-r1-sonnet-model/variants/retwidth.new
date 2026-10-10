@@ -1,0 +1,2 @@
+            && (record_type == PACKED_TYPE_RETIREMENT || registered_record_width(record_type) == Some(width))
+            && count * width <= declared

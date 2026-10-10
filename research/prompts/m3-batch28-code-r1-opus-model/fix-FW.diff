@@ -1,0 +1,95 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -2211,15 +2211,24 @@
+                     &child,
+                     Some(class_the_entry_type_names),
+                 ) {
+-                    self.judge_a_container_tree_entry_whose_child_is_of_another_class(
+-                        &child,
+-                        entry_type,
+-                        class_the_entry_type_names,
+-                        child_class,
+-                        identity_invariant,
+-                        name,
+-                    );
+-                    continue;
++                    // 攻方 F-W（零轮）：另一份按条目类型段那一类自证得过时，判红之后照类型段那一支走那一份（槽数按类型段那一类登记）。
++                    if opus_a_copy_verifies_as(self.reader, &child, class_the_entry_type_names) {
++                        self.judgements.judge(identity_invariant, false, || {
++                            format!(
++                                "{name}内部条目类型段 {entry_type} 说孩子是 {class_the_entry_type_names:?}，有一份孩子头里的类标签是 {child_class:?}（按那一类的长度读回、整单元校验和对得上），另一份是 {class_the_entry_type_names:?}"
++                            )
++                        });
++                    } else {
++                        self.judge_a_container_tree_entry_whose_child_is_of_another_class(
++                            &child,
++                            entry_type,
++                            class_the_entry_type_names,
++                            child_class,
++                            identity_invariant,
++                            name,
++                        );
++                        continue;
++                    }
+                 }
+             }
+             match ContainerTreeEntryType::of(entry_type, record_type) {
+@@ -2530,20 +2539,27 @@
+                 &child,
+                 class_the_entry_type_names,
+             ) {
+-                let span_in_slots = slots_spanned_by_a_unit_of_the_class(child_class).expect(
+-                    "child_unit_class_other_than_the_entry_type_names 只交回有长度的登记码",
+-                );
+-                self.note_references_of_a_pointer_followed_by_the_walk(
+-                    &child,
+-                    span_in_slots,
+-                    "inode 树的孩子",
+-                );
++                // 攻方 F-W（零轮）：另一份按条目类型段那一类自证得过时，判红之后照类型段那一支走那一份（槽数按类型段那一类登记）。
++                let same_class_copy_verifies = class_the_entry_type_names
++                    .is_some_and(|class| opus_a_copy_verifies_as(self.reader, &child, class));
++                if !same_class_copy_verifies {
++                    let span_in_slots = slots_spanned_by_a_unit_of_the_class(child_class).expect(
++                        "child_unit_class_other_than_the_entry_type_names 只交回有长度的登记码",
++                    );
++                    self.note_references_of_a_pointer_followed_by_the_walk(
++                        &child,
++                        span_in_slots,
++                        "inode 树的孩子",
++                    );
++                }
+                 self.judgements.judge("I-9.2", false, || {
+                     format!(
+                         "inode 内部条目类型段 {record_type} 说孩子是 {class_the_entry_type_names:?}，孩子头里的类标签是 {child_class:?}（按那一类的长度读回、整单元校验和对得上）"
+                     )
+                 });
+-                continue;
++                if !same_class_copy_verifies {
++                    continue;
++                }
+             }
+             let registered_entry_type = match entry_type {
+                 InodeInternalEntryType::LeafContainer => {
+@@ -4158,6 +4174,21 @@
+ /// 它是陈旧副本时，第二份照样要看）。
+ /// 类型段不认得的条目（`class_the_entry_type_names` 是 None）没有「它说的那一类」，交回孩子自证过的那一类。
+ /// 只认按它自己的长度自证过的孩子：头里的类标签坏了的单元按那个长度对不上校验和，不会被当成「另一类」。只读、不判。
++/// 攻方 F-W（零轮）：有一份副本头里的类就是 `class`、按那一类的长度读回的整单元校验和对得上。
++fn opus_a_copy_verifies_as(reader: &dyn ImageReader, child: &PointerView, class: MappingKeyUnitClass) -> bool {
++    let Some(unit_bytes) = unit_bytes_of_the_class(class) else {
++        return false;
++    };
++    child.locations.iter().any(|location| {
++        reader
++            .read(location.device, location.slot * SLOT_BYTES, unit_bytes)
++            .is_some_and(|content| {
++                MappingKeyUnitClass::of(content[UNIT_HEADER_CLASS_TAG_OFFSET]) == class
++                    && crc32_castagnoli_table(&content) == location.checksum
++            })
++    })
++}
++
+ fn child_unit_class_other_than_the_entry_type_names(
+     reader: &dyn ImageReader,
+     child: &PointerView,

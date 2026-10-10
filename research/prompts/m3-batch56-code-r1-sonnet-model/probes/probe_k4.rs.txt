@@ -1,0 +1,53 @@
+
+    /// PROBE (forward leg, not in repo): wide family, all rewritings vs implementation.
+    #[test]
+    fn zz_probe_equivalence_wide() {
+        let capacity = 233usize;
+        let mut values: Vec<usize> = (1..=233usize)
+            .filter(|v| *v <= 4 || (112..=122).contains(v) || *v >= 228 || (*v % 37 == 0) || (55..=60).contains(v))
+            .collect();
+        values.sort_unstable();
+        values.dedup();
+        eprintln!("values {} = {:?}", values.len(), values);
+        let mut shapes = 0u64;
+        let mut removals = 0u64;
+        let mut diffs: Vec<String> = Vec::new();
+        let mut stack: Vec<Vec<usize>> = vec![Vec::new()];
+        let mut all: Vec<Vec<usize>> = Vec::new();
+        for _ in 0..4 {
+            let mut next = Vec::new();
+            for prefix in &stack {
+                for v in &values {
+                    if prefix.last().is_none_or(|last| last + *v >= capacity + 1) {
+                        let mut longer = prefix.clone();
+                        longer.push(*v);
+                        next.push(longer);
+                    }
+                }
+            }
+            all.extend(next.iter().cloned());
+            stack = next;
+        }
+        for record_counts in all {
+            let before = tree_of_record_counts(&record_counts);
+            shapes += 1;
+            for inode in inodes_removed_from_each_container(&before) {
+                removals += 1;
+                let implementation = remove_record_from_leaf_containers(&before, inode).unwrap();
+                for rewriting in [
+                    MergeRuleRewriting::EveryPassStopsAfterAbsorbingOnePair,
+                    MergeRuleRewriting::NothingIsAbsorbedAfterDroppingTheEmptiedContainer,
+                ] {
+                    if implementation != remove_record_under_the_rewriting(&before, inode, rewriting) {
+                        if diffs.len() < 20 {
+                            diffs.push(format!("{record_counts:?} del {inode:?} {rewriting:?}"));
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!("PROBE shapes={shapes} removals={removals} diffs={}", diffs.len());
+        for d in &diffs { eprintln!("DIFF {d}"); }
+        assert!(diffs.is_empty());
+    }
+}

@@ -1,0 +1,28 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.21s
+     Running tests/checker_known_bad_images.rs (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 3 tests
+test lineage_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant ... ok
+test tombstone_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant ... FAILED
+test retirement_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant ... ok
+
+failures:
+
+---- tombstone_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant stdout ----
+
+thread 'tombstone_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant' (4169371) panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:16713:5:
+assertion `left == right` failed: Tombstone：只红 I-9.22：[("I-1.1", Holds), ("I-1.2", Holds), ("I-1.3", Holds), ("I-1.4", Holds), ("I-1.6", Holds), ("I-1.7", Holds), ("I-1.8", Holds), ("I-1.10", Holds), ("I-1.11", Holds), ("I-2.1", Holds), ("I-2.3", Holds), ("I-2.4", Holds), ("I-2.5", Holds), ("I-3.1", Holds), ("I-3.8", Holds), ("I-3.9", Holds), ("I-3.10", Holds), ("I-3.11", Holds), ("I-4.2", Holds), ("I-4.8", Holds), ("I-5.1", Holds), ("I-5.2", Holds), ("I-5.4", Holds), ("I-7.1", Holds), ("I-7.2", Holds), ("I-7.3", Holds), ("I-7.4", Holds), ("I-7.6", Holds), ("I-7.7", Holds), ("I-7.8", Holds), ("I-7.9", NotApplicable("根环里没有抬 F 的根：每条根带的 F 都不高于同一实例里它前一条根带的（回退与新实例的第一条根不算抬）")), ("I-7.12", Holds), ("I-7.13", Holds), ("I-7.14", Holds), ("I-8.6", Holds), ("I-8.7", Holds), ("I-8.8", NotApplicable("环里没有哪一组（同一块盘上实例代号与事务号都相同的非 0 记录）落了两条以上、也没有哪一组一条提交标记都没有：③ ④ 没有判的对象，提交标记字节单独成立不算这一条成立")), ("I-8.9", Holds), ("I-9.1", Holds), ("I-9.2", Holds), ("I-9.4", Holds), ("I-9.6", Holds), ("I-9.7", Holds), ("I-9.10", Holds), ("I-9.12", Holds), ("I-9.13", Holds), ("I-9.14", Holds), ("I-9.15", Holds), ("I-9.16", Holds), ("I-1.12", Holds), ("I-8.10", Holds), ("I-8.11", Holds), ("I-4.9", Holds), ("I-9.25", Holds), ("I-3.13", Holds), ("I-9.26", Holds), ("I-3.12", NotApplicable("根环里没有哪条根指着一张读得出、有行的实例表")), ("I-7.16", Holds), ("I-7.17", Holds), ("I-8.12", Holds), ("I-7.15", Holds), ("I-4.1", NotApplicable("所选根之上一次发布都不施加：重放之后那一版就是所选根，它可不可遍历归 I-7.2")), ("I-8.1", Holds), ("I-7.5", Holds), ("I-8.5", Holds), ("I-3.5", Holds), ("I-9.27", Holds), ("I-5.5", NotApplicable("回退候选集里每条根与由记录施加出来的那几版，没有一版是从 mkfs 水位第一次建树的那一版（树表非空、种类 1 条目的树 ID 是 65536、每条条目的诞生 txg 等于这一版的 txg）：一版都不判")), ("I-9.28", Holds), ("I-9.5", Holds), ("I-3.4", Holds), ("I-4.7", NotApplicable("走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）")), ("I-4.6", NotApplicable("走读到的每一版 inode 树里都没有 nlink = 0 的记录")), ("I-4.4", NotApplicable("第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现")), ("I-9.17", NotApplicable("走读到的每一版谱系树都是零根：没有谱系树内部条目可判")), ("I-9.18", NotApplicable("走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判")), ("I-9.19", NotApplicable("走读到的每一版里都没有在谱系上、而 inode 树里还有同号同对象出生代记录的墓碑")), ("I-9.20", Holds), ("I-9.21", NotApplicable("这张镜像用了只供测试的墓碑容量旋钮（新入口给了旋钮值）：产品容量那一条不判")), ("I-9.22", Holds), ("I-9.23", Holds), ("I-9.24", Holds), ("I-9.29", Holds), ("I-3.14", Holds), ("I-9.30", Holds), ("I-9.31", NotApplicable("走读到的每一版退役树都是零根：没有退役树内部条目可判")), ("I-9.32", NotApplicable("走读到的每一版退役树都是零根：没有退役记录可判")), ("I-9.33", NotApplicable("走读到的每一版里没有一条退役记录在谱系上：没有对象可判")), ("I-9.34", NotApplicable("走读到的每一版里没有一条退役记录在谱系上：没有对象可判")), ("I-9.35", Holds), ("I-9.36", NotApplicable("走读到的每一版里没装旋钮的谱系树与退役树都是零根或只一片容器：没有非最右的容器")), ("I-9.37", NotApplicable("池级 checker 没拿到只供测试的谱系与退役容量旋钮（旧入口，或新入口没给这两个旋钮值）：旋钮那一条不判"))]
+  left: []
+ right: ["I-9.22"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    tombstone_containers_with_an_empty_rightmost_one_redden_only_the_knob_capacity_invariant
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 246 filtered out; finished in 10.97s
+
+error: test failed, to rerun pass `-p singlefs-harness --test checker_known_bad_images`
+exit=101

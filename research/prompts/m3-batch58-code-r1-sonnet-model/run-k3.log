@@ -1,0 +1,10 @@
+
+running 5 tests
+test allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_count_by_the_recovery ... ok
+test allocation_records_whose_generation_is_after_the_root_are_refused_before_each_accounting_entry_is_judged_by_the_recovery ... ok
+test allocation_records_whose_generation_is_after_the_root_are_refused_before_the_mapping_entry_count_by_the_recovery ... ok
+test allocation_records_whose_generation_is_after_the_root_are_refused_before_the_mapping_entry_count_by_the_writable_mount ... ok
+test allocation_records_whose_generation_is_after_the_root_are_refused_before_the_accounting_entry_count_by_the_writable_mount ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 3.23s
+

@@ -1,0 +1,9 @@
+FXSTART plain W=256 k=5 m=1 k2=2 | current_txg=12 unmount=Raised publishes=2 writes=36 baseline={0: (Some(10), "ok", Some(2901999628984371162)), 1: (Some(12), "ok", Some(12238527202627583360))}
+FXPLAN plain W=256 k=5 m=1 k2=2 n=10 sc=2 roots=0 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=12 effective=12 floor_in_row=12 row_txg=13 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 screened_prefixes=39 bad=0
+FXENUMT plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 enumerate_s=51.3 distinct_survivors=394
+FXENUM plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={} bad_judgements=0 elapsed=51.4s
+FXENUMV plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 count=16395 lost=dev0 chosen=Some(10) read=same
+FXENUMV plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 count=4116 lost=dev0 chosen=Some(13) read=known
+FXENUMV plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 count=20502 lost=dev1 chosen=Some(12) read=same
+FXENUMV plain W=256 k=5 m=1 k2=2 n=10 plan=w:-/-:z j=0 count=9 lost=dev1 chosen=Some(14) read=same
+FXDONE plain W=256 k=5 m=1 k2=2 elapsed=51.4s

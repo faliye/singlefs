@@ -1,0 +1,29 @@
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A0.fd versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A0.res versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A1.fd versions_positive=21159 peak=2
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A1.res versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A2.fd versions_positive=21159 peak=2
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 A2.res versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C1 versions_positive=21159 peak=1
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C1L versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C2 versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C3 versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C3S versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C4 versions_positive=8943 peak=1
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C4L versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C6 versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 C7 versions_positive=0 peak=0
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 Pa.deficit versions_positive=798496 peak_bytes=294912
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 Pa.free min_bytes=-147456
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 Pb.deficit versions_positive=59 peak_bytes=65536
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 Pb.free min_bytes=-49152
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first A1.fd history=intent:4 rb:5 crash:1 rb:5 rb:4 rb:6 intent:1 rb:10 rb:11 rb:13 final intent:4 final rb:17
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first A2.fd history=intent:4 rb:5 crash:1 rb:5 rb:4 rb:6 intent:1 rb:10 rb:11 rb:13 final intent:4 final rb:17
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first C1 history=intent:4 rb:5 crash:1 rb:5 rb:4 rb:6 intent:1 rb:10 rb:11 rb:13 final intent:4 final rb:17
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first C4 history=intent:2 rb:3 intent:1 final rb:8 rb:5 rb:11 rb:7 crash:2 rb:12 create intent:1 crash:1 rb:12 crash:2 intent:3 final rb:17 rb:23 intent:1 final rb:21 crash:2 rb:26 final intent:2 final
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first Pa.deficit history=intent:4
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first Pb.deficit history=intent:4 final intent:2 rb:7 rb:7 final rb:6 create rb:7 final intent:2 final rb:14 intent:3 rb:15 rb:15 rb:15 rb:22 final rb:24 rb:25 rb:26 crash:2 final create rb:29
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 first same_ident_max history=intent:4 rb:5 crash:1 rb:5 rb:4 rb:6 intent:1 rb:10 rb:11 rb:13 final intent:4 final
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 retire_records max=6
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 same_ident_max versions_positive=51846 peak=6
+random cap3-th0-rc2-f2-ring8 seed=11 runs=20000 len=40 versions=799968 max_retired_per_publish=1 growth_publishes_written_more_than_term_before=6 max_written_minus_term_before=1

@@ -1,0 +1,329 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -8681,6 +8681,7 @@
+ /// 池级 checker 的入口：每条第一版不变量都报，没评估到的报「不适用」并带理由。
+ #[must_use]
+ pub fn check_pool_image(reader: &dyn ImageReader) -> Vec<(&'static str, InvariantVerdict)> {
++    let _ = attack_stash::take();
+     let system_configurations = chosen_system_configurations(reader);
+     let mut root_ring_judgements = Judgements::default();
+     let chosen: Vec<_> = system_configurations
+@@ -9316,6 +9317,45 @@
+         &mut index_node_cache,
+         &mut judgements,
+     );
++    {
++        let attack_inputs: Vec<attack_stash::VersionInput<'_>> = candidate_indexes
++            .iter()
++            .map(|index| {
++                let root = &roots[*index].2;
++                attack_stash::VersionInput {
++                    name: format!("根（实例 {}、txg {}）", root.instance, root.checkpoint_txg),
++                    instance: root.instance,
++                    txg: root.checkpoint_txg,
++                    is_newest: *index == newest_index,
++                    from_records: false,
++                    tree_table_pointer: &root.record_bytes[ROOT_RECORD_TREE_TABLE_POINTER],
++                }
++            })
++            .chain(versions_applied_only_by_records.iter().map(|version| attack_stash::VersionInput {
++                name: format!("由记录施加出来的那一版（实例 {}、txg {}）", version.instance, version.checkpoint_txg),
++                instance: version.instance,
++                txg: version.checkpoint_txg,
++                is_newest: false,
++                from_records: true,
++                tree_table_pointer: version.tree_table_and_mapping_root_pointers().0,
++            }))
++            .collect();
++        let attack_newest_watermark = accounting
++            .get(&(STATISTIC_INODE_WATERMARK, STATISTIC_NO_DEVICE_DIMENSION))
++            .copied();
++        attack_stash::collect(
++            reader,
++            &attack_inputs,
++            &published,
++            &mut index_node_cache,
++            roots[newest_index].2.instance,
++            roots[newest_index].2.checkpoint_txg,
++            attack_newest_watermark,
++            walk.largest_inode_number_in_the_inode_tree,
++            &walk.inode_object_birth,
++            &instance_table_rows,
++        );
++    }
+     // I-4.4（意图只描述目标态）：第一版的意图载体没有可装增量的字段，报不适用并写理由（用户 2026-10-05 定）。
+     judgements.not_applicable(
+         INTENT_DESCRIBES_ONLY_THE_TARGET_STATE,
+@@ -10339,3 +10379,272 @@
+         );
+     }
+ }
++
++// ===== 攻方腿（m3-delete-checker-r2-opus）副本专用：把池级 checker 删除态扫描要判的那几版的事实留一份给原型读 =====
++// 只读、不改任何判定：check_pool_image 在删除态扫描之后调 `attack_stash::collect`，原型调 `attack_stash::take` 取走。
++pub mod attack_stash {
++    use super::*;
++    use std::cell::RefCell;
++
++    #[derive(Clone, Debug, PartialEq, Eq)]
++    pub struct Tombstone {
++        pub object: u64,
++        pub birth: u64,
++        pub start: u64,
++        pub end: u64,
++        pub death: u64,
++    }
++
++    #[derive(Clone, Debug)]
++    pub struct Container {
++        pub container: u64,
++        pub birth_txg: u64,
++        pub published: bool,
++        pub records: Vec<Vec<u8>>,
++    }
++
++    #[derive(Clone, Debug)]
++    pub struct InodeRecord {
++        pub inode: u64,
++        pub nlink: u32,
++        pub size: u64,
++        pub birth: u64,
++        pub container: u64,
++    }
++
++    #[derive(Clone, Debug)]
++    pub struct Version {
++        pub name: String,
++        pub instance: u32,
++        pub txg: u64,
++        pub is_newest: bool,
++        pub from_records: bool,
++        pub tree_table_key: (u32, u64, u32),
++        pub has_trees: bool,
++        pub gap: Option<String>,
++        /// None：没有 deleted_inodes 树（树表里没有那一条）；Some(号表)。
++        pub queue: Option<Vec<u64>>,
++        /// 叶序原样（同号两条、乱序都留着）。
++        pub inode_records: Vec<InodeRecord>,
++        pub tombstone_containers: Vec<Container>,
++        pub lineage_containers: Vec<Container>,
++        pub watermark: Option<u64>,
++    }
++
++    #[derive(Clone, Debug, Default)]
++    pub struct Facts {
++        pub versions: Vec<Version>,
++        pub newest_instance: u32,
++        pub newest_txg: u64,
++        pub newest_watermark: Option<u64>,
++        pub largest_key_walked: Option<u64>,
++        pub inode_object_birth: BTreeMap<u64, u64>,
++        pub instance_table_rows: Vec<(u32, u64)>,
++    }
++
++    thread_local! {
++        static STASH: RefCell<Option<Facts>> = const { RefCell::new(None) };
++    }
++
++    pub fn take() -> Option<Facts> {
++        STASH.with(|cell| cell.borrow_mut().take())
++    }
++
++    pub(super) struct VersionInput<'a> {
++        pub name: String,
++        pub instance: u32,
++        pub txg: u64,
++        pub is_newest: bool,
++        pub from_records: bool,
++        pub tree_table_pointer: &'a [u8],
++    }
++
++    /// 码 2 容器树（墓碑树、谱系树、inode 树同形）按叶序交回每片码 3 容器（容器号、诞生代号、已发布、记录原样）。
++    fn containers_in_leaf_order(
++        reader: &dyn ImageReader,
++        root_pointer: &crate::image::PointerView,
++        expected_type_segment: u16,
++        published: &PublishedPredicate<'_>,
++        index_cache: &mut IndexNodeCache,
++        packed_cache: &mut PackedUnitCache,
++        out: &mut Vec<Container>,
++    ) -> Result<(), String> {
++        if root_pointer.all_zero {
++            return Ok(());
++        }
++        let node = read_index_node_without_judging(reader, root_pointer, index_cache)
++            .ok_or("码 2 节点读不出")?;
++        if node.level == 0 {
++            return if node.entries.is_empty() { Ok(()) } else { Err("层级 0 而有条目".into()) };
++        }
++        for entry in &node.entries {
++            let child_pointer = parse_node_pointer(&entry[34..120]);
++            let segment = read_u16(entry, 16);
++            if segment == 0 {
++                containers_in_leaf_order(reader, &child_pointer, expected_type_segment, published, index_cache, packed_cache, out)?;
++            } else if segment == expected_type_segment {
++                let container = read_packed_unit_without_judging(reader, &child_pointer, packed_cache)
++                    .ok_or("码 3 容器读不出")?;
++                let is_published = published.holds_for(
++                    WriteOrderUnderThePublishedPredicate::IndexOrPackedRecordUnit {
++                        birth_txg: container.view.birth_txg,
++                        instance: container.write_order_instance,
++                    },
++                );
++                out.push(Container {
++                    container: container.view.container,
++                    birth_txg: container.view.birth_txg,
++                    published: is_published,
++                    records: container.view.records.clone(),
++                });
++            } else {
++                return Err(format!("类型段 {segment}"));
++            }
++        }
++        Ok(())
++    }
++
++    fn one_version(
++        reader: &dyn ImageReader,
++        input: &VersionInput<'_>,
++        published: &PublishedPredicate<'_>,
++        index_cache: &mut IndexNodeCache,
++        packed_cache: &mut PackedUnitCache,
++    ) -> Version {
++        let tree_table_pointer = parse_node_pointer(input.tree_table_pointer);
++        let mut version = Version {
++            name: input.name.clone(),
++            instance: input.instance,
++            txg: input.txg,
++            is_newest: input.is_newest,
++            from_records: input.from_records,
++            tree_table_key: if tree_table_pointer.all_zero {
++                (0, 0, 0)
++            } else {
++                let first = tree_table_pointer.locations[0];
++                (first.device, first.slot, first.checksum)
++            },
++            has_trees: false,
++            gap: None,
++            queue: None,
++            inode_records: Vec::new(),
++            tombstone_containers: Vec::new(),
++            lineage_containers: Vec::new(),
++            watermark: None,
++        };
++        if tree_table_pointer.all_zero {
++            return version;
++        }
++        let Some(tree_table) = read_index_node_without_judging(reader, &tree_table_pointer, index_cache) else {
++            version.gap = Some("树表读不出".into());
++            return version;
++        };
++        if tree_table.entries.is_empty() {
++            return version;
++        }
++        version.has_trees = true;
++        let mut gaps: Vec<String> = Vec::new();
++        for entry in &tree_table.entries {
++            if entry.len() < tree_table_entry_bytes() {
++                gaps.push("树表条目太短".into());
++                continue;
++            }
++            let kind = read_u16(entry, TREE_TABLE_ENTRY_KIND_OFFSET);
++            let root_pointer = parse_node_pointer(&entry[14..100]);
++            match kind {
++                TREE_KIND_INODE => {
++                    let mut containers = Vec::new();
++                    match containers_in_leaf_order(reader, &root_pointer, PACKED_TYPE_INODE, published, index_cache, packed_cache, &mut containers) {
++                        Ok(()) => {
++                            for container in containers {
++                                for record in &container.records {
++                                    version.inode_records.push(InodeRecord {
++                                        inode: read_u64(record, 0),
++                                        nlink: read_u32(record, INODE_RECORD_NLINK_OFFSET),
++                                        size: read_u64(record, INODE_RECORD_SIZE_OFFSET),
++                                        birth: read_u64(record, INODE_RECORD_OBJECT_BIRTH_OFFSET),
++                                        container: container.container,
++                                    });
++                                }
++                            }
++                        }
++                        Err(why) => gaps.push(format!("inode 树：{why}")),
++                    }
++                }
++                TREE_KIND_DELETED_INODES => {
++                    match deleted_inodes_queue_without_judging(reader, &root_pointer, index_cache) {
++                        Ok(queue) => version.queue = Some(queue.into_iter().collect()),
++                        Err(gap) => gaps.push(format!("队列：{gap:?}")),
++                    }
++                }
++                TREE_KIND_TOMBSTONE => {
++                    let mut containers = Vec::new();
++                    match containers_in_leaf_order(reader, &root_pointer, PACKED_TYPE_TOMBSTONE, published, index_cache, packed_cache, &mut containers) {
++                        Ok(()) => version.tombstone_containers = containers,
++                        Err(why) => gaps.push(format!("墓碑树：{why}")),
++                    }
++                }
++                TREE_KIND_LINEAGE => {
++                    let mut containers = Vec::new();
++                    match containers_in_leaf_order(reader, &root_pointer, PACKED_TYPE_LINEAGE, published, index_cache, packed_cache, &mut containers) {
++                        Ok(()) => version.lineage_containers = containers,
++                        Err(why) => gaps.push(format!("谱系树：{why}")),
++                    }
++                }
++                TREE_KIND_ACCOUNTING if !root_pointer.all_zero => {
++                    let mut rows = Vec::new();
++                    match collect_accounting_rows_without_judging(reader, &root_pointer, index_cache, &mut rows) {
++                        Ok(()) => {
++                            version.watermark = rows
++                                .iter()
++                                .find(|row| {
++                                    read_u16(row, 0) == STATISTIC_INODE_WATERMARK
++                                        && read_u32(row, ACCOUNTING_ROW_DEVICE_OFFSET) == STATISTIC_NO_DEVICE_DIMENSION
++                                })
++                                .map(|row| read_u64(row, ACCOUNTING_ROW_VALUE_OFFSET));
++                        }
++                        Err(gap) => gaps.push(format!("记账：{gap:?}")),
++                    }
++                }
++                _ => {}
++            }
++        }
++        if !gaps.is_empty() {
++            version.gap = Some(gaps.join("；"));
++        }
++        version
++    }
++
++    #[allow(clippy::too_many_arguments)]
++    pub(super) fn collect(
++        reader: &dyn ImageReader,
++        inputs: &[VersionInput<'_>],
++        published: &PublishedPredicate<'_>,
++        index_cache: &mut IndexNodeCache,
++        newest_instance: u32,
++        newest_txg: u64,
++        newest_watermark: Option<u64>,
++        largest_key_walked: Option<u64>,
++        inode_object_birth: &BTreeMap<u64, u64>,
++        instance_table_rows: &[InstanceTableRow],
++    ) {
++        let mut packed_cache = PackedUnitCache::new();
++        let versions = inputs
++            .iter()
++            .map(|input| one_version(reader, input, published, index_cache, &mut packed_cache))
++            .collect();
++        let facts = Facts {
++            versions,
++            newest_instance,
++            newest_txg,
++            newest_watermark,
++            largest_key_walked,
++            inode_object_birth: inode_object_birth.clone(),
++            instance_table_rows: instance_table_rows
++                .iter()
++                .map(|row| (row.instance, row.published_checkpoint_txg))
++                .collect(),
++        };
++        STASH.with(|cell| *cell.borrow_mut() = Some(facts));
++    }
++}

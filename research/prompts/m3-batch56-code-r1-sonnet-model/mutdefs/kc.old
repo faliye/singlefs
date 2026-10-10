@@ -1,0 +1,1 @@
+            .map_or(0, |difference| difference / 2);

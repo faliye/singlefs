@@ -1,0 +1,185 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/repo/crates/singlefs-core)
+warning: value assigned to `current_position` is never read
+   --> crates/singlefs-core/src/inode_tree.rs:470:17
+    |
+470 |                 current_position -= 1;
+    |                 ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+    = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `absorbed_at_least_once` is never read
+   --> crates/singlefs-core/src/inode_tree.rs:474:13
+    |
+474 |             absorbed_at_least_once = true;
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: maybe it is overwritten before being read?
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/repo/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.66s
+     Running tests/deletion_scenario_writes.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/deletion_scenario_writes-4816c458a61d78c1)
+
+running 5 tests
+test spans_of_consecutive_parts_refuse_a_part_without_writes_and_accounts_that_do_not_add_up ... ok
+test spans_of_consecutive_parts_give_each_part_the_barriers_after_its_last_write_and_the_first_part_the_leading_barriers ... ok
+test the_in_process_history_publishes_the_intent_then_three_batches_of_thirteen_twelve_eleven_and_twelve_units_per_device ... ok
+test the_history_beside_a_size_zero_inode_creates_inode_two_before_the_sequential_write_and_gives_the_intent_sixty_seconds_after_the_write_which_every_batch_copies ... ok
+test the_mount_continuation_history_publishes_its_three_batches_after_the_unmount_the_row_and_the_warm_up ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.41s
+
+     Running tests/inode_tree_leaf_containers_appended_one_at_a_time_up_to_what_one_root_node_holds.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/inode_tree_leaf_containers_appended_one_at_a_time_up_to_what_one_root_node_holds-ef26fcb99226b563)
+
+running 1 test
+test appending_inode_records_one_at_a_time_rewrites_container_floor_k_over_233_and_refuses_the_136th_container ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.65s
+
+     Running tests/many_inodes_write_and_read.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/many_inodes_write_and_read-a832878a0df9797b)
+
+running 4 tests
+test more_leaf_containers_than_one_root_node_holds_is_refused_before_anything_reaches_the_disk ... ok
+test creating_one_inode_below_the_threshold_keeps_one_container_and_bumps_the_watermark_by_one ... ok
+test creating_inodes_across_the_two_hundred_thirty_three_threshold_splits_at_the_end_and_reads_back_cold ... ok
+test publish_naming_more_units_than_one_journal_record_holds_spills_its_one_transaction_over_two_records_and_only_the_second_ends_the_publish ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.90s
+
+     Running tests/pool_checker_judges_the_deletion_state_of_every_walked_version.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/pool_checker_judges_the_deletion_state_of_every_walked_version-e216f9aa004669de)
+
+running 45 tests
+test a_pending_deletion_occupancy_row_that_is_not_zero_reddens_only_the_pending_deletion_invariant ... ok
+test a_new_inode_published_with_nlink_zero_as_in_the_formal_line_being_deleted_variant_reddens_the_deletion_queue_invariant ... ok
+test a_leaf_holding_two_inode_numbers_in_descending_order_reddens_only_the_container_number_invariant ... ok
+test a_deletion_queue_holding_one_number_twice_reddens_only_the_key_order_invariant ... ok
+test a_deleted_inodes_root_that_does_not_read_back_leaves_the_deletion_queue_invariants_not_judged ... ok
+test a_queued_inode_whose_tombstone_names_another_object_birth_reddens_the_queued_tombstone_invariant ... ok
+test a_queued_inode_whose_tombstone_does_not_cover_the_whole_object_reddens_the_queued_tombstone_invariant ... ok
+test a_tombstone_container_that_does_not_read_back_leaves_the_watermark_invariant_not_judged ... ok
+test a_size_ahead_of_the_data_units_on_a_version_without_a_deleted_inodes_entry_is_not_judged_with_the_reason_of_the_missing_entry ... ok
+test a_queue_number_without_an_inode_record_reddens_only_the_deletion_queue_invariant ... ok
+test a_deletion_queue_of_two_inodes_being_deleted_with_their_tombstones_reddens_only_the_at_most_one_key_invariant ... ok
+test a_queue_number_whose_inode_record_has_nlink_one_reddens_the_deletion_queue_invariant ... ok
+test a_tombstone_container_outside_the_published_predicate_does_not_count_toward_the_watermark ... ok
+test an_accounting_tree_that_does_not_read_back_leaves_the_pending_deletion_invariant_not_judged ... ok
+test a_deleted_inodes_entry_whose_head_identifier_names_no_inode_tree_leaves_the_deletion_queue_invariants_not_judged ... ok
+test an_accounting_tree_without_the_pending_deletion_occupancy_row_reddens_only_the_pending_deletion_invariant ... ok
+test a_queued_inode_whose_tombstone_died_on_a_branch_a_rollback_left_reddens_only_the_queued_tombstone_invariant ... ok
+test an_extent_tree_that_does_not_read_back_leaves_the_data_unit_invariants_of_the_deletion_not_judged ... ok
+test an_empty_entry_standing_in_for_the_extent_tree_while_the_real_extent_tree_names_no_inode_tree_leaves_the_data_unit_invariants_not_judged ... ok
+test an_inode_being_deleted_with_size_zero_and_one_data_unit_holds_the_intermediate_state_invariant ... ok
+test an_extent_tree_entry_whose_head_identifier_names_no_inode_tree_leaves_the_data_unit_invariants_not_judged ... ok
+test an_inode_being_deleted_whose_size_asks_for_more_data_units_than_it_has_reddens_only_the_intermediate_state_invariant ... ok
+test an_inode_record_with_nlink_zero_outside_the_queue_reddens_only_the_deletion_queue_invariant ... ok
+test an_inode_tree_whose_deleted_inodes_entry_carries_an_unregistered_kind_leaves_the_deletion_queue_invariants_not_judged ... ok
+test an_inode_tree_without_a_deleted_inodes_entry_in_the_tree_table_leaves_the_deletion_queue_invariants_not_judged ... ok
+test an_intermediate_deletion_batch_with_a_non_zero_pending_deletion_row_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_deletion_batch_whose_size_asks_for_more_data_units_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_tree_table_that_does_not_read_back_leaves_the_deletion_invariants_not_judged ... ok
+test an_intermediate_version_with_data_units_of_an_inode_without_a_record_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_version_with_an_inode_record_of_nlink_zero_outside_the_queue_reddens_while_the_newest_root_is_clean ... ok
+test an_intermediate_version_whose_inode_leaf_does_not_read_back_is_not_judged_rather_than_red ... ok
+test an_intermediate_tree_table_whose_entries_are_narrower_than_the_field_table_leaves_the_deletion_invariants_not_judged ... ok
+test data_units_of_an_inode_without_a_record_outside_the_queue_redden_only_the_inode_being_deleted_invariant ... ok
+test an_intermediate_version_without_a_deleted_inodes_entry_leaves_the_deletion_queue_invariants_not_judged_while_the_newest_root_is_clean ... ok
+test unlinking_then_rolling_back_before_the_intent_and_back_to_the_emptied_version_holds_every_lineage_invariant ... ok
+test unlinking_the_same_inode_again_after_a_rollback_before_its_intent_holds_the_tombstone_record_invariant ... ok
+test a_tombstone_on_the_lineage_carrying_another_object_birth_for_a_live_number_reddens_the_one_birth_per_number_invariant ... ok
+test a_tombstone_that_died_after_every_version_reddens_only_the_tombstone_record_invariant ... ok
+test a_tombstone_on_the_lineage_naming_a_live_inode_reddens_only_the_live_object_invariant ... ok
+test a_tombstone_that_died_before_its_object_was_born_reddens_only_the_tombstone_record_invariant ... ok
+test a_tombstone_that_does_not_cover_the_whole_object_reddens_only_the_tombstone_record_invariant ... ok
+test a_tombstone_whose_object_identifier_reaches_the_inode_number_watermark_reddens_only_the_watermark_invariant ... ok
+test a_tombstone_off_the_lineage_whose_object_birth_differs_from_the_live_record_reddens_only_the_object_birth_invariant ... ok
+test two_tombstones_of_one_object_on_the_lineage_redden_only_the_tombstone_record_invariant ... ok
+test every_published_step_of_unlinking_a_three_unit_file_holds_the_deletion_invariants ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.22s
+
+     Running tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_idempotence_criteria_and_rollback_to_the_emptied_version-e9df936c04fe3af8)
+
+running 5 tests
+test tags_four_and_six_of_every_deletion_version_equal_the_values_recomputed_from_its_image ... ok
+test rolling_back_to_the_version_before_the_intent_recomputes_tag_six_from_the_rollback_targets_inode_tree ... ok
+test rolling_back_to_the_emptied_version_is_accepted_and_publishes_a_version_with_trees_and_no_file ... ok
+test the_publishes_continued_by_a_remount_between_two_batches_equal_the_rest_of_the_uninterrupted_run ... ok
+test a_crash_halfway_through_the_writes_of_the_first_batch_continues_on_remount_to_the_uninterrupted_end_state ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.32s
+
+     Running tests/unlink_in_histories_judged_by_the_model.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_in_histories_judged_by_the_model-c27e9462af770d3d)
+
+running 8 tests
+test an_overwrite_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... ok
+test an_unlink_after_rolling_back_to_the_intent_is_judged_by_the_model_through_the_walked_step ... ok
+test creating_an_inode_after_rolling_back_to_the_intent_walks_the_queue_first_and_is_judged_by_the_model ... ok
+test after_an_inode_is_created_on_the_emptied_version_a_rollback_to_before_the_unlink_lets_the_first_file_be_overwritten ... ok
+test unlinking_the_first_file_then_reading_back_and_mounting_runs_to_the_end_with_the_model_agreeing ... ok
+test creating_inodes_after_the_first_file_was_deleted_runs_through_a_mount_with_the_model_agreeing ... ok
+test the_fast_tier_weights_draw_an_unlink_and_the_first_history_with_one_runs_to_the_end_with_the_model_agreeing ... ok
+test the_fast_tier_weights_draw_an_inode_creation_after_an_unlink_and_the_first_history_with_one_runs_to_the_end ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 41.30s
+
+     Running tests/unlink_mount_continuation_and_the_emptied_version.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_mount_continuation_and_the_emptied_version-395c716adb759702)
+
+running 23 tests
+test only_the_version_after_the_final_batch_rebuilds_as_with_trees_and_no_file ... ok
+test a_session_unlink_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test after_the_unlink_the_session_holds_the_emptied_version_and_refuses_an_overwrite_before_any_write ... ok
+test new_inodes_on_the_emptied_version_are_published_and_the_version_holds_files_again ... ok
+test a_session_unlink_given_a_time_past_thirty_two_bits_writes_it_whole_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_session_mounted_with_batches_of_one_unlinks_a_three_unit_file_in_an_intent_and_three_steps ... ok
+test the_intent_given_a_time_earlier_than_the_previous_version_writes_that_earlier_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... ok
+test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... ok
+test an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published ... ok
+test the_tombstone_prepay_of_an_overwrite_reads_the_tombstone_tree_height_from_the_root_node_header ... ok
+test the_intent_and_a_middle_batch_each_set_the_change_count_to_the_txg_of_their_own_publish ... ok
+test a_writable_mount_after_the_intent_continues_the_queue_to_empty_after_its_warm_up ... ok
+test a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_session_unlink_given_a_time_that_is_not_a_whole_minute_writes_it_to_the_second_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... ok
+test a_mount_whose_continuation_step_fails_on_a_device_error_hands_back_the_writes_of_every_publish_it_landed ... ok
+test rolling_back_to_the_intent_takes_its_deleted_inodes_root_and_the_next_mount_continues_it_to_empty ... ok
+test the_batches_of_a_mount_continuation_after_an_intent_given_a_time_earlier_than_the_previous_version_copy_that_earlier_time_on_disk ... ok
+test the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk ... ok
+test the_mount_hands_in_every_continuation_step_after_its_warm_up_in_publish_order ... ok
+test the_session_hands_in_the_intent_and_every_step_of_an_unlink_in_publish_order ... ok
+test two_session_unlinks_in_the_same_mount_the_second_given_an_earlier_time_write_the_second_given_time_into_the_three_time_fields_of_its_intent_on_disk ... ok
+test two_copies_of_the_image_between_two_batches_continue_to_byte_identical_disks ... ok
+
+test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.95s
+
+     Running tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches-fddebf66bb4f4cd8)
+
+running 1 test
+test a_file_over_two_extent_lower_leaves_unlinked_in_product_batches_rewrites_the_leaf_whose_last_unit_is_cut ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.01s
+
+     Running tests/unlink_single_file_publishes.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_single_file_publishes-33f27b5e0dc69e8a)
+
+running 9 tests
+test intent_rewrites_the_inode_leaf_and_root_the_deleted_inodes_root_and_the_tombstone_container_and_root ... ok
+test a_batch_of_one_unit_rewrites_the_cut_lower_leaf_and_the_extent_root_and_releases_the_tail_unit ... ok
+test the_final_batch_removes_the_record_the_queue_key_and_every_remaining_unit_in_the_same_publish ... ok
+test unlink_of_an_inode_that_is_not_a_live_record_is_refused_before_any_write ... ok
+test continuing_after_the_queue_is_empty_publishes_nothing ... ok
+test overwriting_the_first_file_after_it_is_deleted_is_refused_as_not_in_the_tree ... ok
+test from_the_intent_on_the_read_only_mount_and_the_cold_walk_answer_no_file ... ok
+test every_deletion_version_rebuilt_from_disk_equals_the_published_one ... ok
+test the_pool_checker_finds_no_violation_after_the_intent_and_after_every_batch ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.30s
+
+     Running tests/unlink_writes_per_transaction_do_not_grow_with_the_file.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/unlink_writes_per_transaction_do_not_grow_with_the_file-9c8b1d7ae28636ce)
+
+running 3 tests
+test unlink_of_files_of_sixteen_and_thirty_two_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_stays_within_a_constant_of_a_one_unit_file ... ignored, harness 慢档用例：两份几千个数据单元的文件各顺序写一次、再分十几到三十几批删完；判决点名放慢档，debug 下单跑量过 28、55、63 秒（随机器负载）
+test the_product_unlink_batch_releases_one_extent_lower_leaf_from_a_file_of_any_size_up_to_two_to_the_fortieth_data_units ... ok
+test unlink_of_files_of_one_to_four_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_does_not_grow_with_the_file ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 3.17s
+

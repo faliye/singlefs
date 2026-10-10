@@ -1,0 +1,42 @@
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.31 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.14s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.32 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.27s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.33 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.28s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.34 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.26s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.36 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 3.48s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:
+第 54 批：抬 F 之后 E 镜像的豁免表删掉 I-9.37 那一行（没有删除的会话上它报的不适用不再被认）
+  expected: raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_
+  rc 101
+   test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out; finished in 2.99s
+   error: test failed, to rerun pass `-p singlefs-harness --test reuse_after_raising_the_floor`
+   error: 1 target failed:

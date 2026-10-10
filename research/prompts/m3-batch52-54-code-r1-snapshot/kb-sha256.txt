@@ -1,0 +1,7 @@
+c708e5933178577310cf329f2670e93e927908a4c7d7c3bcc12a501e2a050362  .claude/kb/invariants.md
+c67116fbb4d3dc8d0a6e5f9bdc444f9afcab1261f4f89a19ccc8ef35facc5d18  .claude/kb/decisions/23-journal的角色与格式.md
+afb789519f60f9ff77a90d443cc71a34f2643800596d56bfbd670d73739daed4  .claude/kb/decisions/08-核心索引结构.md
+1730ad450d2cd4b2db27e24e59ed9c1a533d104c59603de0164f0205de50e7a0  .claude/kb/decisions/18-块里携带什么信息.md
+4ec193a32f4ed93e03f08fd635c12c486b5c0562f68d40a27f22566b02565892  .claude/kb/layout/03-third-txn.md
+2ea15c3aae7c8a0e8416f13a7b0c5e045c27e3259ec935ef2c6b8fd7b7a77e9d  .claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md
+b0dbfd0cd855472633b24ccf50658bd2842e3c698e91e9806cf2b204ae2cc9c5  .claude/kb/checks-owed.md

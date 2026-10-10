@@ -1,0 +1,29 @@
+--- m3-batch10-code-r3/tree/crates/singlefs-core/src/mount.rs	2026-10-06 00:13:48.157251678 +0000
++++ m3-batch10-code-r3-sonnet/work/crates/singlefs-core/src/mount.rs	2026-10-06 00:40:20.376202485 +0000
+@@ -2044,10 +2044,24 @@
+             None => {
+                 before_the_one_reread.before_rereading();
+                 let readings_of_the_reread = read_every_root_ring_slot_once();
+-                let readings_of_the_two_passes_merged = merged_readings_of_the_two_root_ring_passes(
++                // ARM-X: whole-swap to the reread, but refuse when a first-pass self-verified root is not self-verified on the reread.
++                let first_pass_root_lost = first_readings
++                    .iter()
++                    .zip(readings_of_the_reread.iter())
++                    .any(|((_, first), (_, again))| {
++                        matches!(first, RootRingSlotReadingTellingNeverWrittenApart::SelfVerified(_))
++                            && !matches!(again, RootRingSlotReadingTellingNeverWrittenApart::SelfVerified(_))
++                    });
++                if first_pass_root_lost && std::env::var("ARM_X_REFUSES").is_ok() {
++                    return Err(
++                        MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread,
++                    );
++                }
++                let _unused_merge = merged_readings_of_the_two_root_ring_passes(
+                     &first_readings,
+-                    readings_of_the_reread,
++                    readings_of_the_reread.clone(),
+                 );
++                let readings_of_the_two_passes_merged = readings_of_the_reread;
+                 let Some(window_anchor) =
+                     newest_valid_root_txg_of_the_readings(&readings_of_the_two_passes_merged)
+                 else {

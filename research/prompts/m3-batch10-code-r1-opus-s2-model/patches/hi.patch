@@ -1,0 +1,12 @@
+--- jia/crates/singlefs-core/src/allocator.rs	2026-10-05 02:35:11.585199015 +0000
++++ hi/crates/singlefs-core/src/allocator.rs	2026-10-05 07:52:33.706038863 +0000
+@@ -972,7 +972,8 @@
+     /// 落到这个槽上、不晚于新实例第一次发布之前那个 txg 的最小 txg：回收门槛钉在这里（窗口之外留在洞里的旧根也罩得住）。
+     #[must_use]
+     pub fn oldest_txg_it_can_have_held(self) -> CheckpointTxg {
+-        self.oldest_txg_it_can_have_held
++        // 攻方对照臂 hi：钉在能住的最大 txg（第 10b 批之前的取法），只为量「钉最旧」这一项的代价。
++        self.highest_txg_it_can_hold
+     }
+ 
+     /// 它在 (N − 3S, 新实例第一次发布的 txg − 1] 里能住的最大 txg：准入抬 F 的上限按它并（Q3）。

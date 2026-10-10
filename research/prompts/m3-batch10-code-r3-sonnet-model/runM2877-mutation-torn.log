@@ -1,0 +1,25 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch10-code-r3-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r3-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.15s
+     Running tests/rollback_by_a_forward_publish.rs (target/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+
+running 1 test
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... FAILED
+
+failures:
+
+---- the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash stdout ----
+
+thread 'the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash' (1384088) panicked at crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs:207:5:
+assertion `left == right` failed: TornAfterTheFirstHalf：崩溃之后重开：记账比遍历多的字节数：盘 0：记账的已分配 Some(6275072)，遍历全部有效根得到 5586944（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 31、环里自证过的根槽 23 个、最老的自证过的根 txg 8、遍历的候选根槽 23 个、并进遍历的由记录施加出来的版本 1 个、被实例表判抛弃的根槽 0 个、回退下界 F 0、低于 F 的根槽 0 个
+  left: 688128
+ right: 819200
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 filtered out; finished in 11.79s
+
+error: test failed, to rerun pass `-p singlefs-harness --test rollback_by_a_forward_publish`

@@ -1,0 +1,164 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10x-code-r1-opus/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.66s
+     Running tests/attack_m3_10x_gpu_ledger.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10x-code-r1-opus/target/debug/deps/attack_m3_10x_gpu_ledger-588f374d2b5144d6)
+
+running 5 tests
+test k1_c_the_ceiling_takes_the_total_while_an_empty_card_never_reads_its_total_as_free ... ROW k1c config=quiesced-32G room_on_the_empty_card=29550 need=29551 outcome=not-run ceiling_seen_in_red=0 largest_need_still_not_run=30047 band_mebibytes=497
+ROW k1c config=daily-15G room_on_the_empty_card=12800 need=12801 outcome=red ceiling_seen_in_red=12800 largest_need_still_not_run=12801 band_mebibytes=1
+ROW k1c config=unconfigured-3/4 room_on_the_empty_card=21521 need=21522 outcome=not-run ceiling_seen_in_red=0 largest_need_still_not_run=21893 band_mebibytes=372
+ROW k1c config=unconfigured+env30000 room_on_the_empty_card=21521 need=21522 outcome=not-run ceiling_seen_in_red=0 largest_need_still_not_run=21893 band_mebibytes=372
+SUMMARY k1c configurations_with_a_band=3
+ok
+test k2_a_free_read_before_and_occupied_read_after_this_process_allocated_counts_the_lease_twice ... ROW k2a config=quiesced-32G other=0 lease=1024 free_after=28399 room_consistent_before=28526 room_consistent_after=28399 room_mixed=29184 over=785
+ROW k2a config=quiesced-32G other=0 lease=4096 free_after=25327 room_consistent_before=25454 room_consistent_after=25327 room_mixed=26112 over=785
+ROW k2a config=quiesced-32G other=0 lease=8192 free_after=21231 room_consistent_before=21358 room_consistent_after=21231 room_mixed=22016 over=785
+ROW k2a config=quiesced-32G other=0 lease=12288 free_after=17135 room_consistent_before=17262 room_consistent_after=17135 room_mixed=17920 over=785
+ROW k2a config=quiesced-32G other=4096 lease=1024 free_after=24303 room_consistent_before=24430 room_consistent_after=24303 room_mixed=25327 over=1024
+ROW k2a config=quiesced-32G other=4096 lease=4096 free_after=21231 room_consistent_before=21358 room_consistent_after=21231 room_mixed=25327 over=4096
+ROW k2a config=quiesced-32G other=4096 lease=8192 free_after=17135 room_consistent_before=17262 room_consistent_after=17135 room_mixed=22016 over=4881
+ROW k2a config=quiesced-32G other=4096 lease=12288 free_after=13039 room_consistent_before=13166 room_consistent_after=13039 room_mixed=17920 over=4881
+ROW k2a config=quiesced-32G other=8192 lease=1024 free_after=20207 room_consistent_before=20334 room_consistent_after=20207 room_mixed=21231 over=1024
+ROW k2a config=quiesced-32G other=8192 lease=4096 free_after=17135 room_consistent_before=17262 room_consistent_after=17135 room_mixed=21231 over=4096
+ROW k2a config=quiesced-32G other=8192 lease=8192 free_after=13039 room_consistent_before=13166 room_consistent_after=13039 room_mixed=21231 over=8192
+ROW k2a config=quiesced-32G other=8192 lease=12288 free_after=8943 room_consistent_before=9070 room_consistent_after=8943 room_mixed=17920 over=8977
+ROW k2a config=quiesced-32G other=12288 lease=1024 free_after=16111 room_consistent_before=16238 room_consistent_after=16111 room_mixed=17135 over=1024
+ROW k2a config=quiesced-32G other=12288 lease=4096 free_after=13039 room_consistent_before=13166 room_consistent_after=13039 room_mixed=17135 over=4096
+ROW k2a config=quiesced-32G other=12288 lease=8192 free_after=8943 room_consistent_before=9070 room_consistent_after=8943 room_mixed=17135 over=8192
+ROW k2a config=quiesced-32G other=12288 lease=12288 free_after=4847 room_consistent_before=4974 room_consistent_after=4847 room_mixed=17135 over=12288
+ROW k2a config=quiesced-32G other=16384 lease=1024 free_after=12015 room_consistent_before=12142 room_consistent_after=12015 room_mixed=13039 over=1024
+ROW k2a config=quiesced-32G other=16384 lease=4096 free_after=8943 room_consistent_before=9070 room_consistent_after=8943 room_mixed=13039 over=4096
+ROW k2a config=quiesced-32G other=16384 lease=8192 free_after=4847 room_consistent_before=4974 room_consistent_after=4847 room_mixed=13039 over=8192
+ROW k2a config=quiesced-32G other=16384 lease=12288 free_after=751 room_consistent_before=878 room_consistent_after=751 room_mixed=13039 over=12288
+ROW k2a config=quiesced-32G other=20480 lease=1024 free_after=7919 room_consistent_before=8046 room_consistent_after=7919 room_mixed=8943 over=1024
+ROW k2a config=quiesced-32G other=20480 lease=4096 free_after=4847 room_consistent_before=4974 room_consistent_after=4847 room_mixed=8943 over=4096
+ROW k2a config=quiesced-32G other=20480 lease=8192 free_after=751 room_consistent_before=878 room_consistent_after=751 room_mixed=8943 over=8192
+ROW k2a config=daily-15G other=0 lease=1024 free_after=28399 room_consistent_before=11776 room_consistent_after=11776 room_mixed=11776 over=-16623
+ROW k2a config=daily-15G other=0 lease=4096 free_after=25327 room_consistent_before=8704 room_consistent_after=8704 room_mixed=8704 over=-16623
+ROW k2a config=daily-15G other=0 lease=8192 free_after=21231 room_consistent_before=4608 room_consistent_after=4608 room_mixed=4608 over=-16623
+ROW k2a config=daily-15G other=0 lease=12288 free_after=17135 room_consistent_before=512 room_consistent_after=512 room_mixed=512 over=-16623
+ROW k2a config=daily-15G other=4096 lease=1024 free_after=24303 room_consistent_before=11776 room_consistent_after=11776 room_mixed=11776 over=-12527
+ROW k2a config=daily-15G other=4096 lease=4096 free_after=21231 room_consistent_before=8704 room_consistent_after=8704 room_mixed=8704 over=-12527
+ROW k2a config=daily-15G other=4096 lease=8192 free_after=17135 room_consistent_before=4608 room_consistent_after=4608 room_mixed=4608 over=-12527
+ROW k2a config=daily-15G other=4096 lease=12288 free_after=13039 room_consistent_before=512 room_consistent_after=512 room_mixed=512 over=-12527
+ROW k2a config=daily-15G other=8192 lease=1024 free_after=20207 room_consistent_before=11776 room_consistent_after=11776 room_mixed=11776 over=-8431
+ROW k2a config=daily-15G other=8192 lease=4096 free_after=17135 room_consistent_before=8704 room_consistent_after=8704 room_mixed=8704 over=-8431
+ROW k2a config=daily-15G other=8192 lease=8192 free_after=13039 room_consistent_before=4608 room_consistent_after=4608 room_mixed=4608 over=-8431
+ROW k2a config=daily-15G other=8192 lease=12288 free_after=8943 room_consistent_before=512 room_consistent_after=512 room_mixed=512 over=-8431
+ROW k2a config=daily-15G other=12288 lease=1024 free_after=16111 room_consistent_before=11776 room_consistent_after=11776 room_mixed=11776 over=-4335
+ROW k2a config=daily-15G other=12288 lease=4096 free_after=13039 room_consistent_before=8704 room_consistent_after=8704 room_mixed=8704 over=-4335
+ROW k2a config=daily-15G other=12288 lease=8192 free_after=8943 room_consistent_before=4608 room_consistent_after=4608 room_mixed=4608 over=-4335
+ROW k2a config=daily-15G other=12288 lease=12288 free_after=4847 room_consistent_before=512 room_consistent_after=512 room_mixed=512 over=-4335
+ROW k2a config=daily-15G other=16384 lease=1024 free_after=12015 room_consistent_before=11776 room_consistent_after=11776 room_mixed=11776 over=-239
+ROW k2a config=daily-15G other=16384 lease=4096 free_after=8943 room_consistent_before=8704 room_consistent_after=8704 room_mixed=8704 over=-239
+ROW k2a config=daily-15G other=16384 lease=8192 free_after=4847 room_consistent_before=4608 room_consistent_after=4608 room_mixed=4608 over=-239
+ROW k2a config=daily-15G other=16384 lease=12288 free_after=751 room_consistent_before=512 room_consistent_after=512 room_mixed=512 over=-239
+ROW k2a config=daily-15G other=20480 lease=1024 free_after=7919 room_consistent_before=8046 room_consistent_after=7919 room_mixed=8943 over=1024
+ROW k2a config=daily-15G other=20480 lease=4096 free_after=4847 room_consistent_before=4974 room_consistent_after=4847 room_mixed=8704 over=3857
+ROW k2a config=daily-15G other=20480 lease=8192 free_after=751 room_consistent_before=878 room_consistent_after=751 room_mixed=4608 over=3857
+ROW k2a config=unconfigured-3/4 other=0 lease=1024 free_after=28399 room_consistent_before=20497 room_consistent_after=20401 room_mixed=21169 over=-7230
+ROW k2a config=unconfigured-3/4 other=0 lease=4096 free_after=25327 room_consistent_before=17425 room_consistent_after=17329 room_mixed=20401 over=-4926
+ROW k2a config=unconfigured-3/4 other=0 lease=8192 free_after=21231 room_consistent_before=13329 room_consistent_after=13233 room_mixed=19377 over=-1854
+ROW k2a config=unconfigured-3/4 other=0 lease=12288 free_after=17135 room_consistent_before=9233 room_consistent_after=9137 room_mixed=18353 over=1218
+ROW k2a config=unconfigured-3/4 other=4096 lease=1024 free_after=24303 room_consistent_before=17425 room_consistent_after=17329 room_mixed=18097 over=-6206
+ROW k2a config=unconfigured-3/4 other=4096 lease=4096 free_after=21231 room_consistent_before=14353 room_consistent_after=14257 room_mixed=17329 over=-3902
+ROW k2a config=unconfigured-3/4 other=4096 lease=8192 free_after=17135 room_consistent_before=10257 room_consistent_after=10161 room_mixed=16305 over=-830
+ROW k2a config=unconfigured-3/4 other=4096 lease=12288 free_after=13039 room_consistent_before=6161 room_consistent_after=6065 room_mixed=15281 over=2242
+ROW k2a config=unconfigured-3/4 other=8192 lease=1024 free_after=20207 room_consistent_before=14353 room_consistent_after=14257 room_mixed=15025 over=-5182
+ROW k2a config=unconfigured-3/4 other=8192 lease=4096 free_after=17135 room_consistent_before=11281 room_consistent_after=11185 room_mixed=14257 over=-2878
+ROW k2a config=unconfigured-3/4 other=8192 lease=8192 free_after=13039 room_consistent_before=7185 room_consistent_after=7089 room_mixed=13233 over=194
+ROW k2a config=unconfigured-3/4 other=8192 lease=12288 free_after=8943 room_consistent_before=3089 room_consistent_after=2993 room_mixed=12209 over=3266
+ROW k2a config=unconfigured-3/4 other=12288 lease=1024 free_after=16111 room_consistent_before=11281 room_consistent_after=11185 room_mixed=11953 over=-4158
+ROW k2a config=unconfigured-3/4 other=12288 lease=4096 free_after=13039 room_consistent_before=8209 room_consistent_after=8113 room_mixed=11185 over=-1854
+ROW k2a config=unconfigured-3/4 other=12288 lease=8192 free_after=8943 room_consistent_before=4113 room_consistent_after=4017 room_mixed=10161 over=1218
+ROW k2a config=unconfigured-3/4 other=12288 lease=12288 free_after=4847 room_consistent_before=17 room_consistent_after=0 room_mixed=9137 over=4290
+ROW k2a config=unconfigured-3/4 other=16384 lease=1024 free_after=12015 room_consistent_before=8209 room_consistent_after=8113 room_mixed=8881 over=-3134
+ROW k2a config=unconfigured-3/4 other=16384 lease=4096 free_after=8943 room_consistent_before=5137 room_consistent_after=5041 room_mixed=8113 over=-830
+ROW k2a config=unconfigured-3/4 other=16384 lease=8192 free_after=4847 room_consistent_before=1041 room_consistent_after=945 room_mixed=7089 over=2242
+ROW k2a config=unconfigured-3/4 other=20480 lease=1024 free_after=7919 room_consistent_before=5137 room_consistent_after=5041 room_mixed=5809 over=-2110
+ROW k2a config=unconfigured-3/4 other=20480 lease=4096 free_after=4847 room_consistent_before=2065 room_consistent_after=1969 room_mixed=5041 over=194
+ROW k2a config=unconfigured+env30000 other=0 lease=1024 free_after=28399 room_consistent_before=20497 room_consistent_after=20401 room_mixed=21169 over=-7230
+ROW k2a config=unconfigured+env30000 other=0 lease=4096 free_after=25327 room_consistent_before=17425 room_consistent_after=17329 room_mixed=20401 over=-4926
+ROW k2a config=unconfigured+env30000 other=0 lease=8192 free_after=21231 room_consistent_before=13329 room_consistent_after=13233 room_mixed=19377 over=-1854
+ROW k2a config=unconfigured+env30000 other=0 lease=12288 free_after=17135 room_consistent_before=9233 room_consistent_after=9137 room_mixed=17712 over=577
+ROW k2a config=unconfigured+env30000 other=4096 lease=1024 free_after=24303 room_consistent_before=17425 room_consistent_after=17329 room_mixed=18097 over=-6206
+ROW k2a config=unconfigured+env30000 other=4096 lease=4096 free_after=21231 room_consistent_before=14353 room_consistent_after=14257 room_mixed=17329 over=-3902
+ROW k2a config=unconfigured+env30000 other=4096 lease=8192 free_after=17135 room_consistent_before=10257 room_consistent_after=10161 room_mixed=16305 over=-830
+ROW k2a config=unconfigured+env30000 other=4096 lease=12288 free_after=13039 room_consistent_before=6161 room_consistent_after=6065 room_mixed=15281 over=2242
+ROW k2a config=unconfigured+env30000 other=8192 lease=1024 free_after=20207 room_consistent_before=14353 room_consistent_after=14257 room_mixed=15025 over=-5182
+ROW k2a config=unconfigured+env30000 other=8192 lease=4096 free_after=17135 room_consistent_before=11281 room_consistent_after=11185 room_mixed=14257 over=-2878
+ROW k2a config=unconfigured+env30000 other=8192 lease=8192 free_after=13039 room_consistent_before=7185 room_consistent_after=7089 room_mixed=13233 over=194
+ROW k2a config=unconfigured+env30000 other=8192 lease=12288 free_after=8943 room_consistent_before=3089 room_consistent_after=2993 room_mixed=12209 over=3266
+ROW k2a config=unconfigured+env30000 other=12288 lease=1024 free_after=16111 room_consistent_before=11281 room_consistent_after=11185 room_mixed=11953 over=-4158
+ROW k2a config=unconfigured+env30000 other=12288 lease=4096 free_after=13039 room_consistent_before=8209 room_consistent_after=8113 room_mixed=11185 over=-1854
+ROW k2a config=unconfigured+env30000 other=12288 lease=8192 free_after=8943 room_consistent_before=4113 room_consistent_after=4017 room_mixed=10161 over=1218
+ROW k2a config=unconfigured+env30000 other=12288 lease=12288 free_after=4847 room_consistent_before=17 room_consistent_after=0 room_mixed=9137 over=4290
+ROW k2a config=unconfigured+env30000 other=16384 lease=1024 free_after=12015 room_consistent_before=8209 room_consistent_after=8113 room_mixed=8881 over=-3134
+ROW k2a config=unconfigured+env30000 other=16384 lease=4096 free_after=8943 room_consistent_before=5137 room_consistent_after=5041 room_mixed=8113 over=-830
+ROW k2a config=unconfigured+env30000 other=16384 lease=8192 free_after=4847 room_consistent_before=1041 room_consistent_after=945 room_mixed=7089 over=2242
+ROW k2a config=unconfigured+env30000 other=20480 lease=1024 free_after=7919 room_consistent_before=5137 room_consistent_after=5041 room_mixed=5809 over=-2110
+ROW k2a config=unconfigured+env30000 other=20480 lease=4096 free_after=4847 room_consistent_before=2065 room_consistent_after=1969 room_mixed=5041 over=194
+SUMMARY k2a rows=88 rows_over_physical_free=42 worst_over=12288
+ok
+test k2_b_memory_this_process_holds_off_the_books_is_taken_as_the_unbuilt_lease_already_on_the_card ... ROW k2b config=quiesced-32G unbooked=6783 first=1024 free=25327 second_room=25327 free_once_the_first_is_built=21616 over=3711
+ROW k2b config=quiesced-32G unbooked=6783 first=2048 free=25327 second_room=25327 free_once_the_first_is_built=20592 over=4735
+ROW k2b config=quiesced-32G unbooked=6783 first=4096 free=25327 second_room=25327 free_once_the_first_is_built=18544 over=6783
+ROW k2b config=quiesced-32G unbooked=10879 first=1024 free=21231 second_room=21231 free_once_the_first_is_built=17520 over=3711
+ROW k2b config=quiesced-32G unbooked=10879 first=2048 free=21231 second_room=21231 free_once_the_first_is_built=16496 over=4735
+ROW k2b config=quiesced-32G unbooked=10879 first=4096 free=21231 second_room=21231 free_once_the_first_is_built=14448 over=6783
+ROW k2b config=quiesced-32G unbooked=19071 first=1024 free=13039 second_room=13039 free_once_the_first_is_built=9328 over=3711
+ROW k2b config=quiesced-32G unbooked=19071 first=2048 free=13039 second_room=13039 free_once_the_first_is_built=8304 over=4735
+ROW k2b config=quiesced-32G unbooked=19071 first=4096 free=13039 second_room=13039 free_once_the_first_is_built=6256 over=6783
+ROW k2b config=quiesced-32G unbooked=23167 first=1024 free=8943 second_room=8943 free_once_the_first_is_built=5232 over=3711
+ROW k2b config=quiesced-32G unbooked=23167 first=2048 free=8943 second_room=8943 free_once_the_first_is_built=4208 over=4735
+ROW k2b config=quiesced-32G unbooked=23167 first=4096 free=8943 second_room=8943 free_once_the_first_is_built=2160 over=6783
+ROW k2b config=daily-15G unbooked=6783 first=1024 free=25327 second_room=11776 free_once_the_first_is_built=21616 over=-9840
+ROW k2b config=daily-15G unbooked=6783 first=2048 free=25327 second_room=10752 free_once_the_first_is_built=20592 over=-9840
+ROW k2b config=daily-15G unbooked=6783 first=4096 free=25327 second_room=8704 free_once_the_first_is_built=18544 over=-9840
+ROW k2b config=daily-15G unbooked=10879 first=1024 free=21231 second_room=11776 free_once_the_first_is_built=17520 over=-5744
+ROW k2b config=daily-15G unbooked=10879 first=2048 free=21231 second_room=10752 free_once_the_first_is_built=16496 over=-5744
+ROW k2b config=daily-15G unbooked=10879 first=4096 free=21231 second_room=8704 free_once_the_first_is_built=14448 over=-5744
+ROW k2b config=daily-15G unbooked=19071 first=1024 free=13039 second_room=11776 free_once_the_first_is_built=9328 over=2448
+ROW k2b config=daily-15G unbooked=19071 first=2048 free=13039 second_room=10752 free_once_the_first_is_built=8304 over=2448
+ROW k2b config=daily-15G unbooked=19071 first=4096 free=13039 second_room=8704 free_once_the_first_is_built=6256 over=2448
+ROW k2b config=daily-15G unbooked=23167 first=1024 free=8943 second_room=8943 free_once_the_first_is_built=5232 over=3711
+ROW k2b config=daily-15G unbooked=23167 first=2048 free=8943 second_room=8943 free_once_the_first_is_built=4208 over=4735
+ROW k2b config=daily-15G unbooked=23167 first=4096 free=8943 second_room=8704 free_once_the_first_is_built=2160 over=6544
+ROW k2b config=unconfigured-3/4 unbooked=6783 first=1024 free=25327 second_room=18097 free_once_the_first_is_built=21616 over=-3519
+ROW k2b config=unconfigured-3/4 unbooked=6783 first=2048 free=25327 second_room=17841 free_once_the_first_is_built=20592 over=-2751
+ROW k2b config=unconfigured-3/4 unbooked=6783 first=4096 free=25327 second_room=17329 free_once_the_first_is_built=18544 over=-1215
+ROW k2b config=unconfigured-3/4 unbooked=10879 first=1024 free=21231 second_room=15025 free_once_the_first_is_built=17520 over=-2495
+ROW k2b config=unconfigured-3/4 unbooked=10879 first=2048 free=21231 second_room=14769 free_once_the_first_is_built=16496 over=-1727
+ROW k2b config=unconfigured-3/4 unbooked=10879 first=4096 free=21231 second_room=14257 free_once_the_first_is_built=14448 over=-191
+ROW k2b config=unconfigured-3/4 unbooked=19071 first=1024 free=13039 second_room=8881 free_once_the_first_is_built=9328 over=-447
+ROW k2b config=unconfigured-3/4 unbooked=19071 first=2048 free=13039 second_room=8625 free_once_the_first_is_built=8304 over=321
+ROW k2b config=unconfigured-3/4 unbooked=19071 first=4096 free=13039 second_room=8113 free_once_the_first_is_built=6256 over=1857
+ROW k2b config=unconfigured-3/4 unbooked=23167 first=1024 free=8943 second_room=5809 free_once_the_first_is_built=5232 over=577
+ROW k2b config=unconfigured-3/4 unbooked=23167 first=2048 free=8943 second_room=5553 free_once_the_first_is_built=4208 over=1345
+ROW k2b config=unconfigured-3/4 unbooked=23167 first=4096 free=8943 second_room=5041 free_once_the_first_is_built=2160 over=2881
+ROW k2b config=unconfigured+env30000 unbooked=6783 first=1024 free=25327 second_room=18097 free_once_the_first_is_built=21616 over=-3519
+ROW k2b config=unconfigured+env30000 unbooked=6783 first=2048 free=25327 second_room=17841 free_once_the_first_is_built=20592 over=-2751
+ROW k2b config=unconfigured+env30000 unbooked=6783 first=4096 free=25327 second_room=17329 free_once_the_first_is_built=18544 over=-1215
+ROW k2b config=unconfigured+env30000 unbooked=10879 first=1024 free=21231 second_room=15025 free_once_the_first_is_built=17520 over=-2495
+ROW k2b config=unconfigured+env30000 unbooked=10879 first=2048 free=21231 second_room=14769 free_once_the_first_is_built=16496 over=-1727
+ROW k2b config=unconfigured+env30000 unbooked=10879 first=4096 free=21231 second_room=14257 free_once_the_first_is_built=14448 over=-191
+ROW k2b config=unconfigured+env30000 unbooked=19071 first=1024 free=13039 second_room=8881 free_once_the_first_is_built=9328 over=-447
+ROW k2b config=unconfigured+env30000 unbooked=19071 first=2048 free=13039 second_room=8625 free_once_the_first_is_built=8304 over=321
+ROW k2b config=unconfigured+env30000 unbooked=19071 first=4096 free=13039 second_room=8113 free_once_the_first_is_built=6256 over=1857
+ROW k2b config=unconfigured+env30000 unbooked=23167 first=1024 free=8943 second_room=5809 free_once_the_first_is_built=5232 over=577
+ROW k2b config=unconfigured+env30000 unbooked=23167 first=2048 free=8943 second_room=5553 free_once_the_first_is_built=4208 over=1345
+ROW k2b config=unconfigured+env30000 unbooked=23167 first=4096 free=8943 second_room=5041 free_once_the_first_is_built=2160 over=2881
+SUMMARY k2b rows=48 worst_over=6783
+ok
+test k2_d_a_sibling_lease_in_this_process_turns_the_next_lease_into_not_run_without_waiting ... ROW k2d first=16384 second=8192 free_while_first_held=13039 second_outcome=booked second_books_after_the_first_returned=true
+ROW k2d first=16384 second=12288 free_while_first_held=13039 second_outcome=booked second_books_after_the_first_returned=true
+ROW k2d first=20480 second=8192 free_while_first_held=8943 second_outcome=booked second_books_after_the_first_returned=true
+ROW k2d first=20480 second=12288 free_while_first_held=8943 second_outcome=not-run second_books_after_the_first_returned=true
+ROW k2d first=24576 second=8192 free_while_first_held=4847 second_outcome=not-run second_books_after_the_first_returned=true
+ROW k2d first=24576 second=12288 free_while_first_held=4847 second_outcome=not-run second_books_after_the_first_returned=true
+SUMMARY k2d not_run_rows=3
+ok
+test k2_w1_cards_full_right_now_but_fit_when_empty_end_in_the_red_branch_not_in_not_run ... ROW k2w1 room_now=440 room_when_empty=29550 one_state=602 holds_now=0 booking=red need=602 largest_ceiling=0 decision_on_nothing_to_place=NoCardHoldsOneState { largest_ceiling_mebibytes: 0 }
+ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

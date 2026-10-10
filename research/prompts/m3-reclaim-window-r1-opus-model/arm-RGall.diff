@@ -1,0 +1,29 @@
+diff -ru G/crates/singlefs-checker/src/walk.rs RGall/crates/singlefs-checker/src/walk.rs
+--- G/crates/singlefs-checker/src/walk.rs	2026-10-03 21:00:29.060576333 +0000
++++ RGall/crates/singlefs-checker/src/walk.rs	2026-10-04 16:36:01.330477966 +0000
+@@ -7024,7 +7024,8 @@
+ impl OneRevolutionWindow {
+     /// txg 落在窗口里：txg > N − 3S，写成 txg + 3S > N（N < 3S 时整个环都在窗口里，不减出负数）。
+     fn contains(self, checkpoint_txg: u64) -> bool {
+-        checkpoint_txg.saturating_add(self.root_ring_slot_count) > self.anchor_txg
++        let _ = (checkpoint_txg, self.root_ring_slot_count, self.anchor_txg);
++        true
+     }
+ }
+ 
+diff -ru G/crates/singlefs-core/src/root_ring.rs RGall/crates/singlefs-core/src/root_ring.rs
+--- G/crates/singlefs-core/src/root_ring.rs	2026-10-03 09:39:03.181537079 +0000
++++ RGall/crates/singlefs-core/src/root_ring.rs	2026-10-04 16:36:01.329571529 +0000
+@@ -125,10 +125,8 @@
+     window_anchor: CheckpointTxg,
+     slots_per_region: RootRingSlotsPerRegion,
+ ) -> bool {
+-    checkpoint_txg
+-        .0
+-        .saturating_add(ROOT_RING_REGIONS * slots_per_region.count())
+-        > window_anchor.0
++    let _ = (checkpoint_txg, window_anchor, slots_per_region, ROOT_RING_REGIONS);
++    true
+ }
+ 
+ /// 一个区域占多少字节：S 个槽 × 槽距。区域之间隔着 P × chunk，这一段之外的字节不归根环。

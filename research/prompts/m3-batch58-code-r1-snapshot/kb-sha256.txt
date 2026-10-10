@@ -1,0 +1,3 @@
+c708e5933178577310cf329f2670e93e927908a4c7d7c3bcc12a501e2a050362  .claude/kb/invariants.md
+1730ad450d2cd4b2db27e24e59ed9c1a533d104c59603de0164f0205de50e7a0  .claude/kb/decisions/18-块里携带什么信息.md
+a86c625cc08552ae42329d6ad10aad33a0d8e06ac89e28f9a9853cce0e93f48d  .claude/kb/decisions/05-快照-空间记账机制.md

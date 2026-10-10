@@ -1,0 +1,6 @@
+command=1 args=--release -p singlefs-harness --test rollback_by_a_forward_publish filter=--include-ignored rc=0
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+command=2 args=--release -p singlefs-harness --test tree_identifier_watermark_after_the_first_file_root_is_abandoned filter= rc=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+command=3 args=--release -p singlefs-harness --test unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over filter= rc=0
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

@@ -1,0 +1,28 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling hashbrown v0.17.1
+   Compiling equivalent v1.0.2
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling indexmap v2.14.2
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-format)
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+    Finished `release` profile [optimized + debuginfo] target(s) in 54.67s
+     Running tests/probe_m3_oracle.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-rel/release/deps/probe_m3_oracle-dd10dd66e96297b8)
+
+running 1 test
+PROBE deletes=209019 merges=466 borrows=3006 retired_total=9685 max_retired_per_delete=1
+test m3_crates_vs_e176_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 22 filtered out; finished in 44.20s
+

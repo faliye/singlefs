@@ -1,0 +1,15 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 460M 的 2 倍，照理由放行：变异后重编比测试占内存
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：多个子 agent 各跑各的，正推腿在自己的目录跑 harness 档用例
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.82s
+     Running tests/writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring-3ca7dfaca4208094)
+
+running 5 tests
+test the_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring_is_on_the_d23_list_and_the_read_stage_one_is_not ... ok
+test a_refusal_for_no_valid_root_on_a_crash_image_without_read_faults_whose_root_ring_was_zeroed_by_hand_is_illegal ... ok
+test a_refusal_for_no_valid_root_on_a_read_faulted_crash_image_whose_root_ring_was_zeroed_by_hand_is_legal ... ok
+test a_refusal_for_no_valid_root_by_a_mount_reading_through_injected_faults_is_legal_though_the_crash_image_reads_back ... ok
+test a_refusal_for_no_valid_root_on_a_crash_image_whose_root_ring_reads_back_is_illegal_because_its_criterion_is_false ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

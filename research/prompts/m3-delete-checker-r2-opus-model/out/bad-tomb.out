@@ -1,0 +1,13 @@
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同机别的活互不依赖
+TOMB case=「I-9.10 那份：2、3 分两次建，删完 3，墓碑对象 ID 3 → 2」 history=C1,C1,U3 newest_txg=9 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["T2a/each", "T2c-A/each", "I918/A", "I918/B", "I918/A2", "C479yi/rec+tombA"]
+TOMB case=「I-9.19 那份：同上，墓碑 (3, b3) → (2, b2)」 history=C1,C1,U3 newest_txg=9 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["I918/A", "I918/B", "I918/A2", "I919/A", "I919/A2"]
+TOMB case=「I-9.20 区间那份：删完 3，区间止 → 5」 history=C1,C1,U3 newest_txg=9 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["I918/A", "I918/B", "I918/A2", "I920/A", "I920/interval-all-T14"]
+TOMB case=「死亡 txg → 0（早于对象出生代）」 history=C1,C1,U3 newest_txg=9 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["TombDeath/birth-le-death-le-txg"]
+TOMB case=「I-9.10 那份：2、3 分两次建，删完 3，墓碑对象 ID 3 → 2」 history=C1,C1,U3,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1 newest_txg=39 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["T2a/each", "T2c-A/each", "C479yi/rec+tombA"]
+TOMB case=「I-9.19 那份：同上，墓碑 (3, b3) → (2, b2)」 history=C1,C1,U3,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1 newest_txg=39 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["I919/A", "I919/A2"]
+TOMB case=「I-9.20 区间那份：删完 3，区间止 → 5」 history=C1,C1,U3,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1 newest_txg=39 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["I920/A", "I920/interval-all-T14"]
+TOMB case=「死亡 txg → 0（早于对象出生代）」 history=C1,C1,U3,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1,C1 newest_txg=39 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["TombDeath/birth-le-death-le-txg"]
+TOMB case=「I-9.18 那份：意图之后（崩在第一批之前），死亡 txg → 最新根 txg + 1」 history=C2,U3,Y4 newest_txg=7 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["I918/A", "I918/B", "I918/A2", "TombDeath/birth-le-death-le-txg"]
+TOMB case=「I-9.18 变体：意图之后，死亡 txg → 0」 history=C2,U3,Y4 newest_txg=7 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["TombDeath/birth-le-death-le-txg"]
+TOMB case=「I-9.18 变体：意图之后，死亡 txg → 对象出生代 − 1」 history=C2,U3,Y4 newest_txg=7 clean_checker=[] clean_cand=[] checker_red=[] cand_red=["TombDeath/birth-le-death-le-txg"]
+ELAPSED 14.5s

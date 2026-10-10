@@ -1,0 +1,15 @@
+--- crates/singlefs-core/src/mount.rs
++++ crates/singlefs-core/src/mount.rs
+@@ -1693,9 +1693,9 @@
+     let unreadable_ring_slots: BTreeSet<RootRingSlot> = ring_slot_readings
+         .iter()
+         .filter_map(|(ring_slot, reading)| match reading {
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable) => Some(*ring_slot),
+-            RootRingSlotReading::Bad(BadRootRingSlotReading::NotSelfVerified)
+-            | RootRingSlotReading::SelfVerified(_) => None,
++            // ZS 臂（攻方副本，零轮）：读得出而自证不过的槽与读不出的同样并进回收门槛（与「抬 F 的上限」那一行两类都并同一个思路）。
++            RootRingSlotReading::Bad(BadRootRingSlotReading::Unreadable | BadRootRingSlotReading::NotSelfVerified) => Some(*ring_slot),
++            RootRingSlotReading::SelfVerified(_) => None,
+         })
+         .collect();
+     let ring_length_in_txgs = ROOT_RING_REGIONS * slots_per_region.count();

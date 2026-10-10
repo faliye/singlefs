@@ -1,0 +1,28 @@
+I920 test a_tombstone_that_does_not_cover_the_whole_object_reddens_only_the_tombstone_record_invariant ... ok
+I920 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 10.32s
+I920 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 11.53s
+I920 test two_tombstones_of_one_object_on_the_lineage_redden_only_the_tombstone_record_invariant ... ok
+KNOWNBAD n1_rule=0 test a_leaf_holding_the_same_inode_number_twice_reddens_only_the_container_number_invariant ... ok
+KNOWNBAD n1_rule=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 207 filtered out; finished in 0.31s
+KNOWNBAD n1_rule=0 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 207 filtered out; finished in 8.16s
+KNOWNBAD n1_rule=0 test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+KNOWNBAD n1_rule=1 test a_leaf_holding_the_same_inode_number_twice_reddens_only_the_container_number_invariant ... ok
+KNOWNBAD n1_rule=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 207 filtered out; finished in 0.32s
+KNOWNBAD n1_rule=1 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 207 filtered out; finished in 7.93s
+KNOWNBAD n1_rule=1 test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+OPUSK3 image=borrow_half_separator_is_container_number n1_rule=false leaves=[no=1 1..299 n=166][no=234 300..466 n=167][no=467 467..467 n=1] separators=[1, 234, 467] violated=["I-9.4", "I-9.12"]
+OPUSK3 image=borrow_half_separator_is_container_number n1_rule=true leaves=[no=1 1..299 n=166][no=234 300..466 n=167][no=467 467..467 n=1] separators=[1, 234, 467] violated=["I-9.12"]
+OPUSK3 image=borrow_half_separator_is_new_smallest n1_rule=false leaves=[no=1 1..299 n=166][no=234 300..466 n=167][no=467 467..467 n=1] separators=[1, 300, 467] violated=["I-9.4"]
+OPUSK3 image=borrow_half_separator_is_new_smallest n1_rule=true leaves=[no=1 1..299 n=166][no=234 300..466 n=167][no=467 467..467 n=1] separators=[1, 300, 467] violated=[]
+OPUSK3 image=borrow_just_enough_separator_is_container_number n1_rule=false leaves=[no=1 1..250 n=117][no=234 251..466 n=216][no=467 467..467 n=1] separators=[1, 234, 467] violated=["I-9.4", "I-9.12"]
+OPUSK3 image=borrow_just_enough_separator_is_container_number n1_rule=true leaves=[no=1 1..250 n=117][no=234 251..466 n=216][no=467 467..467 n=1] separators=[1, 234, 467] violated=["I-9.12"]
+OPUSK3 image=borrow_just_enough_separator_is_new_smallest n1_rule=false leaves=[no=1 1..250 n=117][no=234 251..466 n=216][no=467 467..467 n=1] separators=[1, 251, 467] violated=["I-9.4"]
+OPUSK3 image=borrow_just_enough_separator_is_new_smallest n1_rule=true leaves=[no=1 1..250 n=117][no=234 251..466 n=216][no=467 467..467 n=1] separators=[1, 251, 467] violated=[]
+OPUSK3 image=clean_three_leaves n1_rule=false leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=467 467..467 n=1] separators=[1, 234, 467] violated=[]
+OPUSK3 image=clean_three_leaves n1_rule=true leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=467 467..467 n=1] separators=[1, 234, 467] violated=[]
+OPUSK3 image=left_deleted_to_100 n1_rule=false leaves=[no=1 1..100 n=100][no=234 234..466 n=233][no=467 467..467 n=1] separators=[1, 234, 467] violated=[]
+OPUSK3 image=left_deleted_to_100 n1_rule=true leaves=[no=1 1..100 n=100][no=234 234..466 n=233][no=467 467..467 n=1] separators=[1, 234, 467] violated=[]
+OPUSK3 image=third_leaf_numbered_300_separator_300 n1_rule=false leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=300 467..467 n=1] separators=[1, 234, 300] violated=["I-1.1", "I-9.4", "I-9.12"]
+OPUSK3 image=third_leaf_numbered_300_separator_300 n1_rule=true leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=300 467..467 n=1] separators=[1, 234, 300] violated=["I-1.1", "I-9.12"]
+OPUSK3 image=third_leaf_numbered_300_separator_467 n1_rule=false leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=300 467..467 n=1] separators=[1, 234, 467] violated=["I-9.4"]
+OPUSK3 image=third_leaf_numbered_300_separator_467 n1_rule=true leaves=[no=1 1..233 n=233][no=234 234..466 n=233][no=300 467..467 n=1] separators=[1, 234, 467] violated=[]

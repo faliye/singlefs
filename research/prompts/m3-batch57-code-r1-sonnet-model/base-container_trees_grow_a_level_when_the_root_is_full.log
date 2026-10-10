@@ -1,0 +1,19 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/container_trees_grow_a_level_when_the_root_is_full.rs (/home/fy5090/.local/share/singlefs/work/m3-batch57-code-r1-sonnet/target/debug/deps/container_trees_grow_a_level_when_the_root_is_full-2146bd2474ef2c05)
+
+running 8 tests
+test a_random_history_under_every_container_knob_of_two_records_reddens_no_invariant_at_any_step ... ignored, harness 慢档用例：60 步随机历史、每步一次池级 checker，debug 下约两分钟
+test a_random_history_under_every_container_knob_reddens_no_invariant_at_any_step ... ignored, harness 慢档用例：60 步随机历史、每步一次池级 checker，debug 下约两分钟
+test the_third_rollback_grows_the_lineage_tree_and_the_checkpoint_cost_counts_the_internal_level ... ok
+test the_third_tombstone_container_grows_the_tree_and_keeps_the_old_root_in_place ... ok
+test a_tree_grown_under_the_capped_fanout_takes_the_next_container_under_the_product_fanout ... ok
+test the_fifth_tombstone_container_grows_the_tree_to_three_levels_and_rebuild_reads_it ... ok
+test a_tombstone_container_holding_more_records_than_the_knob_reddens_only_the_knob_capacity_invariant ... ok
+test a_capped_tombstone_tree_judged_as_a_product_image_reddens_only_the_full_container_invariant ... ok
+
+test result: ok. 6 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 1.65s
+
+
+real	0m1.885s
+user	0m5.349s
+sys	0m0.131s

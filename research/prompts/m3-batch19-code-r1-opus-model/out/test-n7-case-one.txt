@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/inode_number_watermark_pressed_back_reissues_a_number.rs (/tmp/claude-1000/m3-batch19-code-r1-opus/rerun-W/target/debug/deps/inode_number_watermark_pressed_back_reissues_a_number-a0aa9576907067e5)
+
+running 1 test
+test creating_an_inode_after_the_watermark_is_pressed_back_below_the_largest_key_reddens_the_watermark_invariant ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+

@@ -1,0 +1,10 @@
+FXSTART narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty | current_txg=18 unmount=Raised publishes=2 writes=36 baseline={0: (Some(16), "ok", Some(14695981039346656037)), 1: (Some(18), "ok", Some(14695981039346656037))}
+FXPLAN narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 sc=2 roots=1 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=19 effective=19 floor_in_row=18 row_txg=20 warm_up=2 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=55 mount_writes=55 screened_prefixes=56 bad=0
+FXENUMT narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 enumerate_s=111.2 distinct_survivors=525
+FXENUM narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 closed_form_states=24598 states=24618 observed=24618 violations=24618 failed_states=0 checker_violated={} bad_judgements=0 elapsed=111.5s
+FXENUMV narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 count=24609 lost=dev0 chosen=Some(19) read=same
+FXENUMV narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 count=9 lost=dev0 chosen=Some(22) read=same
+FXENUMV narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 count=16395 lost=dev1 chosen=Some(18) read=same
+FXENUMV narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 count=4107 lost=dev1 chosen=Some(20) read=same
+FXENUMV narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty n=17 plan=w:-/-:z j=0 count=4116 lost=dev1 chosen=Some(21) read=same
+FXDONE narrow U=248 k=4 u=3 b=1 cont=WalkedToEmpty elapsed=111.5s

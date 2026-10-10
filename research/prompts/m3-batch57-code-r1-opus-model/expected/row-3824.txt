@@ -1,0 +1,7 @@
+command args=-p singlefs-checker --lib -- a_full_first_tombstone_container_and_one_more_hold rc=101
+thread 'walk::tests::a_full_first_tombstone_container_and_one_more_hold_on_the_product_branch' panicked at crates/singlefs-checker/src/walk.rs:14126:9:
+failures:
+failures:
+    walk::tests::a_full_first_tombstone_container_and_one_more_hold_on_the_product_branch
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 31 filtered out; 
+row 3824 named-test-red=yes

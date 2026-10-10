@@ -1,0 +1,717 @@
+[a] RESULT A pool-x abandoned=(i2,t6) records_on_C=[(1, 1, 3), (2, 1, 6)] records_on_current=[(1, 1, 3), (2, 1, 9)]
+[a] RESULT A pool-x newest=(i3,t9) rows=(1,3)(2,5) ring=[(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (3, 7), (3, 8), (3, 9)]
+[a] RESULT A A0 干净 I-9.29=成立 core读得出 violated=[]
+[a] RESULT A A1 盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-4.8", "I-7.4"]
+[a] RESULT A A1 盘1那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-4.8", "I-7.4"]
+[a] RESULT A A2 两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A A3 载荷CRC翻一位只重封头 I-9.29=成立 core读不出 violated=["I-2.3"]
+[a] RESULT A A4 链指针记录前插kind2 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A4 链指针记录前插kind3 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A4 链指针记录前插kind128 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A4 链指针记录前插kind255 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A4 第0条前插kind2 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A5 有无下一片写2 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A5 有无下一片写3 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A5 有无下一片写255 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A6 无下一片而指针不全零 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A7 去掉链指针记录 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A7 链指针记录之后多一行 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[a] RESULT A A8 去掉实例2那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[a] RESULT A A8 实例2那一行的txg改成被抛弃那一版的txg I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[a] RESULT A A9 每一行重复一次 I-9.29=成立 core读得出 violated=["I-3.8"]
+[a] RESULT A A10 行倒序 I-9.29=成立 core读得出 violated=[]
+[a] RESULT A A11 每一行flags字节写1 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A12 头里格式版本改成2 I-9.29=部分没判[门] core读不出 violated=["I-2.4", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A A13 容器号写1 I-9.29=部分没判[门] core读不出 violated=["I-1.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A A13 出生树写1 I-9.29=部分没判[门] core读不出 violated=["I-1.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4", "I-1.12"]
+[a] RESULT A A14 记录宽写89 I-9.29=部分没判[门] core读不出 violated=["I-1.7", "I-3.1"]
+[a] RESULT A A14 声明长度多一条记录（尾巴补零） I-9.29=成立 core读不出 violated=[]
+[a] RESULT A A14 声明长度多一条记录、尾巴写一行实例2txg0 I-9.29=成立 core读不出 violated=[]
+[a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[a] RESULT A P2 被抛弃实例那一行在第1片 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[a] RESULT A P2 被抛弃实例那一行在第1片 第1片两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A P2 被抛弃实例那一行在第1片 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[a] RESULT A P6 行全在第1片 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[a] RESULT A P6 行全在第1片 第1片两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[a] RESULT A P6 行全在第1片 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[a] RESULT A P4 第1片指针的盘0位置条目指回第0片（盘1那条对） I-9.29=部分没判[门] core读得出 violated=["I-2.1", "I-3.1", "I-3.9", "I-3.11", "I-4.8", "I-5.1", "I-7.4"]
+[a] RESULT A P5 257片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-3.11", "I-9.29"]
+[a] RESULT A P5 256片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-3.11", "I-9.29"]
+[a] RESULT A P5 257片、行全在第0片 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[a] RESULT A P5 1片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[b1-S0] RESULT B start S0 flags=[] first_page=(0, false)
+[b1-S0] RESULT B history seed=101 flags=[] trace=create2->i1t5 abandon->i2t7 abandon->i3t10 step:skip(队列空) create2->i3t11 rollback(i1,t3)->i3t12 create2->i3t13 create2->i3t14 create-abandon->i4t17 intent6->i4t18 create1->i4t20 abandon->i5t22
+[b1-S0] RESULT B history seed=102 flags=[] trace=create1->i1t5 rollback(i1,t3)->i1t6 drain:skip(队列空) intent1->i1t7 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) create2->i1t9 abandon->i2t11 rollback(i1,t9):skip(TargetNotACandidate { target: ) drain:skip(队列空) abandon->i3t13 step:skip(队列空) remount5->i8t28
+[b1-S0] RESULT B history seed=103 flags=[] trace=step:skip(队列空) rollback(i1,t3)->i1t5 intent1->i1t6 step->i1t7 remount->i2t10 create-abandon->i3t13 step:skip(队列空) rollback(i1,t3)->i3t14 create2->i3t15 step:skip(队列空) step:skip(队列空) create1->i3t16
+[b1-S0] RESULT B history seed=104 flags=[] trace=rollback(i1,t3)->i1t5 create-abandon->i2t8 intent1->i2t9 create-abandon->i3t13 create1->i3t14 remount->i4t16 step:skip(队列空) drain:skip(队列空) create-abandon->i5t19 create2->i5t20 abandon->i6t22 create1->i6t23
+[b1-S0] RESULT B history seed=105 flags=[] trace=step:skip(队列空) create-abandon->i2t7 create2->i2t8 rollback(i1,t3)->i2t9 remount5->i7t22 remount->i8t25 rollback(i2,t8)->i8t26 remount->i9t28 rollback(i8,t26)->i9t29 step:skip(队列空) intent4->i9t30 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 832569344)
+[b1-S0] RESULT B history seed=106 flags=[] trace=intent2->i1t5 intent1->i1t7 create2->i1t9 abandon->i2t11 rollback(i1,t7)->i2t12 remount->i3t15 remount->i4t17 intent3->i4t18 remount5->i9t31 create-abandon->i10t34 rollback(i2,t11)->i10t35 rollback(i1,t5):skip(TargetNotACandidate { target: )
+[b1-S0] RESULT B history seed=107 flags=[] trace=rollback(i1,t3)->i1t5 step:skip(队列空) remount5->i6t19 intent1->i6t20 create2->i6t22 step:skip(队列空) rollback(i6,t20)->i6t23 remount->i7t26 remount->i8t28 rollback(i7,t26)->i8t29 create-abandon->i9t32 remount->i10t34
+[b1-S0] RESULT B history seed=108 flags=[] trace=create-abandon->i2t7 create2->i2t8 create2->i2t9 create-abandon->i3t13 step:skip(队列空) create-abandon->i4t16 create1->i4t17 create1->i4t18 intent1->i4t19 remount5->i9t34 abandon->i10t37 remount->i11t40
+[b1-S0] RESULT B history seed=109 flags=[] trace=drain:skip(队列空) create-abandon->i2t7 create-abandon->i3t10 create1->i3t11 remount->i4t13 remount5->i9t28 create-abandon->i10t31 create1->i10t32 rollback(i2,t7):skip(TargetNotACandidate { target: ) create2->i10t33 create-abandon->i11t37 abandon->i12t40
+[b1-S0] RESULT B history seed=110 flags=[] trace=create-abandon->i2t7 remount5->i7t22 intent1->i7t23 remount5->i12t37 rollback(i7,t23)->i12t38 create2->i12t40 create-abandon->i13t43 rollback(i1,t3):skip(TargetNotACandidate { target: ) rollback(i1,t4):skip(TargetNotACandidate { target: ) remount->i14t46 step:skip(队列空) intent4->i14t47
+[b1-S0] RESULT B history seed=111 flags=[] trace=abandon->i2t7 create1->i2t8 create1->i2t9 remount->i3t11 rollback(i1,t3)->i3t12 remount->i4t14 intent1->i4t15 remount->i5t18 remount->i6t20 rollback(i4,t14)->i6t21 rollback(i1,t3)->i6t22 intent1->i6t23
+[b1-S0] RESULT B history seed=112 flags=[] trace=drain:skip(队列空) rollback(i1,t3)->i1t5 abandon->i2t7 abandon->i3t10 abandon->i4t13 rollback(i3,t10):skip(TargetNotACandidate { target: ) create-abandon->i5t16 create1->i5t17 drain:skip(队列空) create2->i5t18 create-abandon->i6t22 create2->i6t23
+[b1-S0] RESULT B history seed=113 flags=[] trace=abandon->i2t7 create-abandon->i3t10 abandon->i4t13 create-abandon->i5t16 rollback(i2,t8):skip(TargetNotACandidate { target: ) create1->i5t17 remount->i6t19 abandon->i7t22 intent1->i7t23 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 830472192) intent2->i7t25 create-abandon->i8t29
+[b1-S0] RESULT B history seed=114 flags=[] trace=step:skip(队列空) remount->i2t7 drain:skip(队列空) drain:skip(队列空) rollback(i1,t3)->i2t8 intent1->i2t9 create2->i2t11 intent4->i2t12 intent5->i2t14 rollback(i2,t7)->i2t15 step:skip(队列空) rollback(i1,t3)->i2t16
+[b1-S0] RESULT B history seed=115 flags=[] trace=intent1->i1t5 abandon->i2t7 step:skip(队列空) create2->i2t8 create-abandon->i3t11 intent5->i3t12 rollback(i1,t4)->i3t13 intent1->i3t14 remount->i4t17 rollback(i3,t12)->i4t18 remount5->i9t31 rollback(i2,t8)->i9t32
+[b1-S0] RESULT B history seed=116 flags=[] trace=create1->i1t5 rollback(i1,t4)->i1t6 remount->i2t8 remount->i3t10 create1->i3t11 create2->i3t12 remount5->i8t25 step:skip(队列空) step:skip(队列空) step:skip(队列空) intent3->i8t26 intent5->i8t28
+[b1-S0] RESULT B history seed=117 flags=[] trace=rollback(i1,t3)->i1t5 abandon->i2t7 rollback(i1,t5):skip(TargetNotACandidate { target: ) remount5->i7t22 abandon->i8t25 create2->i8t26 intent1->i8t27 step->i8t28 remount5->i13t43 create1->i13t44 abandon->i14t46 create-abandon->i15t49
+[b1-S0] RESULT B history seed=118 flags=[] trace=create-abandon->i2t7 remount->i3t10 step:skip(队列空) intent2->i3t11 step->i3t12 intent3->i3t13 create1->i3t15 rollback(i3,t12)->i3t16 abandon->i4t19 rollback(i3,t13)->i4t20 create-abandon->i5t25 rollback(i3,t11)->i5t26
+[b1-S0] RESULT B history seed=119 flags=[] trace=intent3->i1t5 step->i1t6 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) create2->i1t7 intent4->i1t8 create-abandon->i2t13 rollback(i1,t5)->i2t14 abandon->i3t16 step:skip(队列空) create-abandon->i4t19 step:skip(队列空) step:skip(队列空)
+[b1-S0] RESULT B history seed=120 flags=[] trace=rollback(i1,t3)->i1t5 rollback(i1,t4)->i1t6 abandon->i2t8 rollback(i1,t4)->i2t9 abandon->i3t11 abandon->i4t13 remount5->i9t28 create2->i9t29 rollback(i2,t8)->i9t30 abandon->i10t32 step:skip(队列空) drain:skip(队列空)
+[b1-S0] RESULT B history seed=121 flags=[] trace=create2->i1t5 rollback(i1,t4)->i1t6 rollback(i1,t4)->i1t7 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) rollback(i1,t5)->i1t8 step:skip(队列空) rollback(i1,t4)->i1t9 intent3->i1t10 remount->i2t14 create-abandon->i3t17 remount->i4t19 drain:skip(队列空)
+[b1-S0] RESULT B history seed=122 flags=[] trace=remount5->i6t19 step:skip(队列空) remount5->i11t34 step:skip(队列空) create-abandon->i12t37 rollback(i11,t34)->i12t38 create2->i12t39 abandon->i13t41 create-abandon->i14t44 abandon->i15t46 rollback(i1,t4):skip(TargetNotACandidate { target: ) remount5->i20t61
+[b1-S0] RESULT B history seed=123 flags=[] trace=abandon->i2t7 rollback(i1,t4):skip(TargetNotACandidate { target: ) remount->i3t10 intent1->i3t11 drain->i3t12 drain:skip(队列空) rollback(i1,t3)->i3t13 create-abandon->i4t16 remount->i5t19 create-abandon->i6t22 intent1->i6t23 remount->i7t26
+[b1-S0] RESULT B history seed=124 flags=[] trace=step:skip(队列空) abandon->i2t7 rollback(i1,t3)->i2t8 create-abandon->i3t11 rollback(i2,t9):skip(TargetNotACandidate { target: ) step:skip(队列空) create-abandon->i4t14 abandon->i5t16 abandon->i6t19 remount->i7t22 remount5->i12t37 intent1->i12t38
+[b1-S0] RESULT B history seed=125 flags=[] trace=drain:skip(队列空) abandon->i2t7 create-abandon->i3t10 remount->i4t13 step:skip(队列空) rollback(i3,t10)->i4t14 step:skip(队列空) intent1->i4t15 intent-none:skip(没有活的号) rollback(i4,t14)->i4t16 remount->i5t19 rollback(i1,t4):skip(TargetNotACandidate { target: )
+[b1-S0] RESULT B history seed=126 flags=[] trace=rollback(i1,t3)->i1t5 create2->i1t6 create-abandon->i2t10 abandon->i3t13 step:skip(队列空) remount5->i8t28 drain:skip(队列空) drain:skip(队列空) remount->i9t31 rollback(i1,t7):skip(TargetNotACandidate { target: ) rollback(i8,t28)->i9t32 drain:skip(队列空)
+[b1-S0] RESULT B history seed=127 flags=[] trace=intent3->i1t5 rollback(i1,t3)->i1t6 remount->i2t8 step:skip(队列空) abandon->i3t10 remount5->i8t25 abandon->i9t28 create-abandon->i10t31 create2->i10t32 rollback(i2,t8):skip(TargetNotACandidate { target: ) rollback(i10,t31)->i10t33 create-abandon->i11t37
+[b1-S0] RESULT B history seed=128 flags=[] trace=create1->i1t5 rollback(i1,t3)->i1t6 intent1->i1t7 create-abandon->i2t11 create-abandon->i3t14 intent-none:skip(没有活的号) rollback(i1,t5)->i3t15 rollback(i3,t14)->i3t16 remount->i4t19 create2->i4t20 create-abandon->i5t23 rollback(i4,t21):skip(TargetNotACandidate { target: )
+[b1-S0] RESULT B history seed=129 flags=[] trace=create-abandon->i2t7 remount->i3t10 rollback(i1,t4)->i3t11 intent2->i3t12 create2->i3t14 intent3->i3t15 drain->i3t16 rollback(i1,t4)->i3t17 drain:skip(队列空) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 827326464) create2->i3t18 intent8->i3t19
+[b1-S0] RESULT B history seed=130 flags=[] trace=step:skip(队列空) step:skip(队列空) remount->i2t7 rollback(i1,t3)->i2t8 create-abandon->i3t11 rollback(i1,t4)->i3t12 abandon->i4t14 remount5->i9t28 intent1->i9t29 rollback(i2,t7)->i9t30 drain:skip(队列空) create2->i9t31
+[b1-S0] RESULT B tally S0 checks=286 exposed=43 multi_page=0 max_rows_first_page=19
+[b1-S0] RESULT B tally S0 I-9.29 成立 286
+[b1-S0] RESULT B tally S0 nine I-9.17 不适用[R-no-lineage-entry] 107
+[b1-S0] RESULT B tally S0 nine I-9.17 成立 179
+[b1-S0] RESULT B tally S0 nine I-9.18 不适用[R-no-queue] 144
+[b1-S0] RESULT B tally S0 nine I-9.18 成立 142
+[b1-S0] RESULT B tally S0 nine I-9.19 不适用[R-no-tombstone-naming-record] 144
+[b1-S0] RESULT B tally S0 nine I-9.19 成立 142
+[b1-S0] RESULT B tally S0 nine I-9.20 不适用[R-no-tombstone] 140
+[b1-S0] RESULT B tally S0 nine I-9.20 成立 146
+[b1-S0] RESULT B tally S0 nine I-9.21 不适用[R-no-non-rightmost] 286
+[b1-S0] RESULT B tally S0 nine I-9.22 不适用[R-old-entry] 286
+[b1-S0] RESULT B tally S0 nine I-9.23 不适用[R-no-tombstone-entry] 140
+[b1-S0] RESULT B tally S0 nine I-9.23 成立 146
+[b1-S0] RESULT B tally S0 nine I-9.24 成立 286
+[b1-S0] RESULT B tally S0 nine I-9.29 成立 286
+[b1-S0] RESULT B tally S0 act abandon done=37 refused=1
+[b1-S0] RESULT B tally S0 act create done=48 refused=0
+[b1-S0] RESULT B tally S0 act create-abandon done=44 refused=5
+[b1-S0] RESULT B tally S0 act drain done=2 refused=17
+[b1-S0] RESULT B tally S0 act intent done=40 refused=0
+[b1-S0] RESULT B tally S0 act intent-none done=0 refused=2
+[b1-S0] RESULT B tally S0 act remount done=55 refused=0
+[b1-S0] RESULT B tally S0 act rollback done=55 refused=15
+[b1-S0] RESULT B tally S0 act step done=4 refused=35
+[b1-S0] RESULT B tally S0 other-red ["I-3.1"] 18
+[b1-SX] RESULT B start SX flags=[] first_page=(2, false)
+[b1-SX] RESULT B history seed=201 flags=[] trace=create1->i3t10 create-abandon->i4t13 rollback(i3,t11):skip(TargetNotACandidate { target: ) rollback(i3,t9)->i4t14 rollback(i4,t13)->i4t15 abandon->i5t17 rollback(i3,t11):skip(TargetNotACandidate { target: ) remount->i6t19 drain:skip(队列空) intent2->i6t20 create1->i6t22 drain:skip(队列空)
+[b1-SX] RESULT B history seed=202 flags=[] trace=remount->i4t11 intent1->i4t12 abandon->i5t14 remount->i6t16 intent2->i6t17 create-abandon->i7t22 step:skip(队列空) create1->i7t23 create1->i7t24 step:skip(队列空) abandon->i8t26 rollback(i7,t23)->i8t27
+[b1-SX] RESULT B history seed=203 flags=[] trace=step:skip(队列空) step:skip(队列空) intent2->i3t10 drain->i3t11 intent1->i3t12 rollback(i3,t9)->i3t13 intent1->i3t14 create1->i3t16 step:skip(队列空) abandon:skip(挂载写到了藏起来的盘 0 偏移 827326464) rollback(i3,t13)->i3t17 step:skip(队列空)
+[b1-SX] RESULT B history seed=204 flags=[] trace=create2->i3t10 rollback(i3,t9)->i3t11 rollback(i3,t9)->i3t12 abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) drain:skip(队列空) rollback(i3,t9)->i3t13 abandon->i4t16 step:skip(队列空) remount5->i9t31 create-abandon->i10t34 create-abandon->i11t37 step:skip(队列空)
+[b1-SX] RESULT B history seed=205 flags=[] trace=remount->i4t11 intent2->i4t12 intent1->i4t14 rollback(i4,t11)->i4t15 step:skip(队列空) drain:skip(队列空) remount->i5t17 intent2->i5t18 drain->i5t19 create2->i5t20 intent3->i5t21 step->i5t22
+[b1-SX] RESULT B history seed=206 flags=[] trace=intent1->i3t10 remount->i4t14 remount->i5t16 rollback(i3,t10)->i5t17 create-abandon->i6t22 rollback(i3,t10)->i6t23 create2->i6t25 remount->i7t28 remount5->i12t43 intent4->i12t44 abandon->i13t46 remount->i14t49
+[b1-SX] RESULT B history seed=207 flags=[] trace=rollback-none:skip(没有别的版) remount->i4t11 rollback(i3,t9)->i4t12 intent1->i4t13 remount->i5t17 drain:skip(队列空) create2->i5t18 rollback(i3,t9)->i5t19 create-abandon->i6t22 intent1->i6t23 step->i6t24 rollback(i6,t22)->i6t25
+[b1-SX] RESULT B history seed=208 flags=[] trace=remount->i4t11 create-abandon->i5t14 remount->i6t16 rollback(i4,t11)->i6t17 remount->i7t19 step:skip(队列空) remount5->i12t34 create1->i12t35 step:skip(队列空) create2->i12t36 create1->i12t37 rollback(i4,t12):skip(TargetNotACandidate { target: )
+[b1-SX] RESULT B history seed=209 flags=[] trace=step:skip(队列空) remount5->i8t22 remount->i9t25 intent2->i9t26 rollback(i9,t25)->i9t27 abandon->i10t30 create-abandon->i11t34 create-abandon->i12t37 drain:skip(队列空) rollback(i9,t27):skip(TargetNotACandidate { target: ) step:skip(队列空) create2->i12t38
+[b1-SX] RESULT B history seed=210 flags=[] trace=drain:skip(队列空) intent2->i3t10 abandon->i4t13 abandon->i5t16 rollback(i3,t10):skip(TargetNotACandidate { target: ) remount->i6t19 intent1->i6t20 create1->i6t22 abandon:skip(挂载写到了藏起来的盘 0 偏移 829423616) step:skip(队列空) step:skip(队列空) abandon:skip(挂载写到了藏起来的盘 0 偏移 829423616)
+[b1-SX] RESULT B history seed=211 flags=[] trace=rollback-none:skip(没有别的版) rollback-none:skip(没有别的版) remount->i4t11 rollback(i3,t9)->i4t12 create-abandon->i5t16 step:skip(队列空) create-abandon->i6t19 intent1->i6t20 create-abandon->i7t25 abandon->i8t28 remount5->i13t43 create-abandon->i14t46
+[b1-SX] RESULT B history seed=212 flags=[] trace=intent1->i3t10 step->i3t11 abandon->i4t14 drain:skip(队列空) rollback(i3,t11):skip(TargetNotACandidate { target: ) drain:skip(队列空) remount->i5t16 rollback(i4,t14)->i5t17 create1->i5t18 create2->i5t19 intent2->i5t20 abandon:skip(挂载写到了藏起来的盘 0 偏移 828375040)
+[b1-SX] RESULT B history seed=213 flags=[] trace=create-abandon->i4t13 create1->i4t14 create-abandon->i5t17 rollback(i4,t13)->i5t18 create-abandon->i6t22 create-abandon->i7t25 create-abandon->i8t28 create2->i8t29 create2->i8t30 rollback(i8,t28)->i8t31 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) remount->i9t34
+[b1-SX] RESULT B history seed=214 flags=[] trace=abandon->i4t11 create-abandon->i5t14 rollback(i4,t11)->i5t15 rollback(i3,t9):skip(TargetNotACandidate { target: ) remount->i6t17 abandon->i7t19 rollback(i6,t17):skip(TargetNotACandidate { target: ) create1->i7t20 create-abandon->i8t23 rollback(i3,t9):skip(TargetNotACandidate { target: ) remount->i9t25 step:skip(队列空)
+[b1-SX] RESULT B history seed=215 flags=[] trace=create-abandon->i4t13 step:skip(队列空) create2->i4t14 drain:skip(队列空) remount->i5t16 abandon->i6t19 step:skip(队列空) create-abandon->i7t22 abandon->i8t25 remount->i9t28 rollback(i7,t22):skip(TargetNotACandidate { target: ) remount->i10t31
+[b1-SX] RESULT B history seed=216 flags=[] trace=step:skip(队列空) create2->i3t10 rollback(i3,t9)->i3t11 remount->i4t13 rollback(i3,t10)->i4t14 rollback(i3,t11)->i4t15 abandon->i5t17 abandon->i6t19 abandon->i7t22 step:skip(队列空) rollback(i3,t11)->i7t23 rollback(i4,t15):skip(TargetNotACandidate { target: )
+[b1-SX] RESULT B history seed=217 flags=[] trace=remount5->i8t22 remount5->i13t37 abandon->i14t40 abandon->i15t43 remount->i16t46 remount->i17t49 create-abandon->i18t52 intent1->i18t53 create-abandon->i19t58 remount->i20t61 create-abandon->i21t64 create-abandon->i22t67
+[b1-SX] RESULT B history seed=218 flags=[] trace=intent1->i3t10 remount->i4t14 remount->i5t16 intent2->i5t17 create2->i5t19 intent4->i5t20 abandon:skip(挂载写到了藏起来的盘 0 偏移 828375040) rollback(i3,t9)->i5t21 create2->i5t22 intent6->i5t23 create2->i5t25 step:skip(队列空)
+[b1-SX] RESULT B history seed=219 flags=[] trace=create1->i3t10 create-abandon->i4t13 create-abandon->i5t16 create-abandon->i6t19 intent3->i6t20 step->i6t21 abandon->i7t24 remount5->i12t37 drain:skip(队列空) intent1->i12t38 remount->i13t41 drain:skip(队列空)
+[b1-SX] RESULT B history seed=220 flags=[] trace=create2->i3t10 step:skip(队列空) create-abandon->i4t13 drain:skip(队列空) drain:skip(队列空) intent2->i4t14 abandon->i5t16 rollback(i4,t13)->i5t17 remount->i6t19 abandon->i7t22 remount5->i12t37 rollback(i6,t19):skip(TargetNotACandidate { target: )
+[b1-SX] RESULT B history seed=221 flags=[] trace=intent1->i3t10 abandon->i4t13 create-abandon->i5t16 remount->i6t19 create-abandon->i7t22 intent2->i7t23 drain->i7t24 create-abandon->i8t28 intent1->i8t29 intent-none:skip(没有活的号) create2->i8t31 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736)
+[b1-SX] RESULT B history seed=222 flags=[] trace=rollback-none:skip(没有别的版) rollback-none:skip(没有别的版) abandon->i4t11 create1->i4t12 rollback(i3,t9):skip(TargetNotACandidate { target: ) create-abandon->i5t16 create-abandon->i6t19 create2->i6t20 intent2->i6t21 step->i6t22 step:skip(队列空) drain:skip(队列空)
+[b1-SX] RESULT B history seed=223 flags=[] trace=remount->i4t11 create-abandon->i5t14 intent2->i5t15 rollback(i3,t9)->i5t16 rollback(i5,t15)->i5t17 create-abandon->i6t22 rollback(i5,t17)->i6t23 step->i6t24 rollback(i6,t22)->i6t25 rollback(i5,t15)->i6t26 create-abandon->i7t31 intent1->i7t32
+[b1-SX] RESULT B history seed=224 flags=[] trace=rollback-none:skip(没有别的版) remount5->i8t22 intent1->i8t23 step->i8t24 rollback(i8,t22)->i8t25 create-abandon->i9t28 create-abandon->i10t31 create2->i10t32 intent4->i10t33 intent1->i10t35 remount->i11t38 step:skip(队列空)
+[b1-SX] RESULT B history seed=225 flags=[] trace=drain:skip(队列空) create1->i3t10 step:skip(队列空) rollback(i3,t9)->i3t11 rollback(i3,t9)->i3t12 rollback(i3,t10)->i3t13 intent2->i3t14 step->i3t15 abandon->i4t18 create-abandon->i5t22 abandon->i6t25 remount->i7t28
+[b1-SX] RESULT B history seed=226 flags=[] trace=remount5->i8t22 create2->i8t23 create2->i8t24 abandon->i9t26 create2->i9t27 rollback(i9,t26)->i9t28 intent1->i9t29 abandon->i10t31 abandon->i11t34 intent4->i11t35 rollback(i9,t29):skip(TargetNotACandidate { target: ) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888)
+[b1-SX] RESULT B history seed=227 flags=[] trace=abandon->i4t11 remount->i5t13 create-abandon->i6t16 intent1->i6t17 create-abandon->i7t22 drain:skip(队列空) create1->i7t23 abandon->i8t25 intent-none:skip(没有活的号) create2->i8t26 step:skip(队列空) create1->i8t27
+[b1-SX] RESULT B history seed=228 flags=[] trace=create-abandon->i4t13 intent2->i4t14 abandon->i5t16 rollback(i4,t14):skip(TargetNotACandidate { target: ) rollback(i4,t14):skip(TargetNotACandidate { target: ) rollback(i4,t14):skip(TargetNotACandidate { target: ) create2->i5t17 intent1->i5t18 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 828375040) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 828375040) create1->i5t20 remount5->i10t34
+[b1-SX] RESULT B history seed=229 flags=[] trace=intent1->i3t10 remount->i4t14 drain:skip(队列空) intent2->i4t15 abandon->i5t17 abandon->i6t19 intent2->i6t20 create-abandon->i7t25 remount5->i12t40 abandon->i13t43 drain:skip(队列空) rollback(i4,t15):skip(TargetNotACandidate { target: )
+[b1-SX] RESULT B history seed=230 flags=[] trace=drain:skip(队列空) create2->i3t10 remount->i4t13 intent3->i4t14 rollback(i4,t13)->i4t15 step:skip(队列空) drain:skip(队列空) rollback(i3,t10)->i4t16 create2->i4t17 rollback(i3,t9)->i4t18 rollback(i3,t9)->i4t19 drain:skip(队列空)
+[b1-SX] RESULT B tally SX checks=274 exposed=194 multi_page=0 max_rows_first_page=21
+[b1-SX] RESULT B tally SX I-9.29 成立 274
+[b1-SX] RESULT B tally SX nine I-9.17 不适用[R-no-lineage-entry] 147
+[b1-SX] RESULT B tally SX nine I-9.17 成立 127
+[b1-SX] RESULT B tally SX nine I-9.18 不适用[R-no-queue] 127
+[b1-SX] RESULT B tally SX nine I-9.18 成立 147
+[b1-SX] RESULT B tally SX nine I-9.19 不适用[R-no-tombstone-naming-record] 127
+[b1-SX] RESULT B tally SX nine I-9.19 成立 147
+[b1-SX] RESULT B tally SX nine I-9.20 不适用[R-no-tombstone] 125
+[b1-SX] RESULT B tally SX nine I-9.20 成立 149
+[b1-SX] RESULT B tally SX nine I-9.21 不适用[R-no-non-rightmost] 274
+[b1-SX] RESULT B tally SX nine I-9.22 不适用[R-old-entry] 274
+[b1-SX] RESULT B tally SX nine I-9.23 不适用[R-no-tombstone-entry] 125
+[b1-SX] RESULT B tally SX nine I-9.23 成立 149
+[b1-SX] RESULT B tally SX nine I-9.24 成立 274
+[b1-SX] RESULT B tally SX nine I-9.29 成立 274
+[b1-SX] RESULT B tally SX act abandon done=35 refused=7
+[b1-SX] RESULT B tally SX act create done=42 refused=0
+[b1-SX] RESULT B tally SX act create-abandon done=45 refused=4
+[b1-SX] RESULT B tally SX act drain done=3 refused=22
+[b1-SX] RESULT B tally SX act intent done=47 refused=0
+[b1-SX] RESULT B tally SX act intent-none done=0 refused=2
+[b1-SX] RESULT B tally SX act remount done=52 refused=0
+[b1-SX] RESULT B tally SX act rollback done=41 refused=18
+[b1-SX] RESULT B tally SX act rollback-none done=0 refused=6
+[b1-SX] RESULT B tally SX act step done=8 refused=28
+[b1-SX] RESULT B tally SX other-red ["I-3.1"] 24
+[b1-SK] RESULT B start SK flags=[] first_page=(0, false)
+[b1-SK] RESULT B history seed=301 flags=[] trace=remount->i2t7 rollback(i1,t3)->i2t8 rollback(i2,t7)->i2t9 rollback(i2,t7)->i2t10 abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) step:skip(队列空) abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) create2->i2t11 remount->i3t13 remount->i4t16 create1->i4t17 remount5->i9t31
+[b1-SK] RESULT B history seed=302 flags=[] trace=abandon->i2t7 abandon->i3t10 create2->i3t11 drain:skip(队列空) rollback(i3,t10)->i3t12 abandon->i4t14 create2->i4t15 intent4->i4t16 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 827326464) rollback(i3,t10)->i4t17 abandon->i5t20 create1->i5t21
+[b1-SK] RESULT B history seed=303 flags=[] trace=remount->i2t7 remount->i3t10 create2->i3t11 create-abandon->i4t14 create-abandon->i5t17 step:skip(队列空) abandon->i6t19 remount->i7t22 intent3->i7t23 create2->i7t25 intent5->i7t26 intent1->i7t28
+[b1-SK] RESULT B history seed=304 flags=[] trace=create2->i1t5 abandon->i2t7 rollback(i1,t5):skip(TargetNotACandidate { target: ) drain:skip(队列空) rollback(i1,t4)->i2t8 abandon->i3t10 rollback(i2,t7)->i3t11 create1->i3t12 create2->i3t13 create2->i3t14 create2->i3t15 intent12->i3t16
+[b1-SK] RESULT B history seed=305 flags=[] trace=abandon->i2t7 step:skip(队列空) abandon->i3t10 remount->i4t13 rollback(i1,t4):skip(TargetNotACandidate { target: ) create1->i4t14 intent1->i4t15 drain->i4t16 drain:skip(队列空) create1->i4t17 drain:skip(队列空) step:skip(队列空)
+[b1-SK] RESULT B history seed=306 flags=[] trace=rollback(i1,t3)->i1t5 create2->i1t6 create1->i1t7 remount->i2t10 remount->i3t13 drain:skip(队列空) intent6->i3t14 intent4->i3t16 step->i3t17 rollback(i2,t10)->i3t18 rollback(i3,t16)->i3t19 intent5->i3t21
+[b1-SK] RESULT B history seed=307 flags=[] trace=abandon->i2t7 rollback(i1,t3)->i2t8 rollback(i1,t3)->i2t9 remount->i3t11 abandon->i4t13 intent1->i4t14 rollback(i1,t4):skip(TargetNotACandidate { target: ) create1->i4t16 rollback(i2,t7)->i4t17 create1->i4t18 drain:skip(队列空) remount->i5t20
+[b1-SK] RESULT B history seed=308 flags=[] trace=remount5->i6t19 intent1->i6t20 rollback(i1,t3)->i6t21 abandon->i7t24 intent2->i7t25 abandon->i8t28 rollback(i6,t20)->i8t29 intent3->i8t31 remount->i9t35 create-abandon->i10t38 remount->i11t40 create-abandon->i12t43
+[b1-SK] RESULT B history seed=309 flags=[] trace=remount->i2t7 create2->i2t8 remount->i3t10 create2->i3t11 intent2->i3t12 rollback(i1,t3)->i3t13 rollback(i1,t3)->i3t14 remount5->i8t28 abandon->i9t31 drain:skip(队列空) remount->i10t34 create-abandon->i11t37
+[b1-SK] RESULT B history seed=310 flags=[] trace=remount->i2t7 intent2->i2t8 remount->i3t11 create1->i3t12 remount->i4t14 step:skip(队列空) create-abandon->i5t17 intent3->i5t18 rollback(i3,t12)->i5t19 intent3->i5t20 remount5->i10t34 abandon->i11t37
+[b1-SK] RESULT B history seed=311 flags=[] trace=remount->i2t7 intent2->i2t8 create2->i2t10 create1->i2t11 create2->i2t12 intent6->i2t13 abandon->i3t16 rollback(i2,t10)->i3t17 abandon->i4t19 rollback(i2,t12)->i4t20 rollback(i4,t19)->i4t21 create-abandon->i5t25
+[b1-SK] RESULT B history seed=312 flags=[] trace=intent3->i1t5 abandon->i2t7 drain:skip(队列空) rollback(i1,t4)->i2t8 rollback(i1,t5):skip(TargetNotACandidate { target: ) create1->i2t9 rollback(i2,t8)->i2t10 create1->i2t11 drain:skip(队列空) rollback(i2,t9)->i2t12 remount->i3t14 create1->i3t15
+[b1-SK] RESULT B history seed=313 flags=[] trace=rollback(i1,t3)->i1t5 abandon->i2t7 remount->i3t10 create-abandon->i4t13 intent1->i4t14 create-abandon->i5t19 rollback(i1,t5):skip(TargetNotACandidate { target: ) create-abandon->i6t22 step:skip(队列空) remount5->i11t37 rollback(i4,t13):skip(TargetNotACandidate { target: ) abandon->i12t40
+[b1-SK] RESULT B history seed=314 flags=[] trace=rollback(i1,t3)->i1t5 intent1->i1t6 remount->i2t9 create2->i2t10 rollback(i1,t4)->i2t11 rollback(i1,t4)->i2t12 step:skip(队列空) create2->i2t13 remount->i3t16 remount->i4t19 remount->i5t22 create2->i5t23
+[b1-SK] RESULT B history seed=315 flags=[] trace=remount5->i6t19 create1->i6t20 create-abandon->i7t23 remount->i8t25 remount->i9t28 create-abandon->i10t31 drain:skip(队列空) abandon->i11t34 rollback(i8,t25)->i11t35 create1->i11t36 create-abandon->i12t40 step:skip(队列空)
+[b1-SK] RESULT B history seed=316 flags=[] trace=remount->i2t7 remount5->i7t22 remount5->i12t37 create1->i12t38 rollback(i1,t4):skip(TargetNotACandidate { target: ) abandon->i13t40 abandon->i14t43 create2->i14t44 create2->i14t45 rollback(i14,t44)->i14t46 abandon->i15t49 remount5->i20t64
+[b1-SK] RESULT B history seed=317 flags=[] trace=intent1->i1t5 drain->i1t6 abandon->i2t9 remount->i3t11 create2->i3t12 intent5->i3t13 remount->i4t17 rollback(i3,t12)->i4t18 remount->i5t20 intent3->i5t21 create-abandon->i6t25 step:skip(队列空)
+[b1-SK] RESULT B history seed=318 flags=[] trace=create-abandon->i2t7 create2->i2t8 create2->i2t9 remount5->i7t22 intent2->i7t23 intent3->i7t25 abandon:skip(挂载写到了藏起来的盘 0 偏移 830472192) step->i7t26 rollback(i7,t23)->i7t27 remount->i8t30 rollback(i1,t4):skip(TargetNotACandidate { target: ) abandon->i9t33
+[b1-SK] RESULT B history seed=319 flags=[] trace=create1->i1t5 step:skip(队列空) step:skip(队列空) rollback(i1,t3)->i1t6 intent1->i1t7 create1->i1t9 abandon->i2t11 create1->i2t12 drain:skip(队列空) create1->i2t13 intent5->i2t14 intent6->i2t16
+[b1-SK] RESULT B history seed=320 flags=[] trace=intent3->i1t5 remount->i2t8 step:skip(队列空) drain:skip(队列空) intent2->i2t9 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) intent1->i2t11 abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) remount5->i7t25 create-abandon->i8t28 remount->i9t31 remount5->i14t46
+[b1-SK] RESULT B history seed=321 flags=[] trace=step:skip(队列空) create-abandon->i2t7 step:skip(队列空) abandon->i3t10 abandon->i4t13 create1->i4t14 create2->i4t15 abandon->i5t17 drain:skip(队列空) remount->i6t19 step:skip(队列空) abandon->i7t22
+[b1-SK] RESULT B history seed=322 flags=[] trace=rollback(i1,t3)->i1t5 create1->i1t6 create1->i1t7 rollback(i1,t6)->i1t8 create1->i1t9 intent1->i1t10 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) rollback(i1,t7)->i1t11 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) drain:skip(队列空)
+[b1-SK] RESULT B history seed=323 flags=[] trace=rollback(i1,t3)->i1t5 create2->i1t6 drain:skip(队列空) create-abandon->i2t10 rollback(i1,t6)->i2t11 rollback(i2,t10)->i2t12 step:skip(队列空) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) abandon->i3t14 create-abandon->i4t17 drain:skip(队列空) create-abandon->i5t20
+[b1-SK] RESULT B history seed=324 flags=[] trace=abandon->i2t7 remount->i3t10 create-abandon->i4t13 create1->i4t14 step:skip(队列空) rollback(i4,t13)->i4t15 remount->i5t17 drain:skip(队列空) intent1->i5t18 step->i5t19 remount->i6t22 create2->i6t23
+[b1-SK] RESULT B history seed=325 flags=[] trace=create-abandon->i2t7 rollback(i1,t3)->i2t8 rollback(i1,t3)->i2t9 step:skip(队列空) create2->i2t10 drain:skip(队列空) intent1->i2t11 intent5->i2t13 rollback(i1,t4)->i2t14 rollback(i2,t7)->i2t15 rollback(i2,t11)->i2t16 remount->i3t20
+[b1-SK] RESULT B history seed=326 flags=[] trace=rollback(i1,t3)->i1t5 drain:skip(队列空) rollback(i1,t4)->i1t6 remount5->i6t19 rollback(i1,t4)->i6t20 step:skip(队列空) create-abandon->i7t23 rollback(i1,t6)->i7t24 rollback(i6,t19)->i7t25 remount5->i12t40 create1->i12t41 abandon->i13t43
+[b1-SK] RESULT B history seed=327 flags=[] trace=create-abandon->i2t7 rollback(i1,t3)->i2t8 create-abandon->i3t11 step:skip(队列空) create2->i3t12 intent6->i3t13 remount->i4t17 abandon->i5t20 remount5->i10t34 rollback(i3,t13)->i10t35 create-abandon->i11t40 rollback(i10,t35)->i11t41
+[b1-SK] RESULT B history seed=328 flags=[] trace=create2->i1t5 intent1->i1t6 intent2->i1t8 abandon->i2t10 step:skip(队列空) create-abandon->i3t13 rollback(i2,t11):skip(TargetNotACandidate { target: ) step:skip(队列空) create-abandon->i4t16 create-abandon->i5t19 rollback(i3,t13)->i5t20 create2->i5t21
+[b1-SK] RESULT B history seed=329 flags=[] trace=rollback(i1,t3)->i1t5 remount->i2t7 rollback(i1,t3)->i2t8 create2->i2t9 create-abandon->i3t13 abandon->i4t16 create-abandon->i5t19 create-abandon->i6t22 remount->i7t25 remount->i8t28 remount->i9t31 step:skip(队列空)
+[b1-SK] RESULT B history seed=330 flags=[] trace=rollback(i1,t3)->i1t5 create1->i1t6 rollback(i1,t5)->i1t7 create1->i1t8 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) rollback(i1,t5)->i1t9 step:skip(队列空) rollback(i1,t3)->i1t10 create2->i1t11 intent6->i1t12 intent1->i1t14 intent7->i1t16
+[b1-SK] RESULT B tally SK checks=297 exposed=37 multi_page=0 max_rows_first_page=19
+[b1-SK] RESULT B tally SK I-9.29 成立 297
+[b1-SK] RESULT B tally SK nine I-9.17 不适用[R-no-lineage-entry] 128
+[b1-SK] RESULT B tally SK nine I-9.17 成立 169
+[b1-SK] RESULT B tally SK nine I-9.18 不适用[R-no-queue] 160
+[b1-SK] RESULT B tally SK nine I-9.18 成立 137
+[b1-SK] RESULT B tally SK nine I-9.19 不适用[R-no-tombstone-naming-record] 160
+[b1-SK] RESULT B tally SK nine I-9.19 成立 137
+[b1-SK] RESULT B tally SK nine I-9.20 不适用[R-no-tombstone] 157
+[b1-SK] RESULT B tally SK nine I-9.20 成立 140
+[b1-SK] RESULT B tally SK nine I-9.21 不适用[R-knob-product-not-judged] 297
+[b1-SK] RESULT B tally SK nine I-9.22 不适用[R-no-container-under-knob] 157
+[b1-SK] RESULT B tally SK nine I-9.22 成立 140
+[b1-SK] RESULT B tally SK nine I-9.23 不适用[R-no-tombstone-entry] 157
+[b1-SK] RESULT B tally SK nine I-9.23 成立 140
+[b1-SK] RESULT B tally SK nine I-9.24 成立 297
+[b1-SK] RESULT B tally SK nine I-9.29 成立 297
+[b1-SK] RESULT B tally SK act abandon done=37 refused=5
+[b1-SK] RESULT B tally SK act create done=59 refused=0
+[b1-SK] RESULT B tally SK act create-abandon done=32 refused=7
+[b1-SK] RESULT B tally SK act drain done=2 refused=19
+[b1-SK] RESULT B tally SK act intent done=43 refused=0
+[b1-SK] RESULT B tally SK act remount done=60 refused=0
+[b1-SK] RESULT B tally SK act rollback done=60 refused=9
+[b1-SK] RESULT B tally SK act step done=3 refused=24
+[b1-SK] RESULT B tally SK other-red ["I-3.1"] 17
+[b1-SR] RESULT B start SR flags=[] first_page=(369, true)
+[b1-SR] RESULT B history seed=401 flags=[] trace=intent3->i371t1115 abandon->i372t1117 drain:skip(队列空) rollback(i1,t3):skip(TargetNotACandidate { target: ) create2->i372t1118 rollback(i1,t3):skip(TargetNotACandidate { target: ) step:skip(队列空) drain:skip(队列空)
+[b1-SR] RESULT B history seed=402 flags=[] trace=remount->i372t1117 create-abandon->i373t1120 abandon->i374t1123 drain:skip(队列空) abandon->i375t1126 create1->i375t1127 create-abandon->i376t1130 abandon->i377t1132
+[b1-SR] RESULT B history seed=403 flags=[] trace=create-abandon->i372t1117 rollback(i371,t1115):skip(TargetNotACandidate { target: ) rollback(i371,t1114)->i372t1118 rollback(i1,t4):skip(TargetNotACandidate { target: ) create-abandon->i373t1121 abandon->i374t1123 abandon->i375t1126 create-abandon->i376t1129
+[b1-SR] RESULT B history seed=404 flags=[] trace=create2->i371t1115 intent2->i371t1116 intent1->i371t1118 step->i371t1119 intent5->i371t1120 rollback(i371,t1119)->i371t1121 step:skip(队列空) create-abandon->i372t1124
+[b1-SR] RESULT B tally SR checks=24 exposed=3 multi_page=24 max_rows_first_page=369
+[b1-SR] RESULT B tally SR I-9.29 成立 24
+[b1-SR] RESULT B tally SR nine I-9.17 不适用[R-no-lineage-entry] 17
+[b1-SR] RESULT B tally SR nine I-9.17 成立 7
+[b1-SR] RESULT B tally SR nine I-9.18 不适用[R-no-queue] 17
+[b1-SR] RESULT B tally SR nine I-9.18 成立 7
+[b1-SR] RESULT B tally SR nine I-9.19 不适用[R-no-tombstone-naming-record] 17
+[b1-SR] RESULT B tally SR nine I-9.19 成立 7
+[b1-SR] RESULT B tally SR nine I-9.20 不适用[R-no-tombstone] 17
+[b1-SR] RESULT B tally SR nine I-9.20 成立 7
+[b1-SR] RESULT B tally SR nine I-9.21 不适用[R-no-non-rightmost] 24
+[b1-SR] RESULT B tally SR nine I-9.22 不适用[R-old-entry] 24
+[b1-SR] RESULT B tally SR nine I-9.23 不适用[R-no-tombstone-entry] 17
+[b1-SR] RESULT B tally SR nine I-9.23 成立 7
+[b1-SR] RESULT B tally SR nine I-9.24 成立 24
+[b1-SR] RESULT B tally SR nine I-9.29 成立 24
+[b1-SR] RESULT B tally SR act abandon done=6 refused=0
+[b1-SR] RESULT B tally SR act create done=3 refused=0
+[b1-SR] RESULT B tally SR act create-abandon done=6 refused=0
+[b1-SR] RESULT B tally SR act drain done=0 refused=3
+[b1-SR] RESULT B tally SR act intent done=4 refused=0
+[b1-SR] RESULT B tally SR act remount done=1 refused=0
+[b1-SR] RESULT B tally SR act rollback done=2 refused=4
+[b1-SR] RESULT B tally SR act step done=1 refused=2
+[b1-SR] RESULT B tally SR other-red ["I-3.1"] 12
+[b2-S0] RESULT B start S0 flags=[] first_page=(0, false)
+[b2-S0] RESULT B history seed=131 flags=[] trace=remount->i2t7 remount5->i7t22 remount->i8t25 create-abandon->i9t28 remount->i10t31 create1->i10t32 rollback(i8,t26):skip(TargetNotACandidate { target: ) create-abandon->i11t35 create-abandon->i12t38 create2->i12t39 rollback(i12,t38)->i12t40 step:skip(队列空) step:skip(队列空) step:skip(队列空) rollback(i8,t25)->i12t41 rollback(i9,t28)->i12t42 rollback(i11,t35)->i12t43 create-abandon->i13t46 intent1->i13t47 intent4->i13t49 abandon->i14t52 remount5->i19t67 step:skip(队列空) drain:skip(队列空) remount->i20t70
+[b2-S0] RESULT B history seed=132 flags=[] trace=rollback(i1,t3)->i1t5 drain:skip(队列空) intent1->i1t6 intent-none:skip(没有活的号) rollback(i1,t4)->i1t7 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) rollback(i1,t4)->i1t8 rollback(i1,t3)->i1t9 abandon->i2t11 rollback(i1,t3)->i2t12 create1->i2t13 create-abandon->i3t16 rollback(i1,t5)->i3t17 remount->i4t19 step:skip(队列空) rollback(i1,t5)->i4t20 rollback(i3,t16)->i4t21 remount->i5t23 create2->i5t24 rollback(i4,t20)->i5t25 intent1->i5t26 remount->i6t29 intent-none:skip(没有活的号)
+[b2-S0] RESULT B history seed=133 flags=[] trace=remount->i2t7 create-abandon->i3t10 remount5->i8t25 create2->i8t26 create-abandon->i9t29 abandon->i10t31 abandon->i11t34 rollback(i10,t31):skip(TargetNotACandidate { target: ) rollback(i2,t7):skip(TargetNotACandidate { target: ) create-abandon->i12t37 remount->i13t40 create2->i13t41 remount->i14t43 abandon->i15t46 intent6->i15t47 remount->i16t50 create-abandon->i17t53 rollback(i16,t51):skip(TargetNotACandidate { target: ) rollback(i14,t43):skip(TargetNotACandidate { target: ) intent5->i17t54 create2->i17t56 create2->i17t57 intent2->i17t58 abandon->i18t61 create1->i18t62
+[b2-S0] RESULT B history seed=134 flags=[] trace=rollback(i1,t3)->i1t5 drain:skip(队列空) remount->i2t7 abandon->i3t10 rollback(i2,t7):skip(TargetNotACandidate { target: ) drain:skip(队列空) create1->i3t11 intent4->i3t12 remount->i4t15 rollback(i3,t11)->i4t16 create2->i4t17 step:skip(队列空) create1->i4t18 intent5->i4t19 create2->i4t21 create-abandon->i5t25 create1->i5t26 abandon->i6t28 drain:skip(队列空) drain:skip(队列空) remount->i7t31 create2->i7t32 rollback(i5,t25)->i7t33 abandon->i8t35 remount->i9t37
+[b2-S0] RESULT B history seed=135 flags=[] trace=create2->i1t5 create-abandon->i2t8 rollback(i1,t3)->i2t9 intent1->i2t10 create2->i2t12 abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) rollback(i2,t10)->i2t13 step->i2t14 create2->i2t15 rollback(i1,t5)->i2t16 abandon->i3t19 intent10->i3t20 intent9->i3t22 abandon:skip(挂载写到了藏起来的盘 0 偏移 827326464) intent-none:skip(没有活的号) intent-none:skip(没有活的号) create2->i3t24 step:skip(队列空) intent12->i3t25 create2->i3t27 intent14->i3t28 step->i3t29 remount->i4t31 intent13->i4t32 create2->i4t34
+[b2-S0] RESULT B history seed=136 flags=[] trace=intent3->i1t5 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) create2->i1t7 create-abandon->i2t10 rollback(i1,t4)->i2t11 rollback(i1,t8):skip(TargetNotACandidate { target: ) remount->i3t13 abandon->i4t16 remount->i5t19 create1->i5t20 rollback(i3,t13):skip(TargetNotACandidate { target: ) remount->i6t22 remount->i7t25 create2->i7t26 intent1->i7t27 intent3->i7t29 create-abandon->i8t34 rollback(i7,t26)->i8t35 create-abandon->i9t38 remount->i10t40 rollback(i8,t35)->i10t41 abandon->i11t43 create-abandon->i12t46 abandon->i13t49 rollback(i10,t41):skip(TargetNotACandidate { target: )
+[b2-S0] RESULT B history seed=137 flags=[] trace=step:skip(队列空) create1->i1t5 create1->i1t6 drain:skip(队列空) remount5->i6t19 create2->i6t20 create2->i6t21 intent5->i6t22 rollback(i1,t4)->i6t23 abandon->i7t26 create2->i7t27 remount->i8t29 abandon->i9t31 step:skip(队列空) abandon->i10t34 create2->i10t35 abandon->i11t37 drain:skip(队列空) create2->i11t38 remount5->i16t52 rollback(i11,t38)->i16t53 abandon->i17t55 abandon->i18t58 step:skip(队列空) intent10->i18t59
+[b2-S0] RESULT B history seed=138 flags=[] trace=abandon->i2t7 intent1->i2t8 abandon->i3t10 intent1->i3t11 rollback(i1,t4):skip(TargetNotACandidate { target: ) create-abandon->i4t16 rollback(i3,t13):skip(TargetNotACandidate { target: ) create1->i4t17 create-abandon->i5t20 create1->i5t21 rollback(i4,t17)->i5t22 rollback(i2,t8):skip(TargetNotACandidate { target: ) intent2->i5t23 rollback(i5,t21)->i5t24 intent3->i5t25 create1->i5t27 create-abandon->i6t31 drain:skip(队列空) intent2->i6t32 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) remount->i7t35 intent4->i7t36 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 822083584) rollback(i5,t28):skip(TargetNotACandidate { target: ) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 822083584)
+[b2-S0] RESULT B history seed=139 flags=[] trace=abandon->i2t7 remount->i3t10 create-abandon->i4t13 remount->i5t16 intent1->i5t17 intent-none:skip(没有活的号) drain->i5t18 rollback(i1,t3)->i5t19 remount->i6t22 create2->i6t23 rollback(i4,t13)->i6t24 create1->i6t25 intent1->i6t26 rollback(i6,t23)->i6t27 create-abandon->i7t31 abandon->i8t34 intent1->i8t35 remount->i9t38 rollback(i8,t34)->i9t39 remount->i10t41 rollback(i6,t28):skip(TargetNotACandidate { target: ) step:skip(队列空) abandon->i11t43 remount5->i16t58 create1->i16t59
+[b2-S0] RESULT B history seed=140 flags=[] trace=step:skip(队列空) remount5->i6t19 remount->i7t22 abandon->i8t25 create2->i8t26 drain:skip(队列空) remount->i9t28 create2->i9t29 rollback(i1,t4):skip(TargetNotACandidate { target: ) remount->i10t31 rollback(i9,t28)->i10t32 rollback(i9,t28)->i10t33 rollback(i8,t25)->i10t34 remount->i11t37 create1->i11t38 rollback(i9,t28)->i11t39 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) rollback(i10,t34)->i11t40 abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) remount5->i16t55 create-abandon->i17t58 intent1->i17t59 create1->i17t61 create2->i17t62
+[b2-S0] RESULT B history seed=141 flags=[] trace=remount5->i6t19 rollback(i1,t4)->i6t20 drain:skip(队列空) intent3->i6t21 remount->i7t24 abandon->i8t27 drain:skip(队列空) abandon->i9t30 create-abandon->i10t34 create1->i10t35 create-abandon->i11t38 abandon->i12t40 create-abandon->i13t43 intent4->i13t44 remount->i14t47 abandon->i15t50 create1->i15t51 create-abandon->i16t55 rollback(i11,t38):skip(TargetNotACandidate { target: ) drain:skip(队列空) remount->i17t58 abandon->i18t61 abandon->i19t64 remount5->i24t79 intent1->i24t80
+[b2-S0] RESULT B history seed=142 flags=[] trace=rollback(i1,t3)->i1t5 drain:skip(队列空) remount->i2t7 step:skip(队列空) step:skip(队列空) remount5->i7t22 remount->i8t25 abandon->i9t28 create1->i9t29 remount->i10t31 create2->i10t32 rollback(i8,t25):skip(TargetNotACandidate { target: ) rollback(i1,t4):skip(TargetNotACandidate { target: ) abandon->i11t34 create-abandon->i12t37 create2->i12t38 remount->i13t40 create-abandon->i14t43 abandon->i15t46 create-abandon->i16t49 rollback(i11,t34)->i16t50 rollback(i11,t34)->i16t51 create1->i16t52 remount5->i21t67 create2->i21t68
+[b2-S0] RESULT B history seed=143 flags=[] trace=rollback(i1,t3)->i1t5 create1->i1t6 rollback(i1,t3)->i1t7 abandon->i2t10 remount->i3t13 rollback(i1,t7):skip(TargetNotACandidate { target: ) rollback(i1,t3)->i3t14 create1->i3t15 rollback(i1,t6)->i3t16 create-abandon->i4t19 step:skip(队列空) rollback(i1,t7):skip(TargetNotACandidate { target: ) rollback(i1,t7):skip(TargetNotACandidate { target: ) create-abandon->i5t22 abandon->i6t25 create-abandon->i7t28 intent4->i7t29 remount->i8t32 create-abandon->i9t35 create-abandon->i10t38 step:skip(队列空) intent1->i10t39 create1->i10t41 abandon->i11t43 remount->i12t46
+[b2-S0] RESULT B history seed=144 flags=[] trace=abandon->i2t7 step:skip(队列空) rollback(i1,t4):skip(TargetNotACandidate { target: ) create1->i2t8 rollback(i2,t7)->i2t9 step:skip(队列空) intent1->i2t10 rollback(i1,t3)->i2t11 create-abandon->i3t14 create1->i3t15 create2->i3t16 drain:skip(队列空) remount->i4t19 remount5->i9t34 drain:skip(队列空) drain:skip(队列空) intent4->i9t35 remount->i10t38 create-abandon->i11t41 create-abandon->i12t44 create1->i12t45 create1->i12t46 intent5->i12t47 rollback(i12,t44)->i12t48 create-abandon->i13t52
+[b2-S0] RESULT B tally S0 checks=277 exposed=67 multi_page=0 max_rows_first_page=23
+[b2-S0] RESULT B tally S0 I-9.29 成立 277
+[b2-S0] RESULT B tally S0 nine I-9.17 不适用[R-no-lineage-entry] 78
+[b2-S0] RESULT B tally S0 nine I-9.17 成立 199
+[b2-S0] RESULT B tally S0 nine I-9.18 不适用[R-no-queue] 105
+[b2-S0] RESULT B tally S0 nine I-9.18 成立 172
+[b2-S0] RESULT B tally S0 nine I-9.19 不适用[R-no-tombstone-naming-record] 105
+[b2-S0] RESULT B tally S0 nine I-9.19 成立 172
+[b2-S0] RESULT B tally S0 nine I-9.20 不适用[R-no-tombstone] 99
+[b2-S0] RESULT B tally S0 nine I-9.20 成立 178
+[b2-S0] RESULT B tally S0 nine I-9.21 不适用[R-no-non-rightmost] 277
+[b2-S0] RESULT B tally S0 nine I-9.22 不适用[R-old-entry] 277
+[b2-S0] RESULT B tally S0 nine I-9.23 不适用[R-no-tombstone-entry] 99
+[b2-S0] RESULT B tally S0 nine I-9.23 成立 178
+[b2-S0] RESULT B tally S0 nine I-9.24 成立 277
+[b2-S0] RESULT B tally S0 nine I-9.29 成立 277
+[b2-S0] RESULT B tally S0 act abandon done=38 refused=7
+[b2-S0] RESULT B tally S0 act create done=57 refused=0
+[b2-S0] RESULT B tally S0 act create-abandon done=37 refused=5
+[b2-S0] RESULT B tally S0 act drain done=1 refused=17
+[b2-S0] RESULT B tally S0 act intent done=38 refused=0
+[b2-S0] RESULT B tally S0 act intent-none done=0 refused=5
+[b2-S0] RESULT B tally S0 act remount done=57 refused=0
+[b2-S0] RESULT B tally S0 act rollback done=46 refused=22
+[b2-S0] RESULT B tally S0 act step done=2 refused=18
+[b2-S0] RESULT B tally S0 other-red ["I-3.1"] 52
+[b2-SX] RESULT B start SX flags=[] first_page=(2, false)
+[b2-SX] RESULT B history seed=231 flags=[] trace=intent2->i3t10 remount5->i8t25 rollback(i3,t9)->i8t26 rollback(i3,t9)->i8t27 rollback(i8,t26)->i8t28 remount->i9t31 create-abandon->i10t34 remount->i11t37 create2->i11t38 step:skip(队列空) rollback(i9,t31)->i11t39 abandon->i12t41 remount->i13t43 drain:skip(队列空) create1->i13t44 rollback(i13,t43)->i13t45 create1->i13t46 rollback(i12,t41)->i13t47 create2->i13t48 rollback(i11,t38)->i13t49 remount->i14t52 rollback(i13,t49)->i14t53 create-abandon->i15t56 rollback(i13,t47)->i15t57 step:skip(队列空)
+[b2-SX] RESULT B history seed=232 flags=[] trace=create-abandon->i4t13 create1->i4t14 drain:skip(队列空) rollback(i3,t10):skip(TargetNotACandidate { target: ) step:skip(队列空) rollback(i3,t9)->i4t15 remount->i5t17 step:skip(队列空) create1->i5t18 create2->i5t19 step:skip(队列空) rollback(i4,t13)->i5t20 remount->i6t22 rollback(i4,t13)->i6t23 step:skip(队列空) remount->i7t25 create-abandon->i8t28 create-abandon->i9t31 rollback(i5,t20)->i9t32 intent1->i9t33 rollback(i8,t29):skip(TargetNotACandidate { target: ) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) create-abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) rollback(i6,t22)->i9t34 create2->i9t35
+[b2-SX] RESULT B history seed=233 flags=[] trace=remount->i4t11 intent1->i4t12 create-abandon->i5t16 rollback(i4,t11)->i5t17 rollback(i5,t16)->i5t18 rollback(i4,t11)->i5t19 create1->i5t20 create2->i5t21 rollback(i5,t18)->i5t22 create-abandon->i6t25 step:skip(队列空) create2->i6t26 create-abandon->i7t29 drain:skip(队列空) step:skip(队列空) rollback(i5,t18)->i7t30 abandon->i8t32 create2->i8t33 rollback(i7,t30):skip(TargetNotACandidate { target: ) create1->i8t34 rollback(i5,t22)->i8t35 step:skip(队列空) rollback(i6,t25)->i8t36 rollback(i7,t30):skip(TargetNotACandidate { target: ) remount5->i13t49
+[b2-SX] RESULT B history seed=234 flags=[] trace=intent1->i3t10 create1->i3t12 step:skip(队列空) drain:skip(队列空) rollback(i3,t10)->i3t13 intent2->i3t15 step->i3t16 drain:skip(队列空) rollback(i3,t12)->i3t17 drain:skip(队列空) rollback(i3,t13)->i3t18 step->i3t19 rollback(i3,t12)->i3t20 step:skip(队列空) create2->i3t21 remount->i4t23 create1->i4t24 remount5->i9t37 abandon->i10t40 remount->i11t43 intent2->i11t44 remount->i12t47 abandon->i13t50 create-abandon->i14t53 intent4->i14t54
+[b2-SX] RESULT B history seed=235 flags=[] trace=create2->i3t10 drain:skip(队列空) remount->i4t13 abandon->i5t16 remount->i6t19 rollback(i5,t16)->i6t20 intent1->i6t21 rollback(i6,t19)->i6t22 rollback(i6,t21)->i6t23 remount->i7t26 remount->i8t28 step:skip(队列空) abandon->i9t31 rollback(i6,t23)->i9t32 rollback(i6,t21)->i9t33 abandon->i10t36 remount5->i15t49 rollback(i6,t22):skip(TargetNotACandidate { target: ) remount->i16t52 create1->i16t53 rollback(i9,t33):skip(TargetNotACandidate { target: ) step:skip(队列空) drain:skip(队列空) rollback(i10,t36)->i16t54 rollback(i16,t53)->i16t55
+[b2-SX] RESULT B history seed=236 flags=[] trace=abandon->i4t11 create2->i4t12 create-abandon->i5t16 create1->i5t17 rollback(i3,t9):skip(TargetNotACandidate { target: ) create2->i5t18 intent3->i5t19 create1->i5t21 abandon->i6t23 remount->i7t25 create1->i7t26 remount5->i12t40 create1->i12t41 rollback(i5,t19)->i12t42 remount->i13t45 step:skip(队列空) remount->i14t47 rollback(i5,t21):skip(TargetNotACandidate { target: ) create2->i14t48 rollback(i5,t19):skip(TargetNotACandidate { target: ) remount->i15t50 remount->i16t52 abandon->i17t55 rollback(i15,t50)->i17t56 create-abandon->i18t59
+[b2-SX] RESULT B history seed=237 flags=[] trace=rollback-none:skip(没有别的版) remount->i4t11 intent2->i4t12 remount->i5t15 abandon->i6t18 abandon->i7t21 create-abandon->i8t25 rollback(i3,t9)->i8t26 remount->i9t28 create1->i9t29 rollback(i5,t15):skip(TargetNotACandidate { target: ) rollback(i4,t11)->i9t30 intent2->i9t31 drain->i9t32 remount->i10t34 create-abandon->i11t37 create-abandon->i12t40 create1->i12t41 rollback(i9,t30)->i12t42 drain:skip(队列空) remount->i13t44 remount->i14t46 rollback(i13,t44)->i14t47 rollback(i9,t30)->i14t48 intent1->i14t49
+[b2-SX] RESULT B history seed=238 flags=[] trace=drain:skip(队列空) abandon->i4t11 abandon->i5t13 create1->i5t14 rollback(i3,t9):skip(TargetNotACandidate { target: ) remount->i6t16 drain:skip(队列空) step:skip(队列空) rollback(i3,t9):skip(TargetNotACandidate { target: ) abandon->i7t19 create-abandon->i8t22 create2->i8t23 remount->i9t25 remount->i10t28 rollback(i4,t11):skip(TargetNotACandidate { target: ) step:skip(队列空) rollback(i9,t25)->i10t29 abandon->i11t31 abandon->i12t34 abandon->i13t37 rollback(i10,t28)->i13t38 create-abandon->i14t41 rollback(i10,t29):skip(TargetNotACandidate { target: ) create-abandon->i15t44 remount5->i20t58
+[b2-SX] RESULT B history seed=239 flags=[] trace=step:skip(队列空) rollback-none:skip(没有别的版) intent2->i3t10 step->i3t11 intent1->i3t12 rollback(i3,t11)->i3t13 create-abandon->i4t16 remount->i5t19 rollback(i3,t13)->i5t20 rollback(i5,t19)->i5t21 create1->i5t22 drain:skip(队列空) step:skip(队列空) rollback(i3,t12)->i5t23 create-abandon->i6t28 rollback(i5,t20)->i6t29 create1->i6t30 remount5->i11t43 rollback(i3,t14):skip(TargetNotACandidate { target: ) remount->i12t46 remount->i13t49 create2->i13t50 intent7->i13t51 intent8->i13t53 create-abandon->i14t58
+[b2-SX] RESULT B history seed=240 flags=[] trace=remount->i4t11 rollback(i3,t9)->i4t12 abandon->i5t14 rollback(i4,t12):skip(TargetNotACandidate { target: ) rollback(i4,t11)->i5t15 create-abandon->i6t19 create2->i6t20 intent2->i6t21 remount->i7t24 remount->i8t26 abandon->i9t28 intent3->i9t29 step->i9t30 remount->i10t32 drain:skip(队列空) drain:skip(队列空) abandon->i11t34 create-abandon->i12t37 create1->i12t38 intent1->i12t39 intent4->i12t41 abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) remount5->i17t55 abandon->i18t58 step:skip(队列空)
+[b2-SX] RESULT B history seed=241 flags=[] trace=create2->i3t10 create-abandon->i4t13 abandon->i5t16 create1->i5t17 rollback(i3,t10)->i5t18 remount->i6t20 abandon->i7t22 rollback(i3,t11):skip(TargetNotACandidate { target: ) remount->i8t25 remount->i9t28 create2->i9t29 rollback(i6,t20):skip(TargetNotACandidate { target: ) rollback(i7,t22)->i9t30 rollback(i9,t28)->i9t31 abandon->i10t34 intent3->i10t35 abandon->i11t37 step:skip(队列空) rollback(i10,t35):skip(TargetNotACandidate { target: ) drain:skip(队列空) rollback(i9,t28)->i11t38 remount->i12t40 step:skip(队列空) step:skip(队列空) step:skip(队列空)
+[b2-SX] RESULT B history seed=242 flags=[] trace=create1->i3t10 remount->i4t13 abandon->i5t16 create-abandon->i6t19 step:skip(队列空) create1->i6t20 rollback(i4,t13):skip(TargetNotACandidate { target: ) create2->i6t21 abandon->i7t23 create2->i7t24 create-abandon->i8t28 remount5->i13t43 rollback(i7,t23)->i13t44 create-abandon->i14t47 rollback(i13,t43)->i14t48 rollback(i13,t44)->i14t49 rollback(i7,t23):skip(TargetNotACandidate { target: ) drain:skip(队列空) create1->i14t50 drain:skip(队列空) rollback(i14,t49)->i14t51 remount->i15t53 create1->i15t54 intent3->i15t55 rollback(i13,t45):skip(TargetNotACandidate { target: )
+[b2-SX] RESULT B history seed=243 flags=[] trace=remount5->i8t22 drain:skip(队列空) intent1->i8t23 abandon->i9t25 create-abandon->i10t28 remount->i11t31 create-abandon->i12t34 create-abandon->i13t37 create-abandon->i14t40 rollback(i10,t28)->i14t41 abandon->i15t43 remount5->i20t58 rollback(i10,t28):skip(TargetNotACandidate { target: ) create1->i20t59 rollback(i14,t40)->i20t60 create-abandon->i21t64 create1->i21t65 create1->i21t66 intent1->i21t67 create-abandon->i22t71 create2->i22t72 step:skip(队列空) rollback(i20,t61):skip(TargetNotACandidate { target: ) step:skip(队列空) rollback(i20,t58)->i22t73
+[b2-SX] RESULT B history seed=244 flags=[] trace=create2->i3t10 rollback(i3,t9)->i3t11 remount->i4t13 create2->i4t14 rollback(i3,t9)->i4t15 remount->i5t17 rollback(i3,t10)->i5t18 create2->i5t19 remount5->i10t34 create1->i10t35 create-abandon->i11t38 rollback(i3,t10):skip(TargetNotACandidate { target: ) create-abandon->i12t41 remount->i13t43 rollback(i10,t35)->i13t44 create2->i13t45 create-abandon->i14t49 rollback(i11,t39):skip(TargetNotACandidate { target: ) step:skip(队列空) create-abandon->i15t52 rollback(i14,t50):skip(TargetNotACandidate { target: ) create1->i15t53 intent13->i15t54 create2->i15t56 rollback(i13,t44)->i15t57
+[b2-SX] RESULT B tally SX checks=274 exposed=150 multi_page=0 max_rows_first_page=21
+[b2-SX] RESULT B tally SX I-9.29 成立 274
+[b2-SX] RESULT B tally SX nine I-9.17 不适用[R-no-lineage-entry] 75
+[b2-SX] RESULT B tally SX nine I-9.17 成立 199
+[b2-SX] RESULT B tally SX nine I-9.18 不适用[R-no-queue] 136
+[b2-SX] RESULT B tally SX nine I-9.18 成立 138
+[b2-SX] RESULT B tally SX nine I-9.19 不适用[R-no-tombstone-naming-record] 136
+[b2-SX] RESULT B tally SX nine I-9.19 成立 138
+[b2-SX] RESULT B tally SX nine I-9.20 不适用[R-no-tombstone] 116
+[b2-SX] RESULT B tally SX nine I-9.20 成立 158
+[b2-SX] RESULT B tally SX nine I-9.21 不适用[R-no-non-rightmost] 274
+[b2-SX] RESULT B tally SX nine I-9.22 不适用[R-old-entry] 274
+[b2-SX] RESULT B tally SX nine I-9.23 不适用[R-no-tombstone-entry] 116
+[b2-SX] RESULT B tally SX nine I-9.23 成立 158
+[b2-SX] RESULT B tally SX nine I-9.24 成立 274
+[b2-SX] RESULT B tally SX nine I-9.29 成立 274
+[b2-SX] RESULT B tally SX act abandon done=30 refused=1
+[b2-SX] RESULT B tally SX act create done=54 refused=0
+[b2-SX] RESULT B tally SX act create-abandon done=36 refused=2
+[b2-SX] RESULT B tally SX act drain done=1 refused=18
+[b2-SX] RESULT B tally SX act intent done=25 refused=0
+[b2-SX] RESULT B tally SX act remount done=59 refused=0
+[b2-SX] RESULT B tally SX act rollback done=64 refused=27
+[b2-SX] RESULT B tally SX act rollback-none done=0 refused=2
+[b2-SX] RESULT B tally SX act step done=4 refused=27
+[b2-SX] RESULT B tally SX other-red ["I-3.1"] 42
+[b2-SK] RESULT B start SK flags=[] first_page=(0, false)
+[b2-SK] RESULT B history seed=331 flags=[] trace=remount->i2t7 intent3->i2t8 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 825229312) rollback(i2,t7)->i2t9 abandon->i3t12 create2->i3t13 intent1->i3t14 create-abandon->i4t19 rollback(i2,t7)->i4t20 create1->i4t21 abandon->i5t23 step:skip(队列空) intent3->i5t24 remount->i6t27 abandon->i7t30 rollback(i5,t24)->i7t31 step->i7t32 create1->i7t33 abandon:skip(挂载写到了藏起来的盘 0 偏移 831520768) create-abandon->i8t37 rollback(i7,t31)->i8t38 step->i8t39 create-abandon->i9t43 intent1->i9t44 abandon->i10t46
+[b2-SK] RESULT B history seed=332 flags=[] trace=intent1->i1t5 remount5->i6t19 intent3->i6t20 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 829423616) remount->i7t23 drain:skip(队列空) intent2->i7t24 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 830472192) create2->i7t26 rollback(i7,t23)->i7t27 create2->i7t28 remount->i8t31 rollback(i7,t24)->i8t32 remount->i9t35 rollback(i1,t3):skip(TargetNotACandidate { target: ) rollback(i7,t23)->i9t36 create1->i9t37 rollback(i6,t19)->i9t38 drain:skip(队列空) rollback(i9,t36)->i9t39 create1->i9t40 drain:skip(队列空) rollback(i7,t23)->i9t41 create2->i9t42 remount->i10t44
+[b2-SK] RESULT B history seed=333 flags=[] trace=create2->i1t5 abandon->i2t7 create2->i2t8 create-abandon->i3t11 intent1->i3t12 rollback(i1,t5):skip(TargetNotACandidate { target: ) rollback(i1,t5):skip(TargetNotACandidate { target: ) abandon->i4t14 rollback(i2,t7)->i4t15 intent3->i4t16 step->i4t17 rollback(i4,t15)->i4t18 drain:skip(队列空) remount5->i9t31 remount5->i14t46 abandon->i15t49 rollback(i14,t46):skip(TargetNotACandidate { target: ) create2->i15t50 intent2->i15t51 rollback(i4,t15):skip(TargetNotACandidate { target: ) rollback(i14,t46):skip(TargetNotACandidate { target: ) intent3->i15t53 create-abandon->i16t58 abandon->i17t61 drain:skip(队列空)
+[b2-SK] RESULT B history seed=334 flags=[] trace=abandon->i2t7 remount->i3t10 rollback(i1,t4):skip(TargetNotACandidate { target: ) intent1->i3t11 step->i3t12 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 826277888) drain:skip(队列空) intent-none:skip(没有活的号) remount->i4t14 drain:skip(队列空) intent-none:skip(没有活的号) rollback(i3,t11)->i4t15 intent-none:skip(没有活的号) intent-none:skip(没有活的号) intent-none:skip(没有活的号) abandon->i5t17 create-abandon->i6t20 drain:skip(队列空) create1->i6t21 intent2->i6t22 drain->i6t23 create1->i6t24 create-abandon->i7t28 drain:skip(队列空) rollback(i4,t14)->i7t29
+[b2-SK] RESULT B history seed=335 flags=[] trace=rollback(i1,t3)->i1t5 abandon->i2t7 drain:skip(队列空) remount->i3t10 rollback(i1,t5):skip(TargetNotACandidate { target: ) intent3->i3t11 remount->i4t14 create-abandon->i5t17 create-abandon->i6t20 step:skip(队列空) remount5->i11t34 remount->i12t37 remount->i13t40 drain:skip(队列空) rollback(i11,t34)->i13t41 drain:skip(队列空) rollback(i3,t11):skip(TargetNotACandidate { target: ) remount5->i18t55 create1->i18t56 step:skip(队列空) abandon->i19t58 remount->i20t61 abandon->i21t64 intent1->i21t65 remount->i22t68
+[b2-SK] RESULT B history seed=336 flags=[] trace=intent1->i1t5 intent2->i1t7 rollback(i1,t5)->i1t8 create1->i1t10 step:skip(队列空) remount5->i6t25 create-abandon->i7t28 create1->i7t29 create-abandon->i8t32 rollback(i7,t30):skip(TargetNotACandidate { target: ) create1->i8t33 create-abandon->i9t37 create-abandon->i10t40 abandon->i11t43 create-abandon->i12t46 create1->i12t47 drain:skip(队列空) rollback(i12,t46)->i12t48 intent2->i12t49 create2->i12t51 rollback(i12,t49)->i12t52 remount->i13t56 drain:skip(队列空) intent5->i13t57 remount->i14t60
+[b2-SK] RESULT B history seed=337 flags=[] trace=step:skip(队列空) step:skip(队列空) rollback(i1,t3)->i1t5 create-abandon->i2t8 create-abandon->i3t11 rollback(i1,t3)->i3t12 abandon->i4t14 remount5->i9t28 intent1->i9t29 abandon->i10t31 rollback(i9,t29):skip(TargetNotACandidate { target: ) drain:skip(队列空) create-abandon->i11t34 abandon->i12t37 create-abandon->i13t40 create-abandon->i14t43 abandon->i15t46 create-abandon->i16t49 step:skip(队列空) intent1->i16t50 create1->i16t52 rollback(i11,t34):skip(TargetNotACandidate { target: ) rollback(i14,t43):skip(TargetNotACandidate { target: ) create2->i16t53 create1->i16t54
+[b2-SK] RESULT B history seed=338 flags=[] trace=create1->i1t5 create-abandon->i2t8 drain:skip(队列空) rollback(i1,t3)->i2t9 rollback(i1,t4)->i2t10 intent1->i2t11 create-abandon->i3t16 abandon->i4t19 rollback(i2,t11)->i4t20 create-abandon:skip(挂载写到了藏起来的盘 0 偏移 828375040) intent2->i4t22 rollback(i4,t20)->i4t23 intent3->i4t25 create2->i4t27 intent8->i4t28 intent7->i4t30 drain->i4t31 intent2->i4t32 remount5->i9t46 create-abandon->i10t49 create1->i10t50 step:skip(队列空) remount->i11t52 create2->i11t53 drain:skip(队列空)
+[b2-SK] RESULT B history seed=339 flags=[] trace=remount->i2t7 abandon->i3t10 rollback(i2,t7):skip(TargetNotACandidate { target: ) create-abandon->i4t13 remount5->i9t28 rollback(i1,t3):skip(TargetNotACandidate { target: ) create-abandon->i10t31 intent1->i10t32 rollback(i4,t13)->i10t33 intent3->i10t34 abandon:skip(挂载写到了藏起来的盘 0 偏移 824180736) intent2->i10t36 create1->i10t38 intent5->i10t39 create-abandon->i11t43 create2->i11t44 rollback(i10,t39)->i11t45 intent1->i11t47 rollback(i9,t29):skip(TargetNotACandidate { target: ) create-abandon->i12t52 step:skip(队列空) create1->i12t53 remount5->i17t67 create1->i17t68 create-abandon->i18t71
+[b2-SK] RESULT B history seed=340 flags=[] trace=intent1->i1t5 step->i1t6 abandon->i2t9 rollback(i1,t4)->i2t10 intent2->i2t11 create1->i2t13 rollback(i1,t6):skip(TargetNotACandidate { target: ) remount->i3t16 create1->i3t17 intent4->i3t18 create1->i3t20 create-abandon->i4t23 rollback(i2,t13)->i4t24 step:skip(队列空) remount5->i9t37 create2->i9t38 rollback(i1,t6):skip(TargetNotACandidate { target: ) create-abandon->i10t41 rollback(i3,t17):skip(TargetNotACandidate { target: ) remount->i11t43 step:skip(队列空) rollback(i3,t20)->i11t44 abandon->i12t46 remount->i13t49 drain:skip(队列空)
+[b2-SK] RESULT B history seed=341 flags=[] trace=create-abandon->i2t7 rollback(i1,t4)->i2t8 step:skip(队列空) rollback(i1,t5):skip(TargetNotACandidate { target: ) intent3->i2t9 intent1->i2t11 rollback(i1,t3)->i2t12 abandon->i3t15 create-abandon->i4t19 step:skip(队列空) create1->i4t20 remount->i5t22 abandon->i6t25 rollback(i4,t20)->i6t26 intent5->i6t27 step->i6t28 abandon:skip(挂载写到了藏起来的盘 0 偏移 830472192) create2->i6t29 intent7->i6t30 rollback(i5,t22):skip(TargetNotACandidate { target: ) step->i6t31 rollback(i6,t27)->i6t32 intent2->i6t34 abandon->i7t37 create-abandon->i8t40
+[b2-SK] RESULT B history seed=342 flags=[] trace=remount->i2t7 create-abandon->i3t10 intent1->i3t11 intent3->i3t13 create2->i3t15 create-abandon->i4t19 create-abandon->i5t22 intent2->i5t23 abandon->i6t25 create1->i6t26 remount->i7t28 intent5->i7t29 create-abandon->i8t34 abandon->i9t37 abandon->i10t40 abandon->i11t43 rollback(i9,t37):skip(TargetNotACandidate { target: ) abandon->i12t46 abandon->i13t49 drain:skip(队列空) drain:skip(队列空) create-abandon->i14t52 rollback(i12,t46):skip(TargetNotACandidate { target: ) rollback(i12,t46):skip(TargetNotACandidate { target: ) create-abandon->i15t55
+[b2-SK] RESULT B history seed=343 flags=[] trace=abandon->i2t7 create1->i2t8 rollback(i1,t4):skip(TargetNotACandidate { target: ) intent2->i2t9 create2->i2t11 abandon->i3t13 create-abandon->i4t16 abandon->i5t19 create-abandon->i6t22 intent1->i6t23 rollback(i3,t14):skip(TargetNotACandidate { target: ) remount5->i11t37 intent-none:skip(没有活的号) abandon->i12t40 intent-none:skip(没有活的号) create-abandon->i13t43 abandon->i14t46 create-abandon->i15t49 create-abandon->i16t52 intent-none:skip(没有活的号) abandon->i17t55 rollback(i12,t41):skip(TargetNotACandidate { target: ) remount5->i22t70 remount->i23t73 step:skip(队列空)
+[b2-SK] RESULT B history seed=344 flags=[] trace=drain:skip(队列空) rollback(i1,t3)->i1t5 remount->i2t7 create-abandon->i3t10 create-abandon->i4t13 create-abandon->i5t16 remount->i6t19 rollback(i2,t8):skip(TargetNotACandidate { target: ) step:skip(队列空) intent1->i6t20 rollback(i5,t16)->i6t21 remount->i7t23 remount->i8t25 remount->i9t28 rollback(i5,t16)->i9t29 rollback(i4,t14):skip(TargetNotACandidate { target: ) rollback(i6,t20)->i9t30 abandon->i10t32 remount->i11t34 rollback(i8,t25)->i11t35 create1->i11t36 remount->i12t38 create-abandon->i13t41 rollback(i12,t39):skip(TargetNotACandidate { target: ) intent5->i13t42
+[b2-SK] RESULT B tally SK checks=269 exposed=51 multi_page=0 max_rows_first_page=22
+[b2-SK] RESULT B tally SK I-9.29 成立 269
+[b2-SK] RESULT B tally SK nine I-9.17 不适用[R-no-lineage-entry] 92
+[b2-SK] RESULT B tally SK nine I-9.17 成立 177
+[b2-SK] RESULT B tally SK nine I-9.18 不适用[R-no-queue] 77
+[b2-SK] RESULT B tally SK nine I-9.18 成立 192
+[b2-SK] RESULT B tally SK nine I-9.19 不适用[R-no-tombstone-naming-record] 77
+[b2-SK] RESULT B tally SK nine I-9.19 成立 192
+[b2-SK] RESULT B tally SK nine I-9.20 不适用[R-no-tombstone] 47
+[b2-SK] RESULT B tally SK nine I-9.20 成立 222
+[b2-SK] RESULT B tally SK nine I-9.21 不适用[R-knob-product-not-judged] 269
+[b2-SK] RESULT B tally SK nine I-9.22 不适用[R-no-container-under-knob] 47
+[b2-SK] RESULT B tally SK nine I-9.22 成立 222
+[b2-SK] RESULT B tally SK nine I-9.23 不适用[R-no-tombstone-entry] 47
+[b2-SK] RESULT B tally SK nine I-9.23 成立 222
+[b2-SK] RESULT B tally SK nine I-9.24 成立 269
+[b2-SK] RESULT B tally SK nine I-9.29 成立 269
+[b2-SK] RESULT B tally SK act abandon done=38 refused=3
+[b2-SK] RESULT B tally SK act create done=41 refused=0
+[b2-SK] RESULT B tally SK act create-abandon done=48 refused=5
+[b2-SK] RESULT B tally SK act drain done=2 refused=21
+[b2-SK] RESULT B tally SK act intent done=48 refused=0
+[b2-SK] RESULT B tally SK act intent-none done=0 refused=8
+[b2-SK] RESULT B tally SK act remount done=45 refused=0
+[b2-SK] RESULT B tally SK act rollback done=39 refused=30
+[b2-SK] RESULT B tally SK act step done=7 refused=15
+[b2-SK] RESULT B tally SK other-red ["I-3.1"] 48
+[b2-SR] RESULT B start SR flags=[] first_page=(369, true)
+[b2-SR] RESULT B history seed=405 flags=[] trace=intent3->i371t1115 abandon->i372t1117 intent1->i372t1118 create-abandon->i373t1123 step:skip(队列空) remount->i374t1126 intent3->i374t1127 create1->i374t1129
+[b2-SR] RESULT B history seed=406 flags=[] trace=abandon->i372t1117 create-abandon->i373t1120 abandon->i374t1123 drain:skip(队列空) rollback(i372,t1118):skip(TargetNotACandidate { target: ) create-abandon->i375t1126 rollback(i374,t1124):skip(TargetNotACandidate { target: ) intent3->i375t1127
+[b2-SR] RESULT B history seed=407 flags=[] trace=rollback(i1,t4):skip(TargetNotACandidate { target: ) create2->i371t1115 create1->i371t1116 step:skip(队列空) create-abandon->i372t1120 intent4->i372t1121 create-abandon->i373t1126 rollback(i371,t1117):skip(TargetNotACandidate { target: )
+[b2-SR] RESULT B history seed=408 flags=[] trace=create1->i371t1115 rollback(i1,t4):skip(TargetNotACandidate { target: ) create1->i371t1116 intent3->i371t1117 remount5->i376t1132 remount5->i381t1147 rollback(i371,t1117):skip(TargetNotACandidate { target: ) step:skip(队列空)
+[b2-SR] RESULT B tally SR checks=23 exposed=1 multi_page=23 max_rows_first_page=369
+[b2-SR] RESULT B tally SR I-9.29 成立 23
+[b2-SR] RESULT B tally SR nine I-9.17 不适用[R-no-lineage-entry] 23
+[b2-SR] RESULT B tally SR nine I-9.18 不适用[R-no-queue] 12
+[b2-SR] RESULT B tally SR nine I-9.18 成立 11
+[b2-SR] RESULT B tally SR nine I-9.19 不适用[R-no-tombstone-naming-record] 12
+[b2-SR] RESULT B tally SR nine I-9.19 成立 11
+[b2-SR] RESULT B tally SR nine I-9.20 不适用[R-no-tombstone] 11
+[b2-SR] RESULT B tally SR nine I-9.20 成立 12
+[b2-SR] RESULT B tally SR nine I-9.21 不适用[R-no-non-rightmost] 23
+[b2-SR] RESULT B tally SR nine I-9.22 不适用[R-old-entry] 23
+[b2-SR] RESULT B tally SR nine I-9.23 不适用[R-no-tombstone-entry] 11
+[b2-SR] RESULT B tally SR nine I-9.23 成立 12
+[b2-SR] RESULT B tally SR nine I-9.24 成立 23
+[b2-SR] RESULT B tally SR nine I-9.29 成立 23
+[b2-SR] RESULT B tally SR act abandon done=3 refused=0
+[b2-SR] RESULT B tally SR act create done=5 refused=0
+[b2-SR] RESULT B tally SR act create-abandon done=5 refused=0
+[b2-SR] RESULT B tally SR act drain done=0 refused=1
+[b2-SR] RESULT B tally SR act intent done=6 refused=0
+[b2-SR] RESULT B tally SR act remount done=3 refused=0
+[b2-SR] RESULT B tally SR act rollback done=0 refused=6
+[b2-SR] RESULT B tally SR act step done=0 refused=3
+[b2-SR] RESULT B tally SR other-red ["I-3.1"] 8
+[c-T2b] RESULT C pool T2b kind=10 clean_violated=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=0/2 0->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=0/2 type=0 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=0/2 type=0 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=0/2 type=0 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=0 level=2 entry=1/2 0->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=1/2 type=0 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=1/2 type=0 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=0 level=2 entry=1/2 type=0 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=0/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=0/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b type depth=1 level=1 entry=1/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C shape ok T2b identity depth=1 level=1 entry=1/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2b] RESULT C tally T2b ok 84
+[c-T2k2] RESULT C pool T2k2 kind=10 clean_violated=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=0/2 0->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=0/2 type=0 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=0/2 type=0 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=0/2 type=0 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=0 level=2 entry=1/2 0->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=1/2 type=0 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=1/2 type=0 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=0 level=2 entry=1/2 type=0 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=1/2 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=1/2 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=1/2 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=1/2 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->3 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->4 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->6 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->8 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->9 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->10 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->11 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->12 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->255 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->256 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 type depth=1 level=1 entry=0/1 1->32768 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/1 type=1 birth-tree+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/1 type=1 container+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C shape ok T2k2 identity depth=1 level=1 entry=0/1 type=1 container-birth+1 target=I-9.23:不成立 extra=[] partial_nine=[]
+[c-T2k2] RESULT C tally T2k2 ok 70
+[c-L2b] RESULT C pool L2b kind=11 clean_violated=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=0/2 0->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=0/2 type=0 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=0/2 type=0 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=0/2 type=0 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=0 level=2 entry=1/2 0->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=1/2 type=0 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=1/2 type=0 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=0 level=2 entry=1/2 type=0 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=0/2 5->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=0/2 type=5 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->3 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->4 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->6 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->8 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->9 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->10 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->11 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->12 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->255 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->256 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b type depth=1 level=1 entry=1/2 5->32768 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 birth-tree+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 container+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C shape ok L2b identity depth=1 level=1 entry=1/2 type=5 container-birth+1 target=I-9.17:不成立 extra=[] partial_nine=[]
+[c-L2b] RESULT C tally L2b ok 84
+[c-I0b] RESULT C pool I0b kind=2 clean_violated=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->3 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->4 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->6 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->8 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->9 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->10 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->11 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->12 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->255 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->256 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=0/2 2->32768 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=0/2 type=2 birth-tree+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=0/2 type=2 container+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=0/2 type=2 container-birth+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->3 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->4 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->6 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->8 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->9 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->10 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->11 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->12 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->255 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->256 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b type depth=0 level=1 entry=1/2 2->32768 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=1/2 type=2 birth-tree+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=1/2 type=2 container+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C shape ok I0b identity depth=0 level=1 entry=1/2 type=2 container-birth+1 target=I-9.2:不成立 extra=[] partial_nine=[]
+[c-I0b] RESULT C tally I0b ok 28
+[fix-a] RESULT A pool-x abandoned=(i2,t6) records_on_C=[(1, 1, 3), (2, 1, 6)] records_on_current=[(1, 1, 3), (2, 1, 9)]
+[fix-a] RESULT A pool-x newest=(i3,t9) rows=(1,3)(2,5) ring=[(0, 0), (1, 1), (1, 2), (1, 3), (2, 4), (2, 5), (2, 6), (3, 7), (3, 8), (3, 9)]
+[fix-a] RESULT A A0 干净 I-9.29=成立 core读得出 violated=[]
+[fix-a] RESULT A A1 盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-4.8", "I-7.4"]
+[fix-a] RESULT A A1 盘1那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-4.8", "I-7.4"]
+[fix-a] RESULT A A2 两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A A3 载荷CRC翻一位只重封头 I-9.29=成立 core读不出 violated=["I-2.3"]
+[fix-a] RESULT A A4 链指针记录前插kind2 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A4 链指针记录前插kind3 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A4 链指针记录前插kind128 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A4 链指针记录前插kind255 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A4 第0条前插kind2 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A5 有无下一片写2 I-9.29=成立 core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A5 有无下一片写3 I-9.29=成立 core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A5 有无下一片写255 I-9.29=成立 core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A6 无下一片而指针不全零 I-9.29=成立 core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A7 去掉链指针记录 I-9.29=成立 core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A7 链指针记录之后多一行 I-9.29=部分没判[门] core读不出 violated=["I-3.8"]
+[fix-a] RESULT A A8 去掉实例2那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[fix-a] RESULT A A8 实例2那一行的txg改成被抛弃那一版的txg I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[fix-a] RESULT A A9 每一行重复一次 I-9.29=成立 core读得出 violated=["I-3.8"]
+[fix-a] RESULT A A10 行倒序 I-9.29=成立 core读得出 violated=[]
+[fix-a] RESULT A A11 每一行flags字节写1 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A12 头里格式版本改成2 I-9.29=部分没判[门] core读不出 violated=["I-2.4", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A A13 容器号写1 I-9.29=部分没判[门] core读不出 violated=["I-1.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A A13 出生树写1 I-9.29=部分没判[门] core读不出 violated=["I-1.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4", "I-1.12"]
+[fix-a] RESULT A A14 记录宽写89 I-9.29=部分没判[门] core读不出 violated=["I-1.7", "I-3.1"]
+[fix-a] RESULT A A14 声明长度多一条记录（尾巴补零） I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A A14 声明长度多一条记录、尾巴写一行实例2txg0 I-9.29=成立 core读不出 violated=[]
+[fix-a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[fix-a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片两份都坏 I-9.29=成立 core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A P0 行全在第0片、第1片只有链指针记录 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[fix-a] RESULT A P2 被抛弃实例那一行在第1片 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[fix-a] RESULT A P2 被抛弃实例那一行在第1片 第1片两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A P2 被抛弃实例那一行在第1片 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[fix-a] RESULT A P6 行全在第1片 第1片完好 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[fix-a] RESULT A P6 行全在第1片 第1片两份都坏 I-9.29=部分没判[门] core读不出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.2", "I-7.4"]
+[fix-a] RESULT A P6 行全在第1片 第1片盘0那份坏 I-9.29=成立 core读得出 violated=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4"]
+[fix-a] RESULT A P4 第1片指针的盘0位置条目指回第0片（盘1那条对） I-9.29=部分没判[门] core读得出 violated=["I-2.1", "I-3.1", "I-3.9", "I-3.11", "I-4.8", "I-5.1", "I-7.4"]
+[fix-a] RESULT A P5 257片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-3.11", "I-9.29"]
+[fix-a] RESULT A P5 256片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-3.11", "I-9.29"]
+[fix-a] RESULT A P5 257片、行全在第0片 I-9.29=成立 core读得出 violated=["I-3.1", "I-3.11"]
+[fix-a] RESULT A P5 1片、去掉被抛弃实例那一行 I-9.29=不成立 core读得出 violated=["I-3.1", "I-3.9", "I-9.29"]
+[fix-kbi] test a_malformed_chain_record_on_the_newest_instance_table_leaves_the_one_birth_invariant_partially_judged ... FAILED
+[fix-kbi] test result: FAILED. 123 passed; 1 failed;

@@ -1,0 +1,4 @@
+2448958a486fb1e5254cde675a4a7800137b41a0646198857fe2c7b5854bd22b  .claude/kb/experiments/175-产品路径上inode号水位退回与重发号.md
+6739e34a220703a5bbf4619ed72134b160731c6c47260899ad13c0f0996f704a  .claude/kb/decisions/18-块里携带什么信息.md
+4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md

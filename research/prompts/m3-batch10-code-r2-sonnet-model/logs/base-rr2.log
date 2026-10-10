@@ -1,0 +1,19 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 200 秒）：slice 已占 39.9 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算），总上限 40.1 GiB；账上在跑 4 条
+run-with-memory-cap: 排了 15 秒，起跑（singlefs-memory-cap-3789217-371914879）
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.97s
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root-1b6ee2b4c5dfd964)
+
+running 8 tests
+test on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s
+

@@ -1,0 +1,42 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -1781,6 +1781,17 @@
+     use RootRingSlotReadingTellingNeverWrittenApart::{
+         AllZeroNeverWritten, BadAndNotAllZero, SelfVerified,
+     };
++    let opus_arm = std::env::var("OPUS_R3_ARM").unwrap_or_default();
++    if opus_arm == "first_wins" {
++        if let (SelfVerified(root_of_the_first_pass), SelfVerified(_)) = (first_reading, reading_of_the_reread) {
++            return SelfVerified(root_of_the_first_pass);
++        }
++    }
++    if opus_arm == "zero_over_bad" {
++        if let (BadAndNotAllZero, AllZeroNeverWritten) | (AllZeroNeverWritten, BadAndNotAllZero) = (first_reading, reading_of_the_reread) {
++            return AllZeroNeverWritten;
++        }
++    }
+     match (first_reading, reading_of_the_reread) {
+         (SelfVerified(_), SelfVerified(root_of_the_reread)) => SelfVerified(root_of_the_reread),
+         (BadAndNotAllZero | AllZeroNeverWritten, SelfVerified(root_of_the_reread)) => {
+@@ -2044,10 +2055,17 @@
+             None => {
+                 before_the_one_reread.before_rereading();
+                 let readings_of_the_reread = read_every_root_ring_slot_once();
+-                let readings_of_the_two_passes_merged = merged_readings_of_the_two_root_ring_passes(
+-                    &first_readings,
+-                    readings_of_the_reread,
+-                );
++                let opus_arm = std::env::var("OPUS_R3_ARM").unwrap_or_default();
++                let readings_of_the_two_passes_merged = if opus_arm == "reread_only" {
++                    readings_of_the_reread
++                } else if opus_arm == "first_only" {
++                    first_readings.clone()
++                } else {
++                    merged_readings_of_the_two_root_ring_passes(
++                        &first_readings,
++                        readings_of_the_reread,
++                    )
++                };
+                 let Some(window_anchor) =
+                     newest_valid_root_txg_of_the_readings(&readings_of_the_two_passes_merged)
+                 else {

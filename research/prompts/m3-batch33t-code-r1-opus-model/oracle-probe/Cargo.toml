@@ -1,0 +1,15 @@
+[package]
+name = "opus-b33t-oracle-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "m3-batch33t-code-r1 攻方原型：拿层 0 的 oracle 与记录核对器（库函数）判 F2 退回那几形；只在攻方的仓副本旁边编，不入库"
+
+[workspace]
+
+[dependencies]
+singlefs-checker = { path = "../repo/crates/singlefs-checker" }
+singlefs-checker-tier = { path = "../repo/crates/singlefs-checker-tier" }
+singlefs-core = { path = "../repo/crates/singlefs-core" }
+singlefs-format = { path = "../repo/crates/singlefs-format" }
+singlefs-harness = { path = "../repo/crates/singlefs-harness" }

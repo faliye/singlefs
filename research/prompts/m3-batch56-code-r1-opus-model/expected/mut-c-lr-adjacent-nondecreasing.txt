@@ -1,0 +1,10 @@
+command args=-p singlefs-harness --test checker_known_bad_images rc=101
+failures:
+failures:
+    lineage_containers_numbered_one_and_one_redden_only_the_knob_capacity_invariant
+    lineage_containers_numbered_one_and_three_redden_only_the_knob_capacity_invariant
+    retirement_containers_numbered_one_and_one_redden_only_the_knob_capacity_invariant
+    retirement_containers_numbered_one_and_three_redden_only_the_knob_capacity_invariant
+test result: FAILED. 243 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full rc=0
+test result: ok. 6 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; 

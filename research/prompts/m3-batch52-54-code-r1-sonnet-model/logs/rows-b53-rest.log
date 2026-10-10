@@ -1,0 +1,17 @@
+subprocess.TimeoutExpired: Command '['nice', '-n', '19', 'bash', '/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh', '10G', 'bash', '/home/fy5090/code/singlefs/research/scripts/capped.sh', '12', 'cargo', 'test', '--offline', '--no-fail-fast', '-p', 'singlefs-core', '--lib', '--', 'inode_tree::tests::removing_from_the_middle_of_three_half_full_containers_absorbs_the_right_neighbour_first']' timed out after 200 seconds
+subprocess.TimeoutExpired: Command '['nice', '-n', '19', 'bash', '/home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh', '10G', 'bash', '/home/fy5090/code/singlefs/research/scripts/capped.sh', '12', 'cargo', 'test', '--offline', '--no-fail-fast', '-p', 'singlefs-harness', '--test', 'inode_leaf_merge_and_borrow_against_an_independent_reference', '--', 'every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference']' timed out after 200 seconds
+实三（D23 已定项 14「水位」）：回退那次的 inode 号水位只取环里读得出的根，不与内存里现行那一版的取 max
+  expected: the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_
+  rc 101
+   test the_rollback_takes_the_inode_number_watermark_from_the_current_version_in_memory_when_the_watermark_read_misses_its_root ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 23 filtered out; finished in 0.11s
+   error: test failed, to rerun pass `-p singlefs-harness --test unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over`
+   error: 1 target failed:
+第49批 W3 Y1 Opt2：管理员回退取 inode 号水位时环里读得出的根全都算（被崩溃恢复抛弃的也算，回退跳到被抛弃那一版的水位）
+  expected: a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_of
+  rc 101
+   test a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 24 filtered out; finished in 6.62s
+   error: test failed, to rerun pass `-p singlefs-harness --test rollback_by_a_forward_publish`
+   error: 1 target failed:
+# 第53批 F1 两行：第 1 行（核心单测）rowrun 红了点名那一条（输出见报告 K6）；第 2 行（随机历史）两次 rowrun 都在内存包装排队 / 编译里超时，没跑完；同一个替换由 tools/mut.py 的 m1_left_first 在 T2 上红

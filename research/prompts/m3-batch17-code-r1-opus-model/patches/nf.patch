@@ -1,0 +1,14 @@
+--- crates/singlefs-core/src/mount.rs
++++ crates/singlefs-core/src/mount.rs
+@@ -2492,8 +2492,9 @@
+             roots_read_from_the_ring
+                 .iter()
+                 .filter(|root| {
+-                    !abandoned_by_table(root, table)
+-                        && device_of_txg(root.checkpoint_txg) == *device
++                    // NF 臂（攻方副本）：不滤被抛弃的根。
++                    let _ = table;
++                    device_of_txg(root.checkpoint_txg) == *device
+                 })
+                 .map(|root| root.checkpoint_txg)
+                 .max()

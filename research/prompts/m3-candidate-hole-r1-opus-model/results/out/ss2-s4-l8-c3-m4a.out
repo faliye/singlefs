@@ -1,0 +1,211 @@
+CRASHED txg=9 writes=223 cut_before_root_fua=220
+INSTANCE_2 instance=2 row_txg=10 bad_writer=Some("m4a")
+JUDGE k=0 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=0 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[0,11] non_present=["9:AppliedByRecords"]
+  NOTE k=0 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=0 theta_low=0
+  NOTE k=0 skip=rows i31="e1w" I31 device=0 allocated=Some(11288576) walked=11288576 deferred_high=0 proto=Interval { upper: 11288576 }
+  NOTE k=0 skip=rows i31="e1w" I31 device=1 allocated=Some(11288576) walked=11288576 deferred_high=0 proto=Interval { upper: 11288576 }
+JUDGE k=0 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=0 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1ws" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="rc" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="rcw" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=rows i31="e1w" reds=[] I-3.1=Holds I-3.5=Holds
+  NOTE k=1 newest=12 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[1,12] non_present=["9:AppliedByRecords"]
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=1 theta_low=1
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31 device=0 allocated=Some(13074432) walked=13074432 deferred_high=0 proto=Interval { upper: 13074432 }
+  NOTE k=1 newest=12 skip=rows i31="e1w" I31 device=1 allocated=Some(13074432) walked=13074432 deferred_high=0 proto=Interval { upper: 13074432 }
+JUDGE k=1 newest=12 skip=rows i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=union i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=naive i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=counter i31="na" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=1 newest=12 skip=counter i31="e1wu" reds=[] I-3.1=Holds I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(14843904) 不在 [14860288, 14860288] 里；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(14843904) 不在按记录算的 [14860288, 14860288] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(14843904) 不在按记录算的 [14860288, 14860288] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(14843904) 不在 [14860288, 14860288] 里；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=2 newest=13 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(14843904) 不在 [14860288, 14860288] 里；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+  NOTE k=2 newest=13 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[2,13] non_present=["9:AppliedByRecords"]
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=2 theta_low=2
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31 device=0 allocated=Some(14843904) walked=14860288 deferred_high=0 proto=Interval { upper: 14860288 }
+  NOTE k=2 newest=13 skip=rows i31="e1w" I31 device=1 allocated=Some(14843904) walked=14860288 deferred_high=0 proto=Interval { upper: 14860288 }
+JUDGE k=2 newest=13 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=2 newest=13 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(14843904)，遍历全部有效根得到 14860288（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 13、环里自证过的根槽 11 个、最老的自证过的根 txg 2、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16465920) 不在 [16662528, 16662528] 里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16465920) 不在按记录算的 [16662528, 16662528] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16465920) 不在按记录算的 [16662528, 16662528] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16465920) 不在 [16662528, 16662528] 里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=3 newest=14 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16465920) 不在 [16662528, 16662528] 里；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+  NOTE k=3 newest=14 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[3,14] non_present=["9:AppliedByRecords"]
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=3 theta_low=3
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31 device=0 allocated=Some(16465920) walked=16662528 deferred_high=0 proto=Interval { upper: 16662528 }
+  NOTE k=3 newest=14 skip=rows i31="e1w" I31 device=1 allocated=Some(16465920) walked=16662528 deferred_high=0 proto=Interval { upper: 16662528 }
+JUDGE k=3 newest=14 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=3 newest=14 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16465920)，遍历全部有效根得到 16662528（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 14、环里自证过的根槽 11 个、最老的自证过的根 txg 3、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16498688) 不在 [18284544, 18284544] 里；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16498688) 不在按记录算的 [18284544, 18284544] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16498688) 不在按记录算的 [18284544, 18284544] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16498688) 不在 [18284544, 18284544] 里；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=4 newest=15 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16498688) 不在 [18284544, 18284544] 里；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+  NOTE k=4 newest=15 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[4,15] non_present=["9:AppliedByRecords"]
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=4 theta_low=4
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31 device=0 allocated=Some(16498688) walked=18284544 deferred_high=0 proto=Interval { upper: 18284544 }
+  NOTE k=4 newest=15 skip=rows i31="e1w" I31 device=1 allocated=Some(16498688) walked=18284544 deferred_high=0 proto=Interval { upper: 18284544 }
+JUDGE k=4 newest=15 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=4 newest=15 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16498688)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 15、环里自证过的根槽 11 个、最老的自证过的根 txg 4、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16531456) 不在 [18317312, 18317312] 里；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16531456) 不在按记录算的 [18317312, 18317312] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16531456) 不在按记录算的 [18317312, 18317312] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16531456) 不在 [18317312, 18317312] 里；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+JUDGE k=5 newest=16 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16531456) 不在 [18317312, 18317312] 里；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 1) I-3.5=Holds
+  NOTE k=5 newest=16 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[5,16] non_present=["9:AppliedByRecords"]
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[9] theta_high=5 theta_low=5
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31 device=0 allocated=Some(16531456) walked=18317312 deferred_high=0 proto=Interval { upper: 18317312 }
+  NOTE k=5 newest=16 skip=rows i31="e1w" I31 device=1 allocated=Some(16531456) walked=18317312 deferred_high=0 proto=Interval { upper: 18317312 }
+JUDGE k=5 newest=16 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=5 newest=16 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16531456)，遍历全部有效根得到 18317312（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 16、环里自证过的根槽 11 个、最老的自证过的根 txg 5、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16564224)，遍历全部有效根得到 18219008（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16564224) 不在 [18219008, 18350080] 里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16564224) 不在按记录算的 [18350080, 18350080] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16564224) 不在按记录算的 [18350080, 18350080] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16564224) 不在 [18219008, 18219008] 里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=6 newest=17 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16564224) 不在 [18219008, 18350080] 里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+  NOTE k=6 newest=17 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[6,17] non_present=["9:ExistedUnreachable"]
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=6 theta_low=6
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31 device=0 allocated=Some(16564224) walked=18219008 deferred_high=0 proto=Interval { upper: 18350080 }
+  NOTE k=6 newest=17 skip=rows i31="e1w" I31 device=1 allocated=Some(16564224) walked=18219008 deferred_high=0 proto=Interval { upper: 18350080 }
+JUDGE k=6 newest=17 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16564224) 不在 [18219008, 18350080] 里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=6 newest=17 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=6 newest=17 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=6 newest=17 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=6 newest=17 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16564224) 不在 [18219008, 18350080] 里；机理：根环槽数 12、最新根 txg 17、环里自证过的根槽 11 个、最老的自证过的根 txg 6、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16596992)，遍历全部有效根得到 18251776（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18251776, 18382848] 里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16596992) 不在按记录算的 [18382848, 18382848] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16596992) 不在按记录算的 [18382848, 18382848] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18251776, 18251776] 里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=7 newest=18 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18251776, 18382848] 里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+  NOTE k=7 newest=18 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[7,18] non_present=["9:ExistedUnreachable"]
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=7 theta_low=7
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31 device=0 allocated=Some(16596992) walked=18251776 deferred_high=0 proto=Interval { upper: 18382848 }
+  NOTE k=7 newest=18 skip=rows i31="e1w" I31 device=1 allocated=Some(16596992) walked=18251776 deferred_high=0 proto=Interval { upper: 18382848 }
+JUDGE k=7 newest=18 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18251776, 18382848] 里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=7 newest=18 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=7 newest=18 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=7 newest=18 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=7 newest=18 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18251776, 18382848] 里；机理：根环槽数 12、最新根 txg 18、环里自证过的根槽 11 个、最老的自证过的根 txg 7、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(16596992)，遍历全部有效根得到 18284544（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18284544, 18415616] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16596992) 不在按记录算的 [18415616, 18415616] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(16596992) 不在按记录算的 [18415616, 18415616] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18284544, 18284544] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=8 newest=19 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18284544, 18415616] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+  NOTE k=8 newest=19 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[8,19] non_present=["9:ExistedUnreachable"]
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=8 theta_low=8
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31 device=0 allocated=Some(16596992) walked=18284544 deferred_high=0 proto=Interval { upper: 18415616 }
+  NOTE k=8 newest=19 skip=rows i31="e1w" I31 device=1 allocated=Some(16596992) walked=18284544 deferred_high=0 proto=Interval { upper: 18415616 }
+JUDGE k=8 newest=19 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18284544, 18415616] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=8 newest=19 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=8 newest=19 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(16596992) 不在 [18284544, 18415616] 里；机理：根环槽数 12、最新根 txg 19、环里自证过的根槽 11 个、最老的自证过的根 txg 8、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 0) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(18153472)，遍历全部有效根得到 18251776（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(18153472) 不在 [18251776, 18415616] 里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 ) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(18153472) 不在按记录算的 [18251776, 18415616] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(18153472) 不在按记录算的 [18251776, 18415616] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(18153472) 不在 [18251776, 18251776] 里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 ) I-3.5=Holds
+JUDGE k=9 newest=20 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(18153472) 不在 [18251776, 18415616] 里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 ) I-3.5=Holds
+  NOTE k=9 newest=20 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[9,20] non_present=["9:ExistedUnreachable"]
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[9] trigger=[9] theta_high=10 theta_low=9
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31 device=0 allocated=Some(18153472) walked=18251776 deferred_high=0 proto=Interval { upper: 18415616 }
+  NOTE k=9 newest=20 skip=rows i31="e1w" I31 device=1 allocated=Some(18153472) walked=18251776 deferred_high=0 proto=Interval { upper: 18415616 }
+JUDGE k=9 newest=20 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(18153472) 不在 [18251776, 18415616] 里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 ) I-3.5=Holds
+JUDGE k=9 newest=20 skip=union i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=naive i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=counter i31="na" reds=[] I-3.1=NA(原型 HOLE_I31=na：洞表里有存在过却走不到的那一代) I-3.5=Holds
+JUDGE k=9 newest=20 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：（原型区间形）记账的已分配 Some(18153472) 不在 [18251776, 18415616] 里；机理：根环槽数 12、最新根 txg 20、环里自证过的根槽 11 个、最老的自证过的根 txg 10、遍历的候选根槽 11 个、并进遍历的由记录施加出来的版本 ) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(19972096) 不在按记录算的 [20070400, 20070400] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(19972096) 不在按记录算的 [20070400, 20070400] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+  NOTE k=10 newest=21 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[10,21] non_present=[]
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=10 theta_low=10
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31 device=0 allocated=Some(19972096) walked=20070400 deferred_high=0 proto=Exact
+  NOTE k=10 newest=21 skip=rows i31="e1w" I31 device=1 allocated=Some(19972096) walked=20070400 deferred_high=0 proto=Exact
+JUDGE k=10 newest=21 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=10 newest=21 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(19972096)，遍历全部有效根得到 20070400（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 21、环里自证过的根槽 12 个、最老的自证过的根 txg 10、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(20037632) 不在按记录算的 [21823488, 21823488] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(20037632) 不在按记录算的 [21823488, 21823488] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+  NOTE k=11 newest=22 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[11,22] non_present=[]
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=11 theta_low=11
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31 device=0 allocated=Some(20037632) walked=21823488 deferred_high=0 proto=Exact
+  NOTE k=11 newest=22 skip=rows i31="e1w" I31 device=1 allocated=Some(20037632) walked=21823488 deferred_high=0 proto=Exact
+JUDGE k=11 newest=22 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=11 newest=22 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20037632)，遍历全部有效根得到 21823488（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 22、环里自证过的根槽 12 个、最老的自证过的根 txg 11、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1ws" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="rc" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(20070400) 不在按记录算的 [21856256, 21856256] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="rcw" reds=["I-3.1"] I-3.1=RED(盘 0：（原型 rc 记录形）记账的已分配 Some(20070400) 不在按记录算的 [21856256, 21856256] 里，或遍历走到的槽里有 0 个不在记账该算的记录里；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=rows i31="e1w" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+  NOTE k=12 newest=23 skip=rows i31="e1w" HOLE_TABLE evidence="rows" window=[12,23] non_present=[]
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31_PROTO mode="e1w" unreachable=[] trigger=[] theta_high=12 theta_low=12
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31 device=0 allocated=Some(20070400) walked=21856256 deferred_high=0 proto=Exact
+  NOTE k=12 newest=23 skip=rows i31="e1w" I31 device=1 allocated=Some(20070400) walked=21856256 deferred_high=0 proto=Exact
+JUDGE k=12 newest=23 skip=rows i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=union i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=naive i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=counter i31="na" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+JUDGE k=12 newest=23 skip=counter i31="e1wu" reds=["I-3.1"] I-3.1=RED(盘 0：记账的已分配 Some(20070400)，遍历全部有效根得到 21856256（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 12、最新根 txg 23、环里自证过的根槽 12 个、最老的自证过的根 txg 12、遍历的候选根槽 12 个、并进遍) I-3.5=Holds
+rc=0

@@ -1,0 +1,7 @@
+K4FR admission_refused_at_overwrite=63
+K4FR raise_publishes=2 writes=36 segments=9 record_writes=4
+K4FRARM arm=c mount_err=0 mount_ok_with_red_checker=0 states_differing_from_none=0
+K4FRARM arm=none mount_err=0 mount_ok_with_red_checker=0 states_differing_from_none=0
+K4FRARM arm=w1 mount_err=0 mount_ok_with_red_checker=0 states_differing_from_none=0
+K4FRARM arm=w2 mount_err=0 mount_ok_with_red_checker=0 states_differing_from_none=0
+K4FRTOTAL states=37 hook_mounts_with_unapplied_records_under_none=0 hook_placements=0

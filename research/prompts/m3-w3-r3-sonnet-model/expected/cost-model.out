@@ -1,0 +1,75 @@
+COST constants leaf_entries=477 internal_entries=150 container_root_fanout=135 lineage_container_records_16B=2039 lineage_container_records_24B=1359
+COST edge-model-vs-replica leaf_cap=40 internal_cap=4 publishes=6000 heights_compared=5999 different=0
+COST edge-model-vs-replica leaf_cap=60 internal_cap=3 publishes=6000 heights_compared=5999 different=0
+COST edge-model-vs-replica leaf_cap=40 internal_cap=2 publishes=6000 heights_compared=5999 different=0
+COST edge-model-vs-replica leaf_cap=477 internal_cap=150 publishes=40000 heights_compared=39999 different=0
+COST accounting-height-thresholds history_rows_when_height_2=463 history_rows_when_height_3=36074 history_rows_when_height_4=2742510 history_rows_when_height_5=208431646 note=history_rows = 第一次到这一高度时已经留下的台阶行数（不含当代那一行）；叶从中间切，只往右追加时每片叶只装一半
+COST accounting-rewritten-per-publish-replica height=1 publishes=463 rewritten_distribution={1: 463}
+COST accounting-rewritten-per-publish-replica height=2 publishes=35611 rewritten_distribution={3: 35463, 4: 148}
+COST accounting-rewritten-per-publish-replica height=3 publishes=3926 rewritten_distribution={5: 3909, 6: 17}
+COST accounting-steady-rewritten h1=1 h2=3 h3=5 h4=7 h5=9
+COST accounting-cost-by-history-rows history_rows=0 height=1 rewritten_nodes_per_publish=1 extra_units=0 extra_writes=0 bytes_written_per_publish=32768 bytes_extra=0
+COST accounting-cost-by-history-rows history_rows=100 height=1 rewritten_nodes_per_publish=1 extra_units=0 extra_writes=0 bytes_written_per_publish=32768 bytes_extra=0
+COST accounting-cost-by-history-rows history_rows=462 height=1 rewritten_nodes_per_publish=1 extra_units=0 extra_writes=0 bytes_written_per_publish=32768 bytes_extra=0
+COST accounting-cost-by-history-rows history_rows=463 height=2 rewritten_nodes_per_publish=3 extra_units=2 extra_writes=4 bytes_written_per_publish=98304 bytes_extra=65536
+COST accounting-cost-by-history-rows history_rows=1000 height=2 rewritten_nodes_per_publish=3 extra_units=2 extra_writes=4 bytes_written_per_publish=98304 bytes_extra=65536
+COST accounting-cost-by-history-rows history_rows=5000 height=2 rewritten_nodes_per_publish=3 extra_units=2 extra_writes=4 bytes_written_per_publish=98304 bytes_extra=65536
+COST accounting-cost-by-history-rows history_rows=20000 height=2 rewritten_nodes_per_publish=3 extra_units=2 extra_writes=4 bytes_written_per_publish=98304 bytes_extra=65536
+COST accounting-cost-by-history-rows history_rows=35850 height=2 rewritten_nodes_per_publish=3 extra_units=2 extra_writes=4 bytes_written_per_publish=98304 bytes_extra=65536
+COST accounting-cost-by-history-rows history_rows=100000 height=3 rewritten_nodes_per_publish=5 extra_units=4 extra_writes=8 bytes_written_per_publish=163840 bytes_extra=131072
+COST accounting-cost-by-history-rows history_rows=1000000 height=3 rewritten_nodes_per_publish=5 extra_units=4 extra_writes=8 bytes_written_per_publish=163840 bytes_extra=131072
+COST accounting-cost-by-history-rows history_rows=10000000 height=4 rewritten_nodes_per_publish=7 extra_units=6 extra_writes=12 bytes_written_per_publish=229376 bytes_extra=196608
+COST accounting-storage-per-step-row entry_bytes=34 leaf_rows_when_appending=239 bytes_per_row_one_copy=68.6 bytes_per_row_two_copies=137.1
+COST accounting-keep-I-3.13-route history_rows=100 tree_nodes_before=1 height_before=1 rewritten_nodes_in_next_publish=1
+COST accounting-keep-I-3.13-route history_rows=462 tree_nodes_before=1 height_before=1 rewritten_nodes_in_next_publish=1
+COST accounting-keep-I-3.13-route history_rows=5000 tree_nodes_before=21 height_before=2 rewritten_nodes_in_next_publish=21
+COST container-shape-vs-real-probe lines=929 different=0
+COST container-tree-closed-form-vs-shape-simulation fanouts=2,3,5 containers_up_to=199 result=层数闭式 ⌈log_fanout 容器数⌉ 与逐个新开容器的形状模拟相等
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=1000 containers=1 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=2039 containers=1 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=100000 containers=50 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=275265 containers=135 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=275266 containers=136 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=1000000 containers=491 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=37000000 containers=18147 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-record-16B(C3rL 每个新 inode 一条) records=1000000000 containers=490437 code2_levels=3 rewritten_units_per_append=4 bytes_written_per_append=163840
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=1000 containers=1 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=2039 containers=2 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=100000 containers=74 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=275265 containers=203 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=275266 containers=203 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=1000000 containers=736 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=37000000 containers=27226 code2_levels=3 rewritten_units_per_append=4 bytes_written_per_append=163840
+COST container-tree-cost record=issuance-range-record-24B(C3rL 每次建 inode 的发布一条) records=1000000000 containers=735836 code2_levels=3 rewritten_units_per_append=4 bytes_written_per_append=163840
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=1000 containers=1 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=2039 containers=2 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=100000 containers=74 code2_levels=1 rewritten_units_per_append=2 bytes_written_per_append=98304
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=275265 containers=203 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=275266 containers=203 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=1000000 containers=736 code2_levels=2 rewritten_units_per_append=3 bytes_written_per_append=131072
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=37000000 containers=27226 code2_levels=3 rewritten_units_per_append=4 bytes_written_per_append=163840
+COST container-tree-cost record=lineage-record-24B(三个形态的谱系记录) records=1000000000 containers=735836 code2_levels=3 rewritten_units_per_append=4 bytes_written_per_append=163840
+COST container-tree-thresholds containers_for_height_1=135 records_for_height_1_16B=275265 records_for_height_2_16B=37160775 records_for_height_1_24B=183465 records_for_height_2_24B=24767775
+COST container-tree-storage-per-record bytes_one_copy_16B=16.07 bytes_two_copies_16B=32.14 bytes_two_copies_24B=48.22
+COST per-create-publish-extra creates_so_far=100 C2aL_extra_units=0 C2aL_accounting_height=1 C2aL_extra_writes=0 C3rL_extra_units=2 C3rL_code2_levels=1 C3rL_extra_writes=4 C4g_extra_units=0 C4g_extra_writes=0
+COST per-create-publish-extra creates_so_far=462 C2aL_extra_units=0 C2aL_accounting_height=1 C2aL_extra_writes=0 C3rL_extra_units=2 C3rL_code2_levels=1 C3rL_extra_writes=4 C4g_extra_units=0 C4g_extra_writes=0
+COST per-create-publish-extra creates_so_far=1000 C2aL_extra_units=2 C2aL_accounting_height=2 C2aL_extra_writes=4 C3rL_extra_units=2 C3rL_code2_levels=1 C3rL_extra_writes=4 C4g_extra_units=0 C4g_extra_writes=0
+COST per-create-publish-extra creates_so_far=10000 C2aL_extra_units=2 C2aL_accounting_height=2 C2aL_extra_writes=4 C3rL_extra_units=2 C3rL_code2_levels=1 C3rL_extra_writes=4 C4g_extra_units=0 C4g_extra_writes=0
+COST per-create-publish-extra creates_so_far=100000 C2aL_extra_units=4 C2aL_accounting_height=3 C2aL_extra_writes=8 C3rL_extra_units=2 C3rL_code2_levels=1 C3rL_extra_writes=4 C4g_extra_units=0 C4g_extra_writes=0
+COST per-create-publish-extra creates_so_far=1000000 C2aL_extra_units=4 C2aL_accounting_height=3 C2aL_extra_writes=8 C3rL_extra_units=3 C3rL_code2_levels=2 C3rL_extra_writes=6 C4g_extra_units=0 C4g_extra_writes=0
+COST per-rollback-publish-extra C4g=0 单元（谱系容器本来每次回退都重写）；记录 16→24 字节，容器装 2039→1359 条 C2aL=0 单元；记录 +8 字节；跳升那次多一条台阶行（记账树照上表） C3rL=0 单元；记录 +8 字节
+COST crash-states base_segments=24+2+1+2 base_closed_form=16777223
+COST crash-states-with-extra-units extra_units=0 extra_writes=0 segments=24+2+1+2 closed_form=16777223 ratio_to_base=1.0
+COST crash-states-with-extra-units extra_units=1 extra_writes=2 segments=26+2+1+2 closed_form=67108871 ratio_to_base=4.0
+COST crash-states-with-extra-units extra_units=2 extra_writes=4 segments=28+2+1+2 closed_form=268435463 ratio_to_base=16.0
+COST crash-states-with-extra-units extra_units=3 extra_writes=6 segments=30+2+1+2 closed_form=1073741831 ratio_to_base=64.0
+COST crash-states-with-extra-units extra_units=4 extra_writes=8 segments=32+2+1+2 closed_form=4294967303 ratio_to_base=256.0
+COST crash-states-with-extra-units extra_units=6 extra_writes=12 segments=36+2+1+2 closed_form=68719476743 ratio_to_base=4096.0
+COST growth-after-n-create-events n=10000 C2aL_step_rows_if_one_publish_per_create=10000 C2aL_leaf_units=42 C2aL_bytes_two_copies=1376256 C3rL_records=10000 C3rL_containers=5 C3rL_bytes_two_copies=327680 C4g_bytes=0 note=C2aL 按每次建 inode 都是一次独立发布（最坏）；一次发布建多个 inode 时 C2aL 少、C3rL 仍每个 inode 一条
+COST growth-after-n-create-events n=1000000 C2aL_step_rows_if_one_publish_per_create=1000000 C2aL_leaf_units=4185 C2aL_bytes_two_copies=137134080 C3rL_records=1000000 C3rL_containers=491 C3rL_bytes_two_copies=32178176 C4g_bytes=0 note=C2aL 按每次建 inode 都是一次独立发布（最坏）；一次发布建多个 inode 时 C2aL 少、C3rL 仍每个 inode 一条
+COST growth-after-n-create-events n=100000000 C2aL_step_rows_if_one_publish_per_create=100000000 C2aL_leaf_units=418411 C2aL_bytes_two_copies=13710491648 C3rL_records=100000000 C3rL_containers=49044 C3rL_bytes_two_copies=3214147584 C4g_bytes=0 note=C2aL 按每次建 inode 都是一次独立发布（最坏）；一次发布建多个 inode 时 C2aL 少、C3rL 仍每个 inode 一条
+COST growth-after-n-rollbacks n=1000 lineage_records=1000 containers_24B=1 bytes_two_copies_24B=65536 bytes_two_copies_16B_today=65536
+COST growth-after-n-rollbacks n=100000 lineage_records=100000 containers_24B=74 bytes_two_copies_24B=4849664 bytes_two_copies_16B_today=3276800
+COST checker-read-per-image C2aL=全部台阶行（34 字节 × 行数，一份副本） C3rL=全部发号记录（16 字节 × 创建过的 inode 数，一份副本）；还要拿最新树里每条记录去查 (号, 出生代) 在不在 C4g=全部谱系记录（24 字节 × 回退次数）
+COST step-rows-cannot-be-merged example=两行 (10,5),(20,9)；合法对象 (号 6, 出生代 15)；并成 (10,9) 后 ② 判红 rows_kept_per_watermark_change=1 rows_covered_by_an_earlier_row=0 reason=水位沿时间线严格上升，没有一行被更早的行盖住
+COST end

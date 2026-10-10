@@ -1,0 +1,12 @@
+不同 ('small-every-publish', 29) 探针: rewritten=8 height=3 nodes=14 leaves=10 keys=43 复刻: rewritten=9 height=3 nodes=15 leaves=10 keys=43
+不同 ('small-every-publish', 30) 探针: rewritten=7 height=3 nodes=14 leaves=10 keys=44 复刻: rewritten=7 height=3 nodes=15 leaves=10 keys=44
+不同 ('small-every-publish', 31) 探针: rewritten=7 height=3 nodes=14 leaves=10 keys=45 复刻: rewritten=7 height=3 nodes=15 leaves=10 keys=45
+不同 ('small-every-publish', 32) 探针: rewritten=7 height=3 nodes=14 leaves=10 keys=46 复刻: rewritten=7 height=3 nodes=15 leaves=10 keys=46
+不同 ('small-every-publish', 33) 探针: rewritten=9 height=3 nodes=16 leaves=11 keys=47 复刻: rewritten=8 height=3 nodes=16 leaves=11 keys=47
+不同 ('small-every-publish', 37) 探针: rewritten=8 height=3 nodes=17 leaves=12 keys=51 复刻: rewritten=11 height=4 nodes=20 leaves=12 keys=51
+不同 ('small-every-publish', 38) 探针: rewritten=7 height=3 nodes=17 leaves=12 keys=52 复刻: rewritten=9 height=4 nodes=20 leaves=12 keys=52
+不同 ('small-every-publish', 39) 探针: rewritten=7 height=3 nodes=17 leaves=12 keys=53 复刻: rewritten=9 height=4 nodes=20 leaves=12 keys=53
+不同 ('small-every-publish', 40) 探针: rewritten=7 height=3 nodes=17 leaves=12 keys=54 复刻: rewritten=9 height=4 nodes=20 leaves=12 keys=54
+不同 ('small-every-publish', 41) 探针: rewritten=8 height=3 nodes=18 leaves=13 keys=55 复刻: rewritten=10 height=4 nodes=21 leaves=13 keys=55
+small-every-publish: 比了 3000 行
+probe-compare 比了 3000 行，不同 2969 行

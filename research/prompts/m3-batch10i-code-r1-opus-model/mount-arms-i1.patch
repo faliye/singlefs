@@ -1,0 +1,202 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -2268,6 +2268,15 @@
+                 },
+             )
+     };
++    OPUS_I1_STASH.with(|stash| {
++        let mut stash = stash.borrow_mut();
++        stash.clear();
++        for (ring_slot, root) in &roots_with_ring_slots {
++            if ring_slots_self_verified_on_only_one_of_the_two_passes.contains(ring_slot) {
++                stash.insert(*ring_slot, *root);
++            }
++        }
++    });
+     let occupants: Vec<(RootRingSlot, RootRingOccupant)> = ring_slots_bad_at_mount
+         .iter()
+         .map(|(ring_slot, txgs_it_can_hold)| {
+@@ -2520,8 +2529,13 @@
+         if ring_slots_taken_as_bad_at_mount_when_still_bad_after_one_reread.contains(&ring_slot) {
+             match read_once(ring_slot) {
+                 RootRingSlotReading::SelfVerified(root) => roots.push(root),
++                RootRingSlotReading::Bad(_still_bad) if opus_asread() && opus_stashed(ring_slot).is_some() => {
++                    roots.push(opus_stashed(ring_slot).expect("上一行判过"));
++                    opus_bump(3, 1);
++                }
+                 RootRingSlotReading::Bad(_still_bad) => {
+                     ring_slots_bad_on_this_read_taken_as_holding_no_root.insert(ring_slot);
++                    opus_bump(3, 1);
+                 }
+             }
+             continue;
+@@ -3042,12 +3056,41 @@
+ pub fn ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes_by(
+     allocator: &PoolAllocator,
+ ) -> BTreeMap<RootRingSlot, TxgsARingSlotBadAtMountCanHold> {
++    if std::env::var("OPUS_I1_ARM").as_deref() == Ok("refuse") {
++        return BTreeMap::new();
++    }
+     allocator.root_ring_occupancy().map_or_else(
+         BTreeMap::new,
+         RootRingOccupancy::ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes,
+     )
+ }
+ 
++/// 攻方原型计数（m3-batch10i-code-r1 opus）：[抬 F 那一遍 S1 槽仍坏的次数, 其中住被抛弃根的, ledger 臂补隔离的槽数, 上限那一遍 S1 槽仍坏的次数]。
++pub static OPUS_I1_COUNTERS: [std::sync::atomic::AtomicU64; 4] = [
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++    std::sync::atomic::AtomicU64::new(0),
++];
++thread_local! {
++    /// 同上，按线程（原型多线程跑计划）。
++    pub static OPUS_I1_TL: std::cell::RefCell<[u64; 4]> = const { std::cell::RefCell::new([0; 4]) };
++}
++thread_local! {
++    /// asread 臂：挂载时两遍里只有一遍自证过的槽读出来的那条根（按槽）。
++    pub static OPUS_I1_STASH: std::cell::RefCell<BTreeMap<RootRingSlot, RootRecord>> = std::cell::RefCell::new(BTreeMap::new());
++}
++fn opus_asread() -> bool {
++    std::env::var("OPUS_I1_ARM").as_deref() == Ok("asread")
++}
++fn opus_stashed(ring_slot: RootRingSlot) -> Option<RootRecord> {
++    OPUS_I1_STASH.with(|stash| stash.borrow().get(&ring_slot).copied())
++}
++fn opus_bump(i: usize, by: u64) {
++    OPUS_I1_COUNTERS[i].fetch_add(by, std::sync::atomic::Ordering::Relaxed);
++    OPUS_I1_TL.with(|c| c.borrow_mut()[i] += by);
++}
++
+ /// 这个进程的准入抬 F 的上限（[`rollback_floor_ceiling_not_passing_ring_slots_bad_since_the_mount`]），三类槽都取这个进程分配器上那张根环表：
+ /// 知道住着根的槽、挂载那一刻读坏的槽、重建分配器两遍里只有一遍自证过的槽（后一类按能住的最大 txg 并，用户 2026-10-06 定 S1）。
+ ///
+@@ -3073,8 +3116,19 @@
+         &ring_slots_bad_at_mount_by(allocator),
+         &ring_slots_with_a_root_self_verified_on_only_one_of_the_two_rebuild_passes_by(allocator)
+             .into_iter()
+-            .map(|(ring_slot, txgs_it_can_hold)| {
+-                (ring_slot, txgs_it_can_hold.highest_txg_it_can_hold())
++            .filter_map(|(ring_slot, txgs_it_can_hold)| {
++                if std::env::var("OPUS_I1_ARM").as_deref() == Ok("exact") {
++                    // 零轮臂：S1 槽读坏时按根环表记着的那条根算——被抛弃的不并进上限，有效的按它自己的 txg 并。
++                    return match allocator.root_ring_occupancy().and_then(|o| o.opus_occupants().get(&ring_slot)) {
++                        Some(RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
++                            root: RootReadOnOneRebuildPass::ValidRoot { checkpoint_txg },
++                            ..
++                        }) => Some((ring_slot, *checkpoint_txg)),
++                        // 被抛弃的：仍算 S1 槽（读坏不拒），上限按 u64::MAX 并（取 min 不起作用）。
++                        _ => Some((ring_slot, CheckpointTxg(u64::MAX))),
++                    };
++                }
++                Some((ring_slot, txgs_it_can_hold.highest_txg_it_can_hold()))
+             })
+             .collect(),
+     )
+@@ -3377,9 +3431,30 @@
+             RootRingSlotReading::SelfVerified(root) => {
+                 roots_with_ring_slots.push((*ring_slot, root))
+             }
++            RootRingSlotReading::Bad(_still_bad) if opus_asread() && opus_stashed(*ring_slot).is_some() => {
++                opus_bump(0, 1);
++                roots_with_ring_slots.push((*ring_slot, opus_stashed(*ring_slot).expect("上一行判过")));
++            }
+             RootRingSlotReading::Bad(_still_bad) => {
+-                ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
+-                    .insert(*ring_slot, txgs_it_can_hold.oldest_txg_it_can_have_held());
++                if std::env::var("OPUS_I1_ARM").as_deref() == Ok("exact") {
++                    match allocator.root_ring_occupancy().and_then(|o| o.opus_occupants().get(ring_slot)) {
++                        Some(RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
++                            root: RootReadOnOneRebuildPass::ValidRoot { checkpoint_txg },
++                            ..
++                        }) => {
++                            ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
++                                .insert(*ring_slot, *checkpoint_txg);
++                        }
++                        _ => {
++                            // 被抛弃的不钉门槛，但仍记一项让 ledger 那一段按它补隔离：用它自己的最大 txg（只影响下面取最小，被抛弃的取不到最小就无害）。
++                            ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
++                                .insert(*ring_slot, CheckpointTxg(u64::MAX));
++                        }
++                    }
++                } else {
++                    ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
++                        .insert(*ring_slot, txgs_it_can_hold.oldest_txg_it_can_have_held());
++                }
+             }
+         }
+     }
+@@ -3561,6 +3636,44 @@
+         roots,
+         ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad,
+     } = readable_roots_for_raising_the_floor(&**devices, &system_configuration, allocator)?;
++    if !ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad.is_empty() {
++        opus_bump(0, 1);
++        let abandoned_still_bad: Vec<Vec<PlacementOnDevice>> = allocator
++            .root_ring_occupancy()
++            .map(|occupancy| {
++                ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
++                    .keys()
++                    .filter_map(|slot| match occupancy.opus_occupants().get(slot) {
++                        Some(RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
++                            root: RootReadOnOneRebuildPass::AbandonedRoot { referenced_placements },
++                            ..
++                        }) => Some(referenced_placements.clone()),
++                        _ => None,
++                    })
++                    .collect()
++            })
++            .unwrap_or_default();
++        if !abandoned_still_bad.is_empty() {
++            opus_bump(1, 1);
++        }
++        if matches!(std::env::var("OPUS_I1_ARM").as_deref(), Ok("ledger" | "exact")) && shadow_ledger == ShadowLedger::On {
++            // 零轮改法：这一遍读坏、两遍里只有一遍自证过的被抛弃根，按根环表里记着的落点补隔离（现行账里还分配着的除外）。
++            let live: BTreeSet<(u32, u64)> = current
++                .allocation_records
++                .iter()
++                .filter(|record| !record.is_released)
++                .map(|record| (record.device.0, record.slot.0))
++                .collect();
++            for placements in &abandoned_still_bad {
++                for placement in placements {
++                    if !live.contains(&(placement.device.0, placement.slot.0)) {
++                        allocator.isolate_abandoned(placement.device, placement.slot, placement.span);
++                        opus_bump(2, 1);
++                    }
++                }
++            }
++        }
++    }
+     // 根环表里挂载那一刻读坏、这一遍也没读出根的槽，钉在它可能住过的最旧 txg 并进环里最旧有效根（RR4，攻方 B1；用户 2026-10-04 定钉在最旧 txg；与进程内记根同一取法，
+     // E2 的重读照用：它成了最小的那个时先重读，`oldest_valid_root_in_the_ring_for_raising_the_floor`）。
+     let oldest_valid_root_in_the_ring = oldest_valid_root_in_the_ring_for_raising_the_floor(
+@@ -3568,7 +3681,11 @@
+         &parameters_of_the_pool,
+         allocator,
+         &roots,
+-        &ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad,
++        &ring_slots_with_a_root_self_verified_on_only_one_rebuild_pass_still_bad
++            .iter()
++            .filter(|(_, txg)| txg.0 != u64::MAX)
++            .map(|(slot, txg)| (*slot, *txg))
++            .collect(),
+         &table,
+     );
+     // 候选集按新 F 缩小，只被被抛弃根引用的槽会变多（一个槽此前靠一条低于新 F 的根豁免），回收之前先按新 F 重算影子账，
+--- a/crates/singlefs-core/src/allocator.rs
++++ b/crates/singlefs-core/src/allocator.rs
+@@ -1058,6 +1058,12 @@
+ }
+ 
+ impl RootRingOccupancy {
++    /// 攻方原型（m3-batch10i-code-r1 opus）：只读看这张表。
++    #[must_use]
++    pub fn opus_occupants(&self) -> &BTreeMap<RootRingSlot, RootRingOccupant> {
++        &self.occupants
++    }
++
+     /// 从盘上读出来的那一刻：`occupants` 是每个读得出的根环槽上的根与挂载时读坏的槽，`effective_floor` 是恢复后生效的 F，
+     /// `latest_txg_before_the_next_publish` 是这个进程下一条根的 txg 减一（挂载时 = 新实例第一次发布的 txg − 1：
+     /// 环里只有记录、没有根的那几个 txg 这时已经跳过，它们的槽上照旧是读出来的内容）。

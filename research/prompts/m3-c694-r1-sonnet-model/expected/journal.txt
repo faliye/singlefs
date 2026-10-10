@@ -1,0 +1,15 @@
+JOURNAL W=240 k=1 chosen_txg=4 abandoned_txg=5 records_total=5 records_above_water=1 above_txgs=[(5, 5, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=240 k=2 chosen_txg=5 abandoned_txg=6 records_total=6 records_above_water=1 above_txgs=[(6, 6, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=240 k=3 chosen_txg=6 abandoned_txg=7 records_total=7 records_above_water=1 above_txgs=[(7, 7, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=240 k=5 chosen_txg=8 abandoned_txg=9 records_total=9 records_above_water=1 above_txgs=[(9, 9, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=240 k=8 chosen_txg=11 abandoned_txg=12 records_total=12 records_above_water=1 above_txgs=[(12, 12, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=256 k=1 chosen_txg=4 abandoned_txg=5 records_total=5 records_above_water=1 above_txgs=[(5, 5, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=256 k=2 chosen_txg=5 abandoned_txg=6 records_total=6 records_above_water=1 above_txgs=[(6, 6, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=256 k=3 chosen_txg=6 abandoned_txg=7 records_total=7 records_above_water=1 above_txgs=[(7, 7, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=256 k=5 chosen_txg=8 abandoned_txg=9 records_total=9 records_above_water=1 above_txgs=[(9, 9, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=256 k=8 chosen_txg=11 abandoned_txg=12 records_total=12 records_above_water=1 above_txgs=[(12, 12, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=384 k=1 chosen_txg=4 abandoned_txg=5 records_total=5 records_above_water=1 above_txgs=[(5, 5, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=384 k=2 chosen_txg=5 abandoned_txg=6 records_total=6 records_above_water=1 above_txgs=[(6, 6, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=384 k=3 chosen_txg=6 abandoned_txg=7 records_total=7 records_above_water=1 above_txgs=[(7, 7, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=384 k=5 chosen_txg=8 abandoned_txg=9 records_total=9 records_above_water=1 above_txgs=[(9, 9, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10
+JOURNAL W=384 k=8 chosen_txg=11 abandoned_txg=12 records_total=12 records_above_water=1 above_txgs=[(12, 12, true)] names_tree_table_slot=true names_mapping_root_slot=true named_units_in_above=10

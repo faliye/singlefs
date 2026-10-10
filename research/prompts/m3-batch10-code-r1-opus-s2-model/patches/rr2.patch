@@ -1,0 +1,31 @@
+--- jia/crates/singlefs-core/src/mount.rs	2026-10-05 05:44:37.628526347 +0000
++++ rr2/crates/singlefs-core/src/mount.rs	2026-10-05 08:09:31.858542730 +0000
+@@ -1919,8 +1919,27 @@
+     // 写行那次记根算回收门槛只看得到它自己，释放代高于 F_生效 的一截当场放开、被暖机写掉，盘上环里更旧的有效根还引用着（D16（发布语义） 已定项 1
+     // 「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）。拒在取号之前，盘上逐字节不变。
+     let first_readings = read_every_root_ring_slot_once();
++    // 攻方改法 rr2（零轮，只在攻方副本上量）：这一遍有一块盘一条不被抛弃的自证有效根都没读出，也整环重读一次（不只「一条都没读出」）。
++    let every_device_has_a_valid_root = |readings: &[(RootRingSlot, RootRingSlotReadingTellingNeverWrittenApart)]| {
++        devices.iter().all(|(identity, _)| {
++            readings.iter().any(|(_, reading)| match reading {
++                RootRingSlotReadingTellingNeverWrittenApart::SelfVerified(root) => {
++                    !abandoned_by_table(root, &newest_table)
++                        && system_configuration.immutable.region_devices[usize::try_from(
++                            target_for_publish(root.checkpoint_txg, slots_per_region).region,
++                        )
++                        .expect("区域号")]
++                            == *identity
++                }
++                RootRingSlotReadingTellingNeverWrittenApart::BadAndNotAllZero
++                | RootRingSlotReadingTellingNeverWrittenApart::AllZeroNeverWritten => false,
++            })
++        })
++    };
++    let first_valid = newest_valid_root_txg_of_the_readings(&first_readings)
++        .filter(|_| every_device_has_a_valid_root(&first_readings));
+     let (ring_slot_readings, window_anchor, root_ring_of_the_rebuilt_allocator) =
+-        match newest_valid_root_txg_of_the_readings(&first_readings) {
++        match first_valid {
+             Some(window_anchor) => (
+                 first_readings,
+                 window_anchor,

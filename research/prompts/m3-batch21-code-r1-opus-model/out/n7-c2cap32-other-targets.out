@@ -1,0 +1,19 @@
+run-with-memory-cap: 上限 4G 超过实测峰值 161M 的 2 倍，照理由放行：新编译目录从头编、探针用例与峰值表记的不是同一次
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/container_trees_grow_a_level_when_the_root_is_full.rs (/tmp/claude-1000/m3-batch21-code-r1-opus/rerun2/target-c2cap32/release/deps/container_trees_grow_a_level_when_the_root_is_full-d2ba2166624985e1)
+
+running 4 tests
+test the_third_rollback_grows_the_lineage_tree_and_the_checkpoint_cost_counts_the_internal_level ... ok
+test the_third_tombstone_container_grows_the_tree_and_keeps_the_old_root_in_place ... ok
+test a_tree_grown_under_the_capped_fanout_takes_the_next_container_under_the_product_fanout ... ok
+test the_fifth_tombstone_container_grows_the_tree_to_three_levels_and_rebuild_reads_it ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.20s
+
+     Running tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs (/tmp/claude-1000/m3-batch21-code-r1-opus/rerun2/target-c2cap32/release/deps/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches-ffaf4aef9b45701c)
+
+running 1 test
+test a_file_over_two_extent_lower_leaves_unlinked_in_product_batches_rewrites_the_leaf_whose_last_unit_is_cut ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.60s
+

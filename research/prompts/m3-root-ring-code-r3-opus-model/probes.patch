@@ -1,0 +1,188 @@
+--- a/crates/singlefs-core/src/instance_table_sweep.rs
++++ b/crates/singlefs-core/src/instance_table_sweep.rs
+@@ -348,11 +348,19 @@
+     let mut slots_allocated_in_an_account_of_the_ring: BTreeSet<PlacementOfAUnitHead> =
+         BTreeSet::new();
+     for root in &roots_of_the_ring {
+-        let records = allocation_records_under_root_in_the_unit_area_starting_at(
++        let read = allocation_records_under_root_in_the_unit_area_starting_at(
+             reader,
+             unit_area_start,
+             root,
+-        )
++        );
++        // 攻方原型改法 A2（只在副本上、R3_ATTACK_FIX_A=1 时）：账读不出而这条根低于现行那一版的 F，回收门槛已许可它独占的槽被复用，跳过它的账。
++        if read.is_err()
++            && std::env::var("R3_ATTACK_FIX_A").is_ok_and(|v| v == "1")
++            && root.checkpoint_txg < current_root.rollback_floor
++        {
++            continue;
++        }
++        let records = read
+         .map_err(
+             |failure| NoRowDeletedThisRound::AccountOfARingRootUnreadable {
+                 root: RollbackTarget {
+@@ -539,10 +547,14 @@
+     // 迭代上界是要抹的头数；跨轮携带的只有抹了的那几个；提前出口是块设备错。
+     for to_erase in &judgement.heads_to_erase {
+         let offset = to_erase.placement.slot.to_device_offset();
+-        let reread_head =
+-            PoolReader::read(&*devices, to_erase.placement.device, offset, head_bytes)
+-                .as_deref()
+-                .and_then(unit_head_read_by_sweep);
++        let reread_bytes = PoolReader::read(&*devices, to_erase.placement.device, offset, head_bytes);
++        // 攻方原型改法 B（只在副本上、R3_ATTACK_FIX_B=1 时）：重读读失败与「已不是那个单元」分开，读失败这一轮不删行。
++        if reread_bytes.is_none() && std::env::var("R3_ATTACK_FIX_B").is_ok_and(|v| v == "1") {
++            return InstanceTableSweepOutcome::NoRowDeleted(NoRowDeletedThisRound::AReadOfAPlacementFailed {
++                placement: to_erase.placement,
++            });
++        }
++        let reread_head = reread_bytes.as_deref().and_then(unit_head_read_by_sweep);
+         let still_the_unpublished_unit_judged = reread_head.is_some_and(|head| {
+             head == to_erase.head
+                 && rows_by_instance
+--- a/crates/singlefs-harness/tests/instance_table_sweep_at_the_end_of_a_writable_mount.rs
++++ b/crates/singlefs-harness/tests/instance_table_sweep_at_the_end_of_a_writable_mount.rs
+@@ -822,3 +822,50 @@
+         "录制流一样长"
+     );
+ }
++
++/// 攻方原型（m3-root-ring-code-r3，K1，不入库）：第一个孤儿那一槽判的那一次读照读、第 n 次起读坏（抹之前那次重读落在第 2 次）。
++/// 看：清扫删不删行、那个孤儿的头还在不在、删行之后 F5 观察者看到的按删前那一行判未发布的孤儿还剩几个。
++#[test]
++fn r3_attack_a_read_failure_on_the_reread_before_erasing() {
++    for read_back in [UnreadableRangeReadBack::DeviceError, UnreadableRangeReadBack::Zeros] {
++        for nth in [2u64, 3] {
++            let pool = pool_with_a_dead_instance(None);
++            let (first_orphan, first_head) = *pool.orphans_left_on_disk.first().expect("孤儿");
++            let unreadable = SharedUnreadableRanges::new(
++                vec![UnreadableRange {
++                    device: first_orphan.device,
++                    offset_in_bytes: first_orphan.slot.to_device_offset().0,
++                    length_in_bytes: 512,
++                    failing_reads: FailingReadsOfARange::FromTheNthOnward(nth),
++                }],
++                read_back,
++            );
++            let stream = SharedStream::retaining_contents();
++            let mut devices = with_unreadable_ranges(recording_of(&pool.image, &stream), &unreadable);
++            let mounted = mount_writable_with_instance_table_sweep_configuration(
++                &parameters_of_the_ring_hole_pools(),
++                &mut devices,
++                SpaceAdmission::JudgedByTheFormula,
++                ShadowLedger::On,
++                sweeping_at_the_end_of_the_mount_on_any_row(),
++            )
++            .expect("挂载");
++            let after = image_after(&pool.image, &stream);
++            let still = unit_head_read_by_sweep(&head_bytes_at(&after, first_orphan)) == Some(first_head);
++            let left: Vec<_> = pool
++                .orphans_left_on_disk
++                .iter()
++                .filter(|(p, h)| unit_head_read_by_sweep(&head_bytes_at(&after, *p)) == Some(*h))
++                .map(|(p, _)| *p)
++                .collect();
++            let outcome = format!("{:?}", mounted.output.instance_table_sweep);
++            println!(
++                "REREAD read_back={read_back:?} nth={nth} rows_after={:?} first_orphan_head_still_there={still} orphans_left={} of {} outcome={}",
++                instances_with_a_row_on(&after),
++                left.len(),
++                pool.orphans_left_on_disk.len(),
++                outcome.chars().take(240).collect::<String>()
++            );
++        }
++    }
++}
+--- a/crates/singlefs-harness/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs
++++ b/crates/singlefs-harness/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs
+@@ -88,6 +88,13 @@
+ fn pool_just_before_the_admission_raise(
+     x_slot_reads: FailingReadsOfARange,
+ ) -> PoolJustBeforeTheAdmissionRaise {
++    pool_just_before_the_admission_raise_reading_back(x_slot_reads, UnreadableRangeReadBack::DeviceError)
++}
++
++fn pool_just_before_the_admission_raise_reading_back(
++    x_slot_reads: FailingReadsOfARange,
++    read_back: UnreadableRangeReadBack,
++) -> PoolJustBeforeTheAdmissionRaise {
+     let parameters = parameters_of_the_ring_hole_pools();
+     let slots_per_region = parameters.geometry.root_ring_slots_per_region;
+     let ring_length = 3 * SLOTS_PER_REGION_OF_THE_RING_HOLE_POOLS;
+@@ -128,7 +135,7 @@
+             length_in_bytes: u64::from(parameters.geometry.physical_block_size),
+             failing_reads: x_slot_reads,
+         }],
+-        UnreadableRangeReadBack::DeviceError,
++        read_back,
+     );
+     let stream = SharedStream::retaining_contents();
+     let mut devices = with_unreadable_ranges(recording_of(&image, &stream), &unreadable_x_slot);
+@@ -227,3 +234,56 @@
+         "抬完之后"
+     );
+ }
++
++/// 攻方原型（m3-root-ring-code-r3，K2，不入库）：X 那一槽第四次挂载起每次读都「报成功、字节全 0」（读得出而自证不过），
++/// 与报设备错那一形并排；交回上限、抬到的 F、根环表记没记 X 那一槽，与抬完之后池级 checker 的全部违例（含 I-7.9）。
++#[test]
++fn r3_attack_x_slot_reads_back_zeros_since_the_mount() {
++    let slots_per_region = parameters_of_the_ring_hole_pools().geometry.root_ring_slots_per_region;
++    let x_slot = target_for_publish(CheckpointTxg(X_TXG), slots_per_region);
++    for (label, reads, read_back) in [
++        ("device-error-every", FailingReadsOfARange::Every, UnreadableRangeReadBack::DeviceError),
++        ("zeros-every", FailingReadsOfARange::Every, UnreadableRangeReadBack::Zeros),
++        ("zeros-only-the-first", FailingReadsOfARange::OnlyTheFirst, UnreadableRangeReadBack::Zeros),
++        ("device-error-only-the-first", FailingReadsOfARange::OnlyTheFirst, UnreadableRangeReadBack::DeviceError),
++        ("never", FailingReadsOfARange::Never, UnreadableRangeReadBack::DeviceError),
++    ] {
++        let mut pool = pool_just_before_the_admission_raise_reading_back(reads, read_back);
++        let recorded = pool
++            .allocator
++            .root_ring_occupancy()
++            .expect("根环表")
++            .ring_slots_unreadable_at_mount()
++            .get(&x_slot)
++            .copied();
++        let raised = raise_rollback_floor_to_the_admission_ceiling(
++            &parameters_of_the_ring_hole_pools(),
++            &mut pool.devices,
++            &mut pool.allocator,
++            &mut pool.current,
++            ShadowLedger::On,
++        );
++        let ceiling = match &raised {
++            Ok(RaiseToTheAdmissionCeiling::Raised(r)) => format!("{:?}", r.ceiling),
++            other => format!("{other:?}").chars().take(160).collect(),
++        };
++        let image = pool.image_now();
++        let all: Vec<String> = check_pool_image(&image)
++            .into_iter()
++            .filter_map(|(invariant, verdict)| match verdict {
++                InvariantVerdict::Violated(detail) => Some(format!("{invariant}:{}", detail.chars().take(200).collect::<String>())),
++                _ => None,
++            })
++            .collect();
++        let i79: Vec<String> = check_pool_image(&image)
++            .into_iter()
++            .filter(|(invariant, _)| *invariant == "I-7.9")
++            .map(|(_, verdict)| format!("{verdict:?}").chars().take(200).collect())
++            .collect();
++        println!(
++            "RS3Z {label} x_recorded_unreadable={recorded:?} ceiling={ceiling} floor_after={:?} x_on_disk={} i79={i79:?} violated={all:?}",
++            pool.current.root.rollback_floor,
++            readable_root_at_txg(&image, X_TXG).is_some()
++        );
++    }
++}
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -10,6 +10,7 @@
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
+     "crates/singlefs-reference-filesystem",
++    "crates/r3-attack-enum",
+ ]
+ exclude = ["research"]
+ 

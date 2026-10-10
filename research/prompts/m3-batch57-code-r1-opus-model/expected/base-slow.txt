@@ -1,0 +1,4 @@
+command args=-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full -- --ignored rc=0
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; 
+command args=-p singlefs-harness --test checker_known_bad_images -- --ignored rc=0
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 253 filtered out; 

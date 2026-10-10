@@ -1,0 +1,2 @@
+        let right_container_follows_the_left_by_one =
+            left_container.checked_add(1) == Some(right_container);

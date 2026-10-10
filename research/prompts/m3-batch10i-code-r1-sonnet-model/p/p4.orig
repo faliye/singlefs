@@ -1,0 +1,8 @@
+                    TxgsARingSlotBadAtMountCanHold::new(
+                        txgs_it_can_hold
+                            .oldest_txg_it_can_have_held()
+                            .min(root.checkpoint_txg),
+                        txgs_it_can_hold
+                            .highest_txg_it_can_hold()
+                            .max(root.checkpoint_txg),
+                    )

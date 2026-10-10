@@ -1,0 +1,18 @@
+clean violated=[]
+clean I-9.5 = Holds
+clean I-4.7 = Holds
+clean I-4.6 = Holds
+clean I-4.4 = NotApplicable("第一版不适用：意图载体（nlink = 0 的记录、`deleted_inodes` 的 key、墓碑）没有可装增量的字段；logged_ops 有字段表时实现")
+clean I-9.16 = Holds
+L1a violated=["I-9.16"]
+L1a I-9.5 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")
+L1a I-4.7 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")
+L1a I-4.6 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")
+L1c-base violated=[]
+L1c-base I-9.5 = Holds
+L1c-base I-4.7 = Holds
+L1c-base I-4.6 = Holds
+L1c violated=["I-9.16"]
+L1c I-9.5 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")
+L1c I-4.7 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")
+L1c I-4.6 = NotApplicable("走读到的某一版树表里有一棵 inode 树，同一张表里偏移 116 的头 ID 指着它的 deleted_inodes 条目不是恰好一条：那一版这棵树的队列与记录判不了")

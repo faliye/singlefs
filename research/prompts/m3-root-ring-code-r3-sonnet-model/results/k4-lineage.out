@@ -1,0 +1,16 @@
+$ grep -n -i "lineage\|谱系" crates/singlefs-checker-tier/src/crash_judge_checker.wgsl crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl crates/singlefs-checker-tier/src/crash_judge_common.wgsl crates/singlefs-checker-tier/src/crash_judge_recovery.wgsl
+crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl:156:const TREE_KIND_LINEAGE: u32 = 11u;
+crates/singlefs-checker-tier/src/crash_judge_checker.wgsl:1719:            || kind == TREE_KIND_SPARSE_SIDE_TABLE || kind == TREE_KIND_DEADLIST || kind == TREE_KIND_LINEAGE
+$ grep -n "TREE_KIND_LINEAGE\|TREE_KIND_TOMBSTONE\|TREE_KIND_DELETED_INODES" crates/singlefs-checker/src/walk.rs | head -12
+71:const TREE_KIND_DELETED_INODES: u16 = 9;
+72:const TREE_KIND_TOMBSTONE: u16 = 10;
+73:const TREE_KIND_LINEAGE: u16 = 11;
+86:    TREE_KIND_DELETED_INODES,
+87:    TREE_KIND_TOMBSTONE,
+88:    TREE_KIND_LINEAGE,
+213:        TREE_KIND_DELETED_INODES => Some(DELETED_INODES_ENTRY_BYTES),
+215:        TREE_KIND_TOMBSTONE | TREE_KIND_LINEAGE => Some(inode_internal_entry_bytes()),
+386:    [TREE_KIND_EXTENT, TREE_KIND_INODE, TREE_KIND_DELETED_INODES];
+1933:        if kind == TREE_KIND_TOMBSTONE {
+1942:        if kind == TREE_KIND_LINEAGE {
+3433:            TREE_KIND_EXTENT | TREE_KIND_DELETED_INODES | TREE_KIND_TOMBSTONE => {

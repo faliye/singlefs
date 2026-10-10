@@ -1,0 +1,101 @@
+--- base_ledger_copy.rs	2026-10-07 03:10:19.325877286 +0000
++++ tree/crates/singlefs-harness/tests/opus_model/fixed_ledger.rs	2026-10-07 03:06:30.109938458 +0000
+@@ -807,6 +807,10 @@
+     /// 这个进程里还过几次：等着的线程记下看到的次数，次数变了就不睡（还在它判完、睡下之前时不漏叫）。
+     returns_in_this_process: Mutex<u64>,
+     memory_returned: Condvar,
++    /// 攻方模型改法 甲：每次借都在锁里现读空闲、重夹估计（None 是今天的实现）。
++    re_read_free_memory: Option<Box<dyn Fn(usize) -> Result<u64, String> + Send + Sync>>,
++    /// 攻方模型改法 乙：按状态数借时照「容量 − 已记」压，不照整份容量压（false 是今天的实现）。
++    compress_to_room: bool,
+ }
+ 
+ /// 锁住一张卡的账本、读出来（去掉死了的进程记的）、交 `change` 改，改过的写回去；交回 `change` 的结局。
+@@ -911,9 +915,33 @@
+             next_lease_identifier: AtomicU64::new(0),
+             returns_in_this_process: Mutex::new(0),
+             memory_returned: Condvar::new(),
++            re_read_free_memory: None,
++            compress_to_room: false,
+         })
+     }
+ 
++    /// 攻方模型：同上，另挂两个改法。
++    pub fn open_with_the_attack_model_fixes(
++        settings: LedgerSettings,
++        card_file_stems: Vec<String>,
++        read_free_memory_mebibytes: Box<dyn Fn(usize) -> Result<u64, String> + Send + Sync>,
++        capacity_for_this_process: CardCapacityForThisProcess,
++        re_read_at_every_booking: bool,
++        compress_to_room: bool,
++    ) -> Result<Self, LedgerOpeningRefusal> {
++        let mut ledger = Self::open_reading_the_free_memory_inside_each_card_lock(
++            settings,
++            card_file_stems,
++            &*read_free_memory_mebibytes,
++            capacity_for_this_process,
++        )?;
++        if re_read_at_every_booking {
++            ledger.re_read_free_memory = Some(read_free_memory_mebibytes);
++        }
++        ledger.compress_to_room = compress_to_room;
++        Ok(ledger)
++    }
++
+     /// 这张卡此刻看这个进程的容量与已记的（在锁里读）。账本里没有估计（开账之后被人删了）当容量 0：借什么都放不下，调用方判红。
+     fn card_seen_by_this_process(
+         records: &CardLedgerRecords,
+@@ -934,6 +962,23 @@
+         }
+     }
+ 
++    /// 攻方模型改法甲：在这张卡的锁里现读一次空闲，照开账那一套夹估计。
++    fn re_clamp_the_estimate(&self, records: &mut CardLedgerRecords, card_position: usize) {
++        if let Some(read) = &self.re_read_free_memory {
++            if let Ok(free_now) = read(card_position) {
++                records.memory_all_registered_processes_may_hold_mebibytes =
++                    Some(memory_all_registered_processes_may_hold_mebibytes(
++                        records.memory_all_registered_processes_may_hold_mebibytes,
++                        free_now,
++                        records.booked_mebibytes_by_every_live_process(
++                            self.settings.this_process,
++                            self.settings.mebibytes_each_process_keeps_on_a_card,
++                        ),
++                    ));
++            }
++        }
++    }
++
+     /// 这几张卡此刻各看这个进程的容量与已记的。
+     fn cards_seen_by_this_process(
+         &self,
+@@ -946,6 +991,7 @@
+                     &self.settings,
+                     &self.card_file_stems[*card_position],
+                     |records| {
++                        self.re_clamp_the_estimate(records, *card_position);
+                         Self::card_seen_by_this_process(
+                             records,
+                             &self.settings,
+@@ -1002,14 +1048,20 @@
+             &self.settings,
+             &self.card_file_stems[card_position],
+             |records| {
++                self.re_clamp_the_estimate(records, card_position);
+                 let seen = Self::card_seen_by_this_process(
+                     records,
+                     &self.settings,
+                     &self.capacity_for_this_process,
+                     card_position,
+                 );
++                let compress_against = if self.compress_to_room {
++                    seen.capacity_mebibytes.saturating_sub(seen.booked_mebibytes)
++                } else {
++                    seen.capacity_mebibytes
++                };
+                 let (need_mebibytes, states_booked) =
+-                    what.need_within_the_capacity(seen.capacity_mebibytes);
++                    what.need_within_the_capacity(compress_against);
+                 match decide_booking_by_priority(
+                     &[seen.capacity_mebibytes],
+                     &[seen.booked_mebibytes],

@@ -1,0 +1,12 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch58-code-r1-sonnet/repo/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch58-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running tests/checker_known_bad_images.rs (/home/fy5090/.local/share/singlefs/work/m3-batch58-code-r1-sonnet/target/debug/deps/checker_known_bad_images-fa5092303c98133d)
+
+running 3 tests
+test lineage_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+test tombstone_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+test retirement_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 262 filtered out; finished in 2.49s
+

@@ -1,0 +1,7 @@
+            lineage: LineageContainerCapacityKnob::new(1),
+            retirement: None,
+        },
+    )
+}
+
+/// 池级 checker 带三棵容器树旋钮值的入口

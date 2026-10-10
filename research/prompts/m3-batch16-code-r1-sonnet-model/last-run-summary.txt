@@ -1,0 +1,85 @@
+### 阶段 baseline
+base | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.82s
+base | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=0 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.56s
+base | unlink_mount_continuation_and_the_emptied_version | exit=0 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.43s
+base | --lib | exit=0 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.00s
+### 阶段 rows
+row 2386 | 必须红的测试：after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads
+row2386 | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=101 | test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.28s
+    test after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads ... FAILED
+    test after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads ... FAILED
+    test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.28s
+row 2387 | 必须红的测试：when_no_valid_root_on_device_one_is_read_during_the_unmount_every_reclaimed_slot_is_held_and_device_one_reads_back_its_live_file
+row2387 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=101 | test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.21s
+    test when_no_valid_root_on_device_one_is_read_during_the_unmount_every_reclaimed_slot_is_held_and_device_one_reads_back_its_live_file ... FAILED
+    test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.21s
+row 2388 | 必须红的测试：an_abandoned_root_newest_on_a_device_does_not_stand_for_that_devices_newest_valid_root
+row2388 | --lib | exit=101 | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.00s
+    test mount::newest_valid_root_on_every_device_tests::an_abandoned_root_newest_on_a_device_does_not_stand_for_that_devices_newest_valid_root ... FAILED
+    test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 183 filtered out; finished in 0.00s
+row 2389 | 必须红的测试：after_the_second_unmount_publish_of_a_narrow_pool_remounted_once_a_lone_surviving_device_reads_back_its_live_file
+row2389 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=101 | test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.41s
+    test after_the_second_unmount_publish_of_a_narrow_pool_remounted_once_a_lone_surviving_device_reads_back_its_live_file ... FAILED
+    test after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_before ... FAILED
+    test after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before ... FAILED
+    test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.41s
+row 2390 | 必须红的测试：a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk
+row2390 | unlink_mount_continuation_and_the_emptied_version | exit=101 | test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.33s
+    test a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... FAILED
+    test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.33s
+row 2391 | 必须红的测试：the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk
+row2391 | unlink_mount_continuation_and_the_emptied_version | exit=101 | test result: FAILED. 13 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.46s
+    test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... FAILED
+    test a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... FAILED
+    test the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk ... FAILED
+    test result: FAILED. 13 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.46s
+row 2392 | 必须红的测试：the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk
+row2392 | unlink_mount_continuation_and_the_emptied_version | exit=101 | test result: FAILED. 13 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.41s
+    test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... FAILED
+    test the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk ... FAILED
+    test a_session_unlink_writes_the_given_time_into_the_three_time_fields_of_the_intent_and_of_every_batch_on_disk ... FAILED
+    test result: FAILED. 13 passed; 3 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.41s
+row 2393 | 必须红的测试：the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk
+row2393 | unlink_mount_continuation_and_the_emptied_version | exit=101 | test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.40s
+    test the_batches_of_a_mount_continuation_after_the_intent_copy_the_time_the_intent_wrote_on_disk ... FAILED
+    test result: FAILED. 15 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.40s
+### 阶段 x2
+x2 | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.44s
+x2 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=0 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.22s
+x2 | writable_mount_of_a_formatted_pool | exit=0 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.47s
+x2 | admission_raises_the_floor_before_refusing | exit=0 | test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.61s
+x2 | whole_device_loss_after_warm_up | exit=0 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.53s
+### 阶段 x3
+x3 | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.31s
+x3 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=0 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.47s
+x3 | writable_mount_of_a_formatted_pool | exit=0 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.98s
+x3 | admission_raises_the_floor_before_refusing | exit=0 | test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.54s
+x3 | whole_device_loss_after_warm_up | exit=0 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.72s
+### 阶段 x1
+x1 | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.60s
+x1 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=0 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.51s
+x1 | unlink_mount_continuation_and_the_emptied_version | exit=0 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.48s
+x1 | admission_raises_the_floor_before_refusing | exit=0 | test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.27s
+x1 | reuse_after_raising_the_floor | exit=0 | test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 2.28s
+x1 | whole_device_loss_after_warm_up | exit=0 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.44s
+x1 | row_publish_admission | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.15s
+x1 | warm_up_journal_counter | exit=0 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.02s
+x1 | writable_mount_takes_a_second_instance | exit=0 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.24s
+x1 | writable_mount_of_a_formatted_pool | exit=0 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.14s
+x1 | an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.62s
+x1 | raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.66s
+x1 | admission_formula_on_the_mounted_state | exit=0 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.64s
+### 阶段 x4
+x4 | the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.77s
+x4 | a_lone_surviving_device_reads_back_what_it_read_before_the_unmount | exit=0 | test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.00s
+x4 | unlink_mount_continuation_and_the_emptied_version | exit=0 | test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.98s
+x4 | admission_raises_the_floor_before_refusing | exit=0 | test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 16.46s
+x4 | reuse_after_raising_the_floor | exit=0 | test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 6.55s
+x4 | whole_device_loss_after_warm_up | exit=0 | test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.80s
+x4 | row_publish_admission | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.63s
+x4 | warm_up_journal_counter | exit=0 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.34s
+x4 | writable_mount_takes_a_second_instance | exit=0 | test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.49s
+x4 | writable_mount_of_a_formatted_pool | exit=0 | test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.96s
+x4 | an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.09s
+x4 | raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic | exit=0 | test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.47s
+x4 | admission_formula_on_the_mounted_state | exit=0 | test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.12s

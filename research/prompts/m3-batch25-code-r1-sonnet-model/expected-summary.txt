@@ -1,0 +1,23 @@
+MUTATION own-never-open | rc 101 | 红的测试数 3
+MUTATION 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..、整单元校验和对得上，主走读照用这一片的行，门却报部分没判） | rc 101 | 红的测试数 2
+MUTATION 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..主走读走到了末片、候选集滤掉了被抛弃的 C，门却报部分没判） | rc 101 | 红的测试数 2
+MUTATION 第 25 批 I-9.29 门（CPU）：最新根的实例表链指针记录不合法也当主走..：分不出后面还有没有片，I-9.29 报成立而不是部分没判） | rc 101 | 红的测试数 1
+MUTATION 第23批 X I-9.29：最新根的实例表读不出时当它滤过了被抛弃的根，照旧跨版..弃的 C 同号不同出生代，I-9.29 判红而不是部分没判） | rc 101 | 红的测试数 1
+PROBE N5-a violated=[] i929=Holds
+PROBE N5-b flag=1 violated=["I-3.8"] i929=PartiallyJudged("最新根的实例表读不出（主走读沿链没走到末片：有一片读不出、解不开或链指针记录不合法）：回退候选集里滤不掉被崩溃恢复抛弃的根，收到的 1 个号一个都没比")
+PROBE N5-b flag=2 violated=["I-3.8"] i929=PartiallyJudged("最新根的实例表读不出（主走读沿链没走到末片：有一片读不出、解不开或链指针记录不合法）：回退候选集里滤不掉被崩溃恢复抛弃的根，收到的 1 个号一个都没比")
+PROBE N5-c violated=["I-2.3"] i929=Holds
+PROBE clean violated=[] i929=Holds
+RED own-never-open :: test a_payload_crc_mismatch_on_the_newest_instance_table_reddens_only_the_payload_crc_and_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED own-never-open :: test a_record_of_an_unregistered_kind_before_the_chain_record_of_the_newest_instance_table_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED own-never-open :: test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back
+RED 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..、整单元校验和对得上，主走读照用这一片的行，门却报部分没判） :: test a_payload_crc_mismatch_on_the_newest_instance_table_reddens_only_the_payload_crc_and_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..、整单元校验和对得上，主走读照用这一片的行，门却报部分没判） :: test a_record_of_an_unregistered_kind_before_the_chain_record_of_the_newest_instance_table_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..主走读走到了末片、候选集滤掉了被抛弃的 C，门却报部分没判） :: test a_payload_crc_mismatch_on_the_newest_instance_table_reddens_only_the_payload_crc_and_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED 第 25 批 I-9.29 门（CPU）：判不了的门改回另用只读不判的读法读最新..主走读走到了末片、候选集滤掉了被抛弃的 C，门却报部分没判） :: test a_record_of_an_unregistered_kind_before_the_chain_record_of_the_newest_instance_table_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds
+RED 第 25 批 I-9.29 门（CPU）：最新根的实例表链指针记录不合法也当主走..：分不出后面还有没有片，I-9.29 报成立而不是部分没判） :: test a_malformed_chain_record_on_the_newest_instance_table_leaves_the_one_birth_invariant_partially_judged
+RED 第23批 X I-9.29：最新根的实例表读不出时当它滤过了被抛弃的根，照旧跨版..弃的 C 同号不同出生代，I-9.29 判红而不是部分没判） :: test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back
+test a_malformed_chain_record_on_the_newest_instance_table_leaves_the_one_birth_invariant_partially_judged ... ok
+test a_payload_crc_mismatch_on_the_newest_instance_table_reddens_only_the_payload_crc_and_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds ... ok
+test a_record_of_an_unregistered_kind_before_the_chain_record_of_the_newest_instance_table_still_filters_the_abandoned_root_so_the_one_birth_invariant_holds ... ok
+test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back ... ok

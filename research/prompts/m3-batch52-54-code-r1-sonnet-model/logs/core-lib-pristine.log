@@ -1,0 +1,4 @@
+test mount::inode_number_watermark_of_the_rollback_tests::a_ring_root_abandoned_by_the_instance_table_does_not_set_the_watermark ... ok
+test mount::inode_number_watermark_of_the_rollback_tests::a_ring_root_not_abandoned_whose_watermark_is_above_the_current_version_sets_the_watermark ... ok
+test mount::inode_number_watermark_of_the_rollback_tests::a_ring_root_whose_watermark_is_below_the_current_version_leaves_the_current_watermark ... ok
+test result: ok. 244 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.84s

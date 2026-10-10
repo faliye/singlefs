@@ -1,0 +1,12 @@
+        thread_local! { static LATEST: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
+        let change = match change {
+            UserChange::Unlink { inode, write_time_seconds } => {
+                let t = LATEST.with(|l| { let t = write_time_seconds.max(l.get()); l.set(t); t });
+                UserChange::Unlink { inode, write_time_seconds: t }
+            }
+            UserChange::NewInodes { count, write_time_seconds } => {
+                let t = LATEST.with(|l| { let t = write_time_seconds.max(l.get()); l.set(t); t });
+                UserChange::NewInodes { count, write_time_seconds: t }
+            }
+            other => other,
+        };

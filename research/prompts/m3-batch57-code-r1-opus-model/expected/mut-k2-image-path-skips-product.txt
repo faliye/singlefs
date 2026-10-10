@@ -1,0 +1,28 @@
+command args=-p singlefs-checker --lib rc=0
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test checker_known_bad_images rc=101
+thread 'the_old_tombstone_knob_entry_judges_the_lineage_tree_by_its_product_capacity' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:17260:5:
+thread 'the_old_tombstone_knob_entry_judges_the_retirement_tree_by_its_product_capacity' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:17260:5:
+thread 'two_leaves_retired_one_record_per_retirement_container_judged_as_a_product_image_reddens_only_the_full_container_invariant' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:11155:5:
+thread 'two_rollbacks_one_record_per_lineage_container_judged_as_a_product_image_reddens_only_the_full_container_invariant' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:11266:5:
+failures:
+failures:
+    the_old_tombstone_knob_entry_judges_the_lineage_tree_by_its_product_capacity
+    the_old_tombstone_knob_entry_judges_the_retirement_tree_by_its_product_capacity
+    two_leaves_retired_one_record_per_retirement_container_judged_as_a_product_image_reddens_only_the_full_container_invariant
+    two_rollbacks_one_record_per_lineage_container_judged_as_a_product_image_reddens_only_the_full_container_invariant
+test result: FAILED. 249 passed; 4 failed; 2 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full rc=101
+thread 'a_capped_tombstone_tree_judged_as_a_product_image_reddens_only_the_full_container_invariant' panicked at crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs:429:5:
+failures:
+failures:
+    a_capped_tombstone_tree_judged_as_a_product_image_reddens_only_the_full_container_invariant
+test result: FAILED. 5 passed; 1 failed; 2 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test checker_known_bad_images -- --ignored rc=101
+thread 'nine_hundred_sixty_retirements_at_product_capacity_fill_every_retirement_container_but_the_rightmost_and_redden_nothing' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:17088:9:
+thread 'one_thousand_three_hundred_sixty_rollbacks_at_product_capacity_fill_every_lineage_container_but_the_rightmost_and_redden_nothing' panicked at crates/singlefs-harness/tests/checker_known_bad_images.rs:17124:5:
+failures:
+failures:
+    nine_hundred_sixty_retirements_at_product_capacity_fill_every_retirement_container_but_the_rightmost_and_redden_nothing
+    one_thousand_three_hundred_sixty_rollbacks_at_product_capacity_fill_every_lineage_container_but_the_rightmost_and_redden_nothing
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 253 filtered out; 

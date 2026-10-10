@@ -1,0 +1,5 @@
+    ring_roots
+        .iter()
+        .filter(|root| abandoned_by_table(root, _current_table_not_consulted))
+        .map(|root| root.tree_identifier_watermark)
+        .fold(tree_identifier_watermark_of_the_current_version, u64::max)

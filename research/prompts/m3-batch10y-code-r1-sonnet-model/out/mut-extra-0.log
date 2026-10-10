@@ -1,0 +1,1 @@
+[1] X1 ret 往下压的结果不存回 => 红（被抓） rc=101 ['test result: FAILED. 37 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.00s', 'gpu_memory_ledger::tests::a_returned_lease_still_on_the_card_is_not_taken_for_a_live_lease_already_built']

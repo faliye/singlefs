@@ -1,0 +1,22 @@
+--- jia/crates/singlefs-core/src/mount.rs	2026-10-05 05:44:37.628526347 +0000
++++ noq3/crates/singlefs-core/src/mount.rs	2026-10-05 07:56:28.338761666 +0000
+@@ -2849,7 +2849,8 @@
+         current.root.rollback_floor,
+         &current_instance_table,
+         &ring_slots_known_to_hold_a_root_by(allocator),
+-        &ring_slots_bad_at_mount_by(allocator),
++        // 攻方对照臂 noq3（同上）。
++        &BTreeMap::new(),
+     )?;
+     if ceiling <= current.root.rollback_floor {
+         return Ok(RaiseToTheAdmissionCeiling::FloorAlreadyAtTheCeiling {
+@@ -3130,7 +3131,8 @@
+                 current.root.rollback_floor,
+                 &table,
+                 &ring_slots_known_to_hold_a_root_by(allocator),
+-                &ring_slots_bad_at_mount_by(allocator),
++                // 攻方对照臂 noq3：准入抬 F 的上限不并挂载那一刻读坏的槽（Q3 之前、RS3 之前的取法），只为量 Q3 这一项的代价。
++                &BTreeMap::new(),
+             )?;
+             if new_floor > ceiling {
+                 return Err(MountError::RollbackFloorAboveCeiling {

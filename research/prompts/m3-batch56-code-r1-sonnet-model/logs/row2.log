@@ -1,0 +1,26 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.65s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/target/debug/deps/singlefs_core-5c6a767bd9164a51)
+
+running 2 tests
+test mount::tree_identifier_watermark_of_the_rollback_tests::ring_roots_all_below_the_current_version_leave_the_current_tree_identifier_watermark ... ok
+test mount::tree_identifier_watermark_of_the_rollback_tests::an_abandoned_ring_root_whose_tree_identifier_watermark_is_above_the_current_version_sets_the_watermark ... FAILED
+
+failures:
+
+---- mount::tree_identifier_watermark_of_the_rollback_tests::an_abandoned_ring_root_whose_tree_identifier_watermark_is_above_the_current_version_sets_the_watermark stdout ----
+
+thread 'mount::tree_identifier_watermark_of_the_rollback_tests::an_abandoned_ring_root_whose_tree_identifier_watermark_is_above_the_current_version_sets_the_watermark' (4160673) panicked at crates/singlefs-core/src/mount.rs:9515:9:
+assertion `left == right` failed: 树 ID 水位取环里读得出的全部根：被崩溃恢复抛弃的那条照旧算
+  left: 65549
+ right: 65560
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mount::tree_identifier_watermark_of_the_rollback_tests::an_abandoned_ring_root_whose_tree_identifier_watermark_is_above_the_current_version_sets_the_watermark
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 246 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p singlefs-core --lib`
+exit=101

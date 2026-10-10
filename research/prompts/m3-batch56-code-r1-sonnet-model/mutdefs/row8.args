@@ -1,0 +1,1 @@
+-p singlefs-harness --test checker_known_bad_images -- containers_numbered_one_and_one

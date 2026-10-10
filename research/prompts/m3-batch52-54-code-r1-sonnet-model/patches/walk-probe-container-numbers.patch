@@ -1,0 +1,60 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-fixes-code-r1/repo/crates/singlefs-checker/src/walk.rs	2026-10-09 20:46:09.002874541 +0000
++++ /home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/pristine/walk_with_probe.rs	2026-10-09 21:14:40.892835706 +0000
+@@ -13873,3 +13873,57 @@
+         );
+     }
+ }
++
++#[cfg(test)]
++mod sonnet_probe_container_numbers {
++    use super::*;
++    use crate::image::{InvariantVerdict, Judgements};
++
++    fn verdict_of(
++        invariant: &'static str,
++        numbers_and_counts: &[(u64, usize)],
++        knob: Option<u64>,
++        tree: LineageOrRetirementTree,
++    ) -> InvariantVerdict {
++        let mut judgements = Judgements::default();
++        judge_lineage_or_retirement_container_capacity_of_a_version(
++            "probe", tree, 7, numbers_and_counts, knob, &mut judgements,
++        );
++        judgements
++            .into_report()
++            .into_iter()
++            .find(|(name, _)| *name == invariant)
++            .map(|(_, verdict)| verdict)
++            .expect("in the list")
++    }
++
++    #[test]
++    fn probe() {
++        let p = NON_RIGHTMOST_LINEAGE_AND_RETIREMENT_CONTAINERS_ARE_FULL_ON_A_PRODUCT_IMAGE;
++        let k = LINEAGE_AND_RETIREMENT_CONTAINERS_STAY_WITHIN_THE_CAPACITY_KNOBS_ON_A_TEST_IMAGE;
++        let l = LineageOrRetirementTree::Lineage;
++        let r = LineageOrRetirementTree::Retirement;
++        // gap in container numbers (1, 3), non-rightmost full, rightmost partial
++        eprintln!("PROBE gap-1-3 lineage product: {:?}", verdict_of(p, &[(1, 1359), (3, 5)], None, l));
++        // first container number not 1
++        eprintln!("PROBE start-at-5 retirement product: {:?}", verdict_of(p, &[(5, 959), (6, 5)], None, r));
++        // equal numbers
++        eprintln!("PROBE equal-2-2 retirement product: {:?}", verdict_of(p, &[(2, 959), (2, 5)], None, r));
++        // decreasing
++        eprintln!("PROBE decreasing-3-2 retirement product: {:?}", verdict_of(p, &[(3, 959), (2, 5)], None, r));
++        // single container product
++        eprintln!("PROBE single product: {:?}", verdict_of(p, &[(1, 5)], None, l));
++        // zero containers knob
++        eprintln!("PROBE zero knob: {:?}", verdict_of(k, &[], Some(2), l));
++        // rightmost over product (1360) no knob: only I-1.7 would catch
++        eprintln!("PROBE rightmost-over-product product: {:?}", verdict_of(p, &[(1, 1359), (2, 1400)], None, l));
++        // knob: early close allowed
++        eprintln!("PROBE knob early-close: {:?}", verdict_of(k, &[(1, 1), (2, 2)], Some(2), l));
++        // knob: over
++        eprintln!("PROBE knob over: {:?}", verdict_of(k, &[(1, 3)], Some(2), l));
++        // knob: gap
++        eprintln!("PROBE knob gap: {:?}", verdict_of(k, &[(1, 2), (9, 2)], Some(2), l));
++        // knob: decreasing
++        eprintln!("PROBE knob decreasing: {:?}", verdict_of(k, &[(4, 2), (3, 2)], Some(2), l));
++    }
++}

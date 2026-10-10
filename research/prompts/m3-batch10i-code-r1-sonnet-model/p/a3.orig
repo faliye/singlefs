@@ -1,0 +1,17 @@
+            Some(
+                RootRingOccupant::AbandonedRoot {
+                    referenced_placements,
+                }
+                | RootRingOccupant::RootSelfVerifiedOnOnlyOneOfTheTwoRebuildPasses {
+                    root:
+                        RootReadOnOneRebuildPass::AbandonedRoot {
+                            referenced_placements,
+                        },
+                    ..
+                },
+            ) => self.clear_isolation_no_abandoned_root_in_the_ring_backs(
+                &referenced_placements,
+                &still_referenced_by_abandoned_roots,
+            ),
+            Some(
+                RootRingOccupant::ValidRoot { .. }

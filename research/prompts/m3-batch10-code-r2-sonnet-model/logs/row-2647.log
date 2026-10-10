@@ -1,0 +1,58 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 965M 的 2 倍，照理由放行：变异后重编比测试占内存
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：多个子 agent 各跑各的，正推腿在自己的目录跑 harness 档用例
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.41s
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read-8f767751369a600d)
+
+running 6 tests
+test a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write ... FAILED
+test a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over ... FAILED
+test the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write ... FAILED
+test only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over ... FAILED
+test only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads ... FAILED
+test a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before ... ok
+
+failures:
+
+---- a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write stdout ----
+
+thread 'a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write' (3801228) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs:646:5:
+钩子恰调一次，在重建那一遍之后、重读之前（每个根环槽恰读过 6 次）：[]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over stdout ----
+
+thread 'a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over' (3801230) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs:843:33:
+重读那一遍读得出盘 0 的根：照常可写挂载：NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread
+
+---- the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write stdout ----
+
+thread 'the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write' (3801233) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs:566:5:
+assertion `left == right` failed: 读坏的恰是两整遍（重建那一遍与它的重读）：每个根环槽两次
+  left: 24
+ right: 48
+
+---- only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over stdout ----
+
+thread 'only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over' (3801232) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs:504:9:
+只坏重建分配器那一遍：重读读得出，照常可写挂载：NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread
+
+---- only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads stdout ----
+
+thread 'only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads' (3801231) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs:774:9:
+assertion `left == right` failed: 那条根的写恰被拦下一次：[]
+  left: 0
+ right: 1
+
+
+failures:
+    a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write
+    a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over
+    only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads
+    only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over
+    the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write
+
+test result: FAILED. 1 passed; 5 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.08s
+
+error: test failed, to rerun pass `-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read`

@@ -1,0 +1,20 @@
+--- tree/crates/singlefs-checker/src/walk.rs	2026-10-06 00:32:16.973446567 +0000
++++ tree-fix/crates/singlefs-checker/src/walk.rs	2026-10-06 01:17:36.124251654 +0000
+@@ -4096,7 +4096,16 @@
+         };
+         let class_in_the_header = MappingKeyUnitClass::of(header[UNIT_HEADER_CLASS_TAG_OFFSET]);
+         if Some(class_in_the_header) == class_the_entry_type_names {
+-            return None;
++            // 攻方改法 F1（只在攻方模型上量过、被攻过零轮）：头里的类就是类型段说的那一类，也要按那一类的长度自证过才算「孩子是这一类」；
++            // 自证不过（陈旧副本、坏副本）看下一条位置条目。
++            let named_bytes = unit_bytes_of_the_class(class_in_the_header).expect("类型段只说码 2 或码 3");
++            let verifies_at_the_named_length = reader
++                .read(location.device, offset, named_bytes)
++                .is_some_and(|content| crc32_castagnoli_table(&content) == location.checksum);
++            if verifies_at_the_named_length {
++                return None;
++            }
++            continue;
+         }
+         let Some(unit_bytes) = unit_bytes_of_the_class(class_in_the_header) else {
+             continue;

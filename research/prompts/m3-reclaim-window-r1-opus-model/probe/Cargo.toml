@@ -1,0 +1,16 @@
+[package]
+name = "attack-rw-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+
+[[bin]]
+name = "attack-rw-probe"
+path = "main.rs"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

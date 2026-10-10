@@ -1,0 +1,6 @@
+        lender.contents.separator_key_in_the_parent_entry = lender
+            .contents
+            .records
+            .first()
+            .map(|record| record.inode)
+            .expect("右邻借出的条数少于它的记录数：借完至少还剩一条");

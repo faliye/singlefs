@@ -1,0 +1,4 @@
+    ring_roots_not_abandoned_by_crash_recovery(ring_roots, _current_table_not_consulted)
+        .iter()
+        .map(|root| root.tree_identifier_watermark)
+        .fold(tree_identifier_watermark_of_the_current_version, u64::max)

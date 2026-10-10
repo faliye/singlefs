@@ -1,0 +1,6 @@
+full by-publish keys 21 sum 1678377204
+quick by-publish keys 21 sum 278
+16 65547
+24 16777227
+28 268435467
+txg9 expected 16777227 got 16777227

@@ -1,0 +1,612 @@
+b1-1a	RC 0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=abandon done=4 skipped=1
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=create done=9 skipped=0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=drain done=1 skipped=6
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=intent done=8 skipped=0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=remount done=4 skipped=0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=rollback done=12 skipped=0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 act=step done=1 skipped=4
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 clean I-9.29=成立 39
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 clean_checks=39 mutated_checks=198 mismatches=0 unfiltered_states=0
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.10 7
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.18 15
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.19 8
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.20 13
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.24 3
+b1-1a	RESULT campaign knob=0 fault="" seeds=0..5 steps=10 mutations=6 mutated_cpu_red I-9.29 23
+b1-1a	RESULT history seed=0 trace=intent1->t15 abandon->t17 step:skip remount->t19 rollback(i1,t12)->t20 intent2->t21 abandon->t23 step:skip step:skip step:skip
+b1-1a	RESULT history seed=1 trace=rollback(i1,t4)->t15 intent1->t16 step->t17 drain->t18 rollback(i1,t4)->t19 intent1->t20 abandon:skip rollback(i1,t9)->t21 rollback(i1,t15)->t22 remount->t25
+b1-1a	RESULT history seed=2 trace=create3->t15 create2->t16 remount->t19 create2->t20 rollback(i1,t4)->t21 drain:skip drain:skip rollback(i1,t14)->t22 intent4->t23 rollback(i1,t6)->t24
+b1-1a	RESULT history seed=3 trace=drain:skip rollback(i1,t9)->t15 abandon->t17 drain:skip intent4->t18 create2->t20 rollback(i1,t3)->t21 remount->t23 create1->t24 intent10->t25
+b1-1a	RESULT history seed=4 trace=rollback(i1,t7)->t15 rollback(i1,t11)->t16 intent1->t17 create2->t19 drain:skip create2->t20 drain:skip create2->t21 create2->t22 abandon->t25
+b1-1a	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=[] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-1a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-1b	RC 0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=abandon done=5 skipped=0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=create done=10 skipped=0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=drain done=0 skipped=4
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=intent done=10 skipped=0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=remount done=3 skipped=0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=rollback done=15 skipped=1
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 act=step done=0 skipped=2
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 clean I-9.29=成立 43
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 clean_checks=43 mutated_checks=222 mismatches=0 unfiltered_states=0
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 clean_red ["I-3.1"] 1
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.10 3
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.18 17
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.19 5
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.20 13
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.24 6
+b1-1b	RESULT campaign knob=0 fault="" seeds=5..10 steps=10 mutations=6 mutated_cpu_red I-9.29 26
+b1-1b	RESULT history seed=5 trace=create2->t15 drain:skip rollback(i1,t5)->t16 rollback(i1,t4)->t17 create3->t18 create3->t19 remount->t22 intent10->t23 intent12->t25 rollback(i1,t17)->t26
+b1-1b	RESULT history seed=6 trace=abandon->t17 rollback(i1,t6)->t18 create1->t19 abandon->t22 rollback(i1,t6)->t23 intent4->t24 intent2->t26 rollback(i3,t22)->t27 drain:skip abandon->t30
+b1-1b	RESULT history seed=7 trace=remount->t16 create2->t17 rollback(i1,t4)->t18 create3->t19 rollback(i2,t18)->t20 intent1->t21 create2->t23 drain:skip step:skip rollback(i1,t5)->t24
+b1-1b	RESULT history seed=8 trace=intent3->t15 create1->t17 abandon->t19 rollback(i1,t4)->t20 abandon->t22 intent1->t23 rollback(i1,t6)->t24 step:skip rollback(i1,t17):skip rollback(i2,t19)->t25
+b1-1b	RESULT history seed=9 trace=intent2->t15 remount->t18 intent7->t19 create3->t21 rollback(i1,t9)->t22 rollback(i2,t18)->t23 intent7->t24 create2->t26 drain:skip rollback(i1,t3)->t27
+b1-1b	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=[] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-1b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-2a	RC 0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=abandon done=6 skipped=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=create done=11 skipped=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=drain done=2 skipped=1
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=intent done=12 skipped=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=remount done=4 skipped=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=rollback done=10 skipped=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 act=step done=0 skipped=4
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 clean I-9.29=成立 45
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 clean_checks=45 mutated_checks=244 mismatches=0 unfiltered_states=0
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 clean_red ["I-3.1", "I-9.21"] 2
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 clean_red ["I-9.21"] 43
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.10 11
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.18 51
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.19 17
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.20 41
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.21 242
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.24 1
+b1-2a	RESULT campaign knob=1 fault="" seeds=100..105 steps=10 mutations=6 mutated_cpu_red I-9.29 19
+b1-2a	RESULT history seed=100 trace=intent1->t15 create1->t17 rollback(i1,t3)->t18 abandon->t20 create2->t21 drain:skip rollback(i1,t12)->t22 rollback(i1,t6)->t23 create2->t24 step:skip
+b1-2a	RESULT history seed=101 trace=create3->t15 intent1->t16 remount->t22 rollback(i1,t13)->t23 intent1->t25 intent3->t27 abandon->t29 intent7->t30 intent2->t32 drain->t33
+b1-2a	RESULT history seed=102 trace=create2->t15 intent7->t16 create3->t18 intent3->t19 drain->t20 rollback(i1,t12)->t21 step:skip rollback(i1,t18)->t22 abandon->t25 create3->t26
+b1-2a	RESULT history seed=103 trace=intent7->t15 create2->t17 create2->t18 rollback(i1,t4)->t19 step:skip remount->t22 rollback(i1,t5)->t23 rollback(i1,t18)->t24 intent9->t25 intent1->t27
+b1-2a	RESULT history seed=104 trace=step:skip abandon->t17 abandon->t20 rollback(i1,t5)->t21 create2->t22 intent1->t23 remount->t28 abandon->t32 remount->t34 create3->t35
+b1-2a	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-2a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-2b	RC 0
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=abandon done=1 skipped=1
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=create done=9 skipped=0
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=drain done=1 skipped=5
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=intent done=12 skipped=0
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=remount done=2 skipped=0
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=rollback done=11 skipped=1
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 act=step done=3 skipped=4
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 clean I-9.29=成立 39
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 clean_checks=39 mutated_checks=208 mismatches=0 unfiltered_states=0
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 clean_red ["I-9.21"] 39
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.10 13
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.18 33
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.19 5
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.20 21
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.21 200
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.24 3
+b1-2b	RESULT campaign knob=1 fault="" seeds=105..110 steps=10 mutations=6 mutated_cpu_red I-9.29 34
+b1-2b	RESULT history seed=105 trace=intent3->t15 rollback(i1,t11)->t16 abandon:skip create1->t17 intent4->t18 step->t19 create1->t20 drain:skip rollback(i1,t5)->t21 step:skip
+b1-2b	RESULT history seed=106 trace=intent2->t15 intent4->t17 intent7->t19 create1->t21 drain:skip remount->t23 rollback(i1,t7)->t24 step:skip drain:skip rollback(i2,t23)->t25
+b1-2b	RESULT history seed=107 trace=step:skip intent4->t15 step->t16 rollback(i1,t11)->t17 remount->t19 rollback(i1,t15)->t20 create3->t22 rollback(i1,t11)->t23 intent3->t24 intent7->t26
+b1-2b	RESULT history seed=108 trace=abandon->t17 create1->t18 step:skip create3->t19 drain:skip intent10->t20 drain->t21 create3->t22 rollback(i2,t21)->t23 rollback(i1,t14):skip
+b1-2b	RESULT history seed=109 trace=intent1->t15 create3->t17 create2->t18 drain:skip rollback(i1,t14)->t19 intent2->t20 rollback(i1,t12)->t21 rollback(i1,t17)->t22 intent8->t23 step->t24
+b1-2b	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-2b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-3a	RC 0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=create done=14 skipped=0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=drain done=1 skipped=3
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=intent done=14 skipped=0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=intent-none done=0 skipped=2
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=remount done=3 skipped=0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=rollback done=11 skipped=0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 act=step done=0 skipped=2
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 clean I-9.29=成立 43
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 clean_checks=43 mutated_checks=222 mismatches=0 unfiltered_states=0
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 clean_red ["I-9.21"] 43
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.10 13
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.18 27
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.19 10
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.20 25
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.21 222
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.24 4
+b1-3a	RESULT campaign knob=2 fault="" seeds=200..205 steps=10 mutations=6 mutated_cpu_red I-9.29 36
+b1-3a	RESULT history seed=200 trace=intent2->t15 drain->t16 intent3->t17 create1->t19 rollback(i1,t11)->t20 rollback(i1,t16)->t21 intent1->t22 create3->t24 intent9->t25 rollback(i1,t13)->t26
+b1-3a	RESULT history seed=201 trace=create1->t15 intent3->t16 intent4->t18 remount->t21 intent2->t22 rollback(i1,t3)->t23 drain:skip intent1->t24 intent-none:skip intent-none:skip
+b1-3a	RESULT history seed=202 trace=rollback(i1,t12)->t15 create1->t16 drain:skip intent6->t17 create2->t19 intent10->t20 rollback(i1,t6)->t21 drain:skip create2->t22 create3->t23
+b1-3a	RESULT history seed=203 trace=intent7->t15 create2->t17 rollback(i1,t12)->t18 remount->t20 create2->t21 intent10->t22 create1->t24 rollback(i2,t21)->t25 rollback(i2,t24)->t26 step:skip
+b1-3a	RESULT history seed=204 trace=create1->t15 intent7->t16 rollback(i1,t5)->t17 remount->t19 step:skip create2->t20 rollback(i1,t16)->t21 create1->t23 create2->t24 intent12->t25
+b1-3a	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-3a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-3b	RC 0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=abandon done=5 skipped=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=create done=10 skipped=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=drain done=0 skipped=2
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=intent done=13 skipped=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=remount done=2 skipped=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=rollback done=12 skipped=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 act=step done=2 skipped=4
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 clean I-9.29=成立 44
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 clean_checks=44 mutated_checks=239 mismatches=0 unfiltered_states=0
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 clean_red ["I-3.1", "I-9.21"] 1
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 clean_red ["I-9.21"] 43
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.10 11
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.18 30
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.19 11
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.20 22
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.21 239
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.24 7
+b1-3b	RESULT campaign knob=2 fault="" seeds=205..210 steps=10 mutations=6 mutated_cpu_red I-9.29 47
+b1-3b	RESULT history seed=205 trace=rollback(i1,t9)->t15 intent2->t16 rollback(i1,t14)->t17 step:skip abandon->t20 create1->t21 intent6->t22 create1->t24 intent3->t25 create2->t27
+b1-3b	RESULT history seed=206 trace=intent2->t15 intent7->t17 create2->t19 rollback(i1,t5)->t20 create1->t21 step:skip rollback(i1,t11)->t22 rollback(i1,t14)->t23 abandon->t25 rollback(i1,t4)->t26
+b1-3b	RESULT history seed=207 trace=drain:skip rollback(i1,t7)->t15 rollback(i1,t14)->t16 step:skip create1->t17 rollback(i1,t6)->t18 intent2->t19 step->t20 create3->t21 intent10->t22
+b1-3b	RESULT history seed=208 trace=rollback(i1,t5)->t15 abandon->t17 rollback(i1,t12)->t18 create2->t19 create1->t20 intent3->t21 rollback(i2,t20)->t22 remount->t25 intent10->t26 intent1->t28
+b1-3b	RESULT history seed=209 trace=intent2->t15 step->t16 intent1->t17 create1->t19 drain:skip remount->t22 abandon->t25 abandon->t28 step:skip intent7->t29
+b1-3b	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b1-3b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-4a	RC 0
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=abandon done=3 skipped=1
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=create done=10 skipped=0
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=drain done=0 skipped=3
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=intent done=6 skipped=0
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=remount done=7 skipped=0
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=rollback done=12 skipped=4
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 act=step done=1 skipped=3
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 clean I-9.29=成立 39
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 clean_checks=39 mutated_checks=190 mismatches=0 unfiltered_states=0
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 mutated_cpu_red I-9.10 4
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 mutated_cpu_red I-9.18 6
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 mutated_cpu_red I-9.24 1
+b1-4a	RESULT campaign knob=0 fault="" seeds=300..305 steps=10 mutations=6 mutated_cpu_red I-9.29 22
+b1-4a	RESULT history seed=300 trace=remount->t13 drain:skip intent3->t14 create2->t16 remount->t19 create1->t20 drain:skip create3->t21 rollback(i4,t19)->t22 step:skip
+b1-4a	RESULT history seed=301 trace=rollback(i1,t3)->t12 remount->t14 step:skip rollback(i1,t7):skip remount->t16 intent1->t17 create2->t19 rollback(i1,t7):skip remount->t22 rollback(i1,t6)->t23
+b1-4a	RESULT history seed=302 trace=rollback(i1,t4)->t12 intent1->t13 abandon:skip create1->t15 rollback(i2,t13)->t16 rollback(i1,t7):skip step->t17 create1->t19 abandon->t22 rollback(i2,t11)->t23
+b1-4a	RESULT history seed=303 trace=rollback(i1,t7):skip create2->t12 drain:skip rollback(i1,t3)->t13 intent1->t14 create3->t16 abandon->t19 rollback(i2,t13)->t20 intent1->t21 rollback(i2,t12)->t22
+b1-4a	RESULT history seed=304 trace=create1->t12 abandon->t14 create1->t15 intent6->t16 rollback(i1,t5)->t17 rollback(i1,t6)->t18 remount->t20 rollback(i1,t4)->t21 remount->t23 step:skip
+b1-4a	RESULT prefix=reissue records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+b1-4a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b1-4b	RC 0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=abandon done=5 skipped=0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=create done=9 skipped=0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=drain done=0 skipped=3
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=intent done=7 skipped=0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=remount done=4 skipped=0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=rollback done=11 skipped=3
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 act=step done=2 skipped=6
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 clean I-9.29=成立 38
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 clean_checks=38 mutated_checks=184 mismatches=0 unfiltered_states=0
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 mutated_cpu_red I-9.10 1
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 mutated_cpu_red I-9.18 7
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 mutated_cpu_red I-9.20 4
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 mutated_cpu_red I-9.24 1
+b1-4b	RESULT campaign knob=0 fault="" seeds=305..310 steps=10 mutations=6 mutated_cpu_red I-9.29 24
+b1-4b	RESULT history seed=305 trace=remount->t13 intent1->t14 abandon->t16 remount->t19 drain:skip rollback(i2,t10)->t20 drain:skip create3->t21 create2->t22 drain:skip
+b1-4b	RESULT history seed=306 trace=step:skip step:skip create2->t12 intent6->t13 step->t14 create1->t15 remount->t17 abandon->t19 rollback(i1,t7):skip intent1->t20
+b1-4b	RESULT history seed=307 trace=rollback(i1,t3)->t12 intent1->t13 create1->t15 rollback(i1,t7):skip abandon->t17 step:skip create1->t18 create3->t19 rollback(i2,t15):skip intent6->t20
+b1-4b	RESULT history seed=308 trace=abandon->t13 rollback(i2,t10)->t14 rollback(i1,t4)->t15 rollback(i3,t14)->t16 rollback(i1,t5)->t17 intent2->t18 rollback(i2,t10)->t19 rollback(i3,t17)->t20 intent2->t21 step->t22
+b1-4b	RESULT history seed=309 trace=rollback(i1,t6)->t12 abandon->t14 step:skip rollback(i1,t3)->t15 create1->t16 step:skip rollback(i1,t4)->t17 remount->t19 step:skip create1->t20
+b1-4b	RESULT prefix=reissue records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+b1-4b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-1a	RC 0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=abandon done=6 skipped=3
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=create done=10 skipped=0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=drain done=0 skipped=2
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=intent done=9 skipped=0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=remount done=5 skipped=0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=rollback done=14 skipped=0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 act=step done=2 skipped=9
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 clean I-9.29=成立 46
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 clean_checks=46 mutated_checks=87 mismatches=0 unfiltered_states=0
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 clean_red ["I-3.1"] 3
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 mutated_cpu_red I-9.18 7
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 mutated_cpu_red I-9.19 3
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 mutated_cpu_red I-9.20 6
+b2-1a	RESULT campaign knob=0 fault="" seeds=1000..1003 steps=20 mutations=2 mutated_cpu_red I-9.29 7
+b2-1a	RESULT history seed=1000 trace=rollback(i1,t4)->t15 step:skip rollback(i1,t4)->t16 step:skip drain:skip create3->t17 step:skip rollback(i1,t5)->t18 intent2->t19 rollback(i1,t7)->t20 rollback(i1,t17)->t21 create2->t22 abandon->t25 abandon->t28 intent8->t29 step->t30 intent10->t31 intent9->t33 abandon->t35 remount->t37
+b2-1a	RESULT history seed=1001 trace=intent7->t15 step->t16 abandon:skip step:skip abandon:skip create1->t17 intent8->t18 create2->t20 rollback(i1,t3)->t21 rollback(i1,t5)->t22 create1->t23 step:skip rollback(i1,t9)->t24 remount->t26 rollback(i1,t4)->t27 intent1->t28 create2->t30 step:skip abandon:skip rollback(i2,t26)->t31
+b2-1a	RESULT history seed=1002 trace=remount->t16 rollback(i1,t7)->t17 abandon->t19 step:skip abandon->t22 step:skip drain:skip step:skip rollback(i2,t16)->t23 rollback(i1,t9)->t24 intent1->t25 remount->t29 create1->t30 create1->t31 create2->t32 abandon->t34 intent6->t35 remount->t38 create2->t39 rollback(i4,t22)->t40
+b2-1a	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=[] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b2-1a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-1b	RC 0
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=abandon done=10 skipped=3
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=create done=6 skipped=0
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=drain done=1 skipped=6
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=intent done=10 skipped=0
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=remount done=5 skipped=0
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=rollback done=12 skipped=1
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 act=step done=2 skipped=4
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 clean I-9.29=成立 46
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 clean_checks=46 mutated_checks=86 mismatches=0 unfiltered_states=0
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 clean_red ["I-3.1"] 5
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 mutated_cpu_red I-9.10 2
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 mutated_cpu_red I-9.18 3
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 mutated_cpu_red I-9.19 5
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 mutated_cpu_red I-9.20 5
+b2-1b	RESULT campaign knob=0 fault="" seeds=1003..1006 steps=20 mutations=2 mutated_cpu_red I-9.29 12
+b2-1b	RESULT history seed=1003 trace=rollback(i1,t7)->t15 abandon->t17 intent4->t18 remount->t21 abandon->t24 rollback(i1,t6)->t25 remount->t28 intent2->t29 rollback(i3,t21):skip rollback(i1,t7)->t30 create3->t31 step:skip intent9->t32 step->t33 create3->t34 intent12->t35 rollback(i5,t32)->t36 abandon:skip create2->t38 intent4->t39
+b2-1b	RESULT history seed=1004 trace=drain:skip drain:skip intent3->t15 intent4->t17 step->t18 step:skip rollback(i1,t5)->t19 step:skip rollback(i1,t3)->t20 remount->t22 abandon->t25 abandon->t28 abandon->t31 create1->t32 intent8->t33 remount->t36 abandon->t39 create2->t40 abandon->t43 drain:skip
+b2-1b	RESULT history seed=1005 trace=drain:skip drain:skip rollback(i1,t5)->t15 step:skip abandon->t17 abandon->t19 remount->t22 rollback(i1,t7)->t23 rollback(i1,t14)->t24 create1->t25 abandon:skip rollback(i4,t22)->t26 drain:skip abandon->t28 intent3->t29 intent7->t31 rollback(i1,t11)->t32 abandon:skip rollback(i5,t31)->t33 drain->t34
+b2-1b	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=[] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b2-1b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-2a	RC 0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=abandon done=4 skipped=1
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=create done=14 skipped=0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=drain done=0 skipped=5
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=intent done=13 skipped=0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=remount done=5 skipped=0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=rollback done=9 skipped=0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 act=step done=2 skipped=7
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 clean I-9.29=成立 47
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 clean_checks=47 mutated_checks=88 mismatches=0 unfiltered_states=0
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 clean_red ["I-3.1", "I-9.21"] 1
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 clean_red ["I-9.21"] 46
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.10 1
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.18 10
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.19 5
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.20 16
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.21 88
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.24 1
+b2-2a	RESULT campaign knob=1 fault="" seeds=1100..1103 steps=20 mutations=2 mutated_cpu_red I-9.29 7
+b2-2a	RESULT history seed=1100 trace=rollback(i1,t12)->t15 create3->t16 intent4->t17 create2->t19 remount->t22 create3->t23 drain:skip abandon->t25 intent7->t26 step->t27 create3->t28 intent14->t29 create3->t31 step:skip intent6->t32 intent10->t34 create1->t36 intent13->t37 remount->t41 intent11->t42
+b2-2a	RESULT history seed=1101 trace=create1->t15 intent1->t16 rollback(i1,t4)->t17 drain:skip create1->t18 remount->t20 intent9->t21 abandon->t23 remount->t25 step:skip abandon->t28 create1->t29 remount->t31 step:skip drain:skip drain:skip create1->t32 rollback(i6,t31)->t33 intent1->t34 rollback(i1,t12)->t35
+b2-2a	RESULT history seed=1102 trace=step:skip rollback(i1,t7)->t15 rollback(i1,t12)->t16 abandon:skip step:skip step:skip rollback(i1,t3)->t17 drain:skip rollback(i1,t7)->t18 abandon->t20 create1->t21 create3->t22 intent9->t23 step->t24 step:skip create3->t25 rollback(i1,t3)->t26 intent1->t27 create2->t29 intent16->t30
+b2-2a	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b2-2a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-2b	RC 0
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=abandon done=7 skipped=4
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=create done=8 skipped=0
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=drain done=0 skipped=5
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=intent done=17 skipped=0
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=remount done=3 skipped=0
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=rollback done=13 skipped=1
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 act=step done=1 skipped=1
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 clean I-9.29=成立 49
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 clean_checks=49 mutated_checks=89 mismatches=0 unfiltered_states=0
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 clean_red ["I-3.1", "I-9.21"] 3
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 clean_red ["I-9.21"] 46
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.10 2
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.18 9
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.19 5
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.20 12
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.21 88
+b2-2b	RESULT campaign knob=1 fault="" seeds=1103..1106 steps=20 mutations=2 mutated_cpu_red I-9.29 4
+b2-2b	RESULT history seed=1103 trace=rollback(i1,t9)->t15 rollback(i1,t3)->t16 abandon:skip create1->t17 rollback(i1,t4)->t18 create3->t19 drain:skip intent9->t20 abandon->t22 drain:skip intent1->t23 remount->t28 intent11->t29 abandon:skip intent9->t31 rollback(i1,t17)->t32 rollback(i3,t29)->t33 rollback(i1,t11)->t34 rollback(i1,t11)->t35 rollback(i1,t18)->t36
+b2-2b	RESULT history seed=1104 trace=rollback(i1,t13)->t15 intent1->t17 abandon:skip intent2->t19 abandon->t22 create2->t23 create3->t24 intent9->t25 abandon:skip intent10->t27 intent8->t29 rollback(i2,t27)->t30 abandon->t33 step:skip intent2->t34 intent3->t36 rollback(i1,t11):skip intent12->t38 rollback(i2,t29)->t39 create1->t41
+b2-2b	RESULT history seed=1105 trace=create2->t15 drain:skip remount->t17 abandon->t19 rollback(i1,t13)->t20 abandon->t22 remount->t25 rollback(i1,t6)->t26 create3->t27 drain:skip drain:skip intent1->t28 intent10->t30 abandon->t32 intent4->t33 step->t34 create2->t35 abandon->t37 intent3->t38 intent2->t40
+b2-2b	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+b2-2b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-3a	RC 0
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=abandon done=2 skipped=3
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=create done=19 skipped=0
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=drain done=1 skipped=4
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=intent done=12 skipped=0
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=remount done=3 skipped=0
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=rollback done=9 skipped=3
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 act=step done=1 skipped=3
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 clean I-9.29=成立 47
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 clean_checks=47 mutated_checks=82 mismatches=0 unfiltered_states=0
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.10 1
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.18 3
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.19 1
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.20 4
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.24 1
+b2-3a	RESULT campaign knob=0 fault="" seeds=1200..1203 steps=20 mutations=2 mutated_cpu_red I-9.29 16
+b2-3a	RESULT history seed=1200 trace=step:skip rollback(i1,t4)->t12 rollback(i1,t7):skip create3->t13 abandon:skip rollback(i1,t3)->t14 create1->t15 intent1->t16 create3->t18 step:skip abandon:skip rollback(i2,t15)->t19 rollback(i1,t4)->t20 abandon->t22 create3->t23 remount->t25 remount->t28 intent13->t29 intent9->t31 intent15->t33
+b2-3a	RESULT history seed=1201 trace=abandon->t13 rollback(i2,t11):skip create3->t14 drain:skip create1->t15 drain:skip drain:skip rollback(i1,t7):skip create1->t16 create1->t17 intent3->t18 intent4->t20 create2->t22 intent5->t23 step->t24 intent1->t25 create2->t27 create3->t28 rollback(i1,t6)->t29 rollback(i3,t18)->t30
+b2-3a	RESULT history seed=1202 trace=intent4->t12 remount->t15 create3->t16 create3->t17 create1->t18 create3->t19 drain:skip step:skip rollback(i2,t11)->t20 create1->t21 create2->t22 rollback(i1,t4)->t23 intent1->t24 drain->t25 create3->t26 intent19->t27 abandon:skip rollback(i2,t11)->t28 create3->t29 intent24->t30
+b2-3a	RESULT prefix=reissue records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+b2-3a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-3b	RC 0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=abandon done=6 skipped=0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=create done=11 skipped=0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=drain done=1 skipped=6
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=intent done=6 skipped=0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=remount done=3 skipped=0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=rollback done=17 skipped=3
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 act=step done=1 skipped=6
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 clean I-9.29=成立 45
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 clean_checks=45 mutated_checks=81 mismatches=0 unfiltered_states=0
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 clean_red ["I-3.1"] 1
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 mutated_cpu_red I-9.10 3
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 mutated_cpu_red I-9.18 4
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 mutated_cpu_red I-9.19 2
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 mutated_cpu_red I-9.20 1
+b2-3b	RESULT campaign knob=0 fault="" seeds=1203..1206 steps=20 mutations=2 mutated_cpu_red I-9.29 12
+b2-3b	RESULT history seed=1203 trace=intent1->t12 step->t13 rollback(i2,t10)->t14 rollback(i2,t12)->t15 abandon->t17 rollback(i2,t10)->t18 rollback(i2,t14)->t19 abandon->t22 abandon->t25 create3->t26 rollback(i2,t14)->t27 abandon->t29 remount->t31 intent2->t32 create3->t34 remount->t37 step:skip drain:skip rollback(i2,t13):skip intent10->t38
+b2-3b	RESULT history seed=1204 trace=rollback(i1,t7):skip intent5->t12 rollback(i1,t6)->t13 intent4->t14 rollback(i1,t4)->t15 create3->t16 create2->t17 rollback(i2,t12)->t18 drain->t19 step:skip drain:skip intent1->t20 abandon->t22 drain:skip create2->t23 create1->t24 rollback(i2,t16)->t25 step:skip create1->t26 drain:skip
+b2-3b	RESULT history seed=1205 trace=create3->t12 step:skip rollback(i2,t10)->t13 rollback(i2,t12)->t14 drain:skip step:skip abandon->t16 create3->t17 remount->t19 rollback(i3,t17)->t20 step:skip create2->t21 rollback(i1,t5)->t22 drain:skip rollback(i1,t5)->t23 rollback(i1,t6)->t24 rollback(i2,t14):skip create2->t25 rollback(i2,t12)->t26 rollback(i4,t23)->t27
+b2-3b	RESULT prefix=reissue records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+b2-3b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-4a	RC 0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=abandon done=5 skipped=0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=create done=15 skipped=0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=drain done=0 skipped=4
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=intent done=13 skipped=0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=remount done=2 skipped=0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=rollback done=12 skipped=1
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 act=step done=3 skipped=5
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 clean I-9.29=成立 50
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 clean_checks=50 mutated_checks=88 mismatches=0 unfiltered_states=0
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 clean_red ["I-3.1", "I-9.21"] 2
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 clean_red ["I-9.21"] 10
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.10 2
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.18 4
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.20 1
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.21 23
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.24 2
+b2-4a	RESULT campaign knob=3 fault="" seeds=1300..1303 steps=20 mutations=2 mutated_cpu_red I-9.29 11
+b2-4a	RESULT history seed=1300 trace=intent4->t7 step->t8 intent1->t9 step->t10 create1->t12 rollback(i1,t5)->t13 rollback(i1,t5)->t14 rollback(i1,t10)->t15 create3->t17 rollback(i1,t5)->t18 intent1->t19 step->t20 create1->t22 remount->t25 rollback(i1,t6)->t26 intent3->t27 create2->t29 rollback(i1,t14)->t30 drain:skip abandon->t32
+b2-4a	RESULT history seed=1301 trace=create2->t7 intent2->t8 create3->t10 intent6->t11 rollback(i1,t6)->t12 step:skip rollback(i1,t6)->t13 create2->t14 step:skip intent11->t15 intent3->t17 rollback(i1,t4)->t18 create2->t19 step:skip rollback(i1,t6)->t20 intent4->t21 create3->t23 intent14->t24 abandon->t26 step:skip
+b2-4a	RESULT history seed=1302 trace=remount->t8 create3->t9 step:skip abandon->t11 intent2->t12 create3->t14 create3->t15 drain:skip intent1->t16 abandon->t19 abandon->t22 create2->t23 rollback(i3,t14)->t24 rollback(i1,t6)->t25 intent4->t26 create1->t28 drain:skip rollback(i1,t3):skip drain:skip create1->t29
+b2-4a	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+b2-4b	RC 0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=abandon done=8 skipped=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=create done=12 skipped=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=drain done=3 skipped=6
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=intent done=12 skipped=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=remount done=4 skipped=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=rollback done=9 skipped=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 act=step done=2 skipped=4
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 clean I-9.29=成立 50
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 clean_checks=50 mutated_checks=75 mismatches=0 unfiltered_states=0
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 clean_red ["I-3.1", "I-9.21"] 2
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 clean_red ["I-3.1"] 2
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 clean_red ["I-9.21"] 9
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 mutated_cpu_red I-9.18 8
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 mutated_cpu_red I-9.20 3
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 mutated_cpu_red I-9.21 20
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 mutated_cpu_red I-9.24 1
+b2-4b	RESULT campaign knob=3 fault="" seeds=1303..1306 steps=20 mutations=2 mutated_cpu_red I-9.29 7
+b2-4b	RESULT history seed=1303 trace=create3->t7 intent1->t8 drain->t9 step:skip create3->t10 rollback(i1,t4)->t11 remount->t13 rollback(i1,t9)->t14 intent5->t15 intent3->t17 drain->t18 drain:skip rollback(i1,t11)->t19 abandon->t22 rollback(i1,t6)->t23 drain:skip intent3->t24 create2->t26 intent4->t27 abandon->t29
+b2-4b	RESULT history seed=1304 trace=abandon->t8 create1->t9 step:skip drain:skip drain:skip abandon->t11 create3->t12 create2->t13 intent1->t14 remount->t19 abandon->t23 intent2->t24 step->t25 rollback(i3,t12)->t26 remount->t28 intent4->t29 rollback(i6,t28)->t30 create2->t31 abandon->t34 abandon->t37
+b2-4b	RESULT history seed=1305 trace=intent2->t7 rollback(i1,t5)->t8 create2->t9 step:skip drain:skip intent1->t10 drain->t11 rollback(i1,t10)->t12 remount->t17 intent6->t18 create2->t20 step:skip intent3->t21 step->t22 create2->t23 drain:skip create2->t24 abandon->t26 rollback(i1,t3)->t27 create3->t28
+b2-4b	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+batch-test-tree	RC 0
+batch-test-tree	test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back ... ok
+batch-test-tree	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out
+batch-test-tree-fixa	RC 0
+batch-test-tree-fixa	test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back ... ok
+batch-test-tree-fixa	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 102 filtered out
+build-tree	RC 0
+build-tree-fixa	RC 0
+cliff	RC 0
+cliff	RESULT N6-cliff 删过 1000 个号、活的 1 个 最后一版墓碑容器记录数=[815, 185] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+cliff	RESULT N6-cliff 删过 2000 个号、活的 1 个 最后一版墓碑容器记录数=[815, 815, 370] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+cliff	RESULT N6-cliff 删过 2040 个号、活的 1 个 最后一版墓碑容器记录数=[815, 815, 410] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+cliff	RESULT N6-cliff 删过 2044 个号、活的 1 个 最后一版墓碑容器记录数=[815, 815, 414] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+cliff	RESULT N6-cliff 删过 2048 个号、活的 1 个 最后一版墓碑容器记录数=[815, 815, 418] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=Some(59) mismatches=[]
+cliff	RESULT N6-cliff 删过 2100 个号、活的 1 个 最后一版墓碑容器记录数=[815, 815, 470] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=Some(59) mismatches=[]
+cliff	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+fixa-legal	RC 0
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=abandon done=6 skipped=1
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=create done=23 skipped=0
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=drain done=1 skipped=7
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=intent done=14 skipped=0
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=intent-none done=0 skipped=1
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=remount done=5 skipped=0
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=rollback done=14 skipped=3
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 act=step done=2 skipped=3
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 clean I-9.29=成立 65
+fixa-legal	RESULT campaign knob=0 fault="" seeds=300..308 steps=10 mutations=0 clean_checks=65 mutated_checks=0 mismatches=0 unfiltered_states=0
+fixa-legal	RESULT history seed=300 trace=remount->t13 abandon->t16 create2->t17 create1->t18 drain:skip create1->t19 abandon->t22 create1->t23 step:skip intent2->t24
+fixa-legal	RESULT history seed=301 trace=rollback(i1,t3)->t12 rollback(i1,t4)->t13 drain:skip drain:skip intent1->t14 intent-none:skip rollback(i1,t5)->t15 intent1->t16 rollback(i1,t7):skip abandon->t19
+fixa-legal	RESULT history seed=302 trace=rollback(i1,t4)->t12 create2->t13 intent6->t14 create3->t16 create2->t17 intent1->t18 abandon:skip step->t19 rollback(i2,t11)->t20 create1->t21
+fixa-legal	RESULT history seed=303 trace=rollback(i1,t7):skip create2->t12 remount->t14 remount->t16 intent6->t17 rollback(i1,t5)->t18 rollback(i2,t10)->t19 create3->t20 create3->t21 drain:skip
+fixa-legal	RESULT history seed=304 trace=create1->t12 rollback(i1,t6)->t13 intent1->t14 step->t15 abandon->t18 rollback(i1,t7):skip abandon->t21 create2->t22 create2->t23 create3->t24
+fixa-legal	RESULT history seed=305 trace=remount->t13 intent4->t14 rollback(i1,t5)->t15 rollback(i3,t13)->t16 intent2->t17 create3->t19 intent4->t20 abandon->t22 intent7->t23 create2->t25
+fixa-legal	RESULT history seed=306 trace=step:skip step:skip create2->t12 create2->t13 rollback(i2,t11)->t14 intent2->t15 drain->t16 intent3->t17 intent1->t19 create3->t21
+fixa-legal	RESULT history seed=307 trace=rollback(i1,t3)->t12 rollback(i1,t6)->t13 create3->t14 remount->t16 create3->t17 drain:skip rollback(i1,t4)->t18 drain:skip drain:skip create2->t19
+fixa-legal	RESULT prefix=reissue records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+fixa-legal	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+n4	RC 0
+n4	RESULT N4-s0 墓碑树层级 1 干净 violated=[] I-9.23=成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s0 墓碑树层级 2 干净（旋钮镜像，I-9.21 照产品读法红是预期） violated=["I-9.21"] I-9.23=成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s0 谱系树层级 1 干净 violated=[] I-9.23=成立 I-9.17=成立 scan_mismatches=[]
+n4	RESULT N4-s1 墓碑树根类型段 1 条目身份出生代加一 violated=["I-9.23"] I-9.23=不成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s2 墓碑树根类型段 1 条目身份出生树加一 violated=["I-9.23"] I-9.23=不成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s3 谱系树根类型段 5 条目身份容器号加一 violated=["I-9.17"] I-9.23=成立 I-9.17=不成立 scan_mismatches=[]
+n4	RESULT N4-s4 层级 2 根类型段 0 条目身份出生代写 1 violated=["I-9.21", "I-9.23"] I-9.23=不成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s5 层级 1 内部节点类型段 1 条目身份容器号加一 violated=["I-9.21", "I-9.23"] I-9.23=不成立 I-9.17=不适用 scan_mismatches=[]
+n4	RESULT N4-s6 只有旧一版（txg 8，根槽 50316，最新根槽 50346）的墓碑树根条目身份容器号加一 violated=["I-9.23"] I-9.23=不成立 I-9.17=不适用 scan_mismatches=[]
+n4	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+n5	RC 0
+n5	RESULT N5-0 干净镜像 violated=[] I-9.29=成立（） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-a 链指针记录之前多一条 kind 2 violated=[] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-b 链指针记录有无下一片写 2 violated=["I-3.8"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=不成立
+n5	RESULT N5-c 载荷 CRC 对不上、整单元校验和补过 violated=["I-2.3"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-d 两份都读不出（对照） violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=12 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-e0 I-9.29 说明 inode 树（树 65537）里 inode 1 在回退候选集里对应不止一个对象出生代：对象出生代 3（根（实例 1、txg 3）的 inode 记录）、对象出生代 4（根（实例 2、txg 11）的 inode 记录）
+n5	RESULT N5-e0 最新那一版 1 号出生代加一、实例表读得出 violated=["I-9.29"] I-9.29=不成立（inode 树（树 65537）里 inode ） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-e1 同上、实例表两份都读不出 violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=12 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5	RESULT N5-setup records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+n5	RESULT N5-setup 崩溃恢复之后现行那一版 实例2 txg10 records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6)]
+n5	RESULT N5-setup 最新根 实例2 txg11
+n5	RESULT N5-setup 最新根实例表 槽50304 记录数2 各条 kind [0, 1]
+n5	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+n5-fixa	RC 0
+n5-fixa	RESULT N5-0 干净镜像 violated=[] I-9.29=成立（） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-a 链指针记录之前多一条 kind 2 violated=[] I-9.29=成立（） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-b 链指针记录有无下一片写 2 violated=["I-3.8"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=不成立
+n5-fixa	RESULT N5-c 载荷 CRC 对不上、整单元校验和补过 violated=["I-2.3"] I-9.29=成立（） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-d 两份都读不出（对照） violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=12 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-e0 I-9.29 说明 inode 树（树 65537）里 inode 1 在回退候选集里对应不止一个对象出生代：对象出生代 3（根（实例 1、txg 3）的 inode 记录）、对象出生代 4（根（实例 2、txg 11）的 inode 记录）
+n5-fixa	RESULT N5-e0 最新那一版 1 号出生代加一、实例表读得出 violated=["I-9.29"] I-9.29=不成立（inode 树（树 65537）里 inode ） filtered_flag=Some(true) versions=11 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-e1 同上、实例表两份都读不出 violated=["I-2.1", "I-3.1", "I-4.8", "I-7.2", "I-7.4"] I-9.29=部分没判（最新根的实例表读不出（链上有一片读不出或解不开）） filtered_flag=Some(false) versions=12 (干净镜像 11) I-7.9=不适用 I-3.8=成立
+n5-fixa	RESULT N5-setup records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (5, 1, 11)]
+n5-fixa	RESULT N5-setup 崩溃恢复之后现行那一版 实例2 txg10 records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6)]
+n5-fixa	RESULT N5-setup 最新根 实例2 txg11
+n5-fixa	RESULT N5-setup 最新根实例表 槽50304 记录数2 各条 kind [0, 1]
+n5-fixa	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+n6	RC 0
+n6	RESULT N6-s0 815 条（一片满） 最后一版墓碑容器记录数=[815] violated=[] I-9.20=成立 I-9.21=不适用 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s1 开第二片那次被崩溃恢复抛弃、新线删另一个号 最后一版墓碑容器记录数=[815, 1] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s1 被抛弃的意图删的是 817，新线删的是 820，新线的号 [(817, 1643), (818, 1643), (819, 1647)]
+n6	RESULT N6-s2 1631 条（815 + 815 + 1） 最后一版墓碑容器记录数=[815, 815, 1] violated=[] I-9.20=成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s3a 第一片去掉最后一条 最后一版墓碑容器记录数=[814, 815, 1] violated=["I-9.21"] I-9.20=成立 I-9.21=不成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s3b 第二片容器号改成第一片的 最后一版墓碑容器记录数=[815, 815, 1] violated=["I-9.21", "I-9.23"] I-9.20=成立 I-9.21=不成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s3c 最右那片容器号改成第二片的减一 最后一版墓碑容器记录数=[815, 815, 1] violated=["I-9.21", "I-9.23"] I-9.20=成立 I-9.21=不成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	RESULT N6-s3d 最右那片多一条（复制第一条） 最后一版墓碑容器记录数=[815, 815, 2] violated=["I-9.20"] I-9.20=不成立 I-9.21=成立 I-9.29=成立 gpu_undecidable=None mismatches=[]
+n6	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+n7	RC 0
+n7	RESULT N7-s0 干净（意图那一版 txg 8 的队列根槽 50313 层级 0） violated=[] I-9.24=成立 I-9.5=成立 scan_mismatches=[]
+n7	RESULT N7-s1 只有旧一版的队列是 {5, 6} violated=["I-1.1", "I-9.18", "I-9.24", "I-9.5"] I-9.24=不成立 I-9.5=不成立 scan_mismatches=[]
+n7	RESULT N7-s2 旧一版队列乱序 [6, 5] violated=["I-1.1", "I-9.18", "I-9.24", "I-9.5"] I-9.24=不成立 I-9.5=不成立 scan_mismatches=[]
+n7	RESULT N7-s3 旧一版队列同号两条 [5, 5]（上一轮判决第三节第 3 条那一问，这里只记） violated=["I-1.1"] I-9.24=成立 I-9.5=成立 scan_mismatches=[]
+n7	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+setup	RC 0
+setup	RESULT setup 被判 checker_known_bad_images.rs sha256=98d4f3c5e3da3fcfb3de05b587c64f3477375a6be0631afb3c0f0e489d40a9b2
+setup	RESULT setup 被判 walk.rs sha256=61cba439c8bcb7b453b5cb9fef232ecc0594e5ea67822a8f95bb4984ac5d7dd3
+st-18	RC 0
+st-18	RESULT MISMATCH seed=0 step=1 mutation=5 (码3 类型1 槽50390 记录0/1 op5 墓碑偏移 16 改成 1) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=0 step=5 mutation=0 (码3 类型1 槽50418 记录0/1 op8 墓碑偏移 24 改成 18446744073709551614) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=0 step=6 mutation=3 (码3 类型1 槽50314 记录0/1 op5 墓碑偏移 24 改成 18446744073709551614) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=1 step=2 mutation=4 (码3 类型1 槽50344 记录0/1 op8 墓碑偏移 24 改成 18446744073709551614) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=2 step=3 mutation=3 (码3 类型1 槽50344 记录0/1 op5 墓碑偏移 24 改成 18446744073709551614) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=3 step=1 mutation=0 (码3 类型1 槽50314 记录0/1 op5 墓碑偏移 16 改成 1) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT MISMATCH seed=4 step=1 mutation=1 (码3 类型1 槽50314 记录0/1 op5 墓碑偏移 16 改成 1) I-9.18 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=abandon done=5 skipped=1
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=create done=5 skipped=0
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=drain done=1 skipped=5
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=intent done=5 skipped=0
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=remount done=5 skipped=0
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=rollback done=15 skipped=1
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 act=step done=1 skipped=4
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 clean I-9.29=成立 37
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 clean_checks=37 mutated_checks=194 mismatches=7 unfiltered_states=0
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 clean_red ["I-3.1", "I-9.21"] 1
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 clean_red ["I-9.21"] 36
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.10 5
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.18 31
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.19 7
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.20 22
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.21 190
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.24 3
+st-18	RESULT campaign knob=1 fault="no-whole-object-18" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.29 24
+st-18	RESULT history seed=0 trace=intent1->t15 remount->t20 drain:skip create2->t21 rollback(i1,t9)->t22 intent6->t23 abandon->t25 rollback(i2,t21)->t26
+st-18	RESULT history seed=1 trace=rollback(i1,t4)->t15 drain:skip rollback(i1,t14)->t16 abandon:skip step:skip create3->t17 rollback(i1,t13)->t18 create2->t20
+st-18	RESULT history seed=2 trace=create3->t15 intent7->t16 drain->t17 remount->t19 remount->t22 abandon->t25 abandon->t28 rollback(i1,t4):skip
+st-18	RESULT history seed=3 trace=drain:skip rollback(i1,t9)->t15 intent3->t16 step->t17 drain:skip abandon->t20 intent4->t21 remount->t24
+st-18	RESULT history seed=4 trace=rollback(i1,t7)->t15 rollback(i1,t11)->t16 step:skip step:skip rollback(i1,t11)->t17 abandon->t19 remount->t22 rollback(i1,t11)->t23
+st-18	RESULT history seed=5 trace=create2->t15 drain:skip rollback(i1,t5)->t16 rollback(i1,t4)->t17 rollback(i1,t9)->t18 step:skip rollback(i1,t17)->t19 rollback(i1,t18)->t20
+st-18	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+st-18	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+st-24	RC 0
+st-24	RESULT MISMATCH seed=0 step=2 mutation=1 (码2 种类9 层级0 槽50301 条目0/1 队列追加号 6) I-9.24 cpu=不成立 gpu=不红 cpu_violated=["I-1.1", "I-9.24", "I-9.5"]
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=abandon done=5 skipped=1
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=create done=12 skipped=0
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=drain done=0 skipped=4
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=intent done=5 skipped=0
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=remount done=2 skipped=0
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=rollback done=16 skipped=0
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 act=step done=1 skipped=2
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 clean I-9.29=成立 41
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 clean_checks=41 mutated_checks=170 mismatches=1 unfiltered_states=0
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.10 6
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.18 5
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.24 1
+st-24	RESULT campaign knob=1 fault="queue-bound-off-24" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.29 19
+st-24	RESULT history seed=0 trace=intent1->t7 abandon:skip rollback(i1,t4)->t8 step:skip create3->t9 step:skip abandon->t11 remount->t13
+st-24	RESULT history seed=1 trace=rollback(i1,t4)->t7 intent1->t8 create2->t10 create1->t11 drain:skip rollback(i1,t7)->t12 drain:skip rollback(i1,t11)->t13
+st-24	RESULT history seed=2 trace=create3->t7 rollback(i1,t5)->t8 intent3->t9 step->t10 rollback(i1,t6)->t11 create1->t12 rollback(i1,t6)->t13 create2->t14
+st-24	RESULT history seed=3 trace=drain:skip rollback(i1,t5)->t7 rollback(i1,t4)->t8 rollback(i1,t5)->t9 create3->t10 intent7->t11 rollback(i1,t4)->t12 remount->t14
+st-24	RESULT history seed=4 trace=rollback(i1,t4)->t7 create1->t8 rollback(i1,t4)->t9 abandon->t11 intent5->t12 create1->t14 abandon->t16 rollback(i1,t8)->t17
+st-24	RESULT history seed=5 trace=create2->t7 rollback(i1,t3)->t8 rollback(i1,t4)->t9 drain:skip abandon->t11 create2->t12 create2->t13 abandon->t16
+st-24	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+st-29	RC 0
+st-29	RESULT MISMATCH seed=0 step=2 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=0 step=2 mutation=1 (码2 种类9 层级0 槽50301 条目0/1 队列追加号 6) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-1.1", "I-9.24", "I-9.5"]
+st-29	RESULT MISMATCH seed=0 step=2 mutation=4 (码2 种类2 层级1 槽50294 条目0/1 类型段改成 1) I-9.19 cpu=不适用 gpu=红 cpu_violated=["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+st-29	RESULT MISMATCH seed=0 step=4 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=0 step=4 mutation=0 (码3 类型1 槽50302 记录0/1 op1 墓碑偏移 0 改成 1) I-9.19 cpu=成立 gpu=红 cpu_violated=[]
+st-29	RESULT MISMATCH seed=0 step=4 mutation=2 (码3 类型2 槽50292 记录1/4 op9 容器号改成 0) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=4 mutation=4 (码2 种类2 层级1 槽50258 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=6 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=0 step=6 mutation=0 (码2 种类2 层级1 槽50270 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=6 mutation=2 (码3 类型2 槽50242 记录0/1 op7 去掉最后一条) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-4.7", "I-9.13"]
+st-29	RESULT MISMATCH seed=0 step=6 mutation=3 (码2 种类2 层级1 槽50258 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=6 mutation=4 (码2 种类2 层级1 槽50294 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=7 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=0 step=7 mutation=0 (码3 类型2 槽50242 记录0/1 op6 追加一份同样的记录) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.4"]
+st-29	RESULT MISMATCH seed=0 step=7 mutation=1 (码2 种类2 层级1 槽50270 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=7 mutation=2 (码2 种类2 层级1 槽50258 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=0 step=7 mutation=3 (码2 种类11 层级1 槽50316 条目0/1 身份出生树改成 65547) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=1 step=5 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=1 step=5 mutation=0 (码2 种类2 层级1 槽50258 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=1 step=5 mutation=2 (码3 类型1 槽50314 记录0/1 op9 容器号改成 0) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.23"]
+st-29	RESULT MISMATCH seed=1 step=5 mutation=3 (码3 类型2 槽50268 记录0/3 op6 追加一份同样的记录) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.4"]
+st-29	RESULT MISMATCH seed=1 step=5 mutation=4 (码2 种类2 层级1 槽50332 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=1 step=7 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=1 step=7 mutation=5 (码2 种类11 层级1 槽50300 条目0/1 身份出生树改成 65547) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=2 step=4 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=2 step=4 mutation=0 (码2 种类2 层级1 槽50258 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=4 mutation=4 (码2 种类2 层级1 槽50244 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=4 mutation=5 (码2 种类10 层级1 槽50328 条目0/1 类型段改成 1) I-9.19 cpu=成立 gpu=红 cpu_violated=[]
+st-29	RESULT MISMATCH seed=2 step=5 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=2 step=5 mutation=0 (码3 类型2 槽50292 记录2/7 op4 inode 记录偏移 0 改成 5) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.4"]
+st-29	RESULT MISMATCH seed=2 step=5 mutation=2 (码2 种类2 层级1 槽50294 条目0/1 类型段改成 0) I-9.19 cpu=不适用 gpu=红 cpu_violated=["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+st-29	RESULT MISMATCH seed=2 step=5 mutation=4 (码2 种类2 层级1 槽50270 条目0/1 身份容器号改成 2) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=6 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=2 step=6 mutation=3 (码2 种类11 层级1 槽50354 条目0/2 身份出生树改成 65547) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=2 step=6 mutation=4 (码2 种类2 层级1 槽50270 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=6 mutation=5 (码2 种类2 层级1 槽50258 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=7 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=2 step=7 mutation=0 (码2 种类11 层级1 槽50382 条目0/1 身份出生树改成 65547) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=2 step=7 mutation=1 (码2 种类2 层级1 槽50282 条目0/1 类型段改成 7) I-9.19 cpu=不适用 gpu=红 cpu_violated=["I-2.1", "I-3.1", "I-4.8", "I-5.1", "I-7.4"]
+st-29	RESULT MISMATCH seed=2 step=7 mutation=2 (码3 类型5 槽50352 记录0/1 op9 容器号改成 3) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=2 step=7 mutation=3 (码3 类型5 槽50380 记录0/1 op9 容器号改成 4) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=2 step=7 mutation=4 (码2 种类2 层级1 槽50258 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT MISMATCH seed=2 step=7 mutation=5 (码2 种类11 层级1 槽50354 条目1/2 身份容器号改成 3) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.17"]
+st-29	RESULT MISMATCH seed=4 step=7 clean I-9.19 cpu=成立 gpu=红
+st-29	RESULT MISMATCH seed=4 step=7 mutation=1 (码3 类型2 槽50304 记录0/2 op1 inode 记录偏移 8 改成 4) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.29"]
+st-29	RESULT MISMATCH seed=4 step=7 mutation=5 (码2 种类2 层级1 槽50258 条目0/1 身份出生树改成 65538) I-9.19 cpu=成立 gpu=红 cpu_violated=["I-9.2"]
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=abandon done=5 skipped=1
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=create done=12 skipped=0
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=drain done=0 skipped=4
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=intent done=5 skipped=0
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=remount done=2 skipped=0
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=rollback done=16 skipped=0
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 act=step done=1 skipped=2
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 clean I-9.29=成立 41
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 clean_checks=41 mutated_checks=170 mismatches=46 unfiltered_states=0
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.10 6
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.18 5
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.24 1
+st-29	RESULT campaign knob=1 fault="no-lineage-filter-29" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.29 19
+st-29	RESULT history seed=0 trace=intent1->t7 abandon:skip rollback(i1,t4)->t8 step:skip create3->t9 step:skip abandon->t11 remount->t13
+st-29	RESULT history seed=1 trace=rollback(i1,t4)->t7 intent1->t8 create2->t10 create1->t11 drain:skip rollback(i1,t7)->t12 drain:skip rollback(i1,t11)->t13
+st-29	RESULT history seed=2 trace=create3->t7 rollback(i1,t5)->t8 intent3->t9 step->t10 rollback(i1,t6)->t11 create1->t12 rollback(i1,t6)->t13 create2->t14
+st-29	RESULT history seed=3 trace=drain:skip rollback(i1,t5)->t7 rollback(i1,t4)->t8 rollback(i1,t5)->t9 create3->t10 intent7->t11 rollback(i1,t4)->t12 remount->t14
+st-29	RESULT history seed=4 trace=rollback(i1,t4)->t7 create1->t8 rollback(i1,t4)->t9 abandon->t11 intent5->t12 create1->t14 abandon->t16 rollback(i1,t8)->t17
+st-29	RESULT history seed=5 trace=create2->t7 rollback(i1,t3)->t8 rollback(i1,t4)->t9 drain:skip abandon->t11 create2->t12 create2->t13 abandon->t16
+st-29	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+st-death	RC 0
+st-death	RESULT MISMATCH seed=5 step=7 mutation=2 (码3 类型1 槽50314 记录0/1 op3 墓碑偏移 32 改成 9) I-9.20 cpu=不成立 gpu=不红 cpu_violated=["I-9.18", "I-9.20", "I-9.21"]
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=abandon done=5 skipped=1
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=create done=5 skipped=0
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=drain done=1 skipped=5
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=intent done=5 skipped=0
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=remount done=5 skipped=0
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=rollback done=15 skipped=1
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 act=step done=1 skipped=4
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 clean I-9.29=成立 37
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 clean_checks=37 mutated_checks=194 mismatches=1 unfiltered_states=0
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 clean_red ["I-3.1", "I-9.21"] 1
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 clean_red ["I-9.21"] 36
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.10 5
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.18 31
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.19 7
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.20 22
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.21 190
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.24 3
+st-death	RESULT campaign knob=1 fault="death-bound-plus-one" seeds=0..6 steps=8 mutations=6 mutated_cpu_red I-9.29 24
+st-death	RESULT history seed=0 trace=intent1->t15 remount->t20 drain:skip create2->t21 rollback(i1,t9)->t22 intent6->t23 abandon->t25 rollback(i2,t21)->t26
+st-death	RESULT history seed=1 trace=rollback(i1,t4)->t15 drain:skip rollback(i1,t14)->t16 abandon:skip step:skip create3->t17 rollback(i1,t13)->t18 create2->t20
+st-death	RESULT history seed=2 trace=create3->t15 intent7->t16 drain->t17 remount->t19 remount->t22 abandon->t25 abandon->t28 rollback(i1,t4):skip
+st-death	RESULT history seed=3 trace=drain:skip rollback(i1,t9)->t15 intent3->t16 step->t17 drain:skip abandon->t20 intent4->t21 remount->t24
+st-death	RESULT history seed=4 trace=rollback(i1,t7)->t15 rollback(i1,t11)->t16 step:skip step:skip rollback(i1,t11)->t17 abandon->t19 remount->t22 rollback(i1,t11)->t23
+st-death	RESULT history seed=5 trace=create2->t15 drain:skip rollback(i1,t5)->t16 rollback(i1,t4)->t17 rollback(i1,t9)->t18 step:skip rollback(i1,t17)->t19 rollback(i1,t18)->t20
+st-death	RESULT prefix=rich records=[(1, 1, 3), (2, 1, 5), (3, 1, 5), (4, 1, 6), (7, 1, 7)] queue=[] violated=["I-9.21"] mismatches=[] I-9.18=成立 I-9.20=成立 I-9.29=成立
+st-death	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out

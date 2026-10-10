@@ -1,0 +1,7 @@
+P L2 violated=["I-9.16"]
+P extent-root-zero violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+P deleted-root-zero violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+P tree-table narrow=false violated=["I-2.1", "I-3.1", "I-4.8", "I-7.4"]
+P tree-table narrow=true violated=["I-4.8", "I-7.4"]
+P tombstone-zero violated=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+P tombstone-unpublished violated=["I-1.2", "I-1.11", "I-4.2", "I-7.7"]

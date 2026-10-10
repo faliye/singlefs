@@ -1,0 +1,17 @@
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 bad=0
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e faulted_reads=24 same_stream_as=w:-/-:z
+FXREFUSED narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:all/all:e faulted_reads=48 writes_before_err=0 Recovery(NoValidRoot)
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=r120-144:all/all:e+r144-168:-/all:e faulted_reads=32 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 bad=0
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:all/-:e faulted_reads=40 same_stream_as=r120-144:all/all:e+r144-168:-/all:e
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=r120-144:all/all:e+r144-168:only1/-:e faulted_reads=25 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 bad=0
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=r120-144:all/all:e+r144-168:-/only1:e faulted_reads=25 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 bad=0
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:but1/-:e faulted_reads=39 same_stream_as=w:-/-:z
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:-/but1:e faulted_reads=31 same_stream_as=w:-/-:z
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:but1/but1:e faulted_reads=46 same_stream_as=w:-/-:z
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e+r144-168:only1/only1:e faulted_reads=26 same_stream_as=r120-144:all/all:e+r144-168:-/only1:e
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:-/all:z faulted_reads=32 same_stream_as=r120-144:all/all:e+r144-168:-/all:e
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:all/-:z faulted_reads=40 same_stream_as=r120-144:all/all:e+r144-168:-/all:e
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:only1/-:z faulted_reads=25 same_stream_as=r120-144:all/all:e+r144-168:only1/-:e
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:-/only1:z faulted_reads=25 same_stream_as=r120-144:all/all:e+r144-168:-/only1:e
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:but1/-:z faulted_reads=39 same_stream_as=w:-/-:z
+FXSAME narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z+r144-168:-/but1:z faulted_reads=31 same_stream_as=w:-/-:z

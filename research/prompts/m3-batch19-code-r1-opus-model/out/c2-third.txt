@@ -1,0 +1,10 @@
+run-with-memory-cap: 上限 3G 超过实测峰值 133M 的 2 倍，照理由放行：同一个原型二进制按 MODE 跑不同的活，峰值表只记了最小的那一种；整编峰值比增量编大
+C2STEP mut=c2-third n=1 first_step=FinalBatch { data_units_released: 1 }
+C2STEP mut=c2-third n=144 first_step=FinalBatch { data_units_released: 144 }
+C2STEP mut=c2-third n=145 first_step=Batch { data_units_kept: 1, size_after_the_batch_in_bytes: 32634 }
+C2STEP mut=c2-third n=432 first_step=Batch { data_units_kept: 288, size_after_the_batch_in_bytes: 9398592 }
+C2STEP mut=c2-third n=433 first_step=Batch { data_units_kept: 288, size_after_the_batch_in_bytes: 9398592 }
+C2STEP mut=c2-third n=576 first_step=Batch { data_units_kept: 384, size_after_the_batch_in_bytes: 12531456 }
+C2STEP mut=c2-third n=864 first_step=Batch { data_units_kept: 576, size_after_the_batch_in_bytes: 18797184 }
+C2STEP mut=c2-third n=4320 first_step=Batch { data_units_kept: 2880, size_after_the_batch_in_bytes: 93985920 }
+C2RUN mut=c2-third units=433 每一次发布换下的数据单元=[0, 145, 144, 144] 最多=145

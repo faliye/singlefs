@@ -1,0 +1,5 @@
+50d4d79ca5c7b523eb56a99739ed14a3b5728c6e355c85f370d865fd5c899896  .claude/kb/decisions/23-journal的角色与格式.md
+0789e07ebd511b33b3fe86cb7047628e3a0e38e21997988438a3b2a79a3bc345  .claude/kb/decisions/28-挂载期承诺量.md
+0b97af507e86c13251eb564cf6aece96a6ff237887e90f3fd5a4abc759d76223  .claude/kb/checks-owed.md
+4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md

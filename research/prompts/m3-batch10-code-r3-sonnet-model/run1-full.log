@@ -1,0 +1,75 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/rollback_by_a_forward_publish.rs (target/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+
+running 4 tests
+PROBE 恢复之后重开 txg 32 violated ["I-3.1"] i31_diffs [1146880]
+PROBE 恢复之后重开 txg 33 violated ["I-3.1"] i31_diffs [1376256]
+PROBE 恢复之后重开 txg 34 violated ["I-3.1"] i31_diffs [1540096]
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ok
+PROBE 恢复之后重开 txg 35 violated ["I-3.1"] i31_diffs [1671168]
+PROBE ZeroesWritten：崩溃之后重开 txg 32 violated ["I-3.1"] i31_diffs [1048576]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 32 violated ["I-3.1"] i31_diffs [1048576]
+PROBE 恢复之后重开 txg 36 violated ["I-3.1"] i31_diffs [1802240]
+PROBE ZeroesWritten：崩溃之后重开 txg 33 violated ["I-3.1"] i31_diffs [1277952]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 33 violated ["I-3.1"] i31_diffs [1277952]
+PROBE 恢复之后重开 txg 37 violated ["I-3.1"] i31_diffs [2064384]
+PROBE ZeroesWritten：崩溃之后重开 txg 34 violated ["I-3.1"] i31_diffs [1441792]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 34 violated ["I-3.1"] i31_diffs [1441792]
+PROBE 恢复之后重开 txg 38 violated ["I-3.1"] i31_diffs [2326528]
+PROBE ZeroesWritten：崩溃之后重开 txg 35 violated ["I-3.1"] i31_diffs [1572864]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 35 violated ["I-3.1"] i31_diffs [1572864]
+PROBE 恢复之后重开 txg 39 violated ["I-3.1"] i31_diffs [2588672]
+PROBE ZeroesWritten：崩溃之后重开 txg 36 violated ["I-3.1"] i31_diffs [1703936]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 36 violated ["I-3.1"] i31_diffs [1703936]
+PROBE 恢复之后重开 txg 40 violated ["I-3.1"] i31_diffs [2850816]
+PROBE ZeroesWritten：崩溃之后重开 txg 37 violated ["I-3.1"] i31_diffs [1966080]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 37 violated ["I-3.1"] i31_diffs [1966080]
+PROBE 恢复之后重开 txg 41 violated ["I-3.1"] i31_diffs [3112960]
+PROBE ZeroesWritten：崩溃之后重开 txg 38 violated ["I-3.1"] i31_diffs [2228224]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 38 violated ["I-3.1"] i31_diffs [2228224]
+PROBE 恢复之后重开 txg 42 violated ["I-3.1"] i31_diffs [3375104]
+PROBE ZeroesWritten：崩溃之后重开 txg 39 violated ["I-3.1"] i31_diffs [2490368]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 39 violated ["I-3.1"] i31_diffs [2490368]
+PROBE 恢复之后重开 txg 43 violated ["I-3.1"] i31_diffs [3637248]
+PROBE ZeroesWritten：崩溃之后重开 txg 40 violated ["I-3.1"] i31_diffs [2752512]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 40 violated ["I-3.1"] i31_diffs [2752512]
+PROBE 恢复之后重开 txg 44 violated ["I-3.1"] i31_diffs [3899392]
+PROBE ZeroesWritten：崩溃之后重开 txg 41 violated ["I-3.1"] i31_diffs [3014656]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 41 violated ["I-3.1"] i31_diffs [3014656]
+PROBE 恢复之后重开 txg 45 violated ["I-3.1"] i31_diffs [4161536]
+PROBE ZeroesWritten：崩溃之后重开 txg 42 violated ["I-3.1"] i31_diffs [3276800]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 42 violated ["I-3.1"] i31_diffs [3276800]
+PROBE 恢复之后重开 txg 46 violated ["I-3.1"] i31_diffs [4423680]
+PROBE ZeroesWritten：崩溃之后重开 txg 43 violated ["I-3.1"] i31_diffs [3538944]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 43 violated ["I-3.1"] i31_diffs [3538944]
+PROBE 恢复之后重开 txg 47 violated ["I-3.1"] i31_diffs [4685824]
+PROBE ZeroesWritten：崩溃之后重开 txg 44 violated ["I-3.1"] i31_diffs [3801088]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 44 violated ["I-3.1"] i31_diffs [3801088]
+PROBE 恢复之后重开 txg 48 violated ["I-3.1"] i31_diffs [4947968]
+PROBE ZeroesWritten：崩溃之后重开 txg 45 violated ["I-3.1"] i31_diffs [4063232]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 45 violated ["I-3.1"] i31_diffs [4063232]
+PROBE 恢复之后重开 txg 49 violated ["I-3.1"] i31_diffs [5210112]
+PROBE ZeroesWritten：崩溃之后重开 txg 46 violated ["I-3.1"] i31_diffs [4325376]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 46 violated ["I-3.1"] i31_diffs [4325376]
+PROBE 恢复之后重开 txg 50 violated ["I-3.1"] i31_diffs [5472256]
+PROBE ZeroesWritten：崩溃之后重开 txg 47 violated ["I-3.1"] i31_diffs [4587520]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 47 violated ["I-3.1"] i31_diffs [4587520]
+PROBE 恢复之后重开 txg 51 violated ["I-3.1"] i31_diffs [5898240]
+PROBE ZeroesWritten：崩溃之后重开 txg 48 violated ["I-3.1"] i31_diffs [4849664]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 48 violated ["I-3.1"] i31_diffs [4849664]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 49 violated ["I-3.1"] i31_diffs [5111808]
+PROBE ZeroesWritten：崩溃之后重开 txg 49 violated ["I-3.1"] i31_diffs [5111808]
+test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... ok
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 50 violated ["I-3.1"] i31_diffs [5373952]
+PROBE ZeroesWritten：崩溃之后重开 txg 50 violated ["I-3.1"] i31_diffs [5373952]
+PROBE TornAfterTheFirstHalf：崩溃之后重开 txg 51 violated ["I-3.1"] i31_diffs [5799936]
+PROBE ZeroesWritten：崩溃之后重开 txg 51 violated ["I-3.1"] i31_diffs [5799936]
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 46.46s
+
+
+real	0m46.660s
+user	2m22.867s
+sys	0m3.225s

@@ -1,0 +1,14 @@
+
+running 1 test
+K52 du=187 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=188 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=189 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 max_ok_write_du=188
+test sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.31s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.21s
+     Running tests/probe_k52.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/probe_k52-70b66d4cc3d6930b)

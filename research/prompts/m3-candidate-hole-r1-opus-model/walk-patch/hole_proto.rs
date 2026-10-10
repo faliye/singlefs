@@ -55,10 +55,11 @@ fn proto_hole_table_store(
         rows.iter().any(|row| row.instance == instance && txg > row.published_checkpoint_txg)
     };
     let low = effective_rollback_floor.max((newest_txg + 1).saturating_sub(window.root_ring_slot_count));
-    // 锚：窗口里没被抛弃的根与由记录施加出来的版本（候选集里那几版）。
+    // 锚：没被抛弃的根（窗口外的也算，窗口前沿那一格的 R⁻ 可以在窗口外：调查员那条「取号跳过」的行证据不要求 R⁻ 在窗口里）
+    // 与由记录施加出来的版本。
     let mut anchors: BTreeMap<u64, u32> = BTreeMap::new();
     for (_, _, root) in roots {
-        if root.checkpoint_txg >= low && root.checkpoint_txg <= newest_txg && !abandoned(root.instance, root.checkpoint_txg) {
+        if root.checkpoint_txg <= newest_txg && !abandoned(root.instance, root.checkpoint_txg) {
             anchors.insert(root.checkpoint_txg, root.instance);
         }
     }
@@ -77,12 +78,16 @@ fn proto_hole_table_store(
         } else {
             let previous = anchors.range(..t).next_back().map(|(txg, inst)| (*txg, *inst));
             let next = anchors.range(t + 1..).next().map(|(txg, inst)| (*txg, *inst));
-            let rows_skip = match (previous, next) {
-                (Some((pt, pi)), Some((nt, ni))) => {
-                    proto_hole_by_rows(pt, &BTreeSet::from([pi]), nt, ni, rows)
-                        == HoleInTheCandidateSet::HoleBridgedByTheInstanceTableRows
-                }
-                _ => false,
+            // 行证据（调查员第十节「取号跳过」那一格）：有一行 (i, Ti) 且 Ti < t，t 之上第一个锚的实例 v > i、两者之间每个实例都有行且都是 (j, 0, 0)，
+            // t 之下最近的锚不晚于 Ti（R⁻ 就是 (i, Ti) 那一版时这一判就是 gap-row；R⁻ 已被环盖掉、不在盘上时照样认）。
+            let rows_skip = match next {
+                Some((nt, ni)) => rows.iter().any(|row| {
+                    row.published_checkpoint_txg < t
+                        && previous.is_none_or(|(pt, _)| pt <= row.published_checkpoint_txg)
+                        && proto_hole_by_rows(row.published_checkpoint_txg, &BTreeSet::from([row.instance]), nt, ni, rows)
+                            == HoleInTheCandidateSet::HoleBridgedByTheInstanceTableRows
+                }),
+                None => false,
             };
             let committed: Vec<&ScannedJournalRecord> = records_by_device
                 .iter()

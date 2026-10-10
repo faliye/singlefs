@@ -1,0 +1,3 @@
+                for invariant in RETIREMENT_SCAN_INVARIANTS.into_iter().chain([
+                    lineage_or_retirement_capacity_invariant_of(retirement_capacity_knob),
+                ]) {

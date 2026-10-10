@@ -1,0 +1,10 @@
+--- a/Cargo.toml	2026-10-02 14:44:08.496410410 +0000
++++ b/Cargo.toml	2026-10-05 04:26:21.562886769 +0000
+@@ -10,6 +10,7 @@
+     "crates/singlefs-checker",
+     "crates/singlefs-checker-tier",
+     "crates/singlefs-reference-filesystem",
++    "crates/m3b18-opus-proto",
+ ]
+ exclude = ["research"]
+ 

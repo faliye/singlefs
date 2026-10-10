@@ -1,0 +1,3 @@
+$ awk 汇总 research/prompts/m3-r1-batch9-repin-evidence/window-fuzz/summary.txt（每行 out-文件 seeds= … checker_red_seeds=）
+R230 seeds=230 checker_red_seeds=0
+R150 seeds=150 checker_red_seeds=0

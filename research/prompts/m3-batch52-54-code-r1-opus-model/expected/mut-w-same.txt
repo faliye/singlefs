@@ -1,0 +1,12 @@
+command=1 args=--release -p singlefs-harness --test opus_probe_k2_k4 filter=opus_probe_k2_container_numbers_under_the_knobs rc=0
+OPUS_K2_NUMBERS trees tombstone=[(1, 1), (1, 1)] lineage=[(1, 1), (1, 1)] retirement=[(1, 1), (1, 1)] levels(t,l,r)=(1,1,1) leaves=[1]
+OPUS_K2_NUMBERS knob_entry_violations=["I-1.1: 树 65545（种类 10）的根：key 宽 / key 区间与条目不符（Err(KeysNotStrictlyAscending)）", "I-9.22: 根（实例 1、txg 9）：墓碑树（树 65545）沿叶序容器号不严格递增：容器 1 之后是容器 1", "I-9.37: 根（实例 1、txg 9）：退役树（树 65548）沿叶序容器号不严格递增：容器 1 之后是容器 1"]
+OPUS_K2_NUMBERS knob_entry I-9.37=Violated I-9.22=Violated
+OPUS_K2_NUMBERS product_entry_violated=["I-1.1", "I-9.21", "I-9.36"]
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out
+command=2 args=--release -p singlefs-core --lib filter=_tree:: rc=101
+test result: FAILED. 51 passed; 4 failed; 0 ignored; 0 measured; 189 filtered out
+test container_tree::tests::appending_several_records_rewrites_every_touched_container_and_all_their_ancestors ... FAILED
+test container_tree::tests::the_growth_publish_rewrites_the_rightmost_path_and_carries_the_old_root ... FAILED
+test retirement_tree::tests::a_full_open_container_is_closed_and_a_publish_with_two_records_can_span_two_containers ... FAILED
+test tombstone_tree::tests::a_full_open_container_is_closed_and_the_next_one_takes_the_largest_number_plus_one ... FAILED

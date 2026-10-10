@@ -1,0 +1,26 @@
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-checker)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 21.18s
+     Running tests/container_trees_grow_a_level_when_the_root_is_full.rs (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/target/release/deps/container_trees_grow_a_level_when_the_root_is_full-d2ba2166624985e1)
+
+running 1 test
+test a_random_history_under_every_container_knob_reddens_no_invariant_at_any_step ... FAILED
+
+failures:
+
+---- a_random_history_under_every_container_knob_reddens_no_invariant_at_any_step stdout ----
+
+thread 'a_random_history_under_every_container_knob_reddens_no_invariant_at_any_step' (1168158) panicked at crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs:672:9:
+assertion `left == right` failed: 第 6 步之后的合法镜像（带同一组旋钮值）一条都不红
+  left: ["I-9.37: 根（实例 1、txg 14）：谱系树（树 65546）沿叶序容器号不是逐片加一：容器 1 之后是容器 2（下一个号 = 最右号 + 1）"]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_random_history_under_every_container_knob_reddens_no_invariant_at_any_step
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 6 filtered out; finished in 22.59s
+
+error: test failed, to rerun pass `-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full`
+exit=101

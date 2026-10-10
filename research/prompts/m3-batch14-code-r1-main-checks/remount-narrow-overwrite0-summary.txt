@@ -1,0 +1,12 @@
+== rn ga 覆盖写 0（窄盘族 SLOTS 176,208,240,272,304,336、UNITS 1,4,14、BATCHES 0,1,3）
+  lost=dev0 inter_unmount=0 inter_remount=0 read=same = 86315
+  lost=dev0 inter_unmount=0 inter_remount=1 read=differs[ro = 2393
+  lost=dev0 inter_unmount=0 inter_remount=1 read=same = 13668
+  lost=dev1 inter_unmount=0 inter_remount=0 read=same = 101944
+  lost=dev1 inter_unmount=0 inter_remount=1 read=differs[ro = 20
+  lost=dev1 inter_unmount=0 inter_remount=1 read=same = 412
+starts=48 start_failed=6 unmount_raised=48 unmount_err=0 remounts=1764 remount_err=0 starts_with_lone_read_differs=5 of_which_with_remount_intersection=5
+== rn fx 覆盖写 0（窄盘族 SLOTS 176,208,240,272,304,336、UNITS 1,4,14、BATCHES 0,1,3）
+  lost=dev0 inter_unmount=0 inter_remount=0 read=same = 102448
+  lost=dev1 inter_unmount=0 inter_remount=0 read=same = 102448
+starts=48 start_failed=6 unmount_raised=48 unmount_err=0 remounts=1764 remount_err=0 starts_with_lone_read_differs=0 of_which_with_remount_intersection=0

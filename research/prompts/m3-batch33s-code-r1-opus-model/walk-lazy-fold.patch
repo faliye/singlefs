@@ -1,0 +1,64 @@
+--- a/crates/singlefs-checker/src/walk.rs
++++ b/crates/singlefs-checker/src/walk.rs
+@@ -528,6 +528,8 @@
+     user_visible_tree_roots: Vec<UserVisibleTreeRootOfAVersion>,
+     /// 这一版走读一条走读失败都没记：记了就是引用集合数不全，它参与的每一对报不适用。
+     references_are_complete: bool,
++    /// 攻方原型：这一版引用过的落点（ATTACK_LAZY_FOLD 时按全部走完之后的折叠表重折，GPU 的读法）。
++    attack_placements: Vec<(u32, u64)>,
+ }
+ 
+ /// 回退候选集里相邻两版之间有没有洞（I-3.5 的缺口条款；I-3.1 在短环上洞里的误红归下一批调查，那一处要接同一份判法，
+@@ -1240,6 +1242,13 @@
+                 )
+             })
+             .collect();
++        if std::env::var_os("ATTACK_ORDER_ONLY").is_some() {
++            println!("ATTACK_ORDER instance={instance} txg={checkpoint_txg}");
++        }
++        if std::env::var_os("ATTACK_TRACE").is_some() {
++            let unit_list: Vec<(u32, u64)> = BTreeMap::<(u32, u64), Option<UserVisibleTreeOfTheWalk>>::keys(&units).copied().collect();
++            eprintln!("ATTACK_WALKED instance={instance} txg={checkpoint_txg} units={unit_list:?}");
++        }
+         self.versions_walked_for_the_appearance_rule
+             .push(VersionReferencesForTheAppearanceRule {
+                 instance,
+@@ -1247,6 +1256,7 @@
+                 units,
+                 user_visible_tree_roots: self.user_visible_tree_roots_of_this_version.clone(),
+                 references_are_complete: self.walk_failures.len() == walk_failures_before,
++                attack_placements: self.placements_referenced_in_this_version.keys().copied().collect(),
+             });
+     }
+ 
+@@ -11377,6 +11387,30 @@
+                 )
+             });
+     }
++    if std::env::var_os("ATTACK_LAZY_FOLD").is_some() {
++        let refolded: Vec<VersionReferencesForTheAppearanceRule> = walk
++            .versions_walked_for_the_appearance_rule
++            .iter()
++            .map(|version| VersionReferencesForTheAppearanceRule {
++                instance: version.instance,
++                checkpoint_txg: version.checkpoint_txg,
++                units: version
++                    .attack_placements
++                    .iter()
++                    .map(|placement| {
++                        (
++                            *walk.unit_of_each_placement.get(placement).expect("记过"),
++                            walk.user_visible_tree_of_each_placement.get(placement).copied(),
++                        )
++                    })
++                    .collect(),
++                user_visible_tree_roots: version.user_visible_tree_roots.clone(),
++                references_are_complete: version.references_are_complete,
++                attack_placements: version.attack_placements.clone(),
++            })
++            .collect();
++        walk.versions_walked_for_the_appearance_rule = refolded;
++    }
+     judge_the_appearance_rule_of_adjacent_candidate_versions(
+         &walk.versions_walked_for_the_appearance_rule,
+         &walk.birth_txg_of_walked_units,

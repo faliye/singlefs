@@ -1,0 +1,16 @@
+CASE product
+  retirement containers=1 records=[2] numbers=[1]
+  lineage containers=1 records=[2] numbers=[1]
+  tombstone containers=1 records=[2] numbers=[1]
+  checker violations: 0
+CASE retire1-lineage1
+  retirement containers=2 records=[1, 1] numbers=[1, 2]
+  lineage containers=2 records=[1, 1] numbers=[1, 2]
+  tombstone containers=1 records=[2] numbers=[1]
+  checker violations: 0
+CASE tomb1
+  retirement containers=1 records=[2] numbers=[1]
+  lineage containers=1 records=[2] numbers=[1]
+  tombstone containers=2 records=[1, 1] numbers=[1, 2]
+  checker violations: 1
+  VIOLATION I-9.21: 根（实例 1、txg 9）：墓碑树（树 65545）里不是最右的容器 1 装了 1 条，不是 815（满了才关）

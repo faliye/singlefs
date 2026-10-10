@@ -1,0 +1,13 @@
+--- crates/singlefs-core/src/mount.rs
++++ crates/singlefs-core/src/mount.rs
+@@ -1830,6 +1830,10 @@
+         .filter(|root| !is_abandoned(root))
+         .map(|root| root.checkpoint_txg)
+         .max();
++    if window_anchor.is_none() {
++        // RR 臂（攻方副本，零轮）：这一遍根环一条有效根都没读出（择根那一遍择到了根），读数前后不一，任何写之前拒这次可写挂载。
++        return Err(MountError::Recovery(RecoveryFailure::NoValidRoot));
++    }
+     let is_inside_the_window = |checkpoint_txg: CheckpointTxg| {
+         window_anchor.is_none_or(|anchor| {
+             txg_is_inside_the_one_revolution_window(checkpoint_txg, anchor, slots_per_region)

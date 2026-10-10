@@ -1,0 +1,12 @@
+
+running 3 tests
+test lineage_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+test tombstone_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+test retirement_containers_of_two_one_two_and_one_records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 262 filtered out; finished in 16.85s
+
+
+real	0m17.310s
+user	0m7.224s
+sys	0m0.300s

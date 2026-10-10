@@ -1,0 +1,180 @@
+H2 W=240 k=2 arm=A MOUNT_ERR states=5
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=4 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=6 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=A m2_isolated=28 step=8 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=B MOUNT_ERR states=5
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=B m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=today MOUNT_ERR states=5
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=2 arm=today m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A MOUNT_ERR states=5
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=4 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=6 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=A m2_isolated=28 step=8 (w)faulty_overwrite=Ok(raises=1)[in_ring=false dmg=2 chk=] then=Ok(raises=0)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(3) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B MOUNT_ERR states=5
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=B m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today MOUNT_ERR states=5
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=3 arm=today m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=A MOUNT_ERR states=5
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=4 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=6 (w)faulty_overwrite=Ok(raises=1)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=false dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=0 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=A m2_isolated=28 step=8 (w)faulty_overwrite=Ok(raises=1)[in_ring=false dmg=0 chk=] then=Ok(raises=0)[in_ring=false dmg=2 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(3) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=B MOUNT_ERR states=5
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=0 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=B m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=0 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=today MOUNT_ERR states=5
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=0 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=1 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=2 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=3 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=4 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=5 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=6 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=7 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 damaged_at_m2=0 step=8 damaged_now=0 (u)unmount=Err(StillUnreadable:AccountOfAnAbandonedRoot)->retry:Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=0 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=1 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=2 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=0)[in_ring=true dmg=0 chk=],Ok(raises=1)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=3 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=4 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(2) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=5 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=6 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=true dmg=0 chk=],Ok(raises=0)[in_ring=true dmg=0 chk=] unmount=Ok(3) damaged_after=0 probe=onR:read-ok states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=7 (w)faulty_overwrite=Ok(raises=0)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=0 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+H2 W=240 k=4 arm=today m2_isolated=28 step=8 (w)faulty_overwrite=Err(FloorRaiseFailedWhilePushingForSpace+Account)[in_ring=true dmg=0 chk=] then=Ok(raises=1)[in_ring=false dmg=0 chk=],Ok(raises=0)[in_ring=false dmg=2 chk=] unmount=Ok(2) damaged_after=2 probe=onR:FAILED(NoValidRoot) states=4
+L0TALLY recorded W=240 k=2 arm=A (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=2 arm=B (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=2 arm=today (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=3 arm=A (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=3 arm=B (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=3 arm=today (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=4 arm=A (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=4 arm=B (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-
+L0TALLY recorded W=240 k=4 arm=today (H2) states=13 root_persisted=9 violations=0 failed=0 no_file=0 file_read=13 checker_violated=[] first_violation=-

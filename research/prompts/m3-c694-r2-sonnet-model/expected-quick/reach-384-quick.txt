@@ -1,0 +1,26 @@
+K4ARM arm=c mount_err=60 mount_ok_with_red_checker=0 states_differing_from_none=16 isolate_calls=579 abandoned_roots_seen=0 account_unreadable=0 mapping_recompute_failed=0 refused=0 c_hook_mounts=579 c_hook_mounts_with_unapplied_records=16 c_hook_records_above_water=16 c_hook_placements=232
+K4ARM arm=none mount_err=60 mount_ok_with_red_checker=0 states_differing_from_none=0 isolate_calls=579 abandoned_roots_seen=0 account_unreadable=0 mapping_recompute_failed=0 refused=0 c_hook_mounts=579 c_hook_mounts_with_unapplied_records=16 c_hook_records_above_water=16 c_hook_placements=232
+K4DIFF seed_offset=0 segment=37 persisted_writes=1 arm=c base_arm=none base=Ok eff=(1,8) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(1,8) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=38 persisted_writes=0 arm=c base_arm=none base=Ok eff=(1,8) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(1,8) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=46 persisted_writes=1 arm=c base_arm=none base=Ok eff=(2,10) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(2,10) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=47 persisted_writes=0 arm=c base_arm=none base=Ok eff=(2,10) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(2,10) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=6 persisted_writes=1 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4DIFF seed_offset=0 segment=63 persisted_writes=1 arm=c base_arm=none base=Ok eff=(3,14) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(3,14) isolated=20 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=64 persisted_writes=0 arm=c base_arm=none base=Ok eff=(3,14) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(3,14) isolated=20 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=0 segment=7 persisted_writes=0 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4DIFF seed_offset=1 segment=26 persisted_writes=1 arm=c base_arm=none base=Ok eff=(1,5) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(1,5) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=1 segment=27 persisted_writes=0 arm=c base_arm=none base=Ok eff=(1,5) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(1,5) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=1 segment=39 persisted_writes=1 arm=c base_arm=none base=Ok eff=(2,8) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(2,8) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=1 segment=40 persisted_writes=0 arm=c base_arm=none base=Ok eff=(2,8) isolated=0 unreadable=0 admission=before warmups=1 reds=[] | arm_result=Ok eff=(2,8) isolated=16 unreadable=0 admission=before warmups=1 reds=[]
+K4DIFF seed_offset=1 segment=6 persisted_writes=1 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4DIFF seed_offset=1 segment=7 persisted_writes=0 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4DIFF seed_offset=2 segment=6 persisted_writes=1 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4DIFF seed_offset=2 segment=7 persisted_writes=0 arm=c base_arm=none base=Ok eff=(0,0) isolated=0 unreadable=0 admission=before warmups=2 reds=[] | arm_result=Ok eff=(0,0) isolated=6 unreadable=0 admission=before warmups=2 reds=[]
+K4ERR arm=c Err Recovery count=54
+K4ERR arm=c Err SystemConfigurationUnreadableAfterTheReadStage count=6
+K4ERR arm=none Err Recovery count=54
+K4ERR arm=none Err SystemConfigurationUnreadableAfterTheReadStage count=6
+K4HIST width=UnitAreaOf384Slots seed_offset=0 segments=74 writes=338 states=339 recover_failed_on_a_chosen_root=0 recover_no_root_chosen=18
+K4HIST width=UnitAreaOf384Slots seed_offset=1 segments=46 writes=209 states=210 recover_failed_on_a_chosen_root=0 recover_no_root_chosen=18
+K4HIST width=UnitAreaOf384Slots seed_offset=2 segments=20 writes=83 states=84 recover_failed_on_a_chosen_root=0 recover_no_root_chosen=18
+K4TOTAL width=UnitAreaOf384Slots seeds=3 ops=12 states=633 recover_failed_on_a_chosen_root=0 recover_no_root_chosen=54

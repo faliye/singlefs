@@ -1,0 +1,26 @@
+R growth fanout135 append=136 grew=true written_blocks=4 term_with_levels_before=3 term_with_levels_after=4
+R growth fanout2 append=17 grew=true written_blocks=7 term_with_levels_before=6 term_with_levels_after=7
+R growth fanout2 append=33 grew=true written_blocks=8 term_with_levels_before=7 term_with_levels_after=8
+R growth fanout2 append=5 grew=true written_blocks=5 term_with_levels_before=4 term_with_levels_after=5
+R growth fanout2 append=9 grew=true written_blocks=6 term_with_levels_before=5 term_with_levels_after=6
+R growth_summary fanout135 appends=140 publishes_written_more_than_term_before=1
+R growth_summary fanout2 appends=40 publishes_written_more_than_term_before=5
+R left_shift leaves=10 dropped_position=0 dropped=1 rewritten_leaves=9 inode_leaf_slots=18 plus_inode_root=1 plus_retire_container_and_root=3 sum=22 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=10 dropped_position=5 dropped=1 rewritten_leaves=4 inode_leaf_slots=8 plus_inode_root=1 plus_retire_container_and_root=3 sum=12 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=10 dropped_position=9 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=135 dropped_position=0 dropped=1 rewritten_leaves=134 inode_leaf_slots=268 plus_inode_root=1 plus_retire_container_and_root=3 sum=272 w_outside_allocation_record_tree=24 exceeds=true
+R left_shift leaves=135 dropped_position=134 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=135 dropped_position=67 dropped=1 rewritten_leaves=67 inode_leaf_slots=134 plus_inode_root=1 plus_retire_container_and_root=3 sum=138 w_outside_allocation_record_tree=24 exceeds=true
+R left_shift leaves=2 dropped_position=1 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=2 dropped_position=1 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=3 dropped_position=0 dropped=1 rewritten_leaves=2 inode_leaf_slots=4 plus_inode_root=1 plus_retire_container_and_root=3 sum=8 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=3 dropped_position=1 dropped=1 rewritten_leaves=1 inode_leaf_slots=2 plus_inode_root=1 plus_retire_container_and_root=3 sum=6 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=3 dropped_position=2 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=30 dropped_position=0 dropped=1 rewritten_leaves=29 inode_leaf_slots=58 plus_inode_root=1 plus_retire_container_and_root=3 sum=62 w_outside_allocation_record_tree=24 exceeds=true
+R left_shift leaves=30 dropped_position=15 dropped=1 rewritten_leaves=14 inode_leaf_slots=28 plus_inode_root=1 plus_retire_container_and_root=3 sum=32 w_outside_allocation_record_tree=24 exceeds=true
+R left_shift leaves=30 dropped_position=29 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=9 dropped_position=0 dropped=1 rewritten_leaves=8 inode_leaf_slots=16 plus_inode_root=1 plus_retire_container_and_root=3 sum=20 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=9 dropped_position=4 dropped=1 rewritten_leaves=4 inode_leaf_slots=8 plus_inode_root=1 plus_retire_container_and_root=3 sum=12 w_outside_allocation_record_tree=24 exceeds=false
+R left_shift leaves=9 dropped_position=8 dropped=1 rewritten_leaves=0 inode_leaf_slots=0 plus_inode_root=1 plus_retire_container_and_root=3 sum=4 w_outside_allocation_record_tree=24 exceeds=false
+R w pool=2x4GiB batch_data_units=144 ring_window_slots=9200 roots_plus_one=25 w=368
+R w pool=2x4GiB batch_data_units=16 ring_window_slots=2800 roots_plus_one=25 w=112

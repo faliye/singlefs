@@ -1,0 +1,54 @@
+applied m6_borrow_rounds_up
+== m6_borrow_rounds_up core inode_tree::
+test inode_tree::tests::deleting_from_the_left_of_a_pair_borrows_until_the_pair_fits_in_one_and_then_absorbs ... FAILED
+test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+== m6_borrow_rounds_up harness ref test
+test every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.05s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference`
+== m6_borrow_rounds_up harness absorb_and_borrow_on_unlink_path
+test the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it ... FAILED
+test a_leaf_below_the_floor_borrows_half_the_difference_from_its_right_neighbour_and_retires_nothing ... FAILED
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.25s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path`
+applied m7_floor_116
+== m7_floor_116 core inode_tree::
+test inode_tree::tests::deleting_from_the_left_of_a_pair_borrows_until_the_pair_fits_in_one_and_then_absorbs ... FAILED
+test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+== m7_floor_116 harness ref test
+test every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.07s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference`
+== m7_floor_116 harness absorb_and_borrow_on_unlink_path
+test a_leaf_below_the_floor_borrows_half_the_difference_from_its_right_neighbour_and_retires_nothing ... FAILED
+test the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it ... FAILED
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.16s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path`
+applied m8_floor_strict
+== m8_floor_strict core inode_tree::
+test inode_tree::tests::deleting_from_the_left_of_a_pair_borrows_until_the_pair_fits_in_one_and_then_absorbs ... FAILED
+test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+== m8_floor_strict harness ref test
+test every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.74s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference`
+== m8_floor_strict harness absorb_and_borrow_on_unlink_path
+test the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it ... FAILED
+test the_first_leaf_absorbing_the_second_writes_as_many_slots_in_a_tree_of_twenty_leaves_as_in_a_tree_of_forty ... FAILED
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.77s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path`
+applied m9_separator_key_not_updated
+== m9_separator_key_not_updated core inode_tree::
+test inode_tree::tests::a_container_below_the_floor_borrows_half_the_difference_from_its_right_neighbour ... FAILED
+test result: FAILED. 20 passed; 1 failed; 0 ignored; 0 measured; 223 filtered out; finished in 0.11s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+== m9_separator_key_not_updated harness ref test
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.11s
+== m9_separator_key_not_updated harness absorb_and_borrow_on_unlink_path
+test a_leaf_below_the_floor_borrows_half_the_difference_from_its_right_neighbour_and_retires_nothing ... FAILED
+test the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it ... FAILED
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 17.33s
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_absorb_and_borrow_on_the_unlink_path`

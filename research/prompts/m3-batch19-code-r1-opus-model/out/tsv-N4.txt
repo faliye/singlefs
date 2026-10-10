@@ -1,0 +1,37 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 810M 的 2 倍，照理由放行：同一个原型二进制按 MODE 跑不同的活，峰值表只记了最小的那一种；整编峰值比增量编大
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch19-code-r1-opus/rerun-W/pristine/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch19-code-r1-opus/rerun-W/pristine/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.23s
+     Running tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs (/tmp/claude-1000/m3-batch19-code-r1-opus/rerun-W/target-pristine/debug/deps/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads-e1a37a31449dc348)
+
+running 6 tests
+test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_until_its_warm_up_landed_on_every_device ... ok
+test after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor ... FAILED
+test after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_reading_no_root_on_device_one_and_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+test after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads ... ok
+test after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device ... FAILED
+
+failures:
+
+---- after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor stdout ----
+
+thread 'after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor' (2403735) panicked at crates/singlefs-harness/tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs:717:13:
+挂载交回之后第一次写把文件顺序写回 36 个单元：NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: PlacementRefused { unit: Data(DataUnitIndexInFile(31)), refusal: NoFreeSlotOnAnyDevice }, floor_raises: [], refusals_that_pushed_the_floor_raises: [], stop: FloorAlreadyAtTheCeiling { floor: CheckpointTxg(5), ceiling: CheckpointTxg(5) }, versions_published: [] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device stdout ----
+
+thread 'after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device' (2403731) panicked at crates/singlefs-harness/tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs:596:9:
+assertion `left == right` failed: 盘 DeviceIdentity(0)：影子账关着没有隔离位；空闲的槽每一个都发得出去，重建时扣住的那一截在暖机落满之后全放开了
+  left: (0, 211932)
+ right: (0, 211918)
+
+
+failures:
+    after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device
+    after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.84s
+
+error: test failed, to rerun pass `-p singlefs-harness --test the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads`

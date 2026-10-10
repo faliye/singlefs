@@ -1,0 +1,7 @@
+command args=-p singlefs-checker --lib -- product_tombstone_containers_with_an_empty_rightmost_one rc=101
+thread 'walk::tests::product_tombstone_containers_with_an_empty_rightmost_one_violate_only_the_non_empty_sentence' panicked at crates/singlefs-checker/src/walk.rs:14099:9:
+failures:
+failures:
+    walk::tests::product_tombstone_containers_with_an_empty_rightmost_one_violate_only_the_non_empty_sentence
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 31 filtered out; 
+row 3823 named-test-red=yes

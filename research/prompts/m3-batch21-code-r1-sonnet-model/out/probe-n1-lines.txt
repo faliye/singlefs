@@ -1,0 +1,9 @@
+PROBE-N1-LEGIT stage=three-unit-file violated=[] I-9.5=Holds I-4.7=NotApplicable("走读到的每一版里都没有处于删除中的 inode（nlink = 0 的记录、有数据单元而没有 nlink ≥ 1 记录的号）") I-4.6=NotApplicable("走读到的每一版 inode 树里都没有 nlink = 0 的记录") I-3.4=Holds
+PROBE-N1-LEGIT stage=after-intent violated=[] I-9.5=Holds I-4.7=Holds I-4.6=Holds I-3.4=Holds
+PROBE-N1-LEGIT-SHAPE batch=1 inode_record_is_none=false deleted_inodes_is_empty=false data_pointers=2 lower_nodes=1 upper_nodes=1
+PROBE-N1-LEGIT stage=after-batch-1 violated=[] I-9.5=Holds I-4.7=Holds I-4.6=Holds I-3.4=Holds
+PROBE-N1-LEGIT-SHAPE batch=2 inode_record_is_none=false deleted_inodes_is_empty=false data_pointers=1 lower_nodes=0 upper_nodes=1
+PROBE-N1-LEGIT stage=after-batch-2 violated=[] I-9.5=Holds I-4.7=Holds I-4.6=Holds I-3.4=Holds
+PROBE-N1-LEGIT-SHAPE batch=3 inode_record_is_none=true deleted_inodes_is_empty=true data_pointers=0 lower_nodes=0 upper_nodes=1
+PROBE-N1-LEGIT stage=after-batch-3 violated=[] I-9.5=Holds I-4.7=Holds I-4.6=Holds I-3.4=Holds
+PROBE-N1-LEGIT stage=after-new-inode-on-the-emptied-version violated=[] I-9.5=Holds I-4.7=Holds I-4.6=Holds I-3.4=Holds

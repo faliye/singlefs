@@ -1,0 +1,25 @@
+PHASES fixed-orphans crash_points=1 second_by_phase={Acquisition: 1, RowPublish: 1, WarmUp: 1, ErasingHeadsOfTheInstanceTableSweep: 1, InstanceTableSweepPublish: 1} new_findings=0
+PHASES orphans-seed0 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed1 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed2 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed3 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed4 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed5 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed6 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed7 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed8 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed9 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed10 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed11 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed12 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed13 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed14 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed15 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed16 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed17 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed18 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed19 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed20 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed21 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed22 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0
+PHASES orphans-seed23 crash_points=3 second_by_phase={Acquisition: 3, RowPublish: 3, WarmUp: 3} new_findings=0

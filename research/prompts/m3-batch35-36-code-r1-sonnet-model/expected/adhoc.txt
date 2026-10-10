@@ -1,0 +1,2 @@
+R6 变异表里锚 protected.extend 的行数	0
+ADHOC rc=0 compile_error=False nfailed=0

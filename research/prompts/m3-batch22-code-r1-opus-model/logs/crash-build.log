@@ -1,0 +1,27 @@
+run-with-memory-cap: 上限 6G 超过实测峰值 317M 的 2 倍，照理由放行：派发提示写死编译 6G、跑 4G
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿模型复跑，在自己的工作目录里各跑各的
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling libc v0.2.189
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling singlefs-format v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling singlefs-replay-prefix v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-harness)
+   Compiling singlefs-checker-tier v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/tree/crates/singlefs-checker-tier)
+   Compiling opus-b22-crash v0.1.0 (/tmp/claude-1000/m3-batch22-code-r1-opus/rerun2/crash)
+    Finished `release` profile [optimized] target(s) in 41.76s

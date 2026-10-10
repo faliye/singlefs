@@ -1,0 +1,36 @@
+== A 基线：harness 档 gpu_memory_ledger 单测
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 2.02s
+== B 变异：容量那一项「估计减驱动」换成 u64::MAX（变异表里没有点名它的行）
+  ✓ crates/singlefs-harness/src/gpu_memory_ledger.rs：命中 1 次，已替换（改名换上新 inode）并回读确认
+-- B1 变异后：gpu_memory_ledger 单测
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 2.81s
+-- B2 变异后：探针 probe_f
+test probe_f_the_capacity_never_exceeds_any_of_its_bounds ... FAILED
+thread 'probe_f_the_capacity_never_exceeds_any_of_its_bounds' (2422329) panicked at crates/singlefs-harness/tests/k_forward_ledger_probe.rs:228:17:
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s
+fb56c7c09ba90377130c0d2fadc8a2cb35c5b91d7251f9f27de1d79722f3e15a
+== C K3-1 CPU 差分：实现 InstanceTableChainRecord::parse 对 checker chain_record_view
+PROBE_K3_CPU cases=203579 disagreements=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+-- C2 变异（checker 不看 extent 偏移）后同一探针
+  ✓ crates/singlefs-checker/src/walk.rs：命中 1 次，已替换（改名换上新 inode）并回读确认
+PROBE_K3_CPU cases=203579 disagreements=25
+PROBE_K3_CPU_DISAGREEMENT two bytes @1,34=1: core=2 checker=1 bytes=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+PROBE_K3_CPU_DISAGREEMENT two bytes @1,35=1: core=2 checker=1 bytes=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+PROBE_K3_CPU_DISAGREEMENT one byte @34=1: core=2 checker=1 bytes=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+PROBE_K3_CPU_DISAGREEMENT one byte @34=2: core=2 checker=1 bytes=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0,
+PROBE_K3_CPU_DISAGREEMENT one byte @34=127: core=2 checker=1 bytes=[1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 127, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 1, 0
+thread 'probe_the_core_and_the_checker_read_every_one_byte_and_two_byte_change_of_a_chain_record_the_same_way' (2423297) panicked at crates/singlefs-harness/tests/k3_chain_record_differential_probe.rs:100:5:
+test probe_the_core_and_the_checker_read_every_one_byte_and_two_byte_change_of_a_chain_record_the_same_way ... FAILED
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s
+== D K4-2 扫源码探针
+test probe_evasion_1_a_c_raw_string_swallows_the_call_after_it ... PROBE_EVASION_1 hits=[] (真实 Rust 里第 2 行调了 usable_gpu_cards)
+test probe_evasion_2_a_comma_in_the_generics_ends_the_item_before_its_body ... PROBE_EVASION_2 hits=[]
+PROBE_EVASION_2b hits=[]
+test probe_evasion_3_a_bare_test_attribute_outside_a_cfg_test_item_is_not_scanned ... PROBE_EVASION_3 hits=[]
+test probe_evasion_4_the_ways_of_writing_cfg_test_that_do_not_start_a_line_with_the_attribute_open ... PROBE_EVASION_4 form=inner hits=[]
+PROBE_EVASION_4 form=own_file hits=[]
+PROBE_EVASION_4 form=same_line hits=[]
+PROBE_EVASION_4 form=spaced hits=[]
+test probe_evasion_5_starting_a_device_straight_from_wgpu_names_none_of_the_scanned_functions ... PROBE_EVASION_5 hits=[]
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s

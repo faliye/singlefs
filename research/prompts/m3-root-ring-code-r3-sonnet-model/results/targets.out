@@ -1,0 +1,12 @@
+rows 2466 bad 11
+(86, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '步 6：I-3.8 的判定没跑到（层 0 报「不适用」，阴性结果与没跑到混在一起')
+(87, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '步 6：I-2.1 的判定没跑到（层 0 报「不适用」，阴性结果与没跑到混在一起')
+(88, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '步 6：层 0 计数不记「不适用」（评估过 + 不适用 ≠ 状态数）')
+(112, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '增补 2 第 41 行 层 0 并行：丢掉第一片（状态数等于闭式的断言要红）')
+(113, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '增补 2 第 41 行 层 0 并行：相邻两片重叠（状态数等于闭式的断言要红）')
+(192, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', 'I-8.7 一条记录都不判（层 0 整片报「不适用」，阴性结果与没跑到混在一起）')
+(295, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '步 6 验收第 1 条：层 0 按发布分状态数时根槽写那一段归到下一次发布（按段')
+(480, 'red-test-not-in-file', 'every_crash_state_outside_the_two_unit_segments_recovers_to_', '收口表第 26 行 I-7.9：一条抬 F 的根都不认（层 0 那条抬过 F 的')
+(1240, 'red-test-not-in-file', 'a_later_acquisition_writes_the_largest_tail_of_the_pool_into', 'C554 乙-配置续：见证值只读盘 0（整池最大的 tail 只在盘 1 上时带')
+(1241, 'red-test-not-in-file', 'a_later_acquisition_writes_the_largest_tail_of_the_pool_into', 'C554 乙-配置续：见证值取最小的 tail')
+(2014, 'red-test-not-in-file', 'the_floor_raise_boundary_is_located_by_position_when_every_s', 'K2：抬 F 的界按位置取时多扣一个写（界认早一位，暖机末尾的系统配置轮换被算进')

@@ -1,0 +1,3 @@
+        borrower.is_changed_this_publish = true;
+        self.absorb_until_no_pair_fits(lender_position);
+    }

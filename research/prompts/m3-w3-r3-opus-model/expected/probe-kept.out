@@ -1,0 +1,133 @@
+W3R2STREAM width=UnitAreaOf256Slots creates_before=[] p_count=2 p_key=(1, 4) p_new=[(2, 4), (3, 4)] writes=21 segments=[16, 2, 1, 2] closed_form=65543 layer0_states_with_torn_overwrites=65548
+LAYER0_PARALLEL_START states=65548 slices=80 states_per_slice=820 worker_threads=5 configured_worker_threads=5 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=80
+W3R2TRACE state=1 effective=(1, 3) script= key=(2, 5) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=c key=(2, 6) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=c1 key=(2, 7) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=c11 key=(2, 8) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3), (8, 6, 7, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script= key=(2, 5) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=c key=(2, 6) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=c1 key=(2, 7) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=1 effective=(1, 3) script=1 key=(2, 6) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[(6, 4, 5, 2, 1, 2)] red=[] real=[]
+LAYER0_PROGRESS slice=5/80 states=[3280,4100) segments=0..=0 finished_slices=1/80 finished_states=820/65548 resumed_slices=0 elapsed_seconds=5.8
+LAYER0_PROGRESS slice=2/80 states=[820,1640) segments=0..=0 finished_slices=2/80 finished_states=1640/65548 resumed_slices=0 elapsed_seconds=5.8
+LAYER0_PROGRESS slice=1/80 states=[0,820) segments=0..=0 finished_slices=3/80 finished_states=2460/65548 resumed_slices=0 elapsed_seconds=5.8
+LAYER0_PROGRESS slice=3/80 states=[1640,2460) segments=0..=0 finished_slices=4/80 finished_states=3280/65548 resumed_slices=0 elapsed_seconds=6.1
+LAYER0_PROGRESS slice=4/80 states=[2460,3280) segments=0..=0 finished_slices=5/80 finished_states=4100/65548 resumed_slices=0 elapsed_seconds=6.1
+LAYER0_PROGRESS slice=6/80 states=[4100,4920) segments=0..=0 finished_slices=6/80 finished_states=4920/65548 resumed_slices=0 elapsed_seconds=11.3
+LAYER0_PROGRESS slice=8/80 states=[5740,6560) segments=0..=0 finished_slices=7/80 finished_states=5740/65548 resumed_slices=0 elapsed_seconds=11.3
+LAYER0_PROGRESS slice=7/80 states=[4920,5740) segments=0..=0 finished_slices=8/80 finished_states=6560/65548 resumed_slices=0 elapsed_seconds=11.6
+LAYER0_PROGRESS slice=9/80 states=[6560,7380) segments=0..=0 finished_slices=9/80 finished_states=7380/65548 resumed_slices=0 elapsed_seconds=12.0
+LAYER0_PROGRESS slice=10/80 states=[7380,8200) segments=0..=0 finished_slices=10/80 finished_states=8200/65548 resumed_slices=0 elapsed_seconds=12.1
+LAYER0_PROGRESS slice=11/80 states=[8200,9020) segments=0..=0 finished_slices=11/80 finished_states=9020/65548 resumed_slices=0 elapsed_seconds=16.8
+LAYER0_PROGRESS slice=12/80 states=[9020,9840) segments=0..=0 finished_slices=12/80 finished_states=9840/65548 resumed_slices=0 elapsed_seconds=16.8
+LAYER0_PROGRESS slice=13/80 states=[9840,10660) segments=0..=0 finished_slices=13/80 finished_states=10660/65548 resumed_slices=0 elapsed_seconds=17.1
+LAYER0_PROGRESS slice=15/80 states=[11480,12300) segments=0..=0 finished_slices=14/80 finished_states=11480/65548 resumed_slices=0 elapsed_seconds=17.8
+LAYER0_PROGRESS slice=14/80 states=[10660,11480) segments=0..=0 finished_slices=15/80 finished_states=12300/65548 resumed_slices=0 elapsed_seconds=18.0
+LAYER0_PROGRESS slice=16/80 states=[12300,13120) segments=0..=0 finished_slices=16/80 finished_states=13120/65548 resumed_slices=0 elapsed_seconds=22.3
+LAYER0_PROGRESS slice=17/80 states=[13120,13940) segments=0..=0 finished_slices=17/80 finished_states=13940/65548 resumed_slices=0 elapsed_seconds=22.3
+LAYER0_PROGRESS slice=18/80 states=[13940,14760) segments=0..=0 finished_slices=18/80 finished_states=14760/65548 resumed_slices=0 elapsed_seconds=22.6
+LAYER0_PROGRESS slice=19/80 states=[14760,15580) segments=0..=0 finished_slices=19/80 finished_states=15580/65548 resumed_slices=0 elapsed_seconds=23.4
+LAYER0_PROGRESS slice=20/80 states=[15580,16400) segments=0..=0 finished_slices=20/80 finished_states=16400/65548 resumed_slices=0 elapsed_seconds=23.7
+LAYER0_PROGRESS slice=21/80 states=[16400,17220) segments=0..=0 finished_slices=21/80 finished_states=17220/65548 resumed_slices=0 elapsed_seconds=27.9
+LAYER0_PROGRESS slice=22/80 states=[17220,18040) segments=0..=0 finished_slices=22/80 finished_states=18040/65548 resumed_slices=0 elapsed_seconds=27.9
+LAYER0_PROGRESS slice=23/80 states=[18040,18860) segments=0..=0 finished_slices=23/80 finished_states=18860/65548 resumed_slices=0 elapsed_seconds=28.2
+LAYER0_PROGRESS slice=24/80 states=[18860,19680) segments=0..=0 finished_slices=24/80 finished_states=19680/65548 resumed_slices=0 elapsed_seconds=29.2
+LAYER0_PROGRESS slice=25/80 states=[19680,20500) segments=0..=0 finished_slices=25/80 finished_states=20500/65548 resumed_slices=0 elapsed_seconds=29.4
+LAYER0_PROGRESS slice=26/80 states=[20500,21320) segments=0..=0 finished_slices=26/80 finished_states=21320/65548 resumed_slices=0 elapsed_seconds=33.7
+LAYER0_PROGRESS slice=27/80 states=[21320,22140) segments=0..=0 finished_slices=27/80 finished_states=22140/65548 resumed_slices=0 elapsed_seconds=33.9
+LAYER0_PROGRESS slice=28/80 states=[22140,22960) segments=0..=0 finished_slices=28/80 finished_states=22960/65548 resumed_slices=0 elapsed_seconds=34.1
+LAYER0_PROGRESS slice=29/80 states=[22960,23780) segments=0..=0 finished_slices=29/80 finished_states=23780/65548 resumed_slices=0 elapsed_seconds=35.1
+LAYER0_PROGRESS slice=30/80 states=[23780,24600) segments=0..=0 finished_slices=30/80 finished_states=24600/65548 resumed_slices=0 elapsed_seconds=35.2
+LAYER0_PROGRESS slice=31/80 states=[24600,25420) segments=0..=0 finished_slices=31/80 finished_states=25420/65548 resumed_slices=0 elapsed_seconds=39.6
+LAYER0_PROGRESS slice=32/80 states=[25420,26240) segments=0..=0 finished_slices=32/80 finished_states=26240/65548 resumed_slices=0 elapsed_seconds=40.0
+LAYER0_PROGRESS slice=33/80 states=[26240,27060) segments=0..=0 finished_slices=33/80 finished_states=27060/65548 resumed_slices=0 elapsed_seconds=40.1
+LAYER0_PROGRESS slice=34/80 states=[27060,27880) segments=0..=0 finished_slices=34/80 finished_states=27880/65548 resumed_slices=0 elapsed_seconds=41.1
+LAYER0_PROGRESS slice=35/80 states=[27880,28700) segments=0..=0 finished_slices=35/80 finished_states=28700/65548 resumed_slices=0 elapsed_seconds=41.2
+LAYER0_PROGRESS slice=37/80 states=[29520,30340) segments=0..=0 finished_slices=36/80 finished_states=29520/65548 resumed_slices=0 elapsed_seconds=48.0
+LAYER0_PROGRESS slice=36/80 states=[28700,29520) segments=0..=0 finished_slices=37/80 finished_states=30340/65548 resumed_slices=0 elapsed_seconds=48.7
+LAYER0_PROGRESS slice=38/80 states=[30340,31160) segments=0..=0 finished_slices=38/80 finished_states=31160/65548 resumed_slices=0 elapsed_seconds=52.5
+LAYER0_PROGRESS slice=40/80 states=[31980,32800) segments=0..=0 finished_slices=39/80 finished_states=31980/65548 resumed_slices=0 elapsed_seconds=53.2
+LAYER0_PROGRESS slice=39/80 states=[31160,31980) segments=0..=0 finished_slices=40/80 finished_states=32800/65548 resumed_slices=0 elapsed_seconds=53.7
+LAYER0_PROGRESS slice=41/80 states=[32800,33620) segments=0..=0 finished_slices=41/80 finished_states=33620/65548 resumed_slices=0 elapsed_seconds=58.6
+LAYER0_PROGRESS slice=42/80 states=[33620,34440) segments=0..=0 finished_slices=42/80 finished_states=34440/65548 resumed_slices=0 elapsed_seconds=58.7
+LAYER0_PROGRESS slice=43/80 states=[34440,35260) segments=0..=0 finished_slices=43/80 finished_states=35260/65548 resumed_slices=0 elapsed_seconds=59.5
+LAYER0_PROGRESS slice=44/80 states=[35260,36080) segments=0..=0 finished_slices=44/80 finished_states=36080/65548 resumed_slices=0 elapsed_seconds=59.7
+LAYER0_PROGRESS slice=45/80 states=[36080,36900) segments=0..=0 finished_slices=45/80 finished_states=36900/65548 resumed_slices=0 elapsed_seconds=59.8
+LAYER0_PROGRESS slice=46/80 states=[36900,37720) segments=0..=0 finished_slices=46/80 finished_states=37720/65548 resumed_slices=0 elapsed_seconds=64.1
+LAYER0_PROGRESS slice=47/80 states=[37720,38540) segments=0..=0 finished_slices=47/80 finished_states=38540/65548 resumed_slices=0 elapsed_seconds=64.8
+LAYER0_PROGRESS slice=48/80 states=[38540,39360) segments=0..=0 finished_slices=48/80 finished_states=39360/65548 resumed_slices=0 elapsed_seconds=65.2
+LAYER0_PROGRESS slice=49/80 states=[39360,40180) segments=0..=0 finished_slices=49/80 finished_states=40180/65548 resumed_slices=0 elapsed_seconds=65.4
+LAYER0_PROGRESS slice=50/80 states=[40180,41000) segments=0..=0 finished_slices=50/80 finished_states=41000/65548 resumed_slices=0 elapsed_seconds=65.5
+LAYER0_PROGRESS slice=51/80 states=[41000,41820) segments=0..=0 finished_slices=51/80 finished_states=41820/65548 resumed_slices=0 elapsed_seconds=69.8
+LAYER0_PROGRESS slice=52/80 states=[41820,42640) segments=0..=0 finished_slices=52/80 finished_states=42640/65548 resumed_slices=0 elapsed_seconds=70.8
+LAYER0_PROGRESS slice=53/80 states=[42640,43460) segments=0..=0 finished_slices=53/80 finished_states=43460/65548 resumed_slices=0 elapsed_seconds=70.9
+LAYER0_PROGRESS slice=54/80 states=[43460,44280) segments=0..=0 finished_slices=54/80 finished_states=44280/65548 resumed_slices=0 elapsed_seconds=71.0
+LAYER0_PROGRESS slice=55/80 states=[44280,45100) segments=0..=0 finished_slices=55/80 finished_states=45100/65548 resumed_slices=0 elapsed_seconds=71.2
+LAYER0_PROGRESS slice=56/80 states=[45100,45920) segments=0..=0 finished_slices=56/80 finished_states=45920/65548 resumed_slices=0 elapsed_seconds=75.3
+LAYER0_PROGRESS slice=58/80 states=[46740,47560) segments=0..=0 finished_slices=57/80 finished_states=46740/65548 resumed_slices=0 elapsed_seconds=76.6
+LAYER0_PROGRESS slice=57/80 states=[45920,46740) segments=0..=0 finished_slices=58/80 finished_states=47560/65548 resumed_slices=0 elapsed_seconds=76.7
+LAYER0_PROGRESS slice=59/80 states=[47560,48380) segments=0..=0 finished_slices=59/80 finished_states=48380/65548 resumed_slices=0 elapsed_seconds=76.8
+LAYER0_PROGRESS slice=60/80 states=[48380,49200) segments=0..=0 finished_slices=60/80 finished_states=49200/65548 resumed_slices=0 elapsed_seconds=76.9
+LAYER0_PROGRESS slice=61/80 states=[49200,50020) segments=0..=0 finished_slices=61/80 finished_states=50020/65548 resumed_slices=0 elapsed_seconds=81.2
+LAYER0_PROGRESS slice=62/80 states=[50020,50840) segments=0..=0 finished_slices=62/80 finished_states=50840/65548 resumed_slices=0 elapsed_seconds=82.6
+LAYER0_PROGRESS slice=65/80 states=[52480,53300) segments=0..=0 finished_slices=63/80 finished_states=51660/65548 resumed_slices=0 elapsed_seconds=82.6
+LAYER0_PROGRESS slice=63/80 states=[50840,51660) segments=0..=0 finished_slices=64/80 finished_states=52480/65548 resumed_slices=0 elapsed_seconds=82.7
+LAYER0_PROGRESS slice=64/80 states=[51660,52480) segments=0..=0 finished_slices=65/80 finished_states=53300/65548 resumed_slices=0 elapsed_seconds=82.7
+LAYER0_PROGRESS slice=66/80 states=[53300,54120) segments=0..=0 finished_slices=66/80 finished_states=54120/65548 resumed_slices=0 elapsed_seconds=87.0
+LAYER0_PROGRESS slice=68/80 states=[54940,55760) segments=0..=0 finished_slices=67/80 finished_states=54940/65548 resumed_slices=0 elapsed_seconds=88.5
+LAYER0_PROGRESS slice=69/80 states=[55760,56580) segments=0..=0 finished_slices=68/80 finished_states=55760/65548 resumed_slices=0 elapsed_seconds=88.6
+LAYER0_PROGRESS slice=67/80 states=[54120,54940) segments=0..=0 finished_slices=69/80 finished_states=56580/65548 resumed_slices=0 elapsed_seconds=88.6
+LAYER0_PROGRESS slice=70/80 states=[56580,57400) segments=0..=0 finished_slices=70/80 finished_states=57400/65548 resumed_slices=0 elapsed_seconds=88.7
+LAYER0_PROGRESS slice=71/80 states=[57400,58220) segments=0..=0 finished_slices=71/80 finished_states=58220/65548 resumed_slices=0 elapsed_seconds=93.0
+LAYER0_PROGRESS slice=72/80 states=[58220,59040) segments=0..=0 finished_slices=72/80 finished_states=59040/65548 resumed_slices=0 elapsed_seconds=94.3
+LAYER0_PROGRESS slice=73/80 states=[59040,59860) segments=0..=0 finished_slices=73/80 finished_states=59860/65548 resumed_slices=0 elapsed_seconds=94.3
+LAYER0_PROGRESS slice=74/80 states=[59860,60680) segments=0..=0 finished_slices=74/80 finished_states=60680/65548 resumed_slices=0 elapsed_seconds=94.5
+LAYER0_PROGRESS slice=75/80 states=[60680,61500) segments=0..=0 finished_slices=75/80 finished_states=61500/65548 resumed_slices=0 elapsed_seconds=94.7
+LAYER0_PROGRESS slice=76/80 states=[61500,62320) segments=0..=0 finished_slices=76/80 finished_states=62320/65548 resumed_slices=0 elapsed_seconds=98.8
+LAYER0_PROGRESS slice=77/80 states=[62320,63140) segments=0..=0 finished_slices=77/80 finished_states=63140/65548 resumed_slices=0 elapsed_seconds=100.1
+W3R2TRACE state=65535 effective=(1, 3) script= key=(2, 5) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+W3R2TRACE state=65535 effective=(1, 3) script=c key=(2, 6) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[] red=[] real=[]
+W3R2TRACE state=65535 effective=(1, 3) script=c1 key=(2, 7) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=65535 effective=(1, 3) script=c11 key=(2, 8) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3), (8, 6, 7, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=65535 effective=(1, 3) script= key=(2, 5) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+LAYER0_PROGRESS slice=79/80 states=[63960,64780) segments=0..=0 finished_slices=78/80 finished_states=63960/65548 resumed_slices=0 elapsed_seconds=100.3
+W3R2TRACE state=65535 effective=(1, 3) script=c key=(2, 6) wm=3 tree=[(1, 3), (2, 6)] legal=true cross=true rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[] red=[] real=[]
+LAYER0_PROGRESS slice=78/80 states=[63140,63960) segments=0..=0 finished_slices=79/80 finished_states=64780/65548 resumed_slices=0 elapsed_seconds=100.3
+W3R2TRACE state=65535 effective=(1, 3) script=c1 key=(2, 7) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (6, 3)] rows_all=[(3, 2), (6, 3)] log=[(1, 3), (2, 6)] lineage=[(7, 5, 6, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=65535 effective=(1, 3) script=1 key=(2, 6) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[(6, 4, 5, 2, 1, 2)] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 4) script= key=(2, 7) wm=4 tree=[(1, 3), (2, 4), (3, 4)] legal=true cross=false rows_create=[(3, 2), (4, 4)] rows_all=[(3, 2), (4, 4)] log=[(1, 3), (2, 4), (3, 4)] lineage=[] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 4) script=c key=(2, 8) wm=5 tree=[(1, 3), (2, 4), (3, 4), (4, 8)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 4) script=c1 key=(2, 9) wm=5 tree=[(1, 3), (2, 4), (3, 4)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[(9, 7, 8, 5, 4, 5)] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 4) script=c11 key=(2, 10) wm=5 tree=[(1, 3), (2, 4), (3, 4), (4, 8)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[(9, 7, 8, 5, 4, 5), (10, 8, 9, 5, 4, 5)] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 3) script= key=(2, 7) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 3) script=c key=(2, 8) wm=3 tree=[(1, 3), (2, 8)] legal=true cross=true rows_create=[(3, 2), (8, 3)] rows_all=[(3, 2), (8, 3)] log=[(1, 3), (2, 8)] lineage=[] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 3) script=c1 key=(2, 9) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (8, 3)] rows_all=[(3, 2), (8, 3)] log=[(1, 3), (2, 8)] lineage=[(9, 7, 8, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=262143 effective=(1, 3) script=1 key=(2, 8) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[(8, 6, 7, 2, 1, 2)] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 4) script= key=(2, 7) wm=4 tree=[(1, 3), (2, 4), (3, 4)] legal=true cross=false rows_create=[(3, 2), (4, 4)] rows_all=[(3, 2), (4, 4)] log=[(1, 3), (2, 4), (3, 4)] lineage=[] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 4) script=c key=(2, 8) wm=5 tree=[(1, 3), (2, 4), (3, 4), (4, 8)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 4) script=c1 key=(2, 9) wm=5 tree=[(1, 3), (2, 4), (3, 4)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[(9, 7, 8, 5, 4, 5)] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 4) script=c11 key=(2, 10) wm=5 tree=[(1, 3), (2, 4), (3, 4), (4, 8)] legal=true cross=false rows_create=[(3, 2), (4, 4), (8, 5)] rows_all=[(3, 2), (4, 4), (8, 5)] log=[(1, 3), (2, 4), (3, 4), (4, 8)] lineage=[(9, 7, 8, 5, 4, 5), (10, 8, 9, 5, 4, 5)] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 3) script= key=(2, 7) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 3) script=c key=(2, 8) wm=3 tree=[(1, 3), (2, 8)] legal=true cross=true rows_create=[(3, 2), (8, 3)] rows_all=[(3, 2), (8, 3)] log=[(1, 3), (2, 8)] lineage=[] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 3) script=c1 key=(2, 9) wm=3 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2), (8, 3)] rows_all=[(3, 2), (8, 3)] log=[(1, 3), (2, 8)] lineage=[(9, 7, 8, 3, 2, 3)] red=[] real=[]
+W3R2TRACE state=524287 effective=(1, 3) script=1 key=(2, 8) wm=2 tree=[(1, 3)] legal=true cross=false rows_create=[(3, 2)] rows_all=[(3, 2)] log=[(1, 3)] lineage=[(8, 6, 7, 2, 1, 2)] red=[] real=[]
+LAYER0_PROGRESS slice=80/80 states=[64780,65548) segments=0..=all_persisted finished_slices=80/80 finished_states=65548/65548 resumed_slices=0 elapsed_seconds=101.0
+LAYER0_FINDINGS signatures=0 red_states=0 states=65548
+LAYER0_PARALLEL_FINISHED states=65548 slices=80 worker_threads=5 configured_worker_threads=5 worker_threads_source=environment_variable resumed_slices=0 freshly_run_slices=80 progress_file_after_completion=none elapsed_seconds=101.0
+W3R2LAYER0 width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 states=65548 observed_states=65548 violations=0 root_persisted_states=9 failed_states=0 checker_violated={} first_violation=None
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_cross_abandoned_reissue_images=4
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_images=16
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_legal_images=16
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_mount_ok=4
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_p_abandoned_states=2
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_rollbacks=8
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3a_states=65548
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_cross_abandoned_reissue_images=4
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_images=16
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_legal_images=16
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_mount_ok=4
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_p_abandoned_states=4
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_p_abandoned_with_readable_root_states=1
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_rollbacks=8
+W3R2COUNT width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 w3b_states=65548
+W3R2DONE width=UnitAreaOf256Slots exp=A:c11;B:c1,1 creates_before=- p_count=2 scripts=x shard=0/1 elapsed_s=101.0

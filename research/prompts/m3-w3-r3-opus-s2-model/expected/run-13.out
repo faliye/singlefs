@@ -1,0 +1,92 @@
+W3R3S2MODEL group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 full_length_histories=3120676 images=3613164 legal_images=2575091 events=96994 residual_images=163117 hole_events=41282 hole_residual_images=132170 rollbacks=877894 jumps_from_abandoned_roots_only=55995 jumps_from_a_root_not_abandoned=129889 events_after_a_jump=3384 identity_collision_images=98740 identity_collision_images_other_copy_visible=26749 newest_root_not_cur_images=0 clones=230505 cloned_log_entries=535074 elapsed_s=19.1
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 false_positive=0 event_missed=42538 residual_missed=142420 hole_event_missed=41282 hole_residual_missed=132170 false_positive_after_jump=0 event_missed_after_jump=1245 red_on_identity_collision=1305 event_missed_without_jump=41293
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 false_positive=0 event_missed=89776 residual_missed=150734 hole_event_missed=41282 hole_residual_missed=132170 false_positive_after_jump=0 event_missed_after_jump=3286 red_on_identity_collision=10112 event_missed_without_jump=86490
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-create false_positive=451084 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=18497 event_missed_after_jump=0 red_on_identity_collision=51038 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-skip false_positive=414305 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=17857 event_missed_after_jump=0 red_on_identity_collision=49337 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-src false_positive=451084 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=18497 event_missed_after_jump=0 red_on_identity_collision=51038 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL false_positive=226723 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=6885 event_missed_after_jump=0 red_on_identity_collision=20462 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL-pool false_positive=216887 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=6595 event_missed_after_jump=0 red_on_identity_collision=20395 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=18153 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-1log false_positive=300200 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=7844 event_missed_after_jump=0 red_on_identity_collision=24120 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-nocopy false_positive=1458939 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=87058 event_missed_after_jump=0 red_on_identity_collision=98740 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=17683 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g-pool false_positive=35500 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=2195 event_missed_after_jump=0 red_on_identity_collision=17204 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i false_positive=0 event_missed=0 residual_missed=26135 hole_event_missed=0 hole_residual_missed=22690 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=17491 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool false_positive=230477 event_missed=0 residual_missed=28510 hole_event_missed=0 hole_residual_missed=24357 false_positive_after_jump=6949 event_missed_after_jump=0 red_on_identity_collision=21477 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=17683 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig-pool false_positive=233158 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=6965 event_missed_after_jump=0 red_on_identity_collision=21793 event_missed_without_jump=0
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 false_positive=0 event_missed=96994 residual_missed=163117 hole_event_missed=41282 hole_residual_missed=132170 false_positive_after_jump=0 event_missed_after_jump=3384 red_on_identity_collision=0 event_missed_without_jump=93610
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg false_positive=0 event_missed=96994 residual_missed=163117 hole_event_missed=41282 hole_residual_missed=132170 false_positive_after_jump=0 event_missed_after_jump=3384 red_on_identity_collision=0 event_missed_without_jump=93610
+W3R3S2COUNT group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL+C3rL false_positive=226723 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=6885 event_missed_after_jump=0 red_on_identity_collision=20908 event_missed_without_jump=0
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=hole_event_missed ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed_after_jump ops=[create1,create1,crash-hide,rollback2,create1,crash-hide,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,create1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed_without_jump ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=residual_missed ops=[create1,rollback1,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=hole_event_missed ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed_after_jump ops=[create1,create1,crash-hide,rollback2,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed_without_jump ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-create kind=false_positive ops=[create1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-create kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-create kind=red_on_identity_collision ops=[create1,clone,crash-hide,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-skip kind=false_positive ops=[create1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-skip kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-skip kind=red_on_identity_collision ops=[create1,clone,crash-hide,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-src kind=false_positive ops=[create1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-src kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2a-src kind=red_on_identity_collision ops=[create1,clone,crash-hide,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL kind=false_positive ops=[create1,rollback1,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback2,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL-pool kind=false_positive ops=[create1,rollback1,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL-pool kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback2,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL-pool kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-1log kind=false_positive ops=[clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-1log kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-1log kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-nocopy kind=false_positive ops=[clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-nocopy kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C3rL-nocopy kind=red_on_identity_collision ops=[clone,crash-hide,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g-pool kind=false_positive ops=[clone,create1,delete1,rollback1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g-pool kind=false_positive_after_jump ops=[clone,create1,create1,crash-hide,rollback1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C4g-pool kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i kind=residual_missed ops=[create1,rollback1,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool kind=false_positive ops=[clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool kind=residual_missed ops=[create1,rollback1,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2i-pool kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig-pool kind=false_positive ops=[clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,clone,create1,create2]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2ig-pool kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=residual_missed ops=[create1,rollback1,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=hole_event_missed ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed_after_jump ops=[create1,create1,crash-hide,rollback2,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed_without_jump ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=residual_missed ops=[create1,rollback1,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=hole_event_missed ops=[create1,delete1,rollback2,clone,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=hole_residual_missed ops=[create1,delete1,rollback2,create1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed_after_jump ops=[create1,create1,crash-hide,rollback2,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed_without_jump ops=[create1,rollback1,create1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL+C3rL kind=false_positive ops=[create1,rollback1,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL+C3rL kind=false_positive_after_jump ops=[create1,create1,crash-hide,rollback2,rollback1]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=C2aL+C3rL kind=red_on_identity_collision ops=[create1,clone,crash-hide,rollback2,clone]
+W3R3S2EXAMPLE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 form=- kind=identity_collision ops=[clone,crash-hide,clone]
+W3R3S2TRACE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 kind=identity_collision step=start newest=1:3 cur=1:3 heads=[t1:wm2:[1@3]] table=[] rows_all=[t1:3:2] lin=[] ring=[1:3:wm2] records=[1:3] issued=[(1, 1, 3)]
+W3R3S2TRACE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 kind=identity_collision step=0 op=clone jump_abandoned=0 newest=1:4 cur=1:4 heads=[t1:wm2:[1@3] t2:wm2:[1@3]] table=[] rows_all=[t1:3:2,t2:4:2] lin=[] ring=[1:4:wm2/2,1:3:wm2] records=[1:3,1:4] issued=[(1, 1, 3), (2, 1, 3)] red=[C3rL-nocopy]
+W3R3S2TRACE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 kind=identity_collision step=1 op=crash-hide jump_abandoned=0 newest=2:5 cur=2:5 heads=[t1:wm2:[1@3]] table=[1:3] rows_all=[t1:3:2] lin=[] ring=[1:4:wm2/2,2:5:wm2,1:3:wm2] records=[1:3,1:4,2:5] issued=[(1, 1, 3)] red=[]
+W3R3S2TRACE group=clone rule=Opt1 arm=V1 first_txg=Product ring=4 depth=8 kind=identity_collision step=2 op=clone jump_abandoned=0 newest=2:6 cur=2:6 heads=[t1:wm2:[1@3] t2:wm2:[1@3]] table=[1:3] rows_all=[t1:3:2,t2:6:2] lin=[] ring=[1:4:wm2/2,2:5:wm2,2:6:wm2/2,1:3:wm2] records=[1:3,1:4,2:5,2:6] issued=[(1, 1, 3), (2, 1, 3)] red=[C3rL-nocopy]

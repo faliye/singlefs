@@ -1,0 +1,44 @@
+SWEEP family=f3 histories=102 from=0 to=102 elapsed=14.2s
+SUMMARY sweep-f3 states=732
+COUNT sweep-f3	step	C479bing/lineage	holds=732	red=0	na=0
+COUNT sweep-f3	step	C479bing/txg-1	holds=646	red=86	na=0
+COUNT sweep-f3	step	C479yi/rec	holds=732	red=0	na=0
+COUNT sweep-f3	step	C479yi/rec+tombA	holds=732	red=0	na=0
+COUNT sweep-f3	step	I918/A	holds=484	red=0	na=248
+COUNT sweep-f3	step	I918/A+pub	holds=484	red=0	na=248
+COUNT sweep-f3	step	I918/A2	holds=484	red=0	na=248
+COUNT sweep-f3	step	I918/B	holds=376	red=108	na=248
+COUNT sweep-f3	step	I918/B+pub	holds=376	red=108	na=248
+COUNT sweep-f3	step	I918/nofilter	holds=484	red=0	na=248
+COUNT sweep-f3	step	I919/A	holds=484	red=0	na=248
+COUNT sweep-f3	step	I919/A+pub	holds=484	red=0	na=248
+COUNT sweep-f3	step	I919/A2	holds=484	red=0	na=248
+COUNT sweep-f3	step	I919/B	holds=450	red=0	na=282
+COUNT sweep-f3	step	I919/nofilter	holds=398	red=86	na=248
+COUNT sweep-f3	step	I920/A	holds=484	red=0	na=248
+COUNT sweep-f3	step	I920/A2	holds=484	red=0	na=248
+COUNT sweep-f3	step	I920/B	holds=450	red=0	na=282
+COUNT sweep-f3	step	I920/all-dedup	holds=484	red=0	na=248
+COUNT sweep-f3	step	I920/interval-all-T14	holds=484	red=0	na=248
+COUNT sweep-f3	step	I921/each	holds=0	red=0	na=732
+COUNT sweep-f3	step	I921/selected	holds=0	red=0	na=732
+COUNT sweep-f3	step	I924/each	holds=732	red=0	na=0
+COUNT sweep-f3	step	I96/code	holds=732	red=0	na=0
+COUNT sweep-f3	step	I96/each	holds=732	red=0	na=0
+COUNT sweep-f3	step	I96/newest	holds=632	red=0	na=100
+COUNT sweep-f3	step	S4a-bing/all-types-sorted	holds=508	red=224	na=0
+COUNT sweep-f3	step	S4a-jia/type2-sorted	holds=732	red=0	na=0
+COUNT sweep-f3	step	T2a/each	holds=484	red=0	na=248
+COUNT sweep-f3	step	T2a/sel-x-map	holds=484	red=0	na=248
+COUNT sweep-f3	step	T2c-A/each	holds=484	red=0	na=248
+COUNT sweep-f3	step	T2c-A2/each	holds=484	red=0	na=248
+COUNT sweep-f3	step	T2c-B/each	holds=450	red=0	na=282
+COUNT sweep-f3	step	T2c-B/sel-x-map	holds=450	red=0	na=282
+COUNT sweep-f3	step	TombDeath/birth-le-death-le-txg	holds=484	red=0	na=248
+COUNT sweep-f3	step	gap/any-version	holds=732	red=0	na=0
+FIRSTRED sweep-f3	step	C479bing/txg-1	b144:C2,U1,R2,U2,U3,C1 #3:R2 [rolled-back-to txg6/inst2 now txg9] :: 根（实例 2、txg 9）：新号 1 小于父版本 根（实例 2、txg 8） 的水位 4
+FIRSTRED sweep-f3	step	I918/B	b144:C2,U1,R2,U2,U3,C1 #3:R2 [rolled-back-to txg6/inst2 now txg9] :: 根（实例 2、txg 7）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED sweep-f3	step	I918/B+pub	b144:C2,U1,R2,U2,U3,C1 #3:R2 [rolled-back-to txg6/inst2 now txg9] :: 根（实例 2、txg 7）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED sweep-f3	step	I919/nofilter	b144:C2,U1,R2,U2,U3,C1 #3:R2 [rolled-back-to txg6/inst2 now txg9] :: 根（实例 2、txg 9）：谱系上的墓碑 (1, 3, 死于 7) 指着 nlink 1 的记录
+FIRSTRED sweep-f3	step	S4a-bing/all-types-sorted	b144:C2,U1,U3,U2,C1 #4:U2 [ok versions=2 now txg12] :: 根（实例 2、txg 12）：容器 1 首段序 [1, 3, 2]
+ELAPSED 14.2s

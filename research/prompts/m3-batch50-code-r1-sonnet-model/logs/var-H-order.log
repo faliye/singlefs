@@ -1,0 +1,13 @@
+
+running 4 tests
+test the_left_leaf_absorbs_its_right_neighbour_and_the_final_batch_retires_the_right_one ... ok
+test the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it ... ok
+test a_leaf_below_the_floor_borrows_half_the_difference_from_its_right_neighbour_and_retires_nothing ... ok
+test the_first_leaf_absorbing_the_second_writes_as_many_slots_in_a_tree_of_twenty_leaves_as_in_a_tree_of_forty ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 25.47s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.60s
+     Running tests/inode_leaf_absorb_and_borrow_on_the_unlink_path.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/inode_leaf_absorb_and_borrow_on_the_unlink_path-a216efb9e20c700a)

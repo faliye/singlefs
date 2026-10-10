@@ -1,0 +1,28 @@
+[base-unlink_mount_continuation_and_the_emptied_version] 退出码=0 红的=无 结果行=test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0
+[base-the_mount_after_a_crashed_unmount] 退出码=0 红的=无 结果行=test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 
+[base-unlink_single_file_publishes] 退出码=0 红的=无 结果行=test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 
+[base-container_trees_grow_a_level] 退出码=0 红的=无 结果行=test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 
+[base-unlink_writes_per_transaction] 退出码=0 红的=无 结果行=test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 
+[base-inode_number_watermark] 退出码=0 红的=无 结果行=test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 
+[base-core_lib_pressed_back] 退出码=0 红的=无 结果行=test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 18
+[row-2670] 退出码=101 红的=a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount,a_session_unlink_given_a_time_earlier_than_the_previous_version_writes 结果行=test result: FAILED. 20 passed; 2 failed; 0 ignored; 0 measure
+[row-2671] 退出码=101 红的=a_session_unlink_given_a_time_past_thirty_two_bits_writes_it_whole_int 结果行=test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measure
+[row-2672] 退出码=101 红的=a_session_unlink_given_a_time_past_thirty_two_bits_writes_it_whole_int,a_session_unlink_given_a_time_that_is_not_a_whole_minute_writes_it_to_ 结果行=test result: FAILED. 20 passed; 2 failed; 0 ignored; 0 measure
+[row-2673] 退出码=101 红的=a_session_unlink_given_a_time_earlier_than_the_previous_version_writes,the_batches_of_a_mount_continuation_after_an_intent_given_a_time_earli,the_intent_given_a_time_earlier_than_the_previous_version_writes_that_ 结果行=test result: FAILED. 19 passed; 3 failed; 0 ignored; 0 measure
+[row-2674] 退出码=101 红的=after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_write,after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_fir 结果行=test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured
+[row-2675] 退出码=101 红的=after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_moun,after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_fir 结果行=test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured
+[row-2676] 退出码=101 红的=unlink_of_files_of_one_to_three_batches_releases_at_most_one_batch_per 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
+[row-2677] 退出码=101 红的=creating_an_inode_after_the_watermark_is_pressed_back_below_the_larges 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
+[row-2678] 退出码=101 红的=creating_an_inode_after_the_watermark_is_pressed_back_below_the_larges 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
+[row-2679] 退出码=101 红的=creating_an_inode_after_the_watermark_is_pressed_back_below_the_larges 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
+[row-2680] 退出码=101 红的=creating_an_inode_after_the_watermark_is_pressed_back_below_the_larges 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured
+[row-2681] 退出码=101 红的=the_pressed_back_inode_number_watermark_refuses_the_invalid_inode_numb 结果行=test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured
+[row-2682] 退出码=101 红的=a_pressed_back_inode_number_watermark_not_below_the_previous_watermark 结果行=test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured
+[variant-qfm-session-field-batch17] 退出码=101 红的=a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount 结果行=test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measure
+[variant-qfm-thread-local] 退出码=101 红的=a_session_unlink_after_a_new_inode_with_a_later_time_in_the_same_mount 结果行=test result: FAILED. 21 passed; 1 failed; 0 ignored; 0 measure
+[variant-jia-without-the-core-assert] 退出码=101 红的=after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_write 结果行=test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured
+[probe-n7-baseline] 退出码=0 红的=无 结果行=test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 
+[probe-n7-under-row-2679] 退出码=0 红的=无 结果行=test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 
+  [probe-n7-baseline] PROBE watermark=4 birth3=Some(5) txg=5 verdict_I96=Violated("记账里的 inode 号水位 4 不大于 inode 树内最大 key 4") violated=["I-9.6"]
+  [probe-n7-under-row-2679] PROBE watermark=6 birth3=Some(5) txg=5 verdict_I96=Holds violated=[]
+[probe-n4-admission-judged-baseline] 退出码=101 红的=after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_fir 结果行=test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured

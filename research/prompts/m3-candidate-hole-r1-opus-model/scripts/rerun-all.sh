@@ -1,5 +1,5 @@
 #!/bin/bash
-# 复跑：rerun-all.sh <草稿目录> <段>。段：build | sb | nrb | rh | ss4 | ss5 | ss6a | ss6b（每段前台跑得完，ss5 约 3 分钟）。
+# 复跑：rerun-all.sh <草稿目录> <段>。段：build | sb | nrb | rh | skr | show | ss4 | ss5 | ss6a | ss6b（每段前台跑得完，ss5 约 3 分钟）。
 # 输出进 <草稿目录>/out/，汇总用 analyze-judges.py 与 pair-writers.py（见报告开头的复跑命令）。
 set -u
 scratch=$1; part=$2
@@ -23,6 +23,17 @@ case "$part" in
     for k in 3 4 5 6; do { PROTO_SEQ=1 PROTO_CONTENT_BYTES=2097152 run "nrbs-l4-k$k-b1" newest_row_bad 4 1048576 4 "$k" 1; echo "$?" > "$scratch/out/bnrb-$i.rc"; } & i=$((i + 1)); done
     wait; echo "rc_files=$(ls "$scratch"/out/bnrb-*.rc | wc -l) dispatched=$i" ;;
   rh) bash "$model/scripts/rollback-sweep.sh" "$scratch" 1 ;;
+  skr)
+    # 合法的「取号跳过」（实例 2 写行那次崩在根槽写之前、实例 3 取号越过它）：last ∈ {6,8,10}，挂载之后写 14 次；正确写者与 m4a 各一件。
+    rm -f "$scratch"/out/bskr-*.rc; i=0
+    for L in 6 8 10; do for w in ok m4a; do
+      bw=""; [ "$w" = m4a ] && bw=m4a
+      { HOLE_BAD_WRITER=$bw run "skr-l$L-$w" skip_row 4 1048576 "$L" 14; echo "$?" > "$scratch/out/bskr-$i.rc"; } &
+      i=$((i + 1))
+    done; done
+    wait; echo "rc_files=$(ls "$scratch"/out/bskr-*.rc | wc -l) dispatched=$i" ;;
+  show) PROTO_SHOW=I-3.9 run rh-i39-t5-over-upto15 rollback_hole 4 1048576 10 5 over upto:15
+        HOLE_BAD_WRITER=m4a PROTO_NOTES=1 run notes-sb-l14-t12-m4a slot_bad 4 1048576 14 12 ;;
   ss4) bash "$model/scripts/short-ring-sweep.sh" "$scratch" 2 4 ;;
   ss5) bash "$model/scripts/short-ring-sweep.sh" "$scratch" 3 5 ;;
   ss6a) bash "$model/scripts/short-ring-sweep.sh" "$scratch" 4 6 "4 6" ;;

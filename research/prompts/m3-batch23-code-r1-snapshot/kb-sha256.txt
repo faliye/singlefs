@@ -1,0 +1,2 @@
+f76fdad940f2c450d04c1dd1c119c48bd581376184132be01856c4212364b65d  .claude/kb/invariants.md
+bcb62ad096caefa39084a9f05619e577ecb4280bba69255ad69012d2d0f2443d  .claude/kb/experiments/142-新池新建文件的干跑.md

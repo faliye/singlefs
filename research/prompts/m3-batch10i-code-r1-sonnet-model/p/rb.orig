@@ -1,0 +1,4 @@
+        let reclaim_floor = crate::mount::reclaim_floor(
+            occupancy.effective_floor,
+            occupancy.oldest_valid_root_in_the_ring(),
+        );

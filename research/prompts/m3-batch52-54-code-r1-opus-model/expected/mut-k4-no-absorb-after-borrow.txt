@@ -1,0 +1,4 @@
+command=1 args=--release -p singlefs-core --lib filter=inode_tree:: rc=0
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 223 filtered out
+command=2 args=--release -p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference filter= rc=0
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out

@@ -1,0 +1,36 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.03s
+     Running tests/probe_m3_oracle.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-rel/release/deps/probe_m3_oracle-dd10dd66e96297b8)
+
+running 25 tests
+CASCADE retired=116 rewritten=1 leaves_after=19 survivor_sizes_first_few=[2, 2, 2, 2, 2, 2]
+CASCADE-LEFTMOST retired=116 rewritten=1
+test adversarial_cascade_on_a_tree_that_breaks_the_no_adjacent_fit_invariant ... ok
+test model::tests::a1_refuses_the_insert_that_would_open_the_136th_leaf ... ok
+DIRECTED model(right-first)=[(1, 117), (234, 233)] crates=[(1, 117), (234, 233)]
+test directed_three_117_both_pairs_fit_after_one_delete ... ok
+test model::tests::alternate_workload_deletes_the_registered_share_of_each_batch ... ok
+test model::tests::a2_one_record_per_leaf_leaves_m1_only_134_plus_233_live_inodes ... ok
+test model::tests::m2_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position ... ok
+test model::tests::m2_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour ... ok
+test model::tests::m3_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position ... ok
+test model::tests::m3_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour ... ok
+test model::tests::every_registered_anchor_matches_the_independent_reference ... ok
+test model::tests::main_random_sequence_feeds_every_arm_the_same_operation_prefix ... ok
+test model::tests::moving_a_threshold_between_two_same_verdict_points_splits_them ... ok
+test model::tests::merge_and_borrow_arms_keep_adjacent_pairs_above_one_leaf_through_a_random_run ... ok
+test model::tests::random_workload_starts_with_a_create_and_only_unlinks_live_inodes ... ok
+test model::tests::rational_decimal_rounds_half_away_from_zero ... ok
+test model::tests::segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest ... ok
+test model::tests::multithreaded_and_single_threaded_runs_are_byte_identical ... ok
+test model::tests::segment_two_sensitivity_pairs_four_m3_rows_for_the_borrow_amount_and_six_rows_for_the_check_order ... ok
+test model::tests::segment_two_windows_put_each_registered_variant_against_m1 ... ok
+test model::tests::sequential_workload_creates_a_round_then_deletes_the_oldest ... ok
+test model::tests::sha256_matches_the_published_test_vectors_whether_fed_at_once_or_in_pieces ... ok
+test model::tests::structural_check_turns_red_on_each_broken_shape ... ok
+test model::tests::verdict_thresholds_are_inclusive_where_the_registration_says_so ... ok
+test model::tests::segment_two_multithreaded_and_single_threaded_runs_are_byte_identical ... ok
+PROBE deletes=209019 merges=466 borrows=3006 retired_total=9685 max_retired_per_delete=1
+test m3_crates_vs_e176_model ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.00s
+

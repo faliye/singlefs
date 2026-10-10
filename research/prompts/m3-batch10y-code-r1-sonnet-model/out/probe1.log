@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running tests/sonnet_probe_nvidia_smi_report.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/target/debug/deps/sonnet_probe_nvidia_smi_report-9490ae34ec71efb4)
+
+running 2 tests
+test live_report_free_equals_query_gpu_memory_free ... PARSED [CardMemoryReading { free_mebibytes: 32110, total_less_reserved_mebibytes: 32110, occupied_by_this_process: NotListed }, CardMemoryReading { free_mebibytes: 15849, total_less_reserved_mebibytes: 15849, occupied_by_this_process: NotListed }]
+QUERY  [("01:00.0", 0, 32110, 32607, 497), ("10:00.0", 1, 15849, 16311, 462)]
+LIVE_MATCH attempt=1 cards=2
+ok
+test unrecognised_outputs_are_errors_not_silent_zeroes ... CASE 空串: Err("nvidia-smi 的报告里没有总线 01:00.0 那张卡")
+CASE 乱码: Err("nvidia-smi 的报告里没有总线 01:00.0 那张卡")
+CASE 缺 Reserved（老驱动的样子）: Err("nvidia-smi 的报告里总线 01:00.0 那张卡的 Reserved 读不出")
+CASE Free 写 N/A: Err("nvidia-smi 的报告里总线 01:00.0 那张卡的 Free 读不出")
+CASE Free 缺单位: Err("nvidia-smi 的报告里总线 01:00.0 那张卡的 Free 读不出")
+CASE 没有 FB 小节: Err("nvidia-smi 的报告里总线 01:00.0 那张卡的 Total 读不出")
+CASE 点名的卡不在报告里: Err("nvidia-smi 的报告里没有总线 99:00.0 那张卡")
+CASE 进程号认不出: Err("nvidia-smi 的报告里一行进程号认不出：\"        Process ID                                     : abc\"")
+CASE 本进程占的量 N/A: Ok([CardMemoryReading { free_mebibytes: 32110, total_less_reserved_mebibytes: 32110, occupied_by_this_process: NotListed }])
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s
+

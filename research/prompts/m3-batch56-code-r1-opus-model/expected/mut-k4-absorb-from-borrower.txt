@@ -1,0 +1,10 @@
+command args=-p singlefs-core --lib inode_tree:: rc=101
+failures:
+failures:
+    inode_tree::tests::stopping_every_absorb_pass_after_one_pair_changes_nothing_when_every_adjacent_pair_overflows_one_container
+test result: FAILED. 22 passed; 1 failed; 0 ignored; 0 measured; 225 filtered out; 
+command args=-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference rc=101
+failures:
+failures:
+    every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; 

@@ -1,0 +1,28 @@
+--- a/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
++++ b/crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+@@ -234,6 +234,25 @@
+             InstanceGeneration(3),
+         );
+         overwrite += 1;
++        {
++            let verdicts: Vec<(&str, String)> = check_pool_image(&pool.memory_pool())
++                .into_iter()
++                .filter_map(|(invariant, verdict)| match verdict {
++                    InvariantVerdict::Violated(detail) => Some((invariant, detail)),
++                    _ => None,
++                })
++                .collect();
++            let names: Vec<&str> = verdicts.iter().map(|(n, _)| *n).collect();
++            let i31 = verdicts
++                .iter()
++                .find(|(n, _)| *n == "I-3.1")
++                .and_then(|(_, d)| singlefs_harness::history::allocated_and_walked_bytes(d));
++            println!(
++                "OPUS-K3 step={step:?} txg={} violated={names:?} i31_allocated_walked={i31:?} diff={:?}",
++                pool.output.root.checkpoint_txg.0,
++                i31.map(|(a, w)| i128::from(a) - i128::from(w))
++            );
++        }
+     }
+     let violated_before_the_slot_is_written: Vec<&str> = check_pool_image(&pool.memory_pool())
+         .into_iter()

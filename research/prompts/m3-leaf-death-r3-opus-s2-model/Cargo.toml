@@ -1,0 +1,15 @@
+[package]
+name = "m3-leaf-death-r3-opus-s2-model"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "m3-leaf-death-r3-opus-s2-model"
+path = "src/main.rs"
+
+[profile.release]
+debug = false
+overflow-checks = true
+
+[workspace]

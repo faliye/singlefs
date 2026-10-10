@@ -1,0 +1,380 @@
+--- device-source.rs
++++ device-source-w3.rs
+@@ -356,7 +356,7 @@
+ }
+ 
+ /// D 族：D1 一段、D2(k) 六段（k = 1..=6）、D3 一段。
+-const DIRECTED_HISTORY_COUNT: u64 = 8;
++const DIRECTED_HISTORY_COUNT: u64 = 10;
+ const LARGEST_DIRECTED_ROLLBACK_INDEX: u64 = 6;
+ 
+ fn ring_root(index_from_newest: u64) -> HistoryOperation {
+@@ -389,6 +389,37 @@
+                 HistoryOperation::CreateInode,
+             ],
+         ),
++        // W3 正推腿加的两段（不是登记的 D 族）：W3-climb 回退之后同一会话里建四个、水位爬过回退前的高水位；W3-climb-then-mount 同上再挂载、再建一个。
++        8 => (
++            "W3-climb-then-mount".to_string(),
++            vec![
++                HistoryOperation::Unlink,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                ring_root(3),
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CloseAndMountWritable,
++                HistoryOperation::CreateInode,
++            ],
++        ),
++        9 => (
++            "W3-climb".to_string(),
++            vec![
++                HistoryOperation::Unlink,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                ring_root(3),
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++                HistoryOperation::CreateInode,
++            ],
++        ),
+         other => panic!("D 族只有 {DIRECTED_HISTORY_COUNT} 段，序号 {other} 越界"),
+     }
+ }
+@@ -919,6 +950,7 @@
+     current_trajectory: Vec<(String, Option<u64>, Vec<(u64, u64)>)>,
+     /// 每次做成的回退：目标那一版的身份与 S1 读到的水位（D 族 A5 k ≥ 2 那几格按它钉）。
+     rollback_targets: Vec<(RootIdentity, Option<u64>)>,
++    w3: W3Account,
+ }
+ 
+ /// 这一步读到的盘面（S1）与 S3 两路的判定。
+@@ -947,6 +979,7 @@
+             first_q11_detail: None,
+             current_trajectory: Vec::new(),
+             rollback_targets: Vec::new(),
++            w3: W3Account::default(),
+         }
+     }
+ 
+@@ -1147,6 +1180,23 @@
+         self.judge_with_the_checker(observation.image, &position, &mut events_of_this_step);
+         self.count_watermark_regression(current.as_ref(), table);
+         self.count_operation_specific(observation, applied_effect, &position, current.as_ref());
++        {
++            let i9_29 = self.step_verdicts.last().map_or("missing", |verdict| verdict.one_birth_per_number.label());
++            let abandoned_now = abandoned.clone();
++            self.w3.observe(
++                &position,
++                &read.readable,
++                table,
++                current.as_ref(),
++                self.previous.as_ref(),
++                &self.watermarks_seen,
++                &self.births,
++                &|identity| abandoned_now.get(&identity).copied().unwrap_or(false),
++                i9_29,
++                &events_of_this_step,
++                &format!("{:?}", observation.outcome).chars().filter(|c| !c.is_whitespace()).take(70).collect::<String>(),
++            );
++        }
+         self.events.extend(events_of_this_step);
+         self.previous = Some(StepView { readable: read.readable, abandoned, current });
+         self.previous_model_newest = model_newest;
+@@ -1667,6 +1717,10 @@
+             block.push_str(&line);
+             block.push('\n');
+         }
++        for line in evaluation.account.w3.lines(evaluation.family.label(), arm.label(), evaluation.index) {
++            block.push_str(&line);
++            block.push('\n');
++        }
+         block.push_str(&evaluation.history_line(arm));
+         block.push('\n');
+         file.write_all(block.as_bytes()).expect("写结果文件");
+@@ -2275,3 +2329,279 @@
+ fn first_history_of_g_long_f1_yields_a_complete_line() {
+     first_history_of_the_family_yields_a_complete_line(Family::Geometry(GeometryPoint::LongerBroad));
+ }
++
++
++// ---------------------------------------------------------------------------------------------
++// W3 正推腿（m3-w3-r1-sonnet）加的一段：不改上面任何一行的判，只在每一步之后另算四个候选的「盘上历史」会让这一步判红不判红。
++// 候选的历史行 = (g, H)：「到 txg g 为止，这条时间线上小于 H 的号都发过了」。
++//   c1a  实例表行预留里记「所选根（重放之后那一版）的水位」，恢复时由新实例写；行 (实例 i, T_i, M_i)，g = T_i，H = M_i
++//   c1b  同上，但值取恢复那一刻根环里读得出的、该实例 txg <= T_i 的根的水位最大值（比 c1a 多看环里没被回退盖掉的）
++//   c2i  记账里每个实例留一条水位行，每次发布携带「该实例时间线上的最大水位」，g = 第一次到达这个最大水位的 txg
++//   c2all 记账里每个发布的水位行都留（g = 那个根的 txg，H = 它的水位），即完整的台阶
++//   c3   完整台阶的另一种容器（只追加的 (号区间, 出生代) 记录）：按出生代账判，同号两个出生代、其中一个由时间线上的根持有就红
++// 两条判法：A 水位地板——最新根的水位不低于全部历史行的 H；B 出生代截断——最新根 inode 树里每条 (n, b)，没有一条历史行满足 H > n 且 b > g。
++#[derive(Clone, Copy, Debug, Default)]
++struct W3Flags {
++    floor: bool,
++    cut: bool,
++}
++
++impl W3Flags {
++    fn red(self) -> bool {
++        self.floor || self.cut
++    }
++    fn text(self) -> String {
++        format!("{}{}", if self.floor { "A" } else { "-" }, if self.cut { "B" } else { "-" })
++    }
++}
++
++#[derive(Clone, Debug)]
++struct W3Step {
++    position: String,
++    watermark: Option<u64>,
++    i9_29: String,
++    c1a: W3Flags,
++    c1b: W3Flags,
++    c2i: W3Flags,
++    c2all: W3Flags,
++    c4: W3Flags,
++    c3: bool,
++    same_timeline_conflict_so_far: bool,
++    rows_text: String,
++    outcome: String,
++    events_here: u64,
++    /// 这一步每个事件自己那条记录 (号, 出生代) 单独拿去比：c1a c1b c2i c2all c3 各判不判红（事件自己的记录，不含别的记录）。
++    own: Vec<(u64, u64, [bool; 6])>,
++}
++
++#[derive(Default)]
++struct W3Account {
++    /// 实例 → (T_i, M_a, M_b)：行第一次（或 T 变了）出现的那一步，用「那一步之前」的环算出来，之后不变。
++    rows: BTreeMap<u32, (u64, u64, u64)>,
++    steps: Vec<W3Step>,
++}
++
++fn w3_own_cut(history_rows: &[(u64, u64)], n: u64, b: u64) -> bool {
++    history_rows.iter().any(|(g, h)| *h > n && b > *g)
++}
++
++fn w3_flags(history_rows: &[(u64, u64)], watermark: u64, records: &[(u64, u64)]) -> W3Flags {
++    let highest = history_rows.iter().map(|(_, h)| *h).max().unwrap_or(0);
++    let floor = watermark < highest;
++    let cut = records
++        .iter()
++        .any(|(n, b)| history_rows.iter().any(|(g, h)| *h > *n && *b > *g));
++    W3Flags { floor, cut }
++}
++
++impl W3Account {
++    #[allow(clippy::too_many_arguments)]
++    fn observe(
++        &mut self,
++        position: &str,
++        readable: &[RootFacts],
++        table: Option<&InstanceTableRecords>,
++        current: Option<&RootFacts>,
++        previous: Option<&StepView>,
++        watermarks_seen: &BTreeMap<RootIdentity, Option<u64>>,
++        births: &BTreeMap<u64, BTreeMap<u64, BTreeSet<RootIdentity>>>,
++        abandoned: &dyn Fn(RootIdentity) -> bool,
++        i9_29: &str,
++        events_here: &[ReissueEvent],
++        outcome: &str,
++    ) {
++        let _ = readable;
++        if let Some(table) = table {
++            let mut next: BTreeMap<u32, (u64, u64, u64)> = BTreeMap::new();
++            for row in &table.rows {
++                let instance = row.instance.0;
++                let txg = row.selected_root_txg.0;
++                match self.rows.get(&instance) {
++                    Some(old) if old.0 == txg => {
++                        next.insert(instance, *old);
++                    }
++                    _ => {
++                        let before = previous.map_or(&[][..], |view| &view.readable[..]);
++                        let m_a = if txg == 0 {
++                            0
++                        } else {
++                            before
++                                .iter()
++                                .find(|facts| facts.identity == (instance, txg))
++                                .and_then(RootFacts::watermark)
++                                .unwrap_or(0)
++                        };
++                        let m_b = if txg == 0 {
++                            0
++                        } else {
++                            before
++                                .iter()
++                                .filter(|facts| facts.identity.0 == instance && facts.identity.1 <= txg)
++                                .filter_map(RootFacts::watermark)
++                                .max()
++                                .unwrap_or(0)
++                        };
++                        next.insert(instance, (txg, m_a, m_b));
++                    }
++                }
++            }
++            self.rows = next;
++        }
++        let Some(current) = current else {
++            return;
++        };
++        let Some(watermark) = current.watermark() else {
++            return;
++        };
++        let records: Vec<(u64, u64)> = current.inode_births().to_vec();
++        let current_instance = current.identity.0;
++        let c1a_rows: Vec<(u64, u64)> = self.rows.values().filter(|r| r.0 > 0).map(|r| (r.0, r.1)).collect();
++        let c1b_rows: Vec<(u64, u64)> = self.rows.values().filter(|r| r.0 > 0).map(|r| (r.0, r.2)).collect();
++        // c2i：表里每个 T>0 的实例，加现行实例（没有行）。
++        let mut instances: BTreeMap<u32, Option<u64>> = BTreeMap::new();
++        for (instance, row) in &self.rows {
++            if row.0 > 0 {
++                instances.insert(*instance, Some(row.0));
++            }
++        }
++        instances.entry(current_instance).or_insert(None);
++        let mut c2i_rows: Vec<(u64, u64)> = Vec::new();
++        for (instance, cut_at) in &instances {
++            let roots: Vec<(u64, u64)> = watermarks_seen
++                .iter()
++                .filter(|(identity, _)| identity.0 == *instance && cut_at.is_none_or(|cut| identity.1 <= cut))
++                .filter_map(|(identity, seen)| seen.map(|wm| (identity.1, wm)))
++                .collect();
++            if let Some(highest) = roots.iter().map(|(_, wm)| *wm).max() {
++                let reached = roots.iter().filter(|(_, wm)| *wm == highest).map(|(txg, _)| *txg).min().unwrap_or(0);
++                c2i_rows.push((reached, highest));
++            }
++        }
++        // c2all：时间线上（现行表不判抛弃）每个根的 (txg, 水位)。
++        let c2all_rows: Vec<(u64, u64)> = watermarks_seen
++            .iter()
++            .filter(|(identity, _)| !abandoned(**identity))
++            .filter_map(|(identity, seen)| seen.map(|wm| (identity.1, wm)))
++            .collect();
++        // c4：根记录里带一对 (全时间线最大水位, 第一次到达它的 txg)。
++        let c4_rows: Vec<(u64, u64)> = {
++            let highest = c2all_rows.iter().map(|(_, wm)| *wm).max();
++            highest
++                .map(|h| vec![(c2all_rows.iter().filter(|(_, wm)| *wm == h).map(|(txg, _)| *txg).min().unwrap_or(0), h)])
++                .unwrap_or_default()
++        };
++        // c3：按出生代账判。
++        let c3 = records.iter().any(|(n, b)| {
++            births.get(n).is_some_and(|by_birth| {
++                by_birth
++                    .iter()
++                    .any(|(other, holders)| other != b && holders.iter().any(|holder| !abandoned(*holder)))
++            })
++        });
++        let same_timeline_conflict_so_far = births
++            .values()
++            .any(|by_birth| by_birth.len() >= 2 && by_birth.values().flatten().any(|holder| !abandoned(*holder)));
++        let rows_text = self
++            .rows
++            .iter()
++            .filter(|(_, r)| r.0 > 0)
++            .map(|(i, r)| format!("{i}:{}/{}/{}", r.0, r.1, r.2))
++            .collect::<Vec<_>>()
++            .join(";");
++        self.steps.push(W3Step {
++            position: position.to_string(),
++            watermark: Some(watermark),
++            i9_29: i9_29.to_string(),
++            c1a: w3_flags(&c1a_rows, watermark, &records),
++            c1b: w3_flags(&c1b_rows, watermark, &records),
++            c2i: w3_flags(&c2i_rows, watermark, &records),
++            c2all: w3_flags(&c2all_rows, watermark, &records),
++            c4: w3_flags(&c4_rows, watermark, &records),
++            c3,
++            same_timeline_conflict_so_far,
++            rows_text,
++            outcome: outcome.to_string(),
++            events_here: u64::try_from(events_here.len()).expect("事件数"),
++            own: events_here
++                .iter()
++                .map(|event| {
++                    let n = event.inode;
++                    let b = event.new_birth;
++                    let c3_own = births.get(&n).is_some_and(|by_birth| {
++                        by_birth
++                            .iter()
++                            .any(|(other, holders)| *other != b && holders.iter().any(|holder| !abandoned(*holder)))
++                    });
++                    (
++                        n,
++                        b,
++                        [
++                            w3_own_cut(&c1a_rows, n, b),
++                            w3_own_cut(&c1b_rows, n, b),
++                            w3_own_cut(&c2i_rows, n, b),
++                            w3_own_cut(&c2all_rows, n, b),
++                            c3_own,
++                            w3_own_cut(&c4_rows, n, b),
++                        ],
++                    )
++                })
++                .collect(),
++        });
++    }
++
++    fn lines(&self, family: &str, arm: &str, index: u64) -> Vec<String> {
++        let mut lines = Vec::new();
++        for step in &self.steps {
++            let any_red = step.c1a.red() || step.c1b.red() || step.c2i.red() || step.c2all.red() || step.c3 || step.c4.red();
++            if step.events_here > 0 || any_red {
++                lines.push(format!(
++                    "E7RESULT name=w3step family={family} arm={arm} index={index} position={} events_here={} outcome={} own={} i9_29={} conflict_so_far={} wm={} c1a={} c1b={} c2i={} c2all={} c3={} c4={} rows={}",
++                    step.position,
++                    step.events_here,
++                    step.outcome,
++                    if step.own.is_empty() {
++                        "-".to_string()
++                    } else {
++                        step.own
++                            .iter()
++                            .map(|(n, b, f)| {
++                                format!(
++                                    "{n}/{b}:{}",
++                                    f.iter().map(|x| if *x { 'R' } else { '-' }).collect::<String>()
++                                )
++                            })
++                            .collect::<Vec<_>>()
++                            .join(",")
++                    },
++                    step.i9_29,
++                    step.same_timeline_conflict_so_far,
++                    step.watermark.map_or("none".to_string(), |w| w.to_string()),
++                    step.c1a.text(),
++                    step.c1b.text(),
++                    step.c2i.text(),
++                    step.c2all.text(),
++                    if step.c3 { "R" } else { "-" },
++                    step.c4.text(),
++                    if step.rows_text.is_empty() { "-" } else { &step.rows_text },
++                ));
++            }
++        }
++        let own_events: u64 = self.steps.iter().map(|s| u64::try_from(s.own.len()).expect("n")).sum();
++        let own_caught = |k: usize| -> u64 {
++            self.steps.iter().flat_map(|s| s.own.iter()).filter(|(_, _, f)| f[k]).count() as u64
++        };
++        let count = |f: &dyn Fn(&W3Step) -> bool| u64::try_from(self.steps.iter().filter(|s| f(s)).count()).expect("步数");
++        let untainted = |s: &W3Step| !s.same_timeline_conflict_so_far;
++        lines.push(format!(
++            "E7RESULT name=w3summary family={family} arm={arm} index={index} steps={} red_c1a={} red_c1b={} red_c2i={} red_c2all={} red_c3={} untainted_red_c1a={} untainted_red_c1b={} untainted_red_c2i={} untainted_red_c2all={} untainted_red_c3={} event_steps={} event_steps_red_c1a={} event_steps_red_c1b={} event_steps_red_c2i={} event_steps_red_c2all={} event_steps_red_c3={} own_events={own_events} own_caught_c1a={} own_caught_c1b={} own_caught_c2i={} own_caught_c2all={} own_caught_c3={} own_caught_c4={} red_c4={} untainted_red_c4={}",
++            self.steps.len(),
++            count(&|s| s.c1a.red()), count(&|s| s.c1b.red()), count(&|s| s.c2i.red()), count(&|s| s.c2all.red()), count(&|s| s.c3),
++            count(&|s| untainted(s) && s.c1a.red()), count(&|s| untainted(s) && s.c1b.red()), count(&|s| untainted(s) && s.c2i.red()), count(&|s| untainted(s) && s.c2all.red()), count(&|s| untainted(s) && s.c3),
++            count(&|s| s.events_here > 0),
++            count(&|s| s.events_here > 0 && s.c1a.red()), count(&|s| s.events_here > 0 && s.c1b.red()), count(&|s| s.events_here > 0 && s.c2i.red()), count(&|s| s.events_here > 0 && s.c2all.red()), count(&|s| s.events_here > 0 && s.c3),
++            own_caught(0), own_caught(1), own_caught(2), own_caught(3), own_caught(4), own_caught(5),
++            count(&|s| s.c4.red()), count(&|s| untainted(s) && s.c4.red()),
++        ));
++        lines
++    }
++}

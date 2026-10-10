@@ -1,0 +1,24 @@
+
+running 1 test
+test walk::tests::a_full_first_lineage_container_and_one_more_hold_on_the_product_branch ... FAILED
+
+failures:
+
+---- walk::tests::a_full_first_lineage_container_and_one_more_hold_on_the_product_branch stdout ----
+
+thread 'walk::tests::a_full_first_lineage_container_and_one_more_hold_on_the_product_branch' (2465188) panicked at crates/singlefs-checker/src/walk.rs:14126:9:
+assertion `left == right` failed: Lineage 表 [(1, 1359), (2, 1)]（旋钮 None）：I-9.36 一处都不红（第一处：Some("单测那一版：谱系树（树 65546）沿叶序容器号不是逐片加一：容器 1 之后是容器 2（下一个号 = 最右号 + 1）")）
+  left: 1
+ right: 0
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    walk::tests::a_full_first_lineage_container_and_one_more_hold_on_the_product_branch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 31 filtered out; finished in 0.00s
+
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch57-code-r1-sonnet/repo/crates/singlefs-checker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.35s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch57-code-r1-sonnet/target/debug/deps/singlefs_checker-68797fa85c855dfd)
+error: test failed, to rerun pass `-p singlefs-checker --lib`

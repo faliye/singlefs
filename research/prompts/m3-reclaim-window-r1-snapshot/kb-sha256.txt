@@ -1,0 +1,4 @@
+7d0ae12ed1a2d732f988bff3a81966df27506cac1e6b121bfb4e3cdb866854ea  .claude/kb/decisions/16-发布语义.md
+492bc09f5ab1aded1fd5faf62d179acb0e18c4bd0b8771ba5a28d466a86ac14e  .claude/kb/decisions/23-journal的角色与格式.md
+8e2f4b8f069ec05d1fddcea223c98ab93e6138299e6ec0a453d049b38a7299bf  .claude/kb/experiments/139-按盘回退下界的收严形态.md
+46a30a5b99195dbe2661a2ed56e9ce1c099dd5f9137137c3b10f8797bb77c121  .claude/kb/invariants.md

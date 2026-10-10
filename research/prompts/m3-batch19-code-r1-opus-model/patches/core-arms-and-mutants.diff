@@ -1,0 +1,163 @@
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-05 05:44:37.628526347 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-05 09:08:06.016977807 +0000
+@@ -3708,6 +3708,9 @@
+         }
+     };
+     let mut taken_by_every_publish = vec![placements_taken_by(&row_publish)];
++    if b19_arm() == 3 {
++        copy.release_reclaim_holds();
++    }
+     let mut current = row_publish;
+     // 迭代上界是暖机的次数；跨轮携带的是预演出来的现行那一版（下一次的计划接着它）。
+     for (warm_up_position, planned_txg) in warm_up_publish_txgs.iter().enumerate() {
+@@ -3752,6 +3755,9 @@
+         );
+         taken_by_every_publish.push(placements_taken_by(&next));
+         current = next;
++        if b19_arm() == 6 && warm_up_position == 0 {
++            copy.release_reclaim_holds();
++        }
+     }
+     Ok(taken_by_every_publish)
+ }
+@@ -4571,6 +4577,28 @@
+ }
+ 
+ /// 取号 → 写行发布 → 暖机到本实例的根覆盖每块盘 → 取号之前准入不够的，推抬 F 的空发布再判：可写挂载的后半段。
++/// 攻方原型的臂：0 合法（冻结副本原样）；1 甲（暖机之前放开，预演不动，= mutations.tsv 删除批第 19 批 甲）；2 N4（暖机之后不放开，= 删除批第 19 批 N4）；
++/// 3 甲同步（暖机之前放开，预演在拷贝上同一处也放开：预演对真发那一判不分叉）；4 预演之前放开（取号之前就放开，预演与真发都看放开之后的）；
++/// 5 只在暖机第一次之后放开（暖机多于一次时早于落满，预演不动）；6 同 5、预演在拷贝上同一处也放开。初值读环境变量 B19_ARM，原型可改。
++/// 每个线程各自一个臂（原型在几个线程上同时跑不同的臂）；没设过的线程读环境变量 B19_ARM。
++pub fn b19_set_arm(arm: u8) {
++    B19_ARM.with(|a| a.set(arm));
++}
++pub fn b19_arm() -> u8 {
++    let a = B19_ARM.with(|a| a.get());
++    if a != 255 { return a; }
++    let v = std::env::var("B19_ARM").ok().and_then(|s| s.parse().ok()).unwrap_or(0);
++    B19_ARM.with(|a| a.set(v));
++    v
++}
++thread_local! {
++    static B19_ARM: std::cell::Cell<u8> = const { std::cell::Cell::new(255) };
++    /// 攻方原型：最近一次 establish_instance 进门时分配器上扣住位置着的槽。
++    pub static B19_HELD_AT_ESTABLISH: std::cell::RefCell<Vec<(u32, u64)>> = const { std::cell::RefCell::new(Vec::new()) };
++    /// 攻方原型：最近一次 establish_instance 推的暖机次数。
++    pub static B19_WARM_UPS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
++}
++
+ fn establish_instance<Device: BlockDevice>(
+     parameters: &MakeFilesystemParameters,
+     devices: &mut Vec<(DeviceIdentity, Device)>,
+@@ -4587,6 +4615,10 @@
+         devices,
+         unit_area_start_of_the_chosen_system_configuration(&start.system_configuration),
+     )?;
++    B19_HELD_AT_ESTABLISH.with(|h| *h.borrow_mut() = allocator.b19_held_slots());
++    if b19_arm() == 4 {
++        allocator.release_reclaim_holds();
++    }
+     let mut pool = PoolWriter::new(parameters, devices.as_mut_slice());
+     let all_devices: Vec<DeviceIdentity> =
+         pool.devices.iter().map(|(identity, _)| *identity).collect();
+@@ -4860,6 +4892,10 @@
+         start.first_txg,
+         "写行那次发布的 txg 就是算暖机计划用的那个：两条路（带文件的写行、树表 0 条的零单元发布）交给发布路径的 txg 都取 start.first_txg"
+     );
++    if matches!(b19_arm(), 1 | 3) {
++        allocator.release_reclaim_holds();
++    }
++    B19_WARM_UPS.with(|w| w.set(warm_up_publishes_planned.len()));
+     let mut current = row_publish.clone();
+     let mut warm_up_publishes = Vec::new();
+     for planned_txg in &warm_up_publishes_planned {
+@@ -4878,6 +4914,9 @@
+         )?;
+         warm_up_publishes.push(next.clone());
+         current = next;
++        if matches!(b19_arm(), 5 | 6) && warm_up_publishes.len() == 1 {
++            allocator.release_reclaim_holds();
++        }
+     }
+     // 暖机走完、本实例的根在每块盘上都落了（`warm_up_publish_txgs` 按根环落点公式推到覆盖每块盘为止），重建分配器时扣住的那一截放开
+     // （`rebuilt_allocator`，用户 2026-10-04 选甲）：此后丢哪块盘，恢复择到的都不低于本实例的根，它们不引用这一截。
+@@ -4885,7 +4924,9 @@
+     // （写行之后的准入 `push_floor_raises_after_the_row_publish`、续做里推的那几串），它们置的扣住位归它们自己放（`raise_rollback_floor`）；
+     // 走到这里分配器上的扣住位全是重建那一处置的。暖机没走完（取号之前被拒、写行或暖机落盘途中报错）时挂载整次报错，分配器随错丢掉，
+     // 扣住的那一截不交给任何会话。
+-    allocator.release_reclaim_holds();
++    if b19_arm() != 2 {
++        allocator.release_reclaim_holds();
++    }
+     // 取号之前在拷贝上取的落点就是真发起来取的：同一个分配器、同一串分配动作。这一串里有一份换下的单元读盘核校验和对不上时不比——
+     // 真发时那一份的分配记录留在已分配，拷贝上没做那一步、照常释放，那一槽若在这一串里被回收（崩溃恢复落到环里最旧的那条根、其余全被抛弃），两边可以不同
+     // （`dry_run_of_the_publishes_after_acquisition` 的文档注释）；那一格取号之前判的与真发的不是同一串，是这一版留着的缺口。
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-05 02:35:11.585199015 +0000
++++ crates/singlefs-core/src/allocator.rs	2026-10-05 09:08:03.844869938 +0000
+@@ -414,6 +414,12 @@
+     /// 不在单元区里的那条根当「账读不出」只计数（代码审阅第 32 条）。
+     /// 写成 `checked_sub(...).expect(...)` 而不是直接减：`Cargo.toml` 的 `overflow-checks = true` 下直接减也会炸，
+     /// 但炸出来的是一句 `attempt to subtract with overflow`，说不出是哪条前置条件没守住。
++    /// 攻方原型：扣住位置着的槽号。
++    pub fn b19_held_slots(&self) -> Vec<u64> {
++        let start = self.unit_area_start.slot().0;
++        self.held_until_floor_takes_effect.iter().enumerate().filter(|(_, h)| **h).map(|(i, _)| start + i as u64).collect()
++    }
++
+     fn index(&self, slot: SlotNumber) -> usize {
+         let offset_in_slots = slot.0.checked_sub(self.unit_area_start.slot().0).expect(
+             "槽号在单元区内：盘上读来的分配记录与 mkfs 那一版两条指针在 recovery::allocation_records_fit_the_pool_geometry 判过，被抛弃根的指针槽号在 recovery::placement_lies_in_the_unit_area_of_its_device 判过，分配器自己发的落点都从单元区起点起",
+@@ -1856,6 +1862,11 @@
+         reclaimed_now
+     }
+ 
++    /// 攻方原型：每块盘上扣住位置着的槽（盘号, 槽号）。
++    pub fn b19_held_slots(&self) -> Vec<(u32, u64)> {
++        self.devices.iter().flat_map(|m| m.b19_held_slots().into_iter().map(move |s| (m.device.0, s))).collect()
++    }
++
+     /// 抬 F 生效（带新 F 的根落满每块盘）之后，把扣住的回收槽放开。
+     pub fn release_reclaim_holds(&mut self) {
+         for device_map in &mut self.devices {
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/unlink.rs	2026-10-03 03:13:50.535229079 +0000
++++ crates/singlefs-core/src/unlink.rs	2026-10-05 09:08:06.017435582 +0000
+@@ -114,9 +114,20 @@
+ 
+ /// 现行那一版这个文件还剩 `data_units_remaining` 个数据单元时，下一步是哪一批：剩下的多于一批 ⇒ 释放尾部一批；
+ /// 剩下的不多于一批 ⇒ 最后一批把它们全部释放（「只有这一条路，不设一次做完的快路」：剩下的再少也走最后一批这一个形状）。
++/// 攻方原型：错实现开关（环境变量 B19_MUT，读一次）。
++pub fn b19_mut_is(name: &str) -> bool {
++    static MUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
++    MUT.get_or_init(|| std::env::var("B19_MUT").unwrap_or_default()) == name
++}
++
+ #[must_use]
+ pub fn next_unlink_step(data_units_remaining: u64, batch_size: UnlinkBatchSize) -> UnlinkStep {
+-    let data_units_per_batch = batch_size.data_units_per_batch();
++    let data_units_per_batch = match batch_size {
++        UnlinkBatchSize::OneExtentLowerLeaf if b19_mut_is("c2-third") => {
++            batch_size.data_units_per_batch().max(data_units_remaining.div_ceil(3))
++        }
++        _ => batch_size.data_units_per_batch(),
++    };
+     if data_units_remaining <= data_units_per_batch {
+         return UnlinkStep::FinalBatch {
+             data_units_released: data_units_remaining,
+--- /tmp/claude-1000/m3-batch19-code-r1/tree/crates/singlefs-core/src/mounted_session.rs	2026-10-03 17:21:13.629171533 +0000
++++ crates/singlefs-core/src/mounted_session.rs	2026-10-05 09:08:06.017605478 +0000
+@@ -254,7 +254,14 @@
+             allocator,
+             previous,
+             inode,
+-            write_time_seconds,
++            if crate::unlink::b19_mut_is("q-unlink-mono") {
++                thread_local! { static LAST_UNLINK_TIME: std::cell::Cell<u64> = const { std::cell::Cell::new(0) }; }
++                let clamped = LAST_UNLINK_TIME.with(|last| last.get().max(write_time_seconds));
++                LAST_UNLINK_TIME.with(|last| last.set(clamped));
++                clamped
++            } else {
++                write_time_seconds
++            },
+             instance,
+         ),
+         UserChange::Overwrite(file) => {

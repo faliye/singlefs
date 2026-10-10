@@ -1,0 +1,18 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：派出去的攻方腿与正推腿各跑各的
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch10i-code-r1-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10i-code-r1-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.29s
+     Running tests/rollback_by_a_forward_publish.rs (/tmp/claude-1000/m3-batch10i-code-r1-sonnet/target/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+
+running 4 tests
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ok
+test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... ok
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 19 filtered out; finished in 51.95s
+
+
+real	0m55.446s
+user	2m42.247s
+sys	0m5.992s

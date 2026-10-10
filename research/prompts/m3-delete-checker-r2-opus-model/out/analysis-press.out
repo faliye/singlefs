@@ -1,0 +1,33 @@
+PRESSAGG follow=0 rows=249 reissue=243 checker_any_red=172
+PRESSAGG follow=0 caught T2a=38 T2c-A=26 T2c-A2=26 T2a/selmap=0 yi/rec=243 yi/rec+tomb=243 bing=243 I96code=166 I96newest=144 I96each=144 I919A=0
+PRESSAGG follow=0 checker_silent rows=41 caught_by=['yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=0 checker_silent rows=18 caught_by=['T2a', 'T2c-A', 'T2c-A2', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=0 checker_silent rows=12 caught_by=['T2a', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 rows=249 reissue=243 checker_any_red=151
+PRESSAGG follow=1 caught T2a=49 T2c-A=33 T2c-A2=33 T2a/selmap=26 yi/rec=243 yi/rec+tomb=243 bing=243 I96code=135 I96newest=124 I96each=144 I919A=0
+PRESSAGG follow=1 checker_silent rows=43 caught_by=['yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 checker_silent rows=12 caught_by=['T2a', 'T2a/selmap', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 checker_silent rows=12 caught_by=['T2a', 'T2c-A', 'T2c-A2', 'T2a/selmap', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 checker_silent rows=10 caught_by=['T2a', 'T2c-A', 'T2c-A2', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 checker_silent rows=10 caught_by=['yi/rec', 'yi/rec+tomb', 'bing', 'I96each']
+PRESSAGG follow=1 checker_silent rows=2 caught_by=['T2a', 'yi/rec', 'yi/rec+tomb', 'bing']
+PRESSAGG follow=1 checker_silent rows=2 caught_by=['T2a', 'yi/rec', 'yi/rec+tomb', 'bing', 'I96each']
+PRESSAGG follow=1 checker_silent rows=1 caught_by=['T2a', 'T2c-A', 'T2c-A2', 'yi/rec', 'yi/rec+tomb', 'bing', 'I96each']
+PRESSAGG follow=30 rows=249 reissue=243 checker_any_red=44
+PRESSAGG follow=30 caught T2a=54 T2c-A=36 T2c-A2=36 T2a/selmap=48 yi/rec=87 yi/rec+tomb=117 bing=87 I96code=3 I96newest=3 I96each=81 I919A=0
+PRESSAGG follow=30 checker_silent rows=93 caught_by=[]
+PRESSAGG follow=30 checker_silent rows=75 caught_by=['yi/rec', 'yi/rec+tomb', 'bing', 'I96each']
+PRESSAGG follow=30 checker_silent rows=19 caught_by=['T2a', 'T2c-A', 'T2c-A2', 'T2a/selmap', 'yi/rec+tomb']
+PRESSAGG follow=30 checker_silent rows=12 caught_by=['T2a', 'T2a/selmap']
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=2 n=1 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=2 n=2 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=2 n=3 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=3 n=1 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=3 n=2 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R2 p=3 n=3 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=2 n=1 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=2 n=2 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=2 n=3 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=3 n=1 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=3 n=2 marks=R--RHHHHHH-
+PRESSAGG follow=30 only_T2a_family prefix=C2,U3,R3 p=3 n=3 marks=R--RHHHHHH-

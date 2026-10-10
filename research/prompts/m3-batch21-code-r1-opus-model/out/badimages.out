@@ -1,0 +1,59 @@
+BADIMAGE base=u3-n0-b1 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u3-n0-b1 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u3-n0-b1 version=intent mutation=2 target=I-9.6 only_target=true violated=["I-9.6"]
+BADIMAGE base=u3-n0-b1 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+BADIMAGE base=u3-n0-b1 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+BADIMAGE base=u3-n0-b1 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n0-b1 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n0-b1 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n0-b1 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u145-n3-b100 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u145-n3-b100 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u145-n3-b100 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+BADIMAGE base=u145-n3-b100 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+BADIMAGE base=u145-n3-b100 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+
+thread 'main' (3728950) panicked at crates/m3b21-opus-proto/src/../../singlefs-harness/tests/common_deletion_in_progress/mod.rs:450:9:
+assertion `left == right` failed: 叶里两条：1 号与空 inode 2
+  left: 4
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+BADIMAGE base=u145-n3-b100 version=after_new_inodes mutation=1 target=I-4.7 result=mutation_panicked
+BADIMAGE base=u145-n3-b100 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+BADIMAGE base=u145-n3-b100 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+BADIMAGE base=u145-n3-b100 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u145-n3-b100 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u145-n3-b100 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u145-n3-b100 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n470-b1 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u3-n470-b1 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u3-n470-b1 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+BADIMAGE base=u3-n470-b1 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+BADIMAGE base=u3-n470-b1 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+
+thread 'main' (3728950) panicked at crates/m3b21-opus-proto/src/../../singlefs-harness/tests/common_deletion_in_progress/mod.rs:450:9:
+assertion `left == right` failed: 叶里两条：1 号与空 inode 2
+  left: 233
+ right: 2
+BADIMAGE base=u3-n470-b1 version=after_new_inodes mutation=1 target=I-4.7 result=mutation_panicked
+BADIMAGE base=u3-n470-b1 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+BADIMAGE base=u3-n470-b1 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+BADIMAGE base=u3-n470-b1 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n470-b1 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n470-b1 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u3-n470-b1 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u1-n1-b144 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u1-n1-b144 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u1-n1-b144 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+
+thread 'main' (3728950) panicked at crates/m3b21-opus-proto/src/../../singlefs-harness/tests/common_deletion_in_progress/mod.rs:342:28:
+最新的根那一版 inode 树里有 inode 1 的记录
+BADIMAGE base=u1-n1-b144 version=first_batch mutation=0 target=I-4.6 result=mutation_panicked
+BADIMAGE base=u1-n1-b144 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+BADIMAGE base=u1-n1-b144 version=after_new_inodes mutation=1 target=I-4.7 only_target=true violated=["I-4.7"]
+BADIMAGE base=u1-n1-b144 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+BADIMAGE base=u1-n1-b144 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+BADIMAGE base=u1-n1-b144 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u1-n1-b144 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u1-n1-b144 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+BADIMAGE base=u1-n1-b144 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]

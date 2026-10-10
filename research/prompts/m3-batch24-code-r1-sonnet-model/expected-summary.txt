@@ -1,0 +1,393 @@
+== sha256
+SHA256_OK_OF_10 10
+== anchors
+TABLE_ROWS 2898
+A_ROWS 27 K=21 G=6
+A OK  hits=1 differs=True has_test=True 第24批 K N4：容器树条目不认孩子头里的类（类型段 0 指码 3 照旧按 16 KiB 
+A OK  hits=1 differs=True has_test=True 第24批 K N4：容器树类型段 0 那一支不认孩子头里的类（身份三段为 0 的类型段 0 
+A OK  hits=1 differs=True has_test=True 第24批 K N4：容器树类型段 0 那一支不认孩子头里的类（谱系树那一侧，I-9.17 连
+A OK  hits=1 differs=True has_test=True 第24批 K N4：容器树类型段 = 打包记录类型那一支不认孩子头里的类（类型段 1 指码 
+A OK  hits=1 differs=True has_test=True 第24批 K N4：容器树类型段 = 打包记录类型那一支不认孩子头里的类（根环转过一圈之后那
+A OK  hits=1 differs=True has_test=True 第24批 K I-9.2 同形：inode 树类型段 0 那一支当孩子该是码 3（指码 3 
+A OK  hits=1 differs=True has_test=True 第24批 K I-9.2 同形：孩子头里的类与类型段说的不符也当相符（身份三段为 0 的 i
+A OK  hits=1 differs=True has_test=True 第24批 K 孩子的类不验整单元校验和（只改了类标签的叶容器被当成码 2 孩子、按一槽登记）
+A OK  hits=1 differs=True has_test=True 第24批 K M1：容器树类型段 0 那一支身份判定恒真
+A OK  hits=1 differs=True has_test=True 第24批 K M1：谱系树类型段不认得那一支不判红
+A OK  hits=1 differs=True has_test=True 第24批 K M5：墓碑容器号沿叶序严格递增那一句恒真
+A OK  hits=1 differs=True has_test=True 第24批 K M2：I-9.29 不收谱系上墓碑的出生代（墓碑一侧记到别的号下）
+A OK  hits=1 differs=True has_test=True 第24批 K M3：I-9.20 不比死亡 txg 的上界
+A OK  hits=1 differs=True has_test=True 第24批 K M4：I-9.4 第四句只要求前后不同（倒序放过）
+A OK  hits=1 differs=True has_test=True 第24批 K M6：I-9.18 配墓碑时不比对象出生代
+A OK  hits=1 differs=True has_test=True 第24批 K M7：I-9.18 配墓碑时不比整对象区间
+A OK  hits=1 differs=True has_test=True 第24批 K 队列同号两条：码 2 节点条目 key 只要求不减（同 key 两条放过）
+A OK  hits=1 differs=True has_test=True 第24批 K E142 导出：空闲图按算术判时上界不起作用（比上界多一个槽照样放过）
+A OK  hits=1 differs=True has_test=True 第24批 K E142 导出：恰好在上界上的也拒（上界那一格差一）
+A OK  hits=1 differs=True has_test=True 第24批 K 新九条的不适用理由：I-9.23 没有内部条目时不写专门理由（落到缺省理由「这
+A OK  hits=1 differs=True has_test=True 第24批 K 新九条的不适用理由：I-9.18 队列空时不写专门理由（落到缺省理由「这个镜像
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 N4：墓碑树、谱系树类型段 0 的条目不按孩子头里的类认（层级 
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 N4：墓碑树、谱系树类型段 0 的条目不按孩子头里的类认（层级 
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 N4：墓碑树、谱系树类型段 = 记录类型的条目不按孩子头里的类认
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 N4：墓碑树、谱系树类型段 = 记录类型的条目不按孩子头里的类认
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 N4：inode 树内部条目不按孩子头里的类认（inode 树根
+A OK  hits=1 differs=True has_test=True 第 24 批 GPU 判器 I-9.29：最新根的实例表读不出时照旧比同号出生代（被抛弃的根
+A_OK 27/27
+B_DELETED_ROW_PRESENT False
+B_ROWS_WITH_TRY_RESERVE_ANCHOR 0
+C_ROWS 2898 C_NOT_EXACTLY_ONE 1
+C_BAD ('C577 结清 ②：litmus「轮换之后屏障」的 P0 去掉轮换之后那道屏障，与录制流里发布最后三步对不上', 'source-missing')
+exit=0
+== tests
+build exit=0
+run exit=0
+test a_lineage_tree_entry_of_type_zero_over_a_container_reddens_only_the_lineage_entry_invariant
+test a_lineage_tree_entry_with_an_unregistered_type_reddens_only_the_lineage_entry_invariant
+test an_inode_leaf_whose_class_tag_alone_says_index_node_is_read_at_the_length_of_its_entry_type
+test an_inode_tree_entry_of_type_zero_over_a_leaf_container_reddens_only_the_inode_entry_invariant
+test an_inode_tree_entry_of_type_zero_with_a_zero_identity_over_a_leaf_container_reddens_only_the_inode_entry_invariant
+test a_tombstone_tree_entry_of_the_container_type_over_a_node_after_the_root_ring_turned_over_reddens_only_the_tombstone_entry_invariant
+test a_tombstone_tree_entry_of_the_container_type_over_a_node_reddens_only_the_tombstone_entry_invariant
+test a_tombstone_tree_entry_of_type_zero_over_a_container_reddens_only_the_tombstone_entry_invariant
+test a_tombstone_tree_entry_of_type_zero_with_a_container_number_reddens_only_the_tombstone_entry_invariant
+test a_tombstone_tree_entry_of_type_zero_with_a_zero_identity_over_a_container_reddens_only_the_tombstone_entry_invariant
+test two_tombstone_containers_with_one_container_number_redden_only_the_capacity_knob_invariant
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 110 filtered out
+build exit=0
+run exit=0
+test a_deletion_queue_holding_one_number_twice_reddens_only_the_key_order_invariant
+test a_leaf_holding_two_inode_numbers_in_descending_order_reddens_only_the_container_number_invariant
+test a_queued_inode_whose_tombstone_does_not_cover_the_whole_object_reddens_the_queued_tombstone_invariant
+test a_queued_inode_whose_tombstone_names_another_object_birth_reddens_the_queued_tombstone_invariant
+test a_tombstone_on_the_lineage_carrying_another_object_birth_for_a_live_number_reddens_the_one_birth_per_number_invariant
+test a_tombstone_that_died_after_every_version_reddens_only_the_tombstone_record_invariant
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out
+build exit=0
+run exit=0
+test floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_one_device_lost_its_root_carrying_it
+test floor_carried_by_the_system_configuration_takes_effect_on_remount_with_both_carrier_roots_intact
+test four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form
+test raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused
+test raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable
+test raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root
+test raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable
+test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it
+test raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refused_before_any_write
+test reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red
+test rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write
+test rolling_back_while_mounted_takes_the_floor_from_the_system_configuration_when_it_is_above_every_root_carried_floor
+test slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect
+test the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker
+test the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor
+test torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+build exit=0
+run exit=0
+test an_abandoned_root_naming_another_object_birth_leaves_the_one_birth_invariant_partially_judged_once_the_newest_instance_table_does_not_read_back
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 120 filtered out
+== mut
+MUT_ROWS_HARNESS 19
+MUT 0 第24批 K N4：容器树条目不认孩子头里的类（类型段 0 指码 3 照 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 类型段 0 的条目指着码 3 容器：只红 I-9.23，不连带 I-4. left: ["I-4.8", "I-7.2", "I-7.4", "I-9.23"] right: ["I-9.23"]
+MUT 1 第24批 K N4：容器树类型段 0 那一支不认孩子头里的类（身份三段为 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 身份三段为 0 的类型段 0 条目指着码 3 容器：只红 I-9.23： left: ["I-4.8", "I-7.2", "I-7.4"] right: ["I-9.23"]
+MUT 2 第24批 K N4：容器树类型段 0 那一支不认孩子头里的类（谱系树那一 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 谱系树类型段 0 的条目指着码 3 容器：只红 I-9.17：[("I- left: ["I-4.8", "I-7.2", "I-7.4", "I-9.17"] right: ["I-9.17"]
+MUT 3 第24批 K N4：容器树类型段 = 打包记录类型那一支不认孩子头里的类 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 类型段 1 的条目指着码 2 节点：只红 I-9.23，不连带 I-2. left: ["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] right: ["I-9.23"]
+MUT 4 第24批 K N4：容器树类型段 = 打包记录类型那一支不认孩子头里的类 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 根环转过一圈之后类型段 1 的条目指着码 2 节点：只红 I-9.23： left: ["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] right: ["I-9.23"]
+MUT 5 第24批 K I-9.2 同形：inode 树类型段 0 那一支当孩子该 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: inode 树类型段 0 的条目指着码 3 叶容器：只红 I-9.2：[ left: ["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] right: ["I-9.2"]
+MUT 6 第24批 K I-9.2 同形：孩子头里的类与类型段说的不符也当相符（身 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 身份三段为 0 的 inode 树类型段 0 条目指着码 3 叶容器：只 left: ["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] right: ["I-9.2"]
+MUT 7 第24批 K 孩子的类不验整单元校验和（只改了类标签的叶容器被当成码 2 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC I-9.2 照类型段 2 那一支判出孩子头的类不是 3：Violated("inode 内部条目类型段 2 说孩子是 Some(Packed
+MUT 8 第24批 K M1：容器树类型段 0 那一支身份判定恒真 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 类型段 0 的条目身份容器号不为 0：只红 I-9.23：[("I-1. left: [] right: ["I-9.23"]
+MUT 9 第24批 K M1：谱系树类型段不认得那一支不判红 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 谱系树根条目的类型段不认得：只红 I-9.17，不连带 I-3.1：[( left: [] right: ["I-9.17"]
+MUT 10 第24批 K M5：墓碑容器号沿叶序严格递增那一句恒真 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 120 filtered out | FIRST_PANIC assertion `left == right` failed: 两片墓碑容器同号：只红 I-9.22：[("I-1.1", Holds) left: [] right: ["I-9.22"]
+MUT 11 第24批 K M2：I-9.29 不收谱系上墓碑的出生代（墓碑一侧记到别 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 2 号的记录与谱系上的墓碑两个出生代：红 I-9.29 与 I-9.10 left: ["I-9.10"] right: ["I-9.10", "I-9.29"]
+MUT 12 第24批 K M3：I-9.20 不比死亡 txg 的上界 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 只红 I-9.20 left: [] right: ["I-9.20"]
+MUT 13 第24批 K M4：I-9.4 第四句只要求前后不同（倒序放过） exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 只红 I-9.4 left: [] right: ["I-9.4"]
+MUT 14 第24批 K M6：I-9.18 配墓碑时不比对象出生代 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 墓碑的出生代不是 2 号记录的：红 I-9.18，连带 I-9.29 与 left: ["I-9.10", "I-9.29"] right: ["I-9.10", "I-9.18", "I-9.29"]
+MUT 15 第24批 K M7：I-9.18 配墓碑时不比整对象区间 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 墓碑不是整对象：红 I-9.18，连带 I-9.20 left: ["I-9.20"] right: ["I-9.18", "I-9.20"]
+MUT 16 第24批 K 队列同号两条：码 2 节点条目 key 只要求不减（同 k exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 44 filtered out | FIRST_PANIC assertion `left == right` failed: 队列同号两条：只红 I-1.1（I-9.24 按号收成一个） left: [] right: ["I-1.1"]
+MUT 17 第24批 K 新九条的不适用理由：I-9.23 没有内部条目时不写专门理 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out | FIRST_PANIC assertion `left == right` failed: I-9.23 在 E 之后的镜像上报「走读到的每一版墓碑树都是零根：没有 left: NotApplicable("这个镜像上没有它判的对象") right: NotApplicable("走读到的每一版墓碑树都是零根：没有墓碑树内部条目可判")
+MUT 18 第24批 K 新九条的不适用理由：I-9.18 队列空时不写专门理由（落 exit=101 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 15 filtered out | FIRST_PANIC assertion `left == right` failed: I-9.18 在 E 之后的镜像上报「走读到的每一版 deleted_i left: NotApplicable("这个镜像上没有它判的对象") right: NotApplicable("走读到的每一版 deleted_inodes 里都没有号：没有队列里的号可判")
+== matrix
+build exit=0
+run exit=0
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=0 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=7 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=5 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.23"] DEVIATION_EXTRA_RED
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelOne type=1 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_FIXTURE LineageLevelOne child_slot=50352 child_length=32768 child_original_tag=3
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU LineageLevelOne type=0 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4"]
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=0 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=7 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=1 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.17"] DEVIATION_EXTRA_RED
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_CPU LineageLevelOne type=5 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+ZS_FIXTURE InodeLevelOne child_slot=50242 child_length=32768 child_original_tag=3
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU InodeLevelOne type=0 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(false) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=0 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(false) reds=[]
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=7 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=1 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.11", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"] DEVIATION_TARGET
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=None verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=Some(1) verifies_as=Some(1) expected_target_red=Some(true) reds=["I-1.11", "I-9.2"] DEVIATION_EXTRA_RED
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=Some(2) verifies_as=None expected_target_red=Some(true) reds=["I-1.2", "I-1.6", "I-1.11", "I-2.4", "I-4.2", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=Some(3) verifies_as=Some(3) expected_target_red=Some(true) reds=["I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_CPU InodeLevelOne type=2 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.2"]
+ZS_FIXTURE TombstoneLevelTwo child_slot=50306 child_length=16384 child_original_tag=2
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=None verifies_as=Some(2) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=Some(1) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=Some(2) verifies_as=Some(2) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=Some(3) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=None verifies_as=Some(2) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=Some(1) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=Some(2) verifies_as=Some(2) expected_target_red=Some(false) reds=[]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=Some(3) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=0 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=None verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=Some(1) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=Some(2) verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=Some(3) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=None verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=Some(1) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=Some(2) verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=Some(3) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=7 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=None verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=Some(1) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=Some(2) verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=Some(3) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=Some(9) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=5 zero_identity=false tag=Some(0) verifies_as=None expected_target_red=Some(true) reds=["I-1.6", "I-1.11", "I-2.4", "I-4.8", "I-7.4", "I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=None verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=Some(1) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=Some(2) verifies_as=Some(2) expected_target_red=Some(true) reds=["I-9.23"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=Some(3) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=Some(9) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_CPU TombstoneLevelTwo type=1 zero_identity=true tag=Some(0) verifies_as=None expected_target_red=None reds=["I-1.6", "I-1.11", "I-2.1", "I-2.4", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.2", "I-7.4"]
+ZS_SUMMARY rows=144 deviations=27
+== reasons
+run exit=0
+ZS_RED one-file knob=false reds=[]
+ZS_REASON one-file entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON one-file entry=old I-9.18 NA-specific:走读到的每一版 delete
+ZS_REASON one-file entry=old I-9.19 NA-specific:走读到的每一版里都没有在谱系
+ZS_REASON one-file entry=old I-9.20 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON one-file entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON one-file entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON one-file entry=old I-9.23 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON one-file entry=old I-9.24 Holds
+ZS_REASON one-file entry=old I-9.29 Holds
+ZS_RED three-unit-file-after-the-intent knob=false reds=[]
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.18 Holds
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.19 Holds
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.20 Holds
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.23 Holds
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.24 Holds
+ZS_REASON three-unit-file-after-the-intent entry=old I-9.29 Holds
+ZS_RED three-unit-file-after-first-batch knob=false reds=[]
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.18 Holds
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.19 Holds
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.20 Holds
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.23 Holds
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.24 Holds
+ZS_REASON three-unit-file-after-first-batch entry=old I-9.29 Holds
+ZS_RED empty-inode-after-the-intent knob=false reds=[]
+ZS_REASON empty-inode-after-the-intent entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON empty-inode-after-the-intent entry=old I-9.18 Holds
+ZS_REASON empty-inode-after-the-intent entry=old I-9.19 Holds
+ZS_REASON empty-inode-after-the-intent entry=old I-9.20 Holds
+ZS_REASON empty-inode-after-the-intent entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON empty-inode-after-the-intent entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON empty-inode-after-the-intent entry=old I-9.23 Holds
+ZS_REASON empty-inode-after-the-intent entry=old I-9.24 Holds
+ZS_REASON empty-inode-after-the-intent entry=old I-9.29 Holds
+ZS_RED three-unit-file-unlinked-to-the-end knob=false reds=[]
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.18 Holds
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.19 Holds
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.20 Holds
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.23 Holds
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.24 Holds
+ZS_REASON three-unit-file-unlinked-to-the-end entry=old I-9.29 Holds
+ZS_RED inode-three-unlinked-ring-turned-over knob=false reds=[]
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.18 NA-specific:走读到的每一版 delete
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.19 NA-specific:走读到的每一版里都没有在谱系
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.20 Holds
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.23 Holds
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.24 Holds
+ZS_REASON inode-three-unlinked-ring-turned-over entry=old I-9.29 Holds
+ZS_RED inode-two-unlinked-rolled-back-ring-turned-over knob=false reds=[]
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.17 Holds
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.18 NA-specific:走读到的每一版 delete
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.19 NA-specific:走读到的每一版里都没有在谱系
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.20 Holds
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.23 Holds
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.24 Holds
+ZS_REASON inode-two-unlinked-rolled-back-ring-turned-over entry=old I-9.29 Holds
+ZS_RED rolled-back-to-the-first-root knob=false reds=[]
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.17 Holds
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.18 NA-specific:走读到的每一版 delete
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.19 NA-specific:走读到的每一版里都没有在谱系
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.20 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.21 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.23 NA-specific:走读到的每一版墓碑树都是零根
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.24 Holds
+ZS_REASON rolled-back-to-the-first-root entry=old I-9.29 Holds
+ZS_RED two-inodes-one-tombstone-per-container-old-entry knob=false reds=["I-9.21"]
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.18 Holds
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.19 Holds
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.20 Holds
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.21 VIOLATED:根（实例 1、txg 7）：墓碑树（树 65545）里不是最右的容器 1 装了  FLAGGED
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.22 NA-specific:池级 checker 的旧入
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.23 Holds
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.24 Holds
+ZS_REASON two-inodes-one-tombstone-per-container-old-entry entry=old I-9.29 Holds
+ZS_RED two-inodes-one-tombstone-per-container knob=true reds=[]
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.18 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.19 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.20 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.21 NA-specific:这张镜像用了只供测试的墓碑容
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.22 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.23 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.24 Holds
+ZS_REASON two-inodes-one-tombstone-per-container entry=knob I-9.29 Holds
+ZS_RED three-inodes-level-two knob=true reds=[]
+ZS_REASON three-inodes-level-two entry=knob I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON three-inodes-level-two entry=knob I-9.18 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.19 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.20 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.21 NA-specific:这张镜像用了只供测试的墓碑容
+ZS_REASON three-inodes-level-two entry=knob I-9.22 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.23 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.24 Holds
+ZS_REASON three-inodes-level-two entry=knob I-9.29 Holds
+ZS_RED one-inode-under-the-knob knob=true reds=[]
+ZS_REASON one-inode-under-the-knob entry=knob I-9.17 NA-specific:走读到的每一版谱系树都是零根
+ZS_REASON one-inode-under-the-knob entry=knob I-9.18 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.19 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.20 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.21 NA-specific:这张镜像用了只供测试的墓碑容
+ZS_REASON one-inode-under-the-knob entry=knob I-9.22 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.23 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.24 Holds
+ZS_REASON one-inode-under-the-knob entry=knob I-9.29 Holds
+ZS_REASON_SUMMARY cases=12 flagged=1
+== arith
+SLOTS_AT_BOUND 134217728 (= 2^27 True) DEVICE_BYTES_AT_BOUND 2199845339136
+ARITH 4GiB           bytes=          4294967296 orig=ok                 mutant18=ok                 mutant19=ok
+ARITH 8GiB           bytes=          8589934592 orig=ok                 mutant18=ok                 mutant19=ok
+ARITH 0              bytes=                   0 orig=ok(mkfs-decides)   mutant18=ok(mkfs-decides)   mutant19=ok(mkfs-decides)
+ARITH U64MAX         bytes=18446744073709551615 orig=refuse(over-bound) mutant18=ok                 mutant19=refuse(over-bound)
+ARITH 2^43           bytes=       8796093022208 orig=refuse(over-bound) mutant18=ok                 mutant19=refuse(over-bound)
+ARITH at-bound       bytes=       2199845339136 orig=ok                 mutant18=ok                 mutant19=refuse(over-bound)
+ARITH at-bound+slot  bytes=       2199845355520 orig=refuse(over-bound) mutant18=ok                 mutant19=refuse(over-bound)
+INLINE_TESTS original               largest_device_bytes_test=pass at_the_bound_test=pass
+INLINE_TESTS mutant18(> u64::MAX)   largest_device_bytes_test=RED at_the_bound_test=RED
+INLINE_TESTS mutant19(>=)           largest_device_bytes_test=pass at_the_bound_test=RED
+MAX_SLOTS_OF_AN_U64_DEVICE_TIMES_8 9007199254339576 fits u64: True

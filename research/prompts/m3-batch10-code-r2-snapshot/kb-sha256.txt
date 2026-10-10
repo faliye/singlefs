@@ -1,0 +1,7 @@
+492bc09f5ab1aded1fd5faf62d179acb0e18c4bd0b8771ba5a28d466a86ac14e  .claude/kb/decisions/23-journal的角色与格式.md
+1941a2e0d2f06aedf343b0229a6443bbf455043ee05835bc3f9cc1d2f19f55c0  .claude/kb/decisions/16-发布语义.md
+88173cf491fc5850b0b321a51ef6a1e79a4ae282d0f0b5a6ff288cdf1147b94a  .claude/kb/experiments/173-上限卡在读坏槽的三种处置.md
+a1ba83004d8532317a63cc4951d79313347921a7ed13c92931810fcb6136ae7a  .claude/kb/checks-owed.md
+224d1b38d33847e6c045dc16db7e0c2f3a5b6d4613fb77ff30f3515f0335fe00  .claude/kb/experiments/139-按盘回退下界的收严形态.md
+96e60a72b83c8053f1641cbf418d2f9a353457545d7c38702780cd64f7c40197  .claude/kb/experiments/158-择根与修复四岔路.md
+0e89c01625226482b4783c077b8192892321c462d25ec174efc21d0066251cc2  .claude/kb/experiments/171-三oracle合谋测试.md

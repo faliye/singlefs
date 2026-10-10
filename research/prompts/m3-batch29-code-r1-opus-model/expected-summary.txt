@@ -1,0 +1,1385 @@
+RESULT harness target=a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=a_floor_raise_refused_for_space_counts_as_short_of_space rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=a_lone_surviving_device_reads_back_what_it_read_before_the_unmount rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=a_swallowed_barrier_is_in_the_recorded_stream_but_not_on_the_device_side rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=a_writable_mount_with_system_configuration_slot_zero_unreadable rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=a_zero_unit_publish_whose_post_rotation_barrier_fails_returns_the_mount_error rc=101 passed=1 failed=1 probe_hits=0
+RESULT harness target=accounting_and_mapping_tree_split rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=accounting_tree_node_full rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=acquisition_refuses_a_device_whose_witness_slots_turn_unreadable_and_the_remaining_writer_panics rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=acquisition_writes_the_witnessed_journal_tail_so_two_crashed_acquisitions_still_witness_the_newest_publish rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=admission_checkpoint_cost_per_device_paths rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=admission_formula_on_the_mounted_state rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=admission_raises_the_floor_before_refusing rc=0 passed=25 failed=0 probe_hits=0
+RESULT harness target=admission_refuses_before_units_cannot_land_outside_the_mounts_clustered_segments rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=admission_ring_window_and_tombstone_prepay_on_the_publish_path rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=allocation_record_tree_root_level_of_writer_and_reader rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=allocator_fallback_count_on_small_devices_after_repeated_mounts_and_the_first_file rc=0 passed=10 failed=0 probe_hits=0
+RESULT harness target=an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping rc=0 passed=13 failed=0 probe_hits=0
+RESULT harness target=checker_cross_links_malformed_nodes_and_mapping_entries rc=0 passed=14 failed=0 probe_hits=0
+RESULT harness target=checker_judges_reference_intervals_and_every_new_root_segment_field rc=0 passed=15 failed=0 probe_hits=0
+RESULT harness target=checker_judges_reserved_bytes_and_widths_it_used_to_skip rc=0 passed=15 failed=0 probe_hits=0
+RESULT harness target=checker_known_bad_images rc=0 passed=156 failed=0 probe_hits=308
+RESULT harness target=checker_narrow_invariants_and_abandoned_roots rc=0 passed=20 failed=0 probe_hits=0
+RESULT harness target=commit_generated_units_fall_back_when_the_segment_runs_out rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=container_trees_grow_a_level_when_the_root_is_full rc=0 passed=7 failed=0 probe_hits=30
+RESULT harness target=core_review_geometry_back_chain_and_empty_inode rc=0 passed=14 failed=0 probe_hits=0
+RESULT harness target=core_review_tree_table_duplicates_and_slot_one_search rc=0 passed=12 failed=0 probe_hits=0
+RESULT harness target=core_review_unit_area_start_and_publish_limits rc=0 passed=20 failed=0 probe_hits=0
+RESULT harness target=corrupt_on_disk_content_is_refused_instead_of_panicking rc=0 passed=31 failed=0 probe_hits=0
+RESULT harness target=crash_recovery_judge_refuses_a_root_older_than_the_newest_persisted_one rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=data_unit_allocation_and_write rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=deletion_scenario_writes rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=entries_after_mount_refuse_swapped_or_behind_devices rc=0 passed=41 failed=0 probe_hits=0
+RESULT harness target=fault_injection_fast_tier rc=0 passed=14 failed=0 probe_hits=0
+RESULT harness target=first_file_version_checks_the_previous_record rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=fsync_drop_and_devices_without_the_selected_version rc=0 passed=16 failed=0 probe_hits=0
+RESULT harness target=index_node_header_width_computed_three_ways_agrees_for_every_key_width rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=inode_number_watermark_pressed_back_reissues_a_number rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=inode_number_watermark_switch_on_a_publish_without_a_previous_version rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=inode_tree_leaf_containers_appended_one_at_a_time_up_to_what_one_root_node_holds rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=instance_acquisition rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=instance_table_chain_read rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=instance_table_page_full rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=instance_table_second_page_write rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=instance_table_sweep_at_the_end_of_a_writable_mount rc=0 passed=12 failed=0 probe_hits=0
+RESULT harness target=journal_last_record_flag_of_a_multi_record_publish rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=journal_replay_applies_no_more_records_than_the_in_flight_limit rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=journal_ring_geometry_fields_are_recomputed_when_choosing_the_system_configuration rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=journal_scan_keeps_the_first_copy_of_a_duplicated_record_key rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=many_inodes_write_and_read rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=mapping_tree_capacity_admission rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=mkfs_bytes_judged_by_the_checker rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=mkfs_on_image_files_punches_the_zeroed_ranges rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=mkfs_refuses_geometries_whose_root_slots_do_not_align rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=model_answers_unmount_with_the_floor_at_the_current_version rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=model_compares_a_rollback_to_a_version_with_fewer_inode_leaf_containers rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=model_compares_inode_creations_into_the_third_inode_leaf_container rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=model_compares_the_third_and_fourth_inode_leaf_containers rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=model_comparison_judges_the_instance_table_and_allocation_generations_of_a_version_without_a_file rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=mount_transparency_judged_field_by_field_after_a_writable_mount rc=0 passed=48 failed=0 probe_hits=0
+RESULT harness target=mount_transparency_judges_the_system_configuration_witness_by_r2 rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=mounted_read_by_offset rc=0 passed=12 failed=0 probe_hits=0
+RESULT harness target=mounted_read_tells_a_narrow_inode_internal_entry_from_a_child_pointer_it_cannot_dereference rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=mounted_recovery_reads_each_candidate_once_in_order rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=multi_record_publishes_of_transaction_zero rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=multi_unit_file_write_and_read rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=named_unit_verification_stands_in_for_the_barrier_before_the_record rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=new_pool_file_creation_publish rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=new_pool_file_creation_write_regions rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=one_revolution_window_after_a_hole_in_the_root_ring rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=overwrite_in_one_instance rc=0 passed=12 failed=0 probe_hits=0
+RESULT harness target=pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_every_tree_reader rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=pointer_extent_offset_that_is_not_zero_is_refused_by_both_mounts rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=pointer_extent_offset_that_is_not_zero_is_refused_by_every_tree_reader rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=pool_checker_gap_row_conditions_and_incomplete_reference_pairs rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=pool_checker_judges_the_deletion_state_of_every_walked_version rc=0 passed=45 failed=0 probe_hits=4
+RESULT harness target=pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=pool_checker_scan_of_tree_identifiers_claims_whole_units rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=presumed_clause_checks rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=publish_failure_resent_unchanged rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=publish_order_matches_litmus rc=101 passed=0 failed=1 probe_hits=0
+RESULT harness target=publishes_of_a_history_broken_at_the_power_loss_seam rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=random_histories rc=0 passed=23 failed=0 probe_hits=0
+RESULT harness target=random_history_generation_keeps_the_existing_weights_step_for_step rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=rebuild_with_an_unreadable_data_unit rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root rc=0 passed=31 failed=0 probe_hits=0
+RESULT harness target=rebuilt_root_takes_every_new_root_segment_field_from_the_record rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=reclaim_floor_takes_the_oldest_valid_root_of_the_whole_ring_after_crashes_before_the_row_root rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=recovery_anchor_failure_carries_the_counters_the_prefix_kernel_saw rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=recovery_reads_the_created_file_after_reopen rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=reference_filesystem_translation_of_histories rc=0 passed=16 failed=0 probe_hits=0
+RESULT harness target=release_checksum_quarantine rc=0 passed=14 failed=0 probe_hits=0
+RESULT harness target=replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=reuse_after_raising_the_floor rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=reused_allocation_record_overlap rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=rollback_by_a_forward_publish rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=rollback_lineage_record_and_its_checkpoint_cost_term rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=root_choice_on_a_tied_checkpoint_txg_takes_the_higher_instance_in_a_later_slot rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=root_record_pointer_encryption_and_compression_fields_outside_the_first_version_are_refused_by_both_mounts rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=root_ring_turn_in_one_mount rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=root_ring_turn_in_the_make_filesystem_session rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=row_publish_admission rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=row_publish_checks_before_acquisition rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=row_publish_record_without_its_root rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=sequential_write_one_record_per_data_unit rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=sequential_write_split_into_one_unit_transactions rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=shadow_ledger_candidates_and_the_deferred_reclaim_threshold_take_the_whole_ring rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=sparse_device_zero_fill rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=sparse_devices_refuse_requests_outside_the_device_like_the_file_backend rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=system_configuration_choice_names_an_empty_pool_and_devices_that_lost_both_slots rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=system_configuration_fields_core_and_checker_refuse_the_same_table rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=system_configuration_mutability_classes rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=system_configuration_per_device_redundancy rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=system_configuration_rollback_floor_and_layout_identity rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=system_configuration_slot_is_overwritten_only_after_a_barrier rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=system_configuration_slots_per_region rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=system_configuration_witness_is_undecidable_only_when_a_slot_reports_a_read_error_and_no_device_verified_both rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=test_only_switches_force_every_branch rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=tree_identifier_watermark_after_the_first_file_root_is_abandoned rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=tree_nodes_and_the_central_mapping_on_mounted_read rc=0 passed=12 failed=0 probe_hits=0
+RESULT harness target=tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=unequal_devices rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over rc=0 passed=24 failed=0 probe_hits=0
+RESULT harness target=unlink_idempotence_criteria_and_rollback_to_the_emptied_version rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=unlink_in_histories_judged_by_the_model rc=0 passed=8 failed=0 probe_hits=0
+RESULT harness target=unlink_mount_continuation_and_the_emptied_version rc=0 passed=23 failed=0 probe_hits=0
+RESULT harness target=unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=unlink_single_file_publishes rc=0 passed=9 failed=0 probe_hits=0
+RESULT harness target=unlink_writes_per_transaction_do_not_grow_with_the_file rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=unreadable_abandoned_root_slot rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=warm_up_journal_counter rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=whole_device_loss_after_warm_up rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=writable_mount_of_a_formatted_pool rc=0 passed=15 failed=0 probe_hits=0
+RESULT harness target=writable_mount_reads_each_candidate_in_order_through_the_read_stage_cache rc=0 passed=4 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refusal_after_the_read_stage_on_a_read_faulted_crash_state_is_judged_apart_from_the_witness_criterion rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refusal_for_no_valid_root_in_the_rebuilt_allocators_root_ring rc=0 passed=6 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refusal_judged_against_the_d23_list rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refusal_on_a_crash_state_without_read_faults rc=0 passed=5 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refuses_a_device_identity_handed_in_twice rc=0 passed=1 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refuses_a_device_table_disagreeing_with_the_system_configuration rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=writable_mount_refuses_caller_parameters_disagreeing_with_the_system_configuration_on_disk rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=writable_mount_takes_a_second_instance rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness target=write_accounting_per_structure rc=0 passed=3 failed=0 probe_hits=0
+RESULT harness target=write_entries_refuse_an_inode_being_deleted rc=0 passed=2 failed=0 probe_hits=0
+RESULT harness target=zero_unit_publishes_are_compared_with_what_the_row_publish_of_the_same_mount_handed_in rc=0 passed=7 failed=0 probe_hits=0
+RESULT harness-hit target=checker_known_bad_images probe=hb_container test=a_lineage_tree_entry_whose_identity_birth_tree_is_one_off_over_a_container_that_does_not_read_back_reddens_the_lineage_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_container test=a_tombstone_tree_entry_whose_child_pointer_birth_tree_is_one_off_over_a_container_that_does_not_read_back_reddens_the_tombstone_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_container test=opus_b29_level_one_third_branch_forms hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_of_the_leaf_container_type_with_agreeing_birth_trees_over_a_leaf_that_does_not_read_back_leaves_the_inode_entry_invariant_unviolated hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_of_type_zero_whose_identity_carries_only_a_birth_tree_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_of_type_zero_whose_identity_carries_only_a_container_birth_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_of_type_zero_whose_identity_carries_only_a_container_number_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=an_inode_tree_entry_whose_identity_birth_tree_is_one_off_over_a_leaf_that_does_not_read_back_reddens_the_inode_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=opus_b29_level_one_forms hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=opus_b29_level_one_third_branch_forms hits=3
+RESULT harness-hit target=checker_known_bad_images probe=hb_inode test=the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_lineage_tree_entry_of_type_zero_over_a_container_reddens_only_the_lineage_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_lineage_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_lineage_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_lineage_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_the_container_type_over_a_node_after_the_root_ring_turned_over_reddens_only_the_tombstone_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_the_container_type_over_a_node_reddens_only_the_tombstone_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_the_container_type_over_a_node_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_type_zero_over_a_container_reddens_only_the_tombstone_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_type_zero_over_a_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_of_type_zero_with_a_zero_identity_over_a_container_reddens_only_the_tombstone_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hv test=a_tombstone_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_reddens_only_the_inode_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_with_a_stale_copy_of_the_child_reddens_the_inode_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_of_type_zero_with_a_zero_identity_over_a_leaf_container_reddens_only_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=hv test=an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=hv test=opus_b29_level_one_forms hits=31
+RESULT harness-hit target=checker_known_bad_images probe=hv test=opus_b29_level_one_third_branch_forms hits=21
+RESULT harness-hit target=checker_known_bad_images probe=l1_type0 test=opus_b29_level_one_forms hits=4
+RESULT harness-hit target=checker_known_bad_images probe=l1_type0 test=opus_b29_level_one_third_branch_forms hits=4
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_of_type_zero_over_a_container_reddens_only_the_lineage_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_lineage_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_lineage_tree_entry_with_an_unregistered_type_reddens_only_the_lineage_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_the_container_type_over_a_node_after_the_root_ring_turned_over_reddens_only_the_tombstone_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_the_container_type_over_a_node_reddens_only_the_tombstone_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_the_container_type_over_a_node_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_type_zero_over_a_container_reddens_only_the_tombstone_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_type_zero_over_a_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_of_type_zero_with_a_zero_identity_over_a_container_reddens_only_the_tombstone_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=a_tombstone_tree_entry_with_an_unregistered_type_reddens_only_the_tombstone_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_reddens_only_the_inode_entry_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_with_a_stale_copy_of_the_child_reddens_the_inode_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_of_type_zero_with_a_zero_identity_over_a_leaf_container_reddens_only_the_inode_entry_invariant hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant hits=4
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=1
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=opus_b29_level_one_forms hits=51
+RESULT harness-hit target=checker_known_bad_images probe=unwalked test=opus_b29_level_one_third_branch_forms hits=30
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_lineage_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_lineage_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_lineage_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_tombstone_tree_entry_of_the_container_type_over_a_node_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_tombstone_tree_entry_of_type_zero_over_a_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_tombstone_tree_entry_of_type_zero_over_a_container_with_a_stale_copy_of_the_child_reddens_the_tombstone_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=a_tombstone_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_whose_first_location_checksum_is_wrong_reddens_the_checksum_invariant hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=an_inode_tree_entry_of_type_zero_over_a_leaf_container_with_a_stale_copy_of_the_child_reddens_the_inode_entry_invariant_on_either_device hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants hits=2
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=opus_b29_level_one_forms hits=24
+RESULT harness-hit target=checker_known_bad_images probe=unwalked_mismatch test=opus_b29_level_one_third_branch_forms hits=24
+RESULT harness-hit target=container_trees_grow_a_level_when_the_root_is_full probe=hb_container test=opus_b29_level_two_tombstone_forms hits=4
+RESULT harness-hit target=container_trees_grow_a_level_when_the_root_is_full probe=hv test=opus_b29_level_two_tombstone_forms hits=4
+RESULT harness-hit target=container_trees_grow_a_level_when_the_root_is_full probe=unwalked test=opus_b29_level_two_tombstone_forms hits=12
+RESULT harness-hit target=container_trees_grow_a_level_when_the_root_is_full probe=unwalked_mismatch test=opus_b29_level_two_tombstone_forms hits=10
+RESULT harness-hit target=pool_checker_judges_the_deletion_state_of_every_walked_version probe=hb_container test=a_tombstone_container_that_does_not_read_back_leaves_the_watermark_invariant_not_judged hits=1
+RESULT harness-hit target=pool_checker_judges_the_deletion_state_of_every_walked_version probe=hb_inode test=an_intermediate_version_whose_inode_leaf_does_not_read_back_is_not_judged_rather_than_red hits=3
+RESULT harness-total targets=162 passed=1214 failed=2 targets_with_probe_hits=3
+RESULT stage=crash-count crash I2 writes=31 segments=4 longest_segment=26 closed_form_states=67108871
+RESULT stage=crash-count crash I2-N2 writes=56 segments=8 longest_segment=26 closed_form_states=68157453
+RESULT stage=crash-count crash I2-R1 writes=56 segments=8 longest_segment=26 closed_form_states=68157453
+RESULT stage=crash-count crash I2-R2 writes=56 segments=8 longest_segment=26 closed_form_states=68157453
+RESULT stage=crash-count crash N1 writes=25 segments=4 longest_segment=20 closed_form_states=1048583
+RESULT stage=crash-count crash N1-N2 writes=50 segments=8 longest_segment=20 closed_form_states=2097165
+RESULT stage=crash-count crash N1-R1 writes=50 segments=8 longest_segment=20 closed_form_states=2097165
+RESULT stage=crash-count crash N1-R2 writes=50 segments=8 longest_segment=20 closed_form_states=2097165
+RESULT stage=crash-count crash N1-U3 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash N1-U3c writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2 writes=56 segments=8 longest_segment=26 closed_form_states=68157453
+RESULT stage=crash-count crash U2-N2 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2-R1 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2-R2 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2-R2-U2 writes=137 segments=20 longest_segment=26 closed_form_states=137363487
+RESULT stage=crash-count crash U2-U3 writes=112 segments=16 longest_segment=26 closed_form_states=136314905
+RESULT stage=crash-count crash U2-U3c writes=112 segments=16 longest_segment=26 closed_form_states=136314905
+RESULT stage=crash-count crash U2c writes=56 segments=8 longest_segment=26 closed_form_states=68157453
+RESULT stage=crash-count crash U2c-N2 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2c-R1 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2c-R2 writes=81 segments=12 longest_segment=26 closed_form_states=69206035
+RESULT stage=crash-count crash U2c-U3 writes=112 segments=16 longest_segment=26 closed_form_states=136314905
+RESULT stage=crash-count crash U2c-U3c writes=112 segments=16 longest_segment=26 closed_form_states=136314905
+RESULT stage=crash-count crash U2c-U3c-U4c writes=174 segments=24 longest_segment=28 closed_form_states=421527589
+RESULT stage=crash-count crash total_states_run=0
+RESULT stage=ctg-anylen ctg form=tomb-L2-as-is-type1 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1dev7-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1zero16-type0 red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1zero16-type1 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum01bad-type0 red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum01bad-type1 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum0bad-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag1-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag1-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag1-type7 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag3-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag3-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag3-type7 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag9-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag9-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-anylen ctg form=tomb-L2-tag9-type7 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-anylen exit=0
+RESULT stage=ctg-fix ctg form=tomb-L2-as-is-type1 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1dev7-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1zero16-type0 red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1zero16-type1 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-sum01bad-type0 red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-sum01bad-type1 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-fix ctg form=tomb-L2-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-sum0bad-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-fix ctg form=tomb-L2-tag1-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag1-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag1-type7 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-fix ctg form=tomb-L2-tag3-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag3-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag3-type7 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-fix ctg form=tomb-L2-tag9-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag9-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-fix ctg form=tomb-L2-tag9-type7 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-fix exit=0
+RESULT stage=ctg-new ctg form=tomb-L2-as-is-type1 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1dev7-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1zero16-type0 red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1zero16-type1 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-sum01bad-type0 red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-sum01bad-type1 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-new ctg form=tomb-L2-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-sum0bad-type1 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=ctg-new ctg form=tomb-L2-tag1-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag1-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag1-type7 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-new ctg form=tomb-L2-tag3-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag3-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag3-type7 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=ctg-new ctg form=tomb-L2-tag9-type0 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag9-type1 red=[I-1.11,I-1.6,I-2.1,I-2.4,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.23] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=ctg-new ctg form=tomb-L2-tag9-type7 red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=ctg-new exit=0
+RESULT stage=existing-anylen exit=0
+RESULT stage=existing-anylen test result: ok. 156 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=existing-anylen test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=existing-anylen test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=existing-fix exit=0
+RESULT stage=existing-fix test result: ok. 156 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=existing-fix test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=existing-fix test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+RESULT stage=kbi-anylen exit=0
+RESULT stage=kbi-anylen kbi form=inode-L1-as-is-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-as-is-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag1-type0 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag1-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag1-typeR red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag2-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1-tag2-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1-tag9-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1-tag9-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum01bad-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum01bad-type0z red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sumok-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sumok-type0z red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sumok-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=inode-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-as-is-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-as-is-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag1-type0 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag1-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag1-typeR red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag2-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1-tag2-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1-tag9-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum01bad-type0 red=[I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum01bad-type0z red=[I-4.8,I-7.2,I-7.4] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sumok-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sumok-type0z red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sumok-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=lin-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-as-is-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag1-type0 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag1-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag1-typeR red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag2-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag2-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag9-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum01bad-type0 red=[I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum01bad-type0z red=[I-4.8,I-7.2,I-7.4] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sumok-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sumok-type0z red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sumok-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-anylen kbi form=tomb-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix exit=0
+RESULT stage=kbi-fix kbi form=inode-L1-as-is-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-as-is-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-tag1-type0 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-tag1-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-tag1-typeR red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-tag2-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=inode-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1-tag9-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1-tag9-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1T-sum01bad-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1T-sum01bad-type0z red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=inode-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=inode-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sumok-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sumok-type0z red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sumok-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=inode-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-as-is-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-as-is-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-tag1-type0 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-tag1-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-tag1-typeR red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-tag2-type0 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=lin-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=lin-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=lin-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=lin-L1-tag9-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=lin-L1T-sum01bad-type0 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=lin-L1T-sum01bad-type0z red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=lin-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=lin-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=lin-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sumok-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sumok-type0z red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sumok-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=lin-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-as-is-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-tag1-type0 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-tag1-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-tag1-typeR red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-tag2-type0 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=tomb-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=tomb-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=tomb-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=tomb-L1-tag9-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum01bad-type0 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum01bad-type0z red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sumok-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sumok-type0z red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sumok-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-fix kbi form=tomb-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new exit=0
+RESULT stage=kbi-new kbi form=inode-L1-as-is-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-as-is-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-tag1-type0 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-tag1-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-tag1-typeR red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-tag2-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=inode-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1-tag9-type0 red=[I-1.11,I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1-tag9-type7 red=[I-1.11,I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1T-sum01bad-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4,I-9.2] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1T-sum01bad-type0z red=[I-2.1,I-3.1,I-3.11,I-4.8,I-5.1,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=inode-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=inode-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.2] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sumok-type0 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sumok-type0z red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sumok-type7 red=[I-9.2] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=inode-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-as-is-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-as-is-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-tag1-type0 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-tag1-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-tag1-typeR red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-tag2-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=lin-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1-tag9-type7 red=[I-1.11,I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1T-sum01bad-type0 red=[I-4.8,I-7.2,I-7.4,I-9.17] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1T-sum01bad-type0z red=[I-4.8,I-7.2,I-7.4] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=lin-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=lin-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.17] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sumok-type0 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sumok-type0z red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sumok-type7 red=[I-9.17] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=lin-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-as-is-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-as-is-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1beyond-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1beyond-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1beyond-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1dev7-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1dev7-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1dev7-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero16-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero16-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero16-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero32-type0 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero32-type7 red=[I-3.1,I-3.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zero32-typeR red=[I-3.1,I-3.11] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zerowrong-type0 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zerowrong-type7 red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-loc1zerowrong-typeR red=[I-2.1,I-3.1,I-3.11,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-tag1-type0 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-tag1-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-tag1-typeR red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-tag2-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1-tag2-type7 red=[I-1.11,I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=tomb-L1-tag2-typeR red=[I-1.11,I-1.2,I-1.6,I-2.4,I-4.2,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1-tag9-type0 red=[I-1.11,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1-tag9-type7 red=[I-1.11,I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1-tag9-typeR red=[I-1.11,I-1.6,I-2.4,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1T-sum01bad-type0 red=[I-4.8,I-7.2,I-7.4,I-9.23] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1T-sum01bad-type0z red=[I-4.8,I-7.2,I-7.4] i2_1=- i2_1_verdict=holds i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1T-sum01bad-type7 red=[I-2.1,I-4.8,I-7.2,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=unwalked-child-both
+RESULT stage=kbi-new kbi form=tomb-L1T-sum01bad-typeR red=[I-2.1,I-4.8,I-7.2,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=elsewhere
+RESULT stage=kbi-new kbi form=tomb-L1T-sum0bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum0bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum0bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum0bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum1bad-type0 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum1bad-type0z red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum1bad-type7 red=[I-2.1,I-4.8,I-7.4,I-9.23] i2_1=unwalked-child i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sum1bad-typeR red=[I-2.1,I-4.8,I-7.4] i2_1=elsewhere i2_1_verdict=violated i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sumok-type0 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sumok-type0z red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sumok-type7 red=[I-9.23] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-L1T-sumok-typeR red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=kbi-new kbi form=tomb-clean red=[] i2_1=- i2_1_verdict=holds i7_2=-
+RESULT stage=l2 l2 newest=1 other=255 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=255 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=256 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=257 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=257 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=257 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=257 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=257 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=257 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=1 other=300 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=1 other=300 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=255 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=256 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=200 other=257 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=200 other=300 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=255 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=256 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=255 other=257 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=255 other=300 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=255 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=abandoned break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=below-floor break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=256 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=256 role=candidate break=None share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=256 other=257 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=100 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=255 share=None batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=256 other=300 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=255 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=256 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=256 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=None share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=None share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=256 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=257 other=257 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=abandoned break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=256 share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=256 share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=None share=(1, 100) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=None share=(1, 250) batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=below-floor break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=100 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=100 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=100 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=255 share=(1, 100) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=255 share=(1, 250) batch29=decided mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=255 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=256 share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=256 share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=256 share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=None share=(1, 100) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=None share=(1, 250) batch29=undecidable-37 mutant_without_the_two_lines=decided-but-rows-truncated:candidate
+RESULT stage=l2 l2 newest=257 other=300 role=candidate break=None share=None batch29=undecidable-61 mutant_without_the_two_lines=undecidable-61
+RESULT stage=l2 l2-killer newest=200 other=257 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=200 other=257 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=200 other=300 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=200 other=300 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=255 other=257 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=255 other=257 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=255 other=300 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=255 other=300 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=256 other=257 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=256 other=257 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=256 other=300 role=candidate break=None share=(1, 100) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killer newest=256 other=300 role=candidate break=None share=(1, 250) -> undecidable-37 / M: decided-but-rows-truncated:candidate
+RESULT stage=l2 l2-killers count=16
+RESULT stage=l2 l2-summary batch29=decided mutant=decided shapes=432
+RESULT stage=l2 l2-summary batch29=undecidable-37 mutant=decided shapes=16
+RESULT stage=l2 l2-summary batch29=undecidable-37 mutant=decided-but-rows-truncated:candidate shapes=16
+RESULT stage=l2 l2-summary batch29=undecidable-61 mutant=undecidable-61 shapes=160
+RESULT stage=setup sha256 c3bb7b20183b7b741ebf20c34b8f56e4584002d640453bdc71ce2233a8e84731  variants/walk-fix.rs
+RESULT stage=setup sha256 ebc07d1589761a64fb1f5da8be19cdcdf24e8a84193f8937cd1e43c7db908b3a  variants/walk-probe.rs
+RESULT stage=setup sha256 f3d266f828841dc1bf6a7320825e34bc705434475f46909ad456eba5c51e4978  variants/walk-anylen.rs

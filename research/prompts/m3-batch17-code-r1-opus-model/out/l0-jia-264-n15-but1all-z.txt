@@ -1,0 +1,29 @@
+FXSTART narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty | current_txg=20 unmount=Raised publishes=2 writes=36 baseline={0: (Some(19), "ok", Some(14695981039346656037)), 1: (Some(20), "ok", Some(14695981039346656037))}
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 screened_prefixes=39 bad=0
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=6 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=7 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=8 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=9 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=10 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=11 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=12 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=13 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=14 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=15 next=unit_write lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=16 next=journal_record lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=w:but1/all:z m=17 next=journal_record lost=dev0 chosen=Some(19) BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=w:but1/all:z faulted_reads=337 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 screened_prefixes=39 bad=13
+FXENUMT narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 enumerate_s=119.8 distinct_survivors=394
+FXENUM narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={} bad_judgements=14339 elapsed=120.0s
+FXENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 count=14339 lost=dev0 chosen=Some(19) read=BAD_err
+FXENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 count=2056 lost=dev0 chosen=Some(19) read=same
+FXENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 count=4116 lost=dev0 chosen=Some(22) read=same
+FXENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 count=20502 lost=dev1 chosen=Some(20) read=same
+FXENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 count=9 lost=dev1 chosen=Some(23) read=same
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=2 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=3 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=3 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=4 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=5 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXENUMBAD narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 plan=w:but1/all:z j=0 lost=dev0 chosen=Some(19) surviving_writes_persisted=5 states_with_this_survivor=128 BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412) }))]
+FXDONE narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty elapsed=120.1s

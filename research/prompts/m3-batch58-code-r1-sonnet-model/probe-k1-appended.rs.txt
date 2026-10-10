@@ -1,0 +1,43 @@
+// 追加在 checker_known_bad_images.rs 拷贝末尾的第二个探针
+fn sonnet_probe_k1_gpu_flow_sizes() {
+    use singlefs_harness::memory_pool::writes_and_segments_with_stream_indexes;
+    use singlefs_harness::segments::StepKind;
+    for (name, tree) in [
+        ("tombstone", ContainerTreeOfTheCapacityInvariants::Tombstone),
+        ("lineage", ContainerTreeOfTheCapacityInvariants::Lineage),
+        ("retirement", ContainerTreeOfTheCapacityInvariants::Retirement),
+    ] {
+        let pool = pool_with_records_in_one_container_tree_written_under_these_knobs(
+            tree,
+            &format!("sonnet-probe-k1-{name}"),
+            &[2, 2, 1, 1],
+        );
+        let operations = pool.retained_operations();
+        let (writes, segments, _) =
+            writes_and_segments_with_stream_indexes(&operations[pool.mkfs_operation_count..], &geometry());
+        let mut per_location: std::collections::BTreeMap<(u32, u64), usize> = Default::default();
+        for write in &writes {
+            let granule = if write.kind == StepKind::UnitWrite { 16384 } else { 512 };
+            let first = write.offset.0 / granule;
+            let last = (write.offset.0 + write.length_in_bytes() - 1) / granule;
+            for g in first..=last {
+                *per_location.entry((write.device.0, g * granule)).or_default() += 1;
+            }
+        }
+        let expanded_states: u64 = segments
+            .iter()
+            .filter(|s| s.len() <= 8)
+            .map(|s| (1u64 << s.len()) - 1)
+            .sum();
+        println!(
+            "PROBE_K1 {name}: writes={} segments={} max_segment={} segments_expanded_at_limit_8={} closed_form_states_approx={} max_writes_over_one_location={} versions={}",
+            writes.len(),
+            segments.len(),
+            segments.iter().map(Vec::len).max().unwrap_or(0),
+            segments.iter().filter(|s| s.len() <= 8).count(),
+            1 + expanded_states,
+            per_location.values().max().copied().unwrap_or(0),
+            pool.output.root.checkpoint_txg.0 - 2,
+        );
+    }
+}

@@ -1,0 +1,21 @@
+# inode_tree.rs 变异（tools/mut.py + tools/run_mut.sh）。三个目标：
+#   T1 core 库 inode_tree:: 21 条；T2 harness inode_leaf_merge_and_borrow_against_an_independent_reference（第 53 批新加）；
+#   T3 harness inode_leaf_absorb_and_borrow_on_the_unlink_path（4 条，原有）。
+# 另：core 库全部 244 条；wide = tools/wide-targets.txt 里 10 个 harness 二进制（deletion_scenario_writes … inode_tree_leaf_containers_appended_one_at_a_time...）。
+m1_left_first                T1 FAILED(1)  T2 FAILED  T3 ok
+m2_no_merge_after_borrow     T1 ok         T2 ok      T3 FAILED(the_lender_absorbs_its_right_neighbour_when_the_two_fit_after_lending_and_retires_it)
+m3_chain_stops_after_one     T1 ok  T2 ok  T3 ok  core 全库 244 ok  wide 10 个二进制全 ok         # 推：从「相邻两片之和 >= 234」不可达，见报告 K4
+m4_empty_drop_no_merge       T1 ok  T2 ok  T3 ok  core 全库 244 ok（没跑 wide）                                # 同上，不可达（删空那片只有 1 条时左右邻都是满的）
+m5_no_left_absorb            T1 ok  T2 ok  T3 ok  core 全库 244 ok  wide 10 个二进制全 ok            # 可达：[117,117,117] 删最后一片一条，见 inode-tree-probe-left-absorb.patch
+m6_borrow_rounds_up          T1 FAILED  T2 FAILED  T3 FAILED(2)
+m7_floor_116                 T1 FAILED  T2 FAILED  T3 FAILED(2)
+m8_floor_strict              T1 FAILED  T2 FAILED  T3 FAILED(2)
+m9_separator_key_not_updated T1 FAILED  T2 ok  T3 FAILED(2)
+# mount.rs 变异 mt1：树 ID 水位只取没被崩溃恢复抛弃的根（`let tree_identifier_watermark = ring_roots` 改成
+# `ring_roots_not_abandoned_by_crash_recovery(&ring_roots, &current_table)` 起头）：
+#   rollback_by_a_forward_publish（--include-ignored 25 条）、unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over（24）、
+#   rollback_lineage_record_and_its_checkpoint_cost_term（5）、container_trees_grow_a_level_when_the_root_is_full（6）、
+#   pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root（8）、raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table（2）、
+#   rollback_target_left_in_a_hole_outside_the_one_revolution_window_is_a_candidate（20）、presumed_clause_checks（3）、core_review_unit_area_start_and_publish_limits（67）、
+#   unlink_idempotence_criteria_and_rollback_to_the_emptied_version（1）、an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor（7）、
+#   system_configuration_rollback_floor_and_layout_identity（5）：全 ok（logs/mt1-ignored.log、logs/mt1-more.log）。

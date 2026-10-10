@@ -1,0 +1,19 @@
+S=8 L=28 alphabet=KC U=2 mode=family arm=G histories=841 states=104306 fake=0 lone0=0 lone1=56 newest=0 states_with_valid_root_outside_window=36430 max_held=48
+    lone1_sample=KKKKKKKKKKKKKKKKKKKKKKKC@23C|crash-in-52
+S=8 L=28 alphabet=KC U=2 mode=family arm=RG histories=841 states=104306 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=36430 max_held=94
+S=8 L=28 alphabet=KC U=2 mode=family arm=WD histories=841 states=104306 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=36430 max_held=48
+S=4 L=20 alphabet=PKCR U=3 mode=random:3000:1 arm=G histories=158 states=13923 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=12341 max_held=36
+S=4 L=20 alphabet=PKCR U=3 mode=random:3000:1 arm=RG histories=158 states=13923 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=12341 max_held=150
+S=4 L=20 alphabet=PKCR U=3 mode=random:3000:1 arm=WD histories=158 states=13923 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=12341 max_held=36
+S=4 L=20 alphabet=PXYCR U=1 mode=random:3000:2 arm=G histories=3000 states=220100 fake=0 lone0=6 lone1=332 newest=0 states_with_valid_root_outside_window=207376 max_held=12
+    lone0_sample=CYYYYRCCRCRXRYPXPCCR@5R|crash-in-30
+    lone1_sample=YYPYXXXRPYYRPXXPCCYX@5X|crash-in-27
+S=4 L=20 alphabet=PXYCR U=1 mode=random:3000:2 arm=RG histories=3000 states=220100 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=207376 max_held=54
+S=4 L=20 alphabet=PXYCR U=1 mode=random:3000:2 arm=WD histories=3000 states=220100 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=207376 max_held=14
+S=8 L=24 alphabet=PXYCR U=2 mode=random:2000:3 arm=G histories=2000 states=175301 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=167885 max_held=48
+S=8 L=24 alphabet=PXYCR U=2 mode=random:2000:3 arm=RG histories=2000 states=175301 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=167885 max_held=152
+S=8 L=24 alphabet=PXYCR U=2 mode=random:2000:3 arm=WD histories=2000 states=175301 fake=0 lone0=0 lone1=0 newest=0 states_with_valid_root_outside_window=167885 max_held=48
+
+real	0m15.693s
+user	0m15.677s
+sys	0m0.013s

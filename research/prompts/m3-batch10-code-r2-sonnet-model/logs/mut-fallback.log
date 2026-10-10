@@ -1,0 +1,43 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r2-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.91s
+     Running tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable-8c273157d5c36717)
+
+running 8 tests
+test the_first_writable_mount_of_a_formatted_pool_has_nothing_witnessed_and_does_not_reread ... ok
+test a_newest_root_the_system_configuration_never_witnessed_is_abandoned_without_a_reread ... ok
+test a_witnessed_newest_root_that_reads_back_an_error_until_just_before_the_one_reread_is_chosen_and_nothing_is_abandoned ... ok
+test a_witnessed_newest_root_that_reads_back_zeros_until_just_before_the_one_reread_is_chosen_because_zeros_stay_out_of_the_read_cache ... ok
+test a_witnessed_newest_root_whose_reads_fail_only_once_is_chosen_by_the_immediate_reread_of_the_product_path ... ok
+test a_witnessed_newest_root_still_unreadable_after_the_one_reread_refuses_the_writable_mount_before_any_write_while_the_read_only_mount_reads_the_version_before_it ... ok
+test without_the_last_record_of_the_selected_version_the_record_at_the_witnessed_counter_decides_and_without_both_the_mount_counts_it_as_witnessed ... ok
+test a_newest_instance_table_unreadable_when_the_shadow_ledger_reads_it_is_reread_once_then_refuses_writable_instead_of_turning_the_isolation_off ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.08s
+
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read-8f767751369a600d)
+
+running 6 tests
+test a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write ... ok
+test the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write ... ok
+test only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads ... ok
+test a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before ... ok
+test only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over ... ok
+test a_reread_still_failing_on_device_one_hands_over_what_both_passes_failing_only_on_device_one_hand_over ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.19s
+
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs (/tmp/claude-1000/m3-batch10-code-r2-sonnet/target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root-1b6ee2b4c5dfd964)
+
+running 8 tests
+test on_the_192_slot_pool_after_a_crashed_unmount_device_one_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_192_slot_pool_after_a_crashed_unmount_device_zero_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_reading_back_zeros_in_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_one_failing_the_rebuild_pass_rereads_and_mounts ... ok
+test on_the_216_slot_pool_crashed_after_its_continued_mount_device_zero_reading_back_garbage_in_the_rebuild_pass_rereads_and_mounts ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.57s
+

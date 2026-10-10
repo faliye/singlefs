@@ -1,0 +1,26 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/copy/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.21s
+     Running tests/inode_leaf_merge_and_borrow_against_an_independent_reference.rs (/home/fy5090/.local/share/singlefs/work/m3-batch56-code-r1-sonnet/target/debug/deps/inode_leaf_merge_and_borrow_against_an_independent_reference-885ca83eed17c3bc)
+
+running 1 test
+test every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference ... FAILED
+
+failures:
+
+---- every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference stdout ----
+
+thread 'every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference' (4177590) panicked at crates/singlefs-harness/tests/inode_leaf_merge_and_borrow_against_an_independent_reference.rs:351:5:
+assertion `left == right` failed: unlink 177（删之前各片 [117, 233, 42]，最后一批 txg 495）：每片叶的分隔 key 与参照不同
+  left: [1, 234]
+ right: [1, 343]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    every_publish_of_a_random_history_leaves_the_leaf_shape_and_the_retired_leaves_of_the_independent_reference
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.37s
+
+error: test failed, to rerun pass `-p singlefs-harness --test inode_leaf_merge_and_borrow_against_an_independent_reference`
+exit=101

@@ -1,0 +1,56 @@
+chain_model: cases=32 violations=0
+chain_model: chain-1000-pages-valid gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-1-pages-valid gpu_reached_last=1 gpu_undecidable=0 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-255-pages-last-record-invalid gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-255-pages-page-1-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-255-pages-page-254-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-255-pages-valid gpu_reached_last=1 gpu_undecidable=0 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-last-record-invalid gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-page-1-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-page-1-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-page-254-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-page-255-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-page-255-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-256-pages-valid gpu_reached_last=1 gpu_undecidable=0 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-last-record-invalid gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-1-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-1-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-254-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-255-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-255-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-256-already-visited gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-page-256-unreadable gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-257-pages-valid gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-258-pages-valid gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-2-pages-valid gpu_reached_last=1 gpu_undecidable=0 cpu_reached_last=1 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-1-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-1-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-254-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-255-already-visited gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-255-unreadable gpu_reached_last=0 gpu_undecidable=0 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-256-already-visited gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-256-unreadable gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+chain_model: chain-300-pages-page-257-unreadable gpu_reached_last=0 gpu_undecidable=1 cpu_reached_last=0 decided_same_or_left_to_cpu=1
+harness_run: baseline exit_ok=1
+harness_run: baseline test an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant ... ok
+harness_run: baseline test an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant ... ok
+harness_run: mutated-row-2934 exit_ok=0
+harness_run: mutated-row-2934 test an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant ... FAILED
+harness_run: mutated-row-2934 test an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant ... ok
+harness_run: mutated-row-2935 exit_ok=0
+harness_run: mutated-row-2935 test an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant ... ok
+harness_run: mutated-row-2935 test an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant ... FAILED
+harness_run: mutated-row-2937 exit_ok=0
+harness_run: mutated-row-2937 test an_inode_tree_entry_of_type_zero_with_an_identity_over_a_child_that_does_not_read_back_reddens_the_inode_entry_invariant ... ok
+harness_run: mutated-row-2937 test an_inode_tree_entry_with_an_unregistered_type_over_a_child_that_does_not_read_back_reddens_only_the_inode_entry_invariant ... FAILED
+mutation: applied row 2934: 第26批 inode 树读不出孩子时 I-9.2 不判（类型段 0 身份三段不为 0的条目只记 I-2.1 与走读失败）
+mutation: applied row 2935: 第26批 inode 树读不出孩子时 I-9.2 不判（类型段不认得的条目只记 I-2.1 与走读失败）
+mutation: applied row 2937: 第27批 inode 树类型段不认得那一支孩子按一槽登记（层级 1 下面的叶容器少登记一槽，I-3.1 连带红）
+row_check: row=2934 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=checker_known_bad_images
+row_check: row=2935 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=checker_known_bad_images
+row_check: row=2937 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=checker_known_bad_images
+row_check: row=2938 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
+row_check: row=2939 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
+row_check: row=2940 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
+row_check: row=2941 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state
+row_check: row=2942 anchor_hits=1 named_test_matched_by_a_filter=1 test_target=crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state

@@ -1,0 +1,16 @@
+command args=-p opus-probe-b58 --test k1_gpu_flow_proxy rc=0
+OPUS_K1P judged flow=lineage-2-1-1 domain=gpu-test states=105 I-9.37_violated_states=9 I-9.37_held_states=36 states_with_any_violation=9 digest=26103a906f2cda2c
+OPUS_K1P judged flow=retirement-2-1-1 domain=gpu-test states=189 I-9.37_violated_states=9 I-9.37_held_states=108 states_with_any_violation=9 digest=55bde54b4a31d7d8
+OPUS_K1P judged flow=tombstone-2-1-1 domain=gpu-test states=153 I-9.22_violated_states=21 I-9.22_held_states=72 states_with_any_violation=21 digest=1d0b97c82ec31027
+OPUS_K1P plan flow=lineage-2-1-1 domain=gpu-test writes=166 segments=31 longest_segment=24 closed_form_full=22020150 states=105
+OPUS_K1P plan flow=retirement-2-1-1 domain=gpu-test writes=387 segments=59 longest_segment=30 closed_form_full=1394606176 states=189
+OPUS_K1P plan flow=tombstone-2-1-1 domain=gpu-test writes=298 segments=47 longest_segment=30 closed_form_full=1312817230 states=153
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-checker --lib rc=0
+test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test checker_known_bad_images rc=0
+test result: ok. 259 passed; 0 failed; 5 ignored; 0 measured; 0 filtered out; 
+command args=-p singlefs-harness --test checker_known_bad_images -- --ignored records_under_changing_knobs_redden_only_the_knob_capacity_invariant_when_judged_with_the_knob_two rc=0
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 261 filtered out; 
+command args=-p singlefs-harness --test container_trees_grow_a_level_when_the_root_is_full rc=0
+test result: ok. 6 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; 

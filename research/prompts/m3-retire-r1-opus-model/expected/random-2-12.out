@@ -1,0 +1,29 @@
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A0.fd versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A0.res versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A1.fd versions_positive=13528 peak=2
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A1.res versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A2.fd versions_positive=13528 peak=2
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 A2.res versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C1 versions_positive=13528 peak=1
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C1L versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C2 versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C3 versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C3S versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C4 versions_positive=6383 peak=1
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C4L versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C6 versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 C7 versions_positive=0 peak=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 Pa.deficit versions_positive=795968 peak_bytes=262144
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 Pa.free min_bytes=-81920
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 Pb.deficit versions_positive=9 peak_bytes=60074
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 Pb.free min_bytes=0
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first A1.fd history=create intent:2 rb:3 rb:7 rb:7 create rb:11 intent:5 rb:9 rb:11 crash:2 rb:13 rb:13 crash:1 crash:2 crash:1 rb:17 rb:22 crash:2 crash:1 rb:22 rb:22 rb:26 rb:28 rb:28 final rb:30
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first A2.fd history=create intent:2 rb:3 rb:7 rb:7 create rb:11 intent:5 rb:9 rb:11 crash:2 rb:13 rb:13 crash:1 crash:2 crash:1 rb:17 rb:22 crash:2 crash:1 rb:22 rb:22 rb:26 rb:28 rb:28 final rb:30
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first C1 history=create intent:2 rb:3 rb:7 rb:7 create rb:11 intent:5 rb:9 rb:11 crash:2 rb:13 rb:13 crash:1 crash:2 crash:1 rb:17 rb:22 crash:2 crash:1 rb:22 rb:22 rb:26 rb:28 rb:28 final rb:30
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first C4 history=rb:3 intent:1 rb:3 create rb:7 crash:2 crash:2 crash:1 final create crash:2 rb:14 rb:17 final create rb:18 rb:21 rb:22 rb:23 rb:20 rb:22 crash:1 crash:2 rb:24 final
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first Pa.deficit history=intent:4
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first Pb.deficit history=rb:3 intent:1 rb:7 rb:8 final rb:10 final rb:8 rb:12 rb:13 rb:14 rb:13 rb:16 rb:17 final rb:17 crash:2 crash:1 final rb:24 rb:24 rb:24 rb:24 rb:25 rb:29 final rb:28 final rb:29 rb:34 rb:31 final rb:33
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 first same_ident_max history=create intent:2 rb:3 rb:7 rb:7 create rb:11 intent:5 rb:9 rb:11 crash:2 rb:13 rb:13 crash:1 crash:2 crash:1 rb:17 rb:22 crash:2 crash:1 rb:22 rb:22 rb:26 rb:28 rb:28 final
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 retire_records max=6
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 same_ident_max versions_positive=38565 peak=6
+random cap4-th2-rc3-f2-ring6 seed=12 runs=20000 len=40 versions=800000 max_retired_per_publish=1 growth_publishes_written_more_than_term_before=0 max_written_minus_term_before=0

@@ -1,0 +1,2 @@
+        let survivor = &mut self.containers[left_position];
+        survivor.contents.records.extend(absorbed.records);

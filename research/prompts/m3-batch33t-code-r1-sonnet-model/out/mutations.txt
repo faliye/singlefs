@@ -1,0 +1,19 @@
+ROWS 18
+ROW 0 rc=101 RED(expected test failed) failed=['a_power_loss_before_the_row_root_of_the_mount_that_took_a_new_instance_still_reads_back_th'] name=第33批T C694 的 C 一个落点都不隔离（取新实例那次挂载写行根落盘之前断电，R 的单元已被写掉）
+ROW 1 rc=101 RED(expected test failed) failed=['the_ninth_admission_term_equals_the_slots_isolated_for_the_records_above_the_water_mark_on'] name=第33批T C694 的 C 一个落点都不隔离（D28 已定项 1 第九项不含 C 那一部分）
+ROW 2 rc=101 RED(expected test failed) failed=['the_units_named_by_the_readable_records_of_a_publish_whose_last_record_reads_back_zero_are'] name=第33批T C694 的 C 选法退成只认带末条标志的记录（last）
+ROW 3 rc=101 RED(expected test failed) failed=['the_units_named_by_the_record_of_a_root_reread_as_abandoned_stay_isolated_until_this_proce'] name=第33批T C694 的 C 随 D16 已定项 1 读回全零那一行的进程内重读解开（d16）
+ROW 4 rc=101 RED(expected test failed) failed=['an_abandoned_root_whose_account_slots_were_taken_by_later_units_no_longer_refuses_unmount_'] name=第33批T C694 的 B 凭据恒不成立（被抛弃根的账读不出一律照拒）
+ROW 5 rc=101 RED(expected test failed) failed=['an_abandoned_root_whose_account_slots_only_read_back_zero_still_refuses_the_unmount_before'] name=第33批T C694 的 B 凭据不看现行账、读不出就放（第一轮攻方 A）
+ROW 6 rc=101 RED(expected test failed) failed=['a_publish_whose_middle_record_and_units_read_back_zero_refuses_the_writable_mount_before_a'] name=第33批T F1 乙不认序号缺口（中间一条读不出）
+ROW 7 rc=101 RED(expected test failed) failed=['a_publish_whose_first_record_and_units_read_back_zero_refuses_the_writable_mount_before_an'] name=第33批T F1 乙不认序号缺口（第一条读不出）
+ROW 8 rc=101 RED(expected test failed) failed=['a_publish_whose_last_record_and_units_read_back_zero_refuses_the_writable_mount_before_any'] name=第33批T F1 乙不认缺末条
+ROW 9 rc=101 RED(expected test failed) failed=['a_power_loss_while_writing_the_records_of_a_publish_whose_units_verify_still_mounts_writab'] name=第33批T F1 乙不看点名单元验不验得过（正常崩溃在写记录中途也拒）
+ROW 10 rc=101 RED(expected test failed) failed=['a_root_whose_units_were_overwritten_while_its_record_reads_falls_back_to_the_witnessed_ver'] name=第33批T F2 乙末条读得出那一支恒见证过（不退）
+ROW 11 rc=101 RED(expected test failed) failed=['user_accepted_cost_of_2026_10_07_a_confirmed_root_whose_newer_system_configuration_slots_a'] name=第33批T F2 乙末条读得出那一支恒见证过（S1 那一形不退）
+ROW 12 rc=101 RED(expected test failed) failed=['a_root_whose_units_and_record_read_back_zero_at_the_mount_falls_back_to_the_witnessed_vers'] name=第33批T F2 乙拿 c_见证 那条比的一支恒见证过（不退）
+ROW 13 rc=101 RED(expected test failed) failed=['a_confirmed_root_whose_last_record_and_units_read_back_zero_is_not_replaced_by_the_previou'] name=第33批T F2 乙两条都读不出就退（攻方 loose）
+ROW 14 rc=101 RED(expected test failed) failed=['every_root_of_a_pool_without_a_file_opens_to_an_empty_tree_table_instead_of_an_unreadable_'] name=第33批T C695 甲映射根是空指针时照旧先读映射
+ROW 15 rc=101 RED(expected test failed) failed=['recovery::allocation_records_per_device_tests::the_one_gibibyte_journal_ring_geometry_has_'] name=第33批T C692 G2 下限退成默认几何的常数 14（1024 MiB 环那套几何每盘少两条判不出）
+ROW 16 rc=101 RED(expected test failed) failed=['recovery::allocation_records_per_device_tests::the_default_geometry_has_fourteen_placement', 'recovery::allocation_records_per_device_tests::the_one_gibibyte_journal_ring_geometry_has_'] name=第33批T C692 G2 下限少算一个落点（默认几何每盘少一条判不出）
+ROW 17 rc=101 RED(expected test failed) failed=['without_named_unit_verification_the_same_state_is_a_model_disagreement'] name=第33批T F2 乙施加过记录、由记录重建的那一版走读失败也退（条款只写了所选根）

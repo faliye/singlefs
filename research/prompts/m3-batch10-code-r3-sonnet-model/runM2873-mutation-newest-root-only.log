@@ -1,0 +1,25 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch10-code-r3-sonnet/work/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch10-code-r3-sonnet/work/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.06s
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs (target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root-1b6ee2b4c5dfd964)
+
+running 1 test
+test on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before ... FAILED
+
+failures:
+
+---- on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before stdout ----
+
+thread 'on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before' (1384869) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs:1048:9:
+assertion `left == right` failed: 丢盘 0：再挂、接着覆盖写之后，挂载之前环里还在、不低于 F 的根在剩下那块盘上整读与挂载之前相同（读得不一样的根的 txg）
+  left: [9, 7, 10, 8]
+ right: []
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    on_the_264_slot_pool_with_a_live_file_device_zero_failing_the_rebuild_pass_rereads_and_mounts_and_lone_survivors_read_as_before
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.86s
+
+error: test failed, to rerun pass `-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root`

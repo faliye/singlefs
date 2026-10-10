@@ -1,0 +1,17 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-opus/copy/crates/singlefs-core/src/inode_tree.rs	2026-10-09 15:09:17.427209803 +0000
++++ inode_tree.rs	2026-10-09 15:56:00.763945906 +0000
+@@ -463,11 +463,11 @@
+                 && self.pair_fits_in_one_container(current_position);
+             let left_pair_fits =
+                 current_position > 0 && self.pair_fits_in_one_container(current_position - 1);
+-            if right_pair_fits {
+-                self.absorb_the_right_neighbour(current_position);
+-            } else if left_pair_fits {
++            if left_pair_fits {
+                 self.absorb_the_right_neighbour(current_position - 1);
+                 current_position -= 1;
++            } else if right_pair_fits {
++                self.absorb_the_right_neighbour(current_position);
+             } else {
+                 return absorbed_at_least_once;
+             }

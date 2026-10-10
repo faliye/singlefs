@@ -1,0 +1,6 @@
+SHAPE name=clean violated=[] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+SHAPE name=drop-record violated=["I-4.7"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=V(根（实例_1、txg_4）：inode_1_处于删除中（inode_树里没有它的记录），extent_树里还有_1_个数)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+SHAPE name=drop-record+S1 violated=["I-9.16", "I-9.27"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=G(走读到的某一版树表里有一棵_extent_树，偏移_116_的头_ID_配不上同一张表里恰好一条_inode_树条目：那)_I-4.6=G(走读到的某一版树表里有一棵_extent_树，偏移_116_的头_ID_配不上同一张表里恰好一条_inode_树条目：那)
+SHAPE name=drop-record+swap-extent-and-livelist-kinds violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+SHAPE name=drop-record+extent-as-unregistered-13 violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+SHAPE name=clean+swap-extent-and-livelist-kinds violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)

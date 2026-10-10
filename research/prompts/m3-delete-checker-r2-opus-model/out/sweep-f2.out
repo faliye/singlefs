@@ -1,0 +1,44 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同机别的活互不依赖
+SWEEP family=f2 histories=42 from=0 to=42 elapsed=7.3s
+SUMMARY sweep-f2 states=269
+COUNT sweep-f2	step	C479bing/lineage	holds=269	red=0	na=0
+COUNT sweep-f2	step	C479bing/txg-1	holds=257	red=12	na=0
+COUNT sweep-f2	step	C479yi/rec	holds=269	red=0	na=0
+COUNT sweep-f2	step	C479yi/rec+tombA	holds=269	red=0	na=0
+COUNT sweep-f2	step	I918/A	holds=105	red=0	na=164
+COUNT sweep-f2	step	I918/A+pub	holds=105	red=0	na=164
+COUNT sweep-f2	step	I918/A2	holds=105	red=0	na=164
+COUNT sweep-f2	step	I918/B	holds=102	red=3	na=164
+COUNT sweep-f2	step	I918/B+pub	holds=102	red=3	na=164
+COUNT sweep-f2	step	I918/nofilter	holds=105	red=0	na=164
+COUNT sweep-f2	step	I919/A	holds=105	red=0	na=164
+COUNT sweep-f2	step	I919/A+pub	holds=105	red=0	na=164
+COUNT sweep-f2	step	I919/A2	holds=105	red=0	na=164
+COUNT sweep-f2	step	I919/B	holds=102	red=0	na=167
+COUNT sweep-f2	step	I919/nofilter	holds=105	red=0	na=164
+COUNT sweep-f2	step	I920/A	holds=105	red=0	na=164
+COUNT sweep-f2	step	I920/A2	holds=105	red=0	na=164
+COUNT sweep-f2	step	I920/B	holds=102	red=0	na=167
+COUNT sweep-f2	step	I920/all-dedup	holds=105	red=0	na=164
+COUNT sweep-f2	step	I920/interval-all-T14	holds=105	red=0	na=164
+COUNT sweep-f2	step	I921/each	holds=0	red=0	na=269
+COUNT sweep-f2	step	I921/selected	holds=0	red=0	na=269
+COUNT sweep-f2	step	I924/each	holds=269	red=0	na=0
+COUNT sweep-f2	step	I96/code	holds=269	red=0	na=0
+COUNT sweep-f2	step	I96/each	holds=269	red=0	na=0
+COUNT sweep-f2	step	I96/newest	holds=269	red=0	na=0
+COUNT sweep-f2	step	S4a-bing/all-types-sorted	holds=269	red=0	na=0
+COUNT sweep-f2	step	S4a-jia/type2-sorted	holds=269	red=0	na=0
+COUNT sweep-f2	step	T2a/each	holds=105	red=0	na=164
+COUNT sweep-f2	step	T2a/sel-x-map	holds=105	red=0	na=164
+COUNT sweep-f2	step	T2c-A/each	holds=105	red=0	na=164
+COUNT sweep-f2	step	T2c-A2/each	holds=105	red=0	na=164
+COUNT sweep-f2	step	T2c-B/each	holds=102	red=0	na=167
+COUNT sweep-f2	step	T2c-B/sel-x-map	holds=102	red=0	na=167
+COUNT sweep-f2	step	TombDeath/birth-le-death-le-txg	holds=105	red=0	na=164
+COUNT sweep-f2	step	gap/any-version	holds=269	red=0	na=0
+FIRSTRED sweep-f2	step	C479bing/txg-1	b144:C2,U2,X,R2,C1 #4:R2 [rolled-back-to txg9/inst3 now txg12] :: 根（实例 3、txg 12）：新号 2 小于父版本 根（实例 3、txg 11） 的水位 4
+FIRSTRED sweep-f2	step	I918/B	b144:C2,U2,R3,X,C1 #3:R3 [rolled-back-to txg5/inst2 now txg9] :: 根（实例 2、txg 7）：队列号 2（出生代 6）没有谱系上的整对象墓碑
+FIRSTRED sweep-f2	step	I918/B+pub	b144:C2,U2,R3,X,C1 #3:R3 [rolled-back-to txg5/inst2 now txg9] :: 根（实例 2、txg 7）：队列号 2（出生代 6）没有谱系上的整对象墓碑
+CHECKERRED sweep-f2	step	I-7.4	31	b144:C2,U1,C1,X,C2 #4:X [dropped_rotation_writes=2 mounted inst3 chosen=txg8 effective=txg8 continuation=0] :: 被抛弃的根（实例 2、txg 9）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元 在盘 0 槽 50376 的那一份与位置条目里的校验和对不上；树表单元 两份都读不到对得上的
+ELAPSED 7.3s

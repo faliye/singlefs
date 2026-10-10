@@ -1,0 +1,10 @@
+状态总数 1764
+CPU新 与 GPU新 不同的状态数 0
+CPU新 与 按条款写的规格 不同的状态数 0
+旧写法与新写法交回不同的状态按形分：
+   ('first=named+v', 'second verifies other') 旧→新 [(None, 1), (None, 2), (None, 3)]
+变异写法与新写法交回不同的状态数（0 = 在全部状态上等价）：
+   cpu_old_form 0
+   cpu_row_2930 12
+   gpu_old_form 0
+   gpu_row_2936 12

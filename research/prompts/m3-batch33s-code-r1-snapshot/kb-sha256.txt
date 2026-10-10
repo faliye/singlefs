@@ -1,0 +1,3 @@
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
+0b97af507e86c13251eb564cf6aece96a6ff237887e90f3fd5a4abc759d76223  .claude/kb/checks-owed.md
+4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md

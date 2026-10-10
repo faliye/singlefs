@@ -1,0 +1,31 @@
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A0.fd versions_positive=2512 peak=1
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A0.res versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A1.fd versions_positive=8021 peak=2
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A1.res versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A2.fd versions_positive=8021 peak=2
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 A2.res versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C1 versions_positive=8021 peak=1
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C1L versions_positive=2512 peak=1
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C2 versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C3 versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C3S versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C4 versions_positive=424 peak=1
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C4L versions_positive=314 peak=1
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C6 versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 C7 versions_positive=0 peak=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 Pa.deficit versions_positive=1055345 peak_bytes=262144
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 Pa.free min_bytes=-81920
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 Pb.deficit versions_positive=0 peak_bytes=-16384
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 Pb.free min_bytes=0
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first A0.fd history=crash:2 crash:2 crash:1 intent:1 final rb:10
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first A1.fd history=crash:2 crash:2 crash:1 intent:1 final rb:9
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first A2.fd history=crash:2 crash:2 crash:1 intent:1 final rb:9
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first C1 history=crash:2 crash:2 crash:1 intent:1 final rb:9
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first C1L history=crash:2 crash:2 crash:1 intent:1 final rb:10
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first C4 history=crash:2 crash:2 intent:1 final rb:9 final
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first C4L history=crash:2 crash:2 intent:1 final rb:9 final
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first Pa.deficit history=create
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 first same_ident_max history=crash:2 crash:2 crash:1 crash:1 intent:1 final
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 retire_records max=3
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 same_ident_max versions_positive=25153 peak=3
+sweep cap3-th0-rc2-f2-ring8-death_at_intent depth=6 versions=1055516 max_retired_per_publish=1 growth_publishes_written_more_than_term_before=0 max_written_minus_term_before=0

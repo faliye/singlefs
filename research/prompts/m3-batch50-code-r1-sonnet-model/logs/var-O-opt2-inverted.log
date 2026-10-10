@@ -1,0 +1,49 @@
+
+running 25 tests
+test after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test inode_number_watermark_steps_are_left_by_publishes_creating_inodes_and_carried_by_the_others_and_by_a_rollback ... ok
+test rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration ... ok
+test a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root ... FAILED
+
+failures:
+
+---- a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root stdout ----
+
+thread 'a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root' (1936298) panicked at crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs:2177:5:
+assertion `left == right` failed: 回退那次发布的 inode 号水位 = max(cur 内存里的 3, 没被抛弃的根的)：不取被抛弃那一版的 5
+  left: 5
+ right: 3
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_rollback_after_a_recovery_abandoned_a_root_that_created_inodes_keeps_the_inode_number_watermark_off_the_abandoned_root
+
+test result: FAILED. 2 passed; 1 failed; 22 ignored; 0 measured; 0 filtered out; finished in 3.45s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.34s
+     Running tests/rollback_by_a_forward_publish.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/rollback_by_a_forward_publish-f89e6d24c776385c)
+error: test failed, to rerun pass `-p singlefs-harness --test rollback_by_a_forward_publish`

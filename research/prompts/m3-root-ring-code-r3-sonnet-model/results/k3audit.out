@@ -1,0 +1,27 @@
+files mentioning InvariantVerdict members: 83
+files with 0 PartiallyJudged: 22
+   ('crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs', 1, 0, 1, 0)
+   ('crates/singlefs-checker-tier/tests/crash_points_of_the_rollback_publish.rs', 0, 0, 1, 0)
+   ('crates/singlefs-checker-tier/tests/rollback_floor_written_into_the_system_configuration_first_and_normal_unmount.rs', 1, 0, 1, 0)
+   ('crates/singlefs-harness/tests/an_abandoned_roots_rollback_floor_counts_toward_the_effective_floor.rs', 0, 1, 0, 0)
+   ('crates/singlefs-harness/tests/an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping.rs', 1, 0, 1, 0)
+   ('crates/singlefs-harness/tests/instance_table_page_full.rs', 0, 0, 1, 0)
+   ('crates/singlefs-harness/tests/instance_table_second_page_write.rs', 2, 0, 1, 0)
+   ('crates/singlefs-harness/tests/journal_last_record_flag_of_a_multi_record_publish.rs', 0, 0, 3, 0)
+   ('crates/singlefs-harness/tests/many_inodes_write_and_read.rs', 2, 0, 3, 0)
+   ('crates/singlefs-harness/tests/multi_record_publishes_of_transaction_zero.rs', 0, 0, 2, 0)
+   ('crates/singlefs-harness/tests/named_unit_verification_stands_in_for_the_barrier_before_the_record.rs', 0, 0, 1, 0)
+   ('crates/singlefs-harness/tests/overwrite_in_one_instance.rs', 2, 0, 1, 0)
+   ('crates/singlefs-harness/tests/publish_failure_resent_unchanged.rs', 1, 0, 1, 0)
+   ('crates/singlefs-harness/tests/release_checksum_quarantine.rs', 3, 0, 2, 0)
+   ('crates/singlefs-harness/tests/replayed_version_takes_the_instance_table_and_allocation_record_tree_from_the_new_root_segment.rs', 1, 0, 2, 0)
+   ('crates/singlefs-harness/tests/reused_allocation_record_overlap.rs', 1, 0, 1, 0)
+   ('crates/singlefs-harness/tests/root_choice_through_the_glue_puts_the_checkpoint_txg_before_the_instance.rs', 1, 0, 0, 0)
+   ('crates/singlefs-harness/tests/root_ring_turn_in_one_mount.rs', 0, 0, 1, 0)
+   ('crates/singlefs-harness/tests/system_configuration_per_device_redundancy.rs', 0, 4, 0, 0)
+   ('crates/singlefs-harness/tests/test_only_switches_force_every_branch.rs', 0, 0, 1, 0)
+   ('crates/singlefs-harness/tests/tree_table_ordering_is_judged_by_the_cold_walk_and_the_checker.rs', 1, 0, 4, 0)
+   ('crates/singlefs-harness/tests/writable_mount_takes_a_second_instance.rs', 1, 0, 2, 0)
+--- matches with a wildcard arm after InvariantVerdict arms
+crates/singlefs-harness/tests/checker_known_bad_images.rs 1837 _ => InvariantVerdict::Holds,
+crates/singlefs-harness/tests/checker_known_bad_images.rs 2951 _ => InvariantVerdict::Holds,

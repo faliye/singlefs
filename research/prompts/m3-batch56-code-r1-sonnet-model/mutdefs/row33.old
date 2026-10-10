@@ -1,0 +1,2 @@
+            let left_pair_fits =
+                current_position > 0 && self.pair_fits_in_one_container(current_position - 1);

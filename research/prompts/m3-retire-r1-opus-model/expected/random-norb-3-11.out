@@ -1,0 +1,24 @@
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A0.fd versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A0.res versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A1.fd versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A1.res versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A2.fd versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 A2.res versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C1 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C1L versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C2 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C3 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C3S versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C4 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C4L versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C6 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 C7 versions_positive=0 peak=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 Pa.deficit versions_positive=797916 peak_bytes=360448
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 Pa.free min_bytes=-81920
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 Pb.deficit versions_positive=0 peak_bytes=-24576
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 Pb.free min_bytes=0
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 first Pa.deficit history=intent:1
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 first same_ident_max history=intent:1 crash:1 crash:2 intent:1 crash:1 intent:2 final
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 retire_records max=7
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 same_ident_max versions_positive=455574 peak=1
+random-norb cap2-th2-rc2-f3-ring8 seed=11 runs=20000 len=40 versions=799917 max_retired_per_publish=1 growth_publishes_written_more_than_term_before=8 max_written_minus_term_before=1

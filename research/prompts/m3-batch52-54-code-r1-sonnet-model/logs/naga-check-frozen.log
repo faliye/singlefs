@@ -1,0 +1,3 @@
+recovery ok inlined_expressions=332666 margin=67334
+checker-walk ok inlined_expressions=346278 margin=53722
+checker-scan ok inlined_expressions=387470 margin=12530

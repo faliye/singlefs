@@ -1,0 +1,78 @@
+W3R3S2MODEL group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 full_length_histories=9582726 images=10866042 legal_images=6321420 events=378708 residual_images=578671 hole_events=87356 hole_residual_images=158578 rollbacks=3822631 jumps_from_abandoned_roots_only=101525 jumps_from_a_root_not_abandoned=885663 events_after_a_jump=4114 identity_collision_images=0 identity_collision_images_other_copy_visible=0 newest_root_not_cur_images=0 clones=0 cloned_log_entries=0 elapsed_s=67.4
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 false_positive=0 event_missed=91672 residual_missed=297816 hole_event_missed=87356 hole_residual_missed=158578 false_positive_after_jump=0 event_missed_after_jump=551 red_on_identity_collision=0 event_missed_without_jump=91121
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 false_positive=0 event_missed=359585 residual_missed=304493 hole_event_missed=87356 hole_residual_missed=158578 false_positive_after_jump=0 event_missed_after_jump=4106 red_on_identity_collision=0 event_missed_without_jump=355479
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-create false_positive=195256 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=135548 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-skip false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-src false_positive=145539 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=112875 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL false_positive=2130774 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=275309 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL-pool false_positive=2130774 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=275309 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C3rL false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C3rL-1log false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C3rL-nocopy false_positive=0 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=0 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g false_positive=44332 event_missed=233956 residual_missed=415540 hole_event_missed=28654 hole_residual_missed=108703 false_positive_after_jump=37439 event_missed_after_jump=3568 red_on_identity_collision=0 event_missed_without_jump=230388
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool false_positive=44332 event_missed=233956 residual_missed=415540 hole_event_missed=28654 hole_residual_missed=108703 false_positive_after_jump=37439 event_missed_after_jump=3568 red_on_identity_collision=0 event_missed_without_jump=230388
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i false_positive=124775 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=102152 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i-pool false_positive=124775 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=102152 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig false_positive=124775 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=102152 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig-pool false_positive=124775 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=102152 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 false_positive=0 event_missed=378708 residual_missed=578671 hole_event_missed=87356 hole_residual_missed=158578 false_positive_after_jump=0 event_missed_after_jump=4114 red_on_identity_collision=0 event_missed_without_jump=374594
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg false_positive=0 event_missed=378708 residual_missed=578671 hole_event_missed=87356 hole_residual_missed=158578 false_positive_after_jump=0 event_missed_after_jump=4114 red_on_identity_collision=0 event_missed_without_jump=374594
+W3R3S2COUNT group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL+C3rL false_positive=2130774 event_missed=0 residual_missed=0 hole_event_missed=0 hole_residual_missed=0 false_positive_after_jump=275309 event_missed_after_jump=0 red_on_identity_collision=0 event_missed_without_jump=0
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.29 kind=event_missed_without_jump ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=residual_missed ops=[create1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-9.6 kind=event_missed_without_jump ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-create kind=false_positive ops=[create1,crash-hide,rollback1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-create kind=false_positive_after_jump ops=[create1,crash-hide,rollback1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-src kind=false_positive ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2a-src kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL kind=false_positive ops=[create1,mount,rollback1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL-pool kind=false_positive ops=[create1,mount,rollback1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=false_positive ops=[create1,crash-hide,rollback1,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=event_missed ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=residual_missed ops=[create1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g kind=event_missed_without_jump ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=false_positive ops=[create1,crash-hide,rollback1,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=event_missed ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=residual_missed ops=[create1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C4g-pool kind=event_missed_without_jump ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i kind=false_positive ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i-pool kind=false_positive ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2i-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig kind=false_positive ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig-pool kind=false_positive ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2ig-pool kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=residual_missed ops=[create1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=I-3.12 kind=event_missed_without_jump ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=residual_missed ops=[create1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=hole_event_missed ops=[create1,delete1,crash-mid-create,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=hole_residual_missed ops=[create1,delete1,mount,create1,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed_after_jump ops=[create1,crash-hide,rollback1,create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=X-txg kind=event_missed_without_jump ops=[create1,mount,create1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL+C3rL kind=false_positive ops=[create1,mount,rollback1]
+W3R3S2EXAMPLE group=k2 rule=Opt1 arm=V3 first_txg=Product ring=4 depth=8 form=C2aL+C3rL kind=false_positive_after_jump ops=[create1,crash-hide,rollback1,mount]

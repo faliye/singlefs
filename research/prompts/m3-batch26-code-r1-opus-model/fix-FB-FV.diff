@@ -1,0 +1,70 @@
+--- crates/singlefs-checker/src/walk.rs
++++ crates/singlefs-checker/src/walk.rs
+@@ -2359,6 +2359,14 @@
+             data_unit_bytes(),
+             &what,
+         ) else {
++            // 攻方 F-B（零轮）：「子指针头部的出生树 == 身份引用的出生树」不看孩子就判得了。
++            self.judgements
++                .judge(identity_invariant, child.birth_tree == identity.0, || {
++                    format!(
++                        "{name}内部条目：容器两份都读不出，子指针头部的出生树 {} 不等于身份引用的出生树 {}",
++                        child.birth_tree, identity.0
++                    )
++                });
+             self.walk_failures
+                 .push(format!("{name}的容器两份都读不到对得上的"));
+             return;
+@@ -2536,6 +2544,7 @@
+                     &mut self.judgements,
+                     entry_type,
+                     identity,
++                    child.birth_tree,
+                 );
+                 self.walk_failures
+                     .push("inode 树的孩子两份都读不到对得上的".to_string());
+@@ -4110,6 +4119,7 @@
+     child: &PointerView,
+     class_the_entry_type_names: Option<MappingKeyUnitClass>,
+ ) -> Option<MappingKeyUnitClass> {
++    let mut other_class = None;
+     for location in &child.locations {
+         let offset = location.slot * SLOT_BYTES;
+         // 头按最短的单元（码 2，16 KiB）那么长读：读者只认整块的读，32 KiB 的单元头也在这前 16 KiB 里。
+@@ -4126,12 +4136,12 @@
+         if !verifies_at_the_length_of_its_class {
+             continue;
+         }
+-        if Some(class_in_the_header) == class_the_entry_type_names {
+-            return None;
++        // 攻方 F-V（零轮）：不在第一份自证过的副本处停，两份都看。
++        if Some(class_in_the_header) != class_the_entry_type_names && other_class.is_none() {
++            other_class = Some(class_in_the_header);
+         }
+-        return Some(class_in_the_header);
+     }
+-    None
++    other_class
+ }
+ 
+ /// inode 树一条内部条目的孩子两份都读不出（[`child_unit_class_other_than_the_entry_type_names`] 也没认出另一类）时，I-9.2 里不看孩子就判得了的那几小句，
+@@ -4143,9 +4153,18 @@
+     judgements: &mut Judgements,
+     entry_type: InodeInternalEntryType,
+     identity: (u64, u16, u64, u64),
++    pointer_birth_tree: u64,
+ ) {
+     match entry_type {
+-        InodeInternalEntryType::LeafContainer => {}
++        InodeInternalEntryType::LeafContainer => {
++            // 攻方 F-B（零轮）：「子指针头部的出生树 == 身份引用的出生树」不看孩子就判得了。
++            judgements.judge("I-9.2", pointer_birth_tree == identity.0, || {
++                format!(
++                    "inode 内部条目类型段 2：孩子两份都读不出，子指针头部的出生树 {pointer_birth_tree} 不等于身份引用的出生树 {}",
++                    identity.0
++                )
++            });
++        }
+         InodeInternalEntryType::InternalNode => {
+             let (birth_tree, _, container, container_birth) = identity;
+             let identity_is_zero = birth_tree == 0 && container == 0 && container_birth == 0;

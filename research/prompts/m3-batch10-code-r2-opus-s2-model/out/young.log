@@ -1,0 +1,24 @@
+run-with-memory-cap: 上限 4000M 超过实测峰值 2M 的 2 倍，照理由放行：上一次过滤成零个测试量到的峰值不代表这次
+
+running 1 test
+test k2_young_ring_rereads ... name=k2-young mount=M1-after-mkfs ring=OnTheOneReread hooks=1 reads_per_ring_slot={15} effective_root=(0,0)
+name=k2-young mount=M2-after-a-clean-M1 ring=OnTheFirstRead hooks=0 reads_per_ring_slot={14} effective_root=(1,2)
+name=k2-young mount=M3 ring=OnTheFirstRead hooks=0 reads_per_ring_slot={16} effective_root=(2,4)
+name=k2-young-sweep m1_crash_at_write=1 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=2 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=3 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=4 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=5 m2_ring=OnTheOneReread
+name=k2-young-sweep m1_crash_at_write=6 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=7 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=8 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=9 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=10 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=11 m2_ring=OnTheFirstRead
+name=k2-young-sweep m1_crash_at_write=12 m2_ring=OnTheFirstRead
+name=k2-young-sweep M1 finished before write 13: stop
+name=k2-young-sweep-total crash_points=12 m2_rereading=5
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 13.15s
+

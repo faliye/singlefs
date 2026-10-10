@@ -1,0 +1,11 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-opus/copy/crates/singlefs-core/src/mount.rs	2026-10-09 15:09:17.427258192 +0000
++++ mount.rs	2026-10-09 15:56:00.774556863 +0000
+@@ -8117,7 +8117,7 @@
+     let inode_number_watermark = highest_inode_number_watermark_in_the_ring(
+         devices,
+         unit_area_start,
+-        &ring_roots_not_abandoned_by_crash_recovery(&ring_roots, &current_table),
++        &ring_roots_not_abandoned_by_crash_recovery(&ring_roots, &current_table)[..0],
+         &current.record,
+     )
+     .map_or(current.inode_number_watermark(), |ring| {

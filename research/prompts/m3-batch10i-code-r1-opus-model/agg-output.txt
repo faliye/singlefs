@@ -1,0 +1,7 @@
+OPUSI1-AGG by=arm,red,classes rows=54
+  arm=prod red=false classes= n=46
+  arm=prod red=true classes=I-7.4, latent-abandoned-free n=8
+K2AGG k2-refuse-3.log
+  ab-384-3-5 no-s1 Err(CandidateJudgementStillUnreadableAfterOneRere S1-slot n=216
+  mat-384-30-8 no-s1 Err(CandidateJudgementStillUnreadableAfterOneRere S1-slot n=228
+  mat-384-30-8 no-s1 Ok() - n=60

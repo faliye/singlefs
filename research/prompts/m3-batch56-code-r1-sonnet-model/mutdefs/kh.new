@@ -1,0 +1,3 @@
+        let survivor = &mut self.containers[left_position];
+        survivor.contents.separator_key_in_the_parent_entry = absorbed.separator_key_in_the_parent_entry;
+        survivor.contents.records.extend(absorbed.records);

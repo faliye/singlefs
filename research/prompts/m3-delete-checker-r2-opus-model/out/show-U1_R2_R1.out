@@ -1,0 +1,89 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同机别的活互不依赖
+STEP #0 M -> mounted inst2 chosen=txg3 effective=txg3 continuation=0
+  newest=inst2/txg5 wm=Some(2) maxkey=Some(1) rows=[(1, 3)]
+  V 根（实例 0、txg 0） txg=0 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 3） txg=3 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 1） txg=1 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 4） txg=4 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 2） txg=2 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 5） txg=5 newest=true rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+STEP #1 U1 -> ok versions=2 now txg7
+  newest=inst2/txg7 wm=Some(2) maxkey=Some(1) rows=[(1, 3)]
+  V 根（实例 0、txg 0） txg=0 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 3） txg=3 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 6） txg=6 newest=false rec=false q=Some([1]) wm=Some(2) recs=[(1, 0, 3)] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 1、txg 1） txg=1 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 4） txg=4 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 7） txg=7 newest=true rec=false q=Some([]) wm=Some(2) recs=[] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 1、txg 2） txg=2 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 5） txg=5 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+STEP #2 R2 -> rolled-back-to txg5/inst2 now txg8
+  newest=inst2/txg8 wm=Some(2) maxkey=Some(1) rows=[(1, 3)]
+  V 根（实例 0、txg 0） txg=0 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 3） txg=3 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 6） txg=6 newest=false rec=false q=Some([1]) wm=Some(2) recs=[(1, 0, 3)] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 1、txg 1） txg=1 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 4） txg=4 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 7） txg=7 newest=false rec=false q=Some([]) wm=Some(2) recs=[] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 1、txg 2） txg=2 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 5） txg=5 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 8） txg=8 newest=true rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[(1, 3, 6, true)] lineage=[(8, 5)] gap=None
+STEP #3 R1 -> rolled-back-to txg7/inst2 now txg9
+  newest=inst2/txg9 wm=Some(2) maxkey=Some(1) rows=[(1, 3)]
+  V 根（实例 0、txg 0） txg=0 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 1、txg 3） txg=3 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 6） txg=6 newest=false rec=false q=Some([1]) wm=Some(2) recs=[(1, 0, 3)] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 2、txg 9） txg=9 newest=true rec=false q=Some([]) wm=Some(2) recs=[] tombs=[(1, 3, 6, true)] lineage=[(8, 5), (9, 7)] gap=None
+  V 根（实例 1、txg 1） txg=1 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 4） txg=4 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 7） txg=7 newest=false rec=false q=Some([]) wm=Some(2) recs=[] tombs=[(1, 3, 6, true)] lineage=[] gap=None
+  V 根（实例 1、txg 2） txg=2 newest=false rec=false q=None wm=None recs=[] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 5） txg=5 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[] lineage=[] gap=None
+  V 根（实例 2、txg 8） txg=8 newest=false rec=false q=Some([]) wm=Some(2) recs=[(1, 1, 3)] tombs=[(1, 3, 6, true)] lineage=[(8, 5)] gap=None
+SUMMARY show states=4
+COUNT show	step	C479bing/lineage	holds=4	red=0	na=0
+COUNT show	step	C479bing/txg-1	holds=2	red=2	na=0
+COUNT show	step	C479yi/rec	holds=4	red=0	na=0
+COUNT show	step	C479yi/rec+tombA	holds=4	red=0	na=0
+COUNT show	step	I918/A	holds=3	red=0	na=1
+COUNT show	step	I918/A+pub	holds=3	red=0	na=1
+COUNT show	step	I918/A2	holds=3	red=0	na=1
+COUNT show	step	I918/B	holds=2	red=1	na=1
+COUNT show	step	I918/B+pub	holds=2	red=1	na=1
+COUNT show	step	I918/nofilter	holds=3	red=0	na=1
+COUNT show	step	I919/A	holds=3	red=0	na=1
+COUNT show	step	I919/A+pub	holds=3	red=0	na=1
+COUNT show	step	I919/A2	holds=3	red=0	na=1
+COUNT show	step	I919/B	holds=1	red=1	na=2
+COUNT show	step	I919/nofilter	holds=1	red=2	na=1
+COUNT show	step	I920/A	holds=3	red=0	na=1
+COUNT show	step	I920/A2	holds=3	red=0	na=1
+COUNT show	step	I920/B	holds=2	red=0	na=2
+COUNT show	step	I920/all-dedup	holds=3	red=0	na=1
+COUNT show	step	I920/interval-all-T14	holds=3	red=0	na=1
+COUNT show	step	I921/each	holds=0	red=0	na=4
+COUNT show	step	I921/selected	holds=0	red=0	na=4
+COUNT show	step	I924/each	holds=4	red=0	na=0
+COUNT show	step	I96/code	holds=4	red=0	na=0
+COUNT show	step	I96/each	holds=4	red=0	na=0
+COUNT show	step	I96/newest	holds=2	red=0	na=2
+COUNT show	step	S4a-bing/all-types-sorted	holds=4	red=0	na=0
+COUNT show	step	S4a-jia/type2-sorted	holds=4	red=0	na=0
+COUNT show	step	T2a/each	holds=3	red=0	na=1
+COUNT show	step	T2a/sel-x-map	holds=3	red=0	na=1
+COUNT show	step	T2c-A/each	holds=3	red=0	na=1
+COUNT show	step	T2c-A2/each	holds=3	red=0	na=1
+COUNT show	step	T2c-B/each	holds=2	red=0	na=2
+COUNT show	step	T2c-B/sel-x-map	holds=2	red=0	na=2
+COUNT show	step	TombDeath/birth-le-death-le-txg	holds=3	red=0	na=1
+COUNT show	step	gap/any-version	holds=4	red=0	na=0
+FIRSTRED show	step	C479bing/txg-1	show #2:R2 [rolled-back-to txg5/inst2 now txg8] :: 根（实例 2、txg 8）：新号 1 小于父版本 根（实例 2、txg 7） 的水位 2
+FIRSTRED show	step	I918/B	show #2:R2 [rolled-back-to txg5/inst2 now txg8] :: 根（实例 2、txg 6）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED show	step	I918/B+pub	show #2:R2 [rolled-back-to txg5/inst2 now txg8] :: 根（实例 2、txg 6）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED show	step	I919/B	show #3:R1 [rolled-back-to txg7/inst2 now txg9] :: 根（实例 2、txg 8）：谱系上的墓碑 (1, 3, 死于 6) 指着 nlink 1 的记录
+FIRSTRED show	step	I919/nofilter	show #2:R2 [rolled-back-to txg5/inst2 now txg8] :: 根（实例 2、txg 8）：谱系上的墓碑 (1, 3, 死于 6) 指着 nlink 1 的记录
+STEPLINE show #0:M [mounted inst2 chosen=txg3 effective=txg3 continuation=0] versions=6 checker_red=[] cand_red=[]
+STEPLINE show #1:U1 [ok versions=2 now txg7] versions=8 checker_red=[] cand_red=[]
+STEPLINE show #2:R2 [rolled-back-to txg5/inst2 now txg8] versions=9 checker_red=[] cand_red=["I918/B", "I918/B+pub", "I919/nofilter", "C479bing/txg-1"]
+STEPLINE show #3:R1 [rolled-back-to txg7/inst2 now txg9] versions=10 checker_red=[] cand_red=["I919/B", "I919/nofilter", "C479bing/txg-1"]
+ELAPSED 0.6s

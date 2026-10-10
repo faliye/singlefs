@@ -1,0 +1,12 @@
+[package]
+name = "w3-r3-s2-model"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "m3-w3-r3 攻方腿第二次抽样的抽象时间线模型：Y1 两种取法、克隆头、新实例第一个 txg 被改坏；C2aL、C3rL、C4g、C2i。不依赖 crates/。"
+
+[workspace]
+
+[profile.release]
+debug = false
+overflow-checks = true

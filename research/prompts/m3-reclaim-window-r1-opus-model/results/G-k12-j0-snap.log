@@ -1,0 +1,5 @@
+run-with-memory-cap: 上限 3G 超过实测峰值 45M 的 2 倍，照理由放行：原型换参数、开层 0 枚举后内存会涨
+START s=4 c=24 ring=12 build=0.0s
+s=4 c=24 k=12 j=0 mount instance=14 chosen=24 effective=24 row=37 warm_up=[38] current=38 alloc_after_mount=[dev0:alloc=20,free=7084,deferred=6,isolated=0 dev1:alloc=20,free=7084,deferred=6,isolated=0] skipped_row_txgs=[25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36]
+s=4 c=24 k=12 j=0 SNAPSHOTS roots=2 any_bad=false
+DONE elapsed=0.2s

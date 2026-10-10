@@ -1,0 +1,122 @@
+PROBE W=240 k=1 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=1 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=1 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=1 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=2 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=2 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=2 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=2 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=3 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=3 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=3 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=3 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=5 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=240 k=5 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=240 k=5 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=240 k=5 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=240 k=8 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=8 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=8 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=240 k=8 k2=4 START_FAILED
+PROBE W=256 k=1 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=1 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=1 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=1 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=2 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=2 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=2 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=2 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=3 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=3 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=3 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=3 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=5 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=256 k=5 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=256 k=5 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=256 k=5 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=256 k=8 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=8 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=8 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=256 k=8 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=1 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=1 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=1 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=1 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(5)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=2 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=2 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=2 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=2 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(6)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=3 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=3 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=3 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=3 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=3 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(7)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=5 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=384 k=5 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=384 k=5 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=384 k=5 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(9)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=1 then_unmount=Ok publishes=3
+PROBE W=384 k=8 k2=0 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[] unmount=Ok publishes=2 reds_after_unmount=[] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=8 k2=1 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=8 k2=2 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=3 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE W=384 k=8 k2=4 abandoned=(InstanceGeneration(1), CheckpointTxg(12)) in_ring_at_start=true reds_at_start=[I-7.4] unmount=Ok publishes=2 reds_after_unmount=[I-7.4] remount=Ok abandoned_unreadable=0 then_unmount=Ok publishes=3
+PROBE_SESSION W=240 k=1 k2=0 writes_done=9 first_refused=Some((10, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=1 k2=1 writes_done=8 first_refused=Some((9, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=1 k2=2 writes_done=7 first_refused=Some((8, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=1 k2=4 writes_done=5 first_refused=Some((6, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=2 k2=0 writes_done=10 first_refused=Some((11, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=2 k2=1 writes_done=9 first_refused=Some((10, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=2 k2=2 writes_done=8 first_refused=Some((9, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=2 k2=4 writes_done=6 first_refused=Some((7, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=3 k2=0 writes_done=9 first_refused=Some((10, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=3 k2=1 writes_done=8 first_refused=Some((9, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=3 k2=2 writes_done=7 first_refused=Some((8, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=3 k2=4 writes_done=5 first_refused=Some((6, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=28 reds_at_end=[I-7.4]
+PROBE_SESSION W=240 k=5 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=96 reds_at_end=[]
+PROBE_SESSION W=240 k=5 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=97 reds_at_end=[]
+PROBE_SESSION W=240 k=5 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=101 reds_at_end=[]
+PROBE_SESSION W=240 k=5 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=105 reds_at_end=[]
+PROBE_SESSION W=240 k=8 k2=0 writes_done=3 first_refused=Some((4, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[]
+PROBE_SESSION W=240 k=8 k2=1 writes_done=2 first_refused=Some((3, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[]
+PROBE_SESSION W=240 k=8 k2=2 writes_done=1 first_refused=Some((2, "NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { last_refusal: SpaceAdmissionRefused(AdmissionRefused")) abandoned_still_in_ring=true txg=23 reds_at_end=[]
+PROBE_SESSION W=256 k=1 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=74 reds_at_end=[]
+PROBE_SESSION W=256 k=1 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=75 reds_at_end=[]
+PROBE_SESSION W=256 k=1 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=78 reds_at_end=[]
+PROBE_SESSION W=256 k=1 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=83 reds_at_end=[]
+PROBE_SESSION W=256 k=2 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=78 reds_at_end=[]
+PROBE_SESSION W=256 k=2 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=79 reds_at_end=[]
+PROBE_SESSION W=256 k=2 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=83 reds_at_end=[]
+PROBE_SESSION W=256 k=2 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=87 reds_at_end=[]
+PROBE_SESSION W=256 k=3 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=79 reds_at_end=[]
+PROBE_SESSION W=256 k=3 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=83 reds_at_end=[]
+PROBE_SESSION W=256 k=3 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=84 reds_at_end=[]
+PROBE_SESSION W=256 k=3 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=88 reds_at_end=[]
+PROBE_SESSION W=256 k=5 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=69 reds_at_end=[]
+PROBE_SESSION W=256 k=5 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=70 reds_at_end=[]
+PROBE_SESSION W=256 k=5 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=74 reds_at_end=[]
+PROBE_SESSION W=256 k=5 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=76 reds_at_end=[]
+PROBE_SESSION W=256 k=8 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=99 reds_at_end=[]
+PROBE_SESSION W=256 k=8 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=100 reds_at_end=[]
+PROBE_SESSION W=256 k=8 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=104 reds_at_end=[]
+PROBE_SESSION W=256 k=8 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=106 reds_at_end=[]
+PROBE_SESSION W=384 k=1 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=51 reds_at_end=[]
+PROBE_SESSION W=384 k=1 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=52 reds_at_end=[]
+PROBE_SESSION W=384 k=1 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=53 reds_at_end=[]
+PROBE_SESSION W=384 k=1 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=57 reds_at_end=[]
+PROBE_SESSION W=384 k=2 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=52 reds_at_end=[]
+PROBE_SESSION W=384 k=2 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=53 reds_at_end=[]
+PROBE_SESSION W=384 k=2 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=54 reds_at_end=[]
+PROBE_SESSION W=384 k=2 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=58 reds_at_end=[]
+PROBE_SESSION W=384 k=3 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=54 reds_at_end=[]
+PROBE_SESSION W=384 k=3 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=57 reds_at_end=[]
+PROBE_SESSION W=384 k=3 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=58 reds_at_end=[]
+PROBE_SESSION W=384 k=3 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=60 reds_at_end=[]
+PROBE_SESSION W=384 k=5 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=56 reds_at_end=[]
+PROBE_SESSION W=384 k=5 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=57 reds_at_end=[]
+PROBE_SESSION W=384 k=5 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=60 reds_at_end=[]
+PROBE_SESSION W=384 k=5 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=62 reds_at_end=[]
+PROBE_SESSION W=384 k=8 k2=0 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=60 reds_at_end=[]
+PROBE_SESSION W=384 k=8 k2=1 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=61 reds_at_end=[]
+PROBE_SESSION W=384 k=8 k2=2 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=62 reds_at_end=[]
+PROBE_SESSION W=384 k=8 k2=4 writes_done=40 first_refused=None abandoned_still_in_ring=false txg=64 reds_at_end=[]
+SWITCHES w1
+SWITCHES w1
+SWITCHES w1

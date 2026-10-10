@@ -1,0 +1,16 @@
+S=4 after publication 1: n=24 alow: gate_lower_by_txgs mean=2.00 max=2 extra_pinned_blocks mean=26.0 max=26 | ring: txgs mean=2.00 max=2 extra_pinned mean=26.0 max=26
+S=4 after publication 2: n=24 alow: gate_lower_by_txgs mean=1.00 max=3 extra_pinned_blocks mean=12.7 max=38 | ring: txgs mean=3.00 max=3 extra_pinned mean=38.0 max=38
+S=4 after publication 3: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=4.00 max=4 extra_pinned mean=42.0 max=50
+S=4 after publication 4: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=5.00 max=5 extra_pinned mean=42.0 max=50
+S=4 after publication 5: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=6.00 max=6 extra_pinned mean=42.0 max=50
+S=4 after publication 6: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=7.00 max=7 extra_pinned mean=42.0 max=50
+S=4 after publication 7: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=8.00 max=8 extra_pinned mean=42.0 max=50
+S=4 after publication 8: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=9.00 max=9 extra_pinned mean=42.0 max=50
+S=16 after publication 1: n=24 alow: gate_lower_by_txgs mean=2.00 max=2 extra_pinned_blocks mean=26.0 max=26 | ring: txgs mean=2.00 max=2 extra_pinned mean=26.0 max=26
+S=16 after publication 2: n=24 alow: gate_lower_by_txgs mean=1.00 max=3 extra_pinned_blocks mean=12.7 max=38 | ring: txgs mean=3.00 max=3 extra_pinned mean=38.0 max=38
+S=16 after publication 3: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=4.00 max=4 extra_pinned mean=42.0 max=50
+S=16 after publication 4: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=5.00 max=5 extra_pinned mean=42.0 max=50
+S=16 after publication 5: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=6.00 max=6 extra_pinned mean=42.0 max=50
+S=16 after publication 6: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=7.00 max=7 extra_pinned mean=42.0 max=50
+S=16 after publication 7: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=8.00 max=8 extra_pinned mean=42.0 max=50
+S=16 after publication 8: n=24 alow: gate_lower_by_txgs mean=0.00 max=0 extra_pinned_blocks mean=0.0 max=0 | ring: txgs mean=9.00 max=9 extra_pinned mean=42.0 max=50

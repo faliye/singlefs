@@ -1,0 +1,44 @@
+== d-P.out histories 10 events 0
+ all events : {}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 0, 'c1b': 0, 'c2i': 0, 'c2all': 0, 'c3': 0, 'c4': 0, 'steps': 67}
+== d-V1.out histories 10 events 9
+ all events : {'events': 9, 'c2i': 9, 'c2all': 9, 'c3': 9, 'c4': 9}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 0, 'c1b': 0, 'c2i': 7, 'c2all': 7, 'c3': 0, 'c4': 7, 'steps': 67}
+== f1-broad-V1.out histories 32 events 12
+ all events : {'events': 12, 'c1a': 11, 'c1b': 12, 'c2i': 12, 'c2all': 12, 'c3': 12, 'c4': 12}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 14, 'c1b': 15, 'c2i': 19, 'c2all': 19, 'c3': 0, 'c4': 19, 'steps': 868}
+== f1-deleting-V1.out histories 32 events 103
+ all events : {'events': 103, 'c2i': 103, 'c2all': 103, 'c3': 103, 'c4': 103}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 0, 'c1b': 0, 'c2i': 109, 'c2all': 109, 'c3': 0, 'c4': 109, 'steps': 982}
+== f1-newest-V1.out histories 32 events 16
+ all events : {'events': 16, 'c1a': 10, 'c1b': 14, 'c2i': 16, 'c2all': 16, 'c3': 16, 'c4': 16}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 14, 'c1b': 19, 'c2i': 25, 'c2all': 25, 'c3': 0, 'c4': 25, 'steps': 868}
+== f1-reuse-V1.out histories 32 events 7
+ all events : {'events': 7, 'c2i': 7, 'c2all': 7, 'c3': 7, 'c4': 7, 'c1a': 2, 'c1b': 3}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 6, 'c1b': 6, 'c2i': 11, 'c2all': 11, 'c3': 0, 'c4': 11, 'steps': 982}
+== f2-V1.out histories 64 events 336
+ all events : {'events': 336, 'c1a': 97, 'c1b': 229, 'c2i': 336, 'c2all': 336, 'c3': 336, 'c4': 336}
+ Q9=Gone    : {'events': 5, 'c1b': 5, 'c2i': 5, 'c2all': 5, 'c3': 5, 'c4': 5}
+ untainted red steps: {'c1a': 73, 'c1b': 311, 'c2i': 426, 'c2all': 426, 'c3': 0, 'c4': 426, 'steps': 3904}
+== f3a-P.out histories 1500 events 0
+ all events : {}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 0, 'c1b': 0, 'c2i': 0, 'c2all': 0, 'c3': 0, 'c4': 0, 'steps': 13390}
+== f3a-V1.out histories 1464 events 975
+ all events : {'events': 975, 'c2i': 975, 'c2all': 975, 'c3': 975, 'c4': 975, 'c1b': 172, 'c1a': 52}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 54, 'c1b': 174, 'c2i': 1784, 'c2all': 1784, 'c3': 0, 'c4': 1784, 'steps': 13030}
+== g-long-P.out histories 64 events 0
+ all events : {}
+ Q9=Gone    : {}
+ untainted red steps: {'c1a': 0, 'c1b': 0, 'c2i': 0, 'c2all': 0, 'c3': 0, 'c4': 0, 'steps': 9664}
+== g-long-V1.out histories 32 events 476
+ all events : {'events': 476, 'c1a': 153, 'c1b': 338, 'c2i': 476, 'c2all': 476, 'c3': 476, 'c4': 476}
+ Q9=Gone    : {'events': 6, 'c1b': 6, 'c2i': 6, 'c2all': 6, 'c3': 6, 'c4': 6}
+ untainted red steps: {'c1a': 55, 'c1b': 215, 'c2i': 257, 'c2all': 257, 'c3': 0, 'c4': 257, 'steps': 4832}

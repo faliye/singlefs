@@ -1,0 +1,21 @@
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/repo/crates/singlefs-format)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/repo/crates/singlefs-checker)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.03s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch52-54-code-r1-sonnet/target/debug/deps/singlefs_checker-68797fa85c855dfd)
+
+running 1 test
+PROBE gap-1-3 lineage product: Holds
+PROBE start-at-5 retirement product: Holds
+PROBE equal-2-2 retirement product: Violated("probe：退役树（树 7）沿叶序容器号不严格递增：容器 2 之后是容器 2")
+PROBE decreasing-3-2 retirement product: Violated("probe：退役树（树 7）沿叶序容器号不严格递增：容器 3 之后是容器 2")
+PROBE single product: NotApplicable("这个镜像上没有它判的对象")
+PROBE zero knob: NotApplicable("这个镜像上没有它判的对象")
+PROBE rightmost-over-product product: Holds
+PROBE knob early-close: Holds
+PROBE knob over: Violated("probe：谱系树（树 7）的容器 1 装了 3 条，多于旋钮值 2")
+PROBE knob gap: Holds
+PROBE knob decreasing: Violated("probe：谱系树（树 7）沿叶序容器号不严格递增：容器 4 之后是容器 3")
+test walk::sonnet_probe_container_numbers::probe ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+

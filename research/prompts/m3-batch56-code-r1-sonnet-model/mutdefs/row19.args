@@ -1,0 +1,1 @@
+-p singlefs-harness --test checker_known_bad_images -- the_old_tombstone_knob_entry_judges_the_retirement_tree_by_its_product_capacity

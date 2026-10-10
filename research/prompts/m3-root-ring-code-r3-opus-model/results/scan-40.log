@@ -1,0 +1,88 @@
+run-with-memory-cap: 上限 2G 超过实测峰值 665M 的 2 倍，照理由放行：探针取样量随参数变大，峰值会涨
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/r3_attack_sweep_probe.rs (target/release/deps/r3_attack_sweep_probe-2e8a5b3ccba3f597)
+
+running 1 test
+SCAN schedule=[(0, false), (1, false)] mounts=40 deleted=33 blocked_by_account=0 longest_blocked_streak=0 no_candidate=4 other=3 last_rows=3 red_at_end=0
+SCAN schedule=[(0, false), (1, true)] mounts=40 deleted=18 blocked_by_account=1 longest_blocked_streak=1 no_candidate=18 other=3 last_rows=3 red_at_end=0
+SCAN schedule=[(0, false), (2, false)] mounts=40 deleted=30 blocked_by_account=0 longest_blocked_streak=0 no_candidate=7 other=3 last_rows=3 red_at_end=0
+SCAN schedule=[(0, false), (2, true)] mounts=40 deleted=18 blocked_by_account=6 longest_blocked_streak=1 no_candidate=13 other=3 last_rows=4 red_at_end=0
+SCAN schedule=[(0, false), (3, false)] mounts=40 deleted=27 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=3 last_rows=3 red_at_end=0
+SCAN schedule=[(0, false), (3, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(0, false), (4, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(0, false), (4, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(0, false), (5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=0 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(0, false), (5, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=9 other=3 last_rows=1 red_at_end=0
+SCAN schedule=[(0, false)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=9 other=3 last_rows=4 red_at_end=0
+SCAN schedule=[(0, true), (0, false)] mounts=40 deleted=19 blocked_by_account=17 longest_blocked_streak=1 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (1, false)] mounts=40 deleted=27 blocked_by_account=0 longest_blocked_streak=0 no_candidate=11 other=2 last_rows=3 red_at_end=0
+SCAN schedule=[(0, true), (1, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (2, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (2, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (3, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (3, true)] mounts=40 deleted=19 blocked_by_account=0 longest_blocked_streak=0 no_candidate=19 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(0, true), (4, false)] mounts=40 deleted=36 blocked_by_account=1 longest_blocked_streak=1 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (4, true)] mounts=40 deleted=19 blocked_by_account=0 longest_blocked_streak=0 no_candidate=19 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(0, true), (5, false)] mounts=40 deleted=31 blocked_by_account=0 longest_blocked_streak=0 no_candidate=7 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(0, true), (5, true)] mounts=40 deleted=19 blocked_by_account=0 longest_blocked_streak=0 no_candidate=19 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(0, true)] mounts=40 deleted=36 blocked_by_account=1 longest_blocked_streak=1 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (2, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=3 red_at_end=0
+SCAN schedule=[(1, false), (2, true)] mounts=40 deleted=35 blocked_by_account=1 longest_blocked_streak=1 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (3, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (3, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=0 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (4, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (4, true)] mounts=40 deleted=28 blocked_by_account=1 longest_blocked_streak=1 no_candidate=8 other=3 last_rows=1 red_at_end=0
+SCAN schedule=[(1, false), (5, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, false), (5, true)] mounts=40 deleted=20 blocked_by_account=0 longest_blocked_streak=0 no_candidate=17 other=3 last_rows=1 red_at_end=0
+SCAN schedule=[(1, false)] mounts=40 deleted=29 blocked_by_account=0 longest_blocked_streak=0 no_candidate=8 other=3 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (1, false)] mounts=40 deleted=0 blocked_by_account=36 longest_blocked_streak=36 no_candidate=2 other=2 last_rows=39 red_at_end=0
+SCAN schedule=[(1, true), (2, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (2, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (3, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (3, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (4, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (5, false)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(1, true), (5, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(1, true)] mounts=40 deleted=36 blocked_by_account=1 longest_blocked_streak=1 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, false), (3, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, false), (3, true)] mounts=40 deleted=20 blocked_by_account=0 longest_blocked_streak=0 no_candidate=18 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, false), (4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, false), (4, true)] mounts=40 deleted=20 blocked_by_account=0 longest_blocked_streak=0 no_candidate=18 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, false), (5, false)] mounts=40 deleted=31 blocked_by_account=0 longest_blocked_streak=0 no_candidate=7 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, false), (5, true)] mounts=40 deleted=19 blocked_by_account=0 longest_blocked_streak=0 no_candidate=19 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, true), (2, false)] mounts=40 deleted=28 blocked_by_account=1 longest_blocked_streak=1 no_candidate=9 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, true), (3, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, true), (3, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, true), (4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(2, true), (4, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, true), (5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, true), (5, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(2, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(3, false), (4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, false), (4, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, false), (5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, false), (5, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(3, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, true), (3, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, true), (4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(3, true), (4, true)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(3, true), (5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(3, true), (5, true)] mounts=40 deleted=19 blocked_by_account=0 longest_blocked_streak=0 no_candidate=19 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(3, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(4, false), (5, false)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(4, false), (5, true)] mounts=40 deleted=20 blocked_by_account=0 longest_blocked_streak=0 no_candidate=18 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(4, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(4, true), (4, false)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(4, true), (5, false)] mounts=40 deleted=28 blocked_by_account=0 longest_blocked_streak=0 no_candidate=10 other=2 last_rows=2 red_at_end=0
+SCAN schedule=[(4, true), (5, true)] mounts=40 deleted=36 blocked_by_account=0 longest_blocked_streak=0 no_candidate=2 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(4, true)] mounts=40 deleted=19 blocked_by_account=9 longest_blocked_streak=1 no_candidate=10 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(5, true), (5, false)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN schedule=[(5, true)] mounts=40 deleted=37 blocked_by_account=0 longest_blocked_streak=0 no_candidate=1 other=2 last_rows=1 red_at_end=0
+SCAN-TOTAL schedules=78 lines=78
+test k1_scan_periodic_schedules ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 11.47s
+

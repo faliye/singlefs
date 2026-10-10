@@ -1,0 +1,552 @@
+badimages BADIMAGE base=u3-n0-b1 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u3-n0-b1 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u3-n0-b1 version=intent mutation=2 target=I-9.6 only_target=true violated=["I-9.6"]
+badimages BADIMAGE base=u3-n0-b1 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+badimages BADIMAGE base=u3-n0-b1 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+badimages BADIMAGE base=u3-n0-b1 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n0-b1 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n0-b1 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n0-b1 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u145-n3-b100 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u145-n3-b100 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u145-n3-b100 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+badimages BADIMAGE base=u145-n3-b100 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+badimages BADIMAGE base=u145-n3-b100 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages left: 4
+badimages right: 2
+badimages BADIMAGE base=u145-n3-b100 version=after_new_inodes mutation=1 target=I-4.7 result=mutation_panicked
+badimages BADIMAGE base=u145-n3-b100 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+badimages BADIMAGE base=u145-n3-b100 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+badimages BADIMAGE base=u145-n3-b100 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u145-n3-b100 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u145-n3-b100 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u145-n3-b100 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n470-b1 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u3-n470-b1 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u3-n470-b1 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+badimages BADIMAGE base=u3-n470-b1 version=first_batch mutation=0 target=I-4.6 only_target=true violated=["I-4.6"]
+badimages BADIMAGE base=u3-n470-b1 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages left: 233
+badimages right: 2
+badimages BADIMAGE base=u3-n470-b1 version=after_new_inodes mutation=1 target=I-4.7 result=mutation_panicked
+badimages BADIMAGE base=u3-n470-b1 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+badimages BADIMAGE base=u3-n470-b1 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+badimages BADIMAGE base=u3-n470-b1 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n470-b1 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n470-b1 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u3-n470-b1 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u1-n1-b144 version=intent mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u1-n1-b144 version=intent mutation=1 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u1-n1-b144 version=intent mutation=2 target=I-9.6 only_target=false violated=[]
+badimages BADIMAGE base=u1-n1-b144 version=first_batch mutation=0 target=I-4.6 result=mutation_panicked
+badimages BADIMAGE base=u1-n1-b144 version=after_new_inodes mutation=0 target=I-9.5 only_target=true violated=["I-9.5"]
+badimages BADIMAGE base=u1-n1-b144 version=after_new_inodes mutation=1 target=I-4.7 only_target=true violated=["I-4.7"]
+badimages BADIMAGE base=u1-n1-b144 version=intent_generic mutation=0 target=I-9.6 only_target=true violated=["I-9.6"]
+badimages BADIMAGE base=u1-n1-b144 version=after_new_inodes_generic mutation=0 target=I-4.7 only_target=true violated=["I-4.7"]
+badimages BADIMAGE base=u1-n1-b144 version=file mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u1-n1-b144 version=file mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u1-n1-b144 version=intent mutation=0 target=I-3.4 only_target=true violated=["I-3.4"]
+badimages BADIMAGE base=u1-n1-b144 version=intent mutation=1 target=I-3.4 only_target=true violated=["I-3.4"]
+count CRASH_COUNT flow=c-del3 base=顺序写@txg4 publishes_in_stream=4 writes=112 segments=16 largest_segment=26 states=89128985
+count CRASH_COUNT flow=c-del1 base=新池新建文件@txg3 publishes_in_stream=2 writes=56 segments=8 largest_segment=26 states=68157453
+count CRASH_COUNT flow=c-empty base=建空inode@txg4 publishes_in_stream=2 writes=56 segments=8 largest_segment=26 states=68157453
+count CRASH_COUNT flow=c-midcreate base=顺序写@txg4 publishes_in_stream=5 writes=139 segments=20 largest_segment=26 states=93323295
+count CRASH_COUNT flow=c-post base=删除步1@txg5 publishes_in_stream=3 writes=81 segments=12 largest_segment=26 states=69206035
+n5-fix-g5-tree Running tests/n5_probe_crashed_unmount_sweep.rs
+n5-fix-g5-tree G5 newest_root_on_device_one=4 versions=[(4, 12), (5, 12), (6, 12)]
+n5-fix-g5-tree test fix_g5_every_version_after_the_newest_root_on_device_one_released_slots_stay_untouched_in_either_warm_up ... ok
+n5-fix-g5-tree test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out
+n5-fix-g5-w1 Running tests/n5_probe_crashed_unmount_sweep.rs
+n5-fix-g5-w1 G5 newest_root_on_device_one=4 versions=[(4, 12), (5, 12), (6, 12)]
+n5-fix-g5-w1 left: [[], [], [1414, 1415, 1416, 1417]]
+n5-fix-g5-w1 right: [[], [], []]
+n5-fix-g5-w1 test fix_g5_every_version_after_the_newest_root_on_device_one_released_slots_stay_untouched_in_either_warm_up ... FAILED
+n5-fix-g5-w1 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out
+n5-fix-g5-w1 exit=101
+n5-fix-g5-w2 Running tests/n5_probe_crashed_unmount_sweep.rs
+n5-fix-g5-w2 G5 newest_root_on_device_one=4 versions=[(4, 12), (5, 12), (6, 12)]
+n5-fix-g5-w2 left: [[1414, 1415], [], []]
+n5-fix-g5-w2 right: [[], [], []]
+n5-fix-g5-w2 test fix_g5_every_version_after_the_newest_root_on_device_one_released_slots_stay_untouched_in_either_warm_up ... FAILED
+n5-fix-g5-w2 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 8 filtered out
+n5-fix-g5-w2 exit=101
+n5-probe-tree-k0123 N5SUM variant=tree k=0 current_txg=3 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-tree-k0123 N5SUM variant=tree k=1 current_txg=4 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-tree-k0123 N5SUM variant=tree k=2 current_txg=5 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=34,35
+n5-probe-tree-k0123 N5SUM variant=tree k=3 current_txg=6 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-tree-k456 N5SUM variant=tree k=4 current_txg=7 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-tree-k456 N5SUM variant=tree k=5 current_txg=8 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=34,35
+n5-probe-tree-k456 N5SUM variant=tree k=6 current_txg=9 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w1-k0123 N5SUM variant=w1 k=0 current_txg=3 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w1-k0123 N5SUM variant=w1 k=1 current_txg=4 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=1,2,3,4,5,6,7,8,9,10,11,12,13,14,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-w1-k0123 N5SUM variant=w1 k=2 current_txg=5 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=26 crash_points_with_bad=32,33 test_check_nonzero_c=32,33,34,35
+n5-probe-w1-k0123 N5SUM variant=w1 k=3 current_txg=6 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=26 crash_points_with_bad=15,16 test_check_nonzero_c=15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w1-k456 N5SUM variant=w1 k=4 current_txg=7 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=1,2,3,4,5,6,7,8,9,10,11,12,13,14,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-w1-k456 N5SUM variant=w1 k=5 current_txg=8 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=26 crash_points_with_bad=32,33 test_check_nonzero_c=32,33,34,35
+n5-probe-w1-k456 N5SUM variant=w1 k=6 current_txg=9 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=26 crash_points_with_bad=15,16 test_check_nonzero_c=15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w2-k0123 N5SUM variant=w2 k=0 current_txg=3 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w2-k0123 N5SUM variant=w2 k=1 current_txg=4 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-w2-k0123 N5SUM variant=w2 k=2 current_txg=5 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=34,35
+n5-probe-w2-k0123 N5SUM variant=w2 k=3 current_txg=6 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=212 crash_points_with_bad=1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16 test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-probe-w2-k456 N5SUM variant=w2 k=4 current_txg=7 mod3=1 crash_points=52 refused=0 warm_up_twice_c=1..52 remount_crash_states=4564 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52
+n5-probe-w2-k456 N5SUM variant=w2 k=5 current_txg=8 mod3=2 crash_points=35 refused=0 warm_up_twice_c=32..35 remount_crash_states=2796 bad_states=0 crash_points_with_bad=- test_check_nonzero_c=34,35
+n5-probe-w2-k456 N5SUM variant=w2 k=6 current_txg=9 mod3=0 crash_points=35 refused=0 warm_up_twice_c=15..31 remount_crash_states=3238 bad_states=90 crash_points_with_bad=15,16 test_check_nonzero_c=17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35
+n5-tests-tree Running tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs
+n5-tests-tree test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_until_its_warm_up_landed_on_every_device ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_narrow_pool_overwritten_three_times_the_next_writable_mount_warming_up_twice_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_in_either_warm_up ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_reading_no_root_on_device_one_and_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device ... ok
+n5-tests-tree test after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads ... ok
+n5-tests-tree test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-tests-w1 Running tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs
+n5-tests-w1 test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_until_its_warm_up_landed_on_every_device ... ok
+n5-tests-w1 test after_a_crashed_unmount_of_a_narrow_pool_overwritten_three_times_the_next_writable_mount_warming_up_twice_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_in_either_warm_up ... FAILED
+n5-tests-w1 test after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor ... ok
+n5-tests-w1 test after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-w1 test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_reading_no_root_on_device_one_and_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-w1 test after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device ... ok
+n5-tests-w1 test after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads ... ok
+n5-tests-w1 left: [[], [], [1416, 1417]]
+n5-tests-w1 right: [[], [], []]
+n5-tests-w1 test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+n5-tests-w1 exit=101
+n5-tests-w2 Running tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs
+n5-tests-w2 test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_until_its_warm_up_landed_on_every_device ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_narrow_pool_overwritten_three_times_the_next_writable_mount_warming_up_twice_writes_no_unit_into_a_slot_the_version_before_the_unmount_released_in_either_warm_up ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_narrow_pool_whose_file_was_shrunk_the_first_write_of_the_next_writable_mount_regrows_it_without_raising_the_floor ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_narrow_pool_whose_deletion_was_continued_the_next_writable_mount_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_narrow_pool_the_next_writable_mount_reading_no_root_on_device_one_and_crashing_in_its_row_publish_keeps_what_device_one_reads ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_four_gibibyte_pool_the_next_writable_mount_hands_over_no_held_slot_once_its_warm_up_landed_on_every_device ... ok
+n5-tests-w2 test after_a_crashed_unmount_of_a_four_gibibyte_pool_remounted_once_the_next_writable_mount_crashing_after_its_thirty_third_write_keeps_what_device_one_reads ... ok
+n5-tests-w2 test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-tree-ignored-rollback Running tests/rollback_by_a_forward_publish.rs
+n5-tree-ignored-rollback test refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-tree-ignored-rollback test after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content ... ok
+n5-tree-ignored-rollback test after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds ... ok
+n5-tree-ignored-rollback test rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write ... ok
+n5-tree-ignored-rollback test with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record ... ok
+n5-tree-ignored-rollback test rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content ... ok
+n5-tree-ignored-rollback test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... FAILED
+n5-tree-ignored-rollback test an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic ... ok
+n5-tree-ignored-rollback test rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write ... ok
+n5-tree-ignored-rollback test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ok
+n5-tree-ignored-rollback test the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation ... ok
+n5-tree-ignored-rollback test with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content ... ok
+n5-tree-ignored-rollback test without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit ... ok
+n5-tree-ignored-rollback test writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge ... ok
+n5-tree-ignored-rollback test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... FAILED
+n5-tree-ignored-rollback test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ok
+n5-tree-ignored-rollback test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... FAILED
+n5-tree-ignored-rollback test result: FAILED. 19 passed; 3 failed; 0 ignored; 0 measured; 1 filtered out
+n5-tree-ignored-rollback exit=101
+n5-w2-ignored Running tests/admission_raises_the_floor_before_refusing.rs
+n5-w2-ignored test at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a_crash_remount_is_admitted_before_acquisition ... ok
+n5-w2-ignored test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 25 filtered out
+n5-w2-ignored Running tests/rollback_by_a_forward_publish.rs
+n5-w2-ignored test refusal_before_any_write_when_allocation_record_tree_root_of_the_third_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test refusal_before_any_write_when_current_account_allocating_the_data_slot_of_the_first_version_under_another_generation_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test refusal_before_any_write_when_allocation_record_tree_root_of_the_first_version_unreadable_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test refusal_before_any_write_when_current_account_without_the_data_unit_of_the_first_version_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test refusal_before_any_write_when_tree_identifiers_of_the_current_version_differ_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test refusal_before_any_write_when_data_unit_of_the_first_version_corrupt_on_device_one_leaves_the_disk_the_allocator_and_the_current_version_unchanged ... ok
+n5-w2-ignored test after_rolling_back_to_the_first_version_the_third_versions_root_is_still_a_candidate_and_rolling_back_to_it_reads_the_third_content ... ok
+n5-w2-ignored test after_rolling_back_to_the_first_version_the_next_overwrite_releases_the_resurrected_units_and_every_invariant_holds ... ok
+n5-w2-ignored test rolling_back_while_a_root_slot_this_process_wrote_reads_not_self_verified_is_refused_before_any_write ... ok
+n5-w2-ignored test with_the_file_version_root_slot_unreadable_the_ring_watermark_still_comes_from_its_journal_record ... ok
+n5-w2-ignored test rolling_back_to_the_first_version_while_mounted_publishes_one_root_carrying_its_state_and_cold_start_reads_the_first_content ... ok
+n5-w2-ignored test an_abandoned_roots_allocation_record_whose_span_runs_past_the_unit_area_is_counted_and_does_not_panic ... ok
+n5-w2-ignored test rolling_back_to_a_missing_root_an_abandoned_root_or_a_root_without_file_is_refused_before_any_write ... ok
+n5-w2-ignored test plain_overwrite_whose_root_slot_write_zeroes_the_oldest_ring_root_leaves_the_pre_recovery_image_red_only_by_what_that_root_alone_referenced ... FAILED
+n5-w2-ignored test torn_tree_table_of_an_abandoned_root_is_counted_and_does_not_fail_the_mount ... ok
+n5-w2-ignored test without_the_shadow_ledger_a_publish_after_a_recovery_reuses_the_abandoned_data_slot_and_the_abandoned_root_reads_a_torn_unit ... ok
+n5-w2-ignored test the_plain_remount_after_a_recovery_that_abandoned_roots_keeps_the_isolation ... ok
+n5-w2-ignored test with_the_shadow_ledger_a_publish_after_a_recovery_keeps_off_the_abandoned_data_slot_and_the_abandoned_root_reads_the_third_content ... ok
+n5-w2-ignored test writable_mount_on_the_newest_root_cannot_reclaim_what_its_own_chain_released_so_the_rehearsal_without_the_release_read_cannot_diverge ... ok
+n5-w2-ignored test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_zeroed_is_resent_in_process_or_replayed_after_a_crash ... FAILED
+n5-w2-ignored test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_refused_before_writing_is_resent_in_process_or_replayed_after_a_crash ... ok
+n5-w2-ignored test the_failed_root_slot_write_of_a_rollback_to_the_oldest_ring_root_torn_after_the_first_half_is_resent_in_process_or_replayed_after_a_crash ... FAILED
+n5-w2-ignored test result: FAILED. 19 passed; 3 failed; 0 ignored; 0 measured; 1 filtered out
+n5-w2-ignored exit=101
+n5-w2-unmount-targets Running tests/a_block_device_error_while_raising_the_floor_for_space_is_handed_up_as_is.rs
+n5-w2-unmount-targets test a_block_device_error_in_the_floor_raise_pushed_by_the_session_is_not_reported_as_no_space ... ok
+n5-w2-unmount-targets test a_block_device_error_in_the_floor_raise_pushed_by_the_mount_fails_the_mount_instead_of_reporting_still_short ... ok
+n5-w2-unmount-targets test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs
+n5-w2-unmount-targets test when_no_valid_root_on_device_one_is_read_during_the_unmount_every_reclaimed_slot_is_held_and_device_one_reads_back_its_live_file ... ok
+n5-w2-unmount-targets test after_the_second_unmount_publish_of_a_narrow_pool_remounted_once_a_lone_surviving_device_reads_back_its_live_file ... ok
+n5-w2-unmount-targets test after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_before ... ok
+n5-w2-unmount-targets test after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before ... ok
+n5-w2-unmount-targets test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/admission_raises_the_floor_before_refusing.rs
+n5-w2-unmount-targets test a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_continuation_step_failing_after_both_the_admission_and_the_continuation_raised_the_floor_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_writes_of_the_mounts_publishes ... ok
+n5-w2-unmount-targets test a_continuation_step_failing_on_its_journal_record_write_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_back_every_landed_write ... ok
+n5-w2-unmount-targets test an_unlink_whose_last_batch_and_the_floor_raise_pushed_for_it_both_find_no_unblocked_slot_hands_back_no_space_with_the_intent_published ... ok
+n5-w2-unmount-targets test an_unlink_whose_intent_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+n5-w2-unmount-targets test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... ok
+n5-w2-unmount-targets test an_unlink_whose_last_batch_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+n5-w2-unmount-targets test known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged ... ok
+n5-w2-unmount-targets test after_a_mount_whose_continuation_stays_short_the_next_mount_is_refused_by_the_placement_before_acquisition_writing_nothing ... ok
+n5-w2-unmount-targets test root_slot_already_unreadable_at_mount_is_taken_as_a_possible_root_and_holds_the_admission_ceiling_at_its_txg ... ok
+n5-w2-unmount-targets test writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_before_acquisition_with_the_disk_unchanged ... ok
+n5-w2-unmount-targets test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... ok
+n5-w2-unmount-targets test a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims ... ok
+n5-w2-unmount-targets test a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version ... ok
+n5-w2-unmount-targets test after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor ... ok
+n5-w2-unmount-targets test after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes ... ok
+n5-w2-unmount-targets test mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount ... ok
+n5-w2-unmount-targets test a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue ... ok
+n5-w2-unmount-targets test an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version ... ok
+n5-w2-unmount-targets test crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck ... ok
+n5-w2-unmount-targets test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/checker_judges_reference_intervals_and_every_new_root_segment_field.rs
+n5-w2-unmount-targets test a_last_record_whose_allocation_record_tree_root_pointer_differs_from_its_root_reddens_the_new_root_segment_invariant ... ok
+n5-w2-unmount-targets test a_last_record_whose_unmount_marker_differs_from_its_root_reddens_the_new_root_segment_invariant ... ok
+n5-w2-unmount-targets test a_record_whose_unmount_marker_has_bits_other_than_bit_zero_is_dropped_by_the_checker_as_by_the_recovery ... ok
+n5-w2-unmount-targets test a_last_record_whose_instance_table_pointer_differs_from_its_root_reddens_the_new_root_segment_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_shared_by_two_versions_is_judged_against_the_txg_of_each_version ... ok
+n5-w2-unmount-targets test a_unit_new_in_an_overwrite_born_at_the_txg_of_the_version_before_reddens_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test a_zero_unit_publish_sharing_the_tree_table_and_the_mapping_root_holds_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test a_user_visible_tree_whose_root_pointer_was_born_at_the_txg_of_the_version_before_reddens_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test in_a_hole_the_instance_table_rows_do_not_bridge_a_fixed_point_unit_born_before_the_hole_reddens_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test a_hole_the_instance_table_rows_bridge_judges_the_user_visible_units_too ... ok
+n5-w2-unmount-targets test a_rollback_inheriting_the_user_visible_trees_of_its_target_whole_holds_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test in_a_hole_the_instance_table_rows_do_not_bridge_a_user_visible_unit_born_before_the_hole_is_not_judged ... ok
+n5-w2-unmount-targets test a_fixed_point_tree_of_the_rollback_pointed_back_at_the_rollback_target_reddens_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test a_unit_in_an_inherited_user_visible_tree_born_after_its_root_reddens_the_reference_interval_invariant ... ok
+n5-w2-unmount-targets test the_row_publish_record_carries_every_new_root_segment_field_of_its_root ... ok
+n5-w2-unmount-targets test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/checker_known_bad_images.rs
+n5-w2-unmount-targets test a_device_short_of_self_verified_system_configuration_slots_is_reported_aside_while_the_tail_slot_invariant_holds ... ok
+n5-w2-unmount-targets test a_data_pointer_with_no_location_on_one_device_skips_that_device_and_the_first_data_unit_invariant_holds ... ok
+n5-w2-unmount-targets test a_file_version_whose_root_record_carries_a_non_zero_allocation_record_tree_root_reddens_the_disjointness_invariant_besides_the_walk ... ok
+n5-w2-unmount-targets test a_record_of_another_instance_at_the_same_counter_does_not_hide_a_broken_overwrite_record_from_the_replayed_version_invariant ... ok
+n5-w2-unmount-targets test a_first_record_of_a_publish_whose_ordinal_is_not_one_stops_the_replay_before_it ... ok
+n5-w2-unmount-targets test a_last_record_without_its_commit_marker_stops_the_replay_before_it ... ok
+n5-w2-unmount-targets test a_readable_record_of_the_same_publish_after_the_last_record_flag_stops_the_replay_before_it ... ok
+n5-w2-unmount-targets test a_publish_of_one_record_more_than_the_in_flight_limit_reddens_only_the_ring_geometry_invariant ... ok
+n5-w2-unmount-targets test a_record_of_another_instance_at_the_same_counter_on_the_first_device_does_not_hide_the_overwrite_record_from_the_replay ... ok
+n5-w2-unmount-targets test a_publish_of_exactly_the_in_flight_limit_of_records_holds_the_ring_geometry_invariant ... ok
+n5-w2-unmount-targets test a_replay_stops_at_the_in_flight_limit_and_a_publish_longer_than_it_is_not_applied ... ok
+n5-w2-unmount-targets test a_record_one_counter_past_the_anchor_successor_stops_the_replay_before_it ... ok
+n5-w2-unmount-targets test a_replay_stopped_by_a_named_unit_that_does_not_verify_leaves_the_replayed_version_invariant_not_applicable ... ok
+n5-w2-unmount-targets test a_record_whose_back_chain_does_not_match_its_predecessor_stops_the_replay_before_it ... ok
+n5-w2-unmount-targets test a_record_whose_back_chain_does_not_match_is_not_the_version_the_next_mount_applies_first ... ok
+n5-w2-unmount-targets test a_replayed_version_whose_tree_table_does_not_read_back_reddens_only_the_replayed_version_invariant ... ok
+n5-w2-unmount-targets test a_root_slot_whose_algorithm_type_is_one_reddens_only_the_header_checksum_coverage_invariant ... ok
+n5-w2-unmount-targets test a_system_configuration_slot_whose_encryption_type_is_on_reddens_only_its_own_invariant_and_every_other_is_not_applicable ... ok
+n5-w2-unmount-targets test a_tree_table_that_does_not_read_back_leaves_the_first_data_unit_invariant_partially_judged ... ok
+n5-w2-unmount-targets test a_root_slot_whose_mac_has_a_non_zero_byte_reddens_only_the_header_checksum_coverage_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_whose_allocation_entry_carries_an_unregistered_kind_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_whose_deadlist_entry_became_a_second_allocation_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_whose_livelist_entry_became_a_second_extent_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_root_slot_whose_nonce_has_a_non_zero_byte_reddens_only_the_header_checksum_coverage_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_whose_logged_operations_entry_became_a_second_extent_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_whose_two_entries_swapped_their_kinds_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_without_its_allocation_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_without_its_deadlist_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test a_tree_table_without_its_logged_operations_entry_reddens_the_tree_table_ordering_invariant_besides_the_walk ... ok
+n5-w2-unmount-targets test an_allocation_record_tree_that_does_not_read_back_leaves_the_disjointness_invariant_partially_judged ... ok
+n5-w2-unmount-targets test a_wrong_release_generation_is_still_reddened_when_only_a_root_not_later_than_the_last_one_referencing_it_is_incomplete ... ok
+n5-w2-unmount-targets test an_allocation_record_tree_that_does_not_read_back_leaves_the_first_data_unit_invariant_partially_judged ... ok
+n5-w2-unmount-targets test an_allocation_record_tree_of_the_newest_version_that_does_not_read_back_leaves_the_disjointness_invariant_partially_judged_while_the_previous_version_reads_back ... ok
+n5-w2-unmount-targets test an_allocation_record_whose_start_slot_header_does_not_verify_is_not_judged_by_the_allocation_generation_invariant ... ok
+n5-w2-unmount-targets test an_empty_leaf_hung_below_the_root_of_the_allocation_record_tree_reddens_only_the_block_identity_invariant ... ok
+n5-w2-unmount-targets test an_extent_tree_that_does_not_read_back_leaves_the_first_data_unit_invariant_partially_judged ... ok
+n5-w2-unmount-targets test an_instance_table_pointer_whose_birth_txg_differs_from_the_instance_table_header_reddens_only_the_birth_identity_invariant ... ok
+n5-w2-unmount-targets test an_allocation_record_whose_span_covers_the_next_record_reddens_only_the_disjointness_invariant ... ok
+n5-w2-unmount-targets test an_extent_offset_on_the_container_pointer_of_the_tombstone_tree_root_reddens_only_the_pointer_head_invariant ... ok
+n5-w2-unmount-targets test an_entry_width_that_is_not_the_field_table_width_reddens_only_the_entry_width_invariant ... ok
+n5-w2-unmount-targets test central_mapping_root_whose_header_tree_differs_from_its_root_pointer_birth_tree_reddens_only_the_tree_identifier_invariant ... ok
+n5-w2-unmount-targets test an_unreleased_allocation_record_that_kept_the_previous_generation_reddens_only_the_allocation_generation_invariant ... ok
+n5-w2-unmount-targets test devices_whose_own_device_numbers_are_swapped_redden_only_the_own_device_number_invariant ... ok
+n5-w2-unmount-targets test a_journal_record_whose_back_chain_does_not_match_is_not_walked_as_a_version_a_recovery_applied ... ok
+n5-w2-unmount-targets test each_system_configuration_geometry_field_the_reader_refuses_reddens_only_its_own_invariant_naming_the_refused_field ... ok
+n5-w2-unmount-targets test each_ring_geometry_and_root_slot_alignment_bad_image_reddens_only_its_own_invariant ... ok
+n5-w2-unmount-targets test each_release_generation_and_tree_table_birth_bad_image_reddens_only_its_own_invariant_after_the_overwrite ... ok
+n5-w2-unmount-targets test an_allocation_generation_past_its_unit_birth_in_the_version_only_its_journal_record_carries_reddens_the_allocation_generation_invariant_before_the_mount ... ok
+n5-w2-unmount-targets test each_publish_ordinal_bad_image_reddens_only_the_publish_ordinal_invariant_on_its_registered_criteria ... ok
+n5-w2-unmount-targets test inode_record_blocks_other_than_the_logical_length_in_512_byte_blocks_reddens_only_the_blocks_invariant ... ok
+n5-w2-unmount-targets test journal_ring_geometry_fields_that_disagree_redden_only_the_ring_geometry_invariant_and_every_other_is_not_applicable ... ok
+n5-w2-unmount-targets test an_instance_table_row_whose_published_txg_reaches_the_root_referencing_it_reddens_only_the_instance_table_row_invariant ... ok
+n5-w2-unmount-targets test each_pointer_journal_and_generation_field_bad_image_reddens_only_its_own_invariant ... ok
+n5-w2-unmount-targets test each_transaction_boundary_bad_image_reddens_only_its_own_invariant_on_its_registered_criteria ... ok
+n5-w2-unmount-targets test no_self_verified_system_configuration_slot_on_any_device_reddens_the_tail_slot_invariant_and_every_other_is_not_applicable ... ok
+n5-w2-unmount-targets test live_unit_recorded_as_deferred_reddens_only_the_allocated_minus_deferred_invariant ... ok
+n5-w2-unmount-targets test erasing_a_unit_only_the_version_applied_by_its_journal_record_references_reddens_the_reuse_invariants ... ok
+n5-w2-unmount-targets test on_a_synthetic_base_with_an_empty_defer_queue_one_deferred_slot_reddens_the_allocated_minus_deferred_invariant ... ok
+n5-w2-unmount-targets test an_extent_offset_on_the_container_pointer_of_the_lineage_tree_root_reddens_only_the_pointer_head_invariant ... ok
+n5-w2-unmount-targets test pure_leak_that_keeps_free_plus_allocated_equal_to_the_unit_area_reddens_only_the_allocated_statistic_invariant ... ok
+n5-w2-unmount-targets test one_publish_over_two_records_with_the_last_record_flag_on_the_second_holds_the_publish_ordinal_invariant ... ok
+n5-w2-unmount-targets test one_transaction_over_two_records_with_the_commit_marker_on_the_last_holds_both_transaction_boundary_invariants ... ok
+n5-w2-unmount-targets test birth_txg_that_the_line_after_a_rollback_records_differently_from_the_rollback_target_reddens_only_the_same_line_and_the_every_readable_root_birth_invariants ... ok
+n5-w2-unmount-targets test region_count_past_the_region_device_fields_is_refused_by_the_geometry_reader ... ok
+n5-w2-unmount-targets test marked_root_raising_the_floor_above_the_previous_root_reddens_only_the_rollback_floor_invariant ... ok
+n5-w2-unmount-targets test reused_unit_referenced_only_by_the_newest_root_makes_the_reuse_invariant_red ... ok
+n5-w2-unmount-targets test journal_record_that_no_mount_has_applied_yet_is_not_walked_and_every_invariant_holds ... ok
+n5-w2-unmount-targets test rewriting_an_older_root_rechains_the_later_record_of_its_instance_and_every_verdict_stays_as_on_the_clean_image ... ok
+n5-w2-unmount-targets test self_verified_system_configuration_slots_no_reader_can_choose_leave_every_invariant_not_applicable ... ok
+n5-w2-unmount-targets test repeated_transaction_number_in_one_instance_reddens_the_uncut_transaction_invariant_and_only_when_separated_the_transaction_number_invariant ... ok
+n5-w2-unmount-targets test system_configuration_slot_generations_one_apart_in_each_others_slot_redden_only_the_rotation_invariant_on_the_parity ... ok
+n5-w2-unmount-targets test system_configuration_slot_generations_three_apart_in_their_own_slots_redden_only_the_rotation_invariant_on_the_difference ... ok
+n5-w2-unmount-targets test the_allocated_statistic_violation_carries_every_mechanism_field_the_known_red_forms_read ... ok
+n5-w2-unmount-targets test the_merge_and_the_back_chain_bad_images_redden_only_their_own_invariant ... ok
+n5-w2-unmount-targets test the_birth_identity_bad_images_redden_only_their_own_invariant ... ok
+n5-w2-unmount-targets test the_root_ring_health_invariant_reddens_when_the_previous_generation_is_gone_but_not_right_after_mkfs ... ok
+n5-w2-unmount-targets test the_tree_table_after_the_overwrite_whose_deadlist_entry_became_a_second_allocation_entry_reddens_only_the_tree_table_ordering_invariant ... ok
+n5-w2-unmount-targets test every_root_carrying_the_raised_floor_unreadable_keeps_the_candidate_invariants_green_because_the_checker_reads_the_system_configuration_floor ... ok
+n5-w2-unmount-targets test birth_txg_recorded_differently_only_on_the_timeline_cut_off_by_a_recovery_holds_the_same_line_invariant_and_reddens_only_the_every_readable_root_invariant ... ok
+n5-w2-unmount-targets test version_applied_only_by_its_journal_record_is_walked_so_the_allocated_statistic_holds_and_the_leak_on_top_still_reddens_it ... ok
+n5-w2-unmount-targets test version_applied_only_by_its_journal_record_leaves_the_walk_once_the_rollback_floor_is_raised_past_it ... ok
+n5-w2-unmount-targets test release_generations_hidden_behind_a_later_incomplete_root_are_skipped_and_the_release_generation_invariant_is_not_applicable ... ok
+n5-w2-unmount-targets test release_generation_outside_its_interval_on_the_second_page_of_the_replaced_instance_table_chain_reddens_the_release_generation_invariant ... ok
+n5-w2-unmount-targets test published_nodes_behind_an_intermediate_row_still_count_against_the_tree_identifier_watermark ... ok
+n5-w2-unmount-targets test version_applied_only_by_its_journal_record_walks_the_instance_table_of_the_root_it_was_applied_on_even_below_the_floor ... ok
+n5-w2-unmount-targets test one_device_whose_system_configuration_floor_is_below_a_root_on_it_reddens_only_the_system_configuration_floor_invariant ... ok
+n5-w2-unmount-targets test version_applied_only_by_its_journal_record_leaves_the_walk_once_the_root_ring_has_turned_past_it_and_the_mount_reclaimed_its_units ... ok
+n5-w2-unmount-targets test the_clean_image_holds_every_invariant_and_each_mutation_violates_its_target ... ok
+n5-w2-unmount-targets test raising_the_floor_above_its_ceiling_reddens_only_the_rollback_floor_invariant ... ok
+n5-w2-unmount-targets test result: ok. 89 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/entries_after_a_writable_mount_refuse_a_device_without_a_self_verified_system_configuration.rs
+n5-w2-unmount-targets test the_session_refusal_reads_the_two_system_configuration_slots_of_each_device_and_writes_nothing ... ok
+n5-w2-unmount-targets test raising_the_floor_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_on_every_raise_entry ... ok
+n5-w2-unmount-targets test rolling_back_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_for_the_current_and_an_older_target ... ok
+n5-w2-unmount-targets test unmount_with_device_one_replaced_by_device_one_of_another_pool_is_still_refused_when_choosing_the_system_configuration ... ok
+n5-w2-unmount-targets test the_session_refuses_to_publish_with_device_one_replaced_by_device_one_of_another_pool ... ok
+n5-w2-unmount-targets test the_session_refuses_to_publish_with_device_one_replaced_by_a_blank_disk_before_any_write ... ok
+n5-w2-unmount-targets test unmount_with_device_one_replaced_by_a_blank_disk_is_refused_before_any_write_and_the_real_disk_still_unmounts ... ok
+n5-w2-unmount-targets test a_device_with_one_of_its_two_system_configuration_slots_corrupted_is_still_visible_to_the_session_and_to_unmount ... ok
+n5-w2-unmount-targets test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/entries_after_a_writable_mount_refuse_other_parameters_and_device_tables_before_any_write.rs
+n5-w2-unmount-targets test the_pool_of_a_session_without_a_mount_is_read_from_the_disk_and_a_disagreeing_device_table_is_refused ... ok
+n5-w2-unmount-targets test pushing_a_floor_raise_with_another_filesystem_identifier_is_refused_before_the_budget_is_judged ... ok
+n5-w2-unmount-targets test unmounting_with_a_device_identity_handed_in_twice_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test raising_the_floor_with_other_parameters_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test raising_the_floor_to_the_admission_ceiling_with_a_third_device_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test the_session_refuses_a_device_table_other_than_the_one_of_its_mount_before_any_write ... ok
+n5-w2-unmount-targets test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/entries_after_mount_refuse_swapped_or_behind_devices.rs
+n5-w2-unmount-targets test a_floor_raise_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_device_one_holding_the_publish_root_taken_before_its_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_device_zero_holding_the_publish_root_in_region_two_taken_before_its_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_session_publish_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_session_publish_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused ... ok
+n5-w2-unmount-targets test a_thread_cap_of_zero_for_the_swept_user_steps_panics_instead_of_taking_the_default - should panic ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_floor_raise_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_normal_unmount_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot ... ok
+n5-w2-unmount-targets test a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_device_one_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_corrupted_reading_of_its_root_slot ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_device_zero_whose_ring_slot_in_region_two_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_the_root_device_taken_before_the_publish_root_slot_write_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_writable_mount_onto_the_root_device_taken_after_the_publish_root_slot_write_whose_root_slot_fails_two_reads_in_a_row_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test an_unreadable_thread_cap_for_the_swept_user_steps_panics_instead_of_falling_back_to_the_default - should panic ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_the_root_device_taken_after_the_publish_root_slot_write_is_not_refused_for_one_transient_read_error_of_its_root_slot ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_the_root_device_whose_ring_slot_holds_the_root_of_the_previous_lap_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_floor_raise_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_writable_mount_onto_the_root_device_taken_before_the_publish_root_slot_write_applies_the_publish_record_and_mounts ... ok
+n5-w2-unmount-targets test a_normal_unmount_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_session_publish_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test an_administrator_rollback_with_the_two_device_bodies_swapped_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test an_administrator_rollback_onto_a_stale_snapshot_of_device_one_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test a_device_left_with_one_self_verified_system_configuration_slot_is_not_refused_by_any_entry ... ok
+n5-w2-unmount-targets test stale_snapshot_substitution_is_refused_by_every_entry_over_the_swept_user_steps ... ok
+n5-w2-unmount-targets test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/instance_table_sweep_at_the_end_of_a_writable_mount.rs
+n5-w2-unmount-targets test a_sweep_on_a_version_without_file_is_not_supported_and_writes_nothing ... ok
+n5-w2-unmount-targets test the_background_sweep_with_a_device_missing_deletes_no_row ... ok
+n5-w2-unmount-targets test a_sweep_publish_refused_for_its_placement_deletes_no_row_and_the_mount_stays_writable ... ok
+n5-w2-unmount-targets test a_forged_head_inside_the_content_of_a_data_unit_is_claimed_by_the_unit_and_not_erased ... ok
+n5-w2-unmount-targets test the_product_configuration_does_not_sweep_a_table_at_or_below_the_threshold ... ok
+n5-w2-unmount-targets test a_read_failure_on_one_placement_deletes_no_row_and_erases_no_head ... ok
+n5-w2-unmount-targets test a_head_inside_a_unit_still_allocated_in_the_account_of_a_ring_root_is_skipped_and_not_erased ... ok
+n5-w2-unmount-targets test the_background_sweep_rereads_every_head_before_erasing_and_deletes_no_row_when_a_slot_was_allocated_after_the_judgement ... ok
+n5-w2-unmount-targets test the_row_of_a_dead_instance_is_deleted_after_its_roots_left_the_ring_and_its_unpublished_heads_are_erased ... ok
+n5-w2-unmount-targets test a_device_error_on_the_reread_before_erasing_deletes_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance ... ok
+n5-w2-unmount-targets test zeros_read_back_on_the_reread_before_erasing_delete_no_row_and_the_next_sweep_leaves_no_orphan_of_the_deleted_instance ... ok
+n5-w2-unmount-targets test sweeping_a_periodic_schedule_of_unmounted_and_crashed_mounts_keeps_the_instance_table_short ... ok
+n5-w2-unmount-targets test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/model_answers_unmount_with_the_floor_at_the_current_version.rs
+n5-w2-unmount-targets test unmount_on_a_version_without_trees_writes_nothing_and_the_model_answers_zero_roots_and_agrees ... ok
+n5-w2-unmount-targets test unmount_on_an_overwrite_at_txg_four_pushes_three_empty_publishes_carrying_floor_four_and_the_model_agrees ... ok
+n5-w2-unmount-targets test an_unmount_whose_roots_carry_the_floor_of_the_current_version_instead_of_its_txg_is_reported_at_the_rollback_floor ... ok
+n5-w2-unmount-targets test unmount_on_the_first_file_at_txg_three_pushes_two_empty_publishes_carrying_floor_three_and_the_model_agrees ... ok
+n5-w2-unmount-targets test an_unmount_that_pushes_empty_publishes_on_a_version_without_trees_is_reported_at_the_publish_count ... ok
+n5-w2-unmount-targets test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs
+n5-w2-unmount-targets test a_floor_raise_pushed_inside_the_continuation_is_located_between_the_continuation_steps ... ok
+n5-w2-unmount-targets test a_mapping_root_written_non_zero_by_a_mount_on_a_pool_without_file_is_red ... ok
+n5-w2-unmount-targets test a_mount_taking_instance_two_on_a_pool_without_file_writes_a_non_zero_allocation_record_tree_root ... ok
+n5-w2-unmount-targets test a_deleted_inodes_root_pointer_that_moved_with_a_mount_that_did_not_continue_is_red ... ok
+n5-w2-unmount-targets test a_mount_that_raises_no_floor_keeps_the_effective_floor_and_writes_it_into_its_root ... ok
+n5-w2-unmount-targets test a_journal_instance_of_the_system_configuration_other_than_the_instance_of_the_root_is_red ... ok
+n5-w2-unmount-targets test a_journal_tail_past_every_record_in_the_ring_of_a_second_crash_image_is_red ... ok
+n5-w2-unmount-targets test a_journal_tail_below_the_one_on_the_crash_image_after_a_second_crash_is_red ... ok
+n5-w2-unmount-targets test a_journal_tail_below_the_highest_record_counter_in_the_ring_after_a_mount_and_one_publish_is_red ... ok
+n5-w2-unmount-targets test a_non_zero_allocation_record_tree_root_after_a_mount_on_a_file_version_is_red ... ok
+n5-w2-unmount-targets test a_recovery_after_the_mount_that_applies_a_record_is_red ... ok
+n5-w2-unmount-targets test a_checkpoint_txg_that_does_not_clear_the_newest_record_of_the_crash_image_is_red ... ok
+n5-w2-unmount-targets test a_second_crash_recovering_content_other_than_the_first_version_is_red ... ok
+n5-w2-unmount-targets test a_second_crash_right_after_the_acquisition_recovers_the_first_version_field_by_field ... ok
+n5-w2-unmount-targets test a_tree_identifier_watermark_that_moved_with_the_mount_is_red ... ok
+n5-w2-unmount-targets test an_effective_floor_that_moved_although_the_mount_raised_none_is_red ... ok
+n5-w2-unmount-targets test an_immutable_configuration_with_another_device_count_after_the_mount_is_red ... ok
+n5-w2-unmount-targets test an_inode_tree_root_pointer_that_moved_with_the_mount_is_red ... ok
+n5-w2-unmount-targets test an_instance_generation_one_too_high_after_the_mount_is_red ... ok
+n5-w2-unmount-targets test after_a_mount_on_a_pool_left_by_an_unmount_the_unmount_marker_is_not_written_by_the_unmount_sequence ... ok
+n5-w2-unmount-targets test after_a_mount_that_continued_the_deletion_the_two_tree_root_pointers_are_those_of_its_last_continuation_step ... ok
+n5-w2-unmount-targets test floor_raises_pushed_by_both_the_admission_and_the_continuation_are_located_from_the_first_admission_raise ... ok
+n5-w2-unmount-targets test floor_raises_pushed_by_the_mount_admission_are_located_before_the_continuation_that_follows_them ... ok
+n5-w2-unmount-targets test flipping_one_byte_of_the_mapping_root_range_on_a_pool_without_file_reddens_its_row ... ok
+n5-w2-unmount-targets test flipping_one_byte_of_each_compared_range_of_the_three_field_byte_tables_reddens_its_row ... ok
+n5-w2-unmount-targets test an_instance_table_row_whose_applied_transaction_is_dropped_is_red ... ok
+n5-w2-unmount-targets test an_unmount_marker_after_the_mount_is_red ... ok
+n5-w2-unmount-targets test posix_content_of_the_version_before_the_publish_after_the_mount_is_the_content_recovered_from_the_crash_image ... ok
+n5-w2-unmount-targets test posix_content_that_differs_from_the_crash_image_is_red ... ok
+n5-w2-unmount-targets test the_first_mount_of_a_new_pool_takes_one_above_every_instance_on_the_crash_image ... ok
+n5-w2-unmount-targets test instance_table_rows_follow_the_recovery_rule_when_the_crash_image_is_rebuilt_from_a_record ... ok
+n5-w2-unmount-targets test a_mount_whose_continuation_raised_the_floor_leaves_the_effective_floor_at_the_last_one_the_continuation_raised_to ... ok
+n5-w2-unmount-targets test the_immutable_configuration_except_this_device_is_the_same_after_a_mount_alone ... ok
+n5-w2-unmount-targets test the_journal_instance_of_the_system_configuration_after_a_mount_alone_is_the_instance_of_its_root ... ok
+n5-w2-unmount-targets test the_checkpoint_txg_lies_above_every_root_and_record_of_a_crash_image_rebuilt_from_a_record ... ok
+n5-w2-unmount-targets test the_journal_tail_after_a_mount_and_one_publish_is_the_highest_record_counter_in_the_ring ... ok
+n5-w2-unmount-targets test the_three_field_byte_tables_cover_the_root_record_the_system_configuration_and_a_tree_table_entry_end_to_end ... ok
+n5-w2-unmount-targets test the_mapping_root_stays_all_zero_after_a_mount_alone_on_a_pool_without_file ... ok
+n5-w2-unmount-targets test a_mount_that_raises_the_floor_leaves_the_effective_floor_at_the_last_one_it_raised_to ... ok
+n5-w2-unmount-targets test the_runtime_configuration_after_a_mount_alone_is_the_built_in_default_written_in_the_clauses ... ok
+n5-w2-unmount-targets test the_tree_identifier_watermark_is_unchanged_by_a_mount_alone ... ok
+n5-w2-unmount-targets test the_tree_table_entry_root_pointers_before_the_publish_after_the_mount_are_those_of_the_crash_image ... ok
+n5-w2-unmount-targets test the_recovery_after_the_mount_applies_no_record_even_when_the_crash_image_was_rebuilt_from_one ... ok
+n5-w2-unmount-targets test a_second_crash_after_the_warm_up_judges_the_floor_unchanged_and_one_after_the_first_floor_raise_write_leaves_it_unjudged ... ok
+n5-w2-unmount-targets test an_effective_floor_other_than_the_last_one_the_mount_raised_to_is_red ... ok
+n5-w2-unmount-targets test a_mount_whose_floor_raises_are_not_in_the_handed_writes_leaves_the_floor_of_every_second_crash_unjudged ... ok
+n5-w2-unmount-targets test the_floor_raise_boundary_is_located_by_position_when_every_system_configuration_write_carries_a_higher_effective_floor ... ok
+n5-w2-unmount-targets test the_floor_raise_boundary_is_not_taken_early_when_an_earlier_system_configuration_write_carries_the_raised_floor ... ok
+n5-w2-unmount-targets test result: ok. 48 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window.rs
+n5-w2-unmount-targets test a_remount_over_a_root_ring_hole_left_by_a_journal_applied_version_keeps_an_old_floor_raise_within_its_ceiling ... ok
+n5-w2-unmount-targets test an_unmount_sequence_root_raising_the_floor_above_the_previous_root_inside_both_windows_still_reddens_the_rollback_floor_invariant ... ok
+n5-w2-unmount-targets test an_unmount_sequence_root_after_a_hole_one_revolution_later_is_not_judged_against_the_old_root_left_in_the_hole ... ok
+n5-w2-unmount-targets test a_floor_raised_above_the_ceiling_of_the_roots_inside_the_window_still_reddens_the_rollback_floor_invariant ... ok
+n5-w2-unmount-targets test a_remount_over_a_root_ring_hole_left_by_a_withheld_row_publish_keeps_an_old_floor_raise_within_its_ceiling ... ok
+n5-w2-unmount-targets test a_remount_over_a_root_ring_hole_whose_withheld_root_its_record_applies_keeps_an_old_floor_raise_within_its_ceiling ... ok
+n5-w2-unmount-targets test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_no_valid_root_is_read.rs
+n5-w2-unmount-targets test a_hook_before_the_root_ring_reread_failing_that_reread_too_refuses_the_writable_mount_before_any_write ... ok
+n5-w2-unmount-targets test the_allocator_rebuild_pass_and_its_reread_both_failing_refuse_the_writable_mount_before_any_write ... ok
+n5-w2-unmount-targets test only_the_allocator_rebuild_pass_failing_and_a_crash_before_the_warm_up_root_lands_on_device_zero_keep_what_device_zero_reads ... ok
+n5-w2-unmount-targets test a_remount_without_faults_does_not_reread_the_root_ring_and_reads_each_slot_as_often_as_before ... ok
+n5-w2-unmount-targets test only_the_allocator_rebuild_pass_failing_rereads_the_ring_and_hands_over_what_a_remount_without_faults_hands_over ... ok
+n5-w2-unmount-targets test a_reread_still_failing_on_device_one_hands_over_what_a_rebuild_pass_failing_only_on_device_one_hands_over ... ok
+n5-w2-unmount-targets test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/rebuilt_root_takes_every_new_root_segment_field_from_the_record.rs
+n5-w2-unmount-targets test a_root_rebuilt_from_the_second_unmount_publish_record_takes_the_unmount_marker_from_the_record ... ok
+n5-w2-unmount-targets test a_root_rebuilt_from_a_first_file_record_over_a_version_that_wrote_a_row_takes_the_empty_allocation_record_tree_root_from_the_record ... ok
+n5-w2-unmount-targets test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/rollback_by_a_forward_publish.rs
+n5-w2-unmount-targets test rolling_back_to_the_first_version_writes_its_units_in_one_segment_before_the_records_the_root_and_the_system_configuration ... ok
+n5-w2-unmount-targets test result: ok. 1 passed; 0 failed; 22 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence.rs
+n5-w2-unmount-targets test a_root_rebuilt_from_both_records_of_the_unmount_sequence_takes_the_unmount_marker_from_the_record ... ok
+n5-w2-unmount-targets test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n5-w2-unmount-targets Running tests/writable_mount_of_a_formatted_pool.rs
+n5-w2-unmount-targets test first_file_version_that_cannot_judge_or_issue_its_trees_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test first_file_version_whose_root_and_previous_record_disagree_is_refused_before_any_write ... ok
+n5-w2-unmount-targets test transient_system_configuration_read_errors_between_the_refusal_and_the_acquisition_refuse_before_any_write ... ok
+n5-w2-unmount-targets test formatted_pool_mount_starting_after_a_leftover_record_publishes_from_the_next_txg ... ok
+n5-w2-unmount-targets test writable_mount_after_a_crash_between_warm_up_and_the_first_file_writes_the_row_for_the_previous_instance ... ok
+n5-w2-unmount-targets test root_record_of_a_file_version_leaves_the_allocation_record_tree_pointer_zero ... ok
+n5-w2-unmount-targets test a_formatted_pool_mounted_twice_writes_the_row_then_the_first_file_and_reads_it_back_cold ... ok
+n5-w2-unmount-targets test writable_mount_after_a_crash_right_after_acquiring_an_instance_writes_a_row_for_the_burnt_instance ... ok
+n5-w2-unmount-targets test the_first_file_version_after_a_recovery_dropped_an_earlier_one_issues_its_trees_above_the_ring_watermark_and_reads_back ... ok
+n5-w2-unmount-targets test the_third_writable_mount_keeps_the_instance_table_that_the_row_publish_swapped_out_out_of_the_free_pool ... ok
+n5-w2-unmount-targets test crash_recovery_abandoning_the_unwitnessed_row_publish_of_the_version_without_file_keeps_its_tree_table_and_allocation_record_tree_root_isolated_once_the_floor_passes_them ... ok
+n5-w2-unmount-targets test a_third_writable_mount_on_a_version_whose_rows_were_written_is_refused_before_touching_the_allocator ... ok
+n5-w2-unmount-targets test writable_mount_of_a_formatted_pool_takes_instance_one_publishes_two_zero_unit_roots_and_the_first_file_version_reads_back_cold ... ok
+n5-w2-unmount-targets test crash_recovery_that_cannot_read_the_witnessed_row_publish_of_the_version_without_file_chooses_it_when_the_read_fault_is_lifted_before_the_one_reread ... ok
+n5-w2-unmount-targets test crash_recovery_that_cannot_read_the_witnessed_row_publish_of_the_version_without_file_refuses_writable_when_the_read_fault_persists_through_the_one_reread ... ok
+n5-w2-unmount-targets test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n7-c2cap32-core-lib Running unittests src/lib.rs
+n7-c2cap32-core-lib test unlink::tests::a_deletion_batch_cut_on_a_leaf_boundary_carries_the_kept_leaf_as_the_new_lower_root ... ok
+n7-c2cap32-core-lib test unlink::tests::a_deletion_batch_down_to_one_data_unit_drops_the_whole_lower_segment ... ok
+n7-c2cap32-core-lib test unlink::tests::a_file_of_at_most_one_batch_goes_straight_to_the_final_batch ... ok
+n7-c2cap32-core-lib test unlink::tests::a_deletion_batch_rewrites_only_the_cut_lower_leaf_and_its_ancestors ... ok
+n7-c2cap32-core-lib test unlink::tests::the_product_batch_is_one_extent_lower_leaf_and_the_test_switch_lies_between_one_and_it ... ok
+n7-c2cap32-core-lib test unlink::tests::the_plan_continued_from_any_intermediate_version_equals_the_rest_of_the_uninterrupted_plan ... ok
+n7-c2cap32-core-lib test unlink::tests::three_data_units_in_batches_of_one_take_two_batches_and_a_final_batch_of_one ... ok
+n7-c2cap32-core-lib test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 186 filtered out
+n7-c2cap32-other-targets Running tests/container_trees_grow_a_level_when_the_root_is_full.rs
+n7-c2cap32-other-targets test the_third_rollback_grows_the_lineage_tree_and_the_checkpoint_cost_counts_the_internal_level ... ok
+n7-c2cap32-other-targets test the_third_tombstone_container_grows_the_tree_and_keeps_the_old_root_in_place ... ok
+n7-c2cap32-other-targets test a_tree_grown_under_the_capped_fanout_takes_the_next_container_under_the_product_fanout ... ok
+n7-c2cap32-other-targets test the_fifth_tombstone_container_grows_the_tree_to_three_levels_and_rebuild_reads_it ... ok
+n7-c2cap32-other-targets test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n7-c2cap32-other-targets Running tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs
+n7-c2cap32-other-targets test a_file_over_two_extent_lower_leaves_unlinked_in_product_batches_rewrites_the_leaf_whose_last_unit_is_cut ... ok
+n7-c2cap32-other-targets test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n7-c2cap32-tests Running tests/unlink_writes_per_transaction_do_not_grow_with_the_file.rs
+n7-c2cap32-tests test unlink_of_files_of_one_to_four_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_does_not_grow_with_the_file ... ok
+n7-c2cap32-tests test unlink_of_files_of_sixteen_and_thirty_two_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_stays_within_a_constant_of_a_one_unit_file ... ok
+n7-c2cap32-tests test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n7-fix-g7-c2cap32 Running tests/n7_fix_product_batch_on_large_files.rs
+n7-fix-g7-c2cap32 test the_product_batch_releases_one_extent_lower_leaf_however_large_the_file_is ... FAILED
+n7-fix-g7-c2cap32 left: Batch { data_units_kept: 4464, size_after_the_batch_in_bytes: 145678176 }
+n7-fix-g7-c2cap32 right: Batch { data_units_kept: 4465, size_after_the_batch_in_bytes: 145710810 }
+n7-fix-g7-c2cap32 test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out
+n7-fix-g7-c2cap32 exit=101
+n7-fix-g7-tree Running tests/n7_fix_product_batch_on_large_files.rs
+n7-fix-g7-tree test the_product_batch_releases_one_extent_lower_leaf_however_large_the_file_is ... ok
+n7-fix-g7-tree test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+n7-probe-c2cap32 Running tests/n7_probe_unlink_batch_points.rs
+n7-probe-c2cap32 N7_PROBE one_unit_largest=31 bound_add=748
+n7-probe-c2cap32 N7_PROBE size=4609 publishes=33 first_released=[0, 145, 144, 144] clause_first=[0, 144, 144, 144] released_equals_clause=false largest_write_calls=53 largest_written_bytes=836096
+n7-probe-c2cap32 N7_PROBE size=9216 publishes=55 first_released=[0, 288, 279, 271] clause_first=[0, 144, 144, 144] released_equals_clause=false largest_write_calls=79 largest_written_bytes=1262080
+n7-probe-c2cap32 test probe_points_outside_the_sampled_sizes ... ok
+n7-probe-c2cap32 test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
+n7-probe-tree Running tests/n7_probe_unlink_batch_points.rs
+n7-probe-tree N7_PROBE one_unit_largest=31 bound_add=748
+n7-probe-tree N7_PROBE size=4609 publishes=34 first_released=[0, 144, 144, 144] clause_first=[0, 144, 144, 144] released_equals_clause=true largest_write_calls=55 largest_written_bytes=868864
+n7-probe-tree N7_PROBE size=9216 publishes=65 first_released=[0, 144, 144, 144] clause_first=[0, 144, 144, 144] released_equals_clause=true largest_write_calls=73 largest_written_bytes=1163776
+n7-probe-tree test probe_points_outside_the_sampled_sizes ... ok
+n7-probe-tree test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out
+n7-tree-tests Running tests/unlink_writes_per_transaction_do_not_grow_with_the_file.rs
+n7-tree-tests test unlink_of_files_of_one_to_four_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_does_not_grow_with_the_file ... ok
+n7-tree-tests test unlink_of_files_of_sixteen_and_thirty_two_batches_releases_exactly_one_batch_or_the_rest_per_publish_and_its_largest_publish_stays_within_a_constant_of_a_one_unit_file ... ok
+n7-tree-tests test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+shapes SHAPE name=clean violated=[] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+shapes SHAPE name=drop-record violated=["I-4.7"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=V(根（实例_1、txg_4）：inode_1_处于删除中（inode_树里没有它的记录），extent_树里还有_1_个数)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+shapes SHAPE name=drop-record+S1 violated=["I-9.16", "I-9.27"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=G(走读到的某一版树表里有一棵_extent_树，偏移_116_的头_ID_配不上同一张表里恰好一条_inode_树条目：那)_I-4.6=G(走读到的某一版树表里有一棵_extent_树，偏移_116_的头_ID_配不上同一张表里恰好一条_inode_树条目：那)
+shapes SHAPE name=drop-record+swap-extent-and-livelist-kinds violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+shapes SHAPE name=drop-record+extent-as-unregistered-13 violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+shapes SHAPE name=clean+swap-extent-and-livelist-kinds violated=["I-9.16"] watched=I-9.6=H()_I-9.5=H()_I-3.4=H()_I-4.7=N(走读到的每一版里都没有处于删除中的_inode（nlink_=_0_的记录、有数据单元而没有_nlink_≥_1_记录的)_I-4.6=N(走读到的每一版_inode_树里都没有_nlink_=_0_的记录)
+sweep SWEEP_HISTORY_LINES count=466 sha256_16=42886e58b9baa95c
+sweep SWEEP_TOTALS histories=466 {"I-3.4H": 3508, "I-4.6H": 2342, "I-4.6N": 1166, "I-4.7H": 2342, "I-4.7N": 1166, "I-9.5H": 3508, "I-9.6H": 3508, "cpuFF": 1468, "cpuZZ": 2040, "images": 3508}
+sweep SWEEP_FLAGGED_HISTORIES 0

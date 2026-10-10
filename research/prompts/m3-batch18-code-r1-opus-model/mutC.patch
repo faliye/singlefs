@@ -1,0 +1,12 @@
+--- a/crates/singlefs-core/src/unlink.rs	2026-10-03 03:13:50.535229079 +0000
++++ b/crates/singlefs-core/src/unlink.rs	2026-10-05 05:14:11.661033721 +0000
+@@ -126,7 +126,8 @@
+     UnlinkStep::Batch {
+         data_units_kept,
+         size_after_the_batch_in_bytes: data_units_kept
+-            * u64::try_from(data_unit_payload_capacity()).expect("32634"),
++            * u64::try_from(data_unit_payload_capacity()).expect("32634")
++            + 1,
+     }
+ }
+ 

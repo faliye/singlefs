@@ -1,0 +1,5 @@
+        let moved: Vec<InodeRecord> = self.containers[lender_position]
+            .contents
+            .records
+            .drain(..moved_count)
+            .collect();

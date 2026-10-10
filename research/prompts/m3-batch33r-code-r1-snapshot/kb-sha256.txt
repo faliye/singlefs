@@ -1,0 +1,2 @@
+f85723cd5e2dea9f3cb7a5c66a98517856ff6ac616c6fb3b3160d5822cc85651  .claude/kb/milestone/03-third-txn.md
+4c3cf55571da0b6843bdcfc3edfab93cf77113df0c274de05c77e7da120939b9  .claude/kb/decisions/08-核心索引结构.md

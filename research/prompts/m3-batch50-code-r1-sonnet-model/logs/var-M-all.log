@@ -1,0 +1,58 @@
+
+running 1 test
+K52 du=200 write=ok(raises=0,versions=1) then +2 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=201 write=ok(raises=0,versions=1) then +1 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=202 write=ok(raises=0,versions=1) then +1 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=203 write=ok(raises=0,versions=1) then +1 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=204 write=ok(raises=0,versions=1) then +1 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=205 write=ok(raises=0,versions=1) then +1 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=206 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=207 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=208 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=209 write=ok(raises=0,versions=1) then +0 inodes (stop:ERR:NoSpaceAfterRaisingTheFloor(NoSpaceA) | unlink2=ok(raises=0,versions=2) unlink3=ok(raises=0,versions=2) unlink1=ok(raises=0,versions=3) | write_after=ERR:Publish { cause: WriteToAnInodeThatIsNotInTheTree { inode: 1
+K52 du=210 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=211 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=212 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=213 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=214 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=215 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=216 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=217 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=218 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=219 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=220 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=221 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=222 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=223 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=224 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 du=225 write=ERR:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor { la | unlink2= unlink3= unlink1= | write_after=
+K52 max_ok_write_du=209
+test sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.07s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-core)
+warning: unused variable: `retirement_tree_internal_levels`
+   --> crates/singlefs-core/src/admission.rs:344:13
+    |
+344 |             retirement_tree_internal_levels,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `retirement_tree_internal_levels: _`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `inode_records`
+   --> crates/singlefs-core/src/admission.rs:345:13
+    |
+345 |             inode_records,
+    |             ^^^^^^^^^^^^^ help: try ignoring the field: `inode_records: _`
+
+warning: unused variable: `retirement_container_cow`
+    --> crates/singlefs-core/src/admission.rs:1123:17
+     |
+1123 |             let retirement_container_cow =
+     |                 ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_retirement_container_cow`
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/probe-tree/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 3 warnings (run `cargo fix --lib -p singlefs-core` to apply 3 suggestions)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.84s
+     Running tests/probe_k52.rs (/home/fy5090/.local/share/singlefs/work/m3-batch50-code-r1-sonnet/target-h/debug/deps/probe_k52-70b66d4cc3d6930b)

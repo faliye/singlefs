@@ -1,0 +1,29 @@
+--- a/crates/attack-b17-probe/src/main.rs
++++ b/crates/attack-b17-probe/src/main.rs
+@@ -10,6 +10,7 @@
+ 
+ #[path = "../../singlefs-harness/tests/common_admission/mod.rs"]
+ mod common_admission;
++mod k;
+ 
+ use std::cell::RefCell;
+ use std::collections::{BTreeMap, BTreeSet};
+@@ -910,6 +911,10 @@
+         main_qf();
+         return;
+     }
++    if mode == "k4" {
++        k::main_k4();
++        return;
++    }
+     if mode == "ab2" {
+         main_ab2();
+         return;
+@@ -921,6 +926,7 @@
+             ("r2", Ok(start)) => run_r2_on(start),
+             ("unmounthide", Ok(start)) => run_unmount_hide_on(start),
+             ("fx", Ok(start)) => run_fx_on(start),
++            ("k", Ok(start)) => k::run_k_on(start),
+             (_, Err(error)) => println!("START_FAILED {error}"),
+             (other, Ok(_)) => panic!("MODE {other}"),
+         }

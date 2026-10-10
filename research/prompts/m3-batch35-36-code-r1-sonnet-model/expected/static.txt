@@ -1,0 +1,10 @@
+R1 sha256 OK 份数	20
+ANCHOR 3075 hits=0 第32批 GPU 判器 F-零槽：读者对单元区里没写过的槽照旧读不出（墓碑树根条
+ANCHOR 3116 hits=0 第33批 GPU 全零单元守卫照改之前拿 first_slot + 读的槽数 比
+ANCHOR 3117 hits=0 第33批 GPU F-α 那一处拿按 16 KiB 读回的切片的 32 KiB 
+ROWS 3252 ANCHOR-BAD 3
+PREFIX 删除线第35批 15
+PREFIX 第36批 V 16
+PREFIX 第33批T 16
+DELETED-ROW-STILL-PRESENT 第33批T F2 乙两条都读不出就退 False
+DELETED-ROW-STILL-PRESENT 第33批T F2 乙施加过记录、由记录重 False

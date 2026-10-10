@@ -1,0 +1,47 @@
+
+// ---- 以下是正推腿的探针（rerun.py 从入库用例文件机械剪出前半、接上这一段）----
+
+#[test]
+fn probe_unraised_floor_pressed_back_below_the_largest_tombstone() {
+    let (mut pool, _txg) =
+        pool_whose_inode_three_is_unlinked_and_whose_floor_is_raised_past_its_record("probe-n8-unraised");
+    let (pressed, image) = create_one_inode_with_the_watermark_from(&mut pool, pressed_back_to(2));
+    println!(
+        "PROBE-N8-UNRAISED watermark={} floor={:?} I-9.6={:?} violated={:?}",
+        pressed.inode_number_watermark(),
+        pressed.root.rollback_floor,
+        verdict_of(&image, "I-9.6"),
+        violated_invariants(&image)
+    );
+}
+
+#[test]
+fn probe_press_back_to_two_and_create_two_inodes() {
+    let mut pool = pool_with_new_inodes("probe-n8-two-inodes", 2);
+    assert_eq!(pool.output.inode_number_watermark(), 4);
+    let publish_parameters = parameters();
+    let previous = pool.output.clone();
+    let devices = pool.devices.as_mut().expect("镜像还开着");
+    let mut writer = PoolWriter::new(&publish_parameters, devices.as_mut_slice());
+    writer.set_inode_number_watermark_source(pressed_back_to(2));
+    let output = publish_new_inodes(
+        &mut writer,
+        &mut pool.allocator,
+        &previous,
+        2,
+        WRITE_TIME_SECONDS_OF_THE_NEW_INODES,
+        INSTANCE_OF_THE_PUBLISHES,
+    )
+    .expect("建两个 inode");
+    pool.output = output.clone();
+    let image = pool.memory_pool();
+    println!(
+        "PROBE-N8-TWO watermark={} birth_of_2={:?} birth_of_3={:?} I-9.6={:?} violated={:?} root_txg={:?}",
+        output.inode_number_watermark(),
+        object_birth_of(&output, 2),
+        object_birth_of(&output, 3),
+        verdict_of(&image, "I-9.6"),
+        violated_invariants(&image),
+        output.root.checkpoint_txg
+    );
+}

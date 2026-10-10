@@ -1,0 +1,1 @@
+lag N - chosen distribution (points): {0: 800, 1: 480, 2: 224, 4: 48, 5: 48} max 5 3S min 12

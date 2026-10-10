@@ -1,0 +1,230 @@
+ANCHOR line=3078 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=6 per_filter=1,1,1,1,1,1
+ANCHOR line=3079 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=6 per_filter=1,1,1,1,1,1
+ANCHOR line=3080 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=6 per_filter=1,1,1,1,1,1
+ANCHOR line=3081 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=8 per_filter=1,1,1,1,1,1,2
+ANCHOR line=3082 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=6 per_filter=1,1,1,1,1,1
+ANCHOR line=3083 file=crates/singlefs-checker/src/walk.rs anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=6 per_filter=1,1,1,1,1,1
+ANCHOR line=3084 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3085 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3086 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3087 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3088 file=crates/singlefs-checker-tier/src/crash_judge_checker.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+ANCHOR line=3089 file=crates/singlefs-checker-tier/src/crash_judge_common.wgsl anchor_hits=1 named_is_a_test=yes named_selected=yes tests_selected=1 per_filter=exact
+GPU-ANCHOR line=3084 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+GPU-ANCHOR line=3085 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+GPU-ANCHOR line=3086 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+GPU-ANCHOR line=3087 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+GPU-ANCHOR line=3088 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+GPU-ANCHOR line=3089 anchor_hits=1 named_is_a_test=yes exact_arg_equals_named=yes test_count_with_that_name=1
+MODEL crc zeros16384=94640b85 zeros32768=bc43baad
+MODEL p2 loc0=BAD loc1=BAD identity_red=False (类=None)
+MODEL p2 loc0=BAD loc1=C16 identity_red=True (类=3)
+MODEL p2 loc0=BAD loc1=S2 identity_red=False (类=2)
+MODEL p2 loc0=BAD loc1=S3 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=BAD loc1=UNREAD identity_red=False (类=None)
+MODEL p2 loc0=BAD loc1=ZERO identity_red=True (类=0)
+MODEL p2 loc0=C16 loc1=BAD identity_red=True (类=3)
+MODEL p2 loc0=C16 loc1=C16 identity_red=True (类=3)
+MODEL p2 loc0=C16 loc1=S2 identity_red=False (类=2)
+MODEL p2 loc0=C16 loc1=S3 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=C16 loc1=UNREAD identity_red=True (类=3)
+MODEL p2 loc0=C16 loc1=ZERO identity_red=True (类=3)
+MODEL p2 loc0=S2 loc1=BAD identity_red=False (类=2)
+MODEL p2 loc0=S2 loc1=C16 identity_red=False (类=2)
+MODEL p2 loc0=S2 loc1=S2 identity_red=False (类=2)
+MODEL p2 loc0=S2 loc1=S3 identity_red=True (F-W 或另一类（红）)
+MODEL p2 loc0=S2 loc1=UNREAD identity_red=False (类=2)
+MODEL p2 loc0=S2 loc1=ZERO identity_red=False (类=2)
+MODEL p2 loc0=S3 loc1=BAD identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=S3 loc1=C16 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=S3 loc1=S2 identity_red=True (F-W 或另一类（红）)
+MODEL p2 loc0=S3 loc1=S3 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=S3 loc1=UNREAD identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=S3 loc1=ZERO identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=UNREAD loc1=BAD identity_red=False (类=None)
+MODEL p2 loc0=UNREAD loc1=C16 identity_red=True (类=3)
+MODEL p2 loc0=UNREAD loc1=S2 identity_red=False (类=2)
+MODEL p2 loc0=UNREAD loc1=S3 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=UNREAD loc1=UNREAD identity_red=False (类=None)
+MODEL p2 loc0=UNREAD loc1=ZERO identity_red=True (类=0)
+MODEL p2 loc0=ZERO loc1=BAD identity_red=True (类=0)
+MODEL p2 loc0=ZERO loc1=C16 identity_red=True (类=0)
+MODEL p2 loc0=ZERO loc1=S2 identity_red=False (类=2)
+MODEL p2 loc0=ZERO loc1=S3 identity_red=True (另一类，不往下走（红）)
+MODEL p2 loc0=ZERO loc1=UNREAD identity_red=True (类=0)
+MODEL p2 loc0=ZERO loc1=ZERO identity_red=True (类=0)
+MODEL p2 换盘序判定不同的格：[]
+MODEL zero-unit[small] CPU 读出全零而 GPU 读不到（单元区之前）：4340 个 (盘, 槽, 长度)
+MODEL zero-unit[small] GPU 交回全零单元而 CPU UNREADABLE：14 个 (盘, 槽, 长度)
+MODEL zero-unit[small] fork-1 槽 1092（没写过，下一槽 1093 是落点）读 16384：GPU=('ZERO', 0) CPU=ALL_ZERO
+MODEL zero-unit[small] fork-1 槽 1092（没写过，下一槽 1093 是落点）读 32768：GPU=('NONE',) CPU=OVERLAPS_A_LOCATION
+MODEL zero-unit[small] fork-2 单元区之前的槽 0 读 16384：GPU=('NONE',) CPU=OVERLAPS_A_LOCATION
+MODEL zero-unit[small] fork-2 单元区之前的槽 1 读 16384：GPU=('NONE',) CPU=ALL_ZERO
+MODEL zero-unit[small] fork-2 单元区之前的槽 1087 读 16384：GPU=('NONE',) CPU=ALL_ZERO
+MODEL zero-unit[small] point slot=190000 offset=(3112960000,0) 16KiB read_at=('ZERO', 0) cpu=ALL_ZERO
+MODEL zero-unit[small] point slot=4294967295 offset=(4294950912,16383) 16KiB read_at=('ZERO', 1) cpu=UNREADABLE
+MODEL zero-unit[small] point slot=4295157296 offset=(3112960000,16384) 16KiB read_at=('ZERO', 0) cpu=UNREADABLE
+MODEL zero-unit[small] point slot=68719666736 offset=(3112960000,262144) 16KiB read_at=('NONE',) cpu=UNREADABLE
+MODEL zero-unit[small] point slot=8590124592 offset=(3112960000,32768) 16KiB read_at=('ZERO', 0) cpu=UNREADABLE
+MODEL zero-unit[small] 一致：都是全零：1044202 个 (盘, 槽, 长度)
+MODEL zero-unit[small] 越界误认 盘 0 长度 16384：槽 [4294967295, 4295157296, 4295229439, 8590124592, 68719476735]
+MODEL zero-unit[small] 越界误认 盘 0 长度 32768：槽 [4295157296, 8590124592]
+MODEL zero-unit[small] 越界误认 盘 1 长度 16384：槽 [4294967295, 4295157296, 4295229439, 8590124592, 68719476735]
+MODEL zero-unit[small] 越界误认 盘 1 长度 32768：槽 [4295157296, 8590124592]
+MODEL zero-unit[wide] CPU 读出全零而 GPU 读不到（单元区之前）：4340 个 (盘, 槽, 长度)
+MODEL zero-unit[wide] GPU 交回全零单元而 CPU UNREADABLE：4 个 (盘, 槽, 长度)
+MODEL zero-unit[wide] fork-1 槽 1092（没写过，下一槽 1093 是落点）读 16384：GPU=('ZERO', 0) CPU=ALL_ZERO
+MODEL zero-unit[wide] fork-1 槽 1092（没写过，下一槽 1093 是落点）读 32768：GPU=('NONE',) CPU=OVERLAPS_A_LOCATION
+MODEL zero-unit[wide] fork-2 单元区之前的槽 0 读 16384：GPU=('NONE',) CPU=OVERLAPS_A_LOCATION
+MODEL zero-unit[wide] fork-2 单元区之前的槽 1 读 16384：GPU=('NONE',) CPU=ALL_ZERO
+MODEL zero-unit[wide] fork-2 单元区之前的槽 1087 读 16384：GPU=('NONE',) CPU=ALL_ZERO
+MODEL zero-unit[wide] point slot=190000 offset=(3112960000,0) 16KiB read_at=('ZERO', 0) cpu=ALL_ZERO
+MODEL zero-unit[wide] point slot=4294967295 offset=(4294950912,16383) 16KiB read_at=('ZERO', 1) cpu=UNREADABLE
+MODEL zero-unit[wide] point slot=4295157296 offset=(3112960000,16384) 16KiB read_at=('NONE',) cpu=UNREADABLE
+MODEL zero-unit[wide] point slot=68719666736 offset=(3112960000,262144) 16KiB read_at=('NONE',) cpu=UNREADABLE
+MODEL zero-unit[wide] point slot=8590124592 offset=(3112960000,32768) 16KiB read_at=('NONE',) cpu=UNREADABLE
+MODEL zero-unit[wide] 一致：都是全零：1044188 个 (盘, 槽, 长度)
+MODEL zero-unit[wide] 越界误认 盘 0 长度 16384：槽 [4294967295, 68719476735]
+MODEL zero-unit[wide] 越界误认 盘 1 长度 16384：槽 [4294967295, 68719476735]
+PROBE crc zeros16384=94640b85 zeros32768=bc43baad
+PROBE i49-base inode named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-base inode named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-base lineage named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-4.9", "I-5.1", "I-7.4"] I-4.9=Violated:别的版本先走过的盘 0 槽 50244 的单元：诞生代号 9 大于引用它的候选根的 txg 3 I-3.5=Holds
+PROBE i49-base lineage named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-base tomb named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-base tomb named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-f1 inode named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-f1 inode named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-f1 lineage named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-3.5", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Violated:相邻两版 (实例 {2}、txg 8) → (实例 2、txg 9)（NoHole）：后一版引用、前一版不引用的单元盘 0 槽 50244（用户可见树 None）诞生代号 3 不大于前一版的 txg，也不在一棵整棵继承下来的用户可见树里（根指针出生 txg 小于前一版的 txg、子树里读得出的诞生代号都不大于它）
+PROBE i49-f1 lineage named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-f1 tomb named_walked_node_in_location=0 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE i49-f1 tomb named_walked_node_in_location=1 red=["I-1.7", "I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-5.1", "I-7.4"] I-4.9=Holds I-3.5=Holds
+PROBE p2 lineage loc0=BAD loc1=BAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=BAD loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=BAD loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=BAD loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=BAD loc1=UNREAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=BAD loc1=ZERO identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=C16 loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=C16 loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=C16 loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=C16 loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=C16 loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=C16 loc1=ZERO identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S2 loc1=BAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=S2 loc1=C16 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=S2 loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=S2 loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S2 loc1=UNREAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=S2 loc1=ZERO identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=S3 loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S3 loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S3 loc1=S2 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S3 loc1=S3 identity_red=true red=["I-9.17"]
+PROBE p2 lineage loc0=S3 loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=S3 loc1=ZERO identity_red=true red=["I-3.1", "I-3.11", "I-9.17"]
+PROBE p2 lineage loc0=UNREAD loc1=BAD identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=UNREAD loc1=C16 identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=UNREAD loc1=S2 identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=UNREAD loc1=S3 identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=UNREAD loc1=UNREAD identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=UNREAD loc1=ZERO identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=ZERO loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=ZERO loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=ZERO loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 lineage loc0=ZERO loc1=S3 identity_red=true red=["I-3.1", "I-3.11", "I-9.17"]
+PROBE p2 lineage loc0=ZERO loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 lineage loc0=ZERO loc1=ZERO identity_red=true red=["I-4.8", "I-7.2", "I-7.4", "I-9.17"]
+PROBE p2 tomb loc0=BAD loc1=BAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=BAD loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=BAD loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=BAD loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=BAD loc1=UNREAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=BAD loc1=ZERO identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=C16 loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=C16 loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=C16 loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=C16 loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=C16 loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=C16 loc1=ZERO identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S2 loc1=BAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=S2 loc1=C16 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=S2 loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=S2 loc1=S3 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S2 loc1=UNREAD identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=S2 loc1=ZERO identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=S3 loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S3 loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S3 loc1=S2 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S3 loc1=S3 identity_red=true red=["I-9.23"]
+PROBE p2 tomb loc0=S3 loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=S3 loc1=ZERO identity_red=true red=["I-3.1", "I-3.11", "I-9.23"]
+PROBE p2 tomb loc0=UNREAD loc1=BAD identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=UNREAD loc1=C16 identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=UNREAD loc1=S2 identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=UNREAD loc1=S3 identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=UNREAD loc1=UNREAD identity_red=false red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=UNREAD loc1=ZERO identity_red=true red=["I-2.1", "I-2.5", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=ZERO loc1=BAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=ZERO loc1=C16 identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=ZERO loc1=S2 identity_red=false red=["I-2.1", "I-4.8", "I-7.2", "I-7.4"]
+PROBE p2 tomb loc0=ZERO loc1=S3 identity_red=true red=["I-3.1", "I-3.11", "I-9.23"]
+PROBE p2 tomb loc0=ZERO loc1=UNREAD identity_red=true red=["I-2.1", "I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p2 tomb loc0=ZERO loc1=ZERO identity_red=true red=["I-4.8", "I-7.2", "I-7.4", "I-9.23"]
+PROBE p4 zero-slot-crc slot190000 red=["I-3.1", "I-3.11", "I-9.23"]
+PROBE p4 zero-slot-crc slot262143-last-slot-of-the-disk red=["I-3.1", "I-3.11", "I-9.23"]
+PROBE p4 zero-slot-crc slot262144-one-past-the-disk red=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p4 zero-slot-crc slot2p32+190000 red=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p4 zero-slot-crc slot2p33+190000 red=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4", "I-9.23"]
+PROBE p4 zero-slot-crc slot2p36+190000 red=["I-2.1", "I-3.1", "I-3.11", "I-4.8", "I-7.4", "I-9.23"]
+RESULT broad line=3078 cargo_rc=101 ran=30 failed=3 failed_tests=[ a_lineage_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ]
+RESULT broad line=3079 cargo_rc=101 ran=30 failed=4 failed_tests=[ a_lineage_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device a_lineage_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device ]
+RESULT broad line=3080 cargo_rc=101 ran=30 failed=1 failed_tests=[ a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ]
+RESULT broad line=3081 cargo_rc=101 ran=30 failed=4 failed_tests=[ a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device a_tombstone_container_below_a_level_one_node_whose_first_copy_verifies_as_a_container_reddens_the_packed_container_invariant a_tombstone_container_below_a_level_one_node_whose_second_copy_verifies_as_a_container_reddens_the_packed_container_invariant a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ]
+RESULT broad line=3082 cargo_rc=101 ran=30 failed=1 failed_tests=[ an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ]
+RESULT broad line=3083 cargo_rc=101 ran=30 failed=1 failed_tests=[ an_inode_tree_entry_whose_only_leaf_copy_matching_at_the_container_length_is_a_data_unit_does_not_go_down_that_copy ]
+RESULT extra line=1 named_test=an_inode_leaf_with_a_non_zero_reserved_byte_beside_a_copy_verifying_as_a_node_reddens_the_reserved_bytes_invariant_on_either_device verdict=SURVIVES cargo_rc=101 ran=30 failed=3 failed_tests=[ a_lineage_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ]
+RESULT extra line=2 named_test=a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before verdict=SURVIVES cargo_rc=0 ran=30 failed=0 failed_tests=[ ]
+RESULT extra line=3 named_test=an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before verdict=RED cargo_rc=101 ran=30 failed=1 failed_tests=[ an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ]
+RESULT extra line=4 named_test=an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before verdict=SURVIVES cargo_rc=0 ran=30 failed=0 failed_tests=[ ]
+RESULT extra line=5 named_test=a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before verdict=RED cargo_rc=101 ran=30 failed=2 failed_tests=[ a_lineage_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ]
+RESULT extra line=6 named_test=a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device verdict=SURVIVES cargo_rc=0 ran=30 failed=0 failed_tests=[ ]
+RESULT extra line=7 named_test=a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device verdict=SURVIVES cargo_rc=0 ran=30 failed=0 failed_tests=[ ]
+RESULT extra line=8 named_test=a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device verdict=RED cargo_rc=101 ran=30 failed=4 failed_tests=[ a_lineage_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device a_lineage_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device ]
+RESULT table line=3078 named_test=a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before verdict=RED cargo_rc=101 ran=6 failed=1 failed_tests=[ a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ]
+RESULT table line=3079 named_test=a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device verdict=RED cargo_rc=101 ran=6 failed=1 failed_tests=[ a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device ]
+RESULT table line=3080 named_test=a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants verdict=RED cargo_rc=101 ran=6 failed=1 failed_tests=[ a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ]
+RESULT table line=3081 named_test=a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device verdict=RED cargo_rc=101 ran=8 failed=3 failed_tests=[ a_tombstone_container_below_a_level_one_node_whose_first_copy_verifies_as_a_container_reddens_the_packed_container_invariant a_tombstone_container_below_a_level_one_node_whose_second_copy_verifies_as_a_container_reddens_the_packed_container_invariant a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ]
+RESULT table line=3082 named_test=an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device verdict=RED cargo_rc=101 ran=6 failed=1 failed_tests=[ an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ]
+RESULT table line=3083 named_test=an_inode_tree_entry_whose_only_leaf_copy_matching_at_the_container_length_is_a_data_unit_does_not_go_down_that_copy verdict=RED cargo_rc=101 ran=6 failed=1 failed_tests=[ an_inode_tree_entry_whose_only_leaf_copy_matching_at_the_container_length_is_a_data_unit_does_not_go_down_that_copy ]
+test a_lineage_container_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ... ok
+test a_lineage_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ... ok
+test a_lineage_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device ... ok
+test a_lineage_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_lineage_entry_invariant_holding_on_either_device ... ok
+test a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ... ok
+test a_lineage_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device ... ok
+test a_lineage_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test a_lineage_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_lineage_entry_invariant_alike_on_either_device ... ok
+test a_lineage_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test a_tombstone_container_below_a_level_one_node_whose_first_copy_verifies_as_a_container_reddens_the_packed_container_invariant ... ok
+test a_tombstone_container_below_a_level_one_node_whose_second_copy_verifies_as_a_container_reddens_the_packed_container_invariant ... ok
+test a_tombstone_container_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ... ok
+test a_tombstone_container_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ... ok
+test a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test a_tombstone_tree_entry_of_type_zero_in_a_root_of_level_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device ... ok
+test a_tombstone_tree_entry_of_type_zero_over_a_container_checked_at_sixteen_kibibytes_beside_a_node_leaves_the_tombstone_entry_invariant_holding_on_either_device ... ok
+test a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ... ok
+test a_tombstone_tree_entry_of_type_zero_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device ... ok
+test a_tombstone_tree_entry_of_type_zero_without_an_identity_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test a_tombstone_tree_entry_whose_container_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_tombstone_entry_invariant_alike_on_either_device ... ok
+test a_tombstone_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test an_inode_leaf_with_a_non_zero_reserved_byte_beside_a_copy_verifying_as_a_node_reddens_the_reserved_bytes_invariant_on_either_device ... ok
+test an_inode_leaf_with_a_wrong_record_width_beside_a_copy_verifying_as_a_node_reddens_the_packed_container_invariant_on_either_device ... ok
+test an_inode_leaf_with_a_wrong_record_width_reddens_the_packed_container_invariant_whichever_location_names_a_node_walked_before ... ok
+test an_inode_leaf_with_blocks_off_the_logical_length_beside_a_copy_verifying_as_a_node_reddens_the_blocks_invariant_on_either_device ... ok
+test an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_goes_down_the_type_zero_branch_on_either_device ... ok
+test an_inode_tree_entry_of_type_zero_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device ... ok
+test an_inode_tree_entry_whose_leaf_has_a_copy_verifying_as_a_node_on_one_device_reddens_the_inode_entry_invariant_alike_on_either_device ... ok
+test an_inode_tree_entry_whose_only_leaf_copy_matching_at_the_container_length_is_a_data_unit_does_not_go_down_that_copy ... ok
+test an_inode_tree_entry_with_an_unregistered_type_over_a_child_whose_two_location_checksums_are_wrong_reddens_the_checksum_and_walk_invariants ... ok
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured

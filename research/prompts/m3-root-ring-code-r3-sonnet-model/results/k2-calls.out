@@ -1,0 +1,18 @@
+$ grep -n "record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(" crates/singlefs-core/src/mount.rs crates/singlefs-core/src/transaction.rs
+crates/singlefs-core/src/transaction.rs:1757:    crate::mount::record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(
+crates/singlefs-core/src/transaction.rs:7754:    crate::mount::record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(
+crates/singlefs-core/src/mount.rs:3452:            record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(
+crates/singlefs-core/src/mount.rs:4686:                record_root_written_by_this_process_rereading_root_ring_slots_unreadable_at_mount(
+$ grep -n "rollback_floor_ceiling_not_passing_ring_slots_unreadable_since_the_mount(\|rollback_floor_ceiling(" crates/singlefs-core/src/*.rs
+crates/singlefs-core/src/mount.rs:2188:    rollback_floor_ceiling_not_passing_ring_slots_unreadable_since_the_mount(
+crates/singlefs-core/src/mount.rs:2692:    let ceiling = rollback_floor_ceiling_not_passing_ring_slots_unreadable_since_the_mount(
+crates/singlefs-core/src/mount.rs:2973:            let ceiling = rollback_floor_ceiling_not_passing_ring_slots_unreadable_since_the_mount(
+$ grep -rn "rollback_floor_ceiling(" crates --include=*.rs | grep -v "singlefs-core/src/mount.rs"
+crates/singlefs-checker-tier/src/on_device_modes.rs:279:    let ceiling = rollback_floor_ceiling(
+crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs:1987:    let Ok(ceiling) = rollback_floor_ceiling(
+crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:2263:    rollback_floor_ceiling(
+crates/singlefs-harness/src/model.rs:1291:    pub fn rollback_floor_ceiling(&self) -> Option<ModelCheckpointTxg> {
+crates/singlefs-harness/src/model.rs:1364:        view_without_the_roots.rollback_floor_ceiling()
+crates/singlefs-harness/src/model.rs:2422:        let ceiling = self.rollback_floor_ceiling();
+crates/singlefs-harness/src/model.rs:3426:        assert_eq!(model.rollback_floor_ceiling(), Some(ModelCheckpointTxg(6)));
+crates/singlefs-harness/src/model.rs:3541:        assert_eq!(model.rollback_floor_ceiling(), Some(ModelCheckpointTxg(6)));

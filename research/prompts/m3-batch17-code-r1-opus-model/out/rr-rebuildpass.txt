@@ -1,0 +1,16 @@
+FXSTART narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty | current_txg=18 unmount=Raised publishes=2 writes=36 baseline={0: (Some(16), "ok", Some(14695981039346656037)), 1: (Some(18), "ok", Some(14695981039346656037))}
+FXPLAN narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=18 effective=19 floor_in_row=18 row_txg=20 warm_up=2 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=55 mount_writes=55 screened_prefixes=56 bad=0
+FXREFUSED narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXREFUSED narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXPLAN narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=17 sc=2 roots=1 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=19 effective=19 floor_in_row=18 row_txg=20 warm_up=2 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=55 mount_writes=55 screened_prefixes=56 bad=0
+FXREFUSED narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=17 j=0 plan=r120-144:all/all:e faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXREFUSED narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty n=17 j=0 plan=r120-144:all/all:z faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXDONE narrow U=192 k=4 u=3 b=1 cont=WalkedToEmpty elapsed=0.1s
+FXSTART narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty | current_txg=20 unmount=Raised publishes=2 writes=36 baseline={0: (Some(19), "ok", Some(14695981039346656037)), 1: (Some(20), "ok", Some(14695981039346656037))}
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 sc=2 roots=0 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=20 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 screened_prefixes=39 bad=0
+FXREFUSED narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:e faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXREFUSED narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 plan=r120-144:all/all:z faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXPLAN narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=17 sc=2 roots=1 j=0 plan=w:-/-:z faulted_reads=0 ok chosen=21 effective=21 floor_in_row=20 row_txg=22 warm_up=1 floor_raises=0 cont=WalkedToEmpty overwrites_done=0 writes2=38 mount_writes=38 screened_prefixes=39 bad=0
+FXREFUSED narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=17 j=0 plan=r120-144:all/all:e faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXREFUSED narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=17 j=0 plan=r120-144:all/all:z faulted_reads=24 writes_before_err=0 Recovery(NoValidRoot)
+FXDONE narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty elapsed=0.1s

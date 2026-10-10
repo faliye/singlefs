@@ -1,0 +1,1 @@
+            left_container.checked_add(2) == Some(right_container);

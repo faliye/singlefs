@@ -1,0 +1,51 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs (target/debug/deps/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root-1b6ee2b4c5dfd964)
+
+running 5 tests
+test a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots ... FAILED
+test the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring ... FAILED
+test the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring ... FAILED
+test the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring ... FAILED
+test the_abandoned_roots_slot_failing_on_the_first_pass_and_read_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring ... ok
+
+failures:
+
+---- a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots stdout ----
+
+thread 'a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots' (1375771) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs:1613:5:
+assertion `left == right` failed: 重读整环都坏、第一遍读出了盘 0 的根：并两遍照常挂上
+  left: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Err("NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread"), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: false, both_devices_isolate_slots_after_the_mount: false, no_place_of_the_abandoned_root_is_free_after_the_mount: false, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: false, checker_violations_when_the_abandoned_root_leaves_the_ring: [] }
+ right: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: true, no_place_of_the_abandoned_root_is_free_after_the_mount: true, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: true, checker_violations_when_the_abandoned_root_leaves_the_ring: [] }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring stdout ----
+
+thread 'the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring' (1375775) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs:1532:5:
+assertion `left == right` failed: 重读只坏 C 的根槽（读回全 0）：并两遍留第一遍的 C，影子账照隔离
+  left: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: false, no_place_of_the_abandoned_root_is_free_after_the_mount: false, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: false, checker_violations_when_the_abandoned_root_leaves_the_ring: ["I-7.4: 被抛弃的根（实例 2、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1416 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"] }
+ right: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: true, no_place_of_the_abandoned_root_is_free_after_the_mount: true, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: true, checker_violations_when_the_abandoned_root_leaves_the_ring: [] }
+
+---- the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring stdout ----
+
+thread 'the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring' (1375774) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs:1546:5:
+assertion `left == right` failed: 重读只坏 C 的根槽（读回乱字节）：并两遍留第一遍的 C，影子账照隔离
+  left: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: false, no_place_of_the_abandoned_root_is_free_after_the_mount: false, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: false, checker_violations_when_the_abandoned_root_leaves_the_ring: ["I-7.4: 被抛弃的根（实例 2、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1416 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"] }
+ right: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: true, no_place_of_the_abandoned_root_is_free_after_the_mount: true, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: true, checker_violations_when_the_abandoned_root_leaves_the_ring: [] }
+
+---- the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring stdout ----
+
+thread 'the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring' (1375773) panicked at crates/singlefs-harness/tests/rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root.rs:1518:5:
+assertion `left == right` failed: 重读只坏 C 的根槽（报读错）：并两遍留第一遍的 C，影子账照隔离
+  left: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: false, no_place_of_the_abandoned_root_is_free_after_the_mount: false, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: false, checker_violations_when_the_abandoned_root_leaves_the_ring: ["I-7.4: 被抛弃的根（实例 2、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1416 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"] }
+ right: RemountOfThePoolWithAnAbandonedRoot { root_ring_of_the_rebuilt_allocator: Ok(OnTheOneReread), hook_calls_after_exactly_the_rebuild_pass: [true], faulted_reads_are_the_named_ones: true, same_disk_as_the_reference_remount: true, both_devices_isolate_slots_after_the_mount: true, no_place_of_the_abandoned_root_is_free_after_the_mount: true, places_of_the_abandoned_root_kept_until_it_leaves_the_ring: true, checker_violations_when_the_abandoned_root_leaves_the_ring: [] }
+
+
+failures:
+    a_reread_failing_on_the_whole_ring_after_a_first_pass_that_read_device_zero_mounts_on_the_first_pass_roots
+    the_abandoned_roots_slot_failing_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring
+    the_abandoned_roots_slot_reading_back_garbage_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring
+    the_abandoned_roots_slot_reading_back_zeros_only_on_the_reread_keeps_its_units_isolated_until_it_leaves_the_ring
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 10 filtered out; finished in 1.50s
+
+error: test failed, to rerun pass `-p singlefs-harness --test rebuilding_the_allocator_rereads_the_root_ring_once_when_one_device_reads_no_valid_root`

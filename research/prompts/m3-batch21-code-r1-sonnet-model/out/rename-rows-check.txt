@@ -1,0 +1,12 @@
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-9.5 正方向不判（队列里没有记录、或记录 nlink ≠ 0 的号放过）
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-3.4 只判缺行、不判标签 4 那一行的值
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-3.4 只判值、不判缺行
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-4.6 不判（nlink = 0 的记录单元数与 size 对不上放过）
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-9.6 墓碑那一半不判（已发布墓碑的对象 ID 不小于水位放过）
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：extent 树下段叶的数据单元不按号数（删除中 inode 的单元数读成 0
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：扫描内核没接删除态扫描
+OK   _m3-batch18-code-r1-di 三·3 GPU 判器：I-9.5 的下标错位成 I-3.4 那一位（70）
+OK   _m3-batch20-code-r1-di 第 20 批 C712 GPU 判器：恢复内核不判 nlink = 0，删除中间态那条流上意图那一版
+OK   _m3-batch20-code-r1-di 第 20 批 C712 GPU 判器：恢复内核不判 nlink = 0，墓碑坏流上意图那一版起照读文
+OK   _m3-batch20-code-r1-di 第 20 批 C712 GPU 判器：恢复内核的 nlink = 0 判挪到核单元数之后，删除中而 
+改名行 OK=11 DIFF=0；冻结副本 crates/ 里旧名残留 0 处

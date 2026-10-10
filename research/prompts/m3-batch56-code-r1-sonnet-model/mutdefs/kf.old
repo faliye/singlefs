@@ -1,0 +1,2 @@
+        let absorbed_at_least_once = tree.absorb_until_no_pair_fits(holding_position);
+        if !absorbed_at_least_once {

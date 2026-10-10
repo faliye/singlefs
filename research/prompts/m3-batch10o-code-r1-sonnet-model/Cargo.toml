@@ -1,0 +1,13 @@
+[package]
+name = "t2-arm-probe"
+version = "0.1.0"
+publish = false
+edition = "2021"
+description = "T2 回退不拒那一臂的量（m3-batch10o-code-r1 正推腿，只在冻结副本的拷贝上）"
+
+[dependencies]
+singlefs-checker = { path = "../singlefs-checker" }
+singlefs-checker-tier = { path = "../singlefs-checker-tier" }
+singlefs-core = { path = "../singlefs-core" }
+singlefs-format = { path = "../singlefs-format" }
+singlefs-harness = { path = "../singlefs-harness" }

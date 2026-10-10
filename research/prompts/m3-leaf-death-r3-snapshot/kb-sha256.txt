@@ -1,0 +1,3 @@
+41ea6f543a2c88ae511f7ef7f073fb2cd4c993a24328a7f9f53cb71800ffc716  .claude/kb/experiments/177-逐树不写墓碑的复活数.md
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md
+32ddf0f21c857168af23492b4e10a6359fa21984ccbfa6722c416aaa14298bc3  .claude/kb/checks-owed.md

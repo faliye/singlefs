@@ -1,0 +1,75 @@
+
+    /// 攻方原型（m3-batch56-code-r1 opus，K4-2）：等价留档那一族放宽。片数 1–2 时每片记录数取遍 1..=233，片数 3–5 时取
+    /// {1, 2, 3, 58, 59, 115, 116, 117, 118, 119, 175, 176, 231, 232, 233}；相邻两片之和都 ≥ 234；每片删第一条、中间一条、最后一条。
+    /// 实现与两种改写逐片比（整份），并核删完之后相邻两片之和仍 ≥ 234。打印不同的次数与第一处。
+    #[test]
+    fn opus_probe_b56_equivalence_family_widened() {
+        let capacity = usize::try_from(INODE_LEAF_RECORDS).expect("233");
+        let wide: Vec<usize> = (1..=capacity).collect();
+        let coarse: Vec<usize> = vec![1, 2, 3, 58, 59, 115, 116, 117, 118, 119, 175, 176, 231, 232, 233];
+        let mut shapes: Vec<Vec<usize>> = Vec::new();
+        let mut current: Vec<Vec<usize>> = vec![Vec::new()];
+        // 迭代上界：5 轮，每轮多一片。
+        for length in 1..=5usize {
+            let values = if length <= 2 { &wide } else { &coarse };
+            current = current
+                .iter()
+                .flat_map(|prefix| {
+                    values
+                        .iter()
+                        .filter(|count| prefix.last().is_none_or(|last| last + **count > capacity))
+                        .filter(|count| length > 2 || prefix.iter().all(|earlier| wide.contains(earlier)))
+                        .map(|count| {
+                            let mut longer = prefix.clone();
+                            longer.push(*count);
+                            longer
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .filter(|shape| shape.len() <= 2 || shape.iter().all(|count| coarse.contains(count)))
+                .collect();
+            shapes.extend(current.iter().cloned());
+        }
+        let mut removals = 0u64;
+        let mut differ = [0u64; 2];
+        let mut first_difference = [String::new(), String::new()];
+        let mut precondition_broken = 0u64;
+        for record_counts in &shapes {
+            let before = tree_of_record_counts(record_counts);
+            for container in &before {
+                let records = &container.records;
+                let mut picks = vec![records[0].inode, records[records.len() / 2].inode, records[records.len() - 1].inode];
+                picks.dedup();
+                for inode in picks {
+                    let inode = InodeNumber(inode);
+                    removals += 1;
+                    let implementation = remove_record_from_leaf_containers(&before, inode).expect("在树里");
+                    for pair in implementation.containers.windows(2) {
+                        if pair[0].records.len() + pair[1].records.len() < 234 {
+                            precondition_broken += 1;
+                        }
+                    }
+                    for (index, rewriting) in [
+                        MergeRuleRewriting::EveryPassStopsAfterAbsorbingOnePair,
+                        MergeRuleRewriting::NothingIsAbsorbedAfterDroppingTheEmptiedContainer,
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
+                        if implementation != remove_record_under_the_rewriting(&before, inode, rewriting) {
+                            differ[index] += 1;
+                            if first_difference[index].is_empty() {
+                                first_difference[index] = format!("{record_counts:?} 删 {inode:?}");
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        eprintln!(
+            "OPUS_K4_FAMILY shapes={} removals={removals} differ_stop_after_one_pair={} differ_no_absorb_after_drop={} precondition_broken={precondition_broken} first={first_difference:?}",
+            shapes.len(),
+            differ[0],
+            differ[1]
+        );
+    }

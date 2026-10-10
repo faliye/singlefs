@@ -1,0 +1,18 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.29s
+     Running tests/sonnet_probe_k4_records.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10y-code-r1-sonnet/target/debug/deps/sonnet_probe_k4_records-3b164b36d2c9e453)
+
+running 1 test
+test records_and_units_of_r_reading_back_zero ... R 一共 3 条记录
+记录 1: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+记录 2: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+记录 3: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+全部记录: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+记录 1 + 第一个数据单元: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+记录 2 + 第一个数据单元: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+记录 3 + 第一个数据单元: M1 ok 选 (1, 9)，R 的单元被写掉 0 份，I-7.4 -
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.14s
+

@@ -1,0 +1,48 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：三方攻方腿原型复跑，与同机别的活互不依赖
+SWEEP family=r histories=150 from=0 to=150 elapsed=53.9s
+SUMMARY sweep-r states=1581
+COUNT sweep-r	step	C479bing/lineage	holds=1581	red=0	na=0
+COUNT sweep-r	step	C479bing/txg-1	holds=1440	red=141	na=0
+COUNT sweep-r	step	C479yi/rec	holds=1581	red=0	na=0
+COUNT sweep-r	step	C479yi/rec+tombA	holds=1581	red=0	na=0
+COUNT sweep-r	step	I918/A	holds=585	red=0	na=996
+COUNT sweep-r	step	I918/A+pub	holds=585	red=0	na=996
+COUNT sweep-r	step	I918/A2	holds=585	red=0	na=996
+COUNT sweep-r	step	I918/B	holds=477	red=108	na=996
+COUNT sweep-r	step	I918/B+pub	holds=477	red=108	na=996
+COUNT sweep-r	step	I918/nofilter	holds=585	red=0	na=996
+COUNT sweep-r	step	I919/A	holds=585	red=0	na=996
+COUNT sweep-r	step	I919/A+pub	holds=585	red=0	na=996
+COUNT sweep-r	step	I919/A2	holds=585	red=0	na=996
+COUNT sweep-r	step	I919/B	holds=497	red=8	na=1076
+COUNT sweep-r	step	I919/nofilter	holds=488	red=97	na=996
+COUNT sweep-r	step	I920/A	holds=585	red=0	na=996
+COUNT sweep-r	step	I920/A2	holds=585	red=0	na=996
+COUNT sweep-r	step	I920/B	holds=505	red=0	na=1076
+COUNT sweep-r	step	I920/all-dedup	holds=576	red=9	na=996
+COUNT sweep-r	step	I920/interval-all-T14	holds=585	red=0	na=996
+COUNT sweep-r	step	I921/each	holds=0	red=0	na=1581
+COUNT sweep-r	step	I921/selected	holds=0	red=0	na=1581
+COUNT sweep-r	step	I924/each	holds=1581	red=0	na=0
+COUNT sweep-r	step	I96/code	holds=1581	red=0	na=0
+COUNT sweep-r	step	I96/each	holds=1581	red=0	na=0
+COUNT sweep-r	step	I96/newest	holds=1524	red=0	na=57
+COUNT sweep-r	step	S4a-bing/all-types-sorted	holds=1509	red=72	na=0
+COUNT sweep-r	step	S4a-jia/type2-sorted	holds=1581	red=0	na=0
+COUNT sweep-r	step	T2a/each	holds=585	red=0	na=996
+COUNT sweep-r	step	T2a/sel-x-map	holds=585	red=0	na=996
+COUNT sweep-r	step	T2c-A/each	holds=585	red=0	na=996
+COUNT sweep-r	step	T2c-A2/each	holds=585	red=0	na=996
+COUNT sweep-r	step	T2c-B/each	holds=505	red=0	na=1076
+COUNT sweep-r	step	T2c-B/sel-x-map	holds=505	red=0	na=1076
+COUNT sweep-r	step	TombDeath/birth-le-death-le-txg	holds=585	red=0	na=996
+COUNT sweep-r	step	gap/any-version	holds=1581	red=0	na=0
+FIRSTRED sweep-r	step	C479bing/txg-1	b144:C1,M,U1,X,R5,R7,R7,R5 #5:R5 [rolled-back-to txg9/inst3 now txg15] :: 根（实例 4、txg 15）：新号 1 小于父版本 根（实例 4、txg 14） 的水位 3
+FIRSTRED sweep-r	step	I918/B	b144:C1,M,U1,X,R5,R7,R7,R5 #6:R7 [rolled-back-to txg8/inst3 now txg16] :: 根（实例 3、txg 9）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED sweep-r	step	I918/B+pub	b144:C1,M,U1,X,R5,R7,R7,R5 #6:R7 [rolled-back-to txg8/inst3 now txg16] :: 根（实例 3、txg 9）：队列号 1（出生代 3）没有谱系上的整对象墓碑
+FIRSTRED sweep-r	step	I919/B	b144:C1,M,U1,X,R5,R7,R7,R5 #7:R7 [rolled-back-to txg9/inst3 now txg17] :: 根（实例 4、txg 16）：谱系上的墓碑 (1, 3, 死于 9) 指着 nlink 1 的记录
+FIRSTRED sweep-r	step	I919/nofilter	b144:C1,M,U1,X,R5,R7,R7,R5 #6:R7 [rolled-back-to txg8/inst3 now txg16] :: 根（实例 4、txg 16）：谱系上的墓碑 (1, 3, 死于 9) 指着 nlink 1 的记录
+FIRSTRED sweep-r	step	I920/all-dedup	b1:C1,X,X,X,U1,R2,U1,C1,R5 #7:U1 [ok versions=2 now txg18] :: 根（实例 5、txg 18）：谱系上的墓碑 (1, 3) 两条（死于 Some(14) 与 17）
+FIRSTRED sweep-r	step	S4a-bing/all-types-sorted	b1:C1,X,X,X,U1,R2,U1,C1,R5 #7:U1 [ok versions=2 now txg18] :: 根（实例 5、txg 18）：容器 1 首段序 [1, 1]
+CHECKERRED sweep-r	step	I-7.4	44	b144:C2,C1,C1,Y4,R3,X,U3 #6:X [dropped_rotation_writes=2 mounted inst3 chosen=txg8 effective=txg8 continuation=0] :: 被抛弃的根（实例 2、txg 9）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元 在盘 0 槽 50374 的那一份与位置条目里的校验和对不上；树表单元 两份都读不到对得上的
+ELAPSED 53.9s

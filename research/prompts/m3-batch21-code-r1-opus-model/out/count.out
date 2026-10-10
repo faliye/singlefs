@@ -1,0 +1,5 @@
+CRASH_COUNT flow=c-del3 base=顺序写@txg4 publishes_in_stream=4 writes=112 segments=16 largest_segment=26 states=89128985
+CRASH_COUNT flow=c-del1 base=新池新建文件@txg3 publishes_in_stream=2 writes=56 segments=8 largest_segment=26 states=68157453
+CRASH_COUNT flow=c-empty base=建空inode@txg4 publishes_in_stream=2 writes=56 segments=8 largest_segment=26 states=68157453
+CRASH_COUNT flow=c-midcreate base=顺序写@txg4 publishes_in_stream=5 writes=139 segments=20 largest_segment=26 states=93323295
+CRASH_COUNT flow=c-post base=删除步1@txg5 publishes_in_stream=3 writes=81 segments=12 largest_segment=26 states=69206035

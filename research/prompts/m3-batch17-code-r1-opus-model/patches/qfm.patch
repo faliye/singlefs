@@ -1,0 +1,70 @@
+diff -ru /tmp/claude-1000/m3-batch17-code-r1/tree/crates/singlefs-core/src/mounted_session.rs /tmp/claude-1000/m3-batch17-code-r1-opus/qf/qfm/crates/singlefs-core/src/mounted_session.rs
+--- crates/singlefs-core/src/mounted_session.rs
++++ crates/singlefs-core/src/mounted_session.rs
+@@ -47,6 +47,8 @@
+     /// 这次挂载认下的池（`MountOutput::parameters_and_device_table`；没经过可写挂载的会话读盘造，
+     /// `ParametersAndDeviceTableOfTheMount::of_a_pool_on_disk`）：写入口只按它的参数建，交进来的盘表与它的逐项比。
+     pub parameters_and_device_table: ParametersAndDeviceTableOfTheMount,
++    /// QFM 错实现（攻方副本）：会话里给过的最晚的时间，之后的改动时间只进不退。
++    pub latest_change_time_seconds: u64,
+ }
+ 
+ /// 用户的一次改动，经会话发布（发布路径那三种接在带文件的一版后面的改动）。
+@@ -292,6 +294,7 @@
+             instance: output.instance,
+             shadow_ledger: output.shadow_ledger,
+             parameters_and_device_table: output.parameters_and_device_table.clone(),
++            latest_change_time_seconds: 0,
+         };
+         (output, session)
+     }
+@@ -329,7 +332,22 @@
+             instance,
+             shadow_ledger,
+             parameters_and_device_table,
++            latest_change_time_seconds,
+         } = self;
++        // QFM 错实现（攻方副本）：会话内时间只进不退。
++        let change = match change {
++            UserChange::Unlink { inode, write_time_seconds } => {
++                let t = write_time_seconds.max(*latest_change_time_seconds);
++                *latest_change_time_seconds = t;
++                UserChange::Unlink { inode, write_time_seconds: t }
++            }
++            UserChange::NewInodes { count, write_time_seconds } => {
++                let t = write_time_seconds.max(*latest_change_time_seconds);
++                *latest_change_time_seconds = t;
++                UserChange::NewInodes { count, write_time_seconds: t }
++            }
++            other => other,
++        };
+         if !parameters_and_device_table.is_the_device_table_of_the_mount(devices) {
+             return Err(UserChangeRefused::DeviceTableOtherThanTheOneOfTheMount {
+                 device_table_of_the_mount: parameters_and_device_table
+diff -ru /tmp/claude-1000/m3-batch17-code-r1/tree/crates/singlefs-harness/src/history.rs /tmp/claude-1000/m3-batch17-code-r1-opus/qf/qfm/crates/singlefs-harness/src/history.rs
+--- crates/singlefs-harness/src/history.rs
++++ crates/singlefs-harness/src/history.rs
+@@ -3168,6 +3168,7 @@
+         carried_to_zero_unit_publishes,
+     } = session_slot.take().expect("上面判过这个进程的会话开着");
+     let mut mounted_session = MountedSession {
++        latest_change_time_seconds: 0, // QFM 错实现（攻方副本）
+         allocator,
+         current,
+         instance,
+@@ -3580,6 +3581,7 @@
+         carried_to_zero_unit_publishes: _,
+     } = session_slot.take().expect("上面判过这个进程的会话开着");
+     let mut mounted_session = MountedSession {
++        latest_change_time_seconds: 0, // QFM 错实现（攻方副本）
+         allocator,
+         current,
+         instance,
+@@ -3805,6 +3807,7 @@
+         carried_to_zero_unit_publishes: _,
+     } = session_slot.take().expect("上面判过这个进程的会话开着");
+     let mut mounted_session = MountedSession {
++        latest_change_time_seconds: 0, // QFM 错实现（攻方副本）
+         allocator,
+         current,
+         instance,

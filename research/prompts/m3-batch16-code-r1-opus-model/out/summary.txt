@@ -1,0 +1,244 @@
+[r2-narrow-jia] starts=222 start_failed=30 remounts_ok=8724 remount_err=0
+[r2-narrow-jia] starts_with_bad=0
+[r2-narrow-jia] sum prefix j=0 in_mount lost=dev0 read=same count=420883
+[r2-narrow-jia] sum prefix j=0 in_mount lost=dev1 read=same count=420883
+[r2-narrow-ga] starts=222 start_failed=30 remounts_ok=8724 remount_err=0
+[r2-narrow-ga] starts_with_bad=16
+[r2-narrow-ga] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=5479
+[r2-narrow-ga] sum prefix j=0 in_mount lost=dev0 read=same count=415100
+[r2-narrow-ga] sum prefix j=0 in_mount lost=dev1 read=same count=420579
+[r2-narrower-jia] starts=95 start_failed=13 remounts_ok=3560 remount_err=0
+[r2-narrower-jia] starts_with_bad=0
+[r2-narrower-jia] sum prefix j=0 in_mount lost=dev0 read=same count=236801
+[r2-narrower-jia] sum prefix j=0 in_mount lost=dev1 read=same count=236801
+[r2-narrower-ga] starts=95 start_failed=13 remounts_ok=3560 remount_err=0
+[r2-narrower-ga] starts_with_bad=18
+[r2-narrower-ga] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=4508
+[r2-narrower-ga] sum prefix j=0 in_mount lost=dev0 read=same count=232293
+[r2-narrower-ga] sum prefix j=0 in_mount lost=dev1 read=same count=236801
+[r2-plain-jia] starts=96 start_failed=0 remounts_ok=8664 remount_err=0
+[r2-plain-jia] starts_with_bad=0
+[r2-plain-jia] sum prefix j=0 in_mount lost=dev0 read=baseline_err_and_err count=3320
+[r2-plain-jia] sum prefix j=0 in_mount lost=dev0 read=known count=36604
+[r2-plain-jia] sum prefix j=0 in_mount lost=dev0 read=same count=166960
+[r2-plain-jia] sum prefix j=0 in_mount lost=dev1 read=known count=34848
+[r2-plain-jia] sum prefix j=0 in_mount lost=dev1 read=same count=172036
+[r2-plain-jia] sum prefix j=2 after_mount lost=dev0 read=known count=99240
+[r2-plain-jia] sum prefix j=2 after_mount lost=dev0 read=same count=141800
+[r2-plain-jia] sum prefix j=2 after_mount lost=dev1 read=known count=154220
+[r2-plain-jia] sum prefix j=2 after_mount lost=dev1 read=same count=86820
+[r2-plain-jia] sum prefix j=2 in_mount lost=dev0 read=baseline_err_and_err count=3320
+[r2-plain-jia] sum prefix j=2 in_mount lost=dev0 read=known count=36604
+[r2-plain-jia] sum prefix j=2 in_mount lost=dev0 read=same count=166960
+[r2-plain-jia] sum prefix j=2 in_mount lost=dev1 read=known count=34848
+[r2-plain-jia] sum prefix j=2 in_mount lost=dev1 read=same count=172036
+[r2-plain-ga] starts=96 start_failed=0 remounts_ok=8664 remount_err=0
+[r2-plain-ga] starts_with_bad=9
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=2154
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev0 read=baseline_err_and_err count=3320
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev0 read=known count=36604
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev0 read=same count=164378
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev1 read=known count=34848
+[r2-plain-ga] sum prefix j=0 in_mount lost=dev1 read=same count=171608
+[r2-plain-ga] sum prefix j=2 after_mount lost=dev0 read=known count=95240
+[r2-plain-ga] sum prefix j=2 after_mount lost=dev0 read=same count=141800
+[r2-plain-ga] sum prefix j=2 after_mount lost=dev1 read=known count=152220
+[r2-plain-ga] sum prefix j=2 after_mount lost=dev1 read=same count=84820
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev0 read=BAD_err count=2154
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev0 read=baseline_err_and_err count=3320
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev0 read=known count=36604
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev0 read=same count=164378
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev1 read=known count=34848
+[r2-plain-ga] sum prefix j=2 in_mount lost=dev1 read=same count=171608
+[r2-narrow-jia-hide1] starts=222 start_failed=30 remounts_ok=8724 remount_err=0
+[r2-narrow-jia-hide1] starts_with_bad=16
+[r2-narrow-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=5479
+[r2-narrow-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=same count=576920
+[r2-narrow-jia-hide1] sum prefix j=0 in_mount lost=dev1 read=same count=582399
+[r2-narrow-jia-hide0-half] starts=112 start_failed=14 remounts_ok=4273 remount_err=0
+[r2-narrow-jia-hide0-half] starts_with_bad=7
+[r2-narrow-jia-hide0-half] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=3404
+[r2-narrow-jia-hide0-half] sum prefix j=0 in_mount lost=dev0 read=same count=319982
+[r2-narrow-jia-hide0-half] sum prefix j=0 in_mount lost=dev1 read=same count=323386
+[r2-narrow-jia-hide1err-half] starts=112 start_failed=14 remounts_ok=4273 remount_err=0
+[r2-narrow-jia-hide1err-half] starts_with_bad=7
+[r2-narrow-jia-hide1err-half] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=3404
+[r2-narrow-jia-hide1err-half] sum prefix j=0 in_mount lost=dev0 read=same count=194804
+[r2-narrow-jia-hide1err-half] sum prefix j=0 in_mount lost=dev1 read=same count=198208
+[r2-narrow-nh-hide1] starts=222 start_failed=30 remounts_ok=7822 remount_err=902
+[r2-narrow-nh-hide1] starts_with_bad=0
+[r2-narrow-nh-hide1] sum prefix j=0 in_mount lost=dev0 read=same count=510047
+[r2-narrow-nh-hide1] sum prefix j=0 in_mount lost=dev1 read=same count=510047
+[r2-narrow-nh-hide1] sum remount_err j=0 count=902
+[r2-plain-small-jia-hide1] starts=72 start_failed=0 remounts_ok=6162 remount_err=0
+[r2-plain-small-jia-hide1] starts_with_bad=6
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=1362
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=baseline_err_and_err count=2232
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=known count=24312
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev0 read=same count=109719
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev1 read=known count=23016
+[r2-plain-small-jia-hide1] sum prefix j=0 in_mount lost=dev1 read=same count=114609
+[r2-plain-small-jia-hide1] sum prefix j=2 after_mount lost=dev0 read=known count=63672
+[r2-plain-small-jia-hide1] sum prefix j=2 after_mount lost=dev0 read=same count=94866
+[r2-plain-small-jia-hide1] sum prefix j=2 after_mount lost=dev1 read=known count=101760
+[r2-plain-small-jia-hide1] sum prefix j=2 after_mount lost=dev1 read=same count=56778
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev0 read=BAD_err count=1362
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev0 read=baseline_err_and_err count=2232
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev0 read=known count=24312
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev0 read=same count=109719
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev1 read=known count=23016
+[r2-plain-small-jia-hide1] sum prefix j=2 in_mount lost=dev1 read=same count=114609
+[r2-plain-small-nh-hide1] starts=72 start_failed=0 remounts_ok=6162 remount_err=0
+[r2-plain-small-nh-hide1] starts_with_bad=0
+[r2-plain-small-nh-hide1] sum prefix j=0 in_mount lost=dev0 read=baseline_err_and_err count=2232
+[r2-plain-small-nh-hide1] sum prefix j=0 in_mount lost=dev0 read=known count=24312
+[r2-plain-small-nh-hide1] sum prefix j=0 in_mount lost=dev0 read=same count=112149
+[r2-plain-small-nh-hide1] sum prefix j=0 in_mount lost=dev1 read=known count=23016
+[r2-plain-small-nh-hide1] sum prefix j=0 in_mount lost=dev1 read=same count=115677
+[r2-plain-small-nh-hide1] sum prefix j=2 after_mount lost=dev0 read=known count=70392
+[r2-plain-small-nh-hide1] sum prefix j=2 after_mount lost=dev0 read=same count=100434
+[r2-plain-small-nh-hide1] sum prefix j=2 after_mount lost=dev1 read=known count=107904
+[r2-plain-small-nh-hide1] sum prefix j=2 after_mount lost=dev1 read=same count=62922
+[r2-plain-small-nh-hide1] sum prefix j=2 in_mount lost=dev0 read=baseline_err_and_err count=2232
+[r2-plain-small-nh-hide1] sum prefix j=2 in_mount lost=dev0 read=known count=24312
+[r2-plain-small-nh-hide1] sum prefix j=2 in_mount lost=dev0 read=same count=112149
+[r2-plain-small-nh-hide1] sum prefix j=2 in_mount lost=dev1 read=known count=23016
+[r2-plain-small-nh-hide1] sum prefix j=2 in_mount lost=dev1 read=same count=115677
+[twice-tw-ga-200:1:4:2] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-ga-200:1:4:2] starts_with_bad=1
+[twice-tw-ga-200:1:4:2] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=308
+[twice-tw-ga-200:1:4:2] sum prefix j=0 in_mount lost=dev0 read=same count=1268
+[twice-tw-ga-200:1:4:2] sum prefix j=0 in_mount lost=dev1 read=same count=1576
+[twice-tw-ga-200:1:4:2] sum twice j=0 lost=dev0 read=BAD_err count=9634
+[twice-tw-ga-200:1:4:2] sum twice j=0 lost=dev0 read=same count=60794
+[twice-tw-ga-200:1:4:2] sum twice j=0 lost=dev1 read=same count=70428
+[twice-tw-ga-232:0:4:3] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-ga-232:0:4:3] starts_with_bad=1
+[twice-tw-ga-232:0:4:3] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=801
+[twice-tw-ga-232:0:4:3] sum prefix j=0 in_mount lost=dev0 read=same count=520
+[twice-tw-ga-232:0:4:3] sum prefix j=0 in_mount lost=dev1 read=same count=1321
+[twice-tw-ga-232:0:4:3] sum twice j=0 lost=dev0 read=BAD_err count=25223
+[twice-tw-ga-232:0:4:3] sum twice j=0 lost=dev0 read=same count=31588
+[twice-tw-ga-232:0:4:3] sum twice j=0 lost=dev1 read=same count=56811
+[twice-tw-ga-264:6:4:0] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-ga-264:6:4:0] starts_with_bad=1
+[twice-tw-ga-264:6:4:0] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=315
+[twice-tw-ga-264:6:4:0] sum prefix j=0 in_mount lost=dev0 read=same count=1006
+[twice-tw-ga-264:6:4:0] sum prefix j=0 in_mount lost=dev1 read=same count=1321
+[twice-tw-ga-264:6:4:0] sum twice j=0 lost=dev0 read=BAD_err count=14539
+[twice-tw-ga-264:6:4:0] sum twice j=0 lost=dev0 read=same count=42272
+[twice-tw-ga-264:6:4:0] sum twice j=0 lost=dev1 read=same count=56811
+[twice-tw-ga-p240] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-ga-p240] starts_with_bad=1
+[twice-tw-ga-p240] sum prefix j=0 in_mount lost=dev0 read=BAD_err count=308
+[twice-tw-ga-p240] sum prefix j=0 in_mount lost=dev0 read=known count=1204
+[twice-tw-ga-p240] sum prefix j=0 in_mount lost=dev0 read=same count=64
+[twice-tw-ga-p240] sum prefix j=0 in_mount lost=dev1 read=same count=1576
+[twice-tw-ga-p240] sum twice j=0 lost=dev0 read=BAD_err count=9634
+[twice-tw-ga-p240] sum twice j=0 lost=dev0 read=known count=60538
+[twice-tw-ga-p240] sum twice j=0 lost=dev0 read=same count=256
+[twice-tw-ga-p240] sum twice j=0 lost=dev1 read=same count=70428
+[twice-tw-jia-200:1:4:2] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-jia-200:1:4:2] starts_with_bad=0
+[twice-tw-jia-200:1:4:2] sum prefix j=0 in_mount lost=dev0 read=same count=1576
+[twice-tw-jia-200:1:4:2] sum prefix j=0 in_mount lost=dev1 read=same count=1576
+[twice-tw-jia-200:1:4:2] sum twice j=0 lost=dev0 read=same count=70428
+[twice-tw-jia-200:1:4:2] sum twice j=0 lost=dev1 read=same count=70428
+[twice-tw-jia-232:0:4:3] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-jia-232:0:4:3] starts_with_bad=0
+[twice-tw-jia-232:0:4:3] sum prefix j=0 in_mount lost=dev0 read=same count=1321
+[twice-tw-jia-232:0:4:3] sum prefix j=0 in_mount lost=dev1 read=same count=1321
+[twice-tw-jia-232:0:4:3] sum twice j=0 lost=dev0 read=same count=56811
+[twice-tw-jia-232:0:4:3] sum twice j=0 lost=dev1 read=same count=56811
+[twice-tw-jia-264:6:4:0] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-jia-264:6:4:0] starts_with_bad=0
+[twice-tw-jia-264:6:4:0] sum prefix j=0 in_mount lost=dev0 read=same count=1321
+[twice-tw-jia-264:6:4:0] sum prefix j=0 in_mount lost=dev1 read=same count=1321
+[twice-tw-jia-264:6:4:0] sum twice j=0 lost=dev0 read=same count=56811
+[twice-tw-jia-264:6:4:0] sum twice j=0 lost=dev1 read=same count=56811
+[twice-tw-jia-p240] starts=1 start_failed=0 remounts_ok=33 remount_err=0
+[twice-tw-jia-p240] starts_with_bad=0
+[twice-tw-jia-p240] sum prefix j=0 in_mount lost=dev0 read=known count=1204
+[twice-tw-jia-p240] sum prefix j=0 in_mount lost=dev0 read=same count=372
+[twice-tw-jia-p240] sum prefix j=0 in_mount lost=dev1 read=same count=1576
+[twice-tw-jia-p240] sum twice j=0 lost=dev0 read=known count=60538
+[twice-tw-jia-p240] sum twice j=0 lost=dev0 read=same count=10162
+[twice-tw-jia-p240] sum twice j=0 lost=dev1 read=same count=70700
+[l1-ga] R2ENUM narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=6144 R2Verdict { lost: 0, chosen: Some(19), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410)]", inter_unmount: 0, inter_remount: 1 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=8195 R2Verdict { lost: 0, chosen: Some(19), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412)]", inter_unmount: 0, inter_remount: 1 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=264 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=1792 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 1 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(22), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(20), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-ga] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=9 R2Verdict { lost: 1, chosen: Some(23), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia-hide1] R2ENUM narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=6144 R2Verdict { lost: 0, chosen: Some(19), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1410)]", inter_unmount: 0, inter_remount: 1 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=8195 R2Verdict { lost: 0, chosen: Some(19), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1412)]", inter_unmount: 0, inter_remount: 1 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=264 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=1792 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 1 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(22), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(20), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=9 R2Verdict { lost: 1, chosen: Some(23), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia] R2ENUM narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[l1-jia] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=16395 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(22), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(20), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-jia] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=9 R2Verdict { lost: 1, chosen: Some(23), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-nh-hide1] R2ENUM narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[l1-nh-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=16395 R2Verdict { lost: 0, chosen: Some(19), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-nh-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(22), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-nh-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(20), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l1-nh-hide1] R2ENUMV narrow U=264 k=6 u=4 b=0 cont=WalkedToEmpty n=15 j=0 count=9 R2Verdict { lost: 1, chosen: Some(23), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-ga] R2ENUM plain W=240 k=0 m=1 k2=1 n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={}
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=1024 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[open:ExtentTreeWalk(MappingStillUnreadable { slot: SlotNumbe]", inter_unmount: 0, inter_remount: 1 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=6144 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1474)]", inter_unmount: 0, inter_remount: 1 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=8195 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1476)]", inter_unmount: 0, inter_remount: 1 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=1032 R2Verdict { lost: 0, chosen: Some(4), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(7), read: "known", inter_unmount: 0, inter_remount: 0 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(6), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-ga] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=9 R2Verdict { lost: 1, chosen: Some(8), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia-hide1] R2ENUM plain W=240 k=0 m=1 k2=1 n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={}
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=1024 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[open:ExtentTreeWalk(MappingStillUnreadable { slot: SlotNumbe]", inter_unmount: 0, inter_remount: 1 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=6144 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1474)]", inter_unmount: 0, inter_remount: 1 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=8195 R2Verdict { lost: 0, chosen: Some(4), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1476)]", inter_unmount: 0, inter_remount: 1 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=1032 R2Verdict { lost: 0, chosen: Some(4), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(7), read: "known", inter_unmount: 0, inter_remount: 0 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(6), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=9 R2Verdict { lost: 1, chosen: Some(8), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia] R2ENUM plain W=240 k=0 m=1 k2=1 n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={}
+[l2-jia] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=16395 R2Verdict { lost: 0, chosen: Some(4), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(7), read: "known", inter_unmount: 0, inter_remount: 0 }
+[l2-jia] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(6), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-jia] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=9 R2Verdict { lost: 1, chosen: Some(8), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-nh-hide1] R2ENUM plain W=240 k=0 m=1 k2=1 n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=0 failed_states=0 checker_violated={}
+[l2-nh-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=16395 R2Verdict { lost: 0, chosen: Some(4), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-nh-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=4116 R2Verdict { lost: 0, chosen: Some(7), read: "known", inter_unmount: 0, inter_remount: 0 }
+[l2-nh-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=20502 R2Verdict { lost: 1, chosen: Some(6), read: "same", inter_unmount: 0, inter_remount: 0 }
+[l2-nh-hide1] R2ENUMV plain W=240 k=0 m=1 k2=1 n=1 j=0 count=9 R2Verdict { lost: 1, chosen: Some(8), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e1-renum-h2-jia-hide1] R2ENUM narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=12302 R2Verdict { lost: 0, chosen: Some(13), read: "BAD_err[ro:Open(Walk(MappingStillUnreadable { slot: SlotNumber(1411)]", inter_unmount: 0, inter_remount: 1 }
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=2056 R2Verdict { lost: 0, chosen: Some(13), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=6144 R2Verdict { lost: 0, chosen: Some(13), read: "same", inter_unmount: 0, inter_remount: 1 }
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=9 R2Verdict { lost: 0, chosen: Some(16), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=16395 R2Verdict { lost: 1, chosen: Some(14), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e1-renum-h2-jia-hide1] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=4116 R2Verdict { lost: 1, chosen: Some(15), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e2-renum-h2-jia] R2ENUM narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 closed_form_states=20496 states=20511 observed=20511 violations=20511 failed_states=0 checker_violated={}
+[e2-renum-h2-jia] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=20502 R2Verdict { lost: 0, chosen: Some(13), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e2-renum-h2-jia] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=9 R2Verdict { lost: 0, chosen: Some(16), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e2-renum-h2-jia] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=16395 R2Verdict { lost: 1, chosen: Some(14), read: "same", inter_unmount: 0, inter_remount: 0 }
+[e2-renum-h2-jia] R2ENUMV narrow U=176 k=0 u=4 b=3 cont=WalkedToEmpty n=1 j=0 count=4116 R2Verdict { lost: 1, chosen: Some(15), read: "same", inter_unmount: 0, inter_remount: 0 }
+[n1-s2n-jia] starts=93 start_failed=33 unmount_raised=93 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2n-imm] starts=93 start_failed=33 unmount_raised=93 unmount_err=0 starts_with_intersection=12 intersection_slot_lines_sum=19 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2nc-jia] starts=30 start_failed=0 unmount_raised=30 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2nc-imm] starts=30 start_failed=0 unmount_raised=30 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2c-jia] starts=177 start_failed=15 unmount_raised=177 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2c-imm] starts=177 start_failed=15 unmount_raised=177 unmount_err=0 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[n1-s2a-jia] starts=22 start_failed=2 unmount_raised=20 unmount_err=2 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[abandon-chosen-jia] cut_verdicts=2799 chosen_the_abandoned_root=0
+[n1-s2a-imm] starts=22 start_failed=2 unmount_raised=20 unmount_err=2 starts_with_intersection=0 intersection_slot_lines_sum=0 start_lost_pairs_with_old_root_read_failure=0 such_cuts=0
+[abandon-chosen-imm] cut_verdicts=2799 chosen_the_abandoned_root=0
+[qf-jia] 180 qf_lines; identical=true wrong_times_nonzero=false=180 
+[qf-n7clamp] QFTALLY identical=true wrong_times_nonzero=true count=2
+[unmount-hide]  1272 Err NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot 
+[tests-n7clamp]  1 test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; ; 1 test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; ; 1 test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; ; 1 test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; ; 1 test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; ;

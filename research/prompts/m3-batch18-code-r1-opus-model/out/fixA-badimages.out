@@ -1,0 +1,24 @@
+BAD_IMAGE case=「V1 第一批之后队列 {1} 改 {1,7}（7 没有记录）」 only_red_itself=true violated=["I-9.5"] watched=I-9.6=H,I-9.5=V,I-3.4=H,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V1 第一批之后队列 {1} 改 {1,7}（7 没有记录）」 I-9.5：根（实例 1、txg 6）：deleted_inodes 里的号 7 在同一版的 inode 树（树 65537）里没有记录
+BAD_IMAGE case=「V2 意图之后队列 {1} 改 {1,2}（2 号活着、nlink 1）」 only_red_itself=true violated=["I-9.5"] watched=I-9.6=H,I-9.5=V,I-3.4=H,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V2 意图之后队列 {1} 改 {1,2}（2 号活着、nlink 1）」 I-9.5：根（实例 1、txg 6）：deleted_inodes 里的号 2 在同一版的 inode 树（树 65537）里的记录 nlink = 1，不是 0
+BAD_IMAGE case=「V3 只在意图那一版把空 inode 2 的 nlink 改 0（最新根写对）」 only_red_itself=true violated=["I-9.5"] watched=I-9.6=H,I-9.5=V,I-3.4=H,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V3 只在意图那一版把空 inode 2 的 nlink 改 0（最新根写对）」 I-9.5：根（实例 1、txg 6）：inode 树（树 65537）里 inode 2 的记录 nlink = 0，号不在同一版的 deleted_inodes 里
+BAD_IMAGE case=「V4 三个单元（有下段）的文件拿掉记录、单元留着」 only_red_itself=true violated=["I-4.7"] watched=I-9.6=H,I-9.5=H,I-3.4=H,I-4.7=V,I-4.6=N,I-4.4=N
+BAD_IMAGE_DETAIL case=「V4 三个单元（有下段）的文件拿掉记录、单元留着」 I-4.7：根（实例 1、txg 5）：inode 1 处于删除中（inode 树里没有它的记录），extent 树里还有 3 个数据单元，号也不在 deleted_inodes 里
+BAD_IMAGE case=「V5 意图那一版 size 2.5 净荷改 1.5 净荷（要 2 个、有 3 个）」 only_red_itself=true violated=["I-4.6"] watched=I-9.6=H,I-9.5=H,I-3.4=H,I-4.7=H,I-4.6=V,I-4.4=N
+BAD_IMAGE_DETAIL case=「V5 意图那一版 size 2.5 净荷改 1.5 净荷（要 2 个、有 3 个）」 I-4.6：根（实例 1、txg 5）：inode 1 的记录 nlink = 0、size 48951，按净荷容量 32634 要 2 个数据单元，extent 树里有 3 个
+BAD_IMAGE case=「V6 意图那一版 size 改 0（要 0 或 1 个、有 3 个）」 only_red_itself=true violated=["I-4.6"] watched=I-9.6=H,I-9.5=H,I-3.4=H,I-4.7=H,I-4.6=V,I-4.4=N
+BAD_IMAGE_DETAIL case=「V6 意图那一版 size 改 0（要 0 或 1 个、有 3 个）」 I-4.6：根（实例 1、txg 5）：inode 1 的记录 nlink = 0、size 0，按净荷容量 32634 要 0 或 1 个数据单元，extent 树里有 3 个
+BAD_IMAGE case=「V7 意图那一版记账标签 4 那一行 0 改 1」 only_red_itself=true violated=["I-3.4"] watched=I-9.6=H,I-9.5=H,I-3.4=V,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V7 意图那一版记账标签 4 那一行 0 改 1」 I-3.4：根（实例 1、txg 5）的记账树（树 65539）里待删除但意图未完成占用（标签 4、设备段 0xffffffff）那一行的值是 1，不是 0
+BAD_IMAGE case=「V8 只在第一批那一版拿掉标签 4 那一行（最新根写对）」 only_red_itself=true violated=["I-3.4"] watched=I-9.6=H,I-9.5=H,I-3.4=V,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V8 只在第一批那一版拿掉标签 4 那一行（最新根写对）」 I-3.4：根（实例 1、txg 6）的记账树（树 65539）走全了，没有待删除但意图未完成占用（标签 4、设备段 0xffffffff）那一行
+BAD_IMAGE case=「V9 删完之后记账 inode 号水位 2 改 1（墓碑对象 ID 1）」 only_red_itself=true violated=["I-9.6"] watched=I-9.6=V,I-9.5=H,I-3.4=H,I-4.7=H,I-4.6=H,I-4.4=N
+BAD_IMAGE_DETAIL case=「V9 删完之后记账 inode 号水位 2 改 1（墓碑对象 ID 1）」 I-9.6：记账里的 inode 号水位 1 不大于 inode 树内最大 key 1
+BAD_IMAGE case=「L1a 最新那一版树表 deleted_inodes 条目种类码 9 改 13」 literal_red=I-9.5 checker_verdict=N missed=true reason=走读到的某一版树表里头 ID 指着某棵 inode 树的 deleted_inodes 条目不是恰好一条：那一版判不了 violated=["I-9.16"] watched=I-9.6=H,I-9.5=N,I-3.4=H,I-4.7=N,I-4.6=N,I-4.4=N
+BAD_IMAGE case=「L1b 最新那一版树表 deleted_inodes 条目整条拿掉」 literal_red=I-9.5 checker_verdict=N missed=true reason=走读到的某一版树表里头 ID 指着某棵 inode 树的 deleted_inodes 条目不是恰好一条：那一版判不了 violated=["I-9.16"] watched=I-9.6=H,I-9.5=N,I-3.4=H,I-4.7=N,I-4.6=N,I-4.4=N
+BAD_IMAGE case=「L1c 只在第一批那一版树表把 deleted_inodes 种类码改 13」 literal_red=I-9.5 checker_verdict=N missed=true reason=走读到的某一版树表里头 ID 指着某棵 inode 树的 deleted_inodes 条目不是恰好一条：那一版判不了 violated=["I-9.16"] watched=I-9.6=H,I-9.5=N,I-3.4=H,I-4.7=N,I-4.6=N,I-4.4=N
+BAD_IMAGE case=「L1d 对照：最新那一版 deleted_inodes 头 ID 改成 extent 树的树 ID」 literal_red=I-9.5 checker_verdict=N missed=true reason=走读到的某一版树表里头 ID 指着某棵 inode 树的 deleted_inodes 条目不是恰好一条：那一版判不了 violated=["I-9.27"] watched=I-9.6=H,I-9.5=N,I-3.4=H,I-4.7=N,I-4.6=N,I-4.4=N
+BAD_IMAGE case=「L2 L1a 之上再把 1 号 size 加一个净荷（要 4 个、有 3 个）」 literal_red=I-4.6 checker_verdict=N missed=true reason=走读到的某一版树表里头 ID 指着某棵 inode 树的 deleted_inodes 条目不是恰好一条：那一版判不了 violated=["I-9.16"] watched=I-9.6=H,I-9.5=N,I-3.4=H,I-4.7=N,I-4.6=N,I-4.4=N
+BAD_IMAGE_SUMMARY cases_not_as_expected=5

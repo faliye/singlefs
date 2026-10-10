@@ -1,0 +1,27 @@
+--- /tmp/claude-1000/m3-batch10-code-r2/tree/crates/singlefs-core/src/mount.rs	2026-10-05 13:27:06.902324457 +0000
++++ crates/singlefs-core/src/mount.rs	2026-10-05 14:01:36.458014828 +0000
+@@ -1955,8 +1955,11 @@
+     // 「已释放 ∧ 释放代 ≤ max(F_生效, 环里最旧有效根)」）。拒在取号之前，盘上逐字节不变。
+     let first_readings = read_every_root_ring_slot_once();
+     let window_anchor_of_the_first_readings =
+-        newest_valid_root_txg_of_the_readings(&first_readings)
+-            .filter(|_| a_valid_root_was_read_on_every_device(&first_readings));
++        newest_valid_root_txg_of_the_readings(&first_readings).filter(|_| {
++            // 攻方原型开关（只在副本上）：SINGLEFS_OPUS_RR2_OFF 设了就退回 rr2 之前的触发（整环一条都没有才重读）。
++            std::env::var_os("SINGLEFS_OPUS_RR2_OFF").is_some()
++                || a_valid_root_was_read_on_every_device(&first_readings)
++        });
+     let (ring_slot_readings, window_anchor, root_ring_of_the_rebuilt_allocator) =
+         match window_anchor_of_the_first_readings {
+             Some(window_anchor) => (
+@@ -1967,6 +1970,10 @@
+             None => {
+                 before_the_one_reread.before_rereading();
+                 let readings_of_the_reread = read_every_root_ring_slot_once();
++                // 攻方原型开关（只在副本上）：SINGLEFS_OPUS_REREAD_REFUSES 设了就当重读那一遍一条都没有（造一个错拒 Q3 的实现）。
++                if std::env::var_os("SINGLEFS_OPUS_REREAD_REFUSES").is_some() {
++                    return Err(MountError::NoValidRootInTheRootRingOfTheRebuiltAllocatorAfterOneReread);
++                }
+                 let Some(window_anchor) =
+                     newest_valid_root_txg_of_the_readings(&readings_of_the_reread)
+                 else {

@@ -1,0 +1,190 @@
+   Compiling singlefs-core v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-opus/qf/crates/singlefs-core)
+warning: variable does not need to be mutable
+    --> crates/singlefs-core/src/mount.rs:2955:17
+     |
+2955 |             let mut reclaimed = match newest_valid_root_txg_on_every_device(
+     |                 ----^^^^^^^^^
+     |                 |
+     |                 help: remove this `mut`
+     |
+     = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+   Compiling singlefs-harness v0.1.0 (/tmp/claude-1000/m3-batch14-code-r1-opus/qf/crates/singlefs-harness)
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.60s
+     Running tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount-007cdc6f9ef9ebd8)
+
+running 2 tests
+test after_the_first_unmount_publish_of_a_narrow_pool_whose_deletion_was_continued_a_lone_surviving_device_reads_back_what_it_read_before ... ok
+test after_the_first_publish_of_a_second_unmount_of_a_four_gibibyte_pool_a_lone_surviving_device_reads_back_what_it_read_before ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.40s
+
+     Running tests/admission_raises_the_floor_before_refusing.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/admission_raises_the_floor_before_refusing-56077624ac43594f)
+
+running 26 tests
+test a_continuation_step_failing_after_the_admission_raised_the_floor_hands_back_every_landed_write ... ok
+test a_floor_raise_failing_on_a_device_error_in_the_continuation_hands_back_the_writes_of_the_mounts_publishes ... ok
+test a_continuation_step_failing_after_both_the_admission_and_the_continuation_raised_the_floor_hands_back_every_landed_write ... ok
+test a_continuation_step_failing_on_its_root_slot_write_hands_back_every_landed_write ... ok
+test a_continuation_step_failing_on_its_second_unit_write_hands_back_every_landed_write ... ok
+test a_continuation_step_failing_on_its_journal_record_write_hands_back_every_landed_write ... ok
+test a_continuation_step_failing_after_the_continuation_raised_the_floor_hands_back_every_landed_write ... ok
+test after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor ... FAILED
+test after_a_mount_whose_continuation_stays_short_the_next_mount_is_refused_by_the_placement_before_acquisition_writing_nothing ... ok
+test a_floor_raise_in_the_continuation_failing_on_its_system_configuration_write_hands_back_every_landed_write ... ok
+test an_unlink_whose_intent_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+test an_unlink_whose_last_batch_and_the_floor_raise_pushed_for_it_both_find_no_unblocked_slot_hands_back_no_space_with_the_intent_published ... ok
+test at_366_instance_rows_every_admitted_overwrite_leaves_the_next_mounts_row_so_a_crash_remount_is_admitted_before_acquisition ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test an_unlink_whose_last_batch_finds_no_unblocked_slot_is_refused_by_the_landing_judgement_and_published_after_raising_the_floor_in_the_session ... ok
+test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... ok
+test known_root_slot_that_reads_bad_once_is_reread_and_the_ceiling_is_unchanged ... ok
+test an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version ... FAILED
+test root_slot_already_unreadable_at_mount_counts_as_no_root_and_does_not_block_the_floor_raise ... ok
+test a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims ... FAILED
+test writable_mount_on_a_version_without_file_short_of_its_reserve_is_refused_before_acquisition_with_the_disk_unchanged ... ok
+test a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue ... FAILED
+test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... ok
+test a_mount_whose_deletion_continuation_finds_no_unblocked_slot_raises_the_floor_and_continues_to_the_emptied_version ... ok
+test after_a_file_is_truncated_the_same_size_is_written_back_within_three_user_visible_publishes ... ok
+test mount_still_short_after_the_publishes_of_one_admission_is_made_and_its_writes_report_no_space_until_a_normal_unmount ... ok
+test crash_only_remounts_on_a_narrow_pool_push_floor_raises_after_the_row_publish_and_never_get_stuck ... ok
+
+failures:
+
+---- after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor stdout ----
+
+thread 'after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor' (64575) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:1662:5:
+回收出来的槽里有释放代高于 19 的（txg 19 那条根还引用着，GA 下扣到生效）
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version stdout ----
+
+thread 'an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version' (64579) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:1662:5:
+回收出来的槽里有释放代高于 19 的（txg 19 那条根还引用着，GA 下扣到生效）
+
+---- a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims stdout ----
+
+thread 'a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims' (64570) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:772:5:
+assertion `left == right` failed: 卸载之后池级 checker 全绿
+  left: ["I-3.1: 盘 0：记账的已分配 Some(753664)，遍历全部有效根得到 540672（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 25、环里自证过的根槽 24 个、最老的自证过的根 txg 2、遍历的候选根槽 4 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 22、低于 F 的根槽 20 个、一圈窗口之外的根槽 0 个"]
+ right: []
+
+---- a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue stdout ----
+
+thread 'a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue' (64572) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:570:5:
+assertion `left == right` failed: 卸载之后池级 checker 全绿
+  left: ["I-3.1: 盘 0：记账的已分配 Some(999424)，遍历全部有效根得到 573440（其中隔离豁免 0、F 之下仍在 defer 的 0）；机理：根环槽数 24、最新根 txg 23、环里自证过的根槽 24 个、最老的自证过的根 txg 0、遍历的候选根槽 3 个、并进遍历的由记录施加出来的版本 0 个、被实例表判抛弃的根槽 0 个、回退下界 F 21、低于 F 的根槽 21 个、一圈窗口之外的根槽 0 个"]
+ right: []
+
+
+failures:
+    a_mount_whose_continuation_walks_to_empty_without_raising_the_floor_is_unmounted_on_the_slots_its_unmount_sequence_reclaims
+    a_mount_whose_deletion_continuation_stays_short_after_raising_the_floor_is_made_writable_and_its_unmount_lets_the_next_mount_continue
+    after_the_unmount_loses_power_before_any_root_with_the_new_floor_a_lone_surviving_device_recovers_its_own_newest_root_below_the_floor
+    an_unmount_losing_power_after_its_system_configuration_write_before_any_root_with_the_new_floor_recovers_to_the_current_version
+
+test result: FAILED. 21 passed; 4 failed; 1 ignored; 0 measured; 0 filtered out; finished in 14.54s
+
+error: test failed, to rerun pass `-p singlefs-harness --test admission_raises_the_floor_before_refusing`
+     Running tests/model_answers_unmount_with_the_floor_at_the_current_version.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/model_answers_unmount_with_the_floor_at_the_current_version-61d7000cfa0d63f1)
+
+running 5 tests
+test an_unmount_whose_roots_carry_the_floor_of_the_current_version_instead_of_its_txg_is_reported_at_the_rollback_floor ... ok
+test unmount_on_an_overwrite_at_txg_four_pushes_three_empty_publishes_carrying_floor_four_and_the_model_agrees ... ok
+test unmount_on_a_version_without_trees_writes_nothing_and_the_model_answers_zero_roots_and_agrees ... ok
+test unmount_on_the_first_file_at_txg_three_pushes_two_empty_publishes_carrying_floor_three_and_the_model_agrees ... ok
+test an_unmount_that_pushes_empty_publishes_on_a_version_without_trees_is_reported_at_the_publish_count ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.49s
+
+     Running tests/mount_transparency_judged_field_by_field_after_a_writable_mount.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/mount_transparency_judged_field_by_field_after_a_writable_mount-f3fc39dd2b77e6f6)
+
+running 33 tests
+test a_floor_raise_pushed_inside_the_continuation_is_located_between_the_continuation_steps ... ok
+test a_recovery_after_the_mount_that_applies_a_record_is_red ... ok
+test a_mount_that_raises_no_floor_keeps_the_effective_floor_and_writes_it_into_its_root ... ok
+test a_second_crash_recovering_content_other_than_the_first_version_is_red ... ok
+test a_second_crash_right_after_the_acquisition_recovers_the_first_version_field_by_field ... ok
+test a_checkpoint_txg_that_does_not_clear_the_newest_record_of_the_crash_image_is_red ... ok
+test a_tree_identifier_watermark_that_moved_with_the_mount_is_red ... ok
+test a_second_crash_after_the_warm_up_judges_the_floor_unchanged_and_one_after_the_first_floor_raise_write_leaves_it_unjudged ... ok
+test after_a_mount_on_a_pool_left_by_an_unmount_the_unmount_marker_is_not_written_by_the_unmount_sequence ... ok
+test after_a_mount_that_continued_the_deletion_the_two_tree_root_pointers_are_those_of_its_last_continuation_step ... ok
+test a_mount_that_raises_the_floor_leaves_the_effective_floor_at_the_last_one_it_raised_to ... ok
+test an_effective_floor_that_moved_although_the_mount_raised_none_is_red ... ok
+test an_instance_generation_one_too_high_after_the_mount_is_red ... ok
+test an_immutable_configuration_with_another_device_count_after_the_mount_is_red ... ok
+test floor_raises_pushed_by_both_the_admission_and_the_continuation_are_located_from_the_first_admission_raise ... ok
+test floor_raises_pushed_by_the_mount_admission_are_located_before_the_continuation_that_follows_them ... ok
+test a_mount_whose_continuation_raised_the_floor_leaves_the_effective_floor_at_the_last_one_the_continuation_raised_to ... ok
+test an_inode_tree_root_pointer_that_moved_with_the_mount_is_red ... ok
+test an_instance_table_row_whose_applied_transaction_is_dropped_is_red ... ok
+test a_mount_whose_floor_raises_are_not_in_the_handed_writes_leaves_the_floor_of_every_second_crash_unjudged ... ok
+test posix_content_of_the_version_before_the_publish_after_the_mount_is_the_content_recovered_from_the_crash_image ... ok
+test the_first_mount_of_a_new_pool_takes_one_above_every_instance_on_the_crash_image ... ok
+test posix_content_that_differs_from_the_crash_image_is_red ... ok
+test instance_table_rows_follow_the_recovery_rule_when_the_crash_image_is_rebuilt_from_a_record ... ok
+test an_unmount_marker_after_the_mount_is_red ... ok
+test the_checkpoint_txg_lies_above_every_root_and_record_of_a_crash_image_rebuilt_from_a_record ... ok
+test the_tree_identifier_watermark_is_unchanged_by_a_mount_alone ... ok
+test the_immutable_configuration_except_this_device_is_the_same_after_a_mount_alone ... ok
+test an_effective_floor_other_than_the_last_one_the_mount_raised_to_is_red ... ok
+test the_two_user_visible_tree_root_pointers_before_the_publish_after_the_mount_are_those_of_the_crash_image ... ok
+test the_recovery_after_the_mount_applies_no_record_even_when_the_crash_image_was_rebuilt_from_one ... ok
+test the_floor_raise_boundary_is_located_by_position_when_every_system_configuration_write_carries_a_higher_effective_floor ... ok
+test the_floor_raise_boundary_is_not_taken_early_when_an_earlier_system_configuration_write_carries_the_raised_floor ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.25s
+
+     Running tests/reuse_after_raising_the_floor.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/reuse_after_raising_the_floor-3ba9612a2f7c672d)
+
+running 16 tests
+test floor_carried_by_the_system_configuration_takes_effect_on_remount_even_when_one_device_lost_its_root_carrying_it ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test floor_carried_by_the_system_configuration_takes_effect_on_remount_with_both_carrier_roots_intact ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test four_overwrites_after_crash_recovery_abandoned_the_third_version_are_red_only_on_i_7_4_before_any_floor_raise_in_the_known_double_fault_form ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test raising_the_floor_above_the_fourth_newest_non_empty_root_is_refused ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test raising_the_floor_is_refused_when_a_valid_root_tree_table_is_unreadable ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test raising_the_floor_to_the_first_release_generation_reclaims_the_first_data_slot_and_the_next_publish_reuses_it ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test reclaiming_without_raising_the_floor_reuses_a_slot_a_candidate_root_still_references_and_the_checker_goes_red ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test rolling_back_after_the_floor_carrier_this_process_wrote_on_device_one_reads_not_self_verified_is_refused_before_any_write ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_state_repeated_by_rollbacks_is_counted_once_for_the_floor_ceiling_by_the_entry_and_by_the_checker ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test the_transaction_number_keeps_counting_per_instance_across_the_empty_publishes_that_raise_the_floor ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test torn_journal_record_does_not_turn_its_root_into_an_empty_root_for_the_floor_ceiling ... ignored, harness 慢档用例：debug 下单条跑过 60 秒；随时跑：cargo test -p singlefs-harness -- --ignored，经内存包装
+test raising_the_floor_when_the_current_roots_instance_table_is_unreadable_is_refused_before_any_write ... ok
+test raising_the_floor_in_the_make_filesystem_process_after_three_overwrites_reads_the_instance_table_through_the_root ... ok
+test rolling_back_while_mounted_takes_the_floor_from_the_system_configuration_when_it_is_above_every_root_carried_floor ... ok
+
+test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 2.76s
+
+     Running tests/unlink_mount_continuation_and_the_emptied_version.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/unlink_mount_continuation_and_the_emptied_version-395c716adb759702)
+
+running 14 tests
+test only_the_version_after_the_final_batch_rebuilds_as_with_trees_and_no_file ... ok
+test new_inodes_on_the_emptied_version_are_published_and_the_version_holds_files_again ... ok
+test after_the_unlink_the_session_holds_the_emptied_version_and_refuses_an_overwrite_before_any_write ... ok
+test the_intent_and_a_middle_batch_each_set_the_change_count_to_the_txg_of_their_own_publish ... ok
+test the_intent_writes_the_given_time_into_the_three_time_fields_and_a_middle_batch_copies_it ... ok
+test a_session_mounted_with_batches_of_one_unlinks_a_three_unit_file_in_an_intent_and_three_steps ... ok
+test the_tombstone_prepay_of_an_overwrite_reads_the_tombstone_tree_height_from_the_root_node_header ... ok
+test an_overwrite_after_rolling_back_to_the_intent_walks_the_queue_and_its_refusal_carries_every_version_it_published ... ok
+test a_writable_mount_after_the_intent_continues_the_queue_to_empty_after_its_warm_up ... ok
+test rolling_back_to_the_intent_takes_its_deleted_inodes_root_and_the_next_mount_continues_it_to_empty ... ok
+test a_mount_whose_continuation_step_fails_on_a_device_error_hands_back_the_writes_of_every_publish_it_landed ... ok
+test the_session_hands_in_the_intent_and_every_step_of_an_unlink_in_publish_order ... ok
+test the_mount_hands_in_every_continuation_step_after_its_warm_up_in_publish_order ... ok
+test two_copies_of_the_image_between_two_batches_continue_to_byte_identical_disks ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.84s
+
+     Running tests/unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence.rs (/tmp/claude-1000/m3-batch14-code-r1-opus/target-qf/debug/deps/unmount_marker_of_a_root_rebuilt_from_the_records_of_the_unmount_sequence-a8fbb768e54d8015)
+
+running 1 test
+test a_root_rebuilt_from_both_records_of_the_unmount_sequence_takes_the_unmount_marker_from_the_record ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+
+error: 1 target failed:
+    `-p singlefs-harness --test admission_raises_the_floor_before_refusing`

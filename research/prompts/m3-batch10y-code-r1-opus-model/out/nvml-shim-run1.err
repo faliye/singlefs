@@ -1,0 +1,2 @@
+NVMLCALL nvmlDeviceGetMemoryInfo_v2 dev=0x70ffacc80898 t_us=112227489255.4..112227489266.2
+NVMLCALL nvmlDeviceGetMemoryInfo_v2 dev=0x70ffaccf5298 t_us=112227490614.1..112227490622.0
