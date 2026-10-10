@@ -1,0 +1,27 @@
+
+running 1 test
+SON ab k=0 grow=2 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=10 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=20 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=30 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=40 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=50 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=0 grow=60 first=ok(raises=0) c_before=(1, 22) ab_before=1
+SON ab k=2 grow=2 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=10 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=20 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=30 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=40 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=50 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=2 grow=60 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(16) iso_field=20 c_before=(1, 18) ab_before=1 iso_all_before=44 push=pushed(18) real_released=44 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON ab k=6 grow=2 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=6 grow=10 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=6 grow=20 first=ok(raises=0) c_before=(1, 18) ab_before=1
+SON ab k=6 grow=30 STUCK listed=true reh=ChangeAdmittedAfterThePush { isolated_sl n_field=19 r_txg=Some(20) iso_field=236 c_before=(1, 18) ab_before=1 iso_all_before=260 push=pushed(19) real_released=260 text_times=19 text_slots=19 text_released=260 retry=["ok"]
+SON ab k=6 grow=40 STUCK listed=true reh=ChangeAdmittedAfterThePush { isolated_sl n_field=19 r_txg=Some(20) iso_field=236 c_before=(1, 18) ab_before=1 iso_all_before=260 push=pushed(19) real_released=260 text_times=19 text_slots=19 text_released=260 retry=["ok"]
+SON ab k=6 grow=50 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(20) iso_field=236 c_before=(1, 18) ab_before=1 iso_all_before=260 push=pushed(19) real_released=260 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON ab k=6 grow=60 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(20) iso_field=236 c_before=(1, 18) ab_before=1 iso_all_before=260 push=pushed(19) real_released=260 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+test son_abandoned_and_c_stuck_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 0.69s
+

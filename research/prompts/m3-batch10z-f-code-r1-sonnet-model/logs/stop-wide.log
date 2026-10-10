@@ -1,0 +1,10 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-f-code-r1-sonnet/copy-a/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.35s
+     Running tests/sonnet_stop_wide.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-f-code-r1-sonnet/target-a/debug/deps/sonnet_stop_wide-72067c63b6942032)
+
+running 1 test
+STOP_FILE_REMOVED runs=24000 ends={"EveryBlockStored": 13463, "NotRun": 3882, "StoppedOnRequest": 6655} asserts_panicked=0 cards_panicked=0 stopped_on_request_but_run_not_marked_stopped_early=0 stop_seen_and_the_file_gone_at_the_end=1602
+test a_stop_file_removed_mid_run_neither_panics_the_round_nor_leaves_the_stopped_run_unmarked ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.69s
+

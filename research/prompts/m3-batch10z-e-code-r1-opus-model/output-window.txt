@@ -1,0 +1,4 @@
+WINDOW rust_backtrace=None panics=50 first_micros=49 rest_median_micros=9 rest_max_micros=23
+WINDOW rust_backtrace=Some("1") panics=50 first_micros=7782 rest_median_micros=220 rest_max_micros=283
+WINDOW rust_backtrace=Some("full") panics=50 first_micros=8809 rest_median_micros=1134 rest_max_micros=1214
+GAP threads=6 seconds=1 longest_micros=1998 gaps_over_100_micros=3

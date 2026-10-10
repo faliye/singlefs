@@ -1,0 +1,22 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.97s
+     Running tests/lost_restart_model.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/target/debug/deps/lost_restart_model-b8f7cbf9f5a0f331)
+
+running 1 test
+DIRECTED healthy: lease 10000 built, device started: ledger_room=19550 truth=19550
+DIRECTED device lost, ledger not asked yet (window): ledger_room=19550 truth=16990
+DIRECTED prepare after loss -> Ok(())
+DIRECTED after the first prepare (new device not started): ledger_room=16990 truth=16990
+DIRECTED restarted, dead share freed, new device started (k=1): ledger_room=16990 truth=19550
+DIRECTED k=2 prepare -> Ok(())
+DIRECTED restarted again (k=2): ledger_room=14430 truth=19550
+DIRECTED k=3 prepare -> Ok(())
+DIRECTED restarted again (k=3): ledger_room=11870 truth=19550
+DIRECTED k=4 prepare -> Ok(())
+DIRECTED restarted again (k=4): ledger_room=9310 truth=19550
+DIRECTED k=5 prepare -> Ok(())
+DIRECTED restarted again (k=5): ledger_room=6990 truth=19550
+test directed_loss_window_and_k_restarts ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

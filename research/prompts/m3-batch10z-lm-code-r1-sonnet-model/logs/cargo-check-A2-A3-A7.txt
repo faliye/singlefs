@@ -1,0 +1,3 @@
+A2 函数体最前面 return（整句不执行） rc= 0 | Checking singlefs-checker-tier v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-chk/crates/singlefs-checke / Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.37s
+A3 丢没丢与 poll 两个闭包对调位置（类型相同，编得过） rc= 0 | Checking singlefs-checker-tier v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-chk/crates/singlefs-checke / Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.31s
+A7 叫停：往下交的换成永不叫停、另加一句 let _ = stop_is_requested rc= 0 | Checking singlefs-checker-tier v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-chk/crates/singlefs-checke / Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.29s

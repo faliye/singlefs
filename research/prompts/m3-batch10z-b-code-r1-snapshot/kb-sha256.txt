@@ -1,0 +1,4 @@
+f04bed2e3fa34a54dd9afffb0e8b9247627950538417608c0a256e835ca2d1d3  .claude/kb/decisions/16-发布语义.md
+9d70036af3b7816c3b972429ca04b3aa1e9d5ff61ec9add9f0ee421477dbfa71  .claude/kb/decisions/23-journal的角色与格式.md
+0789e07ebd511b33b3fe86cb7047628e3a0e38e21997988438a3b2a79a3bc345  .claude/kb/decisions/28-挂载期承诺量.md
+7fd0a0000c17345e3e9b3dccd64a910a3833e09ed9496c36ca05c50de9d7bce2  .claude/kb/invariants.md

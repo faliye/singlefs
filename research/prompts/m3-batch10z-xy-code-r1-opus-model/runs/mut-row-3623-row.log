@@ -1,0 +1,23 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 36.4 GiB，这一条要 12.0 GiB（峰值表里没有这条，按它的上限 12G 算），总上限 40.1 GiB；账上在跑 5 条
+run-with-memory-cap: 排了 37 秒，起跑（singlefs-memory-cap-1867670-1304514587）
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/singlefs_core-473295d7695e4d7d)
+
+running 1 test
+test mounted_session::tests::the_device_keeping_writes_in_memory_on_4096_byte_physical_blocks_agrees_with_a_device_written_through_on_a_random_request_stream ... FAILED
+
+failures:
+
+---- mounted_session::tests::the_device_keeping_writes_in_memory_on_4096_byte_physical_blocks_agrees_with_a_device_written_through_on_a_random_request_stream stdout ----
+
+thread 'mounted_session::tests::the_device_keeping_writes_in_memory_on_4096_byte_physical_blocks_agrees_with_a_device_written_through_on_a_random_request_stream' (1869519) panicked at crates/singlefs-core/src/mounted_session.rs:2134:9:
+每个请求两边交回值与读回的字节相同，而 6892 个对不上，头几个：["第 4 个请求（写 18446744073709551254 起 12288 字节）：写穿的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551254), length: 12288, physical_block_size: 4096 })，只进内存的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551254), length: 12288, physical_block_size: 512 })", "第 6 个请求（读 18446744073709551448 起 0 字节）：写穿的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551448), length: 0, physical_block_size: 4096 })，只进内存的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551448), length: 0, physical_block_size: 512 })", "第 7 个请求（写 65536 起 42242 字节）：写穿的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(65536), length: 42242, physical_block_size: 4096 })，只进内存的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(65536), length: 42242, physical_block_size: 512 })", "第 9 个请求（写 18446744073709551227 起 0 字节）：写穿的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551227), length: 0, physical_block_size: 4096 })，只进内存的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(18446744073709551227), length: 0, physical_block_size: 512 })", "第 11 个请求（写 36864 起 47672 字节）：写穿的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(36864), length: 47672, physical_block_size: 4096 })，只进内存的盘交回 Err(Unaligned { offset: DeviceOffsetInBytes(36864), length: 47672, physical_block_size: 512 })"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mounted_session::tests::the_device_keeping_writes_in_memory_on_4096_byte_physical_blocks_agrees_with_a_device_written_through_on_a_random_request_stream
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 225 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `-p singlefs-core --lib`

@@ -1,0 +1,439 @@
+
+use std::str::FromStr;
+use std::io::BufRead;
+mod gpu { #![allow(dead_code, unused, warnings)]
+
+
+    /// `text` 以 `"` 起头时，那一个字符串字面量连两头引号的长度（反斜杠连同它转义的那个字跳过）。
+    fn length_of_the_quoted_literal_at_the_start(text: &str) -> usize {
+        let bytes = text.as_bytes();
+        let mut position = 1;
+        loop {
+            let byte = *bytes.get(position).expect("字符串字面量有收尾的引号");
+            if byte == b'"' {
+                return position + 1;
+            }
+            position += if byte == b'\\' { 2 } else { 1 };
+        }
+    }
+
+    /// `text` 以 `'` 起头时，那一个字符字面量连两头引号的长度；是生命周期（`'static`、`'_`）交 `None`。
+    fn length_of_the_character_literal_at_the_start(text: &str) -> Option<usize> {
+        let after_the_quote = &text[1..];
+        if after_the_quote.starts_with('\\') {
+            // 转义的（`'\''`、`'\n'`、`'\u{7b}'`）：收尾的引号在反斜杠与它后面那个字之后
+            let closing_quote = 3 + text[3..].find('\'').expect("转义的字符字面量有收尾的引号");
+            return Some(closing_quote + 1);
+        }
+        let first_character = after_the_quote.chars().next().expect("引号后面还有字");
+        after_the_quote[first_character.len_utf8()..]
+            .starts_with('\'')
+            .then(|| first_character.len_utf8() + 2)
+    }
+
+    /// `text` 是原始字符串去掉 `r`、`br`、`cr` 之后那一截（以若干个 `#` 与一个 `"` 起头）时，到收尾的 `"` 与同样多个 `#` 为止的长度。
+    fn length_of_the_raw_string_at_the_start(text: &str) -> usize {
+        let hashes = text.len() - text.trim_start_matches('#').len();
+        let closing = format!("\"{}", "#".repeat(hashes));
+        let body_start = hashes + 1;
+        body_start + text[body_start..].find(&closing).expect("原始字符串有收尾") + closing.len()
+    }
+
+    /// `text` 以 `/*` 起头时，那一段块注释（可以嵌套）的长度。
+    fn length_of_the_block_comment_at_the_start(text: &str) -> usize {
+        let mut depth = 0_usize;
+        let mut position = 0;
+        loop {
+            let rest = &text[position..];
+            if rest.starts_with("/*") {
+                depth += 1;
+                position += 2;
+            } else if rest.starts_with("*/") {
+                depth -= 1;
+                position += 2;
+                if depth == 0 {
+                    return position;
+                }
+            } else {
+                position += rest.chars().next().expect("块注释有收尾").len_utf8();
+            }
+        }
+    }
+
+    /// 拼成关键字的原始标识符（`r#mod`、`r#use`）是名字，不是关键字：分词时这几个连着 `r#` 出词，免得被当成关键字（第 10z 批第二十三块，
+    /// 正推 K4-2 L14）；别的原始标识符（`r#std`）与不带 `r#` 的同名，取它后面的名字。
+    const KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL: [&str; 48] = [
+        "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "do",
+        "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+        "return", "static", "struct", "trait", "true", "try", "type", "typeof", "unsafe",
+        "unsized", "use", "virtual", "where", "while", "yield",
+    ];
+
+    /// `code` 拆成的词：标识符与关键字（`r#` 原始标识符取它后面的名字，拼成关键字的连着 `r#`）、生命周期（连着它前面的 `'`）、
+    /// 数字（照标识符那样收一段）、`::`、`!=`，其余标点一个字一个词；注释（行注释、可以嵌套的块注释）、字符串与字符字面量
+    /// （普通的、原始的 `r#"…"#`、`br`、`cr`，字节的、C 的）不出词。认原始字符串的写法与崩溃放量那一份数花括号
+    /// （`crash_amplification.rs` 的 `lines_read_past_comments_and_literals`）相同：`r`、`br`、`cr` 后面紧跟若干个 `#` 与一个 `"`。
+    /// 扫源码的用例照它找条目、`use` 引进来的名字与花括号的层数：字面量与注释里的 `mod`、`use`、花括号都不算。
+    /// 非 ASCII 的字只落在注释、字面量与标识符里，切出来的词因此总在字符边界上。
+    fn rust_tokens_without_comments_and_literals(code: &str) -> Vec<&str> {
+        rust_tokens_with_their_offsets(code)
+            .into_iter()
+            .map(|(_offset, token)| token)
+            .collect()
+    }
+
+    /// [`rust_tokens_without_comments_and_literals`] 的词，各连同它在 `code` 里起头的字节位置。
+    fn rust_tokens_with_their_offsets(code: &str) -> Vec<(usize, &str)> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut tokens = Vec::new();
+        let mut position = 0;
+        while position < code.len() {
+            let rest = &code[position..];
+            let first_character = rest.chars().next().expect("没到结尾就还有字");
+            if first_character.is_whitespace() {
+                position += first_character.len_utf8();
+            } else if rest.starts_with("//") {
+                position += rest.find('\n').unwrap_or(rest.len());
+            } else if rest.starts_with("/*") {
+                position += length_of_the_block_comment_at_the_start(rest);
+            } else if first_character == '"' {
+                position += length_of_the_quoted_literal_at_the_start(rest);
+            } else if first_character == '\'' {
+                match length_of_the_character_literal_at_the_start(rest) {
+                    Some(literal_length) => position += literal_length,
+                    None => {
+                        let lifetime_length = 1 + rest[1..]
+                            .find(|character: char| !is_identifier_character(character))
+                            .unwrap_or(rest.len() - 1);
+                        tokens.push((position, &rest[..lifetime_length]));
+                        position += lifetime_length;
+                    }
+                }
+            } else if is_identifier_character(first_character) {
+                let word_length = rest
+                    .find(|character: char| !is_identifier_character(character))
+                    .unwrap_or(rest.len());
+                let word = &rest[..word_length];
+                let after_the_word = &rest[word_length..];
+                if matches!(word, "r" | "br" | "cr")
+                    && after_the_word.trim_start_matches('#').starts_with('"')
+                {
+                    position += word_length + length_of_the_raw_string_at_the_start(after_the_word);
+                } else if word == "r" && after_the_word.starts_with('#') {
+                    // 原始标识符 `r#名字`：拼成关键字的连着 `r#` 出词（`r#mod` 是名字，不是关键字），别的名字下一圈照标识符收
+                    let name = &after_the_word[1..];
+                    let name_length = name
+                        .find(|character: char| !is_identifier_character(character))
+                        .unwrap_or(name.len());
+                    if KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL.contains(&&name[..name_length]) {
+                        tokens.push((position, &rest[..word_length + 1 + name_length]));
+                        position += word_length + 1 + name_length;
+                    } else {
+                        position += word_length + 1;
+                    }
+                } else if matches!(word, "b" | "c") && after_the_word.starts_with('"') {
+                    position +=
+                        word_length + length_of_the_quoted_literal_at_the_start(after_the_word);
+                } else if word == "b" && after_the_word.starts_with('\'') {
+                    position += word_length
+                        + length_of_the_character_literal_at_the_start(after_the_word)
+                            .expect("b 后面紧跟引号的是字节字面量");
+                } else {
+                    tokens.push((position, word));
+                    position += word_length;
+                }
+            } else if rest.starts_with("::") {
+                tokens.push((position, "::"));
+                position += 2;
+            } else if rest.starts_with("!=") {
+                // 不等号整个一个词：拆成 `!`、`=` 时，条目层 `const 名: bool = 甲 != 乙;` 的 `甲 !` 会被认成调宏
+                tokens.push((position, "!="));
+                position += 2;
+            } else {
+                tokens.push((position, &rest[..first_character.len_utf8()]));
+                position += first_character.len_utf8();
+            }
+        }
+        tokens
+    }
+
+
+  pub fn tokens(code: &str) -> Vec<(usize, &str)> { rust_tokens_with_their_offsets(code) } }
+mod crash { #![allow(dead_code, unused, warnings)]
+
+
+    /// 数花括号时，读到的这个字在源码的哪一种地方（跨行时带到下一行）。
+    #[derive(Clone, Copy)]
+    enum PlaceInTheSource {
+        Code,
+        InsideAString,
+        /// 原始字符串（`r"…"`、`r#"…"#`、`br"…"`、`cr"…"`）：收尾是一个 `"` 后面跟这么多个 `#`。
+        InsideARawString {
+            closing_hashes: usize,
+        },
+        /// 块注释，可以嵌套：`nesting` 是还没收尾的 `/*` 有几层。
+        InsideABlockComment {
+            nesting: usize,
+        },
+    }
+
+    /// 读过的一个字算源码里的哪一类（`lines_read_past_comments_and_literals`）。
+    #[derive(Clone, Copy)]
+    enum KindOfACharacterInTheSource {
+        Code,
+        /// 行注释、块注释里的字，连同 `//`、`/*`、`*/`。
+        Comment,
+        /// 字符串（普通的、原始的）与字符字面量里的字，连同引号与原始字符串的 `r`、`br`、`cr` 和 `#`。
+        Literal,
+    }
+
+    /// 一行读过注释与字面量之后的样子（`lines_read_past_comments_and_literals`）。
+    struct LineReadPastCommentsAndLiterals {
+        /// 这一行起头处在第几层花括号里。
+        brace_depth_at_the_start: usize,
+        /// 注释里的字换成空格（一个字换成与它的 UTF-8 字节数一样多的空格，字节位置不变），字面量照原样。
+        without_comments: String,
+        /// 注释与字面量里的字都换成空格，字节位置不变：扫源码的用例照它找名字、数 `let`、数花括号，注释与字符串里写的不算。
+        without_comments_and_literals: String,
+    }
+
+    /// `lines` 每一行起头处在第几层花括号里（第一行起头算第 0 层）：字符串（普通的、原始的）、字符字面量、行注释与块注释（可以嵌套）里的
+    /// 花括号不算，字符串、块注释跨行时照跨着数。
+    ///
+    /// # Panics
+    /// 右花括号多于左花括号。
+    fn brace_depth_at_the_start_of_each_line(lines: &[&str]) -> Vec<usize> {
+        lines_read_past_comments_and_literals(lines)
+            .iter()
+            .map(|read_line| read_line.brace_depth_at_the_start)
+            .collect()
+    }
+
+    /// `lines` 逐行读过注释与字面量：每一行起头处的花括号层数，连同去掉注释、去掉注释与字面量的两份（字节位置与原行相同）。
+    /// 字符串（普通的、原始的 `r"…"`、`r#"…"#`、`br`、`cr`）、字符字面量、行注释与块注释（可以嵌套）里的花括号不算，
+    /// 字符串、块注释跨行时照跨着读。与卡池扫源码那一份分词（`gpu_unit_checks.rs` 的 `rust_tokens_without_comments_and_literals`）
+    /// 认原始字符串的写法相同：`r`、`br`、`cr` 后面紧跟若干个 `#` 与一个 `"`。
+    ///
+    /// # Panics
+    /// 右花括号多于左花括号。
+    fn lines_read_past_comments_and_literals(
+        lines: &[&str],
+    ) -> Vec<LineReadPastCommentsAndLiterals> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut depth = 0_usize;
+        let mut place = PlaceInTheSource::Code;
+        let mut read_lines = Vec::with_capacity(lines.len());
+        for line in lines {
+            let brace_depth_at_the_start = depth;
+            let characters: Vec<char> = line.chars().collect();
+            let mut kinds = vec![KindOfACharacterInTheSource::Code; characters.len()];
+            let mut index = 0;
+            while index < characters.len() {
+                let character = characters[index];
+                let next_character = characters.get(index + 1).copied();
+                let read_from = index;
+                let place_before = place;
+                match place {
+                    PlaceInTheSource::InsideAString => {
+                        if character == '\\' {
+                            index += 1;
+                        } else if character == '"' {
+                            place = PlaceInTheSource::Code;
+                        }
+                    }
+                    PlaceInTheSource::InsideARawString { closing_hashes } => {
+                        let closing_hashes_follow = characters
+                            .get(index + 1..index + 1 + closing_hashes)
+                            .is_some_and(|after_the_quote| {
+                                after_the_quote.iter().all(|after| *after == '#')
+                            });
+                        if character == '"' && closing_hashes_follow {
+                            index += closing_hashes;
+                            place = PlaceInTheSource::Code;
+                        }
+                    }
+                    PlaceInTheSource::InsideABlockComment { nesting } => {
+                        if character == '/' && next_character == Some('*') {
+                            index += 1;
+                            place = PlaceInTheSource::InsideABlockComment {
+                                nesting: nesting + 1,
+                            };
+                        } else if character == '*' && next_character == Some('/') {
+                            index += 1;
+                            place = match nesting.checked_sub(1) {
+                                Some(0) | None => PlaceInTheSource::Code,
+                                Some(nesting_left) => PlaceInTheSource::InsideABlockComment {
+                                    nesting: nesting_left,
+                                },
+                            };
+                        }
+                    }
+                    PlaceInTheSource::Code => {
+                        if character == '"' {
+                            place = PlaceInTheSource::InsideAString;
+                        } else if character == '\'' {
+                            // 字符字面量（`'x'`、`'\''`、`'\u{7b}'`）整个跳过；生命周期（`'static`）只跳这个引号
+                            if next_character == Some('\\') {
+                                index += 2;
+                                while characters.get(index + 1).is_some_and(|next| *next != '\'') {
+                                    index += 1;
+                                }
+                                index += 1;
+                            } else if characters.get(index + 2) == Some(&'\'') {
+                                index += 2;
+                            }
+                        } else if character == '/' && next_character == Some('/') {
+                            kinds[index..].fill(KindOfACharacterInTheSource::Comment);
+                            break;
+                        } else if character == '/' && next_character == Some('*') {
+                            index += 1;
+                            place = PlaceInTheSource::InsideABlockComment { nesting: 1 };
+                        } else if is_identifier_character(character) {
+                            // 一整个词跳过；词是 r、br、cr 而后面紧跟若干个 # 与一个 " 的，是原始字符串的开头
+                            let word_end = characters[index..]
+                                .iter()
+                                .position(|after| !is_identifier_character(*after))
+                                .map_or(characters.len(), |word_length| index + word_length);
+                            let word: String = characters[index..word_end].iter().collect();
+                            let opening_hashes = characters[word_end..]
+                                .iter()
+                                .take_while(|after| **after == '#')
+                                .count();
+                            if matches!(word.as_str(), "r" | "br" | "cr")
+                                && characters.get(word_end + opening_hashes) == Some(&'"')
+                            {
+                                index = word_end + opening_hashes;
+                                place = PlaceInTheSource::InsideARawString {
+                                    closing_hashes: opening_hashes,
+                                };
+                            } else {
+                                index = word_end - 1;
+                            }
+                        } else if character == '\u{7b}' {
+                            depth += 1;
+                        } else if character == '\u{7d}' {
+                            depth = depth.checked_sub(1).expect("右花括号不多于左花括号");
+                        }
+                    }
+                }
+                index += 1;
+                let kind_read = match place_before {
+                    PlaceInTheSource::InsideAString | PlaceInTheSource::InsideARawString { .. } => {
+                        KindOfACharacterInTheSource::Literal
+                    }
+                    PlaceInTheSource::InsideABlockComment { .. } => {
+                        KindOfACharacterInTheSource::Comment
+                    }
+                    PlaceInTheSource::Code => match place {
+                        PlaceInTheSource::InsideAString
+                        | PlaceInTheSource::InsideARawString { .. } => {
+                            KindOfACharacterInTheSource::Literal
+                        }
+                        PlaceInTheSource::InsideABlockComment { .. } => {
+                            KindOfACharacterInTheSource::Comment
+                        }
+                        // 一次读过不止一个字的引号是整个字符字面量；生命周期只读过那一个引号
+                        PlaceInTheSource::Code if character == '\'' && index > read_from + 1 => {
+                            KindOfACharacterInTheSource::Literal
+                        }
+                        PlaceInTheSource::Code => KindOfACharacterInTheSource::Code,
+                    },
+                };
+                kinds[read_from..index.min(characters.len())].fill(kind_read);
+            }
+            let mut without_comments = String::with_capacity(line.len());
+            let mut without_comments_and_literals = String::with_capacity(line.len());
+            for (character, kind) in characters.iter().zip(&kinds) {
+                let spaces = " ".repeat(character.len_utf8());
+                match kind {
+                    KindOfACharacterInTheSource::Code => {
+                        without_comments.push(*character);
+                        without_comments_and_literals.push(*character);
+                    }
+                    KindOfACharacterInTheSource::Comment => {
+                        without_comments.push_str(&spaces);
+                        without_comments_and_literals.push_str(&spaces);
+                    }
+                    KindOfACharacterInTheSource::Literal => {
+                        without_comments.push(*character);
+                        without_comments_and_literals.push_str(&spaces);
+                    }
+                }
+            }
+            read_lines.push(LineReadPastCommentsAndLiterals {
+                brace_depth_at_the_start,
+                without_comments,
+                without_comments_and_literals,
+            });
+        }
+        read_lines
+    }
+
+
+  pub fn depths(lines: &[&str]) -> Vec<usize> { brace_depth_at_the_start_of_each_line(lines) } }
+
+fn truth_depths(text: &str, line_count: usize) -> Option<Vec<usize>> {
+    let stream = proc_macro2::TokenStream::from_str(text).ok()?;
+    let mut groups = Vec::new();
+    fn walk(stream: proc_macro2::TokenStream, groups: &mut Vec<(usize, usize)>) {
+        for tree in stream {
+            if let proc_macro2::TokenTree::Group(g) = tree {
+                if g.delimiter() == proc_macro2::Delimiter::Brace {
+                    groups.push((g.span_open().start().line, g.span_close().start().line));
+                }
+                walk(g.stream(), groups);
+            }
+        }
+    }
+    walk(stream, &mut groups);
+    let mut diff = vec![0i64; line_count + 3];
+    for (o, c) in groups {
+        // 1 起的行号；起头处在里面：o < L <= c
+        if o < c { diff[o + 1] += 1; diff[c + 1] -= 1; }
+    }
+    let mut depth = 0i64; let mut out = Vec::new();
+    for l in 1..=line_count { depth += diff[l]; out.push(depth as usize); }
+    Some(out)
+}
+
+fn gpu_depths(text: &str, line_count: usize) -> Vec<usize> {
+    let tokens = gpu::tokens(text);
+    let mut line_starts = vec![0usize];
+    for (i, b) in text.bytes().enumerate() { if b == b'\n' { line_starts.push(i + 1); } }
+    let mut out = Vec::new();
+    let mut depth = 0i64; let mut ti = 0;
+    for l in 0..line_count {
+        let start = line_starts[l];
+        while ti < tokens.len() && tokens[ti].0 < start {
+            if tokens[ti].1 == "{" { depth += 1; } else if tokens[ti].1 == "}" { depth -= 1; }
+            ti += 1;
+        }
+        out.push(depth.max(0) as usize);
+    }
+    out
+}
+
+fn main() {
+    std::panic::set_hook(Box::new(|_| {}));
+    let mut stats = std::collections::BTreeMap::<String, usize>::new();
+    let stdin = std::io::stdin();
+    for path in stdin.lock().lines() {
+        let path = path.unwrap();
+        let Ok(text) = std::fs::read_to_string(&path) else { *stats.entry("unreadable".into()).or_default() += 1; continue; };
+        let lines: Vec<&str> = text.split('\n').collect();
+        let Some(truth) = truth_depths(&text, lines.len()) else { *stats.entry("proc_macro2_rejects".into()).or_default() += 1; continue; };
+        *stats.entry("files_with_truth".into()).or_default() += 1;
+        let crash_r = std::panic::catch_unwind(|| crash::depths(&lines));
+        let gpu_r = std::panic::catch_unwind(|| gpu_depths(&text, lines.len()));
+        let mut verdict = Vec::new();
+        match &crash_r { Err(_) => verdict.push("crash_panic".to_string()), Ok(d) => if *d != truth { let line = d.iter().zip(&truth).position(|(a, b)| a != b).unwrap_or(0); verdict.push(format!("crash_depth_differs@{}", line + 1)); } }
+        match &gpu_r { Err(_) => verdict.push("gpu_panic".to_string()), Ok(d) => if *d != truth { let line = d.iter().zip(&truth).position(|(a, b)| a != b).unwrap_or(0); verdict.push(format!("gpu_depth_differs@{}", line + 1)); } }
+        if let (Ok(a), Ok(b)) = (&crash_r, &gpu_r) { if a != b { verdict.push("crash_vs_gpu_differ".into()); } }
+        for v in &verdict { *stats.entry(v.split('@').next().unwrap().to_string()).or_default() += 1; }
+        if !verdict.is_empty() { println!("{path}: {}", verdict.join(" ")); }
+    }
+    for (k, v) in stats { println!("STAT {k} {v}"); }
+}

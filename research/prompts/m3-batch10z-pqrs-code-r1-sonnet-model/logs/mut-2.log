@@ -1,0 +1,8 @@
+ringLenMinus: rc=0 红 0 条  | ['test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.54s'] (25s)
+skipDevCheck: rc=0 红 0 条  | ['test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.53s'] (25s)
+isoAllSlots: rc=101 红 3 条 a_rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protect a_deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_pr | ['test result: FAILED. 32 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.82s'] (25s)
+emptyHeld: rc=0 红 0 条  | ['test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.54s'] (25s)
+diskReadWholeIso: rc=101 红 2 条 defer_slots_an_abandoned_root_references_are_not_counted_twice_at_the_ defer_slots_an_abandoned_root_whose_ring_slot_reads_bad_references_are | ['test result: FAILED. 33 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.55s'] (25s)
+notRecordedAsNotAllocated: rc=0 红 0 条  | ['test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.53s'] (25s)
+badSlotLoopOld: rc=101 红 1 条 defer_slots_an_abandoned_root_whose_ring_slot_reads_bad_references_are | ['test result: FAILED. 34 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 5.53s'] (25s)
+txgOfRNone: rc=101 红 3 条 a_rollback_after_twenty_overwrites_stuck_behind_the_wide_protection_is an_inode_creation_after_forty_overwrites_stuck_behind_the_wide_protect a_deletion_after_one_hundred_sixty_overwrites_stuck_behind_the_wide_pr | ['test result: FAILED. 32 passed; 3 failed; 1 ignored; 0 measured; 0 filtered out; finished in 4.82s'] (24s)

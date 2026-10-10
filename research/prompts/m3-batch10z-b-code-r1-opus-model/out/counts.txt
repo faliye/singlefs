@@ -1,0 +1,18 @@
+# X1
+X1 arm=today fault=slot histories=90 refused=90 refused_while_C_abandoned=90 checker_red=0
+X1 arm=today fault=account histories=90 refused=0 refused_while_C_abandoned=0 checker_red=0
+X1 arm=today fault=none histories=90 refused=0 refused_while_C_abandoned=0 checker_red=0
+X1 arm=slot fault=slot histories=90 refused=18 refused_while_C_abandoned=0 checker_red=0
+X1 arm=slot fault=account histories=90 refused=0 refused_while_C_abandoned=0 checker_red=0
+X1 arm=slot fault=none histories=90 refused=0 refused_while_C_abandoned=0 checker_red=0
+# F1
+F1 arm=cring form1 var=A histories=285 refused=0 checker_red=0 r_units_overwritten=0
+F1 arm=cring form1 var=B histories=345 refused=0 checker_red=0 r_units_overwritten=0
+F1 arm=cring form1 var=none histories=285 refused=0 checker_red=0 r_units_overwritten=0
+F1 arm=cring other var=A histories=60 refused=20 checker_red=0 r_units_overwritten=0
+F1 arm=cring other var=none histories=60 refused=0 checker_red=0 r_units_overwritten=8
+F1 arm=today form1 var=A histories=285 refused=285 checker_red=0 r_units_overwritten=0
+F1 arm=today form1 var=B histories=345 refused=0 checker_red=0 r_units_overwritten=0
+F1 arm=today form1 var=none histories=285 refused=0 checker_red=0 r_units_overwritten=0
+F1 arm=today other var=A histories=60 refused=20 checker_red=0 r_units_overwritten=0
+F1 arm=today other var=none histories=60 refused=0 checker_red=0 r_units_overwritten=8

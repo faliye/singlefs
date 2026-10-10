@@ -1,0 +1,187 @@
+
+running 1 test
+test s2_sweep ... S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=4P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=8X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=13P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oobFPWFFXWFooP secs=1.91 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=5P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=9X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=12P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oGWWWPFbWXFFPX secs=1.92 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=13 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=1P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=14X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=15X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oPWoWXFWWooWbbXXGFb secs=2.66 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=14 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=8P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=11X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=bWGXbXbPPGbXoXGG secs=2.05 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=11 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=0P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=3P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=18X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=PWGPWXPPWFbFoobbWWX secs=2.36 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=9P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=14P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=15P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=o r_txg=37 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=FooFGbPoWPoWWWPPWG secs=2.37 selected=37 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rall,qall persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=4P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=8X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=13P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=oobFPWFFXWFooP secs=1.86 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=5P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=9X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=12P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=oGWWWPFbWXFFPX secs=1.82 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=13 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=1P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=14X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=15X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=oPWoWXFWWooWbbXXGFb secs=2.62 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=14 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=8P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=11X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=bWGXbXbPPGbXoXGG secs=2.03 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=- iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=11 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=0P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=3P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=18X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=PWGPWXPPWFbFoobbWWX secs=2.45 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=9P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=14P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=15P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=o r=b2 r_txg=37 r_old_txg=34 r_old_in_ring=true faults=rroot,qroot persist=false actions=FooFGbPoWPoWWWPPWG secs=2.40 selected=37 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rall,qall persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=racct,qracct,rlin persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=4P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=8X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=13P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oobFPWFFXWFooP secs=1.82 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=5P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=9X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=12P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oGWWWPFbWXFFPX secs=1.79 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=1P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=14X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=15X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=oPWoWXFWWooWbbXXGFb secs=2.51 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=14 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=8P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=11X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=bWGXbXbPPGbXoXGG secs=2.03 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=11 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=0P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=3P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=18X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=PWGPWXPPWFbFoobbWWX secs=2.46 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=9P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=14P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=15P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=o r_txg=38 r_old_txg=- r_old_in_ring=false faults=rroot,qroot persist=false actions=FooFGbPoWPoWWWPPWG secs=2.56 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rall,qall persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oobFPWFFXWFooP secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oGWWWPFbWXFFPX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oPWoWXFWWooWbbXXGFb secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=bWGXbXbPPGbXoXGG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=PWGPWXPPWFbFoobbWWX secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=FooFGbPoWPoWWWPPWG secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1586)})
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=4P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=8X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oobFPWFFXWFooP step=13P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=oobFPWFFXWFooP secs=1.96 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=5P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=9X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=12P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oGWWWPFbWXFFPX step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=oGWWWPFbWXFFPX secs=1.88 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=1P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=14X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=oPWoWXFWWooWbbXXGFb step=15X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=oPWoWXFWWooWbbXXGFb secs=2.63 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=14 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=8P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=11X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=bWGXbXbPPGbXoXGG step=13X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=bWGXbXbPPGbXoXGG secs=2.16 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=11 hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=0P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=3P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=5X X:remount-ok:hold=0:iso=0
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=7P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=PWGPWXPPWFbFoobbWWX step=18X X:remount-ok:hold=0:iso=0
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=PWGPWXPPWFbFoobbWWX secs=2.39 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=6P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=9P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=14P pushRef:Nothing
+DIAG label=d2 prefix=30 r=o;b2 faults=rroot,qroot actions=FooFGbPoWPoWWWPPWG step=15P pushRef:Nothing
+S2 label=d2 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid=oo r=b2 r_txg=38 r_old_txg=35 r_old_in_ring=true faults=rroot,qroot persist=false actions=FooFGbPoWPoWWWPPWG secs=2.35 selected=38 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=d2 arm=implemented histories=72 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 53.57s
+

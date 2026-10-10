@@ -1,0 +1,3 @@
+test raising_the_floor_over_a_root_left_in_a_hole_below_an_abandoned_root_keeps_the_allocated_statistic_with_the_deferred_threshold_on_the_whole_ring ... ok
+test a_remount_isolates_no_slot_an_abandoned_root_shares_with_valid_roots_left_in_the_holes_outside_the_one_revolution_window ... ok
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.69s

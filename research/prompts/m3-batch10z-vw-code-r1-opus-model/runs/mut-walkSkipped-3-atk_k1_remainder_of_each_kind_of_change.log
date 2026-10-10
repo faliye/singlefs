@@ -1,0 +1,71 @@
+
+running 1 test
+ATK k1kinds k1main overwrite(1) first=admitted published=1
+ATK k1kinds k1main overwrite(2999) first=admitted published=1
+ATK k1kinds k1main overwrite(16317) first=admitted published=1
+ATK k1kinds k1main overwrite(32634) first=admitted published=1
+ATK k1kinds k1main seq(+1) first=admitted published=1
+ATK k1kinds k1main seq(+5) first=admitted published=1
+ATK k1kinds k1main seq(+13) published=0 remainder_ok=true ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds k1main seq(+20) published=0 remainder_ok=true ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1kinds k1main seq(+40) published=0 remainder_ok=true ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1kinds k1main inodes(1) first=admitted published=1
+ATK k1kinds k1main inodes(2) first=admitted published=1
+ATK k1kinds k1main inodes(8) first=admitted published=1
+ATK k1kinds k1main inodes(32) first=admitted published=1
+ATK k1kinds k1main inodes(128) first=admitted published=1
+ATK k1kinds k1main inodes(512) first=admitted published=1
+ATK k1kinds k1main unlink(first) first=admitted published=2
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } overwrite(1) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } overwrite(2999) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } overwrite(16317) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } overwrite(32634) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } seq(+1) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } seq(+5) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } seq(+13) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } seq(+20) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } seq(+40) published=0 remainder_ok=true ask=adm ask_io=(2,640,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(1) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(2) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(8) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(32) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(128) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } inodes(512) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(20) retry=admitted agree=yes n_reh=[220, 220] n_real=[220, 220] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds RollbackSixVersionsBack { overwrites_before: 20 } unlink(first) first=admitted published=2
+ATK k1kinds InodeCreation { overwrites_before: 40 } overwrite(1) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } overwrite(2999) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } overwrite(16317) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } overwrite(32634) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } seq(+1) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } seq(+5) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } seq(+13) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } seq(+20) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } seq(+40) published=0 remainder_ok=true ask=adm ask_io=(2,622,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(1) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(2) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(8) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(32) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(128) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } inodes(512) published=0 remainder_ok=true ask=adm ask_io=(2,618,0) ask_untouched=true ways=2 push=pushed(18) retry=admitted agree=yes n_reh=[308, 308] n_real=[308, 308] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds InodeCreation { overwrites_before: 40 } unlink(first) first=admitted published=2
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } overwrite(1) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } overwrite(2999) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } overwrite(16317) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } overwrite(32634) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } seq(+1) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } seq(+5) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } seq(+13) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } seq(+20) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } seq(+40) published=0 remainder_ok=true ask=adm ask_io=(2,632,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(1) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(2) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(8) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(32) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(128) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } inodes(512) published=0 remainder_ok=true ask=adm ask_io=(2,624,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[377, 377] n_real=[377, 377] n_same=true dbg_same=- ways_ok=true
+ATK k1kinds FirstPublishOfADeletion { overwrites_before: 160 } unlink(first) first=admitted published=2
+ATK k1kinds totals {"first=admitted": 16, "stuck walk_only=false remainder_ok=true follow_ok=true": 48}
+test atk_k1_remainder_of_each_kind_of_change ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 65 filtered out; finished in 5.84s
+

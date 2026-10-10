@@ -1,0 +1,147 @@
+== g00-legal-frozen
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104166 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g01-red-S14-real-tests-wrapped
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调�
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏�
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里�
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符�
+a_card_hands_out_its_own_device_and_its_own_device_condition: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不�
+probe code_before_the_tests_module: PANIC assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的字节�
+== g02-red-S14b-wrapped-after-an-item-ending-in-a-semicolon
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调�
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏�
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里�
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符�
+a_card_hands_out_its_own_device_and_its_own_device_condition: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不�
+probe code_before_the_tests_module: PANIC assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的字节�
+== g03-red-S19-wrapped-fake-tests-hiding-a-bad-drop
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 钉住的 ["Drop", "for", "GpuCardLease"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处�
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104375 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g04-red-G14-clean-drop-under-cfg-then-bad
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 钉住的 ["Drop", "for", "GpuCardLease"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处�
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104273 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g05-red-G15-bad-drop-only
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 借据丢掉时那一步要有一处 wait_for_the_device_and_take_in_the_outcome(： {             fn drop(&mut self) {}   left: 0  right: 
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=102451 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g06-red-G16-clean-entry-under-cfg-then-bad
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 钉住的 ["fn", "lease_the_first_card_with_room_now"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104850 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g07-red-G17-bad-entry-only
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED lease_the_first_card_with_room_now 借之前先 poll 没等成的那几张卡（方法体顶层整行一句）：[     "(",     "                &'static self,",     "      
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104110 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g08-red-clean-pool-under-cfg-then-real-with-mod-wgpu
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED assertion `left == right` failed: 钉住的 ["mod", "card_pool"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处就
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104675 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g09-red-S14b-in-square-brackets
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调�
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏�
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里�
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符�
+a_card_hands_out_its_own_device_and_its_own_device_condition: RED assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不�
+probe code_before_the_tests_module: PANIC assertion `left == right` failed: 代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的字节�
+== g10-legal-char-literals
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104341 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g11-legal-lifetimes
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104293 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g12-legal-strings
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104349 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g13-legal-comments
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104225 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g14-legal-attribute-before-the-opening
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104189 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g15-legal-macro-rules-before-the-opening
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104209 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g16-legal-pool-module-under-a-feature
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED 钉住的 ["mod", "card_pool"] 前面挂着 ["cfg"]：#[cfg] 让它编译时去掉
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104197 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g17-legal-another-module-named-card-pool
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: RED assertion `left == right` failed: 钉住的 ["mod", "card_pool"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处就
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104212 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g18-legal-pinned-words-in-comments-and-strings
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: GREEN
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104313 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g19-legal-another-fn-lease-card-outside-the-pool
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED assertion `left == right` failed: 钉住的 ["fn", "lease_card"] 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处就读到副
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104231 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"
+== g20-legal-drop-under-a-cfg-attr
+the_entries_outside_the_card_pool_start_their_devices_as_outside_the_card_pool: GREEN
+the_card_lease_hands_its_return_to_the_ledger_and_every_booking_entry_polls_first: RED 钉住的 ["Drop", "for", "GpuCardLease"] 前面挂着 ["cfg_attr"]：#[cfg] 让它编译时去掉
+the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking: GREEN
+the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call: GREEN
+a_card_hands_out_its_own_device_and_its_own_device_condition: GREEN
+probe code_before_the_tests_module: ok len_of_debug=104226 head="\"//! 崩溃放量的 GPU 核对（里程碑二「增补 4」第四项；用户 2026-09-28 定：数据从 KV 按批读出来交给 GPU 核对，写回，门禁一次读违例"

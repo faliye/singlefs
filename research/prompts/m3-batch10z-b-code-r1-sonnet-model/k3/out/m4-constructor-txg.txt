@@ -1,0 +1,12 @@
+ok ['m4-constructor-txg']
+## newfile rc=101 :: test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.23s 
+   FAILED: test unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds ... FAILED
+   FAILED: test session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements ... FAILED
+   BUILD: error: test failed, to rerun pass `-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`
+## credential rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s 
+## lr3 rc=101 :: test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 9.19s 
+   FAILED: test a_floor_raise_whose_shadow_ledger_meets_an_abandoned_root_unreadable_by_account_and_mapping_is_refused_and_restores_the_allocator ... FAILED
+   BUILD: error: test failed, to rerun pass `-p singlefs-harness --test an_abandoned_roots_unreadable_account_is_recomputed_from_the_mapping`
+## onepass rc=0 :: test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 57.53s 
+ok ['m4-constructor-txg', 'restore']
+done

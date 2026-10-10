@@ -1,0 +1,437 @@
+
+running 1 test
+test atk_k1_two_c_slots_ways_out_vs_real ... ATK k1two o=1 pre=0 g=1 first=admitted
+ATK k1two o=1 pre=0 g=2 first=admitted
+ATK k1two o=1 pre=0 g=3 first=admitted
+ATK k1two o=1 pre=0 g=4 first=admitted
+ATK k1two o=1 pre=0 g=5 first=admitted
+ATK k1two o=1 pre=0 g=6 first=admitted
+ATK k1two o=1 pre=0 g=7 first=admitted
+ATK k1two o=1 pre=0 g=8 first=admitted
+ATK k1two o=1 pre=0 g=9 first=admitted
+ATK k1two o=1 pre=0 g=10 first=admitted
+ATK k1two o=1 pre=0 g=11 first=admitted
+ATK k1two o=1 pre=0 g=12 first=admitted
+ATK k1two o=1 pre=0 g=13 first=admitted
+ATK k1two o=1 pre=0 g=14 first=admitted
+ATK k1two o=1 pre=0 g=15 first=admitted
+ATK k1two o=1 pre=0 g=16 first=admitted
+ATK k1two o=1 pre=0 g=17 first=admitted
+ATK k1two o=1 pre=0 g=18 first=admitted
+ATK k1two o=1 pre=0 g=19 first=admitted
+ATK k1two o=1 pre=0 g=20 first=admitted
+ATK k1two o=1 pre=0 g=21 first=admitted
+ATK k1two o=1 pre=0 g=22 first=admitted
+ATK k1two o=1 pre=0 g=23 first=admitted
+ATK k1two o=1 pre=0 g=24 first=admitted
+ATK k1two o=1 pre=0 g=25 first=admitted
+ATK k1two o=1 pre=0 g=26 first=admitted
+ATK k1two o=1 pre=0 g=27 first=admitted
+ATK k1two o=1 pre=0 g=28 first=admitted
+ATK k1two o=1 pre=0 g=29 first=admitted
+ATK k1two o=1 pre=0 g=30 first=admitted
+ATK k1two o=1 pre=0 g=31 first=admitted
+ATK k1two o=1 pre=0 g=32 first=admitted
+ATK k1two o=1 pre=0 g=33 first=admitted
+ATK k1two o=1 pre=0 g=34 first=admitted
+ATK k1two o=1 pre=0 g=35 first=admitted
+ATK k1two o=1 pre=0 g=36 first=admitted
+ATK k1two o=1 pre=0 g=37 first=admitted
+ATK k1two o=1 pre=0 g=38 first=admitted
+ATK k1two o=1 pre=0 g=39 first=admitted
+ATK k1two o=1 pre=0 g=40 first=admitted
+ATK k1two o=1 pre=0 g=41 first=admitted
+ATK k1two o=1 pre=0 g=42 first=admitted
+ATK k1two o=1 pre=0 g=43 first=admitted
+ATK k1two o=1 pre=0 g=44 first=admitted
+ATK k1two o=1 pre=0 g=45 first=admitted
+ATK k1two o=1 pre=0 g=46 first=admitted
+ATK k1two o=1 pre=0 g=47 first=admitted
+ATK k1two o=1 pre=0 g=48 first=admitted
+ATK k1two o=1 pre=0 g=49 first=admitted
+ATK k1two o=1 pre=0 g=50 first=admitted
+ATK k1two o=1 pre=0 g=51 first=admitted
+ATK k1two o=1 pre=0 g=52 first=admitted
+ATK k1two o=1 pre=0 g=53 first=admitted
+ATK k1two o=1 pre=0 g=54 first=admitted
+ATK k1two o=1 pre=0 g=55 first=admitted
+ATK k1two o=1 pre=0 g=56 first=admitted
+ATK k1two o=1 pre=0 g=57 first=admitted
+ATK k1two o=1 pre=0 g=58 first=admitted
+ATK k1two o=1 pre=0 g=59 first=admitted
+ATK k1two o=1 pre=0 g=60 first=admitted
+ATK k1two o=1 pre=0 g=61 first=admitted
+ATK k1two o=1 pre=0 g=62 first=admitted
+ATK k1two o=1 pre=0 g=63 first=admitted
+ATK k1two o=1 pre=0 g=64 first=admitted
+ATK k1two o=1 pre=0 g=65 first=admitted
+ATK k1two o=1 pre=0 g=66 first=admitted
+ATK k1two o=1 pre=0 g=67 first=admitted
+ATK k1two o=1 pre=0 g=68 first=admitted
+ATK k1two o=1 pre=0 g=69 first=admitted
+ATK k1two o=1 pre=0 g=70 first=admitted
+ATK k1two o=1 pre=0 g=71 first=admitted
+ATK k1two o=1 pre=0 g=72 first=admitted
+ATK k1two o=1 pre=0 g=73 first=admitted
+ATK k1two o=1 pre=0 g=74 first=admitted
+ATK k1two o=1 pre=0 g=75 first=admitted
+ATK k1two o=1 pre=0 g=76 first=admitted
+ATK k1two o=1 pre=0 g=77 first=admitted
+ATK k1two o=1 pre=0 g=78 first=admitted
+ATK k1two o=1 pre=0 g=79 first=admitted
+ATK k1two o=1 pre=0 g=80 first=admitted
+ATK k1two o=1 pre=0 g=81 first=admitted
+ATK k1two o=1 pre=0 g=82 first=admitted
+ATK k1two o=1 pre=0 g=83 first=admitted
+ATK k1two o=1 pre=0 g=84 first=admitted
+ATK k1two o=1 pre=0 g=85 first=admitted
+ATK k1two o=1 pre=0 g=86 first=admitted
+ATK k1two o=1 pre=0 g=87 first=admitted
+ATK k1two o=1 pre=0 g=88 first=admitted
+ATK k1two o=1 pre=0 g=89 first=admitted
+ATK k1two o=1 pre=0 g=90 first=admitted
+ATK k1two o=3 pre=0 g=1 first=admitted
+ATK k1two o=3 pre=0 g=2 first=admitted
+ATK k1two o=3 pre=0 g=3 first=admitted
+ATK k1two o=3 pre=0 g=4 first=admitted
+ATK k1two o=3 pre=0 g=5 first=admitted
+ATK k1two o=3 pre=0 g=6 first=admitted
+ATK k1two o=3 pre=0 g=7 first=admitted
+ATK k1two o=3 pre=0 g=8 first=admitted
+ATK k1two o=3 pre=0 g=9 first=admitted
+ATK k1two o=3 pre=0 g=10 first=admitted
+ATK k1two o=3 pre=0 g=11 first=admitted
+ATK k1two o=3 pre=0 g=12 first=admitted
+ATK k1two o=3 pre=0 g=13 first=admitted
+ATK k1two o=3 pre=0 g=14 first=admitted
+ATK k1two o=3 pre=0 g=15 first=admitted
+ATK k1two o=3 pre=0 g=16 first=admitted
+ATK k1two o=3 pre=0 g=17 first=admitted
+ATK k1two o=3 pre=0 g=18 first=admitted
+ATK k1two o=3 pre=0 g=19 first=admitted
+ATK k1two o=3 pre=0 g=20 first=admitted
+ATK k1two o=3 pre=0 g=21 first=admitted
+ATK k1two o=3 pre=0 g=22 first=admitted
+ATK k1two o=3 pre=0 g=23 first=admitted
+ATK k1two o=3 pre=0 g=24 first=admitted
+ATK k1two o=3 pre=0 g=25 first=admitted
+ATK k1two o=3 pre=0 g=26 first=admitted
+ATK k1two o=3 pre=0 g=27 first=admitted
+ATK k1two o=3 pre=0 g=28 first=admitted
+ATK k1two o=3 pre=0 g=29 first=admitted
+ATK k1two o=3 pre=0 g=30 first=admitted
+ATK k1two o=3 pre=0 g=31 first=admitted
+ATK k1two o=3 pre=0 g=32 first=admitted
+ATK k1two o=3 pre=0 g=33 first=admitted
+ATK k1two o=3 pre=0 g=34 first=admitted
+ATK k1two o=3 pre=0 g=35 first=admitted
+ATK k1two o=3 pre=0 g=36 first=admitted
+ATK k1two o=3 pre=0 g=37 first=admitted
+ATK k1two o=3 pre=0 g=38 first=admitted
+ATK k1two o=3 pre=0 g=39 first=admitted
+ATK k1two o=3 pre=0 g=40 first=admitted
+ATK k1two o=3 pre=0 g=41 first=admitted
+ATK k1two o=3 pre=0 g=42 first=admitted
+ATK k1two o=3 pre=0 g=43 first=admitted
+ATK k1two o=3 pre=0 g=44 first=admitted
+ATK k1two o=3 pre=0 g=45 first=admitted
+ATK k1two o=3 pre=0 g=46 first=admitted
+ATK k1two o=3 pre=0 g=47 first=admitted
+ATK k1two o=3 pre=0 g=48 first=admitted
+ATK k1two o=3 pre=0 g=49 first=admitted
+ATK k1two o=3 pre=0 g=50 first=admitted
+ATK k1two o=3 pre=0 g=51 first=admitted
+ATK k1two o=3 pre=0 g=52 first=admitted
+ATK k1two o=3 pre=0 g=53 first=admitted
+ATK k1two o=3 pre=0 g=54 first=admitted
+ATK k1two o=3 pre=0 g=55 first=admitted
+ATK k1two o=3 pre=0 g=56 first=admitted
+ATK k1two o=3 pre=0 g=57 first=admitted
+ATK k1two o=3 pre=0 g=58 first=admitted
+ATK k1two o=3 pre=0 g=59 first=admitted
+ATK k1two o=3 pre=0 g=60 first=admitted
+ATK k1two o=3 pre=0 g=61 first=admitted
+ATK k1two o=3 pre=0 g=62 first=admitted
+ATK k1two o=3 pre=0 g=63 first=admitted
+ATK k1two o=3 pre=0 g=64 first=admitted
+ATK k1two o=3 pre=0 g=65 first=admitted
+ATK k1two o=3 pre=0 g=66 first=admitted
+ATK k1two o=3 pre=0 g=67 first=admitted
+ATK k1two o=3 pre=0 g=68 first=admitted
+ATK k1two o=3 pre=0 g=69 first=admitted
+ATK k1two o=3 pre=0 g=70 first=admitted
+ATK k1two o=3 pre=0 g=71 first=admitted
+ATK k1two o=3 pre=0 g=72 first=admitted
+ATK k1two o=3 pre=0 g=73 first=admitted
+ATK k1two o=3 pre=0 g=74 first=admitted
+ATK k1two o=3 pre=0 g=75 first=admitted
+ATK k1two o=3 pre=0 g=76 first=admitted
+ATK k1two o=3 pre=0 g=77 first=admitted
+ATK k1two o=3 pre=0 g=78 first=admitted
+ATK k1two o=3 pre=0 g=79 first=admitted
+ATK k1two o=3 pre=0 g=80 first=admitted
+ATK k1two o=3 pre=0 g=81 first=admitted
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=82 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=83 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=84 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=85 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=86 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=87 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=88 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=89 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,772,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(19) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=3 pre=0 g=90 n_pub=19 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,27,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=1 first=admitted
+ATK k1two o=8 pre=0 g=2 first=admitted
+ATK k1two o=8 pre=0 g=3 first=admitted
+ATK k1two o=8 pre=0 g=4 first=admitted
+ATK k1two o=8 pre=0 g=5 first=admitted
+ATK k1two o=8 pre=0 g=6 first=admitted
+ATK k1two o=8 pre=0 g=7 first=admitted
+ATK k1two o=8 pre=0 g=8 first=admitted
+ATK k1two o=8 pre=0 g=9 first=admitted
+ATK k1two o=8 pre=0 g=10 first=admitted
+ATK k1two o=8 pre=0 g=11 first=admitted
+ATK k1two o=8 pre=0 g=12 first=admitted
+ATK k1two o=8 pre=0 g=13 first=admitted
+ATK k1two o=8 pre=0 g=14 first=admitted
+ATK k1two o=8 pre=0 g=15 first=admitted
+ATK k1two o=8 pre=0 g=16 first=admitted
+ATK k1two o=8 pre=0 g=17 first=admitted
+ATK k1two o=8 pre=0 g=18 first=admitted
+ATK k1two o=8 pre=0 g=19 first=admitted
+ATK k1two o=8 pre=0 g=20 first=admitted
+ATK k1two o=8 pre=0 g=21 first=admitted
+ATK k1two o=8 pre=0 g=22 first=admitted
+ATK k1two o=8 pre=0 g=23 first=admitted
+ATK k1two o=8 pre=0 g=24 first=admitted
+ATK k1two o=8 pre=0 g=25 first=admitted
+ATK k1two o=8 pre=0 g=26 first=admitted
+ATK k1two o=8 pre=0 g=27 first=admitted
+ATK k1two o=8 pre=0 g=28 first=admitted
+ATK k1two o=8 pre=0 g=29 first=admitted
+ATK k1two o=8 pre=0 g=30 first=admitted
+ATK k1two o=8 pre=0 g=31 first=admitted
+ATK k1two o=8 pre=0 g=32 first=admitted
+ATK k1two o=8 pre=0 g=33 first=admitted
+ATK k1two o=8 pre=0 g=34 first=admitted
+ATK k1two o=8 pre=0 g=35 first=admitted
+ATK k1two o=8 pre=0 g=36 first=admitted
+ATK k1two o=8 pre=0 g=37 first=admitted
+ATK k1two o=8 pre=0 g=38 first=admitted
+ATK k1two o=8 pre=0 g=39 first=admitted
+ATK k1two o=8 pre=0 g=40 first=admitted
+ATK k1two o=8 pre=0 g=41 first=admitted
+ATK k1two o=8 pre=0 g=42 first=admitted
+ATK k1two o=8 pre=0 g=43 first=admitted
+ATK k1two o=8 pre=0 g=44 first=admitted
+ATK k1two o=8 pre=0 g=45 first=admitted
+ATK k1two o=8 pre=0 g=46 first=admitted
+ATK k1two o=8 pre=0 g=47 first=admitted
+ATK k1two o=8 pre=0 g=48 first=admitted
+ATK k1two o=8 pre=0 g=49 first=admitted
+ATK k1two o=8 pre=0 g=50 first=admitted
+ATK k1two o=8 pre=0 g=51 first=admitted
+ATK k1two o=8 pre=0 g=52 first=admitted
+ATK k1two o=8 pre=0 g=53 first=admitted
+ATK k1two o=8 pre=0 g=54 first=admitted
+ATK k1two o=8 pre=0 g=55 first=admitted
+ATK k1two o=8 pre=0 g=56 first=admitted
+ATK k1two o=8 pre=0 g=57 first=admitted
+ATK k1two o=8 pre=0 g=58 first=admitted
+ATK k1two o=8 pre=0 g=59 first=admitted
+ATK k1two o=8 pre=0 g=60 first=admitted
+ATK k1two o=8 pre=0 g=61 first=admitted
+ATK k1two o=8 pre=0 g=62 first=admitted
+ATK k1two o=8 pre=0 g=63 first=admitted
+ATK k1two o=8 pre=0 g=64 first=admitted
+ATK k1two o=8 pre=0 g=65 first=admitted
+ATK k1two o=8 pre=0 g=66 first=admitted
+ATK k1two o=8 pre=0 g=67 first=admitted
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=68 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=69 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=70 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=71 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=72 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=73 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=74 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=75 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=76 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=77 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=78 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=79 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=80 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=81 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=82 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=83 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=84 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=85 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=86 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=87 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=88 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=89 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,859,0) ask_untouched=true ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[26, 26] n_real=[26, 26] n_same=true dbg_same=true ways_ok=true
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=table-reversed: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=pushed(18) retry=other(DeviceTableOtherThanTheOneOfTheMount { device_table_of_the_mount: [DeviceIdentity(0), Devi) agree=yes
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=table-swapped: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[1, 0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=table-one: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=tableref[[0, 1]->[0]] ask_io=(0,0,0) ask_untouched=true push=push_refused[DevicesHandedIn] retry=- agree=yes
+ATK k1two o=8 pre=0 g=90 n_pub=18 act=table-stale: restored_ask=still[NoSpaceAfterRaisingTheFloor] ask=pushref[DevicesHandedIn:DevicesBehindTheCurrentVersionAndMissingItsUnitsOrItsRoot] ask_io=(2,29,0) ask_untouched=true ways=1 push=push_refused[DevicesHandedIn] retry=- agree=yes n_reh=[] n_real=[] n_same=true dbg_same=true ways_ok=true
+ATK k1two totals stuck=32 disagree=0 moved=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 20.94s
+

@@ -1,0 +1,14 @@
+
+running 1 test
+test s2_sweep ... DIAG label=jk-20,46-10-5 prefix=12 r=o faults=none actions=JHH step=0J J:injected20:hold=2
+DIAG label=jk-20,46-10-5 prefix=12 r=o faults=none actions=JHH step=2H NS[Ceil(14,14);S(r=Some(17),n=16,iso=20,rNe,reh=A,rel=10+10);hold=2;isoC=20;needs=Some(16)]|pushed16|stillIso=0/20|retryOk|CMP[]
+S2 label=jk-20,46-10-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JHH secs=0.38 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=20 iso_max=20 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=2H:NS[Ceil(14,14);S(r=Some(17),n=16,iso=20,rNe,reh=A,rel=10+10);hold=2;isoC=20;needs=Some(16)]|pushed16|stillIso=0/20|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+DIAG label=jk-20,46-10-5 prefix=12 r=o faults=none actions=JWH step=0J J:injected20:hold=2
+S2 label=jk-20,46-10-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JWH secs=0.26 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=20 iso_max=20 iso_end=20 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=jk-20,46-10-5 prefix=12 r=o faults=none actions=JNH step=0J J:injected20:hold=2
+S2 label=jk-20,46-10-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JNH secs=0.27 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=20 iso_max=20 iso_end=20 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=jk-20,46-10-5 arm=implemented histories=3 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.95s
+

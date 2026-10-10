@@ -1,0 +1,66 @@
+
+running 1 test
+SON two o=1 grow=62 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=64 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=66 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=68 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=70 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=72 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=74 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=76 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=78 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=80 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=82 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=84 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=86 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=88 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=90 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=92 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=1 grow=94 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=22 r_txg=Some(6) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(22) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=1 grow=96 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=22 r_txg=Some(6) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(22) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=1 grow=98 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=22 r_txg=Some(6) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(22) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=1 grow=100 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=22 r_txg=Some(6) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(22) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=62 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=64 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=66 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=68 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=70 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=72 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=74 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=76 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=78 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=80 first=ok(raises=0) c_before=(2, 52) ab_before=0
+SON two o=3 grow=82 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=84 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=86 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=88 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=90 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=92 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=94 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=96 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=98 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=3 grow=100 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=19 r_txg=Some(8) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(19) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=62 first=ok(raises=1) c_before=(2, 52) ab_before=0
+SON two o=8 grow=64 first=ok(raises=1) c_before=(2, 52) ab_before=0
+SON two o=8 grow=66 first=ok(raises=1) c_before=(2, 52) ab_before=0
+SON two o=8 grow=68 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=70 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=72 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=74 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=76 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=78 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=80 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=82 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=84 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=86 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=88 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=90 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=92 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=94 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=96 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=98 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+SON two o=8 grow=100 STUCK listed=false reh=ChangeStillRefusedAfterThePush { isolate n_field=18 r_txg=Some(13) iso_field=52 c_before=(2, 52) ab_before=0 iso_all_before=52 push=pushed(18) real_released=52 text_times=- text_slots=- text_released=- retry=["refused", "refused"]
+test son_two_c_stuck_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 4.08s
+

@@ -1,0 +1,10 @@
+w10 s2 SINGLEFS_PROBE_ARM= S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=w10
+x10 s2 SINGLEFS_PROBE_ARM=narrow S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=x10
+w20 s2 SINGLEFS_PROBE_ARM= S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=w20
+x20 s2 SINGLEFS_PROBE_ARM=narrow S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=x20
+w40 s2 SINGLEFS_PROBE_ARM= S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=w40
+x40 s2 SINGLEFS_PROBE_ARM=narrow S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=x40
+w80 s2 SINGLEFS_PROBE_ARM= S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=w80
+x80 s2 SINGLEFS_PROBE_ARM=narrow S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=x80
+w160 s2 SINGLEFS_PROBE_ARM= S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=w160
+x160 s2 SINGLEFS_PROBE_ARM=narrow S2_ACTIONS=oo S2_SLOTS=6144 S2_PREFIXES=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo S2_MID= S2_RS=b4 S2_FAULTS=racct;racct,rlin S2_LABEL=x160

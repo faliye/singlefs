@@ -1,0 +1,44 @@
+
+running 1 test
+test s2_sweep ... DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=0o NS[Ceil(25,25);S(r=Some(29),n=19,iso=332,rEq);hold=1;isoC=332;needs=Some(19)]
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=1P P[cur,rOcc=Some((34, Some(29))),needs=Some(19),hold=1,isoC=332,isoAll=332->0]pushed19[n=19,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+19]
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#5 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#5 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#6 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#6 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#7 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#7 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#8 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#8 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#9 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#9 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#10 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#10 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#11 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#11 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#12 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#12 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#13 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#13 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#14 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#14 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#15 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#15 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#16 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#16 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#17 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#17 after=true imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+CRASHDIAG label=ctl256 actions=oPoo step=1P root#18 after=false imageRed:I-7.4:被抛弃的根（实例1、txg29）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：树表单元在盘0槽1542的那一份与位置条目里
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=2o NS[Pub(5+3);N;hold=0;isoC=0;needs=None]
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=3o NS[Pub(6+3);N;hold=0;isoC=0;needs=None]
+S2 label=ctl256 arm=implemented slots=256 prefix=oooooooooooooooooooo mid= r=b6 r_txg=29 r_old_txg=20 r_old_in_ring=true faults=racct,rlin persist=false actions=oPoo secs=4.57 selected=28 c_r=406 revived=2 revived_in_c_r=2 iso_mount=332 ab_mount=0 iso_after_first_raise=- iso_max=332 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=38 crash_bad=27 refused_steps=3 first_refused=0o:NS[Ceil(25,25);S(r=Some(29),n=19,iso=332,rEq);hold=1;isoC=332;needs=Some(19)] r_left_at=1 hit=false first_red=-
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=0o NS[Ceil(40,40);S(r=Some(44),n=19,iso=352,rEq);hold=1;isoC=352;needs=Some(19)]
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=1P P[cur,rOcc=Some((49, Some(44))),needs=Some(19),hold=1,isoC=352,isoAll=352->0]pushed19[n=19,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+19]
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=2o NS[Pub(5+3);N;hold=0;isoC=0;needs=None]
+DIAG label=ctl256 prefix=51 r=b6 faults=racct,rlin actions=oPoo step=3o NS[Pub(6+3);N;hold=0;isoC=0;needs=None]
+S2 label=ctl256 arm=implemented slots=256 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=44 r_old_txg=35 r_old_in_ring=true faults=racct,rlin persist=false actions=oPoo secs=5.65 selected=43 c_r=416 revived=2 revived_in_c_r=2 iso_mount=352 ab_mount=0 iso_after_first_raise=- iso_max=352 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=38 crash_bad=0 refused_steps=3 first_refused=0o:NS[Ceil(40,40);S(r=Some(44),n=19,iso=352,rEq);hold=1;isoC=352;needs=Some(19)] r_left_at=1 hit=false first_red=-
+S2_DONE label=ctl256 arm=implemented histories=2 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 10.35s
+

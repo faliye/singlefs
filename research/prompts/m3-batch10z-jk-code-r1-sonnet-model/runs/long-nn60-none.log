@@ -1,0 +1,8 @@
+
+running 1 test
+test probe_sweep ... PROBEJK label=long-nn60 arm=none slots=384 k=3 q=Some('n') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo secs=9.28 selected=6 c_r=44 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=64 iso_max=64 iso_end=18 c_left=0 abn_left=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK_DONE label=long-nn60 arm=none histories=1
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.30s
+

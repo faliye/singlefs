@@ -1,0 +1,28 @@
+## J_OFFSETS=3 H_STEP=40
+## J_OFFSETS=3 H_STEP=60
+## J_OFFSETS=3 H_STEP=80
+## J_OFFSETS=3 H_STEP=100
+step=2H NS[Ceil(19,19);S(r=Some(4),n=3,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(3)]|pushed3|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=3 H_STEP=130
+step=2H NS[Ceil(19,19);S(r=Some(4),n=3,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(3)]|pushed3|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=8 H_STEP=40
+## J_OFFSETS=8 H_STEP=60
+## J_OFFSETS=8 H_STEP=80
+## J_OFFSETS=8 H_STEP=100
+step=2H NS[Ceil(19,19);S(r=Some(9),n=8,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(8)]|pushed8|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=8 H_STEP=130
+step=2H NS[Ceil(19,19);S(r=Some(9),n=8,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(8)]|pushed8|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=14 H_STEP=40
+## J_OFFSETS=14 H_STEP=60
+## J_OFFSETS=14 H_STEP=80
+## J_OFFSETS=14 H_STEP=100
+step=2H NS[Ceil(19,19);S(r=Some(15),n=14,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(14)]|pushed14|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=14 H_STEP=130
+step=2H NS[Ceil(19,19);S(r=Some(15),n=14,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=0+0);hold=1;isoC=28;needs=Some(14)]|pushed14|stillIso=28/28|retryNS[Ceil(19,19);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=20 H_STEP=40
+## J_OFFSETS=20 H_STEP=60
+## J_OFFSETS=20 H_STEP=80
+## J_OFFSETS=20 H_STEP=100
+step=2H NS[Ceil(19,19);S(r=Some(21),n=20,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=14+14);hold=1;isoC=28;needs=Some(20)]|pushed20|stillIso=0/28|retryNS[Pub(7+3);N;hold=0;isoC=0;needs=None]|CMP[]
+## J_OFFSETS=20 H_STEP=130
+step=2H NS[Ceil(19,19);S(r=Some(21),n=20,iso=28,rNe,reh=R:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingThe,rel=14+14);hold=1;isoC=28;needs=Some(20)]|pushed20|stillIso=0/28|retryNS[Pub(7+3);N;hold=0;isoC=0;needs=None]|CMP[]

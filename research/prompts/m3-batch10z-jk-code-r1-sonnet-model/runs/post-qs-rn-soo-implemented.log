@@ -1,0 +1,15 @@
+
+running 1 test
+test probe_sweep ... PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=FoonoFFsnonoFFoonFsosnoFnnn secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=ooooonssFnFsoFsoFnsosFns secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=nnsnnsFnsnFnnFFnsnoonFFo secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=onFosFnFssosnFFFssFoFsosFFsFoFsFs secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=sFssnosnsoFnnFnnFnFnssnonFsFonsonF secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=onoFnoFnsnsnoFnossooososnssF secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=snFonFnssnFossnoosnoFFnoFsFs secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK label=post-qs-rn-soo arm=implemented slots=384 k=3 q=Some('s') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=FoonsFonFFsFoFnnFFFFnnsss secs=0.00 mount=Err:Recovery(NoValidSystemConfiguration{first_device_with_no_valid_system_configur
+PROBEJK_DONE label=post-qs-rn-soo arm=implemented histories=8
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+

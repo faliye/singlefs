@@ -1,0 +1,9 @@
+arm=bing k=3 q=s r=o faults=racct histories=30 step_refused=1
+arm=bing k=3 q=s r=s faults=racct histories=30 step_refused=1
+arm=bing k=3 q=s r=n faults=racct histories=30 step_refused=1
+arm=exact k=3 q=s r=o faults=racct histories=30 step_refused=1
+arm=exact k=3 q=s r=s faults=racct histories=30 step_refused=1
+arm=exact k=3 q=s r=n faults=racct histories=30 step_refused=1
+arm=h2 k=3 q=s r=o faults=racct histories=30 step_refused=1
+arm=h2 k=3 q=s r=s faults=racct histories=30 step_refused=1
+arm=h2 k=3 q=s r=n faults=racct histories=30 step_refused=1

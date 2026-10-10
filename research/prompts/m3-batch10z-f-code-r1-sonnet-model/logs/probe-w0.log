@@ -1,0 +1,15 @@
+ROW 0 RED(caught) rc=101 24s kind=probe P1 DeviceLostNotStartedAgain 也照读数记占着（旧口径：驱动那份照在卡上）
+   test gpu_memory_ledger::tests::a_lease_booked_after_a_refused_restart_keeps_the_restart_judged_again ... FAILED
+   test gpu_memory_ledger::tests::a_lost_device_refused_a_restart_is_judged_again_on_every_later_attempt ... FAILED
+   test gpu_memory_ledger::tests::a_lost_device_started_again_books_its_driver_share_as_not_yet_on_the_card ... FAILED
+   test gpu_memory_ledger::tests::a_lost_device_started_again_fits_when_its_driver_share_fits_exactly ... FAILED
+   test gpu_memory_ledger::tests::a_lost_device_started_again_is_refused_when_its_driver_share_no_longer_fits_now ... FAILED
+   test gpu_memory_ledger::tests::a_refused_restart_asked_again_takes_no_further_driver_share_off_the_room ... FAILED
+ROW 4 RED(caught) rc=101 2s kind=probe P8 stop_of_the_run 把叫停翻成没叫停
+   test gpu_memory_ledger::tests::a_stop_request_seen_once_stays_requested_after_the_request_is_gone ... FAILED
+   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.31s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 8 RED(caught) rc=101 2s kind=probe P12 return_a_lease 回到 DeviceStarted 的条件去掉（Remain 状态靠别的出口也回不去）改为总回
+   test gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement ... FAILED
+   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.23s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`

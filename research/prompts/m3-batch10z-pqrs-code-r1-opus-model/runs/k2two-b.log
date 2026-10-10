@@ -1,0 +1,13 @@
+
+running 1 test
+ATK k2two o=1 pre=3 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(19) writes=327 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root18", "R@root19"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+ATK k2two o=1 pre=6 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(16) writes=276 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root15", "R@root16"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+test atk_k2_two_c_slots_push has been running for over 60 seconds
+ATK k2two o=3 pre=3 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(19) writes=327 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root18", "R@root19"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+ATK k2two o=3 pre=6 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(16) writes=276 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root15", "R@root16"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+ATK k2two o=8 pre=3 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(18) writes=306 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root17", "R@root18"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+ATK k2two o=8 pre=6 c_at_mount=(2, 52) c_before_push=(2, 52) pre_refused=0 push=pushed(15) writes=255 iso_before=52 iso_after=0 c_after=(0, 0) abandoned_after=0 leave_order=["Q@root14", "R@root15"] violating_prefixes=0 first=None after5(refused=0,violated=0)
+test atk_k2_two_c_slots_push ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 44 filtered out; finished in 137.61s
+

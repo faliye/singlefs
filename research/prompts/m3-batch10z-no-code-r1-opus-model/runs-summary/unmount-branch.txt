@@ -1,0 +1,8 @@
+U1 arm=today histories=108 exposed_right_after_unmount=0 red=0
+U1 arm=unmount_plain histories=108 exposed_right_after_unmount=72 red=0
+U2 job=1 today S3_SLOTS=384 histories=84 exposed_right_after_unmount=0 red=0
+U2 job=2 OPUS_NO_ARM=unmount_plain S3_SLOTS=384 histories=84 exposed_right_after_unmount=84 red=0
+U2 job=3 today S3_SLOTS=1536 histories=8 exposed_right_after_unmount=0 red=0
+U2 job=4 OPUS_NO_ARM=unmount_plain S3_SLOTS=1536 histories=8 exposed_right_after_unmount=8 red=0
+U2 job=5 today S3_SLOTS=1536 histories=8 exposed_right_after_unmount=0 red=0
+U2 job=6 OPUS_NO_ARM=unmount_plain S3_SLOTS=1536 histories=8 exposed_right_after_unmount=8 red=0

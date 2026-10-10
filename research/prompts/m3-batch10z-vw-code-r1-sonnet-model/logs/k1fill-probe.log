@@ -1,0 +1,9 @@
+
+running 1 test
+ATK k1fill area=384 pre=4 fill=16 g=13 action=inode s0:adm s10:admitted s20:admitted s30:admitted s40:admitted
+ATK k1fill area=384 pre=4 fill=16 g=13 action=overwrite s0:adm s10:admitted s20:admitted s30:admitted s40:admitted
+ATK k1fill totals area=384 kinds={"adm": 2, "admitted": 80} disagree=0
+test atk_k1_fill_up_with_small_actions_then_report ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 66 filtered out; finished in 1.49s
+

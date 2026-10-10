@@ -1,0 +1,7 @@
+baseline
+baseline | LM_T5 checked=35556 violations=0 lost_but_unmarked_overgive_states=13208 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']
+第10z批第十三块 显存账 K4-2 借之前看到留着的设备丢了不告诉账（照旧等借到之后的重起，正推账层探针） | LM_T5 checked=35556 violations=130 lost_but_unmarked_overgive_states=13208 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']
+第10z批第十三块 显存账 K4-2 告诉账设备丢了只销那几笔、不照重起记（这张卡照旧按读数分，多给） | LM_T5 checked=35556 violations=1468 lost_but_unmarked_overgive_states=13208 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']
+Z3 丢了的设备改成销列出来的借据、不照重起记 | LM_T5 checked=35556 violations=1468 lost_but_unmarked_overgive_states=13208 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']
+Z5 告诉账丢了：只记驱动那一份、不销没等成的借据 | LM_T5 checked=35568 violations=0 lost_but_unmarked_overgive_states=13208 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']
+Z6 告诉账丢了：在用的那一台不记成丢了（不进 lost_devices_not_released） | LM_T5 checked=35556 violations=312 lost_but_unmarked_overgive_states=13273 | ['test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 208 filtered out; finished in 0.03s']

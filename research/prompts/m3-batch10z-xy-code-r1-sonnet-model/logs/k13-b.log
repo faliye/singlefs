@@ -1,0 +1,17 @@
+run-with-memory-cap: 排队（已等 0 秒，至多 3600 秒）：slice 已占 39.9 GiB，这一条要 2.0 GiB（峰值表里没有这条，按它的上限 2G 算），总上限 40.1 GiB；账上在跑 12 条
+run-with-memory-cap: 排了 1 秒，起跑（singlefs-memory-cap-1471129-69519766）
+
+running 1 test
+test vw_k13_state_changes_with_and_without_moving_instance_and_txg ... VW k13 pre=4 fill=16 g=20 baseline: ways_out=Ok(still[NoSpaceAfterRaisingTheFloor] ways=1) truth=still
+VW k13 pre=4 fill=16 g=20 after_same_write_again: ways_out=Ok(still[NoSpaceAfterRaisingTheFloor] ways=1) second_report=stuck
+VW k13 pre=4 fill=16 g=20 after_a_change_refused_before_any_write: ways_out=Ok(still[NoSpaceAfterRaisingTheFloor] ways=1) small_change=Some("DeviceTableOtherThanTheOneOfTheMount { d")
+VW k13 pre=4 fill=16 g=20 after_a_small_write_failing_at_write_0(small=err,txg 16->16,frozen=true): ways_out=Ok(pushref[PublishFrozenAfterAWriteFailureIsNotResentYet] ways=1) truth=pushref PublishFrozenAfterAWriteFailureIsNotResentYet { chec
+VW k13 pre=4 fill=16 g=20 after_a_small_write_failing_at_write_3(small=err,txg 16->16,frozen=true): ways_out=Ok(pushref[PublishFrozenAfterAWriteFailureIsNotResentYet] ways=1) truth=pushref PublishFrozenAfterAWriteFailureIsNotResentYet { chec
+VW k13 pre=4 fill=16 g=20 after_a_small_write_failing_at_write_9(small=err,txg 16->16,frozen=true): ways_out=Ok(pushref[PublishFrozenAfterAWriteFailureIsNotResentYet] ways=1) truth=pushref PublishFrozenAfterAWriteFailureIsNotResentYet { chec
+VW k13 pre=4 fill=16 g=20 after_a_small_write_published: ways_out=Err(SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion { instance_refused_on: InstanceGeneration(2), checkpoint_txg_refused_on: CheckpointTxg(16), ins) small_write=ok
+VW k13 pre=4 fill=16 g=20 after_the_push: ways_out=Err(SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion { instance_refused_on: InstanceGeneration(2), checkpoint_txg_refused_on: CheckpointTxg(16), ins) pushed=true
+VW k13 after_unmount_and_remount: ways_out=Err(SessionMovedPastTheVersionRefusedOnNotSupportedInTheFirstVersion { instance_refused_on: InstanceGeneration(2), checkpoint_txg_refused_on: CheckpointTxg(16), instance_of_the_current_version: InstanceGe) unmount_ok=true instance 2->3
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 0.44s
+

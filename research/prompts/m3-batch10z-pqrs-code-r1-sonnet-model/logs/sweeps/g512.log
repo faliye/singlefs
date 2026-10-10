@@ -1,0 +1,11 @@
+
+running 1 test
+test s2_sweep ... S2 label=g512 arm=implemented slots=512 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=WWW secs=0.03 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=96 iso_end=96 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=g512 arm=implemented slots=512 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=rall persist=false actions=WWW secs=0.02 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=96 iso_end=96 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=g512 arm=implemented slots=512 prefix=oooooooooooooooooooo mid= r=n r_txg=24 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=WWW secs=0.02 selected=23 c_r=48 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=18 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=g512 arm=implemented slots=512 prefix=oooooooooooooooooooo mid= r=n r_txg=24 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=WWW secs=0.02 selected=23 c_r=470 revived=0 revived_in_c_r=0 iso_mount=20 ab_mount=0 iso_after_first_raise=- iso_max=92 iso_end=92 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=g512 arm=implemented histories=4 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.16s
+

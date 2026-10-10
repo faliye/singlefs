@@ -1,0 +1,6 @@
+test a_power_loss_before_the_row_root_of_the_mount_that_took_a_new_instance_still_reads_back_the_root_whose_units_read_back_zero_at_that_mount ... ok
+test a_power_loss_before_the_row_root_of_the_mount_still_reads_back_a_candidate_root_whose_mapping_root_read_back_zero_at_that_mount ... ok
+test the_ninth_admission_term_equals_the_slots_isolated_for_the_records_above_the_water_mark_on_every_device ... ok
+test the_units_named_by_the_readable_records_of_a_publish_whose_last_record_reads_back_zero_are_isolated ... ok
+test the_units_named_by_the_record_of_a_root_reread_as_abandoned_stay_isolated_until_this_process_overwrites_its_root_ring_slot ... ok
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.92s

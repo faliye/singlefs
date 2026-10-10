@@ -1,0 +1,10 @@
+ATK gpuscan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/g0-frozen.rs found=0
+ATK gpuscan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/g1-use-wgpu-itself.rs found=1
+ATK gpuscan   卡池模块经 use 引进叫 wgpu 的名字（引的是 wgpu），遮住外部 crate
+ATK gpuscan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/g2-block-scoped-rename-in-a-helper.rs found=1
+ATK gpuscan   卡池模块经 use 引进叫 std 的名字（引的是 core），遮住外部 crate
+
+thread 'main' (3665624) panicked at src/bin/atk-gpu-scan.rs:55:49:
+块注释有收尾
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+ATK gpuscan /home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/scan-proto/inputs/g3-commented-tests-opening-inside-the-pool.rs panicked

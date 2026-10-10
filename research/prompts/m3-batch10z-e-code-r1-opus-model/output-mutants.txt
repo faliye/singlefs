@@ -1,0 +1,42 @@
+MUTANT H1-largest-is-the-last-judged lib_rc=0 model_rc=101
+  lib: test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.21s
+  model: test k1_5_monotonic_stop_random_rounds ... FAILED
+  model: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 5.75s
+  model: error: test failed, to rerun pass `-p singlefs-harness --test attack_10ze_rounds`
+MUTANT H2-next-card-ignores-the-stop lib_rc=0 model_rc=0
+  lib: test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.59s
+MUTANT H3-stop-before-any-judged-takes-the-head lib_rc=101 model_rc=0
+  lib: test gpu_memory_ledger::tests::a_card_asked_to_stop_takes_only_the_blocks_judged_blocks_wait_for_and_leaves_the_rest ... FAILED
+  lib: test result: FAILED. 82 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  lib: error: test failed, to rerun pass `-p singlefs-harness --lib`
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.92s
+MUTANT H4-less-or-equal lib_rc=0 model_rc=0
+  lib: test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.85s
+MUTANT H5-short-cards-counted-as-left lib_rc=101 model_rc=0
+  lib: test gpu_memory_ledger::tests::with_one_card_only_a_block_it_gives_back_leaves_the_run_not_run ... FAILED
+  lib: test result: FAILED. 82 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  lib: error: test failed, to rerun pass `-p singlefs-harness --lib`
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.50s
+MUTANT H6-record-on-taking-not-on-judging lib_rc=0 model_rc=0
+  lib: test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.70s
+MUTANT H11-device-never-lost-at-return lib_rc=101 model_rc=0
+  lib: test gpu_memory_ledger::tests::a_device_recorded_lost_is_lost_and_another_is_not ... FAILED
+  lib: test gpu_memory_ledger::tests::a_lost_device_explains_a_failure_only_with_an_out_of_memory_since_the_work_began ... FAILED
+  lib: test gpu_memory_ledger::tests::a_piece_failing_on_a_lost_device_is_told_after_another_piece_records_its_out_of_memory ... FAILED
+  lib: test gpu_memory_ledger::tests::a_work_failing_on_a_device_another_group_lost_for_lack_of_memory_is_told_out_of_memory ... FAILED
+  lib: test result: FAILED. 79 passed; 4 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  lib: error: test failed, to rerun pass `-p singlefs-harness --lib`
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 2.70s
+MUTANT H12-device-read-after-waiting lib_rc=101 model_rc=0
+  lib: test gpu_memory_ledger::tests::a_genuine_panic_while_the_device_was_there_is_not_told_out_of_memory_after_another_piece_runs_out ... FAILED
+  lib: test result: FAILED. 82 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.21s
+  lib: error: test failed, to rerun pass `-p singlefs-harness --lib`
+  model: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 5.13s
+MUTANT H19-stop-with-one-waiting-block-stops lib_rc=0 model_rc=101
+  lib: test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+  model: test k1_5_monotonic_stop_random_rounds ... FAILED
+  model: test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 1 filtered out; finished in 3.43s
+  model: error: test failed, to rerun pass `-p singlefs-harness --test attack_10ze_rounds`

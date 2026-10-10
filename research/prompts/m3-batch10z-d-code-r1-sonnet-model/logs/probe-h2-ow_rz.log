@@ -1,0 +1,35 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/k2d_probe.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/target/debug/deps/k2d_probe-f4065a7d768a6fa7)
+
+running 14 tests
+RESULT ow_rz[组0/10组,R单元20个,不在C里20]: 择P=false 表记被抛弃落点=None C借来=None 挂后R单元空闲=0 | 会话写11/45 被拒=Some((12, "FloorRaiseFailedWhilePushingForSpace(FloorRaiseFailedWhilePushingForSpace { cause: RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { root: Rollb")) 推抬F串=0 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=true 被覆盖(写后)=0 违例(写后)=[] | 卸载=做成(计数0) R在环里=true 空闲(卸载后)=Some(20) 被覆盖=0 违例(卸载后)=[]
+test h2_ow_rz_g00 ... ok
+RESULT ow_rz[组2/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g02 ... ok
+RESULT ow_rz[组4/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g04 ... ok
+RESULT ow_rz[组5/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+RESULT ow_rz[组3/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+RESULT ow_rz[组1/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g05 ... ok
+test h2_ow_rz_g03 ... ok
+test h2_ow_rz_g01 ... ok
+RESULT ow_rz: 组10 超出(共10组)
+test h2_ow_rz_g10 ... ok
+RESULT ow_rz: 组11 超出(共10组)
+test h2_ow_rz_g11 ... ok
+RESULT ow_rz: 组13 超出(共10组)
+test h2_ow_rz_g13 ... ok
+RESULT ow_rz: 组12 超出(共10组)
+test h2_ow_rz_g12 ... ok
+RESULT ow_rz[组6/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g06 ... ok
+RESULT ow_rz[组7/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g07 ... ok
+RESULT ow_rz[组8/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g08 ... ok
+RESULT ow_rz[组9/10组,R单元20个,不在C里0]: 择P=true 表记被抛弃落点=None C借来=Some(22) 挂后R单元空闲=0 | 会话写45/45 被拒=None 推抬F串=3 R在环里时空闲/被覆盖的步=[] 逐步首违例=None 写满=未做 R在环里(写后)=false 被覆盖(写后)=20 违例(写后)=[] | 卸载=做成(计数0) R在环里=false 空闲(卸载后)=Some(14) 被覆盖=20 违例(卸载后)=[]
+test h2_ow_rz_g09 ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 39.95s
+

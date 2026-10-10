@@ -1,0 +1,14 @@
+applied h2-slot-off-by-one
+## core rc=101
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot ... FAILED
+thread 'allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot' (897720) panicked at crates/singlefs-core/src/allocator.rs:3326:13:
+test result: FAILED. 201 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+## raise rc=101
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 29.14s
+test unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot ... FAILED
+thread 'unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot' (901418) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.90s
+error: test failed, to rerun pass `-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`
+error: 1 target failed:
+restored h2-slot-off-by-one

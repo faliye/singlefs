@@ -1,0 +1,8 @@
+行2347 第10z批第二十块 甲 预演推完放得下也不列推环: rc=101 红 1 条 the_push_lists_both_ways_out_and_goes_through_after_the_push | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (22s)
+行2348 第10z批第二十块 出路二写的推环次数与写掉的槽数恒为 0（正推 textCountZero）: rc=101 红 1 条 the_push_lists_both_ways_out_and_goes_through_after_the_push | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (25s)
+行2349 第10z批第二十块 出路二的根环槽写成槽号.区域号（正推 textRegionSlot）: rc=101 红 1 条 the_push_lists_both_ways_out_and_goes_through_after_the_push | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (24s)
+行2350 第10z批第二十块 出路一在 R 那一槽没有根时照旧说 R 判成被抛弃（攻方第一节末）: rc=101 红 1 条 the_push_lists_both_ways_out_and_goes_through_after_the_push | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (24s)
+行2351 第10z批第二十块 出路一不写 R 的账永久读不出时再挂被拒、会话已断开（正推 K1-2）: rc=101 红 1 条 lback_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (25s)
+行2352 第10z批第二十块 出路二放出来的槽数取推之前的全部隔离（不是推完前后之差）: rc=101 红 1 条 ts_holding_overlapping_placements_are_what_the_push_releases | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (25s)
+行2353 第10z批第二十块 攻方 M7 报的挡着的槽数取全部隔离（不限 C 那一圈罩着的）: rc=101 红 1 条 ts_holding_overlapping_placements_are_what_the_push_releases | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (24s)
+行2354 第10z批第二十块 推环入口不先判冻结（攻方第二节：预演在冻结着的分配器拷贝上照样过）: rc=101 红 1 条 k_device_error_halfway_is_refused_as_frozen_before_any_write | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)

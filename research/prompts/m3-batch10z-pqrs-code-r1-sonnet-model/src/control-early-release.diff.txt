@@ -1,0 +1,12 @@
+# K2-1 阳性对照：在 tree-a 的编译副本里把推环入口改成「一开始就把 C 记着的槽的隔离位全清掉」。不进库。
+# 加在 crates/singlefs-core/src/mounted_session.rs 推环入口里 `let publishes_in_the_push =` 之前：
+        for placement in &target.placements {
+            for slot in placement.slot.0..placement.slot.0 + placement.span {
+                allocator
+                    .devices
+                    .iter_mut()
+                    .find(|device_map| device_map.device == placement.device)
+                    .unwrap()
+                    .clear_isolation_of_slot(crate::address::SlotNumber(slot));
+            }
+        }

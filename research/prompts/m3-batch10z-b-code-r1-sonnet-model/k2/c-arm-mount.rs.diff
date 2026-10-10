@@ -1,0 +1,23 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-b-code-r1/tree/crates/singlefs-core/src/mount.rs	2026-10-07 22:30:39.694490354 +0000
++++ repo/crates/singlefs-core/src/mount.rs	2026-10-07 22:36:17.364210063 +0000
+@@ -3838,6 +3838,20 @@
+                 .collect()
+         })
+         .unwrap_or_default();
++    let mut placements_recorded_for_abandoned_roots = placements_recorded_for_abandoned_roots;
++    if std::env::var("SINGLEFS_ARM_C").is_ok() {
++        if let Some(occupancy) = allocator.root_ring_occupancy() {
++            for root in roots.iter().filter(|root| abandoned_by_table(root, &table)) {
++                let key = (root.instance, root.checkpoint_txg);
++                if placements_recorded_for_abandoned_roots.contains_key(&key) {
++                    continue;
++                }
++                if let Some(c) = occupancy.c_arm_placements_for_the_valid_root(root.checkpoint_txg) {
++                    placements_recorded_for_abandoned_roots.insert(key, c);
++                }
++            }
++        }
++    }
+     let abandoned_roots_unreadable = if shadow_ledger == ShadowLedger::On {
+         match isolate_slots_referenced_only_by_abandoned_roots(
+             devices,

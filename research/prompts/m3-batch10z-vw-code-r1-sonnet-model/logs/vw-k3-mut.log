@@ -1,0 +1,12 @@
+
+running 1 test
+VW k3    2 × overwrite_walk_before: no queue left   [first ]
+VW k3    2 × overwrite_walk_before: notwhat(FloorRaiseRefusedForSpace { refusal: Rai)   [first ]
+VW k3    6 × overwrite_walk_before: stuck(change=overwrite,versions_before_report=0, remainder=WalkTheQueueThenPublishTheChange) reh=still truth=still agree=true   [first k=4 per=1 left=29 n=1]
+VW k3    2 × unlink_walk_after_intent: admitted   [first ]
+VW k3    2 × unlink_walk_after_intent: notwhat(FloorRaiseRefusedForSpace { refusal: Rai)   [first ]
+VW k3    6 × unlink_walk_after_intent: stuck(change=unlink,versions_before_report=1, remainder=WalkTheQueue) reh=adm truth=still agree=false   [first k=4 per=1 left=29 n=1]
+test vw_k3_walk_after_the_push_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.23s
+

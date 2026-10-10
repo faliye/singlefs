@@ -1,0 +1,9 @@
+
+running 1 test
+test s2_sweep ... S2 label=w40 arm= slots=6144 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b4 r_txg=44 r_old_txg=39 r_old_in_ring=true faults=racct persist=false actions=oo secs=0.35 selected=43 c_r=68 revived=2 revived_in_c_r=2 iso_mount=42 iso_after_first_raise=- iso_max=42 iso_end=42 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=w40 arm= slots=6144 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b4 r_txg=44 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=oo secs=0.31 selected=43 c_r=774 revived=2 revived_in_c_r=2 iso_mount=838 iso_after_first_raise=- iso_max=838 iso_end=838 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=w40 arm= histories=2 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.77s
+

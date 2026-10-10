@@ -1,0 +1,9 @@
+
+running 1 test
+test probe_sweep ... PROBEJK label=sw-bn-qroot+qlast arm=implemented slots=384 k=3 q=Some('b') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=nsnosnssonosonsonnssnsossn secs=9.40 selected=6 c_r=44 revived=2 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=76 iso_max=76 iso_end=30 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK label=sw-bn-qroot+qlast arm=implemented slots=384 k=3 q=Some('b') r=n back=0 faults=cfgq,qroot,qlast,racct persist=false actions=nonosnsoooonnoonossnnssnn secs=5.99 selected=6 c_r=44 revived=2 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=76 iso_max=76 iso_end=30 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK_DONE label=sw-bn-qroot+qlast arm=implemented histories=2
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 15.41s
+

@@ -1,0 +1,11 @@
+
+running 1 test
+test probe_sweep ... PROBEJK label=res-racct+rold arm=control slots=384 k=4 q=None r=b back=4 faults=racct,rold persist=false actions=sosnsnonnnossonooosnnnos secs=5.26 selected=7 c_r=126 revived=2 revived_in_c_r=2 iso_mount=116 iso_after_first_raise=144 iso_max=144 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK label=res-racct+rold arm=control slots=384 k=4 q=None r=b back=4 faults=racct,rold persist=false actions=ssonnnsnssonnonsnsssossososssn secs=7.21 selected=7 c_r=126 revived=2 revived_in_c_r=2 iso_mount=116 iso_after_first_raise=144 iso_max=144 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK label=res-racct+rold arm=control slots=384 k=4 q=None r=b back=4 faults=racct,rold persist=false actions=oonnnsossossoossnnoons secs=4.55 selected=7 c_r=126 revived=2 revived_in_c_r=2 iso_mount=116 iso_after_first_raise=144 iso_max=144 iso_end=0 refused_steps=0 first_refused=- r_left_at=18 hit=false first_red=-
+PROBEJK label=res-racct+rold arm=control slots=384 k=4 q=None r=b back=4 faults=racct,rold persist=false actions=ossonssnsnoonnnnsoosssosnnooss secs=9.50 selected=7 c_r=126 revived=2 revived_in_c_r=2 iso_mount=116 iso_after_first_raise=144 iso_max=144 iso_end=0 refused_steps=0 first_refused=- r_left_at=19 hit=false first_red=-
+PROBEJK_DONE label=res-racct+rold arm=control histories=4
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 26.55s
+

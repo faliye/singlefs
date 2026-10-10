@@ -1,0 +1,7 @@
+m8_extend_arm_plain s1 histories=60 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s2 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s3 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s4 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s5 histories=60 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s6 histories=40 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0
+m8_extend_arm_plain s7 histories=72 handed_out>0:0 both>0:0 unblocked_grew:0 rc=0

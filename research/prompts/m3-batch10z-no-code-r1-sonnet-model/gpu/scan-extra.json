@@ -1,0 +1,8 @@
+[
+ {
+  "id": "N1_decoy_if_false_branch_check_selected_blocks",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "    check_blocks_where_until(\n        store,\n        flow,\n        plan,\n        &|block_sequence| selected_block_sequences.contains(&block_sequence),\n        unit_checksums,\n        version,\n        stop_is_requested,\n    )\n}",
+  "new": "    if false {\n        let _ = check_blocks_where_until(\n            store,\n            flow,\n            plan,\n            &|block_sequence| selected_block_sequences.contains(&block_sequence),\n            unit_checksums,\n            version,\n            stop_is_requested,\n        );\n    }\n    check_blocks_where_until(\n        store,\n        flow,\n        plan,\n        &|block_sequence| selected_block_sequences.contains(&block_sequence),\n        unit_checksums,\n        version,\n        &|| false,\n    )\n}"
+ }
+]

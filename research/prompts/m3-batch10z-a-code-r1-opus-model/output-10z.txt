@@ -1,0 +1,71 @@
+test a_lease_booked_after_the_reading_is_taken_for_the_returned_one_until_it_is_returned_itself ... ATTACK scenario=P1-overlap step=b-alive ledger_room=13550 truly_lendable=16550 difference=-3000
+ATTACK scenario=P1-overlap step=book-15550 outcome=Err("NoCardHasRoomNow { need_mebibytes: 15550, card_rooms_mebibytes: [13550] }")
+ATTACK scenario=P1-overlap step=b-returned ledger_room=19550 truly_lendable=19550 difference=0
+test a_lost_device_started_again_is_refused_over_a_band_where_it_fits_and_never_overgiven ... ATTACK scenario=restart-sweep class=booking-refused cells=445 others_from=15560 others_to=20000
+ATTACK scenario=restart-sweep class=restart-allowed-and-fits cells=1300 others_from=0 others_to=12990
+ATTACK scenario=restart-sweep class=restart-refused-and-does-not-fit cells=60 others_from=14960 others_to=15550
+ATTACK scenario=restart-sweep class=restart-refused-but-fits cells=196 others_from=13000 others_to=14950
+test a_restart_with_the_old_device_still_on_the_card_leaves_a_shortfall_that_never_goes_away ... ATTACK scenario=restart-after step=reading_between=true ledger_room=23590 truly_lendable=25550 difference=-1960
+ATTACK scenario=restart-after step=reading_between=true-ten-more-readings ledger_room=23590 truly_lendable=25550 difference=-1960
+ATTACK scenario=restart-after step=reading_between=false ledger_room=20950 truly_lendable=25550 difference=-4600
+ATTACK scenario=restart-after step=reading_between=false-ten-more-readings ledger_room=20950 truly_lendable=25550 difference=-4600
+test p1_a_lease_alive_and_unbuilt_when_another_thread_reads_costs_its_whole_amount_after_it_is_returned ... ATTACK scenario=P1-three-threads step=round=0 ledger_room=19550 truly_lendable=19550 difference=0
+ATTACK scenario=P1-three-threads step=round=1 ledger_room=18550 truly_lendable=19550 difference=-1000
+ATTACK scenario=P1-three-threads step=round=2 ledger_room=17550 truly_lendable=19550 difference=-2000
+ATTACK scenario=P1-three-threads step=round=3 ledger_room=16550 truly_lendable=19550 difference=-3000
+ATTACK scenario=P1-three-threads step=round=4 ledger_room=15550 truly_lendable=19550 difference=-4000
+ATTACK scenario=P1-three-threads step=round=5 ledger_room=14550 truly_lendable=19550 difference=-5000
+ATTACK scenario=P1-three-threads step=round=6 ledger_room=13550 truly_lendable=19550 difference=-6000
+ATTACK scenario=P1-three-threads step=round=7 ledger_room=12550 truly_lendable=19550 difference=-7000
+ATTACK scenario=P1-three-threads step=round=8 ledger_room=11550 truly_lendable=19550 difference=-8000
+ATTACK scenario=P1-three-threads step=round=9 ledger_room=10550 truly_lendable=19550 difference=-9000
+ATTACK scenario=P1-three-threads step=round=10 ledger_room=9550 truly_lendable=19550 difference=-10000
+ATTACK scenario=P1-three-threads step=book-18550 outcome=Err("NoCardHasRoomNow { need_mebibytes: 18550, card_rooms_mebibytes: [9550] }")
+test p1_a_lease_half_built_when_another_thread_reads_costs_the_unbuilt_half_after_it_is_returned ... ATTACK scenario=P1-half-built step=round=1 ledger_room=19050 truly_lendable=19550 difference=-500
+ATTACK scenario=P1-half-built step=round=2 ledger_room=18550 truly_lendable=19550 difference=-1000
+ATTACK scenario=P1-half-built step=round=3 ledger_room=18050 truly_lendable=19550 difference=-1500
+ATTACK scenario=P1-half-built step=round=4 ledger_room=17550 truly_lendable=19550 difference=-2000
+ATTACK scenario=P1-half-built step=round=5 ledger_room=17050 truly_lendable=19550 difference=-2500
+ATTACK scenario=P1-half-built step=round=6 ledger_room=16550 truly_lendable=19550 difference=-3000
+ATTACK scenario=P1-half-built step=round=7 ledger_room=16050 truly_lendable=19550 difference=-3500
+ATTACK scenario=P1-half-built step=round=8 ledger_room=15550 truly_lendable=19550 difference=-4000
+ATTACK scenario=P1-half-built step=round=9 ledger_room=15050 truly_lendable=19550 difference=-4500
+ATTACK scenario=P1-half-built step=round=10 ledger_room=14550 truly_lendable=19550 difference=-5000
+test p1_a_lease_rounded_up_by_one_mebibyte_costs_one_mebibyte_each_time_it_is_returned ... ATTACK scenario=P1-rounded step=rounds=1000 ledger_room=18550 truly_lendable=19550 difference=-1000
+test p1_control_without_a_reading_while_the_short_lease_lives_costs_nothing ... ATTACK scenario=P1-control step=rounds=10 ledger_room=19550 truly_lendable=19550 difference=0
+test random_histories_with_the_user_steps_set_free ... ATTACK scenario=random mode=control-reads-and-bookings-only-when-every-live-lease-is-built-returns-freed histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=0 shortfall_at_reading_max=7432
+ATTACK scenario=random mode=grow-only-returns-freed histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=1841 shortfall_at_reading_max=14234
+ATTACK scenario=random mode=grow-only-returns-left-on-the-card histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=1976 shortfall_at_reading_max=13911
+ATTACK scenario=random mode=shrinking-live-leases-returns-left-on-the-card histories=3000 steps_each=80 overgive_at_reading_max=2543 overgive_bookings=0 false_refusals=1833 shortfall_at_reading_max=14100
+test seen_shrinks_when_a_live_lease_drops_its_pass_buffers_and_the_returned_share_is_pressed_too_far ... ATTACK scenario=P1-assumption-broken step=after-the-pass ledger_room=11550 truly_lendable=8550 difference=3000
+ATTACK scenario=P1-assumption-broken step=all-grown on_the_card=35110 empty=32110 over=3000
+test with_a_device_outside_the_books_on_the_bus_a_fitting_booking_is_refused ... ATTACK scenario=yi-fu-also-outside step=long-12000-built ledger_room=4950 truly_lendable=17550 difference=-12600
+ATTACK scenario=yi-fu-not-listed step=long-12000-built ledger_room=4950 truly_lendable=17550 difference=-12600
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+test a_block_given_back_after_the_other_card_left_is_not_judged_and_the_blocks_after_it_are_judged_but_not_stored ... ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=1 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=2 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=3 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=4 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=5 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=6 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=7 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=8 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=9 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[1, 1] oom_at_block_of_card_0=10 stored=19 judged=19 judged_not_stored=0 outcome=not-run
+ATTACK scenario=P2-summary seconds=[1, 1] not_run_cells=1
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=1 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=2 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=3 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=4 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=5 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=6 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[2, 1] oom_at_block_of_card_0=7 stored=19 judged=19 judged_not_stored=0 outcome=not-run
+ATTACK scenario=P2-summary seconds=[2, 1] not_run_cells=1
+ATTACK scenario=P2 seconds=[3, 1] oom_at_block_of_card_0=1 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[3, 1] oom_at_block_of_card_0=2 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[3, 1] oom_at_block_of_card_0=3 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[3, 1] oom_at_block_of_card_0=4 stored=20 judged=20 judged_not_stored=0 outcome=every-block-judged
+ATTACK scenario=P2 seconds=[3, 1] oom_at_block_of_card_0=5 stored=17 judged=19 judged_not_stored=2 outcome=not-run
+ATTACK scenario=P2-summary seconds=[3, 1] not_run_cells=1
+test with_every_state_on_the_first_card_one_out_of_memory_is_not_run_while_the_second_card_is_idle ... ATTACK scenario=P2-one-card-placed oom_at_block_of_card_0=5 stored=4 judged=4 outcome=not-run
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

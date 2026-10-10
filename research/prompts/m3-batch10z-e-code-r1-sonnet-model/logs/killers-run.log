@@ -1,0 +1,8 @@
+BASE rc= 0 failed= [] ['test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 未变异
+M05 rc= 101 failed= ['m05_the_block_judged_last_is_not_the_largest_judged'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 判完块号记最后一块而不是最大
+M10 rc= 101 failed= ['m10_one_waiting_judged_block_still_needs_another_round_or_not_run'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 叫停、等着的块边界 ==0 改 <2
+M13 rc= 101 failed= ['m13_a_round_without_out_of_memory_leaves_no_judged_block_waiting'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 轮末第一条断言（等着的块是 0）去掉
+M14 rc= 101 failed= ['m14_a_round_without_a_stop_leaves_no_block_untaken'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 轮末第二条断言（没叫停块都领走）去掉
+M17 rc= 101 failed= ['m17_the_first_out_of_memory_stays_the_first'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 头一句 OOM 取最后一句
+M22 rc= 101 failed= ['m22_giving_a_block_back_twice_panics'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 交回的块再交回不拦
+M23 rc= 101 failed= ['m23_the_last_out_of_memory_of_a_work_is_the_one_told'] ['test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'] | 判到的 OOM 报告取最早而不是最后

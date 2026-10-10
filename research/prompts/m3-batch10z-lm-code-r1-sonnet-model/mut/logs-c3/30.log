@@ -1,0 +1,61 @@
+
+running 19 tests
+test a_root_taking_the_current_account_that_is_not_a_rollback_takes_nothing_released_and_isolates_as_before_at_the_mount ... ok
+test a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_target_still_allocated ... FAILED
+test units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount ... FAILED
+test the_public_rollback_floor_ceiling_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_equals_the_ceiling_while_it_reads ... ok
+test session_writes_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements ... ok
+test session_writes_after_the_account_of_an_abandoned_root_turns_unreadable_raise_the_floor_with_its_recorded_placements ... ok
+test units_a_rollback_revived_stay_through_writes_while_every_unit_it_wrote_reads_back_zero_at_the_mount ... ok
+test units_a_rollback_revived_stay_through_writes_while_its_lineage_unit_and_its_account_read_back_zero_at_the_mount ... ok
+test units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount ... FAILED
+test units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount ... FAILED
+test unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot ... ok
+test unmount_after_the_account_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds ... ok
+test unmount_after_the_root_ring_slot_of_a_valid_root_turns_unreadable_is_still_refused_before_any_write ... ok
+test unmount_after_the_root_ring_slot_of_an_abandoned_root_turns_unreadable_takes_its_recorded_placements_and_succeeds ... ok
+test unmount_takes_the_empty_placements_recorded_for_an_abandoned_root_the_credential_passed_at_mount_without_reading_its_account ... ok
+test writable_mount_after_a_crash_still_refuses_while_the_account_of_an_abandoned_root_is_unreadable_without_the_credential ... ok
+test units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_once_its_account_reads_again ... ok
+test units_a_root_abandoned_by_the_mounts_own_row_shares_with_the_selected_version_stay_through_writes_raising_the_floor_while_its_account_still_reads_back_zero ... ok
+test units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ring_slot_is_written ... ok
+
+failures:
+
+---- a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_target_still_allocated stdout ----
+
+thread 'a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_target_still_allocated' (1003577) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:2297:5:
+assertion `left == right` failed: C 里 R 那一槽里现行账已释放的落点，就是 R_old 账里仍分配、现行账里已释放的那一截（窄取法：不多并现行账里别的已释放落点）
+  left: {}
+ right: {(DeviceIdentity(0), SlotNumber(1412)), (DeviceIdentity(0), SlotNumber(1472)), (DeviceIdentity(0), SlotNumber(1474)), (DeviceIdentity(0), SlotNumber(1476)), (DeviceIdentity(0), SlotNumber(1477)), (DeviceIdentity(0), SlotNumber(1478)), (DeviceIdentity(0), SlotNumber(1479)), (DeviceIdentity(0), SlotNumber(1480)), (DeviceIdentity(0), SlotNumber(1481)), (DeviceIdentity(0), SlotNumber(1482)), (DeviceIdentity(1), SlotNumber(1412)), (DeviceIdentity(1), SlotNumber(1472)), (DeviceIdentity(1), SlotNumber(1474)), (DeviceIdentity(1), SlotNumber(1476)), (DeviceIdentity(1), SlotNumber(1477)), (DeviceIdentity(1), SlotNumber(1478)), (DeviceIdentity(1), SlotNumber(1479)), (DeviceIdentity(1), SlotNumber(1480)), (DeviceIdentity(1), SlotNumber(1481)), (DeviceIdentity(1), SlotNumber(1482))}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount stdout ----
+
+thread 'units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount' (1003613) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:1875:5:
+挂载那一刻 C 里 R 那一槽并上了回退目标账里仍分配、P 的账里已释放的落点（回退复活）：复活的都在里面，缺 [PlacementOnDevice { device: DeviceIdentity(0), slot: SlotNumber(1412), span: 2 }, PlacementOnDevice { device: DeviceIdentity(1), slot: SlotNumber(1412), span: 2 }]
+
+---- units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount stdout ----
+
+thread 'units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount' (1003813) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:2010:9:
+推过抬 F 之后顺序写：被抛弃根引用的单元一个都没复用：["I-7.4: 被抛弃的根（实例 1、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1412 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"]
+
+---- units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount stdout ----
+
+thread 'units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount' (1003834) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:2010:9:
+推过抬 F 之后顺序写：被抛弃根引用的单元一个都没复用：["I-7.4: 被抛弃的根（实例 1、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1412 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"]
+
+
+failures:
+    a_rollback_recognized_at_the_mount_takes_among_the_released_only_what_its_target_still_allocated
+    units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_reads_back_zero_at_the_mount
+    units_a_rollback_revived_stay_through_writes_while_its_account_and_the_account_of_its_target_read_back_zero_at_the_mount
+    units_a_rollback_revived_stay_through_writes_while_its_account_and_the_root_slot_of_its_target_read_back_zero_at_the_mount
+
+test result: FAILED. 15 passed; 4 failed; 0 ignored; 0 measured; 0 filtered out; finished in 42.21s
+
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-m1/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-m1/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.52s
+     Running tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/target-m1/debug/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-2d383b6ace7078e1)
+error: test failed, to rerun pass `-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`

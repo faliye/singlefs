@@ -1,0 +1,19 @@
+# TRIDIFF 汇总（每个 diff 臂的挂载算一次入库实现与按 jk 轮 tri 臂逐字重写的参照臂 triref，比并进 R 那一槽的落点集合）
+smoke TRIDIFF=10 equal_true=10 equal_false=0
+b1a TRIDIFF=464 equal_true=464 equal_false=0
+b1b TRIDIFF=464 equal_true=464 equal_false=0
+b2 TRIDIFF=300 equal_true=300 equal_false=0
+b3 TRIDIFF=0 equal_true=0 equal_false=0
+b4 TRIDIFF=0 equal_true=0 equal_false=0
+b5 TRIDIFF=0 equal_true=0 equal_false=0
+b6 TRIDIFF=5 equal_true=5 equal_false=0
+b7 TRIDIFF=0 equal_true=0 equal_false=0
+b8 TRIDIFF=0 equal_true=0 equal_false=0
+b9 TRIDIFF=1 equal_true=1 equal_false=0
+b10 TRIDIFF=4 equal_true=4 equal_false=0
+b11 TRIDIFF=24 equal_true=24 equal_false=0
+b12 TRIDIFF=0 equal_true=0 equal_false=0
+合计 TRIDIFF=1272
+合计 equal=false 0
+diff 臂的 S2/PROBEJK 行数与其中 hit=true 数：1309
+0

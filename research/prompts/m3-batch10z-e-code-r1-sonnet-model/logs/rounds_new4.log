@@ -1,0 +1,33 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree/crates/singlefs-harness)
+warning: unused variable: `cards_that_judged`
+   --> crates/singlefs-harness/tests/rounds_new.rs:205:86
+    |
+205 | ...eCards<usize>, cards_that_judged: BTreeSet<u32>, only_wait: usize, overbooked: u64| {
+    |                   ^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_cards_that_judged`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "rounds_new") generated 1 warning (run `cargo fix --test "rounds_new" -p singlefs-harness` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.42s
+     Running tests/rounds_new.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/target/debug/deps/rounds_new-fde9081ba75ad0aa)
+
+running 3 tests
+test cards_used_when_a_card_judges_some_blocks_and_then_runs_out ... CARDS_USED_NEW ended=EveryBlockStored rounds=1 stored=10 cards_used=1 cards_that_judged_a_block={0, 1} judged_by_card=[3, 7]
+ok
+test k1_5_a_stop_around_the_closing_round ... ATTACK_NEW k1_5=stop-in-the-closing-round cell=no-stop ended=EveryBlockStored rounds=2 stored=5 judged_once_or_more=5 judged_not_stored=0 stop_requested=false only_for_waiting_rounds=0 cards_used=1
+ATTACK_NEW k1_5=stop-in-the-closing-round cell=stop-at-round-1-last-block ended=EveryBlockStored rounds=2 stored=5 judged_once_or_more=5 judged_not_stored=0 stop_requested=true only_for_waiting_rounds=1 cards_used=1
+ATTACK_NEW k1_5=stop-in-the-closing-round cell=stop-at-round-2-build ended=EveryBlockStored rounds=2 stored=5 judged_once_or_more=5 judged_not_stored=0 stop_requested=true only_for_waiting_rounds=0 cards_used=1
+ATTACK_NEW k1_5=stop-in-the-closing-round cell=stop-at-round-2-first-block ended=EveryBlockStored rounds=2 stored=5 judged_once_or_more=5 judged_not_stored=0 stop_requested=true only_for_waiting_rounds=0 cards_used=1
+ATTACK_NEW k1_5=stop-in-the-closing-round cell=stop-at-event-1 ended=StoppedOnRequest rounds=1 stored=0 judged_once_or_more=0 judged_not_stored=0 stop_requested=true only_for_waiting_rounds=0 cards_used=1
+ATTACK_NEW k1_5=stop-in-the-closing-round cell=stop-at-event-3 ended=StoppedOnRequest rounds=1 stored=0 judged_once_or_more=0 judged_not_stored=0 stop_requested=true only_for_waiting_rounds=0 cards_used=1
+ok
+test stopsim_two_cards_ten_blocks ... STOPSIM_NEW stop_at_event=None ended=EveryBlockStored rounds=2 stored=10 judged=10 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=0 overbooked_states=0 cards_used=1 cards_that_judged={1}
+STOPSIM_NEW stop_at_event=Some(2) ended=StoppedOnRequest rounds=1 stored=0 judged=0 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=0 overbooked_states=0 cards_used=1 cards_that_judged={}
+STOPSIM_NEW stop_at_event=Some(4) ended=StoppedOnRequest rounds=2 stored=2 judged=2 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=1 overbooked_states=8 cards_used=1 cards_that_judged={1}
+STOPSIM_NEW stop_at_event=Some(8) ended=StoppedOnRequest rounds=2 stored=6 judged=6 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=1 overbooked_states=4 cards_used=1 cards_that_judged={1}
+STOPSIM_NEW stop_at_event=Some(12) ended=EveryBlockStored rounds=2 stored=10 judged=10 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=1 overbooked_states=0 cards_used=1 cards_that_judged={1}
+STOPSIM_NEW stop_at_event=Some(14) ended=EveryBlockStored rounds=2 stored=10 judged=10 judged_not_stored=0 waiting_at_end=0 only_for_waiting_rounds=0 overbooked_states=0 cards_used=1 cards_that_judged={1}
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.01s
+

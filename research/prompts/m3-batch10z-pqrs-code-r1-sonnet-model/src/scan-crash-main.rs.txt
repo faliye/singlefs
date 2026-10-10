@@ -1,0 +1,267 @@
+#![allow(dead_code, unused)]
+use std::panic::{catch_unwind, AssertUnwindSafe};
+fn source_text() -> &'static str { Box::leak(std::fs::read_to_string(std::env::var("CRASH_SRC").expect("CRASH_SRC")).unwrap().into_boxed_str()) }
+const TESTS_MODULE_OPENING: &str = "#[cfg(test)]\nmod tests \u{7b}";
+const TOP_LEVEL_CLOSING_BRACE_LINE: &str = "\n\u{7d}\n";
+    /// 这份源文件测试模块之外的代码行（注释行不算）。
+    fn code_lines_outside_the_tests() -> Vec<String> {
+        let source = source_text();
+        let tests_start = source
+            .find(TESTS_MODULE_OPENING)
+            .expect("这份文件有测试模块");
+        let tests_end = tests_start
+            + source[tests_start..]
+                .find(TOP_LEVEL_CLOSING_BRACE_LINE)
+                .expect("测试模块在顶格的右括号处收尾");
+        format!("{}{}", &source[..tests_start], &source[tests_end..])
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .map(str::to_string)
+            .collect()
+    }
+
+
+    /// `line` 里 `stop_is_requested` 作为整个名字出现了几次（前后不连着字母、数字、下划线：`stop_is_requested_by_the_environment`、
+    /// `_stop_is_requested` 不算）。
+    fn whole_name_uses_of_the_stop_request(line: &str) -> usize {
+        let name = concat!("stop_is_", "requested");
+        let is_part_of_a_name = |neighbour: Option<char>| {
+            neighbour.is_some_and(|neighbour_character| {
+                neighbour_character.is_alphanumeric() || neighbour_character == '_'
+            })
+        };
+        line.match_indices(name)
+            .filter(|(position, _name)| {
+                !is_part_of_a_name(line[..*position].chars().next_back())
+                    && !is_part_of_a_name(line[position + name.len()..].chars().next())
+            })
+            .count()
+    }
+
+    /// 没有行为用例的那几层，扫源码钉住它们怎么用收到的叫停（`every_layer_handed_the_stop_request_hands_it_on_or_asks_it`）。
+    enum StopRequestUseThatIsPinned {
+        /// 函数体短：参数行之后到函数收尾（返回类型与函数体，去掉注释行与空白）整个等于这一句。
+        WholeBodyAfterTheParameter(&'static str),
+        /// 函数体太长、整句比不了：用到叫停整名的只有 `line` 这一行（去掉首尾空白），它是函数体顶层的一句；
+        /// `binding` 在这一层只由它 `let` 绑一次，`type_name` 在这一层只出现在它里面。
+        TopLevelStatementOfALongBody {
+            line: &'static str,
+            binding: &'static str,
+            type_name: &'static str,
+        },
+    }
+
+    /// `lines` 每一行起头处在第几层花括号里（第一行起头算第 0 层）：字符串、字符字面量与行注释里的花括号不算，字符串跨行时照跨着数。
+    ///
+    /// # Panics
+    /// 右花括号多于左花括号；碰到原始字符串（`r"…"`、`r#"…"#`，这里不认它，层数会数错）。
+    fn brace_depth_at_the_start_of_each_line(lines: &[&String]) -> Vec<usize> {
+        let mut depth = 0_usize;
+        let mut is_inside_a_string = false;
+        let mut depths = Vec::with_capacity(lines.len());
+        for line in lines {
+            depths.push(depth);
+            let characters: Vec<char> = line.chars().collect();
+            let mut index = 0;
+            while index < characters.len() {
+                let character = characters[index];
+                if is_inside_a_string {
+                    if character == '\\' {
+                        index += 1;
+                    } else if character == '"' {
+                        is_inside_a_string = false;
+                    }
+                } else if character == '"' {
+                    let previous = index.checked_sub(1).map(|before| characters[before]);
+                    assert!(
+                        !(previous == Some('r') || previous == Some('#')),
+                        "这一层里有原始字符串，花括号的层数要先认它再数：{line}"
+                    );
+                    is_inside_a_string = true;
+                } else if character == '\'' {
+                    // 字符字面量（`'x'`、`'\''`、`'\u{7b}'`）整个跳过；生命周期（`'static`）只跳这个引号
+                    if characters.get(index + 1) == Some(&'\\') {
+                        index += 2;
+                        while characters.get(index + 1).is_some_and(|next| *next != '\'') {
+                            index += 1;
+                        }
+                        index += 1;
+                    } else if characters.get(index + 2) == Some(&'\'') {
+                        index += 2;
+                    }
+                } else if character == '/' && characters.get(index + 1) == Some(&'/') {
+                    break;
+                } else if character == '\u{7b}' {
+                    depth += 1;
+                } else if character == '\u{7d}' {
+                    depth = depth.checked_sub(1).expect("右花括号不多于左花括号");
+                }
+                index += 1;
+            }
+        }
+        depths
+    }
+
+    /// 第 10z 批第十五块（第 10z 批第十二、十三块代码轮判决 K4：扫源码的用例被领块之前那一问写成 `if false && stop_is_requested()` 骗过，
+    /// 攻方 crash-3）：四块要判，叫停在第三次被问时交真：领每一块之前各问一次、问到真就不再领，叫停之前领的两块判完写了，之后的不领，
+
+    fn every_layer_handed_the_stop_request_hands_it_on_or_asks_it() {
+        let stop_parameter = concat!("stop_is_", "requested: &(dyn Fn() -> bool + Sync),");
+        let pinned_layers_without_a_behaviour_test: [(&str, StopRequestUseThatIsPinned); 4] = [
+            (
+                "judge_my_blocks_on_gpu_cards",
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<(CheckingTally,GpuJudgeOutcome),String>\u{7b}",
+                    "matchjudge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(",
+                    "store,flow,plan,is_mine,version,cards,GpuCardsSource::DevicesStartedForThisRun,stop_is_",
+                    "requested,)?\u{7b}",
+                    "GpuJudgingOfMyBlocks::Judged\u{7b}tally,outcome\u{7d}=>Ok((tally,outcome)),",
+                    "GpuJudgingOfMyBlocks::NotRunTheGpuMemoryWasShort\u{7b}reason,..\u{7d}=>Err(reason),",
+                    "\u{7d}"
+                )),
+            ),
+            (
+                "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from",
+                StopRequestUseThatIsPinned::TopLevelStatementOfALongBody {
+                    line: concat!(
+                        "let stop_request = StopRequestRememberedInThisRun::new(stop_is_",
+                        "requested);"
+                    ),
+                    binding: "stop_request",
+                    type_name: "StopRequestRememberedInThisRun",
+                },
+            ),
+            (
+                "check_selected_blocks",
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<CheckingTally,VerdictStoreError>\u{7b}",
+                    "check_blocks_where_until(store,flow,plan,",
+                    "&|block_sequence|selected_block_sequences.contains(&block_sequence),",
+                    "unit_checksums,version,stop_is_",
+                    "requested,)"
+                )),
+            ),
+            (
+                "judge_my_blocks_on_gpu",
+                StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(concat!(
+                    ")->Result<GpuJudgingOfMyBlocks,String>\u{7b}",
+                    "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from(",
+                    "store,flow,plan,is_mine,version,cards,cards_taken_from,stop_is_",
+                    "requested,)"
+                )),
+            ),
+        ];
+        let lines = code_lines_outside_the_tests();
+        let mut layers_handed_the_stop_request = Vec::new();
+        for (parameter_line_index, _parameter_line) in lines
+            .iter()
+            .enumerate()
+            .filter(|(_line_index, line)| line.trim() == stop_parameter)
+        {
+            let signature = lines[..parameter_line_index]
+                .iter()
+                .rev()
+                .find(|line| line.contains("fn "))
+                .expect("参数行之前有函数签名");
+            let layer = signature
+                .split("fn ")
+                .nth(1)
+                .and_then(|after_fn| after_fn.split(['(', '<']).next())
+                .expect("签名里 fn 之后是函数名")
+                .to_string();
+            let rest_of_the_layer: Vec<&String> = lines[parameter_line_index + 1..]
+                .iter()
+                .take_while(|line| line.as_str() != "\u{7d}")
+                .collect();
+            match pinned_layers_without_a_behaviour_test
+                .iter()
+                .find(|(layer_without_a_behaviour_test, _pinned)| {
+                    *layer_without_a_behaviour_test == layer.as_str()
+                })
+                .map(|(_layer, pinned)| pinned)
+            {
+                Some(StopRequestUseThatIsPinned::WholeBodyAfterTheParameter(expected_body)) => {
+                    let body_without_spaces: String = rest_of_the_layer
+                        .iter()
+                        .flat_map(|line| line.chars())
+                        .filter(|character| !character.is_whitespace())
+                        .collect();
+                    assert_eq!(
+                        body_without_spaces, *expected_body,
+                        "{layer} 参数行之后整句等于钉住的那一句（死分支里留一份原样的调用、真调用换实参，都多出或换掉一截）：{rest_of_the_layer:#?}"
+                    );
+                }
+                Some(StopRequestUseThatIsPinned::TopLevelStatementOfALongBody {
+                    line: pinned_line,
+                    binding,
+                    type_name,
+                }) => {
+                    let lines_using_it: Vec<(usize, &str)> = rest_of_the_layer
+                        .iter()
+                        .enumerate()
+                        .filter(|(_offset, line)| whole_name_uses_of_the_stop_request(line) > 0)
+                        .map(|(offset, line)| (offset, line.trim()))
+                        .collect();
+                    assert_eq!(
+                        lines_using_it
+                            .iter()
+                            .map(|(_offset, line)| *line)
+                            .collect::<Vec<&str>>(),
+                        vec![*pinned_line],
+                        "{layer} 用到叫停的只有钉住的那一行、原样（只提一次名字而永不叫停的写法多一行或那一行变了）：{rest_of_the_layer:#?}"
+                    );
+                    let depths = brace_depth_at_the_start_of_each_line(&rest_of_the_layer);
+                    let (pinned_offset, _pinned_line) = lines_using_it[0];
+                    assert_eq!(
+                        depths[pinned_offset], 1,
+                        "{layer} 的 {pinned_line} 是函数体顶层的一句，不在 `if false` 一类的块里（参数行之后那一行开函数体，算第 1 层）"
+                    );
+                    let let_bindings = rest_of_the_layer
+                        .iter()
+                        .filter(|line| {
+                            let statement = line.trim_start();
+                            [
+                                format!("let {binding} "),
+                                format!("let {binding}:"),
+                                format!("let mut {binding}"),
+                            ]
+                            .iter()
+                            .any(|binding_opening| statement.starts_with(binding_opening.as_str()))
+                        })
+                        .count();
+                    assert_eq!(
+                        let_bindings, 1,
+                        "{layer} 里 {binding} 只由钉住的那一行 let 绑一次（后面再 let 一次就换掉了记住的叫停）"
+                    );
+                    let lines_naming_the_type = rest_of_the_layer
+                        .iter()
+                        .filter(|line| line.contains(type_name))
+                        .count();
+                    assert_eq!(
+                        lines_naming_the_type, 1,
+                        "{layer} 里只有钉住的那一行提到 {type_name}（块里 use 或另起同名的类型会遮住它）"
+                    );
+                }
+                None => {}
+            }
+            layers_handed_the_stop_request.push(layer);
+        }
+        assert_eq!(
+            layers_handed_the_stop_request,
+            vec![
+                "check_blocks_where_until",
+                "check_pending_blocks_in_pieces",
+                "judge_my_blocks_on_gpu_cards",
+                "judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from",
+                "check_selected_blocks",
+                "judge_my_blocks_on_gpu",
+            ],
+            "收叫停的是这六层（多一层少一层都要回来看这条用例罩没罩到）"
+        );
+    }
+
+
+fn main() {
+    std::panic::set_hook(Box::new(|_| {}));
+    if catch_unwind(AssertUnwindSafe(|| every_layer_handed_the_stop_request_hands_it_on_or_asks_it())).is_err() { println!("RED"); } else { println!("GREEN"); }
+}

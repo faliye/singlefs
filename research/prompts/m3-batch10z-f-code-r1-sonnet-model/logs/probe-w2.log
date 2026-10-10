@@ -1,0 +1,6 @@
+ROW 2 GREEN(survived) rc=0 10s kind=probe P3 重起时没等成的那几笔销账不同时从活着的集合里去掉
+   test result: ok. 94 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.37s
+ROW 6 RED(caught) rc=101 3s kind=probe P10 kept 集合不记（等失败那一笔 insert 去掉）
+   test gpu_memory_ledger::tests::a_lease_whose_wait_failed_stays_booked_until_the_device_is_taken_as_lost_and_gives_no_more ... FAILED
+   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.27s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`

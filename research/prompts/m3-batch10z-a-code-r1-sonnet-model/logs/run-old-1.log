@@ -1,0 +1,32 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s
+     Running tests/sonnet_probe_common.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-a-code-r1-sonnet/target-old/debug/deps/sonnet_probe_common-8b6c4472e5f18b94)
+
+running 6 tests
+S1 b1=1000: after drop, no leftover: ledger 29550 truth 29550
+S1 b1=1000: L2 built 10000: ledger 19550 truth 19550
+S1 b1=2560: after drop, no leftover: ledger 29550 truth 29550
+S1 b1=2560: L2 built 10000: ledger 19550 truth 19550
+S1 b1=10000: after drop, no leftover: ledger 29550 truth 29550
+S1 b1=10000: L2 built 10000: ledger 19550 truth 19550
+S1b: leftover still on card: ledger 19550 truth 19550
+S1b: leftover freed: ledger 29550 truth 29550
+test s1_first_returned_lease_never_seen_on_the_card ... ok
+test s1b_returned_lease_seen_on_the_card_then_freed ... ok
+S3: L1 built: ledger 19550 truth 19550
+S3: S built: ledger 18550 truth 18550
+S3: L1 idle (live, a=0), S leftover 1000 on card: ledger 18550 truth 18550 (> truth is an overlend)
+S5: L1 built, U booked unbuilt, L3 built: ledger 11550 truth 11550
+S5: U returned unbuilt: ledger 11550 truth 16550
+S5: again: ledger 11550 truth 16550
+test s3_live_lease_shrinks_while_a_returned_short_lease_is_still_on_the_card ... ok
+test s5_an_unbuilt_lease_in_the_seen_set_is_returned_without_ever_being_built ... ok
+FUZZ monotone xd=2560 collect%=50: Stats { samples: 13922, over_count: 0, over_max: 0, under_count: 6056, under_max: 11443, quiet_samples: 1660, quiet_under_count: 563, quiet_under_max: 11000, shortest_over_trace: None }
+FUZZ shrink xd=2560 collect%=50: Stats { samples: 14346, over_count: 0, over_max: 0, under_count: 6767, under_max: 10050, quiet_samples: 1697, quiet_under_count: 598, quiet_under_max: 10050, shortest_over_trace: None }
+FUZZ monotone xd=2560 collect%=90: Stats { samples: 14358, over_count: 0, over_max: 0, under_count: 6764, under_max: 12110, quiet_samples: 2157, quiet_under_count: 978, quiet_under_max: 11490, shortest_over_trace: None }
+FUZZ shrink xd=2560 collect%=90: Stats { samples: 14644, over_count: 0, over_max: 0, under_count: 7379, under_max: 11096, quiet_samples: 2146, quiet_under_count: 971, quiet_under_max: 10050, shortest_over_trace: None }
+test fuzz_live_buffers_may_shrink ... ok
+FUZZ monotone xd=600 collect%=50: Stats { samples: 14162, over_count: 5526, over_max: 1960, under_count: 4095, under_max: 11175, quiet_samples: 1696, quiet_under_count: 446, quiet_under_max: 11175, shortest_over_trace: Some(["book 1000 -> id0", "start", "build id0 a=153", "return id0 (leftover 153 still on card)", "book1500: ledger 22550 truth 22397 over 153"]) }
+test fuzz_monotone_live_buffers ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s
+

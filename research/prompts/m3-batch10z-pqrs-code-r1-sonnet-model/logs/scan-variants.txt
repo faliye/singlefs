@@ -1,0 +1,37 @@
+## variants.py gpu
+control_mod_wgpu: RED the_card_pool_module_shadows_n
+K5_use_as: RED the_card_pool_module_shadows_n
+K5_nested_use_braces: RED the_card_pool_module_shadows_n
+K5_thread_local_macro: RED the_card_pool_module_shadows_n
+K5_const_ne: RED the_card_pool_module_shadows_n
+K5_const_ne_ident: RED the_card_pool_module_shadows_n
+K5_lifetime_char: GREEN
+K5_raw_byte_strings: GREEN
+K5_block_comment_nested: GREEN
+K5_cfg_test_mod_inside: RED the_card_pool_module_shadows_n
+K5_extern_c_block: RED the_card_pool_module_shadows_n
+K5_pub_use_self_group: RED the_card_pool_module_shadows_n
+K5_use_wildcard_enum: RED the_card_pool_module_shadows_n
+bypass_use_in_fn_as: RED the_card_pool_module_shadows_n
+bypass_type_named_std: GREEN
+bypass_trait_named_wgpu: GREEN
+bypass_const_named_wgpu: GREEN
+bypass_enum_named_std: GREEN
+## 九行变异（实现员 mutations-append）
+第10z批第十八块 GPU 取卡 K4 卡池模块里加同名 mod wgpu 遮住借之前那一步的 poll、改成一直等到设备空（攻方 K4） -> RED the_card_pool_module_shadows_n
+第10z批第十八块 GPU 取卡 K4 卡池模块里加同名 mod std 遮住借之前那一步的 catch_unwind、不 poll 恒交队 -> RED the_card_pool_module_shadows_n
+第10z批第十八块 GPU 取卡 K4 卡池模块经 use 改名把上一层的模块引成 std、遮住借之前那一步的 catch_unwind（攻 -> RED the_card_pool_module_shadows_n
+第10z批第十八块 GPU 取卡 K4 卡池模块去掉 device_found_idle_by_a_poll 的 use、另起同名函数恒交真 -> RED the_card_pool_module_shadows_n
+第10z批第十八块 GPU 取卡 K4 GpuCard::device 交这个进程里头一张问过的卡的设备（正推 K4 device() 不在 -> RED a_card_hands_out_its_own_devic
+第10z批第十八块 GPU 取卡 K4 GpuCard::device_condition 交一份从不丢的设备情况 -> RED a_card_hands_out_its_own_devic
+第10z批第十八块 崩溃放量 K4 check_selected_blocks 真调用的叫停换成永不叫停、钉住那一行留在 if false  -> RED
+第10z批第十八块 崩溃放量 K4 第 ① 段在卡上判记住的叫停换成永不叫停、钉住那一行留在 if false 死分支里（正推 N1 那一形 -> RED
+第10z批第十八块 崩溃放量 K4 第 ① 段在卡上判钉住那一行之后再 let 一次、记住的叫停换成永不叫停 -> RED
+## 崩溃放量扫源码：手造的绕过
+control_second_let: RED
+control_if_false_wrap: RED
+bypass_tuple_let_rebind: GREEN
+bypass_let_extra_spaces: GREEN
+bypass_nested_fn_item: GREEN
+bypass_extra_layer_one_line: GREEN
+bypass_extra_layer_other_name: GREEN

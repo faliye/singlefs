@@ -1,0 +1,4 @@
+tu k1ab atk_k1_abandoned_root_and_c_rehearsal_vs_real
+tu k1-area352 atk_k1_rehearsal_vs_real_sweep ATK_AREA=352 ATK_EXTRA=8
+tu k1-area320 atk_k1_rehearsal_vs_real_sweep ATK_AREA=320 ATK_EXTRA=8
+tu k1-area288 atk_k1_rehearsal_vs_real_sweep ATK_AREA=288 ATK_EXTRA=8

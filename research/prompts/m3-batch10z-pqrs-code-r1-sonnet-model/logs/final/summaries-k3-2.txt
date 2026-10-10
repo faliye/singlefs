@@ -1,0 +1,4 @@
+$ python3 scripts/summ2.py logs/sweeps/mutant-none-arm-true-q1.log logs/sweeps/mutant-none-arm-true-q2.log | head -3
+histories 192 first_red 0 c_unblocked_grew 0 c_handed_out 0 pu_pos 0 crash_samples 0 crash_bad 0
+skipped {'根槽写3次': 4}
+37 ('push:pushedN', 'stillIso0', 'retryOk')

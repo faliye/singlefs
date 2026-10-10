@@ -1,0 +1,10 @@
+
+running 1 test
+test atk_k1_read_faults_while_asking_for_the_ways_out has been running for over 60 seconds
+ATK k1askrd pre=4 fill=16 g=13 base=adm reads_of_the_ask=666 step=1
+ATK k1askrd pre=4 fill=16 g=13 transient   666 × adm same_as_without_fault=true untouched=true (first n=1)
+ATK k1askrd pre=4 fill=16 g=13 pinned      666 × adm untouched=true | follow: pushed(19) retry=admitted ok=Some(true) (first n=1)
+test atk_k1_read_faults_while_asking_for_the_ways_out ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 67 filtered out; finished in 80.53s
+

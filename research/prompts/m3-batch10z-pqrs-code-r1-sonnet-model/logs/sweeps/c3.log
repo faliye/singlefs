@@ -1,0 +1,521 @@
+
+running 1 test
+test s2_sweep ... DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.24 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.18 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.13 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.20 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=34 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushed11
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.24 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=70 iso_max=70 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.18 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=GFGGGXXGFGFFGP secs=0.07 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=18 iso_max=34 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=racct persist=false actions=oFoGGGGFGGGFXGG secs=0.08 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=18 iso_max=70 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.23 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.19 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.14 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.21 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=34 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=4G NS[Ceil;S(r=Some(16),n=15,iso=336,rEq);hold=1;isoC=336;needs=Some(15)]|pushed15|stillIso=0/336|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.23 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=4G:NS[Ceil;S(r=Some(16),n=15,iso=336,rEq);hold=1;isoC=336;needs=Some(15)]|pushed15|stillIso=0/336|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.20 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=4G NS[Ceil;S(r=Some(16),n=14,iso=308,rEq);hold=1;isoC=308;needs=Some(14)]|pushed14|stillIso=0/308|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=GFGGGXXGFGFFGP secs=0.09 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=260 iso_max=260 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=4G:NS[Ceil;S(r=Some(16),n=14,iso=308,rEq);hold=1;isoC=308;needs=Some(14)]|pushed14|stillIso=0/308|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=5G NS[Ceil;S(r=Some(16),n=12,iso=336,rEq);hold=1;isoC=336;needs=Some(12)]|pushed12|stillIso=0/336|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=rall persist=false actions=oFoGGGGFGGGFXGG secs=0.10 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=260 iso_max=260 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=5G:NS[Ceil;S(r=Some(16),n=12,iso=336,rEq);hold=1;isoC=336;needs=Some(12)]|pushed12|stillIso=0/336|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.22 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.17 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.13 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.21 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=28G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.20 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=4 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=21G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=23G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.16 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=8 first_refused=21G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=GFGGGXXGFGFFGP secs=0.07 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b2 r_txg=16 r_old_txg=13 r_old_in_ring=true faults=oldacct persist=false actions=oFoGGGGFGGGFXGG secs=0.07 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.23 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.22 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.15 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.24 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=34 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushed11
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.27 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=70 iso_max=70 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.21 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=GFGGGXXGFGFFGP secs=0.07 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=42 iso_max=42 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=racct persist=false actions=oFoGGGGFGGGFXGG secs=0.08 selected=15 c_r=64 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=42 iso_max=70 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.25 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.21 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.14 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=34
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.21 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=34 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=4G NS[Ceil;S(r=Some(16),n=15,iso=336,rEq);hold=1;isoC=336;needs=Some(15)]|pushed15|stillIso=0/336|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.23 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=4G:NS[Ceil;S(r=Some(16),n=15,iso=336,rEq);hold=1;isoC=336;needs=Some(15)]|pushed15|stillIso=0/336|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.19 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=0 iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=4G NS[Ceil;S(r=Some(16),n=14,iso=308,rEq);hold=1;isoC=308;needs=Some(14)]|pushed14|stillIso=0/308|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=GFGGGXXGFGFFGP secs=0.09 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=260 iso_max=260 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=4G:NS[Ceil;S(r=Some(16),n=14,iso=308,rEq);hold=1;isoC=308;needs=Some(14)]|pushed14|stillIso=0/308|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=5G NS[Ceil;S(r=Some(16),n=12,iso=336,rEq);hold=1;isoC=336;needs=Some(12)]|pushed12|stillIso=0/336|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=rall persist=false actions=oFoGGGGFGGGFXGG secs=0.10 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 iso_after_first_raise=260 iso_max=260 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=5G:NS[Ceil;S(r=Some(16),n=12,iso=336,rEq);hold=1;isoC=336;needs=Some(12)]|pushed12|stillIso=0/336|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.21 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.17 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.12 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.20 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=28G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.18 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=4 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=21G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=23G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.15 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=8 first_refused=21G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=GFGGGXXGFGFFGP secs=0.08 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=b4 r_txg=16 r_old_txg=11 r_old_in_ring=true faults=oldacct persist=false actions=oFoGGGGFGGGFXGG secs=0.07 selected=16 c_r=0 revived=2 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.23 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.19 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.13 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.20 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=28 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushed11
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.23 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.18 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=GFGGGXXGFGFFGP secs=0.06 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=24 iso_max=28 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=racct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=oFoGGGGFGGGFXGG secs=0.07 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=24 iso_max=52 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushed21
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.21 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushed19
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.18 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushed20
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.13 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=28
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.19 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=28 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=4G NS[Ceil;S(r=Some(16),n=15,iso=342,rEq);hold=1;isoC=342;needs=Some(15)]|pushed15|stillIso=0/342|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.20 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=4G:NS[Ceil;S(r=Some(16),n=15,iso=342,rEq);hold=1;isoC=342;needs=Some(15)]|pushed15|stillIso=0/342|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushed18
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.17 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=0 iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=4G NS[Ceil;S(r=Some(16),n=14,iso=314,rEq);hold=1;isoC=314;needs=Some(14)]|pushed14|stillIso=0/314|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=GFGGGXXGFGFFGP secs=0.08 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=266 iso_max=266 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=4G:NS[Ceil;S(r=Some(16),n=14,iso=314,rEq);hold=1;isoC=314;needs=Some(14)]|pushed14|stillIso=0/314|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=5G NS[Ceil;S(r=Some(16),n=12,iso=342,rEq);hold=1;isoC=342;needs=Some(12)]|pushed12|stillIso=0/342|retryOk
+DIAG label=c3 prefix=12 r=b2;b4;o faults=rall actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oFoGGGGFGGGFXGG secs=0.09 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=266 iso_max=266 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=5G:NS[Ceil;S(r=Some(16),n=12,iso=342,rEq);hold=1;isoC=342;needs=Some(12)]|pushed12|stillIso=0/342|retryOk r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=0P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=12P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=20P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=23P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=25X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG step=30X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=PGFGGGoGGGGGPGPGGGGGPGGPGXGoGGXGG secs=0.18 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=2P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=19X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=20X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=21X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGPFGGGGGGGGGGFGGGGXXXX step=22X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GGPFGGGGGGGGGGFGGGGXXXX secs=0.15 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=1P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=7P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=14P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=16P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GPGGGGGPGFoGGGPGPFXoGFGGFF step=18X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GPGGGGGPGFoGGGPGPFXoGFGGFF secs=0.10 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=3X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=9X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=15P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=26G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG step=30P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GoGXGGGGGXooGGGPGPGGoGGGGGGGoGPoGG secs=0.17 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=8P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=9P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=27P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=28G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=30P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=32G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=33G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG step=35P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GGGGGGoGPPGGGoGGGGoFFGGGGGoPGFPFGGoPG secs=0.16 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=4 first_refused=25G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=3P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=4P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=17P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=22P pushRef:Nothing
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=24G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=25G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=27G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=29G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=30G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG step=31G NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None]
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GGGPPGGGGoGGGGGGGPFGGGPGGGFGFGGG secs=0.14 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=24G:NS[Ceil;N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Ceil;N;hold=0;isoC=0;needs=None] r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=5X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=6X X:remount-ok:hold=0:iso=0
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=GFGGGXXGFGFFGP step=13P pushRef:Nothing
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=GFGGGXXGFGFFGP secs=0.06 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=c3 prefix=12 r=b2;b4;o faults=oldacct actions=oFoGGGGFGGGFXGG step=12X X:remount-ok:hold=0:iso=0
+S2 label=c3 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=oldacct persist=false actions=oFoGGGGFGGGFXGG secs=0.06 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 iso_after_first_raise=0 iso_max=0 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=c3 arm=implemented histories=72 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 11.65s
+

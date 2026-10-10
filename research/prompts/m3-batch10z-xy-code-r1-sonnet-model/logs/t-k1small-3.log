@@ -1,0 +1,978 @@
+
+running 1 test
+test atk_k1_rehearsal_vs_real_sweep ... ATK k1 pre=4 fill=6 size_now=6 g_ctrl=Some(76) g_c=Some(63)
+ATK k1 pre=4 fill=6 g=63 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=63 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=63 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=63 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=63 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=63 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=64 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=64 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=64 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=64 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=64 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=64 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=65 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=65 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=65 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=65 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=65 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=65 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=66 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=66 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=66 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=66 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=66 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=66 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=67 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=67 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=67 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=67 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=67 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=67 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=68 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=68 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=68 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=68 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=68 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=68 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=6 g=69 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=69 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=69 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=69 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=69 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=69 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=70 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=70 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=70 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=70 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=70 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=70 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=71 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=71 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=71 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=71 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=71 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=72 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=72 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=72 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=72 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=73 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=73 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=6 g=73 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=73 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=74 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=74 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=74 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=75 ctrl=admitted first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=75 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=75 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=76 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=76 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=76 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=77 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=77 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=77 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=78 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=78 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=78 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=79 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=79 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=79 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=80 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=80 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=80 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=81 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=81 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=81 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=82 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=82 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=82 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=83 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=83 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=83 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=6 g=84 ctrl=refused first=stuck reh=still ways=1 push=pushed(20) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=6 g=84 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(17) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[29, 29] n_real=[29, 29] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=6 g=84 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(11) retry=notwhat(ceiling) agree=yes n_reh=[31, 31] n_real=[31, 31] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 size_now=11 g_ctrl=Some(62) g_c=Some(37)
+ATK k1 pre=4 fill=11 g=37 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=37 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=37 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=37 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=37 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=37 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=37 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=11 g=37 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=37 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=37 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=37 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=38 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=38 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=38 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=38 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=38 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=38 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=38 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=11 g=38 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=38 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=38 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=38 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=39 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=39 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=39 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=39 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=39 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=39 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=39 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=11 g=39 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=39 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=39 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=39 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=40 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=40 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=40 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=40 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=40 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=40 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=41 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=41 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=41 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=41 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=41 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=41 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=42 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=42 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=42 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=42 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=42 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=42 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=43 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=43 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=43 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=43 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=43 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=43 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=44 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=44 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=44 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=44 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=44 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=44 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=45 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=45 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=45 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=45 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=45 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=45 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=46 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=46 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=46 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=46 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=46 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=46 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=47 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=47 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=47 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=47 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=47 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=47 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=48 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=48 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=48 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=48 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=48 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=48 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=49 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=49 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=49 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=49 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=49 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=49 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=50 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=50 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=50 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=50 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=50 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=50 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=51 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=51 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=51 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=51 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=51 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=51 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=52 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=52 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=52 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=52 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=52 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=52 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=53 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=53 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=53 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=53 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=53 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=53 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=54 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=54 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=54 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=54 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=54 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=54 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=55 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=55 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=55 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=55 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=55 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=55 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=56 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=56 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=56 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=56 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=56 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=57 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=57 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=57 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=57 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=57 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=58 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=58 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=58 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=58 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=58 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=11 g=59 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=59 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=59 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=59 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=60 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=60 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=60 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=60 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=61 ctrl=admitted first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=61 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=61 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=11 g=61 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=62 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=62 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=62 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=63 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=63 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=63 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=64 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=64 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=64 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=65 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=65 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=65 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=66 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=66 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=66 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=67 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=67 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=67 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=68 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=68 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=68 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=69 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=69 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=69 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=11 g=70 ctrl=refused first=stuck reh=still ways=1 push=pushed(18) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=11 g=70 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(14) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(budget) agree=yes n_reh=[39, 39] n_real=[39, 39] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 overwrite4:stuck(small_refused=0) reh=still ways=1 push=pushed(12) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=11 g=70 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[41, 41] n_real=[41, 41] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 size_now=16 g_ctrl=Some(36) g_c=Some(13)
+ATK k1 pre=4 fill=16 g=13 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=13 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=13 inode2:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=13 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=13 overwrite3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=13 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=14 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=14 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=14 inode2:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=14 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=14 overwrite3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=14 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=15 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=15 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=15 inode2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=15 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=15 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=15 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=15 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=15 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=15 overwrite3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=15 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=15 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=16 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=16 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=16 inode2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=16 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=16 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=16 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=16 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=16 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=16 overwrite3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=16 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=16 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=17 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=17 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=17 inode2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=17 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=17 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=17 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=17 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=17 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=17 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=17 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=17 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=18 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=18 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=18 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=18 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=18 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=18 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=18 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=18 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=18 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=18 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=18 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=19 ctrl=admitted first=stuck reh=adm ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true again=stuck again_reh=adm again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=19 inode1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=19 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=19 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=19 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=19 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=19 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=19 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=19 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=19 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=19 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=20 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=20 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=20 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=20 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=20 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=20 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=20 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=20 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=20 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=20 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=20 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=21 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=21 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=21 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=21 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=21 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=21 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=21 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=21 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=21 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=21 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=21 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=22 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=22 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=22 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=22 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=22 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=22 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=22 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=22 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=22 overwrite3:stuck(small_refused=0) reh=adm ways=2 push=pushed(13) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=22 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=22 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=23 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=23 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=23 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=23 inode3:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=23 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=23 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=23 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=23 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=23 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=23 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=23 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=24 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=24 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=24 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=24 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=24 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=24 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=24 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=24 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=24 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=24 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=24 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=25 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=25 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=25 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=25 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=25 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=25 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=25 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=25 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=25 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=25 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=25 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=26 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=26 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=26 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=26 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=26 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=26 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=26 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=26 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=26 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=26 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=26 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=27 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=27 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=27 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=27 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=27 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=27 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=27 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=27 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=27 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=27 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=27 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=28 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=28 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=28 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=28 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=28 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=28 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=28 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=28 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=28 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=28 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=28 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=29 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=29 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=29 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=29 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=29 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=29 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=29 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=29 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=29 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=29 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=29 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=30 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=30 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=30 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=30 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=30 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=30 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=30 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=30 overwrite2:stuck(small_refused=0) reh=adm ways=2 push=pushed(15) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=30 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=30 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=30 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=31 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=31 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=31 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=31 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=31 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=31 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=31 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=31 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=31 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=31 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=31 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=32 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=32 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=32 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=32 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=32 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=32 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=32 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=32 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=32 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=32 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=32 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=33 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=33 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=33 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=33 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=33 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=33 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=33 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=33 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=33 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=33 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=33 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=34 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=34 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=34 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=34 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=34 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=34 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=34 overwrite1:stuck(small_refused=0) reh=adm ways=2 push=pushed(16) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1small pre=4 fill=16 g=34 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=34 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=34 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=34 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=35 ctrl=admitted first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=35 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=35 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=35 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=35 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=35 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=36 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=36 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=36 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=36 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=36 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=36 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=37 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=37 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=37 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=37 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=37 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=37 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=38 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=38 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=38 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=38 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=38 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=38 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=39 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=39 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=39 inode6:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=39 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=39 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=39 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=40 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=40 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=40 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(10) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=40 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=40 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=41 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=41 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=41 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(10) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=41 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=41 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=42 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=42 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 inode4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=42 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(10) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=42 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=42 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=43 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=43 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(10) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=43 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=43 overwrite6:admitted(small_refused=0)
+ATK k1 pre=4 fill=16 g=44 ctrl=refused first=stuck reh=still ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true again=stuck again_reh=still again_raises=0 again_ops=0 again_unchanged=true
+ATK k1small pre=4 fill=16 g=44 inode1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 inode2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 inode3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 inode4:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 inode6:stuck(small_refused=0) reh=still ways=1 push=pushed(10) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 overwrite1:stuck(small_refused=0) reh=still ways=1 push=pushed(16) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 overwrite2:stuck(small_refused=0) reh=still ways=1 push=pushed(15) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 overwrite3:stuck(small_refused=0) reh=still ways=1 push=pushed(13) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1small pre=4 fill=16 g=44 overwrite4:admitted(small_refused=0)
+ATK k1small pre=4 fill=16 g=44 overwrite6:stuck(small_refused=0) reh=still ways=1 push=pushed(9) retry=notwhat(ceiling) agree=yes n_reh=[53, 53] n_real=[53, 53] n_same=true dbg_same=true ways_ok=true
+ATK k1 totals area=384 cells=88 stuck=88 disagree=0 small_stuck=621 small_disagree=0 rehearsal_kinds={"adm": 7, "still[NoSpaceAfterRaisingTheFloor]": 81}
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 114.52s
+

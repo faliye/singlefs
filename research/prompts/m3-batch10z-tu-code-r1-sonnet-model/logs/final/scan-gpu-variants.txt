@@ -1,0 +1,35 @@
+REAL GREEN
+L1_use_as_other: GREEN
+L2_nested_braces: GREEN
+L3_self_group: GREEN
+L4_extern_c_block: GREEN
+L5_const_ne: GREEN
+L6_plain_items: GREEN
+L7_attr_include_str: RED 卡池模块的条目这一层调宏或定义宏 include_str!：宏展开出来的条目也能
+L8_const_assert: RED 卡池模块的条目这一层调宏或定义宏 assert!：宏展开出来的条目也能叫 std
+L9_concat_in_static: RED 卡池模块的条目这一层调宏或定义宏 concat!：宏展开出来的条目也能叫 std
+L10_precise_capture_use: PANIC
+L11_char_brace: GREEN
+L12_raw_string_mod: GREEN
+L13_c_raw_string: GREEN
+L14_raw_ident_mod: RED 卡池模块里另起模块：叫 std、wgpu 的直接遮住外部 crate，别的名字的
+L15_lifetimes: GREEN
+L16_doc_use_as_std: GREEN
+L17_trailing_comment_use: GREEN
+L18_block_comment_nested: GREEN
+B1_use_as_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 std），遮住外部 crat
+B2_use_wgpu_as_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 wgpu），遮住外部 cra
+B3_nested_as_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 a::b::c），遮住外部 
+B4_self_as_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 a），遮住外部 crate
+B5_use_last_seg_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 a::std），遮住外部 c
+B6_mod_std: RED 卡池模块里另起模块：叫 std、wgpu 的直接遮住外部 crate，别的名字的
+B7_extern_crate: RED 卡池模块里写 extern crate：extern crate … as st
+B8_glob: RED 卡池模块里通配 use a::*：引进来的名字（叫 std、wgpu 的模块也算
+B9_macro_rules: RED 卡池模块的条目这一层调宏或定义宏 macro_rules!：宏展开出来的条目也能
+B10_struct_std: GREEN
+B11_type_alias_wgpu: GREEN
+B12_cfg_use_then_fn: GREEN
+B13_cfg_test_use_then_fn: GREEN
+B14_fn_name_via_local_macro_in_fn: GREEN
+B15_use_inside_fn_as_std: RED 卡池模块经 use 引进叫 std 的名字（引的是 a::b），遮住外部 cra
+B16_extern_crate_after_attr: RED 卡池模块里写 extern crate：extern crate … as st

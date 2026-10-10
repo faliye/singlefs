@@ -1,0 +1,8 @@
+
+running 1 test
+test s2_sweep ... S2 label=ev384-core arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b6 r_txg=49 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=oooooo secs=0.04 selected=48 c_r=660 revived=2 revived_in_c_r=2 iso_mount=616 iso_after_first_raise=- iso_max=616 iso_end=616 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- refused_steps=6 first_refused=0o:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
+S2_DONE label=ev384-core arm=implemented histories=1 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.14s
+

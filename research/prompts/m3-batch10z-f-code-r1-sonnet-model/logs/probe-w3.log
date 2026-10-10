@@ -1,0 +1,6 @@
+ROW 3 GREEN(survived) rc=0 15s kind=probe P5 第二次丢设备时（Remain 状态）不重新记账
+   test result: ok. 94 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.28s
+ROW 7 RED(caught) rc=101 2s kind=probe P11 重起时把 B（触发重起的那一笔）之外只记旧的：extend 改成只记 leases 里最小一笔
+   test gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement ... FAILED
+   test result: FAILED. 93 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.22s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`

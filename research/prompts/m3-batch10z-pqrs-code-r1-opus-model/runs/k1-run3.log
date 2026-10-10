@@ -1,0 +1,13 @@
+
+running 1 test
+ATK k1 pre=4 fill=16 step=5 units=16 arm=ctrl size_now=16 c_slots=0 c_iso=0 iso_all=0 first_refused=Some((36, "nospace(stop=ceiling(F=7,C=7),last=admission[0:1900503/1916928,1:1900503/1916928],field=NotWhat,raises=1)"))
+ATK k1 pre=4 fill=16 step=5 units=16 arm=crash@63/100 size_now=16 c_slots=1 c_iso=102 iso_all=102 first_refused=Some((13, "nospace(stop=ceiling(F=7,C=7),last=admission[0:1163223/1163264,1:1163223/1163264],field=Stuck(r_slot=2.3,r_txg=None,n=19,iso=[51, 51]),raises=1)"))
+ATK k1 pre=4 fill=16 step=5 units=16 arm=crash@63/100 ctrl_grow=36 before=nospace(stop=ceiling(F=7,C=7),last=admission[0:1163223/1916928,1:1163223/1916928],field=Stuck(r_slot=2.3,r_txg=None,n=19,iso=[51, 51]),raises=1) push=pushed(19) iso_after_push=0 after=nospace(stop=budget,last=admission[0:1376215/1916928,1:1376215/1916928],field=NotWhat,raises=2) retries=["nospace(stop=budget,last=admission[0:1310679/1884160,1:1310679/1884160],field=NotWhat,raises=2)", "nospace(stop=budget,last=admission[0:1310679/1916928,1:1310679/1916928],field=NotWhat,raises=2)", "nospace(stop=budget,last=admission[0:1245143/1916928,1:1245143/1916928],field=NotWhat,raises=2)", "nospace(stop=budget,last=admission[0:1245143/1916928,1:1245143/1916928],field=NotWhat,raises=2)"] viol=0
+ATK k1 pre=4 fill=16 step=5 units=16 arm=crash@63/100 way_out[0]=出路一：正常卸载（mount::unmount）之后再可写挂载一次。再挂时 R（那一槽没有读得出的有效根）按新实例的实例表判成被抛弃，影子账只护它自己账里引用的落点，宽护不再出现；R 的账再挂时仍读不出就照旧拒可写（C694 的 B）。
+ATK k1 pre=4 fill=16 step=5 units=16 arm=crash@63/100 way_out[1]=出路二：调 MountedSession::push_the_root_ring_to_the_ring_slot_of_r_dropping_rollback_candidates_below_four_states（推环到 R 那一槽，根环槽 2.3）：发 19 次 F 不变的空发布写掉那一槽，宽护随之解开、隔离的 102 个槽放出来；根环里更早的回退候选会被这一串整环写掉，回退候选集掉到少于 4 个不同状态（D16（发布语义） 已定项 1），调用即确认。
+ATK k1own pre=4 fill=16 step=5 units=16 arm=crash@63/100 own_grow=13 before=nospace(stop=ceiling(F=7,C=7),last=admission[0:1163223/1163264,1:1163223/1163264],field=Stuck(r_slot=2.3,r_txg=None,n=19,iso=[51, 51]),raises=1) push=pushed(19) after=["ok(raises=0)"] viol=0
+ATK k1 pre=4 fill=16 step=5 units=16 arm=crash@63/100 way_one: refused_first=nospace(stop=ceiling(F=7,C=7),last=admission[0:1163223/1163264,1:1163223/1163264],field=Stuck(r_slot=2.3,r_txg=None,n=19,iso=[51, 51]),raises=1) unmount=ok(3) remount_c_slots=0 remount_c_iso=0 grow13_after=ok(raises=0) viol=0
+test atk_k1_fill_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 2.07s
+

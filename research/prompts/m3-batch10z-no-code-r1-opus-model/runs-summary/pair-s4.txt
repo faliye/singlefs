@@ -1,0 +1,3 @@
+PAIR batch=s4 tree=today histories=8 skipped=0 mount_err=0 red=1 exposed=3 dbl_c_or_other=0 refused_any=2 c_exempt_partial=0 c_exempt_partial_unprotected_slots=0 dup_key_wider=4 ab_exempt_partial=0 probe_max=2/0/0/0/0/0
+PAIR batch=s4 tree=pre14 histories=8 skipped=0 mount_err=0 red=1 exposed=3 dbl_c_or_other=5 refused_any=2 c_exempt_partial=0 c_exempt_partial_unprotected_slots=0 dup_key_wider=4 ab_exempt_partial=0 probe_max=2/0/716/0/716/0
+PAIR batch=s4 paired=8 red_differs=0

@@ -1,0 +1,16 @@
+H01_mod_line_without_space	fn f() {}\n#[cfg(test)]\nmod tests{\n    fn t() {}\n}\n
+H02_one_line	fn f() {}\n#[cfg(test)] mod tests {\n    fn t() {}\n}\n
+H03_spaces_in_attribute	fn f() {}\n#[ cfg ( test ) ]\nmod tests {\n    fn t() {}\n}\n
+H04_extra_spaces_in_mod	fn f() {}\n#[cfg(test)]\nmod  tests  {\n    fn t() {}\n}\n
+H05_indented_attribute	fn f() {}\n    #[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+H06_trailing_space_on_attribute	fn f() {}\n#[cfg(test)]  \nmod tests {\n    fn t() {}\n}\n
+H07_trailing_comment_on_attribute	fn f() {}\n#[cfg(test)] // c\nmod tests {\n    fn t() {}\n}\n
+H08_trailing_comment_on_mod	fn f() {}\n#[cfg(test)]\nmod tests { // c\n    fn t() {}\n}\n
+H09_two_openings	fn f() {}\n#[cfg(test)]\nmod tests {\n}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+H10_inside_paren_group	m!(\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n);\n
+H11_inside_bracket_group	m![\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n];\n
+H12_inside_brace_group_after_semicolon	m! {\nconst A: u8 = 0;\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n}\n
+H13_previous_token_is_a_paren	static A: u8 = (0)\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+H14_previous_token_is_an_identifier	static A: u8 = B\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+H15_in_a_block_comment_only	/*\n#[cfg(test)]\nmod tests {\n*/\nfn f() {}\n
+H16_in_a_string_only	const A: &str = "\\n#[cfg(test)]\\nmod tests {";\nfn f() {}\n

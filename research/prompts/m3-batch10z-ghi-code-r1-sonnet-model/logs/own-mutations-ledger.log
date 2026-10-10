@@ -1,0 +1,4 @@
+GREEN(not caught) | E1 release_a_device 不销该台上没等成的借据 | rc 0 | test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.21s | failed: []
+GREEN(not caught) | E2 release_a_device 不把在用的那台清成 None | rc 0 | test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s | failed: []
+GREEN(not caught) | E5 借据只等它那张卡上的设备那条断言去掉卡位比较 | rc 0 | test result: ok. 104 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s | failed: []
+RED(caught) | E6 take_in_that_the_submitted_work_finished 只销第 0 台 | rc 101 | test result: FAILED. 103 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s | failed: ['gpu_memory_ledger::tests::a_finished_wait_on_a_lost_device_leaves_a_lease_kept_on_its_replacement_on_the_books']

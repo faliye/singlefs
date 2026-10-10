@@ -1,0 +1,1 @@
+STAT files_with_truth 4640

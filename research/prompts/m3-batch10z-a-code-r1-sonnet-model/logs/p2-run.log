@@ -1,0 +1,7 @@
+test tests::a_given_back_block_is_taken_once ... taken: Some(1) None
+test tests::card_a_gives_the_block_back_before_card_b_asks_again ... B asks again after give_back: Some(0)
+test tests::card_b_has_left_before_card_a_gives_the_block_back ... B asks again: None
+any_left after give_back = true
+blocks_stored = 0 of 2 (block 1 was judged but waits for block 0)
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s

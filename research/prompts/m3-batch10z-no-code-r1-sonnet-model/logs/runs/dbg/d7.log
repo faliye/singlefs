@@ -1,0 +1,31 @@
+
+running 1 test
+test s2_sweep ... MOUNTDEBUG r_key=(1,24) selected=23 flat=474 r_group=474 
+MOUNTDEBUG C-placement dev=DeviceIdentity(0) (1452,2) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG C-placement dev=DeviceIdentity(0) (1683,1) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG C-placement dev=DeviceIdentity(0) (1684,2) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG C-placement dev=DeviceIdentity(1) (1452,2) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG C-placement dev=DeviceIdentity(1) (1683,1) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG C-placement dev=DeviceIdentity(1) (1684,2) in_r_group=true bits=(true, false, false)
+MOUNTDEBUG rec (1452,2,gen23,released=false)
+MOUNTDEBUG rec (1683,1,gen23,released=false)
+MOUNTDEBUG rec (1684,2,gen23,released=false)
+MOUNTDEBUG rec (1686,1,gen23,released=false)
+HODEBUG newrec=(0,1452,2,gen27) slot=1452 c=(1452,2)
+HODEBUG newrec=(0,1452,2,gen27) slot=1453 c=(1452,2)
+HODEBUG newrec=(0,1683,1,gen27) slot=1683 c=(1683,1)
+HODEBUG newrec=(0,1684,2,gen27) slot=1684 c=(1684,2)
+HODEBUG newrec=(0,1684,2,gen27) slot=1685 c=(1684,2)
+HODEBUG newrec=(0,1686,1,gen27) slot=1686 c=(1686,1)
+HODEBUG newrec=(1,1452,2,gen27) slot=1452 c=(1452,2)
+HODEBUG newrec=(1,1452,2,gen27) slot=1453 c=(1452,2)
+HODEBUG newrec=(1,1683,1,gen27) slot=1683 c=(1683,1)
+HODEBUG newrec=(1,1684,2,gen27) slot=1684 c=(1684,2)
+HODEBUG newrec=(1,1684,2,gen27) slot=1685 c=(1684,2)
+HODEBUG newrec=(1,1686,1,gen27) slot=1686 c=(1686,1)
+S2 label=d6 arm=implemented slots=768 prefix=oooooooooooooooooooo mid= r=b2 r_txg=24 r_old_txg=21 r_old_in_ring=true faults=rall persist=false actions=o secs=0.02 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=24 iso_after_first_raise=- iso_max=48 iso_end=48 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=12 c_handed_out_first=0o:12 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=d6 arm=implemented histories=1 hits=1
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.08s
+

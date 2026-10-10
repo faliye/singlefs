@@ -1,0 +1,17 @@
+
+running 1 test
+test s2_sweep ... DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JHH step=0J J:injected10:hold=1
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JHH step=1H NS[Ceil(13,13);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[]
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JHH step=2H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+S2 label=tb-jk-47-30-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JHH secs=0.51 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=- iso_max=10 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=1H:NS[Ceil(13,13);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JWH step=0J J:injected10:hold=1
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JWH step=2H NS[Ceil(14,14);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[]
+S2 label=tb-jk-47-30-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JWH secs=0.35 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=- iso_max=10 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=2H:NS[Ceil(14,14);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JNH step=0J J:injected10:hold=1
+DIAG label=tb-jk-47-30-5 prefix=12 r=o faults=none actions=JNH step=2H NS[Ceil(14,14);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[]
+S2 label=tb-jk-47-30-5 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JNH secs=0.35 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=- iso_max=10 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=2H:NS[Ceil(14,14);S(r=Some(18),n=20,iso=10,rNe,reh=A,rel=5+5);hold=1;isoC=10;needs=Some(20)]|pushed20|stillIso=0/10|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+S2_DONE label=tb-jk-47-30-5 arm=implemented histories=3 hits=0 tbl_asks=12
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.24s
+

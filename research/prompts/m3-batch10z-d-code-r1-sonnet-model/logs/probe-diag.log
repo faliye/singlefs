@@ -1,0 +1,22 @@
+warning: unused variable: `e`
+    --> crates/singlefs-harness/tests/k2d_probe.rs:1334:17
+     |
+1334 |             Err(e) => {
+     |                 ^ help: if this is intentional, prefix it with an underscore: `_e`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "k2d_probe") generated 1 warning (run `cargo fix --test "k2d_probe" -p singlefs-harness` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 13.46s
+     Running tests/k2d_probe.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/target/debug/deps/k2d_probe-f4065a7d768a6fa7)
+
+running 1 test
+RESULT diag step 14 refused; R_in_ring=true current_root=(InstanceGeneration(2),CheckpointTxg(24)) table=Ok(InstanceTableRecords { rows: [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(8), applied_transaction_high_water: 0 }] })
+RESULT diag roots_in_ring=[(2, 24), (1, 3), (1, 6), (1, 9), (2, 12), (2, 15), (2, 18), (2, 21), (1, 1), (1, 4), (1, 7), (2, 10), (2, 13), (2, 16), (2, 19), (2, 22), (1, 2), (1, 5), (1, 8), (2, 11), (2, 14), (2, 17), (2, 20), (2, 23)]
+RESULT diag session.current.root=(InstanceGeneration(2),CheckpointTxg(24)) floor=CheckpointTxg(0) table_from_session_current=Ok(InstanceTableRecords { rows: [InstanceRow { instance: InstanceGeneration(1), selected_root_txg: CheckpointTxg(8), applied_transaction_high_water: 0 }] })
+RESULT diag ceiling_with_session_table=Err(RollbackFloorCeilingNeedsUnreadableValidRootTreeTable { root: RollbackTarget { instance: InstanceGeneration(2), checkpoint_txg: CheckpointTxg(10) }, failure: UnitUnreadable { slot: SlotNumber(1543) } })
+RESULT diag valid_by_session_table=[(2, 24), (1, 3), (1, 6), (2, 12), (2, 15), (2, 18), (2, 21), (1, 1), (1, 4), (1, 7), (2, 10), (2, 13), (2, 16), (2, 19), (2, 22), (1, 2), (1, 5), (1, 8), (2, 11), (2, 14), (2, 17), (2, 20), (2, 23)]
+test diag_bz_refusal ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 182 filtered out; finished in 1.62s
+

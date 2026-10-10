@@ -1,0 +1,8 @@
+RED no-remount faults=rroot,racct r=b1 persist=true n=1
+RED no-remount faults=rroot,racct r=b3 persist=true n=1
+RED no-remount faults=rroot,racct r=b6 persist=true n=6
+RED no-remount faults=rroot,racct r=n persist=true n=1
+RED no-remount faults=rroot,racct,rlin r=b1 persist=true n=1
+RED no-remount faults=rroot,racct,rlin r=b3 persist=true n=1
+RED no-remount faults=rroot,racct,rlin r=b6 persist=true n=4
+RED no-remount faults=rroot,racct,rlin r=n persist=true n=1

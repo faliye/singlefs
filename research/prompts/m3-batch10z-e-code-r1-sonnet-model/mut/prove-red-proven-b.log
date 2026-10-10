@@ -1,0 +1,8 @@
+第10z批第五块 崩溃放量 K1-5 叫停、判完的块都入库而这一轮有卡报了时报本次未跑（结局随交回的先后变）	抓到	a_stop_with_a_block_given_back_in_the_same_round_stores_the_judged_block_and_stops 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/001.log）
+第10z批第五块 崩溃放量 K1-5 一张卡两轮各收工一次算两张（攻方乙、正推第 4 点：cards_used 算两遍）	抓到	rounds_keep_the_cards_short_of_memory_out_and_count_a_card_finishing_twice_once 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/002.log）
+第10z批第五块 显存账 K3 读数不进账（正推 M01）	抓到	a_reading_after_the_card_took_a_returned_lease_back_lets_a_later_lease_count_once 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/003.log）
+第10z批第五块 显存账 K3 设备丢了重起时驱动那一份仍记成起着（正推 M05）	抓到	a_refused_restart_asked_again_takes_no_further_driver_share_off_the_room 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/004.log）
+第10z批第五块 显存账 K3 重起判差 1 MiB 也放行（正推 M10）	抓到	a_restart_is_allowed_when_it_fits_exactly_and_refused_one_mebibyte_short 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/005.log）
+第10z批第五块 显存账 K3 重起被拒之后借一笔把驱动那一份记回登记了、没起（正推 M13）	抓到	a_lease_booked_after_a_refused_restart_keeps_the_restart_judged_again 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/006.log）
+第10z批第五块 崩溃放量 K3 卡判不了一块也接着领（正推 M30）	抓到	a_card_stops_taking_blocks_after_a_refusal_and_after_the_store_is_gone 红了（日志 /home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/mut/prove-red-logs-c/007.log）
+✓ 点名 7 条：跑了 7 条，跳过 0 条，跑的都抓到了

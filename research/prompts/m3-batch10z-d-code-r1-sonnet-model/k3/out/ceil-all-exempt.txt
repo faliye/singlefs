@@ -1,0 +1,22 @@
+applied ceil-all-exempt
+## core rc=0
+test result: ok. 202 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+## raise rc=0
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 18.97s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.52s
+## wide rc=101
+test known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write ... FAILED
+test the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling ... FAILED
+thread 'known_root_slot_still_bad_after_one_reread_refuses_the_floor_raise_before_any_write' (3885060) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:2334:9:
+thread 'the_seeded_history_whose_ceiling_read_of_the_genesis_root_slot_fails_once_refuses_the_raise_above_the_ceiling' (3885070) panicked at crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs:2451:5:
+test result: FAILED. 23 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 13.82s
+error: test failed, to rerun pass `-p singlefs-harness --test admission_raises_the_floor_before_refusing`
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.06s
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.38s
+test a_slot_whose_reread_read_a_valid_root_staying_unreadable_refuses_the_raise_before_any_write ... FAILED
+thread 'a_slot_whose_reread_read_a_valid_root_staying_unreadable_refuses_the_raise_before_any_write' (3890306) panicked at crates/singlefs-harness/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs:494:5:
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.08s
+error: test failed, to rerun pass `-p singlefs-harness --test root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread`
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.72s
+error: 2 targets failed:
+restored ceil-all-exempt

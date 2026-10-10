@@ -1,0 +1,2 @@
+行2355 第10z批第二十块 攻方 M1 推环真发失败不把会话的 current 挪到最后一次落盘的那一版: rc=101 红 1 条 k_device_error_halfway_is_refused_as_frozen_before_any_write | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (31s)
+行2356 第10z批第二十块 攻方 M2 推环入口不核交进来的盘表（直接用会话持着的参数）: rc=101 红 1 条 th_the_two_device_bodies_swapped_is_refused_before_any_write | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)

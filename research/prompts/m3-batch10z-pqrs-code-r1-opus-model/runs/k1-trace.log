@@ -1,0 +1,16 @@
+
+running 1 test
+ATK trace mounted txg=13 F=0 ceiling=Ok(7) iso=102 unblocked=[970, 970] c=(1, 102)
+ATK trace before nospace(stop=ceiling(F=7,C=7),last=admission[0:1163223/1392640,1:1163223/1392640],field=Stuck(r_slot=2.3,r_txg=None,n=19,iso=[51, 51]),raises=1) | txg=16 F=7 ceiling=Ok(7) iso=102 unblocked=[1001, 1001] c=(1, 102)
+ATK trace push=pushed(19) | txg=35 F=7 ceiling=Ok(12) iso=0 unblocked=[1014, 1014] c=(0, 0)
+ATK trace attempt1 nospace(stop=budget,last=admission[0:1376215/1392640,1:1376215/1392640],field=NotWhat,raises=2) | txg=40 F=14 ceiling=Ok(17) iso=0 unblocked=[1014, 1014] c=(0, 0)
+ATK trace attempt2 nospace(stop=budget,last=admission[0:1310679/1359872,1:1310679/1359872],field=NotWhat,raises=2) | txg=46 F=20 ceiling=Ok(23) iso=0 unblocked=[1010, 1010] c=(0, 0)
+ATK trace attempt3 nospace(stop=budget,last=admission[0:1310679/1392640,1:1310679/1392640],field=NotWhat,raises=2) | txg=52 F=26 ceiling=Ok(29) iso=0 unblocked=[1010, 1010] c=(0, 0)
+ATK trace attempt4 nospace(stop=budget,last=admission[0:1245143/1392640,1:1245143/1392640],field=NotWhat,raises=2) | txg=58 F=32 ceiling=Ok(35) iso=0 unblocked=[1006, 1006] c=(0, 0)
+ATK trace attempt5 nospace(stop=budget,last=admission[0:1245143/1392640,1:1245143/1392640],field=NotWhat,raises=2) | txg=64 F=38 ceiling=Ok(41) iso=0 unblocked=[1006, 1006] c=(0, 0)
+ATK trace attempt6 nospace(stop=budget,last=admission[0:1310679/1392640,1:1310679/1392640],field=NotWhat,raises=2) | txg=70 F=44 ceiling=Ok(47) iso=0 unblocked=[1010, 1010] c=(0, 0)
+ATK trace overwrite_after ok(raises=0) | txg=71 F=44 ceiling=Ok(48) iso=0 unblocked=[1002, 1002] c=(0, 0) viol=0
+test atk_k1_push_trace ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 38 filtered out; finished in 0.35s
+

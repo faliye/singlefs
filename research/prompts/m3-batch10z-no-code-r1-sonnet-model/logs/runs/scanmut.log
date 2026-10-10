@@ -1,0 +1,14 @@
+baseline gpu  : GREEN
+baseline crash: GREEN
+repo7 z批第十五块 GPU 取卡 K4 借之前那一步方法体最前面整句返回（正推 A2） | gpu | RED: 方法体整句不等于钉住的那一句
+repo8  GPU 取卡 K4 借之前那一步丢没丢与 poll 两个闭包对调（正推 A3） | gpu | RED: 方法体整句不等于钉住的那一句
+repo9  GPU 取卡 K4 借之前那一步整个包进 if false（攻方 gpu-2） | gpu | RED: 方法体整句不等于钉住的那一句
+repo10 evice_found_idle_by_a_poll 恒交真（攻方 gpu-3） | gpu | RED: 方法体整句不等于钉住的那一句
+repo11 cks_where_until 往下交永不叫停、另提一句叫停的名字（正推 A7） | crash | GREEN
+repo12 e_until 往下交的闭包里提一次叫停的名字而永不叫停（攻方 crash-2） | crash | GREEN
+repo13 ocks_in_pieces 领块之前那一问短路成永不问（攻方 crash-3） | crash | GREEN
+repo14 的闭包里提一次叫停的名字而永不叫停（攻方 crash-2 那一形挪到要卡的一层） | crash | RED: judge_my_blocks_on_gpu_cards 用到叫停的行不等于钉住的：["&|| { let _ = stop_is_requested; false },"]
+repo15 ocks 往下交永不叫停、另提一句叫停的名字（正推 A7 那一形挪到要库的一层） | crash | RED: check_selected_blocks 用到叫停的行不等于钉住的：["{ let _ = stop_is_requested; &|| false },"]
+repo18 K5 check_blocks_where_until 往下交的叫停换成永不叫停 | crash | GREEN
+repo19  check_pending_blocks_in_pieces 领块之前不问叫停 | crash | GREEN
+N1_decoy_if_false_branch_check_selected_blocks | crash | GREEN

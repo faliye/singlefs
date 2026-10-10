@@ -1,0 +1,110 @@
+[
+ {
+  "id": "n14-0",
+  "name": "第10z批第十四块 H2 挂载那一刻 C 那一圈照旧隔离分配位置着的槽（1536 槽盘先释放一大批再认不出那一形）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        allocator\n            .isolate_the_slots_not_allocated_of_a_placement_named_by_unapplied_journal_records(\n                placement.device,\n                placement.slot,\n                placement.span,\n            );",
+  "new": "        allocator.isolate_abandoned(placement.device, placement.slot, placement.span);",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- --include-ignored wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices",
+  "test": "wide_protection_after_releasing_a_large_batch_counts_no_slot_twice_and_writes_go_through_on_the_1536_slot_devices"
+ },
+ {
+  "id": "n14-1",
+  "name": "第10z批第十四块 H2 挂载那一刻 C 那一圈照旧隔离分配位置着的槽（第九项与已分配双扣）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        allocator\n            .isolate_the_slots_not_allocated_of_a_placement_named_by_unapplied_journal_records(\n                placement.device,\n                placement.slot,\n                placement.span,\n            );",
+  "new": "        allocator.isolate_abandoned(placement.device, placement.slot, placement.span);",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_the_384_slot_devices",
+  "test": "wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_the_384_slot_devices"
+ },
+ {
+  "id": "n14-2",
+  "name": "第10z批第十四块 H2 C 那一圈隔离时不看分配位（分配器那一判拿掉）",
+  "file": "crates/singlefs-core/src/allocator.rs",
+  "old": "            if !self.allocated[index] {\n                self.isolate_slot_at_index(index);\n            }",
+  "new": "            self.isolate_slot_at_index(index);",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_the_384_slot_devices",
+  "test": "wide_protection_at_the_mount_isolates_no_slot_still_counted_as_allocated_on_the_384_slot_devices"
+ },
+ {
+  "id": "n14-3",
+  "name": "第10z批第十四块 H2 抬 F 那一串回收之后不补隔离（挂载那一刻跳过的 defer 槽回收出去）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        ShadowLedger::On => allocator\n            .reclaim_released_up_to_isolating_what_the_isolation_still_protects(floor, reuse),",
+  "new": "        ShadowLedger::On => allocator.reclaim_released_up_to(floor, reuse),",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero",
+  "test": "revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero"
+ },
+ {
+  "id": "n14-4",
+  "name": "第10z批第十四块 H2 分配器回收之后补隔离那一步拿掉（抬 F 那一串）",
+  "file": "crates/singlefs-core/src/allocator.rs",
+  "old": "        self.isolate_reclaimed_slots_the_isolation_still_protects(\n            &reclaimed,\n            &still_protected_by_the_isolation,\n        );\n        reclaimed\n            .into_iter()",
+  "new": "        reclaimed\n            .into_iter()",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero",
+  "test": "revived_units_skipped_at_the_mount_are_isolated_when_the_floor_raise_reclaims_them_while_the_root_slot_of_the_rollback_read_back_zero"
+ },
+ {
+  "id": "n14-5",
+  "name": "第10z批第十四块 K2 读盘一层只看第一个打包单元（删除发布墓碑片读不出那一形）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": ".filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)\n        .map(\n",
+  "new": ".filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)\n        .take(1)\n        .map(\n",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- a_deletion_whose_tombstone_unit_and_account_read_back_zero_at_the_mount_takes_every_released_placement",
+  "test": "a_deletion_whose_tombstone_unit_and_account_read_back_zero_at_the_mount_takes_every_released_placement"
+ },
+ {
+  "id": "n14-6",
+  "name": "第10z批第十四块 K2 读盘一层只看第一条记录点名的打包单元（顺序写末条点名叶容器那一形）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        .iter()\n        .flat_map(|record| record.named.iter())\n        .filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)",
+  "new": "        .iter()\n        .take(1)\n        .flat_map(|record| record.named.iter())\n        .filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)",
+  "cmd": "-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table -- a_sequential_write_whose_inode_unit_named_by_its_last_record_and_account_read_back_zero_at_the_mount_takes_every_released_placement",
+  "test": "a_sequential_write_whose_inode_unit_named_by_its_last_record_and_account_read_back_zero_at_the_mount_takes_every_released_placement"
+ },
+ {
+  "id": "n14-7",
+  "name": "第10z批第十四块 K2 读得出而解不开的打包单元当解开了（旧写法 ok() 吞掉）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "                    Err(_unparsable) => PackedUnitNamedByAPublishAsRead::ReadButUnparsable,",
+  "new": "                    Err(_unparsable) => PackedUnitNamedByAPublishAsRead::Parsed {\n                        record_type: 0,\n                        records: Vec::new(),\n                    },",
+  "cmd": "-p singlefs-core --lib -- every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart",
+  "test": "every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart"
+ },
+ {
+  "id": "n14-8",
+  "name": "第10z批第十四块 K2 读盘一层只看第一个打包单元（读盘一层的库用例）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": ".filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)\n        .map(\n",
+  "new": ".filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)\n        .take(1)\n        .map(\n",
+  "cmd": "-p singlefs-core --lib -- every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart",
+  "test": "every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart"
+ },
+ {
+  "id": "n14-9",
+  "name": "第10z批第十四块 K2 读盘一层只看第一条记录点名的打包单元（读盘一层的库用例）",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        .iter()\n        .flat_map(|record| record.named.iter())\n        .filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)",
+  "new": "        .iter()\n        .take(1)\n        .flat_map(|record| record.named.iter())\n        .filter(|named| named.unit_class == crate::unit::UNIT_CLASS_PACKED)",
+  "cmd": "-p singlefs-core --lib -- every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart",
+  "test": "every_packed_unit_named_by_every_record_is_read_in_order_and_an_unparsable_one_is_told_apart"
+ },
+ {
+  "id": "n14-10",
+  "name": "步 5：抬 F 回收的槽不扣住、生效之前就能发出去",
+  "file": "crates/singlefs-core/src/mount.rs",
+  "old": "        ReuseOfTheSlotsReclaimedByTheSequence::HeldUntilFloorTakesEffect => {\n            reclaim_released_in_the_sequence_raising_the_floor_up_to(\n                allocator,\n                shadow_ledger,\n                floor_of_the_reclaim,\n                ReclaimedReuse::HeldUntilFloorTakesEffect,\n            )\n        }",
+  "new": "        ReuseOfTheSlotsReclaimedByTheSequence::HeldUntilFloorTakesEffect => {\n            reclaim_released_in_the_sequence_raising_the_floor_up_to(\n                allocator,\n                shadow_ledger,\n                floor_of_the_reclaim,\n                ReclaimedReuse::Immediately,\n            )\n        }",
+  "cmd": "-p singlefs-harness --test reuse_after_raising_the_floor -- --include-ignored slots_reclaimed_by_raising",
+  "test": "slots_reclaimed_by_raising_the_floor_are_not_handed_out_before_the_floor_takes_effect"
+ },
+ {
+  "id": "n14-11",
+  "name": "C518（一次挂载之内环转过一圈之后不回收）：挂载内回收出来、被抛弃根还引用着的槽不补隔离（D23 已定项 14 主句）",
+  "file": "crates/singlefs-core/src/allocator.rs",
+  "old": "            self.reclaim_released_records_up_to(reclaim_floor, ReclaimedReuse::Immediately);\n        self.isolate_reclaimed_slots_the_isolation_still_protects(\n            &reclaimed,\n            &still_protected_by_the_isolation,\n        );",
+  "new": "            self.reclaim_released_records_up_to(reclaim_floor, ReclaimedReuse::Immediately);\n        let _ = (&reclaimed, &still_protected_by_the_isolation);",
+  "cmd": "-p singlefs-harness --test unreadable_abandoned_root_slot -- slot_reclaimed_while_an_abandoned_root_still_references",
+  "test": "slot_reclaimed_while_an_abandoned_root_still_references_it_stays_isolated_until_that_root_leaves_the_ring"
+ }
+]

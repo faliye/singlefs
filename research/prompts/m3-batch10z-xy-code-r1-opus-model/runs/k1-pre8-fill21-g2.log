@@ -1,0 +1,7 @@
+
+running 1 test
+test atk_k1_ways_out_vs_real_sweep ... ATK k1 pre=8 fill=21 r_not_recorded
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 75 filtered out; finished in 0.07s
+

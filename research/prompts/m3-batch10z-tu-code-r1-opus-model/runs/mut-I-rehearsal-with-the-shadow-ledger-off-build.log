@@ -1,0 +1,5 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/repo-mut/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/repo-mut/crates/singlefs-harness)
+    Finished `release` profile [optimized + debuginfo] target(s) in 20.83s
+  Executable tests/atk_tu_opus.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/target-mut/release/deps/atk_tu_opus-39aa64a579c8215d)
+  Executable tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-tu-code-r1-opus/target-mut/release/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-a6a6b07acd5b9197)

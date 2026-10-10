@@ -1,0 +1,8 @@
+test a_slot_whose_reread_read_a_valid_root_staying_unreadable_refuses_the_raise_before_any_write ... ok
+test a_valid_root_read_bad_once_on_the_reread_keeps_the_slot_pinned_at_the_oldest_txg_it_can_have_held ... ok
+test a_valid_root_read_on_the_reread_holds_the_reclaim_threshold_at_its_txg ... ok
+test an_abandoned_root_read_on_the_reread_is_taken_as_no_root ... ok
+test the_instance_table_judging_the_rereads_after_the_mount_is_the_one_the_row_publish_wrote ... ok
+test the_row_publish_on_a_version_without_file_rereads_the_slot_unreadable_at_mount_pinned_at_the_oldest_txg_it_can_have_held ... ok
+test a_front_hole_unreadable_at_mount_reread_as_all_zero_stays_pinned_until_the_process_overwrites_it ... ok
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 13.69s

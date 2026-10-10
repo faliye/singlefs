@@ -1,0 +1,116 @@
+   Compiling proc-macro2 v1.0.107
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling equivalent v1.0.2
+   Compiling hashbrown v0.17.1
+   Compiling convert_case v0.4.0
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling verus_builtin v0.0.0-2026-09-16-0054
+   Compiling libc v0.2.189
+   Compiling singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-format)
+   Compiling singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-reference-filesystem)
+   Compiling singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-checker)
+   Compiling indexmap v2.14.2
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling syn v2.0.119
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-replay-prefix)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/tree-mut/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 18.52s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-e-code-r1-sonnet/target-mut/debug/deps/singlefs_harness-90bdf76cfc53b9d8)
+
+running 83 tests
+test gpu_memory_ledger::tests::a_block_given_back_by_a_card_out_of_memory_goes_to_the_next_card_that_takes_one ... ok
+test gpu_memory_ledger::tests::a_booking_after_an_outsider_left_gets_the_memory_it_returned ... ok
+test gpu_memory_ledger::tests::a_booking_on_a_named_card_stays_on_that_card_even_when_an_earlier_card_has_room ... ok
+test gpu_memory_ledger::tests::a_booking_after_an_outsider_took_memory_follows_the_free_memory_read_at_that_booking ... ok
+test gpu_memory_ledger::tests::a_card_asked_to_stop_takes_only_the_blocks_judged_blocks_wait_for_and_leaves_the_rest ... ok
+test gpu_memory_ledger::tests::a_card_quota_from_the_environment_caps_each_card_ledger_and_without_it_the_capacity_is_unchanged ... ok
+test gpu_memory_ledger::tests::a_booking_without_room_now_is_reported_not_run_with_the_gpu_not_run_marker ... ok
+test gpu_memory_ledger::tests::a_card_stops_taking_blocks_after_a_refusal_and_after_the_store_is_gone ... ok
+test gpu_memory_ledger::tests::a_card_the_caller_found_holding_no_state_now_is_no_room_now_not_nothing_left_to_place ... ok
+test gpu_memory_ledger::tests::a_card_with_less_free_memory_than_one_driver_share_lends_nothing_and_registers_nothing ... ok
+test gpu_memory_ledger::tests::a_device_outside_the_books_is_marked_on_its_bus_before_it_starts ... ok
+test gpu_memory_ledger::tests::a_device_outside_the_books_that_failed_to_start_stays_marked_on_its_bus ... ok
+test gpu_memory_ledger::tests::a_device_recorded_lost_is_lost_and_another_is_not ... ok
+test gpu_memory_ledger::tests::a_device_that_failed_to_start_is_started_again_and_a_lost_one_is_replaced ... ok
+test gpu_memory_ledger::tests::a_lease_booked_after_a_refused_restart_keeps_the_restart_judged_again ... ok
+test gpu_memory_ledger::tests::a_lease_is_on_the_books_until_it_is_dropped ... ok
+test gpu_memory_ledger::tests::a_lost_device_refused_a_restart_is_judged_again_on_every_later_attempt ... ok
+test gpu_memory_ledger::tests::a_lost_device_started_again_books_its_driver_share_as_not_yet_on_the_card ... ok
+test gpu_memory_ledger::tests::a_lost_device_explains_a_failure_only_with_an_out_of_memory_since_the_work_began ... ok
+test gpu_memory_ledger::tests::a_lost_device_started_again_fits_when_its_driver_share_fits_exactly ... ok
+test gpu_memory_ledger::tests::a_genuine_panic_while_the_device_was_there_is_not_told_out_of_memory_after_another_piece_runs_out ... ok
+test gpu_memory_ledger::tests::a_lost_device_started_again_is_refused_when_its_driver_share_no_longer_fits_now ... ok
+test gpu_memory_ledger::tests::a_need_larger_than_the_card_when_empty_never_fits_and_a_smaller_one_has_no_room_now ... ok
+test gpu_memory_ledger::tests::a_missing_reserved_memory_in_the_report_is_an_error_not_zero ... ok
+test gpu_memory_ledger::tests::a_need_beyond_what_an_empty_card_has_never_fits_even_below_the_total_memory ... ok
+test gpu_memory_ledger::tests::a_process_that_started_the_card_pool_books_the_scratch_of_each_card_for_the_states_placed_on_it ... ok
+test gpu_memory_ledger::tests::a_piece_dropping_its_ending_without_ending_does_not_keep_the_others_waiting ... ok
+test gpu_memory_ledger::tests::a_piece_failing_on_a_lost_device_is_told_after_another_piece_records_its_out_of_memory ... ok
+test gpu_memory_ledger::tests::a_reading_of_more_cards_than_the_pool_is_refused_and_nothing_is_booked ... ok
+test gpu_memory_ledger::tests::a_reading_that_cannot_tell_this_process_apart_leaves_the_returned_share_unpressed ... ok
+test gpu_memory_ledger::tests::a_reading_after_the_card_took_a_returned_lease_back_lets_a_later_lease_count_once ... ok
+test gpu_memory_ledger::tests::a_refused_restart_asked_again_takes_no_further_driver_share_off_the_room ... ok
+test gpu_memory_ledger::tests::a_restart_is_allowed_when_it_fits_exactly_and_refused_one_mebibyte_short ... ok
+test gpu_memory_ledger::tests::a_piece_records_what_its_scope_caught_before_it_reports_its_ending ... ok
+test gpu_memory_ledger::tests::a_returned_lease_is_pressed_only_to_what_this_process_occupies_not_below_by_a_whole_driver_share ... ok
+test gpu_memory_ledger::tests::a_returned_lease_still_on_the_card_is_not_pressed_away_when_a_live_lease_shrinks_back_to_the_driver ... ok
+test gpu_memory_ledger::tests::a_returned_lease_still_on_the_card_is_not_taken_for_a_live_lease_already_built ... ok
+test gpu_memory_ledger::tests::a_scratch_booking_compresses_its_states_to_the_room_now_and_books_them ... ok
+test gpu_memory_ledger::tests::a_second_card_without_room_leaves_every_state_to_the_first_card ... ok
+test gpu_memory_ledger::tests::a_small_flow_opens_scratch_for_its_own_states_and_a_large_flow_still_follows_the_memory ... ok
+test gpu_memory_ledger::tests::a_state_needing_exactly_what_an_empty_card_lends_is_no_room_now ... ok
+test gpu_memory_ledger::tests::a_work_begun_inside_another_hands_the_thread_back_to_the_outer_work_when_it_ends ... ok
+test gpu_memory_ledger::tests::a_stop_before_the_closing_round_still_judges_the_block_nine_judged_blocks_wait_for ... ok
+test gpu_memory_ledger::tests::a_work_compiling_in_two_places_at_once_stays_compiling_until_both_end ... ok
+test gpu_memory_ledger::tests::a_stop_with_a_block_given_back_in_the_same_round_stores_the_judged_block_and_stops ... ok
+test gpu_memory_ledger::tests::after_a_round_another_round_starts_only_when_a_card_ran_out_and_another_card_is_left ... ok
+test gpu_memory_ledger::tests::a_stop_leaves_the_blocks_not_judged_to_the_next_run_after_storing_the_judged_ones ... ok
+test gpu_memory_ledger::tests::an_environment_quota_larger_than_the_configured_card_quota_stays_within_the_configured_card_quota ... ok
+test gpu_memory_ledger::tests::an_environment_quota_without_a_card_priority_configured_stays_within_the_default_three_quarter_share ... ok
+test gpu_memory_ledger::tests::an_unreadable_card_memory_is_refused_and_nothing_is_booked ... ok
+test gpu_memory_ledger::tests::an_out_of_memory_in_the_work_of_another_thread_does_not_explain_a_failure_of_this_work ... ok
+test gpu_memory_ledger::tests::an_out_of_memory_on_a_thread_without_work_explains_only_the_work_compiling_on_the_device_then ... ok
+test gpu_memory_ledger::tests::a_work_failing_on_a_device_another_group_lost_for_lack_of_memory_is_told_out_of_memory ... ok
+test gpu_memory_ledger::tests::an_unreadable_free_memory_in_the_report_is_an_error_not_zero ... ok
+test gpu_memory_ledger::tests::an_unreadable_memory_of_this_process_in_the_report_is_not_listed_not_a_huge_occupancy ... ok
+test gpu_memory_ledger::tests::buffers_held_at_once_are_the_uploaded_tables_plus_every_pass_still_alive_rounded_up ... ok
+test gpu_memory_ledger::tests::an_unreadable_process_identifier_in_the_report_is_an_error_not_process_zero ... ok
+test gpu_memory_ledger::tests::bookings_fill_the_first_card_before_the_next_card_takes_any ... ok
+test gpu_memory_ledger::tests::each_booking_reads_the_free_memory_and_this_process_occupancy_from_one_report ... ok
+test gpu_memory_ledger::tests::judged_blocks_are_stored_in_block_order_and_none_after_a_storing_error ... ok
+test gpu_memory_ledger::tests::memory_of_this_process_outside_the_books_is_not_taken_for_leases_already_built ... ok
+test gpu_memory_ledger::tests::returned_short_leases_while_a_long_lease_stays_built_each_stay_booked_as_possibly_on_the_card ... ok
+test gpu_memory_ledger::tests::rounds_keep_the_cards_short_of_memory_out_and_count_a_card_finishing_twice_once ... ok
+test gpu_memory_ledger::tests::states_compressed_before_an_outsider_took_memory_are_compressed_again_in_the_booking ... ok
+test gpu_memory_ledger::tests::a_stop_around_the_closing_round_stores_every_block_judged_before_it ... ok
+test gpu_memory_ledger::tests::the_memory_this_process_may_hold_caps_the_capacity_even_when_both_quotas_are_set ... ok
+test gpu_memory_ledger::tests::the_memory_this_process_may_hold_counts_only_what_it_occupies_of_what_it_promised ... ok
+test gpu_memory_ledger::tests::the_most_states_whose_need_fits_is_the_largest_count_whose_need_is_within_the_capacity ... ok
+test gpu_memory_ledger::tests::the_out_of_memory_reason_says_the_gpu_memory_was_short_in_the_not_run_line ... ok
+test gpu_memory_ledger::tests::one_nvidia_smi_report_gives_the_frame_buffer_memory_and_this_process_occupancy_of_each_card ... ok
+test gpu_memory_ledger::tests::the_device_starts_only_on_a_card_this_process_booked_and_then_counts_the_driver_share_as_on_the_card ... ok
+test gpu_memory_ledger::tests::the_room_now_subtracts_the_leases_and_the_ceiling_takes_what_an_empty_card_has ... ok
+test gpu_memory_ledger::tests::the_states_a_card_did_not_book_go_to_the_next_card ... ok
+test gpu_memory_ledger::tests::the_same_card_given_twice_to_a_scratch_booking_is_refused_by_an_assertion ... ok
+test gpu_memory_ledger::tests::the_states_a_card_cannot_take_now_go_to_the_next_card_with_room ... ok
+test gpu_memory_ledger::tests::two_bookings_of_this_process_on_one_card_stay_within_the_free_memory_read_now ... ok
+test gpu_memory_ledger::tests::with_no_card_booked_a_card_that_fits_when_empty_means_no_room_now_and_none_means_red ... ok
+test gpu_memory_ledger::tests::with_no_card_holding_a_state_now_a_card_holding_one_when_empty_means_not_run_not_red ... ok
+test gpu_memory_ledger::tests::with_this_process_not_listed_a_started_device_leaves_room_for_its_whole_driver_share ... ok
+test gpu_memory_ledger::tests::with_one_card_only_a_block_it_gives_back_leaves_the_run_not_run ... ok
+test gpu_memory_ledger::tests::with_every_state_on_the_first_card_the_blocks_it_leaves_are_judged_on_the_second_card ... ok
+test gpu_memory_ledger::tests::a_block_a_card_gives_back_is_judged_once_and_every_block_is_stored_at_any_speed_of_two_cards ... ok
+test gpu_memory_ledger::tests::the_last_piece_to_report_wakes_every_piece_waiting_for_it ... ok
+
+test result: ok. 83 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.20s
+
+
+real	0m18.928s
+user	0m29.662s
+sys	0m2.985s

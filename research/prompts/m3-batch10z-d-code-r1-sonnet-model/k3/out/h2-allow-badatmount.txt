@@ -1,0 +1,10 @@
+applied h2-allow-badatmount
+## core rc=101
+test allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot ... FAILED
+thread 'allocator::tests::placements_named_by_unapplied_journal_records_for_a_root_recorded_valid_answer_only_for_the_same_root_on_its_ring_slot' (934918) panicked at crates/singlefs-core/src/allocator.rs:3377:13:
+test result: FAILED. 201 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s
+error: test failed, to rerun pass `-p singlefs-core --lib`
+## raise rc=0
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.17s
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+restored h2-allow-badatmount

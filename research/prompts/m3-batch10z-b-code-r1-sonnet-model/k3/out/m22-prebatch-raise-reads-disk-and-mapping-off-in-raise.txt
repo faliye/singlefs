@@ -1,0 +1,4 @@
+ok ['m22-prebatch-raise-reads-disk-and-mapping-off-in-raise']
+## lr3full rc=0 :: test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 21.71s 
+ok ['m22-prebatch-raise-reads-disk-and-mapping-off-in-raise', 'restore']
+done

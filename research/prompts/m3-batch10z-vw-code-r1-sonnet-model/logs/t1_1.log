@@ -1,0 +1,355 @@
+
+running 1 test
+test s2_sweep ... DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(12,12);S(r=Some(16),n=18,iso=236,rEq,reh=A,rel=118+118);hold=1;isoC=236;needs=Some(18)]|pushed18|stillIso=0/236|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=THTKE secs=0.71 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(12,12);S(r=Some(16),n=18,iso=236,rEq,reh=A,rel=118+118);hold=1;isoC=236;needs=Some(18)]|pushed18|stillIso=0/236|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=22:selected=22:hold=0:iso=18
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=26:selected=26:hold=0:iso=18
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=TENKTNEWK secs=0.87 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=18 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=6E:Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=34
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=34
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=TXoNX secs=0.46 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=34 iso_end=34 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=34
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=oXHWTT secs=0.63 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=34 iso_end=34 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=34
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=34
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=XENoX secs=0.49 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=34 iso_end=34 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=34
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=TTbXNTNT secs=0.72 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=34 iso_end=34 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((19, Some(16))),needs=Some(21),hold=1,isoC=18,isoAll=18->0]pushed21[n=21,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+21]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=44:selected=44:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=PHKTNK secs=0.81 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(13,13);S(r=Some(16),n=18,iso=260,rEq,reh=A,rel=130+130);hold=1;isoC=260;needs=Some(18)]|pushed18|stillIso=0/260|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=b6 r_txg=16 r_old_txg=9 r_old_in_ring=true faults=rall persist=false actions=oHXTPH secs=0.89 selected=15 c_r=286 revived=2 revived_in_c_r=2 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(13,13);S(r=Some(16),n=18,iso=260,rEq,reh=A,rel=130+130);hold=1;isoC=260;needs=Some(18)]|pushed18|stillIso=0/260|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(12,12);S(r=Some(16),n=18,iso=236,rEq,reh=A,rel=118+118);hold=1;isoC=236;needs=Some(18)]|pushed18|stillIso=0/236|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=THTKE secs=0.67 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(12,12);S(r=Some(16),n=18,iso=236,rEq,reh=A,rel=118+118);hold=1;isoC=236;needs=Some(18)]|pushed18|stillIso=0/236|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=22:selected=22:hold=0:iso=18
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=26:selected=26:hold=0:iso=18
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TENKTNEWK secs=0.87 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=18 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=6E:Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=22
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=28
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TXoNX secs=0.44 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=28
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oXHWTT secs=0.58 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=22
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=28
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=XENoX secs=0.45 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[9, 9]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=22
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TTbXNTNT secs=0.69 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=22 iso_end=22 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((19, Some(16))),needs=Some(21),hold=1,isoC=18,isoAll=18->0]pushed21[n=21,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+21]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=44:selected=44:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=PHKTNK secs=0.81 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(13,13);S(r=Some(16),n=18,iso=260,rEq,reh=A,rel=130+130);hold=1;isoC=260;needs=Some(18)]|pushed18|stillIso=0/260|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=n r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oHXTPH secs=0.89 selected=15 c_r=286 revived=0 revived_in_c_r=0 iso_mount=18 ab_mount=0 iso_after_first_raise=- iso_max=18 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(13,13);S(r=Some(16),n=18,iso=260,rEq,reh=A,rel=130+130);hold=1;isoC=260;needs=Some(18)]|pushed18|stillIso=0/260|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[12, 12]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(12,12);S(r=Some(16),n=18,iso=242,rEq,reh=A,rel=121+121);hold=1;isoC=242;needs=Some(18)]|pushed18|stillIso=0/242|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=THTKE secs=0.67 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(12,12);S(r=Some(16),n=18,iso=242,rEq,reh=A,rel=121+121);hold=1;isoC=242;needs=Some(18)]|pushed18|stillIso=0/242|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[12, 12]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=22:selected=22:hold=0:iso=24
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=26:selected=26:hold=0:iso=24
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TENKTNEWK secs=0.87 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=24 iso_end=24 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=6E:Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[12, 12]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=28
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=28
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TXoNX secs=0.45 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=28
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oXHWTT secs=0.59 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=28
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=28
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=XENoX secs=0.45 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[12, 12]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[12, 12]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=28
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TTbXNTNT secs=0.70 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((19, Some(16))),needs=Some(21),hold=1,isoC=24,isoAll=24->0]pushed21[n=21,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+21]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=41:selected=41:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=44:selected=44:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=PHKTNK secs=0.81 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(13,13);S(r=Some(16),n=18,iso=266,rEq,reh=A,rel=133+133);hold=1;isoC=266;needs=Some(18)]|pushed18|stillIso=0/266|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oHXTPH secs=0.90 selected=15 c_r=290 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=24 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(13,13);S(r=Some(16),n=18,iso=266,rEq,reh=A,rel=133+133);hold=1;isoC=266;needs=Some(18)]|pushed18|stillIso=0/266|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=THTKE secs=0.88 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=TENKTNEWK secs=1.28 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=2N:NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=38
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=38
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=TXoNX secs=0.66 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=38 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=38
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=oXHWTT secs=0.85 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=38 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=38
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=38
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=XENoX secs=0.66 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=38 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=38
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=TTbXNTNT secs=1.06 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=38 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((40, Some(36))),needs=Some(20),hold=1,isoC=500,isoAll=500->0]pushed20[n=20,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+20]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=PHKTNK secs=1.04 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=b6 r_txg=36 r_old_txg=29 r_old_in_ring=true faults=rall persist=false actions=oHXTPH secs=1.09 selected=35 c_r=536 revived=2 revived_in_c_r=2 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=THTKE secs=0.86 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TENKTNEWK secs=1.28 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=2N:NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=26
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=32
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TXoNX secs=0.66 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=26
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oXHWTT secs=0.84 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=26 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=26
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=32
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=XENoX secs=0.69 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=26
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TTbXNTNT secs=1.07 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=26 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((40, Some(36))),needs=Some(20),hold=1,isoC=500,isoAll=500->0]pushed20[n=20,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+20]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=PHKTNK secs=1.04 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=n r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oHXTPH secs=1.11 selected=35 c_r=536 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=THTKE step=4E ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=THTKE secs=0.88 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[] r_left_at=1 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=2N NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=3K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=5N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=6E Publish{cause:UnlinkOfAnInodeThatIsNotALiveRecord{inode
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=7W Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TENKTNEWK step=8K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TENKTNEWK secs=1.30 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=2N:NS[Ceil(34,34);S(r=Some(36),n=16,iso=548,rEq,reh=A,rel=274+274);hold=1;isoC=548;needs=Some(16)]|pushed16|stillIso=0/548|retryOk|CMP[] r_left_at=2 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=1X X:remount-ok:hold=0:iso=32
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=2o ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=3N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TXoNX step=4X X:remount-ok:hold=0:iso=32
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TXoNX secs=0.67 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=1X X:remount-ok:hold=0:iso=32
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=2H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=3W ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=4T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oXHWTT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oXHWTT secs=0.84 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=0X X:remount-ok:hold=0:iso=32
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=1E ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=2N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=3o Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=XENoX step=4X X:remount-ok:hold=0:iso=32
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=XENoX secs=0.67 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=3o:Publish{cause:WriteToAnInodeThatIsNotInTheTree{inode:1 r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=0T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=1T T[walk]:A[250, 250]:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=2b b
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=3X X:remount-ok:hold=0:iso=32
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=5T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=6N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=TTbXNTNT step=7T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=TTbXNTNT secs=1.07 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=32 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=0P P[cur,rOcc=Some((40, Some(36))),needs=Some(20),hold=1,isoC=500,isoAll=500->0]pushed20[n=20,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+20]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=1H ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=2K K:remount-ok:sessionTxg=61:selected=61:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=4N ok0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=PHKTNK step=5K K:remount-ok:sessionTxg=65:selected=65:hold=0:iso=0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=PHKTNK secs=1.03 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=0 hit=false first_red=-
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=0o NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=1H NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)]|pushed20|stillIso=0/500|retryOk|CMP[]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=2X X:remount-ok:hold=0:iso=0
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=3T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=4P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+DIAG label=t1_1 prefix=43 r=b6;n;o faults=rall actions=oHXTPH step=5H ok0
+S2 label=t1_1 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooo mid= r=o r_txg=36 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=oHXTPH secs=1.09 selected=35 c_r=540 revived=0 revived_in_c_r=0 iso_mount=500 ab_mount=0 iso_after_first_raise=- iso_max=500 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=2 first_refused=0o:NS[Ceil(32,32);S(r=Some(36),n=20,iso=500,rEq,reh=A,rel=250+250);hold=1;isoC=500;needs=Some(20)] r_left_at=1 hit=false first_red=-
+S2_DONE label=t1_1 arm=implemented histories=48 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.30s
+

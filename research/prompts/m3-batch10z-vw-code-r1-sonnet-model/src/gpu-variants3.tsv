@@ -1,0 +1,54 @@
+# 名字	项
+N01_use_wgpu_self	    use wgpu;
+N02_use_root_std	    use ::std;
+N03_use_root_wgpu_as_wgpu	    use ::wgpu as wgpu;
+N04_use_other_wgpu	    use other::wgpu;
+N05_use_crate_wgpu	    use crate::wgpu;
+N06_block_use_in_unrelated_fn	    fn unrelated() <LB> use core as std; <RB>
+N07_block_use_in_nested_blocks_holding_drop	    fn outer() <LB> use core as std; <LB> impl Drop for GpuCardLease <LB> fn drop(&mut self) <LB><RB> <RB> <RB> <RB>
+N08_const_block_holding_drop	    const _: () = <LB> use core as std; impl Drop for GpuCardLease <LB> fn drop(&mut self) <LB><RB> <RB> <RB>;
+N09_use_in_other_impl	    impl Other <LB> fn f() <LB> use core as std; <RB> <RB>
+N10_macro_in_fn_body	    fn g() <LB> let v = vec![1]; assert!(v.len() == 1); <RB>
+N11_item_macro_after_semicolon	    const A: u8 = 1; thread_local!<LB> static X: u8 = 1; <RB>
+N12_item_macro_after_attr	    #[allow(dead_code)] thread_local!<LB> static X: u8 = 1; <RB>
+N13_expr_macro_in_const	    const A: usize = line!();
+N14_expr_macro_after_paren	    const A: usize = (line!()) + 1;
+N16_static_array_macros	    static T: [&str; 2] = [concat!("a","b"), stringify!(x)];
+N18_use_lt	    fn h<'a>() -> impl Sized + use<'a> <LB> 1u8 <RB>
+N20_raw_ident_std_use	    use other::r#std;
+N21_raw_ident_mod_fn	    fn r#mod() <LB><RB>
+N22_raw_ident_use_fn	    fn r#use() <LB><RB>
+N23_cr_string_with_brace_and_quote	    const S: &CStr = cr#"say "<LB>" here"#;
+N24_raw_string_hashes_body	    const S: &str = r##"a"#<LB>b"##;
+N25_char_quote_and_brace	    const Q: char = '"'; const R: char = '<LB>';
+N26_lifetime_then_chars	    fn k<'a>(x: &'a str) -> char <LB> if x.is_empty() <LB> 'q' <RB> else <LB> '\'' <RB> <RB>
+N29_cfg_attr_unrelated	    #[cfg_attr(test, allow(dead_code))] const Z: u8 = 1;
+N30_cfg_unrelated_use	    #[cfg(unix)] use std::os::unix::io::AsRawFd;
+N31_cfg_on_pinned_use_other_source	    #[cfg(any())] use other::device_found_idle_by_a_poll;
+N32_cfg_attr_unrelated_use	    #[cfg_attr(unix, allow(unused))] use std::fmt::Write;
+N33_mod_std_in_fn	    fn m() <LB> mod std <LB><RB> <RB>
+N35_glob_enum	    use Kind::*;
+N36_use_self_wgpu	    use self::inner::wgpu;
+N37_pub_use_self_group	    pub use std::<LB>self, fmt<RB>;
+N38_use_with_comments	    use /* x */ core /* y */ as /* z */ std;
+N40_pub_in_path	    pub(in crate::a) use other::std;
+N41_cfg_comment_between	    // note\n    #[cfg(any())]\n    // between\n    use other::device_found_idle_by_a_poll;
+N42_cfg_doc_between	    #[cfg(any())]\n    /// doc\n    use other::device_found_idle_by_a_poll;
+N43_cfg_attr_nested_cfg	    #[cfg_attr(all(), cfg(any()))] use other::device_found_idle_by_a_poll;
+N44_pinned_name_via_alias	    use other::x as device_found_idle_by_a_poll;
+N45_inner_fn_named_like_pinned	    fn z() <LB> fn device_found_idle_by_a_poll(_: &u8) -> bool <LB> false <RB> <RB>
+N46_module_level_fn_named_like_pinned	    fn device_found_idle_by_a_poll(_: &u8) -> bool <LB> false <RB>
+N47_static_named_wgpu	    static wgpu: u8 = 0;
+N48_const_named_std	    const std: u8 = 0;
+N49_macro_rules_in_fn	    fn f() <LB> macro_rules! m <LB> () => <LB><RB> <RB> <RB>
+N50_use_group_with_alias_inside	    use other::<LB>a as std, b<RB>;
+N51_use_trailing_semicolons_two	    use a::b;; use c::d;
+N52_use_r_hash_as	    use other::x as r#std;
+N53_use_unicode_ident	    use other::名字 as 别名;
+N54_pub_const_with_string_apostrophe	    pub const NOTE: &str = "it's a '{' brace";
+N55_where_clause_closure_bound	    fn w<F>(f: F) where F: Fn() -> bool + Sync <LB> let _ = f; <RB>
+N56_attr_with_macro_inside_item_level	    #[doc = concat!("a", "b")] const Q: u8 = 1;
+N57_const_generic_expr	    fn cg<const N: usize>() -> [u8; N] <LB> [0; N] <RB>
+N58_closure_returning_macro	    fn cm() <LB> let f = || format!("x"); f(); <RB>
+N59_nested_generic_shift	    type X = Vec<Vec<u8>>; const SHIFT: u8 = 1 << 2 >> 1;
+N60_label_and_lifetime	    fn lb() <LB> 'outer: loop <LB> break 'outer; <RB> <RB>

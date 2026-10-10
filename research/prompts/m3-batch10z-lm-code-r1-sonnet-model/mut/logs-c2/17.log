@@ -1,0 +1,28 @@
+
+running 3 tests
+test mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::the_ring_slot_of_a_root_taking_the_current_account_takes_what_the_publishes_in_between_named ... ok
+test mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::a_root_taking_the_current_account_right_after_the_selected_version_takes_nothing_more ... ok
+test mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::every_root_taking_the_current_account_takes_what_the_publishes_between_it_and_the_selected_version_named ... FAILED
+
+failures:
+
+---- mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::every_root_taking_the_current_account_takes_what_the_publishes_between_it_and_the_selected_version_named stdout ----
+
+thread 'mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::every_root_taking_the_current_account_takes_what_the_publishes_between_it_and_the_selected_version_named' (992590) panicked at crates/singlefs-core/src/mount.rs:8739:9:
+assertion `left == right` failed: txg 24 那一槽：原有的在前，再并上 22、23 两槽的
+  left: [PlacementOnDevice { device: DeviceIdentity(0), slot: SlotNumber(300), span: 2 }]
+ right: [PlacementOnDevice { device: DeviceIdentity(0), slot: SlotNumber(300), span: 2 }, PlacementOnDevice { device: DeviceIdentity(0), slot: SlotNumber(100), span: 2 }, PlacementOnDevice { device: DeviceIdentity(0), slot: SlotNumber(200), span: 2 }]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::every_root_taking_the_current_account_takes_what_the_publishes_between_it_and_the_selected_version_named
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 211 filtered out; finished in 0.00s
+
+    Blocking waiting for file lock on package cache
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-m1/crates/singlefs-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.77s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/target-m1/debug/deps/singlefs_core-5c6a767bd9164a51)
+error: test failed, to rerun pass `-p singlefs-core --lib`

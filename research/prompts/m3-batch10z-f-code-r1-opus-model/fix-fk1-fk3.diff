@@ -1,0 +1,32 @@
+1409c1409,1419
+<             DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished => {}
+---
+>             DeviceWaitBeforeReturningTheLease::TheSubmittedWorkFinished => {
+>                 // 攻方改法 F-K1（只在攻方模型上量过、被攻过零轮）：设备没丢时这一次 Wait { None } 等成了，之前没等成的那几笔
+>                 // 提交的活也都做完了（它们的提交号不大于这一次等的），同这一笔一样可以销账
+>                 let mut books = self.ledger.books_locked();
+>                 let books_of_the_card = &mut books[self.card_position];
+>                 if books_of_the_card.driver_share == DriverShareOnTheCard::DeviceStarted {
+>                     for kept in std::mem::take(&mut books_of_the_card.leases_kept_after_a_failed_wait) {
+>                         books_of_the_card.leases.remove(&kept);
+>                     }
+>                 }
+>             }
+1434c1444,1458
+<             LeaseWhenTheBookingIsDropped::KeptOnTheBooksAfterAFailedWait => {}
+---
+>             LeaseWhenTheBookingIsDropped::KeptOnTheBooksAfterAFailedWait => {
+>                 // 攻方改法 F-K3（只在攻方模型上量过、被攻过零轮）：设备丢了那一刻就活着的一笔（拿着旧设备）没等成：它的卡已经先丢了
+>                 // （GpuCardLease 的字段次序），旧设备留在卡上的照分不出算到那几笔都还了为止，这一笔不再记
+>                 let mut books = self.ledger.books_locked();
+>                 let books_of_the_card = &mut books[self.card_position];
+>                 if books_of_the_card
+>                     .leases_alive_when_the_device_was_lost
+>                     .contains(&self.lease_identifier)
+>                 {
+>                     books_of_the_card
+>                         .leases_kept_after_a_failed_wait
+>                         .remove(&self.lease_identifier);
+>                     let _ = books_of_the_card.return_a_lease(self.lease_identifier);
+>                 }
+>             }

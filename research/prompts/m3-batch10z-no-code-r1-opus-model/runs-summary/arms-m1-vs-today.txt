@@ -1,0 +1,12 @@
+CMP today: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP raise_plain: histories=192 red=45 exposed=2 dbl_c_or_other=4 refused_any=114
+CMP paired=192 differs=2
+CMP today: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP unmount_plain: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP paired=192 differs=0
+CMP today: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP held_plain: histories=192 red=45 exposed=2 dbl_c_or_other=4 refused_any=114
+CMP paired=192 differs=2
+CMP today: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP first_slot_only: histories=192 red=45 exposed=0 dbl_c_or_other=4 refused_any=114
+CMP paired=192 differs=0

@@ -1,0 +1,2 @@
+label=nest arm=implemented slots=384 mid=- r=b1 r_old_in_ring=true faults=racct histories=9 hit=0 refused_histories=0 revived_in_c_r_sum=18/18 iso_mount_max=42 iso_max_max=76
+label=nest arm=implemented slots=384 mid=- r=b2 r_old_in_ring=true faults=racct histories=9 hit=0 refused_histories=0 revived_in_c_r_sum=18/18 iso_mount_max=42 iso_max_max=76

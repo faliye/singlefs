@@ -1,0 +1,35 @@
+# 名字	项（\n 换行，<LB> <RB> 花括号；RAW: 开头 = 整个模块文本）
+L1_use_as_other	    use std::sync::Arc as SharedArc;
+L2_nested_braces	    use std::<LB>collections::<LB>BTreeMap, btree_map::<LB>Entry<RB><RB><RB>;
+L3_self_group	    use std::sync::<LB>self as sync_mod, Mutex<RB>;
+L4_extern_c_block	    extern "C" <LB> fn some_c_function(); static SOME_C_STATIC: u8; <RB>
+L5_const_ne	    const A: u8 = 1; const B: u8 = 2; const DIFFER: bool = A != B;
+L6_plain_items	    const X: u8 = 1; static Y: u8 = 2; struct S; impl S <LB> fn f(&self) -> bool <LB> !true <RB> <RB>
+L7_attr_include_str	    #[doc = include_str!("x.md")]\n    struct S;
+L8_const_assert	    const _: () = assert!(1 < 2);
+L9_concat_in_static	    static NAME: &str = concat!("a", "b");
+L10_precise_capture_use	    fn f<'a>(x: &'a u8) -> impl Sized + use<'a> <LB> x <RB>
+L11_char_brace	    fn f(x: char) -> bool <LB> x == '<LB>' <RB>
+L12_raw_string_mod	    const T: &str = r#"mod std <LB> use x as std; <RB>"#;
+L13_c_raw_string	    const T: &std::ffi::CStr = cr#"mod std <LB> "#;
+L14_raw_ident_mod	    fn f() <LB> let r#mod = 1; <RB>
+L15_lifetimes	    fn f<'a, 'b: 'a>(x: &'a str, y: &'b str) -> char <LB> 'outer: loop <LB> break 'outer; <RB> 'x' <RB>
+L16_doc_use_as_std	    /// use x as std;\n    fn f() <LB><RB>
+L17_trailing_comment_use	    fn f() <LB><RB> // use x as std;
+L18_block_comment_nested	    /* a /* mod std <LB> */ still */ fn f() <LB><RB>
+B1_use_as_std	    use std as std;
+B2_use_wgpu_as_std	    use ::wgpu as std;
+B3_nested_as_std	    use a::<LB>b::<LB>c as std<RB><RB>;
+B4_self_as_std	    use a::<LB>self as std<RB>;
+B5_use_last_seg_std	    use a::std;
+B6_mod_std	    mod std <LB><RB>
+B7_extern_crate	    extern crate foo as std;
+B8_glob	    use a::*;
+B9_macro_rules	    macro_rules! m <LB> () => <LB><RB> <RB>
+B10_struct_std	    struct std;
+B11_type_alias_wgpu	    type wgpu = u8;
+B12_cfg_use_then_fn	RAW:mod card_pool <LB>\n    #[cfg(any())] use super::super::<LB> device_found_idle_by_a_poll <RB>;\n    use super::super::<LB>device_wait_before_returning_a_lease, poll_type_before_returning_a_lease<RB>;\n    use singlefs_harness::gpu_memory_ledger::wait_for_the_device_and_take_in_the_outcome;\n    fn device_found_idle_by_a_poll(_x: &u8) -> bool <LB> false <RB>\n<RB>\n
+B13_cfg_test_use_then_fn	RAW:mod card_pool <LB>\n    #[cfg(test)] use super::super::<LB> device_found_idle_by_a_poll <RB>;\n    use super::super::<LB>device_wait_before_returning_a_lease, poll_type_before_returning_a_lease<RB>;\n    use singlefs_harness::gpu_memory_ledger::wait_for_the_device_and_take_in_the_outcome;\n    #[cfg(not(test))] fn device_found_idle_by_a_poll(_x: &u8) -> bool <LB> false <RB>\n<RB>\n
+B14_fn_name_via_local_macro_in_fn	    fn g() <LB> macro_rules! m <LB> () => <LB><RB> <RB> <RB>
+B15_use_inside_fn_as_std	    fn g() <LB> use a::b as std; <RB>
+B16_extern_crate_after_attr	    #[macro_use]\n    extern crate foo;

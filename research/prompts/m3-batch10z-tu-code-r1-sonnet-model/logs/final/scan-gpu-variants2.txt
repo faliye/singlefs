@@ -1,0 +1,16 @@
+REAL GREEN
+L13b_c_raw_string_with_inner_quote: PANIC
+L19_pub_crate_use: GREEN
+L20_use_super_glob: RED 卡池模块里通配 use super::*：引进来的名字（叫 std、wgpu 的
+L21_derive_and_attrs: GREEN
+L22_same_name_use_as_same_name: GREEN
+L23_unary_not_in_const: GREEN
+L24_never_return: GREEN
+L25_where_clause_closure: GREEN
+L26_trailing_expr_macro_in_fn: GREEN
+L27_byte_literals: GREEN
+L28_lifetime_before_quote: GREEN
+L29_escaped_quote_char: GREEN
+L30_number_suffix: GREEN
+L31_cfg_any_extern_crate: RED 卡池模块里写 extern crate：extern crate … as st
+L32_unicode_ident_and_strings: GREEN

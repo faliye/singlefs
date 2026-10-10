@@ -1,0 +1,8 @@
+ok ['m5-badatmount-some-empty']
+## lib rc=0 :: test result: ok. 200 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s 
+## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.39s 
+## credential rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s 
+## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 14.85s 
+## reuse rc=0 :: test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 3.05s 
+ok ['m5-badatmount-some-empty', 'restore']
+done

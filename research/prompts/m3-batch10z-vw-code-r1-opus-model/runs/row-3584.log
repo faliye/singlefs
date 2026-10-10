@@ -1,0 +1,40 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/repo-mut/crates/singlefs-core)
+    Finished `release` profile [optimized + debuginfo] target(s) in 5.55s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/target-mut/release/deps/singlefs_core-473295d7695e4d7d)
+
+running 7 tests
+test mounted_session::tests::a_read_of_blocks_never_written_passes_through_to_the_disk_below ... ok
+test mounted_session::tests::a_read_across_written_and_unwritten_blocks_stitches_the_kept_blocks_with_the_disk_below ... ok
+test mounted_session::tests::a_write_kept_in_memory_reads_back_and_leaves_the_disk_below_unchanged ... ok
+test mounted_session::tests::a_request_off_the_physical_block_boundaries_is_refused_before_anything_is_kept ... FAILED
+test mounted_session::tests::a_request_past_the_end_of_the_disk_below_is_refused_and_one_ending_at_the_end_is_kept ... FAILED
+test mounted_session::tests::zeroes_written_in_memory_read_back_as_zero_over_the_disk_below ... ok
+test mounted_session::tests::the_device_keeping_writes_in_memory_agrees_with_a_device_written_through_on_a_random_request_stream ... FAILED
+
+failures:
+
+---- mounted_session::tests::a_request_off_the_physical_block_boundaries_is_refused_before_anything_is_kept stdout ----
+
+thread 'mounted_session::tests::a_request_off_the_physical_block_boundaries_is_refused_before_anything_is_kept' (55041) panicked at crates/singlefs-core/src/mounted_session.rs:1829:13:
+偏移不在物理块边界上的写：拒成 Unaligned，带偏移 612 与长度 512，而交回 Ok(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- mounted_session::tests::a_request_past_the_end_of_the_disk_below_is_refused_and_one_ending_at_the_end_is_kept stdout ----
+
+thread 'mounted_session::tests::a_request_past_the_end_of_the_disk_below_is_refused_and_one_ending_at_the_end_is_kept' (55042) panicked at crates/singlefs-core/src/mounted_session.rs:1633:23:
+attempt to add with overflow
+
+---- mounted_session::tests::the_device_keeping_writes_in_memory_agrees_with_a_device_written_through_on_a_random_request_stream stdout ----
+
+thread 'mounted_session::tests::the_device_keeping_writes_in_memory_agrees_with_a_device_written_through_on_a_random_request_stream' (55044) panicked at crates/singlefs-core/src/mounted_session.rs:1656:23:
+range end index 9216 out of range for slice of length 8192
+
+
+failures:
+    mounted_session::tests::a_request_off_the_physical_block_boundaries_is_refused_before_anything_is_kept
+    mounted_session::tests::a_request_past_the_end_of_the_disk_below_is_refused_and_one_ending_at_the_end_is_kept
+    mounted_session::tests::the_device_keeping_writes_in_memory_agrees_with_a_device_written_through_on_a_random_request_stream
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 216 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p singlefs-core --lib`

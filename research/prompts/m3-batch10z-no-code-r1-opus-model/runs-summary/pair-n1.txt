@@ -1,0 +1,3 @@
+CMP today: histories=68 red=16 exposed=0 dbl_c_or_other=0 refused_any=0
+CMP pre14: histories=68 red=16 exposed=0 dbl_c_or_other=35 refused_any=0
+CMP paired=68 differs=0

@@ -1,0 +1,2 @@
+M16 报到：最后一段报完不叫醒等着的: 超时（挂住，算被拦住） (45s)
+M17 报到：没报到就丢掉时不补报: 超时（挂住，算被拦住） 红的：a_piece_failing_on_a_lost_device_is_told_after_another_piece_records_its_out_of_memory (45s)

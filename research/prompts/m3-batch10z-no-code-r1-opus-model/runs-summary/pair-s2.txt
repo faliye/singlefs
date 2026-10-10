@@ -1,0 +1,3 @@
+PAIR batch=s2 tree=today histories=192 skipped=8 mount_err=6 red=0 exposed=0 dbl_c_or_other=4 refused_any=18 c_exempt_partial=0 c_exempt_partial_unprotected_slots=0 dup_key_wider=0 ab_exempt_partial=0 probe_max=0/0/28/0/28/0
+PAIR batch=s2 tree=pre14 histories=192 skipped=8 mount_err=6 red=0 exposed=0 dbl_c_or_other=110 refused_any=18 c_exempt_partial=0 c_exempt_partial_unprotected_slots=0 dup_key_wider=0 ab_exempt_partial=0 probe_max=0/0/242/0/242/0
+PAIR batch=s2 paired=192 red_differs=0

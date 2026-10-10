@@ -1,0 +1,10 @@
+
+running 1 test
+ATK costsize area=67108864 device_gib=1024.03 setup_s=5.0 allocator_clone_s=0.1189 overwrite=admitted 0.394s peak+902.1MiB | push=Ok(22) 14.006s peak+845.8MiB | rehearsal=adm 13.829s peak+1229.8MiB overlay_blocks=15655 overlay_mib=7.6
+test atk_k1_rehearsal_cost_by_device_size has been running for over 60 seconds
+ATK costsize area=134217728 device_gib=2048.03 setup_s=10.0 allocator_clone_s=0.2206 overwrite=admitted 0.687s peak+1789.7MiB | push=Ok(22) 26.750s peak+1613.7MiB | rehearsal=adm 24.965s peak+2461.1MiB overlay_blocks=15655 overlay_mib=7.6
+test atk_k1_rehearsal_cost_by_device_size ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 63 filtered out; finished in 98.58s
+
+wall=98.79 maxrss_kb=4859532

@@ -1,0 +1,12 @@
+
+running 1 test
+test probe_sweep ... 
+thread 'probe_sweep' (306163) panicked at crates/singlefs-harness/tests/probe_jk.rs:173:42:
+attempt to subtract with overflow
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+PROBEJK label=rb-preobo-k2-b6 arm=implemented k=2 back=6 record=skipped
+PROBEJK_DONE label=rb-preobo-k2-b6 arm=implemented histories=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

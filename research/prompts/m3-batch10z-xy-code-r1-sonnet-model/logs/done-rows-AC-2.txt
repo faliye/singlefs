@@ -1,0 +1,9 @@
+asUserChangeSwapOverwrite@core	红(别的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	4s
+newInodesCountPlus@core	红(别的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	2s
+overwriteWriteTimeZero@core	红(别的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	2s
+rehearseOnCurrentNotRefusedVersionDisk@core	绿		3s
+sizeInBytesZero@core	绿		3s
+walkSkipped@core	绿		2s
+第10z批第二十四块 正推 unlinkInodeZero 报里记的 unlink 的 inode 记成 0（读回那一条）#1	红(点名的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	1s
+第10z批第二十四块 正推 overwriteWriteTimeZero 报里记的覆盖写写入时间记成 0（读回那一条）#1	红(点名的)	ests::each_kind_of_change_kept_by_the_refusal_reads_back_as_the_change_handed_in	1s
+第10z批第二十四块 正推 checkRequestBlock512 只进内存的盘判据里物理块写死 512（4096 盘上落在 512 边界的请求）#1	红(点名的)	boundaries_off_the_4096_byte_physical_blocks_are_refused_before_anything_is_kept	1s

@@ -1,0 +1,10 @@
+ok ['m6-allzero-some-empty']
+## lib rc=0 :: test result: ok. 200 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.13s 
+## newfile rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.47s 
+## credential rc=101 :: test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s 
+   FAILED: test an_abandoned_root_whose_account_slots_only_read_back_zero_still_refuses_the_unmount_before_any_write ... FAILED
+   BUILD: error: test failed, to rerun pass `-p singlefs-harness --test abandoned_root_whose_account_is_unreadable_passes_when_the_current_account_records_later_units_over_its_slots`
+## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 27.18s 
+## reuse rc=0 :: test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 3.82s 
+ok ['m6-allzero-some-empty', 'restore']
+done

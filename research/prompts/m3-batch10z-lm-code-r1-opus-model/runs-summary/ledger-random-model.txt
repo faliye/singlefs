@@ -1,0 +1,2 @@
+test gpu_memory_ledger::tests::opus_lm_random_ledger_model ... OPUS_LM_LEDGER seeds=5000 steps=400 bookings=352533 refusals=91662 under_refusals=57479 early_marks_seen=34986 overfull_seeds=0 over_steps=0 worst_over_mebibytes=0 over_steps_while_the_ledger_does_not_know_the_loss=53350
+OPUS_LM_UNDER_BY_STATE {"DeviceLostNotStartedAgain/kept_listed=0": 12270, "DeviceStarted/kept_listed=0": 1569, "DeviceStarted/kept_listed=1": 1489, "DeviceStartedAgainWhileTheLostDeviceRemains/kept_listed=0": 37491, "DeviceStartedAgainWhileTheLostDeviceRemains/kept_listed=1": 4660}

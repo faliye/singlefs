@@ -1,0 +1,17 @@
+行1 扫源码测试模块头两行不核恰好一处的上界（代码里两处头两行取第一处，正推 K3-5 W8）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_cut_only_at_one_opening_of_two_whole_lin
+行2 模块头两行不核花括号第 0 层（花括号里前面以分号收尾的一份也认，正推 K3-5 W9）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_cut_only_at_one_opening_of_two_whole_lin
+行3 方括号第 0 层（宏调用圆括号里前面以分号收尾的一份也认，正推 K4-1 S14 同形）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_cut_only_at_one_opening_of_two_whole_lin
+行4 PU 取卡 K4 卡池扫源码测试模块头两行不看前一个词（前一个词不是条目收尾的一份也认）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_cut_only_at_one_opening_of_two_whole_lin
+行5 行、行尾带空白、CRLF 又认作头两行，与崩溃放量按行逐字的口径不一致，正推 K4-2）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_cut_only_at_one_opening_of_two_whole_lin
+行6 好一处（挂 cfg 的干净副本在前、坏版本在后取第一处，正推 K4-1 G14、G16）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_refuse_a_second_copy_or_a_conditional_at
+行7 挂的 cfg（唯一的一份借据丢掉时那一步挂 #[cfg(any())] 编译时去掉漏过）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_refuse_a_second_copy_or_a_conditional_at
+行8 与借卡入口改回取第一处（挂 cfg 的干净副本在前漏过，正推 K4-1 G14、G16）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_refuse_a_second_copy_or_a_conditional_at
+行9 改回取第一处（挂 cfg 的干净卡池模块副本在前、真模块里另起 mod wgpu 漏过）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scans_refuse_a_second_copy_or_a_conditional_at
+行10 源码只拒模块这一层的 mod（故意拒的函数体里的 mod 放过，正推 K4-2 N33）: 点名的红；红 1 条，绿 15；点名 the_card_pool_scan_refuses_globs_item_level_macros_and_inner
+行11 K3 测试模块头两行不核恰好一处的上界（代码里两处头两行取第一处，正推 K3-5 X6）: 点名的红；红 1 条，绿 10；点名 the_tests_module_is_cut_only_at_one_opening_of_two_whole_lin
+行12 模块头两行不核花括号第 0 层（花括号里前面以分号收尾的一份也认，正推 K3-5 X7）: 点名的红；红 1 条，绿 10；点名 the_tests_module_is_cut_only_at_one_opening_of_two_whole_lin
+行13 方括号第 0 层（宏调用圆括号里前面以分号收尾的一份也认，正推 K4-1 S14 同形）: 点名的红；红 1 条，绿 10；点名 the_tests_module_is_cut_only_at_one_opening_of_two_whole_lin
+行14 第二十五块 崩溃放量 K4 测试模块头两行不看前一个词（前一个词不是条目收尾的一份也认）: 点名的红；红 1 条，绿 10；点名 the_tests_module_is_cut_only_at_one_opening_of_two_whole_lin
+行15 行尾空白再比（行尾带空白或注释的头一行又认，与卡池按行逐字的口径不一致，正推 K4-2）: 点名的红；红 1 条，绿 10；点名 the_tests_module_is_cut_only_at_one_opening_of_two_whole_lin
+行16 法（::core::primitive::bool 的新层漏过，正推 K4-1 N01）: 点名的红；红 1 条，绿 10；点名 the_stop_request_scan_finds_new_layers_whose_stop_returns_bo
+行17  K4 叫停返回类型不跳外面套的括号（(bool) 的新层漏过，正推 K4-1 N02）: 点名的红；红 1 条，绿 10；点名 the_stop_request_scan_finds_new_layers_whose_stop_returns_bo

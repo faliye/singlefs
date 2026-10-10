@@ -1,0 +1,22 @@
+
+running 1 test
+K1-3b stuck(before 2nd loss): room=16840 safe=27440 | after 2nd restart and C returned: room=26840 safe=27440
+test k1_3b_a_second_device_loss_clears_the_lease_stuck_from_the_first_one ... FAILED
+
+failures:
+
+failures:
+    k1_3b_a_second_device_loss_clears_the_lease_stuck_from_the_first_one
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-f-code-r1-sonnet/copy-w3/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.33s
+     Running tests/sonnet_g2_model.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-f-code-r1-sonnet/target-w3/debug/deps/sonnet_g2_model-9f6e816d6aaf501e)
+
+thread 'k1_3b_a_second_device_loss_clears_the_lease_stuck_from_the_first_one' (1966638) panicked at crates/singlefs-harness/tests/sonnet_g2_model.rs:383:5:
+assertion `left == right` failed: 第二次重起把 A 清掉，之后全还了回到照读数算
+  left: 26840
+ right: 27440
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+error: test failed, to rerun pass `-p singlefs-harness --test sonnet_g2_model`

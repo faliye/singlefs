@@ -1,0 +1,65 @@
+I-new-rehearsal-with-the-shadow-ledger-off@core	绿	4s
+inodesWriteTimeZero@core	红(别的)	2s
+overwriteContentHalf@core	红(别的)	2s
+recordedOnlyTxgNotInstance@core	绿	3s
+seqWriteTimeZero@core	红(别的)	3s
+unlinkWriteTimeZero@core	红(别的)	2s
+第10z批第二十四块 正推 inodesWriteTimeZero 报里记的建 inode 写入时间记成 0（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 overwriteContentHalf 报里记的覆盖写内容只记一半（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 asUserChangeSwapOverwrite 报里拷下的覆盖写读回成顺序写（读回那一条）#1	红(点名的)	1s
+asUserChangeSwapOverwrite@core	红(别的)	4s
+newInodesCountPlus@core	红(别的)	2s
+overwriteWriteTimeZero@core	红(别的)	2s
+rehearseOnCurrentNotRefusedVersionDisk@core	绿	3s
+sizeInBytesZero@core	绿	3s
+walkSkipped@core	绿	2s
+第10z批第二十四块 正推 unlinkInodeZero 报里记的 unlink 的 inode 记成 0（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 overwriteWriteTimeZero 报里记的覆盖写写入时间记成 0（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 checkRequestBlock512 只进内存的盘判据里物理块写死 512（4096 盘上落在 512 边界的请求）#1	红(点名的)	1s
+checkRequestBlock512@core	红(别的)	4s
+notRecordedAsNotAllocated@core	绿	2s
+readUnwrittenStartBuffer@core	绿	2s
+ringLenMinus@core	绿	3s
+unlinkInodeZero@core	红(别的)	3s
+第10z批第二十四块 正推 newInodesCountPlus 报里记的建 inode 个数记大（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 unlinkWriteTimeZero 报里记的 unlink 写入时间记成 0（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 seqWriteTimeZero 报里记的顺序写写入时间记成 0（读回那一条）#1	红(点名的)	1s
+第10z批第二十四块 正推 checkRequestBlock512 只进内存的盘判据里物理块写死 512（4096 盘差分对拍那一条）#1	红(点名的)	2s
+notRecordedAsNotAllocated@harness	绿	175s
+rehearseOnCurrentNotRefusedVersionDisk@harness	绿	164s
+walkSkipped@harness	红(别的)	161s
+第10z批第二十四块 要出路不核盘表次序（少交一块盘：预演里读过盘才拒）#1	红(点名的)	7s
+第10z批第二十四块 正推 inodesWriteTimeZero 报里记的建 inode 写入时间记成 0#1	红(点名的)	3s
+第10z批第二十四块 正推 overwriteContentHalf 报里记的覆盖写内容只记一半#1	红(点名的)	2s
+readUnwrittenStartBuffer@harness	绿	173s
+ringLenMinus@harness	绿	163s
+第10z批第二十四块 要出路不核盘表次序（次序对调的盘表预演照过、列推环，攻方打中二）#1	红(点名的)	8s
+第10z批第二十四块 正推 walkSkipped 预演里只剩走空那一支恒放得下（推完之后走空照旧被拒那一形列推环）#1	红(点名的)	5s
+第10z批第二十四块 正推 unlinkInodeZero 报里记的 unlink 的 inode 记成 0#1	红(点名的)	4s
+第10z批第二十四块 正推 overwriteWriteTimeZero 报里记的覆盖写写入时间记成 0#1	红(点名的)	2s
+I-new-rehearsal-with-the-shadow-ledger-off@harness	绿	172s
+recordedOnlyTxgNotInstance@harness	绿	161s
+sizeInBytesZero@harness	绿	156s
+第10z批第二十四块 要出路不核盘表次序（多交一块盘：预演里读过盘才拒）#1	红(点名的)	6s
+第10z批第二十四块 正推 newInodesCountPlus 报里记的建 inode 个数记大#1	红(点名的)	3s
+第10z批第二十四块 正推 unlinkWriteTimeZero 报里记的 unlink 写入时间记成 0#1	红(点名的)	2s
+第10z批第二十四块 正推 seqWriteTimeZero 报里记的顺序写写入时间记成 0#1	红(点名的)	4s
+S2-gateBeforeTheVersionCheck@core	绿	3s
+S5-checkRequestSizeMax@core	红(别的)	2s
+S8-asUserChangeSequentialWriteAsOverwrite@core	红(别的)	2s
+S3-versionCheckInstanceOnly@core	绿	3s
+S6-blockSizeFixed512InTheConstructor@core	红(别的)	2s
+S9-remainderKeptDropsTheChange@core	绿	2s
+S1-gatePayloadSwapped@core	绿	3s
+S4-sessionMovedCurrentInstanceFromTheReport@core	绿	2s
+S7-keptOverwriteAsSequentialWrite@core	红(别的)	2s
+S10-asRemainderDropsTheChange@core	绿	2s
+S2-gateBeforeTheVersionCheck@harness	绿	158s
+S9-remainderKeptDropsTheChange@harness	红(别的)	155s
+S3-versionCheckInstanceOnly@harness	红(别的)	159s
+S10-asRemainderDropsTheChange@harness	红(别的)	153s
+S1-gatePayloadSwapped@harness	红(别的)	158s
+S4-sessionMovedCurrentInstanceFromTheReport@harness	绿	157s
+W2-walkArmOnTheAllocatorBeforeThePush	红(别的)	168s
+W3-walkArmFromThePrePushVersion	绿	166s
+W1-walkArmShadowLedgerOff	绿	161s

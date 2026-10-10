@@ -1,0 +1,8 @@
+
+running 1 test
+test atk_k3_sweep has been running for over 60 seconds
+ATK k3 totals={"floor_at_a/account clean": 20, "floor_at_a/account refused_f_refused(RollbackFloorC": 4, "floor_at_a/none clean": 20, "floor_at_a/root_slot clean": 20, "floor_at_a/root_slot refused_f_refused(RollbackFloorC": 52, "floor_at_a/root_slot refused_u_refused(NewerStateStil": 28, "plain/account clean": 20, "plain/account refused_f_refused(RollbackFloorC": 2, "plain/none clean": 20, "plain/root_slot clean": 20, "plain/root_slot refused_f_refused(RollbackFloorC": 28, "plain/root_slot refused_u_refused(NewerStateStil": 13}
+test atk_k3_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 45 filtered out; finished in 179.97s
+

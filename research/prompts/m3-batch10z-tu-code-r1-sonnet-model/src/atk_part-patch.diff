@@ -1,0 +1,20 @@
+--- /home/fy5090/code/singlefs/research/prompts/m3-batch10z-pqrs-code-r1-opus-model/atk_part.rs	2026-10-09 03:03:45.558388625 +0000
++++ src/atk/atk_part.rs	2026-10-09 06:45:25.107147904 +0000
+@@ -329,7 +329,7 @@
+         Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space)) => {
+             match &no_space.wide_protection_at_the_ceiling {
+                 WideProtectionAtTheCeiling::NotWhatStopsTheAdmission => "NotWhat".to_string(),
+-                WideProtectionAtTheCeiling::StuckBehindTheWideProtection(_) => "Stuck".to_string(),
++                WideProtectionAtTheCeiling::StuckBehindTheWideProtection(s) => format!("Stuck:{}:{}", if s.ways_out().len() == 2 { "A" } else { "R" }, { let d = format!("{:?}", s.pushing_the_root_ring); if d.contains("stop: PublishesPerAdmission") { "budget" } else if d.contains("stop: FloorAlreadyAtTheCeiling") { "ceil" } else if d.contains("stop: FloorRaiseRefusedForSpace") { "space" } else if d.starts_with("PushRefused") { "pushrefused" } else if d.starts_with("ChangeAdmitted") { "adm" } else { "other" } }),
+             }
+         }
+         Err(_) => "other".to_string(),
+@@ -638,7 +638,7 @@
+                 Ok(_) => "admitted".to_string(),
+                 Err(UserChangeRefused::NoSpaceAfterRaisingTheFloor(no_space)) => match &no_space.wide_protection_at_the_ceiling {
+                     WideProtectionAtTheCeiling::NotWhatStopsTheAdmission => "NotWhat".to_string(),
+-                    WideProtectionAtTheCeiling::StuckBehindTheWideProtection(_) => "Stuck".to_string(),
++                    WideProtectionAtTheCeiling::StuckBehindTheWideProtection(s) => format!("Stuck:{}", if s.ways_out().len() == 2 { "A" } else { "R" }),
+                 },
+                 Err(_) => "other".to_string(),
+             };

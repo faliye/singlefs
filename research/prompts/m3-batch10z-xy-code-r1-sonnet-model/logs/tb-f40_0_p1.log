@@ -1,0 +1,22 @@
+
+running 1 test
+test s2_sweep ... S2 label=tb-f40_0_p1 arm=implemented prefix=oooooooooooooooooooo mid= r=o record=skipped:根槽写3次
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHHH step=0H NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHHH step=1H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHHH step=2H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHHH step=3H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+S2 label=tb-f40_0_p1 arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=HHHH secs=1.12 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=4 first_refused=0H:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=0 hit=false first_red=-
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHWH step=0H NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHWH step=1H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=HHWH step=3H NS[Pub(5+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+S2 label=tb-f40_0_p1 arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=HHWH secs=0.92 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=0H:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=0 hit=false first_red=-
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=NHHH step=0N NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=NHHH step=2H NS[Pub(5+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+DIAG label=tb-f40_0_p1 prefix=20 r=o;b6;n faults=racct,rlin actions=NHHH step=3H NS[Pub(6+3);N;hold=0;isoC=0;needs=None]|pushRef:Nothing|stillIso=0/0|retryNS[Pub(6+3);N;hold=0;isoC=0;needs=None]|CMP[]
+S2 label=tb-f40_0_p1 arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=NHHH secs=0.89 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=3 first_refused=0N:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=0 hit=false first_red=-
+S2 label=tb-f40_0_p1 arm=implemented prefix=oooooooooooooooooooo mid= r=n record=skipped:根槽写3次
+S2_DONE label=tb-f40_0_p1 arm=implemented histories=3 hits=0 tbl_asks=12
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.07s
+

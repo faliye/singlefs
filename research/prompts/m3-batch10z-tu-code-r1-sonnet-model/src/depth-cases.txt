@@ -1,0 +1,136 @@
+fn f() {
+    let a = '\'';
+    let b = '{';
+}
+x
+====
+fn f() {
+    let a = b'}';
+    let b = b'{';
+}
+x
+====
+fn f() {
+    let a = '\u{7d}';
+}
+x
+====
+fn f<'a>(x: &'a str) -> &'a str {
+    x
+}
+x
+====
+fn f() {
+    'outer: loop { break 'outer; }
+}
+x
+====
+fn f() {
+    let s = "a \
+    }";
+}
+x
+====
+fn f() {
+    let s = r##"}"# }"##;
+}
+x
+====
+fn f() {
+    let s = cr#"} "#;
+}
+x
+====
+fn f() {
+    let s = c"}";
+}
+x
+====
+fn f() {
+    let s = b"}";
+}
+x
+====
+fn f() {
+    let r#fn = 1;
+}
+x
+====
+fn f() {
+    /// }
+    let a = 1;
+}
+x
+====
+fn f() { /* } */
+    let a = 1;
+}
+x
+====
+fn f() {
+    /* start
+  } still
+  */ let a = 1;
+}
+x
+====
+fn f() {
+    let s = "http://x }";
+}
+x
+====
+fn f() {
+    let c = '/'; // }
+}
+x
+====
+fn f<'a>(x: &'a [u8; 1]) -> Foo<'a> {
+    Foo { y: x }
+}
+x
+====
+#![allow(x)]
+fn f() {
+}
+x
+====
+fn f(g: &dyn for<'a> Fn(&'a u8)) {
+    g(&1);
+}
+x
+====
+fn f() {
+    println!("{} {{}}", 1);
+}
+x
+====
+fn f() {
+    let a = 1_000;
+}
+x
+====
+fn f() {
+    let a = '花'; let b = '}';
+}
+x
+====
+fn f<'a>(x: &'a u8) {
+    let c = '}';
+}
+x
+====
+fn f() -> impl Iterator<Item = &'static str> {
+    [].into_iter()
+}
+x
+====
+fn f() {
+    let r = 1;
+    let s = r;
+}
+x
+====
+fn f() {
+    let s = foo(bar"}");
+}
+x

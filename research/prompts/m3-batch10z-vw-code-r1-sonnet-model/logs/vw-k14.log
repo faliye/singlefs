@@ -1,0 +1,23 @@
+
+running 1 test
+VW k14a pre=4 fill=16 g=13 report=stuck forced_notwhat=notwhat(ceiling) counts[r,w,z,b,probe,size]=[561, 53, 0, 22, 0, 1168] vs [561, 53, 0, 22, 0, 1168] allocator_clones=23 vs 23 same_counts=true same_clones=true same_allocator_after=true same_current_after=true
+VW k14b pre=4 fill=16 g=13 ways_out_counts[r,w,z,b,probe,size]=[666, 0, 0, 0, 2, 1928] allocator_clones=100 head=adm unchanged=true
+VW k14c pre=4 fill=16 g=13 reads_in_ways_out=666 session_or_disk_changed=0 tally={"adm ways=2": 666}
+VW k14a pre=4 fill=16 g=19 report=stuck forced_notwhat=notwhat(ceiling) counts[r,w,z,b,probe,size]=[561, 53, 0, 22, 0, 1168] vs [561, 53, 0, 22, 0, 1168] allocator_clones=23 vs 23 same_counts=true same_clones=true same_allocator_after=true same_current_after=true
+VW k14b pre=4 fill=16 g=19 ways_out_counts[r,w,z,b,probe,size]=[666, 0, 0, 0, 2, 1952] allocator_clones=100 head=adm unchanged=true
+VW k14c pre=4 fill=16 g=19 reads_in_ways_out=666 session_or_disk_changed=0 tally={"adm ways=2": 666}
+VW k14a pre=4 fill=16 g=20 report=stuck forced_notwhat=notwhat(ceiling) counts[r,w,z,b,probe,size]=[561, 53, 0, 22, 0, 1168] vs [561, 53, 0, 22, 0, 1168] allocator_clones=23 vs 23 same_counts=true same_clones=true same_allocator_after=true same_current_after=true
+VW k14b pre=4 fill=16 g=20 ways_out_counts[r,w,z,b,probe,size]=[868, 0, 0, 0, 2, 22244] allocator_clones=135 head=still[NoSpaceAfterRaisingTheFloor] unchanged=true
+test vw_k14_report_step_touches_nothing_and_ways_out_changes_nothing has been running for over 60 seconds
+VW k14c pre=4 fill=16 g=20 reads_in_ways_out=868 session_or_disk_changed=0 tally={"still[NoSpaceAfterRaisingTheFloor] ways=1": 868}
+VW k14a pre=2 fill=16 g=17 report=stuck forced_notwhat=notwhat(ceiling) counts[r,w,z,b,probe,size]=[481, 36, 0, 16, 0, 928] vs [481, 36, 0, 16, 0, 928] allocator_clones=18 vs 18 same_counts=true same_clones=true same_allocator_after=true same_current_after=true
+VW k14b pre=2 fill=16 g=17 ways_out_counts[r,w,z,b,probe,size]=[674, 0, 0, 0, 2, 2031] allocator_clones=105 head=adm unchanged=true
+VW k14c pre=2 fill=16 g=17 reads_in_ways_out=674 session_or_disk_changed=0 tally={"adm ways=2": 674}
+VW k14a pre=8 fill=11 g=40 report=stuck forced_notwhat=notwhat(ceiling) counts[r,w,z,b,probe,size]=[573, 53, 0, 22, 0, 1398] vs [573, 53, 0, 22, 0, 1398] allocator_clones=23 vs 23 same_counts=true same_clones=true same_allocator_after=true same_current_after=true
+VW k14b pre=8 fill=11 g=40 ways_out_counts[r,w,z,b,probe,size]=[812, 0, 0, 0, 2, 21472] allocator_clones=141 head=still[NoSpaceAfterRaisingTheFloor] unchanged=true
+VW k14c pre=8 fill=11 g=40 reads_in_ways_out=812 session_or_disk_changed=0 tally={"still[NoSpaceAfterRaisingTheFloor] ways=1": 812}
+VW k14 done cells_stuck=5
+test vw_k14_report_step_touches_nothing_and_ways_out_changes_nothing ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 67 filtered out; finished in 189.87s
+

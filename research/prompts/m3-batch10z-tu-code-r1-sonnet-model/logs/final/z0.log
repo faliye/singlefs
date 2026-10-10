@@ -1,0 +1,27 @@
+
+running 1 test
+test s2_sweep ... DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZWTP step=0Z Z:readerr_on=2
+REHEARSAL secs=0.0203 clone_secs=0.0000 blocks=8965 bytes=4590080 result=A
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZWTP step=1W NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+REHEARSAL secs=0.0002 clone_secs=0.0000 blocks=0 bytes=0 result=PushRefused
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZWTP step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZWTP step=3P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+S2 label=z arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=ZWTP secs=0.09 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1W:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=- hit=false first_red=-
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZHTP step=0Z Z:readerr_on=2
+REHEARSAL secs=0.0196 clone_secs=0.0000 blocks=14645 bytes=7498240 result=A
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZHTP step=1H NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+REHEARSAL secs=0.0008 clone_secs=0.0000 blocks=0 bytes=0 result=PushRefused
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZHTP step=2T T[walk]:P:NothingHeldUntilThisProcessWritesARingSlot:unchanged=true
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=ZHTP step=3P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+S2 label=z arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=ZHTP secs=0.08 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=1H:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=- hit=false first_red=-
+REHEARSAL secs=0.0178 clone_secs=0.0000 blocks=8965 bytes=4590080 result=A
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=WZWP step=0W NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[]
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=WZWP step=1Z Z:readerr_on=2
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=WZWP step=2W ok0
+DIAG label=z prefix=20 r=b6 faults=racct,rlin actions=WZWP step=3P P[cur,rOcc=None,needs=None,hold=0,isoC=0,isoAll=0->0]pushRef:Nothing[n=0,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+0]
+S2 label=z arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=WZWP secs=0.06 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0W:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]|pushed20|stillIso=0/440|retryOk|CMP[] r_left_at=- hit=false first_red=-
+S2_DONE label=z arm=implemented histories=3 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.29s
+

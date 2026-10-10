@@ -1,0 +1,1 @@
+OPUS_NO_STRESS threads=8 rounds=5000 bookings=40000 restarts=2039 restart_refused=0 wrongly_lost=0 panics=0 lost_and_still_in_use_after_one_more_pass=0

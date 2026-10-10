@@ -1,0 +1,9 @@
+
+running 1 test
+test s2_sweep ... S2 label=k4 arm=diff slots=384 prefix=oooo mid=o r=b1 r_txg=9 r_old_txg=7 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oo secs=0.01 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1542)})
+S2 label=k4 arm=diff slots=384 prefix=oooo mid=o r=b1 r_txg=9 r_old_txg=7 r_old_in_ring=true faults=racct,qracct,rlin persist=false actions=oFoo secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1542)})
+S2_DONE label=k4 arm=diff histories=2 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

@@ -1,0 +1,12 @@
+
+running 1 test
+ATK k1small pre=4 fill=16 grow=20 push=false k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+ATK k1small pre=4 fill=16 grow=20 push=true k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+ATK k1small pre=4 fill=16 grow=28 push=false k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+ATK k1small pre=4 fill=16 grow=28 push=true k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+ATK k1small pre=4 fill=16 grow=35 push=false k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+ATK k1small pre=4 fill=16 grow=35 push=true k0:no k1:no k2:no k3:no k4:ok k5:ok k6:ok k7:ok k8:ok
+test atk_k1_small_writes_after_push_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 39 filtered out; finished in 2.07s
+

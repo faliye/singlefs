@@ -1,0 +1,10 @@
+== cfg_shadow
+pinned-like call returned false (outer fn returns true)
+== cfg_stop
+layer(&|| true) = false (a layer that hands the stop on would return true)
+== struct_std
+error[E0223]: ambiguous associated type
+== type_wgpu2
+error: expected type, found variant `PollType`
+== type_std2
+error[E0223]: ambiguous associated type

@@ -1,0 +1,106 @@
+
+running 1 test
+ATK k1 pre=4 fill=16 size_now=16 g_ctrl=Some(36) g_c=Some(13)
+ATK k1 pre=4 fill=16 g=13 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=13 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=13 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=14 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=14 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=14 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=15 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=15 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=15 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=16 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=16 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=16 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=17 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=17 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=17 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=18 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=18 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=18 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=19 n_pub=19 act=none: ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=19 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=19 n_pub=19 act=same:stuck ask=adm ask_io=(2,666,0) ask_untouched=true ways=2 push=pushed(19) retry=admitted agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=- ways_ok=true
+ATK k1 pre=4 fill=16 g=20 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=20 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=20 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=21 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=21 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=21 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=22 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=22 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=22 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=23 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=23 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=23 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=24 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=24 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=24 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=25 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=25 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=25 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=26 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=26 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=26 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=27 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=27 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=27 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=28 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=28 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=28 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=29 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=29 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=29 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=30 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=30 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=30 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=31 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=31 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=31 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=32 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=32 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=32 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=33 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=33 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=33 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=34 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=34 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=34 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=35 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=35 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=35 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=36 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=36 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=36 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=37 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=37 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=37 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=38 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=38 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=38 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=39 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=39 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=39 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=40 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=40 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=40 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=41 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=41 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=41 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=42 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=42 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=42 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=43 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=43 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=43 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=44 n_pub=19 act=none: ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 pre=4 fill=16 g=44 n_pub=19 act=unmount-remount:unmount=raised remount=ok(instance 3) ask=moved[2.16->3.22] ask_io=(0,0,0) ask_untouched=true
+ATK k1 pre=4 fill=16 g=44 n_pub=19 act=same:stuck ask=still[NoSpaceAfterRaisingTheFloor] ask_io=(2,868,0) ask_untouched=true ways=1 push=pushed(19) retry=notwhat(budget) agree=yes n_reh=[51, 51] n_real=[51, 51] n_same=true dbg_same=true ways_ok=true
+ATK k1 totals area=384 action=none cells=32 stuck=32 agree=32 mismatch=0 moved_or_unasked=0
+ATK k1 totals area=384 action=same cells=32 stuck=32 agree=32 mismatch=0 moved_or_unasked=0
+ATK k1 totals area=384 action=unmount-remount cells=32 stuck=32 agree=0 mismatch=0 moved_or_unasked=32
+test atk_k1_ways_out_vs_real_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 65 filtered out; finished in 13.43s
+

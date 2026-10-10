@@ -1,0 +1,4 @@
+STAT crash_paren_bracket_differs 2679
+STAT crash_paren_negative_would_panic 4134
+STAT crash_vs_gpu_paren_differ 2679
+STAT files_with_truth 4640

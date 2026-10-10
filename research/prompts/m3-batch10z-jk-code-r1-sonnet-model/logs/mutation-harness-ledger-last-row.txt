@@ -1,0 +1,1 @@
+0	第10z批第十一块 显存账 K4-2 拆锁之后拿到起设备的锁不再看一次留着的（等完照样另起一台）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.50s	gpu_memory_ledger::tests::a_second_start_on_the_same_card_waits_for_the_restart_in_progres

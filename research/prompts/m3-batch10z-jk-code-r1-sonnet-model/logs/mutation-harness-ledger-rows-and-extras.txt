@@ -1,0 +1,18 @@
+0	第10z批第十一块 显存账 K1-1 poll 交回队列空了连列卡之后才没等成的也销（攻方 take-in-between）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_lease_kept_after_the_listing_stays_on_the_books_when_the_poll_
+1	第10z批第十一块 显存账 K4-2 借之前取留着的设备照旧等正在起的设备（正推 probe_started_now_blocks）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 10.01s	gpu_memory_ledger::tests::taking_the_device_kept_does_not_wait_for_a_restart_in_progress .
+2	第10z批第十一块 显存账 K4-2 拆锁之后同一张卡上同时要起的不等这一次起完（各起一台）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_second_start_on_the_same_card_waits_for_the_restart_in_progres
+3	第10z批第十一块 显存账 K5 放掉在用的那一台时不销它上面没等成的（攻方 mut.py M1）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::releasing_the_device_in_use_returns_the_leases_kept_on_it_and_a_
+4	第10z批第十一块 显存账 K5 放掉在用的那一台时不把在用的清掉（攻方 mut.py M2）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::releasing_the_device_in_use_returns_the_leases_kept_on_it_and_a_
+5	第10z批第八块 显存账 K1-3 重起好了就当丢了的设备都已放掉（丢了的那一台还有克隆没丢）	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share
+6	第10z批第八块 显存账 K1-3 丢了的设备都放掉了也不回到照读数分	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share
+7	第10z批第八块 显存账 K1-3 设备丢了、账照重起记时不把在用的那一台记成丢了还没放掉	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share
+8	第10z批第十一块 显存账 K4-2 拿到起设备的锁之后再看那一下丢了的也拿	rc=101	test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 194 filtered out; finished in 0.00s	gpu_memory_ledger::tests::a_device_that_failed_to_start_is_started_again_and_a_lost_one_is
+9	G1 列出来的借据不看它等的是哪一台就销	rc=0	test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.53s	
+10	G2 换下来的旧设备在 started 锁里丢（改回拆锁之前）	rc=0	test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.55s	
+11	G3 started_now 起着时交 None	rc=101	test result: FAILED. 107 passed; 1 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.54s	gpu_memory_ledger::tests::taking_the_device_kept_does_not_wait_for_a_restart_in_progress .
+12	G4 take_in_that 不核卡位置	rc=0	test result: ok. 108 passed; 0 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.55s	
+13	G5 列卡带出的是此刻全部借据而不是列卡那一刻（克隆换成引用同一份：列卡时多列一个哨兵借据）	rc=101	test result: FAILED. 105 passed; 3 failed; 0 ignored; 0 measured; 87 filtered out; finished in 0.51s	gpu_memory_ledger::tests::a_finished_wait_on_a_lost_device_leaves_a_lease_kept_on_its_repl;gpu_memory_ledger::tests::a_lease_whose_wait_timed_out_leaves_the_books_when_a_poll_finds_;gpu_memory_ledger::tests::a_lease_kept_after_the_listing_stays_on_the_books_when_the_poll_
+
+real	0m34.389s
+user	1m26.758s
+sys	0m11.931s

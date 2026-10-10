@@ -1,0 +1,14 @@
+
+running 1 test
+test atk_k1_location_turning_unreadable_while_reporting ... ATK k1pin pre=8 fill=11 g=40 reads=882 step=1
+ATK k1pin pre=8 fill=11 g=40      19 × other(FloorRaiseFailedWhilePushingForSpace(FloorRaiseFailedWhilePushin fired_in_report=2 (first n=30)
+ATK k1pin pre=8 fill=11 g=40       8 × stuck:still[FloorRaiseFailed:NewerStateStillUnreadableAfterOneReread] | follow:pushed(19) retry=other(FloorRaiseFailedWhilePushingForSpace( agree=true fired_in_report=2 (first n=725)
+ATK k1pin pre=8 fill=11 g=40     232 × stuck:still[FloorRaiseFailed:RollbackFloorCeilingRootRingSlotStillBadAfterOneReread] | follow:pushed(19) retry=other(FloorRaiseFailedWhilePushingForSpace( agree=true fired_in_report=2 (first n=103)
+ATK k1pin pre=8 fill=11 g=40      31 × stuck:still[NoSpaceAfterRaisingTheFloor] | follow:pushed(19) retry=notwhat(budget) agree=true fired_in_report=1 (first n=61)
+ATK k1pin pre=8 fill=11 g=40     225 × stuck:still[NoSpaceAfterRaisingTheFloor] | follow:pushed(19) retry=notwhat(budget) agree=true fired_in_report=2 (first n=1)
+ATK k1pin pre=8 fill=11 g=40       1 × stuck:still[NoSpaceAfterRaisingTheFloor] | follow:pushed(19) retry=other(FloorRaiseFailedWhilePushingForSpace( agree=true fired_in_report=1 (first n=52)
+ATK k1pin pre=8 fill=11 g=40     366 × stuck:still[NoSpaceAfterRaisingTheFloor] | follow:pushed(19) retry=other(FloorRaiseFailedWhilePushingForSpace( agree=true fired_in_report=2 (first n=37)
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 83 filtered out; finished in 77.70s
+

@@ -1,0 +1,124 @@
+
+running 1 test
+VW k3cell unlink_walk_after_intent k=4 per=1 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=1 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=1 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=1 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=1 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=1 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=2 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=2 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=2 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=2 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=2 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=2 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=3 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=3 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=3 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=3 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=3 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=3 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=5 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=5 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=5 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=5 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=5 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=5 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=8 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=8 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=8 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=8 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=8 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=8 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=16 left=29 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=16 left=29 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=16 left=30 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=16 left=30 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=4 per=16 left=31 n=1 versions_before_report=1 remainder=WalkTheQueue reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell overwrite_walk_before k=4 per=16 left=31 n=1 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=still[NoSpaceAfterRaisingTheFloor] truth=still
+VW k3cell unlink_walk_after_intent k=6 per=1 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=1 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=1 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=1 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=1 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=1 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=2 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=2 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=2 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=2 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=2 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=2 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=3 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=3 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=3 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=3 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=3 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=3 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=5 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=5 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=5 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=5 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=5 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=5 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=8 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=8 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=8 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=8 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=8 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=8 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=16 left=29 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=16 left=29 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=16 left=30 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=16 left=30 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=6 per=16 left=31 n=3 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=6 per=16 left=31 n=3 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=1 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=1 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=1 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=1 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=1 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=1 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=2 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=2 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=2 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=2 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=2 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=2 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=3 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=3 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=3 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=3 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=3 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=3 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=5 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=5 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=5 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=5 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=5 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=5 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=8 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=8 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=8 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=8 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=8 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=8 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=16 left=29 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=16 left=29 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=16 left=30 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=16 left=30 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell unlink_walk_after_intent k=9 per=16 left=31 n=6 versions_before_report=1 remainder=WalkTheQueue reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3cell overwrite_walk_before k=9 per=16 left=31 n=6 versions_before_report=0 remainder=WalkTheQueueThenPublishTheChange reh=pushref[RefusedByTheRehearsalBeforeAnyWrite] truth=pushref
+VW k3  870 × overwrite_walk_before: no queue left   [first ]
+VW k3   18 × overwrite_walk_before: notwhat(FloorAlreadyAtTheCeiling { floor: Checkp)   [first ]
+VW k3  462 × overwrite_walk_before: notwhat(FloorRaiseRefusedForSpace { refusal: Rai)   [first ]
+VW k3   36 × overwrite_walk_before: stuck(change=overwrite,versions_before_report=0, remainder=WalkTheQueueThenPublishTheChange) reh=pushref truth=pushref agree=true   [first k=6 per=1 left=29 n=3]
+VW k3   18 × overwrite_walk_before: stuck(change=overwrite,versions_before_report=0, remainder=WalkTheQueueThenPublishTheChange) reh=still truth=still agree=true   [first k=4 per=1 left=29 n=1]
+VW k3  870 × unlink_walk_after_intent: admitted   [first ]
+VW k3   18 × unlink_walk_after_intent: notwhat(FloorAlreadyAtTheCeiling { floor: Checkp)   [first ]
+VW k3  462 × unlink_walk_after_intent: notwhat(FloorRaiseRefusedForSpace { refusal: Rai)   [first ]
+VW k3   36 × unlink_walk_after_intent: stuck(change=unlink,versions_before_report=1, remainder=WalkTheQueue) reh=pushref truth=pushref agree=true   [first k=6 per=1 left=29 n=3]
+VW k3   18 × unlink_walk_after_intent: stuck(change=unlink,versions_before_report=1, remainder=WalkTheQueue) reh=still truth=still agree=true   [first k=4 per=1 left=29 n=1]
+test vw_k3_walk_after_the_push_sweep ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 18.62s
+

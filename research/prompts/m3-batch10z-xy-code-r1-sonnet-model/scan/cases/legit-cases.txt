@@ -1,0 +1,22 @@
+L01_tests_module_at_the_start_of_the_file	#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L02_after_an_inner_attribute	#![allow(dead_code)]\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L03_after_a_function	fn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L04_after_a_use	use std::fmt;\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L05_after_a_line_comment_after_a_semicolon	use std::fmt; // c\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L06_after_a_string_with_parens	const A: &str = "(([";\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L07_after_char_literals	const C: char = '(';\nconst D: u8 = b'[';\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L08_after_a_raw_string	const R: &str = r#"(("#;\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L09_after_lifetimes	fn f<'a>(x: &'a str) -> &'a str { x }\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L10_after_block_comment_with_parens	/* ( [ */\nfn g() {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L11_after_an_outer_attribute	#[allow(unused)]\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L12_after_a_macro_rules	macro_rules! m { () => { ( [ ] ) } }\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L13_after_a_macro_call_with_parens	m!(1, 2);\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L14_after_an_array_const	const A: [u8; 2] = [1, 2];\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L15_cfg_test_fn_before	#[cfg(test)]\nfn only_in_tests() {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L16_unrelated_tests_mod_in_a_fn_body	fn f() {\n    mod tests {}\n}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L17_doc_comment_before	/// docs ( [\nfn h() {}\n/// doc on tests\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L18_after_extern_block	extern "C" { fn x(); }\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L19_after_an_impl_with_where	impl<T> A for B<T> where T: C {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L20_two_blank_lines_before	fn f() {}\n\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L21_nested_block_comment_unbalanced	/* /* ( */ [ */\nfn f() {}\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n
+L22_after_const_with_closure_in_parens	const F: fn() = || { let _ = (1, [2]); };\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n

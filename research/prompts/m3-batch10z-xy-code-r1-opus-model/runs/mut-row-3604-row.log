@@ -1,0 +1,21 @@
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-a6a6b07acd5b9197)
+
+running 1 test
+test asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device ... FAILED
+
+failures:
+
+---- asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device stdout ----
+
+thread 'asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device' (1672370) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:6456:18:
+OneDeviceMore：盘表与挂载时的不同：在预演之前拒成盘表那一种，而交回 Ok(WaysOutOfTheWideProtection { pushing_the_root_ring: PushRefused(DevicesHandedIn(CallerParametersDisagreeWithTheSelectedSystemConfiguration { disagreeing_fields: [], disagreeing_device_table: [DeviceCountDiffersFromTheSystemConfiguration { devices_handed_in: DeviceCount(3), device_count_in_the_system_configuration: DeviceCount(2) }] })), ways_out: ["出路一：正常卸载（mount::unmount）之后再可写挂载一次。再挂时 R（txg 49）按新实例的实例表判成被抛弃，影子账只护它自己账里引用的落点，宽护不再出现。R 的账读不出若是盘上永久坏，卸载之后再挂会被拒（C694 的 B），而会话在卸载时已断开。"] })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    asking_for_the_ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 66 filtered out; finished in 0.39s
+
+error: test failed, to rerun pass `-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`

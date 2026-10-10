@@ -1,0 +1,79 @@
+
+running 1 test
+test s2_sweep ... TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=nnsFsbnbFsbnsbF secs=2.86 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=ooFbbsbosFonnnno secs=3.03 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=nnsFsbnbFsbnsbF secs=2.72 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=ooFbbsbosFonnnno secs=3.00 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=nnsFsbnbFsbnsbF secs=2.70 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=ooFbbsbosFonnnno secs=2.99 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=nnsFsbnbFsbnsbF secs=2.69 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=ooFbbsbosFonnnno secs=2.99 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1542)})
+S2 label=e101 arm=diff slots=384 prefix=oooon mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1542)})
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=nnsFsbnbFsbnsbF secs=2.68 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=ooFbbsbosFonnnno secs=2.96 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=nnsFsbnbFsbnsbF secs=2.67 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=ooFbbsbosFonnnno secs=2.96 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=nnsFsbnbFsbnsbF secs=2.66 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=ooFbbsbosFonnnno secs=2.96 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=nnsFsbnbFsbnsbF secs=2.66 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=48 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=ooFbbsbosFonnnno secs=2.95 selected=9 c_r=50 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=48 iso_max=48 iso_end=0 refused_steps=0 first_refused=- r_left_at=15 hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1556)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1542)})
+S2 label=e101 arm=diff slots=384 prefix=ooonn mid= r=d r_txg=10 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1542)})
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=nnsFsbnbFsbnsbF secs=2.82 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=ooFbbsbosFonnnno secs=3.08 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=nnsFsbnbFsbnsbF secs=2.82 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=ooFbbsbosFonnnno secs=3.09 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=nnsFsbnbFsbnsbF secs=2.82 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=ooFbbsbosFonnnno secs=3.08 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=nnsFsbnbFsbnsbF secs=2.82 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=11 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=ooFbbsbosFonnnno secs=3.08 selected=10 c_r=56 revived=0 revived_in_c_r=0 iso_mount=18 iso_after_first_raise=58 iso_max=58 iso_end=58 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1568)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=nnsFsbnbFsbnsbF secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1554)})
+S2 label=e101 arm=diff slots=384 prefix=oooons mid= r=d r_txg=11 r_old_txg=- r_old_in_ring=false faults=rtomb persist=false actions=ooFbbsbosFonnnno secs=0.00 mount=Err:Recovery(MappingStillUnreadable{slot:SlotNumber(1554)})
+S2_DONE label=e101 arm=diff histories=48 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 69.24s
+

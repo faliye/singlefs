@@ -1,0 +1,6 @@
+ROW 0 RED(caught) rc=101 59s kind=append 第10z批第六块 显存账 G2 乙 等设备没等成照样销账（等失败那一支多给）
+   test k3_1_random_ops_never_let_the_ledger_give_more_than_is_physically_lendable ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.34s
+   error: test failed, to rerun pass `-p singlefs-harness --test sonnet_g2_model`
+ROW 4 GREEN(survived) rc=0 15s kind=probe P3 重起时没等成的那几笔销账不同时从活着的集合里去掉
+   test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 2.65s

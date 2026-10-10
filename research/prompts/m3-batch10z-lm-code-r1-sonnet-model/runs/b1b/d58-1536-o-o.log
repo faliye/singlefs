@@ -1,0 +1,39 @@
+
+running 1 test
+test s2_sweep ... TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=ossbsssnonnnonbnFo secs=3.08 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=ossbsssnonnnonbnFo secs=3.13 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=102 ref=102 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=ossbsssnonnnonbnFo secs=3.27 selected=8 c_r=150 revived=0 revived_in_c_r=0 iso_mount=146 iso_after_first_raise=174 iso_max=174 iso_end=174 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=ossbsssnonnnonbnFo secs=3.27 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=ossbsssnonnnonbnFo secs=3.38 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=ossbsssnonnnonbnFo secs=3.26 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=racct,rlin,oldroot persist=false actions=ossbsssnonnnonbnFo secs=3.19 selected=8 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=9 equal=true impl=102 ref=102 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooo mid=o r=o r_txg=9 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=ossbsssnonnnonbnFo secs=3.15 selected=8 c_r=150 revived=0 revived_in_c_r=0 iso_mount=146 iso_after_first_raise=174 iso_max=174 iso_end=174 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=ossbsssnonnnonbnFo secs=3.35 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=ossbsssnonnnonbnFo secs=3.34 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=118 ref=118 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rall persist=false actions=ossbsssnonnnonbnFo secs=3.34 selected=9 c_r=166 revived=0 revived_in_c_r=0 iso_mount=164 iso_after_first_raise=192 iso_max=192 iso_end=192 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rtomb persist=false actions=ossbsssnonnnonbnFo secs=3.35 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldroot persist=false actions=ossbsssnonnnonbnFo secs=3.32 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,oldacct persist=false actions=ossbsssnonnnonbnFo secs=3.32 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=0 ref=0 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=racct,rlin,oldroot persist=false actions=ossbsssnonnnonbnFo secs=3.32 selected=9 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 iso_after_first_raise=52 iso_max=52 iso_end=52 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+TRIDIFF txg=10 equal=true impl=118 ref=118 extra_in_impl=[] missing_in_impl=[]
+S2 label=d58 arm=diff slots=1536 prefix=oooon mid=o r=o r_txg=10 r_old_txg=- r_old_in_ring=false faults=rall persist=false actions=ossbsssnonnnonbnFo secs=3.37 selected=9 c_r=166 revived=0 revived_in_c_r=0 iso_mount=164 iso_after_first_raise=192 iso_max=192 iso_end=192 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=d58 arm=diff histories=16 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 52.46s
+

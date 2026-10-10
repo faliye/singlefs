@@ -1,0 +1,10 @@
+
+running 1 test
+VW k14d pre=2 fill=16 g=17 reads_in_ways_out=674 stride=7
+VW k14d pre=2 fill=16 g=17      97 × fired_in_ways_out=true reh=adm truth=adm agree=true unchanged=true (first n=1)
+VW k14d pre=8 fill=11 g=40 reads_in_ways_out=812 stride=7
+VW k14d pre=8 fill=11 g=40     116 × fired_in_ways_out=true reh=still truth=still agree=true unchanged=true (first n=1)
+test vw_k14_persistent_read_fault_during_ways_out_vs_truth ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 68 filtered out; finished in 15.15s
+

@@ -1,0 +1,15 @@
+
+running 1 test
+test s2_sweep ... DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=0o NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq);hold=1;isoC=440;needs=Some(20)]
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=1P P[cur,rOcc=Some((28, Some(24))),needs=Some(20),hold=1,isoC=440,isoAll=440->440]pushRef:AfterRehearsal3/20:BlockDevice(InputOutput(Custom[n=2,stillIsoC=440,hold_after=1,ab_left=0,FSame,txg+2]
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=2o Publish{cause:PublishFrozenAfterAWriteFailureIsNotResentY
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=3o Publish{cause:PublishFrozenAfterAWriteFailureIsNotResentY
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=4X unmountErr:RaiseFloorSequencePublishFailed(PublishSequenceFailed{cause:PublishFrozenAfterAWriteFailureIsNotResentYet{checkpoint_txg:CheckpointTxg(31),instance:InstanceGeneration(2)},writes_before_the_first_publish:WritesByStructureKind{counted:{}},writes_of_persisted_publishes:[],writes_of_failed_publishes:[]})
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=5o Publish{cause:PublishFrozenAfterAWriteFailureIsNotResentY
+DIAG label=k35t prefix=20 r=b6 faults=racct,rlin actions=oPooXoo step=6o Publish{cause:PublishFrozenAfterAWriteFailureIsNotResentY
+S2 label=k35t arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=oPooXoo secs=0.66 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=440 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=6 first_refused=0o:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq);hold=1;isoC=440;needs=Some(20)] r_left_at=- hit=false first_red=-
+S2_DONE label=k35t arm=implemented histories=1 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.72s
+

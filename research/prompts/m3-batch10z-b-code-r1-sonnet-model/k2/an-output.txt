@@ -1,0 +1,31 @@
+cases today 50 c 50 same labels True
+== 今天读盘臂
+('OW', '仅挂后R账读错(无读零)', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '仅挂载时R账读错(无读零)', 'selP', 'Cvalid') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '挂后账读错', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '挂后账读错', 'selP', 'Cvalid') n=9 拒9 {(17, 'NewerStateStillUnreadableAfterOneReread'): 9} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'拒': 9}
+('OW', '账无故障', 'notP', 'noC') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '账无故障', 'selP', 'Cvalid') n=9 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 9}
+('SQ', '仅挂后R账读错(无读零)', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('SQ', '仅挂载时R账读错(无读零)', 'selP', 'Cvalid') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('SQ', '挂后账读错', 'notP', 'noC') n=3 拒3 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 3} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 3}
+('SQ', '挂后账读错', 'selP', 'Cvalid') n=10 拒10 {(17, 'NewerStateStillUnreadableAfterOneReread'): 10} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'拒': 10}
+('SQ', '账无故障', 'notP', 'noC') n=3 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 3}
+('SQ', '账无故障', 'selP', 'Cvalid') n=10 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 10}
+== C 臂
+('OW', '仅挂后R账读错(无读零)', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '仅挂载时R账读错(无读零)', 'selP', 'Cvalid') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '挂后账读错', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '挂后账读错', 'selP', 'Cvalid') n=9 拒9 {(32, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 9} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 9}
+('OW', '账无故障', 'notP', 'noC') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('OW', '账无故障', 'selP', 'Cvalid') n=9 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 9}
+('SQ', '仅挂后R账读错(无读零)', 'notP', 'noC') n=1 拒1 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 1} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('SQ', '仅挂载时R账读错(无读零)', 'selP', 'Cvalid') n=1 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 1}
+('SQ', '挂后账读错', 'notP', 'noC') n=3 拒3 {(17, 'RollbackFloorCeilingNeedsUnreadableValidRootTreeTable'): 3} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 3}
+('SQ', '挂后账读错', 'selP', 'Cvalid') n=10 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 10}
+('SQ', '账无故障', 'notP', 'noC') n=3 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 3}
+('SQ', '账无故障', 'selP', 'Cvalid') n=10 拒0 {} 违例(逐步/写后)0 违例(卸载后)0 卸载 {'做成': 10}
+隔离集合 两臂都做成抬F的例子：相同 25 不同 0
+一臂做成一臂没做成的例子数 25
+两臂都做成但集合不同 []
+{'both None': 6, 'today None / C Some': 19}

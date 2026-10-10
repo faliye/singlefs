@@ -1,0 +1,36 @@
+test a_lease_booked_after_the_reading_is_taken_for_the_returned_one_until_it_is_returned_itself ... ATTACK scenario=P1-overlap step=b-alive ledger_room=12550 truly_lendable=16550 difference=-4000
+test a_lost_device_started_again_is_refused_over_a_band_where_it_fits_and_never_overgiven ... ATTACK scenario=restart-sweep class=booking-refused cells=445 others_from=15560 others_to=20000
+ATTACK scenario=restart-sweep class=restart-allowed-and-fits cells=1496 others_from=0 others_to=14950
+ATTACK scenario=restart-sweep class=restart-allowed-but-does-not-fit cells=60 others_from=14960 others_to=15550
+test a_restart_with_the_old_device_still_on_the_card_leaves_a_shortfall_that_never_goes_away ... ATTACK scenario=restart-after step=reading_between=true ledger_room=23510 truly_lendable=25550 difference=-2040
+ATTACK scenario=restart-after step=reading_between=true-ten-more-readings ledger_room=23510 truly_lendable=25550 difference=-2040
+test p1_a_lease_alive_and_unbuilt_when_another_thread_reads_costs_its_whole_amount_after_it_is_returned ... ATTACK scenario=P1-three-threads step=round=0 ledger_room=19550 truly_lendable=19550 difference=0
+ATTACK scenario=P1-three-threads step=round=1 ledger_room=17550 truly_lendable=19550 difference=-2000
+ATTACK scenario=P1-three-threads step=round=2 ledger_room=15550 truly_lendable=19550 difference=-4000
+ATTACK scenario=P1-three-threads step=round=3 ledger_room=13550 truly_lendable=19550 difference=-6000
+ATTACK scenario=P1-three-threads step=round=4 ledger_room=11550 truly_lendable=19550 difference=-8000
+ATTACK scenario=P1-three-threads step=round=5 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-three-threads step=round=6 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-three-threads step=round=7 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-three-threads step=round=8 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-three-threads step=round=9 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-three-threads step=round=10 ledger_room=11510 truly_lendable=19550 difference=-8040
+test p1_a_lease_half_built_when_another_thread_reads_costs_the_unbuilt_half_after_it_is_returned ... ATTACK scenario=P1-half-built step=round=1 ledger_room=18550 truly_lendable=19550 difference=-1000
+ATTACK scenario=P1-half-built step=round=2 ledger_room=17550 truly_lendable=19550 difference=-2000
+ATTACK scenario=P1-half-built step=round=3 ledger_room=16550 truly_lendable=19550 difference=-3000
+ATTACK scenario=P1-half-built step=round=4 ledger_room=15550 truly_lendable=19550 difference=-4000
+ATTACK scenario=P1-half-built step=round=5 ledger_room=14550 truly_lendable=19550 difference=-5000
+ATTACK scenario=P1-half-built step=round=6 ledger_room=13550 truly_lendable=19550 difference=-6000
+ATTACK scenario=P1-half-built step=round=7 ledger_room=12550 truly_lendable=19550 difference=-7000
+ATTACK scenario=P1-half-built step=round=8 ledger_room=11550 truly_lendable=19550 difference=-8000
+ATTACK scenario=P1-half-built step=round=9 ledger_room=11510 truly_lendable=19550 difference=-8040
+ATTACK scenario=P1-half-built step=round=10 ledger_room=11510 truly_lendable=19550 difference=-8040
+test p1_a_lease_rounded_up_by_one_mebibyte_costs_one_mebibyte_each_time_it_is_returned ... ATTACK scenario=P1-rounded step=rounds=1000 ledger_room=17550 truly_lendable=19550 difference=-2000
+test p1_control_without_a_reading_while_the_short_lease_lives_costs_nothing ... ATTACK scenario=P1-control step=rounds=10 ledger_room=11510 truly_lendable=19550 difference=-8040
+test random_histories_with_the_user_steps_set_free ... ATTACK scenario=random mode=control-reads-and-bookings-only-when-every-live-lease-is-built-returns-freed histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=53 shortfall_at_reading_max=13440
+ATTACK scenario=random mode=grow-only-returns-freed histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=3827 shortfall_at_reading_max=13421
+ATTACK scenario=random mode=grow-only-returns-left-on-the-card histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=4041 shortfall_at_reading_max=13416
+ATTACK scenario=random mode=shrinking-live-leases-returns-left-on-the-card histories=3000 steps_each=80 overgive_at_reading_max=0 overgive_bookings=0 false_refusals=3869 shortfall_at_reading_max=13293
+test seen_shrinks_when_a_live_lease_drops_its_pass_buffers_and_the_returned_share_is_pressed_too_far ... ATTACK scenario=P1-assumption-broken step=after-the-pass ledger_room=8550 truly_lendable=8550 difference=0
+test with_a_device_outside_the_books_on_the_bus_a_fitting_booking_is_refused ... ATTACK scenario=yi-fu-also-outside step=long-12000-built ledger_room=7510 truly_lendable=17550 difference=-10040
+test result: FAILED. 1 passed; 9 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.32s

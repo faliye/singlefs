@@ -1,0 +1,11 @@
+
+running 1 test
+test s2_sweep ... S2 label=smoke arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b6 r_txg=49 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=oooooo secs=0.94 selected=48 c_r=660 revived=2 revived_in_c_r=2 iso_mount=616 iso_after_first_raise=- iso_max=616 iso_end=616 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- refused_steps=6 first_refused=0o:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
+S2 label=smoke arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b6 r_txg=49 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=ssssss secs=0.98 selected=48 c_r=660 revived=2 revived_in_c_r=2 iso_mount=616 iso_after_first_raise=- iso_max=616 iso_end=616 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- refused_steps=6 first_refused=0s:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
+S2 label=smoke arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b6 r_txg=49 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=nnnnn secs=0.89 selected=48 c_r=660 revived=2 revived_in_c_r=2 iso_mount=616 iso_after_first_raise=- iso_max=616 iso_end=616 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- refused_steps=5 first_refused=0n:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
+S2 label=smoke arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=b6 r_txg=49 r_old_txg=39 r_old_in_ring=true faults=racct,rlin persist=false actions=oFoFoF secs=0.94 selected=48 c_r=660 revived=2 revived_in_c_r=2 iso_mount=616 iso_after_first_raise=- iso_max=616 iso_end=616 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- refused_steps=3 first_refused=0o:NoSpaceAfterRaisingTheFloor(NoSpaceAfterRaisingTheFloor{la r_left_at=- hit=false first_red=-
+S2_DONE label=smoke arm=implemented histories=4 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.86s
+

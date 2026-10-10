@@ -1,0 +1,33 @@
+ROW 3 RED(caught) rc=101 102s kind=append 第10z批第六块 显存账 G2 乙 销了账之后照旧扣一份驱动那么大（还了一笔再借一笔建满）
+   test gpu_memory_ledger::tests::a_lease_booked_after_another_was_returned_counts_its_built_buffers_once ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 7 RED(caught) rc=101 4s kind=append 第10z批第六块 显存账 G2 乙 重起好了就当旧设备已经不在（设备丢了那一刻活着的借据还在）
+   test gpu_memory_ledger::tests::a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 11 RED(caught) rc=101 63s kind=append 第10z批第六块 叫停 K2-2 见过叫停不记住（攻方 stop-file-removed 一臂：轮末断言 panic、整趟没记成提早收尾）
+   test a_stop_file_removed_mid_run_neither_panics_the_round_nor_leaves_the_stopped_run_unmarked ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.35s
+   error: test failed, to rerun pass `-p singlefs-harness --test gpu_card_rounds_remember_a_stop_request_removed_mid_run`
+ROW 15 RED(caught) rc=101 3s kind=append 第10z批第六块 K3 M05 判完块号记最后一块而不是最大
+   test gpu_memory_ledger::tests::the_largest_judged_block_not_the_last_judged_lets_a_stopped_card_take_the_block_it_waits_for ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.02s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 19 RED(caught) rc=101 4s kind=append 第10z批第六块 K3 M17 头一句 Out of Memory 取最后一句
+   test gpu_memory_ledger::tests::the_first_out_of_memory_of_the_run_stays_the_first_reported ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 23 SKIP(not harness) 第10z批第六块 GPU 取卡 G2 乙 没等成也当等完了（照常销账）
+ROW 27 RED(caught) rc=101 4s kind=replace 第10x批 显存账 实际占着的不封顶到许出去的（分配器多拿的块也算成能借的）
+   test gpu_memory_ledger::tests::the_memory_this_process_may_hold_counts_only_what_it_occupies_of_what_it_promised ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 31 RED(caught) rc=101 2s kind=replace 第10z批 显存账 K1-3 设备丢了重起不重新登记驱动那一份
+   test gpu_memory_ledger::tests::a_lost_device_started_again_is_refused_when_its_driver_share_no_longer_fits_now ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`
+ROW 35 RED(caught) rc=101 3s kind=replace 第10z批第五块 显存账 K3 重起被拒之后借一笔把驱动那一份记回登记了、没起（正推 M13）
+   test gpu_memory_ledger::tests::a_lease_booked_after_a_refused_restart_keeps_the_restart_judged_again ... FAILED
+   test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 180 filtered out; finished in 0.00s
+   error: test failed, to rerun pass `-p singlefs-harness --lib`

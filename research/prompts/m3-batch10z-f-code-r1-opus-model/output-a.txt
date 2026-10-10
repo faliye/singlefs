@@ -1,0 +1,79 @@
+ATTACK arm=timeout-kept step=k_built ledger_room=9440 truth_room=9440 under=0 over=0
+ATTACK arm=timeout-kept step=k_wait_timed_out_buffers_still_in_flight ledger_room=9440 truth_room=9550 under=110 over=0
+ATTACK arm=timeout-kept step=k_work_done_memory_back ledger_room=9440 truth_room=29440 under=20000 over=0
+ATTACK arm=timeout-kept step=book_15000 result=refused:NoCardHasRoomNow{need_mebibytes:15000,card_rooms_mebibytes:[9440]}
+ATTACK arm=timeout-kept step=after_50_leases_waited_and_returned_normally ledger_room=9440 truth_room=29440 under=20000 over=0
+ATTACK arm=timeout-kept step=after_2_timeouts ledger_room=0 truth_room=29440 under=29440 over=0
+ATTACK arm=timeout-kept step=book_1_after_2_timeouts result=Err("NoCardHasRoomNow{need_mebibytes:1,card_rooms_mebibytes:[0]}") truth_room=29440
+ATTACK arm=timeout-kept step=after_a_device_loss_and_restart_judged ledger_room=29440 truth_room=29440 under=0 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=Restart ledger_room=0 truth_room=13950 under=13950 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=DropA ledger_room=18950 truth_room=24440 under=5490 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=ReturnL ledger_room=29440 truth_room=29440 under=0 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=q_15000_built ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=100_leases_of_1000 refused=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished step=after_100_normal_leases ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_finished summary under_after_q=0 book_10000_after_q=booked truth_fits_10000=true over_max=0 still_short_after_100=false
+ATTACK table order=[Restart, DropA, ReturnL] a_wait=TheSubmittedWorkFinished under=0 over_max=0 book_10000=true truth_fits=true
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=Restart ledger_room=0 truth_room=13950 under=13950 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=DropA ledger_room=8950 truth_room=24440 under=15490 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=ReturnL ledger_room=18950 truth_room=29440 under=10490 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=q_15000_built ledger_room=0 truth_room=14440 under=14440 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=100_leases_of_1000 refused=100
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed step=after_100_normal_leases ledger_room=0 truth_room=14440 under=14440 over=0
+ATTACK arm=lost-device:Restart>DropA>ReturnL-a_wait_failed summary under_after_q=14440 book_10000_after_q=refused truth_fits_10000=true over_max=0 still_short_after_100=true
+ATTACK table order=[Restart, DropA, ReturnL] a_wait=TheWaitFailed under=14440 over_max=0 book_10000=false truth_fits=true
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=Restart ledger_room=0 truth_room=13950 under=13950 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=ReturnL ledger_room=8350 truth_room=18950 under=10600 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=DropA ledger_room=29440 truth_room=29440 under=0 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=q_15000_built ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=100_leases_of_1000 refused=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished step=after_100_normal_leases ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_finished summary under_after_q=0 book_10000_after_q=booked truth_fits_10000=true over_max=0 still_short_after_100=false
+ATTACK table order=[Restart, ReturnL, DropA] a_wait=TheSubmittedWorkFinished under=0 over_max=0 book_10000=true truth_fits=true
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=Restart ledger_room=0 truth_room=13950 under=13950 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=ReturnL ledger_room=8350 truth_room=18950 under=10600 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=DropA ledger_room=18950 truth_room=29440 under=10490 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=q_15000_built ledger_room=0 truth_room=14440 under=14440 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=100_leases_of_1000 refused=100
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed step=after_100_normal_leases ledger_room=0 truth_room=14440 under=14440 over=0
+ATTACK arm=lost-device:Restart>ReturnL>DropA-a_wait_failed summary under_after_q=14440 book_10000_after_q=refused truth_fits_10000=true over_max=0 still_short_after_100=true
+ATTACK table order=[Restart, ReturnL, DropA] a_wait=TheWaitFailed under=14440 over_max=0 book_10000=false truth_fits=true
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=DropA ledger_room=21510 truth_room=14550 under=0 over=6960
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=Restart ledger_room=18950 truth_room=24440 under=5490 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=ReturnL ledger_room=29440 truth_room=29440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=q_15000_built ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=100_leases_of_1000 refused=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished step=after_100_normal_leases ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_finished summary under_after_q=0 book_10000_after_q=booked truth_fits_10000=true over_max=6960 still_short_after_100=false
+ATTACK table order=[DropA, Restart, ReturnL] a_wait=TheSubmittedWorkFinished under=0 over_max=6960 book_10000=true truth_fits=true
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=DropA ledger_room=14440 truth_room=14550 under=110 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=Restart ledger_room=18950 truth_room=24440 under=5490 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=ReturnL ledger_room=29440 truth_room=29440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=q_15000_built ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=100_leases_of_1000 refused=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed step=after_100_normal_leases ledger_room=14440 truth_room=14440 under=0 over=0
+ATTACK arm=lost-device:DropA>Restart>ReturnL-a_wait_failed summary under_after_q=0 book_10000_after_q=booked truth_fits_10000=true over_max=0 still_short_after_100=false
+ATTACK table order=[DropA, Restart, ReturnL] a_wait=TheWaitFailed under=0 over_max=0 book_10000=true truth_fits=true
+ATTACK k1_3 histories_refusing_a_lease_that_fits=2 of 6
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(3) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 0, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=3
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(4) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 1, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=4
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(5) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 2, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=5
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(6) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 3, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(7) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 4, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(0) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(1) stop_at=Some(4) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 1, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=4
+ATTACK k2_2 oom_at=Some(1) stop_at=Some(5) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 2, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=5
+ATTACK k2_2 oom_at=Some(1) stop_at=Some(6) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 3, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(1) stop_at=Some(7) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 4, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(1) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(2) stop_at=Some(5) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 2, rounds: 2 } same_stop_without_oom=StoppedOnRequest stored_without_oom=5
+ATTACK k2_2 oom_at=Some(2) stop_at=Some(6) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 3, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(2) stop_at=Some(7) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 4, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(2) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(3) stop_at=Some(6) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 3, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(3) stop_at=Some(7) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 4, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(3) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(4) stop_at=Some(7) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 4, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(4) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 oom_at=Some(5) stop_at=Some(8) Ending { outcome: "StoppedOnRequest", line_this_trip: true, line_this_round: false, blocks_stored: 5, rounds: 2 } same_stop_without_oom=EveryBlockStored stored_without_oom=6
+ATTACK k2_2 summary histories=91 printed_this_trip=33 printed_this_round=12 differ=21 differ_that_complete_without_the_oom=15

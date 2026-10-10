@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'atk_k2_two_c_slots_push' (2604951) panicked at crates/singlefs-core/src/mounted_session.rs:782:9:
+推环写到了 R 那一槽：每次发布 txg 加一、写 target_for_publish(txg) 那一槽并在取完落点之后摘下 C 在那一槽记着的落点，R 那一槽是这几槽里最后轮到的；还记着说明有一次发布没经分配器记根
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test atk_k2_two_c_slots_push ... FAILED
+
+failures:
+
+failures:
+    atk_k2_two_c_slots_push
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 45 filtered out; finished in 0.04s
+

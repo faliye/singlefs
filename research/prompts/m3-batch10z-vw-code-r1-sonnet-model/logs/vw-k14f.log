@@ -1,0 +1,17 @@
+
+running 1 test
+VW k14f pre=4 fill=16 g=13 reads_in_ways_out=666 stride=23
+VW k14f     28 × ways_out=adm (2 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f      1 × ways_out=pushref[DevicesHandedIn] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f pre=4 fill=16 g=20 reads_in_ways_out=868 stride=23
+VW k14f      1 × ways_out=pushref[DevicesHandedIn] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f     34 × ways_out=still[FloorRaiseFailedWhilePushingForSpace] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f      3 × ways_out=still[NoSpaceAfterRaisingTheFloor] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f pre=8 fill=11 g=40 reads_in_ways_out=812 stride=23
+VW k14f      1 × ways_out=pushref[DevicesHandedIn] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f     33 × ways_out=still[FloorRaiseFailedWhilePushingForSpace] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+VW k14f      2 × ways_out=still[NoSpaceAfterRaisingTheFloor] (1 ways) real_push=pushref[DevicesHandedIn] unchanged=true
+test vw_k14_every_read_fails_from_the_nth_read_of_the_ways_out ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 73 filtered out; finished in 3.78s
+

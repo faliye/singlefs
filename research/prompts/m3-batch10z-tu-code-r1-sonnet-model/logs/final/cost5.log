@@ -1,0 +1,11 @@
+
+running 1 test
+test s2_sweep ... DIAG label=cost prefix=12 r=o faults=none actions=JT step=0J J:injected80:hold=1
+REHEARSAL secs=0.3522 clone_secs=0.0000 blocks=8308 bytes=4253696 result=R
+DIAG label=cost prefix=12 r=o faults=none actions=JT step=1T T[change]:R:Publish{cause:JournalRecordsOfThePublish:unchanged=true
+S2 label=cost arm=implemented slots=16384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=none persist=false actions=JT secs=0.42 selected=16 c_r=0 revived=0 revived_in_c_r=0 iso_mount=0 ab_mount=0 iso_after_first_raise=- iso_max=80 iso_end=80 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+S2_DONE label=cost arm=implemented histories=1 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.45s
+

@@ -1,0 +1,2 @@
+ATK k1other pre=2 fill=16 g=13 first=admitted
+ATK k1other pre=8 fill=11 g=20 first=admitted

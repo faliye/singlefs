@@ -1,0 +1,18 @@
+
+running 1 test
+VW k14e pre=4 fill=16 g=13 table=empty: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=4 fill=16 g=13 table=first_only: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=4 fill=16 g=13 table=reversed: ways_out=adm:2 real_push=pushed
+VW k14e pre=4 fill=16 g=13 table=older_image: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=4 fill=16 g=20 table=empty: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=4 fill=16 g=20 table=first_only: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=4 fill=16 g=20 table=reversed: ways_out=still[NoSpaceAfterRaisingTheFloor]:1 real_push=pushed
+VW k14e pre=4 fill=16 g=20 table=older_image: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=8 fill=11 g=40 table=empty: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=8 fill=11 g=40 table=first_only: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+VW k14e pre=8 fill=11 g=40 table=reversed: ways_out=still[NoSpaceAfterRaisingTheFloor]:1 real_push=pushed
+VW k14e pre=8 fill=11 g=40 table=older_image: ways_out=pushref[DevicesHandedIn]:1 real_push=DevicesHandedIn
+test vw_k14_wrong_device_tables_are_judged_like_the_push_entry_judges_them ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 72 filtered out; finished in 0.44s
+

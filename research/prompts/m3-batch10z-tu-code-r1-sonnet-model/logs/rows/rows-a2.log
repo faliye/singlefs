@@ -1,0 +1,6 @@
+行2341 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（回退形写成 60 个单元）: rc=101 红 1 条 lback_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
+行2342 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（回退形写成 80 个单元）: rc=101 红 1 条 lback_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
+行2343 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（建 inode 形写成 60 个单元）: rc=101 红 1 条 ation_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (23s)
+行2344 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（建 inode 形写成 80 个单元）: rc=101 红 1 条 ation_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (27s)
+行2345 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（删除形写成 60 个单元）: rc=101 红 1 条 etion_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (24s)
+行2346 第10z批第二十块 甲 去掉预演准入那一判、推完照旧被拒也列推环（删除形写成 80 个单元）: rc=101 红 1 条 etion_stuck_behind_the_wide_protection_lists_only_unmounting | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 54 fil (24s)

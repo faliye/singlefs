@@ -1,0 +1,360 @@
+#![allow(dead_code, unused, warnings)]
+fn source_text_unused() -> &'static str { Box::leak(std::fs::read_to_string(std::env::var("SRC").expect("SRC")).expect("读得到 SRC").into_boxed_str()) }
+
+
+    // 扫源码的用例里，串里的花括号一律写成 \u 转义：门禁 code-source-discipline 的 mutation-tables 格配花括号时不跳字符串，
+    // 串里落单的半边括号会让它把后面的用例算到别的模块下（第 10z 批第八块）。
+    /// 这份文件测试模块的头两行（扫源码的用例从这里切掉测试模块）。
+    const TESTS_MODULE_OPENING: &str = "#[cfg(test)]\nmod tests \u{7b}";
+
+    /// `text` 以 `"` 起头时，那一个字符串字面量连两头引号的长度（反斜杠连同它转义的那个字跳过）。
+    fn length_of_the_quoted_literal_at_the_start(text: &str) -> usize {
+        let bytes = text.as_bytes();
+        let mut position = 1;
+        loop {
+            let byte = *bytes.get(position).expect("字符串字面量有收尾的引号");
+            if byte == b'"' {
+                return position + 1;
+            }
+            position += if byte == b'\\' { 2 } else { 1 };
+        }
+    }
+
+    /// `text` 以 `'` 起头时，那一个字符字面量连两头引号的长度；是生命周期（`'static`、`'_`）交 `None`。
+    fn length_of_the_character_literal_at_the_start(text: &str) -> Option<usize> {
+        let after_the_quote = &text[1..];
+        if after_the_quote.starts_with('\\') {
+            // 转义的（`'\''`、`'\n'`、`'\u{7b}'`）：收尾的引号在反斜杠与它后面那个字之后
+            let closing_quote = 3 + text[3..].find('\'').expect("转义的字符字面量有收尾的引号");
+            return Some(closing_quote + 1);
+        }
+        let first_character = after_the_quote.chars().next().expect("引号后面还有字");
+        after_the_quote[first_character.len_utf8()..]
+            .starts_with('\'')
+            .then(|| first_character.len_utf8() + 2)
+    }
+
+    /// `text` 是原始字符串去掉 `r`、`br`、`cr` 之后那一截（以若干个 `#` 与一个 `"` 起头）时，到收尾的 `"` 与同样多个 `#` 为止的长度。
+    fn length_of_the_raw_string_at_the_start(text: &str) -> usize {
+        let hashes = text.len() - text.trim_start_matches('#').len();
+        let closing = format!("\"{}", "#".repeat(hashes));
+        let body_start = hashes + 1;
+        body_start + text[body_start..].find(&closing).expect("原始字符串有收尾") + closing.len()
+    }
+
+    /// `text` 以 `/*` 起头时，那一段块注释（可以嵌套）的长度。
+    fn length_of_the_block_comment_at_the_start(text: &str) -> usize {
+        let mut depth = 0_usize;
+        let mut position = 0;
+        loop {
+            let rest = &text[position..];
+            if rest.starts_with("/*") {
+                depth += 1;
+                position += 2;
+            } else if rest.starts_with("*/") {
+                depth -= 1;
+                position += 2;
+                if depth == 0 {
+                    return position;
+                }
+            } else {
+                position += rest.chars().next().expect("块注释有收尾").len_utf8();
+            }
+        }
+    }
+
+    /// 拼成关键字的原始标识符（`r#mod`、`r#use`）是名字，不是关键字：分词时这几个连着 `r#` 出词，免得被当成关键字（第 10z 批第二十三块，
+    /// 正推 K4-2 L14）；别的原始标识符（`r#std`）与不带 `r#` 的同名，取它后面的名字。
+    const KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL: [&str; 48] = [
+        "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "do",
+        "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+        "return", "static", "struct", "trait", "true", "try", "type", "typeof", "unsafe",
+        "unsized", "use", "virtual", "where", "while", "yield",
+    ];
+
+    /// `code` 拆成的词：标识符与关键字（`r#` 原始标识符取它后面的名字，拼成关键字的连着 `r#`）、生命周期（连着它前面的 `'`）、
+    /// 数字（照标识符那样收一段）、`::`、`!=`，其余标点一个字一个词；注释（行注释、可以嵌套的块注释）、字符串与字符字面量
+    /// （普通的、原始的 `r#"…"#`、`br`、`cr`，字节的、C 的）不出词。认原始字符串的写法与崩溃放量那一份数花括号
+    /// （`crash_amplification.rs` 的 `lines_read_past_comments_and_literals`）相同：`r`、`br`、`cr` 后面紧跟若干个 `#` 与一个 `"`。
+    /// 扫源码的用例照它找条目、`use` 引进来的名字与花括号的层数：字面量与注释里的 `mod`、`use`、花括号都不算。
+    /// 非 ASCII 的字只落在注释、字面量与标识符里，切出来的词因此总在字符边界上。
+    fn rust_tokens_without_comments_and_literals(code: &str) -> Vec<&str> {
+        rust_tokens_with_their_offsets(code)
+            .into_iter()
+            .map(|(_offset, token)| token)
+            .collect()
+    }
+
+    /// [`rust_tokens_without_comments_and_literals`] 的词，各连同它在 `code` 里起头的字节位置。
+    fn rust_tokens_with_their_offsets(code: &str) -> Vec<(usize, &str)> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut tokens = Vec::new();
+        let mut position = 0;
+        while position < code.len() {
+            let rest = &code[position..];
+            let first_character = rest.chars().next().expect("没到结尾就还有字");
+            if first_character.is_whitespace() {
+                position += first_character.len_utf8();
+            } else if rest.starts_with("//") {
+                position += rest.find('\n').unwrap_or(rest.len());
+            } else if rest.starts_with("/*") {
+                position += length_of_the_block_comment_at_the_start(rest);
+            } else if first_character == '"' {
+                position += length_of_the_quoted_literal_at_the_start(rest);
+            } else if first_character == '\'' {
+                match length_of_the_character_literal_at_the_start(rest) {
+                    Some(literal_length) => position += literal_length,
+                    None => {
+                        let lifetime_length = 1 + rest[1..]
+                            .find(|character: char| !is_identifier_character(character))
+                            .unwrap_or(rest.len() - 1);
+                        tokens.push((position, &rest[..lifetime_length]));
+                        position += lifetime_length;
+                    }
+                }
+            } else if is_identifier_character(first_character) {
+                let word_length = rest
+                    .find(|character: char| !is_identifier_character(character))
+                    .unwrap_or(rest.len());
+                let word = &rest[..word_length];
+                let after_the_word = &rest[word_length..];
+                if matches!(word, "r" | "br" | "cr")
+                    && after_the_word.trim_start_matches('#').starts_with('"')
+                {
+                    position += word_length + length_of_the_raw_string_at_the_start(after_the_word);
+                } else if word == "r" && after_the_word.starts_with('#') {
+                    // 原始标识符 `r#名字`：拼成关键字的连着 `r#` 出词（`r#mod` 是名字，不是关键字），别的名字下一圈照标识符收
+                    let name = &after_the_word[1..];
+                    let name_length = name
+                        .find(|character: char| !is_identifier_character(character))
+                        .unwrap_or(name.len());
+                    if KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL.contains(&&name[..name_length]) {
+                        tokens.push((position, &rest[..word_length + 1 + name_length]));
+                        position += word_length + 1 + name_length;
+                    } else {
+                        position += word_length + 1;
+                    }
+                } else if matches!(word, "b" | "c") && after_the_word.starts_with('"') {
+                    position +=
+                        word_length + length_of_the_quoted_literal_at_the_start(after_the_word);
+                } else if word == "b" && after_the_word.starts_with('\'') {
+                    position += word_length
+                        + length_of_the_character_literal_at_the_start(after_the_word)
+                            .expect("b 后面紧跟引号的是字节字面量");
+                } else {
+                    tokens.push((position, word));
+                    position += word_length;
+                }
+            } else if rest.starts_with("::") {
+                tokens.push((position, "::"));
+                position += 2;
+            } else if rest.starts_with("!=") {
+                // 不等号整个一个词：拆成 `!`、`=` 时，条目层 `const 名: bool = 甲 != 乙;` 的 `甲 !` 会被认成调宏
+                tokens.push((position, "!="));
+                position += 2;
+            } else {
+                tokens.push((position, &rest[..first_character.len_utf8()]));
+                position += first_character.len_utf8();
+            }
+        }
+        tokens
+    }
+
+    /// `source`（这份源文件，或用例在它上面改过的一份）测试模块头两行之前的那一段。头两行只认这一种，与崩溃放量那一份
+    /// （`crash_amplification.rs` 的 `text_outside_the_tests_module`）同一口径、按行逐字：
+    /// - 相邻两整行逐字是 [`TESTS_MODULE_OPENING`] 那两行（`#[cfg(test)]`，与 `mod tests`、一个空格、一个左花括号；行首起、行尾止，不带别的空白与注释，换行是 `\n`），在代码里（注释与字面量之外）；
+    /// - 在花括号的第 0 层，也在圆括号、方括号的第 0 层；
+    /// - 前一个词（空白、注释、字面量都跳过）是分号、右花括号、右方括号或文件开头。
+    ///
+    /// 照原文找第一处时，注释或字符串里写一份头两行就把切口挪到那里，它与真测试模块之间的代码哪一条扫源码的用例都看不见（第 10z 批第二十三块，
+    /// 攻方 K4-2）；拿一个吃掉 `#[cfg(test)]` 的宏把测试模块包进一次宏调用的圆括号里，那个「测试模块」在非测试构建里照编，头两行却仍在
+    /// 花括号第 0 层（第 10z 批第二十五块，正推 K4-1 S14），宏调用的括号里头两行前一个词是 `(`，前面先放一条以分号收尾的条目也还在
+    /// 圆括号里。卡池这一份原先按词认头两行，第二十五块对齐成按行逐字：这两份文件是 rustfmt 出的，头两行就是这一种写法，
+    /// 别的写法（`mod tests` 后面不空格就接左花括号、写在一行、`#[ cfg ( test ) ]`、多空格、缩进、行尾带空白或注释、CRLF 换行）一律判红，是故意拒。
+    ///
+    /// # Panics
+    /// 照上面那样认的头两行不是恰好一处。
+    fn code_before_the_tests_module(source: &str) -> &str {
+        let tokens = rust_tokens_with_their_offsets(source);
+        let mut brace_depth = 0_usize;
+        let mut parenthesis_and_bracket_depth = 0_usize;
+        let mut openings = Vec::new();
+        for (index, (offset, token)) in tokens.iter().enumerate() {
+            let token_before_the_attribute = index
+                .checked_sub(1)
+                .map(|index_before| tokens[index_before].1);
+            if *token == "#"
+                && is_the_tests_module_opening_as_two_whole_lines_at(source, *offset)
+                && brace_depth == 0
+                && parenthesis_and_bracket_depth == 0
+                && token_before_the_attribute
+                    .is_none_or(|token_before| matches!(token_before, ";" | "\u{7d}" | "]"))
+            {
+                openings.push(*offset);
+            }
+            if *token == "\u{7b}" {
+                brace_depth += 1;
+            } else if *token == "\u{7d}" {
+                brace_depth = brace_depth.checked_sub(1).expect("右花括号不多于左花括号");
+            } else if matches!(*token, "(" | "[") {
+                parenthesis_and_bracket_depth += 1;
+            } else if matches!(*token, ")" | "]") {
+                parenthesis_and_bracket_depth = parenthesis_and_bracket_depth
+                    .checked_sub(1)
+                    .expect("右圆括号、右方括号不多于左的");
+            }
+        }
+        assert_eq!(
+            openings.len(),
+            1,
+            "代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的字节位置：{openings:?}"
+        );
+        &source[..openings[0]]
+    }
+
+    /// `source` 从 `offset` 起是不是测试模块头两行那两整行：`offset` 在行首（文件开头或紧跟 `\n`），往后逐字是 [`TESTS_MODULE_OPENING`]，
+    /// 再往后是 `\n` 或文件结尾。
+    fn is_the_tests_module_opening_as_two_whole_lines_at(source: &str, offset: usize) -> bool {
+        let starts_a_line = offset == 0 || source[..offset].ends_with('\n');
+        starts_a_line
+            && source[offset..]
+                .strip_prefix(TESTS_MODULE_OPENING)
+                .is_some_and(|after_the_opening| {
+                    after_the_opening.is_empty() || after_the_opening.starts_with('\n')
+                })
+    }
+
+    /// 这份源码（测试那一段之外）里卡池模块（`mod card_pool`）的词，各带它在模块里第几层花括号里：从模块的左花括号之后
+    /// 到与它配对的右花括号之前，模块的条目在第 0 层（左花括号算它外面那一层，右花括号算它收回到的那一层）。
+    /// 卡池模块按词恰好一处、不挂 `#[cfg]`（[`index_of_the_one_pinned_item_without_a_conditional_attribute`]）：取第一处时，前面放一份挂 `#[cfg(any())]`、
+    /// 只有那四条 `use` 的干净卡池模块，扫的就是它，真生效的那一份里另起 `mod wgpu` 也看不见（第 10z 批第二十五块，与正推 K4-1 G14 同形）。
+    fn card_pool_module_tokens_with_their_brace_depth(code: &str) -> Vec<(usize, &str)> {
+        let tokens = rust_tokens_without_comments_and_literals(code);
+        let module_keyword = index_of_the_one_pinned_item_without_a_conditional_attribute(
+            &tokens,
+            &["mod", "card_pool"],
+        );
+        assert_eq!(
+            tokens.get(module_keyword + 2),
+            Some(&"\u{7b}"),
+            "卡池模块写在这一段里（mod card_pool 后面紧跟左花括号，不是 mod card_pool; 另起文件）"
+        );
+        let opening = module_keyword + 3;
+        let mut depth = 0_usize;
+        let mut module_tokens = Vec::new();
+        for token in &tokens[opening..] {
+            if *token == "\u{7b}" {
+                module_tokens.push((depth, *token));
+                depth += 1;
+            } else if *token == "\u{7d}" {
+                let Some(depth_after_the_closing) = depth.checked_sub(1) else {
+                    return module_tokens;
+                };
+                depth = depth_after_the_closing;
+                module_tokens.push((depth, *token));
+            } else {
+                module_tokens.push((depth, *token));
+            }
+        }
+        panic!("卡池模块有与它的左花括号配对的右花括号")
+    }
+
+    /// `tokens` 里第 `index` 个词（一个条目的头一个词）前面挂着的属性，各取 `#[` 之后的头一个词（`cfg`、`cfg_attr`、`allow`……），
+    /// 照源码倒着；属性与条目之间的 `pub`、`pub(…)` 跳过。
+    fn names_of_the_attributes_right_before<'token>(
+        tokens: &[&'token str],
+        index: usize,
+    ) -> Vec<&'token str> {
+        let mut item_start = index;
+        if item_start > 0 && tokens[item_start - 1] == "pub" {
+            item_start -= 1;
+        } else if item_start > 1 && tokens[item_start - 1] == ")" {
+            let visibility_opening = tokens[..item_start - 1]
+                .iter()
+                .rposition(|token| *token == "(");
+            if let Some(parenthesis) = visibility_opening.filter(|parenthesis| {
+                parenthesis.checked_sub(1).map(|before| tokens[before]) == Some("pub")
+            }) {
+                item_start = parenthesis - 1;
+            }
+        }
+        let mut names = Vec::new();
+        while item_start > 0 && tokens[item_start - 1] == "]" {
+            let mut unclosed_brackets = 0_usize;
+            let mut attribute_opening = None;
+            for token_index in (0..item_start).rev() {
+                if tokens[token_index] == "]" {
+                    unclosed_brackets += 1;
+                } else if tokens[token_index] == "[" {
+                    unclosed_brackets -= 1;
+                    if unclosed_brackets == 0 {
+                        attribute_opening = Some(token_index);
+                        break;
+                    }
+                }
+            }
+            let Some(bracket) = attribute_opening
+                .filter(|bracket| bracket.checked_sub(1).map(|before| tokens[before]) == Some("#"))
+            else {
+                break;
+            };
+            names.extend(tokens.get(bracket + 1).copied());
+            item_start = bracket - 1;
+        }
+        names
+    }
+
+    /// `tokens`（一段代码的词）里钉住的那一个条目，交 `signature`（按词：`["fn", 名字]`、`["mod", 名字]`、`["Drop", "for", 类型]`）
+    /// 在 `tokens` 里那一处的下标。按词恰好一处，那个条目（往前到最近的 `impl`、`fn`、`mod`，再往前跳过 `const`、`async`、`unsafe`、
+    /// `extern`、`safe`）前面不挂 `#[cfg]`、`#[cfg_attr]`：取第一处时，前面先放一份挂 `#[cfg(any())]` 的干净副本、后面写真生效的坏版本，
+    /// 读到的是编译时去掉的那一份（第 10z 批第二十五块，正推 K4-1 G14、G16）；只有一份而挂着 `#[cfg]` 的，编译时整个去掉。
+    /// 与第二十三块 `use` 上挂 `#[cfg]` 判红是同一个判法（[`names_of_the_attributes_right_before`]）。
+    ///
+    /// # Panics
+    /// 按词不是恰好一处，或那一处的条目挂着 `#[cfg]`、`#[cfg_attr]`。
+    fn index_of_the_one_pinned_item_without_a_conditional_attribute(
+        tokens: &[&str],
+        signature: &[&str],
+    ) -> usize {
+        let places: Vec<usize> = tokens
+            .windows(signature.len())
+            .enumerate()
+            .filter(|(_index, window)| *window == signature)
+            .map(|(index, _window)| index)
+            .collect();
+        assert_eq!(
+            places.len(),
+            1,
+            "钉住的 {signature:?} 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处就读到副本），读到的词下标：{places:?}"
+        );
+        let item_keyword = tokens[..=places[0]]
+            .iter()
+            .rposition(|token| matches!(*token, "impl" | "fn" | "mod"))
+            .expect("钉住的条目由 impl、fn 或 mod 起头");
+        let qualifiers = tokens[..item_keyword]
+            .iter()
+            .rev()
+            .take_while(|token| matches!(**token, "const" | "async" | "unsafe" | "extern" | "safe"))
+            .count();
+        let attributes = names_of_the_attributes_right_before(tokens, item_keyword - qualifiers);
+        assert!(
+            !attributes
+                .iter()
+                .any(|attribute| matches!(*attribute, "cfg" | "cfg_attr")),
+            "钉住的 {signature:?} 前面挂着 {attributes:?}：#[cfg] 让它编译时去掉"
+        );
+        places[0]
+    }
+
+
+fn main() {
+    std::panic::set_hook(Box::new(|_| {}));
+    for line in std::fs::read_to_string(std::env::args().nth(1).unwrap()).unwrap().lines() {
+        let mut p = line.splitn(2, '\t');
+        let name = p.next().unwrap(); let text = p.next().unwrap().replace("\\n", "\n");
+        let r = std::panic::catch_unwind(|| code_before_the_tests_module(&text).len());
+        match r { Ok(n) => println!("{name}: OK cut_len={n}"), Err(e) => println!("{name}: PANIC {}", e.downcast_ref::<String>().cloned().or_else(|| e.downcast_ref::<&str>().map(|s| s.to_string())).unwrap_or_default().chars().take(70).collect::<String>()) }
+    }
+}

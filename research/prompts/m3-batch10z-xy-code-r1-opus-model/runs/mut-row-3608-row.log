@@ -1,0 +1,32 @@
+warning: unused variable: `write_time_seconds`
+   --> crates/singlefs-core/src/mounted_session.rs:535:17
+    |
+535 |                 write_time_seconds,
+    |                 ^^^^^^^^^^^^^^^^^^ help: try ignoring the field: `write_time_seconds: _`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-core` (lib) generated 1 warning (run `cargo fix --lib -p singlefs-core` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.02s
+     Running tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-a6a6b07acd5b9197)
+
+running 1 test
+test an_inode_creation_stuck_behind_the_wide_protection_keeps_its_count_and_write_time ... FAILED
+
+failures:
+
+---- an_inode_creation_stuck_behind_the_wide_protection_keeps_its_count_and_write_time stdout ----
+
+thread 'an_inode_creation_stuck_behind_the_wide_protection_keeps_its_count_and_write_time' (1709921) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:6708:5:
+assertion `left == right` failed: 报里记着的是走空再建这几个 inode：个数、写入时间逐字相同
+  left: "remainder_of_the_change: WalkTheQueueThenPublishTheChange(NewInodes { count: 3, write_time_seconds: 0 }) }"
+ right: "remainder_of_the_change: WalkTheQueueThenPublishTheChange(NewInodes { count: 3, write_time_seconds: 9000017 }) }"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    an_inode_creation_stuck_behind_the_wide_protection_keeps_its_count_and_write_time
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 66 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `-p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table`

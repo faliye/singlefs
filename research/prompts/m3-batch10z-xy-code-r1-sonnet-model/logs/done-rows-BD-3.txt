@@ -1,0 +1,7 @@
+I-new-rehearsal-with-the-shadow-ledger-off@harness	绿		172s
+recordedOnlyTxgNotInstance@harness	绿		161s
+sizeInBytesZero@harness	绿		156s
+第10z批第二十四块 要出路不核盘表次序（多交一块盘：预演里读过盘才拒）#1	红(点名的)	ways_out_with_one_device_more_than_the_mount_is_refused_without_reading_a_device	6s
+第10z批第二十四块 正推 newInodesCountPlus 报里记的建 inode 个数记大#1	红(点名的)	n_inode_creation_stuck_behind_the_wide_protection_keeps_its_count_and_write_time	3s
+第10z批第二十四块 正推 unlinkWriteTimeZero 报里记的 unlink 写入时间记成 0#1	红(点名的)	nk_stuck_behind_the_wide_protection_at_the_intent_keeps_its_inode_and_write_time	2s
+第10z批第二十四块 正推 seqWriteTimeZero 报里记的顺序写写入时间记成 0#1	红(点名的)	al_write_stuck_behind_the_wide_protection_keeps_its_whole_content_and_write_time	4s

@@ -1,0 +1,13 @@
+
+running 1 test
+test probe_sweep ... PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=0 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=nnsssnssnnssssno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=0 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=onsnononssonnonoonos secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=1 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=nnsssnssnnssssno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=1 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=onsnononssonnonoonos secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=2 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=nnsssnssnnssssno secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK label=m4 arm=diff slots=384 k=3 q=Some('o') r=b back=2 faults=cfgq,qroot,qacct,racct,rlin persist=false actions=onsnononssonnonoonos secs=0.00 mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1532)})
+PROBEJK_DONE label=m4 arm=diff histories=6
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

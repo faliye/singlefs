@@ -1,0 +1,6 @@
+hal OutOfMemory = "Out of memory"
+hal Lost        = "Device is lost"
+hal Unexpected  = "Unexpected error variant (driver implementation is at fault)"
+wgc DeviceError::OutOfMemory = "Not enough memory left."
+wgc DeviceError::Lost        = "Parent device is lost"
+wgpu::Error::OutOfMemory     = "Out of Memory"

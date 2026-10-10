@@ -1,0 +1,3 @@
+offs=3,9  独立读（P 动作，探针读根环表）: rOcc=Some((19, Some(4))),needs=Some(9)   报告里的: S(r=Some(4),n=6
+offs=5,30,41  独立读（P 动作，探针读根环表）: rOcc=Some((19, Some(12))),needs=Some(17)   报告里的: S(r=Some(12),n=14
+offs=20,46  独立读（P 动作，探针读根环表）: rOcc=Some((19, Some(17))),needs=Some(22)   报告里的: S(r=Some(17),n=19

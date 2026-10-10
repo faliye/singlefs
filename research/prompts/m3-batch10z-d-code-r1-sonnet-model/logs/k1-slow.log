@@ -1,0 +1,10 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/repo/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/repo/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.10s
+     Running tests/reuse_after_raising_the_floor.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/target/debug/deps/reuse_after_raising_the_floor-3ba9612a2f7c672d)
+
+running 1 test
+test raising_the_floor_counts_abandoned_roots_whose_ledger_is_unreadable ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 15 filtered out; finished in 6.36s
+

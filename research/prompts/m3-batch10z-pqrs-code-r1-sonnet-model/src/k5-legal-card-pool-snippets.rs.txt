@@ -1,0 +1,16 @@
+#![allow(dead_code, unused_imports, unused_variables)]
+mod card_pool {
+    use std::sync::Arc as SharedArc;
+    use std::collections::{BTreeMap, btree_map::{Entry}};
+    thread_local! { static COUNT: std::cell::Cell<u8> = std::cell::Cell::new(0); }
+    const A: u8 = 1;
+    const B: u8 = 2;
+    const TWO_DIFFER: bool = A != B;
+    const TWO_DIFFER_LIT: bool = 1 != 2;
+    #[cfg(test)]
+    mod unit { }
+    extern "C" { fn abs(x: i32) -> i32; }
+    use std::sync::{self, Arc};
+    use std::cmp::Ordering::*;
+}
+fn main() { println!("ok"); }

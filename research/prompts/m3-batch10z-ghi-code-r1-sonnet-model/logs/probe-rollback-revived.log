@@ -1,0 +1,40 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-ghi-code-r1-sonnet/copy-a/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-ghi-code-r1-sonnet/copy-a/crates/singlefs-harness)
+warning: value assigned to `raised_while_r_in_ring` is never read
+    --> crates/singlefs-harness/tests/probe_rollback_revived.rs:1527:38
+     |
+1527 |     let mut raised_while_r_in_ring = None;
+     |                                      ^^^^ this value is reassigned later and never used
+...
+1534 |             raised_while_r_in_ring = Some(r_in_ring);
+     |             ---------------------------------------- `raised_while_r_in_ring` is overwritten here before the previous value is read
+     |
+     = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `singlefs-harness` (test "probe_rollback_revived") generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 9.06s
+     Running tests/probe_rollback_revived.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-ghi-code-r1-sonnet/target-a/debug/deps/probe_rollback_revived-893574f1a2d58abe)
+
+running 1 test
+PROBE rolled back: resurrected=8 released=4
+PROBE mounted on (InstanceGeneration(1), CheckpointTxg(7)), previous_key (InstanceGeneration(1), CheckpointTxg(7)), r key (InstanceGeneration(1), CheckpointTxg(8))
+PROBE borrowed for R = Some(44) entries; revived n = 2
+PROBE revived not in C[R]: 2 of 2
+PROBE after raise (after 15 overwrites; R in ring before the step: Some(true)): free revived slots = 4
+PROBE after seq write 1: R in ring=true violations=["I-7.4: 被抛弃的根（实例 1、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1412 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"]
+PROBE after seq write 2: R in ring=true violations=["I-7.4: 被抛弃的根（实例 1、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1412 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"]
+PROBE after seq write 3: R in ring=true violations=["I-7.4: 被抛弃的根（实例 1、txg 8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元 在盘 0 槽 1412 的那一份与位置条目里的校验和对不上；数据单元两份都读不到对得上的；映射条目指的单元两份都读不到对得上的"]
+
+thread 'probe_units_revived_by_an_unwitnessed_rollback_publish_stay_through_writes_raising_the_floor' (3889727) panicked at crates/singlefs-harness/tests/probe_rollback_revived.rs:1549:5:
+复活的数据单元在抬 F 之后一槽都不空闲：空闲 [(DeviceIdentity(0), SlotNumber(1412)), (DeviceIdentity(0), SlotNumber(1413)), (DeviceIdentity(1), SlotNumber(1412)), (DeviceIdentity(1), SlotNumber(1413))]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test probe_units_revived_by_an_unwitnessed_rollback_publish_stay_through_writes_raising_the_floor ... FAILED
+
+failures:
+
+failures:
+    probe_units_revived_by_an_unwitnessed_rollback_publish_stay_through_writes_raising_the_floor
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 11 filtered out; finished in 3.35s
+
+error: test failed, to rerun pass `-p singlefs-harness --test probe_rollback_revived`

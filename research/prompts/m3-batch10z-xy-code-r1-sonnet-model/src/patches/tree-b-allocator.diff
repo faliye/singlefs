@@ -1,0 +1,12 @@
+--- /home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1/tree/crates/singlefs-core/src/allocator.rs	2026-10-09 02:03:44.305212806 +0000
++++ tree-b/crates/singlefs-core/src/allocator.rs	2026-10-09 15:11:42.176972131 +0000
+@@ -1303,6 +1303,9 @@
+ 
+     /// 环里还在的被抛弃根引用着的全部落点，加还没解开的、水位之上没施加的记录点名的全部落点：清隔离位之前要看的那一份
+     /// （一个槽两边任一边还罩着就不清），回收出来的槽里它们罩着的补隔离。
++    pub fn debug_placements_the_isolation_still_protects(&self) -> Vec<PlacementOnDevice> {
++        self.placements_the_isolation_still_protects()
++    }
+     fn placements_the_isolation_still_protects(&self) -> Vec<PlacementOnDevice> {
+         let mut protected = self.placements_referenced_by_abandoned_roots();
+         protected.extend(self.placements_named_by_unapplied_journal_records());

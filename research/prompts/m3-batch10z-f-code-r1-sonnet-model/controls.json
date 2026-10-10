@@ -1,0 +1,59 @@
+[
+ {
+  "kind": "append",
+  "name": "第10z批第六块 显存账 G2 乙 等设备没等成照样销账（等失败那一支多给）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "                self.when_dropped = LeaseWhenTheBookingIsDropped::KeptOnTheBooksAfterAFailedWait;",
+  "repl": "                self.when_dropped = LeaseWhenTheBookingIsDropped::ReturnedToTheDriverAndOffTheBooks;",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": "a_lease_whose_wait_failed_stays_booked_until_the_device_is_taken_as_lost_and_gives_no_more",
+  "nfields": 6
+ },
+ {
+  "kind": "append",
+  "name": "第10z批第六块 显存账 G2 乙 重起好了就当旧设备已经不在（设备丢了那一刻活着的借据还在）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "            .leases_alive_when_the_device_was_lost\n            .is_empty()\n        {",
+  "repl": "            .leases_alive_when_the_device_was_lost\n            .is_empty()\n            || true\n        {",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": "a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement",
+  "nfields": 6
+ },
+ {
+  "kind": "append",
+  "name": "第10z批第六块 显存账 G2 乙 丢了的设备还可能占着卡时照读数分（旧设备那一份当成新设备的驱动那一份）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "        | DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => return 0,",
+  "repl": "        | DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => booked\n            .leases_mebibytes\n            .saturating_add(mebibytes_left_for_the_driver),",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": "a_lost_device_left_on_the_card_is_not_taken_for_the_driver_share_of_its_replacement",
+  "nfields": 6
+ },
+ {
+  "kind": "probe",
+  "name": "P1 DeviceLostNotStartedAgain 也照读数记占着（旧口径：驱动那份照在卡上）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "        DriverShareOnTheCard::DeviceLostNotStartedAgain\n        | DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => return 0,",
+  "repl": "        DriverShareOnTheCard::DeviceLostNotStartedAgain => booked.leases_mebibytes.saturating_add(mebibytes_left_for_the_driver),\n        DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => return 0,",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": ""
+ },
+ {
+  "kind": "probe",
+  "name": "P3 重起时没等成的那几笔销账不同时从活着的集合里去掉",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "            self.leases_alive_when_the_device_was_lost\n                .remove(&kept_lease);\n",
+  "repl": "",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": ""
+ },
+ {
+  "kind": "probe",
+  "name": "P5 第二次丢设备时（Remain 状态）不重新记账",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "anchor": "            DriverShareOnTheCard::DeviceStarted\n            | DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => {\n                books[card_position].take_back_the_driver_share_of_a_lost_device();\n                self.driver_share_of_a_new_device_fits_now(&books, card_position)\n            }\n            DriverShareOnTheCard::DeviceLostNotStartedAgain => {\n                self.driver_share_of_a_new_device_fits_now(&books, card_position)\n            }",
+  "repl": "            DriverShareOnTheCard::DeviceStarted => {\n                books[card_position].take_back_the_driver_share_of_a_lost_device();\n                self.driver_share_of_a_new_device_fits_now(&books, card_position)\n            }\n            DriverShareOnTheCard::DeviceLostNotStartedAgain\n            | DriverShareOnTheCard::DeviceStartedAgainWhileLeasesOfTheLostDeviceRemain => {\n                self.driver_share_of_a_new_device_fits_now(&books, card_position)\n            }",
+  "cmd": "-p singlefs-harness --test sonnet_g2_model k3_1 -- --nocapture",
+  "test": ""
+ }
+]

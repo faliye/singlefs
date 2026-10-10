@@ -1,0 +1,18 @@
+baseline gpu  : GREEN
+baseline crash: GREEN
+table | 第10z批第十三块 GPU 取卡 K4-2 借之前那一步丢没丢恒为没丢（丢了的照 poll、不告诉账） | gpu | RED: 要有一处 |started:&GpuCard|started.device_condition().is_lost(),（丢没丢照设备的情况），数到 0
+table | 第10z批第十三块 GPU 取卡 K5 借之前那一步 poll 的结局恒为队列空了 | gpu | RED: 要有一处 |started:&GpuCard|{device_found_idle_by_a_poll(&std::panic::catch_unwind(std::panic::AssertUnwindSaf
+table | 第10z批第十三块 GPU 取卡 K4-2 借之前那一步取的总是第一张卡留着的设备 | gpu | RED: 要有一处 |card_position|self.cards[card_position].started.started_now(),（列出来那一格留着的设备，不等正在起的），数到 0
+table | 第10z批第十三块 崩溃放量 K5 check_blocks_where_until 往下交的叫停换成永不叫停 | crash | RED: check_blocks_where_until 收了叫停却没用上
+table | 第10z批第十三块 崩溃放量 K5 check_pending_blocks_in_pieces 领块之前不问叫停 | crash | RED: check_pending_blocks_in_pieces 收了叫停却没用上
+table | 第10z批第十三块 崩溃放量 K5 judge_my_blocks_on_gpu_cards 往下交的叫停换成永不叫停 | crash | RED: judge_my_blocks_on_gpu_cards 收了叫停却没用上
+table | 第10z批第十三块 崩溃放量 K5 第 ① 段在卡上判记住的叫停换成永不叫停 | crash | RED: judge_my_blocks_on_gpu_cards_booking_the_scratch_by_where_the_cards_came_from 收了叫停却没用上
+table | 第10z批第十三块 崩溃放量 K5 check_selected_blocks 往下交的叫停换成永不叫停 | crash | RED: check_selected_blocks 收了叫停却没用上
+table | 第10z批第十三块 崩溃放量 K5 judge_my_blocks_on_gpu 往下交的叫停换成永不叫停 | crash | RED: judge_my_blocks_on_gpu 收了叫停却没用上
+extra | A1 整句包进 if false（账不再被告知） | gpu | GREEN
+extra | A2 函数体最前面 return（整句不执行） | gpu | GREEN
+extra | A3 丢没丢与 poll 两个闭包对调位置（类型相同，编得过） | gpu | GREEN
+extra A4 丢没丢的闭包后面追加 && false（不改闭包前缀的写法） OLD-NOT-ONCE 2
+extra | A5 poll 的闭包体里 PollType::Poll 换成 PollType::Wait（会等） | gpu | RED: 要有一处 |started:&GpuCard|{device_found_idle_by_a_poll(&std::panic::catch_unwind(std::panic::AssertUnwindSaf
+extra A6 叫停：层首 shadow 成永不叫停 OLD-NOT-ONCE 0
+extra | A7 叫停：往下交的换成永不叫停、另加一句 let _ = stop_is_requested | crash | GREEN

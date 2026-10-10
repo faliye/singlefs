@@ -1,0 +1,11 @@
+
+running 1 test
+test s2_sweep ... DIAG label=m6 prefix=121 r=n faults=racct,rlin actions=oPo step=1P P[cur,rOcc=Some((53, Some(49))),needs=Some(20),hold=1,isoC=22,isoAll=22->0]pushed20[n=20,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+20]
+S2 label=m6 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooo mid= r=n r_txg=49 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=oPo secs=28.27 selected=48 c_r=52 revived=0 revived_in_c_r=0 iso_mount=22 ab_mount=0 iso_after_first_raise=- iso_max=22 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=40 crash_bad=0 refused_steps=0 first_refused=- r_left_at=1 hit=false first_red=-
+DIAG label=m6 prefix=121 r=n faults=racct,rlin actions=oPo step=1P P[cur,rOcc=Some((98, Some(95))),needs=Some(21),hold=1,isoC=22,isoAll=22->0]pushed21[n=21,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+21]
+S2 label=m6 arm=implemented slots=384 prefix=oooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo mid= r=n r_txg=95 r_old_txg=- r_old_in_ring=false faults=racct,rlin persist=false actions=oPo secs=41.68 selected=94 c_r=52 revived=0 revived_in_c_r=0 iso_mount=22 ab_mount=0 iso_after_first_raise=- iso_max=22 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=42 crash_bad=0 refused_steps=0 first_refused=- r_left_at=1 hit=false first_red=-
+S2_DONE label=m6 arm=implemented histories=2 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 70.19s
+

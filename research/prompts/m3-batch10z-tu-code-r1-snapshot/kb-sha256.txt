@@ -1,0 +1,6 @@
+4f34498910f53d3a32d8a8a6190d8784675af52d19af689258411430136f4119  .claude/kb/decisions/16-发布语义.md
+fef151f6744e99dc943c7eb6ba35d59020456f033f46779f01eeeb421e5be8f2  .claude/kb/decisions/28-挂载期承诺量.md
+3c7dfb20ecb5ddd3701e74e6c70df19ac95c8f9f35f3595373fe43b6a3b174e3  .claude/kb/decisions/23-journal的角色与格式.md
+786784574cb000168ffaf06c9eb88a320b3af0b2afbaff89ff2258e71c94a686  .claude/kb/invariants.md
+b0dbfd0cd855472633b24ccf50658bd2842e3c698e91e9806cf2b204ae2cc9c5  .claude/kb/checks-owed.md
+bdbe7c46ef4504ea604eda496570b2f9b0112e59bf7f0a88e431b771c74b32b6  .claude/kb/experiments/171-三oracle合谋测试.md

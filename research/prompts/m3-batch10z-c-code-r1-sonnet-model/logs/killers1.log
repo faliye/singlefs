@@ -1,0 +1,13 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.50s
+     Running tests/killers.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/target/debug/deps/killers-0cbd9041ec0bece5)
+
+running 5 tests
+test k_a_lease_booked_after_a_refused_restart_keeps_the_restart_judged ... ok
+test k_a_refused_restart_asked_again_does_not_take_another_driver_share_off_the_room ... ok
+test k_pressing_lets_a_later_lease_count_once_the_card_took_the_returned_one_back ... ok
+test k_the_card_loop_stops_on_request_on_refusal_and_when_the_store_is_gone ... ok
+test k_the_restart_is_refused_when_one_mebibyte_short_and_allowed_when_exactly_enough ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

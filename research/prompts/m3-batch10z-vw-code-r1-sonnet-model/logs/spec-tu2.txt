@@ -1,0 +1,4 @@
+tu k1small-3 atk_k1_rehearsal_vs_real_sweep ATK_PRES=4 ATK_FILLS=6,11,16 ATK_EXTRA=8 ATK_SMALL=inode,overwrite ATK_KS=1,2,3,4,6
+tu k1small-4 atk_k1_rehearsal_vs_real_sweep ATK_PRES=8 ATK_FILLS=6,11,16 ATK_EXTRA=8 ATK_SMALL=inode,overwrite ATK_KS=1,2,3,4,6
+tu k1two-a atk_k1_two_c_slots_rehearsal_vs_real ATK_PRE_WRITES=0,1,3
+tu k1two-b atk_k1_two_c_slots_rehearsal_vs_real ATK_PRE_WRITES=6,10

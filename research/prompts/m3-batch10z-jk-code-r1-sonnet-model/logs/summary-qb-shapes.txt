@@ -1,0 +1,10 @@
+qb-cfgq+qacct+racct          arm=implemented  n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+qb-cfgq+qacct+racct          arm=none         n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+qb-cfgq+qroot+qacct+qlast+racct arm=implemented  n=4 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=76.0/76 iso_max=76.0/76 iso_end=30.0/30 c_r=44.0/44 rev_in_c_r=0.0/0 revived=2.0/2
+qb-cfgq+qroot+qacct+qlast+racct arm=none         n=4 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=76.0/76 iso_max=76.0/76 iso_end=30.0/30 c_r=44.0/44 rev_in_c_r=0.0/0 revived=2.0/2
+qb-cfgq+qroot+qacct+racct    arm=implemented  n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+qb-cfgq+qroot+qacct+racct    arm=none         n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+qb-cfgq+qroot+qlast+racct    arm=implemented  n=4 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=76.0/76 iso_max=76.0/76 iso_end=30.0/30 c_r=44.0/44 rev_in_c_r=0.0/0 revived=2.0/2
+qb-cfgq+qroot+qlast+racct    arm=none         n=4 mount_err=0 hit=0 preroot=0 refused=0 iso_mount=18.0/18 iso_first_raise=76.0/76 iso_max=76.0/76 iso_end=30.0/30 c_r=44.0/44 rev_in_c_r=0.0/0 revived=2.0/2
+qb-cfgq+qroot+racct          arm=implemented  n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+qb-cfgq+qroot+racct          arm=none         n=4 mount_err=4 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-

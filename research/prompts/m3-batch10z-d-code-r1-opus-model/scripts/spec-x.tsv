@@ -1,0 +1,12 @@
+x1-k1-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=1 OPUS_I3=0 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+x1-k1-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=1 OPUS_I3=2 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+x1-k3-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=3 OPUS_I3=0 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+x1-k3-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=3 OPUS_I3=2 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+x1-k5-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=5 OPUS_I3=0 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+x1-k5-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=5 OPUS_I3=2 OPUS_FAULTS=slot-after,slot-after-err OPUS_MAXLEN=3
+z1-k1-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=1 OPUS_I3=0 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2
+z1-k1-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=1 OPUS_I3=2 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2
+z1-k3-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=3 OPUS_I3=0 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2
+z1-k3-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=3 OPUS_I3=2 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2
+z1-k5-i0	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=5 OPUS_I3=0 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2
+z1-k5-i2	OPUS_BIN=opus10zd_abandoned_slot-445dd4894c7ea5ed OPUS_KS=5 OPUS_I3=2 OPUS_FAULTS=none,slot-zero-at-mount,slot-err-at-mount OPUS_MAXLEN=2

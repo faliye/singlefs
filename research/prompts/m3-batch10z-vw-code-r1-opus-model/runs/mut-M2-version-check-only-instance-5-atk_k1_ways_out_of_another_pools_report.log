@@ -1,0 +1,16 @@
+
+running 1 test
+ATK k1other pre=4 fill=16 g=13 own=adm other=same-prefix-without-r reached=true same_pair=true pair=2.16 ask=pushref[NothingHeldUntilThisProcessWritesARingSlot] ask_io=(2,16,0) ask_untouched=true ways=1 same_text_as_own=false real_push_on_other=push_refused[NothingHeldUntilThisProcessWritesARingSlot]
+ATK k1other   way_one_on_other=出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 2.3）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。
+ATK k1other pre=4 fill=16 g=13 own=adm other=another-k1-cell reached=false same_pair=false pair=2.18 ask=adm ask_io=(2,582,0) ask_untouched=true ways=2 same_text_as_own=true real_push_on_other=pushed(15)
+ATK k1other   way_one_on_other=出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 2.3）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。
+ATK k1other pre=4 fill=16 g=20 own=still[NoSpaceAfterRaisingTheFloor] other=same-prefix-without-r reached=true same_pair=true pair=2.16 ask=pushref[NothingHeldUntilThisProcessWritesARingSlot] ask_io=(2,16,0) ask_untouched=true ways=1 same_text_as_own=true real_push_on_other=push_refused[NothingHeldUntilThisProcessWritesARingSlot]
+ATK k1other   way_one_on_other=出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 2.3）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。
+ATK k1other pre=4 fill=16 g=20 own=still[NoSpaceAfterRaisingTheFloor] other=another-k1-cell reached=false same_pair=false pair=2.18 ask=adm ask_io=(2,582,0) ask_untouched=true ways=2 same_text_as_own=false real_push_on_other=pushed(15)
+ATK k1other   way_one_on_other=出路一：正常卸载（mount::unmount）之后再可写挂载一次。R 那一槽（根环槽 2.3）没有读得出的有效根：再挂时择的是卸载推出来的最后一版，R 那几条记录不在它的水位之上，C 那一圈照它重算、不再有这一槽，宽护不再出现。
+ATK k1other pre=2 fill=16 g=13 first=admitted
+ATK k1other pre=8 fill=11 g=20 first=admitted
+test atk_k1_ways_out_of_another_pools_report ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 65 filtered out; finished in 0.60s
+

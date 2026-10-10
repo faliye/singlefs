@@ -1,0 +1,11 @@
+
+running 1 test
+test s2_sweep ... DIAG label=pu1 prefix=20 r=b6 faults=racct,rlin actions=oPoo step=0o NS[Ceil(22,22);S(r=Some(26),n=19,iso=346,rEq);hold=1;isoC=346;needs=Some(19)]
+PUDIAG label=pu1 actions=oPoo step=0o pu=2 outcome=NS[Ceil(22,22);S(r=Some(26),n=19,iso=346,rEq);hold=1;isoC=346;needs=Some(19)] detail=dev0:slot1515:inC=true:recs=["(slot=1514,span=2,gen=8,rel=true)"]:placement=(1514,2) ; dev1:slot1515:inC=true:recs=["(slot=1514,span=2,gen=8,rel=true)"]:placement=(1514,2)
+DIAG label=pu1 prefix=20 r=b6 faults=racct,rlin actions=oPoo step=1P P[cur,rOcc=Some((31, Some(26))),needs=Some(19),hold=1,isoC=346,isoAll=346->0]pushed19[n=19,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+19]
+S2 label=pu1 arm=implemented slots=320 prefix=oooooooooooooooooooo mid= r=b6 r_txg=26 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=oPoo secs=0.05 selected=25 c_r=408 revived=2 revived_in_c_r=2 iso_mount=346 ab_mount=0 iso_after_first_raise=- iso_max=346 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=2 c_unblocked_max=2 c_unblocked_first=0o:2 c_handed_out_max=0 c_handed_out_first=- pu_max=2 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0o:NS[Ceil(22,22);S(r=Some(26),n=19,iso=346,rEq);hold=1;isoC=346;needs=Some(19)] r_left_at=- hit=false first_red=-
+S2_DONE label=pu1 arm=implemented histories=1 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.11s
+

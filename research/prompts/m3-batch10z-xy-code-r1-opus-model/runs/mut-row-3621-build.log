@@ -1,0 +1,43 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/repo-mut/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/repo-mut/crates/singlefs-harness)
+warning: unused variable: `stuck`
+    --> crates/singlefs-harness/tests/atk_xy_opus.rs:7931:14
+     |
+7931 |     let Some(stuck) = atk_stuck_of(&outcome) else {
+     |              ^^^^^ help: if this is intentional, prefix it with an underscore: `_stuck`
+     |
+     = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `atk_overwrite_of` is never used
+    --> crates/singlefs-harness/tests/atk_xy_opus.rs:6836:4
+     |
+6836 | fn atk_overwrite_of<Device: DeviceOverASparseImage>(pool: &mut PoolUnderTest<Device>, bytes: usize) -> AtkChange {
+     |    ^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `atk_after_action` is never used
+    --> crates/singlefs-harness/tests/atk_xy_opus.rs:7264:4
+     |
+7264 | fn atk_after_action(after_report: &AtkSnap, stuck: &StuckBehindTheWideProtection, change: &AtkChange, action: &str) -> (String, Op...
+     |    ^^^^^^^^^^^^^^^^
+
+warning: function `atk_leave_unblocked` is never used
+    --> crates/singlefs-harness/tests/atk_xy_opus.rs:7675:4
+     |
+7675 | fn atk_leave_unblocked(pool: &mut PoolUnderTest<SparseBlockDevice>, leave: u64) {
+     |    ^^^^^^^^^^^^^^^^^^^
+
+warning: function `atk_keep_only_isolated_by_c` is never used
+    --> crates/singlefs-harness/tests/atk_xy_opus.rs:7691:4
+     |
+7691 | fn atk_keep_only_isolated_by_c(pool: &mut PoolUnderTest<SparseBlockDevice>, keep: u64) -> Vec<u64> {
+     |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: `singlefs-harness` (test "atk_xy_opus") generated 5 warnings (run `cargo fix --test "atk_xy_opus" -p singlefs-harness` to apply 1 suggestion)
+    Finished `release` profile [optimized + debuginfo] target(s) in 30.49s
+  Executable tests/atk_xy_opus.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/atk_xy_opus-48c67fa6cbf8c16c)
+  Executable tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-a6a6b07acd5b9197)
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/repo-mut/crates/singlefs-core)
+    Finished `release` profile [optimized + debuginfo] target(s) in 15.06s
+  Executable unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-xy-code-r1-opus/target-mut/release/deps/singlefs_core-473295d7695e4d7d)

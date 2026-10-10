@@ -1,0 +1,96 @@
+57 cring form1 A unmount unmount:ok over=0 checker=-
+57 cring form1 A w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+57 cring form1 A w12+unmount w12:ok unmount:ok over=0 checker=-
+57 cring form1 A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+57 cring form1 A w3+unmount w3:ok unmount:ok over=0 checker=-
+69 cring form1 B unmount unmount:ok over=0 checker=-
+69 cring form1 B w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+69 cring form1 B w12+unmount w12:ok unmount:ok over=0 checker=-
+69 cring form1 B w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+69 cring form1 B w3+unmount w3:ok unmount:ok over=0 checker=-
+57 cring form1 none unmount unmount:ok over=0 checker=-
+57 cring form1 none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+57 cring form1 none w12+unmount w12:ok unmount:ok over=0 checker=-
+57 cring form1 none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+57 cring form1 none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) A unmount unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) A w12+rollback+w6+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 cring not-form1((1,12)) A w12+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 cring not-form1((1,12)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) none unmount unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,12)) none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) A unmount unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) A w12+rollback+w6+unmount w12:ok rollback:ok w6:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 cring not-form1((1,7)) A w12+unmount w12:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) none unmount unmount:ok over=0 checker=-
+1 cring not-form1((1,7)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=18 checker=-
+3 cring not-form1((1,7)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=20 checker=-
+4 cring not-form1((1,7)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,7)) none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) A unmount unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) A w12+rollback+w6+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 cring not-form1((1,9)) A w12+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 cring not-form1((1,9)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) none unmount unmount:ok over=0 checker=-
+1 cring not-form1((1,9)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=18 checker=-
+3 cring not-form1((1,9)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=20 checker=-
+4 cring not-form1((1,9)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 cring not-form1((1,9)) none w3+unmount w3:ok unmount:ok over=0 checker=-
+57 today form1 A unmount unmount:Err/NewerStateStillUnreadableAfter over=0 checker=-
+38 today form1 A w12+rollback+w6+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+19 today form1 A w12+rollback+w6+unmount w12:ok rollback:ok w6:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+38 today form1 A w12+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+19 today form1 A w12+unmount w12:ok unmount:Err/NewerStateStillUnreadableAfter over=0 checker=-
+57 today form1 A w3+rollback+unmount w3:ok rollback:ok unmount:Err/NewerStateStillUnreadableAfter over=0 checker=-
+57 today form1 A w3+unmount w3:ok unmount:Err/NewerStateStillUnreadableAfter over=0 checker=-
+69 today form1 B unmount unmount:ok over=0 checker=-
+69 today form1 B w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+69 today form1 B w12+unmount w12:ok unmount:ok over=0 checker=-
+69 today form1 B w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+69 today form1 B w3+unmount w3:ok unmount:ok over=0 checker=-
+57 today form1 none unmount unmount:ok over=0 checker=-
+57 today form1 none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+57 today form1 none w12+unmount w12:ok unmount:ok over=0 checker=-
+57 today form1 none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+57 today form1 none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) A unmount unmount:ok over=0 checker=-
+4 today not-form1((1,12)) A w12+rollback+w6+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 today not-form1((1,12)) A w12+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 today not-form1((1,12)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) none unmount unmount:ok over=0 checker=-
+4 today not-form1((1,12)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,12)) none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) A unmount unmount:ok over=0 checker=-
+4 today not-form1((1,7)) A w12+rollback+w6+unmount w12:ok rollback:ok w6:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 today not-form1((1,7)) A w12+unmount w12:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) none unmount unmount:ok over=0 checker=-
+1 today not-form1((1,7)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=18 checker=-
+3 today not-form1((1,7)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=20 checker=-
+4 today not-form1((1,7)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,7)) none w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,9)) A unmount unmount:ok over=0 checker=-
+4 today not-form1((1,9)) A w12+rollback+w6+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 today not-form1((1,9)) A w12+unmount w12:Err@n/FloorRaiseFailedWhilePushingFo over=0 checker=-
+4 today not-form1((1,9)) A w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,9)) A w3+unmount w3:ok unmount:ok over=0 checker=-
+4 today not-form1((1,9)) none unmount unmount:ok over=0 checker=-
+1 today not-form1((1,9)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=18 checker=-
+3 today not-form1((1,9)) none w12+rollback+w6+unmount w12:ok rollback:ok w6:ok unmount:ok over=20 checker=-
+4 today not-form1((1,9)) none w12+unmount w12:ok unmount:ok over=0 checker=-
+4 today not-form1((1,9)) none w3+rollback+unmount w3:ok rollback:ok unmount:ok over=0 checker=-
+4 today not-form1((1,9)) none w3+unmount w3:ok unmount:ok over=0 checker=-

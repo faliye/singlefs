@@ -1,0 +1,102 @@
+L1_use_as_other: GREEN
+L2_nested_braces: GREEN
+L3_self_group: GREEN
+L4_extern_c_block: GREEN
+L5_const_ne: GREEN
+L6_plain_items: GREEN
+L7_attr_include_str: GREEN
+L8_const_assert: GREEN
+L9_concat_in_static: GREEN
+L10_precise_capture_use: GREEN
+L11_char_brace: GREEN
+L12_raw_string_mod: GREEN
+L13_c_raw_string: GREEN
+L14_raw_ident_mod: GREEN
+L15_lifetimes: GREEN
+L16_doc_use_as_std: GREEN
+L17_trailing_comment_use: GREEN
+L18_block_comment_nested: GREEN
+B1_use_as_std: GREEN
+B2_use_wgpu_as_std: RED 1
+B3_nested_as_std: RED 1
+B4_self_as_std: RED 1
+B5_use_last_seg_std: RED 1
+B6_mod_std: RED 1
+B7_extern_crate: RED 1
+B8_glob: RED 1
+B9_macro_rules: RED 1
+B10_struct_std: GREEN
+B11_type_alias_wgpu: GREEN
+B12_cfg_use_then_fn: RED 1
+B13_cfg_test_use_then_fn: RED 1
+B14_fn_name_via_local_macro_in_fn: GREEN
+B15_use_inside_fn_as_std: GREEN
+B16_extern_crate_after_attr: RED 1
+L13b_c_raw_string_with_inner_quote: GREEN
+L19_pub_crate_use: GREEN
+L20_use_super_glob: RED 1
+L21_derive_and_attrs: GREEN
+L22_same_name_use_as_same_name: GREEN
+L23_unary_not_in_const: GREEN
+L24_never_return: GREEN
+L25_where_clause_closure: GREEN
+L26_trailing_expr_macro_in_fn: GREEN
+L27_byte_literals: GREEN
+L28_lifetime_before_quote: GREEN
+L29_escaped_quote_char: GREEN
+L30_number_suffix: GREEN
+L31_cfg_any_extern_crate: RED 1
+L32_unicode_ident_and_strings: GREEN
+N01_use_wgpu_self: GREEN
+N02_use_root_std: GREEN
+N03_use_root_wgpu_as_wgpu: GREEN
+N04_use_other_wgpu: RED 1
+N05_use_crate_wgpu: RED 1
+N06_block_use_in_unrelated_fn: GREEN
+N07_block_use_in_nested_blocks_holding_drop: RED 1
+N08_const_block_holding_drop: RED 1
+N09_use_in_other_impl: GREEN
+N10_macro_in_fn_body: GREEN
+N11_item_macro_after_semicolon: RED 1
+N12_item_macro_after_attr: RED 1
+N13_expr_macro_in_const: GREEN
+N14_expr_macro_after_paren: GREEN
+N16_static_array_macros: GREEN
+N18_use_lt: GREEN
+N20_raw_ident_std_use: RED 1
+N21_raw_ident_mod_fn: GREEN
+N22_raw_ident_use_fn: GREEN
+N23_cr_string_with_brace_and_quote: GREEN
+N24_raw_string_hashes_body: GREEN
+N25_char_quote_and_brace: GREEN
+N26_lifetime_then_chars: GREEN
+N29_cfg_attr_unrelated: GREEN
+N30_cfg_unrelated_use: GREEN
+N31_cfg_on_pinned_use_other_source: RED 2
+N32_cfg_attr_unrelated_use: GREEN
+N33_mod_std_in_fn: RED 1
+N35_glob_enum: RED 1
+N36_use_self_wgpu: RED 1
+N37_pub_use_self_group: GREEN
+N38_use_with_comments: RED 1
+N40_pub_in_path: RED 1
+N41_cfg_comment_between: RED 2
+N42_cfg_doc_between: RED 2
+N43_cfg_attr_nested_cfg: RED 2
+N44_pinned_name_via_alias: RED 1
+N45_inner_fn_named_like_pinned: GREEN
+N46_module_level_fn_named_like_pinned: GREEN
+N47_static_named_wgpu: GREEN
+N48_const_named_std: GREEN
+N49_macro_rules_in_fn: GREEN
+N50_use_group_with_alias_inside: RED 1
+N51_use_trailing_semicolons_two: GREEN
+N52_use_r_hash_as: RED 1
+N53_use_unicode_ident: GREEN
+N54_pub_const_with_string_apostrophe: GREEN
+N55_where_clause_closure_bound: GREEN
+N56_attr_with_macro_inside_item_level: GREEN
+N57_const_generic_expr: GREEN
+N58_closure_returning_macro: GREEN
+N59_nested_generic_shift: GREEN
+N60_label_and_lifetime: GREEN

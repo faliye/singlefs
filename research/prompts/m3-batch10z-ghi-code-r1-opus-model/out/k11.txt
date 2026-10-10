@@ -1,0 +1,8 @@
+ATTACK arm=take-in-between step=x_kept_buffers_in_flight ledger_room=19440 truth_room=19550 under=110 over=0
+ATTACK arm=take-in-between step=a_kept_buffers_in_flight ledger_room=11440 truth_room=21550 under=10110 over=0
+ATTACK arm=take-in-between step=after_b_takes_in ledger_room=23510 truth_room=21550 under=0 over=1960
+ATTACK arm=take-in-between a_on_the_books=false
+ATTACK arm=take-in-before-a step=x_kept_buffers_in_flight ledger_room=19440 truth_room=19550 under=110 over=0
+ATTACK arm=take-in-before-a step=a_kept_buffers_in_flight ledger_room=21440 truth_room=21550 under=110 over=0
+ATTACK arm=take-in-before-a step=after_b_takes_in ledger_room=21440 truth_room=21550 under=110 over=0
+ATTACK arm=take-in-before-a a_on_the_books=true

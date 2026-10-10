@@ -1,0 +1,13 @@
+RED remount-before-red faults=rroot,racct r=b1 persist=true n=4
+RED remount-before-red faults=rroot,racct r=b3 persist=true n=4
+RED remount-before-red faults=rroot,racct r=b6 persist=true n=3
+RED remount-before-red faults=rroot,racct r=n persist=true n=3
+RED remount-before-red faults=rroot,racct r=s persist=true n=3
+RED remount-before-red faults=rroot,racct,rlin r=b1 persist=true n=4
+RED remount-before-red faults=rroot,racct,rlin r=b3 persist=true n=4
+RED remount-before-red faults=rroot,racct,rlin r=b6 persist=true n=3
+RED remount-before-red faults=rroot,racct,rlin r=n persist=true n=3
+RED remount-before-red faults=rroot,racct,rlin r=s persist=true n=3
+RED remount-before-red faults=rroot,rlin r=b1 persist=true n=4
+RED remount-before-red faults=rroot,rlin r=b3 persist=true n=4
+RED remount-before-red faults=rroot,rlin r=b6 persist=true n=3

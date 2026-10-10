@@ -1,0 +1,15 @@
+## J_OFFSETS=3
+test s2_sweep ... DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=0X X:remount-ok:hold=0:iso=28
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=1J J:injected22:hold=1
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=2P P[cur,rOcc=Some((25, Some(4))),needs=Some(3),hold=1,isoC=28,isoAll=28->28]pushed3[n=3,stillIsoC=28,hold_after=0,ab_left=1,FSame,txg+3]
+S2 label=jo arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=XJPooo secs=0.49 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=28 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=- hit=false first_red=-
+## J_OFFSETS=14
+test s2_sweep ... DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=0X X:remount-ok:hold=0:iso=28
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=1J J:injected22:hold=1
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=2P P[cur,rOcc=Some((25, Some(15))),needs=Some(14),hold=1,isoC=28,isoAll=28->28]pushed14[n=14,stillIsoC=28,hold_after=0,ab_left=1,FSame,txg+14]
+S2 label=jo arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=XJPooo secs=0.56 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=3 hit=false first_red=-
+## J_OFFSETS=20
+test s2_sweep ... DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=0X X:remount-ok:hold=0:iso=28
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=1J J:injected22:hold=1
+DIAG label=jo prefix=12 r=o faults=racct actions=XJPooo step=2P P[cur,rOcc=Some((25, Some(21))),needs=Some(20),hold=1,isoC=28,isoAll=28->0]pushed20[n=20,stillIsoC=0,hold_after=0,ab_left=0,FSame,txg+20]
+S2 label=jo arm=implemented slots=384 prefix=oooooooooooo mid= r=o r_txg=16 r_old_txg=- r_old_in_ring=false faults=racct persist=false actions=XJPooo secs=0.58 selected=15 c_r=48 revived=0 revived_in_c_r=0 iso_mount=24 ab_mount=0 iso_after_first_raise=- iso_max=28 iso_end=0 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=0 first_refused=- r_left_at=2 hit=false first_red=-

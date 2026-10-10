@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/k2d_probe.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-d-code-r1-sonnet/target/debug/deps/k2d_probe-f4065a7d768a6fa7)
+
+running 2 tests
+RESULT 基线 无故障: 参照落点数=22 挂载记着=Some(22) 挂后空闲=0 | 会话写至多200:完成27次 被拒=Some((28, "FloorRaiseFailedWhilePushingForSpace(FloorRaiseFailedWhilePushingForSpace { cause: RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 2, slot: 2 }, first_reading: Unreadable, reread: Unreadable }, refusal_that_pushed_the_failed_raise: SpaceAdmissionRefused(Adm")) 推抬F串=1 表里还记着C=Some(false) 首次推抬F后空闲=None 逐步首个违例=None 空闲(写后)=0 违例(写后)=[] | 卸载=拒 NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 2, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) 空闲(卸载后)=None 违例(卸载后)=[]
+test k23_baseline_no_fault ... ok
+RESULT H1 根槽读错(挂后): 参照落点数=22 挂载记着=Some(22) 挂后空闲=0 | 会话写至多200:完成27次 被拒=Some((28, "FloorRaiseFailedWhilePushingForSpace(FloorRaiseFailedWhilePushingForSpace { cause: RollbackFloorCeilingRootRingSlotStillBadAfterOneReread { ring_slot: RootRingSlot { region: 2, slot: 2 }, first_reading: Unreadable, reread: Unreadable }, refusal_that_pushed_the_failed_raise: SpaceAdmissionRefused(Adm")) 推抬F串=1 表里还记着C=Some(false) 首次推抬F后空闲=None 逐步首个违例=None 空闲(写后)=0 违例(写后)=[] | 卸载=拒 NewerStateStillUnreadableAfterOneReread(RootRingSlotKnownToHoldARoot { ring_slot: RootRingSlot { region: 2, slot: 2 }, first_reading: Unreadable, reread: Unreadable }) 空闲(卸载后)=None 违例(卸载后)=[]
+test h1_ring_error_after_mount ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 19.56s
+

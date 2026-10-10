@@ -1,0 +1,14 @@
+    Blocking waiting for file lock on package cache
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/tree/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.66s
+     Running tests/rounds_sim4.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-c-code-r1-sonnet/target/debug/deps/rounds_sim4-51e53f2544cd1bf6)
+
+running 2 tests
+test random_cards_and_oom_schedules ... ROUNDS_SIM cells=3000 results={"ERR-no-card-holds-a-state": 157, "EveryBlockStored": 2353, "NotRun": 490} dup_finished_cells=47 violations=0 notrun_cells=490 notrun_cells_with_judged_but_unstored=10 max_wasted_blocks=3
+ok
+test stop_requested_between_round_one_and_two_with_blocks_waiting_behind_a_given_back_block ... STOPSIM stop_from_round=None result=EveryBlockStored stored=10 rounds=2 judged_ok=[1, 1, 1, 1, 1, 1, 1, 1, 1, 1] assertion_failures=[]
+STOPSIM stop_from_round=Some(2) result=StoppedOnRequest stored=0 rounds=2 judged_ok=[0, 1, 1, 1, 1, 1, 1, 1, 1, 1] assertion_failures=["round 2: blocks_waiting()=9 != 0（产品代码 3081 行断言会 panic）"]
+ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.74s
+

@@ -1,0 +1,16 @@
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/tree-gpu/crates/singlefs-harness)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.31s
+     Running unittests src/lib.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-lm-code-r1-sonnet/target-gpu/debug/deps/singlefs_harness-90bdf76cfc53b9d8)
+
+running 5 tests
+LM_T4 room_now=29550 truly_left=28950
+LM_T4 restart_after_booking_room=Err(NoCardHasRoomNow { need_mebibytes: 2560, card_rooms_mebibytes: [0] })
+test gpu_memory_ledger::tests::lm_t3_a_card_without_a_device_kept_does_not_stop_the_listing_of_the_next_card ... ok
+test gpu_memory_ledger::tests::lm_t1_a_lease_kept_after_the_listing_survives_the_poll_before_booking ... ok
+test gpu_memory_ledger::tests::lm_t2_after_the_early_loss_and_the_restart_the_lost_device_still_on_the_card_is_not_lent_again ... ok
+test gpu_memory_ledger::tests::lm_t4_a_lost_device_without_any_kept_lease_is_not_marked_before_booking ... ok
+LM_T5 checked=35556 violations=0 lost_but_unmarked_overgive_states=13208
+test gpu_memory_ledger::tests::lm_t5_random_operation_strings_never_lend_more_than_the_card_truly_has_left_once_the_ledger_knows ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 204 filtered out; finished in 0.03s
+

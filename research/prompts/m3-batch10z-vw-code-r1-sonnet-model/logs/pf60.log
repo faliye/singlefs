@@ -1,0 +1,13 @@
+
+running 1 test
+test s2_sweep ... DIAG label=k60 prefix=20 r=b6 faults=racct,rlin actions=oPPKoooKoo step=0o NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)]
+DIAG label=k60 prefix=20 r=b6 faults=racct,rlin actions=oPPKoooKoo step=1P P[cur,rOcc=Some((28, Some(24))),needs=Some(20),hold=1,isoC=440,isoAll=440->440]pushRef:AfterRehearsal4/20:BlockDevice(InputOutput(Custom[n=3,stillIsoC=440,hold_after=1,ab_left=0,FSame,txg+3]
+DIAG label=k60 prefix=20 r=b6 faults=racct,rlin actions=oPPKoooKoo step=2P P[cur,rOcc=Some((31, Some(24))),needs=Some(17),hold=1,isoC=440,isoAll=440->440]pushRef:Frozen[n=0,stillIsoC=440,hold_after=1,ab_left=0,FSame,txg+0]
+DIAG label=k60 prefix=20 r=b6 faults=racct,rlin actions=oPPKoooKoo step=3K K:remount-ok:sessionTxg=31:selected=31:hold=0:iso=34
+DIAG label=k60 prefix=20 r=b6 faults=racct,rlin actions=oPPKoooKoo step=7K K:remount-ok:sessionTxg=37:selected=37:hold=0:iso=34
+S2 label=k60 arm=implemented slots=384 prefix=oooooooooooooooooooo mid= r=b6 r_txg=24 r_old_txg=17 r_old_in_ring=true faults=racct,rlin persist=false actions=oPPKoooKoo secs=1.12 selected=23 c_r=474 revived=2 revived_in_c_r=2 iso_mount=440 ab_mount=0 iso_after_first_raise=- iso_max=440 iso_end=34 both_mount=0 both_max=0 c_unblocked_mount=0 c_unblocked_max=0 c_unblocked_first=- c_handed_out_max=0 c_handed_out_first=- pu_max=0 crash_samples=0 crash_bad=0 refused_steps=1 first_refused=0o:NS[Ceil(20,20);S(r=Some(24),n=20,iso=440,rEq,reh=A,rel=220+220);hold=1;isoC=440;needs=Some(20)] r_left_at=- hit=false first_red=-
+S2_DONE label=k60 arm=implemented histories=1 hits=0
+ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.17s
+

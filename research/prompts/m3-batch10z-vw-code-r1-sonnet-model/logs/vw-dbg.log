@@ -1,0 +1,7 @@
+
+running 1 test
+VW dbg from=600 reads_attempted=791 fired=192 head=adm ways=2 debug=ChangeAdmittedAfterThePush { isolated_slots_released_by_the_push_on_each_device: [(DeviceIdentity(0), 51), (DeviceIdentity(1), 51)] }
+test vw_k14_debug_one_failing_from ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 74 filtered out; finished in 0.08s
+

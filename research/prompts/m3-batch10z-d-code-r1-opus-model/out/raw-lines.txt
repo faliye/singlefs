@@ -1,0 +1,17 @@
+## intree arm=h2（草稿副本，cargo test -p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table）
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+## intree arm=diskfirst（草稿副本，cargo test -p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table）
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+## intree arm=today（草稿副本，cargo test -p singlefs-harness --test raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table）
+test unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot ... FAILED
+thread 'unmount_after_the_account_of_a_root_abandoned_by_the_mounts_own_row_turns_unreadable_takes_what_the_unapplied_records_named_on_its_ring_slot' (1027731) panicked at crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs:475:25:
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.34s
+## a1-k3-n-acct-h2-s1 命中行与同一段历史在 today 臂上的行（原样）
+OPUS10ZD arm=h2 k=3 rkind=n r=(1, 7) p=(1, 6) fault=acct actions=Wss hit=true secs=0.13 selected=(1, 6) borrowed_at_mount=22 recorded_abandoned=-1 faulted_reads=10 W=ok(after=15) s=ok(raises=0) s=ok(raises=0) r_own_units_overwritten=0 first_red_step=- final=I-7.4:被抛弃的根（实例1、txg7）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元在盘0槽1418的那一份与位置条目里的校验和对不上；数据单 crash=not-run
+OPUS10ZD arm=today k=3 rkind=n r=(1, 7) p=(1, 6) fault=acct actions=Wss hit=false secs=0.13 selected=(1, 6) borrowed_at_mount=22 recorded_abandoned=-1 faulted_reads=10 W=ok(after=15) s=ok(raises=0) s=ok(raises=0) r_own_units_overwritten=0 first_red_step=- final=- crash=not-run
+## a3-k5 命中一行（原样）
+OPUS10ZD arm=h2 k=5 rkind=n r=(1, 9) p=(1, 8) fault=acct actions=Wsss hit=true secs=0.69 selected=(1, 8) borrowed_at_mount=22 recorded_abandoned=-1 faulted_reads=10 W=ok(after=13) s=ok(raises=0) s=ok(raises=0) s=ok(raises=0) r_own_units_overwritten=0 first_red_step=3s final=I-7.4:被抛弃的根（实例1、txg9）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元在盘0槽1422的那一份与位置条目里的校验和对不上；数据单 crash=not-run
+OPUS10ZD arm=diskfirst k=5 rkind=n r=(1, 9) p=(1, 8) fault=acct actions=Wsss hit=false secs=0.51 selected=(1, 8) borrowed_at_mount=22 recorded_abandoned=-1 faulted_reads=10 W=ok(after=13) s=ok(raises=0) s=ok(raises=0) s=ok(raises=0) r_own_units_overwritten=0 first_red_step=- final=- crash=not-run
+OPUS10ZD arm=cplusmountaccount k=5 rkind=n r=(1, 9) p=(1, 8) fault=acct actions=Wsss hit=false secs=0.52 selected=(1, 8) borrowed_at_mount=44 recorded_abandoned=-1 faulted_reads=10 W=ok(after=13) s=ok(raises=0) s=ok(raises=0) s=ok(raises=0) r_own_units_overwritten=0 first_red_step=- isolated_at_end=23+23 final=- crash=not-run
+## z1 一行（原样）
+OPUS10ZDX k=1 i3=0 c=(2, 8) fault=slot-zero-at-mount actions=o recorded_at_mount=-1 abandoned_slots_in_table=0 faulted_reads=16 o=ok(raises=0) first_red=0o:I-7.4:被抛弃的根（实例2、txg8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元在盘0槽1416的 final=I-7.4:被抛弃的根（实例2、txg8）引用的单元已被重新分配或抹头（校验和对不上或头用不了）：数据单元在盘0槽1416的

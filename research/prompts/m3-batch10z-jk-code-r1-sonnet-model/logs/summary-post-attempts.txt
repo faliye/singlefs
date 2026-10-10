@@ -1,0 +1,4 @@
+post-qs-rn-so                arm=implemented  n=8 mount_err=8 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+post-qs-rn-so                arm=none         n=8 mount_err=8 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+post-qs-rn-soo               arm=implemented  n=8 mount_err=8 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-
+post-qs-rn-soo               arm=none         n=8 mount_err=8 hit=0 preroot=0 refused=0 iso_mount=- iso_first_raise=- iso_max=- iso_end=- c_r=- rev_in_c_r=- revived=-

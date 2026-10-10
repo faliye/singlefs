@@ -1,0 +1,3 @@
+行1522 步 4：影子账一个槽都不隔离: rc=101 红 1 条 ned_data_slot_and_the_abandoned_root_reads_the_third_content | test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 22 fil (18s)
+行1523 增补 2 收口第 27 行：影子账隔离只铺记录起点那一槽，不按记录的跨度铺位: rc=101 红 2 条 lds_are_cleared_by_the_publish_that_overwrites_its_root_slot either_isolated_nor_counted_when_its_root_slot_is_unreadable | test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 0 filt (19s)
+行1524 第10z批第九块 K3 loop-span1 根槽这一遍读坏的被抛弃根记着的落点补隔离只隔起点那一槽（正推 loop-span1：跨两槽的落: rc=0 红 0 条  | test result: ok. 35 passed; 0 failed; 1 ignored; 0 measured; 0 filtere (24s)

@@ -1,0 +1,15 @@
+G1_char_literal_never: 红 6 条 ['the_entries_outside_the_card_pool_start_their_devices_as_out', 'the_card_lease_hands_its_return_to_the_ledger_and_every_book', 'the_card_pool_hands_its_kept_devices_to_the_ledger_before_bo', 'the_card_pool_module_shadows_neit
+G2_raw_string_off: 旧串命中 0 次，跳过
+G3_block_comment_off: 红 1 条 ['the_card_pool_scans_cut_the_tests_module_at_its_opening_in_c']
+G4_block_comment_not_nested: 全绿（活）
+G5_line_comment_off: 红 6 条 ['the_entries_outside_the_card_pool_start_their_devices_as_out', 'the_card_lease_hands_its_return_to_the_ledger_and_every_book', 'the_card_pool_hands_its_kept_devices_to_the_ledger_before_bo', 'the_card_pool_module_shadows_neithe
+G6_string_escape_off: 全绿（活）
+G7_raw_ident_off: 红 1 条 ['the_card_pool_scan_accepts_writings_that_cannot_replace_what']
+G8_byte_string_off: 旧串命中 0 次，跳过
+G9_lifetime_as_char_start: 全绿（活）
+G10_escaped_char_end: 全绿（活）
+G11_depth_rule_zero_removed: 红 1 条 ['the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_fu']
+G12_macro_alnum_removed: 全绿（活）
+G13_expected_source_ignored: 红 1 条 ['the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_broug']
+G14_self_group_trailing_comma: 红 2 条 ['the_card_pool_scan_accepts_renames_nested_groups_and_self_th', 'the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_broug']
+G15_double_colon_token_off: 旧串命中 0 次，跳过

@@ -1,0 +1,21 @@
+0	第10z批第十块 丙并中间 走丙那一支的根那一槽不并所选那一版与它之间那几槽（攻方 K2-1：写掉 Q 那一槽之后 Q 的单元发得出去）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.56s	units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ri
+1	第10z批第十块 丙并中间 走丙那一支的根那一槽不并所选那一版与它之间那几槽（库单测：R 那一槽缺 txg 7、8 两槽的落点）	rc=101	test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 0.00s	mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::the_ring
+2	第10z批第十块 丙并中间 中间那几槽只取紧挨着所选那一版之后的第二个 txg 起（Q 紧挨着 P 时 Q 那一槽并不进来）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 20.32s	units_a_root_inherits_from_a_publish_between_it_and_the_selected_version_stay_until_its_ri
+3	第10z批第十块 丙并中间 中间那几槽只取紧挨着 R 的那一个（库单测：txg 7 那一槽并不进来）	rc=101	test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 0.00s	mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::the_ring
+4	第10z批第十块 丙并中间 R 那一槽已有的落点也再并一次（库单测：200 重复）	rc=101	test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 0.00s	mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::the_ring
+5	第10z批第十块 回退复活 认回退时谱系记录按 txg 0 找（认不出回退：丙那一支不并回退目标账里仍分配、现行账里已释放的落点）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.08s	units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_r
+6	第10z批第十块 回退复活 回退目标账里取现行账里仍分配的、不取已释放的（复活的那几个滤掉）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 38.75s	units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_r
+7	第10z批第十块 回退复活 打包单元只看非谱系的那几片（谱系片里那条记录看不到）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 43.87s	units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_r
+8	第10z批第十块 回退复活 回退目标按被抛弃的根找（R_old 按实例表有效，找不到）	rc=101	test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 39.04s	units_a_rollback_publish_revived_stay_through_writes_raising_the_floor_while_its_account_r
+9	第10z批第十块 丙并中间 中间那几槽从所选那一版自己的 txg 起（库单测：紧挨着的那一形把所选那一版那一槽也并进来）	rc=101	test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 0.00s	mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::a_root_t
+10	E1 回退目标按全部有效根找（不限 txg = T_old）	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 13.22s	
+11	E2 认回退时任何谱系记录都认（不比 rollback_txg）	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 15.10s	
+12	E3 对照臂：认出回退就并现行账里全部已释放的落点（乙一类）	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 12.40s	
+13	E4 丙并中间：中间那几槽不去掉 R 自己那一槽	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 37.35s	
+14	E5 丙并中间：不取最近的一整圈、取最旧的一整圈	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 40.16s	
+15	E6 丙并中间：并进去的是 R 之后那些槽（上界改成 R 之后一圈）	rc=101	test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 203 filtered out; finished in 0.00s	mount::placements_of_the_publishes_in_between_chained_onto_the_newer_roots_tests::the_ring
+16	E7 丙并中间：每个走丙的根都当成同一条根（只并最后一条）	rc=0	test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 12 filtered out; finished in 36.07s	
+
+real	2m19.722s
+user	15m5.891s
+sys	0m33.896s

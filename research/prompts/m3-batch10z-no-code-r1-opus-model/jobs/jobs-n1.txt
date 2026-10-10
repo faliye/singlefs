@@ -1,0 +1,4 @@
+today|S3_PERSIST=1 S3_SLOTS=384 S3_PREFIXES=oooooooooo S3_RS=b1;b3;b6;n S3_FAULTS=rroot,racct;rroot,racct,rlin;rroot,rlin S3_ACTIONS=Foooooooooooooooooo;oooooooooooooooooooo;ssssssssss;nnnnnnnnnnnnnnnnnnnn;oFoFoFoFoFoFoFoFoF S3_PREROOT=1
+pre14|S3_PERSIST=1 S3_SLOTS=384 S3_PREFIXES=oooooooooo S3_RS=b1;b3;b6;n S3_FAULTS=rroot,racct;rroot,racct,rlin;rroot,rlin S3_ACTIONS=Foooooooooooooooooo;oooooooooooooooooooo;ssssssssss;nnnnnnnnnnnnnnnnnnnn;oFoFoFoFoFoFoFoFoF S3_PREROOT=1
+today|S3_PERSIST=1 S3_SLOTS=1536 S3_PREFIXES=oooooooooo S3_RS=b6;n S3_FAULTS=rroot,racct;rroot,rlin S3_ACTIONS=Foooooooooooooooooo;oooooooooooooooooooo S3_PREROOT=1
+pre14|S3_PERSIST=1 S3_SLOTS=1536 S3_PREFIXES=oooooooooo S3_RS=b6;n S3_FAULTS=rroot,racct;rroot,rlin S3_ACTIONS=Foooooooooooooooooo;oooooooooooooooooooo S3_PREROOT=1

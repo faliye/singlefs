@@ -1,0 +1,182 @@
+[
+ {
+  "id": "repo0",
+  "name": "第10z批第十五块 显存账 K3-3 借之前那一步只看列出来的卡（没有没等成借据的卡上设备丢了不告诉账，正推 T4）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "        for card_position in 0..card_count {",
+  "new": "        for card_position in listed_cards.iter().map(LeasesKeptAfterAFailedWaitWhenListed::card_position) {",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::a_device_lost_without_a_kept_lease_is_taken_in_before_booking_so_the_room_lent_leaves_space_for_the_restart",
+  "test": "a_device_lost_without_a_kept_lease_is_taken_in_before_booking_so_the_room_lent_leaves_space_for_the_restart"
+ },
+ {
+  "id": "repo1",
+  "name": "第10z批第十五块 显存账 K3-3 随机操作串 借之前那一步只看列出来的卡",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "        for card_position in 0..card_count {",
+  "new": "        for card_position in listed_cards.iter().map(LeasesKeptAfterAFailedWaitWhenListed::card_position) {",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::random_operation_strings_never_lend_more_than_the_card_has_left_once_the_ledger_knows_of_the_loss",
+  "test": "random_operation_strings_never_lend_more_than_the_card_has_left_once_the_ledger_knows_of_the_loss"
+ },
+ {
+  "id": "repo2",
+  "name": "第10z批第十五块 显存账 K4 借之前取留着的设备缺了的那张卡就停（正推 Z1）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "            let Some(kept) = device_kept_on_the_card(card_position) else {\n                continue;\n            };",
+  "new": "            let Some(kept) = device_kept_on_the_card(card_position) else {\n                break;\n            };",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::a_card_whose_device_is_still_starting_does_not_keep_the_next_card_from_returning_its_kept_lease",
+  "test": "a_card_whose_device_is_still_starting_does_not_keep_the_next_card_from_returning_its_kept_lease"
+ },
+ {
+  "id": "repo3",
+  "name": "第10z批第十五块 显存账 K4 告诉账丢了时在用的那一台不进丢了还没放掉的那一堆（正推 Z6）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "        if books_of_the_card.device_in_use == Some(self.device) {\n            books_of_the_card.take_back_the_driver_share_of_a_lost_device();\n        }",
+  "new": "        if books_of_the_card.device_in_use == Some(self.device) {\n            books_of_the_card.driver_share = DriverShareOnTheCard::DeviceLostNotStartedAgain;\n            books_of_the_card.device_in_use = None;\n            for kept_lease in std::mem::take(&mut books_of_the_card.leases_kept_after_a_failed_wait).into_keys() {\n                books_of_the_card.leases.remove(&kept_lease);\n            }\n        }",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::the_lost_device_still_on_the_card_after_the_early_loss_and_the_restart_is_not_lent_again",
+  "test": "the_lost_device_still_on_the_card_after_the_early_loss_and_the_restart_is_not_lent_again"
+ },
+ {
+  "id": "repo4",
+  "name": "第10z批第十五块 显存账 K4 借之前没丢的那一支 poll 之后销这张卡此刻全部没等成的、不只列出来的（正推 Z8）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "                kept_on_the_books.take_in_that_the_work_of_the_listed_leases_finished(listed);",
+  "new": "                kept_on_the_books.take_in_that_the_work_of_the_listed_leases_finished(&self.leases_kept_after_a_failed_wait_on_each_card().into_iter().find(|listed_now| listed_now.card_position == card_position).unwrap_or_else(|| listed.clone()));",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::a_lease_kept_after_the_listing_survives_the_poll_before_booking",
+  "test": "a_lease_kept_after_the_listing_survives_the_poll_before_booking"
+ },
+ {
+  "id": "repo5",
+  "name": "第10z批第十五块 显存账 K4 随机操作串 告诉账设备丢了只销那几笔、不照重起记",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "        if books_of_the_card.device_in_use == Some(self.device) {\n            books_of_the_card.take_back_the_driver_share_of_a_lost_device();\n        }",
+  "new": "        if books_of_the_card.device_in_use == Some(self.device) {\n            for kept_lease in std::mem::take(&mut books_of_the_card.leases_kept_after_a_failed_wait).into_keys() {\n                books_of_the_card.leases.remove(&kept_lease);\n            }\n        }",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::random_operation_strings_never_lend_more_than_the_card_has_left_once_the_ledger_knows_of_the_loss",
+  "test": "random_operation_strings_never_lend_more_than_the_card_has_left_once_the_ledger_knows_of_the_loss"
+ },
+ {
+  "id": "repo6",
+  "name": "第10z批第十五块 显存账 K3-3 借之前那一步没列出来的卡也拿别的卡列出来的那几笔去 poll",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "                .find(|listed| listed.card_position == card_position)",
+  "new": "                .find(|_listed| true)",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::a_card_without_a_kept_lease_is_not_polled_before_booking",
+  "test": "a_card_without_a_kept_lease_is_not_polled_before_booking"
+ },
+ {
+  "id": "repo7",
+  "name": "第10z批第十五块 GPU 取卡 K4 借之前那一步方法体最前面整句返回（正推 A2）",
+  "file": "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+  "old": "            fn take_in_the_devices_found_idle(&self) {\n                self.ledger.take_in_the_devices_kept_before_booking(",
+  "new": "            fn take_in_the_devices_found_idle(&self) {\n                if true { return; }\n                self.ledger.take_in_the_devices_kept_before_booking(",
+  "cmd": "-p singlefs-checker-tier --features gpu --lib -- gpu_unit_checks::tests::the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking",
+  "test": "the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking"
+ },
+ {
+  "id": "repo8",
+  "name": "第10z批第十五块 GPU 取卡 K4 借之前那一步丢没丢与 poll 两个闭包对调（正推 A3）",
+  "file": "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+  "old": "                    |started: &GpuCard| started.device_condition().is_lost(),\n                    |started: &GpuCard| {\n                        device_found_idle_by_a_poll(&std::panic::catch_unwind(\n                            std::panic::AssertUnwindSafe(|| {\n                                started.device().poll(wgpu::PollType::Poll)\n                            }),\n                        ))\n                    },\n",
+  "new": "                    |started: &GpuCard| {\n                        device_found_idle_by_a_poll(&std::panic::catch_unwind(\n                            std::panic::AssertUnwindSafe(|| {\n                                started.device().poll(wgpu::PollType::Poll)\n                            }),\n                        ))\n                    },\n                    |started: &GpuCard| started.device_condition().is_lost(),\n",
+  "cmd": "-p singlefs-checker-tier --features gpu --lib -- gpu_unit_checks::tests::the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking",
+  "test": "the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking"
+ },
+ {
+  "id": "repo9",
+  "name": "第10z批第十五块 GPU 取卡 K4 借之前那一步整个包进 if false（攻方 gpu-2）",
+  "file": "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+  "old": "            fn take_in_the_devices_found_idle(&self) {\n                self.ledger.take_in_the_devices_kept_before_booking(\n                    |card_position| self.cards[card_position].started.started_now(),\n                    |started: &GpuCard| started.device_condition().is_lost(),\n                    |started: &GpuCard| {\n                        device_found_idle_by_a_poll(&std::panic::catch_unwind(\n                            std::panic::AssertUnwindSafe(|| {\n                                started.device().poll(wgpu::PollType::Poll)\n                            }),\n                        ))\n                    },\n                    |started: &GpuCard| {\n                        started\n                            .device_on_the_books\n                            .as_deref()\n                            .expect(\"卡池起的设备起好时放进了账上的那一台（started_card）\")\n                    },\n                );\n            }",
+  "new": "            fn take_in_the_devices_found_idle(&self) {\n                if false {\n                self.ledger.take_in_the_devices_kept_before_booking(\n                    |card_position| self.cards[card_position].started.started_now(),\n                    |started: &GpuCard| started.device_condition().is_lost(),\n                    |started: &GpuCard| {\n                        device_found_idle_by_a_poll(&std::panic::catch_unwind(\n                            std::panic::AssertUnwindSafe(|| {\n                                started.device().poll(wgpu::PollType::Poll)\n                            }),\n                        ))\n                    },\n                    |started: &GpuCard| {\n                        started\n                            .device_on_the_books\n                            .as_deref()\n                            .expect(\"卡池起的设备起好时放进了账上的那一台（started_card）\")\n                    },\n                );\n                }\n            }",
+  "cmd": "-p singlefs-checker-tier --features gpu --lib -- gpu_unit_checks::tests::the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking",
+  "test": "the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking"
+ },
+ {
+  "id": "repo10",
+  "name": "第10z批第十五块 GPU 取卡 K4 借之前那一步方法体里另起同名 device_found_idle_by_a_poll 恒交真（攻方 gpu-3）",
+  "file": "crates/singlefs-checker-tier/src/gpu_unit_checks.rs",
+  "old": "            fn take_in_the_devices_found_idle(&self) {\n                self.ledger.take_in_the_devices_kept_before_booking(",
+  "new": "            fn take_in_the_devices_found_idle(&self) {\n                fn device_found_idle_by_a_poll<Polled>(_polled: &Polled) -> bool { true }\n                self.ledger.take_in_the_devices_kept_before_booking(",
+  "cmd": "-p singlefs-checker-tier --features gpu --lib -- gpu_unit_checks::tests::the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking",
+  "test": "the_card_pool_hands_its_kept_devices_to_the_ledger_before_booking"
+ },
+ {
+  "id": "repo11",
+  "name": "第10z批第十五块 崩溃放量 K4 check_blocks_where_until 往下交永不叫停、另提一句叫停的名字（正推 A7）",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        checking_threads(),\n        stop_is_requested,",
+  "new": "        checking_threads(),\n        { let _ = stop_is_requested; &|| false },",
+  "cmd": "-p singlefs-checker-tier --features verdict-store --test crash_amplification_pipeline_records_checks_and_reuses -- a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest",
+  "test": "a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest"
+ },
+ {
+  "id": "repo12",
+  "name": "第10z批第十五块 崩溃放量 K4 check_blocks_where_until 往下交的闭包里提一次叫停的名字而永不叫停（攻方 crash-2）",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        checking_threads(),\n        stop_is_requested,",
+  "new": "        checking_threads(),\n        &|| { let _ = stop_is_requested; false },",
+  "cmd": "-p singlefs-checker-tier --features verdict-store --test crash_amplification_pipeline_records_checks_and_reuses -- a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest",
+  "test": "a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest"
+ },
+ {
+  "id": "repo13",
+  "name": "第10z批第十五块 崩溃放量 K4 check_pending_blocks_in_pieces 领块之前那一问短路成永不问（攻方 crash-3）",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        if stop_is_requested() {\n            break;\n        }",
+  "new": "        if false && stop_is_requested() {\n            break;\n        }",
+  "cmd": "-p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_amplification::tests::the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken",
+  "test": "the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken"
+ },
+ {
+  "id": "repo14",
+  "name": "第10z批第十五块 崩溃放量 K4 judge_my_blocks_on_gpu_cards 往下交的闭包里提一次叫停的名字而永不叫停（攻方 crash-2 那一形挪到要卡的一层）",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        GpuCardsSource::DevicesStartedForThisRun,\n        stop_is_requested,",
+  "new": "        GpuCardsSource::DevicesStartedForThisRun,\n        &|| { let _ = stop_is_requested; false },",
+  "cmd": "-p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_amplification::tests::every_layer_handed_the_stop_request_hands_it_on_or_asks_it",
+  "test": "every_layer_handed_the_stop_request_hands_it_on_or_asks_it"
+ },
+ {
+  "id": "repo15",
+  "name": "第10z批第十五块 崩溃放量 K4 check_selected_blocks 往下交永不叫停、另提一句叫停的名字（正推 A7 那一形挪到要库的一层）",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        unit_checksums,\n        version,\n        stop_is_requested,\n    )",
+  "new": "        unit_checksums,\n        version,\n        { let _ = stop_is_requested; &|| false },\n    )",
+  "cmd": "-p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_amplification::tests::every_layer_handed_the_stop_request_hands_it_on_or_asks_it",
+  "test": "every_layer_handed_the_stop_request_hands_it_on_or_asks_it"
+ },
+ {
+  "id": "repo16",
+  "name": "第10z批第十三块 显存账 K5 借之前列卡的循环只看第一张卡（正推 Y3）",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "        for card_position in 0..card_count {",
+  "new": "        for card_position in 0..card_count.min(1) {",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::every_listed_card_whose_kept_device_is_idle_at_the_poll_returns_its_kept_lease",
+  "test": "every_listed_card_whose_kept_device_is_idle_at_the_poll_returns_its_kept_lease"
+ },
+ {
+  "id": "repo17",
+  "name": "第10z批第十三块 显存账 K4-2 借之前那一步不核卡池那一格交的设备在不在列出来的那张卡上",
+  "file": "crates/singlefs-harness/src/gpu_memory_ledger.rs",
+  "old": "                std::ptr::eq(kept_on_the_books.ledger, self)\n                    && kept_on_the_books.card_position == card_position,",
+  "new": "                std::ptr::eq(kept_on_the_books.ledger, self)\n                    || kept_on_the_books.card_position == card_position,",
+  "cmd": "-p singlefs-harness --lib -- gpu_memory_ledger::tests::a_kept_device_on_the_books_of_another_card_is_refused_by_an_assertion",
+  "test": "a_kept_device_on_the_books_of_another_card_is_refused_by_an_assertion"
+ },
+ {
+  "id": "repo18",
+  "name": "第10z批第十三块 崩溃放量 K5 check_blocks_where_until 往下交的叫停换成永不叫停",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        checking_threads(),\n        stop_is_requested,",
+  "new": "        checking_threads(),\n        &|| false,",
+  "cmd": "-p singlefs-checker-tier --features verdict-store --test crash_amplification_pipeline_records_checks_and_reuses -- a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest",
+  "test": "a_run_asked_to_stop_keeps_the_block_it_judged_and_the_next_run_judges_only_the_rest"
+ },
+ {
+  "id": "repo19",
+  "name": "第10z批第十三块 崩溃放量 K5 check_pending_blocks_in_pieces 领块之前不问叫停",
+  "file": "crates/singlefs-checker-tier/src/crash_amplification.rs",
+  "old": "        if stop_is_requested() {\n            break;\n        }",
+  "new": "        if false {\n            break;\n        }",
+  "cmd": "-p singlefs-checker-tier --features verdict-store,gpu --lib -- crash_amplification::tests::the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken",
+  "test": "the_stop_request_is_asked_once_before_each_block_and_a_stop_leaves_the_later_blocks_untaken"
+ }
+]

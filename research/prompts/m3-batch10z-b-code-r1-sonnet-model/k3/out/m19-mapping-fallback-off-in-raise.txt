@@ -1,0 +1,8 @@
+ok ['m19-mapping-fallback-off-in-raise']
+## credential rc=0 :: test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.28s 
+## slotbad rc=0 :: test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 51.29s 
+## reuse rc=0 :: test result: ok. 3 passed; 0 failed; 13 ignored; 0 measured; 0 filtered out; finished in 3.39s 
+## corrupt rc=0 :: test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 30 filtered out; finished in 4.84s 
+## onepass rc=0 :: test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 59.11s 
+ok ['m19-mapping-fallback-off-in-raise', 'restore']
+done

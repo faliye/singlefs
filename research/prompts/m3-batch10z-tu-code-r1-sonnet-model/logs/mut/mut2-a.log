@@ -1,0 +1,5 @@
+maxmin: rc=101 红 2 条 pushing_the_root_ring_with_two_ring_slots_holding_placements_writes_up the_slots_the_way_out_by_the_push_releases_with_two_ring_slots_holding | ['test result: FAILED. 52 passed; 2 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.84s'] (29s)
+noIsoCheck: 旧串命中 2 次，跳过 (0s)
+budgetAsStuck: rc=101 红 1 条 no_space_when_the_publishes_of_one_admission_run_out_while_the_ring_sl | ['test result: FAILED. 53 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.99s'] (30s)
+spaceAsStuck: rc=101 红 1 条 no_space_when_the_floor_raise_finds_no_placement_while_the_ring_slots_ | ['test result: FAILED. 53 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 7.09s'] (30s)
+failNoCurrent: rc=101 红 1 条 pushing_the_root_ring_again_after_a_block_device_error_halfway_is_refu | ['test result: FAILED. 53 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 6.65s'] (27s)

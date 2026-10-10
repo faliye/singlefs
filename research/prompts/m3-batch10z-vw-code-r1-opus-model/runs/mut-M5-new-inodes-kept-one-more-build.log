@@ -1,0 +1,20 @@
+   Compiling singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/repo-mut/crates/singlefs-core)
+   Compiling singlefs-harness v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/repo-mut/crates/singlefs-harness)
+warning: function `atk_overwrite_of` is never used
+    --> crates/singlefs-harness/tests/atk_vw_opus.rs:6462:4
+     |
+6462 | fn atk_overwrite_of<Device: DeviceOverASparseImage>(pool: &mut PoolUnderTest<Device>, bytes: usize) -> AtkChange {
+     |    ^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `atk_after_action` is never used
+    --> crates/singlefs-harness/tests/atk_vw_opus.rs:6829:4
+     |
+6829 | fn atk_after_action(after_report: &AtkSnap, stuck: &StuckBehindTheWideProtection, change: &AtkChange, action: &str) -> (String, Op...
+     |    ^^^^^^^^^^^^^^^^
+
+warning: `singlefs-harness` (test "atk_vw_opus") generated 2 warnings
+    Finished `release` profile [optimized + debuginfo] target(s) in 20.28s
+  Executable tests/atk_vw_opus.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/target-mut/release/deps/atk_vw_opus-ff9e3af048c5d2d0)
+  Executable tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-vw-code-r1-opus/target-mut/release/deps/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table-a6a6b07acd5b9197)

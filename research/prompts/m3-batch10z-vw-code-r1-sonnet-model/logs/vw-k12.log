@@ -1,0 +1,74 @@
+
+running 1 test
+VW k12   71 × inodes: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=0
+VW k12   71 × overwrite: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=0
+VW k12    0 × overwrite_after_unlink_queue left=0: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=10: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=11: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=12: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=13: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=14: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=15: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=16: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=17: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=18: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=19: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=1: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=2: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=32: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=33: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=34: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=35: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=36: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=37: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=38: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=39: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=3: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=40: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=41: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=42: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=43: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=44: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=45: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=46: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=47: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=48: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=49: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=4: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=50: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=51: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=52: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=53: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=54: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=55: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=56: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=57: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=58: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=59: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=5: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=60: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=61: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=62: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=63: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=64: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=65: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=66: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=67: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=68: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=69: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=6: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=70: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=7: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=8: unlink did not leave a queue
+VW k12    0 × overwrite_after_unlink_queue left=9: unlink did not leave a queue
+VW k12    9 × overwrite_after_unlink_queue: notwhat
+VW k12    3 × overwrite_after_unlink_queue: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=0
+VW k12   71 × sequential: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=0
+VW k12   39 × unlink: admitted
+VW k12    9 × unlink: notwhat
+VW k12   20 × unlink: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=0
+VW k12    3 × unlink: stuck remainder_ok=true reh=pushref truth=pushref agree=true versions_published_before_report=1
+test vw_k12_remainder_recorded_matches_the_refused_change ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 71 filtered out; finished in 2.60s
+

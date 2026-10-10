@@ -1,0 +1,65 @@
+   Compiling libc v0.2.189
+   Compiling proc-macro2 v1.0.107
+   Compiling find-msvc-tools v0.1.14
+   Compiling shlex v2.0.1
+   Compiling quote v1.0.47
+   Compiling unicode-ident v1.0.26
+   Compiling pkg-config v0.3.34
+   Compiling glob v0.3.4
+   Compiling memchr v2.8.3
+   Compiling cfg-if v1.0.4
+   Compiling verus_prettyplease v0.0.0-2026-09-06-0133
+   Compiling minimal-lexical v0.2.1
+   Compiling regex-syntax v0.8.11
+   Compiling libloading v0.8.9
+   Compiling clang-sys v1.9.1
+   Compiling equivalent v1.0.2
+   Compiling either v1.18.0
+   Compiling vcpkg v0.2.15
+   Compiling bindgen v0.72.1
+   Compiling hashbrown v0.17.1
+   Compiling itertools v0.13.0
+   Compiling nom v7.1.3
+   Compiling syn v2.0.119
+   Compiling verus_syn v0.0.0-2026-09-06-0133
+   Compiling indexmap v2.14.2
+   Compiling jobserver v0.1.35
+   Compiling cc v1.5.1
+   Compiling regex-automata v0.4.18
+   Compiling vstd v0.0.0-2026-09-20-0158
+   Compiling convert_case v0.4.0
+   Compiling cexpr v0.6.0
+   Compiling bitflags v2.13.2
+   Compiling rustc-hash v2.1.3
+   Compiling shlex v1.3.0
+    Checking verus_builtin v0.0.0-2026-09-16-0054
+   Compiling rustflags v0.1.7
+    Checking singlefs-format v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-chk/crates/singlefs-format)
+    Checking singlefs-checker v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-chk/crates/singlefs-checker)
+    Checking singlefs-reference-filesystem v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-chk/crates/singlefs-reference-filesystem)
+   Compiling libz-sys v1.1.29
+   Compiling zstd-sys v2.1.0+zstd.1.5.7
+   Compiling lz4-sys v1.11.1+lz4-1.10.0
+   Compiling bzip2-sys v0.1.13+1.0.8
+   Compiling regex v1.13.1
+   Compiling synstructure v0.13.2
+   Compiling verus_state_machines_macros v0.0.0-2026-09-06-0133
+   Compiling verus_builtin_macros v0.0.0-2026-09-20-0158
+   Compiling librocksdb-sys v0.19.0+11.8.1
+    Checking singlefs-replay-prefix v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-chk/crates/singlefs-replay-prefix)
+    Checking singlefs-core v0.1.0 (/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/tree-chk/crates/singlefs-core)
+error: failed to run custom build command for `librocksdb-sys v0.19.0+11.8.1`
+
+Caused by:
+  process didn't exit successfully: `/home/fy5090/.local/share/singlefs/work/m3-batch10z-no-code-r1-sonnet/target-chk/debug/build/librocksdb-sys-301933bec9a0661a/build-script-build` (exit status: 101)
+  --- stderr
+  rocksdb/include/rocksdb/c.h:65:10: fatal error: 'stdbool.h' file not found
+
+  thread 'main' (1986786) panicked at /home/fy5090/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/librocksdb-sys-0.19.0+11.8.1/build.rs:42:10:
+  unable to generate rocksdb bindings: ClangDiagnostic("rocksdb/include/rocksdb/c.h:65:10: fatal error: 'stdbool.h' file not found\n")
+  note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+warning: build failed, waiting for other jobs to finish...
+
+real	0m7.416s
+user	0m30.428s
+sys	0m3.438s

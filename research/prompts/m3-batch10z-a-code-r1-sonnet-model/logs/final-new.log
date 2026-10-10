@@ -1,0 +1,61 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/sonnet_probe_common.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-a-code-r1-sonnet/target/debug/deps/sonnet_probe_common-8b6c4472e5f18b94)
+
+running 11 tests
+test fuzz_live_buffers_may_shrink ... FUZZ shrink xd=2560 collect%=50: Stats { samples: 14075, over_count: 66, over_max: 4437, under_count: 11342, under_max: 12374, quiet_samples: 1642, quiet_under_count: 938, quiet_under_max: 11092, shortest_over_trace: Some(["book 4000 -> id0", "start", "build id0 a=618", "book 6500 -> id1", "build id0 a=2985", "build id1 a=6165", "book 5000 -> id2", "book 4500 -> id3", "build id0 a=513", "return id1 (leftover 6165 still on card)", "build id2 a=3942", "book5000: ledger 6022 truth 3885 over 2137"]) }
+FUZZ shrink xd=2560 collect%=90: Stats { samples: 14465, over_count: 34, over_max: 3952, under_count: 11742, under_max: 12374, quiet_samples: 2176, quiet_under_count: 1462, quiet_under_max: 12044, shortest_over_trace: Some(["book 4000 -> id0", "start", "build id0 a=618", "book 6500 -> id1", "build id0 a=2985", "build id1 a=6165", "book 5000 -> id2", "book 4500 -> id3", "build id0 a=513", "return id1 (leftover 6165 still on card)", "build id2 a=3942", "book5000: ledger 6022 truth 3885 over 2137"]) }
+ok
+test fuzz_monotone_live_buffers ... FUZZ monotone xd=2560 collect%=50: Stats { samples: 13686, over_count: 0, over_max: 0, under_count: 11058, under_max: 12105, quiet_samples: 1646, quiet_under_count: 956, quiet_under_max: 12105, shortest_over_trace: None }
+FUZZ monotone xd=2560 collect%=90: Stats { samples: 14200, over_count: 0, over_max: 0, under_count: 11578, under_max: 12626, quiet_samples: 2194, quiet_under_count: 1504, quiet_under_max: 12626, shortest_over_trace: None }
+FUZZ monotone xd=600 collect%=50: Stats { samples: 13899, over_count: 0, over_max: 0, under_count: 11271, under_max: 11195, quiet_samples: 1653, quiet_under_count: 963, quiet_under_max: 10832, shortest_over_trace: None }
+ok
+test fuzz_only_built_leases_are_returned ... FUZZ built-only-returns xd=2560 free_on_return%=0: Stats { samples: 9769, over_count: 0, over_max: 0, under_count: 3525, under_max: 10560, quiet_samples: 1075, quiet_under_count: 70, quiet_under_max: 10560, shortest_over_trace: None }
+FUZZ built-only-returns xd=2560 free_on_return%=50: Stats { samples: 11445, over_count: 0, over_max: 0, under_count: 6775, under_max: 13560, quiet_samples: 1882, quiet_under_count: 731, quiet_under_max: 13560, shortest_over_trace: None }
+FUZZ built-only-returns xd=2560 free_on_return%=100: Stats { samples: 12553, over_count: 0, over_max: 0, under_count: 8619, under_max: 14060, quiet_samples: 4819, quiet_under_count: 3506, quiet_under_max: 13560, shortest_over_trace: None }
+ok
+test fuzz_well_behaved_leases_built_in_full ... FUZZ full-build xd=2560 free_on_return%=0: Stats { samples: 12955, over_count: 0, over_max: 0, under_count: 10096, under_max: 15560, quiet_samples: 1651, quiet_under_count: 953, quiet_under_max: 15560, shortest_over_trace: None }
+FUZZ full-build xd=2560 free_on_return%=50: Stats { samples: 14123, over_count: 0, over_max: 0, under_count: 11322, under_max: 14060, quiet_samples: 2639, quiet_under_count: 1930, quiet_under_max: 14060, shortest_over_trace: None }
+FUZZ full-build xd=2560 free_on_return%=100: Stats { samples: 14701, over_count: 0, over_max: 0, under_count: 12019, under_max: 15060, quiet_samples: 4820, quiet_under_count: 4102, quiet_under_max: 15060, shortest_over_trace: None }
+FUZZ full-build xd=600 free_on_return%=100: Stats { samples: 14874, over_count: 0, over_max: 0, under_count: 12192, under_max: 13600, quiet_samples: 4840, quiet_under_count: 4122, quiet_under_max: 13600, shortest_over_trace: None }
+ok
+test s10_the_p1_numbers ... S10 long built: ledger 19550 truth 19550; #1 ledger 19550 truth 19550; #2 ledger 19550 truth 19550; #3 ledger 19550 truth 19550; #4 ledger 19550 truth 19550; #5 ledger 19550 truth 19550; #6 ledger 19550 truth 19550; #7 ledger 19550 truth 19550; #8 ledger 19550 truth 19550; #9 ledger 19550 truth 19550; #10 ledger 19550 truth 19550;
+ok
+test s1_first_returned_lease_never_seen_on_the_card ... S1 b1=1000: after drop, no leftover: ledger 28550 truth 29550
+S1 b1=1000: L2 built 10000: ledger 18550 truth 19550
+S1 b1=2560: after drop, no leftover: ledger 26990 truth 29550
+S1 b1=2560: L2 built 10000: ledger 16990 truth 19550
+S1 b1=10000: after drop, no leftover: ledger 26990 truth 29550
+S1 b1=10000: L2 built 10000: ledger 16990 truth 19550
+ok
+test s1b_returned_lease_seen_on_the_card_then_freed ... S1b: leftover still on card: ledger 19550 truth 19550
+S1b: leftover freed: ledger 29550 truth 29550
+ok
+test s3_live_lease_shrinks_while_a_returned_short_lease_is_still_on_the_card ... S3: L1 built: ledger 19550 truth 19550
+S3: S built: ledger 18550 truth 18550
+S3: L1 idle (live, a=0), S leftover 1000 on card: ledger 19550 truth 18550 (> truth is an overlend)
+ok
+test s5_an_unbuilt_lease_in_the_seen_set_is_returned_without_ever_being_built ... S5: L1 built, U booked unbuilt, L3 built: ledger 11550 truth 11550
+S5: U returned unbuilt: ledger 11550 truth 16550
+S5: again: ledger 11550 truth 16550
+ok
+test s7_started_device_but_the_process_is_not_listed ... S7 built=0: ledger 16990 truth 19550 under 2560
+S7 built=10000: ledger 6990 truth 19550 under 12560
+ok
+test s8_a_need_that_truly_fits_after_a_returned_lease_was_never_seen ... S8: truth 29550; book 27000 -> NoCardHasRoomNow { need_mebibytes: 27000, card_rooms_mebibytes: [26990] }
+ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/sonnet_probe_new_only.rs (/home/fy5090/.local/share/singlefs/work/m3-batch10z-a-code-r1-sonnet/target/debug/deps/sonnet_probe_new_only-b7076c8f9fa8b856)
+
+running 3 tests
+test s4_lost_device_restart_variants ... S4 old_device_still_on_the_card_when_prepared=false: before_loss 19550 prepared Ok(()) after_restart reads 16990 16990 truth 19550 (under 2560)
+S4 old_device_still_on_the_card_when_prepared=true: before_loss 19550 prepared Ok(()) after_restart reads 16990 16990 truth 19550 (under 2560)
+ok
+test s6_a_refused_restart_is_asked_again ... S6: room before second lease 19550; restart attempts: first Err(NoCardHasRoomNow { need_mebibytes: 2560, card_rooms_mebibytes: [0] }); second Ok(()); third Ok(()); room now 0
+ok
+test s9_a_need_that_truly_fits_after_the_restart ... S9: truth 19550; book 17000 -> NoCardHasRoomNow { need_mebibytes: 17000, card_rooms_mebibytes: [16990] }
+ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

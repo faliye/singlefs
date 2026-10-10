@@ -1,0 +1,15 @@
+
+running 1 test
+test s2_sweep ... 
+thread 's2_sweep' (950529) panicked at crates/singlefs-harness/tests/common_unwitnessed_publish/../common_admission_pool/mod.rs:212:14:
+第一个文件之后现行那一版都带文件
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    s2_sweep
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

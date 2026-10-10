@@ -1,0 +1,17 @@
+## summ2.py over logs/sweeps/{a1,a2,a3,b1,b2,b3,c1,c2,c3,d1,d2,d3,d4}.log (384 slots, random action strings)
+histories 1260 first_red 0 c_unblocked_grew 0 c_handed_out 0 pu_pos 0 crash_samples 0 crash_bad 0
+skipped {'根槽写3次': 2}
+342 ('Ceil', 'NotWide', 'hold0', 'iso0')
+224 ('Ceil', 'Stuck', 'holdPos', 'isoPos')
+171 ('push:pushRef:Nothing', 'stillIso0', 'retryNS[Ceil;N;hold=N;isoC=N;needs=None]')
+141 ('push:pushedN', 'stillIso0', 'retryOk')
+flags {}
+X/mount {'mount=18': 278, 'X:remount-ok:hold=N:iso=N': 850, 'mount=0': 496, 'mount=24': 90, 'mount=22': 62, 'mount=440': 24, 'mount=46': 6, 'mount=616': 36, 'mount=28': 28, 'mount=34': 32, 'mount=500': 40, 'mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1622)})': 36, 'mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1634)})': 36, 'mount=Err:Recovery(UnitUnreadable{slot:SlotNumber(1576)})': 24,
+
+## summ2.py over logs/final/base-raise-reclaim-config-q3.log (unmutated, control config)
+histories 96 first_red 0 c_unblocked_grew 0 c_handed_out 0 pu_pos 0 crash_samples 0 crash_bad 0
+skipped {'根槽写3次': 2}
+19 ('push:pushedN', 'stillIso0', 'retryOk')
+## summ2.py over logs/final/ctl-raise-reclaim-no-reisolate.log (mutant)
+histories 96 first_red 39 c_unblocked_grew 54 c_handed_out 61 pu_pos 77 crash_samples 0 crash_bad 0
+skipped {'根槽写3次': 2}

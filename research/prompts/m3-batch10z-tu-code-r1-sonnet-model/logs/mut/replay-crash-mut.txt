@@ -1,0 +1,16 @@
+C1_char_literal_off: 全绿（活）
+C2_cr_raw_off: 全绿（活）
+C3_block_comment_not_nested: 红 1 条 ['brace_depth_reads_past_raw_strings_block_comments_and_string']
+C4_string_escape_off: 全绿（活）
+C5_line_comment_off: 全绿（活）
+C6_lifetime_branch_off: 全绿（活）
+C7_raw_closing_hashes_ignored: 红 1 条 ['brace_depth_reads_past_raw_strings_block_comments_and_string']
+C8_escape_char_literal_end: 全绿（活）
+C9_ident_skip_off: 全绿（活）
+C10_let_pattern_end_only_equals: 全绿（活）
+C11_whole_word_neighbor_ignored: 全绿（活）
+C12_ref_type_prefix_any_amp: 全绿（活）
+C13_layer_name_from_first_fn: 红 4 条 ['the_stop_request_scan_finds_a_new_layer_whose_stop_parameter', 'the_stop_request_scan_finds_a_new_layer_whose_stop_parameter', 'the_stop_request_scan_finds_the_remembered_stop_request_rebo', 'every_layer_handed_the_stop_request_hands_it_on_or_asks_it']
+C14_depth_must_be_1_removed: 全绿（活）
+C15_type_name_count_removed: 全绿（活）
+C16_pinned_lines_compare_removed: 红 1 条 ['every_layer_handed_the_stop_request_hands_it_on_or_asks_it']

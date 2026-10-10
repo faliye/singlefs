@@ -1,0 +1,4 @@
+tu k1rd-1 atk_k1_transient_read_error_while_reporting ATK_STEP_N=1 ATK_CELLS=4:16:13,4:16:19
+tu k1rd-2 atk_k1_transient_read_error_while_reporting ATK_STEP_N=1 ATK_CELLS=4:16:20,2:16:17,8:11:40
+tu k1pin-1 atk_k1_location_turning_unreadable_while_reporting ATK_CELLS=4:16:13,4:16:19 ATK_STEP_N=1
+tu k1pf atk_k1_persistent_read_faults_on_the_isolated_c_slots

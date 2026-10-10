@@ -1,0 +1,1010 @@
+#![allow(dead_code, unused, warnings)]
+fn source_text() -> &'static str { Box::leak(std::fs::read_to_string(std::env::var("SRC").expect("SRC")).expect("读得到 SRC").into_boxed_str()) }
+
+
+    // 扫源码的用例里，串里的花括号一律写成 \u 转义：门禁 code-source-discipline 的 mutation-tables 格配花括号时不跳字符串，
+    // 串里落单的半边括号会让它把后面的用例算到别的模块下（第 10z 批第八块）。
+    /// 这份文件测试模块的头两行（扫源码的用例从这里切掉测试模块）。
+    const TESTS_MODULE_OPENING: &str = "#[cfg(test)]\nmod tests \u{7b}";
+
+    /// `text` 以 `"` 起头时，那一个字符串字面量连两头引号的长度（反斜杠连同它转义的那个字跳过）。
+    fn length_of_the_quoted_literal_at_the_start(text: &str) -> usize {
+        let bytes = text.as_bytes();
+        let mut position = 1;
+        loop {
+            let byte = *bytes.get(position).expect("字符串字面量有收尾的引号");
+            if byte == b'"' {
+                return position + 1;
+            }
+            position += if byte == b'\\' { 2 } else { 1 };
+        }
+    }
+
+    /// `text` 以 `'` 起头时，那一个字符字面量连两头引号的长度；是生命周期（`'static`、`'_`）交 `None`。
+    fn length_of_the_character_literal_at_the_start(text: &str) -> Option<usize> {
+        let after_the_quote = &text[1..];
+        if after_the_quote.starts_with('\\') {
+            // 转义的（`'\''`、`'\n'`、`'\u{7b}'`）：收尾的引号在反斜杠与它后面那个字之后
+            let closing_quote = 3 + text[3..].find('\'').expect("转义的字符字面量有收尾的引号");
+            return Some(closing_quote + 1);
+        }
+        let first_character = after_the_quote.chars().next().expect("引号后面还有字");
+        after_the_quote[first_character.len_utf8()..]
+            .starts_with('\'')
+            .then(|| first_character.len_utf8() + 2)
+    }
+
+    /// `text` 是原始字符串去掉 `r`、`br`、`cr` 之后那一截（以若干个 `#` 与一个 `"` 起头）时，到收尾的 `"` 与同样多个 `#` 为止的长度。
+    fn length_of_the_raw_string_at_the_start(text: &str) -> usize {
+        let hashes = text.len() - text.trim_start_matches('#').len();
+        let closing = format!("\"{}", "#".repeat(hashes));
+        let body_start = hashes + 1;
+        body_start + text[body_start..].find(&closing).expect("原始字符串有收尾") + closing.len()
+    }
+
+    /// `text` 以 `/*` 起头时，那一段块注释（可以嵌套）的长度。
+    fn length_of_the_block_comment_at_the_start(text: &str) -> usize {
+        let mut depth = 0_usize;
+        let mut position = 0;
+        loop {
+            let rest = &text[position..];
+            if rest.starts_with("/*") {
+                depth += 1;
+                position += 2;
+            } else if rest.starts_with("*/") {
+                depth -= 1;
+                position += 2;
+                if depth == 0 {
+                    return position;
+                }
+            } else {
+                position += rest.chars().next().expect("块注释有收尾").len_utf8();
+            }
+        }
+    }
+
+    /// 拼成关键字的原始标识符（`r#mod`、`r#use`）是名字，不是关键字：分词时这几个连着 `r#` 出词，免得被当成关键字（第 10z 批第二十三块，
+    /// 正推 K4-2 L14）；别的原始标识符（`r#std`）与不带 `r#` 的同名，取它后面的名字。
+    const KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL: [&str; 48] = [
+        "abstract", "as", "async", "await", "become", "box", "break", "const", "continue", "do",
+        "dyn", "else", "enum", "extern", "false", "final", "fn", "for", "gen", "if", "impl", "in",
+        "let", "loop", "macro", "match", "mod", "move", "mut", "override", "priv", "pub", "ref",
+        "return", "static", "struct", "trait", "true", "try", "type", "typeof", "unsafe",
+        "unsized", "use", "virtual", "where", "while", "yield",
+    ];
+
+    /// `code` 拆成的词：标识符与关键字（`r#` 原始标识符取它后面的名字，拼成关键字的连着 `r#`）、生命周期（连着它前面的 `'`）、
+    /// 数字（照标识符那样收一段）、`::`、`!=`，其余标点一个字一个词；注释（行注释、可以嵌套的块注释）、字符串与字符字面量
+    /// （普通的、原始的 `r#"…"#`、`br`、`cr`，字节的、C 的）不出词。认原始字符串的写法与崩溃放量那一份数花括号
+    /// （`crash_amplification.rs` 的 `lines_read_past_comments_and_literals`）相同：`r`、`br`、`cr` 后面紧跟若干个 `#` 与一个 `"`。
+    /// 扫源码的用例照它找条目、`use` 引进来的名字与花括号的层数：字面量与注释里的 `mod`、`use`、花括号都不算。
+    /// 非 ASCII 的字只落在注释、字面量与标识符里，切出来的词因此总在字符边界上。
+    fn rust_tokens_without_comments_and_literals(code: &str) -> Vec<&str> {
+        rust_tokens_with_their_offsets(code)
+            .into_iter()
+            .map(|(_offset, token)| token)
+            .collect()
+    }
+
+    /// [`rust_tokens_without_comments_and_literals`] 的词，各连同它在 `code` 里起头的字节位置。
+    fn rust_tokens_with_their_offsets(code: &str) -> Vec<(usize, &str)> {
+        let is_identifier_character =
+            |character: char| character.is_alphanumeric() || character == '_';
+        let mut tokens = Vec::new();
+        let mut position = 0;
+        while position < code.len() {
+            let rest = &code[position..];
+            let first_character = rest.chars().next().expect("没到结尾就还有字");
+            if first_character.is_whitespace() {
+                position += first_character.len_utf8();
+            } else if rest.starts_with("//") {
+                position += rest.find('\n').unwrap_or(rest.len());
+            } else if rest.starts_with("/*") {
+                position += length_of_the_block_comment_at_the_start(rest);
+            } else if first_character == '"' {
+                position += length_of_the_quoted_literal_at_the_start(rest);
+            } else if first_character == '\'' {
+                match length_of_the_character_literal_at_the_start(rest) {
+                    Some(literal_length) => position += literal_length,
+                    None => {
+                        let lifetime_length = 1 + rest[1..]
+                            .find(|character: char| !is_identifier_character(character))
+                            .unwrap_or(rest.len() - 1);
+                        tokens.push((position, &rest[..lifetime_length]));
+                        position += lifetime_length;
+                    }
+                }
+            } else if is_identifier_character(first_character) {
+                let word_length = rest
+                    .find(|character: char| !is_identifier_character(character))
+                    .unwrap_or(rest.len());
+                let word = &rest[..word_length];
+                let after_the_word = &rest[word_length..];
+                if matches!(word, "r" | "br" | "cr")
+                    && after_the_word.trim_start_matches('#').starts_with('"')
+                {
+                    position += word_length + length_of_the_raw_string_at_the_start(after_the_word);
+                } else if word == "r" && after_the_word.starts_with('#') {
+                    // 原始标识符 `r#名字`：拼成关键字的连着 `r#` 出词（`r#mod` 是名字，不是关键字），别的名字下一圈照标识符收
+                    let name = &after_the_word[1..];
+                    let name_length = name
+                        .find(|character: char| !is_identifier_character(character))
+                        .unwrap_or(name.len());
+                    if KEYWORDS_A_RAW_IDENTIFIER_CAN_SPELL.contains(&&name[..name_length]) {
+                        tokens.push((position, &rest[..word_length + 1 + name_length]));
+                        position += word_length + 1 + name_length;
+                    } else {
+                        position += word_length + 1;
+                    }
+                } else if matches!(word, "b" | "c") && after_the_word.starts_with('"') {
+                    position +=
+                        word_length + length_of_the_quoted_literal_at_the_start(after_the_word);
+                } else if word == "b" && after_the_word.starts_with('\'') {
+                    position += word_length
+                        + length_of_the_character_literal_at_the_start(after_the_word)
+                            .expect("b 后面紧跟引号的是字节字面量");
+                } else {
+                    tokens.push((position, word));
+                    position += word_length;
+                }
+            } else if rest.starts_with("::") {
+                tokens.push((position, "::"));
+                position += 2;
+            } else if rest.starts_with("!=") {
+                // 不等号整个一个词：拆成 `!`、`=` 时，条目层 `const 名: bool = 甲 != 乙;` 的 `甲 !` 会被认成调宏
+                tokens.push((position, "!="));
+                position += 2;
+            } else {
+                tokens.push((position, &rest[..first_character.len_utf8()]));
+                position += first_character.len_utf8();
+            }
+        }
+        tokens
+    }
+
+    /// `source`（这份源文件，或用例在它上面改过的一份）测试模块头两行之前的那一段。头两行只认这一种，与崩溃放量那一份
+    /// （`crash_amplification.rs` 的 `text_outside_the_tests_module`）同一口径、按行逐字：
+    /// - 相邻两整行逐字是 [`TESTS_MODULE_OPENING`] 那两行（`#[cfg(test)]`，与 `mod tests`、一个空格、一个左花括号；行首起、行尾止，不带别的空白与注释，换行是 `\n`），在代码里（注释与字面量之外）；
+    /// - 在花括号的第 0 层，也在圆括号、方括号的第 0 层；
+    /// - 前一个词（空白、注释、字面量都跳过）是分号、右花括号、右方括号或文件开头。
+    ///
+    /// 照原文找第一处时，注释或字符串里写一份头两行就把切口挪到那里，它与真测试模块之间的代码哪一条扫源码的用例都看不见（第 10z 批第二十三块，
+    /// 攻方 K4-2）；拿一个吃掉 `#[cfg(test)]` 的宏把测试模块包进一次宏调用的圆括号里，那个「测试模块」在非测试构建里照编，头两行却仍在
+    /// 花括号第 0 层（第 10z 批第二十五块，正推 K4-1 S14），宏调用的括号里头两行前一个词是 `(`，前面先放一条以分号收尾的条目也还在
+    /// 圆括号里。卡池这一份原先按词认头两行，第二十五块对齐成按行逐字：这两份文件是 rustfmt 出的，头两行就是这一种写法，
+    /// 别的写法（`mod tests` 后面不空格就接左花括号、写在一行、`#[ cfg ( test ) ]`、多空格、缩进、行尾带空白或注释、CRLF 换行）一律判红，是故意拒。
+    ///
+    /// # Panics
+    /// 照上面那样认的头两行不是恰好一处。
+    fn code_before_the_tests_module(source: &str) -> &str {
+        let tokens = rust_tokens_with_their_offsets(source);
+        let mut brace_depth = 0_usize;
+        let mut parenthesis_and_bracket_depth = 0_usize;
+        let mut openings = Vec::new();
+        for (index, (offset, token)) in tokens.iter().enumerate() {
+            let token_before_the_attribute = index
+                .checked_sub(1)
+                .map(|index_before| tokens[index_before].1);
+            if *token == "#"
+                && is_the_tests_module_opening_as_two_whole_lines_at(source, *offset)
+                && brace_depth == 0
+                && parenthesis_and_bracket_depth == 0
+                && token_before_the_attribute
+                    .is_none_or(|token_before| matches!(token_before, ";" | "\u{7d}" | "]"))
+            {
+                openings.push(*offset);
+            }
+            if *token == "\u{7b}" {
+                brace_depth += 1;
+            } else if *token == "\u{7d}" {
+                brace_depth = brace_depth.checked_sub(1).expect("右花括号不多于左花括号");
+            } else if matches!(*token, "(" | "[") {
+                parenthesis_and_bracket_depth += 1;
+            } else if matches!(*token, ")" | "]") {
+                parenthesis_and_bracket_depth = parenthesis_and_bracket_depth
+                    .checked_sub(1)
+                    .expect("右圆括号、右方括号不多于左的");
+            }
+        }
+        assert_eq!(
+            openings.len(),
+            1,
+            "代码里测试模块的头两行恰好一处（两整行逐字、括号第 0 层、前一个词是条目收尾；注释、字符串、宏调用括号里的不算），读到的字节位置：{openings:?}"
+        );
+        &source[..openings[0]]
+    }
+
+    /// `source` 从 `offset` 起是不是测试模块头两行那两整行：`offset` 在行首（文件开头或紧跟 `\n`），往后逐字是 [`TESTS_MODULE_OPENING`]，
+    /// 再往后是 `\n` 或文件结尾。
+    fn is_the_tests_module_opening_as_two_whole_lines_at(source: &str, offset: usize) -> bool {
+        let starts_a_line = offset == 0 || source[..offset].ends_with('\n');
+        starts_a_line
+            && source[offset..]
+                .strip_prefix(TESTS_MODULE_OPENING)
+                .is_some_and(|after_the_opening| {
+                    after_the_opening.is_empty() || after_the_opening.starts_with('\n')
+                })
+    }
+
+    /// 这份源码（测试那一段之外）里卡池模块（`mod card_pool`）的词，各带它在模块里第几层花括号里：从模块的左花括号之后
+    /// 到与它配对的右花括号之前，模块的条目在第 0 层（左花括号算它外面那一层，右花括号算它收回到的那一层）。
+    /// 卡池模块按词恰好一处、不挂 `#[cfg]`（[`index_of_the_one_pinned_item_without_a_conditional_attribute`]）：取第一处时，前面放一份挂 `#[cfg(any())]`、
+    /// 只有那四条 `use` 的干净卡池模块，扫的就是它，真生效的那一份里另起 `mod wgpu` 也看不见（第 10z 批第二十五块，与正推 K4-1 G14 同形）。
+    fn card_pool_module_tokens_with_their_brace_depth(code: &str) -> Vec<(usize, &str)> {
+        let tokens = rust_tokens_without_comments_and_literals(code);
+        let module_keyword = index_of_the_one_pinned_item_without_a_conditional_attribute(
+            &tokens,
+            &["mod", "card_pool"],
+        );
+        assert_eq!(
+            tokens.get(module_keyword + 2),
+            Some(&"\u{7b}"),
+            "卡池模块写在这一段里（mod card_pool 后面紧跟左花括号，不是 mod card_pool; 另起文件）"
+        );
+        let opening = module_keyword + 3;
+        let mut depth = 0_usize;
+        let mut module_tokens = Vec::new();
+        for token in &tokens[opening..] {
+            if *token == "\u{7b}" {
+                module_tokens.push((depth, *token));
+                depth += 1;
+            } else if *token == "\u{7d}" {
+                let Some(depth_after_the_closing) = depth.checked_sub(1) else {
+                    return module_tokens;
+                };
+                depth = depth_after_the_closing;
+                module_tokens.push((depth, *token));
+            } else {
+                module_tokens.push((depth, *token));
+            }
+        }
+        panic!("卡池模块有与它的左花括号配对的右花括号")
+    }
+
+    /// 一条 `use` 引进来的一样东西。
+    enum BroughtInByAUse {
+        /// 引进一个名字：`source` 是被引的那一处的全路径（`甲::乙`；花括号里的 `self` 取花括号之前那一段），
+        /// `name` 是它在这里叫什么（有 `as` 的取改成的那个名字）。
+        Name { source: String, name: String },
+        /// 通配（`甲::乙::*`）：引进来哪些名字，扫这一个模块的源码看不见。
+        Glob { source: String },
+    }
+
+    /// `outer_path` 后面接上 `segments`，用 `::` 连起来（`outer_path` 空着就只是 `segments`）。
+    fn path_joined(outer_path: &str, segments: &[&str]) -> String {
+        outer_path
+            .split("::")
+            .filter(|segment| !segment.is_empty())
+            .chain(segments.iter().copied())
+            .collect::<Vec<&str>>()
+            .join("::")
+    }
+
+    /// `statement`（一条 `use` 从 `use` 那个词到分号的词）从 `start` 起的一棵 use 树（`甲::乙`、`甲::乙 as 丙`、`甲::self`、`甲::*`、
+    /// `甲::{…}`，花括号可以套几层）引进来的东西，路径前面接着外层花括号之前那一段 `outer_path`；连同这棵树收尾之后那个词的位置
+    /// （逗号、右花括号或分号）。
+    fn brought_in_by_a_use_tree(
+        statement: &[&str],
+        start: usize,
+        outer_path: &str,
+    ) -> (Vec<BroughtInByAUse>, usize) {
+        let mut segments: Vec<&str> = Vec::new();
+        let mut position = start;
+        loop {
+            let token = *statement.get(position).expect("use 树在分号之前收尾");
+            if token == "::" {
+                position += 1;
+            } else if token == "*" {
+                let glob = BroughtInByAUse::Glob {
+                    source: path_joined(outer_path, &segments),
+                };
+                return (vec![glob], position + 1);
+            } else if token == "\u{7b}" {
+                let group_path = path_joined(outer_path, &segments);
+                let mut brought_in = Vec::new();
+                position += 1;
+                while statement[position] != "\u{7d}" {
+                    let (brought_in_by_the_inner_tree, after_the_inner_tree) =
+                        brought_in_by_a_use_tree(statement, position, &group_path);
+                    brought_in.extend(brought_in_by_the_inner_tree);
+                    position =
+                        after_the_inner_tree + usize::from(statement[after_the_inner_tree] == ",");
+                }
+                return (brought_in, position + 1);
+            } else {
+                segments.push(token);
+                position += 1;
+                if statement.get(position) == Some(&"::") {
+                    continue;
+                }
+                let is_self = token == "self";
+                let source = path_joined(
+                    outer_path,
+                    &segments[..segments.len() - usize::from(is_self)],
+                );
+                let name_without_a_rename = if is_self {
+                    source
+                        .rsplit("::")
+                        .next()
+                        .expect("rsplit 至少交一段")
+                        .to_string()
+                } else {
+                    token.to_string()
+                };
+                let (name, after_the_tree) = if statement.get(position) == Some(&"as") {
+                    (statement[position + 1].to_string(), position + 2)
+                } else {
+                    (name_without_a_rename, position)
+                };
+                return (vec![BroughtInByAUse::Name { source, name }], after_the_tree);
+            }
+        }
+    }
+
+    /// 钉住那两段（借之前那一步、借据丢掉时那一步）按名字调的函数，各连同它该从哪一处 `use` 进卡池模块。
+    const FUNCTIONS_THE_PINNED_BODIES_CALL_BY_NAME: [(&str, &str); 4] = [
+        ("super::super", "device_found_idle_by_a_poll"),
+        ("super::super", "poll_type_before_returning_a_lease"),
+        ("super::super", "device_wait_before_returning_a_lease"),
+        (
+            "singlefs_harness::gpu_memory_ledger",
+            "wait_for_the_device_and_take_in_the_outcome",
+        ),
+    ];
+
+    /// 钉住那两段（借之前那一步、借据丢掉时那一步）的签名，按词。
+    const SIGNATURES_OF_THE_PINNED_BODIES: [&[&str]; 2] = [
+        &["fn", "take_in_the_devices_found_idle"],
+        &["impl", "Drop", "for", "GpuCardLease"],
+    ];
+
+    /// 卡池模块的词（`module_tokens`，各带花括号层数）里第 `index` 个词所在的作用域罩不罩得到钉住那两段：在模块这一层（第 0 层）的罩得到；
+    /// 在花括号里的（函数体、块）只罩它那一对花括号里，那一对花括号里有钉住那两段的签名才罩得到。
+    fn does_the_scope_of_the_token_reach_the_pinned_bodies(
+        module_tokens: &[(usize, &str)],
+        index: usize,
+    ) -> bool {
+        let Some(enclosing_depth) = module_tokens[index].0.checked_sub(1) else {
+            return true;
+        };
+        let opening = module_tokens[..index]
+            .iter()
+            .rposition(|(depth, token)| *depth == enclosing_depth && *token == "\u{7b}")
+            .expect("第 1 层往里的词前面有开这一层的左花括号");
+        let closing = index
+            + module_tokens[index..]
+                .iter()
+                .position(|(depth, token)| *depth == enclosing_depth && *token == "\u{7d}")
+                .expect("第 1 层往里的词后面有收这一层的右花括号");
+        let block: Vec<&str> = module_tokens[opening..=closing]
+            .iter()
+            .map(|(_depth, token)| *token)
+            .collect();
+        SIGNATURES_OF_THE_PINNED_BODIES.iter().any(|signature| {
+            block
+                .windows(signature.len())
+                .any(|window| window == *signature)
+        })
+    }
+
+    /// `tokens` 里第 `index` 个词（一个条目的头一个词）前面挂着的属性，各取 `#[` 之后的头一个词（`cfg`、`cfg_attr`、`allow`……），
+    /// 照源码倒着；属性与条目之间的 `pub`、`pub(…)` 跳过。
+    fn names_of_the_attributes_right_before<'token>(
+        tokens: &[&'token str],
+        index: usize,
+    ) -> Vec<&'token str> {
+        let mut item_start = index;
+        if item_start > 0 && tokens[item_start - 1] == "pub" {
+            item_start -= 1;
+        } else if item_start > 1 && tokens[item_start - 1] == ")" {
+            let visibility_opening = tokens[..item_start - 1]
+                .iter()
+                .rposition(|token| *token == "(");
+            if let Some(parenthesis) = visibility_opening.filter(|parenthesis| {
+                parenthesis.checked_sub(1).map(|before| tokens[before]) == Some("pub")
+            }) {
+                item_start = parenthesis - 1;
+            }
+        }
+        let mut names = Vec::new();
+        while item_start > 0 && tokens[item_start - 1] == "]" {
+            let mut unclosed_brackets = 0_usize;
+            let mut attribute_opening = None;
+            for token_index in (0..item_start).rev() {
+                if tokens[token_index] == "]" {
+                    unclosed_brackets += 1;
+                } else if tokens[token_index] == "[" {
+                    unclosed_brackets -= 1;
+                    if unclosed_brackets == 0 {
+                        attribute_opening = Some(token_index);
+                        break;
+                    }
+                }
+            }
+            let Some(bracket) = attribute_opening
+                .filter(|bracket| bracket.checked_sub(1).map(|before| tokens[before]) == Some("#"))
+            else {
+                break;
+            };
+            names.extend(tokens.get(bracket + 1).copied());
+            item_start = bracket - 1;
+        }
+        names
+    }
+
+    /// `tokens`（一段代码的词）里钉住的那一个条目，交 `signature`（按词：`["fn", 名字]`、`["mod", 名字]`、`["Drop", "for", 类型]`）
+    /// 在 `tokens` 里那一处的下标。按词恰好一处，那个条目（往前到最近的 `impl`、`fn`、`mod`，再往前跳过 `const`、`async`、`unsafe`、
+    /// `extern`、`safe`）前面不挂 `#[cfg]`、`#[cfg_attr]`：取第一处时，前面先放一份挂 `#[cfg(any())]` 的干净副本、后面写真生效的坏版本，
+    /// 读到的是编译时去掉的那一份（第 10z 批第二十五块，正推 K4-1 G14、G16）；只有一份而挂着 `#[cfg]` 的，编译时整个去掉。
+    /// 与第二十三块 `use` 上挂 `#[cfg]` 判红是同一个判法（[`names_of_the_attributes_right_before`]）。
+    ///
+    /// # Panics
+    /// 按词不是恰好一处，或那一处的条目挂着 `#[cfg]`、`#[cfg_attr]`。
+    fn index_of_the_one_pinned_item_without_a_conditional_attribute(
+        tokens: &[&str],
+        signature: &[&str],
+    ) -> usize {
+        let places: Vec<usize> = tokens
+            .windows(signature.len())
+            .enumerate()
+            .filter(|(_index, window)| *window == signature)
+            .map(|(index, _window)| index)
+            .collect();
+        assert_eq!(
+            places.len(),
+            1,
+            "钉住的 {signature:?} 按词恰好一处（挂 #[cfg(any())] 的干净副本在前、真生效的在后，取第一处就读到副本），读到的词下标：{places:?}"
+        );
+        let item_keyword = tokens[..=places[0]]
+            .iter()
+            .rposition(|token| matches!(*token, "impl" | "fn" | "mod"))
+            .expect("钉住的条目由 impl、fn 或 mod 起头");
+        let qualifiers = tokens[..item_keyword]
+            .iter()
+            .rev()
+            .take_while(|token| matches!(**token, "const" | "async" | "unsafe" | "extern" | "safe"))
+            .count();
+        let attributes = names_of_the_attributes_right_before(tokens, item_keyword - qualifiers);
+        assert!(
+            !attributes
+                .iter()
+                .any(|attribute| matches!(*attribute, "cfg" | "cfg_attr")),
+            "钉住的 {signature:?} 前面挂着 {attributes:?}：#[cfg] 让它编译时去掉"
+        );
+        places[0]
+    }
+
+    /// `code`（这份源码测试那一段之外，或用例造的一段）的卡池模块里，能把钉住那两段按路径首段解析的 `std`、`wgpu` 与按名字调的
+    /// 那几个函数换掉的写法，一处一句；一处没有交空。判法与名单在 `the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call`。
+    fn ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(
+        code: &str,
+    ) -> Vec<String> {
+        let module_tokens = card_pool_module_tokens_with_their_brace_depth(code);
+        let tokens: Vec<&str> = module_tokens.iter().map(|(_depth, token)| *token).collect();
+        let mut found = Vec::new();
+        if tokens.contains(&"mod") {
+            found.push(
+                "卡池模块里另起模块：叫 std、wgpu 的直接遮住外部 crate，别的名字的经 #[macro_use] 把宏漏到这一层、mod 名字; 与 #[path] 的源码不在这一段里"
+                    .to_string(),
+            );
+        }
+        for pair in tokens.windows(2) {
+            if pair == ["extern", "crate"] {
+                found.push(
+                    "卡池模块里写 extern crate：extern crate … as std 遮住外部 crate".to_string(),
+                );
+            }
+        }
+        for (index, pair) in module_tokens.windows(2).enumerate() {
+            // 条目这一层的宏前面是上一个条目的收尾、属性的右方括号，或者模块的开头；跟在 = 后面、属性方括号里的是表达式宏
+            // （`const _: () = assert!(…);`、`#[doc = include_str!(…)]`），展开不出条目（第 10z 批第二十三块，正推 K4-2 L7–L9）
+            let token_before = index
+                .checked_sub(1)
+                .map(|index_before| module_tokens[index_before].1);
+            if pair[0].0 == 0
+                && pair[1].1 == "!"
+                && pair[0]
+                    .1
+                    .starts_with(|character: char| character.is_alphanumeric() || character == '_')
+                && token_before.is_none_or(|token| matches!(token, ";" | "\u{7d}" | "]"))
+            {
+                found.push(format!(
+                    "卡池模块的条目这一层调宏或定义宏 {}!：宏展开出来的条目也能叫 std、wgpu",
+                    pair[0].1
+                ));
+            }
+        }
+        // 一条 use 后面不会紧跟 <：`impl Trait + use<'a>` 里的 use 是精确捕获（第 10z 批第二十三块，正推 K4-2 L10）；
+        // 块里的 use 只在那一对花括号里有效，块里没有钉住那两段的签名就罩不到它们（攻方 K4-2 g2）
+        let use_indices: Vec<usize> = tokens
+            .iter()
+            .enumerate()
+            .filter(|(use_index, token)| {
+                **token == "use"
+                    && tokens.get(use_index + 1) != Some(&"<")
+                    && does_the_scope_of_the_token_reach_the_pinned_bodies(
+                        &module_tokens,
+                        *use_index,
+                    )
+            })
+            .map(|(use_index, _token)| use_index)
+            .collect();
+        let use_statement_at = |use_index: usize| -> &[&str] {
+            let length = tokens[use_index..]
+                .iter()
+                .position(|token| *token == ";")
+                .expect("use 以分号收尾")
+                + 1;
+            &tokens[use_index..use_index + length]
+        };
+        let use_statements: Vec<&[&str]> = use_indices
+            .iter()
+            .map(|use_index| use_statement_at(*use_index))
+            .collect();
+        let mut brought_in = Vec::new();
+        for statement in &use_statements {
+            let (brought_in_by_the_statement, end_of_the_tree) =
+                brought_in_by_a_use_tree(statement, 1, "");
+            assert_eq!(
+                end_of_the_tree,
+                statement.len() - 1,
+                "use 树读到分号收尾：{statement:?}"
+            );
+            brought_in.extend(brought_in_by_the_statement);
+        }
+        for use_index in &use_indices {
+            let attributes = names_of_the_attributes_right_before(&tokens, *use_index);
+            let Some(conditional_attribute) = attributes
+                .iter()
+                .find(|attribute| matches!(**attribute, "cfg" | "cfg_attr"))
+            else {
+                continue;
+            };
+            let (brought_in_by_the_statement, _end_of_the_tree) =
+                brought_in_by_a_use_tree(use_statement_at(*use_index), 1, "");
+            for brought_in_by_a_use in &brought_in_by_the_statement {
+                match brought_in_by_a_use {
+                    BroughtInByAUse::Name { source: _, name }
+                        if FUNCTIONS_THE_PINNED_BODIES_CALL_BY_NAME
+                            .iter()
+                            .any(|(_prefix, function)| function == name) =>
+                    {
+                        found.push(format!(
+                            "卡池模块里挂 #[{conditional_attribute}] 的 use 引进钉住那两段按名字调的 {name}：编译时这条 use 可以被去掉，按名字调的就落到模块里另起的同名函数上"
+                        ));
+                    }
+                    BroughtInByAUse::Name { .. } | BroughtInByAUse::Glob { .. } => {}
+                }
+            }
+        }
+        for brought_in_by_a_use in &brought_in {
+            match brought_in_by_a_use {
+                BroughtInByAUse::Glob { source } => found.push(format!(
+                    "卡池模块里通配 use {source}::*：引进来的名字（叫 std、wgpu 的模块也算）扫这一段看不见"
+                )),
+                BroughtInByAUse::Name { source, name } => {
+                    // use wgpu; 引的就是外部 crate 自己，遮不住它（攻方 K4-2 g1）
+                    if matches!(name.as_str(), "std" | "wgpu") && source != name {
+                        found.push(format!(
+                            "卡池模块经 use 引进叫 {name} 的名字（引的是 {source}），遮住外部 crate"
+                        ));
+                    }
+                }
+            }
+        }
+        for (expected_prefix, function) in FUNCTIONS_THE_PINNED_BODIES_CALL_BY_NAME {
+            let sources_brought_in_under_the_name: Vec<&str> = brought_in
+                .iter()
+                .filter_map(|brought_in_by_a_use| match brought_in_by_a_use {
+                    BroughtInByAUse::Name { source, name } if name == function => {
+                        Some(source.as_str())
+                    }
+                    BroughtInByAUse::Name { .. } | BroughtInByAUse::Glob { .. } => None,
+                })
+                .collect();
+            let expected_source = format!("{expected_prefix}::{function}");
+            if sources_brought_in_under_the_name != [expected_source.as_str()] {
+                found.push(format!(
+                    "钉住那两段按名字调的 {function} 要由一条 use 从 {expected_source} 引进卡池模块，引进来的是 {sources_brought_in_under_the_name:?}"
+                ));
+            }
+        }
+        found
+    }
+
+    /// 第 10z 批第十八块（第 10z 批第十四、十五块代码轮判决 K4，攻方：卡池模块里加 `mod wgpu { … }` 或 `mod std { … }` 遮住方法体里的
+    /// `wgpu::PollType::Poll`、`std::panic::catch_unwind`，方法体一个字不动、`cargo check` 0 警告编过，整句比照绿）：钉住的两段（借之前那一步、
+    /// 借据丢掉时那一步）里按路径首段解析的 `std`、`wgpu` 与按名字调的那几个函数，在卡池模块这一层只落到外部 crate 与 `use` 点名的那一处。
+    /// 这一层能把一个名字换掉的写法，逐样拒：`use` 引进叫 `std` 或 `wgpu` 的名字（改名 `as`、花括号里的 `self`、几层花括号里的都照引进来的名字认）、
+    /// `extern crate`；那几个函数各由一条 `use` 从钉住的那一处引进来（引了它，模块里再起同名的条目编译不过；去掉 `use` 另起一个、
+    /// 或 `use 别处::某函数 as 那个名字` 就是这里红）。扫这份源码（测试那一段之外，注释与字面量不算），不要卡。
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K5，正推：以后合法的写法被判红）逐类判过：`!=` 被当成调宏是误判，改了；
+    /// `use … as 别的名字`、两层花括号、`use 甲::{self, …}`、`extern "C" { … }` 换不掉钉住那两段用的名字，是误判，改了
+    /// （`the_card_pool_scan_reads_an_item_level_not_equal_as_a_comparison_and_still_finds_an_item_level_macro`、
+    /// `the_card_pool_scan_accepts_renames_nested_groups_and_self_that_bring_in_neither_std_nor_wgpu`、
+    /// `the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_brought_in_under_a_rename_a_nested_group_or_self`、
+    /// `the_card_pool_scan_accepts_an_extern_block_and_still_finds_extern_crate`）。
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4）：挂 `#[cfg]`、`#[cfg_attr]` 的 `use` 引进钉住那两段调的函数判红——编译时
+    /// 那条 `use` 去掉，按名字调的就落到模块里另起的同名函数上（正推 K4-1 B12、B13，
+    /// `the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_cfg`）；换不掉那几个名字的几样判绿
+    /// （`the_card_pool_scan_accepts_writings_that_cannot_replace_what_the_pinned_bodies_call`）：`use wgpu;` 引的就是外部 crate 自己；
+    /// 块里的 `use`（函数体里 `use core as std;`）只罩那一对花括号，里面没有钉住那两段的签名就不拒，有就照拒
+    /// （`the_card_pool_scan_finds_a_rename_in_a_block_holding_a_pinned_body_and_an_item_level_macro_under_an_attribute`）；
+    /// 属性与常量、静态量初始值里的表达式宏（`include_str!`、`assert!`、`concat!`）展开不出条目；`impl … + use<'a>` 的 `use` 是精确捕获；
+    /// 分词认 `cr#"…"#`、`c"…"`（与崩溃放量那一份认法相同），拼成关键字的原始标识符（`r#mod`）是名字。测试模块只从代码里那一处头两行切
+    /// （`the_card_pool_scans_cut_the_tests_module_at_its_opening_in_code_not_at_a_copy_in_a_comment_or_a_string`）。
+    ///
+    /// 故意拒的写法（换不换得掉那几个名字，扫这一个模块的源码判不出），一种一条，各写为什么
+    /// （`the_card_pool_scan_refuses_globs_item_level_macros_and_inner_modules_even_when_they_name_nothing_pinned`）：
+    /// - 通配 `use 甲::*`：引进来哪些名字要看 `甲` 里有什么，`甲` 里有叫 `std`、`wgpu` 的模块就遮住外部 crate；要用就逐个点名；
+    /// - 条目这一层调宏或定义宏（`thread_local!` 也算）：宏名按文本作用域解析，卡池模块外面先定义的同名 `macro_rules!` 会顶替标准库那一个，
+    ///   展开出来的条目也能叫 `std`、`wgpu`；要用就放进函数体里；
+    /// - 另起模块（`#[cfg(test)] mod …` 也算）：叫 `std`、`wgpu` 的直接遮住外部 crate，别的名字的经 `#[macro_use]` 把里面的宏漏到这一层，
+    ///   `mod 名字;` 与 `#[path]` 的源码不在这一段里；单测写在这份文件的测试模块里。函数体里的 `mod` 也拒（第 10z 批第二十五块写明，
+    ///   正推 K4-2 N33）：它只罩那个函数体、遮不住钉住那两段，是合法写法，判红是故意的，判法不分模块写在哪一层；
+    /// - `extern crate`，挂 `#[cfg(any())]` 的也拒（第 10z 批第二十五块写明，正推 K4-2）：编译时去掉的那一条遮不住什么，是合法写法，
+    ///   判红是故意的，判法不看 `extern crate` 上挂的属性。
+    ///
+    /// 测试模块头两行换写法（`mod tests` 后面不空格就接左花括号、写在一行、`#[ cfg ( test ) ]`、多空格、缩进、行尾带空白或注释）与 CRLF 换行，切口当场判红，
+    /// 也是故意拒（[`code_before_the_tests_module`]）。
+    ///
+    /// 拦不住的写法（扫这一个模块的源码看不见），一种一条：
+    /// - 过程宏（派生宏、属性宏）在卡池模块里展开出来的条目；
+    /// - crate 根上改 `std` 指什么（`#![no_std]` 加 `extern crate … as std`）；
+    /// - `Cargo.toml` 里把 `wgpu` 换成另一个包（`package = …`）；
+    /// - 被引的那一处自己换了：`super::super` 那一层的同名函数改了，或改成从别处 `pub use` 进来；
+    /// - 过程宏（属性宏）挂在测试模块上、或把它包住，把测试模块编进非测试构建：切口（[`code_before_the_tests_module`]）只认头两行的写法与
+    ///   所在的层，宏做了什么扫源码看不见。
+    fn the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call()
+    {
+        let source = source_text();
+        let code = code_before_the_tests_module(source);
+        assert_eq!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(code),
+            Vec::<String>::new(),
+            "卡池模块这一层不换掉钉住那两段按路径首段解析的 std、wgpu 与按名字调的那几个函数"
+        );
+    }
+
+    /// 用例造的卡池模块：头上照真源码那样把钉住那两段按名字调的四个函数各 `use` 进来，再接 `items`（花括号写成 \u 转义）。
+    fn card_pool_module_with_the_pinned_uses_and(items: &str) -> String {
+        let mut module = String::from(concat!(
+            "mod card_pool \u{7b}\n",
+            "    use super::super::\u{7b}\n",
+            "        device_found_idle_by_a_poll, device_wait_before_returning_a_lease,\n",
+            "        poll_type_before_returning_a_lease,\n",
+            "    \u{7d};\n",
+            "    use singlefs_harness::gpu_memory_ledger::wait_for_the_device_and_take_in_the_outcome;\n",
+        ));
+        module.push_str(items);
+        module.push_str("\n\u{7d}\n");
+        module
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K5，正推 `K5_const_ne`、`K5_const_ne_ident`）：条目这一层的
+    /// `const 名: bool = 甲 != 乙;` 是比较，不是调宏 `甲!`；条目这一层真调宏（`thread_local!`）照旧拒。不要卡。
+    /// 第 10z 批第二十三块：条目层的宏另看前一个词（跟在 `=` 后面的不算）之后，`!=` 拆成两个词也不再被认成调宏，两道各自拦得住这一形；
+    /// 分词把 `!=` 当一个词这一道另由头一句断言钉住。
+    fn the_card_pool_scan_reads_an_item_level_not_equal_as_a_comparison_and_still_finds_an_item_level_macro(
+    ) {
+        assert_eq!(
+            rust_tokens_without_comments_and_literals("FIRST_LIMIT!=SECOND_LIMIT"),
+            ["FIRST_LIMIT", "!=", "SECOND_LIMIT"],
+            "分词把不等号当一个词：拆成 ! 与 = 时 甲 ! 读起来像调宏"
+        );
+        let comparisons = card_pool_module_with_the_pinned_uses_and(concat!(
+            "    const FIRST_LIMIT: u8 = 1;\n",
+            "    const SECOND_LIMIT: u8 = 2;\n",
+            "    const THE_LIMITS_DIFFER: bool = FIRST_LIMIT != SECOND_LIMIT;\n",
+            "    const THE_LITERALS_DIFFER: bool = 1 != 2;\n",
+            "    const THE_LIMITS_DIFFER_WITHOUT_SPACES: bool = FIRST_LIMIT!=SECOND_LIMIT;",
+        ));
+        assert_eq!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&comparisons),
+            Vec::<String>::new(),
+            "条目这一层的 != 是比较，不算调宏：{comparisons}"
+        );
+        let item_level_macro = card_pool_module_with_the_pinned_uses_and(
+            "    thread_local! \u{7b} static COUNT: std::cell::Cell<u8> = std::cell::Cell::new(0); \u{7d}",
+        );
+        assert_ne!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&item_level_macro),
+            Vec::<String>::new(),
+            "条目这一层调宏照旧拒：{item_level_macro}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K5，正推 `K5_use_as`、`K5_nested_use_braces`、`K5_pub_use_self_group`）：
+    /// 改成别的名字、两层花括号、花括号里的 `self` 引进来的名字既不叫 `std`、`wgpu`，也不是钉住那两段调的函数，不拒。不要卡。
+    fn the_card_pool_scan_accepts_renames_nested_groups_and_self_that_bring_in_neither_std_nor_wgpu(
+    ) {
+        let module = card_pool_module_with_the_pinned_uses_and(concat!(
+            "    use std::sync::Arc as SharedArc;\n",
+            "    use std::collections::\u{7b}BTreeMap, btree_map::\u{7b}Entry\u{7d}\u{7d};\n",
+            "    use std::sync::\u{7b}self, Mutex\u{7d};\n",
+            "    use ::std::fmt::\u{7b}Display as Shown,\u{7d};",
+        ));
+        assert_eq!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module),
+            Vec::<String>::new(),
+            "这几条 use 引进来的是 SharedArc、BTreeMap、Entry、sync、Mutex、Shown：{module}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（同上一条的反面）：改名、套在里层花括号里、花括号里的 `self` 引进叫 `std`、`wgpu` 的名字照旧拒；
+    /// 钉住那两段调的函数换成 `use 别处::某函数 as 那个名字` 也拒。不要卡。
+    fn the_card_pool_scan_finds_std_wgpu_or_a_pinned_function_brought_in_under_a_rename_a_nested_group_or_self(
+    ) {
+        for (form, items) in [
+            (
+                "改名成 std",
+                "    use super::a_module_shadowing_the_crate as std;",
+            ),
+            (
+                "里层花括号里的 wgpu",
+                "    use super::\u{7b}outer::\u{7b}wgpu, other\u{7d}\u{7d};",
+            ),
+            (
+                "花括号里的 self 引进 wgpu",
+                "    use super::shadowing::wgpu::\u{7b}self\u{7d};",
+            ),
+            (
+                "花括号里的 self 改名成 std",
+                "    use super::\u{7b}shadowing::\u{7b}self as std\u{7d}\u{7d};",
+            ),
+        ] {
+            let module = card_pool_module_with_the_pinned_uses_and(items);
+            assert_ne!(
+                ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module),
+                Vec::<String>::new(),
+                "{form} 拒：{module}"
+            );
+        }
+        let pinned_function_renamed_in = card_pool_module_with_the_pinned_uses_and("")
+            .replacen("device_found_idle_by_a_poll, ", "", 1)
+            .replacen(
+                "    use singlefs_harness",
+                "    use super::super::a_poll_that_always_finds_the_device_idle as device_found_idle_by_a_poll;\n    use singlefs_harness",
+                1,
+            );
+        assert!(
+            !pinned_function_renamed_in.contains("device_found_idle_by_a_poll, "),
+            "造的模块去掉了从钉住那一处引的 device_found_idle_by_a_poll：{pinned_function_renamed_in}"
+        );
+        assert_eq!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(
+                &pinned_function_renamed_in
+            ),
+            vec![
+                "钉住那两段按名字调的 device_found_idle_by_a_poll 要由一条 use 从 super::super::device_found_idle_by_a_poll 引进卡池模块，引进来的是 [\"super::super::a_poll_that_always_finds_the_device_idle\"]"
+                    .to_string()
+            ],
+            "别处的函数改名成钉住那两段调的名字引进来，拒：{pinned_function_renamed_in}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K5，正推 `K5_extern_c_block`）：`extern "C" { … }` 里声明的外部函数
+    /// 在值的名字空间，遮不住按路径首段解析的 `std`、`wgpu`，与 `use` 进来的同名函数撞了编译不过，不拒；`extern crate` 照旧拒。不要卡。
+    fn the_card_pool_scan_accepts_an_extern_block_and_still_finds_extern_crate() {
+        let extern_block = card_pool_module_with_the_pinned_uses_and(
+            "    extern \"C\" \u{7b} fn abs(input: i32) -> i32; \u{7d}",
+        );
+        assert_eq!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&extern_block),
+            Vec::<String>::new(),
+            "extern 块不拒：{extern_block}"
+        );
+        let extern_crate =
+            card_pool_module_with_the_pinned_uses_and("    extern crate alloc as std;");
+        assert_ne!(
+            ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&extern_crate),
+            Vec::<String>::new(),
+            "extern crate 照旧拒：{extern_crate}"
+        );
+    }
+
+    /// 第 10z 批第二十一块（第 10z 批第十六至十九块代码轮判决 K5，正推 `K5_use_wildcard_enum`、`K5_thread_local_macro`、
+    /// `K5_cfg_test_mod_inside`）：故意拒的三类（为什么写在
+    /// `the_card_pool_module_shadows_neither_std_nor_wgpu_nor_the_functions_its_pinned_bodies_call` 的名单里），
+    /// 写的东西本身不叫 `std`、`wgpu` 也拒。不要卡。
+    /// 第 10z 批第二十五块（第 10z 批第二十二、二十三块代码轮判决 K4，正推 K4-2：合法写法判红的写明故意拒）：函数体里的 `mod`、
+    /// 挂 `#[cfg(any())]` 的 `extern crate` 两样也在这里钉成拒。
+    fn the_card_pool_scan_refuses_globs_item_level_macros_and_inner_modules_even_when_they_name_nothing_pinned(
+    ) {
+        for (form, items) in [
+            ("通配", "    use std::cmp::Ordering::*;"),
+            (
+                "条目这一层调宏",
+                "    thread_local! \u{7b} static COUNT: std::cell::Cell<u8> = std::cell::Cell::new(0); \u{7d}",
+            ),
+            (
+                "另起模块",
+                "    #[cfg(test)]\n    mod unit_checks_of_the_pool \u{7b} \u{7d}",
+            ),
+            (
+                "函数体里另起模块",
+                "    fn a_helper_with_an_inner_module() -> u8 \u{7b} mod inner \u{7b}\u{7d} 0 \u{7d}",
+            ),
+            (
+                "挂 cfg 的 extern crate",
+                "    #[cfg(any())]\n    extern crate alloc;",
+            ),
+        ] {
+            let module = card_pool_module_with_the_pinned_uses_and(items);
+            assert_ne!(
+                ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module),
+                Vec::<String>::new(),
+                "{form} 故意拒：{module}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，攻方 K4-2）：卡池模块之前写一份测试模块的头两行在块注释里（或跨行的字符串里），
+    /// 扫源码的用例照旧切到真测试模块的头两行：切出来的那一段只多了写进去的那几行。不要卡。
+    fn the_card_pool_scans_cut_the_tests_module_at_its_opening_in_code_not_at_a_copy_in_a_comment_or_a_string(
+    ) {
+        let source = source_text();
+        assert_eq!(
+            source.matches(TESTS_MODULE_OPENING).count(),
+            1,
+            "这份源码里测试模块的头两行原文只有代码里那一处"
+        );
+        let code = code_before_the_tests_module(source);
+        assert!(
+            source[code.len()..].starts_with(TESTS_MODULE_OPENING),
+            "切口在真测试模块的头两行"
+        );
+        let card_pool_opening = "    mod card_pool \u{7b}\n";
+        assert_eq!(
+            code.matches(card_pool_opening).count(),
+            1,
+            "测试那一段之外恰好一处卡池模块"
+        );
+        for (form, copy_of_the_opening) in [
+            (
+                "块注释",
+                format!("    /*\n{TESTS_MODULE_OPENING}\n    */\n"),
+            ),
+            (
+                "跨行的字符串",
+                format!(
+                    "    pub const A_COPY_OF_THE_OPENING: &str = \"\n{TESTS_MODULE_OPENING}\n\";\n"
+                ),
+            ),
+        ] {
+            let with_a_copy = source.replacen(
+                card_pool_opening,
+                &format!("{copy_of_the_opening}{card_pool_opening}"),
+                1,
+            );
+            assert_eq!(
+                code_before_the_tests_module(&with_a_copy).len(),
+                code.len() + copy_of_the_opening.len(),
+                "卡池模块之前{form}里写一份测试模块的头两行，切口不挪"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，正推 K4-1 B12、B13：钉住那两段调的 `device_found_idle_by_a_poll` 改由一条挂
+    /// `#[cfg(any())]` 的 `use` 引进、模块里另起一个同名函数，编译时那条 `use` 去掉、按名字调的是另起的那一个，扫源码照绿）：挂 `#[cfg]`、
+    /// 展开成 `cfg` 的 `#[cfg_attr]`、`pub(crate)` 之前的 `#[cfg]`，都红。不要卡。
+    fn the_card_pool_scan_finds_a_pinned_function_brought_in_by_a_use_under_a_cfg() {
+        for (form, conditional_use) in [
+            (
+                "cfg",
+                "    #[cfg(any())]\n    use super::super::device_found_idle_by_a_poll;\n",
+            ),
+            (
+                "展开成 cfg 的 cfg_attr",
+                "    #[cfg_attr(all(), cfg(any()))]\n    use super::super::device_found_idle_by_a_poll;\n",
+            ),
+            (
+                "pub(crate) 之前的 cfg，另隔一条别的属性",
+                "    #[cfg(any())]\n    #[allow(unused_imports, reason = \"造的\")]\n    pub(crate) use super::super::device_found_idle_by_a_poll;\n",
+            ),
+        ] {
+            let module = card_pool_module_with_the_pinned_uses_and(
+                "    fn device_found_idle_by_a_poll(_outcome: &u8) -> bool \u{7b} true \u{7d}",
+            )
+            .replacen("device_found_idle_by_a_poll, ", "", 1)
+            .replacen(
+                "    use singlefs_harness",
+                &format!("{conditional_use}    use singlefs_harness"),
+                1,
+            );
+            let found = ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module);
+            assert!(
+                found.iter().any(|finding| finding
+                    .contains("的 use 引进钉住那两段按名字调的 device_found_idle_by_a_poll")),
+                "挂 {form} 的 use 引进钉住那两段调的函数，红：{found:#?}\n{module}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（第 10z 批第二十、二十一块代码轮判决 K4，攻方 K4-2 g1、g2，正推 K4-2 L7–L10、L13b、L14）：换不掉钉住那两段用的名字的写法，
+    /// 一样一个模块，都判绿。不要卡。
+    fn the_card_pool_scan_accepts_writings_that_cannot_replace_what_the_pinned_bodies_call() {
+        for (form, items) in [
+            ("引外部 crate 自己", "    use wgpu;\n    use ::std;"),
+            (
+                "别的函数体里块作用域的改名",
+                "    fn a_helper_with_its_own_std() -> u8 \u{7b} use core as std; std::convert::identity(0) \u{7d}",
+            ),
+            (
+                "属性里的表达式宏",
+                "    #[doc = include_str!(\"card_pool.md\")]\n    const POOL_SIZE: u8 = 2;",
+            ),
+            ("常量初始值里的表达式宏", "    const _: () = assert!(1 < 2);"),
+            (
+                "静态量初始值里的表达式宏",
+                "    static JOINED_NAME: &str = concat!(\"card\", \"pool\");",
+            ),
+            (
+                "精确捕获",
+                "    fn borrowed_names<'pool>(names: &'pool [u8]) -> impl Iterator<Item = &'pool u8> + use<'pool> \u{7b} names.iter() \u{7d}",
+            ),
+            (
+                "C 风格原始字符串里有引号与花括号",
+                "    const QUOTED: &core::ffi::CStr = cr#\"say \"\u{7b}\" here\"#;\n    const PLAIN: &core::ffi::CStr = c\"say \u{7d} here\";",
+            ),
+            (
+                "拼成关键字的原始标识符",
+                "    fn r#mod() -> u8 \u{7b} 0 \u{7d}\n    fn r#use(r#extern: u8) -> u8 \u{7b} r#extern \u{7d}",
+            ),
+            (
+                "挂 cfg 的 use 引的不是钉住那两段调的函数",
+                "    #[cfg(any())]\n    use std::sync::Arc as SharedArcWhenConfigured;",
+            ),
+        ] {
+            let module = card_pool_module_with_the_pinned_uses_and(items);
+            assert_eq!(
+                ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module),
+                Vec::<String>::new(),
+                "{form} 换不掉钉住那两段用的名字，判绿：{module}"
+            );
+        }
+    }
+
+    /// 第 10z 批第二十三块（上一条的反面）：块里的改名所在那一对花括号里有钉住那两段的签名（`impl Drop for GpuCardLease` 挪进函数体）照拒；
+    /// 属性下面的条目层宏照拒。不要卡。
+    fn the_card_pool_scan_finds_a_rename_in_a_block_holding_a_pinned_body_and_an_item_level_macro_under_an_attribute(
+    ) {
+        for (form, items) in [
+            (
+                "块里改名、同一块里有借据丢掉时那一步",
+                "    fn holding_the_lease_drop() \u{7b}\n        use core as std;\n        impl Drop for GpuCardLease \u{7b} fn drop(&mut self) \u{7b}\u{7d} \u{7d}\n    \u{7d}",
+            ),
+            (
+                "属性下面的条目层宏",
+                "    #[allow(unused, reason = \"造的\")]\n    thread_local! \u{7b} static COUNT: std::cell::Cell<u8> = std::cell::Cell::new(0); \u{7d}",
+            ),
+        ] {
+            let module = card_pool_module_with_the_pinned_uses_and(items);
+            assert_ne!(
+                ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module),
+                Vec::<String>::new(),
+                "{form} 拒：{module}"
+            );
+        }
+    }
+
+fn main() {
+    std::panic::set_hook(Box::new(|_| {}));
+    let path = std::env::args().nth(1).expect("tsv");
+    for line in std::fs::read_to_string(path).unwrap().lines() {
+        if line.starts_with('#') || line.trim().is_empty() { continue; }
+        let mut parts = line.splitn(2, '\t');
+        let name = parts.next().unwrap();
+        let items = parts.next().unwrap_or("").replace("\\n", "\n").replace("<LB>", "\u{7b}").replace("<RB>", "\u{7d}");
+        let module = if let Some(raw) = items.strip_prefix("RAW:") { raw.to_string() } else { card_pool_module_with_the_pinned_uses_and(&items) };
+        let result = std::panic::catch_unwind(|| ways_the_card_pool_module_could_replace_what_its_pinned_bodies_call(&module));
+        match result {
+            Ok(found) if found.is_empty() => println!("{name}: GREEN"),
+            Ok(found) => println!("{name}: RED {}", found.len()),
+            Err(payload) => {
+                let m = payload.downcast_ref::<String>().cloned().or_else(|| payload.downcast_ref::<&str>().map(|s| s.to_string())).unwrap_or_default();
+                println!("{name}: PANIC {}", m.chars().take(60).collect::<String>())
+            }
+        }
+    }
+}

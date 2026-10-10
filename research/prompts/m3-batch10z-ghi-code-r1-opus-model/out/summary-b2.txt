@@ -1,0 +1,4 @@
+arm=bing k=5 q=s r=n faults=cfgq,qroot,qlast,racct histories=40 hit=8 preroot_red=8 red_root_txg=10=8
+arm=bing-persist k=3 q=s r=n faults=cfgq,qroot,qlast,racct histories=40 hit=8 preroot_red=8 red_root_txg=8=8
+arm=chain k=5 q=s r=n faults=cfgq,qroot,qlast,racct histories=40
+arm=chain-persist k=3 q=s r=n faults=cfgq,qroot,qlast,racct histories=40
