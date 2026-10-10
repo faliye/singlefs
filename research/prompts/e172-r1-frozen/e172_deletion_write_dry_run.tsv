@@ -1,0 +1,20 @@
+M1_nlink_offset_36_read_as_24	builder.push("L03-1", "nlink", 0, field_text(record_now.as_ref(), 36, 4));	builder.push("L03-1", "nlink", 0, field_text(record_now.as_ref(), 24, 4));
+M2_batch_size_uses_32768	data_units_after.saturating_mul(DATA_UNIT_PAYLOAD_CAPACITY)	data_units_after.saturating_mul(32768)
+M3_blocks_round_down	builder.push("L03-3", "blocks", expected_size.div_ceil(512),	builder.push("L03-3", "blocks", expected_size / 512,
+M4_change_count_expected_txg_minus_one	builder.push("L03-4", "change_count", txg,	builder.push("L03-4", "change_count", txg - 1,
+M6_tombstone_range_end_two_to_the_63_minus_one	builder.push("L03-9", "range_end", u64::MAX,	builder.push("L03-9", "range_end", u64::MAX >> 1,
+M7_death_txg_expected_intent_plus_one	builder.push("L03-9", "death_txg", intent_txg,	builder.push("L03-9", "death_txg", intent_txg + 1,
+M8_deleted_inodes_tree_expected_65545	"tag2/tree{DELETED_INODES_TREE}/key_width8/count1/width8/entries_at131/entry{}/declared8",	"tag2/tree{TOMBSTONE_TREE}/key_width8/count1/width8/entries_at131/entry{}/declared8",
+M9_tombstone_capacity_header_107	(DATA_UNIT_BYTES - PACKED_UNIT_RECORDS_OFFSET) / TOMBSTONE_RECORD_BYTES	(DATA_UNIT_BYTES - PACKED_UNIT_PLAINTEXT_HEADER_BYTES) / TOMBSTONE_RECORD_BYTES
+M10_accounting_copies_one	const ACCOUNTING_COPIES: u64 = 2;	const ACCOUNTING_COPIES: u64 = 1;
+M11_force_unit_access_write_does_not_cut	} else if operation.is_force_unit_access {	} else if false && operation.is_force_unit_access {
+M12_barrier_counted_once_per_pool	current.add("barrier");	if !current_is_closed_by_a_barrier { current.add("barrier"); }
+M13_allocation_leaf_position_off_by_one	0 => start_slot / ALLOCATION_LEAF_SLOTS,	0 => (start_slot - 1) / ALLOCATION_LEAF_SLOTS,
+M14_system_configuration_by_generation	*counter == configuration.journal_tail &&	*counter == configuration.generation &&
+M15_nonzero_padding_counted_as_zero	if region.bytes[byte_offset] != 0 {	if false && region.bytes[byte_offset] != 0 {
+M16_crc_polynomial_ieee	(remainder >> 1) ^ 0x82F6_3B78	(remainder >> 1) ^ 0xEDB8_8320
+M17_key_range_readings_swapped	(true, false) => KeyRangeReading::EntryKeyRange,\n        (false, true) => KeyRangeReading::SubtreeCoverage,	(true, false) => KeyRangeReading::SubtreeCoverage,\n        (false, true) => KeyRangeReading::EntryKeyRange,
+M18_row_five_difference_reversed	&two_to_one_identities.difference(&final_identities)	&final_identities.difference(&two_to_one_identities)
+M19_empty_inode_root_key_range_expected_one_one	"inode_root_key_range",\n            "0/0",	"inode_root_key_range",\n            "1/1",
+M20_code2_payload_crc_starts_after_the_reserved_bytes	if !crc_matches(&bytes[header_end..], read_u32(bytes, 76 + 2 * key_width)) {	if !crc_matches(&bytes[entries_offset..], read_u32(bytes, 76 + 2 * key_width)) {
+M21_parent_location_checksum_ignored	if location.checksum != expected_checksum {	if false && location.checksum != expected_checksum {

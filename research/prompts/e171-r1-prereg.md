@@ -571,6 +571,36 @@ Q1–Q5 问的本身是计数（「有没有一行 / 一态」），翻面的门
 
 （留空；装置写之后、产物之前由执行员写，只许收严或补臂。读法 9 要的 O3 冻结行、5.2 里「O1-对拍·卸载」改坏的是哪个字段、第三节行号在冻结树上的现查结果抄在这里。）
 
+### 修订 1（第一段执行员，2026-10-04，装置写完、编过、冻结树拍好之后，任何 O3 列产物之前；只抄登记点名要抄的三样，判据一个字不改）
+
+**1. 读法 9：O3 用的那一版。** 依据是派发提示原句「读法 9（O3 用哪一版）：E170 第 2 次重跑 Q4 判甲，交的是 v2-487——目录 `research/e7-index-bench/src/bin/e170_o3_spec_executor_with_witness_predicates_journal_header_487/`、冻结行 `research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out` 第 676–692 行、种子 `ce39b484ec109c7a`」（主 agent 照 E170 第 2 次重跑登记末尾「主 agent 认定第二段 Q5 交回」那一节定）。那份 E170 产物 sha256 `f7896f70efc32174f48cb37b4d8e49e479e7ffa8c458ff7908497fefce6c4989`（2026-10-04 现算）。第 676–692 行原样（`sed -n '676,692p'`）：
+
+```
+name=freeze file=crash_dump.py sha256=7a671b85d8346f2aee45982a888e2111e98495f5570ecfc57a348ee7595d30dd
+name=freeze file=crash_image.py sha256=e391dbe8377014258f1978005062d4cb14891b8565ca420a6a5b731ad4387a5f
+name=freeze file=crc32c_castagnoli.py sha256=34b9f571bc7d0e9dc32dce56b166536a6c26581b9f4744e7c3a14b0ef69bea6d
+name=freeze file=executor_core.py sha256=37f22a1ef8589399221a308918b856a635bdf3ddaa2caefa954127aaf7b47776
+name=freeze file=executor_main.py sha256=a9bd9104b386ea4f7d2747eb302759bf1e06d048163ef661426b0092b9d96429
+name=freeze file=journal_ring.py sha256=19c2cbc74801963f1f6a149c8995c28056a2dad98c22bfb084e2aeaf5a8787b9
+name=freeze file=on_disk_layout.py sha256=b4b2cf97e3391cfcd144823db514c75c700e88e5bc470634a6a5a98aec60e149
+name=freeze file=replay_prefix.py sha256=a36cb9c1772eae7cfefba68b8912ad339b96a5383066970c2cb083cdf4537840
+name=freeze file=root_ring.py sha256=6ac949d183997789419d1aeeb448d00bc341b26216ce7c22b6691879a7a2f89e
+name=freeze file=spec-gaps.tsv sha256=98792f7bbe6d534a7e5ba840421db80db0fc4de4107238f69a43b147571986e4
+name=freeze file=spec_gaps.py sha256=60f2f8b468cc68a2651716bd4ca3193380d0858935a846a5e1b4f28755685f5f
+name=freeze file=synthetic_pool_for_tests.py sha256=ac97036edb1273218ad0eb67dc441d99c5a8a1f0f31b99bbf027d6c8dd0ff977
+name=freeze file=system_configuration.py sha256=a07a280f3c96d8be8cedeaf9f92bddb8a5d7101b50e7e494357c2fdcdb16b394
+name=freeze file=test_executor_on_synthetic_pool.py sha256=1704804cd38f824988f06cf7e4a88f6fb58da2011a08f10da7a8c8d4159b4de5
+name=freeze file=version_table.py sha256=d407a8c1a53f58aa5a85a6af4eff215844b838d0a48871aaee4b567446a52ba4
+name=freeze file=witness_predicates.py sha256=8499ebe274eb2919be0a637a63466da32d9a3a549b35ef131ba317d1d8925e3e
+name=freeze_seed sha256_prefix16=ce39b484ec109c7a
+```
+
+核对做法同原登记修订 2：研究一侧 `frozen_o3.py` 的 `freeze_differences` 只取那一段（`FREEZE_REFERENCE_FIRST_LINE`、`FREEZE_REFERENCE_LAST_LINE`），冻结范围照 v2-487 自己的 `executor_main.FILES_OUTSIDE_THE_FREEZE`（`comparator`、`mutation_driver`、`witness_reference`、`run_` 起头的不在范围里）；2026-10-04 在主仓上核一遍：0 处不同、种子 `ce39b484ec109c7a`。每趟开头与收尾照旧各核一次（Z2）。
+
+**2. 5.2「O1-对拍·卸载」改坏的字段：** 16-2 的观测 `model_comparison::observed_unmount`（冻结树里第 646 行）交 `ObservedEffect::Publishes { roots, .. }`，每条根是那几次带新 F 的空发布之一；阳性对照把 `roots` 第一条的 `rollback_floor`（卸载要比的新 F）加一，再交 `answer_unmount`（冻结树里 `model.rs` 第 2505 行）。只流二卸载那一次。
+
+**3. 第三节行号在冻结树（快照摘要 `499e81294eddd57df05ddbbdd2264e2b69e4ee57fe0e5726de79e7f4ace34b1e`）上的现查结果**（对不上登记写的照实列，判据不改）：`model.rs` `committed_versions` 第 1225 行（登记写 1207）、`answer_unlink_intent` 第 1911 行（1882）、`answer_deletion_step` 第 1953 行（1924）、`answer_create_inode` 第 1998 行（1969）、`answer_unmount` 第 2505 行（登记时没有）、`judge_and_advance` 第 2600 行（2512）、`crash_recovery_disagreement` 第 3159 行（3071）；`model_comparison.rs` `observed_unmount` 第 646 行；`mount_transparency.rs` `newer_publish_witnessed_on_the_crash_image` 第 1392 行（1320）、`judge_writable_mount_refusal` 第 1590 行（1426）、16-3 加的 `judge_writable_mount_refusal_of_a_crash_state` 第 1617 行（带 `ReadFaultsInTheCrashState`）；`crash_injection.rs` 第二截调它在第 2291 行（登记写 2044 调五参数版）、`writable_mount_alone_on` 第 1674 行（1504）、`materialized_crash_image` 第 1556 行；`transaction.rs` `publish_new_inodes` 第 5787 行（5781）、`publish_unlink_intent` 第 5852 行（5845）、`publish_unlink_step` 第 5907 行（5899）、`inode_leaf_containers` 第 2740 行（2734）；`recovery.rs` `verified_system_configuration_slots` 第 3251 行（3232）；`reference_filesystem_translation.rs` 与 RefFS `lib.rs` 的 sha256 与登记第十三节同（`65ea707b…`、`5eb77191…`），行号不变。
+
 ## 十三、读过的文件与跑过的命令
 
 **读过的文件**（行号区间；grep 命中行也算读过）：
@@ -647,3 +677,1795 @@ $ python3 -c "a,b,c=5569.6,7607.9,1277.9; print(a+b+c, (a+b+c)/3600, a*2/117, b*
 14455.4 4.0153888888888885 95.20683760683761 92.77926829268293 425.9666666666667
 $ python3 research/scripts/replace-once.py research/prompts/e171-r1-prereg.md <旧串> <新串>   # 五次：第五节末句、第九节 V7、第十一节够判停机一句、本节「跑过的命令」那一句、这一行自己，都是「命中 1 次，已替换」
 ```
+
+### 修订 2（设计员，2026-10-04；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers V17 V18 V19 S13 -->
+
+**时点**：第一段交回之后；第一段 16 趟逐行、第二段整表、带流三的基线一份产物都还没有；Q5 主取样点只有一份 `not_run` 产物（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-04-s1-q5-main-before-the-first-barrier-of-call-3.out` 第 11 行 `not_run=too_many_states`）。
+**依据**：批次 `records/2026-10-01-里程碑三形式化接入.md#25` 的派发；第一段执行员交回的第 10、11 节（报告没入库，这里只引它点名的产物与代码行）。
+**原判据原样保留**：第一至十一节、修订 1 一个字不改。下面每一件写明改了什么、收严还是放宽。
+
+| 件 | 改了什么 | 收严 / 放宽 |
+|---|---|---|
+| 2.1 | Q5 主取样点的造法：读法 7 字面的全枚举跑不完，列五个候选，**交主 agent 或用户定**；定之前 Q5 主取样点不跑 | 各候选各自标（2.1 末表） |
+| 2.2 | S5 与流三不改；冻结树在理想模型那件修理合入之后重拍，修订 1 那棵作废 | 收严（多一件合入；旧树产物不进判定） |
+| 2.3 | RefFS 从 `#[path]` 编进装置改成 checker 档包的正式依赖 | 判法不变（不收不放） |
+| 2.4 | V4、V11 各补一条内联用例与变异行 | 收严 |
+| 2.5 | 逐行限时由写死的 1800 秒改成「先量基线、取它的倍数、不低于 1800 秒」 | 对各行的候选不收不放；对读法 5「超时」一类是放宽（限时只升不降，落进这一类的行只会更少） |
+| 2.6 | 带计时的结果行另落一份产物 | 收严 |
+
+#### 2.1 Q5 主取样点的造法（读法 7 第二点「末段（……）的整写子集全枚举，可撕裂的写另加撕裂态，一个不落」）
+
+**末段是什么**（第一段产物与导出现查；新树上由 S1 回比，不符走 S1）：
+- 主取样点产物第 6–8 行：末段 29 个写、其中可撕裂 2 个、全枚举 1 207 959 552 态；第 10 行：删的屏障 `[50,51,55,56]`、改成普通写的根槽写 `[52]`、截断 81、反向截断 57（下标是删屏障之前的流二写流，`research/target/e171-r1-dumps/s2-baseline-streams-1-2/fixed_script_through_e_then_unmount/ops.tsv` 第 1 列）。
+- 拆开（同一份 `ops.tsv` 第 49–82 行现查）：第 2 次调用 5 个写——两块盘的 journal 记录（下标 48、49）、根槽写（52，已改普通写）、两块盘的系统配置槽（53、54，即那 2 个可撕裂的写）；第 3 次调用 24 个写（下标 57–80，12 对两盘镜像写，都不可撕裂、按落点看都写在第 2 次调用写过的地址之后的新地址上，不落在根槽、系统配置槽与 journal 环；种类由下面类核对 ② 现核）。
+- 记号：K = 第 2 次调用的那 5 个写，取法 2³ × 3² = 72 种；C = 第 3 次调用的那 24 个写，取法 2²⁴ 种；72 × 2²⁴ = 1 207 959 552。
+
+**每态挂钟**（推挂钟只用这个数，没进任何判据）：第一段反向取样点那一趟（冻结树 release、单线程）装置自己计的 `E7TIMING name=stream_time … observe_ns=726679579`，72 态 ⇒ 每态 10.09 毫秒（造镜像、层 0 判、两个崩溃子列、O2、恢复全算在内）；其中 O1、O2、恢复三段每态平均 4.83 毫秒（导出 `research/target/e171-r1-dumps/q5-reverse/confirmed_loss_form/fixed_script_through_e_then_unmount/impl-verdicts.tsv` 末列 72 行之和 347 473 336 纳秒）。`E7TIMING` 行没进 `research/results/` 的产物（2.6 补）。装置逐态判是单线程（`crates/singlefs-checker-tier/src/crash.rs` 第 1271 行 `judge_layer0_state_range` 按序号逐个判；装置里 `grep -c 'rayon\|par_iter\|thread::scope\|std::thread'` 为 0）。主取样点每态多 24 个写要落，按同一个数推，**推的**。
+
+**五个候选**（每一个都只改「末段怎么枚举」；Q5-有效、Q5-判、Q5-阴性、Q5-反向的判据、门槛、F5、F8 与反向取样点一个字不改，在各自罩住的态集合上照判）：
+
+**候选一「Q5-全枚举」**：读法 7 原句照字面，1 207 959 552 态逐态判。今天单线程推约 141 天；装置改成 8 线程并行（要另写，按线性推）约 17.6 天。不收不放。
+
+**候选二「Q5-等价类」（不抽样）**：态集合与原句相同，每态的 O1 两个崩溃子列不逐态算，由等价类的代表推出。
+- 等价关系：两态等价 ⇔ ① K 的 5 个写取法相同（含撕裂与否）且 ② 「C 里至少落了一个」这一位相同。共 72 × 2 = 144 类；「C 一个没落」的类各 1 态，「C 至少落一个」的类各 2²⁴ − 1 = 16 777 215 态。
+- 为什么这样分得开：O1 两个崩溃子列在一态上吃的输入只有四样——看 journal 那一遍的恢复报告（`judgement.consulted`，读回内容由它出）、`newest_persisted_root`（只看根槽写落没落，根槽写在 K 里）、`touched_call`（`crash_judge_is_applicable`，装置第 3448 行；C 落没落决定它是 2 还是 3）、段号（末段，各态相同）。恢复只经 `PoolReader` 读盘（`crates/singlefs-core/src/recovery.rs` 第 102 行），是读到的字节的确定函数；只要恢复在代表上读到的字节区间与 C 的 24 个写的字节区间不相交，同一 K 取法下任一 C 子集的镜像在恢复读到的每个字节上与代表相同，恢复逐读相同、报告相同。
+- 每一跑都要核过的四条（任一不过走新设的停机 S13，不当结果、不自动退回抽样）：
+  - 类核对 ①（输入清单）：执行员在新树上逐项列 `observation_of_a_judged_state` 里 O1 两个崩溃子列与 RefFS 一票读的每一个逐态输入与行号；多出上面四样之外的，把它加进键再分类。
+  - 类核对 ②（C 的种类）：C 的 24 个写经 `geometry.classify` 逐个列种类，没有根槽写、系统配置槽写、journal 记录写。
+  - 类核对 ③（读集不相交）：72 个 K 取法各取「C 一个没落」那一态当代表，经装置自写的只转发、只记的读者（做法照 `crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` 第 1488 行 `RecordingReader`，本装置另写一份，不引它）跑 `recover(…, JournalPolicy::Consult)`，记下每一次读的（盘、起点、长度），与 C 的 24 个写的（盘、起点、长度）求交，必须为空。不为空的：交到的 C 写移进键（逐个枚举它的取法），细分出的每个代表重做 ③，直到不动点；细分后要判的态数超过装置上限 10 000 000 走 S13。
+  - 类核对 ④（两条路同答）：③ 那一遍的恢复报告与层 0 判同一态交的 `judgement.consulted` 逐字段相同；另把每个 K 取法下「C 全落」那一态走原路径（`judge_layer0_state_range`）判一遍，它的恢复报告、两个崩溃子列与 RefFS 一票与它所在的类推出的逐项相同。
+- 判的态：72 个代表（记读集）+ 72 个「C 全落」= 144 态（不细分时）。推约 1.5 秒加记读的开销，**推的**。
+- 出什么：每类一行 `name=q5_class`（K 取法的落地串、C 落没落、类的态数、恢复落到的版本、是不是「已确认的丢了」、模型崩溃判官、RefFS 一票）；`name=q5` 那一行照旧（`states` 是各类态数之和，另加 `derived_by=equivalence_classes judged_states=…`）；`name=q5_equivalence` 一行报 ①–④ 各自的计数与细分次数。L = 「已确认的丢了」各类的态数之和。轨迹（第八节「按末段里落了几个写排开」）照组合数精确算：K 取法落了 n 个写的类，「C 至少落一个」那一类里落了 j 个 C 写的有 C(24, j) 态。
+- A10 在这一候选下：装置报的各类态数之和 = 72 × 2²⁴；比对器从导出的 `ops.tsv` 现数末段里 C 的写数与 K 的可撕裂写数，自己算类的态数与 L（从导出的代表恢复报告现判丢没丢），不读装置的计数。
+- 用例钉住等价关系（内联单测，重型，提交时跑）：同一种造法、截断点挪到 C 的前 2 个写之后（候选三 k = 2，72 × 4 = 288 态），288 态全枚举逐态判一遍、再按本候选分类推一遍，每态的恢复报告、两个崩溃子列与 RefFS 一票逐态相同。这一格同样在每一跑里做一遍（「等价类对拍」，288 态推约 2.9 秒），有一态不同走 S13。
+- 变异（装置一侧，追加进 `crates/mutations.tsv`，「E171R1 装置」起头）：
+  - V17：键去掉「C 至少落一个」那一位。取样点：上面那条用例里把 `model_stopped_at_call` 设成第 3 次调用的那一遍——「C 落了」的态模型崩溃判官不适用、代表上适用，类推出的与全枚举不同，红。（模型没停在第 3 次调用时这一位在所有态上同值，那是取样点不敏感，所以用例要带这一遍。）
+  - V18：类核对 ③ 恒判不相交。取样点：用例里把 C 的第 1 个写的落点改到第 2 次调用 journal 记录写的同一扇区（手造写流），原式 ③ 不过、细分后与全枚举相同；变异照原键推，「那个写落了」的态恢复不同，红。
+  - V19：「C 至少落一个」那一类的态数写成 2²⁴。取样点：A10 两份各算的那一格（各类态数之和 ≠ 72 × 2²⁴），用例断言之和，红。
+- 停机 S13（新设）：类核对 ①–④ 任一不过（细分到上限仍不过），或「等价类对拍」有一态不同。触发观测：`name=q5_equivalence` 那一行任一计数不是 0，或对拍那一行 `mismatching_states` 大于 0。两边都查（`.claude/rules/implementation-first.md` 第 4 条），既不作废也不当结果，交主 agent。
+
+**候选三「Q5-短截断」（参数 k，1 ≤ k ≤ 17）**：截断点从「第 3 次调用的第一道屏障之前」挪到「第 3 次调用发出的前 k 个写之后」（按发出次序；k 为奇数时拆开一对镜像写），别的同读法 7。仍是「已确认的丢了」那一形：第 2 次调用已返回（A3 的前一半照核），第 3 次调用在途、末段带它的写。态数 72 × 2^k：k = 2 是 288 态，k = 12 是 294 912 态，k = 17 是 9 437 184 态（不超装置上限 10 000 000 的最大 k）。罩住的是原句态集合的子集（C 的后 24 − k 个写都没落的那些态）——**放宽**，少罩 72 × (2²⁴ − 2^k) 态。k 由定的人一并定；k = 0 就是现有的反向取样点，所以 k 越小，主、反两个取样点越近，第八节那一格的「方向相反」越弱。本地常量改成这一 k 下的末段写数、可撕裂写数与态数（S1）；变异 V12 照旧。
+
+**候选四「Q5-成组」**：C 的写成组取「全落 / 全不落」，组内不拆。两种分组：(a) 24 个写一组，72 × 2 = 144 态；(b) 每对两盘镜像写一组，12 组，72 × 2¹² = 294 912 态。罩住的是原句态集合的子集（(a) 少罩「C 落了一部分」的态，(b) 少罩「同一对镜像写只落了一边」的态）——**放宽**。(a) 的 144 态恰是候选二判的那 144 态，但这里不推类、只判这 144 态本身。
+
+**候选五「Q5-抽样」（抽样）**：72 个 K 取法每个都取「C 全不落」「C 全落」两态，另按固定种子（打在产物里）各均匀抽 m 个 C 子集（不重复、不含那两个）；m = 10 000 时共 72 × 10 002 = 720 144 态。**是抽样**，罩住的是原句态集合的一个随机子集——**放宽**，少罩的是没抽到的态。
+
+**五个候选能不能回答问题单 Q5 原句**（「O1 崩溃一列接上 RefFS（或与模型的崩溃判官并列）之后，「已确认的丢了」那一形在 O1 一列红不红」；翻面观测「那一形的态上 RefFS 与模型崩溃判官都绿」；够判条件「那一形的写流跑完」）：
+- 候选一：能，照原句。
+- 候选二：能，态集合与原句相同；前提是类核对 ①–④ 与「等价类对拍」都过，不过就停机，不给判定。
+- 候选三、四：判甲（L 个态里有一态 O1 红）能传到原句的态集合上（红的那一态就在原句的集合里）；判乙只能写成「这 N 态里两者都没红」，不能写成原句的乙——原句集合里没罩到的态照样可能有红。
+- 候选五：同候选三、四，而且乙那一边连「这 N 态」都是随机抽的；够判条件「写流跑完」按字面不满足，判乙只能写「抽样内乙」。
+- 五个候选都不改反向取样点（72 态全枚举）；Q5-反向与主取样点判得不同照旧记「不稳定」。
+
+**代价表**（每态 10.09 毫秒、单线程，挂钟都是**推的**；「类核对」那几样的开销没量）：
+
+| 候选 | 抽不抽样 | 罩住的态 | 与读法 7 原句比 | 要判的态数 | 推的挂钟 | 能不能答 Q5 原句 |
+|---|---|---|---|---|---|---|
+| 一 Q5-全枚举 | 不抽 | 1 207 959 552 | 相同 | 1 207 959 552 | 约 141 天（8 线程并行另写，约 17.6 天） | 能 |
+| 二 Q5-等价类 | 不抽 | 1 207 959 552（144 类） | 态集合相同；逐态算改成按类推（放宽在「每态的 O1 由代表推出」，以 ①–④ 与对拍逐跑核过为前提），O2、O3 附带只在判过的态上 | 144 + 对拍 288 | 约 4.4 秒加记读开销 | 能（前提不过即停机） |
+| 三 Q5-短截断 k = 2 | 不抽 | 288 | 子集，少 1 207 959 264 态 | 288 | 约 2.9 秒 | 甲能传；乙只到这 288 态 |
+| 三 Q5-短截断 k = 12 | 不抽 | 294 912 | 子集，少 1 207 664 640 态 | 294 912 | 约 50 分钟 | 同上 |
+| 三 Q5-短截断 k = 17 | 不抽 | 9 437 184 | 子集，少 1 198 522 368 态 | 9 437 184 | 约 26.5 小时 | 同上 |
+| 四 Q5-成组 (a) | 不抽 | 144 | 子集（C 只取全落、全不落） | 144 | 约 1.5 秒 | 同上 |
+| 四 Q5-成组 (b) | 不抽 | 294 912 | 子集（镜像对只取同落、同不落） | 294 912 | 约 50 分钟 | 同上 |
+| 五 Q5-抽样 m = 10 000 | **抽样** | 720 144（随机） | 随机子集 | 720 144 | 约 2.0 小时 | 甲能传；乙只写「抽样内乙」 |
+
+**定之前与定之后**：定之前 Q5 主取样点不跑，Q5 照第十一节「够判停机」写「还差主取样点」。定的人（主 agent 或用户）在本登记末尾追加一行「修订 3：Q5 主取样点取候选 X（k 或 m 取值）、日期、谁定的」；那一候选在本节写的造法、核对、停机、变异与本地常量即刻生效，不再派设计员。选候选二的，装置先过「等价类对拍」再跑主取样点。
+
+#### 2.2 S5 与流三：修理想模型，不收窄实验；冻结树重拍
+
+- **改了什么**：不改。读法 2 的流三（建 inode 到叶容器第一次变成两片、再多建一次）、读法 6 的三处不适用来源、停机 S5 照原文。第一段报告的那一处（`crates/singlefs-harness/src/model_comparison.rs` 第 81 行起 `assert_eq!(index, InodeLeafContainerIndexInTree::LEFTMOST, …)`，流三第 234 次建 inode 起胶水造不出观测）由主 agent 定的那件修理来解：实现员让 O1 罩 inode 树第二片叶容器。那件合入、主 agent 的合入验证绿之后：流三照读法 2 跑；S5 照原文判——合入后的树上流三还出现「模型接不住这次观测」（装置记 `model_cannot_take_the_observation`），就是读法 6 三处之外的来源，S5 触发、停机，不补第四处来源。
+- **冻结树**：读法 10 的做法不变，时点改成「那件修理合入、合入验证绿，且 2.3、2.4 的改动进了装置、编过之后」再拍。`name=frozen_tree` 那几行另记：那件修理改过的每个文件在冻结树里的 sha256；`grep -c '模型今天只罩一片叶容器的那几种发布' crates/singlefs-harness/src/model_comparison.rs`（2026-10-04 主仓上是 1，第 84 行，即第 81 行起那条断言的消息）的输出与那件交回写的预期对照（第七节 A12 加这一项）。
+- **修订 1 那棵（快照摘要 `499e81294eddd57df05ddbbdd2264e2b69e4ee57fe0e5726de79e7f4ace34b1e`）作废**，原因三条：① 它不带模型那件修理，流三在它上面必然触发 S5；② 2.3 改 `crates/singlefs-checker-tier/Cargo.toml` 与 `Cargo.lock`、2.4 改装置文件，读法 10 拷的正是 `Cargo.toml`、`Cargo.lock`、`crates/`，快照摘要必变；③ Q1、Q4 问的是「合入之后的实现」，合入的集合多了这一件。
+- 修订 1 第 1 条（O3 用 v2-487 与那 17 行冻结行）与树无关，照旧有效；第 2 条（O1-对拍·卸载改坏 `rollback_floor`）照旧，执行员在新树上核 `observed_unmount` 交的观测类型没变，变了照修订 1 的做法另写一条修订；第 3 条（行号）在新树上重查，另写一条修订。
+- 第一段报告第 11 节第 6 条（基线上的 S5 改成「模型一次都不停、每次调用不是对拍过就是取号暖机」）：基线上读法 6 那三处来源都不该出现，这一判法与 S5 原文在基线上同义；逐行那一趟照 S5 原文（只许三处来源）。
+
+#### 2.3 RefFS 改成 checker 档包的正式依赖
+
+- **依据**：`.claude/rules/verification.md@定义与名字` 表里 RefFS 那一行「它是库，被 harness 档与 checker 档调用」；门禁 checker-independence-and-sync 的 checker-implementation-disjoint 格 ⑤⑥⑦ 判的是 RefFS 自己的依赖闭包、它的源码不引别人、实现与池级 checker 的闭包里没有它（同一份规则「门禁管哪一半」表），checker 档依赖它不在那三格的射程里。第一段经 `#[path]` 把 RefFS 源码编进装置，那份源码按 checker 档的 lint 判，clippy 红的 4 处里有 1 处出在那里。
+- **要改的**（判法不变：S9 的映射逐臂照旧对 `events_of`，执行员在新树上重列行号）：
+  1. `crates/singlefs-checker-tier/Cargo.toml` 的 `[dependencies]` 加一行 `singlefs-reference-filesystem = { path = "../singlefs-reference-filesystem" }`，上面一行注释写它是谁（RefFS，D13（验证路线） 已定项 3）、为什么只读不改。
+  2. `Cargo.lock` 由 cargo 改：只许多出 `singlefs-checker-tier` 那一节 `dependencies` 里一行 `"singlefs-reference-filesystem"`（这个包已经在工作区里，harness 档依赖它）；`git diff -- Cargo.lock` 有别的行变了就停下交回。
+  3. 装置今天第 30–40 行（那段说明、`#[allow(dead_code, …)]`、`#[path = "../../../singlefs-reference-filesystem/src/lib.rs"]`、`mod reference_filesystem;`）换成一行 `use singlefs_reference_filesystem as reference_filesystem;` 加一句说明（checker 档包直接依赖 RefFS，类型与 harness 翻译层用的是同一份）；装置里 `reference_filesystem::…` 的路径不用动。
+  4. 内联单测：RefFS 自带的 24 条不再编进装置二进制，它们归 RefFS 包自己（harness 档）。装置自己的条数照 `grep -c '#\[test\]'` 现数（今天 40；加 2.4 两条是 42；选候选二再加它那条）。
+  5. clippy：新 bin 按 checker 档的 lint 零处；另外 3 处由执行员改，改法不动行为（照 5.4 跑 fmt、clippy、编）。
+  6. `crates/mutations.tsv` 第 2443–2465 行的锚点在改后的装置里逐条再核恰好命中 1 次。
+- **谁改**：`Cargo.toml`、`Cargo.lock` 在执行员写范围之外（第一段写范围闸拒过），由主 agent 自己改或派实现员；装置文件归执行员。2.2 的冻结树在这两处都改完、编过之后才拍。
+
+#### 2.4 V4、V11 补用例
+
+**V4**（第九节：装置调用 panic 那一支退回「整条流不导出」）。
+- 新用例 `a_stream_stopped_by_a_panic_is_exported_and_its_sampled_states_are_judged`：`prepare_stream(StreamName::FixedScriptThroughEThenUnmount, 带 PositiveControl::PanicInTheCall 的 RunSwitches, false)`，再 `export_prepared_stream(&stream, &目录, false, 同一组开关, StateSelection::RegisteredBatches { third_batch: false }, Instant::now(), 0)`；目录取 `std::env::temp_dir()` 下带进程号的新目录，用例收尾删掉。断言：`stream.ending` 是 `StreamEnding::StoppedByAPanic { call_index: 3, .. }`；`export.not_exported` 是 `None`；`export.observations` 非空；panic 之前对拍判过的调用恰 1 次。
+- 变异行：原文是装置今天第 4426 行 `    export.ending = Some(stream.ending.clone());`（全文件恰 1 处），替换文是同一行接 `\n    if matches!(stream.ending, StreamEnding::StoppedByAPanic { .. }) {\n        export.not_exported = Some("implementation_crashed".to_string());\n        return export;\n    }`。
+- 怎么证红：变异下 `export.not_exported` 是 `Some`，第二条断言红。取样点：流二第 3 次调用 panic（与阳性对照 panic 同一造法）；不带 panic 的流上两式同值，所以用例必须走 panic 那一形。
+
+**V11**（第九节：（i）判不出那一支并进（ii））。
+- 现有用例（装置今天第 8625 行起 `a_torn_system_configuration_slot_is_the_undecidable_branch_and_a_raised_tail_is_the_counter_branch`）罩不到的原因：它撕的是干净池上的一槽，另三槽的 journal_tail 等于所选那一版末条记录的计数器，三句都不为真；去掉（i）的拦法后 `counter_sentence` 照样是 `None`——取样点不敏感（`.claude/rules/mutation-sampling.md`「没红的三类，判据不同」第三行）。它注释里「V11 … 这里红」那半句挪到新用例上。
+- 新用例 `a_torn_slot_beside_raised_tails_is_only_the_undecidable_branch`：`first_file_pool_and_its_selected_version` 取干净池与所选版本；副本上 `raise_the_witnessed_counter_past_the_selected_version` 交回 4；再照现有用例的撕法把盘 1 偏移 `fixed_structure_slot_spacing` 那一槽第 100 字节翻一位。断言：`some_device_has_fewer_than_two_verified_slots` 为真；`counter_sentence` 是 `None`；`witnessed_counter` 等于没撕之前那份副本上算出的 `witnessed_counter`（另三槽抬过的 tail 还在，这一条证明取样点敏感）。
+- 变异行：原文是装置今天第 3141–3142 行 `    let counter_sentence = if some_device_has_fewer_than_two_verified_slots\n        || witnessed_counter == 0`，替换文 `    let counter_sentence = if witnessed_counter == 0`。
+- 怎么证红：变异下撕过一槽而另三槽 tail 抬过的态，三句的第一句为真，`counter_sentence` 是 `Some(WitnessCounterSentenceThatHolds::AboveTheLastRecordOfTheSelectedVersion)`，第二条断言红。
+- 射程照实记：V11 只罩 `witness_criterion_on_the_crash_image` 里的拦法；装置今天第 6482–6488 行按两支计数的那两个闭包没有变异行，Q4 的（i）（ii）计数在那里形成，这一处的判别力只靠阳性对照「见证」与 S11 的 Q4-对账。
+
+两条都是装置一侧的行，追加进 `crates/mutations.tsv` 末尾，名字以「E171R1 装置 V4」「E171R1 装置 V11」起头；用例与变异行都是重型，提交时复跑（5.4）。
+
+#### 2.5 逐行限时：先量基线，再取倍数
+
+- **改了什么**：逐行驱动 `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 64 行 `ROW_TIME_LIMIT_SECONDS = 1800`（装置那一步经内存包装的 `RUN_WITH_MEMORY_CAP_TIME_LIMIT`，第 270 行；不含编译，不含 O3 执行器）改成命令行给；驱动开头打一行 `name=row_time_limit seconds=… baseline_seconds=… source=<产物文件名>`。
+- **规则**：每行装置那一步的限时 = max(1800, ⌈3 × T⌉) 秒。T 是同一棵冻结树上、同一组 `--streams` 的基线那一趟装置进程的挂钟：
+  - 第一段逐行（三条流）：T 取 2.6 那份「带流三、带探针的基线第一次」的进程挂钟；带探针与不带探针的行用同一个 T（带探针那一趟只多不少）。
+  - 第二段整表（流一、流二）：T 取新树上 S2 那一趟新装置基线（`--streams 1,2`、不带探针）的进程挂钟。
+  - 挂钟在进程起止各取一次时刻相减，不按输出行到达的时刻切（`.claude/singlefs-ai-sop/rules/test-discipline.md@分段计时在被测进程里计，不在转发输出的循环里计`）；装置自己的 `E7TIMING name=stream_time` 各流 `elapsed_ns` 之和另报，进程挂钟必须包住它，包不住的那一次不算，重量一次。
+  - 3 倍不从任何一行的读数来：坏实现行会让写数、段数与取样态数跟着变，两条线道并跑会互相抢核。
+- **超时的点名行**（第一段的空变异与 15 行）：同一行单独再跑一次（一条线道），限时取上面那个数的 3 倍；两次都超时才记读法 5 的「超时」一类（Q1 七行照 F3 记「不够判」）。重跑只看「超时了没有」，不看判定（超时的那一次没有判定）。第二段照原登记读法 5 与补位规则，不重跑。
+- **收严 / 放宽**：限时只升不降（不低于原来的 1800 秒），落进「超时」一类的行只会更少；不改任何一行判甲判乙的条件。
+
+#### 2.6 计时另落一份产物
+
+`run_device.sh` 那一类包装与逐行驱动只把 `E7RESULT` 行收进产物，`E7TIMING` 行留在临时目录。从这一条修订起：每一趟装置除 `E7RESULT` 那份之外，另写同名加 `-timing` 的一份进 `research/results/`，原样收全部 `E7TIMING` 行，加一行 `name=process_wall seconds=… exit=…`（包装在进程起止取的时刻）。逐行驱动每一行的结果行已经带装置那一步的 `device_ns`（`row_driver.py` 第 547–548 行），照旧。2.1 的每态挂钟与 2.5 的 T 都从这几份产物里取。
+
+#### 2.7 新树上从头跑什么；第一段旧树上的产物算什么
+
+- 第一段在修订 1 那棵树上的产物（`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-04-s1-*.out` 二十份）与导出目录不删、不改，**不进任何判定**（与作废 Z5 同一个理由：不是在登记的那棵冻结树上编的）。
+- 新树拍好之后照第五节 5.5 第一段的次序从头跑：S1（本地常量，含流三的 K 与选定的 Q5 候选那几样）、S2（它的新装置基线就是 2.5 第二段的 T）、S3、S8–S12 的逐项对拍；阳性对照全表（基线那一趟三条流、空变异那一趟流一流二）；O3 基线；Q5 反向取样点；带流三、带探针的基线两次（第一次给 2.5 第一段的 T）；Q5 主取样点（候选定了之后）；然后 16 趟逐行。
+
+#### 2.8 跑之前已经存在的数（这一条修订）
+
+1. 第一段的结果读数：Q5 反向取样点产物第 37 行（`lost_the_confirmed_version=9 reference_filesystem_red=9 model_crash_judge_red=0 both_green=0 … not_lost_states=63 not_lost_o1_red=0`）与第 38–40 行轨迹；第一段报告里的阳性对照各数、流一流二基线分批态数、S1 全过、K = 234、流三 6000 写 959 段 441 453 147 态。影响：五个候选与它们的核对、停机、变异只按「罩住哪些态、要判多少态、能不能答原句」写，不按哪一个更可能判甲或乙写；候选三、四、五「判乙传不到原句」那条不对称写在主取样点任何读数之前。定候选的人同样看得到反向取样点这几个数，修订 3 那一行写明定的依据（代价与罩住的态）。
+2. 计时：726 679 579 纳秒 / 72 态、347 473 336 纳秒 / 72 态。只进 2.1 的挂钟推算，不进门槛。
+3. 写流结构：29、2、1 207 959 552、下标 48–80、截断 81 与 57。进候选的定义（是造法的结构，不是判定）。
+4. 原登记第四节第 6 条已列的第二轮攻方「末段全枚举 288 态」：候选三 k = 2 的态数也是 288（72 × 4，算出来的，不是照那个数挑的）；那一条的读数（s4 树上 RefFS 红 36 态）不进任何门槛。
+5. 第一段报告推的挂钟（基线各 40–90 分钟、带探针的行 25–35 分钟）：2.5 不用它们定限时，限时只从新树上量到的基线来。
+
+#### 2.9 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md`、`.claude/singlefs-ai-sop/rules/evidence-discipline.md`、`.claude/rules/three-way-inference.md`、`.claude/rules/mutation-sampling.md`、`.claude/rules/implementation-first.md`、`.claude/rules/verification.md` 全文。
+- 本登记 1–679 全文；`research/prompts/e171-r1-questions.md` 1–12。
+- 第一段执行员报告全文（没入库）；第一段那一趟 Q5 两个取样点的装置标准输出（`E7TIMING` 行，没入库）。
+- `research/results/` 下第一段的两份 Q5 产物全文（主取样点 13 行、反向 42 行）；`research/target/e171-r1-dumps/q5-reverse/confirmed_loss_form/fixed_script_through_e_then_unmount/` 的 `impl-verdicts.tsv`（末列求和）、`stream-status.tsv`、`manifest.tsv`、`ops.tsv` 头 2 行与末 16 行、`torn.tsv`、`calls.tsv`；`research/target/e171-r1-dumps/s2-baseline-streams-1-2/fixed_script_through_e_then_unmount/` 的 `calls.tsv` 头 5 行、`ops.tsv` 第 5–46、45–90 行（`awk` 按第 1 列取）。
+- 新装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：26–41、1880–1920、3085–3200、3414–3463、3530–3612、3713–3800、4379–4440、6478–6500、6944–7100、7955–8000、8290–8340、8615–8680 与 `grep -n` 命中行（计时、`#[path]`、`reference_filesystem::`、`StoppedByAPanic`、见证两支）。
+- `crates/singlefs-checker-tier/src/crash.rs` 1255–1300；`crates/singlefs-checker-tier/Cargo.toml` 全文；`crates/singlefs-checker-tier/src/crash_injection.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/Cargo.toml` 与 `src/lib.rs` 的 `grep -n reference` 命中行；`crates/singlefs-harness/src/model_comparison.rs` 79–84；`crates/singlefs-harness/src/memory_pool.rs`、`read_tally.rs` 的 `pub` 项 `grep -n` 与 `read_tally.rs` 1–40；`crates/singlefs-core/src/recovery.rs` 102–114；全仓 `impl … PoolReader for` 的 `grep -n` 命中行；`crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs` 1–40、1476–1500（只读读者的做法，没读它的结果）。
+- `crates/mutations.tsv` 第 1 行与第 2443–2465 行（名字、文件、测试名三列）。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 255–300 与 `grep -n` 命中行（第 64、266、270、534、547–548、696 行）；`research/scripts/capped.sh` 1–30；`.claude/singlefs-ai-sop/scripts/doc-lint.sh` 900–975（not-numbers 怎么读）。
+
+跑过的命令（原样，输出在设计员报告里）：
+
+```
+$ grep -n '^#' research/prompts/e171-r1-prereg.md
+$ awk -F'\t' '{s+=$NF; …}' impl-verdicts.tsv            # n=72 sum_ns=347473336 mean_ms=4.826
+$ grep '^E7TIMING' <反向取样点那一趟的标准输出> | grep -v 'stage_time\|file_with_timing'   # observe_ns=726679579
+$ python3 -c "…"                                         # 每态 10.09 毫秒；72×2**24=1207959552；各候选态数与挂钟
+$ grep -c 'export.ending = Some(stream.ending.clone());' <新装置>        # 1（第 4426 行）
+$ grep -n '        || witnessed_counter == 0' <新装置>                    # 3142
+$ grep -c '模型今天只罩一片叶容器的那几种发布' crates/singlefs-harness/src/model_comparison.rs   # 1（第 84 行）
+$ grep -c '#\[test\]' <新装置>                                           # 40
+$ sha256sum <新装置> research/prompts/e171-r1-prereg.md research/prompts/e171-r1-questions.md crates/singlefs-harness/src/model_comparison.rs
+$ ls research/results/ | grep -c '^e171-r1-…-2026-10-04-s1-.*\.out$'     # 20
+```
+
+追加之前本登记 sha256 `e276f6ae78decf46050c1f0ae49e59b6d9b59ac6060a21d43aa0035d9b6ef28b`、679 行；这一条修订整段先写进设计员草稿目录，再 `>>` 追加，追加后 `tail -n +680 | cmp - 草稿` 逐字节一致。
+
+### 修订 3（主 agent 记用户定案，2026-10-04）
+
+修订 3：Q5 主取样点取候选二「Q5-等价类」（不抽样，无 k、m 取值）；2026-10-04；用户定（弹窗，主 agent 给的选项：候选二、候选一、候选三 k = 17、候选五 m = 10 000）；依据：修订 2 第 2.1 节代价表——候选二罩住的态集合与读法 7 原句相同（1 207 959 552 态，144 类），推约 4.4 秒加记读开销，前提逐跑由类核对 ①–④ 与「等价类对拍」核、不过走 S13；候选一推约 141 天（8 线程另写约 17.6 天），候选三、五判乙传不到原句。第 2.1 节候选二的造法、类核对、停机 S13、变异 V17–V19 与本地常量即刻生效；装置先过「等价类对拍」再跑主取样点。
+
+### 主 agent 认定：25-3a 装置返工交回（2026-10-05；在任何新树产物之前）
+
+依据：实现员报告 `/tmp/claude-1000/m3-formal-25-3a/report.md`（sha256 a84c5299…）「停下交主 agent」一节。逐条，原判据一个字不改：
+1. 流三那条内联用例原断言「跨叶那次胶水接不了」，25-1 之后必然不成立，改成「没有一次接不了、模型不停、取号暖机之外全对得上」：认。与 2.2「修理想模型、不收窄实验」同向，S5 照原文判。
+2. 类核对 ① 装置里做的是运行期重算比对（逐态输入在代表与全枚举两路上算一遍比）；登记要的人工输入清单（第 2.1 节类核对 ① 那一句）仍由执行员在新树上逐项列、与装置的比对一起交：两样都要。
+3. `name=q5_equivalence` 那一行只放类核对 ①–④ 与对拍的计数（任一不是 0 就走 S13，照原文）；细分次数等分法类的量另起一行 `name=q5_partition`，不进 S13；同一行另加 `s13=true|false` 直接给判定：收严（把原文里一行混放的两类量分开，不改哪些量触发 S13）。实现员自加的 `class_landing_mismatches`（每类的恢复落点与代表不同的态数）算进 S13：收严，留。
+4. journal 位置提示记成读了整个环（比「记每一次读」罩得宽，交集只会更大、更早走细分与 S13）：收严，认。
+5. 等价类对拍有一态不同就退 3、不跑主取样点：与 S13「既不作数也不当结果，交主 agent」同义，认。
+6. 「没有根写可判」那一支在这条流上走不到，装置今天把它记成 `s13=true`，字面不对：执行员在新树上改成记 `q5_not_run=no_root_write`（不进 S13、不进判定），改在冻结树拍之前。
+
+### 修订 4（第一段·新树执行员，2026-10-05；冻结树拍好、S1 与 S3 自检之后，阳性对照与 Q1–Q5 任何产物之前；只抄修订 2 第 2.2 节点名要在新树上重查的两样，判据一个字不改）
+
+依据：修订 2 第 2.2 节第四点「第 2 条……执行员在新树上核 `observed_unmount` 交的观测类型没变，变了照修订 1 的做法另写一条修订；第 3 条（行号）在新树上重查，另写一条修订」。新冻结树快照摘要 `4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd`（284 个文件，产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-frozen-tree.out`）；修订 1 那棵改名留在 `research/target/e171-r1-frozen-tree-revision-1-void-2026-10-04`。
+
+1. **修订 1 第 2 条**：新树 `model_comparison.rs` 第 640 行 `pub fn observed_unmount(unmounted: &Unmounted) -> ObservedEffect`，交的仍是 `ObservedEffect::Publishes { roots, .. }`，没变；阳性对照照修订 1 第 2 条改第一条根的 `rollback_floor`。
+2. **修订 1 第 3 条的行号在新树上**（与修订 1 写的不同的照实列）：`model.rs` `committed_versions` 第 1342 行（修订 1 写 1225）、`answer_unlink_intent` 第 2053 行（1911）、`answer_deletion_step` 第 2095 行（1953）、`answer_create_inode` 第 2140 行（1998）、`answer_unmount` 第 2664 行（2505）、`judge_and_advance` 第 2759 行（2600）、`crash_recovery_disagreement` 第 3318 行（3159）；`model_comparison.rs` `observed_unmount` 第 640 行（646）；`mount_transparency.rs` `newer_publish_witnessed_on_the_crash_image` 第 1392 行、`judge_writable_mount_refusal` 第 1590 行、`judge_writable_mount_refusal_of_a_crash_state` 第 1617 行（三处同修订 1）；`crash_injection.rs` 第二截调它在第 2291 行（同）、`writable_mount_alone_on` 第 1674 行（同）、`materialized_crash_image` 第 1556 行（同）；`transaction.rs` `publish_new_inodes` 第 5787 行、`publish_unlink_intent` 第 5852 行、`publish_unlink_step` 第 5907 行、`inode_leaf_containers` 第 2740 行（四处同）；`recovery.rs` `verified_system_configuration_slots` 第 3251 行（同）；`singlefs-format/src/lib.rs` `INODE_LEAF_RECORDS` 第 110 行（同）；`reference_filesystem_translation.rs` 与 RefFS `lib.rs` 的 sha256 仍是 `65ea707b…`、`5eb77191…`。
+
+### 修订 5（设计员，2026-10-05；批次 `records/2026-10-01-里程碑三形式化接入.md#27` 27-1；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers K1 K2 K3 KM1 KM2 KM3 KM4 KM5 KM6 KM7 U1 U2 U3 U4 U5 U6 U7 U8 U9 V9 V20 V21 V22 V23 V24 V25 V26 V27 V28 V29 V30 V31 S14 F9 Z7 -->
+
+**时点**：第一段新树（快照摘要 `4d071c12…`，修订 4）的按序脚本在跑，第 10 步 Q5 主取样点用的是修订 4 那一版装置（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`，sha256 `b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84`，与冻结树里那份相同）；修订 5 的装置改动（27-2）还没写；Q5 在修订 5 装置上的产物一份都没有。
+**依据**：第 25 批代码轮第一轮判决 `research/prompts/m3-formal-code-b25-r1-main-verification.md`（sha256 `bf573a92377b7c5d41fb562f6460024c69f77c47b5a5121a60cd2f085b0aaade`）第二节 K2 表与第三节第 1、2 条。
+**不换候选**：Q5 主取样点仍是修订 3 用户定的候选二「Q5-等价类」；甲、丙与下面各件是在候选二之内补它自己的前提。
+**原判据原样保留**：第一至十一节、修订 1–4、「主 agent 认定：25-3a 装置返工交回」一个字不改；Q5-有效、Q5-判、Q5-阴性、Q5-反向的判据与门槛、F5、F8 不动。下面每件写改了什么、收严还是放宽。
+
+| 件 | 改了什么 | 收严 / 放宽 |
+|---|---|---|
+| 5.1 | 甲：判态路上除看 journal 那遍恢复之外各件的 panic 各自接住、单列；O1 两个崩溃子列只随看 journal 那遍恢复 panic；新设阳性对照「判态路 panic 单列」 | 收严（原来记「恢复 panic」、不判的态，现在照判；多一样阳性对照） |
+| 5.2 | 丙：「等价类对拍」从第 3 次调用的前 2 个写加到前 6 个写 | 收严（对拍的态从 288 加到 4 608） |
+| 5.3 | `q5_not_run=no_root_write` 在对拍之前判 | 收严（多一道前置判；出口与认定第 6 条同义，控制流改到它真到得了） |
+| 5.4 | 类核对七处告警各配一条会红的内联用例与一行变异 | 收严 |
+| 5.5 | `class_landing_mismatches` 的释义；三个字段挪进 `q5_partition` 行；S13 照 `s13=` 字段读 | 判法相同；对拍那一行「各类态数之和 ≠ 组合数」写进 S13 的读法，收严 |
+| 5.6 | Q5 这一次怎么跑：第 10 步那一份记「方法待修，结论不作数」；Q5 树；哪几步重跑、哪几步沿用；Q5 作数的条件 | 收严（Q5 多一道「告警自证」才作数） |
+| 5.7 | 新设停机 S14、失败 F9、作废 Z7；用例 U7–U9 与变异 V28–V31 | 收严 |
+
+**每件量什么、为哪一判、量到哪算够**（都对问题单 Q5 那一行；各件都不改 Q5 的候选与翻面观测，只决定「候选二按类推出的那一份读数能不能当 Q5 的读数」）：
+
+| 件 | 量什么 | 为哪一判 | 量到哪算够 |
+|---|---|---|---|
+| 5.1 甲 | 判过的态上各件 panic 的态数（新列）；阳性对照「判态路 panic 单列」各件的态数、O1 两列与不注入那一遍逐态同不同 | O1 两列只吃四样输入这句话成不成立（不成立，按类推出的 O1 就不能当 Q5 读数） | 那一行恰为第 5.1 节的精确数、与不注入那一遍逐态不同 0 态；U7 提交时绿、V28、V29 提交时抓到 |
+| 5.2 丙 | k = 6 的对拍 4 608 态：`mismatching_states`、类核对各计数、`s13` | 按类推在逐态全判的子集上复不复现每一态（S13） | 那一行 `s13=false`，S1 新加三条都过 |
+| 5.3 | 主取样点与对拍两形的 `judged_root_index` | Q5 是「不够判（没有可判的根写）」，还是进对拍 | 今天的流上有根写（S1 `confirmed_loss_root_write_made_plain` 过）；U8 提交时绿、V30 提交时抓到 |
+| 5.4 | U1–U6 的断言；V20–V27 红不红 | 类核对七处告警真不真会红（判别力，不是 Q5 的读数） | 提交时那一趟 U1–U6 全绿、V20–V27 全抓 |
+| 5.5 | 不量 | — | 字面改完 |
+| 5.6 | 第 5.6 节第 3 条列的各步 | Q5 甲 / 乙 | 第 5.6 节第 7 条 |
+
+#### 5.1 甲：判态路上的 panic 各自接住，O1 两个崩溃子列只随看 journal 那遍恢复
+
+**病根**（判决 K2 第二格，攻方坐实）：装置判一态时，回调链上——`crates/singlefs-checker-tier/src/crash.rs` 第 1226–1258 行 `judge_crash_image`（看 journal 那遍恢复、不看 journal 那遍恢复、两份层 0 oracle 归类、`check_pool_image`、`check_records`）与装置第 3551 行起 `observation_of_a_judged_state`（O1 两个崩溃子列、RefFS 一票、O2 直调、计时那一遍恢复、探针）——任一处 panic，那一态都走装置第 3684 行起的 `observation_of_a_panicking_state`，两个崩溃子列都记 `recovery_panic`（第 3728–3729 行）。所以两列在一态上除了修订 2 第 2.1 节说的四样输入，还随这几样的 panic 变（第五样输入），而类核对 ③ 只记看 journal 那遍的读。
+
+**改法**（装置，27-2 写；不改 `crates/singlefs-checker-tier/src/crash.rs` 与别的库）：
+1. 正常那一路（回调链没 panic 的态）一个字不改，只多填一列（第 5 条）。
+2. 回调链 panic 了，装置在同一个镜像上（照今天 `observation_of_a_panicking_state` 从事实表的掩码现造）按下面的次序逐件重做，**每一件各包一层 `catch_unwind`**，panic 了记下件名、接着做下一件：
+   - `consulted_recovery`：`recover(image, JournalPolicy::Consult)`；
+   - `ignored_recovery`：`recover(image, JournalPolicy::Ignore)`；
+   - `root_persisted`：被判那次根槽写落没落（`image.persisted[judged_root_index]`）；
+   - `layer0_oracles`：两份 `classified_oracle_violation_for_versions`（各吃自己那一遍恢复；那一遍 panic 了，这一件记 `not_run`）；
+   - `pool_checker`：`check_pool_image`（`judge_crash_image` 里那次与装置直调那次是同一函数、同一镜像，算一件）；
+   - `record_checker`：`check_records(image, consulted.effective_root)`（看 journal 那遍 panic 了记 `not_run`）；
+   - `crash_judge`：O1-模型崩溃判官本身（适用性照第 3479 行 `crash_judge_is_applicable`，交法照第 3445 行 `crash_judge_of_the_state`）；
+   - `reference_filesystem`：RefFS 一票本身；
+   - `timing_recovery`：装置第 3629–3630 行计时那一遍恢复；
+   - `probe`：可写挂载探针（开了才有）。
+   实现员在交回里逐件列装置里的行号；回调链上还有这张单子之外的一步，加一件、写明，不并进别的件。
+3. **O1 两个崩溃子列的取值**：`consulted_recovery` panic → 两列都记 `recovery_panic`（读法 5 原样）；没 panic → 两列照正常那一路的函数、从这一遍的恢复报告算（适用性、版本目录、RefFS 崩溃时刻都同正常那一路）；`crash_judge` 或 `reference_filesystem` 自己 panic → 那一列记新词 `judge_panic`（不红不绿，与弃权、不适用分开计）。别的件 panic **不改**这两列。这一条之后两列在一态上只是四样输入（看 journal 那遍恢复的结局，含它的 panic；盘上已持久的最新根；触达的最后一次调用；段号）的函数，修订 2 第 2.1 节「为什么这样分得开」那一句才成立。
+4. **O2 一列照旧**：`pool_checker` panic 记 `pool_checker_panic`、按红计（今天第 3714 行的读法），Q1 的 O2 列读法不变。`impl-verdicts.tsv` 那一行各格取各件自己的结果，panic 的件写 `panic`，没跑的写 `not_run`。
+5. **新列怎么报**：
+   - `oracle-verdicts.tsv` 末尾加一列 `piece_panics`：panic 的件名按第 2 条的次序用逗号连起来，没有写 `-`；
+   - 原末列「恢复 panic 的消息」与 `recovery_panic_states=` 的含义收窄成「看 journal 那遍恢复 panic」（修订 4 那一版是「回调链上任一处 panic」）；
+   - `name=batch`、`name=verdict` 两种行加一个字段 `piece_panic_states=<件>:<态数>,…`（0 的件不写，全 0 写 `-`）；
+   - Q5 那几趟另打 `name=q5_piece_panics sampling_point=<main|pairing|piece_panic_control|reverse> judged_states=… <第 2 条十件各一个字段>=<态数>`；主取样点只数照原路径判过的态，不按类外推。
+6. **进不进 S13**：不进。S13 管「按类推出的 O1 与逐态判的同不同」；第 3 条之后别的件 panic 不进 O1，按类推与逐态判在那几态上照样相同，对拍判得出（第 5.2 节）。
+7. **进不进 Q5 判定**：不进。Q5-判照第六节数 L 个态上的 RefFS 红、模型崩溃判官红、两者都绿、RefFS 弃权，另加两列各自 `judge_panic` 的态数（不红不绿）；L 个态上没有一态红、也没有一态两者都绿（全是弃权或 `judge_panic`），照 F8 记不够判。主取样点判过的态上任一件 panic 的态数大于 0：照数交回、单列（它说的是实现或那件工具在崩溃镜像上会 panic），交主 agent，不停机、不改 Q5 的判定。
+
+**阳性对照「判态路 panic 单列」**（新设；第五节 5.2「每一条新加的管子都跑」；每一跑主取样点都做，排在不注入的对拍之后、主取样点之前）：
+- 造法：同一条 k = 6 的对拍流（第 5.2 节）。记 C 的前 6 个写按发出次序为 c1…c6，(c1,c2)、(c3,c4)、(c5,c6) 是三对镜像（S1 新加那一条核）。装置这一侧按落地串注入：正常那一路在回调里先 panic（逼走第 2 条那一路），第 2 条那一路里点名的那一件 panic。三条注入的态互不相交：
+  - `pool_checker`：c3 落、c4 没落 → 72 × 2⁴ = 1 152 态；
+  - `ignored_recovery`：c3 没落、c4 落 → 1 152 态；
+  - `record_checker`：c5 落、c6 没落，且 (c3,c4) 同落或同不落 → 72 × 2² × 2 = 576 态。
+  「落」= 落地串那一位不是 `0`（C 的写都不可撕裂，只取 `0`、`2`）。注入只经装置内部的开关进，命令行不开放，产物里写明；不改实现。
+- 必须看到（钉绝对值）：`name=q5_piece_panic_control states=4608 pool_checker=1152 ignored_recovery=1152 record_checker=576 o1_columns_differing_from_the_plain_pairing=0 mismatching_states=0 s13=false`，别的件 0，`consulted_recovery` 与不注入那一遍的同名数相等（两边都应为 0，不为 0 照实写）。`o1_columns_differing_from_the_plain_pairing` = 逐态比两个崩溃子列与看 journal 那遍恢复的结局，注入那一遍对不注入那一遍不同的态数。
+- 不符走 F9（第 5.7 节），主取样点不跑。
+- 判别力：修订 4 那一版装置上同样注入，两列在 2 880 态上变 `recovery_panic`，对拍与这一行都红（推的；同形的单件注入攻方副本上量过 1 152 态不同，副本上的数）。V28、V29 在这一行上改变输出（第 5.7 节）。
+
+**已有产物的读法**（第一段新树按序脚本的每一份产物，与之后仍用修订 4 那一版装置跑的）：甲只改「回调链 panic 了」那一路，一份产物的读法变不变只看它有没有这样的态。
+- 数法：那一份产物里各 `name=batch` 行（逐行驱动收进来的同）`recovery_panic_states=` 之和（修订 4 那一版的含义：回调链上任一处 panic）。
+- 和为 0：读法不变，不重跑。第五节 5.2 各阳性对照（含「panic 截断」：它是调用 panic，走 `StreamDriver::call` 那一路，甲不碰；第七节 A8 的精确数不变）、阴性对照、基线、O3 基线、Q4 的探针、16 趟逐行都照这一条判。
+- 和大于 0：读法变的是那几态的 `oracle-verdicts.tsv` O1-崩溃判官列、RefFS 列、恢复 panic 消息列，`impl-verdicts.tsv` 那几行，`name=batch` 行 O1 两列的各计数与 `recovery_panic_states=`。那一步在 Q5 树（第 5.6 节第 2 条）上重跑一次，旧产物留着；重跑那一份里，旧产物 `recovery_panic` 为 `-` 的态除新加的 `piece_panics` 列与耗时列之外逐字节相同（不同走 S14 ④），旧产物记了恢复 panic 的态照新读法判；那一行 Q1（或那一样阳性对照）的判定照重跑那一份。
+- 执行员在交回里列一张表：产物文件名、`recovery_panic_states=` 之和、重跑否。
+- 第二段（整表）：Q2 读 O1-对拍、Q3 数调用，都不读两个崩溃子列，甲不改这两行的读数；它在哪棵树上跑照原登记，附带的 Q1 类读数照上面的数法。
+
+#### 5.2 丙：对拍截到第 3 次调用的前 6 个写
+
+- **改了什么**：装置常量 `EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT`（今天第 7699 行，值 2）改成 6：每一跑主取样点之前的「等价类对拍」截到第 3 次调用发出的前 6 个写之后（`ConfirmedLossTruncation::AfterTheFirstInFlightWrites(6)`），末段 = 第 2 次调用的 5 个写（K）加这 6 个写，72 × 2⁶ = 4 608 态全枚举、逐态照原路径判，再按类推、逐态比（判法同修订 2 第 2.1 节与今天第 8546 行 `equivalence_pairing_of`）。阳性对照「判态路 panic 单列」用同一条流。内联用例 U1–U6 与已有的两条（第 10073、10146 行）可以留在 k = 2（288 态，用例自己的常量），U7 用 k = 4，U9 钉 6。
+- **k 怎么定**：k = 6 = C 的前三对镜像写。依据三条：① k = 2 只罩一个单元的两份镜像（判决 K2 第三格坐实），罩不到「一个单元落、另一个单元没落」；② 两对起才有同一块盘上两个不同单元各落各的、两块盘上不同单元交错落的组合；③ 阳性对照「判态路 panic 单列」的三条注入要互不相交，第三条用到第三对。态数 4 608，按修订 2 第 2.1 节每态 10.09 毫秒推约 46.5 秒（推的，没量；攻方副本上 41–55 秒，副本上的数）。不再往上加：k = 8 是 18 432 态、约 3.1 分钟，k = 17 是 9 437 184 态、约 26.5 小时（修订 2 代价表），多出来的只是 C 后面那些写之间的组合，那一半由类核对 ③ 与甲罩，不由对拍罩（下一条）。
+- **罩到哪、罩不到哪**（写结论时照这一句带上）：对拍只在「C 的第 7–24 个写都没落」的态上逐态核过等价关系；C 后 18 个写参与的组合，等价靠两样：类核对 ③ 每跑在 72 个代表上核读集不相交，甲让看 journal 那遍恢复成为 O1 两列唯一读盘的件。这一半是推的，Q5 的结论写成「等价关系在 k = 6 的 4 608 态上逐态核过，其余态按类核对 ③ 与甲推」。
+- **态数上限与 S13**：对拍全枚举 4 608 态，不受 `CONFIRMED_LOSS_STATE_LIMIT`（10 000 000）管；对拍那一形的分类（③ 细分）照旧受它管。S13 照旧：对拍那一行 `mismatching_states` 大于 0、各类态数之和不等于组合数、类核对任一计数不是 0、细分到上限，任一成立即 S13（第 5.5 节照 `s13=` 读）。
+- **S1 加三条**（本地常量，每一跑 `confirmed-loss-form` 开头回比，不过走 S1）：`equivalence_pairing_in_flight_writes` = 6（对拍流末段里属于第 3 次调用的写数）；`equivalence_pairing_states` = 4 608（对拍流末段各写取法数之积，本地写成 72 × 2⁶ 的积）；`equivalence_pairing_mirrored_pairs` = 3（c1…c6 两两同偏移、同长度、分属盘 0 与盘 1，三对的偏移互不相同）。对拍那一行的 `in_flight_writes_kept` 打实际截的 k，与 `q5_partition sampling_point=pairing` 那一行的 `in_flight_writes` 必须相等（不等走 S1）。
+
+#### 5.3 `q5_not_run=no_root_write` 在对拍之前判
+
+- **改了什么**：`run_confirmed_loss_form`（今天第 7304 行）的次序改成：S1 → 造主取样点那一形（反向取样点同）→ 看它的 `judged_root_index`（今天第 7158–7161 行算，没有根槽写时是 `usize::MAX`）→ 造对拍那一形 → 看它的 `judged_root_index` → 对拍 → 阳性对照「判态路 panic 单列」→ 主取样点的分类与判态。
+- **任一形没有根写**：打 `name=q5 sampling_point=<main|reverse> not_run=no_root_write shape=<main|pairing>` 与 `name=verdict s1_failed_checks=… s13=false q5_not_run=no_root_write`，退 3；不打对拍、阳性对照、`q5_equivalence`、`q5_partition` 任何一行。不进 S13、不进 Q5 判定；Q5 记「不够判（那一形没有可判的根写）」，交主 agent 查造法（A3 与 S1 的 `confirmed_loss_root_write_made_plain`）。反向取样点在导出之前同样先判。今天第 7471–7486 行那一支留着当第二道。
+- **今天的流上走不到**：S1 的 `confirmed_loss_root_write_made_plain` 回比的就是那次根槽写（本地常量第 254 行，下标 52）；这一出口「到得了、排在对拍之前」只靠 U8 与 V30 证明。
+
+#### 5.4 类核对七处告警：会红的内联用例与变异
+
+都是装置一侧：用例写进新装置的测试模块，变异行追加进 `crates/mutations.tsv` 末尾、名字以「E171R1 装置」起头（第九节的做法）；用例与变异都是重型，提交时由主 agent 跑。U1、U4、U5、U6 的共同起点「S0」：k = 2 的对拍流（第 10058 行 `equivalence_pairing_stream` 那一形），照第 8546 行 `equivalence_pairing_of` 的前几步造 `ObservationTables`、`context`、`LastSegmentDigits`，`classify_the_last_segment` 得分法，逐态全判得 288 个观测；先断言不篡改时 `evaluate_the_classes` 的五个计数全 0、`equivalence_stops_at_s13` 为假（证明下面那一处篡改才是让它红的东西）。「代表 0」= `representative_ordinal(&digits, 0)` 那一态；「全落 0」= `fully_landed_ordinal(&digits, 0)` 那一态；「c1」= 末段里第一个属于第 3 次调用的写。行号都是今天装置（`b1457bc6…`）的。
+
+| 告警（判决的 KM 号） | 用例：喂什么 | 断言 | 变异：改坏哪里 | 点名的用例 |
+|---|---|---|---|---|
+| 类核对 ①（KM2） | U1 `the_input_list_check_counts_a_state_whose_columns_do_not_follow_the_four_inputs`：S0，把代表 0 的观测里 `crash_judge` 换掉（绿换成 `Red { what: "tampered" }`，别的换成绿），交 `evaluate_the_classes` | `input_list_mismatches == 1`；`equivalence_stops_at_s13` 为真 | V20「E171R1 装置 V20 Q5 类核对 ① 不计数」：第 8340 行 `            checks.input_list_mismatches += 1;` 换成一行注释 | U1 |
+| 类核对 ②（KM1） | U2 `an_in_flight_write_classified_as_a_journal_record_is_a_forbidden_kind`：k = 2 的对拍流，把 c1 在 `stream.operations` 里对应的那条操作（`stream_indexes` 指的那一条）的盘与偏移改成第 2 次调用在末段里第一个 journal 记录写那条操作的盘与偏移；`stream.writes` 不动；先断言 `common::geometry().classify` 对改后那条操作交 `StepKind::JournalRecord` | `in_flight_writes_of_a_forbidden_kind == 1`；`in_flight_write_kinds` 是 `journal_record:1`、`unit_write:1`；`classification.refinements == 0`（写表没动，③ 看不见它，只有 ② 抓）；`equivalence_stops_at_s13` 为真 | V21「E171R1 装置 V21 Q5 类核对 ② 不计数」：第 8318 行 `                checks.in_flight_writes_of_a_forbidden_kind += 1;` 换成一行注释 | U2 |
+| 类核对 ③ 的 journal 提示记整环（KM7） | U3 `an_in_flight_write_in_an_unread_journal_ring_slot_is_moved_into_the_key_through_the_hint`：`RecordedReadRange` 加一个字段记这一段来自 `read` 还是来自提示（`recorded_reads_overlap_the_write` 照旧用全部段）。k = 2 的对拍流，不改流先分类一遍，从代表 0 的记读里取盘 0 提示那一段 [环起点, 环终点)；取 o = 环终点 − c1 的长度、按 4 096 向下对齐；前提断言：72 个代表的记读里，来自 `read` 的段在盘 0 上都不与 [o, o + c1 长度) 相交（这一处只有提示那一段罩得到）。再把 c1 在 `stream.writes` 里的盘、偏移改成（盘 0，o），内容不动，跑 `equivalence_pairing_of` | `classification.moved_positions == vec![c1 在末段里的位置]`；`refinements == 1`；`mismatching_states == 0` | V22「E171R1 装置 V22 Q5 类核对 ③ 的 journal 提示不记」：第 7990 行起 `journal_record_offsets_hint` 里记整环的那一句 push 删掉（锚点照改后的源码写、恰命中 1 次） | U3 |
+| 类核对 ④ 前一半（KM4） | U4 `a_recording_recovery_that_differs_from_the_layer0_report_is_counted`：S0，分法里代表 0 那一项 `representative_recoveries` 换成 `ConsultedRecovery::Panicked("tampered")`，观测不动 | `recording_report_mismatches == 1`；`equivalence_stops_at_s13` 为真 | V23「E171R1 装置 V23 Q5 类核对 ④ 前一半不计数」：第 8391 行 `            checks.recording_report_mismatches += 1;` 换成一行注释 | U4 |
+| 类核对 ④ 后一半（KM3） | U5 `a_fully_landed_state_that_differs_from_its_derived_class_is_counted`：S0，全落 0 的观测里 RefFS 一票换成 `ReferenceFileSystemVoteOfAState::RecoveryPanicked`（原来就是它的换成绿） | `derived_class_mismatches == 1`（① 同时为 1，照实断言） | V24「E171R1 装置 V24 Q5 类核对 ④ 后一半不计数」：第 8442 行 `            checks.derived_class_mismatches += 1;` 换成一行注释 | U5 |
+| 代表与全落两态的落地串核对（KM5） | U6 `a_landing_string_off_the_partition_is_counted_and_stops_at_s13`：S0，(a) 代表 0 的 `landing_vector` 里 c1 那一位改成 `2`；(b) 还原后全落 0 的 `landing_vector` 里 c1 那一位改成 `0`；各交一次 `evaluate_the_classes` | (a)、(b) 各 `class_landing_mismatches == 1`，另外四个计数都是 0（触达调用存在观测里、不从落地串重算，① ④ 不动）；`equivalence_stops_at_s13` 为真 | V25「E171R1 装置 V25 Q5 代表的落地串核对恒过」：第 8380 行 `            \|\| !class_landings_are(representative, '0')` 换成 `            \|\| false`；V26「E171R1 装置 V26 Q5 全落那一态的落地串核对恒过」：第 8437 行 `            \|\| !class_landings_are(fully_landed, highest_digit_landing)` 换成 `            \|\| false` | V25、V26 都点 U6 |
+| S13 拼法含 `class_landing_mismatches`（KM6） | 同 U6（(a)、(b) 都只有落地串那一个计数不是 0，S13 只能从它来） | U6 的 `equivalence_stops_at_s13` 为真 | V27「E171R1 装置 V27 Q5 S13 不看落地串核对」：第 8477 行 `        \|\| checks.class_landing_mismatches > 0` 换成一行注释 | U6 |
+
+**装置跑法里读得出读不出**：V17、V18 在装置自己的跑法里读不出——主取样点上施加它们，标准输出与不施加时逐行相同（判决 K2 第四格：正推副本上量过、主 agent 复跑同；原因是真流上模型不停在第 3 次调用，「C 落没落」那一位在所有态上同值，真流里也没有 C 写落在恢复读到的位置），只靠第 10073、10146 行那两条内联用例。V20–V27 与 V30 同样只靠内联用例（真流上那几个计数恒为 0、有根写）。V28、V29 读得出（阳性对照「判态路 panic 单列」那一行），V31 读得出（S1 新加三条）。所以 Q5 主取样点那一跑的产物本身证明不了这十条告警会红：第 5.6 节第 7 条把「提交时那一趟这几条用例绿、这几行变异全抓」写成 Q5 作数的条件。
+
+#### 5.5 两处字面与 S13 的读法
+
+1. **`class_landing_mismatches` 的释义**：「主 agent 认定：25-3a 装置返工交回」第 3 条括号里写成「每类的恢复落点与代表不同的态数」，与装置第 8276 行的文档注释、第 8362–8383 与 8435–8440 行的计法不是一回事。改成：**落地串（哪些写落了）与分法说的不同**的态数——代表与「C 全落」那一态的落地串（`landing_vector`，从这一态的持久集合独立算出）上，代表那一态类里的写不全是 `0`、「C 全落」那一态类里的写不全是 `2`，或这一态按分法的类键不是它该在的那一类。认定第 3 条「算进 S13」不变。
+2. **字段归属**（认定第 3 条在先）：`name=q5_equivalence`（主取样点）与 `name=q5_equivalence_pairing`（对拍）两种行只放类核对的计数与判定：`input_list_mismatches`、`in_flight_writes_of_a_forbidden_kind`、`read_overlaps_left`、`recording_report_mismatches`、`derived_class_mismatches`、`class_landing_mismatches`、`s13`（对拍那一行另带 `in_flight_writes_kept`、`states`、`product_of_the_choices`、`class_states`、`classes`、`mismatching_states`、`crash_judge_not_applicable_states`）。`refinements`、`moved_last_segment_positions`、`stopped_at_the_state_limit` 挪进 `name=q5_partition sampling_point=<main|pairing>` 那一行，与今天 `partition_fields`（第 8503 行）的六个字段放在一起；对拍那一形今天并在 `q5_equivalence_pairing` 一行里的分法字段同样挪出去，另打 `q5_partition sampling_point=pairing`。
+3. **S13 的触发观测照 `s13=` 字段读**（替修订 2 第 2.1 节 S13 那一条的触发观测「`name=q5_equivalence` 那一行任一计数不是 0，或对拍那一行 `mismatching_states` 大于 0」）：`name=q5_equivalence` 或 `name=q5_equivalence_pairing` 那一行 `s13=true`，或 `name=verdict` 那一行 `s13=` 是 `true`、`equivalence_pairing`、`state_limit` 之一，即 S13；`s13=false`（含第 5.3 节那一出口）不是。`s13` 由装置照第 8467 行 `equivalence_stops_at_s13` 算（细分到上限、③ 还剩相交、①、②、④ 两半、落地串核对，任一成立），对拍那一行再并上 `mismatching_states` 大于 0 与各类态数之和不等于组合数（第 8538 行）。`stopped_at_the_state_limit` 住在 `q5_partition` 行，照样经 `s13` 进 S13：认定第 3 条「`q5_partition` 不进 S13」读成「那一行的字段不直接当触发观测」。这样读，触发的集合与修订 2 原句加认定第 3 条相同，多出的只有对拍那一行「各类态数之和 ≠ 组合数」（今天代码已经算进），收严。
+
+#### 5.6 Q5 的这一次怎么跑
+
+1. **第一段第 10 步那一份**（修订 4 那一版装置在冻结树 `4d071c12…` 上跑的 Q5 主取样点）：照跑完，q5 那几行记「方法待修，结论不作数」；产物与导出目录不删、不改、不进任何判定（同修订 2 第 2.7 节处置修订 1 那棵树上产物的做法）。本设计员没读它（禁读清单），修订 5 的门槛与常量都不从它来。
+2. **Q5 树：冻结树要重拍，但不从仓里重拍**。
+   - 为什么要重拍：装置文件在 `crates/` 里，改了它，`snapshot_digest`（`research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 235 行，罩全部 `.rs` 与 `Cargo.*`）必变；作废 Z5 要每趟开头与收尾核的摘要等于登记的那棵。
+   - 为什么不从仓里重拍：第一段冻结树之后，仓里的 `crates/` 已经合入根环线第 10b 批与第 26 批（判决第三节第 5 条点名 `allocator.rs`、`mount.rs`、`walk.rs`），从仓里拍，Q5 判的就不是第一段 Q1–Q4 判的那一份实现。E171 要不要在 10b 之后的树上重跑由主 agent 另判，不在这一条修订里。
+   - 怎么拍：把 `research/target/e171-r1-frozen-tree/`（摘要 `4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd`）整棵拷到 `research/target/e171-r1-frozen-tree-revision-5-q5/`（不带 target），只把装置文件换成 27-2 合入后仓里那一份（逐字节相同）；`crates/mutations.tsv` 不换（不进编译，也不进 `snapshot_digest`）。产物开头 `name=frozen_tree` 几行：新摘要与文件数、旧摘要与文件数、两棵树按 `snapshot_digest` 的逐文件（路径, sha256）表的差、装置文件在两棵树里各自的 sha256、`git rev-parse HEAD`。Q5 这几趟的二进制都从这棵树编（`--manifest-path` 指它、编译目录另起）；读法 10 与 Z5 对这几趟说的「登记的那棵冻结树」就是它。
+   - 编不过（仓里那一份装置跟着第 26 批之后的接口改过，旧树上没有那些接口）：S14 ②，交主 agent 定，不在旧树上另改一份装置去凑。
+3. **在 Q5 树上跑什么，按这个次序**：
+   - a. `confirmed-loss-form --truncate-at-the-return-point`（反向取样点，72 + 1 态全枚举，约 1 秒，推的）：**重跑**。依据：主、反两点要出自同一个二进制，第八节 Q5-反向那一格比的才是两个几何取样点，不是两版装置；甲改的回调链 panic 那一路反向取样点也走。另做一项核对：第一段新树那一份反向取样点产物（按序脚本里那一步，执行员按脚本定文件名）`recovery_panic_states=` 为 0 时，两份导出的 `oracle-verdicts.tsv`、`impl-verdicts.tsv` 去掉 `piece_panics` 列与耗时列之后逐字节相同，不同走 S14 ④（它证明正常那一路没被修订 5 动过）；第一段没有那一份，这一项记「没得比」。
+   - b. `confirmed-loss-form`（主取样点）：S1（含第 5.2 节新加三条）→ 第 5.3 节两形的根写 → k = 6 的对拍 → 阳性对照「判态路 panic 单列」→ 分类（③ 细分）→ 判代表与「C 全落」那些态（不细分时 144 态）→ ①、②、④ 与落地串核对 → `q5_class`、`q5`、`q5_trajectory`、`q5_piece_panics` 各行。全部**重跑**，不沿用第 10 步任何一行：甲改了判态路，丙改了对拍，次序也改了。
+   - c. b 在同一棵 Q5 树上连跑两次（Z7）。
+   - d. **沿用、不在 Q5 树上跑的**：基线、第五节 5.2 阳性对照全表、阴性对照、O3 基线、Q4 的探针、16 趟逐行——它们不走候选二，Q5 不读它们；甲对它们的影响照第 5.1 节「已有产物的读法」判（`recovery_panic_states=` 和为 0 不重跑）。Q5 那一形上的 O2、O3 照旧附带、够判后不跑。
+4. **产物**：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-revision-5-q5-frozen-tree.out`、`…-s1-revision-5-q5-reverse.out`、`…-s1-revision-5-q5-main-run-1.out`、`…-s1-revision-5-q5-main-run-2.out`，各带修订 2 第 2.6 节的 `-timing` 一份；导出目录 `research/target/e171-r1-dumps/q5-revision-5-reverse/`、`research/target/e171-r1-dumps/q5-revision-5-main/`。都用新文件名，不覆盖第一段的。
+5. **谁跑**：27-2 实现员改装置（连同 U1–U9 与 `crates/mutations.tsv` 的 V20–V31 行），交回里写第 5.1 节第 2 条的逐件行号与装置相对 `b1457bc6…` 的逐 hunk 对应表（每个 hunk 对修订 5 哪一件，或判决 K3 那一句 V9 文档）；27-3 执行员拍 Q5 树、编、跑 a–c、写交回（含第 5.1 节那张产物表）；超过 240 秒的（Q5 树的头一次编译多半超过）交主 agent 后台起。U1–U9、已有内联用例与 V17–V31 等装置变异行是重型，提交时由主 agent 跑。
+6. **挂钟**（推的，没量；每态 10.09 毫秒取自修订 2 第 2.1 节）：反向约 1 秒；主取样点一次约 1.6 分钟（对拍 4 608 态约 46.5 秒，阳性对照同一形约 46.5 秒——另加每个注入态重起一次 `judge_layer0_state_range` 的开销（第 3500 行那一圈），没量——分类 72 个代表加判 144 态约 3 秒，加驱动），两次约 3.2 分钟；Q5 树头一次 release 编译另算。
+7. **Q5 作数的条件（够判）**，各占一行，全成立 Q5 才照第六节 Q5-判、Q5-反向判甲乙：
+   - Q5 树：S14 ①②③ 都不触发；
+   - 主取样点两次：S1 全过；`s13=false`；阳性对照「判态路 panic 单列」恰为第 5.1 节的精确数（F9 不触发）；两次的结果行去掉耗时之后逐字节相同（Z7 不触发）；
+   - 反向取样点：S1 全过；S14 ④ 不触发；
+   - 告警自证：提交时那一趟里 U1–U9 与第 10073、10146 行那两条绿，`crates/mutations.tsv` 里 V17–V31 各行全抓（无效与没红都不算抓，照 `.claude/rules/mutation-sampling.md` 第八类分栏）。这一条没到之前，Q5 记「跑了，待告警自证」，不判甲乙，交主 agent 排提交。
+   第一段其余各行的够判照第十一节原文；Q5 一行照这一条。
+
+#### 5.7 新设的条款、其余用例与变异
+
+**内联用例 U7–U9**（装置一侧，重型，提交时跑）：
+
+| 用例 | 喂什么 | 断言 |
+|---|---|---|
+| U7 `a_panic_off_the_consulted_recovery_leaves_the_two_crash_columns_to_the_four_inputs`（第 5.1 节甲） | k = 4 的对拍流（72 × 2⁴ = 1 152 态；c1…c4 两对镜像）。先不注入跑一遍 `equivalence_pairing_of`；再开注入跑一遍：c3 落、c4 没落 → `pool_checker` panic（72 × 2² = 288 态）；c3 没落、c4 落 → `ignored_recovery` panic（288 态）；c1 没落、c2 落、(c3,c4) 同落或同不落 → `record_checker` panic（72 × 2 = 144 态） | 不注入那一遍各件 panic 都是 0（前提）；注入那一遍各件的态数恰为 288、288、144，别的件 0；逐态两个崩溃子列与看 journal 那遍恢复的结局与不注入那一遍相同；`recovery_panic` 都是 `None`；`mismatching_states == 0`、`stops_at_s13()` 为假；`pool_checker` 注入的那 288 态 O2 一列是 `pool_checker_panic` |
+| U8 `a_shape_without_a_root_write_stops_before_the_pairing`（第 5.3 节） | `run_confirmed_loss_form` 判完 S1 之后的那一段拆成一个吃两形（主取样点那一形、对拍那一形）、往收集器里打结果行、交回退出码的函数；`ResultLines` 加一个只在用例里用的收集模式。第一次：主取样点那一形的 `judged_root_index` 设成 `usize::MAX`（只模拟条件，写流不变，与攻方副本同一做法）；第二次：主那一形照旧、对拍那一形设成 `usize::MAX` | 两次都退 3；各有一行 `name=q5 … not_run=no_root_write`（第一次 `shape=main`，第二次 `shape=pairing`）；`name=verdict` 那一行带 `s13=false` 与 `q5_not_run=no_root_write`；没有一行以 `name=q5_equivalence_pairing`、`name=q5_piece_panic_control`、`name=q5_equivalence` 开头 |
+| U9 `the_pairing_keeps_the_first_three_mirrored_pairs_of_the_in_flight_call`（第 5.2 节丙） | k = `EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT` 的对拍流，只造 `LastSegmentDigits`、不判态 | 末段各写取法数之积 = 4 608 = 本地常量；末段里属于第 3 次调用的写 6 个；c1…c6 两两同偏移、同长度、分属盘 0、盘 1，三对的偏移互不相同 |
+
+**变异 V28–V31**（追加进 `crates/mutations.tsv`，名字以「E171R1 装置 V28」…「E171R1 装置 V31」起头；锚点由实现员照改后的源码写、恰命中 1 次）：
+
+| # | 改坏哪里 | 在哪个取样点上改变输出 | 点名的用例 |
+|---|---|---|---|
+| V28 | 第 5.1 节第 2 条那一路：只要有一件 panic，两个崩溃子列就记 `recovery_panic`（退回修订 4 的读法） | U7 注入的那 720 态；跑法里是阳性对照「判态路 panic 单列」那 2 880 态（`o1_columns_differing_from_the_plain_pairing` 由 0 变 2 880，那一形的 `mismatching_states` 同） | U7 |
+| V29 | 第 5.1 节第 2 条那一路：`pool_checker` 那一件 panic 不记件名 | U7 那 288 态（`pool_checker` 计数由 288 变 0）；跑法里阳性对照那一行 `pool_checker=` 由 1 152 变 0 | U7 |
+| V30 | 第 5.3 节那一道前置判删掉（退回「先对拍」） | U8 两次（对拍那一行出现） | U8 |
+| V31 | `EQUIVALENCE_PAIRING_IN_FLIGHT_WRITES_KEPT` 由 6 改回 2 | U9（积由 4 608 变 288）；跑法里 S1 `equivalence_pairing_states` 不过 | U9 |
+
+V20–V27 见第 5.4 节表。V20–V31 都要在提交时那一趟抓到（第 5.6 节第 7 条）；没红的照 `.claude/rules/mutation-sampling.md`「没红的三类，判据不同」分，不直接记盲区或等价；U3 的前提断言不成立（72 个代表的 `read` 段罩住了环尾那一处），是 V22 在这条流上取样点不敏感，实现员换一处取样点，不把 V22 记成等价。
+
+**失败 F9**（新设）：阳性对照「判态路 panic 单列」不是第 5.1 节的精确数——甲那条管子接错了；主取样点不跑（打 `name=verdict … q5_not_run=piece_panic_control_failed`、退 3），不记成「O1 盲」，修好重跑。什么观测会让它触发：`name=q5_piece_panic_control` 那一行 `pool_checker`、`ignored_recovery`、`record_checker` 任一不是 1 152、1 152、576，或 `o1_columns_differing_from_the_plain_pairing`、`mismatching_states` 大于 0，或别的件不是 0，或 `consulted_recovery` 与不注入那一遍的不等。
+
+**停机 S14**（新设；Q5 树与这一次重跑的前提；两边都查，既不作废也不当结果，交主 agent）：
+- ① Q5 树与 `4d071c12…` 那棵按 `snapshot_digest` 的逐文件表比，装置文件之外还有文件不同，或文件数不同。触发观测：`name=frozen_tree` 那几行的差表多于一行，或两边文件数不等。
+- ② 装置在 Q5 树上编不过。触发观测：那一次 `cargo build` 退非 0。
+- ③ Q5 树里那份装置相对 `b1457bc6…` 的差，有一个 hunk 对不上修订 5 的任何一件（或判决 K3 那一句 V9 文档）。触发观测：实现员交回的 hunk 对应表里有空格，或执行员 `diff` 数出的 hunk 数与那张表的行数不等。
+- ④ 修订 5 动了正常那一路。触发观测：第 5.6 节第 3 条 a 那项核对，或第 5.1 节「已有产物的读法」里重跑的那一份，在旧产物 `recovery_panic` 为 `-` 的态上，去掉 `piece_panics` 列与耗时列之后有一个字节不同。
+
+**作废 Z7**（新设）：主取样点在同一棵 Q5 树上连跑两次，结果行去掉耗时字段之后不逐字节相同——两次都不算结果，查装置有没有隐藏状态，修好重跑。触发观测：两份产物 `grep '^E7RESULT'` 去掉耗时字段之后 `cmp` 不同。
+
+**够判停机**照第十一节：Q5 一行够判（第 5.6 节第 7 条）就停，附带量（Q5 那一形上的 O2、O3，不带内容那一形）够判后不跑。
+
+#### 5.8 跑之前已经存在的数（这一条修订）
+
+1. **判决 `research/prompts/m3-formal-code-b25-r1-main-verification.md` 全文**（派发点名）：K2 表与第四节的复跑读数——附加态 4 896、与类推的 0 处不同、抹掉类键 936；对拍 k = 6 时 4 608 态、每类四样取值唯一；`fault-k2 rc=0`、`fault-k6 rc=3 mismatching_states=1152`；两腿 9 504 个态 O2 都是 `Some([])`；k = 6 复跑 41–55 秒；`noroot rc=3 … s13=equivalence_pairing`；KM1 `differing_lines=2`、KM2–KM7 与 V17、V18 `stdout_same_as_unmutated=True`、V19 `exit=3`；K1 的 1 296、1 276 / 1 277、135。影响：k = 6 出自判决的改法丙，不从 41–55 秒定；第 5.1 节三条注入的态数（1 152、1 152、576；U7 的 288、288、144）是照注入的定义算的积。`pool_checker` 那条与攻方注入同形（第二对镜像只落一份），所以 1 152 与攻方 `mismatching_states=1152` 相等——是同形的结果，不是照那个数挑的形。
+2. **攻方报告 `research/prompts/m3-formal-code-b25-r1-opus-output.md`**（为核 K2-b、K2-c、K2-d 的造法读了标题行、关键词命中行与第 162–172、186–236 行，见 5.9）：读到了**攻方副本上 Q5 主取样点按候选二判出的一行**（第 152、177 行，命中行截到 300 字：`states=1207959552 … lost_the_confirmed_version=150994944 reference_filesystem_red=150994944 model_crash_…`，截断处之后没读）。这是 Q5 的一个答案（副本上、修订 4 那一版方法）。影响：修订 5 不改 Q5-有效、Q5-判、Q5-阴性、Q5-反向的任何判据与门槛（第一节问题单与第六节原文）；改的都是「按类推出的读数能不能用」的前提，改法出自读这份报告之前已定稿的判决。另读到：第 187 行 72 × 2²² = 301 989 888 态、其中 37 748 736 态（推的）；第 207–210 行 C 前 4 个写的盘、偏移、长度（822 181 888 / 32 768、823 345 152 / 16 384）。影响：S1 新加「三对镜像」那一条与 U9 照这个结构写，但由 Q5 树上的 S1 现核，不照这几个数写死。
+3. **正推报告 `research/prompts/m3-formal-code-b25-r1-sonnet-output.md`** 第 85–100 行（KM1–KM7 的定义）：5 040 个态 O2 都是 `Some([])`；正推另造的那条流上 `forbidden_kind=1 refinements=1 mismatching_states=0 stops_at_s13=true`；`not_applicable_states=216`、`moved_positions=[5]`。影响：U2 只改操作、不改写表，是为了让 ② 单独红（正推那一条同时挪了写，③ 也动了）；没有门槛从这几个数来。
+4. **调度记录第十八、十九节**（第 963–1040 行）：第一段新树 13 步按序脚本、推的挂钟约 17 小时；新冻结树 284 个文件、`4d071c12…`；第 26 批与 10b 合入改了哪些文件；26-1r 交回。影响：第 5.6 节第 2 条「Q5 树只换装置」的依据。
+5. **自己算的与现查的**：72 × 2⁶ = 4 608；72 × 2⁴ = 1 152；72 × 2² × 2 = 576；三者之和 2 880；72 × 2² = 288；72 × 2 = 144；288 + 288 + 144 = 720；4 608 × 10.09 毫秒 ≈ 46.5 秒；72 × 2⁸ = 18 432、约 3.1 分钟；仓里 `crates/mutations.tsv` 与冻结树里那份 sha256 不同（`f6eaa8c6…`、`4140c784…`）；装置文件仓里与冻结树里 sha256 相同（`b1457bc6…`）；第 5.4 节七处锚点各 `grep -c` 为 1。都只进定义与推算，不进 Q5 的门槛。
+6. 第一段新树的产物（禁读清单 `research/results/e171-r1-*2026-10-05*`）一份都没打开。
+
+#### 5.9 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/rules/three-way-inference.md` 1–174、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）。
+- 本登记 1–120、289–869（第 120–288 行，第二节整抄的 D13 已定项 1、D23 已定项 14 与三行欠账，这一次没重读）。
+- `research/prompts/m3-formal-code-b25-r1-main-verification.md` 1–85（全文）。
+- `research/prompts/m3-formal-code-b25-r1-opus-output.md`：`grep -n '^#'` 前 40 行；`grep -n 'fault-k\|noroot\|第五样\|k = 6\|4608\|OPUSWRITE'` 命中行（第 49、50、152、156、160、171、174、177、179、180、185、187、188、189、197、207–210、219、222、257 行，截到 300 字）；第 162–172、186–236 行（每行截到 900 字）。
+- `research/prompts/m3-formal-code-b25-r1-sonnet-output.md`：`grep -n 'KM[1-7]'` 命中行（第 95、99、184、186 行，截到 400 字）；第 85–100 行。
+- `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 20 行；第 963–1040 行。
+- 装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 3376–3855、7290–7559、7690–8613、9688–9713、10009–10208 行，第 7150–7175、7195–7215 行；`grep -n` 命中行（Q5 与 S13 的字段、`catch_unwind`、`recovery_panic`、`JournalPolicy`、`check_records`、函数与测试名、常量、第 4100–4160 行里 `panic` 的命中、第 6482、6931 行的字段）。
+- `crates/singlefs-checker-tier/src/crash.rs` 第 1130–1300 行与 `grep -n` 命中行（`judge_crash_image`、`check_records`、`JournalPolicy`）。
+- `crates/singlefs-harness/src/memory_pool.rs` 第 470–500、995–1015 行；`crates/singlefs-core/src/recovery.rs` 第 3405–3430 行；全仓 `fn journal_record_offsets_hint` 的 `grep -rn` 命中行；`crates/singlefs-harness/src/segments.rs` 第 34–38 行（`grep` 命中）。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` `grep -n 'def \|snapshot'` 命中行与第 235–247 行；目录里 `*.py` 的 `grep -n 's13\|q5_not_run\|q5_partition\|q5_equivalence'`（0 命中）。
+- `crates/mutations.tsv`：第 1 行；名字以「E171R1 装置」起头各行的第 1、3 列（第 2420–2442、2464–2468 行）。`research/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv` 第 1 列。
+
+跑过的命令（原样，草稿目录写成 `<草稿目录>`；输出在设计员报告里）：
+
+```
+$ wc -l .claude/singlefs-ai-sop/rules/test-discipline.md .claude/rules/three-way-inference.md .claude/singlefs-ai-sop/rules/evidence-discipline.md .claude/rules/mutation-sampling.md .claude/rules/implementation-first.md research/prompts/m3-formal-code-b25-r1-main-verification.md
+$ grep -n '^#' research/prompts/e171-r1-prereg.md
+$ sha256sum crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs research/target/e171-r1-frozen-tree/crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs   # 两份都是 b1457bc6…
+$ awk -F'\t' '$1 ~ /^E171R1 装置/ {print NR": "$1" | "$3}' crates/mutations.tsv | cut -c1-220
+$ awk 'NR==8318||NR==8340||NR==8380||NR==8391||NR==8437||NR==8442||NR==8477 {print NR": ["$0"]"}' <装置>   # 七处锚点原文与缩进
+$ grep -c '            checks.input_list_mismatches += 1;' <装置>   # 1；另七条 grep -c（第 5.4 节其余六处锚点与提示那一处 `end_in_bytes: ring_start.0 + ring_bytes,`）各 1
+$ sha256sum research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py crates/mutations.tsv research/target/e171-r1-frozen-tree/crates/mutations.tsv research/prompts/m3-formal-code-b25-r1-main-verification.md research/prompts/m3-formal-code-b25-r1-opus-output.md research/prompts/m3-formal-code-b25-r1-sonnet-output.md
+$ TZ=Asia/Tokyo date +%F   # 2026-10-05
+$ python3 -c "print(72*2**6, 72*2**4, 72*2**2*2, …)"   # 4608 1152 576 2880 1152 288 144 720；46.49472；18432 3.099648；301989888 37748736
+$ sha256sum research/prompts/e171-r1-prereg.md; wc -l research/prompts/e171-r1-prereg.md   # 追加之前
+$ cat <草稿目录>/rev5.md >> research/prompts/e171-r1-prereg.md
+$ head -n 869 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +870 research/prompts/e171-r1-prereg.md | cmp - <草稿目录>/rev5.md
+```
+
+追加之前本登记 sha256 `37fd1ba244aea3fbafdcc0021b79dea0ae41d3829c21f581e47fe2d28014b68c`、869 行（末尾是修订 4）；这一条修订整段先写进设计员草稿目录，再 `>>` 追加，追加后前 869 行的 sha256 与追加前整份的相同、`tail -n +870` 与草稿逐字节一致。
+
+#### 主 agent 认定：修订 5 交回（2026-10-05，任何修订 5 装置与产物之前）
+
+1. 修订 5 收；设计员报的五项都收：Z7 主取样点连跑两次逐字节相同；提交时 U1–U9 与 V17–V31 全过之前 Q5 只记「跑了，待告警自证」；甲接住的件比判决点名的三样多；`recovery_panic_states=` 之和大于 0 的步骤在 Q5 树上重跑；仓里装置在旧树上编不过走 S14 ②。
+2. 设计员在攻方报告第 152、177 行读到过攻方副本上的 Q5 主取样点读数，修订 5 第四节已列；修订 5 不改 Q5 的任何门槛与常量，改法出自读它之前定稿的判决（`research/prompts/m3-formal-code-b25-r1-main-verification.md`），认它不影响判据。
+3. 为少走 S14 ②：27-2 实现员改装置时，同一份装置文件要在仓里与旧冻结树（`4d071c12…`）的拷贝上都编得过；做不到就停下交主 agent，不在旧树上另改一份。
+
+#### 主 agent 认定：27-2 装置交回（2026-10-05，修订 5 装置的任何产物之前）
+
+1. 收：`newest_persisted_root` 并进 `layer0_oracles`、读回转换并进 `crash_judge` 与 `reference_filesystem` 两件（读回转换吃的是看 journal 那遍恢复的结果，属四样输入那一侧）；`crash_columns_of_the_four_inputs` 里判官 panic 记 `judge_panic`（与第 5.1 节第 3 条同一个词）。两处被攻过零轮，进第 27 批代码轮。
+2. 补一格（收严）：正常那一路 panic、而逐件重做一件都没 panic 的态，记进新计数 `unattributed_panic_states=`（`name=verdict` 与 `q5_piece_panics` 两种行都带）。它大于 0 时这一趟的 Q5 不判甲乙、不进 S13，打 `q5_not_run=unattributed_panic`、退 3，交主 agent（甲那条管子漏了一件）。什么观测会让它触发：那一态 `catch_unwind` 正常那一路接到 panic，逐件那一遍十件的 panic 列全是 `-`。
+3. 收：no_root_write 那一行沿用长 `sampling_point` 名；每种 `name=verdict` 行都带 `piece_panic_states=`；阳性对照那一行多带的字段；主取样点导出的总耗时不再含驱动（只动计时字段，不进判定）。
+
+#### 主 agent 认定：27-3 Q5 树交回（2026-10-05）
+
+1. S14 ③：Q5 树装置相对 a6ebeb17… 的 28 个 hunk 对的是「主 agent 认定：27-2 装置交回」第 2 条（`unattributed_panic_states=`）。那一段是修订 5 装置任何产物之前追加进登记的收严，算修订 5 的一件；S14 ③ 判不触发。
+2. 主取样点第 2 次另起导出目录 `research/target/e171-r1-dumps/q5-revision-5-main-run-2/` 收（装置不往已存在的目录里写，导出路径不进结果行）。
+3. 还差两样，由主 agent 在第一段跑完后做：第 5.1 节「已有产物的读法」那张表（第一段各产物 `recovery_panic_states=` 之和，第 10 步那份除外）；S14 ④ 补比（第一段第 6 步反向取样点落地之后，比法 `/tmp/claude-1000/e171-r1-q5-revision-5/s14_four_compare.py`）。
+
+### 修订 6（设计员，2026-10-05；批次 `records/2026-10-01-里程碑三形式化接入.md#31`；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers U10 U11 U12 U13 U14 U15 U16 V32 V33 V34 V35 V36 S15 -->
+
+**时点**：第一段新树（快照摘要 `4d071c12…`，修订 4）的按序脚本停在第 7 步（调度记录第 1077 行）；第 31 批（core 断言、`build_pool`、E171 装置）还没派；修订 6 的装置改动一行没写；修订 6 树（第 6.3 节）上的产物一份都没有。
+**依据**：调度记录第 1077、1079 行（第 7 步停机与调查员交回；调查报告 sha256 `38aef28695440f94ece35be0cefb094d66bc7e69c069dafd47498bc18fe2a144`，没入库，这里只引它点名的代码行与它的结论）；用户 2026-10-05 定案（弹窗选项原文「再加 core 断言」，第 1079 行）；第 27–29 批代码轮判决 `research/prompts/m3-formal-code-b29-r1-main-verification.md`（sha256 `b36b2cbc…`）第二节 L1 末行与第三节第 2 条、攻方报告 `research/prompts/m3-formal-code-b29-r1-opus-output.md`（sha256 `d26d04a0…`）第 48–63 行与改法表 A1、A2 两行。
+**原判据原样保留**：第一至十一节、修订 1–5 与其后各条「主 agent 认定」一个字不改。第七节 A1、第十节 F2 原文不动。下面每件写改了什么、收严还是放宽。
+
+| 件 | 改了什么 | 收严 / 放宽 |
+|---|---|---|
+| 6.1 | A1 不符怎么记；第一段已有产物的去留 | 判据不收不放；已有产物一份不照用，收严 |
+| 6.2 | 装置改法的边界：装根环表、启动核对、流三本地常量重取、b29 改法 A1 与 A2 的注入入口 | 收严（流三多走根环回收那一段；S1 多一条） |
+| 6.3 | 冻结树重拍成「修订 6 树」；Q5 树退为参照 | 收严（多一道 S15）；对「主 agent 认定：修订 5 交回」第 3 条是放宽（见 6.3 末） |
+| 6.4 | 第一段从第 0 步起在修订 6 树上全部重跑；流一流二怎么核没变 | 收严 |
+| 6.5 | 会红自证：U10–U16、V32–V36 | 收严 |
+| 6.6 | 新设停机 S15；Q5 与 Q1–Q4 作数的条件 | 收严 |
+
+**每件量什么、为哪一判、量到哪算够**（对问题单 Q1–Q5 哪一行）：
+
+| 件 | 量什么 | 为哪一判 | 量到哪算够 |
+|---|---|---|---|
+| 6.1 | 不量 | 第一段在 `4d071c12…` 上的读数能不能进 Q1–Q5 | 字面写完 |
+| 6.2 / 6.5 | S1 新加一条；U10–U16 断言；V32–V36 红不红 | 流三是不是 core 部署的那种会话（Q1、Q4 用流三的那几列）；Q5 判决路四个出口会不会红（Q5） | 修订 6 树每趟基线 S1 全过；提交时 U10–U16 绿、V32–V36 全抓 |
+| 6.3 | `name=frozen_tree` 那几行；S15 ①–③ | Q1–Q5 判的是不是登记的那一份实现 | S15 ①–③ 不触发 |
+| 6.4 | 第 0–13 步各步的原判法；S15 ④–⑥ | Q1–Q5 各行，照第十一节与修订 5 第 5.6 节第 7 条 | 第十一节「够判停机」原文 |
+
+#### 6.1 A1 不符怎么记；第一段已有产物的去留
+
+**发生了什么**（调度记录第 1077 行原文转引，不是本设计员读的产物）：第 7 步带流三、带探针的基线第一次，`o2_red_states=10495`，全在流三（三批 4 289、1 498、4 708），O2 红的全是 I-3.1，O1 崩溃判官全绿。第七节 A1（「基线与空变异三条流批 1 批 2 上 O1 三个子列、O2、O3 甲乙判红都是 0 处」）不成立。
+
+**照 F2 两边查的结论**（调查报告第 1、3、5、7 节，主 agent 现查三处对上，调度记录第 1079 行）：
+- O2 一边没判错：core 装了根环表时自己按 D16（发布语义） 已定项 1 的可再分配谓词回收，回收后的已分配槽数正好等于池级 checker 遍历出的数（调查报告第 5 节）。
+- 实现一边没错：同一份 core 在装了根环表的分配器上，同形历史每次发布都不红（调查报告第 4 节）。
+- 装置一边错了：`LiveStream::start`（冻结树那份装置第 1067–1083 行，`PoolAllocator::new` 在第 1069 行）只建空闲图、`mark_format_time_units`，不装根环表；冻结树 `crates/singlefs-core/src/allocator.rs` 第 1817 行 `record_root_written_by_this_process` 见没装就返回，这条 mkfs 同进程的会话转过 24 槽根环之后一次不回收。core 给这种会话的建法是冻结树 `crates/singlefs-core/src/make_filesystem.rs` 第 710 行 `allocator_after_make_filesystem`（第 731 行装根环表），挂载建的分配器同样装（冻结树 `crates/singlefs-core/src/mount.rs` 第 1942 行）。装置造的那种会话，core 自己哪一处都不造。
+- 所以：A1 那句与它的出处（原登记 A3「正常实现、正常镜像必须三条都放行」）没错，错在问题单落到装置上的写法——读法 2 的流三由装置驱动，装置的分配器不是 core 部署的那一种，第 7 步流三跑出的不是「正常实现」的历史。F2 的「既不作废也不当结果」照办：那一份读数不进任何判定，也不作废（第 6.1 节末表）。
+
+**记一次输**（evidence-discipline「臂的定义也在「跑前写死」之列」三步的第一步，按最弱读法）：在冻结树 `4d071c12…`、装置 `b1457bc6…` 上，第一段第 7 步阴性对照 A1 不成立；输的是装置流三的造法（输给 O2：O2 抓到了装置造出来的、core 不会造的会话留下的态）。问题单 Q1–Q5 的任何一个候选都不因这一格记输记赢。
+
+**打中之后的四问**（同一份规则「判据自己也会写错」）：
+1. 分不分辨臂：不分辨。病根在各行、各候选共用的前提（装置怎么建分配器）里，打中的是基线本身。照「打中不分辨臂」那一行办：不拿它判任何一行，共用前提另立一笔账先修——那笔账就是 C551（全行见第 6.9 节）与第 31 批。
+2. 被判的系统看不看得到它要区分的东西：看得到。池级 checker 在镜像上读到的就是不回收留下的单元，不是「判别子观测不到」。
+3. 满足的是哪一句的哪个分句：第七节 A1 的「O2……判红都是 0 处」那一分句与第十节 F2 的「阴性对照上任一子列判红」；没归错。
+4. 改法碰不碰得到打中的格：装根环表那一句在调查报告第 4 节的同形历史上（只多这一句那一臂）每次发布、每个按序前缀态都不红；导出里撕裂、乱序落地的崩溃态在装了根环表的写法下没判过（调查报告第 11 节）。所以碰没碰到，由修订 6 树上第 7 步的 A1 现判；那里 O2 在流三上仍有一态红，就是调查结论的推翻条件 1 成立，照 F2 再停、交主 agent，不在装置上另找改法。
+
+**只许收严、收严在哪**：判据一个字不改（A1 仍要 0 处，Q1–Q5 的候选、翻面观测、门槛都不动）；读法 2 的字面不改。改的是装置的做法：读法 2「mkfs、取号、暖机、发布第一个文件……」要的是实现的一段合法历史（「怎么做」推得出「做完会怎样」才算数），旧做法推不出，换成推得出的那一种。新做法比旧的多要求三样：
+- 流三的分配器带 mkfs 刚写下的根环表，S1 每趟基线核它（第 6.2 节第 1 条）；
+- 流三在 txg 26 起照 D16 已定项 1 的谓词回收。旧做法整段绕过的根环记账（`record_root_written_by_this_process` 及其断言、回收），流三上现在每次发布都走到；坏实现表里动这一段的行（例：第 252 行「发布取完落点之后不记根」）在修订 6 树上第一次够得着它，读数与 s4、与第一段旧树都不可比（读法 11 原本就只当对照）；
+- 修订 6 树上多一道 S15（第 6.6 节），其中 ⑤ ⑥ 核「只有流三在根环转过之后才变」。
+
+**第一段已有产物的去留**（依据：读法 10 与作废 Z5「不是在登记的那棵冻结树上编的」，登记的那棵自修订 6 起是修订 6 树；修订 2 第 2.7 节处置修订 1 那棵树上产物的先例）：
+
+| 产物（省前缀 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-`） | 去留 | 依据 |
+|---|---|---|
+| 第 7 步 `baseline-run1.out` 与 `-timing.out`、导出 `research/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1/` | **保留为参照**；不进任何判定，不作废 | F2「既不作废也不当结果」。它另有三处用：① 「不装根环表那一形」在流三上让 A1 红的实测（第 6.5 节会红自证的红那一边，量过的）；② S15 ⑥ 比流三前缀的旧那一份；③ 第 6.4 节推挂钟。它的 `-timing` 不再给逐行限时的 T（T 取修订 6 树上第 7 步那一份，修订 2 第 2.5 节原文） |
+| 第 1 步 `s2-device-baseline-streams-1-2`、第 2 步 `s2-e170-export-dump`、`s2` | **保留为参照**，不进判定 | 装置变了：分配器的 `{:?}` 文本带了根环表，`call-return-values.tsv` 里分配器那一项摘要在流一全部调用、流二挂载之前的调用上必变（读法 4 的内存对象），拿旧装置的基线去比修订 6 树编的行，每一行都会报「内存对象不同」，Q2 的集合被装置的改动污染。第 1 步导出另当 S15 ⑤ 的旧那一份 |
+| 第 3 步阳性对照（基线那一趟）十项 | **保留为参照**，不进判定 | O1 崩溃判官与 RefFS 两项跑的是三条流，含旧造法的流三；其余几项与第 1 步同一个装置理由。A8 的精确数在修订 6 树上现量 |
+| 第 4 步空变异那一趟十项、第 5 步 O3 基线、第 6 步 Q5 反向取样点 | **保留为参照**，不进判定 | 读法 10 与 Z5；第 6 步那一份另当 S14 ④ 的旧那一份（「主 agent 认定：27-3 Q5 树交回」第 3 条，照旧由主 agent 比） |
+| 第一段新树之前的自检（`frozen-tree`、`stream-constants`、`s3-s11-baseline-stream-1-with-probe`、`research-mutations`） | `research-mutations` **照用**（只判研究一侧，不编装置，装置改动碰不到）；`frozen-tree`、`stream-constants`、`s3-s11-…` 三份**保留为参照** | 那三份出自 `4d071c12…` 那棵树与旧装置，修订 6 树上重做 |
+| 修订 5 Q5 树上的 `revision-5-q5-*` 七份与导出 `q5-revision-5-*` | **保留为参照**；Q5 的读数改取修订 6 树上那几趟（第 6.3 节） | S15 ④ 的旧那一份 |
+
+照用的只有 `research-mutations` 一份；别的都在修订 6 树上重跑（第 6.4 节）。「主 agent 认定：27-3 Q5 树交回」第 3 条那张「第 5.1 节已有产物的读法」表不再需要：第一段每一步都用修订 6 树重跑，装置已含修订 5 甲，各产物原生就是新读法；那张表要回答的「哪几步要在 Q5 树上重跑」已经被「全部重跑」罩住（收严）。
+
+#### 6.2 装置改法的边界
+
+谁改：第 31 批实现员（与 core 断言、`build_pool` 同一批，派发提示写「要动的 crates 文件」）；第 2 条的常量由第一段执行员在拍树之前改（照 25-3 换进主工作区的做法）。装置在第 31 批合入之后的仓里写、在仓里编，内联用例在提交时按仓里合入后的 `crates/`（带 core 断言、`build_pool` 装了根环表）跑；修订 6 树上那一份怎么造见第 6.3 节。行号都是今天仓里装置（sha256 `945e41c8d9f6ecc46aca843a1d2de617c52802f4d10625d472e23e8cb72c12e1`，11 967 行）的。
+
+1. **装根环表**：`LiveStream::start`（第 1087 行起）在 `allocator.mark_format_time_units(…)`（第 1093–1102 行）之后加一句 `allocator.install_root_ring_occupancy(root_ring_occupancy_after_make_filesystem(&common::parameters(), &formatted.genesis));`。
+   - 形态的出处：根环表的值取 core 给 mkfs 同进程会话的那个函数（冻结树 `make_filesystem.rs` 第 681 行 `root_ring_occupancy_after_make_filesystem`，mkfs 建分配器的第 731 行用的就是它），装法是 core 挂载与 mkfs 共用的 `install_root_ring_occupancy`（冻结树 `allocator.rs` 第 1780 行）。即调查报告第 1、8 节改法 a 的「丙」那一句。
+   - 不整个换成 `allocator_after_make_filesystem`（「乙」）：它另把空闲图换成 `DeviceFreeMap::with_unit_area_start`，而流一的 S1 回比 `new_pool_file_creation_operations_equal_build_pool`（第 2112 行）比的 `build_pool` 与 S2 比的 E170 导出装置（`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs`，`grep -c 'install_root_ring_occupancy\|allocator_after_make_filesystem'` 为 0）都用 `DeviceFreeMap::new`；用户定的只是根环表一件，调查报告第 4 节「丙」那一臂证明只这一句就够。
+   - 启动核对（S1 加一条，名 `<流>_allocator_carries_the_root_ring_of_make_filesystem`）：装完那一刻，`allocator.root_ring_occupancy()` 是 `Some`，且它的 `{:?}` 文本与 `root_ring_occupancy_after_make_filesystem(&common::parameters(), &formatted.genesis)` 的 `{:?}` 文本相同（`RootRingOccupancy` 只派生 `Clone, Debug`，冻结树 `allocator.rs` 第 979 行）；结果在 `start` 里存进流，S1 照原登记只在基线与 `stream-constants` 那几趟打出、回比，不过走 S1。
+2. **流三本地常量重取**：S1 里流三的段长表、写数、根槽写数（原登记 5.3）是旧造法下实测写死的；根环转过之后回收，单元落点与分配记录树都会变，这几样可能跟着变。拍树之前，第一段执行员在草稿副本（`4d071c12…` 那棵整棵拷出、换上第 31 批合入后的装置）上编、跑 `stream-constants --streams 1,2,3`：
+   - 流一、流二的常量一项都不许变（变了走 S15 ⑤ 的同一个停机，交主 agent）；
+   - 流三的根槽写数与 K 不许变（K = 234，第七节 A7；根槽写数等于发布次数，调用序列没变）；
+   - 段长表与写数只许从「写 txg 26 那条根的那次调用」所在的段起变（与 S15 ⑥ 同一个预言）；
+   - 过了才改仓里装置的那几个常量，新旧对照在拍树之前写进第十二节一条修订（照修订 4 的做法，只抄、判据不改），这一处改动在 S15 ③ 的 hunk 表里单列。
+3. **b29 改法 A1、A2：Q5 判决路的注入入口**（判决第二节 L1 末行「给 Q5 那条路一个注入入口，四个调用点各一条用例、各一行变异」）：
+   - `ConfirmedLossShapes`（第 7996 行）加一个字段，装三个可空的 `PiecePanicInjection`：对拍那一遍（第 8041 行 `equivalence_pairing_of(pairing_stream)` 改调第 9364 行 `equivalence_pairing_with_injected_piece_panics`，注入为空时与 `equivalence_pairing_of` 同义，第 9359–9361 行）、阳性对照（为空时照今天第 9480 行 `piece_panic_control_injection` 造；不为空时用它**替换**内置的那三条规则）、主取样点或反向取样点那一次导出（`export_prepared_stream`（第 5018 行）多收一个可空注入，交给它造的 `ObservationContext` 的 `piece_panic_injection` 字段（第 3899 行，今天只有对拍那一遍设）；别的调用处——基线、逐行、对拍——一律交空）。
+   - `run_confirmed_loss_form`（第 7938 行）一律交三个空；命令行不开放（修订 5 第 5.1 节「注入只经装置内部的开关进」同一条）。
+   - 不把 k 改成参数（攻方 A2 那一句）：用例照 U8 的做法直接造 `ConfirmedLossShapes` 交进去，k = 2 的流用第 11100 行 `equivalence_pairing_stream()`；阳性对照那一处靠「替换内置规则」在 k = 2 上也造得出未归属的态。
+   - 四个调用点（第 8080、8113、8187、8248 行）一个字不改。
+4. **除此之外一字不动**：Q1–Q5 的判法、各结果行的字段（只多第 1 条那一行 S1）、流一流二与 Q5 那一形的驱动与造法、修订 5 的各件、别的本地常量都不动。第 31 批实现员交回里给一张「装置相对 `945e41c8…` 的逐 hunk 对应表」，每个 hunk 落在第 1、3 条与第 6.5 节 U10–U16（含它们要的、只在用例里用的帮手）之一；第 2 条那几个常量由执行员另补一行。`crates/mutations.tsv` 里「E171R1 装置」起头的各行锚点照改后的源码逐条再核恰好命中 1 次（门禁 code-source-discipline 的 mutation-tables 格）。
+5. **装置变异**（追加进 `crates/mutations.tsv` 末尾，名字以「E171R1 装置 V32」…「E171R1 装置 V36」起头；用例与变异都是重型，提交时由主 agent 跑）：
+
+| # | 改坏哪里 | 在哪个取样点上改变输出 | 点名的用例 |
+|---|---|---|---|
+| V32 | 第 1 条那一句删掉（退回「不装根环表那一形」） | U10：三条流 `root_ring_occupancy()` 都由 `Some` 变 `None`；U11：仓里 core（带第 31 批断言）上第一个文件那次发布 panic，`4d071c12…` 那份 core 上最新根到 txg 26 的那次发布之后 I-3.1 红（调查报告第 4 节「甲」那一臂 `first_red_txg=Some(26)`）——两种 core 上都红；跑法里修订 6 树每趟基线 S1 新加那一条不过 | U10、U11 |
+| V33 | 第 8080 行那一处（对拍之后）整个 `if let Some(exit_code) = stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(…) { return exit_code; }` 块删掉 | U13：原式在对拍那一处退 3、判决行 `q5_not_run=unattributed_panic`；变异往下走到阳性对照（k = 2 上内置规则造不出，F9），判决行换成 `piece_panic_control_failed` | U13 |
+| V34 | 第 8113 行那一处（阳性对照之后）同上删掉 | U14：原式在阳性对照那一处退 3；变异走到 F9 那一支，判决行换成 `piece_panic_control_failed` | U14 |
+| V35 | 第 8187 行那一处（反向取样点导出之后）同上删掉 | U15：原式退 3、没有 Q5 计数行；变异往下打出 `report_the_confirmed_loss` 那几行与不带 `q5_not_run` 的判决行 | U15 |
+| V36 | 第 8248 行那一处（主取样点导出之后）同上删掉 | U16：原式退 3、没有 `name=q5_equivalence sampling_point=` 那一行；变异往下走到类核对与判决 | U16 |
+
+V33–V36 四处的源码逐字相同（攻方报告第 50 行；第 8187、8248 行连第三个实参都相同），锚点各带它前一行（`q5_piece_panics_line("pairing"`、`("piece_panic_control"`、`("reverse"`、`("main"` 那一行）才恰好命中 1 次；实现员照改后的源码写、逐条 `grep -c` 核 1。攻方 L1-a 表里另三种改坏（实参换组、漏加 `totals.failed_checks`、挪到计数行之后）不各配一行：判决第三节第 2 条只要「各一行」，删整块是四处共有、最直接的那一种；另三种照旧没有变异行，写进实验页「装置、研究一侧与变异表」一节的射程句。
+
+#### 6.3 冻结树重拍：修订 6 树；Q5 树退为参照
+
+**三种拍法**（都只是「这一段的二进制从哪棵树编」，判据不变）：
+- **树甲**：`4d071c12…` 整棵拷出，只换装置文件。Q1–Q4 判的仍是第一段新树拍下的那一份实现（读法 10「第 16 批合入之后」那一棵，加 25-1、25-3a 两份补丁），只多了装置的改动。
+- **树乙**：树甲之外，另把第 31 批那一处 core 断言的 hunk 打进树里那份 `allocator.rs`（`61da68ec…`）。这份文件仓里、旧树里都没有。
+- **树丙**：第 31 批合入之后从仓里整棵重拍。仓里已合入根环线 10b、第 26、28–30 批与删除线第 20 批等（调度记录第十八至二十二节），Q1–Q4 判的就换成另一份实现，坏实现表的锚点、第二截的签名（第 26、29 批改过 `mount_transparency.rs`）都要重查——那是「E171 要不要在 10b 之后的树上重跑」，修订 5 第 5.6 节第 2 条与判决 b29 第三节第 2 条都留给主 agent 另判，不在这一条修订里。
+
+**取树甲**。不取树乙：core 断言改的是被测实现（坏实现表里动根环装法或根记账的行，在带断言的 core 上会由静默变成 panic，读法 5 的截断跟着变），而修订 6 只修装置；装置这一侧有没有装根环表，由第 6.2 节第 1 条的启动核对在每趟基线上现判，不靠 core 断言。core 断言对这个装置会不会 panic，由 U12 在提交时按仓里的 `crates/` 证（第 6.5 节）。主 agent 要树乙的，照树甲的做法多打那一个 hunk，`name=frozen_tree` 另记那份 `allocator.rs` 的 sha256 与 hunk 原文，S15 ① 的「装置文件之外」改成「装置文件与 `allocator.rs` 之外」。
+
+**装置文件怎么造**（仓里那一份在旧树上编不过）：今天仓里装置 `945e41c8…` 与 Q5 树里那份 `dbef78ed…` 只差一个 hunk——第 29 批加的 `RefusalConditionNotMet::SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults` 那一臂（仓里第 3438–3441 行，4 行）；那个枚举成员在 `4d071c12…` 树的 `crates/singlefs-harness/src/mount_transparency.rs` 里没有（`grep -c` 为 0，仓里为 3），所以「主 agent 认定：修订 5 交回」第 3 条「同一份装置文件要在仓里与旧冻结树的拷贝上都编得过」对仓里这一份已经做不到。改成：
+1. P6 = 第 31 批合入、第 6.2 节第 2 条常量改完之后仓里那一份装置，相对 `945e41c8…` 的 `diff -u`（只含修订 6 的 hunk）；
+2. 修订 6 树的装置 = Q5 树那份 `dbef78ed…` 打上 P6（`patch` 不带模糊匹配，打不上走 S15 ②）；
+3. 核对：把 `dbef78ed…` 到 `945e41c8…` 那一个 hunk 再打到修订 6 树的装置上，得到的文件与仓里那一份 sha256 相同（不同走 S15 ②）。即两份装置恰好只差第 29 批那 4 行；那一臂在旧树的枚举里没有对应成员，旧树上走不到它。
+
+**拍法**：把 `research/target/e171-r1-frozen-tree/`（`4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd`，284 个文件）整棵拷到 `research/target/e171-r1-frozen-tree-revision-6/`（不带 target），只把装置文件换成上面造出来的那一份；`crates/mutations.tsv` 不换（不进编译，也不进 `snapshot_digest`，修订 5 第 5.6 节第 2 条同一个理由）。
+- **取自哪一刻**：第 31 批合入主工作区、主 agent 的合入验证绿、第 6.2 节第 2 条的常量改完并换进主工作区之后；拍完在树里 release 编过，再算一遍快照摘要，前后相同。
+- **`name=frozen_tree` 那几行**（第一段第一份产物开头）：新摘要与文件数；`4d071c12…` 的摘要与文件数；两棵树按 `snapshot_digest` 的逐文件（路径, sha256）差表（应恰一行：装置文件）；修订 6 树与 Q5 树的同一种差表（同样恰一行）；装置在修订 6 树、Q5 树（`dbef78ed…`）、`4d071c12…`（`b1457bc6…`）、仓里（第 31 批之后）四处各自的 sha256；P6 的 sha256 与 hunk 数；上面第 3 条核对的结果；`git rev-parse HEAD`；仓里与树里 `crates/singlefs-core/src/allocator.rs`（树里 `61da68ec…`，不带第 31 批断言）、`crates/singlefs-harness/tests/common/mod.rs`（树里 `d2f84876…`，`build_pool` 不装根环表）各自的 sha256；新装置与 E170 导出装置两个 release 二进制的 sha256（按序脚本开跑核）。
+- 第一段（含重跑的每一步）与第二段的每一趟都从这棵树编；读法 10 与作废 Z5 说的「登记的那棵冻结树」自修订 6 起就是它。
+
+**树里 `build_pool` 不装根环表，正好多一道核对**：装置经 `#[path]` 把 `crates/singlefs-harness/tests/common/mod.rs` 编进来（仓里第 29–30 行）。修订 6 树里那份是旧的，所以流一的 S1 回比 `new_pool_file_creation_operations_equal_build_pool` 在这棵树上比的就是「装了根环表的流一」对「没装的 `build_pool`」整条流逐条相同（流一只发 3 次调用、不转环）。
+
+**Q5 树（`research/target/e171-r1-frozen-tree-revision-5-q5/`）**：
+- Q5 的读数改取修订 6 树上那几趟（第 6.4 节第 6、10 步）：一段的 Q1–Q5 出自同一个二进制（读法 10），b29 改法 A1、A2 又正好改在 Q5 的判决路上。
+- Q5 树与它上面的七份产物、三个导出目录不删不改，保留为参照，另当 S15 ④ 的旧那一份。
+- **S14 ①–④ 怎么判**：S14 只管 Q5 树对 `4d071c12…`，原文不动。① ② ③ 已判：① 本设计员现比两棵树 `.rs` 与 `Cargo.*` 的逐文件 sha256，只差装置一行（第 6.10 节命令）；② Q5 树上那七份产物在，认定里没记编不过；③ 见「主 agent 认定：27-3 Q5 树交回」第 1 条；④ 照那条认定第 3 条由主 agent 比（Q5 树反向取样点对 `4d071c12…` 第 6 步那一份），比出不同照 S14 原文停。修订 6 树对 `4d071c12…` 与对 Q5 树的同一类核对，另立 S15（第 6.6 节），不并进 S14。
+
+**收严 / 放宽**：多一道 S15，收严。对「主 agent 认定：修订 5 交回」第 3 条是**放宽**：修订 6 树里的装置与仓里那一份不再逐字节相同，多出的正是第 29 批那 4 行；补的是第 3 条核对与 S15 ②③（两份之差必须恰是那一个 hunk，修订 6 的每个 hunk 都要对上一件）。这一处待主 agent 认。
+
+#### 6.4 第一段从哪一步重跑
+
+**从第 0 步起全部重跑**，都在修订 6 树上、照修订 2 第 2.7 节的次序（第一段新树按序脚本的第 0–13 步就是那个次序）。不从中间接：第 1–6 步的产物出自旧装置（第 6.1 节末表），要核「流一流二没变」本来也得在新装置上再跑一遍；第 0–6 步合计约 5.4 小时（下表），省下的不值两种装置混在一段里。
+
+**流一、流二怎么核没变**（调查报告第 8 节问题 3：它们没在 mkfs 同进程里转过根环——流一 3 次调用；流二 15 次调用，中间一次可写挂载把分配器换成挂载建的、本来就装了根环表的那一个）。三条路，各自独立：
+1. **S2 比对**（第 2 步，原登记 S2 原样）：E170 导出装置不装根环表（第 6.2 节第 1 条那条 `grep`），它与修订 6 树上新装置第 1 步的导出两条流八个文件与 `impl-verdicts.tsv`（去耗时列）逐字节相同。不同走原 S2。
+2. **S1 的流一回比**：修订 6 树里 `build_pool` 不装根环表（第 6.3 节），流一 `new_pool_file_creation_operations_equal_build_pool` 过，就是装与不装两种建法下流一整条流逐条相同。不过走原 S1。
+3. **逐字节比旧导出**（新设 S15 ⑤，第 6.6 节）：修订 6 树第 1 步导出对 `4d071c12…` 第 1 步导出，预言只有分配器那一项内存对象摘要在流一全部调用与流二挂载之前的调用上不同，别的逐字节相同。
+
+核不过（三条任一）：停机，两边都查（`.claude/rules/implementation-first.md` 第 4 条）——要么「流一流二不转环」那句不成立，要么修订 6 的装置改动越出了第 6.2 节的边界；既不作废也不当结果，交主 agent，不在装置上就地再改。
+
+**流三与依赖它的步**：第 3 步（O1 崩溃判官、RefFS 两项跑三条流）、第 7、8、9 步、第 11–13 步逐行。第 7 步另做 S15 ⑥（流三在根环转过之前的写流不变）。修订 6 树上第 7 步 A1 仍要 0 处；不是 0，照第 6.1 节第 4 问办。
+
+**两处 Q5 步照修订 5 换判法**：第 6 步（反向取样点）照修订 5 第 5.6 节第 3 条 a（另做 S15 ④）；第 10 步（主取样点）照第 3 条 b、c（同一棵树连跑两次，Z7；另做 S15 ④）。按序脚本里第 10 步原写的「对拍 288 态」那套判法作废，换成修订 5 第 5.6 节第 7 条主取样点那几行。
+
+**按序脚本**：第一段执行员照 `4d071c12…` 那一份按序脚本改一份新的：换快照摘要与两个二进制的 sha256、第 6、10 步换判法、第 1、6、7、10 步之后接 S15 ⑤、④、⑥、④ 的比对；产物名加 `RUN_SUFFIX`（例 `-r6`），导出目录另起（例 `research/target/e171-r1-dumps/revision-6-<日期>/`），不覆盖第一段已有的任何一份。起法照旧由主 agent 经脱离单元起。
+
+**挂钟**（推的；没量的照写「推的」，从产物文件的修改时刻算的只算元数据，不读内容）：
+
+| 步 | 跑什么 | 推的挂钟 | 依据 |
+|---|---|---|---|
+| 0 | 前提；拍树之前的常量重取（第 6.2 节第 2 条）；冻结树产物、`stream-constants`、S3 与 S11 的流一带探针自检 | 十几分钟 | 第一段新树同几样 |
+| 1–2 | S2 两半 | 约 3 分钟 | 同上 |
+| 3 | 阳性对照（基线那一趟） | 约 5.1 小时 | 旧树上第 3 步各产物的修改时刻：头一份之前到末一份共 18 210 秒；其中带流三的 O1 崩溃判官 9 698 秒、RefFS 8 128 秒 |
+| 4–6 | 空变异那一趟十项；O3 基线；Q5 反向 | 约 15 分钟 | 旧树上 718 秒；Q5 树上反向那一趟百来秒 |
+| 7 | 带流三、带探针的基线第一次 | 约 4.1 小时 | 旧树第 7 步 `process_wall seconds=14581.558`（调度记录第 1077 行转引）；主 agent 给的流三每态 0.82 秒（带探针，推的）与它同源，这里直接用进程挂钟 |
+| 8 | O3 判第 7 步三条流 | 5–30 分钟 | 按序脚本原推 |
+| 9 | 基线第二次 | 约 4.1 小时 | 同第 7 步 |
+| 10 | Q5 主取样点两次 | 约 4 分钟 | Q5 树上两次共 233 秒 |
+| 11 | 第 242、269 行，带探针，两条线道并跑 | 约 4.1–5 小时 | 每行约一个 T；两条线道抢核的开销没量 |
+| 12 | 空变异加 13 行，不带探针，两条线道 | 约 16–19 小时 | 每趟约等于第 3 步一项带流三的阳性对照（8 128–9 698 秒）加编译约 2 分钟，14 趟分两道是 7 轮 |
+| 13 | 超时的行再跑 | 0，或每行十几小时 | 只在有 253 时跑 |
+
+合计约 34–38 小时（推的），比第一段新树按序脚本原推的约 17 小时多出的主要在第 12 步：原推按流三约 3 万态、每态约 70 毫秒算，第 3 步的修改时刻说流三不带探针一趟就要 2–3 小时。线道照按序脚本原定的两条、每条平分派发那一次的线程上限；修订 2 第 2.5 节逐行限时 max(1800, ⌈3 × T⌉) 秒，T 取修订 6 树第 7 步的进程挂钟（照旧树那一份推约 43 745 秒）。按序脚本第 9 节「省时的做法」（第 9、11 步换序；第 11、12 步并成四条线道）照旧交主 agent 定，它们改 T 量的条件。
+
+**收严 / 放宽**：收严——旧树上第 1–6 步一份不照用；流一流二多两道核对（S15 ⑤ 与 S1 回比在新树上的新含义）；流三多 S15 ⑥。
+
+#### 6.5 会红自证
+
+「不装根环表那一形」红的那一边已经量过一次：旧树第 7 步，A1 在流三上不成立（第 6.1 节）。下面三条用例把它钉成提交时会红的检查，另四条钉 Q5 判决路的四个出口。都写进新装置的测试模块，重型，提交时由主 agent 跑；行号、函数名照第 31 批改后的源码。
+
+| 用例 | 喂什么 | 断言 | 证什么 |
+|---|---|---|---|
+| U10 `every_live_stream_starts_with_the_root_ring_of_make_filesystem` | 三条流各 `LiveStream::start` 一次，不驱动 | `allocator.root_ring_occupancy()` 是 `Some`，`{:?}` 与 `root_ring_occupancy_after_make_filesystem(&common::parameters(), &formatted.genesis)` 的相同；第 6.2 节第 1 条那条 S1 在三条流上都过 | 装法本身。V32 下三条流都由 `Some` 变 `None`，与 core 带不带断言无关 |
+| U11 `the_third_stream_past_one_turn_of_the_root_ring_holds_i_3_1` | 流三的驱动走到第 30 次建 inode 发布为止（调查报告第 4 节 N = 30 同形，最新根 txg 35；只在用例里用的截停帮手） | 每次调用都 `Succeeded`；每次发布之后，对整条流施加出的镜像（全部写落地）调 `check_pool_image`，I-3.1 都 `Holds`；末次发布的最新根 txg ≥ 30（环已转过 24 槽，取样点敏感的证明） | 「不转环就看不出」的取样点问题（`.claude/rules/mutation-sampling.md` 第三类）：发布不到 txg 26，V32 下也是绿。V32 下：仓里 core（带第 31 批断言）在第一个文件那次发布 panic，「每次调用都 `Succeeded`」红；旧 core 上 txg 26 起 I-3.1 红 |
+| U12 `a_live_stream_without_the_root_ring_panics_in_core_at_its_first_root` | `LiveStream::start` 之后，用例里把 `allocator` 换成旧造法（`PoolAllocator::new` 加 `mark_format_time_units`，与旧树装置第 1069–1083 行同形），驱动流一三次调用 | 第 0、1 次调用（取号、暖机）`Succeeded`；第 2 次（第一个文件）结局是 panic，消息含第 31 批那条断言的一段原文（实现员在交回里给出、用例照抄一个独有的子串） | core 断言之后「不装根环表那一形」会 panic。它只在带第 31 批断言的 `crates/` 上成立（修订 6 树的 core 不带，那棵树只编 release 二进制、不编用例）。第 31 批给 core 断言写的变异行（删断言），点名的测试里加上 U12：变异下第 2 次调用 `Succeeded`，U12 红 |
+| U13 `an_unattributed_panic_in_the_pairing_stops_the_q5_at_the_pairing` | 照 U8 直接造 `ConfirmedLossShapes`：主那一形与对拍都是 k = 2 的流（第 11100 行 `equivalence_pairing_stream()`），对拍那一遍注入一条不点名件的规则（`piece: None`，条件「c1 落」） | 退 3；末行判决 `q5_not_run=unattributed_panic`，`unattributed_panic_states=` 等于用例自己从对拍流的落地串数出的「c1 落」态数（不读装置的计数）；没有一行以 `name=q5_piece_panic_control` 开头 | V33 |
+| U14 `an_unattributed_panic_in_the_piece_panic_control_stops_the_q5_at_the_control` | 同 U13 的两形，对拍不注入；阳性对照那一格交同一条规则（替换内置规则） | 退 3；末行同 U13 的写法，数照用例自己数；有一行 `name=q5_piece_panic_control`；没有一行以 `name=q5_shape` 开头 | V34 |
+| U15 `an_unattributed_panic_at_the_reverse_sampling_point_stops_before_the_tally` | 反向取样点那一形（`truncate_at_the_return_point = true`，对拍为空），导出那一格交一条不带条件的不点名件规则（选中全部态） | 退 3；末行 `q5_not_run=unattributed_panic`，`unattributed_panic_states=` 等于用例按末段各写取法数之积加全持久态现算的态数；没有 `report_the_confirmed_loss` 打出的 Q5 计数行（行首照改后的源码写死） | V35 |
+| U16 `an_unattributed_panic_at_the_main_sampling_point_stops_before_the_classes_are_judged` | 主那一形取 k = 2 的流、对拍为空（只为走到第 8248 行那一处，跑法里不会这么交），导出那一格交同 U15 的规则 | 退 3；末行同上，数等于分法交的判态数（用例从 `classify_the_last_segment` 的 `judged_ordinals` 现数）；没有一行以 `name=q5_equivalence sampling_point=` 开头 | V36 |
+
+U13–U16 每条约几秒（k = 2 的流 288 态，修订 2 第 2.1 节每态 10.09 毫秒推的）。V32–V36 的取样点写在第 6.2 节第 5 条。没红的照 `.claude/rules/mutation-sampling.md`「没红的三类，判据不同」分，不直接记盲区或等价；无效的照第八类另列、换一条真改行为的补。
+
+**为什么另设启动核对**：U10–U12 只在提交时跑，修订 6 树上跑的是 release 二进制。每一趟基线里，第 6.2 节第 1 条那条 S1 当场判这一趟的流是不是装了根环表；A1 本身再在流三上判一遍结果。两样一起，跑法里「不装根环表那一形」不靠提交时那一趟也会停。
+
+**收严 / 放宽**：收严（多七条用例、五行变异、一条 S1）。
+
+#### 6.6 新设停机 S15；作数的条件
+
+**停机 S15**（新设；修订 6 树与第一段重跑的前提；两边都查，既不作废也不当结果，交主 agent）：
+- ① 修订 6 树按 `snapshot_digest` 的逐文件表，对 `4d071c12…` 或对 Q5 树，装置文件之外还有文件不同，或文件数不同。触发观测：`name=frozen_tree` 那两张差表任一多于一行，或文件数不等。
+- ② 修订 6 树的装置造不出或编不过。触发观测：P6 打不上 `dbef78ed…`；第 6.3 节第 3 条核对出的 sha256 与仓里那一份不同；树里 `cargo build --release` 退非 0。
+- ③ 修订 6 树装置相对 `dbef78ed…` 的 hunk，有一个对不上第 6.2 节第 1–3 条与第 6.5 节 U10–U16（含只在用例里用的帮手）之一。触发观测：实现员交回的 hunk 对应表（加执行员补的常量那一行）有空格，或执行员 `diff` 数出的 hunk 数与那张表的行数不等。
+- ④ 修订 6 动了 Q5 那条路的不注入那一路。触发观测：第 6、10 步三份产物与 Q5 树上的 `revision-5-q5-reverse`、`-main-run-1`、`-main-run-2` 比，`E7RESULT` 行去掉耗时字段（照作废 Z7 的去法）与第 6.2 节第 1 条那条 S1 行之后有一个字节不同；或两边导出目录（`research/target/e171-r1-dumps/q5-revision-5-reverse/`、`q5-revision-5-main/`、`q5-revision-5-main-run-2/` 对新的三个）的 `ops.tsv`、`states.tsv`、`oracle-verdicts.tsv`、`impl-verdicts.tsv`（去耗时列）有一处不同；`call-return-values.tsv` 有的话，分配器那一项之外有一处不同。
+- ⑤ 流一、流二变了。触发观测：第 1 步新导出对 `research/target/e171-r1-dumps/newtree-2026-10-05/s2-device-baseline-streams-1-2/` 两条流——S2 那九件（八个文件与去耗时列的 `impl-verdicts.tsv`）、`oracle-verdicts.tsv`、`call-outcomes.tsv` 有一处不同（旧那一份出自修订 5 之前的装置：先去掉修订 5 第 5.1 节第 5 条加的 `piece_panics` 列，照 S14 ④ 的去法，再比）；或 `call-return-values.tsv` 里交回值各列有一处不同；或内存对象各列的不同不恰是「分配器那一项，在流一每一次调用与流二可写挂载之前的每一次调用上」——多一处（别的对象，或挂载及之后的调用）、少一处（预言的那几格有一格相同：那一次调用的分配器没带上根环表）都算。第 7 步的流一、流二两份另照同一比法比旧第 7 步导出里的同名两份。
+- ⑥ 流三在根环转过之前就变了。触发观测：第 7 步新导出对 `research/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf/`，`calls.tsv` 逐行、`ops.tsv` 逐行、`ops-payload.bin` 按 `ops.tsv` 切的逐段，从头比到第一处不同：它落在「写 txg 26 那条根的那次调用」（新旧两份各从根槽写与 `calls.tsv` 现定；调查报告第 2 节读到的是第 25 号调用）发出的第一个写之前；或两份从头到尾一处不同都没有。
+
+S15 ⑤ ⑥ 的预言出自调查报告第 4、5、8 节的机理（转环之前三种建法的计数相同、回收从 txg 26 起），是它的推翻条件，不是 Q1–Q5 的门槛。
+
+**作数的条件**：
+- Q1–Q4（第一段各行）：第十一节原文，另加 S15 ①②③⑤⑥ 都不触发。
+- Q5：修订 5 第 5.6 节第 7 条照旧，其中「Q5 树」读作修订 6 树、「S14 ①②③」读作「S15 ①②③」；反向取样点与主取样点两次另加 S15 ④ 不触发；「告警自证」那一条加上 U13–U16 绿、V33–V36 全抓。这一条没到之前，Q5 照旧记「跑了，待告警自证」。
+- U10–U12 与 V32 不进任何一行的作数条件：跑法里每趟基线有第 6.2 节第 1 条那条 S1 与 A1 当场判；它们提交时不过，照提交时的规矩交主 agent。
+- 第二段（整表）照原文，在修订 6 树上跑。
+
+#### 6.7 待主 agent 认的几处
+
+1. 树甲（第 6.3 节）；要树乙或树丙的，照第 6.3 节写的改法改。
+2. 「主 agent 认定：修订 5 交回」第 3 条的放宽：修订 6 树里的装置是 `dbef78ed…` 打 P6，与仓里那一份差第 29 批那 4 行（第 6.3 节）。
+3. 流三本地常量由第一段执行员在拍树之前、在草稿副本上重取并改仓里装置（第 6.2 节第 2 条）。
+4. 第 31 批给 core 断言写的变异行点名 U12；U12 要的断言原文由第 31 批实现员在交回里给。
+5. 第一段推约 34–38 小时，第 12 步占约一半（第 6.4 节）。
+
+#### 6.8 跑之前已经存在的数（这一条修订）
+
+1. **第 7 步的读数**（派发提示与调度记录第 1077 行转引，产物本身没打开）：`o2_red_states=10495`、三批 4 289、1 498、4 708、全是 I-3.1、O1 崩溃判官全绿、产物第 2029 行、2030 行、`process_wall seconds=14581.558`；派发提示另给流三每态 0.82 秒（推的）。影响：只进第 6.1 节「发生了什么」与第 6.4 节挂钟；没有门槛从这几个数来。
+2. **调查报告全文**（sha256 `38aef286…`）：态 504 记账 4 538 368、遍历 4 521 984、差 1 槽 50178（mkfs 第 0 版树表，txg 3 释放）；态 11694 的 43 089 920 与 4 554 752；同形历史 N = 235 两臂 `first_red_txg=None` 与 `Some(26)`、238 次发布、N = 30 三臂、前缀态 1 063 个与 284 个红；ZZALLOC 那几行计数（txg 24–27、35）；附带看到的层 0 `red_items` 计数与红的分界。影响：第 6.2 节第 1 条的形态（「丙」）、U11 的 N = 30 与「txg ≥ 30」、S15 ⑥ 的「txg 26」都出自它的机理，是那份调查的推翻条件，写成停机，不当 Q1–Q5 的门槛。
+3. **第一段新树执行员报告**（sha256 `7eab7a41…`）第 5、7、9 节与按序脚本（sha256 `b3482fdd…`）的步表与 `grep -n` 命中行、`s2_compare.py`（sha256 `8ca65474…`）全文：步号、各步判法、两个二进制的 sha256、两条线道各 5 线程、原推挂钟（约 17 小时、流三约 3 万态、每态约 70 毫秒）、`name=verdict` 那四行原样（`o2_red_states=0`、`probed_states=82`、`undecidable_branch_states=20` 等，都是流一的）。影响：第 6.4 节的步表与挂钟比较；没有门槛从这里来。
+4. **产物文件的修改时刻**（`ls -l` 只看元数据）：第 3 步 18 210 秒、其中两项带流三的 9 698 秒与 8 128 秒；第 4 步 718 秒；Q5 树那几趟 335 秒。影响：只进第 6.4 节挂钟（推的）。
+5. **判决 b29 全文与攻方报告第 46–63、194–209 行**：L1 那一格的读码事实（四个调用点、U8 走的分支、`crates/mutations.tsv` 命中 0 次）与改法表；判决第二节其余各格（GPU、G1、G4 等）与 E171 无关的读数。影响：第 6.2 节第 3 条、第 6.5 节 U13–U16、V33–V36。
+6. **调度记录第 963–994、1063–1080 行**：第 26、30 批与第 30 批之后各条（30-3 改 T_time 毫秒、E142 第 23 次、E171 停机与调查交回、用户定案）。影响：第 6.3 节树丙那一段列的「仓里已合入的」与第 6.1 节的引文。
+7. **自己现查、现算的**：仓里装置 `945e41c8…` 11 967 行，Q5 树那份 `dbef78ed…` 11 963 行，两份 `diff` 只一个 hunk（第 3437 行后加 4 行）；`4d071c12…` 树与 Q5 树 `.rs`、`Cargo.*` 逐文件 sha256 只差装置一行；那个枚举成员在旧树 `mount_transparency.rs` 里 0 处、仓里 3 处；`allocator.rs` 仓里 `c80d321d…`、两棵树 `61da68ec…`；`make_filesystem.rs` 仓里与旧树同为 `1ee1a83f…`；`tests/common/mod.rs` 仓里与旧树同为 `d2f84876…`（第 31 批之前）；E170 导出装置 `install_root_ring_occupancy` 与 `allocator_after_make_filesystem` 0 处；18 210、9 698、8 128、718、335 秒的减法；⌈3 × 14 581.558⌉ ≈ 43 745；7 × (8 128 + 120) 到 7 × (9 698 + 120) 秒即约 16.0–19.1 小时；合计约 33.9–38.4 小时。都只进定义与推算，不进门槛。
+8. **没打开的**：`research/results/` 下任何一份产物的内容、各导出目录的文件内容、实验页的结果与结论各节、修订 5 Q5 那几趟的读数。导出目录只 `ls` 过目录名与文件名（S15 ④–⑥ 要指它们）。
+
+#### 6.9 C551 整行
+
+**出处 `.claude/kb/checks-owed.md:425-425`（整段抄，未转述）**
+
+```markdown
+| C551 | `build_pool` 的分配器没有根环表 | 连续覆盖写那条用例转过根环之后 I-3.1（已分配统计对得上） 红，用例因此只判 I-1.1（块头自述逻辑地址） 与 I-3.10（已分配记录的分配代等于它罩住的单元的诞生代号）。绕法：转过根环之前先可写挂载一次，转环时用的是挂载重建的分配器——`crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs` 的 `build_a_full_ring_whose_oldest_root_is_the_second_version`（C558（回退目标是环里最旧的根时回退那次发布会写坏它） 那条用例的池）这样搭，之后重发与崩溃重开的镜像上判全部不变量。 | `build_pool` 装上根环表之后，同一条用例判全部不变量。 | 实现缺口。 | 2026-09-25 实二一报告 `research/prompts/m2-keyspace-implementer-report.md` 第 13 条；绕法见 2026-09-26 实三交回（`records/2026-09-24-里程碑二收尾调度.md` 第三节「实三交回」那一行） |
+```
+
+#### 6.10 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）。
+- 本登记 1–90、289–1097（第 91–288 行，第二节整抄的三段决策与三行欠账，这一次没重读）。
+- 调查报告全文（sha256 `38aef286…`，220 行）；第一段新树执行员报告（sha256 `7eab7a41…`）的 `grep -n '^#'` 与第 72–97、156–256 行；它的按序脚本（sha256 `b3482fdd…`）的 `grep -n 'step\|STEP'` 与 `grep -n 'E170_BIN=\|^BIN=\|E170'` 命中行；`s2_compare.py`（sha256 `8ca65474…`）全文。
+- `research/prompts/m3-formal-code-b29-r1-main-verification.md` 全文（109 行）；`research/prompts/m3-formal-code-b29-r1-opus-output.md` 的 `grep -n '^#\|A1\|A2'` 命中行与第 46–64、194–209 行。
+- `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 30 行、`grep -n '第 31 批\|#31'`、`grep -n '停在第 7 步'` 命中行；第 963–994、1063–1080 行。
+- `.claude/kb/checks-owed.md` 第 425 行（C551）。
+- 仓里装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 1060–1130、1395–1415、2095–2135、3715–3775、3890–3902、5018–5030、7938–8275、9358–9370、9476–9515、9597–9640、10685–10700、10885–10900 行，与函数、常量、`common::`、`PoolAllocator::new`、`judge_the_confirmed_loss_shapes(`、`stop_the_q5_and_write_the_verdict_when_a_panic_is_unattributed(`、`PiecePanicInjection` 的 `grep -n` 命中行；`diff` 对 Q5 树那份的全部输出。
+- 冻结树 `research/target/e171-r1-frozen-tree/`：装置第 1060–1083 行与 `fn start(name`、`PoolAllocator::new(vec`、`mark_format_time_units`、`new_pool_file_creation_operations_equal_build_pool` 的命中行；`crates/singlefs-core/src/allocator.rs` 的 `root_ring` 等命中行（第 24、975–980、1207–1241、1780–1798、1817–1818、1864–1871、1929、2687–2816 行附近）；`crates/singlefs-core/src/make_filesystem.rs` 第 670–740 行；`crates/singlefs-core/src/mount.rs` 第 1942 行；`crates/singlefs-harness/tests/common/mod.rs` 第 56–62、221–227 行；`crates/singlefs-harness/src/mount_transparency.rs` 那个枚举的 `grep -n -A40` 命中行。
+- 仓里 `crates/singlefs-core/src/allocator.rs` 第 1905–1925 行与 `root_ring_occupancy`、`record_root_written_by_this_process` 等命中行；`crates/singlefs-core/src/make_filesystem.rs`、`mount.rs`、`admission.rs` 的 `install_root_ring_occupancy` 命中行；`crates/singlefs-harness/tests/common/mod.rs` 第 670–720 行；`crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 的 `PoolAllocator::new\|build_pool` 命中行（第 9、258 行）。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/row_driver.py` 第 235–260 行。
+- `research/scripts/quote-kb.py` 1–40；`.claude/gate.d/doc-experiments.sh` 第 409–428、614–640 行与 `grep -n tmp` 命中行（查 /tmp 怎么算引依据）。
+- `research/results/` 与 `research/target/e171-r1-dumps/` 只 `ls`（文件名、修改时刻），没打开任何一份。
+
+跑过的命令（原样，草稿目录写成 `<草稿目录>`，别的会话草稿目录写成 `<调查目录>`、`<第一段新树草稿目录>`；输出在设计员报告里）：
+
+```
+$ wc -l <五份规则> research/prompts/e171-r1-prereg.md <调查目录>/report.md research/prompts/m3-formal-code-b29-r1-main-verification.md research/prompts/m3-formal-code-b29-r1-opus-output.md
+$ sha256sum research/prompts/e171-r1-prereg.md          # 7f96f837…（追加之前）
+$ grep -n '^#' research/prompts/e171-r1-prereg.md
+$ D=<装置相对路径>; sha256sum $D <旧树>/$D <Q5 树>/$D crates/singlefs-core/src/allocator.rs <旧树>/…/allocator.rs <Q5 树>/…/allocator.rs crates/singlefs-core/src/make_filesystem.rs <旧树>/…/make_filesystem.rs
+$ diff <Q5 树>/$D $D                                      # 3437a3438,3441（一个 hunk）
+$ grep -c 'SystemConfigurationUnreadableAfterTheReadStageCriterionTrueOnACrashImageWithoutReadFaults' <旧树>/crates/singlefs-harness/src/mount_transparency.rs crates/singlefs-harness/src/mount_transparency.rs   # 0；3
+$ diff <(cd <旧树> && find . -path ./target -prune -o -type f \( -name '*.rs' -o -name 'Cargo.*' \) -print | sort | xargs sha256sum) <(cd <Q5 树> && 同上)   # 只差装置一行
+$ for f in crates/singlefs-checker-tier/src/bin/e170*.rs; do grep -c 'install_root_ring_occupancy\|allocator_after_make_filesystem' $f; done   # 0
+$ sha256sum <旧树>/crates/singlefs-harness/tests/common/mod.rs crates/singlefs-harness/tests/common/mod.rs   # 都是 d2f84876…
+$ ls research/results/ | grep '^e171-r1-.*2026-10-05'; ls -l --time-style=+%H:%M:%S research/results/ | grep 'e171-r1-.*2026-10-05-s1-'
+$ ls research/target/e171-r1-dumps/ research/target/e171-r1-dumps/newtree-2026-10-05/ …/baseline-run1/ …/s2-device-baseline-streams-1-2/ …/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf/
+$ python3 research/scripts/quote-kb.py <草稿目录>/c551.md '.claude/kb/checks-owed.md~^\| C551 \|'   # ✓ 1 段整抄，回读逐字节一致
+$ python3 -c "…"                                          # 修改时刻的减法、⌈3T⌉、第 12 步与合计的推算
+$ sha256sum <调查目录>/report.md research/prompts/m3-formal-code-b29-r1-main-verification.md research/prompts/m3-formal-code-b29-r1-opus-output.md records/2026-10-01-里程碑三形式化接入.md <第一段新树草稿目录>/report.md <第一段新树草稿目录>/run_segment_one_on_the_new_tree.sh <第一段新树草稿目录>/s2_compare.py
+$ TZ=Asia/Tokyo date +%F                                  # 2026-10-05
+$ sha256sum research/prompts/e171-r1-prereg.md; wc -l research/prompts/e171-r1-prereg.md   # 追加之前
+$ for part in 1 2 3; do cat <草稿目录>/rev6-part-$part.md >> research/prompts/e171-r1-prereg.md; done   # 分三段追加，每段不超过 150 行，接缝在 6.3、6.6 两个标题之前
+$ head -n 1097 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1098 research/prompts/e171-r1-prereg.md | cmp - <草稿目录>/rev6.md
+```
+
+追加之前本登记 sha256 `7f96f83785e920b807125c2ec2440d7b2b555ef31d763d2eed400fb3ad5b3412`、1 097 行（末尾是「主 agent 认定：27-3 Q5 树交回」）；这一条修订整段先写进设计员草稿目录，再分三段 `>>` 追加，追加后前 1 097 行的 sha256 与追加前整份的相同、`tail -n +1098` 与草稿逐字节一致。
+
+#### 主 agent 认定：修订 6 交回（2026-10-05，修订 6 装置与新树的任何产物之前）
+
+1. 6.3「树里的装置 = `dbef78ed…` 打上 P6」认：仓里装置 `945e41c8…` 比 `dbef78ed…` 多第 29 批一个 `match` 分支（4 行），它引的枚举成员旧树 `mount_transparency.rs` 里没有，「主 agent 认定：修订 5 交回」第 3 条（同一份装置在仓里与旧树上都编得过）做不到。放宽在这一条上：改成两份装置之差恰好是那 4 行，执行员拍树时逐行核，多一行就停。
+2. 冻结树取 6.3 的树甲（`4d071c12…` 整棵拷出、只换装置、不带 core 断言）。Q1–Q4 的被测实现因此与第一段第 1–7 步同一份；要不要在 10b 之后的树上重跑，照原样留到第一段跑完另判，不并进修订 6。
+3. 6.1 第 7 步与第 1–6 步产物保留为参照、不进判定，认；「打中不分辨臂」那一判认。
+4. 挂钟推约 34–38 小时（推的，设计员按第 3 步产物修改时刻估），照登记修订 2 第 2.7 节的线道跑，不为挂钟改线道。
+
+### 修订 7（第一段·修订 6 执行员，2026-10-05；修订 6 树拍好之前，修订 6 树上任何产物之前；只抄修订 6 第 6.2 节第 2 条点名要抄的流三常量，判据一个字不改）
+
+**依据**：修订 6 第 6.2 节第 2 条「过了才改仓里装置的那几个常量，新旧对照在拍树之前写进第十二节一条修订（照修订 4 的做法，只抄、判据不改）」。
+
+**草稿副本怎么造**：`research/target/e171-r1-frozen-tree/`（摘要 `4d071c12…`）整棵拷进草稿目录，装置换成 `dbef78ed…` 打第 31 批 31-2 交回的 `p6-on-dbef78ed.patch`（`patch --fuzz=0`，得 `2c933e2136f991a664ed3a7c319f60072c311d113cf6d6b89a7245d2ceedbcf9`）。修订 6 第 6.2 节第 2 条写的是「换上第 31 批合入后的装置」；仓里那一份（`cc73677273fd…`）多第 29 批那 4 行，在 `4d071c12…` 上编不过（修订 6 第 6.3 节），所以换的是修订 6 树那一种拍法的装置，两份只差那 4 行。草稿副本里 release 编过，跑 `stream-constants --streams 1,2,3`，退 3，`s1_failed_checks=4`。产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-stream-constants-on-the-draft-copy-r6.out`（83 行，sha256 `a241302baa86b3c80deb8a65bbbbed1387c09826887c2c4d3e6eca743208a58c`）。
+
+**新旧对照**（新值取产物里那一行 `crates=` 那一栏；旧值是装置今天的本地常量，即同一行 `local=` 那一栏）：
+
+| 常量 | 旧 | 新 | 产物行 |
+|---|---|---|---|
+| `LOCAL_THIRD_STREAM_SEGMENT_LENGTHS`（959 段） | 第 307、311、579、847、851 段各 24 | 这五段各 20；其余 954 段不变 | 第 72 行 |
+| `LOCAL_THIRD_STREAM_WRITES` | 6000 | 5980 | 第 73 行 |
+| `LOCAL_THIRD_STREAM_FULL_STATES` | 441 453 147 | 362 809 947 | 第 77 行 |
+| `LOCAL_THIRD_STREAM_TWO_STATE_CLOSED_FORM` | 441 451 942 | 362 808 742 | 第 79 行 |
+
+算术自洽：五段各少 4 个写，6000 − 5 × 4 = 5980；闭式 1 + Σ(2^n − 1) 与全量各少 5 × (2^24 − 2^20) = 78 643 200。装置里 `local_segment_tables_reproduce_the_closed_forms_and_write_counts_copied_from_the_tests` 那条用例回比的正是段长表对闭式、对写数这两样（用例是重型，没跑）。
+
+**修订 6 第 6.2 节第 2 条的三条限制逐条**：
+- 流一、流二的常量一项不变：产物里检查名以 `new_pool_file_creation`、`fixed_script_through_e_then_unmount`、`second_stream` 起头的 S1 共 30 行，全 `holds=true`（流一流二的段长、写数、根槽写数、全量、快档、闭式都在内）。
+- 流三的根槽写数与 K 不变：第 74 行 `first_file_unlinked_then_inodes_across_one_leaf_root_writes local=240 crates=240 holds=true`；第 68 行 `third_stream_split_publish local=Some(234) crates=Some(234) holds=true`。快档状态数 3127 也没变（第 78 行）。
+- 段长表只从「写 txg 26 那条根的那次调用」所在的段起变：新旧两张表第一处不同在第 307 段（下标从 0 数）。写 txg 26 那条根的是第 25 号调用，它的第一段是第 99 段——这一对数取自第一段新树第 7 步导出 `research/target/e171-r1-dumps/newtree-2026-10-05/baseline-run1/first_file_unlinked_then_inodes_across_one_leaf/`（按 `ops.tsv` 切段：`barrier` 收段、`write_fua` 自成收段，切出的 959 段与旧本地常量逐个相同；根槽写认 payload 头 4 字节 `SFSR`，`checkpoint_txg` 取第 28 字节起的 u64 小端，与 `calls.tsv` 的 op 区间对上调用）。草稿副本那一趟不写导出，新流里同一对数由按序脚本第 7 步的 S15 ⑥ 现判。307 ≥ 99，不触发。
+
+**装置要改的四个 hunk**（S15 ③ 那张表单列这一件；相对仓里 `cc73677273fd…`，`diff -u` 出 4 个：`@@ -188,6 +188,8 @@` 在流三常量那段注释后加两行出处、`@@ -210,7 +212,7 @@`、`@@ -219,7 +221,7 @@`、`@@ -229,18 +231,18 @@` 改段长表五个数与写数、全量、闭式三行）。改完仓里那一份应为 `a435807f240bcf85205c906d04e0debf732d5639662820b361127422f81004cd`；P6（相对 `945e41c8…`）由 20 个 hunk 变 24 个；修订 6 树那份装置 = `dbef78ed…` 打这份 P6（`patch --fuzz=0` 打上），得 `67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156`；把 `dbef78ed…` 到 `945e41c8…` 那一个 hunk 再打到它上面，得到的文件与 `a435807f…` 逐字节相同（修订 6 第 6.3 节第 3 条）。`crates/mutations.tsv` 里点名这份装置的 47 行，锚点在改后那一份上各恰命中 1 次。
+
+**还没做的一件**：这一段的派发写明不改 `crates/`，仓里装置还是 `cc73677273fd…`，换进主工作区交主 agent（照 25-3 的 compile-then-swap 做法）。修订 6 第 6.3 节「取自哪一刻」要求常量换进主工作区之后再拍树；这一段先拍了树（树的内容只由 `4d071c12…`、`dbef78ed…` 与这份 P6 定），按序脚本第 0 步开跑时核仓里装置等于 `a435807f…`、再做第 6.3 节第 3 条核对，不等就停，不往下跑。这一处次序待主 agent 认。
+
+#### 主 agent 认定：修订 6 起跑准备交回（2026-10-05，修订 6 树上第一段任何步之前）
+
+1. S15 ④⑤ 照字面一装根环表就必停（`call-outcomes.tsv` 末列、`name=call` 行的 `memory_objects_sha256`、`name=file` 行两份文件的 sha256 都带分配器那一项）；跑法脚本改成「这几处只许在分配器那一项不同的那几次调用上不同」。相对 S15 字面是放宽，在任何修订 6 产物之前写下，认；放宽在这几列上，别的列照字面判。
+2. 次序：先拍树、后把修订 7 的流三常量换进仓里装置，由第 0 步核仓里装置是不是修订 7 那一份来补，认。仓里装置正在第 31 批代码轮（m3-formal-code-b31-r1）被判，常量等那一轮判决写完再换，换的改动并进下一批代码轮。
+3. S15 ④ 要比第 6、10 步的产物，挪进脚本在那两步之后做，认。
+4. 草稿副本里换的是 `2c933e21…`（旧树上编得过的那一份），不是仓里的 `cc736772…`，认（同「主 agent 认定：修订 6 交回」第 1 条）。
+
+## 主 agent 认定：修订 6 起跑前仓里装置与写法偏离（2026-10-05，起跑之前）
+
+1. 仓里装置：第 31 批代码轮判决（`research/prompts/m3-formal-code-b31-r1-main-verification.md`）写完之后，主 agent 把修订 7 那份常量（`/tmp/claude-1000/e171-r1-segment1-rev6/device-repo-expected.rs` a435807f…）换进主工作区。换之前根环线第 10g 批已合进主工作区，给这份装置的 `refusal_condition_text` 加了一臂（新拒因 `NoValidRootInTheRootRingCriterionTrueOnACrashImageWithoutReadFaults`，core 新增拒因带来的穷举臂，不加编不过），与第 29 批那 4 行同形。换法：把 10g 那 3 行 `patch --fuzz=0` 打到 a435807f… 上，得 ab35105f…，与换之前的仓里那份（979e2663…）只差 14 行流三常量；`cargo build --release -p singlefs-checker-tier --bin e171_three_oracle_collusion_after_the_oracle_fixes` 过。仓里装置于是等于「修订 6 冻结树那份 + 第 29 批 4 行 + 10g 3 行」，两处多出来的都是冻结树的 core 里没有的拒因臂、冻结树那份不需要；照「主 agent 认定：修订 6 交回」里「装置 = dbef78ed + P6」那一放宽的同一读法认。跑法脚本第 38 行期望 sha 由 a435807f… 改成 ab35105f…（脚本改前 abb70e2d…、改后 98fa007a…）。
+2. 第 31 批判决记的两处写法偏离，结局等价，认：S1 启动核对比的是两边 `{:?}` 文本的 sha256（登记写「文本相同」）；U13 登记写「末行判决」，判决行实际是倒数第二行（末行是 `name=done emitted=N`），用例按倒数第二行写。
+3. 第一趟起跑（2026-10-05，后缀 `-r6`）停在第 0 步：产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-frozen-tree-r6.out` 的 verdict 行 `triggered=device_repo,s15_2`。原因是主 agent 换装置时只改了跑法脚本第 38 行，没改第 0 步判法 `frozen_tree_lines_revision_6.py` 里写死的仓里装置期望值，且 S15 ② 的两处核对（仓里装置相对 945e41c8… 的差就是 P6；树里那份打上第 29 批那一块等于仓里那份）没有算 10g 那 3 行。S15 ①③ 与 A12 十二项都不触发。这一份产物原样留着，是那一趟的记录。
+4. 照第 1 条的认定改第 0 步判法（改前 sha256 前缀见会话草稿 `e171-swap/frozen_tree_lines_revision_6-before.py`，改后 e222107a…），只加 10g 那一块作第二个已知差额，别的一个字不放宽：期望值换成 ab35105f…；新 fixture `hunk-10g.diff`（008a531d…，b31 冻结副本那份装置到 979e2663… 的 `diff -u`）进 fixture 核对；P6 那一核改成先把 10g 那一块从仓里那份无模糊反着撤掉（撤出来必须正好是 a435807f…，新结果行 `key=hunk_10g`），再比相对 945e41c8… 的差；第 3 条核对改成树里那份依次无模糊打上第 29 批那一块与 10g 那一块，结果等于仓里那份。主 agent 自证：今天的仓里装置 `triggered=none`；把仓里装置换成换常量之前那份（979e2663…）`triggered=device_repo,s15_2`。第二趟后缀 `-r6-r2`。
+5. 第二趟（后缀 `-r6-r2`）第 0 步：冻结树产物 `triggered=none`，`stream-constants` 退 0、S1 全过（流一流二流三装根环表三条、流三拆发布 234 都成立），停在跑法脚本对 `stream-constants` 计时产物的 `device_timing.py check`（`streams=0 contains_the_stream_times=false`）。这一核是修订 6 跑法脚本加 `stream-constants` 那一趟时套上的，母本（第一段新树那份跑法）第 0 步没有，登记第 0 步也不要求：`stream-constants` 只算常量、不跑流，计时产物里本来就没有逐流时间。删掉这一行（跑法脚本改后 sha256 前缀 ce6f9600…），`s3-s11-…` 那一趟的计时核对照留。第二趟两份第 0 步产物（`…-s1-frozen-tree-r6-r2.out`、`…-s1-stream-constants-r6-r2.out` 与计时）原样留着。第三趟后缀 `-r6-r3`。
+
+## 主 agent 认定：整机重启后重建跑法交回（2026-10-06，第 11 步续跑之前）
+
+重建报告 `~/.local/share/singlefs/work/e171-r1-segment1-rebuild/report.md`（78b00a41…，125 行）；新根 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/`（不在开机清空的目录里）。
+
+1. 逐字节复原：跑法脚本 ce6f9600…、第 0 步判法 e222107a…，从两份会话记录按时间重放，中间态（脚本 abb70e2d → 98fa007a → ce6f9600，判法 5076717a → e222107a）逐个对上，原样留在新根 `exact-reconstruction/`；主 agent 现核两份 sha256 前缀相同。仓里装置 ab35105f… 没动。冻结树与两个二进制在仓里 `research/target/e171-r1-frozen-tree-revision-6/`，没丢，跑法脚本开跑时现核。
+2. 三份 fixture（`p6-revision-6.patch`、`constants-on-cc736772.patch`、`hunk-10g.diff`）只差 `diff -u` 头两行里原文件的纳秒级修改时刻，复原不出；hunk 体由确定输入推出、hunk 头与当时会话输出逐行相同。认：它们只进第 0 步判法的 fixture 核对，第 11 步续跑不碰第 0 步。往后要从第 0 步重跑的，先另立一条认定改那三项期望值，这一条不放宽它们。
+3. 新根那一份相对逐字节复原：判法只改 2 行 `/tmp` 路径；跑法脚本改 16 处（diff 在重建草稿 `run-script-new-root.diff`，70 行）：路径换到新根、加 `RUN_DATE`（不给时与原来同）、加 `RESUME_TAG`（只接进第 11–13 步的产物名、逐行输出根与日志目录）、加续跑入口。第 0–10 步的判法、阈值、线程（10，两道各 5）、内存一个字没动。主 agent 逐行读过这份 diff，认。
+4. 续跑入口：`FROM_STEP>0` 要给齐 `RUN_DATE`、`RESUME_TAG`、`RESUME_LOG`、`RESUME_MANIFEST`，缺一个就停；`resume_check.py check` 核上一趟日志第 0 至 N-1 步都记了绿、日志点名的 18 份产物都在且行数与日志同、这 18 份都在清单里、清单 774 个文件的 sha256 都没变，都过才跳过。日志本身不记 sha256，所以清单基准是做清单那一刻仓里的文件。认。主 agent 起跑前在仓根现跑一次：`resume_check pass before_step=11 manifest_files=774 logged_products=18 problems=0`。
+5. 产物名沿用 `2026-10-05`（第 11 步按这个日期读 `baseline-run1` 的计时），认。第三趟停在第 11 步留下的半份产物（`…-rows-probe-driver-r6-r3.out`，一行）与 `segment1-rows/` 原样留着，续跑写进 `-resume1`，第 11 步两行都重跑，认。线程仍 10，与第 0–10 步同一跑法，认。
+6. 丢了、续跑不需要的：上一趟日志目录里第 0–10 步的判法输出与每一步的 stdout、stderr；结果行与计时行已抽进 `research/results/`、都在清单里。续跑后缀 `-r6-r3-resume1`。
+
+## 主 agent 认定：多机跑法交回（2026-10-06，第 11 步续跑 `-resume2` 之前）
+
+报告 `~/.local/share/singlefs/work/e171-r1-segment1-multi-host/report.md`（d7ed1556…，220 行）。用户 2026-10-06 定案（经根环线转达）：「分片 双机62核 给80g」「长时间重型任务 。分片 断点重启 这都不用我说。 自适应多机跑 /home/fy5090/code/singlefs/multi-host.env」。
+
+1. 新入口 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/run_segment_one_on_the_revision_6_tree_multi_host.sh`（ec89ec78…）由 869d2c0a… 生成；主 agent 逐行比过，前 350 行（前提、续跑入口、第 0–10 步）只多了文件头几行注释（含三行长活声明）。第 11–13 步交编排器 `rows_orchestrator.py`（7bfbdb84…），别的台那一头 `peer_side.py`（27cea9e7…）。认。
+2. 线道：改成每行一个单线道驱动，每槽线程 = ⌊那台可用线程 ÷ 槽数⌋（不低于 5），台与额度起跑与每次续跑时经 `layer0-shard-configuration-check.sh --emit-hosts` 与 `host-resources.py --json` 现算。这一条替掉「主 agent 认定：修订 6 交回」第 4 条「不为挂钟改线道」——依据是上面的用户定案，不是主 agent 自行放宽。限时公式不变（修订 2 第 2.5 节，驱动照 `--baseline-timing` 现算）；各台每行线程不同（table 行 `threads_per_lane` 列出），拿行耗时下结论时按台分开看。
+3. 第 11、12 步同时跑，`check_product.py rows` 在两份合成产物上各判一次；驱动参数只改 `--lanes`、`--threads`、`--rows`、输出根、工作根，另加驱动自带的 `--skip-finished`，`--empty-mutation` 只给含 row-0 的那一片。认（只改跑法）。
+4. 收严，认：跨机一致对照（row-0 两台各跑一次，比 row 行去四个耗时列、device.out 的 E7RESULT 行、导出 z1 五个文件、o3.out 去 config 与 state_time 两种行和 `_ns` 字段，不同就停机，只有一台报 not_run，新产物两份）；别的台每趟起跑前预检，没过退 78；每行前后核驱动、模块、两张行表 sha256 与 Z5 冻结树摘要；内存每槽另加实占 10 GiB 一道；连不上、读不到资源、配置判不过、放不下都退 78，不退回单机。
+5. 合并规则①–⑦写死、配自证（编排器文件头）；第 13 步线程改成挑中那台的可用线程（≤31），单线道、限时 ×3、带探针先跑不变；新入口 `FROM_STEP` 只许 ≤11；后缀 `-resume2`，产物日期沿用 `2026-10-05`（同「整机重启后重建跑法交回」第 5 条）。认。
+6. 自证：编排器终版连跑 5 轮，每轮末行 `自证 34 项，红 0`（27 格 + 7 个弄坏开关各红在点名格）；新入口干跑 `resume_check pass before_step=11 manifest_files=774 logged_products=18 problems=0`、产物目录不多一件；真第二台不起 cargo 的预检第二次 7 项全过。共用脚本缺口（`multi-host-run.sh` 只认 `PEER_*`、等不到结局退 255 时不先取回就删树、`--send` 不建上级目录）照报告第 8 节绕开，记进治理欠账，不在这一趟改。
+
+### 修订 8（设计员，2026-10-07；批次 `records/2026-10-01-里程碑三形式化接入.md#36`；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers S16 S17 H1 H2 H3 H4 H5 H6 H7 H8 H9 H10 H11 H12 H13 H14 H15 H16 H17 H18 H19 H20 -->
+
+**时点**：修订 6 树（快照摘要 `7726cdd6…`）那一趟在跑第 11–13 步（调度记录第 1287 行，单元 `e171-r1-s1-revision-6-r3-resume2-a2`）；这一轮（形式化接入、删除与并发、根环线）还没全部合完；修订 8 说的那棵树还没拍，它上面的产物一份都没有。本设计员没打开任何一份 E171 产物与导出（第 8.11 节）。
+**依据**：用户 2026-10-06 定（经根环线转达，调度记录第 1280 行）「两样都要」的第 ② 样：这一轮全部合完之后重拍冻结树、改登记、在最终主线上从第 0 步再跑第一段一趟，同样多机分片；用户 2026-10-06「长时间重型任务 。分片 断点重启 这都不用我说。 自适应多机跑」（第 1281 行）；「主 agent 认定：多机跑法交回」；调度记录第 1283 行第 ④ 条（最终主线的登记修订复用分片跑法，冻结树等全部合完才拍）。
+**原判据原样保留**：第一至十一节、修订 1–7 与其后各条「主 agent 认定」一个字不改。修订 6 树那一趟照修订 6、7 与各条认定判，修订 8 不碰它的跑法、产物与判定。修订 8 只管另一趟，下称「修订 8 那一趟」，它的树称「修订 8 树」；两趟各判各的，并排见第 8.5 节。
+
+| 件 | 改了什么（相对修订 6） | 收严 / 只改跑法 |
+|---|---|---|
+| 8.1 | 树：从主 agent 宣布全部合完那一刻的仓里整棵拍（修订 6 第 6.3 节说的「树丙」），不再是旧树只换装置 | 被测实现换成最终主线（问题单问法不变，「合入后的实现」取最新那一份）；拍法收严（拍前五项核对、S16 ①–④） |
+| 8.2 | 拍树之前在草稿副本上重取本地常量，分三类、甲类不许变；拍树之后重查第三节行号；都写进修订 9（只抄） | 收严（修订 6 只许流三的段长表与写数变，这里列明哪些一项都不许变） |
+| 8.3 | 第 0 步换判法：六份 fixture 与 S15 ①②③ 不用，换成 S16 ①②③；A12 照搬；新加树里 `crates/mutations.tsv`、十五行锚点、研究一侧文件三样 | 收严 |
+| 8.4 | 第 1–13 步判法、阈值、限时一个字不改；加第 2b 步在修订 8 树上现导 E170 坏状态；第 3–10 步按依赖同时跑；逐单元续跑；第 11–13 步照多机编排 | 只改跑法；第 2b 步与续跑清单收严 |
+| 8.5 | 两趟之间的对照：并排、谁也不进谁的判据 | 不收不放（描述量） |
+| 8.6 | S14、S15 ①–⑥ 对修订 8 那一趟不设；新设 S16、S17 | 逐条见第 8.6 节 |
+| 8.7 | 作数的条件 | 收严（多 S16、S17、修订 9） |
+| 8.8 | 拍树那一刻才知道的值：占位 H1–H20 | — |
+
+**每件量什么、为哪一判、量到哪算够**：
+
+| 件 | 量什么 | 为哪一判（问题单哪一行） | 量到哪算够 |
+|---|---|---|---|
+| 8.1、8.3 | `name=frozen_tree` 那几行；S16 ①②③ | Q1–Q5 判的是不是宣布那一刻主线上的实现与登记的那份装置 | S16 ①–④ 不触发，H1–H11 填齐 |
+| 8.2 | 草稿副本上 `stream-constants --streams 1,2,3` 的 S1 行；第三节各行号与观测类型 | 修订 8 树上的本地常量与 S8–S10 的对拍对不对（Q1–Q5 共用） | 甲类全 `holds=true`；乙类新值与行号写进修订 9 |
+| 8.4 | 第 0–13 步各步原判法的读数 | Q1–Q5，照第十一节与修订 5 第 5.6 节第 7 条 | 第十一节「够判停机」原文 |
+| 8.5 | 两趟同名读数并排 | 不对应任何一行的判定（描述同一问题在两棵树上判得同不同） | 两趟各自判完之后出一份 |
+
+#### 8.1 树：什么时候拍、怎么拍、记什么
+
+**什么时候拍（「全部合完」怎么判）**：
+1. 由主 agent 宣布。宣布写成调度记录 `records/2026-10-01-里程碑三形式化接入.md` 当时最末一节里的一行，行首固定写「- E171 最终主线拍树宣布（<日期>）：」，行里写：三条线各自最后合入的批号、各自合入验证目录与合后 sha 清单（`after.sha256`）的路径、合入次序（同一个文件被几批改过的，后合的算）；根环线与删除线各自「全部合完、可以起跑」那句原话与转达人；宣布那一刻的 `git rev-parse HEAD`。三条线有一条没回这句，不写这一行，不拍。第 8.2 节换了装置常量的，那一次换算最后一次合入，主 agent 在宣布行之后另起一行记装置换前换后的 sha256。
+2. 拍树之前执行员逐项核，任一不过就不拍、交回主 agent（S16 ④）：
+   - a. 宣布行恰一行（`grep -c '^- E171 最终主线拍树宣布' records/2026-10-01-里程碑三形式化接入.md` 为 1）；
+   - b. 宣布行点名的每份 `after.sha256` 里的每个文件，照合入次序取最后一份给的 sha256（装置文件取换常量那一行的换后值），与工作区现算的相同；
+   - c. 没有在跑的合入验证（`ps -o pid,args -u "$(id -u)"` 里没有 `merge-and-verify.sh`）；
+   - d. 草稿副本（第 8.2 节）里 `e171_three_oracle_collusion_after_the_oracle_fixes` 与 `e170_o3_spec_executor_export` 两个 bin release 编得过；
+   - e. 第 8.2 节甲类常量全过，乙类新值已写进修订 9；换过常量的装置已由主 agent 换进仓里，仓里装置的 sha256 与修订 9 写的相同。
+
+**怎么拍**（读法 10 的拍法）：
+- 把仓的 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/`（不带 target）拷进 `research/target/e171-r1-frozen-tree-final-mainline/`；目录已存在就停，不覆盖、不复用修订 1–6 的任何一棵。装置不换、不打补丁：树里那一份就是仓里那一刻那一份。
+- 拍完在树里 release 编上面两个 bin（`--manifest-path` 指树里的 `Cargo.toml`，编译目录照修订 6 树放在树里的 `target/`），编前编后各算一遍 `snapshot_digest`，相同才算拍成。
+- 拍完那一刻逐文件核树对仓：`snapshot_digest` 罩的（`.rs`、`Cargo.*`）加 `.cargo/` 下全部与 `crates/mutations.tsv`，（路径, sha256）表的差为空、文件数相等（S16 ①）。
+- 不取修订 6 的「树甲」（旧树只换装置）：用户要的第 ② 样就是最终主线那一份实现；取旧树就是修订 6 那一趟本身。
+
+**树里装置与仓里装置的已知差额怎么认**：
+- 拍的那一刻两份逐字节相同（S16 ① 已罩）。
+- 树里装置相对 `ab35105f…` 的差要逐块有来源（S16 ③）。`ab35105f…` 是修订 6 那一趟第 0 步核过的仓里装置，即修订 6 树装置 `67e7a549…` 加第 29 批 4 行与第 10g 批 3 行（「主 agent 认定：修订 6 起跑前仓里装置与写法偏离」第 1、4 条）。来源只认三种：修订 9 的常量（第 8.2 节）；core 新增拒因带来的穷举臂（与第 29 批、第 10g 批同形：只加 `match` 臂，不改别的行，主 agent 逐条认）；主 agent 认定点名的别的装置改动（写批号、实现员报告、改了什么）。
+- 每一块存成一份 fixture，用 `diff -u --label <旧名> --label <新名>` 出，头两行不带修改时刻，fixture 的 sha256 可复现（修订 6 那三份 fixture 复原不出，就是因为头里有纳秒级修改时刻，「主 agent 认定：整机重启后重建跑法交回」第 2 条）。块表每行写块名、来源、fixture 的 sha256。
+- 核法：`ab35105f…` 那份文件（修订 6 草稿 `devices/device-repo-ab35105f.rs`，拷进修订 8 执行员草稿、核整文件 sha256）依次无模糊打上块表各块，结果与树里那份逐字节相同。不按块数核：相邻两块在 `diff -u` 里会并成一块（今天仓里装置对修订 6 树装置就是这样，第 8.11 节第 4 条）。
+- 拍了之后仓里装置再改的不进树。第 0 步每次起跑与续跑都核仓里装置仍等于树里那份（S16 ②）；不等时，要主 agent 另立认定把多出来的几块记成已知差额（同上：`--label` 固定头的 fixture，从仓里那份无模糊撤得掉，撤完等于树里那份），才往下跑。要核它，是因为 Q5 作数要在提交时用仓里装置跑 U1–U16 与 V17–V36（第 8.7 节），那份装置必须就是树里跑的这一份，或只差认过的几块。
+
+**拍出来要记的**（第 0 步第一份产物 `…-frozen-tree-r8.out` 的 `name=frozen_tree` 行；值在拍树那一刻填进第 0 步判法与修订 9，占位见第 8.8 节）：宣布行行号与原文（H1）；`git rev-parse HEAD` 与 `git status --porcelain -- crates Cargo.toml Cargo.lock .cargo` 全文（H2）；快照摘要与文件数（H3）；装置在树、仓、`ab35105f…`、修订 6 树 `67e7a549…` 四处的 sha256（H4）；对 `ab35105f…` 的块表（H5）；两个 release 二进制的 sha256（H7）；树里 `crates/mutations.tsv` 的 sha256（H8）；十五行锚点（H9）；A12 十二项（H10）；研究一侧各文件 sha256（H11）；修订 6 树（`7726cdd6…`）对修订 8 树的逐文件差表（只描述，进第 8.5 节对照）。
+
+#### 8.2 本地常量重取与第三节行号重查（修订 9）
+
+**为什么要重取**：装置的本地常量（原登记 5.3、修订 2 第 2.1 节、修订 5 第 5.2 节、修订 7）是在修订 6 树那份实现上实测写死的。最终主线上实现改了（调度记录第 1280 行：冻结树与工作区的 checker `walk.rs`、`image.rs`、core 8 个文件、`model.rs` 都不同），写流可能跟着变；S1 在基线那几趟回比，不过就停。修订 6 第 6.2 节第 2 条与修订 7 是先例。
+
+**怎么取**：宣布之后、拍树之前，执行员把宣布那一刻仓的 `Cargo.toml`、`Cargo.lock`、`.cargo`、`crates/` 拷进自己的草稿目录，release 编装置，经内存包装跑 `stream-constants --streams 1,2,3`（它回比三条流与 Q5 那一形的全部本地常量；装置第 259 行注释「取 `stream-constants` 现算的那一份」），产物落 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-stream-constants-on-the-draft-copy-r8.out`。只跑这一种模式：不跑 `baseline`、`confirmed-loss-form`，不让任何 Q1–Q5 的读数在登记的树之前出现。
+
+**三类**（修订 9 里每一项写明属于哪一类；下面没点名的项照乙类办，执行员在修订 9 里点名）：
+- **甲：定义钉死，不许变**。流三拆发布那一次 `third_stream_split_publish`（K = 234，第七节 A7，前提是 `INODE_LEAF_RECORDS` 仍为 233、与 ⌊(32768 − 136) ÷ 140⌋ 回比过）；三条流各自的根槽写数（等于各流发布调用的次数，调用序列由读法 2 定）；三条流的分配器带 mkfs 的根环表（修订 6 第 6.2 节第 1 条那三条 S1）；流一 `new_pool_file_creation_operations_equal_build_pool`；Q5 那一形的已确认调用与在途调用（第 2、3 次，装置第 256–257 行）；对拍末段里属于第 3 次调用的写数 6 与它们是三对镜像（修订 5 第 5.2 节，装置第 285、290 行）。甲类任一项不过：停机 S1，两边都查（`.claude/rules/implementation-first.md` 第 4 条），不拍树。
+- **乙：随写流变，按定义现取**。三条流的段长表、写数、全量 / 快档 / 闭式态数；Q5 那一形删的屏障下标、改成普通写的根槽写下标、两个截断点、主取样点末段写数与可撕裂写数与全枚举态数、K 的取法数（`LOCAL_CONFIRMED_LOSS_KEY_CHOICES`）、C 的写数、类数、类的态数、照原路径判的态数。新值取草稿副本那份产物里那一行 `crates=` 那一栏，旧值是 `local=` 那一栏。乙类变了不停：执行员照修订 7 的做法改装置里那几个常量（只改值与它们的出处注释），交主 agent 换进仓里（第 8.1 节第 2 条 e）。Q5 的定义（读法 7 的造法、修订 3 的候选二、修订 5 的 k = 6）不跟着变，变的只是这些定义在新写流上落到的下标与计数。
+- **丙：由乙推出的精确数**。对拍的态数（K 取法数 × 2⁶，装置第 287 行）；阳性对照「判态路 panic 单列」三件的态数（装置第 292–299 行，K 取法数 × 2⁴、× 2⁴、× 2³；修订 6 树上 K 取法数为 72，即 1 152、1 152、576）；第 6 步判法写死的 `q5 states=`（反向取样点，等于 K 取法数）与第 10 步的 `q5 states=`（主取样点全枚举态数）。丙类不另取，由乙类代进式子；第 6、10 步的期望值写进修订 9（H14）。
+
+**行号与观测类型**（修订 1 第 2、3 条，修订 4 是先例）：拍树之后、第 0 步之前，执行员在修订 8 树上重查第三节与修订 4 第 2 条那一串行号；核 `model_comparison::observed_unmount` 交的仍是 `ObservedEffect::Publishes { roots, .. }`（阳性对照「O1-对拍·卸载」改坏的 `rollback_floor` 还在），变了照修订 1 第 2 条另写；`reference_filesystem_translation.rs` 与 RefFS `lib.rs` 的 sha256 与修订 6 树比，不同就照 S9 逐臂重列装置映射对 `events_of` 的对应行号；S8（三处行号）、S10（探针入参与第二截那一处逐项）照原文两边列行号。
+
+**修订 9** 由执行员写、只抄、判据不改：常量那一半写在拍树之前，行号那一半写在拍树之后、第 0 步之前；都在修订 8 树的任何产物之前（草稿副本那一份 `stream-constants` 不算修订 8 树的产物）。
+
+#### 8.3 第 0 步：判法换成修订 8 那一份；fixture 哪些照搬、哪些重算
+
+修订 6 第 0 步的判法 `frozen_tree_lines_revision_6.py`（逐字节复原那份 `e222107a…`，新根那份 `252f1b73…` 只差两行 `/tmp` 路径）正给修订 6 那一趟用着，不改它。执行员另写 `frozen_tree_lines_revision_8.py`，逐项如下：
+
+| 修订 6 判法里的项 | 修订 8 怎么办 | 期望值从哪来、什么时候取 |
+|---|---|---|
+| 六份 fixture 的 sha256（`p6-revision-6.patch`、`hunk-b29.diff`、`p6-on-dbef78ed-from-31-2.patch`、`constants-on-cc736772.patch`、`device-945e41c8.rs`、`hunk-10g.diff`） | 不用。它们只为核「`4d071c12…` 整棵拷出、`dbef78ed…` 打 P6」那种拍法；修订 8 树从仓里整棵拍，装置不打补丁 | — |
+| 其中复原不出的三份（`p6-revision-6.patch`、`constants-on-cc736772.patch`、`hunk-10g.diff`） | 修订 8 不读它们，也不改它们在修订 6 判法里的期望值：「主 agent 认定：整机重启后重建跑法交回」第 2 条「往后要从第 0 步重跑的，先另立一条认定」管的是修订 6 那一趟，修订 8 不替它放宽。第 10g 批那一块的内容由 `ab35105f…` 整文件带着（整文件的 sha256 可现算），不再靠那份 diff | — |
+| 三棵树的快照摘要；S15 ①（对 `4d071c12…`、对 Q5 树各只差装置一行） | 换成 S16 ①：拍的那一刻树对仓逐文件差为空，只在拍树那一刻判一次，结果行抄进第 0 步产物；每次起跑、续跑再算树的摘要等于 H3（作废 Z5）。另出修订 6 树对修订 8 树的逐文件差表，只描述 | H3：拍完、树里编过、编前编后两遍摘要相同之后 |
+| 装置四处的 sha256（树 `67e7a549…`、Q5 树、第一段树、仓 `ab35105f…`） | 换成：树里等于 H4；仓里等于树里（S16 ②，差额只认认定点名的块）；`ab35105f…` 那份 fixture 等于 `ab35105f861d509457296741d2c60515a3a94b9fefe77944f03d1b358afd45df`；修订 6 树那份等于 `67e7a5498425ec3f27379ba8f0e5cd666faaeaac0817006d6938956d6419a156`（后两个现在就定） | H4：拍树那一刻 |
+| S15 ②（P6 打得上、修订 6 第 6.3 节第 3 条核对）与 S15 ③（对 31-2 那张表逐块对应） | 换成 S16 ③：`ab35105f…` 依次无模糊打上块表各块，结果等于树里那份；表里每行有来源 | H5：块表在拍树之前；每份 fixture 的 sha256 在它写出那一刻 |
+| `git rev-parse HEAD` | 照留；另加 `git status --porcelain -- crates Cargo.toml Cargo.lock .cargo` 全文（读法 10 原有，修订 6 判法没带） | H2：拍树那一刻 |
+| `allocator.rs`、`tests/common/mod.rs` 仓里与树里的 sha256 | 照留，只描述 | 第 0 步现算 |
+| 两个 release 二进制的 sha256 | 照留，跑法脚本开跑核 | H7：树里编完 |
+| A12 十二项（`frozen_tree_lines.py` 的 `GREPS`） | 照搬：判法是「≥ 1」「恰 0」，不是写死的数，在修订 8 树上现判；不过走停机 S12（原文） | 不预取。本设计员在今天的仓上现跑十二项都成立（第 8.11 节第 4 条），只说今天的状态，不是期望值 |
+| 新加：树里 `crates/mutations.tsv` 的 sha256 | 逐行驱动从树里读这张表取坏实现行（`row_driver.py` 第 709 行），`snapshot_digest` 不罩它；第 0 步与每一行前后核它等于 H8，不等算作废 Z5 | H8：拍树那一刻 |
+| 新加：第三节点名的十五行在树里按名字取得到、锚点恰命中 1 次 | 只描述；不是 1 次的行照读法 5 与 F3 记，不在这一趟里重新取锚（重新取锚是换了一行坏实现，是新实验） | H9：拍树之后、第 0 步之前；不是 1 次的，执行员起跑前交主 agent 定照不照跑 |
+| 新加：研究一侧目录全部文件与 `s2_compare.py`、`check_product.py`、编排器副本的 sha256，与修订 6 那一趟用的比 | 研究一侧（驱动、比对器、`frozen_o3.py`、两张坏实现表）有一份不同，就在第 11 步之前重跑研究一侧变异表（修订 1 第 1 行的做法，新产物名带 `-r8`）；全相同，`research-mutations` 那份照用（修订 6 第 6.1 节末表同理） | H11：第 0 步 |
+| 流常量（S1） | 不在这份判法里：第 0 步的 `stream-constants` 那一趟照修订 6 跑法判（S1 全过、三条根环表、拆发布 234），本地常量是修订 9 写的那一份 | 第 8.2 节 |
+
+#### 8.4 第 1–13 步：步表、哪些能分到几台、次序与续跑
+
+**判法不动**：每一步的判法、阈值、限时公式（修订 2 第 2.5 节，T 取修订 8 树第 7 步的进程挂钟）、线程与内存的取法，照修订 6 那一趟的多机跑法 `run_segment_one_on_the_revision_6_tree_multi_host.sh`（`ec89ec78…`）与编排器 `rows_orchestrator.py`（`7bfbdb84…`）。执行员从这两份另起修订 8 的一份（不改在跑的那两份），改的只有下表写的几处。
+
+| 步 | 跑什么（修订 6 第 6.4 节步表） | 这一趟改不改 |
+|---|---|---|
+| 0 | 前提；冻结树产物；`stream-constants`；S3、S11 流一带探针自检 | 判法换成第 8.3 节那一份；前提里不再要求 S15 要比的旧导出与旧产物在；`stream-constants` 那一趟与 S3、S11 自检照旧 |
+| 1 | S2 新装置基线 `--streams 1,2` | 照旧；之后不接 S15 ⑤ 停机，改出一份对照产物（第 8.5 节），退出码不判 |
+| 2 | E170 导出装置 `dump`，与第 1 步逐文件比（S2） | 照旧（E170 导出装置从修订 8 树编） |
+| 2b | 新加：在第 2 步导出的拷贝 `<导出根>/e170-bad-states-second-run/` 上跑 E170 导出装置 `bad-states-second-run --dump-directory <那份拷贝> --seed-hex 85441ae491419411` | 收严。第 3 步 O3 阳性对照与第 4 步 `o3-p1` 要的 P1-F 补丁原来取 `research/target/e170-r2-today-dumps/e170-bad-states-second-run`，那是在另一棵树上导的；O3 阳性对照要底态摘要对得上（`o3_bad_image_judge.py` 第 219–220 行 `base_digest_matches`、`red_strict`），实现变了底态就对不上，F1 会打在接线以外的原因上。模式与种子照 E170 第 2 次重跑登记（`research/prompts/e170-r2-prereg.md` 第 830 行 Z3 那一句） |
+| 3 | 阳性对照全表（基线那一趟）十项 | 判法与精确数（A8）不变；十项各成一个单元，可以同时跑（下表）；O3 那一项改用第 2b 步的目录 |
+| 4 | 阳性对照（空变异那一趟）十项 | 同上；`o3-p1` 那一项改用第 2b 步的目录 |
+| 5 | O3 基线（流一、流二） | 照旧 |
+| 6 | Q5 反向取样点 | 判法照旧，`q5 states=` 的期望改成修订 9 的 K 取法数（H14）；不接 S15 ④ 停机，改出对照产物 |
+| 7 | 带流三、带探针的基线第一次 | 判法与 A1 照旧；不接 S15 ⑥⑤ 停机，改出对照产物；它的进程挂钟是 T（H13） |
+| 8 | O3 判第 7 步三条流 | 照旧 |
+| 9 | 基线第二次、作废 Z1 | 照旧 |
+| 10 | Q5 主取样点两次（Z7） | 判法照旧，`q5 states=` 的期望改成修订 9 的主取样点全枚举态数（H14）；阳性对照「判态路 panic 单列」三件的精确数由装置照修订 9 的 K 取法数现乘（丙类）；不接 S15 ④ 停机，改出对照产物 |
+| 11–13 | 第 242、269 行带探针；空变异加 13 行；超时重跑 | 编排器照「主 agent 认定：多机跑法交回」第 2–5 条。改的只有：树、快照摘要、T 的来源（修订 8 树第 7 步）、别的台那三个落点改名（例 `research/e171-s1-final-peer-kit`、`research/e171-s1-final-frozen-snapshot`、`research/target/e171-s1-final-peer-out`，不与修订 6 那一趟的同名，H18）、每行前后另核树里 `crates/mutations.tsv` 等于 H8。行集、驱动参数、合并规则 ①–⑦、跨机一致对照（S17）、第 13 步的规矩一个字不改 |
+
+**第 0–10 步能不能分到几台**（单元是续跑与派发的最小一件）：
+
+| 步 | 单元 | 本机同时跑 | 分到别的台 | 凭什么 |
+|---|---|---|---|---|
+| 0、1、2、2b | 各一个，依次 | 不 | 不 | 第 0 步核的是本机的树、仓与二进制，是后面全部单元的前提；第 2、2b 步吃第 1、2 步的导出；四步合计约二十分钟（推的） |
+| 3 | 十项各一个 | 可：十项互不依赖（交回值、内存对象两项只读第 1 步产物） | 可，带条件（下面第一条）；今天的编排器做不到（下面第二条） | 带流三的两项各约 2.3–2.7 小时（修订 6 第 6.4 节），同时跑之后第 3 步约等于最长那一项 |
+| 4 | 十项各一个 | 可 | 不 | 每项编一次、跑流一流二，十项合计约十二分钟（推的）；搬过去省下的不够一次拷树加编译 |
+| 5 | 一个 | 可（第 1 步之后） | 不 | 读本机第 1 步导出；几分钟 |
+| 6、10 | 第 6 步一个，第 10 步两次各一个 | 可；第 10 步两次也可同时跑 | 不 | 约 1 秒与约 2 分钟（推的） |
+| 7 | 一个 | 可与别的单元同时跑 | 不 | T 定义成这一趟进程的挂钟（修订 2 第 2.5 节）：按流拆成几个进程就不是那个 T；一条流里按态区间切，要装置有这样的入口，装置今天没有（`grep -c 'state-range\|--shard\|--first-state\|--states-from'` 为 0），加它是改装置，不在修订 8 |
+| 8 | 一个 | 可（第 7 步之后） | 不 | 读本机第 7 步导出；5–30 分钟 |
+| 9 | 一个 | 可与第 7 步同时起 | 可，带条件（下面第一条）；今天的编排器做不到（下面第二条） | 约 4.1 小时；Z1 拿它与第 7 步逐字节比，放到别的台时这一比同时就是跨机一致对照 |
+
+- 「分到别的台」的条件（第 3 步各项、第 9 步）：那一台从发过去的冻结树快照编（快照摘要等于 H3，与编排器合并规则 ② 同一核），二进制 sha256 照实记、不要求等于 H7；产物与导出取回本机再判。S17 罩它们：第 9 步在别的台时 Z1 不过，先在本机再跑一次第 9 步，本机那次 Z1 过就是跨机不一致（S17），本机那次也不过就是 Z1 作废；第 3 步在别的台跑的各项，要等第 12 步 row-0 两台对照（S17）判过才作数，S17 触发时它们全部不作数、在本机重跑。
+- 缺的一段：`rows_orchestrator.py` 在别的台只会起逐行驱动（`STEPS` 五种都跑 `row_driver.py`），没有「在别的台从快照编、跑一趟装置、取回产物与导出」这一类活。执行员写跑法时补得上就补（照编排器已有的预检、取回、续跑写，配自证与弄坏开关）；补不上，第 3、9 步留在本机与第 7 步同时跑，交回里写明缺这一段（H20）。
+- 按流切不做：A8 的「恰 3 态」、T、Z1 都是按一趟三条流写的，拆开要改判法的形态；流三一条就占这几趟挂钟的绝大部分（修订 6 第 6.4 节），拆出流一、流二省不下时间。
+- 本机同时跑几个单元：槽数照编排器的分配法从 `research/scripts/host-resources.py --json` 现算（带流三的单元每槽 6G，只有流一流二的 4G，照修订 6 跑法的 `CAP_LARGE`、`CAP_SMALL`），不写死；放不下的排队，第 7 步最先，其余按推的用时最长先。
+- T 照旧取第 7 步的进程挂钟。同时跑的别的单元会让它变长，逐行限时 max(1800, ⌈3T⌉) 只会更宽（修订 2 第 2.5 节「限时只升不降」）；第 7 步的计时产物另打一行，列出它跑的期间同时在跑的单元名（只描述，不进判定）。
+
+**次序**（只改跑法，判法不动；修订 2 第 2.7 节与修订 6 第 6.4 节原是一步接一步）：
+1. 第 0、1、2、2b 步依次跑。
+2. 之后同时起第 7 步、第 9 步、第 3 步十项、第 4 步十项、第 5、6、10 步；槽不够时第 7 步最先。
+3. 第 8 步在第 7 步绿之后起。
+4. 第 11–13 步（编排器）在第 0、1、2、2b、7 步都绿之后起：逐行要 T，第 7 步的 A1 是逐行读数有意义的前提。它与还在跑的第 3–10 步各单元共用本机的槽，按现查的余量分配。
+5. 一步停：不再起新单元，也不再派新行；在跑的跑完再停（编排器原有的做法）。已落的各单元产物照原样留着，作不作数照那一条条款自己的射程判（例：F1 只让那一列整轮作废；Z5 只作废核不过的那几趟），不因次序变了而扩大或缩小。
+6. 作数（第 8.7 节）要第 0–10 步全部单元绿：先起的逐行在前面某步红了时不作数，与一步接一步跑时停在那一步的结局相同。
+
+**续跑**（同一条命令重起就是续跑，不再要 `FROM_STEP`）：
+- 单元：第 0、1、2、2b、5、6、7、8、9 步各一个，第 3、4 步每项一个，第 10 步两次各一个；第 11–13 步按行。
+- 一个单元算做完要三样都成立（「主 agent 认定：整机重启后重建跑法交回」第 4 条 `resume_check.py` 那一套，加一样）：序列日志里有它的绿行；日志点名的产物都在、行数与日志同；它的产物与导出目录各文件的 sha256 与它绿的那一刻写下的清单相同。清单在单元绿的那一刻当场追加进这一趟的续跑清单，不靠事后 `make`（收严：修订 6 那一次的清单是重启之后才补做的）。
+- 没做完的单元整个重跑：产物名与导出目录加 `-attempt<N>`（N 从 2 起），上一次的半份原样留着、不进判定；依赖它的单元等它绿。
+- 第 11–13 步照编排器：行目录里有 `row-result.tsv` 才算做完；别的台取回的先收进来；写到一半的重做。
+- 每次起跑与续跑都重核第 0 步的前提（快照摘要 H3、两个二进制 H7、仓里装置等于树里装置 S16 ②、树里 `crates/mutations.tsv` H8、O3 冻结行 Z2），分配重新现查。
+
+#### 8.5 两趟之间的对照
+
+两趟：「修订 6 那一趟」是修订 6 树（`7726cdd6…`），第 0–10 步后缀 `-r6-r3`，第 11–13 步后缀 `-r6-r3-resume2`（「主 agent 认定：多机跑法交回」第 5 条）；「修订 8 那一趟」是修订 8 树（H3），后缀 `-r8`（H16）。
+
+照读法 11（「s4 读数只当对照」）的形态：
+1. **两趟各自出判定**。各用自己那一趟的比对器（`segment_one_comparator.py`，接第一段的执行员写）只读自己那一趟的产物前缀与导出根，照 Q1–Q5 写判定行。比对器不读另一趟的任何产物：输入路径只认自己那一趟的前缀与导出根，给到另一个前缀就退出（比对器单测钉一条）。
+2. **两份判定都写完之后另出对照**。一份新产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-contrast-revision-6-against-revision-8.out`，每行带 `role=contrast`，由另一份对照脚本写（比对器不引它），逐格并排：
+   - Q1：七行 × 三条流 × O1 三个子列、O2、O3 严格与暂代，两趟各自的红态数（O1-对拍是红的调用数）与适用数、峰值、为正段数、期末值，Q1-甲、乙的判定；
+   - Q2：C672 七行每次调用的交回值、内存对象同不同与 O1-对拍判定；
+   - Q3：第 125 行的 c、截断之后判了的态数、触达否；
+   - Q4：三趟 × 三条流 × 两批的（i）（ii）态数、第二截判定、挂载结局；
+   - Q5：两个取样点上的 L、RefFS 红、模型崩溃判官红、两者都绿、弃权、`judge_panic` 各态数；
+   - 第 1、6、7、10 步之后那几份对照产物（S15 ④⑤⑥ 的比法，用在两趟之间，只描述）；
+   - 两棵树的逐文件差表（第 8.3 节）；两趟各行装置那一步的耗时，按台分开。
+3. **谁也不进谁的判据**。对照产物里任何一格不改任何一趟的判定、不触发任何条款。两趟判得不同的那一行，问题单那一行把两个判定并列写、各带树名（快照摘要），不合成一个，也不写成「最终主线推翻了第 16 批那一版」：差别出自哪一次合入是推论，要用就另走三方。
+4. 问题单 Q1–Q5 的状态由主 agent 照两趟各自的够判逐行写；一趟够判、另一趟还差的，照实写哪一趟还差什么。
+
+#### 8.6 作废、停机、运行条件
+
+**照旧沿用**（原文不动；对修订 8 那一趟逐条读，「登记的那棵冻结树」读作修订 8 树）：作废 Z1–Z7（Z5 另加树里 `crates/mutations.tsv` 等于 H8）；停机 S1–S3、S5–S13（拍树之后 S1 不再有第 8.2 节「重取」这条出路，哪一趟 S1 不过都停）；失败 F1–F9；「主 agent 认定：多机跑法交回」第 4 条的跨机一致对照（下面起名 S17）与别的台预检退 78。
+
+**对修订 8 那一趟不设**：
+- S14 ①–④：管的是 Q5 树对 `4d071c12…`；修订 8 那一趟没有 Q5 树。
+- S15 ①②③：管的是修订 6 树怎么由 `4d071c12…` 换装置造出来；修订 8 树从仓里拍，由 S16 ①②③ 接替。
+- S15 ④⑤⑥：预言是「只有装置那一处改动；只有分配器那一项、只有流三转环之后会变」。修订 8 树上实现本身变了，这个预言没有依据可立，不设停机；那几种比法改在两趟之间出对照产物（第 8.5 节）。装置一侧有没有越出边界，另由 S16 ③ 逐块认。这一条对修订 8 那一趟是不设，不是放宽：被比的两边不是同一份实现；修订 6 那一趟的 S15 照旧。
+
+**新设**（两边都查，既不作废也不当结果，交主 agent）：
+- **S16** 树、装置与宣布对不上：
+  - ① 拍的那一刻树对仓的逐文件差不为空，或文件数不等。触发观测：第 0 步产物 `name=frozen_tree key=s16_1` 那一行差的文件数大于 0，或两边文件数不等。
+  - ② 树里装置不是 H4；或某次起跑、续跑时仓里装置不等于树里装置，而多出来的块不在主 agent 认定点名的已知差额里（撤不掉，或撤完不等于树里那份）。触发观测：第 0 步前提那一行 `device_repo_equals_the_tree=false`，且已知差额撤完仍不等。
+  - ③ `ab35105f…` 依次无模糊打上块表各块，结果不等于树里装置；或块表里有一行的来源不在第 8.1 节那三种里。触发观测：`name=frozen_tree key=s16_3` 那一行 `identical=false`，或块表那几行里有 `source=none`。
+  - ④ 拍树前五项核对（第 8.1 节第 2 条 a–e）任一不过：不拍。触发观测：执行员拍树前那份核对产物的 verdict 行。
+- **S17** 跨机一致对照不同：第 12 步 row-0 两台各跑一次（「主 agent 认定：多机跑法交回」第 4 条原样）；第 9 步放到别的台时 Z1 不过、本机重跑那次 Z1 过。触发观测：`…-rows-cross-host-check-r8.out` 的 verdict 行，或第 9 步本机重跑那份 Z1 判法退 0 而别的台那份退 1。S17 触发时，别的台跑的全部单元与行都不作数，在本机重跑。
+
+**运行条件**（退 78，不是停机）：多机配置判不过、某台连不上或读不到资源、别的台预检没过（工具链、Python、离线编译、盘；第二台 cargo 缓存缺 `vstd` 那一次就是离线编译这一种，调度记录第 1287 行，`cargo fetch` 补齐之后同一条命令续跑）、此刻一个单元都放不下。不悄悄退回单机。
+
+#### 8.7 作数的条件与够判（修订 8 那一趟）
+
+- **Q1–Q4**：第十一节原文，另加：S16 ①–④ 不触发；S17 不触发；修订 9 在第 0 步之前写进登记；第 0–10 步全部单元绿。
+- **Q5**：修订 5 第 5.6 节第 7 条与修订 6 第 6.6 节「作数的条件」Q5 那一条，「Q5 树」读作修订 8 树，「S14 ①②③」「S15 ①②③」读作 S16 ①②③，S15 ④ 不设。「告警自证」那一条（U1–U16 绿、V17–V36 全抓）要在仓里装置等于树里装置（或只差认定点名的已知差额）的那一次提交里过；不等的那一次提交不算这一趟的告警自证。
+- **够判停机**：第十一节原文。修订 8 那一趟只跑第一段：Q2 的集合与 Q3 的分母照写「还差第二段」；第二段在哪棵树上跑不在修订 8 里，交主 agent 另判。
+
+#### 8.8 拍树那一刻才知道的值（占位表）
+
+修订 8 里这些值现在都不写数，只写占位；执行员在下表的时刻填进修订 9 与第 0 步判法，主 agent 认过才起跑。
+
+| 占位 | 是什么 | 谁填 | 什么时候填 | 填之前核什么 |
+|---|---|---|---|---|
+| H1 | 宣布行的行号与原文 | 主 agent 写宣布行，执行员抄 | 全部合完时 | 第 8.1 节第 2 条 a |
+| H2 | `git rev-parse HEAD` 与 `git status --porcelain -- crates Cargo.toml Cargo.lock .cargo` 全文 | 执行员 | 拍树那一刻 | 第 8.1 节第 2 条 b、c |
+| H3 | 修订 8 树的快照摘要与文件数 | 执行员 | 拍完、树里编过 | 编前编后两遍摘要相同；S16 ① |
+| H4 | 树里装置的 sha256 | 执行员 | 拍树那一刻 | 等于仓里那一刻那份；S16 ③ |
+| H5 | 装置对 `ab35105f…` 的块表（块名、来源、fixture 的 sha256） | 改装置的那一方（常量那几块是执行员），主 agent 认 | 拍树之前 | 每块用 `diff -u --label` 出；依次无模糊打上之后等于仓里那份 |
+| H6 | 修订 9：常量的类、旧值、新值、产物行；第三节行号与观测类型 | 执行员 | 常量在拍树之前；行号在拍树之后、第 0 步之前 | 甲类全过；乙类只改值与出处注释 |
+| H7 | 两个 release 二进制的 sha256 | 执行员 | 树里编完 | 编前编后摘要相同 |
+| H8 | 树里 `crates/mutations.tsv` 的 sha256 | 执行员 | 拍树那一刻 | 等于仓里那一刻那份 |
+| H9 | 十五行按名字取得到否、锚点命中次数 | 执行员 | 拍树之后、第 0 步之前 | 不是 1 次的交主 agent 定照不照跑 |
+| H10 | A12 十二项 | 第 0 步判法 | 每次第 0 步 | — |
+| H11 | 研究一侧各文件 sha256 与修订 6 那一趟用的比 | 执行员 | 第 0 步 | 有不同就在第 11 步之前补研究一侧变异表 |
+| H12 | 第 2b 步的目录与 P1-F 那一行的底态摘要 | 跑法 | 第 2b 步 | 种子 `85441ae491419411`；第 3 步那一项 `base_digest_matches=true` |
+| H13 | T（第 7 步进程挂钟）与逐行限时 | 跑法 | 第 7 步绿 | 进程挂钟包住各流 `elapsed_ns` 之和（修订 2 第 2.5 节） |
+| H14 | 第 6、10 步 `q5 states=` 的期望与丙类精确数 | 执行员（由修订 9 代进第 8.2 节的式子） | 拍树之前 | 主取样点全枚举态数 = K 取法数 × 2^(C 的写数)（A10 同式） |
+| H15 | 修订 6 那一趟拿来对照的产物与导出目录清单 | 主 agent | 出对照产物之前 | 那一趟第 11–13 步跑完，或写明停在哪一行 |
+| H16 | `RUN_DATE`、`RUN_SUFFIX`（`-r8`）、导出根、日志目录 | 主 agent | 起跑时 | 名字不与已有产物撞 |
+| H17 | 跑法脚本、第 0 步判法、编排器副本、续跑核对、对照脚本的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash research/scripts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿 |
+| H18 | 别的台的三个落点 | 执行员 | 写跑法时 | 与修订 6 那一趟的不同名 |
+| H19 | 各台槽数与每槽线程 | 编排器 | 每次起跑与续跑 | 现查 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts` 与 `research/scripts/host-resources.py --json` |
+| H20 | 第 3、9 步分不分到别的台（编排器那一段补没补上） | 执行员写，主 agent 认 | 起跑之前 | 补上的那一段有自证与弄坏开关 |
+
+#### 8.9 挂钟、分片、续跑、多机
+
+预计挂钟：超过 2 小时。
+推的（修订 8 树上没量过，基数是修订 6 树上的读数）：拍树与树里 release 编译约 20–40 分钟；第 0、1、2、2b 步约二十分钟；之后第 7 步约 4.1 小时（修订 6 第 6.4 节）是逐行开始之前最长的一段，第 3 步带流三的两项（各约 2.3–2.7 小时）与第 9 步（约 4.1 小时）同它一起跑；第 11–13 步照修订 6 那一趟起跑时的分配推，本机约 9.5 小时、第二台约 7.0 小时（调度记录第 1287 行，本机 5 槽、第二台 3 槽）；第 13 步只在有超时的行时跑。合计约 14–16 小时（推的）；一步接一步、两条线道的跑法推约 34–38 小时（修订 6 第 6.4 节）。实现变了，流三的写数、态数与每态耗时都可能变，这个数只用来排机器，不进任何判据。
+- 分片：第 3、4 步每项、第 10 步每次各一个单元，与第 5、6、7、9 步同时跑（第 8.4 节）；第 11–13 步按行，每行一个单线道驱动，最长先派到空出来的槽（编排器）。第 7 步不分（T 的定义）；流内按态区间切要改装置，不在修订 8。
+- 续跑：同一条命令重起只补没做完的：第 0–10 步按单元（日志记绿、产物在且行数同、单元绿时当场写下的清单 sha256 不变），第 11–13 步按行目录里有没有 `row-result.tsv`。
+- 多机：台数从 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `research/scripts/host-resources.py --json` 现算，不写常量；第 3、9 步分到别的台要补编排器缺的那一段（第 8.4 节），补不上留本机。
+
+#### 8.10 待主 agent 认的几处
+
+1. 树取宣布那一刻的仓（「树丙」），不取旧树换装置（第 8.1 节）。
+2. 第 3–10 步按依赖同时跑，逐行在第 0、1、2、2b、7 步绿之后就起；T 会因同时跑而变长、限时只升不降（第 8.4 节）。
+3. 第 3、9 步分到别的台是可选的，条件是 S17；编排器那一段补不补由执行员报、主 agent 认（H20）。
+4. S14、S15 ①–⑥ 对修订 8 那一趟不设，S15 ④⑤⑥ 的比法改成两趟之间的对照（第 8.6 节）。
+5. 第 2b 步在修订 8 树上现导 E170 坏状态（第 8.4 节）。
+6. 常量分甲乙丙三类，修订 9 由执行员写；乙类改的是 `crates/` 里的装置，在执行员写范围之外，由主 agent 换进仓里，照修订 7 与「主 agent 认定：修订 6 起跑准备交回」第 2 条的做法（第 8.2 节）。
+7. 仓里装置每次起跑、续跑与 Q5 告警自证那次提交都要等于树里那份或只差认过的块（S16 ②、第 8.7 节）。
+8. 修订 8 那一趟只跑第一段，第二段另判（第 8.7 节）。
+9. 宣布行的格式与三条线的回话（第 8.1 节第 1 条）。
+
+#### 8.11 跑之前已经存在的数（这一条修订）
+
+1. **调度记录第 1245–1287 行**（第 36 批一节，派发提示点名的批次）：修订 6 那一趟起跑时的分配与推的挂钟（第一次起本机 2 槽 × 11 线程、第二台 3 槽 × 10 线程，约 13.9 / 12.9 小时；第二次起本机 5 槽 × 6 线程、第二台 3 槽 × 10 线程，约 9.5 / 7.0 小时）；第二台 cargo 缓存缺 `vstd`；第 1280 行「冻结树与工作区的 checker `walk.rs`、`image.rs`、core 8 个文件、`model.rs` 都不同」。影响：只进第 8.9 节挂钟、第 8.6 节运行条件的例子与第 8.2 节「为什么要重取」；没有门槛从这里来。
+2. **修订 6 第 6.4 节步表的挂钟**（18 210、9 698、8 128、718、14 581.558 秒等，本登记里原有）。影响：只进挂钟。
+3. **编排器文件头第 39 行**：「编译 36 秒、O3 33 秒取自第 269 行早先那一份 row-result.tsv」，是修订 6 树上一行的耗时。影响：没有门槛从它来。
+4. **现查今天的仓与修订 6 树**（实现的状态，不是 E171 产物）：仓里装置 sha256 `ab35105f…`，与修订 6 树装置 `67e7a549…` 的 `diff -u` 只一块（`@@ -3475,6 +3475,13 @@`：第 29 批与第 10g 批两块相邻、并成了一块，所以第 8.1 节按打补丁的结果核，不按块数核）；A12 十二项在今天的仓上都成立；十五行在今天的仓与修订 6 树上按名字都取得到、锚点各恰 1 次；`INODE_LEAF_RECORDS` 为 233；装置没有按态区间切的入口；E170 坏状态的模式与种子（E170 第 2 次重跑登记第 830 行）。影响：都是今天的状态，不是拍树那一刻的期望值；H4、H9、H10 在拍树那一刻现取。
+5. **问题单**有 Q6 一行；本登记只管 Q1–Q5（第一节原文）。
+6. **没打开的**：`research/results/` 下任何 E171 产物，`research/target/e171-r1-dumps/` 下任何文件，修订 6 那一趟的序列日志，实验页的结果与结论各节，修订 6 那一趟第 11–13 步的任何读数。
+
+#### 8.12 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/rules/implementation-first.md` 1–20、`.claude/rules/three-way-inference.md` 1–174、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/mutation-sampling.md` 1–96（全文）。
+- 本登记 1–90、289–1431（第 91–288 行是第二节整抄的条款，这一次没重读）；`research/prompts/e171-r1-questions.md` 1–12。
+- `records/2026-10-01-里程碑三形式化接入.md`：`grep -n '^#'` 末 30 行；`grep -n '36\b\|#36\|第 36 批'` 命中行；第 1218–1287 行。
+- 修订 6 草稿 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/`（下写 `<修订 6 草稿>`）：`frozen_tree_lines_revision_6.py` 1–192、`frozen_tree_lines.py` 1–74、`run_segment_one_on_the_revision_6_tree_multi_host.sh` 1–383、`resume_check.py` 1–137、`rows_orchestrator.py` 1–146 与 `grep -n '^"""\|^# \|^def \|^class \|^[A-Z_]* = '` 命中行、第 696–708、717–730 行、`s15_compare.py` 1–40、`check_product.py` 1–30、`s2_compare.py` 1–36；`run_segment_one_on_the_revision_6_tree.sh` 的 `grep -n` 命中行（第 11、23、67、107、113、210、229、230、254、352–382 行）与它前 350 行对多机那份的 `diff`；`exact-reconstruction/frozen_tree_lines_revision_6.py` 对新根那份的 `diff`；`devices/` 两份装置之间的 `diff -u` 与 `fixtures/hunk-b29.diff`、`fixtures/hunk-10g.diff` 的块。
+- 仓里装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs`：第 255–300 行；`grep -n` 命中行（命令行开关第 7449–7477 行、`stream-constants` 的 S1 第 7899–7961 行、第 9797、9808 行）。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/`：`ls`；`row_driver.py` 第 359–392 行与 `grep -n` 命中行（第 17、56、67、235、622、673、709 行等）；`bad_implementation_table.py` 的 `grep -n` 命中行；`o3_bad_image_judge.py` 1–40 与 `base_digest` 命中行（第 59–232 行一带）；`bad-implementations-117.tsv` 头 2 行。
+- `crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs` 第 3435–3470 行与 `grep -n` 命中行（第 1706、2020、3448、3892 行）；`research/prompts/e170-r2-prereg.md` 的 `grep -n 'seed-hex\|种子'` 与 `grep -n 'e170-bad-states-second-run'` 命中行（截到 300 字）；`crates/singlefs-format/src/lib.rs` 第 109–110、375 行（`grep` 命中）。
+- `research/results/` 与 `research/target/e171-r1-dumps/` 一份都没打开，也没 `ls`。
+
+跑过的命令（原样，草稿目录写成 `<草稿目录>`）：
+
+```
+$ wc -l .claude/agent-common.md research/prompts/e171-r1-prereg.md research/prompts/e171-r1-questions.md
+$ grep -n '^#' research/prompts/e171-r1-prereg.md; git log --oneline -5 -- research/prompts/e171-r1-prereg.md; sha256sum research/prompts/e171-r1-prereg.md
+$ ls -la <修订 6 草稿> …; wc -l <修订 6 草稿>/*.py <修订 6 草稿>/*.sh; sha256sum <修订 6 草稿>/*.py <修订 6 草稿>/*.sh <修订 6 草稿>/fixtures/*
+$ sha256sum <修订 6 草稿>/exact-reconstruction/*; diff <修订 6 草稿>/exact-reconstruction/frozen_tree_lines_revision_6.py <修订 6 草稿>/frozen_tree_lines_revision_6.py   # 只差两行路径
+$ diff <(sed -n '1,350p' <单机跑法>) <(sed -n '1,350p' <多机跑法>)
+$ R=records/2026-10-01-里程碑三形式化接入.md; wc -l $R; grep -n '^#' $R | tail -30; grep -n '36\b\|#36\|第 36 批' $R | head -20
+$ sha256sum <仓里装置> research/target/e171-r1-frozen-tree-revision-6/<装置>   # ab35105f…；67e7a549…
+$ python3 -（frozen_tree_lines.GREPS 在仓与修订 6 树上逐项数）   # 两边十二项都成立
+$ python3 -（bad_implementation_table 按名字取十五行、数锚点）   # 仓与修订 6 树上十五行都 ok:1
+$ python3 -（diff -u 修订 6 树装置 对 ab35105f…，按块比 hunk-b29、hunk-10g 的块体）   # 一块 @@ -3475,6 +3475,13 @@
+$ grep -n '"--[a-z-]*"' <仓里装置> …; grep -c 'state-range\|--shard\|--first-state\|--states-from' <仓里装置>   # 0
+$ grep -n 'seed-hex\|种子' research/prompts/e170-r2-prereg.md | cut -c1-300 | head -12
+$ for t in S16 S17 Z8 F10 H1 H12 B1 T1 Y1; do …grep -c… research/prompts/e171-r1-prereg.md; done   # S16、S17、H1–H20 都没用过
+$ TZ=Asia/Tokyo date +%F   # 2026-10-07
+$ sha256sum research/prompts/e171-r1-prereg.md; wc -l research/prompts/e171-r1-prereg.md   # 追加之前
+$ cat <草稿目录>/rev8-part-{1,2,3,4,5,6}.md > <草稿目录>/rev8.md
+$ for part in 1 2 3 4 5 6; do cat <草稿目录>/rev8-part-$part.md >> research/prompts/e171-r1-prereg.md; done   # 分六段追加，每段不超过 150 行
+$ head -n 1431 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1432 research/prompts/e171-r1-prereg.md | cmp - <草稿目录>/rev8.md
+```
+
+追加之前本登记 sha256 `d2c44b97b2be71bf474b6804ac923c649d5758a6d7bc8b5a9ad8ec10613fab11`、1 431 行（末尾是「主 agent 认定：多机跑法交回」）；这一条修订整段先写进设计员草稿目录，再分六段 `>>` 追加，追加后前 1 431 行的 sha256 与追加前整份的相同、`tail -n +1432` 与草稿逐字节一致。
+
+## 主 agent 认定：修订 8 交回（2026-10-07，拍树之前）
+
+设计员报告 `~/.local/share/singlefs/work/e171-r1-final-mainline-revision/report.md`（0585001d…）。主 agent 现核：修订 8 追加在第 1432–1709 行，前 1431 行 sha256 前缀 d2c44b97… 与追加前同，`tail -n +1432` 与草稿 `rev8.md` 逐字节相同。第 8.10 节九条逐条：
+
+1. 树取宣布那一刻的仓（树丙），不取旧树换装置：认。被测实现就是最终主线，这比换装置更贴问题单的字面。
+2. 第 3–10 步按依赖同时跑、逐行在第 0、1、2、2b、7 步绿之后就起：认。限时 T 因此只升不降，与修订 2 第 2.5 节同向（落进「超时」一类的行只会更少），登记照旧把它记成对「超时」一类的放宽。
+3. 第 3、9 步分到别的台：可选，条件 S17；编排器补不补由执行员报（H20），补了再认。
+4. S14 ①–④、S15 ①–⑥ 对修订 8 那一趟不设：认。S14 管 Q5 树对 `4d071c12…`，S15 ①②③ 管修订 6 树怎么由旧树换装置造出来，修订 8 那一趟两样都没有对象，由 S16 ①–④ 接替；S15 ④⑤⑥ 的预言只对同一份实现成立，改成两趟之间的对照产物（第 8.5 节）。修订 6 那一趟的 S14、S15 照旧。
+5. 第 2b 步在修订 8 树上用种子 `85441ae491419411` 现导 E170 坏状态：认（不重导，O3 阳性对照的底态摘要对不上）。
+6. 乙类常量改的是 `crates/` 里的装置，拍树前由主 agent 换进仓里，照修订 7 与「主 agent 认定：修订 6 起跑准备交回」第 2 条的做法，换的改动并进当时最近一批代码轮：认。
+7. 仓里装置每次起跑、续跑与 Q5 告警自证那次提交都等于树里那份或只差认过的块（S16 ②）：认。
+8. 修订 8 那一趟只跑第一段：认；第二段在哪棵树上跑另判，到时交用户。
+9. 宣布行：主 agent 在 `records/2026-10-01-里程碑三形式化接入.md` 写一行，行首固定为「- E171 最终主线拍树宣布（日期）：」；写之前向根环线、删除线两条线要「这一轮已全部合完」的回话：认。
+
+占位 H1–H20（第 8.8 节表）在拍树那一刻由执行员与主 agent 照表填；修订 8 的第 0 步判法、跑法、编排器副本、对照脚本与修订 9 归那时派的执行员。
+
+## 主 agent 认定：`-resume2` 跨机一致对照 S17 停机的处置（2026-10-07，第 11–13 步跑完之后）
+
+1. 现象：单元 `e171-r1-s1-revision-6-r3-resume2-a4` 第 11、12 步 16 行跑完，两份合成产物 `check_product.py rows` 都 `not_ok=[] timed_out=none freeze_checks_clean=True`；跨机对照原产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-rows-cross-host-check-resume2-r6-r3.out` 判 `part=o3 identical=false lines=7645/7645`，其余三格同，停机。
+2. 两边查（执行员报告 `~/.local/share/singlefs/work/e171-r1-cross-host-o3/report.md` 73bf68e4…）：o3.out 的不同只在 `name=state` 行的 `worker=`（冻结执行器 `executor_main.py:51`、`:62` 的 `os.getpid()`）、`name=timing` 行的 `workers=`/`worker_processes=`（`:98`、`:100`，取 `--workers` 与实际进程数）与行序（`:89` `imap_unordered`）；每条 state 行自带 `stream/state/batch`，7035 条三元组无重复；冻结执行器自己的单测（`test_executor_on_synthetic_pool.py:689`）比单进程与两进程时用的就是「去 `time_ns`、`worker` 再排序」。主 agent 手比与执行员独立脚本都得：三键去掉、排序后两台 7645 行相同。判为对照器缺陷（原判据漏了这两样：不带 `_ns` 的调度键与多进程行序；编排器自证的假 o3.out 没有 state 与 timing 行，没抓到），不是两台不一致。
+3. 改法认：另写对照入口 `~/.local/share/singlefs/work/e171-r1-cross-host-o3/cross_host_o3_check.py`（04376c00…，开跑核编排器 7bfbdb84… 的 sha256，前三格调编排器原函数），o3 一格在原去法之后只在点名的行种里去这三个键、按整行排序比多重集；判定字段一个不去（state 行留 34 个键），行数与重复次数照算，所以不是放宽。自证 38 项（含 7 个弄坏开关），主 agent 复跑末行 `自证 38 项，红 0`。遗留：B2、B3 的 `failing_states=` 行内次序没规范化，出错只会判不同、触发停机；这一趟两台都是 `-`。
+4. 新产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-rows-cross-host-check-resume2-r6-r3-2026-10-07.out`（0f260f66…）：`E7RESULT name=verdict cross_host_identical=true row=0 host_of_step_12_row_0=1 host_of_cross_host_row_0=2 parts=4 differing_parts=none`。原产物一字不改、留着。S17 解除。
+5. 第 13 步不起：两份合成产物 `device_exit=253` 都是 0 行（主 agent 现数：第 11 步 2 行、第 12 步 14 行）。作废 Z5 收尾核主 agent 现跑：`row_driver.snapshot_digest('research/target/e171-r1-frozen-tree-revision-6')` = `7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4`，与跑法脚本 `SNAPSHOT_DIGEST` 相同。不再起原编排器那条命令（它会用原去法重做对照、照样停机）。第一段第 11–13 步到此跑完，比对器（`segment_one_comparator.py`）归下一段执行员。修订 8 那一趟用的编排器副本要带上这一处改法（第 8.4 节多机编排）。
+
+## 主 agent 认定：第一段（修订 6 树）比对器交回（2026-10-07）
+
+报告 `~/.local/share/singlefs/work/e171-r1-segment1-comparator/report.md`（48abed08…）。判决行 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out` 第 678 行：`E7RESULT name=verdict q1=jia q3=jia q4_baseline=jia q4_row_242=yi q4_row_269=yi q5_main=jia q5_reverse=jia q5_same_at_both_sampling_points=true a1_baseline_red=0 a8_failing_controls=0 a11_failing_streams=0 z1_differing_files=0 f7=false a1_empty_mutation_red=0 empty_mutation_touched=false`（主 agent 现读）。
+
+1. 比对器六处改动认（判据一字不改）：读 25 列（多读修订 5 第 5.1 节第 5 条加的 `piece_panics`，只描述）；A11 换同值算法（单测拿原写法对拍 4 组首 op × 8 个落地串）；`--dumps-root`、`--product-prefix`、`--product-suffix` 必给、对不上退 2（修订 8 第 8.5 节第 1 条，收严）；补第六节「流三覆盖（O3）」与 F7、第七节 A1 空变异那一半（补登记的量）；`q5_judged` 多带 `judge_panic` 计数（只描述）。改后 `segment_one_comparator.py` 352cd4d4…、`run_directory.py` e4aa151f…、`test_segment_one.py` 5971c63b…。
+2. Q3 的 c：比对器只数有 panic 的流二得 12，连流一算 13；问题单 Q3 的翻面观测是「自崩前可判的调用数为 0」，两种读法都判甲，两个数并列记、不择一。分母 D 要第二段。
+3. 还欠、下一段补：第六节 Q4-（ii）逐态清单与第八节 Q4、Q5 轨迹比对器不出；`q5_verdict` 在 L 态全弃权或 `judge_panic` 时报 `not_enough`，登记写的是 F8，改成登记的名字（这一趟两点都有红、到不了那一支，判定不受影响）。
+4. 实验页影响的决策表：D13（验证路线） 已定项 1、D23（journal 的角色与格式） 已定项 14 由「不影响」改「备料」认（备料不确立任何分项）；D13 已定项 6 的「**依据**」段引不引这一趟、Q1、Q3、Q4 的判定撑不撑哪条分项，是推论，归结论三方，不在这一节定。
+5. Q5 照数是甲，作数要等提交时的告警自证（U1–U9、U13–U16 与两条原有内联用例绿，V17–V31、V33–V36 全抓），在那之前实验页写「跑了，待告警自证」。
+
+## 主 agent 认定：第一段（修订 6 树）Q5 告警自证（2026-10-07）
+
+修订 6 第 6.6 节要的告警自证由主 agent 带 `SINGLEFS_HEAVY_TESTS=user-request` 提前跑（用户 2026-10-07「把能做的往前做」），单元 `e171-q5-alert-selfproof`，日志 `~/.local/state/singlefs/detached-runs/e171-q5-alert-selfproof/log`，原样：`仓里装置 sha256：ab35105f861d509457296741d2c60515a3a94b9fefe77944f03d1b358afd45df`（即「主 agent 认定：修订 6 起跑前仓里装置与写法偏离」第 1 条认的那一份）；装置内联用例 `test result: ok. 60 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 32.75s`（含 U1–U9、U13–U16 与两条原有内联用例）；`crates/mutations.tsv` 全部 49 行「E171R1 装置」（含 V17–V31、V33–V36）`计数：抓到 49 条、没红 0 条、无效 0 条、内存撞顶 0 条、超时 0 条、被总上限挤掉 0 条、排不上没跑 0 条、scope 起不来没跑 0 条（共 49 条）`、`基线：…结果是 ok 的 49 行，基线不绿 0 行`。Q5（修订 6 那一趟）由「跑了，待告警自证」改记作数：主取样点与反向取样点都判甲（比对器判决行 `q5_main=jia q5_reverse=jia q5_same_at_both_sampling_points=true`）。提交时这两样照旧在 checker 档复跑；那时仓里装置若已不是 ab35105f…（修订 8 乙类常量换进去之后），以那一次为准另记。
+
+## 主 agent 认定：第二段整表多机跑法交回（2026-10-07，第二段任何行之前）
+
+报告 `~/.local/share/singlefs/work/e171-r1-segment2-multi-host/report.md`（25be8c55…）。入口 `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/run_segment_two_on_the_revision_6_tree_multi_host.sh`，编排 `rows_orchestrator_segment_two.py`（新的一层，按路径载入第一段编排器 7bfbdb84… 并先核 sha256，第一段编排器一个字节不改）。第 8 节九条：
+
+1. 另写一层、不改第一段编排器：认（只改跑法；`cross_host_o3_check.py` 与 `replay.sh` 钉着它的 sha256）。
+2. 超时重跑：主 agent 派发写错，以登记为准——第 801 行「第二段照原登记读法 5 与补位规则，不重跑」。第二段的判定只读整表那一份产物；跑法里那趟超时重跑若跑出产物，只留档、不进比对器、不改任何一行的读法 5 归类。
+3. 补位由编排层传排除表、整表做完再核一遍撞名（行号小的留、大的重做）：认（只改跑法）。
+4. `check_product.py` 新加子命令 `rows_without_executor`（补位补不上的四类不算红，包装自己的结局 250–252、254 照 `rows` 算红、判过才装产物），原 `rows` 一字不动：认。
+5. 装置内存上限：沿用第一段每行的 6G，不改 4G（只影响撞包装上限那一类，6G 让 Z3 更少）。
+6. 起跑时放不下的台每 600 秒重查、放得下就加槽：认（只改跑法）。
+7. 续跑前核 13 个输入文件 sha256：认（收严）。
+8. 跨机对照取第 201 行，不跑执行器，o3 一格报 `not_run`：认（只改跑法）。
+9. s4 的计时只用来排派发先后，不进任何判定：认。
+
+T = 75.274 秒，出自 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-s2-device-baseline-streams-1-2-r6-r3-timing.out` 第 25 行 `E7TIMING name=process_wall seconds=75.274 exit=0`；每行限时 max(1800, ⌈3T⌉) = 1800 秒。编排器自证孤儿：新层把自己设成收养者、收尾收掉并数遗留，弄坏开关 `sweep-skipped` 证红，5 轮各 `自证 46 项，红 0`、`ps` 遗留 0；两份自证主 agent 照报告第 9 节原文登记进 `.claude/hooks/selftest-registry.tsv`（light）。
+
+## 主 agent 认定：第二段（修订 6 树）比对器交回（2026-10-07）
+
+报告 `~/.local/share/singlefs/work/e171-r1-segment2-comparator/report.md`（835e6468…）。判决行 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s2-comparator-r6.out`（74f3582f…）第 450 行（主 agent 现读）：`E7RESULT name=verdict q2=yi q2_set_rows=7 q2_o1_red_rows=2 d_registration_batch_1=39 d_registration_batch_2=35 d_original_reading_5_batch_1=38 d_original_reading_5_batch_2=34 row_125_counted_registration_batch_1=true rows_read=281 table_rows=281 rows_not_located=107,168 unstable_memory_objects=0 …`。
+
+1. 新写 `segment_two_comparator.py`（3dd9a11b…）、单测 17 条、研究一侧变异表 28 条全抓，第一段比对器不动：认。基线取修订 6 第 1 步 S2 新装置基线（修订 6 第 6.1 节末表那一格）：认。
+2. 第 85、235、272 行（两条流都 `pipeline_panicked`、`calls=0`）记自崩、不进分母：认；没有导出可比，另一读法 D 也不变。
+3. 第 107、168 行（变异名在冻结树行表里命中 0 次）记读法 5 的「找不到」、不进分母：认（读法 5 原文列了这一类）；按组内下标补位那一读法要改驱动、重跑，不采。
+4. `untouched_rows_with_a_red_column=2` 是第 155、161 行（O1-对拍红的两行），描述量，不是失败计数。
+5. 修订 6 那一趟 Q1–Q5 都够判（Q1 甲、Q2 乙（集合 7 行即 C672 点名的第 49、110、155、161、162、174、252 行，O1-对拍红 2 行）、Q3 甲且 D = 39（另三种算法 38、35、34 并列）、Q4 基线甲与第 242、269 行乙、Q5 甲），照第十一节「够判停机」停下，附带量够判后不跑。这些判定撑不撑、推不推翻哪条决策分项，归结论三方，主 agent 定在修订 8（最终主线）那一趟跑完之后一并开，两棵树的读数并排进同一轮材料，不为修订 6 单开一轮。
+
+## 主 agent 认定：修订 8 装置准备交回（2026-10-07，拍树之前）
+
+报告 `~/.local/share/singlefs/work/e171-r1-revision-8-prep/report.md`（ad81426e…）。装置在 `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/` 下名字带 `revision_8` 的几份（sha256 见报告第二节）；修订 6 树上干跑：S16 ① 照预期触发（树对今天的仓差 140 个文件）、S16 ②③、A12 12 项、H7、H8、Z5 过，S16 ④ a、b、e 因还没宣布行与修订 9 不过（照预期）；PLAN_ONLY 没写任何产物。五份自证各 5 轮红 0，单测 26 条、研究一侧变异 26 条全抓。第六节 12 条：
+
+1. H20 = 不补，第 3、9 步留本机：认。
+2. 第 9 步 Z1、第 10 步 Z7 各拆一个小单元（判法一字不动）：认。
+3. 没做完的单元下游一并重跑（带 -attempt<N>）：认（收严）。
+4. S15 ④⑤⑥ 的比法挪进对照脚本、两趟判定都写完之后出：认，照第 8.5 节时点（第 8.4 节那一处的时点以第 8.5 节为准），对照产物不进任何判定。
+5. 逐行编排外层每 600 秒重查、可给已有槽的台加槽：认（只改跑法）。
+6. 第 4 步每项各用自己的工作根冷编、单元额度另加编译 3 GiB：认（只改跑法）。
+7. 每个单元 10 线程（修订 6 跑法第 54 行；T 的定义与修订 6 读数都在 10 线程上）：认。
+8. H11 比对器无逐字节记录、`run_directory.py` 已变（a9abba32… → e4aa151f…），研究一侧变异表这一趟必排：认（照实）。
+9. 第 11–13 步不用 RESUME_TAG、续跑由编排器按行目录补：认。
+10. `s2_compare.py`（8ca65475…）、`s15_compare.py`（346fcc2e…）仍按路径用修订 6 草稿 `~/.local/share/singlefs/work/e171-r1-segment1-rev6/` 那两份，开跑核 sha256：认；该目录与 `~/.local/share/singlefs/work/e171-r1-revision-8-prep/fixtures-revision-8/` 在修订 8 那一趟跑完、结论三方判完之前不删。
+11、12：git 索引与 .pyc 的说明，记下，不另处置。
+
+主 agent 另做：五份自证照报告第八节登记进 `.claude/hooks/selftest-registry.tsv`（light，第 49–53 行）；`research/scripts/replay.sh` 追加 `E171|@driver_e171_r1_s1_revision_8_tools_research_mutations||…-2026-10-07-s1-revision-8-tools-research-mutations-2026-10-07.out|exact` 与驱动函数，主 agent 照它的口径单跑一次，输出与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。
+
+### 修订 10（设计员，2026-10-08；批次 `records/2026-10-01-里程碑三形式化接入.md#36`；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers H21 H22 H23 H24 H25 H26 H27 H28 H29 -->
+
+**编号**：现有最大是修订 8（`grep -n '^### 修订'`）。修订 9 已由修订 8 第 8.2 节留给修订 8 那一趟的执行员（本地常量与行号，只抄），第 8.1、8.7、8.8 节与「主 agent 认定：修订 8 交回」都按这个名字引它；这一条取修订 10，不占那个名字。
+**时点**：修订 8 树还没拍（第 8.1 节的宣布行还没有），修订 8 那一趟的产物一份都没有；修订 6 那一趟第一段、第二段都已跑完，主 agent 认定五行够判（「主 agent 认定：第二段（修订 6 树）比对器交回」第 5 条）。本设计员没打开任何一份 E171 产物与导出（第 10.11 节）。
+**依据**：用户 2026-10-07 弹窗定：E171 最终主线那一趟（修订 8）「也跑第二段」（主 agent 派发转达，批次 `records/2026-10-01-里程碑三形式化接入.md#36`）。它改的是修订 8 第 8.7 节「够判停机」那一句（「修订 8 那一趟只跑第一段：Q2 的集合与 Q3 的分母照写「还差第二段」；第二段在哪棵树上跑不在修订 8 里，交主 agent 另判」）、第 8.10 节第 8 条与「主 agent 认定：修订 8 交回」第 8 条（「修订 8 那一趟只跑第一段：认；第二段在哪棵树上跑另判，到时交用户」）：第二段整表加进修订 8 那一趟，在修订 8 树上跑。
+**原判据原样保留**：第一至十一节、修订 1–8 与其后各条「主 agent 认定」一个字不改；修订 6 那一趟的第二段（产物、判定、跑法文件）不碰。下面只写修订 8 那一趟里第二段怎么跑、怎么比、怎么判作数；判据（第六节 Q2-集合、Q2-判、Q2-观测、Q2-七行、Q3-分母，读法 4、5，补位规则）一个字不改。
+
+| 件 | 改了什么（相对修订 8 与修订 6 第二段） | 收严 / 只改跑法 |
+|---|---|---|
+| 10.1 | 树取修订 8 树（H3），不另拍；第二段的 T 取修订 8 那一趟第 1 步绿的那一次的进程挂钟；基线取第 1 步，稳定性基线取第 7、9 步 | 只改跑法（树、T、基线换成这一趟的，取法是修订 2 第 2.5 节与比对器认定的原文） |
+| 10.2 | 跑法照修订 6 第二段与「主 agent 认定：第二段整表多机跑法交回」九条；另写一层编排，不改修订 6 第二段那两份文件；别的台落点改名；每行另核 H8 | 只改跑法；每行核 H8 收严 |
+| 10.3 | 与第一段同时跑：逐行在第 0、1、2 步（与研究一侧变异表，排了的话）绿之后就起；别的台先用，本机等第 7 步绿；认停派文件 | 只改跑法；停派文件与本机闸收严 |
+| 10.4 | 比对器照修订 6 第二段那一份的判法与三处读法，输入换成这一趟的 | 不收不放 |
+| 10.5 | 两趟第二段读数并排出 `role=contrast`，谁也不进谁的判据 | 不收不放（描述量） |
+| 10.6 | 占位 H21–H29 | — |
+| 10.7 | 作废、停机、运行条件逐条写对这一段适用不适用 | 不收不放；S17 两处触发同一后果，见那一节 |
+| 10.8 | 作数与够判：Q2、Q3 分母在修订 8 那一趟由这一段补齐 | 第 8.7 节「够判停机」那一句换掉（依据是用户定案）；作数条件收严（多第二段自己的几样） |
+
+**每件量什么、为哪一判、量到哪算够**（对问题单哪一行）：
+
+| 件 | 量什么 | 为哪一判 | 量到哪算够 |
+|---|---|---|---|
+| 10.1–10.3 | 整表 281 行加补位，流一、流二，批 1 批 2 的逐行读数（触达、交回值与内存对象摘要、O1-对拍、自崩、读法 5 各类） | Q2（集合与 O1-对拍红不红）；Q3（分母 D） | 1–281 每一行有 `row-result.tsv` 或落进读法 5 的一类；合成产物过 `check_product.py rows_without_executor` |
+| 10.4 | 比对器的 Q2-集合、Q2-判、Q2-观测、Q2-七行、Q3-分母 | Q2；Q3 分母 | 判决行写出 `q2=` 与 D 的四种算法 |
+| 10.5 | 两趟同名读数并排 | 不对应任何一行的判定（同一问题在两棵树上判得同不同） | 两趟第二段比对器都写完之后出一份 |
+
+#### 10.1 树、T 与基线
+
+- **树**：修订 8 树（第 8.1 节，`research/target/e171-r1-frozen-tree-final-mainline/`，快照摘要 H3），与修订 8 第一段同一棵（修订 6 第 6.3 节说的「树丙」），不另拍。每行照驱动原有的做法从这棵树拷、改坏、编。读法 10 与作废 Z5 的「登记的那棵冻结树」对这一段同样读作修订 8 树；树里 `crates/mutations.tsv` 等于 H8（第 8.6 节给 Z5 的加项；逐行驱动从树里读这张表取坏实现行与补位行，`row_driver.py` 第 709 行）。
+- **T**：修订 2 第 2.5 节第二段那一句「T 取新树上 S2 那一趟新装置基线（`--streams 1,2`、不带探针）的进程挂钟」，落到修订 8 那一趟就是**第 1 步**（单元 `step-1`，`baseline --streams 1,2`，`segment_one_unit_revision_8.sh` 第 127–129 行）绿的那一次：计时产物 `<H16 前缀>-s2-device-baseline-streams-1-2<TAG>-r8-timing.out` 里那一行 `E7TIMING name=process_wall seconds=…`，下称 T₂。`<H16 前缀>` 是 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<H16 的 RUN_DATE>-s1`；`<TAG>` 空着，或那一单元重跑过时序列日志记绿的那一次的 `-attempt<N>`。逐行限时 max(1800, ⌈3 × T₂⌉) 秒，由驱动照 `--baseline-timing` 现算（修订 2 第 2.5 节原文）。
+  - 不取第 7 步的 T（H13，第一段逐行用的那个）：修订 2 第 2.5 节把两段的 T 分开写，第二段只跑流一、流二、不带探针，同一组 `--streams` 的是第 1 步。
+  - 进程挂钟包住各流 `elapsed_ns` 之和才算（修订 2 第 2.5 节），包不住就不起第二段、交主 agent。
+  - T₂ 不受第二段影响：第二段在第 2 步绿之后才起（第 10.3 节），第 1 步跑的时候第二段一行都还没有。
+- **基线**（比对器用，第 10.4 节）：Q2 比的基线是第 1 步那一趟的导出 `<H16 导出根>/s2-device-baseline-streams-1-2<TAG>`（「主 agent 认定：第二段（修订 6 树）比对器交回」第 1 条「基线取修订 6 第 1 步 S2 新装置基线」，换成这一趟的第 1 步）。读法 4「基线连跑两次摘要不同的对象从比较里拿掉」用的稳定性基线，照比对器文件头（`segment_two_comparator.py` 第 8–10 行）取这一趟第 7、9 步两次三流带探针的基线导出 `<H16 导出根>/baseline-run1<TAG>`、`<H16 导出根>/baseline-run2<TAG>`，只比流一、流二。
+- 第 1 步若在第二段起了之后又重跑（新的 `-attempt<N>`）：T₂ 与基线都换了来源。第二段的输入清单里有 T₂ 那份计时产物（第 10.2 节表第 7 条），下一次起跑或续跑核清单就停；已跑的行不与新 T₂ 下跑的行合进一份产物，交主 agent 定（整表另起后缀重跑，或另判）。
+
+#### 10.2 跑法
+
+**照修订 6 第二段**（第五节 5.5 表「第二段」那一行、第 5.3 节「第二段的行导出判完即删」、修订 2 第 2.5 节、修订 6 第 6.6 节末条），一个字不改的几样：
+- 行集是两张坏实现表的整表编号 1–281，加读法 5 的补位（原登记 5.2 的补位规则）；不跑空变异（第二段登记里没有）。
+- 流一、流二，批 1、批 2；不跑执行器（`--no-executor`），不带探针；不带 `--keep-dumps`（驱动删三个大文件、留判定表与 `manifest.tsv`）。
+- 读法 5：编不过、锚点不唯一、找不到、超时不进分母；「实现自崩」照第 1 次重跑收窄过的那一句；补位照原登记的规则。
+- **第二段不重跑超时的行**：修订 2 第 2.5 节，本登记第 801 行「第二段照原登记读法 5 与补位规则，不重跑」。编排层那一趟超时重跑若跑出产物，只留档，不进比对器，不改任何一行的读法 5 归类（「主 agent 认定：第二段整表多机跑法交回」第 2 条）。
+
+**多机编排照「主 agent 认定：第二段整表多机跑法交回」九条**，逐条：
+
+| 条 | 修订 6 那一趟 | 修订 8 那一趟 |
+|---|---|---|
+| 1 | 另写一层 `rows_orchestrator_segment_two.py`，按路径载入第一段编排器 `7bfbdb84…`、核 sha256，第一段编排器不改 | 同一个做法再另写一层（下称「第二段·修订 8 编排层」）：按路径载入 `rows_orchestrator_segment_two.py`（`132731f8…`）并核 sha256，它照旧载入 `7bfbdb84…`。`rows_orchestrator_segment_two.py` 与入口 `run_segment_two_on_the_revision_6_tree_multi_host.sh`（`c582ee61…`）一个字节不改：修订 6 那一趟的输入清单记着前者，入口里树、摘要、T、变异表都写死成修订 6 树的值。新层只改下面「这一趟改的几处」，形态照 `rows_orchestrator_revision_8.py` 对第一段编排器的做法（覆写模块里的落点常量、加每行前后的核对、认停派文件），配自证与弄坏开关 |
+| 2 | 超时重跑只留档 | 照旧 |
+| 3 | 补位排除表由编排层传、整表做完再核撞名（行号小的留、大的重做），出 `rows-substitution-coordination` 产物 | 照旧 |
+| 4 | `check_product.py rows_without_executor`，原 `rows` 不动 | 照旧（同一份 `check_product.py`，`93c80a12…`，不改） |
+| 5 | 装置内存上限 6G | 照旧 |
+| 6 | 起跑时放不下的台每 600 秒重查、放得下就加槽；已有槽的台不增不减 | 照旧，另加第 10.3 节的本机闸与停派文件 |
+| 7 | 续跑前核 13 个输入文件的 sha256 | 照旧，清单换成这一趟的：基线计时换成 T₂ 那一份，树里的变异表等于 H8，另加新层文件与 `rows_orchestrator_segment_two.py`；清单记进 H26 |
+| 8 | 跨机对照取权重最接近 1 的那一行（那一趟是第 201 行），不跑执行器，o3 一格 `not_run` | 照旧的取法，按这一趟现算的权重取，不写死第 201 行；产物 `<H23 前缀>-rows-cross-host-check-r8.out` 的 verdict 行是 S17 在这一段的触发观测（第 10.7 节） |
+| 9 | s4 的计时只排派发先后，不进任何判定 | 照旧 |
+
+**这一趟改的几处**（只改跑法）：
+- 树、快照摘要（H3）、T₂ 那份计时产物（H21）、树里变异表的 sha256（H8）、产物前缀与后缀、导出根、日志目录、工作根（H23），从修订 8 那一趟的占位配置与序列日志读，不写死。
+- 每行前后（编排器起驱动之前、收尾之后核 Z5 的那两处）另核树里 `crates/mutations.tsv` 等于 H8，不等记作废 Z5、停（第 8.4 节步表末行对第一段是同一条）。
+- 别的台的落点与标签另起名（H24）：不与修订 6 第二段用过的（`research/e171-s1-peer-kit`、`research/e171-s1-frozen-snapshot`、`research/target/e171-s1-peer-out`、`research/e171-s2-launch`，标签 `e171s2-` 起头）同名，也不与修订 8 第一段的（H18：`research/e171-s1-final-peer-kit`、`research/e171-s1-final-frozen-snapshot`、`research/target/e171-s1-final-peer-out`，标签 `e171s1r8`）同名。两段要在同一台上同时跑，同名就会互相盖掉或删掉对方的工具包与树（「主 agent 认定：多机跑法交回」第 6 条记的共用脚本缺口：等不到结局退 255 时不先取回就删树）。
+- 本机闸、让路与停派文件（第 10.3 节第 2–4 条）。
+
+#### 10.3 与第一段的次序与资源
+
+**依赖**（只看谁读谁的输出）：
+
+| 第二段的哪一件 | 要谁先绿 | 凭什么 |
+|---|---|---|
+| 逐行（编排层起第一行） | 修订 8 那一趟第 0、1、2 步；研究一侧变异表那一单元（第 0 步判 `research_side_differs=true` 而排了的话） | 第 0 步核树（H3、S16 ①③）、树里变异表（H8）、A12（S12）、`stream-constants`（S1）与 S3、S11 自检；第 1 步给 T₂；第 2 步是 S2（流一、流二与 E170 导出装置是不是同一份，这一段只跑这两条流）。研究一侧变异表核的是驱动与比对器的判别力，第一段逐行等它（`segment_one_units_revision_8.py` 文件头「单元」末句），第二段用的是同一份驱动 |
+| 不等的 | 第 2b 步；第 3–6、8、10 步；第 11–13 步 | 第二段不跑执行器、不跑 Q5、不读这些步的任何产物（第 2b 步只给 O3 阳性对照） |
+| 比对器 | 第 1 步；第 7、9 步与 `step-9-z1`；第二段整表、补位核对、跨机对照都过 | 基线与稳定性基线（第 10.1 节）；Z1 不过时两次三流基线作废，稳定性比较没有依据 |
+| 作数 | 第 0–10 步全部单元绿 | 第 10.8 节 |
+
+**能不能与第一段第 3–13 步同时跑**：能，逐行在上表第一行那几步绿之后就起。凭的是读写不相交：第二段每一行只读冻结树（H3，每行前后核）、树里变异表（H8，每行前后核）、两张行表与研究一侧几份文件（输入清单 H26）和 T₂ 那一份计时产物，第 3–13 步写的产物与导出一份都不读；它写的东西放在自己的导出根与 `-s2` 前缀下（H23），第一段的单元、逐行与比对器都不读（第一段比对器只认自己的前缀与导出根，修订 8 第 8.5 节第 1 条）。所以先跑后跑都不改第二段任何一行的读数，也不改第一段的。
+
+**资源怎么排**（只改跑法；三层各自照现查分配：修订 8 的单元编排、修订 8 的逐行编排、第二段·修订 8 编排层）：
+1. **别的台**：上表第一行那几步绿就起。第 0–10 步只在本机跑（H20 = 不补，「主 agent 认定：修订 8 装置准备交回」第 1 条），第 11–13 步在第 7 步绿之后才起（第 8.4 节「次序」第 4 条）；这一段时间（推约 4 小时，第 8.9 节）别的台在第一段里空着，第二段先用它。
+2. **本机**：第 7 步绿、修订 8 的逐行编排起了之后，第二段才在本机加槽（经编排层原有的每 600 秒重查）。两个理由：
+   - 修订 8 的单元编排在逐行编排起来之前按起跑那一次现查的余量自己记账，起单元之前不再现查本机（`segment_one_units_revision_8.py` 第 19、22 行）；第二段在那之前占了本机，它会照旧余量起单元，本机就超额。逐行编排起了之后它每起一个单元都现查，看得见第二段的槽。
+   - 第一段逐行的 T 是第 7 步的进程挂钟（H13）。第二段在本机与第 7 步同时跑会把它拉长，第一段逐行限时跟着放宽；第 3–10 步同时跑已经朝这个方向放宽过（「主 agent 认定：修订 8 交回」第 2 条认了），第二段不再往上加。
+3. **让路**：第 7 步绿之后，第一段逐行（第 11–13 步，每行推约一个 T）是这一趟的长杆；第二段每行推的只有几分钟（修订 6 那一趟 T = 75.274 秒，限时取了下限 1800 秒）。第一段先拿槽：修订 8 的逐行编排还有排着、放不下的行时，第二段不在那一台起新行，在跑的跑完。编排层补得上就补（照编排器已有的写法配自证与弄坏开关）；补不上，两层各按现查分配、谁先占谁先用，交回写明（H27）。让不让路只动挂钟，不动任何读数。
+4. **停派文件**：修订 8 的单元编排在第 0–10 步某个单元红时写 `<H16 日志目录>/stop-dispatching-rows`（`segment_one_units_revision_8.py` 第 76 行；第 8.4 节「次序」第 5 条）。第二段见到它同样不再派新行，在跑的跑完再停；那时第 10.8 节的作数条件已经不成立，再派只是白跑。已落的行原样留着，主 agent 处置之后同一条命令续跑。
+5. **同一刻下判**：几层在同一刻现查同一台，看到的余量是同一份，可能一起超额。`host-resources.py` 的内存余量减掉了内存包装账上在跑的那几截（文件头「内存」一条），起跑之后互相看得见，超额只出在「定了分配、包装还没记账」那一小段。撞上了的结局是包装自己的退出码，照作废 Z3 办（第 10.7 节），不会变成悄悄错的读数。不另设锁。
+
+#### 10.4 比对
+
+- **比对器**：`segment_two_comparator.py`（`3dd9a11b…`）照「主 agent 认定：第二段（修订 6 树）比对器交回」那一份的判法，一个字不改。要改（例如读不了修订 8 那一趟的导出）先交主 agent；改了的那一份重跑它的单测与研究一侧变异表，新产物带 `-r8`。
+- **输入**（只换成这一趟的，H22、H23）：`--baseline` 第 1 步导出；`--stability-baseline` 第 7、9 步导出（只比流一、流二）；`--rows-root` 第二段的行输出根；`--driver-product` 第二段合成产物；`--mutations-table` 树里的 `crates/mutations.tsv`（H8）；`--dumps-root` 第二段的导出根与 H16 的导出根；`--product-prefix`、`--product-suffix` 第二段的。给到修订 6 那一趟的任何路径，比对器退 2、不写产物（它的文件头末段）。
+- **三处读法**（那一条认定第 2–4 条；写成规则，不写成修订 6 树上的行号，哪几行落进去在修订 8 树上现判、逐行列出）：
+  1. 两条流都是 `pipeline_panicked`、`calls=0` 的行：记自崩、不进分母；没有导出可比，另一种读法的 D 也照这样算。
+  2. 变异名在树里那张行表（H8）里命中 0 次的行：记读法 5 的「找不到」、不进分母；不按组内下标补位（那要改驱动、重跑；第 8.3 节表「十五行锚点」那一行同一个理由：重新取锚是换了一行坏实现，是新实验）。
+  3. 判决行里的 `untouched_rows_with_a_red_column` 是描述量（未触达而某一列红的行数），不是失败计数。
+- 那一条认定第 1 条（基线取第 1 步 S2 新装置基线）落到这一趟见第 10.1 节。
+- **Q3 的 D**：判定用登记的算法、批 1 那一个数；原登记读法 5 的算法与两种算法在批 2 上的数并列报（第六节 Q3-分母，第八节「Q3 的分母」）。第 125 行在批 1、批 2 上计不计入都报。Q3 的甲乙（第 125 行的 c）出自第一段比对器，这里不重判。
+
+#### 10.5 两趟第二段读数的对照
+
+照修订 8 第 8.5 节的形态：
+1. **两趟各自出判定**。修订 6 那一趟第二段已写完（「主 agent 认定：第二段（修订 6 树）比对器交回」；拿来对照的产物与导出由主 agent 填 H28）；修订 8 那一趟第二段由第 10.4 节的比对器写。比对器不读另一趟的任何产物。
+2. **两份判定都写完之后另出对照**：新产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s2-contrast-revision-6-against-revision-8.out`，每行带 `role=contrast`，没有 `name=verdict` 行，由另一份对照脚本写（比对器不引它）。第一段那份对照脚本 `contrast_revision_6_against_revision_8.py`（`8bfeddb2…`）不改，它的 sha256 记在 H17 里。逐格并排：
+   - Q2：两棵树各自的集合（行号）、n、r、`q2=` 判定；集合里每一行每次交回值或内存对象不同的调用：哪几个顶层字段不同、哪个内存对象不同、胶水造出的观测同不同、O1-对拍判定；C672 七行（第 49、110、155、161、162、174、252 行）逐行；
+   - Q3：两棵树各行在登记算法与原登记读法 5 算法、批 1 与批 2 上的类（比对器 `CATEGORY_ORDER` 那几类），四个 D，第 125 行计不计入；
+   - 两棵树之间类变了的行、触达与否翻了的行、补位各用了哪一行；
+   - 两趟各行装置那一步的耗时，按台分开。
+   - 两棵树的逐文件差表不另出，引第一段对照产物里的 `name=contrast_tree_file` 那几行。
+3. **谁也不进谁的判据**。对照产物里任何一格不改任何一趟的判定、不触发任何条款。两趟判得不同的那一行，问题单 Q2、Q3 那一行把两个判定并列写、各带树名（快照摘要），不合成一个；差别出自哪一次合入是推论，要用就另走三方（照那一条认定第 5 条：两棵树的读数并排进同一轮结论三方的材料）。
+
+#### 10.6 拍树那一刻之后才知道的值（占位表，接 H20 往下）
+
+形态同第 8.8 节：现在不写数，只写占位；在下表的时刻填进这一段的配置与日志，主 agent 认过才起跑。
+
+| 占位 | 是什么 | 谁填 | 什么时候填 | 填之前核什么 |
+|---|---|---|---|---|
+| H21 | T₂：第 1 步绿的那一次的 TAG、计时产物路径与 sha256、`process_wall` 秒数、逐行限时 | 编排层入口从修订 8 那一趟的序列日志现取，写进第二段日志与输入清单 | 第 0、1、2 步绿之后、第二段第一行之前 | 进程挂钟包住各流 `elapsed_ns` 之和；序列日志里 `step-1` 绿行的 TAG 与产物名对得上 |
+| H22 | 比对器的三份基线导出目录（第 1、7、9 步绿的那一次） | 接第二段比对的执行员 | 比对之前 | 三个目录都在 H16 导出根下，TAG 与序列日志里各自的绿行对得上；`step-9-z1` 绿 |
+| H23 | 第二段的 `RUN_DATE`、产物前缀（`…-<RUN_DATE>-s2`）与后缀（`-r8`）、导出根、行输出根、日志目录、工作根 | 主 agent | 起跑时 | 不与修订 6 第二段（导出根 `research/target/e171-r1-dumps/revision-6-segment-2`、后缀 `-r6`）、修订 8 第一段（H16）的任何一个撞名 |
+| H24 | 别的台的四个落点（工具包、冻结树快照、取回目录、起法目录）与标签前缀 | 执行员 | 写跑法时 | 与修订 6 第二段、修订 8 第一段（H18、`e171s1r8`）的都不同名 |
+| H25 | 第二段·修订 8 编排层、入口、对照脚本（比对器改了的话连它）的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | `bash research/scripts/detached-run.sh long-run-check -- <起法>` 退 0；各自的自证绿，每个弄坏开关红在点名格 |
+| H26 | 第二段的输入清单（文件与 sha256） | 编排层入口在第一趟开跑那一刻写下 | 第一行之前 | 续跑先核，对不上就停 |
+| H27 | 让路（第 10.3 节第 3 条）补没补上 | 执行员写，主 agent 认 | 起跑之前 | 补上的那一段有自证与弄坏开关 |
+| H28 | 修订 6 那一趟第二段拿来对照的产物与导出（比对器产物、合成产物、行输出根、前缀与后缀） | 主 agent | 出对照产物之前 | 文件都在，sha256 记下 |
+| H29 | 各台槽数与每槽线程（第二段编排层） | 编排层 | 每次起跑、续跑、加槽 | 现查 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts` 与 `research/scripts/host-resources.py --json`，不写常量 |
+
+#### 10.7 作废、停机、运行条件（沿用第 8.6 节与修订 6 第二段，逐条）
+
+原文都不动；「登记的那棵冻结树」读作修订 8 树。「经第 N 步」指那一条由第一段那一步判，那一步绿是第二段起跑的前提（第 10.3 节）或作数的前提（第 10.8 节）。
+
+| 条款 | 对第二段 | 怎么读、为什么 |
+|---|---|---|
+| Z1 | 适用（经 `step-9-z1`） | 稳定性基线是第 7、9 步那两次；Z1 不过，比对器不起 |
+| Z2、Z4 | 不适用 | 不跑执行器，没有 O3 列 |
+| Z3 | 适用 | 照修订 6 第二段的接法：驱动对包装自己的结局重跑一次，仍撞（250–252、254）的行 `check_product.py rows_without_executor` 判红、合成产物不装，交主 agent（`check_product.py` 第 16 行；「主 agent 认定：第二段整表多机跑法交回」第 4 条）。253 是限时到点，照读法 5 记超时、不重跑（第 801 行） |
+| Z5 | 适用 | 入口每次起跑、续跑核快照摘要等于 H3；编排层每行前后核摘要与树里变异表等于 H8 |
+| Z6 | 适用 | 驱动退 5 的行；比对器判决行 `rows_compiled_without_the_rebuild_check` 不是 0 |
+| Z7 | 不适用 | 管 Q5 主取样点两次 |
+| S1 | 适用（经第 0、1 步） | 本地常量在基线那几趟回比；第 0 步 `stream-constants`、第 1 步基线不过，第二段不起 |
+| S2、S6 | 适用（经第 2 步） | 第二段只跑流一、流二 |
+| S3 | 适用（经第 0 步 S3 自检） | — |
+| S5 | 适用 | 逐行装置记下的 O1 不适用来源只许读法 6 那三处；比对器那一侧的两个行数 |
+| S7 | 不适用 | 没有 O3 列 |
+| S8、S9 | 适用 | 每行照算 O1-模型崩溃判官与 RefFS 一票；行号与映射照修订 9 |
+| S10、S11 | 不适用 | 不带探针 |
+| S12 | 适用（经第 0 步 A12） | — |
+| S13 | 不适用 | Q5 |
+| S14、S15 ①–⑥ | 不设 | 同第 8.6 节 |
+| S16 ①③④ | 适用（经拍树前核对与第 0 步） | — |
+| S16 ② | 第二段自己的起跑、续跑不核 | 仓里装置不进第二段任何一行（行从树里拷、编）与比对器；S16 ② 管的是 Q5 告警自证那次提交用的装置（第 8.1 节末条）。第一段起跑、续跑照核。触发时整趟先不作数（第 10.8 节），等主 agent 照第 8.1 节末条另立认定把多出来的块记成已知差额，或另判；第二段在跑的行不读仓里装置，不因它停 |
+| S17 | 适用 | 两处触发观测：第一段 `<H16 前缀>-rows-cross-host-check-r8.out` 的 verdict 行（与第 9 步那一处，第 8.6 节）；第二段 `<H23 前缀>-rows-cross-host-check-r8.out` 的 verdict 行。任一处触发，照 S17 原文「别的台跑的全部单元与行都不作数，在本机重跑」：两段用的是同一些台，两段在别的台跑的行一起不作数 |
+| F1 | 适用（经第 3、4 步） | O1-对拍、交回值、内存对象、panic 截断四样阳性对照是 Q2、Q3 分母用的管子；哪一样不是 A8 那个数，这一趟 Q2（或 Q3 分母）里吃那条管子的读数整轮作废，修好重跑 |
+| F2 | 适用（经第 4、7、9 步） | A1 |
+| F3 | 不适用 | Q1 |
+| F4 | 适用 | Q2 集合为空 |
+| F6 | 部分适用 | 第 125 行在修订 8 树上没自崩时 Q3 甲乙不够判（第一段）；分母照报 |
+| F5、F7、F8、F9 | 不适用 | Q5、O3 |
+| 运行条件（退 78） | 适用 | 照第 8.6 节（多机配置判不过、某台连不上或读不到资源、别的台预检没过、此刻一条线道都放不下）；另加：第 10.3 节依赖表第一行那几步还没全绿就起，退 78（前提没满足，不是停机），等它们绿了同一条命令再起 |
+
+#### 10.8 作数与够判（修订 8 那一趟的第二段）
+
+**作数**：
+- 第 8.7 节 Q1–Q4 那一条的各项：S16 ①–④ 不触发；S17 两处都不触发；修订 9 在第 0 步之前写进登记；第 0–10 步全部单元绿。
+- 第二段自己的：合成产物过 `check_product.py rows_without_executor`，合并规则 ①–⑦ 过；补位协调产物 `substitute_collisions=0`；每行 Z5 核过（H3、H8）；Z6 那个数为 0；比对器那一侧 S5 的两个行数照它的判法过；每次续跑输入清单（H26）都对得上；跨机对照过，或只有一台时 `not_run`。
+
+**够判**：
+- **Q2**：整表做完（1–281 每一行有行结果或落进读法 5 的一类）且比对器写出 `q2=`。集合 n ≥ 1 时照第六节 Q2-判按 r 与 n 判甲乙丙；n = 0 走 F4，记「不够判（修订 8 树上没有未触达而交回值或内存对象不同的行）」，这也是这一趟 Q2 的终局，不再续段。
+- **Q3 分母**：同一份整表，比对器写出 D（登记的算法、批 1）与另三种算法、各类逐行、第 125 行两批计不计入。Q3 的甲乙由第一段比对器判；两样都有，这一趟 Q3 够判。
+- **够判停机**：第十一节原文。第 8.7 节「修订 8 那一趟只跑第一段……交主 agent 另判」那一句换成：第一段交回时 Q2 的集合与 Q3 的分母照写「还差第二段」；第二段交回之后五行都应够判（或照 F4、F6 记「不够判」），不再续段。第 10.5 节的对照产物是描述量，出不出不影响够判。附带量照旧够判后不跑（第 5.5 节末句：流三在整表上、O3 在整表上、不带内容那一形、s4 对照表）。
+
+#### 10.9 挂钟、分片、续跑、多机（这一段）
+
+预计挂钟：超过 2 小时。
+推的（修订 8 树上没量过；基数是修订 6 那一趟）：修订 6 第二段整表两台各 3 槽跑完不到 2.6 小时（主 agent 派发转达），折每行约 2.6 × 6 ÷ 281 ≈ 0.056 槽时（约 200 秒，含拷树与编译）。这一趟第二段起跑之后先只用别的台：到第 7 步绿约 4 小时（第 8.9 节），按 3 槽推约做完 216 行；余下约 65 行、约 3.6 槽时在第 7 步绿之后与第一段逐行分槽，让路时排在第一段后面。第二段从起到完推约 5–6 小时。整趟（两段）：第一段推约 14–16 小时（第 8.9 节）；第二段大半落在第一段只用本机的那几小时里，推整趟约 14–17 小时。实现变了，T₂ 与每行用时都可能变，这些数只用来排机器，不进任何判据。
+- 分片：按行切，每行一个单线道逐行驱动，最长先派到各台空出来的槽（`rows_orchestrator_segment_two.py` 文件头「派发」，第二段·修订 8 编排层照用）；本机等第 7 步绿再加槽（第 10.3 节第 2 条）。
+- 续跑：同一条命令重起只补行目录里还没有 `row-result.tsv` 的行；别的台被停时取回的行先收进来，写到一半的重做；开跑先核输入清单（H26）与 H3、H8。
+- 多机：台数从 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，每台槽数与每槽线程从 `research/scripts/host-resources.py --json` 现查现算（起跑、续跑、加槽时），不写常量（H29）。
+
+#### 10.10 待主 agent 认的几处
+
+1. 编号取修订 10：修订 9 已由修订 8 留给执行员（第 8.2 节）。
+2. 第二段的 T₂ 取修订 8 那一趟第 1 步绿的那一次（不取第 7 步的 T）；比对器的基线取第 1 步、稳定性基线取第 7、9 步（第 10.1 节）。
+3. 起跑闸：第 0、1、2 步（与研究一侧变异表，排了的话）绿；别的台先用，本机等第 7 步绿、修订 8 逐行编排起了之后再加槽（第 10.3 节）。
+4. 让路是可选的；编排层补不补由执行员报（H27）。
+5. 停派文件对第二段同样生效（第 10.3 节第 4 条）。
+6. S16 ② 第二段自己的起跑、续跑不核（第 10.7 节）。
+7. S17 两处任一触发，两段在别的台跑的行一起不作数（第 10.7 节，S17 原文）。
+8. 另写一层编排，修订 6 第二段的编排层与入口一个字节不改；别的台落点与标签另起名（第 10.2 节、H24）。
+9. 两趟第二段的对照另写一份脚本，第一段那份对照脚本不改（第 10.5 节）。
+10. 第 8.7 节「够判停机」那一句、第 8.10 节第 8 条与「主 agent 认定：修订 8 交回」第 8 条的「只跑第一段」照用户定案换掉（第 10.8 节）。
+
+#### 10.11 跑之前已经存在的数（这一条修订）
+
+1. **本登记里已有的修订 6 那一趟判定**：第 1737 行第一段判决行（`q1=jia q3=jia q4_baseline=jia q4_row_242=yi q4_row_269=yi q5_main=jia …`）；第 1740 行 Q3 的 c 为 12 与 13；第 1767 行第二段判决行（`q2=yi q2_set_rows=7 q2_o1_red_rows=2 d_registration_batch_1=39 … rows_not_located=107,168 …`）；第 1770–1773 行第 85、235、272 行记自崩、第 107、168 行记找不到、第 155、161 行 O1-对拍红、Q2 集合是 C672 那七行；第 1747 行 Q5 告警自证；第 1763 行 T = 75.274 秒、限时 1800 秒；第 1760 行跨机对照取第 201 行。影响：第 10.4 节三处读法写成规则、不写这些行号；没有门槛、期望值从这些数来；第 10.5 节只并排，不拿修订 6 的数当修订 8 的期望。
+2. **派发提示**：修订 6 第二段整表两台各 3 槽跑完不到 2.6 小时。只进第 10.9 节挂钟。
+3. **本登记里的挂钟与槽数**：修订 6 第 6.4 节步表、第 8.9 节、第 8.11 节第 1 条。只进挂钟。
+4. **现查的跑法文件**（今天仓里的状态，不是读数）：`rows_orchestrator_segment_two.py` 文件头（行集、驱动参数、分配、派发、补位、跨机对照、超时重跑）、`run_segment_two_on_the_revision_6_tree_multi_host.sh` 全文（写死的树、摘要、T、变异表 sha256）、`segment_two_comparator.py` 文件头与命令行参数、`segment_one_units_revision_8.py` 文件头与常量、`rows_orchestrator_revision_8.py` 文件头、`segment_one_unit_revision_8.sh` 的产物命名、`contrast_revision_6_against_revision_8.py` 文件头、`revision_8_placeholders.json`（H18 三个落点、H20 = false）、`host-resources.py` 文件头。影响：第 10.2、10.3 节的跑法与依赖；没有判据从这里来。
+5. **没打开的**：`research/results/` 下任何 E171 产物，`research/target/e171-r1-dumps/` 下任何文件（也没 `ls`），修订 6 第二段的序列日志、行目录与输入清单，实验页的结果与结论各节，各份交回报告。
+
+#### 10.12 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）。
+- 本登记 1–82、330–604、681–850、1099–1791（第 83–329 行是第二节整抄的条款与第三、四节，第 605–680 行是第十三节，第 851–1098 行是修订 3–5，这一次没重读）；`research/prompts/e171-r1-questions.md` 1–12。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes/`（下写 `<研究一侧>`）：`ls`；`run_segment_two_on_the_revision_6_tree_multi_host.sh` 1–88；`run_segment_one_on_the_revision_8_tree_multi_host.sh` 1–19；`rows_orchestrator_segment_two.py` 1–200 与 `grep -n` 命中行（第 101、309–364、474–537、591、1207–1210 行一带）；`segment_two_comparator.py` 1–60 与 `grep -n` 命中行（第 99–100、270–271、447–475 行）；`contrast_revision_6_against_revision_8.py` 1–45 与第 180 行；`segment_one_units_revision_8.py` 1–100 与第 111–112、189–191、770、920、941 行；`rows_orchestrator_revision_8.py` 1–60 与第 152、217–219 行；`rows_orchestrator.py` 的 `grep -n '^[A-Z_]* = '` 命中行与第 25–26、235–283 行一带的 `grep` 命中行；`segment_one_unit_revision_8.sh` 的 `grep -n` 命中行（第 11–14、32–35、89–316 行一带）；`check_product.py` 第 13–16、140–143、180–183 行；`row_driver.py` 第 709 行；`revision_8_placeholders.json` 全文。
+- `research/scripts/host-resources.py` 1–40 与 `grep -n 'slice_room\|available_threads'` 命中行。
+- `research/results/` 与 `research/target/e171-r1-dumps/` 一份都没打开，也没 `ls`。
+
+跑过的命令（原样，草稿目录写成 `<草稿目录>`；输出在设计员报告里）：
+
+```
+$ wc -l .claude/agent-common.md research/prompts/e171-r1-prereg.md research/prompts/e171-r1-questions.md
+$ grep -n '^### 修订\|^## \|^### 主 agent 认定\|^#### \|^### ' research/prompts/e171-r1-prereg.md | head -200
+$ D=<研究一侧>; ls -la $D; wc -l …; sha256sum $D/run_segment_two_on_the_revision_6_tree_multi_host.sh $D/rows_orchestrator_segment_two.py $D/segment_two_comparator.py $D/*revision_8* research/prompts/e171-r1-prereg.md
+$ cat -n $D/run_segment_two_on_the_revision_6_tree_multi_host.sh; cat -n $D/run_segment_one_on_the_revision_8_tree_multi_host.sh
+$ awk 'NR<=200' $D/rows_orchestrator_segment_two.py | cut -c1-400
+$ awk 'NR<=60' $D/segment_two_comparator.py; grep -n 'add_argument\|prefix\b\|r6\|revision.6\|revision-6' $D/segment_two_comparator.py
+$ awk 'NR<=45' $D/contrast_revision_6_against_revision_8.py; grep -n 'segment.two\|第二段\|s2-\|segment2' $D/contrast_revision_6_against_revision_8.py $D/segment_one_units_revision_8.py $D/rows_orchestrator_revision_8.py $D/revision_8_placeholders.py $D/revision_8_placeholders.json
+$ awk 'NR<=100' $D/segment_one_units_revision_8.py; awk 'NR<=60' $D/rows_orchestrator_revision_8.py; grep -n '^[A-Z_]* = ' $D/rows_orchestrator.py
+$ grep -n 'PEER_\|e171s\|label' $D/rows_orchestrator_segment_two.py; grep -n 'host-resources\|slice_room\|available_threads' $D/rows_orchestrator.py; python3 research/scripts/host-resources.py --help   # 退 2（用法错，只为看用法）
+$ grep -n 'slice_room\|available_threads' research/scripts/host-resources.py; awk 'NR<=40' research/scripts/host-resources.py
+$ grep -n '250\|wrapper\|Z3' $D/rows_orchestrator_segment_two.py; grep -n 'rows_without_executor' -A3 $D/check_product.py; grep -n 'wrapper_ended\|WRAPPER' $D/segment_two_comparator.py
+$ grep -n 's2-device-baseline\|PREFIX=\|SUFFIX\|TAG\b\|attempt\|timing.out\|DUMPS_ROOT\|EXPORT' $D/segment_one_unit_revision_8.sh; cat $D/revision_8_placeholders.json
+$ P=research/prompts/e171-r1-prereg.md; grep -n '^### 修订' $P; for t in H21 … H30 S18 S19 Z8 F10; do grep -c "$t" $P; done; grep -c '修订 10' $P   # H21–H30、S18、S19、修订 10 都没用过
+$ grep -n '每起一个单元之前再现查一次本机\|…' $D/segment_one_units_revision_8.py …   # 引用的行号
+$ TZ=Asia/Tokyo date +%F   # 2026-10-08
+$ python3 -c "…"   # 2.6×6÷281≈0.0555 槽时≈200 秒；4×3÷0.0555≈216 行；余 65 行约 3.61 槽时；max(1800,⌈3×75.274⌉)=1800
+$ sed -n '801p' research/prompts/e171-r1-prereg.md; sed -n '16p' $D/check_product.py; awk 'NR==709' $D/row_driver.py; sha256sum $D/{check_product.py,rows_orchestrator.py,row_driver.py,cross_host_o3_check.py}
+$ sha256sum research/prompts/e171-r1-prereg.md; wc -l < research/prompts/e171-r1-prereg.md   # 追加之前
+$ cat <草稿目录>/rev10-part-{1,2,3,4,5,6}.md > <草稿目录>/rev10.md
+$ for part in 1 2 3 4 5 6; do cat <草稿目录>/rev10-part-$part.md >> research/prompts/e171-r1-prereg.md; done   # 分六段追加，每段不超过 150 行
+$ head -n 1791 research/prompts/e171-r1-prereg.md | sha256sum; tail -n +1792 research/prompts/e171-r1-prereg.md | cmp - <草稿目录>/rev10.md
+```
+
+追加之前本登记 sha256 `449bd8c79092ea86f77c5751bc46d7d4aa9294334247d79d54c7d572e34e68e1`、1 791 行（末尾是「主 agent 认定：修订 8 装置准备交回」）；这一条修订整段先写进设计员草稿目录，再分六段 `>>` 追加，追加后前 1 791 行的 sha256 与追加前整份的相同、`tail -n +1792` 与草稿逐字节一致。
+
+## 主 agent 认定：修订 10 交回（2026-10-07，拍树之前）
+
+设计员报告 `~/.local/share/singlefs/work/e171-r1-revision-8-segment-two/report.md`（6280a226…）。主 agent 现核：修订 10 追加在第 1792–2028 行，前 1791 行 sha256 前缀 449bd8c7… 与追加前同，`tail -n +1792` 与草稿 `rev10.md` 逐字节相同。依据是用户 2026-10-07 弹窗定「也跑第二段」。第 10.10 节十条都认：1 编号取修订 10（修订 9 留给第 8.2 节）；2 T₂ 取修订 8 那一趟第 1 步绿的那一次，比对基线取第 1 步、稳定性基线取第 7、9 步（照修订 2 第 2.5 节第二段那一句）；3 起跑闸与本机加槽时点（只改跑法，不拉长第一段的 T）；4 让路可选，补不补由执行员报（H27）；5 第一段停派文件对第二段同样生效（收严）；6 S16 ② 第二段自己不核——第二段每行从冻结树编，不读仓里装置；7 S17 两处任一触发、两段在别的台跑的行一起不作数（收严，照 S17 原文）；8 另写一层编排，修订 6 第二段编排层与入口一字节不改，别的台落点另起名；9 两趟第二段对照另写一份脚本；10 第 8.7 节、第 8.10 节第 8 条与「主 agent 认定：修订 8 交回」第 8 条的「只跑第一段」照用户定案改为两段都跑。
+
+## 主 agent 认定：修订 10 装置准备交回（拍树之前）
+
+报告 `~/.local/share/singlefs/work/e171-r1-revision-10-prep/report.md`（1e2003e4…）。新文件 `rows_orchestrator_segment_two_revision_10.py`（9dd8198b…，载入 `rows_orchestrator_segment_two.py` 先核 132731f8…）、`run_segment_two_revision_10_multi_host.sh`（696926b5…，`long-run-check` 退 0）、`contrast_segment_two_revision_10.py`（ffdcc6f7…）、`revision_10_placeholders.py`（99aff3ab…）与模板 `.json`（73cc5692…）；修订 8 模板、修订 6 第二段编排层与入口、比对器 3dd9a11b…、第一段对照 8bfeddb2… 一字节没改。自证 3 份各 5 轮红 0、单测 27 条、研究一侧变异 29 条全抓；修订 6 树上 PLAN_ONLY 三种状态都退 0，没写产物。第六节 8 条：
+
+1. 风险：修订 8 逐行编排起跑那一刻各台都放不下一条线道时退 78（`rows_orchestrator.py:1181`），第一段单元编排随之不再起新单元（`segment_one_units_revision_8.py:577`），第二段先占第二台会让它更易发生。主 agent 取 (a)：认这个风险，撞上就用同一条命令续跑第一段（那时第一段一行都还没起，续跑代价小）；不取 (b) 卡时点手停第二段（要人盯时点，更易出错）。
+2. 占位另写一份、入口两份都核：认。
+3. H27 让路：第一段还有排着的行时第二段在各台都不起新行，第 13 步超时重跑那几行不看：认。
+4. 本机闸开之前整表做完、跨机对照那一行没处放就退 78，等第 7 步绿再续跑：认。
+5. S17 只做「第二段读到第一段那一处触发就停派、退 1」这一个方向；反方向（第二段那一处触发）由主 agent 照修订 10 第 10.7 节手动处置：停第一段，两段在别的台跑的行都不作数、在本机重跑。
+6. 跨机对照那一行照原取法现算（修订 6 树上仍是第 201 行）：认。
+7. 两份配置文件不进输入清单，配置值由 `run-values.tsv` 逐项核：认。
+8. git 索引说明：记下，不另处置。
+
+主 agent 另做：三份自证照报告第八节原文登记进 `.claude/hooks/selftest-registry.tsv`（light，第 54–56 行）；`research/scripts/replay.sh` 追加 `E171|@driver_e171_r1_s2_revision_10_tools_research_mutations||…-2026-10-08-s2-revision-10-tools-research-mutations.out|exact` 与驱动，主 agent 照口径单跑一次，与入库产物逐字节相同。新产物由修订 8 那一趟写实验页的执行员一并点名。拍树之后在修订 8 操作清单之外多做的 ⑨–⑭ 在报告第七节。
+
+### 修订 11（设计员，2026-10-08；批次 `records/2026-10-01-里程碑三形式化接入.md#38` 38-1；接第十二节，只许追加，所以写在文件末尾）
+
+<!-- doc-lint:not-numbers R1 R2 R3 R4 R5 R6 R7 S18 RC1 RC2 RC3 RC4 RC5 RP1 RP2 RP3 RP4 RP5 RP6 RP7 RP8 RV1 RV2 RV3 RV4 RV5 RV6 RV7 RV8 RV9 RV10 RV11 RV12 RV13 RV14 RV15 H30 H31 H32 H33 H34 H35 -->
+
+**编号**：现有最大是修订 10（`grep -n '^### 修订'`）；修订 9 留给第 8.2 节（常量与行号），这一条取修订 11。
+**时点**：修订 8 树还没拍，修订 8 那一趟（第一段、第二段）一份产物都没有。本设计员没打开任何一份 E171 产物与导出，只看了存在性、文件名与 sha256（第 11.13 节）。
+**依据**：问题单 `research/prompts/e171-r1-reuse-questions.md`（sha256 `e1a7f0a9d807108704f43b51017b24a32c584b730039b5b8fbf81593471857fd`）；用户 2026-10-08 原话在问题单第 3 行。问题单末句：「修订 8 那一趟两段带着复用跑；复用功能做好之前不起跑。判据、阈值、限时一个字不改，只改跑法。」
+**原判据原样保留**：第一至十一节、修订 1–10 与其后各条「主 agent 认定」一个字不改。这一条只改修订 8 那一趟（两段）与以后各趟的跑法：哪些单元的读数可以从复用库取来、取来之前与之后核什么、产物里怎么分开报。任何一条判据读的输入、门槛与限时公式都不变（第 11.4 节逐条核过）。
+
+问题单第 7–15 行逐字（`sed -n '7,15p'` 原样）：
+
+| 行 | 要回答的判断 | 候选（各自的定义） | 翻面观测 | 够判条件 |
+|---|---|---|---|---|
+| R1 | E171 两段里可以单独复用的单元是什么 | 甲：第 0–13 步每一项、第一段每一行、第二段每一行各算一个单元；乙：再往下切到一行里的每条流 / 每一步；丙：别的切法（设计员提） | 某种切法下，同一单元的读数依赖另一单元的产物或次序（单元之间不独立） | 每个单元列出它读谁的产物、写什么，单元之间读写不相交或依赖写成有向无环 |
+| R2 | 一个单元的键怎么算才不漏输入 | 甲：冻结树里那个二进制按 cargo 依赖闭包取到的全部源文件、`Cargo.*`、`.cargo/`，加装置、研究一侧脚本、参数、种子、工具链；乙：编出来的二进制 sha256 加运行参数、运行时读的文件与工具链；丙：只取那一单元执行时实际覆盖到的源文件（覆盖率），加乙的运行时输入 | 同一个键下现跑两次读数不同；或者改动键外的一个文件后读数变了 | 每种候选写出它漏得掉的输入种类（常量、内联、静态数据、未执行分支、构建环境、导出目录）与能不能补，并有一条现跑的读数相等检查 |
+| R3 | 第二段每一行（拷树、改坏一处、编、跑）在键上有什么特别 | 甲：改坏那一处并进键（变异行原文、替换文、所在文件）；乙：用改坏之后编出的二进制 sha256 当键 | 两行改坏不同处而键相同；或同一行两趟键不同而读数相同到逐字节 | 写出两种键各自在「只改了与那一行无关的文件」时复不复用、算不算得对 |
+| R4 | 复用来的读数进 Q1–Q5 判定时与现跑的是否等价，产物里怎么分开报 | 甲：复用的读数照原样进判定，产物里逐单元标「复用自 <那一趟、那份产物>」；乙：复用的只进描述、判定只认现跑的 | 有一条判据读的是挂钟、次序、本机状态这类跨趟不可复现的量 | 第一至十一节与修订 1–10 的每条判据逐条判它的输入是不是全在键里 |
+| R5 | 修订 6 树上已经跑完的读数能不能事后算键、导进来给修订 8 那一趟用 | 甲：能，按 R2 选的键在修订 6 树（`research/target/e171-r1-frozen-tree-revision-6/`）上事后算；乙：不能，复用库从修订 8 那一趟起才有 | 修订 6 那一趟有某样输入今天已复原不出（导出被删、二进制没留、参数没记全） | 逐单元写出事后算键要的每样输入在不在 |
+| R6 | 复用的代价与收益 | — | — | 在两种差上各数出能复用的单元数与它们在修订 6 那一趟的挂钟：①修订 6 树对修订 8 树（拍树之后才有，先给算法与脚本）；②一个假想的「只改一个 core 文件」的差。用计数，不拍 |
+| R7 | 剪枝与复用的自证 | — | — | 小规模输入上复用开、关两遍读数逐项相同；从键里拿掉一项输入的弄坏开关打开后自证红；被打断后同一条命令续跑只补没判的（照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」） |
+
+| 件 | 改了什么 | 收严 / 只改跑法 |
+|---|---|---|
+| 11.1 | 单元切法：读数单元、判法、现状核对三样分开；读数单元按「一次装置、执行器或驱动的进程」切 | 只改跑法 |
+| 11.2 | 键：rustc dep-info 列的源文件加构建环境、参数、限时、上游读数、研究一侧运行期闭包；三种候选逐项比 | 只改跑法 |
+| 11.3 | 第二段每行的键：改坏之后的源文件内容进键；要补位的行永远现跑 | 只改跑法 |
+| 11.4 | 逐条判据核输入在不在键里；读挂钟、读两次独立现跑、读此刻状态的几类永不复用或每趟现判；复用账本单出一份 | 收严（多一份账本、多几道核对） |
+| 11.5 | 复用库：位置、条目、原子写入、取用核对、两台、与分片续跑怎么叠 | 只改跑法 |
+| 11.6 | 修订 6 那一趟的读数：默认不导；拍树之后按第 11.7 节计数，有键相同的才照导入步骤导 | 不收不放 |
+| 11.7 | 代价与收益的计数：算法、脚本规格、假想改一个 core 文件的现数 | 描述量 |
+| 11.8 | 自证 RP1–RP8 与变异 RV1–RV15 | 收严 |
+| 11.9 | 新设停机 S18（同键读数不同、闭包认不全）；作废、停机、运行条件对复用的读法 | 收严 |
+| 11.10 | 执行员（件 38-4）改什么；占位 H30–H35 | 只改跑法 |
+
+**每件量什么、为哪一判、量到哪算够**（对问题单哪一行）：
+
+| 件 | 量什么 | 为哪一判 | 量到哪算够 |
+|---|---|---|---|
+| 11.1 | 每个单元读谁的文件、写什么 | R1 | 单元表（第 11.1 节）读写不相交或依赖成有向无环；要补位的行另列 |
+| 11.2 | 三种候选各自漏得掉的输入种类；dep-info 罩不罩得住 `#[path]`；二进制带不带构建目录 | R2 | 第 11.2 节比较表每格有判定与依据；同键读数相等由 RC1–RC5 每趟现跑核 |
+| 11.3 | 两种键在「只改了与那一行无关的文件」时复不复用、对不对 | R3 | 第 11.3 节表 |
+| 11.4 | 第一至十一节、修订 1–10 每条判据的输入 | R4 | 第 11.4 节表每条有去向 |
+| 11.6 | 修订 6 那一趟每类单元事后算键要的每样输入在不在 | R5 | 第 11.6 节表；拍树之后 H33 那份计数 |
+| 11.7 | 两种差上能复用的单元数与挂钟 | R6 | ②现数（第 11.7 节）；①拍树之后照同一脚本出 H33 |
+| 11.8 | 开关两遍、键少一项、续跑只补没判的 | R7 | RP1–RP8 各自绿、每个弄坏开关红在点名格、RV1–RV15 全抓 |
+
+#### 11.1 R1：单元怎么切
+
+**定案：丙**——按「产出读数的那一个进程」切读数单元，判法与现状核对不算单元、每趟都现做。依据与切法如下。
+
+三样东西分开：
+- **读数单元**：一次装置进程（`e171_three_oracle_collusion_after_the_oracle_fixes`）、一次 E170 导出装置进程、一次 O3 执行器进程（`frozen_o3.run_executor` 或 `o3_bad_image_judge.py control`）、一次逐行驱动的一行（拷树、改坏、编、跑装置、需要时跑执行器，在 `row_driver.py` 第 499 行 `run_row_on_the_lane` 里是一体的）、一次研究一侧变异表（`mutation_driver.py`）。读数是它写出的文件：`E7RESULT` 产物、`-timing` 产物、导出目录、行目录。
+- **判法**：`check_product.py` 各子命令（含第 108 行 `z1`）、`s2_compare.py`、第 10 步 Z7 的 `cmp`、`device_timing.py check`、两段比对器、对照脚本、编排器的合并规则与跨机比法、补位协调核对。只读读数，不起装置，几秒到几分钟；读数是现跑的还是取来的，判法都在这一趟现跑一遍。
+- **现状核对**：Z5 快照摘要、H8、Z2 冻结行、S16 ①–④（`frozen_tree_lines_revision_8.py step-0`）、H7、A12、输入清单（H26）、前提核对。核的是「此刻」的树、仓与工具，每趟每次起跑、续跑照原样现核，不进库、不复用。
+
+**读数单元表**（修订 8 那一趟；单元名照 `segment_one_units_revision_8.py` 第 107 行起的 `unit_table` 与两份编排器）：
+
+| 单元 | 种类 | 读谁写出的文件 | 写什么 | 限时取谁的挂钟 |
+|---|---|---|---|---|
+| step-0 里 `stream-constants`、`s3-s11-baseline-stream-1-with-probe` 两趟 | 装置 | 无 | 产物、计时、后者另有导出 | 无 |
+| step-1 | 装置 | 无 | 产物、计时、导出 `s2-device-baseline-streams-1-2` | 无 |
+| step-2 | E170 导出装置 | 无 | 导出 `s2-e170-export`、产物、计时 | 无 |
+| step-2b | E170 导出装置 | step-2 导出（拷一份再在拷贝上写） | 拷贝目录、产物、计时 | 无 |
+| step-3 八项装置对照与两项带流三的 | 装置 | 无 | 产物、计时、导出 | 无 |
+| step-3-o3-p1 | 执行器 | step-1 导出、step-2b 目录 | 产物 | 无 |
+| step-4 十项 | 驱动行（空变异） | `o3-p1` 那一项读 step-2b 目录 | 驱动产物、计时、行目录 | step-1 |
+| step-5 | 执行器 | step-1 导出 | 产物 | 无 |
+| step-6、step-10-run-1、step-10-run-2 | 装置 | 无 | 产物、计时、导出 | 无 |
+| step-7、step-9 | 装置 | 无 | 产物、计时、导出（step-7 的计时给 T） | 无 |
+| step-8 | 执行器 | step-7 导出 | 产物 | 无 |
+| research-mutations | 变异驱动 | 研究一侧目录 | 产物 | 无 |
+| 第一段第 11–13 步各行（含 row-0、跨机那一份、超时重跑） | 驱动行 | 无 | 行目录、分片产物 | step-7（第 13 步再乘 3） |
+| 第二段第 1–281 行（含跨机那一行、超时重跑那一份） | 驱动行 | 要补位的行另读别的行用过的补位名 | 行目录、分片产物 | step-1 |
+
+读数到读数的依赖只有五条：step-2 → step-2b → step-3-o3-p1、step-4-o3-p1；step-1 → step-3-o3-p1、step-5；step-7 → step-8。限时的依赖两条：step-1 的计时 → step-4 与第二段各行的 L；step-7 的计时 → 第一段各行的 L。七条都从步号小的指向大的，没有环；判法读别的单元的产物（例 step-3 交回值那一项的 `calls_differ` 读 step-1 产物）不算读数依赖。
+
+**单元之间不独立的地方**（问题单 R1 翻面观测），逐处与处置：
+1. **补位**：一行编不过、锚点不唯一或按名字找不到时，换哪一行取决于「这一次跑里别的补位用过的」（`row_driver.py` 第 359 行 `prepare_row`、`bad_implementation_table.py` 第 158 行 `substitute_for`；第二段由编排层传排除表，`rows_orchestrator_segment_two.py` 文件头第 35 行起「补位协调」）。要补位的行读数依赖别的行与次序，**永远现跑、不进库**（第 11.3 节）。按名字一次取到、锚点恰 1 次、编得过的行不读排除表，独立。
+2. **同一槽上的增量编译**：后一行在前一行留下的编译目录上增量编（`rows_orchestrator.py` 文件头第 40 行）。驱动编前编后核重编（`row_driver.py` 第 414 行 `compile_one_mutation`，作废 Z6），核过的行读数与编译目录的历史无关；没核过（行结果没有 `packages_checked_rebuilt`）的行不进库。
+3. **第二趟、跨机那一份**：step-9（Z1）、step-10-run-2（Z7）、第一段 row-0 在另一台那一份与第二段跨机那一行（S17）的意义就是「同一输入独立再跑一次」，取来就失去意义：**永远现跑**（第 11.4 节）。
+
+**为什么不取甲、乙原样**：甲（每步每项、每行一个单元）大体就是上表，差在三处——step-0 拆成两趟装置加一份现状核对、step-9-z1 与 step-10-z7 是判法不是读数、O3 执行器从装置单元里分出来（它的键不含 Rust 闭包，第 11.7 节②里它是唯一「上游字节相同就能复用」的一类）。乙（切到每条流）不取：几条流在同一个装置进程里跑、吃同一个二进制，键只在二进制一级有差别，切开省不下一次复用；T、A8 的「恰 3 态」、Z1 都按一趟进程写（修订 8 第 8.4 节「按流切不做」同一个理由）。
+
+#### 11.2 R2：键怎么算
+
+**先问读数是哪些输入的函数**（读数单元的装置、执行器、驱动三类，逐样现查）：
+- 装置进程：二进制与命令行参数。运行期只读自己刚写的导出（`e171_three_oracle_collusion_after_the_oracle_fixes.rs` 第 2495 行 `read_file` 只给 S4 回读用），不读环境变量之外的外部文件；`E7RESULT` 行「与跑几次无关」（同文件第 25 行）。闭包里按名字读的环境变量有 `SINGLEFS_LAYER0_*` 几个与线程数几个（命令见第 11.14 节）。
+- 二进制：rustc 编进去的全部源文件、`Cargo.toml`、`Cargo.lock`（`vstd`、`libc` 两个注册表依赖）、`.cargo/config.toml`、工具链、构建环境变量。根 `Cargo.toml` 第 17–19 行 release 带 `debug = true`：二进制里写着编译目录的绝对路径（修订 6 树那份二进制里 `/home/fy5090/code/singlefs/research/target/e171-r1-frozen-tree-revision-6` 出现 1 次，命令在第 11.14 节）。
+- 驱动行另加：那一行与变异表那一行的原文、驱动参数、限时 L、驱动与它 import 的模块、执行器目录与冻结行（跑执行器的行）。
+- 执行器：冻结的执行器目录、冻结行、上游导出的那几个文件。
+
+**三种候选逐项比**（「漏」= 这类输入变了而键不变；「补」= 能不能加进键补上）：
+
+| 输入种类 | 甲：dep-info 闭包 + 构建环境 + 运行期输入 | 乙：二进制 sha256 + 运行期输入 | 丙：覆盖率实际执行到的源文件 + 乙的运行期输入 |
+|---|---|---|---|
+| 常量、`static` | 不漏（整份文件进键） | 不漏 | 漏：别处定义、在执行到的地方内联的常量，定义它的文件「没执行到」；补不上 |
+| 内联、泛型、`derive(Debug)` 生成的文本（交回值摘要就是 `{:?}` 文本） | 不漏 | 不漏 | 漏：类型定义所在的文件不在覆盖里；补不上 |
+| `#[path]`、`include_str!` 这类静态数据 | 不漏：rustc 的 dep-info 列它们（修订 6 树装置的 dep-info 67 个文件里有 `../../../singlefs-harness/tests/common/mod.rs`） | 不漏 | 漏 |
+| 没执行的分支 | 不漏（多罩，只少复用） | 不漏 | 不漏（就是它省下的那一块） |
+| 构建环境（工具链、Cargo 清单与锁、`.cargo`、`RUSTFLAGS` 一类） | 补进 `[build]` 节，照 `research/scripts/admission.py` 第 517 行 `toolchain_line`、第 543 行 `build_environment_lines` 的取法 | 不漏 | 补进同一节 |
+| 系统链接器、libc 版本 | 漏；不补（二进制字节会变，语义不变），由第二台的工具链比对（`multi-host-run.sh` 第 17 行）与 RC1–RC5 现跑核 | 不漏 | 漏 |
+| 编译目录的绝对路径 | 不进键（不改语义） | 进了：同一份源码在两个槽、两台编出两个 sha256，假的「不同」；不改编法补不上 | 同乙 |
+| 导出目录（上游读数） | 补进 `[upstream]`：上游那几个文件的 sha256 | 同甲 | 同甲 |
+| 研究一侧、参数、限时、种子 | 补进 `[research]`、`[args]`、`[limit]` | 同甲 | 同甲 |
+| 什么时候能算 | 编之前（只读树与 dep-info） | 编完之后（每行先花一次编译） | 要另编一份插桩的二进制，与登记的二进制不是同一份 |
+
+**定案：甲**。乙的二进制 sha256 只当旁证写进条目（不进键），丙不取。
+
+**键文本**（参照实现在设计员草稿 `reuse_key.py`，执行员照它写入库的那一份；键 = 键文本的 sha256）。分十节，节名与次序写死：
+- `[kind]` 单元种类：`device`、`e170`、`driver-row`、`o3-executor`、`mutation-driver`。
+- `[build]` `cargo -V` 与 `rustc -vV` 原样的 sha256；根与 `crates/*/Cargo.toml`、`Cargo.lock`、树里 `.cargo/` 下每个文件的 sha256；`admission.build_environment_lines` 给的构建环境各行。
+- `[closure]` 那棵树在树里编的 release 二进制的 dep-info（`target/release/<bin>.d`）列的每个源文件，相对树根的路径与 sha256；驱动行用改坏之后的内容（照 `bad_implementation_table.apply_mutation` 施加）。树外的路径出现在 dep-info 里就停（S18 ②）。
+- `[env]` 闭包源码里按名字读的环境变量（`SINGLEFS_`、`KS_`、`RAYON_` 起头的字面量），去掉 `research/scripts/capped.sh` 第 22–31 行设的八个线程数变量，逐个记「设了 / 没设」；有一个设了的单元不查库、不进库。
+- `[mutation]` 行号、行表那一行原文、变异表那一行原文；空变异记 `empty-of <原名>` 与那一行原文。
+- `[args]` 装置或驱动的参数，去掉输出目录、`--threads`、`--memory-cap`、`--lanes`、工作根与输出根。
+- `[limit]` L 的秒数（`max(1800, ⌈3T⌉)`，第 13 步再乘 3）；不限时的单元记 `none`。
+- `[upstream]` 角色名与上游那几个文件各自的 sha256（按读数内容，不按上游的键：上游重跑出来字节相同，下游照样命中）。
+- `[research]` 研究一侧运行期闭包各文件的 sha256：装置单元是 `device_timing.py`；驱动行是 `row_driver.py` 与它 import 的 `device_timing.py`、`frozen_o3.py`、`run_directory.py`、`bad_implementation_table.py`；跑执行器的再加执行器目录全部文件、冻结行所在那份产物、`frozen_o3.py`、`o3_bad_image_judge.py`、`result_lines.py`；变异驱动是研究一侧整个目录与它的变异表。两张行表不整份进（一行只吃自己那一行，在 `[mutation]`）。
+- `[python]` `python3 -VV` 原样。
+
+**键外的几样与理由**（每样都有一道现跑的核对盯着）：线程数（八个线程变量、驱动 `--threads`，修订 6 那一趟两台每行线程不同、跨机对照四格相同，「主 agent 认定：`-resume2` 跨机一致对照 S17 停机的处置」第 4 条）；内存上限与包装脚本 `run-with-memory-cap.sh`、`capped.sh`（只决定撞不撞包装自己的结局与限时，撞了的不进库，第 11.4 节）；编译目录与工作根路径；哪一台跑的（工具链两台相同由 `multi-host-run.sh` 第 17 行 ③ 拒）。这几样任一变了而读数变了，RC1–RC5 会现出来。
+
+**钉住「同键必同读数」的现跑核对**（问题单 R2 翻面观测；任一不过走 S18）：
+- **RC1 入库比**：一个单元现跑完、库里已有同一个键：逐项比读数（比法见第 11.5 节「读数相等」），不同不入库。修订 8 那一趟里 step-7 与 step-9、step-10 两次、第一段 row-0 与它跨机那一份都是同键，第一趟库空着也会碰上。
+- **RC2 第二趟永远现跑**：step-9、step-10-run-2、第一段 row-0 两台各一份、第二段跨机那一行两份；库里有同键条目时它们与条目比（RC1 的比法）。
+- **RC3 第二段抽样**：第二段从库里取来的行数 M ≥ 1 时，另挑 k = max(3, ⌈0.02 × M⌉) 行现跑，挑法：按 sha256(H23 的后缀 ‖ 键) 从小到大取前 k 个；现跑的读数与条目比。k 与挑中的行写进账本。
+- **RC4 闭包核对**：每个现跑编译的单元编完，读那一次的 dep-info，路径集合必须等于键里 `[closure]` 的路径集合；本机的槽在下一行起之前核，第二台的行由 `peer_side.py` 在那一边核完写一行进行的分片产物（执行员接不上的照 H35 报）。另在算键时静态拦：变异原文或替换文里带 `mod `、`#[path`、`include_str!`、`include_bytes!`、`include!` 的行永远现跑。
+- **RC5 取用核对**：从库里取一条之前，逐文件核条目的 `manifest.sha256`；不符的条目移进隔离目录、这一单元当没命中现跑，账本记 `corrupted_entries`。
+
+#### 11.3 R3：第二段每一行的键
+
+第二段一行 = 从树拷、改坏一处、编、跑（`run_row_on_the_lane`）。两种键：
+
+| 情形 | 甲：改坏那一处进键（照第 11.2 节，`[closure]` 里那个文件取改坏之后的内容，`[mutation]` 带行原文） | 乙：改坏之后编出的二进制 sha256 当键 |
+|---|---|---|
+| 两行改坏不同处 | 改坏后的文件内容不同、行号与行原文也不同，键不同 | 二进制不同，键不同；但每行先要编完才知道 |
+| 只改了闭包外的文件（例：`crates/singlefs-harness/tests/` 下任一份） | 复用，对：编出来的二进制与读数不变 | 二进制路径不变时复用；换了槽或台就不命中（编译目录路径在二进制里） |
+| 只改了闭包里与那一行无关的文件 | 不复用（键变）；对：那份文件编进了这一行的二进制 | 多半也不复用（`debug = true` 的行号表随行号变）；偶尔字节相同时复用，对 |
+| 同一行两趟、读数逐字节相同而键不同 | 闭包里有文件变了而没改行为（注释、改名）时发生：多跑一次，不错 | 编出来字节不同时同样发生 |
+| 编不过的行 | 键在编之前就有；编不过本身是补位的起点，按下面一条永远现跑 | 没有二进制，没有键 |
+
+**定案：甲**。另加两条只针对第二段的：要补位的行（按名字取不到、锚点不是恰 1 次、编不过）永远现跑、不进库，它们的补位还照编排层原有的排除表与整表做完再核撞名；行号与行原文进键，同一份改坏结果落在两个行号上也是两个键（行结果里带行名，读数本来就不同）。
+
+#### 11.4 R4：复用来的读数进判定等不等价，产物里怎么分开报
+
+**逐条判据核输入在不在键里**（「甲」= 读数照原样进判定；「现判」= 每趟现做、不复用；「现跑」= 那一单元永远现跑）：
+
+| 判据（第六、七、十、十一节与修订 1–10） | 读的是什么 | 去向 |
+|---|---|---|
+| Q1–Q5 各量、阴性、阳性、流三覆盖、第八节轨迹与几何、A1、A8–A11 | 装置、执行器、驱动行的读数 | 甲（键罩全输入，第 11.2 节） |
+| F1–F9 | 同上 | 甲 |
+| S1、S2、S3、S5、S6、S8–S11、S13 | 读数（S6 是 E170 导出装置的退出码，也是读数） | 甲 |
+| 读法 5「超时」一类（装置退 253） | 挂钟 | **不进库**：退 253 的那一趟不入库，下一趟现跑（第二段照原文不重跑，第一段照第 13 步） |
+| 读法 5 编不过、锚点不唯一、找不到，与补位 | 次序与别的行（第 11.1 节第 1 条） | **现跑**（便宜：找不到的不编，编不过的只编不跑） |
+| Z3 包装自己的结局（250–252、254） | 机器当时的内存账 | **不进库**；驱动原有的重跑一次照旧 |
+| Z1、Z7、S17 | 同一输入两次独立现跑 | 第二趟与跨机那一份**现跑**（RC2）；第一趟可以取来 |
+| Z6 | 行结果里的 `packages_checked_rebuilt` | 甲（它记的是那一趟怎么编的）；没有这个键的行不入库 |
+| Z4 | 执行器的读数 | 甲 |
+| Z2、Z5（含 H8）、S7、S12（A12）、S16 ①–④、H7、输入清单 | 此刻的树、仓、冻结行、二进制 | **现判**：每次起跑、续跑照原样核，取来的单元在取用那一刻另核一遍 Z5 |
+| 修订 2 第 2.5 节 T 与 L、「进程挂钟包住各流之和」 | step-1、step-7 的计时 | 甲：计时随那一单元一起取来；L 进行的键，所以取来的行与这一趟的 L 一致 |
+| 修订 8 第 8.4 节「同时在跑的单元」那一行、各行耗时按台分开、第 8.5 与 10.5 节对照 | 挂钟与本机状态 | 只描述；取来的单元的耗时是原那一趟的，账本里标出来，对照产物不改、读的时候按账本分开 |
+
+问题单 R4 的翻面观测（有判据读挂钟、次序、本机状态）对上表加粗那几类成立；它们逐类走「不进库 / 现跑 / 现判」，其余各条照甲进判定。不取乙（取来的只进描述）：对键罩全输入的那些判据，取来的读数与现跑的是同一个函数值，只进描述等于没复用。
+
+**产物里怎么分开报**：判定产物的格式一个字不改（比对器、`check_product.py`、合并规则都不改）。取来的单元在这一趟的产物名与导出根下照原样落一份（第 11.5 节「取用」），另出**复用账本**，每层一份：
+- `<H16 前缀>-reuse-ledger-units-r8.out`（第 0–10 步与 research-mutations）、`<H16 前缀>-reuse-ledger-rows-r8.out`（第一段各行）、`<H23 前缀>-reuse-ledger-rows-r8.out`（第二段各行）。
+- 每个单元一行：`E7RESULT name=reuse unit=<名> key=<键> state=fresh|reused|fresh-check|fresh-always reason=<没命中、永远现跑的哪一类、环境变量设了、条目坏了> entry=<条目路径> origin_run=<原那一趟的前缀与后缀> origin_product=<原产物文件名> origin_host=<台号>`。
+- RC1、RC2、RC3 每次比一行 `name=reuse_check kind=insert|second-run|sample unit= key= identical=true|false differing=<比法里哪几样>`；入库一行 `name=reuse_insert unit= key= state=inserted|present-identical|present-differs`。
+- 末行 `name=verdict units=<N+M> judged_fresh=<N> reused=<M> sample_size=<k> check_mismatches=<RC1–RC3 不同的次数> closure_mismatches=<RC4> corrupted_entries=<RC5> env_set_units=<>`；N + M 不等于这一层登记的单元数就判红（照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」「成功那句报「现判 N、复用 M」」）。
+
+#### 11.5 复用库：放哪、存什么、两台、与分片续跑怎么叠
+
+**放哪（H30）**：本机 `~/.local/share/singlefs/reuse/e171-r1/`。不放 `research/results/`（那是这一趟的输出），不放 `/tmp`、`$TMPDIR` 与 `GATE_CROSS_RUN_TMPDIR` 的缺省（缺省落到 `/tmp`，开机清空；`.claude/singlefs-ai-sop/rules/command-safety.md` 第 153 行「有意跨轮复用的缓存……放 `${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}` 下或项目定的位置」，这里取项目定的位置）。与 `research/target/` 同一个文件系统（`df` 同为 `/`），条目里的文件用硬链接，不另占盘。
+
+**一条条目**：`entries/<键前 2 位>/<键>/` 下放 `key.txt`（键文本全文）、`reading/`（读数文件，相对路径照这一单元在产物名与导出根下的样子，产物名里的前缀与后缀换成占位）、`manifest.sha256`（`reading/` 下每个文件）、`meta.tsv`（单元名、种类、退出码、原那一趟的前缀后缀、原产物文件名、台号、线程数、二进制 sha256 旁证、入库日期）。
+- **入库条件**：读数单元正常结束（装置退出码在那一步预期的集合里：0，或 step-3 panic 那一项的 3；驱动行有 `row-result.tsv`、`status=ok`、装置退 0 或 3，或 `status` 是编不过以外的结局都不入）；不是 250–254；不是要补位的行；有 `packages_checked_rebuilt`（驱动行）；`[env]` 没有设了的变量。判法红不红不影响入库（判法每趟现跑）。
+- **原子**：先写进 `staging/<pid>-<随机>/`，`manifest.sha256` 最后写，`rename` 到 `entries/…/<键>/`；目标已在就走 RC1 比，不覆盖。起跑时 `staging/` 下的残留删掉（只删那个目录里的）。
+- **取用**：核 RC5 → 把 `reading/` 下的文件按这一趟的产物名与导出根硬链接过去（目标已存在就拒，照现有「不覆盖」的写法）→ 写账本 → 这一单元的判法照原样现跑。驱动行取来后行目录里有 `row-result.tsv`，编排器原有的 `--skip-finished` 重报（`rows_orchestrator.py` 文件头第 44 行「更早几趟已做完的行由本机一个 --skip-finished 驱动从行目录重报一份」）把它并进合成产物，合并规则 ①–⑦ 不改：L 进键，所以重报那一份的 `name=row_time_limit` 与别的分片逐字相同。
+
+**读数相等**（RC1–RC3 的比法）：装置单元比 `E7RESULT` 产物全文与导出目录每个文件，`impl-verdicts.tsv` 去耗时列（同 Z1）、读法 4 写明拿掉的不稳定对象照拿；驱动行比 `row-result.tsv` 去 `copy_ns`、`compile_ns`、`device_ns`、`o3_ns`、`lane`、`compile_kind`、`packages_checked_rebuilt`，加 `device.out` 的 `E7RESULT` 行、导出每个文件、`o3.out` 照 `cross_host_o3_check.py` 第 52 行那一套去法；执行器单元比 `o3.out` 同一去法；变异驱动比产物去耗时。计时产物不比。比的文件集合比 Z1、S17 宽（多 `call-return-values.tsv`、`manifest.tsv` 与 `E7RESULT` 全文），是收严。
+
+**两台**：库只在本机。查库、取用、入库都在本机做；取来的单元与行不派出去。第二台跑的行照编排器原有的取回收进本机行输出根之后，由本机算键、照入库条件入库，`meta.tsv` 记台号。第二台不留库，也就没有两份库要对。取回之后入库之前另核三样（不过不入库、账本记一行）：行结果里 `row_number`、`mutation_line_sha256` 与键里 `[mutation]` 对得上；那一分片的 `name=row_time_limit` 秒数等于键里的 L；那一分片的 `snapshot_digest` 等于 H3（合并规则 ② 原有）。
+
+**与分片、续跑怎么叠**：
+- 查库在派发之前：命中的行不进派发队列，各台的槽只排没命中的与 RC2、RC3 要现跑的；分配仍照编排器现查现算。
+- 续跑照原样：同一条命令再起，已落的（现跑的、取来的）都算做完。取用是先写账本旁的标记 `<导出根>/reuse-markers/<单元>.tsv`、再链接、最后链 `row-result.tsv`（驱动行）或写序列日志的绿行（第 0–10 步单元）；断在中间的，续跑时见到标记而没有绿行或 `row-result.tsv`，删掉这一单元已链的几份重取。账本在每层收尾时由标记现合，不靠中途追加。
+- 第 0–10 步续跑清单（第 8.4 节「续跑」第二条）把取来的单元照现跑的一样记进清单，sha256 是链过来那几份的。
+- 准入一层照旧：整个实验的输入没变，`research/scripts/admission.py experiment` 退 77，不起跑；判定一级的复用在这一层之下。
+
+#### 11.6 R5：修订 6 那一趟的读数能不能事后算键导进来
+
+**逐类单元，事后算键要的每样输入在不在**（只看了存在性、文件名、sha256；原样输出在设计员草稿 `r5-existence.txt`）：
+
+| 输入 | 第 0–10 步装置与 E170 单元（后缀 `-r6-r3`） | step-4 十项（驱动行） | 第一段第 11–12 步 16 行与跨机那一份（`-resume2`） | 第二段 281 行（`-r6`） |
+|---|---|---|---|---|
+| 树与闭包文件 | 在：`research/target/e171-r1-frozen-tree-revision-6/`，摘要可现算（主 agent 2026-10-07 现算 `7726cdd6…`） | 在 | 在 | 在 |
+| dep-info | 在：树里 `target/release/` 两个 bin 的 `.d` | 在（同一份，改坏不改文件集合） | 在 | 在 |
+| `[build]` | 在：树里 `Cargo.*`、`.cargo/config.toml`；`rustc` 版本在树里 `target/.rustc_info.json`（1.98.0）；`cargo -V` 没记，只能推（`stable` 工具链目录日期 2026-08-26，早于那一趟） | 同左 | 同左；第二台由 `multi-host-run.sh` ③ 保证与本机同 | 同左 |
+| `[env]` | 没记；日志丢了（「主 agent 认定：整机重启后重建跑法交回」第 6 条） | 没记 | 序列日志在、没打开 | 序列日志在、没打开 |
+| `[mutation]` | — | 在：树里 `crates/mutations.tsv`（sha256 `4140c784…`，与第二段入口第 28 行写死的相同） | 在 | 在；要补位的行照第 11.3 节本来就不导 |
+| `[args]` | 在：仓里修订 6 跑法（与 `ec89ec78…` 只差两行路径） | 在 | 在：`rows_orchestrator.py` 第 137–146 行 | 在：`rows_orchestrator_segment_two.py` 第 96 行 |
+| `[limit]` | — | 要 step-1 计时：文件在 | 要 step-7 计时：文件在 | 文件在，sha256 记在输入清单 |
+| `[upstream]` | step-2b 那一类修订 6 没有；step-3、step-4 的 O3 取 `research/target/e170-r2-today-dumps/e170-bad-states-second-run`（在）；step-5、step-8 的上游导出在 | o3-p1 同左 | — | — |
+| `[research]` | **复原不出**：那一趟没记研究一侧文件的 sha256（第 0–10 步的判法输出与日志在重启时丢了；修订 8 装置准备交回第 8 条「H11 比对器无逐字节记录、`run_directory.py` 已变」） | **复原不出**（驱动 import `run_directory.py`，那时那一份只知道前缀 `a9abba32…`） | 编排器 `7bfbdb84…` 在；驱动与模块的 sha256 只在序列日志里，没打开 | 在：`research/target/e171-r1-dumps/revision-6-segment-2/inputs.sha256`，今天 `sha256sum -c` 13 项全 OK |
+| `[python]` | 没记 | 没记 | 没记 | 没记 |
+| 读数本身 | 产物 77 份按名字都在；导出目录在（`stream-constants` 本来不导出） | 10 个 `row-0/row-result.tsv` 在 | 16 + 1 个行目录、`row-result.tsv`、导出、`o3.out` 都在 | 281 个 `row-result.tsv` 在；276 个有导出（第 85、107、168、235、272 行没有） |
+
+**定案：乙**（复用库从修订 8 那一趟起才有），附一条有条件的导入。理由：
+- 翻面观测对第 0–10 步与 step-4 成立：`[research]` 那一节今天复原不出。
+- 第一段各行与第二段各行的键大体算得出（`[env]`、`[python]` 没记，`cargo -V` 只能推），但能不能派上用场取决于修订 8 树的闭包：修订 6 树与仓的差在调度记录第 1280 行有「core 8 个文件」，而 core 33 个文件都在两个 bin 的闭包里（第 11.7 节），只要有一个 core 文件不同，所有装置与驱动行的键都不同，导进来一条也用不上。
+- 有条件的导入：拍树之后照第 11.7 节跑①（H33）。只要有单元键相同（只可能出在闭包与构建环境都没变的那几类），那几个单元照下面导：`[env]` 与 `[python]` 写成「没记，按今天的值」并在 `meta.tsv` 记 `imported_from=revision-6`；读数照入库条件与原子写法入库；**导入的条目在修订 8 那一趟不当取来的用，只当 RC1 的比较对象**（修订 8 那一趟照问题单原话「这次要全部跑」，全部现跑；现跑完与导入条目比，不同走 S18）。H33 报 0 个相同就不导。
+
+#### 11.7 R6：代价与收益的计数
+
+**算法**：对两份输入（树甲、树乙，或树甲加一处假想改动），按第 11.2 节逐单元算键，比每个单元两边的键：
+- `same`：键相同，可以复用；
+- `upstream`：只差 `[upstream]` 或 `[limit]` 两节（上游重跑之后读数字节相同、或限时相同才可复用，条件式）；
+- `differs`：别的节不同，写出第一处不同的节；
+- `fresh-always`：第 11.1、11.3 节永远现跑的（step-9、step-10-run-2、第一段 row-0、要补位的行；第二段跨机那一行与 RC3 抽样按那一趟现算，不在计数里）。
+挂钟：`same` 与 `upstream` 两类各单元在修订 6 那一趟的挂钟，从计时产物的 `process_wall`、行结果的 `device_ns`、`compile_ns` 取，要读产物，归执行员；这里只给单元表里写的推的用时（`segment_one_units_revision_8.py` 第 107–131 行 `estimated_seconds`）。
+
+**脚本规格**（设计员草稿 `count_reusable.py` 与 `reuse_key.py`，执行员照它写入库的一份进研究一侧目录，名字 `count_reusable_units.py`）：参数 `--repo`、`--tree-a`、`--dep-a-device`、`--dep-a-e170`，再给 `--tree-b --dep-b-device --dep-b-e170` 或 `--hypothetical-change <相对路径>`，`--toolchain <文本>`、`--per-unit`；开头核单元表里每条装置参数串在 `segment_one_unit_revision_8.sh` 里逐字出现，缺了退 2；不读任何 E171 产物与导出；输出 `count group= verdict= units=` 与 `first_difference group= section= units=` 两种行，末行 `total units=`。单元总数 330 = 第 0–10 步 33（装置与 E170 19、执行器 3、step-4 十项、变异驱动 1）+ 第一段 16 行 + 第二段 281 行。
+
+**② 假想只改一个 core 文件**（现数；树甲 = 修订 6 树，`crates/singlefs-core/src/` 下 33 个文件逐个各假想改一次，33 次输出的计数行 sha256 前 16 位全是 `a975fafe6a6c5511`，即 33 次一样）：
+
+| 组 | same | upstream | differs | fresh-always |
+|---|---|---|---|---|
+| 第 0–10 步 33 个单元 | 1（research-mutations，推的 600 秒） | 3（step-3-o3-p1、step-5、step-8，推的 48、300、1800 秒） | 27 | 2 |
+| 第一段 16 行 | 0 | 0 | 15 | 1 |
+| 第二段 281 行 | 0 | 0 | 279 | 2（第 107、168 行：修订 6 树的变异表里按名字取不到） |
+
+为什么一样：修订 6 树里装置 bin 的 dep-info 67 个文件、E170 导出 bin 的 67 个文件都含 core 全部 33 个，所以改哪一个 core 文件，凡是编装置或 E170 的单元键都变。
+
+**同一脚本在别的改动位置上**（几何敏感性，方向相反的取样点；同一棵树、各改一处）：
+
+| 假想改的文件 | 第 0–10 步 same / upstream / differs / fresh | 第一段 same / differs / fresh | 第二段 same / differs / fresh |
+|---|---|---|---|
+| 装置文件本身 | 3 / 3 / 25 / 2 | 0 / 15 / 1 | 0 / 279 / 2 |
+| E170 导出 bin 文件 | 27 / 2 / 2 / 2 | 15 / 0 / 1 | 279 / 0 / 2 |
+| 闭包外一份（`crates/singlefs-harness/tests/` 下第一份） | 31 / 0 / 0 / 2 | 15 / 0 / 1 | 279 / 0 / 2 |
+| `Cargo.lock` | 同 core 那一行 | 同 core | 同 core |
+
+修订 6 树 `crates/` 下 289 个文件：两个闭包都有 65、只在装置闭包 1、只在 E170 闭包 1、`Cargo.toml` 7、`crates/mutations.tsv` 1、两个闭包都没有 214（`.rs` 208 个：checker-tier `src/` 6、`src/bin/` 11、`tests/` 41，harness `tests/` 150）。改那 214 份里任一份，可复用的是闭包外那一行的数。
+
+**① 修订 6 树对修订 8 树**：拍树之后、第 0 步之前，执行员用入库那一份计数脚本跑一次（树乙 = 修订 8 树，dep-info 取 H7 那次编译的），产物 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-<日期>-s1-reuse-count-revision-6-against-revision-8.out`（H33），不进任何判定。设计员拿今天的仓当树乙预演过一次（仓里 dep-info 是 2026-10-05 的旧件，只核脚本跑得通）：第 0–10 步 same 1、upstream 3、differs 27，两段的行除永远现跑的之外全部 differs（第二段 fresh-always 3，比修订 6 树多第 33 行）；这一组数不是①的答案。
+
+#### 11.8 R7：自证与变异
+
+**自证**（照 `.claude/singlefs-ai-sop/rules/test-script-discipline.md`「判定可复用：按输入存，按前缀剪」「测试脚本自己也要被测试证明有效」；RP1、RP3–RP8 用假件，进快档，`--selftest` 末行「自证 N 项，红 M」，每格之后收进程；RP2 用真二进制）：
+
+| # | 证什么 | 怎么做 | 必须看到 |
+|---|---|---|---|
+| RP1 | 复用开、关两遍读数逐项相同 | 假世界（假装置、假驱动、假执行器、假编排，沿用 `selftest_fakes/`）：第 0–10 步全部单元与两段各 6 行，复用关跑一遍（入库）、复用开再跑一遍 | 第二遍除永远现跑的几类外全部取来；两遍落下的每份读数文件逐字节相同；两遍每条判法的输出行逐字相同；账本 N + M 等于单元数 |
+| RP2 | 真二进制上同键读数相等、取来的与现跑的相同 | 修订 8 那一趟 step-0 绿之后的小单元 `reuse-selfproof`：H7 那个装置二进制跑三次 `stream-constants --streams 1,2,3`（只打 S1 常量，没有 Q1–Q5 读数）：①复用关、入一个只给这一单元用的库（H30 下 `selfproof/`）；②复用开、取来；③另一个目录现跑、照 RC1 比 | ②落下的文件与①逐字节相同；③ `identical=true`；产物 `<H16 前缀>-reuse-selfproof-r8.out` |
+| RP3 | 键里少一项就会错用 | 假世界里十节各有一格：只改那一节对应的一样输入（改闭包里一个文件、改工具链文本、设一个环境变量、改变异行、改参数、改 L、改上游一个文件、改驱动 import 的一个模块、改 Python 文本），其余不动 | 每格都不命中、现跑；弄坏开关 `drop-<节名>` 打开后那一格命中、格红 |
+| RP4 | 续跑只补没判的 | 假世界里在第 k 个取用与第 j 个现跑之后发 TERM，同一条命令再起 | 已取来的、已现跑完的都不再做；断在取用中间的那一个重取；库里条目数等于不同键的个数；账本 N + M 不变 |
+| RP5 | 入库是原子的 | 在 `staging/` 写完、`rename` 之前杀掉 | 没有半条条目；再起时 `staging/` 残留删掉；那一单元下一趟照常入库 |
+| RP6 | RC4 闭包核对会红 | 假编译交一份多一个文件（树里有、键里没有）的 dep-info；另一格 dep-info 里有树外路径 | 两格都走 S18，账本 `closure_mismatches=1` |
+| RP7 | RC1–RC3 会红 | 假装置第二次跑时导出里一个文件多一字节（只在导出，不在 `E7RESULT`） | `check_mismatches=1`，走 S18，那一趟取来的读数不作数 |
+| RP8 | RC5 会红 | 库里一条条目的读数改一字节 | 不取它、移进隔离目录、现跑；账本 `corrupted_entries=1` |
+
+**弄坏开关**（`REUSE_BREAK=<项>`，只在自证起的子进程里认，别处设了退 2；写进新文件头）：`drop-kind`、`drop-build`、`drop-closure`、`drop-env`、`drop-mutation`、`drop-args`、`drop-limit`、`drop-upstream`、`drop-research`、`drop-python`（各红在 RP3 那一节的格）；`check-skipped`（RC1–RC3 不比，红在 RP7）；`closure-check-skipped`（红在 RP6）；`manifest-unchecked`（红在 RP8）；`insert-in-place`（红在 RP5）；`fresh-always-ignored`（step-9 取来，红在 RP1 的「永远现跑」格）。
+
+**变异**（追加进 `research/mutations/e171_three_oracle_collusion_after_the_oracle_fixes.tsv`，经 `mutation_driver.py` 跑；每条写明在哪一格改变输出）：
+
+| # | 改哪 | 改成什么 | 在哪一格改变输出 |
+|---|---|---|---|
+| RV1 | 驱动行 `[closure]` | 用没改坏的文件内容 | RP3「改坏的那个文件别处改了」：原式不命中，变异命中 |
+| RV2 | `[limit]` | 不进键 | RP3「改 L」 |
+| RV3 | `[upstream]` | 取上游单元名、不取文件 sha256 | RP3「改上游一个文件」 |
+| RV4 | 驱动行 `[research]` | 只取 `row_driver.py` | RP3「改驱动 import 的模块」 |
+| RV5 | `[build]` | 不取工具链 | RP3「改工具链文本」 |
+| RV6 | `[args]` | 去掉 `--positive-control` 那一对 | RP3「改参数」：两项对照原式两个键，变异一个键 |
+| RV7 | `[env]` | 设了的变量当没设 | RP3「设一个环境变量」 |
+| RV8 | 读数相等 | 不比导出目录 | RP7：原式 `identical=false`，变异 `true` |
+| RV9 | 入库条件 | 装置退 253 也入库 | RP1「超时不入库」格 |
+| RV10 | 入库条件 | 250–254 也入库 | RP1「包装结局不入库」格 |
+| RV11 | 永远现跑的集合 | 少 step-9 | RP1「永远现跑」格 |
+| RV12 | 入库 | 直接写进 `entries/`、不经 `staging/` | RP5 |
+| RV13 | 取用 | 不核 `manifest.sha256` | RP8 |
+| RV14 | 账本 | 取来的记成现跑 | RP1「账本 N、M」格 |
+| RV15 | 取来的单元 | 不跑判法、直接记绿 | RP1「取来的单元判法照跑」格：假判法改成要另一个值，原式那一单元红，变异绿 |
+
+没红的照 `.claude/rules/mutation-sampling.md`「没红的三类，判据不同」分；无效的照第八类另换一条。
+
+#### 11.9 新设停机 S18；条款对复用的读法
+
+**S18 同键读数不同，或闭包认不全**（两边都查，既不作废也不当结果，交主 agent）：
+- ① RC1、RC2、RC3 任一次 `identical=false`。触发观测：任一份复用账本末行 `check_mismatches` 大于 0。
+- ② RC4 不过：dep-info 有树外路径，或现跑那一次 dep-info 的路径集合不等于键里 `[closure]` 的。触发观测：账本末行 `closure_mismatches` 大于 0。
+- 触发时：这一趟取来的读数一律不作数，现跑的照原条款判；库冻住（不取、不入），直到主 agent 查出漏的那样输入、加进键（键文本第一行 `schema` 的版本号加一，旧条目自然全不命中）或另判。
+
+**别的条款**：第 8.6 节与第 10.7 节逐条照旧。取来的单元另守三样：取用那一刻现核 Z5（快照摘要、H8）；它的读数照原条款判（例：取来的阳性对照不是 A8 那个数照 F1 办）；永远现跑的几类与不入库的几类照第 11.4 节。运行条件加一样：H30 那个目录写不了，或与 `research/target/` 不在同一个文件系统（硬链接不成），退 78。
+
+**作数**：第 8.7 节、第 10.8 节原文，另加：S18 不触发；三份账本末行 N + M 等于各层登记的单元数、`corrupted_entries` 照报不判；RP1–RP8 绿、RV1–RV15 全抓（RP2 在那一趟里跑，其余在起跑之前）。
+
+#### 11.10 执行员（件 38-4）改什么
+
+**形态照先例另写一层**：修订 8、修订 10 的几份（`segment_one_units_revision_8.py`、`segment_one_unit_revision_8.sh`、`rows_orchestrator_revision_8.py`、`rows_orchestrator_segment_two_revision_10.py` 与两个入口）一个字节不改，新层按路径载入、先核 sha256（`rows_orchestrator_segment_two.py` 文件头「为什么另写一层」那一段的做法）。覆写不了的那一处交回主 agent 定，不就地改旧文件。研究一侧目录里新加（名字是建议，执行员可改，改了写进 H31）：
+
+| 文件 | 做什么 |
+|---|---|
+| `reuse_library.py` | 第 11.2 节键、第 11.5 节库（查、取、原子入库、隔离、读数相等）、账本合成；`--selftest` 跑 RP1、RP3–RP8 与弄坏开关 |
+| `count_reusable_units.py` | 第 11.7 节计数（照设计员草稿 `count_reusable.py`） |
+| `segment_one_units_revision_11.py` | 载入修订 8 单元编排：起一个单元之前查库；命中的交单元脚本走取用；加单元 `reuse-selfproof`（依赖 step-0）；单元绿或结束时照入库条件入库；收尾合账本 |
+| `segment_one_unit_revision_11.sh` | 修订 8 单元脚本照抄，只在 `device_step`、`driver_step`、`run_executor` 三处加「给了 `REUSE_ENTRY` 就取用、不起进程」；判法那几行一个字不改 |
+| `rows_orchestrator_revision_11.py` | 第一段逐行：派发之前查库；row-0 与跨机那一份照 RC2 现跑；取回之后入库前核三样（第 11.5 节「两台」）；RC4 |
+| `rows_orchestrator_segment_two_revision_11.py` | 第二段：查库、RC2、RC3 抽样、入库、RC4；补位协调照旧（要补位的行不查库） |
+| 两个入口 `run_segment_one_revision_11_multi_host.sh`、`run_segment_two_revision_11_multi_host.sh` 与 `revision_11_placeholders.json` | 照修订 8、10 入口的写法；文件头三行长活声明；`bash research/scripts/detached-run.sh long-run-check -- <起法>` 退 0 |
+
+研究一侧变异表追加 RV1–RV15；研究一侧有文件变了，research-mutations 那一单元这一趟照 H11 原规矩重跑（它自己的键也变了）。自证登记进 `.claude/hooks/selftest-registry.tsv` 归主 agent。
+
+**占位**（接 H29 往下；形态同第 8.8 节）：
+
+| 占位 | 是什么 | 谁填 | 什么时候 | 填之前核什么 |
+|---|---|---|---|---|
+| H30 | 复用库根目录（默认 `~/.local/share/singlefs/reuse/e171-r1/`） | 主 agent 认 | 起跑之前 | 不在开机清空的目录；与 `research/target/` 同一个文件系统 |
+| H31 | 第 11.10 节新文件的 sha256 | 执行员写完，主 agent 认 | 起跑之前 | 各自自证绿、每个弄坏开关红在点名格；RV1–RV15 全抓 |
+| H32 | RC3 的 k 与挑中的行 | 第二段编排层 | 第二段派发之前 | 照第 11.2 节式子与挑法现算，写进账本 |
+| H33 | ①计数产物 | 执行员 | 拍树之后、第 0 步之前 | 计数脚本开头核单元表参数退 0 |
+| H34 | 修订 6 读数导不导、导了哪几个单元 | 主 agent 照 H33 定 | 第 0 步之前 | H33 报的 `same` 单元，每样输入照第 11.6 节表核在 |
+| H35 | 第二台的行做不做 RC4 | 执行员报，主 agent 认 | 起跑之前 | 做不成的写明缺哪一段，那几行只有静态拦 |
+
+#### 11.11 挂钟、分片、续跑、多机
+
+预计挂钟：超过 2 小时（这一条不改修订 8、10 那一趟的推算）。
+- 修订 8 那一趟：照第 8.9、10.9 节推约 14–17 小时（推的）。复用层多出的：每个单元算键（读 67 个源文件加几个研究文件，秒级；330 个单元合计几分钟，推的）、入库硬链接（秒级）、RC1 比读数（每个导出几十到一百多 MB，几秒到一分钟，推的）、RP2 三次 `stream-constants`（几分钟，推的）。库是空的（H34 导入的只当 RC1 比较对象），所以这一趟没有取来的单元，挂钟不省。
+- 以后各趟：省多少看改了哪（第 11.7 节）。只改闭包外的文件时，现跑的只剩 step-9（约 4.1 小时，修订 6 第 6.4 节）、step-10-run-2、第一段 row-0 两台各一份（每份约一个 T）、第二段跨机那一行两份与 RC3 的 k 行，推约 4–5 小时；改了任一 core 文件时一个装置单元都省不下。
+- 分片：不变（第 0–10 步按单元、两段按行）；命中的单元与行不进队列。
+- 续跑：同一条命令重起；取用靠标记与绿行补齐（第 11.5 节）；入库靠 `staging/` 加 `rename`。
+- 多机：台数照旧从 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts` 读，槽与线程照旧从 `research/scripts/host-resources.py --json` 现算；库只在本机，第二台不查库、不留库。
+
+#### 11.12 待主 agent 认的几处
+
+1. R1 取丙：读数单元、判法、现状核对三分；step-9、step-10-run-2、第一段 row-0 两份、第二段跨机那一行两份与要补位的行永远现跑（第 11.1 节）。
+2. R2 取甲（dep-info 形）；键外的线程数、包装脚本、链接器、编译目录路径四样，靠 RC1–RC5 盯（第 11.2 节）。
+3. RC3 的 k = max(3, ⌈0.02 × M⌉)，按 sha256(后缀 ‖ 键) 挑（第 11.2 节）。
+4. R4：超时与包装结局不入库，Z1、Z7、S17 的第二份现跑，现状核对每趟现判，其余照原样进判定；账本单出三份，判定产物格式不改（第 11.4 节）。
+5. 库放 H30（家目录下，不放 `research/target/`：第二台那棵树会被 `multi-host-run.sh` 删，本机的放在家目录与别的长存数据同处）；只在本机（第 11.5 节）。
+6. R5 取乙，附条件导入，导入的条目在修订 8 那一趟只当 RC1 的比较对象（第 11.6 节）。
+7. 修订 8 那一趟「带着复用跑」读作：查库开着（库空）、入库与 RC1–RC5 开着、RP2 跑；照用户「这次要全部跑」全部现跑。若主 agent 要这一趟连查库也关，只改 `revision_11_placeholders.json` 一项，入库与核对照开。
+8. 新设 S18（第 11.9 节）；作数条件加 S18、账本、RP1–RP8 与 RV1–RV15。
+9. 另写一层、不改修订 8、10 的文件（第 11.10 节）。
+
+#### 11.13 跑之前已经存在的数（这一条修订）
+
+1. **本登记里已有的修订 6 那一趟判定与读数**（读第 1403–2047 行时读到）：第 1737 行第一段判决行、第 1740 行 Q3 的 c、第 1747 行 Q5 告警自证、第 1763 行 T = 75.274 秒与限时 1800 秒、第 1767 行第二段判决行（含 `rows_not_located=107,168`）、第 1770–1773 行（第 85、235、272 行自崩，第 107、168 行找不到，Q2 集合七行）、第 1760 行跨机对照取第 201 行。影响：没有一条复用规则、门槛、k 的式子从这些数来；第 11.3 节「要补位的行永远现跑」是按 `row_driver.py` 的补位写法定的，不是按这几行。
+2. **设计员自己查到、算出的**（命令在第 11.14 节）：修订 6 树装置与 E170 导出 bin 的 dep-info 各 67 个文件、合起来 68 个、core 33 个全在两份里；`crates/` 下 289 个文件里两个闭包都没有的 214 个；修订 6 树装置二进制里树的绝对路径出现 1 次；第 11.7 节的计数；第二段 281 个 `row-result.tsv` 在、276 个有导出、没导出的是第 85、107、168、235、272 行（存在性，与第 1 条已有的读法一致）；第二段输入清单 13 项与今天的文件 `sha256sum -c` 全 OK；修订 6 第一段续跑清单 774 行里研究一侧文件 0 行。影响：只进第 11.2 节的比较表、第 11.6 节表、第 11.7 节计数与第 11.11 节挂钟；没有门槛从这里来。
+3. **单元表里推的用时**（`segment_one_units_revision_8.py` 第 107–131 行）与修订 6 第 6.4 节步表的挂钟：只进第 11.7 节与第 11.11 节，标「推的」。
+4. **调度记录第 1353–1364 行**（第 38 批）：只有件号与出口，没有读数。
+5. **没打开的**：`research/results/` 下任何 E171 产物（只 `ls` 了文件名、算了第二段输入清单里那一份计时产物与 E170 冻结行那一份产物的 sha256）；`research/target/e171-r1-dumps/` 下任何文件（只 `ls` 了目录名、数了 `row-result.tsv`、`dump/`、`o3.out` 在不在）；各序列日志与续跑日志（只核在不在）；第一段续跑清单只取了路径一列；实验页的结果与结论各节；各份交回报告。
+
+#### 11.14 这一条修订读过的文件与跑过的命令
+
+读过的（行号区间；grep 命中行也算）：
+- `.claude/agent-common.md` 全文；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122、`.claude/singlefs-ai-sop/rules/test-script-discipline.md` 1–96、`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176、`.claude/rules/three-way-inference.md` 1–174、`.claude/rules/mutation-sampling.md` 1–96、`.claude/rules/implementation-first.md` 1–20（全文）；`.claude/singlefs-ai-sop/rules/command-safety.md` 第 153 行（grep 命中）。
+- 本登记 1–82、289–573、793–812、1220–1300、1403–2047；`research/prompts/e171-r1-reuse-questions.md` 全文（17 行）；`records/2026-10-01-里程碑三形式化接入.md` 第 1353–1380 行与 `grep -n '^#'` 末 8 行、`grep -n '38-[0-9]'` 命中行。
+- 研究一侧目录（下写 `<研究一侧>`）：`row_driver.py` 1–130、221–748；`bad_implementation_table.py` 1–64、125–175 与 `grep -n` 命中行；`rows_orchestrator.py` 1–160、680–700 与 `grep -n` 命中行（第 110、112、137、146、581、597、681、696、915、1211 行）；`rows_orchestrator_segment_two.py` 1–130 与 `grep -n` 命中行；`segment_one_units_revision_8.py` 1–150；`segment_one_unit_revision_8.sh` 1–376；`run_segment_two_on_the_revision_6_tree_multi_host.sh`、`run_segment_one_on_the_revision_8_tree_multi_host.sh`、`run_segment_two_revision_10_multi_host.sh` 全文；`frozen_o3.py` 1–60；`check_product.py`、`cross_host_o3_check.py`、`device_timing.py`、`o3_bad_image_judge.py` 的 `grep -n` 命中行。
+- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs` 1–60、2485–2514、5225–5236、9780–9830 与 `grep -n` 命中行；`crates/singlefs-checker-tier/src/crash.rs` 与 `crash_identity.rs`、`verdict_store.rs` 的 `grep -n` 命中行（文件头）；`research/scripts/admission.py` 1188–1240、260–300、517–560 与 `grep -n` 命中行；`research/scripts/capped.sh` 22–36；`research/scripts/multi-host-run.sh` 的 `grep -n` 命中行；根 `Cargo.toml` 第 17–19 行；修订 6 树里各 `Cargo.toml` 的 `[dependencies]` 一段、`singlefs-checker-tier/Cargo.toml` 去注释的全文、两份 dep-info 全文、`target/.rustc_info.json` 的 rustc 一行；修订 6 树 dep-info 列的 67 个文件里读环境变量的 `grep` 命中行。
+
+跑过的命令（原样，草稿目录写成 `<草稿目录>`，修订 6 树写成 `$T`；输出在设计员报告与草稿目录里）：
+
+```
+$ wc -l <各规则文件> research/prompts/e171-r1-reuse-questions.md research/prompts/e171-r1-prereg.md
+$ grep -n '^#' research/prompts/e171-r1-prereg.md
+$ cd <研究一侧>; wc -l *.py *.sh | sort -n; wc -l <装置>
+$ grep -n 'fs::read\|File::open\|…\|thread::spawn' <装置>; grep -n 'thread::scope\|…' crates/singlefs-checker-tier/src/crash.rs
+$ ls crates/*/build.rs; ls rust-toolchain* .cargo; grep -n 'proc-macro\|\[profile' -A3 Cargo.toml crates/*/Cargo.toml
+$ ls $T; ls $T/target/release; ls research/target/e171-r1-dumps/
+$ tr ' ' '\n' < $T/target/release/e171_three_oracle_collusion_after_the_oracle_fixes.d | … > <草稿目录>/dep-info-rev6-device.txt   # 67 个
+$ tr ' ' '\n' < $T/target/release/e170_o3_spec_executor_export.d | … > <草稿目录>/dep-info-rev6-e170.txt   # 67 个，与装置共有 66
+$ grep -a -o '/home/fy5090/[a-zA-Z0-9_./-]\{0,60\}' $T/target/release/e171_three_oracle_collusion_after_the_oracle_fixes | sort | uniq -c   # 1 次
+$ du -sh <两段行输出根与 baseline-run1>; df -h ~ research/target; git check-ignore -v research/target/x
+$ for r in <修订 6 各行输出根>; do ls …row-result.tsv | wc -l; …; done
+$ sha256sum -c research/target/e171-r1-dumps/revision-6-segment-2/inputs.sha256   # 13 项 OK
+$ awk '{print $2}' <修订 6 草稿>/resume/manifest-before-step-11.sha256 | … ; grep -c 'row_driver.py\|…' 同上   # 774 行，研究一侧 0
+$ rustc -vV; cargo -V; python3 -VV; ls -la ~/.rustup/toolchains/; rustup default
+$ python3 -B <草稿目录>/count_reusable.py --repo . --tree-a $T … --hypothetical-change <33 个 core 文件逐个> | grep '^count' | sha256sum   # 33 次同为 a975fafe6a6c5511
+$ python3 -B <草稿目录>/count_reusable.py … --hypothetical-change <装置文件 / E170 bin 文件 / harness tests 第一份 / Cargo.lock>
+$ python3 -B <草稿目录>/count_reusable.py … --tree-b . --dep-b-device target/release/…d --dep-b-e170 target/release/…d   # 预演，不是①
+$ python3 - <按闭包把 $T/crates 下 289 个文件分类>
+$ { …存在性核对… } > <草稿目录>/r5-existence.txt
+$ for t in RV1 … H35 '修订 11'; do grep -c "$t" research/prompts/e171-r1-prereg.md; done   # 新用的名字都没用过（S18、H30 只出现在第 2017 行那条命令里）
+$ TZ=Asia/Tokyo date +%F   # 2026-10-08
+```
+
+## 主 agent 认定：修订 11 交回（2026-10-08，拍树之前）
+
+设计员报告 `~/.local/share/singlefs/work/e171-r1-reuse-design/report.md`（4ac33b18…）。主 agent 现核：修订 11 追加在第 2048–2433 行，前 2047 行 sha256 前缀 d1345e9e… 与追加前同，`tail -n +2048` 与草稿 `rev11.md`（bb661774…）逐字节相同。依据是用户 2026-10-08「这个E171 形式化还是要做剪枝 复用的 不是每一次都会改所有的模块和代码」「这次要全部跑 是改动范围的问题 不是这个功能不应该有的问题」「如果 E171 还没有跑 那么就做 如果跑了 就先这样」；问题单 `research/prompts/e171-r1-reuse-questions.md`。
+
+第 11.12 节九条都认：
+1. R1 取丙（读数单元、判法、现状核对三分），永远现跑的几类照第 11.1 节。
+2. R2 取甲（dep-info 闭包加构建环境加运行期输入）；不取乙，依据是根 `Cargo.toml` release 带 `debug = true`、二进制写编译目录绝对路径（第 11.2 节）；键外四样由 RC1–RC5 盯。
+3. RC3 的 k 与挑法照第 11.2 节。
+4. R4 照第 11.4 节；判定产物格式不改，复用账本另出三份。
+5. 库放 H30 默认 `~/.local/share/singlefs/reuse/e171-r1/`，只在本机；主 agent 现核它与 `research/target/` 同在 `/` 一个文件系统（`df --output=target`）。
+6. R5 取乙，导入只当 RC1 的比较对象，导不导由 H33 计数后照 H34 定。
+7. 修订 8 那一趟「带着复用跑」照第 11.12 节第 7 条读：查库开着（库空）、入库与 RC1–RC5 开着、RP2 跑，全部现跑。复用功能（件 38-4）做好、H31 认过之前不起跑。
+8. 新设 S18 与作数加项照第 11.9 节。
+9. 另写一层、修订 8、10 的文件一个字节不改（第 11.10 节）。
+
+件 38-4 派执行员照第 11.10 节写；自证登记 `.claude/hooks/selftest-registry.tsv` 归主 agent。
+
+## 主 agent 认定：修订 11 实现交回（2026-10-08，拍树之前）
+
+执行员报告 `~/.local/share/singlefs/work/e171-r1-revision-11-implement/report.md`（52e20a79…）。主 agent 现核：
+- 修订 8、10 与之前的 47 个文件对执行员开工前那份清单 `sha256sum -c` 47 个 OK（在研究一侧目录里核）；第 11.10 节 9 个新文件对 `h31.sha256` 9 个 OK。
+- 四份自证主 agent 各跑一轮：`reuse_library.py` 自证 38 项红 0、`segment_one_units_revision_11.py` 10 项红 0、`rows_orchestrator_revision_11.py` 9 项红 0、`rows_orchestrator_segment_two_revision_11.py` 11 项红 0；登记进 `.claude/hooks/selftest-registry.tsv` 第 57–60 行（light）。
+- 变异表 `research/mutations/e171_three_oracle_collusion_after_the_oracle_fixes_revision_11.tsv` 的产物入库为 `research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-08-revision-11-tools-research-mutations.out`，`research/scripts/replay.sh` 第 358 行登记、驱动 `driver_e171_r1_revision_11_tools_research_mutations`；主 agent 照驱动口径单跑一次，与入库产物逐字节相同，`E7RESULT name=verdict mutations=15 caught=15 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true`。
+
+报告第二节十条都认：
+1. 变异表另起 `_revision_11.tsv`，不追加进主表（主表由 `replay.sh` 逐字节复跑，照修订 8、10 先例）。
+2. 单元脚本加取用的几处（O3 阳性对照、研究一侧变异表两个读数进程、研究一侧变异表取用后补的 verdict 判法、第 2b 步取用不拷导出、`reuse-selfproof` 单元）：判法只是对取来的读数照原判法判，不改判据。
+3. 驱动行取用之后仍起驱动、带 `--skip-finished` 重报，不编、不跑装置。
+4. 驱动行导出比较照 Z1 去掉 impl-verdicts 的耗时列、照读法 4 拿掉不稳的对象（与原比对口径相同，否则 S18 每趟误触发）。
+5. 第二台三样核对里的快照摘要比合并规则 ② 那一份。
+6. RV1 那一格照报告的写法。
+7. RV9、RV10 写成 `return True`。
+8. H35：第二台的行不做 RC4，只有静态拦。
+9. H34 的导入工具等 H33 计数之后再定写不写；修订 8 那一趟库为空照第 11.12 节第 7 条跑，不导也不影响作数。
+10. 新代码避开第二段变异表 W7 的锚点，五张表锚点各恰 1 次。
+
+H30 认 `~/.local/share/singlefs/reuse/e171-r1/`（主 agent 已建目录）；H31 认 `revision_11_placeholders.json` 里填的 9 个 sha256（现核同 `h31.sha256`）。RP2、H33、H34 归拍树之后的执行员。修订 8 那一趟两段起法改用 `run_segment_one_revision_11_multi_host.sh` 与 `run_segment_two_revision_11_multi_host.sh`。

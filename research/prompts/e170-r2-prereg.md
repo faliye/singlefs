@@ -1113,3 +1113,195 @@ nice -n 19 python3 research/scripts/quote-kb.py $D/quote-d22-flags.md '.claude/k
 # 修订 1 换进第十二节：照草稿分几段用 research/scripts/replace-once.py 换掉第十二节的占位句（每段命中 1 次）；
 # 第十三节这一段用 >> 追加；回读核抄录区在登记里与草稿逐字节相同（见交回报告）
 ```
+
+### 修订 2（设计员，2026-10-04；Z4 的已知坏镜像那一族；Z4 产物与 Q5 任何判定之前）
+
+<!-- doc-lint:not-numbers S6 V20 V21 XC8 XC9 -->
+
+这一条属第十二节，接在修订 1 之后读；照主 agent 的派发只追加在登记末尾，第一至十三节与修订 1 一个字不改。写执行器的人不读这一条（里面有 `crates/` 的事实与 E171 装置的改法，同 12.9）。
+
+**时点**：Z 族的重导跑过一次（`research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export.out`），据重导准备第二趟执行员的报告（`/tmp/claude-1000/e170-r2-export-prep2/report.md` 第二节），那一次 Z1、Z5 的 S1 回比有 `holds=false`（流二段长表那几项）；`research/target/e170-r2-today-dumps/` 今天只有 `e170-dump`、`e171-baseline-run1` 两个目录，没有 `known-bad-s2`，Z4 一张没造；`research/results/` 里没有 `-s1b-` 与 Q5 的产物（文件名清单，第十三节末「修订 2」）。所以这一条在 Z4 的产物与 Q5 的任何判定之前。v2 在 I4 上的判定已经跑过（`…-s2-v2-i4-images.out`，只看了文件名），这一条不读、不动它。
+
+**来由**：E171 装置 `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 第 4416–4417 行 `KNOWN_BAD_TEST_FILE_SHA256` 写死用例文件 `crates/singlefs-harness/tests/checker_known_bad_images.rs` 的 `e8543908…`，第 4419 行 `KNOWN_BAD_ENTRY_COUNT = 41`；今天那份文件是 `e426cdff…`、43 条（12.12）。不处置，Z4 最后一步 `known-bad-images` 的四格照抄核对里 sha256、原文件条数、名字三格不过、退 3，照 S5 停（读码推的，没跑）。主 agent 定的方向（派发原话）：「照今天的用例文件重抄那组条目（不是只改 sha256），Z 族的已知坏镜像跟今天；I4 那一族（s4 导出上 41 行）不动」；修订 1 的十项、第三段交回的四点照旧。
+
+**原判据原样保留**：Q5 的翻面观测、门槛、甲乙判法，读法 13–15、12.7、12.8 的每一条都不改；这一条只把读法 14 在已知坏镜像族上没写死的两处写死（行名怎么取、两边是不是同一条改法），再补一个量、一个核对、一个锚点、一个停机。收严在哪写在 12.14 末尾。
+
+#### 12.12 跑之前已经存在的数（修订 2；现数，第十三节末「修订 2」的命令）
+
+1. **今天的用例文件**：工作区 sha256 `e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736`；`git status` 是 `MM`（暂存区 `be36a3e2…`、HEAD `ba5b6e10…`，别的会话还在改它）。三份都数出同一个结果：`fn known_bad_images(clean: &MemoryPool)` 一函数（工作区第 755–1326 行）43 条，字面名 38 条、常量名 5 条；三种数法（读法 18）都是 43。git 历史里没有哪一次提交的这份文件是 `e8543908…`（`git log` 十三次提交逐个算 sha256，没有一个对上）：I4 当初照抄的那一份不在版本库里。
+2. **照抄前的模块**：装置里 `mod known_bad_images_copied_from_the_harness_test`（第 2822–4234 行）抽出来的文本，sha256 `a5866391e1c1b036a34b4239e9e083716726d8d3ab7863a5f6c7d861d00bbf4a`，HEAD（`13ca0a19`，这份装置唯一的一次提交，2026-10-03）、暂存区、工作区三处相同。它的 `known_bad_images` 41 条。
+3. **逐条比**（草稿脚本 `analyze.py`、`items.py`，读法 18 的归一）：照抄前 41 条与今天前 41 条按序、目标名、条目文本全同；序号 14（I-5.1）只差一处折行，`vec!` 之前的前导绑定只差一个收尾逗号。今天多的两条接在末尾：序号 41 目标 `REFERENCE_INTERVALS_ARE_EXACT`（`crates/singlefs-checker/src/image.rs` 第 197 行，值 `I-3.5`），序号 42 目标 `FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK`（同文件第 206 行，值 `I-5.5`）。模块里 104 个顶层条目：99 个与今天同名条目逐字相同，2 个不同（`known_bad_images`；`set_transaction_number_of_journal_record` 只差一个收尾逗号），3 个今天文件里没有（两行 `use`、装置自己的 `entries_of_the_known_bad_images`）；归一之后不同的只剩 `known_bad_images`。新两条要带进来的只有一个辅助函数 `move_the_data_unit_of_the_first_file_two_slots_further`（今天第 1331–1375 行），它调的辅助条目模块里都有。
+4. **装置的名字数法今天会怎样**：`entry_names_in_the_original_test_file`（第 4422 行起）只认三个常量名（第 4449–4460 行的三个分支），新两个会落到第 4461 行 `unresolved_constant:`，名字那一格不过。
+5. **I4 是哪一版造的**：`research/target/e171-dumps/known-bad-s2/` 四个文件的修改日期 2026-10-02，早于那次提交；造 I4 的那一刻模块是不是就是 `a5866391…`，git 里取不到，是推的（读法 19 写怎么补核）。
+6. **影响**：这些是输入的条数与条目文本，不是 Q5 的答案，不进任何门槛。它们让「照抄前后 41 条全同」在设计时就可推（Q5-i 期望全过），所以 Q5-i 只当前提核对与停机，不当 Q5 的证据；Q5-pc3 证明那份核对分得出差别。
+
+#### 12.13 读法 17–19
+
+17. **Z4 已知坏镜像族的造法**。E171 原登记 5.5 那一族的造法是「用例函数里的每一条」，条数由那一份用例文件给（下面整段抄的第 270、273、275 行）。I4 照 `e8543908…` 那一份造，41 条；Z4 照今天那一份造，今天 43 条（文件再变就照读法 18 重数）。第四节第 3 条与 B4 的「已知坏镜像 41 行」说的是 I4，不动；读法 13 Z4 那一项括注里的「已知坏镜像 41 行」读成「照今天用例文件的条数」。
+**出处 `research/prompts/e171-preregistration.md:270-270`（整段抄，未转述）**
+
+```markdown
+| 已知坏镜像族 | `checker_known_bad_images.rs` 第 747 行 `known_bad_images(clean)` 的每一条，施加在流一的全持久态 F 上；补丁 = 施加前后逐 512 字节扇区的差 | 41 | 照 O2 的判据造 |
+```
+
+**出处 `research/prompts/e171-preregistration.md:273-273`（整段抄，未转述）**
+
+```markdown
+- **已知坏镜像族与 `checker_known_bad_images.rs` 的关系**：用例里的干净镜像就是 `build_pool` 走完的池，等于流一的全持久态 F（停机 S4 核摘要相等）；用例断言每一条都让 O2 的目标不变量红，本实验在中性格式这条管子上重放同一批改坏，同时第一次让 O3 判它们。条目由装置 `#[path]` 引或照抄（执行员定）；照抄的逐条与原函数比条目名与条数。那个文件里其余几族（发布 B 之后、回退之后、抬 F 之后……）的干净镜像不在两条流的任何一个状态上，不取。
+```
+
+**出处 `research/prompts/e171-preregistration.md:275-275`（整段抄，未转述）**
+
+```markdown
+- **几何取样点**：P 行自带两个底态（F、Mk），逐行比两个底态上的判定（第八节）；已知坏镜像族只能在流一 F 上（用例的闭包写死了流一那份池的单元槽号，例 `DATA_UNIT` = 50180），没有方向相反的取样点，第八节照写。
+```
+
+18. **怎么数、怎么抄**（重导准备的执行员照做；结果写进 Q5-i 的产物）。
+   - **数**：三种数法各数一遍，三个数相等才往下抄。（a）装置的名字数法 `entry_names_in_the_original_test_file`，补上 12.15 的两个分支之后跑在今天的文件上：条数，且没有一个名字以 `unresolved_constant:` 开头；（b）从 `fn known_bad_images(clean: &MemoryPool)` 那一行到其后第一行恰为 `}` 的行，数 `Box::new(` 出现次数；（c）同一区间里恰为八格缩进加 `(` 的行数（`vec!` 的每一项）。另报字面名、常量名各几条。对 `e426cdff…` 那一份：43、43、43，字面 38、常量 5。
+   - **抄的来源**：抄的那一刻工作区里的那份用例文件，sha256 写进 `KNOWN_BAD_TEST_FILE_SHA256` 与 Q5-i 的产物。重导的快照拷 `crates/`，装置读的是快照里那一份（`CARGO_MANIFEST_DIR`）；抄完到拍快照之间那份文件又变了，装置的 sha256 那一格不过、照 S5 停，执行员照这一条再抄一次、重数，B17 换成新数写进修订记录——数随输入走，不算改判据。
+   - **抄什么**：今天的 `known_bad_images` 整个函数（缩进加四格）；今天文件里被模块条目引到、模块里还没有的顶层条目（今天只有 `move_the_data_unit_of_the_first_file_two_slots_further`）；新目标常量补进模块的 `use singlefs_checker::image::{…}`（第 2830 行起）。模块里已有、归一之后与今天同名条目相同的条目可以不动。
+   - **归一**：去掉全部空白字符，再去掉紧挨在 `)`、`]`、`}` 之前的逗号（rustfmt 的折行与收尾逗号）。
+   - **抄完核**：模块里除两行 `use` 与 `entries_of_the_known_bad_images` 之外的每个顶层条目，与今天文件里同名条目归一之后相同；有一个不同 → S6。
+
+19. **Z4 对 I4 怎么比**（读法 14 行格在已知坏镜像族上的具体化）。
+   - **行名**：`known_bad_<序号>|<目标不变量名>`，序号取 `known-bad-states.tsv` 第 1 列，目标名取 `known-bad-o2.tsv` 第 2 列，与第二段 Q1 比对器 `research/e7-index-bench/src/bin/e170_o3_spec_executor_with_witness_predicates/comparator_two_versions.py` 第 128 行同一取法。`known-bad-states.tsv` 没有补丁描述列，读法 14 的「补丁描述不同」在这一族上没有可比的列，照原文只按行名。
+   - **可比与不可比**：两边都有的行名可比，照读法 14 进 Q5-a、Q5-b。今天 Z4 的序号 0–40 与 I4 的序号 0–40 同名，41 行可比；序号 41、42 I4 没有，照读法 14「一边没有这一行」记不可比，进 Q5-c，不进 Q5-a、不判，判定逐行列进 Q5-h。
+   - **同一条改法的核对**（Q5-i，读法 14 原文没要求，收严）：可比的每一行另核两边是同一条改法——照抄前模块（`a5866391…`）的第 i 条与照抄后的第 i 条（i = 0–40），目标名、条目文本、`vec!` 之前的前导绑定、条目引到的辅助条目，归一之后都相同。I4 那一侧：I4 `known-bad-o2.tsv` 第 2 列序号 0–40 的目标名按序等于照抄前模块的 41 个目标名（重导准备第三趟的执行员核，只读那一列）。造 I4 的那一刻模块就是 `a5866391…` 这一件在 git 里取不到（12.12 第 5 条），写成推的，交回照写。
+   - **核对不过不挪行**：某一行同一性不过，那一行照读法 14 原文按行名照比、照计进 Q5-a，另在 Q5-i 单列「条目不同」，走 S6；这一核对不把任何一行挪出 Q5-a，也不把任何一行挪进来。
+   - **几何**：已知坏镜像族只有流一 F 一个取样点（上面抄的第 275 行），G6–G9 都不罩它，第八节照写「只取一点，没有方向相反的取样点」。
+
+#### 12.14 量、锚点、作废、停机增补（接 12.7、12.8）
+
+| 量 | 怎么算 | 门槛 | 判定 | 问题单哪一行、取什么值翻面 |
+|---|---|---|---|---|
+| Q5-h | Z4 里 I4 没有的已知坏镜像行（今天序号 41、42）：v2-487 的严格判定、`failed_predicates`、落点类、`witness_true`、`tail_check`，逐行列 | — | 不判 | 附带，不另跑（v2-487 判 Z4 那一趟本来就出这几行）：Q5-c 不可比那几行的明细；翻不了 Q5、Q4 |
+| Q5-i | 读法 18、19 的照抄核对：三种数法的条数；照抄后模块逐条目对今天文件；照抄前后 41 条逐条同一；I4 目标名列对照抄前 | 三种数法相等；三项「不同」都是 0 | 任一不满足 → S6 | Q5 的前提：已知坏镜像族可比的 41 行两边是同一条改法 |
+| Q5-pc3 | 照抄核对脚本的判别力：照抄后的装置复制一份，把序号 5 那一条条目文本里一个数改掉、目标名不动，脚本对它报的「照抄前后不同」条数 | 恰 1 | ≠ 1 → V21 | Q5-i 的判别力 |
+
+门槛与臂并排看：Q5-i 的门槛是照抄的定义（抄全、抄对），不从 v2-487、v2 任何一条臂推出；它管的是 Z4 与 I4 的已知坏镜像族比的是不是同一批改法，不管判得对不对。
+
+**锚点**（独立算出、用命令核过，对 `e426cdff…` 那一份）：
+- B17：用例函数 43 条 = 字面名 38 + 常量名 5，在工作区第 755–1326 行；照抄前 41 条与今天前 41 条归一之后全同，序号 41、42 的目标是 `I-3.5`、`I-5.5`；Z4 的 `known-bad-states.tsv` 43 行，`known-bad-o2.tsv` 第 2 列按序等于这 43 个目标名。文件没变而 Z4 的行数或目标名列与 B17 不等 → V20。
+
+**作废**：
+- V20：B17 不符（照抄时记的用例文件 sha256 与快照里的相同，而 Z4 的行数或目标名列与 B17 不等）：Z4 那一步作废。
+- V21：Q5-pc3 ≠ 1：照抄核对分不出差别，Q5-i 作废，S6 那一判不算，改脚本重跑。
+
+**停机**：
+- S6 照抄核对：Q5-i 任一不满足。产物照打、交主 agent；不在快照里另改（同 S5）。Q5 照原判据照判（读法 19 末两条）；S6 未解时，Q5 甲那一支交出去要连同 S6 一起写。
+
+**翻面判据变不变**：不变。Q5 的翻面观测（问题单「任一对照或坏镜像族在两份上判定不同」）、Q5-a 的门槛 0、Q5-b 每族 ≥ 1、读法 15 的 Q4 判法一个字不改。已知坏镜像族的可比格仍是 I4 那 41 行全部（与 I4 一一对应）；Z4 多出的两行一边没有，照读法 14 原文不可比，翻不了 Q5，也翻不了 Q4（读法 15 的 (i)、(ii) 只看 Q5-a 里的格）。
+
+**比修订 1 多要求了什么**（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「臂的定义也在「跑前写死」之列」三步的「写明收严在哪」；Z4 一张没造、Q5 一格没判，「记一次输」不适用）：已知坏镜像的行名取法写死；可比的 41 行要证明两边是同一条改法（Q5-i、S6），原文只按行名；B17 钉条数与目标名列；Q5-h 列出不可比那两行的判定；Q5-pc3 证明核对会红。放宽：没有。读法 17 把读法 13 括注里 Z4 的「41 行」换成照今天的条数，是输入跟今天（主 agent 定）；原判据下能进 Q5-a 的行一行没少，核对不过也不挪行。
+
+**变异**（接 12.8 的表；XC8、XC9 进 `research/mutations/e170_o3_spec_executor_with_witness_predicates_journal_header_487.tsv`，两条 crates 行进 `crates/mutations.tsv` 末尾）：
+
+| 变异 | 改什么 | 在哪个取样点上改变输出 |
+|---|---|---|
+| XC8 | 照抄核对只比目标名、不比条目文本 | Q5-pc3 那份复制件：「照抄前后不同」1 → 0 |
+| XC9 | 归一不去收尾逗号 | 真实的照抄前后比：`vec!` 之前的前导绑定差一个收尾逗号（12.12 第 3 条），「照抄前后不同」0 → 1，S6 误触发 |
+| E171 装置名字数法认错 `REFERENCE_INTERVALS_ARE_EXACT` | 12.15 新加的那个分支给的名字 `I-3.5` 换成 `I-3.4` | 扩过的单测 `entry_names_are_read_in_file_order_from_the_twelve_space_indented_lines_of_the_function`：它的文本里有一行十二格缩进的 `REFERENCE_INTERVALS_ARE_EXACT,`，期望 `I-3.5`，变异后红 |
+| E171 装置名字数法认错 `FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK` | 另一个新分支 `I-5.5` 换成 `I-5.4` | 同一条单测里那一行，期望 `I-5.5` |
+
+两条 crates 行的第 5 列照第 1978 行写 `-p singlefs-checker-tier --bin e171_three_oracle_collusion`，第 6 列是上面那条单测名；原文必须在改后的源码里恰好命中一次（带上常量名，避开单测里同样的字面量）。它们属 checker 档，提交时由主 agent 的 checker-tier-crates-mutation-replay 跑。XC8、XC9 是纯 Python，重导准备第三趟在草稿副本上逐条替换、跑核对脚本、还原。
+
+#### 12.15 E171 装置要改哪几处（重导准备第三趟；写执行器的人不读）
+
+**装置写在哪**：入库装置，就是 E171 装置本身（`crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs`）。这一族问的是「Z4 照今天的用例文件造」，造它的就是这份装置，另写独立模型答不了。行号是 2026-10-04 工作区（sha256 `9c88d5c5…`）：
+
+| 处 | 行 | 改成 |
+|---|---|---|
+| 照抄的函数 | 第 3569 行起的 `known_bad_images` | 照读法 18 换成今天文件的整个函数（43 条） |
+| 新辅助函数 | 模块里 | 照抄 `move_the_data_unit_of_the_first_file_two_slots_further`（今天第 1331–1375 行） |
+| 模块的导入 | 第 2830 行起 `use singlefs_checker::image::{…}` | 补 `REFERENCE_INTERVALS_ARE_EXACT`、`FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK`（照抄的条目自己要用） |
+| 用例文件 sha256 | 第 4416–4417 行 | 抄的那一刻那份文件的 sha256（今天 `e426cdff…`） |
+| 条目数 | 第 4419 行，与第 4418 行的注释 | 41 → 读法 18 数出的数（今天 43）；注释改成今天的行区间与字面 / 常量条数 |
+| 名字数法 | 第 4449–4461 行的 `match` | 加两个分支：`REFERENCE_INTERVALS_ARE_EXACT` → `"I-3.5"`，`FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK` → `"I-5.5"`，写本地字面量、旁注出处 `crates/singlefs-checker/src/image.rs` 第 197、206 行；回比就是已有那一格 `known_bad_entry_names_equal_the_original_file_in_order`（照抄的条目带的是 crates 常量的值，两边不等就不过）。已有三个分支不动 |
+| 单测 | 第 6150 行那一条 | 文本里加两项（十二格缩进的两个新常量名），期望加 `"I-3.5"`、`"I-5.5"` |
+| 注释与提示文字 | 第 2809–2814 行模块头（行区间、sha256）；第 4269 行 `expect` 里的「41」；第 4413、4509 行的「41 条」 | 跟今天的数与行号 |
+| 变异行 | `crates/mutations.tsv` | 上面那两条；改完照 `.claude/rules/mutation-sampling.md` 第七类核这份装置名下全部变异行的原文各恰好命中一次 |
+
+**核对脚本**：`research/e7-index-bench/src/bin/e170_o3_spec_executor_with_witness_predicates_journal_header_487/known_bad_recopy_check.py`（不进冻结，同 `run_today_export.sh`）。输入：照抄前的装置（`git show 13ca0a19:` 那一份，抽出的模块先核 sha256 `a5866391…`）、照抄后的装置、抄的那份用例文件、I4 的 `known-bad-o2.tsv`。输出逐行：`name=known_bad_source sha256=`、三种数法各一行、`name=known_bad_entry_identity index= target= identical=`（41 行）、`name=known_bad_item_identity item= identical=`、`name=i4_target_names equal=`、`name=known_bad_recopy_verdict`。产物 `research/results/e170-r2-o3-spec-executor-<日期>-s2b-known-bad-recopy.out`，Q5-pc3 那一趟另起文件名。
+
+**重不重**：改装置与核对脚本、跑核对脚本、`cargo build` 都不是重型；装置的内联单测属 checker 档，没跑，交主 agent 提交时跑；`known-bad-images` 那一步随重导由主 agent 用 `cargo run` 起（12.9）。
+
+**射程外的连带**（这一条不处置，交主 agent）：这份装置也是 E171 自己复跑的装置，改完它的 `known-bad-images` 出 43 行；E171 研究一侧 `research/e7-index-bench/src/bin/e171_three_oracle_collusion/bad_images_report.py` 第 25 行 `KNOWN_BAD_ROWS_EXPECTED = 41`；E171 第 1 次重跑的新装置照抄这份装置起头（`research/prompts/e171-r1-prereg.md` 第 398 行）。
+
+**分段增补**（接 12.8 的分段表）：
+
+| 段 | 谁做 | 做什么 | 补问题单哪一行 | 补完够不够判 |
+|---|---|---|---|---|
+| 重导准备第三趟 | 能读 `crates/` 的执行员（不是写执行器的人） | 12.15 全部；Q5-i、Q5-pc3、XC8、XC9；只编不跑 | 不补 | 不够；交出照抄后的装置与 `-s2b-known-bad-recopy.out` |
+| 重导 | 主 agent 后台起 | 12.6 原样；Z4 的已知坏镜像这次照今天的条数 | 不补 | 不够 |
+| 第二段 | 原第二段的执行员 | 12.8 原样；Q5 比对器照读法 19；Q5-h；B17 的 Z4 那一半 | Q5；Q4 随之 | 照 12.8 |
+
+#### 12.16 修订 2 读过的文件与跑过的命令
+
+**读过的文件**（行号区间；grep 命中行也列）：
+
+- `.claude/agent-common.md` 1–100；`.claude/singlefs-ai-sop/rules/test-discipline.md` 1–122；`.claude/rules/implementation-first.md` 1–20；`.claude/rules/mutation-sampling.md` 1–96；`.claude/rules/three-way-inference.md` 1–174；`.claude/singlefs-ai-sop/rules/evidence-discipline.md` 1–176。
+- 本登记 1–80、368–1115（修订之前那一版，sha256 `73fce1f069d7c4e7c3cf40b55003dae3ff5509c79cb9fc6d170ea30eea5ba1b4`）；`research/prompts/e170-r2-questions.md` 1–11；重导准备第二趟的报告 `/tmp/claude-1000/e170-r2-export-prep2/report.md` 1–160（它引的那份重导产物的 8 行 S1 回比在报告里，产物本身没打开）。
+- `research/prompts/e171-preregistration.md` grep 命中 10、16、135、152、192、199、205、215、251、270、273、275、281、282、299、335、348、408、450、484、486、504、520、529、561、563、681、698、699、701、721、723 行（已知坏镜像族的造法、A8、S4、X15）；`research/prompts/e171-r1-prereg.md` grep 命中 24、364、381、398、501、555 行。
+- `crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs` 2805–2830、3330–3340、3565–3575、4220–4280、4410–4660、6140–6175，grep 命中 16、2024、2809–2822、3239、3569、4228–4269、4413–4461、4509–4643、5103–5236、6151 行，模块 2822–4234 抽进草稿整份比过；`crates/singlefs-harness/tests/checker_known_bad_images.rs` 工作区 755–800、1300–1330、1331–1375 与 grep 命中 17、24、429、523、671、755、1188、1301、1322、1405、1812、1935、1964、2432、2824、2832、3660 行，`known_bad_images` 与模块对应条目整份比过，HEAD 与暂存区两份同法比过；`crates/singlefs-checker/src/image.rs` grep 命中 197、206 行；`crates/mutations.tsv` 1–3、1978 行与这份装置名下 14 行的第 1、3、6 列。
+- `research/e7-index-bench/src/bin/e171_three_oracle_collusion/o3_bad_image_judge.py` 1–60、74–200；同目录与 `e170_o3_spec_executor_with_witness_predicates/`、`…_journal_header_487/` 里 grep `41`、`known_bad`、`known-bad` 的命中行（`comparator_two_versions.py` 120–128、231，`comparator_bad_image_judge.py` 15、144–182，`run_segment_two.sh` 24、54、78、106，`mutation_driver_third_segment.py` 341、363、380，`witness_reference.py` 10、547–584，`bad_images_report.py` 3、25、31、77–94、177、228、231，`comparator.py` 9、33、59、446、491–492，`test_o3_comparison.py` 161）。
+- `/tmp/claude-1000/e170-r2-export-prep/run_today_export.sh` grep 命中 14–18、31、44、45、75、96、97 行（sha256 `0dac1f94…`；它不在仓里，12.6 写的是放 v2-487 的目录）。
+- `.claude/singlefs-ai-sop/scripts/doc-lint.sh` 900–975。
+- 文件名与元数据：`research/results/` 里 `e170-r2` 开头的文件名；`research/target/` 里 `e170-r2` 开头的目录名与 `e170-r2-today-dumps/` 的目录名；`research/target/e171-dumps/known-bad-s2/` 的文件名、行数、修改时间。
+- 没读：`.claude/kb/experiments/` 下的实验页；`research/results/` 下任何文件的内容；`research/target/` 下导出文件的内容（只数了行、看了时间）。
+
+**跑过的命令**（原样；只读命令的输出没进登记的不贴）：
+
+```bash
+TZ=Asia/Tokyo date +%F                                                     # 2026-10-04
+D=/tmp/claude-1000/e170-r2-designer-rev2; F=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs; T=crates/singlefs-harness/tests/checker_known_bad_images.rs
+sha256sum $F $T                       # 9c88d5c5…  / e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736
+git status --short -- $F $T           # " M" / "MM"
+for c in $(git log --format=%h -- $T | head -20); do echo "$c $(git show $c:$T | sha256sum | cut -c1-16)"; done   # 13 次提交，没有 e8543908
+sed -n '/^mod known_bad_images_copied_from_the_harness_test {/,/^}/p' $F | sha256sum         # a5866391…（HEAD、暂存区同）
+git log -1 --format='%h %cs' 13ca0a19                                                         # 13ca0a19 2026-10-03
+stat -c '%y %n' research/target/e171-dumps/known-bad-s2/*                                     # 修改日期 2026-10-02
+cp $T $D/test-today.rs; git show HEAD:$T > $D/test-head.rs; git show :$T > $D/test-index.rs
+sed -n '/^mod known_bad_images_copied_from_the_harness_test {/,/^}/p' $F > $D/copied-module.rs
+nice -n 19 python3 $D/analyze.py $D/test-today.rs        # old_entries 41 new_entries 43 / device_rule_names_today 43 / box_new 43 / 前 41 条 equal（序号 14 只差折行）/ 末尾插入两条（新序号 41、42）
+nice -n 19 python3 $D/items.py $D/test-today.rs          # copied_items 104 same 99 differ 2 missing_today 3 / 归一之后不同 ['known_bad_images'] / new_items_needed ['move_the_data_unit_of_the_first_file_two_slots_further']
+# test-head.rs、test-index.rs 两份跑同样两条，输出相同
+S=755; E=1326; awk "NR>=$S&&NR<=$E" $T | grep -c 'Box::new('                          # 43
+awk "NR>=$S&&NR<=$E" $T | grep -cE '^            "I-[0-9]+\.[0-9]+",?$'                   # 38
+awk "NR>=$S&&NR<=$E" $T | grep -E '^            [A-Z_]+,?$'                              # 5 行常量名
+awk "NR>=$S&&NR<=$E" $T | grep -cE '^        \($'                                        # 43
+grep -rn 'pub const REFERENCE_INTERVALS_ARE_EXACT\|pub const FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK' crates/singlefs-checker/src/   # image.rs:197 "I-3.5"、:206 "I-5.5"
+nice -n 19 python3 research/scripts/quote-kb.py $D/quote-e171-55.md 'research/prompts/e171-preregistration.md:270-270' 'research/prompts/e171-preregistration.md:273-273' 'research/prompts/e171-preregistration.md:275-275'
+#   ✓ 3 段整抄进 /tmp/claude-1000/e170-r2-designer-rev2/quote-e171-55.md，回读逐字节一致
+sha256sum research/prompts/e170-r2-prereg.md   # 修订之前 73fce1f069d7c4e7c3cf40b55003dae3ff5509c79cb9fc6d170ea30eea5ba1b4
+# 修订 2 照草稿 partA–partD 依次 >> 追加到登记末尾；回读：tail -c <草稿总字节> 登记 | cmp - <四段拼起来>
+```
+
+草稿脚本 sha256：`analyze.py` `90075a8c…`、`items.py` `31a5d503…`、`entry-diff.py` `019403dc…`；它们只在草稿目录里，重导准备第三趟的执行员照读法 18、19 另写入库的核对脚本，不拷这几份。
+
+## 主 agent 认定修订 2（2026-10-04，跑产物之前）
+
+对修订 2「要你认或处理的」七条：1 认（同一性核对不过只停机交回）；2 认（两个新分支用本地字面量，与已有三支并存）；3 认（多出的两行只列不判）；4 认，派「重导准备第三趟」执行员，要动的 crates 文件就那两份；5 那几处连带归 E171 第 1 次重跑与复跑登记行那两件（调度记录第 22 批 22-6、22-7）；6 用例文件开工时与拍快照前各核一次 sha256，变了照 S5；旧 `research/target/e170-r2-today-*` 由主 agent 重导前改名留底；7 认。
+
+## 主 agent 认定重导准备第三趟交回（2026-10-04）
+
+报告 `/tmp/claude-1000/e170-r2-export-prep3/report.md`（sha256 67639330…）交的四条：1 序号 33（I-8.6）前面那一行注释在条目括号之外，不算条目文本，不触发 S6；2 XC9 红在 `item_differences` 0 → 2、不在 12.14 预期的「照抄前后不同」0 → 1，原因是收尾逗号的差在模块与原文件之间，照实记：XC9 被抓到、红在预期之外的那一格；3 `-s2b-known-bad-recopy.out` 产物、核对脚本与 XC8、XC9 的变异表由第一段乙的执行员从 `/tmp/claude-1000/e170-r2-export-prep3/` 带进仓（脚本进 v2-487 目录、产物进 `research/results/`）；4 拍快照前主 agent 再核用例文件 sha256。
+
+## 主 agent 认定 Z 族重导（2026-10-04）
+
+重导产物 `research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export-r3.out`（`name=done steps_exit_zero=10 steps_exit_nonzero=0 steps_skipped=0 snapshot_checks_failed=0`；`-r2.out` 是 build 被内存包装峰值闸拒、一行没跑的那一次，留作记录）。
+
+V16 打中而不分辨：脚本逐字节比报「name=z1_vs_z1r_summary same=16 different=4 one_side_only=0」，四份不同是两条流的 `impl-verdicts.tsv` 与记它摘要的 `manifest.tsv`；装置自己的比较行「E7RESULT name=verdict … v2_compared=true v2_differing_files=4 v2_differing_files_without_timing=0」，去掉耗时列后两条流 `impl-verdicts.tsv` 逐行相同（主 agent 现核：两条流各 82、890 行，`awk` 去掉最后一列后 `diff` 无差）。耗时列按登记 5.3 是每个状态 `judge_crash_image` 的纳秒数，每次跑都不同，V16 的字面在任何一次导出上都打中，分不出导出确定不确定（`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「判据自己也会写错」那张表「打中不分辨臂」一行）。照那一行：不拿它判 Z 族作废；确定性照装置第 1222 行写的口径（`impl-verdicts.tsv` 去掉最后一列、`manifest.tsv` 去掉记它摘要那一行）判，结果 0 处不同，判确定。V16 字面打中这一笔照实记在这里，实验页写这一次时一并写。
+
+更正（2026-10-04）：「主 agent 认定重导准备第三趟交回」第 3 条原定由第一段乙的执行员把 `/tmp/claude-1000/e170-r2-export-prep3/` 里的产物、核对脚本与 XC8、XC9 变异表带进仓；核对脚本读 `crates/` 下的用例文件，落在 5.7 禁读清单里，改由第二段的执行员带。
+
+## 主 agent 认定第一段乙交回（2026-10-04）
+
+报告 `/tmp/claude-1000/e170-r2-segment1b/report.md`（sha256 b25585c1…），产物 `research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out`（sha256 f7896f70…）。
+
+1. 禁读偏差：执行员 grep 登记节标题带出第十三节命令注释 19 行与 12.16 三行（第 1089 行「#   184 … = 11;  185 … = 19;  197 … = 188;  200 … = 311;  206 … = 67;」），grep 第一段甲报告带出第 169 行（转述 `crates/singlefs-format/src/lib.rs` 今天的 487 / 364 / 64 与 HEAD 的 311 / 188 / 67）。V7 的主语是写 v2 的执行员、V18 的主语是写格式补丁的人；这一段没改两条臂里任何已有文件，冻结行是对现有文件算的哈希，新写的 `run_segment_one_b_anchors_and_freeze.py` 以 `run_` 起头、照 5.6 不进冻结。带出的是格式常量，同样的值在 D23 已定项 4 正文里、执行员本可读。判：V7、V18 不触发，两份冻结认；偏差照实记在这里，实验页写这一段时一并写。
+2. `impl-verdicts.tsv` 的 sha256（manifest 核对里两项 `not_checked`）由第二段的执行员补核。
+3. 认：这份产物依赖不进 git 的 Z1 导出，照 5.5 不加复跑行。
+
+## 主 agent 认定第二段 Q5 交回（2026-10-04）
+
+报告 `/tmp/claude-1000/e170-r2-segment2-q5/report.md`（sha256 2439fc0e…）：Q5 甲、Q4 甲，交 E171 第 1 次重跑读法 9 的是 v2-487。它交的四条：1 认：核对脚本入仓名 `run_known_bad_recopy_check.py`（照 5.6 `run_` 起头不进冻结；照 12.15 原名会被算进冻结、种子变、往后冻结核对撞 V17，两句里保「不进冻结」那一句）；2 认：`bad-expected.tsv` 第 9 列的流序位置数当偏移排除（两种读法 Q5 都是甲）；3 记：XC8、XC9 在 487 那张变异表里，往后用单测层驱动整表跑时先排除这两行；4 实验页与复跑行并进 E170 收尾那一件（调度记录第 22 批 22-7）。第三段（附带）、第四段够判后未跑。
