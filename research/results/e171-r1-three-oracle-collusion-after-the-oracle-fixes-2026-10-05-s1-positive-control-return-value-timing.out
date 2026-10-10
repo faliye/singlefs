@@ -1,0 +1,13 @@
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o1 states=397 total_ns=12013652 median_ns=29680 p95_ns=48141 max_ns=79960
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o2 states=397 total_ns=15012151096 median_ns=38348423 p95_ns=69446866 max_ns=79181127
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=recovery states=397 total_ns=217506179 median_ns=544782 p95_ns=867194 max_ns=1736209
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o1 states=119 total_ns=3964123 median_ns=32670 p95_ns=52280 max_ns=63451
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o2 states=119 total_ns=4516348237 median_ns=38569664 p95_ns=67823838 max_ns=70436782
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=recovery states=119 total_ns=63159173 median_ns=540472 p95_ns=721303 max_ns=1550648
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o1 states=374 total_ns=12161032 median_ns=31151 p95_ns=48260 max_ns=65921
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o2 states=374 total_ns=14212325670 median_ns=38514494 p95_ns=67711117 max_ns=70675003
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=recovery states=374 total_ns=195331001 median_ns=539623 p95_ns=702913 max_ns=1008516
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv bytes=51150 sha256=1c35cfeb6304a3321feb92faa4ff75826665137c089c1f264821d96c1fe27730
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=manifest.tsv bytes=912 sha256=9a9c9cf58c8e4c7ff0e6a6cb3333b1bf7bb390315bec18ef403aeac0e2c3d590
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=79125775097 drive_ns=1934698927 observe_ns=74832486941 write_ns=2281547741
+E7TIMING name=process_wall seconds=79.389 exit=0

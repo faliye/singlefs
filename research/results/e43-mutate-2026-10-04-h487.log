@@ -1,0 +1,88 @@
+mutate: 这一轮开 3 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 3 个；表里 24 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 2（MUTATE_CARGO_JOBS）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+基线：全绿
+run-with-memory-cap: 上限 1G 超过实测峰值 84M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 84M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 84M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M1_基线元数据打错] 红：tests::counted_upper_bound_from_the_zfs_clause_is_zero_now,tests::both_rows_are_dearer_than_zfs_at_zero,tests::only_the_unit_header_lives_inside_the_unit,tests::our_rows_reproduce_the_decision_21_table,tests::positive_control_every_unit_arm,tests::the_btrfs_half_clause_already_fails_at_zero
+✅ [M2_占比不四舍五入] 红：tests::integer_and_float_paths_agree_on_every_cell,tests::our_rows_reproduce_the_decision_21_table,tests::positive_control_every_unit_arm,tests::reference_rows_reproduce_the_decision_21_table
+✅ [M3_扇出不扣扩展点] 红：tests::height_thresholds_are_pinned_per_node_size,tests::positive_control_every_node_arm
+run-with-memory-cap: 上限 1G 超过实测峰值 81M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 81M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 81M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M4_ZFS对照行打错] 红：tests::both_rows_are_dearer_than_zfs_at_zero,tests::counted_upper_bound_from_the_zfs_clause_is_zero_now,tests::reference_rows_reproduce_the_decision_21_table
+✅ [M5_净荷少扣一字节] 红：tests::every_rejection_reason_is_reachable,tests::structural_upper_bounds_are_pinned
+✅ [M6_下界漏掉长度] 红：tests::lower_bound_is_a_range_from_seven_to_thirteen
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M7_DataOnly也扣] 红：tests::data_only_carrier_never_grows_the_tree
+✅ [M8_树高少数一层] 红：tests::height_thresholds_are_pinned_per_node_size
+✅ [M9_btrfs常量打错] 红：tests::reference_rows_reproduce_the_decision_21_table,tests::the_btrfs_half_clause_already_fails_at_zero
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M10_下界漏掉校验和档] 红：tests::lower_bound_is_a_range_from_seven_to_thirteen
+✅ [M11_长度字段量程算错] 红：tests::two_byte_length_cannot_span_a_128_kib_unit
+✅ [M12_条带档基线打错] 红：tests::both_rows_are_dearer_than_zfs_at_zero,tests::our_rows_reproduce_the_decision_21_table
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+✅ [M13_容器约束扣144] 红：tests::every_rejection_reason_is_reachable,tests::structural_upper_bounds_are_pinned
+✅ [M14_节点不留指针] 红：tests::every_rejection_reason_is_reachable,tests::structural_upper_bounds_are_pinned
+✅ [M15_单元头宽度打错] 红：tests::every_rejection_reason_is_reachable,tests::only_the_unit_header_lives_inside_the_unit,tests::structural_upper_bounds_are_pinned
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M16_自证余量算错] 红：tests::every_rejection_reason_is_reachable,tests::header_sensitivity_rows_of_the_two_judged_values_are_pinned,tests::header_sensitivity_pairs_match_independent_arithmetic,tests::self_witness_room_holds_the_decision_23_item_counts,tests::self_witness_room_matches_the_decision_23_number,tests::the_decision_21_example_of_128_overflows_the_self_witness_room,tests::the_self_witness_bound_is_25_not_864
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M17_槽不按原子单元数] 红：tests::every_rejection_reason_is_reachable,tests::the_same_declaration_can_mount_here_and_be_rejected_there,tests::two_256_byte_slots_share_one_512_byte_atomic_unit
+✅ [M18_挂载判定漏掉撕裂隔离] 红：tests::every_rejection_reason_is_reachable,tests::the_same_declaration_can_mount_here_and_be_rejected_there
+✅ [M19_挂载判定漏掉自证溢出] 红：tests::every_rejection_reason_is_reachable,tests::the_decision_21_example_of_128_overflows_the_self_witness_room
+run-with-memory-cap: 上限 1G 超过实测峰值 83M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M20_头宽退回307] 红：tests::every_rejection_reason_is_reachable,tests::header_bytes_equals_the_decision_23_breakdown,tests::self_witness_room_holds_the_decision_23_item_counts,tests::self_witness_room_matches_the_decision_23_number,tests::the_decision_21_example_of_128_overflows_the_self_witness_room,tests::the_self_witness_bound_is_25_not_864
+✅ [M21_头宽落到根槽线上] 红：tests::header_bytes_equals_the_decision_23_breakdown,tests::every_rejection_reason_is_reachable,tests::self_witness_room_holds_the_decision_23_item_counts,tests::self_witness_room_matches_the_decision_23_number,tests::the_decision_21_example_of_128_overflows_the_self_witness_room,tests::the_self_witness_bound_is_25_not_864
+run-with-memory-cap: 上限 1G 超过实测峰值 83M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一次 mutate.sh 的第 3 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 上限 1G 超过实测峰值 82M 的 2 倍，照理由放行：变异编译占内存比单测峰值大取一个宽松上限
+run-with-memory-cap: 这个会话已有 2 条日常的在跑，照理由并行：同一次 mutate.sh 的第 2 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一次 mutate.sh 的第 1 个工作进程，各用各的副本与编译目录（mutate.sh 进程 2373302、这一轮共 3 个，被测 e43_extension_point_budget）
+✅ [M22_敏感性行的128判据写成严格小于] 红：tests::header_sensitivity_pairs_match_independent_arithmetic
+✅ [M23_头宽退回311] 红：tests::header_bytes_equals_the_decision_23_breakdown,tests::every_rejection_reason_is_reachable,tests::self_witness_room_holds_the_decision_23_item_counts,tests::self_witness_room_matches_the_decision_23_number,tests::the_decision_21_example_of_128_overflows_the_self_witness_room,tests::the_self_witness_bound_is_25_not_864
+✅ [M24_自证溢出判据写成大于等于] 红：tests::every_rejection_reason_is_reachable
+计数：内存撞顶 0 条（上限 1G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条
+已还原，基线仍全绿

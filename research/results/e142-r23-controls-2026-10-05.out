@@ -1,0 +1,87 @@
+命令十一
+f598eee8f08090dbcadc6338bf05ea811e4ba8fd9c8f0a9c6c366a03d2a55089  /tmp/claude-1000/e142-r23-run/ttime_anchor.py
+3e33a12a08bfbfc079c454ef570733a6b775f24d3f5b232618e6f7198e6f029f  /tmp/claude-1000/e142-r23-run/make_synthetic_ttime.py
+ 112 /tmp/claude-1000/e142-r23-run/ttime_anchor.py
+  23 /tmp/claude-1000/e142-r23-run/make_synthetic_ttime.py
+ 135 total
+A7 rows 46 total 489 expected 489 True
+A7 t_time_offset 433 expected 433 True
+A7 slot_checksum_offset 155 crc_bytes [155,159) expected 155 True
+A8 t_time_value 5000 le_hex 88130000 old_value 5 old_le_hex 05000000
+A9 t15_slot device_offset 4096 length 4096 devices 0,1
+exit=0
+A7 rows 46 total 485 expected 489 False
+A7 t_time_offset 429 expected 433 False
+TTIME side=model device=0 magic=SFSB t_time=5000 le_hex=88130000
+TTIME side=model device=1 magic=SFSB t_time=5000 le_hex=88130000
+TTIME side=crates device=0 magic=SFSB t_time=5000 le_hex=88130000
+TTIME side=model device=0 magic=SFSB t_time=5000 le_hex=88130000
+TTIME_DIFF device=0 changed_bytes=6 offsets=155,156,157,158,433,434 outside_t_time_and_crc=0
+TTIME_DIFF device=1 changed_bytes=6 offsets=155,156,157,158,433,434 outside_t_time_and_crc=0
+TTIME_DIFF device=0 changed_bytes=7 offsets=6,155,156,157,158,433,434 outside_t_time_and_crc=1
+TTIME_DIFF device=1 changed_bytes=7 offsets=6,155,156,157,158,433,434 outside_t_time_and_crc=1
+--- PC-f23（臂 N22R 逐区域）
+411:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=27 unequal=2 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+407:E7RESULT name=impl_bytes_equal step=31 region=unregistered device=0 offset=4096 length=4096 matched=true equal=false first_diff_offset=155 mismatch_bytes=6 fields=标签_unregistered_不在候选表里
+410:E7RESULT name=impl_bytes_equal step=32 region=unregistered device=1 offset=4096 length=4096 matched=true equal=false first_diff_offset=155 mismatch_bytes=6 fields=标签_unregistered_不在候选表里
+--- PC-f23p / PC-k（P8G 比对器：selftest、弄坏开关、N22R 对 P8G 导出）
+1090d0a763085ae6eb7a9ae2739b0d1b7bec9bea23f03a6180298792cd7937a8  /tmp/claude-1000/e142-r23-run/p8g_region_compare.py
+selftest same=(3, 0, 0, 0) flip=(2, 1, 0, 0) drop=(2, 0, 1, 0) True
+selftest same=(3, 0, 0, 0) flip=(3, 0, 0, 0) drop=(2, 0, 1, 0) False
+P8G_EQUAL region=unregistered device=0 offset=4096 length=4096 equal=false first_diff_offset=155
+P8G_EQUAL region=unregistered device=1 offset=4096 length=4096 equal=false first_diff_offset=155
+P8G_SUMMARY model_regions=29 matched=29 equal=27 unequal=2 unmatched_model=0 unmatched_crates=0
+--- PC-t2（T_time 解码，N22R 与 P8G 导出）
+TTIME side=model device=0 magic=SFSB t_time=5 le_hex=05000000
+TTIME side=model device=1 magic=SFSB t_time=5 le_hex=05000000
+TTIME side=crates device=0 magic=SFSB t_time=5000 le_hex=88130000
+TTIME side=crates device=1 magic=SFSB t_time=5000 le_hex=88130000
+(p8g_device_region_bytes)
+TTIME side=model device=0 magic=SFSB t_time=5 le_hex=05000000
+TTIME side=model device=1 magic=SFSB t_time=5 le_hex=05000000
+(P8G 导出)
+TTIME side=crates device=0 magic=SFSB t_time=5000 le_hex=88130000
+TTIME side=crates device=1 magic=SFSB t_time=5000 le_hex=88130000
+--- PC-g23（独立 bin old-new：合成对 N22R、N22R 对 N22R）
+synthetic sha256: 6317bf3cfe8cd562ae7b23454437a86a80f5ca69731bf2a588744b59b76d5318  /tmp/claude-1000/e142-r23-run/synthetic-pcg.out
+E7RESULT name=old_new_independent_clause_values side=new region=root_record device=0 flags_hex=00000000 checksum_recomputes=true
+E7RESULT name=old_new_independent_clause_values side=new region=system_configuration device=0 incompat_byte0=0x02 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=true
+E7RESULT name=old_new_independent_clause_values side=new region=system_configuration device=1 incompat_byte0=0x03 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=false
+E7RESULT name=old_new_independent_clause_values side=old region=root_record device=0 flags_hex=00000000 checksum_recomputes=true
+E7RESULT name=old_new_independent_clause_values side=old region=system_configuration device=0 incompat_byte0=0x02 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=true
+E7RESULT name=old_new_independent_clause_values side=old region=system_configuration device=1 incompat_byte0=0x02 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=true
+E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=1 unchanged=28 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=1
+E7RESULT name=old_new_independent_verdict all_changes_mapped=false
+exit=0
+(N22R 对 N22R)
+E7RESULT name=old_new_independent_clause_values side=old region=system_configuration device=0 incompat_byte0=0x02 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=true
+E7RESULT name=old_new_independent_clause_values side=old region=system_configuration device=1 incompat_byte0=0x02 feature_bits_rest_zero=true rollback_floor_hex=0000000000000000 padding_after_489_zero=true checksum_recomputes=true
+E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=0 unchanged=29 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=0
+E7RESULT name=old_new_independent_verdict all_changes_mapped=true
+--- PC-j（label6_anchor.py：不带输入、弄坏开关、--decode N22R）
+15c945328a473e21c0e50a604445e54b9b40b98c4996a434a1596883a70725f7  /tmp/claude-1000/e142-r23-run/label6_anchor.py
+per_object_41 41 expected 41 True
+A1 label6 main (copies 2, H 0, n_live 1) 98386 expected 98386 True
+A1 le_hex 5280010000000000
+per_object_41 40 expected 41 False
+A1 label6 main (copies 2, H 0, n_live 1) 98384 expected 98386 False
+DECODE side=model device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=model device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+--- PC-j 的 head -3 之后（上面已写）
+--- PC-i（命令七 on 冻结装置的 HEAD 版草稿仓树；命令六 on HEAD 版装置、on frozen-s2.rs）
+2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999  /tmp/claude-1000/e142-r23-run/headtree/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+ec2af965de10fb42fb4d79e141dda75c355273ef822e998ca2ef0274512aa107  /tmp/claude-1000/e142-r23-run/headtree/research/mutations/e142_new_pool_file_creation_dry_run.tsv
+63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0  /tmp/claude-1000/e142-r23-run/residual_old_values.sh
+命令七 HEAD 版：
+residual_old_values count=69
+命令六 HEAD 版（该是 1 1 1 1）：
+1 1 1 1 
+命令六 frozen-s2（登记预期 1 1 0 0 之前，即第 22 次第二段冻结装置）：
+0 0 0 0 
+命令七 仓根（frozen-s2 即今天的装置）：
+residual_old_values count=0
+--- PC-twelve（命令十二在 frozen-s2.rs 上，该是 1 1 0 0）
+命令十二 1 1 0 0 
+(更正上面一行的标注：「命令六 frozen-s2」那一行写的是 frozen-s2.rs 上命令六的四个计数 0 0 0 0，「登记预期 1 1 0 0」是误标，1 1 0 0 是命令十二的预期；frozen-s2.rs 上命令六预期 0 0 0 0（登记命令六「冻结之后四个计数都要是 0」），实得 0 0 0 0)

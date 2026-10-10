@@ -1,0 +1,58 @@
+mutate: 这一轮开 2 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 2 个；表里 20 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 8（调用方的 CARGO_BUILD_JOBS）
+run-with-memory-cap: 上限 3G 超过实测峰值 426M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 426M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+基线：全绿
+run-with-memory-cap: 上限 3G 超过实测峰值 494M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 494M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 443M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 443M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M1_nlink_offset_36_read_as_24] 红：tests::intent_record_cells_read_the_registered_offsets,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+✅ [M2_batch_size_uses_32768] 红：tests::batch_sizes_are_remaining_units_times_32634_and_blocks_round_up
+run-with-memory-cap: 上限 3G 超过实测峰值 438M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 438M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M3_blocks_round_down] 红：tests::batch_sizes_are_remaining_units_times_32634_and_blocks_round_up,tests::intent_record_cells_read_the_registered_offsets
+✅ [M4_change_count_expected_txg_minus_one] 红：tests::change_counts_equal_the_publish_txg_in_every_deletion_version
+run-with-memory-cap: 上限 3G 超过实测峰值 450M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 455M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M6_tombstone_range_end_two_to_the_63_minus_one] 红：tests::intent_tombstone_record_and_queue_root_match_the_registered_values
+✅ [M7_death_txg_expected_intent_plus_one] 红：tests::intent_tombstone_record_and_queue_root_match_the_registered_values,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+run-with-memory-cap: 上限 3G 超过实测峰值 447M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+run-with-memory-cap: 上限 3G 超过实测峰值 451M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M8_deleted_inodes_tree_expected_65545] 红：tests::intent_tombstone_record_and_queue_root_match_the_registered_values
+✅ [M9_tombstone_capacity_header_107] 红：tests::registered_capacities_compute_to_815_2031_and_120
+run-with-memory-cap: 上限 3G 超过实测峰值 442M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 442M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M10_accounting_copies_one] 红：tests::committed_reservation_formula_gives_98304_without_live_inodes_and_98386_with_one,tests::committed_reservation_rows_read_98304_in_every_h1_deletion_version
+✅ [M11_force_unit_access_write_does_not_cut] 红：tests::cutting_cuts_at_force_unit_access_and_counts_a_barrier_step_per_device,tests::h1_window_string_is_the_four_registered_strings_end_to_end,tests::h1_intent_segment_string_kind_string_and_roles_are_decoded_independently,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+run-with-memory-cap: 上限 3G 超过实测峰值 458M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 450M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M12_barrier_counted_once_per_pool] 红：tests::cutting_cuts_at_force_unit_access_and_counts_a_barrier_step_per_device,tests::h1_intent_segment_string_kind_string_and_roles_are_decoded_independently
+✅ [M13_allocation_leaf_position_off_by_one] 红：tests::h1_intent_segment_string_kind_string_and_roles_are_decoded_independently
+run-with-memory-cap: 上限 3G 超过实测峰值 449M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 449M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+✅ [M14_system_configuration_by_generation] 红：tests::mount_writes_are_attributed_to_the_same_segments_the_export_cuts,tests::registered_rotation_first_reading_takes_the_two_acquisition_writes_for_the_previous_instances_rotation,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+✅ [M15_nonzero_padding_counted_as_zero] 红：tests::coverage_counts_a_nonzero_byte_in_constant_zero_padding,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+run-with-memory-cap: 上限 3G 超过实测峰值 440M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 439M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M16_crc_polynomial_ieee] 红：tests::castagnoli_crc32_of_the_standard_check_string_is_e3069283,tests::decoded_structure_passes_every_stop_check_on_the_export,tests::a_resealed_container_still_fails_the_parent_location_checksum,tests::every_positive_control_except_the_registered_reading_one_turns_its_target_red_on_every_history
+✅ [M17_key_range_readings_swapped] 红：tests::key_range_reading_tells_entry_key_range_from_subtree_coverage,tests::queue_and_tombstone_roots_record_an_entry_key_range_reading
+run-with-memory-cap: 上限 3G 超过实测峰值 434M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+✅ [M18_row_five_difference_reversed] 红：tests::final_batch_drops_exactly_the_inode_leaf_container_against_the_two_to_one_batch
+run-with-memory-cap: 上限 3G 超过实测峰值 442M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M19_empty_inode_root_key_range_expected_one_one] 红：tests::final_batch_removes_the_record_and_leaves_an_empty_inode_root
+run-with-memory-cap: 上限 3G 超过实测峰值 453M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 上限 3G 超过实测峰值 449M 的 2 倍，照理由放行：E172 变异每条都要重编装置，编译峰值比只跑单测的 426M 大
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：主 agent 同时跑 E142 与 E172 两张研究变异表、E161 单线程可行性档，三件互不依赖
+✅ [M20_code2_payload_crc_starts_after_the_reserved_bytes] 红：tests::decoded_structure_passes_every_stop_check_on_the_export
+✅ [M21_parent_location_checksum_ignored] 红：tests::a_resealed_container_still_fails_the_parent_location_checksum
+计数：内存撞顶 0 条（上限 3G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条
+已还原，基线仍全绿

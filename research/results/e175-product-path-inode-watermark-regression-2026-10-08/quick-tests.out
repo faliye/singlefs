@@ -1,0 +1,226 @@
+# code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb
+# 冻结副本（第二份，根环线第10z批第十、十一块合入之后）上三臂快档与三个弄坏开关；装置 device-source.rs sha256 310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca；三臂整套快档（--test-threads 5），弄坏开关三次带 --skip first_history_of（跳过 8 条每族序号 0 的取样用例）
+===== q-P exit=0
+
+running 28 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test first_history_of_deleting_files_of_several_lower_leaves_yields_a_complete_line ... ok
+test first_history_of_broad_yields_a_complete_line ... ok
+test first_history_of_g_small_yields_a_complete_line ... ok
+test first_history_of_g_draw_yields_a_complete_line ... ok
+test invariant_names_match_the_checker ... ok
+test first_history_of_reuse_after_raising_the_floor_yields_a_complete_line ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... ok
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test first_history_of_newest_system_configuration_slot_reading_zeros_yields_a_complete_line ... ok
+test rollback_one_step_then_create_matches_the_arm ... ok
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+test first_history_of_g_long_yields_a_complete_line ... ok
+test first_history_of_g_long_f1_yields_a_complete_line ... ok
+
+test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 47.42s
+
+===== q-V1 exit=0
+
+running 28 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test first_history_of_deleting_files_of_several_lower_leaves_yields_a_complete_line ... ok
+test first_history_of_broad_yields_a_complete_line ... ok
+test first_history_of_g_small_yields_a_complete_line ... ok
+test first_history_of_newest_system_configuration_slot_reading_zeros_yields_a_complete_line ... ok
+test invariant_names_match_the_checker ... ok
+test first_history_of_g_draw_yields_a_complete_line ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... ok
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test rollback_one_step_then_create_matches_the_arm ... ok
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test first_history_of_reuse_after_raising_the_floor_yields_a_complete_line ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+test first_history_of_g_long_f1_yields_a_complete_line ... ok
+test first_history_of_g_long_yields_a_complete_line ... ok
+
+test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 44.68s
+
+===== q-V2 exit=0
+
+running 28 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test first_history_of_deleting_files_of_several_lower_leaves_yields_a_complete_line ... ok
+test first_history_of_broad_yields_a_complete_line ... ok
+test first_history_of_g_small_yields_a_complete_line ... ok
+test first_history_of_g_draw_yields_a_complete_line ... ok
+test invariant_names_match_the_checker ... ok
+test first_history_of_newest_system_configuration_slot_reading_zeros_yields_a_complete_line ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... ok
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test rollback_one_step_then_create_matches_the_arm ... ok
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test first_history_of_reuse_after_raising_the_floor_yields_a_complete_line ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+test first_history_of_g_long_f1_yields_a_complete_line ... ok
+test first_history_of_g_long_yields_a_complete_line ... ok
+
+test result: ok. 26 passed; 0 failed; 2 ignored; 0 measured; 0 filtered out; finished in 48.20s
+
+===== q-V1-break-ledger-ignores-birth exit=101
+
+running 20 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test invariant_names_match_the_checker ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... ok
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test rollback_one_step_then_create_matches_the_arm ... FAILED
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+
+failures:
+
+---- rollback_one_step_then_create_matches_the_arm stdout ----
+D2(1) arm=V1 ending=completed issued=[[2], [3], [3]] rollbacks_applied=1 rollback_targets=[((1, 6), Some(3))] q1=0 q3b=0
+
+thread 'rollback_one_step_then_create_matches_the_arm' (484545) panicked at crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs:1993:17:
+assertion `left == right` failed: A5：Q1 恰好 1
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rollback_one_step_then_create_matches_the_arm
+
+test result: FAILED. 17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out; finished in 4.49s
+
+===== q-V1-break-every-root-abandoned exit=101
+
+running 20 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test invariant_names_match_the_checker ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... ok
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test rollback_one_step_then_create_matches_the_arm ... FAILED
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+
+failures:
+
+---- rollback_one_step_then_create_matches_the_arm stdout ----
+D2(1) arm=V1 ending=completed issued=[[2], [3], [3]] rollbacks_applied=1 rollback_targets=[((1, 6), Some(3))] q1=0 q3b=1
+
+thread 'rollback_one_step_then_create_matches_the_arm' (484783) panicked at crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs:1993:17:
+assertion `left == right` failed: A5：Q1 恰好 1
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    rollback_one_step_then_create_matches_the_arm
+
+test result: FAILED. 17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out; finished in 4.44s
+
+===== q-P-break-q9-always-still-present exit=101
+
+running 20 tests
+test f2_weight_tables_each_sum_to_one_hundred_and_generate_sixty_steps ... ok
+test invariant_names_match_the_checker ... ok
+test q9_classification_says_gone_when_no_holder_is_readable ... FAILED
+test result_files_from_two_code_baselines_or_without_a_header_are_refused_by_the_summary ... ok
+test f3a_scale_matches_the_registered_counts ... ok
+test first_file_alone_reads_inode_one_born_at_three_and_watermark_two ... ok
+test rollback_five_steps_then_create_matches_the_arm ... ok
+test rollback_four_steps_then_create_matches_the_arm ... ok
+test rollback_one_step_then_create_matches_the_arm ... ok
+test rollback_six_steps_then_create_matches_the_arm ... ok
+test run_one_family_on_one_arm_into_the_result_file ... ignored, 大规模：跑登记的一族一臂，参数取环境变量（文件头）；快档不跑
+test second_segment_families_change_only_the_registered_knob ... ok
+test second_segment_scales_match_the_registered_counts ... ok
+test seed_base_and_first_inode_number_match_the_crates ... ok
+test summarize_the_result_files ... ignored, 汇总：读 E175_SUMMARY_INPUTS（逗号分隔的结果文件）写到 E175_SUMMARY_FILE；快档不跑
+test summary_counts_duplicates_conflicts_and_unfinished_lines ... ok
+test rollback_three_steps_then_create_matches_the_arm ... ok
+test rollback_two_steps_then_create_matches_the_arm ... ok
+test creations_across_mounts_and_a_cold_start_match_the_arm ... ok
+test one_thread_and_three_threads_give_the_same_lines ... ok
+
+failures:
+
+---- q9_classification_says_gone_when_no_holder_is_readable stdout ----
+
+thread 'q9_classification_says_gone_when_no_holder_is_readable' (484916) panicked at crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs:1900:5:
+assertion `left == right` failed
+  left: Still
+ right: Gone
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    q9_classification_says_gone_when_no_holder_is_readable
+
+test result: FAILED. 17 passed; 1 failed; 2 ignored; 0 measured; 8 filtered out; finished in 4.61s
+

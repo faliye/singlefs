@@ -1,0 +1,137 @@
+## PC-e 字段表分得出一格（命令 grep -n 'name=layout_field_positive_control' $M）
+899:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+
+## P2 装置自己的翻位对照（命令 grep -n 'name=positive_control_p2' $M）
+320:E7RESULT name=positive_control_p2 arm=arm_n16 point=a_level1_pointer_first_byte region=allocation_internal_of_device_0 device=0 injected_offset=145 regions_flagged=1 matches_injection=true
+321:E7RESULT name=positive_control_p2 arm=arm_n16 point=b_root_largest_key_last_byte region=allocation_root device=0 injected_offset=71 regions_flagged=1 matches_injection=true
+322:E7RESULT name=positive_control_p2 arm=arm_n16 point=c_extent_leaf_entry_tag_byte region=extent_root device=0 injected_offset=187 regions_flagged=1 matches_injection=true
+323:E7RESULT name=positive_control_p2 arm=arm_n16 point=d_journal_named_item_5_first_byte region=journal_record device=0 injected_offset=711 regions_flagged=1 matches_injection=true
+
+## PC-f 逐区域比对分得出改之前的装置（N19R 对今天的 crates/）
+411:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=2 unequal=27 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+N19R 里 equal=false 的行数: 27；其中 region=journal_record 两盘: 2，root_record: 1
+equal=false 的 region 清单（Q142.85 附带，不判）：
+      1 accounting_root 0 823296000
+      1 accounting_root 1 823296000
+      1 allocation_internal_of_device_0 0 823246848
+      1 allocation_internal_of_device_0 1 823246848
+      1 allocation_internal_of_device_1 0 823263232
+      1 allocation_internal_of_device_1 1 823263232
+      1 allocation_leaf_of_device_0 0 823214080
+      1 allocation_leaf_of_device_0 1 823214080
+      1 allocation_leaf_of_device_1 0 823230464
+      1 allocation_leaf_of_device_1 1 823230464
+      1 allocation_root 0 823279616
+      1 allocation_root 1 823279616
+      1 data_unit 0 822149120
+      1 data_unit 1 822149120
+      1 extent_root 0 823132160
+      1 extent_root 1 823132160
+      1 inode_leaf 0 823164928
+      1 inode_leaf 1 823164928
+      1 inode_root 0 823197696
+      1 inode_root 1 823197696
+      1 journal_record 0 16785408
+      1 journal_record 1 16785408
+      1 mapping_root 0 823312384
+      1 mapping_root 1 823312384
+      1 root_record 0 1052672
+      1 tree_table 0 823328768
+      1 tree_table 1 823328768
+
+## PC-g 独立比对分得出一个字节（合成文件 = N19R 的拷贝，设备 1、偏移 4096、长 4096 那份窗口系统配置槽区域内偏移 6 的字节异或 0x01）
+合成文件 sha256 be96545974639917e58c34d5160112b8e7f84078046c4ac6a67adc918082e9cb（生成脚本 make_pcg.py 全文见本文件末尾）
+old-new (合成, N19R)：E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=1 unchanged=28 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=1
+old-new (N19R, N19R)：E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=0 unchanged=29 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=0
+
+## PC-h1 / PC-h2 / PC-h3 与 7.2 B1、B1b（命令四：back_chain_487.py，脚本 sha256 b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de）
+不带输入：
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+no inputs: self tests only
+弄坏开关 BACK_CHAIN_487_BREAK=1 的第一行：
+self_test direct==derived 200 rounds: False
+带输入（输入取自这一次主产物 N21 里的 t13 [463,471) 与 t14 [170,256)，controls.py 取）：
+B2 from product t12: entry_count 11 declared_length 2200 tree_id_of_node 0
+B3 from product t12 tree ids [65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547] first8 hex 0000010000000000 last entry first8 hex 0b00010000000000
+B3 from product t14 watermark LE hex 0c00010000000000
+B5/B6 from product t13: watermark@271 65548 F@279 0 unmount@459 0 fsid@463 5f5346532d453134 mac@471 all zero True first named entry@487 slot 50180
+B10 t13 instance pointer == t14 root[170:256]: True  loc slots 50176 50176
+journal ring offsets present in window product: [(0, 16785408, 4096), (1, 16785408, 4096)]
+B11 offsets present: [(0, 1052672, 512), (0, 16785408, 4096), (0, 822149120, 32768), (1, 16785408, 4096), (1, 822149120, 32768)]
+inputs for back_chain_487.py: fsid 5f5346532d453134 itp 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c40000000021aa2fd40100000000c40000000021aa2fd40000000000000000
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+instance_table_pointer loc0 device 0 slot 50176
+instance_table_pointer loc1 device 1 slot 50176
+B1b w4.back_chain = CRC32C(new w1 header): 750278362
+B1  t13.back_chain = CRC32C(new w4 header): 2660362816
+discriminate instance_table_pointer=0: 626022660
+discriminate unmount_marker=1: 1493326352
+discriminate watermark=65544: 548646779
+
+步 ①(4) 的输出（N19R 产物里取的输入）research/results/e142-r21-anchor-b1-2026-10-04.out 的 B1、B1b 两行：
+B1b w4.back_chain = CRC32C(new w1 header): 750278362
+B1  t13.back_chain = CRC32C(new w4 header): 2660362816
+
+## 7.2 B2–B11 独立复算（命令六：offsets_487.py，脚本 sha256 936bbf5707f495d50feeef07caf8c548df140375f3f9faeea9704144ed7b771d）
+B5 new_root_segment_start 99 segment_bytes 364
+B6 tree_table 99 185
+B6 mapping_root 185 271
+B6 watermark 271 279
+B6 floor 279 287
+B6 instance_table 287 373
+B6 allocation_root 373 459
+B6 unmount_marker 459 463
+B5 fsid 463 mac 471 header_end 487 increment_after_ten 409
+B7 room 3609 entries 64 used 3584 left 25
+B7 t13 payload_end 1159 entry_k_offsets [487, 543, 599, 655, 711, 767, 823, 879, 935, 991, 1047, 1103]
+B7 old 311: room 3785 entries 67 old fsid 287 old mac 295
+B8 512 left 25
+B9 crc32c(empty) = 0
+B10 root record offsets: flags 20, watermark 122, checksum 138, instance_table 170..256, mapping 256..342, allocation_root 342..428 (4+16+4+4+8+86+8+8+32 = 170 )
+B10 instance pointer loc0 device/slot at 50 54 loc1 64 68 in new segment: loc0 slot at 341 loc1 slot at 355
+
+## PC-i / Q142.84 旧值残留（命令七：residual_old_values.sh，脚本 sha256 63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0）
+没改的装置与变异表（git HEAD 提交版，抽到草稿目录的仓树里跑）：
+residual_old_values count=69
+冻结的装置与变异表（今天工作区）：
+residual_old_values count=0
+冻结源码里 287、295 两个数的每一处命中：
+5307:    // 第二十一次跑改按 487 字节头的字段表（新根段七项：实例表指针 287、分配记录树根指针 373、卸载记号 459，fsid 463、MAC 471、头末 487）。
+5350:        287..=372 => {
+5351:            let local = offset - 287;
+6628:            "instance_table_pointer[287,373)_vs_published_root_record[170,256)",
+6631:            &|record: &[u8]| lowercase_hex(&record[287..373]),
+7802:        // 新根段内（D23 已定项 15 的七项次序，7.2 B6）：树表 99、映射 185、水位 271、F 279、实例表指针 287、分配记录树根指针 373、卸载记号 459、段�
+7806:        assert_eq!(279 + 8, 287, "实例表单元指针起点");
+7807:        assert_eq!(287 + NODE_POINTER_BYTES, 373, "分配记录树根指针起点");
+9115:    /// 第二十一次跑再钉新根段后三项与挪位之后的 fsid、MAC（7.2 B6：287、373、459、463、471，M220 的会红检查落在这里）。
+9127:            (287, "new_instance_table"),
+9268:        // 新根段后三项（D23 已定项 15）：实例表指针 [287, 373) 与这次发布写的根记录 [170, 256) 逐字节相同（B10），
+9272:        assert_eq!(&output.record_bytes[287..373], &root_slot[170..256], "实例表指针与那次发布写的根记录里的逐字节相同");
+变异表第 2、3 列里 287、295 的命中行数：
+0
+
+## 附录：PC-g 合成文件的生成脚本 make_pcg.py（输出 sha256 与上面那份相同，已核）
+# PC-g 合成文件：N19R 产物的拷贝，只把第一行 name=done 之前、device=1 offset=4096 length=4096 的那一行 name=device_region_bytes 的
+# hexadecimal 里第 6 个字节（偏移 6）异或 0x01，其余行原样。用法：python3 make_pcg.py <N19R 产物> <输出路径>
+import sys
+src = open(sys.argv[1], encoding='utf-8').read().split('\n')
+out = []
+done = 0
+changed = 0
+for ln in src:
+    if ln.startswith('E7RESULT name=done'):
+        done += 1
+    if done == 0 and ln.startswith('E7RESULT name=device_region_bytes ') and ' device=1 ' in ln and ' offset=4096 ' in ln and ' length=4096 ' in ln:
+        i = ln.index('hexadecimal=') + len('hexadecimal=')
+        b = bytearray(bytes.fromhex(ln[i:]))
+        b[6] ^= 0x01
+        ln = ln[:i] + bytes(b).hex()
+        changed += 1
+    out.append(ln)
+open(sys.argv[2], 'w', encoding='utf-8').write('\n'.join(out))
+print('changed lines', changed)

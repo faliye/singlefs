@@ -1,0 +1,21 @@
+name=config experiment=E165 segment=5a checks=PV13,PQ20,PV11 script=compare5.py script_sha256=c964001e0ef479949bffcb455cad1db03f473cd5b555dc1c00ea856e47d3f8b6 binary_sha256=de328f66b677df588fcfb8cbed1981f8b17041650bac05de5ac65dd947fc7902 root_manifest_sha256=47c6d3494bf6688bb6b5a8e88df87c32a7ffee8ca253cc56128c523a3a47a950
+name=pv13 product=row1_r1_legal identical_whole=True identical_without_config=True rerun_lines=910 earlier_lines=910
+name=pv13 product=row14_r3_adversarial identical_whole=True identical_without_config=True rerun_lines=380 earlier_lines=380
+name=pv13 product=row15_r3_root_choice identical_whole=True identical_without_config=True rerun_lines=379 earlier_lines=379
+name=pv13 product=row16_r4_root_choice_faults identical_whole=True identical_without_config=True rerun_lines=3309 earlier_lines=3309
+name=pv13 product=segment3_r5_legal identical_whole=True identical_without_config=True rerun_lines=1532 earlier_lines=1532
+name=pq20_files r2_lines=3359 gate_a_lines=3309
+name=pq20_unchanged_set rows_r2=2208 rows_gate_a=2208 differing=0 one_sided=0
+name=pq20_rest row=config rows_r2=1 rows_gate_a=1 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=control rows_r2=135 rows_gate_a=135 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=done rows_r2=1 rows_gate_a=1 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=fake_outcomes rows_r2=15 rows_gate_a=15 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=in_flight_limit rows_r2=2 rows_gate_a=2 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=mount_two_fault rows_r2=143 rows_gate_a=143 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=promised rows_r2=30 rows_gate_a=30 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=root_choice_fault_refusals rows_r2=49 rows_gate_a=0 judgement_changed_identities=0 one_sided_identities=49
+name=pq20_rest row=root_choice_fault_states rows_r2=15 rows_gate_a=15 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=self_check rows_r2=1 rows_gate_a=1 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=self_proof rows_r2=5 rows_gate_a=4 judgement_changed_identities=0 one_sided_identities=5
+name=pq20_rest row=verdict rows_r2=4 rows_gate_a=4 judgement_changed_identities=0 one_sided_identities=0
+name=pq20_rest row=violations rows_r2=750 rows_gate_a=750 judgement_changed_identities=0 one_sided_identities=0

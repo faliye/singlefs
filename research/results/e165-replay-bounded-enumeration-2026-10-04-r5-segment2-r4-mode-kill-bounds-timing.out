@@ -1,0 +1,13 @@
+  基线 baseline：编译 60.6 秒，跑 82.9 秒，3309 行
+  baseline：编译 0.0 秒，跑 0.0 秒，合计 0.0 秒
+E165_KILL_BOUNDS_PROGRESS 挂钟 300 秒：变体做完 1/7 个；在做 2 项：tsv-1810（跑 --bounds segment1 --family root_choice_faults，这一步 42 秒，这一项共 156 秒）、tsv-1811（跑 --bounds segment1 --family root_choice_faults，这一步 42 秒，这一项共 156 秒）
+  tsv-1810：编译 114.2 秒，跑 163.3 秒，合计 277.8 秒
+  tsv-1811：编译 113.8 秒，跑 163.6 秒，合计 277.8 秒
+E165_KILL_BOUNDS_PROGRESS 挂钟 600 秒：变体做完 3/7 个；在做 2 项：tsv-1812（跑 --bounds segment1 --family root_choice_faults，这一步 88 秒，这一项共 179 秒）、tsv-1813（跑 --bounds segment1 --family root_choice_faults，这一步 86 秒，这一项共 179 秒）
+  tsv-1813：编译 92.6 秒，跑 165.6 秒，合计 258.4 秒
+  tsv-1812：编译 90.6 秒，跑 183.7 秒，合计 274.5 秒
+E165_KILL_BOUNDS_PROGRESS 挂钟 900 秒：变体做完 5/7 个；在做 2 项：tsv-1814（跑 --bounds segment1 --family root_choice_faults，这一步 127 秒，这一项共 220 秒）、tsv-1815（跑 --bounds segment1 --family root_choice_faults，这一步 106 秒，这一项共 204 秒）
+  tsv-1814：编译 93.5 秒，跑 155.6 秒，合计 249.3 秒
+  tsv-1815：编译 97.9 秒，跑 155.6 秒，合计 253.7 秒
+  基线 baseline-at-end：编译 64.8 秒，跑 83.7 秒，3309 行
+  这一次 7 个变体，挂钟 806.2 秒（不含开头与收尾的基线）

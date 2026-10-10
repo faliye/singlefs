@@ -1,0 +1,20 @@
+== 行 1：Q1b、Q1c
+first 段数 11 四个数不全相等的段数 0 逐个数 true 的段数 11
+second 段数 16 四个数不全相等的段数 0 逐个数 true 的段数 16
+second 的 anchor_segment 行数 78 three_agree 非 true 的段 []
+== 行 2：Q2c
+1 first_small states ['45'] 期望 45 有对象
+1 first_quick states ['46'] 期望 46 有对象
+1 first_segment_head states ['4096'] 期望 4096 有对象
+1 second_quick states ['52'] 期望 52 有对象
+1 second_segment_head states ['4096'] 期望 4096 有对象
+2 refed_state_unit_positions 34
+3 first_small k2_consult distinct_outcomes 7
+4 k4_full distinct_outcomes {'first_small': 8, 'first_segment_head': 1, 'first_quick': 8, 'second_segment_head': 1, 'second_quick': 5}
+5 timing 行数 6 states ['1000'] pc3_segment_holds ['true']
+6a crates compared_states [('first_small', '45'), ('first_quick', '46'), ('second_quick', '52')]
+6b per_state states [('first_segment_head', '4096'), ('second_segment_head', '4096')]
+7 control_states [('first_small_and_head', '4141'), ('second_small_and_head', '4096')]
+8 positions [('first_small_and_head', 'k2_consult', '4129'), ('first_small_and_head', 'k2_ignore', '4109'), ('first_small_and_head', 'k4_walk', '54'), ('first_small_and_head', 'k4_units', '64'), ('first_small_and_head', 'k4_full', '4169'), ('second_small_and_head', 'k2_consult', '52'), ('second_small_and_head', 'k2_ignore', '44'), ('second_small_and_head', 'k4_walk', '54'), ('second_small_and_head', 'k4_units', '88'), ('second_small_and_head', 'k4_full', '129')]
+9 device_memory 行 ['first_segment_head', 'second_segment_head']
+没有对象的格数 0 []

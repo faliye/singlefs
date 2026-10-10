@@ -1,0 +1,11 @@
+--- a/crates/singlefs-core/src/mount.rs
++++ b/crates/singlefs-core/src/mount.rs
+@@ -2025,7 +2025,7 @@
+     );
+     let ring_slots_reading_back_all_zero_at_mount: Vec<(RootRingSlot, CheckpointTxg)> =
+         txgs_ring_slots_bad_at_mount_can_hold(
+-            &ring_slots_reading_back_all_zero,
++            &{ let _ = &ring_slots_reading_back_all_zero; BTreeSet::new() },
+             window_anchor,
+             first_txg,
+             slots_per_region,

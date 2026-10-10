@@ -1,0 +1,13 @@
+E7TIMING name=judge_time stream=new_pool_file_creation batch=1 states=53 total_ns=169135584 median_ns=1719378 p95_ns=7936977 max_ns=8314965
+E7TIMING name=judge_time stream=new_pool_file_creation batch=2 states=7 total_ns=12766455 median_ns=1816368 p95_ns=1955737 max_ns=1955737
+E7TIMING name=judge_time stream=new_pool_file_creation batch=3 states=22 total_ns=39177837 median_ns=1796028 p95_ns=1833388 max_ns=1848998
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=impl-verdicts.tsv bytes=4214 sha256=6bce03849c7c5cb6c23bbc405eb39cc9cb262c513da6ee7460de9d6be93b9dab
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=manifest.tsv bytes=895 sha256=7c4a1862674c6bf9e3bd5eb3e20e0824a0505f93e917d4759fd4961456f7352a
+E7TIMING name=stream_time stream=new_pool_file_creation elapsed_ns=533813767
+E7TIMING name=judge_time stream=fixed_script_through_e_then_unmount batch=1 states=397 total_ns=14918591656 median_ns=36871825 p95_ns=72898477 max_ns=83595416
+E7TIMING name=judge_time stream=fixed_script_through_e_then_unmount batch=2 states=119 total_ns=4437375039 median_ns=36931375 p95_ns=72311791 max_ns=73944319
+E7TIMING name=judge_time stream=fixed_script_through_e_then_unmount batch=3 states=374 total_ns=13917538024 median_ns=36826205 p95_ns=71967983 max_ns=73646792
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv bytes=51150 sha256=4cc1eebdc2722a4b0116df4c5b9da120d14c95052bb28ec43bc0967e29b437cf
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=manifest.tsv bytes=912 sha256=216cc5cf1c850530a0910218ddcc0ec7413bb7094d7d76df4684d9c6915965c8
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=77849743470
+E7TIMING name=process_wall seconds=78.388 exit=0

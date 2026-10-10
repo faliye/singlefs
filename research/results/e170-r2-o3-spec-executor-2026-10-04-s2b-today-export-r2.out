@@ -1,0 +1,125 @@
+name=config script_sha256=0dac1f94ecfc2225a5fddd30987ece52169e0c6bce50bddc4c7e05ba54da5795 repo_root=/home/fy5090/code/singlefs memory_cap=8G threads=8 seed_hex=85441ae491419411 date=2026-10-04
+name=config snapshot=research/target/e170-r2-today-tree cargo_target_dir=research/target/e170-r2-today-tree-cargo-target dumps=research/target/e170-r2-today-dumps work=research/target/e170-r2-today-export-work
+name=step step=snapshot skipped=false command=tar -C /home/fy5090/code/singlefs --exclude=target -cf - Cargo.toml Cargo.lock .cargo crates | tar -C /home/fy5090/code/singlefs/research/target/e170-r2-today-tree -xf -
+name=today_tree snapshot_digest=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec files=291 workspace_digest_before_copy=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec workspace_digest_after_copy=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec snapshot_equals_workspace_before_copy=true
+name=today_tree git_head=31e47115471ba5502a4531d25dffcc921be36899
+name=today_tree git_status_porcelain_lines=81
+name=today_tree git_status_porcelain_line=MM crates/mutations.tsv
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bad_disk_input.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/crash.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker-tier/src/crash_injection.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+name=today_tree git_status_porcelain_line=M  crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/tests/crash_points_tree_identifier_watermark_orphans.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/tests/gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-checker-tier/tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker/src/image.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-checker/src/walk.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-core/src/allocator.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-core/src/instance_table_sweep.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-core/src/lib.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-core/src/mount.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-core/src/recovery.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/src/fault_injection.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/src/history.rs
+name=today_tree git_status_porcelain_line=M  crates/singlefs-harness/src/mount_transparency.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/accounting_and_mapping_tree_split.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/checker_cross_links_malformed_nodes_and_mapping_entries.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/checker_judges_reference_intervals_and_every_new_root_segment_field.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-harness/tests/checker_known_bad_images.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/common_admission_pool/mod.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/fault_injection_fast_tier.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/instance_table_chain_read.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/instance_table_sweep_at_the_end_of_a_writable_mount.rs
+name=today_tree git_status_porcelain_line=A  crates/singlefs-harness/tests/mount_transparency_judges_the_system_configuration_witness_by_r2.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/pool_checker_gap_row_conditions_and_incomplete_reference_pairs.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/pool_checker_scan_of_tree_identifiers_claims_whole_units.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs
+name=today_tree git_status_porcelain_line=AM crates/singlefs-harness/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/random_histories.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs
+name=today_tree git_status_porcelain_line=AD crates/singlefs-harness/tests/root_ring_slot_reread_that_does_not_self_verify_counts_as_still_unreadable.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/row_publish_admission.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/row_publish_checks_before_acquisition.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/row_publish_record_without_its_root.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/system_configuration_fields_core_and_checker_refuse_the_same_table.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/unlink_single_file_publishes.rs
+name=today_tree git_status_porcelain_line=MM crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
+name=today_tree git_status_porcelain_line= M crates/singlefs-harness/tests/writable_mount_refusal_on_a_crash_state_without_read_faults.rs
+name=today_tree git_status_porcelain_line=?? crates/singlefs-checker-tier/tests/crash_injection_publish_after_a_mount_whose_deletion_continuation_stays_short.rs
+name=today_tree git_status_porcelain_line=?? crates/singlefs-harness/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs
+name=today_tree git_status_porcelain_line=?? crates/singlefs-harness/tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs
+name=today_tree source=crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs sha256=b4a0b61a15031f179f13aefc566efd3fe9e1932f71c185a73beeabba3a1a3423
+name=today_tree source=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs sha256=37b5b27cb6f7a430dce58ca02de1f0c70c8c1853f15d60b7b0d76f871e46af94
+name=today_tree source=crates/singlefs-format/src/lib.rs sha256=bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f
+name=today_tree source=Cargo.lock sha256=8ee46ee73ba30d367cb9f4ad2c0350c73a259dfa14bf0baf60d1202da7409c4b
+name=format_constants constant=JOURNAL_HEADER_TEN_FIELD_BYTES value=78 line=216 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NEW_ROOT_SEGMENT_BYTES value=364 line=220 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_HEADER_BYTES value=487 line=223 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NAMED_ENTRY_BYTES value=56 line=226 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_NAMED_ENTRIES_PER_RECORD value=64 line=229 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=JOURNAL_RECORD_BYTES value=4096 line=213 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=ROOT_RECORD_BYTES value=457 line=210 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=SYSTEM_CONFIGURATION_SLOT_BYTES value=4096 line=257 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=TREE_IDENTIFIER_WATERMARK_AT_MKFS value=65536 line=206 matches=1 file=crates/singlefs-format/src/lib.rs
+name=format_constants constant=TREE_IDENTIFIER_WATERMARK_AFTER_FIRST_PUBLISH value=65548 line=207 matches=1 file=crates/singlefs-format/src/lib.rs
+name=step_exit step=snapshot exit=0 counted=true
+name=snapshot_check step=build when=begin digest=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec recorded=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec holds=true
+name=step step=build skipped=false command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo build --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export --bin e171_three_oracle_collusion
+name=snapshot_check step=build when=end digest=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec recorded=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec holds=true
+name=step_exit step=build exit=251 counted=false stdout_lines=0 stderr_lines=2
+name=step_stderr_tail step=build line=  ✗ 上限 8G 超过峰值表里这条命令实测峰值 2065M 的 2 倍（键「env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo build --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export --bin e171_three_oracle_」），命令一行都没跑
+name=step_stderr_tail step=build line=  → 怎么办：写 auto（取实测峰值的 1.5 倍，3098M），或写不超过 4130M 的上限；确有理由要更大，设 RUN_WITH_MEMORY_CAP_OVER_PEAK_REASON=<至少 8 个字的理由>
+name=step step=z1 skipped=true reason=build_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump
+name=step step=z1r skipped=true reason=z1_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- dump --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump-repeat --compare-with /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump
+name=step step=z3-copy skipped=true reason=z1_did_not_finish_with_exit_0 command=cp -r /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-dump /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-second-run
+name=step step=z3 skipped=true reason=z3-copy_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states-second-run --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-second-run --seed-hex 85441ae491419411
+name=step step=z5 skipped=true reason=build_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e171_three_oracle_collusion -- baseline --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e171-baseline-run1
+name=step step=z4-copy skipped=true reason=z5_did_not_finish_with_exit_0 command=cp -r /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e171-baseline-run1 /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2
+name=step step=z4-bad-states skipped=true reason=z4-copy_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e170_o3_spec_executor_export -- bad-states --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2 --seed-hex 85441ae491419411
+name=step step=z4-known-bad skipped=true reason=z4-bad-states_did_not_finish_with_exit_0 command=nice -n 19 bash /home/fy5090/code/singlefs/research/scripts/capped.sh 8 bash /home/fy5090/code/singlefs/research/scripts/run-with-memory-cap.sh 8G env CARGO_TARGET_DIR=/home/fy5090/code/singlefs/research/target/e170-r2-today-tree-cargo-target cargo run -q --release --locked --manifest-path /home/fy5090/code/singlefs/research/target/e170-r2-today-tree/Cargo.toml -p singlefs-checker-tier --bin e171_three_oracle_collusion -- known-bad-images --dump-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/e170-bad-states-copy-s2 --output-directory /home/fy5090/code/singlefs/research/target/e170-r2-today-dumps/known-bad-s2 --e170-bad-rows
+name=export_directory directory=e170-dump present=false
+name=export_directory directory=e170-dump-repeat present=false
+name=export_directory directory=e170-bad-states-second-run present=false
+name=export_directory directory=e171-baseline-run1 present=false
+name=export_directory directory=e170-bad-states-copy-s2 present=false
+name=export_directory directory=known-bad-s2 present=false
+name=z1_vs_z1r_summary compared=false reason=z1_or_z1r_directory_missing
+name=snapshot_check step=all when=end digest=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec recorded=d32a8b2da6ca653362537837457909d6194b69867f233ab55f6f4e04c64c9cec holds=true
+name=done steps_exit_zero=1 steps_exit_nonzero=1 steps_skipped=8 snapshot_checks_failed=0 product=research/results/e170-r2-o3-spec-executor-2026-10-04-s2b-today-export-r2.out

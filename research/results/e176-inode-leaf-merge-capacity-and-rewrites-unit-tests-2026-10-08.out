@@ -1,0 +1,30 @@
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 1.14s
+     Running unittests src/bin/e176_inode_leaf_merge_capacity_and_rewrites.rs (target/release/deps/e176_inode_leaf_merge_capacity_and_rewrites-30e9898baf80f465)
+
+running 22 tests
+test tests::alternate_workload_deletes_the_registered_share_of_each_batch ... ok
+test tests::m2_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position ... ok
+test tests::m2_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour ... ok
+test tests::m3_checking_the_left_pair_first_lets_the_left_neighbour_absorb_the_middle_leaf_and_shifts_one_more_position ... ok
+test tests::m3_checking_the_right_pair_first_lets_the_middle_leaf_absorb_its_right_neighbour ... ok
+test tests::moving_a_threshold_between_two_same_verdict_points_splits_them ... ok
+test tests::rational_decimal_rounds_half_away_from_zero ... ok
+test tests::random_workload_starts_with_a_create_and_only_unlinks_live_inodes ... ok
+test tests::a1_refuses_the_insert_that_would_open_the_136th_leaf ... ok
+test tests::a2_one_record_per_leaf_leaves_m1_only_134_plus_233_live_inodes ... ok
+test tests::segment_two_windows_put_each_registered_variant_against_m1 ... ok
+test tests::sequential_workload_creates_a_round_then_deletes_the_oldest ... ok
+test tests::sha256_matches_the_published_test_vectors_whether_fed_at_once_or_in_pieces ... ok
+test tests::structural_check_turns_red_on_each_broken_shape ... ok
+test tests::verdict_thresholds_are_inclusive_where_the_registration_says_so ... ok
+test tests::merge_and_borrow_arms_keep_adjacent_pairs_above_one_leaf_through_a_random_run ... ok
+test tests::segment_two_sensitivity_pairs_four_m3_rows_for_the_borrow_amount_and_six_rows_for_the_check_order ... ok
+test tests::every_registered_anchor_matches_the_independent_reference ... ok
+test tests::main_random_sequence_feeds_every_arm_the_same_operation_prefix ... ok
+test tests::segment_two_anchors_judge_a1_for_the_three_variants_and_only_report_the_rest ... ok
+test tests::multithreaded_and_single_threaded_runs_are_byte_identical ... ok
+test tests::segment_two_multithreaded_and_single_threaded_runs_are_byte_identical ... ok
+
+test result: ok. 22 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.02s
+

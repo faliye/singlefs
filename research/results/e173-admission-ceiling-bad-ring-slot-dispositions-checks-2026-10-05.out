@@ -1,0 +1,285 @@
+E7RESULT name=config segment=checks slots_per_region=[4, 8, 16] metadata_blocks=[5, 10] data_blocks_per_overwrite=8 admission_budget=8 requests_per_mount=2*3S+8 reserve_readings=code:c,clause:10+7c pools=near0,near2,roomy
+E7RESULT name=anchor id=K1 description=有洞那一份 X 读不出：上限 6、F 抬到 6 q1=today q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=bad_at_mount_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K1 q1=today q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K1 q1=today q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K1 description=有洞那一份 X 读不出：上限 6、F 抬到 6 q1=pushB q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=bad_at_mount_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K1 q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K1 q1=pushB q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K1 description=有洞那一份 X 读不出：上限 6、F 抬到 6 q1=pushW q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=bad_at_mount_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K1 q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K1 q1=pushW q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K1 description=有洞那一份 X 读不出：上限 6、F 抬到 6 q1=nomerge q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=bad_at_mount_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K1 q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K1 q1=nomerge q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K2_e description=没洞那一份 X 读不出：上限 17 q1=today q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_e q1=today q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_e q1=today q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K2_e description=没洞那一份 X 读不出：上限 17 q1=pushB q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_e q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_e q1=pushB q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K2_e description=没洞那一份 X 读不出：上限 17 q1=pushW q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_e q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_e q1=pushW q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K2_g description=没洞那一份 X 读不出：上限 17 q1=today q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_g q1=today q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_g q1=today q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K2_g description=没洞那一份 X 读不出：上限 17 q1=pushB q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_g q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_g q1=pushB q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K2_g description=没洞那一份 X 读不出：上限 17 q1=pushW q2=zeronot c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K2_g q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K2_g q1=pushW q2=zeronot step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零不并：上限 18、越过 X（越过数 1） q1=today q2=zeronot c0=18 c_merged=18 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=1 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=today q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=18 free_blocks=632
+E7RESULT name=trace id=K3 q1=today q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零并：上限 17 q1=today q2=zeromerge c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=0 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=today q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K3 q1=today q2=zeromerge step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零不并：上限 18、越过 X（越过数 1） q1=pushB q2=zeronot c0=18 c_merged=18 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=1 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=18 free_blocks=632
+E7RESULT name=trace id=K3 q1=pushB q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零并：上限 17 q1=pushB q2=zeromerge c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=0 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=pushB q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K3 q1=pushB q2=zeromerge step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零不并：上限 18、越过 X（越过数 1） q1=pushW q2=zeronot c0=18 c_merged=18 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=1 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=18 free_blocks=632
+E7RESULT name=trace id=K3 q1=pushW q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K3 description=没洞那一份 X 读回全零、全零并：上限 17 q1=pushW q2=zeromerge c0=18 c_merged=17 floor_after=17 crossed=0 pushed=yes stop=none expected_floor=17 expected_crossed=0 slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K3 q1=pushW q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K3 q1=pushW q2=zeromerge step=1 raise 0->17 publishes=3 ceiling=17
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=today q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=today q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=today q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=today q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=today q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=today q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=today q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=today q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=today q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=today q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=today q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=today q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushB q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushB q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushB q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushB q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushB q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushB q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushB q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushB q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushB q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushB q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushB q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushW q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushW q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushW q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushW q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushW q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushW q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushW q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushW q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=pushW q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=pushW q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=pushW q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=nomerge q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=nomerge q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=nomerge q2=zeronot c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=nomerge q2=zeronot step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=nomerge q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=all_zero_oldest_9_highest_21 matches=yes
+E7RESULT name=trace id=K4 q1=nomerge q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=nomerge q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K4 description=有洞那一份 X 读回全零或读得出：上限 6 q1=nomerge q2=zeromerge c0=6 c_merged=6 floor_after=6 crossed=0 pushed=yes stop=none expected_floor=6 expected_crossed=none slot_entry=valid_root_21 matches=yes
+E7RESULT name=trace id=K4 q1=nomerge q2=zeromerge step=0 ceiling_pass request=0 txg=29 floor=0 c0=6 c_merged=6 free_blocks=662
+E7RESULT name=trace id=K4 q1=nomerge q2=zeromerge step=1 raise 0->6 publishes=2 ceiling=6
+E7RESULT name=anchor id=K5_e description=没洞那一份不并：上限 18 q1=nomerge q2=zeronot c0=18 c_merged=17 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_e q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K5_e q1=nomerge q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K5_e description=没洞那一份不并：上限 18 q1=nomerge q2=zeromerge c0=18 c_merged=17 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_e q1=nomerge q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K5_e q1=nomerge q2=zeromerge step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K5_g description=没洞那一份不并：上限 18 q1=nomerge q2=zeronot c0=18 c_merged=17 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_g q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K5_g q1=nomerge q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K5_g description=没洞那一份不并：上限 18 q1=nomerge q2=zeromerge c0=18 c_merged=17 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=bad_at_mount_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_g q1=nomerge q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K5_g q1=nomerge q2=zeromerge step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K5_z description=没洞那一份不并：上限 18 q1=nomerge q2=zeronot c0=18 c_merged=18 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_z q1=nomerge q2=zeronot step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=18 free_blocks=632
+E7RESULT name=trace id=K5_z q1=nomerge q2=zeronot step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K5_z description=没洞那一份不并：上限 18 q1=nomerge q2=zeromerge c0=18 c_merged=17 floor_after=18 crossed=1 pushed=yes stop=none expected_floor=18 expected_crossed=none slot_entry=all_zero_oldest_5_highest_17 matches=yes
+E7RESULT name=trace id=K5_z q1=nomerge q2=zeromerge step=0 ceiling_pass request=0 txg=28 floor=0 c0=18 c_merged=17 free_blocks=632
+E7RESULT name=trace id=K5_z q1=nomerge q2=zeromerge step=1 raise 0->18 publishes=3 ceiling=18
+E7RESULT name=anchor id=K6_no_holes slot_entry=all_zero_oldest_5_highest_17 expected_oldest=5 expected_highest=none matches=yes
+E7RESULT name=anchor id=K6_holes slot_entry=all_zero_oldest_9_highest_21 expected_oldest=9 expected_highest=none matches=yes
+E7RESULT name=anchor id=K2_table_no_holes slot_entry=bad_at_mount_oldest_5_highest_17 expected_oldest=5 expected_highest=17 matches=yes
+E7RESULT name=anchor id=K1_table_holes slot_entry=bad_at_mount_oldest_9_highest_21 expected_oldest=9 expected_highest=21 matches=yes
+E7RESULT name=anchor id=A1 observed=8 expected=8 matches=yes
+E7RESULT name=anchor id=A2_c5 observed=45 expected=45 matches=yes
+E7RESULT name=anchor id=A2_c10 observed=80 expected=80 matches=yes
+E7RESULT name=anchor id=A3_raise_sequence_by_txg_mod_3 observed=[2, 3, 2] expected=[2, 3, 2] matches=yes
+E7RESULT name=anchor id=B1_matches_A3 observed=[2, 3, 2] expected=[2, 3, 2] matches=yes
+E7RESULT name=anchor id=A4_slots_per_region_in_4_to_16 observed=yes expected=yes matches=yes
+E7RESULT name=anchor id=A5_warm_up_at_most_three observed=yes expected=yes matches=yes
+E7RESULT name=anchor id=B2_warm_up_by_row_mod_3 observed=[1, 1, 2] expected=[1, 1, 2] matches=yes
+E7RESULT name=anchor id=B4_c5_seven_empties observed=35 expected=35 matches=yes
+E7RESULT name=anchor id=B4_c5_reserve observed=45 expected=45 matches=yes
+E7RESULT name=anchor id=B4_c10_seven_empties observed=70 expected=70 matches=yes
+E7RESULT name=anchor id=B4_c10_reserve observed=80 expected=80 matches=yes
+E7RESULT name=anchor id=B5_mount_facts_today_zeronot observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_today_zeronot observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=today_zeronot step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=today_zeronot step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=today_zeronot step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_today_zeromerge observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_today_zeromerge observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=today_zeromerge step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=today_zeromerge step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=today_zeromerge step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_pushB_zeronot observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_pushB_zeronot observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=pushB_zeronot step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=pushB_zeronot step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=pushB_zeronot step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_pushB_zeromerge observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_pushB_zeromerge observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=pushB_zeromerge step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=pushB_zeromerge step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=pushB_zeromerge step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_pushW_zeronot observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_pushW_zeronot observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=pushW_zeronot step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=pushW_zeronot step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=pushW_zeronot step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_pushW_zeromerge observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_pushW_zeromerge observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=pushW_zeromerge step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=pushW_zeromerge step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=pushW_zeromerge step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_nomerge_zeronot observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_nomerge_zeronot observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=nomerge_zeronot step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=nomerge_zeronot step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=nomerge_zeronot step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B5_mount_facts_nomerge_zeromerge observed=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 expected=N=50 row=51 warmup=1 ring=[41,52] pending_total=127 matches=yes
+E7RESULT name=anchor id=B5_first_request_nomerge_zeromerge observed=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 expected=accepted=true raises=1 ceiling=47 sequence_publishes=3 floor=47 lowest_free_in_the_raise=Some(30) free_above_reserve_after=50 pending_after=77 txg_after=56 matches=yes
+E7RESULT name=trace id=B5 arm=nomerge_zeromerge step=0 ceiling_pass request=0 txg=52 floor=0 c0=47 c_merged=47 free_blocks=45
+E7RESULT name=trace id=B5 arm=nomerge_zeromerge step=1 raise 0->47 publishes=3 ceiling=47
+E7RESULT name=trace id=B5 arm=nomerge_zeromerge step=2 request 0 accepted=true rejection=none txg=56 floor=47 free_above_reserve=50
+E7RESULT name=anchor id=B6_roomy_pool_no_fault_never_rejects observed=cells=384 cells_with_a_rejection=0 expected=cells=384 cells_with_a_rejection=0 matches=yes
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=today_zeronot observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_today_zeronot observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_today_zeronot observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_today_zeronot observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_today_zeronot observed=1 5 expected=1 5 matches=yes
+E7RESULT name=trace id=PC4 arm=today_zeronot step=0 ceiling_pass request=0 txg=52 floor=47 c0=47 c_merged=47 free_blocks=717
+E7RESULT name=trace id=PC4 arm=today_zeronot step=1 ceiling_pass request=0 txg=53 floor=47 c0=47 c_merged=47 free_blocks=712
+E7RESULT name=trace id=PC4 arm=today_zeronot step=2 request 0 accepted=false rejection=floor_at_ceiling txg=53 floor=47 free_above_reserve=667
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=today_zeromerge observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_today_zeromerge observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_today_zeromerge observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_today_zeromerge observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_today_zeromerge observed=1 5 expected=1 5 matches=yes
+E7RESULT name=trace id=PC4 arm=today_zeromerge step=0 ceiling_pass request=0 txg=52 floor=47 c0=47 c_merged=47 free_blocks=717
+E7RESULT name=trace id=PC4 arm=today_zeromerge step=1 ceiling_pass request=0 txg=53 floor=47 c0=47 c_merged=47 free_blocks=712
+E7RESULT name=trace id=PC4 arm=today_zeromerge step=2 request 0 accepted=false rejection=floor_at_ceiling txg=53 floor=47 free_above_reserve=667
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=pushB_zeronot observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_pushB_zeronot observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_pushB_zeronot observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_pushB_zeronot observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_pushB_zeronot observed=5 25 expected=5 25 matches=yes
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=0 ceiling_pass request=0 txg=52 floor=45 c0=47 c_merged=45 free_blocks=717
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=1 empty push (within budget) txg=53
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=2 ceiling_pass request=0 txg=53 floor=45 c0=47 c_merged=45 free_blocks=712
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=3 empty push (within budget) txg=54
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=4 ceiling_pass request=0 txg=54 floor=45 c0=47 c_merged=45 free_blocks=707
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=5 empty push (within budget) txg=55
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=6 ceiling_pass request=0 txg=55 floor=45 c0=47 c_merged=45 free_blocks=702
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=7 empty push (within budget) txg=56
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=8 ceiling_pass request=0 txg=56 floor=45 c0=47 c_merged=45 free_blocks=697
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=9 empty push (within budget) txg=57
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=10 ceiling_pass request=0 txg=57 floor=45 c0=47 c_merged=47 free_blocks=705
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=11 raise 45->47 publishes=2 ceiling=47
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=12 ceiling_pass request=0 txg=59 floor=47 c0=48 c_merged=48 free_blocks=721
+E7RESULT name=trace id=PC4 arm=pushB_zeronot step=13 request 0 accepted=false rejection=budget txg=59 floor=47 free_above_reserve=676
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=pushB_zeromerge observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_pushB_zeromerge observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_pushB_zeromerge observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_pushB_zeromerge observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_pushB_zeromerge observed=5 25 expected=5 25 matches=yes
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=0 ceiling_pass request=0 txg=52 floor=45 c0=47 c_merged=45 free_blocks=717
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=1 empty push (within budget) txg=53
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=2 ceiling_pass request=0 txg=53 floor=45 c0=47 c_merged=45 free_blocks=712
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=3 empty push (within budget) txg=54
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=4 ceiling_pass request=0 txg=54 floor=45 c0=47 c_merged=45 free_blocks=707
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=5 empty push (within budget) txg=55
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=6 ceiling_pass request=0 txg=55 floor=45 c0=47 c_merged=45 free_blocks=702
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=7 empty push (within budget) txg=56
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=8 ceiling_pass request=0 txg=56 floor=45 c0=47 c_merged=45 free_blocks=697
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=9 empty push (within budget) txg=57
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=10 ceiling_pass request=0 txg=57 floor=45 c0=47 c_merged=47 free_blocks=705
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=11 raise 45->47 publishes=2 ceiling=47
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=12 ceiling_pass request=0 txg=59 floor=47 c0=48 c_merged=48 free_blocks=721
+E7RESULT name=trace id=PC4 arm=pushB_zeromerge step=13 request 0 accepted=false rejection=budget txg=59 floor=47 free_above_reserve=676
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=pushW_zeronot observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_pushW_zeronot observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_pushW_zeronot observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_pushW_zeronot observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_pushW_zeronot observed=5 25 expected=5 25 matches=yes
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=0 ceiling_pass request=0 txg=52 floor=45 c0=47 c_merged=45 free_blocks=717
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=1 empty push (beyond budget) txg=53
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=2 empty push (beyond budget) txg=54
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=3 empty push (beyond budget) txg=55
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=4 empty push (beyond budget) txg=56
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=5 empty push (beyond budget) txg=57
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=6 ceiling_pass request=0 txg=57 floor=45 c0=47 c_merged=47 free_blocks=705
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=7 raise 45->47 publishes=2 ceiling=47
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=8 ceiling_pass request=0 txg=59 floor=47 c0=48 c_merged=48 free_blocks=721
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=9 raise 47->48 publishes=2 ceiling=48
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=10 ceiling_pass request=0 txg=61 floor=48 c0=50 c_merged=50 free_blocks=737
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=11 raise 48->50 publishes=3 ceiling=50
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=12 ceiling_pass request=0 txg=64 floor=50 c0=53 c_merged=53 free_blocks=737
+E7RESULT name=trace id=PC4 arm=pushW_zeronot step=13 request 0 accepted=false rejection=budget txg=64 floor=50 free_above_reserve=692
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=pushW_zeromerge observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_pushW_zeromerge observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_pushW_zeromerge observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_pushW_zeromerge observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_pushW_zeromerge observed=5 25 expected=5 25 matches=yes
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=0 ceiling_pass request=0 txg=52 floor=45 c0=47 c_merged=45 free_blocks=717
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=1 empty push (beyond budget) txg=53
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=2 empty push (beyond budget) txg=54
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=3 empty push (beyond budget) txg=55
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=4 empty push (beyond budget) txg=56
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=5 empty push (beyond budget) txg=57
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=6 ceiling_pass request=0 txg=57 floor=45 c0=47 c_merged=47 free_blocks=705
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=7 raise 45->47 publishes=2 ceiling=47
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=8 ceiling_pass request=0 txg=59 floor=47 c0=48 c_merged=48 free_blocks=721
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=9 raise 47->48 publishes=2 ceiling=48
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=10 ceiling_pass request=0 txg=61 floor=48 c0=50 c_merged=50 free_blocks=737
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=11 raise 48->50 publishes=3 ceiling=50
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=12 ceiling_pass request=0 txg=64 floor=50 c0=53 c_merged=53 free_blocks=737
+E7RESULT name=trace id=PC4 arm=pushW_zeromerge step=13 request 0 accepted=false rejection=budget txg=64 floor=50 free_above_reserve=692
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=nomerge_zeronot observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_nomerge_zeronot observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_nomerge_zeronot observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_nomerge_zeronot observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_nomerge_zeronot observed=1 5 expected=1 5 matches=yes
+E7RESULT name=trace id=PC4 arm=nomerge_zeronot step=0 ceiling_pass request=0 txg=52 floor=47 c0=47 c_merged=47 free_blocks=717
+E7RESULT name=trace id=PC4 arm=nomerge_zeronot step=1 ceiling_pass request=0 txg=53 floor=47 c0=47 c_merged=47 free_blocks=712
+E7RESULT name=trace id=PC4 arm=nomerge_zeronot step=2 request 0 accepted=false rejection=floor_at_ceiling txg=53 floor=47 free_above_reserve=667
+E7RESULT name=anchor id=PC1_PC3_registered_k8_pool_floor_raises arm=nomerge_zeromerge observed=0 note=registered_pool_does_not_reach_the_raise_path
+E7RESULT name=anchor id=PC1_crossed_by_two_nomerge_zeromerge observed=2 expected=2 matches=yes
+E7RESULT name=anchor id=PC3_states_lost_nomerge_zeromerge observed=3 expected=3 matches=yes
+E7RESULT name=anchor id=PC2_rejected_nomerge_zeromerge observed=30 expected=30 matches=yes
+E7RESULT name=anchor id=PC4_empty_publishes_nomerge_zeromerge observed=1 5 expected=1 5 matches=yes
+E7RESULT name=trace id=PC4 arm=nomerge_zeromerge step=0 ceiling_pass request=0 txg=52 floor=47 c0=47 c_merged=47 free_blocks=717
+E7RESULT name=trace id=PC4 arm=nomerge_zeromerge step=1 ceiling_pass request=0 txg=53 floor=47 c0=47 c_merged=47 free_blocks=712
+E7RESULT name=trace id=PC4 arm=nomerge_zeromerge step=2 request 0 accepted=false rejection=floor_at_ceiling txg=53 floor=47 free_above_reserve=667
+E7RESULT name=anchor id=B3_F4_empty_pushes_S4 observed=positions=8 beyond_budget_mismatches=[] within_budget_mismatches=[] expected=positions=8 beyond_budget_mismatches=[] within_budget_mismatches=[] matches=yes
+E7RESULT name=anchor id=B3_F4_empty_pushes_S8 observed=positions=20 beyond_budget_mismatches=[] within_budget_mismatches=[] expected=positions=20 beyond_budget_mismatches=[] within_budget_mismatches=[] matches=yes
+E7RESULT name=anchor id=B3_F4_empty_pushes_S16 observed=positions=44 beyond_budget_mismatches=[] within_budget_mismatches=[] expected=positions=44 beyond_budget_mismatches=[] within_budget_mismatches=[] matches=yes
+E7RESULT name=verdict scope=checks self_checks_passed=106 void_conditions=0 void_list=none halt_conditions=0 halt_list=none
+E7RESULT name=done emitted=285

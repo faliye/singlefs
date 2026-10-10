@@ -1,0 +1,71 @@
+mutate: 这一轮开 4 个工作进程（各项取最小、至少 1）：核数 32 的一半、至多 16，给 16 个；MUTATE_JOBS 给 4 个；表里 17 条。卡在「MUTATE_JOBS」这一项；每个 cargo 编译并行度 6（调用方的 CARGO_BUILD_JOBS）
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+基线：全绿
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+✅ [最底一层扇出改用内部扇出（144→147）] 红：tests::crates_format_literals_used_here_are_pinned_to_the_registered_values,tests::geometry_root_level_node_levels_root_children_are_pinned,tests::geometry_unit_counts_match_the_byte_sizes,tests::lowest_level_node_indices_of_adjacent_units
+✅ [内部扇出改小一档（147→146）] 红：tests::crates_format_literals_used_here_are_pinned_to_the_registered_values,tests::geometry_root_level_node_levels_root_children_are_pinned,tests::geometry_unit_counts_match_the_byte_sizes,tests::s2b1_and_s2b2_match_the_independent_anchor_script
+✅ [数据单元载荷不扣头偏移] 红：tests::data_unit_payload_bytes_matches_the_addition_form,tests::geometry_unit_counts_match_the_byte_sizes
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [一条记录装旧记录宽的项数（67→72）] 红：tests::crates_format_literals_used_here_are_pinned_to_the_registered_values,tests::entries_per_record_today_and_legacy,tests::write_ahead_log_leaf_record_blocks_today_vs_legacy_at_boundary_batches
+run-with-memory-cap: 上限 2G 超过实测峰值 117M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [甲的游标记录不计块] 红：tests::s2b1_and_s2b2_match_the_independent_anchor_script,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one_on_the_second_segment_points,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one
+run-with-memory-cap: 上限 2G 超过实测峰值 117M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 3 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 113M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [甲的根槽不计块] 红：tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one_on_the_second_segment_points,tests::s2b1_and_s2b2_match_the_independent_anchor_script
+✅ [祖先只走到根层级的下一层（漏根）] 红：tests::ancestor_deduplication_matches_hand_computation,tests::s2b1_and_s2b2_match_the_independent_anchor_script,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one_on_the_second_segment_points,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one
+✅ [根层级取跨度大于等于N改成大于N（边界取错）] 红：tests::geometry_root_level_node_levels_root_children_are_pinned,tests::predicted_ratio_uses_node_levels_not_node_levels_minus_one,tests::s2b1_and_s2b2_match_the_independent_anchor_script
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 117M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [流的落点用地板除改成向上取整] 红：tests::stream_offset_for_one_tebibyte_file_geometry_matches_the_anchor_script
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [预测式的树高少套一层] 红：tests::predicted_ratio_uses_node_levels_not_node_levels_minus_one
+✅ [相对误差的分母恒用预测比值] 红：tests::relative_error_denominator_is_the_passed_in_value_not_always_predicted
+run-with-memory-cap: 上限 2G 超过实测峰值 111M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+run-with-memory-cap: 上限 2G 超过实测峰值 115M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [峰值集合容差从0.1%换成10%] 红：tests::peak_set_tolerance_change_widens_the_peak_set
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [批≈流数带宽因子从2换成4] 红：tests::near_diagonal_band_bound_change_flips_classification
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [单调容差从1%换成0] 红：tests::monotonic_tolerance_change_flips_the_batch_at_most_streams_verdict
+✅ [乙每次fsync落全部脏单元不扣已落过的] 红：tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one,tests::positive_control_four_ratio_above_one_for_small_batches,tests::s2b1_and_s2b2_match_the_independent_anchor_script,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one_on_the_second_segment_points
+run-with-memory-cap: 上限 2G 超过实测峰值 116M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [checkpoint间隔恒取2000不取批的整数倍] 红：tests::checkpoint_interval_and_operation_count_are_pinned
+run-with-memory-cap: 上限 2G 超过实测峰值 117M 的 2 倍，照理由放行：变异表整张跑的单测峰值取自单条测试先取2G
+run-with-memory-cap: 这个会话已有 4 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+✅ [记录宽旋钮的EntriesPerRecord改成地板除] 红：tests::entries_per_record_format_divides_with_ceiling_not_floor,tests::positive_control_four_batch_one_difference_equals_node_levels_plus_one_on_the_second_segment_points
+计数：内存撞顶 0 条（上限 2G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条
+已还原，基线仍全绿

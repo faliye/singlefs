@@ -1,0 +1,201 @@
+name=known_bad_source path=crates/singlefs-harness/tests/checker_known_bad_images.rs sha256=e426cdff6c0cd4feebb8d493940c077243017a4d493523e719d7ae68dbf35736
+name=old_module sha256=a5866391e1c1b036a34b4239e9e083716726d8d3ab7863a5f6c7d861d00bbf4a expected=a5866391e1c1b036a34b4239e9e083716726d8d3ab7863a5f6c7d861d00bbf4a equal=True
+name=new_module sha256=85621ad075bfc6fa7f1a01e2048abbed45d728a5df99c40a03f076e9f853c481
+name=count method=device_name_rule_python_port count=43 unresolved=0 literal=38 constant=5
+name=count method=box_new lines=755-1326 count=43
+name=count method=eight_space_open_paren lines=755-1326 count=43
+name=entries old=41 new=43
+name=known_bad_prelude_identity identical=True
+name=known_bad_entry_identity index=0 target="I-7.4" identical=True target_identical=True text_identical=True helpers=7 helpers_identical=True
+name=known_bad_entry_identity index=1 target="I-4.8" identical=True target_identical=True text_identical=True helpers=4 helpers_identical=True
+name=known_bad_entry_identity index=2 target="I-1.1" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=3 target="I-1.3" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=4 target="I-1.4" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=5 target="I-1.4" identical=True target_identical=True text_identical=True helpers=3 helpers_identical=True
+name=known_bad_entry_identity index=6 target="I-1.6" identical=True target_identical=True text_identical=True helpers=13 helpers_identical=True
+name=known_bad_entry_identity index=7 target="I-1.7" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=8 target="I-1.10" identical=True target_identical=True text_identical=True helpers=15 helpers_identical=True
+name=known_bad_entry_identity index=9 target="I-2.1" identical=True target_identical=True text_identical=True helpers=4 helpers_identical=True
+name=known_bad_entry_identity index=10 target="I-2.3" identical=True target_identical=True text_identical=True helpers=13 helpers_identical=True
+name=known_bad_entry_identity index=11 target="I-2.4" identical=True target_identical=True text_identical=True helpers=13 helpers_identical=True
+name=known_bad_entry_identity index=12 target="I-2.5" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=13 target="I-3.1" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=14 target="I-5.1" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=15 target="I-5.2" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=16 target="I-7.1" identical=True target_identical=True text_identical=True helpers=3 helpers_identical=True
+name=known_bad_entry_identity index=17 target="I-7.2" identical=True target_identical=True text_identical=True helpers=5 helpers_identical=True
+name=known_bad_entry_identity index=18 target="I-7.6" identical=True target_identical=True text_identical=True helpers=3 helpers_identical=True
+name=known_bad_entry_identity index=19 target=SYSTEM_CONFIGURATION_CARRIES_ONLY_VALUES_THE_READER_ACCEPTS identical=True target_identical=True text_identical=True helpers=7 helpers_identical=True
+name=known_bad_entry_identity index=20 target=SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_IS_THE_DEVICE_IDENTITY identical=True target_identical=True text_identical=True helpers=6 helpers_identical=True
+name=known_bad_entry_identity index=21 target="I-7.7" identical=True target_identical=True text_identical=True helpers=2 helpers_identical=True
+name=known_bad_entry_identity index=22 target="I-7.7" identical=True target_identical=True text_identical=True helpers=1 helpers_identical=True
+name=known_bad_entry_identity index=23 target="I-7.7" identical=True target_identical=True text_identical=True helpers=4 helpers_identical=True
+name=known_bad_entry_identity index=24 target="I-7.8" identical=True target_identical=True text_identical=True helpers=2 helpers_identical=True
+name=known_bad_entry_identity index=25 target="I-9.1" identical=True target_identical=True text_identical=True helpers=15 helpers_identical=True
+name=known_bad_entry_identity index=26 target="I-9.2" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=27 target="I-9.4" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=28 target="I-9.7" identical=True target_identical=True text_identical=True helpers=13 helpers_identical=True
+name=known_bad_entry_identity index=29 target="I-9.10" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=30 target="I-9.15" identical=True target_identical=True text_identical=True helpers=15 helpers_identical=True
+name=known_bad_entry_identity index=31 target="I-9.16" identical=True target_identical=True text_identical=True helpers=21 helpers_identical=True
+name=known_bad_entry_identity index=32 target="I-3.8" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=33 target="I-8.6" identical=True target_identical=True text_identical=True helpers=3 helpers_identical=True
+name=known_bad_entry_identity index=34 target="I-1.8" identical=True target_identical=True text_identical=True helpers=12 helpers_identical=True
+name=known_bad_entry_identity index=35 target="I-1.2" identical=True target_identical=True text_identical=True helpers=17 helpers_identical=True
+name=known_bad_entry_identity index=36 target=MAPPING_KEY_INVARIANT identical=True target_identical=True text_identical=True helpers=17 helpers_identical=True
+name=known_bad_entry_identity index=37 target="I-4.2" identical=True target_identical=True text_identical=True helpers=27 helpers_identical=True
+name=known_bad_entry_identity index=38 target="I-9.6" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=39 target="I-9.12" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_identity index=40 target="I-9.13" identical=True target_identical=True text_identical=True helpers=14 helpers_identical=True
+name=known_bad_entry_added index=41 target=REFERENCE_INTERVALS_ARE_EXACT
+name=known_bad_entry_added index=42 target=FIRST_DATA_UNIT_OF_THE_VERSION_BUILDING_TREES_FROM_THE_MKFS_WATERMARK
+name=known_bad_use_in_the_file use='use super::common::{' present=False
+name=known_bad_use_in_the_file use='use singlefs_checker::image::{' present=False
+name=known_bad_use_in_the_file use='use singlefs_checker::walk::check_pool_image;' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::address::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::allocation_record_tree::AllocationRecordTreeNodePosition;' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::allocator::{DeviceFreeMap, Placement, PoolAllocator};' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::block_device::{BlockDevice, PhysicalBlockSizeInBytes};' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::checksum::{crc32_castagnoli, wide_checksum_with_field_zeroed};' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::journal::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::make_filesystem::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::mount::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::recovery::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::system_configuration::SystemImmutableSizes;' present=True
+name=known_bad_use_in_the_file use='use singlefs_core::transaction::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_format::{' present=True
+name=known_bad_use_in_the_file use='use singlefs_harness::history::{allocation_statistic_mechanism, AllocationStatisticMechanism};' present=True
+name=known_bad_use_in_the_file use='use singlefs_harness::memory_pool::{MemoryPool, SparseBlockDevice};' present=True
+name=known_bad_use_in_the_file use='use singlefs_harness::segments::StepKind;' present=True
+name=known_bad_use_in_the_file use='use singlefs_harness::{RetainedOperation, SharedStream};' present=True
+name=known_bad_item_identity item=const:SLOT identical=True
+name=known_bad_item_identity item=const:DEVICES identical=True
+name=known_bad_item_identity item=const:UNITS identical=True
+name=known_bad_item_identity item=const:UNITS_AFTER_OVERWRITE identical=True
+name=known_bad_item_identity item=const:ALLOCATION_LEAVES_AFTER_OVERWRITE identical=True
+name=known_bad_item_identity item=const:TREE_TABLE_AFTER_OVERWRITE identical=True
+name=known_bad_item_identity item=const:INSTANCE_TABLE identical=True
+name=known_bad_item_identity item=const:GENESIS_TREE_TABLE identical=True
+name=known_bad_item_identity item=const:DATA_UNIT identical=True
+name=known_bad_item_identity item=const:EXTENT_ROOT identical=True
+name=known_bad_item_identity item=const:INODE_LEAF identical=True
+name=known_bad_item_identity item=const:INODE_ROOT identical=True
+name=known_bad_item_identity item=const:ALLOCATION_LEAVES identical=True
+name=known_bad_item_identity item=const:ACCOUNTING_ROOT identical=True
+name=known_bad_item_identity item=const:TREE_TABLE identical=True
+name=known_bad_item_identity item=fn:read identical=True
+name=known_bad_item_identity item=fn:write identical=True
+name=known_bad_item_identity item=fn:reseal_unit identical=True
+name=known_bad_item_identity item=fn:root_slots identical=True
+name=known_bad_item_identity item=fn:location_pattern identical=True
+name=known_bad_item_identity item=fn:replace_all identical=True
+name=known_bad_item_identity item=fn:propagate identical=True
+name=known_bad_item_identity item=const:JOURNAL_RECORD_CHECKPOINT_TXG_OFFSET identical=True
+name=known_bad_item_identity item=fn:mutate_one_device_copy_of_unit identical=True
+name=known_bad_item_identity item=fn:mutate_unit_of identical=True
+name=known_bad_item_identity item=fn:mutate_unit identical=True
+name=known_bad_item_identity item=fn:mutate_allocation_leaves identical=True
+name=known_bad_item_identity item=fn:verdict identical=True
+name=known_bad_item_identity item=const:JOURNAL_RECORD_INSTANCE_OFFSET identical=True
+name=known_bad_item_identity item=const:JOURNAL_RECORD_TRANSACTION_OFFSET identical=True
+name=known_bad_item_identity item=const:RECORDS_READ_BACK_AT_MOST identical=True
+name=known_bad_item_identity item=fn:journal_records_on_device identical=True
+name=known_bad_item_identity item=fn:set_transaction_number_of_journal_record identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_ENCRYPTION_TYPE_OFFSET identical=True
+name=known_bad_item_identity item=const:ENCRYPTION_TYPE_THE_FIRST_VERSION_DOES_NOT_READ identical=True
+name=known_bad_item_identity item=const:DEVICE_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT identical=True
+name=known_bad_item_identity item=const:OFFSET_OF_THE_REFUSED_SYSTEM_CONFIGURATION_SLOT identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_JOURNAL_RING_START_SLOT_OFFSET identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_JOURNAL_RING_BYTES_OFFSET identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_ROOT_RING_BASE_SLOT_OFFSET identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_UNIT_AREA_START_SLOT_OFFSET identical=True
+name=known_bad_item_identity item=const:SYSTEM_CONFIGURATION_OWN_DEVICE_NUMBER_OFFSET identical=True
+name=known_bad_item_identity item=const:JOURNAL_RING_START_SLOT_OF_THE_POOL identical=True
+name=known_bad_item_identity item=const:JOURNAL_RING_BYTES_OF_THE_POOL identical=True
+name=known_bad_item_identity item=const:ROOT_RING_BASE_SLOT_OF_THE_POOL identical=True
+name=known_bad_item_identity item=const:UNIT_AREA_START_SLOT_OF_THE_POOL identical=True
+name=known_bad_item_identity item=const:CLUSTER_SEGMENT_SLOTS_OF_THE_POOL identical=True
+name=known_bad_item_identity item=fn:mutate_system_configuration_slot identical=True
+name=known_bad_item_identity item=fn:set_u64 identical=True
+name=known_bad_item_identity item=fn:set_u16 identical=True
+name=known_bad_item_identity item=fn:get_u32 identical=True
+name=known_bad_item_identity item=fn:set_u32 identical=True
+name=known_bad_item_identity item=fn:swap_the_own_device_numbers_of_the_two_devices identical=True
+name=known_bad_item_identity item=fn:known_bad_images_of_the_system_configuration_geometry identical=True
+name=known_bad_item_identity item=fn:tree_table_entry_offset identical=True
+name=known_bad_item_identity item=fn:narrow_the_entry_width_to_the_key_width identical=True
+name=known_bad_item_identity item=const:INDEX_NODE_BIRTH_SEQUENCE_OFFSET_BEFORE_THE_KEYS identical=True
+name=known_bad_item_identity item=const:DATA_UNIT_BIRTH_TXG_OFFSET identical=True
+name=known_bad_item_identity item=const:EXTENT_RECORD_DATA_POINTER_BIRTH_TXG_OFFSET identical=True
+name=known_bad_item_identity item=const:TREE_TABLE_ENTRY_BIRTH_TXG_OFFSET identical=True
+name=known_bad_item_identity item=const:ALLOCATION_NODE_ENTRY_COUNT_OFFSET identical=True
+name=known_bad_item_identity item=const:ALLOCATION_NODE_ENTRY_START identical=True
+name=known_bad_item_identity item=const:ALLOCATION_RECORD_BYTES identical=True
+name=known_bad_item_identity item=const:ALLOCATION_RECORD_RELEASED_FLAG identical=True
+name=known_bad_item_identity item=fn:get_u64 identical=True
+name=known_bad_item_identity item=fn:rewrite_the_data_unit_mapping_key_birth_txg identical=True
+name=known_bad_item_identity item=const:MAPPING_KEY_INVARIANT identical=True
+name=known_bad_item_identity item=fn:raise_the_mapping_key_tail_of_the_node_at identical=True
+name=known_bad_item_identity item=fn:rewrite_released_generations identical=True
+name=known_bad_item_identity item=fn:set_allocation_record_span identical=True
+name=known_bad_item_identity item=type:Mutation identical=True
+name=known_bad_item_identity item=fn:known_bad_images identical=True
+name=known_bad_item_identity item=fn:move_the_data_unit_of_the_first_file_two_slots_further identical=True
+name=known_bad_item_identity item=const:INODE_RECORD_BLOCKS_OFFSET identical=True
+name=known_bad_item_identity item=const:JOURNAL_RECORD_BACK_CHAIN_OFFSET identical=True
+name=known_bad_item_identity item=const:MAPPING_ROOT identical=True
+name=known_bad_item_identity item=fn:adjust_accounting identical=True
+name=known_bad_item_identity item=fn:set_accounting identical=True
+name=known_bad_item_identity item=fn:swap_the_kinds_of_the_livelist_and_sparse_side_table_entries identical=True
+name=known_bad_item_identity item=fn:rewrite_unreleased_allocation_generation identical=True
+name=known_bad_item_identity item=const:LIVELIST_TREE_TABLE_ENTRY_INDEX identical=True
+name=known_bad_item_identity item=const:TREE_KIND_LIVELIST identical=True
+name=known_bad_item_identity item=const:TREE_KIND_SPARSE_SIDE_TABLE identical=True
+name=known_bad_item_identity item=const:SPARSE_SIDE_TABLE_TREE_TABLE_ENTRY_INDEX identical=True
+name=known_bad_item_identity item=const:TREE_TABLE_ENTRY_KIND_OFFSET identical=True
+name=known_bad_entry_names_resolved_equal_the_file_in_order equal=True count=43
+name=known_bad_entry_name index=0 name=I-7.4
+name=known_bad_entry_name index=1 name=I-4.8
+name=known_bad_entry_name index=2 name=I-1.1
+name=known_bad_entry_name index=3 name=I-1.3
+name=known_bad_entry_name index=4 name=I-1.4
+name=known_bad_entry_name index=5 name=I-1.4
+name=known_bad_entry_name index=6 name=I-1.6
+name=known_bad_entry_name index=7 name=I-1.7
+name=known_bad_entry_name index=8 name=I-1.10
+name=known_bad_entry_name index=9 name=I-2.1
+name=known_bad_entry_name index=10 name=I-2.3
+name=known_bad_entry_name index=11 name=I-2.4
+name=known_bad_entry_name index=12 name=I-2.5
+name=known_bad_entry_name index=13 name=I-3.1
+name=known_bad_entry_name index=14 name=I-5.1
+name=known_bad_entry_name index=15 name=I-5.2
+name=known_bad_entry_name index=16 name=I-7.1
+name=known_bad_entry_name index=17 name=I-7.2
+name=known_bad_entry_name index=18 name=I-7.6
+name=known_bad_entry_name index=19 name=I-7.13
+name=known_bad_entry_name index=20 name=I-7.14
+name=known_bad_entry_name index=21 name=I-7.7
+name=known_bad_entry_name index=22 name=I-7.7
+name=known_bad_entry_name index=23 name=I-7.7
+name=known_bad_entry_name index=24 name=I-7.8
+name=known_bad_entry_name index=25 name=I-9.1
+name=known_bad_entry_name index=26 name=I-9.2
+name=known_bad_entry_name index=27 name=I-9.4
+name=known_bad_entry_name index=28 name=I-9.7
+name=known_bad_entry_name index=29 name=I-9.10
+name=known_bad_entry_name index=30 name=I-9.15
+name=known_bad_entry_name index=31 name=I-9.16
+name=known_bad_entry_name index=32 name=I-3.8
+name=known_bad_entry_name index=33 name=I-8.6
+name=known_bad_entry_name index=34 name=I-1.8
+name=known_bad_entry_name index=35 name=I-1.2
+name=known_bad_entry_name index=36 name=I-1.11
+name=known_bad_entry_name index=37 name=I-4.2
+name=known_bad_entry_name index=38 name=I-9.6
+name=known_bad_entry_name index=39 name=I-9.12
+name=known_bad_entry_name index=40 name=I-9.13
+name=known_bad_entry_name index=41 name=I-3.5
+name=known_bad_entry_name index=42 name=I-5.5
+name=i4_target_names equal=True rows=41 old_module_entries=41
+name=known_bad_recopy_verdict counts_equal=True recopy_differences=0 item_differences=0 names_resolved_equal=True i4_target_names_equal=True

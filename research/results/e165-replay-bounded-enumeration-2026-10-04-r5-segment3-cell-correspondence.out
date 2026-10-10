@@ -1,0 +1,1072 @@
+name=config experiment=E165 segment=3 checks=PQ8,PQ9,PQ10,PQ11,PV8 script=cells3.py script_sha256=0fe9df3beeb29e0dd3ff3ae023c747d276e08e6fced2b24c7c4ccd9ef3946c4a
+name=pq9_files family=legal parity=even new_lines=1532 old_lines=1466 new_cells=65 old_cells=65
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=1 new=J8a_instance_table:0/1 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/1 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=1 new=J8a_unmount_marker:0/1 old=J7b:0/1 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=1 new=J8c:0/3 old=J7c:0/3 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=1 j8_without_a_source=0 judged=1
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=2 new=J8b:0/32 old=J7a_filesystem_identifier:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=2 new=J8c:0/26 old=J7c:0/26 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=3 new=J8a_instance_table:0/44 old=J7a_instance_table:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/44 old=J7a_allocation_record_tree_root:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=3 new=J8a_unmount_marker:0/44 old=J7b:0/44 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=3 new=J8b:0/256 old=J7a_filesystem_identifier:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=3 new=J8c:0/212 old=J7c:0/212 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=3 j8_without_a_source=0 judged=44
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=4 new=J8a_instance_table:0/344 old=J7a_instance_table:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/344 old=J7a_allocation_record_tree_root:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=4 new=J8a_unmount_marker:0/344 old=J7b:0/344 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=4 new=J8b:0/2048 old=J7a_filesystem_identifier:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=4 new=J8c:0/1704 old=J7c:0/1704 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=4 j8_without_a_source=0 judged=344
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=5 new=J8a_instance_table:0/2736 old=J7a_instance_table:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/2736 old=J7a_allocation_record_tree_root:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=5 new=J8a_unmount_marker:0/2736 old=J7b:0/2736 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=5 new=J8b:0/16384 old=J7a_filesystem_identifier:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=5 new=J8c:0/13648 old=J7c:0/13648 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=5 j8_without_a_source=0 judged=2736
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=6 new=J8a_instance_table:0/21856 old=J7a_instance_table:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/21856 old=J7a_allocation_record_tree_root:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=6 new=J8a_unmount_marker:0/21856 old=J7b:0/21856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=6 new=J8b:0/131072 old=J7a_filesystem_identifier:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C ring_slots=64 n=6 new=J8c:0/109216 old=J7c:0/109216 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C ring_slots=64 n=6 j8_without_a_source=0 judged=21856
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=1 new=J8a_instance_table:0/1 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/1 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=1 new=J8a_unmount_marker:0/1 old=J7b:0/1 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=1 new=J8c:0/3 old=J7c:0/3 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C6 ring_slots=6 n=1 j8_without_a_source=0 judged=1
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=2 new=J8b:0/32 old=J7a_filesystem_identifier:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=2 new=J8c:0/26 old=J7c:0/26 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C6 ring_slots=6 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=3 new=J8a_instance_table:0/40 old=J7a_instance_table:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/40 old=J7a_allocation_record_tree_root:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=3 new=J8a_unmount_marker:0/40 old=J7b:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=3 new=J8b:0/192 old=J7a_filesystem_identifier:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=3 new=J8c:0/152 old=J7c:0/152 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C6 ring_slots=6 n=3 j8_without_a_source=0 judged=40
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=4 new=J8a_instance_table:0/256 old=J7a_instance_table:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=4 new=J8a_allocation_record_tree_root:0/256 old=J7a_allocation_record_tree_root:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=4 new=J8a_unmount_marker:0/256 old=J7b:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=4 new=J8b:0/1280 old=J7a_filesystem_identifier:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=4 new=J8c:0/1024 old=J7c:0/1024 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C6 ring_slots=6 n=4 j8_without_a_source=0 judged=256
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=5 new=J8a_instance_table:0/1664 old=J7a_instance_table:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=5 new=J8a_allocation_record_tree_root:0/1664 old=J7a_allocation_record_tree_root:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=5 new=J8a_unmount_marker:0/1664 old=J7b:0/1664 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=5 new=J8b:0/8192 old=J7a_filesystem_identifier:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=C6 ring_slots=6 n=5 new=J8c:0/6528 old=J7c:0/6528 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=C6 ring_slots=6 n=5 j8_without_a_source=0 judged=1664
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E1 ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E1 ring_slots=64 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=3 new=J8a_instance_table:0/12 old=J7a_instance_table:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/12 old=J7a_allocation_record_tree_root:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=3 new=J8a_unmount_marker:0/12 old=J7b:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=3 new=J8b:0/64 old=J7a_filesystem_identifier:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=3 new=J8c:0/52 old=J7c:0/52 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E1 ring_slots=64 n=3 j8_without_a_source=0 judged=12
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=4 new=J8a_instance_table:0/56 old=J7a_instance_table:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/56 old=J7a_allocation_record_tree_root:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=4 new=J8a_unmount_marker:0/56 old=J7b:0/56 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=4 new=J8b:0/320 old=J7a_filesystem_identifier:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E1 ring_slots=64 n=4 new=J8c:0/264 old=J7c:0/264 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E1 ring_slots=64 n=4 j8_without_a_source=0 judged=56
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=1 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=1 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E2 ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=2 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=2 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=2 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=2 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E2 ring_slots=64 n=2 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=3 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=3 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=3 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=E2 ring_slots=64 n=3 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=E2 ring_slots=64 n=3 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=3 new=J8b:0/72 old=J7a_filesystem_identifier:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=3 new=J8c:0/56 old=J7c:0/56 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=4 new=J8a_instance_table:0/104 old=J7a_instance_table:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/104 old=J7a_allocation_record_tree_root:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=4 new=J8a_unmount_marker:0/104 old=J7b:0/104 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=4 new=J8b:0/432 old=J7a_filesystem_identifier:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=4 new=J8c:0/328 old=J7c:0/328 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=4 j8_without_a_source=0 judged=104
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=5 new=J8a_instance_table:0/640 old=J7a_instance_table:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/640 old=J7a_allocation_record_tree_root:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=5 new=J8a_unmount_marker:0/640 old=J7b:0/640 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=5 new=J8b:0/2592 old=J7a_filesystem_identifier:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=5 new=J8c:0/1952 old=J7c:0/1952 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=5 j8_without_a_source=0 judged=640
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=6 new=J8a_instance_table:0/3872 old=J7a_instance_table:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/3872 old=J7a_allocation_record_tree_root:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=6 new=J8a_unmount_marker:0/3872 old=J7b:0/3872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=6 new=J8b:0/15552 old=J7a_filesystem_identifier:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=6 new=J8c:0/11680 old=J7c:0/11680 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=6 j8_without_a_source=0 judged=3872
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=7 new=J8a_instance_table:0/23296 old=J7a_instance_table:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=7 new=J8a_allocation_record_tree_root:0/23296 old=J7a_allocation_record_tree_root:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=7 new=J8a_unmount_marker:0/23296 old=J7b:0/23296 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=7 new=J8b:0/93312 old=J7a_filesystem_identifier:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=7 new=J8c:0/70016 old=J7c:0/70016 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=7 j8_without_a_source=0 judged=23296
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=8 new=J8a_instance_table:0/139904 old=J7a_instance_table:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=8 new=J8a_allocation_record_tree_root:0/139904 old=J7a_allocation_record_tree_root:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=8 new=J8a_unmount_marker:0/139904 old=J7b:0/139904 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=8 new=J8b:0/559872 old=J7a_filesystem_identifier:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=8 new=J8c:0/419968 old=J7c:0/419968 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=8 j8_without_a_source=0 judged=139904
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=9 new=J8a_instance_table:0/839680 old=J7a_instance_table:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=9 new=J8a_allocation_record_tree_root:0/839680 old=J7a_allocation_record_tree_root:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=9 new=J8a_unmount_marker:0/839680 old=J7b:0/839680 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=9 new=J8b:0/3359232 old=J7a_filesystem_identifier:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=9 new=J8c:0/2519552 old=J7c:0/2519552 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=9 j8_without_a_source=0 judged=839680
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=10 new=J8a_instance_table:0/5038592 old=J7a_instance_table:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=10 new=J8a_allocation_record_tree_root:0/5038592 old=J7a_allocation_record_tree_root:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=10 new=J8a_unmount_marker:0/5038592 old=J7b:0/5038592 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=10 new=J8b:0/20155392 old=J7a_filesystem_identifier:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L ring_slots=64 n=10 new=J8c:0/15116800 old=J7c:0/15116800 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L ring_slots=64 n=10 j8_without_a_source=0 judged=5038592
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=3 new=J8b:0/40 old=J7a_filesystem_identifier:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=3 new=J8c:0/24 old=J7c:0/24 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=4 new=J8a_instance_table:0/64 old=J7a_instance_table:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=4 new=J8a_allocation_record_tree_root:0/64 old=J7a_allocation_record_tree_root:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=4 new=J8a_unmount_marker:0/64 old=J7b:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=4 new=J8b:0/176 old=J7a_filesystem_identifier:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=4 new=J8c:0/112 old=J7c:0/112 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=4 j8_without_a_source=0 judged=64
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=5 new=J8a_instance_table:0/256 old=J7a_instance_table:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=5 new=J8a_allocation_record_tree_root:0/256 old=J7a_allocation_record_tree_root:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=5 new=J8a_unmount_marker:0/256 old=J7b:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=5 new=J8b:0/672 old=J7a_filesystem_identifier:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=5 new=J8c:0/416 old=J7c:0/416 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=5 j8_without_a_source=0 judged=256
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=6 new=J8a_instance_table:0/1024 old=J7a_instance_table:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=6 new=J8a_allocation_record_tree_root:0/1024 old=J7a_allocation_record_tree_root:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=6 new=J8a_unmount_marker:0/1024 old=J7b:0/1024 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=6 new=J8b:0/2752 old=J7a_filesystem_identifier:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L6 ring_slots=6 n=6 new=J8c:0/1728 old=J7c:0/1728 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L6 ring_slots=6 n=6 j8_without_a_source=0 judged=1024
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=3 new=J8b:0/72 old=J7a_filesystem_identifier:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=3 new=J8c:0/56 old=J7c:0/56 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=4 new=J8a_instance_table:0/104 old=J7a_instance_table:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=4 new=J8a_allocation_record_tree_root:0/104 old=J7a_allocation_record_tree_root:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=4 new=J8a_unmount_marker:0/104 old=J7b:0/104 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=4 new=J8b:0/304 old=J7a_filesystem_identifier:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=4 new=J8c:0/200 old=J7c:0/200 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=4 j8_without_a_source=0 judged=104
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=5 new=J8a_instance_table:0/496 old=J7a_instance_table:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=5 new=J8a_allocation_record_tree_root:0/496 old=J7a_allocation_record_tree_root:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=5 new=J8a_unmount_marker:0/496 old=J7b:0/496 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=5 new=J8b:0/1568 old=J7a_filesystem_identifier:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=5 new=J8c:0/1072 old=J7c:0/1072 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=5 j8_without_a_source=0 judged=496
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=6 new=J8a_instance_table:0/2464 old=J7a_instance_table:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=6 new=J8a_allocation_record_tree_root:0/2464 old=J7a_allocation_record_tree_root:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=6 new=J8a_unmount_marker:0/2464 old=J7b:0/2464 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=6 new=J8b:0/7872 old=J7a_filesystem_identifier:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=6 new=J8c:0/5408 old=J7c:0/5408 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=6 j8_without_a_source=0 judged=2464
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=7 new=J8a_instance_table:0/12224 old=J7a_instance_table:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=7 new=J8a_allocation_record_tree_root:0/12224 old=J7a_allocation_record_tree_root:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=7 new=J8a_unmount_marker:0/12224 old=J7b:0/12224 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=7 new=J8b:0/38016 old=J7a_filesystem_identifier:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=7 new=J8c:0/25792 old=J7c:0/25792 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=7 j8_without_a_source=0 judged=12224
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=8 new=J8a_instance_table:0/60032 old=J7a_instance_table:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=8 new=J8a_allocation_record_tree_root:0/60032 old=J7a_allocation_record_tree_root:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=8 new=J8a_unmount_marker:0/60032 old=J7b:0/60032 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=8 new=J8b:0/189184 old=J7a_filesystem_identifier:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=8 new=J8c:0/129152 old=J7c:0/129152 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=8 j8_without_a_source=0 judged=60032
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=9 new=J8a_instance_table:0/296704 old=J7a_instance_table:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=9 new=J8a_allocation_record_tree_root:0/296704 old=J7a_allocation_record_tree_root:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=9 new=J8a_unmount_marker:0/296704 old=J7b:0/296704 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=9 new=J8b:0/934400 old=J7a_filesystem_identifier:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=L9 ring_slots=9 n=9 new=J8c:0/637696 old=J7c:0/637696 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=L9 ring_slots=9 n=9 j8_without_a_source=0 judged=296704
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=2 new=J8a_instance_table:0/4 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/4 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=2 new=J8a_unmount_marker:0/4 old=J7b:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=2 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=2 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=R ring_slots=64 n=2 j8_without_a_source=0 judged=4
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=3 new=J8a_instance_table:0/40 old=J7a_instance_table:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/40 old=J7a_allocation_record_tree_root:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=3 new=J8a_unmount_marker:0/40 old=J7b:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=3 new=J8b:0/64 old=J7a_filesystem_identifier:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=3 new=J8c:0/24 old=J7c:0/24 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=R ring_slots=64 n=3 j8_without_a_source=0 judged=40
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=4 new=J8a_instance_table:0/320 old=J7a_instance_table:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/320 old=J7a_allocation_record_tree_root:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=4 new=J8a_unmount_marker:0/320 old=J7b:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=4 new=J8b:0/688 old=J7a_filesystem_identifier:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=4 new=J8c:0/368 old=J7c:0/368 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=R ring_slots=64 n=4 j8_without_a_source=0 judged=320
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=5 new=J8a_instance_table:0/2400 old=J7a_instance_table:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/2400 old=J7a_allocation_record_tree_root:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=5 new=J8a_unmount_marker:0/2400 old=J7b:0/2400 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=5 new=J8b:0/6208 old=J7a_filesystem_identifier:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=R ring_slots=64 n=5 new=J8c:0/3808 old=J7c:0/3808 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=R ring_slots=64 n=5 j8_without_a_source=0 judged=2400
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 new=J8b:0/6 old=J7a_filesystem_identifier:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 new=J8c:0/6 old=J7c:0/6 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 new=J8a_instance_table:0/30 old=J7a_instance_table:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/30 old=J7a_allocation_record_tree_root:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 new=J8a_unmount_marker:0/30 old=J7b:0/30 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 new=J8b:0/108 old=J7a_filesystem_identifier:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 new=J8c:0/78 old=J7c:0/78 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=2 j8_without_a_source=0 judged=30
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 new=J8a_instance_table:0/840 old=J7a_instance_table:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/840 old=J7a_allocation_record_tree_root:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 new=J8a_unmount_marker:0/840 old=J7b:0/840 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 new=J8b:0/1944 old=J7a_filesystem_identifier:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 new=J8c:0/1104 old=J7c:0/1104 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=3 j8_without_a_source=0 judged=840
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 new=J8a_instance_table:0/18120 old=J7a_instance_table:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/18120 old=J7a_allocation_record_tree_root:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 new=J8a_unmount_marker:0/18120 old=J7b:0/18120 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 new=J8b:0/34992 old=J7a_filesystem_identifier:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 new=J8c:0/16872 old=J7c:0/16872 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=4 j8_without_a_source=0 judged=18120
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 new=J8a_instance_table:0/356160 old=J7a_instance_table:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/356160 old=J7a_allocation_record_tree_root:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 new=J8a_unmount_marker:0/356160 old=J7b:0/356160 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 new=J8b:0/629856 old=J7a_filesystem_identifier:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 new=J8c:0/273696 old=J7c:0/273696 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=5 j8_without_a_source=0 judged=356160
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 new=J8a_instance_table:0/6710880 old=J7a_instance_table:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/6710880 old=J7a_allocation_record_tree_root:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 new=J8a_unmount_marker:0/6710880 old=J7b:0/6710880 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 new=J8b:0/11337408 old=J7a_filesystem_identifier:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 new=J8c:0/4626528 old=J7c:0/4626528 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_off ring_slots=64 n=6 j8_without_a_source=0 judged=6710880
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 new=J8b:0/6 old=J7a_filesystem_identifier:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 new=J8c:0/6 old=J7c:0/6 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 new=J8b:0/108 old=J7a_filesystem_identifier:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 new=J8c:0/102 old=J7c:0/102 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 new=J8a_instance_table:0/120 old=J7a_instance_table:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/120 old=J7a_allocation_record_tree_root:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 new=J8a_unmount_marker:0/120 old=J7b:0/120 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 new=J8b:0/1944 old=J7a_filesystem_identifier:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 new=J8c:0/1824 old=J7c:0/1824 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=3 j8_without_a_source=0 judged=120
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 new=J8a_instance_table:0/2184 old=J7a_instance_table:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/2184 old=J7a_allocation_record_tree_root:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 new=J8a_unmount_marker:0/2184 old=J7b:0/2184 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 new=J8b:0/34992 old=J7a_filesystem_identifier:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 new=J8c:0/32808 old=J7c:0/32808 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=4 j8_without_a_source=0 judged=2184
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 new=J8a_instance_table:0/39360 old=J7a_instance_table:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/39360 old=J7a_allocation_record_tree_root:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 new=J8a_unmount_marker:0/39360 old=J7b:0/39360 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 new=J8b:0/629856 old=J7a_filesystem_identifier:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 new=J8c:0/590496 old=J7c:0/590496 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=5 j8_without_a_source=0 judged=39360
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 new=J8a_instance_table:0/708576 old=J7a_instance_table:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/708576 old=J7a_allocation_record_tree_root:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 new=J8a_unmount_marker:0/708576 old=J7b:0/708576 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 new=J8b:0/11337408 old=J7a_filesystem_identifier:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 new=J8c:0/10628832 old=J7c:0/10628832 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=U_verify_on ring_slots=64 n=6 j8_without_a_source=0 judged=708576
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=2 new=J8a_instance_table:0/0 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=2 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=2 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=2 new=J8c:0/4 old=J7c:0/4 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=2 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=3 new=J8a_instance_table:0/4 old=J7a_instance_table:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/4 old=J7a_allocation_record_tree_root:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=3 new=J8a_unmount_marker:0/4 old=J7b:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=3 new=J8b:0/48 old=J7a_filesystem_identifier:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=3 new=J8c:0/44 old=J7c:0/44 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=3 j8_without_a_source=0 judged=4
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=4 new=J8a_instance_table:0/56 old=J7a_instance_table:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/56 old=J7a_allocation_record_tree_root:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=4 new=J8a_unmount_marker:0/56 old=J7b:0/56 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=4 new=J8b:0/432 old=J7a_filesystem_identifier:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=4 new=J8c:0/376 old=J7c:0/376 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=4 j8_without_a_source=0 judged=56
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=5 new=J8a_instance_table:0/544 old=J7a_instance_table:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/544 old=J7a_allocation_record_tree_root:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=5 new=J8a_unmount_marker:0/544 old=J7b:0/544 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=5 new=J8b:0/3456 old=J7a_filesystem_identifier:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=5 new=J8c:0/2912 old=J7c:0/2912 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=5 j8_without_a_source=0 judged=544
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=6 new=J8a_instance_table:0/4544 old=J7a_instance_table:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/4544 old=J7a_allocation_record_tree_root:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=6 new=J8a_unmount_marker:0/4544 old=J7b:0/4544 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=6 new=J8b:0/25920 old=J7a_filesystem_identifier:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=6 new=J8c:0/21376 old=J7c:0/21376 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=6 j8_without_a_source=0 judged=4544
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=7 new=J8a_instance_table:0/35008 old=J7a_instance_table:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=7 new=J8a_allocation_record_tree_root:0/35008 old=J7a_allocation_record_tree_root:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=7 new=J8a_unmount_marker:0/35008 old=J7b:0/35008 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=7 new=J8b:0/186624 old=J7a_filesystem_identifier:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=even domain=X ring_slots=64 n=7 new=J8c:0/151616 old=J7c:0/151616 zero_or_not_same=True
+name=pq10 family=legal parity=even domain=X ring_slots=64 n=7 j8_without_a_source=0 judged=35008
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_instance_table,marker_parity=even value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_allocation_record_tree_root,marker_parity=even value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_unmount_marker,marker_parity=even value=620 must_see=equals_620 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8b,marker_parity=even value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8c,marker_parity=even value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_instance_table value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_allocation_record_tree_root value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_unmount_marker value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a_unmount_marker measured=domain=L,max_n=5,implementation=C8b,counter=J8a_unmount_marker,marker_parity=even value=142 must_see=equals_142 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8a_unmount_marker measured=domain=L,max_n=5,implementation=C8b,generator=r1,counter=J8a_unmount_marker value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8b,marker_parity=even value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_instance_table,marker_parity=even value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_allocation_record_tree_root,marker_parity=even value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_unmount_marker,marker_parity=even value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8b measured=domain=L,max_n=5,implementation=C8c,generator=r1,counter=J8b value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8c measured=domain=L,max_n=5,implementation=C8d,counter=J8c,marker_parity=even value=2348 must_see=equals_2348 red_as_required=true
+name=pq11 family=legal parity=even criterion=J8c measured=domain=L,max_n=5,implementation=C8d,generator=r1,counter=J8c value=0 must_see=equals_0 red_as_required=true
+name=pv8 family=legal parity=even domain=L applied_ge1=6046106 empty=False
+name=pv8 family=legal parity=even domain=L6 applied_ge1=1362 empty=False
+name=pv8 family=legal parity=even domain=L9 applied_ge1=372042 empty=False
+name=pv8 family=legal parity=even domain=U_verify_on applied_ge1=750246 empty=False
+name=pv8 family=legal parity=even domain=U_verify_off applied_ge1=7086030 empty=False
+name=pv8 family=legal parity=even domain=C applied_ge1=24987 empty=False
+name=pv8 family=legal parity=even domain=C6 applied_ge1=1967 empty=False
+name=pv8 family=legal parity=even domain=X applied_ge1=40156 empty=False
+name=pv8 family=legal parity=even domain=E1 applied_ge1=70 empty=False
+name=pv8 family=legal parity=even domain=E2 applied_ge1=0 empty=True
+name=pv8 family=legal parity=even domain=R applied_ge1=1808 empty=False
+name=pq9_files family=adversarial parity=even new_lines=390 old_lines=257 new_cells=10 old_cells=10
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=1 new=J8a_instance_table:0/6 old=J7a_instance_table:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=1 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=1 new=J8b:0/138 old=J7a_filesystem_identifier:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=1 new=J8c:0/132 old=J7c:0/132 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A ring_slots=64 n=1 j8_without_a_source=0 judged=6
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=2 new=J8a_instance_table:0/410 old=J7a_instance_table:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/410 old=J7a_allocation_record_tree_root:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=2 new=J8a_unmount_marker:0/410 old=J7b:0/410 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=2 new=J8b:0/9490 old=J7a_filesystem_identifier:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=2 new=J8c:0/9080 old=J7c:0/9080 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A ring_slots=64 n=2 j8_without_a_source=0 judged=410
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=3 new=J8a_instance_table:0/24642 old=J7a_instance_table:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/24642 old=J7a_allocation_record_tree_root:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=3 new=J8a_unmount_marker:0/24642 old=J7b:0/24642 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=3 new=J8b:0/650650 old=J7a_filesystem_identifier:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=3 new=J8c:0/626008 old=J7c:0/626008 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A ring_slots=64 n=3 j8_without_a_source=0 judged=24642
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=4 new=J8a_instance_table:0/1448298 old=J7a_instance_table:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/1448298 old=J7a_allocation_record_tree_root:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=4 new=J8a_unmount_marker:0/1448298 old=J7b:0/1448298 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=4 new=J8b:0/44489250 old=J7a_filesystem_identifier:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A ring_slots=64 n=4 new=J8c:0/43040952 old=J7c:0/43040952 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A ring_slots=64 n=4 j8_without_a_source=0 judged=1448298
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=1 new=J8a_instance_table:0/6 old=J7a_instance_table:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=1 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=1 new=J8b:0/138 old=J7a_filesystem_identifier:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=1 new=J8c:0/132 old=J7c:0/132 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A6 ring_slots=6 n=1 j8_without_a_source=0 judged=6
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=2 new=J8a_instance_table:0/410 old=J7a_instance_table:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/410 old=J7a_allocation_record_tree_root:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=2 new=J8a_unmount_marker:0/410 old=J7b:0/410 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=2 new=J8b:0/9490 old=J7a_filesystem_identifier:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=2 new=J8c:0/9080 old=J7c:0/9080 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A6 ring_slots=6 n=2 j8_without_a_source=0 judged=410
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=3 new=J8a_instance_table:0/24642 old=J7a_instance_table:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/24642 old=J7a_allocation_record_tree_root:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=3 new=J8a_unmount_marker:0/24642 old=J7b:0/24642 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=3 new=J8b:0/650650 old=J7a_filesystem_identifier:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=A6 ring_slots=6 n=3 new=J8c:0/626008 old=J7c:0/626008 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=A6 ring_slots=6 n=3 j8_without_a_source=0 judged=24642
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=1 new=J8a_instance_table:0/8 old=J7a_instance_table:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/8 old=J7a_allocation_record_tree_root:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=1 new=J8a_unmount_marker:0/8 old=J7b:0/8 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=1 new=J8b:0/274 old=J7a_filesystem_identifier:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=1 new=J8c:0/266 old=J7c:0/266 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=AC ring_slots=64 n=1 j8_without_a_source=0 judged=8
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=2 new=J8a_instance_table:0/1092 old=J7a_instance_table:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/1092 old=J7a_allocation_record_tree_root:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=2 new=J8a_unmount_marker:0/1092 old=J7b:0/1092 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=2 new=J8b:0/37410 old=J7a_filesystem_identifier:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=2 new=J8c:0/36318 old=J7c:0/36318 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=AC ring_slots=64 n=2 j8_without_a_source=0 judged=1092
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=3 new=J8a_instance_table:0/131924 old=J7a_instance_table:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/131924 old=J7a_allocation_record_tree_root:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=3 new=J8a_unmount_marker:0/131924 old=J7b:0/131924 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=3 new=J8b:0/5092146 old=J7a_filesystem_identifier:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=even domain=AC ring_slots=64 n=3 new=J8c:0/4960222 old=J7c:0/4960222 zero_or_not_same=True
+name=pq10 family=adversarial parity=even domain=AC ring_slots=64 n=3 j8_without_a_source=0 judged=131924
+name=pv8 family=adversarial parity=even domain=A applied_ge1=1473356 empty=False
+name=pv8 family=adversarial parity=even domain=A6 applied_ge1=25058 empty=False
+name=pv8 family=adversarial parity=even domain=AC applied_ge1=133024 empty=False
+name=pq9_files family=legal parity=odd new_lines=1536 old_lines=1471 new_cells=65 old_cells=65
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=1 new=J8a_instance_table:0/1 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/1 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=1 new=J8a_unmount_marker:0/1 old=J7b:0/1 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=1 new=J8c:0/3 old=J7c:0/3 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=1 j8_without_a_source=0 judged=1
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=2 new=J8b:0/32 old=J7a_filesystem_identifier:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=2 new=J8c:0/26 old=J7c:0/26 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=3 new=J8a_instance_table:0/44 old=J7a_instance_table:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/44 old=J7a_allocation_record_tree_root:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=3 new=J8a_unmount_marker:0/44 old=J7b:0/44 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=3 new=J8b:0/256 old=J7a_filesystem_identifier:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=3 new=J8c:0/212 old=J7c:0/212 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=3 j8_without_a_source=0 judged=44
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=4 new=J8a_instance_table:0/344 old=J7a_instance_table:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/344 old=J7a_allocation_record_tree_root:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=4 new=J8a_unmount_marker:0/344 old=J7b:0/344 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=4 new=J8b:0/2048 old=J7a_filesystem_identifier:0/2048 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=4 new=J8c:0/1704 old=J7c:0/1704 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=4 j8_without_a_source=0 judged=344
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=5 new=J8a_instance_table:0/2736 old=J7a_instance_table:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/2736 old=J7a_allocation_record_tree_root:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=5 new=J8a_unmount_marker:0/2736 old=J7b:0/2736 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=5 new=J8b:0/16384 old=J7a_filesystem_identifier:0/16384 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=5 new=J8c:0/13648 old=J7c:0/13648 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=5 j8_without_a_source=0 judged=2736
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=6 new=J8a_instance_table:0/21856 old=J7a_instance_table:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/21856 old=J7a_allocation_record_tree_root:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=6 new=J8a_unmount_marker:0/21856 old=J7b:0/21856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=6 new=J8b:0/131072 old=J7a_filesystem_identifier:0/131072 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C ring_slots=64 n=6 new=J8c:0/109216 old=J7c:0/109216 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C ring_slots=64 n=6 j8_without_a_source=0 judged=21856
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=1 new=J8a_instance_table:0/1 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/1 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=1 new=J8a_unmount_marker:0/1 old=J7b:0/1 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=1 new=J8c:0/3 old=J7c:0/3 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C6 ring_slots=6 n=1 j8_without_a_source=0 judged=1
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=2 new=J8b:0/32 old=J7a_filesystem_identifier:0/32 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=2 new=J8c:0/26 old=J7c:0/26 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C6 ring_slots=6 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=3 new=J8a_instance_table:0/40 old=J7a_instance_table:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/40 old=J7a_allocation_record_tree_root:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=3 new=J8a_unmount_marker:0/40 old=J7b:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=3 new=J8b:0/192 old=J7a_filesystem_identifier:0/192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=3 new=J8c:0/152 old=J7c:0/152 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C6 ring_slots=6 n=3 j8_without_a_source=0 judged=40
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=4 new=J8a_instance_table:0/256 old=J7a_instance_table:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=4 new=J8a_allocation_record_tree_root:0/256 old=J7a_allocation_record_tree_root:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=4 new=J8a_unmount_marker:0/256 old=J7b:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=4 new=J8b:0/1280 old=J7a_filesystem_identifier:0/1280 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=4 new=J8c:0/1024 old=J7c:0/1024 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C6 ring_slots=6 n=4 j8_without_a_source=0 judged=256
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=5 new=J8a_instance_table:0/1664 old=J7a_instance_table:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=5 new=J8a_allocation_record_tree_root:0/1664 old=J7a_allocation_record_tree_root:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=5 new=J8a_unmount_marker:0/1664 old=J7b:0/1664 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=5 new=J8b:0/8192 old=J7a_filesystem_identifier:0/8192 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=C6 ring_slots=6 n=5 new=J8c:0/6528 old=J7c:0/6528 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=C6 ring_slots=6 n=5 j8_without_a_source=0 judged=1664
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E1 ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E1 ring_slots=64 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=3 new=J8a_instance_table:0/12 old=J7a_instance_table:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/12 old=J7a_allocation_record_tree_root:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=3 new=J8a_unmount_marker:0/12 old=J7b:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=3 new=J8b:0/64 old=J7a_filesystem_identifier:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=3 new=J8c:0/52 old=J7c:0/52 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E1 ring_slots=64 n=3 j8_without_a_source=0 judged=12
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=4 new=J8a_instance_table:0/56 old=J7a_instance_table:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/56 old=J7a_allocation_record_tree_root:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=4 new=J8a_unmount_marker:0/56 old=J7b:0/56 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=4 new=J8b:0/320 old=J7a_filesystem_identifier:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E1 ring_slots=64 n=4 new=J8c:0/264 old=J7c:0/264 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E1 ring_slots=64 n=4 j8_without_a_source=0 judged=56
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=1 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=1 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E2 ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=2 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=2 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=2 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=2 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E2 ring_slots=64 n=2 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=3 new=J8a_instance_table:0/0 old=J7a_instance_table:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=3 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=3 new=J8b:0/0 old=J7a_filesystem_identifier:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=E2 ring_slots=64 n=3 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=E2 ring_slots=64 n=3 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=3 new=J8b:0/72 old=J7a_filesystem_identifier:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=3 new=J8c:0/56 old=J7c:0/56 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=4 new=J8a_instance_table:0/104 old=J7a_instance_table:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/104 old=J7a_allocation_record_tree_root:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=4 new=J8a_unmount_marker:0/104 old=J7b:0/104 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=4 new=J8b:0/432 old=J7a_filesystem_identifier:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=4 new=J8c:0/328 old=J7c:0/328 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=4 j8_without_a_source=0 judged=104
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=5 new=J8a_instance_table:0/640 old=J7a_instance_table:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/640 old=J7a_allocation_record_tree_root:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=5 new=J8a_unmount_marker:0/640 old=J7b:0/640 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=5 new=J8b:0/2592 old=J7a_filesystem_identifier:0/2592 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=5 new=J8c:0/1952 old=J7c:0/1952 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=5 j8_without_a_source=0 judged=640
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=6 new=J8a_instance_table:0/3872 old=J7a_instance_table:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/3872 old=J7a_allocation_record_tree_root:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=6 new=J8a_unmount_marker:0/3872 old=J7b:0/3872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=6 new=J8b:0/15552 old=J7a_filesystem_identifier:0/15552 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=6 new=J8c:0/11680 old=J7c:0/11680 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=6 j8_without_a_source=0 judged=3872
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=7 new=J8a_instance_table:0/23296 old=J7a_instance_table:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=7 new=J8a_allocation_record_tree_root:0/23296 old=J7a_allocation_record_tree_root:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=7 new=J8a_unmount_marker:0/23296 old=J7b:0/23296 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=7 new=J8b:0/93312 old=J7a_filesystem_identifier:0/93312 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=7 new=J8c:0/70016 old=J7c:0/70016 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=7 j8_without_a_source=0 judged=23296
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=8 new=J8a_instance_table:0/139904 old=J7a_instance_table:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=8 new=J8a_allocation_record_tree_root:0/139904 old=J7a_allocation_record_tree_root:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=8 new=J8a_unmount_marker:0/139904 old=J7b:0/139904 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=8 new=J8b:0/559872 old=J7a_filesystem_identifier:0/559872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=8 new=J8c:0/419968 old=J7c:0/419968 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=8 j8_without_a_source=0 judged=139904
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=9 new=J8a_instance_table:0/839680 old=J7a_instance_table:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=9 new=J8a_allocation_record_tree_root:0/839680 old=J7a_allocation_record_tree_root:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=9 new=J8a_unmount_marker:0/839680 old=J7b:0/839680 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=9 new=J8b:0/3359232 old=J7a_filesystem_identifier:0/3359232 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=9 new=J8c:0/2519552 old=J7c:0/2519552 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=9 j8_without_a_source=0 judged=839680
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=10 new=J8a_instance_table:0/5038592 old=J7a_instance_table:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=10 new=J8a_allocation_record_tree_root:0/5038592 old=J7a_allocation_record_tree_root:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=10 new=J8a_unmount_marker:0/5038592 old=J7b:0/5038592 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=10 new=J8b:0/20155392 old=J7a_filesystem_identifier:0/20155392 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L ring_slots=64 n=10 new=J8c:0/15116800 old=J7c:0/15116800 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L ring_slots=64 n=10 j8_without_a_source=0 judged=5038592
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=3 new=J8b:0/40 old=J7a_filesystem_identifier:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=3 new=J8c:0/24 old=J7c:0/24 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=4 new=J8a_instance_table:0/64 old=J7a_instance_table:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=4 new=J8a_allocation_record_tree_root:0/64 old=J7a_allocation_record_tree_root:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=4 new=J8a_unmount_marker:0/64 old=J7b:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=4 new=J8b:0/176 old=J7a_filesystem_identifier:0/176 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=4 new=J8c:0/112 old=J7c:0/112 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=4 j8_without_a_source=0 judged=64
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=5 new=J8a_instance_table:0/256 old=J7a_instance_table:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=5 new=J8a_allocation_record_tree_root:0/256 old=J7a_allocation_record_tree_root:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=5 new=J8a_unmount_marker:0/256 old=J7b:0/256 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=5 new=J8b:0/672 old=J7a_filesystem_identifier:0/672 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=5 new=J8c:0/416 old=J7c:0/416 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=5 j8_without_a_source=0 judged=256
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=6 new=J8a_instance_table:0/1024 old=J7a_instance_table:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=6 new=J8a_allocation_record_tree_root:0/1024 old=J7a_allocation_record_tree_root:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=6 new=J8a_unmount_marker:0/1024 old=J7b:0/1024 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=6 new=J8b:0/2752 old=J7a_filesystem_identifier:0/2752 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L6 ring_slots=6 n=6 new=J8c:0/1728 old=J7c:0/1728 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L6 ring_slots=6 n=6 j8_without_a_source=0 judged=1024
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=1 new=J8b:0/2 old=J7a_filesystem_identifier:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=1 new=J8c:0/2 old=J7c:0/2 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=2 new=J8a_instance_table:0/2 old=J7a_instance_table:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=2 new=J8a_allocation_record_tree_root:0/2 old=J7a_allocation_record_tree_root:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=2 new=J8a_unmount_marker:0/2 old=J7b:0/2 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=2 new=J8b:0/12 old=J7a_filesystem_identifier:0/12 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=2 new=J8c:0/10 old=J7c:0/10 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=2 j8_without_a_source=0 judged=2
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=3 new=J8a_instance_table:0/16 old=J7a_instance_table:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=3 new=J8a_allocation_record_tree_root:0/16 old=J7a_allocation_record_tree_root:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=3 new=J8a_unmount_marker:0/16 old=J7b:0/16 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=3 new=J8b:0/72 old=J7a_filesystem_identifier:0/72 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=3 new=J8c:0/56 old=J7c:0/56 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=3 j8_without_a_source=0 judged=16
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=4 new=J8a_instance_table:0/104 old=J7a_instance_table:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=4 new=J8a_allocation_record_tree_root:0/104 old=J7a_allocation_record_tree_root:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=4 new=J8a_unmount_marker:0/104 old=J7b:0/104 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=4 new=J8b:0/304 old=J7a_filesystem_identifier:0/304 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=4 new=J8c:0/200 old=J7c:0/200 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=4 j8_without_a_source=0 judged=104
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=5 new=J8a_instance_table:0/496 old=J7a_instance_table:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=5 new=J8a_allocation_record_tree_root:0/496 old=J7a_allocation_record_tree_root:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=5 new=J8a_unmount_marker:0/496 old=J7b:0/496 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=5 new=J8b:0/1568 old=J7a_filesystem_identifier:0/1568 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=5 new=J8c:0/1072 old=J7c:0/1072 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=5 j8_without_a_source=0 judged=496
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=6 new=J8a_instance_table:0/2464 old=J7a_instance_table:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=6 new=J8a_allocation_record_tree_root:0/2464 old=J7a_allocation_record_tree_root:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=6 new=J8a_unmount_marker:0/2464 old=J7b:0/2464 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=6 new=J8b:0/7872 old=J7a_filesystem_identifier:0/7872 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=6 new=J8c:0/5408 old=J7c:0/5408 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=6 j8_without_a_source=0 judged=2464
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=7 new=J8a_instance_table:0/12224 old=J7a_instance_table:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=7 new=J8a_allocation_record_tree_root:0/12224 old=J7a_allocation_record_tree_root:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=7 new=J8a_unmount_marker:0/12224 old=J7b:0/12224 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=7 new=J8b:0/38016 old=J7a_filesystem_identifier:0/38016 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=7 new=J8c:0/25792 old=J7c:0/25792 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=7 j8_without_a_source=0 judged=12224
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=8 new=J8a_instance_table:0/60032 old=J7a_instance_table:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=8 new=J8a_allocation_record_tree_root:0/60032 old=J7a_allocation_record_tree_root:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=8 new=J8a_unmount_marker:0/60032 old=J7b:0/60032 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=8 new=J8b:0/189184 old=J7a_filesystem_identifier:0/189184 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=8 new=J8c:0/129152 old=J7c:0/129152 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=8 j8_without_a_source=0 judged=60032
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=9 new=J8a_instance_table:0/296704 old=J7a_instance_table:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=9 new=J8a_allocation_record_tree_root:0/296704 old=J7a_allocation_record_tree_root:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=9 new=J8a_unmount_marker:0/296704 old=J7b:0/296704 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=9 new=J8b:0/934400 old=J7a_filesystem_identifier:0/934400 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=L9 ring_slots=9 n=9 new=J8c:0/637696 old=J7c:0/637696 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=L9 ring_slots=9 n=9 j8_without_a_source=0 judged=296704
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=2 new=J8a_instance_table:0/4 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/4 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=2 new=J8a_unmount_marker:0/4 old=J7b:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=2 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=2 new=J8c:0/0 old=J7c:0/0 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=R ring_slots=64 n=2 j8_without_a_source=0 judged=4
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=3 new=J8a_instance_table:0/40 old=J7a_instance_table:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/40 old=J7a_allocation_record_tree_root:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=3 new=J8a_unmount_marker:0/40 old=J7b:0/40 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=3 new=J8b:0/64 old=J7a_filesystem_identifier:0/64 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=3 new=J8c:0/24 old=J7c:0/24 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=R ring_slots=64 n=3 j8_without_a_source=0 judged=40
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=4 new=J8a_instance_table:0/320 old=J7a_instance_table:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/320 old=J7a_allocation_record_tree_root:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=4 new=J8a_unmount_marker:0/320 old=J7b:0/320 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=4 new=J8b:0/688 old=J7a_filesystem_identifier:0/688 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=4 new=J8c:0/368 old=J7c:0/368 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=R ring_slots=64 n=4 j8_without_a_source=0 judged=320
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=5 new=J8a_instance_table:0/2400 old=J7a_instance_table:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/2400 old=J7a_allocation_record_tree_root:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=5 new=J8a_unmount_marker:0/2400 old=J7b:0/2400 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=5 new=J8b:0/6208 old=J7a_filesystem_identifier:0/6208 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=R ring_slots=64 n=5 new=J8c:0/3808 old=J7c:0/3808 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=R ring_slots=64 n=5 j8_without_a_source=0 judged=2400
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 new=J8b:0/6 old=J7a_filesystem_identifier:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 new=J8c:0/6 old=J7c:0/6 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 new=J8a_instance_table:0/30 old=J7a_instance_table:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/30 old=J7a_allocation_record_tree_root:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 new=J8a_unmount_marker:0/30 old=J7b:0/30 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 new=J8b:0/108 old=J7a_filesystem_identifier:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 new=J8c:0/78 old=J7c:0/78 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=2 j8_without_a_source=0 judged=30
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 new=J8a_instance_table:0/840 old=J7a_instance_table:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/840 old=J7a_allocation_record_tree_root:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 new=J8a_unmount_marker:0/840 old=J7b:0/840 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 new=J8b:0/1944 old=J7a_filesystem_identifier:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 new=J8c:0/1104 old=J7c:0/1104 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=3 j8_without_a_source=0 judged=840
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 new=J8a_instance_table:0/18120 old=J7a_instance_table:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/18120 old=J7a_allocation_record_tree_root:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 new=J8a_unmount_marker:0/18120 old=J7b:0/18120 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 new=J8b:0/34992 old=J7a_filesystem_identifier:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 new=J8c:0/16872 old=J7c:0/16872 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=4 j8_without_a_source=0 judged=18120
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 new=J8a_instance_table:0/356160 old=J7a_instance_table:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/356160 old=J7a_allocation_record_tree_root:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 new=J8a_unmount_marker:0/356160 old=J7b:0/356160 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 new=J8b:0/629856 old=J7a_filesystem_identifier:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 new=J8c:0/273696 old=J7c:0/273696 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=5 j8_without_a_source=0 judged=356160
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 new=J8a_instance_table:0/6710880 old=J7a_instance_table:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/6710880 old=J7a_allocation_record_tree_root:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 new=J8a_unmount_marker:0/6710880 old=J7b:0/6710880 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 new=J8b:0/11337408 old=J7a_filesystem_identifier:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 new=J8c:0/4626528 old=J7c:0/4626528 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_off ring_slots=64 n=6 j8_without_a_source=0 judged=6710880
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 new=J8b:0/6 old=J7a_filesystem_identifier:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 new=J8c:0/6 old=J7c:0/6 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 new=J8a_instance_table:0/6 old=J7a_instance_table:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 new=J8b:0/108 old=J7a_filesystem_identifier:0/108 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 new=J8c:0/102 old=J7c:0/102 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=2 j8_without_a_source=0 judged=6
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 new=J8a_instance_table:0/120 old=J7a_instance_table:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/120 old=J7a_allocation_record_tree_root:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 new=J8a_unmount_marker:0/120 old=J7b:0/120 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 new=J8b:0/1944 old=J7a_filesystem_identifier:0/1944 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 new=J8c:0/1824 old=J7c:0/1824 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=3 j8_without_a_source=0 judged=120
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 new=J8a_instance_table:0/2184 old=J7a_instance_table:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/2184 old=J7a_allocation_record_tree_root:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 new=J8a_unmount_marker:0/2184 old=J7b:0/2184 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 new=J8b:0/34992 old=J7a_filesystem_identifier:0/34992 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 new=J8c:0/32808 old=J7c:0/32808 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=4 j8_without_a_source=0 judged=2184
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 new=J8a_instance_table:0/39360 old=J7a_instance_table:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/39360 old=J7a_allocation_record_tree_root:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 new=J8a_unmount_marker:0/39360 old=J7b:0/39360 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 new=J8b:0/629856 old=J7a_filesystem_identifier:0/629856 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 new=J8c:0/590496 old=J7c:0/590496 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=5 j8_without_a_source=0 judged=39360
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 new=J8a_instance_table:0/708576 old=J7a_instance_table:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/708576 old=J7a_allocation_record_tree_root:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 new=J8a_unmount_marker:0/708576 old=J7b:0/708576 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 new=J8b:0/11337408 old=J7a_filesystem_identifier:0/11337408 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 new=J8c:0/10628832 old=J7c:0/10628832 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=U_verify_on ring_slots=64 n=6 j8_without_a_source=0 judged=708576
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=2 new=J8a_instance_table:0/0 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=2 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=2 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=2 new=J8c:0/4 old=J7c:0/4 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=2 j8_without_a_source=0 judged=0
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=3 new=J8a_instance_table:0/4 old=J7a_instance_table:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/4 old=J7a_allocation_record_tree_root:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=3 new=J8a_unmount_marker:0/4 old=J7b:0/4 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=3 new=J8b:0/48 old=J7a_filesystem_identifier:0/48 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=3 new=J8c:0/44 old=J7c:0/44 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=3 j8_without_a_source=0 judged=4
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=4 new=J8a_instance_table:0/56 old=J7a_instance_table:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/56 old=J7a_allocation_record_tree_root:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=4 new=J8a_unmount_marker:0/56 old=J7b:0/56 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=4 new=J8b:0/432 old=J7a_filesystem_identifier:0/432 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=4 new=J8c:0/376 old=J7c:0/376 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=4 j8_without_a_source=0 judged=56
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=5 new=J8a_instance_table:0/544 old=J7a_instance_table:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/544 old=J7a_allocation_record_tree_root:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=5 new=J8a_unmount_marker:0/544 old=J7b:0/544 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=5 new=J8b:0/3456 old=J7a_filesystem_identifier:0/3456 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=5 new=J8c:0/2912 old=J7c:0/2912 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=5 j8_without_a_source=0 judged=544
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=6 new=J8a_instance_table:0/4544 old=J7a_instance_table:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/4544 old=J7a_allocation_record_tree_root:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=6 new=J8a_unmount_marker:0/4544 old=J7b:0/4544 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=6 new=J8b:0/25920 old=J7a_filesystem_identifier:0/25920 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=6 new=J8c:0/21376 old=J7c:0/21376 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=6 j8_without_a_source=0 judged=4544
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=7 new=J8a_instance_table:0/35008 old=J7a_instance_table:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=7 new=J8a_allocation_record_tree_root:0/35008 old=J7a_allocation_record_tree_root:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=7 new=J8a_unmount_marker:0/35008 old=J7b:0/35008 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=7 new=J8b:0/186624 old=J7a_filesystem_identifier:0/186624 zero_or_not_same=True
+name=pq9 family=legal parity=odd domain=X ring_slots=64 n=7 new=J8c:0/151616 old=J7c:0/151616 zero_or_not_same=True
+name=pq10 family=legal parity=odd domain=X ring_slots=64 n=7 j8_without_a_source=0 judged=35008
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_instance_table,marker_parity=odd value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_allocation_record_tree_root,marker_parity=odd value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8a_unmount_marker,marker_parity=odd value=620 must_see=equals_620 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8b,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,counter=J8c,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_instance_table value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_allocation_record_tree_root value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=L,max_n=5,implementation=C8a,generator=r1,counter=J8a_unmount_marker value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=C,max_n=3,implementation=C8a,counter=J8a_instance_table,marker_parity=odd value=51 must_see=greater_than_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a measured=domain=C,max_n=3,implementation=C8a,counter=J8a_allocation_record_tree_root,marker_parity=odd value=51 must_see=greater_than_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a_unmount_marker measured=domain=L,max_n=5,implementation=C8b,counter=J8a_unmount_marker,marker_parity=odd value=620 must_see=equals_620 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8a_unmount_marker measured=domain=L,max_n=5,implementation=C8b,generator=r1,counter=J8a_unmount_marker value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8b,marker_parity=odd value=762 must_see=equals_762 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_instance_table,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_allocation_record_tree_root,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=L,max_n=5,implementation=C8c,counter=J8a_unmount_marker,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=L,max_n=5,implementation=C8c,generator=r1,counter=J8b value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8b measured=domain=C,max_n=3,implementation=C8c,counter=J8b,marker_parity=odd value=51 must_see=greater_than_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8c measured=domain=L,max_n=5,implementation=C8d,counter=J8c,marker_parity=odd value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8c measured=domain=L,max_n=5,implementation=C8d,generator=r1,counter=J8c value=0 must_see=equals_0 red_as_required=true
+name=pq11 family=legal parity=odd criterion=J8c measured=domain=C,max_n=3,implementation=C8d,counter=J8c,marker_parity=odd value=100 must_see=greater_than_0 red_as_required=true
+name=pv8 family=legal parity=odd domain=L applied_ge1=6046106 empty=False
+name=pv8 family=legal parity=odd domain=L6 applied_ge1=1362 empty=False
+name=pv8 family=legal parity=odd domain=L9 applied_ge1=372042 empty=False
+name=pv8 family=legal parity=odd domain=U_verify_on applied_ge1=750246 empty=False
+name=pv8 family=legal parity=odd domain=U_verify_off applied_ge1=7086030 empty=False
+name=pv8 family=legal parity=odd domain=C applied_ge1=24987 empty=False
+name=pv8 family=legal parity=odd domain=C6 applied_ge1=1967 empty=False
+name=pv8 family=legal parity=odd domain=X applied_ge1=40156 empty=False
+name=pv8 family=legal parity=odd domain=E1 applied_ge1=70 empty=False
+name=pv8 family=legal parity=odd domain=E2 applied_ge1=0 empty=True
+name=pv8 family=legal parity=odd domain=R applied_ge1=1808 empty=False
+name=pq9_files family=adversarial parity=odd new_lines=390 old_lines=260 new_cells=10 old_cells=10
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=1 new=J8a_instance_table:0/6 old=J7a_instance_table:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=1 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=1 new=J8b:0/138 old=J7a_filesystem_identifier:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=1 new=J8c:0/132 old=J7c:0/132 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A ring_slots=64 n=1 j8_without_a_source=0 judged=6
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=2 new=J8a_instance_table:0/410 old=J7a_instance_table:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/410 old=J7a_allocation_record_tree_root:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=2 new=J8a_unmount_marker:0/410 old=J7b:0/410 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=2 new=J8b:0/9490 old=J7a_filesystem_identifier:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=2 new=J8c:0/9080 old=J7c:0/9080 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A ring_slots=64 n=2 j8_without_a_source=0 judged=410
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=3 new=J8a_instance_table:0/24642 old=J7a_instance_table:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/24642 old=J7a_allocation_record_tree_root:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=3 new=J8a_unmount_marker:0/24642 old=J7b:0/24642 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=3 new=J8b:0/650650 old=J7a_filesystem_identifier:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=3 new=J8c:0/626008 old=J7c:0/626008 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A ring_slots=64 n=3 j8_without_a_source=0 judged=24642
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=4 new=J8a_instance_table:0/1448298 old=J7a_instance_table:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/1448298 old=J7a_allocation_record_tree_root:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=4 new=J8a_unmount_marker:0/1448298 old=J7b:0/1448298 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=4 new=J8b:0/44489250 old=J7a_filesystem_identifier:0/44489250 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A ring_slots=64 n=4 new=J8c:0/43040952 old=J7c:0/43040952 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A ring_slots=64 n=4 j8_without_a_source=0 judged=1448298
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 new=J8a_instance_table:0/6 old=J7a_instance_table:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/6 old=J7a_allocation_record_tree_root:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 new=J8a_unmount_marker:0/6 old=J7b:0/6 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 new=J8b:0/138 old=J7a_filesystem_identifier:0/138 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 new=J8c:0/132 old=J7c:0/132 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A6 ring_slots=6 n=1 j8_without_a_source=0 judged=6
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 new=J8a_instance_table:0/410 old=J7a_instance_table:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/410 old=J7a_allocation_record_tree_root:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 new=J8a_unmount_marker:0/410 old=J7b:0/410 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 new=J8b:0/9490 old=J7a_filesystem_identifier:0/9490 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 new=J8c:0/9080 old=J7c:0/9080 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A6 ring_slots=6 n=2 j8_without_a_source=0 judged=410
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 new=J8a_instance_table:0/24642 old=J7a_instance_table:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/24642 old=J7a_allocation_record_tree_root:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 new=J8a_unmount_marker:0/24642 old=J7b:0/24642 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 new=J8b:0/650650 old=J7a_filesystem_identifier:0/650650 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 new=J8c:0/626008 old=J7c:0/626008 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=A6 ring_slots=6 n=3 j8_without_a_source=0 judged=24642
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=1 new=J8a_instance_table:0/8 old=J7a_instance_table:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/8 old=J7a_allocation_record_tree_root:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=1 new=J8a_unmount_marker:0/8 old=J7b:0/8 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=1 new=J8b:0/274 old=J7a_filesystem_identifier:0/274 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=1 new=J8c:0/266 old=J7c:0/266 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=AC ring_slots=64 n=1 j8_without_a_source=0 judged=8
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=2 new=J8a_instance_table:0/1092 old=J7a_instance_table:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/1092 old=J7a_allocation_record_tree_root:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=2 new=J8a_unmount_marker:0/1092 old=J7b:0/1092 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=2 new=J8b:0/37410 old=J7a_filesystem_identifier:0/37410 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=2 new=J8c:0/36318 old=J7c:0/36318 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=AC ring_slots=64 n=2 j8_without_a_source=0 judged=1092
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=3 new=J8a_instance_table:0/131924 old=J7a_instance_table:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/131924 old=J7a_allocation_record_tree_root:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=3 new=J8a_unmount_marker:0/131924 old=J7b:0/131924 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=3 new=J8b:0/5092146 old=J7a_filesystem_identifier:0/5092146 zero_or_not_same=True
+name=pq9 family=adversarial parity=odd domain=AC ring_slots=64 n=3 new=J8c:0/4960222 old=J7c:0/4960222 zero_or_not_same=True
+name=pq10 family=adversarial parity=odd domain=AC ring_slots=64 n=3 j8_without_a_source=0 judged=131924
+name=pv8 family=adversarial parity=odd domain=A applied_ge1=1473356 empty=False
+name=pv8 family=adversarial parity=odd domain=A6 applied_ge1=25058 empty=False
+name=pv8 family=adversarial parity=odd domain=AC applied_ge1=133024 empty=False
+name=pq9_files family=multi_disk parity=even new_lines=421 old_lines=405 new_cells=16 old_cells=16
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=1 new=J8c:0/4 old=J7c:0/4 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=2 new=J8a_instance_table:0/12 old=J7a_instance_table:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/12 old=J7a_allocation_record_tree_root:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=2 new=J8a_unmount_marker:0/12 old=J7b:0/12 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=2 new=J8b:0/48 old=J7a_filesystem_identifier:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=2 new=J8c:0/36 old=J7c:0/36 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=2 j8_without_a_source=0 judged=12
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=3 new=J8a_instance_table:0/216 old=J7a_instance_table:0/576 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/216 old=J7a_allocation_record_tree_root:0/576 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=3 new=J8a_unmount_marker:0/216 old=J7b:0/216 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=3 new=J8b:0/576 old=J7a_filesystem_identifier:0/576 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=3 new=J8c:0/360 old=J7c:0/360 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=3 j8_without_a_source=0 judged=216
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=4 new=J8a_instance_table:0/3024 old=J7a_instance_table:0/6912 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/3024 old=J7a_allocation_record_tree_root:0/6912 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=4 new=J8a_unmount_marker:0/3024 old=J7b:0/3024 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=4 new=J8b:0/6912 old=J7a_filesystem_identifier:0/6912 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=4 new=J8c:0/3888 old=J7c:0/3888 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=4 j8_without_a_source=0 judged=3024
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=5 new=J8a_instance_table:0/38880 old=J7a_instance_table:0/82944 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=5 new=J8a_allocation_record_tree_root:0/38880 old=J7a_allocation_record_tree_root:0/82944 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=5 new=J8a_unmount_marker:0/38880 old=J7b:0/38880 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=5 new=J8b:0/82944 old=J7a_filesystem_identifier:0/82944 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=5 new=J8c:0/44064 old=J7c:0/44064 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=5 j8_without_a_source=0 judged=38880
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=6 new=J8a_instance_table:0/482112 old=J7a_instance_table:0/995328 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=6 new=J8a_allocation_record_tree_root:0/482112 old=J7a_allocation_record_tree_root:0/995328 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=6 new=J8a_unmount_marker:0/482112 old=J7b:0/482112 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=6 new=J8b:0/995328 old=J7a_filesystem_identifier:0/995328 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M ring_slots=64 n=6 new=J8c:0/513216 old=J7c:0/513216 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M ring_slots=64 n=6 j8_without_a_source=0 judged=482112
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 new=J8a_instance_table:0/0 old=J7a_instance_table:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 new=J8a_allocation_record_tree_root:0/0 old=J7a_allocation_record_tree_root:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 new=J8a_unmount_marker:0/0 old=J7b:0/0 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 new=J8b:0/4 old=J7a_filesystem_identifier:0/4 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 new=J8c:0/4 old=J7c:0/4 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=1 j8_without_a_source=0 judged=0
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 new=J8a_instance_table:0/12 old=J7a_instance_table:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 new=J8a_allocation_record_tree_root:0/12 old=J7a_allocation_record_tree_root:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 new=J8a_unmount_marker:0/12 old=J7b:0/12 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 new=J8b:0/48 old=J7a_filesystem_identifier:0/48 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 new=J8c:0/36 old=J7c:0/36 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=2 j8_without_a_source=0 judged=12
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 new=J8a_instance_table:0/216 old=J7a_instance_table:0/320 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 new=J8a_allocation_record_tree_root:0/216 old=J7a_allocation_record_tree_root:0/320 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 new=J8a_unmount_marker:0/216 old=J7b:0/216 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 new=J8b:0/320 old=J7a_filesystem_identifier:0/320 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 new=J8c:0/104 old=J7c:0/104 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=3 j8_without_a_source=0 judged=216
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 new=J8a_instance_table:0/1824 old=J7a_instance_table:0/2816 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 new=J8a_allocation_record_tree_root:0/1824 old=J7a_allocation_record_tree_root:0/2816 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 new=J8a_unmount_marker:0/1824 old=J7b:0/1824 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 new=J8b:0/2816 old=J7a_filesystem_identifier:0/2816 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 new=J8c:0/992 old=J7c:0/992 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=4 j8_without_a_source=0 judged=1824
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 new=J8a_instance_table:0/14208 old=J7a_instance_table:0/21504 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 new=J8a_allocation_record_tree_root:0/14208 old=J7a_allocation_record_tree_root:0/21504 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 new=J8a_unmount_marker:0/14208 old=J7b:0/14208 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 new=J8b:0/21504 old=J7a_filesystem_identifier:0/21504 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 new=J8c:0/7296 old=J7c:0/7296 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=5 j8_without_a_source=0 judged=14208
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 new=J8a_instance_table:0/115200 old=J7a_instance_table:0/176128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 new=J8a_allocation_record_tree_root:0/115200 old=J7a_allocation_record_tree_root:0/176128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 new=J8a_unmount_marker:0/115200 old=J7b:0/115200 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 new=J8b:0/176128 old=J7a_filesystem_identifier:0/176128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 new=J8c:0/60928 old=J7c:0/60928 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=M6 ring_slots=6 n=6 j8_without_a_source=0 judged=115200
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=1 new=J8a_instance_table:0/3 old=J7a_instance_table:0/8 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=1 new=J8a_allocation_record_tree_root:0/3 old=J7a_allocation_record_tree_root:0/8 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=1 new=J8a_unmount_marker:0/3 old=J7b:0/3 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=1 new=J8b:0/8 old=J7a_filesystem_identifier:0/8 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=1 new=J8c:0/5 old=J7c:0/5 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=MC ring_slots=64 n=1 j8_without_a_source=0 judged=3
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=2 new=J8a_instance_table:0/42 old=J7a_instance_table:0/128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=2 new=J8a_allocation_record_tree_root:0/42 old=J7a_allocation_record_tree_root:0/128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=2 new=J8a_unmount_marker:0/42 old=J7b:0/42 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=2 new=J8b:0/128 old=J7a_filesystem_identifier:0/128 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=2 new=J8c:0/86 old=J7c:0/86 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=MC ring_slots=64 n=2 j8_without_a_source=0 judged=42
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=3 new=J8a_instance_table:0/636 old=J7a_instance_table:0/2048 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=3 new=J8a_allocation_record_tree_root:0/636 old=J7a_allocation_record_tree_root:0/2048 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=3 new=J8a_unmount_marker:0/636 old=J7b:0/636 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=3 new=J8b:0/2048 old=J7a_filesystem_identifier:0/2048 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=3 new=J8c:0/1412 old=J7c:0/1412 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=MC ring_slots=64 n=3 j8_without_a_source=0 judged=636
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=4 new=J8a_instance_table:0/9960 old=J7a_instance_table:0/32768 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=4 new=J8a_allocation_record_tree_root:0/9960 old=J7a_allocation_record_tree_root:0/32768 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=4 new=J8a_unmount_marker:0/9960 old=J7b:0/9960 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=4 new=J8b:0/32768 old=J7a_filesystem_identifier:0/32768 zero_or_not_same=True
+name=pq9 family=multi_disk parity=even domain=MC ring_slots=64 n=4 new=J8c:0/22808 old=J7c:0/22808 zero_or_not_same=True
+name=pq10 family=multi_disk parity=even domain=MC ring_slots=64 n=4 j8_without_a_source=0 judged=9960
+name=pv8 family=multi_disk parity=even domain=M applied_ge1=524244 empty=False
+name=pv8 family=multi_disk parity=even domain=M6 applied_ge1=131460 empty=False
+name=pv8 family=multi_disk parity=even domain=MC applied_ge1=10641 empty=False
+name=pq9_summary cells=830 differing=0 one_sided=0 j8_nonzero=0 without_a_source_nonzero=0

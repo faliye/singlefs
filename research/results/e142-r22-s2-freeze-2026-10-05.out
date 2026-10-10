@@ -1,0 +1,65 @@
+# E142 r22 第二段步 ⑥ 冻结：装置、变异表、单测、命令六与命令七、锚点核对、导出前后的 sha256
+## 冻结值（命令 sha256sum 与 wc -l）
+c400139b8cfc7c0e4b96d483200055e9891252c9171bbbeb06771046bf63d899  research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+ef63ea858443d708868f3ca55659f62727e4c867d96b5c234bf4dbf3e1fcf1c3  research/mutations/e142_new_pool_file_creation_dry_run.tsv
+662c9df72343dddcbb464d3910d309876730d7e3ba8f880115d49ba636a65624  research/target/release/e142-new-pool-file-creation-dry-run
+ 10866 research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+   210 research/mutations/e142_new_pool_file_creation_dry_run.tsv
+ 11076 total
+## 单测（命令：cargo test --release -p e7-index-bench --bin e142-new-pool-file-creation-dry-run --no-run 编出测试二进制，经 run-with-memory-cap.sh 跑；原样 test result 行见 /tmp/claude-1000/e142-r22-run2/test-3.out 的最后一行）
+test result: ok. 117 passed; 0 failed; 1 ignored; 0 measured; 0 filtered out; finished in 2.23s
+--list | grep -c ': test$'：118；--ignored --list | grep -c ': test$'：1（第一段 108 与 1）
+## 命令六（四个计数，冻结之后都要是 0）
+命令六
+0
+0
+0
+0
+--- 上下文（命中行号）
+266 2903 3057 3058 3061 3103 3199 3985 5987 7900 9840 9844 9855 9867 9918 10728 
+## 命令七（residual_old_values.sh，count 要是 0）
+residual_old_values count=0
+exit=0
+## 变异表锚点逐条核（check_anchors.py：每条原文在源码里恰好命中一次）
+rows 210 bad 0
+## 导出 bin 与 crates/singlefs-core/src/*.rs 的 sha256（P8G 导出命令运行前、后各取一次，cmp 相同）
+a41cf036106fa4caa42d8bc4b8748fbe36bd4bd5aa1e529122eebb13132cf570  crates/singlefs-checker-tier/src/bin/e142_new_pool_file_creation_write_dump.rs
+30600263e76fd52ca5925bfeb08e18568f42d875d05be1f24a9fae9865e81a21  crates/singlefs-core/src/address.rs
+e0390d392e4b956ceb2c8ba9ba5b2bf4405ecf07a56e9fa259a8d8c17a6a5465  crates/singlefs-core/src/admission.rs
+b69df09ce29d07749f87d44cfe82c6d6c7b5c580fdb302b3d0dc048838591e29  crates/singlefs-core/src/allocation_record_tree.rs
+c80d321d7de2265d0430b4e20b26866c6d22db49ba91d6f6aea2a0d8dc4150c5  crates/singlefs-core/src/allocator.rs
+29830f7d7f4bad6f15f62081b08a508980f87f00c3fe6e578693f308ffb08d71  crates/singlefs-core/src/block_device.rs
+1625a750f0667f717a74e2f434fbe90d1a410d5e66e2be14370626969380bd80  crates/singlefs-core/src/bytes.rs
+6f6e6dc5374d98aa45c7e3d904c1e429320b6d1635fe44fd26f4e7adbff24c2d  crates/singlefs-core/src/checksum.rs
+d7a6c7519ccafcaec30414f1770ba6f2b51220727b3ae75d8631e55daad19711  crates/singlefs-core/src/code_two_tree.rs
+30a0ed5ea6f30be1e4153735c5a483ea3021b09d1449a00f2dde37ced2ee751b  crates/singlefs-core/src/container_tree.rs
+8281d755da7067d3a86dbdf8bb162dc6757a53f4f6e24b24953ece904c34dc5e  crates/singlefs-core/src/deleted_inodes.rs
+b8dc0c57d978416bb71b5cb203d07e092fbe432b1fe0faca958bedc92e12791a  crates/singlefs-core/src/extent_tree.rs
+d88d282044941edee45a8bebe5674e86082ffeebc1b6eddf353622d0d45921ab  crates/singlefs-core/src/inode_tree.rs
+62acd8c6157916908e7b7ca0a74cf41d204118a45ea3954514fe00810d35d3a0  crates/singlefs-core/src/instance_table.rs
+7d63c5d85034dc5895600f198818582ba7e3559eed4d0cd8162bcb479d21d1be  crates/singlefs-core/src/instance_table_sweep.rs
+56a4cd459c3fffaacf2c6ce0f7ac39d29c5bb93cd0149054dd071b92604030e8  crates/singlefs-core/src/journal.rs
+ee9edfed7f012ade9663563aae3307e8919d3cb6f7f0ed854554c7c08401f124  crates/singlefs-core/src/lib.rs
+6b729837d0a77b6a64a8fc420cccf13129051e48e59a56b953a1bf474964809d  crates/singlefs-core/src/lineage_tree.rs
+1ee1a83fb86c154c8da2fe0696f2561b78c4d2969d1ffb9c2527f771288da85e  crates/singlefs-core/src/make_filesystem.rs
+3d524c1b0a7da603719610ee60e208dc811df03e0e6be9f2873d7d870d7d2215  crates/singlefs-core/src/mounted_read.rs
+c1e231f8ae72958b5019dfd07991a098ce7a0057424b09d56f0c797210d3d333  crates/singlefs-core/src/mounted_session.rs
+1af35923293a78de3654d48c88259136653329177070dbdff27bf87b91c3afc4  crates/singlefs-core/src/mount.rs
+bd72d1180bda194d7e6f9d8c2beb79e8225019c9c383a9f724ee2c02394027c0  crates/singlefs-core/src/pointer.rs
+f15d755f9670874558220b2f31880cec8c1ff1b13b13e653f51844c2884de8b8  crates/singlefs-core/src/records.rs
+d92b1cb3cb5e24c98ab24b0aeef0a807890e4e0dd76dc5b3cd7c94fde928021d  crates/singlefs-core/src/recovery.rs
+1aca08c46d371eadaeebc9cb6375e9f2e1dd091b21522d567e886df157b14475  crates/singlefs-core/src/root_record.rs
+a8f4df67ed8d912ea91c829f275f0f4795b3d9b2ec5d4d6ef37679c35047301a  crates/singlefs-core/src/root_ring.rs
+a0b44f0954b8a83192b9c2843bdf4496195b0bdf411600b8aae846b88c4f8142  crates/singlefs-core/src/system_configuration.rs
+a7e2e91842c87c0e5220c209f3df6f8c53b8f074383fda5bff36f34a5998c2dc  crates/singlefs-core/src/tombstone_tree.rs
+15b51b388078236d16cf2d44c413a15e8e1df2570bd1bcce7a0080b63efa8f89  crates/singlefs-core/src/transaction.rs
+8a83bf1988f09ab09676577d2a16fe1898d7c3db655bfe47662dbb5fbd93701d  crates/singlefs-core/src/unit.rs
+9b297841f636a7e6cd1b269f4cbe7379b16cf9faf2acd21ce844223a910dd2fa  crates/singlefs-core/src/unlink.rs
+20392735dbd82fb12f143251c9fa1c64dc3f95cb786fcfc1ff742ec87a4153ef  crates/singlefs-core/src/write_accounting.rs
+7c23aed6feef6b0eda66a863add832633c629b6cb0cca078698581527e355033  crates/singlefs-core/src/write_request_split.rs
+--- 之后
+运行前后逐字节相同
+导出二进制（运行前）：
+6ea4d4cc913760b6ca15c21f4c1ecb292c72f0d391a4bd2f76d699cf4928d936  target/debug/e142_new_pool_file_creation_write_dump
+运行后：
+6ea4d4cc913760b6ca15c21f4c1ecb292c72f0d391a4bd2f76d699cf4928d936  target/debug/e142_new_pool_file_creation_write_dump

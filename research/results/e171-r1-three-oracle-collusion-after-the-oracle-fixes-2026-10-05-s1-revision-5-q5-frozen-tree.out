@@ -1,0 +1,14 @@
+E7RESULT name=config segment=s1 product=revision_5_q5_frozen_tree q5_tree=research/target/e171-r1-frozen-tree-revision-5-q5 base_tree=research/target/e171-r1-frozen-tree prereg=research/prompts/e171-r1-prereg.md section=revision_5_5.6_item_2
+E7RESULT name=frozen_tree key=snapshot_digest tree=q5 value=65a66de7352602a787dd0f90087dfb4201825c57840beba65a329d519b29317b files=284
+E7RESULT name=frozen_tree key=snapshot_digest tree=base value=4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd files=284 registered=4d071c126a48577b39d3d8a77a898d59eb32366bfd1c5dc8460e930aafade6dd equals_registered=true
+E7RESULT name=frozen_tree key=differing_file path=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs base_sha256=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84 q5_sha256=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2
+E7RESULT name=frozen_tree key=differing_files value=1
+E7RESULT name=frozen_tree key=device_sha256 tree=base value=b1457bc6175fe3c2b3da50b5e3b5901c1c9a8d95ce3080fef48d2c087bbe6d84 equals_b1457bc6=true
+E7RESULT name=frozen_tree key=device_sha256 tree=q5 value=dbef78ed3eede487d5e5bea46dc5eb0a58735faa6930ea6548889bc62d908ea2 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=git_head value=31e47115471ba5502a4531d25dffcc921be36899
+E7RESULT name=frozen_tree key=device_after_27_2 path=/tmp/claude-1000/m3-formal-27-2b/device-before.rs sha256=a6ebeb178c10fde791c9a80fca696edc36802c88499afe1ca98dce8295d87e52 equals_a6ebeb17=true
+E7RESULT name=frozen_tree key=hunk_table stage=27_2 diff_hunks=56 table_rows=56 hunk_starts_not_matching_the_table=0 empty_mapping_cells=0 holds=true
+E7RESULT name=frozen_tree key=hunk_table stage=27_2b diff_hunks=28 table_rows=28 hunk_starts_not_matching_the_table=0 empty_mapping_cells=0 holds=true
+E7RESULT name=frozen_tree key=hunk_table stage=b1457bc6_to_q5_direct diff_hunks=56 note=two_tables_cover_the_two_stages_not_this_merged_diff
+E7RESULT name=verdict s14_1=false s14_1_differing_files=1 s14_1_file_counts_equal=true s14_3=false base_digest_equals_registered=true
+E7RESULT name=done emitted=14

@@ -1,0 +1,5 @@
+name=row_time_limit seconds=1800 baseline_seconds=75.274 source=e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-s2-device-baseline-streams-1-2-r6-r3-timing.out rerun_of_timed_out_rows=false
+snapshot_digest=7726cdd6c439f0bc9e39799755a53ebcfb3f57fe96b06daf13c1317ae81be5f4 files=284 snapshot_ns=201642429 rows=1
+row row_number=201 row_name=只读挂载认中央映射树的根退回写死树_ID_65540，不按根记录里映射根指针的出生树（崩溃恢复丢掉一次第一个文件版本之后再发的那一版映射树是_65552，打不开） lane=0 packages_checked_rebuilt=crates/singlefs-core substituted_from=- line_matches_the_registration=true mutated_row_name=只读挂载认中央映射树的根退回写死树_ID_65540，不按根记录里映射根指针的出生树（崩溃恢复丢掉一次第一个文件版本之后再发的那一版映射树是_65552，打不开） failed_attempts=0 mutation_line_sha256=ea5e062beaf42ceeece65d1faa29cbd843dd883fd73f3821fc6d378aed5235e5 copy_ns=1605064376 compile_ns=35247550186 compile_kind=cold status=ok device_exit=0 device_ns=85225099656 o3_status=skipped_by_request o3_exit=- o3_ns=- o3_streams=- bulky_dump_files_removed=6
+table lanes=1 threads_per_lane=9 rows=1 table_wall_ns=122078647288 sum_of_row_ns=122077714218 shards=1
+merged_shard host=1 rows=201 sha256=b09c701c830f23bbd15cea738ce08f59d9107cbad91c0aace71f05311e906ac9

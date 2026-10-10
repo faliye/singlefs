@@ -1,0 +1,6 @@
+E7TIMING name=elapsed scope=positive_controls elapsed_seconds=0.071 threads=7
+E7TIMING name=elapsed scope=domain domain=R n=2 states=4 elapsed_seconds=0.000 threads=7
+E7TIMING name=elapsed scope=domain domain=R n=3 states=64 elapsed_seconds=0.001 threads=7
+E7TIMING name=elapsed scope=domain domain=R n=4 states=688 elapsed_seconds=0.004 threads=7
+E7TIMING name=elapsed scope=domain domain=R n=5 states=6208 elapsed_seconds=0.032 threads=7
+E7TIMING name=elapsed scope=run states=6964 elapsed_seconds=0.482 threads=7

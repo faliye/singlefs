@@ -1,0 +1,26 @@
+E7TIMING name=row_device row=0 device_exit=0 device_ns=42187367321
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o1 states=53 total_ns=89060 median_ns=1380 p95_ns=3640 max_ns=4890
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=o2 states=53 total_ns=130361530 median_ns=1324977 p95_ns=6318043 max_ns=6373803
+E7TIMING name=stage_time stream=new_pool_file_creation batch=1 stage=recovery states=53 total_ns=6872521 median_ns=65670 p95_ns=420462 max_ns=426782
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o1 states=7 total_ns=11350 median_ns=1570 p95_ns=1860 max_ns=1860
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=o2 states=7 total_ns=9305491 median_ns=1330498 p95_ns=1341167 max_ns=1341167
+E7TIMING name=stage_time stream=new_pool_file_creation batch=2 stage=recovery states=7 total_ns=458790 median_ns=65800 p95_ns=66700 max_ns=66700
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=new_pool_file_creation batch=3 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=impl-verdicts.tsv bytes=3092 sha256=dc332d9d2b3bc2bd6933480dc3bd3ad1b99366d2da551e7e9f60db16b22745c1
+E7TIMING name=file_with_timing stream=new_pool_file_creation file=manifest.tsv bytes=895 sha256=81d9bbb2c5e96ae269684c0584894aaa69b09c00996322a9e2519df9fc8b8f90
+E7TIMING name=stream_time stream=new_pool_file_creation elapsed_ns=455393151 drive_ns=132442469 observe_ns=312825650 write_ns=9606420
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o1 states=397 total_ns=4093216 median_ns=10310 p95_ns=16040 max_ns=18510
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o2 states=397 total_ns=14325055157 median_ns=35677948 p95_ns=69664887 max_ns=78213762
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=recovery states=397 total_ns=157701796 median_ns=399482 p95_ns=623183 max_ns=1673959
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o1 states=119 total_ns=1441446 median_ns=12540 p95_ns=17080 max_ns=19720
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o2 states=119 total_ns=4291314986 median_ns=35849429 p95_ns=69316255 max_ns=69738007
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=recovery states=119 total_ns=42753228 median_ns=385212 p95_ns=474622 max_ns=482062
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o1 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o2 states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=recovery states=0 total_ns=0 median_ns=0 p95_ns=0 max_ns=0
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv bytes=29568 sha256=1fc9757f2a1db7ae1c7d360813dd114f89b3b13e9d1d93553a6b697b5c5d8273
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=manifest.tsv bytes=912 sha256=a1c6e5f084c69e43ea7db8f3a006911a8a5af74ac0f6af0614b6ff7e3679683c
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=41532179406 drive_ns=1506711103 observe_ns=38970636396 write_ns=1048212902
+E7TIMING name=process_wall seconds=41.992 exit=0

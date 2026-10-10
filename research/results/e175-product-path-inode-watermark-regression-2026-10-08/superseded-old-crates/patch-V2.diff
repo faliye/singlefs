@@ -1,0 +1,11 @@
+--- /home/fy5090/.local/share/singlefs/work/e175-runner/pristine/transaction.rs	2026-10-06 14:45:48.159012078 +0000
++++ /home/fy5090/.local/share/singlefs/work/e175-runner/repo/crates/singlefs-core/src/transaction.rs	2026-10-08 06:42:13.746713230 +0000
+@@ -8032,7 +8032,7 @@
+         None => pool
+             .inode_number_watermark_source()
+             .watermark_of_a_publish_without_a_previous_version(),
+-    } + new_inodes_of_this_publish;
++    } + 0;
+     let device_identities_of_the_accounting_rows: Vec<DeviceIdentity> = allocator
+         .devices
+         .iter()

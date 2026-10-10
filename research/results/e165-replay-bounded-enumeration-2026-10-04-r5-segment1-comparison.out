@@ -1,0 +1,531 @@
+# E165 第 5 次重跑第一段 3-甲 比对（登记 research/prompts/e165-r5-prereg.md 第一节 3-甲、第六节 PQ1–PQ4）。2026-10-04。
+# 根：/tmp/claude-1000/e165-r5-segment1/root（清单 root-manifest-at-start.sha256，sha256 95237ecfd9cb3722aa3fddd95b8cfdf3209fc42cbad4dfc85aec276cacc76646，291 个文件；段尾 sha256sum -c 退 0）。装置 E165_THREADS=7（r4 另一遍 3）。
+# 比对脚本：/tmp/claude-1000/e165-r5-segment1/compare_segment1.py（登记读法）、compare_extended.py（另一种读法：身份加 lagging_class/mounts/user_publishes，判定字段加大写 J 开头计数）、keydiff.py、pq4.py；只用标准库。
+## 登记读法（PQ1、PQ2）
+name=pair label=row1:r1-legal-family old=e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out old_sha256=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 new_sha256=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 identical=true old_lines=910 new_lines=910
+name=pq1 label=row1:r1-legal-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq2_lines_differ label=row1:r1-legal-family row=none old_only=0 new_only=0
+name=pair label=row2:r1-light-legal-family old=e165-replay-bounded-enumeration-2026-10-01-light-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-light-legal-family.out old_sha256=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c new_sha256=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c identical=true old_lines=876 new_lines=876
+name=pq1 label=row2:r1-light-legal-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq2_lines_differ label=row2:r1-light-legal-family row=none old_only=0 new_only=0
+name=pair label=row3:r1-adversarial-family old=e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out old_sha256=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e new_sha256=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e identical=true old_lines=172 new_lines=172
+name=pq1 label=row3:r1-adversarial-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq2_lines_differ label=row3:r1-adversarial-family row=none old_only=0 new_only=0
+name=pair label=row4:r2-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-legal-family-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family.out old_sha256=336eafe1d4cf255aa9d9610ebd0b7a6255280a4f12d8973ef56a54ca60e2a790 new_sha256=5f876ca2ba7173d685eef667645e11a7b6e1d95f73995a7c3bba846e9fe75eb7 identical=false old_lines=1466 new_lines=1466
+name=pq1 label=row4:r2-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=24987
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=20290
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1967
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_instance_table_violations old=0 new=1626
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=E1 ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=70
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=L ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=6046106
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=L6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1362
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=L9 ring_slots=9 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=372042
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=R ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=2764
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=U_verify_off ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=7086030
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=U_verify_on ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=750246
+name=pq1_changed label=row4:r2-legal-family column=j7 row=verdict domain=X ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=40156
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=44
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=344
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=232
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2736
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2080
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=21856
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=17952
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=192
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1664
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=1408
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=E1 n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=E1 n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=E1 n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=10 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=5038592
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=640
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3872
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=23296
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=8 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=139904
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L n=9 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=839680
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=64
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L6 n=6 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1024
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=2 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=3 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=4 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=5 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=496
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=6 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2464
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=7 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12224
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=8 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=60032
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=L9 n=9 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=296704
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=R n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=R n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=R n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=320
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=R n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2400
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_off n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=30
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_off n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=840
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_off n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=18120
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_off n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=356160
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_off n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6710880
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_on n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_on n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=120
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_on n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2184
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_on n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=39360
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=U_verify_on n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=708576
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=X n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=X n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=X n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=544
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=X n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4544
+name=pq1_changed label=row4:r2-legal-family column=j7 row=violations domain=X n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=35008
+name=pq2_lines_differ label=row4:r2-legal-family row=verdict old_only=10 new_only=10
+name=pq2_lines_differ label=row4:r2-legal-family row=violations old_only=64 new_only=64
+name=pair label=row5:r2-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-adversarial-family-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-adversarial-family.out old_sha256=14f5ec4b0bc8c6c0c77f7107858e291533498c195b4713cc4a10d7b3d5068805 new_sha256=e7f10a6aaf3e282944bf95597d6a96e54246d497e8f73c075ed8e31ba0c3f76d identical=false old_lines=257 new_lines=257
+name=pq1 label=row5:r2-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=verdict domain=A ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1473356
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=verdict domain=A6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=25058
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=verdict domain=AC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=133024
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1448298
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=A6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=AC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=8
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=AC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1092
+name=pq1_changed label=row5:r2-adversarial-family column=j7 row=violations domain=AC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=131924
+name=pq2_lines_differ label=row5:r2-adversarial-family row=verdict old_only=3 new_only=3
+name=pq2_lines_differ label=row5:r2-adversarial-family row=violations old_only=10 new_only=10
+name=pair label=row6:r2-odd-marker-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-odd-marker-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-legal-family.out old_sha256=b8fb5613228b899a0dc504768184a4529ce9d7d0f1b2647abe49c55cd19c7ae7 new_sha256=e77b3e09c1c7f46d6da39b9d540e2d590d276ec4431f73f81ad04794c52733ee identical=false old_lines=1471 new_lines=1468
+name=pq1 label=row6:r2-odd-marker-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=3 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=24987
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=20290
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1967
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_instance_table_violations old=0 new=1626
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=E1 ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=70
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=L ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=6046106
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=L6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1362
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=L9 ring_slots=9 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=372042
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=R ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=2764
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=U_verify_off ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=7086030
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=U_verify_on ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=750246
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=verdict domain=X ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=40156
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=44
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=344
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=232
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2736
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2080
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=21856
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=17952
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=192
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1664
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=1408
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=E1 n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=E1 n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=E1 n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=10 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=5038592
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=640
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3872
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=23296
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=8 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=139904
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L n=9 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=839680
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=64
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L6 n=6 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1024
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=2 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=3 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=4 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=5 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=496
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=6 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2464
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=7 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12224
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=8 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=60032
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=L9 n=9 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=296704
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=R n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=R n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=R n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=320
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=R n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2400
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_off n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=30
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_off n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=840
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_off n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=18120
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_off n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=356160
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_off n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6710880
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_on n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_on n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=120
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_on n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2184
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_on n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=39360
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=U_verify_on n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=708576
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=X n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=X n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=X n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=544
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=X n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4544
+name=pq1_changed label=row6:r2-odd-marker-legal-family column=j7 row=violations domain=X n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=35008
+name=pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=j6qn_control_readings
+name=pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=j7_control_readings
+name=pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=odd_marker_parity_turns_the_unmount_marker_controls
+name=pq2_lines_differ label=row6:r2-odd-marker-legal-family row=done old_only=1 new_only=1
+name=pq2_lines_differ label=row6:r2-odd-marker-legal-family row=self_check old_only=3 new_only=0
+name=pq2_lines_differ label=row6:r2-odd-marker-legal-family row=verdict old_only=11 new_only=11
+name=pq2_lines_differ label=row6:r2-odd-marker-legal-family row=violations old_only=64 new_only=64
+name=pq2_numbers_only label=row6:r2-odd-marker-legal-family row=verdict rows=1
+name=pair label=row7:r2-odd-marker-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-odd-marker-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-adversarial-family.out old_sha256=b7a77198da25bc6366be98e63847c81cdb50cf120011da40cb37bfc5b1e1617a new_sha256=3d2f8aa74258e15a4ca5a559dc81c8e9b7fe3fd4b748541bae731fbef6e184e4 identical=false old_lines=260 new_lines=257
+name=pq1 label=row7:r2-odd-marker-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=3 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=verdict domain=A ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1473356
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=verdict domain=A6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=25058
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=verdict domain=AC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=133024
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1448298
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=A6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=AC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=8
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=AC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1092
+name=pq1_changed label=row7:r2-odd-marker-adversarial-family column=j7 row=violations domain=AC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=131924
+name=pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=j6qn_control_readings
+name=pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=j7_control_readings
+name=pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=odd_marker_parity_turns_the_unmount_marker_controls
+name=pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=done old_only=1 new_only=1
+name=pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=self_check old_only=3 new_only=0
+name=pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=verdict old_only=4 new_only=4
+name=pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=violations old_only=10 new_only=10
+name=pq2_numbers_only label=row7:r2-odd-marker-adversarial-family row=verdict rows=1
+name=pair label=row8:r2-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment3-multi-disk-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out old_sha256=6a4e978ab50888bad9fef7a5cdffb4085f2e367893372e683da6f70d830f5614 new_sha256=272bee98bb7ed24bb5fc01b44b16aee2896b6c6175e5c0068d797263fea9aa61 identical=false old_lines=405 new_lines=405
+name=pq1 label=row8:r2-multi-disk verdict_changed_j7=20 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=2 duplicate_identities_new=2
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=verdict domain=M ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=524244
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=verdict domain=M6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=131460
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=10641
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=6612
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=216
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3024
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=38880
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=482112
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=216
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1824
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=14208
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=M6 n=6 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=115200
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=42
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=12
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=636
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=312
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=9960
+name=pq1_changed label=row8:r2-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=6288
+name=pq2_lines_differ label=row8:r2-multi-disk row=lagging_class old_only=50 new_only=50
+name=pq2_lines_differ label=row8:r2-multi-disk row=verdict old_only=13 new_only=13
+name=pq2_lines_differ label=row8:r2-multi-disk row=violations old_only=17 new_only=17
+name=pq2_numbers_only label=row8:r2-multi-disk row=verdict rows=10
+name=pair label=row9:r2-table-both-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out old_sha256=d34cd84865c87ebac59b54234cfb0d7acc6dde0b65b108eb0f8738750670444b new_sha256=621b84050934d61b526cb846906a86136d624d9ec029bf20be06a3264ab8c9d0 identical=false old_lines=1551 new_lines=1551
+name=pq1 label=row9:r2-table-both-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=24987
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=C ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=20290
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1967
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=C6 ring_slots=6 criteria=r2 field=j7a_instance_table_violations old=0 new=1626
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=E1 ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=70
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=L ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=6046106
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=L6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1362
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=L9 ring_slots=9 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=372042
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=R ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=2764
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=U_verify_off ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=7086030
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=U_verify_on ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=750246
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=verdict domain=X ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=40156
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=44
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=344
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=232
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2736
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=5 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=2080
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=21856
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C n=6 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=17952
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=2 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=3 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=24
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=4 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=192
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1664
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=C6 n=5 ring_slots=6 criterion=J7a_instance_table field=violations old=0 new=1408
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=E1 n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=E1 n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=E1 n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=10 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=5038592
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=640
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3872
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=23296
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=8 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=139904
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L n=9 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=839680
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=64
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=256
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L6 n=6 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1024
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=2 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=3 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=16
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=4 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=104
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=5 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=496
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=6 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2464
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=7 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12224
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=8 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=60032
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=L9 n=9 ring_slots=9 criterion=J7a_allocation_record_tree_root field=violations old=0 new=296704
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=R n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=R n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=R n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=320
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=R n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2400
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_off n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=30
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_off n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=840
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_off n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=18120
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_off n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=356160
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_off n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6710880
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_on n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_on n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=120
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_on n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2184
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_on n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=39360
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=U_verify_on n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=708576
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=X n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=X n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=56
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=X n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=544
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=X n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4544
+name=pq1_changed label=row9:r2-table-both-legal-family column=j7 row=violations domain=X n=7 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=35008
+name=pq2_lines_differ label=row9:r2-table-both-legal-family row=verdict old_only=10 new_only=10
+name=pq2_lines_differ label=row9:r2-table-both-legal-family row=violations old_only=64 new_only=64
+name=pair label=row10:r2-table-both-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out old_sha256=944cd5b8cd52b93d8035f59f86fc9d97bb81f5020e277eb023c95b1764615e96 new_sha256=c01dece90f67e215c535a7b4a286bd3d6976be4f119d68befda0e6e74fb6d7f6 identical=false old_lines=279 new_lines=279
+name=pq1 label=row10:r2-table-both-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=verdict domain=A ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1473356
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=verdict domain=A6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=25058
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=verdict domain=AC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=133024
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1448298
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=A6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=AC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=8
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=AC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1092
+name=pq1_changed label=row10:r2-table-both-adversarial-family column=j7 row=violations domain=AC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=131924
+name=pq2_lines_differ label=row10:r2-table-both-adversarial-family row=verdict old_only=3 new_only=3
+name=pq2_lines_differ label=row10:r2-table-both-adversarial-family row=violations old_only=10 new_only=10
+name=pair label=row11:r2-table-both-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-multi-disk.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out old_sha256=d43648cd9e24bf5630aaf3aba9d87b910111e0aa5eca6efb8fd69d688d385466 new_sha256=3f932d6d6515d687235e328f999507627ac614e04d0cd456ac6a4e4d1900afa8 identical=false old_lines=433 new_lines=433
+name=pq1 label=row11:r2-table-both-multi-disk verdict_changed_j7=20 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=2 duplicate_identities_new=2
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=verdict domain=M ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=524244
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=verdict domain=M6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=131460
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=10641
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=6612
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=216
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3024
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=38880
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=482112
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=216
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M6 n=4 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1824
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M6 n=5 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=14208
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=M6 n=6 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=115200
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=42
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=12
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=636
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=312
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=9960
+name=pq1_changed label=row11:r2-table-both-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=6288
+name=pq2_lines_differ label=row11:r2-table-both-multi-disk row=lagging_class old_only=50 new_only=50
+name=pq2_lines_differ label=row11:r2-table-both-multi-disk row=verdict old_only=13 new_only=13
+name=pq2_lines_differ label=row11:r2-table-both-multi-disk row=violations old_only=17 new_only=17
+name=pq2_numbers_only label=row11:r2-table-both-multi-disk row=verdict rows=10
+name=pair label=row12:r2-reversed-disk-order-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out old_sha256=6f1f3d3ea78c59f870bf1496e1392275235d904bc361e183b9a1d9c615b327f5 new_sha256=4bc5418f9d9082bde4951b3fbdfac9505cea57962634a5e8a77cc5b6103ce92b identical=false old_lines=163 new_lines=163
+name=pq1 label=row12:r2-reversed-disk-order-legal-family verdict_changed_j7=5 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row12:r2-reversed-disk-order-legal-family column=j7 row=verdict domain=R ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=2764
+name=pq1_changed label=row12:r2-reversed-disk-order-legal-family column=j7 row=violations domain=R n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=4
+name=pq1_changed label=row12:r2-reversed-disk-order-legal-family column=j7 row=violations domain=R n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=40
+name=pq1_changed label=row12:r2-reversed-disk-order-legal-family column=j7 row=violations domain=R n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=320
+name=pq1_changed label=row12:r2-reversed-disk-order-legal-family column=j7 row=violations domain=R n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=2400
+name=pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=table_comparison old_only=4 new_only=4
+name=pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=verdict old_only=1 new_only=1
+name=pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=violations old_only=4 new_only=4
+name=pair label=row13:r2-reversed-disk-order-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-multi-disk.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out old_sha256=8fe6296d6468511536afb89aa209f894537939c98397c635f6d3ba8d6b7a4efc new_sha256=1e4616ed3b6e56e67baa42b66624c1c068e10ec769e9c986f51106ce97c8d814 identical=false old_lines=287 new_lines=287
+name=pq1 label=row13:r2-reversed-disk-order-multi-disk verdict_changed_j7=14 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=1 duplicate_identities_new=1
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=verdict domain=M ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=524244
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=10641
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=verdict domain=MC ring_slots=64 criteria=r2 field=j7a_instance_table_violations old=0 new=6612
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=M n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=12
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=M n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=216
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=M n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3024
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=M n=5 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=38880
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=M n=6 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=482112
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=3
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=42
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=2 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=12
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=636
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=3 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=312
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=9960
+name=pq1_changed label=row13:r2-reversed-disk-order-multi-disk column=j7 row=violations domain=MC n=4 ring_slots=64 criterion=J7a_instance_table field=violations old=0 new=6288
+name=pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=lagging_class old_only=25 new_only=25
+name=pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=verdict old_only=7 new_only=7
+name=pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=violations old_only=12 new_only=12
+name=pq2_numbers_only label=row13:r2-reversed-disk-order-multi-disk row=verdict rows=5
+name=pair label=row14:r3-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r3-segment1-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out old_sha256=19092224bbcb43cd17f77594d74ec824d863bb274dd7f3f49c6f874d8c4f5eb6 new_sha256=3534db6b9b64703e9259899e7c03ebda64325879f8ac078cb5939bc4ca8173b6 identical=false old_lines=380 new_lines=380
+name=pq1 label=row14:r3-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=verdict domain=A ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=1473356
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=verdict domain=A6 ring_slots=6 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=25058
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=verdict domain=AC ring_slots=64 criteria=r2 field=j7a_allocation_record_tree_root_violations old=0 new=133024
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A n=4 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1448298
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A6 n=1 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=6
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A6 n=2 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=410
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=A6 n=3 ring_slots=6 criterion=J7a_allocation_record_tree_root field=violations old=0 new=24642
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=AC n=1 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=8
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=AC n=2 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=1092
+name=pq1_changed label=row14:r3-adversarial-family column=j7 row=violations domain=AC n=3 ring_slots=64 criterion=J7a_allocation_record_tree_root field=violations old=0 new=131924
+name=pq2_lines_differ label=row14:r3-adversarial-family row=verdict old_only=3 new_only=3
+name=pq2_lines_differ label=row14:r3-adversarial-family row=violations old_only=10 new_only=10
+name=pair label=row15:r3-root-choice old=e165-replay-bounded-enumeration-2026-10-03-r3-segment2-root-choice.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-root-choice.out old_sha256=20ca1851dea7cc414fa2071f3b7bccc1a29cfe3799dc59a2ef3d036bd07423de new_sha256=20ca1851dea7cc414fa2071f3b7bccc1a29cfe3799dc59a2ef3d036bd07423de identical=true old_lines=379 new_lines=379
+name=pq1 label=row15:r3-root-choice verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=12 duplicate_identities_new=12
+name=pq2_lines_differ label=row15:r3-root-choice row=none old_only=0 new_only=0
+name=pair label=row16:r4-root-choice-faults old=e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r4-root-choice-faults.out old_sha256=10ff3260ec21d23b22d2cf74d8a9cba3b2e03519ee9643bd1bae7b9890a9f4d7 new_sha256=10ff3260ec21d23b22d2cf74d8a9cba3b2e03519ee9643bd1bae7b9890a9f4d7 identical=true old_lines=3309 new_lines=3309
+name=pq1 label=row16:r4-root-choice-faults verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=261 duplicate_identities_new=261
+name=pq2_lines_differ label=row16:r4-root-choice-faults row=none old_only=0 new_only=0
+## 另一种读法（只为报两种读法结果是否相同，不是登记读法）
+name=extended_pair label=row1:r1-legal-family old=e165-replay-bounded-enumeration-2026-10-01-segment1-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-legal-family.out old_sha256=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 new_sha256=eb54d5032d53d93b74bd0febdb60d1124c0bfd7f3d2750cf084f856dacd5b3c5 identical=true old_lines=910 new_lines=910
+name=extended_pq1 label=row1:r1-legal-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row1:r1-legal-family row=none old_only=0 new_only=0
+name=extended_pair label=row2:r1-light-legal-family old=e165-replay-bounded-enumeration-2026-10-01-light-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-light-legal-family.out old_sha256=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c new_sha256=c4af67b0a22a29f08f7d7bc77401f3bae33e0a96f2185bd366cb38b84c5aeb1c identical=true old_lines=876 new_lines=876
+name=extended_pq1 label=row2:r1-light-legal-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row2:r1-light-legal-family row=none old_only=0 new_only=0
+name=extended_pair label=row3:r1-adversarial-family old=e165-replay-bounded-enumeration-2026-10-01-segment1-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r1-adversarial-family.out old_sha256=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e new_sha256=3ca19987eed1d99dfe2987e1c1f7a336fc98764f9fb936a4f00d7c919ee3da6e identical=true old_lines=172 new_lines=172
+name=extended_pq1 label=row3:r1-adversarial-family verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row3:r1-adversarial-family row=none old_only=0 new_only=0
+name=extended_pair label=row4:r2-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-legal-family-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-legal-family.out old_sha256=336eafe1d4cf255aa9d9610ebd0b7a6255280a4f12d8973ef56a54ca60e2a790 new_sha256=5f876ca2ba7173d685eef667645e11a7b6e1d95f73995a7c3bba846e9fe75eb7 identical=false old_lines=1466 new_lines=1466
+name=extended_pq1 label=row4:r2-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row4:r2-legal-family row=verdict old_only=10 new_only=10
+name=extended_pq2_lines_differ label=row4:r2-legal-family row=violations old_only=64 new_only=64
+name=extended_pair label=row5:r2-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-adversarial-family-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-adversarial-family.out old_sha256=14f5ec4b0bc8c6c0c77f7107858e291533498c195b4713cc4a10d7b3d5068805 new_sha256=e7f10a6aaf3e282944bf95597d6a96e54246d497e8f73c075ed8e31ba0c3f76d identical=false old_lines=257 new_lines=257
+name=extended_pq1 label=row5:r2-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row5:r2-adversarial-family row=verdict old_only=3 new_only=3
+name=extended_pq2_lines_differ label=row5:r2-adversarial-family row=violations old_only=10 new_only=10
+name=extended_pair label=row6:r2-odd-marker-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-odd-marker-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-legal-family.out old_sha256=b8fb5613228b899a0dc504768184a4529ce9d7d0f1b2647abe49c55cd19c7ae7 new_sha256=e77b3e09c1c7f46d6da39b9d540e2d590d276ec4431f73f81ad04794c52733ee identical=false old_lines=1471 new_lines=1468
+name=extended_pq1 label=row6:r2-odd-marker-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=3 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=j6qn_control_readings
+name=extended_pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=j7_control_readings
+name=extended_pq1_one_sided label=row6:r2-odd-marker-legal-family column=exempt side=old_only row=self_check check=odd_marker_parity_turns_the_unmount_marker_controls
+name=extended_pq2_lines_differ label=row6:r2-odd-marker-legal-family row=done old_only=1 new_only=1
+name=extended_pq2_lines_differ label=row6:r2-odd-marker-legal-family row=self_check old_only=3 new_only=0
+name=extended_pq2_lines_differ label=row6:r2-odd-marker-legal-family row=verdict old_only=11 new_only=11
+name=extended_pq2_lines_differ label=row6:r2-odd-marker-legal-family row=violations old_only=64 new_only=64
+name=extended_pq2_numbers_only label=row6:r2-odd-marker-legal-family row=verdict rows=1
+name=extended_pair label=row7:r2-odd-marker-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment1b-odd-marker-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-odd-marker-adversarial-family.out old_sha256=b7a77198da25bc6366be98e63847c81cdb50cf120011da40cb37bfc5b1e1617a new_sha256=3d2f8aa74258e15a4ca5a559dc81c8e9b7fe3fd4b748541bae731fbef6e184e4 identical=false old_lines=260 new_lines=257
+name=extended_pq1 label=row7:r2-odd-marker-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=3 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=j6qn_control_readings
+name=extended_pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=j7_control_readings
+name=extended_pq1_one_sided label=row7:r2-odd-marker-adversarial-family column=exempt side=old_only row=self_check check=odd_marker_parity_turns_the_unmount_marker_controls
+name=extended_pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=done old_only=1 new_only=1
+name=extended_pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=self_check old_only=3 new_only=0
+name=extended_pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=verdict old_only=4 new_only=4
+name=extended_pq2_lines_differ label=row7:r2-odd-marker-adversarial-family row=violations old_only=10 new_only=10
+name=extended_pq2_numbers_only label=row7:r2-odd-marker-adversarial-family row=verdict rows=1
+name=extended_pair label=row8:r2-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment3-multi-disk-2026-10-02.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-multi-disk.out old_sha256=6a4e978ab50888bad9fef7a5cdffb4085f2e367893372e683da6f70d830f5614 new_sha256=272bee98bb7ed24bb5fc01b44b16aee2896b6c6175e5c0068d797263fea9aa61 identical=false old_lines=405 new_lines=405
+name=extended_pq1 label=row8:r2-multi-disk verdict_changed_j7=30 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row8:r2-multi-disk row=lagging_class old_only=50 new_only=50
+name=extended_pq2_lines_differ label=row8:r2-multi-disk row=verdict old_only=13 new_only=13
+name=extended_pq2_lines_differ label=row8:r2-multi-disk row=violations old_only=17 new_only=17
+name=extended_pair label=row9:r2-table-both-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-legal-family.out old_sha256=d34cd84865c87ebac59b54234cfb0d7acc6dde0b65b108eb0f8738750670444b new_sha256=621b84050934d61b526cb846906a86136d624d9ec029bf20be06a3264ab8c9d0 identical=false old_lines=1551 new_lines=1551
+name=extended_pq1 label=row9:r2-table-both-legal-family verdict_changed_j7=74 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row9:r2-table-both-legal-family row=verdict old_only=10 new_only=10
+name=extended_pq2_lines_differ label=row9:r2-table-both-legal-family row=violations old_only=64 new_only=64
+name=extended_pair label=row10:r2-table-both-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-adversarial-family.out old_sha256=944cd5b8cd52b93d8035f59f86fc9d97bb81f5020e277eb023c95b1764615e96 new_sha256=c01dece90f67e215c535a7b4a286bd3d6976be4f119d68befda0e6e74fb6d7f6 identical=false old_lines=279 new_lines=279
+name=extended_pq1 label=row10:r2-table-both-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row10:r2-table-both-adversarial-family row=verdict old_only=3 new_only=3
+name=extended_pq2_lines_differ label=row10:r2-table-both-adversarial-family row=violations old_only=10 new_only=10
+name=extended_pair label=row11:r2-table-both-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-table-both-multi-disk.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-table-both-multi-disk.out old_sha256=d43648cd9e24bf5630aaf3aba9d87b910111e0aa5eca6efb8fd69d688d385466 new_sha256=3f932d6d6515d687235e328f999507627ac614e04d0cd456ac6a4e4d1900afa8 identical=false old_lines=433 new_lines=433
+name=extended_pq1 label=row11:r2-table-both-multi-disk verdict_changed_j7=30 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row11:r2-table-both-multi-disk row=lagging_class old_only=50 new_only=50
+name=extended_pq2_lines_differ label=row11:r2-table-both-multi-disk row=verdict old_only=13 new_only=13
+name=extended_pq2_lines_differ label=row11:r2-table-both-multi-disk row=violations old_only=17 new_only=17
+name=extended_pair label=row12:r2-reversed-disk-order-legal-family old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-legal-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-legal-family.out old_sha256=6f1f3d3ea78c59f870bf1496e1392275235d904bc361e183b9a1d9c615b327f5 new_sha256=4bc5418f9d9082bde4951b3fbdfac9505cea57962634a5e8a77cc5b6103ce92b identical=false old_lines=163 new_lines=163
+name=extended_pq1 label=row12:r2-reversed-disk-order-legal-family verdict_changed_j7=5 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=table_comparison old_only=4 new_only=4
+name=extended_pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=verdict old_only=1 new_only=1
+name=extended_pq2_lines_differ label=row12:r2-reversed-disk-order-legal-family row=violations old_only=4 new_only=4
+name=extended_pair label=row13:r2-reversed-disk-order-multi-disk old=e165-replay-bounded-enumeration-2026-10-02-r2-segment4-reversed-disk-order-multi-disk.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r2-reversed-disk-order-multi-disk.out old_sha256=8fe6296d6468511536afb89aa209f894537939c98397c635f6d3ba8d6b7a4efc new_sha256=1e4616ed3b6e56e67baa42b66624c1c068e10ec769e9c986f51106ce97c8d814 identical=false old_lines=287 new_lines=287
+name=extended_pq1 label=row13:r2-reversed-disk-order-multi-disk verdict_changed_j7=19 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=lagging_class old_only=25 new_only=25
+name=extended_pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=verdict old_only=7 new_only=7
+name=extended_pq2_lines_differ label=row13:r2-reversed-disk-order-multi-disk row=violations old_only=12 new_only=12
+name=extended_pair label=row14:r3-adversarial-family old=e165-replay-bounded-enumeration-2026-10-02-r3-segment1-adversarial-family.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-adversarial-family.out old_sha256=19092224bbcb43cd17f77594d74ec824d863bb274dd7f3f49c6f874d8c4f5eb6 new_sha256=3534db6b9b64703e9259899e7c03ebda64325879f8ac078cb5939bc4ca8173b6 identical=false old_lines=380 new_lines=380
+name=extended_pq1 label=row14:r3-adversarial-family verdict_changed_j7=13 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row14:r3-adversarial-family row=verdict old_only=3 new_only=3
+name=extended_pq2_lines_differ label=row14:r3-adversarial-family row=violations old_only=10 new_only=10
+name=extended_pair label=row15:r3-root-choice old=e165-replay-bounded-enumeration-2026-10-03-r3-segment2-root-choice.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r3-root-choice.out old_sha256=20ca1851dea7cc414fa2071f3b7bccc1a29cfe3799dc59a2ef3d036bd07423de new_sha256=20ca1851dea7cc414fa2071f3b7bccc1a29cfe3799dc59a2ef3d036bd07423de identical=true old_lines=379 new_lines=379
+name=extended_pq1 label=row15:r3-root-choice verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=0 duplicate_identities_new=0
+name=extended_pq2_lines_differ label=row15:r3-root-choice row=none old_only=0 new_only=0
+name=extended_pair label=row16:r4-root-choice-faults old=e165-replay-bounded-enumeration-2026-10-03-r4-segment1-root-choice-faults-2026-10-03-r2.out new=e165-replay-bounded-enumeration-2026-10-04-r5-segment1-r4-root-choice-faults.out old_sha256=10ff3260ec21d23b22d2cf74d8a9cba3b2e03519ee9643bd1bae7b9890a9f4d7 new_sha256=10ff3260ec21d23b22d2cf74d8a9cba3b2e03519ee9643bd1bae7b9890a9f4d7 identical=true old_lines=3309 new_lines=3309
+name=extended_pq1 label=row16:r4-root-choice-faults verdict_changed_j7=0 verdict_changed_elsewhere=0 one_sided_j7=0 one_sided_elsewhere=0 one_sided_exempt_rev4_self_checks=0 duplicate_identities_old=1 duplicate_identities_new=1
+name=extended_pq2_lines_differ label=row16:r4-root-choice-faults row=none old_only=0 new_only=0
+## 两边各自独有的行逐字段比：哪些字段不同（身份照另一种读法配对）
+name=keydiff product=r1-legal-family old_only_lines=0 new_only_lines=0 unpaired=0 
+name=keydiff product=r1-light-legal-family old_only_lines=0 new_only_lines=0 unpaired=0 
+name=keydiff product=r1-adversarial-family old_only_lines=0 new_only_lines=0 unpaired=0 
+name=keydiff product=r2-legal-family old_only_lines=74 new_only_lines=74 unpaired=0 verdict.j7a_allocation_record_tree_root_violations=10 verdict.j7a_instance_table_violations=2 violations.violations=64 violations.witness=64
+name=keydiff product=r2-adversarial-family old_only_lines=13 new_only_lines=13 unpaired=0 verdict.j7a_allocation_record_tree_root_violations=3 violations.violations=10 violations.witness=10
+name=keydiff product=r2-odd-marker-legal-family old_only_lines=79 new_only_lines=76 unpaired=3 done.emitted=1 verdict.j7a_allocation_record_tree_root_violations=10 verdict.j7a_instance_table_violations=2 verdict.self_checks_passed=1 violations.violations=64 violations.witness=64
+name=keydiff product=r2-odd-marker-adversarial-family old_only_lines=18 new_only_lines=15 unpaired=3 done.emitted=1 verdict.j7a_allocation_record_tree_root_violations=3 verdict.self_checks_passed=1 violations.violations=10 violations.witness=10
+name=keydiff product=r2-multi-disk old_only_lines=80 new_only_lines=80 unpaired=0 lagging_class.J7a_allocation_record_tree_root=50 verdict.J7a_allocation_record_tree_root=10 verdict.j7a_allocation_record_tree_root_violations=3 verdict.j7a_instance_table_violations=1 violations.violations=17 violations.witness=17
+name=keydiff product=r2-table-both-legal-family old_only_lines=74 new_only_lines=74 unpaired=0 verdict.j7a_allocation_record_tree_root_violations=10 verdict.j7a_instance_table_violations=2 violations.violations=64 violations.witness=64
+name=keydiff product=r2-table-both-adversarial-family old_only_lines=13 new_only_lines=13 unpaired=0 verdict.j7a_allocation_record_tree_root_violations=3 violations.violations=10 violations.witness=10
+name=keydiff product=r2-table-both-multi-disk old_only_lines=80 new_only_lines=80 unpaired=0 lagging_class.J7a_allocation_record_tree_root=50 verdict.J7a_allocation_record_tree_root=10 verdict.j7a_allocation_record_tree_root_violations=3 verdict.j7a_instance_table_violations=1 violations.violations=17 violations.witness=17
+name=keydiff product=r2-reversed-disk-order-legal-family old_only_lines=9 new_only_lines=9 unpaired=0 table_comparison.rows_witness=4 verdict.j7a_allocation_record_tree_root_violations=1 violations.violations=4 violations.witness=4
+name=keydiff product=r2-reversed-disk-order-multi-disk old_only_lines=44 new_only_lines=44 unpaired=0 lagging_class.J7a_allocation_record_tree_root=25 verdict.J7a_allocation_record_tree_root=5 verdict.j7a_allocation_record_tree_root_violations=2 verdict.j7a_instance_table_violations=1 violations.violations=12 violations.witness=12
+name=keydiff product=r3-adversarial-family old_only_lines=13 new_only_lines=13 unpaired=0 verdict.j7a_allocation_record_tree_root_violations=3 violations.violations=10 violations.witness=10
+name=keydiff product=r3-root-choice old_only_lines=0 new_only_lines=0 unpaired=0 
+name=keydiff product=r4-root-choice-faults old_only_lines=0 new_only_lines=0 unpaired=0 
+## PQ4：J7 字段变法与推 s3 逐格对
+name=pq4 product=r2-legal-family r2_verdict_rows_with_atr_eq_j7b_judged=11 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[C=20290 C6=1626] atr_cells_still_zero=[L/n1 L6/n1 L9/n1 U_verify_on/n1 U_verify_off/n1 X/n2 E1/n1 E2/n1 E2/n2 E2/n3]
+name=pq4 product=r2-adversarial-family r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[] atr_cells_still_zero=[]
+name=pq4 product=r2-odd-marker-legal-family r2_verdict_rows_with_atr_eq_j7b_judged=11 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[C=20290 C6=1626] atr_cells_still_zero=[L/n1 L6/n1 L9/n1 U_verify_on/n1 U_verify_off/n1 X/n2 E1/n1 E2/n1 E2/n2 E2/n3]
+name=pq4 product=r2-odd-marker-adversarial-family r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[] atr_cells_still_zero=[]
+name=pq4 product=r2-multi-disk r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[MC=6612] atr_cells_still_zero=[M/n1 M6/n1]
+name=pq4 product=r2-table-both-legal-family r2_verdict_rows_with_atr_eq_j7b_judged=11 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[C=20290 C6=1626] atr_cells_still_zero=[L/n1 L6/n1 L9/n1 U_verify_on/n1 U_verify_off/n1 X/n2 E1/n1 E2/n1 E2/n2 E2/n3]
+name=pq4 product=r2-table-both-adversarial-family r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[] atr_cells_still_zero=[]
+name=pq4 product=r2-table-both-multi-disk r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[MC=6612] atr_cells_still_zero=[M/n1 M6/n1]
+name=pq4 product=r2-reversed-disk-order-legal-family r2_verdict_rows_with_atr_eq_j7b_judged=1 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[] atr_cells_still_zero=[]
+name=pq4 product=r2-reversed-disk-order-multi-disk r2_verdict_rows_with_atr_eq_j7b_judged=2 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[MC=6612] atr_cells_still_zero=[M/n1]
+name=pq4 product=r3-adversarial-family r2_verdict_rows_with_atr_eq_j7b_judged=3 atr_ne_j7b_judged_or_other_j7_nonzero=[] instance_table_nonzero_domains=[] atr_cells_still_zero=[]
+## PQ3：r4 带故障一族 7 线程与 3 线程两遍整份逐字比
+name=pq3 threads=7,3 identical=true

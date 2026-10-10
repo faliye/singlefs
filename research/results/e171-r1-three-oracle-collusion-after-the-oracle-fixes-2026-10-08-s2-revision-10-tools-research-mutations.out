@@ -1,0 +1,62 @@
+E7RESULT name=config table_rows=29 unit_test_modules=test_revision_10 timeout_seconds=300
+E7RESULT name=anchor mutation=R10-1_逐行编排的起与退在同一处也当在跑 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-2_研究一侧变异表的闸取反 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-3_起跑闸不核绿行点名产物的行数 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-4_T₂_不接第_1_步绿的那一次的_TAG hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-5_逐行限时按超时重跑那一档算 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-6_本机闸第_7_步绿与逐行编排起过只要一样 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-7_比对器的基线导出不接_TAG hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-8_H23_只认修订_6_第二段导出根的原名 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-9_目录重叠只看一个方向 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-10_标签前缀相撞只看一个方向 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-11_H25_该登没登的不数 hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-12_比对器那一条命令的后缀少_.out hits=1 files=revision_10_placeholders.py
+E7RESULT name=anchor mutation=R10-13_每行前后不核树里的变异表等于_H8 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-14_本机闸把第二台的槽记_0 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-15_让路取第一段逐行最早那一趟 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-16_写了_exit_的分片也当在跑 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-17_重报的_carry_分片也当在跑 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-18_做完的行也当排着 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-19_X_读第_12_步的行目录 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-20_输入清单不比_sha256 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-21_run-values_不比 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-22_停派文件看不见 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-23_没跑成的行也算触达 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-24_批_2_的触达读批_1_那一遍恢复的报告 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-25_Q2_的集合只取_O1-对拍红的行 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-26_类变了的行取反 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-27_账里跨机对照那一步也收 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-28_只有一边补位就不报 hits=1 files=contrast_segment_two_revision_10.py
+E7RESULT name=anchor mutation=R10-29_第一段那一处_S17_取反 hits=1 files=rows_orchestrator_segment_two_revision_10.py
+E7RESULT name=baseline unit_tests=green
+E7RESULT name=mutation number=1 outcome=✅ mutation=R10-1_逐行编排的起与退在同一处也当在跑 unit_test_exit=1
+E7RESULT name=mutation number=2 outcome=✅ mutation=R10-2_研究一侧变异表的闸取反 unit_test_exit=1
+E7RESULT name=mutation number=3 outcome=✅ mutation=R10-3_起跑闸不核绿行点名产物的行数 unit_test_exit=1
+E7RESULT name=mutation number=4 outcome=✅ mutation=R10-4_T₂_不接第_1_步绿的那一次的_TAG unit_test_exit=1
+E7RESULT name=mutation number=5 outcome=✅ mutation=R10-5_逐行限时按超时重跑那一档算 unit_test_exit=1
+E7RESULT name=mutation number=6 outcome=✅ mutation=R10-6_本机闸第_7_步绿与逐行编排起过只要一样 unit_test_exit=1
+E7RESULT name=mutation number=7 outcome=✅ mutation=R10-7_比对器的基线导出不接_TAG unit_test_exit=1
+E7RESULT name=mutation number=8 outcome=✅ mutation=R10-8_H23_只认修订_6_第二段导出根的原名 unit_test_exit=1
+E7RESULT name=mutation number=9 outcome=✅ mutation=R10-9_目录重叠只看一个方向 unit_test_exit=1
+E7RESULT name=mutation number=10 outcome=✅ mutation=R10-10_标签前缀相撞只看一个方向 unit_test_exit=1
+E7RESULT name=mutation number=11 outcome=✅ mutation=R10-11_H25_该登没登的不数 unit_test_exit=1
+E7RESULT name=mutation number=12 outcome=✅ mutation=R10-12_比对器那一条命令的后缀少_.out unit_test_exit=1
+E7RESULT name=mutation number=13 outcome=✅ mutation=R10-13_每行前后不核树里的变异表等于_H8 unit_test_exit=1
+E7RESULT name=mutation number=14 outcome=✅ mutation=R10-14_本机闸把第二台的槽记_0 unit_test_exit=1
+E7RESULT name=mutation number=15 outcome=✅ mutation=R10-15_让路取第一段逐行最早那一趟 unit_test_exit=1
+E7RESULT name=mutation number=16 outcome=✅ mutation=R10-16_写了_exit_的分片也当在跑 unit_test_exit=1
+E7RESULT name=mutation number=17 outcome=✅ mutation=R10-17_重报的_carry_分片也当在跑 unit_test_exit=1
+E7RESULT name=mutation number=18 outcome=✅ mutation=R10-18_做完的行也当排着 unit_test_exit=1
+E7RESULT name=mutation number=19 outcome=✅ mutation=R10-19_X_读第_12_步的行目录 unit_test_exit=1
+E7RESULT name=mutation number=20 outcome=✅ mutation=R10-20_输入清单不比_sha256 unit_test_exit=1
+E7RESULT name=mutation number=21 outcome=✅ mutation=R10-21_run-values_不比 unit_test_exit=1
+E7RESULT name=mutation number=22 outcome=✅ mutation=R10-22_停派文件看不见 unit_test_exit=1
+E7RESULT name=mutation number=23 outcome=✅ mutation=R10-23_没跑成的行也算触达 unit_test_exit=1
+E7RESULT name=mutation number=24 outcome=✅ mutation=R10-24_批_2_的触达读批_1_那一遍恢复的报告 unit_test_exit=1
+E7RESULT name=mutation number=25 outcome=✅ mutation=R10-25_Q2_的集合只取_O1-对拍红的行 unit_test_exit=1
+E7RESULT name=mutation number=26 outcome=✅ mutation=R10-26_类变了的行取反 unit_test_exit=1
+E7RESULT name=mutation number=27 outcome=✅ mutation=R10-27_账里跨机对照那一步也收 unit_test_exit=1
+E7RESULT name=mutation number=28 outcome=✅ mutation=R10-28_只有一边补位就不报 unit_test_exit=1
+E7RESULT name=mutation number=29 outcome=✅ mutation=R10-29_第一段那一处_S17_取反 unit_test_exit=1
+E7RESULT name=verdict mutations=29 caught=29 invalid=0 survived=0 timed_out=0 restored_and_baseline_green=true
+E7RESULT name=done emitted=62

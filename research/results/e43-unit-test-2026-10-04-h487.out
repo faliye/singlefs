@@ -1,0 +1,36 @@
+run-with-memory-cap: 这个会话已有 1 条日常的在跑，照理由并行：同一会话派出去的几个执行员各跑各的装置
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 0.22s
+     Running unittests src/bin/e43_extension_point_budget.rs (target/release/deps/e43_extension_point_budget-ba419008fe4d277d)
+
+running 27 tests
+test tests::both_rows_are_dearer_than_zfs_at_zero ... ok
+test tests::counted_upper_bound_from_the_zfs_clause_is_zero_now ... ok
+test tests::every_rejection_reason_is_reachable ... ok
+test tests::header_bytes_equals_the_decision_23_breakdown ... ok
+test tests::header_sensitivity_fits_128_pair_loses_its_one_when_threshold_moves ... ok
+test tests::header_sensitivity_pairs_match_independent_arithmetic ... ok
+test tests::data_only_carrier_never_grows_the_tree ... ok
+test tests::header_sensitivity_rows_of_the_two_judged_values_are_pinned ... ok
+test tests::integer_and_float_paths_agree_on_every_cell ... ok
+test tests::lower_bound_is_a_range_from_seven_to_thirteen ... ok
+test tests::only_the_unit_header_lives_inside_the_unit ... ok
+test tests::our_rows_reproduce_the_decision_21_table ... ok
+test tests::positive_control_every_node_arm ... ok
+test tests::positive_control_every_unit_arm ... ok
+test tests::reference_rows_reproduce_the_decision_21_table ... ok
+test tests::self_witness_room_holds_the_decision_23_item_counts ... ok
+test tests::self_witness_room_matches_the_decision_23_number ... ok
+test tests::the_btrfs_half_clause_already_fails_at_zero ... ok
+test tests::height_thresholds_are_pinned_per_node_size ... ok
+test tests::the_cross_check_itself_can_go_red ... ok
+test tests::the_decision_21_example_of_128_overflows_the_self_witness_room ... ok
+test tests::structural_upper_bounds_are_pinned ... ok
+test tests::the_same_declaration_can_mount_here_and_be_rejected_there ... ok
+test tests::two_256_byte_slots_share_one_512_byte_atomic_unit ... ok
+test tests::two_byte_length_cannot_span_a_128_kib_unit ... ok
+test tests::zero_extension_point_reproduces_e30_geometry ... ok
+test tests::the_self_witness_bound_is_25_not_864 ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

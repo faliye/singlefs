@@ -1,0 +1,24 @@
+lowered_points_all=23 lowered_points_fitting=17 per_rho_cells_x2=34
+LOWERED S=4 k=1 pos=front fits=True txg=16 floor=5 floor_r4=6
+LOWERED S=4 k=2 pos=front fits=True txg=16 floor=5 floor_r4=6
+LOWERED S=4 k=2 pos=front fits=True txg=21 floor=10 floor_r4=11
+LOWERED S=4 k=4 pos=front fits=False txg=28 floor=10 floor_r4=17
+LOWERED S=4 k=4 pos=front fits=False txg=29 floor=10 floor_r4=18
+LOWERED S=4 k=4 pos=front fits=False txg=30 floor=10 floor_r4=19
+LOWERED S=4 k=4 pos=front fits=False txg=31 floor=10 floor_r4=20
+LOWERED S=4 k=4 pos=front fits=False txg=32 floor=10 floor_r4=21
+LOWERED S=4 k=4 pos=front fits=False txg=33 floor=10 floor_r4=23
+LOWERED S=8 k=1 pos=front fits=True txg=28 floor=5 floor_r4=6
+LOWERED S=8 k=2 pos=front fits=True txg=28 floor=5 floor_r4=6
+LOWERED S=8 k=2 pos=front fits=True txg=33 floor=10 floor_r4=11
+LOWERED S=8 k=4 pos=front fits=True txg=28 floor=5 floor_r4=6
+LOWERED S=8 k=4 pos=front fits=True txg=33 floor=10 floor_r4=11
+LOWERED S=8 k=4 pos=front fits=True txg=39 floor=16 floor_r4=17
+LOWERED S=8 k=4 pos=front fits=True txg=45 floor=22 floor_r4=23
+LOWERED S=16 k=1 pos=front fits=True txg=52 floor=5 floor_r4=6
+LOWERED S=16 k=2 pos=front fits=True txg=52 floor=5 floor_r4=6
+LOWERED S=16 k=2 pos=front fits=True txg=57 floor=10 floor_r4=11
+LOWERED S=16 k=4 pos=front fits=True txg=52 floor=5 floor_r4=6
+LOWERED S=16 k=4 pos=front fits=True txg=57 floor=10 floor_r4=11
+LOWERED S=16 k=4 pos=front fits=True txg=63 floor=16 floor_r4=17
+LOWERED S=16 k=4 pos=front fits=True txg=69 floor=22 floor_r4=23

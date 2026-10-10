@@ -1,0 +1,21 @@
+PC-h1/h2 与 B1 复算（back_chain_487.py）
+b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de  /tmp/claude-1000/e142-r23-run/back_chain_487.py
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+no inputs: self tests only
+exit=0
+self_test direct==derived 200 rounds: False
+--- 带输入
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+instance_table_pointer loc0 device 0 slot 50176
+instance_table_pointer loc1 device 1 slot 50176
+B1b w4.back_chain = CRC32C(new w1 header): 750278362
+B1  t13.back_chain = CRC32C(new w4 header): 2660362816
+discriminate instance_table_pointer=0: 626022660
+discriminate unmount_marker=1: 1493326352
+discriminate watermark=65544: 548646779
+exit=0
+PC-h3: fsid(t13 记录 [463,471))=5f5346532d453134 ; t1 数据单元(设备 0、偏移 822149120、长度 32768) 偏移 83 起 8 字节=5f5346532d453134 ; 相同=True

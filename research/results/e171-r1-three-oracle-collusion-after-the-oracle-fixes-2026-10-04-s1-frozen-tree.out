@@ -1,0 +1,105 @@
+E7RESULT name=config segment=s1 product=frozen_tree tree=research/target/e171-r1-frozen-tree
+E7RESULT name=frozen_tree key=snapshot_digest value=499e81294eddd57df05ddbbdd2264e2b69e4ee57fe0e5726de79e7f4ace34b1e files=283
+E7RESULT name=frozen_tree key=git_head value=31e47115471ba5502a4531d25dffcc921be36899
+E7RESULT name=frozen_tree key=git_status_lines value=84
+E7RESULT name=frozen_tree key=git_status line=MM_crates/mutations.tsv
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bad_disk_input.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e158_root_choice_repair.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e161_crash_state_dedup_and_time_split.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e165_replay_bounded_enumeration.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e168_delete_ring_window_borrow.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e170_o3_spec_executor_export.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/crash.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker-tier/src/crash_injection.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker-tier/src/crash_judge_checker.wgsl
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker-tier/src/crash_judge_checker_common.wgsl
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/src/crash_judge_checker_scan.wgsl
+E7RESULT name=frozen_tree key=git_status line=M__crates/singlefs-checker-tier/src/crash_judge_common.wgsl
+E7RESULT name=frozen_tree key=git_status line=M__crates/singlefs-checker-tier/src/crash_judge_dispatch.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker-tier/src/crash_judge_gpu.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/tests/crash_enumeration_findings_log_dedupes_by_signature_and_survives_resume.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/tests/crash_injection_record_checker_sees_every_publish_across_a_second_crash.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker-tier/tests/crash_judge_gpu_agrees_with_the_cpu_judge_on_every_state.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-checker-tier/tests/crash_points_of_the_instance_table_sweep.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/tests/crash_points_tree_identifier_watermark_orphans.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/tests/gpu_judge_root_choice_tie_takes_the_earlier_root_like_the_cpu_checker.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-checker-tier/tests/gpu_judge_tree_identifier_watermark_of_the_newest_root_like_the_cpu_checker.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker/src/image.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-checker/src/walk.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-core/src/allocator.rs
+E7RESULT name=frozen_tree key=git_status line=A__crates/singlefs-core/src/instance_table_sweep.rs
+E7RESULT name=frozen_tree key=git_status line=M__crates/singlefs-core/src/lib.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-core/src/mount.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-core/src/recovery.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-core/src/root_record.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/src/fault_injection.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/src/history.rs
+E7RESULT name=frozen_tree key=git_status line=M__crates/singlefs-harness/src/mount_transparency.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/a_lone_surviving_device_reads_back_what_it_read_before_the_unmount.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/a_mount_that_cannot_read_a_newer_root_rereads_once_then_refuses_writable.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/accounting_and_mapping_tree_split.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/admission_formula_on_the_mounted_state.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/admission_raises_the_floor_before_refusing.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/checker_cross_links_malformed_nodes_and_mapping_entries.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/checker_judges_reference_intervals_and_every_new_root_segment_field.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/checker_judges_reserved_bytes_and_widths_it_used_to_skip.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-harness/tests/checker_known_bad_images.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/checker_narrow_invariants_and_abandoned_roots.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/common_admission_pool/mod.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/container_trees_grow_a_level_when_the_root_is_full.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/fault_injection_fast_tier.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/fsync_drop_and_devices_without_the_selected_version.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/instance_table_chain_read.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/instance_table_sweep_at_the_end_of_a_writable_mount.rs
+E7RESULT name=frozen_tree key=git_status line=A__crates/singlefs-harness/tests/mount_transparency_judges_the_system_configuration_witness_by_r2.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/multi_unit_file_write_and_read.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/one_revolution_window_after_a_hole_in_the_root_ring.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/pool_checker_floor_raise_ceiling_takes_only_roots_inside_the_one_revolution_window.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/pool_checker_gap_row_conditions_and_incomplete_reference_pairs.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/pool_checker_judges_tree_table_head_identifiers_and_the_first_tree_building_placement.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/pool_checker_scan_of_tree_identifiers_claims_whole_units.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/pool_checker_tree_identifier_birth_txg_agrees_across_every_readable_root.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/raising_the_floor_after_holes_at_the_oldest_end_of_the_one_revolution_window.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/raising_the_floor_into_the_gap_an_abandoned_instance_left_keeps_the_allocated_statistic.rs
+E7RESULT name=frozen_tree key=git_status line=AM_crates/singlefs-harness/tests/raising_the_floor_to_the_ceiling_does_not_pass_a_slot_unreadable_since_the_mount.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/random_histories.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/reuse_after_raising_the_floor.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/rollback_by_a_forward_publish.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/rollback_lineage_record_and_its_checkpoint_cost_term.rs
+E7RESULT name=frozen_tree key=git_status line=AD_crates/singlefs-harness/tests/root_ring_slot_reread_that_does_not_self_verify_counts_as_still_unreadable.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/root_ring_slot_unreadable_at_mount_is_reread_when_it_becomes_the_oldest_in_the_window.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/row_publish_admission.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/row_publish_checks_before_acquisition.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/row_publish_record_without_its_root.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/system_configuration_fields_core_and_checker_refuse_the_same_table.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/system_configuration_slot_one_read_at_every_spacing_by_the_checker_and_recovery.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/unit_area_start_follows_the_ring_and_unreadable_reads_are_not_passed_over.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/unlink_idempotence_criteria_and_rollback_to_the_emptied_version.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/unlink_mount_continuation_and_the_emptied_version.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/unlink_of_a_file_spanning_two_extent_lower_leaves_in_product_batches.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/unlink_single_file_publishes.rs
+E7RESULT name=frozen_tree key=git_status line=MM_crates/singlefs-harness/tests/writable_mount_of_a_formatted_pool.rs
+E7RESULT name=frozen_tree key=git_status line=_M_crates/singlefs-harness/tests/writable_mount_refusal_on_a_crash_state_without_read_faults.rs
+E7RESULT name=frozen_tree key=git_status line=??_crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs
+E7RESULT name=frozen_tree key=git_status line=??_crates/singlefs-checker-tier/tests/crash_injection_publish_after_a_mount_whose_deletion_continuation_stays_short.rs
+E7RESULT name=frozen_tree key=git_status line=??_crates/singlefs-harness/tests/root_ring_slot_reread_outcomes_the_instance_table_judging_them_and_the_publishes_that_reread.rs
+E7RESULT name=frozen_tree key=git_status line=??_crates/singlefs-harness/tests/the_mount_after_a_crashed_unmount_keeps_what_the_other_device_reads.rs
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-harness/src/model.rs sha256=8ba9b34515e876dfe8724db8baaa1c9ce94fb0ab9a42649beb8c49857c2b3012 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-harness/src/model_comparison.rs sha256=effc95f9ab209224686c5ff2fcc6448c8717d082a9e42d640f9e45221e4a77e5 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-harness/src/mount_transparency.rs sha256=4fc8fef4953e6d3e35d2b31687aee248bc7f0a83bc5ababc476c6f9bbe468137 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-checker-tier/src/crash_injection.rs sha256=11ff8274211d4ddad0d3d6bc4c6c4f1ec8012b1e9a5e8bea0f440c8cfc05401e equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-checker-tier/src/crash_judge_gpu.rs sha256=986e85e8184f0fff81ace51237a2a8c1242fff15c2a725566a2a5f6191d5ad55 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-checker/src/image.rs sha256=4b7161622a98170be9fa46096e98510ec3c8262d5d146126fbd5393d62a2e52e equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-checker/src/walk.rs sha256=438b7187e468f151cda043ccb378ac9d14304295a66fdd1a38629ba95fe490ef equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-reference-filesystem/src/lib.rs sha256=5eb77191233817867971f9893784c8f5c4b36bbcea21a690969b928638265e20 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-harness/src/reference_filesystem_translation.rs sha256=65ea707b2005ba6461b31ae99c9bc0f950878c17eb744ecaafd289492a9935dc equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=file_sha256 file=crates/singlefs-checker-tier/src/bin/e171_three_oracle_collusion_after_the_oracle_fixes.rs sha256=262245088495b8ed2e07fa5d0ab41335a6ffadc80fc27c9e2640126d2bf97b01 equals_the_main_tree_now=true
+E7RESULT name=frozen_tree key=a12 check=answer_unmount_defined_in_the_model file=crates/singlefs-harness/src/model.rs hits=1 holds=true
+E7RESULT name=frozen_tree key=a12 check=observed_unmount_defined_in_the_glue file=crates/singlefs-harness/src/model_comparison.rs hits=1 holds=true
+E7RESULT name=frozen_tree key=a12 check=second_crop_entry_with_read_faults file=crates/singlefs-harness/src/mount_transparency.rs hits=1 holds=true
+E7RESULT name=frozen_tree key=a12 check=second_crop_read_faults_parameter file=crates/singlefs-harness/src/mount_transparency.rs hits=1 holds=true
+E7RESULT name=frozen_tree key=a12 check=o2_head_identifiers_of_the_tree_table_entries file=crates/singlefs-checker/src/image.rs hits=1 holds=true
+E7RESULT name=frozen_tree key=a12 check=o2_first_data_unit_of_the_mkfs_watermark_version file=crates/singlefs-checker/src/image.rs hits=1 holds=true
+E7RESULT name=done emitted=105

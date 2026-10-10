@@ -1,0 +1,45 @@
+# E142 r22 步 1(4)：back_chain_487.py（sha256 b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de）
+## 不带输入
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+no inputs: self tests only
+exit=0
+## BACK_CHAIN_487_BREAK=1（第一行）
+self_test direct==derived 200 rounds: False
+## 带输入（N21R 产物：fsid=5f5346532d453134）
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+instance_table_pointer loc0 device 0 slot 50176
+instance_table_pointer loc1 device 1 slot 50176
+B1b w4.back_chain = CRC32C(new w1 header): 750278362
+B1  t13.back_chain = CRC32C(new w4 header): 2660362816
+discriminate instance_table_pointer=0: 626022660
+discriminate unmount_marker=1: 1493326352
+discriminate watermark=65544: 548646779
+exit=0
+
+## 附录：extract_b1_inputs.py 全文（取 B1 的两段输入）
+# 取 B1 的两段输入：装置一侧（第一行 name=done 之前）name=device_region_bytes 里设备 0、偏移 16785408、长 4096 那一行的 [463,471) 与设备 0、偏移 1052672、长 512 那一行的 [170,256)
+# 用法：extract_b1_inputs.py <产物> ；打两行 FSID_HEX=... 与 ITP_HEX=...
+import sys
+done = 0
+found = {}
+for raw in open(sys.argv[1], encoding="utf-8"):
+    line = raw.rstrip("\n")
+    if "name=done" in line:
+        done += 1
+        if done == 1:
+            break
+    if " name=device_region_bytes " in line and " region=" in line:
+        f = dict(t.split("=", 1) for t in line.split() if "=" in t)
+        key = (int(f["device"]), int(f["offset"]), int(f["length"]))
+        found[key] = bytes.fromhex(f["hexadecimal"])
+t13 = found[(0, 16785408, 4096)]
+t14 = found[(0, 1052672, 512)]
+print("FSID_HEX=" + t13[463:471].hex())
+print("ITP_HEX=" + t14[170:256].hex())
+输入（b1-inputs.txt）：
+FSID_HEX=5f5346532d453134
+ITP_HEX=00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c40000000021aa2fd40100000000c40000000021aa2fd40000000000000000

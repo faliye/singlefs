@@ -1,0 +1,4 @@
+E7RESULT name=o3_control dumps=s2-device-baseline-streams-1-2 patch_row=P1-F stream=new_pool_file_creation
+E7RESULT name=image_judgement source=control stream=new_pool_file_creation row=0 label=P1-F patched_digest=match base_digest=match strict=not_in provisional=not_in gaps=- landed=none refusal=system_configuration_value_refused:root_ring_base_not_first_version_slot:device=0:slot=1 chosen_root=none applied=0
+E7RESULT name=o3_control_verdict strict=not_in provisional=not_in base_digest_matches=true red_strict=true
+E7RESULT name=done emitted=4

@@ -1,0 +1,11 @@
+E7RESULT name=config segment=s1 product=s15_four inputs=research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-q5-reverse-at-the-return-point-of-call-2-r6-r3.out_research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-revision-5-q5-reverse.out_research/target/e171-r1-dumps/revision-6-2026-10-05-r3/q5-reverse_research/target/e171-r1-dumps/q5-revision-5-reverse
+E7RESULT name=s15_4 part=product lines_new=51 lines_old=51 dropped_root_ring_lines_new=0 dropped_root_ring_lines_old=0 first_differing_line=none emitted_new=52 emitted_old=52 emitted_matches_after_the_drop=true
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=ops.tsv equal=true
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=states.tsv equal=true
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=oracle-verdicts.tsv equal=true
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=impl-verdicts.tsv_without_timing equal=true
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=call-return-values.tsv calls_with_other_columns_differing=none differences_outside_the_allocator=none allocator_differs_at=[0,_1,_2]
+E7RESULT name=s15_4 part=dump stream=confirmed_loss_form/fixed_script_through_e_then_unmount file=call-outcomes.tsv first_ten_columns_equal=true memory_digest_column_differs_at=[0,_1,_2] outside_the_allocator_calls=none
+E7RESULT name=s15_4 part=product_call_memory_objects differs_at=[('fixed_script_through_e_then_unmount',_0),_('fixed_script_through_e_then_unmount',_1),_('fixed_script_through_e_then_unmount',_2)] outside_the_allocator_calls=none
+E7RESULT name=verdict s15_four_problems=0 triggered=false
+E7RESULT name=done emitted=11

@@ -1,0 +1,405 @@
+E7RESULT name=config experiment=E165 bounds=segment1 family=multi_disk only=every_domain max_n=none chosen_instance=3 first_txg=100 big_ring_slots=64 big_ring_first_counter=7 small_ring_slots=6,9 profile=r2 marker_parity=even
+E7RESULT name=self_check check=local_constants_equal_the_implementation passed=true
+E7RESULT name=self_check check=back_chain_of_every_generated_record passed=true
+E7RESULT name=self_check check=new_root_segment_of_every_generated_record passed=true
+E7RESULT name=self_check check=state_counts_of_the_smallest_sizes passed=true
+E7RESULT name=self_check check=three_readings_on_hand_made_tables passed=true
+E7RESULT name=self_check check=root_plus_disk_on_a_bad_unit_copy passed=true
+E7RESULT name=self_check check=farthest_version_on_the_small_ring passed=true
+E7RESULT name=self_check check=two_monotone_readings_on_one_later_record passed=true
+E7RESULT name=self_check check=residue_does_not_complete_a_publish passed=true
+E7RESULT name=self_check check=parse_rejects_ordinal_zero_whose_checksums_hold passed=true
+E7RESULT name=self_check check=in_flight_limit_control_on_both_rings passed=true
+E7RESULT name=self_check check=fixed_point_control passed=true
+E7RESULT name=self_check check=structure_control passed=true
+E7RESULT name=self_check check=fields_beyond_the_projection_of_the_r2_generator passed=true
+E7RESULT name=self_check check=profile_options passed=true
+E7RESULT name=self_check check=multi_disk_state_counts_of_the_smallest_sizes passed=true
+E7RESULT name=self_check check=lagging_direction_on_hand_made_masks passed=true
+E7RESULT name=self_check check=multi_disk_control_readings passed=true
+E7RESULT name=self_check check=direct_table_reads_the_first_device_before_the_second passed=true
+E7RESULT name=in_flight_limit ring_slots=64 local=21 implementation=21
+E7RESULT name=in_flight_limit ring_slots=9 local=3 implementation=3
+E7RESULT name=in_flight_limit ring_slots=6 local=2 implementation=2
+E7RESULT name=control criterion=multi_disk_any_copy measured=domain=M,max_n=3,implementation=ideal_counting_only_the_first_device_copies,counter=J4 value=100 must_see=equals_100 red_as_required=true
+E7RESULT name=control criterion=multi_disk_any_copy measured=domain=M6,max_n=4,implementation=ideal_counting_only_the_first_device_copies,counter=J4 value=996 must_see=equals_996 red_as_required=true
+E7RESULT name=control criterion=multi_disk_any_copy measured=domain=L,max_n=5,implementation=ideal_counting_only_the_first_device_copies,counter=J4 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=M,max_n=3,implementation=off_timeline_root_whenever_applied,counter=J1 value=228 must_see=equals_228 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=M,max_n=3,implementation=off_timeline_root_whenever_applied,counter=farthest_ge1 value=228 must_see=equals_228 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=M6,max_n=4,implementation=off_timeline_root_whenever_applied,counter=J1 value=2052 must_see=equals_2052 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=M6,max_n=4,implementation=off_timeline_root_whenever_applied,counter=farthest_ge1 value=2052 must_see=equals_2052 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=MC,max_n=2,implementation=off_timeline_root_whenever_applied,counter=J1 value=45 must_see=equals_45 red_as_required=true
+E7RESULT name=control criterion=J1_multi_disk measured=domain=MC,max_n=2,implementation=off_timeline_root_whenever_applied,counter=farthest_ge1 value=45 must_see=equals_45 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M,max_n=3,implementation=always_returns_the_chosen_root,counter=J4 value=228 must_see=equals_228 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M,max_n=3,implementation=always_returns_the_chosen_root,counter=J1 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M,max_n=3,implementation=always_returns_the_chosen_root,counter=J2 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M,max_n=3,implementation=always_returns_the_chosen_root,counter=J3 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M6,max_n=4,implementation=always_returns_the_chosen_root,counter=J4 value=2052 must_see=equals_2052 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M6,max_n=4,implementation=always_returns_the_chosen_root,counter=J1 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M6,max_n=4,implementation=always_returns_the_chosen_root,counter=J2 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=M6,max_n=4,implementation=always_returns_the_chosen_root,counter=J3 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=MC,max_n=2,implementation=always_returns_the_chosen_root,counter=J4 value=45 must_see=equals_45 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=MC,max_n=2,implementation=always_returns_the_chosen_root,counter=J1 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=MC,max_n=2,implementation=always_returns_the_chosen_root,counter=J2 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J4_multi_disk measured=domain=MC,max_n=2,implementation=always_returns_the_chosen_root,counter=J3 value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J5_multi_disk measured=domain=MC,max_n=2,implementation=returns_the_chosen_root_when_every_record_is_on_disk,set=wide,column=today_j5a value=110 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=J5_multi_disk measured=domain=MC,max_n=2,implementation=returns_the_chosen_root_when_every_record_is_on_disk,set=wide,column=today_j5b value=30 must_see=greater_than_0 red_as_required=true
+E7RESULT name=states domain=M ring_slots=64 n=1 states=4 panicked=0 failed=0 applied_ge1=0 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=0 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J0 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J1 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J2 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J3 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J4 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J6_premise_holds violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J6Qn_premise_holds violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J7a_instance_table violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J7a_allocation_record_tree_root violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J7a_filesystem_identifier violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J7b violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=1 criterion=J7c violations=0 judged=4 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=1 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=1 lagging_class=equal states=2 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=1 lagging_class=lagging states=2 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=1 lagging_class=crossed states=0 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=1 lagging_class=first_device_behind states=1 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=1 lagging_class=second_device_behind states=1 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M ring_slots=64 n=2 states=48 panicked=0 failed=0 applied_ge1=12 applied_ge2=0 farthest_ge1=12 farthest_ge2=0 in_flight_limit=21 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J0 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J1 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J2 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J3 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J4 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J6_premise_holds violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J6Qn_premise_holds violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J7a_instance_table violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J7a_allocation_record_tree_root violations=12 judged=48 witness=shape=1c0+1c0;on_disk=-,good;on_second_device=-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J7a_filesystem_identifier violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J7b violations=0 judged=12 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=2 criterion=J7c violations=0 judged=36 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=2 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=2 lagging_class=equal states=12 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=2 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=2 lagging_class=lagging states=30 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=8 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=2 lagging_class=crossed states=6 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=2 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=2 lagging_class=first_device_behind states=15 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=4 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=2 lagging_class=second_device_behind states=15 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=4 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M ring_slots=64 n=3 states=576 panicked=0 failed=0 applied_ge1=216 applied_ge2=36 farthest_ge1=216 farthest_ge2=36 in_flight_limit=21 above_water_max=2 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J0 violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J1 violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J2 violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J3 violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J4 violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J6_premise_holds violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J6Qn_premise_holds violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J7a_instance_table violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J7a_allocation_record_tree_root violations=216 judged=576 witness=shape=1c0+1c0+1c0;on_disk=-,good,-;on_second_device=-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J7a_filesystem_identifier violations=0 judged=576 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J7b violations=0 judged=216 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=3 criterion=J7c violations=0 judged=360 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=3 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=3 lagging_class=equal states=72 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=16 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=3 lagging_class=lagging states=342 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=124 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=3 lagging_class=crossed states=162 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=76 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=3 lagging_class=first_device_behind states=171 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=62 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=3 lagging_class=second_device_behind states=171 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=62 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M ring_slots=64 n=4 states=6912 panicked=0 failed=0 applied_ge1=3024 applied_ge2=864 farthest_ge1=3024 farthest_ge2=864 in_flight_limit=21 above_water_max=3 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J0 violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J1 violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J2 violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J3 violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J4 violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J6_premise_holds violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J6Qn_premise_holds violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J7a_instance_table violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J7a_allocation_record_tree_root violations=3024 judged=6912 witness=shape=1c0+1c0+1c0+1c0;on_disk=-,good,-,-;on_second_device=-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J7a_filesystem_identifier violations=0 judged=6912 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J7b violations=0 judged=3024 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=4 criterion=J7c violations=0 judged=3888 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=4 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=4 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=4 lagging_class=equal states=432 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=104 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=4 lagging_class=lagging states=3510 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=1388 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=4 lagging_class=crossed states=2970 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=1532 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=4 lagging_class=first_device_behind states=1755 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=694 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=4 lagging_class=second_device_behind states=1755 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=694 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M ring_slots=64 n=5 states=82944 panicked=0 failed=0 applied_ge1=38880 applied_ge2=14256 farthest_ge1=38880 farthest_ge2=14256 in_flight_limit=21 above_water_max=4 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J0 violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J1 violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J2 violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J3 violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J4 violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J6_premise_holds violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J6Qn_premise_holds violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J7a_instance_table violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J7a_allocation_record_tree_root violations=38880 judged=82944 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=-,good,-,-,-;on_second_device=-,-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J7a_filesystem_identifier violations=0 judged=82944 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J7b violations=0 judged=38880 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=5 criterion=J7c violations=0 judged=44064 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=5 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=5 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=5 lagging_class=equal states=2592 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=640 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=5 lagging_class=lagging states=34182 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=13852 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=5 lagging_class=crossed states=46170 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=24388 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=5 lagging_class=first_device_behind states=17091 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=6926 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=5 lagging_class=second_device_behind states=17091 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=6926 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M ring_slots=64 n=6 states=995328 panicked=0 failed=0 applied_ge1=482112 applied_ge2=202176 farthest_ge1=482112 farthest_ge2=202176 in_flight_limit=21 above_water_max=5 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J0 violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J1 violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J2 violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J3 violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J4 violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J6_premise_holds violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J6Qn_premise_holds violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J7a_instance_table violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J7a_allocation_record_tree_root violations=482112 judged=995328 witness=shape=1c0+1c0+1c0+1c0+1c0+1c0;on_disk=-,good,-,-,-,-;on_second_device=-,-,-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J7a_filesystem_identifier violations=0 judged=995328 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J7b violations=0 judged=482112 witness=none
+E7RESULT name=violations domain=M ring_slots=64 n=6 criterion=J7c violations=0 judged=513216 witness=none
+E7RESULT name=fixed_point domain=M ring_slots=64 n=6 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M ring_slots=64 n=6 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=6 lagging_class=equal states=15552 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=3872 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=6 lagging_class=lagging states=323190 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=131516 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=6 lagging_class=crossed states=656586 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=346724 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=6 lagging_class=first_device_behind states=161595 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=65758 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M ring_slots=64 n=6 lagging_class=second_device_behind states=161595 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=65758 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 states=1085812 j0_violations=0 failed_states=0 j1_violations=0 j2_violations=0 j3_violations=0 j4_violations=0 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=524244 applied_ge2=217332 domain_is_nonempty=true
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 lagging_class=equal states=18662 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=4634 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 lagging_class=lagging states=361256 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=146888 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 lagging_class=crossed states=705894 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=372722 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 lagging_class=first_device_behind states=180628 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=73444 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 lagging_class=second_device_behind states=180628 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=73444 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M ring_slots=64 smallest_n=1 largest_n=6 criteria=r2 j6qn_premise_holds_violations=0 j6qn_premise_holds_judged=1085812 j6qn_premise_fails_violations=0 j6qn_premise_fails_judged=0 j7_judged=1085812 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=524244 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=524244 j7c_violations=0 j7c_judged=561568 first_returned_root_txg_is_the_largest=0
+E7RESULT name=states domain=M6 ring_slots=6 n=1 states=4 panicked=0 failed=0 applied_ge1=0 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=2 above_water_max=0 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J0 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J1 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J2 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J3 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J4 violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J6_premise_holds violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J6Qn_premise_holds violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J7a_instance_table violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J7a_allocation_record_tree_root violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J7a_filesystem_identifier violations=0 judged=4 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J7b violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=1 criterion=J7c violations=0 judged=4 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=1 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=1 lagging_class=equal states=2 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=1 lagging_class=lagging states=2 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=1 lagging_class=crossed states=0 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=1 lagging_class=first_device_behind states=1 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=1 lagging_class=second_device_behind states=1 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=0 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M6 ring_slots=6 n=2 states=48 panicked=0 failed=0 applied_ge1=12 applied_ge2=0 farthest_ge1=12 farthest_ge2=0 in_flight_limit=2 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J0 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J1 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J2 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J3 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J4 violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J6_premise_holds violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J6Qn_premise_holds violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J7a_instance_table violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J7a_allocation_record_tree_root violations=12 judged=48 witness=shape=1c0+1c0;on_disk=-,good;on_second_device=-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J7a_filesystem_identifier violations=0 judged=48 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J7b violations=0 judged=12 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=2 criterion=J7c violations=0 judged=36 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=2 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=2 lagging_class=equal states=12 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=2 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=2 lagging_class=lagging states=30 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=8 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=2 lagging_class=crossed states=6 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=2 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=2 lagging_class=first_device_behind states=15 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=4 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=2 lagging_class=second_device_behind states=15 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=4 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M6 ring_slots=6 n=3 states=320 panicked=0 failed=0 applied_ge1=216 applied_ge2=36 farthest_ge1=216 farthest_ge2=36 in_flight_limit=2 above_water_max=2 above_water_over_limit=0 above_water_at_limit=108 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J0 violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J1 violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J2 violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J3 violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J4 violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J6_premise_holds violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J6Qn_premise_holds violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J7a_instance_table violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J7a_allocation_record_tree_root violations=216 judged=320 witness=shape=1c0+1c0+1c0;on_disk=-,good,-;on_second_device=-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J7a_filesystem_identifier violations=0 judged=320 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J7b violations=0 judged=216 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=3 criterion=J7c violations=0 judged=104 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=3 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=3 lagging_class=equal states=40 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=16 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=3 lagging_class=lagging states=190 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=124 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=3 lagging_class=crossed states=90 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=76 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=3 lagging_class=first_device_behind states=95 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=62 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=3 lagging_class=second_device_behind states=95 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=0 J6Qn_premise_holds=0 J6Qn_premise_fails=0 J7a_instance_table=0 J7a_allocation_record_tree_root=62 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M6 ring_slots=6 n=4 states=2816 panicked=0 failed=0 applied_ge1=1824 applied_ge2=432 farthest_ge1=1824 farthest_ge2=432 in_flight_limit=2 above_water_max=3 above_water_over_limit=540 above_water_at_limit=1404 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J0 violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J1 violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J2 violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J3 violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J4 violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J6_premise_holds violations=0 judged=2276 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J6_premise_fails violations=540 judged=540 witness=shape=1c0+1c0+1c0+1c0;on_disk=-,good,good,good;on_second_device=-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J6Qn_premise_holds violations=0 judged=2276 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J6Qn_premise_fails violations=540 judged=540 witness=shape=1c0+1c0+1c0+1c0;on_disk=-,good,good,good;on_second_device=-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;first_root_txg=102;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J7a_instance_table violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J7a_allocation_record_tree_root violations=1824 judged=2816 witness=shape=1c0+1c0+1c0+1c0;on_disk=-,good,-,-;on_second_device=-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J7a_filesystem_identifier violations=0 judged=2816 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J7b violations=0 judged=1824 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=4 criterion=J7c violations=0 judged=992 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=4 first_call_failed=0 third_call_equals_second=540 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=4 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=4 lagging_class=equal states=176 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=10 J6Qn_premise_holds=0 J6Qn_premise_fails=10 J7a_instance_table=0 J7a_allocation_record_tree_root=64 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=4 lagging_class=lagging states=1430 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=220 J6Qn_premise_holds=0 J6Qn_premise_fails=220 J7a_instance_table=0 J7a_allocation_record_tree_root=844 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=4 lagging_class=crossed states=1210 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=310 J6Qn_premise_holds=0 J6Qn_premise_fails=310 J7a_instance_table=0 J7a_allocation_record_tree_root=916 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=4 lagging_class=first_device_behind states=715 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=110 J6Qn_premise_holds=0 J6Qn_premise_fails=110 J7a_instance_table=0 J7a_allocation_record_tree_root=422 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=4 lagging_class=second_device_behind states=715 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=110 J6Qn_premise_holds=0 J6Qn_premise_fails=110 J7a_instance_table=0 J7a_allocation_record_tree_root=422 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M6 ring_slots=6 n=5 states=21504 panicked=0 failed=0 applied_ge1=14208 applied_ge2=2880 farthest_ge1=14208 farthest_ge2=2880 in_flight_limit=2 above_water_max=4 above_water_over_limit=12636 above_water_at_limit=6696 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J0 violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J1 violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J2 violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J3 violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J4 violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J6_premise_holds violations=0 judged=8868 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J6_premise_fails violations=8424 judged=12636 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=-,good,good,good,-;on_second_device=-,-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J6Qn_premise_holds violations=0 judged=8868 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J6Qn_premise_fails violations=8424 judged=12636 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=-,good,good,good,-;on_second_device=-,-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;first_root_txg=102;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J7a_instance_table violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J7a_allocation_record_tree_root violations=14208 judged=21504 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=-,good,-,-,-;on_second_device=-,-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J7a_filesystem_identifier violations=0 judged=21504 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J7b violations=0 judged=14208 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=5 criterion=J7c violations=0 judged=7296 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=5 first_call_failed=0 third_call_equals_second=7776 third_call_differs_or_is_missing=648
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=5 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=5 lagging_class=equal states=672 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=72 J6Qn_premise_holds=0 J6Qn_premise_fails=72 J7a_instance_table=0 J7a_allocation_record_tree_root=256 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=5 lagging_class=lagging states=8862 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=2592 J6Qn_premise_holds=0 J6Qn_premise_fails=2592 J7a_instance_table=0 J7a_allocation_record_tree_root=5212 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=5 lagging_class=crossed states=11970 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=5760 J6Qn_premise_holds=0 J6Qn_premise_fails=5760 J7a_instance_table=0 J7a_allocation_record_tree_root=8740 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=5 lagging_class=first_device_behind states=4431 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=1296 J6Qn_premise_holds=0 J6Qn_premise_fails=1296 J7a_instance_table=0 J7a_allocation_record_tree_root=2606 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=5 lagging_class=second_device_behind states=4431 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=1296 J6Qn_premise_holds=0 J6Qn_premise_fails=1296 J7a_instance_table=0 J7a_allocation_record_tree_root=2606 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=states domain=M6 ring_slots=6 n=6 states=176128 panicked=0 failed=0 applied_ge1=115200 applied_ge2=25344 farthest_ge1=115200 farthest_ge2=25344 in_flight_limit=2 above_water_max=5 above_water_over_limit=143640 above_water_at_limit=26568 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J0 violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J1 violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J2 violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J3 violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J4 violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J6_premise_holds violations=0 judged=32488 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J6_premise_fails violations=66528 judged=143640 witness=shape=1c0+1c0+1c0+1c0+1c0+1c0;on_disk=-,good,good,good,-,-;on_second_device=-,-,-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J6Qn_premise_holds violations=0 judged=32488 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J6Qn_premise_fails violations=66528 judged=143640 witness=shape=1c0+1c0+1c0+1c0+1c0+1c0;on_disk=-,good,good,good,-,-;on_second_device=-,-,-,-,-,-;residue_at=none;chosen=0;farthest=2;verify=true;first=returned:txg102:watermark1002:applied2;first_root_txg=102;second=returned:txg103:watermark1003:applied1
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J7a_instance_table violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J7a_allocation_record_tree_root violations=115200 judged=176128 witness=shape=1c0+1c0+1c0+1c0+1c0+1c0;on_disk=-,good,-,-,-,-;on_second_device=-,-,-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J7a_filesystem_identifier violations=0 judged=176128 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J7b violations=0 judged=115200 witness=none
+E7RESULT name=violations domain=M6 ring_slots=6 n=6 criterion=J7c violations=0 judged=60928 witness=none
+E7RESULT name=fixed_point domain=M6 ring_slots=6 n=6 first_call_failed=0 third_call_equals_second=40284 third_call_differs_or_is_missing=26244
+E7RESULT name=first_returned_root_txg domain=M6 ring_slots=6 n=6 first_returned_root_txg_is_the_largest=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=6 lagging_class=equal states=2752 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=272 J6Qn_premise_holds=0 J6Qn_premise_fails=272 J7a_instance_table=0 J7a_allocation_record_tree_root=1024 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=6 lagging_class=lagging states=57190 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=15440 J6Qn_premise_holds=0 J6Qn_premise_fails=15440 J7a_instance_table=0 J7a_allocation_record_tree_root=32620 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=6 lagging_class=crossed states=116186 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=50816 J6Qn_premise_holds=0 J6Qn_premise_fails=50816 J7a_instance_table=0 J7a_allocation_record_tree_root=81556 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=6 lagging_class=first_device_behind states=28595 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=7720 J6Qn_premise_holds=0 J6Qn_premise_fails=7720 J7a_instance_table=0 J7a_allocation_record_tree_root=16310 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=lagging_class domain=M6 ring_slots=6 n=6 lagging_class=second_device_behind states=28595 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=7720 J6Qn_premise_holds=0 J6Qn_premise_fails=7720 J7a_instance_table=0 J7a_allocation_record_tree_root=16310 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 states=200820 j0_violations=0 failed_states=0 j1_violations=0 j2_violations=0 j3_violations=0 j4_violations=0 j6_premise_holds_violations=0 j6_premise_fails_violations=75492 j6_premise_fails_judged=156816 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=131460 applied_ge2=28692 domain_is_nonempty=true
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 lagging_class=equal states=3654 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=354 J6Qn_premise_holds=0 J6Qn_premise_fails=354 J7a_instance_table=0 J7a_allocation_record_tree_root=1362 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 lagging_class=lagging states=67704 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=18252 J6Qn_premise_holds=0 J6Qn_premise_fails=18252 J7a_instance_table=0 J7a_allocation_record_tree_root=38808 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 lagging_class=crossed states=129462 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=56886 J6Qn_premise_holds=0 J6Qn_premise_fails=56886 J7a_instance_table=0 J7a_allocation_record_tree_root=91290 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 lagging_class=first_device_behind states=33852 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=9126 J6Qn_premise_holds=0 J6Qn_premise_fails=9126 J7a_instance_table=0 J7a_allocation_record_tree_root=19404 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 lagging_class=second_device_behind states=33852 J1=0 J2=0 J4=0 J6_premise_holds=0 J6_premise_fails=9126 J6Qn_premise_holds=0 J6Qn_premise_fails=9126 J7a_instance_table=0 J7a_allocation_record_tree_root=19404 J7a_filesystem_identifier=0 J7b=0 J7c=0
+E7RESULT name=verdict domain=M6 ring_slots=6 smallest_n=1 largest_n=6 criteria=r2 j6qn_premise_holds_violations=0 j6qn_premise_holds_judged=44004 j6qn_premise_fails_violations=75492 j6qn_premise_fails_judged=156816 j7_judged=200820 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=131460 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=131460 j7c_violations=0 j7c_judged=69360 first_returned_root_txg_is_the_largest=0
+E7RESULT name=states domain=MC ring_slots=64 n=1 states=8 panicked=0 failed=0 applied_ge1=3 applied_ge2=0 farthest_ge1=3 farthest_ge2=0 in_flight_limit=21 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=4 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J0 violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J1 violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J2 violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J3 violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J4 violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J6_premise_holds violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J6Qn_premise_holds violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J7a_instance_table violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J7a_allocation_record_tree_root violations=3 judged=8 witness=shape=1c0+1c0;on_disk=good,good;on_second_device=good,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J7a_filesystem_identifier violations=0 judged=8 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J7b violations=0 judged=3 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=1 criterion=J7c violations=0 judged=5 witness=none
+E7RESULT name=fixed_point domain=MC ring_slots=64 n=1 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=MC ring_slots=64 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=pair_states domain=MC ring_slots=64 n=1 pair_states_without_an_interval=0
+E7RESULT name=pairs domain=MC ring_slots=64 n=1 set=wide pairs=27 today_j5a=5 today_j5b=0 ideal_j5a=5 ideal_j5b=0
+E7RESULT name=states domain=MC ring_slots=64 n=2 states=128 panicked=0 failed=0 applied_ge1=42 applied_ge2=9 farthest_ge1=42 farthest_ge2=9 in_flight_limit=21 above_water_max=2 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=80 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J0 violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J1 violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J2 violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J3 violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J4 violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J6_premise_holds violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J6Qn_premise_holds violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J7a_instance_table violations=12 judged=128 witness=shape=1c0+1c0+1c0;on_disk=good,-,good;on_second_device=good,-,-;residue_at=none;chosen=1;farthest=2;verify=true;first=returned:txg102:watermark1002:applied1;chosen_root=marker_not_written:instance_table_slot69001:allocation_record_tree_root_slot68001:fsid_last_byte1;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte1;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J7a_allocation_record_tree_root violations=42 judged=128 witness=shape=1c0+1c0+1c0;on_disk=good,good,-;on_second_device=good,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J7a_filesystem_identifier violations=0 judged=128 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J7b violations=0 judged=42 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=2 criterion=J7c violations=0 judged=86 witness=none
+E7RESULT name=fixed_point domain=MC ring_slots=64 n=2 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=MC ring_slots=64 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=pair_states domain=MC ring_slots=64 n=2 pair_states_without_an_interval=0
+E7RESULT name=pairs domain=MC ring_slots=64 n=2 set=wide pairs=1215 today_j5a=230 today_j5b=0 ideal_j5a=230 ideal_j5b=0
+E7RESULT name=states domain=MC ring_slots=64 n=3 states=2048 panicked=0 failed=0 applied_ge1=636 applied_ge2=180 farthest_ge1=636 farthest_ge2=180 in_flight_limit=21 above_water_max=3 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=1472 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J0 violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J1 violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J2 violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J3 violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J4 violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J6_premise_holds violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J6Qn_premise_holds violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J7a_instance_table violations=312 judged=2048 witness=shape=1c0+1c0+1c0+1c0;on_disk=good,-,good,-;on_second_device=good,-,-,-;residue_at=none;chosen=1;farthest=2;verify=true;first=returned:txg102:watermark1002:applied1;chosen_root=marker_not_written:instance_table_slot69001:allocation_record_tree_root_slot68001:fsid_last_byte1;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte1;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J7a_allocation_record_tree_root violations=636 judged=2048 witness=shape=1c0+1c0+1c0+1c0;on_disk=good,good,-,-;on_second_device=good,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J7a_filesystem_identifier violations=0 judged=2048 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J7b violations=0 judged=636 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=3 criterion=J7c violations=0 judged=1412 witness=none
+E7RESULT name=fixed_point domain=MC ring_slots=64 n=3 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=MC ring_slots=64 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=pair_states domain=MC ring_slots=64 n=3 pair_states_without_an_interval=0
+E7RESULT name=pairs domain=MC ring_slots=64 n=3 set=wide pairs=54675 today_j5a=10805 today_j5b=0 ideal_j5a=10805 ideal_j5b=0
+E7RESULT name=states domain=MC ring_slots=64 n=4 states=32768 panicked=0 failed=0 applied_ge1=9960 applied_ge2=2988 farthest_ge1=9960 farthest_ge2=2988 in_flight_limit=21 above_water_max=4 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=25856 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=0
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J0 violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J1 violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J2 violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J3 violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J4 violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J6_premise_holds violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J6Qn_premise_holds violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J7a_instance_table violations=6288 judged=32768 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=good,-,good,-,-;on_second_device=good,-,-,-,-;residue_at=none;chosen=1;farthest=2;verify=true;first=returned:txg102:watermark1002:applied1;chosen_root=marker_not_written:instance_table_slot69001:allocation_record_tree_root_slot68001:fsid_last_byte1;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte1;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J7a_allocation_record_tree_root violations=9960 judged=32768 witness=shape=1c0+1c0+1c0+1c0+1c0;on_disk=good,good,-,-,-;on_second_device=good,-,-,-,-;residue_at=none;chosen=0;farthest=1;verify=true;first=returned:txg101:watermark1001:applied1;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J7a_filesystem_identifier violations=0 judged=32768 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J7b violations=0 judged=9960 witness=none
+E7RESULT name=violations domain=MC ring_slots=64 n=4 criterion=J7c violations=0 judged=22808 witness=none
+E7RESULT name=fixed_point domain=MC ring_slots=64 n=4 first_call_failed=0 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=MC ring_slots=64 n=4 first_returned_root_txg_is_the_largest=0
+E7RESULT name=pair_states domain=MC ring_slots=64 n=4 pair_states_without_an_interval=0
+E7RESULT name=pairs domain=MC ring_slots=64 n=4 set=wide pairs=2460375 today_j5a=501710 today_j5b=0 ideal_j5a=501710 ideal_j5b=0
+E7RESULT name=verdict domain=MC ring_slots=64 smallest_n=1 largest_n=4 states=34952 j0_violations=0 failed_states=0 j1_violations=0 j2_violations=0 j3_violations=0 j4_violations=0 j6_premise_holds_violations=0 j6_premise_fails_violations=0 j6_premise_fails_judged=0 ia1_violations=0 ia2_violations=0 specification_self_check_mismatches=0 applied_ge1=10641 applied_ge2=3177 domain_is_nonempty=true
+E7RESULT name=verdict domain=MC ring_slots=64 smallest_n=1 largest_n=4 set=wide pairs=2516292 today_j5a_violations=512750 today_j5b_violations=0 ideal_j5a_violations=512750 ideal_j5b_violations=0
+E7RESULT name=verdict domain=MC ring_slots=64 smallest_n=1 largest_n=4 criteria=r2 j6qn_premise_holds_violations=0 j6qn_premise_holds_judged=34952 j6qn_premise_fails_violations=0 j6qn_premise_fails_judged=0 j7_judged=34952 j7a_instance_table_violations=6612 j7a_allocation_record_tree_root_violations=10641 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=10641 j7c_violations=0 j7c_judged=24311 first_returned_root_txg_is_the_largest=0
+E7RESULT name=verdict scope=run bounds=segment1 family=multi_disk states=1321584 self_checks_passed=19 control_readings=23 controls_not_red=0 void_conditions=0 halt_conditions=0 profile=r2 marker_parity=even
+E7RESULT name=done emitted=405

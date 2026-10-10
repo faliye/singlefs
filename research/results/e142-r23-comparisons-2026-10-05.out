@@ -1,0 +1,106 @@
+=== Q142.105 主点逐区域（主产物）
+411:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=29 unequal=0 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+0
+=== Q142.106 反向链
+59:E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=65548 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=2660362816
+688:E7RESULT name=back_chain records=3 chains=1:0,2:750278362,3:2660362816
+const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = 2_660_362_816;
+=== Q142.109 P8G 逐区域（p8g_region_compare.py 主产物 对 P8G 导出）
+1090d0a763085ae6eb7a9ae2739b0d1b7bec9bea23f03a6180298792cd7937a8  /tmp/claude-1000/e142-r23-run/p8g_region_compare.py
+29
+P8G_SUMMARY model_regions=29 matched=29 equal=29 unequal=0 unmatched_model=0 unmatched_crates=0
+=== Q142.110 P8G 字段表
+1150:E7RESULT name=p8g_layout_field_summary rows=174 equal=174 unequal=0
+174
+0
+=== Q142.111 P8G 判决
+1158:E7RESULT name=p8g_control_main_point fields=12 equal=12 unequal=0 unequal_fields=none
+1157:E7RESULT name=p8g_verdict write_list_ok=true recover_full_ok=true positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+908:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_vio
+1157:E7RESULT name=p8g_verdict write_list_ok=true recover_full_ok=true positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+(i)(ii) 逐字段比：见 e142-r23 草稿脚本输出——(i) 不同字段数 0，(ii) 不同字段数 0（下面 python 重跑一遍）
+p8g_verdict fields 12
+(i) differing vs verdict: []
+(ii) differing vs r22 s2: []
+=== Q142.112 P8G 记账
+974:E7RESULT name=p8g_accounting entries=15 allocated_bytes_per_device=278528 free_bytes_per_device=7767572480 empty_cluster_segments_per_device=7406 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=98386 sequence_all_one=true generation=3
+=== Q142.115 N22R 没漂（r22 s2 主产物 → N22R 的归一化 diff）
+e2_e3_removed=True e2_rows_a=0 e2_rows_b=0
+normalized_lines a=1124 b=1124
+(见 /tmp 草稿：diff 行数 0；下面重算)
+0
+59:E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=65548 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=2660362816
+688:E7RESULT name=back_chain records=3 chains=1:0,2:750278362,3:2660362816
+=== Q142.117 字段表
+898:E7RESULT name=layout_field_summary rows=174 equal=174 unequal=0
+174
+0
+899:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+=== Q142.118 旧值残留
+命令七（仓根）
+residual_old_values count=0
+fixture_lines 0 table_lines 0
+命令六
+0
+0
+0
+0
+命令十二
+0
+0
+1
+0
+冻结
+287 / 295 逐处归类（命中 287 共 14 处，295 零处；每一处都指实例表指针起点 287 或其注释、断言，没有一处指 fsid 或 MAC；fsid 在 463、MAC 在 471）：
+5416:    // 第二十一次跑改按 487 字节头的字段表（新根段七项：实例表指针 287、分�
+5459:        287..=372 => {
+5460:            let local = offset - 287;
+7061:            "instance_table_pointer[287,373)_vs_published_root_record[170,256)",
+7064:            &|record: &[u8]| lowercase_hex(&record[287..373]),
+8250:        // 新根段内（D23 已定项 15 的七项次序，7.2 B6）：树表 99、映射 185、水位 
+8254:        assert_eq!(279 + 8, 287, "实例表单元指针起点");
+8255:        assert_eq!(287 + NODE_POINTER_BYTES, 373, "分配记录树根指针起点");
+9563:    /// 第二十一次跑再钉新根段后三项与挪位之后的 fsid、MAC（7.2 B6：287、373、45
+9575:            (287, "new_instance_table"),
+9716:        // 新根段后三项（D23 已定项 15）：实例表指针 [287, 373) 与这次发布写的根
+9720:        assert_eq!(&output.record_bytes[287..373], &root_slot[170..256], "实例表指针与那次发布�
+命中计数：
+12
+0
+=== Q142.119 判决字段（R71 集，77 个）：第 22 次第二段主产物 对 主产物 对 N22R
+   77 /tmp/claude-1000/e142-r23-run/r71-r22-s2-main.txt
+   77 /tmp/claude-1000/e142-r23-run/r71-r23-main.txt
+   77 /tmp/claude-1000/e142-r23-run/r71-n22r.txt
+  231 total
+0
+0
+30
+=== Q142.121 两份主点导出（N22R 与主产物各自第一行 name=done 之后）
+     39 /tmp/claude-1000/e142-r23-run/half-n22r.txt
+     39 /tmp/claude-1000/e142-r23-run/half-main.txt
+     78 total
+cmp: identical
+=== Q142.122 N22R 的不同区域
+E7RESULT name=impl_bytes_equal step=31 region=unregistered device=0 offset=4096 length=4096 matched=true equal=false first_diff_offset=155 mismatch_bytes=6 fields=标签_unregistered_不在候选表里
+E7RESULT name=impl_bytes_equal step=32 region=unregistered device=1 offset=4096 length=4096 matched=true equal=false first_diff_offset=155 mismatch_bytes=6 fields=标签_unregistered_不在候选表里
+(更正上面 Q142.118 一节里的「命中 287 共 14 处」：实得 12 处，由其后「命中计数：」两行（12、0）与上面逐处列出的 12 行为准；295 零处不变)
+=== Q142.114 改动之外什么都没动（N22R → 主产物的归一化 diff，按 name= 分组；R71 的归一化与剔除，只看第一行 name=done 之前）
+e2_e3_removed=True e2_rows_a=0 e2_rows_b=0
+normalized_lines a=1124 b=1124
+lines a=1124 b=1124
+GROUP name=device_region_bytes lines_in_a=29 deleted=2 added=2
+GROUP name=journal_header_write_digest lines_in_a=60 deleted=12 added=12
+GROUP name=p8g_device_region_bytes lines_in_a=29 deleted=2 added=2
+GROUP name=p8g_write_list_row lines_in_a=29 deleted=2 added=2
+GROUP name=write_list_row lines_in_a=29 deleted=2 added=2
+N22R 里 journal_header_write_digest 的 kind=system_configuration_slot 行数：
+12
+变了的 journal_header_write_digest 行里 kind 的分布（删 / 加）：
+     12   +	kind=system_configuration_slot
+     12   -	kind=system_configuration_slot
+write_list_row / p8g_write_list_row 变了的行里，逐字段比，只有 sha256 一个字段不同：
+write_list_row step=31 [('sha256', 'e305c8810ee7', 'e55cb9e74678')]
+write_list_row step=32 [('sha256', '5dc1f792b1d2', '05460661c286')]
+p8g_write_list_row step=31 [('sha256', 'e305c8810ee7', 'e55cb9e74678')]
+p8g_write_list_row step=32 [('sha256', '5dc1f792b1d2', '05460661c286')]
+变了的 write_list_row 的 sha256 与同一次写的 device_region_bytes 行的 sha256 相同（e305… → e55c…、5dc1… → 0546…）：见上面 groupdiff 的 device_region_bytes 两行与此处

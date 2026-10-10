@@ -1,0 +1,45 @@
+# E142 r22 步 1(3)：label6_anchor.py（sha256 15c945328a473e21c0e50a604445e54b9b40b98c4996a434a1596883a70725f7）
+## 不带输入
+per_object_41 41 expected 41 True
+A1 label6 main (copies 2, H 0, n_live 1) 98386 expected 98386 True
+A1 le_hex 5280010000000000
+A2 label6 without deleted_inodes entry 0
+A3 discriminators: resident 2+H 65618 ; floor 40 98384 ; copies 1 49193 ; H 1 131154 ; n_live 2 98468 ; slot 4096 24658
+A4 t10 device offset 823296000 length 16384
+A4 row 3 free_bytes_dev0 entry [227,261) key_label_at 227 value [249,257)
+A4 row 4 free_bytes_dev1 entry [261,295) key_label_at 261 value [283,291)
+A4 row 10 committed_reservation entry [465,499) key_label_at 465 value [487,495)
+A4 row 13 empty_cluster_segments_dev0 entry [567,601) key_label_at 567 value [589,597)
+A4 row 14 empty_cluster_segments_dev1 entry [601,635) key_label_at 601 value [623,631)
+A5 main device_bytes 4294967296 slots 262144 unit_area_slots 211968 segments 3312 empty_segments 3310 free_bytes 3472605184 journal_ring_ok True label6 98386
+A5 P8G device_bytes 8589934592 slots 524288 unit_area_slots 474112 segments 7408 empty_segments 7406 free_bytes 7767572480 journal_ring_ok True label6 98386
+exit=0
+## LABEL6_ANCHOR_BREAK=1（只打前两行）
+per_object_41 40 expected 41 False
+A1 label6 main (copies 2, H 0, n_live 1) 98384 expected 98386 False
+## --decode N21R 产物 e142-new-pool-file-creation-dry-run-r22-arm-n21r-2026-10-05.out
+per_object_41 41 expected 41 True
+A1 label6 main (copies 2, H 0, n_live 1) 98386 expected 98386 True
+A1 le_hex 5280010000000000
+A2 label6 without deleted_inodes entry 0
+A3 discriminators: resident 2+H 65618 ; floor 40 98384 ; copies 1 49193 ; H 1 131154 ; n_live 2 98468 ; slot 4096 24658
+A4 t10 device offset 823296000 length 16384
+A4 row 3 free_bytes_dev0 entry [227,261) key_label_at 227 value [249,257)
+A4 row 4 free_bytes_dev1 entry [261,295) key_label_at 261 value [283,291)
+A4 row 10 committed_reservation entry [465,499) key_label_at 465 value [487,495)
+A4 row 13 empty_cluster_segments_dev0 entry [567,601) key_label_at 567 value [589,597)
+A4 row 14 empty_cluster_segments_dev1 entry [601,635) key_label_at 601 value [623,631)
+A5 main device_bytes 4294967296 slots 262144 unit_area_slots 211968 segments 3312 empty_segments 3310 free_bytes 3472605184 journal_ring_ok True label6 98386
+A5 P8G device_bytes 8589934592 slots 524288 unit_area_slots 474112 segments 7408 empty_segments 7406 free_bytes 7767572480 journal_ring_ok True label6 98386
+DECODE side=model device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:0 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=model device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:0 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+exit=0
+## --decode 主产物 e142-new-pool-file-creation-dry-run-r22-main-2026-10-05.out（步 3(8)，Q142.87）
+A1 label6 main (copies 2, H 0, n_live 1) 98386 expected 98386 True
+DECODE side=model device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=model device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+exit=0

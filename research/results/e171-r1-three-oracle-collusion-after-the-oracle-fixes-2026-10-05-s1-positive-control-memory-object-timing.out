@@ -1,0 +1,13 @@
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o1 states=397 total_ns=12528470 median_ns=16600 p95_ns=93100 max_ns=114521
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=o2 states=397 total_ns=15596693678 median_ns=37043535 p95_ns=81811599 max_ns=88962066
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=1 stage=recovery states=397 total_ns=218152016 median_ns=449642 p95_ns=1113946 max_ns=2239481
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o1 states=119 total_ns=3857779 median_ns=17640 p95_ns=85421 max_ns=116731
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=o2 states=119 total_ns=4686800866 median_ns=36743904 p95_ns=79963339 max_ns=84017141
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=2 stage=recovery states=119 total_ns=61188302 median_ns=436113 p95_ns=992765 max_ns=1154866
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o1 states=374 total_ns=12603285 median_ns=17370 p95_ns=95011 max_ns=127261
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=o2 states=374 total_ns=14770365454 median_ns=36710103 p95_ns=80607363 max_ns=97250440
+E7TIMING name=stage_time stream=fixed_script_through_e_then_unmount batch=3 stage=recovery states=374 total_ns=194839195 median_ns=433832 p95_ns=1033546 max_ns=1344897
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=impl-verdicts.tsv bytes=51150 sha256=8ef9a3de8d5c868774074d9652849de141e2ddb6f67c46f7b85dd396d070cc13
+E7TIMING name=file_with_timing stream=fixed_script_through_e_then_unmount file=manifest.tsv bytes=912 sha256=f19cea73ff6307c9e80af7da9b6f2e374c8e40b0b0dcdf953244c0c359a0cb5a
+E7TIMING name=stream_time stream=fixed_script_through_e_then_unmount elapsed_ns=84196824476 drive_ns=1498326373 observe_ns=76931148918 write_ns=5733536687
+E7TIMING name=process_wall seconds=84.385 exit=0

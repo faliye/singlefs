@@ -1,0 +1,203 @@
+## PC-e 字段表分得出一格（命令 grep -n 'name=layout_field_positive_control' $M）
+899:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+
+## P2 装置自己的翻位对照（命令 grep -n 'name=positive_control_p2' $M）
+320:E7RESULT name=positive_control_p2 arm=arm_n16 point=a_level1_pointer_first_byte region=allocation_internal_of_device_0 device=0 injected_offset=145 regions_flagged=1 matches_injection=true
+321:E7RESULT name=positive_control_p2 arm=arm_n16 point=b_root_largest_key_last_byte region=allocation_root device=0 injected_offset=71 regions_flagged=1 matches_injection=true
+322:E7RESULT name=positive_control_p2 arm=arm_n16 point=c_extent_leaf_entry_tag_byte region=extent_root device=0 injected_offset=187 regions_flagged=1 matches_injection=true
+323:E7RESULT name=positive_control_p2 arm=arm_n16 point=d_journal_named_item_5_first_byte region=journal_record device=0 injected_offset=711 regions_flagged=1 matches_injection=true
+
+## PC-f22 逐区域比对分得出标签 6（N21R 对今天的 crates/）
+411:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=20 unequal=9 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+N21R 里 accounting_root 的 impl_bytes_equal 行：
+accounting_root device=0 offset=823296000 equal=false first_diff=10 mismatch_bytes=11
+accounting_root device=1 offset=823296000 equal=false first_diff=10 mismatch_bytes=11
+crates/ 一侧的标签 6（label6_anchor.py --decode N21R 产物，research/results/e142-r22-anchor-label6-2026-10-05.out）：
+DECODE side=crates device=0 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+DECODE side=crates device=1 free_bytes_dev0=label2:3472605184 free_bytes_dev1=label2:3472605184 committed_reservation=label6:98386 empty_cluster_segments_dev0=label11:3310 empty_cluster_segments_dev1=label11:3310
+
+## PC-g 独立比对分得出一个字节（合成文件 = N21R 产物的拷贝，设备 1、偏移 4096、长 4096 那份窗口系统配置槽区域内偏移 6 的字节异或 0x01；脚本 make_pcg.py sha256 3808eb79766e0a1fddbe6e775de82b864704a45ffb74f1e32542c2c7418a15ea）
+合成文件 sha256 aa93c6f586e83a95fe8fcb316b2ad71d538a70cc01fcf59ad9b6f951a25e5c45
+old-new (合成, N21R)：E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=1 unchanged=28 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=1
+old-new (N21R, N21R)：E7RESULT name=old_new_independent_summary new_regions=29 old_regions=29 matched=29 changed=0 unchanged=29 unmatched_new=0 unmatched_old=0 mapped_regions=0 unmapped_regions=0
+
+## PC-h1 / PC-h2 / B1 B1b（back_chain_487.py sha256 b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de；N21R 输入的那次在 research/results/e142-r22-anchor-b1-2026-10-05.out）
+不带输入：
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+no inputs: self tests only
+弄坏开关 BACK_CHAIN_487_BREAK=1 的第一行：
+self_test direct==derived 200 rounds: False
+
+## PC-h3 锚点 B1 的输入对得上条款
+实例表指针两条位置条目的设备与槽号（步 ①(4) 带输入那次）：
+instance_table_pointer loc0 device 0 slot 50176
+instance_table_pointer loc1 device 1 slot 50176
+fsid 对 t1 数据单元：
+t1 数据单元 [83,91) = 5f5346532d453134  t13 [463,471) = 5f5346532d453134  相同: True
+
+## 7.2 B1 / B1b 复算：输入取自这一次主产物（controls_from_product.py 取 t13 [463,471) 与 t14 [170,256)，另列 B2–B11 在产物里的读数）
+B2 from product t12: entry_count 11 declared_length 2200 tree_id_of_node 0
+B3 from product t12 tree ids [65536, 65537, 65538, 65539, 65541, 65542, 65543, 65544, 65545, 65546, 65547] first8 hex 0000010000000000 last entry first8 hex 0b00010000000000
+B3 from product t14 watermark LE hex 0c00010000000000
+B5/B6 from product t13: watermark@271 65548 F@279 0 unmount@459 0 fsid@463 5f5346532d453134 mac@471 all zero True first named entry@487 slot 50180
+B10 t13 instance pointer == t14 root[170:256]: True  loc slots 50176 50176
+journal ring offsets present in window product: [(0, 16785408, 4096), (1, 16785408, 4096)]
+B11 offsets present: [(0, 1052672, 512), (0, 16785408, 4096), (0, 822149120, 32768), (1, 16785408, 4096), (1, 822149120, 32768)]
+inputs for back_chain_487.py: fsid 5f5346532d453134 itp 00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c40000000021aa2fd40100000000c40000000021aa2fd40000000000000000
+self_test direct==derived 200 rounds: True
+control flags 0->1: 1057457588 -> 3937788698 expected 3937788698 True
+r20 B1 (311 header, watermark 65536): 2213468031 expected 2213468031 True
+instance_table_pointer loc0 device 0 slot 50176
+instance_table_pointer loc1 device 1 slot 50176
+B1b w4.back_chain = CRC32C(new w1 header): 750278362
+B1  t13.back_chain = CRC32C(new w4 header): 2660362816
+discriminate instance_table_pointer=0: 626022660
+discriminate unmount_marker=1: 1493326352
+discriminate watermark=65544: 548646779
+
+
+## 7.2 B2–B11 独立复算（offsets_487.py，sha256 936bbf5707f495d50feeef07caf8c548df140375f3f9faeea9704144ed7b771d，登记里记的 936bbf57…）
+B5 new_root_segment_start 99 segment_bytes 364
+B6 tree_table 99 185
+B6 mapping_root 185 271
+B6 watermark 271 279
+B6 floor 279 287
+B6 instance_table 287 373
+B6 allocation_root 373 459
+B6 unmount_marker 459 463
+B5 fsid 463 mac 471 header_end 487 increment_after_ten 409
+B7 room 3609 entries 64 used 3584 left 25
+B7 t13 payload_end 1159 entry_k_offsets [487, 543, 599, 655, 711, 767, 823, 879, 935, 991, 1047, 1103]
+B7 old 311: room 3785 entries 67 old fsid 287 old mac 295
+B8 512 left 25
+B9 crc32c(empty) = 0
+B10 root record offsets: flags 20, watermark 122, checksum 138, instance_table 170..256, mapping 256..342, allocation_root 342..428 (4+16+4+4+8+86+8+8+32 = 170 )
+B10 instance pointer loc0 device/slot at 50 54 loc1 64 68 in new segment: loc0 slot at 341 loc1 slot at 355
+
+## PC-i 旧值残留检查分得出旧值（命令七 residual_old_values.sh sha256 63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0；命令六）
+命令七 HEAD 版装置与变异表（git show HEAD: 抽到草稿仓树，装置 sha256 2f4ea2cfd3f142bbe76e054bfb6747ebe4cfd17509a19e6737f1dcf9ebd62999）：residual_old_values count=69
+命令七 N21R 那一份装置与变异表（git show :<路径> 取暂存区版本，装置 sha256 3bfa09fbcbe393516747a9ef3e7815a10d64dde3d01be5557d92dbddfbf0e147）：residual_old_values count=0
+命令七 冻结的 N22 装置与变异表（仓根）：residual_old_values count=0
+命令六 N21R 那一份装置（四个计数，各应为 1）：
+STATISTIC_COMMITTED_RESERVATION_BYTES, TREE_IDENTIFIER_NONE, 0) => 1
+for statistic in \[STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES\] => 1
+准入不等式要的四项 day-1 各写一行 0 => 1
+三项 0（读不到行是坏账 => 1
+
+## 附录：本文件用到的脚本 sha256
+3808eb79766e0a1fddbe6e775de82b864704a45ffb74f1e32542c2c7418a15ea  /tmp/claude-1000/e142-r22-run/make_pcg.py
+b267c41bc41b3f41e6d216c3608ad1cdd57f0496af4b69024b8b5e69516a89de  /tmp/claude-1000/e142-r22-run/back_chain_487.py
+936bbf5707f495d50feeef07caf8c548df140375f3f9faeea9704144ed7b771d  /tmp/claude-1000/e142-r22-run/offsets_487.py
+1b4d591c9b35d23d273447704921f6bccdcb3f3eb3f357e98784fac21376a697  /tmp/claude-1000/e142-r22-run/controls_from_product.py
+3728dcd6e3bd73215a4245a7bd587a567bf32ef1a1fc4f06669bd8cdaf01e190  /tmp/claude-1000/e142-r22-run/fsid_vs_data_unit.py
+63ea086247aaee402ff74cf9dd3c9d51c1220f7f379f3f5dc2f2bf595de2a1c0  /tmp/claude-1000/e142-r22-run/residual_old_values.sh
+4d4c410289c62599e460e624e881d333cf06150f4372fae2d08b257ee71b5f63  /tmp/claude-1000/e142-r22-run/controls22.sh
+
+### fsid_vs_data_unit.py
+# PC-h3 的第二半：N21R 产物 t1 数据单元（设备 0、偏移 822149120、长度 32768）偏移 83 起 8 字节，与 t13 [463,471) 的 fsid 比。用法：fsid_vs_data_unit.py <产物>
+import sys
+found = {}
+for raw in open(sys.argv[1], encoding="utf-8"):
+    line = raw.rstrip("\n")
+    if "name=done" in line: break
+    if " name=device_region_bytes " in line and " region=" in line:
+        f = dict(t.split("=", 1) for t in line.split() if "=" in t)
+        found[(int(f["device"]), int(f["offset"]), int(f["length"]))] = bytes.fromhex(f["hexadecimal"])
+data_unit = found[(0, 822149120, 32768)]; t13 = found[(0, 16785408, 4096)]
+print("t1 数据单元 [83,91) =", data_unit[83:91].hex(), " t13 [463,471) =", t13[463:471].hex(), " 相同:", data_unit[83:91] == t13[463:471])
+### controls_from_product.py
+import sys,struct,subprocess
+P=sys.argv[1]
+lines=open(P,encoding='utf-8').read().split('\n')
+def parse(line):
+    return dict(t.split('=',1) for t in line.split() if '=' in t)
+model={};crates={};done=0
+for ln in lines:
+    if ln.startswith('E7RESULT name=done'): done+=1; continue
+    if ln.startswith('E7RESULT name=device_region_bytes '):
+        d=parse(ln); key=(int(d['device']),int(d['offset']),int(d['length']))
+        (model if done==0 else crates)[key]=bytes.fromhex(d['hexadecimal'])
+def crc32c(data):
+    crc=0xFFFFFFFF
+    for byte in data:
+        crc^=byte
+        for _ in range(8):
+            crc=(crc>>1)^(0x82F63B78 if crc&1 else 0)
+    return crc^0xFFFFFFFF
+t12=model[(0,823328768,16384)]
+print('B2 from product t12: entry_count',struct.unpack_from('<H',t12,98)[0],'declared_length',struct.unpack_from('<H',t12,8)[0],'tree_id_of_node',struct.unpack_from('<Q',t12,42)[0])
+ids=[struct.unpack_from('<Q',t12,131+200*i)[0] for i in range(11)]
+print('B3 from product t12 tree ids',ids,'first8 hex',t12[131:139].hex(),'last entry first8 hex',t12[131+2000:131+2008].hex())
+t14=model[(0,1052672,512)]
+print('B3 from product t14 watermark LE hex',t14[122:130].hex())
+t13=model[(0,16785408,4096)]
+print('B5/B6 from product t13: watermark@271',struct.unpack_from('<Q',t13,271)[0],'F@279',struct.unpack_from('<Q',t13,279)[0],'unmount@459',struct.unpack_from('<I',t13,459)[0],'fsid@463',t13[463:471].hex(),'mac@471 all zero',all(b==0 for b in t13[471:487]),'first named entry@487 slot',int.from_bytes(t13[491:497],'little'))
+print('B10 t13 instance pointer == t14 root[170:256]:',t13[287:373]==t14[170:256],' loc slots',int.from_bytes(t13[341:347],'little'),int.from_bytes(t13[355:361],'little'))
+w1=model[(0,16777216,4096)] if (0,16777216,4096) in model else None
+print('journal ring offsets present in window product:',[k for k in model if k[1] in (16777216,16781312,16785408)])
+print('B11 offsets present:',sorted(k for k in model if k[1] in (822149120,4194304,7340032,1052672,16785408)))
+# B1 recompute: w4/w1 are not in the 29-write window; recompute t13 back chain from its own record is not possible (needs w4 header); use anchors
+fsid=t13[463:471]; ptr=t14[170:256]
+print('inputs for back_chain_487.py: fsid',fsid.hex(),'itp',ptr.hex())
+out=subprocess.run(['python3','/tmp/claude-1000/e142-r22-run/back_chain_487.py','--fsid-hex',fsid.hex(),'--instance-table-pointer-hex',ptr.hex()],capture_output=True,text=True).stdout
+print(out)
+
+## 附录：controls22.sh 全文（sha256 4d4c410289c62599e460e624e881d333cf06150f4372fae2d08b257ee71b5f63）
+#!/usr/bin/env bash
+# E142 第 22 次重跑步 ③(10)：第五节 5.2 的阳性对照与第七节 7.2 复算。仓根起跑。输出全文进 research/results/e142-r22-controls-2026-10-05.out。
+cd /home/fy5090/code/singlefs
+D=/tmp/claude-1000/e142-r22-run
+R=research/results
+M=$R/e142-new-pool-file-creation-dry-run-r22-main-2026-10-05.out
+N=$R/e142-new-pool-file-creation-dry-run-r22-arm-n21r-2026-10-05.out
+echo "## PC-e 字段表分得出一格（命令 grep -n 'name=layout_field_positive_control' \$M）"; grep -n 'name=layout_field_positive_control' $M
+echo; echo "## P2 装置自己的翻位对照（命令 grep -n 'name=positive_control_p2' \$M）"; grep -n 'name=positive_control_p2' $M | cut -c1-260
+echo; echo "## PC-f22 逐区域比对分得出标签 6（N21R 对今天的 crates/）"
+grep -n 'name=impl_bytes_equal_summary' $N
+echo "N21R 里 accounting_root 的 impl_bytes_equal 行："; grep 'name=impl_bytes_equal ' $N | grep 'region=accounting_root' | sed -E 's/.* region=([^ ]+) device=([0-9]+) offset=([0-9]+).*(equal=[a-z]+).*first_diff_offset=([^ ]+) mismatch_bytes=([^ ]+).*/\1 device=\2 offset=\3 \4 first_diff=\5 mismatch_bytes=\6/'
+echo "crates/ 一侧的标签 6（label6_anchor.py --decode N21R 产物，research/results/e142-r22-anchor-label6-2026-10-05.out）："; grep 'DECODE side=crates' $R/e142-r22-anchor-label6-2026-10-05.out | head -2 | cut -c1-250
+echo; echo "## PC-g 独立比对分得出一个字节（合成文件 = N21R 产物的拷贝，设备 1、偏移 4096、长 4096 那份窗口系统配置槽区域内偏移 6 的字节异或 0x01；脚本 make_pcg.py sha256 $(sha256sum $D/make_pcg.py | cut -d' ' -f1)）"
+echo "合成文件 sha256 $(sha256sum $D/pc-g-synthetic.out | cut -d' ' -f1)"
+echo "old-new (合成, N21R)：$(grep name=old_new_independent_summary $D/indep-pcg-synth.out)"
+echo "old-new (N21R, N21R)：$(grep name=old_new_independent_summary $D/indep-pcg-same.out)"
+echo; echo "## PC-h1 / PC-h2 / B1 B1b（back_chain_487.py sha256 $(sha256sum $D/back_chain_487.py | cut -d' ' -f1)；N21R 输入的那次在 $R/e142-r22-anchor-b1-2026-10-05.out）"
+echo "不带输入："; python3 $D/back_chain_487.py
+echo "弄坏开关 BACK_CHAIN_487_BREAK=1 的第一行："; BACK_CHAIN_487_BREAK=1 python3 $D/back_chain_487.py | head -1
+echo; echo "## PC-h3 锚点 B1 的输入对得上条款"
+echo "实例表指针两条位置条目的设备与槽号（步 ①(4) 带输入那次）："; grep -E 'instance_table_pointer loc' $R/e142-r22-anchor-b1-2026-10-05.out
+echo "fsid 对 t1 数据单元："; python3 $D/fsid_vs_data_unit.py $N
+echo; echo "## 7.2 B1 / B1b 复算：输入取自这一次主产物（controls_from_product.py 取 t13 [463,471) 与 t14 [170,256)，另列 B2–B11 在产物里的读数）"
+python3 $D/controls_from_product.py $M
+echo; echo "## 7.2 B2–B11 独立复算（offsets_487.py，sha256 $(sha256sum $D/offsets_487.py | cut -d' ' -f1)，登记里记的 936bbf57…）"; python3 $D/offsets_487.py
+echo; echo "## PC-i 旧值残留检查分得出旧值（命令七 residual_old_values.sh sha256 $(sha256sum $D/residual_old_values.sh | cut -d' ' -f1)；命令六）"
+echo "命令七 HEAD 版装置与变异表（git show HEAD: 抽到草稿仓树，装置 sha256 $(sha256sum $D/headtree/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/headtree | tail -1)"
+echo "命令七 N21R 那一份装置与变异表（git show :<路径> 取暂存区版本，装置 sha256 $(sha256sum $D/frozen_n21r/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs | cut -d' ' -f1)）：$(bash $D/residual_old_values.sh $D/frozen_n21r | tail -1)"
+echo "命令七 冻结的 N22 装置与变异表（仓根）：$(bash $D/residual_old_values.sh /home/fy5090/code/singlefs | tail -1)"
+echo "命令六 N21R 那一份装置（四个计数，各应为 1）："
+A=$D/frozen_n21r/research/e7-index-bench/src/bin/e142_new_pool_file_creation_dry_run.rs
+for pattern in 'STATISTIC_COMMITTED_RESERVATION_BYTES, TREE_IDENTIFIER_NONE, 0)' 'for statistic in \[STATISTIC_UNRECLAIMABLE_BYTES, STATISTIC_PENDING_DELETE_BYTES, STATISTIC_COMMITTED_RESERVATION_BYTES\]' '准入不等式要的四项 day-1 各写一行 0' '三项 0（读不到行是坏账'; do printf '%s => ' "$pattern"; grep -c "$pattern" $A; done
+echo; echo "## 附录：本文件用到的脚本 sha256"
+sha256sum $D/make_pcg.py $D/back_chain_487.py $D/offsets_487.py $D/controls_from_product.py $D/fsid_vs_data_unit.py $D/residual_old_values.sh $D/controls22.sh
+echo; echo "### fsid_vs_data_unit.py"; cat $D/fsid_vs_data_unit.py; echo "### controls_from_product.py"; cat $D/controls_from_product.py
+## 附录：make_pcg.py 全文
+# PC-g 合成文件：N19R 产物的拷贝，只把第一行 name=done 之前、device=1 offset=4096 length=4096 的那一行 name=device_region_bytes 的
+# hexadecimal 里第 6 个字节（偏移 6）异或 0x01，其余行原样。用法：python3 make_pcg.py <N19R 产物> <输出路径>
+import sys
+src = open(sys.argv[1], encoding='utf-8').read().split('\n')
+out = []
+done = 0
+changed = 0
+for ln in src:
+    if ln.startswith('E7RESULT name=done'):
+        done += 1
+    if done == 0 and ln.startswith('E7RESULT name=device_region_bytes ') and ' device=1 ' in ln and ' offset=4096 ' in ln and ' length=4096 ' in ln:
+        i = ln.index('hexadecimal=') + len('hexadecimal=')
+        b = bytearray(bytes.fromhex(ln[i:]))
+        b[6] ^= 0x01
+        ln = ln[:i] + bytes(b).hex()
+        changed += 1
+    out.append(ln)
+open(sys.argv[2], 'w', encoding='utf-8').write('\n'.join(out))
+print('changed lines', changed)

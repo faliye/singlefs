@@ -1,0 +1,380 @@
+E7RESULT name=config experiment=E165 bounds=segment1 family=adversarial only=every_domain max_n=none chosen_instance=3 first_txg=100 big_ring_slots=64 big_ring_first_counter=7 small_ring_slots=6,9 profile=r3 marker_parity=even
+E7RESULT name=self_check check=local_constants_equal_the_implementation passed=true
+E7RESULT name=self_check check=back_chain_of_every_generated_record passed=true
+E7RESULT name=self_check check=new_root_segment_of_every_generated_record passed=true
+E7RESULT name=self_check check=state_counts_of_the_smallest_sizes passed=true
+E7RESULT name=self_check check=three_readings_on_hand_made_tables passed=true
+E7RESULT name=self_check check=root_plus_disk_on_a_bad_unit_copy passed=true
+E7RESULT name=self_check check=farthest_version_on_the_small_ring passed=true
+E7RESULT name=self_check check=two_monotone_readings_on_one_later_record passed=true
+E7RESULT name=self_check check=residue_does_not_complete_a_publish passed=true
+E7RESULT name=self_check check=parse_rejects_ordinal_zero_whose_checksums_hold passed=true
+E7RESULT name=self_check check=in_flight_limit_control_on_both_rings passed=true
+E7RESULT name=self_check check=fixed_point_control passed=true
+E7RESULT name=self_check check=structure_control passed=true
+E7RESULT name=self_check check=fields_beyond_the_projection_of_the_r2_generator passed=true
+E7RESULT name=self_check check=profile_options passed=true
+E7RESULT name=in_flight_limit ring_slots=64 local=21 implementation=21
+E7RESULT name=in_flight_limit ring_slots=9 local=3 implementation=3
+E7RESULT name=in_flight_limit ring_slots=6 local=2 implementation=2
+E7RESULT name=control criterion=A0 measured=domain=A,max_n=2,counter=panicked value=1 must_see=equals_1 red_as_required=true
+E7RESULT name=control criterion=AS_whole_table measured=domain=A,max_n=3,implementation=S_consecutive_gap_continues,counter=AS_whole_table value=1024 must_see=equals_1024 red_as_required=true
+E7RESULT name=control criterion=AS_whole_table measured=domain=A,max_n=3,counter=whole_table_vs_consecutive_gap_continues value=1024 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=AS_consecutive_gap_continues measured=domain=A,max_n=3,implementation=S_consecutive_gap_stops,counter=AS_consecutive_gap_continues value=2400 must_see=equals_2400 red_as_required=true
+E7RESULT name=control criterion=AS_consecutive_gap_continues measured=domain=A,max_n=3,counter=consecutive_gap_continues_vs_consecutive_gap_stops value=2400 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=AS_consecutive_gap_stops measured=domain=A,max_n=3,implementation=S_whole_table,counter=AS_consecutive_gap_stops value=3424 must_see=equals_3424 red_as_required=true
+E7RESULT name=control criterion=AS_consecutive_gap_stops measured=domain=A,max_n=3,counter=whole_table_vs_consecutive_gap_stops value=3424 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=A_mutual measured=domain=A,max_n=3,implementation=S_never_judges,counter=AS_whole_table value=13088 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=A_structure measured=domain=A,max_n=2,counter=A_structure value=2224 must_see=greater_than_0 red_as_required=true
+E7RESULT name=control criterion=A_limit measured=domain=A,max_n=2,counter=A_limit_must_equal_states value=10804 must_see=equals_10804 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=146 must_see=equals_146 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=9122 must_see=equals_9122 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=1536 must_see=equals_1536 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=490802 must_see=equals_490802 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=490802 must_see=equals_490802 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=221696 must_see=equals_221696 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=221696 must_see=equals_221696 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=32768 must_see=equals_32768 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=32768 must_see=equals_32768 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=32768 must_see=equals_32768 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=32768 must_see=equals_32768 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=523570 must_see=equals_523570 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=A6,n=3,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=254464 must_see=equals_254464 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=290 must_see=equals_290 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=290 must_see=equals_290 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=290 must_see=equals_290 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=1,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_holds value=35906 must_see=equals_35906 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_holds_judged value=35906 must_see=equals_35906 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_holds_i812_fails value=6144 must_see=equals_6144 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_holds_i812_fails_judged value=6144 must_see=equals_6144 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_holds value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_holds_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=J6Qn_premise_fails_i812_fails value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=j6qn_premise_fails_i812_fails_judged value=0 must_see=equals_0 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_hold value=35906 must_see=equals_35906 red_as_required=true
+E7RESULT name=control criterion=J6Qn_i812_split measured=domain=AC,n=2,implementation=first_call_returns_the_chosen_root_second_call_reports_more_than_one_last_record_flag,counter=i812_states_fail value=6144 must_see=equals_6144 red_as_required=true
+E7RESULT name=states domain=A ring_slots=64 n=1 states=146 panicked=0 failed=8 applied_ge1=6 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=48
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=A0 violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=AS_whole_table violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=AS_consecutive_gap_continues violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=AS_consecutive_gap_stops violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=A_structure violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=A_limit violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6_premise_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J7a_instance_table violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J7a_allocation_record_tree_root violations=6 judged=138 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg101:watermark9001038/txg101:watermark9001038/txg101:watermark9001038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J7a_filesystem_identifier violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J7b violations=0 judged=6 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J7c violations=0 judged=132 witness=none
+E7RESULT name=fixed_point domain=A ring_slots=64 n=1 first_call_failed=8 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=A ring_slots=64 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=1 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A ring_slots=64 n=1 i812_holds=146 i812_fails=0 states=146
+E7RESULT name=specification domain=A ring_slots=64 n=1 expects_failure=8
+E7RESULT name=mutual domain=A ring_slots=64 n=1 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=A ring_slots=64 n=1 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=A ring_slots=64 n=1 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=A ring_slots=64 n=2 states=10658 panicked=0 failed=1168 applied_ge1=410 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=2 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=5856
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=A0 violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=AS_whole_table violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=AS_consecutive_gap_continues violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=AS_consecutive_gap_stops violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=A_structure violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=A_limit violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6_premise_holds violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_holds violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J7a_instance_table violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J7a_allocation_record_tree_root violations=410 judged=9490 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg101:watermark9002038/txg101:watermark9002038/txg101:watermark9002038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J7a_filesystem_identifier violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J7b violations=0 judged=410 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J7c violations=0 judged=9080 witness=none
+E7RESULT name=fixed_point domain=A ring_slots=64 n=2 first_call_failed=1168 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=A ring_slots=64 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=8210 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=1280 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=2 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A ring_slots=64 n=2 i812_holds=9122 i812_fails=1536 states=10658
+E7RESULT name=specification domain=A ring_slots=64 n=2 expects_failure=1168
+E7RESULT name=mutual domain=A ring_slots=64 n=2 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=A ring_slots=64 n=2 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=A ring_slots=64 n=2 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=A ring_slots=64 n=3 states=778034 panicked=0 failed=127384 applied_ge1=24642 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=3 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=542736
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=A0 violations=0 judged=778034 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=AS_whole_table violations=2048 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=AS_consecutive_gap_continues violations=1024 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=AS_consecutive_gap_stops violations=3424 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=A_structure violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=A_limit violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6_premise_holds violations=464 judged=650650 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_holds violations=464 judged=650650 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J7a_instance_table violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J7a_allocation_record_tree_root violations=24642 judged=650650 witness=anchor=absent;slots=-,-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9003038:applied1;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J7a_filesystem_identifier violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J7b violations=0 judged=24642 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J7c violations=0 judged=626008 witness=none
+E7RESULT name=fixed_point domain=A ring_slots=64 n=3 first_call_failed=127384 third_call_equals_second=0 third_call_differs_or_is_missing=464
+E7RESULT name=first_returned_root_txg domain=A ring_slots=64 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=450202 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_holds_i812_fails violations=464 judged=200448 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=3 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A ring_slots=64 n=3 i812_holds=523570 i812_fails=254464 states=778034
+E7RESULT name=specification domain=A ring_slots=64 n=3 expects_failure=127384
+E7RESULT name=mutual domain=A ring_slots=64 n=3 readings=whole_table_vs_consecutive_gap_continues differing=1024 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L0:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038
+E7RESULT name=mutual domain=A ring_slots=64 n=3 readings=whole_table_vs_consecutive_gap_stops differing=3424 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=mutual domain=A ring_slots=64 n=3 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=2400 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=states domain=A ring_slots=64 n=4 states=56796482 panicked=0 failed=12307232 applied_ge1=1448298 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=4 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=45266880
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=A0 violations=0 judged=56796482 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=AS_whole_table violations=328192 judged=56796482 witness=anchor=absent;slots=-,t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9004038/txg101:watermark9004038/txg101:watermark9004038
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=AS_consecutive_gap_continues violations=153600 judged=56796482 witness=anchor=absent;slots=-,t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9004038/txg101:watermark9004038/txg101:watermark9004038
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=AS_consecutive_gap_stops violations=484800 judged=56796482 witness=anchor=absent;slots=-,t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9004038/txg101:watermark9004038/txg101:watermark9004038
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=A_structure violations=0 judged=44489250 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=A_limit violations=0 judged=44489250 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6_premise_holds violations=84936 judged=44489250 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg100:watermark1000/txg101:watermark9002038/txg101:watermark9002038;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_holds violations=84936 judged=44489250 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg100:watermark1000/txg101:watermark9002038/txg101:watermark9002038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J7a_instance_table violations=0 judged=44489250 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J7a_allocation_record_tree_root violations=1448298 judged=44489250 witness=anchor=absent;slots=-,-,-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9004038:applied1;expected=txg101:watermark9004038/txg101:watermark9004038/txg101:watermark9004038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J7a_filesystem_identifier violations=0 judged=44489250 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J7b violations=0 judged=1448298 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J7c violations=0 judged=43040952 witness=none
+E7RESULT name=fixed_point domain=A ring_slots=64 n=4 first_call_failed=12307232 third_call_equals_second=0 third_call_differs_or_is_missing=84936
+E7RESULT name=first_returned_root_txg domain=A ring_slots=64 n=4 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=23428130 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_holds_i812_fails violations=84936 judged=21061120 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg100:watermark1000/txg101:watermark9002038/txg101:watermark9002038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A ring_slots=64 n=4 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A ring_slots=64 n=4 i812_holds=28459330 i812_fails=28337152 states=56796482
+E7RESULT name=specification domain=A ring_slots=64 n=4 expects_failure=12307232
+E7RESULT name=mutual domain=A ring_slots=64 n=4 readings=whole_table_vs_consecutive_gap_continues differing=174592 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L0:C0:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg100:watermark1000/txg101:watermark9002038/txg101:watermark9002038
+E7RESULT name=mutual domain=A ring_slots=64 n=4 readings=whole_table_vs_consecutive_gap_stops differing=505792 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9002038
+E7RESULT name=mutual domain=A ring_slots=64 n=4 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=331200 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9002038
+E7RESULT name=verdict domain=A ring_slots=64 smallest_n=1 largest_n=4 states=57585320 a0_violations=0 failed_states=12435792 as_whole_table_violations=330240 as_consecutive_gap_continues_violations=154624 as_consecutive_gap_stops_violations=488224 readings_differing_whole_table_vs_consecutive_gap_continues=175616 readings_differing_whole_table_vs_consecutive_gap_stops=509216 readings_differing_consecutive_gap_continues_vs_consecutive_gap_stops=333600 a_structure_violations=0 a_limit_violations=0 j6_premise_holds_violations=85400 j6_premise_fails_violations=0 j6_premise_fails_judged=0 applied_ge1=1473356 states_holding_a_record_rejected_by_parse=45815520 domain_is_nonempty=true
+E7RESULT name=verdict domain=A ring_slots=64 smallest_n=1 largest_n=4 criteria=r2 j6qn_premise_holds_violations=85400 j6qn_premise_holds_judged=45149528 j6qn_premise_fails_violations=0 j6qn_premise_fails_judged=0 j7_judged=45149528 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=1473356 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=1473356 j7c_violations=0 j7c_judged=43676172 first_returned_root_txg_is_the_largest=0
+E7RESULT name=verdict domain=A ring_slots=64 smallest_n=1 largest_n=4 criteria=r3_i812 j6qn_premise_holds_i812_holds_violations=0 j6qn_premise_holds_i812_holds_judged=23886680 j6qn_premise_holds_i812_fails_violations=85400 j6qn_premise_holds_i812_fails_judged=21262848 j6qn_premise_fails_i812_holds_violations=0 j6qn_premise_fails_i812_holds_judged=0 j6qn_premise_fails_i812_fails_violations=0 j6qn_premise_fails_i812_fails_judged=0 i812_holds=28992168 i812_fails=28593152 split_rows_equal_the_unsplit_rows=true
+E7RESULT name=states domain=A6 ring_slots=6 n=1 states=146 panicked=0 failed=8 applied_ge1=6 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=2 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=48
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A0 violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=AS_whole_table violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=AS_consecutive_gap_continues violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=AS_consecutive_gap_stops violations=0 judged=146 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A_structure violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=A_limit violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6_premise_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J7a_instance_table violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J7a_allocation_record_tree_root violations=6 judged=138 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg101:watermark9001038/txg101:watermark9001038/txg101:watermark9001038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J7a_filesystem_identifier violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J7b violations=0 judged=6 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J7c violations=0 judged=132 witness=none
+E7RESULT name=fixed_point domain=A6 ring_slots=6 n=1 first_call_failed=8 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=A6 ring_slots=6 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=138 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=1 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A6 ring_slots=6 n=1 i812_holds=146 i812_fails=0 states=146
+E7RESULT name=specification domain=A6 ring_slots=6 n=1 expects_failure=8
+E7RESULT name=mutual domain=A6 ring_slots=6 n=1 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=A6 ring_slots=6 n=1 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=A6 ring_slots=6 n=1 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=A6 ring_slots=6 n=2 states=10658 panicked=0 failed=1168 applied_ge1=410 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=2 above_water_max=2 above_water_over_limit=0 above_water_at_limit=2048 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=5856
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=A0 violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=AS_whole_table violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=AS_consecutive_gap_continues violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=AS_consecutive_gap_stops violations=0 judged=10658 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=A_structure violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=A_limit violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6_premise_holds violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_holds violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J7a_instance_table violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J7a_allocation_record_tree_root violations=410 judged=9490 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg101:watermark9002038/txg101:watermark9002038/txg101:watermark9002038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J7a_filesystem_identifier violations=0 judged=9490 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J7b violations=0 judged=410 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J7c violations=0 judged=9080 witness=none
+E7RESULT name=fixed_point domain=A6 ring_slots=6 n=2 first_call_failed=1168 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=A6 ring_slots=6 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=8210 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=1280 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=2 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=A6 ring_slots=6 n=2 i812_holds=9122 i812_fails=1536 states=10658
+E7RESULT name=specification domain=A6 ring_slots=6 n=2 expects_failure=1168
+E7RESULT name=mutual domain=A6 ring_slots=6 n=2 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=A6 ring_slots=6 n=2 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=A6 ring_slots=6 n=2 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=A6 ring_slots=6 n=3 states=778034 panicked=0 failed=127384 applied_ge1=24642 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=2 above_water_max=3 above_water_over_limit=65536 above_water_at_limit=251904 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=542736
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=A0 violations=0 judged=778034 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=AS_whole_table violations=2048 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=AS_consecutive_gap_continues violations=1024 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=AS_consecutive_gap_stops violations=3424 judged=778034 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=A_structure violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=A_limit violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6_premise_holds violations=0 judged=585114 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6_premise_fails violations=496 judged=65536 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+1:o2:L1:C1:x1:chain_true,t+2:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002046:applied2;expected=txg101:watermark9002046/txg101:watermark9002046/txg101:watermark9002046;second=returned:txg102:watermark9003062:applied1
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_holds violations=0 judged=585114 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_fails violations=496 judged=65536 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+1:o2:L1:C1:x1:chain_true,t+2:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002046:applied2;expected=txg101:watermark9002046/txg101:watermark9002046/txg101:watermark9002046;first_root_txg=101;second=returned:txg102:watermark9003062:applied1
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J7a_instance_table violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J7a_allocation_record_tree_root violations=24642 judged=650650 witness=anchor=absent;slots=-,-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9003038:applied1;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J7a_filesystem_identifier violations=0 judged=650650 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J7b violations=0 judged=24642 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J7c violations=0 judged=626008 witness=none
+E7RESULT name=fixed_point domain=A6 ring_slots=6 n=3 first_call_failed=127384 third_call_equals_second=48 third_call_differs_or_is_missing=448
+E7RESULT name=first_returned_root_txg domain=A6 ring_slots=6 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=417434 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=167680 witness=none
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_fails_i812_holds violations=48 judged=32768 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+1:o2:L1:C1:x1:chain_true,t+2:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002046:applied2;expected=txg101:watermark9002046/txg101:watermark9002046/txg101:watermark9002046;first_root_txg=101;second=returned:txg102:watermark9003062:applied1
+E7RESULT name=violations domain=A6 ring_slots=6 n=3 criterion=J6Qn_premise_fails_i812_fails violations=448 judged=32768 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=i812_states domain=A6 ring_slots=6 n=3 i812_holds=523570 i812_fails=254464 states=778034
+E7RESULT name=specification domain=A6 ring_slots=6 n=3 expects_failure=127384
+E7RESULT name=mutual domain=A6 ring_slots=6 n=3 readings=whole_table_vs_consecutive_gap_continues differing=1024 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L0:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038
+E7RESULT name=mutual domain=A6 ring_slots=6 n=3 readings=whole_table_vs_consecutive_gap_stops differing=3424 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=mutual domain=A6 ring_slots=6 n=3 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=2400 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=verdict domain=A6 ring_slots=6 smallest_n=1 largest_n=3 states=788838 a0_violations=0 failed_states=128560 as_whole_table_violations=2048 as_consecutive_gap_continues_violations=1024 as_consecutive_gap_stops_violations=3424 readings_differing_whole_table_vs_consecutive_gap_continues=1024 readings_differing_whole_table_vs_consecutive_gap_stops=3424 readings_differing_consecutive_gap_continues_vs_consecutive_gap_stops=2400 a_structure_violations=0 a_limit_violations=0 j6_premise_holds_violations=0 j6_premise_fails_violations=496 j6_premise_fails_judged=65536 applied_ge1=25058 states_holding_a_record_rejected_by_parse=548640 domain_is_nonempty=true
+E7RESULT name=verdict domain=A6 ring_slots=6 smallest_n=1 largest_n=3 criteria=r2 j6qn_premise_holds_violations=0 j6qn_premise_holds_judged=594742 j6qn_premise_fails_violations=496 j6qn_premise_fails_judged=65536 j7_judged=660278 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=25058 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=25058 j7c_violations=0 j7c_judged=635220 first_returned_root_txg_is_the_largest=0
+E7RESULT name=verdict domain=A6 ring_slots=6 smallest_n=1 largest_n=3 criteria=r3_i812 j6qn_premise_holds_i812_holds_violations=0 j6qn_premise_holds_i812_holds_judged=425782 j6qn_premise_holds_i812_fails_violations=0 j6qn_premise_holds_i812_fails_judged=168960 j6qn_premise_fails_i812_holds_violations=48 j6qn_premise_fails_i812_holds_judged=32768 j6qn_premise_fails_i812_fails_violations=448 j6qn_premise_fails_i812_fails_judged=32768 i812_holds=532838 i812_fails=256000 split_rows_equal_the_unsplit_rows=true
+E7RESULT name=states domain=AC ring_slots=64 n=1 states=290 panicked=0 failed=16 applied_ge1=8 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=1 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=96
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=A0 violations=0 judged=290 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=AS_whole_table violations=0 judged=290 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=AS_consecutive_gap_continues violations=0 judged=290 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=AS_consecutive_gap_stops violations=0 judged=290 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=A_structure violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=A_limit violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6_premise_holds violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_holds violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J7a_instance_table violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J7a_allocation_record_tree_root violations=8 judged=274 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg101:watermark9001038/txg101:watermark9001038/txg101:watermark9001038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J7a_filesystem_identifier violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J7b violations=0 judged=8 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J7c violations=0 judged=266 witness=none
+E7RESULT name=fixed_point domain=AC ring_slots=64 n=1 first_call_failed=16 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=AC ring_slots=64 n=1 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=274 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=1 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=AC ring_slots=64 n=1 i812_holds=290 i812_fails=0 states=290
+E7RESULT name=specification domain=AC ring_slots=64 n=1 expects_failure=16
+E7RESULT name=mutual domain=AC ring_slots=64 n=1 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=AC ring_slots=64 n=1 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=AC ring_slots=64 n=1 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=AC ring_slots=64 n=2 states=42050 panicked=0 failed=4640 applied_ge1=1092 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=2 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=23232
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=A0 violations=0 judged=42050 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=AS_whole_table violations=0 judged=42050 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=AS_consecutive_gap_continues violations=0 judged=42050 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=AS_consecutive_gap_stops violations=0 judged=42050 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=A_structure violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=A_limit violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6_premise_holds violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_holds violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J7a_instance_table violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J7a_allocation_record_tree_root violations=1092 judged=37410 witness=anchor=absent;slots=-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9002038:applied1;expected=txg101:watermark9002038/txg101:watermark9002038/txg101:watermark9002038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J7a_filesystem_identifier violations=0 judged=37410 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J7b violations=0 judged=1092 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J7c violations=0 judged=36318 witness=none
+E7RESULT name=fixed_point domain=AC ring_slots=64 n=2 first_call_failed=4640 third_call_equals_second=0 third_call_differs_or_is_missing=0
+E7RESULT name=first_returned_root_txg domain=AC ring_slots=64 n=2 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=32290 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_holds_i812_fails violations=0 judged=5120 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=2 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=AC ring_slots=64 n=2 i812_holds=35906 i812_fails=6144 states=42050
+E7RESULT name=specification domain=AC ring_slots=64 n=2 expects_failure=4640
+E7RESULT name=mutual domain=AC ring_slots=64 n=2 readings=whole_table_vs_consecutive_gap_continues differing=0 witness=none
+E7RESULT name=mutual domain=AC ring_slots=64 n=2 readings=whole_table_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=mutual domain=AC ring_slots=64 n=2 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=0 witness=none
+E7RESULT name=states domain=AC ring_slots=64 n=3 states=6097250 panicked=0 failed=1005104 applied_ge1=131924 applied_ge2=0 farthest_ge1=0 farthest_ge2=0 in_flight_limit=21 above_water_max=3 above_water_over_limit=0 above_water_at_limit=0 chosen_root_is_a_later_version=0 off_timeline_landings=0 states_holding_a_record_rejected_by_parse=4271904
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=A0 violations=0 judged=6097250 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=AS_whole_table violations=10240 judged=6097250 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=AS_consecutive_gap_continues violations=4096 judged=6097250 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=AS_consecutive_gap_stops violations=16640 judged=6097250 witness=anchor=absent;slots=t+1:o1:L0:C0:x1:chain_true,t+0:o1:L1:C0:x1:chain_true,t+1:o1:L1:C1:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=A_structure violations=0 judged=5092146 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=A_limit violations=0 judged=5092146 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6_premise_holds violations=2904 judged=5092146 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_holds violations=2904 judged=5092146 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_fails violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J7a_instance_table violations=0 judged=5092146 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J7a_allocation_record_tree_root violations=131924 judged=5092146 witness=anchor=absent;slots=-,-,t+1:o1:L1:C1:x1:chain_true;first=returned:txg101:watermark9003038:applied1;expected=txg101:watermark9003038/txg101:watermark9003038/txg101:watermark9003038;chosen_root=marker_written:instance_table_slot69000:allocation_record_tree_root_slot68000:fsid_last_byte0;returned_root=marker_not_written:instance_table_slot69000:allocation_record_tree_root_slot0:fsid_last_byte0;projection_equals_the_chosen_one=false
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J7a_filesystem_identifier violations=0 judged=5092146 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J7b violations=0 judged=131924 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J7c violations=0 judged=4960222 witness=none
+E7RESULT name=fixed_point domain=AC ring_slots=64 n=3 first_call_failed=1005104 third_call_equals_second=0 third_call_differs_or_is_missing=2904
+E7RESULT name=first_returned_root_txg domain=AC ring_slots=64 n=3 first_returned_root_txg_is_the_largest=0
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_holds_i812_holds violations=0 judged=3503922 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_holds_i812_fails violations=2904 judged=1588224 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L1:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038;first_root_txg=101;second=failed:more_than_one_last_record_flag
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_fails_i812_holds violations=0 judged=0 witness=none
+E7RESULT name=violations domain=AC ring_slots=64 n=3 criterion=J6Qn_premise_fails_i812_fails violations=0 judged=0 witness=none
+E7RESULT name=i812_states domain=AC ring_slots=64 n=3 i812_holds=4079970 i812_fails=2017280 states=6097250
+E7RESULT name=specification domain=AC ring_slots=64 n=3 expects_failure=1005104
+E7RESULT name=mutual domain=AC ring_slots=64 n=3 readings=whole_table_vs_consecutive_gap_continues differing=6144 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,t+2:o1:L0:C0:x1:chain_true,t+1:o1:L0:C0:x1:chain_true;first=returned:txg101:watermark9001038:applied1;expected=txg100:watermark1000/txg101:watermark9001038/txg101:watermark9001038
+E7RESULT name=mutual domain=AC ring_slots=64 n=3 readings=whole_table_vs_consecutive_gap_stops differing=18688 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=mutual domain=AC ring_slots=64 n=3 readings=consecutive_gap_continues_vs_consecutive_gap_stops differing=12544 witness=anchor=absent;slots=t+1:o1:L1:C1:x1:chain_true,-,t+1:o1:L0:C0:x1:chain_true;first=returned:txg100:watermark1000:applied0;expected=txg100:watermark1000/txg100:watermark1000/txg101:watermark9001038
+E7RESULT name=verdict domain=AC ring_slots=64 smallest_n=1 largest_n=3 states=6139590 a0_violations=0 failed_states=1009760 as_whole_table_violations=10240 as_consecutive_gap_continues_violations=4096 as_consecutive_gap_stops_violations=16640 readings_differing_whole_table_vs_consecutive_gap_continues=6144 readings_differing_whole_table_vs_consecutive_gap_stops=18688 readings_differing_consecutive_gap_continues_vs_consecutive_gap_stops=12544 a_structure_violations=0 a_limit_violations=0 j6_premise_holds_violations=2904 j6_premise_fails_violations=0 j6_premise_fails_judged=0 applied_ge1=133024 states_holding_a_record_rejected_by_parse=4295232 domain_is_nonempty=true
+E7RESULT name=verdict domain=AC ring_slots=64 smallest_n=1 largest_n=3 criteria=r2 j6qn_premise_holds_violations=2904 j6qn_premise_holds_judged=5129830 j6qn_premise_fails_violations=0 j6qn_premise_fails_judged=0 j7_judged=5129830 j7a_instance_table_violations=0 j7a_allocation_record_tree_root_violations=133024 j7a_filesystem_identifier_violations=0 j7b_violations=0 j7b_judged=133024 j7c_violations=0 j7c_judged=4996806 first_returned_root_txg_is_the_largest=0
+E7RESULT name=verdict domain=AC ring_slots=64 smallest_n=1 largest_n=3 criteria=r3_i812 j6qn_premise_holds_i812_holds_violations=0 j6qn_premise_holds_i812_holds_judged=3536486 j6qn_premise_holds_i812_fails_violations=2904 j6qn_premise_holds_i812_fails_judged=1593344 j6qn_premise_fails_i812_holds_violations=0 j6qn_premise_fails_i812_holds_judged=0 j6qn_premise_fails_i812_fails_violations=0 j6qn_premise_fails_i812_fails_judged=0 i812_holds=4116166 i812_fails=2023424 split_rows_equal_the_unsplit_rows=true
+E7RESULT name=verdict scope=run bounds=segment1 family=adversarial states=64513748 self_checks_passed=15 control_readings=80 controls_not_red=0 void_conditions=0 halt_conditions=0 profile=r3 marker_parity=even
+E7RESULT name=done emitted=380

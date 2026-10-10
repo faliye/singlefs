@@ -1,0 +1,49 @@
+name=implementation_source file=crates/singlefs-format/src/lib.rs snapshot_sha256=bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f working_tree_sha256=bf4f9982490a7d30a4577547779c5061d76b211096cc42a8db71d45936b4835f same=true
+name=implementation_source file=crates/singlefs-core/src/journal.rs snapshot_sha256=56a4cd459c3fffaacf2c6ce0f7ac39d29c5bb93cd0149054dd071b92604030e8 working_tree_sha256=56a4cd459c3fffaacf2c6ce0f7ac39d29c5bb93cd0149054dd071b92604030e8 same=true
+name=implementation_constant constant=JOURNAL_HEADER_TEN_FIELD_BYTES value=78 line=216 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=JOURNAL_NEW_ROOT_SEGMENT_BYTES value=364 line=220 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=JOURNAL_HEADER_BYTES value=487 line=223 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=JOURNAL_NAMED_ENTRY_BYTES value=56 line=226 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=JOURNAL_NAMED_ENTRIES_PER_RECORD value=64 line=229 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=JOURNAL_RECORD_BYTES value=4096 line=213 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=WIDE_CHECKSUM_BYTES value=32 line=26 file=crates/singlefs-format/src/lib.rs
+name=implementation_constant constant=NODE_POINTER_BYTES value=86 line=89 file=crates/singlefs-format/src/lib.rs
+name=q5d_field field=magic implementation=0+4 implementation_line=215 executor=0+4 same=true
+name=q5d_field field=record_type implementation=4+2 implementation_line=216 executor=4+2 same=true
+name=q5d_field field=algorithm_type implementation=6+1 implementation_line=217 executor=6+1 same=true
+name=q5d_field field=record_flags implementation=7+1 implementation_line=222 executor=7+1 same=true
+name=q5d_field field=record_length implementation=8+4 implementation_line=223 executor=8+4 same=true
+name=q5d_field field=named_item_count implementation=12+4 implementation_line=224 executor=12+4 same=true
+name=q5d_field field=jsn_instance implementation=16+4 implementation_line=225 executor=16+4 same=true
+name=q5d_field field=jsn_counter implementation=20+6 implementation_line=226 executor=20+6 same=true
+name=q5d_field field=checkpoint_txg implementation=26+8 implementation_line=227 executor=26+8 same=true
+name=q5d_field field=nonce implementation=34+12 implementation_line=228 executor=34+12 same=true
+name=q5d_field field=header_checksum implementation=46+32 implementation_line=233 executor=46+32 same=true
+name=q5d_field field=transaction_number implementation=78+8 implementation_line=234 executor=78+8 same=true
+name=q5d_field field=commit_marker implementation=86+1 implementation_line=235 executor=86+1 same=true
+name=q5d_field field=ordinal_within_publish implementation=87+4 implementation_line=240 executor=87+4 same=true
+name=q5d_field field=back_chain implementation=91+4 implementation_line=241 executor=91+4 same=true
+name=q5d_field field=payload_checksum implementation=95+4 implementation_line=243 executor=95+4 same=true
+name=q5d_field field=new_root_tree_table_pointer implementation=99+86 implementation_line=245 executor=99+86 same=true
+name=q5d_field field=new_root_central_mapping_root_pointer implementation=185+86 implementation_line=246 executor=185+86 same=true
+name=q5d_field field=new_root_tree_identifier_watermark implementation=271+8 implementation_line=247 executor=271+8 same=true
+name=q5d_field field=new_root_rollback_floor implementation=279+8 implementation_line=248 executor=279+8 same=true
+name=q5d_field field=new_root_instance_table_pointer implementation=287+86 implementation_line=249 executor=287+86 same=true
+name=q5d_field field=new_root_allocation_records_root_pointer implementation=373+86 implementation_line=250 executor=373+86 same=true
+name=q5d_field field=new_root_unmount_marker implementation=459+4 implementation_line=252 executor=459+4 same=true
+name=q5d_field field=file_system_identity_low_eight_bytes implementation=463+8 implementation_line=257 executor=463+8 same=true
+name=q5d_field field=message_authentication_code implementation=471+16 implementation_line=258 executor=471+16 same=true
+name=q5d_fields_only_in_the_executor fields=-
+name=q5d_constant item=journal_header_bytes executor=487 implementation=487 same=true
+name=q5d_constant item=journal_header_bytes_by_write_order executor=487 implementation=487 same=true
+name=q5d_constant item=new_root_segment_bytes executor=364 implementation=364 same=true
+name=q5d_constant item=new_root_segment_bytes_by_write_order executor=364 implementation=364 same=true
+name=q5d_constant item=ten_field_bytes executor=78 implementation=78 same=true
+name=q5d_constant item=ten_field_bytes_by_write_order executor=78 implementation=78 same=true
+name=q5d_constant item=named_items_per_record executor=64 implementation=64 same=true
+name=q5d_constant item=named_item_bytes executor=56 implementation=56 same=true
+name=q5d_constant item=new_root_pointer_bytes executor=86 implementation=86 same=true
+name=q5d_constant item=header_checksum_bytes executor=32 implementation=32 same=true
+name=q5d_verdict differing=0 compared=36 stop_s4=false
+name=q4_fmt_487 executor_v2_487=487 decision_23_item_4=487 decision_line=150 implementation=487 implementation_line=223 all_three_equal=true layout_line_357=311
+name=done emitted=49

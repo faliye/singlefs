@@ -1,0 +1,103 @@
+E7RESULT name=config segment=s1 mode=baseline streams=1 sector_bytes=512 first_batch_divisor=7 second_batch_divisor=14 third_batch_divisor=23 torn_states_per_segment=4 torn_scan_ordinals_per_segment=100000 third_batch_sampled=true positive_control=none disabled_oracle=none writable_mount_probe=true
+E7RESULT name=s1 stream=independent check=device_bytes local=4294967296 crates=4294967296 holds=true
+E7RESULT name=s1 stream=independent check=physical_block_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=independent check=minimum_input_output_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=independent check=sector_bytes local=512 crates=512 holds=true
+E7RESULT name=s1 stream=independent check=filesystem_identifier local=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] crates=[95,83,70,83,45,69,49,52,50,45,48,48,48,49,45,0] holds=true
+E7RESULT name=s1 stream=independent check=fixed_write_time_seconds local=1788000000 crates=1788000000 holds=true
+E7RESULT name=s1 stream=independent check=first_file_bytes local=3000 crates=3000 holds=true
+E7RESULT name=s1 stream=independent check=first_file_content local=true crates=true holds=true
+E7RESULT name=s1 stream=independent check=inode_leaf_records local=233 crates=233 holds=true
+E7RESULT name=s1 stream=independent check=system_configuration_slots_per_device local=2 crates=2 holds=true
+E7RESULT name=s1 stream=independent check=system_configuration_slot_bytes local=4096 crates=4096 holds=true
+E7RESULT name=s1 stream=independent check=equivalence_pairing_in_flight_writes local=6 crates=6 holds=true
+E7RESULT name=s1 stream=independent check=equivalence_pairing_states local=4608 crates=4608 holds=true
+E7RESULT name=s1 stream=independent check=equivalence_pairing_mirrored_pairs local=3 crates=3 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_key_choices local=72 crates=72 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_in_flight_writes local=24 crates=24 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_classes local=144 crates=144 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_states_of_a_class_with_in_flight_writes_landed local=16777215 crates=16777215 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_judged_states local=144 crates=144 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_class_states_sum_to_the_states local=1207959552 crates=1207959552 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_removed_barriers local=[50,51,55,56] crates=[50,51,55,56] holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_root_write_made_plain local=[52] crates=[52] holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_truncation local=81 crates=81 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_reverse_truncation local=57 crates=57 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_last_segment_writes local=29 crates=29 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_last_segment_tearable_writes local=2 crates=2 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_states local=1207959552 crates=1207959552 holds=true
+E7RESULT name=s1 stream=independent check=confirmed_loss_states_equal_the_last_segment_and_the_fully_persisted_state local=1207959552 crates=1207959552 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_allocator_carries_the_root_ring_of_make_filesystem local=Some("9cef74c37640de79e5e0d1a0aca71c4b478f444d7114942cbba322883c618906") crates=Some("9cef74c37640de79e5e0d1a0aca71c4b478f444d7114942cbba322883c618906") holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=first_acquired_instance_is_one local=InstanceGeneration(1) crates=InstanceGeneration(1) holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_write_order_is_the_non_barrier_operation_order local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_segment_lengths local=[2,2,1,2,2,1,2,24,2,1,2] crates=[2,2,1,2,2,1,2,24,2,1,2] holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_writes local=41 crates=41 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_root_writes local=3 crates=3 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_count local=2 crates=2 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_device_bytes local=4294967296 crates=4294967296 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_operations_equal_build_pool local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_mkfs_operations_equal_build_pool local=25 crates=25 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_warm_up_return_point_equal_build_pool local=47 crates=47 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_full_states local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_quick_tier_states local=46 crates=46 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_two_state_closed_form local=16777240 crates=16777240 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_enumeration_tables_state_count local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_flow_facts_state_count local=16777260 crates=16777260 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_o1_model_never_stops local=None crates=None holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_every_call_is_judged_or_is_the_acquire_or_the_warm_up local=true crates=true holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_reference_filesystem_segments_equal_the_device_segments local=11 crates=11 holds=true
+E7RESULT name=s1 stream=new_pool_file_creation check=new_pool_file_creation_reference_filesystem_translation_does_not_stop_on_a_missing_root_or_a_refused_operation local=false crates=false holds=true
+E7RESULT name=stream stream=new_pool_file_creation ending=completed exported=true not_exported_why=- operations=57 writes=41 segments=11 tearable_writes=8 calls=3 full_states=16777260 quick_tier_states=46 sampled_states=82 model_stopped_at_call=none reference_filesystem_segments=11 reference_filesystem_stopped=- comparison_judged_calls_before_the_first_panic=1
+E7RESULT name=call stream=new_pool_file_creation call=0 label=acquire first_operation=0 return_point=4 status=ok o1_comparison=not_modelled return_value_sha256=280d034e69c4e0223b954141b1641779faeb4c597e43a3f6e050946b5e1b1e2c memory_objects_sha256=bd484fee8aa6c6781b2de268dbf185ffcabbe9c69758c0cc23937d8a1e500c75
+E7RESULT name=call stream=new_pool_file_creation call=1 label=warm_up first_operation=4 return_point=22 status=ok o1_comparison=not_modelled return_value_sha256=3d5fec96b1b3d8dacb666164e61769c52452476c813cc2ad491d55db30d3e23c memory_objects_sha256=253ffa6a5fff5c009be1cd949e055442cd9fb0d9a5a9c5c679ff03dacc6d4a2d
+E7RESULT name=call stream=new_pool_file_creation call=2 label=publish first_operation=22 return_point=57 status=ok o1_comparison=agrees return_value_sha256=d9a3f3cf2af27219aba3f9d857de8abc884b2e124dbb8f5ddcfb8747bfa1e5bd memory_objects_sha256=a82f217c6cd9d14e76b15c8596ec9382c53a3d150afbd7841531cd8206856149
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=0 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=3 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=6 scanned=8 found=0 wanted=4
+E7RESULT name=torn_scan stream=new_pool_file_creation segment=10 scanned=8 found=0 wanted=4
+E7RESULT name=batch stream=new_pool_file_creation batch=1 states=53 segments_touched=12 states_with_a_torn_write=20 o1_crash_judge_red=0 o1_crash_judge_green=53 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o1_reference_filesystem_red=0 o1_reference_filesystem_green=53 o1_reference_filesystem_abstained=0 o1_reference_filesystem_off=0 recovery_panic_states=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0 piece_panic_states=-
+E7RESULT name=probe_batch stream=new_pool_file_creation batch=1 probed_states=53 mounted=53 refused=0 refused_for_the_witness=0 undecidable_branch=20 undecidable_branch_judged_legal=0 counter_branch=0 counter_branch_judged_legal=0 counter_branch_judged_illegal=0 witness_refusals_without_either_branch=0 counter_branch_mounted=0
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=1 segment=0 landing_sha256=1c76479af2b5d3fc0c76b1bd3761647706260c57315d11d37a29bcbe97595d37 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=0,0 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=3 segment=0 landing_sha256=58a958232cfab72941322637faa9e7ccdad53adb3fa16a7ef3c3c61e4991bb21 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=0,0 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=4 segment=0 landing_sha256=2f99bd681834aa02245732b80e959739b01b6d94e36ed2c9515aefa3949fba39 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=0,0 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=5 segment=0 landing_sha256=53cfeda0345b65e705203473be109b19fd9ec8369008bd4b6ddd3f5c8476e773 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=0,0 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=7 segment=0 landing_sha256=8632867dac25624d4e837a961cd1abe38e84df6a7276da05775f11baa0e8673e undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=0,0 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=13 segment=3 landing_sha256=bf11d5f0b132f8ef8b56dea088c8d8d0144ec5ffb7d89c4aad12c4b9785dbcc4 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=1,1 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=15 segment=3 landing_sha256=0efb1e75ae0f00bedaef5fe7749c138ef3287425d7ecbd23a7ac30afe9b15b09 undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=1,1 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16 segment=3 landing_sha256=b32137c79743ddd881c94050b846dd018db3ab794b6808f8f0d7e4718e09adaa undecidable_branch=true counter_branch=false witnessed_counter=0 selected_version=1,1 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=17 segment=3 landing_sha256=c3dae2d9923a736c2122f2bc243e65ca71ff223a6b7d2bd934fb7cefdbeab83f undecidable_branch=true counter_branch=false witnessed_counter=1 selected_version=1,1 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=19 segment=3 landing_sha256=b4c7cbc8caaf996abe30977d6e69b523c51267df6e3c99875daf239288d7bce4 undecidable_branch=true counter_branch=false witnessed_counter=1 selected_version=1,1 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=25 segment=6 landing_sha256=a2ed19d480183379b16df56ba628327c5b5265d3c1d28703cc4b3a06c89466da undecidable_branch=true counter_branch=false witnessed_counter=1 selected_version=1,2 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=27 segment=6 landing_sha256=f599d8c6396f36aa4a8a452567ba91179e01ebdeb3789576e2d0630e3a95a470 undecidable_branch=true counter_branch=false witnessed_counter=1 selected_version=1,2 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=28 segment=6 landing_sha256=85d4bfcf46cd494b00ab8ed2e5d905a63fc0704399fb5aba23bbce43e9e7a24b undecidable_branch=true counter_branch=false witnessed_counter=1 selected_version=1,2 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=29 segment=6 landing_sha256=cabc253323c061ce35f562a73b0eb0f8651ac28d13c3552c22d2ee03090ea177 undecidable_branch=true counter_branch=false witnessed_counter=2 selected_version=1,2 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=31 segment=6 landing_sha256=78a6c7a2495865517c60b64bfb2d613ea229ec79ec108661fcdbfba93533b0a6 undecidable_branch=true counter_branch=false witnessed_counter=2 selected_version=1,2 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16777252 segment=10 landing_sha256=9a7e992de82bb415ee06187db2982b9b21382964890986c853ea0cd7082745c9 undecidable_branch=true counter_branch=false witnessed_counter=2 selected_version=1,3 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16777254 segment=10 landing_sha256=1199b77e51d685b7e1dea60f62eff3c99cd892a8881ef34292f451d8b513b07e undecidable_branch=true counter_branch=false witnessed_counter=2 selected_version=1,3 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16777255 segment=10 landing_sha256=c2d0224416d5d80a33ca60bb5cbabf0037cb6a2a3627e69540fabd88a5556b90 undecidable_branch=true counter_branch=false witnessed_counter=2 selected_version=1,3 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16777256 segment=10 landing_sha256=df84d8bebf7d583b8d6776b996186a99a9ec4d97595154a0aff5f35b62464d05 undecidable_branch=true counter_branch=false witnessed_counter=3 selected_version=1,3 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=probe_state stream=new_pool_file_creation batch=1 ordinal=16777258 segment=10 landing_sha256=c0ff66579472e7e30efab8c680ac97fbfce32ad8bdec60a8c6a9d989f1786a3d undecidable_branch=true counter_branch=false witnessed_counter=3 selected_version=1,3 mount=mounted refusal=- on_the_d23_list=- second_crop=-
+E7RESULT name=batch stream=new_pool_file_creation batch=2 states=7 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=7 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o1_reference_filesystem_red=0 o1_reference_filesystem_green=7 o1_reference_filesystem_abstained=0 o1_reference_filesystem_off=0 recovery_panic_states=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0 piece_panic_states=-
+E7RESULT name=probe_batch stream=new_pool_file_creation batch=2 probed_states=7 mounted=7 refused=0 refused_for_the_witness=0 undecidable_branch=0 undecidable_branch_judged_legal=0 counter_branch=0 counter_branch_judged_legal=0 counter_branch_judged_illegal=0 witness_refusals_without_either_branch=0 counter_branch_mounted=0
+E7RESULT name=batch stream=new_pool_file_creation batch=3 states=22 segments_touched=1 states_with_a_torn_write=0 o1_crash_judge_red=0 o1_crash_judge_green=22 o1_crash_judge_not_applicable=0 o1_crash_judge_off=0 o1_reference_filesystem_red=0 o1_reference_filesystem_green=22 o1_reference_filesystem_abstained=0 o1_reference_filesystem_off=0 recovery_panic_states=0 o2_red=0 o2_matches_judgement_false=0 judge_crash_image_pool_checker_red=0 record_checker_red_states=0 consulted_oracle_red_states=0 ignored_oracle_red_states=0 consulted_effective_root_none=0 consulted_failed_outcomes=0 piece_panic_states=-
+E7RESULT name=probe_batch stream=new_pool_file_creation batch=3 probed_states=22 mounted=22 refused=0 refused_for_the_witness=0 undecidable_branch=0 undecidable_branch_judged_legal=0 counter_branch=0 counter_branch_judged_legal=0 counter_branch_judged_illegal=0 witness_refusals_without_either_branch=0 counter_branch_mounted=0
+E7RESULT name=s4 stream=new_pool_file_creation rebuilt_states=82 digest_mismatches=0
+E7RESULT name=crash_facts_mask stream=new_pool_file_creation states=82 mismatches=0
+E7RESULT name=s3 stream=new_pool_file_creation states=82 o2_direct_differs_from_judge_crash_image=0
+E7RESULT name=file stream=new_pool_file_creation file=base-sectors.bin bytes=5764 sha256=0358e613eb190dd9a9212a6282fa7671976349e42f7fd448999239a69216ce35
+E7RESULT name=file stream=new_pool_file_creation file=ops.tsv bytes=4293 sha256=ac4c69ba9f40325555760bb645c724e63e7c82decea73a6f643a59e7ef9b1936
+E7RESULT name=file stream=new_pool_file_creation file=ops-payload.bin bytes=517632 sha256=b6ea71ba7ec15dca8cfd0bd2cca33aff74502aaeaceee9c5b24e7b3a71a9e565
+E7RESULT name=file stream=new_pool_file_creation file=calls.tsv bytes=54 sha256=c0ca8a14aaeb45d80f8db2a7d3a06a4197f50141685493ea6a44087fd7d10bab
+E7RESULT name=file stream=new_pool_file_creation file=torn.tsv bytes=622 sha256=08fec2c3c6de44a767ce5b7806942d5d275548292600a9252c344ad5d3506311
+E7RESULT name=file stream=new_pool_file_creation file=torn-payload.bin bytes=32768 sha256=f76cdeaefc1b9f43cba7b070533f0772a838ca0e8c96773c400413a402f22754
+E7RESULT name=file stream=new_pool_file_creation file=states.tsv bytes=9855 sha256=9454c63745934e435ffccd99da7e1b390b87d38756999dfe4b4a118237539578
+E7RESULT name=file stream=new_pool_file_creation file=impl-verdicts.tsv sha256_without_timing=4f21e41bfbafd409dc6d59718c52fab62716726de185f765322a25daf57d0f6a
+E7RESULT name=file stream=new_pool_file_creation file=quick-tier.tsv bytes=42 sha256=4602e4f1e9944d9b0db07c391650c3958a25fc96727328b5d809484d6bdac65c
+E7RESULT name=file stream=new_pool_file_creation file=manifest.tsv sha256_without_timing=a1d75c6274961efe8a98c21bc6f8677e0e416ccdee11c5dc5d4ebc328abe1f52
+E7RESULT name=file stream=new_pool_file_creation file=oracle-verdicts.tsv bytes=9212 sha256=93752530b0c32c3386e92fdd8c5dcdb9cf207bfca290be4b17ee1b2734071cd5
+E7RESULT name=file stream=new_pool_file_creation file=writable-mount-probe.tsv bytes=5398 sha256=b3bda7543d264daa4d679b314764e010710bccd3f0bff8d1d27f155e914a8de1
+E7RESULT name=file stream=new_pool_file_creation file=call-outcomes.tsv bytes=495 sha256=881cb7b741e5ddd18f0411ebd388283f7e18e6d90e2517a90a22862e51a8c582
+E7RESULT name=file stream=new_pool_file_creation file=call-return-values.tsv bytes=4305 sha256=53fbb86f0697bdb50aa274e5cd275cabcc74b561729cc7c4fc366936491012ca
+E7RESULT name=file stream=new_pool_file_creation file=stream-status.tsv bytes=83 sha256=8a98b77c581adf82cb049aa1adee597f83e1e094ef4229ecf69776c8c84275aa
+E7RESULT name=verdict s1_failed_checks=0 s4_digest_mismatches=0 crash_facts_mask_mismatches=0 s3_o2_judgement_mismatches=0 s9_failed_checks=0 streams_not_exported=0 o1_comparison_red_calls=0 o1_crash_judge_red_states=0 o1_reference_filesystem_red_states=0 o2_red_states=0 recovery_panic_states=0 probed_states=82 counter_branch_states=0 counter_branch_states_judged_legal=0 undecidable_branch_states=20 witness_refusals_without_either_branch=0 counter_branch_states_that_mounted=0 piece_panic_states=- unattributed_panic_states=0
+E7RESULT name=done emitted=103

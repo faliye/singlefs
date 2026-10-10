@@ -1,0 +1,133 @@
+步 ③(1) 钉值
+const E142_BACK_CHAIN_OF_NEW_POOL_FILE_CREATION: u32 = 2_660_362_816;
+Q142.125 q123_guard.py <第 23 次主产物> <第 24 次主产物>
+Q123 lines old=1124 new=1124 e2_e3_removed=true
+Q123_COUNT side=old name=device_region_bytes rows=29 expected=29
+Q123_COUNT side=new name=device_region_bytes rows=29 expected=29
+Q123_COUNT side=old name=p8g_device_region_bytes rows=29 expected=29
+Q123_COUNT side=new name=p8g_device_region_bytes rows=29 expected=29
+Q123_COUNT side=old name=p8g_write_list_row rows=29 expected=29
+Q123_COUNT side=new name=p8g_write_list_row rows=29 expected=29
+Q123_COUNT side=old name=write_list_row rows=29 expected=29
+Q123_COUNT side=new name=write_list_row rows=29 expected=29
+Q123 order_same=true counts_ok=true
+Q123_DIGEST system_configuration_rows_old=12 changed=0
+Q123_GROUP name=device_region_bytes rows=29 changed=0 allowed=no problems=changed_rows_0_not_2,devices
+Q123_GROUP name=journal_header_write_digest rows=60 changed=0 allowed=no problems=not_exactly_the_system_configuration_rows
+Q123_GROUP name=p8g_device_region_bytes rows=29 changed=0 allowed=no problems=changed_rows_0_not_2,devices
+Q123_GROUP name=p8g_write_list_row rows=29 changed=0 allowed=no problems=changed_rows_0_not_2
+Q123_GROUP name=write_list_row rows=29 changed=0 allowed=no problems=changed_rows_0_not_2
+Q123 changed_lines_total=0
+Q123_VERDICT pass=false ambiguous=0 groups_outside_allowed=device_region_bytes,journal_header_write_digest,p8g_device_region_bytes,p8g_write_list_row,write_list_row
+Q142.123 q123_guard.py <第 23 次 N22R> <第 24 次主产物>
+Q123 lines old=1124 new=1124 e2_e3_removed=true
+Q123_COUNT side=old name=device_region_bytes rows=29 expected=29
+Q123_COUNT side=new name=device_region_bytes rows=29 expected=29
+Q123_COUNT side=old name=p8g_device_region_bytes rows=29 expected=29
+Q123_COUNT side=new name=p8g_device_region_bytes rows=29 expected=29
+Q123_COUNT side=old name=p8g_write_list_row rows=29 expected=29
+Q123_COUNT side=new name=p8g_write_list_row rows=29 expected=29
+Q123_COUNT side=old name=write_list_row rows=29 expected=29
+Q123_COUNT side=new name=write_list_row rows=29 expected=29
+Q123 order_same=true counts_ok=true
+Q123_DIGEST system_configuration_rows_old=12 changed=12
+Q123_PAIR group=write_list_row step=31 device=0 changed_keys=sha256 new_equals_device_region_bytes=true old_equals_device_region_bytes=true
+Q123_PAIR group=write_list_row step=32 device=1 changed_keys=sha256 new_equals_device_region_bytes=true old_equals_device_region_bytes=true
+Q123_PAIR group=p8g_write_list_row step=31 device=0 changed_keys=sha256 new_equals_p8g_device_region_bytes=true old_equals_p8g_device_region_bytes=true
+Q123_PAIR group=p8g_write_list_row step=32 device=1 changed_keys=sha256 new_equals_p8g_device_region_bytes=true old_equals_p8g_device_region_bytes=true
+Q123_GROUP name=device_region_bytes rows=29 changed=2 allowed=yes problems=none
+Q123_GROUP name=journal_header_write_digest rows=60 changed=12 allowed=yes problems=none
+Q123_GROUP name=p8g_device_region_bytes rows=29 changed=2 allowed=yes problems=none
+Q123_GROUP name=p8g_write_list_row rows=29 changed=2 allowed=yes problems=none
+Q123_GROUP name=write_list_row rows=29 changed=2 allowed=yes problems=none
+Q123 changed_lines_total=20
+Q123_VERDICT pass=true ambiguous=0 groups_outside_allowed=none
+Q142.124 (1) 命令十七
+0
+Q142.124 (2) crates_half_compare.py <第 23 次主产物> <第 24 次主产物>
+CRATES_HALF lines_old=39 lines_new=39 done_seen_old=true done_seen_new=true identical=true
+CRATES_REGION_SUMMARY matched=29 equal=29 unequal=0 unmatched_old=0 unmatched_new=0 ambiguous=0
+
+Q142.119 判决字段（R71）：r71fields.py sha256 4f395b2b…35af（脚本复用第 23 次执行员的草稿脚本，全文在 /tmp/claude-1000/e142-r24-run/r71fields.py）
+4f395b2b3b83a879cb0f7b49057fd63571ac8ccffa910b13bbffde89331e35af  /tmp/claude-1000/e142-r24-run/r71fields.py
+   77 /tmp/claude-1000/e142-r24-run/r71-r22-s2.txt
+   77 /tmp/claude-1000/e142-r24-run/r71-r23-main.txt
+   77 /tmp/claude-1000/e142-r24-run/r71-r23-n22r.txt
+   77 /tmp/claude-1000/e142-r24-run/r71-r24-main.txt
+  308 total
+--diff 第 22 次第二段 vs 第 24 次主产物（空 = 逐个相同）
+diff_exit=0
+--diff 第 23 次主产物 vs 第 24 次主产物
+diff_exit=0
+--width 行 expected!=actual 的条数
+30
+mismatch=0
+--判决字段里 false / not_run
+positive_control_change_count#3 matches_injection=false
+verdict#1 layer0_states_ok=not_run
+verdict#1 layer0_violations=not_run
+verdict#1 control_outcome_matrix_ok=false
+verdict#1 g7_states_ok=false
+verdict#1 g7_violations_zero=false
+verdict#1 journal_differing_states=not_run
+
+步 ③(7) 主产物原样整行
+411:E7RESULT name=impl_bytes_equal_summary model_regions=29 crates_regions=29 matched=29 equal=29 unequal=0 unmatched_model=0 unmatched_crates=0 snapshot_given=true
+59:E7RESULT name=root_record checkpoint_txg=3 instance=1 tree_identifier_watermark=65548 rollback_floor=0 unmount_marker=false record_bytes=4096 back_chain=2660362816
+688:E7RESULT name=back_chain records=3 chains=1:0,2:750278362,3:2660362816
+685:E7RESULT name=accounting entries=15 allocated_bytes_per_device=278528 free_bytes_per_device=3472605184 empty_cluster_segments_per_device=3310 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=98386 sequence_all_one=true generation=3
+898:E7RESULT name=layout_field_summary rows=174 equal=174 unequal=0
+899:E7RESULT name=layout_field_positive_control injected=4 detected=4 exact=true
+320:E7RESULT name=positive_control_p2 arm=arm_n16 point=a_level1_pointer_first_byte region=allocation_internal_of_device_0 device=0 injected_offset=145 regions_flagged=1 matches_injection=true
+321:E7RESULT name=positive_control_p2 arm=arm_n16 point=b_root_largest_key_last_byte region=allocation_root device=0 injected_offset=71 regions_flagged=1 matches_injection=true
+322:E7RESULT name=positive_control_p2 arm=arm_n16 point=c_extent_leaf_entry_tag_byte region=extent_root device=0 injected_offset=187 regions_flagged=1 matches_injection=true
+323:E7RESULT name=positive_control_p2 arm=arm_n16 point=d_journal_named_item_5_first_byte region=journal_record device=0 injected_offset=711 regions_flagged=1 matches_injection=true
+908:E7RESULT name=verdict width_mismatches=0 write_list_ok=true recover_full_ok=true layer0_states_ok=not_run layer0_violations=not_run control_states_ok=true control_violations_ok=true control_missed_zero=true control_false_alarm_zero=true control_outcome_matrix_ok=false g6_states_ok=true g6_violations_zero=true g7_states_ok=false g7_violations_zero=false positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true journal_differing_states=not_run r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+1157:E7RESULT name=p8g_verdict write_list_ok=true recover_full_ok=true positive_control_main_geometry_ok=true role_label_contradictions_zero=true role_labels_all_defined=true text_number_mismatches_zero=true text_numbers_all_classified=true named_instances_ok=true r18_system_configuration_fields_ok=true r18_root_flags_ok=true r18_g8_ok=true r18_g9_ok=true
+974:E7RESULT name=p8g_accounting entries=15 allocated_bytes_per_device=278528 free_bytes_per_device=7767572480 empty_cluster_segments_per_device=7406 fragmentation_runs_per_device=4 inode_watermark=2 unreclaimable_per_device=0 defer_queue_per_device=16384 pending_delete=0 committed_reservation=98386 sequence_all_one=true generation=3
+1150:E7RESULT name=p8g_layout_field_summary rows=174 equal=174 unequal=0
+1158:E7RESULT name=p8g_control_main_point fields=12 equal=12 unequal=0 unequal_fields=none
+--Q142.117 layout_field 行数与 equal=false 条数
+174
+0
+--p8g_layout_field 条数与 equal=false
+174
+0
+--V24e 产物齐不齐（一条命令数）
+accounting 1
+back_chain 1
+device_region_bytes 58
+impl_bytes_equal_summary 1
+journal_header_write_digest 60
+layout_field 174
+layout_field_positive_control 1
+layout_field_summary 1
+p8g_accounting 1
+p8g_control_main_point 1
+p8g_device_region_bytes 29
+p8g_layout_field 174
+p8g_layout_field_summary 1
+p8g_verdict 1
+p8g_write_list_row 29
+positive_control_p2 4
+root_record 1
+verdict 1
+write_list_row 29
+--第一个 done 之前 device_region_bytes 行数 / 之后
+before_done=29 after_done=29
+--name=positive_control_change_count 行
+317:E7RESULT name=positive_control_change_count control=A segments=2 matches_injection=true
+318:E7RESULT name=positive_control_change_count control=B segments=2 matches_injection=true
+319:E7RESULT name=positive_control_change_count control=C segments=0 matches_injection=false reason=blocked_no_crates_write_scope
+
+V24e 补：gaps 行数
+1
+
+Q142.123 归因表（组、变几行、归到哪一处、证据；输出行见上面 Q142.123 一节的 Q123_GROUP / Q123_PAIR / Q123_DIGEST）
+group=device_region_bytes changed=2 (step 31 device 0 / step 32 device 1, offset 4096 length 4096, 只变 sha256 与 hexadecimal_sha256) -> 第 1524 行 writer.put_u32(5000)（t15 两次系统配置写经 to_slot）；证据：装置第 7508-7509 行循环里 sha256_hex(&write.bytes) 写区域行；Q142.113 TTIME_DIFF outside_t_time_and_crc=0
+group=p8g_device_region_bytes changed=2 (同上，P8G 一段) -> 第 1524 行；证据：装置第 5949-5951 行 P8G 循环，第 6093 行 prefix_row_name_with_p8g 加前缀
+group=write_list_row changed=2 (step 31 device 0 / step 32 device 1，只变 sha256；Q123_PAIR 两行 changed_keys=sha256 new_equals=true old_equals=true) -> 第 1524 行；证据：装置第 7514 行 write_list_row(..., &write.bytes) 在第 6307 行 sha256_hex(bytes) 对同一段字节再算一次
+group=p8g_write_list_row changed=2 (同上) -> 第 1524 行；证据：装置第 5954 行 write_list_row(..., &write.bytes)，同第 6307 行
+group=journal_header_write_digest changed=12 = 参照里全部 kind=system_configuration_slot 行（Q123_DIGEST system_configuration_rows_old=12 changed=12），只变 sha256 -> 第 1524 行；证据：装置第 7286-7289 行对每次写的 write.bytes 算摘要，t15 之外的系统配置槽写也含 T_time 字段
+其余各组：零差异（q123_guard 其余行组不在 Q123_GROUP 里列出，changed_lines_total=20 = 2+2+2+2+12）；没有归不了因的组，F24e 不触发
+更正说明：上面 journal_header_write_digest 一行里「t15 之外的系统配置槽写也含 T_time 字段」是推的（每次系统配置写都带同一份运行时配置）；产物实测的只有 Q123_DIGEST 12 行全变、只变 sha256=。

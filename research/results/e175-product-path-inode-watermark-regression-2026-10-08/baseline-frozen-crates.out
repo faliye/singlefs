@@ -1,0 +1,17 @@
+name=frozen_copy date=2026-10-08 root_ring_batch=根环线第10z批第十、十一块合入、合后验证全绿之后 git_head=31e47115471ba5502a4531d25dffcc921be36899 diff_head_crates_sha256=dc38fa0f7555b2ca81ae6ea0906c49a0ae4b4733bf25966d019eddb61ffc3a08 status_short_crates_sha256=c8cf7741814f283767bc17aef80824d03035f3528e589b4f674a627c40aafbef file_count=340 sha_list_sha256=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb main_before_copy_equal=true main_after_copy_equal=true device_source_sha256=310c60a51a7a0c5cc015b070006d7d48ae0eb09d8a581ec8acba9d6bfc185fca
+name=mutation_anchor arm=V1 file=crates/singlefs-core/src/mount.rs line=7917 hits=1
+name=mutation_anchor arm=V2 file=crates/singlefs-core/src/transaction.rs line=8035 hits=1
+name=mutation_anchor arm=V717 file=crates/singlefs-core/src/mount.rs line=7913 hits=1 mutations_tsv_row=717
+name=arm_check segment=one arm=P phase=before_build listed_mismatch=0 extra_files=0 patched_file_sha256=none device_present=True
+name=arm_check segment=one arm=P phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=none device_present=True
+name=arm_check segment=one arm=V1 phase=before_build listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/mount.rs:79a1d845e0b3e80715cd1158789a526e68e10135b232bb35d450bba541a2d2fe device_present=True
+name=arm_check segment=one arm=V1 phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/mount.rs:73d353c452a564e4b74faefcc4b13d467699cea09022ea2c77a4a1cd55dea145 device_present=True
+name=arm_check segment=one arm=V2 phase=before_build listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/transaction.rs:66f62934719f0bdcac7b2189a28833fb1bac7be753788d89c249769d6c55500f device_present=True
+name=arm_check segment=one arm=V2 phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/transaction.rs:d8399a64e6830209cac207f5f9f4d43b76bf43aef43b395de6963eab526c9c89 device_present=True
+name=arm_check segment=two arm=P phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=none device_present=True
+name=arm_check segment=two arm=V1 phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/mount.rs:73d353c452a564e4b74faefcc4b13d467699cea09022ea2c77a4a1cd55dea145 device_present=True
+name=arm_check segment=two arm=V2 phase=after_restore listed_mismatch=0 extra_files=0 patched_file_sha256=crates/singlefs-core/src/transaction.rs:d8399a64e6830209cac207f5f9f4d43b76bf43aef43b395de6963eab526c9c89 device_present=True
+name=arm_binary arm=P sha256=1567ea41a0823821b0883e0430e2491226cd23909b7d1722231a247e8f572d67 built=once_before_segment_one used_for_segments=one,two
+name=arm_binary arm=V1 sha256=3c6a4d336eb6567a91fbed54350357f9e1297dd7e6ca0d7e09e1ecdb2a668c67 built=once_before_segment_one used_for_segments=one,two
+name=arm_binary arm=V2 sha256=f3231c2c4e30d33ddc6bd187f18247256975492f0f42088e0eadaab880ec9f26 built=once_before_segment_one used_for_segments=one,two
+name=main_drift_after_copy files_changed=6 files_added_or_removed=0 changed=crates/mutations.tsv,crates/singlefs-checker-tier/src/crash_amplification.rs,crates/singlefs-checker-tier/src/gpu_unit_checks.rs,crates/singlefs-core/src/mount.rs,crates/singlefs-harness/src/gpu_memory_ledger.rs,crates/singlefs-harness/tests/raise_floor_takes_abandoned_root_placements_recorded_in_the_root_ring_table.rs

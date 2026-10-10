@@ -1,0 +1,27 @@
+   Compiling e7-index-bench v0.1.0 (/home/fy5090/code/singlefs/research/e7-index-bench)
+    Finished `release` profile [optimized + debuginfo] target(s) in 2.32s
+     Running unittests src/bin/e174_lease_drop_wait_memory_return.rs (/home/fy5090/.local/share/singlefs/work/m3-r1/e174/mutate-target/release/deps/e174_lease_drop_wait_memory_return-9356e310bc5e4989)
+
+running 19 tests
+test tests::compute_applications_parser_sums_rows_of_this_card_and_process ... ok
+test tests::only_a_hold_control_child_that_lost_the_buffer_stops_the_whole_run ... ok
+test tests::allocator_peak_grows_by_at_least_the_whole_planned_size ... ok
+test tests::a_lease_that_is_already_void_does_not_sit_through_the_window ... ok
+test tests::job_arguments_round_trip_and_unknown_flags_are_refused ... ok
+test tests::presence_needs_all_rounds_on_one_side_of_their_own_tau ... ok
+test tests::report_parser_reads_the_process_line_and_not_the_bar_one_line ... ok
+test tests::report_parser_adds_up_every_line_of_this_process_and_skips_others ... ok
+test tests::round_is_complete_when_the_child_is_clean_and_the_needed_leases_are_valid ... ok
+test tests::tau_is_the_pre_reading_spread_plus_the_rounding_allowance ... ok
+test tests::time_to_clear_is_the_start_of_the_first_reading_after_which_every_reading_is_clean ... ok
+test tests::two_arms_alternate_with_the_round_number_on_the_same_slot ... ok
+test tests::wait_cost_tokens_follow_the_registered_limits ... ok
+test tests::heavy_wait_arm_waits_for_the_rest_of_the_work_and_the_outer_timer_covers_it ... ok
+test tests::hold_control_still_holds_the_buffer_at_the_first_reading_after_the_drop ... ok
+test tests::in_flight_work_is_not_waited_for_before_the_lease_drop ... ok
+test tests::piece_plan_covers_every_registered_size ... ok
+test tests::shuffle_rank_is_seeded_and_does_not_depend_on_what_was_already_run ... ok
+test tests::every_self_check_passes ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

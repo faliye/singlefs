@@ -1,0 +1,6 @@
+  基线 baseline：编译 36.3 秒，跑 187.2 秒，3359 行
+E165_KILL_BOUNDS_PROGRESS 挂钟 300 秒：变体做完 0/1 个；在做 1 项：tsv-1812（跑 --bounds segment1 --family root_choice_faults --gate r2，这一步 24 秒，这一项共 76 秒）
+E165_KILL_BOUNDS_PROGRESS 挂钟 600 秒：变体做完 0/1 个；在做 1 项：tsv-1812（跑 --bounds segment1 --family root_choice_faults --gate r2，这一步 324 秒，这一项共 376 秒）
+  tsv-1812：编译 52.2 秒，跑 354.4 秒，合计 406.7 秒
+  基线 baseline-at-end：编译 32.1 秒，跑 169.9 秒，3359 行
+  这一次 1 个变体，挂钟 406.7 秒（不含开头与收尾的基线）

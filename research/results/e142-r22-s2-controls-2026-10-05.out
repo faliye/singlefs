@@ -1,0 +1,16 @@
+# E142 第 22 次第二段：Q142.97 的真输入对照（脚本 p8g_region_compare.py 与第二段产物不变）
+## 对照 1：P8G 装置一侧 对 主点（4 GiB）crates/ 导出（第二段步 ⑤' 的不带参数导出，/tmp/claude-1000/e142-r22-run2/dump-nodev.txt，sha256 79640e8e3d75db783364cbca85a988cc51e7e30dbed3b217e2138aafad9b6110）——应有 9 个区域不等（A6 那九个）
+不等区域数 9
+P8G_EQUAL region=root_record device=0 offset=1052672 length=512 equal=false first_diff_offset=96
+P8G_EQUAL region=journal_record device=0 offset=16785408 length=4096 equal=false first_diff_offset=46
+P8G_EQUAL region=accounting_root device=0 offset=823296000 length=16384 equal=false first_diff_offset=10
+P8G_EQUAL region=mapping_root device=0 offset=823312384 length=16384 equal=false first_diff_offset=10
+P8G_EQUAL region=tree_table device=0 offset=823328768 length=16384 equal=false first_diff_offset=10
+P8G_EQUAL region=journal_record device=1 offset=16785408 length=4096 equal=false first_diff_offset=46
+P8G_EQUAL region=accounting_root device=1 offset=823296000 length=16384 equal=false first_diff_offset=10
+P8G_EQUAL region=mapping_root device=1 offset=823312384 length=16384 equal=false first_diff_offset=10
+P8G_EQUAL region=tree_table device=1 offset=823328768 length=16384 equal=false first_diff_offset=10
+P8G_SUMMARY model_regions=29 matched=29 equal=20 unequal=9 unmatched_model=0 unmatched_crates=0
+## 对照 2：P8G 导出的副本里把设备 1 记账树根（offset 823296000）十六进制第一个字符改掉一个（/tmp/claude-1000/e142-r22-run2/p8g-dump-flipped.txt），应恰 1 个区域不等
+P8G_EQUAL region=accounting_root device=1 offset=823296000 length=16384 equal=false first_diff_offset=0
+P8G_SUMMARY model_regions=29 matched=29 equal=28 unequal=1 unmatched_model=0 unmatched_crates=0
