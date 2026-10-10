@@ -6,8 +6,11 @@
 # SessionStart hook：会话开始时往上下文里补两样东西，按 hook 输入的 source 分，只报、不改任何东西。
 #   compact           上下文压缩之后，接续工作要先对齐的几件：还有没有子 agent 在跑、工作区里哪些没提交、这件活的状态记在哪份记录里。
 #   startup / resume  近 SESSION_START_OOM_HOURS 小时（默认 12）内核因为内存不够杀过的进程：journalctl -k 里的 Killed process 行，
-#                     每条写时间（UTC 与 JST）、进程号、进程名、anon-rss，整机 OOM 与内存上限（cgroup）里的分开列，外加一行「怎么办」。
-#                     读不到内核日志（没有 journalctl、权限不够看不到内核日志、journalctl 出错或超时）报「没查成」，不当成没有 OOM。
+#                     每条写时间（UTC 与 JST）、进程号、进程名、anon-rss，整机 OOM 与内存上限（cgroup）里的分开列，外加一行「怎么办」；
+#                     同一段时间显卡驱动报的显存不够（同一行既有 NVRM 又有 NV_ERR_NO_MEMORY，用户 2026-10-06 定运行时认显存 OOM，
+#                     records/2026-09-16-subagent拆分提案.md 第五十五、五十六节）：按卡数次数、写头一次与末一次的时间，外加一行「怎么办」。
+#                     读不到内核日志（没有 journalctl、权限不够看不到内核日志、journalctl 出错或超时）报「没查成」，不当成没有 OOM、也不当成没撞显存。
+#                     近几小时按 journalctl _TRANSPORT=kernel 取（不用 -k：它只看这一次开机，卡死重启之后看不到死机之前那几行）。
 #
 # 为什么：2026-09-25 两次整机 OOM 把 Claude Code 会话拖垮，第一次崩了之后主 agent 没查 `journalctl -k` 就照原样重派同一步，
 # 第二次 OOM 就是这样来的（records/2026-09-16-subagent拆分提案.md 第四十节第 28 行）。会话崩了再起，是 startup 或 resume。
@@ -35,6 +38,8 @@ KILLED_PROCESS_LINE = re.compile(
     r"Killed process (?P<pid>\d+) \((?P<name>.*)\) total-vm:\d+kB, anon-rss:(?P<anon_rss_kibibytes>\d+)kB")
 # oom-kill 明细行：带被杀进程所在的 cgroup（task_memcg）与进程号，跟在 Killed process 行的前后
 OOM_KILL_DETAIL_LINE = re.compile(r"kernel: oom-kill:constraint=\S*?task_memcg=(?P<memcg>[^,]+),task=[^,]+,pid=(?P<pid>\d+)")
+# 显卡驱动报的显存不够：同一行既有 NVRM 又有 NV_ERR_NO_MEMORY（research/scripts/run-with-memory-cap.sh 命令退出之后认的是同一种行）
+GPU_MEMORY_LINE = re.compile(r"^(?P<timestamp>\S+) \S+ kernel: NVRM: (?:(?P<gpu>GPU\d+) )?.*NV_ERR_NO_MEMORY")
 SELFTEST_CGROUP_MARK = "singlefs_memory_selftest_"   # run-with-memory-cap.sh --selftest 给自己开的 slice 名（它文件头「slice 名」那一段）；那里的 OOM 是自检故意造的
 # journalctl 看不到别人的日志时退 0、只在 stderr 给这句提示：不认它，读不到就会被当成「没有 OOM」
 JOURNAL_PERMISSION_HINT = "not seeing messages from other users and the system"
@@ -80,7 +85,10 @@ def read_kernel_journal(hours):
         return None, "这台机器上没有 journalctl"
     try:
         probe = subprocess.run(["journalctl", "-k", "-n", "1", "--no-pager", "-q"], capture_output=True, text=True, timeout=JOURNAL_TIMEOUT_SECONDS)
-        recent = subprocess.run(["journalctl", "-k", "--since", f"-{hours:g}h", "--utc", "-o", "short-iso-precise", "--no-pager", "-q"],
+        # 近几小时的内核消息按 _TRANSPORT=kernel 取、不用 -k：-k 隐含 -b（只看这一次开机），机器卡死重启之后会话开头就看不到死机之前那几小时
+        # （2026-10-06 卡死重启，重启前的显存不够与 cgroup OOM 都在上一次开机里，records/2026-09-16-subagent拆分提案.md 第五十六节）
+        recent_selector = ["-k"] if BROKEN_JUDGEMENT == "current-boot-only" else ["_TRANSPORT=kernel"]
+        recent = subprocess.run(["journalctl", *recent_selector, "--since", f"-{hours:g}h", "--utc", "-o", "short-iso-precise", "--no-pager", "-q"],
                                 capture_output=True, text=True, timeout=JOURNAL_TIMEOUT_SECONDS)
     except subprocess.TimeoutExpired:
         return None, f"journalctl 过了 {JOURNAL_TIMEOUT_SECONDS} 秒没返回"
@@ -119,6 +127,39 @@ def killed_processes(journal_text):
     return kills
 
 
+def gpu_memory_events(journal_text):
+    """显卡驱动报显存不够的每一行：{"moment", "gpu"}（行里没写第几张卡的记成「GPU?」）。弄坏开关 skip-gpu-oom 下一行都不认。"""
+    if BROKEN_JUDGEMENT == "skip-gpu-oom":
+        return []
+    events = []
+    for line in journal_text.splitlines():
+        matched = GPU_MEMORY_LINE.match(line)
+        if not matched:
+            continue
+        try:
+            moment = datetime.fromisoformat(matched.group("timestamp")).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        events.append({"moment": moment, "gpu": matched.group("gpu") or "GPU?"})
+    return events
+
+
+def moment_text(moment):
+    return f"{moment.strftime('%Y-%m-%d %H:%M:%S')} UTC / {moment.astimezone(TOKYO).strftime('%m-%d %H:%M:%S')} JST"
+
+
+def gpu_memory_report(hours, events):
+    counts = {}
+    for event in events:
+        counts[event["gpu"]] = counts.get(event["gpu"], 0) + 1
+    return "\n".join([
+        f"【近 {hours:g} 小时显卡驱动报过 {len(events)} 次显存不够（journalctl -k 里的 NVRM … NV_ERR_NO_MEMORY 行）】",
+        f"  - " + "、".join(f"{gpu} ×{count}" for gpu, count in sorted(counts.items())) + f"；头一次 {moment_text(min(event['moment'] for event in events))}，"
+        f"末一次 {moment_text(max(event['moment'] for event in events))}",
+        "- 怎么办：先查那段时间谁在用卡（经 research/scripts/run-with-memory-cap.sh 起、命令退出之后认出显存不够的那几条退 245；同一段时间的 Killed process 行也看一眼），"
+        "查清之前别照原样重派同一件活；要上卡的经 research/scripts/host-dispatch.py --gpu 按各台显存余量派。"])
+
+
 def format_size(kibibytes):
     if kibibytes >= 1024 * 1024:
         return f"{kibibytes / (1024 * 1024):.1f} GiB"
@@ -148,17 +189,21 @@ def oom_report(hours):
     journal_text, problem = read_kernel_journal(hours)
     if problem is not None:
         return "\n".join([
-            f"【没查成：近 {hours:g} 小时内核有没有因为内存不够杀进程】{problem}。",
-            f"- 怎么办：手动跑 `journalctl -k --since '-{hours:g}h' | grep 'Killed process'` 看一眼；查不了就当不知道，不当成没有 OOM——"
+            f"【没查成：近 {hours:g} 小时内核有没有因为内存不够杀进程、显卡驱动有没有报显存不够】{problem}。",
+            f"- 怎么办：手动跑 `journalctl -k --since '-{hours:g}h' | grep -E 'Killed process|NV_ERR_NO_MEMORY'` 看一眼；查不了就当不知道，不当成没有 OOM——"
             "会话要是突然断掉才重开的，先别照原样重派断掉之前在跑的那件活。"])
     kills = killed_processes(journal_text)
     selftest_kills = [kill for kill in kills if kill["selftest"]]
     kills = [kill for kill in kills if not kill["selftest"]]
+    gpu_events = gpu_memory_events(journal_text)
+    gpu_text = gpu_memory_report(hours, gpu_events) if gpu_events else ""
     if not kills:
         if selftest_kills:
-            return (f"近 {hours:g} 小时内核杀过的 {len(selftest_kills)} 个进程全是 run-with-memory-cap.sh --selftest 故意造的"
-                    f"（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故；别的没有（journalctl -k 查过，看得到内核日志）。")
-        return f"近 {hours:g} 小时内核没有因为内存不够杀过进程（journalctl -k 查过，看得到内核日志）。"
+            memory_text = (f"近 {hours:g} 小时内核杀过的 {len(selftest_kills)} 个进程全是 run-with-memory-cap.sh --selftest 故意造的"
+                           f"（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故；别的没有（journalctl -k 查过，看得到内核日志）")
+        else:
+            memory_text = f"近 {hours:g} 小时内核没有因为内存不够杀过进程（journalctl -k 查过，看得到内核日志）"
+        return memory_text + ("。\n" + gpu_text if gpu_text else "；显卡驱动也没报过显存不够。")
     whole_machine = [kill for kill in kills if kill["whole_machine"]]
     capped = [kill for kill in kills if not kill["whole_machine"]]
     lines = [f"【近 {hours:g} 小时内核因为内存不够杀过 {len(kills)} 个进程（journalctl -k 里的 Killed process 行）】"]
@@ -172,6 +217,8 @@ def oom_report(hours):
         lines.append(f"- 另有 {len(selftest_kills)} 次是 run-with-memory-cap.sh --selftest 故意造的（cgroup 名带 {SELFTEST_CGROUP_MARK}），不算事故、不列")
     lines.append("- 怎么办：先查这几个进程是谁起的、为什么涨（进程名对上是哪个实验二进制或测试，去派它的子 agent 的会话记录与变异表里找那一步），"
                  "查清之前别照原样重派同一件活；重派时让那一步经 research/scripts/run-with-memory-cap.sh 带上限跑。")
+    if gpu_text:
+        lines.append(gpu_text)
     return "\n".join(lines)
 
 
@@ -196,6 +243,11 @@ SELFTEST_ONLY_KILL_LINES = (
     "task_memcg=/user.slice/user-1000.slice/user@1000.service/singlefs_memory_selftest_777_1.slice/singlefs-memory-cap-777-1.scope,task=python3,pid=2400001,uid=1000\n"
     "2026-09-25T08:21:10.100500+00:00 host kernel: Memory cgroup out of memory: Killed process 2400001 (python3) total-vm:100000kB, anon-rss:65536kB, file-rss:100kB, shmem-rss:0kB, UID:1000 pgtables:100kB oom_score_adj:0\n")
 FAKE_KILL_LINES = FAKE_KILL_LINES + SELFTEST_ONLY_KILL_LINES
+# 显卡驱动报显存不够的两行（GPU1），外加一行不是显存不够的 NVRM（Xid）：只认前两行
+FAKE_GPU_MEMORY_LINES = (
+    "2026-10-06T08:29:48.212283+00:00 host kernel: NVRM: GPU1 nvAssertOkFailedNoLog: Assertion failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from pmaAllocatePages() @ pool_alloc.c:270\n"
+    "2026-10-06T08:29:48.213329+00:00 host kernel: NVRM: GPU1 nvAssertOkFailedNoLog: Assertion failed: Out of memory [NV_ERR_NO_MEMORY] (0x00000051) returned from rmMemPoolReserve() @ ctx_buf_pool.c:315\n"
+    "2026-10-06T08:29:50.000000+00:00 host kernel: NVRM: Xid (PCI:0000:10:00): 109, pid=441575, name=selftest, channel 0x00000003, errorString CTX SWITCH TIMEOUT, Info 0xc002\n")
 
 
 def write_fake_journalctl(directory, recent_output, probe_output, stderr_text="", exit_code=0):
@@ -288,7 +340,19 @@ def selftest_in(hook_dir, work):
     clean = os.path.join(work, "clean")
     os.makedirs(clean)
     write_fake_journalctl(clean, "2026-09-25T08:30:00+00:00 host kernel: usb 1-1: new device\n", "2026-09-25T08:30:00+00:00 host kernel: usb 1-1: new device\n")
-    expect("看得到内核日志、没有 OOM", run_hook("startup", clean), ["内核没有因为内存不够杀过进程（journalctl -k 查过，看得到内核日志）"], ["没查成"])
+    expect("看得到内核日志、没有 OOM", run_hook("startup", clean), ["内核没有因为内存不够杀过进程（journalctl -k 查过，看得到内核日志）", "显卡驱动也没报过显存不够"],
+           ["没查成", "显存不够（journalctl"])
+    gpu_only = os.path.join(work, "gpu-only")
+    os.makedirs(gpu_only)
+    write_fake_journalctl(gpu_only, FAKE_GPU_MEMORY_LINES, "x\n")
+    expect("只有显卡驱动报的显存不够", run_hook("startup", gpu_only),
+           ["内核没有因为内存不够杀过进程", "显卡驱动报过 2 次显存不够（journalctl -k 里的 NVRM … NV_ERR_NO_MEMORY 行）", "GPU1 ×2",
+            "头一次 2026-10-06 08:29:48 UTC / 10-06 17:29:48 JST", "- 怎么办：先查那段时间谁在用卡"], ["显卡驱动也没报过显存不够", "没查成"])
+    gpu_and_kills = os.path.join(work, "gpu-and-kills")
+    os.makedirs(gpu_and_kills)
+    write_fake_journalctl(gpu_and_kills, FAKE_KILL_LINES + FAKE_GPU_MEMORY_LINES, "x\n")
+    expect("内存 OOM 与显存不够一起", run_hook("resume", gpu_and_kills),
+           ["内存不够杀过 3 个进程", "显卡驱动报过 2 次显存不够", "- 怎么办：先查这几个进程是谁起的", "- 怎么办：先查那段时间谁在用卡"])
     no_permission = os.path.join(work, "no-permission")
     os.makedirs(no_permission)
     write_fake_journalctl(no_permission, "", "", "Hint: You are currently not seeing messages from other users and the system.\n")
@@ -300,18 +364,27 @@ def selftest_in(hook_dir, work):
     failing = os.path.join(work, "failing")
     os.makedirs(failing)
     write_fake_journalctl(failing, "", "", "Failed to open journal\n", exit_code=1)
+    earlier_boot = os.path.join(work, "earlier-boot")
+    os.makedirs(earlier_boot)
+    with open(os.path.join(earlier_boot, "journalctl"), "w", encoding="utf-8") as handle:   # 假 journalctl：-k（只看这一次开机）读不到上一次开机里的那几行
+        handle.write("#!/usr/bin/env bash\n"
+                     'case " $* " in *" -n 1 "*) echo "2026-10-06T09:00:00+00:00 host kernel: probe"; exit 0 ;; esac\n'
+                     f'case " $* " in *" _TRANSPORT=kernel "*) printf %b {json.dumps(FAKE_GPU_MEMORY_LINES)} ;; esac\n')
+    os.chmod(os.path.join(earlier_boot, "journalctl"), 0o755)
+    expect("重启之前那一次开机里的也读到", run_hook("startup", earlier_boot), ["显卡驱动报过 2 次显存不够"], ["显卡驱动也没报过显存不够"])
     expect("journalctl 出错", run_hook("startup", failing), ["没查成", "journalctl 退出码 1"], ["内核没有因为内存不够杀过进程"])
     expect("没有 journalctl", run_hook("startup", path_without_journalctl=True), ["没查成", "没有 journalctl"], ["内核没有因为内存不够杀过进程"])
     expect("clear 不报", run_hook("clear", journal), [], ["Killed process", "内存不够", "上下文刚压缩过"])
     for failure in failures:
         print(f"  ✗ 自检：{failure}")  # gate-lint:detail
     if failures:
-        print("    → 看 reminder() / oom_report() / read_kernel_journal() / killed_processes() 与入口；"
-              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean、count-selftest-kills）设着的话这里本来就该红")
+        print("    → 看 reminder() / oom_report() / read_kernel_journal() / killed_processes() / gpu_memory_events() 与入口；"
+              "AFTER_COMPACT_DISABLE=1 或 SESSION_START_BREAK（skip-oom、unreadable-as-clean、count-selftest-kills、skip-gpu-oom、current-boot-only）设着的话这里本来就该红")
         return 1
     print(f"  ✓ 自检通过（查了 {checked} 种）：压缩之后补分支、未提交数、最近的记录与看门狗命令；startup 与 resume 列近几小时内核杀的进程"
           f"（时间写 UTC 与 JST、进程号、进程名、anon-rss，整机 OOM 与 cgroup 上限分开，杀得多时逐条列最大的 {KILLS_LISTED_ONE_BY_ONE} 个、其余按进程名合计，"
-          f"外加「怎么办」），看得到内核日志而没有 OOM 时说查过；权限不够、一条内核消息都读不出、journalctl 出错、没有 journalctl 都报「没查成」；clear 不报；退出码恒 0")
+          f"外加「怎么办」），同一段时间显卡驱动报的显存不够按卡数次数、写头一次与末一次（别的 NVRM 行不算），看得到内核日志而两样都没有时说查过；"
+          f"权限不够、一条内核消息都读不出、journalctl 出错、没有 journalctl 都报「没查成」；clear 不报；退出码恒 0")
     return 0
 
 

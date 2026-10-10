@@ -19,7 +19,7 @@
 #   ② three-way-forward / three-way-attack / three-way-defense / three-way-verifier：交回里点名的 research/prompts/…-output.md 逐份交给
 #      research/scripts/cite-check.py（--root 项目根，--unchanged-since 取这个子 agent 会话记录第一条的时刻），有对不上的拒；交回里一份报告都没点名也拒；
 #      找不到它的会话记录（认不出开工时刻）就不判这一条，stderr 写一句；
-#   ③ kb-scribe / experiment-runner：交回正文与它点名的报告文件（research/prompts/ 或 /tmp/claude-<uid>/ 下的 .md）里，以 ✓ 起头的行没有数字、
+#   ③ kb-scribe / experiment-runner：交回正文与它点名的报告文件（research/prompts/、工作根或过渡期旧根下的 .md；两个根怎么认只在同目录 lib_work_root.py）里，以 ✓ 起头的行没有数字、
 #      或写「查了 0 项」这类零项的，拒，逐行列出——绿行要连它报的查了多少项一起贴，0 项或没有数的按没判写。
 # 这一道自己出错（读不了报告、cite-check 跑不起来、JSON 解析不了）不拒：放行，错误写进 stderr。
 #
@@ -43,6 +43,8 @@
 #   HANDBACK_GUARD_BREAK=no-green-count  green_count_problems() 不判 ③ 绿行没有数
 #       书记员绿行没数（「应当返回 2，实际 0」）
 #       执行员报告文件里的绿行没数（「应当返回 2，实际 0」）
+#       执行员工作根下的报告里绿行没数（~ 写法）（「应当返回 2，实际 0」）
+#       执行员过渡期旧根下的报告里绿行没数（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=zero-count-ok  green_count_problems() 不判 ③ 绿行报 0 项
 #       书记员绿行 0 项（「应当返回 2，实际 0」）
 #   HANDBACK_GUARD_BREAK=judge-general-purpose  is_project_agent() 把带 agent_type 的一律当项目子 agent（general-purpose 也判 ①②③）
@@ -51,6 +53,10 @@
 #       交回时自己起的后台任务还在跑（项目子 agent）（「应当返回 2，实际 0」）
 #       交回时自己起的后台任务还在跑（通用 agent 也判）（「应当返回 2，实际 0」）
 #       后台还在跑的拒绝说明列出进程号、命令与两条出路（等完成通知、按进程号停）（「应当返回 True，实际 False」）
+#   SINGLEFS_WORK_ROOT_BREAK=new-root-unknown（同目录 lib_work_root.py：工作根退回旧根）  ③ 认不出工作根下的报告文件
+#       执行员工作根下的报告里绿行没数（~ 写法）（「应当返回 2，实际 0」）
+#   SINGLEFS_WORK_ROOT_BREAK=legacy-root-unknown（同上：不认过渡期旧根）  ③ 认不出旧根下的报告文件
+#       执行员过渡期旧根下的报告里绿行没数（「应当返回 2，实际 0」）
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$HOOK_DIR/../singlefs-ai-sop/scripts/preflight.sh"
@@ -64,7 +70,13 @@ HANDBACK_CHARACTER_LIMIT = int(os.environ.get("HANDBACK_CHARACTER_LIMIT", "4000"
 CITATION_CHECKED_AGENTS = {"three-way-forward", "three-way-attack", "three-way-defense", "three-way-verifier"}
 GREEN_COUNT_CHECKED_AGENTS = {"kb-scribe", "experiment-runner"}
 LEG_REPORT_MENTION = re.compile(r"research/prompts/[^\s`'\"，。；：、（）()「」]+-output\.md")
-REPORT_MENTION = re.compile(r"(?:research/prompts/|/tmp/claude-\d+/)[^\s`'\"，。；：、（）()「」]+\.md")
+try:   # 工作根与过渡期旧根的唯一定义：同目录的 lib_work_root.py（读不到时那两处下的报告认不出、不判，stderr 写一句）
+    sys.dont_write_bytecode = True
+    sys.path.insert(0, sys.argv[1]); import lib_work_root as work_roots
+    SCRATCH_MENTION_PREFIX, work_roots_error = work_roots.mention_prefix_pattern(), None
+except Exception as error:  # 文件不在、语法错、弄坏开关写错都算读不到
+    work_roots, SCRATCH_MENTION_PREFIX, work_roots_error = None, "(?!)", error
+REPORT_MENTION = re.compile(r"(?:research/prompts/|" + SCRATCH_MENTION_PREFIX + r")[^\s`'\"，。；：、（）()「」]+\.md")
 GREEN_LINE = re.compile(r"^\s*(?:[-*>|]\s*)*✓")
 # 编号不是数：阶段号、实验 / 决策 / 欠账 / 不变量号、阶段文件名、时刻
 NOT_A_COUNT = re.compile(r"\d+\s*号|\b\d{2}-[\w.-]+|\b[EDC]\d+|\bI-[\d.]+|\d{1,2}:\d{2}")
@@ -97,6 +109,7 @@ def started_at(hook_input):
 
 
 def resolved(path, project_root):
+    path = work_roots.expand_written_path(path) if work_roots else path   # ~/…、$HOME/…、$SINGLEFS_WORK_ROOT/… 写法
     return path if os.path.isabs(path) else os.path.join(project_root, path)
 
 
@@ -202,8 +215,13 @@ def decide(hook_input, project_root, cite_check):
 
 
 def selftest(hook_dir):
+    if work_roots is None:
+        print(f"  ✗ 自检读不到工作根的定义 {os.path.join(hook_dir, 'lib_work_root.py')}：{work_roots_error!r}")
+        print("    → 怎么办：恢复那份库（工作根与过渡期旧根只在那里定义），SINGLEFS_WORK_ROOT_BREAK 只写它认的值，再跑 --selftest")
+        return 1
     work = tempfile.mkdtemp(prefix="handback-guard-selftest-")
     sleeper = None   # ④ 的样本：开着一个后台任务输出文件在睡的进程，自检自己起、自己停
+    scratch_reports = []   # ③ 放在工作根与旧根下的报告目录，自检的 TMPDIR 之外
     try:
         cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "cite-check.py")
         for agent in ("three-way-attack", "three-way-verifier", "kb-scribe", "experiment-runner", "sweep"):
@@ -235,6 +253,14 @@ def selftest(hook_dir):
             sleeper = subprocess.Popen(["sleep", "120"], stdout=output_handle, stderr=subprocess.STDOUT)
         scribe_report = os.path.join(work, "research", "prompts", "scribe-report.md")
         open(scribe_report, "w", encoding="utf-8").write("✓ 文档铁律检查通过（检查 486，跳过 0）\n✓ 通过\n")
+        # ③ 的报告放工作根（不看弄坏开关）与过渡期旧根下各一份，交回里工作根那一份写成 ~ 起头；自己建、finally 里删
+        home = os.path.expanduser("~")
+        for scratch_root in (work_roots.configured_work_root(), work_roots.legacy_root()):
+            os.makedirs(scratch_root, exist_ok=True)
+            scratch_reports.append(tempfile.mkdtemp(prefix="handback-guard-selftest-", dir=scratch_root))
+            open(os.path.join(scratch_reports[-1], "report.md"), "w", encoding="utf-8").write("✓ 通过\n")
+        new_root_report = os.path.join(scratch_reports[0], "report.md")
+        new_root_report = "~" + new_root_report[len(home):] if new_root_report.startswith(home + "/") else new_root_report
 
         def case(label, agent_type, message, want, agent_id="a1"):
             hook_input = {"tool_name": "SubagentHandback", "tool_input": {"message": message}, "agent_type": agent_type,
@@ -253,6 +279,8 @@ def selftest(hook_dir):
             case("书记员绿行没数", "kb-scribe", "✓ doc-registries 转绿", 2),
             case("书记员绿行 0 项", "kb-scribe", "✓ doc-registries 通过（查了 0 项）", 2),
             case("执行员报告文件里的绿行没数", "experiment-runner", f"报告 {os.path.relpath(scribe_report, work)}", 2),
+            case("执行员工作根下的报告里绿行没数（~ 写法）", "experiment-runner", f"报告 {new_root_report}", 2),
+            case("执行员过渡期旧根下的报告里绿行没数", "experiment-runner", f"报告 {os.path.join(scratch_reports[1], 'report.md')}", 2),
             case("回扫员的绿行不判", "sweep", "✓ 通过", 0),
             case("交回时自己起的后台任务还在跑（项目子 agent）", "sweep", "报告 /tmp/x", 2, "a2"),
             case("交回时自己起的后台任务还在跑（通用 agent 也判）", "general-purpose", "交回", 2, "a2"),
@@ -278,13 +306,15 @@ def selftest(hook_dir):
             return 1
         print(f"  ✓ handback-guard 自检通过（查了 {len(cases)} 种）：子 agent 交回时自己起的后台任务还在跑拒（通用 agent 也判、主 agent 不判、说明里列出进程号与两条出路），"
               "跑完了或停掉之后放行；项目子 agent 超长交回拒、正好在上限放行、非项目 agent 与主 agent 不判；"
-              "三方腿与核查员引文对不上或没点名报告拒、对上放行；书记员与执行员绿行没数或报 0 项拒（交回正文与点名的报告文件都查）；走真实 stdin 入口拒得出")
+              "三方腿与核查员引文对不上或没点名报告拒、对上放行；书记员与执行员绿行没数或报 0 项拒（交回正文与点名的报告文件都查，报告在 research/prompts/、工作根（含 ~ 写法）与过渡期旧根下都认）；走真实 stdin 入口拒得出")
         return 0
     finally:
         if sleeper is not None and sleeper.poll() is None:
             sleeper.kill()
             sleeper.wait()
         shutil.rmtree(work, ignore_errors=True)
+        for directory in scratch_reports:
+            shutil.rmtree(directory, ignore_errors=True)
 
 
 def main():
@@ -298,6 +328,8 @@ def main():
         return 0
     project_root = os.environ.get("CLAUDE_PROJECT_DIR") or os.path.dirname(os.path.dirname(hook_dir))
     cite_check = os.path.join(os.path.dirname(os.path.dirname(hook_dir)), "research", "scripts", "cite-check.py")
+    if work_roots is None:
+        print(f"! handback-guard 读不到 {os.path.join(hook_dir, 'lib_work_root.py')}（{work_roots_error!r}）：工作根与旧根下的报告这一次没判", file=sys.stderr)
     code, message = decide(hook_input, project_root, cite_check)
     if message:
         print(message, file=sys.stderr)

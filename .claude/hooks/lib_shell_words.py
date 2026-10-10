@@ -127,8 +127,8 @@ DETACHED_RUN_SCRIPT_NAME = "detached-run.sh"
 DETACHED_RUN_SCRIPT_LOCATION = "research/scripts/detached-run.sh"
 DETACHED_RUN_SIGNATURE_LINE = re.compile(rb"^# detached-run-script-signature:", re.MULTILINE)
 DETACHED_RUN_HEAD_BYTES = 4096
-# 它的 start 带值的选项（`--label <名>`、`--log <文件>`、`--stop-timeout <秒>`，也可以写成 `--选项=值`）
-DETACHED_RUN_OPTIONS_WITH_VALUE = frozenset({"--label", "--log", "--stop-timeout"})
+# 它的 start 带值的选项（`--wall-clock <within-2h|over-2h>`、`--label <名>`、`--log <文件>`、`--stop-timeout <秒>`，也可以写成 `--选项=值`）
+DETACHED_RUN_OPTIONS_WITH_VALUE = frozenset({"--wall-clock", "--label", "--log", "--stop-timeout"})
 # 剥掉的 heredoc 在剥完的文字里换成这个记号（NUL 开头，不是 \w，不会被 HEREDOC 再认一次），切词之后它是 `<<` 的目标词，按编号找回正文
 HEREDOC_BODY_MARKER = re.compile(r"^\x00heredoc-body-(\d+)\x00$")
 
