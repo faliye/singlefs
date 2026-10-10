@@ -52,7 +52,7 @@
 #
 # 复用（接法同 checker-tier-formal-verification.sh）：真仓与 --staged 下整道跑时，stage-inputs.tsv 本阶段那一行的路径与 environment=（--tool-versions 那几行）
 #   都没变就整道退 77；判绿之后记环境；写全绿标记（admission.py stage-marker-write）之前核登记的输入路径（连同登记表与这一道自己）上工作区等于暂存区、
-#   没有未跟踪文件：标记按工作区算指纹，格判的是暂存区，两边不同就不写标记，打「本次未写全绿标记：<原因>」。库目录不在 git 树里，复用期间靠 stage-must-run.sh 的 24 小时上限兜。
+#   没有未跟踪文件：标记按工作区算指纹，格判的是暂存区，两边不同就不写标记，打「本次未写全绿标记：<原因>」。库目录不在 git 树里、不进复用判定；要重判设 SINGLEFS_GATE_FULL=1 再跑。
 #
 # 样本（fixtures/checker-tier-broad-mutation.sh/<格名>-<情形>/，各放 .gate-cells 点名一格；共享门禁的 stage-selftest.sh 跑）：
 #   样本根放了标记 .broad-mutation-sample（只供样本的开关：被判的根不是这道阶段所在的仓、也没设 GATE_STAGED_FROM 时才认）时，

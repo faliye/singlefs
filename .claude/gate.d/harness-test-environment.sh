@@ -7,6 +7,7 @@
 # gate-similar: code-tooling.sh 它的 research-script-selftests 格只跑 test-environment-check.py 的 --selftest（判别力），不看这台机器此刻的样子；它的 stage-order 格只判这一道的文件名排在跑测试的阶段之后，不读机器；这里在真机上判
 # gate-similar: checker-tier-layer0-replay.sh 它跑崩溃点重放时自己建镜像、自己收拾，判的是重放的结局；机器上残不残留、宿主盘好不好，由这一道在全部跑测试的阶段之后统一判
 # gate-similar: checker-tier-qemu-device-streams.sh 它起 QEMU、判设备流的结局；带 singlefs 的 qemu 进程跑完还在不在，由这一道判
+# gate-similar: gate.sh 上游「跑完没留下临时文件」那一段在全部阶段跑完之后判 gate.sh 发给这一轮的 TMPDIR 里剩下的每一项（名字不限 singlefs-*）；它判绿时这一轮的 TMPDIR 下没有剩东西，这里对那个目录的 singlefs-* 也必然判绿，所以在 gate.sh 里时临时目录残留那一类不再扫它。它看不见的 /tmp 与别处的 singlefs-*、loop / dm / 挂载、qemu 进程与宿主盘仍归这一道
 #
 # 格名表（--list 打它，--check machine-clean 只跑这一格，格名写错退 2）：
 # gate-cell: machine-clean 跑完测试之后机器还干不干净
@@ -19,13 +20,26 @@
 # 判据：`research/scripts/test-environment-check.py check` 汇总行里「判红 N 类」不是 0 红，「没查成 N 类」不是 0 也红，
 # 汇总行读不到也红；真跑时它的退出码（1 有判红、3 只有没查成、0 干净）与汇总对不上，红。
 # 射程：只看机器此刻的样子，不查这一轮有没有重新 mkfs（那由用例的排他创建守）。不给 --smart，SMART 由它逐个列为没跑。
+# 在 gate.sh 里（GATE_NOT_RUN_FILE 所在的目录正是此刻的 TMPDIR，gate.sh 把这一轮的临时目录发给各阶段的那一份）：把这个 TMPDIR 交给
+# --gate-run-temporary-directory，临时目录残留那一类不扫它，由上游「跑完没留下临时文件」判；loop / dm / 挂载与宿主盘照旧算它。单跑时不交。
+# GATE_CROSS_RUN_TMPDIR 设了（gate.sh 设它：开跑前的那个 TMPDIR）就交给 --cross-run-temporary-directory：临时目录残留那一类另扫它，
+# 只判 singlefs-* 残留、判法与 /tmp 相同；不交的话它不是 /tmp 时从来没人扫。
 #
-# 样本：被判目录里没有那份脚本而有 `test-environment-check-output.log` 时，只判这份录好的输出
-# （fixtures/harness-test-environment.sh/，每份的 .gate-cells 点名 machine-clean）：
+# 样本（fixtures/harness-test-environment.sh/，每份的 .gate-cells 点名 machine-clean）：被判目录里没有那份脚本而有
+# `test-environment-check-output.log` 时，只判这份录好的输出：
 #   machine-clean-red    判红 1 类（临时目录残留）、没查成 1 类
 #   machine-clean-green  10 类都查过、判红 0 类
+#   machine-clean-gate-run-green  放一份只核参数的替身 research/scripts/test-environment-check.py：在 gate.sh 里该带
+#                        --gate-run-temporary-directory <TMPDIR>、单跑时不带，对上了报判红 0 类，判绿
+#   machine-clean-cross-run-green  放一份只核参数的替身：GATE_CROSS_RUN_TMPDIR 设了该带 --cross-run-temporary-directory <它>、没设不带，
+#                        对上了报判红 0 类，判绿
 # 脚本与录好的输出都没有：判红，不当跳过。
 # 弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让 machine-clean-red 退 0。
+# 这一道自己的弄坏开关 HARNESS_TEST_ENVIRONMENT_BREAK=gate-run-scanned：在 gate.sh 里也不交 --gate-run-temporary-directory。
+#   照 gate.sh 设好 TMPDIR 与 GATE_NOT_RUN_FILE（GATE_NOT_RUN_FILE 指到 TMPDIR 下）喂样本时 machine-clean-gate-run-green 判红、退 1；
+#   单跑时这一道本来就不交，那份样本照样判绿，证不了红。
+# 另一个 HARNESS_TEST_ENVIRONMENT_BREAK=cross-run-unscanned：GATE_CROSS_RUN_TMPDIR 设了也不交 --cross-run-temporary-directory。
+#   设好 GATE_CROSS_RUN_TMPDIR 喂样本时 machine-clean-cross-run-green 判红、退 1；没设时这一道本来就不交，那份样本照样判绿。
 #
 #   bash .claude/gate.d/harness-test-environment.sh [项目根]
 #   bash .claude/gate.d/harness-test-environment.sh --list
@@ -87,13 +101,24 @@ cell_machine_clean() {
   log="$(mktemp)"
   trap 'rm -f "$log"' EXIT
 
+  # 在 gate.sh 里：这一轮的 TMPDIR 交给 --gate-run-temporary-directory（文件头「射程」一段）
+  local gate_run_arguments=()
+  if [[ -n "${GATE_NOT_RUN_FILE:-}" && -n "${TMPDIR:-}" && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != gate-run-scanned ]] \
+    && [[ "$(realpath -m -- "$(dirname -- "$GATE_NOT_RUN_FILE")")" == "$(realpath -m -- "$TMPDIR")" ]]; then
+    gate_run_arguments=(--gate-run-temporary-directory "$TMPDIR")
+  fi
+  # gate.sh 开跑前的 TMPDIR（GATE_CROSS_RUN_TMPDIR，跨轮复用的缓存放那里）：不是 /tmp 时不点名就从来不扫，点名交给 --cross-run-temporary-directory
+  # （临时目录残留这一类另扫它，判法照旧；与 /tmp、这一轮的 TMPDIR 是同一处时脚本只扫一次）
+  if [[ -n "${GATE_CROSS_RUN_TMPDIR:-}" && "${HARNESS_TEST_ENVIRONMENT_BREAK:-}" != cross-run-unscanned ]]; then
+    gate_run_arguments+=(--cross-run-temporary-directory "$GATE_CROSS_RUN_TMPDIR")
+  fi
   # 脚本的退出码要留着：它在「判红 0 类、没查成 ≥1 类」时退 3，吞掉它就只剩汇总行里的判红数可读
   script_rc=""
   if [[ -f "$SCRIPT" ]]; then
     if started="$(gate_started_epoch)"; then
-      if python3 "$SCRIPT" check --produced-after "$started" >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
+      if python3 "$SCRIPT" check --produced-after "$started" ${gate_run_arguments[@]+"${gate_run_arguments[@]}"} >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
     else
-      if python3 "$SCRIPT" check >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
+      if python3 "$SCRIPT" check ${gate_run_arguments[@]+"${gate_run_arguments[@]}"} >"$log" 2>&1; then script_rc=0; else script_rc=$?; fi
     fi
   elif [[ -f test-environment-check-output.log ]]; then
     cp test-environment-check-output.log "$log"

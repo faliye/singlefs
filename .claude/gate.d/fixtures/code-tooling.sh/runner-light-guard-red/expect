@@ -1,0 +1,5 @@
+exit=1
+want=bash research/scripts/sample-light-real-cargo.sh --selftest 没过（退出码 3）
+want=替身拒了的真工具链
+want=cargo build --manifest-path
+want=runner 表 2 条里 1 条没过

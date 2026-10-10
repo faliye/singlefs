@@ -1,0 +1,2 @@
+# 样本豁免表：一截不走 GPU、代码里有一处标记
+writable-mount	// gpu-exempt: writable-mount	要在崩溃态上真跑 Rust 实现的可写挂载路径，被测对象就是这段实现	2026-10-10	# 可写挂载

@@ -1,0 +1,3 @@
+# 样本的崩溃点重放合表（开跑前的静态判据 crash-case-check.py --only placement 读它：每条 crash-case: 恰好被一项点名，写法同仓里那一份的表头）
+clean-stream	crash-case:clean-stream	-	clean_stream	# 样本
+no-enumeration	crash-case:no-enumeration	-	no_enumeration	# 样本

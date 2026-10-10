@@ -1,0 +1,15 @@
+# E165 被取代红例账登记表：登记在这里的账是完整的一趟（有收尾行、ledger_sha256 对得上），但被同档的后一趟取代了；
+# 门禁 checker-tier-formal-verification 的 pinned-red-examples-complete 格（research/scripts/e165-pin-red-examples.py --check）跳过它，不要求它的每一行钉进 e165-pinned-red-examples.tsv；
+# 取代它的账照常要钉全（--check 只点名被取代的账时，把取代它的账补进这一次判的账）。成功那句报「跳过作废账 N 份、被取代的账 M 份：逐个列名（被取代的写取代它的是哪份）」。
+# 没跑完的一趟（没有收尾行）不登记在这里，登记进作废表 .claude/gate.d/e165-void-red-example-ledgers.tsv。
+# 一行一份，四段，制表符分隔，都不许空：
+#   ① 被取代的账的路径（仓根起，research/results/e165-*-red-examples.tsv 里的一份）
+#   ② 取代它的账的路径（同上；它自己不许登记在作废表或这张表的第一段里）
+#   ③ 理由（不少于 8 个字：为什么后一趟取代前一趟、为什么不钉前一趟）
+#   ④ 实验页里写明取代关系的那一处，写成「文件:行号」（登记时的行号；--check 只判写法，不核那一行的内容）
+# 判红的：缺段或有段空着、理由不到 8 个字、④ 不是「文件:行号」、两份账有一份不在、两份是同一份、① 登记两次或也登记作废、② 登记作废或登记成被取代；
+#   两份账各自同一趟 kill-bounds 产物（<前缀>-red-examples.tsv 配同一目录的 <前缀>-kill-bounds.out）的 device_arguments= 照钉表 ㉒ 那套规则取档，取不到或档不同；
+#   ① 的每一行按（第 3 列域, 第 4 列 N, 第 5 列枚举序号, 输入指纹 ①）在 ② 里一行配一行（① 是第 3、4 列与第 12 列 state= 算的、钉表第 1 段那一个；同一个键几行就要几行），配不上的；
+#   ② 没钉全的（照常报没钉的行，另注明它取代了谁）。
+# 只登记实验页已写明取代关系的账。--list-items 与 --replay 不读这张表。
+research/results/e165-replay-bounded-enumeration-2026-10-02-r2-segment2c-red-examples.tsv	research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment2-r2-mode-red-examples.tsv	同档（--profile r2）后一趟重跑出同一批 165 个反例状态（域、N、枚举序号、怎么不同逐个相同），原实现逐态行在后一趟多计 J7a，钉表钉的是后一趟那份	.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md:1011

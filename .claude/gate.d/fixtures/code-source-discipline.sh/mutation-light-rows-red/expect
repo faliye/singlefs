@@ -1,0 +1,6 @@
+exit=1
+want=「add-becomes-subtract」 不是 crates/mutations.tsv 里成形的一行的变异名
+want=测试目标「-p tiny --lib」在轻型登记表里没有一行（照挑法补这一行：add-becomes-sub
+want=测试目标「-p tiny --test walk」在轻型登记表里没有一行（照挑法补这一行：walk-stops-early
+want=「outside-core-flip」 的改坏对象是 crates/outside/src/lib.rs，不在 crates/singlefs-core/src/ 下
+want=mutation-light-rows：红

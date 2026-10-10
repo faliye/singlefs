@@ -19,15 +19,18 @@
 #   --list-items            逐行打六个模式与各自判什么，不编译、不起虚机
 #   --item <模式>           只跑点名的模式（给几次取并集；写错退 2、列出可点的模式）：不问整道的复用判定与改动范围，不写全绿标记
 #   认不出的选项退 2。
-# 读的环境变量：VM_LOG_MB（每块盘的设备侧日志 MiB，默认 4096）；GATE55_KEEP_WORK=1（判绿也留现场，重录样本时拷四件套用）；
+# 读的环境变量：VM_LOG_MB（每块盘的设备侧日志 MiB，默认 4096）；GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1（判绿也留现场，重录样本时拷四件套用）；
 #   SINGLEFS_GATE_FULL=1 由 stage-must-run.sh 与 change-touches-crates.sh 读（不复用、不按改动范围跳过）。
 #
-# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
+# 样本 fixtures/checker-tier-qemu-device-streams.sh/{red,direct-divergence-red,e142-row-missing-red,e142-row-duplicate-red,green}（stage-selftest.sh 跑，各放 .gate-cells 点名 device-streams）：
 # 样本根放 .qemu-prerecorded，按 <模式>/out.txt、vm-exit、check.txt、check-exit 摆某一轮真跑的原样输出，本阶段不起虚机、不编译，
 # 用同一段判定代码判（只供测试的开关：.claude/rules/fs-design.md 五条硬要求第 2 条）。预录档全过这一格退 77：退 0 与真起过虚机的一档在汇总里分不出。
 #
 # 弄坏开关（只给样本证红用）：GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 让 direct 那一档只看退出码与宿主读回、不逐盘读 divergence=none 那一行，
 #   direct-divergence-red（direct 的 check.txt 里盘 1 那一行改成 device=2、退出码仍是 0）判绿退 77、expect 里那几条 want 找不到。
+#   GATE_QEMU_DEVICE_STREAMS_BREAK=e142-all-rows 让取 E142 产物的那一步退回「取复跑表里全部 E142 行的第 4 列」、不数行数：
+#   green（复跑表里两行 E142，真仓现在的形态）取到两个文件名，红在「从 replay.sh 的 @driver_e142 那一行解析不出产物文件」、不是预期的退 77，expect 里的 want 对不上；
+#   e142-row-missing-red（@driver_e142 那一行缺了）取到别的行的文件名，过了这一处，红不在「第 2 列是 @driver_e142 的 E142 行取到 0 行」。
 #
 # 准入：读的路径与三个前提（QEMU、/dev/kvm、内核镜像）都登记在 .claude/gate.d/stage-inputs.tsv 本阶段那一行，复用判定与改动范围都从它取，
 # 那一行不在判红；判法在 research/scripts/admission.py。
@@ -227,8 +230,17 @@ if ((prerecorded == 0)); then
   fi
 fi
 
-PRODUCT="research/results/$(awk -F'|' '$1=="E142"{print $4}' research/scripts/replay.sh)"
-[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 E142 行解析不出产物文件（得到 $PRODUCT）" "看 research/scripts/replay.sh 里 E142 那一行的第 4 列。"
+# 复跑表里 E142 有不止一行（第 2 列 @driver_e142 与 @driver_e142_p8g_crates_dump 等）：只取第 2 列恰是 @driver_e142 的那一行的第 4 列，不取全部 E142 行。
+e142_row_filter='$1=="E142" && $2=="@driver_e142"'
+[[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" == e142-all-rows ]] && e142_row_filter='$1=="E142"'
+e142_product_names="$(awk -F'|' "$e142_row_filter"'{print $4}' research/scripts/replay.sh)"
+e142_product_row_count="$(grep -c . <<<"$e142_product_names")"
+if [[ "${GATE_QEMU_DEVICE_STREAMS_BREAK:-}" != e142-all-rows && "$e142_product_row_count" != 1 ]]; then
+  fail "research/scripts/replay.sh 里第 2 列是 @driver_e142 的 E142 行取到 $e142_product_row_count 行（要恰好 1 行；0 行是这一行被删或改了名，多于 1 行是被重复登记）" \
+       "看 research/scripts/replay.sh 里 E142|@driver_e142| 开头的行：留一行，第 4 列写这一道对照的 E142 产物文件名；驱动改了名，这里的 @driver_e142 跟着改。"
+fi
+PRODUCT="research/results/$e142_product_names"
+[[ -f "$PRODUCT" ]] || fail "从 replay.sh 的 @driver_e142 那一行解析不出产物文件（得到 $PRODUCT）" "看 research/scripts/replay.sh 里 E142|@driver_e142| 那一行的第 4 列，对应的文件在不在 research/results/ 下。"
 # 反向链从产物里现取，不写死：写死的数在格式常量一改就过期，红起来像是写路错了。
 EXPECTED_BACK_CHAIN="$(sed -n 's/.*name=root_record .*back_chain=\([0-9][0-9]*\).*/\1/p' "$PRODUCT" | head -1)"
 [[ -n "$EXPECTED_BACK_CHAIN" ]] || fail "产物里取不出 name=root_record 的 back_chain（$PRODUCT）" "看 $PRODUCT 有没有 name=root_record 那一行、它的 back_chain 字段还在不在。"
@@ -249,14 +261,14 @@ if ((prerecorded)); then
   ((${#present[@]})) || fail "预录档：$work 下一个模式的四件套（out.txt / vm-exit / check.txt / check-exit）都没摆全" "按 <模式>/out.txt、vm-exit、check.txt、check-exit 放某一轮真跑留下来的原样输出；模式名取 ${MODES[*]} 里的。"
   MODES=("${present[@]}")
 else
-  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-gate55.XXXXXX")"
+  work="$(mktemp -d "${TMPDIR:-/tmp}/singlefs-checker-tier-qemu-device-streams.XXXXXX")"
   # 设备侧日志（blklogwrites）连数据记下每块盘收到的每个写，要装得下 mkfs 写零的 768 MiB 与之后的写：默认取一块数据盘的大小（4096 MiB）；
   # vm-bench.sh 自己的 256 MiB 装不下，direct 那几档会在 mkfs 里撞 I/O error。镜像是稀疏文件，只占真写进去的那些。
   # 数据盘或写路再变大，先看判红现场里 log<d>.img 的 du -m。
   QEMU_DEVICE_LOG_MEGABYTES="${VM_LOG_MB:-4096}"
   [[ "$QEMU_DEVICE_LOG_MEGABYTES" =~ ^[1-9][0-9]*$ ]] || fail "VM_LOG_MB 写成了「$QEMU_DEVICE_LOG_MEGABYTES」，vm-bench.sh 要的是正整数（MiB）" "写成正整数，例 VM_LOG_MB=4096；不设就用一块数据盘的大小 4096。"
   # 判绿才清理：判红时出路点名的 check.txt、out.txt 都在 $work 底下，留着现场、印出路径，删不删由看的人定。
-  trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE55_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE55_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
+  trap 'stage_exit_code=$?; if ((stage_exit_code == 0)) && [[ "${GATE_QEMU_DEVICE_STREAMS_KEEP_WORK:-0}" != 1 ]]; then rm -rf "${work:?}"; elif ((stage_exit_code == 0)); then echo "     ! GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1，判绿的现场留着：$work（看完自己删）"; else echo "     ! 判红，现场没清：$work（出路里点名的文件都在这底下，看完自己删）"; fi' EXIT
   missing=()
   BIN="target/x86_64-unknown-linux-musl/release/new_pool_file_creation_on_device"
   CHECK="target/debug/new_pool_file_creation_device_log_check"

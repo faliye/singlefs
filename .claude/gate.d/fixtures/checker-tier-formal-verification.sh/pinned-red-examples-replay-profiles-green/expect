@@ -1,0 +1,4 @@
+exit=0
+want=钉住的 6 行：点名的变异都还在它们的表里
+want=按档 2 组：--profile r1 3 行、--profile r2 3 行
+want=pinned-red-examples-replay：绿

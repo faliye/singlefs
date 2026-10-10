@@ -1,0 +1,4 @@
+exit=1
+want=第 5 行没写档（21 段，要 22 段：㉒ 是出这一行的那一趟的档）
+want=--backfill
+want=pinned-red-examples-replay：红（退出 1）

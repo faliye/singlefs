@@ -18,7 +18,7 @@
 #   ① 复用（research/scripts/stage-must-run.sh）：登记的路径在 refs/sop/staged-green 与这一次的暂存树之间没变，
 #      且 herd7 版本（第三列 environment=）与上次判绿时记下的相同，才退 77。版本不在 git 树里，判绿后经 gate-record-environment 记进 git common-dir。
 #   ② 前提（第三列 probe=：找得到 herd7）没齐判红，不退 77。
-#   内核树里的 tools/memory-model 不进复用判定（不在 git 树里、可能要联网取），只靠 stage-must-run.sh 的 24 小时复用上限兜。
+#   内核树里的 tools/memory-model 不进复用判定（不在 git 树里、可能要联网取）；它换了要重判，设 SINGLEFS_GATE_FULL=1 再跑。
 #
 #   bash .claude/gate.d/checker-tier-lkmm.sh [项目根]
 #   bash .claude/gate.d/checker-tier-lkmm.sh --list                       逐行打格名与判什么，不起 herd7

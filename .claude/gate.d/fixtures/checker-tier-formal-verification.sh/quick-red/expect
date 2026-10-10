@@ -1,0 +1,4 @@
+exit=1
+want=· --quick：核心部分 toolchain proof complete 三项；轻型没有剪枝：判定库只记不读
+want=3 行里 1 行没钉进
+want=pinned-red-examples-complete：红（退出 1）

@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：gpu-exemptions
+want=✓ 不走 GPU 的计算与豁免表逐项对上：豁免表 1 行、代码里 1 处标记（扫了 crates/ 下 1 份 .rs）
+want=gpu-exemptions：绿

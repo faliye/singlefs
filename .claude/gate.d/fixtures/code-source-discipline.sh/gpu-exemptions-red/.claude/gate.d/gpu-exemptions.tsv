@@ -1,0 +1,3 @@
+# 样本豁免表：writable-mount 代码里有标记；second-crash-during-mount 代码里没有标记；代码里另有一处 continuation 的标记没有表行
+writable-mount	// gpu-exempt: writable-mount	要在崩溃态上真跑 Rust 实现的可写挂载路径，被测对象就是这段实现	2026-10-10	# 可写挂载
+second-crash-during-mount	// gpu-exempt: second-crash-during-mount	要录下可写挂载那一趟 Rust 实现发出的写、再在它上面造第二次崩溃	2026-10-10	# 挂载途中二次崩溃

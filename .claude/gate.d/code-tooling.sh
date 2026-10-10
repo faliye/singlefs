@@ -4,7 +4,7 @@
 # gate-stage: 工具层自检（十一格：研究脚本的自证都过、有阶段在跑；项目规则清单；阶段归属表按格登记；钩子注册与写范围表与定义头；改动范围只许一份取法；研究脚本与钩子的拒绝出路与 shell 纪律；阶段声称的样本与编造的日期；kb 登记表；门禁结构；环境检查排在跑测试的阶段之后）
 # gate-category: 代码类
 # 不写 gate-covers：.claude/gate-not-implemented.tsv 里的两项判的是被测代码的行为，这一道只判工具层自己。
-# gate-similar: checker-tier-research-build-and-replay.sh 它编 research/ 的装置、跑它们的单测，也先赋变量再 "$变量" --selftest 跑几份脚本的自证；这一道的 research-script-selftests 格跑的是 runner 表里研究脚本的自证、research-script-selftest-coverage 格核每份实现了 --selftest 的都有阶段在跑，不编译
+# gate-similar: checker-tier-research-build-and-replay.sh 它编 research/ 的装置、跑它们的单测，不跑研究脚本的自证（oov-check.py、stage-mine.py、relabel-item.py、claim-experiment.sh 这几份的自证不要 research 工作区先编好，同别的研究脚本一样在这里的 runner 表里跑）；这一道的 research-script-selftests 格跑 runner 表里研究脚本的自证、research-script-selftest-coverage 格核每份实现了 --selftest 的都有阶段在跑，不编译
 # gate-similar: harness-model-differential-and-scenarios.sh 它在真仓上判 harness 用例一条一个场景，crash-case-check.py 的判别力由这一道 research-script-selftests 格跑它的 --selftest；判的对象一个是用例源码，一个是脚本的自证
 # gate-similar: doc-text.sh 也扫全仓文件，但判的是文本里登记过的禁用写法与旧术语；这一道 fixture-claims 格判文件名与样本目录里编出来的日期、阶段头部声称的样本在不在
 # gate-similar: code-source-discipline.sh 它判实验二进制的变异表、绝对值断言与读数纪律，对象是实验源码；crates-mutation-rows.py 与 check-segment-registry.py 这类脚本的自证由这一道 research-script-selftests 格替它们跑
@@ -32,7 +32,7 @@
 # 参数解析、样本根的 .gate-cells、每格一个子 shell、逐格汇总与退出码经共用库 lib/stage-cells.sh（写法在它的文件头），这里只登记格、解析项目根。
 #
 # 判别力：fixtures/code-tooling.sh/ 下每一格至少一红一绿，每份样本根放 .gate-cells 只点名它判的那一格：
-#   research-script-selftests          runner-red、runner-green
+#   research-script-selftests          runner-red、runner-green、runner-light-guard-red、runner-light-guard-green
 #   research-script-selftest-coverage  red、green、coverage-claims-red、coverage-claims-green
 #   rules-manifest                     rules-manifest-red、rules-manifest-green
 #   stage-owners                       stage-owners-red、stage-owners-green
@@ -47,6 +47,8 @@
 # 汇总与 --check 的弄坏开关归共用库：STAGE_CELLS_BREAK=red-swallowed 让这一道每份 exit=1 的样本（red 与各格的 *-red）都判错；别的开关见 lib/stage-cells.sh 文件头。
 # 格的判法各有弄坏开关 CODE_TOOLING_BREAK=<项>，逐项写开关名、弄坏哪一处、打开后哪几份样本判错（样本自检报那一份退出码不对或 want 找不到）：
 #   runner-exit-swallowed    research-script-selftests 回读时把每条的退出码都当 0：runner-red 判绿
+#   light-guard-skipped      research-script-selftests 每条不经 light-selftest-guard.py、直接起（判定照「盯了、没扫到」写）：runner-light-guard-red 判绿，
+#                            runner-light-guard-green 里「本次未盯 1 条」那条 want 找不到
 #   claims-any-file          research-script-selftest-coverage 退回「全文出现 --selftest 就算声称有」：coverage-claims-green 判红
 #   numbered-stages-only     research-script-selftest-coverage 与 fixture-claims 只认两位数开头的阶段：coverage-claims-green 判红、fixture-claims-unnumbered-red 退 77，
 #                            fixture-claims-green（cells-covered.sh 不扫，「有样本的阶段 3 格」那条 want 找不到）、fixture-claims-cells-red（cells-uncovered.sh 不扫，扫到 0 个阶段，「有格缺红或缺绿」那条 want 找不到）
@@ -180,6 +182,10 @@ PY_CODE_WITHOUT_TEXT
 # ── 格 research-script-selftests：runner 表里每一条研究脚本与共用库的自证都通过（分批并行跑）
 #
 # 判据：SELFTEST_RUNNERS 里每一条自证都退 0；表全不全归 research-script-selftest-coverage 格。lib/stage-cells.sh 不是阶段，它的自证只在这张表里跑。
+#   每一条经 research/scripts/light-selftest-guard.py --only-if-light 起（登记表取被判那棵树的 .claude/hooks/selftest-registry.tsv）：登记成 light 的，
+#   跑的时候它整棵进程树里起了真 cargo / rustc（版本查询之外）、真清场（gpu-quiesce-run.sh 读真多机配置）或私有清场脚本，守卫退 3，这一条照没过记；
+#   经 PATH 起的 cargo、rustc 被守卫的替身当场拒、真的那一份不起。判据、射程与本次未查写在守卫文件头。别的（登记成 heavy、heavy-if-set 而变量设了、
+#   表外的、不是单独一个 --selftest 的）守卫原样 exec、本次未盯，成功句逐条列名。每条的判定写 <序号>.guard，按表次序回读、数份数，缺一份整格红。
 #
 # 分批并行：SELFTEST_RUNNERS_STARTED_ALONE 里最慢的那几条先各自单独起、跑到完；其余按表次序每批 N 条并行，一批收齐再起下一批，
 #   N = SINGLEFS_THREAD_CAP（research/scripts/capped.sh 设的；不设或不是正整数取 nproc）减去单独起的条数，至少 1。
@@ -189,6 +195,9 @@ PY_CODE_WITHOUT_TEXT
 # 样本：被判的根是样本时（judged_root_is_sample），样本根的 .selftest-runners（一行一条命令，空行与 # 开头的行不算）换掉 runner 表，
 #   单独起的那一路不走；真仓与 --staged 下放了它也不认。runner-red 四条里第二条必红，必须判红、点名它并列出输出，另三条照样跑完、
 #   报 4 条里 1 条没过；runner-green 三条都退 0，判绿并报跑了 3 条。
+#   runner-light-guard-red 与 runner-light-guard-green 各放一份自己的 .claude/hooks/selftest-registry.tsv，把一份样本自证登记成 light：
+#   red 那一份经 PATH 起 cargo build（清单不在），必须被守卫的替身拒、这一条退 3 判红，报 2 条里 1 条没过；green 那一份只用样本自己的假 cargo，
+#   判绿并报盯了 1 条、本次未盯 1 条（另一条没登记）。
 SELFTEST_RUNNERS=(
   "bash research/scripts/ask-local-selftest.sh" "python3 research/scripts/checklist-specs.py --selftest"
   "python3 research/scripts/quote-kb.py --selftest" "python3 research/scripts/kb-sections.py --selftest"
@@ -210,10 +219,11 @@ SELFTEST_RUNNERS=(
   "bash research/scripts/capped.sh --selftest" "bash research/scripts/stage-run-or-skip.sh --selftest"
   "bash research/scripts/layer0-shard-run.sh --selftest" "bash research/scripts/mutation-shard-run.sh --selftest"
   "bash research/scripts/multi-host-run.sh --selftest" "bash research/scripts/run-with-memory-cap.sh --selftest"
-  "bash research/scripts/detached-run.sh --selftest"
+  "bash research/scripts/detached-run.sh --selftest" "bash research/scripts/replay.sh --selftest"
   "bash research/scripts/mutate.sh --selftest" "python3 research/scripts/cite-check.py --selftest"
   "python3 research/scripts/kb-spec-check.py --selftest" "python3 research/scripts/crash-case-check.py --selftest"
   "bash research/scripts/prove-red.sh --selftest" "python3 research/scripts/apply-writer-patch.py --selftest"
+  "python3 research/scripts/lib_libtest_result_lines.py --selftest" "python3 research/scripts/rerun-failed-tests.py --selftest"
   "python3 research/scripts/closeout-status.py --selftest" "python3 research/scripts/compile-then-swap.py --selftest"
   "python3 research/scripts/corruption-check.py --selftest" "python3 research/scripts/crates-mutation-rows.py --selftest"
   "bash .claude/gate.d/lib/stage-cells.sh --selftest" "python3 research/scripts/gate-structure-check.py --selftest"
@@ -221,12 +231,19 @@ SELFTEST_RUNNERS=(
   "bash research/scripts/crash-amplification.sh --selftest"
   "bash research/scripts/crash-amplification-item.sh --selftest"
   "bash research/scripts/crash-amplification-two-hosts.sh --selftest"
+  "bash research/scripts/gpu-quiesce-run.sh --selftest"
+  "bash research/scripts/crash-point-replay.sh --selftest"
+  "python3 research/scripts/crates-mutation-light-rows.py --selftest" "python3 research/scripts/gpu-exemptions-check.py --selftest"
   "python3 research/scripts/broad-mutation.py --selftest" "python3 research/scripts/mutation-prune.py --selftest"
   "python3 research/scripts/verus-proof-check.py --selftest" "python3 research/scripts/e165-pin-red-examples.py --selftest"
   "bash research/scripts/e165-replay-mutation-kill-bounds.sh --selftest"
   "python3 research/scripts/e165-compare-kill-bounds.py --selftest"
-  "python3 research/scripts/hook-swap.py --selftest"
+  "python3 research/scripts/hook-swap.py --selftest" "python3 research/scripts/host-dispatch.py --selftest"
+  "python3 research/scripts/light-selftest-guard.py --selftest"
+  "python3 research/scripts/host-resources.py --selftest" "python3 research/scripts/source-stamp.py --selftest"
   "bash research/scripts/qemu-blklogwrites-check.sh --selftest" "bash research/scripts/build-patched-qemu.sh --selftest"
+  "python3 research/scripts/oov-check.py --selftest" "python3 research/scripts/stage-mine.py --selftest"
+  "python3 research/scripts/relabel-item.py --selftest" "bash research/scripts/claim-experiment.sh --selftest"
 )
 SELFTEST_RUNNERS_STARTED_ALONE=("bash research/scripts/layer0-shard-run.sh --selftest" "python3 research/scripts/agent-watch.py --selftest")
 
@@ -269,10 +286,16 @@ batch_size=$((thread_cap - ${#alone_set[@]}))
 
 scratch="$(mktemp -d)" || { echo "  ✗ 建不了放逐条输出与退出码的临时目录"; echo "     → 怎么办：看 \$TMPDIR 满没满、有没有写权限，修好再跑这一格；一条自证都没跑。"; exit 1; }
 started_pids=()
-# start_selftest <表里的序号> <命令>：后台起一条，输出写 <序号>.out、退出码写 <序号>.exit，进程号记进 started_pids
+light_selftest_guard="$STAGE_REPOSITORY/research/scripts/light-selftest-guard.py"
+# start_selftest <表里的序号> <命令>：后台起一条，输出写 <序号>.out、退出码写 <序号>.exit、守卫的判定写 <序号>.guard，进程号记进 started_pids
 start_selftest() {
-  # runner 表每条是「解释器 脚本 参数」，按空白切词起，与原来逐条顺序跑时同一个起法
-  { $2 > "$scratch/$1.out" 2>&1; printf '%s\n' "$?" > "$scratch/$1.exit"; } &
+  # runner 表每条是「解释器 脚本 参数」，按空白切词起，与原来逐条顺序跑时同一个起法；经守卫起：登记成 light 的盯着它的进程树，别的守卫原样 exec
+  if [[ "${CODE_TOOLING_BREAK:-}" == light-guard-skipped ]]; then
+    { printf 'watched\tfindings=0\tscan=no\texamined=0\texit=-\n' > "$scratch/$1.guard"; $2 > "$scratch/$1.out" 2>&1; printf '%s\n' "$?" > "$scratch/$1.exit"; } &
+  else
+    { python3 "$light_selftest_guard" --only-if-light --registry-root "$ROOT" --verdict-file "$scratch/$1.guard" -- $2 > "$scratch/$1.out" 2>&1
+      printf '%s\n' "$?" > "$scratch/$1.exit"; } &
+  fi
   started_pids+=("$!")
 }
 for index in "${!runners[@]}"; do
@@ -297,13 +320,20 @@ done
 ((${#batch[@]})) && run_selftest_batch
 for pid in ${alone_pids[@]+"${alone_pids[@]}"}; do wait "$pid"; done
 
-collected=0; failed_count=0; uncollected=()
+collected=0; failed_count=0; uncollected=(); watched_count=0; unwatched=(); unjudged=()
 for index in "${!runners[@]}"; do
   runner="${runners[$index]}"
   if [[ ! -f "$scratch/$index.exit" ]]; then uncollected+=("$runner"); continue; fi
   collected=$((collected + 1))
   rc="$(<"$scratch/$index.exit")"
   [[ "${CODE_TOOLING_BREAK:-}" == runner-exit-swallowed ]] && rc=0
+  guard_verdict=""
+  [[ -f "$scratch/$index.guard" ]] && guard_verdict="$(head -n 1 "$scratch/$index.guard")"
+  case "$guard_verdict" in
+    watched$'\t'*) watched_count=$((watched_count + 1)) ;;
+    not-watched$'\t'*) unwatched+=("$runner") ;;
+    *) unjudged+=("$runner") ;;
+  esac
   if [[ "$rc" != 0 ]]; then
     failed_count=$((failed_count + 1))
     echo "  ✗ $runner 没过（退出码 $rc）："
@@ -317,12 +347,19 @@ if ((collected != ${#runners[@]})); then
   echo "     → 怎么办：临时目录在跑的过程中被删了或写不进去；看 \$TMPDIR 再重跑这一格，收不全的一轮不算判过。"
   exit 1
 fi
+if ((${#unjudged[@]})); then
+  echo "  ✗ research/scripts/light-selftest-guard.py 没给 ${#unjudged[@]} 条写判定（盯没盯说不清）：$(printf '「%s」' "${unjudged[@]}")"
+  echo "     → 怎么办：单跑 python3 research/scripts/light-selftest-guard.py --only-if-light --verdict-file <文件> -- <那条命令> 看它报什么；判定不全的一轮不算判过。"
+  exit 1
+fi
 if ((failed_count)); then
   echo "  ✗ runner 表 ${#runners[@]} 条里 $failed_count 条没过（上面按表次序逐条列着）"
   echo "     → 怎么办：逐条按那份自证给的下一步修；只在并行下红、单跑绿的，是几份自证抢同一份状态，照这一格文件头那一段办。"
   exit 1
 fi
-echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} 条，表取自 $table_source；单独起 ${#alone_pids[@]} 条，其余 $((${#runners[@]} - ${#alone_pids[@]})) 条按每批至多 $batch_size 条并行、共 $batches 批）"
+unwatched_text=""
+((${#unwatched[@]})) && unwatched_text="：$(printf '「%s」' "${unwatched[@]}")"
+echo "  ✓ research 脚本的自证都通过（这一格跑了 ${#runners[@]} 条，表取自 $table_source；单独起 ${#alone_pids[@]} 条，其余 $((${#runners[@]} - ${#alone_pids[@]})) 条按每批至多 $batch_size 条并行、共 $batches 批；登记成 light 的 $watched_count 条经 light-selftest-guard.py 盯着进程树、没起真 cargo / rustc 与真清场，本次未盯 ${#unwatched[@]} 条$unwatched_text）"
 }
 
 # ── 格 research-script-selftest-coverage：research/scripts/ 里代码实现了 --selftest 的脚本，都有门禁阶段在跑或登记了为什么不跑

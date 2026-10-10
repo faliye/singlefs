@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+# 样本的假 cargo：只打一行、退 0
+echo "假 cargo $*"
+exit 0

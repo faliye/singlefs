@@ -3,4 +3,4 @@ release	0.2026.09.20.aef82ed	aef82eda71838deef4a8cd0260fda6c9504be9b9	7b870fa12b
 package	vstd	0.0.0-2026-09-20-0158	320411804871a2db305fc25bc66a481870581f0e	source/vstd	135cc8280824fe808e9d25edf33978f5ee32dc51a1ccb47e74ee0c4b4f91b545
 crate	crates/singlefs-replay-prefix	2
 kernel	crates/singlefs-replay-prefix/src/lib.rs
-must-red-worlds	crates/singlefs-replay-prefix/verus-mutations.tsv
+must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv

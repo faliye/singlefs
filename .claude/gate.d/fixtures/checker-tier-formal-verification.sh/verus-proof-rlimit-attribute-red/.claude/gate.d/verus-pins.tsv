@@ -8,5 +8,5 @@ package	verus_syn	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b
 package	verus_prettyplease	0.0.0-2026-09-06-0133	53ec5c4b0770df8ba5526adb823929fb85eb0c4b	dependencies/prettyplease	0052db78e25abd4a063ac154bfb8e616aa017725154a3dba5d6e9816551f8f97
 crate	crates/singlefs-replay-prefix	2
 kernel	crates/singlefs-replay-prefix/src/lib.rs
-must-red-worlds	crates/singlefs-replay-prefix/verus-mutations.tsv
+must-red-worlds	crates/singlefs-replay-prefix/verus-must-red-worlds.tsv
 rlimit	10

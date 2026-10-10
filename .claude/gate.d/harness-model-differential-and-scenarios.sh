@@ -46,7 +46,7 @@
 # 每格先问 research/scripts/stage-must-run.sh（输入登记在 .claude/gate.d/stage-inputs.tsv，键是这份文件名）与 change-touches-crates.sh，
 # 可跳过的退 77；one-scenario 每次都判。
 # 读的环境变量：GATE_MODEL_DIFFERENTIAL_MEMORY_MAX，cargo test 经 research/scripts/run-with-memory-cap.sh 跑的内存上限，没设取 8G；
-# 谁跑这一道外面都不再包一层。包装退 250–254 不是测试的判定，单独判红、单独给出路。
+# 谁跑这一道外面都不再包一层。包装退 245 或 250–254 不是测试的判定，单独判红、单独给出路。
 # 被判目录里没有 Cargo.toml 而有 model-differential-cargo-output.log 时不跑 cargo，只判录好的输出里这一段，并打出本该跑的 cargo 命令；
 # 两样都没有：这几格退 77。
 # 弄坏开关 GATE_MODEL_DIFFERENTIAL_BREAK=<项>：
@@ -180,11 +180,11 @@ model_differential_cell() {
     if ((cargo_exit != 0)); then
       tail -40 "$log"
       case "$cargo_exit" in
-        250|251|252|253|254)
+        245|250|251|252|253|254)
           echo "  ✗ 「$section」那条用例没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 $cargo_exit（上限 $memory_max），这一次的输出不算判定"
           echo "     → 怎么办：照包装文件头「退出码」一段办：250 是这一格要的比上限多，把 GATE_MODEL_DIFFERENTIAL_MEMORY_MAX 设大再跑；"
           echo "                251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；不拿掉包装跑。"
-          echo "                253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑。"
+          echo "                253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑。245 是同一段时间内核报了显存不够：nvidia-smi 看谁在用卡，等它跑完再重跑这一格。"
           ;;
         *)
           echo "  ✗ 「$section」那条用例判红（上面是 cargo test 的尾部）"

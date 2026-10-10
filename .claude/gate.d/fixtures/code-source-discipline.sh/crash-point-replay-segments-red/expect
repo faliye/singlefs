@@ -1,0 +1,8 @@
+exit=1
+want=样本只跑 .gate-cells 点名的格：crash-point-replay-segments
+want=项名 ghost-item 不是合表
+want=段号「01」不是非负整数
+want=段写数「0」要是大于 0 的整数
+want=不是 64 位小写十六进制
+want=other-stream 第 2 段已在第 6 行登记过
+want=crash-point-replay-segments：红

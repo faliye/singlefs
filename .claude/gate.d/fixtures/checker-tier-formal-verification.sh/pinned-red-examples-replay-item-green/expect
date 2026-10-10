@@ -1,0 +1,4 @@
+exit=0
+want=钉住的 2 行（--item 点名的 2 行）：点名的变异都还在它们的表里
+want=--item 点名 2 项
+want=pinned-red-examples-replay：绿

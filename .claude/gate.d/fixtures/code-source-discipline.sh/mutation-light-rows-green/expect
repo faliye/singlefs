@@ -1,0 +1,4 @@
+exit=0
+want=样本只跑 .gate-cells 点名的格：mutation-light-rows
+want=✓ 轻型变异登记表核过：2 行，改坏对象在 crates/singlefs-core/src/ 下的行里 2 个测试目标每个恰好一行
+want=mutation-light-rows：绿

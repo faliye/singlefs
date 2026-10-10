@@ -1,0 +1,7 @@
+E7RESULT name=config experiment=E165 segment=2 device_arguments=--profile+r2 bounds=segment2
+E7RESULT name=kill_bound item=baseline table=none table_row=none outcome=baseline title=基线（不改） complete=yes
+E7RESULT name=kill_bound item=tsv-2 table=crates/mutations.tsv table_row=2 outcome=red red_examples=1 title=链首锚点错一位 complete=yes
+E7RESULT name=kill_bound item=tsv-3 table=crates/mutations.tsv table_row=3 outcome=red red_examples=1 title=每条记录都当末条 complete=yes
+E7RESULT name=kill_bound item=Z1 table=research/mutations/e165_replay_bounded_enumeration_custom.tsv table_row=2 outcome=red red_examples=1 title=Z1_一条都不施加 complete=yes
+E7RESULT name=verdict scope=segment2 variants=4 variants_excluding_baseline=3 red=3 ledger_sha256=24ae99798dd319964b494e84c2ce2e35bfcb4ea59329fa3af25b4bef3a572b5e
+E7RESULT name=done emitted=6

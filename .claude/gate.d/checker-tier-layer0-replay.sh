@@ -49,6 +49,10 @@
 # 快档 feature-gated-tests 格（C604（快档不开特性，崩溃放量与 GPU 对拍编进来零条））：特性从 checker 档 tests/ 顶层每个 .rs 的 cfg 现读，不另抄名单；
 #   挂特性的文件跑到 0 条、每处 NOT_RUN_NO_GPU_ADAPTER（GPU 对拍没卡时打这一行后返回成功）都报「本次未跑」、不判红；一个挂特性的文件都没有，记无对象可判。
 #   清掉调用方的 SINGLEFS_CRASH_AMPLIFICATION_* 与 SINGLEFS_LAYER0_FINDINGS_FILE：快档不写真的判定库、不按全量的规模跑。
+#   特性里有 gpu 时这一趟经 research/scripts/gpu-quiesce-run.sh 起：照多机配置清场并回读、跑，跑完不复原（包装打 step=restore result=not-restored；
+#   要复原由用户手动跑私有复原脚本），它打的 GPU_QUIESCE 行逐行转打；清场回读没过（包装退 78、打 step=command result=not-started）判红、写出路，
+#   卡上有不归清场白名单的计算进程时出路是等它跑完再只重跑这一格，这里不停它。样本档里清场配置只认样本根 .layer0-sample-tools/multi-host.env
+#   （只写假清场命令），没有就判红、不起包装；包装的登记与本机日志放这一趟的临时目录，不落进真工作根。
 #
 # 自证：这一份的流程（逐条复用、只重跑输入变了的那一条、续跑的三个环境变量、--start-over、快档缺一格判红、跑的过程中输入变了不写标记）由
 #   research/scripts/admission.py --selftest 的「checker-tier-layer0-replay」那几格核：把这一份拷进临时仓的 .claude/stage-under-test/（不在 .claude/gate.d/ 下）、拿打合成日志的假 cargo 跑；
@@ -66,7 +70,11 @@
 #   quick-features-green         三个挂特性的文件都跑到了用例
 #   quick-features-gpu-not-run   两处 NOT_RUN_NO_GPU_ADAPTER（一处跟在 test 行后面、一处在库那一段）
 #   quick-features-zero          一个文件只有 ignored、一个文件 cargo 输出里没有它那一段
-#   quick-features-red           带特性那一趟退 101
+#   quick-features-red           带特性那一趟退 101（不复原）
+#   quick-features-quiesce-red   假清场配置的清场回读退 1：带特性那一趟不起、判红（不复原）
+#   quick-features-interrupted   假 cargo 打完日志给自己发 TERM（退 143）：判红（不复原）
+#   quick-features-no-quiesce-config  样本档里没放假的清场配置：不起包装、判红
+#   quick-features-* 的 .layer0-sample-tools/multi-host.env 是只写假清场命令（true / false）的多机配置，quick-features-no-quiesce-config 没有它。
 #   sample-cargo-not-executable  标记目录里只有假 cargo 与假 rustc，setup.sh 把假 cargo 的执行位去掉、给假 rustc 补上：退 2
 #   四份 quick-features-* 的 tests/ 里挂特性的写法各有一处：整份 #![cfg(feature)]、折成几行的 #![cfg(all(…))]、逐条 #[cfg(feature)]，
 #   与一个只在 // 注释里出现的特性名（读进来就找不到那组特性的日志）。
@@ -93,6 +101,13 @@
 #       quick-features-zero（输出里找不到「本次未跑（这不是通过）：checker 档 crates/s…」）
 #   GATE_LAYER0_BREAK=ignore-gpu-not-run  不读 NOT_RUN_NO_GPU_ADAPTER
 #       quick-features-gpu-not-run（输出里找不到「本次未跑（这不是通过）：GPU 对拍没跑…」）
+#   GATE_LAYER0_BREAK=gpu-pass-unquiesced  特性里有 gpu 也不经清场包装、直接起 cargo
+#       quick-features-green、quick-features-red、quick-features-interrupted（输出里找不到「GPU_QUIESCE step=…」）；
+#       quick-features-quiesce-red、quick-features-no-quiesce-config（期望退出 1，实测 3）
+#   GPU_QUIESCE_BREAK=run-despite-failed-quiesce  清场包装（research/scripts/gpu-quiesce-run.sh）清场回读没过也起命令
+#       quick-features-quiesce-red（期望退出 1，实测 3）
+#   GPU_QUIESCE_BREAK=restore-after-run  清场包装出去时又照多机配置复原
+#       quick-features-green、quick-features-red、quick-features-interrupted、quick-features-quiesce-red（输出里找不到「GPU_QUIESCE step=restore result=not-restored holders=0」）
 #   GATE_LAYER0_BREAK=sample-tools-unchecked  不核标记目录里的假工具
 #       sample-cargo-not-executable（期望退出 2，实测 1）
 #   CRASH_CASE_CHECK_BREAK=rows-ignored  判法那一份（research/scripts/crash-case-check.py）不报没登记的那一条
@@ -703,6 +718,21 @@ run_feature_gated_tests_cell() {
   feature_list="$(IFS=,; printf '%s' "${features[*]}")"
   if [[ "$layer0_break" == features-not-from-source ]]; then feature_list="verdict-store,gpu"; fi
   for row in "${gated_rows[@]}"; do target_arguments+=(--test "${row%%.rs$'\t'*}"); done
+  # 特性里有 gpu：这一趟经清场包装起（文件头「快档 feature-gated-tests 格」）；样本档只认样本里只写假清场命令的那份多机配置
+  local -a quiesce_prefix=() quiesce_environment=()
+  if [[ ",$feature_list," == *,gpu,* && "$layer0_break" != gpu-pass-unquiesced ]]; then
+    quiesce_prefix=(bash "$layer0_stage_repository/research/scripts/gpu-quiesce-run.sh" --)
+    if [[ "$layer0_sample_mode" == 1 ]]; then
+      if [[ ! -f "$PWD/.layer0-sample-tools/multi-host.env" ]]; then
+        echo "  ✗ $LAYER0_FEATURE_CELL_NAME：样本档里没有假的清场配置 $PWD/.layer0-sample-tools/multi-host.env，带 gpu 特性那一趟不起（起了就是照真的多机配置清场）"
+        echo "     → 怎么办：照 .claude/gate.d/fixtures/checker-tier-layer0-replay.sh/quick-features-green/.layer0-sample-tools/multi-host.env 放一份只写假清场命令的配置，再跑"
+        return 1
+      fi
+      quiesce_environment=("SINGLEFS_MULTI_HOST_CONFIG=$PWD/.layer0-sample-tools/multi-host.env" "GPU_QUIESCE_STATE_DIRECTORY=$layer0_scratch_directory/gpu-quiesce-state"
+        "GPU_QUIESCE_LOG_DIRECTORY=$layer0_scratch_directory/gpu-quiesce-logs")
+    fi
+    echo "  · $LAYER0_FEATURE_CELL_NAME：特性里有 gpu，这一趟经 research/scripts/gpu-quiesce-run.sh 照多机配置清场再起，跑完不复原（要复原手动跑私有复原脚本，多机配置的 QUIESCE_START_COMMAND）"
+  fi
 # librocksdb-sys 的 bindgen 要的头文件目录：与崩溃放量取同一个值，编译产物才共用。在子 shell 里 source 那份库、只读这一个变量。
   if [[ -f "$amplification_library" ]]; then
     bindgen_arguments="$(source "$amplification_library" >/dev/null 2>&1; printf '%s' "${CRASH_AMPLIFICATION_BINDGEN_INCLUDE_ARGUMENTS:-}")"
@@ -720,12 +750,20 @@ run_feature_gated_tests_cell() {
   if [[ "$layer0_break" == no-feature-pass ]]; then
     : > "$feature_log"
   else
-    env "${cleared_environment[@]}" ${bindgen_setting[@]+"${bindgen_setting[@]}"} \
-      cargo test --release -p singlefs-checker-tier --features "$feature_list" --lib "${target_arguments[@]}" -- --nocapture 2>&1 \
+    env "${cleared_environment[@]}" ${quiesce_environment[@]+"${quiesce_environment[@]}"} ${bindgen_setting[@]+"${bindgen_setting[@]}"} \
+      ${quiesce_prefix[@]+"${quiesce_prefix[@]}"} cargo test --release -p singlefs-checker-tier --features "$feature_list" --lib "${target_arguments[@]}" -- --nocapture 2>&1 \
       | tee "$feature_log" \
       | { grep --line-buffered '^LAYER0_PROGRESS ' || true; } \
       | sed -u 's/^/    /'
     feature_exit="${PIPESTATUS[0]}"
+  fi
+  if (( ${#quiesce_prefix[@]} > 0 )); then
+    grep '^GPU_QUIESCE ' "$feature_log" | sed 's/^/    /'
+    if [[ "$feature_exit" == 78 ]] && grep -q '^GPU_QUIESCE step=command result=not-started' "$feature_log"; then
+      echo "  ✗ $LAYER0_FEATURE_CELL_NAME：带 gpu 特性那一趟没起：清场回读没过或多机配置没写全 QUIESCE_*（清场那两个键；清场包装的原话在 $feature_log）"
+      echo "     → 怎么办：卡上有不归清场白名单的计算进程（别的会话的 GPU 活）时清场回读本来就不过：等那个进程跑完再只重跑这一格，不停它：bash .claude/gate.d/checker-tier-layer0-replay.sh --check $LAYER0_FEATURE_CELL_NAME；多机配置缺键的照仓根 multi-host.env.example 写全"
+      return 1
+    fi
   fi
   if [[ "$feature_exit" != 0 && "$layer0_break" != ignore-feature-pass-exit ]]; then
     tail -40 "$feature_log"

@@ -1,0 +1,12 @@
+# 崩溃点重放的按段登记（判决 research/prompts/m3-crash-enumeration-merge-r3-main-verification.md 第三节 J10、M4 第 15 条）：
+# 登记了的段，引擎在重型里按「甲二」展开（展开 6 对超过 6 次写的段不展开）。入口 research/scripts/crash-point-replay.sh 开跑时往引擎送
+# SINGLEFS_CRASH_POINT_REPLAY_SEGMENTS_REGISTRY=<这份文件的绝对路径>；引擎那一侧怎么读归实现那一路。
+# 一行一段，制表符分隔四列，可再加一列 # 说明；# 开头的行是注释：
+#   <项名>\t<段号>\t<段写数>\t<段写表摘要 sha256 十六进制 64 位>
+#   ① 项名：合表 .claude/gate.d/crash-point-replay-items.tsv 里的一项
+#   ② 段号：非负整数（十进制、不带前导 0）
+#   ③ 段写数：大于 0 的整数
+#   ④ 段写表摘要：那一段写表的 sha256，64 位小写十六进制
+#   同一项同一段只一行。
+# 核法在 research/scripts/lib_crash_point_replay_items.py 的 segment_problems（门禁 code-source-discipline 的 crash-point-replay-segments 格、入口开跑前都调它）。
+# 今天一段都没登记。

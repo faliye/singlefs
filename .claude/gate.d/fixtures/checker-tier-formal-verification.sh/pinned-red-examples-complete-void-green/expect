@@ -1,0 +1,4 @@
+exit=0
+want=1 份红例账 3 行都钉在
+want=跳过作废账 1 份、被取代的账 0 份：research/results/e165-sample-void-red-examples.tsv
+want=pinned-red-examples-complete：绿

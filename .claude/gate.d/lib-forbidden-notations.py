@@ -4,7 +4,7 @@
 FORMS 一项一种形态，加一种禁用写法就是往 FORMS 里加一项。每一项登记：
 - key、name：形态键与名字。
 - patterns：判据行 (键, 名字, 正则, 上下文规则)，一种形态可以有几行；一行文字命中其中任一条就算这一形态的一处违例，
-  报最靠前的那一处（同一位置几行都中，报排在前面的那一行）。上下文规则是 None，或一个函数 (整行, 命中) → True 表示
+  first_hit 报最靠前的那一处，all_hits 逐处全报（带行号；同一位置几行都中，报排在前面的那一行）。上下文规则是 None，或一个函数 (整行, 命中) → True 表示
   这一处按上下文不是违例、接着找这一行后面的命中。
 - excluded_prefixes：(路径前缀, 理由)，相对仓根；这些文件里这一形态是被测输入或只能在上游改，不判。
 - allow_suffixes：哪几种后缀的文件认逐行的放行标记（一行里写「# <形态键>:allow <理由>」，Rust 写「//」，理由至少 4 个字）；
@@ -50,6 +50,8 @@ ISO 时间戳与「日期后面跟钟点」只放过紧跟在「=」后面的（
 弄坏开关（环境变量，逗号分隔，可以写几个键；每次现读，同一个进程里切换也认）：
 - LIB_FORBIDDEN_NOTATIONS_BREAK=<判据行键或形态键>：那几条判据行（写形态键的，那一形态的全部判据行）不判。
   打开时 doc-text.sh 那一形态的红样本（prime-marks-red、clock-times-red、session-names-red）、write-guard.sh --selftest 里点名那一行的格必须判红，证判据真在管那一行。
+  同一个变量另认一项 first-hit-only：all_hits 只交最靠前的那一处（退回只报第一处的旧样子）；
+  打开时 write-guard.sh --selftest 的「钟点:两处都报（行号与总数）」「会话号:两处都报（行号与总数）」两格必须判红。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT=<判据行键或形态键>：那几条判据行的上下文规则不生效，命中一律算违例。
   打开时 doc-text.sh 的 clock-times-green 样本里的冒号对、write-guard.sh --selftest 里靠上下文放行的格必须判红，证放行靠的是上下文规则。
 - LIB_FORBIDDEN_NOTATIONS_BREAK_ALLOW=<形态键>：那几种形态的放行标记不认。
@@ -248,26 +250,53 @@ def allowed_by_marker(form_key, line, relative_path):
     return re.search(rf'(?:#|//)\s*{re.escape(form_key)}:allow[ \t]+\S.{{3,}}', line) is not None
 
 
-def first_hit(form_key, text, relative_path=''):
-    """这一形态在 text 里最靠前的一处：(位置, 判据行名字, 命中的串)；没有返回 None。
-    relative_path 是 text 所在文件相对仓根的路径，用来认放行标记；不给就不认。"""
+def judged_patterns(form_key):
+    """这一形态此刻要判的判据行：[(序号, 键, 名字, 正则, 上下文规则或 None)]；整形态被弄坏开关关掉时交 None。"""
     skipped = environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK')
     if form_key in skipped:
         return None
     context_off = environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK_CONTEXT')
-    patterns = [(index, key, name, pattern, None if key in context_off or form_key in context_off else not_violation)
-                for index, (key, name, pattern, not_violation) in enumerate(FORMS_BY_KEY[form_key]['patterns']) if key not in skipped]
+    return [(index, key, name, pattern, None if key in context_off or form_key in context_off else not_violation)
+            for index, (key, name, pattern, not_violation) in enumerate(FORMS_BY_KEY[form_key]['patterns']) if key not in skipped]
+
+
+def line_hits(form_key, line, relative_path, patterns):
+    """一行里这一形态的违例，按位置排、互不重叠：[(列, 判据行名字, 命中的串)]。同一位置几行都中，取排在前面的那一行。"""
+    if allowed_by_marker(form_key, line, relative_path):
+        return []
+    candidates = [(candidate.start(), index, candidate.end(), name, candidate.group(0))
+                  for index, key, name, pattern, not_violation in patterns for candidate in pattern.finditer(line)
+                  if not_violation is None or not not_violation(line, candidate)]
+    hits, covered_until = [], -1
+    for start, _, end, name, matched in sorted(candidates):
+        if start >= covered_until:
+            hits.append((start, name, matched))
+            covered_until = max(end, start + 1)
+    return hits
+
+
+def first_hit(form_key, text, relative_path=''):
+    """这一形态在 text 里最靠前的一处：(位置, 判据行名字, 命中的串)；没有返回 None。
+    relative_path 是 text 所在文件相对仓根的路径，用来认放行标记；不给就不认。"""
+    patterns = judged_patterns(form_key)
+    if patterns is None:
+        return None
     offset = 0
     for line in text.split('\n'):
-        if not allowed_by_marker(form_key, line, relative_path):
-            found = []
-            for index, key, name, pattern, not_violation in patterns:
-                match = next((candidate for candidate in pattern.finditer(line)
-                              if not_violation is None or not not_violation(line, candidate)), None)
-                if match:
-                    found.append((match.start(), index, name, match.group(0)))
-            if found:
-                position, _, name, matched = min(found)
-                return offset + position, name, matched
+        hits = line_hits(form_key, line, relative_path, patterns)
+        if hits:
+            position, name, matched = hits[0]
+            return offset + position, name, matched
         offset += len(line) + 1
     return None
+
+
+def all_hits(form_key, text, relative_path=''):
+    """这一形态在 text 里的每一处：[(行号（从 1 起）, 列, 判据行名字, 命中的串)]，按出现的次序；没有交空表。
+    弄坏开关 LIB_FORBIDDEN_NOTATIONS_BREAK=first-hit-only 时只交最靠前的那一处。"""
+    patterns = judged_patterns(form_key)
+    if patterns is None:
+        return []
+    hits = [(number, column, name, matched) for number, line in enumerate(text.split('\n'), 1)
+            for column, name, matched in line_hits(form_key, line, relative_path, patterns)]
+    return hits[:1] if 'first-hit-only' in environment_keys('LIB_FORBIDDEN_NOTATIONS_BREAK') else hits

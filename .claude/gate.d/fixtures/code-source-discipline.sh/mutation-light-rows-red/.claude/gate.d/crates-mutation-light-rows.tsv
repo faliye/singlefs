@@ -1,0 +1,3 @@
+# 样本的轻型变异登记表：第一个核心测试目标点名了一个变异表里没有的名字，第二个核心测试目标没登记，另登记了一行改坏对象不在核心代码下的
+add-becomes-subtract	-p tiny --lib
+outside-core-flip	-p outside --lib

@@ -1,6 +1,6 @@
 来源：2026-10-02（东京时间）在本机真起虚机的那一趟本阶段（主 agent 的整道真跑第 5 趟，判绿：
 「QEMU 真设备：6 次虚机跑（direct skip-new-pool-file-creation-barrier page-cache file-overwrite second-instance
-raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1 留下的现场 /tmp/singlefs-gate55.KnIwjf/<模式>/。
+raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1（那时的变量名，今天改名为 GATE_QEMU_DEVICE_STREAMS_KEEP_WORK）留下的现场 /tmp/singlefs-gate55.KnIwjf/<模式>/。
 
 1. 六档的 out.txt、vm-exit、check.txt、check-exit 是那份现场的原样字节（cp 之后逐份 cmp 过）。
    - 虚机：VM_DISKS=2 VM_DISK_MB=4096、VM_LOG_MB 取默认 4096，research/scripts/vm-bench.sh 送进 QEMU；
@@ -14,10 +14,16 @@ raise-rollback-floor）、115 项检查全过」），GATE55_KEEP_WORK=1 留下�
 2. research/results/e142-trimmed.out：今天 replay.sh 里 E142 那一行登记的产物
    research/results/e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out 里本阶段会读的那几行，
    原样取第 35–39 行（name=segments 五行）与第 59 行（name=root_record 一行）。
-   research/scripts/replay.sh 只留 E142 那一行，第 4 列换成 e142-trimmed.out，别的列与今天的仓里那一行相同。
+   research/scripts/replay.sh 只留 E142 的两行（2026-10-08 起与真仓同形）：@driver_e142 那一行第 4 列换成 e142-trimmed.out，
+   @driver_e142_p8g_crates_dump 那一行第 4 列照真仓写 e142-r24-p8g-crates-dump-2026-10-05.out（样本里没有这个文件，也不该被读）；别的列与真仓里那两行相同。
    本阶段从这两处现取段序列与反向链（back_chain=3937788698）。
 3. .gate-cells（点名 device-streams）与 .qemu-prerecorded（空文件）照旧。
 
+2026-10-08 起 green、red、direct-divergence-red 的 replay.sh 都是上面那两行 E142（之前只有一行）。
+e142-row-missing-red：只有 .gate-cells、.qemu-prerecorded、research/results/e142-trimmed.out 与 replay.sh，不摆六档（红在取 E142 产物那一步，在预录档判各档之前）；
+     replay.sh 里 @driver_e142 那一行缺了，只剩 @driver_e142_p8g_crates_dump 一行且第 4 列写 e142-trimmed.out（文件在）：
+     本阶段红在「第 2 列是 @driver_e142 的 E142 行取到 0 行」；弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=e142-all-rows 下取全部 E142 行，取到那个文件、过了这一处，红在后面「预录档……四件套都没摆全」，expect 的 want 对不上。
+e142-row-duplicate-red：同上摆法，replay.sh 里 @driver_e142 有两行（第二行第 4 列 e142-trimmed-second.out，样本里没有这个文件）：红在「……取到 2 行」。
 green：上面六档原样，本阶段预录档判 6 档、117 项检查全过，退 77（预录档不算真跑过 QEMU，整道跟着退 77，不退 0）。
      比真跑那一趟多的 2 项是 direct 那一档逐盘读 divergence=none 那一行（2026-10-03 补上，之前 direct 只看退出码与宿主读回）。
 red：与 green 只差一个数：red/raise-rollback-floor/check.txt 第 3 行 name=device_log device=1 改成 device=2。
@@ -29,7 +35,7 @@ direct-divergence-red：与 green 只差一个数：direct-divergence-red/direct
      check-exit 仍是 0。direct 在判定次序的最前，这一份红在「direct 盘 1：宿主检查退出 0，却没有这块盘 divergence=none 的 name=device_log 行」；
      弄坏开关 GATE_QEMU_DEVICE_STREAMS_BREAK=direct-divergence-unread 下 direct 不逐盘读，它判绿退 77，expect 里的 want 对不上。
 
-重新生成（重型测试，只在提交时或用户要求时跑）：在仓根不带 .qemu-prerecorded 跑一遍本阶段，设 GATE55_KEEP_WORK=1
+重新生成（重型测试，只在提交时或用户要求时跑）：在仓根不带 .qemu-prerecorded 跑一遍本阶段，设 GATE_QEMU_DEVICE_STREAMS_KEEP_WORK=1
 留现场（不复用上一次全绿判定再加 SINGLEFS_GATE_FULL=1），判绿后把它打出的现场目录里六档各自的
 out.txt、vm-exit、check.txt、check-exit 拷进 green/、red/ 与 direct-divergence-red/ 对应的目录，逐份 cmp；e142-trimmed.out 照第 2 条从
 replay.sh 那时登记的 E142 产物重取；red、direct-divergence-red 照上面两段各重改那一个数，再改 green/expect 里的项数与两份红样本 expect 的 want。

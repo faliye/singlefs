@@ -1,0 +1,6 @@
+exit=0
+want=· --quick：核心部分 toolchain proof complete 三项；轻型没有剪枝：判定库只记不读
+want=── 汇总：checker-tier-formal-verification.sh 跑了 3 格（--item 点名 3 项）
+want=verus-proof：本次未跑
+want=1 份红例账 3 行都钉在
+want=pinned-red-examples-complete：绿

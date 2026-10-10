@@ -1,0 +1,4 @@
+exit=1
+want=1 份红例账 3 行里 3 行没钉进
+want=钉的档不对：表第 3 行整行与账这一行相同，㉒ 是「--profile r1」，这份账那一趟是「--profile r2」
+want=pinned-red-examples-complete：红（退出 1）

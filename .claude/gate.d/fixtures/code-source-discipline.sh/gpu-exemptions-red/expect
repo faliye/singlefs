@@ -1,0 +1,4 @@
+exit=1
+want=标了「// gpu-exempt: continuation」，豁免表里没有 continuation 这一行
+want=second-crash-during-mount 在 crates/ 里一处标记都没有
+want=gpu-exemptions：红

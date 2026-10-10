@@ -13,6 +13,7 @@ want=endless-walk：20 秒没跑完（超时），点名的测试 walking_to_ten
 want=临时目录：4 条变异各一个自己的 TMPDIR，每条结束时不论退出码都整个删掉了
 want=基线：没改坏的副本上点名的测试恰好对上一个用例、结果是 ok 的 4 行，基线不绿 2 行（按 cargo 参数分 1 批；共 6 行）
 want=有几行基线不绿（基线不绿 2 行
+want=覆盖：这一趟记了 0 组（cargo 参数 + 点名用例），那份快照上已有、沿用 0 组，没记成 0 组
 want=ambiguous-name：基线不绿——点名的测试 doubles_three_to_six 在没改坏的副本上对上了 2 个不同的用例
 want=reads-outside：基线不绿——点名的测试 reads_the_answer_from_outside_the_copy 在没改坏的副本上的结果是 FAILED
 want=checker-tier-crates-mutation-replay.sh：1 格里 1 格红（crates-mutation-rows）

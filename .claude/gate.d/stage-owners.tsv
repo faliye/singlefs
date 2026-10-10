@@ -12,7 +12,7 @@ checker-tier-crates-mutation-replay.sh	crates-mutation-rows	investigator	crates 
 checker-tier-formal-verification.sh	verus-toolchain-pinned	tooling-writer,implementation-writer	版本登记表 .claude/gate.d/verus-pins.tsv 由工具实现员改（换版本先复核同源）；Cargo.toml、Cargo.lock 里 vstd 那几个包的版本由改 crates/ 的实现员改。没有合并之前的旧归属，2026-10-01 新立
 checker-tier-formal-verification.sh	verus-proof	implementation-writer	证明与核在 crates/singlefs-replay-prefix 里，验不过、verified 数变了都由写证明的实现员修（加减了证明照判定行改登记数时连同登记表一起交补丁）。新立
 checker-tier-formal-verification.sh	verus-vacuity	implementation-writer	空真是核的前置条件写得不可满足，由写证明的实现员改前置条件。新立
-checker-tier-formal-verification.sh	verus-must-red-worlds	implementation-writer	必红世界表 crates/singlefs-replay-prefix/verus-mutations.tsv 与核一起由实现员维护：锚点腐化、改坏了还验得过都归它。新立
+checker-tier-formal-verification.sh	verus-must-red-worlds	implementation-writer	必红世界表 crates/singlefs-replay-prefix/verus-must-red-worlds.tsv 与核一起由实现员维护：锚点腐化、改坏了还验得过都归它。新立
 checker-tier-formal-verification.sh	pinned-red-examples-complete	tooling-writer	没钉全只差跑一次 research/scripts/e165-pin-red-examples.py（写 .claude/gate.d/ 下的表），由工具实现员补；第二段驱动收尾本该当场钉，没钉上先查驱动。新立
 checker-tier-formal-verification.sh	pinned-red-examples-replay	implementation-writer	钉住的输入在今天的实现上与原实现不同是恢复代码的回归，装置读表（--pinned-cases）也在 crates/singlefs-checker-tier 里，都归改 crates/ 的实现员；点名的变异行不在了归同一个人找回。新立
 checker-tier-lkmm.sh	litmus-verdicts	investigator	herd7 内存序，提交时由主 agent 跑、红了派调查员查
@@ -28,6 +28,9 @@ code-source-discipline.sh	mutation-tables	experiment-runner,kb-scribe,implementa
 code-source-discipline.sh	absolute-assertions	experiment-runner	实验钉绝对值的断言，实验源码由执行员写
 code-source-discipline.sh	reading-discipline	experiment-runner,mutation-triage	实验源码的种子折叠（C59）与恒为字面量 0 的读数（C60）：research/e7-index-bench/src/bin/ 下的源码由实验执行员写；变异分诊读同一批源码
 code-source-discipline.sh	unsafe-allowances	implementation-writer,tooling-writer	crates/ 里多出的 allow(unsafe_code) 与 unsafe 关键字、根没写 forbid / deny 是 .rs 的毛病，由改 crates/ 的实现员修；要新增一处放开要改 .claude/gate.d/unsafe-allowances.tsv 的登记并走三方，登记表在 gate.d 下，由工具实现员改
+code-source-discipline.sh	mutation-light-rows	tooling-writer	轻型变异登记表 .claude/gate.d/crates-mutation-light-rows.tsv 在 gate.d 下，crates/mutations.tsv 加了新的测试目标或改名删行之后照表头的挑法补行、换行，由工具实现员改。新立，没有合并之前的旧归属
+code-source-discipline.sh	gpu-exemptions	implementation-writer,tooling-writer	代码里的 // gpu-exempt: 标记写在 crates/ 里不走 GPU 的那一截上，由改 crates/ 的实现员加删；豁免表 .claude/gate.d/gpu-exemptions.tsv 在 gate.d 下，每加一行先问用户点头，由工具实现员改。新立，没有合并之前的旧归属
+code-source-discipline.sh	crash-point-replay-segments	tooling-writer	按段登记文件 .claude/gate.d/crash-point-replay-segments.tsv 在 gate.d 下，登记哪一段由引擎那一路定、行由工具实现员写；合表改了项名之后照合表改。新立，没有合并之前的旧归属
 code-tooling.sh	research-script-selftests	three-way-materials	材料员用的抽取脚本的自证
 code-tooling.sh	research-script-selftest-coverage	three-way-materials	研究脚本实现了 --selftest 就要有门禁在跑它，材料员的抽取脚本与本地腿脚本最常新加
 code-tooling.sh	rules-manifest	investigator	看 CLAUDE.md 的规则引用，收尾跑整轮门禁时一并判

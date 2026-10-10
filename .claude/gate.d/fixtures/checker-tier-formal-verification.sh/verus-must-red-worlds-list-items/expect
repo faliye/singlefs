@@ -1,0 +1,8 @@
+exit=0
+want=toolchain	verus-toolchain-pinned
+want=proof	verus-proof
+want=vacuity:crates/singlefs-replay-prefix/src/lib.rs:11	verus-vacuity
+want=vacuity:crates/singlefs-replay-prefix/src/lib.rs:30	verus-vacuity
+want=must-red:夹到上限时返回原值	verus-must-red-worlds
+want=complete	pinned-red-examples-complete
+want=pinned:22	pinned-red-examples-replay

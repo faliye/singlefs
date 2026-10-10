@@ -1,0 +1,3 @@
+# 样本的轻型变异登记表：两个测试目标各一行（照挑法取行号最小的那一条）
+add-becomes-sub	-p tiny --lib
+walk-stops-early	-p tiny --test walk

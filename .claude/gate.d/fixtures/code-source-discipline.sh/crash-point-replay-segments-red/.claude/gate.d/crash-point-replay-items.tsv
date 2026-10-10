@@ -1,0 +1,3 @@
+# 样本合表
+demo-stream	crash-case:demo-stream	-	demo_stream	# 样本
+other-stream	-	other-piped	other_piped	# 样本

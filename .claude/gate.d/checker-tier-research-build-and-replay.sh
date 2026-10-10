@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 # admission: always 判的是此刻被判的仓（工作区或 --staged 的临时树），上一次的结论不替这一次作保
 # run-condition: none 要 cargo：缺了就在单测那一格判红、复跑那一格由它调的 research/scripts/replay.sh 编实验二进制时判红，不交给 gate.sh 预判；此外只要跑门禁本身就要的 bash、git、python3
-# gate-stage: research 工作区的构建、单测与研究脚本的自证；入库的实验数今天还复现得出来吗
+# gate-stage: research 工作区的构建与单测；入库的实验数今天还复现得出来吗
 # gate-category: checker-tier 类
 # gate-similar: harness-model-differential-and-scenarios.sh 它也经内存包装跑 release 的 cargo test，但编的是仓根的 crates 工作区、判的是模型对拍那几段；这里编的是 research 工作区，两个工作区互相看不到对方，编译产物不共用，并进来反而要多编一份
 # gate-similar: code-source-discipline.sh 它的实验源码纪律那一格静态判 research 的实验二进制与变异表（锚点、每个实验有变异表），不编译、不跑；这里真编、真跑单测与复跑，判的是编得过、跑得出同样的数
 # gate-similar: doc-experiments.sh 它判实验页与产物登记（索引行、产物写回、产物落在仓里），读的是 kb 与 research/results/ 的文字；这里把产物重跑一遍逐字节比，读的是实验二进制的输出
+# gate-similar: code-tooling.sh 研究脚本的 --selftest 都在它的 research-script-selftests 格跑（不要 research 工作区先编好、经 light-selftest-guard.py 盯着）；这里只编 research 工作区、跑它的单测与复跑，一份研究脚本的自证都不跑
 #
-# gate-cell: research-unit-tests research 工作区编得过、单测全绿、研究脚本的自证通过
+# gate-cell: research-unit-tests research 工作区编得过、单测全绿
 # gate-cell: experiment-replay 入库的纯模型实验重跑一遍，与 research/results/ 里的产物逐字节相同
-#   research-unit-tests  每次都跑：cargo build --release 编整个 research 工作区，再 cargo test --release，再跑几份研究脚本的 --selftest。
+#   research-unit-tests  每次都跑：cargo build --release 编整个 research 工作区，再 cargo test --release。
 #                        上游「构建与单测」只编 crates/，kb 里实测结论背后的实验二进制只有这一格编。
 #   experiment-replay    .claude/gate.d/stage-inputs.tsv 里本阶段那一行的路径相对上次整轮全绿那棵暂存树没变就退 77
 #                        （为什么按树、按一条 ref、不看工作区，写在 research/scripts/stage-must-run.sh 文件头）；
@@ -21,7 +22,7 @@
 #
 # 读的环境变量：
 #   GATE_RESEARCH_BUILD_MEMORY_MAX  cargo test 经 research/scripts/run-with-memory-cap.sh 跑的内存上限，没设取 8G；谁跑这一道外面都不再包一层。
-#                                   包装退 250–254 不是单测的判定，单独判红、单独给出路。cargo build 不跑编出来的代码，不经包装。
+#                                   包装退 245 或 250–254 不是单测的判定，单独判红、单独给出路。cargo build 不跑编出来的代码，不经包装。
 #   GATE_REPLAY_FULL=1              复跑那一格连 SLOW 与 timing 行一起跑
 #
 #   bash .claude/gate.d/checker-tier-research-build-and-replay.sh [项目根]                                两格都跑
@@ -33,7 +34,7 @@
 #
 # 样本：fixtures/checker-tier-research-build-and-replay.sh/ 下四份，各放 .gate-cells 只点名它判的那一格：
 #   research-unit-tests-red    research 工作区里有一条单测红着的小仓，判红
-#   research-unit-tests-green  一条单测全绿；research/scripts/ 下四份只认 --selftest 的替身（拷真脚本会与真脚本分叉），判绿，成功行报一个测试批次、4 份自证
+#   research-unit-tests-green  一条单测全绿、research/scripts/ 下一份脚本都没有，判绿，成功行报一个测试批次
 #   green                      带假 replay.sh 的小仓，表里一行快的 exact、一行 SLOW 里的 exact、一行 SLOW 里只有 timing 的；
 #                              快的那行派给 replay.sh，另两行逐个列进「没派」
 #   red                        表一行都没有，判红
@@ -47,8 +48,8 @@ STAGE_REPOSITORY="$(cd "$STAGE_DIR/../.." && pwd)"
 STAGE_NAME="$(basename "$0")"
 source "$STAGE_DIR/lib/stage-cells.sh"
 
-stage_cell research-unit-tests cell_research_unit_tests "research 工作区编得过、单测全绿、研究脚本的自证通过" \
-  "先修好编不过或红着的单测（kb 里的实测结论全靠它们背书），研究脚本自证红了照它自己那句出路修；改完只重跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests"
+stage_cell research-unit-tests cell_research_unit_tests "research 工作区编得过、单测全绿" \
+  "先修好编不过或红着的单测（kb 里的实测结论全靠它们背书）；改完只重跑这一格：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check research-unit-tests"
 stage_cell experiment-replay cell_experiment_replay "入库的纯模型实验重跑一遍，与 research/results/ 里的产物逐字节相同" \
   "对不上先判是代码坏了还是产物该更新（两种都要人判）；只重跑红的那几个实验：bash .claude/gate.d/checker-tier-research-build-and-replay.sh --check experiment-replay --item <实验号>"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
@@ -118,8 +119,8 @@ fi
 
 # ── research-unit-tests ──
 cell_research_unit_tests() {
-  local research_selftests_passed=0 no_test_batches=0 out rc b n
-  local MEMORY_CAP_RUNNER RESEARCH_BUILD_MEMORY_MAX OOV STAGE_MINE RELABEL CLAIM
+  local out rc b n
+  local MEMORY_CAP_RUNNER RESEARCH_BUILD_MEMORY_MAX
   [[ -f "$R/Cargo.toml" ]] || { echo "  ! 没有 $R/Cargo.toml，这一格无对象可判"; exit 77; }
   command -v cargo >/dev/null || {
     echo "  ✗ 没有 cargo，装不了就没法验 research 的证据"
@@ -145,12 +146,12 @@ cell_research_unit_tests() {
   out="$(cd "$R" && RUN_WITH_MEMORY_CAP_KEY="gate checker-tier-research-build-and-replay: cargo test --release (research)" \
     bash "$MEMORY_CAP_RUNNER" "$RESEARCH_BUILD_MEMORY_MAX" cargo test --release 2>&1)"
   rc=$?
-  if (( rc >= 250 && rc <= 254 )); then
+  if (( rc == 245 || (rc >= 250 && rc <= 254) )); then
     tail -8 <<<"$out" | sed 's/^/     /'
     echo "  ✗ research 的构建与单测没判出结果：内存包装 research/scripts/run-with-memory-cap.sh 退 $rc（上限 $RESEARCH_BUILD_MEMORY_MAX），这一次的输出不算判定"
     echo "     → 怎么办：照包装文件头「退出码」一段办：250 是这一格要的比上限多，把 GATE_RESEARCH_BUILD_MEMORY_MAX 设大再跑；"
     echo "               251、252、254 先跑 bash research/scripts/run-with-memory-cap.sh --status 看 slice 被谁占着，空出来再重跑这一格；不拿掉包装跑。"
-    echo "               253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑。"
+    echo "               253 是超过限时：把 RUN_WITH_MEMORY_CAP_TIME_LIMIT 拿掉或放宽再跑。245 是同一段时间内核报了显存不够：nvidia-smi 看谁在用卡，等它跑完再重跑这一格。"
     exit 1
   fi
   if (( rc != 0 )); then
@@ -163,77 +164,12 @@ cell_research_unit_tests() {
   b="$(grep -c '^test result: ok' <<<"$out")"
   n="$(awk '/^test result: ok\./ { passed += $4 } END { print passed + 0 }' <<<"$out")"
   [[ "$n" =~ ^[0-9]+$ ]] || n="没数出来（awk 输出「$n」）"
-  # 一个测试批次都没有：单测这一半不记通过，下面的自证照跑照判，跑完退 77
+  # 一个测试批次都没有：不记通过，退 77
   if (( b == 0 )); then
-    no_test_batches=1
-    echo "  ! 本次无对象可判：cargo test 退 0，但输出里一个「test result: ok」批次都没有，research 的单测这一半没判"
-  else
-    echo "  ✓ research 构建通过，$b 个测试批次、共 $n 个单测全绿"
+    echo "  ! 本次无对象可判：cargo test 退 0，但输出里一个「test result: ok」批次都没有，research 的单测没判"
+    exit 77
   fi
-
-  # 研究脚本找不到就判红：搬了家或改了名时自证不许静默跳过
-  missing_selftest_target() {
-    echo "  ✗ 找不到 $1：它的自检这一次没跑"
-    echo "     → 怎么办：它搬了家或改了名，就把这一格里的路径一起改（.claude/rules/path-moves.md）；"
-    echo "               它被删了，就把这一格里它那一段自检一起删。别让自检静默跳过。"
-    exit 1
-  }
-
-  # 三方论证本地腿的字词损坏闸（ask-local.sh 靠它挡损坏输出）自己会不会红
-  OOV="$R/scripts/oov-check.py"
-  if [[ -f "$OOV" ]]; then
-    if ! out="$(python3 "$OOV" --selftest 2>&1)"; then
-      echo "$out" | sed 's/^/  /'
-      echo "     → 怎么办：本地腿的损坏闸判错了样本，修 splice_of 的规则再跑。"
-      echo "                闸不准 ⇒ 三方论证里那一腿的输出可信度归零。"
-      exit 1
-    fi
-    echo "$out" | sed 's/^  /  /'
-    research_selftests_passed=$((research_selftests_passed + 1))
-  else
-    missing_selftest_target "$OOV"
-  fi
-
-  # stage-mine.py 挑错块，别的会话的半成品就被卷进这一次提交
-  STAGE_MINE="$R/scripts/stage-mine.py"
-  if [[ -f "$STAGE_MINE" ]]; then
-    if ! out="$(python3 "$STAGE_MINE" --selftest 2>&1)"; then
-      echo "$out" | sed 's/^/  /'
-      echo "     → 怎么办：stage-mine.py 挑块挑错了样本，修切块或下滑的规则再跑。"
-      exit 1
-    fi
-    echo "  ✓ stage-mine.py $(tail -1 <<<"$out")"
-    research_selftests_passed=$((research_selftests_passed + 1))
-  else
-    missing_selftest_target "$STAGE_MINE"
-  fi
-  RELABEL="$R/scripts/relabel-item.py"
-  if [[ -f "$RELABEL" ]]; then
-    if ! out="$(python3 "$RELABEL" --selftest 2>&1)"; then
-      echo "$out" | sed 's/^/  /'
-      echo "     → 怎么办：relabel-item.py 改写之后 doc-decisions 格「分项引用状态」的库复判不过，修它的归属或改写再跑。"
-      exit 1
-    fi
-    echo "  ✓ relabel-item.py $(tail -1 <<<"$out")"
-    research_selftests_passed=$((research_selftests_passed + 1))
-  else
-    missing_selftest_target "$RELABEL"
-  fi
-  CLAIM="$R/scripts/claim-experiment.sh"
-  if [[ -f "$CLAIM" ]]; then
-    if ! out="$(bash "$CLAIM" --selftest 2>&1)"; then
-      echo "$out" | sed 's/^/  /'
-      echo "     → 怎么办：claim-experiment.sh 放过了已用的号、或同一个号占了两次，修 used_numbers / claim 再跑。"
-      exit 1
-    fi
-    echo "  ✓ claim-experiment.sh $(tail -1 <<<"$out")"
-    research_selftests_passed=$((research_selftests_passed + 1))
-  else
-    missing_selftest_target "$CLAIM"
-  fi
-  # 单测那一半没有对象（见上面「本次无对象可判」那一行）：自检都绿也不记通过
-  if (( no_test_batches )); then exit 77; fi
-  echo "  ✓ research 构建与单测全绿，研究脚本的自证过了 $research_selftests_passed 份"
+  echo "  ✓ research 构建与单测全绿：$b 个测试批次、共 $n 个单测"
 }
 
 # ── experiment-replay ──

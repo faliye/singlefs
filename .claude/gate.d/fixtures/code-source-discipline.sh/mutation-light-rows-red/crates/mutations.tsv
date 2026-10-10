@@ -1,0 +1,5 @@
+# 样本变异表：核心代码下两个测试目标，第一个有两行；核心代码之外还有一个测试目标
+add-becomes-sub	crates/singlefs-core/src/lib.rs	left + right	left - right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+add-becomes-multiply	crates/singlefs-core/src/lib.rs	left + right	left * right	-p tiny --lib -- adds_two_and_three_to_five	adds_two_and_three_to_five
+walk-stops-early	crates/singlefs-core/src/lib.rs	step + 1	step + 2	-p tiny --test walk -- walking_to_ten_ends_at_ten	walking_to_ten_ends_at_ten
+outside-core-flip	crates/outside/src/lib.rs	count + 1	count + 2	-p outside --lib -- counts_one_more	counts_one_more

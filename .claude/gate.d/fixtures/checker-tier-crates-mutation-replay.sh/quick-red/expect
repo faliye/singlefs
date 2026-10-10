@@ -1,0 +1,4 @@
+exit=1
+want=「no-such-row」 不是 crates/mutations.tsv 里成形的一行的变异名
+want=测试目标「-p tiny --lib」在轻型登记表里没有一行（照挑法补这一行：add-becomes-sub
+want=✗ --quick：轻型变异登记表 .claude/gate.d/crates-mutation-light-rows.tsv 核不过

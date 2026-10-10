@@ -12,14 +12,21 @@
 #   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --list                                  逐行打格名与判什么，不起 cargo
 #   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --check crates-mutation-rows [项目根]     只跑这一格（格名写错退 2）
 #   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --list-items [项目根]                    逐行打变异表里可点名的变异名、行号与改哪个文件，不起 cargo
-#   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <变异名> [--item <变异名>…] [项目根]   只判点名的几行
-#   --item：名字原样写、名字里的逗号不拆，不在表里退 2；换成行号走共用模块的选行模式（不问整道的复用判定、不调双机驱动、不写全绿标记，照常写按条记录）。
+#                                                                                                      （打的是 crates-mutation-rows.py --list-items，同一份）
+#   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <行号或变异名> [--item …] [项目根]   只判点名的几行（crates-mutation-rows.py --item 交到这里）
+#   bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick [--item <行号或变异名> …] [项目根]   轻型：只判轻型变异登记表的行，再加点名的几行
+#   --quick（轻型，.claude/rules/verification.md「两档：轻型与重型」）：核心部分是 .claude/gate.d/crates-mutation-light-rows.tsv 登记的行（改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标一行，
+#     写法与挑法在它的表头），先经 research/scripts/crates-mutation-light-rows.py names 核那张表（核不过退 1、一行都不判），再连同 --item 点名的几行
+#     （可变部分，取并集）照下面 --item 那一路判；设 GATE_MUTATION_START_OVER=1：轻型没有剪枝，一律现跑、不复用判定库记录（照旧写新记录、记覆盖）。
+#     样本根放 .mutation-sample/quick 当成给了 --quick（样本没法带参数；被判的根是这道阶段所在的仓或设了 GATE_STAGED_FROM 时不认）。
+#   --item：写变异表里成形的一行的行号，或变异名原样（名字里的逗号不拆、同名的几行都判）；不在表里列出可点名的、退 2。换成行号走共用模块的选行模式
+#     （不问整道的复用判定、不调双机驱动、不写全绿标记，照常写判定库记录、照复用判据复用：点名单跑与整张跑时那一行的判定相同）。
 #     选中的全抓到这一格绿（模块退 3，这里换成 0，成功行写明只判了这几行）；有本次未跑的，成功行写明抓到几条、本次未跑几条；全是本次未跑的退 77。
-#   GATE_MUTATION_ROW_SELECTION=<文件>（一行一个变异表行号，只由双机分片的驱动设）：只判这些行（它们所在的基线批照跑），照常写按条记录，
+#   GATE_MUTATION_ROW_SELECTION=<文件>（一行一个变异表行号，只由双机分片的驱动设）：只判这些行（它们所在的基线批照跑），照常写判定库记录，
 #     不写全绿标记、不问整道的复用判定，末行写明「只判了选中的 N 行，不是整道结论」；不经格汇总，选中的全抓到退 3、有红退 1
 #     （汇总把 0、77 之外的码并成 1，驱动就分不出这两样）。
 #
-# 判据（判法、派活、按条记录与全绿标记都在 research/scripts/crates-mutation-rows.py；拷贝范围、底座指纹、行键、记录放哪、几时复用、弄坏开关见它的文件头）：
+# 判据（判法、派活、判定库、覆盖与全绿标记都在 research/scripts/crates-mutation-rows.py；拷贝范围、判法版本、行键、记录放哪、复用判据、弄坏开关见它的文件头）：
 #   crates/mutations.tsv 每行六段（变异名、文件、原文、替换文、cargo test 参数、必须红的测试名），替换文可以空（删掉原文），其余五段不许空；
 #   原文在文件里恰好命中一次，必须红的测试名是一个用例名，只有 \n 一种反斜杠转义，文件落在每片拷的范围（stage-inputs.tsv 本阶段那一行）之内：
 #   这几样派活之前判（row_problems，门禁 code-source-discipline 经 static-check 静态判同一份）；
@@ -29,7 +36,8 @@
 # 并发（派活与进程数的判法在 crates-mutation-rows.py 的 worker_count_for 与 dispatch_order）：每片各一份源码副本与一个编译目录（共用一份会被 cargo 的文件锁重新串行化）；
 #   按 crate 归堆派（增量编译的命中率才稳），活动态领（等分之下拿到几十秒重测试的那一片会独自拖住整道），上一次用时 ≥ GATE_MUTATION_LONG_ROW_SECONDS（默认 300）秒或超时的先派。
 #   工作进程数取 ① 核数的一半、至多 16（设了 GATE_MUTATION_WORKERS 就顶掉 ①）与 ② 这一趟要现跑的条数的小者、至少 1；不按内存收：开跑那一刻看不见别的重活来抢。
-#   ⚠️ stdout 与进程数、复用了多少都无关：判定按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、复用、前移只进 stderr。
+#   ⚠️ stdout 里的判定与进程数无关：按变异表的行号排序再打，GATE_MUTATION_WORKERS=1 与 =8 逐字相同（并发之后重新证红的那一半）；进度、前移只进 stderr；
+#   复用了多少进 stdout 的「复用：」「覆盖：」两行、抓到那一行末尾的「（现判：<栏>）」或「（按覆盖复用）」与成功句末尾「；这一趟现判 …」，比判定时去掉这几处。
 #
 # 编译目录：${GATE_MUTATION_TARGET_DIR:-${GATE_CROSS_RUN_TMPDIR:-${TMPDIR:-/tmp}}/singlefs-crates-mutation-target}，分片各加 -w<片号>、各自冷编一次（prepare_shard）。
 #   放 GATE_CROSS_RUN_TMPDIR 不放 TMPDIR：门禁每轮给阶段的私有 TMPDIR 跑完就删，放进去每轮都要从头编。
@@ -40,7 +48,9 @@
 #   上限先到先用：变异表里单起一行「# 每条变异的内存上限：<上限>」、GATE_MUTATION_MEMORY_MAX、默认 4G。
 #   默认 4G 的依据：本机 60 GiB、常驻约 12 GiB、同时可能 3 件重活，每件 16 GiB 里再分给几个工作进程；四个 crate 全部测试目标冷编的匿名内存峰值 0.60 GiB。
 #   点名的测试跑起来要多少没量，按条记在 research/scripts/memory-peaks.tsv。这些数只在本机成立，换机器要重算。
-#   包装退 250 记「内存撞顶」，254 记「被总上限挤掉」，252 记「排不上没跑」：都不算抓到也不算没红，单列、整道判红。
+#   包装退 250 记「内存撞顶」，254 记「被总上限挤掉」，252 记「排不上没跑」，245 记「显存不够」（起止之间内核报了 NV_ERR_NO_MEMORY，
+#   输出里的 FAILED 是被它弄红的）：都不算抓到也不算没红，单列、整道判红。分栏在 research/scripts/crates-mutation-rows.py 的 verdict_of_run
+#   （245 那一栏的自证是它 --selftest 里「包装退 245（显存不够）记显存不够、不算抓到」那一格，弄坏开关 GATE_MUTATION_BREAK=gpumemoryasoutput）。
 #   scope 或 slice 的总上限设不上（没有用户级 systemd、D-Bus 连不上）整道判红、一条都不跑，不退回无上限去跑。
 # 限时：交给包装（RUN_WITH_MEMORY_CAP_TIME_LIMIT → scope 的 RuntimeMaxSec，从起跑算、含重编译）；不在包装外面套 timeout：排队的时间会被算成超时。
 #   秒数先到先用：变异表里单起一行「# 每条变异的超时秒数：<秒>」、GATE_MUTATION_TIMEOUT、默认 1800。包装退 253 记「超时」：单列一栏，整道判红。
@@ -49,7 +59,10 @@
 #
 # 基线（判法见 crates-mutation-rows.py 文件头「基线」）：点名的测试在没改坏的副本上本来就红时，改坏之后照样红、记「抓到」什么都没证明，
 #   所以派变异之前先跑基线，不是恰好一个 ok 的行记「基线不绿」、整道判红。「计数：」那一行的格式不动（mutation-triage 照栏读），基线另起一行「基线：…」报。
-# 按条记录（写法见 crates-mutation-rows.py 文件头「按条记录」）：下一趟只跑没有作数记录的行；登记输入里任何一份变了（含这份阶段脚本）整张重跑。
+# 判定库（写法见 crates-mutation-rows.py 文件头「判定库」与「复用判据」）：判成抓到的一行同时按「cargo 参数 + 点名用例」记一份覆盖（-C instrument-coverage、
+#   llvm-profdata、llvm-cov，工具不对整道判红）；下一趟逐行按复用判据判：行键（六段、上限、限时、工具链）同、被变异的函数与执行过的函数没变、
+#   编进去的文件改动都落在函数里，就按覆盖复用，不然现跑，现判的按栏报数（行新加或改了、没有覆盖记录、被变异的函数变了、执行过的函数变了、函数外有改动、一律现跑）。
+#   判法版本（这份阶段脚本、共用模块与它 import 的 libtest 解析、判定库共用部分、内存包装、登记行，连同构建环境）变了整张重跑。记录不按时限过期。只读看这一趟会怎么判：python3 research/scripts/crates-mutation-rows.py plan <根>。
 #   只有「抓到」与基线 ok 复用；SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1 一律不复用。判绿之后写全绿标记（admission.py stage-marker-write），写不成只报不红。
 # 双机分片：只在本地多机配置写了 ENABLE_ACROSS_MACHINES=1 时开（判法 research/scripts/layer0-shard-configuration-check.sh：退 0 开、退 3 关、退 1 判不过），不认环境变量开。
 #   整道跑、没设 SINGLEFS_GATE_FULL=1 与 GATE_MUTATION_START_OVER=1（这两样下最后那一趟不复用，分出去的白跑）、判法退 0 时，
@@ -71,6 +84,10 @@
 #       green（期望退出 0，实测 1）
 #   GATE_MUTATION_BREAK=notrunasmissed  把本次未跑当没红记
 #       not-run（期望退出 0，实测 1）
+#   GATE_MUTATION_BREAK=quicktableunchecked  --quick 不核轻型变异登记表，登记的名字直接当 --item 交下去
+#       quick-red（期望退出 1，实测 2）
+#   GATE_MUTATION_BREAK=quickrunsallrows  --quick 不读轻型变异登记表，整张表都判
+#       quick-green（输出里找不到「点名的 1 条变异都抓到了」）
 #   MUTATION_SHARD_RUN_BREAK 的几项只在 research/scripts/mutation-shard-run.sh --selftest 起的进程里认（那份自证放的标记文件 MUTATION_SHARD_RUN_SELFTEST_MARK，
 #   内容与驱动的 MUTATION_SHARD_SELFTEST_MARK_CONTENT 同一行）；别处设了，这一格判红、什么都不判：
 #   MUTATION_SHARD_RUN_BREAK=break-honored-anywhere  别处设了也认
@@ -80,8 +97,12 @@
 #       「✗ ① 最后那一趟全部复用…」、「✗ ③ 第二台那一份判完 1 条就停…」、「✗ ④ 驱动拒了之后 checker-tier-crates-mutation-replay 在本机整张判…」）
 #   MUTATION_SHARD_RUN_BREAK=environment-opens  GATE_MUTATION_ACROSS_MACHINES=1 照旧把双机打开、不看配置的开关
 #       本道样本不判错；红在 research/scripts/mutation-shard-run.sh --selftest 的一格（「✗ 单机那一趟（配置没开双机、环境变量 GATE_MUTATION_ACROSS_MACHINES=1）判绿…」）
-#   复用、续跑、只改一行只跑那一行、改源码全部重跑、久的先派、选行、导入这几样要连跑好几趟，在 research/scripts/crates-mutation-rows.py --selftest 里
-#   用假 cargo 跑（门禁 code-tooling 替它复跑），弄坏开关 basewithoutsource、timingsignored、importunchecked、nobaseline、emptyreplacementrefused 下各有一格必须判错。
+#   复用、续跑、只改一行只跑那一行、按覆盖复用的每一条判据、久的先派、选行、导入这几样要连跑好几趟，在 research/scripts/crates-mutation-rows.py --selftest 里
+#   用假 cargo、假 llvm 工具跑（门禁 code-tooling 替它复跑），弄坏开关 rowkeywithouttoolchain、mutatedfunctionignored、executedfunctionsignored、outsidechangesignored、
+#   coveragenotrecorded、llvmversionunchecked、timingsignored、importunchecked、nobaseline、emptyreplacementrefused、cargoconfignotcopied 下各有一格必须判错。
+#   拷贝范围含 .cargo/（.cargo/config.toml 的 [env] BINDGEN_EXTRA_CLANG_ARGS，点名的测试要编 gpu 或 verdict-store 特性的行靠它编 librocksdb-sys）也在那里判：
+#   假 cargo 见 --features gpu 而副本里读不到那个变量就照构建脚本报 stdbool.h 找不到、退 101，记「基线不绿」；弄坏开关 GATE_MUTATION_BREAK=cargoconfignotcopied
+#   拷副本时跳过 .cargo/，那一格（「拷贝范围含 .cargo/：点名的测试要编 gpu 特性的那一行基线绿、变异抓到」）必须判错。本道样本不判这一条（样本用真 cargo、不编 librocksdb-sys）。
 # 样本（fixtures/checker-tier-crates-mutation-replay.sh/；各放 .gate-cells 点名 crates-mutation-rows，setup.sh 在样本目录里 git init）：
 #   red      变异表把上限压到 512M、限时压到 20 秒：1 MiB 的缓冲改成 1536 MiB 的那条报「内存撞顶」；步长 1 改成 0、循环走不到上界的那条报「超时」，
 #            它点名的测试先往 TMPDIR 写一个 4 KiB 的文件，判定里报「临时目录已整个删掉（删前留有 1 个文件」（0 个说明 TMPDIR 没传到测试进程）；
@@ -89,8 +110,11 @@
 #            （基线那一行报 4 行 ok、2 行不绿）；「临时目录」那一行报 4 条都删掉了；计数行里没红、无效、内存撞顶、超时各数各的
 #   green    同样压到 512M，留一行撤掉了的「# 给整机留的内存余量：1T」：工作进程数那一行报开 5 个、卡在「这一趟要现跑的条数」，不按内存收；
 #            五条正常变异照旧红在点名的测试上，其中一条改 litmus/sample.litmus（拷贝范围要含 litmus/），一条替换文空着、删掉 add_twice 里第二次相加；
-#            基线那一行报 5 行都 ok，「临时目录」那一行报 5 条都删掉了，stderr 头一行报复用 0 条
+#            基线那一行报 5 行都 ok，「临时目录」那一行报 5 条都删掉了，stderr 头一行报复用 0 条；真 cargo 插桩、真 llvm 工具记覆盖：
+#            5 行 4 组（两行同点 adds_two_and_three_to_five），「覆盖：」那一行报记了 4 组、没记成 0 组，「复用：」那一行报现判 5 条都在「没有覆盖记录」那一栏
 #   not-run  一条点名的测试只打 NOT_RUN_NO_GPU_ADAPTER 那一行就返回、一条正常变异：报本次未跑 1 条、抓到 1 条、这一格绿
+#   quick-green  放 .mutation-sample/quick（当成 --quick）：变异表五行同一个测试目标，轻型登记表登记其中一行，只判那一行、抓到、这一格绿
+#   quick-red    放 .mutation-sample/quick：轻型登记表点名一个变异表里没有的变异名，核表就退 1、一行都不判（不起 cargo）
 set -uo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../scripts/preflight.sh"
 preflight "${BASH_SOURCE[0]}" "$@"; set -- ${PREFLIGHT_ARGUMENTS[@]+"${PREFLIGHT_ARGUMENTS[@]}"}
@@ -100,20 +124,21 @@ stage_cell crates-mutation-rows cell_crates_mutation_rows "crates/mutations.tsv 
   "照上面逐条的判定改：没红的补测试或改变异，锚点腐化的改原文，基线不绿的先让点名的测试在没改坏的副本上绿；只重跑某几行：bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --item <变异名>"
 stage_cells_parse "$@"; set -- ${STAGE_CELLS_REST[@]+"${STAGE_CELLS_REST[@]}"}
 
-list_items=0; root_argument=""; named_mutations=()
+list_items=0; root_argument=""; named_mutations=(); quick=0
 while (($#)); do
   case "$1" in
     --list-items) list_items=1; shift ;;
+    --quick) quick=1; shift ;;
     --item)
       if (($# < 2)) || [[ -z "$2" ]]; then
-        echo "  ✗ --item 后面缺变异名"
-        echo "     → 怎么办：写成 --item <变异名>（变异表第一列，原样照抄，名字里的逗号不拆），几行就给几次；可点的名字用 --list-items 看。"
+        echo "  ✗ --item 后面缺行号或变异名"
+        echo "     → 怎么办：写成 --item <行号或变异名>（变异名是变异表第一列，原样照抄，名字里的逗号不拆），几行就给几次；可点的用 --list-items 看。"
         exit 2
       fi
       named_mutations+=("$2"); shift 2 ;;
     -*)
       echo "  ✗ 认不出的选项 $1"
-      echo "     → 怎么办：只认 --list、--check crates-mutation-rows、--list-items、--item <变异名> 与一个项目根。"
+      echo "     → 怎么办：只认 --list、--check crates-mutation-rows、--list-items、--quick、--item <行号或变异名> 与一个项目根。"
       exit 2 ;;
     *) root_argument="$1"; shift ;;
   esac
@@ -121,12 +146,39 @@ done
 ROOT="${root_argument:-$STAGE_REPOSITORY}"
 cd "$ROOT" 2>/dev/null || exit 2
 MUTATION_TABLE="crates/mutations.tsv"
+# 只供样本：.mutation-sample/quick 当成给了 --quick（被判的根是这道阶段所在的仓、或设了 GATE_STAGED_FROM 时不认）
+if [[ "$(pwd -P)" != "$(cd "$STAGE_REPOSITORY" && pwd -P)" && -z "${GATE_STAGED_FROM:-}" && -f .mutation-sample/quick ]]; then quick=1; fi
+# --quick（文件头「--quick」）：轻型变异登记表核过才取它的行，连同 --item 点名的几行取并集；轻型没有剪枝，一律现跑
+if ((quick)) && ((list_items == 0)) && [[ ",${GATE_MUTATION_BREAK:-}," != *,quickrunsallrows,* ]]; then
+  light_rows_command=(python3 "$STAGE_REPOSITORY/research/scripts/crates-mutation-light-rows.py" names "$ROOT")
+  if light_rows_output="$("${light_rows_command[@]}")"; then light_rows_exit=0; else light_rows_exit=$?; fi
+  if ((light_rows_exit != 0)) && [[ ",${GATE_MUTATION_BREAK:-}," != *,quicktableunchecked,* ]]; then
+    printf '%s\n' "$light_rows_output"
+    echo "  ✗ --quick：轻型变异登记表 .claude/gate.d/crates-mutation-light-rows.tsv 核不过（crates-mutation-light-rows.py names 退 $light_rows_exit），一行都没判"
+    echo "     → 怎么办：照上面逐处列的改登记表（写法与挑法在它的表头），改完单跑 python3 research/scripts/crates-mutation-light-rows.py check 到它退 0，再跑 --quick。"
+    exit 1
+  fi
+  if ((light_rows_exit != 0)); then
+    light_rows_output="$(awk -F'\t' '!/^#/ && NF >= 2 { print $1 }' .claude/gate.d/crates-mutation-light-rows.tsv 2>/dev/null)"
+  fi
+  light_row_count=0
+  while IFS= read -r light_row_name; do
+    [[ -n "$light_row_name" ]] || continue
+    named_mutations+=("$light_row_name"); light_row_count=$((light_row_count + 1))
+  done <<<"$light_rows_output"
+  if ((light_row_count == 0)); then
+    echo "  ✗ --quick：轻型变异登记表一行都没有，核心部分是空的"
+    echo "     → 怎么办：照 .claude/gate.d/crates-mutation-light-rows.tsv 表头的挑法给 crates/mutations.tsv 里改坏对象在 crates/singlefs-core/src/ 下的行里每个测试目标登记一行。"
+    exit 1
+  fi
+  echo "  · --quick：轻型变异登记表 $light_row_count 行（核心部分）$( ((${#named_mutations[@]} > light_row_count)) && echo "，另加点名的 $((${#named_mutations[@]} - light_row_count)) 项" )；轻型没有剪枝，GATE_MUTATION_START_OVER=1、一律现跑"
+  GATE_MUTATION_START_OVER=1
+  export GATE_MUTATION_START_OVER
+fi
 
 if ((list_items)); then
-  [[ -f "$MUTATION_TABLE" ]] || { echo "  ✗ 没有 $ROOT/$MUTATION_TABLE：列不出可点名的变异"; echo "     → 怎么办：在项目根跑，或把项目根作为参数传进来。"; exit 1; }
-  # 一行一条变异（# 起头的行与空行不算）：变异名<制表符>第几行、改哪个文件
-  awk -F'\t' '/^#/ || /^[[:space:]]*$/ { next } { printf "%s\t第 %d 行，改 %s\n", $1, NR, $2 }' "$MUTATION_TABLE"
-  exit 0
+  # 一行一条变异（# 起头的行与空行不算）：变异名<制表符>第几行、改哪个文件；只有共用模块里一份
+  exec python3 "$STAGE_REPOSITORY/research/scripts/crates-mutation-rows.py" --list-items "$ROOT"
 fi
 
 item_selection_file=""
@@ -141,12 +193,18 @@ if ((${#named_mutations[@]})); then
   trap 'rm -f -- "${item_selection_file:?}"' EXIT
   unknown_mutations=()
   for named in "${named_mutations[@]}"; do
-    line_numbers="$(awk -F'\t' -v wanted="$named" '/^#/ || /^[[:space:]]*$/ { next } $1 == wanted { print NR }' "$MUTATION_TABLE")"
+    # 行号：那一行要是成形的一条（六段、# 起头与空行不算）；变异名：同名的几行都选上
+    if [[ "$named" =~ ^[1-9][0-9]*$ ]]; then
+      line_numbers="$(awk -F'\t' -v wanted="$named" 'NR == wanted && !/^#/ && !/^[[:space:]]*$/ && NF == 6 { print NR }' "$MUTATION_TABLE")"
+    else
+      line_numbers="$(awk -F'\t' -v wanted="$named" '/^#/ || /^[[:space:]]*$/ { next } $1 == wanted { print NR }' "$MUTATION_TABLE")"
+    fi
     if [[ -z "$line_numbers" ]]; then unknown_mutations+=("$named"); else printf '%s\n' "$line_numbers" >> "$item_selection_file"; fi
   done
   if ((${#unknown_mutations[@]})); then
-    printf '  ✗ --item 点名的变异不在 %s 里：%s\n' "$MUTATION_TABLE" "$(printf '「%s」' "${unknown_mutations[@]}")"
-    echo "     → 怎么办：变异名照 bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --list-items 列的第一列原样写。"
+    printf '  ✗ --item 点名的变异不在 %s 里（写的是行号就不是成形的一行）：%s\n' "$MUTATION_TABLE" "$(printf '「%s」' "${unknown_mutations[@]}")"
+    echo "     → 怎么办：写行号或变异名，照下面列的（bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --list-items 打的同一份）原样写："
+    python3 "$STAGE_REPOSITORY/research/scripts/crates-mutation-rows.py" --list-items "$ROOT" | sed 's/^/       /'
     exit 2
   fi
   GATE_MUTATION_ROW_SELECTION="$item_selection_file"
@@ -164,7 +222,7 @@ if [[ -n "${MUTATION_SHARD_RUN_BREAK:-}" && ",${MUTATION_SHARD_RUN_BREAK}," != *
   exit 1
 fi
 # 先问能不能复用上一次整轮全绿的判定（为什么用树、只一条 ref、不看工作区，见 research/scripts/stage-must-run.sh 的文件头）；
-# 只判选中的几行（GATE_MUTATION_ROW_SELECTION，驱动设的或 --item 换成的）时不问：那一问是整张表的，选中的几行按条记录复用。
+# 只判选中的几行（GATE_MUTATION_ROW_SELECTION，驱动设的或 --item 换成的）时不问：那一问是整张表的，选中的几行按判定库记录复用。
 if [[ -z "${GATE_MUTATION_ROW_SELECTION:-}" ]]; then
   source "$STAGE_REPOSITORY/research/scripts/stage-run-or-skip.sh" || { echo "  ✗ source 不进 research/scripts/stage-run-or-skip.sh，判不出这一道要不要跑"; echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"; exit 1; }
   stage_run_or_skip "$STAGE_REPOSITORY/research/scripts/stage-must-run.sh" "复用上一次整轮全绿的判定" \
@@ -178,7 +236,7 @@ GATE_MUTATION_MEMORY_CAP_RUNNER="$STAGE_REPOSITORY/research/scripts/run-with-mem
 export GATE_MUTATION_MEMORY_CAP_RUNNER
 MUTATION_ROWS_MODULE="$STAGE_REPOSITORY/research/scripts/crates-mutation-rows.py"
 if [[ ! -f "$MUTATION_ROWS_MODULE" ]]; then
-  echo "  ✗ 找不到 $MUTATION_ROWS_MODULE：这一道的判法、派活与按条记录都在它里面，一条都判不了"
+  echo "  ✗ 找不到 $MUTATION_ROWS_MODULE：这一道的判法、派活与判定库都在它里面，一条都判不了"
   echo "     → 怎么办：它随仓走，被删了或挪了就从 git 找回来；找回之前这一道按红记。"
   exit 1
 fi
@@ -187,7 +245,7 @@ if [[ -z "${GATE_MUTATION_ROW_SELECTION:-}" ]]; then
   across_machines_skipped=""
   across_machines_configuration_exit=0
   if [[ "${SINGLEFS_GATE_FULL:-}" == 1 || "${GATE_MUTATION_START_OVER:-}" == 1 ]]; then
-    across_machines_skipped="SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1：这一趟不复用按条记录，分出去判的行本机还要再跑一遍"
+    across_machines_skipped="SINGLEFS_GATE_FULL=1 或 GATE_MUTATION_START_OVER=1：这一趟不复用判定库记录，分出去判的行本机还要再跑一遍"
   else
     bash "$STAGE_REPOSITORY/research/scripts/layer0-shard-configuration-check.sh" "$ROOT" >/dev/null 2>&1 || across_machines_configuration_exit=$?
     if [[ ",${MUTATION_SHARD_RUN_BREAK:-}," == *,environment-opens,* && "${GATE_MUTATION_ACROSS_MACHINES:-}" == 1 ]]; then
@@ -204,7 +262,7 @@ if [[ -z "${GATE_MUTATION_ROW_SELECTION:-}" ]]; then
     echo "  … 双机分片：没分（$across_machines_skipped），整张表在本机判" >&2
   else
     if bash "$STAGE_REPOSITORY/research/scripts/mutation-shard-run.sh" "$ROOT" >&2; then shard_driver_exit=0; else shard_driver_exit=$?; fi
-    echo "  … 双机分片：驱动退 $shard_driver_exit；下面在本机整张判一遍（命中按条记录的复用、缺的现跑）" >&2
+    echo "  … 双机分片：驱动退 $shard_driver_exit；下面在本机整张判一遍（命中判定库记录的复用、缺的现跑）" >&2
     if [[ ",${MUTATION_SHARD_RUN_BREAK:-}," == *,no-final-pass,* ]]; then
       echo "  ! 弄坏开关 MUTATION_SHARD_RUN_BREAK=no-final-pass：调完驱动就退，不再整张判" >&2
       exit "$shard_driver_exit"
@@ -247,7 +305,8 @@ if [[ -n "$item_selection_file" && "$module_exit" == 3 && "$not_run_count" -gt 0
   exit 0
 fi
 if [[ -n "$item_selection_file" && "$module_exit" == 3 ]]; then
-  echo "  ✓ 点名的 ${#named_mutations[@]} 条变异都抓到了（只判了这几行，不是整道结论；全绿标记没写）"
+  selected_count="$(sort -u "$item_selection_file" | grep -c .)"
+  echo "  ✓ 点名的 $selected_count 条变异都抓到了（只判了这几行，不是整道结论；全绿标记没写；现判与复用了几条见上面「复用：」那一行）"
   exit 0
 fi
 exit "$module_exit"
