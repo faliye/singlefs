@@ -21,7 +21,7 @@ required-inputs: 现象, 草稿目录, 报告
 - 要回答的问题：是真是假、机理、最小复现，哪几样。
 - 只读，还是可以在草稿目录的仓副本里改（改坏、加打印、二分）。
 - 写「查到就修」的：给压着的条款（kb 文件路径与小节标题）与一行「要动的 crates 文件：…」，这时在主工作区改。
-- 线程上限、内存上限；报告路径与草稿目录，都在 `/tmp/claude-1000/` 下。
+- 线程上限、内存上限；报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
 
 ## 做什么
 
@@ -29,9 +29,9 @@ required-inputs: 现象, 草稿目录, 报告
 2. 先原样复现：用输入给的命令在仓副本里（`rsync -a --exclude target --exclude .git`）跑一次，贴命令与原样输出。复现不出就写复现不出，列出与原现场差在哪（提交、环境变量、种子、线程数），不往下猜。
 3. 二分到文件:行：缩小输入、改坏或加打印都只在副本里做；每一步贴命令与输出，记下排除了哪几种解释、各凭哪条观测。
 4. 给最小复现：一条命令加它的原样输出；再给「什么现象会推翻这个定位」，并在副本里造一次那个现象看它确实会出现。
-5. 要跑的东西是重型测试（名字带 layer0 的测试二进制、门禁 `checker-tier-layer0-replay`、checker-tier-qemu-device-streams、checker-tier-lkmm、checker-tier-crates-mutation-replay、checker-tier-formal-verification、checker-tier-research-build-and-replay 的 experiment-replay 格、全量 cargo test）的，不跑，写进报告交主 agent 去问用户。
+5. 要跑的东西是重型测试（判据只有 `.claude/hooks/lib_heavy_tests.py` 的 `classify` 一份，逐类写在它文件头；checker 档包 `singlefs-checker-tier` 的测试按包判、不按名字）的，不跑，写进报告交主 agent 去问用户；轻型里形式化那一条（`.claude/rules/verification.md`「两档：轻型与重型」）照跑，写了「查到就修」的交回前跑它：核心部分加按自己改到的文件点名的项，命令照 `.claude/agents/implementation-writer.md` 第 1d 步；崩溃与变异两条轻型不起，命令写进报告「要主 agent 跑的命令」一节，写法照第 1d 步。
 6. 上下文多大都不交回，活没做完就接着做。
-7. 派发提示写了「查到就修」的：定位到的改法在条款里写明了的，在主工作区只改「要动的 crates 文件」那一行列的文件，照 `.claude/agents/implementation-writer.md` 第 2、3、3a、4 步写实现、补测试、证红（`prove-red.sh`）、变异行追加进 `crates/mutations.tsv`、末尾一条命令跑 fmt、clippy、build 与动到的测试二进制；条款没写、要做设计判断的，停在那一处写进报告，不自己定。报告附 `git diff --stat -- crates`。
+7. 派发提示写了「查到就修」的：定位到的改法在条款里写明了的，在主工作区只改「要动的 crates 文件」那一行列的文件，照 `.claude/agents/implementation-writer.md` 第 1d、2、3、3a、3b、4 步写实现、补测试、证红（`prove-red.sh`）、变异行追加进 `crates/mutations.tsv`、末尾一条命令跑 fmt、clippy、build、动到的测试二进制与形式化轻型；条款没写、要做设计判断的，停在那一处写进报告，不自己定。报告附 `git diff --stat -- crates`。
 
 ## 写范围
 

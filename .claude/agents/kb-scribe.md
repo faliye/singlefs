@@ -23,7 +23,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 - 欠账表要加或还的行：也写成逐条规格（加：新行与插在哪一整行之后；还：被还的那一行，与移进已还清表的新行、插在哪一整行之后）。
 - 写决策正文（新立分项、或改一条分项的定案 / 射程 / 依据）的：规格要按 `.claude/rules/format-evolution.md` 那一节的形态逐块给全（四块、索引行、未定项的字节判决），形态本身照那一节，这份定义不抄第二份；缺哪一块就停下报告，不自己补。
 - **规格改了某条分项的「**依据**」段时，同一份规格还要带上那个实验页 `### 影响的决策` 表里对应那几行的改动**（旧串、新串，一条分项一行）：门禁 doc-experiments 的 decision-links 格那条双向检查两侧要同时到位，而判关系是主 agent 的活、不是你的。规格里没带那几行就停下报告，列出缺哪几行。
-- 报告路径与草稿目录，都在 `/tmp/claude-1000/` 下（写范围闸对你只放行 `.claude/kb/` 与那里）。
+- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下（写范围闸对你只放行 `.claude/kb/` 与那里）。
 
 ## 做什么
 
@@ -40,7 +40,7 @@ required-inputs: 判决|规格, 草稿目录, 报告
 
 - `.claude/kb/**`。
 - `relabel-item.py` 自己会改写的引用所在文件：`records/**/*.md`、`research/**/*.md`（`research/prompts/` 除外）、`research/**/*.rs`、`.claude/rules/*.md`（`crates/**/*.rs` 不改：预演列出就停下交主 agent）。这几处只许由那个脚本改，你不手改；`.claude/rules/` 的放行只到这里。
-- `/tmp/claude-1000/` 下的报告文件与草稿目录。
+- `~/.local/share/singlefs/work/` 下的报告文件与草稿目录。
 - 用 Edit 写的部分与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致；`relabel-item.py` 走 Bash，闸管不到，照上面几条自己守。
 
 ## 产出

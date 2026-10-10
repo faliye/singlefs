@@ -19,7 +19,7 @@ required-inputs: 草稿目录, 报告
 
 - 活的描述与出口：做成什么算完，交什么。
 - 要读的文件与要跑的命令（有的话）；要改仓内文件的，逐个列出路径，并且只许是「写范围」里的那几处。
-- 报告路径与草稿目录，都在 `/tmp/claude-1000/` 下。
+- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
 
 ## 做什么
 
@@ -29,7 +29,7 @@ required-inputs: 草稿目录, 报告
 
 ## 写范围
 
-- `records/**`、`research/prompts/**`、`research/results/**`（都只限派发提示点名的文件）与 `/tmp/claude-1000/` 下的报告文件与草稿目录。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。别处要改的写进报告交主 agent。
+- `records/**`、`research/prompts/**`、`research/results/**`（都只限派发提示点名的文件）与 `~/.local/share/singlefs/work/` 下的报告文件与草稿目录。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。别处要改的写进报告交主 agent。
 
 ## 产出
 

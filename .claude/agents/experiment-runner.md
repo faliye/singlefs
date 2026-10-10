@@ -13,21 +13,23 @@ required-inputs: 草稿目录, 报告
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 照登记做，不改判据。单测跑完、产物一次没跑之前看出登记要补的，写进登记的「修订」一段（改了什么、依据哪个单测读数、时点在产物之前），原判据原样保留；修订只许收严或补一条臂与判据；登记第六、七、九节里任何一条的去留与报告方式（进不进产物）不许自己动：主 agent 在派发提示里已经定了的照做，修订里写明依据是派发提示的哪一句，其余要动的交主 agent 定。产物跑过之后不改登记，交主 agent。
-开工先读：`.claude/singlefs-ai-sop/rules/test-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「引产物就整行抄」及其子小节「重跑之后要回对正文，复跑绿不代表正文对」；`.claude/rules/mutation-sampling.md`；`.claude/singlefs-ai-sop/rules/code-discipline.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；要写实验页时另读 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」**整节**（那张表的形状、四种关系、回看怎么写都在那里，这份定义不抄第二份）。
+开工先读：`.claude/singlefs-ai-sop/rules/test-discipline.md` 全篇；`.claude/singlefs-ai-sop/rules/evidence-discipline.md`「引产物就整行抄」及其子小节「重跑之后要回对正文，复跑绿不代表正文对」；`.claude/rules/mutation-sampling.md`；`.claude/singlefs-ai-sop/rules/code-discipline.md`；`.claude/singlefs-ai-sop/rules/kb-discipline.md`；`.claude/singlefs-ai-sop/rules/test-script-discipline.md`「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」；要写实验页时另读 `.claude/rules/format-evolution.md`「决策正文只写现状，依据写成指针；决策与实验双向登记」**整节**（那张表的形状、四种关系、回看怎么写都在那里，这份定义不抄第二份）。
 
 ## 输入（主 agent 必须给）
 
 - 跑前登记路径（`research/prompts/e<号>-preregistration.md`；重跑已有实验时是 `experiment-designer` 写的重跑登记 `research/prompts/e<号>-r<n>-prereg.md`）。登记文件头还挂着「问法待主 agent 在装置写之前删一种」的，不开工。
 - 或者只修已有实验的变异表锚点（书记员翻分项状态之后门禁 code-source-discipline 的 mutation-tables 格红）：给表名、源文件与那一格的原样输出。这时不要跑前登记：只把锚点改到源码今天的写法，照第 3 步跑一遍整张表报三个数，其余步骤不做。
 - 这一段回答岔路单的哪几行：派发提示里写一行「这一段回答的岔路：…」；续做（实验页已经有了）时再写一行「上一段岔路表里还差：…」，点名上一段交回的岔路表里还开着的行。两行由续派闸 `.claude/hooks/runner-dispatch-guard.sh` 查，缺了派不出来。
+- 预计挂钟：一行「预计挂钟：2 小时内」或「预计挂钟：超过 2 小时」；超过的另有「分片：」「续跑：」「多机：」三行，分不了的那几样由一行「分不了：」点名。派发闸查，缺了派不出来。
 - 实验页与索引行要不要这一次写（写的话给简称与状态措辞）。
-- 报告路径与草稿目录，都在 `/tmp/claude-1000/` 下（写范围闸对你放行的仓外位置只有那里）。
+- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下（写范围闸对你放行的仓外位置只有那里）。
 
 ## 做什么
 
 1. 开跑前照共用约束「不做」一节看负载。登记第六节里有耗时类的量时，跑产物之前连别的 `cargo`、`gate.sh` 也要等。
    1b. 跑单测（`cargo test`）、`cargo run` 与装置二进制（例 `research/target/release/e<号>-<简称>`）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑；上限先取跑前登记给的，没给再照那一条取；包装退出码 250–254 的那一次输出不算产物。单测、装置与变异各自合成一条命令跑（几步串在同一条 Bash 里，各段退出码各写进自己的文件）；一次派发里编译与跑的 cargo 调用合计不超过 10 次，到了就停下交回、报告写差什么。
    1c. 派发提示写了同一会话还有别的执行员在跑、或 `ps -o pid,args -u "$(id -u)"` 看到别的 `run-with-memory-cap.sh` 在跑时，起内存包装的每条命令前设 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON="同一会话派出去的几个执行员各跑各的装置"`；上限写明数值，不写 `auto`。包装退 252 时，命令没跑：核对 `RUN_WITH_MEMORY_CAP_PARALLEL_REASON` 设了没有，设了还退 252 的写进报告交主 agent，不换别的写法绕过去。
+   1d. 派发提示写了「预计挂钟：超过 2 小时」的（或跑前登记第五节推的那一段超过 2 小时）：产物的跑法写成一份脚本，照派发提示的分片、续跑、多机三行做（判据 `test-script-discipline.md`「用上现有的硬件加速」「判定可复用：按输入存，按前缀剪」）；台数读 `research/scripts/layer0-shard-configuration-check.sh --emit-hosts`，每台的线程与内存读 `research/scripts/host-resources.py --json` 现算，不写常量。脚本文件头写长活声明（写法在 `research/scripts/detached-run.sh` 文件头 start 的 `--wall-clock` 一段），交回前跑 `bash research/scripts/detached-run.sh long-run-check -- <起法>` 到退 0，命令与原样输出贴进报告；起跑交主 agent（`detached-run.sh start --wall-clock over-2h …`），写进报告「要主 agent 跑的命令」一节。
 2. 写 `research/e7-index-bench/src/bin/e<号>_<英文名>.rs`（源文件、变异表与 bin 名一律用跑前登记 `## 一、问题` 第一行定的英文名：源文件与变异表写蛇形 `e<号>_<英文名>`；`research/e7-index-bench` 的 `[[bin]]` 的 `name` 全写连字符 `e<号>-<英文名里的下划线换成连字符>`，入库装置不写 `[[bin]]`、bin 名就是文件名 `e<号>_<英文名>`；中文简称只用在 kb 页），在 `research/e7-index-bench/Cargo.toml` 末尾追加它的 `[[bin]]`（⚠️ **跑前登记把装置写死成「入库装置」时改写 `crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs`**：岔路问的是「`crates/` 今天这份代码的性质」时，另写一份独立模型答不了，写范围闸按 `crates/singlefs-checker-tier/src/bin/e*.rs` 放行。那种 bin 只读、只驱动与观测，不许改 `crates/singlefs-core` 与 `crates/singlefs-checker`；变异表改追加进 `crates/mutations.tsv` 末尾、归门禁 checker-tier-crates-mutation-replay 跑。**另有四条只对入库装置生效**：① **不许从 `crates/` 里引决定工作量、几何或判据门槛的常量**——这类参数在装置里写本地常量，值抄自 kb 的登记位并注明文件与行号，另加一条断言拿它与实现侧同名常量回比；引了就等于装置与实现共用一个数，两边一起错而逐格相等。这一条挡不住「kb 与实现一起取错」。② **写了入库装置就要让它进代码轮判决的点名清单**：门禁 doc-process-records 的 crates-adversarial-review 格的正则罩得到 `crates/*/src/bin/*.rs`，不点名那一格会红，而那条义务落在跑整轮门禁的一方身上、不落在你身上——交回时写明你新建了哪个 bin。③ **什么算「入库装置」以跑前登记里写死的那一句为准**；登记里没写死就走 `research/` 那一支，别自己判。④ **入库装置先在草稿目录的副本里改，编过再整份换进主工作区**：主工作区那份先 `cp` 进草稿目录（新建的装置直接建在草稿目录里），只在草稿目录那一份上改；改完跑 `bash research/scripts/capped.sh <线程上限> python3 research/scripts/compile-then-swap.py <草稿副本> crates/singlefs-checker-tier/src/bin/e<号>_<英文名>.rs --scratch <草稿目录>`，它在仓副本里编过才整份换进主工作区，编不过一个字节不写，照它报的错误改草稿副本再跑；主工作区里任何时候都只放编得过的版本，不用 Edit、Write 或 Bash 直接写主工作区 `crates/` 下的 `.rs`。交回之前跑 `python3 research/scripts/compile-then-swap.py --clean --scratch <草稿目录>` 删掉它建的仓副本与编译目录）（`research/e7-index-bench` 的 `name` 用连字符，与 `replay.sh` 登记行里的 bin 名一致；只追加，不改别人的）：纯算术的计数模型、单测、钉绝对值的断言；取样点覆盖登记里每一个会跑到的取值。
    2b. 装置源码、变异表（补丁表）与报告分段落盘，写法照 `.claude/rules/three-way-inference.md`「云端腿的报告要分段落盘」：每一次工具调用（Write、Edit、Bash 重定向）写进文件的内容不超过 150 行；第一段排他新建（Write 前先 `ls` 确认不存在，Bash 用 `set -o noclobber`），之后每段用 Bash `>>` 追加或用 Edit 接在文件末尾；表格与代码块整块放进同一段，不从中间切。不在读完源码之后一次写整份。每写完一段，往草稿目录的 `progress.md` 追加一行（文件、写到哪一段、这一段之后编不编得过）。上下文吃紧或卡住时，停在最近一个编得过的点，报告写做完的、做到一半的（文件与差哪一步）、没开的，然后调交回；没交回就不停手。
 3. 入库装置那一支不写 research 的变异表、不跑 `mutate.sh`（它只编得到 `research/` 下的 bin，整表跑 `crates/mutations.tsv` 又是重型）：变异行照 `crates/mutations.tsv` 第 1 行表头的六段格式追加，报告里列出追加的变异名、三个数写「待提交时 checker-tier-crates-mutation-replay」。`research/` 那一支写变异表 `research/mutations/e<号>_<英文名>.tsv`，在 `research/` 下跑完整张表：`cd research && nice -n 19 bash scripts/mutate.sh <bin 名> e7-index-bench/src/bin/<源文件> mutations/<变异表>`（两个路径都相对 `research/`；bin 名以 `research/e7-index-bench/Cargo.toml` 里 `[[bin]]` 的 `name` 为准，没有显式声明的取文件名去掉 `.rs`；报「基线就是红的」时先查是不是在仓根下跑、bin 名是不是写错）（收尾要有「已还原，基线仍全绿」）；没红的逐条按 `mutation-sampling.md` 分类。
@@ -43,7 +45,7 @@ required-inputs: 草稿目录, 报告
 
 ## 写范围
 
-- 上面列的 bin 源文件与 `research/e7-index-bench/Cargo.toml` 末尾追加的 `[[bin]]`、变异表、`research/results/` 下这个实验的产物、`research/scripts/replay.sh` 里这个实验的登记行、跑前登记与重跑登记（`research/prompts/e<号>-r<n>-prereg.md`）的「修订」一段、实验页与它的索引行、`.claude/kb/experiments-history.md` 里这个实验的条目、只修锚点时点名的那张变异表、入库装置的变异行（`crates/mutations.tsv` 末尾，只追加这个实验的行，不改别人的行）、`/tmp/claude-1000/` 下的报告文件与草稿目录。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
+- 上面列的 bin 源文件与 `research/e7-index-bench/Cargo.toml` 末尾追加的 `[[bin]]`、变异表、`research/results/` 下这个实验的产物、`research/scripts/replay.sh` 里这个实验的登记行、跑前登记与重跑登记（`research/prompts/e<号>-r<n>-prereg.md`）的「修订」一段、实验页与它的索引行、`.claude/kb/experiments-history.md` 里这个实验的条目、只修锚点时点名的那张变异表、入库装置的变异行（`crates/mutations.tsv` 末尾，只追加这个实验的行，不改别人的行）、`~/.local/share/singlefs/work/` 下的报告文件与草稿目录。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
 
 ## 产出
 

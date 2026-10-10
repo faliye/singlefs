@@ -13,7 +13,8 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 开工先读 `.claude/agent-common.md`；这份定义开了 `omitClaudeMd`，不继承项目 CLAUDE.md 与它 `@` 的规则，要用的规则照共用约束「规则怎么读」一节读。
 
 派发提示写「交补丁」的在草稿目录的副本里改、交补丁目录（「产出」一节），不碰主工作区；没写的在主工作区改。主 agent 同时派几个实现员时一律交补丁。你做的是 `.claude/rules/implementation-workflow.md`「三步，缺一步就不算做完」的第 1 步；第 2 步三方对抗与第 3 步 checker 由主 agent 另派。
-开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「harness 档里再分快档用例与慢档用例」「崩溃枚举用例住哪、怎么登记」（测试文件按测什么起名、一条用例一个场景、checker 档测试文件第一行声明模块）。
+开工先读：`.claude/singlefs-ai-sop/rules/show-me-test.md`「新增的测试必须先证明它会红」；`.claude/singlefs-ai-sop/rules/code-discipline.md` 全篇；`.claude/rules/implementation-first.md`「规矩」；`.claude/rules/fs-design.md`；`.claude/rules/verification.md`「定义与名字」「harness 档里再分快档用例与慢档用例」「两档：轻型与重型」「崩溃枚举用例住哪、怎么登记」（测试文件按测什么起名、一条用例一个场景、checker 档测试文件第一行声明模块）。
+改崩溃点重放（层 0 用例、崩溃放量流水线、判定库 `verdict_store`、GPU 判器、崩溃枚举用例）的，开工另读 `.claude/kb/verification-build.md`「八、崩溃点重放：崩溃放量的流程与用户定的两档」；改法与那一节「用户定的」那张表对不上的，照「做什么」第 6 步停在那一处、写进报告交主 agent。
 
 ## 输入（主 agent 必须给）
 
@@ -22,17 +23,19 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 - 压着的条款：kb 文件路径与小节标题（不给摘要）。
 - 主 agent 读过的 `crates/` 路径，以及这一轮别的会话正在改的 `crates/` 文件（你不碰的）。
 - 单独一行「要动的 crates 文件：…」，逐个列全（从仓根起），份数不设上限；派发闸按这一行判与在跑的实现员撞不撞文件（`crates/mutations.tsv` 只追加、不算撞），撞了拒。
-- 报告路径与草稿目录，都在 `/tmp/claude-1000/` 下（写范围闸对你只放行 `crates/`、`litmus/` 与那里）。
+- 报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下（写范围闸对你只放行 `crates/`、`litmus/` 与那里）。
 
 ## 做什么
 
 1. 开跑前照共用约束「不做」一节看负载。
    1b. 第 3 步的证红、第 4 步动到的测试二进制（副本里跑的也算）照共用约束「不做」一节「跑编译出来的代码经内存包装」那一条经包装跑；`cargo fmt --check`、`cargo clippy`、`cargo build` 不经它。
    1c. 动到的测试二进制跑红了，修完只重跑红的那几条：`python3 research/scripts/rerun-failed-tests.py <那一趟的日志> -p <包>` 打印命令（带 `--include-ignored`，慢档用例也跑得到），经内存包装起；不整份重跑（`.claude/rules/verification.md`「harness 档里再分快档用例与慢档用例」）。
+   1d. 交回前只跑前台跑得完的轻型，即形式化那一条，核心部分加按自己改到的文件点名的项：`bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/checker-tier-formal-verification.sh --quick <根> [--item <项>…]`，可点名的项用 `--list-items` 列，贴末尾原样输出。崩溃与变异两条轻型不起：`bash research/scripts/run-with-memory-cap.sh <上限> bash research/scripts/crash-point-replay.sh --quick [--item <项>…]` 与 `bash research/scripts/run-with-memory-cap.sh <上限> bash .claude/gate.d/checker-tier-crates-mutation-replay.sh --quick <根> [--item <项>…]` 写进报告「要主 agent 跑的命令」一节，命令原样可抄，`<根>` 填你改动所在的树，`--item` 按自己改到的文件点名，带 GPU 的写成 `.claude/rules/verification.md`「两档：轻型与重型」那样的起法，并写跑完看哪几行判结果；主 agent 在你的副本里跑，红了新派一个同类 agent 接着改。三条不带 `--quick` 的跑法是重型，不跑。
 2. 读条款与代码，写实现与测试。名字、分支、类型、错误照 `code-discipline.md`：不缩写、不写 `_ =>`、newtype、`expect` 写清依赖哪条不变量。
 3. 每条新测试证明会红：在草稿目录的仓副本里（`rsync -a --exclude target --exclude .git`）改坏被测代码一处，跑那条测试所在的整个测试二进制看它红（经内存包装，共用约束「不做」一节），记「改坏哪一行 → 哪条断言红」与同时红了哪些测试；每份副本用它自己的 target（不把 `CARGO_TARGET_DIR` 指到几份副本共用的目录）；改坏的副本要还原时，从原件拷回之后对被改的文件 `touch`，或删掉这份副本重拷，不用 `rsync -a` 拷回了事；先跑一份不改动的副本：已经红的测试记成基线红集，变异证明只看基线红集之外的测试，你要证明的那条在基线红集里就停下交回；被测代码里有 `debug_assert` 的，debug 下先红的可能是它，照实记红在哪一条，要测试断言自己红就在 `--release` 下再跑一次。`crates/mutations.tsv` 在的话（门禁 checker-tier-crates-mutation-replay），每条再加一行变异，原文在文件里恰好命中一次。
-   3a. 证红一律用 `bash research/scripts/prove-red.sh --copy <副本> [--memory <上限>] <crate> <变异名…>`：先把变异行写进 `crates/mutations.tsv`（参数带 `-p <crate>` 与 `--lib` / `--test <目标>` / `--bin <名>` 之一），它逐条施加、经内存包装跑、判红、还原；不挑目标的行它整次拒，目标带 layer0 的跳过并列出。不自己写证红脚本。
-4. 变异证红按测试算、不按行算：每条新测试挑一行能让它红的变异证一次就够，其余行照样追加进 `crates/mutations.tsv` 末尾，整表复跑归最后的门禁 checker-tier-crates-mutation-replay；报告写明哪几行证过、哪几行留给它。checker 档不跑（`.claude/rules/verification.md`）：自己新加的崩溃枚举流写进 `crates/singlefs-checker-tier/tests/`，不在交回前跑，随提交时的 `checker-tier-layer0-replay` 快档与之后的全量验；已有的一条都不跑；新测试落在 checker 档包 `singlefs-checker-tier` 里的，第 3 步的证红也不跑，变异行照样追加、报告写明留给提交时的 checker-tier-crates-mutation-replay。checker 档由提交时的主 agent 跑（`main-agent.md`「什么时候派哪个 agent」里「暂存之后、提交之前跑门禁」那一步），不由实现员跑。交回前的验证合成一条命令在末尾跑一次（fmt、clippy、build 与动到的测试二进制串在同一条 Bash 里，各段退出码各写进自己的文件、最后逐段读）；中途改一处跑一次的只跑动到的那个测试二进制；一次派发里编译与测试的 cargo 调用合计不超过 10 次，到了就停在编得过的点交回、报告写差什么。验证只到这几样：动到的 harness 档测试二进制（整个二进制，不按名字挑；checker 档包 `singlefs-checker-tier`的不跑）、第 3 步的证红、`cargo fmt --all -- --check`、`cargo clippy --all-targets --all-features -- -D warnings` 加 `.claude/singlefs-ai-sop/scripts/check.sh` 里 `CODE_DISCIPLINE_LINTS` 那几条 `-D`（照那份脚本现抄，不跑 `check.sh` 本身，它是重型）、`cargo build --offline --all-targets`，各贴末尾原样输出。门禁阶段、全量 `cargo test --all`、checker 档的快档与全量都不跑，留给提交时主 agent 统一跑的那一次验证（六道重阶段与整轮门禁）；派发提示另点名要跑的，不是重型测试的照点名跑，重型的照共用约束「不做」一节那一条交回主 agent。
+   3a. 证红一律用 `bash research/scripts/prove-red.sh --copy <副本> [--memory <上限>] <crate> <变异名…>`：先把变异行写进 `crates/mutations.tsv`（参数带 `-p <crate>` 与 `--lib` / `--test <目标>` / `--bin <名>` 之一），它逐条施加、经内存包装跑、判红、还原；不挑目标的行它整次拒，重型的行（判据在第 4 步）它跳过、逐行报「本次未跑」。不自己写证红脚本。
+   3b. 新写崩溃点重放、形式化验证或 crates 变异表的测试，先写进重型，再把其中关键的步骤拿出来放进轻型；轻型登记的每一行写明取自重型的哪一项（`.claude/rules/verification.md`「两档：轻型与重型」）。
+4. 变异证红按测试算、不按行算：每条新测试挑一行能让它红的变异证一次就够，其余行照样追加进 `crates/mutations.tsv` 末尾，整表复跑归最后的门禁 checker-tier-crates-mutation-replay；报告写明哪几行证过、哪几行留给它。checker 档的测试不直接跑，轻型里只经第 1d 步跑形式化那一条，崩溃与变异两条轻型交主 agent 跑（`.claude/rules/verification.md`）：自己新加的崩溃枚举流写进 `crates/singlefs-checker-tier/tests/`，不在交回前跑，随提交时的 `checker-tier-layer0-replay` 快档与之后的全量验；已有的一条都不跑；变异行算不算重型以 `.claude/hooks/lib_heavy_tests.py` 的 `classify` 为准（`prove-red.sh` 照它判，checker 档包 `singlefs-checker-tier` 的行都是），重型的行第 3 步的证红也不跑，变异行照样追加、报告写明留给提交时的 checker-tier-crates-mutation-replay。重型由提交时的主 agent 跑（`main-agent.md`「什么时候派哪个 agent」里「暂存之后、提交之前跑门禁」那一步），不由实现员跑。交回前的验证合成一条命令在末尾跑一次（fmt、clippy、build、动到的测试二进制与第 1d 步的形式化轻型串在同一条 Bash 里，各段退出码各写进自己的文件、最后逐段读）；中途改一处跑一次的只跑动到的那个测试二进制；一次派发里编译与测试的 cargo 调用合计不超过 10 次，到了就停在编得过的点交回、报告写差什么。验证只到这几样：第 1d 步的形式化轻型、动到的 harness 档测试二进制（整个二进制，不按名字挑；checker 档包 `singlefs-checker-tier`的不跑）、第 3 步的证红、`cargo fmt --all -- --check`、`cargo clippy --all-targets --all-features -- -D warnings` 加 `.claude/singlefs-ai-sop/scripts/check.sh` 里 `CODE_DISCIPLINE_LINTS` 那几条 `-D`（照那份脚本现抄，不跑 `check.sh` 本身，它是重型）、`cargo build --offline --all-targets`，各贴末尾原样输出。门禁阶段（第 1d 步形式化那一道门禁的 `--quick` 除外）、第 1d 步的崩溃与变异两条轻型（交主 agent，命令写进「要主 agent 跑的命令」一节）、全量 `cargo test --all`、checker 档的快档与全量、轻型三条不带 `--quick` 的重型跑法都不跑，留给提交时主 agent 统一跑的那一次验证（六道重阶段与整轮门禁）；派发提示另点名要跑的，不是重型测试的照点名跑，重型的照共用约束「不做」一节那一条交回主 agent。
    4a. 改了 checker（`crates/singlefs-checker/src/`）某条不变量的判定集合的，报告单列一节「受影响的层 0 流与崩溃枚举用例」：哪几条流、哪几个用例的钉值会跟着变；层 0 快档是重型（门禁 `checker-tier-layer0-replay`），集成时不跑，主 agent 提交时跑六道重阶段时对着这一节看。`research/scripts/apply-writer-patch.py` 见补丁动了 checker 而报告没这一节就拒绝打。
 5. 要改的文件在输入给的「别的会话正在改」清单里：不碰那个文件，也不做只能落在它上面的条款，报告写明卡在哪个文件、哪条条款；新文件要靠清单里的文件才进编译（模块声明、`Cargo.toml` 的 `[[test]]`）的，那条整条停下，不写那个新文件；其余照做。`crates/mutations.tsv` 例外：只在末尾追加整行，不改别人的行。
 6. 改动里碰到条款没写、要做设计判断的地方，停在那一处，写进报告交主 agent，不自己定。「停在那一处」的写法看这条分支走不走得到：
@@ -45,7 +48,7 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 
 ## 写范围
 
-- `crates/**`（输入里标了别的会话在改的文件除外）、`litmus/**`、`crates/mutations.tsv`、`/tmp/claude-1000/` 下的报告文件与草稿目录。不写 kb、不写 `research/`。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
+- `crates/**`（输入里标了别的会话在改的文件除外）、`litmus/**`、`crates/mutations.tsv`、`~/.local/share/singlefs/work/` 下的报告文件与草稿目录。不写 kb、不写 `research/`。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
 
 ## 产出
 
@@ -55,4 +58,4 @@ required-inputs: 草稿目录, 报告, 条款, 要动的 crates 文件
 
 ## 没做什么（固定会有的）
 
-- 没走三方对抗；checker 档（`checker-tier-layer0-replay` 快档与全量、QEMU、herd7、crates 变异表、Verus 形式化验证）归提交时的主 agent；没提交。
+- 没走三方对抗；重型（`checker-tier-layer0-replay` 快档与全量、QEMU、herd7、crates 变异整表、Verus 形式化验证、轻型三条不带 `--quick` 的跑法）归提交时的主 agent；崩溃与变异两条轻型（第 1d 步）没起，命令在报告「要主 agent 跑的命令」一节，归主 agent；没提交。

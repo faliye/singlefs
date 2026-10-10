@@ -21,7 +21,7 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 - 要改的文件，全列；这一轮别的会话在改的文件（你不碰的）。
 - 出口：做到哪算完。
 - 每条改法要判红的输入样本与弄坏开关名（`<脚本>_BREAK=<项>` 这类）；主 agent 给不出的，写明由你起名。
-- 线程上限、内存上限；报告路径与草稿目录，都在 `/tmp/claude-1000/` 下。
+- 线程上限、内存上限；报告路径与草稿目录，都在 `~/.local/share/singlefs/work/` 下。
 
 ## 做什么
 
@@ -36,7 +36,7 @@ required-inputs: 草稿目录, 报告, 出口, 要改的文件
 
 ## 写范围
 
-- `.claude/hooks/**`、`.claude/gate.d/**`（含 fixtures 与 `stage-*.tsv`）、`.claude/scripts/**`、`research/scripts/**`、`.claude/settings.json`（只改 `hooks` 一节）、`/tmp/claude-1000/` 下的报告文件与草稿目录。
+- `.claude/hooks/**`、`.claude/gate.d/**`（含 fixtures 与 `stage-*.tsv`）、`.claude/scripts/**`、`research/scripts/**`、`.claude/settings.json`（只改 `hooks` 一节）、`~/.local/share/singlefs/work/` 下的报告文件与草稿目录。
 - 第二种活另加 `.claude/agents/*.md`、`.claude/agent-common.md`、`.claude/main-agent.md`、`.claude/rules/*.md`。
 - 不写 `.claude/singlefs-ai-sop/**`（上游副本）、`.claude/kb/**`、`crates/**`、`research/prompts/**`、`research/results/**`。与 `.claude/hooks/agent-write-scope.tsv` 里你那几行一致。
 
