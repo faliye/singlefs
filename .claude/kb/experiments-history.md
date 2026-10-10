@@ -552,6 +552,17 @@
 
 ## E16（journal 的角色：WAL vs 意图日志）
 
+### 2026-10-04
+
+- 第六次跑补变异三数（点名项 67 → 64 重跑的改前改后两次整表，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写变异表 18 条两次整表待跑，实验页标题与索引行写「还没跑」。
+  - **改后**：改前（旧树、旧表 17 条）抓到 17、无效 0、没红 0，改后（18 条）抓到 18、无效 0、没红 0（`research/results/e16-mutate-before-2026-10-04-h487.log`、`research/results/e16-mutate-after-2026-10-04-h487.log`，收尾都有「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0）；登记第九节「除两行外其余 16 条两次状态必须相同」：按变异名逐条比差异恰是登记写的那两行，其余 16 条两次都是「抓到」；作废条款 V6 不触发。
+  - **依据**：两份日志同上；登记 `research/prompts/e16-r6-prereg.md` 第九、十一节。
+- 第六次跑：点名项 67 → 64 重跑（问题单第 4 行），第五次跑的装置与几何不动
+  - **改前**：装置常量 `JOURNAL_HEADER_BYTES` 311、`JOURNAL_NAMED_ENTRIES_PER_RECORD` 67（乙每次 fsync 写 ⌈k ÷ 67⌉ 条记录），`crates/singlefs-format/src/lib.rs` 已是 487 / 64（停机 S1 处于触发状态，只当比较基线：`replay.sh E16R5` 三行字节一致）；批轴不含 63、65；实验页「第五次跑」一节写今天的记录宽是 67 项/条。
+  - **改后**：常量改 487 / 64，批轴并上 63、65，四条单测改钉值（23 单测全绿），变异表删「67→72」、加「64→72」「64→67」（18 条）。产物：第一段 `e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out`（3650 行）、第二段 `e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out`（13366 行）；pc3 产物与登记的那份逐字节相同、不出新产物。两段里不同的格都落在 `⌈B ÷ 64⌉ ≠ ⌈B ÷ 67⌉` 的 18 个批上或新加的 63 / 65 两个批上（产物变）；判定变：G4 的 Q1 流数 128 一行由宽平台变乙行，最小比跌破 1 的行多一行（G1 流数 128、G2 流数 64 等），G2 的 Q1 分类、三个几何的 Q2、Q3、Q5、Q6 ①② 不变；第二段 G3 的二维最大值 3.985294 变 3.984615。`research/scripts/replay.sh` 的 E16R5 第一段与第二段两行改指新产物，三行复跑字节一致。变异表整表改前改后两次还没跑。实验页加「第六次跑」一节，标题与索引行状态写明变异表待跑，影响的决策表十三行回看日期改 2026-10-04。
+  - **依据**：重跑登记 `research/prompts/e16-r6-prereg.md`；产物 `research/results/e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out`、`research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out`。
+
 ### 2026-09-28
 
 - 第五次跑：今天的单元宽度（扇出、树高、记录宽）下重跑 56 格扫描的问题
@@ -1442,6 +1453,17 @@
 
 ## E43（扩展点字节上限）
 
+### 2026-10-04
+
+- E43（扩展点字节上限） 补变异三数（记录头 311 → 487 重跑的整表复跑，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写「整表复跑还没有结果」，实验页写三数待回填；登记写死的改前那一遍也没跑（理由见登记第十二节）。
+  - **改后**：24 条整表 抓到 24、无效 0、没红 0（`research/results/e43-mutate-2026-10-04-h487.log`，收尾「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0）；登记作废条款 V4 只在改之后原有 M1–M19、M22 有一条不是「抓到」时触发，这 20 条与 M20、M21、M23、M24 逐条是 ✅ ⇒ 不触发。实验页里「27 个单测全绿」那一条与「2026-10-04：记录头 311 → 487 重跑」一节的变异句按三数改。
+  - **依据**：日志 `research/results/e43-mutate-2026-10-04-h487.log`；登记 `research/prompts/e43-r2-prereg.md` 第十一、十二节。
+- E43（扩展点字节上限） 随记录头 311 → 487 重跑（问题单第 4 行）
+  - **改前**：`git show 31e47115:research/e7-index-bench/src/bin/e43_extension_point_budget.rs` 里 `JOURNAL_HEADER_BYTES` 是 311（新根段 188），产物 `e43-ext-budget-2026-09-24-h311.out`。
+  - **改后**：`research/prompts/e43-r2-prereg.md` 写死判据（只换两个被判取值 311 与 487、贴着旧值的敏感性取样点，判据、门槛、臂不动）之后，装置常量改 487，6 个单测改钉、新增 2 个（27 个全绿），敏感性取样点 307 换成 487，变异表 22 → 24 条（M20、M21 的原文随常量改，新增 M23、M24，整表复跑还没有结果）。改装置之前先现跑的比较基线逐字节与 h311 那份一致。产物 `e43-ext-budget-2026-10-04-h487.out` 比 h311 那份有 14 行不同：自证单元两行 `room` 201 / 3785 → 25 / 3609，`n_max_if_self_witness_carries` 201 → 25，`mount_eval` 里 `atomic=512`、槽宽 512 与 4096、N=128 两行由 `ok` 变 `reject_self_witness_overflow`，敏感性表 `h=307` 两行换成 `h=487`。**问题单第 4 行记「变」**：D21（权威态与派生态的分界） 举例的 128 放不放得下自证余量、挂载判定网格两格翻面，自证上界由哪一侧夹、放得下下界 9、放得下下界 13 三格不变。`research/scripts/replay.sh` 的 E43 行改指新产物，复跑「字节一致」。
+  - **依据**：`research/prompts/e43-r2-prereg.md`；`research/prompts/m3-r1-batch9-reruns-questions.md` 第 4 行；D23（journal 的角色与格式） 已定项 4 / 15 / 17；D21（权威态与派生态的分界） 已定项 2 / 4 / 16。
+
 ### 2026-09-25
 
 - 见 E49（反向链宽度 32 还是 64） 节同日条目「E49（反向链宽度 32 还是 64） 随记录头 307 → 311 重跑（问题单第 7 行）」。
@@ -1770,6 +1792,17 @@
 - 见 E53（丢一整块盘之后根环还挂不挂得上） 节同日条目「E53（丢一整块盘之后根环还挂不挂得上） —— 第一个真碰设备的失败域实验」。
 
 ## E49（反向链宽度 32 还是 64）
+
+### 2026-10-04
+
+- E49（反向链宽度 32 还是 64） 补变异三数（记录头 311 → 487 重跑的整表复跑，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写「整表复跑还没有结果」，实验页写三数待回填；登记写死的改前那一遍也没跑（理由见登记第十二节）。
+  - **改后**：14 条整表 抓到 14、无效 0、没红 0（`research/results/e49-mutate-2026-10-04-h487.log`，收尾「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0）；登记作废条款 V4 只在改之后原有十一条（M1–M8、M10–M12）有一条不是「抓到」时触发，M1 到 M14 逐条是 ✅ ⇒ 不触发。实验页「2026-10-04」一节与第 68 行的变异句按三数改。
+  - **依据**：日志 `research/results/e49-mutate-2026-10-04-h487.log`；登记 `research/prompts/e49-r2-prereg.md` 第十一、十二节。
+- E49（反向链宽度 32 还是 64） 随记录头 311 → 487 重跑（问题单第 4 行）
+  - **改前**：`git show 31e47115:research/e7-index-bench/src/bin/e49_chain_width.rs` 里 `JOURNAL_HEADER_BYTES` 是 311、读法甲扫描 base 296..319、读法乙扫描 base 280..345、项数上界写在函数里的 67，产物 `e49-chain-width-2026-09-25.out`。
+  - **改后**：`research/prompts/e49-r2-prereg.md` 写死判据（两种读法照头 311 那一次都留，判据 2 以读法乙为准；只换两个被判 base 483 与 307、扫描窗口 472..495 与 440..520、项数上界 64）之后，装置常量改 487，项数上界挪成模块级常量 `ITEM_UPPER_BOUND_TODAY`，单测改钉并新增 B11（25 个全绿），变异表 12 → 14 条（M9 的原文随常量改，新增 M13、M14，整表复跑还没有结果）。改装置之前先现跑的比较基线逐字节与 2026-09-25 那份一致。产物 `e49-chain-width-2026-10-04-h487.out`（211 行）比 2026-09-25 那份有 259 行不同，全部在 `cost_current`、`cost_fixed_record`、`base_sweep`、`base_sweep_items`、`done` 五族里。**问题单第 4 行记「判定不变」**：读法乙 483 与 307 都免费；读法甲 483 与 307 逐格同判（2 对 4 免费、4 对 8 不免费），首个分岔项数 31 → 37、287 → 357，`cap_items` 3 / 67 → 0 / 64；两种读法在 483 上对 4 对 8 判出相反（F4，如实并列）。D23（journal 的角色与格式） 已定项 8 射程的 mod 8 规律在 base 472..495 上成立。`research/scripts/replay.sh` 的 E49 行改指新产物，复跑「字节一致」。
+  - **依据**：`research/prompts/e49-r2-prereg.md`；`research/prompts/m3-r1-batch9-reruns-questions.md` 第 4 行；D23（journal 的角色与格式） 已定项 4 / 8 / 12 / 17。
 
 ### 2026-09-25
 
@@ -3658,6 +3691,17 @@
 
 ## E116（打包容器的账·补元数据写与整理策略）
 
+### 2026-10-04
+
+- E116（打包容器的账·补元数据写与整理策略） 补变异三数（记录头 311 → 487 重跑的改前改后两次整表，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写「变异表改前改后两次整表还没跑」，实验页标题与索引行状态写「部分已跑」。
+  - **改后**：改前（旧树、旧表 18 条）抓到 18、无效 0、没红 0，改后（19 条）抓到 19、无效 0、没红 0（`research/results/e116-mutate-before-2026-10-04-h487.log`、`research/results/e116-mutate-after-2026-10-04-h487.log`，两份收尾都有「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0）；登记作废条款 V4（改常量后原有变异有一条状态变差）：按变异名逐条比只差改后多出的第 19 条，原有 18 条两次都是「抓到」⇒ 不触发。实验页标题与索引行状态改成「已跑」。
+  - **依据**：两份日志同上；登记 `research/prompts/e116-r2-prereg.md` 第九、十一节。
+- E116（打包容器的账·补元数据写与整理策略） 随记录头 311 → 487 重跑（问题单第 4 行）
+  - **改前**：装置里 `JOURNAL_HEADER_BYTES` 是 311（文件头注释写新根段 188），单测钉 37 200 000 / 166 240 384 / 0.051623 / 2.099316 / 169 943 168；D23（journal 的角色与格式） 已定项 4 今天的头是 487（新根段 364）。实验页的现状数是头 311 那一版。
+  - **改后**：常量改 487、文件头注释改 364，单测钉值改成 54 800 000 / 183 840 384 / 0.057088 / 2.104781 / 187 543 168，新根段 364 的分项加法（86 + 86 + 8 + 8 + 86 + 86 + 4）写进 `header_bytes_equals_the_decision_23_breakdown`，20 单测全绿。产物 `e116-pack-settle-2026-10-04-h487.out`（308 行）与头 311 那份差 36 行（`name=config` 1、`payback_key` 5、`payback_fill` 30，`journal=true` 的 35 行 `move_write` 各多 17 600 000），五格判定不变（产物变、判定不变）；`research/scripts/replay.sh` 的 E116 行改指新产物，复跑字节一致。变异表 18 → 19 条（原头宽两条的原文换成 `= 487;`，新加「头宽退回 311」）；整表改前改后两次还没跑。实验页标题与索引行状态改「部分已跑」，现状数换成新产物，影响的决策表八行回看日期改 2026-10-04。
+  - **依据**：重跑登记 `research/prompts/e116-r2-prereg.md`；产物 `research/results/e116-pack-settle-2026-10-04-h487.out`。
+
 ### 2026-09-25
 
 - 见 E49（反向链宽度 32 还是 64） 节同日条目「E49（反向链宽度 32 还是 64） 随记录头 307 → 311 重跑（问题单第 7 行）」。
@@ -4323,6 +4367,20 @@
 
 ## E139（按盘回退下界的收严形态）
 
+### 2026-10-05
+
+- 第 2 次重跑（候选下界补系统配置的 F、回收门槛与另外五处退回整环）已跑：第 1 次那批格 610 行逐行比，228 行计数变了、全是甲（只改数的口径）、乙与丙 0，G2SW 的 `activation` 假候选 46 行降到 6 行，旧下界的候选集严格大于条款形的 53392 次、反方向 0 次（页里「不大于，偏少」那一句方向写反，已改）；RGall、RGall_Q 在第 1 次那 13 类世界与 `disk_stuck` 上假候选、不可恢复、判的格假性 ENOSPC 全 0，`disk_stuck` 上扣住的单元 7 行没有上界、1 行卡死，`broken_slot` 与 H1 的 S = 4 没有上界、S = 16 有上界
+  - **改前**：本次改动之前的页面与索引行（第 1 次重跑一节已写、与本次同批未提交；`git show 31e47115:.claude/kb/experiments.md` 里 E139 那一行是第 1 次重跑之前的）。
+  - **改后**：实验页加「第 2 次重跑」一节（读数表、判决行整行抄、数法命令与原样输出、对 D16（发布语义） 已定项 1 的对照、答不了的）；第 1 次重跑一节里回退候选集那一行、答不了的第 3 条与「方向一览」改方向；`research/scripts/replay.sh` 的 E139 行指 `e139-tightened-floor-2026-10-05.out`（旧产物 `e139-tightened-floor-2026-10-04.out` 留着）；单测 36 → 55、变异 26 → 42；「影响的决策」两行回看、加 D23 一行。
+  - **依据**：重跑登记 `research/prompts/e139-r2-prereg.md`；问题单 `research/prompts/m3-r1-e139-r2-questions.md`；产物 `e139-tightened-floor-2026-10-05.out`；欠账 C660（回收门槛改成一圈窗口之后按盘回退下界的装置要重跑）。
+
+### 2026-10-04
+
+- 第 1 次重跑（回收门槛改成一圈窗口）已跑：加一圈窗口的臂 G2SW 在活化一族 60 行里 46 行出假候选、3 行出不可恢复，判的格假性 ENOSPC 为 0；旧门槛对照 G2SW_ringgate 判的 108 行全 0；逐条相符丙 5 条
+  - **改前**：`git show 31e47115:.claude/kb/experiments/139-按盘回退下界的收严形态.md` 与 `git show 31e47115:.claude/kb/experiments.md` 里 E139 那一行（状态「已跑（2026-09-12，计数模型，21 单测 / 16 条变异全抓）」，没有第 1 次重跑一节）。
+  - **改后**：实验页加「第 1 次重跑」一节（读数表、判决行整行抄、行数自查、单测与变异、最小一例、逐条相符表、差异 ① 的影响、对 D16（发布语义） 已定项 1 那一句的对照、答不了的）；索引行状态改写；`research/scripts/replay.sh` 的 E139 行指 `e139-tightened-floor-2026-10-04.out`；单测 21 → 36、变异 16 → 26。
+  - **依据**：重跑登记 `research/prompts/e139-r1-prereg.md`；产物 `e139-tightened-floor-2026-10-04.out`；欠账 C660（回收门槛改成一圈窗口之后按盘回退下界的装置要重跑）。
+
 ### 2026-09-16
 
 - E139（按盘回退下界的收严形态） 与 E144（头校验和算法的代价与判别力） 正文里整行抄的产物行按留存产物改回
@@ -4390,6 +4448,46 @@
   - **依据**：D16（发布语义） 已定项 8 与 D28（挂载期承诺量） 已定项 3 的连带；C126（切换预留的最坏量没有口径） 半还那一格。
 
 ## E142（新池新建文件的干跑）
+
+### 2026-10-05
+
+- E142（新池新建文件的干跑） 第二十四次跑——守门收成 Q142.123（五组变、写清单两组只变 `sha256=`）之后，装置（第二十三次那一份，一字不改）与 `crates/` 在主点上 29 个区域仍逐字节全相同，守门过，第二十三次已够判的几样仍成立
+  - **改前**：第二十三次的守门 Q142.114 只许三组变，按登记字面打中 F23d（`write_list_row`、`p8g_write_list_row` 各变 2 行），问题单第 1、3 行按字面不够判；复跑登记指第二十三次主产物与 P8G 导出。
+  - **改后**：登记 `research/prompts/e142-r24-prereg.md` 把守门放宽成 Q142.123（许五组变，多出两组只许 `sha256=` 一列变、新旧值各等于同一次写的区域行 `sha256=`），装置不动、不加变异。主点 `impl_bytes_equal_summary … matched=29 equal=29 unequal=0`；`Q123_VERDICT pass=true ambiguous=0 groups_outside_allowed=none`（`changed_lines_total=20`，五组 2、12、2、2、2）；`Q123 order_same=true`、`Q123 changed_lines_total=0`（第二十三次主产物对这一次主产物，装置那一侧没漂）；`CRATES_HALF … identical=true`（`crates/` 一侧第二十三次以来没动）；主点四行解码 `t_time=5000`、标签 6 `98386`；t13 `2660362816`、w4 `750278362`；字段表 174 行全等；命令七 `count=0`；判决字段（77 个）与第二十二次第二段主产物逐个相同。整张变异表 210 条交主 agent 跑。复跑登记现指本次主产物与本次 P8G 导出（P8G 导出与第二十三次那份逐字节相同）。
+  - **依据**：`research/results/e142-new-pool-file-creation-dry-run-r24-main-2026-10-05.out`、`research/results/e142-r24-p8g-crates-dump-2026-10-05.out`、`research/results/e142-r24-comparisons-2026-10-05.out`、`research/results/e142-r24-anchors-2026-10-05.out`、`research/results/e142-r24-controls-2026-10-05.out`；跑前登记 `research/prompts/e142-r24-prereg.md`；逐项数见实验页「2026-10-05（第二十四次跑）」。
+
+- E142（新池新建文件的干跑） 第二十三次跑——T_time 盘上单位改毫秒（默认 5000）之后，装置只改第 1524 行一处，与 30-3 合入后的 `crates/` 在主点与 P8G 上 29 个区域都逐字节全相同；守门里一格按登记字面打中，第 1、3 行交主 agent 判
+  - **改前**：装置第 1524 行写 `writer.put_u32(5); // T_time 秒`，与合入前的 `crates/` 逐字节相同；复跑登记指第二十二次第二段产物与 P8G 导出；问题单 `research/prompts/e142-r23-questions.md` 三行开着。
+  - **改后**：第 1524 行改成 `writer.put_u32(5000); // T_time 毫秒`（与冻结版 `diff` 恰一行；单测 117 过 0 败 1 忽略；变异表 210 条没动，T_time 的值没有变异也没有单测钉，只有产物上的绝对值核对）。主点 `impl_bytes_equal_summary … matched=29 equal=29 unequal=0`，P8G `P8G_SUMMARY … matched=29 equal=29 unequal=0`；八行解码两侧都是 `t_time=5000`；反向链 t13 `2660362816`、w4 `750278362` 不变；字段表 174 行全等；判决字段（77 个）与第二十二次第二段主产物逐个相同；`p8g_verdict` 12 个字段对主点与对第二十二次第二段都不变。臂 N22R（装置原样、`crates/` 合入后）`equal=27 unequal=2`，不同的恰是两盘设备内偏移 4096 的系统配置槽。守门 Q142.114：归一化 diff 里除登记点名的 `device_region_bytes`、`p8g_device_region_bytes`、`journal_header_write_digest` 三组，另有 `write_list_row` 与 `p8g_write_list_row` 各变 2 行（只变 `sha256=` 一个字段，与同一次写的 `device_region_bytes` 行相同，归得到第 1524 行），按登记 F23d 字面第 1、3 行不够判，交主 agent 判。复跑登记现指本次主产物与本次 P8G 导出；整张变异表 210 条交主 agent 跑。
+  - **依据**：`research/results/e142-new-pool-file-creation-dry-run-r23-main-2026-10-05.out`、`research/results/e142-new-pool-file-creation-dry-run-r23-arm-n22r-2026-10-05.out`、`research/results/e142-r23-p8g-crates-dump-2026-10-05.out`、`research/results/e142-r23-comparisons-2026-10-05.out`、`research/results/e142-r23-anchors-2026-10-05.out`；跑前登记 `research/prompts/e142-r23-prereg.md`；逐项数见实验页「2026-10-05（第二十三次跑）」。
+
+- E142（新池新建文件的干跑） 第二十二次跑第二段——第二个两盘几何 P8G（每盘 8 GiB）上装置与 `crates/` 逐字节比 29 个区域全相同，字段表与判决不翻面
+  - **改前**：问题单第 2 行开着，盘大小只有 4 GiB 一个取样点（C317（判决只在一个几何取样点上量过没有检查）），`crates/` 的导出 bin 不收盘大小参数；复跑登记指第一段主产物，实验页与索引行状态写「部分已跑」。
+  - **改后**：装置每盘字节数成参数，`main()` 在主点之后加 P8G 一段（250 行 `name=p8g_` 打头）；冻结版装置 10866 行、变异表 210 行（M55 重锚，新收 M228–M231，小表 5 条全抓）、单测 117 过 1 忽略。P8G 上与 `crates/` 的 P8G 导出 `equal=29 unequal=0`，字段表 174 行 `equal=174 unequal=0`，甲类 12 个判决字段与主点逐个相同，记账空闲每盘 7767572480、全空聚簇段 7406、标签 6 98386（两侧解码与 `label6_anchor.py` 的 A5 一致）；第二段产物删掉 `name=p8g_` 行后与第一段主产物逐字节相同；问题单第 2 行够判。复跑登记现有两行：第二段产物与 P8G 的 `crates/` 导出。整张变异表 210 条在第二段装置上交主 agent 跑，还没跑。
+  - **依据**：`research/results/e142-new-pool-file-creation-dry-run-r22-s2-main-2026-10-05.out`、`research/results/e142-r22-p8g-crates-dump-2026-10-05.out`、`research/results/e142-r22-s2-comparisons-2026-10-05.out`；逐项数见实验页「2026-10-05（第二十二次跑第二段）」。
+
+- 第二十二次跑第一段的整张变异表 206 条由主 agent 跑完：206 抓到、0 无效、0 没红，收尾「已还原，基线仍全绿」；问题单 `research/prompts/e142-r22-questions.md` 第 3 行四样都成立、够判。
+  - **依据**：`research/results/e142-mutate-r22-s1-2026-10-05.log`。
+
+- E142（新池新建文件的干跑） 第二十二次跑第一段——装置的已承诺预留照 D3（空间分配） 已定项 2 的式子现算，与 `crates/` 逐字节比 29 个区域全相同
+  - **改前**：装置第 3000 行把记账第 6 项（已承诺预留）写字面 0，与 `crates/` 比 29 个区域 9 个不同（全是这一处的校验和级联）；复跑登记指 `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`；实验页与索引行写 G13 没跑成、整张变异表 199 条。
+  - **改后**：装置照 D3（空间分配） 已定项 2 的式子现算标签 6（副本数 × ((2 + H + 1) × 16384 + 41 × n_live)，副本数取设备数、H 从墓碑树根指针现读、n_live 数 nlink ≥ 1 的记录、树表里没有 `deleted_inodes` 条目取 0），别处一字不改；单测 107 过 1 忽略，变异表 206 行（新收 M221–M227，小表 7 条全抓；整张 206 条交主 agent 跑，未跑）。与 `crates/` 逐字节比 `equal=29 unequal=0`，两侧解出的标签 6 都是 98386，反向链 t13 `2660362816` 等于 `crates/` 钉值也等于独立锚点；与第二十一次的装置比恰 9 个区域变（记账树、中央映射树、树表各两盘，journal 记录两盘，根记录设备 0），别的 67 组输出零差异；字段表 174 行仍全等、判决字段 76 个逐个与第二十一次相同、装置里不剩旧值。复跑登记改指 `e142-new-pool-file-creation-dry-run-r22-main-2026-10-05.out`。第二个几何 P8G（问题单第 2 行）这一次不跑，`crates/` 的导出 bin 要加盘大小参数，归删除线第 18 批；G13 仍没跑成。
+  - **依据**：`research/prompts/e142-r22-prereg.md`（跑前登记与第十二节「执行员修订一」）；产物与逐项数见实验页「2026-10-05（第二十二次跑第一段）」。
+
+### 2026-10-04
+
+- E142（新池新建文件的干跑） 第二十一次跑补变异三数（整张 199 条，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写「小表 27 条全抓、整张表交主 agent 跑」，实验页与索引行写整张表未跑。
+  - **改后**：整张 199 条抓到 199、无效 0、没红 0（`research/results/e142-mutate-2026-10-04-r21.log`，收尾「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0；跑的时候装置与变异表的 sha256 仍是登记第十二节冻结值）；第九节「整表重跑」的三数如此，作废条款 V21a–V21f 里没有一条挂在变异上，修订一第 1 条「没红而需要改装置源码」的情形没有发生。
+  - **依据**：日志同上；登记 `research/prompts/e142-r21-prereg.md` 第九、十二节。
+- E142（新池新建文件的干跑） 第二十一次跑——树 ID 65536 起、树表 11 条，记录头 487、新根段 364（后三项）、点名项 64：装置对 `layout/01` 逐字段、对 `crates/` 逐字节，判决还成不成立
+  - **改前**：装置还是树 ID 11..18、树表 7 条、记录头 311、新根段 188、点名项 67、施加时后三项照抄所选根、没有字段表；复跑登记指 `e142-new-pool-file-creation-dry-run-2026-09-28-r19-main-2026-09-28.out`。
+  - **改后**：装置照 D8（核心索引结构） 已定项 8 / 9 / 11、D18（块里携带什么信息） 已定项 24、D23（journal 的角色与格式） 已定项 4 / 15 / 17 今天的定案句重写（不照 `crates/` 抄），加 174 行字段表；单测 104 过，变异表 199 行（新收 M204–M220、重锚五条），小表 27 条全抓、整张表交主 agent 跑。字段表 174 行与 `layout/01` 全等、判决字段与改之前逐个相同、gap 行集合不变、反向链三格全相等；与 `crates/` 逐字节比 29 个区域 9 个不同，根因一处（记账第 6 项已承诺预留的 day-1 值，装置照 `layout/01` 写 0、`crates/` 照 D3（空间分配） 已定项 2 墓碑预付写 98386，其余 8 个区域是它的校验和级联）；G13 一盘导出没跑成（S21-dump）。复跑登记改指 `e142-new-pool-file-creation-dry-run-r21-main-2026-10-04.out`。
+  - **依据**：`research/prompts/e142-r21-prereg.md`（跑前登记，第十二节「主 agent 判」与「执行员修订一」）；产物与逐项数见实验页「2026-10-04（第二十一次跑）」。
+- E142（新池新建文件的干跑） 第二十一次跑的主 agent 判法：V21a 不触发、V21c 认整段重跑、S21-crates 归 kb 派生值没跟上、装置要改并跑第 22 次、S21-dump 随第 22 次处理
+  - **结论**：V21a 不触发（Q142.80 的范围是装置那一侧不读导出的行，差出的 10 行读的是导出一侧的文字，剔除清单漏了 `self_check_text_numbers`、`self_check_text_number_unclassified`、`verdict` 的 `text_numbers_all_classified` 三种下游行，去掉再 diff 为零）；V21c 认 A3 = B3 = C3 整段重跑，主产物照留；S21-crates 不是两条条款矛盾，是 `layout/01` 与 D5（快照 / 空间记账机制） 已定项 8 第 10 行的 0 作为树 ID 改号之前的派生值没跟上，写回改成 98 386；装置第 3000 行照旧值写 0，要照 D3（空间分配） 已定项 2 改并跑第 22 次才关树 ID 问题单 R2；G13 一盘导出被 `make_filesystem.rs:474` 拒，随第 22 次处理。
+  - **依据**：`records/2026-10-01-删除与并发事务.md` 2026-10-04 里 E142（新池新建文件的干跑） 第 21 次报告第四节交主 agent 的几件，主 agent 判的那一条。
+  - **改前**：实验页开头状态与「2026-10-04（第二十一次跑）」一节写 V21a、V21c、S21-crates 交主 agent 判，还没有判法；那一节本身没提交，改前不在 git 里。
 
 ### 2026-09-28
 
@@ -4749,6 +4847,23 @@
 
 ## E156（alloc-basis 四条岔路的代价数）
 
+### 2026-10-06
+
+- 实验页「它答不了的」补第 32–33 批代码轮判决 P5：两个对照分不出钉最旧还是钉最大 txg、重读解开、读坏的槽；M36 在前洞格上可能少一块判别力（推的）。定乙写回 D16（发布语义） 已定项 1 第 37 行之后回看，第 6 次门槛读法与条文逐条相同。
+  - **依据**：`research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P5；`research/prompts/e156-r6-prereg.md` 末尾「主 agent 回看」。
+
+### 2026-10-05
+
+- E156（alloc-basis 四条岔路的代价数） 第 6 次重跑——回收门槛照用户 2026-10-05 定乙读（挂载时读回全零的根环槽钉在它可能住过的最旧 txg）
+  - **改前**：装置 5819 行、18 单测，门槛只按镜像根环里读得出的有效根取（第 5 次产物 `research/results/e156-alloc-basis-counts-2026-10-05.out` 的 `s11_k10_violation_points=34`、`f24_real_every_differ_points=34`，来自 core 照定乙钉住全零槽而装置没钉），锚点模型同样不钉。
+  - **改后**：装置 6205 行、19 单测（新 U20），挂载时读切段镜像的全零槽、按新实例第一个 txg 取最旧 txg 钉住，这个进程写掉那一槽或读出一条根才解开；锚点模型照登记命令四改同一处；新行 `name=all_zero_pins_at_mount`、`name=all_zero_pin_cell`、`name=all_zero_pin_summary`。主产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`（4063 行）：38 格 `s11_k10_violation_points=0`、`f24_real_every_differ_points=0`；副本里去掉 core 全零钉住的 `research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out` 两项都是 34，点集与登记 L6 × 两个 ρ 相同；与第 5 次比：「实」列逐字段相同，「每」列随之与「实」列相同，Q1d 在「每」列 4 组由 `grows_with_holes` 变 `not_monotonic`，F1 仍触发、Q1c-前 判定不变；PC-钉门槛 七行与第 5 次逐字节相同。单测与变异 M45–M47 没跑（归提交时）。
+  - **依据**：重跑登记 `research/prompts/e156-r6-prereg.md`；产物 `research/results/e156-alloc-basis-counts-2026-10-05-r2.out`、`research/results/e156-alloc-basis-counts-2026-10-05-all-zero-pin-removed.out`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-vs-r5-compare.txt`、`research/results/e156-alloc-basis-counts-2026-10-05-r6-point-sets.txt`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)「第 6 次重跑（2026-10-05）」一节。
+
+- E156（alloc-basis 四条岔路的代价数） 第 5 次重跑——core 断言之后 W7 那一格的阳性对照换成 PC-钉门槛，第 4 次读数在新 `crates/` 上逐字段重比
+  - **改前**：装置 `crates/singlefs-checker-tier/src/bin/e156_allocation_basis_counts.rs`（5776 行，17 单测）里 W7 的阳性对照是 PC-分配器（`allocator_without_the_root_ring`，S = 4、ρ = 1、k = 0，换回不装根环表的分配器，A10 应判红），产物 `research/results/e156-alloc-basis-counts-2026-09-26-r2.out`（4007 行），`replay.sh` 的 E156 那一行指它；用户 2026-10-05 定「core 在分配器没装根环表而记了一条根时断言」之后，PC-分配器 在第一次记根就 panic。
+  - **改后**：装置 5819 行、18 单测（PC-分配器 撤了，加 PC-钉门槛：格表里 Hh(1, 后, S, ρ) 六格的两份滞后集合交 k = 0 的 A10 判定，打 `name=pc_pinned_floor` 六行与一行汇总；新单测 U19）；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`（3955 行，同一个二进制再跑逐字节相同）。第 1 行：六格两列的判定都判「不符」、滞后集合都含 6S − 1，`v2_pc_pinned_floor_seen=true`。第 2 行：规范化之后 3948 行里 294 行不同（60 判决行、234 计数行，含 `name=done` 的计数项）：`f24_real_every_differ_points` 0 → 34、`s11_k10_violation_points` 0 → 34、`q1d_growth` 的几何敏感性由「12 个取样点一致」变「不稳定」（「实」列 4 点 `not_monotonic`）、F1 仍触发；归属跑（副本里反打 31-1 的断言）与新产物逐字节相同，不同不是 31-1 带来的。停机 S11、S14 触发，交主 agent；`replay.sh` 的 E156 那一行改指新产物，r2 那一份留着。内联单测与变异整表没跑（重型，归提交时）。
+  - **依据**：重跑登记 `research/prompts/e156-r5-prereg.md`；产物 `research/results/e156-alloc-basis-counts-2026-10-05.out`、`research/results/e156-alloc-basis-counts-2026-10-05-attribution-without-31-1.out`、`research/results/e156-alloc-basis-counts-2026-10-05-q2-normalise-compare.txt`；变异两行 `research/results/e156-alloc-basis-counts-2026-10-05-mutations-replacements.tsv`、`research/results/e156-alloc-basis-counts-2026-10-05-mutations-append.tsv`；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
+
 ### 2026-09-26
 
 - E156（alloc-basis 四条岔路的代价数） 第 4 次重跑——三个前提在装置上复现、岔路单第 3 行按前提 2 失效、第 1 行 38 条历史量完
@@ -4772,6 +4887,17 @@
   - **依据**：跑前登记 `research/prompts/e156-r2-prereg.md`；产物 `research/results/e156-alloc-basis-counts-2026-09-23-stage1.out`；复跑 `bash research/scripts/replay.sh E156`（alloc-basis 四条岔路的代价数）报字节一致；单测 `cargo test -p singlefs-harness --bin e156_allocation_basis_counts` → 4 passed；变异表 `crates/mutations.tsv` 该 bin 3 条逐条手工验证；正文 [156-alloc-basis四条岔路的代价数.md](experiments/156-alloc-basis四条岔路的代价数.md)。
 
 ## E157（并行线一两条条款的计数模型）
+
+### 2026-10-04
+
+- E157（并行线一两条条款的计数模型） 补变异三数（记录头 311 → 487、点名项 67 → 64 重跑的改前改后两次整表，主 agent 跑；只补数，结论、产物不动）
+  - **改前**：下一条写「变异表 10 条改前改后两次整表还没跑」；实验页「N 条变异全抓」那句是 2026-09-22 的 7 条；登记推算删掉的头宽退回 307、头宽过上边界、头宽过下边界三条「编不过」没单独跑过。
+  - **改后**：改前（旧树、旧表 10 条）抓到 8、无效 2、没红 0，无效的是 M15、M16（在头 311、点名项 67 的旧树上就编不过），M14 实测是「抓到」；改后（10 条）抓到 10、无效 0、没红 0（`research/results/e157-mutate-before-2026-10-04-h487.log`、`research/results/e157-mutate-after-2026-10-04-h487.log`，收尾都有「已还原，基线仍全绿」，撞顶、超时、排不上、被挤掉都是 0）。登记作废条款 V2（M17、M18 或 M19 没红）不触发，V7（原有变异状态变差）不触发：原有 M1–M6、M13 共 7 条两次都是「抓到」。实验页「N 条变异全抓」照改后那一趟改成 10 条，状态句去掉「还没跑」，仍是「部分已跑」（第 2 行未跑）。
+  - **依据**：两份日志同上；登记 `research/prompts/e157-r2-prereg.md` 第九、十一节。
+- E157（并行线一两条条款的计数模型） 随记录头 311 → 487、点名项 67 → 64 重跑（第一段，问题单第 4 行）
+  - **改前**：装置常量 `JOURNAL_HEADER_BYTES` 是 311、`JOURNAL_NAMED_ENTRIES_PER_RECORD` 是 67，`crates/singlefs-format/src/lib.rs` 已是 487 / 64（停机条款 V6 处于触发状态，只当比较基线：`replay.sh E157` 对旧产物字节一致）；装置第 75 行（2026-09-27 加的）有编译期断言把每条项数与头宽钉在一起；实验页第 12 行写「全部与本装置的常量逐字相等，V6 不触发」，今天是假话。变异表里头宽退回 307、头宽过上边界、头宽过下边界三条。
+  - **改后**：常量改 487 / 64、文件头注释同步；加纯函数 `named_entries_per_record_for_header_bytes`，编译期断言与锚点行的复算都改调它；加一条单测在头宽 456 / 457 / 512 / 513 四点上钉 65 / 64 / 64 / 63（判别力自证：512 一点的期望改成 63、513 一点的期望改成 64，各红一次，已还原）；余数单测改名钉 25；一条记录装几项的单测改成 64。22 单测全绿。产物 `e157-parallel-line-one-clauses-2026-10-04-h487.out`（902 行）与头 311 那份只差 `name=anchors` 一行里 `a1_named_entries_per_record=` 与 `b2_named_entries_per_record_check=` 两个字段（67 → 64），第一段判定格不读点名项数、全部照旧（产物变、判定不变）；`research/scripts/replay.sh` 的 E157 行改指新产物，复跑字节一致。变异表删头宽退回 307 / 过上边界 / 过下边界三条，加每条项数多算一字节、少算一字节、头宽同档内挪一字节三条（10 条）；整表改前改后两次还没跑。实验页第 12 行改成今天的值与现查命令输出，标题与索引行状态写明变异表待跑，影响的决策表六行回看日期改 2026-10-04。单元数取样点 67 / 68 不换（只为没跑的第二段选的）。
+  - **依据**：重跑登记 `research/prompts/e157-r2-prereg.md`；产物 `research/results/e157-parallel-line-one-clauses-2026-10-04-h487.out`。
 
 ### 2026-09-24
 
@@ -4904,6 +5030,13 @@
 
 ## E161（崩溃放量的去重与分段耗时）
 
+### 2026-10-05
+
+- E161（崩溃放量的去重与分段耗时） 第 2 次重跑——取样域按 11 段的流重定
+  - **改前**：第一条流 10 段，登记取样域「写数少于 26 的段全量」是 37 个状态；发布返回前加屏障（`crates/singlefs-core/src/transaction.rs` 第 1301 行，提交 c3540c02）之后第一条流成 11 段，同一句按字面是 16 777 260 个状态，装置 13 条内联测试里两条红、六条撞 32G 内存上限；实验页状态「可行性档已跑（2026-09-27）」，登记行指第 1 次产物。
+  - **改后**：重跑登记 `research/prompts/e161-r2-prereg.md`，取样域读法甲（`STRIDED_SEGMENT_WRITES` 26 改 24；第一条流小域 45 个、第二条流取样段 11–26 小域 393 261 个、快档 46 与 52 个、两个 24 写段各取段内序号最小的 4096 个），装置改为 14 条内联测试（全绿）、`crates/mutations.tsv` 里 E161 共 16 行变异（M13–M16 新加，没跑）。可行性档新产物 `research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out` 186 行：行 1 第一条流 11 段四个数逐段相等（不等段数 0），行 2 域写死且跑得完、每格判据有对象，行 3 有 7 格相对第 1 次翻面（判决行 `first_k4_full_pc2c_pc4c_found_a_position` false 变 true，复用臂 K4-units 在两个段头格 `hits` 3640 变 0、`keys_at_or_above_half` false 变 true，位置去除对照 K4-full 两个字段），没有归因，线程数 1 的附带跑欠；`replay.sh` 第 216 行登记改指新产物，第 1 次产物不删。实验页状态改为「可行性档已跑（2026-09-27），第 2 次重跑已跑（够判，2026-10-05）」，加「第 2 次重跑」一节，回看三行。
+  - **依据**：登记 `research/prompts/e161-r2-prereg.md`；产物 `research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-2026-10-05.out`、判法脚本与三份输出 `research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-judge-2026-10-05.py`、`research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-pcr3-2026-10-05.out`、`research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-compare-2026-10-05.out`、`research/results/e161-crash-state-dedup-and-time-split-feasibility-r2-rows-2026-10-05.out`。
+
 ### 2026-09-27
 
 - E161（崩溃放量的去重与分段耗时） 可行性档
@@ -4955,6 +5088,20 @@
   执行员写装置时卡住被停，主 agent 接手写装置 `research/e7-index-bench/src/bin/e164_crash_amplification_design_function_test.rs`、12 条单测、22 条变异（全抓），跑第一、二段，三份产物落 `research/results/e164-crash-amplification-design-function-test-2026-09-28-*.out`；跑前登记第十二节写了修订 R1–R9。第三段没跑。
 
 ## E165（恢复重放有界穷举与变异杀伤界）
+
+### 2026-10-09
+
+- E165（恢复重放有界穷举与变异杀伤界） 第 6 次重跑已跑（r3 档合法一族），状态加「第 6 次重跑已跑（2026-10-09：r3 档合法一族）」
+  - **改前**：暂存区里那一份（`git show :.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md`）。状态停在第 5 次重跑；r3 档只有对抗与择根两族的正式跑，J6Qn 与 J7 五格的对照在 r3 档没有读数
+  - **改后**：实验页加「第 6 次重跑」一节：`--profile r3 --family legal`（偶数、直接建表、盘次序照常）的对照判据 17 条、与登记写死的相同，58 个对照读数全红，六条的 23 行等于钉值；判定与同一份根上的 r2 合法一族只差档名（`E7RESULT` 只有 `config` 与 `scope=run` 两行差档名）；8 与 4 线程两遍逐字节相同。「复跑」加一段，「路径与结论登记」加路径 16，「它答不了的」加一条，「影响的决策」十二行逐行回看、关系不变
+  - **依据**：登记 `research/prompts/e165-r6-prereg.md`（含主 agent 2026-10-09 认定）；问题单 `research/prompts/m3-formal-e165-r6-questions.md` 第 1 行；产物 `research/results/e165-replay-bounded-enumeration-2026-10-09-r6-comparison.out`、`research/results/e165-replay-bounded-enumeration-2026-10-09-r6-r3-legal-family.out`
+
+### 2026-10-04
+
+- E165（恢复重放有界穷举与变异杀伤界） 第 5 次重跑已跑（五格都已够判，第四段够判后未跑），状态加「第 5 次重跑已跑（够判，2026-10-04：第一段、第二段、第三段与第五段两步；第四段够判后未跑）」
+  - **改前**：`git show 0c065788:.claude/kb/experiments/165-恢复重放有界穷举与变异杀伤界.md`。状态停在第 4 次重跑；「第 4 次重跑」一节写「闸取的是实现今天的取甲」；「它答不了的」写 R2 进了代码之后这一族要重跑、Q1 与 Q2 的读数不替 R2 作保；「复跑」第 4 次第一段一段写主工作区的 `mount.rs`、`transaction.rs` 变了「复出的数会不同」；「路径与结论登记」到路径 13；「影响的决策」十一行，没有 D23（journal 的角色与格式） 已定项 15。
+  - **改后**：实验页加「第 5 次重跑」一节（总表五格与第一段、第二段、第三段、第五段 5-甲、5-乙 五个小节）：3-甲 r1 至 r4 档 16 份比对对象在根环那条线 7-2 之后的根上重跑，判定只在 J7 字段变（J7a 分配记录树根、J7a 实例表指针由 0 变非 0），J7 之外 0 处，r1 档三份、r3 择根、r4 带故障五份逐字节相同，多盘 `lagging_class` 分行的身份取严的读法（主 agent 认定）；3-乙 驱动三个模式加 `--pins r5`，28、6、6 个变体的杀伤界与上一次逐变体相同，首红判据名单多了 J7a 两格另报；3-丙 新档 `--profile r5` 的 J8 五格在 830 格每格 0、与 J7 旧格逐格同判，C8a 至 C8d 38 个对照读数等于钉值；5-甲 生成器闸改取 R2，四个合法域承诺内 KJ1、KJ1T 每格 0，与第 4 次同判定，第一段取甲重跑与第 4 次逐字节相同、没有要归因的翻面；5-乙 驱动 `--gate r2`，六个变体的结局与首红位置与第 4 次相同，三个择根变体仍界内不红；第一趟 8G 时 tsv-1812 撞顶、第二趟 16G 只补它，七行出自哪一趟逐个核过。「第 4 次重跑」一节那一句改成说 2026-10-03 那一次的事；「它答不了的」加五条、两条改成说第 4 次的事并指向第 5 次的重判；「复跑」加第 5 次一段、改第 4 次第一段那一句；「路径与结论登记」加路径 14、15；「影响的决策」十一行逐行回看都写不受影响、加 D23（journal 的角色与格式） 已定项 15 一行（备料）；`research/scripts/replay.sh` 加十行登记与十个驱动函数。产物 72 份（第一段 35、第二段 8、第三段 16、5-甲 6、5-乙 7）在「第 5 次重跑」一节逐份点名。决策正文没动；D23（journal 的角色与格式） 已定项 4、14、15 与 D22（单元原子性怎么合成） 已定项 8 四格该不该升成支撑交主 agent。装置单测与装置变异未跑。
+  - **依据**：登记 `research/prompts/e165-r5-prereg.md`（含修订 1 与主 agent 2026-10-04 四次认定）；产物 `research/results/e165-replay-bounded-enumeration-2026-10-04-r5-segment1-comparison.out`、`…-r5-segment2-comparison.out`、`…-r5-segment3-cell-correspondence.out`、`…-r5-segment5-comparison-with-r4-q1.out`、`…-r5-segment5-comparison-with-r4-q2.out`。
 
 ### 2026-10-03
 
@@ -5030,6 +5177,13 @@
 
 ## E170（O3规约执行器第一版）
 
+### 2026-10-05
+
+- E170（O3规约执行器第一版） 第 2 次重跑收尾：页面加「第 2 次重跑」一节，状态改成「第 2 次重跑已跑（Q1–Q5 够判）」，`replay.sh` 里 E170（O3规约执行器第一版） 的九行换成第 2 次重跑那九行，「影响的决策」四行重新回看
+  - **改前**：`git show 0c065788:.claude/kb/experiments/170-O3规约执行器第一版.md`；索引那一行在 `git show 0c065788:.claude/kb/experiments.md` 里。
+  - **改后**：Q1 甲（射程外 0 项，射程内 8 项恰是输入 3、输入 4 的 P8 八格）；Q2 甲（E171（三oracle合谋测试） 第 242、269 行 K 15、63 态全判不在）；Q3 甲（第 270 行 K270 68 态全判不在，合法历史 1 168 态与几何点 792 + 972 态 0 误红）；Q5 甲（七族可比格不同 0）；Q4 甲（E171（三oracle合谋测试） 第 1 次重跑用 v2-487，冻结行 `research/results/e170-r2-o3-spec-executor-2026-10-04-s1b-executor.out` 第 676–692 行、种子 `ce39b484ec109c7a`）；V16 字面打中而不分辨，确定性照装置口径判确定；第三段变异 34 条全抓，XC8、XC9 抓到。「复跑」一节写删了第一代执行器四行与第 1 次重跑 Q2 比对器一行（今天的格式下没有对应物）、改指四行、新加五行，与 66 份原产物为什么不能直接复跑；「路径与结论登记」加路径 8–11；「单测与变异」「它答不了的」加第 2 次重跑那几条；「影响的决策」四行回看都不受影响，关系不改。
+  - **依据**：跑前登记 `research/prompts/e170-r2-prereg.md`（修订 1、2 与末尾五节「主 agent 认定」）；产物 `research/results/e170-r2-o3-spec-executor-2026-10-04-s2-comparator-q1.out`、`research/results/e170-r2-o3-spec-executor-2026-10-04-s2-comparator-q2-q3.out`、`research/results/e170-r2-o3-spec-executor-2026-10-04-s2-q5-comparator.out`（第 74 行）、`research/results/e170-r2-o3-spec-executor-2026-10-04-s3-mutations.out`；复跑行 `research/scripts/replay.sh` 第 254–262 行；调度记录 `records/2026-10-01-里程碑三形式化接入.md` 第 22 批（第 903、956 行）。
+
 ### 2026-10-03
 
 - E170（O3规约执行器第一版） 第 1 次重跑第二、三段：现状表 Q2、Q3 两行分写第一次与第 1 次重跑，页面状态改成「第 1 次重跑已跑（三段）」，「影响的决策」四行重新回看
@@ -5048,6 +5202,26 @@
   - **依据**：代码轮判决 `research/prompts/m3-formal-code-r1-main-verification.md` 第二节装置那一格与第三节第 5 条；decisions-history.md 里 D13（验证路线） 节同日条目。
 
 ## E171（三oracle合谋测试）
+
+### 2026-10-07
+
+- 第 1 次重跑第二段整表（修订 6 树，281 行，流一、流二）的比对器跑完：另写第二段比对器、单测与变异表，实验页加「第 1 次重跑第二段·修订 6 那一趟」一节（Q2 乙、Q3 分母 D = 39 与另三个口径、各类逐行、两处待主 agent 认的读法），点名第二段 8 份产物；Q5 由「待告警自证」改记「告警自证已过，判甲」；`replay.sh` 加两行；变异驱动加可选的 `--unit-test-module`；「影响的决策」每行回看，关系都没变。
+  - **改前**：标题状态与索引状态列「第 1 次重跑第一段（修订 6 树）已跑（Q1 甲、Q3 甲、Q4 基线甲与第 242、269 行乙；Q5 待提交时告警自证；Q2 与 Q3 的分母差第二段；最终主线的修订 8 那一趟待拍树）」；Q5 一行「跑了，待告警自证」；`replay.sh` 里 E171 十四行。
+  - **改后**：标题状态与索引状态列「第 1 次重跑第一段与第二段整表（修订 6 树）已跑（Q1 甲、Q2 乙、Q3 甲且分母 D = 39、Q4 基线甲与第 242、269 行乙；Q5 告警自证已过，判甲；最终主线的修订 8 那一趟待拍树）」；`replay.sh` 里 E171 十六行；第二段单测 17 条、变异 28 条全抓；第一段的判定、单测与变异表一个没动（第一段那张表重跑与入库产物逐字节相同）。
+  - **依据**：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-07-s2-comparator-r6.out`、`…-2026-10-07-s2-research-mutations-r6.out`、`…-2026-10-07-s2-rows-driver-r6.out`；登记 `research/prompts/e171-r1-prereg.md` 第六节 Q2-集合与 Q3-分母、末节「主 agent 认定：第一段（修订 6 树）Q5 告警自证」与「主 agent 认定：第二段整表多机跑法交回」。
+- 第 1 次重跑第一段·修订 6 那一趟（修订 6 树 `7726cdd6…`，第 0–10 步 `-r6-r3`，第 11、12 步 `-resume2`）的比对器跑完，实验页加「第 1 次重跑第一段·修订 6 那一趟」一节：Q1 甲、Q3 甲（第 125 行计入，c = 12）、Q4 基线甲、第 242 与 269 行乙、Q5 照数是甲而记「跑了，待告警自证」，Q2 只报七行；作数的条件（S15 ①–⑥、Z7、阳性对照「判态路 panic 单列」）逐行抄；跨机一致对照判 `false` 的原产物写明作废、指到登记末节认定，作数的是 `…-2026-10-07.out`。比对器改六处（25 列、A11 提速、只读这一趟的前缀、流三覆盖与 F7、空变异的 A1、Q5 两列 `judge_panic`），研究一侧变异 17 → 23 条全抓；多机编排器、别的台那一头、修订 6 多机跑法、跨机对照入口连同 `check_product.py` 与 `selftest_fakes/` 逐字节拷进研究一侧目录；`replay.sh` 加三行；「路径与结论登记」加第 7、8 行；「影响的决策」每行回看，D13（验证路线） 已定项 1 与 D23（journal 的角色与格式） 已定项 14 由不影响改备料。
+  - **改前**：实验页只有原 E171 的读数，第 1 次重跑的 168 份产物一份都没被点名；`replay.sh` 里 E171 十一行；变异表 17 条；比对器读 24 列的 `oracle-verdicts.tsv`，在这一趟的导出上读不动。
+  - **改后**：页面标题状态与索引行没动（派发没给措辞）；新一节的判定只属于修订 6 树，修订 8 那一趟还没跑。
+  - **依据**：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3.out`、`…-s1-research-mutations-2026-10-07-r2.out`、`…-s1-rows-cross-host-check-resume2-r6-r3-2026-10-07-r2.out`；登记 `research/prompts/e171-r1-prereg.md` 修订 6–8 与末节「`-resume2` 跨机一致对照 S17 停机的处置」。
+- 比对器补登记第六节 Q4-（ii）逐态清单与第八节 Q4、Q5 轨迹，`q5_verdict` 全弃权或 `judge_panic` 那一支改报 `not_enough_f8`；修订 6 那一趟的导出上重出比对器产物；入库的跨机对照入口与多机跑法脚本改指仓里的编排器与 `check_product.py`；页面标题状态与索引状态列改写；实验页加「Q4-（ii）逐态清单与 Q4、Q5 轨迹（修订 6 那一趟）」一节
+  - **改前**：标题状态与索引状态列「已跑（s4 整表 117 行、F4 扩表 164 行与编不过 6 行的补位都已跑，读数到齐；结论三轮判决已写回）」；比对器不出逐态清单与轨迹（装置产物里只有 27 + 3 行 `name=q5_trajectory`），`q5_verdict` 那一支报 `not_enough`；单测 28 条、研究一侧变异 23 条；`replay.sh` 的 E171 第 1 次重跑三行指 `…-comparator-resume2-r6-r3.out`、`…-cross-host-check-resume2-r6-r3-2026-10-07-r2.out`、`…-research-mutations-2026-10-07-r2.out`；跨机对照入口按草稿路径读编排器（`04376c00…`），跑法脚本的编排器与 `check_product.py` 指草稿（`ec89ec78…`）；影响的决策 D13（验证路线） 已定项 6 一行写「依据段引不引这一趟交主 agent」；「产物（第 1 次重跑第一段）」一节写「81 份」时列出的 `-r6-r3` 产物是 79 份。
+  - **改后**：标题状态与索引状态列「第 1 次重跑第一段（修订 6 树）已跑（Q1 甲、Q3 甲、Q4 基线甲与第 242、269 行乙；Q5 待提交时告警自证；Q2 与 Q3 的分母差第二段；最终主线的修订 8 那一趟待拍树）」；比对器新产物 811 行，前 677 行与判决行与旧那份逐字节相同、多出 132 行；判定一个没变；单测 41 条、变异 37 条全抓；`replay.sh` 三行改指新产物；跨机对照入口 `afc9a9b0…`、跑法脚本 `567a8682…`，自证 34 项、38 项都红 0；D13（验证路线） 已定项 1、D23（journal 的角色与格式） 已定项 14 两行仍是备料，D13 已定项 6 依据段不动。
+  - **依据**：`research/results/e171-r1-three-oracle-collusion-after-the-oracle-fixes-2026-10-05-s1-comparator-resume2-r6-r3-2026-10-07.out`、`…-s1-research-mutations-2026-10-07-r3.out`、`…-s1-rows-cross-host-check-resume2-r6-r3-2026-10-07-r3.out`；登记末节「主 agent 认定：第一段（修订 6 树）比对器交回」第 3、4 条，修订 5 第 5.1 节第 7 条。
+
+### 2026-10-06
+
+- 实验页写明 `piece_panic_states=` 按件计；记一句：变异表旧第 38 行改名后，两份 117 行坏实现表第 33 行按旧名找不到、从今天的树重跑走补位。
+  - **依据**：`research/prompts/m3-formal-code-b29-r1-main-verification.md` 第三节第 3 条；`research/prompts/m3-formal-code-b33-r1-main-verification.md` 第二节 P4 与第三节第 5 条。
 
 ### 2026-10-04
 
@@ -5077,3 +5251,95 @@
   - **改后**：第 15、23、42、242、269、270、271 行是真盲区候选（第 15 行依据 D3（空间分配） 已定项 10 ⑤ 的 t2–t12 落点，不是 t1@50180），第 27、112、277 行归「三条不判实现恢复里靠记录重建的那一段」，第 34 行归分配政策（D3（空间分配） 已定项 8 射程），第 92 行归「条款在字节表与里程碑验收，决策正文欠一句」，新加「三轮判决之后的三分」一节，第 110、162、174 行（运行时读数）与第 49、252 行（交回值或内存状态错、写流不变）是第三轮新冒出的两类；触达那一格写攻方在 s4 树副本上量的 232 行里 7 行交回值不同（第 49、110、155、161、162、174、252 行，`name=return_summary hidden_difference=7 identical=225 no_output=6`），触达定义与分母 37 不改；Q2 行与新一节补 O2 放行而 O3 判不在的坏镜像 29 张（`o3_only_strict=12`、`o3_only_strict=17`），不写「O3 独有」；「它答不了的」加 O1 一列不接 RefFS、29 张的来源、行级读数只属于快照那棵树、第 125 行 D = 38 的预演（37 与 38 都写）、W 与 61 个见证拒只对 s4 core 成立（RefFS 的 27 / 27 / 36 只进这一节，出处第二轮判决）、用户数据落点取值算不算 layout 字节另交用户；「影响的决策」D13（验证路线） 已定项 6 改支撑，加 D3（空间分配） 已定项 8、已定项 10 与 D23（journal 的角色与格式） 已定项 15 三行。
   - **依据**：`research/prompts/e171-conclusion-r1-main-verification.md`、`…-r2-main-verification.md`、`…-r3-main-verification.md`（第三轮是最终轮，以第三节与第五节为准）；`research/prompts/e171-conclusion-r3-opus-model/out/return-rows.out`、`…/out/row15-offsets.out`；产物 `…-s4-f4-substitutes-comparator.out` 的 `name=q2_family` 与 `name=substitution_summary` 行。
 - 「它答不了的」里用户数据落点那一条与「影响的决策」D3（空间分配） 已定项 8 那一行改成现值：用户同日定新池新建文件上的落点取值算 layout 登记的字节（D3（空间分配） 节同日条目），这一页的三分与读数不变；第 15 行的三分格加一条依据（t1 从 50180 挪到 50240 按新射程本身不合法），改前写「不是这一行的依据……另交用户」；第 34 行的落点改动不在新池新建文件里，仍归分配政策，三分格里引的射程换成新句。
+
+## E172（删除写出的字节的干跑）
+
+### 2026-10-05
+
+- E172（删除写出的字节的干跑） 建页，第一、二段已跑：独立解码器读入库的 `crates/` 侧删除导出，问题单第 1、2、3、4、7 行够判，第 8 行读数到齐、判定交主 agent，第 5、6 行各差 H3 那一半
+  - **改前**：没有这一页；实验号 E172 只有跑前登记 `research/prompts/e172-preregistration.md`。
+  - **改后**：layout/03 登记的字段八次删除类发布 186 行全等；窗口里没登记的字节 0；H1 段串与登记相同；续做 2 → 1 与最后一批多写分配记录树第 62 片叶一对、变了的记录全部有条款依据；A-journal 锚点推导错；第 8 行 R8.b 原文次序归错 2 次、修订 1 补的 R8.c 归错 0 次，PC-E 改坏之前已红；变异表 20 条写好未跑。
+  - **依据**：导出 `research/results/e172-deletion-write-dump-2026-10-05.out`、装置产物 `research/results/e172-deletion-write-dry-run-2026-10-05.out`、跑前登记第十二节修订 1。
+- 主 agent 判第 8 行与 V4：PC-E 改坏之前目标行 R8.b 已红，照 V4 字面 H2 的全部判定作废；R8.b 两支没写先后、照原文次序在没注错的导出上归错 2 次，是判据自己写错，改判据就是新一轮，修订 1 的 R8.c 是放宽、不替这一轮；第 1、2、3、7 行按 H1 够判，第 4 行、第 6 行 H2 那一半、第 8 行并进第三段、换 R8.c 重判。A-journal 锚点 4 处不符归登记推锚点时加的「计数器 = txg」，layout/01 第 319 行的条款不动（F3，不作废）。
+  - **改前**：建页那一条写「问题单第 1、2、3、4、7 行够判，第 8 行……判定交主 agent」。
+  - **依据**：执行员报告 `/tmp/claude-1000/e172-run1/report.md`（sha256 2fc64947…）；装置产物第 719 行 `E7RESULT name=r_pc pc=PC-E history=h2 target_green_before=false target_red_after=true`；跑前登记第十一节 V4、第十二节修订 1。
+- E172（删除写出的字节的干跑） 第 2 次（重跑）已跑，问题单 `research/prompts/e172-r2-questions.md` 五行都够判，状态改「已跑（够判）」：第 1 行（第 1 次问题单第 1、2、3、7 行在 T_time 改毫秒之后的导出与 H3 上）都成立、T_time 38 次都是 5000；第 2 行乙（续做批多写第 62 片叶一对、有条款依据）；第 3 行照现写（H3 最后一批照写 inode 叶）；第 4 行照这一读法（H3 意图写调用方的时间、各批照抄）；第 5 行 core 不交取号写账、只能算差，差算在 H2 上切对了（R8.c 归错 0），PC-F、PC-G 先绿后红
+  - **改前**：页面状态「进行中：第一、二段跑完，H2 的判定按 V4 作废，第三段等 H3 的导出」，正文是第 1 次的现状与各节（第 1 次的各节原样挪进页面「历史版本」的建页那一条，标题改成「第 1 次：…」）；`research/scripts/replay.sh` 的 E172 一行指 `e172-deletion-write-dry-run-2026-10-05.out`，`driver_e172` 只导一份。
+  - **改后**：正文换成第 2 次的现状、判决、读数、A-journal 八次不符（同一个推导错）、单测 38 条与变异表 32 条（未跑）、它答不了的、路径与结论登记（源码行号改成现值）、影响的决策（加 D8（核心索引结构） 已定项 6 一行，八行都是备料）；登记行改指 `e172-r2-deletion-write-dry-run-2026-10-05.out`，`driver_e172` 先现导两份再跑装置。
+  - **依据**：重跑登记 `research/prompts/e172-r2-prereg.md`；导出 `research/results/e172-r2-deletion-write-dump-h1h2-2026-10-05.out`、`research/results/e172-r2-deletion-write-dump-h3-2026-10-05.out`；装置产物 `research/results/e172-r2-deletion-write-dry-run-2026-10-05.out` 第 452、476、568、572、586、596、753、813、815、816 行。
+
+## E173（上限卡在读坏槽的三种处置）
+
+### 2026-10-05
+
+- E173（上限卡在读坏槽的三种处置） 状态改「已完成（第三段两个旋钮够判后没跑）」，结论补用户定案 Q1 照今天、Q2 照今天不并，D16（发布语义） 已定项 1 一行由备料改支撑，「单测与变异」补主 agent 认 M6、M9 写法一句
+  - **改前**：页面状态「进行中：第一、二段已跑（Q1、Q2 两行都够判），第三段两个旋钮够判后未跑」；「影响的决策」里 D16（发布语义） 已定项 1 一行关系「备料」、回看「2026-10-05 不受影响：被测条款（……）；依据段没引 E173（上限卡在读坏槽的三种处置），……」；页面是新建页，HEAD 里没有，改前的原样不在提交里。
+  - **改后**：页面状态「已完成（第三段两个旋钮够判后没跑）」；现状段加一条用户定案（Q1 照今天、Q2 照今天不并）与按分臂表加总的位置数；D16（发布语义） 已定项 1 一行关系「支撑」、回看「2026-10-05 改了」，D16（发布语义） 已定项 1 的依据段同日引回这个实验；「单测与变异」加一句主 agent 认 M6、M9 两条变异的写法（登记第九节两行留着，写法记在登记第十二节）。
+  - **依据**：用户定案在调度记录 `records/2026-09-30-里程碑三开工第一轮.md` 第 655 行；执行员报告 `/tmp/claude-1000/m3-r1/e173-run/report.md` 第 6 节第 1 条；产物 `research/results/e173-admission-ceiling-bad-ring-slot-dispositions-arm-table-2026-10-05.out`。
+
+## E174（借据丢掉时等待与显存回还）
+
+### 2026-10-08
+
+- E174（借据丢掉时等待与显存回还） 建页，装置写好、没上卡跑
+  独立手写装置 `research/e7-index-bench/src/bin/e174_lease_drop_wait_memory_return.rs`（单测 19 个、变异表 28 条全抓、不起卡的自检 31 条全绿），跑前登记 `research/prompts/e174-preregistration.md` 第十二节写了修订 1（补一条臂「在飞·中」、钉死几处读法，原判据一字没动）。真卡上的两段没跑。
+- E174（借据丢掉时等待与显存回还） 两段真卡跑完、判完，状态改「两段跑完、够判」
+  - **改前**：页面状态「装置写好、没上卡跑」，G2-乙 的两个数没有量；索引行「独立装置、模型卡自检与判法写好，……要上卡才有」；`research/scripts/replay.sh` 登记两行（`checks`、模型卡产物上的 `judge`）；「影响的决策」D24（后台重活能不能卸给 GPU） 已定项 2 一行备料，回看写「真卡产物出来之后再判要不要升成支撑」。
+  - **改后**：页面状态「两段跑完、够判」；正文补第一段（88 格，430 个子进程完整、16 个 Out of Memory 失败，两格作废）与第二段（12 格，60 个子进程全完整）的读数、判决行的点名与岔路表，在飞·轻两段都没跑、记「够判后未跑」；索引行换成两段的结论；`replay.sh` 登记四行，加两段真卡产物的 `judge` 输出（`driver_e174_segment_one_judge`、`driver_e174_segment_two_judge`），手工复跑与产物 `cmp` 逐字节相同；D24（后台重活能不能卸给 GPU） 已定项 2 一行仍是备料，回看改写 2026-10-08 不受影响（被测条款三条硬约束不带显存读数或等待时长的数），升不升成支撑交主 agent 定。
+  - **依据**：产物 `research/results/e174-lease-drop-wait-memory-return-segment-one-2026-10-08.out` 第 1698 行 `E7RESULT name=verdict scope=run segment=first cells_total=88 cells_incomplete=2 children_total=446 children_complete=430 children_failed=16 children_void=0 stopped_by=none`，`research/results/e174-lease-drop-wait-memory-return-segment-two-2026-10-08.out` 第 242 行 `E7RESULT name=verdict scope=run segment=second cells_total=12 cells_incomplete=0 children_total=60 children_complete=60 children_failed=0 children_void=0 stopped_by=none`；判的输出 `research/results/e174-lease-drop-wait-memory-return-segment-one-judge-2026-10-08.out` 第 187 行、`research/results/e174-lease-drop-wait-memory-return-segment-two-judge-2026-10-08.out` 第 25 行（`poll_arm_also_absent_where_wait_arm_absent=false` 是登记 F5 没打中；第一段 `geometry_same_as_main_grid=false` 是登记 F8 在不等待臂四对上打中、等待臂八对相同，两种读法在实验页并列）；用户照两段的数在 `research/prompts/m3-batch10z-a-code-r1-forks.md` G2 一行定「改用乙」。
+
+## E175（产品路径上 inode 号水位退回与重发号）
+
+### 2026-10-08
+
+- E175（产品路径上 inode 号水位退回与重发号） 建页，第一段已跑，状态「部分已跑（第一段；第二段待点名）」
+  仓副本装置（草稿目录里仓副本的 `crates/singlefs-harness/tests/e175_product_path_inode_watermark_regression.rs`，源码原样在 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/device-source.rs`；单测 17 条，快档三臂各 15 过、2 条忽略），跑前登记 `research/prompts/e175-preregistration.md` 第十二节写了修订 1–8（读法钉死与装置写法，判据没动）。汇总 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/summary-segment-one.out`：产品臂 F3a、F2 两族 `sum_q1=0`、`segments_q2_one_birth_violated=0`，`sum_q5` 7 870 + 1 062；V1、V2 两族都红。
+- E175（产品路径上 inode 号水位退回与重发号） 第二段停跑，状态改成「部分已跑（第一段；第二段停跑：crates/ 与第一段不同）」
+  开跑前两次核主工作区 `crates/`，第二次有 6 个文件与第一段基线不同（`research/results/e175-product-path-inode-watermark-regression-2026-10-08/baseline-segment-two.out`），照派发提示停跑，第二段一份产物都没跑；第一段的数不动。
+- E175（产品路径上 inode 号水位退回与重发号） 两段在冻结副本上重跑，状态改成「已跑（够判）」
+  照登记修订 2，主 agent 拷的冻结副本（`research/results/e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.out`，`code_baseline=b000407ab5f4afdffe9083ddaac343fe8470438ea17891c4637b1684d5052b44`）上第一段整段重跑、第二段 F1 四组与几何四点首次跑。旧代码上第一段的 19 份原样挪进 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/superseded-old-crates/`，那份 `crates/` 的清单是其中的 `old-crates.sha`，旧读数不进判决；新第一段九份结果文件的 E7RESULT 行去掉 `elapsed_ns` 与旧的逐份相同。汇总 `summary-segment-one.out`、`summary-segment-two.out`：产品臂每一族 `sum_q1=0`、`segments_q2_one_birth_violated=0`；V1、V2 跑到的每一族都红。W 行够判，第三段 F3b、F4 够判后未跑。装置 `device-source.rs` 加了 `code_baseline` 文件头（单测 28 条），`e175-product-path-inode-watermark-regression-2026-10-08-d-P-replay.out` 换成冻结副本上的那一份。
+- E175（产品路径上 inode 号水位退回与重发号） 两段在第二份冻结副本上重跑，状态仍是「已跑（够判）」
+  根环线第 10z 批第十、十一块合入之后 `crates/singlefs-core/src/mount.rs` 又改了，主 agent 拷第二份冻结副本（`research/results/e175-product-path-inode-watermark-regression-2026-10-08/baseline-frozen-crates.out`，`code_baseline=48e2809c75c44b79e317baa3fc128ccdbc9fb294b16b99997c59f2eb57ae9beb`），两段的 P、V1、V2 在它上面整段重跑。上一份冻结副本（`b000407a…`）上的 37 份原样挪进 `research/results/e175-product-path-inode-watermark-regression-2026-10-08/superseded-b000407a/`，不进判决。新二十六份结果文件的 E7RESULT 行去掉 `elapsed_ns` 与上一份逐份相同，`summary-segment-one.out`、`summary-segment-two.out` 除 `code_baseline` 外逐行相同：产品臂每一族 `sum_q1=0`、`segments_q2_one_birth_violated=0`，V1、V2 跑到的每一族都红，W 行够判。
+- E175（产品路径上 inode 号水位退回与重发号） 影响的决策两行按 W3 的 Opt2 定案回看，关系仍是备料
+  D23（journal 的角色与格式） 已定项 14 那一行回看改成「改了」：用户定 Y1（Opt2），「水位」那一格的 inode 号水位改成 max(cur 那一版内存里的, 环里读得出、按实例表没被崩溃恢复抛弃的根的)，树 ID 水位照旧，E175（产品路径上 inode 号水位退回与重发号） 的读数是改之前取环里全部根的取法上量的；D8（核心索引结构） 已定项 6 那一行回看仍是「不受影响」，理由换成 Opt2 只让合法的跨抛弃重发多 11.6%，被崩溃恢复抛弃那段里发过的号本来可以重发，射程不变。两行原有的读数句保留，「升不升成支撑交主 agent 定」照旧。依据：判决 `research/prompts/m3-w3-r3-main-verification.md` 第二节「Opt2 的代价」那一行、第六节与「回看决策」表。改前：这一页没提交过，两格是同节同日「两段在第二份冻结副本上重跑」那一条写下的，那两格的「不受影响：」之后原样是两段在第二份冻结副本上重跑、读数与上一份逐族相同，接着各自的读数句与「决策依据段没引 E175（产品路径上 inode 号水位退回与重发号）」那半句。
+
+## E176（inode 树叶合并三候选的容量与写代价）
+
+### 2026-10-08
+
+- E176（inode 树叶合并三候选的容量与写代价） 建页，第一段已跑，状态「部分已跑（第一段；第二段的触发条件成立，待点名）」
+  独立手写模型 `research/e7-index-bench/src/bin/e176_inode_leaf_merge_capacity_and_rewrites.rs`（单测 14 个、变异表 13 条全抓）与对拍 bin `research/e7-index-bench/src/bin/e176_crates_oracle/oracle.rs`（独立 manifest，22 条序列逐步比到不合并那一臂被拒、零处不同）；跑前登记 `research/prompts/e176-preregistration.md` 第十二节写了修订 1（f = 59 变体的阳性对照与公共窗口读法）、修订 2（对拍 bin 不挂可选特性，改成独立 manifest）。产物 `research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-one.out` 第 763–775 行是各行总判定，`research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle.out` 第 27 行是对拍判决。
+- E176（inode 树叶合并三候选的容量与写代价） 第二段跑完，状态改「已跑（两段）」
+  - **改前**：状态「部分已跑（第一段；第二段的触发条件成立，待点名）」；M3 借到刚好够下限、M2 / M3 先查左边三个变体没跑；单测 14、变异 13；`research/scripts/replay.sh` 登记一行（`segment-one`）。
+  - **改后**：同一份模型加 `segment-two` 入口，22 条序列 × 六个臂变体 × 三个公共窗口；位置记法 Δ2p、Δ3p 三个窗口都「不翻」，借到刚好够下限那个窗口的 Δ3c 与 Q3 两行由「可忽略」变「不翻」、没有一点到 1.00，先查左边那个窗口六行与主窗口同判；单测 22、变异 16 全抓（跑前登记第十二节修订 3 补 V14–V16 与第二段的窗口、阳性对照）；对拍与判别力用第二段的源码各重跑一次，与第一段逐字节相同；`replay.sh` 加 `segment-two` 一行；实验页把两点值相等的对数写成「挪门槛自证做不了的对数」（第一段 38、第二段 131）。D8（核心索引结构） 已定项 6 一行仍是备料。
+  - **依据**：`research/results/e176-inode-leaf-merge-capacity-and-rewrites-segment-two.out` 第 1137–1148 行（两个新窗口的总判定）与第 1369 行（敏感性自证计数）；`research/results/e176-inode-leaf-merge-capacity-and-rewrites-crates-oracle-2026-10-08.out` 第 27 行 `all_equal=true`。
+- E176（inode 树叶合并三候选的容量与写代价） 影响的决策表：D8（核心索引结构） 已定项 6 一行由备料改成支撑
+  - **改前**：关系「备料」；回看「不受影响（第二段跑完之后重新回看）」，理由是依据段没引这个实验、条款写明合并时机是写路径策略、岔路 M 选哪个候选由用户定。
+  - **改后**：关系「支撑」、回看「改了」：用户定「M3 连借一起做」、借取均分，D8（核心索引结构） 已定项 6 的合并那一句改成左吸收右与左从右借都做、借取均分，依据段引了 E176（inode 树叶合并三候选的容量与写代价）。实验正文、判据与产物没动。
+  - **依据**：岔路单 `research/prompts/m3-3-5-forks.md` M 那一行；判决 `research/prompts/m3-leaf-death-r1-main-verification.md` 第二节 K3、`research/prompts/m3-leaf-death-r2-main-verification.md` 第二节「均分借」。
+
+## E177（逐树不写墓碑的复活数）
+
+### 2026-10-08
+
+- E177（逐树不写墓碑的复活数） 建页，第一段已跑，状态「已跑（够判）」
+  独立手写模型 `research/e7-index-bench/src/bin/e177_per_tree_resurrection_without_tombstones.rs`（单测 23 个、变异表 17 条全抓）；跑前登记 `research/prompts/e177-preregistration.md` 第十二节有修订 1（实验设计员：G-宽 不照 `crates/`、加 G-环 主取样点、大文件写删换成大文件改写删）与执行员修订 2（核对表，装置写之前写）。产物 `research/results/e177-per-tree-resurrection-without-tombstones-segment-one.out` 第 37217–37522 行是判定与断言总计；失败条款「条款可能错」打中（G-宽、G-环 上照 kb 择现行的读法下 inode 树判复活），交主 agent 走三方；第二段没跑。
+- E177（逐树不写墓碑的复活数） 三方三轮与用户定案之后改措辞、逐行回看影响的决策：F1 写成「在缺退役记录的 R-S 下」，F2 记三方判打中，G-紧 字面读法不重判 Q8，D8（核心索引结构） 已定项 6 一行由备料改成支撑
+  - **改前**：现状里 F1 那一条与「失败、作废、停机条款逐条」F1 那一行写「在 R-S 下不成立」「交主 agent 走三方」；F2 那一行只写字面没打中；「它答不了的」里 G-紧 那一条写「按字面那一种重判 Q8 没做，交主 agent 定要不要重跑」；影响的决策表 D8（核心索引结构） 已定项 6 一行关系「备料」、回看「不受影响」（失败条款 F1 打中，交主 agent 走三方，决策文件没动），D18（块里携带什么信息） 已定项 8、10、24 三行的回看理由停在三方之前。
+  - **改后**：F1 两处写「在缺退役记录的 R-S 下不成立」，三方判不整条推翻、改字面，用户定容器身份消失写退役记录，D8（核心索引结构） 已定项 6 改成死亡分三层；F2 那一行加三方判打中（退役记录是 kb 已登记、第一版合并就该写的要素，R-S 没用它；登记的两条字面触发没满足，影响只在措辞），依据列加 E178（叶容器与记录死亡的计数） 在退役记录底座下容器复活与误判死亡都是 0；G-紧 那一条改成三方判不重判（正推腿在副本装置上量字面读法下 Q8 判定逐行相同）；D8（核心索引结构） 已定项 6 一行改成关系「支撑」、回看「改了」，D18（块里携带什么信息） 已定项 8、10、24 三行关系不变、回看理由补上用户定案（墓碑照旧在意图那次写；读法 Z、区间墓碑不做；意图那次生效的途中漏活是代价）。判据、模型、产物与读数没动。
+  - **依据**：判决 `research/prompts/m3-leaf-death-r1-main-verification.md` 第二节 K1「F1 与 F2 的判法」与 K4（G-紧 理由句、影响的决策表）；`research/prompts/m3-leaf-death-r2-main-verification.md` 第二节讲 F2 的那一小节（F2 判打中站得住，影响只在实验页措辞）；`research/prompts/m3-leaf-death-r3-main-verification.md` 第五节与回看决策。
+
+## E178（叶容器与记录死亡的计数）
+
+### 2026-10-08
+
+- E178（叶容器与记录死亡的计数） 建页，第一段已跑，状态「部分已跑（第一段）」
+  独立手写计数模型 `research/e7-index-bench/src/bin/e178_leaf_and_record_death_counts.rs`（三段各一个入口；单测 32 个、变异表 15 条全抓）；跑前登记 `research/prompts/e178-preregistration.md` 第十二节有执行员写的修订 1（F11 上 PC-B2 量不出 B-off-lin 的容器 m，补直接构造 PC-B2-direct，M3 的敏感取样点改由它承担），写在单测跑完、产物之前。产物 `research/results/e178-leaf-and-record-death-counts-segment-one.out` 第 1528–1625 行是判定与断言总计；岔路单 `research/prompts/m3-leaf-death-forks.md` 的 X4 那一行够判（失败条款 FL8「N1 漏判」打中，8 形）；X2、X3 的第二、三段没跑。
+- E178（叶容器与记录死亡的计数） 第二、三段跑完，状态改成「部分已跑（第一至三段）」；第四段装置写好
+  主 agent 跑第二段（`research/results/e178-leaf-and-record-death-counts-segment-two.out`，73284 行）与第三段（`…-segment-three.out`，4335 行）。执行员核判定行：X2、X3 两行在退役记录底座下够判（Z、T 的复活与误判死亡、E-L 两臂的途中与崩溃点漏活都是 0；FL6 照字面打中，是 E-L 臂定义的推论）；PC-B1 在 F11 三段 N2 上不成立（照 V2 作废那三段，成因由单测钉住），PC-M、PC-T 的装置判法比登记松，交主 agent。登记修订 2（实验设计员）补底座两臂 B-stub、B-tsz 作第四段，岔路单补 X1 一行；执行员加第四段入口（分片、续跑、多机）、单测 44 个、变异表 22 条全抓，写修订 3（PC-Bt2-mid），产物没跑。
+- E178（叶容器与记录死亡的计数） 第四段跑完，状态改成「已跑（四段）」
+  主 agent 跑第四段（`research/results/e178-leaf-and-record-death-counts-segment-four.out`，140179 行；第二台那一片被内存包装拒了，由本机补算）。执行员核判定行：B-stub、B-tsz 的复活与误判死亡在全部判定格上都是 0（B-tsz 的容器 r 1–166 是定义的推论），Q-Bs-4、Q-Bt-4 的 576 行都是 `differs=false`、FL-Bx 名单空，B-stub 下 E-L 两臂途中漏活 0；V-Bt2 43176 行与第二段逐行相同；作废与失败条款新增那几条都没打中，V8 与 PC-M 字面照第二段的形态打中、只碰只报数的格。X1 正确性那一侧够判，缺 B-stub 每次删空的写单元（登记没登）；`replay.sh` 第四段那一行没复跑。
+- E178（叶容器与记录死亡的计数） 用户定案之后逐行回看影响的决策：D8（核心索引结构） 已定项 6、D18（块里携带什么信息） 已定项 11 两行由备料改成支撑，加 D18（块里携带什么信息） 已定项 10、D23（journal 的角色与格式） 已定项 14 两行
+  - **改前**：表里四行（D8（核心索引结构） 已定项 6、16，D18（块里携带什么信息） 已定项 11、24）关系都是「备料」、回看都是「不受影响」，理由是依据段没引这个实验；D8（核心索引结构） 已定项 16 那一行写「B-stub 下……第 5 条「删空」判定里零条目根那一项要改」。
+  - **改后**：D8（核心索引结构） 已定项 6 一行改成「支撑」「改了」（用户定退役记录·甲、读法 Z、墓碑从意图那次生效、借时分隔 key 取孩子这一版的最小 key，依据段引了 E178（叶容器与记录死亡的计数））；D18（块里携带什么信息） 已定项 11 一行改成「支撑」「改了」（类型 3 补死亡 txg 与专用的退役树，依据段引了 E178（叶容器与记录死亡的计数））；D8（核心索引结构） 已定项 16 一行仍是备料，B-stub 没选、第 5 条不用改；D18（块里携带什么信息） 已定项 24 一行仍是备料，照第 2 条今天的写法；新加 D18（块里携带什么信息） 已定项 10（备料：读法 Z、区间墓碑不做，第一版只许整对象照旧）与 D23（journal 的角色与格式） 已定项 14（不影响：用户取甲，条款不动）两行。实验正文、判据与产物没动。
+  - **依据**：判决 `research/prompts/m3-leaf-death-r3-main-verification.md` 回看决策表五行与第五节。

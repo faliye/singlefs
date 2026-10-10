@@ -64,6 +64,15 @@
 | formatted-layer0-first-txn-reference | formatted-layer0-new-pool-file-creation-reference | 整串 | 标签 |
 | second_txn | overwrite_release_rollback_reuse | 整串 | 缩写形态的蛇形 |
 | third_txn | crash_verification_rebuild | 整串 | 缩写形态的蛇形 |
+| 按条记录 | 判定库记录 | 整串 | crates 变异表那一份判定库里的记录 |
+| 判法指纹 | 判法版本 | 整串 | crates 变异表判定库目录的那个摘要 |
+| 底座指纹 | 判法版本 | 整串 | 「判法指纹」更早的叫法 |
+| judging-fingerprint | judge-version | 整串 | `crates-mutation-rows.py` 的子命令 |
+| judging_fingerprint | judge_version | 整串 | 函数名与记录字段 |
+| lib_item_verdicts | lib_verdict_library | 整串 | 文件改名（属路径搬迁，`.claude/rules/path-moves.md`「怎么做」），按术语一并查旧名 |
+| GATE_FORMAL_VERDICT_STORE | GATE_FORMAL_VERDICT_LIBRARY | 整串 | 形式化门禁的环境变量 |
+| store-in-tmpdir | library-in-tmpdir | 整串 | `FORMAL_VERIFICATION_BREAK` 的一项 |
+| 快速档 | 快档 | 整串 | E165（恢复重放有界穷举与变异杀伤界） 那一档；与「harness 慢档用例」同属快慢两档的叫法 |
 
 **跟着改的文件名**：`crates/singlefs-core/src/superblock.rs` → `system_configuration.rs`；五个实验装置、五张变异表、五个留存产物
 （E100（系统配置的三段几何）、E115（系统配置字段表的完备性与字节预算）、E124（系统配置字段表按 D18 已定项 14 重算）、E126（系统配置槽宽四条候选的代价）、E147（系统配置字段表按新池新建文件字节表重算））。搬迁怎么做见 [.claude/rules/path-moves.md](../rules/path-moves.md)「怎么做」那一节。

@@ -1,4 +1,4 @@
-## E16 journal 的角色：WAL vs 意图日志 —— 记账模型这一半已跑（2026-08-28；08-31 补祖先计数；09-03 补字节口径；09-28 补第五次跑：今天单元宽度下的峰值落点与适用范围句），延迟那一半未跑
+## E16 journal 的角色：WAL vs 意图日志 —— 记账模型这一半已跑（2026-08-28；08-31 补祖先计数；09-03 补字节口径；09-28 补第五次跑：今天单元宽度下的峰值落点与适用范围句；2026-10-04 点名项 67 → 64 重跑：产物与 23 单测已出，变异表 18 条改前改后两次整表已跑，改后 18/18 抓到），延迟那一半未跑
 
 **背景**：[decisions.md](../decisions.md) D23（journal 的角色与格式） 已定项 1，它自陈「**必须先定角色，才能定大小**」。
 
@@ -95,7 +95,7 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 <!-- doc-lint:not-numbers G0（主几何点） G1 G2 G3 G4 G5 -->
 以下 G0（主几何点）–G5 是跑前登记 `research/prompts/e16-r5-prereg.md` 第五节给的几何点本地标号，不是 kb 编号。
 
-**独立装置**：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽 67 项/条）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `research/results/e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
+**独立装置**：`research/e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs`（不与 `crates/` 共用代码，只把两条臂的语义原样搬过来，换成今天的扇出 144/147、今天的树高（按文件大小算出的旋钮）、今天的记录宽——装置今天是 64 项/条，第五次跑当时是 67 项/条，第六次跑一节写这一次换值）。原装置 `sweep()` 一个字没改，`e16-journal sweep` 现跑一遍当阳性对照（PC1），产物 `research/results/e16-journal-2026-09-28.out`，与 2026-08-28 那次的 56 格逐格一致。
 
 **今天扇出 144/147 下，树高由文件大小定**（`.claude/kb/decisions/08-核心索引结构.md` 已定项 14）：G1=4 GiB（L=3）、G2=1 TiB（L=4，真实基线）、G4=16 TiB（L=5）。
 
@@ -105,15 +105,81 @@ E16（journal 的角色：WAL vs 意图日志）改的是那条决策里「③ �
 
 **预测式今天的误差远大于原表的 9.6%/20.5%**：56 格子集上（G1/G2/G4 × 两种分母）中位误差 13.0%–22.1%、最大误差 33.4%–93.9%，三个几何、两种分母全部「超」；98.2% 的格子上预测式仍然系统性偏高，方向没变，幅度变了。分母口径这一次核实过：原表的「9.6%、20.5%」用的是**预测比值当分母**（不是模型比值），复现命令与两种分母的数见产物 `name=q3_summary` 行。
 
-**今天的说法**：攒批吃不掉延后祖先的收益，只在并发流数 ≤ 16（今天 1 TiB 文件、根下 11 个孩子这个具体几何）时成立；流数更多时收益从批=1 就已经见顶。批超过流数之后比值确实不再上升、也会在 16×流数附近落定到峰值超额的四分之一以内，但对流数 ≤ 32 的情形，比值会在批轴远端（≥16384）实际跌破 1。这条说法在第一段里带一处欠账：树高与根下孩子数这两个因素没有分开——G1（L=3）上全部 21 行都不落在「批≈流数」。第二段（2026-09-28 补）把这条欠账补上：主导变量是根下孩子数，不是树高。
+**今天的说法**：攒批吃不掉延后祖先的收益，只在并发流数 ≤ 16（今天 1 TiB 文件、根下 11 个孩子这个具体几何）时成立；流数更多时收益从批=1 就已经见顶。批超过流数之后比值确实不再上升、也会在 16×流数附近落定到峰值超额的四分之一以内，但对流数 ≤ 32 的情形（第五次跑，记录宽 67 项/条；记录宽 64 项/条之后是流数 ≤ 64，见第六次跑一节），比值会在批轴远端（≥16384）实际跌破 1。这条说法在第一段里带一处欠账：树高与根下孩子数这两个因素没有分开——G1（L=3）上全部 21 行都不落在「批≈流数」。第二段（2026-09-28 补）把这条欠账补上：主导变量是根下孩子数，不是树高。
 
 **第二段：「流数 ≥ 24 时峰值落到批=1」由根下孩子数主导，不是树高。** ⚠️ 被三方打中、待重做（判决 `research/prompts/d23-e16r5-r1-main-verification.md`，2026-09-28）：d23-e16r5-r1 攻方把树高、根下孩子数、扇出分开扫，树高是开关（树高 ≤ 3 全部流数从批 = 1 起收敛、树高 ≥ 5 扫到的流数全部先涨后收敛）、扇出零作用、根下孩子数只在树高 4 时定门槛；这条分开扫的数据只在三方攻方副本上量过，主 agent 复跑逐字节相同，入库装置没重做（用户 2026-09-28 定只改抄错的数，不跑第三段）。第二段按扇出、记录宽两个旋钮各跑一遍网格，其中扇出旋钮的四个点（`one_tebibyte_file`、`full_root_level_four`、`small_fanout_one_tebibyte_file`、`large_fanout_one_tebibyte_file`）树高恒为 L=4，唯一变的是根下孩子数——`one_tebibyte_file`、`small_fanout_one_tebibyte_file`、`large_fanout_one_tebibyte_file` 三点单元数同为 1 TiB 数（33692212），根下孩子数分别是 11（今天真实扇出 144/147）、17（小扇出 128/128）、2（大扇出 296/296）；`full_root_level_four`（G3，满员）单元数是 457419312、根下孩子数 147。峰值消失（丙行）开始出现的流数，随根下孩子数单调后移：根下孩子数=2 时全部 21 行（流数 2–1024）已经是丙行；=11（真实基线）时流数 24 起丙行；=17 时流数 32 起丙行；=147（G3）时甲行一路延伸到流数 128、宽平台到 128、乙行到 256，流数 384 才转丙行——同一个树高下，把根下孩子数从 11 提到 147，丙行的起点从流数 24 推迟到流数 384（16 倍）。反过来，树高旋钮在**不控制根下孩子数**时的四点（G1 L=3 根下 7 孩子全丙行、G2 L=4 根下 11 孩子流数 24 起丙行、G4 L=5 根下 2 孩子形状复杂、G5 L=2 根下 58 孩子全丙行）不是单调的——G5 树高最矮（L=2）却根下孩子数不算少（58），仍然全丙行，单独看树高解释不了。⇒ 峰值消失的起点由根下孩子数主导，树高不是那个直接变量；根下孩子数少的树，不管多高，批一超过 1 就已经吃不到延后祖先的收益。产物（`name=q1_summary`、`name=row_summary` 里 `geometry=full_root_level_four`/`small_fanout_one_tebibyte_file`/`large_fanout_one_tebibyte_file` 各行）与独立算出的根下孩子数（17、2）核对一致。
 
-记录宽旋钮的三个点（今天 67 项/条、`record_width_knob_minimum`=1 项/条、`record_width_knob_maximum`=100 万项/条）里，1 项/条那一点全部 21 行都已经是丙行（乙的记录开销被这个旋钮拉得很高，把甲相对乙的优势从批=1 就已经吃光）；100 万项/条那一点与今天（67 项/条）的分类逐行相同——记录宽只要不是「小到几乎每个单元一条记录」，对峰值落点这件事影响不大。
+记录宽旋钮的三个点（第五次跑当时的今天 67 项/条（2026-10-04 起装置是 64 项/条）、`record_width_knob_minimum`=1 项/条、`record_width_knob_maximum`=100 万项/条）里，1 项/条那一点全部 21 行都已经是丙行（乙的记录开销被这个旋钮拉得很高，把甲相对乙的优势从批=1 就已经吃光）；100 万项/条那一点与当时的今天（67 项/条）的分类逐行相同（64 项/条的新产物里也逐行相同）——记录宽只要不是「小到几乎每个单元一条记录」，对峰值落点这件事影响不大。
 
-产物：`research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash research/scripts/replay.sh E16R5`。变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，17 条全部抓到（`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
+产物：`research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out`（第一段全网格，G1/G2/G4 × 21 流数 × 平均 54 批 = 3423 格）、`research/results/e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out`（PC3 对拍）、`research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out`（第二段，三个旋钮分组 × 共 11 个几何点 × 21 流数 × 平均 54 批 = 12551 格）。复跑：`bash research/scripts/replay.sh E16R5`。变异表 `research/mutations/e16_fifth_run_peak_under_today_widths.tsv`，第五次跑那一次 17 条全部抓到（2026-10-04 起表是 18 条，见第六次跑一节）（`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`；新增的第 17 条锚定第二段记录宽旋钮新增的 `RecordFormat` 分支）。
 
 **它答不了的**：`crates/` 今天的发布点名每一个重写的单元（不只脏叶）、一次写还动别的几棵树（上段叶、树表、中央映射树、分配记录树、记账树）——这两处结构差异这次没建模，会改每次 fsync 的实际块数，但不是「宽度」，不在这一题的范围里；Q1 归类的「加密」重判步骤（批轴相邻取值间逐个整数加密，确认分类不是采样伪影）没做，只人工抽查了两处最可能踩边界的地方，没有系统性证明；根下孩子数这个变量在中间取值（比如 30、50）上是不是也线性影响丙行起点，没有扫描——只取了 2、11、17、147 四个点，够判「主导变量是谁」，不够判「具体是什么函数关系」。
+
+### 第六次跑：点名项 67 → 64（2026-10-04，第五次跑的装置与几何不动）
+
+<!-- doc-lint:not-numbers PC1 PC2 PC3 PC4 F7 S1 V7 -->
+PC1–PC4、F7、S1、V7 是跑前登记 `research/prompts/e16-r5-prereg.md` 与 `research/prompts/e16-r6-prereg.md` 自己的对照 / 失败 / 停机 / 作废条款编号，G1–G5 是同一份登记的几何点标号，都不是 kb 编号。
+D23（journal 的角色与格式） 已定项 4 今天的记录头是 487（新根段 364），一条 4096 记录装 64 个点名项（已定项 12、17），装置里乙一次 fsync 点名 k 片叶写 ⌈k ÷ 64⌉ 条记录（第五次跑时是 ⌈k ÷ 67⌉）。几何点、两条臂的语义、判据、容差、带宽一字不改；重跑登记 `research/prompts/e16-r6-prereg.md`，复跑键仍是 `E16R5`，问题单 `research/prompts/m3-r1-batch9-reruns-questions.md` 第 4 行。
+改了的只有：`JOURNAL_HEADER_BYTES` 487 与 `JOURNAL_NAMED_ENTRIES_PER_RECORD` 64（连同三段注释）、批轴并上 63 与 65（批轴取值共 81 个，两个点在新门槛 64 / 65 两侧）、四条单测的钉值（点名项、乙在 B = 63 到 73 九个批上的块数、头宽、PC4 批集合 {1, 2, 5, 10, 20, 50, 64, 65, 67}）、变异表（删「67→72」，加「64→72」「64→67」两条，18 条）。单测 23 条全绿（`cargo test --release --bin e16-fifth-run-peak-under-today-widths` 输出 `test result: ok. 23 passed`）。
+
+**基线与停机条款**：改装置之前，`bash research/scripts/replay.sh E16R5` 三行都判「字节一致」（装置 311 / 67、`crates/` 487 / 64，登记写死的例外：只当比较基线，不出结论）；改完装置之后、出产物之前，`grep -nE '^pub const (DATA_UNIT_BYTES|DATA_UNIT_PAYLOAD_OFFSET|EXTENT_TREE_INTERNAL_FANOUT|EXTENT_TREE_LOWER_LEAF_DATA_UNITS|JOURNAL_RECORD_BYTES|JOURNAL_HEADER_BYTES|JOURNAL_NAMED_ENTRY_BYTES|JOURNAL_NAMED_ENTRIES_PER_RECORD|TEST_IMAGE_DEFAULT_BYTES):' crates/singlefs-format/src/lib.rs` 的九行输出与登记第十三节命令二的九行逐字相同（S1 过）。
+PC1、PC2（原装置现跑与误差分母核定）没重跑：原装置一字没改、不读点名项数。PC3 过：`pc3` 模式产物与登记的 `e16-fifth-run-peak-under-today-widths-pc3-2026-09-28.out` 逐字节相同（58 行），所以不出新 pc3 产物，`replay.sh` 的 pc3 那一行不动。
+
+**产物**（改完 `replay.sh` 登记行之后，`bash research/scripts/replay.sh E16R5` 三行都判「字节一致」，V7 不触发）：
+
+```
+$ grep -oE '^E7RESULT name=[a-z_0-9]*' research/results/e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out | sort | uniq -c
+   3543 E7RESULT name=cell
+      1 E7RESULT name=config
+      1 E7RESULT name=done
+      3 E7RESULT name=geometry_config
+     21 E7RESULT name=geometry_sensitivity
+      3 E7RESULT name=q1_summary
+      3 E7RESULT name=q2_summary
+      6 E7RESULT name=q3_summary
+      6 E7RESULT name=q4_summary
+     63 E7RESULT name=row_summary
+```
+
+第一段 `e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out`（3650 行，`name=done emitted=3650`；第五次跑的是 3530 行）；第二段 `e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out`（13366 行，`name=done emitted=13366`；第五次跑的是 12926 行，`name=cell` 12991 行、`geometry_config` 11、`q1_summary` 11、`row_summary` 231）。
+与第五次跑的产物逐格比（Q7，`diff <(grep 'name=cell' 旧) <(grep 'name=cell' 新)`）：第一段删 654 行、增 774 行，增出的 120 行都是新批轴上的 63 与 65 两个批；第二段删 1962 行、增 2402 行，增出的 440 行同样只在 63 与 65 两个批。两段里不同的格，批取值都落在 `⌈B ÷ 64⌉ ≠ ⌈B ÷ 67⌉` 的那 18 个批上（65、67、129、193、200、257、385、513、769、1025、1536、2048、3072、4096、6144、8192、12288、16384），动的字段只有乙的块数三个、比值、两个误差分母；B ≤ 64 的格、记录宽旋钮两个取样点（1 项 / 条与 10⁶ 项 / 条）原有批上的格、几何配置行逐字未变，越出允许集合的 0 处。**产物变。**
+
+**Q1–Q6 按几何点重判（与第五次跑产物的判定逐个比）**：
+
+| 几何点 | Q1 峰值落点分类 | Q2 二维最大值 | Q3 误差（两种分母共 6 行） | Q5 | Q6 ①② | Q6 ③ 最小比跌破 1 的行数 |
+|---|---|---|---|---|---|---|
+| G1（4 GiB，L = 3） | 21 行全是丙行，不变 | 不变 | 不变 | 不变 | 不变 | 14 → 15（新增流数 128 一行） |
+| G2（1 TiB，L = 4，真实基线） | 分段（流数 2–16 甲行、24–1024 丙行），不变 | 不变 | 不变 | 不变 | 不变 | 12 → 13（新增流数 64 一行） |
+| G4（16 TiB，L = 5） | 分段，**流数 128 一行由宽平台变乙行**，其余行类别不变 | 不变 | 不变 | 不变 | 不变 | 11 → 11 |
+
+第二段六个取样点：G3（`full_root_level_four`）、G5（`two_fifty_six_mebibyte_file`）、扇出 128 / 296、记录 1 项 / 条与 10⁶ 项 / 条，各行类别（Q1）、Q3、Q5、Q6 ①② 都不变；G3 的二维最大值（Q2）由 3.985294（批 56–67）变 3.984615（批 56–64），两轴仍在扫描区间内部（`streams_interior`、`batch_interior` 仍是 `true`），G3 流数 96、128、192、256 四行的峰值集合上沿由 67 变 64（峰值比略降，例如流数 96 一行 3.985294 变 3.984615）；跌破 1 的行数：第二段里树高旋钮的 G1、G2 与第一段那张表同（14 → 15、12 → 13），1 TiB 的另两份副本（扇出旋钮、记录宽旋钮各一份）各 12 → 13，扇出 296 一点 13 → 14（新增流数 96 一行），别的点不变。10⁶ 项 / 条那一点与今天（64 项 / 条）的 21 行类别逐行相同（第五次跑时与 67 项 / 条也逐行相同），1 项 / 条那一点 21 行全是丙行，没变。
+整行证据（产物原样）：
+
+```
+research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out:3496:E7RESULT name=row_summary geometry=sixteen_tebibyte_file streams=128 classification=宽平台 peak_ratio=4.013520 peak_batch_low=5 peak_batch_high=67 moved_diagonal_ratio=NA rising_steps_before_peak=0 falling_steps_after_peak=21 opposite_direction_steps=0 final_batch=16384 final_ratio=1.015437 ratio_non_decreasing_through_streams_holds=false worst_drop_fraction_through_streams=0.014368 worst_drop_batch_through_streams=68 ratio_non_increasing_beyond_streams_holds=true settles_near_one_beyond_sixteen_streams_holds=true settle_beyond_sixteen_streams_batch=2048 settle_beyond_sixteen_streams_margin=0.178114 row_minimum_ratio=1.015437 row_minimum_batch=16384 row_dips_below_one=false
+research/results/e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out:3616:E7RESULT name=row_summary geometry=sixteen_tebibyte_file streams=128 classification=乙行 peak_ratio=4.013520 peak_batch_low=5 peak_batch_high=63 moved_diagonal_ratio=0.0391 rising_steps_before_peak=0 falling_steps_after_peak=22 opposite_direction_steps=0 final_batch=16384 final_ratio=1.014766 ratio_non_decreasing_through_streams_holds=false worst_drop_fraction_through_streams=0.014449 worst_drop_batch_through_streams=65 ratio_non_increasing_beyond_streams_holds=true settles_near_one_beyond_sixteen_streams_holds=true settle_beyond_sixteen_streams_batch=2048 settle_beyond_sixteen_streams_margin=0.177548 row_minimum_ratio=1.014766 row_minimum_batch=16384 row_dips_below_one=false
+research/results/e16-fifth-run-peak-under-today-widths-2026-09-28.out:2325:E7RESULT name=row_summary geometry=one_tebibyte_file streams=64 classification=丙行 peak_ratio=3.500000 peak_batch_low=1 peak_batch_high=1 moved_diagonal_ratio=NA rising_steps_before_peak=0 falling_steps_after_peak=30 opposite_direction_steps=0 final_batch=16384 final_ratio=1.000451 ratio_non_decreasing_through_streams_holds=false worst_drop_fraction_through_streams=0.047619 worst_drop_batch_through_streams=2 ratio_non_increasing_beyond_streams_holds=true settles_near_one_beyond_sixteen_streams_holds=true settle_beyond_sixteen_streams_batch=1024 settle_beyond_sixteen_streams_margin=0.124760 row_minimum_ratio=1.000451 row_minimum_batch=16384 row_dips_below_one=false
+research/results/e16-fifth-run-peak-under-today-widths-2026-10-04-h487.out:2405:E7RESULT name=row_summary geometry=one_tebibyte_file streams=64 classification=丙行 peak_ratio=3.500000 peak_batch_low=1 peak_batch_high=1 moved_diagonal_ratio=NA rising_steps_before_peak=0 falling_steps_after_peak=29 opposite_direction_steps=0 final_batch=16384 final_ratio=0.999790 ratio_non_decreasing_through_streams_holds=false worst_drop_fraction_through_streams=0.047619 worst_drop_batch_through_streams=2 ratio_non_increasing_beyond_streams_holds=true settles_near_one_beyond_sixteen_streams_holds=true settle_beyond_sixteen_streams_batch=1024 settle_beyond_sixteen_streams_margin=0.124760 row_minimum_ratio=0.999790 row_minimum_batch=16384 row_dips_below_one=true
+research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-09-28.out:4673:E7RESULT name=q2_summary geometry=full_root_level_four maximum_ratio=3.985294 streams_lower=64 streams_upper=128 batch_lower=56 batch_upper=67 streams_interior=true batch_interior=true
+research/results/e16-fifth-run-peak-under-today-widths-second-segment-2026-10-04-h487.out:4833:E7RESULT name=q2_summary geometry=full_root_level_four maximum_ratio=3.984615 streams_lower=64 streams_upper=128 batch_lower=56 batch_upper=64 streams_interior=true batch_interior=true
+```
+
+⇒ **判定变（登记 F7）**，写明两处：G4 的 Q1 在流数 128 一行由宽平台变乙行（峰值集合 [5, 67] 变 [5, 63]，`B_lo ÷ S` = 0.0391，新门槛 64 落在 `[S ÷ 2, 2S]` = [64, 256] 的下沿以外）；Q6 ③ 里「最小比跌破 1」的行多了一行（G1 流数 128、G2 流数 64，最小比都在批 16384：1.000192 → 0.999531、1.000451 → 0.999790，由「没跌破 1」变「跌破 1」）。别的格（G1、G2 的 Q1，三个几何的 Q2、Q3、Q5、Q6 ①②）判定不变。这是正当结果，不许回头改容差、带宽或批轴。
+记录宽旋钮上 Q1 的判定在 67 与 64 之间翻不翻面：G1、G2 不翻，G4 流数 128 一行翻（随记录宽变，见上），第二段六个取样点不翻。跨几何的稳定性行（`name=geometry_sensitivity`）21 行里 20 行逐字不变，`streams=128` 一行的 `sixteen_tebibyte_file` 由宽平台变乙行，`stable=false` 照旧；`stable=true` 的行数两次都是 6（第二段 27）。
+Q1 末句的「加密重判」这一次同样没做（第五次跑起一直没做）。
+
+**变异**：变异表 18 条改前（旧装置、旧表 17 条）与改后两次整表复跑由主 agent 跑，日志 `research/results/e16-mutate-before-2026-10-04-h487.log`、`research/results/e16-mutate-after-2026-10-04-h487.log`，命令：`cd research && bash scripts/mutate.sh e16-fifth-run-peak-under-today-widths e7-index-bench/src/bin/e16_fifth_run_peak_under_today_widths.rs mutations/e16_fifth_run_peak_under_today_widths.tsv`。
+
+```
+$ for p in before after; do f=research/results/e16-mutate-$p-2026-10-04-h487.log; echo "$p: $(for s in '✅' '⏭' '❌' '💥' '⚠️' '⏱' '🧱'; do printf '%s=%s ' "$s" "$(grep -c "^$s" $f)"; done)"; done
+before: ✅=17 ⏭=0 ❌=0 💥=0 ⚠️=0 ⏱=0 🧱=0 
+after: ✅=18 ⏭=0 ❌=0 💥=0 ⚠️=0 ⏱=0 🧱=0 
+$ grep -E '^(计数：|已还原)' research/results/e16-mutate-after-2026-10-04-h487.log
+计数：内存撞顶 0 条（上限 2G）、超时 0 条、排不上 0 条、被总上限挤掉 0 条
+已还原，基线仍全绿
+```
+
+改前 **抓到 17、无效 0、没红 0**（表里 17 条），改后 **抓到 18、无效 0、没红 0**（表里 18 条）；两份各自几栏之和等于各自表的行数，收尾都有「已还原，基线仍全绿」、退出码 0，撞顶、超时、排不上、被挤掉都是 0。登记作废条款 V6（变异表没跑完，只作废「N 条全抓」那句话，不作废产物）不触发：两份都跑完整张表。登记第九节「除两行外其余 16 条两次状态必须相同」：两份日志按变异名逐条比，差异恰是登记写的那两行——改前有、改后没有的「一条记录装旧记录宽的项数（67→72）」，改后有、改前没有的「一条记录装上一代的项数（64→67）」与「一条记录装旧记录宽的项数（64→72）」，其余 16 条两次都是「抓到」；两条新加的都是「抓到」，无效栏没有变多（0 对 0）。
 
 ### 一条推导：组提交与「降低 fsync 频率」在设备写这一侧是同一件事
 
@@ -361,19 +427,19 @@ I-7.4（近 K 代块未被复用）的保护窗口在 2785 发布/秒下塌到�
 
 | 决策分项 | 关系 | 回看 |
 |---|---|---|
-| D23（journal 的角色与格式） 已定项 1 | 支撑 | 2026-09-28 判决 `research/prompts/d23-e16r5-r1-main-verification.md`：定案不受影响，压在『两根轴不正交』这一条结构性依据上，与收益多少无关；G23.2（甲丙差不收敛） 那一格与依据段 E16（journal 的角色：WAL vs 意图日志） 那一条前半句按比值读法、随树高变改写（正文见 D23（journal 的角色与格式） 已定项 1） |
-| D23（journal 的角色与格式） 已定项 17 | 支撑 | 2026-09-28 不受影响：第五次跑只换了几何与记录宽，两条臂「记录点名的东西其父还没写到盘上」这条语义原样保留，没有改动记录格式或校验和的结构 |
-| D10（随机写 / 碎片化的真答案） | 备料 | 2026-09-28 不受影响：第五次跑没有重算 D10（随机写 / 碎片化的真答案） 引用的那个「多流 / ckpt=1000」格；PC1 现跑核对过原装置 56 格与 2026-08-28 逐格一致，那一格的数没变 |
-| D11（索引节点要不要留消息缓冲区） | 备料 | 2026-09-28 不受影响：字节口径与块数口径的排序关系没有在第五次跑里重算 |
-| D13（验证路线） | 不影响 | 2026-09-28 不受影响：只引「独立解析器不许调用被测代码」，与今天宽度下的具体数无关 |
-| D16（发布语义） | 备料 | 2026-09-28 不受影响：「甲下发布率 = fsync 率」是两条臂共有的结构性事实，今天宽度只换了块数，没换这条关系 |
-| D22（单元原子性怎么合成） | 不影响 | 2026-09-28 不受影响：记账块自身的 COW 代价这次仍然没进模型（第五次跑同样只算块数） |
-| D25（目标负载优先级） 已定项 1 | 支撑 | 2026-09-28 不受影响：引的是原装置几何（扇出恒 128、树高恒 4）下四条负载的逐格验证，第五次跑没有重跑负载扫描（只跑了多流一种负载），阳性对照现跑核对过那 56 格没变 |
-| D25（目标负载优先级） 已定项 2 | 支撑 | 2026-09-28 不受影响：引的「一次 fsync 的块数」公式在原装置几何、`arm=intent` 下的验证，阳性对照现跑逐格核对一致，没被这一次改动 |
-| D25（目标负载优先级） 已定项 3 | 支撑 | 2026-09-28 不受影响：批 1 上三条负载的非用户块关系没有在第五次跑里重算 |
-| D25（目标负载优先级） 已定项 4 | 支撑 | 2026-09-28 不受影响：脊柱共享/不相交两类的损失来源没有在第五次跑里重算 |
-| D25（目标负载优先级） 已定项 5 | 支撑 | 2026-09-28 不受影响：块数、屏障、字节三条口径的倍数关系没有在第五次跑里重算（第五次跑只用块数口径） |
-| D4（校验和位置） | 不影响 | 2026-09-28 不受影响：校验和内联进父指针这条结构没有在第五次跑里改动 |
+| D23（journal 的角色与格式） 已定项 1 | 支撑 | 2026-10-04 不受影响：点名项 67 → 64 重跑（登记 research/prompts/e16-r6-prereg.md），G2 上 Q1 仍是流数 2–16 甲行、24–1024 丙行，G1 全丙行，Q3 六行逐字不变；G23.2（甲丙差不收敛） 那一格引的「1 TiB 流数 ≤ 16 先涨后收敛、流数 ≥ 24 从批 = 1 起收敛、流数 64 一行批 1 到批 64 比值 3.500000 降到 3.169231」在新产物里仍成立（那两格在新产物第 1882、1904 行），依据段与 G23.2 那一格不用改；定案压在『两根轴不正交』上，与收益多少无关（2026-09-28 判决 `research/prompts/d23-e16r5-r1-main-verification.md`） |
+| D23（journal 的角色与格式） 已定项 17 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：第六次跑只把乙每条记录装的点名项由 67 换成 64，两条臂「记录点名的东西其父还没写到盘上」这条语义原样保留，没有改动记录格式或校验和的结构 |
+| D10（随机写 / 碎片化的真答案） | 备料 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：第六次跑没有重算 D10（随机写 / 碎片化的真答案） 引用的那个「多流 / ckpt=1000」格；原装置一字没改、不读点名项数，那一格的数没变 |
+| D11（索引节点要不要留消息缓冲区） | 备料 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：字节口径与块数口径的排序关系没有在第六次跑里重算 |
+| D13（验证路线） | 不影响 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：只引「独立解析器不许调用被测代码」，与点名项数无关 |
+| D16（发布语义） | 备料 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：「甲下发布率 = fsync 率」是两条臂共有的结构性事实，第六次跑只换了乙每条记录装的项数，没换这条关系 |
+| D22（单元原子性怎么合成） | 不影响 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：记账块自身的 COW 代价仍然没进模型（第六次跑同样只算块数） |
+| D25（目标负载优先级） 已定项 1 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：引的是原装置几何（扇出恒 128、树高恒 4）下四条负载的逐格验证，第六次跑没有重跑负载扫描（只跑了多流一种负载），原装置一字没改、不读点名项数 |
+| D25（目标负载优先级） 已定项 2 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：引的「一次 fsync 的块数」公式在原装置几何、`arm=intent` 下的验证，原装置一字没改，pc3 产物与登记的那份逐字节相同 |
+| D25（目标负载优先级） 已定项 3 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：批 1 上三条负载的非用户块关系没有在第六次跑里重算 |
+| D25（目标负载优先级） 已定项 4 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：脊柱共享/不相交两类的损失来源没有在第六次跑里重算 |
+| D25（目标负载优先级） 已定项 5 | 支撑 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：块数、屏障、字节三条口径的倍数关系没有在第六次跑里重算（只用块数口径） |
+| D4（校验和位置） | 不影响 | 2026-10-04 不受影响：只补变异三数（整表复跑改后 18/18 抓到，结论、数与产物不变）；2026-10-04 不受影响：校验和内联进父指针这条结构没有在第六次跑里改动 |
 
 ## 历史版本
 
